@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 1.172 $
+ *              $Revision: 1.176 $
  *
  ******************************************************************************/
 
@@ -11,7 +11,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -236,7 +236,7 @@ AcpiGetSleepTypeData (
 
     Info.Parameters = NULL;
     Info.ReturnObject = NULL;
-    SleepStateName = (char *) AcpiGbl_SleepStateNames[SleepState];
+    SleepStateName = ACPI_CAST_PTR (char, AcpiGbl_SleepStateNames[SleepState]);
 
     Status = AcpiNsEvaluateByName (SleepStateName, &Info);
     if (ACPI_FAILURE (Status))
@@ -252,7 +252,7 @@ AcpiGetSleepTypeData (
 
     if (!Info.ReturnObject)
     {
-        ACPI_REPORT_ERROR (("No Sleep State object returned from [%s]\n",
+        ACPI_ERROR ((AE_INFO, "No Sleep State object returned from [%s]",
             SleepStateName));
         Status = AE_NOT_EXIST;
     }
@@ -261,7 +261,7 @@ AcpiGetSleepTypeData (
 
     else if (ACPI_GET_OBJECT_TYPE (Info.ReturnObject) != ACPI_TYPE_PACKAGE)
     {
-        ACPI_REPORT_ERROR (("Sleep State return object is not a Package\n"));
+        ACPI_ERROR ((AE_INFO, "Sleep State return object is not a Package"));
         Status = AE_AML_OPERAND_TYPE;
     }
 
@@ -274,8 +274,8 @@ AcpiGetSleepTypeData (
      */
     else if (Info.ReturnObject->Package.Count < 2)
     {
-        ACPI_REPORT_ERROR ((
-            "Sleep State return package does not have at least two elements\n"));
+        ACPI_ERROR ((AE_INFO,
+            "Sleep State return package does not have at least two elements"));
         Status = AE_AML_NO_OPERAND;
     }
 
@@ -286,8 +286,8 @@ AcpiGetSleepTypeData (
              (ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[1])
                 != ACPI_TYPE_INTEGER))
     {
-        ACPI_REPORT_ERROR ((
-            "Sleep State return package elements are not both Integers (%s, %s)\n",
+        ACPI_ERROR ((AE_INFO,
+            "Sleep State return package elements are not both Integers (%s, %s)",
             AcpiUtGetObjectTypeName (Info.ReturnObject->Package.Elements[0]),
             AcpiUtGetObjectTypeName (Info.ReturnObject->Package.Elements[1])));
         Status = AE_AML_OPERAND_TYPE;
@@ -304,9 +304,8 @@ AcpiGetSleepTypeData (
 
     if (ACPI_FAILURE (Status))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "%s While evaluating SleepState [%s], bad Sleep object %p type %s\n",
-            AcpiFormatException (Status),
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "While evaluating SleepState [%s], bad Sleep object %p type %s",
             SleepStateName, Info.ReturnObject,
             AcpiUtGetObjectTypeName (Info.ReturnObject)));
     }
@@ -332,12 +331,12 @@ ACPI_BIT_REGISTER_INFO *
 AcpiHwGetBitRegisterInfo (
     UINT32                  RegisterId)
 {
-    ACPI_FUNCTION_NAME ("HwGetBitRegisterInfo");
+    ACPI_FUNCTION_ENTRY ();
 
 
     if (RegisterId > ACPI_BITREG_MAX)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid BitRegister ID: %X\n", RegisterId));
+        ACPI_ERROR ((AE_INFO, "Invalid BitRegister ID: %X", RegisterId));
         return (NULL);
     }
 
@@ -452,7 +451,7 @@ AcpiSetRegister (
     BitRegInfo = AcpiHwGetBitRegisterInfo (RegisterId);
     if (!BitRegInfo)
     {
-        ACPI_REPORT_ERROR (("Bad ACPI HW RegisterId: %X\n", RegisterId));
+        ACPI_ERROR ((AE_INFO, "Bad ACPI HW RegisterId: %X", RegisterId));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -680,7 +679,7 @@ AcpiHwRegisterRead (
         break;
 
     default:
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Register ID: %X\n",
+        ACPI_ERROR ((AE_INFO, "Unknown Register ID: %X",
             RegisterId));
         Status = AE_BAD_PARAMETER;
         break;
@@ -894,8 +893,8 @@ AcpiHwLowLevelRead (
 
 
     default:
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Unsupported address space: %X\n", Reg->AddressSpaceId));
+        ACPI_ERROR ((AE_INFO,
+            "Unsupported address space: %X", Reg->AddressSpaceId));
         return (AE_BAD_PARAMETER);
     }
 
@@ -976,8 +975,8 @@ AcpiHwLowLevelWrite (
 
 
     default:
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Unsupported address space: %X\n", Reg->AddressSpaceId));
+        ACPI_ERROR ((AE_INFO,
+            "Unsupported address space: %X", Reg->AddressSpaceId));
         return (AE_BAD_PARAMETER);
     }
 

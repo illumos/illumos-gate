@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actbl.h - Table data structures defined in ACPI specification
- *       $Revision: 1.72 $
+ *       $Revision: 1.74 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -119,6 +119,13 @@
 
 
 /*
+ * Note about bitfields: The UINT8 type is used for bitfields in ACPI tables.
+ * This is the only type that is even remotely portable. Anything else is not
+ * portable, so do not use any other bitfield types.
+ */
+
+
+/*
  *  Values for description table header signatures
  */
 #define RSDP_NAME               "RSDP"
@@ -218,8 +225,8 @@ typedef struct multiple_apic_table
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               PCATCompat      : 1;    /* 00:    System also has dual 8259s */
-    UINT8_BIT                               : 7;    /* 01-07: Reserved, must be zero */
+    UINT8                   PCATCompat      : 1;    /* 00:    System also has dual 8259s */
+    UINT8                                   : 7;    /* 01-07: Reserved, must be zero */
     UINT8                   Reserved1[3];           /* 08-31: Reserved, must be zero */
 
 } MULTIPLE_APIC_TABLE;
@@ -265,14 +272,14 @@ typedef struct apic_header
 /* Common flag definitions (16 bits each) */
 
 #define MPS_INTI_FLAGS \
-    UINT8_BIT               Polarity        : 2;    /* 00-01: Polarity of APIC I/O input signals */\
-    UINT8_BIT               TriggerMode     : 2;    /* 02-03: Trigger mode of APIC input signals */\
-    UINT8_BIT                               : 4;    /* 04-07: Reserved, must be zero */\
+    UINT8                   Polarity        : 2;    /* 00-01: Polarity of APIC I/O input signals */\
+    UINT8                   TriggerMode     : 2;    /* 02-03: Trigger mode of APIC input signals */\
+    UINT8                                   : 4;    /* 04-07: Reserved, must be zero */\
     UINT8                   Reserved1;              /* 08-15: Reserved, must be zero */
 
 #define LOCAL_APIC_FLAGS \
-    UINT8_BIT               ProcessorEnabled: 1;    /* 00:    Processor is usable if set */\
-    UINT8_BIT                               : 7;    /* 01-07: Reserved, must be zero */\
+    UINT8                   ProcessorEnabled: 1;    /* 00:    Processor is usable if set */\
+    UINT8                                   : 7;    /* 01-07: Reserved, must be zero */\
     UINT8                   Reserved2;              /* 08-15: Reserved, must be zero */
 
 /* Sub-structures for MADT */

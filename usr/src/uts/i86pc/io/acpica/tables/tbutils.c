@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 1.70 $
+ *              $Revision: 1.75 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -176,10 +176,8 @@ AcpiTbIsTableInstalled (
          */
         if ((TableDesc->LoadedIntoNamespace) &&
             (TableDesc->Pointer->Length == NewTableDesc->Pointer->Length) &&
-            (!ACPI_MEMCMP (
-                (const char *) TableDesc->Pointer,
-                (const char *) NewTableDesc->Pointer,
-                (ACPI_SIZE) NewTableDesc->Pointer->Length)))
+            (!ACPI_MEMCMP (TableDesc->Pointer, NewTableDesc->Pointer,
+                NewTableDesc->Pointer->Length)))
         {
             /* Match: this table is already installed */
 
@@ -231,15 +229,15 @@ AcpiTbValidateTableHeader (
     ACPI_NAME               Signature;
 
 
-    ACPI_FUNCTION_NAME ("TbValidateTableHeader");
+    ACPI_FUNCTION_ENTRY ();
 
 
     /* Verify that this is a valid address */
 
     if (!AcpiOsReadable (TableHeader, sizeof (ACPI_TABLE_HEADER)))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Cannot read table header at %p\n", TableHeader));
+        ACPI_ERROR ((AE_INFO,
+            "Cannot read table header at %p", TableHeader));
 
         return (AE_BAD_ADDRESS);
     }
@@ -249,12 +247,12 @@ AcpiTbValidateTableHeader (
     ACPI_MOVE_32_TO_32 (&Signature, TableHeader->Signature);
     if (!AcpiUtValidAcpiName (Signature))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Table signature at %p [%p] has invalid characters\n",
+        ACPI_ERROR ((AE_INFO,
+            "Table signature at %p [%p] has invalid characters",
             TableHeader, &Signature));
 
-        ACPI_REPORT_WARNING (("Invalid table signature found: [%4.4s]\n",
-            (char *) &Signature));
+        ACPI_WARNING ((AE_INFO, "Invalid table signature found: [%4.4s]",
+            ACPI_CAST_PTR (char, &Signature)));
 
         ACPI_DUMP_BUFFER (TableHeader, sizeof (ACPI_TABLE_HEADER));
         return (AE_BAD_SIGNATURE);
@@ -264,11 +262,11 @@ AcpiTbValidateTableHeader (
 
     if (TableHeader->Length < sizeof (ACPI_TABLE_HEADER))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Invalid length in table header %p name %4.4s\n",
+        ACPI_ERROR ((AE_INFO,
+            "Invalid length in table header %p name %4.4s",
             TableHeader, (char *) &Signature));
 
-        ACPI_REPORT_WARNING (("Invalid table header length (0x%X) found\n",
+        ACPI_WARNING ((AE_INFO, "Invalid table header length (0x%X) found",
             (UINT32) TableHeader->Length));
 
         ACPI_DUMP_BUFFER (TableHeader, sizeof (ACPI_TABLE_HEADER));
@@ -311,8 +309,8 @@ AcpiTbVerifyTableChecksum (
 
     if (Checksum)
     {
-        ACPI_REPORT_WARNING ((
-            "Invalid checksum in table [%4.4s] (%02X, sum %02X is not zero)\n",
+        ACPI_WARNING ((AE_INFO,
+            "Invalid checksum in table [%4.4s] (%02X, sum %02X is not zero)",
             TableHeader->Signature, (UINT32) TableHeader->Checksum,
             (UINT32) Checksum));
 
@@ -340,23 +338,23 @@ AcpiTbGenerateChecksum (
     void                    *Buffer,
     UINT32                  Length)
 {
-    const UINT8             *limit;
-    const UINT8             *rover;
-    UINT8                   sum = 0;
+    UINT8                   *EndBuffer;
+    UINT8                   *Rover;
+    UINT8                   Sum = 0;
 
 
     if (Buffer && Length)
     {
         /*  Buffer and Length are valid   */
 
-        limit = (UINT8 *) Buffer + Length;
+        EndBuffer = ACPI_ADD_PTR (UINT8, Buffer, Length);
 
-        for (rover = Buffer; rover < limit; rover++)
+        for (Rover = Buffer; Rover < EndBuffer; Rover++)
         {
-            sum = (UINT8) (sum + *rover);
+            Sum = (UINT8) (Sum + *Rover);
         }
     }
-    return (sum);
+    return (Sum);
 }
 
 
@@ -401,7 +399,7 @@ AcpiTbHandleToObject (
         }
     }
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "TableId=%X does not exist\n", TableId));
+    ACPI_ERROR ((AE_INFO, "TableId=%X does not exist", TableId));
     return (AE_BAD_PARAMETER);
 }
 #endif

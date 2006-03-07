@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 1.64 $
+ *              $Revision: 1.67 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -574,7 +574,7 @@ AcpiTbConvertTableFadt (
      */
     if (AcpiGbl_FADT->Length < sizeof (FADT_DESCRIPTOR_REV1))
     {
-        ACPI_REPORT_ERROR (("FADT is invalid, too short: 0x%X\n",
+        ACPI_ERROR ((AE_INFO, "FADT is invalid, too short: 0x%X",
             AcpiGbl_FADT->Length));
         return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
     }
@@ -593,8 +593,8 @@ AcpiTbConvertTableFadt (
         {
             /* Length is too short to be a V2.0 table */
 
-            ACPI_REPORT_WARNING ((
-                "Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table\n",
+            ACPI_WARNING ((AE_INFO,
+                "Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table",
                 AcpiGbl_FADT->Length, AcpiGbl_FADT->Revision));
 
             AcpiTbConvertFadt1 (LocalFadt, (void *) AcpiGbl_FADT);
@@ -625,16 +625,18 @@ AcpiTbConvertTableFadt (
 
     /* Install the new table */
 
-    TableDesc->Pointer      = ACPI_CAST_PTR (ACPI_TABLE_HEADER, AcpiGbl_FADT);
-    TableDesc->Allocation   = ACPI_MEM_ALLOCATED;
-    TableDesc->Length       = sizeof (FADT_DESCRIPTOR_REV2);
+    TableDesc->Pointer    = ACPI_CAST_PTR (ACPI_TABLE_HEADER, AcpiGbl_FADT);
+    TableDesc->Allocation = ACPI_MEM_ALLOCATED;
+    TableDesc->Length     = sizeof (FADT_DESCRIPTOR_REV2);
 
     /* Dump the entire FADT */
 
     ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
         "Hex dump of common internal FADT, size %d (%X)\n",
         AcpiGbl_FADT->Length, AcpiGbl_FADT->Length));
-    ACPI_DUMP_BUFFER ((UINT8 *) (AcpiGbl_FADT), AcpiGbl_FADT->Length);
+
+    ACPI_DUMP_BUFFER (ACPI_CAST_PTR (UINT8, AcpiGbl_FADT),
+        AcpiGbl_FADT->Length);
 
     return_ACPI_STATUS (AE_OK);
 }
@@ -665,15 +667,15 @@ AcpiTbBuildCommonFacs (
 
     if (AcpiGbl_FACS->Length < 24)
     {
-        ACPI_REPORT_ERROR (("Invalid FACS table length: 0x%X\n",
+        ACPI_ERROR ((AE_INFO, "Invalid FACS table length: 0x%X",
             AcpiGbl_FACS->Length));
         return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
     }
 
     if (AcpiGbl_FACS->Length < 64)
     {
-        ACPI_REPORT_WARNING ((
-            "FACS is shorter than the ACPI specification allows: 0x%X, using anyway\n",
+        ACPI_WARNING ((AE_INFO,
+            "FACS is shorter than the ACPI specification allows: 0x%X, using anyway",
             AcpiGbl_FACS->Length));
     }
 

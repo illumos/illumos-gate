@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 1.192 $
+ *              $Revision: 1.196 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -196,9 +196,9 @@ AcpiNsRootInitialize (
 
         if (ACPI_FAILURE (Status) || (!NewNode)) /* Must be on same line for code converter */
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Could not create predefined name %s, %s\n",
-                InitVal->Name, AcpiFormatException (Status)));
+            ACPI_EXCEPTION ((AE_INFO, Status,
+                "Could not create predefined name %s",
+                InitVal->Name));
         }
 
         /*
@@ -211,8 +211,8 @@ AcpiNsRootInitialize (
             Status = AcpiOsPredefinedOverride (InitVal, &Val);
             if (ACPI_FAILURE (Status))
             {
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Could not override predefined %s\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Could not override predefined %s",
                     InitVal->Name));
             }
 
@@ -318,7 +318,7 @@ AcpiNsRootInitialize (
 
             default:
 
-                ACPI_REPORT_ERROR (("Unsupported initial type value %X\n",
+                ACPI_ERROR ((AE_INFO, "Unsupported initial type value %X",
                     InitVal->Type));
                 AcpiUtRemoveReference (ObjDesc);
                 ObjDesc = NULL;
@@ -434,8 +434,8 @@ AcpiNsLookup (
         PrefixNode = ScopeInfo->Scope.Node;
         if (ACPI_GET_DESCRIPTOR_TYPE (PrefixNode) != ACPI_DESC_TYPE_NAMED)
         {
-            ACPI_REPORT_ERROR (("NsLookup: %p is not a namespace node [%s]\n",
-                    PrefixNode, AcpiUtGetDescriptorName (PrefixNode)));
+            ACPI_ERROR ((AE_INFO, "%p is not a namespace node [%s]",
+                PrefixNode, AcpiUtGetDescriptorName (PrefixNode)));
             return_ACPI_STATUS (AE_AML_INTERNAL);
         }
 
@@ -462,9 +462,9 @@ AcpiNsLookup (
     {
         /* A Null NamePath is allowed and refers to the root */
 
-        NumSegments  = 0;
-        ThisNode     = AcpiGbl_RootNode;
-        Path     = "";
+        NumSegments = 0;
+        ThisNode = AcpiGbl_RootNode;
+        Path = "";
 
         ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
             "Null Pathname (Zero segments), Flags=%X\n", Flags));
@@ -531,8 +531,8 @@ AcpiNsLookup (
                 {
                     /* Current scope has no parent scope */
 
-                    ACPI_REPORT_ERROR (
-                        ("ACPI path has too many parent prefixes (^) - reached beyond root node\n"));
+                    ACPI_ERROR ((AE_INFO,
+                        "ACPI path has too many parent prefixes (^) - reached beyond root node"));
                     return_ACPI_STATUS (AE_NOT_FOUND);
                 }
             }
@@ -696,19 +696,20 @@ AcpiNsLookup (
          *
          * Then we have a type mismatch.  Just warn and ignore it.
          */
-        if ((NumSegments        == 0)                               &&
-            (TypeToCheckFor     != ACPI_TYPE_ANY)                   &&
-            (TypeToCheckFor     != ACPI_TYPE_LOCAL_ALIAS)           &&
-            (TypeToCheckFor     != ACPI_TYPE_LOCAL_METHOD_ALIAS)    &&
-            (TypeToCheckFor     != ACPI_TYPE_LOCAL_SCOPE)           &&
-            (ThisNode->Type     != ACPI_TYPE_ANY)                   &&
-            (ThisNode->Type     != TypeToCheckFor))
+        if ((NumSegments == 0)                                  &&
+            (TypeToCheckFor != ACPI_TYPE_ANY)                   &&
+            (TypeToCheckFor != ACPI_TYPE_LOCAL_ALIAS)           &&
+            (TypeToCheckFor != ACPI_TYPE_LOCAL_METHOD_ALIAS)    &&
+            (TypeToCheckFor != ACPI_TYPE_LOCAL_SCOPE)           &&
+            (ThisNode->Type != ACPI_TYPE_ANY)                   &&
+            (ThisNode->Type != TypeToCheckFor))
         {
             /* Complain about a type mismatch */
 
-            ACPI_REPORT_WARNING (
-                ("NsLookup: Type mismatch on %4.4s (%s), searching for (%s)\n",
-                (char *) &SimpleName, AcpiUtGetTypeName (ThisNode->Type),
+            ACPI_WARNING ((AE_INFO,
+                "NsLookup: Type mismatch on %4.4s (%s), searching for (%s)",
+                ACPI_CAST_PTR (char, &SimpleName),
+                AcpiUtGetTypeName (ThisNode->Type),
                 AcpiUtGetTypeName (TypeToCheckFor)));
         }
 

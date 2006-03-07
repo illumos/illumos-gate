@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 1.104 $
+ *              $Revision: 1.106 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -407,8 +407,7 @@ AcpiGetObjectInfo (
         Status = AcpiUtExecute_CID (Node, &CidList);
         if (ACPI_SUCCESS (Status))
         {
-            Size += ((ACPI_SIZE) CidList->Count - 1) *
-                                 sizeof (ACPI_COMPATIBLE_ID);
+            Size += CidList->Size;
             Info->Valid |= ACPI_VALID_CID;
         }
 

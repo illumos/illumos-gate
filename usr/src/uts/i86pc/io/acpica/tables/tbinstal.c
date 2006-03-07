@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 1.80 $
+ *              $Revision: 1.82 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -222,8 +222,7 @@ AcpiTbInstallTable (
     Status = AcpiUtAcquireMutex (ACPI_MTX_TABLES);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_REPORT_ERROR (("Could not acquire table mutex, %s\n",
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status, "Could not acquire table mutex"));
         return_ACPI_STATUS (Status);
     }
 
@@ -242,8 +241,8 @@ AcpiTbInstallTable (
     Status = AcpiTbInitTableDescriptor (TableInfo->Type, TableInfo);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_REPORT_ERROR (("Could not install table [%4.4s], %s\n",
-            TableInfo->Pointer->Signature, AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status, "Could not install table [%4.4s]",
+            TableInfo->Pointer->Signature));
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s located at %p\n",

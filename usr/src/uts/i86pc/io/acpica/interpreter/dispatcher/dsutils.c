@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 1.115 $
+ *              $Revision: 1.119 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -272,7 +272,7 @@ AcpiDsIsResultUsed (
 
     if (!Op)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Op\n"));
+        ACPI_ERROR ((AE_INFO, "Null Op"));
         return_UINT8 (TRUE);
     }
 
@@ -311,8 +311,8 @@ AcpiDsIsResultUsed (
     ParentInfo = AcpiPsGetOpcodeInfo (Op->Common.Parent->Common.AmlOpcode);
     if (ParentInfo->Class == AML_CLASS_UNKNOWN)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Unknown parent opcode. Op=%p\n", Op));
+        ACPI_ERROR ((AE_INFO,
+            "Unknown parent opcode Op=%p", Op));
         return_UINT8 (FALSE);
     }
 
@@ -447,7 +447,7 @@ AcpiDsDeleteResultIfNotUsed (
 
     if (!Op)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Op\n"));
+        ACPI_ERROR ((AE_INFO, "Null Op"));
         return_VOID;
     }
 
@@ -620,7 +620,7 @@ AcpiDsCreateOperand (
          */
         if ((WalkState->DeferredNode) &&
             (WalkState->DeferredNode->Type == ACPI_TYPE_BUFFER_FIELD) &&
-            (ArgIndex != 0))
+            (ArgIndex == (UINT32) ((WalkState->Opcode == AML_CREATE_FIELD_OP) ? 3 : 2)))
         {
             ObjDesc = ACPI_CAST_PTR (
                         ACPI_OPERAND_OBJECT, WalkState->DeferredNode);
@@ -687,7 +687,7 @@ AcpiDsCreateOperand (
 
             if (ACPI_FAILURE (Status))
             {
-                ACPI_REPORT_NSERROR (NameString, Status);
+                ACPI_ERROR_NAMESPACE (NameString, Status);
             }
         }
 
@@ -760,9 +760,8 @@ AcpiDsCreateOperand (
                  * Only error is underflow, and this indicates
                  * a missing or null operand!
                  */
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Missing or null operand, %s\n",
-                    AcpiFormatException (Status)));
+                ACPI_EXCEPTION ((AE_INFO, Status,
+                    "Missing or null operand"));
                 return_ACPI_STATUS (Status);
             }
         }
@@ -861,8 +860,8 @@ Cleanup:
      */
     (void) AcpiDsObjStackPopAndDelete (ArgCount, WalkState);
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While creating Arg %d - %s\n",
-        (ArgCount + 1), AcpiFormatException (Status)));
+    ACPI_EXCEPTION ((AE_INFO, Status, "While creating Arg %d",
+        (ArgCount + 1)));
     return_ACPI_STATUS (Status);
 }
 

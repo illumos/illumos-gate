@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 1.37 $
+ *       $Revision: 1.39 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -140,7 +140,7 @@
 
 typedef struct acpi_walk_state
 {
-    UINT8                       DataType;                           /* To differentiate various internal objs MUST BE FIRST!*/\
+    UINT8                       DataType;                           /* To differentiate various internal objs MUST BE FIRST!*/
     UINT8                       WalkType;
     ACPI_OWNER_ID               OwnerId;                            /* Owner of objects created during the walk */
     BOOLEAN                     LastPredicate;                      /* Result of last predicate */

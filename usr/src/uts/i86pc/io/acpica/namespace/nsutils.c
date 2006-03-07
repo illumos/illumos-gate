@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 1.141 $
+ *              $Revision: 1.148 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -144,7 +144,6 @@ AcpiNsFindParentName (
  *
  * PARAMETERS:  ModuleName          - Caller's module name (for error output)
  *              LineNumber          - Caller's line number (for error output)
- *              ComponentId         - Caller's component ID (for error output)
  *              InternalName        - Name or path of the namespace node
  *              LookupStatus        - Exception code from NS lookup
  *
@@ -158,23 +157,22 @@ void
 AcpiNsReportError (
     char                    *ModuleName,
     UINT32                  LineNumber,
-    UINT32                  ComponentId,
     char                    *InternalName,
     ACPI_STATUS             LookupStatus)
 {
     ACPI_STATUS             Status;
+    UINT32                  BadName;
     char                    *Name = NULL;
 
 
-    AcpiOsPrintf ("%8s-%04d: *** Error: Looking up ",
-        ModuleName, LineNumber);
+    AcpiUtReportError (ModuleName, LineNumber);
 
     if (LookupStatus == AE_BAD_CHARACTER)
     {
         /* There is a non-ascii character in the name */
 
-        AcpiOsPrintf ("[0x%4.4X] (NON-ASCII)\n",
-            *(ACPI_CAST_PTR (UINT32, InternalName)));
+        ACPI_MOVE_32_TO_32 (&BadName, InternalName);
+        AcpiOsPrintf ("[0x%4.4X] (NON-ASCII)", BadName);
     }
     else
     {
@@ -200,7 +198,7 @@ AcpiNsReportError (
         }
     }
 
-    AcpiOsPrintf (" in namespace, %s\n",
+    AcpiOsPrintf (" Namespace lookup failure, %s\n",
         AcpiFormatException (LookupStatus));
 }
 
@@ -211,10 +209,9 @@ AcpiNsReportError (
  *
  * PARAMETERS:  ModuleName          - Caller's module name (for error output)
  *              LineNumber          - Caller's line number (for error output)
- *              ComponentId         - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *              PrefixNode          - Prefix relative to the path
- *              Path                - Path to the node
+ *              Path                - Path to the node (optional)
  *              MethodStatus        - Execution status
  *
  * RETURN:      None
@@ -227,7 +224,6 @@ void
 AcpiNsReportMethodError (
     char                    *ModuleName,
     UINT32                  LineNumber,
-    UINT32                  ComponentId,
     char                    *Message,
     ACPI_NAMESPACE_NODE     *PrefixNode,
     char                    *Path,
@@ -237,18 +233,18 @@ AcpiNsReportMethodError (
     ACPI_NAMESPACE_NODE     *Node = PrefixNode;
 
 
+    AcpiUtReportError (ModuleName, LineNumber);
+
     if (Path)
     {
         Status = AcpiNsGetNodeByPath (Path, PrefixNode,
                     ACPI_NS_NO_UPSEARCH, &Node);
         if (ACPI_FAILURE (Status))
         {
-            AcpiOsPrintf ("ReportMethodError: Could not get node\n");
-            return;
+            AcpiOsPrintf ("[Could not get node by pathname]");
         }
     }
 
-    AcpiOsPrintf ("%8s-%04d: *** Error: ", ModuleName, LineNumber);
     AcpiNsPrintNodePathname (Node, Message);
     AcpiOsPrintf (", %s\n", AcpiFormatException (MethodStatus));
 }
@@ -362,7 +358,7 @@ AcpiNsGetType (
 
     if (!Node)
     {
-        ACPI_REPORT_WARNING (("NsGetType: Null Node input pointer\n"));
+        ACPI_WARNING ((AE_INFO, "Null Node parameter"));
         return_UINT32 (ACPI_TYPE_ANY);
     }
 
@@ -394,7 +390,7 @@ AcpiNsLocal (
     {
         /* Type code out of range  */
 
-        ACPI_REPORT_WARNING (("NsLocal: Invalid Object Type\n"));
+        ACPI_WARNING ((AE_INFO, "Invalid Object Type %X", Type));
         return_UINT32 (ACPI_NS_NORMAL);
     }
 
@@ -811,7 +807,7 @@ AcpiNsExternalizeName (
      */
     if (RequiredLength > InternalNameLength)
     {
-        ACPI_REPORT_ERROR (("NsExternalizeName: Invalid internal name\n"));
+        ACPI_ERROR ((AE_INFO, "Invalid internal name"));
         return_ACPI_STATUS (AE_BAD_PATHNAME);
     }
 
@@ -1017,7 +1013,7 @@ AcpiNsOpensScope (
     {
         /* type code out of range  */
 
-        ACPI_REPORT_WARNING (("NsOpensScope: Invalid Object Type %X\n", Type));
+        ACPI_WARNING ((AE_INFO, "Invalid Object Type %X", Type));
         return_UINT32 (ACPI_NS_NORMAL);
     }
 

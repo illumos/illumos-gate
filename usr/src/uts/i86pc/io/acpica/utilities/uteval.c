@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 1.59 $
+ *              $Revision: 1.64 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -184,7 +184,7 @@ AcpiUtOsiImplementation (
     for (i = 0; i < ACPI_NUM_OSI_STRINGS; i++)
     {
         if (!ACPI_STRCMP (StringDesc->String.Pointer,
-                            (char *) AcpiGbl_ValidOsiStrings[i]))
+                ACPI_CAST_PTR (char, AcpiGbl_ValidOsiStrings[i])))
         {
             /* This string is supported */
 
@@ -248,7 +248,7 @@ AcpiUtEvaluateObject (
         }
         else
         {
-            ACPI_REPORT_METHOD_ERROR ("Method execution failed",
+            ACPI_ERROR_METHOD ("Method execution failed",
                 PrefixNode, Path, Status);
         }
 
@@ -261,7 +261,7 @@ AcpiUtEvaluateObject (
     {
         if (ExpectedReturnBtypes)
         {
-            ACPI_REPORT_METHOD_ERROR ("No object was returned from",
+            ACPI_ERROR_METHOD ("No object was returned from",
                 PrefixNode, Path, AE_NOT_EXIST);
 
             return_ACPI_STATUS (AE_NOT_EXIST);
@@ -311,11 +311,11 @@ AcpiUtEvaluateObject (
 
     if (!(ExpectedReturnBtypes & ReturnBtype))
     {
-        ACPI_REPORT_METHOD_ERROR ("Return object type is incorrect",
+        ACPI_ERROR_METHOD ("Return object type is incorrect",
             PrefixNode, Path, AE_TYPE);
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Type returned from %s was incorrect: %s, expected Btypes: %X\n",
+        ACPI_ERROR ((AE_INFO,
+            "Type returned from %s was incorrect: %s, expected Btypes: %X",
             Path, AcpiUtGetObjectTypeName (Info.ReturnObject),
             ExpectedReturnBtypes));
 
@@ -737,7 +737,7 @@ AcpiUtExecute_STA (
                 "_STA on %4.4s was not found, assuming device is present\n",
                 AcpiUtGetNodeName (DeviceNode)));
 
-            *Flags = 0x0F;
+            *Flags = ACPI_UINT32_MAX;
             Status = AE_OK;
         }
 
@@ -788,7 +788,7 @@ AcpiUtExecute_Sxds (
     {
         Highest[i] = 0xFF;
         Status = AcpiUtEvaluateObject (DeviceNode,
-                    (char *) AcpiGbl_HighestDstateNames[i],
+                    ACPI_CAST_PTR (char, AcpiGbl_HighestDstateNames[i]),
                     ACPI_BTYPE_INTEGER, &ObjDesc);
         if (ACPI_FAILURE (Status))
         {
@@ -796,7 +796,7 @@ AcpiUtExecute_Sxds (
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
                     "%s on Device %4.4s, %s\n",
-                    (char *) AcpiGbl_HighestDstateNames[i],
+                    ACPI_CAST_PTR (char, AcpiGbl_HighestDstateNames[i]),
                     AcpiUtGetNodeName (DeviceNode),
                     AcpiFormatException (Status)));
 

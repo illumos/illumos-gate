@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbrsdt - ACPI RSDT table utilities
- *              $Revision: 1.20 $
+ *              $Revision: 1.23 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -272,7 +272,7 @@ AcpiTbValidateRsdt (
     int                     NoMatch;
 
 
-    ACPI_FUNCTION_NAME ("TbValidateRsdt");
+    ACPI_FUNCTION_ENTRY ();
 
 
     /*
@@ -293,27 +293,26 @@ AcpiTbValidateRsdt (
     {
         /* Invalid RSDT or XSDT signature */
 
-        ACPI_REPORT_ERROR ((
-            "Invalid signature where RSDP indicates RSDT/XSDT should be located\n"));
+        ACPI_ERROR ((AE_INFO,
+            "Invalid signature where RSDP indicates RSDT/XSDT should be located. RSDP:"));
 
         ACPI_DUMP_BUFFER (AcpiGbl_RSDP, 20);
 
-        ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR,
-            "RSDT/XSDT signature at %X (%p) is invalid\n",
+        ACPI_ERROR ((AE_INFO,
+            "RSDT/XSDT signature at %X (%p) is invalid",
             AcpiGbl_RSDP->RsdtPhysicalAddress,
             (void *) (ACPI_NATIVE_UINT) AcpiGbl_RSDP->RsdtPhysicalAddress));
 
         if (AcpiGbl_RootTableType == ACPI_TABLE_TYPE_RSDT)
         {
-            ACPI_REPORT_ERROR (("Looking for RSDT\n"))
+            ACPI_ERROR ((AE_INFO, "Looking for RSDT"));
         }
         else
         {
-            ACPI_REPORT_ERROR (("Looking for XSDT\n"))
+            ACPI_ERROR ((AE_INFO, "Looking for XSDT"));
         }
 
         ACPI_DUMP_BUFFER ((char *) TablePtr, 48);
-
         return (AE_BAD_SIGNATURE);
     }
 
@@ -353,9 +352,7 @@ AcpiTbGetTableRsdt (
     Status = AcpiTbGetTable (&Address, &TableInfo);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not get the RSDT/XSDT, %s\n",
-            AcpiFormatException (Status)));
-
+        ACPI_EXCEPTION ((AE_INFO, Status, "Could not get the RSDT/XSDT"));
         return_ACPI_STATUS (Status);
     }
 

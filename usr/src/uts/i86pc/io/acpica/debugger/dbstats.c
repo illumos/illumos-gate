@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbstats - Generation and display of ACPI table statistics
- *              $Revision: 1.79 $
+ *              $Revision: 1.81 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -464,7 +464,7 @@ AcpiDbDisplayStatistics (
 
     if (!AcpiGbl_DSDT)
     {
-        AcpiOsPrintf ("*** Warning:  There is no DSDT loaded\n");
+        AcpiOsPrintf ("*** Warning: There is no DSDT loaded\n");
     }
 
     if (!TypeArg)

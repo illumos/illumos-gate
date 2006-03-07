@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 1.130 $
+ *       $Revision: 1.133 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -143,7 +143,7 @@
     UINT8                           Type;               /* ACPI_OBJECT_TYPE */\
     UINT16                          ReferenceCount;     /* For object deletion management */\
     union acpi_operand_object       *NextObject;        /* Objects linked to parent NS node */\
-    UINT8                           Flags; \
+    UINT8                           Flags;
 
 /* Values for flag byte above */
 
@@ -589,7 +589,7 @@ typedef union acpi_operand_object
 
 typedef union acpi_descriptor
 {
-    UINT8                           DescriptorId;   /* To differentiate various internal objs */\
+    UINT8                           DescriptorId;   /* To differentiate various internal objs */
     ACPI_OPERAND_OBJECT             Object;
     ACPI_NAMESPACE_NODE             Node;
     ACPI_PARSE_OBJECT               Op;

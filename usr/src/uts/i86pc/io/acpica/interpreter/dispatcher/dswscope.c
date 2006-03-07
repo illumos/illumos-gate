@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 1.63 $
+ *              $Revision: 1.66 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -193,7 +193,7 @@ AcpiDsScopeStackPush (
     {
         /* Invalid scope   */
 
-        ACPI_REPORT_ERROR (("DsScopeStackPush: null scope passed\n"));
+        ACPI_ERROR ((AE_INFO, "Null scope parameter"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -201,8 +201,8 @@ AcpiDsScopeStackPush (
 
     if (!AcpiUtValidObjectType (Type))
     {
-        ACPI_REPORT_WARNING ((
-            "DsScopeStackPush: Invalid object type: 0x%X\n", Type));
+        ACPI_WARNING ((AE_INFO,
+            "Invalid object type: 0x%X", Type));
     }
 
     /* Allocate a new scope object */

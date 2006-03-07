@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmutex - local mutex support
- *              $Revision: 1.3 $
+ *              $Revision: 1.6 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -330,15 +330,15 @@ AcpiUtAcquireMutex (
             {
                 if (i == MutexId)
                 {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Mutex [%s] already acquired by this thread [%X]\n",
+                    ACPI_ERROR ((AE_INFO,
+                        "Mutex [%s] already acquired by this thread [%X]",
                         AcpiUtGetMutexName (MutexId), ThisThreadId));
 
                     return (AE_ALREADY_ACQUIRED);
                 }
 
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Invalid acquire order: Thread %X owns [%s], wants [%s]\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Invalid acquire order: Thread %X owns [%s], wants [%s]",
                     ThisThreadId, AcpiUtGetMutexName (i),
                     AcpiUtGetMutexName (MutexId)));
 
@@ -364,10 +364,8 @@ AcpiUtAcquireMutex (
     }
     else
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Thread %X could not acquire Mutex [%s] %s\n",
-                ThisThreadId, AcpiUtGetMutexName (MutexId),
-                AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "Thread %X could not acquire Mutex [%X]", ThisThreadId, MutexId));
     }
 
     return (Status);
@@ -412,9 +410,8 @@ AcpiUtReleaseMutex (
      */
     if (AcpiGbl_MutexInfo[MutexId].ThreadId == ACPI_MUTEX_NOT_ACQUIRED)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Mutex [%s] is not acquired, cannot release\n",
-            AcpiUtGetMutexName (MutexId)));
+        ACPI_ERROR ((AE_INFO,
+            "Mutex [%X] is not acquired, cannot release", MutexId));
 
         return (AE_NOT_ACQUIRED);
     }
@@ -439,8 +436,8 @@ AcpiUtReleaseMutex (
                     continue;
                 }
 
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Invalid release order: owns [%s], releasing [%s]\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Invalid release order: owns [%s], releasing [%s]",
                     AcpiUtGetMutexName (i), AcpiUtGetMutexName (MutexId)));
 
                 return (AE_RELEASE_DEADLOCK);
@@ -457,10 +454,8 @@ AcpiUtReleaseMutex (
 
     if (ACPI_FAILURE (Status))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Thread %X could not release Mutex [%s] %s\n",
-            ThisThreadId, AcpiUtGetMutexName (MutexId),
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "Thread %X could not release Mutex [%X]", ThisThreadId, MutexId));
     }
     else
     {

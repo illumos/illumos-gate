@@ -773,7 +773,8 @@ acpi_get_possible_irq_resources(acpi_psm_lnk_t *acpipsmlnkp,
 	int status;
 
 	int i, el, po, irqlist_len;
-	uint32_t *irqlist, *tmplist;
+	uint32_t *irqlist;
+	void *tmplist;
 	iflag_t intr_flags;
 
 	ASSERT(acpipsmlnkp != NULL);
@@ -809,11 +810,21 @@ acpi_get_possible_irq_resources(acpi_psm_lnk_t *acpipsmlnkp,
 		default:
 			continue;
 		}
+
+		if (resp->Type != ACPI_RESOURCE_TYPE_IRQ &&
+		    resp->Type != ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
+			cmn_err(CE_WARN, "!psm: get_irq: no IRQ resource");
+			return (ACPI_PSM_FAILURE);
+		}
+
 		/* NEEDSWORK: move this into add_irqlist_entry someday */
 		irqlist = kmem_zalloc(irqlist_len * sizeof (*irqlist),
 					    KM_SLEEP);
 		for (i = 0; i < irqlist_len; i++)
-			irqlist[i] = tmplist[i];
+			if (resp->Type == ACPI_RESOURCE_TYPE_IRQ)
+				irqlist[i] = ((uint8_t *)tmplist)[i];
+			else
+				irqlist[i] = ((uint32_t *)tmplist)[i];
 		intr_flags.intr_el = psm_acpi_edgelevel(el);
 		intr_flags.intr_po = psm_acpi_po(po);
 		acpi_add_irqlist_entry(irqlistp, irqlist, irqlist_len,

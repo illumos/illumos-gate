@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 1.131 $
+ *              $Revision: 1.140 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -166,11 +166,23 @@ static ACPI_NAMESPACE_NODE *
 AcpiDbConvertToNode (
     char                    *InString);
 
+static void
+AcpiDmCompareAmlResources (
+    UINT8                   *Aml1Buffer,
+    ACPI_RSDESC_SIZE        Aml1BufferLength,
+    UINT8                   *Aml2Buffer,
+    ACPI_RSDESC_SIZE        Aml2BufferLength);
+
+static ACPI_STATUS
+AcpiDmTestResourceConversion (
+    ACPI_NAMESPACE_NODE     *Node,
+    char                    *Name);
+
+
 /*
  * Arguments for the Objects command
  * These object types map directly to the ACPI_TYPES
  */
-
 static ARGUMENT_INFO        AcpiDbObjectTypes [] =
 {
     {"ANY"},
@@ -189,6 +201,12 @@ static ARGUMENT_INFO        AcpiDbObjectTypes [] =
     {"THERMALZONES"},
     {"BUFFERFIELDS"},
     {"DDBHANDLES"},
+    {"DEBUG"},
+    {"REGIONFIELDS"},
+    {"BANKFIELDS"},
+    {"INDEXFIELDS"},
+    {"REFERENCES"},
+    {"ALIAS"},
     {NULL}           /* Must be null terminated */
 };
 
@@ -919,14 +937,14 @@ AcpiDbSetMethodData (
         if (Index > ACPI_METHOD_MAX_ARG)
         {
             AcpiOsPrintf ("Arg%d - Invalid argument name\n", Index);
-            return;
+            goto Cleanup;
         }
 
         Status = AcpiDsStoreObjectToLocal (AML_ARG_OP, Index, ObjDesc,
                     WalkState);
         if (ACPI_FAILURE (Status))
         {
-            return;
+            goto Cleanup;
         }
 
         ObjDesc = WalkState->Arguments[Index].Object;
@@ -942,14 +960,14 @@ AcpiDbSetMethodData (
         if (Index > ACPI_METHOD_MAX_LOCAL)
         {
             AcpiOsPrintf ("Local%d - Invalid local variable name\n", Index);
-            return;
+            goto Cleanup;
         }
 
         Status = AcpiDsStoreObjectToLocal (AML_LOCAL_OP, Index, ObjDesc,
                     WalkState);
         if (ACPI_FAILURE (Status))
         {
-            return;
+            goto Cleanup;
         }
 
         ObjDesc = WalkState->LocalVariables[Index].Object;
@@ -961,6 +979,9 @@ AcpiDbSetMethodData (
     default:
         break;
     }
+
+Cleanup:
+    AcpiUtRemoveReference (ObjDesc);
 }
 
 
@@ -1238,6 +1259,176 @@ ErrorExit:
 
 /*******************************************************************************
  *
+ * FUNCTION:    AcpiDmCompareAmlResources
+ *
+ * PARAMETERS:  Aml1Buffer          - Contains first resource list
+ *              Aml1BufferLength    - Length of first resource list
+ *              Aml2Buffer          - Contains second resource list
+ *              Aml2BufferLength    - Length of second resource list
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Compare two AML resource lists, descriptor by descriptor (in
+ *              order to isolate a miscompare to an individual resource)
+ *
+ ******************************************************************************/
+
+static void
+AcpiDmCompareAmlResources (
+    UINT8                   *Aml1Buffer,
+    ACPI_RSDESC_SIZE        Aml1BufferLength,
+    UINT8                   *Aml2Buffer,
+    ACPI_RSDESC_SIZE        Aml2BufferLength)
+{
+    UINT8                   *Aml1;
+    UINT8                   *Aml2;
+    ACPI_RSDESC_SIZE        Aml1Length;
+    ACPI_RSDESC_SIZE        Aml2Length;
+    ACPI_RSDESC_SIZE        Offset = 0;
+    UINT8                   ResourceType;
+    UINT32                  Count = 0;
+
+
+    /* Compare overall buffer sizes (may be different due to size rounding) */
+
+    if (Aml1BufferLength != Aml2BufferLength)
+    {
+        AcpiOsPrintf (
+            "**** Buffer length mismatch in converted AML: original %X new %X ****\n",
+            Aml1BufferLength, Aml2BufferLength);
+    }
+
+    Aml1 = Aml1Buffer;
+    Aml2 = Aml2Buffer;
+
+    /* Walk the descriptor lists, comparing each descriptor */
+
+    while (Aml1 < (Aml1Buffer + Aml1BufferLength))
+    {
+        /* Get the lengths of each descriptor */
+
+        Aml1Length = AcpiUtGetDescriptorLength (Aml1);
+        Aml2Length = AcpiUtGetDescriptorLength (Aml2);
+        ResourceType = AcpiUtGetResourceType (Aml1);
+
+        /* Check for descriptor length match */
+
+        if (Aml1Length != Aml2Length)
+        {
+            AcpiOsPrintf (
+                "**** Length mismatch in descriptor [%.2X] type %2.2X, Offset %8.8X L1 %X L2 %X ****\n",
+                Count, ResourceType, Offset, Aml1Length, Aml2Length);
+        }
+
+        /* Check for descriptor byte match */
+
+        else if (ACPI_MEMCMP (Aml1, Aml2, Aml1Length))
+        {
+            AcpiOsPrintf (
+                "**** Data mismatch in descriptor [%.2X] type %2.2X, Offset %8.8X ****\n",
+                Count, ResourceType, Offset);
+        }
+
+        /* Exit on EndTag descriptor */
+
+        if (ResourceType == ACPI_RESOURCE_NAME_END_TAG)
+        {
+            return;
+        }
+
+        /* Point to next descriptor in each buffer */
+
+        Count++;
+        Offset += Aml1Length;
+        Aml1 += Aml1Length;
+        Aml2 += Aml2Length;
+    }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDmTestResourceConversion
+ *
+ * PARAMETERS:  Node            - Parent device node
+ *              Name            - resource method name (_CRS)
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Compare the original AML with a conversion of the AML to
+ *              internal resource list, then back to AML.
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDmTestResourceConversion (
+    ACPI_NAMESPACE_NODE     *Node,
+    char                    *Name)
+{
+    ACPI_STATUS             Status;
+    ACPI_BUFFER             ReturnObj;
+    ACPI_BUFFER             ResourceObj;
+    ACPI_BUFFER             NewAml;
+    ACPI_OBJECT             *OriginalAml;
+
+
+    AcpiOsPrintf ("Resource Conversion Comparison:\n");
+
+    NewAml.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+    ReturnObj.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+    ResourceObj.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+    /* Get the original _CRS AML resource template */
+
+    Status = AcpiEvaluateObject (Node, Name, NULL, &ReturnObj);
+    if (ACPI_FAILURE (Status))
+    {
+        AcpiOsPrintf ("Could not obtain %s: %s\n",
+            Name, AcpiFormatException (Status));
+        return (Status);
+    }
+
+    /* Get the AML resource template, converted to internal resource structs */
+
+    Status = AcpiGetCurrentResources (Node, &ResourceObj);
+    if (ACPI_FAILURE (Status))
+    {
+        AcpiOsPrintf ("AcpiGetCurrentResources failed: %s\n",
+            AcpiFormatException (Status));
+        goto Exit1;
+    }
+
+    /* Convert internal resource list to external AML resource template */
+
+    Status = AcpiRsCreateAmlResources (ResourceObj.Pointer, &NewAml);
+    if (ACPI_FAILURE (Status))
+    {
+        AcpiOsPrintf ("AcpiRsCreateAmlResources failed: %s\n",
+            AcpiFormatException (Status));
+        goto Exit2;
+    }
+
+    /* Compare original AML to the newly created AML resource list */
+
+    OriginalAml = ReturnObj.Pointer;
+
+    AcpiDmCompareAmlResources (
+        OriginalAml->Buffer.Pointer, OriginalAml->Buffer.Length,
+        NewAml.Pointer, NewAml.Length);
+
+    /* Cleanup and exit */
+
+    ACPI_MEM_FREE (NewAml.Pointer);
+Exit2:
+    ACPI_MEM_FREE (ResourceObj.Pointer);
+Exit1:
+    ACPI_MEM_FREE (ReturnObj.Pointer);
+    return (Status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    AcpiDbDisplayResources
  *
  * PARAMETERS:  ObjectArg       - String with hex value of the object
@@ -1272,12 +1463,14 @@ AcpiDbDisplayResources (
 
     /* Prepare for a return object of arbitrary size */
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
 
     /* _PRT */
 
     AcpiOsPrintf ("Evaluating _PRT\n");
+
+    /* Check if _PRT exists */
 
     Status = AcpiEvaluateObject (Node, METHOD_NAME__PRT, NULL, &ReturnObj);
     if (ACPI_FAILURE (Status))
@@ -1287,19 +1480,18 @@ AcpiDbDisplayResources (
         goto GetCrs;
     }
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
 
     Status = AcpiGetIrqRoutingTable (Node, &ReturnObj);
     if (ACPI_FAILURE (Status))
     {
         AcpiOsPrintf ("GetIrqRoutingTable failed: %s\n",
             AcpiFormatException (Status));
+        goto GetCrs;
     }
-    else
-    {
-        AcpiRsDumpIrqList ((UINT8 *) AcpiGbl_DbBuffer);
-    }
+
+    AcpiRsDumpIrqList (ACPI_CAST_PTR (UINT8, AcpiGbl_DbBuffer));
 
 
     /* _CRS */
@@ -1307,8 +1499,10 @@ AcpiDbDisplayResources (
 GetCrs:
     AcpiOsPrintf ("Evaluating _CRS\n");
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
+
+    /* Check if _CRS exists */
 
     Status = AcpiEvaluateObject (Node, METHOD_NAME__CRS, NULL, &ReturnObj);
     if (ACPI_FAILURE (Status))
@@ -1318,8 +1512,10 @@ GetCrs:
         goto GetPrs;
     }
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    /* Get the _CRS resource list */
+
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
 
     Status = AcpiGetCurrentResources (Node, &ReturnObj);
     if (ACPI_FAILURE (Status))
@@ -1328,11 +1524,19 @@ GetCrs:
             AcpiFormatException (Status));
         goto GetPrs;
     }
-    else
-    {
-        AcpiRsDumpResourceList (ACPI_CAST_PTR (ACPI_RESOURCE,
-            AcpiGbl_DbBuffer));
-    }
+
+    /* Dump the _CRS resource list */
+
+    AcpiRsDumpResourceList (ACPI_CAST_PTR (ACPI_RESOURCE,
+        ReturnObj.Pointer));
+
+    /*
+     * Perform comparison of original AML to newly created AML. This tests both
+     * the AML->Resource conversion and the Resource->Aml conversion.
+     */
+    Status = AcpiDmTestResourceConversion (Node, METHOD_NAME__CRS);
+
+    /* Execute _SRS with the resource list */
 
     Status = AcpiSetCurrentResources (Node, &ReturnObj);
     if (ACPI_FAILURE (Status))
@@ -1348,8 +1552,10 @@ GetCrs:
 GetPrs:
     AcpiOsPrintf ("Evaluating _PRS\n");
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
+
+    /* Check if _PRS exists */
 
     Status = AcpiEvaluateObject (Node, METHOD_NAME__PRS, NULL, &ReturnObj);
     if (ACPI_FAILURE (Status))
@@ -1359,19 +1565,18 @@ GetPrs:
         goto Cleanup;
     }
 
-    ReturnObj.Pointer           = AcpiGbl_DbBuffer;
-    ReturnObj.Length            = ACPI_DEBUG_BUFFER_SIZE;
+    ReturnObj.Pointer = AcpiGbl_DbBuffer;
+    ReturnObj.Length  = ACPI_DEBUG_BUFFER_SIZE;
 
     Status = AcpiGetPossibleResources (Node, &ReturnObj);
     if (ACPI_FAILURE (Status))
     {
         AcpiOsPrintf ("AcpiGetPossibleResources failed: %s\n",
             AcpiFormatException (Status));
+        goto Cleanup;
     }
-    else
-    {
-        AcpiRsDumpResourceList (ACPI_CAST_PTR (ACPI_RESOURCE, AcpiGbl_DbBuffer));
-    }
+
+    AcpiRsDumpResourceList (ACPI_CAST_PTR (ACPI_RESOURCE, AcpiGbl_DbBuffer));
 
 Cleanup:
 
@@ -1537,7 +1742,8 @@ AcpiDbBusWalk (
 
     /* Exit if there is no _PRT under this device */
 
-    Status = AcpiGetHandle (Node, METHOD_NAME__PRT, &TempNode);
+    Status = AcpiGetHandle (Node, METHOD_NAME__PRT,
+                ACPI_CAST_PTR (ACPI_HANDLE, &TempNode));
     if (ACPI_FAILURE (Status))
     {
         return (AE_OK);

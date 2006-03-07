@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 1.36 $
+ *              $Revision: 1.40 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -132,13 +132,21 @@
     ACPI_COPY_FIELD(Out, In, Decode);                    \
     ACPI_COPY_FIELD(Out, In, MinAddressFixed);           \
     ACPI_COPY_FIELD(Out, In, MaxAddressFixed);           \
-    ACPI_COPY_FIELD(Out, In, Attribute);                 \
+    ACPI_COPY_FIELD(Out, In, Info);                      \
     ACPI_COPY_FIELD(Out, In, Granularity);               \
     ACPI_COPY_FIELD(Out, In, Minimum);                   \
     ACPI_COPY_FIELD(Out, In, Maximum);                   \
     ACPI_COPY_FIELD(Out, In, TranslationOffset);         \
     ACPI_COPY_FIELD(Out, In, AddressLength);             \
     ACPI_COPY_FIELD(Out, In, ResourceSource);
+
+
+/* Local prototypes */
+
+static ACPI_STATUS
+AcpiRsMatchVendorResource (
+    ACPI_RESOURCE           *Resource,
+    void                    *Context);
 
 
 /*******************************************************************************
@@ -312,12 +320,12 @@ AcpiGetPossibleResources (
  *
  * FUNCTION:    AcpiWalkResources
  *
- * PARAMETERS:  DeviceHandle    - a handle to the device object for the
+ * PARAMETERS:  DeviceHandle    - Handle to the device object for the
  *                                device we are querying
- *              Path            - method name of the resources we want
+ *              Name            - Method name of the resources we want
  *                                (METHOD_NAME__CRS or METHOD_NAME__PRS)
- *              UserFunction    - called for each resource
- *              Context         - passed to UserFunction
+ *              UserFunction    - Called for each resource
+ *              Context         - Passed to UserFunction
  *
  * RETURN:      Status
  *
@@ -330,88 +338,81 @@ AcpiGetPossibleResources (
 ACPI_STATUS
 AcpiWalkResources (
     ACPI_HANDLE                 DeviceHandle,
-    char                        *Path,
+    char                        *Name,
     ACPI_WALK_RESOURCE_CALLBACK UserFunction,
     void                        *Context)
 {
     ACPI_STATUS                 Status;
-    ACPI_BUFFER                 Buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+    ACPI_BUFFER                 Buffer;
     ACPI_RESOURCE               *Resource;
-    ACPI_RESOURCE               *BufferEnd;
+    ACPI_RESOURCE               *ResourceEnd;
 
 
     ACPI_FUNCTION_TRACE ("AcpiWalkResources");
 
 
-    if (!DeviceHandle ||
-        (ACPI_STRNCMP (Path, METHOD_NAME__CRS, sizeof (METHOD_NAME__CRS)) &&
-         ACPI_STRNCMP (Path, METHOD_NAME__PRS, sizeof (METHOD_NAME__PRS))))
+    /* Parameter validation */
+
+    if (!DeviceHandle || !UserFunction || !Name ||
+        (ACPI_STRNCMP (Name, METHOD_NAME__CRS, sizeof (METHOD_NAME__CRS)) &&
+         ACPI_STRNCMP (Name, METHOD_NAME__PRS, sizeof (METHOD_NAME__PRS))))
     {
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    Status = AcpiRsGetMethodData (DeviceHandle, Path, &Buffer);
+    /* Get the _CRS or _PRS resource list */
+
+    Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+    Status = AcpiRsGetMethodData (DeviceHandle, Name, &Buffer);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
     }
 
-    /* Setup pointers */
+    /* Buffer now contains the resource list */
 
-    Resource  = (ACPI_RESOURCE *) Buffer.Pointer;
-    BufferEnd = ACPI_CAST_PTR (ACPI_RESOURCE,
-                    ((UINT8 *) Buffer.Pointer + Buffer.Length));
+    Resource = ACPI_CAST_PTR (ACPI_RESOURCE, Buffer.Pointer);
+    ResourceEnd = ACPI_ADD_PTR (ACPI_RESOURCE, Buffer.Pointer, Buffer.Length);
 
-    /* Walk the resource list */
+    /* Walk the resource list until the EndTag is found (or buffer end) */
 
-    for (;;)
+    while (Resource < ResourceEnd)
     {
-        if (!Resource || Resource->Type == ACPI_RESOURCE_TYPE_END_TAG)
+        /* Sanity check the resource */
+
+        if (Resource->Type > ACPI_RESOURCE_TYPE_MAX)
         {
+            Status = AE_AML_INVALID_RESOURCE_TYPE;
             break;
         }
 
+        /* Invoke the user function, abort on any error returned */
+
         Status = UserFunction (Resource, Context);
-
-        switch (Status)
+        if (ACPI_FAILURE (Status))
         {
-        case AE_OK:
-        case AE_CTRL_DEPTH:
+            if (Status == AE_CTRL_TERMINATE)
+            {
+                /* This is an OK termination by the user function */
 
-            /* Just keep going */
-
-            Status = AE_OK;
+                Status = AE_OK;
+            }
             break;
+        }
 
-        case AE_CTRL_TERMINATE:
+        /* EndTag indicates end-of-list */
 
-            /* Exit now, with OK stats */
-
-            Status = AE_OK;
-            goto Cleanup;
-
-        default:
-
-            /* All others are valid exceptions */
-
-            goto Cleanup;
+        if (Resource->Type == ACPI_RESOURCE_TYPE_END_TAG)
+        {
+            break;
         }
 
         /* Get the next resource descriptor */
 
-        Resource = ACPI_NEXT_RESOURCE (Resource);
-
-        /* Check for end-of-buffer */
-
-        if (Resource >= BufferEnd)
-        {
-            goto Cleanup;
-        }
+        Resource = ACPI_ADD_PTR (ACPI_RESOURCE, Resource, Resource->Length);
     }
 
-Cleanup:
-
-    AcpiOsFree (Buffer.Pointer);
+    ACPI_MEM_FREE (Buffer.Pointer);
     return_ACPI_STATUS (Status);
 }
 
@@ -487,6 +488,13 @@ AcpiResourceToAddress64 (
     ACPI_RESOURCE_ADDRESS32     *Address32;
 
 
+    if (!Resource || !Out)
+    {
+        return (AE_BAD_PARAMETER);
+    }
+
+    /* Convert 16 or 32 address descriptor to 64 */
+
     switch (Resource->Type)
     {
     case ACPI_RESOURCE_TYPE_ADDRESS16:
@@ -514,3 +522,125 @@ AcpiResourceToAddress64 (
 
     return (AE_OK);
 }
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiGetVendorResource
+ *
+ * PARAMETERS:  DeviceHandle        - Handle for the parent device object
+ *              Name                - Method name for the parent resource
+ *                                    (METHOD_NAME__CRS or METHOD_NAME__PRS)
+ *              Uuid                - Pointer to the UUID to be matched.
+ *                                    includes both subtype and 16-byte UUID
+ *              RetBuffer           - Where the vendor resource is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Walk a resource template for the specified evice to find a
+ *              vendor-defined resource that matches the supplied UUID and
+ *              UUID subtype. Returns a ACPI_RESOURCE of type Vendor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiGetVendorResource (
+    ACPI_HANDLE             DeviceHandle,
+    char                    *Name,
+    ACPI_VENDOR_UUID        *Uuid,
+    ACPI_BUFFER             *RetBuffer)
+{
+    ACPI_VENDOR_WALK_INFO   Info;
+    ACPI_STATUS             Status;
+
+
+    /* Other parameters are validated by AcpiWalkResources */
+
+    if (!Uuid || !RetBuffer)
+    {
+        return (AE_BAD_PARAMETER);
+    }
+
+    Info.Uuid = Uuid;
+    Info.Buffer = RetBuffer;
+    Info.Status = AE_NOT_EXIST;
+
+    /* Walk the _CRS or _PRS resource list for this device */
+
+    Status = AcpiWalkResources (DeviceHandle, Name, AcpiRsMatchVendorResource,
+                &Info);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    return (Info.Status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsMatchVendorResource
+ *
+ * PARAMETERS:  ACPI_WALK_RESOURCE_CALLBACK
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Match a vendor resource via the ACPI 3.0 UUID
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiRsMatchVendorResource (
+    ACPI_RESOURCE           *Resource,
+    void                    *Context)
+{
+    ACPI_VENDOR_WALK_INFO       *Info = Context;
+    ACPI_RESOURCE_VENDOR_TYPED  *Vendor;
+    ACPI_BUFFER                 *Buffer;
+    ACPI_STATUS                 Status;
+
+
+    /* Ignore all descriptors except Vendor */
+
+    if (Resource->Type != ACPI_RESOURCE_TYPE_VENDOR)
+    {
+        return (AE_OK);
+    }
+
+    Vendor = &Resource->Data.VendorTyped;
+
+    /*
+     * For a valid match, these conditions must hold:
+     *
+     * 1) Length of descriptor data must be at least as long as a UUID struct
+     * 2) The UUID subtypes must match
+     * 3) The UUID data must match
+     */
+    if ((Vendor->ByteLength < (ACPI_UUID_LENGTH + 1)) ||
+        (Vendor->UuidSubtype != Info->Uuid->Subtype)  ||
+        (ACPI_MEMCMP (Vendor->Uuid, Info->Uuid->Data, ACPI_UUID_LENGTH)))
+    {
+        return (AE_OK);
+    }
+
+    /* Validate/Allocate/Clear caller buffer */
+
+    Buffer = Info->Buffer;
+    Status = AcpiUtInitializeBuffer (Buffer, Resource->Length);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    /* Found the correct resource, copy and return it */
+
+    ACPI_MEMCPY (Buffer->Pointer, Resource, Resource->Length);
+    Buffer->Length = Resource->Length;
+
+    /* Found the desired descriptor, terminate resource walk */
+
+    Info->Status = AE_OK;
+    return (AE_CTRL_TERMINATE);
+}
+

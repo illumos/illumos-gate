@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psopcode - Parser/Interpreter opcode information table
- *              $Revision: 1.93 $
+ *              $Revision: 1.95 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -518,7 +518,7 @@ AcpiPsGetOpcodeInfo (
 
     /* Unknown AML opcode */
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+    ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
         "Unknown AML opcode [%4.4X]\n", Opcode));
 
     return (&AcpiGbl_AmlOpInfo [_UNK]);

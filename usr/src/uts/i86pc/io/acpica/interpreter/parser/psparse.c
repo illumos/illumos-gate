@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 1.158 $
+ *              $Revision: 1.163 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -421,7 +421,6 @@ AcpiPsNextParseState (
     switch (CallbackStatus)
     {
     case AE_CTRL_TERMINATE:
-
         /*
          * A control method was terminated via a RETURN statement.
          * The walk of this method is complete.
@@ -435,15 +434,24 @@ AcpiPsNextParseState (
 
         ParserState->Aml = WalkState->AmlLastWhile;
         WalkState->ControlState->Common.Value = FALSE;
-        Status = AE_CTRL_BREAK;
+        Status = AcpiDsResultStackPop (WalkState);
+        if (ACPI_SUCCESS (Status))
+        {
+            Status = AE_CTRL_BREAK;
+        }
         break;
+
 
     case AE_CTRL_CONTINUE:
 
-
         ParserState->Aml = WalkState->AmlLastWhile;
-        Status = AE_CTRL_CONTINUE;
+        Status = AcpiDsResultStackPop (WalkState);
+        if (ACPI_SUCCESS (Status))
+        {
+            Status = AE_CTRL_CONTINUE;
+        }
         break;
+
 
     case AE_CTRL_PENDING:
 
@@ -459,17 +467,20 @@ AcpiPsNextParseState (
 #endif
 
     case AE_CTRL_TRUE:
-
         /*
          * Predicate of an IF was true, and we are at the matching ELSE.
          * Just close out this package
          */
         ParserState->Aml = AcpiPsGetNextPackageEnd (ParserState);
+        Status = AcpiDsResultStackPop (WalkState);
+        if (ACPI_SUCCESS (Status))
+        {
+            Status = AE_CTRL_PENDING;
+        }
         break;
 
 
     case AE_CTRL_FALSE:
-
         /*
          * Either an IF/WHILE Predicate was false or we encountered a BREAK
          * opcode.  In both cases, we do not execute the rest of the
@@ -606,12 +617,10 @@ AcpiPsParseAml (
         }
         else if ((Status != AE_OK) && (WalkState->MethodDesc))
         {
-            ACPI_REPORT_METHOD_ERROR ("Method execution failed",
+            /* Either the method parse or actual execution failed */
+
+            ACPI_ERROR_METHOD ("Method parse/execution failed",
                 WalkState->MethodNode, NULL, Status);
-
-            /* Ensure proper cleanup */
-
-            WalkState->ParseFlags |= ACPI_PARSE_EXECUTE;
 
             /* Check for possible multi-thread reentrancy problem */
 
@@ -619,9 +628,12 @@ AcpiPsParseAml (
                 (!WalkState->MethodDesc->Method.Semaphore))
             {
                 /*
-                 * This method is marked NotSerialized, but it tried to create
+                 * Method tried to create an object twice. The probable cause is
+                 * that the method cannot handle reentrancy.
+                 *
+                 * The method is marked NotSerialized, but it tried to create
                  * a named object, causing the second thread entrance to fail.
-                 * We will workaround this by marking the method permanently
+                 * Workaround this problem by marking the method permanently
                  * as Serialized.
                  */
                 WalkState->MethodDesc->Method.MethodFlags |= AML_METHOD_SERIALIZED;
@@ -638,16 +650,26 @@ AcpiPsParseAml (
         AcpiDsScopeStackClear (WalkState);
 
         /*
-         * If we just returned from the execution of a control method,
-         * there's lots of cleanup to do
+         * If we just returned from the execution of a control method or if we
+         * encountered an error during the method parse phase, there's lots of
+         * cleanup to do
          */
-        if ((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE)
+        if (((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE) ||
+            (ACPI_FAILURE (Status)))
         {
             if (WalkState->MethodDesc)
             {
                 /* Decrement the thread count on the method parse tree */
 
-                WalkState->MethodDesc->Method.ThreadCount--;
+                if (WalkState->MethodDesc->Method.ThreadCount)
+                {
+                    WalkState->MethodDesc->Method.ThreadCount--;
+                }
+                else
+                {
+                    ACPI_ERROR ((AE_INFO,
+                        "Invalid zero thread count in method"));
+                }
             }
 
             AcpiDsTerminateControlMethod (WalkState);
@@ -656,7 +678,6 @@ AcpiPsParseAml (
         /* Delete this walk state and all linked control states */
 
         AcpiPsCleanupScope (&WalkState->ParserState);
-
         PreviousWalkState = WalkState;
 
         ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 1.70 $
+ *              $Revision: 1.74 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -399,6 +399,7 @@ AcpiDbExecute (
 {
     ACPI_STATUS             Status;
     ACPI_BUFFER             ReturnObj;
+    char                    *NameString;
 
 
 #ifdef ACPI_DEBUG_OUTPUT
@@ -419,8 +420,15 @@ AcpiDbExecute (
     }
     else
     {
-        AcpiUtStrupr (Name);
-        AcpiGbl_DbMethodInfo.Name = Name;
+        NameString = ACPI_MEM_ALLOCATE (ACPI_STRLEN (Name) + 1);
+        if (!NameString)
+        {
+            return;
+        }
+
+        ACPI_STRCPY (NameString, Name);
+        AcpiUtStrupr (NameString);
+        AcpiGbl_DbMethodInfo.Name = NameString;
         AcpiGbl_DbMethodInfo.Args = Args;
         AcpiGbl_DbMethodInfo.Flags = Flags;
 
@@ -429,6 +437,7 @@ AcpiDbExecute (
 
         AcpiDbExecuteSetup (&AcpiGbl_DbMethodInfo);
         Status = AcpiDbExecuteMethod (&AcpiGbl_DbMethodInfo, &ReturnObj);
+        ACPI_MEM_FREE (NameString);
     }
 
     /*
@@ -505,13 +514,6 @@ AcpiDbMethodThread (
 
     for (i = 0; i < Info->NumLoops; i++)
     {
-#if 0
-       if (i == 0xEFDC)
-        {
-            AcpiDbgLevel = 0x00FFFFFF;
-        }
-#endif
-
         Status = AcpiDbExecuteMethod (Info, &ReturnObj);
         if (ACPI_FAILURE (Status))
         {
@@ -543,7 +545,8 @@ AcpiDbMethodThread (
     Status = AcpiOsSignalSemaphore (Info->ThreadGate, 1);
     if (ACPI_FAILURE (Status))
     {
-        AcpiOsPrintf ("Could not signal debugger semaphore\n");
+        AcpiOsPrintf ("Could not signal debugger thread sync semaphore, %s\n",
+            AcpiFormatException (Status));
     }
 }
 

@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 1.17 $
+ *              $Revision: 1.24 $
  *
  ******************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -194,9 +194,7 @@ AcpiEvaluateObjectTyped (
     {
         /* Error because caller specifically asked for a return value */
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "No return value\n"));
-
+        ACPI_ERROR ((AE_INFO, "No return value"));
         return_ACPI_STATUS (AE_NULL_OBJECT);
     }
 
@@ -209,8 +207,8 @@ AcpiEvaluateObjectTyped (
 
     /* Return object type does not match requested type */
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-        "Incorrect return type [%s] requested [%s]\n",
+    ACPI_ERROR ((AE_INFO,
+        "Incorrect return type [%s] requested [%s]",
         AcpiUtGetTypeName (((ACPI_OBJECT *) ReturnBuffer->Pointer)->Type),
         AcpiUtGetTypeName (ReturnType)));
 
@@ -305,7 +303,6 @@ AcpiEvaluateObject (
         Info.Parameters[ExternalParams->Count] = NULL;
     }
 
-
     /*
      * Three major cases:
      * 1) Fully qualified pathname
@@ -315,9 +312,8 @@ AcpiEvaluateObject (
     if ((Pathname) &&
         (AcpiNsValidRootPrefix (Pathname[0])))
     {
-        /*
-         *  The path is fully qualified, just evaluate by name
-         */
+        /* The path is fully qualified, just evaluate by name */
+
         Status = AcpiNsEvaluateByName (Pathname, &Info);
     }
     else if (!Handle)
@@ -329,13 +325,13 @@ AcpiEvaluateObject (
          */
         if (!Pathname)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Both Handle and Pathname are NULL\n"));
+            ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+                "Both Handle and Pathname are NULL"));
         }
         else
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Handle is NULL and Pathname is relative\n"));
+            ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+                "Null Handle with relative pathname [%s]", Pathname));
         }
 
         Status = AE_BAD_PARAMETER;
@@ -357,9 +353,8 @@ AcpiEvaluateObject (
         }
         else
         {
-           /*
-            * Both a Handle and a relative Pathname
-            */
+            /* Both a Handle and a relative Pathname */
+
             Status = AcpiNsEvaluateRelative (Pathname, &Info);
         }
     }
@@ -409,7 +404,8 @@ AcpiEvaluateObject (
                     if (ACPI_FAILURE (Status))
                     {
                         /*
-                         * Caller's buffer is too small or a new one can't be allocated
+                         * Caller's buffer is too small or a new one can't
+                         * be allocated
                          */
                         ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
                             "Needed buffer size %X, %s\n",
@@ -418,9 +414,8 @@ AcpiEvaluateObject (
                     }
                     else
                     {
-                        /*
-                         *  We have enough space for the object, build it
-                         */
+                        /* We have enough space for the object, build it */
+
                         Status = AcpiUtCopyIobjectToEobject (Info.ReturnObject,
                                         ReturnBuffer);
                     }
@@ -447,9 +442,8 @@ AcpiEvaluateObject (
         }
     }
 
-    /*
-     * Free the input parameter list (if we created one),
-     */
+    /* Free the input parameter list (if we created one) */
+
     if (Info.Parameters)
     {
         /* Free the allocated parameter block */
@@ -508,7 +502,7 @@ AcpiWalkNamespace (
 
     /* Parameter validation */
 
-    if ((Type > ACPI_TYPE_EXTERNAL_MAX) ||
+    if ((Type > ACPI_TYPE_LOCAL_MAX) ||
         (!MaxDepth)                     ||
         (!UserFunction))
     {
@@ -592,9 +586,9 @@ AcpiNsGetDeviceCallback (
         return (AE_CTRL_DEPTH);
     }
 
-    if (!(Flags & 0x01))
+    if (!(Flags & ACPI_STA_DEVICE_PRESENT))
     {
-        /* Don't return at the device or children of the device if not there */
+        /* Don't examine children of the device if not present */
 
         return (AE_CTRL_DEPTH);
     }
@@ -698,9 +692,9 @@ AcpiGetDevices (
      * We're going to call their callback from OUR callback, so we need
      * to know what it is, and their context parameter.
      */
+    Info.Hid          = HID;
     Info.Context      = Context;
     Info.UserFunction = UserFunction;
-    Info.Hid          = HID;
 
     /*
      * Lock the namespace around the walk.
@@ -714,11 +708,9 @@ AcpiGetDevices (
         return_ACPI_STATUS (Status);
     }
 
-    Status = AcpiNsWalkNamespace (ACPI_TYPE_DEVICE,
-                                    ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
-                                    ACPI_NS_WALK_UNLOCK,
-                                    AcpiNsGetDeviceCallback, &Info,
-                                    ReturnValue);
+    Status = AcpiNsWalkNamespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+                ACPI_UINT32_MAX, ACPI_NS_WALK_UNLOCK,
+                AcpiNsGetDeviceCallback, &Info, ReturnValue);
 
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
     return_ACPI_STATUS (Status);

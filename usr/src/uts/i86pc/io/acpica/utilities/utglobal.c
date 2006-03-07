@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 1.214 $
+ *              $Revision: 1.227 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -145,9 +145,12 @@ AcpiFormatException (
     const char              *Exception = NULL;
 
 
-    ACPI_FUNCTION_NAME ("FormatException");
+    ACPI_FUNCTION_ENTRY ();
 
 
+    /*
+     * Status is composed of two parts, a "type" and an actual code
+     */
     SubStatus = (Status & ~AE_CODE_MASK);
 
     switch (Status & AE_CODE_MASK)
@@ -200,13 +203,13 @@ AcpiFormatException (
     {
         /* Exception code was not recognized */
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Unknown exception code: 0x%8.8X\n", Status));
+        ACPI_ERROR ((AE_INFO,
+            "Unknown exception code: 0x%8.8X", Status));
 
-        return ((const char *) "UNKNOWN_STATUS_CODE");
+        Exception = "UNKNOWN_STATUS_CODE";
     }
 
-    return ((const char *) Exception);
+    return (ACPI_CAST_PTR (const char, Exception));
 }
 
 
@@ -520,7 +523,7 @@ AcpiUtGetRegionName (
         return ("InvalidSpaceId");
     }
 
-    return ((char *) AcpiGbl_RegionTypes[SpaceId]);
+    return (ACPI_CAST_PTR (char, AcpiGbl_RegionTypes[SpaceId]));
 }
 
 
@@ -540,11 +543,13 @@ AcpiUtGetRegionName (
 
 static const char        *AcpiGbl_EventTypes[ACPI_NUM_FIXED_EVENTS] =
 {
+/*! [Begin] no source code translation (keep these strings as-is) */
     "PM_Timer",
     "GlobalLock",
     "PowerButton",
     "SleepButton",
     "RealTimeClock",
+/*! [End] no source code translation !*/
 };
 
 
@@ -558,7 +563,7 @@ AcpiUtGetEventName (
         return ("InvalidEventID");
     }
 
-    return ((char *) AcpiGbl_EventTypes[EventId]);
+    return (ACPI_CAST_PTR (char, AcpiGbl_EventTypes[EventId]));
 }
 
 
@@ -588,6 +593,7 @@ static const char           AcpiGbl_BadType[] = "UNDEFINED";
 
 static const char           *AcpiGbl_NsTypeNames[] =
 {
+/*! [Begin] no source code translation (keep these strings as-is) */
     /* 00 */ "Untyped",
     /* 01 */ "Integer",
     /* 02 */ "String",
@@ -619,6 +625,7 @@ static const char           *AcpiGbl_NsTypeNames[] =
     /* 28 */ "Extra",
     /* 29 */ "Data",
     /* 30 */ "Invalid"
+/*! [End] no source code translation !*/
 };
 
 
@@ -629,10 +636,10 @@ AcpiUtGetTypeName (
 
     if (Type > ACPI_TYPE_INVALID)
     {
-        return ((char *) AcpiGbl_BadType);
+        return (ACPI_CAST_PTR (char, AcpiGbl_BadType));
     }
 
-    return ((char *) AcpiGbl_NsTypeNames[Type]);
+    return (ACPI_CAST_PTR (char, AcpiGbl_NsTypeNames[Type]));
 }
 
 
@@ -693,7 +700,7 @@ AcpiUtGetNodeName (
 
     /* Name must be a valid ACPI name */
 
-    if (!AcpiUtValidAcpiName (* (UINT32 *) Node->Name.Ascii))
+    if (!AcpiUtValidAcpiName (Node->Name.Integer))
     {
         return ("????");
     }
@@ -720,6 +727,7 @@ AcpiUtGetNodeName (
 
 static const char           *AcpiGbl_DescTypeNames[] =
 {
+/*! [Begin] no source code translation (keep these ASL Keywords as-is) */
     /* 00 */ "Invalid",
     /* 01 */ "Cached",
     /* 02 */ "State-Generic",
@@ -736,6 +744,7 @@ static const char           *AcpiGbl_DescTypeNames[] =
     /* 13 */ "Parser",
     /* 14 */ "Operand",
     /* 15 */ "Node"
+/*! [End] no source code translation !*/
 };
 
 
@@ -751,10 +760,11 @@ AcpiUtGetDescriptorName (
 
     if (ACPI_GET_DESCRIPTOR_TYPE (Object) > ACPI_DESC_TYPE_MAX)
     {
-        return ((char *) AcpiGbl_BadType);
+        return (ACPI_CAST_PTR (char, AcpiGbl_BadType));
     }
 
-    return ((char *) AcpiGbl_DescTypeNames[ACPI_GET_DESCRIPTOR_TYPE (Object)]);
+    return (ACPI_CAST_PTR (char,
+        AcpiGbl_DescTypeNames[ACPI_GET_DESCRIPTOR_TYPE (Object)]));
 
 }
 
@@ -869,6 +879,12 @@ AcpiUtInitGlobals (
         AcpiGbl_MutexInfo[i].UseCount       = 0;
     }
 
+    for (i = 0; i < ACPI_NUM_OWNERID_MASKS; i++)
+    {
+        AcpiGbl_OwnerIdMask[i]              = 0;
+    }
+    AcpiGbl_OwnerIdMask[ACPI_NUM_OWNERID_MASKS - 1] = 0x80000000; /* Last ID is never valid */
+
     /* GPE support */
 
     AcpiGbl_GpeXruptListHead            = NULL;
@@ -906,7 +922,8 @@ AcpiUtInitGlobals (
     AcpiGbl_NsLookupCount               = 0;
     AcpiGbl_PsFindCount                 = 0;
     AcpiGbl_AcpiHardwarePresent         = TRUE;
-    AcpiGbl_OwnerIdMask                 = 0;
+    AcpiGbl_LastOwnerIdIndex            = 0;
+    AcpiGbl_NextOwnerIdOffset           = 0;
     AcpiGbl_TraceMethodName             = 0;
     AcpiGbl_TraceDbgLevel               = 0;
     AcpiGbl_TraceDbgLayer               = 0;
@@ -921,7 +938,6 @@ AcpiUtInitGlobals (
     /* Namespace */
 
     AcpiGbl_RootNode                    = NULL;
-
     AcpiGbl_RootNodeStruct.Name.Integer = ACPI_ROOT_NAME;
     AcpiGbl_RootNodeStruct.Descriptor   = ACPI_DESC_TYPE_NAMED;
     AcpiGbl_RootNodeStruct.Type         = ACPI_TYPE_DEVICE;

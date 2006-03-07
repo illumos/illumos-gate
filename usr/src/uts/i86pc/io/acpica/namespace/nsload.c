@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 1.73 $
+ *              $Revision: 1.76 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -179,7 +179,7 @@ AcpiNsLoadTable (
 
     if (!TableDesc->AmlStart)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null AML pointer\n"));
+        ACPI_ERROR ((AE_INFO, "Null AML pointer"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -190,7 +190,7 @@ AcpiNsLoadTable (
 
     if (!TableDesc->AmlLength)
     {
-        ACPI_REPORT_WARNING (("Zero-length AML block in table [%4.4s]\n",
+        ACPI_WARNING ((AE_INFO, "Zero-length AML block in table [%4.4s]",
             TableDesc->Pointer->Signature));
         return_ACPI_STATUS (AE_OK);
     }
@@ -371,7 +371,7 @@ AcpiNsLoadNamespace (
 
     if (AcpiGbl_DSDT == NULL)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "DSDT is not in memory\n"));
+        ACPI_ERROR ((AE_INFO, "DSDT is not in memory"));
         return_ACPI_STATUS (AE_NO_ACPI_TABLES);
     }
 

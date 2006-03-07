@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 1.23 $
+ *       $Revision: 1.28 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -133,27 +133,11 @@ typedef struct acpi_external_list
 } ACPI_EXTERNAL_LIST;
 
 extern ACPI_EXTERNAL_LIST       *AcpiGbl_ExternalList;
-extern const char               *AcpiGbl_IoDecode[2];
+
+/* Strings used for decoding flags to ASL keywords */
+
 extern const char               *AcpiGbl_WordDecode[4];
-extern const char               *AcpiGbl_ConsumeDecode[2];
-extern const char               *AcpiGbl_MinDecode[2];
-extern const char               *AcpiGbl_MaxDecode[2];
-extern const char               *AcpiGbl_DECDecode[2];
-extern const char               *AcpiGbl_RNGDecode[4];
-extern const char               *AcpiGbl_MEMDecode[4];
-extern const char               *AcpiGbl_RWDecode[2];
 extern const char               *AcpiGbl_IrqDecode[2];
-extern const char               *AcpiGbl_HEDecode[2];
-extern const char               *AcpiGbl_LLDecode[2];
-extern const char               *AcpiGbl_SHRDecode[2];
-extern const char               *AcpiGbl_TYPDecode[4];
-extern const char               *AcpiGbl_BMDecode[2];
-extern const char               *AcpiGbl_SIZDecode[4];
-extern const char               *AcpiGbl_TTPDecode[2];
-extern const char               *AcpiGbl_MTPDecode[4];
-extern const char               *AcpiGbl_TRSDecode[2];
-
-
 extern const char               *AcpiGbl_LockRule[ACPI_NUM_LOCK_RULES];
 extern const char               *AcpiGbl_AccessTypes[ACPI_NUM_ACCESS_TYPES];
 extern const char               *AcpiGbl_UpdateRules[ACPI_NUM_UPDATE_RULES];
@@ -164,6 +148,7 @@ typedef struct acpi_op_walk_info
 {
     UINT32                  Level;
     UINT32                  BitOffset;
+    UINT32                  Flags;
     ACPI_WALK_STATE         *WalkState;
 
 } ACPI_OP_WALK_INFO;
@@ -306,13 +291,33 @@ AcpiDmIsStringBuffer (
  * dmresrc
  */
 void
-AcpiDmResourceDescriptor (
+AcpiDmDumpInteger8 (
+    UINT8                   Value,
+    char                    *Name);
+
+void
+AcpiDmDumpInteger16 (
+    UINT16                  Value,
+    char                    *Name);
+
+void
+AcpiDmDumpInteger32 (
+    UINT32                  Value,
+    char                    *Name);
+
+void
+AcpiDmDumpInteger64 (
+    UINT64                  Value,
+    char                    *Name);
+
+void
+AcpiDmResourceTemplate (
     ACPI_OP_WALK_INFO       *Info,
     UINT8                   *ByteData,
     UINT32                  ByteCount);
 
 BOOLEAN
-AcpiDmIsResourceDescriptor (
+AcpiDmIsResourceTemplate (
     ACPI_PARSE_OBJECT       *Op);
 
 void
@@ -388,6 +393,13 @@ AcpiDmInterruptDescriptor (
 void
 AcpiDmVendorLargeDescriptor (
     AML_RESOURCE            *Resource,
+    UINT32                  Length,
+    UINT32                  Level);
+
+void
+AcpiDmVendorCommon (
+    char                    *Name,
+    UINT8                   *ByteData,
     UINT32                  Length,
     UINT32                  Level);
 

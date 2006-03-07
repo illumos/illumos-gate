@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmem24 - Memory resource descriptors
- *              $Revision: 1.31 $
+ *              $Revision: 1.33 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -125,279 +125,199 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetMemory24
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsConvertMemory24
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetMemory24 (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO     AcpiRsConvertMemory24[4] =
 {
-    ACPI_FUNCTION_TRACE ("RsGetMemory24");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_MEMORY24,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_MEMORY24),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertMemory24)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_MEMORY24,
+                        sizeof (AML_RESOURCE_MEMORY24),
+                        0},
 
-    /* Get the Read/Write bit */
+    /* Read/Write bit */
 
-    Resource->Data.Memory24.ReadWriteAttribute =
-        (Aml->Memory24.Information & 0x01);
-
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Memory24.WriteProtect),
+                        AML_OFFSET (Memory24.Flags),
+                        0},
     /*
-     * Get the following contiguous fields from the AML descriptor:
+     * These fields are contiguous in both the source and destination:
      * Minimum Base Address
      * Maximum Base Address
      * Address Base Alignment
      * Range Length
      */
-    AcpiRsMoveData (&Resource->Data.Memory24.Minimum,
-        &Aml->Memory24.Minimum, 4, ACPI_MOVE_TYPE_16_TO_32);
-
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_MEMORY24;
-    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY24);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_MOVE16,   ACPI_RS_OFFSET (Data.Memory24.Minimum),
+                        AML_OFFSET (Memory24.Minimum),
+                        4}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetMemory24
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsConvertMemory32
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetMemory24 (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsConvertMemory32[4] =
 {
-    ACPI_FUNCTION_TRACE ("RsSetMemory24");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_MEMORY32,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_MEMORY32),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertMemory32)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_MEMORY32,
+                        sizeof (AML_RESOURCE_MEMORY32),
+                        0},
 
-    /* Set the Information Byte */
+    /* Read/Write bit */
 
-    Aml->Memory24.Information = (UINT8)
-        (Resource->Data.Memory24.ReadWriteAttribute & 0x01);
-
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Memory32.WriteProtect),
+                        AML_OFFSET (Memory32.Flags),
+                        0},
     /*
-     * Set the following contiguous fields in the AML descriptor:
+     * These fields are contiguous in both the source and destination:
      * Minimum Base Address
      * Maximum Base Address
      * Address Base Alignment
      * Range Length
      */
-    AcpiRsMoveData (&Aml->Memory24.Minimum,
-        &Resource->Data.Memory24.Minimum, 4, ACPI_MOVE_TYPE_32_TO_16);
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_MEMORY24,
-        sizeof (AML_RESOURCE_MEMORY24), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_MOVE32,   ACPI_RS_OFFSET (Data.Memory32.Minimum),
+                        AML_OFFSET (Memory32.Minimum),
+                        4}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetMemory32
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsConvertFixedMemory32
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetMemory32 (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO     AcpiRsConvertFixedMemory32[4] =
 {
-    ACPI_FUNCTION_TRACE ("RsGetMemory32");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_FIXED_MEMORY32,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_FIXED_MEMORY32),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertFixedMemory32)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_FIXED_MEMORY32,
+                        sizeof (AML_RESOURCE_FIXED_MEMORY32),
+                        0},
 
-    /* Get the Read/Write bit */
+    /* Read/Write bit */
 
-    Resource->Data.Memory32.ReadWriteAttribute =
-        (Aml->Memory32.Information & 0x01);
-
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.FixedMemory32.WriteProtect),
+                        AML_OFFSET (FixedMemory32.Flags),
+                        0},
     /*
-     * Get the following contiguous fields from the AML descriptor:
-     * Minimum Base Address
-     * Maximum Base Address
-     * Address Base Alignment
-     * Range Length
-     */
-    AcpiRsMoveData (&Resource->Data.Memory32.Minimum,
-        &Aml->Memory32.Minimum, 4, ACPI_MOVE_TYPE_32_TO_32);
-
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_MEMORY32;
-    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY32);
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsSetMemory32
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsSetMemory32 (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
-{
-    ACPI_FUNCTION_TRACE ("RsSetMemory32");
-
-
-    /* Set the Information Byte */
-
-    Aml->Memory32.Information = (UINT8)
-        (Resource->Data.Memory32.ReadWriteAttribute & 0x01);
-
-    /*
-     * Set the following contiguous fields in the AML descriptor:
-     * Minimum Base Address
-     * Maximum Base Address
-     * Address Base Alignment
-     * Range Length
-     */
-    AcpiRsMoveData (&Aml->Memory32.Minimum,
-        &Resource->Data.Memory32.Minimum, 4, ACPI_MOVE_TYPE_32_TO_32);
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_MEMORY32,
-        sizeof (AML_RESOURCE_MEMORY32), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsGetFixedMemory32
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsGetFixedMemory32 (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
-{
-    ACPI_FUNCTION_TRACE ("RsGetFixedMemory32");
-
-
-    /* Get the Read/Write bit */
-
-    Resource->Data.FixedMemory32.ReadWriteAttribute =
-        (Aml->FixedMemory32.Information & 0x01);
-
-    /*
-     * Get the following contiguous fields from the AML descriptor:
+     * These fields are contiguous in both the source and destination:
      * Base Address
      * Range Length
      */
-    ACPI_MOVE_32_TO_32 (&Resource->Data.FixedMemory32.Address,
-        &Aml->FixedMemory32.Address);
-    ACPI_MOVE_32_TO_32 (&Resource->Data.FixedMemory32.AddressLength,
-        &Aml->FixedMemory32.AddressLength);
-
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_FIXED_MEMORY32;
-    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEMORY32);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_MOVE32,   ACPI_RS_OFFSET (Data.FixedMemory32.Address),
+                        AML_OFFSET (FixedMemory32.Address),
+                        2}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetFixedMemory32
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsGetVendorSmall
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetFixedMemory32 (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsGetVendorSmall[3] =
 {
-    ACPI_FUNCTION_TRACE ("RsSetFixedMemory32");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_VENDOR,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_VENDOR),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsGetVendorSmall)},
+
+    /* Length of the vendor data (byte count) */
+
+    {ACPI_RSC_COUNT16,  ACPI_RS_OFFSET (Data.Vendor.ByteLength),
+                        0,
+                        sizeof (UINT8)},
+
+    /* Vendor data */
+
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.Vendor.ByteData[0]),
+                        sizeof (AML_RESOURCE_SMALL_HEADER),
+                        0}
+};
 
 
-    /* Set the Information Byte */
+/*******************************************************************************
+ *
+ * AcpiRsGetVendorLarge
+ *
+ ******************************************************************************/
 
-    Aml->FixedMemory32.Information = (UINT8)
-        (Resource->Data.FixedMemory32.ReadWriteAttribute & 0x01);
+ACPI_RSCONVERT_INFO     AcpiRsGetVendorLarge[3] =
+{
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_VENDOR,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_VENDOR),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsGetVendorLarge)},
+
+    /* Length of the vendor data (byte count) */
+
+    {ACPI_RSC_COUNT16,  ACPI_RS_OFFSET (Data.Vendor.ByteLength),
+                        0,
+                        sizeof (UINT8)},
+
+    /* Vendor data */
+
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.Vendor.ByteData[0]),
+                        sizeof (AML_RESOURCE_LARGE_HEADER),
+                        0}
+};
+
+
+/*******************************************************************************
+ *
+ * AcpiRsSetVendor
+ *
+ ******************************************************************************/
+
+ACPI_RSCONVERT_INFO     AcpiRsSetVendor[7] =
+{
+    /* Default is a small vendor descriptor */
+
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_VENDOR_SMALL,
+                        sizeof (AML_RESOURCE_SMALL_HEADER),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsSetVendor)},
+
+    /* Get the length and copy the data */
+
+    {ACPI_RSC_COUNT16,  ACPI_RS_OFFSET (Data.Vendor.ByteLength),
+                        0,
+                        0},
+
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.Vendor.ByteData[0]),
+                        sizeof (AML_RESOURCE_SMALL_HEADER),
+                        0},
 
     /*
-     * Set the following contiguous fields in the AML descriptor:
-     * Base Address
-     * Range Length
+     * All done if the Vendor byte length is 7 or less, meaning that it will
+     * fit within a small descriptor
      */
-    ACPI_MOVE_32_TO_32 (&Aml->FixedMemory32.Address,
-        &Resource->Data.FixedMemory32.Address);
-    ACPI_MOVE_32_TO_32 (&Aml->FixedMemory32.AddressLength,
-        &Resource->Data.FixedMemory32.AddressLength);
+    {ACPI_RSC_EXIT_LE,  0, 0, 7},
 
-    /* Complete the AML descriptor header */
+    /* Must create a large vendor descriptor */
 
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_FIXED_MEMORY32,
-        sizeof (AML_RESOURCE_FIXED_MEMORY32), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_VENDOR_LARGE,
+                        sizeof (AML_RESOURCE_LARGE_HEADER),
+                        0},
+
+    {ACPI_RSC_COUNT16,  ACPI_RS_OFFSET (Data.Vendor.ByteLength),
+                        0,
+                        0},
+
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.Vendor.ByteData[0]),
+                        sizeof (AML_RESOURCE_LARGE_HEADER),
+                        0}
+};
+
 

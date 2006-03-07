@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 1.85 $
+ *              $Revision: 1.88 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -364,8 +364,8 @@ AcpiDsMethodDataGetNode (
 
         if (Index > ACPI_METHOD_MAX_LOCAL)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Local index %d is invalid (max %d)\n",
+            ACPI_ERROR ((AE_INFO,
+                "Local index %d is invalid (max %d)",
                 Index, ACPI_METHOD_MAX_LOCAL));
             return_ACPI_STATUS (AE_AML_INVALID_INDEX);
         }
@@ -379,8 +379,8 @@ AcpiDsMethodDataGetNode (
 
         if (Index > ACPI_METHOD_MAX_ARG)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Arg index %d is invalid (max %d)\n",
+            ACPI_ERROR ((AE_INFO,
+                "Arg index %d is invalid (max %d)",
                 Index, ACPI_METHOD_MAX_ARG));
             return_ACPI_STATUS (AE_AML_INVALID_INDEX);
         }
@@ -391,7 +391,7 @@ AcpiDsMethodDataGetNode (
         break;
 
     default:
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Opcode %d is invalid\n", Opcode));
+        ACPI_ERROR ((AE_INFO, "Opcode %d is invalid", Opcode));
         return_ACPI_STATUS (AE_AML_BAD_OPCODE);
     }
 
@@ -492,7 +492,7 @@ AcpiDsMethodDataGetValue (
 
     if (!DestDesc)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null object descriptor pointer\n"));
+        ACPI_ERROR ((AE_INFO, "Null object descriptor pointer"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -540,22 +540,22 @@ AcpiDsMethodDataGetValue (
         {
         case AML_ARG_OP:
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Uninitialized Arg[%d] at node %p\n",
+            ACPI_ERROR ((AE_INFO,
+                "Uninitialized Arg[%d] at node %p",
                 Index, Node));
 
             return_ACPI_STATUS (AE_AML_UNINITIALIZED_ARG);
 
         case AML_LOCAL_OP:
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Uninitialized Local[%d] at node %p\n",
+            ACPI_ERROR ((AE_INFO,
+                "Uninitialized Local[%d] at node %p",
                 Index, Node));
 
             return_ACPI_STATUS (AE_AML_UNINITIALIZED_LOCAL);
 
         default:
-            ACPI_REPORT_ERROR (("Not Arg/Local opcode: %X\n", Opcode));
+            ACPI_ERROR ((AE_INFO, "Not a Arg/Local opcode: %X", Opcode));
             return_ACPI_STATUS (AE_AML_INTERNAL);
         }
     }

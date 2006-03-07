@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 1.124 $
+ *              $Revision: 1.126 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -346,7 +346,7 @@ AcpiExWriteDataToField (
          */
         if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_BUFFER)
         {
-            ACPI_REPORT_ERROR (("SMBus write requires Buffer, found type %s\n",
+            ACPI_ERROR ((AE_INFO, "SMBus write requires Buffer, found type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));
 
             return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -354,8 +354,8 @@ AcpiExWriteDataToField (
 
         if (SourceDesc->Buffer.Length < ACPI_SMBUS_BUFFER_SIZE)
         {
-            ACPI_REPORT_ERROR ((
-                "SMBus write requires Buffer of length %X, found length %X\n",
+            ACPI_ERROR ((AE_INFO,
+                "SMBus write requires Buffer of length %X, found length %X",
                 ACPI_SMBUS_BUFFER_SIZE, SourceDesc->Buffer.Length));
 
             return_ACPI_STATUS (AE_AML_BUFFER_LIMIT);

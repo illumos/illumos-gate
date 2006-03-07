@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 1.27 $
+ *              $Revision: 1.31 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -206,8 +206,8 @@ AcpiExOpcode_3A_0T_0R (
 
     default:
 
-        ACPI_REPORT_ERROR (("AcpiExOpcode_3A_0T_0R: Unknown opcode %X\n",
-                WalkState->Opcode));
+        ACPI_ERROR ((AE_INFO, "Unknown AML opcode %X",
+            WalkState->Opcode));
         Status = AE_AML_BAD_OPCODE;
         goto Cleanup;
     }
@@ -324,9 +324,9 @@ AcpiExOpcode_3A_1T_1R (
             goto Cleanup;
         }
 
-        if (Length > 0)
+        if (Buffer)
         {
-            /* Copy the portion requested */
+            /* We have a buffer, copy the portion requested */
 
             ACPI_MEMCPY (Buffer, Operand[0]->String.Pointer + Index,
                          Length);
@@ -345,8 +345,8 @@ AcpiExOpcode_3A_1T_1R (
 
     default:
 
-        ACPI_REPORT_ERROR (("AcpiExOpcode_3A_0T_0R: Unknown opcode %X\n",
-                WalkState->Opcode));
+        ACPI_ERROR ((AE_INFO, "Unknown AML opcode %X",
+            WalkState->Opcode));
         Status = AE_AML_BAD_OPCODE;
         goto Cleanup;
     }

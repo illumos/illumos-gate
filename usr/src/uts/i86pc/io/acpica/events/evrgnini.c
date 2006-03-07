@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI AddressSpace (OpRegion) init
- *              $Revision: 1.78 $
+ *              $Revision: 1.80 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -331,9 +331,9 @@ AcpiEvPciConfigRegionSetup (
                         }
                         else
                         {
-                            ACPI_REPORT_ERROR ((
-                                "Could not install PciConfig handler for Root Bridge %4.4s, %s\n",
-                                AcpiUtGetNodeName (PciRootNode), AcpiFormatException (Status)));
+                            ACPI_EXCEPTION ((AE_INFO, Status,
+                                "Could not install PciConfig handler for Root Bridge %4.4s",
+                                AcpiUtGetNodeName (PciRootNode)));
                         }
                     }
                     break;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 1.172 $
+ *              $Revision: 1.176 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -308,12 +308,12 @@ AcpiNsDumpOneObject (
 
         if (Type > ACPI_TYPE_LOCAL_MAX)
         {
-            ACPI_REPORT_WARNING (("Invalid ACPI Type %08X\n", Type));
+            ACPI_WARNING ((AE_INFO, "Invalid ACPI Object Type %08X", Type));
         }
 
         if (!AcpiUtValidAcpiName (ThisNode->Name.Integer))
         {
-            ACPI_REPORT_WARNING (("Invalid ACPI Name %08X\n",
+            ACPI_WARNING ((AE_INFO, "Invalid ACPI Name %08X",
                 ThisNode->Name.Integer));
         }
 
@@ -323,8 +323,8 @@ AcpiNsDumpOneObject (
     /*
      * Now we can print out the pertinent information
      */
-    AcpiOsPrintf (" %-12s %p ",
-            AcpiUtGetTypeName (Type), ThisNode);
+    AcpiOsPrintf (" %-12s %p %2.2X ",
+            AcpiUtGetTypeName (Type), ThisNode, ThisNode->OwnerId);
 
     DbgLevel = AcpiDbgLevel;
     AcpiDbgLevel = 0;

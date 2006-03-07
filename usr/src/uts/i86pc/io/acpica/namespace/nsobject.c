@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 1.93 $
+ *              $Revision: 1.96 $
  *
  ******************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -168,7 +168,7 @@ AcpiNsAttachObject (
     {
         /* Invalid handle */
 
-        ACPI_REPORT_ERROR (("NsAttachObject: Null NamedObj handle\n"));
+        ACPI_ERROR ((AE_INFO, "Null NamedObj handle"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -176,8 +176,8 @@ AcpiNsAttachObject (
     {
         /* Null object */
 
-        ACPI_REPORT_ERROR ((
-            "NsAttachObject: Null object, but type not ACPI_TYPE_ANY\n"));
+        ACPI_ERROR ((AE_INFO,
+            "Null object, but type not ACPI_TYPE_ANY"));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -185,8 +185,8 @@ AcpiNsAttachObject (
     {
         /* Not a name handle */
 
-        ACPI_REPORT_ERROR (("NsAttachObject: Invalid handle %p [%s]\n",
-                Node, AcpiUtGetDescriptorName (Node)));
+        ACPI_ERROR ((AE_INFO, "Invalid handle %p [%s]",
+            Node, AcpiUtGetDescriptorName (Node)));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
@@ -358,7 +358,7 @@ AcpiNsGetAttachedObject (
 
     if (!Node)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Null Node ptr\n"));
+        ACPI_WARNING ((AE_INFO, "Null Node ptr"));
         return_PTR (NULL);
     }
 

@@ -2,7 +2,7 @@
  *
  * Module Name: evxfregn - External Interfaces, ACPI Operation Regions and
  *                         Address Spaces.
- *              $Revision: 1.64 $
+ *              $Revision: 1.66 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -42,7 +42,7 @@
  * 3. Conditions
  *
  * 3.1. Redistribution of Source with Rights to Further Distribute Source.
- * Redistribution of source code of any substantial prton of the Covered
+ * Redistribution of source code of any substantial portion of the Covered
  * Code or modification with rights to further distribute source must include
  * the above Copyright Notice, the above License, this list of Conditions,
  * and the following Disclaimer and Export Compliance provision.  In addition,

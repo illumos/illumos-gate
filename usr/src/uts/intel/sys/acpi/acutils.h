@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 1.181 $
+ *       $Revision: 1.189 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +117,39 @@
 #ifndef _ACUTILS_H
 #define _ACUTILS_H
 
+
+extern const UINT8                      AcpiGbl_ResourceAmlSizes[];
+
+/* Strings used by the disassembler and debugger resource dump routines */
+
+#if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUGGER)
+
+extern const char                       *AcpiGbl_BMDecode[2];
+extern const char                       *AcpiGbl_ConfigDecode[4];
+extern const char                       *AcpiGbl_ConsumeDecode[2];
+extern const char                       *AcpiGbl_DECDecode[2];
+extern const char                       *AcpiGbl_HEDecode[2];
+extern const char                       *AcpiGbl_IoDecode[2];
+extern const char                       *AcpiGbl_LLDecode[2];
+extern const char                       *AcpiGbl_MaxDecode[2];
+extern const char                       *AcpiGbl_MEMDecode[4];
+extern const char                       *AcpiGbl_MinDecode[2];
+extern const char                       *AcpiGbl_MTPDecode[4];
+extern const char                       *AcpiGbl_RNGDecode[4];
+extern const char                       *AcpiGbl_RWDecode[2];
+extern const char                       *AcpiGbl_SHRDecode[2];
+extern const char                       *AcpiGbl_SIZDecode[4];
+extern const char                       *AcpiGbl_TRSDecode[2];
+extern const char                       *AcpiGbl_TTPDecode[2];
+extern const char                       *AcpiGbl_TYPDecode[4];
+#endif
+
+/* Types for Resource descriptor entries */
+
+#define ACPI_INVALID_RESOURCE           0
+#define ACPI_FIXED_LENGTH               1
+#define ACPI_VARIABLE_LENGTH            2
+#define ACPI_SMALL_VARIABLE_LENGTH      3
 
 typedef
 ACPI_STATUS (*ACPI_PKG_CALLBACK) (
@@ -310,7 +343,6 @@ extern const UINT8 _acpi_ctype[];
 #define ACPI_IS_LOWER(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO))
 #define ACPI_IS_PRINT(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO | _ACPI_UP | _ACPI_DI | _ACPI_SP | _ACPI_PU))
 #define ACPI_IS_ALPHA(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO | _ACPI_UP))
-#define ACPI_IS_ASCII(c)  ((c) < 0x80)
 
 #endif /* ACPI_USE_SYSTEM_CLIBRARY */
 
@@ -436,29 +468,28 @@ AcpiUtPtrExit (
     UINT8                   *Ptr);
 
 void
-AcpiUtReportInfo (
-    char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId);
-
-void
-AcpiUtReportError (
-    char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId);
-
-void
-AcpiUtReportWarning (
-    char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId);
-
-void
 AcpiUtDumpBuffer (
     UINT8                   *Buffer,
     UINT32                  Count,
     UINT32                  Display,
     UINT32                  componentId);
+
+void
+AcpiUtReportError (
+    char                    *ModuleName,
+    UINT32                  LineNumber);
+
+void
+AcpiUtReportInfo (
+    char                    *ModuleName,
+    UINT32                  LineNumber);
+
+void
+AcpiUtReportWarning (
+    char                    *ModuleName,
+    UINT32                  LineNumber);
+
+/* Error and message reporting interfaces */
 
 void ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrint (
@@ -468,7 +499,7 @@ AcpiUtDebugPrint (
     char                    *ModuleName,
     UINT32                  ComponentId,
     char                    *Format,
-    ...) ACPI_PRINTF_LIKE_FUNC;
+    ...) ACPI_PRINTF_LIKE(6);
 
 void ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrintRaw (
@@ -478,7 +509,36 @@ AcpiUtDebugPrintRaw (
     char                    *ModuleName,
     UINT32                  ComponentId,
     char                    *Format,
-    ...) ACPI_PRINTF_LIKE_FUNC;
+    ...) ACPI_PRINTF_LIKE(6);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiUtError (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...) ACPI_PRINTF_LIKE(3);
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiUtException (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    ACPI_STATUS             Status,
+    char                    *Format,
+    ...) ACPI_PRINTF_LIKE(4);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiUtWarning (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...) ACPI_PRINTF_LIKE(3);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiUtInfo (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...) ACPI_PRINTF_LIKE(3);
 
 
 /*
@@ -708,14 +768,31 @@ AcpiUtStrtoul64 (
 
 #define ACPI_ANY_BASE        0
 
-UINT8 *
-AcpiUtGetResourceEndTag (
-    ACPI_OPERAND_OBJECT     *ObjDesc);
+ACPI_STATUS
+AcpiUtValidateResource (
+    void                    *Aml,
+    UINT8                   *ReturnIndex);
+
+UINT32
+AcpiUtGetDescriptorLength (
+    void                    *Aml);
+
+UINT16
+AcpiUtGetResourceLength (
+    void                    *Aml);
 
 UINT8
-AcpiUtGenerateChecksum (
-    UINT8                   *Buffer,
-    UINT32                  Length);
+AcpiUtGetResourceHeaderLength (
+    void                    *Aml);
+
+UINT8
+AcpiUtGetResourceType (
+    void                    *Aml);
+
+ACPI_STATUS
+AcpiUtGetResourceEndTag (
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    UINT8                   **EndTag);
 
 UINT32
 AcpiUtDwordByteSwap (

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsinfo - Dispatch and Info tables
- *              $Revision: 1.3 $
+ *              $Revision: 1.7 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -136,64 +136,64 @@
 
 /* Dispatch table for resource-to-AML (Set Resource) conversion functions */
 
-ACPI_SET_RESOURCE_HANDLER           AcpiGbl_SetResourceDispatch [] =
+ACPI_RSCONVERT_INFO         *AcpiGbl_SetResourceDispatch[] =
 {
     AcpiRsSetIrq,                   /* 0x00, ACPI_RESOURCE_TYPE_IRQ */
-    AcpiRsSetDma,                   /* 0x01, ACPI_RESOURCE_TYPE_DMA */
+    AcpiRsConvertDma,               /* 0x01, ACPI_RESOURCE_TYPE_DMA */
     AcpiRsSetStartDpf,              /* 0x02, ACPI_RESOURCE_TYPE_START_DEPENDENT */
-    AcpiRsSetEndDpf,                /* 0x03, ACPI_RESOURCE_TYPE_END_DEPENDENT */
-    AcpiRsSetIo,                    /* 0x04, ACPI_RESOURCE_TYPE_IO */
-    AcpiRsSetFixedIo,               /* 0x05, ACPI_RESOURCE_TYPE_FIXED_IO */
+    AcpiRsConvertEndDpf,            /* 0x03, ACPI_RESOURCE_TYPE_END_DEPENDENT */
+    AcpiRsConvertIo,                /* 0x04, ACPI_RESOURCE_TYPE_IO */
+    AcpiRsConvertFixedIo,           /* 0x05, ACPI_RESOURCE_TYPE_FIXED_IO */
     AcpiRsSetVendor,                /* 0x06, ACPI_RESOURCE_TYPE_VENDOR */
-    AcpiRsSetEndTag,                /* 0x07, ACPI_RESOURCE_TYPE_END_TAG */
-    AcpiRsSetMemory24,              /* 0x08, ACPI_RESOURCE_TYPE_MEMORY24 */
-    AcpiRsSetMemory32,              /* 0x09, ACPI_RESOURCE_TYPE_MEMORY32 */
-    AcpiRsSetFixedMemory32,         /* 0x0A, ACPI_RESOURCE_TYPE_FIXED_MEMORY32 */
-    AcpiRsSetAddress16,             /* 0x0B, ACPI_RESOURCE_TYPE_ADDRESS16 */
-    AcpiRsSetAddress32,             /* 0x0C, ACPI_RESOURCE_TYPE_ADDRESS32 */
-    AcpiRsSetAddress64,             /* 0x0D, ACPI_RESOURCE_TYPE_ADDRESS64 */
-    AcpiRsSetExtAddress64,          /* 0x0E, ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64 */
-    AcpiRsSetExtIrq,                /* 0x0F, ACPI_RESOURCE_TYPE_EXTENDED_IRQ */
-    AcpiRsSetGenericReg             /* 0x10, ACPI_RESOURCE_TYPE_GENERIC_REGISTER */
+    AcpiRsConvertEndTag,            /* 0x07, ACPI_RESOURCE_TYPE_END_TAG */
+    AcpiRsConvertMemory24,          /* 0x08, ACPI_RESOURCE_TYPE_MEMORY24 */
+    AcpiRsConvertMemory32,          /* 0x09, ACPI_RESOURCE_TYPE_MEMORY32 */
+    AcpiRsConvertFixedMemory32,     /* 0x0A, ACPI_RESOURCE_TYPE_FIXED_MEMORY32 */
+    AcpiRsConvertAddress16,         /* 0x0B, ACPI_RESOURCE_TYPE_ADDRESS16 */
+    AcpiRsConvertAddress32,         /* 0x0C, ACPI_RESOURCE_TYPE_ADDRESS32 */
+    AcpiRsConvertAddress64,         /* 0x0D, ACPI_RESOURCE_TYPE_ADDRESS64 */
+    AcpiRsConvertExtAddress64,      /* 0x0E, ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64 */
+    AcpiRsConvertExtIrq,            /* 0x0F, ACPI_RESOURCE_TYPE_EXTENDED_IRQ */
+    AcpiRsConvertGenericReg         /* 0x10, ACPI_RESOURCE_TYPE_GENERIC_REGISTER */
 };
-
 
 /* Dispatch tables for AML-to-resource (Get Resource) conversion functions */
 
-ACPI_GET_RESOURCE_HANDLER           AcpiGbl_SmGetResourceDispatch [] =
+ACPI_RSCONVERT_INFO         *AcpiGbl_GetResourceDispatch[] =
 {
+    /* Small descriptors */
+
     NULL,                           /* 0x00, Reserved */
     NULL,                           /* 0x01, Reserved */
     NULL,                           /* 0x02, Reserved */
     NULL,                           /* 0x03, Reserved */
     AcpiRsGetIrq,                   /* 0x04, ACPI_RESOURCE_NAME_IRQ */
-    AcpiRsGetDma,                   /* 0x05, ACPI_RESOURCE_NAME_DMA */
+    AcpiRsConvertDma,               /* 0x05, ACPI_RESOURCE_NAME_DMA */
     AcpiRsGetStartDpf,              /* 0x06, ACPI_RESOURCE_NAME_START_DEPENDENT */
-    AcpiRsGetEndDpf,                /* 0x07, ACPI_RESOURCE_NAME_END_DEPENDENT */
-    AcpiRsGetIo,                    /* 0x08, ACPI_RESOURCE_NAME_IO */
-    AcpiRsGetFixedIo,               /* 0x09, ACPI_RESOURCE_NAME_FIXED_IO */
+    AcpiRsConvertEndDpf,            /* 0x07, ACPI_RESOURCE_NAME_END_DEPENDENT */
+    AcpiRsConvertIo,                /* 0x08, ACPI_RESOURCE_NAME_IO */
+    AcpiRsConvertFixedIo,           /* 0x09, ACPI_RESOURCE_NAME_FIXED_IO */
     NULL,                           /* 0x0A, Reserved */
     NULL,                           /* 0x0B, Reserved */
     NULL,                           /* 0x0C, Reserved */
     NULL,                           /* 0x0D, Reserved */
-    AcpiRsGetVendor,                /* 0x0E, ACPI_RESOURCE_NAME_VENDOR_SMALL */
-    AcpiRsGetEndTag                 /* 0x0F, ACPI_RESOURCE_NAME_END_TAG */
-};
+    AcpiRsGetVendorSmall,           /* 0x0E, ACPI_RESOURCE_NAME_VENDOR_SMALL */
+    AcpiRsConvertEndTag,            /* 0x0F, ACPI_RESOURCE_NAME_END_TAG */
 
-ACPI_GET_RESOURCE_HANDLER           AcpiGbl_LgGetResourceDispatch[] =
-{
+    /* Large descriptors */
+
     NULL,                           /* 0x00, Reserved */
-    AcpiRsGetMemory24,              /* 0x01, ACPI_RESOURCE_NAME_MEMORY24 */
-    AcpiRsGetGenericReg,            /* 0x02, ACPI_RESOURCE_NAME_GENERIC_REGISTER */
+    AcpiRsConvertMemory24,          /* 0x01, ACPI_RESOURCE_NAME_MEMORY24 */
+    AcpiRsConvertGenericReg,        /* 0x02, ACPI_RESOURCE_NAME_GENERIC_REGISTER */
     NULL,                           /* 0x03, Reserved */
-    AcpiRsGetVendor,                /* 0x04, ACPI_RESOURCE_NAME_VENDOR_LARGE */
-    AcpiRsGetMemory32,              /* 0x05, ACPI_RESOURCE_NAME_MEMORY32 */
-    AcpiRsGetFixedMemory32,         /* 0x06, ACPI_RESOURCE_NAME_FIXED_MEMORY32 */
-    AcpiRsGetAddress32,             /* 0x07, ACPI_RESOURCE_NAME_ADDRESS32 */
-    AcpiRsGetAddress16,             /* 0x08, ACPI_RESOURCE_NAME_ADDRESS16 */
-    AcpiRsGetExtIrq,                /* 0x09, ACPI_RESOURCE_NAME_EXTENDED_IRQ */
-    AcpiRsGetAddress64,             /* 0x0A, ACPI_RESOURCE_NAME_ADDRESS64 */
-    AcpiRsGetExtAddress64           /* 0x0B, ACPI_RESOURCE_NAME_EXTENDED_ADDRESS64 */
+    AcpiRsGetVendorLarge,           /* 0x04, ACPI_RESOURCE_NAME_VENDOR_LARGE */
+    AcpiRsConvertMemory32,          /* 0x05, ACPI_RESOURCE_NAME_MEMORY32 */
+    AcpiRsConvertFixedMemory32,     /* 0x06, ACPI_RESOURCE_NAME_FIXED_MEMORY32 */
+    AcpiRsConvertAddress32,         /* 0x07, ACPI_RESOURCE_NAME_ADDRESS32 */
+    AcpiRsConvertAddress16,         /* 0x08, ACPI_RESOURCE_NAME_ADDRESS16 */
+    AcpiRsConvertExtIrq,            /* 0x09, ACPI_RESOURCE_NAME_EXTENDED_IRQ */
+    AcpiRsConvertAddress64,         /* 0x0A, ACPI_RESOURCE_NAME_ADDRESS64 */
+    AcpiRsConvertExtAddress64       /* 0x0B, ACPI_RESOURCE_NAME_EXTENDED_ADDRESS64 */
 };
 
 
@@ -201,7 +201,7 @@ ACPI_GET_RESOURCE_HANDLER           AcpiGbl_LgGetResourceDispatch[] =
 
 /* Dispatch table for resource dump functions */
 
-ACPI_DUMP_RESOURCE_HANDLER          AcpiGbl_DumpResourceDispatch [] =
+ACPI_RSDUMP_INFO            *AcpiGbl_DumpResourceDispatch[] =
 {
     AcpiRsDumpIrq,                  /* ACPI_RESOURCE_TYPE_IRQ */
     AcpiRsDumpDma,                  /* ACPI_RESOURCE_TYPE_DMA */
@@ -219,7 +219,7 @@ ACPI_DUMP_RESOURCE_HANDLER          AcpiGbl_DumpResourceDispatch [] =
     AcpiRsDumpAddress64,            /* ACPI_RESOURCE_TYPE_ADDRESS64 */
     AcpiRsDumpExtAddress64,         /* ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64 */
     AcpiRsDumpExtIrq,               /* ACPI_RESOURCE_TYPE_EXTENDED_IRQ */
-    AcpiRsDumpGenericReg            /* ACPI_RESOURCE_TYPE_GENERIC_REGISTER */
+    AcpiRsDumpGenericReg,           /* ACPI_RESOURCE_TYPE_GENERIC_REGISTER */
 };
 #endif
 
@@ -229,7 +229,7 @@ ACPI_DUMP_RESOURCE_HANDLER          AcpiGbl_DumpResourceDispatch [] =
  * Includes size of the descriptor header (1 byte for small descriptors,
  * 3 bytes for large descriptors)
  */
-UINT8                               AcpiGbl_AmlResourceSizes [] =
+const UINT8                 AcpiGbl_AmlResourceSizes[] =
 {
     sizeof (AML_RESOURCE_IRQ),              /* ACPI_RESOURCE_TYPE_IRQ (optional Byte 3 always created) */
     sizeof (AML_RESOURCE_DMA),              /* ACPI_RESOURCE_TYPE_DMA */
@@ -251,49 +251,40 @@ UINT8                               AcpiGbl_AmlResourceSizes [] =
 };
 
 
-/* Macros used in the tables below */
-
-#define ACPI_RLARGE(r)          sizeof (r) - sizeof (AML_RESOURCE_LARGE_HEADER)
-#define ACPI_RSMALL(r)          sizeof (r) - sizeof (AML_RESOURCE_SMALL_HEADER)
-
-/*
- * Base sizes of resource descriptors, both the AML stream resource length
- * (minus size of header and length fields),and the size of the internal
- * struct representation.
- */
-ACPI_RESOURCE_INFO                  AcpiGbl_SmResourceInfo [] =
+const UINT8                 AcpiGbl_ResourceStructSizes[] =
 {
-    {0, 0, 0},
-    {0, 0, 0},
-    {0, 0, 0},
-    {0, 0, 0},
-    {2, ACPI_RSMALL (AML_RESOURCE_IRQ),                 ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_IRQ)},
-    {0, ACPI_RSMALL (AML_RESOURCE_DMA),                 ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_DMA)},
-    {2, ACPI_RSMALL (AML_RESOURCE_START_DEPENDENT),     ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_START_DEPENDENT)},
-    {0, ACPI_RSMALL (AML_RESOURCE_END_DEPENDENT),       ACPI_RESOURCE_LENGTH},
-    {0, ACPI_RSMALL (AML_RESOURCE_IO),                  ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_IO)},
-    {0, ACPI_RSMALL (AML_RESOURCE_FIXED_IO),            ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_IO)},
-    {0, 0, 0},
-    {0, 0, 0},
-    {0, 0, 0},
-    {0, 0, 0},
-    {1, ACPI_RSMALL (AML_RESOURCE_VENDOR_SMALL),        ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR)},
-    {0, ACPI_RSMALL (AML_RESOURCE_END_TAG),             ACPI_RESOURCE_LENGTH}
-};
+    /* Small descriptors */
 
-ACPI_RESOURCE_INFO                  AcpiGbl_LgResourceInfo [] =
-{
-    {0, 0, 0},
-    {0, ACPI_RLARGE (AML_RESOURCE_MEMORY24),            ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY24)},
-    {0, ACPI_RLARGE (AML_RESOURCE_GENERIC_REGISTER),    ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_GENERIC_REGISTER)},
-    {0, 0, 0},
-    {1, ACPI_RLARGE (AML_RESOURCE_VENDOR_LARGE),        ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR)},
-    {0, ACPI_RLARGE (AML_RESOURCE_MEMORY32),            ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY32)},
-    {0, ACPI_RLARGE (AML_RESOURCE_FIXED_MEMORY32),      ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEMORY32)},
-    {1, ACPI_RLARGE (AML_RESOURCE_ADDRESS32),           ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS32)},
-    {1, ACPI_RLARGE (AML_RESOURCE_ADDRESS16),           ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS16)},
-    {1, ACPI_RLARGE (AML_RESOURCE_EXTENDED_IRQ),        ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_EXTENDED_IRQ)},
-    {1, ACPI_RLARGE (AML_RESOURCE_ADDRESS64),           ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS64)},
-    {0, ACPI_RLARGE (AML_RESOURCE_EXTENDED_ADDRESS64),  ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_EXTENDED_ADDRESS64)}
+    0,
+    0,
+    0,
+    0,
+    ACPI_RS_SIZE (ACPI_RESOURCE_IRQ),
+    ACPI_RS_SIZE (ACPI_RESOURCE_DMA),
+    ACPI_RS_SIZE (ACPI_RESOURCE_START_DEPENDENT),
+    ACPI_RS_SIZE_MIN,
+    ACPI_RS_SIZE (ACPI_RESOURCE_IO),
+    ACPI_RS_SIZE (ACPI_RESOURCE_FIXED_IO),
+    0,
+    0,
+    0,
+    0,
+    ACPI_RS_SIZE (ACPI_RESOURCE_VENDOR),
+    ACPI_RS_SIZE_MIN,
+
+    /* Large descriptors */
+
+    0,
+    ACPI_RS_SIZE (ACPI_RESOURCE_MEMORY24),
+    ACPI_RS_SIZE (ACPI_RESOURCE_GENERIC_REGISTER),
+    0,
+    ACPI_RS_SIZE (ACPI_RESOURCE_VENDOR),
+    ACPI_RS_SIZE (ACPI_RESOURCE_MEMORY32),
+    ACPI_RS_SIZE (ACPI_RESOURCE_FIXED_MEMORY32),
+    ACPI_RS_SIZE (ACPI_RESOURCE_ADDRESS32),
+    ACPI_RS_SIZE (ACPI_RESOURCE_ADDRESS16),
+    ACPI_RS_SIZE (ACPI_RESOURCE_EXTENDED_IRQ),
+    ACPI_RS_SIZE (ACPI_RESOURCE_ADDRESS64),
+    ACPI_RS_SIZE (ACPI_RESOURCE_EXTENDED_ADDRESS64)
 };
 

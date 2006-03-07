@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acfreebsd.h - OS specific defines, etc.
- *       $Revision: 1.19 $
+ *       $Revision: 1.22 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -124,6 +124,10 @@
 #include <sys/types.h>
 #include <machine/acpica_machdep.h>
 
+#define ACPI_UINTPTR_T                  uintptr_t
+#define ACPI_USE_LOCAL_CACHE
+#define __cdecl
+
 #ifdef _KERNEL
 #include "opt_acpi.h"
 #endif
@@ -143,7 +147,9 @@
 #ifdef DEBUGGER_THREADING
 #undef DEBUGGER_THREADING
 #endif /* DEBUGGER_THREADING */
+
 #define DEBUGGER_THREADING 0    /* integrated with DDB */
+
 #ifdef ACPI_DEBUG_OUTPUT
 #include "opt_ddb.h"
 #ifdef DDB

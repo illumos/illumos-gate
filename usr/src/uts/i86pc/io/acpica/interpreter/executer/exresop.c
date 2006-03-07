@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 1.86 $
+ *              $Revision: 1.90 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -121,6 +121,7 @@
 #include "amlcode.h"
 #include "acparser.h"
 #include "acinterp.h"
+#include "acnamesp.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -155,7 +156,7 @@ AcpiExCheckObjectType (
     ACPI_OBJECT_TYPE        ThisType,
     void                    *Object)
 {
-    ACPI_FUNCTION_NAME ("ExCheckObjectType");
+    ACPI_FUNCTION_ENTRY ();
 
 
     if (TypeNeeded == ACPI_TYPE_ANY)
@@ -181,8 +182,8 @@ AcpiExCheckObjectType (
 
     if (TypeNeeded != ThisType)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Needed [%s], found [%s] %p\n",
+        ACPI_ERROR ((AE_INFO,
+            "Needed type [%s], found [%s] %p",
             AcpiUtGetTypeName (TypeNeeded),
             AcpiUtGetTypeName (ThisType), Object));
 
@@ -243,7 +244,7 @@ AcpiExResolveOperands (
     ArgTypes = OpInfo->RuntimeArgs;
     if (ArgTypes == ARGI_INVALID_OPCODE)
     {
-        ACPI_REPORT_ERROR (("ResolveOperands: %X is not a valid AML opcode\n",
+        ACPI_ERROR ((AE_INFO, "Unknown AML opcode %X",
             Opcode));
 
         return_ACPI_STATUS (AE_AML_INTERNAL);
@@ -264,7 +265,7 @@ AcpiExResolveOperands (
     {
         if (!StackPtr || !*StackPtr)
         {
-            ACPI_REPORT_ERROR (("ResolveOperands: Null stack entry at %p\n",
+            ACPI_ERROR ((AE_INFO, "Null stack entry at %p",
                 StackPtr));
 
             return_ACPI_STATUS (AE_AML_INTERNAL);
@@ -283,6 +284,18 @@ AcpiExResolveOperands (
             /* Namespace Node */
 
             ObjectType = ((ACPI_NAMESPACE_NODE *) ObjDesc)->Type;
+
+            /*
+             * Resolve an alias object. The construction of these objects 
+             * guarantees that there is only one level of alias indirection;
+             * thus, the attached object is always the aliased namespace node
+             */
+            if (ObjectType == ACPI_TYPE_LOCAL_ALIAS)
+            {
+                ObjDesc = AcpiNsGetAttachedObject ((ACPI_NAMESPACE_NODE *) ObjDesc);
+                *StackPtr = ObjDesc;
+                ObjectType = ((ACPI_NAMESPACE_NODE *) ObjDesc)->Type;
+            }
             break;
 
 
@@ -296,8 +309,8 @@ AcpiExResolveOperands (
 
             if (!AcpiUtValidObjectType (ObjectType))
             {
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Bad operand object type [%X]\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Bad operand object type [%X]",
                     ObjectType));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -334,10 +347,9 @@ AcpiExResolveOperands (
                     break;
 
                 default:
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Operand is a Reference, Unknown Reference Opcode %X [%s]\n",
-                        ObjDesc->Reference.Opcode,
-                        (AcpiPsGetOpcodeInfo (ObjDesc->Reference.Opcode))->Name));
+                    ACPI_ERROR ((AE_INFO,
+                        "Operand is a Reference, Unknown Reference Opcode: %X",
+                        ObjDesc->Reference.Opcode));
 
                     return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
                 }
@@ -349,9 +361,9 @@ AcpiExResolveOperands (
 
             /* Invalid descriptor */
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Invalid descriptor %p [%s]\n",
-                    ObjDesc, AcpiUtGetDescriptorName (ObjDesc)));
+            ACPI_ERROR ((AE_INFO,
+                "Invalid descriptor %p [%s]",
+                ObjDesc, AcpiUtGetDescriptorName (ObjDesc)));
 
             return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
         }
@@ -514,8 +526,8 @@ AcpiExResolveOperands (
             {
                 if (Status == AE_TYPE)
                 {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Needed [Integer/String/Buffer], found [%s] %p\n",
+                    ACPI_ERROR ((AE_INFO,
+                        "Needed [Integer/String/Buffer], found [%s] %p",
                         AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                     return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -543,8 +555,8 @@ AcpiExResolveOperands (
             {
                 if (Status == AE_TYPE)
                 {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Needed [Integer/String/Buffer], found [%s] %p\n",
+                    ACPI_ERROR ((AE_INFO,
+                        "Needed [Integer/String/Buffer], found [%s] %p",
                         AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                     return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -573,8 +585,8 @@ AcpiExResolveOperands (
             {
                 if (Status == AE_TYPE)
                 {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Needed [Integer/String/Buffer], found [%s] %p\n",
+                    ACPI_ERROR ((AE_INFO,
+                        "Needed [Integer/String/Buffer], found [%s] %p",
                         AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                     return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -604,8 +616,8 @@ AcpiExResolveOperands (
                break;
 
             default:
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed [Integer/String/Buffer], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed [Integer/String/Buffer], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -642,8 +654,8 @@ AcpiExResolveOperands (
                 break;
 
             default:
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed [Integer/String/Buffer], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed [Integer/String/Buffer], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -670,8 +682,8 @@ AcpiExResolveOperands (
                 break;
 
             default:
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed [Buffer/String/Package/Reference], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed [Buffer/String/Package/Reference], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -693,8 +705,8 @@ AcpiExResolveOperands (
                 break;
 
             default:
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed [Buffer/String/Package], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed [Buffer/String/Package], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -717,8 +729,8 @@ AcpiExResolveOperands (
                 break;
 
             default:
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed [Region/RegionField], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed [Region/RegionField], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -765,8 +777,8 @@ AcpiExResolveOperands (
                     break;
                 }
 
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Needed Integer/Buffer/String/Package/Ref/Ddb], found [%s] %p\n",
+                ACPI_ERROR ((AE_INFO,
+                    "Needed Integer/Buffer/String/Package/Ref/Ddb], found [%s] %p",
                     AcpiUtGetObjectTypeName (ObjDesc), ObjDesc));
 
                 return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -778,8 +790,8 @@ AcpiExResolveOperands (
 
             /* Unknown type */
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Internal - Unknown ARGI (required operand) type %X\n",
+            ACPI_ERROR ((AE_INFO,
+                "Internal - Unknown ARGI (required operand) type %X",
                 ThisArgType));
 
             return_ACPI_STATUS (AE_BAD_PARAMETER);

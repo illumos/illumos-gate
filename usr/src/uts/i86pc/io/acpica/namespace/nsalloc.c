@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 1.97 $
+ *              $Revision: 1.100 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -390,7 +390,7 @@ AcpiNsDeleteChildren (
 
         if (ChildNode->Child)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found a grandchild! P=%p C=%p\n",
+            ACPI_ERROR ((AE_INFO, "Found a grandchild! P=%p C=%p",
                 ParentNode, ChildNode));
         }
 
@@ -420,8 +420,8 @@ AcpiNsDeleteChildren (
 
         if (ChildNode->ReferenceCount != 1)
         {
-            ACPI_REPORT_WARNING ((
-                "Existing references (%d) on node being deleted (%p)\n",
+            ACPI_WARNING ((AE_INFO,
+                "Existing references (%d) on node being deleted (%p)",
                 ChildNode->ReferenceCount, ChildNode));
         }
 

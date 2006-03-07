@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 1.82 $
+ *              $Revision: 1.86 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -41,7 +41,7 @@
  * 3. Conditions
  *
  * 3.1. Redistribution of Source with Rights to Further Distribute Source.
- * Redistribution of source code of any substantial prton of the Covered
+ * Redistribution of source code of any substantial portion of the Covered
  * Code or modification with rights to further distribute source must include
  * the above Copyright Notice, the above License, this list of Conditions,
  * and the following Disclaimer and Export Compliance provision.  In addition,
@@ -151,7 +151,7 @@ AcpiEnable (
 
     if (!AcpiGbl_FADT)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
+        ACPI_WARNING ((AE_INFO, "No FADT information present!"));
         return_ACPI_STATUS (AE_NO_ACPI_TABLES);
     }
 
@@ -166,7 +166,7 @@ AcpiEnable (
         Status = AcpiHwSetMode (ACPI_SYS_MODE_ACPI);
         if (ACPI_FAILURE (Status))
         {
-            ACPI_REPORT_ERROR (("Could not transition to ACPI mode.\n"));
+            ACPI_ERROR ((AE_INFO, "Could not transition to ACPI mode"));
             return_ACPI_STATUS (Status);
         }
 
@@ -202,7 +202,7 @@ AcpiDisable (
 
     if (!AcpiGbl_FADT)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
+        ACPI_WARNING ((AE_INFO, "No FADT information present!"));
         return_ACPI_STATUS (AE_NO_ACPI_TABLES);
     }
 
@@ -219,7 +219,7 @@ AcpiDisable (
 
         if (ACPI_FAILURE (Status))
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+            ACPI_ERROR ((AE_INFO,
                 "Could not exit ACPI mode to legacy mode"));
             return_ACPI_STATUS (Status);
         }
@@ -285,8 +285,8 @@ AcpiEnableEvent (
 
     if (Value != 1)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Could not enable %s event\n", AcpiUtGetEventName (Event)));
+        ACPI_ERROR ((AE_INFO,
+            "Could not enable %s event", AcpiUtGetEventName (Event)));
         return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
     }
 
@@ -516,8 +516,8 @@ AcpiDisableEvent (
 
     if (Value != 0)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Could not disable %s events\n", AcpiUtGetEventName (Event)));
+        ACPI_ERROR ((AE_INFO,
+            "Could not disable %s events", AcpiUtGetEventName (Event)));
         return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
     }
 
@@ -789,6 +789,14 @@ AcpiInstallGpeBlock (
      */
     Status = AcpiEvCreateGpeBlock (Node, GpeBlockAddress, RegisterCount,
                     0, InterruptNumber, &GpeBlock);
+    if (ACPI_FAILURE (Status))
+    {
+        goto UnlockAndExit;
+    }
+
+    /* Run the _PRW methods and enable the GPEs */
+
+    Status = AcpiEvInitializeGpeBlock (Node, GpeBlock);
     if (ACPI_FAILURE (Status))
     {
         goto UnlockAndExit;

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amlresrc.h - AML resource descriptors
- *              $Revision: 1.32 $
+ *              $Revision: 1.35 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -172,6 +172,11 @@ typedef struct asl_resource_node
 } ASL_RESOURCE_NODE;
 
 
+/* Macros used to generate AML resource length fields */
+
+#define ACPI_AML_SIZE_LARGE(r)      (sizeof (r) - sizeof (AML_RESOURCE_LARGE_HEADER))
+#define ACPI_AML_SIZE_SMALL(r)      (sizeof (r) - sizeof (AML_RESOURCE_SMALL_HEADER))
+
 /*
  * Resource descriptors defined in the ACPI specification.
  *
@@ -244,7 +249,7 @@ typedef struct aml_resource_end_dependent
 typedef struct aml_resource_io
 {
     AML_RESOURCE_SMALL_HEADER_COMMON
-    UINT8                       Information;
+    UINT8                       Flags;
     UINT16                      Minimum;
     UINT16                      Maximum;
     UINT8                       Alignment;
@@ -294,7 +299,7 @@ typedef struct aml_resource_large_header
 typedef struct aml_resource_memory24
 {
     AML_RESOURCE_LARGE_HEADER_COMMON
-    UINT8                       Information;
+    UINT8                       Flags;
     UINT16                      Minimum;
     UINT16                      Maximum;
     UINT16                      Alignment;
@@ -313,7 +318,7 @@ typedef struct aml_resource_vendor_large
 typedef struct aml_resource_memory32
 {
     AML_RESOURCE_LARGE_HEADER_COMMON
-    UINT8                       Information;
+    UINT8                       Flags;
     UINT32                      Minimum;
     UINT32                      Maximum;
     UINT32                      Alignment;
@@ -325,7 +330,7 @@ typedef struct aml_resource_memory32
 typedef struct aml_resource_fixed_memory32
 {
     AML_RESOURCE_LARGE_HEADER_COMMON
-    UINT8                       Information;
+    UINT8                       Flags;
     UINT32                      Address;
     UINT32                      AddressLength;
 
@@ -357,7 +362,7 @@ typedef struct aml_resource_extended_address64
     UINT64                      Maximum;
     UINT64                      TranslationOffset;
     UINT64                      AddressLength;
-    UINT64                      TypeSpecificAttributes;
+    UINT64                      TypeSpecific;
 
 } AML_RESOURCE_EXTENDED_ADDRESS64;
 
@@ -407,8 +412,8 @@ typedef struct aml_resource_extended_irq
 {
     AML_RESOURCE_LARGE_HEADER_COMMON
     UINT8                       Flags;
-    UINT8                       TableLength;
-    UINT32                      InterruptNumber[1];
+    UINT8                       InterruptCount;
+    UINT32                      Interrupts[1];
     /* ResSourceIndex, ResSource optional fields follow */
 
 } AML_RESOURCE_EXTENDED_IRQ;

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 1.70 $
+ *              $Revision: 1.73 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -151,8 +151,7 @@ AcpiHwInitialize (
 
     if (!AcpiGbl_FADT)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No FADT is present\n"));
-
+        ACPI_ERROR ((AE_INFO, "No FADT is present"));
         return_ACPI_STATUS (AE_NO_ACPI_TABLES);
     }
 
@@ -197,7 +196,7 @@ AcpiHwSetMode (
      */
     if (!AcpiGbl_FADT->SmiCmd)
     {
-        ACPI_REPORT_ERROR (("No SMI_CMD in FADT, mode transition failed.\n"));
+        ACPI_ERROR ((AE_INFO, "No SMI_CMD in FADT, mode transition failed"));
         return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
     }
 
@@ -210,8 +209,8 @@ AcpiHwSetMode (
      */
     if (!AcpiGbl_FADT->AcpiEnable && !AcpiGbl_FADT->AcpiDisable)
     {
-        ACPI_REPORT_ERROR ((
-            "No ACPI mode transition supported in this system (enable/disable both zero)\n"));
+        ACPI_ERROR ((AE_INFO,
+            "No ACPI mode transition supported in this system (enable/disable both zero)"));
         return_ACPI_STATUS (AE_OK);
     }
 
@@ -244,8 +243,8 @@ AcpiHwSetMode (
 
     if (ACPI_FAILURE (Status))
     {
-        ACPI_REPORT_ERROR (("Could not write mode change, %s\n",
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "Could not write ACPI mode change"));
         return_ACPI_STATUS (Status);
     }
 
@@ -266,7 +265,7 @@ AcpiHwSetMode (
         Retry--;
     }
 
-    ACPI_REPORT_ERROR (("Hardware never changed modes\n"));
+    ACPI_ERROR ((AE_INFO, "Hardware did not change modes"));
     return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
 }
 

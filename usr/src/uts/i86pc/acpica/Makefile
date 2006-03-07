@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,13 +39,12 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-$(NOT_RELEASE_BUILD)DEBUG_FLGS	= -DACPI_DEBUG_OUTPUT
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 #
 # lint pass one non-enforcement
 #
-CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE
+CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE -DACPI_DEBUG_OUTPUT
 
 #
 # 3rd party code is not lint clean

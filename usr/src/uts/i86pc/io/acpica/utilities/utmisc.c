@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 1.124 $
+ *              $Revision: 1.136 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -144,6 +144,8 @@ AcpiUtAllocateOwnerId (
     ACPI_OWNER_ID           *OwnerId)
 {
     ACPI_NATIVE_UINT        i;
+    ACPI_NATIVE_UINT        j;
+    ACPI_NATIVE_UINT        k;
     ACPI_STATUS             Status;
 
 
@@ -154,7 +156,7 @@ AcpiUtAllocateOwnerId (
 
     if (*OwnerId)
     {
-        ACPI_REPORT_ERROR (("Owner ID [%2.2X] already exists\n", *OwnerId));
+        ACPI_ERROR ((AE_INFO, "Owner ID [%2.2X] already exists", *OwnerId));
         return_ACPI_STATUS (AE_ALREADY_EXISTS);
     }
 
@@ -166,33 +168,71 @@ AcpiUtAllocateOwnerId (
         return_ACPI_STATUS (Status);
     }
 
-    /* Find a free owner ID */
-
-    for (i = 0; i < 32; i++)
+    /*
+     * Find a free owner ID, cycle through all possible IDs on repeated
+     * allocations. (ACPI_NUM_OWNERID_MASKS + 1) because first index may have
+     * to be scanned twice.
+     */
+    for (i = 0, j = AcpiGbl_LastOwnerIdIndex;
+         i < (ACPI_NUM_OWNERID_MASKS + 1);
+         i++, j++)
     {
-        if (!(AcpiGbl_OwnerIdMask & (1 << i)))
+        if (j >= ACPI_NUM_OWNERID_MASKS)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_VALUES,
-                "Current OwnerId mask: %8.8X New ID: %2.2X\n",
-                AcpiGbl_OwnerIdMask, (unsigned int) (i + 1)));
-
-            AcpiGbl_OwnerIdMask |= (1 << i);
-            *OwnerId = (ACPI_OWNER_ID) (i + 1);
-            goto Exit;
+            j = 0;  /* Wraparound to start of mask array */
         }
+
+        for (k = AcpiGbl_NextOwnerIdOffset; k < 32; k++)
+        {
+            if (AcpiGbl_OwnerIdMask[j] == ACPI_UINT32_MAX)
+            {
+                /* There are no free IDs in this mask */
+
+                break;
+            }
+
+            if (!(AcpiGbl_OwnerIdMask[j] & (1 << k)))
+            {
+                /*
+                 * Found a free ID. The actual ID is the bit index plus one,
+                 * making zero an invalid Owner ID. Save this as the last ID
+                 * allocated and update the global ID mask.
+                 */
+                AcpiGbl_OwnerIdMask[j] |= (1 << k);
+
+                AcpiGbl_LastOwnerIdIndex = (UINT8) j;
+                AcpiGbl_NextOwnerIdOffset = (UINT8) (k + 1);
+
+                /*
+                 * Construct encoded ID from the index and bit position
+                 *
+                 * Note: Last [j].k (bit 255) is never used and is marked
+                 * permanently allocated (prevents +1 overflow)
+                 */
+                *OwnerId = (ACPI_OWNER_ID) ((k + 1) + ACPI_MUL_32 (j));
+
+                ACPI_DEBUG_PRINT ((ACPI_DB_VALUES,
+                    "Allocated OwnerId: %2.2X\n", (unsigned int) *OwnerId));
+                goto Exit;
+            }
+        }
+
+        AcpiGbl_NextOwnerIdOffset = 0;
     }
 
     /*
-     * If we are here, all OwnerIds have been allocated. This probably should
+     * All OwnerIds have been allocated. This typically should
      * not happen since the IDs are reused after deallocation. The IDs are
      * allocated upon table load (one per table) and method execution, and
      * they are released when a table is unloaded or a method completes
      * execution.
+     *
+     * If this error happens, there may be very deep nesting of invoked control
+     * methods, or there may be a bug where the IDs are not released.
      */
-    *OwnerId = 0;
     Status = AE_OWNER_ID_LIMIT;
-    ACPI_REPORT_ERROR ((
-        "Could not allocate new OwnerId (32 max), AE_OWNER_ID_LIMIT\n"));
+    ACPI_ERROR ((AE_INFO,
+        "Could not allocate new OwnerId (255 max), AE_OWNER_ID_LIMIT"));
 
 Exit:
     (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
@@ -210,7 +250,7 @@ Exit:
  *              control method or unloading a table. Either way, we would
  *              ignore any error anyway.
  *
- * DESCRIPTION: Release a table or method owner ID.  Valid IDs are 1 - 32
+ * DESCRIPTION: Release a table or method owner ID.  Valid IDs are 1 - 255
  *
  ******************************************************************************/
 
@@ -220,6 +260,8 @@ AcpiUtReleaseOwnerId (
 {
     ACPI_OWNER_ID           OwnerId = *OwnerIdPtr;
     ACPI_STATUS             Status;
+    ACPI_NATIVE_UINT        Index;
+    UINT32                  Bit;
 
 
     ACPI_FUNCTION_TRACE_U32 ("UtReleaseOwnerId", OwnerId);
@@ -231,9 +273,9 @@ AcpiUtReleaseOwnerId (
 
     /* Zero is not a valid OwnerID */
 
-    if ((OwnerId == 0) || (OwnerId > 32))
+    if (OwnerId == 0)
     {
-        ACPI_REPORT_ERROR (("Invalid OwnerId: %2.2X\n", OwnerId));
+        ACPI_ERROR ((AE_INFO, "Invalid OwnerId: %2.2X", OwnerId));
         return_VOID;
     }
 
@@ -249,11 +291,21 @@ AcpiUtReleaseOwnerId (
 
     OwnerId--;
 
+    /* Decode ID to index/offset pair */
+
+    Index = ACPI_DIV_32 (OwnerId);
+    Bit = 1 << ACPI_MOD_32 (OwnerId);
+
     /* Free the owner ID only if it is valid */
 
-    if (AcpiGbl_OwnerIdMask & (1 << OwnerId))
+    if (AcpiGbl_OwnerIdMask[Index] & Bit)
     {
-        AcpiGbl_OwnerIdMask ^= (1 << OwnerId);
+        AcpiGbl_OwnerIdMask[Index] ^= Bit;
+    }
+    else
+    {
+        ACPI_ERROR ((AE_INFO,
+            "Release of non-allocated OwnerId: %2.2X", OwnerId + 1));
     }
 
     (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
@@ -953,164 +1005,129 @@ AcpiUtWalkPackageTree (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiUtGenerateChecksum
- *
- * PARAMETERS:  Buffer          - Buffer to be scanned
- *              Length          - number of bytes to examine
- *
- * RETURN:      The generated checksum
- *
- * DESCRIPTION: Generate a checksum on a raw buffer
- *
- ******************************************************************************/
-
-UINT8
-AcpiUtGenerateChecksum (
-    UINT8                   *Buffer,
-    UINT32                  Length)
-{
-    UINT32                  i;
-    signed char             Sum = 0;
-
-
-    for (i = 0; i < Length; i++)
-    {
-        Sum = (signed char) (Sum + Buffer[i]);
-    }
-
-    return ((UINT8) (0 - Sum));
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtGetResourceEndTag
- *
- * PARAMETERS:  ObjDesc         - The resource template buffer object
- *
- * RETURN:      Pointer to the end tag
- *
- * DESCRIPTION: Find the END_TAG resource descriptor in a resource template
- *
- ******************************************************************************/
-
-
-UINT8 *
-AcpiUtGetResourceEndTag (
-    ACPI_OPERAND_OBJECT     *ObjDesc)
-{
-    UINT8                   BufferByte;
-    UINT8                   *Buffer;
-    UINT8                   *EndBuffer;
-
-
-    Buffer    = ObjDesc->Buffer.Pointer;
-    EndBuffer = Buffer + ObjDesc->Buffer.Length;
-
-    while (Buffer < EndBuffer)
-    {
-        BufferByte = *Buffer;
-        if (BufferByte & ACPI_RESOURCE_NAME_LARGE)
-        {
-            /* Large Descriptor - Length is next 2 bytes */
-
-            Buffer += ((*(Buffer+1) | (*(Buffer+2) << 8)) + 3);
-        }
-        else
-        {
-            /* Small Descriptor.  End Tag will be found here */
-
-            if ((BufferByte & ACPI_RESOURCE_NAME_SMALL_MASK) == ACPI_RESOURCE_NAME_END_TAG)
-            {
-                /* Found the end tag descriptor, all done. */
-
-                return (Buffer);
-            }
-
-            /* Length is in the header */
-
-            Buffer += ((BufferByte & 0x07) + 1);
-        }
-    }
-
-    /* End tag not found */
-
-    return (NULL);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtReportError
+ * FUNCTION:    AcpiUtError, AcpiUtWarning, AcpiUtInfo
  *
  * PARAMETERS:  ModuleName          - Caller's module name (for error output)
  *              LineNumber          - Caller's line number (for error output)
- *              ComponentId         - Caller's component ID (for error output)
+ *              Format              - Printf format string + additional args
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Print message with module/line/version info
+ *
+ ******************************************************************************/
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiUtError (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...)
+{
+    va_list                 args;
+
+
+    AcpiOsPrintf ("ACPI Error (%s-%04d): ", ModuleName, LineNumber);
+
+    va_start (args, Format);
+    AcpiOsVprintf (Format, args);
+    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+}
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiUtException (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    ACPI_STATUS             Status,
+    char                    *Format,
+    ...)
+{
+    va_list                 args;
+
+
+    AcpiOsPrintf ("ACPI Exception (%s-%04d): %s, ", ModuleName, LineNumber,
+        AcpiFormatException (Status));
+
+    va_start (args, Format);
+    AcpiOsVprintf (Format, args);
+    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+}
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiUtWarning (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...)
+{
+    va_list                 args;
+
+
+    AcpiOsPrintf ("ACPI Warning (%s-%04d): ", ModuleName, LineNumber);
+
+    va_start (args, Format);
+    AcpiOsVprintf (Format, args);
+    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+}
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiUtInfo (
+    char                    *ModuleName,
+    UINT32                  LineNumber,
+    char                    *Format,
+    ...)
+{
+    va_list                 args;
+
+
+    AcpiOsPrintf ("ACPI (%s-%04d): ", ModuleName, LineNumber);
+
+    va_start (args, Format);
+    AcpiOsVprintf (Format, args);
+    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiUtReportError, Warning, Info
+ *
+ * PARAMETERS:  ModuleName          - Caller's module name (for error output)
+ *              LineNumber          - Caller's line number (for error output)
  *
  * RETURN:      None
  *
  * DESCRIPTION: Print error message
+ *
+ * Note: Legacy only, should be removed when no longer used by drivers.
  *
  ******************************************************************************/
 
 void
 AcpiUtReportError (
     char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId)
+    UINT32                  LineNumber)
 {
 
-    AcpiOsPrintf ("%8s-%04d: *** Error: ", ModuleName, LineNumber);
+    AcpiOsPrintf ("ACPI Error (%s-%04d): ", ModuleName, LineNumber);
 }
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtReportWarning
- *
- * PARAMETERS:  ModuleName          - Caller's module name (for error output)
- *              LineNumber          - Caller's line number (for error output)
- *              ComponentId         - Caller's component ID (for error output)
- *
- * RETURN:      None
- *
- * DESCRIPTION: Print warning message
- *
- ******************************************************************************/
 
 void
 AcpiUtReportWarning (
     char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId)
+    UINT32                  LineNumber)
 {
 
-    AcpiOsPrintf ("%8s-%04d: *** Warning: ", ModuleName, LineNumber);
+    AcpiOsPrintf ("ACPI Warning (%s-%04d): ", ModuleName, LineNumber);
 }
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtReportInfo
- *
- * PARAMETERS:  ModuleName          - Caller's module name (for error output)
- *              LineNumber          - Caller's line number (for error output)
- *              ComponentId         - Caller's component ID (for error output)
- *
- * RETURN:      None
- *
- * DESCRIPTION: Print information message
- *
- ******************************************************************************/
 
 void
 AcpiUtReportInfo (
     char                    *ModuleName,
-    UINT32                  LineNumber,
-    UINT32                  ComponentId)
+    UINT32                  LineNumber)
 {
 
-    AcpiOsPrintf ("%8s-%04d: *** Info: ", ModuleName, LineNumber);
+    AcpiOsPrintf ("ACPI (%s-%04d): ", ModuleName, LineNumber);
 }
 
 

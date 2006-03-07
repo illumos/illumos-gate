@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 1.162 $
+ *       $Revision: 1.164 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,7 +118,50 @@
 #define __ACINTERP_H__
 
 
-#define ACPI_WALK_OPERANDS       (&(WalkState->Operands [WalkState->NumOperands -1]))
+#define ACPI_WALK_OPERANDS          (&(WalkState->Operands [WalkState->NumOperands -1]))
+
+/* Macros for tables used for debug output */
+
+#define ACPI_EXD_OFFSET(f)          (UINT8) ACPI_OFFSET (ACPI_OPERAND_OBJECT,f)
+#define ACPI_EXD_NSOFFSET(f)        (UINT8) ACPI_OFFSET (ACPI_NAMESPACE_NODE,f)
+#define ACPI_EXD_TABLE_SIZE(name)   (sizeof(name) / sizeof (ACPI_EXDUMP_INFO))
+
+/*
+ * If possible, pack the following structure to byte alignment, since we
+ * don't care about performance for debug output
+ */
+#ifndef ACPI_MISALIGNMENT_NOT_SUPPORTED
+#pragma pack(1)
+#endif
+
+typedef const struct acpi_exdump_info
+{
+    UINT8                   Opcode;
+    UINT8                   Offset;
+    char                    *Name;
+
+} ACPI_EXDUMP_INFO;
+
+/* Values for the Opcode field above */
+
+#define ACPI_EXD_INIT                   0
+#define ACPI_EXD_TYPE                   1
+#define ACPI_EXD_UINT8                  2
+#define ACPI_EXD_UINT16                 3
+#define ACPI_EXD_UINT32                 4
+#define ACPI_EXD_UINT64                 5
+#define ACPI_EXD_LITERAL                6
+#define ACPI_EXD_POINTER                7
+#define ACPI_EXD_ADDRESS                8
+#define ACPI_EXD_STRING                 9
+#define ACPI_EXD_BUFFER                 10
+#define ACPI_EXD_PACKAGE                11
+#define ACPI_EXD_FIELD                  12
+#define ACPI_EXD_REFERENCE              13
+
+/* restore default alignment */
+
+#pragma pack()
 
 
 /*
@@ -529,7 +572,7 @@ AcpiExDumpObjectDescriptor (
     UINT32                  Flags);
 
 void
-AcpiExDumpNode (
+AcpiExDumpNamespaceNode (
     ACPI_NAMESPACE_NODE     *Node,
     UINT32                  Flags);
 

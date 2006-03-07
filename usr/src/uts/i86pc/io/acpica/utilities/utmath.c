@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmath - Integer math support routines
- *              $Revision: 1.17 $
+ *              $Revision: 1.20 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -166,7 +166,7 @@ AcpiUtShortDivide (
 
     if (Divisor == 0)
     {
-        ACPI_REPORT_ERROR (("AcpiUtShortDivide: Divide by zero\n"));
+        ACPI_ERROR ((AE_INFO, "Divide by zero"));
         return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
     }
 
@@ -236,7 +236,7 @@ AcpiUtDivide (
 
     if (InDivisor == 0)
     {
-        ACPI_REPORT_ERROR (("AcpiUtDivide: Divide by zero\n"));
+        ACPI_ERROR ((AE_INFO, "Divide by zero"));
         return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
     }
 
@@ -375,7 +375,7 @@ AcpiUtShortDivide (
 
     if (Divisor == 0)
     {
-        ACPI_REPORT_ERROR (("AcpiUtShortDivide: Divide by zero\n"));
+        ACPI_ERROR ((AE_INFO, "Divide by zero"));
         return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
     }
 
@@ -407,7 +407,7 @@ AcpiUtDivide (
 
     if (InDivisor == 0)
     {
-        ACPI_REPORT_ERROR (("AcpiUtDivide: Divide by zero\n"));
+        ACPI_ERROR ((AE_INFO, "Divide by zero"));
         return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
     }
 

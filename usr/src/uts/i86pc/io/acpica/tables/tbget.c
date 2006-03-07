@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 1.94 $
+ *              $Revision: 1.98 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -176,8 +176,8 @@ AcpiTbGetTable (
     Status = AcpiTbGetTableBody (Address, &Header, TableInfo);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_REPORT_ERROR (("Could not get ACPI table (size %X), %s\n",
-            Header.Length, AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status,
+            "Could not get ACPI table (size %X)", Header.Length));
         return_ACPI_STATUS (Status);
     }
 
@@ -238,10 +238,9 @@ AcpiTbGetTableHeader (
                     sizeof (ACPI_TABLE_HEADER), (void *) &Header);
         if (ACPI_FAILURE (Status))
         {
-            ACPI_REPORT_ERROR ((
-                "Could not map memory at %8.8X%8.8X for length %X\n",
-                ACPI_FORMAT_UINT64 (Address->Pointer.Physical),
-                sizeof (ACPI_TABLE_HEADER)));
+            ACPI_ERROR ((AE_INFO,
+                "Could not map memory at %8.8X%8.8X for table header",
+                ACPI_FORMAT_UINT64 (Address->Pointer.Physical)));
             return_ACPI_STATUS (Status);
         }
 
@@ -254,7 +253,7 @@ AcpiTbGetTableHeader (
 
     default:
 
-        ACPI_REPORT_ERROR (("Invalid address flags %X\n",
+        ACPI_ERROR ((AE_INFO, "Invalid address flags %X",
             Address->PointerType));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
@@ -357,8 +356,7 @@ AcpiTbTableOverride (
     {
         /* Some severe error from the OSL, but we basically ignore it */
 
-        ACPI_REPORT_ERROR (("Could not override ACPI table, %s\n",
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status, "Could not override ACPI table"));
         return_ACPI_STATUS (Status);
     }
 
@@ -379,14 +377,13 @@ AcpiTbTableOverride (
     Status = AcpiTbGetThisTable (&Address, NewTable, TableInfo);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_REPORT_ERROR (("Could not copy override ACPI table, %s\n",
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status, "Could not copy ACPI table"));
         return_ACPI_STATUS (Status);
     }
 
     /* Copy the table info */
 
-    ACPI_REPORT_INFO (("Table [%4.4s] replaced by host OS\n",
+    ACPI_INFO ((AE_INFO, "Table [%4.4s] replaced by host OS",
         TableInfo->Pointer->Signature));
 
     return_ACPI_STATUS (AE_OK);
@@ -439,8 +436,8 @@ AcpiTbGetThisTable (
         FullTable = ACPI_MEM_ALLOCATE (Header->Length);
         if (!FullTable)
         {
-            ACPI_REPORT_ERROR ((
-                "Could not allocate table memory for [%4.4s] length %X\n",
+            ACPI_ERROR ((AE_INFO,
+                "Could not allocate table memory for [%4.4s] length %X",
                 Header->Signature, Header->Length));
             return_ACPI_STATUS (AE_NO_MEMORY);
         }
@@ -465,8 +462,8 @@ AcpiTbGetThisTable (
                     (ACPI_SIZE) Header->Length, (void *) &FullTable);
         if (ACPI_FAILURE (Status))
         {
-            ACPI_REPORT_ERROR ((
-                "Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X\n",
+            ACPI_ERROR ((AE_INFO,
+                "Could not map memory for table [%4.4s] at %8.8X%8.8X for length %X",
                 Header->Signature,
                 ACPI_FORMAT_UINT64 (Address->Pointer.Physical),
                 Header->Length));
@@ -481,7 +478,7 @@ AcpiTbGetThisTable (
 
     default:
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid address flags %X\n",
+        ACPI_ERROR ((AE_INFO, "Invalid address flags %X",
             Address->PointerType));
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }

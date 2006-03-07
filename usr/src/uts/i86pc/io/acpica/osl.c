@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -252,18 +251,120 @@ AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 }
 
 
+/*
+ * ACPI semaphore implementation
+ */
+typedef struct {
+	kmutex_t	mutex;
+	kcondvar_t	cv;
+	uint32_t	available;
+	uint32_t	initial;
+	uint32_t	maximum;
+} acpi_sema_t;
+
+/*
+ *
+ */
+void
+acpi_sema_init(acpi_sema_t *sp, unsigned max, unsigned count, void *name,
+    int type, void *arg)
+{
+	mutex_init(&sp->mutex, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&sp->cv, NULL, CV_DRIVER, NULL);
+	/* no need to enter mutex here at creation */
+	sp->available = count;
+	sp->initial = count;
+	sp->maximum = max;
+}
+
+/*
+ *
+ */
+void
+acpi_sema_destroy(acpi_sema_t *sp)
+{
+
+	cv_destroy(&sp->cv);
+	mutex_destroy(&sp->mutex);
+}
+
+/*
+ *
+ */
+ACPI_STATUS
+acpi_sema_p(acpi_sema_t *sp, unsigned count, uint16_t wait_time)
+{
+	ACPI_STATUS rv = AE_OK;
+	clock_t deadline;
+
+	mutex_enter(&sp->mutex);
+
+	if (sp->available >= count) {
+		/*
+		 * Enough units available, no blocking
+		 */
+		sp->available -= count;
+		mutex_exit(&sp->mutex);
+		return (rv);
+	} else if (wait_time == 0) {
+		/*
+		 * Not enough units available and timeout
+		 * specifies no blocking
+		 */
+		rv = AE_TIME;
+		mutex_exit(&sp->mutex);
+		return (rv);
+	}
+
+	/*
+	 * Not enough units available and timeout specifies waiting
+	 */
+	if (wait_time != ACPI_WAIT_FOREVER)
+		deadline = ddi_get_lbolt() +
+		    (clock_t)drv_usectohz(wait_time * 1000);
+
+	do {
+		if (wait_time == ACPI_WAIT_FOREVER)
+			cv_wait(&sp->cv, &sp->mutex);
+		else if (cv_timedwait(&sp->cv, &sp->mutex, deadline) < 0) {
+			rv = AE_TIME;
+			break;
+		}
+	} while (sp->available < count);
+
+	/* if we dropped out of the wait with AE_OK, we got the units */
+	if (rv == AE_OK)
+		sp->available -= count;
+
+	mutex_exit(&sp->mutex);
+	return (rv);
+}
+
+/*
+ *
+ */
+void
+acpi_sema_v(acpi_sema_t *sp, unsigned count)
+{
+	mutex_enter(&sp->mutex);
+	sp->available += count;
+	cv_broadcast(&sp->cv);
+	mutex_exit(&sp->mutex);
+}
+
+
 ACPI_STATUS
 AcpiOsCreateSemaphore(UINT32 MaxUnits, UINT32 InitialUnits,
 ACPI_HANDLE *OutHandle)
 {
-	ksema_t	*sp;
+	acpi_sema_t *sp;
 
 	if ((OutHandle == NULL) || (InitialUnits > MaxUnits))
 		return (AE_BAD_PARAMETER);
 
-	sp = (ksema_t *)kmem_alloc(sizeof (ksema_t), KM_SLEEP);
-	sema_init(sp, InitialUnits, NULL, SEMA_DRIVER, NULL);
-	*OutHandle = (void *)sp;
+	sp = (acpi_sema_t *)kmem_alloc(sizeof (acpi_sema_t), KM_SLEEP);
+	acpi_sema_init(sp, MaxUnits, InitialUnits, NULL, SEMA_DRIVER, NULL);
+	*OutHandle = (ACPI_HANDLE)sp;
 	return (AE_OK);
 }
 
@@ -272,85 +373,80 @@ ACPI_STATUS
 AcpiOsDeleteSemaphore(ACPI_HANDLE Handle)
 {
 
-	sema_destroy((ksema_t *)Handle);
-	kmem_free((void *)Handle, sizeof (ksema_t));
+	if (Handle == NULL)
+		return (AE_BAD_PARAMETER);
+
+	acpi_sema_destroy((acpi_sema_t *)Handle);
+	kmem_free((void *)Handle, sizeof (acpi_sema_t));
 	return (AE_OK);
 }
 
 ACPI_STATUS
 AcpiOsWaitSemaphore(ACPI_HANDLE Handle, UINT32 Units, UINT16 Timeout)
 {
-	uint32_t p_count = 0;
-	clock_t	timeout_ticks = (clock_t)drv_usectohz(Timeout * 1000);
 
-	do {
-		if (!sema_tryp((ksema_t *)Handle)) {
-			/* going to block */
-			if (timeout_ticks > 0) {
-				delay(1);
-				if (Timeout != 0xffff)
-					timeout_ticks--;
-				continue;
-			} else
-				break;
-		} else {
-			p_count++;
-			if (--Units == 0)
-				return (AE_OK); /* normal exit */
-		}
-	} while (timeout_ticks > 0);
+	if ((Handle == NULL) || (Units < 1))
+		return (AE_BAD_PARAMETER);
 
-	while (p_count > 0)
-		sema_v((ksema_t *)Handle);
-	return (AE_TIME);
+	return (acpi_sema_p((acpi_sema_t *)Handle, Units, Timeout));
 }
 
 ACPI_STATUS
 AcpiOsSignalSemaphore(ACPI_HANDLE Handle, UINT32 Units)
 {
 
-	while (Units > 0) {
-		sema_v((ksema_t *)Handle);
-		Units -= 1;
-	}
+	if ((Handle == NULL) || (Units < 1))
+		return (AE_BAD_PARAMETER);
+
+	acpi_sema_v((acpi_sema_t *)Handle, Units);
 	return (AE_OK);
 }
 
 ACPI_STATUS
 AcpiOsCreateLock(ACPI_HANDLE *OutHandle)
 {
-	ksema_t	*sp;
+	kmutex_t *mp;
 
 	if (OutHandle == NULL)
 		return (AE_BAD_PARAMETER);
 
-	sp = (ksema_t *)kmem_alloc(sizeof (ksema_t), KM_SLEEP);
-	sema_init(sp, 1, NULL, SEMA_DRIVER, NULL);
-	*OutHandle = (void *)sp;
-
+	mp = (kmutex_t *)kmem_alloc(sizeof (kmutex_t), KM_SLEEP);
+	mutex_init(mp, NULL, MUTEX_DRIVER, NULL);
+	*OutHandle = (ACPI_HANDLE)mp;
 	return (AE_OK);
 }
 
 void
 AcpiOsDeleteLock(ACPI_HANDLE Handle)
 {
-	sema_destroy((ksema_t *)Handle);
-	kmem_free((void *)Handle, sizeof (ksema_t));
+
+	if (Handle == NULL)
+		return;
+
+	mutex_destroy((kmutex_t *)Handle);
+	kmem_free((void *)Handle, sizeof (kmutex_t));
 }
 
-UINT32
+ACPI_NATIVE_UINT
 AcpiOsAcquireLock(ACPI_HANDLE Handle)
 {
-	sema_p((ksema_t *)Handle);
-	return (0);
+
+	if (Handle == NULL)
+		return (AE_BAD_PARAMETER);
+
+	mutex_enter((kmutex_t *)Handle);
+	return (AE_OK);
 }
 
 void
-AcpiOsReleaseLock(ACPI_HANDLE Handle, UINT32 Flags)
+AcpiOsReleaseLock(ACPI_HANDLE Handle, ACPI_NATIVE_UINT Flags)
 {
 	_NOTE(ARGUNUSED(Flags))
 
-	sema_v((ksema_t *)Handle);
+	if (Handle == NULL)
+		return;
+
+	mutex_exit((kmutex_t *)Handle);
 }
 
 
@@ -362,7 +458,7 @@ AcpiOsAllocate(ACPI_SIZE Size)
 	Size += sizeof (Size);
 	tmp_ptr = (ACPI_SIZE *)kmem_zalloc(Size, KM_SLEEP);
 	*tmp_ptr++ = Size;
-	return ((void *)tmp_ptr);
+	return (tmp_ptr);
 }
 
 void
@@ -373,7 +469,7 @@ AcpiOsFree(void *Memory)
 	tmp_ptr = (ACPI_SIZE *)Memory;
 	tmp_ptr -= 1;
 	size = *tmp_ptr;
-	kmem_free((void *)tmp_ptr, size);
+	kmem_free(tmp_ptr, size);
 }
 
 ACPI_STATUS
@@ -575,23 +671,6 @@ static struct io_perm  {
 	ACPI_IO_ADDRESS	high;
 	uint8_t		perm;
 } osl_io_perm[] = {
-	{ 0x000, 0x00f, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x020, 0x021, OSL_IO_READ },		/* PIC */
-	{ 0x040, 0x043, OSL_IO_READ },		/* PIT (8254) */
-	{ 0x048, 0x04b, OSL_IO_DEFAULT },
-	{ 0x070, 0x071, OSL_IO_READ },		/* NMI / RTC */
-	{ 0x074, 0x076, OSL_IO_READ },		/* NMI / RTC */
-	{ 0x081, 0x083, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x087, 0x087, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x089, 0x089, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x08a, 0x08b, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x08f, 0x08f, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x090, 0x091, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x093, 0x094, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x096, 0x097, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x0a0, 0x0a1, OSL_IO_READ },		/* PIC */
-	{ 0x0c0, 0x0df, OSL_IO_DEFAULT },	/* DMAC */
-	{ 0x4d0, 0x4d1, OSL_IO_DEFAULT },	/* ELCR */
 	{ 0xcf8, 0xd00, OSL_IO_NONE | OSL_IO_TERM }
 };
 

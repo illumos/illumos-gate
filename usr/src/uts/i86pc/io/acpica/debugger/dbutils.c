@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 1.76 $
+ *              $Revision: 1.80 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -260,7 +260,7 @@ AcpiDbDumpExternalObject (
 
     case ACPI_TYPE_STRING:
 
-        AcpiOsPrintf ("[String]  Value: ");
+        AcpiOsPrintf ("[String] Length %.2X = ", ObjDesc->String.Length);
         for (i = 0; i < ObjDesc->String.Length; i++)
         {
             AcpiOsPrintf ("%c", ObjDesc->String.Pointer[i]);
@@ -274,7 +274,7 @@ AcpiDbDumpExternalObject (
         AcpiOsPrintf ("[Buffer] Length %.2X = ", ObjDesc->Buffer.Length);
         if (ObjDesc->Buffer.Length)
         {
-            AcpiUtDumpBuffer ((UINT8 *) ObjDesc->Buffer.Pointer,
+            AcpiUtDumpBuffer (ACPI_CAST_PTR (UINT8, ObjDesc->Buffer.Pointer),
                     ObjDesc->Buffer.Length, DB_DWORD_DISPLAY, _COMPONENT);
         }
         else
@@ -286,7 +286,7 @@ AcpiDbDumpExternalObject (
 
     case ACPI_TYPE_PACKAGE:
 
-        AcpiOsPrintf ("[Package]  Contains %d Elements:\n",
+        AcpiOsPrintf ("[Package] Contains %d Elements:\n",
                 ObjDesc->Package.Count);
 
         for (i = 0; i < ObjDesc->Package.Count; i++)
@@ -419,7 +419,7 @@ AcpiDbLocalNsLookup (
                     ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE, NULL, &Node);
     if (ACPI_FAILURE (Status))
     {
-        AcpiOsPrintf ("Could not locate name: %s %s\n",
+        AcpiOsPrintf ("Could not locate name: %s, %s\n",
                 Name, AcpiFormatException (Status));
     }
 

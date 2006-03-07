@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actbl2.h - ACPI Specification Revision 2.0 Tables
- *       $Revision: 1.45 $
+ *       $Revision: 1.47 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -175,8 +175,8 @@ typedef struct facs_descriptor_rev2
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               S4Bios_f        : 1;    /* 00:    S4BIOS support is present */
-    UINT8_BIT                               : 7;    /* 01-07: Reserved, must be zero */
+    UINT8                   S4Bios_f        : 1;    /* 00:    S4BIOS support is present */
+    UINT8                                   : 7;    /* 01-07: Reserved, must be zero */
     UINT8                   Reserved1[3];           /* 08-31: Reserved, must be zero */
 
     UINT64                  XFirmwareWakingVector;  /* 64-bit physical address of the Firmware Waking Vector. */
@@ -249,28 +249,28 @@ typedef struct fadt_descriptor_rev2
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               WbInvd      : 1;    /* 00:    The wbinvd instruction works properly */
-    UINT8_BIT               WbInvdFlush : 1;    /* 01:    The wbinvd flushes but does not invalidate */
-    UINT8_BIT               ProcC1      : 1;    /* 02:    All processors support C1 state */
-    UINT8_BIT               Plvl2Up     : 1;    /* 03:    C2 state works on MP system */
-    UINT8_BIT               PwrButton   : 1;    /* 04:    Power button is handled as a generic feature */
-    UINT8_BIT               SleepButton : 1;    /* 05:    Sleep button is handled as a generic feature, or not present */
-    UINT8_BIT               FixedRTC    : 1;    /* 06:    RTC wakeup stat not in fixed register space */
-    UINT8_BIT               Rtcs4       : 1;    /* 07:    RTC wakeup stat not possible from S4 */
-    UINT8_BIT               TmrValExt   : 1;    /* 08:    tmr_val is 32 bits 0=24-bits */
-    UINT8_BIT               DockCap     : 1;    /* 09:    Docking supported */
-    UINT8_BIT               ResetRegSup : 1;    /* 10:    System reset via the FADT RESET_REG supported */
-    UINT8_BIT               SealedCase  : 1;    /* 11:    No internal expansion capabilities and case is sealed */
-    UINT8_BIT               Headless    : 1;    /* 12:    No local video capabilities or local input devices */
-    UINT8_BIT               CpuSwSleep  : 1;    /* 13:    Must execute native instruction after writing SLP_TYPx register */
+    UINT8                   WbInvd      : 1;    /* 00:    The wbinvd instruction works properly */
+    UINT8                   WbInvdFlush : 1;    /* 01:    The wbinvd flushes but does not invalidate */
+    UINT8                   ProcC1      : 1;    /* 02:    All processors support C1 state */
+    UINT8                   Plvl2Up     : 1;    /* 03:    C2 state works on MP system */
+    UINT8                   PwrButton   : 1;    /* 04:    Power button is handled as a generic feature */
+    UINT8                   SleepButton : 1;    /* 05:    Sleep button is handled as a generic feature, or not present */
+    UINT8                   FixedRTC    : 1;    /* 06:    RTC wakeup stat not in fixed register space */
+    UINT8                   Rtcs4       : 1;    /* 07:    RTC wakeup stat not possible from S4 */
+    UINT8                   TmrValExt   : 1;    /* 08:    tmr_val is 32 bits 0=24-bits */
+    UINT8                   DockCap     : 1;    /* 09:    Docking supported */
+    UINT8                   ResetRegSup : 1;    /* 10:    System reset via the FADT RESET_REG supported */
+    UINT8                   SealedCase  : 1;    /* 11:    No internal expansion capabilities and case is sealed */
+    UINT8                   Headless    : 1;    /* 12:    No local video capabilities or local input devices */
+    UINT8                   CpuSwSleep  : 1;    /* 13:    Must execute native instruction after writing SLP_TYPx register */
 
-    UINT8_BIT               PciExpWak                           : 1; /* 14:    System supports PCIEXP_WAKE (STS/EN) bits (ACPI 3.0) */
-    UINT8_BIT               UsePlatformClock                    : 1; /* 15:    OSPM should use platform-provided timer (ACPI 3.0) */
-    UINT8_BIT               S4RtcStsValid                       : 1; /* 16:    Contents of RTC_STS valid after S4 wake (ACPI 3.0) */
-    UINT8_BIT               RemotePowerOnCapable                : 1; /* 17:    System is compatible with remote power on (ACPI 3.0) */
-    UINT8_BIT               ForceApicClusterModel               : 1; /* 18:    All local APICs must use cluster model (ACPI 3.0) */
-    UINT8_BIT               ForceApicPhysicalDestinationMode    : 1; /* 19:    All local xAPICs must use physical dest mode (ACPI 3.0) */
-    UINT8_BIT                                                   : 4; /* 20-23: Reserved, must be zero */
+    UINT8                   PciExpWak                           : 1; /* 14:    System supports PCIEXP_WAKE (STS/EN) bits (ACPI 3.0) */
+    UINT8                   UsePlatformClock                    : 1; /* 15:    OSPM should use platform-provided timer (ACPI 3.0) */
+    UINT8                   S4RtcStsValid                       : 1; /* 16:    Contents of RTC_STS valid after S4 wake (ACPI 3.0) */
+    UINT8                   RemotePowerOnCapable                : 1; /* 17:    System is compatible with remote power on (ACPI 3.0) */
+    UINT8                   ForceApicClusterModel               : 1; /* 18:    All local APICs must use cluster model (ACPI 3.0) */
+    UINT8                   ForceApicPhysicalDestinationMode    : 1; /* 19:    All local xAPICs must use physical dest mode (ACPI 3.0) */
+    UINT8                                                       : 4; /* 20-23: Reserved, must be zero */
     UINT8                   Reserved3;                               /* 24-31: Reserved, must be zero */
 
     ACPI_GENERIC_ADDRESS    ResetRegister;      /* Reset register address in GAS format */
@@ -330,8 +330,8 @@ typedef struct static_resource_alloc
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               Enabled         :1; /* 00:    Use affinity structure */
-    UINT8_BIT                               :7; /* 01-07: Reserved, must be zero */
+    UINT8                   Enabled         :1; /* 00:    Use affinity structure */
+    UINT8                                   :7; /* 01-07: Reserved, must be zero */
     UINT8                   Reserved3[3];       /* 08-31: Reserved, must be zero */
 
     UINT8                   LocalSapicEid;
@@ -352,10 +352,10 @@ typedef struct memory_affinity
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               Enabled         :1; /* 00:    Use affinity structure */
-    UINT8_BIT               HotPluggable    :1; /* 01:    Memory region is hot pluggable */
-    UINT8_BIT               NonVolatile     :1; /* 02:    Memory is non-volatile */
-    UINT8_BIT                               :5; /* 03-07: Reserved, must be zero */
+    UINT8                   Enabled         :1; /* 00:    Use affinity structure */
+    UINT8                   HotPluggable    :1; /* 01:    Memory region is hot pluggable */
+    UINT8                   NonVolatile     :1; /* 02:    Memory is non-volatile */
+    UINT8                                   :5; /* 03-07: Reserved, must be zero */
     UINT8                   Reserved5[3];       /* 08-31: Reserved, must be zero */
 
     UINT64                  Reserved6;          /* Reserved, must be zero */

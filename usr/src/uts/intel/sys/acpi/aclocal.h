@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 1.215 $
+ *       $Revision: 1.220 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -392,6 +392,38 @@ typedef struct acpi_create_field_info
 } ACPI_CREATE_FIELD_INFO;
 
 
+/*
+ * Bitmapped ACPI types.  Used internally only
+ */
+#define ACPI_BTYPE_ANY                  0x00000000
+#define ACPI_BTYPE_INTEGER              0x00000001
+#define ACPI_BTYPE_STRING               0x00000002
+#define ACPI_BTYPE_BUFFER               0x00000004
+#define ACPI_BTYPE_PACKAGE              0x00000008
+#define ACPI_BTYPE_FIELD_UNIT           0x00000010
+#define ACPI_BTYPE_DEVICE               0x00000020
+#define ACPI_BTYPE_EVENT                0x00000040
+#define ACPI_BTYPE_METHOD               0x00000080
+#define ACPI_BTYPE_MUTEX                0x00000100
+#define ACPI_BTYPE_REGION               0x00000200
+#define ACPI_BTYPE_POWER                0x00000400
+#define ACPI_BTYPE_PROCESSOR            0x00000800
+#define ACPI_BTYPE_THERMAL              0x00001000
+#define ACPI_BTYPE_BUFFER_FIELD         0x00002000
+#define ACPI_BTYPE_DDB_HANDLE           0x00004000
+#define ACPI_BTYPE_DEBUG_OBJECT         0x00008000
+#define ACPI_BTYPE_REFERENCE            0x00010000
+#define ACPI_BTYPE_RESOURCE             0x00020000
+
+#define ACPI_BTYPE_COMPUTE_DATA         (ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING | ACPI_BTYPE_BUFFER)
+
+#define ACPI_BTYPE_DATA                 (ACPI_BTYPE_COMPUTE_DATA  | ACPI_BTYPE_PACKAGE)
+#define ACPI_BTYPE_DATA_REFERENCE       (ACPI_BTYPE_DATA | ACPI_BTYPE_REFERENCE | ACPI_BTYPE_DDB_HANDLE)
+#define ACPI_BTYPE_DEVICE_OBJECTS       (ACPI_BTYPE_DEVICE | ACPI_BTYPE_THERMAL | ACPI_BTYPE_PROCESSOR)
+#define ACPI_BTYPE_OBJECTS_AND_REFS     0x0001FFFF  /* ARG or LOCAL */
+#define ACPI_BTYPE_ALL_OBJECTS          0x0000FFFF
+
+
 /*****************************************************************************
  *
  * Event typedefs and structs
@@ -525,13 +557,13 @@ typedef struct acpi_field_info
 #define ACPI_CONTROL_PREDICATE_TRUE          0xC4
 
 
-#define ACPI_STATE_COMMON                  /* Two 32-bit fields and a pointer */\
-    UINT8                       DataType;           /* To differentiate various internal objs */\
+#define ACPI_STATE_COMMON   /* Two 32-bit fields and a pointer */\
+    UINT8                       DataType;   /* To differentiate various internal objs */\
     UINT8                       Flags;      \
     UINT16                      Value;      \
     UINT16                      State;      \
     UINT16                      Reserved;   \
-    void                        *Next;      \
+    void                        *Next;
 
 typedef struct acpi_common_state
 {
@@ -732,7 +764,7 @@ typedef union acpi_parse_value
     char                        AmlOpName[16])  /* Op name (debug only) */\
                                                 /* NON-DEBUG members below: */\
     ACPI_NAMESPACE_NODE         *Node;          /* For use by interpreter */\
-    ACPI_PARSE_VALUE            Value;          /* Value or args associated with the opcode */\
+    ACPI_PARSE_VALUE            Value;          /* Value or args associated with the opcode */
 
 
 #define ACPI_DASM_BUFFER        0x00
@@ -768,6 +800,8 @@ typedef struct acpi_parse_obj_named
 
 /* The parse node is the fundamental element of the parse tree */
 
+#define ACPI_MAX_PARSEOP_NAME   20
+
 typedef struct acpi_parse_obj_asl
 {
     ACPI_PARSE_COMMON
@@ -794,7 +828,7 @@ typedef struct acpi_parse_obj_asl
     UINT8                       AmlOpcodeLength;
     UINT8                       AmlPkgLenBytes;
     UINT8                       Extra;
-    char                        ParseOpName[12];
+    char                        ParseOpName[ACPI_MAX_PARSEOP_NAME];
 
 } ACPI_PARSE_OBJ_ASL;
 

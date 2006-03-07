@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 1.134 $
+ *              $Revision: 1.137 $
  *
  ******************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -491,7 +491,7 @@ AcpiNsExecuteControlMethod (
     Info->ObjDesc = AcpiNsGetAttachedObject (Info->Node);
     if (!Info->ObjDesc)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No attached method object\n"));
+        ACPI_ERROR ((AE_INFO, "No attached method object"));
 
         (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
         return_ACPI_STATUS (AE_NULL_OBJECT);

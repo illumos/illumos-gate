@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 1.116 $
+ *              $Revision: 1.119 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -181,7 +181,7 @@ AcpiExSetupRegion (
 
     if (ACPI_GET_OBJECT_TYPE (RgnDesc) != ACPI_TYPE_REGION)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X (%s)\n",
+        ACPI_ERROR ((AE_INFO, "Needed Region, found type %X (%s)",
             ACPI_GET_OBJECT_TYPE (RgnDesc),
             AcpiUtGetObjectTypeName (RgnDesc)));
 
@@ -255,8 +255,8 @@ AcpiExSetupRegion (
              * than the region itself.  For example, a region of length one
              * byte, and a field with Dword access specified.
              */
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Field [%4.4s] access width (%d bytes) too large for region [%4.4s] (length %X)\n",
+            ACPI_ERROR ((AE_INFO,
+                "Field [%4.4s] access width (%d bytes) too large for region [%4.4s] (length %X)",
                 AcpiUtGetNodeName (ObjDesc->CommonField.Node),
                 ObjDesc->CommonField.AccessByteWidth,
                 AcpiUtGetNodeName (RgnDesc->Region.Node),
@@ -267,8 +267,8 @@ AcpiExSetupRegion (
          * Offset rounded up to next multiple of field width
          * exceeds region length, indicate an error
          */
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Field [%4.4s] Base+Offset+Width %X+%X+%X is beyond end of region [%4.4s] (length %X)\n",
+        ACPI_ERROR ((AE_INFO,
+            "Field [%4.4s] Base+Offset+Width %X+%X+%X is beyond end of region [%4.4s] (length %X)",
             AcpiUtGetNodeName (ObjDesc->CommonField.Node),
             ObjDesc->CommonField.BaseByteOffset,
             FieldDatumByteOffset, ObjDesc->CommonField.AccessByteWidth,
@@ -365,15 +365,15 @@ AcpiExAccessRegion (
     {
         if (Status == AE_NOT_IMPLEMENTED)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Region %s(%X) not implemented\n",
+            ACPI_ERROR ((AE_INFO,
+                "Region %s(%X) not implemented",
                 AcpiUtGetRegionName (RgnDesc->Region.SpaceId),
                 RgnDesc->Region.SpaceId));
         }
         else if (Status == AE_NOT_EXIST)
         {
-            ACPI_REPORT_ERROR ((
-                "Region %s(%X) has no handler\n",
+            ACPI_ERROR ((AE_INFO,
+                "Region %s(%X) has no handler",
                 AcpiUtGetRegionName (RgnDesc->Region.SpaceId),
                 RgnDesc->Region.SpaceId));
         }
@@ -625,7 +625,7 @@ AcpiExFieldDatumIo (
 
     default:
 
-        ACPI_REPORT_ERROR (("Wrong object type in field I/O %X\n",
+        ACPI_ERROR ((AE_INFO, "Wrong object type in field I/O %X",
             ACPI_GET_OBJECT_TYPE (ObjDesc)));
         Status = AE_AML_INTERNAL;
         break;
@@ -734,8 +734,8 @@ AcpiExWriteWithUpdateRule (
 
         default:
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "WriteWithUpdateRule: Unknown UpdateRule setting: %X\n",
+            ACPI_ERROR ((AE_INFO,
+                "Unknown UpdateRule value: %X",
                 (ObjDesc->CommonField.FieldFlags & AML_FIELD_UPDATE_RULE_MASK)));
             return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
         }
@@ -797,8 +797,8 @@ AcpiExExtractFromField (
     if (BufferLength < ACPI_ROUND_BITS_UP_TO_BYTES (
                             ObjDesc->CommonField.BitLength))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Field size %X (bits) is too large for buffer (%X)\n",
+        ACPI_ERROR ((AE_INFO,
+            "Field size %X (bits) is too large for buffer (%X)",
             ObjDesc->CommonField.BitLength, BufferLength));
 
         return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
@@ -918,8 +918,8 @@ AcpiExInsertIntoField (
     if (BufferLength < ACPI_ROUND_BITS_UP_TO_BYTES (
                             ObjDesc->CommonField.BitLength))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Field size %X (bits) is too large for buffer (%X)\n",
+        ACPI_ERROR ((AE_INFO,
+            "Field size %X (bits) is too large for buffer (%X)",
             ObjDesc->CommonField.BitLength, BufferLength));
 
         return_ACPI_STATUS (AE_BUFFER_OVERFLOW);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 1.122 $
+ *              $Revision: 1.126 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -504,9 +504,9 @@ AcpiUtCopyIobjectToEobject (
          * Build a simple object (no nested objects)
          */
         Status = AcpiUtCopyIsimpleToEsimple (InternalObject,
-                    (ACPI_OBJECT *) RetBuffer->Pointer,
-                    ((UINT8 *) RetBuffer->Pointer +
-                    ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT))),
+                    ACPI_CAST_PTR (ACPI_OBJECT, RetBuffer->Pointer),
+                    ACPI_ADD_PTR (UINT8, RetBuffer->Pointer,
+                        ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT))),
                     &RetBuffer->Length);
         /*
          * build simple does not include the object size in the length
@@ -726,8 +726,8 @@ AcpiUtCopyEobjectToIobject (
         /*
          * Packages as external input to control methods are not supported,
          */
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Packages as parameters not implemented!\n"));
+        ACPI_ERROR ((AE_INFO,
+            "Packages as parameters not implemented!"));
 
         return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
     }
@@ -1009,8 +1009,7 @@ AcpiUtCopyIpackageToIpackage (
                                     sizeof (void *));
     if (!DestObj->Package.Elements)
     {
-        ACPI_REPORT_ERROR (
-            ("AmlBuildCopyInternalPackageObject: Package allocation failure\n"));
+        ACPI_ERROR ((AE_INFO, "Package allocation failure"));
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
@@ -1019,7 +1018,7 @@ AcpiUtCopyIpackageToIpackage (
      * This handles nested packages of arbitrary depth.
      */
     Status = AcpiUtWalkPackageTree (SourceObj, DestObj,
-                            AcpiUtCopyIelementToIelement, WalkState);
+                AcpiUtCopyIelementToIelement, WalkState);
     if (ACPI_FAILURE (Status))
     {
         /* On failure, delete the destination package object */

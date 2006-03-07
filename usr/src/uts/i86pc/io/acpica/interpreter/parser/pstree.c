@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pstree - Parser op tree manipulation/traversal/search
- *              $Revision: 1.46 $
+ *              $Revision: 1.49 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -227,7 +227,7 @@ AcpiPsAppendArg (
     {
         /* Invalid opcode */
 
-        ACPI_REPORT_ERROR (("PsAppendArg: Invalid AML Opcode: 0x%2.2X\n",
+        ACPI_ERROR ((AE_INFO, "Invalid AML Opcode: 0x%2.2X",
             Op->Common.AmlOpcode));
         return;
     }

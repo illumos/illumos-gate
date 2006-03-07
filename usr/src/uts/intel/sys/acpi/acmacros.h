@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 1.163 $
+ *       $Revision: 1.180 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -135,7 +135,7 @@
 
 /*
  * For 16-bit addresses, we have to assume that the upper 32 bits
- * are zero.
+ * (out of 64) are zero.
  */
 #define ACPI_LODWORD(l)                 ((UINT32)(l))
 #define ACPI_HIDWORD(l)                 ((UINT32)(0))
@@ -179,30 +179,38 @@
 #define ACPI_FORMAT_UINT64(i)           ACPI_HIDWORD(i),ACPI_LODWORD(i)
 
 /*
- * Extract a byte of data using a pointer.  Any more than a byte and we
- * get into potential aligment issues -- see the STORE macros below
+ * Extract data using a pointer.  Any more than a byte and we
+ * get into potential aligment issues -- see the STORE macros below.
+ * Use with care.
  */
-#define ACPI_GET8(addr)                 (*(UINT8*)(addr))
+#define ACPI_GET8(ptr)                  *ACPI_CAST_PTR (UINT8, ptr)
+#define ACPI_GET16(ptr)                 *ACPI_CAST_PTR (UINT16, ptr)
+#define ACPI_GET32(ptr)                 *ACPI_CAST_PTR (UINT32, ptr)
+#define ACPI_GET64(ptr)                 *ACPI_CAST_PTR (UINT64, ptr)
+#define ACPI_SET8(ptr)                  *ACPI_CAST_PTR (UINT8, ptr)
+#define ACPI_SET16(ptr)                 *ACPI_CAST_PTR (UINT16, ptr)
+#define ACPI_SET32(ptr)                 *ACPI_CAST_PTR (UINT32, ptr)
+#define ACPI_SET64(ptr)                 *ACPI_CAST_PTR (UINT64, ptr)
 
-/* Pointer arithmetic */
-
-#define ACPI_PTR_ADD(t,a,b)             (t *) (void *)((char *)(a) + (ACPI_NATIVE_UINT)(b))
-#define ACPI_PTR_DIFF(a,b)              (ACPI_NATIVE_UINT) ((char *)(a) - (char *)(b))
+/*
+ * Pointer manipulation
+ */
+#define ACPI_CAST_PTR(t, p)             ((t *) (ACPI_UINTPTR_T) (p))
+#define ACPI_CAST_INDIRECT_PTR(t, p)    ((t **) (ACPI_UINTPTR_T) (p))
+#define ACPI_ADD_PTR(t,a,b)             ACPI_CAST_PTR (t, (ACPI_CAST_PTR (UINT8,(a)) + (ACPI_NATIVE_UINT)(b)))
+#define ACPI_PTR_DIFF(a,b)              (ACPI_NATIVE_UINT) (ACPI_CAST_PTR (UINT8,(a)) - ACPI_CAST_PTR (UINT8,(b)))
 
 /* Pointer/Integer type conversions */
 
-#define ACPI_TO_POINTER(i)              ACPI_PTR_ADD (void, (void *) NULL,(ACPI_NATIVE_UINT)i)
+#define ACPI_TO_POINTER(i)              ACPI_ADD_PTR (void,(void *) NULL,(ACPI_NATIVE_UINT) i)
 #define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p,(void *) NULL)
 #define ACPI_OFFSET(d,f)                (ACPI_SIZE) ACPI_PTR_DIFF (&(((d *)0)->f),(void *) NULL)
 #define ACPI_FADT_OFFSET(f)             ACPI_OFFSET (FADT_DESCRIPTOR, f)
 
-#define ACPI_CAST_PTR(t, p)             ((t *)(void *)(p))
-#define ACPI_CAST_INDIRECT_PTR(t, p)    ((t **)(void *)(p))
-
 #if ACPI_MACHINE_WIDTH == 16
 #define ACPI_STORE_POINTER(d,s)         ACPI_MOVE_32_TO_32(d,s)
 #define ACPI_PHYSADDR_TO_PTR(i)         (void *)(i)
-#define ACPI_PTR_TO_PHYSADDR(i)         (UINT32) (char *)(i)
+#define ACPI_PTR_TO_PHYSADDR(i)         (UINT32) ACPI_CAST_PTR (UINT8,(i))
 #else
 #define ACPI_PHYSADDR_TO_PTR(i)         ACPI_TO_POINTER(i)
 #define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
@@ -277,7 +285,7 @@
 
 #define ACPI_BUFFER_INDEX(BufLen,BufOffset,ByteGran)  (BufOffset)
 
-#ifdef ACPI_MISALIGNED_TRANSFERS
+#ifndef ACPI_MISALIGNMENT_NOT_SUPPORTED
 
 /* The hardware supports unaligned transfers, just do the little-endian move */
 
@@ -402,30 +410,40 @@
 #define ACPI_MUL_16(a)                  _ACPI_MUL(a,4)
 #define ACPI_MOD_16(a)                  _ACPI_MOD(a,16)
 
+#define ACPI_DIV_32(a)                  _ACPI_DIV(a,5)
+#define ACPI_MUL_32(a)                  _ACPI_MUL(a,5)
+#define ACPI_MOD_32(a)                  _ACPI_MOD(a,32)
 
 /*
  * Rounding macros (Power of two boundaries only)
  */
-#define ACPI_ROUND_DOWN(value,boundary)      (((ACPI_NATIVE_UINT)(value)) & (~(((ACPI_NATIVE_UINT) boundary)-1)))
-#define ACPI_ROUND_UP(value,boundary)        ((((ACPI_NATIVE_UINT)(value)) + (((ACPI_NATIVE_UINT) boundary)-1)) & (~(((ACPI_NATIVE_UINT) boundary)-1)))
+#define ACPI_ROUND_DOWN(value,boundary)     (((ACPI_NATIVE_UINT)(value)) & \
+                                                (~(((ACPI_NATIVE_UINT) boundary)-1)))
 
-#define ACPI_ROUND_DOWN_TO_32_BITS(a)        ACPI_ROUND_DOWN(a,4)
-#define ACPI_ROUND_DOWN_TO_64_BITS(a)        ACPI_ROUND_DOWN(a,8)
-#define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)    ACPI_ROUND_DOWN(a,ALIGNED_ADDRESS_BOUNDARY)
+#define ACPI_ROUND_UP(value,boundary)       ((((ACPI_NATIVE_UINT)(value)) + \
+                                                (((ACPI_NATIVE_UINT) boundary)-1)) & \
+                                                (~(((ACPI_NATIVE_UINT) boundary)-1)))
 
-#define ACPI_ROUND_UP_TO_32BITS(a)           ACPI_ROUND_UP(a,4)
-#define ACPI_ROUND_UP_TO_64BITS(a)           ACPI_ROUND_UP(a,8)
-#define ACPI_ROUND_UP_TO_NATIVE_WORD(a)      ACPI_ROUND_UP(a,ALIGNED_ADDRESS_BOUNDARY)
+/* Note: sizeof(ACPI_NATIVE_UINT) evaluates to either 2, 4, or 8 */
 
+#define ACPI_ROUND_DOWN_TO_32BIT(a)         ACPI_ROUND_DOWN(a,4)
+#define ACPI_ROUND_DOWN_TO_64BIT(a)         ACPI_ROUND_DOWN(a,8)
+#define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)   ACPI_ROUND_DOWN(a,sizeof(ACPI_NATIVE_UINT))
 
-#define ACPI_ROUND_BITS_UP_TO_BYTES(a)       ACPI_DIV_8((a) + 7)
-#define ACPI_ROUND_BITS_DOWN_TO_BYTES(a)     ACPI_DIV_8((a))
+#define ACPI_ROUND_UP_TO_32BIT(a)           ACPI_ROUND_UP(a,4)
+#define ACPI_ROUND_UP_TO_64BIT(a)           ACPI_ROUND_UP(a,8)
+#define ACPI_ROUND_UP_TO_NATIVE_WORD(a)     ACPI_ROUND_UP(a,sizeof(ACPI_NATIVE_UINT))
 
-#define ACPI_ROUND_UP_TO_1K(a)               (((a) + 1023) >> 10)
+#define ACPI_ROUND_BITS_UP_TO_BYTES(a)      ACPI_DIV_8((a) + 7)
+#define ACPI_ROUND_BITS_DOWN_TO_BYTES(a)    ACPI_DIV_8((a))
+
+#define ACPI_ROUND_UP_TO_1K(a)              (((a) + 1023) >> 10)
 
 /* Generic (non-power-of-two) rounding */
 
-#define ACPI_ROUND_UP_TO(value,boundary)     (((value) + ((boundary)-1)) / (boundary))
+#define ACPI_ROUND_UP_TO(value,boundary)    (((value) + ((boundary)-1)) / (boundary))
+
+#define ACPI_IS_MISALIGNED(value)           (((ACPI_NATIVE_UINT)value) & (sizeof(ACPI_NATIVE_UINT)-1))
 
 /*
  * Bitmask creation
@@ -433,16 +451,24 @@
  * MASK_BITS_ABOVE creates a mask starting AT the position and above
  * MASK_BITS_BELOW creates a mask starting one bit BELOW the position
  */
-#define ACPI_MASK_BITS_ABOVE(position)       (~((ACPI_INTEGER_MAX) << ((UINT32) (position))))
-#define ACPI_MASK_BITS_BELOW(position)       ((ACPI_INTEGER_MAX) << ((UINT32) (position)))
+#define ACPI_MASK_BITS_ABOVE(position)      (~((ACPI_INTEGER_MAX) << ((UINT32) (position))))
+#define ACPI_MASK_BITS_BELOW(position)      ((ACPI_INTEGER_MAX) << ((UINT32) (position)))
 
-#define ACPI_IS_OCTAL_DIGIT(d)               (((char)(d) >= '0') && ((char)(d) <= '7'))
+#define ACPI_IS_OCTAL_DIGIT(d)              (((char)(d) >= '0') && ((char)(d) <= '7'))
 
 
 /* Bitfields within ACPI registers */
 
 #define ACPI_REGISTER_PREPARE_BITS(Val, Pos, Mask)      ((Val << Pos) & Mask)
 #define ACPI_REGISTER_INSERT_VALUE(Reg, Pos, Mask, Val)  Reg = (Reg & (~(Mask))) | ACPI_REGISTER_PREPARE_BITS(Val, Pos, Mask)
+
+/* Generate a UUID */
+
+#define ACPI_INIT_UUID(a,b,c,d0,d1,d2,d3,d4,d5,d6,d7) \
+    (a) & 0xFF, ((a) >> 8) & 0xFF, ((a) >> 16) & 0xFF, ((a) >> 24) & 0xFF, \
+    (b) & 0xFF, ((b) >> 8) & 0xFF, \
+    (c) & 0xFF, ((c) >> 8) & 0xFF, \
+    (d0), (d1), (d2), (d3), (d4), (d5), (d6), (d7)
 
 /*
  * An ACPI_NAMESPACE_NODE * can appear in some contexts,
@@ -504,57 +530,63 @@
 #define INCREMENT_ARG_LIST(List)        (List >>= ((UINT32) ARG_TYPE_WIDTH))
 
 
+#if defined (ACPI_DEBUG_OUTPUT) || !defined (ACPI_NO_ERROR_MESSAGES)
 /*
- * Reporting macros that are never compiled out
+ * Module name is include in both debug and non-debug versions primarily for
+ * error messages. The __FILE__ macro is not very useful for this, because it
+ * often includes the entire pathname to the module
  */
-#define ACPI_PARAM_LIST(pl)                 pl
-
-/*
- * Error reporting.  These versions add callers module and line#.
- *
- * Since _AcpiModuleName gets compiled out when ACPI_DEBUG_OUTPUT
- * isn't defined, only use it in debug mode.
- */
-#ifdef ACPI_DEBUG_OUTPUT
-
-#define ACPI_REPORT_INFO(fp)                {AcpiUtReportInfo(_AcpiModuleName,__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_ERROR(fp)               {AcpiUtReportError(_AcpiModuleName,__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_WARNING(fp)             {AcpiUtReportWarning(_AcpiModuleName,__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_NSERROR(s,e)            AcpiNsReportError(_AcpiModuleName,__LINE__,_COMPONENT, s, e);
-
-#define ACPI_REPORT_METHOD_ERROR(s,n,p,e)   AcpiNsReportMethodError(_AcpiModuleName,__LINE__,_COMPONENT, s, n, p, e);
-
+#define ACPI_MODULE_NAME(Name)          static char ACPI_UNUSED_VAR *_AcpiModuleName = Name;
 #else
-
-#define ACPI_REPORT_INFO(fp)                {AcpiUtReportInfo("ACPI",__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_ERROR(fp)               {AcpiUtReportError("ACPI",__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_WARNING(fp)             {AcpiUtReportWarning("ACPI",__LINE__,_COMPONENT); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define ACPI_REPORT_NSERROR(s,e)            AcpiNsReportError("ACPI",__LINE__,_COMPONENT, s, e);
-
-#define ACPI_REPORT_METHOD_ERROR(s,n,p,e)   AcpiNsReportMethodError("ACPI",__LINE__,_COMPONENT, s, n, p, e);
-
+#define ACPI_MODULE_NAME(Name)
 #endif
 
-/* Error reporting.  These versions pass thru the module and line# */
+/*
+ * Ascii error messages can be configured out
+ */
+#ifndef ACPI_NO_ERROR_MESSAGES
+#define AE_INFO                         _AcpiModuleName, __LINE__
 
-#define _ACPI_REPORT_INFO(a,b,c,fp)         {AcpiUtReportInfo(a,b,c); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define _ACPI_REPORT_ERROR(a,b,c,fp)        {AcpiUtReportError(a,b,c); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
-#define _ACPI_REPORT_WARNING(a,b,c,fp)      {AcpiUtReportWarning(a,b,c); \
-                                                AcpiOsPrintf ACPI_PARAM_LIST(fp);}
+/*
+ * Error reporting. Callers module and line number are inserted by AE_INFO,
+ * the plist contains a set of parens to allow variable-length lists.
+ * These macros are used for both the debug and non-debug versions of the code.
+ */
+#define ACPI_INFO(plist)                AcpiUtInfo plist
+#define ACPI_WARNING(plist)             AcpiUtWarning plist
+#define ACPI_EXCEPTION(plist)           AcpiUtException plist
+#define ACPI_ERROR(plist)               AcpiUtError plist
+#define ACPI_ERROR_NAMESPACE(s,e)       AcpiNsReportError (AE_INFO, s, e);
+#define ACPI_ERROR_METHOD(s,n,p,e)      AcpiNsReportMethodError (AE_INFO, s, n, p, e);
+
+/* Legacy interfaces. Remove when migration is complete */
+
+#define ACPI_REPORT_INFO(fp)            {AcpiUtReportInfo (AE_INFO); \
+                                            AcpiOsPrintf fp;}
+#define ACPI_REPORT_ERROR(fp)           {AcpiUtReportError (AE_INFO); \
+                                            AcpiOsPrintf fp;}
+#define ACPI_REPORT_WARNING(fp)         {AcpiUtReportWarning (AE_INFO); \
+                                            AcpiOsPrintf fp;}
+#else
+
+/* No error messages */
+
+#define ACPI_INFO(plist)
+#define ACPI_WARNING(plist)
+#define ACPI_EXCEPTION(plist)
+#define ACPI_ERROR(plist)
+#define ACPI_ERROR_NAMESPACE(s,e)
+#define ACPI_ERROR_METHOD(s,n,p,e)
+
+#define ACPI_REPORT_INFO(fp)
+#define ACPI_REPORT_ERROR(fp)
+#define ACPI_REPORT_WARNING(fp)
+#endif
 
 /*
  * Debug macros that are conditionally compiled
  */
 #ifdef ACPI_DEBUG_OUTPUT
-#define ACPI_MODULE_NAME(Name)          static char ACPI_UNUSED_VAR *_AcpiModuleName = Name;
 
 /*
  * Common parameters used for debug output functions:
@@ -623,7 +655,7 @@
  * There are two versions of most of the return macros. The default version is
  * safer, since it avoids side-effects by guaranteeing that the argument will
  * not be evaluated twice.
- * 
+ *
  * A less-safe version of the macros is provided for optional use if the
  * compiler uses excessive CPU stack (for example, this may happen in the
  * debug case if code optimzation is disabled.)
@@ -644,11 +676,11 @@
                                             return (_s); })
 #define return_UINT8(s)                 ACPI_DO_WHILE0 ({ \
                                             register UINT8 _s = (UINT8) (s); \
-                                            AcpiUtValueExit (ACPI_DEBUG_PARAMETERS, _s); \
+                                            AcpiUtValueExit (ACPI_DEBUG_PARAMETERS, (ACPI_INTEGER) _s); \
                                             return (_s); })
 #define return_UINT32(s)                ACPI_DO_WHILE0 ({ \
                                             register UINT32 _s = (UINT32) (s); \
-                                            AcpiUtValueExit (ACPI_DEBUG_PARAMETERS, _s); \
+                                            AcpiUtValueExit (ACPI_DEBUG_PARAMETERS, (ACPI_INTEGER) _s); \
                                             return (_s); })
 #else /* Use original less-safe macros */
 
@@ -687,19 +719,6 @@
 #define ACPI_DUMP_PATHNAME(a,b,c,d)     AcpiNsDumpPathname(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)      AcpiRsDumpResourceList(a)
 #define ACPI_DUMP_BUFFER(a,b)           AcpiUtDumpBuffer((UINT8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
-#define ACPI_BREAK_MSG(a)               AcpiOsSignal (ACPI_SIGNAL_BREAKPOINT,(a))
-
-
-/*
- * Generate INT3 on ACPI_ERROR (Debug only!)
- */
-#define ACPI_ERROR_BREAK
-#ifdef  ACPI_ERROR_BREAK
-#define ACPI_BREAK_ON_ERROR(lvl)        if ((lvl)&ACPI_ERROR) \
-                                            AcpiOsSignal(ACPI_SIGNAL_BREAKPOINT,"Fatal error encountered\n")
-#else
-#define ACPI_BREAK_ON_ERROR(lvl)
-#endif
 
 /*
  * Master debug print macros
@@ -707,8 +726,8 @@
  *    1) Debug print for the current component is enabled
  *    2) Debug error level or trace level for the print statement is enabled
  */
-#define ACPI_DEBUG_PRINT(pl)            AcpiUtDebugPrint ACPI_PARAM_LIST(pl)
-#define ACPI_DEBUG_PRINT_RAW(pl)        AcpiUtDebugPrintRaw ACPI_PARAM_LIST(pl)
+#define ACPI_DEBUG_PRINT(plist)         AcpiUtDebugPrint plist
+#define ACPI_DEBUG_PRINT_RAW(plist)     AcpiUtDebugPrintRaw plist
 
 
 #else
@@ -716,9 +735,6 @@
  * This is the non-debug case -- make everything go away,
  * leaving no executable debug code!
  */
-#define ACPI_MODULE_NAME(Name)
-#define _AcpiModuleName ""
-
 #define ACPI_DEBUG_EXEC(a)
 #define ACPI_NORMAL_EXEC(a)             a;
 
@@ -742,7 +758,6 @@
 #define ACPI_DUMP_BUFFER(a,b)
 #define ACPI_DEBUG_PRINT(pl)
 #define ACPI_DEBUG_PRINT_RAW(pl)
-#define ACPI_BREAK_MSG(a)
 
 #define return_VOID                     return
 #define return_ACPI_STATUS(s)           return(s)

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 1.32 $
+ *              $Revision: 1.34 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -125,299 +125,217 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetIo
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsConvertIo
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetIo (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO     AcpiRsConvertIo[5] =
 {
-    ACPI_FUNCTION_TRACE ("RsGetIo");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_IO,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_IO),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertIo)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_IO,
+                        sizeof (AML_RESOURCE_IO),
+                        0},
 
-    /* Get the Decode flag */
+    /* Decode flag */
 
-    Resource->Data.Io.IoDecode = Aml->Io.Information & 0x01;
-
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Io.IoDecode),
+                        AML_OFFSET (Io.Flags),
+                        0},
     /*
-     * Get the following contiguous fields from the AML descriptor:
-     * Minimum Base Address
-     * Maximum Base Address
+     * These fields are contiguous in both the source and destination:
      * Address Alignment
      * Length
+     * Minimum Base Address
+     * Maximum Base Address
      */
-    ACPI_MOVE_16_TO_32 (&Resource->Data.Io.Minimum,
-        &Aml->Io.Minimum);
-    ACPI_MOVE_16_TO_32 (&Resource->Data.Io.Maximum,
-        &Aml->Io.Maximum);
-    Resource->Data.Io.Alignment = Aml->Io.Alignment;
-    Resource->Data.Io.AddressLength = Aml->Io.AddressLength;
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.Io.Alignment),
+                        AML_OFFSET (Io.Alignment),
+                        2},
 
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_IO;
-    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_IO);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_MOVE16,   ACPI_RS_OFFSET (Data.Io.Minimum),
+                        AML_OFFSET (Io.Minimum),
+                        2}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetIo
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsConvertFixedIo
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetIo (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsConvertFixedIo[4] =
 {
-    ACPI_FUNCTION_TRACE ("RsSetIo");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_FIXED_IO,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_FIXED_IO),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertFixedIo)},
 
-
-    /* I/O Information Byte */
-
-    Aml->Io.Information = (UINT8) (Resource->Data.Io.IoDecode & 0x01);
-
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_FIXED_IO,
+                        sizeof (AML_RESOURCE_FIXED_IO),
+                        0},
     /*
-     * Set the following contiguous fields in the AML descriptor:
-     * Minimum Base Address
-     * Maximum Base Address
-     * Address Alignment
-     * Length
-     */
-    ACPI_MOVE_32_TO_16 (&Aml->Io.Minimum, &Resource->Data.Io.Minimum);
-    ACPI_MOVE_32_TO_16 (&Aml->Io.Maximum, &Resource->Data.Io.Maximum);
-    Aml->Io.Alignment = (UINT8) Resource->Data.Io.Alignment;
-    Aml->Io.AddressLength = (UINT8) Resource->Data.Io.AddressLength;
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_IO, sizeof (AML_RESOURCE_IO), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsGetFixedIo
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsGetFixedIo (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
-{
-    ACPI_FUNCTION_TRACE ("RsGetFixedIo");
-
-
-    /*
-     * Get the following contiguous fields from the AML descriptor:
+     * These fields are contiguous in both the source and destination:
      * Base Address
      * Length
      */
-    ACPI_MOVE_16_TO_32 (&Resource->Data.FixedIo.Address,
-        &Aml->FixedIo.Address);
-    Resource->Data.FixedIo.AddressLength = Aml->FixedIo.AddressLength;
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.FixedIo.AddressLength),
+                        AML_OFFSET (FixedIo.AddressLength),
+                        1},
 
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_FIXED_IO;
-    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_IO);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_MOVE16,   ACPI_RS_OFFSET (Data.FixedIo.Address),
+                        AML_OFFSET (FixedIo.Address),
+                        1}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetFixedIo
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsConvertGenericReg
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetFixedIo (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsConvertGenericReg[4] =
 {
-    ACPI_FUNCTION_TRACE ("RsSetFixedIo");
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_GENERIC_REGISTER,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_GENERIC_REGISTER),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertGenericReg)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_GENERIC_REGISTER,
+                        sizeof (AML_RESOURCE_GENERIC_REGISTER),
+                        0},
+    /*
+     * These fields are contiguous in both the source and destination:
+     * Address Space ID
+     * Register Bit Width
+     * Register Bit Offset
+     * Access Size
+     */
+    {ACPI_RSC_MOVE8,    ACPI_RS_OFFSET (Data.GenericReg.SpaceId),
+                        AML_OFFSET (GenericReg.AddressSpaceId),
+                        4},
+
+    /* Get the Register Address */
+
+    {ACPI_RSC_MOVE64,   ACPI_RS_OFFSET (Data.GenericReg.Address),
+                        AML_OFFSET (GenericReg.Address),
+                        1}
+};
+
+
+/*******************************************************************************
+ *
+ * AcpiRsConvertEndDpf
+ *
+ ******************************************************************************/
+
+ACPI_RSCONVERT_INFO   AcpiRsConvertEndDpf[2] =
+{
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_END_DEPENDENT,
+                        ACPI_RS_SIZE_MIN,
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertEndDpf)},
+
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_END_DEPENDENT,
+                        sizeof (AML_RESOURCE_END_DEPENDENT),
+                        0}
+};
+
+
+/*******************************************************************************
+ *
+ * AcpiRsConvertEndTag
+ *
+ ******************************************************************************/
+
+ACPI_RSCONVERT_INFO   AcpiRsConvertEndTag[2] =
+{
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_END_TAG,
+                        ACPI_RS_SIZE_MIN,
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertEndTag)},
 
     /*
-     * Set the following contiguous fields in the AML descriptor:
-     * Base Address
-     * Length
+     * Note: The checksum field is set to zero, meaning that the resource
+     * data is treated as if the checksum operation succeeded.
+     * (ACPI Spec 1.0b Section 6.4.2.8)
      */
-    ACPI_MOVE_32_TO_16 (&Aml->FixedIo.Address,
-        &Resource->Data.FixedIo.Address);
-    Aml->FixedIo.AddressLength = (UINT8) Resource->Data.FixedIo.AddressLength;
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_FIXED_IO,
-        sizeof (AML_RESOURCE_FIXED_IO), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_END_TAG,
+                        sizeof (AML_RESOURCE_END_TAG),
+                        0}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetDma
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsGetStartDpf
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetDma (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO   AcpiRsGetStartDpf[5] =
 {
-    UINT32                  ChannelCount = 0;
-    UINT32                  i;
-    UINT8                   Temp8;
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_START_DEPENDENT,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_START_DEPENDENT),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsGetStartDpf)},
+
+    /* Defaults for Compatibility and Performance priorities */
+
+    {ACPI_RSC_SET8,     ACPI_RS_OFFSET (Data.StartDpf.CompatibilityPriority),
+                        ACPI_ACCEPTABLE_CONFIGURATION,
+                        2},
+
+    /* All done if there is no flag byte present in the descriptor */
+
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_AML_LENGTH, 0, 1},
+
+    /* Flag byte is present, get the flags */
+
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.StartDpf.CompatibilityPriority),
+                        AML_OFFSET (StartDpf.Flags),
+                        0},
+
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.StartDpf.PerformanceRobustness),
+                        AML_OFFSET (StartDpf.Flags),
+                        2}
+};
 
 
-    ACPI_FUNCTION_TRACE ("RsGetDma");
+/*******************************************************************************
+ *
+ * AcpiRsSetStartDpf
+ *
+ ******************************************************************************/
 
+ACPI_RSCONVERT_INFO   AcpiRsSetStartDpf[6] =
+{
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_START_DEPENDENT,
+                        sizeof (AML_RESOURCE_START_DEPENDENT),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsSetStartDpf)},
 
-    /* Decode the DMA channel bits */
+    /* Set the default flag values */
 
-    for (i = 0; i < 8; i++)
-    {
-        if ((Aml->Dma.DmaChannelMask >> i) & 0x01)
-        {
-            Resource->Data.Dma.Channels[ChannelCount] = i;
-            ChannelCount++;
-        }
-    }
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.StartDpf.CompatibilityPriority),
+                        AML_OFFSET (StartDpf.Flags),
+                        0},
 
-    Resource->Length = 0;
-    Resource->Data.Dma.ChannelCount = ChannelCount;
-
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.StartDpf.PerformanceRobustness),
+                        AML_OFFSET (StartDpf.Flags),
+                        2},
     /*
-     * Calculate the structure size based upon the number of channels
-     * Note: Zero DMA channels is valid
+     * All done if flags byte is necessary -- if either priority value
+     * is not ACPI_ACCEPTABLE_CONFIGURATION
      */
-    if (ChannelCount > 0)
-    {
-        Resource->Length = (UINT32) (ChannelCount - 1) * 4;
-    }
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_VALUE,
+                        ACPI_RS_OFFSET (Data.StartDpf.CompatibilityPriority),
+                        ACPI_ACCEPTABLE_CONFIGURATION},
 
-    /* Get the flags: transfer preference, bus mastering, channel speed */
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_VALUE,
+                        ACPI_RS_OFFSET (Data.StartDpf.PerformanceRobustness),
+                        ACPI_ACCEPTABLE_CONFIGURATION},
 
-    Temp8 = Aml->Dma.Flags;
-    Resource->Data.Dma.Transfer  =  Temp8 & 0x03;
-    Resource->Data.Dma.BusMaster = (Temp8 >> 2) & 0x01;
-    Resource->Data.Dma.Type      = (Temp8 >> 5) & 0x03;
+    /* Flag byte is not necessary */
 
-    if (Resource->Data.Dma.Transfer == 0x03)
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Invalid DMA.Transfer preference (3)\n"));
-        return_ACPI_STATUS (AE_BAD_DATA);
-    }
+    {ACPI_RSC_LENGTH,   0, 0, sizeof (AML_RESOURCE_START_DEPENDENT_NOPRIO)}
+};
 
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_DMA;
-    Resource->Length += ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_DMA);
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsSetDma
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsSetDma (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
-{
-    UINT8                   i;
-
-
-    ACPI_FUNCTION_TRACE ("RsSetDma");
-
-
-    /* Convert channel list to 8-bit DMA channel bitmask */
-
-    Aml->Dma.DmaChannelMask = 0;
-    for (i = 0; i < Resource->Data.Dma.ChannelCount; i++)
-    {
-        Aml->Dma.DmaChannelMask |= (1 << Resource->Data.Dma.Channels[i]);
-    }
-
-    /* Set the DMA Flag bits */
-
-    Aml->Dma.Flags = (UINT8)
-        (((Resource->Data.Dma.Type & 0x03) << 5) |
-         ((Resource->Data.Dma.BusMaster & 0x01) << 2) |
-          (Resource->Data.Dma.Transfer & 0x03));
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_DMA, sizeof (AML_RESOURCE_DMA), Aml);
-    return_ACPI_STATUS (AE_OK);
-}
 

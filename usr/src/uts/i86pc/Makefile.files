@@ -177,9 +177,11 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
 		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
 		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
-		   utobject.o utxface.o acpica.o acpi_enum.o master_ops.o \
-		   osl.o osl_ml.o acpica_ec.o utcache.o utmutex.o utstate.o \
-		   psloop.o
+		   utobject.o utresrc.o utxface.o acpica.o acpi_enum.o \
+		   master_ops.o osl.o osl_ml.o acpica_ec.o utcache.o \
+		   utmutex.o utstate.o dmbuffer.o dmnames.o dmobject.o \
+		   dmopcode.o dmresrc.o dmresrcl.o dmresrcs.o dmutils.o \
+		   dmwalk.o psloop.o
 
 POWER_OBJS	+= power.o
 

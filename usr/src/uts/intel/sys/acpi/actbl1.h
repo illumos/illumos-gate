@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actbl1.h - ACPI 1.0 tables
- *       $Revision: 1.32 $
+ *       $Revision: 1.34 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -143,8 +143,8 @@ typedef struct facs_descriptor_rev1
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               S4Bios_f        : 1;    /* 00:    S4BIOS support is present */
-    UINT8_BIT                               : 7;    /* 01-07: Reserved, must be zero */
+    UINT8                   S4Bios_f        : 1;    /* 00:    S4BIOS support is present */
+    UINT8                                   : 7;    /* 01-07: Reserved, must be zero */
     UINT8                   Reserved1[3];           /* 08-31: Reserved, must be zero */
 
     UINT8                   Reserved2[40];          /* Reserved, must be zero */
@@ -197,16 +197,16 @@ typedef struct fadt_descriptor_rev1
 
     /* Flags (32 bits) */
 
-    UINT8_BIT               WbInvd          : 1;    /* 00:    The wbinvd instruction works properly */
-    UINT8_BIT               WbInvdFlush     : 1;    /* 01:    The wbinvd flushes but does not invalidate */
-    UINT8_BIT               ProcC1          : 1;    /* 02:    All processors support C1 state */
-    UINT8_BIT               Plvl2Up         : 1;    /* 03:    C2 state works on MP system */
-    UINT8_BIT               PwrButton       : 1;    /* 04:    Power button is handled as a generic feature */
-    UINT8_BIT               SleepButton     : 1;    /* 05:    Sleep button is handled as a generic feature, or not present */
-    UINT8_BIT               FixedRTC        : 1;    /* 06:    RTC wakeup stat not in fixed register space */
-    UINT8_BIT               Rtcs4           : 1;    /* 07:    RTC wakeup stat not possible from S4 */
-    UINT8_BIT               TmrValExt       : 1;    /* 08:    tmr_val width is 32 bits (0 = 24 bits) */
-    UINT8_BIT                               : 7;    /* 09-15: Reserved, must be zero */
+    UINT8                   WbInvd          : 1;    /* 00:    The wbinvd instruction works properly */
+    UINT8                   WbInvdFlush     : 1;    /* 01:    The wbinvd flushes but does not invalidate */
+    UINT8                   ProcC1          : 1;    /* 02:    All processors support C1 state */
+    UINT8                   Plvl2Up         : 1;    /* 03:    C2 state works on MP system */
+    UINT8                   PwrButton       : 1;    /* 04:    Power button is handled as a generic feature */
+    UINT8                   SleepButton     : 1;    /* 05:    Sleep button is handled as a generic feature, or not present */
+    UINT8                   FixedRTC        : 1;    /* 06:    RTC wakeup stat not in fixed register space */
+    UINT8                   Rtcs4           : 1;    /* 07:    RTC wakeup stat not possible from S4 */
+    UINT8                   TmrValExt       : 1;    /* 08:    tmr_val width is 32 bits (0 = 24 bits) */
+    UINT8                                   : 7;    /* 09-15: Reserved, must be zero */
     UINT8                   Reserved5[2];           /* 16-31: Reserved, must be zero */
 
 } FADT_DESCRIPTOR_REV1;

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 1.57 $
+ *              $Revision: 1.59 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -152,7 +152,7 @@ AcpiExStoreBufferToBuffer (
 
     /* We know that SourceDesc is a buffer by now */
 
-    Buffer = (UINT8 *) SourceDesc->Buffer.Pointer;
+    Buffer = ACPI_CAST_PTR (UINT8, SourceDesc->Buffer.Pointer);
     Length = SourceDesc->Buffer.Length;
 
     /*
@@ -250,7 +250,7 @@ AcpiExStoreStringToString (
 
     /* We know that SourceDesc is a string by now */
 
-    Buffer = (UINT8 *) SourceDesc->String.Pointer;
+    Buffer = ACPI_CAST_PTR (UINT8, SourceDesc->String.Pointer);
     Length = SourceDesc->String.Length;
 
     /*

@@ -12,7 +12,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -213,14 +213,14 @@ void
 AcpiOsDeleteLock (
     ACPI_HANDLE             Handle);
 
-UINT32
+ACPI_CPU_FLAGS
 AcpiOsAcquireLock (
     ACPI_HANDLE             Handle);
 
 void
 AcpiOsReleaseLock (
     ACPI_HANDLE             Handle,
-    UINT32                  Flags);
+    ACPI_CPU_FLAGS          Flags);
 
 
 /*

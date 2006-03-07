@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 1.84 $
+ *              $Revision: 1.87 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -147,7 +147,7 @@ AcpiPsUpdateParameterList (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiDebugTrace  
+ * FUNCTION:    AcpiDebugTrace
  *
  * PARAMETERS:  MethodName      - Valid ACPI name string
  *              DebugLevel      - Optional level mask. 0 to use default
@@ -179,7 +179,7 @@ AcpiDebugTrace (
 
     /* TBDs: Validate name, allow full path or just nameseg */
 
-    AcpiGbl_TraceMethodName = *(UINT32 *) Name;
+    AcpiGbl_TraceMethodName = *ACPI_CAST_PTR (UINT32, Name);
     AcpiGbl_TraceFlags = Flags;
 
     if (DebugLevel)

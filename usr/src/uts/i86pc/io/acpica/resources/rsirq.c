@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 1.47 $
+ *              $Revision: 1.49 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -125,352 +125,189 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetIrq
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsGetIrq
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetIrq (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO     AcpiRsGetIrq[7] =
 {
-    UINT16                  Temp16 = 0;
-    UINT32                  InterruptCount = 0;
-    UINT32                  i;
-    UINT32                  ResourceLength;
-
-
-    ACPI_FUNCTION_TRACE ("RsGetIrq");
-
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_IRQ,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_IRQ),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsGetIrq)},
 
     /* Get the IRQ mask (bytes 1:2) */
 
-    ACPI_MOVE_16_TO_16 (&Temp16, &Aml->Irq.IrqMask);
+    {ACPI_RSC_BITMASK16,ACPI_RS_OFFSET (Data.Irq.Interrupts[0]),
+                        AML_OFFSET (Irq.IrqMask),
+                        ACPI_RS_OFFSET (Data.Irq.InterruptCount)},
 
-    /* Decode the IRQ bits (up to 16 possible) */
+    /* Set default flags (others are zero) */
 
-    for (i = 0; i < 16; i++)
-    {
-        if ((Temp16 >> i) & 0x01)
-        {
-            Resource->Data.Irq.Interrupts[InterruptCount] = i;
-            InterruptCount++;
-        }
-    }
+    {ACPI_RSC_SET8,     ACPI_RS_OFFSET (Data.Irq.Triggering),
+                        ACPI_EDGE_SENSITIVE,
+                        1},
 
-    /* Zero interrupts is valid */
+    /* All done if no flag byte present in descriptor */
 
-    ResourceLength = 0;
-    Resource->Data.Irq.InterruptCount = InterruptCount;
-    if (InterruptCount > 0)
-    {
-        /* Calculate the structure size based upon the number of interrupts */
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_AML_LENGTH, 0, 3},
 
-        ResourceLength = (UINT32) (InterruptCount - 1) * 4;
-    }
+    /* Get flags: Triggering[0], Polarity[3], Sharing[4] */
 
-    /* Get Flags (Byte 3) if it is used */
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Triggering),
+                        AML_OFFSET (Irq.Flags),
+                        0},
 
-    if (AmlResourceLength == 3)
-    {
-        /* Check for HE, LL interrupts */
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Polarity),
+                        AML_OFFSET (Irq.Flags),
+                        3},
 
-        switch (Aml->Irq.Flags & 0x09)
-        {
-        case 0x01: /* HE */
-            Resource->Data.Irq.Triggering = ACPI_EDGE_SENSITIVE;
-            Resource->Data.Irq.Polarity = ACPI_ACTIVE_HIGH;
-            break;
-
-        case 0x08: /* LL */
-            Resource->Data.Irq.Triggering = ACPI_LEVEL_SENSITIVE;
-            Resource->Data.Irq.Polarity = ACPI_ACTIVE_LOW;
-            break;
-
-        default:
-            /*
-             * Only _LL and _HE polarity/trigger interrupts
-             * are allowed (ACPI spec, section "IRQ Format")
-             * so 0x00 and 0x09 are illegal.
-             */
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Invalid interrupt polarity/trigger in resource list, %X\n",
-                Aml->Irq.Flags));
-            return_ACPI_STATUS (AE_BAD_DATA);
-        }
-
-        /* Get Sharing flag */
-
-        Resource->Data.Irq.Sharable = (Aml->Irq.Flags >> 3) & 0x01;
-    }
-    else
-    {
-        /*
-         * Default configuration: assume Edge Sensitive, Active High,
-         * Non-Sharable as per the ACPI Specification
-         */
-        Resource->Data.Irq.Triggering = ACPI_EDGE_SENSITIVE;
-        Resource->Data.Irq.Polarity = ACPI_ACTIVE_HIGH;
-        Resource->Data.Irq.Sharable = ACPI_EXCLUSIVE;
-    }
-
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_IRQ;
-    Resource->Length = ResourceLength + ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_IRQ);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Sharable),
+                        AML_OFFSET (Irq.Flags),
+                        4}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetIrq
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsSetIrq
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetIrq (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsSetIrq[9] =
 {
-    ACPI_SIZE               DescriptorLength;
-    UINT16                  IrqMask;
-    UINT8                   i;
-
-
-    ACPI_FUNCTION_TRACE ("RsSetIrq");
-
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_IRQ,
+                        sizeof (AML_RESOURCE_IRQ),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsSetIrq)},
 
     /* Convert interrupt list to 16-bit IRQ bitmask */
 
-    IrqMask = 0;
-    for (i = 0; i < Resource->Data.Irq.InterruptCount; i++)
-    {
-        IrqMask |= (1 << Resource->Data.Irq.Interrupts[i]);
-    }
+    {ACPI_RSC_BITMASK16,ACPI_RS_OFFSET (Data.Irq.Interrupts[0]),
+                        AML_OFFSET (Irq.IrqMask),
+                        ACPI_RS_OFFSET (Data.Irq.InterruptCount)},
 
-    /* Set the interrupt mask */
+    /* Set the flags byte by default */
 
-    ACPI_MOVE_16_TO_16 (&Aml->Irq.IrqMask, &IrqMask);
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Triggering),
+                        AML_OFFSET (Irq.Flags),
+                        0},
 
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Polarity),
+                        AML_OFFSET (Irq.Flags),
+                        3},
+
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Irq.Sharable),
+                        AML_OFFSET (Irq.Flags),
+                        4},
     /*
-     * The descriptor field is set based upon whether a third byte is
-     * needed to contain the IRQ Information.
+     * Check if the flags byte is necessary. Not needed if the flags are:
+     * ACPI_EDGE_SENSITIVE, ACPI_ACTIVE_HIGH, ACPI_EXCLUSIVE
      */
-    if ((Resource->Data.Irq.Triggering == ACPI_EDGE_SENSITIVE) &&
-        (Resource->Data.Irq.Polarity == ACPI_ACTIVE_HIGH) &&
-        (Resource->Data.Irq.Sharable == ACPI_EXCLUSIVE))
-    {
-        /* IrqNoFlags() descriptor can be used */
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_VALUE,
+                        ACPI_RS_OFFSET (Data.Irq.Triggering),
+                        ACPI_EDGE_SENSITIVE},
 
-        DescriptorLength = sizeof (AML_RESOURCE_IRQ_NOFLAGS);
-    }
-    else
-    {
-        /* Irq() descriptor must be used */
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_VALUE,
+                        ACPI_RS_OFFSET (Data.Irq.Polarity),
+                        ACPI_ACTIVE_HIGH},
 
-        DescriptorLength = sizeof (AML_RESOURCE_IRQ);
+    {ACPI_RSC_EXIT_NE,  ACPI_RSC_COMPARE_VALUE,
+                        ACPI_RS_OFFSET (Data.Irq.Sharable),
+                        ACPI_EXCLUSIVE},
 
-        /* Set the IRQ Info byte */
+    /* IrqNoFlags() descriptor can be used */
 
-        Aml->Irq.Flags = (UINT8)
-            ((Resource->Data.Irq.Sharable & 0x01) << 4);
-
-        if (ACPI_LEVEL_SENSITIVE == Resource->Data.Irq.Triggering &&
-            ACPI_ACTIVE_LOW == Resource->Data.Irq.Polarity)
-        {
-            Aml->Irq.Flags |= 0x08;
-        }
-        else
-        {
-            Aml->Irq.Flags |= 0x01;
-        }
-    }
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_IRQ, DescriptorLength, Aml);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_LENGTH,   0, 0, sizeof (AML_RESOURCE_IRQ_NOFLAGS)}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsGetExtIrq
- *
- * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
- *              AmlResourceLength   - Length of the resource from the AML header
- *              Resource            - Where the internal resource is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
- *              internal resource descriptor, simplifying bitflags and handling
- *              alignment and endian issues if necessary.
+ * AcpiRsConvertExtIrq
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsGetExtIrq (
-    AML_RESOURCE            *Aml,
-    UINT16                  AmlResourceLength,
-    ACPI_RESOURCE           *Resource)
+ACPI_RSCONVERT_INFO     AcpiRsConvertExtIrq[9] =
 {
-    char                    *OutResourceString;
-    UINT8                   Temp8;
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_EXTENDED_IRQ,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_EXTENDED_IRQ),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertExtIrq)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_EXTENDED_IRQ,
+                        sizeof (AML_RESOURCE_EXTENDED_IRQ),
+                        0},
 
-    ACPI_FUNCTION_TRACE ("RsGetExtIrq");
+    /* Flag bits */
 
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.ExtendedIrq.ProducerConsumer),
+                        AML_OFFSET (ExtendedIrq.Flags),
+                        0},
 
-    /* Get the flag bits */
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.ExtendedIrq.Triggering),
+                        AML_OFFSET (ExtendedIrq.Flags),
+                        1},
 
-    Temp8 = Aml->ExtendedIrq.Flags;
-    Resource->Data.ExtendedIrq.ProducerConsumer =  Temp8 & 0x01;
-    Resource->Data.ExtendedIrq.Polarity         = (Temp8 >> 2) & 0x01;
-    Resource->Data.ExtendedIrq.Sharable         = (Temp8 >> 3) & 0x01;
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.ExtendedIrq.Polarity),
+                        AML_OFFSET (ExtendedIrq.Flags),
+                        2},
 
-    /*
-     * Check for Interrupt Mode
-     *
-     * The definition of an Extended IRQ changed between ACPI spec v1.0b
-     * and ACPI spec 2.0 (section 6.4.3.6 in both).
-     *
-     * - Edge/Level are defined opposite in the table vs the headers
-     */
-    Resource->Data.ExtendedIrq.Triggering =
-        (Temp8 & 0x2) ? ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.ExtendedIrq.Sharable),
+                        AML_OFFSET (ExtendedIrq.Flags),
+                        3},
 
-    /* Get the IRQ Table length (Byte4) */
+    /* IRQ Table length (Byte4) */
 
-    Temp8 = Aml->ExtendedIrq.TableLength;
-    Resource->Data.ExtendedIrq.InterruptCount = Temp8;
-    if (Temp8 < 1)
-    {
-        /* Must have at least one IRQ */
+    {ACPI_RSC_COUNT,    ACPI_RS_OFFSET (Data.ExtendedIrq.InterruptCount),
+                        AML_OFFSET (ExtendedIrq.InterruptCount),
+                        sizeof (UINT32)},
 
-        return_ACPI_STATUS (AE_AML_BAD_RESOURCE_LENGTH);
-    }
+    /* Copy every IRQ in the table, each is 32 bits */
 
-    /*
-     * Add any additional structure size to properly calculate
-     * the next pointer at the end of this function
-     */
-    Resource->Length = (Temp8 - 1) * 4;
-    OutResourceString = ACPI_CAST_PTR (char,
-        (&Resource->Data.ExtendedIrq.Interrupts[0] + Temp8));
+    {ACPI_RSC_MOVE32,   ACPI_RS_OFFSET (Data.ExtendedIrq.Interrupts[0]),
+                        AML_OFFSET (ExtendedIrq.Interrupts[0]),
+                        0},
 
-    /* Get every IRQ in the table, each is 32 bits */
+    /* Optional ResourceSource (Index and String) */
 
-    AcpiRsMoveData (Resource->Data.ExtendedIrq.Interrupts,
-        Aml->ExtendedIrq.InterruptNumber,
-        (UINT16) Temp8, ACPI_MOVE_TYPE_32_TO_32);
-
-    /* Get the optional ResourceSource (index and string) */
-
-    Resource->Length += 
-        AcpiRsGetResourceSource (AmlResourceLength,
-            (ACPI_SIZE) Resource->Length + sizeof (AML_RESOURCE_EXTENDED_IRQ),
-            &Resource->Data.ExtendedIrq.ResourceSource,
-            Aml, OutResourceString);
-
-    /* Complete the resource header */
-
-    Resource->Type = ACPI_RESOURCE_TYPE_EXTENDED_IRQ;
-    Resource->Length += ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_EXTENDED_IRQ);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_SOURCEX,  ACPI_RS_OFFSET (Data.ExtendedIrq.ResourceSource),
+                        ACPI_RS_OFFSET (Data.ExtendedIrq.Interrupts[0]),
+                        sizeof (AML_RESOURCE_EXTENDED_IRQ)}
+};
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsSetExtIrq
- *
- * PARAMETERS:  Resource            - Pointer to the resource descriptor
- *              Aml                 - Where the AML descriptor is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Convert an internal resource descriptor to the corresponding
- *              external AML resource descriptor.
+ * AcpiRsConvertDma
  *
  ******************************************************************************/
 
-ACPI_STATUS
-AcpiRsSetExtIrq (
-    ACPI_RESOURCE           *Resource,
-    AML_RESOURCE            *Aml)
+ACPI_RSCONVERT_INFO     AcpiRsConvertDma[6] =
 {
-    ACPI_SIZE               DescriptorLength;
+    {ACPI_RSC_INITGET,  ACPI_RESOURCE_TYPE_DMA,
+                        ACPI_RS_SIZE (ACPI_RESOURCE_DMA),
+                        ACPI_RSC_TABLE_SIZE (AcpiRsConvertDma)},
 
+    {ACPI_RSC_INITSET,  ACPI_RESOURCE_NAME_DMA,
+                        sizeof (AML_RESOURCE_DMA),
+                        0},
 
-    ACPI_FUNCTION_TRACE ("RsSetExtIrq");
+    /* Flags: transfer preference, bus mastering, channel speed */
 
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.Dma.Transfer),
+                        AML_OFFSET (Dma.Flags),
+                        0},
 
-    /* Set the Interrupt vector flags */
+    {ACPI_RSC_1BITFLAG, ACPI_RS_OFFSET (Data.Dma.BusMaster),
+                        AML_OFFSET (Dma.Flags),
+                        2},
 
-    Aml->ExtendedIrq.Flags = (UINT8)
-        ((Resource->Data.ExtendedIrq.ProducerConsumer & 0x01) |
-        ((Resource->Data.ExtendedIrq.Sharable & 0x01) << 3) |
-        ((Resource->Data.ExtendedIrq.Polarity & 0x1) << 2));
+    {ACPI_RSC_2BITFLAG, ACPI_RS_OFFSET (Data.Dma.Type),
+                        AML_OFFSET (Dma.Flags),
+                        5},
 
-    /*
-     * Set the Interrupt Mode
-     *
-     * The definition of an Extended IRQ changed between ACPI spec v1.0b
-     * and ACPI spec 2.0 (section 6.4.3.6 in both).  This code does not
-     * implement the more restrictive definition of 1.0b
-     *
-     * - Edge/Level are defined opposite in the table vs the headers
-     */
-    if (Resource->Data.ExtendedIrq.Triggering == ACPI_EDGE_SENSITIVE)
-    {
-        Aml->ExtendedIrq.Flags |= 0x02;
-    }
+    /* DMA channel mask bits */
 
-    /* Set the Interrupt table length */
-
-    Aml->ExtendedIrq.TableLength = (UINT8)
-        Resource->Data.ExtendedIrq.InterruptCount;
-
-    DescriptorLength = (sizeof (AML_RESOURCE_EXTENDED_IRQ) - 4) +
-        ((ACPI_SIZE) Resource->Data.ExtendedIrq.InterruptCount * sizeof (UINT32));
-
-    /* Set each interrupt value */
-
-    AcpiRsMoveData (Aml->ExtendedIrq.InterruptNumber,
-        Resource->Data.ExtendedIrq.Interrupts,
-        (UINT16) Resource->Data.ExtendedIrq.InterruptCount,
-        ACPI_MOVE_TYPE_32_TO_32);
-
-    /* Resource Source Index and Resource Source are optional */
-
-    DescriptorLength = AcpiRsSetResourceSource (Aml, DescriptorLength,
-                            &Resource->Data.ExtendedIrq.ResourceSource);
-
-    /* Complete the AML descriptor header */
-
-    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_EXTENDED_IRQ,
-        DescriptorLength, Aml);
-    return_ACPI_STATUS (AE_OK);
-}
+    {ACPI_RSC_BITMASK,  ACPI_RS_OFFSET (Data.Dma.Channels[0]),
+                        AML_OFFSET (Dma.DmaChannelMask),
+                        ACPI_RS_OFFSET (Data.Dma.ChannelCount)}
+};
 

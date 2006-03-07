@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsinit - Object initialization namespace walk
- *              $Revision: 1.17 $
+ *              $Revision: 1.22 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2005, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2006, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -166,7 +166,7 @@ AcpiDsInitOneObject (
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_NAME ("DsInitOneObject");
+    ACPI_FUNCTION_ENTRY ();
 
 
     /*
@@ -191,10 +191,9 @@ AcpiDsInitOneObject (
         Status = AcpiDsInitializeRegion (ObjHandle);
         if (ACPI_FAILURE (Status))
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Region %p [%4.4s] - Init failure, %s\n",
-                ObjHandle, AcpiUtGetNodeName (ObjHandle),
-                AcpiFormatException (Status)));
+            ACPI_EXCEPTION ((AE_INFO, Status,
+                "During Region initialization %p [%4.4s]",
+                ObjHandle, AcpiUtGetNodeName (ObjHandle)));
         }
 
         Info->OpRegionCount++;
@@ -202,15 +201,6 @@ AcpiDsInitOneObject (
 
 
     case ACPI_TYPE_METHOD:
-
-        /*
-         * Print a dot for each method unless we are going to print
-         * the entire pathname
-         */
-        if (!(AcpiDbgLevel & ACPI_LV_INIT_NAMES))
-        {
-            ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
-        }
 
         /*
          * Set the execution data width (32 or 64) based upon the
@@ -223,6 +213,23 @@ AcpiDsInitOneObject (
             Node->Flags |= ANOBJ_DATA_WIDTH_32;
         }
 
+#ifdef ACPI_INIT_PARSE_METHODS
+        /*
+         * Note 11/2005: Removed this code to parse all methods during table
+         * load because it causes problems if there are any errors during the
+         * parse. Also, it seems like overkill and we probably don't want to
+         * abort a table load because of an issue with a single method.
+         */
+
+        /*
+         * Print a dot for each method unless we are going to print
+         * the entire pathname
+         */
+        if (!(AcpiDbgLevel & ACPI_LV_INIT_NAMES))
+        {
+            ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
+        }
+
         /*
          * Always parse methods to detect errors, we will delete
          * the parse tree below
@@ -230,14 +237,14 @@ AcpiDsInitOneObject (
         Status = AcpiDsParseMethod (ObjHandle);
         if (ACPI_FAILURE (Status))
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "\n+Method %p [%4.4s] - parse failure, %s\n",
+            ACPI_ERROR ((AE_INFO,
+                "Method %p [%4.4s] - parse failure, %s",
                 ObjHandle, AcpiUtGetNodeName (ObjHandle),
                 AcpiFormatException (Status)));
 
             /* This parse failed, but we will continue parsing more methods */
         }
-
+#endif
         Info->MethodCount++;
         break;
 
@@ -302,8 +309,7 @@ AcpiDsInitializeObjects (
                     AcpiDsInitOneObject, &Info, NULL);
     if (ACPI_FAILURE (Status))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "WalkNamespace failed, %s\n",
-            AcpiFormatException (Status)));
+        ACPI_EXCEPTION ((AE_INFO, Status, "During WalkNamespace"));
     }
 
     ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
