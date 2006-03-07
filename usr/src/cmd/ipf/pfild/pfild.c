@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,7 +424,7 @@ sendpkt(const void *buf, int len)
 			((uint32_t *)buf)[11]);
 	}
 
-	if (iph->ip_v == 4 && len > 20) {
+	if (iph->ip_v == 4 && len >= 20) {
 		struct sockaddr_in sin;
 		sin.sin_family = AF_INET;
 		sin.sin_port = 0;

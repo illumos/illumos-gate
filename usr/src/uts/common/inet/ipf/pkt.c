@@ -5,7 +5,7 @@
  *
  * ident "@(#)$Id: pkt.c,v 1.8 2003/07/28 05:13:58 darrenr Exp $"
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,6 +140,47 @@ queue_t **output_q;
 
 	if (mp == NULL)
 		return NULL;
+
+	/*
+	 * Sometimes the ip_nexthop* functions can't give us a usable packet
+	 * header, for example, when the (nexthop) destination is in need of
+	 * address resolution.  We'd like to punt our packet up to pfild and
+	 * let it send the packet through the normal IP mechanisms, which will
+	 * handle ARP/ND, but if the packet is being sent to an explicit router
+	 * there is no way pfild can indicate that to the IP stack.  So in
+	 * desperation, we discard the packet we are working on and instead
+	 * construct an IP packet with ip_p == 0 to the nexthop router and let
+	 * pfild send that.  This will start the ARP/ND resolution process
+	 * so that next time we need to send a packet to that router, the IRE
+	 * cache is all ready to go.
+	 */
+	if ((MTYPE(mp) == M_PROTO) && (dst != NULL))
+		if ((ip->ip_v == IPV4_VERSION) &&
+		    (ip->ip_dst.s_addr != *(ipaddr_t *)dst)) {
+
+			ASSERT(MTYPE(mb) == M_DATA);
+			if (mb->b_cont != NULL) {
+				freemsg(mb->b_cont);
+				mb->b_cont = NULL;
+			}
+
+			/*
+			 * We don't bother to calculate the IP checksum, raw
+			 * socket will finally do it.
+			 */
+			ip = (struct ip *)mb->b_rptr;
+			ip->ip_hl = 5;
+			ip->ip_tos = 0;
+			ip->ip_len = sizeof (struct ip);
+			ip->ip_id = 0;
+			ip->ip_off = 0;
+			ip->ip_ttl = 1;
+			ip->ip_p = 0;
+			ip->ip_src = *(struct in_addr *)dst;
+			ip->ip_dst = *(struct in_addr *)dst;
+
+			mb->b_wptr = mb->b_rptr + sizeof (struct ip);
+		}
 
 	/* look for output queue */
 	rw_enter(&pfil_rw, RW_READER);
