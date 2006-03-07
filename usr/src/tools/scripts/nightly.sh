@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -861,7 +861,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 #	-x	less public handling of xmod source for the source product
 #
 #	A log file will be generated under the name $LOGFILE
-#	for partially completed build and log.`date '+%m%d%y'`
+#	for partially completed build and log.`date '+%F'`
 #	in the same directory for fully completed builds.
 #
 
@@ -1406,8 +1406,9 @@ fi
 #
 
 logshuffle() {
-    	LLOG="$ATLOG/log.`date '+%m%d'`"
+    	LLOG="$ATLOG/log.`date '+%F'`"
 	rm -rf $ATLOG/log.??`date '+%d'`
+	rm -rf $ATLOG/log.????-??-`date '+%d'`
 	if [ -f $LLOG -o -d $LLOG ]; then
 	    	LLOG=$LLOG.$$
 	fi
