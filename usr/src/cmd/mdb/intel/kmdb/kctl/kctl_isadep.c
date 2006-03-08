@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,155 +44,97 @@
 #endif
 
 static int
-kctl_ddi_prop_read(kmdb_auxv_nv_t *nv, char *pname, void *arg)
+kctl_boot_prop_read(char *pname, char *prop_buf, int buf_len)
 {
-	dev_info_t *dip = arg;
-	char *val;
-
-	if (strlen(pname) >= sizeof (nv->kanv_name)) {
-		cmn_err(CE_WARN, "ignoring boot property %s: name too long\n",
-		    pname);
-		return (0);
-	}
-
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, pname, &val) != DDI_SUCCESS)
-		return (NULL);
-
-	if (strlen(val) >= sizeof (nv->kanv_val)) {
-		cmn_err(CE_WARN, "ignoring boot property %s: value too long\n",
-		    pname);
-		return (0);
-	}
-
-	strcpy(nv->kanv_name, pname);
-	strcpy(nv->kanv_val, val);
-
-	ddi_prop_free(val);
-
-	return (1);
-}
-
-/*ARGSUSED*/
-static int
-cons_type(void)
-{
-#define	CONS_STR_BUFLEN 10
-	static int cons_type = -1;
-	char cons_str[CONS_STR_BUFLEN];
 	int len;
 	struct bootops *ops = kctl.kctl_boot_ops;
 
-	if (cons_type != -1)
-		return (cons_type);
-	cons_type = 0;	/* default to screen */
-
-	len = BOP_GETPROPLEN(ops, "console");
-	if (len > 0 && len <= CONS_STR_BUFLEN) {
-		(void) BOP_GETPROP(ops, "console", (void *)cons_str);
-		if (strncmp(cons_str, "ttya", 4) == 0)
-			cons_type = 1;
-		else if (strncmp(cons_str, "ttyb", 4) == 0)
-			cons_type = 2;
-	}
-
-	return (cons_type);
-}
-
-/*
- * fake prom properties, assuming the properties being read are
- * input-device, output-device, ttya-mode, ttyb-mode.
- */
-/*ARGSUSED*/
-static int
-kctl_boot_prop_read(kmdb_auxv_nv_t *nv, char *pname, void *arg)
-{
-	if (strcmp(pname, "ttya-mode") == 0 ||
-	    strcmp(pname, "ttyb-mode") == 0) {
-		(void) strcpy(nv->kanv_val, "9600,8,n,1,-");
-		return (0);
-	}
-
-	if (strcmp(pname, "input-device") != 0 &&
-	    strcmp(pname, "output-device") != 0)
-		return (0);
-
-	strcpy(nv->kanv_name, pname);
-	switch (cons_type()) {
-	case 0:
-		if (strcmp(pname, "input-device") == 0)
-			(void) strcpy(nv->kanv_val, "keyboard");
-		else
-			(void) strcpy(nv->kanv_val, "screen");
-		break;
-	case 1:
-		(void) strcpy(nv->kanv_val, "ttya");
-		break;
-	case 2:
-		(void) strcpy(nv->kanv_val, "ttyb");
-		break;
-	}
-
-	return (1);
-}
-
-static int
-kctl_props_get(char *pname, kmdb_auxv_nv_t *valnv,
-    kmdb_auxv_nv_t *modenv, int (*preader)(kmdb_auxv_nv_t *, char *, void *),
-    void *arg)
-{
-#ifdef __amd64
-	/*
-	 * The current implementation of the amd64 shim layer doesn't support
-	 * the use of the BOP_* calls with stack-allocated buffers.
-	 */
-	static
-#endif
-	char modepname[25];
-
-	if (!preader(valnv, pname, arg))
-		return (0);
-
-	if (*valnv->kanv_val == '/')
+	len = BOP_GETPROPLEN(ops, pname);
+	if (len > 0 && len <= buf_len) {
+		(void) BOP_GETPROP(ops, pname, (void *)prop_buf);
 		return (1);
+	}
 
-	snprintf(modepname, sizeof (modepname), "%s-mode", valnv->kanv_val);
+	return (0);
+}
 
-	return (preader(modenv, modepname, arg) ? 2 : 1);
+static int
+kctl_ddi_prop_read(char *pname, char *prop_buf, int buf_len)
+{
+	dev_info_t *dip = ddi_root_node();
+	char *val;
+	int ret = 0;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, pname, &val) != DDI_SUCCESS)
+		return (0);
+
+	if (strlen(val) < buf_len) {
+		(void) strcpy(prop_buf, val);
+		ret = 1;
+	}
+
+	ddi_prop_free(val);
+	return (ret);
 }
 
 /*
  * We don't have any property-walking routines, so we have to specifically
  * query and thus have guilty knowledge of the properties that the
  * debugger wants to see.
+ *
+ * Here actually we only support four console properties:
+ *     input-device, output-device, ttya-mode, ttyb-mode.
  */
 #define	KCTL_PROPNV_NENT		4
 
 static kmdb_auxv_nv_t *
 kctl_pcache_create(int *nprops)
 {
-	int (*preader)(kmdb_auxv_nv_t *, char *, void *);
+	int (*preader)(char *, char *, int);
 	kmdb_auxv_nv_t *pnv;
 	size_t psz = sizeof (kmdb_auxv_nv_t) * KCTL_PROPNV_NENT;
-	void *arg;
-	int np = 0;
 
 	if (kctl.kctl_boot_loaded) {
 		preader = kctl_boot_prop_read;
-		arg = NULL;
 	} else {
 		preader = kctl_ddi_prop_read;
-		arg = ddi_find_devinfo("options", -1, 0);
 	}
 
 	pnv = kobj_alloc(psz, KM_WAIT);
 
-	np += kctl_props_get("input-device", &pnv[np], &pnv[np + 1], preader,
-	    arg);
-	np += kctl_props_get("output-device", &pnv[np], &pnv[np + 1], preader,
-	    arg);
+	(void) strcpy((&pnv[0])->kanv_name, "input-device");
+	(void) strcpy((&pnv[1])->kanv_name, "output-device");
+	(void) strcpy((&pnv[2])->kanv_name, "ttya-mode");
+	(void) strcpy((&pnv[3])->kanv_name, "ttyb-mode");
 
-	*nprops = np;
+	/*
+	 * console is defined by "console" property, with
+	 * fallback on the old "input-device" property.
+	 */
+	(void) strcpy((&pnv[0])->kanv_val, "text");	/* default to screen */
+	if (!preader("console", (&pnv[0])->kanv_val,
+	    sizeof ((&pnv[0])->kanv_val)))
+		(void) preader("input-device", (&pnv[0])->kanv_val,
+		    sizeof ((&pnv[0])->kanv_val));
+
+	if (strcmp((&pnv[0])->kanv_val, "ttya") == 0 ||
+	    strcmp((&pnv[0])->kanv_val, "ttyb") == 0) {
+		(void) strcpy((&pnv[1])->kanv_val, (&pnv[0])->kanv_val);
+	} else {
+		(void) strcpy((&pnv[0])->kanv_val, "keyboard");
+		(void) strcpy((&pnv[1])->kanv_val, "screen");
+	}
+
+	if (!preader((&pnv[2])->kanv_name, (&pnv[2])->kanv_val,
+	    sizeof ((&pnv[2])->kanv_val)))
+		(void) strcpy((&pnv[2])->kanv_val, "9600,8,n,1,-");
+
+	if (!preader((&pnv[3])->kanv_name, (&pnv[3])->kanv_val,
+	    sizeof ((&pnv[3])->kanv_val)))
+		(void) strcpy((&pnv[3])->kanv_val, "9600,8,n,1,-");
+
+	*nprops = KCTL_PROPNV_NENT;
 	return (pnv);
 }
 

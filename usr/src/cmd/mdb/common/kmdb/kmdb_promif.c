@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,7 +370,7 @@ kmdb_get_ttyio_mode(kmdb_auxv_t *kav, char *devname)
 	strcpy(modepname, devname);
 	strcat(modepname, "-mode");
 
-	modepval = kmdb_prom_get_options_prop(kav, modepname);
+	modepval = kmdb_prom_get_ddi_prop(kav, modepname);
 
 	strfree(modepname);
 
@@ -536,7 +536,7 @@ kmdb_prom_term_init(kmdb_auxv_t *kav, kmdb_promif_t *pif)
 	bzero(&pif->pif_tios, sizeof (struct termios));
 
 	/* output device characteristics */
-	if ((conout = kmdb_prom_get_options_prop(kav, "output-device")) ==
+	if ((conout = kmdb_prom_get_ddi_prop(kav, "output-device")) ==
 	    NULL || strcmp(conout, "screen") == 0) {
 		(void) kmdb_parse_mode(KMDB_PROM_DEF_CONS_MODE,
 		    &pif->pif_tios, 0);
@@ -580,11 +580,11 @@ kmdb_prom_term_init(kmdb_auxv_t *kav, kmdb_promif_t *pif)
 		}
 
 		if (mode != NULL)
-			kmdb_prom_free_options_prop(mode);
+			kmdb_prom_free_ddi_prop(mode);
 	}
 
 	/* input device characteristics */
-	if ((conin = kmdb_prom_get_options_prop(kav, "input-device")) == NULL ||
+	if ((conin = kmdb_prom_get_ddi_prop(kav, "input-device")) == NULL ||
 	    strcmp(conin, "keyboard") == 0) {
 		(void) kmdb_parse_mode(KMDB_PROM_DEF_CONS_MODE,
 		    &pif->pif_tios, 1);
@@ -623,7 +623,7 @@ kmdb_prom_term_init(kmdb_auxv_t *kav, kmdb_promif_t *pif)
 		}
 
 		if (mode != NULL)
-			kmdb_prom_free_options_prop(mode);
+			kmdb_prom_free_ddi_prop(mode);
 	}
 
 	/* various characteristics of the prom read/write interface */
@@ -632,9 +632,9 @@ kmdb_prom_term_init(kmdb_auxv_t *kav, kmdb_promif_t *pif)
 	bcopy(ccs, &pif->pif_tios.c_cc, sizeof (ccs));
 
 	if (conin != NULL)
-		kmdb_prom_free_options_prop(conin);
+		kmdb_prom_free_ddi_prop(conin);
 	if (conout != NULL)
-		kmdb_prom_free_options_prop(conout);
+		kmdb_prom_free_ddi_prop(conout);
 }
 
 char *
