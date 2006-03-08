@@ -193,7 +193,7 @@ aclent_printacl(acl_t *aclp)
 			break;
 		default:
 			(void) fprintf(stderr,
-			    gettext("unrecognized entry\n"));
+			    dgettext(TEXT_DOMAIN, "unrecognized entry\n"));
 			break;
 		}
 	}
@@ -1222,7 +1222,8 @@ ace_perm_mask(struct acl_perm_type *aclperm, uint32_t *mask)
 
 	error = compute_ace_perms(aclperm->perm_str, mask);
 	if (error) {
-		acl_error(gettext("Invalid permission(s) '%s' specified\n"),
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid permission(s) '%s' specified\n"),
 		    aclperm->perm_str);
 		return (EACL_PERM_MASK_ERROR);
 	}
