@@ -612,11 +612,13 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 		*vpp = sep->se_root;
 		VN_HOLD(*vpp);
 		/*
-		 * If the snapshot was unmounted behind our backs, remount it.
+		 * If the snapshot was unmounted behind our backs,
+		 * try to remount it.
 		 */
-		if (!vn_ismntpt(*vpp))
+		if (traverse(vpp) != 0) {
+			ASSERT(!vn_ismntpt(*vpp));
 			goto domount;
-		VERIFY(traverse(vpp) == 0);
+		}
 		mutex_exit(&sdp->sd_lock);
 		ZFS_EXIT(zfsvfs);
 		return (0);
@@ -684,8 +686,14 @@ domount:
 	mutex_exit(&sdp->sd_lock);
 	ZFS_EXIT(zfsvfs);
 
-	if (err)
+	/*
+	 * If we had an error, drop our hold on the vnode and
+	 * zfsctl_snapshot_inactive() will clean up.
+	 */
+	if (err) {
 		VN_RELE(*vpp);
+		*vpp = NULL;
+	}
 	return (err);
 }
 
@@ -750,15 +758,20 @@ zfsctl_snapdir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
 zfsctl_snapdir_inactive(vnode_t *vp, cred_t *cr)
 {
 	zfsctl_snapdir_t *sdp = vp->v_data;
+	void *private;
 
-	ASSERT(avl_numnodes(&sdp->sd_snaps) == 0);
-	mutex_destroy(&sdp->sd_lock);
-	avl_destroy(&sdp->sd_snaps);
-	gfs_vop_inactive(vp, cr);
+	private = gfs_dir_inactive(vp);
+	if (private != NULL) {
+		ASSERT(avl_numnodes(&sdp->sd_snaps) == 0);
+		mutex_destroy(&sdp->sd_lock);
+		avl_destroy(&sdp->sd_snaps);
+		kmem_free(private, sizeof (zfsctl_snapdir_t));
+	}
 }
 
 static const fs_operation_def_t zfsctl_tops_snapdir[] = {
@@ -826,6 +839,13 @@ zfsctl_snapshot_inactive(vnode_t *vp, cred_t *cr)
 	mutex_exit(&sdp->sd_lock);
 	VN_RELE(dvp);
 
+	/*
+	 * Dispose of the vnode for the snapshot mount point.
+	 * This is safe to do because once this entry has been removed
+	 * from the AVL tree, it can't be found again, so cannot become
+	 * "active".  If we lookup the same name again we will end up
+	 * creating a new vnode.
+	 */
 	gfs_vop_inactive(vp, cr);
 }
 

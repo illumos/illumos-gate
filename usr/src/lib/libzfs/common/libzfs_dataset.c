@@ -2494,12 +2494,11 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 			zfs_handle_t *h;
 
 			/* make sure prefix exists */
-			h = zfs_open(tosnap, ZFS_TYPE_FILESYSTEM |
-			    ZFS_TYPE_VOLUME);
+			h = zfs_open(tosnap, ZFS_TYPE_FILESYSTEM);
 			if (h == NULL) {
 				zfs_error(dgettext(TEXT_DOMAIN,
 				    "cannot restore: "
-				    "filesystem %s does not exist"),
+				    "%s is an invalid destination"),
 				    tosnap);
 				return (-1);
 			}
