@@ -171,8 +171,8 @@ getlinsec:
  */
 xint13:
 	movb	$6, ABS(RetryCount)
-	pushal
 .try:
+	pushal
 	int	$0x13
 	jc	1f
 	add	$(8*4), %sp		    /* Clean up stack */

@@ -1260,11 +1260,11 @@ grub_strlen (const char *str)
 #endif /* ! STAGE1_5 */
 
 int
-memcheck (int addr, int len)
+memcheck (unsigned long addr, unsigned long len)
 {
   errnum = 0;	/* make sure errnum is cleared */
 #ifdef GRUB_UTIL
-  static int start_addr (void)
+  static unsigned long start_addr (void)
     {
       int ret;
 # if defined(HAVE_START_SYMBOL)
@@ -1275,7 +1275,7 @@ memcheck (int addr, int len)
       return ret;
     }
 
-  static int end_addr (void)
+  static unsigned long end_addr (void)
     {
       int ret;
 # if defined(HAVE_END_SYMBOL)

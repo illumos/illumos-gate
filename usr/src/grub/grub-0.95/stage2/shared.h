@@ -947,7 +947,7 @@ int substring (const char *s1, const char *s2);
 int nul_terminate (char *str);
 int get_based_digit (int c, int base);
 int safe_parse_maxint (char **str_ptr, int *myint_ptr);
-int memcheck (int start, int len);
+int memcheck (unsigned long start, unsigned long len);
 void grub_putstr (const char *str);
 
 #ifndef NO_DECOMPRESSION
