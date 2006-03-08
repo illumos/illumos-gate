@@ -119,8 +119,6 @@ static size_t nzents;
 #define	CMD_MIN		CMD_HELP
 #define	CMD_MAX		CMD_ATTACH
 
-#define	SINGLE_USER_RETRY	30
-
 struct cmd {
 	uint_t	cmd_num;				/* command number */
 	char	*cmd_name;				/* command name */
@@ -2937,39 +2935,60 @@ copy_zone(char *src, char *dst)
 }
 
 /*
- * Wait until the target_zone has booted to single-user.  Return Z_OK once
- * the zone has booted to that level or return Z_BAD_ZONE_STATE if the zone
- * has not booted to single-user after the timeout.
+ * Run sys-unconfig on a zone.  This will leave the zone in the installed
+ * state as long as there were no errors during the sys-unconfig.
  */
 static int
-zone_wait_single_user()
+unconfigure_zone(char *zonepath)
 {
-	char cmdbuf[ZONENAME_MAX + 256];
-	int retry;
+	int		err;
+	int		status;
+	struct stat	unconfig_buf;
+	zone_cmd_arg_t	zarg;
+	char		cmdbuf[MAXPATHLEN + 51];
 
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "test \"`/usr/sbin/zlogin -S %s /usr/bin/svcprop -p "
-	    "restarter/state svc:/milestone/single-user:default 2>/dev/null`\" "
-	    "= \"online\"",
-	    target_zone);
-
-	for (retry = 0; retry < SINGLE_USER_RETRY; retry++) {
-		int status;
-
-		status = do_subproc(cmdbuf);
-		if (WIFEXITED(status)) {
-			if (WEXITSTATUS(status) == 0)
-				return (Z_OK);
-
-			(void) sleep(2);
-		} else {
-			return (Z_BAD_ZONE_STATE);
-		}
+	/* The zone has to be installed in order to mount the scratch zone. */
+	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not set state"));
+		return (Z_ERR);
 	}
 
-	return (Z_BAD_ZONE_STATE);
-}
+	/*
+	 * Check if the zone is already sys-unconfiged.  This saves us
+	 * the work of bringing up the scratch zone so we can unconfigure it.
+	 */
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/root/etc/.UNCONFIGURED",
+	    zonepath);
+	if (stat(cmdbuf, &unconfig_buf) == 0)
+		return (Z_OK);
 
+	zarg.cmd = Z_MOUNT;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+		return (Z_ERR);
+	}
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf),
+	    "/usr/sbin/zlogin -S %s /usr/sbin/sys-unconfig -R /a", target_zone);
+
+	status = do_subproc(cmdbuf);
+	if ((err = subproc_status("sys-unconfig", status)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("sys-unconfig failed\n"));
+		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+	}
+
+	zarg.cmd = Z_UNMOUNT;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		(void) fprintf(stderr, gettext("could not unmount zone\n"));
+		return (Z_ERR);
+	}
+
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
 
 /* ARGSUSED */
 int
@@ -2981,20 +3000,14 @@ zfm_print(const char *p, void *r) {
 static int
 clone_func(int argc, char *argv[])
 {
-	char cmdbuf[MAXPATHLEN];
 	char *source_zone = NULL;
 	int lockfd;
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	char source_zonepath[MAXPATHLEN];
-	int status;
 	zone_state_t state;
 	zone_entry_t *zent;
 	char *method = "copy";
-	char *boot_args[] = { "-s", NULL };
-	char *halt_args[] = { NULL };
-	struct stat unconfig_buf;
-	boolean_t revert;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot clone zone in alternate root"));
@@ -3117,72 +3130,14 @@ clone_func(int argc, char *argv[])
 	(void) printf(gettext("Cloning zonepath %s..."), source_zonepath);
 	(void) fflush(stdout);
 
-	if ((err = copy_zone(source_zonepath, zonepath)) != Z_OK)
+	err = copy_zone(source_zonepath, zonepath);
+	(void) printf("\n");
+	if (err != Z_OK)
 		goto done;
 
-	/*
-	 * We have to set the state of the zone to installed so that we
-	 * can boot it and sys-unconfig it from within the zone.  However,
-	 * if something fails during the boot/sys-unconfig, we want to set
-	 * the state back to incomplete.  We use the revert flag to keep
-	 * track of this.
-	 */
-	revert = B_TRUE;
-
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("\ncould not set state"));
-		goto done;
-	}
-
-	/*
-	 * Check if the zone is already sys-unconfiged.  This saves us
-	 * the work of booting the zone so we can unconfigure it.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/root/etc/.UNCONFIGURED",
-	    zonepath);
-	if (stat(cmdbuf, &unconfig_buf) == -1) {
-		if ((err = boot_func(1, boot_args)) != Z_OK) {
-			errno = err;
-			zperror2(target_zone, gettext("\nCould not boot zone "
-			    "for sys-unconfig\n"));
-			goto done;
-		}
-
-		if ((err = zone_wait_single_user()) != Z_OK) {
-			errno = err;
-			zperror2(target_zone, gettext("\nCould not boot zone "
-			    "for sys-unconfig\n"));
-			(void) halt_func(0, halt_args);
-			goto done;
-		}
-
-		(void) snprintf(cmdbuf, sizeof (cmdbuf),
-		    "echo y | /usr/sbin/zlogin -S %s /usr/sbin/sys-unconfig",
-		    target_zone);
-
-		status = do_subproc(cmdbuf);
-		if ((err = subproc_status("sys-unconfig", status)) != Z_OK) {
-			errno = err;
-			zperror2(target_zone,
-			    gettext("\nsys-unconfig failed\n"));
-			/*
-			 * The sys-unconfig halts the zone but if it failed,
-			 * for some reason, we'll try to halt it now.
-			 */
-			(void) halt_func(0, halt_args);
-			goto done;
-		}
-	}
-
-	revert = B_FALSE;
+	err = unconfigure_zone(zonepath);
 
 done:
-	(void) printf("\n");
-
-	if (revert)
-		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
-
 	release_lock_file(lockfd);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
