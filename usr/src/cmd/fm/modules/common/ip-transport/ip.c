@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,19 +277,19 @@ ip_xprt_auth(const struct sockaddr *sap)
 static void
 ip_xprt_accept(ip_xprt_t *ipx)
 {
-	struct sockaddr sa;
+	struct sockaddr_storage sa;
 	socklen_t salen = sizeof (sa);
 	fmd_xprt_t *xp;
 	int fd;
 
-	if ((fd = accept(ipx->ipx_fd, &sa, &salen)) == -1) {
+	if ((fd = accept(ipx->ipx_fd, (struct sockaddr *)&sa, &salen)) == -1) {
 		fmd_hdl_error(ip_hdl, "failed to accept connection");
 		ip_stat.ips_accfail.fmds_value.ui64++;
 		return;
 	}
 
-	(void) getpeername(fd, &sa, &salen);
-	xp = fmd_xprt_open(ip_hdl, ipx->ipx_flags, ip_xprt_auth(&sa), NULL);
+	xp = fmd_xprt_open(ip_hdl, ipx->ipx_flags,
+	    ip_xprt_auth((struct sockaddr *)&sa), NULL);
 	ip_xprt_create(xp, fd, ipx->ipx_flags);
 }
 
@@ -338,7 +337,7 @@ static void
 ip_xprt_thread(void *arg)
 {
 	ip_xprt_t *ipx = arg;
-	struct sockaddr sa;
+	struct sockaddr_storage sa;
 	socklen_t salen = sizeof (sa);
 	struct pollfd pfd;
 	id_t id;
@@ -369,14 +368,15 @@ ip_xprt_thread(void *arg)
 			(void) fcntl(ipx->ipx_fd, F_SETFL,
 			    fcntl(ipx->ipx_fd, F_GETFL, 0) & ~O_NONBLOCK);
 
-			if (getpeername(ipx->ipx_fd, &sa, &salen) != 0) {
+			if (getpeername(ipx->ipx_fd, (struct sockaddr *)&sa,
+			    &salen) != 0) {
 				fmd_hdl_error(ip_hdl, "failed to get peer name "
 				    "for fd %d", ipx->ipx_fd);
 				bzero(&sa, sizeof (sa));
 			}
 
-			ipx->ipx_xprt = fmd_xprt_open(ip_hdl,
-			    ipx->ipx_flags, ip_xprt_auth(&sa), ipx);
+			ipx->ipx_xprt = fmd_xprt_open(ip_hdl, ipx->ipx_flags,
+			    ip_xprt_auth((struct sockaddr *)&sa), ipx);
 
 			fmd_hdl_debug(ip_hdl, "connect fd %d\n", ipx->ipx_fd);
 			continue;
