@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,7 +25,7 @@
 /*
  * newfs: friendly front end to mkfs
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,9 +105,12 @@ static void fatal(char *fmt, ...);
 #define	DESBLKSIZE	8192
 #define	DESFRAGSIZE	1024
 
-#define	dprintf(x)	if (debug) printf x
+#ifdef DEBUG
+#define	dprintf(x)	printf x
+#else
+#define	dprintf(x)
+#endif
 
-int		debug = 0;	/* enable debug output */
 static int	Nflag;		/* run mkfs without writing file system */
 static int	Tflag;		/* set up file system for growth to over 1 TB */
 static int	verbose;	/* show mkfs line before exec */
@@ -119,7 +121,6 @@ static int	ntracks;	/* # tracks/cylinder */
 static int	ntracks_set = 0; /* true if the user specified ntracks */
 static int	optim = FS_OPTTIME;	/* optimization, t(ime) or s(pace) */
 static int	nsectors;	/* # sectors/track */
-static int	geom_nsectors;	/* # sectors/track as returned by GEOM ioctl */
 static int	cpg;		/* cylinders/cylinder group */
 static int	cpg_set = 0;	/* true if the user specified cpg */
 static int	minfree = -1;	/* free space threshold */
@@ -157,7 +158,6 @@ main(int argc, char *argv[])
 	struct stat64 st;
 	int status;
 	int option;
-	int nsect;
 	struct fs *sbp;	/* Pointer to superblock (if present) */
 	diskaddr_t actual_fssize;
 	diskaddr_t max_possible_fssize;
@@ -415,10 +415,10 @@ main(int argc, char *argv[])
 	}
 
 	if (label_type == LABEL_TYPE_VTOC) {
+		if (nsectors < 0)
+			fatal(gettext("%s: no default #sectors/track"),
+			    special);
 		if (!use_efi_dflts) {
-			if (nsectors < 0)
-				fatal(gettext("%s: no default #sectors/track"),
-				    special);
 			if (ntracks < 0)
 				fatal(gettext("%s: no default #tracks"),
 				    special);
@@ -573,12 +573,9 @@ main(int argc, char *argv[])
 
 		maxipg = roundup(bsize * NBBY / 3,
 		    bsize / sizeof (struct inode));
-
-		nsect = (nsectors == -1) ? geom_nsectors : nsectors;
-
 		maxcpg = (bsize - sizeof (struct cg) - howmany(maxipg, NBBY)) /
 		    (sizeof (long) + nrpos * sizeof (short) +
-			nsect / (MAXFRAG * NBBY));
+			nsectors / (MAXFRAG * NBBY));
 		cpg = (fssize / GBSEC) * 32;
 		if (cpg > maxcpg)
 			cpg = maxcpg;
@@ -742,13 +739,14 @@ getdiskbydev(char *disk)
 			use_efi_dflts = 1;
 		}
 		/*
-		 * Though the nsector that is passed to mkfs is decided here
-		 * based on use_efi_dflts, we still need the geometry
-		 * based dkg_nsect for the cpg calculation later.
+		 * The ntracks that is passed to mkfs is decided here based
+		 * on 'use_efi_dflts' and whether ntracks was specified as a
+		 * command line parameter to newfs.
+		 * If ntracks of -1 is passed to mkfs, mkfs uses DEF_TRACKS_EFI
+		 * and DEF_SECTORS_EFI for ntracks and nsectors respectively.
 		 */
-		geom_nsectors = g.dkg_nsect;
 		if (nsectors == 0)
-			nsectors = use_efi_dflts ? -1 : g.dkg_nsect;
+			nsectors = g.dkg_nsect;
 		if (ntracks == 0)
 			ntracks = use_efi_dflts ? -1 : g.dkg_nhead;
 		if (rpm == 0)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,7 @@
  * look good.
  */
 #define	tprintf(x)	if (Nflag && retry) \
-				strncat(tmpbuf, x, strlen(x)); \
+				(void) strncat(tmpbuf, x, strlen(x)); \
 			else \
 				(void) fprintf(stderr, x);
 
@@ -634,8 +634,8 @@ main(int argc, char *argv[])
 	int remaining_cg;
 	int do_dot = 0;
 	int use_efi_dflts = 0, retry = 0;
-	int invalid_sb_cnt, ret, skip_this_sb;
-	int save_nsect, save_ntrack, save_cpg;
+	int invalid_sb_cnt, ret, skip_this_sb, cg_too_small;
+	int geom_nsect, geom_ntrack, geom_cpg;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -1072,15 +1072,26 @@ main(int argc, char *argv[])
 	 * filesystems on EFI disks.
 	 *
 	 * However if the user asked for a specific layout by supplying values
-	 * for these parameters, honour the user supplied parameters.
+	 * for even one of the three parameters (nsect, ntrack, cpg), honour
+	 * the user supplied parameters.
+	 *
+	 * Choosing EFI style or native geometry style can make a lot of
+	 * difference, because the size of a cylinder group is dependent on
+	 * this choice. This in turn means that the position of alternate
+	 * superblocks varies depending on the style chosen. It is not
+	 * necessary that all disks of size > CHSLIMIT have EFI style layout.
+	 * There can be disks which are > CHSLIMIT size, but have native
+	 * geometry style layout, thereby warranting the need for alternate
+	 * logic in superblock detection.
 	 */
 
 	if (mtb != 'y' && label_type == LABEL_TYPE_VTOC &&
-	    ((nsect == -1 && ntrack == -1) ||
-	    (grow && ntrack_flag == RC_DEFAULT))) {
+	    ((ntrack == -1 || (grow && ntrack_flag == RC_DEFAULT)) ||
+	    (nsect_flag == RC_DEFAULT && ntrack_flag == RC_DEFAULT &&
+	    cpg_flag == RC_DEFAULT))) {
 		/*
-		 * "-1" indicates that we were called from newfs and these
-		 * arguments were not passed in command line. Calculate nsect
+		 * "-1" indicates that we were called from newfs and ntracks
+		 * was not specified in newfs command line. Calculate nsect
 		 * and ntrack in the same manner as newfs.
 		 *
 		 * This is required because, the defaults for nsect and ntrack
@@ -1108,9 +1119,8 @@ main(int argc, char *argv[])
 			retry = 1;
 		    }
 		}
-		dprintf(("DeBuG mkfs: geom = %ld CHSLIMIT = %d\n",
-			dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect,
-			CHSLIMIT));
+		dprintf(("DeBuG CHSLIMIT = %d geom = %ld\n", CHSLIMIT,
+			dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
 	}
 
 	/*
@@ -1121,7 +1131,7 @@ main(int argc, char *argv[])
 	 *
 	 * If we were called from growfs, we will have a problem if we mix
 	 * and match the filesystem creation and growth styles. For example,
-	 * if we create using EFI style and we have to also grow using EFI
+	 * if we create using EFI style, we have to also grow using EFI
 	 * style. So follow the style indicated by the fs_version.
 	 *
 	 * Read and verify the primary superblock. If it looks sane, use the
@@ -1133,7 +1143,7 @@ main(int argc, char *argv[])
 	 */
 	if ((Nflag && use_efi_dflts) || (grow)) {
 		if (grow && ntrack_flag != RC_DEFAULT)
-			goto retry_alternate_logic;
+			goto start_fs_creation;
 		rdfs((diskaddr_t)(SBOFF / sectorsize), (int)sbsize,
 			(char *)&altsblock);
 		ret = checksblock(altsblock, 1);
@@ -1141,7 +1151,7 @@ main(int argc, char *argv[])
 		if (!ret) {
 			if (altsblock.fs_magic == MTB_UFS_MAGIC) {
 				mtb = 'y';
-				goto retry_alternate_logic;
+				goto start_fs_creation;
 			}
 			use_efi_dflts = (altsblock.fs_version ==
 				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
@@ -1159,37 +1169,36 @@ main(int argc, char *argv[])
 			if (!ret) {
 			    if (altsblock.fs_magic == MTB_UFS_MAGIC) {
 				mtb = 'y';
-				goto retry_alternate_logic;
+				goto start_fs_creation;
 			    }
 			    use_efi_dflts = (altsblock.fs_version ==
 				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
-			} else
-			    dprintf(("DeBuG checksblock() failed - error : %d"
+			}
+			dprintf(("DeBuG checksblock() returned : %d"
 				" for sb : %d\n", ret, ALTSB));
 		}
 	}
 
+	geom_nsect = nsect;
+	geom_ntrack = ntrack;
+	geom_cpg = cpg;
+	dprintf(("DeBuG geom_nsect=%d, geom_ntrack=%d, geom_cpg=%d\n",
+		geom_nsect, geom_ntrack, geom_cpg));
+
+start_fs_creation:
 retry_alternate_logic:
 	invalid_sb_cnt = 0;
+	cg_too_small = 0;
 	if (use_efi_dflts) {
-		save_nsect = nsect;
-		save_ntrack = ntrack;
-		save_cpg = cpg;
-
 		nsect = DEF_SECTORS_EFI;
 		ntrack = DEF_TRACKS_EFI;
 		cpg = DESCPG;
-
 		dprintf(("\nDeBuG Using EFI defaults\n"));
-		dprintf(("DeBuG save_nsect=%d, save_ntrack=%d, save_cpg=%d\n",
-		    save_nsect, save_ntrack, save_cpg));
 	} else {
-		save_nsect = DEF_SECTORS_EFI;
-		save_ntrack = DEF_TRACKS_EFI;
-		save_cpg = DESCPG;
-		dprintf(("\n\nDeBuG mkfs: Using Geometry\n"));
-		dprintf(("DeBuG save_nsect=%d, save_ntrack=%d, save_cpg=%d\n",
-		    save_nsect, save_ntrack, save_cpg));
+		nsect = geom_nsect;
+		ntrack = geom_ntrack;
+		cpg = geom_cpg;
+		dprintf(("\nDeBuG Using Geometry\n"));
 		/*
 		 * 32K based on max block size of 64K, and rotational layout
 		 * test of nsect <= (256 * sectors/block).  Current block size
@@ -1937,6 +1946,12 @@ grow30:
 		    "implies %ld sector(s) cannot be allocated.\n"),
 		    (cgdmin(&sblock, j) - cgbase(&sblock, j)) / sblock.fs_frag,
 		    i / sblock.fs_frag, i * NSPF(&sblock));
+		/*
+		 * If there is only one cylinder group and that is not even
+		 * big enough to hold the inodes, exit.
+		 */
+		if (sblock.fs_ncg == 1)
+			cg_too_small = 1;
 		sblock.fs_ncg--;
 		sblock.fs_ncyl -= sblock.fs_ncyl % sblock.fs_cpg;
 		sblock.fs_size = fssize_frag =
@@ -2028,6 +2043,12 @@ grow40:
 		perror("calloc");
 		lockexit(32);
 	}
+	if (cg_too_small) {
+		(void) fprintf(stderr, gettext("File system creation failed. "
+			"There is only one cylinder group and\nthat is "
+			"not even big enough to hold the inodes.\n"));
+		lockexit(32);
+	}
 	/*
 	 * Now build the cylinders group blocks and
 	 * then print out indices of cylinder groups.
@@ -2041,9 +2062,9 @@ grow40:
 		/*
 		 * If Nflag and if the disk is larger than the CHSLIMIT,
 		 * then sanity test the superblocks before reporting. If there
-		 * are too many superblocks which look insane, we probably
-		 * have to retry with alternate logic. If we are already
-		 * retrying, then our efforts to arrive at alternate
+		 * are too many superblocks which look insane, we have
+		 * to retry with alternate logic. If both methods have
+		 * failed, then our efforts to arrive at alternate
 		 * superblocks failed, so complain and exit.
 		 */
 		if (Nflag && retry) {
@@ -2078,9 +2099,6 @@ grow40:
 			}
 			retry++;
 			use_efi_dflts = !use_efi_dflts;
-			nsect = save_nsect;
-			ntrack = save_ntrack;
-			cpg = save_cpg;
 			free(tmpbuf);
 			goto retry_alternate_logic;
 		    }
@@ -2096,7 +2114,7 @@ grow40:
 			width += plen;
 		}
 		if (Nflag && retry)
-			strncat(tmpbuf, pbuf, strlen(pbuf));
+			(void) strncat(tmpbuf, pbuf, strlen(pbuf));
 		else
 			(void) fprintf(stderr, "%s", pbuf);
 	}
@@ -2184,9 +2202,6 @@ grow40:
 			}
 			retry++;
 			use_efi_dflts = !use_efi_dflts;
-			nsect = save_nsect;
-			ntrack = save_ntrack;
-			cpg = save_cpg;
 			free(tmpbuf);
 			goto retry_alternate_logic;
 		    }
@@ -2206,14 +2221,14 @@ grow40:
 			width += plen;
 		}
 		if (Nflag && retry)
-			strncat(tmpbuf, pbuf, strlen(pbuf));
+			(void) strncat(tmpbuf, pbuf, strlen(pbuf));
 		else
 			(void) fprintf(stderr, "%s", pbuf);
 	}
 	tprintf("\n");
 	if (Nflag) {
 		if (retry)
-			fprintf(stderr, "%s", tmpbuf);
+			(void) fprintf(stderr, "%s", tmpbuf);
 		free(tmpbuf);
 		lockexit(0);
 	}
@@ -3902,7 +3917,6 @@ checksblock(struct fs sb, int proceed)
 	    err = 6;
 	    errmsg = gettext("Bad superblock; superblock size out of range\n");
 	}
-
 
 	if (proceed) {
 		if (err) dprintf(("%s", errmsg));
