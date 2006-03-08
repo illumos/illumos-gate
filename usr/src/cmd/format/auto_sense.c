@@ -313,7 +313,7 @@ auto_efi_sense(int fd, struct efi_info *label)
 	    }
 	    return (NULL);
 	}
-	if (cur_ctype->ctype_ctype == DKC_DIRECT) {
+	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
 		ctlr = find_direct_ctlr_info(&dkinfo);
 		disk_info = find_direct_disk_info(&dkinfo);
 	} else {
