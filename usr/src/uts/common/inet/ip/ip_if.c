@@ -9084,7 +9084,8 @@ ip_sioctl_xarp(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		 */
 		ire = ire_cache_lookup(sin->sin_addr.s_addr, ALL_ZONES);
 		if ((ire == NULL) || (ire->ire_type == IRE_LOOPBACK) ||
-		    ((ill = ire_to_ill(ire)) == NULL)) {
+		    ((ill = ire_to_ill(ire)) == NULL) ||
+		    (ill->ill_net_type != IRE_IF_RESOLVER)) {
 			if (ire != NULL)
 				ire_refrele(ire);
 			ire = ire_ftable_lookup(sin->sin_addr.s_addr,
