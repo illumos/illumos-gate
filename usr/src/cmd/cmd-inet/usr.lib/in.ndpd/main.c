@@ -1333,7 +1333,6 @@ in_signal(int fd)
 			phyint_delete(pi);
 		}
 		(void) unlink(PATH_PID);
-		logmsg(LOG_ERR, "terminated\n");
 		exit(0);
 		/* NOTREACHED */
 	case 255:

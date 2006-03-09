@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,7 @@ in_data(struct phyint *pi)
 		 * and the ICMP checksum.
 		 */
 		if (hoplimit != IPV6_MAX_HOPS) {
-			logmsg(LOG_INFO, "RS hop limit: %d from %s on %s\n",
+			logmsg(LOG_DEBUG, "RS hop limit: %d from %s on %s\n",
 			    hoplimit, msgbuf, pi->pi_name);
 			return;
 		}
@@ -231,7 +231,7 @@ in_data(struct phyint *pi)
 		 * and the ICMP checksum.
 		 */
 		if (!IN6_IS_ADDR_LINKLOCAL(&from.sin6_addr)) {
-			logmsg(LOG_INFO, "RA from %s - not link local on %s\n",
+			logmsg(LOG_DEBUG, "RA from %s - not link local on %s\n",
 			    msgbuf, pi->pi_name);
 			return;
 		}
@@ -384,14 +384,14 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 	    !(ra_flags & ND_RA_FLAG_MANAGED)) {
 		ra_flags |= ND_RA_FLAG_MANAGED;
 		/* TODO trigger dhcpv6 */
-		logmsg(LOG_INFO, "incoming_ra: trigger dhcp MANAGED\n");
+		logmsg(LOG_DEBUG, "incoming_ra: trigger dhcp MANAGED\n");
 	}
 	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) &&
 	    !(ra_flags & ND_RA_FLAG_OTHER)) {
 		ra_flags |= ND_RA_FLAG_OTHER;
 		if (!(ra_flags & ND_RA_FLAG_MANAGED)) {
 			/* TODO trigger dhcpv6 for non-address info */
-			logmsg(LOG_INFO, "incoming_ra: trigger dhcp OTHER\n");
+			logmsg(LOG_DEBUG, "incoming_ra: trigger dhcp OTHER\n");
 		}
 	}
 	/* Skip default router code if sent from ourselves */
