@@ -740,6 +740,26 @@ top:
 
 		ASSERT(tx_bytes == nbytes);
 
+		/*
+		 * Clear Set-UID/Set-GID bits on successful write if not
+		 * privileged and at least one of the excute bits is set.
+		 *
+		 * It would be nice to to this after all writes have
+		 * been done, but that would still expose the ISUID/ISGID
+		 * to another app after the partial write is committed.
+		 */
+
+		mutex_enter(&zp->z_acl_lock);
+		if ((zp->z_phys->zp_mode & (S_IXUSR | (S_IXUSR >> 3) |
+		    (S_IXUSR >> 6))) != 0 &&
+		    (zp->z_phys->zp_mode & (S_ISUID | S_ISGID)) != 0 &&
+		    secpolicy_vnode_setid_retain(cr,
+		    (zp->z_phys->zp_mode & S_ISUID) != 0 &&
+		    zp->z_phys->zp_uid == 0) != 0) {
+			    zp->z_phys->zp_mode &= ~(S_ISUID | S_ISGID);
+		}
+		mutex_exit(&zp->z_acl_lock);
+
 		n -= nbytes;
 		if (n <= 0)
 			break;
@@ -2044,8 +2064,9 @@ top:
 	dmu_tx_hold_bonus(tx, zp->z_id);
 
 	if (mask & AT_MODE) {
+		uint64_t pmode = pzp->zp_mode;
 
-		new_mode = (pzp->zp_mode & S_IFMT) | (vap->va_mode & ~S_IFMT);
+		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
 
 		if (zp->z_phys->zp_acl.z_acl_extern_obj)
 			dmu_tx_hold_write(tx,

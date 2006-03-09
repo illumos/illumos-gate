@@ -39,6 +39,7 @@
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/unistd.h>
+#include <sys/sdt.h>
 #include <sys/fs/zfs.h>
 #include <sys/mode.h>
 #include <sys/policy.h>
@@ -74,7 +75,7 @@
 #define	ALL_INHERIT	(ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE | \
     ACE_NO_PROPAGATE_INHERIT_ACE|ACE_INHERIT_ONLY_ACE)
 
-#define	SECURE_NO_INHERIT	(ACE_WRITE_ACL|ACE_WRITE_OWNER)
+#define	SECURE_CLEAR	(ACE_WRITE_ACL|ACE_WRITE_OWNER)
 
 #define	OGE_PAD	6		/* traditional owner/group/everyone ACES */
 
@@ -111,11 +112,17 @@ zfs_v4_to_unix(uint32_t access_mask)
 {
 	uint32_t new_mask = 0;
 
-	if (access_mask & (ACE_READ_DATA | ACE_LIST_DIRECTORY))
+	/*
+	 * This is used for mapping v4 permissions into permissions
+	 * that can be passed to secpolicy_vnode_access()
+	 */
+	if (access_mask & (ACE_READ_DATA | ACE_LIST_DIRECTORY |
+	    ACE_READ_ATTRIBUTES | ACE_READ_ACL))
 		new_mask |= S_IROTH;
-	if (access_mask & (ACE_WRITE_DATA|ACE_APPEND_DATA|ACE_ADD_FILE))
+	if (access_mask & (ACE_WRITE_DATA | ACE_APPEND_DATA |
+	    ACE_WRITE_ATTRIBUTES | ACE_ADD_FILE | ACE_WRITE_NAMED_ATTRS))
 		new_mask |= S_IWOTH;
-	if (access_mask & (ACE_EXECUTE|ACE_READ_NAMED_ATTRS))
+	if (access_mask & (ACE_EXECUTE | ACE_READ_NAMED_ATTRS))
 		new_mask |= S_IXOTH;
 
 	return (new_mask);
@@ -161,7 +168,7 @@ zfs_mode_compute(znode_t *zp, zfs_acl_t *aclp)
 
 	for (i = 0, acep = aclp->z_acl;
 	    i != aclp->z_acl_count; i++, acep++) {
-		entry_type = (acep->a_flags & 0xf040);
+		entry_type = (acep->a_flags & ACE_TYPE_FLAGS);
 		if (entry_type == ACE_OWNER) {
 			if ((acep->a_access_mask & ACE_READ_DATA) &&
 			    (!(seen & S_IRUSR))) {
@@ -334,7 +341,7 @@ zfs_acl_valid(znode_t *zp, ace_t *uace, int aclcnt, int *inherit)
 		 * first check type of entry
 		 */
 
-		switch (acep->a_flags & 0xf040) {
+		switch (acep->a_flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
 			acep->a_who = -1;
 			break;
@@ -577,7 +584,7 @@ static int
 zfs_acl_ace_match(ace_t *acep, int allow_deny, int type, int mask)
 {
 	return (acep->a_access_mask == mask && acep->a_type == allow_deny &&
-	    ((acep->a_flags & 0xf040) == type));
+	    ((acep->a_flags & ACE_TYPE_FLAGS) == type));
 }
 
 /*
@@ -663,7 +670,7 @@ zfs_acl_prepend_deny(znode_t *zp, zfs_acl_t *aclp, int i,
 
 	acep = aclp->z_acl;
 	zfs_set_ace(&acep[i], 0, DENY, acep[i + 1].a_who,
-	    (acep[i + 1].a_flags & 0xf040));
+	    (acep[i + 1].a_flags & ACE_TYPE_FLAGS));
 	zfs_acl_prepend_fixup(&acep[i], &acep[i+1], mode, zp->z_phys->zp_uid);
 	aclp->z_acl_count++;
 }
@@ -769,7 +776,7 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 	i = 0;
 	while (i < aclp->z_acl_count) {
 		acep = aclp->z_acl;
-		entry_type = (acep[i].a_flags & 0xf040);
+		entry_type = (acep[i].a_flags & ACE_TYPE_FLAGS);
 		iflags = (acep[i].a_flags & ALL_INHERIT);
 
 		if ((acep[i].a_type != ALLOW && acep[i].a_type != DENY) ||
@@ -896,8 +903,8 @@ static void
 zfs_securemode_update(zfsvfs_t *zfsvfs, ace_t *acep)
 {
 	if ((zfsvfs->z_acl_inherit == SECURE) &&
-	    acep->a_type == ALLOW)
-		acep->a_access_mask &= ~SECURE_NO_INHERIT;
+	    (acep->a_type == ALLOW))
+		acep->a_access_mask &= ~SECURE_CLEAR;
 }
 
 /*
@@ -944,26 +951,21 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp)
 				continue;
 
 			if (zfs_ace_can_use(zp, &pacep[i])) {
+
 				/*
 				 * Now create entry for inherited ace
 				 */
+
 				acep[j] = pacep[i];
 
-				if (pacep[i].a_flags &
-				    ACE_NO_PROPAGATE_INHERIT_ACE) {
-					acep[j].a_flags &= ~ALL_INHERIT;
-					j++;
-					continue;
-				}
+				/*
+				 * When AUDIT/ALARM a_types are supported
+				 * they should be inherited here.
+				 */
 
-				if (pacep[i].a_type != ALLOW &&
-				    pacep[i].a_type != DENY) {
-					zfs_securemode_update(zfsvfs, &acep[j]);
-					j++;
-					continue;
-				}
-
-				if (ZTOV(zp)->v_type != VDIR) {
+				if ((pacep[i].a_flags &
+				    ACE_NO_PROPAGATE_INHERIT_ACE) ||
+				    (ZTOV(zp)->v_type != VDIR)) {
 					acep[j].a_flags &= ~ALL_INHERIT;
 					zfs_securemode_update(zfsvfs, &acep[j]);
 					j++;
@@ -977,15 +979,17 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp)
 				 * only files, then make sure inherit_only
 				 * is on for future propagation.
 				 */
-				if ((acep[j].a_flags & (ACE_FILE_INHERIT_ACE |
-				    ACE_DIRECTORY_INHERIT_ACE)) ==
+				if ((pacep[i].a_flags & (ACE_FILE_INHERIT_ACE |
+				    ACE_DIRECTORY_INHERIT_ACE)) !=
 				    ACE_FILE_INHERIT_ACE) {
-					acep[j].a_flags |= ACE_INHERIT_ONLY_ACE;
+					j++;
+					acep[j] = acep[j-1];
+					acep[j-1].a_flags |=
+					    ACE_INHERIT_ONLY_ACE;
+					acep[j].a_flags &= ~ALL_INHERIT;
 				} else {
-					acep[j].a_flags &=
-					    ~ACE_INHERIT_ONLY_ACE;
+					acep[j].a_flags |= ACE_INHERIT_ONLY_ACE;
 				}
-
 				zfs_securemode_update(zfsvfs, &acep[j]);
 				j++;
 			}
@@ -1219,16 +1223,17 @@ done:
 }
 
 static int
-zfs_ace_access(ace_t *zacep, int mode_wanted, int *working_mode)
+zfs_ace_access(ace_t *zacep, int *working_mode)
 {
-	if ((*working_mode & mode_wanted) == mode_wanted) {
+	if (*working_mode == 0) {
 		return (0);
 	}
 
-	if (zacep->a_access_mask & mode_wanted) {
+	if (zacep->a_access_mask & *working_mode) {
 		if (zacep->a_type == ALLOW) {
-			*working_mode |= (mode_wanted & zacep->a_access_mask);
-			if ((*working_mode & mode_wanted) == mode_wanted)
+			*working_mode &=
+			    ~(*working_mode & zacep->a_access_mask);
+			if (*working_mode == 0)
 				return (0);
 		} else if (zacep->a_type == DENY) {
 			return (EACCES);
@@ -1251,7 +1256,6 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	ace_t		*zacep;
 	gid_t		gid;
-	int		mode_wanted = v4_mode;
 	int		cnt;
 	int		i;
 	int		error;
@@ -1259,7 +1263,7 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 	uint_t		entry_type;
 	uid_t		uid = crgetuid(cr);
 
-	*working_mode = 0;
+	*working_mode = v4_mode;
 
 	if (zfsvfs->z_assign >= TXG_INITIAL)		/* ZIL replay */
 		return (0);
@@ -1284,15 +1288,18 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 
 	for (i = 0; i != cnt; i++) {
 
+		DTRACE_PROBE2(zfs__access__common,
+		    ace_t *, &zacep[i], int, *working_mode);
+
 		if (zacep[i].a_flags & ACE_INHERIT_ONLY_ACE)
 			continue;
 
-		entry_type = (zacep[i].a_flags & 0xf040);
+		entry_type = (zacep[i].a_flags & ACE_TYPE_FLAGS);
 		switch (entry_type) {
 		case ACE_OWNER:
 			if (uid == zp->z_phys->zp_uid) {
 				access_deny = zfs_ace_access(&zacep[i],
-				    mode_wanted, working_mode);
+				    working_mode);
 			}
 			break;
 		case (ACE_IDENTIFIER_GROUP | ACE_GROUP):
@@ -1307,12 +1314,11 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 
 			if (groupmember(gid, cr)) {
 				access_deny = zfs_ace_access(&zacep[i],
-				    mode_wanted, working_mode);
+				    working_mode);
 			}
 			break;
 		case ACE_EVERYONE:
-			access_deny = zfs_ace_access(&zacep[i],
-			    mode_wanted, working_mode);
+			access_deny = zfs_ace_access(&zacep[i], working_mode);
 			break;
 
 		/* USER Entry */
@@ -1320,7 +1326,7 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 			if (entry_type == 0) {
 				if (uid == zacep[i].a_who) {
 					access_deny = zfs_ace_access(&zacep[i],
-					    mode_wanted, working_mode);
+					    working_mode);
 				}
 				break;
 			}
@@ -1331,7 +1337,6 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 
 		if (access_deny != ACCESS_UNDETERMINED)
 			break;
-
 	}
 
 	mutex_exit(&zp->z_acl_lock);
@@ -1348,7 +1353,7 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 int
 zfs_zaccess(znode_t *zp, int mode, cred_t *cr)
 {
-	int	working_mode = 0;
+	int	working_mode;
 	int	error;
 	int	is_attr;
 	znode_t	*xzp;
@@ -1389,9 +1394,10 @@ zfs_zaccess(znode_t *zp, int mode, cred_t *cr)
 		return (error);
 	}
 
-	if (error || (working_mode != mode)) {
+	if (error || working_mode) {
+		working_mode = (zfs_v4_to_unix(working_mode) << 6);
 		error = secpolicy_vnode_access(cr, ZTOV(check_zp),
-		    check_zp->z_phys->zp_uid, ~zfs_v4_to_unix(working_mode));
+		    check_zp->z_phys->zp_uid, working_mode);
 	}
 
 	if (is_attr)
@@ -1490,14 +1496,14 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	/*
 	 * First handle the first row
 	 */
-	if (dzp_working_mode & ACE_DELETE_CHILD)
+	if ((dzp_working_mode & ACE_DELETE_CHILD) == 0)
 		return (0);
 
 	/*
 	 * Second row
 	 */
 
-	if (zp_working_mode & ACE_DELETE)
+	if ((zp_working_mode & ACE_DELETE) == 0)
 		return (0);
 
 	/*
@@ -1510,15 +1516,15 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	if (dzp_error == EROFS)
 		return (dzp_error);
 
-	if (dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE))
+	if ((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) == 0)
 		goto sticky;
 
 	/*
 	 * Fourth Row
 	 */
 
-	if (((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) == 0) &&
-	    (zp_working_mode & ACE_DELETE))
+	if (((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) != 0) &&
+	    ((zp_working_mode & ACE_DELETE) == 0))
 		goto sticky;
 
 	error = secpolicy_vnode_access(cr, ZTOV(zp),
