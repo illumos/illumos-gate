@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1829,19 +1828,19 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 
 #define	SH_B0(eax)	(eax == 0xf40 || eax == 0xf50)
 #define	SH_B3(eax) 	(eax == 0xf51)
-#define	B(eax)		(SH_B0(eax) | SH_B3(eax))
+#define	B(eax)		(SH_B0(eax) || SH_B3(eax))
 
 #define	SH_C0(eax)	(eax == 0xf48 || eax == 0xf58)
 
 #define	SH_CG(eax)	(eax == 0xf4a || eax == 0xf5a || eax == 0xf7a)
 #define	DH_CG(eax)	(eax == 0xfc0 || eax == 0xfe0 || eax == 0xff0)
 #define	CH_CG(eax)	(eax == 0xf82 || eax == 0xfb2)
-#define	CG(eax)		(SH_CG(eax) | DH_CG(eax) | CH_CG(eax))
+#define	CG(eax)		(SH_CG(eax) || DH_CG(eax) || CH_CG(eax))
 
 #define	SH_D0(eax)	(eax == 0x10f40 || eax == 0x10f50 || eax == 0x10f70)
 #define	DH_D0(eax)	(eax == 0x10fc0 || eax == 0x10ff0)
 #define	CH_D0(eax)	(eax == 0x10f80 || eax == 0x10fb0)
-#define	D0(eax)		(SH_D0(eax) | DH_D0(eax) | CH_D0(eax))
+#define	D0(eax)		(SH_D0(eax) || DH_D0(eax) || CH_D0(eax))
 
 #define	SH_E0(eax)	(eax == 0x20f50 || eax == 0x20f40 || eax == 0x20f70)
 #define	JH_E1(eax)	(eax == 0x20f10)	/* JH8_E0 had 0x20f30 */
@@ -1851,8 +1850,9 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 #define	SH_E5(eax)	(eax == 0x20f42)
 #define	DH_E6(eax)	(eax == 0x20ff2 || eax == 0x20fc2)
 #define	JH_E6(eax)	(eax == 0x20f12 || eax == 0x20f32)
-#define	EX(eax)		(SH_E0(eax) | JH_E1(eax) | DH_E3(eax) | SH_E4(eax) | \
-			    BH_E4(eax) | SH_E5(eax) | DH_E6(eax) | JH_E6(eax))
+#define	EX(eax)		(SH_E0(eax) || JH_E1(eax) || DH_E3(eax) || \
+			    SH_E4(eax) || BH_E4(eax) || SH_E5(eax) || \
+			    DH_E6(eax) || JH_E6(eax))
 
 	switch (erratum) {
 	case 1:
@@ -1986,6 +1986,10 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 			return (!(regs.cp_edx & 0x100));
 		}
 		return (0);
+	case 6323525:
+		return (((((eax >> 12) & 0xff00) + (eax & 0xf00)) |
+		    (((eax >> 4) & 0xf) | ((eax >> 12) & 0xf0))) < 0xf40);
+
 	default:
 		return (-1);
 	}
@@ -2559,7 +2563,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
-		create = CPI_MODEL(cpi) == 0xf;
+		create = CPI_FAMILY(cpi) == 0xf;
 		break;
 	default:
 		create = 0;

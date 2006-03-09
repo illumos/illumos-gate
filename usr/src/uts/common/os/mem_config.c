@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -431,14 +430,14 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 
 	memsegs_unlock(1);
 
+	PLCNT_MODIFY_MAX(seg->pages_base, (long)npgs);
+
 	/*
 	 * Free the pages outside the lock to avoid locking loops.
 	 */
 	for (pp = seg->pages; pp < seg->epages; pp++) {
 		page_free(pp, 1);
 	}
-
-	PLCNT_MODIFY_MAX(seg->pages_base, (long)npgs);
 
 	/*
 	 * Now that we've updated the appropriate memory lists we

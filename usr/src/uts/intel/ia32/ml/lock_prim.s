@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +557,16 @@ mutex_exit(kmutex_t *lp)
 	cmpxchgq %rdx, (%rdi)
 	jnz	mutex_vector_enter
 .mutex_enter_lockstat_patch_point:
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_enter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */ 
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 	movq	%rdi, %rsi
 	movl	$LS_MUTEX_ENTER_ACQUIRE, %edi
 /*
@@ -612,8 +620,18 @@ mutex_exit(kmutex_t *lp)
 	cmpxchgq %rdx, (%rdi)
 	jnz	mutex_vector_tryenter
 	not	%eax				/* return success (nonzero) */
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_tryenter_lockstat_patch_point:
+.mutex_tryenter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+.mutex_tryenter_lockstat_6323525_patch_point:	/* new patch point if lfence */
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 .mutex_tryenter_lockstat_patch_point:
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 	movq	%rdi, %rsi
 	movl	$LS_MUTEX_ENTER_ACQUIRE, %edi
 	jmp	lockstat_wrapper
@@ -626,13 +644,21 @@ mutex_exit(kmutex_t *lp)
 	cmpxchgq %rdx, (%rdi)
 	jnz	0f
 	not	%eax				/* return success (nonzero) */
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_atryenter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 0:
 	xorl	%eax, %eax			/* return failure */
 	ret
 	SET_SIZE(mutex_adaptive_tryenter)
 
-	.globl mutex_exit_critical_start
+	.globl	mutex_exit_critical_start
 
 	ENTRY(mutex_exit)
 mutex_exit_critical_start:		/* If interrupted, restart here */
@@ -664,8 +690,18 @@ mutex_exit_critical_size:
 	lock
 	cmpxchgl %edx, (%ecx)
 	jnz	mutex_vector_enter
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_enter_lockstat_patch_point:
+.mutex_enter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 .mutex_enter_lockstat_patch_point:
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 	movl	$LS_MUTEX_ENTER_ACQUIRE, %eax
 	ALTENTRY(lockstat_wrapper)	/* expects edx=thread, ecx=lock, */
 					/*   eax=lockstat event */
@@ -725,8 +761,18 @@ mutex_exit_critical_size:
 	cmpxchgl %edx, (%ecx)
 	jnz	mutex_vector_tryenter
 	movl	%ecx, %eax
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_tryenter_lockstat_patch_point:
+.mutex_tryenter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+.mutex_tryenter_lockstat_6323525_patch_point:	/* new patch point if lfence */
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 .mutex_tryenter_lockstat_patch_point:
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 	movl	$LS_MUTEX_ENTER_ACQUIRE, %eax
 	jmp	lockstat_wrapper
 	SET_SIZE(mutex_tryenter)
@@ -739,14 +785,22 @@ mutex_exit_critical_size:
 	cmpxchgl %edx, (%ecx)
 	jnz	0f
 	movl	%ecx, %eax
+#if defined(OPTERON_WORKAROUND_6323525)
+.mutex_atryenter_6323525_patch_point:
+	ret					/* nop space for lfence */
+	nop
+	nop
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
 0:
 	xorl	%eax, %eax
 	ret
 	SET_SIZE(mutex_adaptive_tryenter)
 
-	.globl mutex_exit_critical_size
-	.globl mutex_exit_critical_start
+	.globl	mutex_exit_critical_size
+	.globl	mutex_exit_critical_start
 
 	ENTRY(mutex_exit)
 mutex_exit_critical_start:		/* If interrupted, restart here */
@@ -822,8 +876,20 @@ rw_exit(krwlock_t *lp)
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to grab write lock */
 	jnz	rw_enter_sleep
+
+#if defined(OPTERON_WORKAROUND_6323525)
+.rw_write_enter_lockstat_patch_point:
+.rw_write_enter_6323525_patch_point:
+	ret
+	nop
+	nop
+.rw_write_enter_lockstat_6323525_patch_point:
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 .rw_write_enter_lockstat_patch_point:
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
+
 	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi = lock ptr */
 	movl	$LS_RW_ENTER_ACQUIRE, %edi
@@ -898,8 +964,20 @@ rw_exit(krwlock_t *lp)
 	lock
 	cmpxchgl %edx, (%ecx)			/* try to grab write lock */
 	jnz	rw_enter_sleep
+
+#if defined(OPTERON_WORKAROUND_6323525)
+.rw_write_enter_lockstat_patch_point:
+.rw_write_enter_6323525_patch_point:
+	ret
+	nop
+	nop
+.rw_write_enter_lockstat_6323525_patch_point:
+	nop
+#else	/* OPTERON_WORKAROUND_6323525 */
 .rw_write_enter_lockstat_patch_point:
 	ret
+#endif	/* OPTERON_WORKAROUND_6323525 */
+
 	movl	%gs:CPU_THREAD, %edx		/* edx = thread ptr */
 	movl	$LS_RW_ENTER_ACQUIRE, %eax
 	pushl	$RW_WRITER
@@ -949,6 +1027,144 @@ rw_exit(krwlock_t *lp)
 
 #endif	/* __lint */
 
+#if defined(OPTERON_WORKAROUND_6323525)
+#if defined(lint) || defined(__lint)
+
+int	workaround_6323525_patched;
+
+void
+patch_workaround_6323525(void)
+{}
+
+#else	/* lint */
+
+/*
+ * If it is necessary to patch the lock enter routines with the lfence
+ * workaround, workaround_6323525_patched is set to a non-zero value so that
+ * the lockstat_hat_patch routine can patch to the new location of the 'ret'
+ * instruction.
+ */
+	DGDEF3(workaround_6323525_patched, 4, 4)
+	.long	0
+
+#if defined(__amd64)
+
+#define HOT_MUTEX_PATCH(srcaddr, dstaddr, size)	\
+	movq	$size, %rbx;			\
+	movq	$dstaddr, %r13;			\
+	addq	%rbx, %r13;			\
+	movq	$srcaddr, %r12;			\
+	addq	%rbx, %r12;			\
+0:						\
+	decq	%r13;				\
+	decq	%r12;				\
+	movzbl	(%r12), %esi;			\
+	movq	$1, %rdx;			\
+	movq	%r13, %rdi;			\
+	call	hot_patch_kernel_text;		\
+	decq	%rbx;				\
+	testq	%rbx, %rbx;			\
+	jg	0b;
+
+/*
+ * patch_workaround_6323525: provide workaround for 6323525
+ *
+ * The workaround is to place a fencing instruction (lfence) between the
+ * mutex operation and the subsequent read-modify-write instruction.
+ *
+ * This routine hot patches the lfence instruction on top of the space
+ * reserved by nops in the lock enter routines.
+ */
+	ENTRY_NP(patch_workaround_6323525)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	pushq	%r12
+	pushq	%r13
+	pushq	%rbx
+
+	/*
+	 * lockstat_hot_patch() to use the alternate lockstat workaround
+	 * 6323525 patch points (points past the lfence instruction to the
+	 * new ret) when workaround_6323525_patched is set.
+	 */
+	movl	$1, workaround_6323525_patched
+
+	/*
+	 * patch ret/nop/nop/nop to lfence/ret at the end of the lock enter
+	 * routines. The 4 bytes are patched in reverse order so that the
+	 * the existing ret is overwritten last. This provides lock enter
+	 * sanity during the intermediate patching stages.
+	 */
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_enter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_tryenter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_atryenter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .rw_write_enter_6323525_patch_point, 4)
+
+	popq	%rbx
+	popq	%r13
+	popq	%r12
+	movq	%rbp, %rsp
+	popq	%rbp
+	ret
+_lfence_insn:
+	lfence
+	ret
+	SET_SIZE(patch_workaround_6323525)
+
+
+#else	/* __amd64 */
+
+#define HOT_MUTEX_PATCH(srcaddr, dstaddr, size)	\
+	movl	$size, %ebx;			\
+	movl	$srcaddr, %esi;			\
+	addl	%ebx, %esi;			\
+	movl	$dstaddr, %edi;			\
+	addl	%ebx, %edi;			\
+0:      					\
+	decl	%esi;				\
+	decl	%edi;				\
+	pushl	$1;				\
+	movzbl	(%esi), %eax;			\
+	pushl	%eax;				\
+	pushl	%edi;				\
+	call	hot_patch_kernel_text;		\
+	addl	$12, %esp;			\
+	decl	%ebx;				\
+	testl	%ebx, %ebx;			\
+	jg	0b;
+
+
+	/* see comments above */
+	ENTRY_NP(patch_workaround_6323525)
+	pushl	%ebp
+	movl	%esp, %ebp
+	pushl	%ebx
+	pushl	%esi
+	pushl	%edi
+
+	movl	$1, workaround_6323525_patched
+
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_enter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_tryenter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .mutex_atryenter_6323525_patch_point, 4)
+	HOT_MUTEX_PATCH(_lfence_insn, .rw_write_enter_6323525_patch_point, 4)
+
+	popl	%edi
+	popl	%esi
+	popl	%ebx
+	movl	%ebp, %esp
+	popl	%ebp
+	ret
+_lfence_insn:
+	.byte	0xf, 0xae, 0xe8		/ [lfence instruction]
+	ret
+	SET_SIZE(patch_workaround_6323525)
+
+#endif	/* !__amd64 */
+#endif	/* !lint */
+#endif	/* OPTERON_WORKAROUND_6323525 */
+
+
 #if defined(lint) || defined(__lint)
 
 void
@@ -995,14 +1211,35 @@ lockstat_hot_patch(void)
 	pushq	%rbp			/* align stack properly */
 	movq	%rsp, %rbp
 #endif	/* __amd64 */
+
+#if defined(OPTERON_WORKAROUND_6323525)
+	cmpl	$0, workaround_6323525_patched
+	je	1f
+	HOT_PATCH(.mutex_enter_lockstat_6323525_patch_point,
+		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	HOT_PATCH(.mutex_tryenter_lockstat_6323525_patch_point,
+		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	HOT_PATCH(.rw_write_enter_lockstat_6323525_patch_point,
+		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	jmp	2f
+1:
 	HOT_PATCH(.mutex_enter_lockstat_patch_point,
 		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
 	HOT_PATCH(.mutex_tryenter_lockstat_patch_point,
 		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
-	HOT_PATCH(.mutex_exit_lockstat_patch_point,
-		LS_MUTEX_EXIT_RELEASE, NOP_INSTR, RET_INSTR, 1)
 	HOT_PATCH(.rw_write_enter_lockstat_patch_point,
 		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+2:
+#else	/* OPTERON_WORKAROUND_6323525 */
+	HOT_PATCH(.mutex_enter_lockstat_patch_point,
+		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	HOT_PATCH(.mutex_tryenter_lockstat_patch_point,
+		LS_MUTEX_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+	HOT_PATCH(.rw_write_enter_lockstat_patch_point,
+		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
+#endif	/* !OPTERON_WORKAROUND_6323525 */
+	HOT_PATCH(.mutex_exit_lockstat_patch_point,
+		LS_MUTEX_EXIT_RELEASE, NOP_INSTR, RET_INSTR, 1)
 	HOT_PATCH(.rw_read_enter_lockstat_patch_point,
 		LS_RW_ENTER_ACQUIRE, NOP_INSTR, RET_INSTR, 1)
 	HOT_PATCH(.rw_write_exit_lockstat_patch_point,

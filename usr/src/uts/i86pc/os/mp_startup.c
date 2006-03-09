@@ -561,6 +561,10 @@ int opteron_workaround_6336786;	/* non-zero -> WA relevant and applied */
 int opteron_workaround_6336786_UP = 0;	/* Not needed for UP */
 #endif
 
+#if defined(OPTERON_WORKAROUND_6323525)
+int opteron_workaround_6323525;	/* if non-zero -> at least one cpu has it */
+#endif
+
 #define	WARNING(cpu, n)						\
 	cmn_err(CE_WARN, "cpu%d: no workaround for erratum %d",	\
 	    (cpu)->cpu_id, (n))
@@ -828,6 +832,33 @@ workaround_errata(struct cpu *cpu)
 				pci_putb_func(0, node + 24, 3, 0x87, data);
 			}
 			opteron_workaround_6336786++;
+		}
+	}
+#endif
+
+#if defined(OPTERON_WORKAROUND_6323525)
+	/*LINTED*/
+	/*
+	 * Mutex primitives don't work as expected.
+	 */
+	if (cpuid_opteron_erratum(cpu, 6323525) > 0) {
+
+		/*
+		 * problem only occurs with 2 or more cores. If bit in
+		 * MSR_BU_CFG set, then not applicable. The workaround
+		 * is to patch the semaphone routines with the lfence
+		 * instruction to provide necessary load memory barrier with
+		 * possible subsequent read-modify-write ops.
+		 *
+		 * It is too early in boot to call the patch routine so
+		 * set erratum variable to be done in startup_end().
+		 */
+		if (opteron_workaround_6323525) {
+			opteron_workaround_6323525++;
+		} else if ((x86_feature & X86_SSE2) && ((lgrp_plat_node_cnt *
+		    cpuid_get_ncpu_per_chip(cpu)) >= 2)) {
+			if ((xrdmsr(MSR_BU_CFG) & 0x02) == 0)
+				opteron_workaround_6323525++;
 		}
 	}
 #endif

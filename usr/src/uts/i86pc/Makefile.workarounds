@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -97,3 +96,9 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_131
 # TSC may drift when C1-Clock ramping enabled
 #
 WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6336786
+
+#
+# Mutex primitives don't work as expected
+#
+WORKAROUND_DEFS += -DOPTERON_WORKAROUND_6323525
+

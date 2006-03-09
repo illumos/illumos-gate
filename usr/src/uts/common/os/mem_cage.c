@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1240,11 +1239,11 @@ check_free_and_return:
 		page_list_sub(pp, which);
 		ASSERT(pp->p_szc == 0);
 		PP_SETNORELOC(pp);
+		PLCNT_XFER_NORELOC(pp);
 		page_list_add(pp, which | PG_LIST_TAIL);
 
 		page_unlock(pp);
 		*nfreedp = 1;
-		PLCNT_XFER_NORELOC(pp);
 		return (0);
 	} else {
 		if (pp->p_szc != 0) {

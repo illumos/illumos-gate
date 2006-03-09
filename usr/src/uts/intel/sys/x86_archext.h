@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -425,6 +424,8 @@ struct cpuid_regs {
 
 extern uint64_t rdmsr(uint_t);
 extern void wrmsr(uint_t, const uint64_t);
+extern uint64_t xrdmsr(uint_t);
+extern void xwrmsr(uint_t, const uint64_t);
 extern void invalidate_cache(void);
 extern ulong_t getcr4(void);
 extern void setcr4(ulong_t);
@@ -481,6 +482,11 @@ extern int opteron_erratum_100;
 
 #if defined(OPTERON_ERRATUM_121)
 extern int opteron_erratum_121;
+#endif
+
+#if defined(OPTERON_WORKAROUND_6323525)
+extern int opteron_workaround_6323525;
+extern void patch_workaround_6323525(void);
 #endif
 
 #endif	/* _KERNEL */

@@ -1841,6 +1841,11 @@ startup_end(void)
 		    "cpu%d does not support syscall/sysret", CPU->cpu_id);
 	}
 #endif
+
+#if defined(OPTERON_WORKAROUND_6323525)
+	if (opteron_workaround_6323525)
+		patch_workaround_6323525();
+#endif
 	/*
 	 * Configure the system.
 	 */
