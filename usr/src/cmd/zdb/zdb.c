@@ -258,14 +258,9 @@ dump_zap_stats(objset_t *os, uint64_t object)
 	    (u_longlong_t)zs.zs_num_leafs);
 	(void) printf("\t\tTotal blocks: %llu\n",
 	    (u_longlong_t)zs.zs_num_blocks);
-	(void) printf("\t\tOversize blocks: %llu\n",
-	    (u_longlong_t)zs.zs_num_blocks_large);
 
 	(void) printf("\t\tLeafs with 2^n pointers:\n");
 	dump_zap_histogram(zs.zs_leafs_with_2n_pointers);
-
-	(void) printf("\t\tLeafs with n chained:\n");
-	dump_zap_histogram(zs.zs_leafs_with_n_chained);
 
 	(void) printf("\t\tBlocks with n*5 entries:\n");
 	dump_zap_histogram(zs.zs_blocks_with_n5_entries);

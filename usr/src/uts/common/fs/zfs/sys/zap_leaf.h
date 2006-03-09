@@ -54,6 +54,18 @@ struct zap;
  */
 #define	ZAP_LEAF_ARRAY_BYTES (ZAP_LEAF_CHUNKSIZE - 3)
 
+#define	ZAP_LEAF_ARRAY_NCHUNKS(bytes) \
+	(((bytes)+ZAP_LEAF_ARRAY_BYTES-1)/ZAP_LEAF_ARRAY_BYTES)
+
+/*
+ * Low water mark:  when there are only this many chunks free, start
+ * growing the ptrtbl.  Ideally, this should be larger than a
+ * "reasonably-sized" entry.  20 chunks is more than enough for the
+ * largest directory entry (MAXNAMELEN (256) byte name, 8-byte value),
+ * while still being only around 3% for 16k blocks.
+ */
+#define	ZAP_LEAF_LOW_WATER (20)
+
 /*
  * The leaf hash table has block size / 2^5 (32) number of entries,
  * which should be more than enough for the maximum number of entries,
@@ -86,21 +98,13 @@ typedef enum zap_chunk_type {
  */
 typedef struct zap_leaf_phys {
 	struct zap_leaf_header {
-		uint64_t lhr_block_type;	/* ZBT_LEAF */
-		uint64_t lhr_next;		/* next block in leaf chain */
-		uint64_t lhr_prefix;
-		uint32_t lhr_magic;		/* ZAP_LEAF_MAGIC */
-		uint16_t lhr_nfree;		/* number free chunks */
-		uint16_t lhr_nentries;		/* number of entries */
-		uint16_t lhr_prefix_len;
-
-#define	lh_block_type 	l_phys->l_hdr.lhr_block_type
-#define	lh_magic 	l_phys->l_hdr.lhr_magic
-#define	lh_next 	l_phys->l_hdr.lhr_next
-#define	lh_prefix 	l_phys->l_hdr.lhr_prefix
-#define	lh_nfree 	l_phys->l_hdr.lhr_nfree
-#define	lh_prefix_len 	l_phys->l_hdr.lhr_prefix_len
-#define	lh_nentries 	l_phys->l_hdr.lhr_nentries
+		uint64_t lh_block_type;		/* ZBT_LEAF */
+		uint64_t lh_pad1;
+		uint64_t lh_prefix;		/* hash prefix of this leaf */
+		uint32_t lh_magic;		/* ZAP_LEAF_MAGIC */
+		uint16_t lh_nfree;		/* number free chunks */
+		uint16_t lh_nentries;		/* number of entries */
+		uint16_t lh_prefix_len;		/* num bits used to id this */
 
 /* above is accessable to zap, below is zap_leaf private */
 
@@ -147,7 +151,6 @@ typedef struct zap_leaf {
 	krwlock_t l_rwlock; 		/* only used on head of chain */
 	uint64_t l_blkid;		/* 1<<ZAP_BLOCK_SHIFT byte block off */
 	int l_bs;			/* block size shift */
-	struct zap_leaf *l_next;	/* next in chain */
 	dmu_buf_t *l_dbuf;
 	zap_leaf_phys_t *l_phys;
 } zap_leaf_t;
@@ -163,8 +166,7 @@ typedef struct zap_entry_handle {
 	/* below is private to zap_leaf.c */
 	uint16_t zeh_fakechunk;
 	uint16_t *zeh_chunkp;
-	zap_leaf_t *zeh_head_leaf;
-	zap_leaf_t *zeh_found_leaf;
+	zap_leaf_t *zeh_leaf;
 } zap_entry_handle_t;
 
 /*
@@ -222,16 +224,8 @@ extern int zap_entry_create(zap_leaf_t *l,
 
 extern void zap_leaf_init(zap_leaf_t *l);
 extern void zap_leaf_byteswap(zap_leaf_phys_t *buf, int len);
-
-extern zap_leaf_t *zap_leaf_split(struct zap *zap, zap_leaf_t *l, dmu_tx_t *tx);
-
-extern int zap_leaf_merge(zap_leaf_t *l, zap_leaf_t *sibling);
-
-extern zap_leaf_t *zap_leaf_chainmore(zap_leaf_t *l, zap_leaf_t *nl);
-
-extern int zap_leaf_advance(zap_leaf_t *l, zap_cursor_t *zc);
-
-extern void zap_stats_leaf(zap_t *zap, zap_leaf_t *l, zap_stats_t *zs);
+extern void zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl);
+extern void zap_leaf_stats(zap_t *zap, zap_leaf_t *l, zap_stats_t *zs);
 
 #ifdef	__cplusplus
 }

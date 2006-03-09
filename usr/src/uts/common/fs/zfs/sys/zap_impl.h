@@ -174,11 +174,6 @@ int zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
 void zap_unlockdir(zap_t *zap);
 void zap_pageout(dmu_buf_t *db, void *vmzap);
 
-void zap_print(zap_t *);
-struct zap_leaf *zap_create_leaf(zap_t *zd, dmu_tx_t *tx);
-void zap_destroy_leaf(zap_t *zap, struct zap_leaf *l, dmu_tx_t *tx);
-uint64_t zap_allocate_blocks(zap_t *zap, int nblocks, dmu_tx_t *tx);
-
 #define	ZAP_HASH_IDX(hash, n) (((n) == 0) ? 0 : ((hash) >> (64 - (n))))
 
 void fzap_byteswap(void *buf, size_t size);

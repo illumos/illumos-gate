@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,13 +40,14 @@
  * not access the DMU object directly using DMU routines.
  *
  * The attributes stored in a zapobj are name-value pairs.  The name is
- * a zero-terminated string of up to 256 bytes (including terminating
- * NULL).  The value is an array of integers (whose length is limited
- * only by the size of the zapobj).  The integers may be 1, 2, 4, or 8
- * bytes long.  Note that an 8-byte integer value can be used to store
- * the location (object number) of another dmu object (which may be
- * itself a zapobj).  Note that you can use a zero-length attribute to
- * store a single bit of information - the attribute is present or not.
+ * a zero-terminated string of up to ZAP_MAXNAMELEN bytes (including
+ * terminating NULL).  The value is an array of integers, which may be
+ * 1, 2, 4, or 8 bytes long.  The total space used by the array (number
+ * of integers * integer length) can be up to ZAP_MAXVALUELEN bytes.
+ * Note that an 8-byte integer value can be used to store the location
+ * (object number) of another dmu object (which may be itself a zapobj).
+ * Note that you can use a zero-length attribute to store a single bit
+ * of information - the attribute is present or not.
  *
  * The ZAP routines are thread-safe.  However, you must observe the
  * DMU's restriction that a transaction may not be operated on
@@ -60,22 +60,16 @@
  * Implementation / Performance Notes:
  *
  * The ZAP is intended to operate most efficiently on attributes with
- * short (23 bytes or less) names and short (23 bytes or less) values.
- * The ZAP should be efficient enough so that the user does not need to
- * cache these attributes.
- *
- * Using extremely long (~256 bytes or more) attribute names or values
- * values will result in poor performance, due to the memcpy from the
- * user's buffer into the ZAP object.  This penalty can be avoided by
- * creating an integer-type attribute to store an object number, and
- * accessing that object using the DMU directly.
+ * short (49 bytes or less) names and single 8-byte values, for which
+ * the microzap will be used.  The ZAP should be efficient enough so
+ * that the user does not need to cache these attributes.
  *
  * The ZAP's locking scheme makes its routines thread-safe.  Operations
  * on different zapobjs will be processed concurrently.  Operations on
  * the same zapobj which only read data will be processed concurrently.
  * Operations on the same zapobj which modify data will be processed
  * concurrently when there are many attributes in the zapobj (because
- * the ZAP uses per-block locking - more than 32 * (number of cpus)
+ * the ZAP uses per-block locking - more than 128 * (number of cpus)
  * small attributes will suffice).
  */
 
@@ -92,6 +86,9 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	ZAP_MAXNAMELEN 256
+#define	ZAP_MAXVALUELEN 1024
 
 /*
  * Create a new zapobj with no attributes and return its object number.
@@ -288,9 +285,6 @@ typedef struct zap_stats {
 	 */
 	uint64_t zs_num_blocks;
 
-	/* The number of blocks used for large names or values */
-	uint64_t zs_num_blocks_large;
-
 	/*
 	 * Histograms.  For all histograms, the last index
 	 * (ZAP_HISTOGRAM_SIZE-1) includes any values which are greater
@@ -304,13 +298,6 @@ typedef struct zap_stats {
 	 * 2^n pointers to it.
 	 */
 	uint64_t zs_leafs_with_2n_pointers[ZAP_HISTOGRAM_SIZE];
-
-	/*
-	 * zs_leafs_with_n_chained[n] is the number of leafs with n
-	 * chained blocks.  zs_leafs_with_n_chained[0] (leafs with no
-	 * chained blocks) should be very close to zs_num_leafs.
-	 */
-	uint64_t zs_leafs_with_n_chained[ZAP_HISTOGRAM_SIZE];
 
 	/*
 	 * zs_leafs_with_n_entries[n] is the number of leafs with
