@@ -900,12 +900,13 @@ zfsctl_lookup_objset(vfs_t *vfsp, uint64_t objsetid, zfsvfs_t **zfsvfsp)
 		error = traverse(&vp);
 		if (error == 0)
 			*zfsvfsp = VTOZ(vp)->z_zfsvfs;
+		mutex_exit(&sdp->sd_lock);
 		VN_RELE(vp);
 	} else {
 		error = EINVAL;
+		mutex_exit(&sdp->sd_lock);
 	}
 
-	mutex_exit(&sdp->sd_lock);
 	VN_RELE(dvp);
 
 	return (error);
