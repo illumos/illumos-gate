@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -32,20 +31,20 @@
 
 # This file loads keyboard mappings and initializes keyboard defaults
 
-# At least for now, skip everything if in a non-global zone
-if [ "${_INIT_ZONENAME:=`/sbin/zonename`}" = "global" ]; then
+. /lib/svc/share/smf_include.sh
 
-	#
-	# Systems with no hardware keyboard ID may provide an eeprom value,
-	# or the value can be supplied in /etc/default/kbd. A value supplied
-	# in /etc/default/kbd will override the value supplied in eeprom.
-	#
-	[ -x /usr/lib/set_keyboard_layout ] && /usr/lib/set_keyboard_layout
+smf_is_globalzone || exit $SMF_EXIT_OK
 
-	# Initialize the keyboard defaults
+#
+# Systems with no hardware keyboard ID may provide an eeprom value,
+# or the value can be supplied in /etc/default/kbd. A value supplied
+# in /etc/default/kbd will override the value supplied in eeprom.
+#
+[ -x /usr/lib/set_keyboard_layout ] && /usr/lib/set_keyboard_layout
 
-	[ -h /dev/kbd -a -x /usr/bin/kbd ] && /usr/bin/kbd -i >/dev/null 2>&1
+# Initialize the keyboard defaults
 
-	# Load the keymap for the attached keyboard.
-	/usr/bin/loadkeys
-fi
+[ -h /dev/kbd -a -x /usr/bin/kbd ] && /usr/bin/kbd -i >/dev/null 2>&1
+
+# Load the keymap for the attached keyboard.
+/usr/bin/loadkeys

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zone.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -48,6 +48,8 @@ static char *ENVFILE	= "/etc/default/init"; /* Default env. */
 
 static char **glob_envp;	/* Array of environment strings */
 static int glob_env_n;		/* Number of environment slots allocated. */
+
+static char zonename[ZONENAME_MAX];
 
 /*
  * init_env()
@@ -166,6 +168,12 @@ init_env()
 
 	/* Append a null pointer to the environment array to mark its end. */
 	glob_envp[i] = NULL;
+
+	/*
+	 * Get the zonename once; it is used to set SMF_ZONENAME for methods.
+	 */
+	(void) getzonenamebyid(getzoneid(), zonename, sizeof (zonename));
+
 }
 
 static int
@@ -250,10 +258,10 @@ set_smf_env(char **env, size_t env_sz, const char *path,
 	size_t sz;
 
 	/*
-	 * Max. of glob_env, env, three SMF_ variables,
+	 * Max. of glob_env, env, four SMF_ variables,
 	 * path, and terminating NULL.
 	 */
-	nenv_size = glob_env_n + env_sz + 3 + 1 + 1;
+	nenv_size = glob_env_n + env_sz + 4 + 1 + 1;
 
 	nenv = startd_zalloc(sizeof (char *) * nenv_size);
 
@@ -265,7 +273,6 @@ set_smf_env(char **env, size_t env_sz, const char *path,
 		(void) strlcpy(*np, path, sz);
 		np++;
 	}
-
 
 	if (inst) {
 		sz = sizeof ("SMF_FMRI=") + strlen(inst->ri_i.i_fmri);
@@ -287,6 +294,12 @@ set_smf_env(char **env, size_t env_sz, const char *path,
 	*np = startd_alloc(sz);
 	(void) strlcpy(*np, "SMF_RESTARTER=", sz);
 	(void) strlcat(*np, SCF_SERVICE_STARTD, sz);
+	np++;
+
+	sz = sizeof ("SMF_ZONENAME=") + strlen(zonename);
+	*np = startd_alloc(sz);
+	(void) strlcpy(*np, "SMF_ZONENAME=", sz);
+	(void) strlcat(*np, zonename, sz);
 	np++;
 
 	for (p = glob_envp; *p != NULL; p++) {

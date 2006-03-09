@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -46,15 +45,13 @@ case "$1" in
 	# it tries to do is irrelevant (and will actually lead to the service
 	# failing if we try to do it), so just bail out.
 	#
-	if [ `/sbin/zonename` != "global" ]; then
-		exit 0
-	fi
+	smf_is_globalzone || exit $SMF_EXIT_OK
+
 	;; # Fall through -- rest of script is the initialization code
 
 'stop')
-	if [ `/sbin/zonename` != "global" ]; then
-		exit 0
-	fi
+	smf_is_globalzone || exit $SMF_EXIT_OK
+
 	#
 	# If we were routing dynamically, we will note this with
 	# the .dynamic_routing file, so that we can leave the routes
@@ -62,11 +59,11 @@ case "$1" in
 	# when we come back into states 2 or 3.
 	#
 	if /usr/bin/pgrep -x -u 0 'in.routed|in.rdisc' >/dev/null 2>&1; then
-		/usr/bin/pkill -z `/sbin/zonename` -x -u 0 'in.routed|in.rdisc'
+		/usr/bin/pkill -z global -x -u 0 'in.routed|in.rdisc'
 		> /etc/.dynamic_routing
 	fi
-	/usr/bin/pkill -z `/sbin/zonename` -x -u 0 'in.ndpd|in.ripngd'
-	exit 0
+	/usr/bin/pkill -z global -x -u 0 'in.ndpd|in.ripngd'
+	exit $SMF_EXIT_OK
 	;;
 
 *)
@@ -368,4 +365,4 @@ if [ -f /etc/inet/static_routes ]; then
 fi
 
 # Clear exit status.
-exit 0
+exit $SMF_EXIT_OK

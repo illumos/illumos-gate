@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,14 +30,16 @@
 
 . /lib/svc/share/smf_include.sh
 
-check_requirements () {
-	if [ ! -x /sbin/zonename ] || [ ! -x /usr/sbin/pooladm ] ||
-	    [ "${_INIT_ZONENAME:=`/sbin/zonename`}" != "global" ]; then
-		exit $SMF_EXIT_ERR_FATAL
-	fi
-}
+if [ ! -x /usr/sbin/pooladm ]; then
+	echo "/usr/sbin/pooladm not found or not executable"
+	exit $SMF_EXIT_ERR_FATAL
+fi
 
-check_requirements
+if smf_is_nonglobalzone; then
+	echo "pools service is only available in the global zone"
+	exit $SMF_EXIT_ERR_FATAL
+fi
+
 case "$1" in
 'start')
 	/usr/sbin/pooladm -e

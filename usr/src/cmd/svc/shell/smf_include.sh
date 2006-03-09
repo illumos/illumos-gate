@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +34,8 @@ smf_clear_env () {
 	unset \
 		SMF_FMRI \
 		SMF_METHOD \
-		SMF_RESTARTER
+		SMF_RESTARTER \
+		SMF_ZONENAME
 }
 
 # smf_console
@@ -48,7 +48,32 @@ smf_console () {
 	/usr/bin/tee ${SMF_MSGLOG_REDIRECT:-/dev/msglog}
 }
 
+# smf_zonename
 #
+#  Prints the name of this zone.
+
+smf_zonename() {
+	echo "${SMF_ZONENAME:=`/sbin/zonename`}"
+}
+
+# smf_is_globalzone
+#
+#  Returns zero (success) if this is the global zone.  1 otherwise.
+#
+smf_is_globalzone() {
+	[ "${SMF_ZONENAME:=`/sbin/zonename`}" = "global" ] && return 0
+	return 1
+}
+
+# smf_is_nonglobalzone
+#
+#  Returns zero (success) if this is not the global zone.  1 otherwise.
+#
+smf_is_nonglobalzone() {
+	[ "${SMF_ZONENAME:=`/sbin/zonename`}" != "global" ] && return 0
+	return 1
+}
+
 # smf_netstrategy
 #   -> (_INIT_NET_IF, _INIT_NET_STRATEGY)
 #
@@ -60,7 +85,7 @@ smf_console () {
 #   The network boot strategy for a zone is always "none".
 #
 smf_netstrategy () {
-	if [ "${_INIT_ZONENAME:=`/sbin/zonename`}" != "global" ]; then
+	if smf_is_nonglobalzone; then
 		_INIT_NET_STRATEGY="none" export _INIT_NET_STRATEGY
 		return 0
 	fi

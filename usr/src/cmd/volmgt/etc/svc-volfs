@@ -57,7 +57,7 @@ fi
 case "$1" in
 'start')
         # volume management is not supported in a local zone
-        if [ `/sbin/zonename` != "global" ] ; then
+        if smf_is_nonglobalzone; then
                 /usr/sbin/svcadm disable -t svc:/system/filesystem/volfs
                 echo "Volume management is not supported in a local zone"
                 sleep 5 &

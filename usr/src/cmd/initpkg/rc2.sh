@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,7 +24,7 @@
 # All rights reserved.
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,6 +39,8 @@ if [ -z "$SMF_RESTARTER" ]; then
 	echo "Cannot be run outside smf(5)"
 	exit 1
 fi
+
+. /lib/svc/share/smf_include.sh
 
 action=$1
 
@@ -65,23 +66,10 @@ export _INIT_RUN_LEVEL _INIT_RUN_NPREV _INIT_PREV_LEVEL \
     _INIT_UTS_SYSNAME _INIT_UTS_NODENAME _INIT_UTS_RELEASE _INIT_UTS_VERSION \
     _INIT_UTS_MACHINE _INIT_UTS_ISA _INIT_UTS_PLATFORM
 
-_INIT_ZONENAME=`/sbin/zonename`
-
-export _INIT_ZONENAME
-
-if [ "$_INIT_ZONENAME" = "global" ]; then
-	# Export net boot configuration strategy. _INIT_NET_IF is set to the
-	# interface name of the netbooted interface if this is a net boot.
-	# _INIT_NET_STRATEGY is set to the network configuration strategy.
-	set -- `/sbin/netstrategy`
-	if [ $? -eq 0 ]; then
-		if [ "$1" = "nfs" -o "$1" = "cachefs" ]; then
-			_INIT_NET_IF="$2"
-		fi
-		_INIT_NET_STRATEGY="$3"
-		export _INIT_NET_IF _INIT_NET_STRATEGY 
-	fi
-fi
+#
+# Set _INIT_NET_STRATEGY and _INIT_NET_IF variables from /sbin/netstrategy
+#
+smf_netstrategy
 
 case $action in
 	stop)
