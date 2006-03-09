@@ -106,6 +106,7 @@ static gfs_opsvec_t zfsctl_opsvec[] = {
 typedef struct zfsctl_node {
 	gfs_dir_t	zc_gfs_private;
 	uint64_t	zc_id;
+	timestruc_t	zc_cmtime;	/* ctime and mtime, always the same */
 } zfsctl_node_t;
 
 typedef struct zfsctl_snapdir {
@@ -176,7 +177,7 @@ zfsctl_root_inode_cb(vnode_t *vp, int index)
 void
 zfsctl_create(zfsvfs_t *zfsvfs)
 {
-	vnode_t *vp;
+	vnode_t *vp, *rvp;
 	zfsctl_node_t *zcp;
 
 	ASSERT(zfsvfs->z_ctldir == NULL);
@@ -186,6 +187,10 @@ zfsctl_create(zfsvfs_t *zfsvfs)
 	    zfsctl_root_inode_cb, MAXNAMELEN, NULL, NULL);
 	zcp = vp->v_data;
 	zcp->zc_id = ZFSCTL_INO_ROOT;
+
+	VERIFY(VFS_ROOT(zfsvfs->z_vfs, &rvp) == 0);
+	ZFS_TIME_DECODE(&zcp->zc_cmtime, VTOZ(rvp)->z_phys->zp_crtime);
+	VN_RELE(rvp);
 
 	/*
 	 * We're only faking the fact that we have a root of a filesystem for
@@ -264,7 +269,8 @@ zfsctl_common_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 static void
 zfsctl_common_getattr(vnode_t *vp, vattr_t *vap)
 {
-	timestruc_t now;
+	zfsctl_node_t	*zcp = vp->v_data;
+	timestruc_t	now;
 
 	vap->va_uid = 0;
 	vap->va_gid = 0;
@@ -281,10 +287,11 @@ zfsctl_common_getattr(vnode_t *vp, vattr_t *vap)
 	    S_IROTH | S_IXOTH;
 	vap->va_type = VDIR;
 	/*
-	 * We live in the now.
+	 * We live in the now (for atime).
 	 */
 	gethrestime(&now);
-	vap->va_mtime = vap->va_ctime = vap->va_atime = now;
+	vap->va_atime = now;
+	vap->va_mtime = vap->va_ctime = zcp->zc_cmtime;
 }
 
 static int
@@ -736,6 +743,7 @@ zfsctl_mknode_snapdir(vnode_t *pvp)
 	    zfsctl_snapdir_readdir_cb, NULL);
 	sdp = vp->v_data;
 	sdp->sd_node.zc_id = ZFSCTL_INO_SNAPDIR;
+	sdp->sd_node.zc_cmtime = ((zfsctl_node_t *)pvp->v_data)->zc_cmtime;
 	mutex_init(&sdp->sd_lock, NULL, MUTEX_DEFAULT, NULL);
 	avl_create(&sdp->sd_snaps, snapentry_compare,
 	    sizeof (zfs_snapentry_t), offsetof(zfs_snapentry_t, se_node));
