@@ -53,7 +53,6 @@ static void	router_insert(struct phyint *pi, struct router *dr);
 static void	router_delete(struct router *dr);
 static void	router_add_k(struct router *dr);
 static void	router_delete_k(struct router *dr);
-static void	router_delete_onlink(struct phyint *pi);
 
 static int	rtmseq;				/* rtm_seq sequence number */
 
@@ -603,10 +602,8 @@ phyint_print(struct phyint *pi)
 	char llabuf[BUFSIZ];
 
 	logmsg(LOG_DEBUG, "Phyint %s index %d state %x, kernel %x, "
-	    "onlink_def %d num routers %d\n",
-	    pi->pi_name, pi->pi_index,
-	    pi->pi_state, pi->pi_kernel_state,
-	    pi->pi_onlink_default ? 1 : 0,
+	    "num routers %d\n",
+	    pi->pi_name, pi->pi_index, pi->pi_state, pi->pi_kernel_state,
 	    pi->pi_num_k_routers);
 	logmsg(LOG_DEBUG, "\taddress: %s flags %x\n",
 	    inet_ntop(AF_INET6, (void *)&pi->pi_ifaddr,
@@ -2033,15 +2030,8 @@ router_create(struct phyint *pi, struct in6_addr addr, uint_t lifetime)
 	dr->dr_address = addr;
 	dr->dr_lifetime = lifetime;
 	router_insert(pi, dr);
-	if (dr->dr_lifetime != 0) {
-		/*
-		 * Delete an onlink default if it exists since we now have
-		 * at least one default router.
-		 */
-		if (pi->pi_onlink_default)
-			router_delete_onlink(dr->dr_physical);
+	if (dr->dr_lifetime != 0)
 		router_add_k(dr);
-	}
 	return (dr);
 }
 
@@ -2075,24 +2065,8 @@ router_delete(struct router *dr)
 		    abuf, sizeof (abuf)), dr->dr_lifetime);
 	}
 	pi = dr->dr_physical;
-	if (dr->dr_inkernel) {
-		/*
-		 * Create a on-link default route only if the interface
-		 * is present in the kernel. This function is called
-		 * to clean up the routes when the interface is
-		 * unplumbed. In that case, don't try to create one
-		 * in the kernel.
-		 */
-		if (pi->pi_kernel_state & PI_PRESENT) {
-			if (!dr->dr_onlink &&
-			    dr->dr_physical->pi_num_k_routers == 1) {
-				(void) router_create_onlink(dr->dr_physical);
-			}
-			router_delete_k(dr);
-		}
-	}
-	if (dr->dr_onlink)
-		pi->pi_onlink_default = _B_FALSE;
+	if (dr->dr_inkernel && (pi->pi_kernel_state & PI_PRESENT))
+		router_delete_k(dr);
 
 	if (dr->dr_prev == NULL) {
 		if (pi != NULL)
@@ -2104,76 +2078,6 @@ router_delete(struct router *dr)
 		dr->dr_next->dr_prev = dr->dr_prev;
 	dr->dr_next = dr->dr_prev = NULL;
 	free(dr);
-}
-
-
-/* Create an onlink default route */
-struct router *
-router_create_onlink(struct phyint *pi)
-{
-	struct router *dr;
-	struct prefix *pr;
-
-	if (debug & D_ROUTER) {
-		logmsg(LOG_DEBUG, "router_create_onlink(%s)\n", pi->pi_name);
-	}
-
-	if (pi->pi_onlink_default) {
-		logmsg(LOG_ERR, "router_create_onlink: already an onlink "
-		    "default: %s\n", pi->pi_name);
-		return (NULL);
-	}
-
-	/*
-	 * Find the interface address to use for the route gateway.
-	 * We need to use the link-local since the others ones might be
-	 * deleted when the prefixes get invalidated.
-	 */
-	for (pr = pi->pi_prefix_list; pr != NULL; pr = pr->pr_next) {
-		if ((pr->pr_state & PR_AUTO) &&
-		    IN6_IS_ADDR_LINKLOCAL(&pr->pr_address))
-			break;
-	}
-	if (pr == NULL) {
-		logmsg(LOG_ERR, "router_create_onlink: no source address\n");
-		return (NULL);
-	}
-	dr = (struct router *)calloc(sizeof (struct router), 1);
-	if (dr == NULL) {
-		logmsg(LOG_ERR, "router_create_onlink: out of memory\n");
-		return (NULL);
-	}
-	dr->dr_address = pr->pr_address;
-	dr->dr_lifetime = 1;	/* Not used */
-	dr->dr_onlink = _B_TRUE;
-	router_insert(pi, dr);
-
-	router_add_k(dr);
-	pi->pi_onlink_default = _B_TRUE;
-	return (dr);
-}
-
-/* Remove an onlink default route */
-static void
-router_delete_onlink(struct phyint *pi)
-{
-	struct router *dr, *next_dr;
-
-	if (debug & D_ROUTER) {
-		logmsg(LOG_DEBUG, "router_delete_onlink(%s)\n", pi->pi_name);
-	}
-
-	if (!pi->pi_onlink_default) {
-		logmsg(LOG_ERR, "router_delete_onlink: no onlink default: "
-		    "%s\n", pi->pi_name);
-		return;
-	}
-	/* Find all onlink routes */
-	for (dr = pi->pi_router_list; dr != NULL; dr = next_dr) {
-		next_dr = dr->dr_next;
-		if (dr->dr_onlink)
-			router_delete(dr);
-	}
 }
 
 /*
@@ -2200,15 +2104,8 @@ router_update_k(struct router *dr)
 			    abuf, sizeof (abuf)), dr->dr_physical->pi_name);
 		}
 		router_delete(dr);
-	} else if (dr->dr_lifetime != 0 && !dr->dr_inkernel) {
-		/*
-		 * Delete an onlink default if it exists since we now have
-		 * at least one default router.
-		 */
-		if (dr->dr_physical->pi_onlink_default)
-			router_delete_onlink(dr->dr_physical);
+	} else if (dr->dr_lifetime != 0 && !dr->dr_inkernel)
 		router_add_k(dr);
-	}
 }
 
 
@@ -2229,10 +2126,6 @@ router_timer(struct router *dr, uint_t elapsed)
 		    dr->dr_physical->pi_name,
 		    inet_ntop(AF_INET6, (void *)&dr->dr_address,
 		    abuf, sizeof (abuf)), dr->dr_lifetime, elapsed);
-	}
-	if (dr->dr_onlink) {
-		/* No timeout */
-		return (next);
 	}
 	if (dr->dr_lifetime <= elapsed) {
 		dr->dr_lifetime = 0;
@@ -2273,11 +2166,6 @@ router_add_k(struct router *dr)
 		    abuf, sizeof (abuf)), dr->dr_lifetime);
 	}
 
-	if (dr->dr_onlink)
-		rt_msg->rtm_flags = 0;
-	else
-		rt_msg->rtm_flags = RTF_GATEWAY;
-
 	rta_gateway->sin6_addr = dr->dr_address;
 
 	rta_ifp->sdl_index = if_nametoindex(pi->pi_name);
@@ -2286,6 +2174,7 @@ router_add_k(struct router *dr)
 		return;
 	}
 
+	rt_msg->rtm_flags = RTF_GATEWAY;
 	rt_msg->rtm_type = RTM_ADD;
 	rt_msg->rtm_seq = ++rtmseq;
 	rlen = write(rtsock, rt_msg, rt_msg->rtm_msglen);
@@ -2300,8 +2189,7 @@ router_add_k(struct router *dr)
 		return;
 	}
 	dr->dr_inkernel = _B_TRUE;
-	if (!dr->dr_onlink)
-		pi->pi_num_k_routers++;
+	pi->pi_num_k_routers++;
 }
 
 /*
@@ -2322,11 +2210,6 @@ router_delete_k(struct router *dr)
 		    abuf, sizeof (abuf)), dr->dr_lifetime);
 	}
 
-	if (dr->dr_onlink)
-		rt_msg->rtm_flags = 0;
-	else
-		rt_msg->rtm_flags = RTF_GATEWAY;
-
 	rta_gateway->sin6_addr = dr->dr_address;
 
 	rta_ifp->sdl_index = if_nametoindex(pi->pi_name);
@@ -2335,6 +2218,7 @@ router_delete_k(struct router *dr)
 		return;
 	}
 
+	rt_msg->rtm_flags = RTF_GATEWAY;
 	rt_msg->rtm_type = RTM_DELETE;
 	rt_msg->rtm_seq = ++rtmseq;
 	rlen = write(rtsock, rt_msg, rt_msg->rtm_msglen);
@@ -2347,8 +2231,7 @@ router_delete_k(struct router *dr)
 		    "only %d for rlen (interface %s)\n", rlen, pi->pi_name);
 	}
 	dr->dr_inkernel = _B_FALSE;
-	if (!dr->dr_onlink)
-		pi->pi_num_k_routers--;
+	pi->pi_num_k_routers--;
 }
 
 
@@ -2357,11 +2240,9 @@ router_print(struct router *dr)
 {
 	char abuf[INET6_ADDRSTRLEN];
 
-	logmsg(LOG_DEBUG, "Router %s on %s inkernel %d onlink %d lifetime %u\n",
-	    inet_ntop(AF_INET6, (void *)&dr->dr_address,
-	    abuf, sizeof (abuf)),
-	    dr->dr_physical->pi_name,
-	    dr->dr_inkernel, dr->dr_onlink, dr->dr_lifetime);
+	logmsg(LOG_DEBUG, "Router %s on %s inkernel %d lifetime %u\n",
+	    inet_ntop(AF_INET6, (void *)&dr->dr_address, abuf, sizeof (abuf)),
+	    dr->dr_physical->pi_name, dr->dr_inkernel, dr->dr_lifetime);
 }
 
 

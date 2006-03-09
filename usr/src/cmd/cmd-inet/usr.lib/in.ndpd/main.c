@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +31,6 @@
 
 static void	initlog(void);
 static void	run_timeouts(void);
-static void	check_fallback(void);
 
 static void	advertise(struct sockaddr_in6 *sin6, struct phyint *pi,
 		    boolean_t no_prefixes);
@@ -1023,8 +1021,6 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 		solicit(&v6allrouters, pi);
 		if (--pi->pi_sol_count == 0) {
 			pi->pi_sol_state = DONE_SOLICIT;
-			/* check if default route needs to be installed */
-			check_fallback();
 			check_daemonize();
 			return (TIMER_INFINITY);
 		}
@@ -1036,66 +1032,6 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 	default:
 		return (pi->pi_sol_time_left);
 	}
-}
-
-/*
- * If no interfaces are advertising and have gone to DONE_SOLICIT
- * and there are no default routers:
- *	We add an "everything is on-link" default route if there
- *	is only one non-point-to-point phyint in the kernel.
- *	XXX What to do when there are multiple phyints?
- *	XXX The router_delete_onlink checks only operate on one phyint!
- */
-void
-check_fallback(void)
-{
-	struct phyint *pi;
-	struct router *dr;
-	boolean_t add_default;
-	int	num_phyints;
-
-	if (debug & D_PREFIX) {
-		logmsg(LOG_DEBUG, "check_fallback()\n");
-	}
-	add_default = _B_TRUE;
-	num_phyints = 0;
-	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		if (pi->pi_AdvSendAdvertisements ||
-		    pi->pi_sol_state != DONE_SOLICIT) {
-			add_default = _B_FALSE;
-			break;
-		}
-		if (!(pi->pi_kernel_state & PI_PRESENT))
-			continue;
-
-		if (!(pi->pi_flags & IFF_POINTOPOINT))
-			num_phyints++;
-		for (dr = pi->pi_router_list; dr != NULL; dr = dr->dr_next) {
-			if (dr->dr_inkernel) {
-				add_default = _B_FALSE;
-				break;
-			}
-		}
-		if (!add_default)
-			break;
-	}
-	if (num_phyints == 1 && add_default) {
-		if (debug & D_ROUTER) {
-			logmsg(LOG_DEBUG,
-			    "check_fallback: create default router\n");
-		}
-		for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-			if (!(pi->pi_kernel_state & PI_PRESENT))
-				continue;
-			if (debug & D_ROUTER) {
-				logmsg(LOG_DEBUG, "check_fallback: "
-				    "%s default router\n", pi->pi_name);
-			}
-			if (!(pi->pi_flags & IFF_POINTOPOINT))
-				(void) router_create_onlink(pi);
-		}
-	}
-
 }
 
 /*
