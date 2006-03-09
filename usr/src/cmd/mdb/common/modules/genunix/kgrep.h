@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,9 +37,10 @@ extern "C" {
 typedef int kgrep_cb_func(uintptr_t, uintptr_t, void *);
 
 #define	KGREP_USAGE \
-	":[-v] [-d dist|-m mask|-M invmask] [-a minaddr] [-A maxaddr] [-s size]"
+	":[-v] [-d dist|-m mask|-M invmask] [-a minad] [-A maxad] [-s sz]"
 
 extern int kgrep(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void kgrep_help(void);
 
 extern int kgrep_subr(kgrep_cb_func *, void *);
 extern size_t kgrep_subr_pagesize(void);

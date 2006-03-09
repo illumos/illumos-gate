@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,6 +175,34 @@ KGREP_FANCY_TEMPLATE(kgrep_range_fancy32, uint32_t)
 KGREP_FANCY_TEMPLATE(kgrep_range_fancy64, uint64_t)
 
 #undef KGREP_FANCY_TEMPLATE
+
+void
+kgrep_help(void)
+{
+	mdb_printf(
+"\n"
+"Search the entire virtual address space for a particular pattern,\n"
+"%<u>addr%</u>.  By default, a pointer-sized search for an exact match is\n"
+"done.\n\n");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf(
+"  -v    Report the value matched at each address\n"
+"  -a minaddr\n"
+"        Restrict the search to addresses >= minaddr\n"
+"  -A maxaddr\n"
+"        Restrict the search to addresses < maxaddr\n"
+"  -d dist\n"
+"        Search for values in [addr, addr + dist)\n"
+"  -m mask\n"
+"        Search for values where (value & mask) == addr\n"
+"  -M invmask\n"
+"        Search for values where (value & ~invmask) == addr\n"
+"  -s size\n"
+"        Instead of pointer-sized values, search for size-byte values.\n"
+"        size must be 1, 2, 4, or 8.\n");
+}
 
 /*ARGSUSED*/
 int

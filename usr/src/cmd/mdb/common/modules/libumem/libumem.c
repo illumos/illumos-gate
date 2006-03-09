@@ -359,7 +359,7 @@ static const mdb_dcmd_t dcmds[] = {
 #ifndef _KMDB
 	/* from ../genunix/kgrep.c + libumem.c */
 	{ "ugrep", KGREP_USAGE, "search user address space for a pointer",
-	    kgrep },
+	    kgrep, kgrep_help },
 
 	/* from ../genunix/leaky.c + leaky_subr.c */
 	{ "findleaks", FINDLEAKS_USAGE, "search for potential memory leaks",
