@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -66,6 +65,7 @@
 #include <rpcsvc/nis_dhext.h>
 #include <nsswitch.h>
 #include <syslog.h>
+#include <errno.h>
 
 #ifndef MAXHOSTNAMELEN
 #define	MAXHOSTNAMELEN 256
@@ -104,7 +104,7 @@ static struct __nsw_lookup lookup_files = {"files", DEF_ACTION, NULL, NULL},
 static struct __nsw_switchconfig publickey_default =
 			{0, "publickey", 2, &lookup_nis};
 
-static mutex_t serialize_netname = DEFAULTMUTEX;
+static mutex_t serialize_netname = ERRORCHECKMUTEX;
 
 /*
  * Convert unix cred to network-name using nisplus
@@ -409,13 +409,22 @@ user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
 	 */
 
 	if (uid == NOBODY_UID) {
-		(void) strcpy(netname, "nobody");
+		(void) strlcpy(netname, "nobody", sizeof (netname));
 		return (1);
 	}
 
 	netname[0] = '\0';  /* make null first (no need for memset) */
 
-	(void) mutex_lock(&serialize_netname);
+	if (mutex_lock(&serialize_netname) == EDEADLK) {
+		/*
+		 * This thread already holds this lock. This scenario
+		 * occurs when a process requires a netname which
+		 * itself requires a netname to look up. As we clearly
+		 * can't continue like this we return 'nobody'.
+		 */
+		(void) strlcpy(netname, "nobody", sizeof (netname));
+		return (1);
+	}
 
 	conf = __nsw_getconfig("publickey", &perr);
 	if (!conf) {
