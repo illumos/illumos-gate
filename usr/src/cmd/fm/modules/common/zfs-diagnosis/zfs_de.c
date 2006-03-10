@@ -178,6 +178,7 @@ zfs_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		if (nvlist_lookup_uint64(nvl,
 		    FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID, &vdev_guid) != 0)
 			vdev_guid = 0;
+		ena = 0;
 	}
 
 	for (zcp = uu_list_first(zfs_cases); zcp != NULL;
