@@ -189,6 +189,9 @@ dis_previnstr(dis_handle_t *dhp, uint64_t pc, int n)
 	int cur, nseen;
 	uint64_t res = pc;
 
+	if (n <= 0)
+		return (pc);
+
 	if (dhp->dh_lookup(dhp->dh_data, pc, NULL, 0, &start, NULL) != 0 ||
 	    start == pc)
 		return (res);

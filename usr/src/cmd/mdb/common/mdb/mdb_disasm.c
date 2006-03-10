@@ -202,9 +202,10 @@ static int
 libdisasm_lookup(void *data, uint64_t addr, char *buf, size_t buflen,
     uint64_t *start, size_t *len)
 {
-	if (buf != NULL) {
-		GElf_Sym sym;
+	char c;
+	GElf_Sym sym;
 
+	if (buf != NULL) {
 #ifdef __sparc
 		uint32_t instr[3];
 		uint32_t dtrace_id;
@@ -234,24 +235,15 @@ libdisasm_lookup(void *data, uint64_t addr, char *buf, size_t buflen,
 			}
 		}
 #endif
-		if (mdb_lookup_by_addr((uintptr_t)addr, MDB_SYM_FUZZY,
-					buf, buflen, &sym) < 0) {
-			if (buflen > 0)
-				*buf = '\0';
-			return (-1);
-		}
+		(void) mdb_snprintf(buf, buflen, "%a", (uintptr_t)addr);
 	}
 
 #ifdef __sparc
 out:
 #endif
 	if (start != NULL || len != NULL) {
-		GElf_Sym sym;
-		char c;
-
 		if (mdb_lookup_by_addr(addr, MDB_SYM_FUZZY, &c, 1, &sym) < 0)
 			return (-1);
-
 		if (start != NULL)
 			*start = sym.st_value;
 		if (len != NULL)
