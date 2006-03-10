@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -34,6 +33,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
+#include <unistd.h>
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -103,6 +103,7 @@ inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 					name, errp);
 			}
 		}
+		(void) close(fd);
 	}
 	(void) rw_unlock(&zpool_lock);
 
