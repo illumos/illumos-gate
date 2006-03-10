@@ -60,7 +60,7 @@ typedef struct vdev_knob {
 extern int vdev_open(vdev_t *);
 extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg);
-extern int vdev_init(vdev_t *, uint64_t txg);
+extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
 
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);

@@ -252,10 +252,9 @@ spa_unload(spa_t *spa)
 	/*
 	 * Close all vdevs.
 	 */
-	if (spa->spa_root_vdev) {
+	if (spa->spa_root_vdev)
 		vdev_free(spa->spa_root_vdev);
-		spa->spa_root_vdev = NULL;
-	}
+	ASSERT(spa->spa_root_vdev == NULL);
 
 	spa->spa_async_suspended = 0;
 }
@@ -268,6 +267,7 @@ static int
 spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 {
 	int error = 0;
+	uint64_t config_cache_txg = spa->spa_config_txg;
 	nvlist_t *nvroot = NULL;
 	vdev_t *rvd;
 	uberblock_t *ub = &spa->spa_uberblock;
@@ -303,7 +303,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
-	spa->spa_root_vdev = rvd;
+	ASSERT(spa->spa_root_vdev == rvd);
 	ASSERT(spa_guid(spa) == pool_guid);
 
 	/*
@@ -475,6 +475,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * This must all happen in a single txg.
 	 */
 	if ((spa_mode & FWRITE) && state != SPA_LOAD_TRYIMPORT) {
+		int c;
 		dmu_tx_t *tx = dmu_tx_create_assigned(spa_get_dsl(spa),
 		    spa_first_txg(spa));
 		dmu_objset_find(spa->spa_name, zil_claim, tx, 0);
@@ -488,6 +489,38 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		 * Wait for all claims to sync.
 		 */
 		txg_wait_synced(spa->spa_dsl_pool, 0);
+
+		/*
+		 * If the config cache is stale relative to the mosconfig,
+		 * sync the config cache.
+		 */
+		if (config_cache_txg != spa->spa_config_txg)
+			spa_config_sync();
+
+		/*
+		 * If we have top-level vdevs that were added but have
+		 * not yet been prepared for allocation, do that now.
+		 * (It's safe now because the config cache is up to date,
+		 * so it will be able to translate the new DVAs.)
+		 * See comments in spa_vdev_add() for full details.
+		 */
+		for (c = 0; c < rvd->vdev_children; c++) {
+			vdev_t *tvd = rvd->vdev_child[c];
+			if (tvd->vdev_ms_array == 0) {
+				uint64_t txg = spa_last_synced_txg(spa) + 1;
+				ASSERT(tvd->vdev_ms_shift == 0);
+				spa_config_enter(spa, RW_WRITER, FTAG);
+				vdev_init(tvd, txg);
+				vdev_config_dirty(tvd);
+				spa_config_set(spa,
+				    spa_config_generate(spa, rvd, txg, 0));
+				spa_config_exit(spa, FTAG);
+				txg_wait_synced(spa->spa_dsl_pool, txg);
+				ASSERT(tvd->vdev_ms_shift != 0);
+				ASSERT(tvd->vdev_ms_array != 0);
+				spa_config_sync();
+			}
+		}
 	}
 
 	error = 0;
@@ -1035,9 +1068,9 @@ int
 spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 {
 	uint64_t txg;
-	int c, error;
+	int c, c0, children, error;
 	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_t *vd;
+	vdev_t *vd, *tvd;
 
 	txg = spa_vdev_enter(spa);
 
@@ -1046,32 +1079,61 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	if (vd == NULL)
 		return (spa_vdev_exit(spa, vd, txg, EINVAL));
 
-	if (rvd == NULL)			/* spa_create() */
-		spa->spa_root_vdev = rvd = vd;
+	if (rvd == NULL) {			/* spa_create() */
+		rvd = vd;
+		c0 = 0;
+	} else {
+		c0 = rvd->vdev_children;
+	}
+
+	ASSERT(spa->spa_root_vdev == rvd);
 
 	if ((error = vdev_create(vd, txg)) != 0)
 		return (spa_vdev_exit(spa, vd, txg, error));
 
+	children = vd->vdev_children;
+
 	/*
-	 * Transfer each top-level vdev from the temporary root
-	 * to the spa's root and initialize its metaslabs.
+	 * Transfer each new top-level vdev from vd to rvd.
 	 */
-	for (c = 0; c < vd->vdev_children; c++) {
-		vdev_t *tvd = vd->vdev_child[c];
+	for (c = 0; c < children; c++) {
+		tvd = vd->vdev_child[c];
 		if (vd != rvd) {
 			vdev_remove_child(vd, tvd);
-			tvd->vdev_id = rvd->vdev_children;
+			tvd->vdev_id = c0 + c;
 			vdev_add_child(rvd, tvd);
 		}
-		if ((error = vdev_init(tvd, txg)) != 0)
-			return (spa_vdev_exit(spa, vd, txg, error));
 		vdev_config_dirty(tvd);
 	}
 
 	/*
-	 * Update the config based on the new in-core state.
+	 * We have to be careful when adding new vdevs to an existing pool.
+	 * If other threads start allocating from these vdevs before we
+	 * sync the config cache, and we lose power, then upon reboot we may
+	 * fail to open the pool because there are DVAs that the config cache
+	 * can't translate.  Therefore, we first add the vdevs without
+	 * initializing metaslabs; sync the config cache (via spa_vdev_exit());
+	 * initialize the metaslabs; and sync the config cache again.
+	 *
+	 * spa_load() checks for added-but-not-initialized vdevs, so that
+	 * if we lose power at any point in this sequence, the remaining
+	 * steps will be completed the next time we load the pool.
 	 */
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
+	if (vd != rvd) {
+		(void) spa_vdev_exit(spa, vd, txg, 0);
+		txg = spa_vdev_enter(spa);
+		vd = NULL;
+	}
+
+	/*
+	 * Now that the config is safely on disk, we can use the new space.
+	 */
+	for (c = 0; c < children; c++) {
+		tvd = rvd->vdev_child[c0 + c];
+		ASSERT(tvd->vdev_ms_array == 0);
+		vdev_init(tvd, txg);
+		vdev_config_dirty(tvd);
+	}
 
 	return (spa_vdev_exit(spa, vd, txg, 0));
 }
@@ -1104,6 +1166,9 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 	if (oldvd == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+
+	if (!oldvd->vdev_ops->vdev_op_leaf)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	pvd = oldvd->vdev_parent;
 
@@ -1183,10 +1248,6 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	ASSERT(pvd->vdev_top == tvd);
 	ASSERT(tvd->vdev_parent == rvd);
 
-	/*
-	 * Update the config based on the new in-core state.
-	 */
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
 	vdev_config_dirty(tvd);
 
 	/*
@@ -1237,6 +1298,9 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 
 	if (vd == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+
+	if (!vd->vdev_ops->vdev_op_leaf)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	pvd = vd->vdev_parent;
 
@@ -1337,11 +1401,6 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 */
 	(void) vdev_metaslab_init(tvd, txg);
 
-	/*
-	 * Update the config based on the new in-core state.
-	 */
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
-
 	vdev_config_dirty(tvd);
 
 	/*
@@ -1429,10 +1488,11 @@ spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
 	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENOENT));
 
+	if (!vd->vdev_ops->vdev_op_leaf)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+
 	spa_strfree(vd->vdev_path);
 	vd->vdev_path = spa_strdup(newpath);
-
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
 
 	vdev_config_dirty(vd->vdev_top);
 

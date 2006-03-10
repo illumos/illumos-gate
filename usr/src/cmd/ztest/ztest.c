@@ -2038,6 +2038,9 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 
 			bcopy(&iobuf[blkoff], &rbt, sizeof (rbt));
 
+			if (rbt.bt_objset == 0)		/* concurrent free */
+				continue;
+
 			ASSERT3U(rbt.bt_objset, ==, wbt.bt_objset);
 			ASSERT3U(rbt.bt_object, ==, wbt.bt_object);
 			ASSERT3U(rbt.bt_offset, ==, wbt.bt_offset);
@@ -2970,9 +2973,11 @@ ztest_run(char *pool)
 	 * Verify that we can export the pool and reimport it under a
 	 * different name.
 	 */
-	(void) snprintf(name, 100, "%s_import", pool);
-	ztest_spa_import_export(pool, name);
-	ztest_spa_import_export(name, pool);
+	if (ztest_random(2) == 0) {
+		(void) snprintf(name, 100, "%s_import", pool);
+		ztest_spa_import_export(pool, name);
+		ztest_spa_import_export(name, pool);
+	}
 
 	/*
 	 * Verify that we can loop over all pools.

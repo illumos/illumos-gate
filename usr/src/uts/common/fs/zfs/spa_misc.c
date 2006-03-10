@@ -439,14 +439,29 @@ spa_vdev_enter(spa_t *spa)
 int
 spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 {
-	ASSERT(txg != 0);
+	vdev_t *rvd = spa->spa_root_vdev;
+	uint64_t next_txg = spa_last_synced_txg(spa) + 1;
+	int config_changed = B_FALSE;
 
 	/*
-	 * Reassess the DTLs.  spa_scrub() looks at the DTLs without
-	 * taking the config lock at all, so keep it safe.
+	 * Usually txg == next_txg, but spa_vdev_attach()
+	 * actually needs to wait for the open txg to sync.
 	 */
-	if (spa->spa_root_vdev)
-		vdev_dtl_reassess(spa->spa_root_vdev, 0, 0, B_FALSE);
+	ASSERT(txg >= next_txg);
+
+	/*
+	 * Reassess the DTLs.
+	 */
+	if (rvd != NULL)
+		vdev_dtl_reassess(rvd, 0, 0, B_FALSE);
+
+	/*
+	 * Update the in-core config if it changed.
+	 */
+	if (error == 0 && !list_is_empty(&spa->spa_dirty_list)) {
+		config_changed = B_TRUE;
+		spa_config_set(spa, spa_config_generate(spa, rvd, next_txg, 0));
+	}
 
 	spa_config_exit(spa, spa);
 
@@ -457,7 +472,7 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	spa_scrub_restart(spa, txg);
 	spa_scrub_resume(spa);
 
-	if (vd == spa->spa_root_vdev)		/* spa_create() */
+	if (vd == rvd)				/* spa_create() */
 		return (error);
 
 	/*
@@ -474,10 +489,9 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	}
 
 	/*
-	 * If we're in the middle of export or destroy, don't sync the
-	 * config -- it will do that anyway, and we deadlock if we try.
+	 * If the config changed, update the config cache.
 	 */
-	if (error == 0 && spa->spa_state == POOL_STATE_ACTIVE)
+	if (config_changed)
 		spa_config_sync();
 
 	mutex_exit(&spa_namespace_lock);

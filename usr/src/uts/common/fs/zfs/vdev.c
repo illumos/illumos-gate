@@ -143,7 +143,7 @@ vdev_lookup_by_guid(vdev_t *vd, uint64_t guid)
 	int c;
 	vdev_t *mvd;
 
-	if (vd->vdev_children == 0 && vd->vdev_guid == guid)
+	if (vd->vdev_guid == guid)
 		return (vd);
 
 	for (c = 0; c < vd->vdev_children; c++)
@@ -266,10 +266,31 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 {
 	vdev_t *vd;
 
-	while (guid == 0)
-		guid = spa_get_random(-1ULL);
-
 	vd = kmem_zalloc(sizeof (vdev_t), KM_SLEEP);
+
+	if (spa->spa_root_vdev == NULL) {
+		ASSERT(ops == &vdev_root_ops);
+		spa->spa_root_vdev = vd;
+	}
+
+	if (guid == 0) {
+		if (spa->spa_root_vdev == vd) {
+			/*
+			 * The root vdev's guid will also be the pool guid,
+			 * which must be unique among all pools.
+			 */
+			while (guid == 0 || spa_guid_exists(guid, 0))
+				guid = spa_get_random(-1ULL);
+		} else {
+			/*
+			 * Any other vdev's guid must be unique within the pool.
+			 */
+			while (guid == 0 ||
+			    spa_guid_exists(spa_guid(spa), guid))
+				guid = spa_get_random(-1ULL);
+		}
+		ASSERT(!spa_guid_exists(spa_guid(spa), guid));
+	}
 
 	vd->vdev_spa = spa;
 	vd->vdev_id = id;
@@ -297,6 +318,8 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 static void
 vdev_free_common(vdev_t *vd)
 {
+	spa_t *spa = vd->vdev_spa;
+
 	if (vd->vdev_path)
 		spa_strfree(vd->vdev_path);
 	if (vd->vdev_devid)
@@ -312,6 +335,9 @@ vdev_free_common(vdev_t *vd)
 	mutex_exit(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dirty_lock);
+
+	if (vd == spa->spa_root_vdev)
+		spa->spa_root_vdev = NULL;
 
 	kmem_free(vd, sizeof (vdev_t));
 }
@@ -595,6 +621,9 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	space_map_obj_t *smo = vd->vdev_smo;
 	metaslab_t **mspp = vd->vdev_ms;
 	int ret;
+
+	if (vd->vdev_ms_shift == 0)	/* not being allocated from yet */
+		return (0);
 
 	dprintf("%s oldc %llu newc %llu\n", vdev_description(vd), oldc, newc);
 
@@ -925,7 +954,7 @@ vdev_create(vdev_t *vd, uint64_t txg)
  * For creation, we want to try to create all vdevs at once and then undo it
  * if anything fails; this is much harder if we have pending transactions.
  */
-int
+void
 vdev_init(vdev_t *vd, uint64_t txg)
 {
 	/*
@@ -935,9 +964,10 @@ vdev_init(vdev_t *vd, uint64_t txg)
 	vd->vdev_ms_shift = MAX(vd->vdev_ms_shift, SPA_MAXBLOCKSHIFT);
 
 	/*
-	 * Initialize the vdev's metaslabs.
+	 * Initialize the vdev's metaslabs.  This can't fail because
+	 * there's nothing to read when creating all new metaslabs.
 	 */
-	return (vdev_metaslab_init(vd, txg));
+	VERIFY(vdev_metaslab_init(vd, txg) == 0);
 }
 
 void
@@ -1226,15 +1256,11 @@ vdev_load(vdev_t *vd)
 	}
 
 	/*
-	 * If this is a top-level vdev, make sure its allocation parameters
-	 * exist and initialize its metaslabs.
+	 * If this is a top-level vdev, initialize its metaslabs.
 	 */
 	if (vd == vd->vdev_top) {
 
-		if (vd->vdev_ms_array == 0 ||
-		    vd->vdev_ms_shift == 0 ||
-		    vd->vdev_ashift == 0 ||
-		    vd->vdev_asize == 0) {
+		if (vd->vdev_ashift == 0 || vd->vdev_asize == 0) {
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			return (0);
@@ -1364,16 +1390,18 @@ vdev_online(spa_t *spa, uint64_t guid)
 	txg = spa_vdev_enter(spa);
 
 	rvd = spa->spa_root_vdev;
+
 	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+
+	if (!vd->vdev_ops->vdev_op_leaf)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	dprintf("ONLINE: %s\n", vdev_description(vd));
 
 	vd->vdev_offline = B_FALSE;
 	vd->vdev_tmpoffline = B_FALSE;
 	vdev_reopen(vd->vdev_top);
-
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
 
 	vdev_config_dirty(vd->vdev_top);
 
@@ -1393,8 +1421,12 @@ vdev_offline(spa_t *spa, uint64_t guid, int istmp)
 	txg = spa_vdev_enter(spa);
 
 	rvd = spa->spa_root_vdev;
+
 	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
+
+	if (!vd->vdev_ops->vdev_op_leaf)
+		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	dprintf("OFFLINE: %s\n", vdev_description(vd));
 
@@ -1426,12 +1458,8 @@ vdev_offline(spa_t *spa, uint64_t guid, int istmp)
 	}
 
 	vd->vdev_tmpoffline = istmp;
-	if (istmp)
-		return (spa_vdev_exit(spa, NULL, txg, 0));
-
-	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
-
-	vdev_config_dirty(vd->vdev_top);
+	if (!istmp)
+		vdev_config_dirty(vd->vdev_top);
 
 	return (spa_vdev_exit(spa, NULL, txg, 0));
 }
