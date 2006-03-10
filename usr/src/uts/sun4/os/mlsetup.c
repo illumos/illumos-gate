@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +70,7 @@
  * External Routines:
  */
 extern void map_wellknown_devices(void);
+extern void hsvc_setup(void);
 
 int	dcache_size;
 int	dcache_linesize;
@@ -225,6 +225,11 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 
 	PRM_DEBUG(panicbuf);
 	PRM_DEBUG(pa);
+
+	/*
+	 * Negotiate hypervisor services, if any
+	 */
+	hsvc_setup();
 
 #ifdef TRAPTRACE
 	/*

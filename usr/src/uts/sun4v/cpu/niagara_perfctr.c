@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,7 @@
 #include <sys/hypervisor_api.h>
 #include <sys/kstat.h>
 
-#define	NIAGARA_MODNAME	"SUNW,UltraSPARC-T1"
-#define	NUM_OF_PICS	2
+extern char cpu_module_name[];
 
 /*
  * Data structure used to build array of event-names and pcr-mask values
@@ -57,6 +55,8 @@ typedef struct ni_kev_mask {
  * most significant bit (i.e. bit# 31) of the DRAM and JBUS performance
  * counters.
  */
+#define	NUM_OF_PICS	2
+
 typedef struct ni_ksinfo {
 	uint8_t		pic_no_evs;			/* number of events */
 	uint8_t		pic_sel_shift[NUM_OF_PICS];
@@ -161,7 +161,7 @@ niagara_kstat_init()
 		if (ksinfop == NULL) {
 			cmn_err(CE_WARN,
 			    "%s: no space for niagara dram kstat\n",
-			    NIAGARA_MODNAME);
+			    cpu_module_name);
 			break;
 		}
 		ksinfop->pic_no_evs =
@@ -194,7 +194,7 @@ niagara_kstat_init()
 
 	if (ni_jbus_kstat == NULL) {
 		cmn_err(CE_WARN, "%s: no space for niagara jbus kstat\n",
-		    NIAGARA_MODNAME);
+		    cpu_module_name);
 	} else {
 		ni_jbus_kstat->pic_no_evs =
 			sizeof (niagara_jbus_events) / sizeof (ni_kev_mask_t);
@@ -256,7 +256,7 @@ ni_create_name_kstat(char *name, ni_ksinfo_t *pp, ni_kev_mask_t *ev)
 
 		if (pp->pic_name_ksp[i] == NULL) {
 			cmn_err(CE_WARN, "%s: unable to create name kstat",
-			    NIAGARA_MODNAME);
+			    cpu_module_name);
 		}
 	}
 }
@@ -360,7 +360,7 @@ ni_create_cntr_kstat(char *name, int instance, int (*update)(kstat_t *, int),
 	if ((counters_ksp = kstat_create(name, instance, "counters", "bus",
 	    KSTAT_TYPE_NAMED, num_pics + 1, KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN,
-		    "%s: kstat_create for %s%d failed", NIAGARA_MODNAME,
+		    "%s: kstat_create for %s%d failed", cpu_module_name,
 		    name, instance);
 		return (NULL);
 	}

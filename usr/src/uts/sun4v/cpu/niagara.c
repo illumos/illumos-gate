@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +56,7 @@
 #include <sys/fault.h>
 #include <sys/niagararegs.h>
 #include <sys/trapstat.h>
+#include <sys/hsvc.h>
 
 #define	S_VAC_SIZE	MMU_PAGESIZE /* XXXQ? */
 
@@ -68,19 +68,16 @@
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 static niagara_mmustat_t *cpu_tstat_va;		/* VA of mmustat buffer */
 static uint64_t cpu_tstat_pa;			/* PA of mmustat buffer */
+char cpu_module_name[] = "SUNW,UltraSPARC-T1";
 
-#ifdef NIAGARA_CHK_VERSION
-static uint64_t	cpu_ver;			/* Niagara CPU version reg */
-
-/* Niagara CPU version register */
-#define	VER_MASK_MAJOR_SHIFT	28
-#define	VER_MASK_MAJOR_MASK	0xf
-
-extern uint64_t	va_to_pa(void *);
-extern uint64_t	ni_getver();			/* HV code to get %hver */
-extern uint64_t	niagara_getver(uint64_t ni_getver_ra, uint64_t *cpu_version);
-
-#endif	/* NIAGARA_CHK_VERSION */
+/*
+ * Hypervisor services information for the NIAGARA CPU module
+ */
+static boolean_t niagara_hsvc_available = B_TRUE;
+static uint64_t niagara_sup_minor;		/* Supported minor number */
+static hsvc_info_t niagara_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_NIAGARA_CPU, 1, 0, cpu_module_name
+};
 
 void
 cpu_setup(void)
@@ -90,6 +87,20 @@ cpu_setup(void)
 	extern int mmu_exported_pagesize_mask;
 	extern int get_cpu_pagesizes(void);
 	extern int cpc_has_overflow_intr;
+	int status;
+
+	/*
+	 * Negotiate the API version for Niagara specific hypervisor
+	 * services.
+	 */
+	status = hsvc_register(&niagara_hsvc, &niagara_sup_minor);
+	if (status != 0) {
+		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
+		    "group: 0x%x major: 0x%x minor: 0x%x errno: %d\n",
+		    niagara_hsvc.hsvc_modname, niagara_hsvc.hsvc_group,
+		    niagara_hsvc.hsvc_major, niagara_hsvc.hsvc_minor, status);
+		niagara_hsvc_available = B_FALSE;
+	}
 
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
 	at_flags = EF_SPARC_SUN_US3 | EF_SPARC_32PLUS | EF_SPARC_SUN_US1;
@@ -231,20 +242,6 @@ cpu_init_private(struct cpu *cp)
 {
 	extern int niagara_kstat_init(void);
 
-#ifdef NIAGARA_CHK_VERSION
-	/*
-	 * Prevent booting on a Niagara 1.x processor as it is no longer
-	 * supported.
-	 *
-	 * This is a temporary hack until everyone has switched to the
-	 * firmware which prevents booting on a Niagara 1.x processor.
-	 */
-	if (niagara_getver(va_to_pa((void *)ni_getver), &cpu_ver) == H_EOK &&
-	    ((cpu_ver >> VER_MASK_MAJOR_SHIFT) & VER_MASK_MAJOR_MASK) <= 1)
-		cmn_err(CE_PANIC, "CPU%d: Niagara 1.x no longer supported.",
-		    cp->cpu_id);
-#endif	/* NIAGARA_CHK_VERSION */
-
 	/*
 	 * This code change assumes that the virtual cpu ids are identical
 	 * to the physical cpu ids which is true for ontario but not for
@@ -255,7 +252,7 @@ cpu_init_private(struct cpu *cp)
 	cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id / 4);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (niagara_cpucnt++ == 0) {
+	if (niagara_cpucnt++ == 0 && niagara_hsvc_available == B_TRUE) {
 		(void) niagara_kstat_init();
 	}
 }
@@ -266,7 +263,7 @@ cpu_uninit_private(struct cpu *cp)
 	extern int niagara_kstat_fini(void);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (--niagara_cpucnt == 0) {
+	if (--niagara_cpucnt == 0 && niagara_hsvc_available == B_TRUE) {
 		(void) niagara_kstat_fini();
 	}
 }
@@ -377,6 +374,9 @@ cpu_trapstat_conf(int cmd)
 	size_t len;
 	uint64_t mmustat_pa, hvret;
 	int status = 0;
+
+	if (niagara_hsvc_available == B_FALSE)
+		return (ENOTSUP);
 
 	switch (cmd) {
 	case CPU_TSTATCONF_INIT:

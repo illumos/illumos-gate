@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,6 +213,16 @@ extern	void		prom_set_mmfsa_traptable(void *tba_addr,
  * Power-off
  */
 extern	void		prom_power_off(void);
+
+/*
+ * sun4v API versioning group
+ */
+extern uint64_t		prom_set_sun4v_api_version(uint64_t api_group,
+			    uint64_t major, uint64_t minor,
+			    uint64_t *supported_minor);
+extern uint64_t		prom_get_sun4v_api_version(uint64_t api_group,
+			    uint64_t *major, uint64_t *minor);
+
 
 /*
  * The client program implementation is required to provide a wrapper

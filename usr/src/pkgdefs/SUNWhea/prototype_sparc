@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -275,6 +275,7 @@ f none usr/platform/sun4v/include/sys/dvma.h 644 root bin
 f none usr/platform/sun4v/include/sys/eeprom.h 644 root bin
 f none usr/platform/sun4v/include/sys/fcode.h 644 root bin
 f none usr/platform/sun4v/include/sys/hypervisor_api.h 644 root bin
+f none usr/platform/sun4v/include/sys/hsvc.h 644 root bin
 f none usr/platform/sun4v/include/sys/idprom.h 644 root bin
 f none usr/platform/sun4v/include/sys/intr.h 644 root bin
 f none usr/platform/sun4v/include/sys/intreg.h 644 root bin

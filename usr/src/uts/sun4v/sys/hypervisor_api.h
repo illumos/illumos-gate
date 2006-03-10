@@ -70,6 +70,7 @@ extern "C" {
 #define	H_ENOTSUPPORTED		13	/* Function not supported */
 #define	H_ENOMAP		14	/* Mapping is not valid, */
 					/* no translation exists */
+#define	H_EBUSY			17	/* Resource busy */
 
 #define	H_BREAK			-1	/* Console Break */
 #define	H_HUP			-2	/* Console Break */
