@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,7 @@
 #include <libintl.h>
 #include <project.h>
 #include <errno.h>
+#include <alloca.h>
 
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>	/* adt_get_auid() */
@@ -86,19 +86,46 @@ getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res)
 {
 	char *str;
 	priv_set_t *tmp;
+	char *badp;
+	int len;
 
 	if ((ua == NULL || ua->attr == NULL ||
 	    (str = kva_match(ua->attr, keyname)) == NULL) &&
 	    (str = defread(defname)) == NULL)
 		return (0);
 
-	tmp = priv_str_to_set(str, ",", NULL);
+	len = strlen(str) + 1;
+	badp = alloca(len);
+	(void) memset(badp, '\0', len);
+	do {
+		const char *q, *endp;
+		tmp = priv_str_to_set(str, ",", &endp);
+		if (tmp == NULL) {
+			if (endp == NULL)
+				break;
+
+			/* Now remove the bad privilege endp points to */
+			q = strchr(endp, ',');
+			if (q == NULL)
+				q = endp + strlen(endp);
+
+			if (*badp != '\0')
+				(void) strlcat(badp, ",", len);
+			/* Memset above guarantees NUL termination */
+			/* LINTED */
+			(void) strncat(badp, endp, q - endp);
+			/* excise bad privilege; strtok ignores 2x sep */
+			(void) memmove((void *)endp, q, strlen(q) + 1);
+		}
+	} while (tmp == NULL && *str != '\0');
 
 	if (tmp == NULL) {
 		syslog(LOG_AUTH|LOG_ERR,
-		    "pam_setcred: bad privilege specification: %s\n", str);
-		priv_freeset(tmp);
+		    "pam_setcred: can't parse privilege specification: %m\n");
 		return (-1);
+	} else if (*badp != '\0') {
+		syslog(LOG_AUTH|LOG_DEBUG,
+		    "pam_setcred: unrecognized privilege(s): %s\n", badp);
 	}
 	*res = tmp;
 	return (0);
@@ -138,7 +165,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	adt_session_data_t *ah;
 	adt_termid_t	*termid = NULL;
 	userattr_t	*ua;
-	priv_set_t	*lim, *def;
+	priv_set_t	*lim, *def, *tset;
 	char		messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	char		buf[PROJECT_BUFSZ];
 	struct project	proj, *pproj;
@@ -506,7 +533,7 @@ adt_done:
 
 	(void) defopen(AUTH_POLICY);
 
-	def = lim = NULL;
+	tset = def = lim = NULL;
 
 	if (getset(USERATTR_LIMPRIV_KW, DEF_LIMITPRIV, ua, &lim) != 0 ||
 	    getset(USERATTR_DFLTPRIV_KW, DEF_DFLTPRIV, ua, &def) != 0) {
@@ -520,6 +547,21 @@ adt_done:
 			(void) priv_addset(def, PRIV_FILE_CHOWN_SELF);
 	}
 	/*
+	 * Silently limit the privileges to those actually available
+	 * in the current zone.
+	 */
+	tset = priv_allocset();
+	if (tset == NULL) {
+		ret = PAM_SYSTEM_ERR;
+		goto out;
+	}
+	if (getppriv(PRIV_PERMITTED, tset) != 0) {
+		ret = PAM_SYSTEM_ERR;
+		goto out;
+	}
+	if (!priv_issubset(def, tset))
+		priv_intersect(tset, def);
+	/*
 	 * We set privilege awareness here so that I gets copied to
 	 * P & E when the final setuid(uid) happens.
 	 */
@@ -531,6 +573,15 @@ adt_done:
 	}
 
 	if (lim != NULL) {
+		/*
+		 * Silently limit the privileges to the limit set available.
+		 */
+		if (getppriv(PRIV_LIMIT, tset) != 0) {
+			ret = PAM_SYSTEM_ERR;
+			goto out;
+		}
+		if (!priv_issubset(lim, tset))
+			priv_intersect(tset, lim);
 		/*
 		 * In order not to suprise certain applications, we
 		 * need to retain privilege awareness and thus we must
@@ -554,6 +605,8 @@ out:
 		priv_freeset(lim);
 	if (def != NULL)
 		priv_freeset(def);
+	if (tset != NULL)
+		priv_freeset(tset);
 
 	return (ret);
 }
