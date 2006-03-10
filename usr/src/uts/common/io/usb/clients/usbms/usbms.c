@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -696,9 +695,23 @@ usbms_rserv_vuid_button(queue_t			*q,
 
 		break;
 	case	1:
-		/* Middle button */
-		hwbit = 0x02;
-
+		/*
+		 * On two-button mice, the second button is the "right"
+		 * button.  There is no "middle".  The vuidps2.c file has
+		 * a bmap[] array in sendButtonEvent().  We do something
+		 * equivalent here ONLY in the case of two-button mice.
+		 */
+		if (nbutt == 2) {
+			hwbit = 0x01;
+			/*
+			 * Trick the vuid message into thinking it's a
+			 * right-button click also.
+			 */
+			button_number = 2;
+		} else {
+			/* ... otherwise, it's just the middle button */
+			hwbit = 0x02;
+		}
 		break;
 	case	0:
 		/* Left button */
