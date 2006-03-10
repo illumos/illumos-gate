@@ -431,8 +431,11 @@ zfsctl_unmount_snap(vnode_t *dvp, const char *name, int force, cred_t *cr)
 		return (err);
 
 	VN_HOLD(sep->se_root);
-	if ((err = dounmount(vn_mountedvfs(sep->se_root), force, kcred)) != 0)
+	err = dounmount(vn_mountedvfs(sep->se_root), force, kcred);
+	if (err) {
+		VN_RELE(sep->se_root);
 		return (err);
+	}
 	ASSERT(sep->se_root->v_count == 1);
 	gfs_vop_inactive(sep->se_root, cr);
 
@@ -618,17 +621,20 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 	if ((sep = avl_find(&sdp->sd_snaps, &search, &where)) != NULL) {
 		*vpp = sep->se_root;
 		VN_HOLD(*vpp);
-		/*
-		 * If the snapshot was unmounted behind our backs,
-		 * try to remount it.
-		 */
-		if (traverse(vpp) != 0) {
-			ASSERT(!vn_ismntpt(*vpp));
+		err = traverse(vpp);
+		if (err) {
+			VN_RELE(*vpp);
+			*vpp = NULL;
+		} else if (*vpp == sep->se_root) {
+			/*
+			 * The snapshot was unmounted behind our backs,
+			 * try to remount it.
+			 */
 			goto domount;
 		}
 		mutex_exit(&sdp->sd_lock);
 		ZFS_EXIT(zfsvfs);
-		return (0);
+		return (err);
 	}
 
 	/*
@@ -898,8 +904,12 @@ zfsctl_lookup_objset(vfs_t *vfsp, uint64_t objsetid, zfsvfs_t **zfsvfsp)
 	if (sep != NULL) {
 		VN_HOLD(vp);
 		error = traverse(&vp);
-		if (error == 0)
-			*zfsvfsp = VTOZ(vp)->z_zfsvfs;
+		if (error == 0) {
+			if (vp == sep->se_root)
+				error = EINVAL;
+			else
+				*zfsvfsp = VTOZ(vp)->z_zfsvfs;
+		}
 		mutex_exit(&sdp->sd_lock);
 		VN_RELE(vp);
 	} else {

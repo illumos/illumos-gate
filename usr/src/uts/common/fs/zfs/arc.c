@@ -1565,7 +1565,7 @@ arc_getbuf_func(zio_t *zio, arc_buf_t *buf, void *arg)
 static void
 arc_read_done(zio_t *zio)
 {
-	arc_buf_hdr_t	*hdr;
+	arc_buf_hdr_t	*hdr, *found;
 	arc_buf_t	*buf;
 	arc_buf_t	*abuf;	/* buffer we're assigning to callback */
 	kmutex_t	*hash_lock;
@@ -1575,22 +1575,19 @@ arc_read_done(zio_t *zio)
 	buf = zio->io_private;
 	hdr = buf->b_hdr;
 
-	if (!HDR_FREED_IN_READ(hdr)) {
-		arc_buf_hdr_t *found;
-
-		found = buf_hash_find(zio->io_spa, &hdr->b_dva, hdr->b_birth,
+	/*
+	 * The hdr was inserted into hash-table and removed from lists
+	 * prior to starting I/O.  We should find this header, since
+	 * it's in the hash table, and it should be legit since it's
+	 * not possible to evict it during the I/O.  The only possible
+	 * reason for it not to be found is if we were freed during the
+	 * read.
+	 */
+	found = buf_hash_find(zio->io_spa, &hdr->b_dva, hdr->b_birth,
 		    &hash_lock);
 
-		/*
-		 * Buffer was inserted into hash-table and removed from lists
-		 * prior to starting I/O.  We should find this header, since
-		 * it's in the hash table, and it should be legit since it's
-		 * not possible to evict it during the I/O.
-		 */
-
-		ASSERT(found);
-		ASSERT(DVA_EQUAL(&hdr->b_dva, BP_IDENTITY(zio->io_bp)));
-	}
+	ASSERT((found == NULL && HDR_FREED_IN_READ(hdr) && hash_lock == NULL) ||
+	    (found == hdr && DVA_EQUAL(&hdr->b_dva, BP_IDENTITY(zio->io_bp))));
 
 	/* byteswap if necessary */
 	callback_list = hdr->b_acb;
@@ -1656,7 +1653,7 @@ arc_read_done(zio_t *zio)
 	 */
 	cv_broadcast(&hdr->b_cv);
 
-	if (!HDR_FREED_IN_READ(hdr)) {
+	if (hash_lock) {
 		/*
 		 * Only call arc_access on anonymous buffers.  This is because
 		 * if we've issued an I/O for an evicted buffer, we've already
@@ -2246,7 +2243,12 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 			arc_hdr_destroy(ab);
 			atomic_add_64(&arc.deleted, 1);
 		} else {
-			ASSERT3U(refcount_count(&ab->b_refcnt), ==, 1);
+			/*
+			 * We could have an outstanding read on this
+			 * block, so multiple active references are
+			 * possible.  But we should only have a single
+			 * data buffer associated at this point.
+			 */
 			ASSERT3U(ab->b_datacnt, ==, 1);
 			if (HDR_IO_IN_PROGRESS(ab))
 				ab->b_flags |= ARC_FREED_IN_READ;
