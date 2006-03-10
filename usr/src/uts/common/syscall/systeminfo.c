@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,14 +122,18 @@ systeminfo(int command, char *buf, long count)
 	}
 
 	if (kstr != NULL) {
-		if ((strcnt = strlen(kstr)) >= count) {
-			getcnt = count - 1;
-			if (subyte(buf + count - 1, 0) < 0)
+		strcnt = strlen(kstr);
+		if (count > 0) {
+			if (count <= strcnt) {
+				getcnt = count - 1;
+				if (subyte(buf + getcnt, 0) < 0)
+					return (set_errno(EFAULT));
+			} else {
+				getcnt = strcnt + 1;
+			}
+			if (copyout(kstr, buf, getcnt))
 				return (set_errno(EFAULT));
-		} else
-			getcnt = strcnt + 1;
-		if (copyout(kstr, buf, getcnt))
-			return (set_errno(EFAULT));
+		}
 		return (strcnt + 1);
 	}
 
@@ -158,16 +161,20 @@ systeminfo(int command, char *buf, long count)
 			strcnt = IFNAMSIZ + strlen(&tmp[IFNAMSIZ]);
 		}
 
-		getcnt = (strcnt >= count) ? count : strcnt + 1;
-
-		if (copyout(tmp, buf, getcnt)) {
-			error = EFAULT;
-			break;
-		}
-
-		if (strcnt >= count && subyte((buf + count - 1), 0) < 0) {
-			error = EFAULT;
-			break;
+		if (count > 0) {
+			if (count <= strcnt) {
+				getcnt = count - 1;
+				if (subyte((buf + getcnt), 0) < 0) {
+					error = EFAULT;
+					break;
+				}
+			} else {
+				getcnt = strcnt + 1;
+			}
+			if (copyout(tmp, buf, getcnt)) {
+				error = EFAULT;
+				break;
+			}
 		}
 
 		return (strcnt + 1);
