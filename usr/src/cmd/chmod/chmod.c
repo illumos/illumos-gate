@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -275,8 +274,6 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 		errmsg(2, 0, "%s\n", strerror(errno));
 		return (1);
 	}
-	dp = readdir(dirp);
-	dp = readdir(dirp); /* read "." and ".." */
 	ecode = 0;
 
 	/*
@@ -291,6 +288,10 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 		(void) strcat(parentdir, "/");
 
 	for (dp = readdir(dirp); dp != NULL; dp = readdir(dirp))  {
+		if (strcmp(dp->d_name, ".") == 0 ||	/* skip . and .. */
+		    strcmp(dp->d_name, "..") == 0) {
+			continue;
+		}
 		(void) strcpy(currdir, parentdir);
 		(void) strcat(currdir, dp->d_name);
 		ecode += dochmod(dp->d_name, currdir, umsk, aclp);
