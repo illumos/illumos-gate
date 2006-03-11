@@ -356,7 +356,8 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 	for (i = 0; i < TXG_SIZE; i++) {
 		ASSERT3U(dn->dn_next_nlevels[i], ==, 0);
 		ASSERT3U(dn->dn_next_indblkshift[i], ==, 0);
-		ASSERT3U(dn->dn_dirtyblksz[i], ==, 0);
+		ASSERT3U(dn->dn_next_blksz[i], ==, 0);
+		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
 		ASSERT3P(list_head(&dn->dn_dirty_dbufs[i]), ==, NULL);
 		ASSERT3U(avl_numnodes(&dn->dn_ranges[i]), ==, 0);
 	}
@@ -386,6 +387,8 @@ void
 dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
     dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
 {
+	int i;
+
 	ASSERT3U(blocksize, >=, SPA_MINBLOCKSIZE);
 	ASSERT3U(blocksize, <=, SPA_MAXBLOCKSIZE);
 	ASSERT3U(blocksize % SPA_MINBLOCKSIZE, ==, 0);
@@ -395,10 +398,9 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	    (bonustype != DMU_OT_NONE && bonuslen != 0));
 	ASSERT3U(bonustype, <, DMU_OT_NUMTYPES);
 	ASSERT3U(bonuslen, <=, DN_MAX_BONUSLEN);
-	ASSERT(dn->dn_dirtyblksz[0] == 0);
-	ASSERT(dn->dn_dirtyblksz[1] == 0);
-	ASSERT(dn->dn_dirtyblksz[2] == 0);
-	ASSERT(dn->dn_dirtyblksz[3] == 0);
+
+	for (i = 0; i < TXG_SIZE; i++)
+		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
 
 	/* clean up any unreferenced dbufs */
 	dnode_evict_dbufs(dn);
@@ -418,9 +420,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	dnode_setdblksz(dn, blocksize);
 	dnode_setdirty(dn, tx);
-	/* don't need dd_dirty_mtx, dnode is already dirty */
-	ASSERT(dn->dn_dirtyblksz[tx->tx_txg&TXG_MASK] != 0);
-	dn->dn_dirtyblksz[tx->tx_txg&TXG_MASK] = blocksize;
+	dn->dn_next_blksz[tx->tx_txg&TXG_MASK] = blocksize;
 	rw_exit(&dn->dn_struct_rwlock);
 
 	/* change type */
@@ -508,7 +508,7 @@ dnode_buf_pageout(dmu_buf_t *db, void *arg)
 		ASSERT(refcount_is_zero(&dn->dn_tx_holds));
 
 		for (n = 0; n < TXG_SIZE; n++)
-			ASSERT(dn->dn_dirtyblksz[n] == 0);
+			ASSERT(!list_link_active(&dn->dn_dirty_link[n]));
 #endif
 		children_dnodes[i] = NULL;
 		dnode_destroy(dn);
@@ -660,14 +660,13 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 	/*
 	 * If we are already marked dirty, we're done.
 	 */
-	if (dn->dn_dirtyblksz[txg&TXG_MASK] > 0) {
+	if (list_link_active(&dn->dn_dirty_link[txg & TXG_MASK])) {
 		mutex_exit(&os->os_lock);
 		return;
 	}
 
 	ASSERT(!refcount_is_zero(&dn->dn_holds) || list_head(&dn->dn_dbufs));
 	ASSERT(dn->dn_datablksz != 0);
-	dn->dn_dirtyblksz[txg&TXG_MASK] = dn->dn_datablksz;
 
 	dprintf_ds(os->os_dsl_dataset, "obj=%llu txg=%llu\n",
 	    dn->dn_object, txg);
@@ -699,6 +698,8 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 void
 dnode_free(dnode_t *dn, dmu_tx_t *tx)
 {
+	int txgoff = tx->tx_txg & TXG_MASK;
+
 	dprintf("dn=%p txg=%llu\n", dn, tx->tx_txg);
 
 	/* we should be the only holder... hopefully */
@@ -717,11 +718,9 @@ dnode_free(dnode_t *dn, dmu_tx_t *tx)
 	 * the dirty list to the free list.
 	 */
 	mutex_enter(&dn->dn_objset->os_lock);
-	if (dn->dn_dirtyblksz[tx->tx_txg&TXG_MASK] > 0) {
-		list_remove(
-		    &dn->dn_objset->os_dirty_dnodes[tx->tx_txg&TXG_MASK], dn);
-		list_insert_tail(
-		    &dn->dn_objset->os_free_dnodes[tx->tx_txg&TXG_MASK], dn);
+	if (list_link_active(&dn->dn_dirty_link[txgoff])) {
+		list_remove(&dn->dn_objset->os_dirty_dnodes[txgoff], dn);
+		list_insert_tail(&dn->dn_objset->os_free_dnodes[txgoff], dn);
 		mutex_exit(&dn->dn_objset->os_lock);
 	} else {
 		mutex_exit(&dn->dn_objset->os_lock);
@@ -760,16 +759,7 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 	if (dn->dn_phys->dn_maxblkid != 0)
 		goto end;
 
-	/*
-	 * Any buffers allocated for blocks beyond the first
-	 * must be evictable/evicted, because they're the wrong size.
-	 */
 	mutex_enter(&dn->dn_dbufs_mtx);
-	/*
-	 * Since we have the dn_dbufs_mtx, nothing can be
-	 * removed from dn_dbufs.  Since we have dn_struct_rwlock/w,
-	 * nothing can be added to dn_dbufs.
-	 */
 	for (db = list_head(&dn->dn_dbufs); db; db = db_next) {
 		db_next = list_next(&dn->dn_dbufs, db);
 
@@ -782,29 +772,21 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 	}
 	mutex_exit(&dn->dn_dbufs_mtx);
 
-	/* Fast-track if there is no data in the file */
-	if (BP_IS_HOLE(&dn->dn_phys->dn_blkptr[0]) && !have_db0) {
-		dnode_setdblksz(dn, size);
-		dn->dn_indblkshift = ibs;
-		dnode_setdirty(dn, tx);
-		/* don't need dd_dirty_mtx, dnode is already dirty */
-		dn->dn_dirtyblksz[tx->tx_txg&TXG_MASK] = size;
-		dn->dn_next_indblkshift[tx->tx_txg&TXG_MASK] = ibs;
-		rw_exit(&dn->dn_struct_rwlock);
-		return (0);
+	db = NULL;
+	if (!BP_IS_HOLE(&dn->dn_phys->dn_blkptr[0]) || have_db0) {
+		/* obtain the old block */
+		db = dbuf_hold(dn, 0, FTAG);
+		dbuf_new_size(db, size, tx);
 	}
-
-	/* obtain the old block */
-	db = dbuf_hold(dn, 0, FTAG);
-
-	dbuf_new_size(db, size, tx);
 
 	dnode_setdblksz(dn, size);
 	dn->dn_indblkshift = ibs;
-	/* don't need dd_dirty_mtx, dnode is already dirty */
-	dn->dn_dirtyblksz[tx->tx_txg&TXG_MASK] = size;
+	dnode_setdirty(dn, tx);
+	dn->dn_next_blksz[tx->tx_txg&TXG_MASK] = size;
 	dn->dn_next_indblkshift[tx->tx_txg&TXG_MASK] = ibs;
-	dbuf_rele(db, FTAG);
+
+	if (db)
+		dbuf_rele(db, FTAG);
 
 	err = 0;
 end:
@@ -827,71 +809,45 @@ dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx)
 {
 	uint64_t txgoff = tx->tx_txg & TXG_MASK;
 	int drop_struct_lock = FALSE;
-	int epbs, old_nlevels, new_nlevels;
+	int epbs, new_nlevels;
 	uint64_t sz;
 
-	if (blkid == DB_BONUS_BLKID)
-		return;
+	ASSERT(blkid != DB_BONUS_BLKID);
 
 	if (!RW_WRITE_HELD(&dn->dn_struct_rwlock)) {
 		rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 		drop_struct_lock = TRUE;
 	}
 
-	if (blkid > dn->dn_maxblkid)
-		dn->dn_maxblkid = blkid;
+	if (blkid <= dn->dn_maxblkid)
+		goto out;
+
+	dn->dn_maxblkid = blkid;
 
 	/*
-	 * Compute the number of levels necessary to support the
-	 * new blkid.
+	 * Compute the number of levels necessary to support the new maxblkid.
 	 */
 	new_nlevels = 1;
 	epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
-
-	for (sz = dn->dn_nblkptr; sz <= blkid && sz >= dn->dn_nblkptr;
-	    sz <<= epbs)
+	for (sz = dn->dn_nblkptr;
+	    sz <= blkid && sz >= dn->dn_nblkptr; sz <<= epbs)
 		new_nlevels++;
-	old_nlevels = dn->dn_nlevels;
 
-	if (new_nlevels > dn->dn_next_nlevels[txgoff])
+	if (new_nlevels > dn->dn_nlevels) {
+		int old_nlevels = dn->dn_nlevels;
+		dmu_buf_impl_t *db;
+
+		dn->dn_nlevels = new_nlevels;
+
+		ASSERT3U(new_nlevels, >, dn->dn_next_nlevels[txgoff]);
 		dn->dn_next_nlevels[txgoff] = new_nlevels;
 
-	if (new_nlevels > old_nlevels) {
-		dprintf("dn %p increasing nlevels from %u to %u\n",
-		    dn, dn->dn_nlevels, new_nlevels);
-		dn->dn_nlevels = new_nlevels;
-	}
-
-	/*
-	 * Dirty the left indirects.
-	 * Note: the caller should have just dnode_use_space()'d one
-	 * data block's worth, so we could subtract that out of
-	 * dn_inflight_data to determine if there is any dirty data
-	 * besides this block.
-	 * We don't strictly need to dirty them unless there's
-	 * *something* in the object (eg. on disk or dirty)...
-	 */
-	if (new_nlevels > old_nlevels) {
-		dmu_buf_impl_t *db = dbuf_hold_level(dn, old_nlevels, 0, FTAG);
-		dprintf("dn %p dirtying left indirects\n", dn);
+		/* Dirty the left indirects.  */
+		db = dbuf_hold_level(dn, old_nlevels, 0, FTAG);
 		dbuf_dirty(db, tx);
 		dbuf_rele(db, FTAG);
-	}
-#ifdef ZFS_DEBUG
-	else if (old_nlevels > 1 && new_nlevels > old_nlevels) {
-		dmu_buf_impl_t *db;
-		int i;
 
-		for (i = 0; i < dn->dn_nblkptr; i++) {
-			db = dbuf_hold_level(dn, old_nlevels-1, i, FTAG);
-			ASSERT(!
-			    list_link_active(&db->db_dirty_node[txgoff]));
-			dbuf_rele(db, FTAG);
-		}
 	}
-#endif
-
-	dprintf("dn %p done\n", dn);
 
 out:
 	if (drop_struct_lock)

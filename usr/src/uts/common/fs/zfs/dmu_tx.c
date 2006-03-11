@@ -331,26 +331,53 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	uint64_t space = 0;
 	dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
 
-	if (dn->dn_datablkshift == 0)
-		return;
 	/*
-	 * not that the dnode can change, since it isn't dirty, but
-	 * dbuf_hold_impl() wants us to have the struct_rwlock.
-	 * also need it to protect dn_maxblkid.
+	 * We don't use any locking to check for dirtyness because it's
+	 * OK if we get stale data -- the dnode may become dirty
+	 * immediately after our check anyway.  This is just a means to
+	 * avoid the expensive count when we aren't sure we need it.  We
+	 * need to be able to deal with a dirty dnode.
+	 */
+	if ((uintptr_t)dn->dn_assigned_tx |
+	    list_link_active(&dn->dn_dirty_link[0]) |
+	    list_link_active(&dn->dn_dirty_link[1]) |
+	    list_link_active(&dn->dn_dirty_link[2]) |
+	    list_link_active(&dn->dn_dirty_link[3]))
+		return;
+
+	/*
+	 * the struct_rwlock protects us against dn_phys->dn_nlevels
+	 * changing, in case (against all odds) we manage to dirty &
+	 * sync out the changes after we check for being dirty.
+	 * also, dbuf_hold_impl() wants us to have the struct_rwlock.
+	 *
+	 * It's fine to use dn_datablkshift rather than the dn_phys
+	 * equivalent because if it is changing, maxblkid==0 and we will
+	 * bail.
 	 */
 	rw_enter(&dn->dn_struct_rwlock, RW_READER);
-	blkid = off >> dn->dn_datablkshift;
-	nblks = (off + len) >> dn->dn_datablkshift;
+	if (dn->dn_phys->dn_maxblkid == 0) {
+		if (off == 0 && len >= dn->dn_datablksz) {
+			blkid = 0;
+			nblks = 1;
+		} else {
+			rw_exit(&dn->dn_struct_rwlock);
+			return;
+		}
+	} else {
+		blkid = off >> dn->dn_datablkshift;
+		nblks = (off + len) >> dn->dn_datablkshift;
 
-	if (blkid >= dn->dn_maxblkid) {
-		rw_exit(&dn->dn_struct_rwlock);
-		return;
+		if (blkid >= dn->dn_phys->dn_maxblkid) {
+			rw_exit(&dn->dn_struct_rwlock);
+			return;
+		}
+		if (blkid + nblks > dn->dn_phys->dn_maxblkid)
+			nblks = dn->dn_phys->dn_maxblkid - blkid;
+
+		/* don't bother after 128,000 blocks */
+		nblks = MIN(nblks, 128*1024);
 	}
-	if (blkid + nblks > dn->dn_maxblkid)
-		nblks = dn->dn_maxblkid - blkid;
-
-	/* don't bother after the 100,000 blocks */
-	nblks = MIN(nblks, 128*1024);
 
 	if (dn->dn_phys->dn_nlevels == 1) {
 		int i;
@@ -399,9 +426,10 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 				}
 			}
 			dbuf_rele(dbuf, FTAG);
-		} else {
-			/* the indirect block is sparse */
-			ASSERT(err == ENOENT);
+		}
+		if (err != 0 && err != ENOENT) {
+			tx->tx_err = err;
+			break;
 		}
 
 		blkid += tochk;
@@ -416,7 +444,7 @@ static void
 dmu_tx_hold_free_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 {
 	uint64_t start, end, i;
-	int dirty, err, shift;
+	int err, shift;
 	zio_t *zio;
 
 	/* first block */
@@ -465,12 +493,7 @@ dmu_tx_hold_free_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	}
 
 	dmu_tx_count_dnode(tx, dn);
-
-	/* XXX locking */
-	dirty = dn->dn_dirtyblksz[0] | dn->dn_dirtyblksz[1] |
-	    dn->dn_dirtyblksz[2] | dn->dn_dirtyblksz[3];
-	if (dn->dn_assigned_tx != NULL && !dirty)
-		dmu_tx_count_free(tx, dn, off, len);
+	dmu_tx_count_free(tx, dn, off, len);
 }
 
 void

@@ -112,36 +112,9 @@ typedef struct dnode_phys {
 
 typedef struct dnode {
 	/*
-	 * lock ordering:
-	 *
-	 * db_mtx > dn_dirty_mtx
-	 * 	dbuf_syncdone
-	 *
-	 * dn_struct_rwlock/r > dn_dirty_mtx
-	 * 	dmu_object_info
-	 *
-	 * dn_struct_rwlock/r > db_mtx > dn_dirty_mtx
-	 * 	dbuf_dirty
-	 * 	dbuf_setdirty
-	 *
-	 * dn_struct_rwlock/w > db_mtx > dn_mtx
-	 * 	dnode_increase_indirection -> dbuf_find
-	 * 	dbuf_hold_impl
-	 * 	dnode_set_bonus
-	 *
-	 * dn_struct_rwlock/w > dn_mtx
-	 * 	dnode_increase_indirection
-	 *
-	 * dn_dirty_mtx > dn_mtx
-	 * 	dnode_buf_pageout
-	 *
-	 * db_mtx > dn_mtx
-	 * 	dbuf_create
-	 */
-
-	/*
-	 * dn_struct_rwlock protects the structure of the dnode.
-	 * In particular, it protects the number of levels of indirection.
+	 * dn_struct_rwlock protects the structure of the dnode,
+	 * including the number of levels of indirection (dn_nlevels),
+	 * dn_maxblkid, and dn_next_*
 	 */
 	krwlock_t dn_struct_rwlock;
 
@@ -158,38 +131,32 @@ typedef struct dnode {
 	dnode_phys_t *dn_phys; /* pointer into dn->dn_dbuf->db.db_data */
 
 	/*
-	 * Copies of stuff in dn_phys.  They're valid here even before
-	 * the dnode is first synced.
+	 * Copies of stuff in dn_phys.  They're valid in the open
+	 * context (eg. even before the dnode is first synced).
+	 * Where necessary, these are protected by dn_struct_rwlock.
 	 */
-	dmu_object_type_t dn_type;	/* object type (immutable) */
-	uint8_t dn_bonustype;		/* bonus type (immutable) */
-	uint16_t dn_bonuslen;		/* bonus length (immutable) */
+	dmu_object_type_t dn_type;	/* object type */
+	uint16_t dn_bonuslen;		/* bonus length */
+	uint8_t dn_bonustype;		/* bonus type */
 	uint8_t dn_nblkptr;		/* number of blkptrs (immutable) */
-	uint8_t dn_datablkshift;	/* zero if blksz not power of 2! */
-	uint32_t dn_datablksz;		/* in bytes */
-	uint16_t dn_datablkszsec;	/* in 512b sectors */
-
 	uint8_t dn_checksum;		/* ZIO_CHECKSUM type */
 	uint8_t dn_compress;		/* ZIO_COMPRESS type */
-
-	/*
-	 * The following are kept up-to-date in the *open* context, the syncing
-	 * context should only pay attention to the dn_next_* values.
-	 */
 	uint8_t dn_nlevels;
 	uint8_t dn_indblkshift;
-
+	uint8_t dn_datablkshift;	/* zero if blksz not power of 2! */
+	uint16_t dn_datablkszsec;	/* in 512b sectors */
+	uint32_t dn_datablksz;		/* in bytes */
+	uint64_t dn_maxblkid;
 	uint8_t dn_next_nlevels[TXG_SIZE];
 	uint8_t dn_next_indblkshift[TXG_SIZE];
+	uint32_t dn_next_blksz[TXG_SIZE];	/* next block size in bytes */
 
 	/* protected by os_lock: */
-	uint32_t dn_dirtyblksz[TXG_SIZE];	/* dirty block size in bytes */
 	list_node_t dn_dirty_link[TXG_SIZE];	/* next on dataset's dirty */
 
 	/* protected by dn_mtx: */
 	kmutex_t dn_mtx;
 	list_t dn_dirty_dbufs[TXG_SIZE];
-	uint64_t dn_maxblkid;
 	avl_tree_t dn_ranges[TXG_SIZE];
 	uint64_t dn_allocated_txg;
 	uint64_t dn_free_txg;

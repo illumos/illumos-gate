@@ -346,33 +346,58 @@ dnode_sync_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 void
 dnode_evict_dbufs(dnode_t *dn)
 {
-	dmu_buf_impl_t *db;
+	int progress;
+	int pass = 0;
 
-	mutex_enter(&dn->dn_dbufs_mtx);
-	while (db = list_head(&dn->dn_dbufs)) {
-		int progress = 0;
-		for (; db; db = list_next(&dn->dn_dbufs, db)) {
-			mutex_enter(&db->db_mtx);
-			if (db->db_state != DB_EVICTING &&
-			    refcount_is_zero(&db->db_holds))
-				break;
-			else if (db->db_state == DB_EVICTING)
-				progress = 1;
-			mutex_exit(&db->db_mtx);
-		}
-		if (db) {
-			ASSERT(!arc_released(db->db_buf));
-			dbuf_clear(db);
-			mutex_exit(&dn->dn_dbufs_mtx);
-			progress = 1;
-		} else {
-			if (progress == 0)
-				break;
-			mutex_exit(&dn->dn_dbufs_mtx);
-		}
+	do {
+		dmu_buf_impl_t *db, *db_next;
+		int evicting = FALSE;
+
+		progress = FALSE;
 		mutex_enter(&dn->dn_dbufs_mtx);
+		for (db = list_head(&dn->dn_dbufs); db; db = db_next) {
+			/* dbuf_clear() may remove db from this list */
+			db_next = list_next(&dn->dn_dbufs, db);
+
+			mutex_enter(&db->db_mtx);
+			if (db->db_state == DB_EVICTING) {
+				progress = TRUE;
+				evicting = TRUE;
+				mutex_exit(&db->db_mtx);
+			} else if (refcount_is_zero(&db->db_holds)) {
+				progress = TRUE;
+				ASSERT(!arc_released(db->db_buf));
+				dbuf_clear(db); /* exits db_mtx for us */
+			} else {
+				mutex_exit(&db->db_mtx);
+			}
+
+		}
+		/*
+		 * NB: we need to drop dn_dbufs_mtx between passes so
+		 * that any DB_EVICTING dbufs can make progress.
+		 * Ideally, we would have some cv we could wait on, but
+		 * since we don't, just wait a bit to give the other
+		 * thread a chance to run.
+		 */
+		mutex_exit(&dn->dn_dbufs_mtx);
+		if (evicting)
+			delay(1);
+		pass++;
+		ASSERT(pass < 100); /* sanity check */
+	} while (progress);
+
+	/*
+	 * This function works fine even if it can't evict everything,
+	 * but all of our callers need this assertion, so let's put it
+	 * here (for now).  Perhaps in the future there will be a try vs
+	 * doall flag.
+	 */
+	if (list_head(&dn->dn_dbufs) != NULL) {
+		panic("dangling dbufs (dn=%p, dbuf=%p)\n",
+		    dn, list_head(&dn->dn_dbufs));
 	}
-	mutex_exit(&dn->dn_dbufs_mtx);
+
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
 	if (dn->dn_bonus && refcount_is_zero(&dn->dn_bonus->db_holds)) {
 		mutex_enter(&dn->dn_bonus->db_mtx);
@@ -380,6 +405,7 @@ dnode_evict_dbufs(dnode_t *dn)
 		dn->dn_bonus = NULL;
 	}
 	rw_exit(&dn->dn_struct_rwlock);
+
 }
 
 static int
@@ -420,6 +446,7 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 	/* Undirty next bits */
 	dn->dn_next_nlevels[txgoff] = 0;
 	dn->dn_next_indblkshift[txgoff] = 0;
+	dn->dn_next_blksz[txgoff] = 0;
 
 	/* free up all the blocks in the file. */
 	dnode_sync_free_range(dn, 0, dn->dn_phys->dn_maxblkid+1, tx);
@@ -436,7 +463,6 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 
 	mutex_enter(&dn->dn_mtx);
 	dn->dn_type = DMU_OT_NONE;
-	dn->dn_dirtyblksz[txgoff] = 0;
 	dn->dn_maxblkid = 0;
 	dn->dn_allocated_txg = 0;
 	mutex_exit(&dn->dn_mtx);
@@ -465,13 +491,10 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 	int txgoff = tx->tx_txg & TXG_MASK;
 	dnode_phys_t *dnp = dn->dn_phys;
 
-	/* ASSERT(dn->dn_objset->dd_snapshot == NULL); */
 	ASSERT(dmu_tx_is_syncing(tx));
-	ASSERT(dn->dn_object == DMU_META_DNODE_OBJECT ||
-	    dn->dn_dirtyblksz[txgoff] > 0);
-
 	ASSERT(dnp->dn_type != DMU_OT_NONE || dn->dn_allocated_txg);
 	DNODE_VERIFY(dn);
+
 	/*
 	 * Make sure the dbuf for the dn_phys is released before we modify it.
 	 */
@@ -502,11 +525,12 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		dnp->dn_nblkptr = dn->dn_nblkptr;
 	}
 
-	if (dn->dn_dirtyblksz[txgoff]) {
-		ASSERT(P2PHASE(dn->dn_dirtyblksz[txgoff],
+	if (dn->dn_next_blksz[txgoff]) {
+		ASSERT(P2PHASE(dn->dn_next_blksz[txgoff],
 		    SPA_MINBLOCKSIZE) == 0);
 		dnp->dn_datablkszsec =
-		    dn->dn_dirtyblksz[txgoff] >> SPA_MINBLOCKSHIFT;
+		    dn->dn_next_blksz[txgoff] >> SPA_MINBLOCKSHIFT;
+		dn->dn_next_blksz[txgoff] = 0;
 	}
 
 	if (dn->dn_next_indblkshift[txgoff]) {
@@ -576,9 +600,6 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		    dn->dn_phys->dn_maxblkid == 0 ||
 		    dnode_next_offset(dn, FALSE, &off, 1, 1) == ESRCH))
 			panic("data after EOF: off=%llu\n", (u_longlong_t)off);
-
-		dn->dn_dirtyblksz[txgoff] = 0;
-
 
 		if (dn->dn_object != DMU_META_DNODE_OBJECT) {
 			dbuf_will_dirty(dn->dn_dbuf, tx);

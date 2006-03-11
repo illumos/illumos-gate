@@ -1638,7 +1638,7 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 	 * we go trundling through the block pointers.
 	 */
 	for (i = 0; i < TXG_SIZE; i++) {
-		if (dn->dn_dirtyblksz[i])
+		if (list_link_active(&dn->dn_dirty_link[i]))
 			break;
 	}
 	if (i != TXG_SIZE) {

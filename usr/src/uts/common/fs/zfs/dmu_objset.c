@@ -279,41 +279,43 @@ void
 dmu_objset_evict_dbufs(objset_t *os)
 {
 	objset_impl_t *osi = os->os;
-	dnode_t *mdn = osi->os_meta_dnode;
 	dnode_t *dn;
-	int allzero = B_TRUE;
+
+	mutex_enter(&osi->os_lock);
+
+	/* process the mdn last, since the other dnodes have holds on it */
+	list_remove(&osi->os_dnodes, osi->os_meta_dnode);
+	list_insert_tail(&osi->os_dnodes, osi->os_meta_dnode);
 
 	/*
-	 * Each time we process an entry on the list, we first move it
-	 * to the tail so that we don't process it over and over again.
-	 * We use the meta-dnode as a marker: if we make a complete pass
-	 * over the list without finding any work to do, we're done.
-	 * This ensures that we complete in linear time rather than
-	 * quadratic time, as described in detail in bug 1182169.
+	 * Find the first dnode with holds.  We have to do this dance
+	 * because dnode_add_ref() only works if you already have a
+	 * hold.  If there are no holds then it has no dbufs so OK to
+	 * skip.
 	 */
-	mutex_enter(&osi->os_lock);
-	list_remove(&osi->os_dnodes, mdn);
-	list_insert_tail(&osi->os_dnodes, mdn);
-	while ((dn = list_head(&osi->os_dnodes)) != NULL) {
-		list_remove(&osi->os_dnodes, dn);
-		list_insert_tail(&osi->os_dnodes, dn);
-		if (dn == mdn) {
-			if (allzero)
-				break;
-			allzero = B_TRUE;
-			continue;
-		}
-		if (!refcount_is_zero(&dn->dn_holds)) {
-			allzero = B_FALSE;
-			dnode_add_ref(dn, FTAG);
-			mutex_exit(&osi->os_lock);
-			dnode_evict_dbufs(dn);
-			dnode_rele(dn, FTAG);
-			mutex_enter(&osi->os_lock);
-		}
+	for (dn = list_head(&osi->os_dnodes);
+	    dn && refcount_is_zero(&dn->dn_holds);
+	    dn = list_next(&osi->os_dnodes, dn))
+		continue;
+	if (dn)
+		dnode_add_ref(dn, FTAG);
+
+	while (dn) {
+		dnode_t *next_dn = dn;
+
+		do {
+			next_dn = list_next(&osi->os_dnodes, next_dn);
+		} while (next_dn && refcount_is_zero(&next_dn->dn_holds));
+		if (next_dn)
+			dnode_add_ref(next_dn, FTAG);
+
+		mutex_exit(&osi->os_lock);
+		dnode_evict_dbufs(dn);
+		dnode_rele(dn, FTAG);
+		mutex_enter(&osi->os_lock);
+		dn = next_dn;
 	}
 	mutex_exit(&osi->os_lock);
-	dnode_evict_dbufs(mdn);
 }
 
 void

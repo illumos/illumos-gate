@@ -761,14 +761,8 @@ dbuf_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 			mutex_exit(&db->db_mtx);
 			continue;
 		}
-		if (db->db_state == DB_READ) {
-			/* this will be handled in dbuf_read_done() */
-			db->db_d.db_freed_in_flight = TRUE;
-			mutex_exit(&db->db_mtx);
-			continue;
-		}
-		if (db->db_state == DB_FILL) {
-			/* this will be handled in dbuf_rele() */
+		if (db->db_state == DB_READ || db->db_state == DB_FILL) {
+			/* will be handled in dbuf_read_done or dbuf_rele */
 			db->db_d.db_freed_in_flight = TRUE;
 			mutex_exit(&db->db_mtx);
 			continue;
@@ -844,16 +838,12 @@ dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx)
 	/* XXX does *this* func really need the lock? */
 	ASSERT(RW_WRITE_HELD(&db->db_dnode->dn_struct_rwlock));
 
-	if (osize == size)
-		return;
-
 	/*
 	 * This call to dbuf_will_dirty() with the dn_struct_rwlock held
 	 * is OK, because there can be no other references to the db
 	 * when we are changing its size, so no concurrent DB_FILL can
 	 * be happening.
 	 */
-	/* Make a copy of the data if necessary */
 	/*
 	 * XXX we should be doing a dbuf_read, checking the return
 	 * value and returning that up to our callers
@@ -871,12 +861,10 @@ dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx)
 		bzero((uint8_t *)buf->b_data + osize, size - osize);
 
 	mutex_enter(&db->db_mtx);
-	/* ASSERT3U(refcount_count(&db->db_holds), ==, 1); */
 	dbuf_set_data(db, buf);
 	VERIFY(arc_buf_remove_ref(obuf, db) == 1);
 	db->db.db_size = size;
 
-	/* fix up the dirty info */
 	if (db->db_level == 0)
 		db->db_d.db_data_old[tx->tx_txg&TXG_MASK] = buf;
 	mutex_exit(&db->db_mtx);
@@ -1234,6 +1222,7 @@ dbuf_clear(dmu_buf_impl_t *db)
 {
 	dnode_t *dn = db->db_dnode;
 	dmu_buf_impl_t *parent = db->db_parent;
+	dmu_buf_impl_t *dndb = dn->dn_dbuf;
 	int dbuf_gone = FALSE;
 
 	ASSERT(MUTEX_HELD(&db->db_mtx));
@@ -1270,7 +1259,7 @@ dbuf_clear(dmu_buf_impl_t *db)
 	 * If this dbuf is referened from an indirect dbuf,
 	 * decrement the ref count on the indirect dbuf.
 	 */
-	if (parent && parent != dn->dn_dbuf)
+	if (parent && parent != dndb)
 		dbuf_rele(parent, db);
 }
 
@@ -1305,17 +1294,23 @@ dbuf_findbp(dnode_t *dn, int level, uint64_t blkid, int fail_sparse,
 			return (err);
 		err = dbuf_read(*parentp, NULL,
 		    (DB_RF_HAVESTRUCT | DB_RF_NOPREFETCH | DB_RF_CANFAIL));
-		if (err == 0) {
-			*bpp = ((blkptr_t *)(*parentp)->db.db_data) +
-			    (blkid & ((1ULL << epbs) - 1));
+		if (err) {
+			dbuf_rele(*parentp, NULL);
+			*parentp = NULL;
+			return (err);
 		}
-		return (err);
+		*bpp = ((blkptr_t *)(*parentp)->db.db_data) +
+		    (blkid & ((1ULL << epbs) - 1));
+		return (0);
 	} else {
 		/* the block is referenced from the dnode */
 		ASSERT3U(level, ==, nlevels-1);
 		ASSERT(dn->dn_phys->dn_nblkptr == 0 ||
 		    blkid < dn->dn_phys->dn_nblkptr);
-		*parentp = dn->dn_dbuf;
+		if (dn->dn_dbuf) {
+			dbuf_add_ref(dn->dn_dbuf, NULL);
+			*parentp = dn->dn_dbuf;
+		}
 		*bpp = &dn->dn_phys->dn_blkptr[blkid];
 		return (0);
 	}
@@ -1427,18 +1422,9 @@ dbuf_destroy(dmu_buf_impl_t *db)
 		 * remove it from that list.
 		 */
 		if (list_link_active(&db->db_link)) {
-			int need_mutex;
-
-			ASSERT(!MUTEX_HELD(&dn->dn_dbufs_mtx));
-			need_mutex = !MUTEX_HELD(&dn->dn_dbufs_mtx);
-			if (need_mutex)
-				mutex_enter(&dn->dn_dbufs_mtx);
-
-			/* remove from dn_dbufs */
+			mutex_enter(&dn->dn_dbufs_mtx);
 			list_remove(&dn->dn_dbufs, db);
-
-			if (need_mutex)
-				mutex_exit(&dn->dn_dbufs_mtx);
+			mutex_exit(&dn->dn_dbufs_mtx);
 
 			dnode_rele(dn, db);
 		}
@@ -1494,7 +1480,7 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
 			    (ARC_NOWAIT | ARC_PREFETCH), &zb);
 		}
-		if (parent && parent != dn->dn_dbuf)
+		if (parent)
 			dbuf_rele(parent, NULL);
 	}
 }
@@ -1522,12 +1508,13 @@ top:
 		blkptr_t *bp = NULL;
 		int err;
 
+		ASSERT3P(parent, ==, NULL);
 		err = dbuf_findbp(dn, level, blkid, fail_sparse, &parent, &bp);
 		if (fail_sparse) {
 			if (err == 0 && bp && BP_IS_HOLE(bp))
 				err = ENOENT;
 			if (err) {
-				if (parent && parent != dn->dn_dbuf)
+				if (parent)
 					dbuf_rele(parent, NULL);
 				return (err);
 			}
@@ -1541,6 +1528,10 @@ top:
 		arc_buf_add_ref(db->db_buf, db);
 		if (db->db_buf->b_data == NULL) {
 			dbuf_clear(db);
+			if (parent) {
+				dbuf_rele(parent, NULL);
+				parent = NULL;
+			}
 			goto top;
 		}
 		ASSERT3P(db->db.db_data, ==, db->db_buf->b_data);
@@ -1572,7 +1563,7 @@ top:
 	mutex_exit(&db->db_mtx);
 
 	/* NOTE: we can't rele the parent until after we drop the db_mtx */
-	if (parent && parent != dn->dn_dbuf)
+	if (parent)
 		dbuf_rele(parent, NULL);
 
 	ASSERT3P(db->db_dnode, ==, dn);

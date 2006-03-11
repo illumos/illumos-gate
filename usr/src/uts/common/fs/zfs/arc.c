@@ -1859,7 +1859,8 @@ top:
 			mutex_exit(hash_lock);
 
 		ASSERT3U(hdr->b_size, ==, size);
-		DTRACE_PROBE2(arc__miss, blkptr_t *, bp, uint64_t, size);
+		DTRACE_PROBE3(arc__miss, blkptr_t *, bp, uint64_t, size,
+		    zbookmark_t *, zb);
 		atomic_add_64(&arc.misses, 1);
 
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
