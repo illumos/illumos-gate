@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,7 +145,7 @@ gfxp_ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	dev_a.prot = (uchar_t)prot;
 	dev_a.maxprot = (uchar_t)maxprot;
 	dev_a.hat_attr = hat_attr;
-	dev_a.hat_flags = 0;
+	dev_a.hat_flags = HAT_LOAD_LOCK;
 	dev_a.devmap_data = NULL;
 
 	error = as_map(as, *addrp, len, segdev_create, &dev_a);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+#include <sys/vmsystm.h>
 #include <sys/ddi.h>
 #include <sys/devops.h>
 #include <sys/sunddi.h>
@@ -209,4 +209,44 @@ gfxp_ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	gfxp_fix_mem_cache_attrs(*kaddrp, *real_length, cache_attr);
 
 	return (DDI_SUCCESS);
+}
+
+int
+gfxp_mlock_user_memory(caddr_t address, size_t length)
+{
+	struct as *as = ttoproc(curthread)->p_as;
+	int error = 0;
+
+	if (((uintptr_t)address & PAGEOFFSET) != 0 || length == 0)
+		return (set_errno(EINVAL));
+
+	if (valid_usr_range(address, length, 0, as, as->a_userlimit) !=
+	    RANGE_OKAY)
+		return (set_errno(ENOMEM));
+
+	error = as_ctl(as, address, length, MC_LOCK, 0, 0, NULL, 0);
+	if (error)
+		(void) set_errno(error);
+
+	return (error);
+}
+
+int
+gfxp_munlock_user_memory(caddr_t address, size_t length)
+{
+	struct as *as = ttoproc(curthread)->p_as;
+	int error = 0;
+
+	if (((uintptr_t)address & PAGEOFFSET) != 0 || length == 0)
+		return (set_errno(EINVAL));
+
+	if (valid_usr_range(address, length, 0, as, as->a_userlimit) !=
+	    RANGE_OKAY)
+		return (set_errno(ENOMEM));
+
+	error = as_ctl(as, address, length, MC_UNLOCK, 0, 0, NULL, 0);
+	if (error)
+		(void) set_errno(error);
+
+	return (error);
 }
