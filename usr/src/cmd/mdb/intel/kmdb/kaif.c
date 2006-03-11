@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -37,6 +36,7 @@
 #include <kmdb/kmdb_umemglue.h>
 #include <kmdb/kaif.h>
 #include <kmdb/kaif_asmutil.h>
+#include <kmdb/kmdb_io.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_isautil.h>
@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/segments.h>
 #include <sys/bitmap.h>
+#include <sys/termios.h>
 
 kaif_cpusave_t	*kaif_cpusave;
 int		kaif_ncpusave;
@@ -117,12 +118,11 @@ kaif_enter_mon(void)
 		    "%s: Do you really want to reboot? (y/n) ",
 		    mdb.m_pname);
 		mdb_iob_flush(mdb.m_out);
+		mdb_iob_clearlines(mdb.m_out);
 
-		while (IOP_READ(mdb.m_term, &c, 1) != 1)
-			continue;
-		mdb_iob_printf(mdb.m_out, "%c%s", c, (c == '\n' ? "" : "\n"));
+		c = kmdb_getchar();
 
-		if (c == 'n' || c == 'N')
+		if (c == 'n' || c == 'N' || c == CTRL('c'))
 			return;
 		else if (c == 'y' || c == 'Y') {
 			mdb_iob_printf(mdb.m_out, "Rebooting...\n");

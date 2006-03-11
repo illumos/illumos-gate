@@ -50,7 +50,7 @@ static char kmdb_prom_readbuf[KMDB_PROM_READBUF_SIZE];
 static int kmdb_prom_readbuf_head;
 static int kmdb_prom_readbuf_tail;
 
-ssize_t
+static ssize_t
 kmdb_prom_polled_read(caddr_t buf, size_t len)
 {
 	uintptr_t arg = (uintptr_t)mdb.m_pio->cons_polledio_argument;
@@ -70,7 +70,7 @@ kmdb_prom_polled_read(caddr_t buf, size_t len)
 	return (nread);
 }
 
-ssize_t
+static ssize_t
 kmdb_prom_polled_write(caddr_t buf, size_t len)
 {
 	uintptr_t args[2];
@@ -115,14 +115,17 @@ kmdb_prom_writer(caddr_t buf, size_t len)
 
 /*
  * Due to the nature of kmdb, we don't have signals.  This prevents us from
- * receiving asynchronous notification when the user would like to abort
- * active dcmds.  Whereas mdb can simply declare a SIGINT handler, we must
+ * receiving asynchronous notification when the user would like to abort active
+ * dcmds.  Whereas mdb can simply declare a SIGINT handler, we must
  * occasionally poll the input stream, looking for pending ^C characters.  To
  * give the illusion of asynchronous interrupt delivery, this polling is
- * triggered from several commonly-used functions, such as kmdb_prom_write,
- * kmdb_prom_read, and the *read and *write target ops.  When an interrupt
- * check is triggered, we read through pending input, looking for interrupt
- * characters.  If we find one, we deliver it.
+ * triggered from several commonly-used functions, such as kmdb_prom_write and
+ * the *read and *write target ops.  When an interrupt check is triggered, we
+ * read through pending input, looking for interrupt characters.  If we find
+ * one, we deliver an interrupt immediately.
+ *
+ * In a read context, we can deliver the interrupt character directly back to
+ * the termio handler rather than raising an interrupt.
  *
  * OBP doesn't have an "unget" facility.  Any character read for interrupt
  * checking is gone forever, unless we save it.  Loss of these characters
@@ -133,25 +136,9 @@ kmdb_prom_writer(caddr_t buf, size_t len)
  * after they undergo interrupt processing.
  *
  * The typeahead facility is implemented as a ring buffer, stored in
- * kmdb_prom_readbuf, and has the following interfaces:
- *
- *   kmdb_prom_drain_readbuf - Given a buffer and a length, copy that many bytes
- *    into the passed buffer.  This routine will not attempt to refill the ring
- *    buffer.  The number of bytes actually copied will be returned.
- *
- *   kmdb_prom_fill_readbuf - Attempt to refill the ring buffer from the input
- *    stream.  The `lossy' argument governs the action taken if the available
- *    input will overflow the available space in the ring buffer.  If the lossy
- *    argument is set, available input will be exhausted.  Characters that will
- *    not fit in the ring buffer will be discarded after interrupt processing.
- *    If this routine is invoked in lossless mode (i.e. the lossy flag is not
- *    set), input will be read only until the buffer is full.
- *
- * kmdb_prom_* routines may call drain and fill directly.  Callers outside of
- * the kmdb promif subsystem must use kmdb_prom_check_interrupt, which will
- * invoke fill in lossy mode.
+ * kmdb_prom_readbuf.
  */
-size_t
+static size_t
 kmdb_prom_drain_readbuf(void *buf, size_t len)
 {
 	size_t n, tailread;
@@ -205,7 +192,7 @@ check_int(char *buf, size_t len)
 	int i;
 
 	for (i = 0; i < len; i++) {
-		if (buf[i] == ('c' & 037)) {
+		if (buf[i] == CTRL('c')) {
 			kmdb_prom_readbuf_tail = kmdb_prom_readbuf_head;
 			if (mdb.m_intr == 0)
 				longjmp(mdb.m_frame->f_pcb, MDB_ERR_SIGINT);
@@ -215,8 +202,20 @@ check_int(char *buf, size_t len)
 	}
 }
 
-void
-kmdb_prom_fill_readbuf(int lossy)
+/*
+ * Attempt to refill the ring buffer from the input stream.  This called from
+ * two contexts:
+ *
+ * Direct read: read the input into our buffer until input is exhausted, or the
+ * buffer is full.
+ *
+ * Interrupt check: called 'asynchronously' from the normal read routines; read
+ * the input into our buffer until it is exhausted, discarding input if the
+ * buffer is full.  In this case we look ahead for any interrupt characters,
+ * delivering an interrupt directly if we find one.
+ */
+static void
+kmdb_prom_fill_readbuf(int check_for_int)
 {
 	int oldhead, left, n;
 
@@ -244,7 +243,8 @@ kmdb_prom_fill_readbuf(int lossy)
 		kmdb_prom_readbuf_head = (kmdb_prom_readbuf_head + n) %
 		    KMDB_PROM_READBUF_SIZE;
 
-		check_int(kmdb_prom_readbuf + oldhead, n);
+		if (check_for_int)
+			check_int(kmdb_prom_readbuf + oldhead, n);
 
 		if (n != left)
 			return;
@@ -260,13 +260,14 @@ kmdb_prom_fill_readbuf(int lossy)
 		kmdb_prom_readbuf_head = (kmdb_prom_readbuf_head + n) %
 		    KMDB_PROM_READBUF_SIZE;
 
-		check_int(kmdb_prom_readbuf + oldhead, n);
+		if (check_for_int)
+			check_int(kmdb_prom_readbuf + oldhead, n);
 
 		if (n != left)
 			return;
 	}
 
-	if (lossy) {
+	if (check_for_int) {
 		char c;
 
 		while (kmdb_prom_reader(&c, 1) == 1)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@
 #include <sys/obpdefs.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_io_impl.h>
@@ -210,4 +210,18 @@ kmdb_promio_create(char *name)
 	io->io_ops = &promio_ops;
 
 	return (io);
+}
+
+char
+kmdb_getchar(void)
+{
+	char c;
+
+	while (IOP_READ(mdb.m_term, &c, 1) != 1)
+		continue;
+	if (isprint(c) && c != '\n')
+		mdb_iob_printf(mdb.m_out, "%c", c);
+	mdb_iob_printf(mdb.m_out, "\n");
+
+	return (c);
 }

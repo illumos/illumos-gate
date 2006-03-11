@@ -37,6 +37,7 @@
 
 #include <kmdb/kmdb_dpi.h>
 #include <kmdb/kmdb_promif.h>
+#include <kmdb/kmdb_io.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_signal.h>
 #include <mdb/mdb_io_impl.h>
@@ -165,16 +166,14 @@ exit(int status)
 	static int recurse = 0;
 
 	if (!recurse) {
-		char c;
 
 		recurse = 1;
 
 		mdb_iob_printf(mdb.m_out, "Press any key to reboot\n");
 		mdb_iob_flush(mdb.m_out);
+		mdb_iob_clearlines(mdb.m_out);
 
-		while (IOP_READ(mdb.m_term, &c, 1) != 1)
-			continue;
-		mdb_iob_printf(mdb.m_out, "%c%s", c, (c == '\n' ? "" : "\n"));
+		(void) kmdb_getchar();
 	}
 
 	kmdb_dpi_reboot();
