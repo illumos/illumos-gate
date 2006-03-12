@@ -532,7 +532,9 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		ASSERT(P2PHASE(dn->dn_next_blksz[txgoff],
 		    SPA_MINBLOCKSIZE) == 0);
 		ASSERT(BP_IS_HOLE(&dnp->dn_blkptr[0]) ||
-		    list_head(&dn->dn_dirty_dbufs[txgoff]) != NULL);
+		    list_head(&dn->dn_dirty_dbufs[txgoff]) != NULL ||
+		    dn->dn_next_blksz[txgoff] >> SPA_MINBLOCKSHIFT ==
+		    dnp->dn_datablkszsec);
 		dnp->dn_datablkszsec =
 		    dn->dn_next_blksz[txgoff] >> SPA_MINBLOCKSHIFT;
 		dn->dn_next_blksz[txgoff] = 0;
