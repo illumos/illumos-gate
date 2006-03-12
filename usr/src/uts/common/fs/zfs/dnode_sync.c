@@ -508,8 +508,6 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 			/* this is a first alloc, not a realloc */
 			/* XXX shouldn't the phys already be zeroed? */
 			bzero(dnp, DNODE_CORE_SIZE);
-			dnp->dn_datablkszsec = dn->dn_datablkszsec;
-			dnp->dn_indblkshift = dn->dn_indblkshift;
 			dnp->dn_nlevels = 1;
 		}
 
@@ -525,9 +523,16 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		dnp->dn_nblkptr = dn->dn_nblkptr;
 	}
 
+	ASSERT(level != 0 || dnp->dn_nlevels > 1 ||
+	    BP_IS_HOLE(&dnp->dn_blkptr[0]) ||
+	    BP_GET_LSIZE(&dnp->dn_blkptr[0]) ==
+	    dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT);
+
 	if (dn->dn_next_blksz[txgoff]) {
 		ASSERT(P2PHASE(dn->dn_next_blksz[txgoff],
 		    SPA_MINBLOCKSIZE) == 0);
+		ASSERT(BP_IS_HOLE(&dnp->dn_blkptr[0]) ||
+		    list_head(&dn->dn_dirty_dbufs[txgoff]) != NULL);
 		dnp->dn_datablkszsec =
 		    dn->dn_next_blksz[txgoff] >> SPA_MINBLOCKSHIFT;
 		dn->dn_next_blksz[txgoff] = 0;
@@ -600,6 +605,11 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		    dn->dn_phys->dn_maxblkid == 0 ||
 		    dnode_next_offset(dn, FALSE, &off, 1, 1) == ESRCH))
 			panic("data after EOF: off=%llu\n", (u_longlong_t)off);
+
+		ASSERT(dnp->dn_nlevels > 1 ||
+		    BP_IS_HOLE(&dnp->dn_blkptr[0]) ||
+		    BP_GET_LSIZE(&dnp->dn_blkptr[0]) ==
+		    dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT);
 
 		if (dn->dn_object != DMU_META_DNODE_OBJECT) {
 			dbuf_will_dirty(dn->dn_dbuf, tx);

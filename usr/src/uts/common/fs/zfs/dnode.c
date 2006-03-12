@@ -317,7 +317,7 @@ dnode_destroy(dnode_t *dn)
 
 void
 dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
-	dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
+    dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
 {
 	int i;
 
@@ -380,7 +380,10 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 	}
 
 	dn->dn_allocated_txg = tx->tx_txg;
+
 	dnode_setdirty(dn, tx);
+	dn->dn_next_indblkshift[tx->tx_txg & TXG_MASK] = ibs;
+	dn->dn_next_blksz[tx->tx_txg & TXG_MASK] = dn->dn_datablksz;
 }
 
 void
@@ -667,6 +670,7 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 
 	ASSERT(!refcount_is_zero(&dn->dn_holds) || list_head(&dn->dn_dbufs));
 	ASSERT(dn->dn_datablksz != 0);
+	ASSERT3U(dn->dn_next_blksz[txg&TXG_MASK], ==, 0);
 
 	dprintf_ds(os->os_dsl_dataset, "obj=%llu txg=%llu\n",
 	    dn->dn_object, txg);
