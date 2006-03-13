@@ -456,20 +456,20 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 		vdev_dtl_reassess(rvd, 0, 0, B_FALSE);
 
 	/*
-	 * Update the in-core config if it changed.
+	 * If the config changed, update the in-core cached copy
+	 * and notify the scrub thread that it must restart.
 	 */
 	if (error == 0 && !list_is_empty(&spa->spa_dirty_list)) {
 		config_changed = B_TRUE;
 		spa_config_set(spa, spa_config_generate(spa, rvd, next_txg, 0));
+		spa_scrub_restart(spa, next_txg);
 	}
 
 	spa_config_exit(spa, spa);
 
 	/*
-	 * If there was a scrub or resilver in progress, indicate that
-	 * it must restart, and then allow it to resume.
+	 * Allow scrubbing to resume.
 	 */
-	spa_scrub_restart(spa, txg);
 	spa_scrub_resume(spa);
 
 	if (vd == rvd)				/* spa_create() */
@@ -512,6 +512,7 @@ int
 spa_rename(const char *name, const char *newname)
 {
 	spa_t *spa;
+	uint64_t txg;
 	int err;
 
 	/*
@@ -539,16 +540,17 @@ spa_rename(const char *name, const char *newname)
 	 * during the sync.
 	 */
 	vdev_config_dirty(spa->spa_root_vdev);
+	txg = spa_last_synced_txg(spa) + 1;
+
+	spa_config_set(spa, spa_config_generate(spa, NULL, txg, 0));
 
 	spa_config_exit(spa, FTAG);
 
-	txg_wait_synced(spa->spa_dsl_pool, 0);
+	txg_wait_synced(spa->spa_dsl_pool, txg);
 
 	/*
 	 * Sync the updated config cache.
 	 */
-	spa_config_set(spa,
-	    spa_config_generate(spa, NULL, spa_last_synced_txg(spa), 0));
 	spa_config_sync();
 
 	spa_close(spa, FTAG);

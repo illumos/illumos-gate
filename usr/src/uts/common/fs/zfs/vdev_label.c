@@ -775,12 +775,17 @@ spa_sync_labels(spa_t *spa, uint64_t txg)
 
 	/*
 	 * If there are any dirty vdevs, sync the uberblock to all vdevs.
-	 * Otherwise, pick one top-level vdev at random.
+	 * Otherwise, pick a random top-level vdev that's known to be
+	 * visible in the config cache (see spa_vdev_add() for details).
 	 */
-	if (!list_is_empty(&spa->spa_dirty_list))
+	if (!list_is_empty(&spa->spa_dirty_list)) {
 		uvd = rvd;
-	else
-		uvd = rvd->vdev_child[spa_get_random(rvd->vdev_children)];
+	} else {
+		do {
+			uvd =
+			    rvd->vdev_child[spa_get_random(rvd->vdev_children)];
+		} while (uvd->vdev_ms_array == 0);
+	}
 
 	/*
 	 * Sync the uberblocks.  If the system dies in the middle of this

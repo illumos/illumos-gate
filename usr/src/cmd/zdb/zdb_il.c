@@ -250,7 +250,7 @@ static zil_rec_info_t zil_rec_info[TX_MAX_TYPE] = {
 
 /* ARGSUSED */
 static void
-print_log_record(zilog_t *zilog, lr_t *lr, void *arg, uint64_t first_txg)
+print_log_record(zilog_t *zilog, lr_t *lr, void *arg, uint64_t claim_txg)
 {
 	int txtype;
 	int verbose = MAX(dump_opt['d'], dump_opt['i']);
@@ -275,10 +275,11 @@ print_log_record(zilog_t *zilog, lr_t *lr, void *arg, uint64_t first_txg)
 
 /* ARGSUSED */
 static void
-print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t first_txg)
+print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 {
 	char blkbuf[BP_SPRINTF_LEN];
 	int verbose = MAX(dump_opt['d'], dump_opt['i']);
+	char *claim;
 
 	if (verbose <= 3)
 		return;
@@ -291,9 +292,15 @@ print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t first_txg)
 		blkbuf[0] = '\0';
 	}
 
+	if (claim_txg != 0)
+		claim = "already claimed";
+	else if (bp->blk_birth >= spa_first_txg(zilog->zl_spa))
+		claim = "will claim";
+	else
+		claim = "won't claim";
+
 	(void) printf("\tBlock seqno %llu, %s%s\n",
-	    (u_longlong_t)bp->blk_cksum.zc_word[3],
-	    bp->blk_birth >= first_txg ? "will claim" : "won't claim", blkbuf);
+	    (u_longlong_t)bp->blk_cksum.zc_word[3], claim, blkbuf);
 }
 
 static void
@@ -341,7 +348,7 @@ dump_intent_log(zilog_t *zilog)
 	if (verbose >= 2) {
 		(void) printf("\n");
 		zil_parse(zilog, print_log_block, print_log_record, NULL,
-		    spa_first_txg(zilog->zl_spa));
+		    zh->zh_claim_txg);
 		print_log_stats(verbose);
 	}
 }

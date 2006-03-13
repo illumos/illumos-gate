@@ -447,13 +447,7 @@ vdev_free(vdev_t *vd)
 	 */
 	vdev_close(vd);
 
-	/*
-	 * It's possible to free a vdev that's been added to the dirty
-	 * list when in the middle of spa_vdev_add().  Handle that case
-	 * correctly here.
-	 */
-	if (vd->vdev_is_dirty)
-		vdev_config_clean(vd);
+	ASSERT(!vd->vdev_is_dirty);
 
 	/*
 	 * Free all children.
@@ -1778,6 +1772,15 @@ vdev_config_dirty(vdev_t *vd)
 	vdev_t *rvd = spa->spa_root_vdev;
 	int c;
 
+	/*
+	 * The dirty list is protected by the config lock.  The caller must
+	 * either hold the config lock as writer, or must be the sync thread
+	 * (which holds the lock as reader).  There's only one sync thread,
+	 * so this is sufficient to ensure mutual exclusion.
+	 */
+	ASSERT(spa_config_held(spa, RW_WRITER) ||
+	    dsl_pool_sync_context(spa_get_dsl(spa)));
+
 	if (vd == rvd) {
 		for (c = 0; c < rvd->vdev_children; c++)
 			vdev_config_dirty(rvd->vdev_child[c]);
@@ -1794,9 +1797,14 @@ vdev_config_dirty(vdev_t *vd)
 void
 vdev_config_clean(vdev_t *vd)
 {
+	spa_t *spa = vd->vdev_spa;
+
+	ASSERT(spa_config_held(spa, RW_WRITER) ||
+	    dsl_pool_sync_context(spa_get_dsl(spa)));
+
 	ASSERT(vd->vdev_is_dirty);
 
-	list_remove(&vd->vdev_spa->spa_dirty_list, vd);
+	list_remove(&spa->spa_dirty_list, vd);
 	vd->vdev_is_dirty = B_FALSE;
 }
 

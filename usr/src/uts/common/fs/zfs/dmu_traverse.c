@@ -470,13 +470,18 @@ get_dnode(traverse_handle_t *th, uint64_t objset, dnode_phys_t *mdn,
 
 /* ARGSUSED */
 static void
-traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t maxtxg)
+traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 {
 	traverse_handle_t *th = arg;
 	traverse_blk_cache_t *bc = &th->th_zil_cache;
 	zbookmark_t *zb = &bc->bc_bookmark;
+	zseg_t *zseg = list_head(&th->th_seglist);
 
-	if (bp->blk_birth < maxtxg) {
+	if (bp->blk_birth <= zseg->seg_mintxg ||
+	    bp->blk_birth >= zseg->seg_maxtxg)
+		return;
+
+	if (claim_txg != 0 || bp->blk_birth < spa_first_txg(th->th_spa)) {
 		zb->zb_object = 0;
 		zb->zb_blkid = bp->blk_cksum.zc_word[3];
 		bc->bc_blkptr = *bp;
@@ -486,17 +491,22 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t maxtxg)
 
 /* ARGSUSED */
 static void
-traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t maxtxg)
+traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 {
 	traverse_handle_t *th = arg;
 	traverse_blk_cache_t *bc = &th->th_zil_cache;
 	zbookmark_t *zb = &bc->bc_bookmark;
+	zseg_t *zseg = list_head(&th->th_seglist);
 
 	if (lrc->lrc_txtype == TX_WRITE) {
 		lr_write_t *lr = (lr_write_t *)lrc;
 		blkptr_t *bp = &lr->lr_blkptr;
 
-		if (bp->blk_birth != 0 && bp->blk_birth < maxtxg) {
+		if (bp->blk_birth <= zseg->seg_mintxg ||
+		    bp->blk_birth >= zseg->seg_maxtxg)
+			return;
+
+		if (claim_txg != 0 && bp->blk_birth >= claim_txg) {
 			zb->zb_object = lr->lr_foid;
 			zb->zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
 			bc->bc_blkptr = *bp;
@@ -506,21 +516,31 @@ traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t maxtxg)
 }
 
 static void
-traverse_zil(traverse_handle_t *th, traverse_blk_cache_t *bc, uint64_t maxtxg)
+traverse_zil(traverse_handle_t *th, traverse_blk_cache_t *bc)
 {
 	spa_t *spa = th->th_spa;
-	objset_phys_t *osphys = bc->bc_data;
 	dsl_pool_t *dp = spa_get_dsl(spa);
+	objset_phys_t *osphys = bc->bc_data;
+	zil_header_t *zh = &osphys->os_zil_header;
+	uint64_t claim_txg = zh->zh_claim_txg;
 	zilog_t *zilog;
 
 	ASSERT(bc == &th->th_cache[ZB_MDN_CACHE][ZB_MAXLEVEL - 1]);
 	ASSERT(bc->bc_bookmark.zb_level == -1);
 
+	/*
+	 * We only want to visit blocks that have been claimed but not yet
+	 * replayed (or, in read-only mode, blocks that *would* be claimed).
+	 */
+	if (claim_txg == 0 && (spa_mode & FWRITE))
+		return;
+
 	th->th_zil_cache.bc_bookmark = bc->bc_bookmark;
 
-	zilog = zil_alloc(dp->dp_meta_objset, &osphys->os_zil_header);
+	zilog = zil_alloc(dp->dp_meta_objset, zh);
 
-	zil_parse(zilog, traverse_zil_block, traverse_zil_record, th, maxtxg);
+	zil_parse(zilog, traverse_zil_block, traverse_zil_record, th,
+	    claim_txg);
 
 	zil_free(zilog);
 }
@@ -596,7 +616,7 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 			}
 			if ((th->th_advance & ADVANCE_ZIL) &&
 			    zb->zb_objset != 0)
-				traverse_zil(th, bc, zseg->seg_maxtxg);
+				traverse_zil(th, bc);
 		}
 
 		return (advance_from_osphys(zseg, th->th_advance));
