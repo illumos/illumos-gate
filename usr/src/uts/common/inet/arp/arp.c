@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -200,8 +199,7 @@ static int	ar_interface_on(queue_t *q, mblk_t *mp);
 static int	ar_interface_off(queue_t *q, mblk_t *mp);
 static void	ar_ll_cleanup_arl_queue(queue_t *q);
 static void	ar_ll_down(arl_t *arl);
-static arl_t	*ar_ll_lookup_by_name(uchar_t *name,
-    uint32_t name_length);
+static arl_t	*ar_ll_lookup_by_name(const char *name);
 static arl_t	*ar_ll_lookup_from_mp(mblk_t *mp);
 static void	ar_ll_init(ar_t *, mblk_t *mp);
 static void	ar_ll_set_defaults(arl_t *, mblk_t *mp);
@@ -676,15 +674,15 @@ ar_ce_report1(ace_t *ace, uchar_t *mp_arg)
 	uchar_t	*p = ace->ace_proto_addr;
 	uchar_t	*h = ace->ace_hw_addr;
 	uchar_t	*m = ace->ace_proto_mask;
-	char	*name = "unknown";
+	const char *name = "unknown";
 
-	if (ace->ace_arl && ace->ace_arl->arl_name)
-		name = (char *)ace->ace_arl->arl_name;
-	if (!p)
+	if (ace->ace_arl != NULL)
+		name = ace->ace_arl->arl_name;
+	if (p == NULL)
 		p = zero_array;
-	if (!h)
+	if (h == NULL)
 		h = zero_array;
-	if (!m)
+	if (m == NULL)
 		m = zero_array;
 	(void) mi_mpprintf(mp,
 	    "%8s %03d.%03d.%03d.%03d "
@@ -877,6 +875,7 @@ ar_client_notify(arl_t *arl, mblk_t *mp, int code)
 	ar_t	*ar = ((ar_t *)arl->arl_rq->q_ptr)->ar_arl_ip_assoc;
 	arcn_t	*arcn;
 	mblk_t	*mp1;
+	int	arl_namelen = strlen(arl->arl_name) + 1;
 
 	/* Looks like the association disappeared */
 	if (ar == NULL) {
@@ -887,7 +886,7 @@ ar_client_notify(arl_t *arl, mblk_t *mp, int code)
 	/* ar is the corresponding ARP-IP instance for this ARL */
 	ASSERT(ar->ar_arl == NULL && ar->ar_wq->q_next != NULL);
 
-	mp1 = allocb(sizeof (arcn_t) + arl->arl_name_length, BPRI_MED);
+	mp1 = allocb(sizeof (arcn_t) + arl_namelen, BPRI_MED);
 	if (mp1 == NULL) {
 		freemsg(mp);
 		return;
@@ -895,12 +894,13 @@ ar_client_notify(arl_t *arl, mblk_t *mp, int code)
 	DB_TYPE(mp1) = M_CTL;
 	mp1->b_cont = mp;
 	arcn = (arcn_t *)mp1->b_rptr;
-	mp1->b_wptr = (uchar_t *)&arcn[1] + arl->arl_name_length;
+	mp1->b_wptr = (uchar_t *)&arcn[1] + arl_namelen;
 	arcn->arcn_cmd = AR_CLIENT_NOTIFY;
 	arcn->arcn_name_offset = sizeof (arcn_t);
-	arcn->arcn_name_length = arl->arl_name_length;
+	arcn->arcn_name_length = arl_namelen;
 	arcn->arcn_code = code;
-	bcopy(arl->arl_name, &arcn[1], arl->arl_name_length);
+	bcopy(arl->arl_name, &arcn[1], arl_namelen);
+
 	putnext(ar->ar_wq, mp1);
 }
 
@@ -1931,25 +1931,16 @@ ar_ll_cleanup_arl_queue(queue_t *q)
 }
 
 /*
- * Look up a lower level tap by name.  Note that the name_length includes
- * the null terminator.
+ * Look up a lower level tap by name.
  */
 static arl_t *
-ar_ll_lookup_by_name(uchar_t *name, uint32_t name_length)
+ar_ll_lookup_by_name(const char *name)
 {
 	arl_t	*arl;
 
 	for (arl = arl_g_head; arl; arl = arl->arl_next) {
-		if (arl->arl_name_length == name_length) {
-			int	i1 = name_length;
-			uchar_t	*cp1 = name;
-			uchar_t	*cp2 = arl->arl_name;
-
-			while (*cp1++ == *cp2++) {
-				if (--i1 == 0)
-					return (arl);
-			}
-		}
+		if (strcmp(arl->arl_name, name) == 0)
+			return (arl);
 	}
 	return (NULL);
 }
@@ -1962,13 +1953,13 @@ static arl_t *
 ar_ll_lookup_from_mp(mblk_t *mp)
 {
 	arc_t	*arc = (arc_t *)mp->b_rptr;
-	uchar_t	*name;
-	uint32_t	name_length = arc->arc_name_length;
+	uint8_t	*name;
+	size_t	namelen = arc->arc_name_length;
 
-	name = mi_offset_param(mp, arc->arc_name_offset, name_length);
-	if (!name)
+	name = mi_offset_param(mp, arc->arc_name_offset, namelen);
+	if (name == NULL || name[namelen - 1] != '\0')
 		return (NULL);
-	return (ar_ll_lookup_by_name(name, name_length));
+	return (ar_ll_lookup_by_name((char *)name));
 }
 
 static void
@@ -2542,7 +2533,7 @@ ar_plink_send(queue_t *q, mblk_t *mp)
 			if ((ar->ar_wq == arpwq) && (ar->ar_arl != NULL)) {
 				ipmxp->ipmx_arpdev_stream = 1;
 				(void) strcpy((char *)ipmxp->ipmx_name,
-				    (char *)ar->ar_arl->arl_name);
+				    ar->ar_arl->arl_name);
 				break;
 			}
 		}
@@ -3191,7 +3182,6 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	ar_t	*ar = (ar_t *)q->q_ptr;
 	arl_t	*arl = ar->ar_arl;
 	struct lifreq *lifr;
-	int newlength;
 	mblk_t *mp = mp_orig;
 
 	arp1dbg(("ar_slifname\n"));
@@ -3221,21 +3211,20 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 
 	lifr = (struct lifreq *)(mp->b_rptr);
 
-	if ((newlength = mi_strlen(lifr->lifr_name) +1) > LIFNAMSIZ)
+	if (strlen(lifr->lifr_name) >= LIFNAMSIZ)
 		return (ENXIO);
 
 	/* Check whether the name is already in use. */
-
-	if (ar_ll_lookup_by_name((uchar_t *)lifr->lifr_name, newlength)) {
+	if (ar_ll_lookup_by_name(lifr->lifr_name)) {
 		arp1dbg(("ar_slifname: %s exists\n", lifr->lifr_name));
 		return (EEXIST);
 	}
-	bcopy(lifr->lifr_name, (char *)arl->arl_name, newlength);
-	arl->arl_name_length = newlength;
+	(void) strlcpy(arl->arl_name, lifr->lifr_name, sizeof (arl->arl_name));
+
 	/* The ppa is sent down by ifconfig */
 	arl->arl_ppa = lifr->lifr_ppa;
-	arp1dbg(("ar_slifname: name is now %s, ppa %d\n",
-	    (char *)arl->arl_name, arl->arl_ppa));
+	arp1dbg(("ar_slifname: name is now %s, ppa %d\n", arl->arl_name,
+	    arl->arl_ppa));
 	/* Chain in the new arl. */
 	arl->arl_next = arl_g_head;
 	arl_g_head = arl;
@@ -3249,7 +3238,6 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	arl_t	*arl = ar->ar_arl;
 	int	ppa;
 	char	*cp;
-	uint_t	name_length;
 	mblk_t	*mp = mp_orig;
 
 	arp1dbg(("ar_set_ppa\n"));
@@ -3285,15 +3273,14 @@ ar_set_ppa(queue_t *q, mblk_t *mp_orig)
 	cp = q->q_qinfo->qi_minfo->mi_idname;
 
 	ppa = *(int *)(mp->b_rptr);
-	(void) mi_sprintf((char *)arl->arl_name, "%s%d", cp, ppa);
-	name_length = mi_strlen((char *)arl->arl_name) + 1;
-	if (ar_ll_lookup_by_name(arl->arl_name, name_length)) {
+	(void) snprintf(arl->arl_name, sizeof (arl->arl_name), "%s%d", cp, ppa);
+	if (ar_ll_lookup_by_name(arl->arl_name) != NULL) {
 		arp1dbg(("ar_set_ppa: %s busy\n", arl->arl_name));
 		/* Make it a null string again */
 		arl->arl_name[0] = '\0';
 		return (EBUSY);
 	}
-	arl->arl_name_length = name_length;
+
 	arp1dbg(("ar_set_ppa: %d\n", ppa));
 	arl->arl_ppa = ppa;
 	/* Chain in the new arl. */
@@ -3421,12 +3408,10 @@ ar_snmp_msg_element(mblk_t **mpp, uchar_t *oldptr, size_t len)
 	return (oldptr);
 }
 
-
-
 static void
 ar_snmp_msg2(ace_t *ace, void *arg)
 {
-	char	*name = "unknown";
+	const char	*name = "unknown";
 	mib2_ipNetToMediaEntry_t ntme;
 	ar_snmp_hashb_t *hashb;
 	mib2_ipNetToMediaEntry_t *np;
@@ -3434,9 +3419,9 @@ ar_snmp_msg2(ace_t *ace, void *arg)
 	ar_snmp_hashb_t	*ar_snmp_hash_tbl;
 
 	ASSERT(ace != NULL && ace->ace_arl != NULL);
-	if (ace->ace_arl && ace->ace_arl->arl_name)
-		name = (char *)ace->ace_arl->arl_name;
-	ntme.ipNetToMediaIfIndex.o_length = MIN(OCTET_LENGTH, mi_strlen(name));
+	if (ace->ace_arl != NULL)
+		name = ace->ace_arl->arl_name;
+	ntme.ipNetToMediaIfIndex.o_length = MIN(OCTET_LENGTH, strlen(name));
 	bcopy(name, ntme.ipNetToMediaIfIndex.o_bytes,
 	    ntme.ipNetToMediaIfIndex.o_length);
 
