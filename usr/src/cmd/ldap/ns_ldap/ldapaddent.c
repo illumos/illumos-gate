@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,6 +202,24 @@ blankline(char *line)
 		if (*p != ' ' && *p != '\t')
 			return (0);
 	return (1);
+}
+
+/*
+ * check whether the token <tok> is a triplet,
+ * i. e. <tok> := (<hostname>,<username>,<domainname>)
+ * where <hostname>, <username>, <domainname> are IA5String
+ * <tok> supposes to contain NO spaces and start with '('
+ */
+static int
+is_triplet(char *tok)
+{
+	char *s;
+	return (strchr(++tok, '(') == NULL &&		/* no more '(' */
+		(s = strchr(tok, ')')) != NULL &&	/* find ')' */
+		!*++s &&				/* ')' ends token */
+		(tok = strchr(tok, ',')) != NULL &&	/* host up to ',' */
+		(tok = strchr(++tok, ',')) != NULL &&	/* user up to ',' */
+		strchr(++tok, ',') == NULL);		/* no more ',' */
 }
 
 static void
@@ -2395,7 +2412,7 @@ genent_netgroup(char *line, int (*cback)())
 	char *cname = NULL;
 	entry_col ecol[4];
 	char *netg_tmp = NULL, *triplet_tmp = NULL;
-	int netgcount = 0, tripletcount = 0, retval = 1;
+	int netgcount = 0, tripletcount = 0, retval = 1, i;
 	struct _ns_netgroups data;
 	int rc = GENENT_OK;
 
@@ -2432,6 +2449,7 @@ genent_netgroup(char *line, int (*cback)())
 		(void) strcpy(parse_err_msg, "no cname");
 		return (GENENT_PARSEERR);
 	}
+
 	ecol[0].ec_value.ec_value_val = t;
 	ecol[0].ec_value.ec_value_len = strlen(t)+1;
 	cname = t;
@@ -2443,13 +2461,18 @@ genent_netgroup(char *line, int (*cback)())
 	}
 
 	if (*t == '(') {
-		ecol[1].ec_value.ec_value_val = t;
-		ecol[1].ec_value.ec_value_len = strlen(t)+1;
+		/* if token starts with '(' it must be a valid triplet */
+		if (is_triplet(t)) {
+			ecol[1].ec_value.ec_value_val = t;
+			ecol[1].ec_value.ec_value_len = strlen(t)+1;
+		} else {
+			(void) strcpy(parse_err_msg, "invalid triplet");
+			return (GENENT_PARSEERR);
+		}
 	} else {
 		ecol[2].ec_value.ec_value_val = t;
 		ecol[2].ec_value.ec_value_len = strlen(t)+1;
 	}
-
 
 	/*
 	 * now build entry.
@@ -2482,7 +2505,7 @@ genent_netgroup(char *line, int (*cback)())
 	 * we now have a valid entry (at least 1 netgroup name and
 	 * 1 netgroup member), proceed with the rest of the line
 	 */
-	while (t = strtok(NULL, " \t")) {
+	while (rc == GENENT_OK && (t = strtok(NULL, " \t"))) {
 
 		/* if next token is equal to netgroup name, ignore */
 		if (t != cname && strcasecmp(t, cname) == 0)
@@ -2491,16 +2514,37 @@ genent_netgroup(char *line, int (*cback)())
 			continue;
 
 		if (*t == '(') {
-			tripletcount++;
-			triplet_tmp = strdup(t);
-			if ((data.triplet = (char **)realloc(data.triplet,
-				tripletcount * sizeof (char **))) == NULL) {
-				(void) fprintf(stderr,
-					gettext("out of memory\n"));
-				exit(1);
+			if (is_triplet(t)) {
+				/* skip a triplet if it is added already */
+				for (i = 0; i < tripletcount &&
+					strcmp(t, data.triplet[i]); i++)
+					;
+				if (i < tripletcount)
+					continue;
+
+				tripletcount++;
+				triplet_tmp = strdup(t);
+				if ((data.triplet = (char **)realloc(
+					data.triplet,
+					tripletcount * sizeof (char **)))
+					== NULL) {
+					(void) fprintf(stderr,
+						gettext("out of memory\n"));
+					exit(1);
+				}
+				data.triplet[tripletcount-1] = triplet_tmp;
+			} else {
+				(void) strcpy(parse_err_msg, "invalid triplet");
+				rc = GENENT_PARSEERR;
 			}
-			data.triplet[tripletcount-1] = triplet_tmp;
 		} else {
+			/* skip a netgroup if it is added already */
+			for (i = 0; i < netgcount &&
+				strcmp(t, data.netgroup[i]); i++)
+				;
+			if (i < netgcount)
+				continue;
+
 			netgcount++;
 			netg_tmp = strdup(t);
 			if ((data.netgroup = (char **)realloc(data.netgroup,
@@ -2512,7 +2556,6 @@ genent_netgroup(char *line, int (*cback)())
 			data.netgroup[netgcount-1] = netg_tmp;
 		}
 	}
-
 
 	/* End the list with NULL */
 	if ((data.triplet = (char **)realloc(data.triplet,
@@ -2528,25 +2571,35 @@ genent_netgroup(char *line, int (*cback)())
 	}
 	data.netgroup[netgcount] = NULL;
 
-	if (flags & F_VERBOSE)
-		(void) fprintf(stdout,
-		    gettext("Adding entry : %s\n"), data.name);
+	if (rc == GENENT_OK) {
+		if (flags & F_VERBOSE)
+			(void) fprintf(stdout,
+			    gettext("Adding entry : %s\n"), data.name);
 
-	retval = (*cback)(&data, 0);
+		retval = (*cback)(&data, 0);
 
-	if (retval == LDAP_ALREADY_EXISTS) {
-		if (continue_onerror)
-			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.name);
-		else {
-			rc = GENENT_CBERR;
-			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
+		if (retval == LDAP_ALREADY_EXISTS) {
+			if (continue_onerror)
+				(void) fprintf(stderr, gettext(
+				"Entry: %s - already Exists, skipping it.\n"),
 				data.name);
-		}
-	} else if (retval)
-		rc = GENENT_CBERR;
+			else {
+				rc = GENENT_CBERR;
+				(void) fprintf(stderr,
+					gettext("Entry: %s - already Exists\n"),
+					data.name);
+			}
+		} else if (retval)
+			rc = GENENT_CBERR;
+	}
+
+	/* release memory allocated by strdup() */
+	for (i = 0; i < tripletcount; i++) {
+		free(data.triplet[i]);
+	}
+	for (i = 0; i < netgcount; i++) {
+		free(data.netgroup[i]);
+	}
 
 	free(data.name);
 	free(data.triplet);
