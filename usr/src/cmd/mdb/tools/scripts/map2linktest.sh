@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +54,18 @@ nawk '
 	# Symbols beginning with "kmdb_" are not in the module API - they are
 	# private to kmdb.
 	$1 ~ /^kmdb_/ { next; }
+
+	# Symbols which have the token "variable" are seen as an int
+	$3 ~ /variable/ {
+		if (seen[$1]) {
+			next;
+		}
+
+		seen[$1] = 1;
+
+		printf("int %s = 0;\n", substr($1, 1, length($1) - 1));
+		next;
+	}
 
 	$1 !~ /;$/ { next; }
 

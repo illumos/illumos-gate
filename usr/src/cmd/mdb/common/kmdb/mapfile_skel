@@ -29,6 +29,11 @@
 /*
  * This file is used to limit the symbols that are to be exported from the
  * debugger.  This ensures that dmods follow the module API.
+ *
+ * There is a special rule for generating the mapfile. If the symbol
+ * is not a function then the symbol, in the mapfile, must have the
+ * the token "variable" as the third symbol on the line - see the
+ * entries for __ctype and errno below.
  */
 
 {
@@ -41,9 +46,9 @@
 		 */
 
 		/* Implementation detail of the ctype macros */
-		__ctype;
+		__ctype;	/* variable */
 		/* There should be only one - ours */
-		errno;
+		errno;		/* variable */
 
 		/* <sys/utsname.h> implictly references this on x86 */
 #if defined(__i386) && !defined(__amd64)
