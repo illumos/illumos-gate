@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -46,6 +45,7 @@
 #ifdef sparc
 #define	ONTARIO_PLAT_NAME	"SUNW,Sun-Fire-T200"
 #define	ERIE_PLAT_NAME		"SUNW,Sun-Fire-T1000"
+#define	PELTON_PLAT_NAME	"SUNW,Netra-T2000"
 cpu_t cpu;
 #endif /* sparc */
 
@@ -230,6 +230,7 @@ fmd_fmri_expand(nvlist_t *nvl)
 		const char *platform = fmd_fmri_get_platform();
 
 		if (strcmp(platform, ONTARIO_PLAT_NAME) == 0 ||
+		    strcmp(platform, PELTON_PLAT_NAME) == 0 ||
 		    strcmp(platform, ERIE_PLAT_NAME) == 0) {
 			if (cpu_phys2virt(cpuid, &cpuvid) != 0)
 				return (fmd_fmri_set_errno(ENOENT));
