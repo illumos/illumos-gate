@@ -350,14 +350,16 @@ dnode_evict_dbufs(dnode_t *dn)
 	int pass = 0;
 
 	do {
-		dmu_buf_impl_t *db, *db_next;
+		dmu_buf_impl_t *db, marker;
 		int evicting = FALSE;
 
 		progress = FALSE;
 		mutex_enter(&dn->dn_dbufs_mtx);
-		for (db = list_head(&dn->dn_dbufs); db; db = db_next) {
-			/* dbuf_clear() may remove db from this list */
-			db_next = list_next(&dn->dn_dbufs, db);
+		list_insert_tail(&dn->dn_dbufs, &marker);
+		db = list_head(&dn->dn_dbufs);
+		for (; db != &marker; db = list_head(&dn->dn_dbufs)) {
+			list_remove(&dn->dn_dbufs, db);
+			list_insert_tail(&dn->dn_dbufs, db);
 
 			mutex_enter(&db->db_mtx);
 			if (db->db_state == DB_EVICTING) {
@@ -373,6 +375,7 @@ dnode_evict_dbufs(dnode_t *dn)
 			}
 
 		}
+		list_remove(&dn->dn_dbufs, &marker);
 		/*
 		 * NB: we need to drop dn_dbufs_mtx between passes so
 		 * that any DB_EVICTING dbufs can make progress.
