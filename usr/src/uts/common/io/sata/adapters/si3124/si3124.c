@@ -308,6 +308,7 @@ static	void si_watchdog_handler(si_ctl_state_t *);
 
 static	void si_log(si_ctl_state_t *, uint_t, char *, ...);
 
+static	void si_copy_out_regs(sata_cmd_t *, fis_reg_h2d_t *);
 
 /*
  * DMA attributes for the data buffer
@@ -1192,7 +1193,7 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 		return (SATA_TRAN_PORT_ERROR);
 	}
 
-	if (spkt->satapkt_cmd.satacmd_flags & SATA_CLEAR_DEV_RESET_STATE) {
+	if (spkt->satapkt_cmd.satacmd_flags.sata_clear_dev_reset) {
 		si_portp->siport_reset_in_progress = 0;
 		SIDBG1(SIDBG_ENTRY, si_ctlp,
 			"si_tran_start clearing the "
@@ -1200,8 +1201,7 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 	}
 
 	if (si_portp->siport_reset_in_progress &&
-		!(spkt->satapkt_cmd.satacmd_flags &
-					SATA_IGNORE_DEV_RESET_STATE)) {
+		! spkt->satapkt_cmd.satacmd_flags.sata_ignore_dev_reset) {
 
 		spkt->satapkt_reason = SATA_PKT_BUSY;
 		SIDBG1(SIDBG_ERRS, si_ctlp,
@@ -1341,6 +1341,13 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 
 		satapkt = si_portp->siport_slot_pkts[tmpslot];
 		ASSERT(satapkt != NULL);
+		prb =  &si_portp->siport_prbpool[tmpslot];
+		ASSERT(prb != NULL);
+		satapkt->satapkt_cmd.satacmd_status_reg =
+						GET_FIS_COMMAND(prb->prb_fis);
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
+
 		SIDBG1(SIDBG_ERRS, si_ctlp,
 			"si_mop_commands sending up completed satapkt: %x",
 			satapkt);
@@ -1385,6 +1392,30 @@ si_mop_commands(si_ctl_state_t *si_ctlp,
 						GET_FIS_COMMAND(prb->prb_fis);
 		satapkt->satapkt_cmd.satacmd_error_reg =
 						GET_FIS_FEATURES(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_sec_count_lsb =
+					GET_FIS_SECTOR_COUNT(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_low_lsb =
+					GET_FIS_SECTOR(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_mid_lsb =
+					GET_FIS_CYL_LOW(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_lba_high_lsb =
+					GET_FIS_CYL_HI(prb->prb_fis);
+		satapkt->satapkt_cmd.satacmd_device_reg =
+					GET_FIS_DEV_HEAD(prb->prb_fis);
+
+		if (satapkt->satapkt_cmd.satacmd_addr_type == ATA_ADDR_LBA48) {
+			satapkt->satapkt_cmd.satacmd_sec_count_msb =
+					GET_FIS_SECTOR_COUNT_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_low_msb =
+					GET_FIS_SECTOR_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_mid_msb =
+					GET_FIS_CYL_LOW_EXP(prb->prb_fis);
+			satapkt->satapkt_cmd.satacmd_lba_high_msb =
+					GET_FIS_CYL_HI_EXP(prb->prb_fis);
+		}
+
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
 		/*
 		 * In the case of NCQ command failures, the error is
@@ -2441,9 +2472,11 @@ si_deliver_satapkt(
 
 	/* Now fill the prb. */
 	if (is_atapi) {
-		if (spkt->satapkt_cmd.satacmd_flags == SATA_DIR_READ) {
+		if (spkt->satapkt_cmd.satacmd_flags.sata_data_direction ==
+		    SATA_DIR_READ) {
 			SET_PRB_CONTROL_PKT_READ(prb);
-		} else if (spkt->satapkt_cmd.satacmd_flags == SATA_DIR_WRITE) {
+		} else if (spkt->satapkt_cmd.satacmd_flags.sata_data_direction
+		    == SATA_DIR_WRITE) {
 			SET_PRB_CONTROL_PKT_WRITE(prb);
 		}
 	}
@@ -2511,7 +2544,7 @@ si_deliver_satapkt(
 
 	}
 
-	if (cmd->satacmd_flags & SATA_QUEUED_CMD) {
+	if (cmd->satacmd_flags.sata_queued) {
 		/*
 		 * For queued commands, the TAG for the sector count lsb is
 		 * generated from current slot number.
@@ -3590,12 +3623,20 @@ si_intr_command_complete(
 	finished_tags =  si_portp->siport_pending_tags &
 					~slot_status & SI_SLOT_MASK;
 	while (finished_tags) {
+		si_prb_t *prb;
+
 		finished_slot = ddi_ffs(finished_tags) - 1;
 		if (finished_slot == -1) {
 			break;
 		}
+		prb =  &si_portp->siport_prbpool[finished_slot];
 
 		satapkt = si_portp->siport_slot_pkts[finished_slot];
+		satapkt->satapkt_cmd.satacmd_status_reg =
+						GET_FIS_COMMAND(prb->prb_fis);
+
+		if (satapkt->satapkt_cmd.satacmd_flags.sata_special_regs)
+			si_copy_out_regs(&satapkt->satapkt_cmd, &prb->prb_fis);
 
 		SENDUP_PACKET(si_portp, satapkt, SATA_PKT_COMPLETED);
 
@@ -5325,4 +5366,31 @@ si_log(si_ctl_state_t *si_ctlp, uint_t level, char *fmt, ...)
 
 	mutex_exit(&si_log_mutex);
 
+}
+
+static void
+si_copy_out_regs(sata_cmd_t *scmd, fis_reg_h2d_t *fisp)
+{
+	fis_reg_h2d_t	fis = *fisp;
+
+	if (scmd->satacmd_flags.sata_copy_out_sec_count_msb)
+		scmd->satacmd_sec_count_msb = GET_FIS_SECTOR_COUNT_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_low_msb)
+		scmd->satacmd_lba_low_msb = GET_FIS_SECTOR_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_mid_msb)
+		scmd->satacmd_lba_mid_msb = GET_FIS_CYL_LOW_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_high_msb)
+		scmd->satacmd_lba_high_msb = GET_FIS_CYL_HI_EXP(fis);
+	if (scmd->satacmd_flags.sata_copy_out_sec_count_lsb)
+		scmd->satacmd_sec_count_lsb = GET_FIS_SECTOR_COUNT(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_low_lsb)
+		scmd->satacmd_lba_low_lsb = GET_FIS_SECTOR(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_mid_lsb)
+		scmd->satacmd_lba_mid_lsb = GET_FIS_CYL_LOW(fis);
+	if (scmd->satacmd_flags.sata_copy_out_lba_high_lsb)
+		scmd->satacmd_lba_high_lsb = GET_FIS_CYL_HI(fis);
+	if (scmd->satacmd_flags.sata_copy_out_device_reg)
+		scmd->satacmd_device_reg = GET_FIS_DEV_HEAD(fis);
+	if (scmd->satacmd_flags.sata_copy_out_error_reg)
+		scmd->satacmd_error_reg = GET_FIS_FEATURES(fis);
 }

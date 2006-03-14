@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +195,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 /* Mask for a port power states */
 #define	SATA_PSTATE_PWR			(SATA_PSTATE_PWRON | \
 					SATA_PSTATE_PWROFF)
-
 /*
  * Device type (in satadev_type field of sata_device structure).
  * More device types may be added in the future.
@@ -285,7 +284,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
  * command block registers (task file registers).
  */
 #define	SATA_CMD_REV_1	1
-#define	SATA_CMD_REV	SATA_CMD_REV_1
+#define	SATA_CMD_REV_2	2
+#define	SATA_CMD_REV	SATA_CMD_REV_2
 
 #define	SATA_ATAPI_MAX_CDB_LEN	16	/* Covers both 12 and 16 byte cdbs */
 #define	SATA_ATAPI_RQSENSE_LEN	24	/* Fixed size Request Sense data */
@@ -293,7 +293,30 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 struct sata_cmd {
 	int		satacmd_rev;		/* version */
 	struct buf	*satacmd_bp;		/* ptr to buffer structure */
-	uint32_t	satacmd_flags;		/* transfer direction */
+	struct sata_cmd_flags {
+		uint32_t	sata_data_direction : 3;	 /* 0-2 */
+		uint32_t	: 1;		/* reserved */	 /* 3 */
+		uint32_t	sata_queue_stag : 1;		 /* 4 */
+		uint32_t	sata_queue_otag : 1;		 /* 5 */
+		uint32_t	: 2;		/* reserved */	 /* 6-7 */
+		uint32_t	sata_queued : 1;		 /* 8 */
+		uint32_t	: 3;		/* reserved */	 /* 9-11 */
+		uint32_t	sata_ignore_dev_reset : 1;	 /* 12 */
+		uint32_t	sata_clear_dev_reset : 1;	 /* 13 */
+		uint32_t	: 2;		/* reserved */	 /* 14-15 */
+		uint32_t	sata_special_regs : 1;		 /* 16 */
+		uint32_t	sata_copy_out_sec_count_msb : 1; /* 17 */
+		uint32_t	sata_copy_out_lba_low_msb : 1;	 /* 18 */
+		uint32_t	sata_copy_out_lba_mid_msb : 1;	 /* 19 */
+		uint32_t	sata_copy_out_lba_high_msb : 1;	 /* 20 */
+		uint32_t	sata_copy_out_sec_count_lsb : 1; /* 21 */
+		uint32_t	sata_copy_out_lba_low_lsb : 1;	 /* 22 */
+		uint32_t	sata_copy_out_lba_mid_lsb : 1;	 /* 23 */
+		uint32_t	sata_copy_out_lba_high_lsb : 1;	 /* 24 */
+		uint32_t	sata_copy_out_device_reg : 1;	 /* 25 */
+		uint32_t	sata_copy_out_error_reg : 1;	 /* 26 */
+		uint32_t	: 5;		/* reserved */	 /* 27-31 */
+	} satacmd_flags;
 	uint8_t 	satacmd_addr_type; 	/* addr type: LBA28, LBA48 */
 	uint8_t		satacmd_features_reg_ext; /* features reg extended */
 	uint8_t		satacmd_sec_count_msb;	/* sector count MSB (LBA48) */
@@ -348,14 +371,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_cmd))
  */
 
 /*
- * Data transfer direction flags (satacmd_flags)
+ * Data transfer direction flags (satacmd_flags.sata_data_direction)
  * Direction flags are mutually exclusive.
  */
 #define	SATA_DIR_NODATA_XFER	0x0001	/* No data transfer */
 #define	SATA_DIR_READ		0x0002	/* Reading data from a device */
 #define	SATA_DIR_WRITE		0x0004	/* Writing data to a device */
-
-#define	SATA_XFER_DIR_MASK	0x0007
 
 /*
  * Tagged Queuing type flags (satacmd_flags).

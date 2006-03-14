@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,9 @@ extern "C" {
 #define	SATAC_WRITE_FPDMA_QUEUED 0x61	/* First-Party-DMA write queued */
 
 #define	SATAC_READ_LOG_EXT	0x2f	/* read log */
+
+#define	SATAC_SMART		0xb0	/* SMART */
+
 #define	SATA_LOG_PAGE_10	0x10	/* log page 0x10 - SATA error */
 /*
  * Power Managment Commands (subset)
@@ -94,6 +97,18 @@ extern "C" {
 #define	SATA_PWRMODE_IDLE	0x80	/* idle mode */
 #define	SATA_PWRMODE_ACTIVE	0xFF	/* active or idle mode, rev7 spec */
 
+
+/*
+ * SMART FEATURES Subcommands
+ */
+#define	SATA_SMART_READ_DATA		0xd0
+#define	SATA_SMART_ATTR_AUTOSAVE	0xd2
+#define	SATA_SMART_EXECUTE_OFFLINE_IMM	0xd4
+#define	SATA_SMART_READ_LOG		0xd5
+#define	SATA_SMART_WRITE_LOG		0xd6
+#define	SATA_SMART_ENABLE_OPS		0xd8
+#define	SATA_SMART_DISABLE_OPS		0xd9
+#define	SATA_SMART_RETURN_STATUS	0xda
 
 /*
  * SET FEATURES Subcommands
@@ -123,72 +138,92 @@ extern "C" {
  * Following is the ATA Device Identify data layout
  */
 typedef struct sata_id {
-/*  					WORD				*/
-/* 					OFFSET COMMENT			*/
-	ushort_t  ai_config;	  /*   0  general configuration bits 	*/
-	ushort_t  ai_fixcyls;	  /*   1  # of cylinders (obsolete)	*/
-	ushort_t  ai_resv0;	  /*   2  # reserved			*/
-	ushort_t  ai_heads;	  /*   3  # of heads (obsolete)		*/
-	ushort_t  ai_trksiz;	  /*   4  # of bytes/track (retired)	*/
-	ushort_t  ai_secsiz;	  /*   5  # of bytes/sector (retired)	*/
-	ushort_t  ai_sectors;	  /*   6  # of sectors/track (obsolete)	*/
-	ushort_t  ai_resv1[3];	  /*   7  "Vendor Unique"		*/
-	char	ai_drvser[20];	  /*  10  Serial number			*/
-	ushort_t ai_buftype;	  /*  20  Buffer type			*/
-	ushort_t ai_bufsz;	  /*  21  Buffer size in 512 byte incr  */
-	ushort_t ai_ecc;	  /*  22  # of ecc bytes avail on rd/wr */
-	char	ai_fw[8];	  /*  23  Firmware revision		*/
-	char	ai_model[40];	  /*  27  Model #			*/
-	ushort_t ai_mult1;	  /*  47  Multiple command flags	*/
-	ushort_t ai_dwcap;	  /*  48  Doubleword capabilities	*/
-	ushort_t ai_cap;	  /*  49  Capabilities			*/
-	ushort_t ai_resv2;	  /*  50  Reserved			*/
-	ushort_t ai_piomode;	  /*  51  PIO timing mode		*/
-	ushort_t ai_dmamode;	  /*  52  DMA timing mode		*/
-	ushort_t ai_validinfo;	  /*  53  bit0: wds 54-58, bit1: 64-70	*/
-	ushort_t ai_curcyls;	  /*  54  # of current cylinders	*/
-	ushort_t ai_curheads;	  /*  55  # of current heads		*/
-	ushort_t ai_cursectrk;	  /*  56  # of current sectors/track	*/
-	ushort_t ai_cursccp[2];	  /*  57  current sectors capacity	*/
-	ushort_t ai_mult2;	  /*  59  multiple sectors info		*/
-	ushort_t ai_addrsec[2];	  /*  60  LBA only: no of addr secs	*/
-	ushort_t ai_sworddma;	  /*  62  single word dma modes		*/
-	ushort_t ai_dworddma;	  /*  63  double word dma modes		*/
-	ushort_t ai_advpiomode;	  /*  64  advanced PIO modes supported	*/
-	ushort_t ai_minmwdma;	  /*  65  min multi-word dma cycle info	*/
-	ushort_t ai_recmwdma;	  /*  66  rec multi-word dma cycle info	*/
-	ushort_t ai_minpio;	  /*  67  min PIO cycle info		*/
-	ushort_t ai_minpioflow;	  /*  68  min PIO cycle info w/flow ctl */
-	ushort_t ai_resv3[2];	  /* 69,70 reserved			*/
-	ushort_t ai_typtime[2];	  /* 71-72 timing			*/
-	ushort_t ai_resv4[2];	  /* 73-74 reserved			*/
-	ushort_t ai_qdepth;	  /*  75  queue depth			*/
-	ushort_t ai_satacap;	  /*  76  SATA capabilities		*/
-	ushort_t ai_resv5;	  /*  77 reserved			*/
-	ushort_t ai_satafsup;	  /*  78 SATA features supported	*/
-	ushort_t ai_satafenbl;	  /*  79 SATA features enabled		*/
-	ushort_t ai_majorversion; /*  80  major versions supported	*/
-	ushort_t ai_minorversion; /*  81  minor version number supported */
-	ushort_t ai_cmdset82;	  /*  82  command set supported		*/
-	ushort_t ai_cmdset83;	  /*  83  more command sets supported	*/
-	ushort_t ai_cmdset84;	  /*  84  more command sets supported	*/
-	ushort_t ai_features85;	  /*  85 enabled features		*/
-	ushort_t ai_features86;	  /*  86 enabled features		*/
-	ushort_t ai_features87;	  /*  87 enabled features		*/
-	ushort_t ai_ultradma;	  /*  88 Ultra DMA mode			*/
-	ushort_t ai_erasetime;	  /*  89 security erase time		*/
-	ushort_t ai_erasetimex;	  /*  90 enhanced security erase time	*/
-	ushort_t ai_padding1[9];  /* pad through 99			*/
-	ushort_t ai_addrsecxt[4]; /* 100 extended max LBA sector	*/
-	ushort_t ai_padding2[22]; /* pad to 126				*/
-	ushort_t ai_lastlun;	  /* 126 last LUN, as per SFF-8070i	*/
-	ushort_t ai_resv6;	  /* 127 reserved			*/
-	ushort_t ai_securestatus; /* 128 security status		*/
-	ushort_t ai_vendor[31];	  /* 129-159 vendor specific		*/
-	ushort_t ai_padding3[16]; /* 160 pad to 176			*/
-	ushort_t ai_curmedser[30]; /* 176-205 current media serial number */
-	ushort_t ai_padding4[49]; /* 206 pad to 255			*/
-	ushort_t ai_integrity;	  /* 255 integrity word			*/
+/*  					WORD				  */
+/* 					OFFSET COMMENT			  */
+	ushort_t  ai_config;	   /*   0  general configuration bits	  */
+	ushort_t  ai_fixcyls;	   /*   1  # of cylinders (obsolete)	  */
+	ushort_t  ai_resv0;	   /*   2  # reserved			  */
+	ushort_t  ai_heads;	   /*   3  # of heads (obsolete)	  */
+	ushort_t  ai_trksiz;	   /*   4  # of bytes/track (retired)	  */
+	ushort_t  ai_secsiz;	   /*   5  # of bytes/sector (retired)	  */
+	ushort_t  ai_sectors;	   /*   6  # of sectors/track (obsolete)  */
+	ushort_t  ai_resv1[3];	   /*   7  "Vendor Unique"		  */
+	char	ai_drvser[20];	   /*  10  Serial number		  */
+	ushort_t ai_buftype;	   /*  20  Buffer type			  */
+	ushort_t ai_bufsz;	   /*  21  Buffer size in 512 byte incr   */
+	ushort_t ai_ecc;	   /*  22  # of ecc bytes avail on rd/wr  */
+	char	ai_fw[8];	   /*  23  Firmware revision		  */
+	char	ai_model[40];	   /*  27  Model #			  */
+	ushort_t ai_mult1;	   /*  47  Multiple command flags	  */
+	ushort_t ai_dwcap;	   /*  48  Doubleword capabilities	  */
+	ushort_t ai_cap;	   /*  49  Capabilities			  */
+	ushort_t ai_resv2;	   /*  50  Reserved			  */
+	ushort_t ai_piomode;	   /*  51  PIO timing mode		  */
+	ushort_t ai_dmamode;	   /*  52  DMA timing mode		  */
+	ushort_t ai_validinfo;	   /*  53  bit0: wds 54-58, bit1: 64-70	  */
+	ushort_t ai_curcyls;	   /*  54  # of current cylinders	  */
+	ushort_t ai_curheads;	   /*  55  # of current heads		  */
+	ushort_t ai_cursectrk;	   /*  56  # of current sectors/track	  */
+	ushort_t ai_cursccp[2];	   /*  57  current sectors capacity	  */
+	ushort_t ai_mult2;	   /*  59  multiple sectors info	  */
+	ushort_t ai_addrsec[2];	   /*  60  LBA only: no of addr secs	  */
+	ushort_t ai_sworddma;	   /*  62  single word dma modes	  */
+	ushort_t ai_dworddma;	   /*  63  double word dma modes	  */
+	ushort_t ai_advpiomode;	   /*  64  advanced PIO modes supported	  */
+	ushort_t ai_minmwdma;	   /*  65  min multi-word dma cycle info  */
+	ushort_t ai_recmwdma;	   /*  66  rec multi-word dma cycle info  */
+	ushort_t ai_minpio;	   /*  67  min PIO cycle info		  */
+	ushort_t ai_minpioflow;	   /*  68  min PIO cycle info w/flow ctl  */
+	ushort_t ai_resv3[2];	   /* 69,70 reserved			  */
+	ushort_t ai_typtime[2];	   /* 71-72 timing			  */
+	ushort_t ai_resv4[2];	   /* 73-74 reserved			  */
+	ushort_t ai_qdepth;	   /*  75  queue depth			  */
+	ushort_t ai_satacap;	   /*  76  SATA capabilities		  */
+	ushort_t ai_resv5;	   /*  77 reserved			  */
+	ushort_t ai_satafsup;	   /*  78 SATA features supported	  */
+	ushort_t ai_satafenbl;	   /*  79 SATA features enabled		  */
+	ushort_t ai_majorversion;  /*  80  major versions supported	  */
+	ushort_t ai_minorversion;  /*  81  minor version number supported */
+	ushort_t ai_cmdset82;	   /*  82  command set supported	  */
+	ushort_t ai_cmdset83;	   /*  83  more command sets supported	  */
+	ushort_t ai_cmdset84;	   /*  84  more command sets supported	  */
+	ushort_t ai_features85;	   /*  85 enabled features		  */
+	ushort_t ai_features86;	   /*  86 enabled features		  */
+	ushort_t ai_features87;	   /*  87 enabled features		  */
+	ushort_t ai_ultradma;	   /*  88 Ultra DMA mode		  */
+	ushort_t ai_erasetime;	   /*  89 security erase time		  */
+	ushort_t ai_erasetimex;	   /*  90 enhanced security erase time	  */
+	ushort_t ai_adv_pwr_mgmt;  /*  91 advanced power management time  */
+	ushort_t ai_master_pwd;    /*  92 master password revision code   */
+	ushort_t ai_hrdwre_reset;  /*  93 hardware reset result		  */
+	ushort_t ai_acoustic;	   /*  94 accoustic management values	  */
+	ushort_t ai_stream_min_sz; /*  95 stream minimum request size	  */
+	ushort_t ai_stream_xfer_d; /*  96 streaming transfer time (DMA)   */
+	ushort_t ai_stream_lat;    /*  97 streaming access latency	  */
+	ushort_t ai_streamperf[2]; /* 98-99 streaming performance gran.   */
+	ushort_t ai_addrsecxt[4];  /* 100 extended max LBA sector	  */
+	ushort_t ai_stream_xfer_p; /* 104 streaming transfer time (PIO)   */
+	ushort_t ai_padding1;	   /* 105 pad				  */
+	ushort_t ai_phys_sect_sz;  /* 106 physical sector size		  */
+	ushort_t ai_seek_delay;	   /* 107 inter-seek delay time (usecs)	  */
+	ushort_t ai_naa_ieee_oui;  /* 108 NAA/IEEE OUI			  */
+	ushort_t ai_ieee_oui_uid;  /* 109 IEEE OUT/unique id		  */
+	ushort_t ai_uid_mid;	   /* 110 unique id (mid)		  */
+	ushort_t ai_uid_low;	   /* 111 unique id (low)		  */
+	ushort_t ai_resv_wwn[4];   /* 112-115 reserved for WWN ext.	  */
+	ushort_t ai_incits;	   /* 116 reserved for INCITS TR-37-2004  */
+	ushort_t ai_words_lsec[2]; /* 117-118 words per logical sector	  */
+	ushort_t ai_cmdset119;	   /* 119 more command sets supported	  */
+	ushort_t ai_features120;   /* 120 enabled features		  */
+	ushort_t ai_padding2[6];   /* pad to 126			  */
+	ushort_t ai_rmsn;	   /* 127 removable media notification	  */
+	ushort_t ai_securestatus;  /* 128 security status		  */
+	ushort_t ai_vendor[31];	   /* 129-159 vendor specific		  */
+	ushort_t ai_padding3[16];  /* 160 pad to 176			  */
+	ushort_t ai_curmedser[30]; /* 176-205 current media serial #	  */
+	ushort_t ai_sctsupport;	   /* 206 SCT command transport		  */
+	ushort_t ai_padding4[48];  /* 207 pad to 255			  */
+	ushort_t ai_integrity;	   /* 255 integrity word		  */
 } sata_id_t;
 
 
@@ -228,11 +263,16 @@ typedef struct sata_id {
 
 /* Identify Device: command set supported/enabled bits - words 82 and 85 */
 
+#define	SATA_SMART_SUPPORTED	0x0001	/* SMART feature set is supported */
 #define	SATA_WRITE_CACHE	0x0020	/* Write Cache supported/enabled */
 #define	SATA_LOOK_AHEAD		0x0040	/* Look Ahead supported/enabled */
 #define	SATA_DEVICE_RESET_CMD	0x0200	/* Device Reset CMD supported/enbld */
 #define	SATA_READ_BUFFER_CMD	0x2000	/* Read Buffer CMD supported/enbld */
 #define	SATA_WRITE_BUFFER_CMD	0x1000	/* Write Buffer CMD supported/enbld */
+#define	SATA_SMART_ENABLED	0x0001	/* SMART feature set is enabled */
+
+/* Identify Device: command set supported/enabled bits - words 84 & 87 */
+#define	SATA_SMART_SELF_TEST_SUPPORTED	0x0002	/* SMART self-test supported */
 
 #define	SATA_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
 #define	SATA_MDMA_2_SEL		0x0400	/* Multiword DMA mode 2 selected */
@@ -241,6 +281,16 @@ typedef struct sata_id {
 #define	SATA_MDMA_2_SUP		0x0004	/* Multiword DMA mode 2 supported */
 #define	SATA_MDMA_1_SUP		0x0002	/* Multiword DMA mode 1 supported */
 #define	SATA_MDMA_0_SUP		0x0001	/* Multiword DMA mode 0 supported */
+
+/* Identify Device: command set supported/enabled bits - word 206 */
+
+/* All are SCT Command Transport support */
+#define	SATA_SCT_CMD_TRANS_SUP		0x0001	/* anything */
+#define	SATA_SCT_CMD_TRANS_LNG_SECT_SUP	0x0002	/* Long Sector Access */
+#define	SATA_SCT_CMD_TRANS_WR_SAME_SUP	0x0004	/* Write Same */
+#define	SATA_SCT_CMD_TRANS_ERR_RCOV_SUP	0x0008	/* Error Recovery Control */
+#define	SATA_SCT_CMD_TRANS_FEAT_CTL_SUP	0x0010	/* Features Control */
+#define	SATA_SCT_CMD_TRANS_DATA_TBL_SUP	0x0020	/* Data Tables supported */
 
 #define	SATA_DISK_SECTOR_SIZE	512	/* HD physical sector size */
 
@@ -254,13 +304,13 @@ typedef struct sata_id {
 #define	SATA_ATAPI_ID_PKT_12B	0x0000  /* Packet size 12 bytes */
 #define	SATA_ATAPI_ID_PKT_16B	0x0001  /* Packet size 16 bytes */
 #define	SATA_ATAPI_ID_DRQ_TYPE	0x0060 	/* DRQ asserted in 3ms after pkt */
-#define	SATA_ATAPI_ID_DRQ_INTR	0x0020 	/* Obsolete in ATA/ATAPI 7 */
+#define	SATA_ATAPI_ID_DRQ_INTR	0x0020  /* Obsolete in ATA/ATAPI 7 */
 
 #define	SATA_ATAPI_ID_DEV_TYPE	0x0f00	/* device type/command set mask */
 #define	SATA_ATAPI_ID_DEV_SHFT	8
 #define	SATA_ATAPI_DIRACC_DEV	0x0000	/* Direct Access device */
-#define	SATA_ATAPI_SQACC_DEV	0x0100	/* Sequential access dev (tape ?) */
-#define	SATA_ATAPI_CDROM_DEV	0x0500	/* CD_ROM device */
+#define	SATA_ATAPI_SQACC_DEV	0x0100  /* Sequential access dev (tape ?) */
+#define	SATA_ATAPI_CDROM_DEV	0x0500  /* CD_ROM device */
 
 /*
  * Status bits from ATAPI Interrupt reason register (AT_COUNT) register
@@ -329,8 +379,151 @@ typedef struct sata_id {
 #define	SATA_ERROR_EOM		0x02    /* end of media (Packet cmds) */
 #define	SATA_ERROR_ILI		0x01    /* cmd sepcific */
 
+
+/*
+ * Bits from the device control register
+ */
+#define	SATA_DEVCTL_NIEN	0x02	/* not interrupt enabled */
+#define	SATA_DEVCTL_SRST	0x04	/* software reset */
+#define	SATA_DEVCTL_HOB		0x80	/* high order bit */
+
 /* device_reg */
 #define	SATA_ADH_LBA		0x40	/* addressing in LBA mode not chs */
+
+
+#define	SCSI_LOG_PAGE_HDR_LEN	4	/* # bytes of a SCSI log page header */
+#define	SCSI_LOG_PARAM_HDR_LEN	4	/* # byttes of a SCSI log param hdr */
+
+/* Number of log entries per extended selftest log block */
+#define	ENTRIES_PER_EXT_SELFTEST_LOG_BLK	19
+
+/* Number of entries per SCSI LOG SENSE SELFTEST RESULTS page */
+#define	SCSI_ENTRIES_IN_LOG_SENSE_SELFTEST_RESULTS	20
+
+/* Length of a SCSI LOG SENSE SELFTEST RESULTS parameter */
+#define	SCSI_LOG_SENSE_SELFTEST_PARAM_LEN	0x10
+
+#define	DIAGNOSTIC_FAILURE_ON_COMPONENT	0x40
+
+#define	SCSI_COMPONENT_81	0x81
+#define	SCSI_COMPONENT_82	0x82
+#define	SCSI_COMPONENT_83	0x83
+#define	SCSI_COMPONENT_84	0x84
+#define	SCSI_COMPONENT_85	0x85
+#define	SCSI_COMPONENT_86	0x86
+#define	SCSI_COMPONENT_87	0x87
+#define	SCSI_COMPONENT_88	0x88
+
+#define	SCSI_ASC_ATA_DEV_FEAT_NOT_ENABLED	0x67
+#define	SCSI_ASCQ_ATA_DEV_FEAT_NOT_ENABLED	0x0b
+
+#define	SCSI_PREDICTED_FAILURE	0x5d
+#define	SCSI_GENERAL_HD_FAILURE	0x10
+
+#define	SCSI_INFO_EXCEPTIONS_PARAM_LEN	3
+
+#define	READ_LOG_EXT_LOG_DIRECTORY	0
+#define	SMART_SELFTEST_LOG_PAGE		6
+#define	EXT_SMART_SELFTEST_LOG_PAGE	7
+/*
+ * SMART data structures
+ */
+struct smart_data {
+	uint8_t smart_vendor_specific[362];
+	uint8_t smart_offline_data_collection_status;
+	uint8_t smart_selftest_exec_status;
+	uint8_t smart_secs_to_complete_offline_data[2];
+	uint8_t smart_vendor_specific2;
+	uint8_t smart_offline_data_collection_capability;
+	uint8_t smart_capability[2];
+	uint8_t	smart_error_logging_capability;
+	uint8_t smart_vendor_specific3;
+	uint8_t smart_short_selftest_polling_time;
+	uint8_t smart_extended_selftest_polling_time;
+	uint8_t smart_conveyance_selftest_polling_time;
+	uint8_t smart_reserved[11];
+	uint8_t smart_vendor_specific4[125];
+	uint8_t smart_checksum;
+};
+
+struct smart_selftest_log_entry {
+	uint8_t	smart_selftest_log_lba_low;
+	uint8_t	smart_selftest_log_status;
+	uint8_t	smart_selftest_log_timestamp[2];
+	uint8_t smart_selftest_log_checkpoint;
+	uint8_t smart_selftest_log_failing_lba[4];	/* from LSB to MSB */
+	uint8_t smart_selftest_log_vendor_specific[15];
+};
+
+#define	NUM_SMART_SELFTEST_LOG_ENTRIES	21
+struct smart_selftest_log {
+	uint8_t	smart_selftest_log_revision[2];
+	struct	smart_selftest_log_entry
+	    smart_selftest_log_entries[NUM_SMART_SELFTEST_LOG_ENTRIES];
+	uint8_t	smart_selftest_log_vendor_specific[2];
+	uint8_t smart_selftest_log_index;
+	uint8_t smart_selftest_log_reserved[2];
+	uint8_t smart_selftest_log_checksum;
+};
+
+struct smart_ext_selftest_log_entry {
+	uint8_t	smart_ext_selftest_log_lba_low;
+	uint8_t smart_ext_selftest_log_status;
+	uint8_t smart_ext_selftest_log_timestamp[2];
+	uint8_t smart_ext_selftest_log_checkpoint;
+	uint8_t smart_ext_selftest_log_failing_lba[6];
+	uint8_t smart_ext_selftest_log_vendor_specific[15];
+};
+
+struct smart_ext_selftest_log {
+	uint8_t	smart_ext_selftest_log_rev;
+	uint8_t	smart_ext_selftest_log_reserved;
+	uint8_t	smart_ext_selftest_log_index[2];
+	struct smart_ext_selftest_log_entry smart_ext_selftest_log_entries[19];
+	uint8_t	smart_ext_selftest_log_vendor_specific[2];
+	uint8_t	smart_ext_selftest_log_reserved2[11];
+	uint8_t	smart_ext_selftest_log_checksum;
+};
+
+struct read_log_ext_directory {
+	uint8_t	read_log_ext_vers[2];	/* general purpose log version */
+	uint8_t read_log_ext_nblks[2][255]; /* # of blks @ log addr index+1 */
+};
+
+/*
+ * SMART specific data
+ * These eventually need to go to a generic scsi hearder file
+ * for now they will reside here
+ */
+#define	PC_CUMMULATIVE_VALUES			0x01
+#define	PAGE_CODE_GET_SUPPORTED_LOG_PAGES	0x00
+#define	PAGE_CODE_SELF_TEST_RESULTS		0x10
+#define	PAGE_CODE_INFORMATION_EXCEPTIONS	0x2f
+#define	PAGE_CODE_SMART_READ_DATA		0x30
+
+
+struct log_parameter {
+	uint8_t param_code[2];		/* parameter dependant */
+	uint8_t param_ctrl_flags;	/* see defines below */
+	uint8_t param_len;		/* # of bytes following */
+	uint8_t param_values[1];	/* # of bytes defined by param_len */
+};
+
+/* param_ctrl_flag fields */
+#define	LOG_CTRL_LP	0x01	/* list parameter */
+#define	LOG_CTRL_LBIN	0x02	/* list is binary */
+#define	LOG_CTRL_TMC	0x0c	/* threshold met criteria */
+#define	LOG_CTRL_ETC	0x10	/* enable threshold comparison */
+#define	LOG_CTRL_TSD	0x20	/* target save disable */
+#define	LOG_CTRL_DS	0x40	/* disable save */
+#define	LOG_CTRL_DU	0x80	/* disable update */
+
+#define	SMART_MAGIC_VAL_1	0x4f
+#define	SMART_MAGIC_VAL_2	0xc2
+#define	SMART_MAGIC_VAL_3	0xf4
+#define	SMART_MAGIC_VAL_4	0x2c
+
+#define	SCT_STATUS_LOG_PAGE	0xe0
 
 #ifdef	__cplusplus
 }

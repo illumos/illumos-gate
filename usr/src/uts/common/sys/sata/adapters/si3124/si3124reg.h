@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,6 +117,9 @@ typedef struct fis_reg_h2d {
 #define	SET_FIS_DEV_HEAD(fis, dev_head)	\
 	(fis.fish_sector_cyllow_cylhi_devhead |= ((dev_head & 0xff) << 24))
 
+#define	GET_FIS_DEV_HEAD(fis)	\
+	((fis.fish_sector_cyllow_cylhi_devhead >> 24) & 0xff)
+
 
 	/* offset 0x08 */
 	uint32_t fish_sectexp_cyllowexp_cylhiexp_featuresexp;
@@ -125,13 +128,22 @@ typedef struct fis_reg_h2d {
 	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |=	\
 		((sectorexp & 0xff)))
 
+#define	GET_FIS_SECTOR_EXP(fis)	\
+	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp  & 0xff)
+
 #define	SET_FIS_CYL_LOW_EXP(fis, cyllowexp)			\
 	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
 		((cyllowexp & 0xff) << 8))
 
+#define	GET_FIS_CYL_LOW_EXP(fis)			\
+	((fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 8) & 0xff)
+
 #define	SET_FIS_CYL_HI_EXP(fis, cylhiexp)			\
 	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
 		((cylhiexp & 0xff) << 16))
+
+#define	GET_FIS_CYL_HI_EXP(fis)			\
+	((fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp >> 16) & 0xff)
 
 #define	SET_FIS_FEATURES_EXP(fis, features_exp)		\
 	(fis.fish_sectexp_cyllowexp_cylhiexp_featuresexp |= 	\
@@ -149,6 +161,9 @@ typedef struct fis_reg_h2d {
 #define	SET_FIS_SECTOR_COUNT_EXP(fis, sector_count_exp)	\
 	(fis.fish_sectcount_sectcountexp_rsvd_devctl |= \
 		((sector_count_exp & 0xff) << 8))
+
+#define	GET_FIS_SECTOR_COUNT_EXP(fis)	\
+	((fis.fish_sectcount_sectcountexp_rsvd_devctl >> 8) & 0xff)
 
 #define	SET_FIS_SECTOR_DEVCTL(fis, devctl)	\
 	(fis.fish_sectcount_sectcountexp_rsvd_devctl |= ((devctl & 0xff) << 24))
