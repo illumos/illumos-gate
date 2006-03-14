@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,27 @@ static int	devid_is_unique(ddi_devid_t did);
 static size_t	free_devid_list(int *count);
 void		md_devid_cleanup(set_t, uint_t);
 extern md_krwlock_t	nm_lock;
+
+typedef enum lookup_dev_result {
+	LOOKUP_DEV_FOUND,	/* Found a good record. */
+	LOOKUP_DEV_NOMATCH,	/* No matching record in DB. */
+	LOOKUP_DEV_CONFLICT	/* Name conflicts with existing record. */
+} lookup_dev_result_t;
+
+/* List of SVM module names. */
+static char *meta_names[] = {
+	"md",
+	MD_STRIPE,
+	MD_MIRROR,
+	MD_TRANS,
+	MD_HOTSPARES,
+	MD_RAID,
+	MD_VERIFY,
+	MD_SP,
+	MD_NOTIFY
+};
+
+#define	META_NAME_COUNT	(sizeof (meta_names) / sizeof (char *))
 
 /*
  * Used in translating from the md major name on miniroot to
@@ -951,10 +971,18 @@ remove_shared_entry(
 	mdkey_t			shn_key;
 	ushort_t		shn_namlen;
 
-	if (nm != (char *)0)
+	if (nm == (char *)0) {
+		/* No name.  Search by key only. */
+		if (key == MD_KEYBAD) {
+			/* No key either.  Nothing to remove. */
+			return (0);
+		}
+	} else {
+		/* How long is the name? */
 		nm_len = ((devid_nm & NM_DEVID) ?
 			ddi_devid_sizeof((ddi_devid_t)nm) :
 			(strlen(nm) + 1));
+	}
 
 	this_rh = ((devid_nm & NM_DEVID) ?
 		&((struct devid_shr_rec *)record)->did_rec_hdr :
@@ -1132,7 +1160,7 @@ lookup_entry(
 
 			if ((key == MD_KEYWILD) && !devid_nm &&
 			    (dev == build_device_number(setno,
-					(struct nm_name *)n)))
+			    (struct nm_name *)n)))
 				return ((void *)n);
 		}
 
@@ -1162,7 +1190,29 @@ lookup_entry(
 	/*NOTREACHED*/
 }
 
-static struct nm_name *
+static int
+is_meta_drive(set_t setno, mdkey_t key)
+{
+	int				i;
+	struct nm_next_hdr		*nh;
+	struct nm_shared_name		*shn;
+
+	if ((nh = get_first_record(setno, 0, NM_SHARED)) == NULL)
+		return (FALSE);
+	if ((shn = (struct nm_shared_name *)lookup_shared_entry(nh,
+		key, NULL, NULL, NM_SHARED)) == NULL) {
+		return (FALSE);
+	}
+
+	/* See if the name is a metadevice. */
+	for (i = 0; i < META_NAME_COUNT; i++) {
+		if (strcmp(meta_names[i], shn->sn_name) == 0)
+			return (TRUE);
+	}
+	return (FALSE);
+}
+
+static lookup_dev_result_t
 lookup_deventry(
 	struct nm_next_hdr	*nh,	/* head record header */
 	set_t			setno,	/* set to lookup in */
@@ -1171,7 +1221,8 @@ lookup_deventry(
 	char			*drvnm,	/* drvnm to be stored */
 	minor_t			mnum,	/* minor number to be stored */
 	char			*dirnm,	/* directory name to be stored */
-	char			*filenm	/* device filename to be stored */
+	char			*filenm, /* device filename to be stored */
+	struct nm_name		**ret_rec /* place return found rec. */
 )
 {
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
@@ -1181,8 +1232,9 @@ lookup_deventry(
 	size_t			offset;
 	mdkey_t			dirkey, drvkey;
 
+	*ret_rec = NULL;
 	if (this_nh == NULL)
-		return (0);
+		return (LOOKUP_DEV_NOMATCH);
 
 	record = (struct nm_rec *)this_nh->nmn_record;
 	this_rh = &record->r_rec_hdr;
@@ -1191,11 +1243,16 @@ lookup_deventry(
 	offset = sizeof (struct nm_rec) - sizeof (struct nm_name);
 
 	if ((drvkey = getshared_key(setno, drvnm, 0L)) == MD_KEYBAD)
-		return (NULL);
+		return (LOOKUP_DEV_NOMATCH);
 
-	if ((dirkey = getshared_key(setno, dirnm, 0L)) == MD_KEYBAD)
-		return (NULL);
-
+	if (dirnm == NULL) {
+		/* No directory name to look up. */
+		dirkey = MD_KEYBAD;
+	} else {
+		/* Look up the directory name */
+		if ((dirkey = getshared_key(setno, dirnm, 0L)) == MD_KEYBAD)
+			return (LOOKUP_DEV_NOMATCH);
+	}
 	ASSERT(side != MD_SIDEWILD);
 
 	/* code to see if EMPTY record */
@@ -1203,7 +1260,7 @@ lookup_deventry(
 		/* Go to next record */
 		this_nh = this_nh->nmn_nextp;
 		if (this_nh == NULL)
-			return (0);
+			return (LOOKUP_DEV_NOMATCH);
 		record = (struct nm_rec *)this_nh->nmn_record;
 		this_rh = &record->r_rec_hdr;
 		n = &record->r_name[0];
@@ -1216,15 +1273,83 @@ lookup_deventry(
 		    (mnum == n->n_minor) &&
 		    (drvkey == n->n_drv_key) &&
 		    (dirkey == n->n_dir_key) &&
-		    (strcmp(filenm, n->n_name) == 0))
-			return (n);
+		    (strcmp(filenm, n->n_name) == 0)) {
+			*ret_rec = n;
+			return (LOOKUP_DEV_FOUND);
+		}
 
+		/*
+		 * Now check for a name conflict.  If the filenm of the
+		 * current record matches filename passed in we have a
+		 * potential conflict.  If all the other parameters match
+		 * except for the side number, then this is not a
+		 * conflict.  The reason is that there are cases where name
+		 * record is added to each side of a set.
+		 *
+		 * There is one additional complication.  It is only a
+		 * conflict if the drvkeys both represent metadevices.  It
+		 * is legal for a metadevice and a physical device to have
+		 * the same name.
+		 */
+		if (strcmp(filenm, n->n_name) == 0) {
+			int	both_meta;
+
+			/*
+			 * It is hsp and we are trying to add it twice
+			 */
+			if (strcmp(getshared_name(setno, n->n_drv_key, 0L),
+			    MD_HOTSPARES) == 0 && (side == n->n_side) &&
+			    find_hot_spare_pool(setno,
+				KEY_TO_HSP_ID(setno, n->n_key)) == NULL) {
+				/*
+				 * All entries removed
+				 */
+				rw_exit(&nm_lock.lock);
+				(void) md_rem_hspname(setno, n->n_key);
+				rw_enter(&nm_lock.lock, RW_WRITER);
+				return (LOOKUP_DEV_NOMATCH);
+			}
+
+			/*
+			 * It is metadevice and we are trying to add it twice
+			 */
+			if (md_set[setno].s_un[MD_MIN2UNIT(n->n_minor)]
+				== NULL && (side == n->n_side) &&
+			    ddi_name_to_major(getshared_name(setno,
+				n->n_drv_key, 0L)) == md_major) {
+				/*
+				 * Apparently it is invalid so
+				 * clean it up
+				 */
+				(void) md_remove_minor_node(n->n_minor);
+				rw_exit(&nm_lock.lock);
+				(void) md_rem_selfname(n->n_minor);
+				rw_enter(&nm_lock.lock, RW_WRITER);
+				return (LOOKUP_DEV_NOMATCH);
+			}
+
+			/* First see if the two drives are metadevices. */
+			if (is_meta_drive(setno, drvkey) &&
+				is_meta_drive(setno, n->n_drv_key)) {
+				both_meta = TRUE;
+			} else {
+				both_meta = FALSE;
+			}
+			/* Check rest of the parameters. */
+			if ((both_meta == TRUE) &&
+				((key != n->n_key) ||
+				(mnum != n->n_minor) ||
+				(drvkey != n->n_drv_key) ||
+				(dirkey != n->n_dir_key))) {
+				return (LOOKUP_DEV_CONFLICT);
+			}
+		}
 		n = (struct nm_name *)get_next_entry(this_nh, (caddr_t)n,
 		    NAMSIZ(n), &offset);
 
 		if (n == (struct nm_name *)0) {
 			if (offset)
-				return (n);
+				return (LOOKUP_DEV_NOMATCH);
 
 			/* Go to next record */
 			offset = sizeof (struct nm_rec) -
@@ -1368,6 +1493,129 @@ lookup_shared_entry(
 	/*NOTREACHED*/
 }
 
+
+/*
+ * lookup_hspentry - Getting a hotspare pool entry from the namespace.
+ *		     Use either the NM key or the hotspare name to find
+ *		     a matching record in the namespace of the set.
+ */
+void *
+lookup_hspentry(
+	struct nm_next_hdr	*nh,	/* head record header */
+	set_t			setno,	/* set to lookup in */
+	side_t			side,	/* (key 1) side number */
+	mdkey_t			key,	/* (key 2) from md_setdevname */
+	char			*name	/* (alt. key 2), if key == MD_KEYWILD */
+)
+{
+	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
+	struct nm_rec		*record;
+	struct nm_rec_hdr	*this_rh;
+	struct nm_name		*n;
+	size_t			offset, n_offset, n_size;
+	side_t			n_side;
+	mdkey_t			n_key;
+	char			*drv_name;
+	char			*tmpname;
+	char			*setname = NULL;
+
+	if ((key == MD_KEYWILD) && (name == '\0'))
+		return ((void *)0);
+
+	if (this_nh == NULL)
+		return ((void *)0);
+
+	record = (struct nm_rec *)this_nh->nmn_record;
+
+	this_rh = &record->r_rec_hdr;
+
+	if (setno != MD_LOCAL_SET) {
+		setname = mddb_getsetname(setno);
+		if (setname == NULL)
+			return ((void *)0);
+	}
+
+	/* code to see if EMPTY record */
+	while (this_nh && this_rh->r_used_size == sizeof (struct nm_rec_hdr)) {
+		/* Go to next record */
+		this_nh = this_nh->nmn_nextp;
+		if (this_nh == NULL)
+			return ((void *)0);
+		record = this_nh->nmn_record;
+		this_rh = &record->r_rec_hdr;
+	}
+
+	/*
+	 * n_offset will be used to reset offset
+	 */
+	n_offset = offset = (sizeof (struct nm_rec) - sizeof (struct nm_name));
+
+	n = ((struct nm_name *)&record->r_name[0]);
+
+	tmpname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+	/*CONSTCOND*/
+	while (1) {
+		n_side = n->n_side;
+		n_size = NAMSIZ(n);
+		if ((drv_name = (char *)getshared_name(setno,
+		    n->n_drv_key, 0L)) != NULL) {
+
+			/* We're only interested in hsp NM records */
+			if ((strcmp(drv_name, "md_hotspares") == 0) &&
+			    ((side == n_side) || (side == MD_SIDEWILD))) {
+				n_key = n->n_key;
+
+				if ((key != MD_KEYWILD) && (key == n_key))
+					goto done;
+
+				/*
+				 * Searching by a hotspare pool name.
+				 * Since the input name is of the form
+				 * setname/hsp_name, we need to attach
+				 * the string 'setname/' in front of the
+				 * n->n_name.
+				 */
+				if (key == MD_KEYWILD) {
+					if (setname != NULL)
+					    (void) snprintf(tmpname, MAXPATHLEN,
+						"%s/%s", setname,
+						((struct nm_name *)n)->n_name);
+					else
+					    (void) snprintf(tmpname, MAXPATHLEN,
+						"%s",
+						((struct nm_name *)n)->n_name);
+
+					if ((strcmp(name, tmpname)) == 0)
+						goto done;
+				}
+			}
+		}
+
+		n = (struct nm_name *)get_next_entry(this_nh, (caddr_t)n,
+		    n_size, &offset);
+
+		if (n == NULL) {
+			/*
+			 * No next record, return
+			 */
+			if (offset)
+				goto done;
+
+			/* Go to next record */
+			offset = n_offset;
+			this_nh = this_nh->nmn_nextp;
+			record = (struct nm_rec *)this_nh->nmn_record;
+			this_rh = &record->r_rec_hdr;
+			n = ((struct nm_name *)&record->r_name[0]);
+		}
+	}
+
+done:
+	kmem_free(tmpname, MAXPATHLEN);
+	return ((void *)n);
+}
+
 static int
 md_make_devname(struct nm_name *n, set_t setno, char *string, size_t max_size)
 {
@@ -1484,7 +1732,8 @@ md_setdevname(
 	char	*drvnm,		/* store this driver name with devicename */
 	minor_t	mnum,		/* store this minor number as well */
 	char	*devname,	/* device name to be stored */
-	set_t	imp_setno	/* used exclusively by import */
+	set_t	imp_setno,	/* used exclusively by import */
+	md_error_t *ep		/* place to return error info */
 )
 {
 	struct nm_next_hdr	*nh, *did_nh = NULL;
@@ -1500,6 +1749,7 @@ md_setdevname(
 	dev_t			devt;
 	char			*mname = NULL;
 	side_t			thisside = MD_SIDEWILD;
+	lookup_dev_result_t	lookup_res;
 	mdkey_t			min_devid_key = MD_KEYWILD;
 	size_t			min_len;
 
@@ -1602,23 +1852,29 @@ md_setdevname(
 
 	/* find boundary between filename and directory */
 	cp = strrchr(devname, '/');
-	ASSERT(cp != NULL);
 
-	/* Isolate the directory name only; save character after '/' */
-	c = *(cp + 1);
-	*(cp + 1) = '\0';
-	dname = md_strdup(devname);
+	if (cp == NULL) {
+		/* No directory part to the name. */
+		fname = devname;
+		dname = NULL;
+	} else {
+		/* Isolate the directory name only; save character after '/' */
+		c = *(cp + 1);
+		*(cp + 1) = '\0';
+		dname = md_strdup(devname);
 
-	/* Restore character after '/' */
-	*(cp + 1) = c;
-	fname = cp+1;
+		/* Restore character after '/' */
+		*(cp + 1) = c;
+		fname = cp+1;
+	}
 
 	/*
 	 * If it already there in the name space
 	 */
-	if ((n = lookup_deventry(nh, setno, side, key,
-	    drvnm, mnum, dname, fname)) != NULL) {
-
+	lookup_res = lookup_deventry(nh, setno, side, key, drvnm, mnum, dname,
+		fname, &n);
+	switch (lookup_res) {
+	case LOOKUP_DEV_FOUND:
 		/* If we are importing the set */
 		if (md_get_setstatus(imp_setno) & MD_SET_IMPORT) {
 			retval = 0;
@@ -1654,73 +1910,96 @@ md_setdevname(
 			}
 		}
 		goto out;
-	}
 
-	/* Create a new name entry */
-	new = 1;
-	n = (struct nm_name *)alloc_entry(nh, md_set[setno].s_nmid,
-	    strlen(fname)+1, NM_NOTSHARED, &recids[0]);
-
-	if (n == NULL)
+	case LOOKUP_DEV_CONFLICT:
+		(void) mderror(ep, MDE_NAME_IN_USE);
+		retval = MD_KEYBAD;
 		goto out;
 
-	n->n_minor = mnum;
-	n->n_side = side;
-	n->n_key = ((key == MD_KEYWILD) ? create_key(nh) : key);
-	n->n_count = 1;
+	case LOOKUP_DEV_NOMATCH:
+		/* Create a new name entry */
+		new = 1;
+		n = (struct nm_name *)alloc_entry(nh, md_set[setno].s_nmid,
+		    strlen(fname)+1, NM_NOTSHARED, &recids[0]);
 
-	/* fill-in filename */
-	(void) strcpy(n->n_name, fname);
-	n->n_namlen = (ushort_t)(strlen(fname) + 1);
-
-	/*
-	 * If MDE_DB_NOSPACE occurs
-	 */
-	if (((n->n_drv_key =
-	    setshared_name(setno, drvnm, MD_KEYWILD, 0L)) == MD_KEYBAD) ||
-	    ((n->n_dir_key =
-	    setshared_name(setno, dname, MD_KEYWILD, 0L)) == MD_KEYBAD)) {
-		/*
-		 * Remove entry allocated by alloc_entry
-		 * and return MD_KEYBAD
-		 */
-		(void) remove_entry(nh, n->n_side, n->n_key, 0L);
-		goto out;
-	}
-
-	recids[1] = md_set[setno].s_nmid;
-	recids[2] = 0;
-	mddb_commitrecs_wrapper(recids);
-	retval = n->n_key;
-
-	/*
-	 * Now to find out if devid's were used for thisside and if
-	 * so what is the devid_key for the entry so that the correct
-	 * minor name entry (did_n) has the correct devid key.
-	 * Also get the minor name of the device, use the minor name
-	 * on this side because the assumption is that the slices are
-	 * going to be consistant across the nodes.
-	 */
-	if (key != MD_KEYWILD && (shared & NM_DEVID)) {
-		if ((did_n = (struct did_min_name *)
-		    lookup_entry(did_nh, setno, thisside, n->n_key,
-		    NODEV64, NM_DEVID)) == NULL) {
-			shared &= ~NM_DEVID;
-		} else {
-			min_devid_key = did_n->min_devid_key;
-			min_len = (size_t)did_n->min_namlen;
-		}
-	} else {
-
-		/*
-		 * It is possible for the minor name to be null, for
-		 * example a metadevice which means the minor name is
-		 * not initialised.
-		 */
-		if (mname == NULL)
+		if (n == NULL)
 			goto out;
 
-		min_len = strlen(mname) + 1;
+		n->n_minor = mnum;
+		n->n_side = side;
+		n->n_key = ((key == MD_KEYWILD) ? create_key(nh) : key);
+		n->n_count = 1;
+
+		/* fill-in filename */
+		(void) strcpy(n->n_name, fname);
+		n->n_namlen = (ushort_t)(strlen(fname) + 1);
+
+		/*
+		 * If MDE_DB_NOSPACE occurs
+		 */
+		if (((n->n_drv_key =
+			setshared_name(setno, drvnm, MD_KEYWILD, 0L)) ==
+			MD_KEYBAD)) {
+			/*
+			 * Remove entry allocated by alloc_entry
+			 * and return MD_KEYBAD
+			 */
+			(void) remove_entry(nh, n->n_side, n->n_key, 0L);
+			goto out;
+		}
+		if (dname == NULL) {
+			/* No directory name implies no key. */
+			n->n_dir_key = MD_KEYBAD;
+		} else {
+			/* We have a directory name to save. */
+			if ((n->n_dir_key =
+				setshared_name(setno, dname, MD_KEYWILD, 0L)) ==
+				MD_KEYBAD) {
+				/*
+				 * Remove entry allocated by alloc_entry
+				 * and return MD_KEYBAD
+				 */
+				(void) remove_entry(nh, n->n_side, n->n_key,
+					0L);
+				goto out;
+			}
+		}
+
+		recids[1] = md_set[setno].s_nmid;
+		recids[2] = 0;
+		mddb_commitrecs_wrapper(recids);
+		retval = n->n_key;
+
+		/*
+		 * Now to find out if devid's were used for thisside and if
+		 * so what is the devid_key for the entry so that the correct
+		 * minor name entry (did_n) has the correct devid key.
+		 * Also get the minor name of the device, use the minor name
+		 * on this side because the assumption is that the slices are
+		 * going to be consistant across the nodes.
+		 */
+		if (key != MD_KEYWILD && (shared & NM_DEVID)) {
+			if ((did_n = (struct did_min_name *)
+			    lookup_entry(did_nh, setno, thisside, n->n_key,
+			    NODEV64, NM_DEVID)) == NULL) {
+				shared &= ~NM_DEVID;
+			} else {
+				min_devid_key = did_n->min_devid_key;
+				min_len = (size_t)did_n->min_namlen;
+			}
+		} else {
+
+			/*
+			 * It is possible for the minor name to be null, for
+			 * example a metadevice which means the minor name is
+			 * not initialised.
+			 */
+			if (mname == NULL)
+				goto out;
+
+			min_len = strlen(mname) + 1;
+		}
+		break;
 	}
 
 	/*
@@ -2098,6 +2377,91 @@ md_getdevname(
 	}
 
 	err = md_make_devname(n, setno, devname, max_size);
+
+	rw_exit(&nm_lock.lock);
+	return (err);
+}
+
+/*
+ * md_gethspinfo -  Getting a hsp name or id from the database.
+ *		    A pointer to a character array is passed in for
+ *		    the hsp name to be built in. If a match is found,
+ *		    the corresponding hspid is stored in ret_hspid.
+ */
+int
+md_gethspinfo(
+	set_t	setno,		/* which set to get name from */
+	side_t	side,		/* (key 1) side number */
+	mdkey_t	key,		/* (key 2) key provided by md_setdevname() */
+	char	*drvnm,		/* return driver name here */
+	hsp_t	*ret_hspid,	/* returned key if key is MD_KEYWILD */
+	char	*hspname	/* alternate key or returned device name */
+)
+{
+	struct nm_next_hdr	*nh;
+	struct nm_name		*n;
+	char			*drv_name;
+	int			err = 0;
+	char			*setname = NULL;
+
+	/*
+	 * Load the devid name space if it exists
+	 */
+	(void) md_load_namespace(setno, NULL, NM_DEVID);
+	if (! md_load_namespace(setno, NULL, 0L)) {
+		/*
+		 * Unload the devid namespace
+		 */
+		(void) md_unload_namespace(setno, NM_DEVID);
+		return (ENOENT);
+	}
+
+	rw_enter(&nm_lock.lock, RW_READER);
+
+	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) {
+		rw_exit(&nm_lock.lock);
+		return (ENOENT);
+	}
+
+	if ((n = (struct nm_name *)lookup_hspentry(nh, setno, side,
+	    key, hspname)) == NULL) {
+		rw_exit(&nm_lock.lock);
+		return (ENOENT);
+	}
+
+	/* Copy the driver name, device name and key for return */
+	drv_name = (char *)getshared_name(setno, n->n_drv_key, 0L);
+	if (!drv_name || (strlen(drv_name) > MD_MAXDRVNM)) {
+		rw_exit(&nm_lock.lock);
+		return (EFAULT);
+	}
+
+	/*
+	 * Pre-friendly hsp names are of the form hspxxx and we
+	 * should not have an entry in the namespace for them.
+	 * So make sure the NM entry we get is a hotspare pool.
+	 */
+	if ((strcmp(drv_name, "md_hotspares")) != 0) {
+		rw_exit(&nm_lock.lock);
+		return (ENOENT);
+	}
+	(void) strcpy(drvnm, drv_name);
+
+	/*
+	 * If the input key is not MD_KEYWILD, return the
+	 * hspname we found.
+	 */
+	if (key != MD_KEYWILD) {
+		setname = mddb_getsetname(setno);
+		if (setname != NULL)
+			(void) snprintf(hspname, MAXPATHLEN,
+			    "%s/%s", setname, n->n_name);
+		else
+			(void) snprintf(hspname, MAXPATHLEN,
+			    "%s", n->n_name);
+	}
+
+	*ret_hspid = KEY_TO_HSP_ID(setno, n->n_key);
 
 	rw_exit(&nm_lock.lock);
 	return (err);

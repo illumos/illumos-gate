@@ -912,7 +912,7 @@ trans_snarf(md_snarfcmd_t cmd, set_t setno)
 			dep->de_icreqsize = newreqsize;
 			rbp->rb_private |= MD_PRV_CONVD;
 			un = big_un;
-			un->c.un_revision = MD_32BIT_META_DEV;
+			un->c.un_revision &= ~MD_64BIT_META_DEV;
 		} else {
 			/* already converted, just set the pointer */
 			un = dep->de_rb_userdata;

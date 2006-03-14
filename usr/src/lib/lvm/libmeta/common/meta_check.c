@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,7 +151,7 @@ meta_check_swapped(
 		mdname_t	*snp;
 
 		if ((snp = metaname(&sp, swtp->swt_ent[i].ste_path,
-		    ep)) == NULL) {
+		    UNKNOWN, ep)) == NULL) {
 			mdclrerror(ep);
 			continue;
 		}
@@ -201,7 +200,7 @@ meta_check_driveswapped(
 		mdname_t	*snp;
 
 		if ((snp = metaname(&sp, swtp->swt_ent[i].ste_path,
-		    ep)) == NULL) {
+		    LOGICAL_DEVICE, ep)) == NULL) {
 			mdclrerror(ep);
 			continue;
 		}
@@ -238,7 +237,7 @@ meta_check_dump(
 	if (ioctl(dump_fd, DIOCGETDEV, device) != -1) {
 		mdname_t	*dump_np;
 
-		if ((dump_np = metaname(&sp, device, ep)) == NULL) {
+		if ((dump_np = metaname(&sp, device, UNKNOWN, ep)) == NULL) {
 			mdclrerror(ep);
 			(void) close(dump_fd);
 			return (0);
@@ -306,7 +305,7 @@ meta_check_mounted(
 		(void) strcpy(mountp, m.mnt_mountp);
 		(void) strcpy(mnt_special, m.mnt_special);
 
-		if ((mnp = metaname(&sp, mnt_special, ep)) == NULL) {
+		if ((mnp = metaname(&sp, mnt_special, UNKNOWN, ep)) == NULL) {
 			mdclrerror(ep);
 			continue;
 		}
@@ -372,7 +371,8 @@ meta_check_drivemounted(
 
 		(void) strcpy(mountp, m.mnt_mountp);
 		(void) strcpy(mnt_special, m.mnt_special);
-		if ((mnp = metaname(&sp, mnt_special, ep)) == NULL) {
+		if ((mnp = metaname(&sp, mnt_special,
+		    LOGICAL_DEVICE, ep)) == NULL) {
 			mdclrerror(ep);
 			continue;
 		}
@@ -525,15 +525,12 @@ meta_check_samedrive(
 	 *
 	 * Case 1 - The filenames are identical
 	 *
-	 * Case 2 - Either name is a metadevice name.  If so then they
-	 *	are not the same drive.
-	 *
-	 * Case 3 - Both devices have a devid
+	 * Case 2 - Both devices have a devid
 	 * 	get and compare the devids for the devices. If both
 	 * 	devices have a devid then the compare will is all
 	 *	that is needed we are done.
 	 *
-	 * Case 4 - One or more devices does not have a devid
+	 * Case 3 - One or more devices does not have a devid
 	 *	start by doing a simple compare of the name, if they
 	 *	are the same just return.
 	 *

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +46,8 @@ usage(
 usage:	%s [-s setname] mirror component-old component-new\n\
 	%s [-s setname] -e mirror component\n\
 	%s [-s setname] [-f] RAID component-old component-new\n\
-	%s [-s setname] [-f] -e RAID component\n\
-	%s [-s setname] -c metadevice component-old component-new\n"),
-	    myname, myname, myname, myname, myname);
+	%s [-s setname] [-f] -e RAID component\n"),
+	    myname, myname, myname, myname);
 	md_exit(sp, eval);
 }
 
@@ -67,7 +65,6 @@ main(
 	mdcmdopts_t	options = (MDCMD_PRINT|MDCMD_DOIT);
 	mdname_t	*namep;
 	int		eflag = 0;
-	int		cflag = 0;
 	int		c;
 	md_error_t	status = mdnullerror;
 	md_error_t	*ep = &status;
@@ -111,7 +108,7 @@ main(
 	/* parse arguments */
 	optind = 1;
 	opterr = 1;
-	while ((c = getopt(argc, argv, "hs:cefn?")) != -1) {
+	while ((c = getopt(argc, argv, "hs:efn?")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(sp, 0);
@@ -135,11 +132,6 @@ main(
 			} else {
 				usage(sp, 1);
 			}
-			break;
-
-		case 'c':
-			options |= MDCMD_CLUSTER_REPLACE;
-			++cflag;
 			break;
 
 		case '?':
@@ -167,30 +159,14 @@ main(
 
 	uname = argv[0];
 
-	if (((namep = metaname(&sp, argv[0], ep)) == NULL)) {
+	if (((namep = metaname(&sp, uname, META_DEVICE, ep)) == NULL)) {
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}
 
-	/*
-	 * This 'if' statement might look a little strange so I'll 'splain
-	 * a few things.
-	 *
-	 * If 'cflag' is not set then always do the metachkmeta.
-	 *    This is the normal behavior and you're not allowed to run
-	 *    metarplace on a hotspare. metachkmeta will barf.
-	 *
-	 * If 'cflag' and uname is not a hotspare do metachkmeta
-	 *    Still need to check out the metadevice as long as it's not
-	 *    a hotspare.
-	 *
-	 * Else we've got a hotspare so we can't call metachkmeta
-	 */
-	if ((!cflag) || (cflag && (!is_hspname(uname)))) {
-		if (metachkmeta(namep, ep) != 0) {
-			mde_perror(ep, "");
-			md_exit(sp, 1);
-		}
+	if (metachkmeta(namep, ep) != 0) {
+		mde_perror(ep, "");
+		md_exit(sp, 1);
 	}
 
 	assert(sp != NULL);
@@ -274,7 +250,7 @@ main(
 		if (argc != 1)
 			usage(sp, 1);
 
-		if ((compnp = metaname(&sp, argv[0], ep)) == NULL) {
+		if ((compnp = metaname(&sp, argv[0], UNKNOWN, ep)) == NULL) {
 			mde_perror(ep, "");
 			md_exit(sp, 1);
 		}
@@ -290,26 +266,18 @@ main(
 		if (argc != 2)
 			usage(sp, 1);
 
-		if ((oldnp = metaname(&sp, argv[0], ep)) == NULL) {
+		if ((oldnp = metaname(&sp, argv[0], UNKNOWN, ep)) == NULL) {
 			mde_perror(ep, "");
 			md_exit(sp, 1);
 		}
-		if ((newnp = metaname(&sp, argv[1], ep)) == NULL) {
+		if ((newnp = metaname(&sp, argv[1], UNKNOWN, ep)) == NULL) {
 			mde_perror(ep, "");
 			md_exit(sp, 1);
 		}
-		if (cflag) {			/* new replace stuff */
-			if (meta_replace(sp, namep, oldnp, newnp, uname,
-			    options, ep) != 0) {
-				mde_perror(ep, "");
-				md_exit(sp, 1);
-			}
-		} else {
-			if (meta_replace_byname(sp, namep, oldnp, newnp,
-			    options, ep) != 0) {
-				mde_perror(ep, "");
-				md_exit(sp, 1);
-			}
+		if (meta_replace_byname(sp, namep, oldnp, newnp,
+		    options, ep) != 0) {
+			mde_perror(ep, "");
+			md_exit(sp, 1);
 		}
 	}
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,18 +32,6 @@
 #include <meta.h>
 
 #include <sdssc.h>
-
-/*
- * check for "none"
- */
-static int
-is_none(char *s)
-{
-	if ((strcoll(s, gettext("none")) == 0) ||
-	    (strcoll(s, gettext("NONE")) == 0))
-		return (1);
-	return (0);
-}
 
 /*
  * print usage message
@@ -202,7 +189,7 @@ stripe_params(
 			break;
 
 		case 'h':
-			if (is_none(optarg)) {
+			if (meta_is_none(optarg)) {
 				msp.hsp_id = MD_HSP_NONE;
 			} else if ((hspnp = metahspname(&sp, optarg,
 			    ep)) == NULL) {
@@ -289,7 +276,7 @@ raid_params(
 			break;
 
 		case 'h':
-			if (is_none(optarg)) {
+			if (meta_is_none(optarg)) {
 				msp.hsp_id = MD_HSP_NONE;
 			} else if ((hspnp = metahspname(&sp, optarg,
 			    ep)) == NULL) {
@@ -442,7 +429,7 @@ main(
 		md_exit(sp, result);
 	}
 
-	if ((np = metaname(&sp, argv[optind], ep)) == NULL) {
+	if ((np = metaname(&sp, argv[optind], META_DEVICE, ep)) == NULL) {
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}

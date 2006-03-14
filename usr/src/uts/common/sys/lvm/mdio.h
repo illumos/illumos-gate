@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,16 +74,55 @@ extern "C" {
 #define	MAKE_HSP_ID(setno, id)  (((setno) << HSP_SET_SHIFT) | (id))
 
 /*
+ * The following macros were added to support friendly names for hot spare
+ * pools.  Before the addition of friendly names the hsp_self_id was merely
+ * the conbination of the set number and the hot spare pool number.  With
+ * friendly names a NM record is created to hold the hot spare pool name.
+ * The hsp_self_id now becomes the set number shifted left plus the NM
+ * record key plus 1000.  The number 1000 is used to collision between
+ * traditional hsp_self_ids and friendly name self ids.  In traditional hot
+ * spare pool the hot spare pool number could never be grater than 999.
+ *
+ * HSP_ID_IS_FN(hspid)	returns TRUE if the hot spare pool ID is the ID of
+ * 			a friendly named hsp.  Will return FALSE otherwise.
+ * 			hspid may contain the set bits, since HSP_ID_IS_FN
+ * 			will call HSP_ID as part of doing its work.
+ *
+ * KEY_TO_HSP_ID(setno, reckey)	constructs a hot spare pool ID (hsp_t) from
+ * 			a set number and a NM record key.  The result is
+ * 			suitable for storing in the hsp_self_id member of a
+ * 			hot_spare_pool struct.
+ *
+ * HSP_ID_TO_KEY(hspid)	returns the NM key that is encoded in the hot spare
+ * 			pool ID.  MD_KEYBAD will be returned if hspid does
+ * 			not represent a friendly named hsp.  hspid may
+ * 			contain the set bits, since HSP_ID_TO_KEY will call
+ * 			HSP_ID as part of doing its work.
+ *
+ * HSP_KEY_OK(reckey)	Insures that the NM record key is not so large as
+ * 			to interfere with the set number bits in a hot
+ * 			spare pool self id.  This macro will probably only
+ * 			be used in meta_hs_add.
+ */
+#define	HSP_FN_BASE	(1000)
+#define	HSP_ID_IS_FN(hspid) (HSP_ID(hspid) > HSP_FN_BASE)
+#define	KEY_TO_HSP_ID(setno, key) ((setno << HSP_SET_SHIFT) | \
+					(key + HSP_FN_BASE))
+#define	HSP_ID_TO_KEY(hspid) ((HSP_ID_IS_FN(hspid)) ? \
+				(HSP_ID(hspid) - HSP_FN_BASE) : MD_KEYBAD)
+#define	HSP_KEY_OK(key)	(((key + HSP_FN_BASE) & HSP_SET_MASK) == 0)
+
+/*
  * for did stat ioctl
  */
 #define	MD_FIND_INVDID	0x01
 #define	MD_GET_INVDID	0x02
 
 /*
- * for setting the un_revision
+ * for setting the un_revision, hsp_revision and hs_revision
  */
-#define	MD_32BIT_META_DEV	0
-#define	MD_64BIT_META_DEV	1
+#define	MD_64BIT_META_DEV	0x01
+#define	MD_FN_META_DEV		0x02	/* Friendly named metadevice */
 
 /*
  * for trans EOF error messages
@@ -268,6 +306,18 @@ typedef struct mdnm_params {
 	uint_t		ref_count;	/* returned n_count */
 } mdnm_params_t;
 
+typedef struct mdhspnm_params {
+	md_error_t	mde;		/* Error return */
+	char		drvnm[MD_MAXDRVNM];  /* drvnm for get/set/rem nm */
+	uint_t		hspname_len;	/* Length of device name, for set nm */
+	uint64_t	hspname;	/* Address of device name for set/get */
+	set_t		setno;		/* Which namespace set to use */
+	side_t		side;		/* -1 == current side, >0 specified */
+	hsp_t		hspid;		/* 0 == alloc one, else use this key */
+	hsp_t		ret_hspid;	/* return key here! */
+	uint_t		ref_count;	/* returned n_count */
+} mdhspnm_params_t;
+
 typedef struct md_getdevs_params {
 	MD_DRIVER
 	md_error_t	mde;
@@ -374,7 +424,7 @@ typedef struct md_mn_setcap_params {
 typedef struct md_mkdev_params {
 	MD_DRIVER
 	md_error_t	mde;		/* Error return */
-	minor_t		mnum;
+	unit_t		un;
 } md_mkdev_params_t;
 
 /*
@@ -697,6 +747,8 @@ typedef struct md_regen_param {
 #define	MD_MN_SETSYNC		(MDIOC|102) /* multi-threaded MD_IOCSETSYNC */
 #define	MD_MN_POKE_HOTSPARES	(MDIOC|103) /* poke hotspares */
 #define	MD_DB_LBINITTIME	(MDIOC|104) /* get the lb_inittime */
+#define	MD_IOCGET_HSP_NM	(MDIOC|105) /* get hsp entry from namespace */
+#define	MD_IOCREM_DEV		(MDIOC|106) /* remove device node for unit */
 
 #define	MDIOC_MISC	(MDIOC|128)	/* misc module base */
 /* Used in DEBUG_TEST code */

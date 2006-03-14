@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,14 +313,19 @@ meta_check_primary_mirror(
 	 * is net mounted as happens if we're part of the
 	 * install process, rootnp will be set to NULL and we
 	 * return success.
+	 *
+	 * Since curroot should be a complete path, we only
+	 * need to check whether the device is a logical device.
+	 * The metaname below returns NULL if curroot is not a logical
+	 * device.
 	 */
-	if ((rootnp = metaname(&sp, curroot, ep)) == NULL)
+	if ((rootnp = metaname(&sp, curroot, LOGICAL_DEVICE, ep)) == NULL)
 		return (0);
 	/*
-	 * If the currently mounted root slice is not a
-	 * ctds, we don't bother checking
+	 * If we're here, the curroot is a mounted on a logical device.
+	 * Make sure this mirror is not on the root logical device.
 	 */
-	if ((!metaismeta(rootnp)) && metaismeta(mirnp)) {
+	if (metaismeta(mirnp)) {
 		if ((mirrorp = meta_get_mirror(sp, mirnp, ep)) == NULL)
 			return (-1);
 
@@ -597,7 +601,14 @@ mirror_print(
 
 
 	if (options & PRINT_LARGEDEVICES) {
-		if (mirrorp->common.revision != MD_64BIT_META_DEV) {
+		if ((mirrorp->common.revision & MD_64BIT_META_DEV) == 0) {
+			rval = 0;
+			goto out;
+		}
+	}
+
+	if (options & PRINT_FN) {
+		if ((mirrorp->common.revision & MD_FN_META_DEV) == 0) {
 			rval = 0;
 			goto out;
 		}
@@ -619,7 +630,7 @@ mirror_print(
 		}
 
 		/* print submirror */
-		if (fprintf(fp, " %s", submirnamep->cname) == EOF)
+		if (fprintf(fp, " %s", submirnamep->rname) == EOF)
 			goto out;
 	}
 
@@ -908,7 +919,40 @@ mirror_report(
 	 * level and print there if appropriate.
 	 */
 	if (options & PRINT_LARGEDEVICES) {
-		if (mirrorp->common.revision != MD_64BIT_META_DEV) {
+		if ((mirrorp->common.revision & MD_64BIT_META_DEV) == 0) {
+			for (smi = 0; (smi < NMIRROR); ++smi) {
+				md_submirror_t	*mdsp =
+				    &mirrorp->submirrors[smi];
+				mdname_t	*submirnamep =
+				    mdsp->submirnamep;
+				if (submirnamep == NULL) {
+					continue;
+				}
+				if ((metaismeta(submirnamep)) &&
+				    (meta_print_name(sp, submirnamep, nlpp,
+				    fname, fp, options | PRINT_SUBDEVS, NULL,
+				    ep) != 0)) {
+					return (-1);
+				}
+			}
+			rval = 0;
+			goto out;
+		} else {
+			if (meta_getdevs(sp, mirrorp->common.namep,
+			    nlpp, ep) != 0)
+				goto out;
+		}
+	}
+
+	/*
+	 * check for the -D option. If -D and the name is
+	 * a descriptive name, get the dev for relocation information
+	 * printout. If not a descriptive name, don't print this
+	 * information out but you need to go down to the subdevice
+	 * level and print there if appropriate.
+	 */
+	if (options & PRINT_FN) {
+		if ((mirrorp->common.revision & MD_FN_META_DEV) == 0) {
 			for (smi = 0; (smi < NMIRROR); ++smi) {
 				md_submirror_t	*mdsp =
 				    &mirrorp->submirrors[smi];
@@ -987,7 +1031,7 @@ mirror_report(
 	/* print resync status */
 	if (status & MD_UN_RESYNC_CANCEL) {
 		/* Resync was cancelled but is restartable */
-		if (mirrorp->common.revision == MD_64BIT_META_DEV) {
+		if (mirrorp->common.revision & MD_64BIT_META_DEV) {
 			if (fprintf(fp, dgettext(TEXT_DOMAIN,
 			    "    Resync cancelled: %2d.%1d %% done\n"),
 			    mirrorp->percent_done/10,
@@ -1002,7 +1046,7 @@ mirror_report(
 			}
 		}
 	} else if (status & MD_UN_RESYNC_ACTIVE) {
-		if (mirrorp->common.revision == MD_64BIT_META_DEV) {
+		if (mirrorp->common.revision & MD_64BIT_META_DEV) {
 			if (fprintf(fp, dgettext(TEXT_DOMAIN,
 			    "    Resync in progress: %2d.%1d %% done\n"),
 			    mirrorp->percent_done/10,
@@ -1136,11 +1180,23 @@ mirror_report(
 		char		*sm_state;
 		md_timeval32_t	tv;
 		char		*timep;
+		md_stripe_t	*stripep;
 
 		/* skip unused submirrors */
 		if (submirnamep == NULL) {
 			assert(mdsp->state == SMS_UNUSED);
 			continue;
+		}
+
+		if (options & PRINT_FN) {
+			/* get unit structure */
+			if ((stripep = meta_get_stripe_common(sp, submirnamep,
+			    ((options & PRINT_FAST) ? 1 : 0), ep)) == NULL)
+				goto out;
+
+			if ((stripep->common.revision & MD_FN_META_DEV)
+			    == 0)
+				continue;
 		}
 
 		/* add extra line */
@@ -2384,10 +2440,10 @@ meta_create_mirror(
 	/* did the user tell us to generate a large device? */
 	create_flag = meta_check_devicesize(mm->c.un_total_blocks);
 	if (create_flag == MD_CRO_64BIT) {
-		mm->c.un_revision = MD_64BIT_META_DEV;
+		mm->c.un_revision |= MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_64BIT;
 	} else {
-		mm->c.un_revision = MD_32BIT_META_DEV;
+		mm->c.un_revision &= ~MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_32BIT;
 	}
 	set_params.mnum = MD_SID(mm);
@@ -2441,7 +2497,7 @@ meta_init_mirror(
 	assert(argc > 0);
 	if (argc < 1)
 		goto syntax;
-	if ((mirnp = metaname(spp, uname, ep)) == NULL)
+	if ((mirnp = metaname(spp, uname, META_DEVICE, ep)) == NULL)
 		goto out;
 	assert(*spp != NULL);
 	uname = mirnp->cname;
@@ -2504,7 +2560,8 @@ meta_init_mirror(
 		}
 
 		/* parse submirror name */
-		if ((submirnamep = metaname(spp, argv[0], ep)) == NULL)
+		if ((submirnamep = metaname(spp, argv[0],
+		    META_DEVICE, ep)) == NULL)
 			goto out;
 		mdsm->submirnamep = submirnamep;
 		--argc, ++argv;

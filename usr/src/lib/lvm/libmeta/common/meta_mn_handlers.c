@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1149,8 +1148,9 @@ mdmn_do_sm_mddb_attach(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	}
 
 	name = splicename(&d->msg_splitname);
-	if ((np = metaname(&sp, name, &ep)) == NULL) {
-		Free(name);
+	np = metaname(&sp, name, LOGICAL_DEVICE, &ep);
+	Free(name);
+	if (np == NULL) {
 		(void) mdstealerror(&(resp->mmr_ep), &ep);
 		resp->mmr_exitval = -1;
 		return;
@@ -1192,7 +1192,7 @@ mdmn_do_sm_mddb_attach(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		}
 	}
 	add_name = splicename(&d->msg_splitname);
-	if ((np = metaname(&sp, add_name, &ep)) != NULL) {
+	if ((np = metaname(&sp, add_name, LOGICAL_DEVICE, &ep)) != NULL) {
 		meta_invalidate_name(np);
 	} else {
 		ret = -1;
@@ -1268,7 +1268,7 @@ mdmn_do_sm_mddb_detach(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		}
 		/* Not incrementing "i" intentionally (dbcnt is changed) */
 	}
-	if ((np = metaname(&sp, del_name, &ep)) != NULL) {
+	if ((np = metaname(&sp, del_name, LOGICAL_DEVICE, &ep)) != NULL) {
 		meta_invalidate_name(np);
 	} else {
 		ret = -1;
@@ -1673,6 +1673,9 @@ mdmn_do_iocset(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		return;
 	}
 
+	/*
+	 * Device should be in the namespace already
+	 */
 	if ((np = metamnumname(&sp, d->iocset_params.mnum, 1, &mde)) == NULL) {
 		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
 		    "MD_MN_MSG_IOCSET: Invalid mnum %d\n"),
@@ -1681,14 +1684,9 @@ mdmn_do_iocset(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		return;
 	}
 
-	if (meta_init_make_device(&sp, np->cname, &mde) == -1) {
-		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-		    "MD_MN_MSG_IOCSET: Invalid metadevice name %s\n"),
-		    np->cname);
-		resp->mmr_exitval = 1;
-		return;
-	}
-
+	/*
+	 * Create unit structure
+	 */
 	d->iocset_params.mdp = (uintptr_t)&d->unit; /* set pointer to unit */
 	ret = metaioctl(MD_IOCSET, &(d->iocset_params), &mde, np->cname);
 	resp->mmr_exitval = ret;
@@ -1757,7 +1755,7 @@ mdmn_do_addkeyname(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		return;
 	}
 
-	compnp = metaname(&sp, d->addkeyname_name, &mde);
+	compnp = metaname(&sp, d->addkeyname_name, UNKNOWN, &mde);
 	if (compnp != NULL) {
 		ret = add_key_name(sp, compnp, NULL, &mde);
 		if (ret < 0)
@@ -1954,4 +1952,70 @@ mdmn_do_poke_hotspares(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 
 	resp->mmr_exitval = metaioctl(MD_MN_POKE_HOTSPARES, &pokehsp,
 	    &pokehsp.mde, NULL);
+}
+
+/*
+ * Called to create a softpart during a metarecover operation
+ */
+/*ARGSUSED*/
+void
+mdmn_do_addmdname(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
+{
+	md_mn_msg_addmdname_t	*d;
+	md_error_t		mde = mdnullerror;
+	mdsetname_t		*sp;
+	int			init = 0;
+	mdkey_t			key;
+	minor_t			mnum;
+
+	resp->mmr_comm_state = MDMNE_ACK; /* Ok state */;
+	resp->mmr_out_size = 0;
+	resp->mmr_err_size = 0;
+	resp->mmr_out = NULL;
+	resp->mmr_err = NULL;
+	d = (md_mn_msg_addmdname_t *)(void *)msg->msg_event_data;
+
+	if ((sp = metasetnosetname(d->addmdname_setno, &mde)) == NULL) {
+		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		    "MD_MN_MSG_ADDMDNAME: Invalid setno %d\n"),
+		    d->addmdname_setno);
+		resp->mmr_exitval = 1;
+		return;
+	}
+
+	/*
+	 * If device node does not exist then init it
+	 */
+	if (!is_existing_meta_hsp(sp, d->addmdname_name)) {
+	    if ((key = meta_init_make_device(&sp, d->addmdname_name,
+		&mde)) <= 0) {
+		    syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			"MD_MN_MSG_ADDMDNAME: Invalid name %s\n"),
+			d->addmdname_name);
+		    resp->mmr_exitval = 1;
+		    return;
+		}
+
+		init = 1;
+	}
+
+	/*
+	 * We should have it
+	 */
+	if (metaname(&sp, d->addmdname_name, META_DEVICE, &mde) == NULL) {
+
+	    if (init) {
+		if (meta_getnmentbykey(sp->setno, MD_SIDEWILD,
+		    key, NULL, &mnum, NULL, &mde) != NULL) {
+			(void) metaioctl(MD_IOCREM_DEV, &mnum,
+				&mde, NULL);
+		}
+		(void) del_self_name(sp, key, &mde);
+	    }
+
+	    resp->mmr_exitval = 1;
+	    return;
+	}
+
+	resp->mmr_exitval = 0;
 }

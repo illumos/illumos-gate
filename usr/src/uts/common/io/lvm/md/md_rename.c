@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,6 +737,8 @@ md_rename_update_self(
 {
 	minor_t		from_min, to_min;
 	sv_dev_t	sv;
+	mddb_de_ic_t	*dep;
+	mddb_rb32_t	*rbp;
 
 	ASSERT(rtxnp);
 	ASSERT(rtxnp->op == MDRNOP_RENAME);
@@ -756,8 +757,21 @@ md_rename_update_self(
 	/*
 	 * self id changes in our own unit struct
 	 */
-
 	MD_SID(delta->unp) = to_min;
+
+	/*
+	 * make sure that dest always has correct un_revision
+	 * and rb_revision
+	 */
+	delta->unp->c.un_revision |= MD_FN_META_DEV;
+	dep = mddb_getrecdep(MD_RECID(delta->unp));
+	ASSERT(dep);
+	rbp = dep->de_rb;
+	if (rbp->rb_revision & MDDB_REV_RB) {
+		rbp->rb_revision = MDDB_REV_RBFN;
+	} else if (rbp->rb_revision & MDDB_REV_RB64) {
+		rbp->rb_revision = MDDB_REV_RB64FN;
+	}
 
 	/*
 	 * clear old array pointers to unit in-core and unit
@@ -796,6 +810,11 @@ md_rename_update_self(
 	sv.key = rtxnp->from.key;
 
 	md_rem_names(&sv, 1);
+
+	/*
+	 * Remove associated device node as well
+	 */
+	(void) md_remove_minor_node(from_min);
 
 	/*
 	 * and store the record id (from the unit struct) into recids
@@ -1644,13 +1663,37 @@ md_rename(
 	IOLOCK		*iolockp)
 {
 	md_rendelta_t	*family		= NULL;
-	md_rentxn_t	 rtxn;
-	int		 err		= 0;
-	set_t		 setno;
+	md_rentxn_t	rtxn;
+	int		err		= 0;
+	set_t		setno;
+	mdc_unit_t	*mdc;
 
 	ASSERT(iolockp);
 	if (mrp == NULL)
 		return (EINVAL);
+
+	setno = MD_MIN2SET(mrp->from.mnum);
+	if (setno >= md_nsets) {
+		return (EINVAL);
+	}
+
+	/*
+	 * Early exit if top is eof trans
+	 */
+	mdc = (mdc_unit_t *)md_set[setno].s_un[MD_MIN2UNIT(mrp->from.mnum)];
+	while (mdc != NULL) {
+	    if (!MD_HAS_PARENT(mdc->un_parent)) {
+		break;
+	    } else {
+		mdc = (mdc_unit_t *)md_set[setno].s_un[MD_MIN2UNIT
+		    (mdc->un_parent)];
+	    }
+	}
+
+	if (mdc && mdc->un_type == MD_METATRANS) {
+		return (EINVAL);
+	}
+
 
 	mdclrerror(&mrp->mde);
 
@@ -1667,13 +1710,6 @@ md_rename(
 	rtxn.op		= mrp->op;
 	rtxn.uflags	= mrp->flags;
 	rtxn.revision	= mrp->revision;
-
-
-	setno = MD_MIN2SET(rtxn.from.mnum);
-	if (setno >= md_nsets) {
-		err = EINVAL;
-		goto cleanup;
-	}
 
 	if (MD_MIN2UNIT(mrp->to.mnum) >= md_nunits) {
 		err = EINVAL;

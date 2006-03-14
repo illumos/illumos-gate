@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +40,6 @@
 #include <meta.h>
 #include <sys/lvm/md_hotspares.h>
 #include <sys/lvm/md_convert.h>
-
 
 /*
  * FUNCTION:	meta_get_hsp_names()
@@ -137,7 +135,7 @@ get_hspinfo(
 
 	/* should have a set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* get size of unit structure */
 	(void) memset(&mig, 0, sizeof (mig));
@@ -191,7 +189,7 @@ meta_get_hsp_common(
 
 	/* must have set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* short circuit */
 	if (hspnp->unitp != NULL)
@@ -285,7 +283,7 @@ in_hsp(
 
 	/* should be in the same set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* get unit */
 	if ((hspp = meta_get_hsp(sp, hspnp, ep)) == NULL)
@@ -482,11 +480,12 @@ hsp_report(
 	mdname_t	*didnp = NULL;
 	uint_t		len;
 	int		large_hs_dev_cnt = 0;
+	int		fn_hs_dev_cnt = 0;
 
 	if (options & PRINT_LARGEDEVICES) {
 		for (hsi = 0; (hsi < hspp->hotspares.hotspares_len); ++hsi) {
 			md_hs_t	*hsp = &hspp->hotspares.hotspares_val[hsi];
-			if (hsp->revision == MD_64BIT_META_DEV) {
+			if (hsp->revision & MD_64BIT_META_DEV) {
 				large_hs_dev_cnt += 1;
 				if (meta_getdevs(sp, hsp->hsnamep, nlpp, ep)
 				    != 0)
@@ -499,6 +498,21 @@ hsp_report(
 			goto out;
 		}
 	}
+
+	if (options & PRINT_FN) {
+		if (!HSP_ID_IS_FN(hspp->hspnamep->hsp)) {
+			rval = 0;
+			goto out;
+		}
+		for (hsi = 0; (hsi < hspp->hotspares.hotspares_len); ++hsi) {
+			md_hs_t	*hsp = &hspp->hotspares.hotspares_val[hsi];
+			fn_hs_dev_cnt += 1;
+			if (meta_getdevs(sp, hsp->hsnamep, nlpp, ep)
+			    != 0)
+				goto out;
+		}
+	}
+
 	/* print header */
 	if (hspp->hotspares.hotspares_len == 0) {
 		if (fprintf(fp, dgettext(TEXT_DOMAIN, "%s: is empty\n"),
@@ -597,7 +611,7 @@ hsp_report(
 		}
 
 		if (options & PRINT_LARGEDEVICES) {
-			if (hsp->revision != MD_64BIT_META_DEV)
+			if ((hsp->revision & MD_64BIT_META_DEV) == 0)
 				continue;
 		}
 		/* determine if devid does NOT exist */
@@ -668,7 +682,8 @@ meta_hsp_print(
 
 	/* should have same set */
 	assert(sp != NULL);
-	assert((hspnp == NULL) || (sp->setno == HSP_SET(hspnp->hsp)));
+	assert(hspnp == NULL || hspnp->hsp == MD_HSP_NONE ||
+	    sp->setno == HSP_SET(hspnp->hsp));
 
 	/* print all hsps */
 	if (hspnp == NULL) {
@@ -743,6 +758,309 @@ meta_invalidate_hsp(
 }
 
 /*
+ * FUNCTION:	del_hsp_name_mn_sides()
+ * INPUT:	sp	- set name
+ *		curside	- side of this node
+ *		key	- key of records to delete
+ * OUTPUT:	ep	- error information
+ * RETURNS:	none.
+ * PURPOSE:	There are name records for each side in a set.  This
+ *		function deletes the records associated with the specified
+ *		key for all sides except curside.  This function is used
+ *		when the set is a multinode set.
+ */
+static void
+del_hsp_name_mn_sides(
+	mdsetname_t	*sp,
+	md_set_desc	*sd,
+	side_t		curside,
+	mdkey_t		key,
+	md_error_t	*ep
+)
+{
+	md_error_t	first_error = MDNULLERROR;
+	int		error_seen = FALSE;
+	md_mnnode_desc	*nd;
+
+	for (nd = sd->sd_nodelist; nd; nd = nd->nd_next) {
+		if (nd->nd_nodeid == curside)
+			continue;
+		if (del_name(sp, nd->nd_nodeid, key, &first_error) == -1) {
+			if (error_seen == FALSE) {
+				error_seen = TRUE;
+				(void) mdstealerror(ep, &first_error);
+			}
+		}
+	}
+}
+
+/*
+ * FUNCTION:	del_hsp_name_trad_sides()
+ * INPUT:	sp	- set name
+ *		curside	- side of this node
+ *		key	- key of records to delete
+ * OUTPUT:	ep	- error information
+ * RETURNS:	none.
+ * PURPOSE:	There are name records for each side in a set.  This
+ *		function deletes the records associated with the specified
+ *		key for all sides except curside.  This function is used
+ *		when the set is a traditional set.
+ */
+static void
+del_hsp_name_trad_sides(
+	mdsetname_t	*sp,
+	md_set_desc	*sd,
+	side_t		curside,
+	mdkey_t		key,
+	md_error_t	*ep
+)
+{
+	int		error_seen = FALSE;
+	md_error_t	first_error = MDNULLERROR;
+	int		i;
+
+	for (i = 0; i < MD_MAXSIDES; i++) {
+		if (i == curside)
+			continue;
+		if (sd->sd_nodes[i][0] != '\0') {
+			if (del_name(sp, i, key, &first_error) == -1) {
+				if (error_seen == FALSE) {
+					error_seen = TRUE;
+					(void) mdstealerror(ep, &first_error);
+				}
+			}
+		}
+	}
+}
+
+/*
+ * FUNCTION:	del_hsp_keys()
+ * INPUT:	sp	- set name
+ *		hspid	- ID of records to delete
+ * OUTPUT:	ep	- error information
+ * RETURNS:	0	- success
+ *		-1	- error
+ * PURPOSE:	Remove the NM records associated with hspid from all sides
+ *		of the set.  Missing records are not considered to be an
+ *		error.  The key associated with the current side is removed
+ *		last.
+ *
+ *		This function is very similar to del_key_name(), except it
+ *		does not require any device look up.  This is because the
+ *		hot spare pool is not a device.
+ */
+static int
+del_hsp_keys(mdsetname_t *sp, hsp_t hspid, md_error_t *ep)
+{
+	md_error_t	first_error = MDNULLERROR;
+	mdkey_t		key = HSP_ID_TO_KEY(hspid);
+	md_set_desc	*sd;
+	side_t		thisside;	/* Side # of this node. */
+
+	/*
+	 * If there is no key, this means that the hot spare was created
+	 * before the introduction of friendly names.  Thus, the is no NM
+	 * record and nothing for us to do in this function.
+	 */
+	if (key == MD_KEYBAD)
+		return (0);
+
+	/* Find our current side */
+	mdclrerror(ep);
+	thisside = getmyside(sp, ep);
+	if (! mdisok(ep))
+		return (-1);
+
+	/*
+	 * If not the local set, we need to process the non-local sides
+	 * first.
+	 */
+	if (!metaislocalset(sp)) {
+		if ((sd = metaget_setdesc(sp, ep)) == NULL)
+			return (-1);
+		if (MD_MNSET_DESC(sd)) {
+			/* Multinode set.  Sides are in a linked list. */
+			del_hsp_name_mn_sides(sp, sd, thisside, key,
+				&first_error);
+		} else {
+			/* Sides are in an array. */
+			del_hsp_name_trad_sides(sp, sd, thisside, key,
+				&first_error);
+		}
+	}
+
+	/* Now delete the name for the current side. */
+	(void) del_name(sp, thisside, key, ep);
+	if (! mdisok(&first_error))
+		(void) mdstealerror(ep, &first_error);
+	return (mdisok(ep) ? 0 : -1);
+}
+
+/*
+ * FUNCTION:	add_hsp_name_mn_sides()
+ * INPUT:	sp	- set name
+ *		curside	- side number for this node
+ *		key	- key to use for the name record
+ *		hsp_name - name of the hot spare
+ * OUTPUT:	ep	- error information
+ * RETURNS:	0 indicates success, and -1 indicates failure.
+ * PURPOSE:	Once the name record has been added for the current side,
+ *		this function adds the record to the remaining sides.  This
+ *		function is to be used when the set is a multinode set.
+ *		The side designated by curside will be ignored when adding
+ *		records.
+ */
+static int
+add_hsp_name_mn_sides(
+	mdsetname_t	*sp,
+	md_set_desc	*sd,
+	side_t		curside,
+	mdkey_t		key,
+	char		*hsp_name,
+	md_error_t	*ep
+)
+{
+	md_mnnode_desc	*nd;
+
+	for (nd = sd->sd_nodelist; nd; nd = nd->nd_next) {
+		if (nd->nd_nodeid == curside)
+			continue;
+		if (add_name(sp, nd->nd_nodeid, key, MD_HOTSPARES,
+			minor(NODEV), hsp_name, ep) == -1) {
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+/*
+ * FUNCTION:	add_hsp_name_trad_sides()
+ * INPUT:	sp	- set name
+ *		curside	- side number for this node
+ *		key	- key to use for the name record
+ *		hsp_name - name of the hot spare
+ * OUTPUT:	ep	- error information
+ * RETURNS:	0 indicates success, and -1 indicates failure.
+ * PURPOSE:	Once the name record has been added for the current side,
+ *		this function adds the record to the remaining sides.  This
+ *		function is to be used when the set is a traditional set.
+ *		The side designated by curside will be ignored when adding
+ *		records.
+ */
+static int
+add_hsp_name_trad_sides(
+	mdsetname_t	*sp,
+	md_set_desc	*sd,
+	side_t		curside,
+	mdkey_t		key,
+	char		*hsp_name,
+	md_error_t	*ep
+)
+{
+	int		i;
+
+	for (i = 0; i < MD_MAXSIDES; i++) {
+		if (i == curside)
+			continue;
+		if (sd->sd_nodes[i][0] != '\0') {
+			if (add_name(sp, i, key, MD_HOTSPARES, minor(NODEV),
+				hsp_name, ep) == -1) {
+				return (-1);
+			}
+		}
+	}
+	return (0);
+}
+
+/*
+ * FUNCTION:	add_hsp_name()
+ * INPUT:	sp	- Name of the set containing the hsp
+ *		hsp_name - Hot spare pool name to be added
+ * OUTPUT:	ep	- Error information
+ * RETURNS:	If successful the key of the newly added record is
+ *		returned.  MD_KEYBAD is returned to indicate a failure.
+ * PURPOSE:	This function creates a new NM record containing the name
+ *		of the hotspare pool.  A record containing the name is
+ *		added to each active side, but the record is added first to
+ *		the current side.  This function is modeled on
+ *		add_key_name() in meta_namespace.  The difference is that
+ *		there is no device associated with a hot spare pool
+ */
+static hsp_t
+add_hsp_name(
+	mdsetname_t	*sp,
+	char		*hsp_name,
+	md_error_t	*ep
+)
+{
+	md_error_t	ignore_error = MDNULLERROR;
+	mdkey_t		key;
+	md_set_desc	*sd;
+	side_t		thisside;	/* Side # of this node. */
+
+	if (sp == NULL) {
+		(void) mderror(ep, MDE_NO_SET, NULL);
+		return (MD_KEYBAD);
+	}
+	if (hsp_name == NULL) {
+		(void) mderror(ep, MDE_INVAL_HSOP, NULL);
+		return (MD_KEYBAD);
+	}
+
+	mdclrerror(ep);
+	thisside = getmyside(sp, ep);
+	if (! mdisok(ep))
+		return (MD_HSPID_WILD);
+
+	/* First add the record for the side of the current node. */
+	key = add_name(sp, thisside, MD_KEYWILD, MD_HOTSPARES, minor(NODEV),
+		hsp_name, ep);
+	if (key == -1) {
+		goto cleanup;
+	}
+
+	/* Make sure that we can use the key */
+	if (!HSP_KEY_OK(key)) {
+		(void) mdhsperror(ep, MDE_HSP_CREATE_FAILURE, MD_HSPID_WILD,
+			hsp_name);
+		goto cleanup;
+	}
+
+	/*
+	 * Now that we have a key, we will use it to add a record to the
+	 * rest of the sides in the set.  For multinode sets, the sides are
+	 * in a linked list that is anchored on the set descriptor.  For
+	 * traditional sets the side information is in an array in the set
+	 * descriptor.
+	 */
+	if (!metaislocalset(sp)) {
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			goto cleanup;
+		}
+		if (MD_MNSET_DESC(sd)) {
+			/* Multinode set.  Sides are in linked list. */
+			if (add_hsp_name_mn_sides(sp, sd, thisside, key,
+				hsp_name, ep) == -1) {
+				goto cleanup;
+			}
+		} else {
+			/* Traditional set.  Sides are in an array. */
+			if (add_hsp_name_trad_sides(sp, sd, thisside, key,
+				hsp_name, ep) == -1) {
+				goto cleanup;
+			}
+		}
+	}
+
+	return (KEY_TO_HSP_ID(sp->setno, key));
+
+cleanup:
+	/* Get rid records that we added. */
+	(void) del_hsp_keys(sp, KEY_TO_HSP_ID(sp->setno, key), &ignore_error);
+	return (MD_HSPID_WILD);
+}
+
+/*
  * add hotspares and/or hotspare pool
  */
 int
@@ -754,12 +1072,14 @@ meta_hs_add(
 	md_error_t	*ep
 )
 {
+	md_error_t	ignore_error = MDNULLERROR;
 	mdnamelist_t	*p;
 	set_hs_params_t	shs;
+	side_t		thisside;
 
 	/* should have a set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* clear cache */
 	meta_invalidate_hsp(hspnp);
@@ -767,8 +1087,38 @@ meta_hs_add(
 	/* setup hotspare pool info */
 	(void) memset(&shs, 0, sizeof (shs));
 	shs.shs_cmd = ADD_HOT_SPARE;
-	shs.shs_hot_spare_pool = hspnp->hsp;
 	MD_SETDRIVERNAME(&shs, MD_HOTSPARES, sp->setno);
+
+	/* Get key for hot spare pool name record. */
+	if (options & MDCMD_DOIT) {
+		/* First see if the name record already exists. */
+		mdclrerror(ep);
+		thisside = getmyside(sp, ep);
+		if (! mdisok(ep))
+			return (-1);
+		shs.shs_hot_spare_pool =
+			meta_gethspnmentbyname(sp->setno, thisside,
+				hspnp->hspname, ep);
+		if (! mdisok(ep)) {
+			/*
+			 * If the error is ENOENT, then we will create a
+			 * hot spare pool name records.  For other types of
+			 * errors, however, we'll bail out.
+			 */
+			if (! mdissyserror(ep, ENOENT))
+				return (-1);
+			mdclrerror(ep);
+			/* make sure that the name isn't already in use */
+			if (is_existing_metadevice(sp, hspnp->hspname))
+				return (mderror(ep, MDE_NAME_IN_USE,
+					hspnp->hspname));
+			if ((shs.shs_hot_spare_pool =
+				add_hsp_name(sp, hspnp->hspname, ep)) ==
+				MD_HSPID_WILD) {
+				return (-1);
+			}
+		}
+	}
 
 	/* add empty hotspare pool */
 	if (hsnlp == NULL) {
@@ -778,8 +1128,14 @@ meta_hs_add(
 			shs.shs_options |= HS_OPT_DRYRUN;
 		}
 		if (metaioctl(MD_IOCSET_HS, &shs, &shs.mde,
-		    hspnp->hspname) != 0)
+			hspnp->hspname) != 0) {
+			if (options & MDCMD_DOIT) {
+				(void) del_hsp_keys(sp,
+					shs.shs_hot_spare_pool,
+					&ignore_error);
+			}
 			return (mdstealerror(ep, &shs.mde));
+		}
 		goto success;
 	}
 
@@ -794,7 +1150,8 @@ meta_hs_add(
 		diskaddr_t	size, label, start_blk;
 
 		/* should be in same set */
-		assert(sp->setno == HSP_SET(hspnp->hsp));
+		assert(hspnp->hsp == MD_HSP_NONE ||
+		    sp->setno == HSP_SET(hspnp->hsp));
 
 		/* check it out */
 		if (meta_check_hotspare(sp, hsnp, ep) != 0)
@@ -857,6 +1214,49 @@ success:
 }
 
 /*
+ * FUNCTION:	meta_hsp_delete()
+ * INPUT:	sp	- Name of the set containing the hsp
+ *		hspnp	- Hot spare pool name information
+ *		options	- Options from command line
+ * OUTPUT:	ep	- Error information
+ * RETURNS:	0 on success and -1 on failure.
+ * PURPOSE:	Common code to delete an empty hot spare pool.
+ */
+static int
+meta_hsp_delete(
+	mdsetname_t	*sp,
+	mdhspname_t	*hspnp,
+	mdcmdopts_t	options,
+	md_error_t	*ep
+)
+{
+	set_hs_params_t	shs;
+
+	/* setup hotspare pool info */
+	(void) memset(&shs, 0, sizeof (shs));
+	shs.shs_hot_spare_pool = hspnp->hsp;
+	MD_SETDRIVERNAME(&shs, MD_HOTSPARES, sp->setno);
+	shs.shs_cmd = DELETE_HOT_SPARE;
+	shs.shs_options = HS_OPT_POOL;
+	/* If DOIT is not set, it's a dryrun */
+	if ((options & MDCMD_DOIT) == 0) {
+		shs.shs_options |= HS_OPT_DRYRUN;
+	}
+
+	/* Remove hsp record. */
+	if (metaioctl(MD_IOCSET_HS, &shs, &shs.mde,
+	    hspnp->hspname) != 0)
+		return (mdstealerror(ep, &shs.mde));
+
+	/* Get rid of hsp NM records */
+	if ((options & MDCMD_DOIT) &&
+		(del_hsp_keys(sp, hspnp->hsp, ep) == -1)) {
+		return (-1);
+	}
+	return (0);
+}
+
+/*
  * delete hotspares from pool
  */
 int
@@ -873,7 +1273,7 @@ meta_hs_delete(
 
 	/* should have a set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* clear cache */
 	meta_invalidate_hsp(hspnp);
@@ -886,14 +1286,8 @@ meta_hs_delete(
 
 	/* delete empty hotspare pool */
 	if (hsnlp == NULL) {
-		shs.shs_options = HS_OPT_POOL;
-		/* If DOIT is not set, it's a dryrun */
-		if ((options & MDCMD_DOIT) == 0) {
-			shs.shs_options |= HS_OPT_DRYRUN;
-		}
-		if (metaioctl(MD_IOCSET_HS, &shs, &shs.mde,
-		    hspnp->hspname) != 0)
-			return (mdstealerror(ep, &shs.mde));
+		if (meta_hsp_delete(sp, hspnp, options, ep) != 0)
+			return (-1);
 		goto success;
 	}
 
@@ -907,7 +1301,8 @@ meta_hs_delete(
 		mdname_t	*hsnp = p->namep;
 
 		/* should be in same set */
-		assert(sp->setno == HSP_SET(hspnp->hsp));
+		assert(hspnp->hsp == MD_HSP_NONE ||
+		    sp->setno == HSP_SET(hspnp->hsp));
 
 		/* delete hotspare */
 		shs.shs_component_old = hsnp->dev;
@@ -963,7 +1358,7 @@ meta_hs_replace(
 
 	/* should be in same set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* save new binding incase this is a rebind where oldnp==newnp */
 	new_dev = newnp->dev;
@@ -1436,7 +1831,8 @@ meta_init_hsp(
 
 	/* see if it exists already */
 	if (meta_get_hsp(*spp, hspnp, ep) != NULL) {
-		(void) mdhsperror(ep, MDE_HSP_ALREADY_SETUP, hspnp->hsp, uname);
+		(void) mdhsperror(ep, MDE_HSP_ALREADY_SETUP,
+		    hspnp->hsp, uname);
 		goto out;
 	} else if (! mdishsperror(ep, MDE_INVAL_HSP)) {
 		goto out;
@@ -1469,7 +1865,8 @@ meta_init_hsp(
 		mdname_t	*hsnamep;
 
 		/* parse hotspare name */
-		if ((hsnamep = metaname(spp, argv[0], ep)) == NULL)
+		if ((hsnamep = metaname(spp, argv[0],
+		    LOGICAL_DEVICE, ep)) == NULL)
 			goto out;
 		hsp->hsnamep = hsnamep;
 		--argc, ++argv;
@@ -1520,7 +1917,8 @@ meta_hsp_reset(
 
 	/* should have the same set */
 	assert(sp != NULL);
-	assert((hspnp == NULL) || (sp->setno == HSP_SET(hspnp->hsp)));
+	assert(hspnp == NULL || hspnp->hsp == MD_HSP_NONE ||
+	    sp->setno == HSP_SET(hspnp->hsp));
 
 	/* reset all hotspares */
 	if (hspnp == NULL) {
@@ -1595,15 +1993,8 @@ meta_hsp_reset(
 	}
 
 	/* clear hotspare pool */
-	shs.shs_options = HS_OPT_POOL;
-	/* If DOIT is not set, it's a dryrun */
-	if ((options & MDCMD_DOIT) == 0) {
-		shs.shs_options |= HS_OPT_DRYRUN;
-	}
-	if (metaioctl(MD_IOCSET_HS, &shs, &shs.mde, hspnp->hspname) != 0) {
-		(void) mdstealerror(ep, &shs.mde);
+	if (meta_hsp_delete(sp, hspnp, options, ep) != 0)
 		goto out;
-	}
 	rval = 0;	/* success */
 
 	/* let em know */

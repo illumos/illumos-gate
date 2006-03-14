@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1436,9 +1435,6 @@ extract_mduser_data(
 		case MDDB_F_HOTSPARE_POOL:
 			/*
 			 * Ondisk and incore records are always same size.
-			 * Also, hotspare pools will always be toplevel
-			 * metadevices, so we don't need to store a
-			 * hsp_self_id.
 			 */
 			hsp = (hot_spare_pool_ond_t *)((uintptr_t)rbp +
 			    (sizeof (mddb_rb_t) - sizeof (int)));
@@ -1448,7 +1444,14 @@ extract_mduser_data(
 			bcopy(hsp, mdrec->record, newreqsize);
 			hsp = (hot_spare_pool_ond_t *)mdrec->record;
 			mdrec->dfunc = &process_hotspare_pool;
-			mdrec->un_self_id = NULL;
+			/*
+			 * If the hsp has descriptive name we'll get
+			 * the un_self_id
+			 */
+			if (HSP_ID_IS_FN(hsp->hsp_self_id))
+				mdrec->un_self_id = hsp->hsp_self_id;
+			else
+				mdrec->un_self_id = NULL;
 			mdrec->has_parent = 0;
 			break;
 		/* All valid cases have been dealt with */
@@ -1467,16 +1470,31 @@ extract_mduser_data(
 		    nmname = (struct nm_name *)((char *)nmname +
 		    NAMSIZ(nmname))) {
 			/*
-			 * Matching the un_self_id for the record to the
-			 * n_minor name in the NM record, to extract the
-			 * metadevice name if it is in the namespace
+			 * Extract the metadevice/hsp name if it is
+			 * in the namespace.
+			 *
+			 * If it is a hot spare pool we will find our
+			 * match by comparing the NM record's n_key
+			 * with the extracted key from the hsp_self_id
+			 * Else, match the un_self_id for the record
+			 * to the n_minor name in the NM record.
 			 */
-			    if ((nmname->n_minor) == (uc.un_self_id)) {
-				(*mdrec).n_key = nmname->n_key;
-				uname = Strdup(nmname->n_name);
-				mdrec->n_name = uname;
-				break;
-			}
+			    if (mdrec->md_type == MDDB_F_HOTSPARE_POOL) {
+				if (nmname->n_key ==
+				    HSP_ID_TO_KEY(hsp->hsp_self_id)) {
+					mdrec->n_key = nmname->n_key;
+					uname = Strdup(nmname->n_name);
+					mdrec->n_name = uname;
+					break;
+				}
+			    } else {
+				if ((nmname->n_minor) == (uc.un_self_id)) {
+					(*mdrec).n_key = nmname->n_key;
+					uname = Strdup(nmname->n_name);
+					mdrec->n_name = uname;
+					break;
+				}
+			    }
 		}
 	}
 
@@ -1541,7 +1559,7 @@ read_mdrecord(
 	mddb_rb32_t	*rbp_32;
 	mddb_rb_t	*rbp_64;
 	crc_skip_t	*skip = NULL;
-	int		is_32bit_record = 0;
+	int		is_32bit_record;
 
 	tmp_mdrec = Zalloc(sizeof (md_im_rec_t));
 	rbp = (void *)Zalloc(dbtob(dep->de_blkcount));
@@ -1596,9 +1614,16 @@ read_mdrecord(
 	 * revision for the current 64bit or 32bit record block.  Also,
 	 * setting the flag for whether or not it is a 32bit record.
 	 */
-	if (revchk(MDDB_REV_RB, rbp_32->rb_revision) == 0) {
+	is_32bit_record = 0;
+	switch (rbp_32->rb_revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		is_32bit_record = 1;
-	} else if (revchk(MDDB_REV_RB64, rbp_32->rb_revision) != 0) {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
+		break;
+	default:
 		rval = -1;
 		(void) mdmddberror(ep, MDE_DB_NODB, 0, 0, 0, NULL);
 		goto out;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +81,93 @@ meta_getnmentbykey(
 
 	return (Strdup(device_name));
 }
+
+/*
+ * Ask the driver for the hsp name, driver name, and minor number;
+ * which has been stored in the metadevice state database
+ * (on behalf of the utilities).
+ * (by key)
+ */
+char *
+meta_gethspnmentbyid(
+	set_t		setno,
+	side_t		sideno,
+	hsp_t		hspid,
+	md_error_t	*ep
+)
+{
+	struct mdhspnm_params	nm;
+	char			*device_name;
+
+	device_name = Malloc(MAXPATHLEN);
+	device_name[0] = '\0';
+
+	(void) memset(&nm, '\0', sizeof (nm));
+	nm.setno = setno;
+	nm.side = sideno;
+	nm.hspid = hspid;
+	nm.ret_hspid = MD_HSPID_WILD;
+	nm.hspname_len = MAXPATHLEN;
+	nm.hspname = (uint64_t)device_name;
+
+	if (metaioctl(MD_IOCGET_HSP_NM, &nm, &nm.mde, NULL) != 0) {
+		(void) mdstealerror(ep, &nm.mde);
+		Free(device_name);
+		return (NULL);
+	}
+
+	return (device_name);
+}
+
+/*
+ * Ask the driver for the hsp_self_id;
+ * which has been stored in the metadevice state database
+ * (on behalf of the utilities).
+ * (by hsp name)
+ */
+hsp_t
+meta_gethspnmentbyname(
+	set_t		setno,
+	side_t		sideno,
+	char		*hspname,
+	md_error_t	*ep
+)
+{
+	struct mdhspnm_params	nm;
+	char			*device_name;
+
+	/* must have a hsp name */
+	assert(hspname != NULL);
+
+	device_name = Malloc(MAXPATHLEN);
+	(void) strcpy(device_name, hspname);
+
+	(void) memset(&nm, '\0', sizeof (nm));
+	nm.setno = setno;
+	nm.side = sideno;
+	nm.hspid = MD_HSPID_WILD;
+	nm.ret_hspid = MD_HSPID_WILD;
+	nm.hspname_len = strlen(device_name) + 1;
+	nm.hspname = (uint64_t)device_name;
+
+	/*
+	 * The ioctl expects the a hsp name and return its hsp_self_id.
+	 */
+	if (metaioctl(MD_IOCGET_HSP_NM, &nm, &nm.mde, NULL) != 0) {
+		(void) mdstealerror(ep, &nm.mde);
+		Free(device_name);
+		return (MD_HSP_NONE);
+	}
+
+	if (nm.ret_hspid == MD_HSPID_WILD) {
+		Free(device_name);
+		return (MD_HSP_NONE);
+	}
+
+	Free(device_name);
+	return (nm.ret_hspid);
+}
+
 
 /*
  * Ask the driver for the minor name which has been stored in the
@@ -277,6 +363,24 @@ meta_getnmentbydev(
 		return (NULL);
 	}
 
+	/*
+	 * With the friendly name work, each metadevice will have
+	 * an NM entry. However, to allow backward compatibility,
+	 * systems upgraded to a friendly name release won't have
+	 * NM entries for the pre-existing top level metadevices. This
+	 * implementation allows users to downgrade to a pre-friendly
+	 * name release since the configuration information (mddb) is
+	 * not modified.
+	 *
+	 * meta_getnmentbydev is called to get nm entry for all metadevices
+	 * and expects the minor and major number and returns a key and
+	 * name. For upgraded systems with pre-existing metadevices,
+	 * the only returning value will be the name since there's no nm
+	 * entry for pre-friendly name top level metadevices. So a return
+	 * key for the device will not be available and will be NULL.
+	 * Thus, the caller is responsible for making sure the returned key
+	 * is valid, not NULL.
+	 */
 	if (drvnm != NULL)
 		*drvnm = Strdup(nm.drvnm);
 	if (mnum != NULL)
@@ -597,5 +701,174 @@ del_key_names(
 	/* cleanup, return success */
 	if (ep == &status)
 		mdclrerror(&status);
+	return (rval);
+}
+
+
+/*
+ * This routine when is called will store the metadevice name
+ * when it is first created
+ */
+mdkey_t
+add_self_name(
+	mdsetname_t	*sp,
+	char 		*uname,
+	md_mkdev_params_t	*params,
+	md_error_t	*ep
+)
+{
+	char		*p, *devname;
+	side_t		myside, side;
+	mdkey_t		key;
+	md_set_desc	*sd;
+	int		len;
+	char		*drvname = params->md_driver.md_drivername;
+	minor_t		minor = MD_MKMIN(sp->setno, params->un);
+	md_mnnode_desc	*mnside;
+
+	p = strrchr(uname, '/');
+	p = (p == NULL? uname : ++p);
+
+	/*
+	 * The valid qualified name
+	 */
+	if (metaislocalset(sp)) {
+	    len = strlen(p) + strlen("/dev/md/dsk/") + 1;
+	    devname = Malloc(len);
+	    (void) strcpy(devname, "/dev/md/dsk/");
+	    (void) strcat(devname, p);
+	} else {
+	    len = strlen(sp->setname) + strlen(p) +
+		strlen("/dev/md//dsk/") + 1;
+	    devname = Malloc(len);
+	    (void) snprintf(devname, len, "/dev/md/%s/dsk/%s",
+			sp->setname, p);
+	}
+
+	/*
+	 * Add self to the namespace
+	 */
+	if ((myside = getmyside(sp, ep)) == MD_SIDEWILD) {
+		Free(devname);
+		return (-1);
+	}
+
+	if (metaislocalset(sp)) {
+	    if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
+		minor, devname, ep)) == MD_KEYBAD) {
+			Free(devname);
+			return (-1);
+	    }
+	} else {
+		/*
+		 * Add myside first and use the returned key to add other sides
+		 */
+		if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
+		    minor, devname, ep)) == MD_KEYBAD) {
+			Free(devname);
+			return (-1);
+		}
+
+		/*
+		 * Add for all other sides
+		 */
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			Free(devname);
+			return (-1);
+		}
+
+		if (MD_MNSET_DESC(sd)) {
+		    for (mnside = sd->sd_nodelist; mnside != NULL;
+			mnside = mnside->nd_next) {
+			if (mnside->nd_nodeid == myside)
+				continue;
+			if (add_name(sp, mnside->nd_nodeid, key, drvname,
+			    minor, devname, ep) == -1) {
+				Free(devname);
+				return (-1);
+			}
+		    }
+		} else {
+		    for (side = 0; side < MD_MAXSIDES; side++) {
+			if (sd->sd_nodes[side][0] == '\0')
+				continue;
+			if (side == myside)
+				continue;
+			if (add_name(sp, side, key, drvname, minor, devname,
+			    ep) == -1) {
+				Free(devname);
+				return (-1);
+			}
+		    }
+		}
+	}
+
+	Free(devname);
+	return (key);
+}
+
+
+/*
+ * This routine when is called will remove the metadevice name
+ * from the namespace and it is the last thing to do in the
+ * metaclear operation
+ */
+int
+del_self_name(
+	mdsetname_t	*sp,
+	mdkey_t		key,
+	md_error_t	*ep
+)
+{
+	side_t		myside;
+	int		rval = 0;
+	side_t		side;
+	md_set_desc	*sd;
+	md_mnnode_desc	*mnside;
+
+	assert(key != MD_KEYBAD);
+
+	if ((myside = getmyside(sp, ep)) == MD_SIDEWILD)
+		return (-1);
+
+	if (metaislocalset(sp)) {
+		rval = del_name(sp, myside, key, ep);
+	} else {
+		/*
+		 * Remove all other sides first
+		 */
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			return (-1);
+		}
+
+		if (MD_MNSET_DESC(sd)) {
+		    for (mnside = sd->sd_nodelist; mnside != NULL;
+			mnside = mnside->nd_next) {
+			if (mnside->nd_nodeid == myside)
+				continue;
+			if ((rval = del_name(sp, mnside->nd_nodeid, key,
+			    ep)) == -1) {
+				goto out;
+			}
+		    }
+		} else {
+		    for (side = 0; side < MD_MAXSIDES; side++) {
+			if (sd->sd_nodes[side][0] == '\0')
+				continue;
+			if (side == myside)
+				continue;
+			if ((rval = del_name(sp, side, key, ep)) == -1) {
+				goto out;
+			}
+		    }
+		}
+
+		/*
+		 * del myside
+		 */
+		rval = del_name(sp, myside, key, ep);
+	}
+
+out:
 	return (rval);
 }

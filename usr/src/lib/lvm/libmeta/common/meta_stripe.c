@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -566,6 +565,13 @@ stripe_print(
 		}
 	}
 
+	if (options & PRINT_FN) {
+		if (stripep->common.revision != MD_FN_META_DEV) {
+			rval = 0;
+			goto out;
+		}
+	}
+
 	/* print name and num rows */
 	if (fprintf(fp, "%s %u",
 	    stripep->common.namep->cname, stripep->rows.rows_len) == EOF)
@@ -580,32 +586,14 @@ stripe_print(
 		if (fprintf(fp, " %u", rp->comps.comps_len) == EOF)
 			goto out;
 
-		/* print components */
+		/*
+		 * Print components. Always print the full path name.
+		 */
 		for (comp = 0; (comp < rp->comps.comps_len); ++comp) {
 			md_comp_t	*cp = &rp->comps.comps_val[comp];
 
-			/* print component */
-			/*
-			 * If the path is our standard /dev/rdsk or /dev/md/rdsk
-			 * then just print out the cxtxdxsx or the dx, metainit
-			 * will assume the default, otherwise we need the full
-			 * pathname to make sure this works as we intend.
-			 */
-			if ((strstr(cp->compnamep->rname, "/dev/rdsk") ==
-			    NULL) && (strstr(cp->compnamep->rname,
-			    "/dev/md/rdsk") == NULL) &&
-			    (strstr(cp->compnamep->rname, "/dev/td/") ==
-			    NULL)) {
-				/* not standard path, print full pathname */
-				if (fprintf(fp, " %s", cp->compnamep->rname)
-				    == EOF)
-					goto out;
-			} else {
-				/* standard path */
-				if (fprintf(fp, " %s", cp->compnamep->cname)
-				    == EOF)
-					goto out;
-			}
+			if (fprintf(fp, " %s", cp->compnamep->rname) == EOF)
+				goto out;
 		}
 
 		/* print interlace */
@@ -998,7 +986,24 @@ stripe_report(
 	 * printing out the relocation information.
 	 */
 	if (options & PRINT_LARGEDEVICES) {
-		if (stripep->common.revision != MD_64BIT_META_DEV) {
+		if ((stripep->common.revision & MD_64BIT_META_DEV) == 0) {
+			rval = 0;
+			goto out;
+		} else {
+			if (meta_getdevs(sp, stripep->common.namep,
+			    nlpp, ep) != 0)
+				goto out;
+		}
+	}
+
+	/*
+	 * if the -D option has been specified check to see if the
+	 * metadevice has a descriptive name and print if so, also if a
+	 * descriptive device name we need to store the ctd involved
+	 * for use in printing out the relocation information.
+	 */
+	if (options & PRINT_FN) {
+		if ((stripep->common.revision & MD_FN_META_DEV) == 0) {
 			rval = 0;
 			goto out;
 		} else {
@@ -1493,10 +1498,10 @@ meta_stripe_attach(
 	mgp.nrows = old_un->un_nrows;
 	if (create_flag == MD_CRO_32BIT) {
 		mgp.options = MD_CRO_32BIT;
-		new_un->c.un_revision = MD_32BIT_META_DEV;
+		new_un->c.un_revision &= ~MD_64BIT_META_DEV;
 	} else {
 		mgp.options = MD_CRO_64BIT;
-		new_un->c.un_revision = MD_64BIT_META_DEV;
+		new_un->c.un_revision |= MD_64BIT_META_DEV;
 	}
 
 	if ((MD_HAS_PARENT(old_un->c.un_parent)) &&
@@ -2096,10 +2101,10 @@ meta_create_stripe(
 
 	/* did the user tell us to generate a large device? */
 	if (create_flag == MD_CRO_64BIT) {
-		ms->c.un_revision = MD_64BIT_META_DEV;
+		ms->c.un_revision |= MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_64BIT;
 	} else {
-		ms->c.un_revision = MD_32BIT_META_DEV;
+		ms->c.un_revision &= ~MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_32BIT;
 	}
 
@@ -2156,7 +2161,7 @@ meta_init_stripe(
 	if (argc < 1)
 		goto syntax;
 
-	if ((stripenp = metaname(spp, uname, ep)) == NULL)
+	if ((stripenp = metaname(spp, uname, META_DEVICE, ep)) == NULL)
 		goto out;
 	assert(*spp != NULL);
 	uname = stripenp->cname;
@@ -2244,7 +2249,8 @@ meta_init_stripe(
 				    meta_getminor(stripenp->dev), uname);
 				goto out;
 			}
-			if ((compnp = metaname(spp, argv[0], ep)) == NULL) {
+			if ((compnp = metaname(spp, argv[0], UNKNOWN,
+			    ep)) == NULL) {
 				goto out;
 			}
 			/* check for soft partition */

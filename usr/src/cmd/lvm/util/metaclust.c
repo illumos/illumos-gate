@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,19 +237,25 @@ static int
 compose_path(mdsetname_t *sp, int mnum, char *pathname, int pathlen)
 {
 	int	rtn;
+	mdname_t	*np;
+	md_error_t	status = mdnullerror;
 
 	if (MD_MIN2SET(mnum) != sp->setno) {
 		md_eprintf(gettext("minor number 0x%x invalid for set %d\n"),
 		    mnum, sp->setno);
 		return (-1);
 	}
-	rtn = snprintf(pathname, pathlen, "/dev/md/%s/rdsk/d%u",
-	    sp->setname, (unsigned)MD_MIN2UNIT(mnum));
+
+	if ((np = metamnumname(&sp, mnum, 0, &status)) == NULL) {
+		return (-1);
+	}
+
+	rtn = snprintf(pathname, pathlen, "%s", np->rname);
 
 	if ((pathname[0] == '\0') || (rtn >= pathlen)) {
 		md_eprintf(gettext(
-		    "Could not create path for device %s/d%u\n"),
-		    sp->setname, (unsigned)MD_MIN2UNIT(mnum));
+		    "Could not create path for device %s\n"),
+		    get_mdname(sp, mnum));
 		return (-1);
 	}
 	return (0);
@@ -328,15 +333,14 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 			mir_state->mnum = meta_getminor(devnp->dev);
 			MD_SETDRIVERNAME(mir_state, MD_MIRROR, sp->setno);
 			meta_mc_log(MC_LOG4, gettext("Getting mirror state"
-			    " for %s/d%u: %s"), sp->setname,
-			    (unsigned)MD_MIN2UNIT(mir_state->mnum),
+			    " for %s: %s"), get_mdname(sp, mir_state->mnum),
 			    meta_print_hrtime(gethrtime() - start_time));
 
 			if (metaioctl(MD_MN_GET_MIRROR_STATE, mir_state, ep,
 			    "MD_MN_GET_MIRROR_STATE") != 0) {
 				mde_perror(ep, gettext("Unable to get "
-				    "mirror state for %s/d%u"), sp->setname,
-				    (unsigned)MD_MIN2UNIT(mir_state->mnum));
+				    "mirror state for %s"),
+				    get_mdname(sp, mir_state->mnum));
 				goto out;
 			} else {
 				continue;
@@ -372,16 +376,15 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 			MD_SETDRIVERNAME(ownpar, MD_MIRROR, sp->setno);
 
 			meta_mc_log(MC_LOG4, gettext("Setting owner "
-			    "for %s/d%u: %s"), sp->setname,
-			    (unsigned)MD_MIN2UNIT(ownpar->d.mnum),
+			    "for %s: %s"), get_mdname(sp, ownpar->d.mnum),
 			    meta_print_hrtime(gethrtime() - start_time));
 
 			/* get the current owner id */
 			if (metaioctl(MD_MN_GET_MM_OWNER, ownpar, ep,
 			    "MD_MN_GET_MM_OWNER") != 0) {
 				mde_perror(ep, gettext("Unable to get "
-				    "mirror owner for %s/d%u"), sp->setname,
-				    (unsigned)MD_MIN2UNIT(ownpar->d.mnum));
+				    "mirror owner for %s"),
+				    get_mdname(sp, ownpar->d.mnum));
 				goto out;
 			}
 		}
@@ -407,18 +410,16 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 				    MD_MN_MM_ALLOW_CHANGE) == -1) {
 					md_eprintf(gettext(
 					    "Unable to reset mirror owner "
-					    "for %s/d%u\n"), sp->setname,
-					    (unsigned)MD_MIN2UNIT(
-					    ownpar->d.mnum));
+					    "for %s\n"),
+					    get_mdname(sp, ownpar->d.mnum));
 					goto out;
 				}
 				if (meta_mirror_resync(sp, devnp, 0, ep,
 				    MD_RESYNC_KILL_NO_WAIT) != 0) {
 					md_eprintf(gettext(
 					    "Unable to kill resync for"
-					    " %s/d%u\n"), sp->setname,
-					    (unsigned)MD_MIN2UNIT(
-					    ownpar->d.mnum));
+					    " %s\n"),
+					    get_mdname(sp, ownpar->d.mnum));
 					goto out;
 				}
 			}
@@ -441,8 +442,8 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 			    ownpar->d.mnum, ownpar->d.owner,
 			    MD_MN_MM_CHOOSE_OWNER) == -1) {
 				md_eprintf(gettext("Unable to choose "
-				    "mirror owner for %s/d%u\n"), sp->setname,
-				    (unsigned)MD_MIN2UNIT(ownpar->d.mnum));
+				    "mirror owner for %s\n"),
+				    get_mdname(sp, ownpar->d.mnum));
 				goto out;
 			}
 		}
@@ -465,7 +466,7 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 			 * cluster, ABR will be cleared on all nodes.
 			 */
 			char		*miscname;
-			char		name[MD_MAX_CTDLEN];
+			char		name[MAXPATHLEN];
 			int		mnum, fd;
 
 			name[0] = '\0';
@@ -483,8 +484,7 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 				continue;
 
 			meta_mc_log(MC_LOG4, gettext("Re-setting ABR state "
-			    "for %s/d%u: %s"), sp->setname,
-			    (unsigned)MD_MIN2UNIT(mnum),
+			    "for %s: %s"), get_mdname(sp, mnum),
 			    meta_print_hrtime(gethrtime() - start_time));
 
 			/* compose the absolute device path and open it */
@@ -507,7 +507,7 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 			 */
 
 			char		*miscname;
-			char		name[MD_MAX_CTDLEN];
+			char		name[MAXPATHLEN];
 			int		mnum, fd;
 			volcap_t	vc;
 			uint_t		tstate;
@@ -535,8 +535,7 @@ reset_state(uint_t mode, mdsetname_t *sp, char *drivername, md_error_t *ep)
 				continue;
 
 			meta_mc_log(MC_LOG4, gettext("Updating ABR state "
-			    "for %s/d%u: %s"), sp->setname,
-			    (unsigned)MD_MIN2UNIT(mnum),
+			    "for %s: %s"), get_mdname(sp, mnum),
 			    meta_print_hrtime(gethrtime() - start_time));
 
 			/* compose the absolute device path and open it */

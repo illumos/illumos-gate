@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -393,7 +392,14 @@ raid_print(
 
 
 	if (options & PRINT_LARGEDEVICES) {
-		if (raidp->common.revision != MD_64BIT_META_DEV) {
+		if ((raidp->common.revision & MD_64BIT_META_DEV) == 0) {
+			rval = 0;
+			goto out;
+		}
+	}
+
+	if (options & PRINT_FN) {
+		if ((raidp->common.revision & MD_FN_META_DEV) == 0) {
 			rval = 0;
 			goto out;
 		}
@@ -403,28 +409,14 @@ raid_print(
 	if (fprintf(fp, "%s -r", raidp->common.namep->cname) == EOF)
 		goto out;
 
-	/* print columns */
+	/*
+	 * Print columns. Always print the full path.
+	 */
 	for (col = 0; (col < raidp->cols.cols_len); ++col) {
 		md_raidcol_t	*mdrcp = &raidp->cols.cols_val[col];
 
-		/* print column */
-		/*
-		 * If the path is our standard /dev/rdsk or /dev/md/rdsk
-		 * then just print out the cxtxdxsx or the dx, metainit
-		 * will assume the default, otherwise we need the full
-		 * pathname to make sure this works as we intend.
-		 */
-		if ((strstr(mdrcp->colnamep->rname, "/dev/rdsk") == NULL) &&
-		    (strstr(mdrcp->colnamep->rname, "/dev/md/rdsk") == NULL) &&
-		    (strstr(mdrcp->colnamep->rname, "/dev/td/") == NULL)) {
-			/* not standard path, print full pathname */
-			if (fprintf(fp, " %s", mdrcp->colnamep->rname) == EOF)
-				goto out;
-		} else {
-			/* standard path so print ctd or d number */
-			if (fprintf(fp, " %s", mdrcp->colnamep->cname) == EOF)
-				goto out;
-		}
+		if (fprintf(fp, " %s", mdrcp->colnamep->rname) == EOF)
+			goto out;
 	}
 
 	if (fprintf(fp, " -k") == EOF)
@@ -806,7 +798,14 @@ raid_report(
 	uint_t		tstate = 0;
 
 	if (options & PRINT_LARGEDEVICES) {
-		if (raidp->common.revision != MD_64BIT_META_DEV) {
+		if ((raidp->common.revision & MD_64BIT_META_DEV) == 0) {
+			rval = 0;
+			goto out;
+		}
+	}
+
+	if (options & PRINT_FN) {
+		if ((raidp->common.revision & MD_FN_META_DEV) == 0) {
 			rval = 0;
 			goto out;
 		}
@@ -1390,10 +1389,10 @@ meta_raid_attach(
 
 	if (create_flag == MD_CRO_32BIT) {
 		mgp.options = MD_CRO_32BIT;
-		new_mr->c.un_revision = MD_32BIT_META_DEV;
+		new_mr->c.un_revision &= ~MD_64BIT_META_DEV;
 	} else {
 		mgp.options = MD_CRO_64BIT;
-		new_mr->c.un_revision = MD_64BIT_META_DEV;
+		new_mr->c.un_revision |= MD_64BIT_META_DEV;
 	}
 	if (metaioctl(MD_IOCGROW, &mgp, &mgp.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &mgp.mde);
@@ -1583,7 +1582,6 @@ meta_raid_replace(
 	md_dev64_t		old_dev, new_dev;
 	diskaddr_t		new_start_blk, new_end_blk;
 	int			rebind;
-	mr_unit_t		*mr;
 	char			*new_devidp = NULL;
 	md_error_t		xep = mdnullerror;
 	int			ret;
@@ -1629,67 +1627,53 @@ meta_raid_replace(
 	params.old_dev = old_dev;
 	params.cmd = force ? FORCE_REPLACE_COMP : REPLACE_COMP;
 
-	if (options & MDCMD_CLUSTER_REPLACE) {
-		if ((mr = (mr_unit_t *)meta_get_mdunit(sp, raidnp, ep)) == NULL)
-			return (NULL);
-		Free(mr);
-		params.options = MDIOCTL_NO_RESYNC_RAID;
-		params.number_blks = metagetsize(newnp, ep);
-		if ((metagetlabel(newnp, ep) == MD_DISKADDR_ERROR) ||
-		    (metagetlabel(newnp, ep) == 0))
-			params.has_label = 0;
-		else
-			params.has_label = 1;
-		params.start_blk = metagetstart(sp, newnp, ep);
+	if ((strcmp(oldnp->rname, newnp->rname) == 0) &&
+	    (old_dev != new_dev)) {
+		rebind = 1;
 	} else {
-		if ((strcmp(oldnp->rname, newnp->rname) == 0) &&
-		    (old_dev != new_dev)) {
-			rebind = 1;
-		} else {
-			rebind = 0;
-		}
-		if (rebind) {
-			newnp->dev = new_dev;
-			newnp->start_blk = new_start_blk;
-			newnp->end_blk = new_end_blk;
-		}
+		rebind = 0;
+	}
+	if (rebind) {
+		newnp->dev = new_dev;
+		newnp->start_blk = new_start_blk;
+		newnp->end_blk = new_end_blk;
+	}
 
-		/*
-		 * Save a copy of the devid associated with the new disk, the
-		 * reason is that the checks for the column (meta_check_column)
-		 * via validate_new_raid(), could cause the disk's devid to be
-		 * changed to that of the devid that is currently stored in the
-		 * replica namespace for the disk in question. This devid could
-		 * be stale if we are replacing the disk. The actual function
-		 * that overwrites the devid is dr2drivedesc().
-		 */
+	/*
+	 * Save a copy of the devid associated with the new disk, the
+	 * reason is that the checks for the column (meta_check_column)
+	 * via validate_new_raid(), could cause the disk's devid to be
+	 * changed to that of the devid that is currently stored in the
+	 * replica namespace for the disk in question. This devid could
+	 * be stale if we are replacing the disk. The actual function
+	 * that overwrites the devid is dr2drivedesc().
+	 */
 
-		/* don't setup new_devid if no devid's or MN diskset */
-		if (newnp->drivenamep->devid != NULL)
-			new_devidp = Strdup(newnp->drivenamep->devid);
+	/* don't setup new_devid if no devid's or MN diskset */
+	if (newnp->drivenamep->devid != NULL)
+		new_devidp = Strdup(newnp->drivenamep->devid);
 
-		if (!metaislocalset(sp)) {
-			if ((sd = metaget_setdesc(sp, ep)) == NULL)
-				return (-1);
-			if (MD_MNSET_DESC(sd))
-				new_devidp = NULL;
-		}
-
-		/* check out new (sets up start_blk, has_label, number_blks) */
-		if (validate_new_raid(sp, raidnp, newnp, &params, rebind,
-		    ep) != 0) {
-			Free(new_devidp);
+	if (!metaislocalset(sp)) {
+		if ((sd = metaget_setdesc(sp, ep)) == NULL)
 			return (-1);
-		}
+		if (MD_MNSET_DESC(sd))
+			new_devidp = NULL;
+	}
 
-		/*
-		 * Copy back the saved devid.
-		 */
-		Free(newnp->drivenamep->devid);
-		if (new_devidp) {
-			newnp->drivenamep->devid = Strdup(new_devidp);
-			Free(new_devidp);
-		}
+	/* check out new (sets up start_blk, has_label, number_blks) */
+	if (validate_new_raid(sp, raidnp, newnp, &params, rebind,
+	    ep) != 0) {
+		Free(new_devidp);
+		return (-1);
+	}
+
+	/*
+	 * Copy back the saved devid.
+	 */
+	Free(newnp->drivenamep->devid);
+	if (new_devidp) {
+		newnp->drivenamep->devid = Strdup(new_devidp);
+		Free(new_devidp);
 	}
 
 	/* store name in namespace, allocate new key */
@@ -2106,7 +2090,7 @@ meta_raid_valid(md_raid_t *raidp, mr_unit_t *mr)
 		 * Otherwise it's of type raid_pwhdr32_od_t and has to
 		 * be converted.
 		 */
-		if (mr->c.un_revision == MD_64BIT_META_DEV) {
+		if (mr->c.un_revision & MD_64BIT_META_DEV) {
 			rpw = (raid_pwhdr_t *)buf;
 		} else {
 			RAID_CONVERT_RPW((raid_pwhdr32_od_t *)buf, rpw);
@@ -2386,10 +2370,10 @@ meta_create_raid(
 	(void) memset(&set_params, 0, sizeof (set_params));
 	/* did the user tell us to generate a large device? */
 	if (create_flag == MD_CRO_64BIT) {
-		mr->c.un_revision = MD_64BIT_META_DEV;
+		mr->c.un_revision |= MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_64BIT;
 	} else {
-		mr->c.un_revision = MD_32BIT_META_DEV;
+		mr->c.un_revision &= ~MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_32BIT;
 	}
 	set_params.mnum = MD_SID(mr);
@@ -2444,7 +2428,7 @@ meta_init_raid(
 	assert(argc > 0);
 	if (argc < 1)
 		goto syntax;
-	if ((raidnp = metaname(spp, uname, ep)) == NULL)
+	if ((raidnp = metaname(spp, uname, META_DEVICE, ep)) == NULL)
 		goto out;
 	assert(*spp != NULL);
 
@@ -2518,7 +2502,7 @@ meta_init_raid(
 		mdname_t	*colnp;
 
 		/* parse column name */
-		if ((colnp = metaname(spp, argv[0], ep)) == NULL)
+		if ((colnp = metaname(spp, argv[0], UNKNOWN, ep)) == NULL)
 			goto out;
 		/* check for soft partitions */
 		if (meta_sp_issp(*spp, colnp, ep) != 0) {

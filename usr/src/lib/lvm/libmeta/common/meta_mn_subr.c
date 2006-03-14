@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +75,7 @@ meta_is_mn_set(
  * FUNCTION:	meta_is_mn_name()
  * INPUT:       spp     - ptr to the set name, if NULL the setname is derived
  *			  from the metadevice name (eg set/d10 )
- *		name	- the metadevice name
+ *		name	- the metadevice/hsp name
  * OUTPUT:	ep	- return error pointer
  * RETURNS:	int	- 1 if MultiNode set else 0
  * PURPOSE:	checks if the metadevice is in a MultiNode set
@@ -88,23 +87,23 @@ meta_is_mn_name(
 	md_error_t	*ep
 )
 {
-	md_error_t	t_e = mdnullerror;
-	char		*cname;
-
 	if (*spp == NULL) {
-		if (is_hspname(name)) {
-			if (metahspname(spp, name, ep) == NULL)
-				return (0);
-		} else if (is_metaname(name)) {
-			/* Will fill in *spp based on name */
-			if ((cname = meta_name_getname(spp, name, &t_e))
-			    != NULL)
-				Free(cname);
-			if (! mdisok(&t_e)) {
-				(void) mdstealerror(ep, &t_e);
-				return (0);
-			}
-		} else return (0);
+		char		*cname;
+
+		/*
+		 * if the setname is specified in uname and *spp is
+		 * not set, then it is setup using that set name value.
+		 * If *spp is set and a setname specified in uname and
+		 * the set names don't agree then cname will be
+		 * returned as NULL
+		 */
+		cname = meta_canonicalize_check_set(spp, name, ep);
+		if (cname == NULL) {
+			mdclrerror(ep);
+			return (0);
+		}
+
+		Free(cname);
 	}
 
 	if ((strcmp((*spp)->setname, MD_LOCAL_NAME) != 0) &&

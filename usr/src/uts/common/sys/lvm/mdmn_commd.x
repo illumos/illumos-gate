@@ -1,27 +1,26 @@
-/*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
- */
+%/*
+% * CDDL HEADER START
+% *
+% * The contents of this file are subject to the terms of the
+% * Common Development and Distribution License (the "License").
+% * You may not use this file except in compliance with the License.
+% *
+% * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+% * or http://www.opensolaris.org/os/licensing.
+% * See the License for the specific language governing permissions
+% * and limitations under the License.
+% *
+% * When distributing Covered Code, include this CDDL HEADER in each
+% * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+% * If applicable, add the following below this CDDL HEADER, with the
+% * fields enclosed by brackets "[]" replaced with your own identifying
+% * information: Portions Copyright [yyyy] [name of copyright owner]
+% *
+% * CDDL HEADER END
+% */
 %
 %/*
-% * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
@@ -103,6 +102,7 @@ enum md_mn_msgtype_t {
 	MD_MN_MSG_SP_SETSTAT2,		/* Update softpart status on error */
 	MD_MN_MSG_SETSYNC,		/* Set resync status */
 	MD_MN_MSG_POKE_HOTSPARES,	/* Call poke_hotspares */
+	MD_MN_MSG_ADDMDNAME,		/* Add metadevice name */
 	MD_MN_NMESSAGES /* insert elements before */
 };
 
@@ -312,6 +312,14 @@ struct md_mn_msg_sp_setstat_t {
 struct md_mn_msg_addkeyname_t {
 	set_t		addkeyname_setno;
 	char		addkeyname_name[1];	/* must be last element */
+};
+
+/*
+ * Add metadevice name into replica
+ */
+struct md_mn_msg_addmdname_t {
+	set_t		addmdname_setno;
+	char		addmdname_name[1];
 };
 
 /* Message format for DELKEYNAME message */

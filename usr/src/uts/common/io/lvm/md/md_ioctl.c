@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@
 #include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_rename.h>
 #include <sys/lvm/md_names.h>
+#include <sys/lvm/md_hotspares.h>
 
 extern md_ops_t		**md_ops;
 extern unit_t		md_nunits;
@@ -71,17 +71,22 @@ extern major_t		md_major;
 extern kmutex_t		md_mx;
 extern kcondvar_t	md_cv;
 
+/* md_hotspares.c */
+extern	hot_spare_pool_t *find_hot_spare_pool(set_t setno, int hsp_id);
+
 /* md_med.c */
 extern int		med_addr_tab_nents;
 extern int		med_get_t_size_ioctl(mddb_med_t_parm_t *tpp, int mode);
 extern int		med_get_t_ioctl(mddb_med_t_parm_t *tpp, int mode);
 extern int		med_set_t_ioctl(mddb_med_t_parm_t *tpp, int mode);
+extern unit_t		md_get_nextunit(set_t setno);
 
 static int		md_mn_commd_present;
 
 /* md_mddb.c */
 extern mddb_set_t	*mddb_setenter(set_t setno, int flag, int *errorcodep);
 extern void		mddb_setexit(mddb_set_t *s);
+extern md_krwlock_t	nm_lock;
 
 /*
  * md_mn_is_commd_present:
@@ -185,8 +190,12 @@ setnm_ioctl(mdnm_params_t *nm, int mode)
 	}
 
 	nm->key = md_setdevname(nm->setno, side, nm->key, nm->drvnm,
-	    nm->mnum, name, 0);
-	if (((int)nm->key) < 0) {
+	    nm->mnum, name, 0, &nm->mde);
+	/*
+	 * If we got an error from md_setdevname & md_setdevname did not
+	 * set the error code, we'll default to MDE_DB_NOSPACE.
+	 */
+	if ((((int)nm->key) < 0) && mdisok(&nm->mde)) {
 		err = mdmddberror(&nm->mde, MDE_DB_NOSPACE, NODEV32, nm->setno);
 		goto out;
 	}
@@ -205,6 +214,9 @@ getnm_ioctl(
 	char		*name;
 	side_t		side;
 	md_dev64_t	dev = NODEV64;
+	mdc_unit_t	*un;
+	uint_t		id;
+	char		*setname;
 	int		err = 0;
 
 	mdclrerror(&nm->mde);
@@ -214,7 +226,6 @@ getnm_ioctl(
 
 	if ((md_get_setstatus(nm->setno) & MD_SET_SNARFED) == 0)
 		return (ENODEV);
-
 
 	name = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
@@ -242,19 +253,61 @@ getnm_ioctl(
 			dev = md_makedevice(ddi_name_to_major(nm->drvnm),
 				nm->mnum);
 	}
-	err = md_getdevname(nm->setno, side, nm->key, dev, name, MAXPATHLEN);
-	if (err) {
-		if (err < 0)
-			err = EINVAL;
-		goto out;
-	}
 
-	err = md_getnment(nm->setno, side, nm->key, dev, nm->drvnm, 16,
-	    &nm->major, &nm->mnum, &nm->retkey);
-	if (err) {
-		if (err < 0)
-			err = EINVAL;
-		goto out;
+	/*
+	 * With the introduction of friendly names, all friendly named
+	 * metadevices will have an entry in the name space. However,
+	 * systems upgraded from pre-friendly name to a friendly name
+	 * release won't have name space entries for pre-friendly name
+	 * top level metadevices.
+	 *
+	 * So we search the name space for the our entry with either the
+	 * given dev_t or key. If we can't find the entry, we'll try the
+	 * un array to get information for our target metadevice. Note
+	 * we only use the un array when searching by dev_t since a
+	 * key implies an existing device which should have been
+	 * found in the name space with the call md_getdevname.
+	 */
+	if (md_getdevname(nm->setno, side, nm->key, dev, name,
+	    MAXPATHLEN) == 0) {
+		err = md_getnment(nm->setno, side, nm->key, dev, nm->drvnm,
+		    sizeof (nm->drvnm), &nm->major, &nm->mnum, &nm->retkey);
+		if (err) {
+			if (err < 0)
+				err = EINVAL;
+			goto out;
+		}
+	} else {
+		if ((nm->key != MD_KEYWILD) ||
+		    (MD_UNIT(nm->mnum) == NULL)) {
+			err = ENOENT;
+			goto out;
+		}
+
+		/*
+		 * We're here because the mnum is of a pre-friendly
+		 * name device. Make sure the major value is for
+		 * metadevices.
+		 */
+		if (nm->major != md_major) {
+			err = ENOENT;
+			goto out;
+		}
+
+		/*
+		 * get the unit number and setname to construct the
+		 * fully qualified name for the metadevice.
+		 */
+		un = MD_UNIT(nm->mnum);
+		id =  MD_MIN2UNIT(un->un_self_id);
+		if (nm->setno != MD_LOCAL_SET) {
+			setname = mddb_getsetname(nm->setno);
+			(void) snprintf(name, MAXPATHLEN,
+			    "/dev/md/%s/dsk/d%u", setname, id);
+		} else {
+			(void) snprintf(name, MAXPATHLEN,
+			    "/dev/md/dsk/d%u", id);
+		}
 	}
 
 	err = ddi_copyout(name, (caddr_t)(uintptr_t)nm->devname,
@@ -268,6 +321,193 @@ out:
 	kmem_free(name, MAXPATHLEN);
 	return (err);
 }
+
+static int
+gethspnm_ioctl(
+	mdhspnm_params_t	*nm,
+	int			mode
+)
+{
+	char			*name;
+	char			*tmpname;
+	char			*setname = NULL;
+	side_t			side;
+	hot_spare_pool_t	*hsp = NULL;
+	mdkey_t			key = MD_KEYWILD;
+	int			err = 0;
+
+	mdclrerror(&nm->mde);
+
+	if (md_snarf_db_set(MD_LOCAL_SET, &nm->mde) != 0)
+		return (0);
+
+	if ((md_get_setstatus(nm->setno) & MD_SET_SNARFED) == 0)
+		return (ENODEV);
+
+	name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+	if (nm->side == -1)
+		side = mddb_getsidenum(nm->setno);
+	else
+		side = nm->side;
+
+	/*
+	 * Get the key from input hspid, use different macros
+	 * since the hspid could be either a FN or pre-FN hspid.
+	 */
+	if (nm->hspid != MD_HSPID_WILD) {
+		if (HSP_ID_IS_FN(nm->hspid))
+			key = HSP_ID_TO_KEY(nm->hspid);
+		else
+			key = HSP_ID(nm->hspid);
+	}
+
+	/*
+	 * Get the input name if we're searching by hsp name. Check
+	 * that the input name length is less than MAXPATHLEN.
+	 */
+	if ((nm->hspid == MD_HSPID_WILD) &&
+	    (nm->hspname_len <= MAXPATHLEN)) {
+		err = ddi_copyin((caddr_t)(uintptr_t)nm->hspname,
+		    name, (sizeof (char)) * nm->hspname_len, mode);
+
+		/* Stop if ddi_copyin failed. */
+		if (err) {
+			err = EFAULT;
+			goto out;
+		}
+	}
+
+	/* Must have either a valid hspid or a name to continue */
+	if ((nm->hspid == MD_HSPID_WILD) && (name[0] == '\0')) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Try to find the hsp namespace entry corresponds to either
+	 * the given hspid or name. If we can't find it, the hsp maybe
+	 * a pre-friendly name hsp so we'll try to find it in the
+	 * s_hsp array.
+	 */
+	if ((nm->hspid == MD_HSPID_WILD) || (HSP_ID_IS_FN(nm->hspid))) {
+
+		if (md_gethspinfo(nm->setno, side, key, nm->drvnm,
+		    &nm->ret_hspid, name) != 0) {
+			/*
+			 * If we were given a key for a FN hsp and
+			 * couldn't find its entry, simply errored
+			 * out.
+			 */
+			if (HSP_ID_IS_FN(nm->hspid)) {
+				err = ENOENT;
+				goto out;
+			}
+
+			/*
+			 * Since md_gethspinfo failed and the hspid is
+			 * not a FN hspid,  we must have a name for a
+			 * pre-FN hotspare pool
+			 */
+			if (name[0] == '\0') {
+				err = EINVAL;
+				goto out;
+			}
+
+			tmpname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+			if (nm->setno != MD_LOCAL_SET)
+				setname = mddb_getsetname(nm->setno);
+
+			hsp = (hot_spare_pool_t *)md_set[nm->setno].s_hsp;
+			while (hsp != NULL) {
+				/* Only use the pre-friendly name hsp */
+				if (!(hsp->hsp_revision & MD_FN_META_DEV)) {
+
+					if (setname != NULL) {
+						(void) snprintf(tmpname,
+						    MAXPATHLEN,
+						    "%s/hsp%03u", setname,
+						    HSP_ID(hsp->hsp_self_id));
+					} else {
+						(void) snprintf(tmpname,
+						    MAXPATHLEN, "hsp%03u",
+						    HSP_ID(hsp->hsp_self_id));
+					}
+
+					if (strcmp(name, tmpname) == 0)
+						break;
+				}
+
+				hsp = hsp->hsp_next;
+			}
+			kmem_free(tmpname, MAXPATHLEN);
+
+			if (hsp == NULL) {
+				err = ENOENT;
+				goto out;
+			}
+
+			/* Return hsp_self_id */
+			nm->ret_hspid = hsp->hsp_self_id;
+		}
+
+	} else {
+		/*
+		 * We have a hspid for a pre-FN hotspare pool. Let's
+		 * try to find the matching hsp using the given
+		 * hspid.
+		 */
+		if (nm->hspid == MD_HSPID_WILD) {
+			err = ENOENT;
+			goto out;
+		}
+
+		hsp = (hot_spare_pool_t *)md_set[nm->setno].s_hsp;
+		while (hsp != NULL) {
+			if (hsp->hsp_self_id == nm->hspid)
+				break;
+			hsp = hsp->hsp_next;
+		}
+
+		if (hsp == NULL) {
+			err = ENOENT;
+			goto out;
+		}
+
+		/* Prepare a name to return */
+		if (nm->setno != MD_LOCAL_SET)
+			setname = mddb_getsetname(nm->setno);
+
+		if (setname != NULL) {
+			(void) snprintf(name, MAXPATHLEN, "%s/hsp%03u",
+			    setname, HSP_ID(hsp->hsp_self_id));
+		} else {
+			(void) snprintf(name, MAXPATHLEN, "hsp%03u",
+			    HSP_ID(hsp->hsp_self_id));
+		}
+
+		nm->ret_hspid = hsp->hsp_self_id;
+	}
+
+	if (nm->hspid != MD_HSPID_WILD) {
+		if ((strlen(name) + 1) > nm->hspname_len) {
+			err = EINVAL;
+			goto out;
+		}
+		err = ddi_copyout(name, (caddr_t)
+		    (uintptr_t)nm->hspname, strlen(name)+1, mode);
+	}
+
+	if (err) {
+		if (err < 0)
+			err = EINVAL;
+	}
+
+out:
+	kmem_free(name, MAXPATHLEN);
+	return (err);
+}
+
 
 /*ARGSUSED*/
 static int
@@ -1378,24 +1618,33 @@ static int
 mkdev_ioctl(md_mkdev_params_t *p)
 {
 	set_t	setno = p->md_driver.md_setno;
+	unit_t	un;
 
 	mdclrerror(&p->mde);
 
+	/*
+	 * Get the next available unit number in this set
+	 */
+	un = md_get_nextunit(setno);
+	if (un == MD_UNITBAD) {
+		(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, un);
+		return (ENODEV);
+	}
+
 	/* Validate arguments passed in to ioctl */
 	if (setno >= MD_MAXSETS) {
-		(void) mdmderror(&p->mde, MDE_INVAL_UNIT, p->mnum);
-		return (EINVAL);
-	}
-	if (p->mnum >= MD_MAXUNITS) {
-		(void) mdmderror(&p->mde, MDE_INVAL_UNIT, p->mnum);
+		(void) mderror(&p->mde, MDE_NO_SET);
 		return (EINVAL);
 	}
 
 	/* Create the device node */
-	if (md_create_minor_node(setno, p->mnum)) {
-		(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, p->mnum);
+	if (md_create_minor_node(setno, un)) {
+		(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, un);
 		return (ENODEV);
 	}
+
+	/* Return the minor number */
+	p->un = un;
 
 	return (0);
 }
@@ -1779,6 +2028,33 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 
 		err = getnm_ioctl((mdnm_params_t *)d, mode);
+		break;
+	}
+
+	case MD_IOCGET_HSP_NM:
+	{
+		if (! (mode & FREAD))
+			return (EACCES);
+
+		sz = sizeof (mdhspnm_params_t);
+		d = kmem_alloc(sz, KM_SLEEP);
+
+		if (ddi_copyin(data, d, sz, mode) != 0) {
+			err = EFAULT;
+			break;
+		}
+
+		/* check data integrity */
+		if (((mdhspnm_params_t *)d)->setno >= md_nsets) {
+			err = EINVAL;
+			break;
+		}
+		if (((mdhspnm_params_t *)d)->hspname == NULL) {
+			err = EINVAL;
+			break;
+		}
+
+		err = gethspnm_ioctl((mdhspnm_params_t *)d, mode);
 		break;
 	}
 
@@ -2960,6 +3236,42 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		break;
 	}
 
+	case MD_IOCREM_DEV:
+	{
+		set_t	setno;
+
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		sz = sizeof (minor_t);
+
+		d = kmem_zalloc(sz, KM_SLEEP);
+
+		if (ddi_copyin(data, d, sz, mode) != 0) {
+			err = EFAULT;
+			break;
+		}
+
+		/*
+		 * This ioctl is called to cleanup the device name
+		 * space when metainit fails or -n is invoked
+		 * In this case, reclaim the dispatched un slot
+		 */
+		setno = MD_MIN2SET(*(minor_t *)d);
+		if (md_set[setno].s_un_next <= 0) {
+			err = EFAULT;
+			break;
+		} else {
+			md_set[setno].s_un_next--;
+		}
+
+		/*
+		 * Attempt to remove the assocated device node
+		 */
+		(void) md_remove_minor_node(*(minor_t *)d);
+		break;
+	}
+
 	/*
 	 * Update md_mn_commd_present global to reflect presence or absence of
 	 * /usr/sbin/rpc.mdcommd. This allows us to determine if an RPC failure
@@ -3030,6 +3342,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 		kmem_free(d, sz);
 	}
+
 	if (err)
 		return (err);
 	return (err_to_user);
@@ -3166,7 +3479,7 @@ md_set_vtoc(md_unit_t *un, struct vtoc *vtoc)
 		return (EINVAL);
 
 	/* don't allow to create a vtoc for a big metadevice */
-	if (un->c.un_revision == MD_64BIT_META_DEV)
+	if (un->c.un_revision & MD_64BIT_META_DEV)
 		return (ENOTSUP);
 	/*
 	 * Validate the partition table
@@ -3588,4 +3901,26 @@ md_dkiocpartition(minor_t mnum, void *data, int mode)
 	}
 
 	return (rval);
+}
+
+
+/*
+ * Remove device node
+ */
+void
+md_remove_minor_node(minor_t mnum)
+{
+	char			name[16];
+	extern dev_info_t	*md_devinfo;
+
+	/*
+	 * Attempt release of its minor node
+	 */
+	(void) snprintf(name, sizeof (name), "%d,%d,blk", MD_MIN2SET(mnum),
+		MD_MIN2UNIT(mnum));
+	ddi_remove_minor_node(md_devinfo, name);
+
+	(void) snprintf(name, sizeof (name), "%d,%d,raw", MD_MIN2SET(mnum),
+		MD_MIN2UNIT(mnum));
+	ddi_remove_minor_node(md_devinfo, name);
 }

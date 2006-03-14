@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -707,6 +706,7 @@ extern int	md_dev_exists(md_dev64_t);
 extern md_parent_t md_get_parent(md_dev64_t);
 extern void	md_set_parent(md_dev64_t, md_parent_t);
 extern void	md_reset_parent(md_dev64_t);
+extern struct hot_spare_pool *find_hot_spare_pool(set_t, int);
 extern int	md_hot_spare_ifc(hs_cmds_t, mddb_recid_t, u_longlong_t, int,
 		    mddb_recid_t *, mdkey_t *, md_dev64_t *, diskaddr_t *);
 extern int	md_notify_interface(md_event_cmds_t cmd, md_tags_t type,
@@ -748,6 +748,9 @@ extern void	mdmn_clear_all_capabilities(minor_t);
 extern int	md_init_probereq(struct md_probedev_impl *p,
 		    daemon_queue_t **hdrpp);
 extern boolean_t callb_md_mrs_cpr(void *, int);
+extern void	md_upd_set_unnext(set_t, unit_t);
+extern int	md_rem_selfname(minor_t);
+extern void	md_rem_hspname(set_t, mdkey_t);
 
 /* Externals from md_ioctl.c */
 extern int	md_mn_is_commd_present(void);
@@ -762,13 +765,16 @@ extern int	md_set_efi(md_unit_t *, char *);
 extern int	md_dkiocgetefi(minor_t, void *, int);
 extern int	md_dkiocsetefi(minor_t, void *, int);
 extern int	md_dkiocpartition(minor_t, void *, int);
+extern void	md_remove_minor_node(minor_t);
 
 
 /* Externals from md_names.c */
 extern mdkey_t	md_setdevname(set_t, side_t, mdkey_t, char *, minor_t, char *,
-			set_t);
+			set_t, md_error_t *);
 extern int	md_getdevname(set_t, side_t, mdkey_t, md_dev64_t, char *,
 		    size_t);
+extern int	md_gethspinfo(set_t, side_t, mdkey_t, char *, hsp_t *,
+		    char *);
 extern int	md_getkeyfromdev(set_t, side_t, md_dev64_t, mdkey_t *, int *);
 extern int	md_devid_found(set_t, side_t, mdkey_t);
 extern int	md_getnment(set_t, side_t, mdkey_t, md_dev64_t,

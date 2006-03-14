@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +100,19 @@ meta_swap(
 	md_rename_t	txn;
 	int		from_add_flag = 0;
 	int		to_add_flag = 0;
+	int		from_is_fn, to_is_fn;
+	bool_t		from_has_parent, to_has_parent;
+
+	/*
+	 * What types of devices we have here?
+	 * For MDRNOP_RENAME to_mdp is NULL
+	 */
+	from_is_fn = (from_mdp->revision & MD_FN_META_DEV);
+	from_has_parent = MD_HAS_PARENT(from_mdp->parent);
+	if (to_mdp) {
+		to_is_fn = (to_mdp->revision & MD_FN_META_DEV);
+		to_has_parent = MD_HAS_PARENT(to_mdp->parent);
+	}
 
 	/*
 	 * If the device exists a key may already exist so need to find it
@@ -119,13 +131,18 @@ meta_swap(
 
 	if ((from_np->key == MD_KEYWILD) || (from_np->key == MD_KEYBAD)) {
 		/*
-		 * If from does not have key and it is a component device
-		 * then something really goes wrong
+		 * If we are top and revision indicates that we
+		 * should have key but we don't then something
+		 * really goes wrong
 		 */
-		assert(!MD_HAS_PARENT(from_mdp->parent));
+		assert(!from_has_parent && !from_is_fn);
+
+		if (from_has_parent || from_is_fn) {
+			return (-1);
+		}
 
 		/*
-		 * So only add the entry if from is a top device
+		 * So only add the entry if necessary
 		 */
 		if (add_key_name(sp, from_np, NULL, ep) != 0) {
 			assert(!mdisok(ep));
@@ -145,13 +162,18 @@ meta_swap(
 
 	if ((to_np->key == MD_KEYWILD) || (to_np->key == MD_KEYBAD)) {
 		/*
-		 * If to does not have key and is not a top device
-		 * then something really goes wrong
+		 * If we are top and revision indicates that we
+		 * should have key but we don't then something
+		 * really goes wrong
 		 */
-		assert(!MD_HAS_PARENT(to_mdp->parent));
+		assert(!to_has_parent && !to_is_fn);
+
+		if (to_has_parent || to_is_fn) {
+			return (-1);
+		}
 
 		/*
-		 * Add entry
+		 * So only add the entry if necessary
 		 */
 		if (add_key_name(sp, to_np, NULL, ep) != 0) {
 			assert(!mdisok(ep));
@@ -180,19 +202,41 @@ meta_swap(
 	if (metaioctl(MD_IOCRENAME, &txn, &txn.mde, from_np->cname) != 0) {
 		if (from_add_flag) {
 			(void) del_key_name(sp, from_np, ep);
+			/*
+			 * Attempt removal of device node
+			 */
+			(void) metaioctl(MD_IOCREM_DEV, &txn.from.mnum,
+				ep, NULL);
 		}
 
 		if (op == MDRNOP_RENAME || to_add_flag) {
 			(void) del_key_name(sp, to_np, ep);
+			/*
+			 * Attempt removal of device node
+			 */
+			(void) metaioctl(MD_IOCREM_DEV, &txn.to.mnum,
+				ep, NULL);
 		}
+
 		return (mdstealerror(ep, &txn.mde));
 	}
 
 	/*
-	 * If top device
+	 * Since now the metadevice can be ref'd in the namespace
+	 * by self and by the top device so upon the successful
+	 * rename/xchange, we need to check the type and make
+	 * necessary adjustment for the device's n_cnt in the namespace
+	 * by calling add_key_name/del_key_name to do the tricks
 	 */
-	if (op == MDRNOP_RENAME && !MD_HAS_PARENT(from_mdp->parent)) {
-		(void) del_key_name(sp, to_np, ep);
+	if (op == MDRNOP_RENAME && from_has_parent) {
+		(void) add_key_name(sp, to_np, NULL, ep);
+		if (from_is_fn)
+			(void) del_key_name(sp, from_np, ep);
+			(void) del_self_name(sp, from_np->key, ep);
+	}
+
+	if (op == MDRNOP_EXCHANGE && from_is_fn) {
+		(void) add_key_name(sp, from_np, NULL, ep);
 	}
 
 	/* force the name cache to re-read device state */
@@ -216,14 +260,11 @@ meta_rename(
 {
 	int		 flags		= (options & MDCMD_FORCE)? FORCE: 0;
 	int		 rc		= 0;
-	mdcinfo_t	*cinfop;
 	char		*p;
-	md_set_desc	*sd;
-	mdkey_t		 side_key = MD_KEYWILD;
-	md_error_t	 dummy_ep = mdnullerror;
-	int		 i, j;
-	md_mnnode_desc	*nd, *nd_del;
 	md_common_t	*from_mdp;
+	minor_t		to_minor = meta_getminor(to_np->dev);
+	md_error_t	status = mdnullerror;
+	md_error_t	*t_ep = &status;
 
 	/* must have a set */
 	assert(sp != NULL);
@@ -263,128 +304,34 @@ meta_rename(
 	}
 	mdclrerror(ep);
 
+	/*
+	 * The dest device name has been added early on
+	 * by meta_init_make_device call so get the entry from
+	 * the namespace
+	 */
+	if (meta_getnmentbydev(sp->setno, MD_SIDEWILD, to_np->dev,
+	    NULL, NULL, &to_np->key, ep) == NULL) {
+		return (-1);
+	}
+
 	/* If FORCE is not set, check if metadevice is open */
 	if (!(flags & FORCE)) {
-		if (check_open(sp, from_np, ep) != 0) {
-			return (-1);
-		}
+	    if (check_open(sp, from_np, ep) != 0) {
+		(void) del_key_name(sp, to_np, t_ep);
+		(void) metaioctl(MD_IOCREM_DEV, &to_minor, t_ep, NULL);
+		return (-1);
+	    }
 	}
 
 	/*
 	 * All checks are done, now we do the real work.
-	 * If we are in dryrun mode, we're done.
+	 * If we are in dryrun mode, clear the deivce node
+	 * and we are done.
 	 */
 	if (flags & DRYRUN) {
+		(void) del_key_name(sp, to_np, t_ep);
+		(void) metaioctl(MD_IOCREM_DEV, &to_minor, t_ep, NULL);
 		return (0); /* success */
-	}
-
-	/*
-	 * add key for new name to the namespace
-	 */
-	if ((cinfop = metagetcinfo(from_np, ep)) == NULL) {
-		assert(!mdisok(ep));
-		return (-1);
-	}
-
-	if (metaislocalset(sp)) {
-		to_np->key = add_name(sp, MD_SIDEWILD, MD_KEYWILD,
-		    cinfop->dname, meta_getminor(to_np->dev), to_np->bname, ep);
-	} else {
-		/*
-		 * As this is not the local set we have to create a namespace
-		 * record for each side (host) in the set. We cannot use
-		 * add_key_names() because the destination device (to_np)
-		 * should not exist and so the subsequent metagetcinfo()
-		 * call will fail when it tries to open the device, so we
-		 * have to use the information from the source device (from_np)
-		 */
-		if ((sd = metaget_setdesc(sp, ep)) == (md_set_desc *)NULL) {
-			return (-1);
-		}
-		to_np->key = MD_KEYWILD;
-
-		if (MD_MNSET_DESC(sd)) {
-			nd = sd->sd_nodelist;
-			while (nd) {
-				side_key = add_name(sp, (side_t)nd->nd_nodeid,
-				    to_np->key, cinfop->dname,
-				    meta_getminor(to_np->dev),
-				    to_np->bname, ep);
-				/*
-				 * Break out if failed to add the key,
-				 * but delete any name space records that
-				 * were added.
-				 */
-				if (side_key == MD_KEYBAD ||
-				    side_key == MD_KEYWILD) {
-					/*
-					 * If we have a valid to_np->key then
-					 * a record was added correctly but
-					 * we do not know for which side, so
-					 * we need to try to delete all of them.
-					 */
-
-					if (to_np->key != MD_KEYBAD &&
-					    to_np->key != MD_KEYWILD) {
-						nd_del = sd->sd_nodelist;
-						while ((nd_del != nd) &&
-						(nd_del != NULL)) {
-						    (void) del_name(sp,
-						    (side_t)nd_del->nd_nodeid,
-						    to_np->key, &dummy_ep);
-						    nd_del = nd_del->nd_next;
-						}
-						/* preserve error key state */
-						to_np->key = side_key;
-					}
-					break;
-				}
-				to_np->key = side_key;
-				nd = nd->nd_next;
-			}
-		} else {
-			for (i = 0; i < MD_MAXSIDES; i++) {
-				if (sd->sd_nodes[i][0] != '\0') {
-					side_key = add_name(sp, (side_t)i,
-					    to_np->key, cinfop->dname,
-					    meta_getminor(to_np->dev),
-					    to_np->bname, ep);
-					/*
-					 * Break out if failed to add the key,
-					 * but delete any name space records
-					 * that were added.
-					 */
-					if (side_key == MD_KEYBAD ||
-					    side_key == MD_KEYWILD) {
-						/*
-						 * If we have a valid
-						 * to_np->key then a record was
-						 * added correctly but we do
-						 * not know for which side, so
-						 * we need to try to delete
-						 * all of them.
-						 */
-						if (to_np->key != MD_KEYBAD &&
-						    to_np->key != MD_KEYWILD) {
-							for (j = 0; j < i;
-							    j++) {
-							    (void) del_name(sp,
-							    (side_t)j,
-							    to_np->key,
-							    &dummy_ep);
-							}
-							/*
-							 * preserve err
-							 * key state
-							 */
-							to_np->key = side_key;
-						}
-						break;
-					}
-					to_np->key = side_key;
-				}
-			}
-		}
 	}
 
 	if (to_np->key == MD_KEYBAD || to_np->key == MD_KEYWILD) {

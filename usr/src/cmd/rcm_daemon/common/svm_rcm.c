@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +71,7 @@
  */
 #define	MSG_UNRECOGNIZED	gettext("SVM: \"%s\" is not a SVM resource")
 #define	MSG_NODEPS		gettext("SVM: can't find dependents")
+#define	MSG_NORECACHE		gettext("SVM: WARNING: couldn't re-cache.")
 #define	MSG_OPENERR		gettext("SVM: can't open \"%s\"")
 #define	MSG_CACHEFAIL		gettext("SVM: can't malloc cache")
 
@@ -120,7 +120,8 @@ typedef struct deventry {
 	struct deventry		*next;		/* next entry with same hash */
 	svm_type_t		devtype;	/* device type */
 	dev_t			devkey;		/* key */
-	char			*devname;	/* name */
+	char			*devname;	/* name in /dev */
+	char			*devicesname;	/* name in /devices */
 	struct deventry		*dependent;	/* 1st dependent */
 	struct deventry		*next_dep;	/* next dependent */
 	struct deventry		*antecedent;	/* antecedent */
@@ -157,6 +158,7 @@ typedef struct cache {
 
 static int svm_register(rcm_handle_t *hd);
 static int svm_unregister(rcm_handle_t *hd);
+static int svm_unregister_device(rcm_handle_t *hd, deventry_t *d);
 static deventry_t *cache_dependent(cache_t *cache, char *devname, int devflags,
     deventry_t *dependents);
 static deventry_t *cache_device(cache_t *cache, char *devname,
@@ -185,7 +187,7 @@ static char *cache_walk(cache_t *cache, uint32_t *i, deventry_t **hashline);
 static void free_cache(cache_t **cache);
 static void free_deventry(deventry_t **deventry);
 static uint32_t hash(uint32_t h, char *s);
-static void register_device(rcm_handle_t *hd, char *devname);
+static void svm_register_device(rcm_handle_t *hd, char *devname);
 static int add_dep(int *ndeps, char ***depsp, deventry_t *deventry);
 static int get_dependents(deventry_t *deventry, char *** dependentsp);
 char *add_to_usage(char ** usagep, char *string);
@@ -341,7 +343,7 @@ svm_register(rcm_handle_t *hd)
 
 	/* If not, register the whole cache and mark it as registered. */
 	while ((devicename = cache_walk(svm_cache, &i, &l)) != NULL) {
-			register_device(hd, devicename);
+			svm_register_device(hd, devicename);
 	}
 	svm_cache->registered = 1;
 
@@ -369,7 +371,6 @@ svm_unregister(rcm_handle_t *hd)
 {
 	deventry_t *l = NULL;
 	uint32_t i = 0;
-	char	    *devicename;
 
 	rcm_log_message(RCM_TRACE1, "SVM: unregister\n");
 	/* Guard against bad arguments */
@@ -378,8 +379,8 @@ svm_unregister(rcm_handle_t *hd)
 	/* Walk the cache, unregistering everything */
 	(void) mutex_lock(&svm_cache_lock);
 	if (svm_cache != NULL) {
-		while ((devicename = cache_walk(svm_cache, &i, &l)) != NULL) {
-			(void) rcm_unregister_interest(hd, devicename, 0);
+		while (cache_walk(svm_cache, &i, &l) != NULL) {
+			(void) svm_unregister_device(hd, l);
 		}
 		svm_cache->registered = 0;
 	}
@@ -1599,7 +1600,8 @@ cache_all_devices_in_set(cache_t *cache, mdsetname_t *sp)
 			mdname_t	*mdn;
 			md_trans_t	*trans;
 
-			mdn = metaname(&sp, nlp->namep->cname, &error);
+			mdn = metaname(&sp, nlp->namep->cname, META_DEVICE,
+			    &error);
 			if (mdn == NULL) {
 				continue;
 			}
@@ -1622,7 +1624,8 @@ cache_all_devices_in_set(cache_t *cache, mdsetname_t *sp)
 			mdname_t	*mdn;
 			md_mirror_t	*mirror;
 
-			mdn = metaname(&sp, nlp->namep->cname, &error);
+			mdn = metaname(&sp, nlp->namep->cname, META_DEVICE,
+			    &error);
 			if (mdn == NULL) {
 				continue;
 			}
@@ -1645,7 +1648,8 @@ cache_all_devices_in_set(cache_t *cache, mdsetname_t *sp)
 			mdname_t	*mdn;
 			md_raid_t	*raid;
 
-			mdn = metaname(&sp, nlp->namep->cname, &error);
+			mdn = metaname(&sp, nlp->namep->cname, META_DEVICE,
+			    &error);
 			if (mdn == NULL) {
 				continue;
 			}
@@ -1668,7 +1672,8 @@ cache_all_devices_in_set(cache_t *cache, mdsetname_t *sp)
 			mdname_t	*mdn;
 			md_stripe_t	*stripe;
 
-			mdn = metaname(&sp, nlp->namep->cname, &error);
+			mdn = metaname(&sp, nlp->namep->cname, META_DEVICE,
+			    &error);
 			if (mdn == NULL) {
 				continue;
 			}
@@ -1691,7 +1696,8 @@ cache_all_devices_in_set(cache_t *cache, mdsetname_t *sp)
 			mdname_t	*mdn;
 			md_sp_t		*soft_part;
 
-			mdn = metaname(&sp, nlp->namep->cname, &error);
+			mdn = metaname(&sp, nlp->namep->cname, META_DEVICE,
+			    &error);
 			if (mdn == NULL) {
 				continue;
 			}
@@ -1844,14 +1850,16 @@ static deventry_t *
 create_deventry(char *devname, svm_type_t devtype, md_dev64_t devkey,
     int devflags)
 {
-	deventry_t	*newdeventry;
-	char		*newdevname;
+	const char	*devprefix = "/dev/";
+	deventry_t	*newdeventry = NULL;
+	char		*newdevname = NULL;
+	char		*devicesname = NULL;
 
 	newdeventry = (deventry_t *)malloc(sizeof (*newdeventry));
 	if (newdeventry == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("SVM: can't malloc deventrys"));
-		return (NULL);
+		goto errout;
 	}
 	(void) memset((char *)newdeventry, 0, sizeof (*newdeventry));
 
@@ -1859,16 +1867,55 @@ create_deventry(char *devname, svm_type_t devtype, md_dev64_t devkey,
 	if (newdevname == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("SVM: can't malloc devname"));
-		free(newdeventry);
-		return (NULL);
+		goto errout;
+	}
+
+	/*
+	 * When we register interest in a name starting with /dev/, RCM
+	 * will use realpath to convert the name to a /devices name before
+	 * storing it.  metaclear removes both the /dev and the /devices
+	 * form of the name of a metadevice from the file system.  Thus,
+	 * when we later call rcm_unregister_interest to get rid of a
+	 * metacleared device, RCM will not be able to derive the /devices
+	 * name for the /dev name.  Thus, to unregister we will need to use
+	 * the /devices name.  We will save it now, so that we have it when
+	 * it comes time to unregister.
+	 */
+	if (strncmp(devname, devprefix, strlen(devprefix)) == 0) {
+		devicesname = (char *)malloc(PATH_MAX);
+		if (devicesname == NULL) {
+			rcm_log_message(RCM_ERROR,
+			    gettext("SVM: can't malloc PATH_MAX bytes"));
+			goto errout;
+		}
+		if (realpath(devname, devicesname) == NULL) {
+			free(devicesname);
+			devicesname = NULL;
+		}
 	}
 	newdeventry->devname = newdevname;
+	newdeventry->devicesname = devicesname;
 	newdeventry->devtype = devtype;
 	newdeventry->devkey = meta_cmpldev(devkey);
 	newdeventry->flags = devflags;
-	rcm_log_message(RCM_TRACE1,
-	    "SVM created deventry for %s\n", newdeventry->devname);
+	if (newdeventry->devicesname == NULL) {
+		rcm_log_message(RCM_TRACE1,
+			"SVM created deventry for %s\n", newdeventry->devname);
+	} else {
+		rcm_log_message(RCM_TRACE1,
+			"SVM created deventry for %s (%s)\n",
+			newdeventry->devname, newdeventry->devicesname);
+	}
 	return (newdeventry);
+
+errout:
+	if (devicesname != NULL)
+		free(devicesname);
+	if (newdevname != NULL)
+		free(newdevname);
+	if (newdeventry != NULL)
+		free(newdeventry);
+	return (NULL);
 }
 
 /*
@@ -1991,7 +2038,40 @@ cache_lookup(cache_t *cache, char *devname)
 /*
  *      cache_sync()
  *
- *      Resync cache with the svm database
+ *	Resync cache with the svm database.  First a new cache is created
+ *	that represents the current state of the SVM database.  The
+ *	function walks the new cache to look for new entries that must be
+ *	registered.  The new entries are kept in a list, because we cannot
+ *	register them at this point.  Entries that appear in both caches
+ *	are removed from the old cache.  Because of this at the end of the
+ *	walk, the old cache will only contain devices that have been
+ *	removed and need to be unregistered.
+ *
+ *	Next the old cache is walked, so that we can unregister the devices
+ *	that are no longer present.
+ *
+ *	Finally, we process the list of new devices that must be
+ *	registered.  There is a reason why we must unregister the removed
+ *	(metacleared) devices before registering the new ones.  It has to
+ *	do with the fact that rcm_register_interest calls realpath(3C) to
+ *	convert a /dev name to a /devices name.  It uses the /devices name
+ *	for storing the device information.
+ *
+ *	It can happen that between cache_syncs that the administrator
+ *	metaclears one metadevice and metacreates a new one.  For example,
+ *
+ *		metaclear acct
+ *		metainit engr 1 1 c1t12d0s0
+ *
+ *	The metaclear operation frees up the minor number that was being
+ *	used by acct.  The metainit operation can then reuse the minor
+ *	number.  This means that both metadevices would have the same
+ *	/devices name even though they had different /dev names.  Since
+ *	rcm_register_interest uses /devices names for storing records, we
+ *	need to unregister acct before registering engr.  Otherwise we
+ *	would get an EALREADY errno and a failed registration.  This is why
+ *	cache_sync creates a list of devices to be registered after all the
+ *	removed devices have been unregistered.
  *
  *      Input:
  *		rcm_handle_t	*hd		rcm handle
@@ -2009,17 +2089,24 @@ cache_sync(rcm_handle_t *hd, cache_t **cachep)
 	cache_t		*new_cache;
 	cache_t		*old_cache = *cachep;
 	deventry_t	*hashline = NULL;
+	deventry_t	**register_list = NULL;
+	deventry_t	*register_this;
+	uint32_t	register_count = 0;	/* # entrys in register_list */
+	uint32_t	allocated = 0;		/* # entrys allocated in */
+						/* register_list */
+	uint32_t	allocate_incr = 16;
 	uint32_t	i = 0;
 
 	/* Get a new cache */
 	if ((new_cache = create_cache()) == NULL) {
-		rcm_log_message(RCM_WARNING,
-		    gettext("SVM: WARNING: couldn't re-cache."));
+		rcm_log_message(RCM_WARNING, MSG_NORECACHE);
 		return;
 	}
 
 	/* For every entry in the new cache... */
 	while ((devicename = cache_walk(new_cache, &i, &hashline)) != NULL) {
+		register_this = NULL;
+
 		/* Look for this entry in the old cache */
 		deventry = cache_lookup(old_cache, devicename);
 		/*
@@ -2028,11 +2115,31 @@ cache_sync(rcm_handle_t *hd, cache_t **cachep)
 		 * again and remove it from the old cache
 		 */
 		if (deventry == NULL) {
-			register_device(hd, hashline->devname);
+			register_this = hashline;
 		} else {
 			if (deventry->flags&REMOVED)
-				register_device(hd, hashline->devname);
+				register_this = hashline;
 			cache_remove(old_cache, deventry);
+		}
+
+		/* Save this entry if we need to register it later. */
+		if (register_this) {
+			if (register_count >= allocated) {
+				/* Need to extend our array */
+				allocated += allocate_incr;
+				register_list =
+					(deventry_t **)realloc(register_list,
+					allocated * sizeof (*register_list));
+				if (register_list == NULL) {
+					/* Out of memory.  Give up. */
+					rcm_log_message(RCM_WARNING,
+						MSG_NORECACHE);
+					free(new_cache);
+					return;
+				}
+			}
+			*(register_list + register_count) = register_this;
+			register_count++;
 		}
 	}
 
@@ -2044,9 +2151,17 @@ cache_sync(rcm_handle_t *hd, cache_t **cachep)
 	hashline = NULL;
 	while ((devicename = cache_walk(old_cache, &i, &hashline)) != NULL) {
 		if (!(hashline->flags&REMOVED)) {
-			(void) rcm_unregister_interest(hd, devicename, 0);
+			(void) svm_unregister_device(hd, hashline);
 		}
 	}
+
+	/* Register the new devices. */
+	for (i = 0; i < register_count; i++) {
+		deventry = *(register_list + i);
+		svm_register_device(hd, deventry->devname);
+	}
+	if (register_list)
+		free(register_list);
 
 	/* Swap pointers */
 	*cachep = new_cache;
@@ -2204,6 +2319,8 @@ free_deventry(deventry_t **deventry)
 					free(oldhspentry);
 				}
 			}
+			if ((*deventry)->devicesname)
+				free((*deventry)->devicesname);
 			free((*deventry)->devname);
 			free (*deventry);
 			*deventry = olddeventry;
@@ -2240,7 +2357,7 @@ hash(uint32_t h, char *s)
 }
 
 /*
- *      register_device()
+ *      svm_register_device()
  *
  *      Register a device
  *
@@ -2251,7 +2368,7 @@ hash(uint32_t h, char *s)
  *      Locking: None
  */
 static void
-register_device(rcm_handle_t *hd, char *devname)
+svm_register_device(rcm_handle_t *hd, char *devname)
 {
 	/* Sanity check */
 	if (devname == NULL)
@@ -2840,7 +2957,6 @@ check_device(deventry_t *deventry)
 	mdsetname_t	*sp;
 	md_error_t	error = mdnullerror;
 	char		sname[BUFSIZ+1];
-	uint32_t	d;
 	mdname_t	*np;
 	deventry_t	*dependent;
 	int		rval = NOTREDUNDANT;
@@ -2871,10 +2987,10 @@ check_device(deventry_t *deventry)
 		 * it contains a setname.
 		 */
 		ret = sscanf(dependent->devname,
-		    "/dev/md/%" VAL2STR(BUFSIZ) "[^/]/dsk/d%u",
-		    sname, &d);
+		    "/dev/md/%" VAL2STR(BUFSIZ) "[^/]/dsk/",
+		    sname);
 
-		if (ret != 2)
+		if (ret != 1)
 			(void) strcpy(sname, MD_LOCAL_NAME);
 
 		if ((sp = metasetname(sname, &error)) == NULL) {
@@ -2887,7 +3003,7 @@ check_device(deventry_t *deventry)
 		rcm_log_message(RCM_TRACE1, "SVM: processing: %s\n",
 		    dependent->devname);
 
-		np = metaname(&sp, dependent->devname, &error);
+		np = metaname(&sp, dependent->devname, META_DEVICE, &error);
 
 		switch (dependent->devtype) {
 		case SVM_TRANS:
@@ -2942,4 +3058,67 @@ check_device(deventry_t *deventry)
 
 	rcm_log_message(RCM_TRACE1, "SVM: check_device return %d\n", rval);
 	return (rval);
+}
+
+/*
+ *	svm_unregister_device
+ *
+ *	Unregister the device specified by the deventry
+ *
+ *	Input:
+ *		rcm_handle_t *	information for RCM
+ *		deventry_t *	description of the device to be
+ *				unregistered
+ *
+ *	Return:
+ *		int		0	- successfully unregistered
+ *				!= 0	- failed to unregister
+ *
+ *	Locking:
+ *		None
+ *
+ * If the deventry_t has a devicesname, we will first attempt to unregister
+ * using that name.  If that fails then we'll attempt to unregister using
+ * devname.  The reason for this strategy has to do with the way that
+ * rcm_register_interest works.  If passed a /dev/ name,
+ * rcm_register_interest uses realpath() to convert it to a /devices name.
+ * Thus, we are more likely to succeed if we use devicesname first.
+ */
+
+static int
+svm_unregister_device(rcm_handle_t *hd, deventry_t *d)
+{
+	int	deleted;
+
+	if (d->devicesname) {
+		rcm_log_message(RCM_TRACE1, "SVM: unregister_device %s (%s)\n",
+			d->devname, d->devicesname);
+	} else {
+		rcm_log_message(RCM_TRACE1, "SVM: unregister_device %s\n",
+			d->devname);
+	}
+	deleted = -1;
+	if (d->devicesname != NULL) {
+		/*
+		 * Try to unregister via the /devices entry first.  RCM
+		 * converts /dev/ entries to /devices entries before
+		 * storing them.  Thus, if this item has a /devices name
+		 * available, we should use it for unregistering.
+		 */
+		deleted = rcm_unregister_interest(hd,
+			d->devicesname, 0);
+	}
+	if (deleted != 0) {
+		/*
+		 * Either we did not have a /devices name or the attempt to
+		 * unregister using the /devices name failed.  Either way
+		 * we'll now try to unregister using the conventional name.
+		 */
+		deleted = rcm_unregister_interest(hd, d->devname, 0);
+	}
+	if (deleted != 0) {
+		rcm_log_message(RCM_TRACE1, "SVM: unregister_device failed "
+			"for %s\n", d->devname);
+	}
+	return (deleted);
 }

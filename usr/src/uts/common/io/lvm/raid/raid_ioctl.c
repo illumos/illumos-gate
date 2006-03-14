@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,7 +294,7 @@ raid_check_pw(mr_unit_t *un)
 		if (biowait(&bp))
 			err = 1;
 		if (i == 0) {
-			if (un->c.un_revision == MD_64BIT_META_DEV) {
+			if (un->c.un_revision & MD_64BIT_META_DEV) {
 				unit = ((raid_pwhdr_t *)buf)->rpw_unit;
 			} else {
 				unit = ((raid_pwhdr32_od_t *)buf)->rpw_unit;
@@ -305,7 +304,7 @@ raid_check_pw(mr_unit_t *un)
 		 * depending upon being an 64bit or 32 bit raid, the
 		 * pre write headers have different layout
 		 */
-		if (un->c.un_revision == MD_64BIT_META_DEV) {
+		if (un->c.un_revision & MD_64BIT_META_DEV) {
 			if ((((raid_pwhdr_t *)buf)->rpw_column != i) ||
 			    (((raid_pwhdr_t *)buf)->rpw_unit != unit))
 				err = 1;
@@ -916,11 +915,11 @@ raid_set(void	*d, int mode)
 		return (mdmderror(&msp->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		mr_recid = mddb_createrec(msp->size, typ1, 0,
-				MD_CRO_64BIT | MD_CRO_RAID, setno);
+			MD_CRO_64BIT | MD_CRO_RAID | MD_CRO_FN, setno);
 #endif
 	} else {
 		mr_recid = mddb_createrec(msp->size, typ1, 0,
-				MD_CRO_32BIT | MD_CRO_RAID, setno);
+			MD_CRO_32BIT | MD_CRO_RAID | MD_CRO_FN, setno);
 	}
 
 	if (mr_recid < 0)
@@ -964,6 +963,7 @@ raid_set(void	*d, int mode)
 	MD_CAPAB(un) = MD_CAN_PARENT | MD_CAN_SP;
 	MD_PARENT(un) = MD_NO_PARENT;
 	un->un_resync_copysize = 0;
+	un->c.un_revision |= MD_FN_META_DEV;
 
 	if (UNIT_STATE(un) == RUS_INIT)
 		MD_STATUS(un) |= MD_UN_GROW_PENDING;
@@ -984,6 +984,11 @@ raid_set(void	*d, int mode)
 		mddb_deleterec_wrapper(mr_recid);
 		goto out;
 	}
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail--;
 
 	recids[rid] = 0;
 	if (un->un_hsp_id != -1) {
@@ -1674,6 +1679,7 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	mddb_recid_t	mr_recid;
 	mddb_recid_t	old_vtoc = 0;
 	mddb_recid_t	*recids;
+	md_create_rec_option_t options;
 	int		err;
 	int		col, i;
 	int64_t		tb, atb;
@@ -1751,16 +1757,23 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 	typ1 = (mddb_type_t)md_getshared_key(setno,
 	    raid_md_ops.md_driver.md_drivername);
 
+	/*
+	 * Preserve the friendly name nature of the device that is
+	 * growing.
+	 */
+	options = MD_CRO_RAID;
+	if (un->c.un_revision & MD_FN_META_DEV)
+		options |= MD_CRO_FN;
 	if (mgph->options & MD_CRO_64BIT) {
 #if defined(_ILP32)
 		return (mdmderror(&mgph->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		mr_recid = mddb_createrec(mgph->size, typ1, 0,
-				MD_CRO_64BIT | MD_CRO_RAID, setno);
+				MD_CRO_64BIT | options, setno);
 #endif
 	} else {
 		mr_recid = mddb_createrec(mgph->size, typ1, 0,
-				MD_CRO_32BIT | MD_CRO_RAID, setno);
+				MD_CRO_32BIT | options, setno);
 	}
 	if (mr_recid < 0) {
 		rval = mddbstatus2error(&mgph->mde, (int)mr_recid,
@@ -1848,7 +1861,7 @@ raid_grow(void *mgp, int mode, IOLOCK *lock)
 		 * and had a vtoc record attached to it, we remove the
 		 * vtoc record, because the layout has changed completely.
 		 */
-		if ((un->c.un_revision == MD_32BIT_META_DEV) &&
+		if (((un->c.un_revision & MD_64BIT_META_DEV) == 0) &&
 		    (un->c.un_vtoc_id != 0)) {
 			old_vtoc = un->c.un_vtoc_id;
 			new_un->c.un_vtoc_id =
@@ -1971,6 +1984,7 @@ raid_reset(md_i_reset_t	*mirp)
 	minor_t		mnum = mirp->mnum;
 	mr_unit_t	*un;
 	mdi_unit_t	*ui;
+	set_t		setno = MD_MIN2SET(mnum);
 
 	mdclrerror(&mirp->mde);
 
@@ -2004,6 +2018,21 @@ raid_reset(md_i_reset_t	*mirp)
 	}
 
 	reset_raid(un, mnum, 1);
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail++;
+
+	/*
+	 * If MN set, reset s_un_next so all nodes can have
+	 * the same view of the next available slot when
+	 * nodes are -w and -j
+	 */
+	if (MD_MNSET_SETNO(setno)) {
+		(void) md_upd_set_unnext(setno, MD_MIN2UNIT(mnum));
+	}
+
 	rw_exit(&md_unit_array_rw.lock);
 
 	return (0);

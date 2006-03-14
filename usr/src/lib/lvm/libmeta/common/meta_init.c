@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
  */
 
 #include <meta.h>
+#include <sys/lvm/mdio.h>
 #include <libdevinfo.h>
 
 
@@ -209,10 +209,10 @@ meta_adjust_geom(
  * Input:	spp	set structure
  *		uname	unit-name (fully qualified or relative)
  * Output:	ep	error return structure
- * Returns:	0	success
+ * Returns:	> 0	success and return 'key'
  *		-1	Error. <ep> contains error reason
  */
-int
+mdkey_t
 meta_init_make_device(
 	mdsetname_t	**spp,
 	char		*uname,
@@ -221,47 +221,29 @@ meta_init_make_device(
 {
 	di_devlink_handle_t	hdl;
 	md_mkdev_params_t	params;
-	int			rval = 0;
-	char			*p, *e = uname;
-	size_t			len = strlen(uname);
+	mdkey_t			rval = 0;
+	char			*p;
+	int			len = strlen(uname);
 
-	e += len;
 	(void) memset(&params, 0, sizeof (params));
 	MD_SETDRIVERNAME(&params, "md", (*spp)->setno);
 
 	/*
-	 * Find the start of the unit within <uname>.
+	 * This ioctl call causes kernel to allocate a unit number
+	 * and populate /devices for the named metadevice
 	 */
-	p = strrchr(uname, '/');
-	if (p == NULL) {
-		/* Relative name (e.g. d80) */
-		p = &uname[1];
-	} else {
-		/* qualified name (e.g. /dev/md/dsk/d80) */
-		p += 2;
-		if (p >= e) {
-			/* Invalid drive name */
-			p = Malloc(len + 3);
-			(void) snprintf(p, len + 3, "\"%s\"", uname);
-			rval = mderror(ep, MDE_NOT_DRIVENAME, p);
-			Free(p);
-			return (rval);
-		}
-	}
-	e = NULL;
-	params.mnum = strtoul(p, &e, 10);
-	if (e == p) {
-		/* Invalid drive name */
-		p = Malloc(len + 3);
-		(void) snprintf(p, len + 3, "\"%s\"", uname);
-		rval = mderror(ep, MDE_NOT_DRIVENAME, p);
-		Free(p);
-		return (rval);
-	}
-
 	if (metaioctl(MD_IOCMAKE_DEV, &params, &params.mde, NULL) != 0) {
 		return (mdstealerror(ep, &params.mde));
 	}
+
+	/*
+	 * Now we have minor number so add it to the namespace
+	 * and return the key
+	 */
+	if ((rval = add_self_name(*spp, uname, &params, ep)) <= 0) {
+		return (mderror(ep, MDE_UNIT_NOT_FOUND, NULL));
+	}
+
 	/*
 	 * Wait until device appears in namespace. di_devlink_init() returns
 	 * once the /dev links have been created. If NULL is returned the
@@ -274,6 +256,10 @@ meta_init_make_device(
 	if (hdl != NULL) {
 		(void) di_devlink_fini(&hdl);
 	} else {
+		/*
+		 * Delete name entry we just created
+		 */
+		(void) del_self_name(*spp, rval, ep);
 		p = Malloc(len + 3);
 		(void) snprintf(p, len + 3, "\"%s\"", uname);
 		rval = mderror(ep, MDE_UNIT_NOT_FOUND, p);
@@ -382,6 +368,7 @@ meta_init_name(
 	mdsetname_t	**spp,
 	int		argc,
 	char		*argv[],
+	char		*cname, /* canonical name */
 	mdcmdopts_t	options,
 	md_error_t	*ep
 )
@@ -390,56 +377,98 @@ meta_init_name(
 	char		*p;
 	int		rval;
 	char		*uname = argv[0];
+	mdkey_t		key = MD_KEYWILD;
+	minor_t		mnum;
+	md_error_t	t_e = mdnullerror;
 
 	assert(argc > 0);
+	assert(*spp != NULL);
 
 	/* determine type of metadevice or hot spare pool being created */
 	init_type = meta_get_init_type(argc, argv);
+
+	/*
+	 * Metatrans is eof
+	 */
+	if (init_type == TAB_TRANS)
+		return (mderror(ep, MDE_EOF_TRANS, NULL));
 
 	/* hotspare pool */
 	if (init_type == TAB_HSP)
 		return (meta_init_hsp(spp, argc, argv, options, ep));
 
+	/*
+	 * We are creating metadevice so make sure the name
+	 * has not been used
+	 */
+	if (is_existing_meta_hsp(*spp, cname)) {
+		/*
+		 * The name has been used by hsp
+		 */
+		if (is_existing_hsp(*spp, cname)) {
+			return (mderror(ep, MDE_NAME_IN_USE, cname));
+		}
+
+		/*
+		 * If path exists but unit is not created
+		 * then meta_init_make_device will correct
+		 * that.  If unit also exists then it
+		 * will return a conflict error
+		 */
+		if (init_type != TAB_UNKNOWN) {
+		    /* Create device node */
+		    if ((key = meta_init_make_device(spp, uname,
+			&t_e)) <= 0) {
+			return (mdstealerror(ep, &t_e));
+		    }
+		}
+	}
+
 	/* metadevice */
 	if (argc >= 2 && init_type != TAB_UNKNOWN) {
-		md_error_t	t_e = mdnullerror;
-		char	*cname;
-
 		/*
 		 * We need to create the device node if the specified metadevice
 		 * does not already exist in the database. The actual creation
 		 * is undertaken by the md driver and the links propagated by
 		 * devfsadm.
 		 */
-
-		/* initialize the spp properly */
-		if ((cname = meta_name_getname(spp, uname, &t_e)) != NULL)
-			Free(cname);
-		if (! mdisok(&t_e))
-			return (mdstealerror(ep, &t_e));
-
-		/* Create device node */
-		if (meta_init_make_device(spp, uname, &t_e) != 0) {
-			return (mdstealerror(ep, &t_e));
+		if (key == MD_KEYWILD) {
+			if ((key = meta_init_make_device(spp, uname,
+			    &t_e)) <= 0)
+				return (mdstealerror(ep, &t_e));
 		}
 
 		switch (init_type) {
 		case TAB_MIRROR:
-			return (meta_init_mirror(spp, argc, argv, options, ep));
+			rval = meta_init_mirror(spp, argc, argv, options, ep);
 			break;
 		case TAB_RAID:
-			return (meta_init_raid(spp, argc, argv, options, ep));
+			rval = meta_init_raid(spp, argc, argv, options, ep);
 			break;
 		case TAB_SP:
-			return (meta_init_sp(spp, argc, argv, options, ep));
-			break;
-		case TAB_TRANS:
-			return (mderror(ep, MDE_EOF_TRANS, NULL));
+			rval = meta_init_sp(spp, argc, argv, options, ep);
 			break;
 		case TAB_STRIPE:
-			return (meta_init_stripe(spp, argc, argv, options, ep));
+			rval = meta_init_stripe(spp, argc, argv, options, ep);
 			break;
 		}
+
+		if (rval == -1 || !(options & MDCMD_DOIT)) {
+			/*
+			 * Remove the device node created before
+			 */
+			if ((meta_getnmentbykey((*spp)->setno, MD_SIDEWILD,
+			    key, NULL, &mnum, NULL, ep) != NULL) &&
+			    MD_MIN2UNIT(mnum) < MD_MAXUNITS) {
+			    (void) metaioctl(MD_IOCREM_DEV, &mnum, &t_e, NULL);
+			}
+
+			/*
+			 * Del what we added before
+			 */
+			(void) del_self_name(*spp, key, &t_e);
+		}
+		return (rval);
 	}
 
 	/* unknown type */

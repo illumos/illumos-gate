@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,7 +136,9 @@ realloc_lines(
  */
 static void
 parse_tab(
-	md_tab_t	*tabp
+	md_tab_t	*tabp,
+	char		*metatab_name,
+	md_error_t	*ep
 )
 {
 	uint_t		lineno = 1;
@@ -158,7 +159,7 @@ parse_tab(
 	context = Malloc(len);
 
 	/* parse lines */
-	while (p < e) {
+	while (p < e && *p != '\0') {
 		md_tab_line_t	*linep;
 		char		*t;
 
@@ -230,8 +231,12 @@ parse_tab(
 		    (! isspace(linep->argv[0][0])));
 		linep->context = Strdup(context);
 		linep->type = meta_get_init_type(linep->argc, linep->argv);
-		linep->cname = Strdup(meta_canonicalize(NULL, linep->argv[0]));
-		assert(linep->cname != NULL);
+		linep->cname = meta_canonicalize(NULL, linep->argv[0]);
+		/* if cname is NULL then the meta/hsp name is invalid */
+		if (linep->cname == NULL) {
+			(void) mderror(ep, MDE_SYNTAX, metatab_name);
+			break;
+		}
 	}
 
 	/* cleanup */
@@ -299,10 +304,11 @@ meta_tab_parse(
 	fd = -1;
 
 	/* parse it up */
-	parse_tab(tabp);
+	parse_tab(tabp, filename, ep);
 
-	/* return success */
-	return (tabp);
+	/* return success if file was correctly parsed */
+	if (mdisok(ep))
+		return (tabp);
 
 	/* cleanup, return error */
 out:
@@ -326,6 +332,10 @@ meta_tab_find(
 {
 	char		*cname = meta_canonicalize(sp, name);
 	size_t		line;
+
+	/* if name is not legal meta name then return NULL */
+	if (cname == NULL)
+		return (NULL);
 
 	for (line = 0; (line < tabp->nlines); ++line) {
 		md_tab_line_t	*linep = &tabp->lines[line];

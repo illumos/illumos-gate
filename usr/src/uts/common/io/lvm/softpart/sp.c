@@ -265,6 +265,11 @@ reset_sp(mp_unit_t *un, minor_t mnum, int removing)
 
 	MD_UNIT(mnum) = NULL;
 
+	/*
+	 * Attempt release of minor node
+	 */
+	(void) md_remove_minor_node(mnum);
+
 	if (!removing)
 		return;
 
@@ -278,6 +283,13 @@ reset_sp(mp_unit_t *un, minor_t mnum, int removing)
 	sv->setno = MD_MIN2SET(mnum);
 	sv->key = un->un_key;
 	vtoc_id = un->c.un_vtoc_id;
+
+	/*
+	 * Remove self from the namespace
+	 */
+	if (un->c.un_revision & MD_FN_META_DEV) {
+		(void) md_rem_selfname(un->c.un_self_id);
+	}
 
 	/* Remove the unit structure */
 	mddb_deleterec_wrapper(un->c.un_record_id);
@@ -1277,38 +1289,46 @@ sp_snarf(md_snarfcmd_t cmd, set_t setno)
 		dep->de_flags = MDDB_F_SOFTPART;
 		rbp = dep->de_rb;
 
-		if ((rbp->rb_revision == MDDB_REV_RB) &&
-		    ((rbp->rb_private & MD_PRV_CONVD) == 0)) {
-			/*
-			 * This means, we have an old and small record.
-			 * And this record hasn't already been converted :-o
-			 * before we create an incore metadevice from this
-			 * we have to convert it to a big record.
-			 */
-			small_un = (mp_unit32_od_t *)mddb_getrecaddr(recid);
-			newreqsize = sizeof (mp_unit_t) +
-					((small_un->un_numexts - 1) *
-					sizeof (struct mp_ext));
-			big_un = (mp_unit_t *)kmem_zalloc(newreqsize, KM_SLEEP);
-			softpart_convert((caddr_t)small_un, (caddr_t)big_un,
-			    SMALL_2_BIG);
-			kmem_free(small_un, dep->de_reqsize);
-			dep->de_rb_userdata = big_un;
-			dep->de_reqsize = newreqsize;
-			rbp->rb_private |= MD_PRV_CONVD;
-			un = big_un;
-		} else {
+		switch (rbp->rb_revision) {
+		case MDDB_REV_RB:
+		case MDDB_REV_RBFN:
+			if ((rbp->rb_private & MD_PRV_CONVD) == 0) {
+				/*
+				 * This means, we have an old and small record.
+				 * And this record hasn't already been converted
+				 * :-o before we create an incore metadevice
+				 * from this we have to convert it to a big
+				 * record.
+				 */
+				small_un =
+				    (mp_unit32_od_t *)mddb_getrecaddr(recid);
+				newreqsize = sizeof (mp_unit_t) +
+						((small_un->un_numexts - 1) *
+						sizeof (struct mp_ext));
+				big_un = (mp_unit_t *)kmem_zalloc(newreqsize,
+					KM_SLEEP);
+				softpart_convert((caddr_t)small_un,
+					(caddr_t)big_un, SMALL_2_BIG);
+				kmem_free(small_un, dep->de_reqsize);
+				dep->de_rb_userdata = big_un;
+				dep->de_reqsize = newreqsize;
+				rbp->rb_private |= MD_PRV_CONVD;
+				un = big_un;
+			} else {
+				/* Record has already been converted */
+				un = (mp_unit_t *)mddb_getrecaddr(recid);
+			}
+			un->c.un_revision &= ~MD_64BIT_META_DEV;
+			break;
+		case MDDB_REV_RB64:
+		case MDDB_REV_RB64FN:
 			/* Large device */
 			un = (mp_unit_t *)mddb_getrecaddr(recid);
-		}
-
-		/* Set revision and flag accordingly */
-		if (rbp->rb_revision == MDDB_REV_RB) {
-			un->c.un_revision = MD_32BIT_META_DEV;
-		} else {
-			un->c.un_revision = MD_64BIT_META_DEV;
+			un->c.un_revision |= MD_64BIT_META_DEV;
 			un->c.un_flag |= MD_EFILABEL;
+			break;
 		}
+		NOTE_FN(rbp->rb_revision, un->c.un_revision);
 
 		/*
 		 * Create minor node for snarfed entry.
@@ -1695,6 +1715,7 @@ sp_imp_set(
 	mddb_rb32_t	*rbp;
 	mp_unit_t	*un64;
 	mp_unit32_od_t	*un32;
+	md_dev64_t	self_devt;
 	minor_t		*self_id;	/* minor needs to be updated */
 	md_parent_t	*parent_id;	/* parent needs to be updated */
 	mddb_recid_t	*record_id;	/* record id needs to be updated */
@@ -1712,7 +1733,9 @@ sp_imp_set(
 		dep = mddb_getrecdep(recid);
 		rbp = dep->de_rb;
 
-		if (rbp->rb_revision == MDDB_REV_RB) {
+		switch (rbp->rb_revision) {
+		case MDDB_REV_RB:
+		case MDDB_REV_RBFN:
 			/*
 			 * Small device
 			 */
@@ -1724,7 +1747,10 @@ sp_imp_set(
 			if (!md_update_minor(setno, mddb_getsidenum
 				(setno), un32->un_key))
 				goto out;
-		} else {
+			break;
+
+		case MDDB_REV_RB64:
+		case MDDB_REV_RB64FN:
 			un64 = (mp_unit_t *)mddb_getrecaddr(recid);
 			self_id = &(un64->c.un_self_id);
 			parent_id = &(un64->c.un_parent);
@@ -1732,6 +1758,21 @@ sp_imp_set(
 
 			if (!md_update_minor(setno, mddb_getsidenum
 				(setno), un64->un_key))
+				goto out;
+			break;
+		}
+
+		/*
+		 * If this is a top level and a friendly name metadevice,
+		 * update its minor in the namespace.
+		 */
+		if ((*parent_id == MD_NO_PARENT) &&
+		    ((rbp->rb_revision == MDDB_REV_RBFN) ||
+		    (rbp->rb_revision == MDDB_REV_RB64FN))) {
+
+			self_devt = md_makedevice(md_major, *self_id);
+			if (!md_update_top_device_minor(setno,
+			    mddb_getsidenum(setno), self_devt))
 				goto out;
 		}
 

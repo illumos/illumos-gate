@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,14 +127,18 @@ init_entries(
 	/* for all matching entries, which haven't already been done */
 	for (line = 0; (line < tabp->nlines); ++line) {
 		md_tab_line_t	*linep = &tabp->lines[line];
+		char		*uname = linep->argv[0];
 
 		/* see if already done */
 		if (linep->flags != DO_AGAIN)
 			continue;
 
+		/* clear the metadev/hsp caches between inits */
+		metaflushmetanames();
+
 		/* try it */
 		if ((called_thru_rpc == FALSE) &&
-		    meta_is_mn_name(spp, linep->argv[0], ep)) {
+		    meta_is_mn_name(spp, uname, ep)) {
 			/*
 			 * MN set, send command to all nodes
 			 * Note that is sp is NULL, meta_is_mn_name() derives
@@ -144,15 +147,26 @@ init_entries(
 			ret = mn_send_command(spp, linep->argc, linep->argv,
 			    options, flags, linep->context, ep);
 		} else {
-			ret = meta_init_name(spp, linep->argc, linep->argv,
-			    options, ep);
-			if (ret != 0) {
-				if (!(flags & MD_IGNORE_STDERR)) {
-					mderrorextra(ep, linep->context);
-					mde_perror(ep, "");
-					rval = -1;
-				}
+			char		*cname = NULL;
+
+			cname = meta_name_getname(spp, uname, META_DEVICE, ep);
+			if (cname == NULL) {
+				mde_perror(ep, "");
 				mdclrerror(ep);
+			} else {
+
+				ret = meta_init_name(spp, linep->argc,
+				    linep->argv, cname, options, ep);
+				Free(cname);
+
+				if (ret != 0) {
+					if (!(flags & MD_IGNORE_STDERR)) {
+					    mderrorextra(ep, linep->context);
+					    mde_perror(ep, "");
+					    rval = -1;
+					}
+					mdclrerror(ep);
+				}
 			}
 		}
 		if (ret == 0) {
@@ -183,16 +197,6 @@ init_all(
 	uint_t		more;
 	int		done;
 	int		eval = -1;
-
-	/* create local set, if necessary */
-	if (*spp == NULL) {
-		if ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL) {
-			mde_perror(ep, "");
-			mdclrerror(ep);
-			return (eval);
-		}
-	}
-	setlen = strlen((*spp)->setname);
 
 	/*
 	 * Only take the lock if this is not a MN set
@@ -225,6 +229,7 @@ init_all(
 		return (eval);
 	}
 
+	setlen = strlen((*spp)->setname);
 	for (more = 0; (more < tabp->nlines); ++more) {
 		md_tab_line_t	*linep = &tabp->lines[more];
 		char		*cname = linep->cname;
@@ -290,11 +295,10 @@ init_name(
 	md_tab_line_t	*linep = NULL;
 	int		rval = -1;
 	int		ret;
+	char		*uname = argv[0];
 
 	/* look in md.tab */
 	if (argc == 1) {
-		char		*name = argv[0];
-
 		/* get md.tab entries */
 		if ((tabp = meta_tab_parse(NULL, ep)) == NULL) {
 			if (! mdissyserror(ep, ENOENT))
@@ -302,7 +306,7 @@ init_name(
 		}
 
 		/* look in md.tab */
-		if ((linep = meta_tab_find(*spp, tabp, name, TAB_MD_HSP))
+		if ((linep = meta_tab_find(*spp, tabp, uname, TAB_MD_HSP))
 								!= NULL) {
 			argc = linep->argc;
 			argv = linep->argv;
@@ -310,14 +314,29 @@ init_name(
 	}
 
 	if ((called_thru_rpc == FALSE) &&
-	    meta_is_mn_name(spp, argv[0], ep)) {
+	    meta_is_mn_name(spp, uname, ep)) {
 		/*
 		 * MN set, send command to all nodes
 		 */
 		ret = mn_send_command(spp, argc, argv, options,
 		    MD_DISP_STDERR, NO_CONTEXT_STRING, ep);
-	} else
-		ret = meta_init_name(spp, argc, argv, options, ep);
+	} else {
+		char		*cname = NULL;
+
+		cname = meta_name_getname(spp, uname, META_DEVICE, ep);
+		if (cname == NULL) {
+			goto out;
+		}
+
+		/* check for ownership */
+		if (meta_check_ownership(*spp, ep) != 0) {
+			Free(cname);
+			goto out;
+		}
+
+		ret = meta_init_name(spp, argc, argv, cname, options, ep);
+		Free(cname);
+	}
 
 	if (ret != 0) {
 		if (linep != NULL)
@@ -687,7 +706,7 @@ main(
 	char		*argv[]
 )
 {
-	char		*sname = NULL;
+	char		*sname = MD_LOCAL_NAME;
 	mdsetname_t	*sp = NULL;
 	enum action {
 		NONE,
@@ -784,12 +803,12 @@ main(
 		}
 	}
 
-	if (sname != NULL) {
-		if ((sp = metasetname(sname, ep)) == NULL) {
-			mde_perror(ep, "");
-			md_exit(sp, 1);
-		}
+	/* sname is MD_LOCAL_NAME if not specified on the command line */
+	if ((sp = metasetname(sname, ep)) == NULL) {
+		mde_perror(ep, "");
+		md_exit(sp, 1);
 	}
+
 	argc -= optind;
 	argv += optind;
 	if (todo == NONE) {

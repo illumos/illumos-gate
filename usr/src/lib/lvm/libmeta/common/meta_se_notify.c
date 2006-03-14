@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,7 @@ char *
 obj2devname(uint32_t tag, set_t setno, md_dev64_t dev)
 {
 	char		*setname;
+	char		*uname;
 	char		name[MD_MAX_CTDLEN];
 	mdsetname_t	*sp;
 	md_error_t	status = mdnullerror;
@@ -60,22 +60,18 @@ obj2devname(uint32_t tag, set_t setno, md_dev64_t dev)
 	case SVM_TAG_RAID5:
 	case SVM_TAG_STRIPE:
 	case SVM_TAG_TRANS:
-		if (setno == 0) {
-			rtn = snprintf(name, sizeof (name), "d%u",
-			    (unsigned)MD_MIN2UNIT(mnum));
-		} else if (setname != NULL) {
-			rtn = snprintf(name, sizeof (name), "%s/d%u", setname,
-			    (unsigned)MD_MIN2UNIT(mnum));
-		}
+		uname = get_mdname(sp, mnum);
+		if (uname == NULL)
+			return (NULL);
+
+		(void) strcpy(name, uname);
 		break;
 	case SVM_TAG_HSP:
-		if (setno == 0) {
-			rtn = snprintf(name, sizeof (name), "hsp%u",
-			    (unsigned)MD_MIN2UNIT(mnum));
-		} else if (setname != NULL) {
-			rtn = snprintf(name, sizeof (name), "%s/hsp%u",
-			    setname, (unsigned)MD_MIN2UNIT(mnum));
-		}
+		uname = get_hspname(sp, mnum);
+		if (uname == NULL)
+			return (NULL);
+
+		(void) strcpy(name, uname);
 		break;
 	case SVM_TAG_DRIVE:
 		(void) sprintf(name, "drive");

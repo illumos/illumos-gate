@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +73,7 @@ extern major_t		md_major;
 extern mdq_anchor_t	md_ff_daemonq;
 extern void		md_probe_one();
 extern void		mirror_openfail_console_info();
+
 #ifdef DEBUG
 extern int		mirror_debug_flag;
 #endif
@@ -194,7 +194,7 @@ mirror_set(
 		return (mdmderror(&msp->mde, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		recid = mddb_createrec((size_t)msp->size, typ1, MIRROR_REC,
-					MD_CRO_64BIT | MD_CRO_MIRROR, setno);
+			MD_CRO_64BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
 #endif
 	} else {
 		/*
@@ -202,7 +202,7 @@ mirror_set(
 		 */
 		msp->size = sizeof (mm_unit32_od_t);
 		recid = mddb_createrec((size_t)msp->size, typ1, MIRROR_REC,
-					MD_CRO_32BIT | MD_CRO_MIRROR, setno);
+			MD_CRO_32BIT | MD_CRO_MIRROR | MD_CRO_FN, setno);
 	}
 	if (recid < 0)
 		return (mddbstatus2error(&msp->mde, (int)recid,
@@ -229,6 +229,7 @@ mirror_set(
 		un->c.un_flag |= MD_EFILABEL;
 	}
 
+	un->c.un_revision |= MD_FN_META_DEV;
 	MD_RECID(un)	= recid;
 	MD_CAPAB(un)	= MD_CAN_PARENT | MD_CAN_META_CHILD | MD_CAN_SP;
 	MD_PARENT(un)	= MD_NO_PARENT;
@@ -260,6 +261,11 @@ mirror_set(
 		mddb_deleterec_wrapper(recid);
 		return (err);
 	}
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail--;
 
 	mirror_commit(un, ALL_SUBMIRRORS, 0);
 	md_create_unit_incore(MD_SID(un), &mirror_md_ops, 0);
@@ -354,6 +360,7 @@ mirror_reset(
 	minor_t		mnum = mirp->mnum;
 	mm_unit_t	*un;
 	mdi_unit_t	*ui;
+	set_t		setno = MD_MIN2SET(mnum);
 
 	mdclrerror(&mirp->mde);
 
@@ -393,6 +400,21 @@ mirror_reset(
 	}
 
 	reset_mirror(un, mnum, 1);
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail++;
+
+	/*
+	 * If MN set, reset s_un_next so all nodes can have
+	 * the same view of the next available slot when
+	 * nodes are -w and -j
+	 */
+	if (MD_MNSET_SETNO(setno)) {
+		(void) md_upd_set_unnext(setno, MD_MIN2UNIT(mnum));
+	}
+
 	rw_exit(&md_unit_array_rw.lock);
 	return (0);
 }
@@ -1300,7 +1322,7 @@ mirror_grow_unit(
 	un->c.un_actual_tb = total_blocks;
 
 	/* Is the mirror growing from 32 bit device to 64 bit device? */
-	if ((un->c.un_revision == MD_32BIT_META_DEV) &&
+	if (((un->c.un_revision & MD_64BIT_META_DEV) == 0) &&
 	    (un->c.un_total_blocks > MD_MAX_BLKS_FOR_SMALL_DEVS)) {
 #if defined(_ILP32)
 		return (mdmderror(ep, MDE_UNIT_TOO_LARGE, mnum));
@@ -1311,15 +1333,21 @@ mirror_grow_unit(
 		mddb_recid_t	old_recid = un->c.un_record_id;
 		mddb_recid_t	old_vtoc;
 		mddb_de_ic_t    *dep, *old_dep;
+		md_create_rec_option_t	options;
 
 		/* yup, new device size. So we need to replace the record */
 		typ1 = (mddb_type_t)md_getshared_key(MD_UN2SET(un),
 		    mirror_md_ops.md_driver.md_drivername);
 		setno = MD_MIN2SET(mnum);
+
+		/* Preserve the friendly name properties of growing unit */
+		options = MD_CRO_64BIT | MD_CRO_MIRROR;
+		if (un->c.un_revision & MD_FN_META_DEV)
+			options |= MD_CRO_FN;
 		recid = mddb_createrec(offsetof(mm_unit_t, un_smic), typ1,
-		    MIRROR_REC, MD_CRO_64BIT | MD_CRO_MIRROR, setno);
+		    MIRROR_REC, options, setno);
 		/* Resize to include incore fields */
-		un->c.un_revision = MD_64BIT_META_DEV;
+		un->c.un_revision |= MD_64BIT_META_DEV;
 		/* All 64 bit metadevices only support EFI labels. */
 		un->c.un_flag |= MD_EFILABEL;
 		/*

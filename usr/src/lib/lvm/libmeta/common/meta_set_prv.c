@@ -149,7 +149,8 @@ checkdrive_onnode(
 		 */
 		if (strcmp(np->rname, rname) != 0) {
 			/* different rname */
-			remote_np = metaname_fast(&sp, rname, ep);
+			remote_np = metaname_fast(&sp, rname,
+			    LOGICAL_DEVICE, ep);
 			if (remote_np != NULL) {
 				remote_dnp = remote_np->drivenamep;
 			}

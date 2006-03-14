@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +72,7 @@
 #include <sys/mkdev.h>
 #include <sys/stat.h>
 #include <sys/open.h>
+#include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_sp.h>
 #include <sys/lvm/md_notify.h>
 #include <sys/modctl.h>
@@ -240,6 +240,12 @@ sp_update_watermarks(void *d, int mode)
 	setno = MD_MIN2SET(mnum);
 	side = mddb_getsidenum(setno);
 	un = MD_UNIT(mnum);
+
+	if (un == NULL) {
+		err = EFAULT;
+		goto out;
+	}
+
 	mdep = &mup->mde;
 
 	mdclrerror(mdep);
@@ -481,12 +487,12 @@ sp_set(void *d, int mode)
 #if defined(_ILP32)
 		return (mdmderror(mdep, MDE_UNIT_TOO_LARGE, mnum));
 #else
-		recids[0] = mddb_createrec((size_t)msp->size, rec_type,
-				0, MD_CRO_64BIT | MD_CRO_SOFTPART, setno);
+		recids[0] = mddb_createrec((size_t)msp->size, rec_type, 0,
+			MD_CRO_64BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
 #endif
 	} else {
-		recids[0] = mddb_createrec((size_t)msp->size, rec_type,
-				0, MD_CRO_32BIT | MD_CRO_SOFTPART, setno);
+		recids[0] = mddb_createrec((size_t)msp->size, rec_type, 0,
+			MD_CRO_32BIT | MD_CRO_SOFTPART | MD_CRO_FN, setno);
 	}
 	/* set initial value for possible child record */
 	recids[1] = 0;
@@ -521,6 +527,7 @@ sp_set(void *d, int mode)
 	MD_SID(un) = mnum;
 	MD_RECID(un) = recids[0];
 	MD_PARENT(un) = MD_NO_PARENT;
+	un->c.un_revision |= MD_FN_META_DEV;
 
 	/* if we are parenting a metadevice, set our child's parent field */
 	if (md_getmajor(un->un_dev) == md_major) {
@@ -546,6 +553,11 @@ sp_set(void *d, int mode)
 		mddb_deleterec_wrapper(recids[0]);
 		return (err);
 	}
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail--;
 
 	/*
 	 * commit the record.
@@ -649,6 +661,7 @@ sp_reset(md_sp_reset_t *softp)
 	mdi_unit_t	*ui;
 	mp_unit_t	*un;
 	md_unit_t	*child_un;
+	set_t		setno = MD_MIN2SET(mnum);
 
 	mdclrerror(&softp->mde);
 
@@ -688,6 +701,20 @@ sp_reset(md_sp_reset_t *softp)
 	/* remove the soft partition */
 	reset_sp(un, mnum, 1);
 
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail++;
+
+	/*
+	 * If MN set, reset s_un_next so all nodes can have
+	 * the same view of the next available slot when
+	 * nodes are -w and -j
+	 */
+	if (MD_MNSET_SETNO(setno)) {
+		md_upd_set_unnext(setno, MD_MIN2UNIT(mnum));
+	}
+
 	/* release locks and return */
 out:
 	rw_exit(&md_unit_array_rw.lock);
@@ -723,6 +750,7 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 	mddb_recid_t	recid;
 	mddb_type_t	rec_type;
 	mddb_recid_t	old_vtoc = 0;
+	md_create_rec_option_t options;
 	int		err;
 	int		rval = 0;
 	set_t		setno;
@@ -776,17 +804,23 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 	rec_type = (mddb_type_t)md_getshared_key(setno,
 	    sp_md_ops.md_driver.md_drivername);
 
+	/*
+	 * Preserve the friendly name nature of the unit that is growing.
+	 */
+	options = MD_CRO_SOFTPART;
+	if (un->c.un_revision & MD_FN_META_DEV)
+		options |= MD_CRO_FN;
 	if (mgp->options & MD_CRO_64BIT) {
 #if defined(_ILP32)
 		rval = mdmderror(mdep, MDE_UNIT_TOO_LARGE, mnum);
 		goto out;
 #else
 		recid = mddb_createrec((size_t)mgp->size, rec_type, 0,
-				MD_CRO_64BIT | MD_CRO_SOFTPART, setno);
+				MD_CRO_64BIT | options, setno);
 #endif
 	} else {
 		recid = mddb_createrec((size_t)mgp->size, rec_type, 0,
-				MD_CRO_32BIT | MD_CRO_SOFTPART, setno);
+				MD_CRO_32BIT | options, setno);
 	}
 	if (recid < 0) {
 		rval = mddbstatus2error(mdep, (int)recid, mnum, setno);
@@ -804,6 +838,8 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 		rval = EFAULT;
 		goto out;
 	}
+	if (options & MD_CRO_FN)
+		new_un->c.un_revision |= MD_FN_META_DEV;
 
 	/* All 64 bit metadevices only support EFI labels. */
 	if (mgp->options & MD_CRO_64BIT) {
@@ -813,7 +849,7 @@ sp_grow(void *d, int mode, IOLOCK *lockp)
 		 * and had a vtoc record attached to it, we remove the
 		 * vtoc record, because the layout has changed completely.
 		 */
-		if ((un->c.un_revision == MD_32BIT_META_DEV) &&
+		if (((un->c.un_revision & MD_64BIT_META_DEV) == 0) &&
 		    (un->c.un_vtoc_id != 0)) {
 			old_vtoc = un->c.un_vtoc_id;
 			new_un->c.un_vtoc_id =

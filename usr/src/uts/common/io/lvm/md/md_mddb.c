@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,7 +249,9 @@ stripe_skip_ts(void *un, uint_t revision)
 	ms_unit32_od_t		*small_un;
 	uint_t			rb_off = offsetof(mddb_rb32_t, rb_data[0]);
 
-	if (revision == MDDB_REV_RB) {
+	switch (revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		small_un = (ms_unit32_od_t *)un;
 		skip_prev = &skip_start;
 
@@ -279,7 +280,9 @@ stripe_skip_ts(void *un, uint_t revision)
 			skip_prev->skip_next = skip;
 			skip_prev = skip;
 		}
-	} else {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
 		big_un = (ms_unit_t *)un;
 		skip_prev = &skip_start;
 
@@ -308,6 +311,7 @@ stripe_skip_ts(void *un, uint_t revision)
 			skip_prev->skip_next = skip;
 			skip_prev = skip;
 		}
+		break;
 	}
 	/* Return the start of the list of fields to skip */
 	return (skip_start.skip_next);
@@ -332,12 +336,17 @@ mirror_skip_ts(uint_t revision)
 	skip_prev = &skip_start;
 
 	skip = (crc_skip_t *)kmem_zalloc(sizeof (crc_skip_t), KM_SLEEP);
-	if (revision == MDDB_REV_RB) {
+	switch (revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		skip->skip_offset = offsetof(mm_unit32_od_t,
 		    un_last_read) + rb_off;
-	} else {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
 		skip->skip_offset = offsetof(mm_unit_t,
 		    un_last_read) + rb_off;
+		break;
 	}
 	skip->skip_size = sizeof (int);
 	skip_prev->skip_next = skip;
@@ -345,12 +354,17 @@ mirror_skip_ts(uint_t revision)
 
 	for (i = 0; i < NMIRROR; i++) {
 		skip = (crc_skip_t *)kmem_zalloc(sizeof (crc_skip_t), KM_SLEEP);
-		if (revision == MDDB_REV_RB) {
+		switch (revision) {
+		case MDDB_REV_RB:
+		case MDDB_REV_RBFN:
 			skip->skip_offset = offsetof(mm_unit32_od_t,
 			    un_sm[i].sm_timestamp) + rb_off;
-		} else {
+			break;
+		case MDDB_REV_RB64:
+		case MDDB_REV_RB64FN:
 			skip->skip_offset = offsetof(mm_unit_t,
 			    un_sm[i].sm_timestamp) + rb_off;
+			break;
 		}
 		skip->skip_size = sizeof (md_timeval32_t);
 		skip_prev->skip_next = skip;
@@ -373,12 +387,17 @@ hotspare_skip_ts(uint_t revision)
 	uint_t		rb_off = offsetof(mddb_rb32_t, rb_data[0]);
 
 	skip = (crc_skip_t *)kmem_zalloc(sizeof (crc_skip_t), KM_SLEEP);
-	if (revision == MDDB_REV_RB) {
+	switch (revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		skip->skip_offset = offsetof(hot_spare32_od_t, hs_timestamp) +
 		    rb_off;
-	} else {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
 		skip->skip_offset = offsetof(hot_spare_t, hs_timestamp) +
 		    rb_off;
+		break;
 	}
 	skip->skip_size = sizeof (md_timeval32_t);
 	return (skip);
@@ -1894,7 +1913,9 @@ getrecord(
 		return (MDDB_F_EFMT | MDDB_F_EDATA);
 	}
 	if ((revchk(MDDB_REV_RB, rbp->rb_revision) != 0) &&
-	    (revchk(MDDB_REV_RB64, rbp->rb_revision) != 0)) {
+	    (revchk(MDDB_REV_RB64, rbp->rb_revision) != 0) &&
+	    (revchk(MDDB_REV_RBFN, rbp->rb_revision) != 0) &&
+	    (revchk(MDDB_REV_RB64FN, rbp->rb_revision) != 0)) {
 		return (MDDB_F_EFMT | MDDB_F_EDATA);
 	}
 	/* Check crc for this record */
@@ -2312,7 +2333,8 @@ getuserdata(
 	 */
 	if (!(md_get_setstatus(setno) & MD_SET_IMPORT) &&
 	    (type >= MDDB_FIRST_MODID) &&
-	    (rbp->rb_revision == MDDB_REV_RB)) {
+	    ((rbp->rb_revision == MDDB_REV_RB) ||
+		(rbp->rb_revision == MDDB_REV_RBFN))) {
 
 		switch (dep->de_flags) {
 
@@ -8859,9 +8881,15 @@ mddb_createrec(
 
 	/* Do we have to create an old style (32 bit) record?  */
 	if (options & MD_CRO_32BIT) {
-		rbp->rb_revision = MDDB_REV_RB;
+		if (options & MD_CRO_FN)
+			rbp->rb_revision = MDDB_REV_RBFN;
+		else
+			rbp->rb_revision = MDDB_REV_RB;
 	} else {
-		rbp->rb_revision = MDDB_REV_RB64;
+		if (options & MD_CRO_FN)
+			rbp->rb_revision = MDDB_REV_RB64FN;
+		else
+			rbp->rb_revision = MDDB_REV_RB64;
 	}
 
 	/* set de_rb_userdata for non optimization records */
@@ -11971,6 +11999,14 @@ mddb_setflags_ioctl(mddb_setflags_config_t *info)
 	return (0);
 }
 
+/*
+ * md_update_minor
+ *
+ * This function updates the minor in the namespace entry for an
+ * underlying metadevice.  The function is called in mod_imp_set
+ * where mod is sp, stripe, mirror and raid.
+ *
+ */
 int
 md_update_minor(
 	set_t	setno,
@@ -12006,6 +12042,68 @@ md_update_minor(
 	 * Look up the key
 	 */
 	if ((n = lookup_entry(nh, setno, side, key, NODEV64, 0L)) != NULL) {
+		/*
+		 * Find the entry, update its n_minor if metadevice
+		 */
+		if ((shn = (char *)getshared_name(setno, n->n_drv_key, 0L))
+		    == NULL) {
+			retval = 0;
+			goto out;
+		}
+
+		if (strcmp(shn, "md") == 0) {
+			n->n_minor = MD_MKMIN(setno, MD_MIN2UNIT(n->n_minor));
+		}
+	}
+
+out:
+	rw_exit(&nm_lock.lock);
+	return (retval);
+}
+
+/*
+ * md_update_top_device_minor
+ *
+ * This function updates the minor in the namespace entry for a top
+ * level metadevice.  The function is called in mod_imp_set where
+ * mod is sp, stripe, mirror and raid.
+ *
+ */
+int
+md_update_top_device_minor(
+	set_t	setno,
+	side_t	side,
+	md_dev64_t dev
+)
+{
+	struct nm_next_hdr	*nh;
+	struct nm_name		*n;
+	char			*shn;
+	int			retval = 1;
+
+	/*
+	 * Load the devid name space if it exists
+	 */
+	(void) md_load_namespace(setno, NULL, NM_DEVID);
+	if (! md_load_namespace(setno, NULL, 0L)) {
+		/*
+		 * Unload the devid namespace
+		 */
+		(void) md_unload_namespace(setno, NM_DEVID);
+		return (0);
+	}
+
+	rw_enter(&nm_lock.lock, RW_READER);
+
+	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) {
+		retval = 0;
+		goto out;
+	}
+
+	/*
+	 * Look up the key
+	 */
+	if ((n = lookup_entry(nh, setno, side, MD_KEYWILD, dev, 0L)) != NULL) {
 		/*
 		 * Find the entry, update its n_minor if metadevice
 		 */
@@ -12326,6 +12424,7 @@ md_imp_create_set(
 	md_drive_record	*dr;
 	size_t		dr_size = sizeof (md_drive_record);
 	mdkey_t		dr_key;
+	md_error_t	error = MDNULLERROR;
 
 
 	if ((s = mddb_setenter(setno, MDDB_MUSTEXIST, &err)) == NULL)
@@ -12356,7 +12455,7 @@ md_imp_create_set(
 		 */
 		if ((dr_key = md_setdevname(MD_LOCAL_SET, 1, MD_KEYWILD,
 		    rip->ri_driver, md_getminor(rip->ri_dev),
-		    rip->ri_devname, setno)) == 0)
+		    rip->ri_devname, setno, &error)) == 0)
 			continue;
 
 		if (dr_key < 0) {

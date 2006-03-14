@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +109,7 @@ print_name(
 	options |= PRINT_SUBDEVS;
 
 	/* hotspare pool */
-	if (is_hspname(uname)) {
+	if (is_existing_hsp(*spp, uname)) {
 		mdhspname_t	*hspnamep;
 
 		/* get hotsparepool */
@@ -128,7 +127,7 @@ print_name(
 	}
 
 	/* get metadevice */
-	if (((namep = metaname(spp, uname, ep)) == NULL) ||
+	if (((namep = metaname(spp, uname, META_DEVICE, ep)) == NULL) ||
 	    (metachkmeta(namep, ep) != 0))
 		return (-1);
 
@@ -162,20 +161,20 @@ print_setstat(
 )
 {
 	int			rval = -1;
+	char			*cname = NULL;
 	char			*cp = NULL;
 	md_gs_stat_parm_t	gsp;
 
-	/* create local set, if necessary */
-	if (*spp == NULL) {
-		if (fname != NULL && (cp = strchr(fname, '/')) != NULL)
-			*cp = '\0';
 
-		if (fname != NULL && (*spp = metasetname(fname, ep)) != NULL) {
-			*cp = '/';
-		} else {
-			if ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL)
-				return (rval);
+	if (fname != NULL && strchr(fname, '/') != NULL) {
+		/* get the canonical name */
+		cname = meta_name_getname(spp, fname, META_DEVICE, ep);
+		if (cname == NULL) {
+			mde_perror(ep, "");
+			mdclrerror(ep);
+			return (-1);
 		}
+		Free(cname);
 	}
 
 	if ((cp = getenv("MD_DEBUG")) == NULL)
@@ -264,7 +263,7 @@ usage(
 )
 {
 	(void) fprintf(stderr, gettext("\
-usage:	%s [-s setname] [-a][-c][-B][-r][-i][-p] [-t] [metadevice...]\n"),
+usage:	%s [-s setname] [-a][-c][-B][-D][-r][-i][-p] [-t] [metadevice...]\n"),
 	    myname);
 	md_exit(sp, eval);
 }
@@ -278,7 +277,7 @@ main(
 	char	*argv[]
 )
 {
-	char		*sname = NULL;
+	char		*sname = MD_LOCAL_NAME;
 	mdsetname_t	*sp = NULL;
 	mdprtopts_t	options = PRINT_HEADER | PRINT_DEVID | PRINT_FAST;
 	int		c;
@@ -288,6 +287,7 @@ main(
 	int		eval = 0;
 	int		inquire = 0;
 	int		quiet_flg = 0;
+	int		set_flg = 0;
 	int		error;
 	int		all_sets_flag = 0;
 	int		concise_flag = 0;
@@ -324,7 +324,7 @@ main(
 	/* parse arguments */
 	optind = 1;
 	opterr = 1;
-	while ((c = getopt(argc, argv, "acSs:hpBrtiq?")) != -1) {
+	while ((c = getopt(argc, argv, "acSs:hpBDrtiq?")) != -1) {
 		switch (c) {
 		case 'a':
 			all_sets_flag++;
@@ -341,6 +341,7 @@ main(
 
 		case 's':
 			sname = optarg;
+			set_flg++;
 			break;
 
 		case 'h':
@@ -363,6 +364,9 @@ main(
 		case 'B':
 			options |= PRINT_LARGEDEVICES;
 			break;
+		case 'D':
+			options |= PRINT_FN;
+			break;
 		case 'r':		/* defunct option */
 			break;
 		case 'q':
@@ -380,23 +384,16 @@ main(
 	argc -= optind;
 	argv += optind;
 
-	if (sname != NULL) {
+	if (all_sets_flag && set_flg) {
+		fprintf(stderr, gettext("metastat: "
+		    "incompatible options: -a and -s\n"));
+		usage(sp, 1);
+	}
 
-		if (all_sets_flag) {
-			fprintf(stderr, gettext("metastat: "
-			    "incompatible options: -a and -s\n"));
-			usage(sp, 1);
-		}
-
-		if ((sp = metasetname(sname, ep)) == NULL) {
-			mde_perror(ep, "");
-			md_exit(sp, 1);
-		}
-	} else {
-		if ((sp = metasetname(MD_LOCAL_NAME, ep)) == NULL) {
-			mde_perror(ep, "");
-			md_exit(sp, 1);
-		}
+	/* get set context */
+	if ((sp = metasetname(sname, ep)) == NULL) {
+		mde_perror(ep, "");
+		md_exit(sp, 1);
 	}
 
 	/* make sure that the mddb is not stale. Else print a warning */
@@ -453,26 +450,39 @@ main(
 	/* print named device types */
 	while (devcnt < argc) {
 		char	*uname = argv[devcnt];
+		char	*cname = NULL;
+
+		/* get the canonical name */
+		cname = meta_name_getname(&sp, uname, META_DEVICE, ep);
+		if (cname == NULL) {
+			/* already printed the error */
+			mdclrerror(ep);
+			eval = 1;
+			++devcnt;
+			continue;
+		}
 
 		if (concise_flag) {
 		    mdname_t *np;
 
-		    np = metaname(&sp, uname, ep);
+		    np = metaname(&sp, cname, META_DEVICE, ep);
 		    if (np == NULL) {
 			mde_perror(ep, "");
 			mdclrerror(ep);
+			eval = 1;
 		    } else {
 			print_concise_md(0, sp, np);
 		    }
 
 		} else {
-		    if (print_name(&sp, uname, &nlistp, NULL, stdout, options,
+		    if (print_name(&sp, cname, &nlistp, NULL, stdout, options,
 			&meta_print_trans_msg, &lognlp, ep) != 0) {
 			    mde_perror(ep, "");
 			    mdclrerror(ep);
 			    eval = 1;
 		    }
 		}
+		Free(cname);
 		++devcnt;
 	}
 
@@ -482,14 +492,24 @@ main(
 
 		while (devcnt < argc) {
 			char	*uname = argv[devcnt];
+			char	*cname = NULL;
+
+			/* get the canonical name */
+			cname = meta_name_getname(&sp, uname, META_DEVICE, ep);
+			if (cname == NULL) {
+				mde_perror(ep, "");
+				mdclrerror(ep);
+				++devcnt;
+				continue;
+			}
 
 			/* hotspare pools */
-			if (is_hspname(uname)) {
+			if (is_existing_hsp(sp, cname)) {
 				mdhspname_t	*hspnamep;
 				md_hsp_t	*hsp;
 
 				/* get hotsparepool */
-				if ((hspnamep = metahspname(&sp, uname,
+				if ((hspnamep = metahspname(&sp, cname,
 					ep)) == NULL)
 					eval = 1;
 
@@ -504,7 +524,8 @@ main(
 					namep = hsp->hotspares.
 					    hotspares_val[hsi].hsnamep;
 
-					if (!(options & PRINT_LARGEDEVICES)) {
+					if (!(options &
+					    (PRINT_LARGEDEVICES | PRINT_FN))) {
 						/* meta_getdevs populates the */
 						/* nlistp structure for use   */
 						if (meta_getdevs(sp, namep,
@@ -517,12 +538,13 @@ main(
 			} else {
 
 				/* get metadevice */
-				if (((namep = metaname(&sp, uname,
-					ep)) == NULL) ||
+				if (((namep = metaname(&sp, cname,
+					META_DEVICE, ep)) == NULL) ||
 					(metachkmeta(namep, ep) != 0))
 					eval = 1;
 
-				if (!(options & PRINT_LARGEDEVICES)) {
+				if (!(options &
+				    (PRINT_LARGEDEVICES | PRINT_FN))) {
 					/* meta_getdevs populates the	*/
 					/* nlistp structure for use 	*/
 					if (meta_getdevs(sp, namep, &nlistp, ep)
@@ -530,7 +552,7 @@ main(
 						eval =  1;
 				}
 			}
-
+			Free(cname);
 			++devcnt;
 		}
 		if (print_devid(sp, nlistp, stdout, ep) != 0)
@@ -602,12 +624,6 @@ print_specific_set(mdsetname_t *sp, mdprtopts_t options, int concise_flag,
 	md_error_t	*ep = &status;
 	int		meta_print_trans_msg = 0;
 
-	/* default to local set */
-	if ((sp == NULL) && ((sp = metasetname(MD_LOCAL_NAME, ep)) == NULL)) {
-	    mde_perror(ep, "");
-	    md_exit(sp, 1);
-	}
-
 	/* check for ownership */
 	assert(sp != NULL);
 	if (meta_check_ownership(sp, ep) != 0) {
@@ -638,7 +654,7 @@ print_specific_set(mdsetname_t *sp, mdprtopts_t options, int concise_flag,
 		 * upgrade.  Even if meta_getalldevs fails, the
 		 * data in nlistp is still valid.
 		 */
-		if (!(options & PRINT_LARGEDEVICES)) {
+		if (!(options & (PRINT_LARGEDEVICES | PRINT_FN))) {
 		    (void) meta_getalldevs(sp, &nlistp, 0, ep);
 		}
 		if (nlistp != NULL) {
@@ -1164,7 +1180,7 @@ print_concise_diskset(mdsetname_t *sp)
 		md_sp_t		*soft_part;
 		mdnamelist_t	*tnlp;
 
-		mdn = metaname(&sp, nlp->namep->cname, &error);
+		mdn = metaname(&sp, nlp->namep->cname, META_DEVICE, &error);
 		mdclrerror(&error);
 		if (mdn == NULL) {
 		    print_concise_entry(0, nlp->namep->cname, 0, 'p');
@@ -1195,7 +1211,9 @@ print_concise_diskset(mdsetname_t *sp)
 		for (tnlp = nlp->next; tnlp != NULL; tnlp = tnlp->next) {
 		    md_sp_t		*part;
 
-		    mdn = metaname(&sp, tnlp->namep->cname, &error);
+		    mdn = metaname(&sp, tnlp->namep->cname,
+		    META_DEVICE, &error);
+
 		    mdclrerror(&error);
 		    if (mdn == NULL)
 			continue;
@@ -1287,7 +1305,7 @@ print_concise_namelist(mdsetname_t *sp, mdnamelist_t **nl, char mtype)
 	    mdname_t	*mdn;
 	    md_common_t	*u;
 
-	    mdn = metaname(&sp, nlp->namep->cname, &error);
+	    mdn = metaname(&sp, nlp->namep->cname, META_DEVICE, &error);
 	    mdclrerror(&error);
 	    if (mdn == NULL) {
 		print_concise_entry(0, nlp->namep->cname, 0, mtype);
@@ -1672,7 +1690,7 @@ get_sm_state(md_mirror_t *mirror, int i, md_status_t mirror_status,
 
 		if (mirror_status & MD_UN_RESYNC_ACTIVE) {
 
-		    if (mirror->common.revision == MD_64BIT_META_DEV) {
+		    if (mirror->common.revision & MD_64BIT_META_DEV) {
 			(void) snprintf(buf, sizeof (buf),
 			    gettext("resync-%2d.%1d%%"),
 			    mirror->percent_done / 10,

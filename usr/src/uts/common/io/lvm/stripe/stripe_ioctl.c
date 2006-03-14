@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +42,7 @@
 #include <sys/mkdev.h>
 #include <sys/stat.h>
 #include <sys/open.h>
+#include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_stripe.h>
 #include <sys/lvm/md_notify.h>
 #include <sys/modctl.h>
@@ -176,11 +176,11 @@ stripe_set(void *d, int mode)
 		return (mdmderror(mdep, MDE_UNIT_TOO_LARGE, mnum));
 #else
 		ms_recid = mddb_createrec((size_t)msp->size, typ1, 0,
-					MD_CRO_64BIT | MD_CRO_STRIPE, setno);
+			MD_CRO_64BIT | MD_CRO_STRIPE | MD_CRO_FN, setno);
 #endif
 	} else {
 		ms_recid = mddb_createrec((size_t)msp->size, typ1, 0,
-					MD_CRO_32BIT | MD_CRO_STRIPE, setno);
+			MD_CRO_32BIT | MD_CRO_STRIPE | MD_CRO_FN, setno);
 	}
 	if (ms_recid < 0)
 		return (mddbstatus2error(mdep, ms_recid, mnum, setno));
@@ -229,6 +229,7 @@ stripe_set(void *d, int mode)
 	MD_RECID(un) = recids[0];
 	MD_CAPAB(un) = MD_CAN_PARENT | MD_CAN_SUB_MIRROR | MD_CAN_SP;
 	MD_PARENT(un) = MD_NO_PARENT;
+	un->c.un_revision |= MD_FN_META_DEV;
 
 	if (err = stripe_build_incore(p, 0)) {
 		MD_UNIT(mnum) = NULL;
@@ -236,6 +237,11 @@ stripe_set(void *d, int mode)
 		kmem_free(recids, num_recs * sizeof (mddb_recid_t));
 		return (err);
 	}
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail--;
 
 	recids[rid] = 0;
 	if (un->un_hsp_id != -1)
@@ -366,6 +372,21 @@ stripe_reset(md_i_reset_t *mirp)
 
 	md_unit_openclose_exit(ui);
 	reset_stripe(un, mnum, 1);
+
+	/*
+	 * Update unit availability
+	 */
+	md_set[setno].s_un_avail++;
+
+	/*
+	 * If MN set, reset s_un_next so all nodes can have
+	 * the same view of the next available slot when
+	 * nodes are -w and -j
+	 */
+	if (MD_MNSET_SETNO(setno)) {
+		(void) md_upd_set_unnext(setno, MD_MIN2UNIT(mnum));
+	}
+
 	rw_exit(&md_unit_array_rw.lock);
 	return (0);
 }
@@ -383,6 +404,7 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 	mddb_recid_t	ms_recid;
 	mddb_recid_t	old_vtoc = 0;
 	mddb_recid_t	*recids;
+	md_create_rec_option_t options;
 	mddb_type_t	typ1;
 	int		err;
 	int64_t		tb, atb;
@@ -448,17 +470,23 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 	typ1 = (mddb_type_t)md_getshared_key(setno,
 	    stripe_md_ops.md_driver.md_drivername);
 
+	/*
+	 * Preserve the friendly name nature of growing device.
+	 */
+	options = MD_CRO_STRIPE;
+	if (un->c.un_revision & MD_FN_META_DEV)
+		options |= MD_CRO_FN;
 	if (mgp->options & MD_CRO_64BIT) {
 #if defined(_ILP32)
 		rval = mdmderror(mdep, MDE_UNIT_TOO_LARGE, mnum);
 		goto out;
 #else
 		ms_recid = mddb_createrec((size_t)mgp->size, typ1, 0,
-				MD_CRO_64BIT | MD_CRO_STRIPE, setno);
+				MD_CRO_64BIT | options, setno);
 #endif
 	} else {
 		ms_recid = mddb_createrec((size_t)mgp->size, typ1, 0,
-				MD_CRO_32BIT | MD_CRO_STRIPE, setno);
+				MD_CRO_32BIT | options, setno);
 	}
 
 
@@ -486,6 +514,8 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 		rval = EFAULT;
 		goto out;
 	}
+	if (options & MD_CRO_FN)
+		new_un->c.un_revision |= MD_FN_META_DEV;
 
 	/*
 	 * allocate the real recids array.  since we may have to
@@ -540,7 +570,7 @@ stripe_grow(void *d, int mode, IOLOCK *lockp)
 		 * and had a vtoc record attached to it, we remove the
 		 * vtoc record, because the layout has changed completely.
 		 */
-		if ((un->c.un_revision == MD_32BIT_META_DEV) &&
+		if (((un->c.un_revision & MD_64BIT_META_DEV) == 0) &&
 		    (un->c.un_vtoc_id != 0)) {
 			old_vtoc = un->c.un_vtoc_id;
 			new_un->c.un_vtoc_id =

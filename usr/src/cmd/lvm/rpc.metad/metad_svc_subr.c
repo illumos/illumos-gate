@@ -2140,7 +2140,7 @@ devinfo(
 	if ((np = metaslicename(dp, MD_SLICE0, ep)) == NULL)
 		return;
 
-	if ((real_np = metaname(&sp, np->bname, ep)) == NULL)
+	if ((real_np = metaname(&sp, np->bname, LOGICAL_DEVICE, ep)) == NULL)
 		return;
 
 	res->dev = real_np->dev;
@@ -2262,7 +2262,7 @@ mdrpc_get_devid(
 	if ((np = metaslicename(dp, MD_SLICE0, ep)) == NULL)
 		return;
 
-	if (metaname(&sp, np->bname, ep) == NULL)
+	if (metaname(&sp, np->bname, LOGICAL_DEVICE, ep) == NULL)
 		return;
 
 	res->enc_devid = meta_get_devid(np->rname);
@@ -2381,7 +2381,7 @@ mdrpc_devinfo_by_devid_2_svc(
 		return (TRUE);
 	}
 
-	np = metaname(&sp, disklist[0].devname, ep);
+	np = metaname(&sp, disklist[0].devname, LOGICAL_DEVICE, ep);
 	if (np != NULL) {
 		mdcinfo_t	*cinfo;
 		if ((cinfo = metagetcinfo(np, ep)) != NULL) {
@@ -2493,7 +2493,7 @@ mdrpc_devinfo_by_devid_name_2_svc(
 	if (disklist[i].dev == NODEV)
 		i = 0;
 
-	np = metaname(&sp, disklist[i].devname, ep);
+	np = metaname(&sp, disklist[i].devname, LOGICAL_DEVICE, ep);
 	if (np != NULL) {
 		mdcinfo_t	*cinfo;
 		if ((cinfo = metagetcinfo(np, ep)) != NULL) {
@@ -5138,9 +5138,9 @@ reset_mirror_owner(
 		if (metaioctl(MD_MN_GET_MM_OWNER, ownpar, ep,
 		    "MD_MN_GET_MM_OWNER") != 0) {
 			mde_perror(ep, gettext(
-			    "Unable to get mirror owner for %s/d%u"),
+			    "Unable to get mirror owner for %s/%s"),
 			    local_sp->setname,
-			    (unsigned)MD_MIN2UNIT(ownpar->d.mnum));
+			    get_mdname(local_sp, ownpar->d.mnum));
 			goto out;
 		}
 
@@ -5160,9 +5160,9 @@ reset_mirror_owner(
 				    MD_MN_MM_ALLOW_CHANGE) == -1) {
 					mde_perror(ep, gettext(
 					    "Unable to reset mirror owner for"
-					    " %s/d%u"), local_sp->setname,
-					    (unsigned)MD_MIN2UNIT(
-					    ownpar->d.mnum));
+					    " %s/%s"), local_sp->setname,
+					    get_mdname(local_sp,
+						    ownpar->d.mnum));
 					goto out;
 				}
 				break;

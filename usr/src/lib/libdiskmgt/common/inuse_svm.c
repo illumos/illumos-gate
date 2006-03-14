@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +86,7 @@ static void		(*mdl_metafreereplicalist)(md_replicalist_t *rlp);
 static md_drive_desc	*(*mdl_metaget_drivedesc)(mdsetname_t *sp, int flags,
 			    md_error_t *ep);
 static mdname_t		*(*mdl_metaname)(mdsetname_t **spp, char *uname,
-			    md_error_t *ep);
+			    meta_device_type_t uname_type, md_error_t *ep);
 static int		(*mdl_metareplicalist)(mdsetname_t *sp, int flags,
 			    md_replicalist_t **rlpp, md_error_t *ep);
 static mdsetname_t	*(*mdl_metasetnosetname)(set_t setno, md_error_t *ep);
@@ -303,7 +302,8 @@ diskset_info(mdsetname_t *sp)
 		mdname_t	*mdn;
 		md_raid_t	*raid;
 
-		mdn = (mdl_metaname)(&sp, nlp->namep->cname, &error);
+		mdn = (mdl_metaname)(&sp, nlp->namep->cname,
+		    META_DEVICE, &error);
 		(mdl_mdclrerror)(&error);
 		if (mdn == NULL) {
 		    continue;
@@ -336,7 +336,8 @@ diskset_info(mdsetname_t *sp)
 		mdname_t	*mdn;
 		md_stripe_t	*stripe;
 
-		mdn = (mdl_metaname)(&sp, nlp->namep->cname, &error);
+		mdn = (mdl_metaname)(&sp, nlp->namep->cname,
+		    META_DEVICE, &error);
 		(mdl_mdclrerror)(&error);
 		if (mdn == NULL) {
 		    continue;
@@ -379,7 +380,8 @@ diskset_info(mdsetname_t *sp)
 		mdname_t	*mdn;
 		md_sp_t		*soft_part;
 
-		mdn = (mdl_metaname)(&sp, nlp->namep->cname, &error);
+		mdn = (mdl_metaname)(&sp, nlp->namep->cname,
+		    META_DEVICE, &error);
 		(mdl_mdclrerror)(&error);
 		if (mdn == NULL) {
 		    continue;
@@ -539,8 +541,8 @@ init_svm()
 	mdl_metaget_drivedesc = (md_drive_desc *(*)(mdsetname_t *, int,
 	    md_error_t *))dlsym(lh, "metaget_drivedesc");
 
-	mdl_metaname = (mdname_t *(*)(mdsetname_t **, char *, md_error_t *))
-	    dlsym(lh, "metaname");
+	mdl_metaname = (mdname_t *(*)(mdsetname_t **, char *,
+	    meta_device_type_t, md_error_t *))dlsym(lh, "metaname");
 
 	mdl_metareplicalist = (int (*)(mdsetname_t *, int, md_replicalist_t **,
 	    md_error_t *))dlsym(lh, "metareplicalist");
@@ -650,7 +652,7 @@ new_entry(char *sname, char *type, char *mname, mdsetname_t *sp)
 	mdname_t	*mdn;
 	md_error_t	 error = *mdl_mdnullerror;
 
-	mdn = (mdl_metaname)(&sp, sname, &error);
+	mdn = (mdl_metaname)(&sp, sname, UNKNOWN, &error);
 	if (!mdisok(&error)) {
 	    (mdl_mdclrerror)(&error);
 	    return (0);

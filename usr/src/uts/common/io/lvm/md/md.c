@@ -996,6 +996,8 @@ md_snarf_db_set(set_t setno, md_error_t *ep)
 	int			size;
 	int			devid_flag;
 	int			retval;
+	uint_t			un;
+	int			un_next_set = 0;
 
 	md_haltsnarf_enter(setno);
 
@@ -1172,6 +1174,22 @@ md_snarf_db_set(set_t setno, md_error_t *ep)
 			}
 		}
 	} while (i);
+
+	/*
+	 * Set the first available slot and availability
+	 */
+	md_set[setno].s_un_avail = 0;
+	for (un = 0; un < MD_MAXUNITS; un++) {
+		if (md_set[setno].s_un[un] != NULL) {
+			continue;
+		} else {
+			if (!un_next_set) {
+				md_set[setno].s_un_next = un;
+				un_next_set = 1;
+			}
+			md_set[setno].s_un_avail++;
+		}
+	}
 
 	md_set_setstatus(setno, MD_SET_SNARFED);
 
@@ -1883,4 +1901,55 @@ mddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		    (dev, addr, blkno, nblk));
 
 	return (ENXIO);
+}
+
+/*
+ * Metadevice unit number dispatcher
+ * When this routine is called it will scan the
+ * incore unit array and return the avail slot
+ * hence the unit number to the caller
+ *
+ * Return -1 if there is nothing available
+ */
+unit_t
+md_get_nextunit(set_t setno)
+{
+	unit_t	un, start;
+
+	/*
+	 * If nothing available
+	 */
+	if (md_set[setno].s_un_avail == 0) {
+		return (MD_UNITBAD);
+	}
+
+	mutex_enter(&md_mx);
+	start = un = md_set[setno].s_un_next;
+
+	/* LINTED: E_CONSTANT_CONDITION */
+	while (1) {
+		if (md_set[setno].s_un[un] == NULL) {
+			/*
+			 * Advance the starting index for the next
+			 * md_get_nextunit call
+			 */
+			if (un == MD_MAXUNITS - 1) {
+				md_set[setno].s_un_next = 0;
+			} else {
+				md_set[setno].s_un_next = un + 1;
+			}
+			break;
+		}
+
+		un = ((un == MD_MAXUNITS - 1) ? 0 : un + 1);
+
+		if (un == start) {
+			un = MD_UNITBAD;
+			break;
+		}
+
+	}
+
+	mutex_exit(&md_mx);
+	return (un);
 }

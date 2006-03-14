@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -777,8 +776,15 @@ meta_check_insp(
 	/* check set pointer */
 	assert(sp != NULL);
 
+	/*
+	 * Get a list of the soft partitions that currently reside on
+	 * the component.  We should ALWAYS force reload the cache,
+	 * because if we're using the md.tab, we must rebuild
+	 * the list because it won't contain the previous (if any)
+	 * soft partition.
+	 */
 	/* find all soft partitions on the component */
-	count = meta_sp_get_by_component(sp, np, &spnlp, 0, ep);
+	count = meta_sp_get_by_component(sp, np, &spnlp, 1, ep);
 
 	if (count == -1) {
 		rval = -1;
@@ -1841,6 +1847,15 @@ meta_sp_extlist_from_wm(
 	mdname_t	*np = NULL;
 	mdsetname_t	*spsetp = NULL;
 	sp_ext_offset_t	cur_off;
+	md_set_desc	*sd;
+	int		init = 0;
+	mdkey_t		key;
+	minor_t		mnum;
+
+	if (!metaislocalset(sp)) {
+		if ((sd = metaget_setdesc(sp, ep)) == NULL)
+			return (-1);
+	}
 
 	if ((cur_off = meta_sp_get_start(sp, compnp, ep)) == MD_DISKADDR_ERROR)
 		return (-1);
@@ -1857,13 +1872,67 @@ meta_sp_extlist_from_wm(
 			}
 		}
 
+		/*
+		 * For the MN set, meta_init_make_device needs to
+		 * be run on all the nodes so the entries for the
+		 * softpart device name and its comp can be created
+		 * in the same order in the replica namespace.  If
+		 * we have it run on mdmn_do_iocset then the mddbs
+		 * will be out of sync between master node and slave
+		 * nodes.
+		 */
 		if (strcmp(wm.wm_mdname, MD_SP_FREEWMNAME) != 0) {
-			if (meta_init_make_device(&sp, wm.wm_mdname, ep) != 0)
-				return (-1);
-			np = metaname(&spsetp, wm.wm_mdname, ep);
-			if (np == NULL) {
-				return (-1);
+
+		    if (!metaislocalset(sp) && MD_MNSET_DESC(sd)) {
+			md_mn_msg_addmdname_t	*send_params;
+			int			result;
+			md_mn_result_t		*resp = NULL;
+			int			message_size;
+
+			message_size =  sizeof (*send_params) +
+			    strlen(wm.wm_mdname) + 1;
+			send_params = Zalloc(message_size);
+			send_params->addmdname_setno = sp->setno;
+			(void) strcpy(&send_params->addmdname_name[0],
+			    wm.wm_mdname);
+			result = mdmn_send_message(sp->setno,
+			    MD_MN_MSG_ADDMDNAME,
+			    MD_MSGF_PANIC_WHEN_INCONSISTENT,
+			    (char *)send_params, message_size, &resp,
+			    ep);
+			Free(send_params);
+			if (resp != NULL) {
+				if (resp->mmr_exitval != 0) {
+					free_result(resp);
+					return (-1);
+				}
+				free_result(resp);
 			}
+			if (result != 0)
+				return (-1);
+		    } else {
+
+			if (!is_existing_meta_hsp(sp, wm.wm_mdname)) {
+			    if ((key = meta_init_make_device(&sp,
+				wm.wm_mdname, ep)) <= 0) {
+					return (-1);
+				}
+				init = 1;
+			}
+		    }
+
+		    np = metaname(&spsetp, wm.wm_mdname, META_DEVICE, ep);
+		    if (np == NULL) {
+			if (init) {
+			    if (meta_getnmentbykey(sp->setno, MD_SIDEWILD,
+				key, NULL, &mnum, NULL, ep) != NULL) {
+				    (void) metaioctl(MD_IOCREM_DEV, &mnum,
+						ep, NULL);
+			    }
+			    (void) del_self_name(sp, key, ep);
+			}
+			return (-1);
+		    }
 		}
 
 		/* insert watermark into extent list */
@@ -1913,7 +1982,12 @@ meta_sp_short_print(
 	int	extn;
 
 	if (options & PRINT_LARGEDEVICES) {
-		if (msp->common.revision != MD_64BIT_META_DEV)
+		if ((msp->common.revision & MD_64BIT_META_DEV) == 0)
+			return (0);
+	}
+
+	if (options & PRINT_FN) {
+		if ((msp->common.revision & MD_FN_META_DEV) == 0)
 			return (0);
 	}
 
@@ -1923,22 +1997,10 @@ meta_sp_short_print(
 
 	/* print the component */
 	/*
-	 * If the path is our standard /dev/rdsk or /dev/md/rdsk
-	 * then just print out the cxtxdxsx or the dx, metainit
-	 * will assume the default, otherwise we need the full
-	 * pathname to make sure this works as we intend.
+	 * Always print the full path name
 	 */
-	if ((strstr(msp->compnamep->rname, "/dev/rdsk") == NULL) &&
-	    (strstr(msp->compnamep->rname, "/dev/md/rdsk") == NULL) &&
-	    (strstr(msp->compnamep->rname, "/dev/td/") == NULL)) {
-		/* not standard path so print full pathname */
-		if (fprintf(fp, " %s", msp->compnamep->rname) == EOF)
-			return (mdsyserror(ep, errno, fname));
-	} else {
-		/* standard path so print ctds or d number */
-		if (fprintf(fp, " %s", msp->compnamep->cname) == EOF)
-			return (mdsyserror(ep, errno, fname));
-	}
+	if (fprintf(fp, " %s", msp->compnamep->rname) == EOF)
+		return (mdsyserror(ep, errno, fname));
 
 	/* print out each extent */
 	for (extn = 0; (extn < msp->ext.ext_len); extn++) {
@@ -2041,7 +2103,16 @@ meta_sp_report(
 	uint_t		tstate = 0;
 
 	if (options & PRINT_LARGEDEVICES) {
-		if (msp->common.revision != MD_64BIT_META_DEV) {
+		if ((msp->common.revision & MD_64BIT_META_DEV) == 0) {
+			return (0);
+		} else {
+			if (meta_getdevs(sp, msp->common.namep, nlpp, ep) != 0)
+				return (-1);
+		}
+	}
+
+	if (options & PRINT_FN) {
+		if ((msp->common.revision & MD_FN_META_DEV) == 0) {
 			return (0);
 		} else {
 			if (meta_getdevs(sp, msp->common.namep, nlpp, ep) != 0)
@@ -3704,7 +3775,7 @@ meta_init_sp(
 
 	/* expect sp name, -p, optional -e, compname, and size parameters */
 	/* grab soft partition name */
-	if ((np = metaname(spp, devname, ep)) == NULL)
+	if ((np = metaname(spp, devname, META_DEVICE, ep)) == NULL)
 		goto out;
 
 	/* see if it exists already */
@@ -3750,7 +3821,7 @@ meta_init_sp(
 		if ((spcompnp = metaslicename(dnp, 0, ep)) == NULL) {
 			goto out;
 		}
-	} else if ((spcompnp = metaname(spp, compname, ep)) == NULL) {
+	} else if ((spcompnp = metaname(spp, compname, UNKNOWN, ep)) == NULL) {
 		goto out;
 	}
 	assert(*spp != NULL);
@@ -4347,10 +4418,10 @@ meta_create_sp(
 	(void) memset(&set_params, 0, sizeof (set_params));
 
 	if (create_flag == MD_CRO_64BIT) {
-		mp->c.un_revision = MD_64BIT_META_DEV;
+		mp->c.un_revision |= MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_64BIT;
 	} else {
-		mp->c.un_revision = MD_32BIT_META_DEV;
+		mp->c.un_revision &= ~MD_64BIT_META_DEV;
 		set_params.options = MD_CRO_32BIT;
 	}
 
@@ -4730,7 +4801,7 @@ meta_sp_reset_component(
 	int		count;
 	md_sp_reset_t	reset_params;
 
-	if ((compnp = metaname(&sp, name, ep)) == NULL)
+	if ((compnp = metaname(&sp, name, UNKNOWN, ep)) == NULL)
 		return (-1);
 
 	/* If we're starting out with no soft partitions, it's an error */
@@ -4959,10 +5030,10 @@ meta_sp_attach(
 	(void) memset(&grow_params, 0, sizeof (grow_params));
 	if (new_un->c.un_total_blocks > MD_MAX_BLKS_FOR_SMALL_DEVS) {
 		grow_params.options = MD_CRO_64BIT;
-		new_un->c.un_revision = MD_64BIT_META_DEV;
+		new_un->c.un_revision |= MD_64BIT_META_DEV;
 	} else {
 		grow_params.options = MD_CRO_32BIT;
-		new_un->c.un_revision = MD_32BIT_META_DEV;
+		new_un->c.un_revision &= ~MD_64BIT_META_DEV;
 	}
 	grow_params.mnum = MD_SID(new_un);
 	grow_params.size = new_un->c.un_size;
@@ -5270,14 +5341,15 @@ meta_sp_resolve_name_conflict(
 			newname[strlen(newname) - 1] = '\0';
 
 		if (!(is_metaname(newname)) ||
-		    (meta_init_make_device(&sp, newname, ep) != 0)) {
+		    (meta_init_make_device(&sp, newname, ep) <= 0)) {
 			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			    "Invalid metadevice name\n"));
 			(void) fflush(stderr);
 			continue;
 		}
 
-		if ((*new_np = metaname(&sp, newname, ep)) == NULL) {
+		if ((*new_np = metaname(&sp, newname,
+		    META_DEVICE, ep)) == NULL) {
 			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			    "Invalid metadevice name\n"));
 			(void) fflush(stderr);
@@ -6092,9 +6164,9 @@ meta_sp_recover_from_wm(
 		set_params.options =
 				meta_check_devicesize(un_array[i]->un_length);
 		if (set_params.options == MD_CRO_64BIT) {
-			un_array[i]->c.un_revision = MD_64BIT_META_DEV;
+			un_array[i]->c.un_revision |= MD_64BIT_META_DEV;
 		} else {
-			un_array[i]->c.un_revision = MD_32BIT_META_DEV;
+			un_array[i]->c.un_revision &= ~MD_64BIT_META_DEV;
 		}
 		MD_SETDRIVERNAME(&set_params, MD_SP,
 		    MD_MIN2SET(set_params.mnum));

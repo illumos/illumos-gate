@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,7 +250,7 @@ validate_root_device(
 		mde_perror(ep, "");
 		return (METAROOT_ERR);
 	}
-	if ((rootnp = metaname(&sp, curroot, ep)) == NULL) {
+	if ((rootnp = metaname(&sp, curroot, UNKNOWN, ep)) == NULL) {
 		mde_perror(ep, "");
 		return (METAROOT_ERR);
 	}
@@ -412,7 +411,7 @@ main(
 	}
 
 	/* get device name */
-	if ((rootnp = metaname(&sp, argv[0], ep)) == NULL) {
+	if ((rootnp = metaname(&sp, argv[0], UNKNOWN, ep)) == NULL) {
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}
@@ -425,7 +424,7 @@ main(
 	 * mounted as happens if this command is part of the install
 	 * process, currootnp will be set to NULL.
 	 */
-	currootnp = metaname(&sp, curroot, ep);
+	currootnp = metaname(&sp, curroot, UNKNOWN, ep);
 	/*
 	 * If the argument is the name of the current root filesystem, then
 	 * the command is allowed, otherwise check that the argument is

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <sys/errno.h>
 #include <sys/door.h>
 #include <sys/lvm/mdmn_commd.h>
+#include <sys/lvm/md_hotspares.h>
 
 #include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_names.h>
@@ -109,6 +109,9 @@ extern int			md_ff_daemon_threads;
 
 extern mddb_set_t	*mddb_setenter(set_t setno, int flag, int *errorcodep);
 extern void		mddb_setexit(mddb_set_t *s);
+extern void		*lookup_entry(struct nm_next_hdr *, set_t,
+				side_t, mdkey_t, md_dev64_t, int);
+extern struct nm_next_hdr	*get_first_record(set_t, int, int);
 
 struct mdq_anchor	md_done_daemon; /* done request queue */
 struct mdq_anchor	md_mstr_daemon; /* mirror timeout requests */
@@ -2837,7 +2840,7 @@ md_create_unit_incore(minor_t mnum, md_ops_t *ops, int alloc_lock)
 	}
 	/* setup the unavailable field */
 #if defined(_ILP32)
-	if (((md_unit_t *)MD_UNIT(mnum))->c.un_revision == MD_64BIT_META_DEV) {
+	if (((md_unit_t *)MD_UNIT(mnum))->c.un_revision & MD_64BIT_META_DEV) {
 		ui->ui_tstate |= MD_64MD_ON_32KERNEL;
 		cmn_err(CE_NOTE, "d%d is unavailable because 64 bit "
 		    "metadevices are not accessible on a 32 bit kernel",
@@ -2952,22 +2955,69 @@ md_shortname(
 	minor_t		mnum
 )
 {
-	static char	buf[MD_MAX_SIDENAME_LEN];
+	static char	buf[MAXPATHLEN];
+	char		*devname;
+	char		*invalid = " (Invalid minor number %u) ";
+	char		*metaname;
+	mdc_unit_t	*un;
+	side_t		side;
 	set_t		setno = MD_MIN2SET(mnum);
 	unit_t		unit = MD_MIN2UNIT(mnum);
 
-	if ((setno >= md_nsets) || (unit >= md_nunits)) {
-		(void) snprintf(buf, 40, " (Invalid minor number %u) ", mnum);
+	if ((un = MD_UNIT(mnum)) == NULL) {
+		(void) snprintf(buf, sizeof (buf), invalid, mnum);
 		return (buf);
 	}
 
-	if (setno == 0) {
-		(void) sprintf(buf, "d%u", (unsigned)unit);
-	} else {
-		(void) sprintf(buf, "%s/d%u",
-		    mddb_getsetname(setno), (unsigned)unit);
+	/*
+	 * If unit is not a friendly name unit, derive the name from the
+	 * minor number.
+	 */
+	if ((un->un_revision & MD_FN_META_DEV) == 0) {
+		/* This is a traditional metadevice */
+		if (setno == MD_LOCAL_SET) {
+			(void) snprintf(buf, sizeof (buf), "d%u",
+				(unsigned)unit);
+		} else {
+			(void) snprintf(buf, sizeof (buf), "%s/d%u",
+			    mddb_getsetname(setno), (unsigned)unit);
+		}
+		return (buf);
 	}
 
+	/*
+	 * It is a friendly name metadevice, so we need to get its name.
+	 */
+	side = mddb_getsidenum(setno);
+	devname = (char *)kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	if (md_getdevname(setno, side, MD_KEYWILD,
+		md_makedevice(md_major, mnum), devname, MAXPATHLEN) == 0) {
+		/*
+		 * md_getdevname has given us either /dev/md/dsk/<metaname>
+		 * or /dev/md/<setname>/dsk/<metname> depending on whether
+		 * or not we are in the local set.  Thus, we'll pull the
+		 * metaname from this string.
+		 */
+		if ((metaname = strrchr(devname, '/')) == NULL) {
+			(void) snprintf(buf, sizeof (buf), invalid, mnum);
+			goto out;
+		}
+		metaname++;	/* move past slash */
+		if (setno == MD_LOCAL_SET) {
+			/* No set name. */
+			(void) snprintf(buf, sizeof (buf), "%s", metaname);
+		} else {
+			/* Include setname */
+			(void) snprintf(buf, sizeof (buf), "%s/%s",
+				mddb_getsetname(setno), metaname);
+		}
+	} else {
+		/* We couldn't find the name. */
+		(void) snprintf(buf, sizeof (buf), invalid, mnum);
+	}
+
+out:
+	kmem_free(devname, MAXPATHLEN);
 	return (buf);
 }
 
@@ -4035,4 +4085,83 @@ callb_md_mrs_cpr(void *arg, int code)
 	}
 	mutex_exit(cp->cc_lockp);
 	return (ret != -1);
+}
+
+
+void
+md_rem_hspname(set_t setno, mdkey_t n_key)
+{
+	int	s;
+	int	max_sides;
+
+
+	/* All entries removed are in the same diskset */
+	if (md_get_setstatus(setno) & MD_SET_MNSET)
+		max_sides = MD_MNMAXSIDES;
+	else
+		max_sides = MD_MAXSIDES;
+
+	for (s = 0; s < max_sides; s++)
+		(void) md_remdevname(setno, s, n_key);
+}
+
+
+int
+md_rem_selfname(minor_t selfid)
+{
+	int	s;
+	set_t	setno = MD_MIN2SET(selfid);
+	int	max_sides;
+	md_dev64_t	dev;
+	struct nm_next_hdr	*nh;
+	struct nm_name	*n;
+	mdkey_t key;
+
+	/*
+	 * Get the key since remove routine expects it
+	 */
+	dev = md_makedevice(md_major, selfid);
+	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) {
+		return (ENOENT);
+	}
+
+	if ((n = (struct nm_name *)lookup_entry(nh, setno, MD_SIDEWILD,
+		MD_KEYWILD, dev, 0L)) == NULL) {
+		return (ENOENT);
+	}
+
+	/* All entries removed are in the same diskset */
+	key = n->n_key;
+	if (md_get_setstatus(setno) & MD_SET_MNSET)
+		max_sides = MD_MNMAXSIDES;
+	else
+		max_sides = MD_MAXSIDES;
+
+	for (s = 0; s < max_sides; s++)
+		(void) md_remdevname(setno, s, key);
+
+	return (0);
+}
+
+void
+md_upd_set_unnext(set_t setno, unit_t un)
+{
+	if (un < md_set[setno].s_un_next) {
+		md_set[setno].s_un_next = un;
+	}
+}
+
+struct hot_spare_pool *
+find_hot_spare_pool(set_t setno, int hsp_id)
+{
+	hot_spare_pool_t *hsp;
+
+	hsp = (hot_spare_pool_t *)md_set[setno].s_hsp;
+	while (hsp != NULL) {
+		if (hsp->hsp_self_id == hsp_id)
+			return (hsp);
+		hsp = hsp->hsp_next;
+	}
+
+	return ((hot_spare_pool_t *)0);
 }

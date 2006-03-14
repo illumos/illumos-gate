@@ -88,21 +88,6 @@ lookup_hot_spare(set_t setno, mddb_recid_t hs_id, int must_exist)
 	return ((hot_spare_t *)NULL);
 }
 
-static hot_spare_pool_t *
-find_hot_spare_pool(set_t setno, int hsp_id)
-{
-	hot_spare_pool_t *hsp;
-
-	hsp = (hot_spare_pool_t *)md_set[setno].s_hsp;
-	while (hsp != NULL) {
-		if (hsp->hsp_self_id == hsp_id)
-			return (hsp);
-		hsp = hsp->hsp_next;
-	}
-
-	return ((hot_spare_pool_t *)0);
-}
-
 
 static int
 seths_create_hsp(set_hs_params_t *shs)
@@ -129,11 +114,13 @@ seths_create_hsp(set_hs_params_t *shs)
 		    shs->shs_hot_spare_pool));
 #else
 		recid = mddb_createrec(sizeof (hot_spare_pool_ond_t), typ1,
-			HSP_REC, MD_CRO_64BIT | MD_CRO_HOTSPARE_POOL, setno);
+		    HSP_REC, MD_CRO_64BIT | MD_CRO_HOTSPARE_POOL | MD_CRO_FN,
+		    setno);
 #endif
 	} else {
 		recid = mddb_createrec(sizeof (hot_spare_pool_ond_t), typ1,
-			HSP_REC, MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL, setno);
+		    HSP_REC, MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL | MD_CRO_FN,
+		    setno);
 	}
 
 	if (recid < 0) {
@@ -150,6 +137,7 @@ seths_create_hsp(set_hs_params_t *shs)
 	hsp->hsp_next = (hot_spare_pool_t *)md_set[setno].s_hsp;
 	hsp->hsp_refcount = 0;
 	hsp->hsp_nhotspares = 0;
+	hsp->hsp_revision |= MD_FN_META_DEV;
 
 	md_set[setno].s_hsp = (void *) hsp;
 
@@ -176,6 +164,7 @@ seths_add(set_hs_params_t *shs)
 	hot_spare_pool_t	*prev_hsp;
 	hot_spare_pool_t	*new_hsp;
 	hot_spare_pool_t	*old_hsp;
+	md_create_rec_option_t	options;
 	mddb_recid_t		recid;
 	mddb_recid_t		recids[5];
 	size_t			new_size;
@@ -310,7 +299,8 @@ seths_add(set_hs_params_t *shs)
 	if (hsp == NULL) {
 		/* create a hot spare pool record */
 		recid = mddb_createrec(sizeof (hot_spare_pool_ond_t),
-		    typ1, HSP_REC, MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL, setno);
+		    typ1, HSP_REC,
+		    MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL | MD_CRO_FN, setno);
 
 		if (recid < 0) {
 			return (mdhsperror(&shs->mde, MDE_HSP_CREATE_FAILURE,
@@ -326,6 +316,7 @@ seths_add(set_hs_params_t *shs)
 		hsp->hsp_next = (hot_spare_pool_t *)md_set[setno].s_hsp;
 		hsp->hsp_refcount = 0;
 		hsp->hsp_nhotspares = 0;
+		hsp->hsp_revision |= MD_FN_META_DEV;
 
 		/* force prev_hsp to NULL, this will cause hsp to be linked */
 		prev_hsp = (hot_spare_pool_t *)0;
@@ -356,8 +347,18 @@ seths_add(set_hs_params_t *shs)
 		 */
 		new_size = sizeof (hot_spare_pool_ond_t) +
 			(sizeof (mddb_recid_t) * hsp->hsp_nhotspares);
-		recid = mddb_createrec(new_size, typ1, HSP_REC,
-		    MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL, setno);
+
+		/*
+		 * The Friendly Name status of the new HSP should duplicate
+		 * the status of the existing one.
+		 */
+		if (hsp->hsp_revision & MD_FN_META_DEV) {
+			options =
+				MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL | MD_CRO_FN;
+		} else {
+			options = MD_CRO_32BIT | MD_CRO_HOTSPARE_POOL;
+		}
+		recid = mddb_createrec(new_size, typ1, HSP_REC, options, setno);
 
 		if (recid < 0) {
 			return (mdhsperror(&shs->mde, MDE_HSP_CREATE_FAILURE,
@@ -395,9 +396,9 @@ seths_add(set_hs_params_t *shs)
 	}
 
 	if (shs->shs_size_option & MD_CRO_64BIT) {
-		hs->hs_revision = MD_64BIT_META_DEV;
+		hs->hs_revision |= MD_64BIT_META_DEV;
 	} else {
-		hs->hs_revision = MD_32BIT_META_DEV;
+		hs->hs_revision &= ~MD_64BIT_META_DEV;
 	}
 
 	/* lock the db records */
@@ -915,9 +916,9 @@ seths_replace(set_hs_params_t *shs)
 	}
 
 	if (shs->shs_size_option & MD_CRO_64BIT) {
-		new_hs->hs_revision = MD_64BIT_META_DEV;
+		new_hs->hs_revision |= MD_64BIT_META_DEV;
 	} else {
-		new_hs->hs_revision = MD_32BIT_META_DEV;
+		new_hs->hs_revision &= ~MD_64BIT_META_DEV;
 	}
 
 	/* commit the db records */
@@ -1286,7 +1287,9 @@ load_hotspare(set_t setno, mddb_recid_t recid)
 	dep = mddb_getrecdep(recid);
 	dep->de_flags = MDDB_F_HOTSPARE;
 	rbp = dep->de_rb;
-	if (rbp->rb_revision == MDDB_REV_RB) {
+	switch (rbp->rb_revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		/*
 		 * Needs to convert to internal 64 bit
 		 */
@@ -1298,14 +1301,17 @@ load_hotspare(set_t setno, mddb_recid_t recid)
 		dep->de_rb_userdata = b_hs;
 		dep->de_reqsize = newreqsize;
 		hs = b_hs;
-	} else {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
 		hs = (hot_spare_t *)mddb_getrecaddr_resize
 			(recid, sizeof (*hs), 0);
+		break;
 	}
-
+	NOTE_FN(rbp->rb_revision, hs->hs_revision);
 
 #if defined(_ILP32)
-	if (hs->hs_revision == MD_64BIT_META_DEV) {
+	if (hs->hs_revision & MD_64BIT_META_DEV) {
 		char	devname[MD_MAX_CTDLEN];
 
 		set_hot_spare_state(hs, HSS_BROKEN);
@@ -1714,15 +1720,20 @@ imp_hotspare(
 
 	dep = mddb_getrecdep(recid);
 	rbp = dep->de_rb;
-	if (rbp->rb_revision == MDDB_REV_RB) {
+	switch (rbp->rb_revision) {
+	case MDDB_REV_RB:
+	case MDDB_REV_RBFN:
 		/*
 		 * 32 bit hotspare
 		 */
 		hs32 = (hot_spare32_od_t *)mddb_getrecaddr(recid);
 		hs_recid = &(hs32->hs_record_id);
-	} else {
+		break;
+	case MDDB_REV_RB64:
+	case MDDB_REV_RB64FN:
 		hs64 = (hot_spare_t *)mddb_getrecaddr(recid);
 		hs_recid = &(hs64->hs_record_id);
+		break;
 	}
 
 	/*

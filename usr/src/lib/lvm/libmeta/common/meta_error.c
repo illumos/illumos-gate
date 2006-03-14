@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,10 +70,10 @@ md_name(
 	char	*name;
 
 	/* get name, or fake it */
-	if ((name = get_mdname(mnum)) == NULL) {
+	if ((name = get_mdname(NULL, mnum)) == NULL) {
 		char	buf[40];
 
-		(void) sprintf(buf, "%lu/d%lu", MD_MIN2SET(mnum),
+		(void) sprintf(buf, "%lu/%lu", MD_MIN2SET(mnum),
 		    MD_MIN2UNIT(mnum));
 		return (Strdup(buf));
 	}
@@ -109,10 +108,10 @@ hsp_name(
 {
 	char	*name;
 
-	if ((name = get_hspname(hsp)) == NULL) {
+	if ((name = get_hspname(NULL, hsp)) == NULL) {
 		char	buf[40];
 
-		(void) sprintf(buf, "%u/hsp%03u", HSP_SET(hsp), HSP_ID(hsp));
+		(void) sprintf(buf, "%u/%u", HSP_SET(hsp), HSP_ID(hsp));
 		return (Strdup(buf));
 	}
 	return (Strdup(name));
@@ -877,6 +876,18 @@ void_to_str(
 	case MDE_SMF_NO_SERVICE:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "service(s) not online in SMF"));
+		break;
+	case MDE_AMBIGUOUS_DEV:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		    "Specify complete path to avoid ambiguity."));
+		break;
+	case MDE_NAME_IN_USE:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		    "Name already in use for metadevice or hot spare pool."));
+		break;
+	case MDE_NAME_ILLEGAL:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		    "Invalid name for metadevice or hot spare pool."));
 		break;
 	case MDE_ZONE_ADMIN:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,

@@ -49,6 +49,7 @@
 #include <sys/debug.h>
 #include <sys/dklabel.h>
 #include <vm/hat.h>
+#include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_mirror.h>
 #include <sys/lvm/md_convert.h>
 #include <sys/lvm/md_mddb.h>
@@ -1971,6 +1972,11 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 
 	MD_UNIT(mnum) = NULL;
 
+	/*
+	 * Attempt release of its minor node
+	 */
+	(void) md_remove_minor_node(mnum);
+
 	if (!removing)
 		return;
 
@@ -2007,6 +2013,14 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 	cv_destroy(&un->un_rs_progress_cv);
 	mutex_destroy(&un->un_dmr_mx);
 	cv_destroy(&un->un_dmr_cv);
+
+	/*
+	 * Remove self from the namespace
+	 */
+	if (un->c.un_revision & MD_FN_META_DEV) {
+		(void) md_rem_selfname(un->c.un_self_id);
+	}
+
 	mddb_deleterec_wrapper(un->c.un_record_id);
 	if (recid != 0)
 		mddb_deleterec_wrapper(recid);
@@ -4348,7 +4362,6 @@ mirror_directed_read(dev_t mdev, vol_directed_rd_t *vdr, int mode)
 	mm_unit_t	*un;
 	mm_submirror_t	*sm;
 	char		*sm_nm;
-	size_t		namelen;
 	uint_t		next_side;
 	void		*kbuffer;
 
@@ -4468,8 +4481,7 @@ mirror_directed_read(dev_t mdev, vol_directed_rd_t *vdr, int mode)
 	sm = &un->un_sm[un->un_dmr_last_read];
 	sm_nm = md_shortname(md_getminor(sm->sm_dev));
 
-	namelen = MIN(MD_MAX_SIDENAME_LEN, VOL_SIDENAME);
-	(void) strncpy(vdr->vdr_side_name, sm_nm, namelen);
+	(void) strncpy(vdr->vdr_side_name, sm_nm, sizeof (vdr->vdr_side_name));
 
 	/*
 	 * Determine if we've completed the read cycle. This is true iff the
@@ -4996,43 +5008,55 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 		dep->de_flags = MDDB_F_MIRROR;
 		rbp = dep->de_rb;
 
-		if ((rbp->rb_revision == MDDB_REV_RB) &&
-		    ((rbp->rb_private & MD_PRV_CONVD) == 0)) {
-			/*
-			 * This means, we have an old and small record
-			 * and this record hasn't already been converted.
-			 * Before we create an incore metadevice from this
-			 * we have to convert it to a big record.
-			 */
-			small_un = (mm_unit32_od_t *)mddb_getrecaddr(recid);
-			newreqsize = sizeof (mm_unit_t);
-			big_un = (mm_unit_t *)kmem_zalloc(newreqsize, KM_SLEEP);
-			mirror_convert((caddr_t)small_un, (caddr_t)big_un,
-			    SMALL_2_BIG);
-			kmem_free(small_un, dep->de_reqsize);
+		switch (rbp->rb_revision) {
+		case MDDB_REV_RB:
+		case MDDB_REV_RBFN:
+			if ((rbp->rb_private & MD_PRV_CONVD) == 0) {
+				/*
+				 * This means, we have an old and small
+				 * record and this record hasn't already
+				 * been converted.  Before we create an
+				 * incore metadevice from this we have to
+				 * convert it to a big record.
+				 */
+				small_un =
+				    (mm_unit32_od_t *)mddb_getrecaddr(recid);
+				newreqsize = sizeof (mm_unit_t);
+				big_un = (mm_unit_t *)kmem_zalloc(newreqsize,
+					KM_SLEEP);
+				mirror_convert((caddr_t)small_un,
+					(caddr_t)big_un, SMALL_2_BIG);
+				kmem_free(small_un, dep->de_reqsize);
 
-			/*
-			 * Update userdata and incore userdata
-			 * incores are at the end of un
-			 */
-			dep->de_rb_userdata_ic = big_un;
-			dep->de_rb_userdata = big_un;
-			dep->de_icreqsize = newreqsize;
-			un = big_un;
-			rbp->rb_private |= MD_PRV_CONVD;
-		} else {
+				/*
+				 * Update userdata and incore userdata
+				 * incores are at the end of un
+				 */
+				dep->de_rb_userdata_ic = big_un;
+				dep->de_rb_userdata = big_un;
+				dep->de_icreqsize = newreqsize;
+				un = big_un;
+				rbp->rb_private |= MD_PRV_CONVD;
+			} else {
+				/*
+				 * Unit already converted, just get the
+				 * record address.
+				 */
+				un = (mm_unit_t *)mddb_getrecaddr_resize(recid,
+					sizeof (*un), 0);
+			}
+			un->c.un_revision &= ~MD_64BIT_META_DEV;
+			break;
+		case MDDB_REV_RB64:
+		case MDDB_REV_RB64FN:
 			/* Big device */
 			un = (mm_unit_t *)mddb_getrecaddr_resize(recid,
 				sizeof (*un), 0);
-		}
-
-		/* Set revision and flag accordingly */
-		if (rbp->rb_revision == MDDB_REV_RB) {
-			un->c.un_revision = MD_32BIT_META_DEV;
-		} else {
-			un->c.un_revision = MD_64BIT_META_DEV;
+			un->c.un_revision |= MD_64BIT_META_DEV;
 			un->c.un_flag |= MD_EFILABEL;
+			break;
 		}
+		NOTE_FN(rbp->rb_revision, un->c.un_revision);
 
 		/*
 		 * Create minor device node for snarfed entry.
@@ -5397,6 +5421,7 @@ mirror_imp_set(
 	mddb_rb32_t	*rbp;
 	mm_unit32_od_t	*un32;
 	mm_unit_t	*un64;
+	md_dev64_t	self_devt;
 	minor_t		*self_id;	/* minor needs to be updated */
 	md_parent_t	*parent_id;	/* parent needs to be updated */
 	mddb_recid_t	*record_id;	/* record id needs to be updated */
@@ -5417,7 +5442,9 @@ mirror_imp_set(
 		dep = mddb_getrecdep(recid);
 		rbp = dep->de_rb;
 
-		if (rbp->rb_revision == MDDB_REV_RB) {
+		switch (rbp->rb_revision) {
+		case MDDB_REV_RB:
+		case MDDB_REV_RBFN:
 			/*
 			 * Small device
 			 */
@@ -5437,7 +5464,9 @@ mirror_imp_set(
 				(setno), un32->un_sm[i].sm_key))
 				goto out;
 			}
-		} else {
+			break;
+		case MDDB_REV_RB64:
+		case MDDB_REV_RB64FN:
 			un64 = (mm_unit_t *)mddb_getrecaddr(recid);
 			self_id = &(un64->c.un_self_id);
 			parent_id = &(un64->c.un_parent);
@@ -5454,6 +5483,21 @@ mirror_imp_set(
 				(setno), un64->un_sm[i].sm_key))
 				goto out;
 			}
+			break;
+		}
+
+		/*
+		 * If this is a top level and a friendly name metadevice,
+		 * update its minor in the namespace.
+		 */
+		if ((*parent_id == MD_NO_PARENT) &&
+		    ((rbp->rb_revision == MDDB_REV_RBFN) ||
+		    (rbp->rb_revision == MDDB_REV_RB64FN))) {
+
+			self_devt = md_makedevice(md_major, *self_id);
+			if (!md_update_top_device_minor(setno,
+			    mddb_getsidenum(setno), self_devt))
+				goto out;
 		}
 
 		/*

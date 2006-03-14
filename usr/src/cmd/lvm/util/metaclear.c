@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +46,7 @@ clear_name(
 {
 
 	/* clear hotspare pool */
-	if (is_hspname(uname)) {
+	if (is_existing_hsp(*spp, uname)) {
 		mdhspname_t	*hspnp;
 
 		/* get hotspare pool name */
@@ -71,8 +70,12 @@ clear_name(
 	else {
 		mdname_t	*np;
 
+		/* check for ownership */
+		if (meta_check_ownership(*spp, ep) != 0)
+			return (-1);
+
 		/* get metadevice name */
-		if (((np = metaname(spp, uname, ep)) == NULL) ||
+		if (((np = metaname(spp, uname, META_DEVICE, ep)) == NULL) ||
 		    (metachkmeta(np, ep) != 0)) {
 			return (-1);
 		}
@@ -80,10 +83,6 @@ clear_name(
 
 		/* grab set lock */
 		if (meta_lock(*spp, TRUE, ep))
-			return (-1);
-
-		/* check for ownership */
-		if (meta_check_ownership(*spp, ep) != 0)
 			return (-1);
 
 		/* clear metadevice */
@@ -119,10 +118,11 @@ main(
 	char		*argv[]
 )
 {
-	char		*sname = NULL;
+	char		*sname = MD_LOCAL_NAME;
 	mdsetname_t	*sp = NULL;
 	int		aflag = 0;
 	int		pflag = 0;
+	int		set_flag = 0;
 	mdcmdopts_t	options = (MDCMD_PRINT|MDCMD_DOIT);
 	int		c;
 	md_error_t	status = mdnullerror;
@@ -172,6 +172,7 @@ main(
 
 		case 's':
 			sname = optarg;
+			set_flag++;
 			break;
 
 		case 'a':
@@ -201,30 +202,20 @@ main(
 	argc -= optind;
 	argv += optind;
 
-	if (sname != NULL && (sp = metasetname(sname, ep)) == NULL) {
-		goto errout;
+	/* with mn sets if -a, set name must have been specified by -s */
+	if (called_thru_rpc && aflag && !set_flag) {
+		md_eprintf(gettext(
+		    "-a parameter requires the use of -s in multi-node sets"));
+		md_exit(sp, 1);
+	}
+
+	/* get set context */
+	if ((sp = metasetname(sname, ep)) == NULL) {
+		mde_perror(ep, "");
+		md_exit(sp, 1);
 	}
 
 	if (called_thru_rpc) {
-
-		if (aflag) {
-			/* if -a, set name must have been specified by -s */
-			if ((sp == NULL) ||
-			    (metaget_setdesc(sp, ep) == NULL))
-				goto errout;
-		} else {
-			/*
-			 * setname may be defined by setname in first arg
-			 * if sp is NULL, meta_is_mn_name() derives sp from
-			 * argv[0], eg from set/d10
-			 */
-			if (meta_is_mn_name(&sp, argv[0], ep)) {
-				if (metaget_setdesc(sp, ep) == NULL)
-					goto errout;
-			} else
-				goto errout;
-		}
-
 		/* Check if the device is open  on all nodes */
 		options |= MDCMD_MN_OPEN_CHECK;
 	}
@@ -232,12 +223,6 @@ main(
 	if (aflag) {	/* clear all devices */
 		if (argc != 0)
 			usage(sp, 1);
-
-		if (sp == NULL) {
-			/* Get sp for local set */
-			if ((sp = metasetname(MD_LOCAL_NAME, ep)) == NULL)
-				goto errout;
-		}
 
 		/*
 		 * If a MN set, we will generate a series of individual
@@ -271,13 +256,12 @@ main(
 		 */
 		if (argc <= 0)
 			usage(sp, 1);
+
 		if (meta_is_mn_name(&sp, argv[0], ep))
 			mnset = TRUE;
 		eval = 0;
 
 		for (; (argc > 0); --argc, ++argv) {
-			mdhspname_t	*hspnp;
-			mdname_t	*np;
 			char		*cname;
 
 			/*
@@ -287,45 +271,32 @@ main(
 			 * deal with it.
 			 */
 			if (!called_thru_rpc && mnset) {
+				/* get the canonical name */
 				if (pflag) {
 					/*
 					 * If -p, set cname to the device
 					 * argument.
 					 */
-					cname = argv[0];
+					cname = Strdup(argv[0]);
 				} else {
 					/*
 					 * For hotspares and metadevices, set
 					 * cname to the full name,
 					 * setname/hspxxx or setname/dxxx
 					 */
-					if (is_hspname(argv[0])) {
-						/* get hotspare pool name */
-						if ((hspnp = metahspname(&sp,
-						    argv[0], ep)) == NULL) {
-							mde_perror(ep, "");
-							eval = 1;
-							continue;
-						}
-						cname = hspnp->hspname;
-					} else {
-						/* get metadevice name */
-						if (((np = metaname(&sp,
-						    argv[0], ep)) == NULL) ||
-						    (metachkmeta(np, ep)
-						    != 0)) {
-							mde_perror(ep, "");
-							eval = 1;
-							continue;
-						}
-						cname = np->cname;
+					cname = meta_name_getname(&sp,
+					    argv[0], META_DEVICE, ep);
+					if (cname == NULL) {
+						mde_perror(ep, "");
+						eval = 1;
+						continue;
 					}
 				}
 				if (meta_mn_send_metaclear_command(sp,
 				    cname, options, pflag, ep) != 0) {
 					eval = 1;
-					continue;
 				}
+				Free(cname);
 			} else {
 				if (pflag) {
 					/*
@@ -339,24 +310,34 @@ main(
 						continue;
 					}
 				} else {
-					/* clear named devices */
-					if (clear_name(&sp, argv[0],
-					    options, ep) != 0) {
+					/*
+					 * get the canonical name and
+					 * setup sp if it has been
+					 * specified as part of the
+					 * metadevice/hsp name param
+					 */
+					cname = meta_name_getname(&sp,
+					    argv[0], META_DEVICE, ep);
+					if (cname == NULL) {
 						mde_perror(ep, "");
 						eval = 1;
 						continue;
 					}
+
+					/* clear named devices */
+					if (clear_name(&sp, cname,
+					    options, ep) != 0) {
+						mde_perror(ep, "");
+						eval = 1;
+						Free(cname);
+						continue;
+					}
+					Free(cname);
 				}
 			}
 		}
 	}
 	/* update md.cf */
-	if (sp == NULL) {
-		/* Get sp for local set */
-		if ((sp = metasetname(MD_LOCAL_NAME, ep)) == NULL)
-			goto errout;
-	}
-
 	if (meta_update_md_cf(sp, ep) != 0) {
 		mde_perror(ep, "");
 		eval = 1;

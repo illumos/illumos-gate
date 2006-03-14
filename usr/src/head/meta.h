@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +153,7 @@ typedef	uint_t	mdprtopts_t;
 #define	PRINT_FAST		0x00000080
 #define	PRINT_DEVID		0x00000100
 #define	PRINT_LARGEDEVICES	0x00000200
+#define	PRINT_FN		0x00000400
 
 /*
  * for meta_devadm options
@@ -218,7 +218,6 @@ typedef	uint_t	mdcmdopts_t;
 #define	MDCMD_INIT		0x0010	/* init operation */
 #define	MDCMD_UPDATE		0x0020	/* update sizes used w/o DOIT mostly */
 #define	MDCMD_NOLOCK		0x0040	/* lock already held, DONT acquire */
-#define	MDCMD_CLUSTER_REPLACE	0x0080	/* don't resync raid */
 #define	MDCMD_VERBOSE		0x0100	/* be verbose */
 #define	MDCMD_USE_WHOLE_DISK	0x0200	/* repartition disk */
 #define	MDCMD_DIRECT		0x0400	/* extents specified directly */
@@ -775,8 +774,8 @@ extern	int		meta_setup_geom(md_unit_t *md, mdname_t *np,
 extern	int		meta_adjust_geom(md_unit_t *md, mdname_t *np,
 			    uint_t write_reinstruct, uint_t read_reinstruct,
 			    uint_t round_cyl, md_error_t *ep);
-extern	int		meta_init_name(mdsetname_t **spp,
-			    int argc, char *argv[], mdcmdopts_t options,
+extern	int		meta_init_name(mdsetname_t **spp, int argc,
+			    char *argv[], char *cname, mdcmdopts_t options,
 			    md_error_t *ep);
 extern	int		meta_check_devicesize(diskaddr_t total_blocks);
 extern	int		meta_init_make_device(mdsetname_t **spp, char *uname,
@@ -1103,9 +1102,16 @@ extern	char		*meta_get_mountp(mdsetname_t *, mdname_t *,
 
 /* meta_name.c */
 extern  char		*meta_name_getname(mdsetname_t **spp, char *uname,
-			    md_error_t *ep);
+			    meta_device_type_t uname_type, md_error_t *ep);
 extern	char		*meta_canonicalize(mdsetname_t *sp, char *uname);
+extern	char		*meta_canonicalize_check_set(mdsetname_t **sp,
+			    char *uname, md_error_t *ep);
+extern	int		meta_is_all(char *uname);
+extern	int		is_existing_metadevice(mdsetname_t *sp, char *uname);
+extern	int		is_existing_hsp(mdsetname_t *sp, char *uname);
+extern	int		is_existing_meta_hsp(mdsetname_t *sp, char *uname);
 extern	int		is_metaname(char *uname);
+extern	int		meta_is_none(char *uname);
 extern	int		is_hspname(char *uname);
 extern	int		parse_ctd(char *uname, uint_t *slice);
 extern	md_set_desc	*sr2setdesc(md_set_record *sr);
@@ -1135,19 +1141,20 @@ extern  mddrivenamelist_t	**meta_drivenamelist_append_wrapper(
 extern	int		meta_getdev(mdsetname_t *sp, mdname_t *np,
 			    md_error_t *ep);
 extern	mdname_t	*metaname_fast(mdsetname_t **spp, char *uname,
-			    md_error_t *ep);
+			    meta_device_type_t uname_type, md_error_t *ep);
 extern	mdname_t	*metaname(mdsetname_t **spp, char *uname,
-			    md_error_t *ep);
+			    meta_device_type_t uname_type, md_error_t *ep);
 extern	mdname_t	*metamnumname(mdsetname_t **spp, minor_t mnum,
 			    int fast, md_error_t *ep);
-extern	char		*get_mdname(minor_t mnum);
+extern	char		*get_mdname(mdsetname_t *sp, minor_t mnum);
 extern	int		metaismeta(mdname_t *np);
 extern	int		metachkmeta(mdname_t *np, md_error_t *ep);
 extern	int		metachkdisk(mdname_t *np, md_error_t *ep);
 extern	int		metachkcomp(mdname_t *np, md_error_t *ep);
 extern	void		metafreenamelist(mdnamelist_t *nlp);
 extern	int		metanamelist(mdsetname_t **spp, mdnamelist_t **nlpp,
-			    int argc, char *argv[], md_error_t *ep);
+			    int argc, char *argv[], meta_device_type_t type,
+			    md_error_t *ep);
 extern	mdname_t	*metanamelist_append(mdnamelist_t **nlpp,
 			    mdname_t *np);
 extern  mdnamelist_t	**meta_namelist_append_wrapper(mdnamelist_t **nlpp,
@@ -1156,7 +1163,7 @@ extern	mdhspname_t	*metahspname(mdsetname_t **spp,
 			    char *uname, md_error_t *ep);
 extern	mdhspname_t	*metahsphspname(mdsetname_t **spp,
 			    hsp_t hsp, md_error_t *ep);
-extern	char		*get_hspname(hsp_t mnum);
+extern	char		*get_hspname(mdsetname_t *sp, hsp_t mnum);
 extern	void		metafreehspnamelist(mdhspnamelist_t *hspnlp);
 extern	int		metahspnamelist(mdsetname_t **spp,
 			    mdhspnamelist_t **hspnlpp,
@@ -1168,6 +1175,7 @@ extern	mdname_t	*metadevname(mdsetname_t **spp,
 extern	char		*get_devname(set_t setno, md_dev64_t dev);
 extern	mdname_t	*metakeyname(mdsetname_t **spp,
 			    mdkey_t key, int fast, md_error_t *ep);
+extern	void		metaflushmetanames(void);
 extern	void		metaflushnames(int flush_sr_cache);
 extern	int		meta_get_hotspare_names(mdsetname_t *sp,
 			    mdnamelist_t **nlpp, int options, md_error_t *ep);
@@ -1213,6 +1221,10 @@ extern	char		*meta_getnmentbykey(set_t setno, side_t sideno,
 extern	char		*meta_getnmentbydev(set_t setno, side_t sideno,
 			    md_dev64_t dev, char **drvnm, minor_t *mnum,
 			    mdkey_t *key, md_error_t *ep);
+extern	char		*meta_gethspnmentbyid(set_t setno, side_t sideno,
+			    hsp_t hspid, md_error_t *ep);
+extern	hsp_t		meta_gethspnmentbyname(set_t setno, side_t sideno,
+			    char *hspname, md_error_t *ep);
 extern	char		*meta_getdidminorbykey(set_t setno, side_t sideno,
 			    mdkey_t key, md_error_t *ep);
 extern	ddi_devid_t	meta_getdidbykey(set_t setno, side_t sideno,
@@ -1230,6 +1242,10 @@ extern	int		del_key_name(mdsetname_t *sp, mdname_t *np,
 			    md_error_t *ep);
 extern	int		del_key_names(mdsetname_t *sp, mdnamelist_t *nlp,
 			    md_error_t *ep);
+extern	mdkey_t		add_self_name(mdsetname_t *, char *,
+			    md_mkdev_params_t *, md_error_t *);
+extern	int		del_self_name(mdsetname_t *, mdkey_t,
+			    md_error_t *);
 
 /* meta_patch.c */
 extern	int		meta_patch_vfstab(char *cmpname, mdname_t *fsnp,
@@ -1329,10 +1345,6 @@ extern	int		meta_replicaslice(mddrivename_t *dnp,
 			    uint_t *slicep, md_error_t *ep);
 
 /* meta_replace.c */
-extern	int		meta_replace(mdsetname_t *sp, mdname_t *metanp,
-			    mdname_t *oldnp,
-			    mdname_t *newnp, char *uname, mdcmdopts_t options,
-			    md_error_t *ep);
 extern	int		meta_replace_byname(mdsetname_t *sp, mdname_t *namep,
 			    mdname_t *oldnp, mdname_t *newnp,
 			    mdcmdopts_t options, md_error_t *ep);

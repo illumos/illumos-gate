@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +119,21 @@ extern "C" {
 
 /*
  * Set struct used by all parts of the driver, to store anchor pointers.
+ *
+ * Lock associated with field in this structure:
+ *
+ * Some of fields are accessible by both the single threaded ioctl thread
+ * and internal threads such as resync, hotsparing...etc.  In this case
+ * additional protection is needed.  For example, s_db is protected by
+ * s_dbmx additionally and s_un, s_ui are protected by md_unit_array_rw.lock
+ * s_nm, s_nmid, s_did_nm and s_did_nmid and s_dtp are protected by nm_lock
+ * Rest of other fileds are protected by md_mx.  Two fields s_un_next and
+ * s_un_avail are introduced by the friendly name project and are ONLY
+ * accessible via a single threaded ioctl thread which already is protected
+ * by the ioctl lock and there is no need to add extra protection to them.
+ * However, in the future if they become accessible by other internal threads
+ * then an additional protection such as md_mx lock is highly recommended.
+ *
  */
 typedef struct md_set {
 	uint_t		s_status;	/* set status */
@@ -137,6 +151,8 @@ typedef struct md_set {
 	int		s_am_i_master;	/* incore master flag for this node */
 	md_mn_nodeid_t	s_nodeid;	/* nodeid of this node - for MN sets */
 	uint_t		s_rcnt;		/* incore resync count for set */
+	unit_t		s_un_next;	/* s_un scan starts here */
+	unit_t		s_un_avail;	/* number of avail slots */
 } md_set_t;
 
 
@@ -181,6 +197,17 @@ typedef struct md_set {
  * with any nodeid (sideno) allowed.
  * The revision is set to MDDB_REV_MNLN which is a change of the
  * MDDB_REV_MAJOR portion of the revision.
+ *
+ * The record blocks have two binary properties.  A record block can
+ * represent either a 32 or 64 bit unit.  A record block can also represent
+ * a traditionally named unit or a friendly named unit.  Thus, there are
+ * minor revisions of record block.
+ *
+ *		Traditional		Friendly
+ *		Name			Name
+ *		-----------		--------
+ * 32 bit	MDDB_REV_RB		MDDB_REV_RBFN
+ * 64 bit	MDDB_REV_RB64		MDDB_REV_RB64FN
  */
 
 #define	MDDB_REV_MB	(uint_t)0x0201
@@ -192,8 +219,24 @@ typedef struct md_set {
 #define	MDDB_REV_MNLN	(uint_t)0x0300
 #define	MDDB_REV_RB	(uint_t)0x0200
 #define	MDDB_REV_RB64	(uint_t)0x0201
+#define	MDDB_REV_RBFN	(uint_t)0x0202
+#define	MDDB_REV_RB64FN	(uint_t)0x0203
 #define	MDDB_REV_DT	(uint_t)0x0100
 #define	MDDB_REV_DI	(uint_t)0x0100
+
+/*
+ * Transfer record block friendly name status to unit/hs structure.
+ */
+#define	NOTE_FN(rbv, unv)	switch (rbv) { \
+				case MDDB_REV_RB: \
+				case MDDB_REV_RB64: \
+					unv &= ~MD_FN_META_DEV; \
+					break; \
+				case MDDB_REV_RBFN: \
+				case MDDB_REV_RB64FN: \
+					unv |= MD_FN_META_DEV; \
+					break;	\
+				}
 
 #define	MDDB_BSIZE	(uint_t)DEV_BSIZE
 #define	MDDB_PREFIXCNT	10
@@ -838,6 +881,8 @@ extern int			mddb_validate_lb(set_t setno, int *rmaxsz);
 extern int			mddb_getinvlb_devid(set_t setno, int count,
 				    int size, char **ctdptr);
 extern int			md_update_minor(set_t, side_t, mdkey_t);
+extern int			md_update_top_device_minor(set_t, side_t,
+				    md_dev64_t);
 #ifdef DEBUG
 extern void			mddb_check(void);
 #endif /* DEBUG */

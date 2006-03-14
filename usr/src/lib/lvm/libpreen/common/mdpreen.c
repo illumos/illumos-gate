@@ -236,7 +236,7 @@ preen_build_devs(
 	/*
 	 * get list of underlying physical devices.
 	 */
-	if ((namep = metaname(&sp, uname, ep)) == NULL) {
+	if ((namep = metaname(&sp, uname, UNKNOWN, ep)) == NULL) {
 		ep_valid = 1;
 		goto out;
 	}

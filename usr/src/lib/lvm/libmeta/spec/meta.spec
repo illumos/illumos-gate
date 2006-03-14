@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -479,6 +478,10 @@ version		SUNWprivate_1.1
 end
 
 function	meta_get_hsp
+version		SUNWprivate_1.1
+end
+
+function	meta_gethspnmentbyid
 version		SUNWprivate_1.1
 end
 
@@ -1158,11 +1161,27 @@ function	get_mdname
 version		SUNWprivate_1.1
 end
 
+function	meta_is_all
+version		SUNWprivate_1.1
+end
+
+function	meta_is_none
+version		SUNWprivate_1.1
+end
+
 function	is_hspname
 version		SUNWprivate_1.1
 end
 
 function	sr2setdesc
+version		SUNWprivate_1.1
+end
+
+function	is_existing_metadevice
+version		SUNWprivate_1.1
+end
+
+function	is_existing_hsp
 version		SUNWprivate_1.1
 end
 
@@ -1219,6 +1238,10 @@ version		SUNWprivate_1.1
 end
 
 function	metafakesetname
+version		SUNWprivate_1.1
+end
+
+function	metaflushmetanames
 version		SUNWprivate_1.1
 end
 
@@ -1287,6 +1310,10 @@ version		SUNWprivate_1.1
 end
 
 function	metamnumname
+version		SUNWprivate_1.1
+end
+
+function	meta_name_getname
 version		SUNWprivate_1.1
 end
 
@@ -1655,10 +1682,6 @@ version		SUNWprivate_1.1
 end
 
 function	meta_enable_byname
-version		SUNWprivate_1.1
-end
-
-function	meta_replace
 version		SUNWprivate_1.1
 end
 
@@ -3711,5 +3734,13 @@ version		SUNWprivate_1.1
 end
 
 function	read_master_block
+version		SUNWprivate_1.1
+end
+
+function	add_self_name
+version		SUNWprivate_1.1
+end
+
+function	del_self_name
 version		SUNWprivate_1.1
 end

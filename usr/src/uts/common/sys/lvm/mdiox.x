@@ -1,13 +1,9 @@
 %/*
-% * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-% * Use is subject to license terms.
-% *
 % * CDDL HEADER START
 % *
 % * The contents of this file are subject to the terms of the
-% * Common Development and Distribution License, Version 1.0 only
-% * (the "License").  You may not use this file except in compliance
-% * with the License.
+% * Common Development and Distribution License (the "License").
+% * You may not use this file except in compliance with the License.
 % *
 % * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 % * or http://www.opensolaris.org/os/licensing.
@@ -21,6 +17,11 @@
 % * information: Portions Copyright [yyyy] [name of copyright owner]
 % *
 % * CDDL HEADER END
+% */
+%
+%/*
+% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+% * Use is subject to license terms.
 % */
 %
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -159,7 +160,8 @@ enum md_create_rec_option_t {
 	MD_CRO_TRANS_LOG	= 0x100,
 	MD_CRO_HOTSPARE		= 0x200,
 	MD_CRO_HOTSPARE_POOL	= 0x400,
-	MD_CRO_CHANGELOG	= 0x800
+	MD_CRO_CHANGELOG	= 0x800,
+	MD_CRO_FN		= 0x1000
 };
 
 %
@@ -532,9 +534,32 @@ enum md_types_t {
 	MD_METASP
 };
 
+%/* SVM general device types
+% *
+% * META_DEVICE refers to any SVM metadevice
+% * LOGICAL_DEVICE refers to any underlying physical device
+% * HSP_DEVICE refers to a hotspare pool
+% *
+% * In the past, the device type can be determined via
+% * the device name (such as d10, c1t1d1s1).  With
+% * the friendly name implementation, it is not possible
+% * to determine from the device name.  In the code,
+% * whereever the device type is obvious that type will be
+% * used explicitly otherwise 'UNKNOWN' will be used and
+% * specific SVM lookup routines will be called to determine
+% * the device type associated with the name.
+% */
+enum meta_device_type_t {
+	UNKNOWN = 0,
+	META_DEVICE,
+	HSP_DEVICE,
+	LOGICAL_DEVICE
+}; 
+
 #ifdef RPC_HDR
 %
 %/* misc module names */
+%/* When modifying this list also update meta_names in md_names.c */
 %#define	MD_STRIPE	"md_stripe"
 %#define	MD_MIRROR	"md_mirror"
 %#define	MD_TRANS	"md_trans"
@@ -1369,7 +1394,12 @@ enum md_void_errno_t {
 	MDE_STRIPE_TRUNC_MULTIPLE,	/* multiple component stripe trun */
 	MDE_SMF_FAIL,		/* service management facility error */
 	MDE_SMF_NO_SERVICE,	/* service not enabled in SMF */
-	MDE_ZONE_ADMIN		/* in a zone & no admin device */
+	MDE_AMBIGUOUS_DEV,	/* Ambiguous device specified */
+	MDE_NAME_IN_USE,	/* Friendly name already in use.  For */
+				/* instance name desired for hot spare pool */
+				/* is being used for a metadevice. */
+	MDE_ZONE_ADMIN,		/* in a zone & no admin device */
+	MDE_NAME_ILLEGAL	/* illegal syntax for metadevice or hsp name */
 };
 
 struct md_void_error_t {

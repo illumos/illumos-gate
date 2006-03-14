@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +59,7 @@ status_hsp(
 
 	/* must have set */
 	assert(sp != NULL);
-	assert(sp->setno == HSP_SET(hspnp->hsp));
+	assert(hspnp->hsp == MD_HSP_NONE || sp->setno == HSP_SET(hspnp->hsp));
 
 	/* print status */
 	if (meta_hsp_print(sp, hspnp, &nlp, NULL, stdout, options, ep) != 0)
@@ -93,18 +92,6 @@ usage:	%s [-s setname] -a hot_spare_pool [component...]\n\
 }
 
 /*
- * check for "all"
- */
-static int
-is_all(char *s)
-{
-	if ((strcoll(s, gettext("all")) == 0) ||
-	    (strcoll(s, gettext("ALL")) == 0))
-		return (1);
-	return (0);
-}
-
-/*
  * parse args and add hotspares
  */
 static int
@@ -125,11 +112,7 @@ add_hotspares(
 	/* get hotspare pool name(s) */
 	if (argc < 1)
 		usage(*spp, 1);
-	if ((argc > 1) && is_all(argv[0])) {
-		if ((*spp == NULL) &&
-		    ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL)) {
-			return (-1);
-		}
+	if ((argc > 1) && meta_is_all(argv[0])) {
 		/* check for ownership */
 		assert(*spp != NULL);
 		if (meta_check_ownership(*spp, ep) != 0)
@@ -140,9 +123,12 @@ add_hotspares(
 		} else if (cnt == 0) {
 			return (mderror(ep, MDE_NO_HSPS, NULL));
 		}
-	} else if ((cnt = metahspnamelist(spp, &hspnlp, 1, &argv[0],
-	    ep)) < 0) {
-		return (-1);
+	} else { /* create the hsp nmlist from the specified hsp name */
+		if (!is_hspname(argv[0]))
+			return (mderror(ep, MDE_NAME_ILLEGAL, argv[0]));
+
+		if ((cnt = metahspnamelist(spp, &hspnlp, 1, &argv[0], ep)) < 0)
+			return (-1);
 	}
 	assert(cnt > 0);
 	--argc, ++argv;
@@ -158,7 +144,8 @@ add_hotspares(
 		return (-1);
 
 	/* get hotspares */
-	if (metanamelist(spp, &nlp, argc, argv, ep) < 0) {
+	if (metanamelist(spp, &nlp, argc, argv,
+	    LOGICAL_DEVICE, ep) < 0) {
 		goto out;
 	}
 
@@ -201,11 +188,7 @@ delete_hotspares(
 	/* get hotspare pool name(s) */
 	if (argc < 1)
 		usage(*spp, 1);
-	if ((argc > 1) && is_all(argv[0])) {
-		if ((*spp == NULL) &&
-		    ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL)) {
-			return (-1);
-		}
+	if ((argc > 1) && meta_is_all(argv[0])) {
 		/* check for ownership */
 		assert(*spp != NULL);
 		if (meta_check_ownership(*spp, ep) != 0)
@@ -234,7 +217,8 @@ delete_hotspares(
 		return (-1);
 
 	/* get hotspares */
-	if (metanamelist(spp, &nlp, argc, argv, ep) < 0) {
+	if (metanamelist(spp, &nlp, argc, argv,
+	    LOGICAL_DEVICE, ep) < 0) {
 		goto out;
 	}
 
@@ -292,7 +276,8 @@ enable_hotspares(
 		usage(*spp, 1);
 
 	/* get list of hotspares */
-	if (metanamelist(spp, &nlp, argc, argv, ep) < 0)
+	if (metanamelist(spp, &nlp, argc, argv,
+	    LOGICAL_DEVICE, ep) < 0)
 		goto out;
 	assert(nlp != NULL);
 
@@ -337,11 +322,7 @@ replace_hotspares(
 	/* get hotspare pool name(s) */
 	if (argc != 3)
 		usage(*spp, 1);
-	if (is_all(argv[0])) {
-		if ((*spp == NULL) &&
-		    ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL)) {
-			return (-1);
-		}
+	if (meta_is_all(argv[0])) {
 		/* check for ownership */
 		assert(*spp != NULL);
 		if (meta_check_ownership(*spp, ep) != 0)
@@ -369,11 +350,11 @@ replace_hotspares(
 		return (-1);
 
 	/* get old component */
-	if ((oldnp = metaname(spp, argv[1], ep)) == NULL)
+	if ((oldnp = metaname(spp, argv[1], LOGICAL_DEVICE, ep)) == NULL)
 		goto out;
 
 	/* get new component */
-	if ((newnp = metaname(spp, argv[2], ep)) == NULL)
+	if ((newnp = metaname(spp, argv[2], LOGICAL_DEVICE, ep)) == NULL)
 		goto out;
 
 	/* replace hotspares */
@@ -480,10 +461,6 @@ status_hotspares(
 
 	/* get hotspare pool name(s) */
 	if (argc == 0) {
-		if ((*spp == NULL) &&
-		    ((*spp = metasetname(MD_LOCAL_NAME, ep)) == NULL)) {
-			return (-1);
-		}
 		/* check for ownership */
 		assert(*spp != NULL);
 		if (meta_check_ownership(*spp, ep) != 0)
@@ -695,6 +672,24 @@ main(
 	argv += optind;
 	if (which_op == NONE)
 		usage(sp, 1);
+
+	/*
+	 * if a hot spare pool was specified by name then
+	 * get the canonical form of the name and set up
+	 * sp if the name was specified in the form 'set/hsp'
+	 * unless 'all' is specified or the request is made to
+	 * enable a hs which means that argv[0] will be a component
+	 */
+	if (argc > 0 && !meta_is_all(argv[0]) && which_op != ENABLE_A_HS) {
+		char *cname = NULL;
+
+		cname = meta_name_getname(&sp, argv[0], HSP_DEVICE, ep);
+		if (cname == NULL) {
+			mde_perror(ep, "");
+			md_exit(sp, 1);
+		}
+		Free(cname);
+	}
 
 	if (which_op == STATUS_A_HSP) {
 		if (status_hotspares(&sp, argc, argv, ep) != 0) {
