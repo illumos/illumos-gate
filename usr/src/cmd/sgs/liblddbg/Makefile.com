@@ -63,7 +63,7 @@ LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc $(VAR_LIBLDDBG_CPPFLAGS)
-DYNFLAGS +=	$(VERSREF) $(MAPOPTS) $(ZLAZYLOAD) -R/usr/tmp '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) $(MAPOPTS) $(ZLAZYLOAD) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 # A bug in pmake causes redundancy when '+=' is conditionally assigned, so
