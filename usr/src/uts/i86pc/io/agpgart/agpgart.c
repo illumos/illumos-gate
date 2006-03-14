@@ -3183,9 +3183,9 @@ agpgart_ioctl(dev_t dev, int cmd, intptr_t intarg, int flags,
 		retval = ioctl_agpgart_unbind(softstate, arg, flags);
 		break;
 	default:
+		AGPDB_PRINT2((CE_WARN, "agpgart_ioctl: wrong argument"));
 		retval = ENXIO;
 		break;
-
 	}
 
 	mutex_exit(&softstate->asoft_instmutex);
