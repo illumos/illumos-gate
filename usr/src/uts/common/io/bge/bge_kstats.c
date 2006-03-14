@@ -968,9 +968,17 @@ bge_m_stat(void *arg, enum mac_stat stat)
 
 	case MAC_STAT_IERRORS:
 		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
-			val = bstp->s.ifInErrors;
+			val = bstp->s.dot3StatsFCSErrors +
+				bstp->s.dot3StatsAlignmentErrors +
+				bstp->s.dot3StatsFrameTooLongs +
+				bstp->s.etherStatsUndersizePkts +
+				bstp->s.etherStatsJabbers;
 		else
-			val = 0;
+			val = bgep->stat_val.dot3StatsFCSErrors +
+				bgep->stat_val.dot3StatsAlignmentErrors +
+				bgep->stat_val.dot3StatsFrameTooLongs +
+				bgep->stat_val.etherStatsUndersizePkts +
+				bgep->stat_val.etherStatsJabbers;
 		break;
 
 	case MAC_STAT_NOXMTBUF:

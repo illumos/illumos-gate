@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -154,6 +153,7 @@ then
 	"pci14e4,1696"
 	"pci14e4,169c"
 	"pci14e4,1677"
+	"pci14e4,1678"
 	"pci14e4,167d"' \
 	-b "$BASEDIR" bge
 else if [ ${ARCH} = "sparc" ]

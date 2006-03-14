@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.50";
+static char bge_ident[] = "BCM579x driver v0.51";
 
 /*
  * Property names
@@ -2080,8 +2080,16 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mip->mi_media = DL_ETHER;
 	mip->mi_sdu_min = 0;
 	mip->mi_sdu_max = cidp->ethmax_size - sizeof (struct ether_header);
-	mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 	mip->mi_poll = DL_CAPAB_POLL;
+
+	/*
+	 * Workaround for Incorrect pseudo-header checksum calculation.
+	 * 	Use partial checksum offload for all affected chips.
+	 */
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		mip->mi_cksum = HCKSUM_INET_PARTIAL | HCKSUM_IPHDRCKSUM;
+	else
+		mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 
 	mip->mi_addr_length = ETHERADDRL;
 	bcopy(ether_brdcst, mip->mi_brdcst_addr, ETHERADDRL);

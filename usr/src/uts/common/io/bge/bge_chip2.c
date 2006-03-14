@@ -579,9 +579,17 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	/*
 	 * Make sure these indirect-access registers are sane
 	 * rather than random after power-up or reset
+	 *
+	 * For BCM5714C A3 silicon to avoid resource deadlocking
 	 */
-	pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
-	pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
+	if ((cidp->device == DEVICE_ID_5714C) &&
+		(cidp->revision == REVISION_ID_5714_A3)) {
+		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0x4900);
+		pci_config_put32(handle, PCI_CONF_BGE_RIADR, 1);
+	} else {
+		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
+		pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
+	}
 }
 
 #ifdef __amd64
@@ -3140,9 +3148,13 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 
 	/*
 	 * Step 28: Configure checksum options:
-	 *	Solaris supports the hardware default checksum options
-	 *	so there's nothing to do here.
+	 *	Solaris supports the hardware default checksum options.
+	 *
+	 *	Workaround for Incorrect pseudo-header checksum calculation.
 	 */
+	if (bgep->macp->m_info.mi_cksum & HCKSUM_INET_PARTIAL)
+		bge_reg_set32(bgep, MODE_CONTROL_REG,
+			MODE_SEND_NO_PSEUDO_HDR_CSUM);
 
 	/*
 	 * Step 29: configure Timer Prescaler.  The value is always the

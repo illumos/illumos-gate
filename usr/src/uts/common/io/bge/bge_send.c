@@ -324,7 +324,7 @@ bge_send_copy(bge_t *bgep, mblk_t *mp, send_ring_t *srp, uint16_t tci)
 	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
 	if (pflags & HCK_IPV4_HDRCKSUM)
 		hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
-	if (pflags & HCK_FULLCKSUM)
+	if (pflags & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))
 		hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
 
 	return (SEND_FREE);
