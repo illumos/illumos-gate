@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -34,28 +34,29 @@
 #include	<sys/procfs.h>
 #include	<sys/mman.h>
 #include	<dlfcn.h>
-#include	"conv.h"
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"msg.h"
-#include	"debug.h"
 
 /*
  * Move data
  */
 void
-move_data(Rt_map * lmp)
+move_data(Rt_map *lmp)
 {
-	Move *		mv = MOVETAB(lmp);
-	Phdr *		pptr = SUNWBSS(lmp);
-	unsigned long	cnt1;
-	Half 		cnt2, stride;
-	Addr		taddr;
+	Lm_list	*lml = LIST(lmp);
+	Move	*mv = MOVETAB(lmp);
+	Phdr	*pptr = SUNWBSS(lmp);
+	ulong_t	num, mvnum = MOVESZ(lmp) / MOVEENT(lmp);
 
-	DBG_CALL(Dbg_move_data(NAME(lmp)));
-	for (cnt1 = 0; cnt1 < MOVESZ(lmp) / MOVEENT(lmp); cnt1++, mv++) {
-		Sym *	sym;
+	DBG_CALL(Dbg_move_data(lmp));
+	for (num = 0; num < mvnum; num++, mv++) {
+		Addr	taddr;
+		Half 	rep, stride;
+		Sym	*sym;
 
 		/*
 		 * If the target address needs to be mapped in,
@@ -74,8 +75,9 @@ move_data(Rt_map * lmp)
 			zero((caddr_t)foff, (long)(zaddr - foff));
 			zlen = eaddr - zaddr;
 			if (zlen > 0) {
-				if (dz_map(zaddr, zlen, PROT_READ | PROT_WRITE,
-				    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
+				if (dz_map(lml, zaddr, zlen,
+				    (PROT_READ | PROT_WRITE),
+				    (MAP_FIXED | MAP_PRIVATE)) == MAP_FAILED)
 					return;
 			}
 
@@ -92,11 +94,12 @@ move_data(Rt_map * lmp)
 		else
 			taddr = taddr + mv->m_poffset + ADDR(lmp);
 
-		DBG_CALL(Dbg_move_mventry2(mv, sym->st_name,
-			(char *)(sym->st_name + STRTAB(lmp))));
+		DBG_CALL(Dbg_move_entry2(lml, mv, sym->st_name,
+		    (const char *)(sym->st_name + STRTAB(lmp))));
 
-		for (cnt2 = 0; cnt2 < mv->m_repeat; cnt2++) {
-			DBG_CALL(Dbg_move_expanding(mv, taddr));
+		for (rep = 0; rep < mv->m_repeat; rep++) {
+			DBG_CALL(Dbg_move_expand(lml, mv, taddr));
+
 			switch (ELF_M_SIZE(mv->m_info)) {
 			case 1:
 				*((char *)taddr) = (char)mv->m_value;
@@ -118,7 +121,7 @@ move_data(Rt_map * lmp)
 				taddr += 8 * stride;
 				break;
 			default:
-				eprintf(ERR_NONE, MSG_INTL(MSG_MOVE_ERR1));
+				eprintf(lml, ERR_NONE, MSG_INTL(MSG_MOVE_ERR1));
 				break;
 			}
 		}

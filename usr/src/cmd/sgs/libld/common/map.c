@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,17 +41,17 @@
 #include	<dirent.h>
 #include	<ctype.h>
 #include	<elfcap.h>
+#include	<debug.h>
 #include	"msg.h"
-#include	"debug.h"
 #include	"_libld.h"
 
-#ifdef _ELF64
+#if	defined(_ELF64)
 #define	STRTOADDR	strtoull
 #define	XWORD_MAX	ULLONG_MAX
 #else	/* Elf32 */
 #define	STRTOADDR	strtoul
 #define	XWORD_MAX	UINT_MAX
-#endif /* _ELF64 */
+#endif	/* _ELF64 */
 
 typedef enum {
 	TK_STRING,	TK_COLON,	TK_SEMICOLON,	TK_EQUAL,
@@ -80,7 +79,7 @@ lowercase(char *str)
  * Get a token from the mapfile.
  */
 static Token
-gettoken(const char *mapfile)
+gettoken(Ofl_desc *ofl, const char *mapfile)
 {
 	static char	oldchr = '\0';	/* Char at end of current token. */
 	char		*end;		/* End of the current token. */
@@ -94,8 +93,9 @@ gettoken(const char *mapfile)
 		if (!isascii(*nextchr) ||
 		    (!isprint(*nextchr) && !isspace(*nextchr) &&
 		    (*nextchr != '\0'))) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_ILLCHAR),
-			    mapfile, EC_XWORD(Line_num), *((uchar_t *)nextchr));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_ILLCHAR), mapfile,
+			    EC_XWORD(Line_num), *((uchar_t *)nextchr));
 			/* LINTED */
 			return ((Token)S_ERROR);
 		}
@@ -143,8 +143,9 @@ gettoken(const char *mapfile)
 			if (((end = strpbrk(nextchr,
 			    MSG_ORIG(MSG_MAP_TOK_1))) == NULL) ||
 			    (*end != '"')) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_NOTERM),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_NOTERM), mapfile,
+				    EC_XWORD(Line_num));
 				/* LINTED */
 				return ((Token)S_ERROR);
 			}
@@ -194,18 +195,20 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 	Xword	number;
 	int	used = 0;
 
-	while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 		/* LINTED */
 		if (tok == (Token)S_ERROR)
 			return (S_ERROR);
 		if (tok == TK_EOF) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_PREMEOF),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 		if (tok != TK_STRING) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSEGATT),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSEGATT), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -255,15 +258,16 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 			number = (Xword)strtoul(&Start_tok[1], &end_tok, 0);
 			if (errno) {
 				int	err = errno;
-				eprintf(ERR_FATAL,
+				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_MAP_BADCAPVAL),
 				    mapfile, EC_XWORD(Line_num), Start_tok,
 				    strerror(err));
 				return (S_ERROR);
 			}
 			if (end_tok != strchr(Start_tok, '\0')) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_BADCAPVAL),
-				    mapfile, EC_XWORD(Line_num), Start_tok,
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_BADCAPVAL), mapfile,
+				    EC_XWORD(Line_num), Start_tok,
 				    MSG_INTL(MSG_MAP_NOBADFRM));
 				return (S_ERROR);
 			}
@@ -280,7 +284,7 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		 * We have an unknown token.
 		 */
 		used++;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKCAPATTR),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_UNKCAPATTR),
 		    mapfile, EC_XWORD(Line_num), Start_tok);
 		return (S_ERROR);
 	}
@@ -290,7 +294,7 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 	 * have been initialized if necessary.
 	 */
 	if (used == 0) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_EMPTYCAP),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_MAP_EMPTYCAP),
 		    mapfile, EC_XWORD(Line_num));
 	} else if (type == CA_SUNW_SF_1) {
 		Lword	badsf1;
@@ -305,14 +309,15 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		 * capabilities that are known.
 		 */
 		if ((badsf1 = (ofl->ofl_sfcap_1 & ~SF1_SUNW_MASK)) != 0) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_BADSF1),
-			    mapfile, EC_XWORD(Line_num), EC_LWORD(badsf1));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_MAP_BADSF1), mapfile,
+			    EC_XWORD(Line_num), EC_LWORD(badsf1));
 			ofl->ofl_sfcap_1 &= SF1_SUNW_MASK;
 		}
 		if (ofl->ofl_sfcap_1 == SF1_SUNW_FPUSED) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
-			    mapfile, EC_XWORD(Line_num),
-			    EC_LWORD(SF1_SUNW_FPUSED));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_BADSF1), mapfile,
+			    EC_XWORD(Line_num), EC_LWORD(SF1_SUNW_FPUSED));
 			ofl->ofl_sfcap_1 = 0;
 		}
 	}
@@ -337,18 +342,20 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	Boolean	b_paddr = FALSE;	/* True if seg physical addr found. */
 	Boolean	b_align = FALSE;	/* True if seg alignment found. */
 
-	while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 		/* LINTED */
 		if (tok == (Token)S_ERROR)
 			return (S_ERROR);
 		if (tok == TK_EOF) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_PREMEOF),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 		if (tok != TK_STRING) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSEGATT),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSEGATT), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -361,23 +368,26 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		 */
 		if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_LOAD)) == 0) {
 			if (b_type) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGTYP));
 				return (S_ERROR);
 			}
 			if ((sgp->sg_flags & FLG_SG_TYPE) &&
 			    (sgp->sg_phdr.p_type != PT_LOAD))
-				eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_REDEFATT),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGTYP), sgp->sg_name);
 			sgp->sg_phdr.p_type = PT_LOAD;
 			sgp->sg_flags |= FLG_SG_TYPE;
 			b_type = TRUE;
 		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_STACK)) == 0) {
 			if (b_type) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGTYP));
 				return (S_ERROR);
 			}
@@ -386,15 +396,17 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 			b_type = TRUE;
 		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NOTE)) == 0) {
 			if (b_type) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGTYP));
 				return (S_ERROR);
 			}
 			if ((sgp->sg_flags & FLG_SG_TYPE) &&
 			    (sgp->sg_phdr.p_type != PT_NOTE))
-				eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_REDEFATT),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGTYP), sgp->sg_name);
 			sgp->sg_phdr.p_type = PT_NOTE;
 			sgp->sg_flags |= FLG_SG_TYPE;
@@ -409,8 +421,9 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 			char	*flag_tok = Start_tok + 1;
 
 			if (b_flags) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGFLAG));
 				return (S_ERROR);
 			}
@@ -443,7 +456,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 						sgp->sg_flags |= FLG_SG_NOHDR;
 						break;
 					default:
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_UNKSEGFLG),
 						    mapfile, EC_XWORD(Line_num),
 						    *flag_tok);
@@ -462,8 +475,9 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 			    !(sgp->sg_phdr.p_type == PT_LOAD &&
 			    (tmp_flags & (PF_R|PF_W)) == (PF_R|PF_W) &&
 			    (tmp_flags ^ sgp->sg_phdr.p_flags) == PF_X)) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_REDEFATT),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGFLAG), sgp->sg_name);
 			}
 			sgp->sg_flags |= FLG_SG_FLAGS;
@@ -482,15 +496,17 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 
 			if ((number = (Xword)STRTOADDR(&Start_tok[1], &end_tok,
 			    0))	>= XWORD_MAX) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGADDR),
-				    mapfile, EC_XWORD(Line_num), Start_tok,
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGADDR), mapfile,
+				    EC_XWORD(Line_num), Start_tok,
 				    MSG_INTL(MSG_MAP_EXCLIMIT));
 				return (S_ERROR);
 			}
 
 			if (end_tok != strchr(Start_tok, '\0')) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGADDR),
-				    mapfile, EC_XWORD(Line_num), Start_tok,
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGADDR), mapfile,
+				    EC_XWORD(Line_num), Start_tok,
 				    MSG_INTL(MSG_MAP_NOBADFRM));
 				return (S_ERROR);
 			}
@@ -498,7 +514,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 			switch (*Start_tok) {
 			case 'l':
 				if (b_len) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_MOREONCE),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGLEN));
@@ -506,7 +522,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				}
 				if ((sgp->sg_flags & FLG_SG_LENGTH) &&
 				    (sgp->sg_length != number))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_REDEFATT),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGLEN),
@@ -517,7 +533,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'r':
 				if (b_round) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_MOREONCE),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGROUND));
@@ -525,7 +541,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				}
 				if ((sgp->sg_flags & FLG_SG_ROUND) &&
 				    (sgp->sg_round != number))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_REDEFATT),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGROUND),
@@ -536,7 +552,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'v':
 				if (b_vaddr) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_MOREONCE),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGVADDR));
@@ -544,7 +560,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				}
 				if ((sgp->sg_flags & FLG_SG_VADDR) &&
 				    (sgp->sg_phdr.p_vaddr != number))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_REDEFATT),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGVADDR),
@@ -557,7 +573,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'p':
 				if (b_paddr) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_MOREONCE),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGPHYS));
@@ -565,7 +581,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				}
 				if ((sgp->sg_flags & FLG_SG_PADDR) &&
 				    (sgp->sg_phdr.p_paddr != number))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_REDEFATT),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGPHYS),
@@ -577,7 +593,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			case 'a':
 				if (b_align) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_MOREONCE),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGALIGN));
@@ -585,7 +601,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				}
 				if ((sgp->sg_flags & FLG_SG_ALIGN) &&
 				    (sgp->sg_phdr.p_align != number))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_REDEFATT),
 					    mapfile, EC_XWORD(Line_num),
 					    MSG_INTL(MSG_MAP_SEGALIGN),
@@ -597,8 +613,9 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 				break;
 			}
 		} else {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKSEGATT),
-			    mapfile, EC_XWORD(Line_num), Start_tok);
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_UNKSEGATT), mapfile,
+			    EC_XWORD(Line_num), Start_tok);
 			return (S_ERROR);
 		}
 	}
@@ -612,25 +629,29 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	if ((sgp->sg_flags & FLG_SG_EMPTY) &&
 	    (sgp->sg_phdr.p_type != PT_SUNWSTACK)) {
 		if (!(ofl->ofl_flags & FLG_OF_EXEC)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGEMPEXE),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_SEGEMPEXE), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 		if (sgp->sg_phdr.p_flags != 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGEMNOPERM),
-				mapfile, EC_XWORD(Line_num),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_SEGEMNOPERM), mapfile,
+			    EC_XWORD(Line_num),
 				EC_WORD(sgp->sg_phdr.p_flags));
 			return (S_ERROR);
 		}
 		if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) !=
 		    (FLG_SG_LENGTH | FLG_SG_VADDR)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGEMPATT),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_SEGEMPATT), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 		if (sgp->sg_phdr.p_type != PT_LOAD) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_SEGEMPLOAD),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_MAP_SEGEMPLOAD), mapfile,
+			    EC_XWORD(Line_num));
 			sgp->sg_phdr.p_type = PT_LOAD;
 		}
 	}
@@ -639,7 +660,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 * All segment attributes have now been scanned.  Certain flags do not
 	 * make sense if this is not a loadable segment, fix if necessary.
 	 * Note, if the segment is of type PT_NULL it must be new, and any
-	 * defaults will be applied back in map_parse().
+	 * defaults will be applied back in ld_map_parse().
 	 * When clearing an attribute leave the flag set as an indicator for
 	 * later entries re-specifying the same segment.
 	 */
@@ -654,29 +675,30 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		if ((sgp->sg_flags & FLG_SG_FLAGS) &&
 		    (sgp->sg_phdr.p_type != PT_SUNWSTACK)) {
 			if (sgp->sg_phdr.p_flags != 0) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_NONLOAD),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_MAP_NONLOAD), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGFLAG));
 				sgp->sg_phdr.p_flags = 0;
 			}
 		}
 		if (sgp->sg_flags & FLG_SG_LENGTH)
 			if (sgp->sg_length != 0) {
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    fmt, mapfile, EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGLEN));
 				sgp->sg_length = 0;
 			}
 		if (sgp->sg_flags & FLG_SG_ROUND)
 			if (sgp->sg_round != 0) {
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    fmt, mapfile, EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGROUND));
 				sgp->sg_round = 0;
 			}
 		if (sgp->sg_flags & FLG_SG_VADDR) {
 			if (sgp->sg_phdr.p_vaddr != 0) {
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    fmt, mapfile, EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGVADDR));
 				sgp->sg_phdr.p_vaddr = 0;
@@ -684,14 +706,14 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		}
 		if (sgp->sg_flags & FLG_SG_PADDR)
 			if (sgp->sg_phdr.p_paddr != 0) {
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    fmt, mapfile, EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGPHYS));
 				sgp->sg_phdr.p_paddr = 0;
 			}
 		if (sgp->sg_flags & FLG_SG_ALIGN)
 			if (sgp->sg_phdr.p_align != 0) {
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    fmt, mapfile, EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SEGALIGN));
 				sgp->sg_phdr.p_align = 0;
@@ -707,7 +729,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
  * 	segment_attribute : section_name section_type section_flags;
  */
 static uintptr_t
-map_colon(const char *mapfile, Ent_desc *enp)
+map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 {
 	Token		tok;		/* Current token. */
 
@@ -718,13 +740,15 @@ map_colon(const char *mapfile, Ent_desc *enp)
 	static	Xword	index = 0;
 
 
-	while ((tok = gettoken(mapfile)) != TK_COLON && tok != TK_SEMICOLON) {
+	while (((tok = gettoken(ofl, mapfile)) != TK_COLON) &&
+	    (tok != TK_SEMICOLON)) {
 		/* LINTED */
 		if (tok == (Token)S_ERROR)
 			return (S_ERROR);
 		if (tok == TK_EOF) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_PREMEOF),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -732,8 +756,9 @@ map_colon(const char *mapfile, Ent_desc *enp)
 
 		if (*Start_tok == '$') {
 			if (b_type) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SECTYP));
 				return (S_ERROR);
 			}
@@ -768,8 +793,9 @@ map_colon(const char *mapfile, Ent_desc *enp)
 			    MSG_ORIG(MSG_STR_NOBITS)) == 0)
 				enp->ec_type = SHT_NOBITS;
 			else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKSECTYP),
-				    mapfile, EC_XWORD(Line_num), Start_tok);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNKSECTYP), mapfile,
+				    EC_XWORD(Line_num), Start_tok);
 				return (S_ERROR);
 			}
 
@@ -783,8 +809,9 @@ map_colon(const char *mapfile, Ent_desc *enp)
 		 */
 		} else if (*Start_tok == '?') {
 			if (b_attr) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SECFLAG));
 				return (S_ERROR);
 			}
@@ -796,7 +823,7 @@ map_colon(const char *mapfile, Ent_desc *enp)
 				switch (*Start_tok) {
 				case '!':
 					if (b_bang) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_BADFLAG),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok);
@@ -806,7 +833,7 @@ map_colon(const char *mapfile, Ent_desc *enp)
 					break;
 				case 'a':
 					if (enp->ec_attrmask & SHF_ALLOC) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_BADFLAG),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok);
@@ -819,7 +846,7 @@ map_colon(const char *mapfile, Ent_desc *enp)
 					break;
 				case 'w':
 					if (enp->ec_attrmask & SHF_WRITE) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_BADFLAG),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok);
@@ -832,7 +859,7 @@ map_colon(const char *mapfile, Ent_desc *enp)
 					break;
 				case 'x':
 					if (enp->ec_attrmask & SHF_EXECINSTR) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_BADFLAG),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok);
@@ -844,7 +871,7 @@ map_colon(const char *mapfile, Ent_desc *enp)
 					b_bang = FALSE;
 					break;
 				default:
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_BADFLAG),
 					    mapfile, EC_XWORD(Line_num),
 					    Start_tok);
@@ -855,8 +882,9 @@ map_colon(const char *mapfile, Ent_desc *enp)
 		 */
 		} else {
 			if (b_name) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
+				    EC_XWORD(Line_num),
 				    MSG_INTL(MSG_MAP_SECNAME));
 				return (S_ERROR);
 			}
@@ -876,20 +904,22 @@ map_colon(const char *mapfile, Ent_desc *enp)
 		/*
 		 * File names.
 		 */
-		while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+		while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 			char	*file;
 
 			/* LINTED */
 			if (tok == (Token)S_ERROR)
 				return (S_ERROR);
 			if (tok == TK_EOF) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_PREMEOF),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
+				    EC_XWORD(Line_num));
 				return (S_ERROR);
 			}
 			if (tok != TK_STRING) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_MALFORM),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_MALFORM), mapfile,
+				    EC_XWORD(Line_num));
 				return (S_ERROR);
 			}
 			if ((file =
@@ -947,17 +977,18 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	Token		tok;		/* Current token. */
 	avl_index_t	where;
 
-	if ((tok = gettoken(mapfile)) != TK_STRING) {
+	if ((tok = gettoken(ofl, mapfile)) != TK_STRING) {
 		/* LINTED */
 		if (tok != (Token)S_ERROR)
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSYM_1),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSYM_1), mapfile,
+			    EC_XWORD(Line_num));
 		return (S_ERROR);
 	}
 
 	if (sgp->sg_sizesym != NULL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGSIZE), mapfile,
-			EC_XWORD(Line_num), sgp->sg_name);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_SEGSIZE),
+		    mapfile, EC_XWORD(Line_num), sgp->sg_name);
 		return (S_ERROR);
 	}
 
@@ -973,7 +1004,7 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 * symbol has been scoped or versioned, in which case it does exist
 	 * but we can freely update it here.
 	 */
-	if ((sdp = sym_find(Start_tok, SYM_NOHASH, &where, ofl)) == NULL) {
+	if ((sdp = ld_sym_find(Start_tok, SYM_NOHASH, &where, ofl)) == NULL) {
 		char	*name;
 		Word hval;
 
@@ -987,15 +1018,15 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		sym->st_size = 0;
 		sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
 
-		DBG_CALL(Dbg_map_size_new(name));
+		DBG_CALL(Dbg_map_size_new(ofl->ofl_lml, name));
 		/* LINTED */
 		hval = (Word)elf_hash(name);
-		if ((sdp = sym_enter(name, sym, hval, ifl, ofl, 0, SHN_ABS,
+		if ((sdp = ld_sym_enter(name, sym, hval, ifl, ofl, 0, SHN_ABS,
 		    (FLG_SY_SPECSEC | FLG_SY_GLOBREF), 0, &where)) ==
 		    (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 		sdp->sd_flags &= ~FLG_SY_CLEAN;
-		DBG_CALL(Dbg_map_symbol(&def_ehdr, sdp));
+		DBG_CALL(Dbg_map_symbol(ofl, sdp));
 	} else {
 		sym = sdp->sd_sym;
 
@@ -1007,9 +1038,10 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 
 			sdp->sd_flags &= ~FLG_SY_MAPREF;
 
-			DBG_CALL(Dbg_map_size_old(&def_ehdr, sdp));
+			DBG_CALL(Dbg_map_size_old(ofl, sdp));
 		} else {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SYMDEF), mapfile,
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_SYMDEF), mapfile,
 			    EC_XWORD(Line_num), demangle(sdp->sd_name),
 			    sdp->sd_file->ifl_name);
 			return (S_ERROR);
@@ -1021,11 +1053,12 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 */
 	sgp->sg_sizesym = sdp;
 
-	if (gettoken(mapfile) != TK_SEMICOLON) {
+	if (gettoken(ofl, mapfile) != TK_SEMICOLON) {
 		/* LINTED */
 		if (tok != (Token)S_ERROR)
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSCOL),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
+			    EC_XWORD(Line_num));
 		return (S_ERROR);
 	} else
 		return (1);
@@ -1033,7 +1066,7 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 
 
 static uintptr_t
-map_pipe(const char *mapfile, Sg_desc *sgp)
+map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 {
 	char		*sec_name;	/* section name */
 	Token		tok;		/* current token. */
@@ -1041,10 +1074,11 @@ map_pipe(const char *mapfile, Sg_desc *sgp)
 	static Word	index = 0;	/* used to maintain a increasing */
 					/* 	index for section ordering. */
 
-	if ((tok = gettoken(mapfile)) != TK_STRING) {
+	if ((tok = gettoken(ofl, mapfile)) != TK_STRING) {
 		/* LINTED */
 		if (tok != (Token)S_ERROR)
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSEC), mapfile,
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSEC), mapfile,
 			    EC_XWORD(Line_num));
 		return (S_ERROR);
 	}
@@ -1062,13 +1096,14 @@ map_pipe(const char *mapfile, Sg_desc *sgp)
 	if (list_appendc(&(sgp->sg_secorder), sc_order) == 0)
 		return (S_ERROR);
 
-	DBG_CALL(Dbg_map_pipe(sgp, sec_name, index));
+	DBG_CALL(Dbg_map_pipe(ofl->ofl_lml, sgp, sec_name, index));
 
-	if ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+	if ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 		/* LINTED */
 		if (tok != (Token)S_ERROR)
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSCOL),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
+			    EC_XWORD(Line_num));
 		return (S_ERROR);
 	}
 
@@ -1111,18 +1146,20 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 	/*
 	 * Get the shared object descriptor string.
 	 */
-	while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 		/* LINTED */
 		if (tok == (Token)S_ERROR)
 			return (S_ERROR);
 		if (tok == TK_EOF) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_PREMEOF),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_PREMEOF), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 		if ((tok != TK_STRING) && (tok != TK_EQUAL)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSO),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSO), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -1131,12 +1168,12 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * definition.
 		 */
 		if (tok == TK_EQUAL) {
-			if ((tok = gettoken(mapfile)) != TK_STRING) {
+			if ((tok = gettoken(ofl, mapfile)) != TK_STRING) {
 				/* LINTED */
 				if (tok == (Token)S_ERROR)
 					return (S_ERROR);
 				else {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_EXPSO), mapfile,
 					    EC_XWORD(Line_num));
 					return (S_ERROR);
@@ -1145,7 +1182,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			switch (dolkey) {
 			case MD_NEEDED:
 				if (sdf->sdf_flags & FLG_SDF_SONAME) {
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_MULSONAME),
 					    mapfile, EC_XWORD(Line_num), name,
 					    sdf->sdf_soname, Start_tok);
@@ -1173,7 +1210,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 				if ((sdf->sdf_flags & (FLG_SDF_SPECVER |
 				    FLG_SDF_ADDVER)) == (FLG_SDF_SPECVER |
 				    FLG_SDF_ADDVER)) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_INCOMFLG),
 					    mapfile, EC_XWORD(Line_num),
 					    sdf->sdf_name);
@@ -1189,8 +1226,9 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 					return (S_ERROR);
 				break;
 			case MD_NONE:
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNEXTOK),
-				    mapfile, EC_XWORD(Line_num), '=');
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNEXTOK), mapfile,
+					EC_XWORD(Line_num), '=');
 				return (S_ERROR);
 			}
 			dolkey = MD_NONE;
@@ -1203,8 +1241,9 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 		 */
 		if (*Start_tok == '$') {
 			if (dolkey != MD_NONE) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNEXTOK),
-				    mapfile, EC_XWORD(Line_num), '$');
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNEXTOK), mapfile,
+				    EC_XWORD(Line_num), '$');
 				return (S_ERROR);
 			}
 			Start_tok++;
@@ -1219,8 +1258,9 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			    MSG_ORIG(MSG_MAP_ADDVERS)) == 0)
 				dolkey = MD_ADDVERS;
 			else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKSOTYP),
-				    mapfile, EC_XWORD(Line_num), Start_tok);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNKSOTYP), mapfile,
+				    EC_XWORD(Line_num), Start_tok);
 				return (S_ERROR);
 			}
 			continue;
@@ -1241,7 +1281,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			return (S_ERROR);
 	}
 
-	DBG_CALL(Dbg_map_dash(name, sdf));
+	DBG_CALL(Dbg_map_dash(ofl->ofl_lml, name, sdf));
 	return (1);
 }
 
@@ -1311,7 +1351,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 	 * serves to initialize the output version descriptor count.
 	 */
 	if (ofl->ofl_vercnt == 0) {
-		if (vers_base(ofl) == (Ver_desc *)S_ERROR)
+		if (ld_vers_base(ofl) == (Ver_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1328,8 +1368,8 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 */
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((vdp = vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
-			if ((vdp = vers_desc(name, hash,
+		if ((vdp = ld_vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
+			if ((vdp = ld_vers_desc(name, hash,
 			    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR)
 				return (S_ERROR);
 		}
@@ -1356,7 +1396,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 	/*
 	 * Scan the mapfile entry picking out scoping and symbol definitions.
 	 */
-	while ((tok = gettoken(mapfile)) != TK_RIGHTBKT) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_RIGHTBKT) {
 		Sym_desc * 	sdp;
 		Word		shndx = SHN_UNDEF;
 		uchar_t 	type = STT_NOTYPE;
@@ -1367,8 +1407,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		uint_t		filter = 0, dftflag;
 
 		if ((tok != TK_STRING) && (tok != TK_COLON)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSYM_2),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSYM_2), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -1378,7 +1419,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 
 		if ((tok != TK_COLON) &&
 		    /* LINTED */
-		    (tok = gettoken(mapfile)) == (Token)S_ERROR)
+		    (tok = gettoken(ofl, mapfile)) == (Token)S_ERROR)
 			return (S_ERROR);
 
 		/*
@@ -1416,8 +1457,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			    == 0)
 				scope = FLG_SCOPE_ELIM;
 			else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKSYMSCO),
-				    mapfile, EC_XWORD(Line_num), _name);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNKSYMSCO), mapfile,
+				    EC_XWORD(Line_num), _name);
 				return (S_ERROR);
 			}
 			continue;
@@ -1429,8 +1471,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * alignment specified and then fall through to process
 			 * the entire symbols information.
 			 */
-			while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
-
+			while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 				/*
 				 * If we had previously seen a filter or
 				 * auxiliary filter requirement, the next string
@@ -1438,7 +1479,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 */
 				if (filter) {
 					if (filtee) {
-					    eprintf(ERR_FATAL,
+					    eprintf(ofl->ofl_lml, ERR_FATAL,
 						MSG_INTL(MSG_MAP_MULTFILTEE),
 						mapfile, EC_XWORD(Line_num),
 						_name);
@@ -1464,7 +1505,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					if ((number = (Lword)STRTOADDR(
 					    &Start_tok[1], &end_tok, 0)) ==
 					    XWORD_MAX) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_SEGADDR),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok,
@@ -1474,7 +1515,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 
 					if (end_tok !=
 					    strchr(Start_tok, '\0')) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_SEGADDR),
 						    mapfile, EC_XWORD(Line_num),
 						    Start_tok,
@@ -1485,7 +1526,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					switch (*Start_tok) {
 					case 'v':
 					    if (value) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_MOREONCE),
 						    mapfile, EC_XWORD(Line_num),
 						    MSG_INTL(MSG_MAP_SYMVAL));
@@ -1496,7 +1537,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    break;
 					case 's':
 					    if (size) {
-						eprintf(ERR_FATAL,
+						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_MOREONCE),
 						    mapfile, EC_XWORD(Line_num),
 						    MSG_INTL(MSG_MAP_SYMSIZE));
@@ -1553,7 +1594,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					continue;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_UNKSYMDEF),
 					    mapfile, EC_XWORD(Line_num),
 					    Start_tok);
@@ -1592,8 +1633,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 */
 			/* LINTED */
 			hash = (Word)elf_hash(_name);
-			DBG_CALL(Dbg_map_version(name, _name, scope));
-			if ((sdp = sym_find(_name, hash, &where,
+			DBG_CALL(Dbg_map_version(ofl->ofl_lml, name, _name,
+			    scope));
+			if ((sdp = ld_sym_find(_name, hash, &where,
 			    ofl)) == NULL) {
 				if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
 					return (S_ERROR);
@@ -1611,7 +1653,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				sym->st_size = size;
 				sym->st_info = ELF_ST_INFO(STB_GLOBAL, type);
 
-				if ((sdp = sym_enter(_name, sym, hash, ifl,
+				if ((sdp = ld_sym_enter(_name, sym, hash, ifl,
 				    ofl, 0, shndx, sym_flags, sym_flags1,
 				    &where)) == (Sym_desc *)S_ERROR)
 					return (S_ERROR);
@@ -1683,7 +1725,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					conflict = 7;
 
 				if (conflict) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_SYMDEF), mapfile,
 					    EC_XWORD(Line_num), demangle(_name),
 					    sdp->sd_file->ifl_name);
@@ -1737,7 +1779,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 */
 			if (type != STT_NOTYPE)
 				ofl->ofl_objscnt++;
-			DBG_CALL(Dbg_map_symbol(&def_ehdr, sdp));
+			DBG_CALL(Dbg_map_symbol(ofl, sdp));
 
 			/*
 			 * If this symbol has an associated filtee, record the
@@ -1746,8 +1788,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * information with the necessary .dynamic entry.
 			 */
 			if (filter && (filtee == 0)) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_NOFILTER),
-				    mapfile, EC_XWORD(Line_num), _name);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_NOFILTER), mapfile,
+				    EC_XWORD(Line_num), _name);
 				return (S_ERROR);
 			}
 
@@ -1801,8 +1844,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			break;
 
 		default:
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSCOL),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_EXPSCOL), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 	}
@@ -1811,22 +1855,24 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 	 * Determine if any version references are provided after the close
 	 * bracket.
 	 */
-	while ((tok = gettoken(mapfile)) != TK_SEMICOLON) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_SEMICOLON) {
 		Ver_desc	*_vdp;
 		char		*_name;
 
 		if (tok != TK_STRING) {
 			/* LINTED */
 			if (tok != (Token)S_ERROR)
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPVERS),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_EXPVERS), mapfile,
+				    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
 		name = Start_tok;
 		if (vdp->vd_ndx == VER_NDX_GLOBAL) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_UNEXDEP),
-			    mapfile, EC_XWORD(Line_num), name);
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_MAP_UNEXDEP), mapfile,
+			    EC_XWORD(Line_num), name);
 			continue;
 		}
 
@@ -1836,12 +1882,12 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 */
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((_vdp = vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
+		if ((_vdp = ld_vers_find(name, hash, &ofl->ofl_verdesc)) == 0) {
 			if ((_name = libld_malloc(strlen(name) + 1)) == 0)
 				return (S_ERROR);
 			(void) strcpy(_name, name);
 
-			if ((_vdp = vers_desc(_name, hash,
+			if ((_vdp = ld_vers_desc(_name, hash,
 			    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR)
 				return (S_ERROR);
 		}
@@ -1852,7 +1898,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		 * first reference (used for error disgnostics if undefined
 		 * version dependencies remain).
 		 */
-		if (vers_find(name, hash, &vdp->vd_deps) == 0)
+		if (ld_vers_find(name, hash, &vdp->vd_deps) == 0)
 			if (list_appendc(&vdp->vd_deps, _vdp) == 0)
 				return (S_ERROR);
 
@@ -1866,7 +1912,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
  * Sort the segment list by increasing virtual address.
  */
 uintptr_t
-sort_seg_list(Ofl_desc *ofl)
+ld_sort_seg_list(Ofl_desc *ofl)
 {
 	List 		seg1, seg2;
 	Listnode	*lnp1, *lnp2, *lnp3;
@@ -1890,7 +1936,7 @@ sort_seg_list(Ofl_desc *ofl)
 	 * Add the loadable segments to another list in sorted order.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_orig(sgp1));
+		DBG_CALL(Dbg_map_sort_orig(ofl->ofl_lml, sgp1));
 		if (sgp1->sg_phdr.p_type != PT_LOAD)
 			continue;
 		if (!(sgp1->sg_flags & FLG_SG_VADDR) ||
@@ -1936,7 +1982,7 @@ sort_seg_list(Ofl_desc *ofl)
 				    sgp2->sg_phdr.p_vaddr) {
 					lnp3 = lnp2;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_SEGSAME),
 					    sgp1->sg_name, sgp2->sg_name);
 					return (S_ERROR);
@@ -1974,7 +2020,7 @@ sort_seg_list(Ofl_desc *ofl)
 	 * segment/section ordering information if present.
 	 */
 	for (LIST_TRAVERSE(&seg1, lnp1, sgp1)) {
-		DBG_CALL(Dbg_map_sort_fini(sgp1));
+		DBG_CALL(Dbg_map_sort_fini(ofl->ofl_lml, sgp1));
 		if (list_appendc(&ofl->ofl_segs, sgp1) == 0)
 			return (S_ERROR);
 	}
@@ -1987,7 +2033,7 @@ sort_seg_list(Ofl_desc *ofl)
  * Parse the mapfile.
  */
 uintptr_t
-map_parse(const char *mapfile, Ofl_desc *ofl)
+ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 {
 	struct stat	stat_buf;	/* stat of mapfile */
 	int		mapfile_fd;	/* descriptor for mapfile */
@@ -2004,15 +2050,15 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 	static	int	num_stack = 0;	/* number of stack segment */
 	int		err;
 
-	DBG_CALL(Dbg_map_parse(mapfile));
+	DBG_CALL(Dbg_map_parse(ofl->ofl_lml, mapfile));
 
 	/*
 	 * Determine if we're dealing with a file or a directory.
 	 */
 	if (stat(mapfile, &stat_buf) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_STAT), mapfile,
-		    strerror(err));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_STAT),
+		    mapfile, strerror(err));
 		return (S_ERROR);
 	}
 	if (S_ISDIR(stat_buf.st_mode)) {
@@ -2037,13 +2083,14 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 				continue;
 			(void) snprintf(path, PATH_MAX, MSG_ORIG(MSG_STR_PATH),
 			    mapfile, denp->d_name);
-			if (map_parse(path, ofl) == S_ERROR)
+			if (ld_map_parse(path, ofl) == S_ERROR)
 				return (S_ERROR);
 		}
 		(void) closedir(dirp);
 		return (1);
 	} else if (!S_ISREG(stat_buf.st_mode)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG), mapfile);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG),
+		    mapfile);
 		return (S_ERROR);
 	}
 
@@ -2054,15 +2101,15 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		return (S_ERROR);
 	if ((mapfile_fd = open(mapfile, O_RDONLY)) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), mapfile,
-		    strerror(err));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+		    mapfile, strerror(err));
 		return (S_ERROR);
 	}
 
 	if (read(mapfile_fd, Mapspace, stat_buf.st_size) != stat_buf.st_size) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_READ), mapfile,
-		    strerror(err));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_READ),
+		    mapfile, strerror(err));
 		return (S_ERROR);
 	}
 	Mapspace[stat_buf.st_size] = '\0';
@@ -2076,7 +2123,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 	/*
 	 * We now parse the mapfile until the gettoken routine returns EOF.
 	 */
-	while ((tok = gettoken(mapfile)) != TK_EOF) {
+	while ((tok = gettoken(ofl, mapfile)) != TK_EOF) {
 		int	ndx = -1;
 
 		/*
@@ -2098,8 +2145,9 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		if (tok != TK_STRING) {
 			/* LINTED */
 			if (tok != (Token)S_ERROR)
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPSEGNAM),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_EXPSEGNAM), mapfile,
+				    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -2115,7 +2163,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		 * and `{' characters do not involve any segment manipulation so
 		 * we handle them first.
 		 */
-		if ((tok = gettoken(mapfile)) == TK_DASH) {
+		if ((tok = gettoken(ofl, mapfile)) == TK_DASH) {
 			if (map_dash(mapfile, name, ofl) == S_ERROR)
 				return (S_ERROR);
 			continue;
@@ -2148,11 +2196,12 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		 */
 		if (tok == TK_PIPE) {
 			if (sgp1 == NULL) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SECINSEG),
-				    mapfile, EC_XWORD(Line_num), name);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SECINSEG), mapfile,
+				    EC_XWORD(Line_num), name);
 				return (S_ERROR);
 			} else {
-				if (map_pipe(mapfile, sgp1) == S_ERROR)
+				if (map_pipe(ofl, mapfile, sgp1) == S_ERROR)
 					return (S_ERROR);
 				continue;
 			}
@@ -2176,8 +2225,9 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		if ((strcmp(sgp1->sg_name, MSG_ORIG(MSG_STR_INTERP)) == 0) ||
 		    (strcmp(sgp1->sg_name, MSG_ORIG(MSG_STR_LD_DYNAMIC)) ==
 		    0)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGRESV),
-			    mapfile, EC_XWORD(Line_num));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MAP_SEGRESV), mapfile,
+			    EC_XWORD(Line_num));
 			return (S_ERROR);
 		}
 
@@ -2190,20 +2240,22 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 				if (map_cap(mapfile, CA_SUNW_HW_1,
 				    ofl) == S_ERROR)
 					return (S_ERROR);
-				Dbg_cap_mapfile(CA_SUNW_HW_1, ofl->ofl_hwcap_1,
-				    M_MACH);
+				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
+				    CA_SUNW_HW_1, ofl->ofl_hwcap_1, M_MACH));
+
 			} else if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_SFCAP_1)) == 0) {
 				if (map_cap(mapfile, CA_SUNW_SF_1,
 				    ofl) == S_ERROR)
 					return (S_ERROR);
-				Dbg_cap_mapfile(CA_SUNW_SF_1, ofl->ofl_sfcap_1,
-				    M_MACH);
+				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
+				    CA_SUNW_SF_1, ofl->ofl_sfcap_1, M_MACH));
+
 			} else {
 				if (map_equal(mapfile, sgp1, ofl) == S_ERROR)
 					return (S_ERROR);
 				ofl->ofl_flags |= FLG_OF_SEGSORT;
-				DBG_CALL(Dbg_map_equal(new_segment));
+				DBG_CALL(Dbg_map_set_equal(new_segment));
 			}
 		} else if (tok == TK_COLON) {
 			/*
@@ -2212,8 +2264,9 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 			 */
 			if ((new_segment == FALSE) &&
 			    (sgp1->sg_flags & FLG_SG_EMPTY)) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_SEGEMPSEC),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGEMPSEC), mapfile,
+				    EC_XWORD(Line_num));
 				return (S_ERROR);
 			}
 
@@ -2236,19 +2289,21 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 					return (S_ERROR);
 			}
 
-			if (map_colon(mapfile, enp) == S_ERROR)
+			if (map_colon(ofl, mapfile, enp) == S_ERROR)
 				return (S_ERROR);
 			ofl->ofl_flags |= FLG_OF_SEGSORT;
-			DBG_CALL(Dbg_map_ent(new_segment, enp, ofl));
+			DBG_CALL(Dbg_map_ent(ofl->ofl_lml, new_segment,
+			    enp, ofl));
 		} else if (tok == TK_ATSIGN) {
 			if (map_atsign(mapfile, sgp1, ofl) == S_ERROR)
 				return (S_ERROR);
-			DBG_CALL(Dbg_map_atsign(new_segment));
+			DBG_CALL(Dbg_map_set_atsign(new_segment));
 		} else {
 			/* LINTED */
 			if (tok != (Token)S_ERROR) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_EXPEQU),
-				    mapfile, EC_XWORD(Line_num));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_EXPEQU), mapfile,
+				    EC_XWORD(Line_num));
 				return (S_ERROR);
 			}
 		}
@@ -2295,7 +2350,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 					 * Currently the number of sunw_stack
 					 * segment is limited to 1.
 					 */
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_MAP_NOSTACK2),
 					    mapfile, EC_XWORD(Line_num));
 					continue;
@@ -2305,8 +2360,9 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 				src_type = 9;
 				break;
 			default:
-				eprintf(ERR_FATAL, MSG_INTL(MSG_MAP_UNKSEGTYP),
-				    mapfile, EC_XWORD(Line_num),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_UNKSEGTYP), mapfile,
+				    EC_XWORD(Line_num),
 				    EC_WORD(sgp1->sg_phdr.p_type));
 				return (S_ERROR);
 			}
@@ -2351,7 +2407,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 					dst_type = 12;
 					break;
 				default:
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_MAP_UNKSEGTYP),
 					    mapfile, EC_XWORD(Line_num),
 					    EC_WORD(sgp2->sg_phdr.p_type));
@@ -2372,7 +2428,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 				lnp2 = lnp1;
 			}
 		}
-		DBG_CALL(Dbg_map_seg(ofl->ofl_e_machine, ndx, sgp1));
+		DBG_CALL(Dbg_map_seg(ofl, ndx, sgp1));
 	}
 
 	/*

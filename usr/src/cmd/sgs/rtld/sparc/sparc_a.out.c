@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
- */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	All Rights Reserved	*/
+/*
+ *	Copyright (c) 1988 AT&T
+ *	All Rights Reserved
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -40,11 +40,11 @@
 #include	<sys/mman.h>
 #include	<synch.h>
 #include	<dlfcn.h>
+#include	<debug.h>
 #include	"_a.out.h"
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"msg.h"
-#include	"debug.h"
 
 extern void	iflush_range(caddr_t, size_t);
 
@@ -66,15 +66,16 @@ extern void	iflush_range(caddr_t, size_t);
 ulong_t
 aout_bndr(caddr_t pc)
 {
-	Rt_map *	lmp, * nlmp, * llmp;
+	Rt_map		*lmp, *nlmp, *llmp;
 	struct relocation_info *rp;
 	struct nlist	*sp;
-	Sym *		sym;
+	Sym		*sym;
 	char		*name;
 	int 		rndx, entry;
 	ulong_t		symval;
 	Slookup		sl;
 	uint_t		binfo;
+	Lm_list		*lml;
 
 	/*
 	 * For compatibility with libthread (TI_VERSION 1) we track the entry
@@ -106,22 +107,23 @@ aout_bndr(caddr_t pc)
 	 * Determine the last link-map of this list, this'll be the starting
 	 * point for any tsort() processing.
 	 */
-	llmp = LIST(lmp)->lm_tail;
+	lml = LIST(lmp);
+	llmp = lml->lm_tail;
 
 	/*
 	 * Find definition for symbol.
 	 */
 	sl.sl_name = name;
 	sl.sl_cmap = lmp;
-	sl.sl_imap = LIST(lmp)->lm_head;
+	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
 	sl.sl_flags = LKUP_DEFT;
 
 	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo)) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
-		rtldexit(LIST(lmp), 1);
+		rtldexit(lml, 1);
 	}
 
 	symval = sym->st_value;
@@ -133,16 +135,15 @@ aout_bndr(caddr_t pc)
 		 * Record that this new link map is now bound to the caller.
 		 */
 		if (bind_one(lmp, nlmp, BND_REFER) == 0)
-			rtldexit(LIST(lmp), 1);
+			rtldexit(lml, 1);
 	}
 
 	/*
 	 * Print binding information and rebuild PLT entry.
 	 */
-	DBG_CALL(Dbg_bind_global(NAME(lmp),
-	    (caddr_t)(ADDR(lmp) + rp->r_address), (caddr_t)rp->r_address,
-	    (Xword)(-1), PLT_T_NONE, NAME(nlmp), (caddr_t)symval,
-	    (caddr_t)sym->st_value, name, binfo));
+	DBG_CALL(Dbg_bind_global(lmp, (Addr)(ADDR(lmp) + rp->r_address),
+	    (Off)rp->r_address, (Xword)(-1), PLT_T_NONE, nlmp,
+	    (Addr)symval, sym->st_value, name, binfo));
 
 	if (!(rtld_flags & RT_FL_NOBIND))
 		aout_plt_write((caddr_t)(ADDR(lmp) + rp->r_address), symval);
@@ -169,7 +170,7 @@ aout_bndr(caddr_t pc)
 	 */
 	if (entry) {
 		is_dep_init(nlmp, lmp);
-		leave(LIST(lmp));
+		leave(lml);
 	}
 
 	return (symval);
@@ -220,8 +221,9 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 	Sym *		sym;		/* symbol definition */
 	int		textrel = 0, ret = 1;
 	Alist		*bound = 0;
+	Lm_list		*lml = LIST(lmp);
 
-	DBG_CALL(Dbg_reloc_run(NAME(lmp), SHT_RELA, plt, DBG_REL_START));
+	DBG_CALL(Dbg_reloc_run(lmp, SHT_RELA, plt, DBG_REL_START));
 
 	/*
 	 * If we've been called upon to promote an RTLD_LAZY object to an
@@ -287,13 +289,13 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			sl.sl_flags = (LKUP_DEFT | LKUP_ALLCNTLIST);
 
 			if ((sym = aout_lookup_sym(&sl, &_lmp, &binfo)) == 0) {
-				if (LIST(lmp)->lm_flags & LML_FLG_TRC_WARN) {
+				if (lml->lm_flags & LML_FLG_TRC_WARN) {
 					(void)
 					    printf(MSG_INTL(MSG_LDD_SYM_NFOUND),
 					    demangle(name), NAME(lmp));
 					continue;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 					    demangle(name));
 					ret = 0;
@@ -323,10 +325,9 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			if (IS_PC_RELATIVE(rp->r_type))
 				value -= (long)ADDR(lmp);
 
-			DBG_CALL(Dbg_bind_global(NAME(lmp), (caddr_t)ra,
-			    (caddr_t)(ra - ADDR(lmp)), (Xword)(-1), PLT_T_NONE,
-			    NAME(_lmp), (caddr_t)value, (caddr_t)sym->st_value,
-			    name, binfo));
+			DBG_CALL(Dbg_bind_global(lmp, (Addr)ra,
+			    (Off)(ra - ADDR(lmp)), (Xword)(-1), PLT_T_NONE,
+			    _lmp, (Addr)value, sym->st_value, name, binfo));
 		}
 
 		/*
@@ -346,7 +347,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 		case RELOC_DISP8:
 			value += *ra & S_MASK(8);
 			if (!S_INRANGE(value, 8))
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
+			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
 				NAME(lmp), (name ? demangle(name) :
 				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 8,
 				(uint_t)ra);
@@ -368,7 +369,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 		case RELOC_DISP16:
 			value += *ra & S_MASK(16);
 			if (!S_INRANGE(value, 16))
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
+			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
 				NAME(lmp), (name ? demangle(name) :
 				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 16,
 				(uint_t)ra);
@@ -378,7 +379,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 		case RELOC_BASE22:
 			value += *ra & S_MASK(22);
 			if (!S_INRANGE(value, 22))
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
+			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
 				NAME(lmp), (name ? demangle(name) :
 				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
 				(uint_t)ra);
@@ -394,7 +395,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			value += *ra & S_MASK(22);
 			value >>= 2;
 			if (!S_INRANGE(value, 22))
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
+			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
 				NAME(lmp), (name ? demangle(name) :
 				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
 				(uint_t)ra);
@@ -414,9 +415,9 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			*(long *)ra = value;
 			break;
 		default:
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL), NAME(lmp),
-			    (name ? demangle(name) : MSG_INTL(MSG_STR_UNKNOWN)),
-			    rp->r_type);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL),
+			    NAME(lmp), (name ? demangle(name) :
+			    MSG_INTL(MSG_STR_UNKNOWN)), rp->r_type);
 			ret = 0;
 			break;
 		}

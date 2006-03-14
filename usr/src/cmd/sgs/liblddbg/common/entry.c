@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1998-1999 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,50 +33,48 @@
  * Print out a single `entry descriptor' entry.
  */
 void
-_Dbg_ent_entry(Half mach, Ent_desc *enp)
+Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 {
 	Listnode	*lnp;
 	char		*cp;
 
-	dbg_print(MSG_ORIG(MSG_ECR_NAME),
+	dbg_print(lml, MSG_ORIG(MSG_ECR_NAME),
 	    (enp->ec_name ? enp->ec_name : MSG_INTL(MSG_STR_NULL)),
-	    conv_secflg_str(mach, enp->ec_attrmask));
+	    conv_sec_flags(enp->ec_attrmask));
 
-	dbg_print(MSG_ORIG(MSG_ECR_SEGMENT),
+	dbg_print(lml, MSG_ORIG(MSG_ECR_SEGMENT),
 	    (enp->ec_segment->sg_name ? enp->ec_segment->sg_name :
-	    MSG_INTL(MSG_STR_NULL)), conv_secflg_str(mach, enp->ec_attrbits));
+	    MSG_INTL(MSG_STR_NULL)), conv_sec_flags(enp->ec_attrbits));
 
-	dbg_print(MSG_ORIG(MSG_ECR_NDX),
-	    EC_WORD(enp->ec_ndx), conv_sectyp_str(mach, enp->ec_type));
+	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX),
+	    EC_WORD(enp->ec_ndx), conv_sec_type(mach, enp->ec_type));
 
 	if (enp->ec_files.head) {
-		dbg_print(MSG_ORIG(MSG_ECR_FILES));
+		dbg_print(lml, MSG_ORIG(MSG_ECR_FILES));
 		for (LIST_TRAVERSE(&(enp->ec_files), lnp, cp))
-			dbg_print(MSG_ORIG(MSG_ECR_FILE), cp);
+			dbg_print(lml, MSG_ORIG(MSG_ECR_FILE), cp);
 	}
 }
-
 
 /*
  * Print out all `entrance descriptor' entries.
  */
 void
-Dbg_ent_print(Half mach, List *len, Boolean dmode)
+Dbg_ent_print(Lm_list *lml, Half mach, List *len, Boolean dmode)
 {
 	Listnode	*lnp;
 	Ent_desc	*enp;
 	int		ndx = 1;
 
-	if (DBG_NOTCLASS(DBG_ENTRY))
+	if (DBG_NOTCLASS(DBG_C_ENTRY))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_ECR_TITLE),
-		(dmode ? MSG_INTL(MSG_ECR_DYNAMIC) : MSG_INTL(MSG_ECR_STATIC)));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_ECR_TITLE),
+	    (dmode ? MSG_INTL(MSG_ECR_DYNAMIC) : MSG_INTL(MSG_ECR_STATIC)));
 
 	for (LIST_TRAVERSE(len, lnp, enp)) {
-		dbg_print(MSG_INTL(MSG_ECR_DESC), ndx);
-		_Dbg_ent_entry(mach, enp);
-		ndx++;
+		dbg_print(lml, MSG_INTL(MSG_ECR_DESC), ndx++);
+		Dbg_ent_entry(lml, mach, enp);
 	}
 }

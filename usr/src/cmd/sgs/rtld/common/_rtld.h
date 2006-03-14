@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@
 #include <sgs.h>
 #include <machdep.h>
 #include <rtc.h>
+#include <debug.h>
 #include <msg.h>
 #include <libc_int.h>
 
@@ -299,10 +299,9 @@ typedef struct {
 /*
  * Status flags for rtld_flags2
  */
-#define	RT_FL2_HASAUDIT	0x00000001	/* We have auditing lm_list */
+#define	RT_FL2_HASAUDIT	0x00000001	/* auditing lm_list is present */
 #define	RT_FL2_RTLDSEEN	0x00000002	/* rtldinfo has been set */
-#define	RT_FL2_UNIFPROC	0x00000004	/* we're running in libc/libthread */
-					/*	Unified environment */
+#define	RT_FL2_UNIFPROC	0x00000004	/* libc/libthread unified environment */
 #define	RT_FL2_NOMALIGN	0x00000008	/* mmap MAP_ALIGN isn't available */
 #define	RT_FL2_NOFLTCFG	0x00000010	/* disable config filter use */
 #define	RT_FL2_FLTCFG	0x00000020	/* filter config info available */
@@ -494,13 +493,13 @@ extern int		alist_delete(Alist *, const void *, Aliste *);
 extern int		alist_test(Alist **, void *, size_t, int);
 extern int		append_alias(Rt_map *, const char *, int *);
 extern int		analyze_lmc(Lm_list *, Aliste, Rt_map *);
-extern Am_ret		anon_map(caddr_t *, size_t, int, int);
+extern Am_ret		anon_map(Lm_list *, caddr_t *, size_t, int, int);
 extern Fct		*are_u_this(Rej_desc *, int, struct stat *,
 			    const char *);
 extern void		atexit_fini(void);
 extern int		bind_one(Rt_map *, Rt_map *, uint_t);
 extern int		bufprint(Prfbuf *, const char *, ...);
-extern void		call_array(Addr *, uint_t, Rt_map *, uint_t);
+extern void		call_array(Addr *, uint_t, Rt_map *, Word);
 extern void		call_fini(Lm_list *, Rt_map **);
 extern void		call_init(Rt_map **, int);
 extern int		callable(Rt_map *, Rt_map *, Grp_hdl *);
@@ -508,8 +507,8 @@ extern Rt_map		*_caller(caddr_t, int);
 extern caddr_t		caller(void);
 extern void		*calloc(size_t, size_t);
 extern void		cap_assign(Cap *, Rt_map *);
-extern const char	*_conv_reloc_type_str(uint_t rel);
-extern uint_t		dbg_setup(const char *);
+extern const char	*_conv_reloc_type(uint_t rel);
+extern uintptr_t	dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);
 extern int		dlclose_intn(Grp_hdl *, Rt_map *);
 extern int		dlclose_core(Grp_hdl *, Rt_map *);
@@ -521,11 +520,11 @@ extern Grp_hdl		*dlmopen_intn(Lm_list *, const char *, int, Rt_map *,
 extern size_t		doprf(const char *, va_list, Prfbuf *);
 extern int		dowrite(Prfbuf *);
 extern void		dz_init(int);
-extern caddr_t		dz_map(caddr_t, size_t, int, int);
+extern caddr_t		dz_map(Lm_list *, caddr_t, size_t, int, int);
 extern int		elf_config(Rt_map *, int);
 extern int		elf_mach_flags_check(Rej_desc *, Ehdr *);
 extern Rtc_obj		*elf_config_ent(const char *, Word, int, const char **);
-extern Pnode		*elf_config_flt(const char *, const char *);
+extern Pnode		*elf_config_flt(Lm_list *, const char *, const char *);
 extern ulong_t		elf_hash(const char *);
 extern void 		elf_reloc_bad(Rt_map *, void *, uchar_t, ulong_t,
 			    ulong_t);
@@ -534,7 +533,6 @@ extern ulong_t		elf_reloc_relative(ulong_t, ulong_t, ulong_t,
 extern ulong_t		elf_reloc_relacount(ulong_t, ulong_t,
 			    ulong_t, ulong_t);
 extern int		enter(void);
-extern void		eprintf(Error, const char *, ...);
 extern uint_t		expand(char **, size_t *, char **, uint_t, uint_t,
 			    Rt_map *);
 extern Pnode		*expand_paths(Rt_map *, const char *, uint_t, uint_t);
@@ -579,10 +577,10 @@ extern Rt_map		*load_path(Lm_list *, Aliste, const char *, Rt_map *,
 extern Rt_map		*load_one(Lm_list *, Aliste, Pnode *, Rt_map *, int,
 			    uint_t, Grp_hdl **);
 extern const char	*load_trace(Lm_list *, const char *, Rt_map *);
-extern caddr_t		nu_map(caddr_t, size_t, int, int);
+extern caddr_t		nu_map(Lm_list *, caddr_t, size_t, int, int);
 extern void		*malloc(size_t);
 extern void		move_data(Rt_map *);
-extern int		pr_open(void);
+extern int		pr_open(Lm_list *);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
@@ -606,9 +604,9 @@ extern int		rt_bind_clear(int);
 extern int		rt_mutex_lock(Rt_lock *);
 extern int		rt_mutex_unlock(Rt_lock *);
 extern thread_t		rt_thr_self(void);
-extern void		rtld_db_dlactivity(void);
-extern void		rtld_db_preinit(void);
-extern void		rtld_db_postinit(void);
+extern void		rtld_db_dlactivity(Lm_list *);
+extern void		rtld_db_preinit(Lm_list *);
+extern void		rtld_db_postinit(Lm_list *);
 extern void		rtldexit(Lm_list *, int);
 extern int		rtld_getopt(char **, char ***, auxv_t **, Word *,
 			    Word *, int);

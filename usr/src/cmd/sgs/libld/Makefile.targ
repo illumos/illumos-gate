@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,37 +18,52 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-
-pics64/%.o:	../common/%.c
-		$(COMPILE.c) -o $@ -D_ELF64 $<
-		$(POST_PROCESS_O)
-
-pics64/%.o:	./%.c
-		$(COMPILE.c) -o $@ -D_ELF64 $<
-		$(POST_PROCESS_O)
 
 pics/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics64/%.o pics/%.o: \
-		$(SGSTOOLS)/common/%.c
+pics/%32.o:	../common/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
+		$(POST_PROCESS_O)
+
+pics/%64.o:	../common/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
+		$(POST_PROCESS_O)
+
+pics/%32.o:	%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
+		$(POST_PROCESS_O)
+
+pics/%64.o:	%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
+		$(POST_PROCESS_O)
+
+pics/%.o:	$(SGSTOOLS)/common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics64/%.o pics/%.o: \
-		$(VAR_AVLDIR)/%.c
+pics/%.o:	$(VAR_AVLDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics64/elfcap.o pics/elfcap.o: \
-		$(ELFCAP)/elfcap.c
-		$(COMPILE.c) -DCAP_LOWERCASE -o $@ $(ELFCAP)/elfcap.c
+#pics/%32.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
+#		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
+#		$(POST_PROCESS_O)
+#
+#pics/%64.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
+#		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
+#		$(POST_PROCESS_O)
+
+pics/elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o  $@ -DCAP_LOWERCASE $(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
 $(DYNLIB):	$(MAPFILES)
@@ -59,6 +73,11 @@ $(LIBLINKS):
 
 delete:
 		$(RM) $(DYNLIB)
+
+.PARALLEL:	$(LINTOUT32) $(LINTOUT64) $(LINTLIB32) $(LINTLIB64)
+
+lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
+		    .WAIT $(SGSLINTOUT)
 
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).
@@ -79,7 +98,7 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 
 catalog:	$(BLTMESG)
 
-chkmsg:		$(LIBSRCS)
+chkmsg:		$(LIBSRCS) $(CHKSRCS)
 		sh $(CHKMSG) $(CHKMSGFLAGS) $(LIBSRCS) $(CHKSRCS)
 
 $(BLTDEFS) + \
@@ -88,5 +107,3 @@ $(BLTDATA):	$(SGSMSGTARG)
 
 $(BLTMESG):	$(SGSMSGALL)
 		$(SGSMSG) $(SGSMSGFLAGS1) $(SGSMSGALL)
-
-lint:		$(LINTLIB32) $(LINTOUT32) $(SGSLINTOUT)

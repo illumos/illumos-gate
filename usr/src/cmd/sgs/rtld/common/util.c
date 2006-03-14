@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,13 +45,12 @@
 #include	<dlfcn.h>
 #include	<unistd.h>
 #include	<stdlib.h>
-#include	<signal.h>
 #include	<sys/auxv.h>
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
-#include	"conv.h"
 #include	"msg.h"
-#include	"debug.h"
 
 static int ld_flags_env(const char *, Word *, Word *, uint_t, int);
 
@@ -71,10 +69,10 @@ static int ld_flags_env(const char *, Word *, Word *, uint_t, int);
  * Null function used as place where a debugger can set a breakpoint.
  */
 void
-rtld_db_dlactivity(void)
+rtld_db_dlactivity(Lm_list *lml)
 {
-	DBG_CALL(Dbg_util_dbnotify(r_debug.rtd_rdebug.r_rdevent,
-		r_debug.rtd_rdebug.r_state));
+	DBG_CALL(Dbg_util_dbnotify(lml, r_debug.rtd_rdebug.r_rdevent,
+	    r_debug.rtd_rdebug.r_state));
 }
 
 /*
@@ -82,24 +80,22 @@ rtld_db_dlactivity(void)
  * processing breakpoint.
  */
 void
-rtld_db_preinit(void)
+rtld_db_preinit(Lm_list *lml)
 {
-	DBG_CALL(Dbg_util_dbnotify(r_debug.rtd_rdebug.r_rdevent,
-		r_debug.rtd_rdebug.r_state));
+	DBG_CALL(Dbg_util_dbnotify(lml, r_debug.rtd_rdebug.r_rdevent,
+	    r_debug.rtd_rdebug.r_state));
 }
-
 
 /*
  * Null function used as place where debugger can set a post .init
  * processing breakpoint.
  */
 void
-rtld_db_postinit(void)
+rtld_db_postinit(Lm_list *lml)
 {
-	DBG_CALL(Dbg_util_dbnotify(r_debug.rtd_rdebug.r_rdevent,
-		r_debug.rtd_rdebug.r_state));
+	DBG_CALL(Dbg_util_dbnotify(lml, r_debug.rtd_rdebug.r_rdevent,
+	    r_debug.rtd_rdebug.r_state));
 }
-
 
 /*
  * Debugger Event Notification
@@ -193,7 +189,7 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
 	 */
 	r_debug.rtd_rdebug.r_state = state;
 	r_debug.rtd_rdebug.r_rdevent = event;
-	fptr();
+	fptr(lml);
 	r_debug.rtd_rdebug.r_rdevent = RD_NONE;
 }
 
@@ -513,7 +509,7 @@ is_dep_init(Rt_map * dlmp, Rt_map * clmp)
 
 	if ((FLAGS(dlmp) & (FLG_RT_RELOCED | FLG_RT_INITCALL)) ==
 	    (FLG_RT_RELOCED | FLG_RT_INITCALL)) {
-		DBG_CALL(Dbg_util_no_init(NAME(dlmp)));
+		DBG_CALL(Dbg_util_no_init(dlmp));
 		return;
 	}
 
@@ -563,7 +559,7 @@ is_dep_ready(Rt_map * dlmp, Rt_map * clmp, int what)
 	    ((tid = rt_thr_self()) != 0) && (THREADID(dlmp) != tid)) {
 		while ((FLAGS(dlmp) & FLG_RT_INITDONE) == 0) {
 			FLAGS1(dlmp) |= FL1_RT_INITWAIT;
-			DBG_CALL(Dbg_util_wait(what, NAME(clmp), NAME(dlmp)));
+			DBG_CALL(Dbg_util_wait(clmp, dlmp, what));
 			(void) rt_cond_wait(CONDVAR(dlmp), &rtldlock);
 		}
 	}
@@ -573,9 +569,9 @@ is_dep_ready(Rt_map * dlmp, Rt_map * clmp, int what)
  * Execute .{preinit|init|fini}array sections
  */
 void
-call_array(Addr * array, uint_t arraysz, Rt_map * lmp, uint_t shtype)
+call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 {
-	int	start, stop, incr, i;
+	int	start, stop, incr, ndx;
 	uint_t	arraycnt = (uint_t)(arraysz / sizeof (Addr));
 
 	if (array == NULL)
@@ -597,13 +593,11 @@ call_array(Addr * array, uint_t arraysz, Rt_map * lmp, uint_t shtype)
 	/*
 	 * Call the .*array[] entries
 	 */
-	for (i = start; i != stop; i += incr) {
-		void (*	fptr)();
+	for (ndx = start; ndx != stop; ndx += incr) {
+		void (*	fptr)() = (void(*)())array[ndx];
 
-		DBG_CALL(Dbg_util_call_array(NAME(lmp), (void *)array[i], i,
-		    shtype));
+		DBG_CALL(Dbg_util_call_array(lmp, (void *)fptr, ndx, shtype));
 
-		fptr = (void(*)())array[i];
 		leave(LIST(lmp));
 		(*fptr)();
 		(void) enter();
@@ -685,7 +679,7 @@ call_init(Rt_map ** tobj, int flag)
 					continue;
 				is_dep_ready(bdp->b_depend, lmp, DBG_WAIT_INIT);
 			}
-			DBG_CALL(Dbg_util_call_init(NAME(lmp), flag));
+			DBG_CALL(Dbg_util_call_init(lmp, flag));
 		}
 
 		if (iptr) {
@@ -698,7 +692,7 @@ call_init(Rt_map ** tobj, int flag)
 		    SHT_INIT_ARRAY);
 
 		if (INITARRAY(lmp) || iptr)
-			DBG_CALL(Dbg_util_call_init(NAME(lmp), DBG_INIT_DONE));
+			DBG_CALL(Dbg_util_call_init(lmp, DBG_INIT_DONE));
 
 		/*
 		 * Set the initdone flag regardless of whether this object
@@ -714,7 +708,7 @@ call_init(Rt_map ** tobj, int flag)
 		 * Wake anyone up who might be waiting on this .init.
 		 */
 		if (FLAGS1(lmp) & FL1_RT_INITWAIT) {
-			DBG_CALL(Dbg_util_broadcast(NAME(lmp)));
+			DBG_CALL(Dbg_util_broadcast(lmp));
 			(void) rt_cond_broadcast(CONDVAR(lmp));
 			FLAGS1(lmp) &= ~FL1_RT_INITWAIT;
 		}
@@ -778,11 +772,11 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 				 * calling any .fini.
 				 */
 				is_dep_ready(lmp, lmp, DBG_WAIT_FINI);
-				DBG_CALL(Dbg_util_call_fini(NAME(lmp)));
+				DBG_CALL(Dbg_util_call_fini(lmp));
 			}
 
-			call_array(FINIARRAY(lmp), FINIARRAYSZ(lmp),
-				lmp, SHT_FINI_ARRAY);
+			call_array(FINIARRAY(lmp), FINIARRAYSZ(lmp), lmp,
+			    SHT_FINI_ARRAY);
 
 			if (fptr) {
 				leave(LIST(lmp));
@@ -828,8 +822,8 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			}
 		}
 	}
-	DBG_CALL(Dbg_bind_plt_summary(M_MACH, pltcnt21d, pltcnt24d,
-		pltcntu32, pltcntu44, pltcntfull, pltcntfar));
+	DBG_CALL(Dbg_bind_plt_summary(lml, M_MACH, pltcnt21d, pltcnt24d,
+	    pltcntu32, pltcntu44, pltcntfull, pltcntfar));
 
 	free(tobj);
 }
@@ -911,8 +905,6 @@ atexit_fini()
 	lml = &lml_rtld;
 	lml->lm_flags |= LML_FLG_ATEXIT;
 	lmp = (Rt_map *)lml->lm_head;
-
-	dbg_mask = 0;
 
 	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != 0) &&
 	    (tobj != (Rt_map **)S_ERROR))
@@ -2694,9 +2686,9 @@ printf(const char *format, ...)
 
 static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = 0;
 
-/*PRINTFLIKE2*/
+/*PRINTFLIKE3*/
 void
-eprintf(Error error, const char *format, ...)
+eprintf(Lm_list *lml, Error error, const char *format, ...)
 {
 	va_list		args;
 	int		overflow = 0;
@@ -2805,7 +2797,7 @@ eprintf(Error error, const char *format, ...)
 		(void) dowrite(&prf);
 	}
 
-	DBG_CALL(Dbg_util_str(nextptr));
+	DBG_CALL(Dbg_util_str(lml, nextptr));
 	va_end(args);
 
 	/*
@@ -2828,7 +2820,7 @@ eprintf(Error error, const char *format, ...)
 				    MSG_STR_NL_SIZE);
 			}
 		}
-		DBG_CALL(Dbg_util_str(str));
+		DBG_CALL(Dbg_util_str(lml, str));
 
 		lock = 0;
 		nextptr = errbuf + ERRSIZE;
@@ -2944,7 +2936,7 @@ dz_init(int fd)
  *	 on the current OS.
  */
 Am_ret
-anon_map(caddr_t *addr, size_t len, int prot, int flags)
+anon_map(Lm_list *lml, caddr_t *addr, size_t len, int prot, int flags)
 {
 #if defined(MAP_ANON)
 	static int	noanon = 0;
@@ -2959,7 +2951,7 @@ anon_map(caddr_t *addr, size_t len, int prot, int flags)
 
 		if ((errno != EBADF) && (errno != EINVAL)) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
 			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 			return (AM_ERROR);
 		} else
@@ -2976,13 +2968,13 @@ anon_map(caddr_t *addr, size_t len, int prot, int flags)
  * behavior for older systems.)
  */
 caddr_t
-dz_map(caddr_t addr, size_t len, int prot, int flags)
+dz_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
 {
 	caddr_t	va;
 	int	err;
 	Am_ret	amret;
 
-	amret = anon_map(&addr, len, prot, flags);
+	amret = anon_map(lml, &addr, len, prot, flags);
 
 	if (amret == AM_OK)
 		return (addr);
@@ -2995,7 +2987,7 @@ dz_map(caddr_t addr, size_t len, int prot, int flags)
 		if ((dz_fd = open(MSG_ORIG(MSG_PTH_DEVZERO),
 		    O_RDONLY)) == FD_UNAVAIL) {
 			err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 			return (MAP_FAILED);
 		}
@@ -3003,7 +2995,7 @@ dz_map(caddr_t addr, size_t len, int prot, int flags)
 
 	if ((va = mmap(addr, len, prot, flags, dz_fd, 0)) == MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
 		    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 	}
 	return (va);
@@ -3012,7 +3004,7 @@ dz_map(caddr_t addr, size_t len, int prot, int flags)
 static int	pr_fd = FD_UNAVAIL;
 
 int
-pr_open()
+pr_open(Lm_list *lml)
 {
 	char	proc[16];
 
@@ -3022,7 +3014,7 @@ pr_open()
 		if ((pr_fd = open(proc, O_RDONLY)) == FD_UNAVAIL) {
 			int	err = errno;
 
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,
 			    strerror(err));
 		}
 	}
@@ -3032,7 +3024,7 @@ pr_open()
 static int	nu_fd = FD_UNAVAIL;
 
 caddr_t
-nu_map(caddr_t addr, size_t len, int prot, int flags)
+nu_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
 {
 	caddr_t	va;
 	int	err;
@@ -3041,7 +3033,7 @@ nu_map(caddr_t addr, size_t len, int prot, int flags)
 		if ((nu_fd = open(MSG_ORIG(MSG_PTH_DEVNULL),
 		    O_RDONLY)) == FD_UNAVAIL) {
 			err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    MSG_ORIG(MSG_PTH_DEVNULL), strerror(err));
 			return (MAP_FAILED);
 		}
@@ -3050,7 +3042,7 @@ nu_map(caddr_t addr, size_t len, int prot, int flags)
 	if ((va = (caddr_t)mmap(addr, len, prot, flags, nu_fd, 0)) ==
 	    MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
 		    MSG_ORIG(MSG_PTH_DEVNULL), strerror(err));
 	}
 	return (va);
@@ -3092,7 +3084,7 @@ unused(Lm_list *lml)
 	 */
 	tracing = lml->lm_flags & (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
 
-	if ((tracing == 0) && (dbg_mask == 0))
+	if ((tracing == 0) && (DBG_ENABLED == 0))
 		return;
 
 	/*
@@ -3107,7 +3099,7 @@ unused(Lm_list *lml)
 		 * determine whether any of this objects callers haven't
 		 * referenced it.
 		 */
-		if ((tracing & LML_FLG_TRC_UNREF) || dbg_mask) {
+		if ((tracing & LML_FLG_TRC_UNREF) || DBG_ENABLED) {
 			Bnd_desc **	bdpp;
 			Aliste		off;
 
@@ -3126,15 +3118,15 @@ unused(Lm_list *lml)
 					if (tracing & LML_FLG_TRC_UNREF)
 					    (void) printf(MSG_ORIG(MSG_STR_NL));
 					else
-					    DBG_CALL(Dbg_util_nl());
+					    DBG_CALL(Dbg_util_nl(lml,
+						DBG_NL_STD));
 				}
 
 				if (tracing & LML_FLG_TRC_UNREF)
 				    (void) printf(MSG_INTL(MSG_LDD_UNREF_FMT),
 					NAME(lmp), NAME(clmp));
 				else
-				    DBG_CALL(Dbg_unused_unref(NAME(lmp),
-					NAME(clmp)));
+				    DBG_CALL(Dbg_unused_unref(lmp, NAME(clmp)));
 			}
 		}
 
@@ -3149,26 +3141,25 @@ unused(Lm_list *lml)
 			if (tracing)
 				(void) printf(MSG_ORIG(MSG_STR_NL));
 			else
-				DBG_CALL(Dbg_util_nl());
+				DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 		}
 		if (CYCGROUP(lmp)) {
 			if (tracing)
 				(void) printf(MSG_INTL(MSG_LDD_UNCYC_FMT),
 				    NAME(lmp), CYCGROUP(lmp));
 			else
-				DBG_CALL(Dbg_unused_file(NAME(lmp), 0,
+				DBG_CALL(Dbg_unused_file(lml, NAME(lmp), 0,
 				    CYCGROUP(lmp)));
 		} else {
 			if (tracing)
 				(void) printf(MSG_INTL(MSG_LDD_UNUSED_FMT),
 				    NAME(lmp));
 			else
-				DBG_CALL(Dbg_unused_file(NAME(lmp), 0, 0));
+				DBG_CALL(Dbg_unused_file(lml, NAME(lmp), 0, 0));
 		}
 	}
 
-	if (dbg_mask)
-		DBG_CALL(Dbg_util_nl());
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 }
 
 /*
@@ -3452,7 +3443,7 @@ const char *
 demangle(const char *name)
 {
 	if (rtld_flags & RT_FL_DEMANGLE)
-		return (conv_sym_dem(name));
+		return (conv_demangle_name(name));
 	else
 		return (name);
 }

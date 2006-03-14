@@ -1089,3 +1089,7 @@ Bugid   Risk Synopsis
 6380470 32-bit ld(1) incorrectly builds 64-bit relocatable objects
 6391407 Insufficient alignment of 32-bit object in archive makes ld segfault
         (libelf component only)
+6316708 LD_DEBUG should provide a means of identifying/isolating individual
+        link-map lists
+6280209 elfdump cores on memory model 0x3
+6197234 elfdump and dump don't handle 64-bit symbols correctly

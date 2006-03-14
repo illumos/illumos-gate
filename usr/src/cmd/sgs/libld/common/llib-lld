@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,35 +33,22 @@
 /*
  * Generic interface definition for usr/src/lib/libld.
  */
+uintptr_t	ld32_create_outfile(Ofl_desc *);
+uintptr_t	ld64_create_outfile(Ofl_desc *);
 
-char *		add_string(char *, char *);
-uintptr_t	create_outfile(Ofl_desc *);
-uintptr_t	ent_setup(Ofl_desc *, Xword);
-uintptr_t	finish_libs(Ofl_desc *);
-int		ld_main(int, char **);
-uintptr_t	ld_support_loadso(const char *);
-Listnode *	list_appendc(List *, const void *);
-Listnode *	list_insertc(List *, const void *, Listnode *);
-Listnode *	list_prependc(List *, const void *);
-Listnode *	list_where(List *, Word);
-uintptr_t	make_sections(Ofl_desc *);
-void		ofl_cleanup(Ofl_desc *);
-uintptr_t	open_outfile(Ofl_desc *);
-Ifl_desc *	process_open(const char *, size_t, int, Ofl_desc *,
-		    Half, Rej_desc *);
-uintptr_t	reloc_init(Ofl_desc *);
-uintptr_t	reloc_process(Ofl_desc *);
-Sdf_desc *	sdf_find(const char *, List *);
-Sdf_desc *	sdf_add(const char *, List *);
-void		sec_validate(Ofl_desc *);
-uintptr_t	sunwmove_preprocess(Ofl_desc *);
-Sym_desc *	sym_add_u(const char *, Ofl_desc *);
-Sym_desc *	sym_enter(const char *, Sym *, Word, Ifl_desc *,
-		    Ofl_desc *, Word, Word, Word, Half, avl_index_t *);
-Sym_desc *	sym_find(const char *, Word, avl_index_t *, Ofl_desc *);
-uintptr_t	sym_validate(Ofl_desc *);
-uintptr_t	update_outfile(Ofl_desc *);
-Ver_desc *	vers_base(Ofl_desc *);
-uintptr_t	vers_check_defs(Ofl_desc *);
-Ver_desc *	vers_desc(const char *, Word, List *);
-Ver_desc *	vers_find(const char *, Word, List *);
+uintptr_t	ld32_ent_setup(Ofl_desc *, Xword);
+uintptr_t	ld64_ent_setup(Ofl_desc *, Xword);
+
+int		ld32_main(int, char **);
+int		ld64_main(int, char **);
+uintptr_t	ld32_make_sections(Ofl_desc *);
+uintptr_t	ld64_make_sections(Ofl_desc *);
+
+uintptr_t	ld32_reloc_init(Ofl_desc *);
+uintptr_t	ld64_reloc_process(Ofl_desc *);
+
+uintptr_t	ld32_sym_validate(Ofl_desc *);
+uintptr_t	ld64_sym_validate(Ofl_desc *);
+
+uintptr_t	ld32_update_outfile(Ofl_desc *);
+uintptr_t	ld64_update_outfile(Ofl_desc *);

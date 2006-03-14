@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,27 +59,25 @@ static const Msg usecs[SHT_HISUNW - SHT_LOSUNW + 1] = {
 #endif
 
 const char *
-/* ARGSUSED 1 */
-conv_sectyp_str(ushort_t mach, uint_t sec)
+conv_sec_type(Half mach, Word sec)
 {
-	static char	string[STRSIZE] = { '\0' };
+	static char	string[CONV_INV_STRSIZE];
 
 	if (sec < SHT_NUM)
 		return (MSG_ORIG(secs[sec]));
 	else if ((sec >= SHT_LOSUNW) && (sec <= SHT_HISUNW))
 		return (MSG_ORIG(usecs[sec - SHT_LOSUNW]));
 	else if ((sec >= SHT_LOPROC) && (sec <= SHT_HIPROC)) {
-		if ((sec == (uint_t)SHT_SPARC_GOTDATA) &&
-		    ((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
-		    (mach == EM_SPARCV9)))
+		if ((sec == SHT_SPARC_GOTDATA) && ((mach == EM_SPARC) ||
+		    (mach == EM_SPARC32PLUS) || (mach == EM_SPARCV9)))
 			return (MSG_ORIG(MSG_SHT_SPARC_GOTDATA));
-		else if ((sec == (uint_t)SHT_AMD64_UNWIND) &&
-		    (mach == EM_AMD64))
+		else if ((sec == SHT_AMD64_UNWIND) && (mach == EM_AMD64))
 			return (MSG_ORIG(MSG_SHT_AMD64_UNWIND));
 		else
-			return (conv_invalid_str(string, STRSIZE, sec, 0));
+			return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			    sec, 0));
 	} else
-		return (conv_invalid_str(string, STRSIZE, sec, 0));
+		return (conv_invalid_val(string, CONV_INV_STRSIZE, sec, 0));
 }
 
 #define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
@@ -97,101 +94,43 @@ conv_sectyp_str(ushort_t mach, uint_t sec)
 		MSG_SHF_EXCLUDE_SIZE + \
 		MSG_SHF_ORDERED_SIZE + \
 		MSG_SHF_AMD64_LARGE_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-/* ARGSUSED 1 */
-conv_secflg_str(ushort_t mach, uint_t flags)
+conv_sec_flags(Xword flags)
 {
-	static	char	string[FLAGSZ] = { '\0' };
+	static	char	string[FLAGSZ];
+	static Val_desc vda[] = {
+		{ SHF_WRITE,		MSG_ORIG(MSG_SHF_WRITE) },
+		{ SHF_ALLOC,		MSG_ORIG(MSG_SHF_ALLOC) },
+		{ SHF_EXECINSTR,	MSG_ORIG(MSG_SHF_EXECINSTR) },
+		{ SHF_MERGE,		MSG_ORIG(MSG_SHF_MERGE) },
+		{ SHF_STRINGS,		MSG_ORIG(MSG_SHF_STRINGS) },
+		{ SHF_INFO_LINK,	MSG_ORIG(MSG_SHF_INFO_LINK) },
+		{ SHF_LINK_ORDER,	MSG_ORIG(MSG_SHF_LINK_ORDER) },
+		{ SHF_OS_NONCONFORMING,	MSG_ORIG(MSG_SHF_OS_NONCONFORMING) },
+		{ SHF_GROUP,		MSG_ORIG(MSG_SHF_GROUP) },
+		{ SHF_TLS,		MSG_ORIG(MSG_SHF_TLS) },
+		{ SHF_EXCLUDE,		MSG_ORIG(MSG_SHF_EXCLUDE) },
+		{ SHF_ORDERED,		MSG_ORIG(MSG_SHF_ORDERED) },
+		{ SHF_AMD64_LARGE,	MSG_ORIG(MSG_SHF_AMD64_LARGE) },
+		{ 0,			0 }
+	};
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
-	else {
-		uint_t	flags_handled = 0;
 
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-		if (flags & SHF_WRITE) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_WRITE));
-			flags_handled |= SHF_WRITE;
-		}
-		if (flags & SHF_ALLOC) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_ALLOC));
-			flags_handled |= SHF_ALLOC;
-		}
-		if (flags & SHF_EXECINSTR) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_EXECINSTR));
-			flags_handled |= SHF_EXECINSTR;
-		}
-		if (flags & SHF_MERGE) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_MERGE));
-			flags_handled |= SHF_MERGE;
-		}
-		if (flags & SHF_STRINGS) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_STRINGS));
-			flags_handled |= SHF_STRINGS;
-		}
-		if (flags & SHF_INFO_LINK) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_INFO_LINK));
-			flags_handled |= SHF_INFO_LINK;
-		}
-		if (flags & SHF_LINK_ORDER) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_LINK_ORDER));
-			flags_handled |= SHF_LINK_ORDER;
-		}
-		if (flags & SHF_OS_NONCONFORMING) {
-			(void) strcat(string,
-				MSG_ORIG(MSG_SHF_OS_NONCONFORMING));
-			flags_handled |= SHF_OS_NONCONFORMING;
-		}
-		if (flags & SHF_GROUP) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_GROUP));
-			flags_handled |= SHF_GROUP;
-		}
-		if (flags & SHF_TLS) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_TLS));
-			flags_handled |= SHF_TLS;
-		}
-		if (flags & SHF_EXCLUDE) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_EXCLUDE));
-			flags_handled |= SHF_EXCLUDE;
-		}
-		if (flags & SHF_ORDERED) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_ORDERED));
-			flags_handled |= SHF_ORDERED;
-		}
-		if (flags & SHF_AMD64_LARGE) {
-			(void) strcat(string, MSG_ORIG(MSG_SHF_AMD64_LARGE));
-			flags_handled |= SHF_AMD64_LARGE;
-		}
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
+	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
 
-		/*
-		 * Are there any flags that haven't been handled.
-		 */
-		if ((flags & flags_handled) != flags) {
-			char	*str;
-			size_t	len;
-
-			len = strlen(string);
-			str = string + len;
-			(void) conv_invalid_str(str, FLAGSZ - len,
-			    (flags & (~flags_handled)), 0);
-		}
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
-
-		return ((const char *)string);
-	}
+	return ((const char *)string);
 }
 
-/*
- * Need to be able to hold a 32bit signed integer.
- */
-#define	INFOSZ	128
-
 const char *
-conv_secinfo_str(uint_t info, uint_t flags)
+conv_sec_info(Word info, Xword flags)
 {
-	static	char	string[INFOSZ] = { '\0' };
+	static	char	string[CONV_INV_STRSIZE];
 
 	if (flags & SHF_ORDERED) {
 		if (info == SHN_BEFORE)
@@ -199,6 +138,6 @@ conv_secinfo_str(uint_t info, uint_t flags)
 		else if (info == SHN_AFTER)
 			return (MSG_ORIG(MSG_SHN_AFTER));
 	}
-	(void) conv_invalid_str(string, INFOSZ, info, 1);
+	(void) conv_invalid_val(string, CONV_INV_STRSIZE, info, 1);
 	return ((const char *)string);
 }

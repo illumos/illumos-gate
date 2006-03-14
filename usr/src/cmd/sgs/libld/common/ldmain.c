@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,59 +18,68 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ld -- link/editor main program
  */
+#include	<sys/types.h>
+#include	<sys/mman.h>
 #include	<string.h>
 #include	<stdio.h>
-#include	<unistd.h>
 #include	<locale.h>
 #include	<stdarg.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
 /*
- * default library search path used if one was not supplied
- * on the command line.  Note:   These strings can not
- * use MSG_ORIG() since they are modified as part of the
- * path processing.
+ * A default library search path is used if one was not supplied on the command
+ * line.  Note: these strings can not use MSG_ORIG() since they are modified as
+ * part of the path processing.
  */
-#ifdef _ELF64
+#if	defined(_ELF64)
 static char	def_Plibpath[] = "/lib/64:/usr/lib/64";
 #else
 static char	def_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
 #endif
 
 /*
+ * A default elf header provides for simplifying diagnostic processing.
+ */
+static Ehdr	def_ehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
+			    M_CLASS, M_DATA }, 0, M_MACH, EV_CURRENT };
+
+/*
  * The main program
  */
 int
-ld_main(int argc, char ** argv)
+ld_main(int argc, char **argv)
 {
 	char		*sgs_support;	/* SGS_SUPPORT environment string */
-	Ofl_desc	*ofl = &Ofl;	/* Output file descriptor */
 	Half		etype;
 	uint_t		stflags;
 	int		suplib = 0;
+	Ofl_desc	*ofl;
 
 	/*
-	 * Initialize signal handlers, and output file variables.
+	 * Initialize signal handlers, and output file variables.  Establish a
+	 * default output ELF header to satisfy diagnostic requirements.
 	 */
-	init();
-	ofl->ofl_libver = EV_CURRENT;
-	ofl->ofl_e_machine = M_MACH;
-	ofl->ofl_e_flags = 0;
+	if ((ofl = libld_calloc(1, sizeof (Ofl_desc))) == 0)
+		return (1);
+
+	ofl->ofl_dehdr = &def_ehdr;
+
+	ld_init(ofl);
 
 	/*
 	 * Build up linker version string
@@ -88,10 +96,10 @@ ld_main(int argc, char ** argv)
 	 * would have been completed and the entrance criteria and segment
 	 * descriptor lists will be complete.
 	 */
-	if (process_flags(ofl, argc, argv) == S_ERROR)
+	if (ld_process_flags(ofl, argc, argv) == S_ERROR)
 		return (1);
 	if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_FLAGS));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FLAGS));
 		return (1);
 	}
 
@@ -135,7 +143,8 @@ ld_main(int argc, char ** argv)
 		char		*lib;
 		char		*lasts;
 
-		DBG_CALL(Dbg_support_req(sgs_support, DBG_SUP_ENVIRON));
+		DBG_CALL(Dbg_support_req(ofl->ofl_lml, sgs_support,
+		    DBG_SUP_ENVIRON));
 		if ((lib = strtok_r(sgs_support, sep, &lasts)) != NULL) {
 			do {
 				if (strcmp(lib,
@@ -143,8 +152,8 @@ ld_main(int argc, char ** argv)
 					if (suplib++)
 						continue;
 				}
-				if (ld_support_loadso(lib) == S_ERROR)
-					return (ldexit());
+				if (ld_sup_loadso(ofl, lib) == S_ERROR)
+					return (ld_exit(ofl));
 
 			} while ((lib = strtok_r(NULL, sep, &lasts)) != NULL);
 		}
@@ -154,23 +163,25 @@ ld_main(int argc, char ** argv)
 		char		*lib;
 
 		for (LIST_TRAVERSE(&lib_support, lnp, lib)) {
-			DBG_CALL(Dbg_support_req(lib, DBG_SUP_CMDLINE));
-			if (ld_support_loadso(lib) == S_ERROR)
-				return (ldexit());
+			DBG_CALL(Dbg_support_req(ofl->ofl_lml, lib,
+			    DBG_SUP_CMDLINE));
+			if (ld_sup_loadso(ofl, lib) == S_ERROR)
+				return (ld_exit(ofl));
 		}
 	} else {
 		if (suplib == 0) {
-			DBG_CALL(Dbg_support_req(MSG_ORIG(MSG_FIL_LIBSTAB),
-			    DBG_SUP_DEFAULT));
-			if (ld_support_loadso(MSG_ORIG(MSG_FIL_LIBSTAB)) ==
+			DBG_CALL(Dbg_support_req(ofl->ofl_lml,
+			    MSG_ORIG(MSG_FIL_LIBSTAB), DBG_SUP_DEFAULT));
+			if (ld_sup_loadso(ofl, MSG_ORIG(MSG_FIL_LIBSTAB)) ==
 			    S_ERROR)
-				return (ldexit());
+				return (ld_exit(ofl));
 		}
 	}
 
-	DBG_CALL(Dbg_ent_print(ofl->ofl_e_machine, &ofl->ofl_ents,
-		(ofl->ofl_flags & FLG_OF_DYNAMIC)));
-	DBG_CALL(Dbg_seg_list(ofl->ofl_e_machine, &ofl->ofl_segs));
+	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
+	    &ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC)));
+	DBG_CALL(Dbg_seg_list(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
+	    &ofl->ofl_segs));
 
 	/*
 	 * The objscnt and soscnt variables were used to estimate the expected
@@ -183,8 +194,8 @@ ld_main(int argc, char ** argv)
 	/*
 	 * Determine whether we can create the file before going any further.
 	 */
-	if (open_outfile(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_open_outfile(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
 	/*
 	 * If the user didn't supply a library path supply a default.  And, if
@@ -207,8 +218,8 @@ ld_main(int argc, char ** argv)
 	/*
 	 * Argument pass two.  Input all libraries and objects.
 	 */
-	if (lib_setup(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_lib_setup(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
 	/*
 	 * Call ld_start() with the etype of our output file and the
@@ -221,27 +232,28 @@ ld_main(int argc, char ** argv)
 	else
 		etype = ET_EXEC;
 
-	lds_start(ofl->ofl_name, etype, argv[0]);
+	ld_sup_start(ofl, etype, argv[0]);
 
 	/*
 	 * Process all input files.
 	 */
-	if (process_files(ofl, argc, argv) == S_ERROR)
-		return (ldexit());
+	if (ld_process_files(ofl, argc, argv) == S_ERROR)
+		return (ld_exit(ofl));
 	if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_FILES), ofl->ofl_name);
-		return (ldexit());
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FILES),
+		    ofl->ofl_name);
+		return (ld_exit(ofl));
 	}
 
-	lds_input_done();
+	ld_sup_input_done(ofl);
 
 	/*
 	 * If there were any partially initialized symbol,
 	 * do preparation works.
 	 */
 	if (ofl->ofl_ismove.head != 0) {
-		if (sunwmove_preprocess(ofl) == S_ERROR)
-			return (ldexit());
+		if (ld_sunwmove_preprocess(ofl) == S_ERROR)
+			return (ld_exit(ofl));
 	}
 
 	/*
@@ -253,8 +265,8 @@ ld_main(int argc, char ** argv)
 	 * it does take a little longer for the user to be told of any undefined
 	 * symbol errors).
 	 */
-	if (reloc_init(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_reloc_init(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
 	/*
 	 * Now that all symbol processing is complete see if any undefined
@@ -264,23 +276,25 @@ ld_main(int argc, char ** argv)
 	 * condition is fatal.  If creating a shared object with the -Bsymbolic
 	 * flag set, this condition is simply a warning.
 	 */
-	if (sym_validate(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_sym_validate(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
 	if (ofl->ofl_flags1 & FLG_OF1_OVRFLW) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_FILES), ofl->ofl_name);
-		return (ldexit());
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_FILES),
+		    ofl->ofl_name);
+		return (ld_exit(ofl));
 	} else if (ofl->ofl_flags & FLG_OF_FATAL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_SYM_FATAL), ofl->ofl_name);
-		return (ldexit());
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_SYM_FATAL),
+		    ofl->ofl_name);
+		return (ld_exit(ofl));
 	} else if (ofl->ofl_flags & FLG_OF_WARN)
-		eprintf(ERR_WARNING, MSG_INTL(MSG_ARG_SYM_WARN));
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_ARG_SYM_WARN));
 
 	/*
 	 * Generate any necessary sections.
 	 */
-	if (make_sections(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_make_sections(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
 	/*
 	 * Now that all sections have been added to the output file, check to
@@ -288,34 +302,33 @@ ld_main(int argc, char ** argv)
 	 * if any ordering directives were not matched.
 	 * Also, if SHF_ORDERED sections exist, set up sort key values.
 	 */
-	sec_validate(ofl);
+	ld_sec_validate(ofl);
 
 	/*
 	 * Having collected all the input data create the initial output file
 	 * image, assign virtual addresses to the image, and generate a load
 	 * map if the user requested one.
 	 */
-	if (create_outfile(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_create_outfile(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
-	if (update_outfile(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_update_outfile(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 	if (ofl->ofl_flags & FLG_OF_GENMAP)
-		ldmap_out(ofl);
+		ld_map_out(ofl);
 
 	/*
 	 * Build relocation sections and perform any relocation updates.
 	 */
-	if (reloc_process(ofl) == S_ERROR)
-		return (ldexit());
+	if (ld_reloc_process(ofl) == S_ERROR)
+		return (ld_exit(ofl));
 
-
-#if defined(__x86) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	/*
 	 * Fill in contents for Unwind Header
 	 */
 	if (populate_amd64_unwindhdr(ofl) == S_ERROR)
-		return (ldexit());
+		return (ld_exit(ofl));
 #endif
 	/*
 	 * Finally create the files elf checksum.
@@ -327,11 +340,12 @@ ld_main(int argc, char ** argv)
 	 * We're done, so make sure the updates are flushed to the output file.
 	 */
 	if ((ofl->ofl_size = elf_update(ofl->ofl_welf, ELF_C_WRITE)) == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_UPDATE), ofl->ofl_name);
-		return (ldexit());
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		    ofl->ofl_name);
+		return (ld_exit(ofl));
 	}
 
-	lds_atexit(0);
+	ld_sup_atexit(ofl, 0);
 
 	DBG_CALL(Dbg_statistics_ld(ofl));
 
@@ -349,71 +363,65 @@ ld_main(int argc, char ** argv)
 	return (0);
 }
 
-/* VARARGS1 */
-void
-dbg_print(const char *format, ...)
+/*
+ * Cleanup an Ifl_desc.
+ */
+static void
+ifl_list_cleanup(List *ifl_list)
 {
-	static char	*prestr = 0;
-	va_list		args;
+	Listnode	*lnp;
+	Ifl_desc	*ifl;
 
-	if (dbg_mask & DBG_G_SNAME) {
-		/*
-		 * If the debugging options have requested each diagnostic line
-		 * be prepended by a name create a prefix string.
-		 */
-		if ((prestr == 0) && Ofl.ofl_name) {
-			const char	*name, *cls;
-			size_t		len;
+	for (LIST_TRAVERSE(ifl_list, lnp, ifl))
+		if (ifl->ifl_elf)
+			(void) elf_end(ifl->ifl_elf);
+	ifl_list->head = 0;
+	ifl_list->tail = 0;
+}
 
-			/*
-			 * Select the fullname or basename of the output file
-			 * being created.
-			 */
-			if (dbg_mask & DBG_G_FNAME)
-				name = Ofl.ofl_name;
-			else {
-				if ((name = strrchr(Ofl.ofl_name, '/')) == 0)
-					name = Ofl.ofl_name;
-				else
-					name++;
-			}
-			len = strlen(name) +
-			    strlen(MSG_INTL(MSG_DBG_NAME_FMT)) + 1;
+/*
+ * Cleanup all memory that has been dynamically allocated during libld
+ * processing and elf_end() all Elf descriptors that are still open.
+ */
+void
+ld_ofl_cleanup(Ofl_desc *ofl)
+{
+	Ld_heap		*chp, *php;
+	Ar_desc		*adp;
+	Listnode	*lnp;
 
-			/*
-			 * Add the output file class if required.
-			 */
-			if (dbg_mask & DBG_G_CLASS) {
-#if	defined(_ELF64)
-				len += MSG_DBG_CLS64_FMT_SIZE;
-				cls = MSG_ORIG(MSG_DBG_CLS64_FMT);
-#else
-				len += MSG_DBG_CLS32_FMT_SIZE;
-				cls = MSG_ORIG(MSG_DBG_CLS32_FMT);
-#endif
-			}
+	ifl_list_cleanup(&ofl->ofl_objs);
+	ifl_list_cleanup(&ofl->ofl_sos);
 
-			/*
-			 * Allocate a string to build the prefix.
-			 */
-			if ((prestr = libld_malloc(len)) == 0)
-				prestr = (char *)MSG_INTL(MSG_DBG_DFLT_FMT);
-			else {
-				(void) snprintf(prestr, len,
-				    MSG_INTL(MSG_DBG_NAME_FMT), name);
-				if (dbg_mask & DBG_G_CLASS)
-					(void) strcat(prestr, cls);
+	for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
+		Ar_aux		*aup;
+		Elf_Arsym	*arsym;
+
+		for (arsym = adp->ad_start, aup = adp->ad_aux;
+		    arsym->as_name; ++arsym, ++aup) {
+			if ((aup->au_mem) && (aup->au_mem != FLG_ARMEM_PROC)) {
+				(void) elf_end(aup->au_mem->am_elf);
+
+				/*
+				 * Null out all entries to this member so
+				 * that we don't attempt to elf_end() it again.
+				 */
+				ld_ar_member(adp, arsym, aup, 0);
 			}
 		}
-		if (prestr)
-			(void) fputs(prestr, stderr);
-		else
-			(void) fputs(MSG_INTL(MSG_DBG_AOUT_FMT), stderr);
-	} else
-		(void) fputs(MSG_INTL(MSG_DBG_DFLT_FMT), stderr);
+		(void) elf_end(adp->ad_elf);
+	}
 
-	va_start(args, format);
-	(void) vfprintf(stderr, format, args);
-	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
-	va_end(args);
+	(void) elf_end(ofl->ofl_elf);
+	(void) elf_end(ofl->ofl_welf);
+
+	for (chp = ld_heap, php = 0; chp; php = chp, chp = chp->lh_next) {
+		if (php)
+			(void) munmap((void *)php,
+			    (size_t)php->lh_end - (size_t)php);
+	}
+	if (php)
+		(void) munmap((void *)php, (size_t)php->lh_end - (size_t)php);
+
+	ld_heap = 0;
 }

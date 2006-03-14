@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
 #include	<unistd.h>
 #include	<string.h>
 #include	<thread.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"_rtld.h"
 #include	"_elf.h"
 #include	"msg.h"
@@ -53,10 +53,10 @@ static pid_t	pid;
  * Enable diagnostic output.  All debugging functions reside in the linker
  * debugging library liblddbg.so which is lazy loaded when required.
  */
-uint_t
-dbg_setup(const char *options)
+uintptr_t
+dbg_setup(const char *options, Dbg_desc *dbp)
 {
-	uint_t		_dbg_mask;
+	uintptr_t	ret;
 	struct stat	status;
 
 	/*
@@ -87,8 +87,8 @@ dbg_setup(const char *options)
 	 * categories selected.  The mask effectively enables calls to the
 	 * debugging library.
 	 */
-	if ((_dbg_mask = Dbg_setup(options)) == (uint_t)S_ERROR)
-		return (0);
+	if ((ret = Dbg_setup(options, dbp)) != (uintptr_t)1)
+		return (ret);
 
 	/*
 	 * If an LD_DEBUG_OUTPUT file was specified then we need to direct all
@@ -99,14 +99,14 @@ dbg_setup(const char *options)
 	if (dbg_file) {
 		char 	file[MAXPATHLEN];
 
-		(void) snprintf(file, MAXPATHLEN, MSG_ORIG(MSG_DBG_FMT_FILE),
-		    dbg_file, (int)getpid());
+		(void) snprintf(file, MAXPATHLEN, MSG_ORIG(MSG_DBG_FILE),
+		    dbg_file, getpid());
 		if ((dbg_fd = open(file, (O_RDWR | O_CREAT), 0666)) == -1) {
 			int	err = errno;
 
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), file,
-			    strerror(err));
-			dbg_mask = 0;
+			eprintf(&lml_rtld, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			    file, strerror(err));
+			dbp->d_class = 0;
 			return (0);
 		}
 	} else {
@@ -126,21 +126,53 @@ dbg_setup(const char *options)
 	dbg_ino = status.st_ino;
 	pid = getpid();
 
-	return (_dbg_mask);
+	return (ret);
+}
+
+static int
+dbg_lmid(Lm_list *lml)
+{
+	const char	**str;
+	Aliste		off;
+
+	for (ALIST_TRAVERSE(dbg_desc->d_list, off, str)) {
+		if (strcmp(lml->lm_lmidstr, *str) == 0)
+			return (1);
+	}
+	return (0);
 }
 
 /*
  * All diagnostic requests are funneled to this routine.
  */
-/*PRINTFLIKE1*/
+/* PRINTFLIKE2 */
 void
-dbg_print(const char *format, ...)
+dbg_print(Lm_list *lml, const char *format, ...)
 {
-	va_list			args;
-	char			buffer[ERRSIZE + 1];
-	pid_t			_pid;
-	struct stat		status;
-	Prfbuf			prf;
+	va_list		args;
+	char		buffer[ERRSIZE + 1];
+	pid_t		_pid;
+	struct stat	status;
+	Prfbuf		prf;
+
+	/*
+	 * Knock off any newline indicator to signify that a diagnostic has
+	 * been processed.
+	 */
+	dbg_desc->d_extra &= ~DBG_E_STDNL;
+
+	/*
+	 * If debugging has been isolated to individual link-map lists,
+	 * determine whether this request originates from a link-map list that
+	 * is being monitored.  Otherwise, process all link-map list diagnostics
+	 * except those that originate from ld.so.1 processing its own
+	 * dependencies.
+	 */
+	if (dbg_desc->d_list && lml && lml->lm_lmidstr) {
+		if (dbg_lmid(lml) == 0)
+			return;
+	} else if (lml && (lml->lm_flags & LML_FLG_RTLDLM))
+		return;
 
 	/*
 	 * If we're in the application make sure the debugging file descriptor
@@ -159,11 +191,10 @@ dbg_print(const char *format, ...)
 				char 	file[MAXPATHLEN];
 
 				(void) snprintf(file, MAXPATHLEN,
-				    MSG_ORIG(MSG_DBG_FMT_FILE), dbg_file,
-				    (int)pid);
+				    MSG_ORIG(MSG_DBG_FILE), dbg_file, pid);
 				if ((dbg_fd = open(file, (O_RDWR | O_APPEND),
 				    0)) == -1) {
-					dbg_mask = 0;
+					dbg_desc->d_class = 0;
 					return;
 				}
 				(void) fstat(dbg_fd, &status);
@@ -174,40 +205,47 @@ dbg_print(const char *format, ...)
 				 * If stderr has been stolen from us simply
 				 * turn debugging off.
 				 */
-				dbg_mask = 0;
+				dbg_desc->d_class = 0;
 				return;
 			}
 		}
 	}
 
+	prf.pr_buf = prf.pr_cur = buffer;
+	prf.pr_len = ERRSIZE;
+	prf.pr_fd = dbg_fd;
+
 	/*
-	 * The getpid() call is a 'special' interface between ld.so.1
-	 * and dbx, because of this getpid() can't be called freely
-	 * until after control has been given to the user program.
-	 * Once the control has been given to the user program
-	 * we know that the r_debug structure has been properly
-	 * initialized for the debugger.
+	 * The getpid() call is a 'special' interface between ld.so.1 and dbx,
+	 * because of this getpid() can't be called freely until after control
+	 * has been given to the user program.  Once the control has been given
+	 * to the user program we know that the r_debug structure has been
+	 * properly initialized for the debugger.
 	 */
 	if (rtld_flags & RT_FL_APPLIC)
 		_pid = getpid();
 	else
 		_pid = pid;
 
-	prf.pr_buf = prf.pr_cur = buffer;
-	prf.pr_len = ERRSIZE;
-	prf.pr_fd = dbg_fd;
-
-	if (rtld_flags & RT_FL_THREADS)
-		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_FMT_THREAD), _pid,
-			rt_thr_self());
+	if (lml)
+		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_PID), _pid);
 	else
-		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_FMT_DIAG), _pid);
+		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_UNDEF));
+	prf.pr_cur--;
+
+	if (DBG_ISLMID() && lml && lml->lm_lmidstr) {
+		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_LMID), lml->lm_lmidstr);
+		prf.pr_cur--;
+	}
+	if (rtld_flags & RT_FL_THREADS) {
+		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_THREAD), rt_thr_self());
+		prf.pr_cur--;
+	}
 
 	/*
 	 * Format the message and print it.
 	 */
 	va_start(args, format);
-	prf.pr_cur--;
 	(void) doprf(format, args, &prf);
 	*(prf.pr_cur - 1) = '\n';
 	(void) dowrite(&prf);

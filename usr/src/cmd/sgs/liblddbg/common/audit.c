@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,54 +31,53 @@
 #include	"msg.h"
 #include	"libld.h"
 
-
 void
-Dbg_audit_version(const char *lib, ulong_t version)
+Dbg_audit_version(Lm_list *lml, const char *lib, ulong_t version)
 {
-	if (DBG_NOTCLASS(DBG_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_AUD_VERSION), lib, (int)version);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_VERSION), lib, (int)version);
 }
 
 void
-Dbg_audit_lib(const char *lib)
+Dbg_audit_lib(Lm_list *lml, const char *lib)
 {
-	if (DBG_NOTCLASS(DBG_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_AUD_INIT), lib);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_INIT), lib);
 }
 
 void
-Dbg_audit_interface(const char *lib, const char *interface)
+Dbg_audit_interface(Lm_list *lml, const char *lib, const char *interface)
 {
-	if (DBG_NOTCLASS(DBG_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_AUD_INTERFACE), lib, interface);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_INTERFACE), lib, interface);
 }
 
 void
-Dbg_audit_object(const char *lib, const char *obj)
+Dbg_audit_object(Lm_list *lml, const char *lib, const char *obj)
 {
-	if (DBG_NOTCLASS(DBG_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_AUD_OBJECT), lib, obj);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_AUD_OBJECT), lib, obj);
 }
 
 void
-Dbg_audit_symval(const char *lib, const char *func, const char *sym,
-    Addr pval, Addr nval)
+Dbg_audit_symval(Lm_list *lml, const char *lib, const char *func,
+    const char *sym, Addr pval, Addr nval)
 {
 	char	mesg[100];
 
-	if (DBG_NOTCLASS(DBG_AUDITING))
+	if (DBG_NOTCLASS(DBG_C_AUDITING))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -88,6 +87,6 @@ Dbg_audit_symval(const char *lib, const char *func, const char *sym,
 	else
 		(void) sprintf(mesg, MSG_INTL(MSG_AUD_SYMNEW), EC_XWORD(nval));
 
-	dbg_print(MSG_INTL(MSG_AUD_SYM), lib, func, _Dbg_sym_dem(sym),
+	dbg_print(lml, MSG_INTL(MSG_AUD_SYM), lib, func, Dbg_demangle_name(sym),
 	    EC_XWORD(pval), mesg);
 }

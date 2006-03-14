@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_CONV_H
@@ -65,62 +64,170 @@ extern "C" {
 #define	CONF_FEATMSK	0xffff00
 
 /*
- * Functions
+ * Various values that can't be matched to a symbolic definition are converted
+ * to a numeric string.  Each function that may require this fallback maintains
+ * its own static string buffer, as many conversion routines may be called for
+ * one final diagnostic.  See conv_invalid_val().
+ *
+ * The string size reflects the largest possible decimal number plus a trailing
+ * null.  Typically however, values are hex with a leading "0x".
+ */
+#if	defined(_ELF64)
+#define	CONV_INV_STRSIZE	22
+#else
+#define	CONV_INV_STRSIZE	12
+#endif
+
+/*
+ * Flags for conv_invalid_val().
+ */
+#define	CONV_INV_DECIMAL	0x1	/* print as decimal (default is hex) */
+#define	CONV_INV_SPACE		0x2	/* append a space */
+
+/*
+ * The expansion of bit-field data items is driven from a value descriptor and
+ * the conv_expn_field() routine.
+ */
+typedef struct {
+	Xword		v_val;		/* expansion value */
+	const char	*v_msg;		/* associated message string */
+} Val_desc;
+
+/*
+ * Define all generic interfaces.
  */
 extern	void		conv_check_native(char **, char **);
-extern	const char	*conv_binding_str(uint_t);
-extern	const char	*conv_bindent_str(uint_t);
-extern	const char	*conv_d_type_str(Elf_Type);
-extern	const char	*conv_deftag_str(Symref);
-extern	const char	*conv_dlflag_str(int, int);
-extern	const char	*conv_dlmode_str(int, int);
-extern	const char	*conv_dyntag_str(uint64_t, ushort_t);
-extern	const char	*conv_dynflag_str(uint_t);
-extern	const char	*conv_dynflag_1_str(uint_t);
-extern	const char	*conv_dynposflag_1_str(uint_t);
-extern	const char	*conv_dynfeature_1_str(uint_t);
-extern	const char	*conv_captag_str(uint64_t);
-extern	const char	*conv_capval_str(uint64_t, uint64_t, ushort_t);
-extern	const char	*conv_config_str(int);
+extern	const char	*conv_config_feat(int);
 extern	const char	*conv_config_obj(ushort_t);
-extern	const char	*conv_dwarf_ehe_str(uint_t);
-extern	const char	*conv_eclass_str(uchar_t);
-extern	const char	*conv_edata_str(uchar_t);
-extern	const char	*conv_emach_str(ushort_t);
-extern	const char	*conv_ever_str(uint_t);
-extern	const char	*conv_etype_str(ushort_t);
-extern	const char	*conv_eflags_str(ushort_t, uint_t);
-extern	const char	*conv_hwcap_1_str(uint64_t, ushort_t);
-extern	const char	*conv_hwcap_1_386_str(uint64_t);
-extern	const char	*conv_hwcap_1_SPARC_str(uint64_t);
-extern	const char	*conv_sfcap_1_str(uint64_t, ushort_t);
-extern	const char	*conv_grphdrflags_str(uint_t);
-extern	const char	*conv_info_bind_str(uchar_t);
-extern	const char	*conv_info_type_str(ushort_t, uchar_t);
-extern	const char	*conv_invalid_str(char *, size_t, uint64_t, int);
+extern	const char	*conv_config_upm(const char *, const char *,
+			    const char *, size_t);
+extern	const char	*conv_def_tag(Symref);
+extern	const char	*conv_demangle_name(const char *);
+extern	const char	*conv_dl_flag(int, int);
+extern	const char	*conv_dl_mode(int, int);
+extern	const char	*conv_dwarf_ehe(uint_t);
+extern	const char	*conv_elfdata_type(Elf_Type);
+extern	const char	*conv_grphdl_flags(uint_t);
 extern	Isa_desc	*conv_isalist(void);
 extern	const char	*conv_lddstub(int);
-extern	const char	*conv_phdrflg_str(uint_t);
-extern	const char	*conv_phdrtyp_str(ushort_t, uint_t);
-extern	const char	*conv_reloc_type_str(ushort_t, uint_t);
-extern	const char	*conv_reloc_SPARC_type_str(uint_t);
-extern	const char	*conv_reloc_386_type_str(uint_t);
-extern	const char	*conv_reloc_amd64_type_str(uint_t);
-extern	const char	*conv_reject_str(Rej_desc *);
-extern	const char	*conv_sym_dem(const char *);
-extern	const char	*conv_sym_value_str(ushort_t, uint_t, uint64_t);
-extern	const char	*conv_sym_SPARC_value_str(uint64_t);
-extern	const char	*conv_sym_stother(uchar_t);
-extern	const char	*conv_secflg_str(ushort_t, uint_t);
-extern	const char	*conv_secinfo_str(uint_t, uint_t);
-extern	const char	*conv_sectyp_str(ushort_t, uint_t);
-extern	const char	*conv_segaflg_str(uint_t);
-extern	const char	*conv_shndx_str(ushort_t);
+extern	const char	*conv_seg_flags(Half);
 extern	int		conv_sys_eclass();
-extern	const char	*conv_upm_string(const char *, const char *,
-			    const char *, size_t);
 extern	Uts_desc	*conv_uts(void);
-extern	const char	*conv_verflg_str(ushort_t);
+extern	const char	*conv_ver_flags(Half);
+
+/*
+ * Define all class specific routines.
+ */
+#if	defined(_ELF64)
+#define	conv_bnd_obj		conv64_bnd_obj
+#define	conv_bnd_type		conv64_bnd_type
+#define	conv_cap_tag		conv64_cap_tag
+#define	conv_cap_val		conv64_cap_val
+#define	conv_cap_val_hw1	conv64_cap_val_hw1
+#define	conv_cap_val_sf1	conv64_cap_val_sf1
+#define	conv_dyn_feature1	conv64_dyn_feature1
+#define	conv_dyn_flag1		conv64_dyn_flag1
+#define	conv_dyn_flag		conv64_dyn_flag
+#define	conv_dyn_posflag1	conv64_dyn_posflag1
+#define	conv_dyn_tag		conv64_dyn_tag
+#define	conv_ehdr_class		conv64_ehdr_class
+#define	conv_ehdr_data		conv64_ehdr_data
+#define	conv_ehdr_flags		conv64_ehdr_flags
+#define	conv_ehdr_mach		conv64_ehdr_mach
+#define	conv_ehdr_type		conv64_ehdr_type
+#define	conv_ehdr_vers		conv64_ehdr_vers
+#define	conv_expn_field		conv64_expn_field
+#define	conv_invalid_val	conv64_invalid_val
+#define	conv_phdr_flags		conv64_phdr_flags
+#define	conv_phdr_type		conv64_phdr_type
+#define	conv_reject_desc	conv64_reject_desc
+#define	conv_reloc_type		conv64_reloc_type
+#define	conv_reloc_386_type	conv64_reloc_386_type
+#define	conv_reloc_amd64_type	conv64_reloc_amd64_type
+#define	conv_reloc_SPARC_type	conv64_reloc_SPARC_type
+#define	conv_sec_flags		conv64_sec_flags
+#define	conv_sec_info		conv64_sec_info
+#define	conv_sec_type		conv64_sec_type
+#define	conv_sym_info_bind	conv64_sym_info_bind
+#define	conv_sym_info_type	conv64_sym_info_type
+#define	conv_sym_shndx		conv64_sym_shndx
+#define	conv_sym_other		conv64_sym_other
+#define	conv_sym_value		conv64_sym_value
+#define	conv_sym_SPARC_value	conv64_sym_SPARC_value
+#else
+#define	conv_bnd_obj		conv32_bnd_obj
+#define	conv_bnd_type		conv32_bnd_type
+#define	conv_cap_tag		conv32_cap_tag
+#define	conv_cap_val		conv32_cap_val
+#define	conv_cap_val_hw1	conv32_cap_val_hw1
+#define	conv_cap_val_sf1	conv32_cap_val_sf1
+#define	conv_dyn_feature1	conv32_dyn_feature1
+#define	conv_dyn_flag1		conv32_dyn_flag1
+#define	conv_dyn_flag		conv32_dyn_flag
+#define	conv_dyn_posflag1	conv32_dyn_posflag1
+#define	conv_dyn_tag		conv32_dyn_tag
+#define	conv_ehdr_class		conv32_ehdr_class
+#define	conv_ehdr_data		conv32_ehdr_data
+#define	conv_ehdr_flags		conv32_ehdr_flags
+#define	conv_ehdr_mach		conv32_ehdr_mach
+#define	conv_ehdr_type		conv32_ehdr_type
+#define	conv_ehdr_vers		conv32_ehdr_vers
+#define	conv_expn_field		conv32_expn_field
+#define	conv_invalid_val	conv32_invalid_val
+#define	conv_phdr_flags		conv32_phdr_flags
+#define	conv_phdr_type		conv32_phdr_type
+#define	conv_reject_desc	conv32_reject_desc
+#define	conv_reloc_type		conv32_reloc_type
+#define	conv_reloc_386_type	conv32_reloc_386_type
+#define	conv_reloc_amd64_type	conv32_reloc_amd64_type
+#define	conv_reloc_SPARC_type	conv32_reloc_SPARC_type
+#define	conv_sec_flags		conv32_sec_flags
+#define	conv_sec_info		conv32_sec_info
+#define	conv_sec_type		conv32_sec_type
+#define	conv_sym_info_bind	conv32_sym_info_bind
+#define	conv_sym_info_type	conv32_sym_info_type
+#define	conv_sym_shndx		conv32_sym_shndx
+#define	conv_sym_other		conv32_sym_other
+#define	conv_sym_value		conv32_sym_value
+#define	conv_sym_SPARC_value	conv32_sym_SPARC_value
+#endif
+
+extern	const char	*conv_bnd_obj(uint_t);
+extern	const char	*conv_bnd_type(uint_t);
+extern	const char	*conv_cap_tag(Xword);
+extern	const char	*conv_cap_val(Xword, Xword, Half);
+extern	const char	*conv_cap_val_hw1(Xword, Half);
+extern	const char	*conv_cap_val_sf1(Xword, Half);
+extern	const char	*conv_dyn_flag1(Xword);
+extern	const char	*conv_dyn_flag(Xword);
+extern	const char	*conv_dyn_posflag1(Xword);
+extern	const char	*conv_dyn_tag(Xword, Half);
+extern	const char	*conv_dyn_feature1(Xword);
+extern	const char	*conv_ehdr_class(uchar_t);
+extern	const char	*conv_ehdr_data(uchar_t);
+extern	const char	*conv_ehdr_flags(Half, Word);
+extern	const char	*conv_ehdr_mach(Half);
+extern	const char	*conv_ehdr_type(Half);
+extern	const char	*conv_ehdr_vers(Word);
+extern	int		conv_expn_field(char *, size_t, const Val_desc *,
+			    Xword, Xword, const char *, int);
+extern	const char	*conv_invalid_val(char *, size_t, Xword, int);
+extern	const char	*conv_phdr_flags(Word);
+extern	const char	*conv_phdr_type(Half, Word);
+extern	const char	*conv_reject_desc(Rej_desc *);
+extern	const char	*conv_reloc_type(Half, Word);
+extern	const char	*conv_reloc_386_type(Word);
+extern	const char	*conv_reloc_amd64_type(Word);
+extern	const char	*conv_reloc_SPARC_type(Word);
+extern	const char	*conv_sec_flags(Xword);
+extern	const char	*conv_sec_info(Word, Xword);
+extern	const char	*conv_sec_type(Half, Word);
+extern	const char	*conv_sym_info_bind(uchar_t);
+extern	const char	*conv_sym_info_type(Half, uchar_t);
+extern	const char	*conv_sym_shndx(Half);
+extern	const char	*conv_sym_other(uchar_t);
+extern	const char	*conv_sym_value(Half, uchar_t, Addr);
+extern	const char	*conv_sym_SPARC_value(Addr);
 
 #ifdef	__cplusplus
 }

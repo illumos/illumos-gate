@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -34,8 +33,8 @@
 #include	<sys/elf_SPARC.h>
 #include	<debug.h>
 #include	<reloc.h>
-#include	<msg.h>
-#include	<_libld.h>
+#include	"msg.h"
+#include	"_libld.h"
 
 /*
  * Local Variable Definitions
@@ -44,7 +43,7 @@ static Sword neggotoffset = 0;		/* off. of GOT table from GOT symbol */
 static Sword smlgotcnt = M_GOT_XNumber;	/* no. of small GOT symbols */
 
 Word
-init_rel(Rel_desc *reld, void *reloc)
+ld_init_rel(Rel_desc *reld, void *reloc)
 {
 	Rela *	rela = (Rela *)reloc;
 
@@ -60,9 +59,9 @@ init_rel(Rel_desc *reld, void *reloc)
 }
 
 void
-mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
+ld_mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 {
-	Word		eflags = ofl->ofl_e_flags;
+	Word		eflags = ofl->ofl_dehdr->e_flags;
 	Word		memopt1, memopt2;
 	static int	firstpass;
 
@@ -71,7 +70,7 @@ mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 	 */
 	if ((ehdr->e_machine == EM_SPARC32PLUS) &&
 	    (ehdr->e_flags & EF_SPARC_32PLUS))
-		ofl->ofl_e_machine = EM_SPARC32PLUS;
+		ofl->ofl_dehdr->e_machine = EM_SPARC32PLUS;
 
 	/*
 	 * On the first pass, we don't yet have a memory model to compare
@@ -79,7 +78,7 @@ mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 	 * passes will do the comparison described below.
 	 */
 	if (firstpass == 0) {
-		ofl->ofl_e_flags |= ehdr->e_flags;
+		ofl->ofl_dehdr->e_flags |= ehdr->e_flags;
 		firstpass++;
 		return;
 	}
@@ -108,11 +107,11 @@ mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 	else
 		eflags |= EF_SPARCV9_RMO;
 
-	ofl->ofl_e_flags = eflags;
+	ofl->ofl_dehdr->e_flags = eflags;
 }
 
 void
-mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
+ld_mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
 {
 	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
 		/*
@@ -124,21 +123,22 @@ mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
 }
 
 void
-mach_update_odynamic(Ofl_desc * ofl, Dyn ** dyn)
+ld_mach_update_odynamic(Ofl_desc * ofl, Dyn ** dyn)
 {
-	if (!(ofl->ofl_flags & FLG_OF_RELOBJ)) {
-		if (ofl->ofl_pltcnt) {
-			(*dyn)->d_tag = DT_PLTGOT;
-			(*dyn)->d_un.d_ptr = fillin_gotplt2(ofl);
-			(*dyn)++;
-		}
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) && ofl->ofl_pltcnt) {
+		(*dyn)->d_tag = DT_PLTGOT;
+		if (ofl->ofl_osplt)
+			(*dyn)->d_un.d_ptr = ofl->ofl_osplt->os_shdr->sh_addr;
+		else
+			(*dyn)->d_un.d_ptr = 0;
+		(*dyn)++;
 	}
 }
 
 #if	defined(_ELF64)
 
 Xword
-calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
+ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Xword	value, pltndx, farpltndx;
 
@@ -419,7 +419,7 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 #else  /* Elf 32 */
 
 Xword
-calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
+ld_calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 {
 	Xword	value, pltndx;
 
@@ -486,7 +486,7 @@ plt_entry(Ofl_desc * ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 #endif /* _ELF64 */
 
 uintptr_t
-perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
+ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 {
 	Os_desc *		relosp, * osp = 0;
 	Xword			ndx, roffset, value;
@@ -515,8 +515,8 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		    ELF_R_TYPE_INFO(orsp->rel_typedata, orsp->rel_rtype));
 		rea.r_offset = orsp->rel_roffset;
 		rea.r_addend = raddend;
-		DBG_CALL(Dbg_reloc_out(M_MACH, SHT_RELA, &rea,
-		    orsp->rel_sname, relosp->os_name));
+		DBG_CALL(Dbg_reloc_out(ofl, ELF_DBG_LD, SHT_RELA, &rea,
+		    relosp->os_name, orsp->rel_sname));
 
 		assert(relosp->os_szoutrels <= relosp->os_shdr->sh_size);
 		(void) memcpy((relbits + relosp->os_szoutrels),
@@ -533,7 +533,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	if (orsp->rel_isdesc && ((orsp->rel_flags &
 	    (FLG_REL_GOT | FLG_REL_BSS | FLG_REL_PLT | FLG_REL_NOINFO)) == 0) &&
 	    (orsp->rel_isdesc->is_flags & FLG_IS_DISCARD)) {
-		DBG_CALL(Dbg_reloc_discard(M_MACH, orsp));
+		DBG_CALL(Dbg_reloc_discard(ofl->ofl_lml, M_MACH, orsp));
 		return (1);
 	}
 
@@ -542,7 +542,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	 * table, adjust the relocation entries.
 	 */
 	if (orsp->rel_move)
-		adj_movereloc(ofl, orsp);
+		ld_adj_movereloc(ofl, orsp);
 
 	/*
 	 * If this is a relocation against a section then we need to adjust the
@@ -552,11 +552,11 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	if (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) {
 		if (ofl->ofl_parsym.head &&
 		    (sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
-		    (psym = am_I_partial(orsp, orsp->rel_raddend))) {
+		    (psym = ld_am_I_partial(orsp, orsp->rel_raddend))) {
 			/*
 			 * If the symbol is moved, adjust the value
 			 */
-			DBG_CALL(Dbg_move_outsctadj(psym));
+			DBG_CALL(Dbg_move_outsctadj(ofl->ofl_lml, psym));
 			sectmoved = 1;
 			if (ofl->ofl_flags & FLG_OF_RELOBJ)
 				raddend = psym->sd_sym->st_value;
@@ -581,7 +581,8 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 
 	if (orsp->rel_flags & FLG_REL_GOT) {
 		osp = ofl->ofl_osgot;
-		roffset = calc_got_offset(orsp, ofl);
+		roffset = ld_calc_got_offset(orsp, ofl);
+
 	} else if (orsp->rel_flags & FLG_REL_PLT) {
 		osp = ofl->ofl_osplt;
 		plt_entry(ofl, sdp->sd_aux->sa_PLTndx, &roffset, &raddend);
@@ -628,14 +629,14 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	 * alignment requirements of the relocation being processed.
 	 */
 	rep = &reloc_table[orsp->rel_rtype];
-	if (((flags & FLG_OF_RELOBJ) ||
-	    !(dtflags1 & DF_1_NORELOC)) &&
+	if (((flags & FLG_OF_RELOBJ) || !(dtflags1 & DF_1_NORELOC)) &&
 	    !(rep->re_flags & FLG_RE_UNALIGN)) {
 		if (((rep->re_fsize == 2) && (roffset & 0x1)) ||
 		    ((rep->re_fsize == 4) && (roffset & 0x3)) ||
 		    ((rep->re_fsize == 8) && (roffset & 0x7))) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN),
-			    conv_reloc_SPARC_type_str(orsp->rel_rtype),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_NONALIGN),
+			    conv_reloc_SPARC_type(orsp->rel_rtype),
 			    orsp->rel_isdesc->is_file->ifl_name,
 			    demangle(orsp->rel_sname), EC_XWORD(roffset));
 			return (S_ERROR);
@@ -690,8 +691,8 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 			orsp->rel_rtype));
 	rea.r_offset = roffset;
 	rea.r_addend = raddend;
-	DBG_CALL(Dbg_reloc_out(M_MACH, SHT_RELA, &rea, orsp->rel_sname,
-	    relosp->os_name));
+	DBG_CALL(Dbg_reloc_out(ofl, ELF_DBG_LD, SHT_RELA, &rea, relosp->os_name,
+	    orsp->rel_sname));
 
 	/*
 	 * Assert we haven't walked off the end of our relocation table.
@@ -706,7 +707,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	 * Determine if this relocation is against a non-writable, allocatable
 	 * section.  If so we may need to provide a text relocation diagnostic.
 	 */
-	reloc_remain_entry(orsp, osp, ofl);
+	ld_reloc_remain_entry(orsp, osp, ofl);
 	return (1);
 }
 
@@ -714,7 +715,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 /*
  * Sparc Instructions for TLS processing
  */
-#if defined(_ELF64)
+#if	defined(_ELF64)
 #define	TLS_GD_IE_LD	0xd0580000	/* ldx [%g0 + %g0], %o0 */
 #else
 #define	TLS_GD_IE_LD	0xd0000000	/* ld [%g0 + %g0], %o0 */
@@ -736,9 +737,8 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 
 #define	REG_G7		7		/* %g7 register */
 
-
-Fixupret
-tls_fixups(Rel_desc *arsp)
+static Fixupret
+tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 {
 	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
@@ -754,40 +754,33 @@ tls_fixups(Rel_desc *arsp)
 		 */
 		switch (rtype) {
 		case R_SPARC_TLS_GD_HI22:
-			DBG_CALL(Dbg_reloc_transition(M_MACH,
-				rtype,
-				R_SPARC_TLS_IE_HI22,
-				arsp->rel_roffset,
-				sdp->sd_name));
+			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+			    rtype, R_SPARC_TLS_IE_HI22, arsp->rel_roffset,
+			    sdp->sd_name));
 			arsp->rel_rtype = R_SPARC_TLS_IE_HI22;
 			return (FIX_RELOC);
+
 		case R_SPARC_TLS_GD_LO10:
-			DBG_CALL(Dbg_reloc_transition(M_MACH,
-				rtype,
-				R_SPARC_TLS_IE_LO10,
-				arsp->rel_roffset,
-				sdp->sd_name));
+			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+			    rtype, R_SPARC_TLS_IE_LO10, arsp->rel_roffset,
+			    sdp->sd_name));
 			arsp->rel_rtype = R_SPARC_TLS_IE_LO10;
 			return (FIX_RELOC);
+
 		case R_SPARC_TLS_GD_ADD:
-			DBG_CALL(Dbg_reloc_transition(M_MACH,
-				rtype,
-				R_SPARC_NONE,
-				arsp->rel_roffset,
-				sdp->sd_name));
+			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+			    rtype, R_SPARC_NONE, arsp->rel_roffset,
+			    sdp->sd_name));
 			*offset = (TLS_GD_IE_LD |
-				(*offset & (FM3_REG_MSK_RS1 |
-				FM3_REG_MSK_RS2)));
-			return (FIX_DONE);
-		case R_SPARC_TLS_GD_CALL:
-			DBG_CALL(Dbg_reloc_transition(M_MACH,
-				rtype,
-				R_SPARC_NONE,
-				arsp->rel_roffset,
-				sdp->sd_name));
-			*offset = TLS_GD_IE_ADD;
+			    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RS2)));
 			return (FIX_DONE);
 
+		case R_SPARC_TLS_GD_CALL:
+			DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
+			    rtype, R_SPARC_NONE, arsp->rel_roffset,
+			    sdp->sd_name));
+			*offset = TLS_GD_IE_ADD;
+			return (FIX_DONE);
 		}
 		return (FIX_RELOC);
 	}
@@ -799,21 +792,17 @@ tls_fixups(Rel_desc *arsp)
 	case R_SPARC_TLS_IE_HI22:
 	case R_SPARC_TLS_GD_HI22:
 	case R_SPARC_TLS_LDO_HIX22:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_TLS_LE_HIX22,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_TLS_LE_HIX22, arsp->rel_roffset, sdp->sd_name));
 		arsp->rel_rtype = R_SPARC_TLS_LE_HIX22;
 		return (FIX_RELOC);
+
 	case R_SPARC_TLS_LDO_LOX10:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_TLS_LE_LOX10,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_TLS_LE_LOX10, arsp->rel_roffset, sdp->sd_name));
 		arsp->rel_rtype = R_SPARC_TLS_LE_LOX10;
 		return (FIX_RELOC);
+
 	case R_SPARC_TLS_IE_LO10:
 	case R_SPARC_TLS_GD_LO10:
 		/*
@@ -828,15 +817,13 @@ tls_fixups(Rel_desc *arsp)
 		 *
 		 *	xor r1, %lox(x), r2
 		 */
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_TLS_LE_LOX10,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_TLS_LE_LOX10, arsp->rel_roffset, sdp->sd_name));
 		*offset = TLS_GD_LE_XOR |
-			(*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RD));
+		    (*offset & (FM3_REG_MSK_RS1 | FM3_REG_MSK_RD));
 		arsp->rel_rtype = R_SPARC_TLS_LE_LOX10;
 		return (FIX_RELOC);
+
 	case R_SPARC_TLS_IE_LD:
 	case R_SPARC_TLS_IE_LDX:
 		/*
@@ -847,14 +834,12 @@ tls_fixups(Rel_desc *arsp)
 		 *
 		 *	mov	r2, r3   (or  %g0, r2, r3)
 		 */
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_NONE,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
 		*offset = ((*offset) & (FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) |
-			TLS_IE_LE_OR;
+		    TLS_IE_LE_OR;
 		return (FIX_DONE);
+
 	case R_SPARC_TLS_LDO_ADD:
 	case R_SPARC_TLS_GD_ADD:
 		/*
@@ -866,32 +851,25 @@ tls_fixups(Rel_desc *arsp)
 		 *
 		 *	add %g7, r2, r3
 		 */
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_NONE,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
 		*offset = *offset & (~FM3_REG_MSK_RS1);
 		*offset = *offset | (REG_G7 << 14);
 		return (FIX_DONE);
+
 	case R_SPARC_TLS_LDM_CALL:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_NONE,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
 		*offset = TLS_LD_LE_CLRO0;
 		return (FIX_DONE);
+
 	case R_SPARC_TLS_LDM_HI22:
 	case R_SPARC_TLS_LDM_LO10:
 	case R_SPARC_TLS_LDM_ADD:
 	case R_SPARC_TLS_IE_ADD:
 	case R_SPARC_TLS_GD_CALL:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_NONE,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
 		*offset = M_NOP;
 		return (FIX_DONE);
 	}
@@ -900,8 +878,8 @@ tls_fixups(Rel_desc *arsp)
 
 #define	GOTOP_ADDINST	0x80000000	/* add %g0, %g0, %g0 */
 
-Fixupret
-gotop_fixups(Rel_desc *arsp)
+static Fixupret
+gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 {
 	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
@@ -910,21 +888,17 @@ gotop_fixups(Rel_desc *arsp)
 
 	switch (rtype) {
 	case R_SPARC_GOTDATA_OP_HIX22:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_GOTDATA_HIX22,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_GOTDATA_HIX22, arsp->rel_roffset, sdp->sd_name));
 		arsp->rel_rtype = R_SPARC_GOTDATA_HIX22;
 		return (FIX_RELOC);
+
 	case R_SPARC_GOTDATA_OP_LOX10:
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_GOTDATA_LOX10,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_GOTDATA_LOX10, arsp->rel_roffset, sdp->sd_name));
 		arsp->rel_rtype = R_SPARC_GOTDATA_LOX10;
 		return (FIX_RELOC);
+
 	case R_SPARC_GOTDATA_OP:
 		/*
 		 * Current instruction:
@@ -934,18 +908,14 @@ gotop_fixups(Rel_desc *arsp)
 		 *
 		 *	add	r1, r2, r3
 		 */
-		DBG_CALL(Dbg_reloc_transition(M_MACH,
-			rtype,
-			R_SPARC_NONE,
-			arsp->rel_roffset,
-			sdp->sd_name));
+		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH, rtype,
+		    R_SPARC_NONE, arsp->rel_roffset, sdp->sd_name));
 		offset = (uint_t *)(uintptr_t)(arsp->rel_roffset +
-			_elf_getxoff(arsp->rel_isdesc->is_indata) +
-			(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
+		    _elf_getxoff(arsp->rel_isdesc->is_indata) +
+		    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
 		*offset = ((*offset) & (FM3_REG_MSK_RS1 |
-			FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) |
-			GOTOP_ADDINST;
+		    FM3_REG_MSK_RS2 | FM3_REG_MSK_RD)) | GOTOP_ADDINST;
 		return (FIX_DONE);
 	}
 	/*
@@ -955,15 +925,17 @@ gotop_fixups(Rel_desc *arsp)
 		ifl_name = arsp->rel_isdesc->is_file->ifl_name;
 	else
 		ifl_name = MSG_INTL(MSG_STR_NULL);
-	eprintf(ERR_FATAL, MSG_INTL(MSG_REL_BADGOTFIX),
-	    conv_reloc_SPARC_type_str(arsp->rel_rtype),
+
+	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTFIX),
+	    conv_reloc_SPARC_type(arsp->rel_rtype),
 	    ifl_name, demangle(arsp->rel_sname));
+
 	assert(0);
 	return (FIX_ERROR);
 }
 
 uintptr_t
-do_activerelocs(Ofl_desc *ofl)
+ld_do_activerelocs(Ofl_desc *ofl)
 {
 	Rel_desc	*arsp;
 	Rel_cache	*rcp;
@@ -972,7 +944,7 @@ do_activerelocs(Ofl_desc *ofl)
 	Word		flags = ofl->ofl_flags;
 	Word		dtflags1 = ofl->ofl_dtflags_1;
 
-	DBG_CALL(Dbg_reloc_doactiverel());
+	DBG_CALL(Dbg_reloc_doact_title(ofl->ofl_lml));
 	/*
 	 * Process active relocations.
 	 */
@@ -995,7 +967,8 @@ do_activerelocs(Ofl_desc *ofl)
 			    ((arsp->rel_flags &
 			    (FLG_REL_GOT | FLG_REL_BSS |
 			    FLG_REL_PLT | FLG_REL_NOINFO)) == 0)) {
-				DBG_CALL(Dbg_reloc_discard(M_MACH, arsp));
+				DBG_CALL(Dbg_reloc_discard(ofl->ofl_lml,
+				    M_MACH, arsp));
 				continue;
 			}
 
@@ -1005,7 +978,7 @@ do_activerelocs(Ofl_desc *ofl)
 			if (arsp->rel_flags & FLG_REL_TLSFIX) {
 				Fixupret	ret;
 
-				if ((ret = tls_fixups(arsp)) == FIX_ERROR)
+				if ((ret = tls_fixups(ofl, arsp)) == FIX_ERROR)
 					return (S_ERROR);
 				if (ret == FIX_DONE)
 					continue;
@@ -1017,7 +990,8 @@ do_activerelocs(Ofl_desc *ofl)
 			if (arsp->rel_flags & FLG_REL_GOTFIX) {
 				Fixupret	ret;
 
-				if ((ret = gotop_fixups(arsp)) == FIX_ERROR)
+				if ((ret =
+				    gotop_fixups(ofl, arsp)) == FIX_ERROR)
 					return (S_ERROR);
 				if (ret == FIX_DONE)
 					continue;
@@ -1028,7 +1002,7 @@ do_activerelocs(Ofl_desc *ofl)
 			 * expanded move table, adjust the relocation entries.
 			 */
 			if (arsp->rel_move)
-				adj_movereloc(ofl, arsp);
+				ld_adj_movereloc(ofl, arsp);
 
 			sdp = arsp->rel_sym;
 			refaddr = arsp->rel_roffset +
@@ -1046,7 +1020,7 @@ do_activerelocs(Ofl_desc *ofl)
 				 * is based off of that sections position.
 				 */
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
-				    (sym = am_I_partial(arsp,
+				    (sym = ld_am_I_partial(arsp,
 				    arsp->rel_roffset))) {
 					/*
 					 * If the symbol is moved,
@@ -1099,7 +1073,7 @@ do_activerelocs(Ofl_desc *ofl)
 			 */
 			if (IS_PLT(arsp->rel_rtype)) {
 				if (sdp->sd_aux && sdp->sd_aux->sa_PLTndx)
-					value = calc_plt_addr(sdp, ofl);
+					value = ld_calc_plt_addr(sdp, ofl);
 			}
 
 			/*
@@ -1144,7 +1118,7 @@ do_activerelocs(Ofl_desc *ofl)
 				else
 					gref = GOT_REF_GENERIC;
 
-				gnp = find_gotndx(&(sdp->sd_GOTndxs), gref,
+				gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), gref,
 				    ofl, arsp);
 				assert(gnp);
 
@@ -1163,7 +1137,8 @@ do_activerelocs(Ofl_desc *ofl)
 				R2addr = R1addr + (uintptr_t)
 				    arsp->rel_osdesc->os_outdata->d_buf;
 
-				DBG_CALL(Dbg_reloc_doact(M_MACH,
+				DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml,
+				    ELF_DBG_LD, M_MACH, SHT_RELA,
 				    arsp->rel_rtype, R1addr, value,
 				    arsp->rel_sname, arsp->rel_osdesc));
 
@@ -1194,7 +1169,7 @@ do_activerelocs(Ofl_desc *ofl)
 				else if (arsp->rel_flags & FLG_REL_MTLS)
 					gref = GOT_REF_TLSLD;
 
-				gnp = find_gotndx(&(sdp->sd_GOTndxs), gref,
+				gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), gref,
 				    ofl, arsp);
 				assert(gnp);
 
@@ -1204,7 +1179,7 @@ do_activerelocs(Ofl_desc *ofl)
 			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				Gotndx	*gnp;
 
-				gnp = find_gotndx(&(sdp->sd_GOTndxs),
+				gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
 				    GOT_REF_GENERIC, ofl, arsp);
 				assert(gnp);
 
@@ -1239,8 +1214,9 @@ do_activerelocs(Ofl_desc *ofl)
 			 * see this.
 			 */
 			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_SPARC_type_str(arsp->rel_rtype),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_EMPTYSEC),
+				    conv_reloc_SPARC_type(arsp->rel_rtype),
 				    ifl_name, demangle(arsp->rel_sname),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
@@ -1254,28 +1230,29 @@ do_activerelocs(Ofl_desc *ofl)
 			    is_indata));
 
 			/*LINTED*/
-			DBG_CALL(Dbg_reloc_doact(M_MACH, arsp->rel_rtype,
-			    (Xword)(uintptr_t)addr, value, arsp->rel_sname,
-			    arsp->rel_osdesc));
+			DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml, ELF_DBG_LD,
+			    M_MACH, SHT_RELA, arsp->rel_rtype, EC_NATPTR(addr),
+			    value, arsp->rel_sname, arsp->rel_osdesc));
 			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
 
-			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_ehdr) >
+			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
 			    ofl->ofl_size) || (arsp->rel_roffset >
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
 				int	class;
 
 				if (((uintptr_t)addr -
-				    (uintptr_t)ofl->ofl_ehdr) > ofl->ofl_size)
+				    (uintptr_t)ofl->ofl_nehdr) > ofl->ofl_size)
 					class = ERR_FATAL;
 				else
 					class = ERR_WARNING;
 
-				eprintf(class, MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_SPARC_type_str(arsp->rel_rtype),
+				eprintf(ofl->ofl_lml, class,
+				    MSG_INTL(MSG_REL_INVALOFFSET),
+				    conv_reloc_SPARC_type(arsp->rel_rtype),
 				    ifl_name, arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -
-				    (uintptr_t)ofl->ofl_ehdr));
+				    (uintptr_t)ofl->ofl_nehdr));
 
 				if (class == ERR_FATAL) {
 					return_code = S_ERROR;
@@ -1290,7 +1267,8 @@ do_activerelocs(Ofl_desc *ofl)
 			if ((flags & FLG_OF_RELOBJ) ||
 			    !(dtflags1 & DF_1_NORELOC)) {
 				if (do_reloc((uchar_t)arsp->rel_rtype, addr,
-				    &value, arsp->rel_sname, ifl_name) == 0)
+				    &value, arsp->rel_sname, ifl_name,
+				    ofl->ofl_lml) == 0)
 					return_code = S_ERROR;
 			}
 		}
@@ -1299,7 +1277,7 @@ do_activerelocs(Ofl_desc *ofl)
 }
 
 uintptr_t
-add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
+ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Rel_desc	*orsp;
 	Rel_cache	*rcp;
@@ -1329,8 +1307,9 @@ add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 */
 		if ((rtype == R_SPARC_HIPLT22) ||
 		    (rtype == R_SPARC_LOPLT10)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNRELREL),
-			    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_UNRELREL),
+			    conv_reloc_SPARC_type(rsp->rel_rtype),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    demangle(rsp->rel_sname));
 			return (S_ERROR);
@@ -1345,8 +1324,9 @@ add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 */
 		if ((rtype == R_SPARC_H44) || (rtype == R_SPARC_M44) ||
 		    (rtype == R_SPARC_L44)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_SHOBJABS44),
-			    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_SHOBJABS44),
+			    conv_reloc_SPARC_type(rsp->rel_rtype),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    demangle(rsp->rel_sname));
 			return (S_ERROR);
@@ -1448,7 +1428,7 @@ add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	if (orsp->rel_rtype == M_R_RELATIVE)
 		ofl->ofl_relocrelcnt++;
 
-#ifdef	_ELF64
+#if	defined(_ELF64)
 	/*
 	 * When building a 64-bit object any R_SPARC_WDISP30 relocation is given
 	 * a plt padding entry, unless we're building a relocatable object
@@ -1482,9 +1462,10 @@ add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		ofl->ofl_dtflags_1 |= DF_1_DISPRELPND;
 
 		if (ofl->ofl_flags & FLG_OF_VERBOSE)
-			disp_errmsg(MSG_INTL(MSG_REL_DISPREL4), orsp, ofl);
+			ld_disp_errmsg(MSG_INTL(MSG_REL_DISPREL4), orsp, ofl);
 	}
-	DBG_CALL(Dbg_reloc_ors_entry(M_MACH, orsp));
+	DBG_CALL(Dbg_reloc_ors_entry(ofl->ofl_lml, ELF_DBG_LD, SHT_RELA,
+	    M_MACH, orsp));
 	return (1);
 }
 
@@ -1500,7 +1481,7 @@ add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
  * appropriate.
  */
 uintptr_t
-reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
+ld_reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
 {
 	if (ofl->ofl_flags & FLG_OF_MULDEFS) {
 		Ifl_desc *	ifl = isp->is_file;
@@ -1521,14 +1502,14 @@ reloc_register(Rel_desc * rsp, Is_desc * isp, Ofl_desc * ofl)
 		if (sdp && (sdp->sd_file != ifl))
 			return (1);
 	}
-	return (add_outrel((rsp->rel_flags | FLG_REL_REG), rsp, ofl));
+	return (ld_add_outrel((rsp->rel_flags | FLG_REL_REG), rsp, ofl));
 }
 
 /*
  * process relocation for a LOCAL symbol
  */
 uintptr_t
-reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
+ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word		flags = ofl->ofl_flags;
 	Sym_desc	*sdp = rsp->rel_sym;
@@ -1558,11 +1539,11 @@ reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		if ((rsp->rel_rtype != R_SPARC_32) &&
 		    (rsp->rel_rtype != R_SPARC_PLT32) &&
 		    (rsp->rel_rtype != R_SPARC_64))
-			return (add_outrel((FLG_REL_SCNNDX | FLG_REL_ADVAL),
+			return (ld_add_outrel((FLG_REL_SCNNDX | FLG_REL_ADVAL),
 			    rsp, ofl));
 
 		rsp->rel_rtype = R_SPARC_RELATIVE;
-		if (add_outrel(FLG_REL_ADVAL, rsp, ofl) == S_ERROR)
+		if (ld_add_outrel(FLG_REL_ADVAL, rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = ortype;
 		return (1);
@@ -1595,8 +1576,9 @@ reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		if (rsp->rel_osdesc &&
 		    (rsp->rel_osdesc->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
 			return (0);
-		(void) eprintf(ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
-		    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(MSG_REL_EXTERNSYM),
+		    conv_reloc_SPARC_type(rsp->rel_rtype),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
 		return (1);
@@ -1605,11 +1587,11 @@ reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	/*
 	 * Perform relocation.
 	 */
-	return (add_actrel(NULL, rsp, ofl));
+	return (ld_add_actrel(NULL, rsp, ofl));
 }
 
 uintptr_t
-reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
+ld_reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word	rtype = rsp->rel_rtype;
 
@@ -1620,7 +1602,7 @@ reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		 */
 		if (rtype == R_SPARC_GOTDATA_OP)
 			return (1);
-		return (reloc_GOT_relative(local, rsp, ofl));
+		return (ld_reloc_GOT_relative(local, rsp, ofl));
 	}
 
 	/*
@@ -1630,11 +1612,11 @@ reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 *	R_*_GOTDATA_OP_LOX10 -> R_*_GOTDATA_LOX10
 	 *	R_*_GOTDATA_OP ->	instruction fixup
 	 */
-	return (add_actrel(FLG_REL_GOTFIX, rsp, ofl));
+	return (ld_add_actrel(FLG_REL_GOTFIX, rsp, ofl));
 }
 
 uintptr_t
-reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
+ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word		rtype = rsp->rel_rtype;
 	Sym_desc	*sdp = rsp->rel_sym;
@@ -1647,8 +1629,8 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 */
 	if ((ofl->ofl_flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
 	    (FLG_OF_STATIC | FLG_OF_EXEC)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
-		    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
+		    conv_reloc_SPARC_type(rsp->rel_rtype),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname));
 		return (S_ERROR);
@@ -1659,11 +1641,12 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 * are illegal.
 	 */
 	if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_TLS) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
-		    conv_reloc_SPARC_type_str(rsp->rel_rtype),
-		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname),
-		    conv_info_type_str(ofl->ofl_e_machine,
+		Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
+
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
+		    conv_reloc_SPARC_type(rsp->rel_rtype),
+		    ifl->ifl_name, demangle(rsp->rel_sname),
+		    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
 		    ELF_ST_TYPE(sdp->sd_sym->st_info)));
 		return (S_ERROR);
 	}
@@ -1698,8 +1681,9 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			 * the current object.
 			 */
 			if (IS_TLS_LD(rtype) || IS_TLS_LE(rtype)) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
-				    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_TLSBND),
+				    conv_reloc_SPARC_type(rsp->rel_rtype),
 				    rsp->rel_isdesc->is_file->ifl_name,
 				    demangle(rsp->rel_sname),
 				    sdp->sd_file->ifl_name);
@@ -1713,33 +1697,33 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			    (rtype == R_SPARC_TLS_GD_LO10) ||
 			    (rtype == R_SPARC_TLS_IE_HI22) ||
 			    (rtype == R_SPARC_TLS_IE_LO10)) &&
-			    ((gnp = find_gotndx(&(sdp->sd_GOTndxs),
+			    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
 			    GOT_REF_TLSIE, ofl, rsp)) == 0)) {
-				if (assign_gotndx(&(sdp->sd_GOTndxs), gnp,
+				if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp,
 				    GOT_REF_TLSIE, ofl, rsp, sdp) == S_ERROR)
 					return (S_ERROR);
 				rsp->rel_rtype = M_R_TPOFF;
-				if (add_outrel((FLG_REL_GOT | FLG_REL_STLS),
+				if (ld_add_outrel((FLG_REL_GOT | FLG_REL_STLS),
 				    rsp, ofl) == S_ERROR)
 					return (S_ERROR);
 				rsp->rel_rtype = rtype;
 			}
 
 			if (IS_TLS_IE(rtype))
-				return (add_actrel(FLG_REL_STLS, rsp, ofl));
+				return (ld_add_actrel(FLG_REL_STLS, rsp, ofl));
 
 			/*
 			 * If (GD) reference models - fixups
 			 * are required.
 			 */
-			return (add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS),
+			return (ld_add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS),
 			    rsp, ofl));
 		}
 		/*
 		 * LE access model
 		 */
 		if (IS_TLS_LE(rtype))
-			return (add_actrel(FLG_REL_STLS, rsp, ofl));
+			return (ld_add_actrel(FLG_REL_STLS, rsp, ofl));
 
 		/*
 		 * When building a executable - these relocations
@@ -1748,7 +1732,8 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		if (rtype == R_SPARC_TLS_IE_ADD)
 			return (1);
 
-		return (add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS), rsp, ofl));
+		return (ld_add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS),
+		    rsp, ofl));
 	}
 
 	/*
@@ -1760,8 +1745,8 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 * will work here.
 	 */
 	if (IS_TLS_IE(rtype) || IS_TLS_LE(rtype)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_TLSIE),
-		    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSIE),
+		    conv_reloc_SPARC_type(rsp->rel_rtype),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname));
 		return (S_ERROR);
@@ -1771,8 +1756,8 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 * LD access mode can only bind to local symbols.
 	 */
 	if (!local && IS_TLS_LD(rtype)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
-		    conv_reloc_SPARC_type_str(rsp->rel_rtype),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
+		    conv_reloc_SPARC_type(rsp->rel_rtype),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname),
 		    sdp->sd_file->ifl_name);
@@ -1792,9 +1777,9 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 */
 	if (((rtype == R_SPARC_TLS_LDM_HI22) ||
 	    (rtype == R_SPARC_TLS_LDM_LO10)) &&
-	    ((gnp = find_gotndx(&(sdp->sd_GOTndxs),
+	    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
 	    GOT_REF_TLSLD, ofl, rsp)) == 0)) {
-		if (assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSLD,
+		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSLD,
 		    ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = M_R_DTPMOD;
@@ -1802,15 +1787,15 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		if (local)
 			rflags |= FLG_REL_SCNNDX;
 
-		if (add_outrel(rflags, rsp, ofl) == S_ERROR)
+		if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 
 		rsp->rel_rtype = rtype;
 
 	} else if (((rtype == R_SPARC_TLS_GD_HI22) || (rtype ==
-	    R_SPARC_TLS_GD_LO10)) && ((gnp = find_gotndx(&(sdp->sd_GOTndxs),
+	    R_SPARC_TLS_GD_LO10)) && ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
 	    GOT_REF_TLSGD, ofl, rsp)) == 0)) {
-		if (assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSGD,
+		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSGD,
 		    ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = M_R_DTPMOD;
@@ -1818,17 +1803,17 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		if (local)
 			rflags |= FLG_REL_SCNNDX;
 
-		if (add_outrel(rflags, rsp, ofl) == S_ERROR)
+		if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 
 		if (local == TRUE) {
 			rsp->rel_rtype = M_R_DTPOFF;
-			if (add_actrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
+			if (ld_add_actrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
 			    ofl) == S_ERROR)
 				return (S_ERROR);
 		} else {
 			rsp->rel_rtype = M_R_DTPOFF;
-			if (add_outrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
+			if (ld_add_outrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
 			    ofl) == S_ERROR)
 				return (S_ERROR);
 		}
@@ -1842,13 +1827,13 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	if ((rtype == R_SPARC_TLS_GD_CALL) || (rtype == R_SPARC_TLS_LDM_CALL)) {
 		Sym_desc *	tlsgetsym;
 
-		if ((tlsgetsym = sym_add_u(MSG_ORIG(MSG_SYM_TLSGETADDR_U),
+		if ((tlsgetsym = ld_sym_add_u(MSG_ORIG(MSG_SYM_TLSGETADDR_U),
 		    ofl)) == (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 		rsp->rel_sym = tlsgetsym;
 		rsp->rel_sname = tlsgetsym->sd_name;
 		rsp->rel_rtype = R_SPARC_WPLT30;
-		if (reloc_plt(rsp, ofl) == S_ERROR)
+		if (ld_reloc_plt(rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 		rsp->rel_sym = sdp;
 		rsp->rel_sname = sdp->sd_name;
@@ -1857,13 +1842,13 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	}
 
 	if (IS_TLS_LD(rtype))
-		return (add_actrel(FLG_REL_MTLS, rsp, ofl));
+		return (ld_add_actrel(FLG_REL_MTLS, rsp, ofl));
 
-	return (add_actrel(FLG_REL_DTLS, rsp, ofl));
+	return (ld_add_actrel(FLG_REL_DTLS, rsp, ofl));
 }
 
 /*
- * allocate_got: if a GOT is to be made, after the section is built this
+ * ld_allocate_got: if a GOT is to be made, after the section is built this
  * function is called to allocate all the GOT slots.  The allocation is
  * deferred until after all GOTs have been counted and sorted according
  * to their size, for only then will we know how to allocate them on
@@ -1875,7 +1860,7 @@ static	Sword small_index;	/* starting index for small GOT entries */
 static	Sword large_index;	/* starting index for large GOT entries */
 
 uintptr_t
-assign_got(Sym_desc * sdp)
+ld_assign_got(Ofl_desc *ofl, Sym_desc * sdp)
 {
 	Listnode *	lnp;
 	Gotndx *	gnp;
@@ -1901,7 +1886,8 @@ assign_got(Sym_desc * sdp)
 			large_index += gotents;
 			break;
 		default:
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_ASSIGNGOT),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_ASSIGNGOT),
 			    EC_XWORD(gnp->gn_gotndx), demangle(sdp->sd_name));
 			return (S_ERROR);
 		}
@@ -1909,12 +1895,11 @@ assign_got(Sym_desc * sdp)
 	return (1);
 }
 
-
 /*
  * Search the GOT index list for a GOT entry with the proper addend.
  */
 Gotndx *
-find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
+ld_find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
 {
 	Listnode *	lnp;
 	Gotndx *	gnp;
@@ -1931,7 +1916,7 @@ find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
 }
 
 Xword
-calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
+ld_calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 {
 	Os_desc		*osp = ofl->ofl_osgot;
 	Sym_desc	*sdp = rdesc->rel_sym;
@@ -1948,7 +1933,7 @@ calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 	else
 		gref = GOT_REF_GENERIC;
 
-	gnp = find_gotndx(&(sdp->sd_GOTndxs), gref, ofl, rdesc);
+	gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), gref, ofl, rdesc);
 	assert(gnp);
 
 	gotndx = (Xword)gnp->gn_gotndx;
@@ -1962,7 +1947,7 @@ calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 }
 
 uintptr_t
-assign_gotndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
+ld_assign_gotndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
     Rel_desc * rsp, Sym_desc * sdp)
 {
 	Xword		raddend;
@@ -2041,14 +2026,14 @@ assign_gotndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
 }
 
 void
-assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
+ld_assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
 {
 	sdp->sd_aux->sa_PLTndx = 1 + ofl->ofl_pltcnt++;
 }
 
 
 uintptr_t
-allocate_got(Ofl_desc * ofl)
+ld_allocate_got(Ofl_desc * ofl)
 {
 	Sym_desc *	sdp;
 	Addr		addr;
@@ -2057,7 +2042,7 @@ allocate_got(Ofl_desc * ofl)
 	 * Sanity check -- is this going to fit at all?
 	 */
 	if (smlgotcnt >= M_GOT_MAXSMALL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_SMALLGOT),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_SMALLGOT),
 		    EC_WORD(smlgotcnt), M_GOT_MAXSMALL);
 		return (S_ERROR);
 	}
@@ -2079,9 +2064,9 @@ allocate_got(Ofl_desc * ofl)
 	 * Assign bias to GOT symbols.
 	 */
 	addr = -neggotoffset * M_GOT_ENTSIZE;
-	if (sdp = sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH, 0, ofl))
+	if (sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH, 0, ofl))
 		sdp->sd_sym->st_value = addr;
-	if (sdp = sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl))
+	if (sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl))
 		sdp->sd_sym->st_value = addr;
 
 	if (ofl->ofl_tlsldgotndx) {
@@ -2096,12 +2081,12 @@ allocate_got(Ofl_desc * ofl)
  * Initializes .got[0] with the _DYNAMIC symbol value.
  */
 uintptr_t
-fillin_gotplt1(Ofl_desc * ofl)
+ld_fillin_gotplt(Ofl_desc * ofl)
 {
 	if (ofl->ofl_osgot) {
 		Sym_desc *	sdp;
 
-		if ((sdp = sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
+		if ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
 		    SYM_NOHASH, 0, ofl)) != NULL) {
 			uchar_t	*genptr = ((uchar_t *)
 			    ofl->ofl_osgot->os_outdata->d_buf +
@@ -2112,17 +2097,4 @@ fillin_gotplt1(Ofl_desc * ofl)
 		}
 	}
 	return (1);
-}
-
-
-/*
- * Return plt[0].
- */
-Addr
-fillin_gotplt2(Ofl_desc * ofl)
-{
-	if (ofl->ofl_osplt)
-		return (ofl->ofl_osplt->os_shdr->sh_addr);
-	else
-		return (0);
 }

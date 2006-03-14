@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,26 +18,24 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# cmd/sgs/Makefile.var
-#
 
-# The link-editor related source files and Makefile files
-# are unified for on10-gate, on{81,28,998}-patch gates.
-# However, some of the compiler pre-processor flags, linker flags
-# are different among the releases. This file is used to
-# specify such flags. 
+# The link-editor related source files and Makefile files are normally unified
+# across all presently maintained release gates.  However, some of the compiler
+# pre-processor flags, linker flags are different among the releases.  This
+# file is used to specify such flags. 
 # 
 # This file is included by the ./Makefile.com.
 # 
-# This file should be the only file which is different
-# among /ws/{on10-gate,on{81,28,998}-patch} workspaces
-# among the files which generate link-editors and related tools.
+# This file should be the only file which is different among the presently
+# maintained release workspaces and the files that generate the link-editors
+# and related tools.
 
 #
 # CPPFEATUREMACROS provides for selectively turning on/off features within the
@@ -114,20 +111,14 @@ VAR_XFFLAG=		-xF=%all
 
 VAR_LINTFLAGS64=	-Xarch=$(MACH64:sparcv9=v9)
 VAR_I386_ARCH=		intel
+
 VAR_PLAT_sparc=		sparc
 VAR_PLAT_i386=		intel/ia32
 VAR_PLAT_amd64=		intel/amd64
-VAR_MAPDIR_sparc=	../spec/sparc
-VAR_MAPDIR_sparcv9=	../spec/sparcv9
-VAR_MAPDIR_i386=	../spec/i386
-VAR_MAPDIR_amd64=	../spec/amd64
 
 VAR_POUND_1=
 VAR_POUND_2=		$(POUND_SIGN)
 VAR_POUND_3=		$(POUND_SIGN)
-
-VAR_SPEC_ON=		
-VAR_SPEC_OFF=		$(POUND_SIGN)
 
 #
 # VAR_AVLDIR - directory to find avl.c in.
@@ -144,7 +135,7 @@ VAR_SPEC_OFF=		$(POUND_SIGN)
 # files avl.c, avl.h and avl_impl.h until these files are back ported into
 # the system.
 #
-VAR_AVLDIR=$(SRCBASE)/common/avl
+VAR_AVLDIR=		$(SRCBASE)/common/avl
 VAR_AVLINCDIR=
 
 #

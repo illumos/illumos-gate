@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,75 +18,115 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
 /* PROTOLIB1 */
-
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved. 
- * Use is subject to license terms.
- */ 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdlib.h>
 #include	<libelf.h>
 #include	<sys/machelf.h>
-#include	"sgs.h"
+#include	<sgs.h>
+#include	<libld.h>
+#include	<conv.h>
 
+/*
+ * Define all generic interfaces.
+ */
 void		conv_check_native(char **, char **);
-const char	*conv_binding_str(uint_t);
-const char	*conv_bindent_str(uint_t);
-const char	*conv_captag_str(uint64_t);
-const char	*conv_capval_str(uint64_t, uint64_t, ushort_t);
+const char      *conv_config_feat(int);
 const char	*conv_config_obj(ushort_t);
-const char	*conv_config_str(int);
-const char	*conv_d_type_str(Elf_Type);
-const char	*conv_deftag_str(int);
-const char	*conv_dlflag_str(int, int);
-const char	*conv_dlmode_str(int, int);
-const char	*conv_dyntag_str(uint64_t, ushort_t);
-const char	*conv_dynflag_str(uint_t);
-const char	*conv_dynflag_1_str(uint_t);
-const char	*conv_dynposflag_1_str(uint_t);
-const char	*conv_dynfeature_1_str(uint_t);
-const char	*conv_dwarf_ehe_str(uint_t);
-const char	*conv_eclass_str(uchar_t);
-const char	*conv_edata_str(uchar_t);
-const char	*conv_emach_str(ushort_t);
-const char	*conv_ever_str(uint_t);
-const char	*conv_etype_str(ushort_t);
-const char	*conv_eflags_str(ushort_t, uint_t);
-const char	*conv_hwcap_1_str(uint64_t, ushort_t);
-const char	*conv_hwcap_1_386_str(uint64_t);
-const char	*conv_hwcap_1_SPARC_str(uint64_t);
-const char	*conv_sfcap_1_str(uint64_t, ushort_t);
-const char	*conv_grphdrflags_str(uint_t);
-const char	*conv_info_bind_str(uchar_t);
-const char	*conv_info_type_str(ushort_t, uchar_t);
+const char	*conv_config_upm(const char *, const char *, const char *,
+		    size_t);
+const char	*conv_def_tag(Symref);
+const char	*conv_demangle_name(const char *);
+const char	*conv_dl_flag(int, int);
+const char	*conv_dl_mode(int, int);
+const char	*conv_dwarf_ehe(uint_t);
+const char	*conv_elfdata_type(Elf_Type);
+int		conv_expn_field(char *, size_t, const Val_desc *, Xword, Xword,
+		    const char *, int);
+const char	*conv_grphdl_flags(uint_t);
 Isa_desc	*conv_isalist(void);
 const char	*conv_lddstub(int);
-const char	*conv_phdrflg_str(uint_t);
-const char	*conv_phdrtyp_str(ushort_t, uint_t);
-const char	*conv_reject_str(Rej_desc *);
-const char	*conv_reloc_type_str(ushort_t, uint_t);
-const char	*conv_reloc_amd64_type_str(uint_t);
-const char	*conv_reloc_SPARC_type_str(uint_t);
-const char	*conv_reloc_386_type_str(uint_t);
-const char	*conv_sym_dem(const char *);
-const char	*conv_sym_stother(uchar_t);
-const char	*conv_sym_value_str(ushort_t, uint_t, uint64_t);
-const char	*conv_sym_SPARC_value_str(uint64_t);
-const char	*conv_secflg_str(ushort_t, uint_t);
-const char	*conv_secinfo_str(uint_t, uint_t);
-const char	*conv_sectyp_str(ushort_t, uint_t);
-const char	*conv_segaflg_str(uint_t);
-const char	*conv_shndx_str(ushort_t);
+const char	*conv_seg_flags(Half);
 int		conv_sys_eclass(void);
 Uts_desc	*conv_uts(void);
-const char	*conv_upm_string(const char *, const char *, const char *,
-		    size_t);
-const char	*conv_verflg_str(ushort_t);
+const char	*conv_ver_flags(Half);
+
+/*
+ * Define all class specific routines.
+ */
+const char	*conv32_bnd_obj(uint_t);
+const char	*conv64_bnd_obj(uint_t);
+const char	*conv32_bnd_type(uint_t);
+const char	*conv64_bnd_type(uint_t);
+const char	*conv32_cap_tag(Elf32_Word);
+const char	*conv64_cap_tag(Elf64_Xword);
+const char	*conv32_cap_val(Elf32_Word, Elf32_Word, Half);
+const char	*conv64_cap_val(Elf64_Xword, Elf64_Xword, Half);
+const char	*conv32_cap_val_hw1(Elf32_Word, Half);
+const char	*conv64_cap_val_hw1(Elf64_Xword, Half);
+const char	*conv32_cap_val_sf1(Elf32_Word, Half);
+const char	*conv64_cap_val_sf1(Elf64_Xword, Half);
+const char	*conv32_dyn_flag1(Elf32_Word);
+const char	*conv64_dyn_flag1(Elf64_Xword);
+const char	*conv32_dyn_flag(Elf32_Word);
+const char	*conv64_dyn_flag(Elf64_Xword);
+const char	*conv32_dyn_posflag1(Elf32_Word);
+const char	*conv64_dyn_posflag1(Elf64_Xword);
+const char	*conv32_dyn_tag(Elf32_Word, Elf32_Half);
+const char	*conv64_dyn_tag(Elf64_Xword, Elf64_Half);
+const char	*conv32_dyn_feature1(Elf32_Word);
+const char	*conv64_dyn_feature1(Elf64_Xword);
+const char	*conv32_ehdr_class(uchar_t);
+const char	*conv64_ehdr_class(uchar_t);
+const char	*conv32_ehdr_data(uchar_t);
+const char	*conv64_ehdr_data(uchar_t);
+const char	*conv32_ehdr_flags(Elf32_Half, Elf32_Word);
+const char	*conv64_ehdr_flags(Elf64_Half, Elf64_Word);
+const char	*conv32_ehdr_mach(Elf32_Half);
+const char	*conv64_ehdr_mach(Elf64_Half);
+const char	*conv32_ehdr_type(Elf32_Half);
+const char	*conv64_ehdr_type(Elf64_Half);
+const char	*conv32_ehdr_vers(Elf32_Word);
+const char	*conv64_ehdr_vers(Elf64_Word);
+const char	*conv32_invalid_val(char *, size_t, Elf32_Word, int);
+const char	*conv64_invalid_val(char *, size_t, Elf64_Xword, int);
+const char	*conv32_phdr_flags(Word);
+const char	*conv64_phdr_flags(Word);
+const char	*conv32_phdr_type(Elf32_Half, Word);
+const char	*conv64_phdr_type(Elf64_Half, Word);
+const char	*conv32_reject_desc(Rej_desc *);
+const char	*conv64_reject_desc(Rej_desc *);
+const char	*conv32_reloc_type(Half, Word);
+const char	*conv64_reloc_type(Half, Word);
+const char	*conv32_reloc_386_type(Word);
+const char	*conv64_reloc_386_type(Word);
+const char	*conv32_reloc_amd64_type(Word);
+const char	*conv64_reloc_amd64_type(Word);
+const char	*conv32_reloc_SPARC_type(Word);
+const char	*conv64_reloc_SPARC_type(Word);
+const char	*conv32_sec_flags(Elf32_Word);
+const char	*conv64_sec_flags(Elf64_Xword);
+const char	*conv32_sec_info(Elf32_Word, Elf32_Word);
+const char	*conv64_sec_info(Elf64_Word, Elf64_Xword);
+const char	*conv32_sec_type(Elf32_Half, Elf32_Word);
+const char	*conv64_sec_type(Elf64_Half, Elf64_Word);
+const char	*conv32_sym_info_bind(uchar_t);
+const char	*conv64_sym_info_bind(uchar_t);
+const char	*conv32_sym_info_type(Elf32_Half, uchar_t);
+const char	*conv64_sym_info_type(Elf64_Half, uchar_t);
+const char	*conv32_sym_shndx(Elf32_Half);
+const char	*conv64_sym_shndx(Elf64_Half);
+const char	*conv32_sym_other(uchar_t);
+const char	*conv64_sym_other(uchar_t);
+const char	*conv32_sym_value(Elf32_Half, uchar_t, Elf32_Addr);
+const char	*conv64_sym_value(Elf64_Half, uchar_t, Elf64_Addr);
+const char	*conv32_sym_SPARC_value(Elf32_Addr);
+const char	*conv64_sym_SPARC_value(Elf64_Addr);

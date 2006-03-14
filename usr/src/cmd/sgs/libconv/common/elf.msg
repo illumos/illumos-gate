@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,9 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Message file for cmd/sgs/libconv/common/elf.c
 
 @ MSG_ELFCLASSNONE	"ELFCLASSNONE"
 @ MSG_ELFCLASS32	"ELFCLASS32"
@@ -149,8 +149,7 @@
 @ MSG_EF_SPARCV9_PSO	" EF_SPARCV9_PSO "
 @ MSG_EF_SPARCV9_RMO	" EF_SPARCV9_RMO "
 
-@ MSG_EF_GEN_1_FLAGS	" %#x "
-@ MSG_EF_GEN_2_FLAGS	"%#x"
+@ MSG_GBL_ZERO		"0"
 
 @ MSG_GBL_OSQBRKT	"["
 @ MSG_GBL_CSQBRKT	"]"

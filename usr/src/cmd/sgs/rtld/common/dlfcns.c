@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- */
-
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,16 +35,16 @@
  */
 #include	"_synonyms.h"
 
+#include	<sys/debug.h>
 #include	<string.h>
 #include	<dlfcn.h>
 #include	<synch.h>
-#include	"debug.h"
+#include	<limits.h>
+#include	<debug.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"msg.h"
-
-#include	<stdio.h>
 
 /*
  * Determine who called us - given a pc determine in which object it resides.
@@ -112,9 +109,9 @@ _caller(caddr_t cpc, int flags)
 char *
 _dlerror()
 {
-	char		*error;
-	Rt_map		*clmp;
-	int		entry;
+	char	*error;
+	Rt_map	*clmp;
+	int	entry;
 
 	entry = enter();
 
@@ -134,9 +131,9 @@ _dlerror()
  * is newly created.
  */
 int
-hdl_add(Grp_hdl * ghp, Rt_map * lmp, uint_t flags)
+hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 {
-	Grp_desc *	gdp;
+	Grp_desc	*gdp;
 	Aliste		off;
 	int		found = ALE_CREATE;
 
@@ -189,8 +186,8 @@ hdl_add(Grp_hdl * ghp, Rt_map * lmp, uint_t flags)
 Grp_hdl *
 hdl_alloc()
 {
-	Grp_hdl *	ghp;
-	uint_t		ndx;
+	Grp_hdl	*ghp;
+	uint_t	ndx;
 
 	if ((ghp = calloc(sizeof (Grp_hdl), 1)) == 0)
 		return (0);
@@ -209,11 +206,11 @@ hdl_alloc()
  * Create a handle.
  */
 Grp_hdl *
-hdl_create(Lm_list * lml, Rt_map * nlmp, Rt_map * clmp, uint_t flags)
+hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 {
-	Grp_hdl *	ghp = 0, ** ghpp;
+	Grp_hdl		*ghp = 0, ** ghpp;
 	uint_t		hflags;
-	Alist **	alpp;
+	Alist		**alpp;
 	Aliste		off;
 
 	/*
@@ -277,11 +274,13 @@ hdl_create(Lm_list * lml, Rt_map * nlmp, Rt_map * clmp, uint_t flags)
 		 * GLOBAL visibility.
 		 */
 		if (flags & GPH_ZERO) {
-			ghp->gh_owner = lml->lm_head;
+			ghp->gh_ownlmp = lml->lm_head;
+			ghp->gh_ownlml = lml;
 		} else {
 			uint_t	hflags = GPD_AVAIL;
 
-			ghp->gh_owner = nlmp;
+			ghp->gh_ownlmp = nlmp;
+			ghp->gh_ownlml = LIST(nlmp);
 
 			/*
 			 * As an optimization, a handle for ld.so.1 itself
@@ -314,7 +313,7 @@ hdl_create(Lm_list * lml, Rt_map * nlmp, Rt_map * clmp, uint_t flags)
 			list_delete(&hdl_list[HDLIST_ORP], ghp);
 			(void) list_append(&hdl_list[ndx], ghp);
 
-			if (dbg_mask) {
+			if (DBG_ENABLED) {
 				Aliste		off;
 				Grp_desc *	gdp;
 
@@ -413,19 +412,19 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, Rt_map *clmp, int mode, int promote)
  * Sanity check a program-provided handle.
  */
 static int
-hdl_validate(Grp_hdl * ghp)
+hdl_validate(Grp_hdl *ghp)
 {
-	Listnode *	lnp;
-	Grp_hdl *	_ghp;
+	Listnode	*lnp;
+	Grp_hdl		*lghp;
 	uint_t		ndx;
 
 	/* LINTED */
 	ndx = (uintptr_t)ghp % HDLIST_SZ;
 
-	for (LIST_TRAVERSE(&hdl_list[ndx], lnp, _ghp))
-		if ((_ghp == ghp) && (ghp->gh_refcnt != 0))
+	for (LIST_TRAVERSE(&hdl_list[ndx], lnp, lghp)) {
+		if ((lghp == ghp) && (ghp->gh_refcnt != 0))
 			return (1);
-
+	}
 	return (0);
 }
 
@@ -446,7 +445,7 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
 	 * Diagnose what we're up to.
 	 */
 	if (ghp->gh_flags & GPH_ZERO) {
-		DBG_CALL(Dbg_file_dlclose(MSG_ORIG(MSG_STR_ZERO),
+		DBG_CALL(Dbg_file_dlclose(LIST(clmp), MSG_ORIG(MSG_STR_ZERO),
 		    DBG_DLCLOSE_IGNORE));
 	} else {
 		Rt_map		*olmp;
@@ -455,12 +454,12 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
 		/*
 		 * Determine if we've an owner for this handle.
 		 */
-		if ((olmp = ghp->gh_owner) != 0)
+		if ((olmp = ghp->gh_ownlmp) != 0)
 			owner = NAME(olmp);
 		else
 			owner = MSG_INTL(MSG_STR_UNKNOWN);
 
-		DBG_CALL(Dbg_file_dlclose(owner, DBG_DLCLOSE_NULL));
+		DBG_CALL(Dbg_file_dlclose(LIST(clmp), owner, DBG_DLCLOSE_NULL));
 	}
 
 	/*
@@ -489,11 +488,9 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
 int
 dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 {
-	Rt_map		*nlmp = 0;
-	Lm_list		*olml = 0;
-	Aliste		off;
-	Grp_desc	*gdp;
-	int		error;
+	Rt_map	*nlmp = 0;
+	Lm_list	*olml = 0;
+	int	error;
 
 	/*
 	 * Although we're deleting object(s) it's quite possible that additional
@@ -502,14 +499,7 @@ dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 	 * link-map list as those objects being deleted.  Remember this list
 	 * for later investigation.
 	 */
-	if (ghp->gh_owner)
-		olml = LIST(ghp->gh_owner);
-	else {
-		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
-			if ((olml = LIST(gdp->gd_depend)) != 0)
-				break;
-		}
-	}
+	olml = ghp->gh_ownlml;
 
 	error = dlclose_core(ghp, clmp);
 
@@ -539,10 +529,10 @@ dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 static int
 dlclose_check(void *handle, Rt_map *clmp)
 {
-	Grp_hdl *	ghp = (Grp_hdl *)handle;
+	Grp_hdl	*ghp = (Grp_hdl *)handle;
 
-	if (!hdl_validate(ghp)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
+	if (hdl_validate(ghp) == 0) {
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
 		return (1);
 	}
 	return (dlclose_intn(ghp, clmp));
@@ -557,34 +547,52 @@ int
 _dlclose(void *handle)
 {
 	int		error, entry;
-	uint_t		dbg_save;
-	Word		lmflags;
 	Rt_map		*clmp;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
-
 	error = dlclose_check(handle, clmp);
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
 
 	if (entry)
 		leave(LIST(clmp));
 	return (error);
 }
 
+static uint_t	lmid = 0;
+
+/*
+ * The addition of new link-map lists is assumed to be in small quantities.
+ * Here, we assign a unique link-map id for diagnostic use.  Simply update the
+ * running link-map count until we max out.
+ */
+int
+newlmid(Lm_list *lml)
+{
+	char	buffer[MSG_LMID_ALT_SIZE + 12];
+
+	if (lmid == UINT_MAX) {
+		lml->lm_lmid = UINT_MAX;
+		(void) strncpy(buffer, MSG_ORIG(MSG_LMID_MAXED),
+		    MSG_LMID_ALT_SIZE + 12);
+	} else {
+		lml->lm_lmid = lmid++;
+		(void) snprintf(buffer, MSG_LMID_ALT_SIZE + 12,
+		    MSG_ORIG(MSG_LMID_FMT), MSG_ORIG(MSG_LMID_ALT),
+		    lml->lm_lmid);
+	}
+	if ((lml->lm_lmidstr = strdup(buffer)) == 0)
+		return (0);
+
+	return (1);
+}
+
 /*
  * Core dlopen activity.
  */
 static Grp_hdl *
-dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
+dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
     uint_t flags, uint_t orig)
 {
 	Rt_map	*nlmp;
@@ -593,8 +601,8 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	Aliste	olmco, nlmco;
 	Lm_cntl	*lmc;
 
-	DBG_CALL(Dbg_file_dlopen((path ? path : MSG_ORIG(MSG_STR_ZERO)),
-	    NAME(clmp), mode));
+	DBG_CALL(Dbg_file_dlopen(clmp,
+	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), mode));
 
 	/*
 	 * Check for magic link-map list values:
@@ -623,7 +631,8 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 			lml->lm_flags |= LML_FLG_NOAUDIT;
 		}
 
-		if (list_append(&dynlm_list, lml) == 0) {
+		if ((list_append(&dynlm_list, lml) == 0) ||
+		    (newlmid(lml) == 0)) {
 			free(lml);
 			return (0);
 		}
@@ -693,7 +702,7 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	    ((mode & RTLD_FIRST) == 0)) {
 		remove_pnode(pnp);
 		remove_lml(lml);
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
 		return (0);
 	}
 
@@ -771,8 +780,8 @@ Grp_hdl *
 dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
     uint_t flags, uint_t orig, int *loaded)
 {
-	Rt_map *	dlmp = 0;
-	Grp_hdl *	ghp;
+	Rt_map	*dlmp = 0;
+	Grp_hdl	*ghp;
 
 	/*
 	 * Determine the link-map that has just been loaded.
@@ -785,7 +794,7 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 		 * file (crle(1)).
 		 */
 		if ((mode & RTLD_CONFGEN) == 0)
-			dlmp = ghp->gh_owner;
+			dlmp = ghp->gh_ownlmp;
 	}
 
 	/*
@@ -803,14 +812,14 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
  * Argument checking for dlopen.  Only called via external entry.
  */
 static Grp_hdl *
-dlmopen_check(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
+dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
     int *loaded)
 {
 	/*
 	 * Verify that a valid pathname has been supplied.
 	 */
 	if (path && (*path == '\0')) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLPATH));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLPATH));
 		return (0);
 	}
 
@@ -820,19 +829,19 @@ dlmopen_check(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	 * requires a specific pathname, and use of RTLD_PARENT is meaningless.
 	 */
 	if ((mode & (RTLD_NOW | RTLD_LAZY | RTLD_NOLOAD)) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_1));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_1));
 		return (0);
 	}
 	if ((mode & (RTLD_NOW | RTLD_LAZY)) == (RTLD_NOW | RTLD_LAZY)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_2));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_2));
 		return (0);
 	}
 	if ((lml == (Lm_list *)LM_ID_NEWLM) && (path == 0)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_3));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_3));
 		return (0);
 	}
 	if ((lml == (Lm_list *)LM_ID_NEWLM) && (mode & RTLD_PARENT)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_4));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_4));
 		return (0);
 	}
 	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) &&
@@ -856,30 +865,20 @@ dlmopen_check(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 void *
 _dlopen(const char *path, int mode)
 {
-	int		entry, loaded = 0;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map *	clmp;
-	Grp_hdl *	ghp;
-	Lm_list *	lml;
+	int	entry, loaded = 0;
+	Rt_map	*clmp;
+	Grp_hdl	*ghp;
+	Lm_list	*lml;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
 	lml = LIST(clmp);
 
-	if ((lmflags = lml->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
-
 	ghp = dlmopen_check(lml, path, mode, clmp, &loaded);
 
 	if (entry && ghp && loaded)
 		unused(lml);
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
 
 	if (entry)
 		leave(lml);
@@ -894,28 +893,18 @@ _dlopen(const char *path, int mode)
 void *
 _dlmopen(Lmid_t lmid, const char *path, int mode)
 {
-	int		entry, loaded = 0;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map *	clmp;
-	Grp_hdl *	ghp;
+	int	entry, loaded = 0;
+	Rt_map	*clmp;
+	Grp_hdl	*ghp;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
-
 	ghp = dlmopen_check((Lm_list *)lmid, path, mode, clmp, &loaded);
 
-	if (entry && ghp && ghp->gh_owner && loaded)
-		unused(LIST(ghp->gh_owner));
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
+	if (entry && ghp && ghp->gh_ownlmp && loaded)
+		unused(LIST(ghp->gh_ownlmp));
 
 	if (entry)
 		leave(LIST(clmp));
@@ -928,7 +917,7 @@ _dlmopen(Lmid_t lmid, const char *path, int mode)
 Sym *
 dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 {
-	Rt_map		*nlmp, * lmp = ghp->gh_owner;
+	Rt_map		*nlmp, * lmp = ghp->gh_ownlmp;
 	Rt_map		*clmp = slp->sl_cmap;
 	const char	*name = slp->sl_name;
 	Sym		*sym = 0;
@@ -985,7 +974,7 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 		 * need for elf_lazy_find_sym() to descend the link-maps itself.
 		 */
 		if (LIST(lmp)->lm_lazy) {
-			DBG_CALL(Dbg_syms_lazy_rescan(name));
+			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
 
 			sl.sl_flags |= LKUP_NODESCENT;
 
@@ -1028,7 +1017,7 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 		 * attempt to exhaust the search.
 		 */
 		if (LIST(lmp)->lm_lazy) {
-			DBG_CALL(Dbg_syms_lazy_rescan(name));
+			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
 
 			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 				nlmp = gdp->gd_depend;
@@ -1116,7 +1105,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 */
 		sl.sl_imap = nlmp = (Rt_map *)NEXT(clmp);
 
-		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), (nlmp ? NAME(nlmp) :
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, (nlmp ? NAME(nlmp) :
 		    MSG_INTL(MSG_STR_NULL)), DBG_DLSYM_NEXT));
 
 		if (nlmp == 0)
@@ -1129,7 +1118,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		/*
 		 * If the handle is RTLD_SELF start searching from the caller.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), NAME(clmp),
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, NAME(clmp),
 		    DBG_DLSYM_SELF));
 
 		sl.sl_imap = clmp;
@@ -1143,8 +1132,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * If the handle is RTLD_DEFAULT mimic the standard symbol
 		 * lookup as would be triggered by a relocation.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), 0,
-		    DBG_DLSYM_DEFAULT));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_DEFAULT));
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = LKUP_SPEC;
@@ -1162,7 +1150,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * loaded to satisfy this request, but no exhaustive lazy load
 		 * rescan is carried out.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), 0, DBG_DLSYM_PROBE));
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_PROBE));
 
 		sl.sl_imap = hlmp;
 		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALBACK);
@@ -1175,23 +1163,22 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 * Look in the shared object specified by the handle and in all
 		 * of its dependencies.
 		 */
-		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), NAME(ghp->gh_owner),
+		DBG_CALL(Dbg_syms_dlsym(clmp, name, NAME(ghp->gh_ownlmp),
 		    DBG_DLSYM_DEF));
 		sym = LM_DLSYM(clmp)(ghp, &sl, dlmp, &binfo);
 	}
 
 	if (sym) {
+		Lm_list	*lml = LIST(clmp);
 		Addr	addr = sym->st_value;
 
 		if (!(FLAGS(*dlmp) & FLG_RT_FIXED))
 			addr += ADDR(*dlmp);
 
-		DBG_CALL(Dbg_bind_global(NAME(clmp), 0, 0, (Xword)-1,
-		    PLT_T_NONE, NAME(*dlmp), (caddr_t)addr,
-		    (caddr_t)sym->st_value, name, binfo));
+		DBG_CALL(Dbg_bind_global(clmp, 0, 0, (Xword)-1, PLT_T_NONE,
+		    *dlmp, addr, sym->st_value, name, binfo));
 
-		if ((LIST(clmp)->lm_tflags | FLAGS1(clmp)) &
-		    LML_TFLG_AUD_SYMBIND) {
+		if ((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_SYMBIND) {
 			uint_t	sb_flags = LA_SYMB_DLSYM;
 			/* LINTED */
 			uint_t	symndx = (uint_t)(((Xword)sym -
@@ -1211,10 +1198,10 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 void *
 dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 {
-	Rt_map *	llmp = 0;
-	void *		error;
+	Rt_map		*llmp = 0;
+	void		*error;
 	Aliste		off;
-	Grp_desc *	gdp;
+	Grp_desc	*gdp;
 
 	/*
 	 * While looking for symbols it's quite possible that additional objects
@@ -1228,8 +1215,8 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	else {
 		Grp_hdl *	ghp = (Grp_hdl *)handle;
 
-		if (ghp->gh_owner)
-			llmp = LIST(ghp->gh_owner)->lm_tail;
+		if (ghp->gh_ownlmp)
+			llmp = LIST(ghp->gh_ownlmp)->lm_tail;
 		else {
 			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 				if ((llmp = LIST(gdp->gd_depend)->lm_tail) != 0)
@@ -1245,7 +1232,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		 */
 		if (nosym_str == 0)
 			nosym_str = MSG_INTL(MSG_GEN_NOSYM);
-		eprintf(ERR_FATAL, nosym_str, name);
+		eprintf(LIST(clmp), ERR_FATAL, nosym_str, name);
 	}
 
 	load_completion(llmp, clmp);
@@ -1263,13 +1250,13 @@ dlsym_check(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	 * Verify the arguments.
 	 */
 	if (name == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLSYM));
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_ILLSYM));
 		return (0);
 	}
 	if ((handle != RTLD_NEXT) && (handle != RTLD_DEFAULT) &&
 	    (handle != RTLD_SELF) && (handle != RTLD_PROBE) &&
 	    (hdl_validate((Grp_hdl *)handle) == 0)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
 		return (0);
 	}
 	return (dlsym_intn(handle, name, clmp, dlmp));
@@ -1285,20 +1272,13 @@ dlsym_check(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 void *
 _dlsym(void *handle, const char *name)
 {
-	int		entry;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map		*clmp, *dlmp = 0;
-	void		*addr;
+	int	entry;
+	Rt_map	*clmp, *dlmp = 0;
+	void	*addr;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
-
-	if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
 
 	addr = dlsym_check(handle, name, clmp, &dlmp);
 
@@ -1307,9 +1287,6 @@ _dlsym(void *handle, const char *name)
 
 	if (entry && dlmp)
 		is_dep_init(dlmp, clmp);
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
 
 	if (entry)
 		leave(LIST(clmp));
@@ -1346,10 +1323,8 @@ dladdr_core(Rt_map *clmp, void *addr, Dl_info *dlip, void **info, int flags)
 int
 _dladdr(void *addr, Dl_info *dlip)
 {
-	int		entry, error;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map		*clmp;
+	int	entry, error;
+	Rt_map	*clmp;
 
 	entry = enter();
 
@@ -1359,18 +1334,11 @@ _dladdr(void *addr, Dl_info *dlip)
 	 * indicate the failure.
 	 */
 	if ((clmp = _caller((caddr_t)addr, CL_NONE)) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR), EC_ADDR(addr));
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
+		    EC_NATPTR(addr));
 		error = 0;
 	} else {
-		if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-			dbg_save = dbg_mask;
-			dbg_mask = 0;
-		}
-
 		dladdr_core(clmp, addr, dlip, 0, 0);
-
-		if (lmflags & LML_FLG_RTLDLM)
-			dbg_mask = dbg_save;
 		error = 1;
 	}
 
@@ -1384,10 +1352,8 @@ _dladdr(void *addr, Dl_info *dlip)
 int
 _dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 {
-	int		entry, error = 0;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map		*clmp;
+	int	entry, error = 0;
+	Rt_map	*clmp;
 
 	/*
 	 * Validate any flags.
@@ -1397,11 +1363,12 @@ _dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 
 		if (((request = (flags & RTLD_DL_MASK)) != RTLD_DL_SYMENT) &&
 		    (request != RTLD_DL_LINKMAP)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLFLAGS), flags);
+			eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_ILLFLAGS),
+			    flags);
 			return (0);
 		}
 		if (info == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLINFO), flags);
+			eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_ILLINFO), flags);
 			return (0);
 		}
 	}
@@ -1414,20 +1381,14 @@ _dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 	 * indicate the failure.
 	 */
 	if ((clmp = _caller((caddr_t)addr, CL_NONE)) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR), EC_ADDR(addr));
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
+		    EC_NATPTR(addr));
 		error = 0;
 	} else {
-		if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-			dbg_save = dbg_mask;
-			dbg_mask = 0;
-		}
-
 		dladdr_core(clmp, addr, dlip, info, flags);
-
-		if (lmflags & LML_FLG_RTLDLM)
-			dbg_mask = dbg_save;
 		error = 1;
 	}
+
 	if (entry)
 		leave(0);
 	return (error);
@@ -1437,43 +1398,50 @@ _dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
  * Core dldump activity.
  */
 static int
-dldump_core(const char *ipath, const char *opath, int flags)
+dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 {
-	Addr		addr = 0;
-	Rt_map		*lmp;
+	Addr	addr = 0;
+	Rt_map	*lmp;
 
 	/*
 	 * Verify any arguments first.
 	 */
 	if ((!opath || (*opath == '\0')) || (ipath && (*ipath == '\0'))) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLPATH));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLPATH));
 		return (1);
 	}
 
 	/*
-	 * If an input file is specified make sure its one of our dependencies.
+	 * If an input file is specified make sure its one of our dependencies
+	 * on the main link-map list.  Note, this has really all evolved for
+	 * crle(), which uses libcrle.so on an alternative link-map to trigger
+	 * dumping objects from the main link-map list.   If we ever want to
+	 * dump objects from alternative link-maps, this model is going to
+	 * have to be revisited.
 	 */
 	if (ipath) {
 		if ((lmp = is_so_loaded(&lml_main, ipath, 0)) == 0)
 			lmp = is_so_loaded(&lml_main, ipath, 1);
 
 		if (lmp == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE), ipath);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE),
+			    ipath);
 			return (1);
 		}
 		if (FLAGS(lmp) & FLG_RT_ALTER) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_ALTER), ipath);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_ALTER), ipath);
 			return (1);
 		}
 		if (FLAGS(lmp) & FLG_RT_NODUMP) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_NODUMP), ipath);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NODUMP),
+			    ipath);
 			return (1);
 		}
 	} else
 		lmp = lml_main.lm_head;
 
 
-	DBG_CALL(Dbg_file_dldump(NAME(lmp), opath, flags));
+	DBG_CALL(Dbg_file_dldump(lmp, opath, flags));
 
 	/*
 	 * If the object being dump'ed isn't fixed identify its mapping.
@@ -1497,29 +1465,19 @@ dldump_core(const char *ipath, const char *opath, int flags)
 #pragma weak dldump = _dldump
 
 /*
- * External entry for dldump(3dl).  Returns 0 on success, non-zero otherwise.
+ * External entry for dldump(3c).  Returns 0 on success, non-zero otherwise.
  */
 int
 _dldump(const char *ipath, const char *opath, int flags)
 {
-	int		error, entry;
-	uint_t		dbg_save;
-	Word		lmflags;
-	Rt_map		*clmp;
+	int	error, entry;
+	Rt_map	*clmp;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
-
-	error = dldump_core(ipath, opath, flags);
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
+	error = dldump_core(LIST(clmp), ipath, opath, flags);
 
 	if (entry)
 		leave(LIST(clmp));
@@ -1553,10 +1511,11 @@ get_linkmap_id(Lm_list *lml)
 static int
 dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 {
+	Lm_list	*lml = LIST(clmp);
 	Rt_map	*lmp;
 
 	if ((request > RTLD_DI_MAX) || (p == 0)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
 		return (-1);
 	}
 
@@ -1568,7 +1527,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 
 		if ((config->c_name == 0) || (config->c_bgn == 0) ||
 		    (config->c_end == 0)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_NOCONFIG));
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_NOCONFIG));
 			return (-1);
 		}
 		dlip->dli_fname = config->c_name;
@@ -1581,7 +1540,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	 */
 	if (request == RTLD_DI_PROFILENAME) {
 		if (profile_name == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_NOPROFNAME));
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_NOPROFNAME));
 			return (-1);
 		}
 
@@ -1617,7 +1576,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		 */
 		(void) sigfillset(&set);
 		if (sigismember(&set, sig) != 1) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVSIG), sig);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVSIG), sig);
 			return (-1);
 		}
 
@@ -1634,10 +1593,10 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		Grp_hdl *	ghp = (Grp_hdl *)handle;
 
 		if (!hdl_validate(ghp)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
 			return (-1);
 		}
-		lmp = ghp->gh_owner;
+		lmp = ghp->gh_ownlmp;
 	}
 
 	/*
@@ -1726,13 +1685,14 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 			 * there's sufficient space.
 			 */
 			if (size > info->dls_size) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_SERSIZE),
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_SERSIZE),
 				    EC_OFF(info->dls_size));
 				return (-1);
 			}
 			if (cnt > info->dls_cnt) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_SERCNT),
-				    info->dls_cnt);
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_SERCNT), info->dls_cnt);
 				return (-1);
 			}
 
@@ -1785,23 +1745,13 @@ int
 _dlinfo(void *handle, int request, void *p)
 {
 	int	error, entry;
-	uint_t	dbg_save;
-	Word	lmflags;
 	Rt_map	*clmp;
 
 	entry = enter();
 
 	clmp = _caller(caller(), CL_EXECDEF);
 
-	if ((lmflags = LIST(clmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
-	}
-
 	error = dlinfo_core(handle, request, p, clmp);
-
-	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
 
 	if (entry)
 		leave(LIST(clmp));

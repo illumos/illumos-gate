@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<dlfcn.h>
 #include	<libelf.h>
 #include	<link.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
-
-
 
 /*
  * Table which defines the default functions to be called by the library
@@ -43,13 +42,13 @@
 static Support_list support[LDS_NUM] = {
 	{MSG_ORIG(MSG_SUP_VERSION),	{ 0, 0 }},	/* LDS_VERSION */
 	{MSG_ORIG(MSG_SUP_INPUT_DONE),	{ 0, 0 }},	/* LDS_INPUT_DONE */
-#ifdef _ELF64
+#if	defined(_ELF64)
 	{MSG_ORIG(MSG_SUP_START_64),	{ 0, 0 }},	/* LDS_START64 */
 	{MSG_ORIG(MSG_SUP_ATEXIT_64),	{ 0, 0 }},	/* LDS_ATEXIT64 */
 	{MSG_ORIG(MSG_SUP_FILE_64),	{ 0, 0 }},	/* LDS_FILE64 */
 	{MSG_ORIG(MSG_SUP_INP_SECTION_64), { 0, 0 }},	/* LDS_INP_SECTION64 */
 	{MSG_ORIG(MSG_SUP_SECTION_64),	{ 0, 0 }}	/* LDS_SECTION64 */
-#else  /* Elf32 */
+#else	/* Elf32 */
 	{MSG_ORIG(MSG_SUP_START),	{ 0, 0 }},	/* LDS_START */
 	{MSG_ORIG(MSG_SUP_ATEXIT),	{ 0, 0 }},	/* LDS_ATEXIT */
 	{MSG_ORIG(MSG_SUP_FILE),	{ 0, 0 }},	/* LDS_FILE */
@@ -62,13 +61,9 @@ static Support_list support[LDS_NUM] = {
  * Loads in a support shared object specified using the SGS_SUPPORT environment
  * variable or the -S ld option, and determines which interface functions are
  * provided by that object.
- *
- * return values for ld_support_loadso:
- *	1 -	shared object loaded sucessfully
- *	S_ERROR - aww, damn!
  */
 uintptr_t
-ld_support_loadso(const char *obj)
+ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 {
 	void		*handle;
 	void		(*fptr)();
@@ -81,7 +76,8 @@ ld_support_loadso(const char *obj)
 	 * with a fatal error.
 	 */
 	if ((handle = dlopen(obj, RTLD_LAZY)) == NULL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SUP_NOLOAD), obj, dlerror());
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SUP_NOLOAD),
+		    obj, dlerror());
 		return (S_ERROR);
 	}
 
@@ -89,25 +85,25 @@ ld_support_loadso(const char *obj)
 	for (i = 0; i < LDS_NUM; i++) {
 		if (fptr = (void (*)())dlsym(handle, support[i].sup_name)) {
 
-			if ((flp = (Func_list *)
-			    libld_malloc(sizeof (Func_list))) == NULL)
+			if ((flp = libld_malloc(sizeof (Func_list))) == NULL)
 				return (S_ERROR);
 
 			flp->fl_obj = obj;
 			flp->fl_fptr = fptr;
-			DBG_CALL(Dbg_support_load(obj, support[i].sup_name));
+			DBG_CALL(Dbg_support_load(ofl->ofl_lml, obj,
+			    support[i].sup_name));
+
 			if (i == LDS_VERSION) {
-				DBG_CALL(Dbg_support_action(flp->fl_obj,
-				    support[LDS_VERSION].sup_name,
+				DBG_CALL(Dbg_support_action(ofl->ofl_lml,
+				    flp->fl_obj, support[LDS_VERSION].sup_name,
 				    LDS_VERSION, 0));
 				ver_level = ((uint_t(*)())
 				    flp->fl_fptr)(LD_SUP_VCURRENT);
 				if ((ver_level == LD_SUP_VNONE) ||
 				    (ver_level > LD_SUP_VCURRENT)) {
-					eprintf(ERR_FATAL,
-						MSG_INTL(MSG_SUP_BADVERSION),
-						LD_SUP_VCURRENT,
-						ver_level);
+					eprintf(ofl->ofl_lml, ERR_FATAL,
+					    MSG_INTL(MSG_SUP_BADVERSION),
+					    LD_SUP_VCURRENT, ver_level);
 					(void) dlclose(handle);
 					return (S_ERROR);
 				}
@@ -121,40 +117,38 @@ ld_support_loadso(const char *obj)
 	return (1);
 }
 
-
 /*
  * Wrapper routines for the ld support library calls.
  */
 void
-lds_start(const char *ofile, const Half etype, const char *caller)
+ld_sup_start(Ofl_desc *ofl, const Half etype, const char *caller)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
 
 	for (LIST_TRAVERSE(&support[LDS_START].sup_funcs, lnp, flp)) {
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
-		    support[LDS_START].sup_name, LDS_START, ofile));
-		(*flp->fl_fptr)(ofile, etype, caller);
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
+		    support[LDS_START].sup_name, LDS_START, ofl->ofl_name));
+		(*flp->fl_fptr)(ofl->ofl_name, etype, caller);
 	}
 }
 
-
 void
-lds_atexit(int exit_code)
+ld_sup_atexit(Ofl_desc *ofl, int ecode)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
 
 	for (LIST_TRAVERSE(&support[LDS_ATEXIT].sup_funcs, lnp, flp)) {
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_ATEXIT].sup_name, LDS_ATEXIT, 0));
-		(*flp->fl_fptr)(exit_code);
+		(*flp->fl_fptr)(ecode);
 	}
 }
 
-
 void
-lds_file(const char *ifile, const Elf_Kind ekind, int flags, Elf *elf)
+ld_sup_file(Ofl_desc *ofl, const char *ifile, const Elf_Kind ekind, int flags,
+    Elf *elf)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
@@ -169,15 +163,15 @@ lds_file(const char *ifile, const Elf_Kind ekind, int flags, Elf *elf)
 		if (flags & FLG_IF_EXTRACT)
 			_flags |= LD_SUP_EXTRACTED;
 
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_FILE].sup_name, LDS_FILE, ifile));
 		(*flp->fl_fptr)(ifile, ekind, _flags, elf);
 	}
 }
 
 uintptr_t
-lds_input_section(const char *scnname, Shdr **shdr, Word ndx,
-    const char *file, Elf_Scn *scn, Elf *elf, Ofl_desc *ofl)
+ld_sup_input_section(Ofl_desc * ofl, const char *scnname, Shdr **shdr, Word ndx,
+    const char *file, Elf_Scn *scn, Elf *elf)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
@@ -186,21 +180,20 @@ lds_input_section(const char *scnname, Shdr **shdr, Word ndx,
 
 	for (LIST_TRAVERSE(&support[LDS_INP_SECTION].sup_funcs, lnp, flp)) {
 		/*
-		 * This interface was introduced in VERSION2 - so only
-		 * call it for libraries reporting support for
-		 * version 2 or above.
+		 * This interface was introduced in VERSION2 - so only call it
+		 * for libraries reporting support for * version 2 or above.
 		 */
 		if (flp->fl_version < LD_SUP_VERSION2)
 			continue;
 		if ((data == NULL) &&
 		    ((data = elf_getdata(scn, NULL)) == NULL)) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
-				file);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETDATA), file);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (S_ERROR);
 		}
 
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_INP_SECTION].sup_name, LDS_INP_SECTION,
 		    scnname));
 		(*flp->fl_fptr)(scnname, shdr, ndx, data, elf, &flags);
@@ -209,21 +202,21 @@ lds_input_section(const char *scnname, Shdr **shdr, Word ndx,
 }
 
 void
-lds_section(const char *scn, Shdr *shdr, Word ndx,
+ld_sup_section(Ofl_desc *ofl, const char *scn, Shdr *shdr, Word ndx,
     Elf_Data *data, Elf *elf)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
 
 	for (LIST_TRAVERSE(&support[LDS_SECTION].sup_funcs, lnp, flp)) {
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_SECTION].sup_name, LDS_SECTION, scn));
 		(*flp->fl_fptr)(scn, shdr, ndx, data, elf);
 	}
 }
 
 void
-lds_input_done(void)
+ld_sup_input_done(Ofl_desc *ofl)
 {
 	Func_list	*flp;
 	Listnode	*lnp;
@@ -231,13 +224,12 @@ lds_input_done(void)
 
 	for (LIST_TRAVERSE(&support[LDS_INPUT_DONE].sup_funcs, lnp, flp)) {
 		/*
-		 * This interface was introduced in VERSION2 - so only
-		 * call it for libraries reporting support for
-		 * version 2 or above.
+		 * This interface was introduced in VERSION2 - so only call it
+		 * for libraries reporting support for version 2 or above.
 		 */
 		if (flp->fl_version < LD_SUP_VERSION2)
 			continue;
-		DBG_CALL(Dbg_support_action(flp->fl_obj,
+		DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
 		    support[LDS_INPUT_DONE].sup_name, LDS_INPUT_DONE, 0));
 		(*flp->fl_fptr)(&flags);
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -31,43 +31,39 @@
 #include	"group_msg.h"
 
 #define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
-		MSG_GPH_INITIAL_SIZE + \
 		MSG_GPH_ZERO_SIZE + \
 		MSG_GPH_LDSO_SIZE + \
 		MSG_GPH_FIRST_SIZE + \
 		MSG_GPH_PARENT_SIZE + \
 		MSG_GPH_FILTEE_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		MSG_GPH_INITIAL_SIZE + \
+		MSG_GPH_STICKY_SIZE + \
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 /*
  * String conversion routine for Grp_hdl flags.
  */
 const char *
-conv_grphdrflags_str(uint_t flags)
+conv_grphdl_flags(uint_t flags)
 {
-	static	char	string[FLAGSZ] = { '\0' };
-
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
+	static char	string[FLAGSZ];
+	static Val_desc vda[] = {
+		{ GPH_ZERO,		MSG_ORIG(MSG_GPH_ZERO) },
+		{ GPH_LDSO,		MSG_ORIG(MSG_GPH_LDSO) },
+		{ GPH_FIRST,		MSG_ORIG(MSG_GPH_FIRST) },
+		{ GPH_PARENT,		MSG_ORIG(MSG_GPH_PARENT) },
+		{ GPH_FILTEE,		MSG_ORIG(MSG_GPH_FILTEE) },
+		{ GPH_INITIAL,		MSG_ORIG(MSG_GPH_INITIAL) },
+		{ GPH_STICKY,		MSG_ORIG(MSG_GPH_STICKY) },
+		{ 0,			0 }
+	};
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
-	if (flags & GPH_INITIAL)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_INITIAL));
-	if (flags & GPH_ZERO)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_ZERO));
-	if (flags & GPH_LDSO)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_LDSO));
-	if (flags & GPH_FIRST)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_FIRST));
-	if (flags & GPH_PARENT)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_PARENT));
-	if (flags & GPH_FILTEE)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_FILTEE));
-	if (flags & GPH_STICKY)
-		(void) strcat(string, MSG_ORIG(MSG_GPH_STICKY));
-
-	(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
+	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
 
 	return ((const char *)string);
 }

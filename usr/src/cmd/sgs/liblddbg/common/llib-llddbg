@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,314 +30,450 @@
 
 #include <sys/types.h>
 #include <sys/auxv.h>
-#include <gelf.h>
-#include "debug.h"
+#include <debug.h>
 
-uint_t Dbg_setup(const char *);
-void Dbg_set(uint_t);
+uintptr_t
+	Dbg_setup(const char *, Dbg_desc *);
+const char *
+	Dbg_demangle_name(const char *);
 
-void Dbg_args_files(int, char *);
-void Dbg_args_flags(int, int);
-void Dbg_audit_interface(const char *, const char *);
-void Dbg_audit_interface64(const char *, const char *);
-void Dbg_audit_lib(const char *);
-void Dbg_audit_lib64(const char *);
-void Dbg_audit_object(const char *, const char *);
-void Dbg_audit_object64(const char *, const char *);
-void Dbg_audit_symval(const char *, const char *, const char *, Addr, Addr);
-void Dbg_audit_symval64(const char *, const char *, const char *, Addr, Addr);
-void Dbg_audit_version(const char *, ulong_t);
-void Dbg_audit_version64(const char *, ulong_t);
-void Dbg_bind_global(const char *, caddr_t, caddr_t, Xword, Pltbindtype,
-	const char *, caddr_t, caddr_t, const char *, uint_t);
-void Dbg_bind_profile(uint_t, uint_t);
-void Dbg_bind_weak(const char *, caddr_t, caddr_t, const char *);
-void Dbg_cap_hw_candidate(const char *);
-void Dbg_cap_hw_filter(const char *, const char *);
-void Dbg_cap_hw_1(Xword, Half);
-void Dbg_cap_sec_entry(uint_t, Xword, Xword, Half);
-void Dbg_cap_sec_title(const char *);
-void Dbg_ent_print(Half, List *, Boolean);
-void Dbg_file_analyze(Rt_map *);
-void Dbg_file_analyze64(Rt_map *);
-void Dbg_file_aout(const char *, ulong_t, ulong_t, ulong_t);
-void Dbg_file_aout64(const char *, ulong_t, ulong_t, ulong_t);
-void Dbg_file_archive(const char *, int);
-void Dbg_file_archive64(const char *, int);
-void Dbg_file_bind_entry(Bnd_desc *);
-void Dbg_file_bind_entry64(Bnd_desc *);
-void Dbg_file_bindings(Rt_map *, int, Word);
-void Dbg_file_bindings64(Rt_map *, int, Word);
-void Dbg_file_bind_title(int);
-void Dbg_file_bind_title64(int);
-void Dbg_file_cntl(Lm_list *, Aliste, Aliste);
-void Dbg_file_config_dis(const char *, int);
-void Dbg_file_config_dis64(const char *, int);
-void Dbg_file_config_obj(const char *, const char *, const char *);
-void Dbg_file_config_obj64(const char *, const char *, const char *);
-void Dbg_file_delete(const char *);
-void Dbg_file_delete64(const char *);
-void Dbg_file_dlclose(const char *, int);
-void Dbg_file_dlclose64(const char *, int);
-void Dbg_file_dldump(const char *, const char *, int);
-void Dbg_file_dldump64(const char *, const char *, int);
-void Dbg_file_dlopen(const char *, const char *, int);
-void Dbg_file_dlopen64(const char *, const char *, int);
-void Dbg_file_elf(const char *, ulong_t, ulong_t, ulong_t, ulong_t, Lmid_t,
-	Aliste);
-void Dbg_file_elf64(const char *, ulong_t, ulong_t, ulong_t, ulong_t, Lmid_t,
-	Aliste);
-void Dbg_file_filtee(const char *, const char *, int);
-void Dbg_file_filtee64(const char *, const char *, int);
-void Dbg_file_filter(const char *, const char *, int);
-void Dbg_file_filter64(const char *, const char *, int);
-void Dbg_file_fixname(const char *, const char *);
-void Dbg_file_fixname64(const char *, const char *);
-void Dbg_file_generic(Ifl_desc *);
-void Dbg_file_generic64(Ifl_desc *);
-void Dbg_file_handle_collect(Grp_hdl *, const char *);
-void Dbg_file_handle_collect64(Grp_hdl *, const char *);
-void Dbg_file_handle(Grp_hdl *, Rt_map *, int);
-void Dbg_file_handle64(Grp_hdl *, Rt_map *, int);
-void Dbg_file_lazyload(const char *, const char *, const char *);
-void Dbg_file_lazyload64(const char *, const char *, const char *);
-void Dbg_file_ldso(const char *, ulong_t, ulong_t, char **, auxv_t *);
-void Dbg_file_ldso64(const char *, ulong_t, ulong_t, char **, auxv_t *);
-void Dbg_file_mode_promote(const char *, int);
-void Dbg_file_needed(const char *, const char *);
-void Dbg_file_needed64(const char *, const char *);
-void Dbg_file_nl(void);
-void Dbg_file_nl64(void);
-void Dbg_file_output(Ofl_desc *);
-void Dbg_file_output64(Ofl_desc *);
-void Dbg_file_preload(const char *);
-void Dbg_file_preload64(const char *);
-void Dbg_file_prot(const char *, int);
-void Dbg_file_prot64(const char *, int);
-void Dbg_file_rejected(Rej_desc *);
-void Dbg_file_reuse(const char *, const char *);
-void Dbg_file_reuse64(const char *, const char *);
-void Dbg_file_ar_rescan(void);
-void Dbg_file_del_rescan(void);
-void Dbg_file_skip(const char *, const char *);
-void Dbg_file_skip64(const char *, const char *);
-void Dbg_got_display(Gottable *, Ofl_desc *);
-void Dbg_got_display64(Gottable *, Ofl_desc *);
-void Dbg_libs_audit(const char *, const char *);
-void Dbg_libs_ignore(const char *);
-void Dbg_libs_init(List *, List *);
-void Dbg_libs_l(const char *, const char *);
-void Dbg_libs_path(const char *, Half, const char *);
-void Dbg_libs_req(const char *, const char *, const char *);
-void Dbg_libs_update(List *, List *);
-void Dbg_libs_yp(const char *);
-void Dbg_libs_ylu(const char *, const char *, int);
-void Dbg_libs_find(const char *);
-void Dbg_libs_found(const char *, int);
-void Dbg_map_atsign(Boolean);
-void Dbg_map_atsign64(Boolean);
-void Dbg_map_dash(const char *, Sdf_desc *);
-void Dbg_map_dash64(const char *, Sdf_desc *);
-void Dbg_map_ent(Boolean, Ent_desc *, Ofl_desc *);
-void Dbg_map_ent64(Boolean, Ent_desc *, Ofl_desc *);
-void Dbg_map_equal(Boolean);
-void Dbg_map_equal64(Boolean);
-void Dbg_map_parse(const char *);
-void Dbg_map_parse64(const char *);
-void Dbg_map_pipe(Sg_desc *, const char *, const Word);
-void Dbg_map_pipe64(Sg_desc *, const char *, const Word);
-void Dbg_map_seg(Half, int, Sg_desc *);
-void Dbg_map_seg64(Half, int, Sg_desc *);
-void Dbg_map_size_new(const char *);
-void Dbg_map_size_new64(const char *);
-void Dbg_map_size_old(Ehdr *, Sym_desc *);
-void Dbg_map_size_old64(Ehdr *, Sym_desc *);
-void Dbg_map_sort_fini(Sg_desc *);
-void Dbg_map_sort_fini64(Sg_desc *);
-void Dbg_map_sort_orig(Sg_desc *);
-void Dbg_map_sort_orig64(Sg_desc *);
-void Dbg_map_symbol(Ehdr *, Sym_desc *);
-void Dbg_map_symbol64(Ehdr *, Sym_desc *);
-void Dbg_map_version(const char *, const char *, int);
-void Dbg_map_version64(const char *, const char *, int);
-void Dbg_move_adjexpandreloc(ulong_t, const char *);
-void Dbg_move_adjmovereloc(ulong_t, ulong_t, const char *);
-void Dbg_move_data(const char *);
-void Dbg_move_expanding(Move *, Addr);
-void Dbg_move_input1(const char *);
-void Dbg_move_mventry(int, Move *, Sym_desc *);
-void Dbg_move_mventry64(int, Move *, Sym_desc *);
-void Dbg_move_mventry2(Move *, Word, char *);
-void Dbg_move_mventry264(Move *, Word, char *);
-void Dbg_move_outmove(const uchar_t *);
-void Dbg_move_outsctadj(Sym_desc *);
-void Dbg_move_outsctadj64(Sym_desc *);
-void Dbg_move_parexpn(const char *, const char *);
-void Dbg_pltpad_bindto64(const char *, const char *, Addr);
-void Dbg_pltpad_boundto64(const char *, Addr, const char *, const char *);
-void Dbg_reloc_apply(unsigned long long, unsigned long long);
-void Dbg_reloc_ars_entry(Half, Rel_desc *);
-void Dbg_reloc_ars_entry64(Half, Rel_desc *);
-void Dbg_reloc_copy(const char *, const char *, const char *, int);
-void Dbg_reloc_discard(Half, Rel_desc *);
-void Dbg_reloc_discard64(Half, Rel_desc *);
-void Dbg_reloc_doact(Half, Word, Xword, Xword, const char *, Os_desc *);
-void Dbg_reloc_doact64(Half, Word, Xword, Xword, const char *, Os_desc *);
-void Dbg_reloc_doactiverel(void);
-void Dbg_reloc_dooutrel(GElf_Word);
-void Dbg_reloc_dooutrel64(GElf_Word);
-void Dbg_reloc_in(Half, Word, void *, const char *, const char *);
-void Dbg_reloc_in64(Half, Word, void *, const char *, const char *);
-void Dbg_reloc_ors_entry(Half, Rel_desc *);
-void Dbg_reloc_ors_entry64(Half, Rel_desc *);
-void Dbg_reloc_out(Half, Word, void *, const char *, const char *);
-void Dbg_reloc_out64(Half, Word, void *, const char *, const char *);
-void Dbg_reloc_proc(Os_desc *, Is_desc *, Is_desc *);
-void Dbg_reloc_proc64(Os_desc *, Is_desc *, Is_desc *);
-void Dbg_reloc_run(const char *, uint_t, int, int);
-void Dbg_reloc_reg_apply(unsigned long long, unsigned long long);
-void Dbg_reloc_reg_apply64(unsigned long long, unsigned long long);
-void Dbg_sec_added(Os_desc *, Sg_desc *);
-void Dbg_sec_added64(Os_desc *, Sg_desc *);
-void Dbg_sec_created(Os_desc *, Sg_desc *);
-void Dbg_sec_created64(Os_desc *, Sg_desc *);
-void Dbg_sec_group(Is_desc *, Group_desc *);
-void Dbg_sec_group64(Is_desc *, Group_desc *);
-void Dbg_sec_in(Is_desc *);
-void Dbg_sec_in64(Is_desc *);
-void Dbg_sec_order_list(Ofl_desc *, int);
-void Dbg_sec_order_list64(Ofl_desc *, int);
-void Dbg_sec_order_error(Ifl_desc *, Word, int);
-void Dbg_sec_order_error64(Ifl_desc *, Word, int);
-void Dbg_seg_entry(Half, int, Sg_desc *);
-void Dbg_seg_entry64(Half, int, Sg_desc *);
-void Dbg_seg_list(Half, List *);
-void Dbg_seg_list64(Half, List *);
-void Dbg_seg_os(Ofl_desc *, Os_desc *, int);
-void Dbg_seg_os64(Ofl_desc *, Os_desc *, int);
-void Dbg_seg_title(void);
-void Dbg_seg_title64(void);
-void Dbg_statistics_ld(Ofl_desc *);
-void Dbg_statistics_ld64(Ofl_desc *);
-void Dbg_statistics_ar(Ofl_desc *);
-void Dbg_statistics_ar64(Ofl_desc *);
-void Dbg_syms_ar_checking(Xword, Elf_Arsym *, const char *);
-void Dbg_syms_ar_checking64(Xword, Elf_Arsym *, const char *);
-void Dbg_syms_ar_entry(Xword, Elf_Arsym *);
-void Dbg_syms_ar_entry64(Xword, Elf_Arsym *);
-void Dbg_syms_ar_resolve(Xword, Elf_Arsym *, const char *, int);
-void Dbg_syms_ar_resolve64(Xword, Elf_Arsym *, const char *, int);
-void Dbg_syms_ar_title(const char *, int);
-void Dbg_syms_ar_title64(const char *, int);
-void Dbg_syms_created(const char *);
-void Dbg_syms_created64(const char *);
-void Dbg_syms_entered(Ehdr *, Sym *, Sym_desc *);
-void Dbg_syms_entered64(Ehdr *, Sym *, Sym_desc *);
-void Dbg_syms_entry(Xword, Sym_desc *);
-void Dbg_syms_entry64(Xword, Sym_desc *);
-void Dbg_syms_global(Xword, const char *);
-void Dbg_syms_global64(Xword, const char *);
-void Dbg_syms_new(Ehdr *, Sym *, Sym_desc *);
-void Dbg_syms_new64(Ehdr *, Sym *, Sym_desc *);
-void Dbg_syms_nl(void);
-void Dbg_syms_nl64(void);
-void Dbg_syms_old(Ehdr *, Sym_desc *);
-void Dbg_syms_old64(Ehdr *, Sym_desc *);
-void Dbg_syms_process(Ifl_desc *);
-void Dbg_syms_process64(Ifl_desc *);
-void Dbg_syms_reduce(int, Ehdr *, Sym_desc *, int, const char *);
-void Dbg_syms_reduce64(int, Ehdr *, Sym_desc *, int, const char *);
-void Dbg_syms_reloc(Ehdr *, Sym_desc *);
-void Dbg_syms_reloc64(Ehdr *, Sym_desc *);
-void Dbg_syms_resolved(Ehdr *, Sym_desc *);
-void Dbg_syms_resolved64(Ehdr *, Sym_desc *);
-void Dbg_syms_resolving1(Xword, const char *, int, int);
-void Dbg_syms_resolving164(Xword, const char *, int, int);
-void Dbg_syms_resolving2(Ehdr *, Sym *, Sym *, Sym_desc *, Ifl_desc *);
-void Dbg_syms_resolving264(Ehdr *, Sym *, Sym *, Sym_desc *, Ifl_desc *);
-void Dbg_syms_sec_entry(int, Sg_desc *, Os_desc *);
-void Dbg_syms_sec_entry64(int, Sg_desc *, Os_desc *);
-void Dbg_syms_sec_title(void);
-void Dbg_syms_sec_title64(void);
-void Dbg_syms_sec_unused(Is_desc *, uint_t);
-void Dbg_syms_sec_unused64(Is_desc *, uint_t);
-void Dbg_syms_spec_title(void);
-void Dbg_syms_spec_title64(void);
-void Dbg_syms_up_title(Ehdr *);
-void Dbg_syms_up_title64(Ehdr *);
-void Dbg_syms_updated(Ehdr *, Sym_desc *, const char *);
-void Dbg_syms_updated64(Ehdr *, Sym_desc *, const char *);
-void Dbg_syms_dlsym(const char *, const char *, const char *, int);
-void Dbg_syms_dlsym64(const char *, const char *, const char *, int);
-void Dbg_syms_lookup_aout(const char *);
-void Dbg_syms_lookup_aout64(const char *);
-void Dbg_syms_lookup(const char *, const char *, const char *);
-void Dbg_syms_lookup64(const char *, const char *, const char *);
-void Dbg_syminfo_entry(int, Syminfo *, Sym *, const char *, Dyn *);
-void Dbg_syminfo_entry64(int, Syminfo *, Sym *, const char *, Dyn *);
-void Dbg_syminfo_title(void);
-void Dbg_syminfo_title64(void);
-void Dbg_support_action(const char *, const char *, Support_ndx, const char *);
-void Dbg_support_load(const char *, const char *);
-void Dbg_support_req(const char *, int);
-void Dbg_unused_file(const char *, int, int);
-void Dbg_unused_rtldinfo(const char *, const char *);
-void Dbg_unused_sec(Is_desc *);
-void Dbg_unused_sec64(Is_desc *);
-void Dbg_unused_unref(const char *, const char *);
-void Dbg_util_broadcast(const char *name);
-void Dbg_util_call_array(const char *libname, void *addr, uint_t ndx,
-    uint_t shtype);
-void Dbg_util_call_fini(const char *name);
-void Dbg_util_call_init(const char *name, int flag);
-void Dbg_util_call_main(const char *name);
-void Dbg_util_collect(const char *name, int flag, int ndx);
-void Dbg_util_dbnotify(rd_event_e event, r_state_e state);
-void Dbg_util_edge_in(Rt_map *clmp, uint_t flags, Rt_map *dlmp, int ndx, int flag);
-void Dbg_util_edge_out(const char *cname, int ndx, const char *dname);
-void Dbg_util_intoolate(const char *name);
-void Dbg_util_nl();
-void Dbg_util_no_init(const char *name);
-void Dbg_util_scc_entry(uint_t idx, const char *name);
-void Dbg_util_scc_title(int sec);
-void Dbg_util_str(const char *name);
-void Dbg_util_wait(int what, const char *cname, const char *dname);
-void Dbg_ver_avail_entry(Ver_index *, const char *);
-void Dbg_ver_avail_entry64(Ver_index *, const char *);
-void Dbg_ver_avail_title(const char *);
-void Dbg_ver_def_title(const char *);
-void Dbg_ver_desc_entry(Ver_desc *);
-void Dbg_ver_desc_entry64(Ver_desc *);
-void Dbg_ver_need_title(const char *);
-void Dbg_ver_need_entry(Half, const char *, const char *);
-void Dbg_ver_symbol(const char *);
+void	Dbg_args_files(Lm_list *, int, char *);
+void	Dbg_args_flags(Lm_list *, int, int);
+void	Dbg_audit_interface(Lm_list *, const char *, const char *);
+void	Dbg_audit_lib(Lm_list *, const char *);
+void	Dbg_audit_object(Lm_list *, const char *, const char *);
+void	Dbg_audit_symval(Lm_list *, const char *, const char *, const char *,
+	    Addr, Addr);
+void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
 
-/*
- * Gelf related functions, used by elfdump
- */
-const char * Gelf_sym_dem(const char *);
+void	Dbg32_bind_global(Rt_map *, Elf32_Addr, Elf32_Off, Elf32_Word,
+	    Pltbindtype, Rt_map *, Elf32_Addr, Elf32_Off, const char *, uint_t);
+void	Dbg64_bind_global(Rt_map *, Elf64_Addr, Elf64_Off, Elf64_Xword,
+	    Pltbindtype, Rt_map *, Elf64_Addr, Elf64_Off, const char *, uint_t);
+void	Dbg64_bind_pltpad_to(Rt_map *, Addr, const char *, const char *);
+void	Dbg64_bind_pltpad_from(Rt_map *, Addr, const char *);
+void	Dbg32_bind_weak(Rt_map *, Elf32_Addr, Elf32_Addr, const char *);
+void	Dbg64_bind_weak(Rt_map *, Elf64_Addr, Elf64_Addr, const char *);
 
-void Gelf_cap_print(GElf_Cap *, int, Half);
-void Gelf_cap_title(void);
-void Gelf_dyn_print(GElf_Dyn *, int ndx, const char *, Half);
-void Gelf_dyn_title(void);
-void Gelf_elf_data_title(void);
-void Gelf_elf_header(GElf_Ehdr *, GElf_Shdr *);
-void Gelf_got_title(uchar_t);
-void Gelf_got_entry(GElf_Ehdr *, Sword, GElf_Addr, GElf_Xword,
-	GElf_Word, void *, const char *);
-void Gelf_note_entry(GElf_Word *, GElf_Word);
-void Gelf_phdr_entry(Half, GElf_Phdr *);
-void Gelf_reloc_entry(const char *, GElf_Half, GElf_Word,
-	GElf_Rela *, const char *, const char *);
-void Gelf_shdr_entry(Half, GElf_Shdr *);
-void Gelf_sym_table_entry(const char *, GElf_Ehdr *, GElf_Sym *,
-	GElf_Word, const char *, const char *);
-void Gelf_sym_table_title(GElf_Ehdr *, const char *, const char *);
-void Gelf_syminfo_entry(int, GElf_Syminfo *, const char *, const char *);
-void Gelf_syminfo_title(void);
-void Gelf_ver_def_title(void);
-void Gelf_ver_need_title(void);
-void Gelf_ver_line_1(const char *, const char *, const char *, const char *);
-void Gelf_ver_line_2(const char *, const char *);
-void Gelf_ver_line_3(const char *, const char *, const char *);
+void	Dbg32_cap_hw_candidate(Lm_list *, const char *);
+void	Dbg64_cap_hw_candidate(Lm_list *, const char *);
+void	Dbg32_cap_hw_filter(Lm_list *, const char *, Rt_map *);
+void	Dbg64_cap_hw_filter(Lm_list *, const char *, Rt_map *);
+void	Dbg32_cap_mapfile(Lm_list *, Elf32_Word, Elf32_Word, Elf32_Half);
+void	Dbg64_cap_mapfile(Lm_list *, Elf64_Xword, Elf64_Xword, Elf64_Half);
+void	Dbg32_cap_sec_entry(Lm_list *, uint_t, Elf32_Word, Elf32_Word,
+	    Elf32_Half);
+void	Dbg64_cap_sec_entry(Lm_list *, uint_t, Elf64_Xword, Elf64_Xword,
+	    Elf64_Half);
+void	Dbg32_cap_sec_title(Ofl_desc *);
+void	Dbg64_cap_sec_title(Ofl_desc *);
+void	Dbg32_cap_val_hw1(Lm_list *, Elf32_Word, Elf32_Half);
+void	Dbg64_cap_val_hw1(Lm_list *, Elf64_Xword, Elf64_Half);
+
+void	Dbg32_ent_print(Lm_list *, Elf32_Half, List *, Boolean);
+void	Dbg64_ent_print(Lm_list *, Elf64_Half, List *, Boolean);
+
+void	Dbg32_file_analyze(Rt_map *);
+void	Dbg64_file_analyze64(Rt_map *);
+void	Dbg32_file_aout(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
+	    const char *, Aliste);
+void	Dbg64_file_aout(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
+	    const char *, Aliste);
+void	Dbg32_file_archive(Lm_list *, const char *, int);
+void	Dbg64_file_archive(Lm_list *, const char *, int);
+void	Dbg32_file_bind_entry(Lm_list *, Bnd_desc *);
+void	Dbg64_file_bind_entry(Lm_list *, Bnd_desc *);
+void	Dbg32_file_bindings(Rt_map *, int);
+void	Dbg64_file_bindings(Rt_map *, int);
+void	Dbg32_file_config_dis(Lm_list *, const char *, int);
+void	Dbg64_file_config_dis(Lm_list *, const char *, int);
+void	Dbg32_file_config_obj(Lm_list *, const char *, const char *,
+	    const char *);
+void	Dbg64_file_config_obj(Lm_list *, const char *, const char *,
+	    const char *);
+void	Dbg32_file_cntl(Lm_list *, Aliste, Aliste);
+void	Dbg64_file_cntl(Lm_list *, Aliste, Aliste);
+void	Dbg32_file_del_rescan(Lm_list *);
+void	Dbg64_file_del_rescan(Lm_list *);
+void	Dbg32_file_delete(Rt_map *);
+void	Dbg64_file_delete(Rt_map *);
+void	Dbg32_file_dlclose(Lm_list *, const char *, int);
+void	Dbg64_file_dlclose(Lm_list *, const char *, int);
+void	Dbg32_file_dldump(Rt_map *, const char *, int);
+void	Dbg64_file_dldump(Rt_map *, const char *, int);
+void	Dbg32_file_dlopen(Rt_map *, const char *, int);
+void	Dbg64_file_dlopen(Rt_map *, const char *, int);
+void	Dbg32_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
+	    ulong_t, const char *, Aliste);
+void	Dbg64_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
+	    ulong_t, const char *, Aliste);
+void	Dbg32_file_filtee(Lm_list *, const char *, const char *, int);
+void	Dbg64_file_filtee(Lm_list *, const char *, const char *, int);
+void	Dbg32_file_filter(Lm_list *, const char *, const char *, int);
+void	Dbg64_file_filter(Lm_list *, const char *, const char *, int);
+void	Dbg64_file_fixname(Lm_list *, const char *, const char *);
+void	Dbg32_file_fixname(Lm_list *, const char *, const char *);
+void	Dbg32_file_hdl_action(Grp_hdl *, Rt_map *, int);
+void	Dbg64_file_hdl_action(Grp_hdl *, Rt_map *, int);
+void	Dbg32_file_hdl_collect(Grp_hdl *, const char *);
+void	Dbg64_file_hdl_collect(Grp_hdl *, const char *);
+void	Dbg32_file_hdl_title(int);
+void	Dbg64_file_hdl_title(int);
+void	Dbg64_file_lazyload(Rt_map *, const char *, const char *);
+void	Dbg32_file_lazyload(Rt_map *, const char *, const char *);
+void	Dbg32_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
+void	Dbg64_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
+void	Dbg32_file_mode_promote(Rt_map *, int);
+void	Dbg64_file_mode_promote(Rt_map *, int);
+void	Dbg32_file_needed(Rt_map *, const char *);
+void	Dbg64_file_needed(Rt_map *, const char *);
+void	Dbg32_file_output(Ofl_desc *);
+void	Dbg64_file_output64(Ofl_desc *);
+void	Dbg32_file_preload(Lm_list *, const char *);
+void	Dbg64_file_preload(Lm_list *, const char *);
+void	Dbg32_file_prot(Rt_map *, int);
+void	Dbg64_file_prot(Rt_map *, int);
+void	Dbg32_file_rejected(Lm_list *, Rej_desc *);
+void	Dbg64_file_rejected(Lm_list *, Rej_desc *);
+void	Dbg32_file_reuse(Lm_list *, const char *, const char *);
+void	Dbg64_file_reuse(Lm_list *, const char *, const char *);
+void	Dbg32_file_skip(Lm_list *, const char *, const char *);
+void	Dbg64_file_skip(Lm_list *, const char *, const char *);
+
+void	Dbg32_got_display(Ofl_desc *, Gottable *);
+void	Dbg64_got_display(Ofl_desc *, Gottable *);
+
+void	Dbg32_libs_audit(Lm_list *, const char *, const char *);
+void	Dbg64_libs_audit(Lm_list *, const char *, const char *);
+void	Dbg32_libs_find(Lm_list *, const char *);
+void	Dbg64_libs_find(Lm_list *, const char *);
+void	Dbg32_libs_found(Lm_list *, const char *, int);
+void	Dbg64_libs_found(Lm_list *, const char *, int);
+void	Dbg32_libs_ignore(Lm_list *, const char *);
+void	Dbg64_libs_ignore(Lm_list *, const char *);
+void	Dbg32_libs_init(Lm_list *, List *, List *);
+void	Dbg64_libs_init(Lm_list *, List *, List *);
+void	Dbg32_libs_l(Lm_list *, const char *, const char *);
+void	Dbg64_libs_l(Lm_list *, const char *, const char *);
+void	Dbg32_libs_path(Lm_list *, const char *, Half, const char *);
+void	Dbg64_libs_path(Lm_list *, const char *, Half, const char *);
+void	Dbg32_libs_req(Lm_list *, const char *, const char *, const char *);
+void	Dbg64_libs_req(Lm_list *, const char *, const char *, const char *);
+void	Dbg32_libs_update(Lm_list *, List *, List *);
+void	Dbg64_libs_update(Lm_list *, List *, List *);
+void	Dbg32_libs_yp(Lm_list *, const char *);
+void	Dbg64_libs_yp(Lm_list *, const char *);
+void	Dbg32_libs_ylu(Lm_list *, const char *, const char *, int);
+void	Dbg64_libs_ylu(Lm_list *, const char *, const char *, int);
+
+void	Dbg32_map_dash(Lm_list *, const char *, Sdf_desc *);
+void	Dbg64_map_dash(Lm_list *, const char *, Sdf_desc *);
+void	Dbg32_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
+void	Dbg64_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
+void	Dbg32_map_parse(Lm_list *, const char *);
+void	Dbg64_map_parse(Lm_list *, const char *);
+void	Dbg32_map_pipe(Lm_list *, Sg_desc *, const char *, Elf32_Word);
+void	Dbg64_map_pipe(Lm_list *, Sg_desc *, const char *, Elf64_Word);
+void	Dbg32_map_set_atsign(Boolean);
+void	Dbg64_map_set_atsign(Boolean);
+void	Dbg32_map_seg(Ofl_desc *, int, Sg_desc *);
+void	Dbg64_map_seg(Ofl_desc *, int, Sg_desc *);
+void	Dbg32_map_set_equal(Boolean);
+void	Dbg64_map_set_equal(Boolean);
+void	Dbg32_map_size_new(Lm_list *, const char *);
+void	Dbg64_map_size_new(Lm_list *, const char *);
+void	Dbg32_map_size_old(Ofl_desc *, Sym_desc *);
+void	Dbg64_map_size_old(Ofl_desc *, Sym_desc *);
+void	Dbg32_map_sort_fini(Lm_list *, Sg_desc *);
+void	Dbg64_map_sort_fini(Lm_list *, Sg_desc *);
+void	Dbg32_map_sort_orig(Lm_list *, Sg_desc *);
+void	Dbg64_map_sort_orig(Lm_list *, Sg_desc *);
+void	Dbg32_map_symbol(Ofl_desc *, Sym_desc *);
+void	Dbg64_map_symbol(Ofl_desc *, Sym_desc *);
+void	Dbg32_map_version(Lm_list *, const char *, const char *, int);
+void	Dbg64_map_version(Lm_list *, const char *, const char *, int);
+
+void	Dbg32_move_adjexpandreloc(Lm_list *, Elf32_Word, const char *);
+void	Dbg64_move_adjexpandreloc(Lm_list *, Elf64_Xword, const char *);
+void	Dbg32_move_adjmovereloc(Lm_list *, Elf32_Word, Elf32_Word,
+	    const char *);
+void	Dbg64_move_adjmovereloc(Lm_list *, Elf64_Xword, Elf64_Xword,
+	    const char *);
+void	Dbg32_move_data(Rt_map *);
+void	Dbg64_move_data(Rt_map *);
+void	Dbg32_move_entry1(Lm_list *, int, Move *, Sym_desc *);
+void	Dbg64_move_entry1(Lm_list *, int, Move *, Sym_desc *);
+void	Dbg32_move_entry2(Lm_list *, Elf32_Move *, Elf32_Word, const char *);
+void	Dbg64_move_entry2(Lm_list *, Elf64_Move *, Elf64_Word, const char *);
+void	Dbg32_move_expand(Lm_list *, Elf32_Move *, Elf32_Addr);
+void	Dbg64_move_expand(Lm_list *, Elf64_Move *, Elf64_Addr);
+void	Dbg32_move_input(Lm_list *, const char *);
+void	Dbg64_move_input(Lm_list *, const char *);
+void	Dbg32_move_outmove(Lm_list *, const char *);
+void	Dbg64_move_outmove(Lm_list *, const char *);
+void	Dbg32_move_outsctadj(Lm_list *, Sym_desc *);
+void	Dbg64_move_outsctadj(Lm_list *, Sym_desc *);
+void	Dbg32_move_parexpn(Lm_list *, const char *, const char *);
+void	Dbg64_move_parexpn(Lm_list *, const char *, const char *);
+
+void	Dbg32_reloc_apply_reg(Lm_list *, int, Elf32_Half, Elf32_Word,
+	    Elf32_Word);
+void	Dbg64_reloc_apply_reg(Lm_list *, int, Elf64_Half, Elf64_Xword,
+	    Elf64_Xword);
+void	Dbg32_reloc_apply_val(Lm_list *, int, Elf32_Word, Elf32_Word);
+void	Dbg64_reloc_apply_val(Lm_list *, int, Elf64_Xword, Elf64_Xword);
+void	Dbg32_reloc_ars_entry(Lm_list *, int, Elf32_Word, Elf32_Half, Rel_desc *);
+void	Dbg64_reloc_ars_entry(Lm_list *, int, Elf64_Word, Elf64_Half, Rel_desc *);
+void	Dbg32_reloc_copy(Rt_map *, Rt_map *, const char *, int);
+void	Dbg64_reloc_copy(Rt_map *, Rt_map *, const char *, int);
+void	Dbg32_reloc_discard(Lm_list *, Elf32_Half, Rel_desc *);
+void	Dbg64_reloc_discard(Lm_list *, Elf64_Half, Rel_desc *);
+void	Dbg32_reloc_doact(Lm_list *, int, Elf32_Half, Elf32_Word, Elf32_Word,
+	    Elf32_Word, Elf32_Word, const char *, Os_desc *);
+void	Dbg64_reloc_doact(Lm_list *, int, Elf64_Half, Elf64_Word, Elf64_Word,
+	    Elf64_Xword, Elf64_Xword, const char *, Os_desc *);
+void	Dbg32_reloc_doact_title(Lm_list *);
+void	Dbg64_reloc_doact_title(Lm_list *);
+void	Dbg32_reloc_dooutrel(Lm_list *, Elf32_Word);
+void	Dbg64_reloc_dooutrel(Lm_list *, Elf64_Word);
+void	Dbg32_reloc_entry(Lm_list *, const char *, Elf32_Half, Elf32_Word,
+	    void *, const char *, const char *, const char *);
+void	Dbg64_reloc_entry(Lm_list *, const char *, Elf64_Half, Elf64_Word,
+	    void *, const char *, const char *, const char *);
+void	Dbg32_reloc_error(Lm_list *, int, Elf32_Half, Elf32_Word, void *,
+	    const char *);
+void	Dbg64_reloc_error(Lm_list *, int, Elf64_Half, Elf64_Word, void *,
+	    const char *);
+void	Dbg32_reloc_generate(Lm_list *, Os_desc *, Elf32_Word);
+void	Dbg64_reloc_generate(Lm_list *, Os_desc *, Elf64_Word);
+void	Dbg32_reloc_in(Lm_list *, int, Elf32_Half, Elf32_Word, void *,
+	    const char *, const char *);
+void	Dbg64_reloc_in(Lm_list *, int, Elf64_Half, Elf64_Word, void *,
+	    const char *, const char *);
+void	Dbg32_reloc_ors_entry(Lm_list *, int, Elf32_Word, Elf32_Half, Rel_desc *);
+void	Dbg64_reloc_ors_entry(Lm_list *, int, Elf64_Word, Elf64_Half, Rel_desc *);
+void	Dbg32_reloc_out(Ofl_desc *, int, Elf32_Word, void *, const char *,
+	    const char *);
+void	Dbg64_reloc_out(Ofl_desc *, int, Elf64_Word, void *, const char *,
+	    const char *);
+void	Dbg32_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
+void	Dbg64_reloc_proc(Lm_list *, Os_desc *, Is_desc *, Is_desc *);
+void	Dbg32_reloc_run(Rt_map *, uint_t, int, int);
+void	Dbg64_reloc_run(Rt_map *, uint_t, int, int);
+void	Dbg32_reloc_transition(Lm_list *, Elf32_Half, Elf32_Word, Elf32_Word,
+	    Elf32_Word, const char *);
+void	Dbg64_reloc_transition(Lm_list *, Elf64_Half, Elf64_Word, Elf64_Word,
+	    Elf64_Xword, const char *);
+
+void	Dbg32_sec_added(Lm_list *, Os_desc *, Sg_desc *);
+void	Dbg64_sec_added(Lm_list *, Os_desc *, Sg_desc *);
+void	Dbg32_sec_created(Lm_list *, Os_desc *, Sg_desc *);
+void	Dbg64_sec_created(Lm_list *, Os_desc *, Sg_desc *);
+void	Dbg32_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
+void	Dbg64_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
+void	Dbg32_sec_group(Lm_list *, Is_desc *, Group_desc *);
+void	Dbg64_sec_group(Lm_list *, Is_desc *, Group_desc *);
+void	Dbg32_sec_in(Lm_list *, Is_desc *);
+void	Dbg64_sec_in(Lm_list *, Is_desc *);
+void	Dbg32_sec_order_error(Lm_list *, Ifl_desc *, Elf32_Word, int);
+void	Dbg64_sec_order_error(Lm_list *, Ifl_desc *, Elf64_Word, int);
+void	Dbg32_sec_order_list(Ofl_desc *, int);
+void	Dbg64_sec_order_list(Ofl_desc *, int);
+void	Dbg32_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
+void	Dbg64_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
+
+void	Dbg32_seg_desc_entry(Lm_list *, Elf32_Half, int, Sg_desc *);
+void	Dbg64_seg_desc_entry(Lm_list *, Elf64_Half, int, Sg_desc *);
+void	Dbg32_seg_entry(Ofl_desc *, int, Sg_desc *);
+void	Dbg64_seg_entry(Ofl_desc *, int, Sg_desc *);
+void	Dbg32_seg_list(Lm_list *, Elf32_Half, List *);
+void	Dbg64_seg_list(Lm_list *, Elf64_Half, List *);
+void	Dbg32_seg_os(Ofl_desc *, Os_desc *, int);
+void	Dbg64_seg_os(Ofl_desc *, Os_desc *, int);
+void    Dbg32_seg_title(Lm_list *);
+void    Dbg64_seg_title(Lm_list *);
+
+void	Dbg32_statistics_ar(Ofl_desc *);
+void	Dbg64_statistics_ar(Ofl_desc *);
+void	Dbg32_statistics_ld(Ofl_desc *);
+void	Dbg64_statistics_ld(Ofl_desc *);
+
+void	Dbg32_support_action(Lm_list *, const char *, const char *, Support_ndx,
+	    const char *);
+void	Dbg64_support_action(Lm_list *, const char *, const char *, Support_ndx,
+	    const char *);
+void	Dbg32_support_load(Lm_list *, const char *, const char *);
+void	Dbg64_support_load(Lm_list *, const char *, const char *);
+void	Dbg32_support_req(Lm_list *, const char *, int);
+void	Dbg64_support_req(Lm_list *, const char *, int);
+
+void	Dbg32_syminfo_entry(Lm_list *, Elf32_Word, Syminfo *, Sym *, const char *,
+	    Dyn *);
+void	Dbg64_syminfo_entry(Lm_list *, Elf64_Word, Syminfo *, Sym *, const char *,
+	    Dyn *);
+void	Dbg32_syminfo_title(Lm_list *);
+void	Dbg64_syminfo_title(Lm_list *);
+
+void	Dbg32_syms_ar_checking(Lm_list *, Xword, Elf_Arsym *, const char *);
+void	Dbg64_syms_ar_checking(Lm_list *, Xword, Elf_Arsym *, const char *);
+void	Dbg32_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
+void	Dbg64_syms_ar_entry(Lm_list *, Xword, Elf_Arsym *);
+void	Dbg32_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *, const char *, int);
+void	Dbg64_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *, const char *, int);
+void	Dbg32_syms_ar_title(Lm_list *, const char *, int);
+void	Dbg64_syms_ar_title(Lm_list *, const char *, int);
+void	Dbg32_syms_created(Lm_list *, const char *);
+void	Dbg64_syms_created(Lm_list *, const char *);
+void	Dbg32_syms_discarded(Lm_list *, Sym_desc *, Is_desc *);
+void	Dbg64_syms_discarded(Lm_list *, Sym_desc *, Is_desc *);
+void	Dbg32_syms_dlsym(Rt_map *, const char *, const char *, int);
+void	Dbg64_syms_dlsym(Rt_map *, const char *, const char *, int);
+void	Dbg32_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
+void	Dbg64_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
+void	Dbg32_syms_entry(Lm_list *, Elf32_Word, Sym_desc *);
+void	Dbg64_syms_entry(Lm_list *, Elf64_Word, Sym_desc *);
+void	Dbg32_syms_global(Lm_list *, Elf32_Word, const char *);
+void	Dbg64_syms_global(Lm_list *, Elf64_Word, const char *);
+void	Dbg32_syms_ignore(Ofl_desc *, Sym_desc *);
+void	Dbg64_syms_ignore(Ofl_desc *, Sym_desc *);
+void	Dbg32_syms_lazy_rescan(Lm_list *, const char *);
+void	Dbg64_syms_lazy_rescan(Lm_list *, const char *);
+void	Dbg32_syms_lookup(Rt_map *, const char *, const char *);
+void	Dbg64_syms_lookup(Rt_map *, const char *, const char *);
+void	Dbg32_syms_lookup_aout(Lm_list *, const char *);
+void	Dbg32_syms_new(Ofl_desc *, Sym *, Sym_desc *);
+void	Dbg64_syms_new(Ofl_desc *, Sym *, Sym_desc *);
+void	Dbg32_syms_old(Ofl_desc *, Sym_desc *);
+void	Dbg64_syms_old(Ofl_desc *, Sym_desc *);
+void	Dbg32_syms_process(Lm_list *, Ifl_desc *);
+void	Dbg64_syms_process(Lm_list *, Ifl_desc *);
+void	Dbg32_syms_reduce(Ofl_desc *, int, Sym_desc *, int, const char *);
+void	Dbg64_syms_reduce(Ofl_desc *, int, Sym_desc *, int, const char *);
+void	Dbg32_syms_reloc(Ofl_desc *, Sym_desc *);
+void	Dbg64_syms_reloc(Ofl_desc *, Sym_desc *);
+void	Dbg32_syms_resolved(Ofl_desc *, Sym_desc *);
+void	Dbg64_syms_resolved(Ofl_desc *, Sym_desc *);
+void	Dbg32_syms_resolving(Ofl_desc *, Elf32_Word, const char *, int, int,
+	    Sym *, Sym *, Sym_desc *, Ifl_desc *);
+void	Dbg64_syms_resolving(Ofl_desc *, Elf64_Word, const char *, int, int,
+	    Sym *, Sym *, Sym_desc *, Ifl_desc *);
+void	Dbg32_syms_sec_entry(Lm_list *, Elf32_Word, Sg_desc *, Os_desc *);
+void	Dbg64_syms_sec_entry(Lm_list *, Elf64_Word, Sg_desc *, Os_desc *);
+void	Dbg32_syms_sec_title(Lm_list *);
+void	Dbg64_syms_sec_title(Lm_list *);
+void	Dbg32_syms_spec_title(Lm_list *);
+void	Dbg64_syms_spec_title(Lm_list *);
+void	Dbg32_syms_updated(Ofl_desc *, Sym_desc *, const char *);
+void	Dbg64_syms_updated(Ofl_desc *, Sym_desc *, const char *);
+void	Dbg32_syms_up_title(Lm_list *);
+void	Dbg64_syms_up_title(Lm_list *);
+
+void	Dbg32_util_broadcast(Rt_map *);
+void	Dbg64_util_broadcast(Rt_map *);
+void	Dbg32_util_call_array(Rt_map *, void *, int, Elf32_Word);
+void	Dbg64_util_call_array(Rt_map *, void *, int, Elf64_Word);
+void	Dbg32_util_call_fini(Rt_map *);
+void	Dbg64_util_call_fini(Rt_map *);
+void	Dbg32_util_call_init(Rt_map *, int);
+void	Dbg64_util_call_init(Rt_map *, int);
+void	Dbg32_util_call_main(Rt_map *);
+void	Dbg64_util_call_main(Rt_map *);
+void	Dbg32_util_collect(Rt_map *, int, int);
+void	Dbg64_util_collect(Rt_map *, int, int);
+void	Dbg32_util_dbnotify(Lm_list *, rd_event_e, r_state_e);
+void	Dbg64_util_dbnotify(Lm_list *, rd_event_e, r_state_e);
+void	Dbg32_util_edge_in(Lm_list *, Rt_map *, uint_t, Rt_map *, int, int);
+void	Dbg64_util_edge_in(Lm_list *, Rt_map *, uint_t, Rt_map *, int, int);
+void	Dbg32_util_edge_out(Rt_map *, Rt_map *);
+void	Dbg64_util_edge_out(Rt_map *, Rt_map *);
+void	Dbg32_util_intoolate(Rt_map *);
+void	Dbg64_util_intoolate(Rt_map *);
+void	Dbg32_util_nl(Lm_list *, int);
+void	Dbg64_util_nl(Lm_list *, int);
+void	Dbg32_util_no_init(Rt_map *);
+void	Dbg64_util_no_init(Rt_map *);
+void	Dbg32_util_scc_entry(Rt_map *, uint_t);
+void	Dbg64_util_scc_entry(Rt_map *, uint_t);
+void	Dbg32_util_scc_title(Lm_list *, int);
+void	Dbg64_util_scc_title(Lm_list *, int);
+void	Dbg32_util_str(Lm_list *, const char  *);
+void	Dbg64_util_str(Lm_list *, const char  *);
+void	Dbg32_util_wait(Rt_map *, Rt_map *, int);
+void	Dbg64_util_wait(Rt_map *, Rt_map *, int);
+
+void	Dbg32_unused_file(Lm_list *, const char *, int, uint_t);
+void	Dbg64_unused_file(Lm_list *, const char *, int, uint_t);
+void	Dbg32_unused_rtldinfo(Rt_map *);
+void	Dbg64_unused_rtldinfo(Rt_map *);
+void	Dbg32_unused_sec(Lm_list *, Is_desc *);
+void	Dbg64_unused_sec(Lm_list *, Is_desc *);
+void	Dbg32_unused_unref(Rt_map *, const char *);
+void	Dbg64_unused_unref(Rt_map *, const char *);
+
+void	Dbg32_ver_need_entry(Lm_list *, Half, const char *, const char *);
+void	Dbg64_ver_need_entry(Lm_list *, Half, const char *, const char *);
+void	Dbg32_ver_need_title(Lm_list *, const char *);
+void	Dbg64_ver_need_title(Lm_list *, const char *);
+
+const char *Elf_demangle_name(const char *);
+
+void Elf_syminfo_entry(Lm_list *, Word, Syminfo *, const char *, const char *);
+void Elf_syminfo_title(Lm_list *);
+void Elf_ver_def_title(Lm_list *);
+void Elf_ver_need_title(Lm_list *);
+void Elf_ver_line_1(Lm_list *, const char *, const char *, const char *,
+    const char *);
+void Elf_ver_line_2(Lm_list *, const char *, const char *);
+void Elf_ver_line_3(Lm_list *, const char *, const char *, const char *);
+void Elf_ver_line_4(Lm_list *, const char *);
+void Elf_ver_line_5(Lm_list *, const char *, const char *);
+
+void Elf64_cap_entry(Lm_list *, Elf64_Cap *, int ndx, Elf64_Half);
+void Elf32_cap_entry(Lm_list *, Elf32_Cap *, int ndx, Elf32_Half);
+void Elf64_cap_title(Lm_list *);
+void Elf32_cap_title(Lm_list *);
+
+void Elf64_dyn_entry(Lm_list *, Elf64_Dyn *, int, const char *, Elf64_Half);
+void Elf32_dyn_entry(Lm_list *, Elf32_Dyn *, int, const char *, Elf32_Half);
+void Elf64_dyn_title(Lm_list *);
+void Elf32_dyn_title(Lm_list *);
+
+void Elf64_ehdr(Lm_list *, Elf64_Ehdr *, Elf64_Shdr *);
+void Elf32_ehdr(Lm_list *, Elf32_Ehdr *, Elf32_Shdr *);
+
+void Elf64_got_entry(Lm_list *, Elf64_Sword, Elf64_Addr, Elf64_Xword,
+    Elf64_Half, Elf64_Word, void *, const char *);
+void Elf32_got_entry(Lm_list *, Elf32_Sword, Elf32_Addr, Elf32_Word,
+    Elf32_Half, Elf32_Word, void *, const char *);
+void Elf64_got_title(Lm_list *);
+void Elf32_got_title(Lm_list *);
+
+void Elf64_phdr(Lm_list *, Elf64_Half, Elf64_Phdr *);
+void Elf32_phdr(Lm_list *, Elf32_Half, Elf32_Phdr *);
+
+void Elf64_reloc_apply_reg(Lm_list *, int, Elf64_Half, Elf64_Xword,
+    Elf64_Xword);
+void Elf32_reloc_apply_reg(Lm_list *, int, Elf32_Half, Elf32_Word,
+    Elf32_Word);
+void Elf64_reloc_apply_val(Lm_list *, int, Elf64_Xword, Elf64_Xword);
+void Elf32_reloc_apply_val(Lm_list *, int, Elf32_Word, Elf32_Word);
+void Elf64_reloc_entry_1(Lm_list *, int, const char *, Elf64_Half, Word, void *,
+    const char *, const char *, const char *);
+void Elf32_reloc_entry_1(Lm_list *, int, const char *, Elf32_Half, Word, void *,
+    const char *, const char *, const char *);
+void Elf64_reloc_entry_2(Lm_list *, int, const char *, Word, const char *,
+    Elf64_Addr, Elf64_Sxword, const char *, const char *, const char *);
+void Elf32_reloc_entry_2(Lm_list *, int, const char *, Word, const char *,
+    Elf32_Addr, Elf32_Sword, const char *, const char *, const char *);
+void Elf64_reloc_title(Lm_list *, int, Word);
+void Elf32_reloc_title(Lm_list *, int, Word);
+
+void Elf64_shdr(Lm_list *, Elf64_Half, Elf64_Shdr *);
+void Elf32_shdr(Lm_list *, Elf32_Half, Elf32_Shdr *);
+
+void Elf64_syms_table_entry(Lm_list *, int, const char *, Elf64_Half,
+    Elf64_Sym *, Elf64_Word, const char *, const char *);
+void Elf32_syms_table_entry(Lm_list *, int, const char *, Elf32_Half,
+    Elf32_Sym *, Elf32_Word, const char *, const char *);
+void Elf64_syms_table_title(Lm_list *, int);
+void Elf32_syms_table_title(Lm_list *, int);

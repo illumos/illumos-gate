@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -35,7 +34,6 @@
 #include	<unistd.h>
 #include	<signal.h>
 #include	<locale.h>
-#include	<errno.h>
 #include	<string.h>
 #include	"msg.h"
 #include	"_libld.h"
@@ -44,19 +42,18 @@
  * Exit after cleaning up.
  */
 int
-ldexit()
+ld_exit(Ofl_desc *ofl)
 {
 	/*
 	 * If we have created an output file remove it.
 	 */
-	if ((Ofl.ofl_fd > 0) && ((Ofl.ofl_flags1 & FLG_OF1_NONREG) == 0))
-		(void) unlink(Ofl.ofl_name);
+	if ((ofl->ofl_fd > 0) && ((ofl->ofl_flags1 & FLG_OF1_NONREG) == 0))
+		(void) unlink(ofl->ofl_name);
 
 	/*
 	 * Inform any support library that the link-edit has failed.
 	 */
-	lds_atexit(1);
-
+	ld_sup_atexit(ofl, 1);
 	return (1);
 }
 
@@ -69,12 +66,15 @@ typedef struct {
 	void (*	defhdl)();
 } Signals;
 
-Signals signals[] = {	{ SIGHUP,	SIG_DFL },
-			{ SIGINT,	SIG_IGN },
-			{ SIGQUIT,	SIG_DFL },
-			{ SIGBUS,	SIG_DFL },
-			{ SIGTERM,	SIG_IGN },
-			{ 0,		0 } };
+static Signals signals[] = {
+	{ SIGHUP,	SIG_DFL },
+	{ SIGINT,	SIG_IGN },
+	{ SIGQUIT,	SIG_DFL },
+	{ SIGBUS,	SIG_DFL },
+	{ SIGTERM,	SIG_IGN },
+	{ 0,		0 } };
+
+static Ofl_desc	*Ofl = 0;
 
 /*
  * Define our signal handler.
@@ -108,9 +108,9 @@ handler(int sig, siginfo_t *sip, void *utp)
 	 * error (one instance was a stale NFS handle from an unstable server).
 	 * Thus we catch all bus errors and hope we can decode a better error.
 	 */
-	if ((sig == SIGBUS) && sip && Ofl.ofl_name) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INTERRUPT), Ofl.ofl_name,
-		    strerror(sip->si_errno));
+	if ((sig == SIGBUS) && sip && Ofl->ofl_name) {
+		eprintf(Ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INTERRUPT),
+		    Ofl->ofl_name, strerror(sip->si_errno));
 	}
 	/*
 	 * This assert(0) causes DEBUG enabled linkers to produce a core file.
@@ -118,18 +118,19 @@ handler(int sig, siginfo_t *sip, void *utp)
 	if ((sig != SIGHUP) && (sig != SIGINT))
 		assert(0);
 
-	exit(ldexit());
+	exit(ld_exit(Ofl));
 }
-
 
 /*
  * Establish a signal handler for all signals we're interested in.
  */
 void
-init()
+ld_init(Ofl_desc *ofl)
 {
 	struct sigaction	nact, oact;
 	Signals *		sigs;
+
+	Ofl = ofl;
 
 	/*
 	 * For each signal we're interested in set up a signal handler that

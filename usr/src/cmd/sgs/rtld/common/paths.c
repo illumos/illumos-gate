@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,10 +38,10 @@
 #include	<fcntl.h>
 #include	<string.h>
 #include	<sys/systeminfo.h>
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"msg.h"
-#include	"conv.h"
-#include	"debug.h"
 
 /*
  * Given a search rule type, return a list of directories to search according
@@ -84,7 +83,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 			if (env_info & ENV_INF_PATHCFG)
 				mode |= LA_SER_CONFIG;
 
-			DBG_CALL(Dbg_libs_path(rpl_libpath, mode,
+			DBG_CALL(Dbg_libs_path(lml, rpl_libpath, mode,
 			    config->c_name));
 
 			/*
@@ -106,7 +105,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				(void) printf(fmt, rpl_libpath, config->c_name);
 			}
 			if (rpl_libdirs && (rtld_flags & RT_FL_SECURE) &&
-			    (search || dbg_mask)) {
+			    (search || DBG_ENABLED)) {
 				free(rpl_libdirs);
 				rpl_libdirs = 0;
 			}
@@ -129,7 +128,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 		 * always call Dbg_libs_path().
 		 */
 		if (prm_libpath) {
-			DBG_CALL(Dbg_libs_path(prm_libpath,
+			DBG_CALL(Dbg_libs_path(lml, prm_libpath,
 			    (LA_SER_LIBPATH | LA_SER_CONFIG), config->c_name));
 
 			/*
@@ -144,7 +143,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				(void) printf(MSG_INTL(MSG_LDD_PTH_LIBPATHC),
 				    prm_libpath, config->c_name);
 			if (prm_libdirs && (rtld_flags & RT_FL_SECURE) &&
-			    (search || dbg_mask)) {
+			    (search || DBG_ENABLED)) {
 				free(prm_libdirs);
 				prm_libdirs = 0;
 			}
@@ -167,7 +166,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 		 * Dbg_libs_path().
 		 */
 		if (RPATH(lmp)) {
-			DBG_CALL(Dbg_libs_path(RPATH(lmp), LA_SER_RUNPATH,
+			DBG_CALL(Dbg_libs_path(lml, RPATH(lmp), LA_SER_RUNPATH,
 			    NAME(lmp)));
 
 			/*
@@ -182,7 +181,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 				(void) printf(MSG_INTL(MSG_LDD_PTH_RPATH),
 				    RPATH(lmp), NAME(lmp));
 			if (RLIST(lmp) && (rtld_flags & RT_FL_SECURE) &&
-			    (search || dbg_mask)) {
+			    (search || DBG_ENABLED)) {
 				free(RLIST(lmp));
 				RLIST(lmp) = 0;
 			}
@@ -208,7 +207,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 		/*
 		 * For ldd(1) -s, indicate the default paths that'll be used.
 		 */
-		if (dirlist && (search || dbg_mask)) {
+		if (dirlist && (search || DBG_ENABLED)) {
 			Pnode *	pnp = dirlist;
 			int	num = 0;
 
@@ -224,7 +223,7 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 					    fmt = MSG_ORIG(MSG_LDD_FMT_PATH1);
 					(void) printf(fmt, pnp->p_name);
 				} else
-					DBG_CALL(Dbg_libs_path(pnp->p_name,
+					DBG_CALL(Dbg_libs_path(lml, pnp->p_name,
 					    pnp->p_orig, config->c_name));
 			}
 			if (search) {
@@ -284,13 +283,14 @@ get_next_dir(Pnode ** dirlist, Rt_map * lmp, uint_t flags)
  */
 uint_t
 expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
-    Rt_map * lmp)
+    Rt_map *lmp)
 {
 	char	_name[PATH_MAX];
 	char	*token = 0, *oname, *optr, *_optr, *nptr, * _list;
 	size_t	olen = 0, nlen = 0, _len;
 	int	isaflag = 0;
 	uint_t	flags = 0;
+	Lm_list	*lml = LIST(lmp);
 
 	optr = _optr = oname = *name;
 	nptr = _name;
@@ -323,8 +323,9 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 				(void) strncpy(nptr, _optr, _len);
 				nptr = nptr + _len;
 			} else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND1),
-				    NAME(lmp), oname);
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_ERR_EXPAND1), NAME(lmp),
+				    oname);
 				return (0);
 			}
 		}
@@ -359,7 +360,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					optr += MSG_TKN_ORIGIN_SIZE;
 					_flags |= PN_TKN_ORIGIN;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
 					    NAME(lmp), oname);
 					return (0);
@@ -397,7 +398,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					optr += MSG_TKN_PLATFORM_SIZE;
 					_flags |= PN_TKN_PLATFORM;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
 					    NAME(lmp), oname);
 					return (0);
@@ -425,7 +426,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					optr += MSG_TKN_OSNAME_SIZE;
 					_flags |= PN_TKN_OSNAME;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
 					    NAME(lmp), oname);
 					return (0);
@@ -453,7 +454,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					optr += MSG_TKN_OSREL_SIZE;
 					_flags |= PN_TKN_OSREL;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
 					    NAME(lmp), oname);
 					return (0);
@@ -494,7 +495,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					optr += MSG_TKN_ISALIST_SIZE;
 					_flags |= PN_TKN_ISALIST;
 				} else {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
 					    NAME(lmp), oname);
 					return (0);
@@ -576,8 +577,9 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			if (_flags)
 				flags |= _flags;
 			else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND2),
-				    NAME(lmp), oname, token);
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_ERR_EXPAND2), NAME(lmp),
+				    oname, token);
 				return (0);
 			}
 		}
@@ -590,7 +592,8 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	 * the lead of a reserved token.
 	 */
 	if (nlen >= PATH_MAX) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND1), NAME(lmp), oname);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND1), NAME(lmp),
+		    oname);
 		return (0);
 	}
 
@@ -631,7 +634,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			(void) strncpy(nptr, _optr, _len);
 			nptr = nptr + _len;
 		} else {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND1),
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ERR_EXPAND1),
 			    NAME(lmp), oname);
 			return (0);
 		}
@@ -767,7 +770,8 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 				(void) printf(MSG_INTL(MSG_LDD_FIL_ILLEGAL),
 				    opath);
 		} else
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SEC_ILLEGAL), opath);
+			eprintf(lml, ERR_WARNING, MSG_INTL(MSG_SEC_ILLEGAL),
+			    opath);
 
 		return (0);
 	}
@@ -789,13 +793,13 @@ is_path_secure(const char *opath, Rt_map * clmp, uint_t info, uint_t flags)
 					opath);
 			}
 		} else
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), opath,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), opath,
 			    strerror(EACCES));
 	} else {
 		/*
 		 * Search paths.
 		 */
-		DBG_CALL(Dbg_libs_ignore(opath));
+		DBG_CALL(Dbg_libs_ignore(lml, opath));
 		if ((lml->lm_flags & LML_FLG_TRC_SEARCH) &&
 		    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0))
 			(void) printf(MSG_INTL(MSG_LDD_PTH_IGNORE), opath);

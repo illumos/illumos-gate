@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -315,7 +315,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 		return (S_ERROR);
 	elfdata->d_type = ELF_T_BYTE;
 	elfdata->d_align = M_WORD_ALIGN;
-	elfdata->d_version = ofl->ofl_libver;
+	elfdata->d_version = ofl->ofl_dehdr->e_version;
 
 
 	/*
@@ -338,7 +338,7 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 	isec->is_indata = elfdata;
 
 
-	if ((ofl->ofl_unwindhdr = place_section(ofl, isec,
+	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isec,
 	    M_ID_UNWINDHDR, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -393,11 +393,10 @@ make_amd64_unwindhdr(Ofl_desc *ofl)
 					cieversion = data[off + ndx];
 					ndx += 1;
 					if (cieversion != 1) {
-					    eprintf(ERR_FATAL,
+					    eprintf(ofl->ofl_lml, ERR_FATAL,
 						MSG_INTL(MSG_UNW_BADCIEVERS),
 						isp->is_file->ifl_name,
-						isp->is_name,
-						off);
+						isp->is_name, off);
 					    return (S_ERROR);
 					}
 				} else
@@ -614,7 +613,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 					    (void) dwarf_ehe_extract(
 						&fdata[foff + fndx],
 						&fndx, ciePflag,
-						ofl->ofl_ehdr->e_ident,
+						ofl->ofl_dehdr->e_ident,
 						shdr->sh_addr + foff + fndx);
 					    break;
 					case 'R':
@@ -644,7 +643,7 @@ populate_amd64_unwindhdr(Ofl_desc *ofl)
 				fdeaddr = shdr->sh_addr + foff;
 
 				initloc = dwarf_ehe_extract(&fdata[foff],
-				    &fndx, cieRflag, ofl->ofl_ehdr->e_ident,
+				    &fndx, cieRflag, ofl->ofl_dehdr->e_ident,
 				    shdr->sh_addr + foff + fndx);
 				binarytable[bintabndx] = (uint_t)(initloc -
 					hdraddr);
@@ -704,36 +703,4 @@ append_amd64_unwind(Os_desc *osp, Ofl_desc * ofl)
 	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
 	    return (S_ERROR);
 	return (1);
-}
-
-uintptr_t
-process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
-	Elf_Scn *scn, Word ndx, int ident, Ofl_desc *ofl)
-{
-	Os_desc	    *osp;
-	Is_desc	    *isp;
-
-	ident = M_ID_UNWIND;
-	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) ==
-	    S_ERROR)
-		return (S_ERROR);
-	/*
-	 * When producing a relocatable object - just collect
-	 * the sections.
-	 */
-	if (ofl->ofl_flags & FLG_OF_RELOBJ)
-		return (1);
-	/*
-	 * If we are producing a executable or shared library, we need
-	 * to keep track of all the output UNWIND sections - so that
-	 * we can create the appropriate frame_hdr information.
-	 *
-	 * If the section hasn't been placed in the output file,
-	 * then there's nothing for us to do.
-	 */
-	if (((isp = ifl->ifl_isdesc[ndx]) == 0) ||
-	    ((osp = isp->is_osdesc) == 0))
-		return (1);
-
-	return (append_amd64_unwind(osp, ofl));
 }

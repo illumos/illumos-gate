@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,60 +38,62 @@
 #define	POSSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_DFP_LAZYLOAD_SIZE + \
 		MSG_DFP_GROUPPERM_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_dynposflag_1_str(uint_t flags)
+conv_dyn_posflag1(Xword flags)
 {
-	static char	string[POSSZ] = { '\0' };
+	static char	string[POSSZ];
+	static Val_desc vda[] = {
+		{ DF_P1_LAZYLOAD,	MSG_ORIG(MSG_DFP_LAZYLOAD) },
+		{ DF_P1_GROUPPERM,	MSG_ORIG(MSG_DFP_GROUPPERM) },
+		{ 0,			0 }
+	};
+
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-
-	if (flags & DF_P1_LAZYLOAD)
-		(void) strcat(string, MSG_ORIG(MSG_DFP_LAZYLOAD));
-	if (flags & DF_P1_GROUPPERM)
-		(void) strcat(string, MSG_ORIG(MSG_DFP_GROUPPERM));
-
-	(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), POSSZ);
+	if (conv_expn_field(string, POSSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), POSSZ);
 
 	return ((const char *)string);
 }
 
-#define	FLAGSZ	MSG_DF_ORIGIN_SIZE + \
+#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
+		MSG_DF_ORIGIN_SIZE + \
 		MSG_DF_SYMBOLIC_SIZE + \
 		MSG_DF_TEXTREL_SIZE + \
 		MSG_DF_BIND_NOW_SIZE + \
-		MSG_DF_STATIC_TLS_SIZE
+		MSG_DF_STATIC_TLS_SIZE + \
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_dynflag_str(uint_t flags)
+conv_dyn_flag(Xword flags)
 {
-	static char	string[FLAGSZ] = { '\0' };
+	static char	string[FLAGSZ];
+	static Val_desc vda[] = {
+		{ DF_ORIGIN,		MSG_ORIG(MSG_DF_ORIGIN) },
+		{ DF_SYMBOLIC,		MSG_ORIG(MSG_DF_SYMBOLIC) },
+		{ DF_TEXTREL,		MSG_ORIG(MSG_DF_TEXTREL) },
+		{ DF_BIND_NOW,		MSG_ORIG(MSG_DF_BIND_NOW) },
+		{ DF_STATIC_TLS,	MSG_ORIG(MSG_DF_STATIC_TLS) },
+		{ 0,			0 }
+	};
+
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
-	else {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-		if (flags & DF_ORIGIN)
-			(void) strcat(string, MSG_ORIG(MSG_DF_ORIGIN));
-		if (flags & DF_SYMBOLIC)
-			(void) strcat(string, MSG_ORIG(MSG_DF_SYMBOLIC));
-		if (flags & DF_TEXTREL)
-			(void) strcat(string, MSG_ORIG(MSG_DF_TEXTREL));
-		if (flags & DF_BIND_NOW)
-			(void) strcat(string, MSG_ORIG(MSG_DF_BIND_NOW));
-		if (flags & DF_STATIC_TLS)
-			(void) strcat(string, MSG_ORIG(MSG_DF_STATIC_TLS));
 
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
+	if (conv_expn_field(string, FLAGSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
 
-		return ((const char *)string);
-	}
+	return ((const char *)string);
 }
 
 #define	FLAG1SZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_DF1_NOW_SIZE + \
+		MSG_DF1_GLOBAL_SIZE + \
 		MSG_DF1_GROUP_SIZE + \
 		MSG_DF1_NODELETE_SIZE + \
 		MSG_DF1_LOADFLTR_SIZE + \
@@ -111,116 +113,101 @@ conv_dynflag_str(uint_t flags)
 		MSG_DF1_IGNMULDEF_SIZE + \
 		MSG_DF1_NOKSYMS_SIZE + \
 		MSG_DF1_NORELOC_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_dynflag_1_str(uint_t flags)
+conv_dyn_flag1(Xword flags)
 {
-	static char	string[FLAG1SZ] = { '\0' };
+	static char	string[FLAG1SZ];
+	static Val_desc vda[] = {
+		{ DF_1_NOW,		MSG_ORIG(MSG_DF_ORIGIN) },
+		{ DF_1_GLOBAL,		MSG_ORIG(MSG_DF1_GLOBAL) },
+		{ DF_1_GROUP,		MSG_ORIG(MSG_DF1_GROUP) },
+		{ DF_1_NODELETE,	MSG_ORIG(MSG_DF1_NODELETE) },
+		{ DF_1_LOADFLTR,	MSG_ORIG(MSG_DF1_LOADFLTR) },
+		{ DF_1_INITFIRST,	MSG_ORIG(MSG_DF1_INITFIRST) },
+		{ DF_1_NOOPEN,		MSG_ORIG(MSG_DF1_NOOPEN) },
+		{ DF_1_ORIGIN,		MSG_ORIG(MSG_DF1_ORIGIN) },
+		{ DF_1_DIRECT,		MSG_ORIG(MSG_DF1_DIRECT) },
+		{ DF_1_TRANS,		MSG_ORIG(MSG_DF1_TRANS) },
+		{ DF_1_INTERPOSE,	MSG_ORIG(MSG_DF1_INTERPOSE) },
+		{ DF_1_NODEFLIB,	MSG_ORIG(MSG_DF1_NODEFLIB) },
+		{ DF_1_NODUMP,		MSG_ORIG(MSG_DF1_NODUMP) },
+		{ DF_1_CONFALT,		MSG_ORIG(MSG_DF1_CONFALT) },
+		{ DF_1_ENDFILTEE,	MSG_ORIG(MSG_DF1_ENDFILTEE) },
+		{ DF_1_DISPRELPND,	MSG_ORIG(MSG_DF1_DISPRELPND) },
+		{ DF_1_DISPRELDNE,	MSG_ORIG(MSG_DF1_DISPRELDNE) },
+		{ DF_1_NODIRECT,	MSG_ORIG(MSG_DF1_NODIRECT) },
+		{ DF_1_IGNMULDEF,	MSG_ORIG(MSG_DF1_IGNMULDEF) },
+		{ DF_1_NOKSYMS,		MSG_ORIG(MSG_DF1_NOKSYMS) },
+		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
+		{ 0,			0 }
+	};
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
-	else {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
 
-		if (flags & DF_1_NOW)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NOW));
-		if (flags & DF_1_GROUP)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_GROUP));
-		if (flags & DF_1_NODELETE)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NODELETE));
-		if (flags & DF_1_LOADFLTR)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_LOADFLTR));
-		if (flags & DF_1_INITFIRST)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_INITFIRST));
-		if (flags & DF_1_NOOPEN)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NOOPEN));
-		if (flags & DF_1_ORIGIN)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_ORIGIN));
-		if (flags & DF_1_DIRECT)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_DIRECT));
-		if (flags & DF_1_TRANS)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_TRANS));
-		if (flags & DF_1_INTERPOSE)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_INTERPOSE));
-		if (flags & DF_1_NODEFLIB)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NODEFLIB));
-		if (flags & DF_1_NODUMP)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NODUMP));
-		if (flags & DF_1_CONFALT)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_CONFALT));
-		if (flags & DF_1_ENDFILTEE)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_ENDFILTEE));
-		if (flags & DF_1_DISPRELPND)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_DISPRELPND));
-		if (flags & DF_1_DISPRELDNE)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_DISPRELDNE));
-		if (flags & DF_1_NODIRECT)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NODIRECT));
-		if (flags & DF_1_IGNMULDEF)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_IGNMULDEF));
-		if (flags & DF_1_NOKSYMS)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NOKSYMS));
-		if (flags & DF_1_NORELOC)
-			(void) strcat(string, MSG_ORIG(MSG_DF1_NORELOC));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAG1SZ);
+	if (conv_expn_field(string, FLAG1SZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAG1SZ);
 
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
-
-		return ((const char *)string);
-	}
+	return ((const char *)string);
 }
 
 #define	FEATSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_DTF_PARINIT_SIZE + \
 		MSG_DTF_CONFEXP_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_dynfeature_1_str(uint_t flags)
+conv_dyn_feature1(Xword flags)
 {
-	static char	string[FEATSZ] = { '\0' };
+	static char	string[FEATSZ];
+	static Val_desc vda[] = {
+		{ DTF_1_PARINIT,	MSG_ORIG(MSG_DTF_PARINIT) },
+		{ DTF_1_CONFEXP,	MSG_ORIG(MSG_DTF_CONFEXP) },
+		{ 0,			0 }
+	};
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
-	else {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
 
-		if (flags & DTF_1_PARINIT)
-			(void) strcat(string, MSG_ORIG(MSG_DTF_PARINIT));
-		if (flags & DTF_1_CONFEXP)
-			(void) strcat(string, MSG_ORIG(MSG_DTF_CONFEXP));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FEATSZ);
+	if (conv_expn_field(string, FEATSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FEATSZ);
 
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
-
-		return ((const char *)string);
-	}
+	return ((const char *)string);
 }
 
-const Msg _dyntag_tags[DT_MAXPOSTAGS] = {
-	MSG_DYN_NULL,		MSG_DYN_NEEDED,		MSG_DYN_PLTRELSZ,
-	MSG_DYN_PLTGOT,		MSG_DYN_HASH,		MSG_DYN_STRTAB,
-	MSG_DYN_SYMTAB,		MSG_DYN_RELA,		MSG_DYN_RELASZ,
-	MSG_DYN_RELAENT,	MSG_DYN_STRSZ,		MSG_DYN_SYMENT,
-	MSG_DYN_INIT,		MSG_DYN_FINI,		MSG_DYN_SONAME,
-	MSG_DYN_RPATH,		MSG_DYN_SYMBOLIC,	MSG_DYN_REL,
-	MSG_DYN_RELSZ,		MSG_DYN_RELENT,		MSG_DYN_PLTREL,
-	MSG_DYN_DEBUG,		MSG_DYN_TEXTREL,	MSG_DYN_JMPREL,
-	MSG_DYN_BIND_NOW,	MSG_DYN_INIT_ARRAY,	MSG_DYN_FINI_ARRAY,
-	MSG_DYN_INIT_ARRAYSZ,	MSG_DYN_FINI_ARRAYSZ,	MSG_DYN_RUNPATH,
-	MSG_DYN_FLAGS,		MSG_DYN_NULL,		MSG_DYN_PREINIT_ARRAY,
-	MSG_DYN_PREINIT_ARRAYSZ
-};
-
 const char *
-conv_dyntag_str(uint64_t tag, ushort_t mach)
+conv_dyn_tag(Xword tag, Half mach)
 {
-	static char	string[STRSIZE] = { '\0' };
+	static char		string[CONV_INV_STRSIZE];
+	static const Msg	tags[DT_MAXPOSTAGS] = {
+		MSG_DYN_NULL,		MSG_DYN_NEEDED,
+		MSG_DYN_PLTRELSZ,	MSG_DYN_PLTGOT,
+		MSG_DYN_HASH,		MSG_DYN_STRTAB,
+		MSG_DYN_SYMTAB,		MSG_DYN_RELA,
+		MSG_DYN_RELASZ,		MSG_DYN_RELAENT,
+		MSG_DYN_STRSZ,		MSG_DYN_SYMENT,
+		MSG_DYN_INIT,		MSG_DYN_FINI,
+		MSG_DYN_SONAME,		MSG_DYN_RPATH,
+		MSG_DYN_SYMBOLIC,	MSG_DYN_REL,
+		MSG_DYN_RELSZ,		MSG_DYN_RELENT,
+		MSG_DYN_PLTREL,		MSG_DYN_DEBUG,
+		MSG_DYN_TEXTREL,	MSG_DYN_JMPREL,
+		MSG_DYN_BIND_NOW,	MSG_DYN_INIT_ARRAY,
+		MSG_DYN_FINI_ARRAY,	MSG_DYN_INIT_ARRAYSZ,
+		MSG_DYN_FINI_ARRAYSZ,	MSG_DYN_RUNPATH,
+		MSG_DYN_FLAGS,		MSG_DYN_NULL,
+		MSG_DYN_PREINIT_ARRAY,	MSG_DYN_PREINIT_ARRAYSZ
+	};
 
 	if (tag < DT_MAXPOSTAGS) {
 		/*
 		 * Generic dynamic tags.
 		 */
-		return (MSG_ORIG(_dyntag_tags[tag]));
+		return (MSG_ORIG(tags[tag]));
 	} else {
 		/*
 		 * SUNW: DT_LOOS -> DT_HIOS range.
@@ -306,65 +293,65 @@ conv_dyntag_str(uint64_t tag, ushort_t mach)
 		else if (tag == DT_DEPRECATED_SPARC_REGISTER)
 			return (MSG_ORIG(MSG_DYN_REGISTER));
 		else
-			return (conv_invalid_str(string, STRSIZE, tag, 0));
+			return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			    tag, 0));
 	}
 }
 
-#define	BINDESZ	MSG_GBL_OSQBRKT_SIZE + \
+#define	BINDTSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_BND_NEEDED_SIZE + \
 		MSG_BND_REFER_SIZE + \
 		MSG_BND_FILTER_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_bindent_str(uint_t flags)
+conv_bnd_type(uint_t flags)
 {
-	static char	string[BINDESZ] = { '\0' };
+	static char	string[BINDTSZ];
+	static Val_desc vda[] = {
+		{ BND_NEEDED,		MSG_ORIG(MSG_BND_NEEDED) },
+		{ BND_REFER,		MSG_ORIG(MSG_BND_REFER) },
+		{ BND_FILTER,		MSG_ORIG(MSG_BND_FILTER) },
+		{ 0,			0 }
+	};
 
-	/*
-	 * Evaluate the binding descriptors flags.
-	 */
-	if (flags) {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-		if (flags & BND_NEEDED)
-			(void) strcat(string, MSG_ORIG(MSG_BND_NEEDED));
-		if (flags & BND_REFER)
-			(void) strcat(string, MSG_ORIG(MSG_BND_REFER));
-		if (flags & BND_FILTER)
-			(void) strcat(string, MSG_ORIG(MSG_BND_FILTER));
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
-
-		return ((const char *)string);
-	} else
+	if (flags == 0)
 		return (MSG_ORIG(MSG_STR_EMPTY));
+
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), BINDTSZ);
+	if (conv_expn_field(string, BINDTSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), BINDTSZ);
+
+	return ((const char *)string);
 }
 
-#define	BINDSSZ	MSG_GBL_OSQBRKT_SIZE + \
+#define	BINDOSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_BND_ADDED_SIZE + \
 		MSG_BND_REEVAL_SIZE + \
 		MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_binding_str(uint_t flags)
+conv_bnd_obj(uint_t flags)
 {
-	static char	string[BINDSSZ] = { '\0' };
+	static char	string[BINDOSZ];
+	static Val_desc vda[] = {
+		{ LML_FLG_OBJADDED,	MSG_ORIG(MSG_BND_ADDED) },
+		{ LML_FLG_OBJREEVAL,	MSG_ORIG(MSG_BND_REEVAL) },
+		{ LML_FLG_OBJDELETED,	MSG_ORIG(MSG_BND_DELETED) },
+		{ LML_FLG_ATEXIT,	MSG_ORIG(MSG_BND_ATEXIT) },
+		{ 0,			0 }
+	};
+
+	if (flags == 0)
+		return (MSG_ORIG(MSG_STR_EMPTY));
 
 	/*
-	 * Evaluate the binding descriptors flags.
+	 * Note, we're not worried about unknown flags for this family, only
+	 * the selected flags are of interest.
 	 */
-	if (flags) {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-		if (flags & LML_FLG_OBJADDED)
-			(void) strcat(string, MSG_ORIG(MSG_BND_ADDED));
-		if (flags & LML_FLG_OBJREEVAL)
-			(void) strcat(string, MSG_ORIG(MSG_BND_REEVAL));
-		if (flags & LML_FLG_OBJDELETED)
-			(void) strcat(string, MSG_ORIG(MSG_BND_DELETED));
-		if (flags & LML_FLG_ATEXIT)
-			(void) strcat(string, MSG_ORIG(MSG_BND_ATEXIT));
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), BINDOSZ);
+	if (conv_expn_field(string, BINDOSZ, vda, flags, 0, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), BINDOSZ);
 
-		return ((const char *)string);
-	} else
-		return (MSG_ORIG(MSG_STR_EMPTY));
+	return ((const char *)string);
 }

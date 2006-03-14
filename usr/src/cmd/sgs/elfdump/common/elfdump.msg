@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,6 +24,7 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _START_
 
@@ -65,11 +65,6 @@
 @ MSG_USAGE_DETAIL20	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
 			 section\n"
 
-@ MSG_USAGE_DEMANGLE	"usage: -C option is only meaningful \
-			 with other options that display symbol names\n"
-@ MSG_USAGE_LONGNAME	"usage: -l option is only meaningful \
-			 with other options that display section names\n"
-
 # Errors
 
 @ MSG_ERR_BADFILE	"%s: invalid file type\n"
@@ -77,13 +72,10 @@
 @ MSG_ERR_SHSTRNULL	"%s: zero size section header string table (shstrtab)\n"
 @ MSG_ERR_FAILURE	"%s: %s failed: %s\n"
 @ MSG_ERR_BADSHNAME	"%s: %s: invalid sh_name: %lld\n"
-@ MSG_ERR_BADSHLINK	"%s: %s: invalid sh_link: %lld\n"
-@ MSG_ERR_BADSHINFO	"%s: %s: invalid sh_info: %lld\n"
-@ MSG_ERR_BADSHTYPE	"%s: %s: invalid sh_type: %lld\n"
+@ MSG_ERR_BADSHLINK	"%s: %s: invalid sh_link: %d\n"
+@ MSG_ERR_BADSHINFO	"%s: %s: invalid sh_info: %d\n"
+@ MSG_ERR_BADSHTYPE	"%s: %s: invalid sh_type: %d\n"
 @ MSG_ERR_BADALIGN	"%s: %s: bad sh_offset alignment\n"
-@ MSG_ERR_SIBADCOUNT	"%s: %s: bad syminfo entry: %d\n"
-@ MSG_ERR_BADCAP	"%s: %s: bad capabilities entry: %s\n"
-@ MSG_ERR_BADSYM	"%s: %s: bad symbol entry: %s\n"
 @ MSG_ERR_BADSYM2	"%s: %s: bad symbol entry: %s: must be SHN_COMMON or \
 			 defined in SHT_NOBITS section\n"
 @ MSG_ERR_BADSYM3	"%s: %s: bad symbol entry: %s: must be defined in \
@@ -93,12 +85,10 @@
 @ MSG_ERR_BADSYM5	"%s: %s: bad symbol entry: %s: invalid shndx: %d\n"
 @ MSG_ERR_BADSYM6	"%s: %s: bad symbol entry: %s: section[%d] size: %lld: \
 			 is smaller than symbol size: %lld\n"
-@ MSG_ERR_BADMOVE	"%s: %s: bad move table entry: %s\n"
-@ MSG_ERR_BADREL	"%s: %s: bad relocation table entry: %s\n"
-@ MSG_ERR_RELBADSYMNDX	"%s: bad symbol reference from relocation entry: %s\n"
-@ MSG_ERR_MVBADSYMNDX	"%s: bad symbol reference from move entry: %s\n"
-@ MSG_ERR_HSBADSYMNDX	"%s: bad symbol reference from hash entry: %s\n"
-@ MSG_ERR_GRBADSYMNDX	"%s: bad symbol reference from group entry: %s\n"
+
+@ MSG_ERR_RELBADSYMNDX	"%s: bad symbol reference %d: from relocation \
+			 entry: %d\n"
+@ MSG_ERR_HSBADSYMNDX	"%s: bad symbol reference %d: from hash entry: %d\n"
 @ MSG_ERR_BADSYMXINDEX1	"%s: %s: index[%d]: invalid SHN_XINDEX reference: \
 			 SHT_SYMTAB_SHNDX section truncated: no entry for this \
 			 symbol\n"
@@ -106,12 +96,12 @@
 			 bad SHT_SYMTAB_SHNDX entry: invalid shndx: 0x%x\n"
 @ MSG_ERR_BADSYMXINDEX3	"%s: %s: index[%d]: invalid SHN_XINDEX reference: \
 			 SHT_SYMTAB_SHNDX section not found\n"
-@ MSG_ERR_BADSTOFF	"%s: %s: index[%d]: bad %s offset: 0x%llx: max 0x%llx\n"
-@ MSG_ERR_BADDYN	"%s: %s: bad index into .dynamic: %d\n"
-@ MSG_ERR_BADSZ		"%s: %s: zero size or entry size information\n"
+
+@ MSG_ERR_BADSTOFF	"%s: %s: index[%d]: bad %s offset: 0x%x: max 0x%x\n"
+@ MSG_ERR_BADSZ		"%s: %s: zero size or zero entry size information\n"
 @ MSG_ERR_BADMINFO	"%s: %s: invalid m_info: 0x%llx\n"
 @ MSG_ERR_BADHASH	"%s: %s: bad hash entry: symbol %s: exists in bucket \
-			 %d, should be bucket %d\n"
+			 %d, should be bucket %ld\n"
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
@@ -138,17 +128,13 @@
 @ MSG_ELF_SCN_NOTE	"Note Section:  %s"
 @ MSG_ELF_SCN_HASH	"Hash Section:  %s"
 @ MSG_ELF_SCN_SYMINFO	"Syminfo Section:  %s"
-@ MSG_ELF_SCN_GOT	"Global Offset Table Section:  %s  (%u entries)"
+@ MSG_ELF_SCN_GOT	"Global Offset Table Section:  %s"
+@ MSG_ELF_SCN_GRP	"Group Section:  %s"
+@ MSG_ELF_SCN_MOVE	"Move Section:  %s"
 
-@ MSG_ELF_RELOC_RELA	"\ttype\t\t              offset     addend  section        \
-			 with respect to"
-@ MSG_ELF_RELOC_REL	"\ttype\t\t              offset             section        \
-			 with respect to"
-@ MSG_ELF_L_RELOC_RELA	"\ttype\t\t              offset     addend  section/symbol"
-@ MSG_ELF_L_RELOC_REL	"\ttype\t\t              offset             section/symbol"
 @ MSG_ELF_HASH_BKTS1	"%10.10s  buckets contain %8d symbols"
 @ MSG_ELF_HASH_BKTS2	"%10.10s  buckets         %8d symbols (globals)"
-@ MSG_ELF_HASH_INFO	"    bucket    symndx    name"
+@ MSG_ELF_HASH_INFO	"    bucket  symndx      name"
 @ MSG_HASH_OVERFLW	"%s: warning: section %s: too many symbols to count, \
 			 bucket=%d count=%d"
 @ MSG_ELF_ERR_SHDR	"\tunable to obtain section header: shstrtab[%lld]\n"
@@ -163,11 +149,8 @@
 @ MSG_GOT_UNEXPECTED	"%s: warning: section %s: section unexpected within \
 			 relocatable object\n"
 
-
 # Miscellaneous clutter
 
-@ MSG_STR_INDEX		"index"
-@ MSG_STR_NAME		"name"
 @ MSG_STR_NULL		"(null)"
 @ MSG_STR_DEPRECATED	"(deprecated value)"
 @ MSG_STR_UNKNOWN	"<unknown>"
@@ -181,35 +164,28 @@
 @ MSG_ERR_OPEN		"%s: open: %s\n"
 
 #
-# For Elf{32,64}_Move section
+# SHT_MOVE messages
 #
-@ MSG_MV_TITLE		"Move Section: %s\n\
-			 \toffset\tndx\tsize\trepeat\tstride\tvalue\twith \
-			 respect to"
-@ MSG_MV_ENTRY		"\t0x%llx\t0x%llx\t%d\t%d\t%d\t0x%llx\t%s"
-
+@ MSG_MOVE_TITLE	"    symndx offset   size repeat stride   \
+			 value               with respect to"
+@ MSG_MOVE_ENTRY	"%10.10s %6lld %6d %6d %6d %#18.18llx  %s"
 
 #
 # SHT_GROUP messages
 #
-@ MSG_GRP_NOTSYMTAB	"%s: %s: sh_link[%lld] does not point to .symtab\n"
-@ MSG_GRP_BADSYMNDX	"%s: %s: sh_info[%lld] has invalid symbol index\n"
-@ MSG_GRP_BADENTSZ	"%s: %s: has invalid sh_entsize: %lld\n"
-@ MSG_GRP_LINE1		"\nGroup Section: %s"
-@ MSG_GRP_LINE2		"\t[ndx]  Flags/Section		Signature Symbol"
-@ MSG_GRP_LINE3		"\t  [0]   %-24s %s"
+@ MSG_GRP_TITLE		"     index    flags / section         signature symbol"
+@ MSG_GRP_SIGNATURE	"       [0]   %-24s %s"
 @ MSG_GRP_INVALSCN	"<invalid section>"
 
 #
 # SHT_NOTE messages
 #
-@ MSG_NOTE_BADDATASIZE	"%s: %s: note header exceeds section size. \
+@ MSG_NOTE_BADDATASZ	"%s: %s: note header exceeds section size. \
 			 offset: 0x%x\n"
-@ MSG_NOTE_BADNMSIZE	"%s: %s: note name value exceeds section size. \
+@ MSG_NOTE_BADNMSZ	"%s: %s: note name value exceeds section size. \
 			 offset: 0x%x namesize: 0x%x\n"
-@ MSG_NOTE_BADDESIZE	"%s: %s: note data size exceeds section size. \
+@ MSG_NOTE_BADDESZ	"%s: %s: note data size exceeds section size. \
 			 offset: 0x%x datasize: 0x%x\n"
-
 
 @ _END_
 
@@ -217,11 +193,12 @@
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
 # translation is required.
 
+@ MSG_STR_OSQBRKT	"["
+@ MSG_STR_CSQBRKT	"]"
 
-@ MSG_GRP_COMDAT	" COMDAT"
-@ MSG_GRP_FMT1		" 0x%x"
-@ MSG_GRP_FMT2		"%13.13s   %s[%d]\n"
-@ MSG_GRP_CLOSBRKT	" ]"
+@ MSG_GRP_COMDAT	" COMDAT "
+@ MSG_GRP_ENTRY		"%10.10s   %s [%lld]\n"
+@ MSG_GRP_UNKNOWN	" 0x%x "
 
 @ MSG_ELF_GOT		".got"
 
@@ -244,11 +221,10 @@
 @ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprsuvw:y"
 
 @ MSG_STR_EMPTY		""
-@ MSG_STR_NL		"\n"
 
 @ MSG_FMT_INDENT	"	%s"
 @ MSG_FMT_INDEX		" [%lld]"
-@ MSG_FMT_INDEX2	"[%lld]"
+@ MSG_FMT_INDEX2	"[%d]"
 @ MSG_FMT_INTEGER	" %d"
 @ MSG_FMT_HASH_INFO	"%10.10s  %-10s  %s"
 @ MSG_FMT_ARSYM1	"%10.10s  0x%8.8x  (%s):%s"
@@ -260,40 +236,42 @@
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
 # Unwind info
+
 @ MSG_SCN_FRM		".eh_frame"
 @ MSG_SCN_FRMHDR	".eh_frame_hdr"
+
 @ MSG_UNW_FRMHDR	"Frame Header:"
 @ MSG_UNW_FRMVERS	"  Version: %d"
-@ MSG_UNW_FRPTRENC	"  FramePtrEnc: %-16s FramePtr: 0x%llx"
-@ MSG_UNW_FDCNENC	"  FdeCntEnc:   %-16s  FdeCnt: %lld"
-@ MSG_UNW_TABENC	"  TableEnc:    %-16s"
+@ MSG_UNW_FRPTRENC	"  FramePtrEnc: %-20s  FramePtr: 0x%llx"
+@ MSG_UNW_FDCNENC	"  FdeCntEnc:   %-20s  FdeCnt: %lld"
+@ MSG_UNW_TABENC	"  TableEnc:    %-20s"
 @ MSG_UNW_BINSRTAB1	"  Binary Search Table:"
-@ MSG_UNW_BINSRTAB2	"     InitialLoc         FdeLoc"
-@ MSG_UNW_BINSRTABENT	"    0x%012llx     0x%012llx"
+@ MSG_UNW_BINSRTAB2	"      InitialLoc          FdeLoc"
+@ MSG_UNW_BINSRTABENT	"    0x%016llx  0x%016llx"
 @ MSG_UNW_CIE		"CIE: [0x%08llx]"
 @ MSG_UNW_CIELNGTH	" length: 0x%02x cieid: %d"
 @ MSG_UNW_CIEVERS	" version: %d  augstring: `%s'"
 @ MSG_UNW_CIECALGN	" codealign: 0x%llx  dataalign: %lld  \
 			  retaddr: %d"
-@ MSG_UNW_CIEAUXVAL	" Auxillary vals:"
+@ MSG_UNW_CIEAUXVAL	" Auxiliary vals:"
 @ MSG_UNW_CIEAUXSIZE	"   size: %d"
 @ MSG_UNW_CIEAUXPERS	"   pers: 0x%02x %s 0x%08llx"
 @ MSG_UNW_CIEAUXCENC	"   cenc: 0x%02x %s"
 @ MSG_UNW_CIEAUXLSDA	"   lsda: 0x%02x %s"
 @ MSG_UNW_CIEAUXUNEC	"   Unexpected aug val: %c"
 @ MSG_UNW_CIECFI	" CallFrameInstructions:"
-@ MSG_UNW_CIECFI1	"\n    "
-@ MSG_UNW_CIECFI2	"0x%02x "
+@ MSG_UNW_CIEPRE	"   "
 
 @ MSG_UNW_FDE		" FDE: [0x%08llx]"
 @ MSG_UNW_FDELNGTH	"    length: 0x%02x  cieptr: 0x%02x"
 @ MSG_UNW_FDEINITLOC	"    initloc: 0x%08llx  addrrange: 0x%04llx"
-@ MSG_UNW_FDEAUXVAL	"   Auxillary vals:"
+@ MSG_UNW_FDEAUXVAL	"   Auxiliary vals:"
 @ MSG_UNW_FDEAUXSIZE	"      size: 0x%llx"
 @ MSG_UNW_FDEAUXLSDA	"    lsda: 0x%llx"
 @ MSG_UNW_FDECFI	"    CallFrameInstructions:"
-@ MSG_UNW_FDECFI1	"\n      "
-@ MSG_UNW_FDECFI2	"0x%02x "
+@ MSG_UNW_FDEPRE	"      "
+
+@ MSG_UNW_TBLENTRY	"0x%02x "
 
 # Note messages
 

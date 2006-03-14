@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Global include file for all sgs ia32 based machine dependent macros,
  * constants and declarations.
@@ -150,9 +149,6 @@ extern "C" {
 #define	M_GOT_ENTSIZE	4		/* got entry size in bytes */
 #endif
 
-
-
-
 /*
  * Make machine class dependent functions transparent to the common code
  */
@@ -210,7 +206,7 @@ extern "C" {
 #define	M_REL_SHT_TYPE	SHT_RELA	/* section header type */
 #define	M_REL_ELF_TYPE	ELF_T_RELA	/* data buffer type */
 
-#define	M_REL_CONTYPSTR	conv_reloc_amd64_type_str
+#define	M_REL_CONTYPSTR	conv_reloc_amd64_type
 #else /* _ELF32 */
 #define	M_REL_DT_TYPE	DT_REL		/* .dynamic entry */
 #define	M_REL_DT_SIZE	DT_RELSZ	/* .dynamic entry */
@@ -219,7 +215,7 @@ extern "C" {
 #define	M_REL_SHT_TYPE	SHT_REL		/* section header type */
 #define	M_REL_ELF_TYPE	ELF_T_REL	/* data buffer type */
 
-#define	M_REL_CONTYPSTR	conv_reloc_386_type_str
+#define	M_REL_CONTYPSTR	conv_reloc_386_type
 #endif /* ELF32 */
 
 /*

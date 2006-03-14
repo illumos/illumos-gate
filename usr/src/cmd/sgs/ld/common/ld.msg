@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +18,12 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -33,8 +34,8 @@
 # System error messages
 
 @ MSG_SYS_OPEN		"file %s: open failed: %s"
-@ MSG_SYS_DLOPEN	"file %s: dlopen failed: %s"
-@ MSG_SYS_DLSYM		"file %s: dlsym failed: %s"
+
+@ MSG_SYS_ALLOC		"alloc failed: %s"
 
 # Generic error diagnostic labels
 
@@ -48,10 +49,6 @@
 # The following strings represent reserved words, files, pathnames and symbols.
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
 # translation is required.
-
-@ MSG_LD_MAIN		"ld_main"
-@ MSG_LD_LIB32		"libld.so.2"
-@ MSG_LD_LIB64		"libld.so.3"
 
 @ MSG_STR_EMPTY		""
 @ MSG_STR_NL		"\n"

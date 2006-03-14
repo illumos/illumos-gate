@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +33,7 @@
 #include	<signal.h>
 #include	<dlfcn.h>
 #include	<synch.h>
+#include	<debug.h>
 #include	"_rtld.h"
 
 /*
@@ -136,7 +136,14 @@ const char	*prm_preload = 0;	/* permanent LD_PRELOAD string */
 uint_t		env_info = 0;		/* information regarding environment */
 					/*	variables */
 int		killsig = SIGKILL;	/* signal sent on fatal exit */
-uint_t		dbg_mask;		/* debugging classes */
+
+/*
+ * Note, the debugging descriptor interposes on the default definition provided
+ * by liblddbg.  This is required as ld.so.1 must only have outstanding relative
+ * relocations.
+ */
+static Dbg_desc	_dbg_desc = {0, 0, 0};
+Dbg_desc	*dbg_desc = &_dbg_desc;	/* debugging descriptor */
 const char	*dbg_file = 0;		/* debugging directed to file */
 
 #pragma weak	environ = _environ	/* environ for PLT tracing - we */

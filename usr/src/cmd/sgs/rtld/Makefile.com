@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,8 @@ NOCTFOBJS=	$(ASOBJS)
 
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
-PLAT=		$(VAR_PLAT_$(BASEPLAT))
+
+PLAT =		$(VAR_PLAT_$(BASEPLAT))
 
 # Dtrace needs an executable data segment.
 NX_MAP=
@@ -73,7 +74,7 @@ FILEMODE =	755
 CPPFEATUREMACROS= $(VAR_RTLD_CPPFEATUREMACROS)
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/common/krtld \
-		$(CPPFEATUREMACROS)
+		    -I$(SRCBASE)/uts/$(PLAT)/krtld $(CPPFEATUREMACROS)
 ASFLAGS=	-P -D_ASM $(CPPFLAGS)
 LDLIB =		-L ../../libld/$(MACH)
 RTLDLIB =	-L ../../librtld/$(MACH)
@@ -85,12 +86,11 @@ CPICLIB =	$(VAR_RTLD_CPICLIB)
 CPICLIB64 =	$(VAR_RTLD_CPICLIB64)
 CLIB =		-lc_pic
 
-LDLIBS=		$(LDLIBS.lib) \
-		$(CONVLIBDIR) -lconv \
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
 		$(CPICLIB) $(CLIB) \
-		$(LDLIB) $(LD_LIB) \
 		$(LDDBGLIBDIR) $(LDDBG_LIB) \
-		$(RTLDLIB) -lrtld
+		$(RTLDLIB) -lrtld \
+		$(LDLIB) $(LD_LIB) 
 
 DYNFLAGS +=	-i -e _rt_boot $(VERSREF) -Bsymbolic -zlazyload -znodlopen \
 		-zdtrace=dtrace_data $(MAPOPTS) '-R$$ORIGIN'

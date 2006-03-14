@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,27 +18,30 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# cmd/sgs/Makefile.com
 
 .KEEP_STATE:
+.KEEP_STATE_FILE: .make.state.$(MACH)
+
 
 include		$(SRC)/cmd/sgs/Makefile.var
 
-SRCBASE=	../../../..
+SRCBASE =	../../../..
 
-i386_ARCH=	$(VAR_I386_ARCH)
-sparc_ARCH=	sparc
+i386_ARCH =	$(VAR_I386_ARCH)
+sparc_ARCH =	sparc
 
-ARCH=		$($(MACH)_ARCH)
+ARCH =		$($(MACH)_ARCH)
 
-ROOTCCSBIN64=		$(ROOTCCSBIN)/$(MACH64)
-ROOTCCSBINPROG64=	$(PROG:%=$(ROOTCCSBIN64)/%)
+ROOTCCSBIN64 =	$(ROOTCCSBIN)/$(MACH64)
+ROOTCCSBINPROG64 = \
+		$(PROG:%=$(ROOTCCSBIN64)/%)
 
 # Establish any global flags.
 
@@ -47,17 +49,17 @@ ROOTCCSBINPROG64=	$(PROG:%=$(ROOTCCSBIN64)/%)
 # checking.  This is automatically enabled for DEBUG builds, not for non-debug
 # builds.  Unset the global C99_DISABLE flag to insure we uncover all compiler
 # warnings/errors.
-DEBUG=
+DEBUG =
 $(NOT_RELEASE_BUILD)DEBUG = -DDEBUG
 
-C99_DISABLE=	$(C99_ENABLE)
+C99_DISABLE =	$(C99_ENABLE)
 
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 
 # Reassign CPPFLAGS so that local search paths are used before any parent
 # $ROOT paths.
-CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
+CPPFLAGS =	-I. -I../common -I../../include -I../../include/$(MACH) \
 		$(VAR_CPPFLAGS) $(CPPFLAGS.master)
 
 # PICS64 is unique to our environment
@@ -70,62 +72,59 @@ DYNFLAGS +=	$(ZIGNORE)
 
 # Establish the local tools, proto and package area.
 
-SGSHOME=	$(SRC)/cmd/sgs
-SGSPROTO=	$(SGSHOME)/proto/$(MACH)
-SGSTOOLS=	$(SGSHOME)/tools
-SGSMSGID=	$(SGSHOME)/messages
-SGSMSGDIR=	$(SGSHOME)/messages/$(MACH)
-SGSONLD=	$(ROOT)/opt/SUNWonld
-SGSRPATH=	/usr/lib
-SGSRPATH64=	$(SGSRPATH)/$(MACH64)
+SGSHOME =	$(SRC)/cmd/sgs
+SGSPROTO =	$(SGSHOME)/proto/$(MACH)
+SGSTOOLS =	$(SGSHOME)/tools
+SGSMSGID =	$(SGSHOME)/messages
+SGSMSGDIR =	$(SGSHOME)/messages/$(MACH)
+SGSONLD =	$(ROOT)/opt/SUNWonld
+SGSRPATH =	/usr/lib
+SGSRPATH64 =	$(SGSRPATH)/$(MACH64)
 
 #
-# Macros to be used to include link against libconv and include
-# vernote.o
+# Macros to be used to include link against libconv and include vernote.o
 #
-VERSREF=	-ulink_ver_string
-CONVLIBDIR=	-L$(SGSHOME)/libconv/$(MACH)
-CONVLIBDIR64=	-L$(SGSHOME)/libconv/$(MACH64)
+VERSREF =	-ulink_ver_string
 
-ELFLIBDIR=	-L$(SGSHOME)/libelf/$(MACH)
-ELFLIBDIR64=	-L$(SGSHOME)/libelf/$(MACH64)
+LDLIBDIR =	-L$(SGSHOME)/libld/$(MACH)
+LDLIBDIR64 =	-L$(SGSHOME)/libld/$(MACH64)
 
-LDDBGLIBDIR=	-L$(SGSHOME)/liblddbg/$(MACH)
-LDDBGLIBDIR64=	-L$(SGSHOME)/liblddbg/$(MACH64)
+CONVLIBDIR =	-L$(SGSHOME)/libconv/$(MACH)
+CONVLIBDIR64 =	-L$(SGSHOME)/libconv/$(MACH64)
 
+ELFLIBDIR =	-L$(SGSHOME)/libelf/$(MACH)
+ELFLIBDIR64 =	-L$(SGSHOME)/libelf/$(MACH64)
 
+LDDBGLIBDIR =	-L$(SGSHOME)/liblddbg/$(MACH)
+LDDBGLIBDIR64 =	-L$(SGSHOME)/liblddbg/$(MACH64)
 
 # The cmd/Makefile.com and lib/Makefile.com define TEXT_DOMAIN.  We don't need
 # this definition as the sgs utilities obtain their domain via sgsmsg(1l).
 
-DTEXTDOM=
-
+DTEXTDOM =
 
 # Define any generic sgsmsg(1l) flags.  The default message generation system
 # is to use gettext(3i), add the -C flag to switch to catgets(3c).
 
-SGSMSG=		$(SGSTOOLS)/$(MACH)/sgsmsg
-CHKMSG=		$(SGSTOOLS)/chkmsg.sh
+SGSMSG =	$(SGSTOOLS)/$(MACH)/sgsmsg
+CHKMSG =	$(SGSTOOLS)/chkmsg.sh
 
 SGSMSGVFLAG =
 SGSMSGFLAGS =	$(SGSMSGVFLAG) -i $(SGSMSGID)/sgs.ident
-CHKMSGFLAGS=	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
-
+CHKMSGFLAGS =	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
 
 # Native targets should use the minimum of ld(1) flags to allow building on
 # previous releases.  We use mapfiles to scope, but don't bother versioning.
 
-native:=	DYNFLAGS = $(MAPOPTS) -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION)
+native :=	DYNFLAGS = $(MAPOPTS) -R$(SGSPROTO) -L$(SGSPROTO) $(ZNOVERSION)
 
-USE_PROTO=	-Yl,$(SGSPROTO)
-
-.KEEP_STATE_FILE: .make.state.$(MACH)
+USE_PROTO =	-Yl,$(SGSPROTO)
 
 #
 # lint-related stuff
 #
 
-DASHES=		"------------------------------------------------------------"
+DASHES =	"------------------------------------------------------------"
 
 LIBNAME32 =	$(LIBNAME:%=%32)
 LIBNAME64 =	$(LIBNAME:%=%64)
@@ -144,18 +143,21 @@ LINTLIBS =	$(LINTLIB32) $(LINTLIB64)
 
 LINTFLAGS =	-m -errtags=yes -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTFLAGS64 =	-m -errtags=yes -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED \
-		-errchk=longptr64 $(VAR_LINTFLAGS64)
+		    $(VAR_LINTFLAGS64) \
 
 #
-# These libraries have two resulting lint libraries.
-# If a dependency is declared using these variables,
-# the substitution for the 32/64 versions at lint time
-# will happen automatically (see Makefile.targ).
+# These libraries have two resulting lint libraries.  If a dependency is
+# declared using these variables, the substitution for the 32/64 versions at
+# lint time happens automatically (see Makefile.targ).
 #
-LDDBG_LIB=	-llddbg
-LDDBG_LIB32=	-llddbg32
-LDDBG_LIB64=	-llddbg64
+LD_LIB =	-lld
+LD_LIB32 =	-lld32
+LD_LIB64 =	-lld64
 
-LD_LIB=		-lld
-LD_LIB32=	-lld32
-LD_LIB64=	-lld64
+LDDBG_LIB =	-llddbg
+LDDBG_LIB32 =	-llddbg32
+LDDBG_LIB64 =	-llddbg64
+
+CONV_LIB =	-lconv
+CONV_LIB32 =	-lconv32
+CONV_LIB64 =	-lconv64

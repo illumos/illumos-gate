@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,35 +18,50 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 
-LIBRARY=	libconv.a
+LIBRARY =	libconv.a
 
-COMOBJS_MSG=	arch.o			config.o \
+COMOBJS32 =	cap32.o			dynamic32.o \
+		elf32.o			globals32.o \
+		phdr32.o		\
+		relocate_i38632.o	relocate_amd6432.o \
+		relocate_sparc32.o	sections32.o \
+		symbols32.o		symbols_sparc32.o
+
+COMOBJS64 =	cap64.o			dynamic64.o \
+		elf64.o			globals64.o \
+		phdr64.o		\
+		relocate_i38664.o	relocate_amd6464.o \
+		relocate_sparc64.o	sections64.o \
+		symbols64.o		symbols_sparc64.o
+
+COMOBJS=	arch.o			config.o \
 		data.o			deftag.o \
-		dl.o			dynamic.o \
-		elf.o			globals.o \
-		dwarf_ehe.o \
-		cap.o			group.o \
-		relocate_amd64.o \
-		lddstub.o		phdr.o \
-		relocate_i386.o		relocate_sparc.o \
-		sections.o		segments.o \
-		symbols.o		symbols_sparc.o \
+		demangle.o		dl.o \
+		dwarf_ehe.o		group.o	\
+		lddstub.o		segments.o \
 		version.o
 
-COMOBJS_NOMSG=	relocate.o		tokens.o
+COMOBJS_NOMSG =	tokens.o
+
+COMOBJS_NOMSG32 = \
+		relocate32.o
+COMOBJS_NOMSG64 = \
+		relocate64.o
 
 ELFCAP_OBJS=	elfcap.o
 
 ASOBJS=		vernote.o
 
-OBJECTS=	$(COMOBJS_MSG) $(COMOBJS_NOMSG) $(ELFCAP_OBJS) $(ASOBJS)
+OBJECTS =	$(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(COMOBJS_NOMSG) \
+		$(COMOBJS_NOMSG32) $(COMOBJS_NOMSG64) $(ELFCAP_OBJS) $(ASOBJS)
 
 ELFCAP=		$(SRC)/common/elfcap
 
@@ -56,8 +70,8 @@ ELFCAP=		$(SRC)/common/elfcap
 # Since static archives should never contain CTF data (regardless of
 # whether the object code is position-independent), we disable CTF.
 #
-NOCTFOBJS=	$(OBJECTS)
-CTFMERGE_LIB=	:
+NOCTFOBJS =	$(OBJECTS)
+CTFMERGE_LIB =	:
 
 include 	$(SRC)/lib/Makefile.lib
 include 	$(SRC)/cmd/sgs/Makefile.com
@@ -73,21 +87,25 @@ ARFLAGS=	cr
 
 AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)
 
-BLTDATA=	$(COMOBJS_MSG:%.o=%_msg.h)
+BLTDATA=	$(COMOBJS:%.o=%_msg.h) \
+		    $(COMOBJS32:%.o=%_msg.h) $(COMOBJS64:%.o=%_msg.h)
 
 SRCS=		../common/llib-lconv
-LINTSRCS=	$(COMOBJS_MSG:%.o=../common/%.c) \
-		$(COMOBJS_NOMSG:%.o=../common/%.c) \
-		$(ELFCOM_OBJS:%.o=$(ELFCAP)/%.c) \
-		../common/lintsup.c
+LINTSRCS=	$(COMOBJS:%.o=../common/%.c) \
+		    $(COMOBJS_NOMSG:%.o=../common/%.c) \
+		    $(ELFCOM_OBJS:%.o=$(ELFCAP)/%.c) ../common/lintsup.c
+LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c)
+LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
 
 VERNOTE_DEBUG= -D
 $(INTERNAL_RELEASE_BUILD)VERNOTE_DEBUG=
 
-SGSMSGTARG=	$(COMOBJS_MSG:%.o=../common/%.msg)
+SGSMSGTARG=	$(COMOBJS:%.o=../common/%.msg) \
+		    $(COMOBJS32:%32.o=../common/%.msg) \
+		    $(COMOBJS64:%64.o=../common/%.msg)
 
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u
 
 CLEANFILES +=	$(BLTDATA) $(LINTOUTS) bld_vernote vernote.s
-CLOBBERFILES +=	$(LINTLIB)
+CLOBBERFILES +=	$(LINTLIBS)

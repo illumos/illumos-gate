@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"_libld.h"
 
 
@@ -37,7 +37,7 @@
  */
 /* ARGSUSED */
 int
-reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
+ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
     Ofl_desc * ofl)
 {
 	return (1);
@@ -45,29 +45,29 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 
 /* ARGSUSED */
 int
-mach_sym_typecheck(Sym_desc * sdp, Sym * nsym, Ifl_desc * ifl, Ofl_desc * ofl)
+ld_mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 const char *
-is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
-    const char *symsecname, Word * flags)
+ld_is_regsym(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
+    int symndx, Word shndx, const char *symsecname, Word * flags)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 Sym_desc *
-reg_find(Sym * sym, Ofl_desc * ofl)
+ld_reg_find(Sym * sym, Ofl_desc * ofl)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 int
-reg_enter(Sym_desc * sdp, Ofl_desc * ofl)
+ld_reg_enter(Sym_desc * sdp, Ofl_desc * ofl)
 {
 	return (0);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +36,9 @@
 #include	<libintl.h>
 #include	<locale.h>
 #include	<fcntl.h>
-#include	<dlfcn.h>
 #include	"conv.h"
 #include	"libld.h"
 #include	"msg.h"
-
 
 /*
  * The following prevent us from having to include ctype.h which defines these
@@ -49,6 +47,52 @@
  * have to suffer the R_SPARC_COPY overhead of the __ctype[] array.
  */
 extern int	isspace(int);
+
+/*
+ * Print a message to stdout
+ */
+/* VARARGS3 */
+void
+eprintf(Lm_list *lml, Error error, const char *format, ...)
+{
+	va_list			args;
+	static const char	*strings[ERR_NUM] = { MSG_ORIG(MSG_STR_EMPTY) };
+
+#if	defined(lint)
+	/*
+	 * The lml argument is only meaningful for diagnostics sent to ld.so.1.
+	 * Supress the lint error by making a dummy assignment.
+	 */
+	lml = 0;
+#endif
+	if (error > ERR_NONE) {
+		if (error == ERR_WARNING) {
+			if (strings[ERR_WARNING] == 0)
+			    strings[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
+		} else if (error == ERR_FATAL) {
+			if (strings[ERR_FATAL] == 0)
+			    strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+		} else if (error == ERR_ELF) {
+			if (strings[ERR_ELF] == 0)
+			    strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+		}
+		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
+	}
+	(void) fputs(strings[error], stderr);
+
+	va_start(args, format);
+	(void) vfprintf(stderr, format, args);
+	if (error == ERR_ELF) {
+		int	elferr;
+
+		if ((elferr = elf_errno()) != 0)
+			(void) fprintf(stderr, MSG_ORIG(MSG_STR_ELFDIAG),
+			    elf_errmsg(elferr));
+	}
+	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
+	(void) fflush(stderr);
+	va_end(args);
+}
 
 
 /*
@@ -111,7 +155,7 @@ getmore:
 		if ((fd = open(argv[optind], O_RDONLY)) == -1) {
 			int err = errno;
 
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    argv[optind], strerror(err));
 			return (0);
 		}
@@ -146,8 +190,8 @@ getmore:
 static int
 prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
 {
-	int	nargc;			/* New argc */
-	char	**nargv;			/* New argv */
+	int	nargc;			/* new argc */
+	char	**nargv;		/* new argv */
 	char	*arg, *string;
 	int	count;
 
@@ -182,8 +226,11 @@ prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
 	 * Allocate a new argv array big enough to hold the new options from
 	 * the environment string and the old argv options.
 	 */
-	if ((nargv = calloc(nargc + *argcp, sizeof (char *))) == 0)
+	if ((nargv = calloc(nargc + *argcp, sizeof (char *))) == 0) {
+		int	err = errno;
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
 		return (0);
+	}
 
 	/*
 	 * Initialize first element of new argv array to be the first element
@@ -224,17 +271,15 @@ prepend_ldoptions(char *ld_options, int *argcp, char ***argvp)
 }
 
 /*
- * The ld_altexec() function checks to see if there is
- * a LD_ALTEXEC=<path to alternate ld> in the environment.
- * If there is - it will null that variable out - and then
- * exec() the binary pointed to with the same arguements
- * as the originating process.
- * This permits using alternate link-editors (debugging/developer
- * copies) even in complex build environments.
+ * Check to see if there is a LD_ALTEXEC=<path to alternate ld> in the
+ * environment.  If so, first null the environment variable out, and then
+ * exec() the binary pointed to by the environment variable, passing the same
+ * arguments as the originating process.  This mechanism permits using
+ * alternate link-editors (debugging/developer copies) even in complex build
+ * environments.
  *
- * If LD_ALTEXEC= isn't set, or the exec() fails this
- * function silently returns and the execution of this
- * link-editor continues on.
+ * If LD_ALTEXEC= isn't set, or the exec() fails, silently return and allow the
+ * current link-editor to execute.
  */
 void
 ld_altexec(char **argv, char **envp)
@@ -273,9 +318,8 @@ ld_altexec(char **argv, char **envp)
 	(void) execve(execstr, argv, envp);
 
 	/*
-	 * If the exec failes - we just silently fall
-	 * through and continue execution of the
-	 * current link-editor.
+	 * If the exec() fails, silently fall through and continue execution of
+	 * the current link-editor.
 	 */
 }
 
@@ -283,16 +327,12 @@ int
 main(int argc, char **argv, char **envp)
 {
 	char		*ld_options, **oargv = argv;
-	const char	*libld = MSG_ORIG(MSG_LD_LIB32);
-	void		*libld_h;
-	int		(*libld_main)(int, char **);
-	unsigned char	class;
+	uchar_t 	class;
 
 	/*
-	 * XX64 -- Strip "-Wl," from the head of each argument.
-	 * This is to accommodate awkwardness in pasing ld arguments
-	 * to gcc while maintaining the structure of the build
-	 * environment's Makefiles.
+	 * XX64 -- Strip "-Wl," from the head of each argument.  This is to
+	 * accommodate awkwardness in passing ld arguments to gcc while
+	 * maintaining the structure of the OSNet build environment's Makefiles.
 	 */
 	{
 		int i;
@@ -330,51 +370,31 @@ main(int argc, char **argv, char **envp)
 	}
 
 	/*
-	 * Locate the first input file and from it determine the class of
+	 * Locate the first input file and from this file determine the class of
 	 * objects we're going to process.  If the class is ELFCLASS64 we'll
-	 * specifically load libld.so.3, otherwise we'll fall back to
-	 * libld.so.2.  Note that if the option -64 is encountered a 64-bit
-	 * link is explicitly being requested.
+	 * call the ELF64 class of interfaces, else the ELF32 class.  Note that
+	 * if the option -64 is encountered a 64-bit link is explicitly being
+	 * requested.
 	 */
 	if ((class = determine_class(argc, argv)) == 0)
 		return (1);
 
 	/*
-	 * dlopen() right libld implementation.  Note: the RTLD_GLOBAL flag is
-	 * added to make ld behave as if libld was one of its dependencies.
-	 * Support libraries, like libldstab.so.1, may expect this, to get at
-	 * libld_malloc, which they argueably shouldn't be using anyway.
+	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of ld.
 	 */
-	if (class == ELFCLASS64) {
-		/*
-		 * If we're on a 64-bit kernel, try to exec a full 64-bit
-		 * version of ld.
-		 */
+	if (class == ELFCLASS64)
 		conv_check_native(oargv, envp);
-		libld = MSG_ORIG(MSG_LD_LIB64);
-	}
-	if ((libld_h = dlopen(libld, (RTLD_LAZY | RTLD_GLOBAL))) == NULL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_DLOPEN), libld, dlerror());
-		return (1);
-	}
 
 	/*
-	 * Find ld_main(), which is ld's generic entry point.
-	 */
-	if ((libld_main = (int (*)(int, char **))dlsym(libld_h,
-	    MSG_ORIG(MSG_LD_MAIN))) == NULL) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_DLSYM), libld, dlerror());
-		return (1);
-	}
-
-	/*
-	 * Reset the arg counter and getopt(3c) error message flag and call the
-	 * generic entry point.
+	 * Reset the getopt(3c) error message flag, and call the generic entry
+	 * point using the appropriate class.
 	 */
 	optind = opterr = 1;
-	return (libld_main(argc, argv));
+	if (class == ELFCLASS64)
+		return (ld64_main(argc, argv));
+	else
+		return (ld32_main(argc, argv));
 }
-
 
 /*
  * Exported interfaces required by our dependencies.  libld and friends bind to
@@ -384,43 +404,4 @@ const char *
 _ld_msg(Msg mid)
 {
 	return (gettext(MSG_ORIG(mid)));
-}
-
-/*
- * Print a message to stdout
- */
-/* VARARGS2 */
-void
-eprintf(Error error, const char *format, ...)
-{
-	va_list			args;
-	static const char	*strings[ERR_NUM] = { MSG_ORIG(MSG_STR_EMPTY) };
-
-	if (error > ERR_NONE) {
-		if (error == ERR_WARNING) {
-			if (strings[ERR_WARNING] == 0)
-			    strings[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
-		} else if (error == ERR_FATAL) {
-			if (strings[ERR_FATAL] == 0)
-			    strings[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
-		} else if (error == ERR_ELF) {
-			if (strings[ERR_ELF] == 0)
-			    strings[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
-		}
-		(void) fputs(MSG_ORIG(MSG_STR_LDDIAG), stderr);
-	}
-	(void) fputs(strings[error], stderr);
-
-	va_start(args, format);
-	(void) vfprintf(stderr, format, args);
-	if (error == ERR_ELF) {
-		int	elferr;
-
-		if ((elferr = elf_errno()) != 0)
-			(void) fprintf(stderr, MSG_ORIG(MSG_STR_ELFDIAG),
-			    elf_errmsg(elferr));
-	}
-	(void) fprintf(stderr, MSG_ORIG(MSG_STR_NL));
-	(void) fflush(stderr);
-	va_end(args);
 }

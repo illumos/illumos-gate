@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +42,6 @@
 #include	<debug.h>
 #include	<msg.h>
 #include	<_libld.h>
-
 
 /*
  * Decide if we can link against this input file.
@@ -67,7 +65,7 @@ ifl_verify(Ehdr * ehdr, Ofl_desc * ofl, Rej_desc * rej)
 		rej->rej_info = (uint_t)ehdr->e_ident[EI_DATA];
 		return (0);
 	}
-	if (ehdr->e_version > ofl->ofl_libver) {
+	if (ehdr->e_version > ofl->ofl_dehdr->e_version) {
 		rej->rej_type = SGS_REJ_VERSION;
 		rej->rej_info = (uint_t)ehdr->e_version;
 		return (0);
@@ -75,12 +73,11 @@ ifl_verify(Ehdr * ehdr, Ofl_desc * ofl, Rej_desc * rej)
 	return (1);
 }
 
-
 /*
  * Check sanity of file header and allocate an infile descriptor
  * for the file being processed.
  */
-Ifl_desc *
+static Ifl_desc *
 ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Half flags, Ofl_desc *ofl,
     Rej_desc *rej)
 {
@@ -90,7 +87,7 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Half flags, Ofl_desc *ofl,
 
 	if (ifl_verify(ehdr, ofl, &_rej) == 0) {
 		_rej.rej_name = name;
-		DBG_CALL(Dbg_file_rejected(&_rej));
+		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
 		if (rej->rej_type == 0) {
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
@@ -117,12 +114,14 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Half flags, Ofl_desc *ofl,
 		Shdr	*shdr0;
 
 		if ((scn = elf_getscn(elf, 0)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN), name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSCN), name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return ((Ifl_desc *)S_ERROR);
 		}
 		if ((shdr0 = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR), name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSHDR), name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return ((Ifl_desc *)S_ERROR);
 		}
@@ -159,7 +158,7 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Half flags, Ofl_desc *ofl,
  * Process a generic section.  The appropriate section information is added
  * to the files input descriptor list.
  */
-uintptr_t
+static uintptr_t
 process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -180,7 +179,8 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	/* LINTED */
 	isp->is_key = (Half)ident;
 	if ((isp->is_indata = elf_getdata(scn, NULL)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETDATA), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -195,19 +195,21 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * to the output section list (some sections like .strtab and
 	 * .shstrtab are not added to the output section list).
 	 *
-	 * If the section has the SHF_ORDERED flag on, do the place_section()
+	 * If the section has the SHF_ORDERED flag on, do the ld_place_section()
 	 * after all input sections from this file are read in.
 	 */
 	ifl->ifl_isdesc[ndx] = isp;
 	if (ident && (shdr->sh_flags & ALL_SHF_ORDER) == 0)
-		return ((uintptr_t)place_section(ofl, isp, ident, 0));
+		return ((uintptr_t)ld_place_section(ofl, isp, ident, 0));
 
 	if (ident && (shdr->sh_flags & ALL_SHF_ORDER)) {
 		isp->is_flags |= FLG_IS_ORDERED;
 		isp->is_ident = ident;
+
 		if ((ndx != 0) && (ndx == shdr->sh_link) &&
 		    (shdr->sh_flags & SHF_ORDERED))
-			return ((uintptr_t)place_section(ofl, isp, ident, 0));
+			return ((uintptr_t)ld_place_section(ofl, isp,
+			    ident, 0));
 	}
 
 	return (1);
@@ -248,7 +250,8 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	 * capabilities, ignore any new input capabilities.
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_OVSFCAP) {
-		Dbg_cap_sec_entry(DBG_CAP_IGNORE, CA_SUNW_SF_1, val, M_MACH);
+		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_SF_1,
+		    val, M_MACH);
 		return;
 	}
 
@@ -264,18 +267,20 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	 * an F1_SUNW_FPUSED by itself is viewed as bad practice.
 	 */
 	if ((badval = (val & ~SF1_SUNW_MASK)) != 0) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, name, EC_XWORD(badval));
 		val &= SF1_SUNW_MASK;
 	}
 	if (val == SF1_SUNW_FPUSED) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
 		    ifl->ifl_name, name, EC_XWORD(val));
 		return;
 	}
 
-	Dbg_cap_sec_entry(DBG_CAP_OLD, CA_SUNW_SF_1, ofl->ofl_sfcap_1, M_MACH);
-	Dbg_cap_sec_entry(DBG_CAP_NEW, CA_SUNW_SF_1, val, M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_SF_1,
+	    ofl->ofl_sfcap_1, M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_SF_1,
+	    val, M_MACH);
 
 	/*
 	 * Determine the resolution of the present frame pointer and the
@@ -299,8 +304,8 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 		ofl->ofl_sfcap_1 = val;
 	}
 
-	Dbg_cap_sec_entry(DBG_CAP_RESOLVED, CA_SUNW_SF_1, ofl->ofl_sfcap_1,
-	    M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_SF_1,
+	    ofl->ofl_sfcap_1, M_MACH);
 }
 
 /*
@@ -317,7 +322,8 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 	 * capabilities, ignore any new input capabilities.
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_OVHWCAP) {
-		Dbg_cap_sec_entry(DBG_CAP_IGNORE, CA_SUNW_HW_1, val, M_MACH);
+		Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_IGNORE, CA_SUNW_HW_1,
+		    val, M_MACH);
 		return;
 	}
 
@@ -328,13 +334,14 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 	if (val == 0)
 		return;
 
-	Dbg_cap_sec_entry(DBG_CAP_OLD, CA_SUNW_HW_1, ofl->ofl_hwcap_1, M_MACH);
-	Dbg_cap_sec_entry(DBG_CAP_NEW, CA_SUNW_HW_1, val, M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_OLD, CA_SUNW_HW_1,
+	    ofl->ofl_hwcap_1, M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_NEW, CA_SUNW_HW_1, val, M_MACH);
 
 	ofl->ofl_hwcap_1 |= val;
 
-	Dbg_cap_sec_entry(DBG_CAP_RESOLVED, CA_SUNW_HW_1, ofl->ofl_hwcap_1,
-	    M_MACH);
+	Dbg_cap_sec_entry(ofl->ofl_lml, DBG_CAP_RESOLVED, CA_SUNW_HW_1,
+	    ofl->ofl_hwcap_1, M_MACH);
 }
 
 /*
@@ -344,9 +351,9 @@ hw1_cap(Ofl_desc *ofl, Xword val)
 static void
 process_cap(const char *name, Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 {
-	Cap *	cdata;
+	Cap	*cdata;
 
-	Dbg_cap_sec_title(ofl->ofl_name);
+	Dbg_cap_sec_title(ofl);
 
 	for (cdata = (Cap *)cisp->is_indata->d_buf;
 	    cdata->c_tag != CA_SUNW_NULL; cdata++) {
@@ -358,7 +365,8 @@ process_cap(const char *name, Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 				sf1_cap(ofl, cdata->c_un.c_val, ifl, name);
 				break;
 			default:
-				eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_UNKCAP),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_FIL_UNKCAP),
 				    ifl->ifl_name, name, cdata->c_tag);
 		}
 	}
@@ -370,7 +378,7 @@ process_cap(const char *name, Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
  * list as we will be creating our own replacement sections later (ie.
  * symtab and relocation).
  */
-uintptr_t
+static uintptr_t
 /* ARGSUSED5 */
 process_input(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Word ndx, int ident, Ofl_desc *ofl)
@@ -384,7 +392,7 @@ process_input(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  * relocations from shared objects to determine if any copy relocation symbol
  * has a displacement relocation against it.
  */
-uintptr_t
+static uintptr_t
 /* ARGSUSED5 */
 process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Word ndx, int ident, Ofl_desc *ofl)
@@ -410,7 +418,7 @@ process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  * Process a string table section.  A valid section contains an initial and
  * final null byte.
  */
-uintptr_t
+static uintptr_t
 process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -451,8 +459,8 @@ process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	if (size) {
 		data = isp->is_indata->d_buf;
 		if (data[0] != '\0' || data[size - 1] != '\0')
-			eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_MALSTR),
-			    ifl->ifl_name, name);
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_MALSTR), ifl->ifl_name, name);
 	} else
 		isp->is_indata->d_buf = (void *)MSG_ORIG(MSG_STR_EMPTY);
 
@@ -463,20 +471,21 @@ process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 /*
  * Invalid sections produce a warning and are skipped.
  */
-uintptr_t
+static uintptr_t
 /* ARGSUSED3 */
 invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
-	eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name, name,
-		conv_sectyp_str(ofl->ofl_e_machine, (unsigned)shdr->sh_type));
+	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
+	    ifl->ifl_name, name, conv_sec_type(ifl->ifl_ehdr->e_machine,
+	    shdr->sh_type));
 	return (1);
 }
 
 /*
  * Process a progbits section.
  */
-uintptr_t
+static uintptr_t
 process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -548,7 +557,7 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 /*
  * Handles the SHT_SUNW_{DEBUG,DEBUGSTR) sections.
  */
-uintptr_t
+static uintptr_t
 process_debug(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -561,11 +570,10 @@ process_debug(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	return (process_progbits(name, ifl, shdr, scn, ndx, ident, ofl));
 }
 
-
 /*
  * Process a nobits section.
  */
-uintptr_t
+static uintptr_t
 process_nobits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -585,7 +593,7 @@ process_nobits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 /*
  * Process a SHT_*_ARRAY section.
  */
-uintptr_t
+static uintptr_t
 process_array(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -618,7 +626,7 @@ process_array(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 /*
  * Process a SHT_SYMTAB_SHNDX section.
  */
-uintptr_t
+static uintptr_t
 process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -633,8 +641,9 @@ process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 
 		if ((isp == 0) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
-				ifl->ifl_name, name, EC_XWORD(shdr->sh_link));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name, name,
+			    EC_XWORD(shdr->sh_link));
 			return (S_ERROR);
 		}
 		isp->is_symshndx = ifl->ifl_isdesc[ndx];
@@ -645,7 +654,7 @@ process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 /*
  * Final processing for SHT_SYMTAB_SHNDX section.
  */
-uintptr_t
+static uintptr_t
 /* ARGSUSED2 */
 sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 {
@@ -654,9 +663,9 @@ sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 		if ((isp == 0) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
-				isc->is_file->ifl_name, isc->is_name,
-				EC_XWORD(isc->is_shdr->sh_link));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_INVSHLINK), isc->is_file->ifl_name,
+			    isc->is_name, EC_XWORD(isc->is_shdr->sh_link));
 			return (S_ERROR);
 		}
 		isp->is_symshndx = isc;
@@ -672,7 +681,7 @@ sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
  *	 set when libld is called from ld.so.1).
  */
 /*ARGSUSED*/
-uintptr_t
+static uintptr_t
 process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
@@ -691,7 +700,8 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * Find the string section associated with the .dynamic section.
 	 */
 	if ((strscn = elf_getscn(ifl->ifl_elf, shdr->sh_link)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -975,7 +985,7 @@ expand(const char *parent, const char *name, char **next)
  * recorded on the `ofl_soneed' list and will be analyzed after all explicit
  * file processing has been completed (refer finish_libs()).
  */
-uintptr_t
+static uintptr_t
 process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	Dyn		*data, *dyn;
@@ -1120,9 +1130,9 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				else
 					hint = MSG_ORIG(MSG_STR_EMPTY);
 
-				eprintf(ERR_FATAL, MSG_INTL(MSG_REC_OBJCNFLT),
-				    sifl->ifl_name, ifl->ifl_name,
-				    sifl->ifl_soname, hint);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_REC_OBJCNFLT), sifl->ifl_name,
+				    ifl->ifl_name, sifl->ifl_soname, hint);
 				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (0);
 			}
@@ -1135,8 +1145,9 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 */
 		if (ofl->ofl_soname &&
 		    (strcmp(ofl->ofl_soname, ifl->ifl_soname) == 0)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REC_OPTCNFLT),
-			    ifl->ifl_name, ifl->ifl_soname);
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REC_OPTCNFLT), ifl->ifl_name,
+			    ifl->ifl_soname);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
@@ -1144,13 +1155,12 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	return (1);
 }
 
-
 /*
  * Process a relocation entry. At this point all input sections from this
  * input file have been assigned an input section descriptor which is saved
  * in the `ifl_isdesc' array.
  */
-uintptr_t
+static uintptr_t
 rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	Word 	rndx;
@@ -1162,9 +1172,9 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * Make sure this is a valid relocation we can handle.
 	 */
 	if (shdr->sh_type != M_REL_SHT_TYPE) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
-		    isc->is_name, conv_sectyp_str(ofl->ofl_e_machine,
-		    (unsigned)shdr->sh_type));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
+		    ifl->ifl_name, isc->is_name,
+		    conv_sec_type(ifl->ifl_ehdr->e_machine, shdr->sh_type));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1181,7 +1191,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		/*
 		 * Broken input file.
 		 */
-		eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
 			ifl->ifl_name, isc->is_name, EC_XWORD(rndx));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
@@ -1208,8 +1218,9 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					return (S_ERROR);
 				return (1);
 			}
-			eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVRELOC1),
-				ifl->ifl_name, isc->is_name, risc->is_name);
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_INVRELOC1), ifl->ifl_name,
+			    isc->is_name, risc->is_name);
 			return (0);
 		}
 		if (list_appendc(&osp->os_relisdescs, isc) == 0)
@@ -1241,7 +1252,7 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		/*
 		 * A conflict, issue an warning message, and ignore the section.
 		 */
-		eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_EXCLUDE),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_EXCLUDE),
 		    ifl->ifl_name, name);
 		return (0);
 	}
@@ -1251,6 +1262,53 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 */
 	return (process_section(name, ifl, shdr, scn, ndx, 0, ofl));
 }
+
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+
+static uintptr_t
+process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
+    Elf_Scn *scn, Word ndx, int ident, Ofl_desc *ofl)
+{
+	Os_desc		*osp, *eosp;
+	Is_desc		*isp;
+	Listnode	*lnp;
+
+	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
+		return (S_ERROR);
+
+	/*
+	 * When producing a relocatable object - just collect the sections.
+	 */
+	if (ofl->ofl_flags & FLG_OF_RELOBJ)
+		return (1);
+
+	/*
+	 * If producing a executable or shared library, keep track of all the
+	 * output UNWIND sections to allow the creation of the appropriate
+	 * frame_hdr information.
+	 *
+	 * If the section hasn't been placed in the output file, then there's
+	 * nothing for us to do.
+	 */
+	if (((isp = ifl->ifl_isdesc[ndx]) == 0) ||
+	    ((osp = isp->is_osdesc) == 0))
+		return (1);
+
+	/*
+	 * Check to see if this output section is already on the list, and if
+	 * not, add it.
+	 */
+	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, eosp))
+		if (osp == eosp)
+		    return (1);
+
+	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
+		return (S_ERROR);
+
+	return (1);
+}
+
+#endif
 
 /*
  * Section processing state table.  `Initial' describes the required initial
@@ -1287,7 +1345,7 @@ static uintptr_t (*Final[SHT_NUM][2])() = {
 
 /* SHT_NULL	*/	NULL,			NULL,
 /* SHT_PROGBITS	*/	NULL,			NULL,
-/* SHT_SYMTAB	*/	sym_process,		sym_process,
+/* SHT_SYMTAB	*/	ld_sym_process,		ld_sym_process,
 /* SHT_STRTAB	*/	NULL,			NULL,
 /* SHT_RELA	*/	rel_process,		NULL,
 /* SHT_HASH	*/	NULL,			NULL,
@@ -1296,7 +1354,7 @@ static uintptr_t (*Final[SHT_NUM][2])() = {
 /* SHT_NOBITS	*/	NULL,			NULL,
 /* SHT_REL	*/	rel_process,		NULL,
 /* SHT_SHLIB	*/	NULL,			NULL,
-/* SHT_DYNSYM	*/	NULL,			sym_process,
+/* SHT_DYNSYM	*/	NULL,			ld_sym_process,
 /* SHT_UNKNOWN12 */	NULL,			NULL,
 /* SHT_UNKNOWN13 */	NULL,			NULL,
 /* SHT_INIT_ARRAY */	NULL,			NULL,
@@ -1313,7 +1371,7 @@ static uintptr_t (*Final[SHT_NUM][2])() = {
  * table to determine whether it should be processed (saved), ignored, or
  * is invalid for the type of input file being processed.
  */
-uintptr_t
+static uintptr_t
 process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 {
 	Elf_Scn		*scn;
@@ -1332,33 +1390,36 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * First process the .shstrtab section so that later sections can
 	 * reference their name.
 	 */
-	lds_file(ifl->ifl_name, elf_kind(elf), ifl->ifl_flags, elf);
+	ld_sup_file(ofl, ifl->ifl_name, elf_kind(elf), ifl->ifl_flags, elf);
 
 	sndx = ifl->ifl_shstrndx;
 	if ((scn = elf_getscn(elf, (size_t)sndx)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if ((shdr = elf_getshdr(scn)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if ((name = elf_strptr(elf, (size_t)sndx, (size_t)shdr->sh_name)) ==
 	    NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_STRPTR), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
-	if (lds_input_section(name, &shdr, sndx, ifl->ifl_name,
-	    scn, elf, ofl) == S_ERROR)
+	if (ld_sup_input_section(ofl, name, &shdr, sndx, ifl->ifl_name,
+	    scn, elf) == S_ERROR)
 		return (S_ERROR);
 
 	/*
 	 * Reset the name since the shdr->sh_name could have been changed as
-	 * part of lds_input_section().  If there is no name, fabricate one
+	 * part of ld_sup_input_section().  If there is no name, fabricate one
 	 * using the section index.
 	 */
 	if (shdr->sh_name == 0) {
@@ -1370,7 +1431,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 	} else if ((name = elf_strptr(elf, (size_t)sndx,
 	    (size_t)shdr->sh_name)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_STRPTR), ifl->ifl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
+		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1394,7 +1456,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		ident = M_ID_UNKNOWN;
 	}
 
-	DBG_CALL(Dbg_file_generic(ifl));
+	DBG_CALL(Dbg_file_generic(ofl->ofl_lml, ifl));
 	ndx = 0;
 	vdfisp = vndisp = vsyisp = sifisp = capisp = 0;
 	scn = NULL;
@@ -1407,21 +1469,21 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			continue;
 
 		if ((shdr = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
-			    ifl->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSHDR), ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
 		name = str + (size_t)(shdr->sh_name);
 
-		if (lds_input_section(name, &shdr, ndx, ifl->ifl_name, scn,
-		    elf, ofl) == S_ERROR)
+		if (ld_sup_input_section(ofl, name, &shdr, ndx, ifl->ifl_name,
+		    scn, elf) == S_ERROR)
 			return (S_ERROR);
 
 		/*
 		 * Reset the name since the shdr->sh_name could have been
-		 * changed as part of lds_input_section().  If there is no name,
-		 * fabricate one using the section index.
+		 * changed as part of ld_sup_input_section().  If there is no
+		 * name, fabricate one using the section index.
 		 */
 		if (shdr->sh_name == 0) {
 			(void) snprintf(_name, MAXNDXSIZE,
@@ -1464,10 +1526,11 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			 * message but do the basic section processing anyway.
 			 */
 			if (row < (Word)SHT_LOSUNW)
-				eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
-				    ifl->ifl_name, name,
-				    conv_sectyp_str(ofl->ofl_e_machine,
-				    (unsigned)shdr->sh_type));
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
+				    name,
+				    conv_sec_type(ifl->ifl_ehdr->e_machine,
+				    shdr->sh_type));
 
 			/*
 			 * Handle sections greater than SHT_LOSUNW.
@@ -1539,7 +1602,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					 * column == ET_REL
 					 */
 					if (process_amd64_unwind(name, ifl,
-					    shdr, scn, ndx, M_ID_NULL,
+					    shdr, scn, ndx, M_ID_UNWIND,
 					    ofl) == S_ERROR)
 						return (S_ERROR);
 				}
@@ -1590,7 +1653,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			 * If this is an ordered section, process it.
 			 */
 			cnt++;
-			if ((osp = (Os_desc *)process_ordered(ifl, ofl, ndx,
+			if ((osp = (Os_desc *)ld_process_ordered(ifl, ofl, ndx,
 			    ifl->ifl_shnum)) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 
@@ -1650,7 +1713,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * .dynamic's NEEDED entries.
 	 */
 	if (vndisp && (ofl->ofl_flags & (FLG_OF_NOUNDEF | FLG_OF_SYMBOLIC)))
-		if (vers_need_process(vndisp, ifl, ofl) == S_ERROR)
+		if (ld_vers_need_process(vndisp, ifl, ofl) == S_ERROR)
 			return (S_ERROR);
 
 	/*
@@ -1658,11 +1721,11 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * version sections.
 	 */
 	if (vsyisp)
-		(void) vers_sym_process(vsyisp, ifl);
+		(void) ld_vers_sym_process(ofl->ofl_lml, vsyisp, ifl);
 
 	if (ifl->ifl_versym &&
 	    (vdfisp || (sdf && (sdf->sdf_flags & FLG_SDF_SELECT))))
-		if (vers_def_process(vdfisp, ifl, ofl) == S_ERROR)
+		if (ld_vers_def_process(vdfisp, ifl, ofl) == S_ERROR)
 			return (S_ERROR);
 
 	/*
@@ -1677,8 +1740,8 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		row = isp->is_shdr->sh_type;
 
 		if ((isp->is_flags & FLG_IS_DISCARD) == 0)
-			lds_section(isp->is_name, isp->is_shdr, ndx,
-				isp->is_indata, elf);
+			ld_sup_section(ofl, isp->is_name, isp->is_shdr, ndx,
+			    isp->is_indata, elf);
 
 		/*
 		 * If this is a ST_SUNW_move section from a
@@ -1708,7 +1771,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 */
 	if (sifisp && ((ifl->ifl_flags & (FLG_IF_NEEDED | FLG_IF_NODIRECT)) ==
 	    (FLG_IF_NEEDED | FLG_IF_NODIRECT)))
-		(void) sym_nodirect(sifisp, ifl, ofl);
+		(void) ld_sym_nodirect(sifisp, ifl, ofl);
 
 	return (1);
 }
@@ -1735,7 +1798,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
  *	recorded as dependencies of the output file being generated.
  */
 Ifl_desc *
-process_ifl(const char *name, const char *soname, int fd, Elf *elf,
+ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
     Half flags, Ofl_desc * ofl, Rej_desc * rej)
 {
 	Ifl_desc	*ifl;
@@ -1775,9 +1838,10 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				 * original archive descriptor and discard the
 				 * new elf descriptor.
 				 */
-				DBG_CALL(Dbg_file_reuse(name, adp->ad_name));
+				DBG_CALL(Dbg_file_reuse(ofl->ofl_lml, name,
+				    adp->ad_name));
 				(void) elf_end(elf);
-				return ((Ifl_desc *)process_archive(name, fd,
+				return ((Ifl_desc *)ld_process_archive(name, fd,
 				    adp, ofl));
 			}
 		}
@@ -1786,15 +1850,15 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * As we haven't processed this file before establish a new
 		 * archive descriptor.
 		 */
-		adp = ar_setup(name, elf, ofl);
+		adp = ld_ar_setup(name, elf, ofl);
 		if ((adp == 0) || (adp == (Ar_desc *)S_ERROR))
 			return ((Ifl_desc *)adp);
 		adp->ad_stdev = status.st_dev;
 		adp->ad_stino = status.st_ino;
 
-		lds_file(name, ELF_K_AR, flags, elf);
+		ld_sup_file(ofl, name, ELF_K_AR, flags, elf);
 
-		return ((Ifl_desc *)process_archive(name, fd, adp, ofl));
+		return ((Ifl_desc *)ld_process_archive(name, fd, adp, ofl));
 
 	case ELF_K_ELF:
 		/*
@@ -1820,7 +1884,7 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				_rej.rej_str = elf_errmsg(-1);
 			}
 			_rej.rej_name = name;
-			DBG_CALL(Dbg_file_rejected(&_rej));
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
 			if (rej->rej_type == 0) {
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
@@ -1858,7 +1922,8 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				/*
 				 * Disregard (skip) this image.
 				 */
-				DBG_CALL(Dbg_file_skip(name, ifl->ifl_name));
+				DBG_CALL(Dbg_file_skip(ofl->ofl_lml,
+				    ifl->ifl_name, name));
 				(void) elf_end(elf);
 
 				/*
@@ -1884,8 +1949,8 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 					else
 					    errmsg = MSG_INTL(MSG_FIL_MULINC_2);
 
-					eprintf(ERR_WARNING, errmsg, name,
-					    ifl->ifl_name);
+					eprintf(ofl->ofl_lml, ERR_WARNING,
+					    errmsg, name, ifl->ifl_name);
 				}
 				return (ifl);
 			}
@@ -1911,14 +1976,14 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 
 		switch (ehdr->e_type) {
 		case ET_REL:
-			mach_eflags(ehdr, ofl);
+			ld_mach_eflags(ehdr, ofl);
 			error = process_elf(ifl, elf, ofl);
 			break;
 		case ET_DYN:
 			if ((ofl->ofl_flags & FLG_OF_STATIC) ||
 			    !(ofl->ofl_flags & FLG_OF_DYNLIBS)) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_SOINSTAT),
-				    name);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_FIL_SOINSTAT), name);
 				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (0);
 			}
@@ -1961,7 +2026,7 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			(void) elf_errno();
 			_rej.rej_type = SGS_REJ_UNKFILE;
 			_rej.rej_name = name;
-			DBG_CALL(Dbg_file_rejected(&_rej));
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
 			if (rej->rej_type == 0) {
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
@@ -1973,7 +2038,7 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		(void) elf_errno();
 		_rej.rej_type = SGS_REJ_UNKFILE;
 		_rej.rej_name = name;
-		DBG_CALL(Dbg_file_rejected(&_rej));
+		DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej));
 		if (rej->rej_type == 0) {
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
@@ -1993,18 +2058,19 @@ process_ifl(const char *name, const char *soname, int fd, Elf *elf,
  * archive (see libs.c: process_archive()).
  */
 Ifl_desc *
-process_open(const char *path, size_t dlen, int fd, Ofl_desc *ofl, Half flags,
-    Rej_desc * rej)
+ld_process_open(const char *path, size_t dlen, int fd, Ofl_desc *ofl,
+    Half flags, Rej_desc * rej)
 {
 	Elf *	elf;
 
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), path);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), path);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 
-	return (process_ifl(&path[0], &path[dlen], fd, elf, flags, ofl, rej));
+	return (ld_process_ifl(&path[0], &path[dlen], fd, elf, flags,
+	    ofl, rej));
 }
 
 /*
@@ -2012,7 +2078,7 @@ process_open(const char *path, size_t dlen, int fd, Ofl_desc *ofl, Half flags,
  * Combine the directory and filename, check the resultant path size, and try
  * opening the pathname.
  */
-Ifl_desc *
+static Ifl_desc *
 process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
     Ofl_desc * ofl, Rej_desc * rej)
 {
@@ -2032,7 +2098,8 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 	dlen++;
 	plen = dlen + strlen(file) + 1;
 	if (plen > PATH_MAX) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_PTHTOLONG), _dir, file);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_PTHTOLONG),
+		    _dir, file);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -2043,7 +2110,8 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 	(void) strcpy(path, _dir);
 	(void) strcat(path, MSG_ORIG(MSG_STR_SLASH));
 	(void) strcat(path, file);
-	DBG_CALL(Dbg_libs_req(sdf->sdf_name, sdf->sdf_rfile, path));
+	DBG_CALL(Dbg_libs_req(ofl->ofl_lml, sdf->sdf_name,
+	    sdf->sdf_rfile, path));
 
 	if ((fd = open(path, O_RDONLY)) == -1)
 		return (0);
@@ -2054,7 +2122,7 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
-		ifl = process_open(_path, dlen, fd, ofl, NULL, rej);
+		ifl = ld_process_open(_path, dlen, fd, ofl, NULL, rej);
 		(void) close(fd);
 		return (ifl);
 	}
@@ -2073,7 +2141,7 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
  *  o	use the default directories, i.e. LIBPATH or -YP.
  */
 uintptr_t
-finish_libs(Ofl_desc *ofl)
+ld_finish_libs(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Sdf_desc	*sdf;
@@ -2119,15 +2187,16 @@ finish_libs(Ofl_desc *ofl)
 			if (*path == '/')
 				break;
 		if (*path) {
-			DBG_CALL(Dbg_libs_req(sdf->sdf_name, sdf->sdf_rfile,
-			    file));
+			DBG_CALL(Dbg_libs_req(ofl->ofl_lml, sdf->sdf_name,
+			    sdf->sdf_rfile, file));
 			if ((fd = open(file, O_RDONLY)) == -1) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_NOTFOUND),
-				    file, sdf->sdf_rfile);
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_FIL_NOTFOUND), file,
+				    sdf->sdf_rfile);
 			} else {
 				Rej_desc	_rej = { 0 };
 
-				ifl = process_open(file, sizeof (file) + 1,
+				ifl = ld_process_open(file, sizeof (file) + 1,
 				    fd, ofl, NULL, &_rej);
 				(void) close(fd);
 
@@ -2135,11 +2204,11 @@ finish_libs(Ofl_desc *ofl)
 					return (S_ERROR);
 				}
 				if (_rej.rej_type) {
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(reject[_rej.rej_type]),
 					    _rej.rej_name ? rej.rej_name :
 					    MSG_INTL(MSG_STR_UNKNOWN),
-					    conv_reject_str(&_rej));
+					    conv_reject_desc(&_rej));
 				} else
 					sdf->sdf_file = ifl;
 			}
@@ -2181,8 +2250,8 @@ finish_libs(Ofl_desc *ofl)
 			if (rpath == 0)
 				return (S_ERROR);
 			(void) strcpy(rpath, sdf->sdf_rpath);
-			DBG_CALL(Dbg_libs_path(rpath, LA_SER_RUNPATH,
-			    sdf->sdf_rfile));
+			DBG_CALL(Dbg_libs_path(ofl->ofl_lml, rpath,
+			    LA_SER_RUNPATH, sdf->sdf_rfile));
 			if ((path = strtok_r(rpath,
 			    MSG_ORIG(MSG_STR_COLON), &next)) != NULL) {
 				do {
@@ -2245,12 +2314,13 @@ finish_libs(Ofl_desc *ofl)
 		 * generic "not found" diagnostic.
 		 */
 		if (rej.rej_type) {
-			eprintf(ERR_WARNING, MSG_INTL(reject[rej.rej_type]),
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
-			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_str(&rej));
+			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(&rej));
 		} else {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_FIL_NOTFOUND), file,
-			    sdf->sdf_rfile);
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_FIL_NOTFOUND), file, sdf->sdf_rfile);
 		}
 	}
 
@@ -2258,5 +2328,5 @@ finish_libs(Ofl_desc *ofl)
 	 * Finally, now that all objects have been input, make sure any version
 	 * requirements have been met.
 	 */
-	return (vers_verify(ofl));
+	return (ld_vers_verify(ofl));
 }

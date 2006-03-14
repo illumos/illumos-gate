@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,21 +33,19 @@
  */
 #include	<stdio.h>
 #include	<string.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
 /*
  * Each time a section is placed, the function set_addralign()
- * is called. This function performs:
- * 	*) if the section is from an external file,
- *	   check if this is empty or not. If not,
- *	   we know the segment this section will belong
- *	   needs a program header. (Of course, the program
- *	   needed only if this section falls into a
- *	   loadable segment.)
- * 	*) compute the Least Common Multiplier for setting
- *	   the segment alignment.
+ * is called.  This function performs:
+ *
+ *  .	if the section is from an external file, check if this is empty or not.
+ *	If not, we know the segment this section will belong needs a program
+ *	header. (Of course, the program is needed only if this section falls
+ *	into a loadable segment.)
+ *  .	compute the Least Common Multiplier for setting the segment alignment.
  */
 static void
 set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
@@ -67,8 +64,8 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	    (osp->os_sgdesc->sg_phdr).p_type != PT_LOAD)
 		return;
 
-	osp->os_sgdesc->sg_addralign = lcm(osp->os_sgdesc->sg_addralign,
-		shdr->sh_addralign);
+	osp->os_sgdesc->sg_addralign =
+	    ld_lcm(osp->os_sgdesc->sg_addralign, shdr->sh_addralign);
 }
 
 /*
@@ -76,8 +73,8 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
  * os_txtndx.  This information is derived from the Sg_desc->sg_segorder
  * list that was built up from the Mapfile.
  */
-int
-set_os_txtndx(Is_desc *isp, Sg_desc * sgp)
+static int
+set_os_txtndx(Is_desc *isp, Sg_desc *sgp)
 {
 	Listnode *	lnp;
 	Sec_order *	scop;
@@ -95,7 +92,7 @@ set_os_txtndx(Is_desc *isp, Sg_desc * sgp)
  * Place a section into the appropriate segment.
  */
 Os_desc *
-place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
+ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 {
 	Listnode *	lnp1, * lnp2;
 	Ent_desc *	enp;
@@ -106,16 +103,16 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	Xword		shflagmask, shflags = shdr->sh_flags;
 	Ifl_desc *	ifl = isp->is_file;
 
-	DBG_CALL(Dbg_sec_in(isp));
+	DBG_CALL(Dbg_sec_in(ofl->ofl_lml, isp));
 
 	if ((shflags & SHF_GROUP) || (shdr->sh_type == SHT_GROUP)) {
 		Group_desc *	gdesc;
 
-		if ((gdesc = get_group(ofl, isp)) == (Group_desc *)S_ERROR)
+		if ((gdesc = ld_get_group(ofl, isp)) == (Group_desc *)S_ERROR)
 			return ((Os_desc *)S_ERROR);
 
 		if (gdesc) {
-			DBG_CALL(Dbg_sec_group(isp, gdesc));
+			DBG_CALL(Dbg_sec_group(ofl->ofl_lml, isp, gdesc));
 
 			/*
 			 * If this group is marked as discarded, then this
@@ -249,20 +246,20 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		osp = isp->is_file->ifl_isdesc[link]->is_osdesc;
 		/*
 		 * If this is a COMDAT section, then see if this
-		 * section is a keeper and/or if it is to
-		 * be discarded.
+		 * section is a keeper and/or if it is to be discarded.
 		 */
 		if (shdr->sh_type == SHT_SUNW_COMDAT) {
 			Listnode *	clist;
 			Is_desc *	cisp;
 
 			for (LIST_TRAVERSE(&(osp->os_comdats), clist, cisp)) {
-				if (strcmp(isp->is_basename,
-				    cisp->is_basename) == 0) {
-					isp->is_flags |= FLG_IS_DISCARD;
-					DBG_CALL(Dbg_sec_discarded(isp, cisp));
-					return (0);
-				}
+				if (strcmp(isp->is_basename, cisp->is_basename))
+					continue;
+
+				isp->is_flags |= FLG_IS_DISCARD;
+				DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
+				    isp, cisp));
+				return (0);
 			}
 
 			/*
@@ -281,7 +278,7 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 			return ((Os_desc *)S_ERROR);
 		isp->is_osdesc = osp;
 		sgp = osp->os_sgdesc;
-		DBG_CALL(Dbg_sec_added(osp, sgp));
+		DBG_CALL(Dbg_sec_added(ofl->ofl_lml, osp, sgp));
 		return (osp);
 	}
 
@@ -332,12 +329,13 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 				for (LIST_TRAVERSE(&(osp->os_comdats),
 				    clist, cisp)) {
 					if (strcmp(isp->is_basename,
-					    cisp->is_basename) == 0) {
-						isp->is_flags |= FLG_IS_DISCARD;
-						DBG_CALL(Dbg_sec_discarded(isp,
-						    cisp));
-						return (0);
-					}
+					    cisp->is_basename))
+						continue;
+
+					isp->is_flags |= FLG_IS_DISCARD;
+					DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
+					    isp, cisp));
+					return (0);
 				}
 
 				/*
@@ -397,14 +395,14 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 			 * section below.
 			 */
 			if (((ifl && (ifl->ifl_flags & FLG_IF_IGNORE)) ||
-			    dbg_mask) &&
+			    DBG_ENABLED) &&
 			    (osp->os_flags & FLG_OS_SECTREF)) {
 				isp->is_flags |= FLG_IS_SECTREF;
 				if (ifl)
 				    ifl->ifl_flags |= FLG_IF_FILEREF;
 			}
 
-			DBG_CALL(Dbg_sec_added(osp, sgp));
+			DBG_CALL(Dbg_sec_added(ofl->ofl_lml, osp, sgp));
 			return (osp);
 		}
 
@@ -512,7 +510,7 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_JCR)) == 0)) {
 		osp->os_flags |= FLG_OS_SECTREF;
 
-		if ((ifl && (ifl->ifl_flags & FLG_IF_IGNORE)) || dbg_mask) {
+		if ((ifl && (ifl->ifl_flags & FLG_IF_IGNORE)) || DBG_ENABLED) {
 			isp->is_flags |= FLG_IS_SECTREF;
 			if (ifl)
 			    ifl->ifl_flags |= FLG_IF_FILEREF;
@@ -544,8 +542,9 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 */
 	if (sgp->sg_phdr.p_type == PT_LOAD) {
 		if (!(osp->os_shdr->sh_flags & SHF_ALLOC)) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SCN_NONALLOC),
-			    ofl->ofl_name, osp->os_name);
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SCN_NONALLOC), ofl->ofl_name,
+			    osp->os_name);
 			osp->os_shdr->sh_flags |= SHF_ALLOC;
 		}
 	}
@@ -566,7 +565,7 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	if (list_appendc(&(osp->os_isdescs), isp) == 0)
 		return ((Os_desc *)S_ERROR);
 
-	DBG_CALL(Dbg_sec_created(osp, sgp));
+	DBG_CALL(Dbg_sec_created(ofl->ofl_lml, osp, sgp));
 	isp->is_osdesc = osp;
 	if (lnp2) {
 		if (list_insertc(&(sgp->sg_osdescs), osp, lnp2) == 0)

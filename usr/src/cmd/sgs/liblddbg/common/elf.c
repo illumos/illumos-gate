@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,151 +18,88 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	"msg.h"
-#include	"_debug.h"
-#include	"libld.h"
-
-
-static void
-Elf_elf_data(const char *str1, Addr addr, Elf_Data *data, const char *file,
-    const char *str2)
-{
-	dbg_print(MSG_INTL(MSG_ELF_ENTRY), str1, EC_ADDR(addr),
-	    conv_d_type_str(data->d_type), EC_XWORD(data->d_size),
-	    EC_OFF(data->d_off), EC_XWORD(data->d_align), file, str2);
-}
+#include	<sgs.h>
+#include	<_debug.h>
+#include	<conv.h>
+#include	<msg.h>
 
 void
-Gelf_elf_data_title()
-{
-	dbg_print(MSG_INTL(MSG_ELF_TITLE));
-}
-
-void
-_Dbg_elf_data_in(Os_desc *osp, Is_desc *isp)
-{
-	Shdr		*shdr = osp->os_shdr;
-	Elf_Data	*data = isp->is_indata;
-	const char	*file, *str;
-	Addr		addr;
-
-	if (isp->is_flags & FLG_IS_DISCARD) {
-		str = MSG_INTL(MSG_ELF_IGNSCN);
-		addr = 0;
-	} else {
-		str = MSG_ORIG(MSG_STR_EMPTY);
-		addr = (Addr)(shdr->sh_addr + data->d_off);
-	}
-
-	if (isp->is_file && isp->is_file->ifl_name)
-		file = isp->is_file->ifl_name;
-	else
-		file = MSG_ORIG(MSG_STR_EMPTY);
-
-	Elf_elf_data(MSG_INTL(MSG_STR_IN), addr, data, file, str);
-}
-
-void
-_Dbg_elf_data_out(Os_desc *osp)
-{
-	Shdr		*shdr = osp->os_shdr;
-	Elf_Data	*data = osp->os_outdata;
-
-	Elf_elf_data(MSG_INTL(MSG_STR_OUT), shdr->sh_addr,
-	    data, MSG_ORIG(MSG_STR_EMPTY), MSG_ORIG(MSG_STR_EMPTY));
-}
-
-void
-Gelf_elf_header(GElf_Ehdr *ehdr, GElf_Shdr *shdr0)
+Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 {
 	Byte		*byte =	&(ehdr->e_ident[0]);
 	const char	*flgs;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_ELF_HEADER));
+	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(lml, MSG_INTL(MSG_ELF_HEADER));
 
-	dbg_print(MSG_ORIG(MSG_ELF_MAGIC), byte[EI_MAG0],
+	dbg_print(lml, MSG_ORIG(MSG_ELF_MAGIC), byte[EI_MAG0],
 	    (byte[EI_MAG1] ? byte[EI_MAG1] : '0'),
 	    (byte[EI_MAG2] ? byte[EI_MAG2] : '0'),
 	    (byte[EI_MAG3] ? byte[EI_MAG3] : '0'));
-	dbg_print(MSG_ORIG(MSG_ELF_CLASS),
-	    conv_eclass_str(ehdr->e_ident[EI_CLASS]),
-	    conv_edata_str(ehdr->e_ident[EI_DATA]));
-	dbg_print(MSG_ORIG(MSG_ELF_MACHINE),
-	    conv_emach_str(ehdr->e_machine), conv_ever_str(ehdr->e_version));
-	dbg_print(MSG_ORIG(MSG_ELF_TYPE), conv_etype_str(ehdr->e_type));
+	dbg_print(lml, MSG_ORIG(MSG_ELF_CLASS),
+	    conv_ehdr_class(ehdr->e_ident[EI_CLASS]),
+	    conv_ehdr_data(ehdr->e_ident[EI_DATA]));
+	dbg_print(lml, MSG_ORIG(MSG_ELF_MACHINE),
+	    conv_ehdr_mach(ehdr->e_machine), conv_ehdr_vers(ehdr->e_version));
+	dbg_print(lml, MSG_ORIG(MSG_ELF_TYPE), conv_ehdr_type(ehdr->e_type));
 
 	/*
-	 * Line up the flags differently depending on wether we
-	 * received a numeric (e.g. "0x200") or text represent-
-	 * ation (e.g. "[ EF_SPARC_SUN_US1 ]").
+	 * Line up the flags differently depending on wether we received a
+	 * numeric (e.g. "0x200") or text representation (e.g.
+	 * "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_eflags_str(ehdr->e_machine, ehdr->e_flags);
+	flgs = conv_ehdr_flags(ehdr->e_machine, ehdr->e_flags);
 	if (flgs[0] == '[')
-		dbg_print(MSG_ORIG(MSG_ELF_FLAGS_FMT), flgs);
+		dbg_print(lml, MSG_ORIG(MSG_ELF_FLAGS_FMT), flgs);
 	else
-		dbg_print(MSG_ORIG(MSG_ELF_FLAGS), flgs);
+		dbg_print(lml, MSG_ORIG(MSG_ELF_FLAGS), flgs);
 
 	if ((ehdr->e_shnum == 0) && (ehdr->e_shstrndx == SHN_XINDEX))
-		dbg_print(MSG_ORIG(MSG_ELFX_ESIZE), EC_ADDR(ehdr->e_entry),
-		    ehdr->e_ehsize);
+		dbg_print(lml, MSG_ORIG(MSG_ELFX_ESIZE),
+		    EC_ADDR(ehdr->e_entry), ehdr->e_ehsize);
 	else
-		dbg_print(MSG_ORIG(MSG_ELF_ESIZE), EC_ADDR(ehdr->e_entry),
+		dbg_print(lml, MSG_ORIG(MSG_ELF_ESIZE), EC_ADDR(ehdr->e_entry),
 		    ehdr->e_ehsize, ehdr->e_shstrndx);
 
 	if ((ehdr->e_shnum == 0) && shdr0 && (shdr0->sh_size != 0))
-		dbg_print(MSG_ORIG(MSG_ELFX_SHOFF), EC_OFF(ehdr->e_shoff),
+		dbg_print(lml, MSG_ORIG(MSG_ELFX_SHOFF), EC_OFF(ehdr->e_shoff),
 		    ehdr->e_shentsize);
 	else
-		dbg_print(MSG_ORIG(MSG_ELF_SHOFF), EC_OFF(ehdr->e_shoff),
+		dbg_print(lml, MSG_ORIG(MSG_ELF_SHOFF), EC_OFF(ehdr->e_shoff),
 		    ehdr->e_shentsize, ehdr->e_shnum);
 
-	if (ehdr->e_phnum == PN_XNUM)
-		dbg_print(MSG_ORIG(MSG_ELFX_PHOFF), EC_OFF(ehdr->e_phoff),
-		    ehdr->e_phentsize);
-	else
-		dbg_print(MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
-		    ehdr->e_phentsize, ehdr->e_phnum);
+	dbg_print(lml, MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
+	    ehdr->e_phentsize, ehdr->e_phnum);
 
-	if (shdr0 == NULL ||
-	    (ehdr->e_phnum != PN_XNUM &&
-	    (ehdr->e_shnum != 0 || shdr0->sh_size)))
+	if ((ehdr->e_shnum != 0) || (shdr0 == NULL) ||
+	    (shdr0->sh_size == 0))
 		return;
 
 	/*
 	 * If we have Extended ELF headers - print shdr0
 	 */
-	dbg_print(MSG_ORIG(MSG_SHD0_TITLE));
-	dbg_print(MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr0->sh_addr),
-	    /* LINTED */
-	    conv_secflg_str(ehdr->e_machine, shdr0->sh_flags));
-	if (ehdr->e_shnum == 0)
-		dbg_print(MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
-		    conv_sectyp_str(ehdr->e_machine, shdr0->sh_type));
-	else
-		dbg_print(MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr0->sh_size),
-		    conv_sectyp_str(ehdr->e_machine, shdr0->sh_type));
-	dbg_print(MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr0->sh_offset),
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_TITLE));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr0->sh_addr),
+	    conv_sec_flags(shdr0->sh_flags));
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
+	    conv_sec_type(ehdr->e_machine, shdr0->sh_type));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr0->sh_offset),
 	    EC_XWORD(shdr0->sh_entsize));
 
-	if (ehdr->e_shstrndx == SHN_XINDEX && ehdr->e_phnum == PN_XNUM)
-		dbg_print(MSG_ORIG(MSG_SHD0_LINK1), EC_WORD(shdr0->sh_link),
-		    EC_WORD(shdr0->sh_info));
-	else if (ehdr->e_shstrndx == SHN_XINDEX)
-		dbg_print(MSG_ORIG(MSG_SHD0_LINK2), EC_WORD(shdr0->sh_link),
-		    EC_WORD(shdr0->sh_info));
-	else if (ehdr->e_phnum == PN_XNUM)
-		dbg_print(MSG_ORIG(MSG_SHD0_LINK3), EC_WORD(shdr0->sh_link),
-		    EC_WORD(shdr0->sh_info));
+	if (ehdr->e_shstrndx == SHN_XINDEX)
+		dbg_print(lml, MSG_ORIG(MSG_SHD0_LINK),
+		    EC_WORD(shdr0->sh_link), conv_sec_info(shdr0->sh_info,
+		    shdr0->sh_flags));
 	else
-		dbg_print(MSG_ORIG(MSG_SHD0_LINK4), EC_WORD(shdr0->sh_link),
-		    EC_WORD(shdr0->sh_info));
+		dbg_print(lml, MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr0->sh_link),
+		    conv_sec_info(shdr0->sh_info, shdr0->sh_flags));
 
-	dbg_print(MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr0->sh_addralign));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr0->sh_addralign));
 }

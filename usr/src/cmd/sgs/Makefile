@@ -28,11 +28,8 @@
 include		$(SRC)/cmd/Makefile.cmd
 
 SUBDIRS-common= libconv		\
-		.WAIT		\
 		libdl		\
-		.WAIT		\
 		libelf		\
-		.WAIT		\
 		liblddbg	\
 		.WAIT		\
 		libld		\

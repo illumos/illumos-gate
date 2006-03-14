@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	<stdio.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -36,7 +36,7 @@
  * Locate a version descriptor.
  */
 Ver_desc *
-vers_find(const char *name, Word hash, List *lst)
+ld_vers_find(const char *name, Word hash, List *lst)
 {
 	Listnode	*lnp;
 	Ver_desc	*vdp;
@@ -57,7 +57,7 @@ vers_find(const char *name, Word hash, List *lst)
  * until it is determined a descriptor need be created (see map_symbol())).
  */
 Ver_desc *
-vers_desc(const char *name, Word hash, List *lst)
+ld_vers_desc(const char *name, Word hash, List *lst)
 {
 	Ver_desc	*vdp;
 
@@ -88,7 +88,7 @@ typedef struct {
 } Ver_Stack;
 
 static uintptr_t
-vers_visit_children(Ver_desc *vp, int flag)
+vers_visit_children(Ofl_desc *ofl, Ver_desc *vp, int flag)
 {
 	Listnode		*lnp1;
 	Ver_desc		*vdp;
@@ -121,23 +121,23 @@ vers_visit_children(Ver_desc *vp, int flag)
 			 * cyclic dependency.
 			 */
 			if (err == 0) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_VER_CYCLIC));
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_VER_CYCLIC));
 				err = 1;
 			}
 			for (tmp_sp = 0; tmp_sp < ver_stk.ver_sp; tmp_sp++) {
 				v = ver_stk.ver_stk[tmp_sp];
 				if ((v->vd_flags & FLG_VER_CYCLIC) == 0) {
 					v->vd_flags |= FLG_VER_CYCLIC;
-					eprintf(ERR_NONE,
-						MSG_INTL(MSG_VER_ADDVER),
-						v->vd_name);
+					eprintf(ofl->ofl_lml, ERR_NONE,
+					    MSG_INTL(MSG_VER_ADDVER),
+					    v->vd_name);
 				}
 			}
 			if ((vp->vd_flags & FLG_VER_CYCLIC) == 0) {
 				vp->vd_flags |= FLG_VER_CYCLIC;
-				eprintf(ERR_NONE,
-					MSG_INTL(MSG_VER_ADDVER),
-					vp->vd_name);
+				eprintf(ofl->ofl_lml, ERR_NONE,
+				    MSG_INTL(MSG_VER_ADDVER), vp->vd_name);
 			}
 			return (err);
 		}
@@ -159,7 +159,7 @@ vers_visit_children(Ver_desc *vp, int flag)
 	 * Now visit children.
 	 */
 	for (LIST_TRAVERSE(&vp->vd_deps, lnp1, vdp))
-		if (vers_visit_children(vdp, 1) == S_ERROR)
+		if (vers_visit_children(ofl, vdp, 1) == S_ERROR)
 			return (S_ERROR);
 
 	/*
@@ -171,20 +171,20 @@ vers_visit_children(Ver_desc *vp, int flag)
 }
 
 uintptr_t
-vers_check_defs(Ofl_desc *ofl)
+ld_vers_check_defs(Ofl_desc *ofl)
 {
 	Listnode	*lnp1, *lnp2;
 	Ver_desc	*vdp;
 	uintptr_t 	is_cyclic = 0;
 
 
-	DBG_CALL(Dbg_ver_def_title(ofl->ofl_name));
+	DBG_CALL(Dbg_ver_def_title(ofl->ofl_lml, ofl->ofl_name));
 
 	/*
 	 * First check if there are any cyclic dependency
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_verdesc, lnp1, vdp))
-		if ((is_cyclic = vers_visit_children(vdp, 0)) == S_ERROR)
+		if ((is_cyclic = vers_visit_children(ofl, vdp, 0)) == S_ERROR)
 			return (S_ERROR);
 	if (is_cyclic)
 		ofl->ofl_flags |= FLG_OF_FATAL;
@@ -199,14 +199,14 @@ vers_check_defs(Ofl_desc *ofl)
 		avl_index_t	where;
 
 		if (vdp->vd_ndx == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_VER_UNDEF), name,
-			    vdp->vd_ref->vd_name,
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_VER_UNDEF), name, vdp->vd_ref->vd_name,
 			    vdp->vd_ref->vd_file->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
 
-		DBG_CALL(Dbg_ver_desc_entry(vdp));
+		DBG_CALL(Dbg_ver_desc_entry(ofl->ofl_lml, vdp));
 
 		/*
 		 * If a version definition contains no symbols this is possibly
@@ -214,7 +214,8 @@ vers_check_defs(Ofl_desc *ofl)
 		 */
 		if ((vdp->vd_flags &
 		    (VER_FLG_BASE | VER_FLG_WEAK | FLG_VER_REFER)) == 0)
-			DBG_CALL(Dbg_ver_nointerface(vdp->vd_name));
+			DBG_CALL(Dbg_ver_nointerface(ofl->ofl_lml,
+			    vdp->vd_name));
 
 		/*
 		 * Update the version entry count to account for this new
@@ -249,7 +250,7 @@ vers_check_defs(Ofl_desc *ofl)
 		else
 			bind = STB_GLOBAL;
 
-		if (sdp = sym_find(name, vdp->vd_hash, &where, ofl)) {
+		if (sdp = ld_sym_find(name, vdp->vd_hash, &where, ofl)) {
 			/*
 			 * If the symbol already exists and is undefined or was
 			 * defined in a shared library, convert it to an
@@ -275,8 +276,9 @@ vers_check_defs(Ofl_desc *ofl)
 			} else if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 			    (sdp->sd_shndx != SHN_ABS) &&
 			    (sdp->sd_ref == REF_REL_NEED)) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_VER_DEFINED),
-				    name, sdp->sd_file->ifl_name);
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_VER_DEFINED), name,
+				    sdp->sd_file->ifl_name);
 			}
 		} else {
 			/*
@@ -286,8 +288,8 @@ vers_check_defs(Ofl_desc *ofl)
 				return (S_ERROR);
 			sym->st_shndx = SHN_ABS;
 			sym->st_info = ELF_ST_INFO(bind, STT_OBJECT);
-			DBG_CALL(Dbg_ver_symbol(name));
-			if ((sdp = sym_enter(name, sym, vdp->vd_hash,
+			DBG_CALL(Dbg_ver_symbol(ofl->ofl_lml, name));
+			if ((sdp = ld_sym_enter(name, sym, vdp->vd_hash,
 			    vdp->vd_file, ofl, 0, SHN_ABS, FLG_SY_SPECSEC,
 			    FLG_SY1_GLOB, &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
@@ -301,7 +303,7 @@ vers_check_defs(Ofl_desc *ofl)
 /*
  * Dereference dependencies as a part of normalizing (allows recursion).
  */
-void
+static void
 vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
 {
 	Listnode	*lnp;
@@ -326,7 +328,7 @@ vers_derefer(Ifl_desc *ifl, Ver_desc *vdp, int weak)
  * required.
  */
 uintptr_t
-vers_check_need(Ofl_desc *ofl)
+ld_vers_check_need(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Ifl_desc	*ifl;
@@ -455,22 +457,22 @@ vers_check_need(Ofl_desc *ofl)
 /*
  * Indicate dependency selection (allows recursion).
  */
-void
-vers_select(Ifl_desc *ifl, Ver_desc *vdp, const char *ref)
+static void
+vers_select(Ofl_desc *ofl, Ifl_desc *ifl, Ver_desc *vdp, const char *ref)
 {
 	Listnode	*lnp;
 	Ver_desc	*_vdp;
 	Ver_index	*vip = &ifl->ifl_verndx[vdp->vd_ndx];
 
 	vip->vi_flags |= FLG_VER_AVAIL;
-	DBG_CALL(Dbg_ver_avail_entry(vip, ref));
+	DBG_CALL(Dbg_ver_avail_entry(ofl->ofl_lml, vip, ref));
 
 	for (LIST_TRAVERSE(&vdp->vd_deps, lnp, _vdp))
-		vers_select(ifl, _vdp, ref);
+		vers_select(ofl, ifl, _vdp, ref);
 }
 
-Ver_index *
-vers_index(Ifl_desc *ifl, int avail)
+static Ver_index *
+vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 {
 	Listnode	*lnp;
 	Ver_desc	*vdp;
@@ -535,12 +537,12 @@ vers_index(Ifl_desc *ifl, int avail)
 			if (!(sdv->sdv_flags & FLG_SDV_MATCHED)) {
 				if (fail == 0) {
 					fail++;
-					eprintf(ERR_NONE,
+					eprintf(ofl->ofl_lml, ERR_NONE,
 					    MSG_INTL(MSG_VER_ADDVERS),
 					    sdf->sdf_rfile, sdf->sdf_name);
 				}
-				eprintf(ERR_NONE, MSG_INTL(MSG_VER_ADDVER),
-				    sdv->sdv_name);
+				eprintf(ofl->ofl_lml, ERR_NONE,
+				    MSG_INTL(MSG_VER_ADDVER), sdv->sdv_name);
 			}
 		}
 		if (fail)
@@ -554,23 +556,23 @@ vers_index(Ifl_desc *ifl, int avail)
  * Process a version symbol index section.
  */
 int
-vers_sym_process(Is_desc *isp, Ifl_desc *ifl)
+ld_vers_sym_process(Lm_list *lml, Is_desc *isp, Ifl_desc *ifl)
 {
 	Shdr	*symshdr;
 	Shdr	*vershdr = isp->is_shdr;
+
 	/*
-	 * Verify that the versym is the same size as the
-	 * linked symbol table.  If these two get out of sync
-	 * the file is considered corrupted.
+	 * Verify that the versym is the same size as the linked symbol table.
+	 * If these two get out of sync the file is considered corrupted.
 	 */
 	symshdr = ifl->ifl_isdesc[vershdr->sh_link]->is_shdr;
 	if ((symshdr->sh_size / symshdr->sh_entsize) != (vershdr->sh_size /
 	    vershdr->sh_entsize)) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_ELF_VERSYM), ifl->ifl_name,
-			isp->is_name,
-			EC_WORD(vershdr->sh_size / vershdr->sh_entsize),
-			ifl->ifl_isdesc[vershdr->sh_link]->is_name,
-			EC_WORD(symshdr->sh_size / symshdr->sh_entsize));
+		eprintf(lml, ERR_WARNING, MSG_INTL(MSG_ELF_VERSYM),
+		    ifl->ifl_name, isp->is_name,
+		    EC_WORD(vershdr->sh_size / vershdr->sh_entsize),
+		    ifl->ifl_isdesc[vershdr->sh_link]->is_name,
+		    EC_WORD(symshdr->sh_size / symshdr->sh_entsize));
 		return (1);
 	}
 	ifl->ifl_versym = (Versym *)isp->is_indata->d_buf;
@@ -585,7 +587,7 @@ vers_sym_process(Is_desc *isp, Ifl_desc *ifl)
  * descriptors will be promoted (concatenated) to the output files image.
  */
 uintptr_t
-vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
+ld_vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	const char	*str, *file = ifl->ifl_name;
 	Sdf_desc	*sdf = ifl->ifl_sdfdesc;
@@ -602,8 +604,9 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		Listnode	*lnp;
 
 		for (LIST_TRAVERSE(&sdf->sdf_vers, lnp, sdv)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_VER_NOEXIST),
-			    ifl->ifl_name, sdv->sdv_name, sdv->sdv_ref);
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
+			    sdv->sdv_name, sdv->sdv_ref);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 		return (0);
@@ -617,8 +620,9 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * data section will be of the same revision.
 	 */
 	if (vdf->vd_version > VER_DEF_CURRENT)
-		(void) eprintf(ERR_WARNING, MSG_INTL(MSG_VER_HIGHER),
-		    ifl->ifl_name, vdf->vd_version, VER_DEF_CURRENT);
+		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(MSG_VER_HIGHER), ifl->ifl_name, vdf->vd_version,
+		    VER_DEF_CURRENT);
 
 
 	num = isp->is_shdr->sh_info;
@@ -629,7 +633,7 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	else
 		relobj = 0;
 
-	DBG_CALL(Dbg_ver_def_title(file));
+	DBG_CALL(Dbg_ver_def_title(ofl->ofl_lml, file));
 
 	/*
 	 * Loop through the version information setting up a version descriptor
@@ -655,8 +659,8 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		name = (char *)(str + vdap->vda_name);
 		/* LINTED */
 		hash = (Word)elf_hash(name);
-		if ((ivdp = vers_find(name, hash, &ifl->ifl_verdesc)) == 0) {
-			if ((ivdp = vers_desc(name, hash,
+		if ((ivdp = ld_vers_find(name, hash, &ifl->ifl_verdesc)) == 0) {
+			if ((ivdp = ld_vers_desc(name, hash,
 			    &ifl->ifl_verdesc)) == (Ver_desc *)S_ERROR)
 				return (S_ERROR);
 		}
@@ -687,14 +691,14 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 				 * descriptor count.
 				 */
 				if (ofl->ofl_vercnt == 0) {
-					if (vers_base(ofl) ==
+					if (ld_vers_base(ofl) ==
 					    (Ver_desc *)S_ERROR)
 						return (S_ERROR);
 				}
 				ofl->ofl_flags |= FLG_OF_VERDEF;
-				if ((ovdp = vers_find(name, hash,
+				if ((ovdp = ld_vers_find(name, hash,
 				    &ofl->ofl_verdesc)) == 0) {
-					if ((ovdp = vers_desc(name, hash,
+					if ((ovdp = ld_vers_desc(name, hash,
 					    &ofl->ofl_verdesc)) ==
 					    (Ver_desc *)S_ERROR)
 						return (S_ERROR);
@@ -727,9 +731,9 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			/* LINTED */
 			hash = (Word)elf_hash(name);
 
-			if ((_ivdp = vers_find(name, hash,
+			if ((_ivdp = ld_vers_find(name, hash,
 			    &ifl->ifl_verdesc)) == 0) {
-				if ((_ivdp = vers_desc(name, hash,
+				if ((_ivdp = ld_vers_desc(name, hash,
 				    &ifl->ifl_verdesc)) ==
 				    (Ver_desc *)S_ERROR)
 					return (S_ERROR);
@@ -737,14 +741,15 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (list_appendc(&ivdp->vd_deps, _ivdp) == 0)
 				return (S_ERROR);
 		}
-		DBG_CALL(Dbg_ver_desc_entry(ivdp));
+		DBG_CALL(Dbg_ver_desc_entry(ofl->ofl_lml, ivdp));
 	}
 
 	/*
 	 * Now that we know the total number of version definitions for this
 	 * file, build an index array for fast access when processing symbols.
 	 */
-	if ((ifl->ifl_verndx = vers_index(ifl, relobj)) == (Ver_index *)S_ERROR)
+	if ((ifl->ifl_verndx =
+	    vers_index(ofl, ifl, relobj)) == (Ver_index *)S_ERROR)
 		return (S_ERROR);
 
 	if (relobj)
@@ -756,7 +761,7 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * symbol bindings can occur.  Otherwise simply mark all versions as
 	 * available.
 	 */
-	DBG_CALL(Dbg_ver_avail_title(file));
+	DBG_CALL(Dbg_ver_avail_title(ofl->ofl_lml, file));
 
 	if (sdf && (sdf->sdf_flags & FLG_SDF_SELECT)) {
 		Listnode	*lnp1;
@@ -773,10 +778,11 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 				}
 			}
 			if (found)
-				vers_select(ifl, vdp, sdv->sdv_ref);
+				vers_select(ofl, ifl, vdp, sdv->sdv_ref);
 			else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_VER_NOEXIST),
-				    ifl->ifl_name, sdv->sdv_name, sdv->sdv_ref);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
+				    sdv->sdv_name, sdv->sdv_ref);
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 		}
@@ -787,7 +793,7 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		for (cnt = VER_NDX_GLOBAL; cnt <= ifl->ifl_vercnt; cnt++) {
 			vip = &ifl->ifl_verndx[cnt];
 			vip->vi_flags |= FLG_VER_AVAIL;
-			DBG_CALL(Dbg_ver_avail_entry(vip, 0));
+			DBG_CALL(Dbg_ver_avail_entry(ofl->ofl_lml, vip, 0));
 		}
 	}
 
@@ -806,7 +812,7 @@ vers_def_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
  * Process a version needed section.
  */
 uintptr_t
-vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
+ld_vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	const char	*str, *file = ifl->ifl_name;
 	Word		num, _num;
@@ -819,15 +825,16 @@ vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * structure as it is assumed all other version structures in this
 	 * data section will be of the same revision.
 	 */
-	if (vnd->vn_version > VER_DEF_CURRENT)
-		(void) eprintf(ERR_WARNING, MSG_INTL(MSG_VER_HIGHER),
-		    ifl->ifl_name, vnd->vn_version, VER_DEF_CURRENT);
-
+	if (vnd->vn_version > VER_DEF_CURRENT) {
+		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(MSG_VER_HIGHER), ifl->ifl_name, vnd->vn_version,
+		    VER_DEF_CURRENT);
+	}
 
 	num = isp->is_shdr->sh_info;
 	str = (char *)ifl->ifl_isdesc[isp->is_shdr->sh_link]->is_indata->d_buf;
 
-	DBG_CALL(Dbg_ver_need_title(file));
+	DBG_CALL(Dbg_ver_need_title(ofl->ofl_lml, file));
 
 	/*
 	 * Loop through the version information setting up a version descriptor
@@ -867,7 +874,8 @@ vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			sdv->sdv_ref = file;
 			if (list_appendc(&sdf->sdf_vers, sdv) == 0)
 				return (S_ERROR);
-			DBG_CALL(Dbg_ver_need_entry(_cnt, name, sdv->sdv_name));
+			DBG_CALL(Dbg_ver_need_entry(ofl->ofl_lml, _cnt, name,
+			    sdv->sdv_name));
 		}
 	}
 
@@ -880,7 +888,7 @@ vers_need_process(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
  * represented in the output file.
  */
 void
-vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
+ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	Half 	vndx;
 
@@ -915,8 +923,8 @@ vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * version definition.
 	 */
 	if ((ifl->ifl_verndx == 0) || (vndx > ifl->ifl_vercnt)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_VER_INVALNDX), sdp->sd_name,
-		    ifl->ifl_name, vndx);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_VER_INVALNDX),
+		    sdp->sd_name, ifl->ifl_name, vndx);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return;
 	}
@@ -942,7 +950,7 @@ vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
  * assigned to represent the file itself.  Known as the base version.
  */
 Ver_desc *
-vers_base(Ofl_desc *ofl)
+ld_vers_base(Ofl_desc *ofl)
 {
 	Ver_desc	*vdp;
 	const char	*name;
@@ -967,8 +975,8 @@ vers_base(Ofl_desc *ofl)
 	 * Generate the version descriptor.
 	 */
 	/* LINTED */
-	if ((vdp = vers_desc(name, (Word)elf_hash(name), &ofl->ofl_verdesc)) ==
-	    (Ver_desc *)S_ERROR)
+	if ((vdp = ld_vers_desc(name, (Word)elf_hash(name),
+	    &ofl->ofl_verdesc)) == (Ver_desc *)S_ERROR)
 		return ((Ver_desc *)S_ERROR);
 
 	/*
@@ -990,7 +998,7 @@ vers_base(Ofl_desc *ofl)
  * themselves (ie,. NEEDED dependencies).
  */
 int
-vers_verify(Ofl_desc *ofl)
+ld_vers_verify(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Sdf_desc	*sdf;
@@ -1050,15 +1058,16 @@ vers_verify(Ofl_desc *ofl)
 
 				vip = &ifl->ifl_verndx[vdp->vd_ndx];
 				if (!(vip->vi_flags & FLG_VER_AVAIL)) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_VER_UNAVAIL),
 					    ifl->ifl_name, sdv->sdv_name,
 					    sdv->sdv_ref);
 					ofl->ofl_flags |= FLG_OF_FATAL;
 				}
 			} else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_VER_NOEXIST),
-				    ifl->ifl_name, sdv->sdv_name, sdv->sdv_ref);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_VER_NOEXIST), ifl->ifl_name,
+				    sdv->sdv_name, sdv->sdv_ref);
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
 		}

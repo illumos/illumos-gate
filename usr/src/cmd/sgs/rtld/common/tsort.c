@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -47,9 +47,9 @@
 #include	<locale.h>
 #include	<string.h>
 #include	<libintl.h>
+#include	<debug.h>
 #include	"_rtld.h"
 #include	"msg.h"
-#include	"debug.h"
 
 /*
  * Structure for maintaining sorting state.
@@ -96,7 +96,8 @@ sort_scc(Sort * sort, int fndx, int flag)
 	static int		cnt = 1;
 	int			ndx;
 	Rt_map			*lmp;
-	Word			lmflags = LIST(sort->s_lmp)->lm_flags;
+	Lm_list			*lml = LIST(sort->s_lmp);
+	Word			lmflags = lml->lm_flags;
 	Word			init, unref;
 
 	/*
@@ -158,7 +159,8 @@ sort_scc(Sort * sort, int fndx, int flag)
 	 * be better traced (see trace_sort()), or analyzed for non-use.
 	 */
 	if (((init = (lmflags & LML_FLG_TRC_INIT)) == 0) &&
-	    ((unref = (lmflags & LML_FLG_TRC_UNREF)) == 0) && (dbg_mask == 0))
+	    ((unref = (lmflags & LML_FLG_TRC_UNREF)) == 0) &&
+	    (DBG_ENABLED == 0))
 		return (1);
 
 	if (init) {
@@ -168,7 +170,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 		}
 		(void) printf(tfmt, cnt);
 	}
-	DBG_CALL(Dbg_util_scc_title(flag & RT_SORT_REV));
+	DBG_CALL(Dbg_util_scc_title(lml, (flag & RT_SORT_REV)));
 
 	/*
 	 * Identify this cyclic group, and under ldd -i print the cycle in the
@@ -181,14 +183,14 @@ sort_scc(Sort * sort, int fndx, int flag)
 
 			if (init)
 				(void) printf(ffmt, NAME(lmp));
-			DBG_CALL(Dbg_util_scc_entry(ndx, NAME(lmp)));
+			DBG_CALL(Dbg_util_scc_entry(lmp, ndx));
 		}
 		cnt++;
 
-	} else if (dbg_mask) {
+	} else if (DBG_ENABLED) {
 		for (ndx = sort->s_lndx - 1; ndx >= fndx; ndx--) {
 			lmp = sort->s_lmpa[ndx];
-			DBG_CALL(Dbg_util_scc_entry(ndx, NAME(lmp)));
+			DBG_CALL(Dbg_util_scc_entry(lmp, ndx));
 		}
 	}
 
@@ -196,7 +198,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 	 * If we're looking for unused dependencies determine if any of these
 	 * cyclic components are referenced from outside of the cycle.
 	 */
-	if (unref || dbg_mask) {
+	if (unref || DBG_ENABLED) {
 		Bnd_desc **	bdpp;
 
 		for (ndx = fndx; ndx < sort->s_lndx; ndx++) {
@@ -247,7 +249,7 @@ sort_scc(Sort * sort, int fndx, int flag)
  * to sort_scc() to sort these elements.
  */
 static int
-visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
+visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 {
 	Alist		*alpp = 0;
 	int		num = sort->s_lndx;
@@ -257,7 +259,7 @@ visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
 	do {
 		tlmp = sort->s_stack[--(sort->s_sndx)];
 		SORTVAL(tlmp) = sort->s_num;
-		DBG_CALL(Dbg_util_collect(NAME(tlmp), sort->s_lndx, flag));
+		DBG_CALL(Dbg_util_collect(tlmp, sort->s_lndx, flag));
 		sort->s_lmpa[(sort->s_lndx)++] = tlmp;
 
 		if (flag & RT_SORT_REV) {
@@ -306,10 +308,10 @@ visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
 }
 
 static int
-dep_visit(Rt_map *, uint_t, Rt_map *, Lm_list *, Sort *, int);
+dep_visit(Lm_list *, Rt_map *, uint_t, Rt_map *, Sort *, int);
 
 static int
-_dep_visit(int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags, Lm_list *lml,
+_dep_visit(Lm_list *lml, int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags,
     Sort *sort, int flag)
 {
 	int	_min;
@@ -369,7 +371,7 @@ _dep_visit(int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags, Lm_list *lml,
 		/*
 		 * Inspect this new dependency.
 		 */
-		if ((_min = dep_visit(clmp, bflags, dlmp, lml,
+		if ((_min = dep_visit(lml, clmp, bflags, dlmp,
 		    sort, flag)) == -1)
 			return (-1);
 	}
@@ -381,8 +383,7 @@ _dep_visit(int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags, Lm_list *lml,
 	 * along this dependency edge.
 	 */
 	if (_min < min) {
-		DBG_CALL(Dbg_util_edge_out(NAME(clmp), SORTVAL(clmp),
-		    NAME(sort->s_stack[_min])));
+		DBG_CALL(Dbg_util_edge_out(clmp, sort->s_stack[_min]));
 		return (_min);
 	} else
 		return (min);
@@ -392,7 +393,7 @@ _dep_visit(int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags, Lm_list *lml,
  * Visit the dependencies of each object.
  */
 static int
-dep_visit(Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Lm_list *lml, Sort *sort,
+dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
     int flag)
 {
 	int 		min;
@@ -406,14 +407,14 @@ dep_visit(Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Lm_list *lml, Sort *sort,
 	if (FLAGS(lmp) & FLG_RT_INITFRST)
 		sort->s_initfirst++;
 
-	DBG_CALL(Dbg_util_edge_in(clmp, cbflags, lmp, min, flag));
+	DBG_CALL(Dbg_util_edge_in(lml, clmp, cbflags, lmp, min, flag));
 
 	/*
 	 * Traverse both explicit and implicit dependencies.
 	 */
 	for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
-		if ((min = _dep_visit(min, lmp, (*bdpp)->b_depend,
-		    (*bdpp)->b_flags, lml, sort, flag)) == -1)
+		if ((min = _dep_visit(lml, min, lmp, (*bdpp)->b_depend,
+		    (*bdpp)->b_flags, sort, flag)) == -1)
 			return (-1);
 	}
 
@@ -443,8 +444,8 @@ dep_visit(Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Lm_list *lml, Sort *sort,
 
 					if (gdp->gd_depend == lmp)
 						continue;
-					if ((min = _dep_visit(min, lmp,
-					    gdp->gd_depend, BND_FILTER, lml,
+					if ((min = _dep_visit(lml, min, lmp,
+					    gdp->gd_depend, BND_FILTER,
 					    sort, flag)) == -1)
 						return (-1);
 				}
@@ -757,11 +758,11 @@ tsort(Rt_map *lmp, int num, int flag)
 	 * tsort() list if their .init has already been called.
 	 */
 	if (lml->lm_flags & LML_FLG_OBJREEVAL)
-		_lmp = LIST(lmp)->lm_head;
+		_lmp = lml->lm_head;
 	else
 		_lmp = lmp;
 
-	DBG_CALL(Dbg_file_bindings(_lmp, flag, lml->lm_flags));
+	DBG_CALL(Dbg_file_bindings(_lmp, flag));
 	lml->lm_flags &=
 	    ~(LML_FLG_OBJREEVAL | LML_FLG_OBJADDED | LML_FLG_OBJDELETED);
 
@@ -775,7 +776,7 @@ tsort(Rt_map *lmp, int num, int flag)
 			    FLG_RT_INITCLCT)) != FLG_RT_RELOCED)
 				continue;
 
-			if (dep_visit(0, 0, _lmp, lml, &sort, flag) == -1)
+			if (dep_visit(lml, 0, 0, _lmp, &sort, flag) == -1)
 				return ((Rt_map **)S_ERROR);
 
 		} else if (!(flag & RT_SORT_DELETE) ||
@@ -789,7 +790,7 @@ tsort(Rt_map *lmp, int num, int flag)
 			    (FLG_RT_INITCLCT)))
 				continue;
 
-			if (dep_visit(0, 0, _lmp, lml, &sort, flag) == -1)
+			if (dep_visit(lml, 0, 0, _lmp, &sort, flag) == -1)
 				return ((Rt_map **)S_ERROR);
 		}
 	}
@@ -864,6 +865,6 @@ tsort(Rt_map *lmp, int num, int flag)
 	 * The caller is responsible for freeing the sorted link-map list once
 	 * the associated .init/.fini's have been fired.
 	 */
-	DBG_CALL(Dbg_util_nl());
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 	return (sort.s_lmpa);
 }

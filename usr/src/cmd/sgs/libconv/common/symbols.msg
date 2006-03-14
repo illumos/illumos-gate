@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +17,13 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Message file for cmd/sgs/libconv/common/symbols.c
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ MSG_STT_NOTYPE	"NOTY"
 @ MSG_STT_OBJECT	"OBJT"
@@ -43,13 +42,10 @@
 @ MSG_SHN_SUNW_IGNORE	"IGNORE"
 @ MSG_SHN_ABS		"ABS"
 @ MSG_SHN_COMMON	"COMMON"
-@ MSG_SHN_X86_64_LCOMMON	"LCOMMON"
+@ MSG_SHN_AMD64_LCOMMON	"LCOMMON"
 @ MSG_SHN_AFTER		"AFTER"
 @ MSG_SHN_BEFORE	"BEFORE"
 @ MSG_SHN_XINDEX	"XINDEX"
 
-@ MSG_FMT_VAL		"0x%8.8llx"
-@ MSG_FMT_VAL_64	"0x%12.12llx"
-
-@ MSG_DEM_SYM		"cplus_demangle"
-@ MSG_DEM_LIB		"libdemangle.so.1"
+@ MSG_SYM_FMT_VAL_32	"0x%8.8llx"
+@ MSG_SYM_FMT_VAL_64	"0x%16.16llx"

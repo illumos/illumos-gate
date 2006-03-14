@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,49 +18,40 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG=		ld
+PROG =		ld
 
 include 	$(SRC)/cmd/Makefile.cmd
 include 	$(SRC)/cmd/sgs/Makefile.com
 
-COMOBJS=	ld.o
-BLTOBJ=		msg.o
+COMOBJS =	ld.o
+BLTOBJ =	msg.o
 
-OBJS =		$(BLTOBJ) $(MACHOBJS) $(COMOBJS)
+OBJS =		$(BLTOBJ) $(COMOBJS)
 .PARALLEL:	$(OBJS)
 
-MAPFILE=	../common/mapfile-vers
+MAPFILE =	../common/mapfile-vers
 
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#   dlopen/dlclose requires libdl.so.1 prior to 5.10
-# 
-DLLIB =		$(VAR_DL_LIB)
-package	:=	DLLIB = $(VAR_PKG_DL_LIB)
+LDFLAGS +=	$(VERSREF) $(LAZYLOAD) $(BDIRECT) $(USE_PROTO) -M$(MAPFILE) \
+		    $(VAR_LD_LLDFLAGS)
+LDLIBS +=	$(LDLIBDIR) $(LD_LIB) $(ELFLIBDIR) -lelf \
+		    $(LDDBGLIBDIR) $(LDDBG_LIB) $(CONVLIBDIR) $(CONV_LIB)
 
-LLDFLAGS =	$(VAR_LD_LLDFLAGS)
-LLDFLAGS64 =	$(VAR_LD_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) $(LAZYLOAD) $(BDIRECT) \
-			$(USE_PROTO) -M$(MAPFILE)
-LLDLIBS=	-lelf $(DLLIB) $(CONVLIBDIR) -lconv
-LLDLIBS64=	-lelf $(DLLIB) $(CONVLIBDIR64) -lconv
-
-LDFLAGS +=	$(LLDFLAGS)
-LDLIBS +=	$(LLDLIBS)
 LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
+LINTFLAGS64 +=	-x $(VAR_LINTFLAGS64)
+
 CLEANFILES +=	$(LINTOUTS)
 
 native :=	LDFLAGS = -R$(SGSPROTO) $(ZNOVERSION)
-native :=	LLDLIBS = -L$(SGSPROTO) -lelf -ldl $(CONVLIBDIR) \
-			-lconv $(VAR_LD_NATIVE_LLDLIBS)
+native :=	LDLIBS = -L$(SGSPROTO) $(LD_LIB) -lelf $(CONVLIBDIR) \
+		    $(CONV_LIB) $(VAR_LD_NATIVE_LLDLIBS)
 
 BLTDEFS=	msg.h
 BLTDATA=	msg.c

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -144,6 +143,8 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 
 	while ((elf = elf_begin(fd, cmd, arf)) != 0) {
 		if (ar_file) /* get header info */ {
+			size_t	len;
+
 			if ((mem_header = elf_getarhdr(elf)) == NULL) {
 				error_message(GETARHDR_ERROR,
 				LIBelf_ERROR, elf_errmsg(-1),
@@ -157,15 +158,18 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 
 			if (cur_filenm != NULL)
 				free(cur_filenm);
-			if ((cur_filenm = malloc((strlen(cur_file) + 3 +
-			    strlen(mem_header->ar_name)))) == NULL) {
+
+			len = (strlen(cur_file) + 3 +
+			    strlen(mem_header->ar_name));
+
+			if ((cur_filenm = malloc(len)) == NULL) {
 				error_message(MALLOC_ERROR,
 				PLAIN_ERROR, (char *)0,
 				prog);
 				mcs_exit(FAILURE);
 			}
 
-			(void) sprintf(cur_filenm, "%s[%s]",
+			(void) snprintf(cur_filenm, len, "%s[%s]",
 				cur_file, mem_header->ar_name);
 		}
 
@@ -1550,7 +1554,8 @@ post_process(Cmd_Info *cmd_info)
 			grpcnt = 0;
 			grpdata = (Word *)(sinfo->data->d_buf);
 			for (i = 1; i < num; i++) {
-				if (sec_table[grpdata[i]].secno != DELETED)
+				if (sec_table[grpdata[i]].secno !=
+				    (GElf_Word)DELETED)
 					grpcnt++;
 			}
 
@@ -1618,7 +1623,7 @@ post_process(Cmd_Info *cmd_info)
 		ngrpdata[0] = grpdata[0];
 		j = 1;
 		for (i = 1; i < num; i++) {
-			if (sec_table[grpdata[i]].secno != -1) {
+			if (sec_table[grpdata[i]].secno != (GElf_Word)DELETED) {
 				ngrpdata[j++] = sec_table[grpdata[i]].secno;
 			}
 		}

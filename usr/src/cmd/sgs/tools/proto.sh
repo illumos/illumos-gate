@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -150,6 +150,7 @@ do
 	fi
 done
 
+SYSLIB=$CODEMGR_WS/proto/root_$MACH/lib
 USRLIB=$CODEMGR_WS/proto/root_$MACH/usr/lib
 
 if [ ! -h $USRLIB/ld.so.1 ]; then
@@ -162,24 +163,26 @@ fi
 # In addition create some 64 symlinks so that dependencies referenced
 # from our test environment will map back to the appropriate libraries.
 #
-if [ $MACH = "sparc" ] ; then
-	if [ ! -h $USRLIB/64 ] ; then
-		rm -f $USRLIB/64
-		ln -s sparcv9 $USRLIB/64
-		echo "$USRLIB/64 -> $USRLIB/sparcv9"
-	fi
-	if [ ! -h $USRLIB/link_audit/64 ] ; then
-		rm -f $USRLIB/link_audit/64
-		ln -s sparcv9 $USRLIB/link_audit/64
-		echo "$USRLIB/link_audit/64 -> $USRLIB/link_audit/sparcv9"
-	fi
-	if [ ! -h $USRLIB/64/ld.so.1 ]; then
-		rm -f $USRLIB/64/ld.so.1
-		ln -s ../../lib/64/ld.so.1 $USRLIB/64/ld.so.1
-		echo "$USRLIB/64/ld.so.1 -> ../../../lib/64/ld.so.1"
-	fi
+if [ ! -h $SYSLIB/64 ] ; then
+	rm -f $SYSLIB/64
+	ln -s $MACH64 $SYSLIB/64
+	echo "$SYSLIB/64 -> $SYSLIB/$MACH64"
 fi
-
+if [ ! -h $USRLIB/64 ] ; then
+	rm -f $USRLIB/64
+	ln -s $MACH64 $USRLIB/64
+	echo "$USRLIB/64 -> $USRLIB/$MACH64"
+fi
+if [ ! -h $USRLIB/link_audit/64 ] ; then
+	rm -f $USRLIB/link_audit/64
+	ln -s $MACH64 $USRLIB/link_audit/64
+	echo "$USRLIB/link_audit/64 -> $USRLIB/link_audit/$MACH64"
+fi
+if [ ! -h $USRLIB/64/ld.so.1 ]; then
+	rm -f $USRLIB/64/ld.so.1
+	ln -s ../../../lib/64/ld.so.1 $USRLIB/64/ld.so.1
+	echo "$USRLIB/64/ld.so.1 -> ../../../lib/64/ld.so.1"
+fi
 
 #
 #

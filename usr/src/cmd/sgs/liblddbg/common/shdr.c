@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,48 +18,28 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2000 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	"msg.h"
-#include	"_debug.h"
-
-
-#if !(defined(_ELF64) && defined(lint))
-
-
-/*
- * Print out a single `section header' entry.
- */
-void
-Elf_shdr_entry(Half mach, Elf32_Shdr * shdr)
-{
-	dbg_print(MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
-	    conv_secflg_str(mach, shdr->sh_flags));
-	dbg_print(MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
-	    conv_sectyp_str(mach, shdr->sh_type));
-	dbg_print(MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr->sh_offset),
-	    EC_XWORD(shdr->sh_entsize));
-	dbg_print(MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr->sh_link),
-	    conv_secinfo_str(shdr->sh_info, shdr->sh_flags));
-	dbg_print(MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr->sh_addralign));
-}
+#include	<sgs.h>
+#include	<_debug.h>
+#include	<conv.h>
+#include	<msg.h>
 
 void
-Gelf_shdr_entry(Half mach, GElf_Shdr * shdr)
+Elf_shdr(Lm_list *lml, Half mach, Shdr * shdr)
 {
-	dbg_print(MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
-	    conv_secflg_str(mach, (Word)shdr->sh_flags));
-	dbg_print(MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
-	    conv_sectyp_str(mach, shdr->sh_type));
-	dbg_print(MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr->sh_offset),
+	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
+	    conv_sec_flags(shdr->sh_flags));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
+	    conv_sec_type(mach, shdr->sh_type));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr->sh_offset),
 	    EC_XWORD(shdr->sh_entsize));
-	dbg_print(MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr->sh_link),
-	    conv_secinfo_str(shdr->sh_info, (Word)shdr->sh_flags));
-	dbg_print(MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr->sh_addralign));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr->sh_link),
+	    conv_sec_info(shdr->sh_info, shdr->sh_flags));
+	dbg_print(lml, MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr->sh_addralign));
 }
-
-#endif /* !(defined(_ELF64) && defined(lint)) */

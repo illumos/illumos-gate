@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,36 +18,40 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * String conversion routine for Elf data buffer types.
  */
-#include	<stdio.h>
 #include	"_conv.h"
 #include	"data_msg.h"
 
-static const Msg types[] = {
-	MSG_DATA_BYTE,		MSG_DATA_ADDR,		MSG_DATA_DYN,
-	MSG_DATA_EHDR,		MSG_DATA_HALF,		MSG_DATA_OFF,
-	MSG_DATA_PHDR,		MSG_DATA_RELA,		MSG_DATA_REL,
-	MSG_DATA_SHDR,		MSG_DATA_SWORD,		MSG_DATA_SYM,
-	MSG_DATA_WORD,		MSG_DATA_VDEF,		MSG_DATA_VNEED,
-	MSG_DATA_SXWORD,	MSG_DATA_XWORD,		MSG_DATA_SYMINFO,
-	MSG_DATA_NOTE,		MSG_DATA_MOVE,		MSG_DATA_MOVEP
-};
-
 const char *
-conv_d_type_str(Elf_Type type)
+conv_elfdata_type(Elf_Type type)
 {
-	static char	string[STRSIZE] = { '\0' };
+	static char		string[CONV_INV_STRSIZE];
+	static const Msg	types[] = {
+		MSG_DATA_BYTE,		MSG_DATA_ADDR,
+		MSG_DATA_DYN,		MSG_DATA_EHDR,
+		MSG_DATA_HALF,		MSG_DATA_OFF,
+		MSG_DATA_PHDR,		MSG_DATA_RELA,
+		MSG_DATA_REL,		MSG_DATA_SHDR,
+		MSG_DATA_SWORD,		MSG_DATA_SYM,
+		MSG_DATA_WORD,		MSG_DATA_VDEF,
+		MSG_DATA_VNEED,		MSG_DATA_SXWORD,
+		MSG_DATA_XWORD,		MSG_DATA_SYMINFO,
+		MSG_DATA_NOTE,		MSG_DATA_MOVE,
+		MSG_DATA_MOVEP,		MSG_DATA_CAP
+	};
 
 	if (type >= ELF_T_NUM)
-		return (conv_invalid_str(string, STRSIZE, type, 0));
+		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
 	else
 		return (MSG_ORIG(types[type]));
 }

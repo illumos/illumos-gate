@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,15 +29,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/elf_SPARC.h>
-#ifndef	_ASM
-#include <sys/elf.h>
-#include <sys/link.h>	/* for Elf*_Dyn */
-#endif	/* _ASM */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sys/elf_SPARC.h>
+#ifndef	_ASM
+#include <sys/types.h>
+#include <sys/elf.h>
+#include <sys/link.h>	/* for Elf*_Dyn */
+#endif	/* _ASM */
 
 /*
  * Make machine class dependent data types transparent to the common code
@@ -53,7 +54,7 @@ typedef	Elf64_Sword	Sword;
 typedef	Elf64_Half	Half;
 typedef	Elf64_Addr	Addr;
 typedef	Elf64_Off	Off;
-typedef	unsigned char	Byte;
+typedef	uchar_t		Byte;
 #endif	/* _ASM */
 
 #if defined(_KERNEL)
@@ -87,7 +88,7 @@ typedef	Elf64_Move	Move;
 typedef	Elf64_Cap	Cap;
 #endif	/* _ASM */
 
-#else  /* _ILP32 */
+#else	/* _ILP32 */
 
 #ifndef	_ASM
 typedef	Elf32_Word	Xword;	/* Xword/Sxword are 32-bits in Elf32 */
@@ -98,7 +99,7 @@ typedef	Elf32_Sword	Sword;
 typedef	Elf32_Half	Half;
 typedef	Elf32_Addr	Addr;
 typedef	Elf32_Off	Off;
-typedef	unsigned char	Byte;
+typedef	uchar_t		Byte;
 #endif	/* _ASM */
 
 #if defined(_KERNEL)
@@ -132,35 +133,41 @@ typedef	Elf32_Move	Move;
 typedef	Elf32_Cap	Cap;
 #endif	/* _ASM */
 
-#endif /* _ILP32 */
-
-
+#endif	/* _ILP32 */
 
 /*
- *  Elf `printf' type-cast macros.  These force arguements to
- *  be a fixed size so that Elf32 and Elf64 can share common
- *  format strings.
+ * Elf `printf' type-cast macros.  These force arguments to be a fixed size
+ * so that Elf32 and Elf64 can share common format strings.
  */
 #ifndef	__lint
-#define	EC_ADDR(a)	((Elf64_Addr)(uintptr_t)(a))	/* "ull" */
-#define	EC_OFF(a)	((Elf64_Off)(a))	/* "ll"  */
-#define	EC_HALF(a)	((Elf64_Half)(a))	/* "d"   */
-#define	EC_WORD(a)	((Elf64_Word)(a))	/* "u"   */
-#define	EC_SWORD(a)	((Elf64_Sword)(a))	/* "d"   */
-#define	EC_XWORD(a)	((Elf64_Xword)(a))	/* "ull" */
-#define	EC_SXWORD(a)	((Elf64_Sxword)(a))	/* "ll"  */
-#define	EC_LWORD(a)	((Elf64_Lword)(a))	/* "ull" */
-#else
-#define	EC_ADDR(a)	((unsigned long long)(a))
-#define	EC_OFF(a)	((unsigned long long)(a))
-#define	EC_HALF(a)	((Elf64_Half)(a))
-#define	EC_WORD(a)	((Elf64_Word)(a))
-#define	EC_SWORD(a)	((Elf64_Sword)(a))
-#define	EC_XWORD(a)	((unsigned long long)(a))
-#define	EC_SXWORD(a)	((long long)(a))
-#define	EC_LWORD(a)	((unsigned long long)(a))
-#endif
+#define	EC_ADDR(a)	((Elf64_Addr)(a))		/* "ull" */
+#define	EC_OFF(a)	((Elf64_Off)(a))		/* "ull"  */
+#define	EC_HALF(a)	((Elf64_Half)(a))		/* "d"   */
+#define	EC_WORD(a)	((Elf64_Word)(a))		/* "u"   */
+#define	EC_SWORD(a)	((Elf64_Sword)(a))		/* "d"   */
+#define	EC_XWORD(a)	((Elf64_Xword)(a))		/* "ull" */
+#define	EC_SXWORD(a)	((Elf64_Sxword)(a))		/* "ll"  */
+#define	EC_LWORD(a)	((Elf64_Lword)(a))		/* "ull" */
 
+/*
+ * A native pointer is special.  Although it can be convenient to display
+ * these from a common format (ull), compilers may flag the cast of a pointer
+ * to an integer as illegal.  Casting these pointers to the native pointer
+ * size, suppresses any compiler errors.
+ */
+#define	EC_NATPTR(a)	((Elf64_Xword)(uintptr_t)(a))	/* "ull" */
+#else
+#define	EC_ADDR(a)	((u_longlong_t)(a))
+#define	EC_OFF(a)	((u_longlong_t)(a))
+#define	EC_HALF(a)	((ushort_t)(a))
+#define	EC_WORD(a)	((uint_t)(a))
+#define	EC_SWORD(a)	((int)(a))
+#define	EC_XWORD(a)	((u_longlong_t)(a))
+#define	EC_SXWORD(a)	((longlong_t)(a))
+#define	EC_LWORD(a)	((u_longlong_t)(a))
+
+#define	EC_NATPTR(a)	((u_longlong_t)(a))
+#endif
 
 #ifndef	_ASM
 /*
@@ -169,12 +176,12 @@ typedef	Elf32_Cap	Cap;
 typedef struct {
 	Xword		re_mask;	/* mask to apply to reloc */
 	Word		re_flags;	/* relocation attributes */
-	unsigned char	re_fsize;	/* field size (in # bytes) */
-	unsigned char	re_bshift;	/* # of bits to shift */
-	unsigned char	re_sigbits;	/* # of significant bits */
+	uchar_t		re_fsize;	/* field size (in bytes) */
+	uchar_t		re_bshift;	/* number of bits to shift */
+	uchar_t		re_sigbits;	/* number of significant bits */
 } Rel_entry;
 
-#endif
+#endif	/* _ASM */
 
 #ifdef	__cplusplus
 }

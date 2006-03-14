@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# cmd/sgs/packages/Makefile
 
 include		$(SRC)/Makefile.master
 include		$(SRC)/cmd/sgs/Makefile.var
@@ -135,9 +134,6 @@ package_dep_:	FRC
 			$(ROOT)/usr/include/rtld_db.h \
 			$(ROOT)/usr/include/link.h
 		@ cd $(SRC)/lib/libproc; pwd; $(MAKE) install_h
-$(VAR_SPEC_ON)	@ cd $(SRC)/head; pwd;	$(MAKE) \
-$(VAR_SPEC_ON)		$(ROOT)/usr/include/apptrace.h \
-$(VAR_SPEC_ON)		$(ROOT)/usr/include/apptrace_impl.h
 		@ cd $(SRC)/uts/common/sys; pwd; $(MAKE) \
 			$(ROOT)/usr/include/sys/elf.h \
 			$(ROOT)/usr/include/sys/elf_386.h \
@@ -152,9 +148,8 @@ $(VAR_SPEC_ON)		$(ROOT)/usr/include/apptrace_impl.h
 			$(ROOT)/usr/include/sys/link.h \
 			$(ROOT)/usr/include/sys/note.h \
 			$(ROOT)/usr/include/sys/systeminfo.h
-$(VAR_SPEC_ON)	@ cd $(SRC)/uts/$(M32)/sys; pwd; $(MAKE) \
+		@ cd $(SRC)/uts/$(M32)/sys; pwd; $(MAKE) \
 			$(ROOT)/usr/include/sys/machelf.h
-$(VAR_SPEC_ON)	@ cd $(SRC)/lib/abi; pwd; $(MAKE) spec
 		@ cd ../tools/$(MACH); pwd; $(MAKE) sgsmsg piglatin
 		@ cd ..; pwd; $(MAKE) _msg_sgsmsg
 		@ cd ..; pwd; $(MAKE) native-add

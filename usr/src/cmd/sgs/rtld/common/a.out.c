@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,9 @@
  */
 #include	"_synonyms.h"
 
+#include	<a.out.h>		/* Explicitly override M_SEGSIZE */
+#include	<machdep.h>		/*	used in M_SROUND */
+
 #include	<sys/mman.h>
 #include	<unistd.h>
 #include	<string.h>
@@ -37,11 +40,11 @@
 #include	<stdio.h>
 #include	<dlfcn.h>
 #include	<errno.h>
+#include	<debug.h>
 #include	"_a.out.h"
 #include	"cache_a.out.h"
 #include	"msg.h"
 #include	"_rtld.h"
-#include	"debug.h"
 
 /*
  * Default and secure dependency search paths.
@@ -111,7 +114,7 @@ Fct aout_fct = {
  * filename.
  */
 static Pnode *
-aout_fix_name(const char *name)
+aout_fix_name(const char *name, Rt_map *clmp)
 {
 	size_t	len;
 	Pnode	*pnp;
@@ -137,7 +140,7 @@ aout_fix_name(const char *name)
 	if (pnp->p_name) {
 		pnp->p_len = len;
 		pnp->p_orig = PN_SER_NEEDED;
-		DBG_CALL(Dbg_file_fixname(pnp->p_name, name));
+		DBG_CALL(Dbg_file_fixname(LIST(clmp), pnp->p_name, name));
 		return (pnp);
 	}
 	free(pnp);
@@ -232,7 +235,7 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 			    name, ((Lnk_obj *)(need))->lo_major,
 			    ((Lnk_obj *)(need))->lo_minor);
 
-			DBG_CALL(Dbg_libs_find(file));
+			DBG_CALL(Dbg_libs_find(lml, file));
 
 			/*
 			 * We need to determine what filename will match the
@@ -258,9 +261,9 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 						break;
 				}
 				if (!path) {
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_SYS_OPEN), file,
-						strerror(ENOENT));
+					    strerror(ENOENT));
 					return (0);
 				}
 				name = path;
@@ -274,10 +277,11 @@ aout_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 			 * it must be fixed to specify the current working
 			 * directory (ie. libc.so.1.2 -> ./libc.so.1.2).
 			 */
-			if ((pnp = aout_fix_name(name)) == 0)
+			if ((pnp = aout_fix_name(name, clmp)) == 0)
 				return (0);
 		}
-		DBG_CALL(Dbg_file_needed(name, NAME(clmp)));
+
+		DBG_CALL(Dbg_file_needed(clmp, name));
 
 		nlmp = load_one(lml, lmco, pnp, clmp, MODE(clmp), 0, 0);
 		remove_pnode(pnp);
@@ -442,7 +446,7 @@ aout_lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	char	name[PATH_MAX];
 	Slookup	sl = *slp;
 
-	DBG_CALL(Dbg_syms_lookup_aout(slp->sl_name));
+	DBG_CALL(Dbg_syms_lookup_aout(LIST(slp->sl_imap), slp->sl_name));
 
 	if (*sl.sl_name == '_')
 		++sl.sl_name;
@@ -471,7 +475,7 @@ aout_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	Rt_map		*ilmp = slp->sl_imap;
 	struct nlist	*sp;
 
-	DBG_CALL(Dbg_syms_lookup(name, NAME(ilmp), MSG_ORIG(MSG_STR_AOUT)));
+	DBG_CALL(Dbg_syms_lookup(ilmp, name, MSG_ORIG(MSG_STR_AOUT)));
 
 	if (sp = aout_findsb(name, ilmp, slp->sl_flags)) {
 		if (sp->n_value != 0) {
@@ -520,7 +524,7 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	if ((addr = mmap(0, size, (PROT_READ | PROT_EXEC), MAP_PRIVATE,
 	    fd, 0)) == MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 		    strerror(err));
 		return (0);
 	}
@@ -549,7 +553,7 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	    (int)exec->a_data, (PROT_READ | PROT_WRITE | PROT_EXEC),
 	    (MAP_FIXED | MAP_PRIVATE), fd, (off_t)exec->a_text) == MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 		    strerror(err));
 		return (0);
 	}
@@ -558,7 +562,7 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * Allocate pages for the object's bss, if necessary.
 	 */
 	if (exec->a_bss != 0) {
-		if (dz_map(addr + M_SROUND(exec->a_text) + exec->a_data,
+		if (dz_map(lml, addr + M_SROUND(exec->a_text) + exec->a_data,
 		    (int)exec->a_bss, PROT_READ | PROT_WRITE | PROT_EXEC,
 		    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
 			goto error;
@@ -592,8 +596,8 @@ aout_new_lm(Lm_list *lml, const char *pname, const char *oname,
 	Rt_map	*lmp;
 	caddr_t offset;
 
-	DBG_CALL(Dbg_file_aout(pname, (ulong_t)ld, (ulong_t)addr,
-	    (ulong_t)size));
+	DBG_CALL(Dbg_file_aout(lml, pname, (ulong_t)ld, (ulong_t)addr,
+	    (ulong_t)size, lml->lm_lmidstr, lmco));
 
 	/*
 	 * Allocate space for the link-map and private a.out information.  Once
@@ -700,22 +704,22 @@ aout_new_lm(Lm_list *lml, const char *pname, const char *oname,
  * on the value of the argument.
  */
 int
-aout_set_prot(Rt_map *lm, int permission)
+aout_set_prot(Rt_map *lmp, int permission)
 {
 	int		prot;		/* protection setting */
 	caddr_t		et;		/* cached _etext of object */
 	size_t		size;		/* size of text segment */
 
-	DBG_CALL(Dbg_file_prot(NAME(lm), permission));
+	DBG_CALL(Dbg_file_prot(lmp, permission));
 
-	et = (caddr_t)ETEXT(lm);
-	size = M_PROUND((ulong_t)(et - TEXTBASE(lm)));
+	et = (caddr_t)ETEXT(lmp);
+	size = M_PROUND((ulong_t)(et - TEXTBASE(lmp)));
 	prot = PROT_READ | PROT_EXEC | permission;
-	if (mprotect((caddr_t)TEXTBASE(lm), size, prot) == -1) {
+	if (mprotect((caddr_t)TEXTBASE(lmp), size, prot) == -1) {
 		int	err = errno;
 
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MPROT), NAME(lm),
-		    strerror(err));
+		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_SYS_MPROT),
+		    NAME(lmp), strerror(err));
 		return (0);
 	}
 	return (1);

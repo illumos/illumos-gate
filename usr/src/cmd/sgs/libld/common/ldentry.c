@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +53,7 @@ sym_muldef_title()
 }
 
 void
-ldmap_out(Ofl_desc * ofl)
+ld_map_out(Ofl_desc * ofl)
 {
 	Listnode *	lnp1, * lnp2, * lnp3;
 	Os_desc *	osp;
@@ -168,8 +167,8 @@ ldmap_out(Ofl_desc * ofl)
 			sym_muldef_title();
 
 		ducp = sdp->sd_file->ifl_name;
-		(void) printf(MSG_INTL(MSG_ENT_MUL_ENTRY_1),
-		    demangle(name), ducp);
+		(void) printf(MSG_INTL(MSG_ENT_MUL_ENTRY_1), demangle(name),
+		    ducp);
 		for (LIST_TRAVERSE(dfiles, lnp2, adcp)) {
 			/*
 			 * Ignore the referenced symbol.
@@ -185,7 +184,7 @@ ldmap_out(Ofl_desc * ofl)
  * been met and print error message.  (only in the case of reordering)
  */
 void
-ent_check(Ofl_desc * ofl)
+ld_ent_check(Ofl_desc * ofl)
 {
 	Listnode *	lnp;
 	Ent_desc *	enp;
@@ -204,11 +203,13 @@ ent_check(Ofl_desc * ofl)
 
 			if ((_lnp != NULL) && (_lnp->data != NULL) &&
 			    (char *)(_lnp->data) != NULL) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_ENT_NOSEC_1),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_ENT_NOSEC_1),
 				    enp->ec_segment->sg_name, enp->ec_name,
 				    (const char *)(_lnp->data));
 			} else {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_ENT_NOSEC_2),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_ENT_NOSEC_2),
 				    enp->ec_segment->sg_name, enp->ec_name);
 			}
 		}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"   /* SVR4 6.2/18.2 */
 
@@ -33,7 +32,7 @@
  * Symbol table resolution
  */
 #include	<stdio.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -72,7 +71,7 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	if (mach_sym_typecheck(sdp, nsym, ifl, ofl))
+	if (ld_mach_sym_typecheck(sdp, nsym, ifl, ofl))
 		return;
 
 	/*
@@ -100,11 +99,12 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	if ((otype == ntype) || (otype == STT_NOTYPE) || (ntype == STT_NOTYPE))
 		return;
 
-	eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
+	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
 	    demangle(sdp->sd_name));
-	eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES), sdp->sd_file->ifl_name,
-	    conv_info_type_str(ofl->ofl_e_machine, otype), ifl->ifl_name,
-	    conv_info_type_str(ofl->ofl_e_machine, ntype));
+	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
+	    sdp->sd_file->ifl_name,
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype), ifl->ifl_name,
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype));
 }
 
 /*ARGSUSED4*/
@@ -115,7 +115,7 @@ sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	(void) mach_sym_typecheck(sdp, nsym, ifl, ofl);
+	(void) ld_mach_sym_typecheck(sdp, nsym, ifl, ofl);
 }
 
 /*
@@ -326,8 +326,9 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if (((nsymflags & FLG_SY_SPECSEC) == 0) && (nshndx != SHN_UNDEF))
 		if ((sdp->sd_isc = ifl->ifl_isdesc[nshndx]) == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_NOSECDEF),
-			    demangle(sdp->sd_name), ifl->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_NOSECDEF), demangle(sdp->sd_name),
+			    ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 }
@@ -383,13 +384,13 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if ((ofile == ET_REL) && (nfile == ET_REL) && (obind != STB_WEAK) &&
 	    (nbind != STB_WEAK) && (!(ofl->ofl_flags & FLG_OF_MULDEFS))) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_MULDEF),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_MULDEF),
 		    demangle(sdp->sd_name));
-		eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_info_type_str(ofl->ofl_e_machine, otype),
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
 		    ifl->ifl_name,
-		    conv_info_type_str(ofl->ofl_e_machine, ntype));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return;
 	}
@@ -397,27 +398,28 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Perform any machine specific type checking.
 	 */
-	if (mach_sym_typecheck(sdp, nsym, ifl, ofl))
+	if (ld_mach_sym_typecheck(sdp, nsym, ifl, ofl))
 		return;
 
 	/*
 	 * Check the symbols type and size.
 	 */
 	if (otype != ntype) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
 		    demangle(sdp->sd_name));
-		eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_info_type_str(ofl->ofl_e_machine, otype),
-		    ifl->ifl_name, conv_info_type_str(ofl->ofl_e_machine,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
 		    ntype));
 		warn++;
 	} else if ((otype == STT_OBJECT) && (osym->st_size != nsym->st_size)) {
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN)) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFATTR),
-			    demangle(sdp->sd_name), MSG_INTL(MSG_STR_SIZES),
-			    sdp->sd_file->ifl_name, EC_XWORD(osym->st_size),
-			    ifl->ifl_name, EC_XWORD(nsym->st_size));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SYM_DIFFATTR), demangle(sdp->sd_name),
+			    MSG_INTL(MSG_STR_SIZES), sdp->sd_file->ifl_name,
+			    EC_XWORD(osym->st_size), ifl->ifl_name,
+			    EC_XWORD(nsym->st_size));
 			warn++;
 		}
 	}
@@ -440,20 +442,20 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if ((sdp->sd_flags & FLG_SY_SOFOUND) && (nfile == ET_DYN)) {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    sdp->sd_file->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
 		return;
 	} else if ((nfile == ET_REL) && ((ofile == ET_DYN) ||
 	    ((obind == STB_WEAK) && (nbind != STB_WEAK)))) {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    ifl->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), ifl->ifl_name);
 		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	} else {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    sdp->sd_file->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
 		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	}
@@ -494,19 +496,19 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	if ((ofile == ET_REL) && (nfile == ET_REL) && (obind == nbind) &&
 	    ((otype == STT_FUNC) || (ntype == STT_FUNC))) {
 		if (ofl->ofl_flags & FLG_OF_MULDEFS) {
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
-			    demangle(sdp->sd_name));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SYM_DIFFTYPE), demangle(sdp->sd_name));
 			sym_promote(sdp, nsym, ifl, ofl, ndx,
 				nshndx, nsymflags);
 		} else {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_MULDEF),
-			    demangle(sdp->sd_name));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_MULDEF), demangle(sdp->sd_name));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
-		eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_info_type_str(ofl->ofl_e_machine, otype),
-		    ifl->ifl_name, conv_info_type_str(ofl->ofl_e_machine,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
 		    ntype));
 		return;
 	} else if (ofile != nfile) {
@@ -541,12 +543,12 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * Check the symbols type and size.
 	 */
 	if (otype != ntype) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SYM_DIFFTYPE),
 		    demangle(sdp->sd_name));
-		eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
+		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_info_type_str(ofl->ofl_e_machine, otype),
-		    ifl->ifl_name, conv_info_type_str(ofl->ofl_e_machine,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
 		    ntype));
 		warn++;
 	} else if (osym->st_size != nsym->st_size) {
@@ -561,15 +563,18 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    (obind == nbind)) &&
 		    ((otent && (osym->st_size > nsym->st_size)) ||
 		    (ntent && (osym->st_size < nsym->st_size)))) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_DIFFATTR),
-			    demangle(sdp->sd_name), MSG_INTL(MSG_STR_SIZES),
-			    sdp->sd_file->ifl_name, EC_XWORD(osym->st_size),
-			    ifl->ifl_name, EC_XWORD(nsym->st_size));
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_TENTERR));
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_DIFFATTR), demangle(sdp->sd_name),
+			    MSG_INTL(MSG_STR_SIZES), sdp->sd_file->ifl_name,
+			    EC_XWORD(osym->st_size), ifl->ifl_name,
+			    EC_XWORD(nsym->st_size));
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_TENTERR));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		} else {
 			if (!(ofl->ofl_flags & FLG_OF_NOWARN)) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFATTR),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_SYM_DIFFATTR),
 				    demangle(sdp->sd_name),
 				    MSG_INTL(MSG_STR_SIZES),
 				    sdp->sd_file->ifl_name,
@@ -614,22 +619,22 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 	if ((sdp->sd_flags & FLG_SY_SOFOUND) && (nfile == ET_DYN)) {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    sdp->sd_file->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
 		return;
 	}
 
 	if (((otent) && (!((obind != STB_WEAK) && (nbind == STB_WEAK)))) ||
 	    ((obind == STB_WEAK) && (nbind != STB_WEAK))) {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    ifl->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), ifl->ifl_name);
 		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	} else {
 		if (warn)
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_DEFTAKEN),
-			    sdp->sd_file->ifl_name);
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
 		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	}
@@ -716,8 +721,8 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			alignscompliment = 0;
 
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN) && !alignscompliment)
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFATTR),
-			    demangle(sdp->sd_name),
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SYM_DIFFATTR), demangle(sdp->sd_name),
 			    MSG_INTL(MSG_STR_ALIGNMENTS),
 			    sdp->sd_file->ifl_name, EC_XWORD(osym->st_value),
 			    ifl->ifl_name, EC_XWORD(nsym->st_value));
@@ -742,7 +747,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			value = balign;
 		}
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN) && !alignscompliment)
-			eprintf(ERR_NONE, emsg, file);
+			eprintf(ofl->ofl_lml, ERR_NONE, emsg, file);
 	}
 
 	/*
@@ -753,10 +758,11 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		const char	*file;
 
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN))
-			eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_DIFFATTR),
-			    demangle(sdp->sd_name), MSG_INTL(MSG_STR_SIZES),
-			    sdp->sd_file->ifl_name, EC_XWORD(osym->st_size),
-			    ifl->ifl_name, EC_XWORD(nsym->st_size));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_SYM_DIFFATTR), demangle(sdp->sd_name),
+			    MSG_INTL(MSG_STR_SIZES), sdp->sd_file->ifl_name,
+			    EC_XWORD(osym->st_size), ifl->ifl_name,
+			    EC_XWORD(nsym->st_size));
 
 
 		/*
@@ -765,7 +771,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 */
 		if ((sdp->sd_flags & FLG_SY_SOFOUND) && (nfile == ET_DYN)) {
 			if (!(ofl->ofl_flags & FLG_OF_NOWARN))
-				eprintf(ERR_NONE, emsg,
+				eprintf(ofl->ofl_lml, ERR_NONE, emsg,
 				    sdp->sd_file->ifl_name);
 			return;
 		}
@@ -814,7 +820,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 				file = sdp->sd_file->ifl_name;
 		}
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN))
-			eprintf(ERR_NONE, emsg, file);
+			eprintf(ofl->ofl_lml, ERR_NONE, emsg, file);
 		if (size)
 			sdp->sd_sym->st_size = (Xword)size;
 	} else {
@@ -884,8 +890,8 @@ static void (*Action[REF_NUM * SYM_NUM * 2][SYM_NUM])(Sym_desc *,
 };
 
 uintptr_t
-sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
-	Word nshndx, Word nsymflags)
+ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
+    Word nshndx, Word nsymflags)
 {
 	int		row, column;		/* State table coordinates */
 	Sym		*osym = sdp->sd_sym;
@@ -953,8 +959,8 @@ sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 		}
 	}
 
-	DBG_CALL(Dbg_syms_resolving1(ndx, sdp->sd_name, row, column));
-	DBG_CALL(Dbg_syms_resolving2(ifl->ifl_ehdr, osym, nsym, sdp, ifl));
+	DBG_CALL(Dbg_syms_resolving(ofl, ndx, sdp->sd_name, row, column,
+	    osym, nsym, sdp, ifl));
 
 	/*
 	 * Record the input filename on the defined files list for possible
@@ -980,7 +986,7 @@ sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 */
 	if ((sdp->sd_file == ifl) && (nfile == ET_REL) && (ifl->ifl_versym) &&
 	    (nshndx != SHN_UNDEF))
-		vers_promote(sdp, ndx, ifl, ofl);
+		ld_vers_promote(sdp, ndx, ifl, ofl);
 
 	/*
 	 * Determine whether a mapfile reference has been satisfied.  Mapfile
@@ -1009,7 +1015,7 @@ sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 			sdp->sd_flags |= FLG_SY_MAPUSED;
 	}
 
-	DBG_CALL(Dbg_syms_resolved(ifl->ifl_ehdr, sdp));
+	DBG_CALL(Dbg_syms_resolved(ofl, sdp));
 
 	return (1);
 }

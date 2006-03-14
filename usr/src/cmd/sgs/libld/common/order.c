@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,9 @@
  * Processing of SHF_ORDERED sections.
  */
 #include	<stdio.h>
-#include	<string.h>
 #include	<fcntl.h>
 #include	<link.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -67,7 +66,7 @@ is_keylink_ok(Ifl_desc *ifl, Word keylink, Word limit)
 }
 
 static Word
-get_shfordered_dest(Ifl_desc *ifl, Word ndx, Word limit)
+get_shfordered_dest(Ofl_desc *ofl, Ifl_desc *ifl, Word ndx, Word limit)
 {
 	Word t1_link = ndx, t2_link, ret_link;
 	Is_desc *isp, *isp1, *isp2;
@@ -140,7 +139,7 @@ get_shfordered_dest(Ifl_desc *ifl, Word ndx, Word limit)
 
 	if (error != 0) {
 		ret_link = 0;
-		DBG_CALL(Dbg_sec_order_error(ifl, ndx, error));
+		DBG_CALL(Dbg_sec_order_error(ofl->ofl_lml, ifl, ndx, error));
 	}
 	return (ret_link);
 }
@@ -150,7 +149,7 @@ get_shfordered_dest(Ifl_desc *ifl, Word ndx, Word limit)
  * This routine does the input processing of the ordered sections.
  */
 uintptr_t
-process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
+ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 {
 	Is_desc *	isp2, * isp = ifl->ifl_isdesc[ndx];
 	Xword		shflags = isp->is_shdr->sh_flags;
@@ -174,10 +173,10 @@ process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 		keylink = isp->is_shdr->sh_link;
 
 	if ((error = is_keylink_ok(ifl, keylink, limit)) != 0) {
-		DBG_CALL(Dbg_sec_order_error(ifl, ndx, error));
+		DBG_CALL(Dbg_sec_order_error(ofl->ofl_lml, ifl, ndx, error));
 		isp->is_flags &= ~FLG_IS_ORDERED;
 		if (isp->is_osdesc == NULL)
-			return ((uintptr_t)place_section(ofl, isp,
+			return ((uintptr_t)ld_place_section(ofl, isp,
 			    isp->is_key, 0));
 		return ((uintptr_t)isp->is_osdesc);
 	}
@@ -188,10 +187,11 @@ process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	 * we follow the default rules for the desitination section.
 	 */
 	if (shflags & SHF_ORDERED) {
-		if ((dest_ndx = get_shfordered_dest(ifl, ndx, limit)) == 0) {
+		if ((dest_ndx = get_shfordered_dest(ofl, ifl,
+		    ndx, limit)) == 0) {
 			isp->is_flags &= ~FLG_IS_ORDERED;
 			if (isp->is_osdesc == NULL)
-				return ((uintptr_t)place_section(ofl, isp,
+				return ((uintptr_t)ld_place_section(ofl, isp,
 				    isp->is_key, 0));
 			return ((uintptr_t)isp->is_osdesc);
 		}
@@ -207,8 +207,8 @@ process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	 * Place the section into it's output section.
 	 */
 	if ((osp = isp->is_osdesc) == NULL) {
-		if ((osp = place_section(ofl, isp, isp->is_ident, dest_ndx)) ==
-		    (Os_desc *)S_ERROR)
+		if ((osp = ld_place_section(ofl, isp, isp->is_ident,
+		    dest_ndx)) == (Os_desc *)S_ERROR)
 			return ((uintptr_t)S_ERROR);
 		if (!osp)
 			return (0);
@@ -245,10 +245,10 @@ process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 		st->st_ordercnt++;
 		isp2 = ifl->ifl_isdesc[keylink];
 		if (isp2->is_flags & FLG_IS_DISCARD) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_BADORDREF),
-			    ifl->ifl_name, isp->is_name, isp->is_scnndx,
-			    isp2->is_name, isp2->is_scnndx);
-
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_BADORDREF), ifl->ifl_name,
+			    isp->is_name, isp->is_scnndx, isp2->is_name,
+			    isp2->is_scnndx);
 			return (S_ERROR);
 		}
 		osp2 = isp2->is_osdesc;
@@ -270,7 +270,7 @@ process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
  * there are any SHF_ORDERED key sections, and if so set up sort key values.
  */
 void
-sec_validate(Ofl_desc * ofl)
+ld_sec_validate(Ofl_desc * ofl)
 {
 	Listnode *	lnp1;
 	Sg_desc *	sgp;
@@ -283,7 +283,8 @@ sec_validate(Ofl_desc * ofl)
 
 		for (LIST_TRAVERSE(&sgp->sg_secorder, lnp2, scop))
 			if (!(scop->sco_flags & FLG_SGO_USED))
-				eprintf(ERR_WARNING, MSG_INTL(MSG_MAP_SECORDER),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_MAP_SECORDER),
 				    sgp->sg_name, scop->sco_secname);
 
 		if ((sgp->sg_flags & FLG_SG_KEY) == 0)
@@ -391,7 +392,7 @@ comp(const void *ss1, const void *ss2)
 }
 
 uintptr_t
-sort_ordered(Ofl_desc *ofl)
+ld_sort_ordered(Ofl_desc *ofl)
 {
 	Listnode *lnp1;
 	Os_desc *osp;

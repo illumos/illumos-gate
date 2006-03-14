@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +35,7 @@
  */
 #include	<stdio.h>
 #include	<string.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -57,7 +56,7 @@ sym_hash_compare(Sym_s_list * s1, Sym_s_list * s2)
  * file images to the output image and their values and index's updated in the
  * output image.
  */
-Addr
+static Addr
 update_osym(Ofl_desc *ofl)
 {
 	Listnode	*lnp1, *lnp2;
@@ -171,7 +170,7 @@ update_osym(Ofl_desc *ofl)
 	strtab = ofl->ofl_strtab;
 	dynstr = ofl->ofl_dynstrtab;
 
-	DBG_CALL(Dbg_syms_sec_title());
+	DBG_CALL(Dbg_syms_sec_title(ofl->ofl_lml));
 
 	/*
 	 * Add the output file name to the first .symtab symbol.
@@ -195,7 +194,7 @@ update_osym(Ofl_desc *ofl)
 	 * If we are to display GOT summary information, then allocate
 	 * the buffer to 'cache' the GOT symbols into now.
 	 */
-	if (dbg_mask) {
+	if (DBG_ENABLED) {
 		if ((_gottable = gottable = libld_calloc(ofl->ofl_gotcnt,
 		    sizeof (Gottable))) == 0)
 		return ((Addr)S_ERROR);
@@ -256,9 +255,9 @@ update_osym(Ofl_desc *ofl)
 			if ((dynsym == 0) || (osp->os_flags & FLG_OS_OUTREL)) {
 				if (versym)
 					versym[*symndx - 1] = 0;
-				DBG_CALL(Dbg_syms_sec_entry(*symndx - 1,
-					sgp, osp));
 				osp->os_scnsymndx = *symndx - 1;
+				DBG_CALL(Dbg_syms_sec_entry(ofl->ofl_lml,
+				    osp->os_scnsymndx, sgp, osp));
 			}
 
 			/*
@@ -334,7 +333,7 @@ update_osym(Ofl_desc *ofl)
 			etext_ndx = SHN_ABS;
 			etext_abs = 1;
 			if (ofl->ofl_flags & FLG_OF_VERBOSE)
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NOREADSEG));
 		}
 		if (dsgp) {
@@ -344,7 +343,7 @@ update_osym(Ofl_desc *ofl)
 			edata_ndx = SHN_ABS;
 			edata_abs = 1;
 			if (ofl->ofl_flags & FLG_OF_VERBOSE)
-				eprintf(ERR_WARNING,
+				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_UPD_NORDWRSEG));
 		}
 
@@ -394,11 +393,12 @@ update_osym(Ofl_desc *ofl)
 			end = (Addr) 0;
 			end_ndx = SHN_ABS;
 			end_abs = 1;
-			eprintf(ERR_WARNING,  MSG_INTL(MSG_UPD_NOSEG));
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_UPD_NOSEG));
 		}
 	}
 
-	DBG_CALL(Dbg_syms_up_title(ofl->ofl_ehdr));
+	DBG_CALL(Dbg_syms_up_title(ofl->ofl_lml));
 
 	/*
 	 * Initialize the scoped symbol table entry point.  This is for all
@@ -448,18 +448,18 @@ update_osym(Ofl_desc *ofl)
 			sdp = ifl->ifl_oldndx[lndx];
 			sym = sdp->sd_sym;
 
-#if defined(sparc) || defined(__sparcv9)
+#if	defined(sparc) || defined(__sparcv9)
 			/*
 			 * Assign a got offset if necessary.
 			 */
-			if (assign_got(sdp) == S_ERROR)
+			if (ld_assign_got(ofl, sdp) == S_ERROR)
 				return ((Addr)S_ERROR);
 #elif defined(i386) || defined(__amd64)
 /* nothing to do */
 #else
 #error Unknown architecture!
 #endif
-			if (dbg_mask) {
+			if (DBG_ENABLED) {
 			    for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
 				_gottable->gt_sym = sdp;
 				_gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
@@ -532,7 +532,7 @@ update_osym(Ofl_desc *ofl)
 				    (sym->st_shndx == SHN_ABS))
 					continue;
 
-				if (sym_copy(sdp) == S_ERROR)
+				if (ld_sym_copy(sdp) == S_ERROR)
 					return ((Addr)S_ERROR);
 				sym = sdp->sd_sym;
 			}
@@ -608,19 +608,19 @@ update_osym(Ofl_desc *ofl)
 	 * the `.init' and `.fini' sections.  In this case determine the size of
 	 * these sections and updated the symbols value accordingly.
 	 */
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_INIT_U), SYM_NOHASH, 0,
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U), SYM_NOHASH, 0,
 	    ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) && sdp->sd_isc &&
 	    (strcmp(sdp->sd_isc->is_name, MSG_ORIG(MSG_SCN_INIT)) == 0)) {
 
-		if (sym_copy(sdp) == S_ERROR)
+		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
 		sdp->sd_sym->st_size =
 			sdp->sd_isc->is_osdesc->os_shdr->sh_size;
 	}
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_FINI_U), SYM_NOHASH, 0,
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U), SYM_NOHASH, 0,
 	    ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) && sdp->sd_isc &&
 	    (strcmp(sdp->sd_isc->is_name, MSG_ORIG(MSG_SCN_FINI)) == 0)) {
-		if (sym_copy(sdp) == S_ERROR)
+		if (ld_sym_copy(sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
 		sdp->sd_sym->st_size =
 			sdp->sd_isc->is_osdesc->os_shdr->sh_size;
@@ -701,8 +701,8 @@ update_osym(Ofl_desc *ofl)
 		 * just be dropped from the output image.
 		 */
 		if (sdp->sd_flags & FLG_SY_INVALID) {
-			DBG_CALL(Dbg_syms_old(ofl->ofl_ehdr, sdp));
-			DBG_CALL(Dbg_syms_ignore(ofl->ofl_ehdr, sdp));
+			DBG_CALL(Dbg_syms_old(ofl, sdp));
+			DBG_CALL(Dbg_syms_ignore(ofl, sdp));
 			continue;
 		}
 
@@ -872,15 +872,15 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Assign a got offset if necessary.
 		 */
-#if defined(sparc) || defined(__sparcv9)
-		if (assign_got(sdp) == S_ERROR)
+#if	defined(sparc) || defined(__sparcv9)
+		if (ld_assign_got(ofl, sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
-#elif defined(i386) || defined(__amd64)
+#elif	defined(i386) || defined(__amd64)
 /* nothing to do */
 #else
 #error Unknown architecture!
 #endif
-		if (dbg_mask) {
+		if (DBG_ENABLED) {
 			for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
 				_gottable->gt_sym = sdp;
 				_gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
@@ -1203,7 +1203,7 @@ update_osym(Ofl_desc *ofl)
 			}
 		}
 
-		DBG_CALL(Dbg_syms_old(ofl->ofl_ehdr, sdp));
+		DBG_CALL(Dbg_syms_old(ofl, sdp));
 
 		spec = NULL;
 		/*
@@ -1213,7 +1213,8 @@ update_osym(Ofl_desc *ofl)
 		if (sectndx == SHN_UNDEF) {
 			if (((sdp->sd_flags & FLG_SY_REGSYM) == 0) &&
 			    (sym->st_value != 0)) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_SYM_NOTNULL),
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_SYM_NOTNULL),
 				    demangle(name), sdp->sd_file->ifl_name);
 			}
 
@@ -1382,7 +1383,7 @@ update_osym(Ofl_desc *ofl)
 		    (ELF_ST_TYPE(sym->st_info) == STT_FUNC) &&
 		    !(flags & FLG_OF_BFLAG)) {
 			if (sap->sa_PLTndx)
-				sym->st_value = calc_plt_addr(sdp, ofl);
+				sym->st_value = ld_calc_plt_addr(sdp, ofl);
 		}
 
 		/*
@@ -1442,7 +1443,7 @@ update_osym(Ofl_desc *ofl)
 			dynsym_ndx++;
 		}
 
-		DBG_CALL(Dbg_syms_new(ofl->ofl_ehdr, sym, sdp));
+		DBG_CALL(Dbg_syms_new(ofl, sym, sdp));
 	}
 
 	/*
@@ -1478,7 +1479,7 @@ update_osym(Ofl_desc *ofl)
 		else
 			bind = STB_WEAK;
 
-		DBG_CALL(Dbg_syms_old(ofl->ofl_ehdr, sdp));
+		DBG_CALL(Dbg_syms_old(ofl, sdp));
 		if ((sym = wkp->wk_symtab) != 0) {
 			sym = wkp->wk_symtab;
 			sym->st_value = _sym->st_value;
@@ -1499,13 +1500,13 @@ update_osym(Ofl_desc *ofl)
 			    ELF_ST_TYPE(sym->st_info));
 			__sym = sym;
 		}
-		DBG_CALL(Dbg_syms_new(ofl->ofl_ehdr, __sym, sdp));
+		DBG_CALL(Dbg_syms_new(ofl, __sym, sdp));
 	}
 
 	/*
-	 * Now display GOT debugging information if required
+	 * Now display GOT debugging information if required.
 	 */
-	DBG_CALL(Dbg_got_display(gottable, ofl));
+	DBG_CALL(Dbg_got_display(ofl, gottable));
 
 	/*
 	 * Update the section headers information.
@@ -1549,7 +1550,7 @@ update_osym(Ofl_desc *ofl)
 /*
  * Build the dynamic section.
  */
-int
+static int
 update_odynamic(Ofl_desc *ofl)
 {
 	Listnode	*lnp;
@@ -1617,14 +1618,14 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 	}
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_INIT_U),
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
 	    SYM_NOHASH, 0, ofl)) != NULL) &&
 		sdp->sd_ref == REF_REL_NEED) {
 		dyn->d_tag = DT_INIT;
 		dyn->d_un.d_ptr = sdp->sd_sym->st_value;
 		dyn++;
 	}
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_FINI_U),
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
 	    SYM_NOHASH, 0, ofl)) != NULL) &&
 		sdp->sd_ref == REF_REL_NEED) {
 		dyn->d_tag = DT_FINI;
@@ -1915,7 +1916,7 @@ update_odynamic(Ofl_desc *ofl)
 	dyn->d_un.d_val = ofl->ofl_dtflags_1;
 	dyn++;
 
-	mach_update_odynamic(ofl, &dyn);
+	ld_mach_update_odynamic(ofl, &dyn);
 
 	dyn->d_tag = DT_NULL;
 	dyn->d_un.d_val = 0;
@@ -1926,7 +1927,7 @@ update_odynamic(Ofl_desc *ofl)
 /*
  * Build the version definition section
  */
-int
+static int
 update_overdef(Ofl_desc *ofl)
 {
 	Listnode	*lnp1, *lnp2;
@@ -1964,7 +1965,7 @@ update_overdef(Ofl_desc *ofl)
 				vdp->vd_name = (const char *)(uintptr_t)stoff;
 			}
 		} else {
-			sdp = sym_find(vdp->vd_name, vdp->vd_hash, 0, ofl);
+			sdp = ld_sym_find(vdp->vd_name, vdp->vd_hash, 0, ofl);
 			/* LINTED */
 			vdp->vd_name = (const char *)
 				(uintptr_t)sdp->sd_sym->st_name;
@@ -2060,7 +2061,7 @@ update_overdef(Ofl_desc *ofl)
 /*
  * Build the version needed section
  */
-int
+static int
 update_overneed(Ofl_desc *ofl)
 {
 	Listnode	*lnp;
@@ -2190,7 +2191,7 @@ update_overneed(Ofl_desc *ofl)
 /*
  * Update syminfo section.
  */
-uintptr_t
+static uintptr_t
 update_osyminfo(Ofl_desc * ofl)
 {
 	Os_desc *	symosp, * infosp = ofl->ofl_ossyminfo;
@@ -2244,9 +2245,9 @@ update_osyminfo(Ofl_desc * ofl)
 	/*
 	 * Display debugging information about section.
 	 */
-	DBG_CALL(Dbg_syminfo_title());
-	if (dbg_mask) {
-		size_t	_cnt, cnt = shdr->sh_size / shdr->sh_entsize;
+	DBG_CALL(Dbg_syminfo_title(ofl->ofl_lml));
+	if (DBG_ENABLED) {
+		Word	_cnt, cnt = shdr->sh_size / shdr->sh_entsize;
 		Sym *	symtab = symosp->os_outdata->d_buf;
 		Dyn *	dyn;
 
@@ -2258,7 +2259,7 @@ update_osyminfo(Ofl_desc * ofl)
 		for (_cnt = 1; _cnt < cnt; _cnt++) {
 			if (sip[_cnt].si_flags || sip[_cnt].si_boundto)
 				/* LINTED */
-				DBG_CALL(Dbg_syminfo_entry((int)_cnt,
+				DBG_CALL(Dbg_syminfo_entry(ofl->ofl_lml, _cnt,
 				    &sip[_cnt], &symtab[_cnt], strtab, dyn));
 		}
 	}
@@ -2268,10 +2269,10 @@ update_osyminfo(Ofl_desc * ofl)
 /*
  * Build the output elf header.
  */
-uintptr_t
+static uintptr_t
 update_oehdr(Ofl_desc * ofl)
 {
-	Ehdr *		ehdr = ofl->ofl_ehdr;
+	Ehdr	*ehdr = ofl->ofl_nehdr;
 
 	/*
 	 * If an entry point symbol has already been established (refer
@@ -2289,15 +2290,16 @@ update_oehdr(Ofl_desc * ofl)
 	 * machine dependent section.
 	 */
 	ehdr->e_ident[EI_DATA] = M_DATA;
-	if (ofl->ofl_e_machine != M_MACH) {
-		if (ofl->ofl_e_machine != M_MACHPLUS)
+	ehdr->e_machine = ofl->ofl_dehdr->e_machine;
+	ehdr->e_flags = ofl->ofl_dehdr->e_flags;
+	ehdr->e_version = ofl->ofl_dehdr->e_version;
+
+	if (ehdr->e_machine != M_MACH) {
+		if (ehdr->e_machine != M_MACHPLUS)
 			return (S_ERROR);
-		if ((ofl->ofl_e_flags & M_FLAGSPLUS) == 0)
+		if ((ehdr->e_flags & M_FLAGSPLUS) == 0)
 			return (S_ERROR);
 	}
-	ehdr->e_machine = ofl->ofl_e_machine;
-	ehdr->e_flags = ofl->ofl_e_flags;
-	ehdr->e_version = ofl->ofl_libver;
 
 	if (ofl->ofl_flags & FLG_OF_SHAROBJ)
 		ehdr->e_type = ET_DYN;
@@ -2334,7 +2336,8 @@ expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *u1)
 	taddr = taddr + mv->m_poffset;
 	for (i = 0; i < mv->m_repeat; i++) {
 		/* LINTED */
-		DBG_CALL(Dbg_move_expanding(mv, (Addr)(taddr - taddr0)));
+		DBG_CALL(Dbg_move_expand(ofl->ofl_lml, mv,
+		    (Addr)(taddr - taddr0)));
 		stride = (unsigned int)mv->m_stride + 1;
 		/* LINTED */
 		switch (ELF_M_SIZE(mv->m_info)) {
@@ -2373,7 +2376,7 @@ expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *u1)
 /*
  * Update Move sections.
  */
-uintptr_t
+static uintptr_t
 update_move(Ofl_desc *ofl)
 {
 	Word		ndx = 0;
@@ -2422,13 +2425,15 @@ update_move(Ofl_desc *ofl)
 				s = MSG_INTL(MSG_PSYM_EXPREASON2);
 			else
 				s = MSG_INTL(MSG_PSYM_EXPREASON3);
-			DBG_CALL(Dbg_move_parexpn(psym->psym_symd->sd_name, s));
+			DBG_CALL(Dbg_move_parexpn(ofl->ofl_lml,
+			    psym->psym_symd->sd_name, s));
 			for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvp)) {
 				if ((mvp->mv_flag & FLG_MV_OUTSECT) == 0)
 					continue;
 				mv2 = mvp->mv_ientry;
 				sdp = psym->psym_symd;
-				DBG_CALL(Dbg_move_mventry(0, mv2, sdp));
+				DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0,
+				    mv2, sdp));
 				(void) expand_move(ofl, sdp, mv2);
 			}
 			continue;
@@ -2437,8 +2442,8 @@ update_move(Ofl_desc *ofl)
 		/*
 		 * Process move table
 		 */
-		DBG_CALL(Dbg_move_outmove((const unsigned char *)
-			psym->psym_symd->sd_name));
+		DBG_CALL(Dbg_move_outmove(ofl->ofl_lml,
+		    psym->psym_symd->sd_name));
 		for (LIST_TRAVERSE(&(psym->psym_mvs), lnp2, mvp)) {
 			int	idx = 1;
 			if ((mvp->mv_flag & FLG_MV_OUTSECT) == 0)
@@ -2448,7 +2453,7 @@ update_move(Ofl_desc *ofl)
 			sdp = isp->is_file->ifl_oldndx[
 				ELF_M_SYM(mv2->m_info)];
 
-			DBG_CALL(Dbg_move_mventry(0, mv2, sdp));
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv2, sdp));
 			*mv1 = *mv2;
 			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
 				if (ELF_ST_BIND(sdp->sd_sym->st_info) ==
@@ -2487,9 +2492,8 @@ update_move(Ofl_desc *ofl)
 					mv1->m_poffset += sdp->sd_sym->st_value;
 				} else {
 					if (isredloc)
-					    DBG_CALL(Dbg_syms_reduce(
-						DBG_SYM_REDUCE_RETAIN,
-						ofl->ofl_ehdr, sdp,
+					    DBG_CALL(Dbg_syms_reduce(ofl,
+						DBG_SYM_REDUCE_RETAIN, sdp,
 						idx, ofl->ofl_osmove->os_name));
 
 					mv1->m_info =
@@ -2497,7 +2501,7 @@ update_move(Ofl_desc *ofl)
 					ELF_M_INFO(sdp->sd_symndx, mv2->m_info);
 				}
 			}
-			DBG_CALL(Dbg_move_mventry(1, mv1, sdp));
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 1, mv1, sdp));
 			mv1++;
 			idx++;
 		}
@@ -2510,7 +2514,7 @@ update_move(Ofl_desc *ofl)
  * Scan through the SHT_GROUP output sections.  Update their
  * sh_link/sh_info fields as well as the section contents.
  */
-uintptr_t
+static uintptr_t
 update_ogroup(Ofl_desc * ofl)
 {
 	Listnode	*lnp;
@@ -2553,9 +2557,9 @@ update_ogroup(Ofl_desc * ofl)
 			 * for the file it came from.
 			 */
 			if (gdata[i] >= ifl->ifl_shnum) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_GRP_INVALNDX),
-					isp->is_name, ifl->ifl_name, i,
-					gdata[i]);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_GRP_INVALNDX), isp->is_name,
+				    ifl->ifl_name, i, gdata[i]);
 				error = S_ERROR;
 				gdata[i] = 0;
 				continue;
@@ -2576,8 +2580,7 @@ update_ogroup(Ofl_desc * ofl)
 	return (error);
 }
 
-
-void
+static void
 update_ostrtab(Os_desc *osp, Str_tbl *stp)
 {
 	Elf_Data	*data;
@@ -2593,8 +2596,8 @@ update_ostrtab(Os_desc *osp, Str_tbl *stp)
  * Translate the shdr->sh_{link, info} from its input section value to that
  * of the corresponding shdr->sh_{link, info} output section value.
  */
-Word
-translate_link(Os_desc * osp, Word link, const char *msg)
+static Word
+translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 {
 	Is_desc *	isp;
 	Ifl_desc *	ifl;
@@ -2619,7 +2622,7 @@ translate_link(Os_desc * osp, Word link, const char *msg)
 	 * is within range for the input file.
 	 */
 	if (link >= ifl->ifl_shnum) {
-		eprintf(ERR_WARNING, msg, ifl->ifl_name,
+		eprintf(ofl->ofl_lml, ERR_WARNING, msg, ifl->ifl_name,
 		    isp->is_name, EC_XWORD(link));
 		return (link);
 	}
@@ -2659,14 +2662,14 @@ translate_link(Os_desc * osp, Word link, const char *msg)
  *	expect this behavior).
  */
 uintptr_t
-update_outfile(Ofl_desc *ofl)
+ld_update_outfile(Ofl_desc *ofl)
 {
 	Addr		size, etext, vaddr = ofl->ofl_segorigin;
 	Listnode	*lnp1, *lnp2;
 	Sg_desc		*sgp;
 	Os_desc		*osp;
 	int		phdrndx = 0, capndx = 0, segndx = -1, secndx;
-	Ehdr		*ehdr = ofl->ofl_ehdr;
+	Ehdr		*ehdr = ofl->ofl_nehdr;
 	List		osecs;
 	Shdr		*hshdr;
 	Phdr		*_phdr = 0, *dtracephdr = 0;
@@ -2678,7 +2681,7 @@ update_outfile(Ofl_desc *ofl)
 	/*
 	 * Loop through the segment descriptors and pick out what we need.
 	 */
-	DBG_CALL(Dbg_seg_title());
+	DBG_CALL(Dbg_seg_title(ofl->ofl_lml));
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
 		Phdr *	phdr = &(sgp->sg_phdr);
 		Xword 	p_align;
@@ -2699,8 +2702,7 @@ update_outfile(Ofl_desc *ofl)
 			if (ofl->ofl_osinterp) {
 				phdr->p_offset = ehdr->e_phoff;
 				phdr->p_filesz = phdr->p_memsz = phdrsz;
-				DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-				    segndx, sgp));
+				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
 			continue;
@@ -2712,8 +2714,7 @@ update_outfile(Ofl_desc *ofl)
 				phdr->p_vaddr = phdr->p_memsz = 0;
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
-				DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-				    segndx, sgp));
+				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
 			continue;
@@ -2750,8 +2751,7 @@ update_outfile(Ofl_desc *ofl)
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
 				phdr->p_flags = PF_R;
-				DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-				    segndx, sgp));
+				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				capndx = phdrndx;
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
@@ -2773,13 +2773,12 @@ update_outfile(Ofl_desc *ofl)
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
 				phdr->p_flags = M_DATASEG_PERM;
-				DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-					segndx, sgp));
+				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
 			continue;
 		}
-#if defined(__x86) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 		if (phdr->p_type == PT_SUNW_UNWIND) {
 			Shdr	    *shdr;
 			if (ofl->ofl_unwindhdr == 0)
@@ -2828,8 +2827,7 @@ update_outfile(Ofl_desc *ofl)
 			phdr->p_memsz = lastmemshdr->sh_offset +
 			    lastmemshdr->sh_size - phdr->p_offset;
 
-			DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-			    segndx, sgp));
+			DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 
 			ofl->ofl_tlsphdr = phdr;
 			ofl->ofl_phdr[phdrndx++] = *phdr;
@@ -2849,8 +2847,7 @@ update_outfile(Ofl_desc *ofl)
 
 			vaddr = phdr->p_vaddr;
 			phdr->p_memsz = sgp->sg_length;
-			DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-				segndx, sgp));
+			DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 			ofl->ofl_phdr[phdrndx++] = *phdr;
 
 			if (phdr->p_type != PT_LOAD)
@@ -2870,12 +2867,10 @@ update_outfile(Ofl_desc *ofl)
 				p_e = p_s + (ofl->ofl_phdr[i]).p_memsz;
 				if (((p_s <= vaddr) && (p_e > vaddr)) ||
 				    ((vaddr <= p_s) && (v_e > p_s)))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_UPD_SEGOVERLAP),
-					    ofl->ofl_name,
-					    EC_ADDR(p_e),
-					    sgp->sg_name,
-					    EC_ADDR(vaddr));
+					    ofl->ofl_name, EC_ADDR(p_e),
+					    sgp->sg_name, EC_ADDR(vaddr));
 			}
 			continue;
 		}
@@ -2914,7 +2909,7 @@ update_outfile(Ofl_desc *ofl)
 			offset += shdr->sh_size;
 			if (shdr->sh_type != SHT_NOBITS) {
 				if (nobits) {
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_UPD_NOBITS));
 					return (S_ERROR);
 				}
@@ -2974,7 +2969,7 @@ update_outfile(Ofl_desc *ofl)
 			if ((sgp->sg_flags & FLG_SG_VADDR)) {
 				if (_phdr && (vaddr > phdr->p_vaddr) &&
 				    (phdr->p_type == PT_LOAD))
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_UPD_SEGOVERLAP),
 					    ofl->ofl_name, EC_ADDR(vaddr),
 					    sgp->sg_name,
@@ -3046,7 +3041,7 @@ update_outfile(Ofl_desc *ofl)
 		    (phdr->p_flags & PF_X))
 			ehdr->e_entry = vaddr;
 
-		DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine, segndx, sgp));
+		DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 
 		/*
 		 * Traverse the output section descriptors for this segment so
@@ -3062,12 +3057,12 @@ update_outfile(Ofl_desc *ofl)
 
 			if (shdr->sh_link)
 			    shdr->sh_link =
-				translate_link(osp, shdr->sh_link,
+				translate_link(ofl, osp, shdr->sh_link,
 				MSG_INTL(MSG_FIL_INVSHLINK));
 
 			if (shdr->sh_info && (shdr->sh_flags & SHF_INFO_LINK))
 			    shdr->sh_info =
-				translate_link(osp, shdr->sh_info,
+				translate_link(ofl, osp, shdr->sh_info,
 				MSG_INTL(MSG_FIL_INVSHINFO));
 
 			if (!(flags & FLG_OF_RELOBJ) &&
@@ -3099,9 +3094,9 @@ update_outfile(Ofl_desc *ofl)
 		 * haven't exceeded any maximum segment length specification.
 		 */
 		if ((sgp->sg_length != 0) && (sgp->sg_length < phdr->p_memsz)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_UPD_LARGSIZE),
-			    ofl->ofl_name, sgp->sg_name,
-			    EC_XWORD(phdr->p_memsz),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_UPD_LARGSIZE), ofl->ofl_name,
+			    sgp->sg_name, EC_XWORD(phdr->p_memsz),
 			    EC_XWORD(sgp->sg_length));
 			return (S_ERROR);
 		}
@@ -3199,9 +3194,12 @@ update_outfile(Ofl_desc *ofl)
 	/*
 	 * Emit Strtab diagnostics.
 	 */
-	DBG_CALL(Dbg_sec_strtab(ofl->ofl_osshstrtab, ofl->ofl_shdrsttab));
-	DBG_CALL(Dbg_sec_strtab(ofl->ofl_osstrtab, ofl->ofl_strtab));
-	DBG_CALL(Dbg_sec_strtab(ofl->ofl_osdynstr, ofl->ofl_dynstrtab));
+	DBG_CALL(Dbg_sec_strtab(ofl->ofl_lml, ofl->ofl_osshstrtab,
+	    ofl->ofl_shdrsttab));
+	DBG_CALL(Dbg_sec_strtab(ofl->ofl_lml, ofl->ofl_osstrtab,
+	    ofl->ofl_strtab));
+	DBG_CALL(Dbg_sec_strtab(ofl->ofl_lml, ofl->ofl_osdynstr,
+	    ofl->ofl_dynstrtab));
 
 	/*
 	 * Initialize the section headers string table index within the elf
@@ -3210,7 +3208,7 @@ update_outfile(Ofl_desc *ofl)
 	/* LINTED */
 	if ((shscnndx = elf_ndxscn(ofl->ofl_osshstrtab->os_scn)) <
 	    SHN_LORESERVE) {
-		ofl->ofl_ehdr->e_shstrndx =
+		ofl->ofl_nehdr->e_shstrndx =
 		    /* LINTED */
 		    (Half)shscnndx;
 	} else {
@@ -3220,17 +3218,18 @@ update_outfile(Ofl_desc *ofl)
 		 */
 		Elf_Scn	*scn;
 		Shdr	*shdr0;
+
 		if ((scn = elf_getscn(ofl->ofl_elf, 0)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
-				ofl->ofl_name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSCN), ofl->ofl_name);
 			return (S_ERROR);
 		}
 		if ((shdr0 = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
-			    ofl->ofl_name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
 			return (S_ERROR);
 		}
-		ofl->ofl_ehdr->e_shstrndx = SHN_XINDEX;
+		ofl->ofl_nehdr->e_shstrndx = SHN_XINDEX;
 		shdr0->sh_link = shscnndx;
 	}
 

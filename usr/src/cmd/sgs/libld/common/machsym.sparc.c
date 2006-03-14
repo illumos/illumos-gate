@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,7 @@
 #include	<string.h>
 #include	<alloca.h>
 #include	<sys/types.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -55,7 +55,7 @@
  *
  */
 int
-reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
+ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
     Ofl_desc * ofl)
 {
 	Sym		*osym = sdp->sd_sym;
@@ -73,8 +73,9 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 	if ((ELF_ST_BIND(osym->st_info) == STB_LOCAL) ||
 	    (ELF_ST_BIND(nsym->st_info) == STB_LOCAL)) {
 		if (osym->st_value == nsym->st_value) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG3),
-			    conv_sym_SPARC_value_str((Lword)osym->st_value),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_INCOMPREG3),
+			    conv_sym_SPARC_value(osym->st_value),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -90,8 +91,9 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		 */
 		if (((osym->st_name == 0) || (nsym->st_name == 0)) ||
 		    (strcmp(oname, nname) != 0)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG1),
-			    conv_sym_SPARC_value_str((Lword)osym->st_value),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_INCOMPREG1),
+			    conv_sym_SPARC_value(osym->st_value),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -103,8 +105,9 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		 */
 		if ((osym->st_shndx == SHN_ABS) &&
 		    (nsym->st_shndx == SHN_ABS)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_MULTINIREG),
-			    conv_sym_SPARC_value_str((Lword)osym->st_value),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_MULTINIREG),
+			    conv_sym_SPARC_value(osym->st_value),
 			    demangle(nname), sdp->sd_file->ifl_name,
 			    ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -112,11 +115,10 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		}
 
 	} else if (strcmp(oname, nname) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG2),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG2),
 		    demangle(sdp->sd_name), sdp->sd_file->ifl_name,
-		    conv_sym_SPARC_value_str((Lword)osym->st_value),
-		    ifl->ifl_name,
-		    conv_sym_SPARC_value_str((Lword)nsym->st_value));
+		    conv_sym_SPARC_value(osym->st_value), ifl->ifl_name,
+		    conv_sym_SPARC_value(nsym->st_value));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (1);
 	}
@@ -124,7 +126,7 @@ reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 }
 
 int
-mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
+ld_mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 {
 	Sym	*osym = sdp->sd_sym;
 	Byte	otype = ELF_ST_TYPE(osym->st_info);
@@ -133,18 +135,20 @@ mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (otype != ntype) {
 		if ((otype == STT_SPARC_REGISTER) ||
 		    (ntype == STT_SPARC_REGISTER)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_DIFFTYPE),
-			    demangle(sdp->sd_name));
-			eprintf(ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
-			    sdp->sd_file->ifl_name,
-			    conv_info_type_str(ofl->ofl_e_machine, otype),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_DIFFTYPE), demangle(sdp->sd_name));
+			eprintf(ofl->ofl_lml, ERR_NONE,
+			    MSG_INTL(MSG_SYM_FILETYPES),
+			    sdp->sd_file->ifl_name, conv_sym_info_type(
+			    sdp->sd_file->ifl_ehdr->e_machine, otype),
 			    ifl->ifl_name,
-			    conv_info_type_str(ofl->ofl_e_machine, ntype));
+			    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
+			    ntype));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
 	} else if (otype == STT_SPARC_REGISTER)
-		return (reg_check(sdp, nsym, sdp->sd_name, ifl, ofl));
+		return (ld_reg_check(sdp, nsym, sdp->sd_name, ifl, ofl));
 
 	return (0);
 }
@@ -157,8 +161,8 @@ static const char *registers[] = { 0,
 };
 
 const char *
-is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
-    const char *symsecname, Word * flags)
+ld_is_regsym(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
+    int symndx, Word shndx, const char *symsecname, Word * flags)
 {
 	const char	*name;
 
@@ -173,8 +177,8 @@ is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
 	 */
 	if ((sym->st_value < STO_SPARC_REGISTER_G1) ||
 	    (sym->st_value > STO_SPARC_REGISTER_G7)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_BADREG), ifl->ifl_name,
-		    symsecname, symndx, EC_XWORD(sym->st_value));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
+		    ifl->ifl_name, symsecname, symndx, EC_XWORD(sym->st_value));
 		return ((const char *)S_ERROR);
 	}
 
@@ -182,8 +186,8 @@ is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
 	 * A register symbol can only be undefined or defined (absolute).
 	 */
 	if ((shndx != SHN_ABS) && (shndx != SHN_UNDEF)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_BADREG), ifl->ifl_name,
-		    symsecname, symndx, EC_XWORD(sym->st_value));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_BADREG),
+		    ifl->ifl_name, symsecname, symndx, EC_XWORD(sym->st_value));
 		return ((const char *)S_ERROR);
 	}
 
@@ -196,9 +200,10 @@ is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
 		 */
 		if ((ELF_ST_BIND(sym->st_info) != STB_GLOBAL) ||
 		    (shndx != SHN_UNDEF)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYM_BADSCRATCH),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_SYM_BADSCRATCH),
 			    ifl->ifl_name, symsecname, symndx,
-			    conv_sym_SPARC_value_str((Lword)sym->st_value));
+			    conv_sym_SPARC_value(sym->st_value));
 			return ((const char *)S_ERROR);
 		}
 
@@ -218,7 +223,7 @@ is_regsym(Ifl_desc *ifl, Sym *sym, const char *strs, int symndx, Word shndx,
 }
 
 Sym_desc *
-reg_find(Sym * sym, Ofl_desc * ofl)
+ld_reg_find(Sym * sym, Ofl_desc * ofl)
 {
 	if (ofl->ofl_regsyms == 0)
 		return (0);
@@ -227,7 +232,7 @@ reg_find(Sym * sym, Ofl_desc * ofl)
 }
 
 int
-reg_enter(Sym_desc * sdp, Ofl_desc * ofl)
+ld_reg_enter(Sym_desc * sdp, Ofl_desc * ofl)
 {
 	if (ofl->ofl_regsyms == 0) {
 		ofl->ofl_regsymsno = STO_SPARC_REGISTER_G7 + 1;

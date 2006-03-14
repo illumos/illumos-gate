@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,11 +30,34 @@
 #include	"libld.h"
 
 void
-Dbg_unused_sec(Is_desc *isp)
+Dbg_unused_rtldinfo(Rt_map *lmp)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_USD_RTLDINFO), NAME(lmp),
+	    NAME(lml->lm_info_lmp));
+}
+
+void
+Dbg_unused_unref(Rt_map *lmp, const char *depend)
+{
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	dbg_print(LIST(lmp), MSG_INTL(MSG_USD_UNREF), NAME(lmp), depend);
+}
+
+void
+Dbg_unused_sec(Lm_list *lml, Is_desc *isp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_UNUSED))
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -54,47 +76,20 @@ Dbg_unused_sec(Is_desc *isp)
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(MSG_INTL(MSG_USD_SEC), isp->is_basename,
+	dbg_print(lml, MSG_INTL(MSG_USD_SEC), isp->is_basename,
 	    EC_XWORD(isp->is_shdr->sh_size), isp->is_file->ifl_name, str);
 }
 
-/*
- * There are no ELF32/ELF64 data structures in these functions - only define
- * one copy in liblddbg.
- */
-#if	!defined(_ELF64)
-
 void
-Dbg_unused_file(const char *name, int needstr, int cycle)
+Dbg_unused_file(Lm_list *lml, const char *name, int needstr, uint_t cycle)
 {
-	if (DBG_NOTCLASS(DBG_UNUSED))
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
 		return;
 
 	if (needstr)
-		dbg_print(MSG_INTL(MSG_USD_NEEDSTR), name);
+		dbg_print(lml, MSG_INTL(MSG_USD_NEEDSTR), name);
 	else if (cycle)
-		dbg_print(MSG_INTL(MSG_USD_FILECYCLIC), name, cycle);
+		dbg_print(lml, MSG_INTL(MSG_USD_FILECYCLIC), name, cycle);
 	else
-		dbg_print(MSG_INTL(MSG_USD_FILE), name);
+		dbg_print(lml, MSG_INTL(MSG_USD_FILE), name);
 }
-
-void
-Dbg_unused_unref(const char *caller, const char *depend)
-{
-	if (DBG_NOTCLASS(DBG_UNUSED))
-		return;
-	if (DBG_NOTDETAIL())
-		return;
-
-	dbg_print(MSG_INTL(MSG_USD_UNREF), caller, depend);
-}
-
-void
-Dbg_unused_rtldinfo(const char *fname1, const char *fname2)
-{
-	if (DBG_NOTCLASS(DBG_UNUSED))
-		return;
-
-	dbg_print(MSG_INTL(MSG_USD_RTLDINFO), fname1, fname2);
-}
-#endif

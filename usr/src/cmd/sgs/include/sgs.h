@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs.
@@ -246,12 +246,21 @@ typedef	struct audit_list	Audit_list;
 typedef struct rel_desc		Rel_desc;
 
 /*
+ * Data structures defined in rtld.h.
+ */
+typedef struct lm_list		Lm_list;
+#ifdef _SYSCALL32
+typedef struct lm_list32	Lm_list32;
+#endif	/* _SYSCALL32 */
+
+/*
  * For the various utilities that include sgs.h
  */
+extern int	assfail(const char *, const char *, int);
+extern void	eprintf(Lm_list *, Error, const char *, ...);
 extern char	*sgs_demangle(char *);
 extern uint_t	sgs_str_hash(const char *);
 extern uint_t	findprime(uint_t);
-extern int	assfail(const char *, const char *, int);
 
 #endif /* _ASM */
 

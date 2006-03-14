@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2000 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -34,7 +34,7 @@
  * Print out a single `segment descriptor' entry.
  */
 void
-_Dbg_seg_desc_entry(Half mach, int ndx, Sg_desc *sgp)
+Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 {
 	const char	*str;
 
@@ -43,64 +43,67 @@ _Dbg_seg_desc_entry(Half mach, int ndx, Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_ORIG(MSG_SEG_NAME), ndx, str);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_ORIG(MSG_SEG_NAME), ndx, str);
 
-	Elf_phdr_entry(mach, &sgp->sg_phdr);
+	Elf_phdr(lml, mach, &sgp->sg_phdr);
 
-	dbg_print(MSG_ORIG(MSG_SEG_LENGTH), EC_ADDR(sgp->sg_length));
-	dbg_print(MSG_ORIG(MSG_SEG_FLAGS), conv_segaflg_str(sgp->sg_flags));
+	dbg_print(lml, MSG_ORIG(MSG_SEG_LENGTH), EC_ADDR(sgp->sg_length));
+	dbg_print(lml, MSG_ORIG(MSG_SEG_FLAGS),
+	    conv_seg_flags(sgp->sg_flags));
+
 	if (sgp->sg_sizesym && sgp->sg_sizesym->sd_name)
-		dbg_print(MSG_ORIG(MSG_SEG_SIZESYM),
-		    _Dbg_sym_dem(sgp->sg_sizesym->sd_name));
-	if (sgp->sg_secorder.head) {
-		Listnode *	lnp;
-		Sec_order *	scop;
+		dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM),
+		    Dbg_demangle_name(sgp->sg_sizesym->sd_name));
 
-		dbg_print(MSG_ORIG(MSG_SEG_ORDER));
+	if (sgp->sg_secorder.head) {
+		Listnode	*lnp;
+		Sec_order	*scop;
+
+		dbg_print(lml, MSG_ORIG(MSG_SEG_ORDER));
 		for (LIST_TRAVERSE(&sgp->sg_secorder, lnp, scop)) {
-			dbg_print(MSG_ORIG(MSG_SEG_SECTION), scop->sco_secname,
-			    EC_WORD(scop->sco_index));
+			dbg_print(lml, MSG_ORIG(MSG_SEG_SECTION),
+			    scop->sco_secname, EC_WORD(scop->sco_index));
 		}
 	}
 }
 
 void
-Dbg_seg_title()
+Dbg_seg_title(Lm_list *lml)
 {
-	if (DBG_NOTCLASS(DBG_SEGMENTS))
+	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_SEG_DESC_INUSE));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_SEG_DESC_INUSE));
 }
 
 void
-Dbg_seg_entry(Half mach, int ndx, Sg_desc *sgp)
+Dbg_seg_entry(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
 {
-	if (DBG_NOTCLASS(DBG_SEGMENTS))
+	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
 
-	_Dbg_seg_desc_entry(mach, ndx, sgp);
+	Dbg_seg_desc_entry(ofl->ofl_lml, ofl->ofl_dehdr->e_machine, ndx, sgp);
 }
 
 /*
  * Print out the available segment descriptors.
  */
 void
-Dbg_seg_list(Half mach, List *lsg)
+Dbg_seg_list(Lm_list *lml, Half mach, List *lsg)
 {
 	Listnode	*lnp;
 	Sg_desc		*sgp;
 	int		ndx = 0;
 
-	if (DBG_NOTCLASS(DBG_SEGMENTS))
+	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_SEG_DESC_AVAIL));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_SEG_DESC_AVAIL));
 	for (LIST_TRAVERSE(lsg, lnp, sgp))
-		_Dbg_seg_desc_entry(mach, ndx++, sgp);
+		Dbg_seg_desc_entry(lml, mach, ndx++, sgp);
 }
 
 /*
@@ -112,20 +115,52 @@ Dbg_seg_list(Half mach, List *lsg)
 void
 Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 {
+	Lm_list		*lml = ofl->ofl_lml;
 	Listnode	*lnp;
 	Is_desc		*isp;
+	Elf_Data	*data;
+	Shdr		*shdr;
 
-	if (DBG_NOTCLASS(DBG_SEGMENTS))
+	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_SEC_NAME), ndx, osp->os_name);
-	Elf_shdr_entry(ofl->ofl_e_machine, osp->os_shdr);
-	Gelf_elf_data_title();
-	_Dbg_elf_data_out(osp);
+	dbg_print(lml, MSG_ORIG(MSG_SEC_NAME), ndx, osp->os_name);
+	Elf_shdr(lml, ofl->ofl_dehdr->e_machine, osp->os_shdr);
+	dbg_print(lml, MSG_INTL(MSG_EDATA_TITLE));
+
+	shdr = osp->os_shdr;
+	data = osp->os_outdata;
+	dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_OUT),
+	    EC_ADDR(shdr->sh_addr), conv_elfdata_type(data->d_type),
+	    EC_XWORD(data->d_size), EC_OFF(data->d_off),
+	    EC_XWORD(data->d_align), MSG_ORIG(MSG_STR_EMPTY),
+	    MSG_ORIG(MSG_STR_EMPTY));
 
 	if (DBG_NOTDETAIL())
 		return;
 
-	for (LIST_TRAVERSE(&(osp->os_isdescs), lnp, isp))
-		_Dbg_elf_data_in(osp, isp);
+	for (LIST_TRAVERSE(&(osp->os_isdescs), lnp, isp)) {
+		const char	*file, *str;
+		Addr		addr;
+
+		data = isp->is_indata;
+
+		if (isp->is_flags & FLG_IS_DISCARD) {
+			str = MSG_INTL(MSG_EDATA_IGNSCN);
+			addr = 0;
+		} else {
+			str = MSG_ORIG(MSG_STR_EMPTY);
+			addr = (Addr)(shdr->sh_addr + data->d_off);
+		}
+
+		if (isp->is_file && isp->is_file->ifl_name)
+			file = isp->is_file->ifl_name;
+		else
+			file = MSG_ORIG(MSG_STR_EMPTY);
+
+		dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_IN),
+		    EC_ADDR(addr), conv_elfdata_type(data->d_type),
+		    EC_XWORD(data->d_size), EC_OFF(data->d_off),
+		    EC_XWORD(data->d_align), file, str);
+	}
 }

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,84 +18,60 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-BASEPLAT=	sparc
-include		$(SRC)/cmd/sgs/libld/Makefile.com
+L_MACHOBJS32 =	machrel.sparc32.o	machsym.sparc32.o
+L_MACHOBJS64 =	machrel.sparc64.o	machsym.sparc64.o
 
-L_MACHSRCS32=	machrel.c machsym.c
-L_MACHSRCS64=	$(L_MACHSRCS32)
-CHKSRCS=	$(SRCBASE)/uts/common/krtld/reloc.h $(L_MACHSRCS32)
-
-LIB64=		libld.so.3
-$(LIB64) :=	SONAME = $(LIB64)
-
-PICS64=		$(OBJECTS:%=pics64/%)
-$(PICS64)  :=	sparc_CFLAGS += -xregs=no%appl -K pic
-$(PICS64)  :=	CFLAGS += $(CTF_FLAGS)
-$(PICS64)  :=	CFLAGS64 += $(CTF_FLAGS)
-$(PICS64)  :=	CTFCONVERT_POST = $(CTFCONVERT_O)
-CTFMERGE_LIB64= $(CTFMERGE) -t -f -L VERSION -o $@ $(PICS64)
-$(LIB64)   :=	CTFMERGE_POST = $(CTFMERGE_LIB64)
-CPPFLAGS +=	-I../../../../uts/sparc/krtld
-
-SGSMSGTARG +=	$(SGSMSGSPARC)
-
-.PARALLEL:	$(PICS64)
-
-ROOTFS_DYNLIB64=	$(ROOTFS_LIBDIR)/$(LIB64)
-$(ROOTFS_DYNLIB64) :=	FILEMODE= 755
+include		../Makefile.com
 
 .KEEP_STATE:
 
-all:		$(DYNLIB) $(LIBLINKS) .WAIT $(LIB64)
+SGSMSGTARG +=	$(SGSMSGSPARC)
 
-
-$(LIB64) $(SGSPROTO)/$(LIB64): \
-		pics64 .WAIT $$(PICS64) $(MAPFILES)
-		$(CC) -o $@ -G $(DYNFLAGS) $(PICS64) $(LDLIBS)
-		$(POST_PROCESS_SO)
-
-native:		$(SGSPROTO)/$(DYNLIB) $(SGSPROTO)/$(LIB64)
-
-native-proto:
-		-@mkdir -p proto/$(MACH) proto/$(MACH64)
-
-lint:		$(LINTLIB64) $(LINTOUT64)
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
-pics64:
-		-@mkdir -p $@
+all:		$(DYNLIB) $(LIBLINKS)
 
 install \
-package:	all $(ROOTFS_DYNLIB) $(ROOTFS_DYNLIB64)
+package:	all $(ROOTFS_DYNLIB)
 
+include		../Makefile.targ
 
-clean: clean64
+# Associate ELF32 and ELF64 objects to the appropriate headers.
 
-clean64:
-		-$(RM) $(PICS64)
+pics/%32.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
+pics/%64.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
 
-clobber:	clobber64
+# Associate the various lint targets with the appropriate headers/files.
 
-clobber64:
-		-$(RM) $(LIB64)
+$(LINTOUT32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
+		    $(ELFTARGET32)
+$(LINTOUT64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
+		    $(ELFTARGET64) -D_ELF64
+$(LINTLIB32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
+		    $(ELFTARGET32)
+$(LINTLIB64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld \
+		    $(ELFTARGET64) -D_ELF64
 
-delete:
-		$(RM) $(DYNLIB) $(LIB64)
+LINTSRCS32 +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
+LINTSRCS64 +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
 
+# Compensate chkmsg with the doreloc family.
 
-include		$(SRC)/cmd/sgs/libld/Makefile.targ
+CHKSRCS +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
+CHKSRCS +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c)
 
-pics64/%.o:	$(SRCBASE)/uts/sparc/krtld/%.c
-		$(COMPILE.c) -o $@ -D_ELF64 $<
+pics/%32.o: \
+		$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(SRCBASE)/uts/sparc/krtld/%.c
-		$(COMPILE.c) -o $@ $<
+pics/%64.o: \
+		$(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
 		$(POST_PROCESS_O)

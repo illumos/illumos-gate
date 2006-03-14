@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,9 +18,12 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-# Message file for cmd/sgs/libconv/common/segments.c
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ MSG_FLG_SG_VADDR	" FLG_SG_VADDR "
 @ MSG_FLG_SG_PADDR	" FLG_SG_PADDR "
@@ -34,8 +33,11 @@
 @ MSG_FLG_SG_FLAGS	" FLG_SG_FLAGS "
 @ MSG_FLG_SG_TYPE	" FLG_SG_TYPE "
 @ MSG_FLG_SG_ORDER	" FLG_SG_ORDER "
-@ MSG_FLG_SG_EMPTY	" FLG_SG_EMPTY "
 @ MSG_FLG_SG_NOHDR	" FLG_SG_NOHDR "
+@ MSG_FLG_SG_EMPTY	" FLG_SG_EMPTY "
+@ MSG_FLG_SG_KEY	" FLG_SG_KEY "
+@ MSG_FLG_SG_DISABLED	" FLG_SG_DISABLED "
+@ MSG_FLG_SG_PHREQ	" FLG_SG_PHREQ "
 
 @ MSG_GBL_ZERO		"0"
 @ MSG_GBL_OSQBRKT	"["

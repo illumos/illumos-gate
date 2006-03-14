@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -41,12 +40,12 @@
 #include	<string.h>
 #include	<limits.h>
 #include	<dlfcn.h>
-#include	"conv.h"
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"msg.h"
-#include	"debug.h"
 
 /*
  * Default and secure dependency search paths.
@@ -142,7 +141,8 @@ elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
 	    (strcmp(name, MSG_ORIG(MSG_FIL_RTLD)) == 0)) {
 		Pnode	*pnp;
 
-		DBG_CALL(Dbg_file_fixname(name, MSG_ORIG(MSG_PTH_LIBSYS)));
+		DBG_CALL(Dbg_file_fixname(LIST(clmp), name,
+		    MSG_ORIG(MSG_PTH_LIBSYS)));
 		if (((pnp = calloc(sizeof (Pnode), 1)) == 0) ||
 		    ((pnp->p_name = strdup(MSG_ORIG(MSG_PTH_LIBSYS))) == 0)) {
 			if (pnp)
@@ -299,7 +299,7 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 * dependencies processing has initiated.
 	 */
 	name = STRTAB(clmp) + DYN(clmp)[ndx].d_un.d_val;
-	DBG_CALL(Dbg_file_lazyload(name, NAME(clmp), sym));
+	DBG_CALL(Dbg_file_lazyload(clmp, name, sym));
 	if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 		dip->di_flags |= FLG_DI_PROCESSD;
 
@@ -467,6 +467,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 	 * Traverse the callers version needed information and determine if any
 	 * specific versions are required from the dependency.
 	 */
+	DBG_CALL(Dbg_ver_need_title(LIST(clmp), NAME(clmp)));
 	for (_num = 1; _num <= num; _num++,
 	    vnd = (Verneed *)((Xword)vnd + vnd->vn_next)) {
 		Half		cnt = vnd->vn_cnt;
@@ -480,7 +481,6 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 		if (strcmp(name, need) != 0)
 			continue;
 
-		DBG_CALL(Dbg_ver_need_title(NAME(clmp)));
 		if ((lml->lm_flags & LML_FLG_TRC_VERBOSE) &&
 		    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0))
 			(void) printf(MSG_INTL(MSG_LDD_VER_FIND), name);
@@ -499,7 +499,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			int		found = 0;
 
 			version = (char *)(cstrs + vnap->vna_name);
-			DBG_CALL(Dbg_ver_need_entry(0, need, version));
+			DBG_CALL(Dbg_ver_need_entry(lml, 0, need, version));
 
 			for (_num = 1; _num <= num; _num++,
 			    vdf = (Verdef *)((Xword)vdf + vdf->vd_next)) {
@@ -552,13 +552,14 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			 */
 			if ((found == 0) && (num != 0) &&
 			    (!(vnap->vna_flags & VER_FLG_WEAK))) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_VER_NFOUND),
-				    need, version, NAME(clmp));
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_VER_NFOUND), need, version,
+				    NAME(clmp));
 				return (0);
 			}
 		}
-		return (1);
 	}
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 	return (1);
 }
 
@@ -668,7 +669,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 			continue;
 		}
 
-		DBG_CALL(Dbg_file_needed(name, NAME(clmp)));
+		DBG_CALL(Dbg_file_needed(clmp, name));
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 			dip->di_flags |= FLG_DI_PROCESSD;
 
@@ -711,7 +712,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 }
 
 static int
-elf_map_check(const char *name, caddr_t vaddr, Off size)
+elf_map_check(Lm_list *lml, const char *name, caddr_t vaddr, Off size)
 {
 	prmap_t		*maps, *_maps;
 	int		pfd, num, _num;
@@ -734,12 +735,13 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
 	/*
 	 * Determine the mappings presently in use by this process.
 	 */
-	if ((pfd = pr_open()) == FD_UNAVAIL)
+	if ((pfd = pr_open(lml)) == FD_UNAVAIL)
 		return (1);
 
 	if (ioctl(pfd, PIOCNMAP, (void *)&num) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name, strerror(err));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name,
+		    strerror(err));
 		return (1);
 	}
 
@@ -748,7 +750,8 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
 
 	if (ioctl(pfd, PIOCMAP, (void *)maps) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name, strerror(err));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name,
+		    strerror(err));
 		free(maps);
 		return (1);
 	}
@@ -775,8 +778,8 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
 		else
 			str = MSG_INTL(MSG_STR_UNKNOWN);
 
-		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_MAPINUSE), name,
-		    EC_ADDR(vaddr), EC_OFF(size), str);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_MAPINUSE), name,
+		    EC_NATPTR(vaddr), EC_OFF(size), str);
 		return (1);
 	}
 	free(maps);
@@ -790,8 +793,8 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
  * reservation using the file as backing.
  */
 static Am_ret
-elf_map_reserve(const char *name, caddr_t *maddr, Off msize, int mperm,
-    int fd, Xword align)
+elf_map_reserve(Lm_list *lml, const char *name, caddr_t *maddr, Off msize,
+    int mperm, int fd, Xword align)
 {
 	Am_ret	amret;
 	int	mflag = MAP_PRIVATE | MAP_NORESERVE;
@@ -802,7 +805,7 @@ elf_map_reserve(const char *name, caddr_t *maddr, Off msize, int mperm,
 		*maddr = (caddr_t)align;
 	}
 #endif
-	if ((amret = anon_map(maddr, msize, PROT_NONE, mflag)) == AM_ERROR)
+	if ((amret = anon_map(lml, maddr, msize, PROT_NONE, mflag)) == AM_ERROR)
 		return (amret);
 
 	if (amret == AM_OK)
@@ -817,7 +820,8 @@ elf_map_reserve(const char *name, caddr_t *maddr, Off msize, int mperm,
 	if ((*maddr = mmap(*maddr, msize, mperm, MAP_PRIVATE,
 	    fd, 0)) == MAP_FAILED) {
 		int	err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name, strerror(err));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name,
+		    strerror(err));
 		return (AM_ERROR);
 	}
 	return (AM_NOSUP);
@@ -864,6 +868,7 @@ elf_map_textdata(caddr_t addr, Off flen, int mperm, int phdr_mperm, int mflag,
  */
 static caddr_t
 elf_map_it(
+	Lm_list		*lml,		/* link-map list */
 	const char	*name,		/* actual name stored for pathname */
 	Off		fsize,		/* total mapping claim of the file */
 	Ehdr		*ehdr,		/* ELF header of file */
@@ -934,7 +939,7 @@ elf_map_it(
 		rsize = fsize + padpsize + padsize;
 
 		if (lml_main.lm_head) {
-			if (elf_map_check(name, raddr, rsize) != 0)
+			if (elf_map_check(lml, name, raddr, rsize) != 0)
 				return (0);
 		}
 
@@ -963,7 +968,7 @@ elf_map_it(
 		 * be remapped.
 		 */
 		rsize = fsize + padmsize + padsize;
-		if ((amret = elf_map_reserve(name, &raddr, rsize, mperm,
+		if ((amret = elf_map_reserve(lml, name, &raddr, rsize, mperm,
 		    fd, align)) == AM_ERROR)
 			return (0);
 		maddr = raddr + padmsize;
@@ -989,8 +994,8 @@ elf_map_it(
 			(void) munmap(raddr, rsize);
 
 			rsize += align;
-			if ((amret = elf_map_reserve(name, &raddr, rsize, mperm,
-			    fd, align)) == AM_ERROR)
+			if ((amret = elf_map_reserve(lml, name, &raddr, rsize,
+			    mperm, fd, align)) == AM_ERROR)
 				return (0);
 
 			maddr = faddr = (caddr_t)S_ROUND((Off)(raddr +
@@ -1047,8 +1052,9 @@ elf_map_it(
 	 */
 	if (padsize) {
 		if (amret == AM_NOSUP) {
-			if (dz_map(raddr, padpsize, PROT_NONE, (MAP_PRIVATE |
-			    MAP_FIXED | MAP_NORESERVE)) == MAP_FAILED)
+			if (dz_map(lml, raddr, padpsize, PROT_NONE,
+			    (MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE)) ==
+			    MAP_FAILED)
 				return (0);
 
 			skipfseg = 0;
@@ -1123,7 +1129,7 @@ elf_map_it(
 			 * processed.  The segment reservation is mapped
 			 * directly from /dev/null.
 			 */
-			if (nu_map((caddr_t)addr, phdr->p_memsz, PROT_NONE,
+			if (nu_map(lml, (caddr_t)addr, phdr->p_memsz, PROT_NONE,
 			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
 				return (0);
 
@@ -1135,7 +1141,7 @@ elf_map_it(
 			 * If this segment has no backing file then it defines a
 			 * nobits segment and is mapped directly from /dev/zero.
 			 */
-			if (dz_map((caddr_t)addr, phdr->p_memsz, mperm,
+			if (dz_map(lml, (caddr_t)addr, phdr->p_memsz, mperm,
 			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
 				return (0);
 
@@ -1176,7 +1182,7 @@ elf_map_it(
 				    (MAP_FIXED | MAP_PRIVATE), fd, foff) ==
 				    MAP_FAILED) {
 					int	err = errno;
-					eprintf(ERR_FATAL,
+					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_SYS_MMAP), name,
 					    strerror(err));
 					return (0);
@@ -1219,7 +1225,8 @@ elf_map_it(
 					zero((caddr_t)foff, (long)zplen);
 
 					if ((zlen = (fend - (Off)zaddr)) > 0) {
-						if (dz_map(zaddr, zlen, mperm,
+						if (dz_map(lml, zaddr, zlen,
+						    mperm,
 						    MAP_FIXED | MAP_PRIVATE) ==
 						    MAP_FAILED)
 							return (0);
@@ -1261,8 +1268,9 @@ elf_map_it(
 			 * maddr is currently page aligned from the last segment
 			 * mapping.
 			 */
-			if (dz_map(maddr, padsize, PROT_NONE, (MAP_PRIVATE |
-			    MAP_FIXED | MAP_NORESERVE)) == MAP_FAILED)
+			if (dz_map(lml, maddr, padsize, PROT_NONE,
+			    (MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE)) ==
+			    MAP_FAILED)
 				return (0);
 		}
 		maddr += padsize;
@@ -1357,13 +1365,13 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		Word	tracing = (LIST(clmp)->lm_flags &
 		    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED));
 
-		if (tracing || dbg_mask) {
+		if (tracing || DBG_ENABLED) {
 			Bnd_desc **	bdpp;
 			Aliste		off;
 
 			FLAGS1(ilmp) |= FL1_RT_USED;
 
-			if ((tracing & LML_FLG_TRC_UNREF) || dbg_mask) {
+			if ((tracing & LML_FLG_TRC_UNREF) || DBG_ENABLED) {
 				for (ALIST_TRAVERSE(CALLERS(ilmp), off, bdpp)) {
 					Bnd_desc *	bdp = *bdpp;
 
@@ -1386,10 +1394,11 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 	filtees = (char *)STRTAB(ilmp) + DYN(ilmp)[ndx].d_un.d_val;
 	if (dip->di_info == 0) {
 		if (rtld_flags2 & RT_FL2_FLTCFG)
-			dip->di_info = elf_config_flt(PATHNAME(ilmp), filtees);
+			dip->di_info = elf_config_flt(lml, PATHNAME(ilmp),
+			    filtees);
 
 		if (dip->di_info == 0) {
-			DBG_CALL(Dbg_file_filter(NAME(ilmp), filtees, 0));
+			DBG_CALL(Dbg_file_filter(lml, NAME(ilmp), filtees, 0));
 			if ((lml->lm_flags &
 			    (LML_FLG_TRC_VERBOSE | LML_FLG_TRC_SEARCH)) &&
 			    ((FLAGS1(ilmp) & FL1_RT_LDDSTUB) == 0))
@@ -1478,7 +1487,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			const char	*filtee = pnp->p_name;
 			int		audit = 0;
 
-			DBG_CALL(Dbg_file_filtee(NAME(ilmp), filtee, 0));
+			DBG_CALL(Dbg_file_filtee(lml, NAME(ilmp), filtee, 0));
 
 			ghp = 0;
 
@@ -1620,7 +1629,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			 */
 			if (nlmp == 0) {
 				pnp->p_info = 0;
-				DBG_CALL(Dbg_file_filtee(0, filtee, audit));
+				DBG_CALL(Dbg_file_filtee(lml, 0, filtee,
+				    audit));
 
 				if (ghp)
 					(void) dlclose_core(ghp, ilmp);
@@ -1700,7 +1710,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		 * If this object is tagged to terminate filtee processing we're
 		 * done.
 		 */
-		if (FLAGS1(ghp->gh_owner) & FL1_RT_ENDFILTE)
+		if (FLAGS1(ghp->gh_ownlmp) & FL1_RT_ENDFILTE)
 			break;
 	}
 
@@ -1835,10 +1845,8 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * If we're only here to establish a symbols index, skip the diagnostic
 	 * used to trace a symbol search.
 	 */
-	if ((slp->sl_flags & LKUP_SYMNDX) == 0) {
-		DBG_CALL(Dbg_syms_lookup(name, NAME(ilmp),
-		    MSG_ORIG(MSG_STR_ELF)));
-	}
+	if ((slp->sl_flags & LKUP_SYMNDX) == 0)
+		DBG_CALL(Dbg_syms_lookup(ilmp, name, MSG_ORIG(MSG_STR_ELF)));
 
 	if (HASH(ilmp) == 0)
 		return ((Sym *)0);
@@ -2015,8 +2023,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 	Xword		rpath = 0;
 	Ehdr		*ehdr = (Ehdr *)addr;
 
-	DBG_CALL(Dbg_file_elf(pname, (ulong_t)ld, addr, msize, entry,
-	    get_linkmap_id(lml), lmco));
+	DBG_CALL(Dbg_file_elf(lml, pname, (ulong_t)ld, addr, msize, entry,
+	    lml->lm_lmidstr, lmco));
 
 	/*
 	 * Allocate space for the link-map and private elf information.  Once
@@ -2292,7 +2300,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				    if ((lml->lm_flags & LML_FLG_STARTREL) == 0)
 					FLAGS(lmp) |= FLG_RT_INTRPOSE;
 				    else {
-					DBG_CALL(Dbg_util_intoolate(NAME(lmp)));
+					DBG_CALL(Dbg_util_intoolate(lmp));
 					if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 					    (void) printf(
 						MSG_INTL(MSG_LDD_REL_ERR2),
@@ -2316,9 +2324,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			case DT_SUNW_RTLDINF:
 				if ((lml->lm_info_lmp != 0) &&
 				    (lml->lm_info_lmp != lmp)) {
-					DBG_CALL(Dbg_unused_rtldinfo(
-						NAME(lmp),
-						NAME(lml->lm_info_lmp)));
+					DBG_CALL(Dbg_unused_rtldinfo(lmp));
 					break;
 				}
 				lml->lm_info_lmp = lmp;
@@ -2534,8 +2540,8 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	else if (etype == ET_DYN)
 		fixed = 0;
 	else {
-		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
-		    conv_etype_str(etype));
+		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
+		    conv_ehdr_type(etype));
 		return (0);
 	}
 
@@ -2546,7 +2552,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	size = (size_t)((char *)ehdr->e_phoff +
 		(ehdr->e_phnum * ehdr->e_phentsize));
 	if (size > fmap->fm_fsize) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
 		return (0);
 	}
 	if (size > fmap->fm_msize) {
@@ -2554,7 +2560,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 		if ((fmap->fm_maddr = mmap(fmap->fm_maddr, size, PROT_READ,
 		    fmap->fm_mflags, fd, 0)) == MAP_FAILED) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 			    strerror(err));
 			return (0);
 		}
@@ -2582,8 +2588,8 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 				fph = pptr;
 			/* LINTED argument lph is initialized in first pass */
 			} else if (pptr->p_vaddr <= lph->p_vaddr) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_GEN_INVPRGHDR),
-				    pname);
+				eprintf(lml, ERR_ELF,
+				    MSG_INTL(MSG_GEN_INVPRGHDR), pname);
 				return (0);
 			}
 
@@ -2621,7 +2627,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * specified file and memory size.
 	 */
 	if ((fph == 0) || (lmph == 0) || (lfph == 0)) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_NOLOADSEG), pname);
+		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_NOLOADSEG), pname);
 		return (0);
 	}
 
@@ -2631,7 +2637,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * bus errors if we're given a truncated file).
 	 */
 	if (fmap->fm_fsize < ((size_t)lfph->p_offset + lfph->p_filesz)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
 		return (0);
 	}
 
@@ -2717,7 +2723,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 		/*
 		 * Map the file.
 		 */
-		if (!(faddr = elf_map_it(pname, memsize, ehdr, fph, lph,
+		if (!(faddr = elf_map_it(lml, pname, memsize, ehdr, fph, lph,
 		    &phdr, &paddr, &plen, fixed, fd, align, mmaps, &mmapcnt)))
 			return (0);
 	}
@@ -2785,7 +2791,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
  * on the value of the argument.
  */
 int
-elf_set_prot(Rt_map * lmp, int permission)
+elf_set_prot(Rt_map *lmp, int permission)
 {
 	Mmap	*mmaps;
 
@@ -2796,7 +2802,7 @@ elf_set_prot(Rt_map * lmp, int permission)
 	if (FLAGS(lmp) & FLG_RT_IMGALLOC)
 		return (1);
 
-	DBG_CALL(Dbg_file_prot(NAME(lmp), permission));
+	DBG_CALL(Dbg_file_prot(lmp, permission));
 
 	for (mmaps = MMAPS(lmp); mmaps->m_vaddr; mmaps++) {
 		if (mmaps->m_perm & PROT_WRITE)
@@ -2805,7 +2811,7 @@ elf_set_prot(Rt_map * lmp, int permission)
 		if (mprotect(mmaps->m_vaddr, mmaps->m_msize,
 		    (mmaps->m_perm | permission)) == -1) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MPROT),
+			eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_SYS_MPROT),
 			    NAME(lmp), strerror(err));
 			return (0);
 		}
@@ -2885,7 +2891,7 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 	if (lml->lm_flags & LML_FLG_TRC_WARN) {
 		if (rsym->st_size != dsym->st_size) {
 			(void) printf(MSG_INTL(MSG_LDD_CPY_SIZDIF),
-			    _conv_reloc_type_str(M_R_COPY), demangle(name),
+			    _conv_reloc_type(M_R_COPY), demangle(name),
 			    NAME(rlmp), EC_XWORD(rsym->st_size),
 			    NAME(dlmp), EC_XWORD(dsym->st_size));
 			if (rsym->st_size > dsym->st_size)
@@ -2898,12 +2904,13 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 
 		if (ELF_ST_VISIBILITY(dsym->st_other) == STV_PROTECTED) {
 			(void) printf(MSG_INTL(MSG_LDD_CPY_PROT),
-			    _conv_reloc_type_str(M_R_COPY), demangle(name),
+			    _conv_reloc_type(M_R_COPY), demangle(name),
 				NAME(dlmp));
 		}
 	}
 
-	DBG_CALL(Dbg_reloc_apply((Xword)radd, (Xword)rc.r_size));
+	DBG_CALL(Dbg_reloc_apply_val(lml, ELF_DBG_RTLD, (Xword)radd,
+	    (Xword)rc.r_size));
 	return (1);
 }
 
@@ -3132,16 +3139,17 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
     ulong_t rsymndx)
 {
 	const char	*name = (char *)0;
+	Lm_list		*lml = LIST(lmp);
 	int		trace;
 
-	if ((LIST(lmp)->lm_flags & LML_FLG_TRC_ENABLE) &&
+	if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 	    (((rtld_flags & RT_FL_SILENCERR) == 0) ||
-	    (LIST(lmp)->lm_flags & LML_FLG_TRC_VERBOSE)))
+	    (lml->lm_flags & LML_FLG_TRC_VERBOSE)))
 		trace = 1;
 	else
 		trace = 0;
 
-	if ((trace == 0) && (dbg_mask == 0))
+	if ((trace == 0) && (DBG_ENABLED == 0))
 		return;
 
 	if (rsymndx) {
@@ -3158,12 +3166,11 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
 	if (trace) {
 		const char *rstr;
 
-		rstr = _conv_reloc_type_str((uint_t)rtype);
+		rstr = _conv_reloc_type((uint_t)rtype);
 		(void) printf(MSG_INTL(MSG_LDD_REL_ERR1), rstr, name,
 		    EC_ADDR(roffset));
 		return;
 	}
 
-	Dbg_reloc_error(M_MACH, M_REL_SHT_TYPE, rel, name,
-		MSG_ORIG(MSG_REL_BADROFFSET));
+	Dbg_reloc_error(lml, ELF_DBG_RTLD, M_MACH, M_REL_SHT_TYPE, rel, name);
 }

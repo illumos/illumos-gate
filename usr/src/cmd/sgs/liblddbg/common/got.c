@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -32,10 +32,10 @@
 
 
 static int
-comparegotsym(Gottable * gtp1, Gottable * gtp2)
+Dbg_got_compare(Gottable *gtp1, Gottable *gtp2)
 {
-	Gotndx *	gnp1 = &gtp1->gt_gndx;
-	Gotndx *	gnp2 = &gtp2->gt_gndx;
+	Gotndx	*gnp1 = &gtp1->gt_gndx;
+	Gotndx	*gnp2 = &gtp2->gt_gndx;
 
 	if (gnp1->gn_gotndx > gnp2->gn_gotndx)
 		return (1);
@@ -46,26 +46,27 @@ comparegotsym(Gottable * gtp1, Gottable * gtp2)
 }
 
 void
-Dbg_got_display(Gottable * gtp, Ofl_desc *ofl)
+Dbg_got_display(Ofl_desc *ofl, Gottable *gtp)
 {
+	Lm_list	*lml = ofl->ofl_lml;
 	Word	gotndx;
 
-	if (DBG_NOTCLASS(DBG_GOT))
+	if (DBG_NOTCLASS(DBG_C_GOT))
 		return;
 
 	if (ofl->ofl_gotcnt == M_GOT_XNumber)
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_GOT_TITLE), EC_WORD(ofl->ofl_gotcnt));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_GOT_INFO), EC_WORD(ofl->ofl_gotcnt));
 
 	if (DBG_NOTDETAIL())
 		return;
 
 	qsort((char *)gtp, ofl->ofl_gotcnt, sizeof (Gottable),
-		(int(*)(const void *, const void *))comparegotsym);
+	    (int(*)(const void *, const void *))Dbg_got_compare);
 
-	dbg_print(MSG_ORIG(MSG_GOT_COLUMNS));
+	dbg_print(lml, MSG_ORIG(MSG_GOT_COLUMNS));
 
 	for (gotndx = 0; gotndx < ofl->ofl_gotcnt; gotndx++, gtp++) {
 		Sym_desc	*sdp;
@@ -78,20 +79,20 @@ Dbg_got_display(Gottable * gtp, Ofl_desc *ofl)
 		if (sdp->sd_flags & FLG_SY_SMGOT)
 			refstr = MSG_ORIG(MSG_GOT_SMALL_PIC);
 		else
-			refstr = MSG_ORIG(MSG_GOT_PIC);
+			refstr = MSG_ORIG(MSG_GOT_BIG_PIC);
 
 		if (sdp->sd_name)
-			name = _Dbg_sym_dem(sdp->sd_name);
+			name = Dbg_demangle_name(sdp->sd_name);
 		else
 			name = MSG_INTL(MSG_STR_UNKNOWN);
 
 		if ((sdp->sd_sym->st_shndx == SHN_UNDEF) ||
 		    (sdp->sd_file == 0)) {
-			dbg_print(MSG_ORIG(MSG_GOT_FORMAT1),
+			dbg_print(lml, MSG_ORIG(MSG_GOT_FORMAT1),
 			    EC_SWORD(gnp->gn_gotndx), refstr,
 			    EC_LWORD(gnp->gn_addend), name);
 		} else {
-			dbg_print(MSG_ORIG(MSG_GOT_FORMAT2),
+			dbg_print(lml, MSG_ORIG(MSG_GOT_FORMAT2),
 			    EC_SWORD(gnp->gn_gotndx), refstr,
 			    EC_LWORD(gnp->gn_addend),
 			    sdp->sd_file->ifl_name, name);
@@ -99,54 +100,41 @@ Dbg_got_display(Gottable * gtp, Ofl_desc *ofl)
 	}
 }
 
-
-#if	!defined(_ELF64)
 void
-Gelf_got_title(uchar_t class)
+Elf_got_title(Lm_list *lml)
 {
-	if (class == ELFCLASS64)
-		dbg_print(MSG_ORIG(MSG_GOT_ECOLUMNS_64));
-	else
-		dbg_print(MSG_ORIG(MSG_GOT_ECOLUMNS));
+	dbg_print(lml, MSG_INTL(MSG_GOT_TITLE));
 }
 
 void
-Gelf_got_entry(GElf_Ehdr *ehdr, Sword gotndx, GElf_Addr addr, GElf_Xword value,
-	GElf_Word rshtype, void *rel, const char *sname)
+Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
+    Word type, void *reloc, const char *name)
 {
-	GElf_Word	rtype;
-	GElf_Sxword	addend;
-	const char	*rstring, * fmt;
+	Rela		*rela;
+	Rel		*rel;
+	const char	*str;
+	char		index[INDEX_STR_SIZE];
 
-	if (rel) {
-		if (rshtype == SHT_RELA) {
-			/* LINTED */
-			rtype = (GElf_Word)GELF_R_TYPE(
-			    ((GElf_Rela *)rel)->r_info);
-			addend = ((GElf_Rela *)rel)->r_addend;
+	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_GOT_INDEX),
+	    EC_SWORD(ndx));
+
+	if (reloc) {
+		if (type == SHT_RELA) {
+			rela = (Rela *)reloc;
+			str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info));
 		} else {
-			/* LINTED */
-			rtype = (GElf_Word)GELF_R_TYPE(
-			    ((GElf_Rel *)rel)->r_info);
-			addend = 0;
+			rel = (Rel *)reloc;
+			str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info));
 		}
-		rstring = conv_reloc_type_str(ehdr->e_machine, rtype);
-	} else {
-		addend = 0;
-		rstring = MSG_ORIG(MSG_STR_EMPTY);
-	}
 
-	if (sname)
-		sname = _Dbg_sym_dem(sname);
-	else
-		sname = MSG_ORIG(MSG_STR_EMPTY);
+		if (name)
+			name = Elf_demangle_name(name);
+		else
+			name = MSG_ORIG(MSG_STR_EMPTY);
 
-	if ((int)ehdr->e_ident[EI_CLASS] == ELFCLASS64)
-		fmt = MSG_ORIG(MSG_GOT_EFORMAT_64);
-	else
-		fmt = MSG_ORIG(MSG_GOT_EFORMAT);
-
-	dbg_print(fmt, EC_SWORD(gotndx), EC_ADDR(addr), EC_XWORD(value),
-	    rstring, EC_SXWORD(addend), sname);
+		dbg_print(lml, MSG_INTL(MSG_GOT_ENTRY_RE), index, EC_ADDR(addr),
+		    EC_XWORD(value), str, name);
+	} else
+		dbg_print(lml, MSG_INTL(MSG_GOT_ENTRY_NR), index, EC_ADDR(addr),
+		    EC_XWORD(value));
 }
-#endif	/* !defined(_ELF64) */

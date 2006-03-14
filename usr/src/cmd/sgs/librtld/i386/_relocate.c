@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -31,21 +31,19 @@
 #include	"_librtld.h"
 #include	"_elf.h"
 
-
 /*
  * Undo relocations that have been applied to a memory image.  Basically this
  * involves copying the original files relocation offset into the new image
  * being created.
  */
 void
-undo_reloc(void *vrel, unsigned char *oaddr, unsigned char *iaddr,
-    Reloc *reloc)
+undo_reloc(void *vrel, uchar_t *oaddr, uchar_t *iaddr, Reloc *reloc)
 {
-	Rel		*rel = vrel;
+	Rel	*rel = vrel;
 	/* LINTED */
-	unsigned long	*_oaddr = (unsigned long *)oaddr;
+	ulong_t	*_oaddr = (ulong_t *)oaddr;
 	/* LINTED */
-	unsigned long	*_iaddr = (unsigned long *)iaddr;
+	ulong_t	*_iaddr = (ulong_t *)iaddr;
 
 	switch (ELF_R_TYPE(rel->r_info)) {
 	case R_386_NONE:
@@ -71,22 +69,21 @@ undo_reloc(void *vrel, unsigned char *oaddr, unsigned char *iaddr,
 	}
 }
 
-
 /*
  * Copy a relocation record and increment its value.  The record must reflect
  * the new address to which this image is fixed.  Note that .got entries
  * associated with .plt's must be fixed to the new base address.
  */
 void
-inc_reloc(void *vnrel, void *vorel, Reloc *reloc, unsigned char *oaddr,
-    unsigned char *iaddr)
+inc_reloc(void *vnrel, void *vorel, Reloc *reloc, uchar_t *oaddr,
+    uchar_t *iaddr)
 {
-	Rel		*nrel = vnrel;
-	Rel		*orel = vorel;
+	Rel	*nrel = vnrel;
+	Rel	*orel = vorel;
 	/* LINTED */
-	unsigned long	*_oaddr = (unsigned long *)oaddr;
+	ulong_t	*_oaddr = (ulong_t *)oaddr;
 	/* LINTED */
-	unsigned long	*_iaddr = (unsigned long *)iaddr;
+	ulong_t	*_iaddr = (ulong_t *)iaddr;
 
 	if (ELF_R_TYPE(nrel->r_info) == R_386_JMP_SLOT) {
 		if (_iaddr)
@@ -99,31 +96,29 @@ inc_reloc(void *vnrel, void *vorel, Reloc *reloc, unsigned char *oaddr,
 	nrel->r_offset += reloc->r_value;
 }
 
-
 /*
  * Clear a relocation record.  The relocation has been applied to the image and
  * thus the relocation must not occur again.
  */
 void
-clear_reloc(void * vrel)
+clear_reloc(void *vrel)
 {
-	Rel *	rel = vrel;
+	Rel	*rel = vrel;
 
 	rel->r_offset = 0;
 	rel->r_info = ELF_R_INFO(0, R_386_NONE);
 }
-
 
 /*
  * Apply a relocation to an image being built from an input file.  Use the
  * runtime linkers routines to do the necessary magic.
  */
 void
-apply_reloc(void *vrel, Reloc *reloc, const char *name,
-    unsigned char *oaddr, Rt_map *lmp)
+apply_reloc(void *vrel, Reloc *reloc, const char *name, uchar_t *oaddr,
+    Rt_map *lmp)
 {
 	Rel	*rel = vrel;
-	Byte	type = ELF_R_TYPE(rel->r_info);
+	Xword	type = ELF_R_TYPE(rel->r_info);
 	Word	value = reloc->r_value;
 
 	if (type == R_386_JMP_SLOT) {
@@ -137,11 +132,12 @@ apply_reloc(void *vrel, Reloc *reloc, const char *name,
 		/* LINTED */
 		elf_plt_write((uintptr_t)addr, vaddr, rel,
 		    (uintptr_t)value, reloc->r_pltndx);
+
 	} else if (type == R_386_COPY) {
 		(void) memcpy((void *)oaddr, (void *)value,
 		    (size_t)reloc->r_size);
-
 	} else {
-		(void) do_reloc(type, oaddr, &value, reloc->r_name, name);
+		(void) do_reloc(type, oaddr, &value, reloc->r_name, name,
+		    LIST(lmp));
 	}
 }

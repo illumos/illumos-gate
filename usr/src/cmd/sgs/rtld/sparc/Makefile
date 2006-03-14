@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		globals.o	malloc.o \
 		mutex.o		paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
-		getcwd.o	remove.o	sunwmove.o	tls.o \
+		getcwd.o	remove.o	move.o		tls.o \
 		cap.o
 
 S_COMOBJS=	debug.o		audit.o		object.o	cache_a.out.o \
@@ -58,7 +58,7 @@ CRTS=		$(CRTI)		$(CRTN)
 
 CHKSRCS=	$(SRCBASE)/uts/common/krtld/reloc.h
 
-BASEPLAT=	sparc
+BASEPLAT =	sparc
 
 # __GNUC is overridden in the environment when building with gcc
 __GNUC:sh=		echo \\043
@@ -79,6 +79,8 @@ ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32
 ADBSUB=		$(ADBSUB32)
 SONAME=		$(VAR_RTLD_SONAME)
+
+MAPFILES +=	../common/mapfile-32-vers
 
 SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC32) $(SGSMSG32)
 

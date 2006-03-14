@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<link.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -73,7 +73,7 @@ gnavl_compare(const void * n1, const void * n2)
  * Determine whether a (COMDAT) group has already been encountered.  If so,
  * tag the new group having the same name as discardable.
  */
-uintptr_t
+static uintptr_t
 gpavl_loaded(Ofl_desc *ofl, Group_desc * gdp)
 {
 	Grp_node	gpn, *gpnp;
@@ -113,7 +113,7 @@ gpavl_loaded(Ofl_desc *ofl, Group_desc * gdp)
 }
 
 Group_desc *
-get_group(Ofl_desc *ofl, Is_desc *isp)
+ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 {
 	Ifl_desc	*ifl = isp->is_file;
 	Elf		*elf = ifl->ifl_elf;
@@ -144,7 +144,8 @@ get_group(Ofl_desc *ofl, Is_desc *isp)
 			 */
 			if ((shdr->sh_link == SHN_UNDEF) ||
 			    (shdr->sh_link >= ifl->ifl_shnum)) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_FIL_INVSHLINK),
 				    ifl->ifl_name, elf_strptr(elf,
 				    ifl->ifl_shstrndx, shdr->sh_name),
 				    EC_XWORD(shdr->sh_link));
@@ -153,7 +154,7 @@ get_group(Ofl_desc *ofl, Is_desc *isp)
 			}
 
 			if (shdr->sh_entsize == 0) {
-				eprintf(ERR_FATAL,
+				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_FIL_INVSHENTSIZE),
 				    ifl->ifl_name, elf_strptr(elf,
 				    ifl->ifl_shstrndx, shdr->sh_name),
@@ -176,7 +177,8 @@ get_group(Ofl_desc *ofl, Is_desc *isp)
 			if ((shdr->sh_info == SHN_UNDEF) ||
 			    (shdr->sh_info >= (Word)(_shdr->sh_size /
 			    _shdr->sh_entsize))) {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_FIL_INVSHINFO),
 				    ifl->ifl_name, elf_strptr(elf,
 				    ifl->ifl_shstrndx, shdr->sh_name),
 				    EC_XWORD(shdr->sh_info));
@@ -235,8 +237,8 @@ get_group(Ofl_desc *ofl, Is_desc *isp)
 		}
 	}
 
-	eprintf(ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT), ifl->ifl_name,
-	    isp->is_name);
+	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT),
+	    ifl->ifl_name, isp->is_name);
 	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (0);
 }

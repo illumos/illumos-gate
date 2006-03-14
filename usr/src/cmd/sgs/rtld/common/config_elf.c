@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,9 +34,9 @@
 #include	<limits.h>
 #include	<stdio.h>
 #include	<string.h>
-#include	"rtc.h"
-#include	"debug.h"
-#include	"conv.h"
+#include	<rtc.h>
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"msg.h"
 
@@ -48,8 +48,9 @@ Config *	config = &_config;
  * Validate a configuration file.
  */
 static void
-elf_config_validate(Addr addr, Rtc_head * head, Rt_map * lmp)
+elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 {
+	Lm_list		*lml = LIST(lmp);
 	const char	*str, *strtbl = config->c_strtbl;
 	Rtc_obj		*obj;
 	Rtc_dir		*dirtbl;
@@ -83,10 +84,11 @@ elf_config_validate(Addr addr, Rtc_head * head, Rt_map * lmp)
 			 * the shared object is part of.  In this case ignore
 			 * any mismatch name warnings.
 			 */
-			if ((LIST(lmp)->lm_flags & LML_FLG_TRC_ENABLE) &&
+			if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 			    ((FLAGS1(lmp) & FL1_RT_LDDSTUB) == 0)) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_CONF_APP),
-				    config->c_name, _cname);
+				eprintf(lml, ERR_WARNING,
+				    MSG_INTL(MSG_CONF_APP), config->c_name,
+				    _cname);
 				return;
 			}
 		}
@@ -132,7 +134,7 @@ elf_config_validate(Addr addr, Rtc_head * head, Rt_map * lmp)
 
 		if (stat(str, &status) != 0) {
 			err = errno;
-			eprintf(ERR_WARNING, MSG_INTL(MSG_CONF_DSTAT),
+			eprintf(lml, ERR_WARNING, MSG_INTL(MSG_CONF_DSTAT),
 			    config->c_name, str, strerror(err));
 			continue;
 		}
@@ -158,8 +160,9 @@ elf_config_validate(Addr addr, Rtc_head * head, Rt_map * lmp)
 
 			if (stat(str, &status) != 0) {
 				err = errno;
-				eprintf(ERR_WARNING, MSG_INTL(MSG_CONF_FSTAT),
-				    config->c_name, str, strerror(err));
+				eprintf(lml, ERR_WARNING,
+				    MSG_INTL(MSG_CONF_FSTAT), config->c_name,
+				    str, strerror(err));
 				continue;
 			}
 
@@ -168,15 +171,16 @@ elf_config_validate(Addr addr, Rtc_head * head, Rt_map * lmp)
 			 * changed.
 			 */
 			if (status.st_size != obj->co_info) {
-				eprintf(ERR_WARNING, MSG_INTL(MSG_CONF_FCMP),
-				    config->c_name, str);
+				eprintf(lml, ERR_WARNING,
+				    MSG_INTL(MSG_CONF_FCMP), config->c_name,
+				    str);
 			}
 		}
 	}
 }
 
 int
-elf_config(Rt_map * lmp, int aout)
+elf_config(Rt_map *lmp, int aout)
 {
 	Rtc_head	*head;
 	int		fd, features = 0;
@@ -202,7 +206,7 @@ elf_config(Rt_map * lmp, int aout)
 		char	*name;
 
 		/*
-		 * If we're dealing with an alternative application fabricate
+		 * If we're dealing with an alternative application, fabricate
 		 * the need for a $ORIGIN/ld.config.app-name configuration file.
 		 */
 		if (rtld_flags & RT_FL_CONFAPP) {
@@ -276,10 +280,10 @@ elf_config(Rt_map * lmp, int aout)
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 		if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 #if	defined(_ELF64)
-			str = conv_upm_string(str, MSG_ORIG(MSG_PTH_USRLIB_64),
+			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB_64),
 			    MSG_ORIG(MSG_PTH_LIB_64), MSG_PTH_LIB_64_SIZE);
 #else
-			str = conv_upm_string(str, MSG_ORIG(MSG_PTH_USRLIB),
+			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB),
 			    MSG_ORIG(MSG_PTH_LIB), MSG_PTH_LIB_SIZE);
 #endif
 		}
@@ -294,11 +298,11 @@ elf_config(Rt_map * lmp, int aout)
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 		if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 #if	defined(_ELF64)
-			str = conv_upm_string(str,
+			str = conv_config_upm(str,
 			    MSG_ORIG(MSG_PTH_USRLIBSE_64),
 			    MSG_ORIG(MSG_PTH_LIBSE_64), MSG_PTH_LIBSE_64_SIZE);
 #else
-			str = conv_upm_string(str, MSG_ORIG(MSG_PTH_USRLIBSE),
+			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIBSE),
 			    MSG_ORIG(MSG_PTH_LIBSE), MSG_PTH_LIBSE_SIZE);
 #endif
 		}
@@ -379,7 +383,8 @@ elf_config(Rt_map * lmp, int aout)
 
 			if (((config->c_bgn <= head->ch_resbgn) &&
 			    (config->c_bgn >= head->ch_resend)) ||
-			    (nu_map((caddr_t)(uintptr_t)head->ch_resbgn,
+			    (nu_map(LIST(lmp),
+			    (caddr_t)(uintptr_t)head->ch_resbgn,
 			    (head->ch_resend - head->ch_resbgn), PROT_NONE,
 			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED))
 				return (-1);
@@ -429,7 +434,7 @@ elf_config_ent(const char *name, Word hash, int id, const char **alternate)
  * a Pnode list.
  */
 Pnode *
-elf_config_flt(const char *filter, const char *string)
+elf_config_flt(Lm_list *lml, const char *filter, const char *string)
 {
 	Rtc_fltr *	fltrtbl;
 	Pnode *		pnp = 0, *npnp, *opnp = 0;
@@ -462,7 +467,7 @@ elf_config_flt(const char *filter, const char *string)
 			    ((npnp->p_name = strdup(flte)) == 0))
 				return (0);
 
-			DBG_CALL(Dbg_file_filter(fltr, flte, 1));
+			DBG_CALL(Dbg_file_filter(lml, fltr, flte, 1));
 
 			if (opnp == 0)
 				pnp = npnp;

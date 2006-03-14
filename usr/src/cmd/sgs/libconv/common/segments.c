@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,8 @@
  * String conversion routine for segment flags.
  */
 #include	<string.h>
-#include	"libld.h"
+#include	<libld.h>
+#include	"_conv.h"
 #include	"segments_msg.h"
 
 #define	SEGSZ	MSG_GBL_OSQBRKT_SIZE + \
@@ -41,41 +42,40 @@
 		MSG_FLG_SG_FLAGS_SIZE + \
 		MSG_FLG_SG_TYPE_SIZE + \
 		MSG_FLG_SG_ORDER_SIZE + \
-		MSG_FLG_SG_EMPTY_SIZE + \
 		MSG_FLG_SG_NOHDR_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		MSG_FLG_SG_EMPTY_SIZE + \
+		MSG_FLG_SG_KEY_SIZE + \
+		MSG_FLG_SG_DISABLED_SIZE + \
+		MSG_FLG_SG_PHREQ_SIZE + \
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
-conv_segaflg_str(uint_t flags)
+conv_seg_flags(Half flags)
 {
-	static	char	string[SEGSZ] = { '\0' };
+	static char	string[SEGSZ];
+	static Val_desc vda[] = {
+		{ FLG_SG_VADDR,		MSG_ORIG(MSG_FLG_SG_VADDR) },
+		{ FLG_SG_PADDR,		MSG_ORIG(MSG_FLG_SG_PADDR) },
+		{ FLG_SG_LENGTH,	MSG_ORIG(MSG_FLG_SG_LENGTH) },
+		{ FLG_SG_ALIGN,		MSG_ORIG(MSG_FLG_SG_ALIGN) },
+		{ FLG_SG_ROUND,		MSG_ORIG(MSG_FLG_SG_ROUND) },
+		{ FLG_SG_FLAGS,		MSG_ORIG(MSG_FLG_SG_FLAGS) },
+		{ FLG_SG_TYPE,		MSG_ORIG(MSG_FLG_SG_TYPE) },
+		{ FLG_SG_ORDER,		MSG_ORIG(MSG_FLG_SG_ORDER) },
+		{ FLG_SG_NOHDR,		MSG_ORIG(MSG_FLG_SG_NOHDR) },
+		{ FLG_SG_EMPTY,		MSG_ORIG(MSG_FLG_SG_EMPTY) },
+		{ FLG_SG_KEY,		MSG_ORIG(MSG_FLG_SG_KEY) },
+		{ FLG_SG_DISABLED,	MSG_ORIG(MSG_FLG_SG_DISABLED) },
+		{ FLG_SG_PHREQ,		MSG_ORIG(MSG_FLG_SG_PHREQ) },
+		{ 0,			0 }
+	};
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
-	else {
-		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-		if (flags & FLG_SG_VADDR)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_VADDR));
-		if (flags & FLG_SG_PADDR)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_PADDR));
-		if (flags & FLG_SG_LENGTH)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_LENGTH));
-		if (flags & FLG_SG_ALIGN)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_ALIGN));
-		if (flags & FLG_SG_ROUND)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_ROUND));
-		if (flags & FLG_SG_FLAGS)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_FLAGS));
-		if (flags & FLG_SG_TYPE)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_TYPE));
-		if (flags & FLG_SG_ORDER)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_ORDER));
-		if (flags & FLG_SG_EMPTY)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_EMPTY));
-		if (flags & FLG_SG_NOHDR)
-			(void) strcat(string, MSG_ORIG(MSG_FLG_SG_NOHDR));
-		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
 
-		return ((const char *)string);
-	}
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), SEGSZ);
+	if (conv_expn_field(string, SEGSZ, vda, flags, flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), SEGSZ);
+
+	return ((const char *)string);
 }

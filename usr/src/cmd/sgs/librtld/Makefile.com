@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,12 +40,13 @@ OBJECTS=	$(BLTOBJ)  $(MACHOBJS)  $(COMOBJS)
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
-MAPFILE=	../common/mapfile-vers
+MAPFILES =	../common/mapfile-vers
+MAPOPTS =	$(MAPFILES:%=-M%)
 
 CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
 		-I$(SRCBASE)/uts/common/krtld
-DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD)
-LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf -lc
+DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
@@ -54,7 +55,7 @@ LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 # '=' is used with extra variables.
 #
 XXXFLAGS=
-$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO) -M$(MAPFILE)
+$(DYNLIB) :=	XXXFLAGS= $(USE_PROTO) $(MAPOPTS)
 DYNFLAGS +=	$(XXXFLAGS)
 
 

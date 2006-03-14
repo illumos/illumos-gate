@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,71 +39,114 @@
 
 # TRANSLATION_NOTE - Use the following output in C as a reference, 1.
 #
-# 		 For debugging the runtime linking of an application:
-# 			LD_DEBUG=token1,token2  prog
-# 		 enables diagnostics to the stderr.  The additional option:
-# 			LD_DEBUG_OUTPUT=file
-# 		 redirects the diagnostics to an output file created using
-# 		 the specified name and the process id as a suffix.  All
-# 		 diagnostics are prepended with the process id.
+# Runtime Linking
+#    Diagnostics that trace the runtime linking of an application can be
+#    enabled to stderr by using the environment variable setting:
+# 	LD_DEBUG=token1,token2
+#    Alternatively, the diagnostics can be redirected to an output file
+#    using the additional environment variable:
+# 	LD_DEBUG_OUTPUT=file
+#    The output file is given the specified name and the process id as a
+#    suffix.
+#
+#    By default, all diagnostics are prepended with the process id,
+#    together with the thread id.  Note, all applications are effectively
+#    thread aware, and once thread capabilities are enabled, even a single
+#    threaded application is labeled as thread 1.
+#
+#    The token `lmid' prepends a link-map list identifier to each
+#    diagnostic.
+#
+#    The tokens `base', `ldso' and `newlm[0-9]*' can be used to isolate
+#    diagnostics to the associated link-map lists.   Note, by default, any
+#    diagnostics associated with loading components for the runtime linker
+#    itself are suppressed, unless `ldso' is explicitly specified.
 # 
-# 		 For debugging the link-editing of an application:
-# 			LD_OPTIONS=-Dtoken1,token2 cc -o prog ...
-# 		 or,
-# 			ld -Dtoken1,token2 -o prog ...
-# 		 where placement of -D on the command line is significant,
-# 		 and options can be switched off by prepending with `!'.  All
-#		 diagnostics are prepended with the string `debug', and
-#		 optionally with the output file basename or fullname, and
-#		 its class, if the `name' or `fullname', and `class' tokens
-#		 are specified respectively.
+# Link-Editing
+#    Diagnostics that trace the link-editing of an application can be
+#    enabled to stderr using the -D option:
+#	ld -Dtoken1,token2 -o prog ...
+#    As the -D option can also be meaningful to compiler drivers, an
+#    alternative mechanism to enable diagnostics is to use the environment
+#    variable:
+#	LD_OPTIONS=-Dtoken1,token2 cc -o prog ...
 #
-#	The next 13 messages makes the above output in C locale.
-#	Use the tabs as alignment characters as needed.
+#    The use of -D on the link-edit command line is significant.
+#    Diagnostics are enabled when a debug token is first encountered, and
+#    can be switched off by prepending the token with `!'.
 #
-@ MSG_USE_RTLD_A	"\t\t  For debugging the runtime linking of an \
-			 application:"
+#    By default, all diagnostics are prepended with the string `debug'.
 #
-# Be warned that the next two messages make a sentence.
-# That is:
-# 			LD_DEBUG=token1,token2  prog
-# 		 enables diagnostics to the stderr.  The additional option:
-# So do not translate the msgid separately, but handle them together
-# Same kind of sentences appear in this block of messages.
-#
-@ MSG_USE_RTLD_B	"\t\t\tLD_DEBUG=token1,token2  prog"
-@ MSG_USE_RTLD_C	"\t\t  enables diagnostics to the stderr.  \
-			 The additional option:"
-@ MSG_USE_RTLD_D	"\t\t\tLD_DEBUG_OUTPUT=file"
-@ MSG_USE_RTLD_E	"\t\t  redirects the diagnostics to an output file \
-			 created using"
-@ MSG_USE_RTLD_F	"\t\t  the specified name and the process id as a \
-			 suffix.  All"
-@ MSG_USE_RTLD_G	"\t\t  diagnostics are prepended with the process id."
-
-@ MSG_USE_LD_A		"\t\t  For debugging the link-editing of an application:"
-@ MSG_USE_LD_B		"\t\t\tLD_OPTIONS=-Dtoken1,token2 cc -o prog ..."
-@ MSG_USE_LD_C		"\t\t  or,"
-@ MSG_USE_LD_D		"\t\t\tld -Dtoken1,token2 -o prog ..."
-@ MSG_USE_LD_E		"\t\t  where placement of -D on the command line is \
-			 significant,"
-@ MSG_USE_LD_F		"\t\t  and options can be switched off by prepending \
-			 with `!'.  All"
-@ MSG_USE_LD_G		"\t\t  diagnostics are prepended with the string \
-			 `debug', and"
-@ MSG_USE_LD_H		"\t\t  optionally with the output file basename or \
-			 fullname, and"
-@ MSG_USE_LD_I		"\t\t  its class, if the `name' or `fullname', and \
-			 `class' tokens"
-@ MSG_USE_LD_J		"\t\t  are specified respectively."
-#
-#	END OF reference 1
-#
+#    The tokens `name', `fullname' and `class' can be used to prepend the
+#    output file basename, fullname, and class respectively, to each
+#    diagnostic.
 
 
-# TRANSLATION_NOTE
-#	The next 23 messages make the following usage table.
-#	Tabs are used for alignment.
+# TRANSLATION_NOTE - The next series of messages makes the above output in C
+# locale.  Use tabs and space alignment characters as needed.
+#
+@ MSG_USE_RTLD_A	"Runtime Linking"
+@ MSG_USE_RTLD_B	"    Diagnostics that trace the runtime linking of an \
+			 application can be"
+@ MSG_USE_RTLD_C	"    enabled to stderr by using the environment \
+			 variable setting:"
+@ MSG_USE_RTLD_D	" 	LD_DEBUG=token1,token2 app ..."
+@ MSG_USE_RTLD_E	"    Alternatively, the diagnostics can be redirected \
+			 to an output file"
+@ MSG_USE_RTLD_F	"    using the additional environment variable:"
+@ MSG_USE_RTLD_G	" 	LD_DEBUG_OUTPUT=file"
+@ MSG_USE_RTLD_H	"    The output file is given the specified name and \
+			 the process id as a"
+@ MSG_USE_RTLD_I	"    suffix."
+@ MSG_USE_RTLD_J	"    By default, all diagnostics are prepended with \
+			 the process id,"
+@ MSG_USE_RTLD_K	"    together with the thread id.  Note, all \
+			 applications are effectively"
+@ MSG_USE_RTLD_L	"    thread aware, and once thread capabilities are \
+			 enabled, even a single"
+@ MSG_USE_RTLD_M	"    threaded application is labeled as thread 1."
+@ MSG_USE_RTLD_N	"    The token `lmid' prepends a link-map list \
+			 identifier to each"
+@ MSG_USE_RTLD_O	"    diagnostic."
+@ MSG_USE_RTLD_P	"    The tokens `base', `ldso' and `newlm[0-9]*' can \
+			 be used to isolate"
+@ MSG_USE_RTLD_Q	"    diagnostics to the associated link-map lists.  \
+			 Note, by default, any"
+@ MSG_USE_RTLD_R	"    diagnostics associated with loading components \
+			 for the runtime linker"
+@ MSG_USE_RTLD_S	"    itself are suppressed, unless `ldso' is \
+			 explicitly specified."
+
+@ MSG_USE_LD_A		"Link-Editing"
+@ MSG_USE_LD_B		"    Diagnostics that trace the link-editing of an \
+			 application can be"
+@ MSG_USE_LD_C		"    enabled to stderr using the -D option:"
+@ MSG_USE_LD_D		"       ld -Dtoken1,token2 -o prog ..."
+@ MSG_USE_LD_E		"    As the -D option can also be meaningful to \
+			 compiler drivers, an"
+@ MSG_USE_LD_F		"    alternative mechanism to enable diagnostics is to \
+			 use the environment"
+@ MSG_USE_LD_G		"    variable:"
+@ MSG_USE_LD_H		"       LD_OPTIONS=-Dtoken1,token2 cc -o prog ..."
+@ MSG_USE_LD_I		"    The use of -D on the link-edit command line is \
+			 significant."
+@ MSG_USE_LD_J		"    Diagnostics are enabled when a debug token is \
+			 first encountered, and"
+@ MSG_USE_LD_K		"    can be switched off by prepending the token \
+			 with `!'."
+@ MSG_USE_LD_L		"    By default, all diagnostics are prepended with \
+			 the string `debug'."
+@ MSG_USE_LD_M		"    The tokens `name', `fullname' and `class' can be \
+			 used to prepend"
+@ MSG_USE_LD_N		"    the output file basename, fullname, and class \
+			 respectively, to each"
+@ MSG_USE_LD_O		"    diagnostic."
+
+# TRANSLATION_NOTE - End of reference 1
+
+
+# TRANSLATION_NOTE - The next series of messages makes the following usage
+# table.  Use tabs and space alignment characters as needed.
 #
 # args		display input argument processing (ld only)
 # audit		display runtime link-audit processing (ld.so.1 only)
@@ -190,6 +232,10 @@
 			 shows actual"
 @ MSG_USE_LIBS_2	"\t\t    library lookup (-l) processing"
 
+# TRANSLATION_NOTE -- do not translate the first token `lmid'.
+@ MSG_USE_LMID		"lmid\t  display link-map list identifier \
+			(ld.so.1 only)"
+
 # TRANSLATION_NOTE -- do not translate the first token `long'.
 @ MSG_USE_LONG		"long\t  display long object names without truncation"
 
@@ -219,7 +265,7 @@
 @ MSG_USE_SYMBOLS_2	"\t\t    symbol table addition and resolution (ld only)"
 
 # TRANSLATION_NOTE -- do not translate the first token `statistics'.
-@ MSG_USE_STATISTICS	"statistics display processing statistics (ld only)"
+@ MSG_USE_STATS		"statistics display processing statistics (ld only)"
 
 # TRANSLATION_NOTE -- do not translate the first token `strtab'.
 @ MSG_USE_STRTAB	"strtab\t  display information about string table \
@@ -247,7 +293,7 @@
 # NOTE: these are used by appcert(1) and lari(1), use care when changing.
 
 @ MSG_BND_BASIC		"binding file=%s to file=%s: symbol `%s'"
-@ MSG_BND_PLT		"binding file=%s (%#llx:%#llx) at plt[%d]:%s to \
+@ MSG_BND_PLT		"binding file=%s (%#llx:%#llx) at plt[%lld]:%s to \
 			 file=%s (%#llx:%#llx): symbol `%s'%s"
 @ MSG_BND_DLSYM		"binding file=%s (dlsym) to file=%s \
 			 (%#llx:%#llx): symbol `%s'%s"
@@ -257,7 +303,9 @@
 @ MSG_BND_WEAK_2	"binding file=%s (%#llx:%#llx) to 0x0 \
 			 (undefined weak): symbol `%s'"
 
-@ MSG_BND_PROFILE	"    profiling symbol[%d];  call count=%d"
+@ MSG_BND_PLTPAD_TO	"   pltpad: %#llx: file=%s bound to file=%s: \
+			 symbol `%s'"
+@ MSG_BND_PLTPAD_FROM	"   pltpad: %#llx: bound from file=%s: symbol `%s'"
 
 @ MSG_BND_PSUM_SPARCV9	"Summary of PLT types bound: 21d=%d, 24d=%d, u32=%d, \
 			 u44=%d, full=%d, far=%d, Total=%d"
@@ -271,23 +319,21 @@
 @ MSG_REL_COLLECT	"collecting input relocations: section=%s, file=%s"
 @ MSG_REL_ACTIVE	"performing active relocations"
 @ MSG_REL_CREATING	"creating output relocations"
-@ MSG_REL_RELOC_START	"relocation processing: file=%s%s"
-@ MSG_REL_RELOC_FINISH	"relocation processing: file=%s; finished%s"
-@ MSG_REL_RELOC_NONE	"relocation processing: file=%s%s; nothing to do"
+@ MSG_REL_START		"relocation processing: file=%s%s"
+@ MSG_REL_FINISH	"relocation processing: file=%s; finished%s"
+@ MSG_REL_NONE		"relocation processing: file=%s%s; nothing to do"
 
-@ MSG_REL_RELOC_PLT	"  (plt processing only)"
-@ MSG_REL_RELOC_FAIL	"  (failed)"
+@ MSG_REL_PLT		"  (plt processing only)"
+@ MSG_REL_FAIL		"  (failed)"
+
+@ MSG_REL_BADROFFSET	"<offset lies outside memory image; \
+			 relocation discarded>"
 
 @ MSG_REL_TRANS		"relocation transition: offset: %#llx old reloc: %s \
 			 new reloc: %s symbol `%s'"
 @ MSG_REL_DISCARDED	"relocation against discarded section=%s from file=%s; \
 			 relocation type=%s offset=0x%llx; relocation discarded"
 @ MSG_REL_COPY		"copy data from file=%s to file=%s: symbol `%s'%s"
-
-# Dynamic section messages
-
-@ MSG_DYN_TITLE		"     index  tag               value"
-@ MSG_DYN_ENTRY		"%10.10s  %-15.15s  %-#14llx    %s"
 
 # Entrance criteria messages
 
@@ -297,13 +343,21 @@
 @ MSG_ECR_DESC		"entrance descriptor[%d]"
 
 
-# Elf section messages
+# Elf Data (section) messages
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more standard 32-bit Elf_Data entries that align with the initial title.
 
-@ MSG_ELF_TITLE		"            addr type        size   offset al file"
-@ MSG_ELF_ENTRY		"  %3s %#10llx %-5s %#10llx %#8llx %2lld %s%s"
-@ MSG_ELF_HEADER	"ELF Header"
-@ MSG_ELF_IGNSCN	"  (section ignored)"
+@ MSG_EDATA_TITLE_32	"            addr type        size   offset al file"
+@ MSG_EDATA_ENTRY_32	"  %3s %#10llx %-5s %#10llx %#8llx %2lld %s%s"
 
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more standard 64-bit Elf_Data entries that align with the initial title.
+
+@ MSG_EDATA_TITLE_64	"                    addr type                \
+			 size           offset al file"
+@ MSG_EDATA_ENTRY_64	"  %3s %#18llx %-5s %#18llx %#8llx %2lld %s%s"
+
+@ MSG_EDATA_IGNSCN	"  (section ignored)"
 
 # File messages
 
@@ -336,10 +390,11 @@
 @ MSG_FIL_CONFIG	"file=%s  [ ELF ]; configuration alternate found: %s"
 
 
-@ MSG_FIL_DATA_1	"    dynamic:  %#10llx  base:  %#10llx  size:   %#10llx"
-@ MSG_FIL_DATA_2	"    entry:    %#10llx  lmid:  %#10llx  lmco:   %#10llx"
-@ MSG_FIL_DATA_3	"    dynamic:  %#10llx  base:  %#10llx"
-@ MSG_FIL_DATA_4	"    envp:     %#10llx  auxv:  %#10llx"
+@ MSG_FIL_DATA_DB	"    dynamic:  %#18llx  base:   %#18llx"
+@ MSG_FIL_DATA_SE	"    size:     %#18llx  entry:  %#18llx"
+@ MSG_FIL_DATA_S	"    size:     %#18llx"
+@ MSG_FIL_DATA_LL	"    lmid:     %18.18s  lmco:   %#18llx"
+@ MSG_FIL_DATA_EA	"    envp:     %#18llx  auxv:   %#18llx"
 
 @ MSG_FIL_BND_ADD	"file=%s;  add binding to:"
 @ MSG_FIL_BND_FILE	"    file=%s   %s"
@@ -444,20 +499,21 @@
 
 # Move messages
 
-@ MSG_MV_ADJEXPAND1	"for symbol=%s new roffset=0x%llx"
-@ MSG_MV_ADJMOVE1	"for symbol=%s roffset(from/to)=\
-			 (0x%llx/0x%llx)"
-@ MSG_MV_OUTSCTADJ1	"adjusting addend for symbol=%s"
-@ MSG_MV_MOVEDATA	"file=%s  processing move data"
-@ MSG_MV_EXPAND0	"expanding %s into .SUNW_data1: %s"
-@ MSG_MV_OUTMOVE0	"copying move entries for %s into .SUNW_move"
-@ MSG_MV_EXPAND1	"\t     0x%llx\t0x%llx    (expanded)"
+@ MSG_MOVE_FILE		"file=%s  processing move data"
+@ MSG_MOVE_TITLE2	"         address       value  repeat  stride  symbol"
+@ MSG_MOVE_ENTRY2	"   in %#10llx   %#10llx  %6d  %6d  %s"
+@ MSG_MOVE_EXPAND	"      %#10llx   %#10llx  (expanded)"
 
-@ MSG_MOVE_INPUT1	"collecting move entries: file=%s"
+@ MSG_MOVE_ADJEXPAND	"for symbol=%s roffset: new=0x%llx"
+@ MSG_MOVE_ADJMOVE	"for symbol=%s roffset: from=0x%llx, to=0x%llx"
+@ MSG_MOVE_OUTSCTADJ	"adjusting addend for symbol=%s"
+@ MSG_MOVE_PAREXPN	"expanding %s into .SUNW_data1: %s"
+@ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
+@ MSG_MOVE_INPUT	"collecting move entries: file=%s"
+
 @ MSG_MOVE_TITLE1	"\t i/o offset\tvalue\trepeat\tstride\tsymbol"
-@ MSG_MOVE_TITLE2	"\t     address\tvalue\trepeat\tstride\tsymbol"
-@ MSG_MOVE_MVENTRY1	"\t  in 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
-@ MSG_MOVE_MVENTRY2	"\t out 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
+@ MSG_MOVE_ENTRY1IN	"\t  in 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
+@ MSG_MOVE_ENTRY1OUT	"\t out 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
 
 # Section messages
 
@@ -533,10 +589,10 @@
 @ MSG_SYM_RETAINING	"symbol table processing; retaining local symbols"
 @ MSG_SYM_VERSION	"symbol table processing; adding version symbols"
 
-@ MSG_SYM_BASIC		"symbol[%lld]=%s"
-@ MSG_SYM_ADDING	"symbol[%lld]=%s  (global); adding"
+@ MSG_SYM_BASIC		"symbol[%d]=%s"
+@ MSG_SYM_ADDING	"symbol[%d]=%s  (global); adding"
 @ MSG_SYM_SECTION	"symbol[%d]=%s  (section); segment=%s"
-@ MSG_SYM_RESOLVING	"symbol[%lld]=%s  (global); resolving [%d][%d]"
+@ MSG_SYM_RESOLVING	"symbol[%d]=%s  (global); resolving [%d][%d]"
 @ MSG_SYM_UPDATE	"symbol=%s;  updated"
 @ MSG_SYM_CREATE	"symbol=%s;  creating"
 @ MSG_SYM_REDUCING	"symbol=%s;  reducing to local"
@@ -554,19 +610,16 @@
 
 @ MSG_SYM_LAZY_RESCAN	"rescanning for lazy dependencies for symbol: %s"
 
-# Syminfo strings
-@ MSG_SYMI_TITLE1	"syminfo information"
-@ MSG_SYMI_TITLE2	"     index  flgs         bound to           symbol"
-@ MSG_SYMI_SELF		"<self>"
-@ MSG_SYMI_PARENT	"<parent>"
-@ MSG_SYMI_EXTERN	"<extern>"
+# Syminfo string
+
+@ MSG_SYMINFO_INFO	"syminfo information"
 
 # Version strings
 
 @ MSG_VER_AVAIL_1	"version availability: file=%s"
 @ MSG_VER_AVAIL_2	" available  version                     selected from"
-@ MSG_VER_DEF_1		"version definition processing: file=%s"
-@ MSG_VER_NEED_1	"version needed processing: file=%s"
+@ MSG_VER_DEF_TITLE	"version definition processing: file=%s"
+@ MSG_VER_NEED_TITLE	"version needed processing: file=%s"
 @ MSG_VER_NOINTERFACE	"version definition has no interface symbols: %s"
 
 # SHF_ORDERED related messages. Token used is sections.
@@ -601,7 +654,7 @@
 
 # GOT Messages
 
-@ MSG_GOT_TITLE		"Global Offset Table information:  (%u entries)"
+@ MSG_GOT_INFO		"Global Offset Table information:  (%u entries)"
 
 # TRANSLATION_NOTE
 #	Do not translate .init or .fini, they represent reserved section names.
@@ -642,7 +695,6 @@
 @ MSG_STR_INITIAL	"initialized"
 @ MSG_STR_IN		" in"
 @ MSG_STR_OUT		"out"
-@ MSG_STR_ERROR		"error"
 @ MSG_STR_ACT		"act"
 @ MSG_STR_OLD		"old"
 @ MSG_STR_NEW		"new"
@@ -661,12 +713,6 @@
 @ MSG_STR_ALTER		"  (alternate)"
 @ MSG_STR_COPYZERO	"  (copy zero's unnecessary)"
 @ MSG_STR_TEMPORARY	"  (temporary)"
-
-# PLT padding messages
-
-@ MSG_REL_PADBOUNDTO	"   pltpad file=%s pad: 0x%8.8llx bound to \
-			 file=%s symbol `%s'"
-@ MSG_REL_PADBINDTO	"   pltpad file=%s symbol `%s' binds to pad: 0x%8.8llx"
 
 # TLS related messages
 
@@ -692,10 +738,8 @@
 @ MSG_STATS_RELOCS_IN	"  Relocations  input: records=%-10lld applied=%lld"
 
 # Hardware/Software capabilities messages
-@ MSG_CAP_ELF_TITLE	"     index  tag               value"
-@ MSG_CAP_ELF_ENTRY	"%10.10s  %-15.15s  %s"
 
-@ MSG_CAP_HW_1		"hardware capabilities - %s"
+@ MSG_CAP_VAL_HW1	"hardware capabilities - %s"
 
 @ MSG_CAP_SEC_TITLE	"hardware/software capabilities; input file=%s"
 @ MSG_CAP_SEC_ENTRY	"%12.12s  %-15.15s  %s"
@@ -704,6 +748,241 @@
 
 @ MSG_CAP_HWFILTR_1	"dir=%s;  hardware capability directory filtered by %s"
 @ MSG_CAP_HWFILTR_2	"dir=%s;  no hardware capability objects found"
+
+
+
+@ MSG_ELF_HEADER	"ELF Header"
+
+# Capabilities entries.
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more capabilities table entries that align with the initial title.
+
+@ MSG_CAP_ELF_TITLE	"     index  tag               value"
+@ MSG_CAP_ELF_ENTRY	"%10.10s  %-15.15s  %s"
+
+
+# Dynamic entries.
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more dynamic table entries that align with the initial title.
+
+@ MSG_DYN_TITLE		"     index  tag                value"
+@ MSG_DYN_ENTRY		"%10.10s  %-16.16s  %-#16llx    %s"
+
+
+# Symbol table entries.
+# TRANSLATION_NOTE - the following entries provide for a series of one or more
+# standard 32-bit symbol table entries that align with the initial title.
+
+@ MSG_SYM_EFS_TITLE_32	"     index    value      size      type bind \
+			 oth ver shndx          name"
+@ MSG_SYM_LDS_TITLE_32	"              value      size      type bind \
+			 oth ver shndx"
+@ MSG_SYM_EFS_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4d \
+			 %-14.14s %s"
+
+# TRANSLATION_NOTE - the following entries provide for a series of one or more
+# long 32-bit symbol table entries that align with the initial title.
+
+@ MSG_SYM_EFL_TITLE_32	"     index    value      size      type bind \
+			 oth ver shndx / name"
+@ MSG_SYM_LDL_TITLE_32	"              value      size      type bind \
+			 oth ver shndx"
+@ MSG_SYM_EFL_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4d \
+			 %-14s %s"
+
+# TRANSLATION_NOTE - the following entries provide for a series of one or more
+# standard 64-bit symbol table entries that align with the initial title.
+
+@ MSG_SYM_EFS_TITLE_64	"     index    value              size              \
+			 type bind oth ver shndx          name"
+@ MSG_SYM_LDS_TITLE_64	"              value              size              \
+			 type bind oth ver shndx"
+@ MSG_SYM_EFS_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4d \
+			 %-14.14s %s"
+
+# TRANSLATION_NOTE - the following entries provide for a series of one or more
+# long 64-bit symbol table entries that align with the initial title.
+
+@ MSG_SYM_EFL_TITLE_64	"     index    value              size              \
+			 type bind oth ver shndx / name"
+@ MSG_SYM_LDL_TITLE_64	"              value              size              \
+			 type bind oth ver shndx"
+@ MSG_SYM_EFL_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4d \
+			 %-14s %s"
+
+
+# Syminfo entries.
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more symbol information table entries that align with the initial title.
+
+@ MSG_SYMINFO_TITLE	"     index  flags        \
+			 bound to                 symbol"
+@ MSG_SYMINFO_ENTRY	"%10.10s  %-4s %7s %-24s %s"
+
+@ MSG_SYMINFO_SELF	"<self>"
+@ MSG_SYMINFO_PARENT	"<parent>"
+@ MSG_SYMINFO_EXTERN	"<extern>"
+
+
+# Global offset table entries.
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more 32-bit got table entries that align with the initial title.
+
+@ MSG_GOT_TITLE_32	"     index    addr        value     \
+			 pending relocation"
+@ MSG_GOT_ENTRY_RE_32	"%10.10s  0x%08llx  0x%08llx  %-24s  %s"
+@ MSG_GOT_ENTRY_NR_32	"%10.10s  0x%08llx  0x%08llx"
+
+# TRANSLATION_NOTE - the following two entries provide for a series of one or
+# more 64-bit got table entries that align with the initial title.
+
+@ MSG_GOT_TITLE_64	"     index    addr                \
+			 value             pending relocation"
+@ MSG_GOT_ENTRY_RE_64	"%10.10s  0x%016llx  0x%016llx  %-24s  %s"
+@ MSG_GOT_ENTRY_NR_64	"%10.10s  0x%016llx  0x%016llx"
+
+
+# Version table entries.
+@ MSG_VER_DEF		"     index  version                     dependency"
+@ MSG_VER_NEED		"            file                        version"
+
+@ MSG_VER_LINE_1	"%10.10s  %-26.26s  %-20s %s"
+@ MSG_VER_LLINE_1	"%10s  %-26s  %-20s %s"
+@ MSG_VER_LINE_2	"%47s  %s"
+@ MSG_VER_LINE_3	"%38s  %-20s %s"
+@ MSG_VER_LINE_4	"                                        %s"
+@ MSG_VER_LINE_5	"            %-26.26s  %s"
+@ MSG_VER_LLINE_5	"            %-26s  %s"
+
+
+# Relocation entries.
+# TRANSLATION_NOTE - the following strings are used by elfdump(1).  These
+# strings provide for a series of one or more 32-bit relocation table entries,
+# using truncated section names, that align with one of the initial titles.
+
+@ MSG_REL_EFSA_TITLE_32	"    type                       offset     addend  \
+			 section        symbol"
+@ MSG_REL_EFSN_TITLE_32	"    type                       offset             \
+			 section        symbol"
+@ MSG_REL_EFSA_ENTRY_32	"  %-24s %#10llx %#10llx  %-14.14s %s"
+@ MSG_REL_EFSN_ENTRY_32	"  %-24s %#10llx             %-14.14s %s"
+
+# TRANSLATION_NOTE - the following strings are used by elfdump(1).  These
+# strings provide for a series of one or more 32-bit relocation table entries,
+# using long section names, that align with one of the initial titles.
+
+@ MSG_REL_EFLA_TITLE_32	"    type                       offset     addend  \
+			 section / symbol"
+@ MSG_REL_EFLN_TITLE_32	"    type                       offset             \
+			 section / symbol"
+@ MSG_REL_EFLA_ENTRY_32	"  %-24s %#10llx %#10llx  %-14s %s"
+@ MSG_REL_EFLN_ENTRY_32	"  %-24s %#10llx             %-14s %s"
+
+
+# TRANSLATION_NOTE - the following strings are used by ld.so.1(1).  These
+# strings provide for a series of one or more 32-bit relocation table entries,
+# that align with the initial titles.
+
+@ MSG_REL_RTA_TITLE_32	"         type                       offset     \
+			 addend  symbol"
+@ MSG_REL_RTN_TITLE_32	"         type                       offset      \
+			 value  symbol"
+@ MSG_REL_RTV_TITLE_32	"                                                value"
+@ MSG_REL_RTA_ENTRY_32	" %5s %-24s %#10llx %#10llx  %s"
+@ MSG_REL_RTN_ENTRY_32	" %5s %-24s %#10llx             %s"
+@ MSG_REL_RT_APLVAL_32	" apply                          %#10llx %#10llx"
+@ MSG_REL_RT_APLREG_32	" apply                          %10.10s %#10llx"
+
+
+# TRANSLATION_NOTE - the following strings are used by ld(1).  These strings
+# provide for a series of one or more 32-bit relocation table entries, using
+# truncated section names, that align with one of the initial titles.
+
+@ MSG_REL_LDSA_TITLE_32	"         type                       \
+			 offset     addend  section        symbol"
+@ MSG_REL_LDSN_TITLE_32	"         type                       \
+			 offset             section        symbol"
+@ MSG_REL_LDSV_TITLE_32	"         type                       \
+			 offset      value  section        symbol"
+@ MSG_REL_LDSA_ENTRY_32	" %5s %-24s %#10llx %#10llx  %-14.14s %s  %s"
+@ MSG_REL_LDSN_ENTRY_32	" %5s %-24s %#10llx             %-14.14s %s  %s"
+
+# TRANSLATION_NOTE - the following strings are used by ld(1).  These strings
+# provide for a series of one or more 32-bit relocation table entries, using
+# long section names, that align with one of the initial titles.
+
+@ MSG_REL_LDLA_TITLE_32	"         type                       \
+			 offset     addend  section / symbol"
+@ MSG_REL_LDLN_TITLE_32	"         type                       \
+			 offset             section / symbol"
+@ MSG_REL_LDLV_TITLE_32	"         type                       \
+			 offset      value  section / symbol"
+@ MSG_REL_LDLA_ENTRY_32	" %5s %-24s %#10llx %#10llx  %-14s %s  %s"
+@ MSG_REL_LDLN_ENTRY_32	" %5s %-24s %#10llx             %-14s %s  %s"
+
+
+# TRANSLATION_NOTE - the following strings are used by elfdump(1).  These
+# strings provide for a series of one or more 64-bit relocation table entries,
+# using truncated section names, that align with one of the initial titles.
+
+@ MSG_REL_EFSA_TITLE_64	"    type                               \
+			 offset             addend  section        symbol"
+@ MSG_REL_EFSN_TITLE_64	"    type                               \
+			 offset                     section        symbol"
+@ MSG_REL_EFSA_ENTRY_64	"  %-24s %#18llx %#18llx  %-14.14s %s"
+@ MSG_REL_EFSN_ENTRY_64	"  %-24s %#18llx                     %-14.14s %s"
+
+# TRANSLATION_NOTE - the following strings are used by elfdump(1).  These
+# strings provide for a series of one or more 64-bit relocation table entries,
+# using long section names, that align with one of the initial titles.
+
+@ MSG_REL_EFLA_TITLE_64	"    type                               \
+			 offset             addend  section / symbol"
+@ MSG_REL_EFLN_TITLE_64	"    type                               \
+			 offset                     section / symbol"
+@ MSG_REL_EFLA_ENTRY_64	"  %-24s %#18llx %#18llx  %-14s %s"
+@ MSG_REL_EFLN_ENTRY_64	"  %-24s %#18llx                     %-14s %s"
+
+
+# TRANSLATION_NOTE - the following strings are used by ld.so.1(1).  These
+# strings provide for a series of one or more 64-bit relocation table entries,
+# that align with the initial titles.
+
+@ MSG_REL_RTA_TITLE_64	"         type                               \
+			 offset             addend  symbol"
+@ MSG_REL_RTN_TITLE_64	"         type                               \
+			 offset              value  symbol"
+@ MSG_REL_RTV_TITLE_64	"                                                                value"
+@ MSG_REL_RTA_ENTRY_64	" %5s %-24s %#18llx %#18llx  %s"
+@ MSG_REL_RTN_ENTRY_64	" %5s %-24s %#18llx                    %s"
+@ MSG_REL_RT_APLVAL_64	" apply                          %#18llx %#18llx"
+@ MSG_REL_RT_APLREG_64	" apply                          %18.18s %#18llx"
+
+# TRANSLATION_NOTE - the following strings are used by ld(1).  These strings
+# provide for a series of one or more 64-bit relocation table entries, using
+# truncated section names, that align with one of the initial titles.
+
+@ MSG_REL_LDSA_TITLE_64	"         type                               \
+			 offset             addend  section        symbol"
+@ MSG_REL_LDSN_TITLE_64	"         type                               \
+			 offset                     section        symbol"
+@ MSG_REL_LDSV_TITLE_64	"         type                               \
+			 offset              value  section        symbol"
+@ MSG_REL_LDSA_ENTRY_64	" %5s %-24s %#18llx %#18llx  %-14.14s %s  %s"
+@ MSG_REL_LDSN_ENTRY_64	" %5s %-24s %#18llx                     %-14.14s %s  %s"
+
+# TRANSLATION_NOTE - the following strings are used by ld(1).  These strings
+# provide for a series of one or more 64-bit relocation table entries, using
+# long section names, that align with one of the initial titles.
+
+@ MSG_REL_LDLA_TITLE_64	"         type                               \
+			 offset             addend  section / symbol"
+@ MSG_REL_LDLN_TITLE_64	"         type                               \
+			 offset                     section / symbol"
+@ MSG_REL_LDLV_TITLE_64	"         type                               \
+			 offset              value  section / symbol"
+@ MSG_REL_LDLA_ENTRY_64	" %5s %-24s %#18llx %#18llx  %-14s %s  %s"
+@ MSG_REL_LDLN_ENTRY_64	" %5s %-24s %#18llx                     %-14s %s  %s"
 
 @ _END_
 
@@ -714,13 +993,11 @@
 @ MSG_TOK_BINDINGS	"bindings"
 @ MSG_TOK_CAP		"cap"
 @ MSG_TOK_BASIC		"basic"
-@ MSG_TOK_DETAIL	"detail"
 @ MSG_TOK_ENTRY		"entry"
 @ MSG_TOK_FILES		"files"
 @ MSG_TOK_HELP		"help"
 @ MSG_TOK_INIT		"init"
 @ MSG_TOK_LIBS		"libs"
-@ MSG_TOK_LONG		"long"
 @ MSG_TOK_MAP		"map"
 @ MSG_TOK_RELOC		"reloc"
 @ MSG_TOK_SECTIONS	"sections"
@@ -734,12 +1011,18 @@
 @ MSG_TOK_MOVE		"move"
 @ MSG_TOK_DEMANGLE	"demangle"
 @ MSG_TOK_STRTAB	"strtab"
-@ MSG_TOK_STATISTICS	"statistics"
+@ MSG_TOK_STATS		"statistics"
 @ MSG_TOK_UNUSED	"unused"
 
+@ MSG_TOK_DETAIL	"detail"
+@ MSG_TOK_LONG		"long"
 @ MSG_TOK_NAME		"name"
 @ MSG_TOK_FULLNAME	"fullname"
 @ MSG_TOK_CLASS		"class"
+@ MSG_TOK_LMID		"lmid"
+@ MSG_TOK_BASE		"base"
+@ MSG_TOK_LDSO		"ldso"
+@ MSG_TOK_NEWLM		"newlm"
 
 # The following strings represent reserved words, files, pathnames and symbols.
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
@@ -764,7 +1047,6 @@
 @ MSG_FMT_PATH		"%s/%s"
 
 @ MSG_PTH_OBJECT	"/tmp/ld.so-OBJECT-"
-@ MSG_FIL_RTLD		"ld.so.1"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
@@ -776,54 +1058,9 @@
 @ MSG_ECR_FILES		"  ec_files:"
 @ MSG_ECR_FILE		"    %s"
 
-# Elf section messages
-
-@ MSG_ELF_MAGIC		"  ei_magic:   { 0x%x, %c, %c, %c }"
-@ MSG_ELF_CLASS		"  ei_class:   %-18s  ei_data:      %s"
-@ MSG_ELF_MACHINE	"  e_machine:  %-18s  e_version:    %s"
-@ MSG_ELF_TYPE		"  e_type:     %s"
-@ MSG_ELF_FLAGS		"  e_flags:    %18s"
-@ MSG_ELF_FLAGS_FMT	"  e_flags:    %s"
-@ MSG_ELF_ESIZE		"  e_entry:    %#18llx  e_ehsize:     %2d  \
-			 e_shstrndx:   %2d"
-@ MSG_ELFX_ESIZE	"  e_entry:    %#18llx  e_ehsize:     %2d  \
-			 e_shstrndx: [sh[0].sh_link]"
-@ MSG_ELF_SHOFF		"  e_shoff:    %#18llx  e_shentsize:  %2d  \
-			 e_shnum:      %2d"
-@ MSG_ELFX_SHOFF	"  e_shoff:    %#18llx  e_shentsize:  %2d  \
-			 e_shnum:    [sh[0].sh_size]"
-@ MSG_ELF_PHOFF		"  e_phoff:    %#18llx  e_phentsize:  %2d  \
-			 e_phnum:      %2d"
-@ MSG_ELFX_PHOFF	"  e_phoff:    %#18llx  e_phentsize:  %2d  \
-			 e_phnum:    [sh[0].sh_info]"
-
-# Shdr[0] messages
-@ MSG_SHD0_TITLE	"Section Header[0]: {ELF Ehdr extensions}"
-@ MSG_SHD0_SIZE		"    sh_size:      %-6lld [shnum]  sh_type:    %s"
-@ MSG_SHD0_LINK1	"    sh_link:      %-6d [strndx] sh_info:    %d [phnum]"
-@ MSG_SHD0_LINK2	"    sh_link:      %-6d [strndx] sh_info:    %d"
-@ MSG_SHD0_LINK3	"    sh_link:      %-14d  sh_info:    %d [phnum]"
-@ MSG_SHD0_LINK4	"    sh_link:      %-14d  sh_info:    %d"
-
-# Section header messages
-
-@ MSG_SHD_ADDR		"    sh_addr:      %#-14llx  sh_flags:   %s"
-@ MSG_SHD_SIZE		"    sh_size:      %#-14llx  sh_type:    %s"
-@ MSG_SHD_OFFSET	"    sh_offset:    %#-14llx  sh_entsize: %#llx"
-@ MSG_SHD_ALIGN		"    sh_addralign: %#-14llx"
-@ MSG_SHD_LINK		"    sh_link:      %-14d  sh_info:    %s"
-
 # Libs messages
 
 @ MSG_LIB_FILE		"  %s"
-
-# Program header messages
-
-@ MSG_PHD_VADDR		"    p_vaddr:      %#-14llx  p_flags:    %s"
-@ MSG_PHD_PADDR		"    p_paddr:      %#-14llx  p_type:     %s"
-@ MSG_PHD_FILESZ	"    p_filesz:     %#-14llx  p_memsz:    %#llx"
-@ MSG_PHD_OFFSET	"    p_offset:     %#-14llx  p_align:    %#llx"
-
 
 # PLT binding methods
 
@@ -883,81 +1120,80 @@
 @ MSG_UTL_STA_DELETE	"RT_DELETE"
 @ MSG_UTL_STA_CONSIST	"RT_CONSISTENT"
 
-#
-# The following messages are placed here because:
-# 	*) it is difficult to keep the table aligned, and to document them,
-#	*) the information here are mainly for programmers, and not for
-#	   regular end-users.
-#
-
-# Relocation messages
-@ MSG_REL_TITLE_1	"        type                        \
-			 offset      value  section        symbol"
-@ MSG_REL_REL_TITLE_2	"        type                        \
-			 offset             section        symbol"
-@ MSG_REL_RELA_TITLE_2	"        type                        \
-			 offset     addend  section        symbol"
-@ MSG_REL_REL_TITLE_3	"        type                        \
-			 offset      value                 symbol"
-@ MSG_REL_RELA_TITLE_3	"        type                        \
-			 offset     addend                 symbol"
-@ MSG_REL_RELA_TITLE_4	"                                           \
-			 value"
-@ MSG_REL_ARGS_2	"                       %#14llx %#10llx"
-@ MSG_REL_ARGS_6	"  %5s %-21s %#14llx %#10llx  %-14.14s %s  %s"
-@ MSG_REL_L_ARGS_6	"  %5s %-21s %#14llx %#10llx  %-14s %s  %s"
-@ MSG_REL_ARGS_5	"  %5s %-21s %#14llx             %-14.14s %s  %s"
-@ MSG_REL_L_ARGS_5	"  %5s %-21s %#14llx             %-14s %s  %s"
-@ MSG_REL_REGSYM	"                       %14.14s %#10llx"
-
-# Symbol strings
-@ MSG_SYM_TITLE		"%10.10s    value       size     type bind \
-			 oth ver shndx       %s"
-@ MSG_SYM_L_TITLE	"%10.10s    value       size     type bind \
-			 oth ver shndx/%s"
-@ MSG_SYM_ENTRY		"%10.10s  %10.10s 0x%8.8llx  %4s %4s %2s %4d \
-			 %-11.11s %s"
-@ MSG_SYM_L_ENTRY	"%10.10s  %10.10s 0x%8.8llx  %4s %4s %2s %4d \
-			 %-11s %s"
-
-@ MSG_SYM_TITLE_64	"%10.10s        value           size     type bind \
-			 oth ver shndx       %s"
-@ MSG_SYM_L_TITLE_64	"%10.10s        value           size     type bind \
-			 oth ver shndx/%s"
-@ MSG_SYM_ENTRY_64	"%10.10s  %14.14s 0x%12.12llx  %4s %4s %2s %4d \
-			 %-11.11s %s"
-@ MSG_SYM_L_ENTRY_64	"%10.10s  %14.14s 0x%12.12llx  %4s %4s %2s %4d \
-			 %-11s %s"
-
 # Version messages
+
 @ MSG_VER_SELECTED	"  SELECTED  %-26.26s  %s"
 @ MSG_VER_L_SELECTED	"  SELECTED  %-26s  %s"
 @ MSG_VER_ALL		"       ALL  %-26.26s"
 @ MSG_VER_L_ALL		"       ALL  %-26s"
-@ MSG_VER_DEF_2		"     index  version                     dependency"
-@ MSG_VER_NEED_2	"            file                        version"
-@ MSG_VER_LINE_1	"%10.10s  %-26.26s  %-20s %s"
-@ MSG_VER_L_LINE_1	"%10s  %-26s  %-20s %s"
-@ MSG_VER_LINE_2	"%47s  %s"
-@ MSG_VER_LINE_3	"%38s  %-20s %s"
-@ MSG_VER_LINE_4	"%38s  %s"
-@ MSG_VER_LINE_5	"            %-26.26s  %s"
-@ MSG_VER_L_LINE_5	"            %-26s  %s"
-
 
 # GOT messages
-@ MSG_GOT_COLUMNS	"index\tref\taddend\t\tsymbol"
+
+@ MSG_GOT_COLUMNS	"index  ref  addend  symbol"
 @ MSG_GOT_SMALL_PIC	"pic"
-@ MSG_GOT_PIC		"PIC"
+@ MSG_GOT_BIG_PIC	"PIC"
 @ MSG_GOT_FORMAT1	"[%05d] %3s  0x%08llx  %s"
 @ MSG_GOT_FORMAT2	"[%05d] %3s  0x%08llx  %s:%s"
-@ MSG_GOT_ECOLUMNS	" ndx     addr      value    reloc              \
-			 addend   symbol"
-@ MSG_GOT_ECOLUMNS_64	" ndx     addr          value        reloc              \
-			 addend       symbol"
-@ MSG_GOT_EFORMAT	"[%05d]  %08llx  %08llx %-18s %08llx %s"
-@ MSG_GOT_EFORMAT_64	"[%05d]  %012llx  %012llx %-18s %012llx %s"
-
-@ MSG_SYMI_FMT		"%10.10s  %-4s %7s %-18s %s"
 
 @ MSG_CNTL_ENTRY	"   [0x%llx]  %s"
+
+@ MSG_STR_EMPTY		""
+@ MSG_STR_NL		"\n"
+
+@ MSG_GOT_INDEX		" [%ld]"
+@ MSG_FMT_INDEX		" [%d]"
+
+@ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
+
+@ MSG_ELF_MAGIC		"  ei_magic:   { 0x%x, %c, %c, %c }"
+@ MSG_ELF_CLASS		"  ei_class:   %-18s  ei_data:      %s"
+@ MSG_ELF_MACHINE	"  e_machine:  %-18s  e_version:    %s"
+@ MSG_ELF_TYPE		"  e_type:     %s"
+@ MSG_ELF_FLAGS		"  e_flags:    %18s"
+@ MSG_ELF_FLAGS_FMT	"  e_flags:    %s"
+@ MSG_ELF_ESIZE		"  e_entry:    %#18llx  e_ehsize:     %2d  \
+			 e_shstrndx:   %2d"
+@ MSG_ELFX_ESIZE	"  e_entry:    %#18llx  e_ehsize:     %2d  \
+			 e_shstrndx: [sh[0].sh_link]"
+@ MSG_ELF_SHOFF		"  e_shoff:    %#18llx  e_shentsize:  %2d  \
+			 e_shnum:      %2d"
+@ MSG_ELFX_SHOFF	"  e_shoff:    %#18llx  e_shentsize:  %2d  \
+			 e_shnum:    [sh[0].sh_size]"
+@ MSG_ELF_PHOFF		"  e_phoff:    %#18llx  e_phentsize:  %2d  \
+			 e_phnum:      %2d"
+
+# Shdr[0] messages
+
+@ MSG_SHD0_TITLE	"Section Header[0]: {ELF Ehdr extensions}"
+@ MSG_SHD0_SIZE		"    sh_size:      %-6lld [shnum]  sh_type:    %s"
+@ MSG_SHD0_LINK		"    sh_link:      %-6d [strndx] sh_info:    %s"
+
+# Section header messages
+
+@ MSG_SHD_ADDR_32	"    sh_addr:      %#-10llx  sh_flags:   %s"
+@ MSG_SHD_SIZE_32	"    sh_size:      %#-10llx  sh_type:    %s"
+@ MSG_SHD_OFFSET_32	"    sh_offset:    %#-10llx  sh_entsize: %#llx"
+@ MSG_SHD_ALIGN_32	"    sh_addralign: %#-10llx"
+@ MSG_SHD_LINK_32	"    sh_link:      %-10d  sh_info:    %s"
+
+@ MSG_SHD_ADDR_64	"    sh_addr:      %#-18llx  sh_flags:   %s"
+@ MSG_SHD_SIZE_64	"    sh_size:      %#-18llx  sh_type:    %s"
+@ MSG_SHD_OFFSET_64	"    sh_offset:    %#-18llx  sh_entsize: %#llx"
+@ MSG_SHD_ALIGN_64	"    sh_addralign: %#-18llx"
+@ MSG_SHD_LINK_64	"    sh_link:      %-18d  sh_info:    %s"
+
+# Program header messages
+
+@ MSG_PHD_VADDR_32	"    p_vaddr:      %#-10llx  p_flags:    %s"
+@ MSG_PHD_PADDR_32	"    p_paddr:      %#-10llx  p_type:     %s"
+@ MSG_PHD_FILESZ_32	"    p_filesz:     %#-10llx  p_memsz:    %#llx"
+@ MSG_PHD_OFFSET_32	"    p_offset:     %#-10llx  p_align:    %#llx"
+
+@ MSG_PHD_VADDR_64	"    p_vaddr:      %#-18llx  p_flags:    %s"
+@ MSG_PHD_PADDR_64	"    p_paddr:      %#-18llx  p_type:     %s"
+@ MSG_PHD_FILESZ_64	"    p_filesz:     %#-18llx  p_memsz:    %#llx"
+@ MSG_PHD_OFFSET_64	"    p_offset:     %#-18llx  p_align:    %#llx"
+
+# Syminfo formats
+
+@ MSG_SYMINFO_UNKFLAG	" 0x%x"

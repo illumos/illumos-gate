@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,49 +42,50 @@ static const Msg order_errors[] = {
 };
 
 void
-Dbg_sec_strtab(Os_desc *osp, Str_tbl *stp)
+Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 {
-	uint_t		i;
+	uint_t	i;
 
-	if (DBG_NOTCLASS(DBG_STRTAB))
+	if (DBG_NOTCLASS(DBG_C_STRTAB))
 		return;
 
 	if (!osp)
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	if (stp->st_flags & FLG_STTAB_COMPRESS)
-		dbg_print(MSG_INTL(MSG_SEC_STRTAB_COMP), osp->os_name,
-			stp->st_fullstringsize, stp->st_stringsize);
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_COMP), osp->os_name,
+		    stp->st_fullstringsize, stp->st_stringsize);
 	else
-		dbg_print(MSG_INTL(MSG_SEC_STRTAB_STND), osp->os_name,
-			stp->st_fullstringsize);
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_STND), osp->os_name,
+		    stp->st_fullstringsize);
 
 	if ((DBG_NOTDETAIL()) ||
 	    ((stp->st_flags & FLG_STTAB_COMPRESS) == 0))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_SEC_STRTAB_HD), osp->os_name,
-		stp->st_hbckcnt);
+	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_HD), osp->os_name,
+	    stp->st_hbckcnt);
+
 	for (i = 0; i < stp->st_hbckcnt; i++) {
 		Str_hash	*sthash;
-		dbg_print(MSG_INTL(MSG_SEC_STRTAB_BCKT), i);
+
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_BCKT), i);
+
 		for (sthash = stp->st_hashbcks[i]; sthash;
 		    sthash = sthash->hi_next) {
-			uint_t	stroff;
+			uint_t	stroff = sthash->hi_mstr->sm_stlen -
+			    sthash->hi_stlen;
 
-			stroff = sthash->hi_mstr->sm_stlen - sthash->hi_stlen;
 			if (stroff == 0) {
-				dbg_print(MSG_INTL(MSG_SEC_STRTAB_MSTR),
-					sthash->hi_refcnt,
-					sthash->hi_mstr->sm_str);
+				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_MSTR),
+				    sthash->hi_refcnt, sthash->hi_mstr->sm_str);
 			} else {
-				const char	*str;
-				str = &sthash->hi_mstr->sm_str[stroff];
-				dbg_print(MSG_INTL(MSG_SEC_STRTAB_SUFSTR),
-					sthash->hi_refcnt,
-					str, sthash->hi_mstr->sm_str);
+				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_SUFSTR),
+				    sthash->hi_refcnt,
+				    &sthash->hi_mstr->sm_str[stroff],
+				    sthash->hi_mstr->sm_str);
 			}
 		}
 
@@ -92,11 +93,11 @@ Dbg_sec_strtab(Os_desc *osp, Str_tbl *stp)
 }
 
 void
-Dbg_sec_in(Is_desc *isp)
+Dbg_sec_in(Lm_list *lml, Is_desc *isp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
 	if (isp->is_file != NULL)
@@ -104,15 +105,15 @@ Dbg_sec_in(Is_desc *isp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_INTL(MSG_SEC_INPUT), isp->is_name, str);
+	dbg_print(lml, MSG_INTL(MSG_SEC_INPUT), isp->is_name, str);
 }
 
 void
-Dbg_sec_added(Os_desc *osp, Sg_desc *sgp)
+Dbg_sec_added(Lm_list *lml, Os_desc *osp, Sg_desc *sgp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
 	if (sgp->sg_name && *sgp->sg_name)
@@ -120,15 +121,15 @@ Dbg_sec_added(Os_desc *osp, Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_INTL(MSG_SEC_ADDED), osp->os_name, str);
+	dbg_print(lml, MSG_INTL(MSG_SEC_ADDED), osp->os_name, str);
 }
 
 void
-Dbg_sec_created(Os_desc *osp, Sg_desc *sgp)
+Dbg_sec_created(Lm_list *lml, Os_desc *osp, Sg_desc *sgp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
 	if (sgp->sg_name && *sgp->sg_name)
@@ -136,26 +137,26 @@ Dbg_sec_created(Os_desc *osp, Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_INTL(MSG_SEC_CREATED), osp->os_name, str);
+	dbg_print(lml, MSG_INTL(MSG_SEC_CREATED), osp->os_name, str);
 }
 
 void
-Dbg_sec_discarded(Is_desc *isp, Is_desc *disp)
+Dbg_sec_discarded(Lm_list *lml, Is_desc *isp, Is_desc *disp)
 {
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
-	dbg_print(MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
+	dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
 	    isp->is_file->ifl_name, disp->is_basename,
 	    disp->is_file->ifl_name);
 }
 
 void
-Dbg_sec_group(Is_desc *isp, Group_desc *gdp)
+Dbg_sec_group(Lm_list *lml, Is_desc *isp, Group_desc *gdp)
 {
 	const char	*fmt;
 
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
 	if (gdp->gd_flags & GRP_FLG_DISCARD)
@@ -163,7 +164,7 @@ Dbg_sec_group(Is_desc *isp, Group_desc *gdp)
 	else
 		fmt = MSG_INTL(MSG_SEC_GRP_INPUT);
 
-	dbg_print(fmt, isp->is_name, isp->is_file->ifl_name,
+	dbg_print(lml, fmt, isp->is_name, isp->is_file->ifl_name,
 	    gdp->gd_gsectname, gdp->gd_symname);
 }
 
@@ -173,9 +174,10 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 	Os_desc		*osp;
 	Is_desc		*isp1;
 	Listnode	*lnp1, *lnp2;
+	Lm_list		*lml = ofl->ofl_lml;
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -191,8 +193,8 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 	for (LIST_TRAVERSE(&ofl->ofl_ordered, lnp1, osp)) {
 		Sort_desc	*sort = osp->os_sort;
 
-		dbg_print(str, osp->os_name);
-		dbg_print(MSG_INTL(MSG_ORD_HDR_1),
+		dbg_print(lml, str, osp->os_name);
+		dbg_print(lml, MSG_INTL(MSG_ORD_HDR_1),
 		    EC_WORD(sort->st_beforecnt), EC_WORD(sort->st_aftercnt),
 		    EC_WORD(sort->st_ordercnt));
 
@@ -203,7 +205,7 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 			static const char	*msg;
 
 			if ((isp1->is_flags & FLG_IS_ORDERED) == 0) {
-				dbg_print(MSG_INTL(MSG_ORD_TITLE_0),
+				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_0),
 				    isp1->is_name, isp1->is_file->ifl_name);
 				continue;
 			}
@@ -218,28 +220,28 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 			}
 
 			if (link == SHN_BEFORE) {
-				dbg_print(MSG_INTL(MSG_ORD_TITLE_1),
+				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_1),
 				    isp1->is_name, isp1->is_file->ifl_name);
 				continue;
 			}
 
 			if (link == SHN_AFTER) {
-				dbg_print(MSG_INTL(MSG_ORD_TITLE_2),
+				dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_2),
 				    isp1->is_name, isp1->is_file->ifl_name);
 				continue;
 			}
 
 			isp2 = ifl->ifl_isdesc[link];
-			dbg_print(msg, isp1->is_name, ifl->ifl_name,
-				isp2->is_name, isp2->is_key);
+			dbg_print(lml, msg, isp1->is_name, ifl->ifl_name,
+			    isp2->is_name, isp2->is_key);
 		}
 	}
 }
 
 void
-Dbg_sec_order_error(Ifl_desc *ifl, Word ndx, int error)
+Dbg_sec_order_error(Lm_list *lml, Ifl_desc *ifl, Word ndx, int error)
 {
-	if (DBG_NOTCLASS(DBG_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -247,9 +249,9 @@ Dbg_sec_order_error(Ifl_desc *ifl, Word ndx, int error)
 	if (error == 0)
 		return;
 
-	dbg_print(MSG_INTL(MSG_ORD_ERR_TITLE),
-		ifl->ifl_isdesc[ndx]->is_name, ifl->ifl_name);
+	dbg_print(lml, MSG_INTL(MSG_ORD_ERR_TITLE),
+	    ifl->ifl_isdesc[ndx]->is_name, ifl->ifl_name);
 
 	if (error)
-		dbg_print(MSG_INTL(order_errors[error - 1]));
+		dbg_print(lml, MSG_INTL(order_errors[error - 1]));
 }

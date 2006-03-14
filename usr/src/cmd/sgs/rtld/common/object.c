@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,13 +36,16 @@
 #include	<libelf.h>
 #include	<string.h>
 #include	<dlfcn.h>
-#include	"libld.h"
+#include	<debug.h>
+#include	<libld.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"debug.h"
 
-static Rt_map *		olmp = 0;
+static Rt_map	*olmp = 0;
+
+static Ehdr	dehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
+			    M_CLASS, M_DATA }, 0, M_MACH, EV_CURRENT };
 
 /*
  * Process a relocatable object.  The static object link map pointer is used as
@@ -61,12 +64,13 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	 */
 	if ((ofl = (Ofl_desc *)calloc(sizeof (Ofl_desc), 1)) == 0)
 		return (0);
-	ofl->ofl_e_machine = M_MACH;
-	ofl->ofl_e_flags = 0;
-	ofl->ofl_libver = EV_CURRENT;
-	ofl->ofl_flags = (FLG_OF_DYNAMIC | FLG_OF_SHAROBJ | FLG_OF_STRIP |
-		FLG_OF_MEMORY);
+
+	ofl->ofl_dehdr = &dehdr;
+
+	ofl->ofl_flags =
+	    (FLG_OF_DYNAMIC | FLG_OF_SHAROBJ | FLG_OF_STRIP | FLG_OF_MEMORY);
 	ofl->ofl_flags1 = FLG_OF1_RELDYN | FLG_OF1_TEXTOFF;
+	ofl->ofl_lml = lml;
 
 	/*
 	 * As ent_setup() will effectively lazy load the necessary support
@@ -79,7 +83,7 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	 * Obtain a generic set of entrance criteria (this is the first call to
 	 * libld.so, which will effectively lazyload it).
 	 */
-	if (ent_setup(ofl, syspagsz) == S_ERROR)
+	if (ld_ent_setup(ofl, syspagsz) == S_ERROR)
 		return (0);
 
 	/*
@@ -89,7 +93,7 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	if ((olmp = (Rt_map *)calloc(sizeof (Rt_map), 1)) == 0)
 		return (0);
 
-	DBG_CALL(Dbg_file_elf(name, 0, 0, 0, 0, get_linkmap_id(lml), lmco));
+	DBG_CALL(Dbg_file_elf(lml, name, 0, 0, 0, 0, lml->lm_lmidstr, lmco));
 	FLAGS(olmp) |= FLG_RT_OBJECT;
 	olmp->rt_priv = (void *)ofl;
 
@@ -142,11 +146,10 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
 	/*
 	 * Proceed to process the input file.
 	 */
-	DBG_CALL(Dbg_util_nl());
-	if (process_open(name, 0, fd, (Ofl_desc *)olmp->rt_priv,
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+	if (ld_process_open(name, 0, fd, (Ofl_desc *)olmp->rt_priv,
 	    NULL, &rej) == (Ifl_desc *)S_ERROR)
 		return (0);
-
 	return (olmp);
 }
 
@@ -167,19 +170,19 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp)
 	uint_t		phnum, mmapcnt;
 	Lm_cntl 	*lmc;
 
-	DBG_CALL(Dbg_util_nl());
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
-	if (reloc_init(ofl) == S_ERROR)
+	if (ld_reloc_init(ofl) == S_ERROR)
 		return (0);
-	if (sym_validate(ofl) == S_ERROR)
+	if (ld_sym_validate(ofl) == S_ERROR)
 		return (0);
-	if (make_sections(ofl) == S_ERROR)
+	if (ld_make_sections(ofl) == S_ERROR)
 		return (0);
-	if (create_outfile(ofl) == S_ERROR)
+	if (ld_create_outfile(ofl) == S_ERROR)
 		return (0);
-	if ((etext = update_outfile(ofl)) == (Addr)S_ERROR)
+	if ((etext = ld_update_outfile(ofl)) == (Addr)S_ERROR)
 		return (0);
-	if (reloc_process(ofl) == S_ERROR)
+	if (ld_reloc_process(ofl) == S_ERROR)
 		return (0);
 
 	/*
@@ -192,7 +195,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp)
 	/*
 	 * Allocate a mapping array to retain mapped segment information.
 	 */
-	ehdr = ofl->ofl_ehdr;
+	ehdr = ofl->ofl_nehdr;
 	phdr = ofl->ofl_phdr;
 	if ((mmaps = calloc(ehdr->e_phnum, sizeof (Mmap))) == 0)
 		return (0);
@@ -247,7 +250,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp)
 	ORIGNAME(nlmp) = ORIGNAME(olmp);
 	DIRSZ(nlmp) = DIRSZ(olmp);
 
-	ofl_cleanup(ofl);
+	ld_ofl_cleanup(ofl);
 	free(olmp->rt_priv);
 	(void) memcpy(olmp, nlmp, sizeof (Rt_map));
 	free(nlmp);

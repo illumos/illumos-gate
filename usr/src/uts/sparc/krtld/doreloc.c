@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -130,8 +129,8 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 				8, 0, 0},
 /* R_SPARC_PLT64 */	{0x0, FLG_RE_PLTREL | FLG_RE_VERIFY |
 				FLG_RE_ADDRELATIVE, 8, 0, 0},
-/* R_SPARC_HIX22 */	{(Xword)(-1LL), FLG_RE_NOTREL | FLG_RE_VERIFY,
-				4, 10, 22},	/* V9 - HaL */
+/* R_SPARC_HIX22 */	{(Xword)(-1LL), FLG_RE_VERIFY,
+				4, 10, 22},			/* V9 - HaL */
 /* R_SPARC_LOX10 */	{0x3ff, FLG_RE_SIGN, 4, 0, 13},		/* V9 - HaL */
 /* R_SPARC_H44 */	{0x0, FLG_RE_VERIFY, 4, 22, 22},	/* V9 */
 /* R_SPARC_M44 */	{0x3ff, FLG_RE_NOTREL, 4, 12, 10},	/* V9 */
@@ -183,8 +182,7 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_GOTDATA_OP_LOX10 */	{ 0x3ff, FLG_RE_SIGN | FLG_RE_GOTOPINS |
 					FLG_RE_GOTADD, 4, 0, 13},
 /* R_SPARC_GOTDATA_OP */	{ 0x0, FLG_RE_GOTOPINS, 0, 0, 0},
-/* R_SPARC_H34 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 4,
-				12, 22} /* V9 */
+/* R_SPARC_H34 */	{0x0, FLG_RE_VERIFY, 4, 12, 22}		/* V9 */
 };
 
 
@@ -345,10 +343,10 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  * Upon successful completion of do_reloc() *value will be set to the
  * 'bit-shifted' value that will be or'ed into memory.
  */
-/* ARGSUSED3 */
+/* ARGSUSED5 */
 int
 do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
-    const char *file)
+    const char *file, void *lml)
 {
 	Xword			uvalue = 0;
 	Xword			basevalue, sigbit_mask, sigfit_mask;
@@ -374,7 +372,7 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		sigfit_mask = sigbit_mask;
 
 	if (field_size == 0) {
-		REL_ERR_UNIMPL(file, sym, rtype);
+		REL_ERR_UNIMPL(lml, file, sym, rtype);
 		return (0);
 	}
 
@@ -397,7 +395,7 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		if (((field_size == 2) && ((uintptr_t)off & 0x1)) ||
 		    ((field_size == 4) && ((uintptr_t)off & 0x3)) ||
 		    ((field_size == 8) && ((uintptr_t)off & 0x7))) {
-			REL_ERR_NONALIGN(file, sym, rtype, (uintptr_t)off);
+			REL_ERR_NONALIGN(lml, file, sym, rtype, (uintptr_t)off);
 			return (0);
 		}
 		switch (field_size) {
@@ -417,7 +415,8 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 			basevalue = (Xword)*((Xword *)off);
 			break;
 		default:
-			REL_ERR_UNNOBITS(file, sym, rtype, rep->re_fsize * 8);
+			REL_ERR_UNNOBITS(lml, file, sym, rtype,
+			    (rep->re_fsize * 8));
 			return (0);
 		}
 	}
@@ -460,7 +459,7 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		 * jump to a non-4 byte aligned address.
 		 */
 		if ((bshift == 2) && (uvalue & 0x3)) {
-			REL_ERR_LOSEBITS(file, sym, rtype, uvalue, 2, off);
+			REL_ERR_LOSEBITS(lml, file, sym, rtype, uvalue, 2, off);
 			return (0);
 		}
 
@@ -500,7 +499,7 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		    (S_INRANGE((Sxword)uvalue, rep->re_sigbits - 1) == 0)) ||
 		    (!(re_flags & FLG_RE_SIGN) &&
 		    ((sigbit_mask & uvalue) != uvalue))) {
-			REL_ERR_NOFIT(file, sym, rtype, uvalue);
+			REL_ERR_NOFIT(lml, file, sym, rtype, uvalue);
 			return (0);
 		}
 	}
@@ -558,7 +557,7 @@ do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 			/*
 			 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
 			 */
-			REL_ERR_UNSUPSZ(file, sym, rtype, rep->re_fsize);
+			REL_ERR_UNSUPSZ(lml, file, sym, rtype, rep->re_fsize);
 			return (0);
 		}
 	}

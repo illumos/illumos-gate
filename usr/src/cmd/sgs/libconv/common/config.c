@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,64 +32,62 @@
 #include	"_conv.h"
 #include	"config_msg.h"
 
-#define	MODESZ	MSG_GBL_OSQBRKT_SIZE + \
+#define	FEATSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_CONF_EDLIBPATH_SIZE + \
-		MSG_CONF_ADLIBPATH_SIZE + \
 		MSG_CONF_ESLIBPATH_SIZE + \
+		MSG_CONF_ADLIBPATH_SIZE + \
 		MSG_CONF_ASLIBPATH_SIZE + \
 		MSG_CONF_DIRCFG_SIZE + \
 		MSG_CONF_OBJALT_SIZE + \
+		MSG_CONF_MEMRESV_SIZE + \
 		MSG_CONF_ENVS_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		MSG_CONF_FLTR_SIZE + \
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 /*
  * String conversion routine for configuration file information.
  */
 const char *
-conv_config_str(int feature)
+conv_config_feat(int features)
 {
-	static	char	string[MODESZ] = { '\0' };
+	static	char	string[FEATSZ];
+	static Val_desc	vda[] = {
+		{ CONF_EDLIBPATH,	MSG_ORIG(MSG_CONF_EDLIBPATH) },
+		{ CONF_ESLIBPATH,	MSG_ORIG(MSG_CONF_ESLIBPATH) },
+		{ CONF_ADLIBPATH,	MSG_ORIG(MSG_CONF_ADLIBPATH) },
+		{ CONF_ASLIBPATH,	MSG_ORIG(MSG_CONF_ASLIBPATH) },
+		{ CONF_DIRCFG,		MSG_ORIG(MSG_CONF_DIRCFG) },
+		{ CONF_OBJALT,		MSG_ORIG(MSG_CONF_OBJALT) },
+		{ CONF_MEMRESV,		MSG_ORIG(MSG_CONF_MEMRESV) },
+		{ CONF_ENVS,		MSG_ORIG(MSG_CONF_ENVS) },
+		{ CONF_FLTR,		MSG_ORIG(MSG_CONF_FLTR) },
+		{ 0,			0 }
+	};
 
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-
-	if (feature & CONF_EDLIBPATH)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_EDLIBPATH));
-	if (feature & CONF_ESLIBPATH)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_ESLIBPATH));
-	if (feature & CONF_ADLIBPATH)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_ADLIBPATH));
-	if (feature & CONF_ASLIBPATH)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_ASLIBPATH));
-	if (feature & CONF_DIRCFG)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_DIRCFG));
-	if (feature & CONF_OBJALT)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_OBJALT));
-	if (feature & CONF_MEMRESV)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_MEMRESV));
-	if (feature & CONF_ENVS)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_ENVS));
-	if (feature & CONF_FLTR)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_FLTR));
-
-	(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FEATSZ);
+	if (conv_expn_field(string, FEATSZ, vda, features,
+	    features, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FEATSZ);
 
 	return ((const char *)string);
 }
 
 #define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_CONF_DIRENT_SIZE + \
-		MSG_CONF_NOEXIST_SIZE + \
 		MSG_CONF_ALLENTS_SIZE + \
+		MSG_CONF_NOEXIST_SIZE + \
 		MSG_CONF_EXEC_SIZE + \
 		MSG_CONF_ALTER_SIZE + \
+		MSG_CONF_OPTIONAL_SIZE + \
 		MSG_CONF_DUMP_SIZE + \
 		MSG_CONF_REALPATH_SIZE + \
+		MSG_CONF_NOALTER_SIZE + \
 		MSG_CONF_GROUP_SIZE + \
 		MSG_CONF_APP_SIZE + \
 		MSG_CONF_CMDLINE_SIZE + \
 		MSG_CONF_FILTER_SIZE + \
 		MSG_CONF_FILTEE_SIZE + \
-		MSG_GBL_CSQBRKT_SIZE
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 /*
  * String conversion routine for object flags.
@@ -97,45 +95,46 @@ conv_config_str(int feature)
 const char *
 conv_config_obj(ushort_t flags)
 {
-	static char	string[FLAGSZ] = { '\0' };
+	static char	string[FLAGSZ];
+	static Val_desc vda[] = {
+		{ RTC_OBJ_DIRENT,	MSG_ORIG(MSG_CONF_DIRENT) },
+		{ RTC_OBJ_ALLENTS,	MSG_ORIG(MSG_CONF_ALLENTS) },
+		{ RTC_OBJ_NOEXIST,	MSG_ORIG(MSG_CONF_NOEXIST) },
+		{ RTC_OBJ_EXEC,		MSG_ORIG(MSG_CONF_EXEC) },
+		{ RTC_OBJ_ALTER,	MSG_ORIG(MSG_CONF_ALTER) },
+		{ RTC_OBJ_DUMP,		MSG_ORIG(MSG_CONF_DUMP) },
+		{ RTC_OBJ_NOALTER,	MSG_ORIG(MSG_CONF_NOALTER) },
+		{ RTC_OBJ_REALPTH,	MSG_ORIG(MSG_CONF_REALPATH) },
+		{ RTC_OBJ_GROUP,	MSG_ORIG(MSG_CONF_GROUP) },
+		{ RTC_OBJ_APP,		MSG_ORIG(MSG_CONF_APP) },
+		{ RTC_OBJ_CMDLINE,	MSG_ORIG(MSG_CONF_CMDLINE) },
+		{ RTC_OBJ_FILTER,	MSG_ORIG(MSG_CONF_FILTER) },
+		{ RTC_OBJ_FILTEE,	MSG_ORIG(MSG_CONF_FILTEE) },
+		{ 0,			0 }
+	};
+	ushort_t	_flags = flags;
 
-	(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
-
-	if (flags & RTC_OBJ_DIRENT)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_DIRENT));
-	if (flags & RTC_OBJ_ALLENTS)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_ALLENTS));
-	if (flags & RTC_OBJ_NOEXIST)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_NOEXIST));
-	if (flags & RTC_OBJ_EXEC)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_EXEC));
-	if (flags & RTC_OBJ_ALTER) {
-		if (flags & RTC_OBJ_OPTINAL)
-			(void) strcat(string, MSG_ORIG(MSG_CONF_OPTIONAL));
-		else
-			(void) strcat(string, MSG_ORIG(MSG_CONF_ALTER));
-	}
-	if (flags & RTC_OBJ_DUMP)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_DUMP));
-	if (flags & RTC_OBJ_REALPTH)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_REALPATH));
-	if (flags & RTC_OBJ_GROUP)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_GROUP));
-	if (flags & RTC_OBJ_APP)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_APP));
-	if (flags & RTC_OBJ_CMDLINE)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_CMDLINE));
-	if (flags & RTC_OBJ_FILTER)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_FILTER));
-	if (flags & RTC_OBJ_FILTEE)
-		(void) strcat(string, MSG_ORIG(MSG_CONF_FILTEE));
-
-	(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
-
-	if (strlen(string) == (MSG_GBL_OSQBRKT_SIZE + MSG_GBL_CSQBRKT_SIZE))
+	if ((flags == 0) || (flags == RTC_OBJ_OPTINAL))
 		return (MSG_ORIG(MSG_GBL_NULL));
-	else
-		return ((const char *)string);
+
+	(void) strlcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
+
+	/*
+	 * Print an alternative-optional object simply as optional.
+	 */
+	if ((flags & (RTC_OBJ_ALTER | RTC_OBJ_OPTINAL)) ==
+	    (RTC_OBJ_ALTER | RTC_OBJ_OPTINAL)) {
+		if (strlcat(string, MSG_ORIG(MSG_CONF_OPTIONAL),
+		    FLAGSZ) >= FLAGSZ)
+			return (conv_invalid_val(string, FLAGSZ, flags, 0));
+		flags = _flags &= ~(RTC_OBJ_ALTER | RTC_OBJ_OPTINAL);
+	}
+	flags = _flags &= ~RTC_OBJ_OPTINAL;
+
+	if (conv_expn_field(string, FLAGSZ, vda, flags, _flags, 0, 0))
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
+
+	return ((const char *)string);
 }
 
 /*
@@ -149,7 +148,7 @@ conv_config_obj(ushort_t flags)
  *	/local/lib:/opt/sfw/lib:/lib:/usr/lib
  */
 const char *
-conv_upm_string(const char *str, const char *old, const char *new,
+conv_config_upm(const char *str, const char *old, const char *new,
     size_t newlen)
 {
 	const char	*curstr, *ptr;

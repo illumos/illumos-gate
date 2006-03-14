@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -37,6 +36,7 @@
 #include <sys/kobj_impl.h>
 #else
 #include <machdep.h>
+#include <rtld.h>
 #include <conv.h>
 #endif /* _KERNEL */
 
@@ -81,7 +81,22 @@ extern "C" {
 						/*    locally */
 
 /*
- * Macros for testing relocation table flags
+ * In user land, redefine the relocation table and relocation engine to be
+ * class specific if necessary.  This allows both engines to reside in the
+ * intel/amd version of libld.
+ */
+#if	!defined(_KERNEL)
+#if	defined(_ELF64)
+#define	do_reloc		do64_reloc
+#define	reloc_table		reloc64_table
+#else
+#define	do_reloc		do32_reloc
+#define	reloc_table		reloc32_table
+#endif
+#endif
+
+/*
+ * Relocation table and macros for testing relocation table flags.
  */
 extern	const Rel_entry		reloc_table[];
 
@@ -107,53 +122,38 @@ extern	const Rel_entry		reloc_table[];
 					FLG_RE_ADDRELATIVE) != 0)
 #define	IS_REGISTER(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_REGISTER) != 0)
-#define	IS_FORMOFF(X)		((reloc_table[(X)].re_flags &\
+#define	IS_FORMOFF(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_FRMOFF) != 0)
-#define	IS_NOTSUP(X)		((reloc_table[(X)].re_flags &\
+#define	IS_NOTSUP(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_NOTSUP) != 0)
-#define	IS_SEG_RELATIVE(X)	((reloc_table[(X)].re_flags &\
+#define	IS_SEG_RELATIVE(X)	((reloc_table[(X)].re_flags & \
 					FLG_RE_SEGREL) != 0)
-#define	IS_EXTOFFSET(X)		((reloc_table[(X)].re_flags &\
+#define	IS_EXTOFFSET(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_EXTOFFSET) != 0)
-#define	IS_SEC_RELATIVE(X)	((reloc_table[(X)].re_flags &\
+#define	IS_SEC_RELATIVE(X)	((reloc_table[(X)].re_flags & \
 					FLG_RE_SECREL) != 0)
-#define	IS_TLS_INS(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS_INS(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSINS) != 0)
-#define	IS_TLS_GD(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS_GD(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSGD) != 0)
-#define	IS_TLS_LD(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS_LD(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSLD) != 0)
-#define	IS_TLS_IE(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS_IE(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSIE) != 0)
-#define	IS_TLS_LE(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS_LE(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSLE) != 0)
-#define	IS_TLS(X)		((reloc_table[(X)].re_flags &\
+#define	IS_TLS(X)		((reloc_table[(X)].re_flags & \
 					(FLG_RE_TLSINS|FLG_RE_TLSGD| \
 					FLG_RE_TLSLD|FLG_RE_TLSIE| \
 					FLG_RE_TLSLE)) != 0)
-#define	IS_LOCALBND(X)		((reloc_table[(X)].re_flags &\
+#define	IS_LOCALBND(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_LOCLBND) != 0)
 
 /*
- * Functions.
+ * Relocation engine.
  */
 extern	int	do_reloc(uchar_t, uchar_t *, Xword *, const char *,
-		    const char *);
-
-/*
- * Provide a macro to select the appropriate convension routine for this
- * architecture.
- */
-#if defined(__amd64)
-#define	CONV_RELOC_TYPE		conv_reloc_amd64_type_str
-#elif defined(__i386)
-#define	CONV_RELOC_TYPE		conv_reloc_386_type_str
-#elif defined(__sparc)
-#define	CONV_RELOC_TYPE		conv_reloc_SPARC_type_str
-#else
-#error platform not defined!
-#endif
-
+		    const char *, void *);
 
 #if defined(_KERNEL)
 /*
@@ -182,49 +182,68 @@ extern	int	do_reloc(uchar_t, uchar_t *, Xword *, const char *,
 #define	MSG_REL_OFFSET		"offset 0x%llx"
 #define	MSG_REL_NOFIT		"value 0x%llx does not fit"
 
-extern const char	 *conv_reloc_386_type_str(uint_t);
-extern const char	 *conv_reloc_amd64_type_str(uint_t);
-extern const char	 *conv_reloc_SPARC_type_str(uint_t);
+/*
+ * Provide a macro to select the appropriate conversion routine for this
+ * architecture.
+ */
+#if defined(__amd64)
+
+extern const char	*conv_reloc_amd64_type(Word);
+#define	CONV_RELOC_TYPE	conv_reloc_amd64_type
+
+#elif defined(__i386)
+
+extern const char	*conv_reloc_386_type(Word);
+#define	CONV_RELOC_TYPE	conv_reloc_386_type
+
+#elif defined(__sparc)
+
+extern const char	*conv_reloc_SPARC_type(Word);
+#define	CONV_RELOC_TYPE	conv_reloc_SPARC_type
+
+#else
+#error platform not defined!
+#endif
 
 /*
- * Note:  Related to bug 4128755, dlerror() only keeps track of a single error
- * string, and therefore must have errors reported through a single eprintf()
- * call.  The kernel's _kobj_printf is somewhat more limited, and must receive
- * messages with only one arguement to the format string.  The following macros
- * are to straighted all this out because krtld and rtld share do_reloc().
+ * Note:  dlerror() only keeps track of a single error string, and therefore
+ * must have errors reported through a single eprintf() call.  The kernel's
+ * _kobj_printf is somewhat more limited, and must receive messages with only
+ * one argument to the format string.  The following macros account for these
+ * differences, as krtld and rtld share do_reloc().
  */
-#define	REL_ERR_UNIMPL(file, sym, rtype) \
+#define	REL_ERR_UNIMPL(lml, file, sym, rtype) \
 	_kobj_printf(ops, MSG_REL_PREFIL, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
 	_kobj_printf(ops, MSG_REL_UNIMPL, (int)(rtype))
 
-#define	REL_ERR_UNSUPSZ(file, sym, rtype, size) \
+#define	REL_ERR_UNSUPSZ(lml, file, sym, rtype, size) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
 	_kobj_printf(ops, MSG_REL_UNSUPSZ, (int)(size))
 
-#define	REL_ERR_NONALIGN(file, sym, rtype, off) \
+#define	REL_ERR_NONALIGN(lml, file, sym, rtype, off) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
 	_kobj_printf(ops, MSG_REL_NONALIGN, EC_OFF((off)))
 
-#define	REL_ERR_UNNOBITS(file, sym, rtype, nbits) \
+#define	REL_ERR_UNNOBITS(lml, file, sym, rtype, nbits) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
 	_kobj_printf(ops, MSG_REL_UNNOBITS, (nbits))
 
-#define	REL_ERR_LOSEBITS(file, sym, rtype, uvalue, nbits, off) \
+#define	REL_ERR_LOSEBITS(lml, file, sym, rtype, uvalue, nbits, off) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
 	_kobj_printf(ops, MSG_REL_VALUE, EC_XWORD((uvalue))); \
 	_kobj_printf(ops, MSG_REL_LOSEBITS, (int)(nbits)); \
-	_kobj_printf(ops, MSG_REL_OFFSET, EC_ADDR((off)))
+	_kobj_printf(ops, MSG_REL_OFFSET, EC_NATPTR((off)))
 
-#define	REL_ERR_NOFIT(file, sym, rtype, uvalue) \
+#define	REL_ERR_NOFIT(lml, file, sym, rtype, uvalue) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
@@ -235,34 +254,34 @@ extern const char	 *conv_reloc_SPARC_type_str(uint_t);
 
 extern	const char *demangle(const char *);
 
-#define	REL_ERR_UNIMPL(file, sym, rtype) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL), (file), \
+#define	REL_ERR_UNIMPL(lml, file, sym, rtype) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (int)(rtype)))
 
-#define	REL_ERR_UNSUPSZ(file, sym, rtype, size) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ), \
-	    CONV_RELOC_TYPE((rtype)), (file), \
+#define	REL_ERR_UNSUPSZ(lml, file, sym, rtype, size) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ), \
+	    conv_reloc_type(M_MACH, (rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (int)(size)))
 
-#define	REL_ERR_NONALIGN(file, sym, rtype, off) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN), \
-	    CONV_RELOC_TYPE((rtype)), (file), \
+#define	REL_ERR_NONALIGN(lml, file, sym, rtype, off) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN), \
+	    conv_reloc_type(M_MACH, (rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), EC_OFF((off))))
 
-#define	REL_ERR_UNNOBITS(file, sym, rtype, nbits) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNNOBITS), \
-	    CONV_RELOC_TYPE((rtype)), (file), \
+#define	REL_ERR_UNNOBITS(lml, file, sym, rtype, nbits) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNNOBITS), \
+	    conv_reloc_type(M_MACH, (rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (nbits)))
 
-#define	REL_ERR_LOSEBITS(file, sym, rtype, uvalue, nbits, off) \
-	(eprintf(ERR_FATAL,  MSG_INTL(MSG_REL_LOSEBITS), \
-	    CONV_RELOC_TYPE((rtype)), (file), \
+#define	REL_ERR_LOSEBITS(lml, file, sym, rtype, uvalue, nbits, off) \
+	(eprintf(lml, ERR_FATAL,  MSG_INTL(MSG_REL_LOSEBITS), \
+	    conv_reloc_type(M_MACH, (rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
-	    EC_XWORD((uvalue)), (nbits), EC_ADDR((off))))
+	    EC_XWORD((uvalue)), (nbits), EC_NATPTR((off))))
 
-#define	REL_ERR_NOFIT(file, sym, rtype, uvalue) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NOFIT), \
-	    CONV_RELOC_TYPE((rtype)), (file), \
+#define	REL_ERR_NOFIT(lml, file, sym, rtype, uvalue) \
+	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOFIT), \
+	    conv_reloc_type(M_MACH, (rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue))))
 

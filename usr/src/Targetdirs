@@ -615,8 +615,6 @@ $(ROOT)/usr/ccs/lib/libl.so:=		REALPATH=../../lib/libl.so.1
 $(ROOT)/usr/ccs/lib/llib-ll.ln:= 	REALPATH=../../lib/llib-ll.ln
 $(ROOT)/usr/ccs/lib/liby.so:=		REALPATH=../../lib/liby.so.1
 $(ROOT)/usr/ccs/lib/llib-ly.ln:= 	REALPATH=../../lib/llib-ly.ln
-$(ROOT)/usr/ccs/lib/libld.so.2:=	REALPATH=../../../lib/libld.so.2
-$(ROOT)/usr/ccs/lib/libld.so.3:=	REALPATH=../../../lib/libld.so.3
 $(ROOT)/usr/lib/libp/libc.so.1:=	REALPATH=../../../lib/libc.so.1
 $(ROOT)/usr/lib/lwp/libthread.so.1:=	REALPATH=../libthread.so.1
 $(ROOT)/usr/lib/lwp/libthread_db.so.1:=	REALPATH=../libthread_db.so.1
@@ -672,10 +670,6 @@ $(ROOT)/usr/ccs/lib/$(MACH64)/liby.so:= \
 	REALPATH=../../../lib/$(MACH64)/liby.so.1
 $(ROOT)/usr/ccs/lib/$(MACH64)/llib-ly.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ly.ln
-$(ROOT)/usr/ccs/lib/$(MACH64)/libld.so.2:= \
-	REALPATH=../../../../lib/$(MACH64)/libld.so.2
-$(ROOT)/usr/ccs/lib/$(MACH64)/libld.so.3:= \
-	REALPATH=../../../../lib/$(MACH64)/libld.so.3
 $(ROOT)/usr/lib/libp/$(MACH64)/libc.so.1:= \
 	REALPATH=../../../../lib/$(MACH64)/libc.so.1
 $(ROOT)/usr/lib/lwp/$(MACH64)/libthread.so.1:= \
@@ -716,13 +710,11 @@ SYM.USRCCSLIB= \
 	/usr/ccs/lib/llib-ll.ln \
 	/usr/ccs/lib/liby.so \
 	/usr/ccs/lib/llib-ly.ln \
-	/usr/ccs/lib/libld.so.2 \
 	/usr/lib/libp/libc.so.1 \
 	/usr/lib/lwp/libthread.so.1 \
 	/usr/lib/lwp/libthread_db.so.1
 
 SYM.USRCCSLIB64= \
-	/usr/ccs/lib/libld.so.3 \
 	/usr/ccs/lib/$(MACH64)/libcurses.so \
 	/usr/ccs/lib/$(MACH64)/llib-lcurses.ln \
 	/usr/ccs/lib/$(MACH64)/libform.so \
@@ -748,8 +740,6 @@ SYM.USRCCSLIB64= \
 	/usr/ccs/lib/$(MACH64)/llib-ll.ln \
 	/usr/ccs/lib/$(MACH64)/liby.so \
 	/usr/ccs/lib/$(MACH64)/llib-ly.ln \
-	/usr/ccs/lib/$(MACH64)/libld.so.2 \
-	/usr/ccs/lib/$(MACH64)/libld.so.3 \
 	/usr/lib/libp/$(MACH64)/libc.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread_db.so.1
@@ -818,8 +808,6 @@ $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
-$(ROOT)/usr/lib/libld.so.2:=		REALPATH=../../lib/libld.so.2
-$(ROOT)/usr/lib/libld.so.3:=		REALPATH=../../lib/libld.so.3
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
 $(ROOT)/usr/lib/libmd5.so.1:=		REALPATH=../../lib/libmd5.so.1
 $(ROOT)/usr/lib/libmd5.so:=		REALPATH=../../lib/libmd5.so.1
@@ -1081,10 +1069,6 @@ $(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
-$(ROOT)/usr/lib/$(MACH64)/libld.so.2:= \
-	REALPATH=../../../lib/$(MACH64)/libld.so.2
-$(ROOT)/usr/lib/$(MACH64)/libld.so.3:= \
-	REALPATH=../../../lib/$(MACH64)/libld.so.3
 $(ROOT)/usr/lib/$(MACH64)/liblddbg.so.4:= \
 	REALPATH=../../../lib/$(MACH64)/liblddbg.so.4
 $(ROOT)/usr/lib/$(MACH64)/libmd5.so.1:= \
@@ -1376,7 +1360,6 @@ SYM.USRLIB= \
 	/usr/lib/libintl.so.1 \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
-	/usr/lib/libld.so.2 \
 	/usr/lib/liblddbg.so.4 \
 	/usr/lib/libmd5.so \
 	/usr/lib/libmd5.so.1 \
@@ -1602,8 +1585,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libintl.so.1 \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
-	/usr/lib/$(MACH64)/libld.so.2 \
-	/usr/lib/$(MACH64)/libld.so.3 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \
 	/usr/lib/$(MACH64)/libmd5.so \
 	/usr/lib/$(MACH64)/libmd5.so.1 \
@@ -1716,8 +1697,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_files.so.1 \
 	/usr/lib/$(MACH64)/nss_nis.so.1 \
 	/usr/lib/$(MACH64)/nss_nisplus.so.1 \
-	/usr/lib/$(MACH64)/nss_user.so.1 \
-	/usr/lib/libld.so.3
+	/usr/lib/$(MACH64)/nss_user.so.1
 
 $(SYM.USRLIB:%=$(ROOT)%):= \
     INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \

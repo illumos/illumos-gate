@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,11 +60,10 @@
 #include	<unistd.h>
 #include	<locale.h>
 #include	<errno.h>
-#include	<sys/varargs.h>
-#include	"sgs.h"
-#include	"conv.h"
-#include	"debug.h"
-#include	"gelf.h"
+#include	<sgs.h>
+#include	<conv.h>
+#include	<gelf.h>
+#include	<debug.h>
 #include	"msg.h"
 
 #define		FLG_VER_AVAIL	0x10
@@ -105,28 +104,10 @@ static const char *
 demangle(const char *name)
 {
 	if (Cflag)
-		return (Gelf_sym_dem(name));
+		return (Elf_demangle_name(name));
 	else
 		return (name);
 }
-
-
-/*
- * Define our own printing routine.  We don't actually use this, but because
- * we use liblddbg to demangle symbols we need to provide this to satisfy
- * liblddbg's binding requirements.
- */
-/*PRINTFLIKE1*/
-void
-dbg_print(const char *format, ...)
-{
-	va_list	ap;
-
-	va_start(ap, format);
-	(void) vprintf(format, ap);
-	(void) printf(MSG_ORIG(MSG_STR_NL));
-}
-
 
 /*
  * Print any reduced symbols.  The convention is that reduced symbols exist as

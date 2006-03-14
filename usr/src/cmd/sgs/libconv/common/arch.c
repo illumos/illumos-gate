@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,8 +29,6 @@
 #include	<unistd.h>
 #include	<string.h>
 #include	<sys/systeminfo.h>
-#include	<sys/param.h>
-#include	<sys/auxv.h>
 #include	"_conv.h"
 #include	"arch_msg.h"
 
@@ -39,7 +37,7 @@
  * Return the corresponding EI_CLASS constant.
  */
 int
-conv_sys_eclass()
+conv_sys_eclass(void)
 {
 	char buf[BUFSIZ];
 
@@ -62,7 +60,7 @@ conv_sys_eclass()
 void
 conv_check_native(char **argv, char **envp)
 {
-	/* ia32 & 64-bit sparc version does nothing */
+	/* 64-bit version does nothing */
 }
 
 #else

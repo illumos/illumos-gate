@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 1998,2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	__CONV_DOT_H
@@ -39,16 +39,24 @@ extern "C" {
 #endif
 
 /*
- * Various values that can't be matched to a symbolic definition will be
- * converted to a numeric string.  Each function that may require this
- * fallback maintains its own static string buffer, as many conversion
- * routines may be called for one final diagnostic.
- *
- * Most strings are printed as a 10.10s, but the string size is big
- * enough for any 32 bit value.
+ * Some format strings differ depending on whether they are used for 32-bit
+ * or 64-bit values.
  */
-#define	STRSIZE		12
-#define	STRSIZE64	24
+#if	defined(_ELF64)
+#define	MSG_GBL_FMT_DEC		MSG_GBL_FMT_DEC_64
+#define	MSG_GBL_FMT_DECS	MSG_GBL_FMT_DECS_64
+#define	MSG_GBL_FMT_HEX		MSG_GBL_FMT_HEX_64
+#define	MSG_GBL_FMT_HEXS	MSG_GBL_FMT_HEXS_64
+
+#define	MSG_SYM_FMT_VAL		MSG_SYM_FMT_VAL_64
+#else
+#define	MSG_GBL_FMT_DEC		MSG_GBL_FMT_DEC_32
+#define	MSG_GBL_FMT_DECS	MSG_GBL_FMT_DECS_32
+#define	MSG_GBL_FMT_HEX		MSG_GBL_FMT_HEX_32
+#define	MSG_GBL_FMT_HEXS	MSG_GBL_FMT_HEXS_32
+
+#define	MSG_SYM_FMT_VAL		MSG_SYM_FMT_VAL_32
+#endif
 
 #ifdef	__cplusplus
 }

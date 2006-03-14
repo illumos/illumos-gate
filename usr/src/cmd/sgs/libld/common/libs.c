@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +33,7 @@
  */
 #include	<stdio.h>
 #include	<string.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -45,7 +44,7 @@
  * contains another tentative definition, or a defined function symbol, then it
  * will not be used.
  */
-int
+static int
 process_member(Ar_mem *amp, const char *name, unsigned char obind,
     Ofl_desc *ofl)
 {
@@ -67,8 +66,8 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
 
 		while (scn = elf_nextscn(amp->am_elf, scn)) {
 			if ((shdr = elf_getshdr(scn)) == NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
-				    amp->am_path);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_GETSHDR), amp->am_path);
 				ofl->ofl_flags |= FLG_OF_FATAL;
 				return (0);
 			}
@@ -77,8 +76,8 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
 				break;
 		}
 		if ((data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
-			    amp->am_path);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
@@ -92,14 +91,14 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
 		 */
 		if ((scn = elf_getscn(amp->am_elf, (size_t)shdr->sh_link)) ==
 		    NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
-			    amp->am_path);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETSCN), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
 		if ((data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
-			    amp->am_path);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETDATA), amp->am_path);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}
@@ -151,7 +150,7 @@ process_member(Ar_mem *amp, const char *name, unsigned char obind,
  * pick off where the last processing finished.
  */
 Ar_desc *
-ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
+ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 {
 	Ar_desc *	adp;
 	size_t		number;
@@ -163,10 +162,12 @@ ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 	 */
 	if ((start = elf_getarsym(elf, &number)) == 0) {
 		if (elf_errno()) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETARSYM), name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETARSYM), name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		} else
-			eprintf(ERR_WARNING, MSG_INTL(MSG_ELF_ARSYM), name);
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_ELF_ARSYM), name);
 
 		return (0);
 	}
@@ -200,11 +201,11 @@ ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
 }
 
 /*
- * For each archive descriptor we maintain an `Ar_aux' table to parallel the
- * archive symbol table (returned from elf_getarsym(3e)).  We use this table to
- * hold the `Sym_desc' for each symbol (thus reducing the number of sym_find()'s
- * we have to do), and to hold the `Ar_mem' pointer.  The `Ar_mem' element can
- * have one of three values indicating the state of the archive member
+ * For each archive descriptor, maintain an `Ar_aux' table to parallel the
+ * archive symbol table (returned from elf_getarsym(3e)).  Use this table to
+ * hold a `Sym_desc' for each symbol (thus reducing the number of
+ * ld_sym_find()'s), and to hold the `Ar_mem' pointer.  The `Ar_mem' element
+ * can have one of three values indicating the state of the archive member
  * associated with the offset for this symbol table entry:
  *
  *  0		indicates that the member has not been processed.
@@ -226,7 +227,7 @@ ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
  * has its `Ar_mem' pointer set to the member structures address.
  */
 void
-ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
+ld_ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
 {
 	Elf_Arsym *	_arsym = arsym;
 	Ar_aux *	_aup = aup;
@@ -262,7 +263,7 @@ ar_member(Ar_desc * adp, Elf_Arsym * arsym, Ar_aux * aup, Ar_mem * amp)
  * through a complete pass without satisfying any unresolved symbols
  */
 uintptr_t
-process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
+ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 {
 	Elf_Arsym *	arsym;
 	Elf_Arhdr *	arhdr;
@@ -270,7 +271,8 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	Ar_aux *	aup;
 	Sym_desc *	sdp;
 	char 		*arname, *arpath;
-	int		ndx, found = 0, again = 0;
+	Xword		ndx;
+	int		found, again;
 	int		allexrt = ofl->ofl_flags1 & FLG_OF1_ALLEXRT;
 	uintptr_t	err;
 	Rej_desc	rej = { 0 };
@@ -301,9 +303,10 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * symbol table.  If so, and if that symbol is still unresolved or
 	 * tentative, process the corresponding archive member.
 	 */
+	found = again = 0;
 	do {
-		DBG_CALL(Dbg_file_archive(name, again));
-		DBG_CALL(Dbg_syms_ar_title(name, again));
+		DBG_CALL(Dbg_file_ar(ofl->ofl_lml, name, again));
+		DBG_CALL(Dbg_syms_ar_title(ofl->ofl_lml, name, again));
 
 		ndx = again = 0;
 		for (arsym = adp->ad_start, aup = adp->ad_aux; arsym->as_name;
@@ -328,10 +331,11 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * (But you skip this if allextract is specified.)
 			 */
 			if ((allexrt == 0) && ((sdp = aup->au_syms) == 0)) {
-				if ((sdp = sym_find(arsym->as_name,
+				if ((sdp = ld_sym_find(arsym->as_name,
 				    /* LINTED */
 				    (Word)arsym->as_hash, 0, ofl)) == 0) {
-					DBG_CALL(Dbg_syms_ar_entry(ndx, arsym));
+					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
+					    ndx, arsym));
 					continue;
 				}
 				aup->au_syms = sdp;
@@ -369,7 +373,8 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				    (sym->st_shndx != SHN_COMMON) && vers) ||
 				    ((ELF_ST_BIND(sym->st_info) == STB_WEAK) &&
 				    (!(ofl->ofl_flags1 & FLG_OF1_WEAKEXT)))) {
-					DBG_CALL(Dbg_syms_ar_entry(ndx, arsym));
+					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
+					    ndx, arsym));
 					continue;
 				}
 			}
@@ -390,7 +395,7 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 */
 				if (elf_rand(adp->ad_elf, arsym->as_off) !=
 				    arsym->as_off) {
-					eprintf(ERR_ELF,
+					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_ARMEM), name,
 					    EC_WORD(arsym->as_off), ndx,
 					    demangle(arsym->as_name));
@@ -399,7 +404,7 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				}
 				if ((arelf = elf_begin(fd, ELF_C_READ,
 				    adp->ad_elf)) == NULL) {
-					eprintf(ERR_ELF,
+					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_BEGIN), name);
 					ofl->ofl_flags |= FLG_OF_FATAL;
 					return (0);
@@ -409,7 +414,7 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 * Construct the member filename.
 				 */
 				if ((arhdr = elf_getarhdr(arelf)) == NULL) {
-					eprintf(ERR_ELF,
+					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_GETARHDR), name);
 					ofl->ofl_flags |= FLG_OF_FATAL;
 					return (0);
@@ -450,8 +455,8 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 					amp->am_name = arname;
 					amp->am_path = arpath;
 				}
-				DBG_CALL(Dbg_syms_ar_checking(ndx, arsym,
-				    arname));
+				DBG_CALL(Dbg_syms_ar_checking(ofl->ofl_lml,
+				    ndx, arsym, arname));
 				if ((err = process_member(amp, arsym->as_name,
 				    bind, ofl)) == S_ERROR)
 					return (S_ERROR);
@@ -466,7 +471,8 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				 */
 				if (err == 0) {
 					if (aup->au_mem == 0)
-						ar_member(adp, arsym, aup, amp);
+						ld_ar_member(adp, arsym,
+						    aup, amp);
 					continue;
 				}
 			}
@@ -475,9 +481,9 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			 * Process the archive member.  Retain any error for
 			 * return to the caller.
 			 */
-			DBG_CALL(Dbg_syms_ar_resolve(ndx, arsym, arname,
-			    allexrt));
-			if ((err = (uintptr_t)process_ifl(arpath, NULL, fd,
+			DBG_CALL(Dbg_syms_ar_resolve(ofl->ofl_lml, ndx, arsym,
+			    arname, allexrt));
+			if ((err = (uintptr_t)ld_process_ifl(arpath, NULL, fd,
 			    arelf, FLG_IF_EXTRACT | FLG_IF_NEEDED, ofl,
 			    &_rej)) == S_ERROR)
 				return (S_ERROR);
@@ -494,7 +500,7 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 					rej.rej_info = _rej.rej_info;
 					rej.rej_name = (const char *)arpath;
 				}
-				ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
+				ld_ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
 				continue;
 			}
 
@@ -514,8 +520,8 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			if (allexrt == 0)
 				again = 1;
 
-			ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
-			DBG_CALL(Dbg_syms_nl());
+			ld_ar_member(adp, arsym, aup, FLG_ARMEM_PROC);
+			DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 		}
 	} while (again);
 
@@ -526,9 +532,10 @@ process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 */
 	if (found == 0) {
 		if (rej.rej_type)
-			eprintf(ERR_WARNING, MSG_INTL(reject[rej.rej_type]),
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
-			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_str(&rej));
+			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(&rej));
 	}
 
 	/*

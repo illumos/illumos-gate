@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,13 +38,13 @@
 #include	<dlfcn.h>
 #include	<synch.h>
 #include	<string.h>
+#include	<debug.h>
+#include	<reloc.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"msg.h"
-#include	"debug.h"
-#include	"reloc.h"
-#include	"conv.h"
 
 extern void	iflush_range(caddr_t, size_t);
 extern void	plt_upper_32(uintptr_t, uintptr_t);
@@ -300,8 +300,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
     int *fail)
 {
 	extern ulong_t	elf_plt_trace();
-	Addr		dyn_plt;
-	Addr *		dyndata;
+	Addr		dyn_plt, *dyndata;
 
 	/*
 	 * If both pltenter & pltexit have been disabled there
@@ -319,7 +318,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 	 * library that is interested in this binding.
 	 */
 	dyn_plt = (Xword)AUDINFO(rlmp)->ai_dynplts +
-		(pltndx * dyn_plt_ent_size);
+	    (pltndx * dyn_plt_ent_size);
 
 	/*
 	 * Have we initialized this dynamic plt entry yet?  If we haven't do it
@@ -328,8 +327,9 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 	 * we just set the plt to point to the new dyn_plt.
 	 */
 	if (*(Word *)dyn_plt == 0) {
-		Sym *	symp;
+		Sym	*symp;
 		Xword	symvalue;
+		Lm_list	*lml = LIST(rlmp);
 
 		(void) memcpy((void *)dyn_plt, dyn_plt_template,
 		    sizeof (dyn_plt_template));
@@ -342,7 +342,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		symvalue = (Xword)dyndata;
 		if (do_reloc(R_SPARC_HH22, (Byte *)(dyn_plt + 0x14),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT)) == 0) {
+		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
 			return (0);
 		}
@@ -354,7 +354,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		symvalue = (Xword)dyndata;
 		if (do_reloc(R_SPARC_HM10, (Byte *)(dyn_plt + 0x18),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT)) == 0) {
+		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
 			return (0);
 		}
@@ -366,7 +366,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		symvalue = (Xword)dyndata;
 		if (do_reloc(R_SPARC_LM22, (Byte *)(dyn_plt + 0x20),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT)) == 0) {
+		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
 			return (0);
 		}
@@ -378,7 +378,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		symvalue = (Xword)dyndata;
 		if (do_reloc(R_SPARC_LO10, (Byte *)(dyn_plt + 0x24),
 		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT)) == 0) {
+		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
 			return (0);
 		}
@@ -388,10 +388,10 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		 *	call	elf_plt_trace
 		 */
 		symvalue = (Xword)((Addr)&elf_plt_trace -
-			(Addr)(dyn_plt + 0x2c));
+		    (Addr)(dyn_plt + 0x2c));
 		if (do_reloc(R_SPARC_WDISP30, (Byte *)(dyn_plt + 0x2c),
 		    &symvalue, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT)) == 0) {
+		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 			*fail = 1;
 			return (0);
 		}
@@ -412,11 +412,10 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		iflush_range((void *)dyn_plt, sizeof (dyn_plt_template));
 	}
 
-	(void) elf_plt_write((uintptr_t)addr, (uintptr_t)addr,
-		rptr, (uintptr_t)dyn_plt, pltndx);
+	(void) elf_plt_write((uintptr_t)addr, (uintptr_t)addr, rptr,
+	    (uintptr_t)dyn_plt, pltndx);
 	return ((caddr_t)dyn_plt);
 }
-
 
 /*
  * Function binding routine - invoked on the first call to a function through
@@ -437,7 +436,7 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 ulong_t
 elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 {
-	Rt_map		*nlmp, * llmp;
+	Rt_map		*nlmp, *llmp;
 	Addr		addr, vaddr, reloff, symval;
 	char		*name;
 	Rela		*rptr;
@@ -447,7 +446,9 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	ulong_t		rsymndx;
 	Slookup		sl;
 	Pltbindtype	pbtype;
-	int		entry, dbg_save, lmflags, farplt = 0;
+	int		entry, lmflags, farplt = 0;
+	uint_t		dbg_class;
+	Lm_list		*lml = LIST(lmp);
 
 	/*
 	 * For compatibility with libthread (TI_VERSION 1) we track the entry
@@ -457,9 +458,9 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 */
 	entry = enter();
 
-	if ((lmflags = LIST(lmp)->lm_flags) & LML_FLG_RTLDLM) {
-		dbg_save = dbg_mask;
-		dbg_mask = 0;
+	if ((lmflags = lml->lm_flags) & LML_FLG_RTLDLM) {
+		dbg_class = dbg_desc->d_class;
+		dbg_desc->d_class = 0;
 	}
 
 	/*
@@ -493,10 +494,10 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 */
 	if (!lmp || (!farplt && (addr % M_PLT_ENTSIZE) != 0) ||
 	    (farplt && (addr % M_PLT_INSSIZE))) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
-		    conv_reloc_SPARC_type_str(R_SPARC_JMP_SLOT),
-		    EC_ADDR(lmp), EC_XWORD(pltoff), EC_ADDR(from));
-		rtldexit(LIST(lmp), 1);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
+		    conv_reloc_SPARC_type(R_SPARC_JMP_SLOT),
+		    EC_NATPTR(lmp), EC_XWORD(pltoff), EC_NATPTR(from));
+		rtldexit(lml, 1);
 	}
 	reloff = pltndx * sizeof (Rela);
 
@@ -513,21 +514,21 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * Determine the last link-map of this list, this'll be the starting
 	 * point for any tsort() processing.
 	 */
-	llmp = LIST(lmp)->lm_tail;
+	llmp = lml->lm_tail;
 
 	/*
 	 * Find definition for symbol.
 	 */
 	sl.sl_name = name;
 	sl.sl_cmap = lmp;
-	sl.sl_imap = LIST(lmp)->lm_head;
+	sl.sl_imap = lml->lm_head;
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = rsymndx;
 	sl.sl_flags = LKUP_DEFT;
 	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
-		rtldexit(LIST(lmp), 1);
+		rtldexit(lml, 1);
 	}
 
 	symval = nsym->st_value;
@@ -539,10 +540,10 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 		 * Record that this new link map is now bound to the caller.
 		 */
 		if (bind_one(lmp, nlmp, BND_REFER) == 0)
-			rtldexit(LIST(lmp), 1);
+			rtldexit(lml, 1);
 	}
 
-	if ((LIST(lmp)->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
+	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
 		/* LINTED */
 		uint_t	symndx = (uint_t)(((uintptr_t)nsym -
 			(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
@@ -558,7 +559,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 
 	pbtype = PLT_T_NONE;
 	if (!(rtld_flags & RT_FL_NOBIND)) {
-		if (((LIST(lmp)->lm_tflags | FLAGS1(lmp)) &
+		if (((lml->lm_tflags | FLAGS1(lmp)) &
 		    (LML_TFLG_AUD_PLTENTER | LML_TFLG_AUD_PLTEXIT)) &&
 		    AUDINFO(lmp)->ai_dynplts) {
 			int	fail = 0;
@@ -570,7 +571,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			    rptr, lmp, nlmp, nsym, symndx, pltndx,
 			    (caddr_t)symval, sb_flags, &fail);
 			if (fail)
-				rtldexit(LIST(lmp), 1);
+				rtldexit(lml, 1);
 		} else {
 			/*
 			 * Write standard PLT entry to jump directly
@@ -584,10 +585,9 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	/*
 	 * Print binding information and rebuild PLT entry.
 	 */
-	DBG_CALL(Dbg_bind_global(NAME(lmp), from, from - ADDR(lmp),
-	    (Xword)pltndx, pbtype, NAME(nlmp), (caddr_t)symval,
-	    (caddr_t)nsym->st_value, name, binfo));
-
+	DBG_CALL(Dbg_bind_global(lmp, (Addr)from, (Off)(from - ADDR(lmp)),
+	    (Xword)pltndx, pbtype, nlmp, (Addr)symval, nsym->st_value,
+	    name, binfo));
 
 	/*
 	 * Complete any processing for newly loaded objects.  Note we don't
@@ -623,7 +623,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	}
 
 	if (lmflags & LML_FLG_RTLDLM)
-		dbg_mask = dbg_save;
+		dbg_desc->d_class = dbg_class;
 
 	return (symval);
 }
@@ -644,8 +644,8 @@ bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
 	for (LIST_TRAVERSE(padlist, lnp, pip)) {
 		if (pip->pp_addr == value) {
 			*pltaddr = pip->pp_plt;
-			DBG_CALL(Dbg_pltpad_bindto64(NAME(lmp), sname,
-				(Addr)*pltaddr));
+			DBG_CALL(Dbg_bind_pltpad_from(lmp, (Addr)*pltaddr,
+			    sname));
 			return (1);
 		}
 		if (pip->pp_addr > value)
@@ -697,7 +697,7 @@ bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
 	}
 
 	*pltaddr = plt;
-	DBG_CALL(Dbg_pltpad_boundto64(NAME(lmp), (Addr)*pltaddr, fname, sname));
+	DBG_CALL(Dbg_bind_pltpad_to(lmp, (Addr)*pltaddr, fname, sname));
 	return (1);
 }
 
@@ -816,7 +816,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		}
 	}
 	if (!relbgn || (relbgn == relend)) {
-		DBG_CALL(Dbg_reloc_run(NAME(lmp), 0, plt, DBG_REL_NONE));
+		DBG_CALL(Dbg_reloc_run(lmp, 0, plt, DBG_REL_NONE));
 		return (1);
 	}
 
@@ -824,7 +824,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 	basebgn = ADDR(lmp);
 	emap = ADDR(lmp) + MSIZE(lmp);
 
-	DBG_CALL(Dbg_reloc_run(NAME(lmp), M_REL_SHT_TYPE, plt, DBG_REL_START));
+	DBG_CALL(Dbg_reloc_run(lmp, M_REL_SHT_TYPE, plt, DBG_REL_START));
 
 	/*
 	 * If we're processing in lazy mode there is no need to scan the
@@ -850,7 +850,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		 * number of relocations.
 		 */
 		if ((rtype == R_SPARC_RELATIVE) &&
-		    !(FLAGS(lmp) & FLG_RT_FIXED) && !dbg_mask) {
+		    ((FLAGS(lmp) & FLG_RT_FIXED) == 0) && (DBG_ENABLED == 0)) {
 			/*
 			 * It's possible that the relative relocation block
 			 * has relocations against the text segment as well
@@ -978,9 +978,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				    (rtype != R_SPARC_COPY)) {
 					/* LINTED */
 					if (psymdef == 0) {
-						DBG_CALL(Dbg_bind_weak(
-						    NAME(lmp), (caddr_t)roffset,
-						    (caddr_t)
+						DBG_CALL(Dbg_bind_weak(lmp,
+						    (Addr)roffset, (Addr)
 						    (roffset - basebgn), name));
 						continue;
 					}
@@ -1044,11 +1043,13 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * chkmsg: MSG_INTL(MSG_LDD_SYM_NFOUND)
 					 */
 					if (symdef == 0) {
+					    Lm_list	*lml = LIST(lmp);
+
 					    if (bind != STB_WEAK) {
-						if (LIST(lmp)->lm_flags &
+						if (lml->lm_flags &
 						    LML_FLG_IGNRELERR) {
 						    continue;
-						} else if (LIST(lmp)->lm_flags &
+						} else if (lml->lm_flags &
 						    LML_FLG_TRC_WARN) {
 						    (void) printf(MSG_INTL(
 							MSG_LDD_SYM_NFOUND),
@@ -1056,7 +1057,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 							NAME(lmp));
 						    continue;
 						} else {
-						    eprintf(ERR_FATAL,
+						    eprintf(lml, ERR_FATAL,
 							MSG_INTL(MSG_REL_NOSYM),
 							NAME(lmp),
 							demangle(name));
@@ -1067,9 +1068,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 						psymndx = rsymndx;
 						psymdef = 0;
 
-						DBG_CALL(Dbg_bind_weak(
-						    NAME(lmp), (caddr_t)roffset,
-						    (caddr_t)
+						DBG_CALL(Dbg_bind_weak(lmp,
+						    (Addr)roffset, (Addr)
 						    (roffset - basebgn), name));
 						continue;
 					    }
@@ -1180,7 +1180,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		/*
 		 * Call relocation routine to perform required relocation.
 		 */
-		DBG_CALL(Dbg_reloc_in(M_MACH, M_REL_SHT_TYPE, rel, name, NULL));
+		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,
+		    M_REL_SHT_TYPE, rel, NULL, name));
 
 		switch (rtype) {
 		case R_SPARC_REGISTER:
@@ -1207,14 +1208,15 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			} else if (roffset == STO_SPARC_REGISTER_G7) {
 				set_sparc_g7(value);
 			} else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_REL_BADREG),
-				    NAME(lmp), EC_ADDR(roffset));
+				eprintf(LIST(lmp), ERR_FATAL,
+				    MSG_INTL(MSG_REL_BADREG), NAME(lmp),
+				    EC_ADDR(roffset));
 				ret = 0;
 				break;
 			}
 
-			DBG_CALL(Dbg_reloc_reg_apply((Xword)roffset,
-				(Xword)value));
+			DBG_CALL(Dbg_reloc_apply_reg(LIST(lmp), ELF_DBG_RTLD,
+			    M_MACH, (Xword)roffset, (Xword)value));
 			break;
 		case R_SPARC_COPY:
 			if (elf_copy_reloc(name, symref, lmp, (void *)roffset,
@@ -1249,8 +1251,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				 * Write standard PLT entry to jump directly
 				 * to newly bound function.
 				 */
-				DBG_CALL(Dbg_reloc_apply(roffset,
-				    (ulong_t)value));
+				DBG_CALL(Dbg_reloc_apply_val(LIST(lmp),
+				    ELF_DBG_RTLD, (Xword)roffset,
+				    (Xword)value));
 				pbtype = elf_plt_write((uintptr_t)vaddr,
 				    (uintptr_t)vaddr, (void *)rel, value,
 				    pltndx);
@@ -1282,9 +1285,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			if ((rtype == R_SPARC_GLOB_DAT) ||
 			    (rtype == R_SPARC_64)) {
 				if (roffset & 0x7) {
-					eprintf(ERR_FATAL,
+					eprintf(LIST(lmp), ERR_FATAL,
 					    MSG_INTL(MSG_REL_NONALIGN),
-					    conv_reloc_SPARC_type_str(rtype),
+					    conv_reloc_SPARC_type(rtype),
 					    NAME(lmp), demangle(name),
 					    EC_OFF(roffset));
 					ret = 0;
@@ -1292,7 +1295,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					*(ulong_t *)roffset += value;
 			} else {
 				if (do_reloc(rtype, (uchar_t *)roffset,
-				    (Xword *)&value, name, NAME(lmp)) == 0)
+				    (Xword *)&value, name,
+				    NAME(lmp), LIST(lmp)) == 0)
 					ret = 0;
 			}
 
@@ -1300,8 +1304,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			 * The value now contains the 'bit-shifted' value that
 			 * was or'ed into memory (this was set by do_reloc()).
 			 */
-			DBG_CALL(Dbg_reloc_apply((ulong_t)roffset,
-			    value));
+			DBG_CALL(Dbg_reloc_apply_val(LIST(lmp), ELF_DBG_RTLD,
+			    (Xword)roffset, (Xword)value));
 
 			/*
 			 * If this relocation is against a text segment, make
@@ -1316,10 +1320,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			break;
 
 		if (binfo) {
-			DBG_CALL(Dbg_bind_global(NAME(lmp), (caddr_t)roffset,
-			    (caddr_t)(roffset - basebgn), pltndx, pbtype,
-			    NAME(_lmp), (caddr_t)value,
-			    (caddr_t)symdef->st_value, name, binfo));
+			DBG_CALL(Dbg_bind_global(lmp, (Addr)roffset,
+			    (Off)(roffset - basebgn), pltndx, pbtype,
+			    _lmp, (Addr)value, symdef->st_value, name, binfo));
 		}
 	}
 
@@ -1352,7 +1355,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
  * ld.so.1.
  */
 const char *
-_conv_reloc_type_str(uint_t rel)
+_conv_reloc_type(uint_t rel)
 {
-	return (conv_reloc_SPARC_type_str(rel));
+	return (conv_reloc_SPARC_type(rel));
 }

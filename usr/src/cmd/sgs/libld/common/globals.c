@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,13 +35,11 @@
 #include	"msg.h"
 #include	"_libld.h"
 
-Ofl_desc	Ofl;		/* provided for signal handler */
-Ld_heap *	ld_heap;	/* list of allocated blocks for */
+Ld_heap		*ld_heap;	/* list of allocated blocks for */
 				/* 	link-edit dynamic allocations */
-List		lib_support;	/* List of support libraries specified */
+List		lib_support;	/* list of support libraries specified */
 				/*	(-S option) */
-
-uint_t		dbg_mask = 0;	/* liblddbg enabled */
+int		demangle_flag;	/* symbol demangling required */
 
 /*
  * Paths and directories for library searches.  These are used to set up
@@ -54,12 +51,12 @@ char		*Ulibdir;	/* User specified -YU */
 Listnode	*insert_lib;	/* insertion point for -L libraries */
 
 /*
- * liblddbg sometimes takes an ehdr in order to figure out the elf class or
- * machine type.  Symbols that are added by ld, such as _etext, don't have a
- * corresponding ehdr, so we pass this instead.
+ * A default library search path is used if one was not supplied on the command
+ * line.  Note: these strings can not use MSG_ORIG() since they are modified as
+ * part of the path processing.
  */
-Ehdr		def_ehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
-			M_CLASS, M_DATA }, 0, M_MACH };
+char		def64_Plibpath[] = "/lib/64:/usr/lib/64";
+char		def32_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
 
 /*
  * For backward compatibility provide a /dev/zero file descriptor.

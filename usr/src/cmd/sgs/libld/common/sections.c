@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,9 +34,8 @@
 #include	<string.h>
 #include	<strings.h>
 #include	<stdio.h>
-#include	<unistd.h>
 #include	<link.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -58,7 +56,7 @@
  *	  So even if -zignore is in effect, if the section is not allocatable,
  *	  we do not eliminate it.
  */
-uintptr_t
+static uintptr_t
 ignore_section_processing(Ofl_desc *ofl)
 {
 	Listnode	*lnp;
@@ -72,7 +70,8 @@ ignore_section_processing(Ofl_desc *ofl)
 		 * Diagnose (-D unused) a completely unreferenced file.
 		 */
 		if ((ifl->ifl_flags & FLG_IF_FILEREF) == 0)
-			DBG_CALL(Dbg_unused_file(ifl->ifl_name, 0, 0));
+			DBG_CALL(Dbg_unused_file(ofl->ofl_lml,
+			    ifl->ifl_name, 0, 0));
 		if (((ofl->ofl_flags1 & FLG_OF1_IGNPRC) == 0) ||
 		    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0))
 			continue;
@@ -85,7 +84,7 @@ ignore_section_processing(Ofl_desc *ofl)
 		discard = 0;
 		if (ifl->ifl_flags & FLG_IF_FILEREF) {
 			for (num = 1; num < ifl->ifl_shnum; num++) {
-				Is_desc	*isp;
+				Is_desc	*isp = ifl->ifl_isdesc[num];
 				Os_desc *osp;
 				Sg_desc	*sgp;
 
@@ -161,9 +160,9 @@ ignore_section_processing(Ofl_desc *ofl)
 			 * the symbol is being defined in - skip it.
 			 */
 			if ((sdp->sd_isc->is_flags & FLG_IS_SECTREF) ||
-			    (((ifl->ifl_flags & FLG_IF_FILEREF) &&
+			    ((ifl->ifl_flags & FLG_IF_FILEREF) &&
 			    ((osp = sdp->sd_isc->is_osdesc) != 0) &&
-			    (osp->os_sgdesc->sg_phdr.p_type != PT_LOAD))))
+			    (osp->os_sgdesc->sg_phdr.p_type != PT_LOAD)))
 				continue;
 
 			/*
@@ -182,7 +181,8 @@ ignore_section_processing(Ofl_desc *ofl)
 					}
 					sdp->sd_flags |= FLG_SY_ISDISC;
 				}
-				DBG_CALL(Dbg_syms_discarded(sdp, sdp->sd_isc));
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
+				    sdp, sdp->sd_isc));
 				continue;
 			}
 
@@ -201,7 +201,8 @@ ignore_section_processing(Ofl_desc *ofl)
 
 					sdp->sd_flags1 |= FLG_SY1_ELIM;
 				}
-				DBG_CALL(Dbg_syms_discarded(sdp, sdp->sd_isc));
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
+				    sdp, sdp->sd_isc));
 				continue;
 			}
 		}
@@ -269,7 +270,7 @@ ignore_section_processing(Ofl_desc *ofl)
  * section required to represent them.
  */
 uintptr_t
-make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
+ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -286,7 +287,7 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = (size_t)size;
 	data->d_align = (size_t)align;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -330,7 +331,7 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 	 * Retain this .bss input section as this will be where global
 	 * symbol references are added.
 	 */
-	if ((osp = place_section(ofl, isec, ident, 0)) == (Os_desc *)S_ERROR)
+	if ((osp = ld_place_section(ofl, isec, ident, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -361,7 +362,7 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
  * Build a SHT_{INIT|FINI|PREINIT}ARRAY section (specified via
  * ld -z *array=name
  */
-uintptr_t
+static uintptr_t
 make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 {
 	uint_t		entcount;
@@ -391,7 +392,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	data->d_type = ELF_T_ADDR;
 	data->d_size = sizeof (Addr) * entcount;
 	data->d_align = sizeof (Addr);
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -413,7 +414,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	if (place_section(ofl, isec, M_ID_ARRAY, 0) == (Os_desc *)S_ERROR)
+	if (ld_place_section(ofl, isec, M_ID_ARRAY, 0) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	osp = isec->is_osdesc;
@@ -451,12 +452,12 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	reloc.r_info = ELF_R_INFO(0, M_R_ARRAYADDR);
 	reloc.r_addend = 0;
 
-	DBG_CALL(Dbg_reloc_generate(osp, M_REL_SHT_TYPE));
+	DBG_CALL(Dbg_reloc_generate(ofl->ofl_lml, osp, M_REL_SHT_TYPE));
 	for (LIST_TRAVERSE(list, lnp, sdp)) {
 		reld.rel_sname = sdp->sd_name;
 		reld.rel_sym = sdp;
 
-		if (process_sym_reloc(ofl, &reld, (Rel *)&reloc, isec,
+		if (ld_process_sym_reloc(ofl, &reld, (Rel *)&reloc, isec,
 		    MSG_INTL(MSG_STR_COMMAND)) == S_ERROR)
 			return (S_ERROR);
 
@@ -470,7 +471,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 /*
  * Build a comment section (-Qy option).
  */
-uintptr_t
+static uintptr_t
 make_comment(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -486,7 +487,7 @@ make_comment(Ofl_desc *ofl)
 	data->d_buf = (void *)ofl->ofl_sgsid;
 	data->d_size = strlen(ofl->ofl_sgsid) + 1;
 	data->d_align = 1;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -506,7 +507,7 @@ make_comment(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	return ((uintptr_t)place_section(ofl, isec, M_ID_NOTE, 0));
+	return ((uintptr_t)ld_place_section(ofl, isec, M_ID_NOTE, 0));
 }
 
 /*
@@ -514,7 +515,7 @@ make_comment(Ofl_desc *ofl)
  * within this structure, they will be added to the global string table
  * (.dynstr).  This routine should be called before make_dynstr().
  */
-uintptr_t
+static uintptr_t
 make_dynamic(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -539,12 +540,12 @@ make_dynamic(Ofl_desc *ofl)
 	if (!(flags & FLG_OF_RELOBJ))
 		shdr->sh_flags |= SHF_ALLOC;
 	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = (Xword)elf_fsize(ELF_T_DYN, 1, ofl->ofl_libver);
-	if (shdr->sh_entsize == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_FSIZE), ofl->ofl_name);
+	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_DYN, 1,
+	    ofl->ofl_dehdr->e_version)) == 0) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
-
 
 	/*
 	 * Allocate and initialize the Elf_Data structure.
@@ -554,7 +555,7 @@ make_dynamic(Ofl_desc *ofl)
 	data->d_type = ELF_T_DYN;
 	data->d_size = 0;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Is_desc structure.
@@ -566,7 +567,7 @@ make_dynamic(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	osp = ofl->ofl_osdynamic = place_section(ofl, isec, M_ID_DYNAMIC, 0);
+	osp = ofl->ofl_osdynamic = ld_place_section(ofl, isec, M_ID_DYNAMIC, 0);
 
 	/*
 	 * Reserve entries for any needed dependencies.
@@ -589,8 +590,8 @@ make_dynamic(Ofl_desc *ofl)
 		if ((ifl->ifl_flags & FLG_IF_NEEDSTR) ||
 		    ((ifl->ifl_flags & FLG_IF_DEPREQD) == 0)) {
 			if (unused++ == 0)
-				DBG_CALL(Dbg_util_nl());
-			DBG_CALL(Dbg_unused_file(ifl->ifl_soname,
+				DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
+			DBG_CALL(Dbg_unused_file(ofl->ofl_lml, ifl->ifl_soname,
 			    (ifl->ifl_flags & FLG_IF_NEEDSTR), 0));
 
 			if (ifl->ifl_flags & FLG_IF_NEEDSTR)
@@ -629,7 +630,7 @@ make_dynamic(Ofl_desc *ofl)
 	}
 
 	if (unused)
-		DBG_CALL(Dbg_util_nl());
+		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 	/*
 	 * Reserve entries for any per-symbol auxiliary/filter strings.
@@ -646,12 +647,12 @@ make_dynamic(Ofl_desc *ofl)
 	/*
 	 * Reserve entries for any _init() and _fini() section addresses.
 	 */
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_INIT_U),
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
 	    SYM_NOHASH, 0, ofl)) != NULL) && sdp->sd_ref == REF_REL_NEED) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
 	}
-	if (((sdp = sym_find(MSG_ORIG(MSG_SYM_FINI_U),
+	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
 	    SYM_NOHASH, 0, ofl)) != NULL) && sdp->sd_ref == REF_REL_NEED) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
@@ -824,9 +825,9 @@ make_dynamic(Ofl_desc *ofl)
 		cnt++;				/* SYMBOLIC */
 
 	/*
-	 * Account for Architecture dependent .dynamic entries, and defaults
+	 * Account for Architecture dependent .dynamic entries, and defaults.
 	 */
-	mach_make_dynamic(ofl, &cnt);
+	ld_mach_make_dynamic(ofl, &cnt);
 
 	cnt += 3;				/* DT_FLAGS, DT_FLAGS_1, */
 						/*   and DT_NULL */
@@ -846,7 +847,7 @@ make_dynamic(Ofl_desc *ofl)
  * Build the GOT section and its associated relocation entries.
  */
 uintptr_t
-make_got(Ofl_desc *ofl)
+ld_make_got(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -862,7 +863,7 @@ make_got(Ofl_desc *ofl)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -884,7 +885,7 @@ make_got(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	if ((ofl->ofl_osgot = place_section(ofl, isec, M_ID_GOT, 0)) ==
+	if ((ofl->ofl_osgot = ld_place_section(ofl, isec, M_ID_GOT, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -896,7 +897,7 @@ make_got(Ofl_desc *ofl)
 /*
  * Build an interp section.
  */
-uintptr_t
+static uintptr_t
 make_interp(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -919,13 +920,13 @@ make_interp(Ofl_desc *ofl)
 	 * In the case of a dynamic executable supply a default interpretor
 	 * if a specific interpreter has not been specified.
 	 */
-	if (!iname) {
-		if (ofl->ofl_e_machine == EM_SPARCV9)
+	if (iname == 0) {
+		if (ofl->ofl_dehdr->e_machine == EM_SPARCV9)
 			iname = ofl->ofl_interp =
-				MSG_ORIG(MSG_PTH_RTLD_SPARCV9);
-		else if (ofl->ofl_e_machine == EM_AMD64)
+			    MSG_ORIG(MSG_PTH_RTLD_SPARCV9);
+		else if (ofl->ofl_dehdr->e_machine == EM_AMD64)
 			iname = ofl->ofl_interp =
-				MSG_ORIG(MSG_PTH_RTLD_AMD64);
+			    MSG_ORIG(MSG_PTH_RTLD_AMD64);
 		else
 			iname = ofl->ofl_interp = MSG_ORIG(MSG_PTH_RTLD);
 	}
@@ -939,7 +940,7 @@ make_interp(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -959,14 +960,14 @@ make_interp(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	ofl->ofl_osinterp = place_section(ofl, isec, M_ID_INTERP, 0);
+	ofl->ofl_osinterp = ld_place_section(ofl, isec, M_ID_INTERP, 0);
 	return ((uintptr_t)ofl->ofl_osinterp);
 }
 
 /*
  * Build a hardware/software capabilities section.
  */
-uintptr_t
+static uintptr_t
 make_cap(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -993,7 +994,7 @@ make_cap(Ofl_desc *ofl)
 	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
 		return (S_ERROR);
 	data->d_type = ELF_T_CAP;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 	data->d_align = M_WORD_ALIGN;
 
 	/*
@@ -1004,9 +1005,10 @@ make_cap(Ofl_desc *ofl)
 	shdr->sh_type = SHT_SUNW_cap;
 	shdr->sh_flags = SHF_ALLOC;
 	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = (Xword)elf_fsize(ELF_T_CAP, 1, ofl->ofl_libver);
-	if (shdr->sh_entsize == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_FSIZE), ofl->ofl_name);
+	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_CAP, 1,
+	    ofl->ofl_dehdr->e_version)) == 0) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -1046,7 +1048,7 @@ make_cap(Ofl_desc *ofl)
 	 * If we're not creating a relocatable object, save the output section
 	 * to trigger the creation of an associated  a program header.
 	 */
-	osec = place_section(ofl, isec, M_ID_CAP, 0);
+	osec = ld_place_section(ofl, isec, M_ID_CAP, 0);
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
 		ofl->ofl_oscap = osec;
 
@@ -1056,7 +1058,7 @@ make_cap(Ofl_desc *ofl)
 /*
  * Build the PLT section and its associated relocation entries.
  */
-uintptr_t
+static uintptr_t
 make_plt(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1067,7 +1069,7 @@ make_plt(Ofl_desc *ofl)
 				(size_t)ofl->ofl_pltpad) * M_PLT_ENTSIZE);
 	size_t		rsize = (size_t)ofl->ofl_relocpltsz;
 
-#if defined(sparc)
+#if	defined(sparc)
 	/*
 	 * Account for the NOP at the end of the plt.
 	 */
@@ -1082,7 +1084,7 @@ make_plt(Ofl_desc *ofl)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = M_PLT_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1104,7 +1106,7 @@ make_plt(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	if ((ofl->ofl_osplt = place_section(ofl, isec, M_ID_PLT, 0)) ==
+	if ((ofl->ofl_osplt = ld_place_section(ofl, isec, M_ID_PLT, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1118,7 +1120,7 @@ make_plt(Ofl_desc *ofl)
  * libraries, and provides hashed lookup into the global symbol table
  * (.dynsym) for the run-time linker to resolve symbol lookups.
  */
-uintptr_t
+static uintptr_t
 make_hash(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1135,7 +1137,7 @@ make_hash(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_WORD;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1145,9 +1147,10 @@ make_hash(Ofl_desc *ofl)
 	shdr->sh_type = SHT_HASH;
 	shdr->sh_flags = SHF_ALLOC;
 	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = (Xword)elf_fsize(ELF_T_WORD, 1, ofl->ofl_libver);
-	if (shdr->sh_entsize == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_FSIZE), ofl->ofl_name);
+	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_WORD, 1,
+	    ofl->ofl_dehdr->e_version)) == 0) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -1164,7 +1167,7 @@ make_hash(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_oshash = place_section(ofl, isec, M_ID_HASH, 0)) ==
+	if ((ofl->ofl_oshash = ld_place_section(ofl, isec, M_ID_HASH, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1200,7 +1203,7 @@ make_hash(Ofl_desc *ofl)
  * Generate the standard symbol table.  Contains all locals and globals,
  * and resides in a non-allocatable section (ie. it can be stripped).
  */
-uintptr_t
+static uintptr_t
 make_symtab(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1217,7 +1220,7 @@ make_symtab(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_SYM;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1226,9 +1229,10 @@ make_symtab(Ofl_desc *ofl)
 		return (S_ERROR);
 	shdr->sh_type = SHT_SYMTAB;
 	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1, ofl->ofl_libver);
-	if (shdr->sh_entsize == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_FSIZE), ofl->ofl_name);
+	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1,
+	    ofl->ofl_dehdr->e_version)) == 0) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -1245,7 +1249,7 @@ make_symtab(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_ossymtab = place_section(ofl, isec, M_ID_SYMTAB, 0)) ==
+	if ((ofl->ofl_ossymtab = ld_place_section(ofl, isec, M_ID_SYMTAB, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1262,7 +1266,7 @@ make_symtab(Ofl_desc *ofl)
 			return (S_ERROR);
 		xdata->d_type = ELF_T_WORD;
 		xdata->d_align = M_WORD_ALIGN;
-		xdata->d_version = ofl->ofl_libver;
+		xdata->d_version = ofl->ofl_dehdr->e_version;
 		if ((xshdr = libld_calloc(sizeof (Shdr), 1)) == 0)
 			return (S_ERROR);
 		xshdr->sh_type = SHT_SYMTAB_SHNDX;
@@ -1273,7 +1277,7 @@ make_symtab(Ofl_desc *ofl)
 		xisec->is_name = MSG_ORIG(MSG_SCN_SYMTAB_SHNDX);
 		xisec->is_shdr = xshdr;
 		xisec->is_indata = xdata;
-		if ((ofl->ofl_ossymshndx = place_section(ofl, xisec,
+		if ((ofl->ofl_ossymshndx = ld_place_section(ofl, xisec,
 		    M_ID_SYMTAB_NDX, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
@@ -1309,7 +1313,7 @@ make_symtab(Ofl_desc *ofl)
  * Build a dynamic symbol table.  Contains only globals symbols and resides
  * in the text segment of a dynamic executable or shared library.
  */
-uintptr_t
+static uintptr_t
 make_dynsym(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1325,7 +1329,7 @@ make_dynsym(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_SYM;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1335,9 +1339,10 @@ make_dynsym(Ofl_desc *ofl)
 	shdr->sh_type = SHT_DYNSYM;
 	shdr->sh_flags = SHF_ALLOC;
 	shdr->sh_addralign = M_WORD_ALIGN;
-	shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1, ofl->ofl_libver);
-	if (shdr->sh_entsize == 0) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_FSIZE), ofl->ofl_name);
+	if ((shdr->sh_entsize = (Xword)elf_fsize(ELF_T_SYM, 1,
+	    ofl->ofl_dehdr->e_version)) == 0) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_FSIZE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -1354,7 +1359,7 @@ make_dynsym(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	if ((ofl->ofl_osdynsym = place_section(ofl, isec, M_ID_DYNSYM, 0)) ==
+	if ((ofl->ofl_osdynsym = ld_place_section(ofl, isec, M_ID_DYNSYM, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1376,7 +1381,7 @@ make_dynsym(Ofl_desc *ofl)
 /*
  * Build a SHT_SYMTAB_SHNDX for the .dynsym
  */
-uintptr_t
+static uintptr_t
 make_dynsym_shndx(Ofl_desc *ofl)
 {
 	Is_desc		*isec;
@@ -1391,7 +1396,7 @@ make_dynsym_shndx(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_WORD;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate the Shdr structure.
@@ -1411,7 +1416,7 @@ make_dynsym_shndx(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	if ((ofl->ofl_osdynshndx = place_section(ofl, isec,
+	if ((ofl->ofl_osdynshndx = ld_place_section(ofl, isec,
 	    M_ID_DYNSYM_NDX, 0)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1429,7 +1434,7 @@ make_dynsym_shndx(Ofl_desc *ofl)
 /*
  * Build a string table for the section headers.
  */
-uintptr_t
+static uintptr_t
 make_shstrtab(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1444,7 +1449,7 @@ make_shstrtab(Ofl_desc *ofl)
 		return (S_ERROR);
 	data->d_type = ELF_T_BYTE;
 	data->d_align = 1;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate the Shdr structure.
@@ -1468,7 +1473,7 @@ make_shstrtab(Ofl_desc *ofl)
 	 * Place the section first, as it may effect the number of section
 	 * headers to account for.
 	 */
-	if ((ofl->ofl_osshstrtab = place_section(ofl, isec, M_ID_NOTE, 0)) ==
+	if ((ofl->ofl_osshstrtab = ld_place_section(ofl, isec, M_ID_NOTE, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1486,7 +1491,7 @@ make_shstrtab(Ofl_desc *ofl)
 /*
  * Build a string section for the standard symbol table.
  */
-uintptr_t
+static uintptr_t
 make_strtab(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1513,7 +1518,7 @@ make_strtab(Ofl_desc *ofl)
 	data->d_size = size;
 	data->d_type = ELF_T_BYTE;
 	data->d_align = 1;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate the Shdr structure.
@@ -1534,14 +1539,14 @@ make_strtab(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	ofl->ofl_osstrtab = place_section(ofl, isec, M_ID_STRTAB, 0);
+	ofl->ofl_osstrtab = ld_place_section(ofl, isec, M_ID_STRTAB, 0);
 	return ((uintptr_t)ofl->ofl_osstrtab);
 }
 
 /*
  * Build a string table for the dynamic symbol table.
  */
-uintptr_t
+static uintptr_t
 make_dynstr(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1597,7 +1602,7 @@ make_dynstr(Ofl_desc *ofl)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = 1;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate the Shdr structure.
@@ -1621,7 +1626,7 @@ make_dynstr(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	ofl->ofl_osdynstr = place_section(ofl, isec, M_ID_DYNSTR, 0);
+	ofl->ofl_osdynstr = ld_place_section(ofl, isec, M_ID_DYNSTR, 0);
 	return ((uintptr_t)ofl->ofl_osdynstr);
 }
 
@@ -1632,7 +1637,7 @@ make_dynstr(Ofl_desc *ofl)
  * If (osp == NULL) then we are creating the coalesced relocation section
  * for an executable and/or a shared object.
  */
-uintptr_t
+static uintptr_t
 make_reloc(Ofl_desc *ofl, Os_desc *osp)
 {
 	Shdr		*shdr;
@@ -1689,7 +1694,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	data->d_type = M_REL_ELF_TYPE;
 	data->d_size = size;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1729,7 +1734,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	 * Associate this relocation section to the section its going to
 	 * relocate.
 	 */
-	if ((rosp = place_section(ofl, isec, M_ID_REL, 0)) ==
+	if ((rosp = ld_place_section(ofl, isec, M_ID_REL, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1773,7 +1778,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 /*
  * Generate version needed section.
  */
-uintptr_t
+static uintptr_t
 make_verneed(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1789,7 +1794,7 @@ make_verneed(Ofl_desc *ofl)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1810,7 +1815,7 @@ make_verneed(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	ofl->ofl_osverneed = place_section(ofl, isec, M_ID_VERSION, 0);
+	ofl->ofl_osverneed = ld_place_section(ofl, isec, M_ID_VERSION, 0);
 	return ((uintptr_t)ofl->ofl_osverneed);
 }
 
@@ -1820,7 +1825,7 @@ make_verneed(Ofl_desc *ofl)
  *  o	the SHT_SUNW_verdef section defines the versions that exist within this
  *	image.
  */
-uintptr_t
+static uintptr_t
 make_verdef(Ofl_desc *ofl)
 {
 	Shdr		*shdr;
@@ -1856,7 +1861,7 @@ make_verdef(Ofl_desc *ofl)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1877,7 +1882,7 @@ make_verdef(Ofl_desc *ofl)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	ofl->ofl_osverdef = place_section(ofl, isec, M_ID_VERSION, 0);
+	ofl->ofl_osverdef = ld_place_section(ofl, isec, M_ID_VERSION, 0);
 	return ((uintptr_t)ofl->ofl_osverdef);
 }
 
@@ -1886,7 +1891,7 @@ make_verdef(Ofl_desc *ofl)
  * section and the SHT_SUNW_syminfo section.  Each of these sections
  * provides additional symbol information.
  */
-Os_desc *
+static Os_desc *
 make_sym_sec(Ofl_desc *ofl, const char *sectname, Word entsize,
     Word stype, int ident)
 {
@@ -1902,7 +1907,7 @@ make_sym_sec(Ofl_desc *ofl, const char *sectname, Word entsize,
 		return ((Os_desc *)S_ERROR);
 	data->d_type = ELF_T_BYTE;
 	data->d_align = M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1931,14 +1936,14 @@ make_sym_sec(Ofl_desc *ofl, const char *sectname, Word entsize,
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	return (place_section(ofl, isec, ident, 0));
+	return (ld_place_section(ofl, isec, ident, 0));
 }
 
 /*
  * Build a .sunwbss section for allocation of tentative definitions.
  */
 uintptr_t
-make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
+ld_make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -1952,7 +1957,7 @@ make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
 	data->d_type = ELF_T_BYTE;
 	data->d_size = size;
 	data->d_align = align;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -1978,7 +1983,7 @@ make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
 	 * symbol references are added.
 	 */
 	ofl->ofl_issunwbss = isec;
-	if (place_section(ofl, isec, 0, 0) == (Os_desc *)S_ERROR)
+	if (ld_place_section(ofl, isec, 0, 0) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	return (1);
@@ -1988,7 +1993,7 @@ make_sunwbss(Ofl_desc *ofl, size_t size, Xword align)
  * This routine is called when -z nopartial is in effect.
  */
 uintptr_t
-make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
+ld_make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -2005,7 +2010,7 @@ make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
 	if ((data->d_buf = libld_calloc(size, 1)) == 0)
 		return (S_ERROR);
 	data->d_align = (size_t)M_WORD_ALIGN;
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -2035,7 +2040,7 @@ make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
 	 * symbol references are added.
 	 */
 	ofl->ofl_issunwdata1 = isec;
-	if ((osp = place_section(ofl, isec, M_ID_DATA, 0)) ==
+	if ((osp = ld_place_section(ofl, isec, M_ID_DATA, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -2050,7 +2055,7 @@ make_sunwdata(Ofl_desc *ofl, size_t size, Xword align)
  * Make .sunwmove section
  */
 uintptr_t
-make_sunwmove(Ofl_desc *ofl, int mv_nums)
+ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -2075,7 +2080,7 @@ make_sunwmove(Ofl_desc *ofl, int mv_nums)
 		return (S_ERROR);
 	data->d_size = size;
 	data->d_align = sizeof (Lword);
-	data->d_version = ofl->ofl_libver;
+	data->d_version = ofl->ofl_dehdr->e_version;
 
 	/*
 	 * Allocate and initialize the Shdr structure.
@@ -2116,7 +2121,7 @@ make_sunwmove(Ofl_desc *ofl, int mv_nums)
 			cnt++;
 		}
 	}
-	if ((ofl->ofl_osmove = place_section(ofl, isec, 0, 0)) ==
+	if ((ofl->ofl_osmove = ld_place_section(ofl, isec, 0, 0)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -2132,7 +2137,7 @@ make_sunwmove(Ofl_desc *ofl, int mv_nums)
  * individual routines can compensate for later, known, additions.
  */
 uintptr_t
-make_sections(Ofl_desc *ofl)
+ld_make_sections(Ofl_desc *ofl)
 {
 	Word		flags = ofl->ofl_flags;
 	Listnode	*lnp1;
@@ -2178,7 +2183,7 @@ make_sections(Ofl_desc *ofl)
 	 * -Dunused a diagnostic for any unused components is generated, under
 	 * -zignore the component is removed from the final output.
 	 */
-	if (dbg_mask || (ofl->ofl_flags1 & FLG_OF1_IGNPRC)) {
+	if (DBG_ENABLED || (ofl->ofl_flags1 & FLG_OF1_IGNPRC)) {
 		if (ignore_section_processing(ofl) == S_ERROR)
 			return (S_ERROR);
 	}

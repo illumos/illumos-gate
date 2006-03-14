@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	__LIBRTLD_H
@@ -84,15 +84,12 @@ typedef struct reloc {
 /*
  * Define any local prototypes.
  */
-extern	void	apply_reloc(void *, Reloc *, const char *, unsigned char *,
-		    Rt_map * lmp);
+extern	void	apply_reloc(void *, Reloc *, const char *, uchar_t *, Rt_map *);
 extern	void	clear_reloc(void *);
 extern	int	count_reloc(Cache *, Cache *, Rt_map *, int, Addr, Xword *,
 		    Xword *, Xword *);
-extern	void	inc_reloc(void *, void *, Reloc *, unsigned char *,
-		    unsigned char *);
-extern	void	undo_reloc(void *, unsigned char *, unsigned char *,
-		    Reloc *);
+extern	void	inc_reloc(void *, void *, Reloc *, uchar_t *, uchar_t *);
+extern	void	undo_reloc(void *, uchar_t *, uchar_t *, Reloc *);
 extern	int	update_dynamic(Cache *, Cache *, Rt_map *, int, Addr, Off,
 		    const char *, Xword, Xword, Xword, Xword, Xword);
 extern	void	update_reloc(Cache *, Cache *, Cache *, const char *,

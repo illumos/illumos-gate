@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +38,7 @@
 #include <sys/elf_M32.h>
 #include <sys/elf_386.h>
 #include <sys/elf_SPARC.h>
+#include <sys/elf_amd64.h>
 #include <sys/machelf.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -301,7 +299,7 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 	int adj = 0;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		adj = 4;
+		adj = 8;
 
 	rel_entsize = p_scns->p_shdr.sh_entsize;
 	if ((rel_entsize == 0) ||
@@ -400,7 +398,7 @@ print_rel(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 	int adj = 0;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		adj = 4;
+		adj = 8;
 
 	rel_entsize = p_scns->p_shdr.sh_entsize;
 	if ((rel_entsize == 0) ||
@@ -468,12 +466,12 @@ print_rel(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 }
 
 /* demangle C++ names */
-static char *format = "%s\t[%s]";
 static char *
 demangled_name(char *s)
 {
-	char *dn;
-	static char *buf;
+	static char	*buf = NULL;
+	char		*dn;
+	size_t		len;
 
 	dn = sgs_demangle(s);
 
@@ -489,11 +487,11 @@ demangled_name(char *s)
 	if (buf != NULL)
 		free(buf);
 
-	buf = malloc(strlen(dn) + 1 + 1 + strlen(s) + 1 + 1);
-	if (buf == NULL)
+	len = strlen(dn) + strlen(s) + 4;
+	if ((buf = malloc(len)) == NULL)
 		return (s);
 
-	(void) sprintf(buf, format, dn, s);
+	(void) snprintf(buf, len, "%s\t[%s]", dn, s);
 	return (buf);
 }
 
@@ -516,7 +514,7 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 	unsigned int	nosymshndx = 0;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		adj = 4;
+		adj = 8;
 
 	while (range > 0) {
 		char		*sym_name = (char *)0;
@@ -712,7 +710,7 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 	int field;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		field = 15;
+		field = 21;
 	else
 		field = 13;
 
@@ -797,6 +795,12 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 				break;
 			case SHT_SUNW_COMDAT:
 				(void) printf("COMD");
+				break;
+			case SHT_AMD64_UNWIND:
+				(void) printf("UNWD");
+				break;
+			case SHT_SPARC_GOTDATA:
+				(void) printf("GOTD");
 				break;
 			default:
 				(void) printf("%u", EC_WORD(p->p_shdr.sh_type));
@@ -903,7 +907,7 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 	size_t shnum;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		adj = 4;
+		adj = 8;
 
 	if ((!p_flag) && (!r_title)) {
 		(void) printf("\n    **** RELOCATION INFORMATION ****\n");
@@ -1114,7 +1118,7 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 	int adj = 0;			/*  field adjustment for elf64 */
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		adj = 4;
+		adj = 8;
 
 	if (p_symtab == NULL) {
 		(void) fprintf(stderr,
@@ -1859,15 +1863,15 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 	int field;
 
 	if (gelf_getehdr(elf_file, elf_head_p) == NULL) {
-		(void) fprintf(stderr,
-		"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+		(void) fprintf(stderr, "%s: %s: %s\n", prog_name, filename,
+		    elf_errmsg(-1));
 		return (NULL);
 	}
 
 	class = (int)elf_head_p->e_ident[4];
 
 	if (class == ELFCLASS64)
-		field = 17;
+		field = 21;
 	else
 		field = 13;
 
@@ -1875,14 +1879,13 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 		return (elf_head_p);
 
 	if (!p_flag) {
-	(void) printf(
-		"\n                    **** ELF HEADER ****\n");
-	(void) printf("%-*s%-11s%-*sMachine     Version\n",
-	    field, "Class", "Data", field, "Type");
-	(void) printf("%-*s%-11s%-*sFlags       Ehsize\n",
-	    field, "Entry", "Phoff", field, "Shoff");
-	(void) printf("%-*s%-11s%-*sShnum       Shstrndx\n\n",
-	    field, "Phentsize", "Phnum", field, "Shentsz");
+		(void) printf("\n                    **** ELF HEADER ****\n");
+		(void) printf("%-*s%-11s%-*sMachine     Version\n",
+		    field, "Class", "Data", field, "Type");
+		(void) printf("%-*s%-11s%-*sFlags       Ehsize\n",
+		    field, "Entry", "Phoff", field, "Shoff");
+		(void) printf("%-*s%-11s%-*sShnum       Shstrndx\n\n",
+		    field, "Phentsize", "Phnum", field, "Shentsz");
 	}
 
 	if (!v_flag) {
@@ -2040,9 +2043,9 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 		int		field;
 
 		if (gelf_getclass(elf_file) == ELFCLASS64)
-			field = 14;
+			field = 21;
 		else
-			field = 12;
+			field = 13;
 		if (!p_flag) {
 			(void) printf("\n	   **** SECTION HEADER[0] "
 			    "{Elf Extensions} ****\n");
@@ -2051,7 +2054,7 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 			    field, "Addr", field, "Offset", field,
 			    "Size(shnum)",
 			    /* compatibility:  tab for elf32 */
-			    (field == 12) ? "\t" : "  ");
+			    (field == 13) ? "\t" : "  ");
 			(void) printf("\tLn(strndx) Info\t%-*s Entsize\n",
 			    field, "Adralgn");
 		}
@@ -2079,7 +2082,7 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 			field, EC_OFF(shdr0.sh_offset),
 			field, EC_XWORD(shdr0.sh_size),
 			/* compatibility:  tab for elf32 */
-			((field == 12) ? "\t" : "  "),
+			((field == 13) ? "\t" : "  "),
 			field, EC_WORD(shdr0.sh_name));
 
 		(void) printf("\t%u\t%u\t%-#*llx %-#*llx\n",
@@ -2231,16 +2234,16 @@ dump_shdr(Elf *elf_file, SCNTAB *s, int num_scns, char *filename)
 	int found_it = 0;  /* for use with -n section_name */
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
-		field = 14;
+		field = 21;
 	else
-		field = 12;
+		field = 13;
 
 	if (!p_flag) {
 		(void) printf("\n	   **** SECTION HEADER TABLE ****\n");
 		(void) printf("[No]\tType\tFlags\t%-*s %-*s %-*s%sName\n",
 		    field, "Addr", field, "Offset", field, "Size",
 		    /* compatibility:  tab for elf32 */
-		    (field == 12) ? "\t" : "  ");
+		    (field == 13) ? "\t" : "  ");
 		(void) printf("\tLink\tInfo\t%-*s Entsize\n\n",
 		    field, "Adralgn");
 	}
@@ -2528,6 +2531,8 @@ dump_ar_files(int fd, Elf *elf_file, char *filename)
 
 	cmd = ELF_C_READ;
 	while ((arf = elf_begin(fd, cmd, elf_file)) != 0) {
+		size_t	len;
+
 		p_ar = elf_getarhdr(arf);
 		if (p_ar == NULL) {
 			(void) fprintf(stderr,
@@ -2542,8 +2547,11 @@ dump_ar_files(int fd, Elf *elf_file, char *filename)
 			continue;
 		}
 
-		fullname = malloc(strlen(filename) + strlen(p_ar->ar_name) + 3);
-		(void) sprintf(fullname, "%s[%s]", filename, p_ar->ar_name);
+		len = strlen(filename) + strlen(p_ar->ar_name) + 3;
+		if ((fullname = malloc(len)) == NULL)
+			return;
+		(void) snprintf(fullname, len, "%s[%s]", filename,
+		    p_ar->ar_name);
 		(void) printf("\n%s:\n", fullname);
 		file_type = elf_kind(arf);
 		if (file_type == ELF_K_ELF) {
@@ -2593,26 +2601,21 @@ each_file(char *filename)
 	errno = 0;
 
 	if (stat(filename, &buf) == -1) {
-		(void) fprintf(stderr, "%s: ", prog_name);
-		perror(filename);
+		int	err = errno;
+		(void) fprintf(stderr, "%s: %s: %s", prog_name, filename,
+		    strerror(err));
 		return;
 	}
 
-	if (elf_version(EV_CURRENT) == EV_NONE) {
-		(void) fprintf(stderr,
-		"%s: Libelf is out of date\n", prog_name);
-		exit(101);
-	}
-
 	if ((fd = open((filename), O_RDONLY)) == -1) {
-		(void) fprintf(stderr, "%s: %s: cannot read\n",
-			prog_name, filename);
+		(void) fprintf(stderr, "%s: %s: cannot read\n", prog_name,
+		    filename);
 		return;
 	}
 	cmd = ELF_C_READ;
 	if ((elf_file = elf_begin(fd, cmd, (Elf *)0)) == NULL) {
-		(void) fprintf(stderr,
-		"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+		(void) fprintf(stderr, "%s: %s: %s\n", prog_name, filename,
+		    elf_errmsg(-1));
 		return;
 	}
 
@@ -2627,24 +2630,18 @@ each_file(char *filename)
 	} else {
 		if (file_type == ELF_K_ELF) {
 			(void) printf("\n%s:\n", filename);
-			if (dump_elf_header(elf_file, filename, &elf_head)
-			    == (GElf_Ehdr *)0) {
-					(void) elf_end(elf_file);
-					(void) close(fd);
-					return;
+			if (dump_elf_header(elf_file, filename, &elf_head)) {
+				if (o_flag)
+					dump_exec_header(elf_file,
+					    (unsigned)elf_head.e_phnum,
+					    filename);
+				if (x_flag)
+					dump_section_table(elf_file,
+					    &elf_head, filename);
 			}
-			if (o_flag)
-				dump_exec_header(elf_file,
-					(unsigned)elf_head.e_phnum, filename);
-			if (x_flag)
-				dump_section_table(elf_file,
-					&elf_head, filename);
 		} else {
 			(void) fprintf(stderr, "%s: %s: invalid file type\n",
-				prog_name, filename);
-			(void) elf_end(elf_file);
-			(void) close(fd);
-			return;
+			    prog_name, filename);
 		}
 	}
 	(void) elf_end(elf_file);
@@ -2660,7 +2657,6 @@ main(int argc, char *argv[], char *envp[])
 {
 	char *optstr = OPTSTR; /* option string used by getopt() */
 	int optchar;
-
 
 	/*
 	 * Check for a binary that better fits this architecture.
@@ -2767,6 +2763,12 @@ main(int argc, char *argv[], char *envp[])
 			usage();
 			exit(269);
 		}
+	}
+
+	if (elf_version(EV_CURRENT) == EV_NONE) {
+		(void) fprintf(stderr, "%s: libelf is out of date\n",
+		    prog_name);
+		exit(101);
 	}
 
 	while (optind < argc) {

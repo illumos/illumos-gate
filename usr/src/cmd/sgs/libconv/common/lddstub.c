@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,40 +32,6 @@
 #include	<dlfcn.h>
 #include	"_conv.h"
 #include	"lddstub_msg.h"
-
-static char	orgstub[PATH_MAX];
-static char	orgstub64[PATH_MAX];
-static int	orgflag;
-static int	orgflag64;
-
-#ifdef NEED_OWN_STRLCAT
-/*
- * Appends src to the dstsize buffer at dst. The append will never
- * overflow the destination buffer and the buffer will always be null
- * terminated. Never reference beyond &bst[dstsize-1] when computing
- * the length of the pre-existing string.
- */
-size_t
-strlcat(char *dst, const char *src, size_t dstsize)
-{
-	char *df = dst;
-	size_t left = dstsize;
-	size_t l1;
-	size_t l2 = strlen(src);
-	size_t copied;
-
-	while (left-- != 0 && *df != '\0')
-		df++;
-	l1 = df - dst;
-	if (dstsize == l1)
-		return (l1 + l2);
-
-	copied = l1 + l2 >= dstsize ? dstsize - l1 - 1 : l2;
-	memcpy(dst + l1, src, copied);
-	dst[l1+copied] = '\0';
-	return (l1 + l2);
-}
-#endif
 
 static int
 originlddstub(char *buffer, const char *orgfile)
@@ -79,11 +45,14 @@ originlddstub(char *buffer, const char *orgfile)
 	if ((len = resolvepath(buffer, buffer, (PATH_MAX - 1))) == -1)
 		return (-1);
 	buffer[len] = '\0';
-	if (access(orgstub, X_OK) == -1)
+	if (access(buffer, X_OK) == -1)
 		return (-1);
 
-	return (0);
+	return (1);
 }
+
+static char	orgstub[PATH_MAX], orgstub64[PATH_MAX];
+static int	orgflag, orgflag64;
 
 /*
  * Determine what lddstub to run.

@@ -1,0 +1,187 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNW_1.6 {
+    global:
+	elf_getphnum;
+} SUNW_1.5;
+
+SUNW_1.5 {
+    global:
+	gelf_getcap;
+	gelf_update_cap;
+} SUNW_1.4;
+
+SUNW_1.4 {
+    global:
+	elf_getshnum;
+	elf_getshstrndx;
+	gelf_getsymshndx;
+	gelf_update_symshndx;
+} SUNW_1.3;
+
+SUNW_1.3 {
+    global:
+	elf32_checksum;
+	elf64_checksum;
+	gelf_checksum;
+} SUNW_1.2;
+
+SUNW_1.2 {
+    global:
+	elf64_fsize;
+	elf64_getehdr;
+	elf64_getphdr;
+	elf64_getshdr;
+	elf64_newehdr;
+	elf64_newphdr;
+	elf64_xlatetof;
+	elf64_xlatetom;
+	gelf_getclass;
+	gelf_fsize;
+	gelf_getehdr;
+	gelf_update_ehdr;
+	gelf_newehdr;
+	gelf_getphdr;
+	gelf_update_phdr;
+	gelf_newphdr;
+	gelf_getshdr;
+	gelf_update_shdr;
+	gelf_xlatetof;
+	gelf_xlatetom;
+	gelf_getsym;
+	gelf_update_sym;
+	gelf_getsyminfo;
+	gelf_getmove;
+	gelf_update_move;
+	gelf_update_syminfo;
+	gelf_getdyn;
+	gelf_update_dyn;
+	gelf_getrela;
+	gelf_update_rela;
+	gelf_getrel;
+	gelf_update_rel;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	SUNW_1.1;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	elf_begin;
+	elf_end;
+	elf_memory;
+	elf_next;
+	elf_rand;
+	elf_cntl;
+	elf_errmsg;
+	elf_errno;
+	elf_fill;
+	elf_flagdata;
+	elf_flagehdr;
+	elf_flagelf;
+	elf_flagphdr;
+	elf_flagscn;
+	elf_flagshdr;
+	elf_getarhdr;
+	elf_getarsym;
+	elf_getbase;
+	elf_getdata;
+	elf_newdata;
+	elf_rawdata;
+	elf_getident;
+	elf_getscn;
+	elf_ndxscn;
+	elf_newscn;
+	elf_nextscn;
+	elf_hash;
+	elf_kind;
+	elf_rawfile;
+	elf_strptr;
+	elf_update;
+	elf_version;
+	nlist;
+	elf32_fsize;
+	elf32_getphdr;
+	elf32_newphdr;
+	elf32_getshdr;
+	elf32_getehdr;
+	elf32_newehdr;
+	elf32_xlatetof;
+	elf32_xlatetom;
+    local:
+	*;
+};
+
+SUNWprivate_1.1 {
+    global:
+	_elf_getxoff;
+	_elf_outsync;
+	_elf_begin;
+	_elf_memory;
+	_elf_cntl;
+	_elf_end;
+	_elf_errno;
+	_elf_errmsg;
+	_elf_fill;
+	_elf_flagdata;
+	_elf_flagehdr;
+	_elf_flagelf;
+	_elf_flagphdr;
+	_elf_flagscn;
+	_elf_flagshdr;
+	_elf_getarhdr;
+	_elf_getarsym;
+	_elf_getbase;
+	_elf_getdata;
+	_elf32_getehdr;
+	_elf_getident;
+	_elf32_getphdr;
+	_elf_getscn;
+	_elf32_getshdr;
+	_elf_hash;
+	_elf_kind;
+	_elf_ndxscn;
+	_elf_newdata;
+	_elf32_newehdr;
+	_elf32_newphdr;
+	_elf_newscn;
+	_elf_next;
+	_elf_nextscn;
+	_elf_rand;
+	_elf_rawdata;
+	_elf_rawfile;
+	_elf_strptr;
+	_elf_update;
+	_elf32_fsize;
+	_elf32_xlatetof;
+	_elf32_xlatetom;
+	_elf_version;
+};

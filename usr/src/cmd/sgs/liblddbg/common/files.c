@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,12 +20,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include	"_synonyms.h"
 
 #include	<sys/auxv.h>
 #include	<string.h>
@@ -34,90 +31,46 @@
 #include	<fcntl.h>
 #include	<limits.h>
 #include	<stdio.h>
+#include	<libld.h>
+#include	<rtld.h>
+#include	<conv.h>
 #include	"msg.h"
 #include	"_debug.h"
-#include	"libld.h"
-#include	"rtld.h"
-
 
 void
-Dbg_file_generic(Ifl_desc *ifl)
+Dbg_file_analyze(Rt_map *lmp)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_BASIC), ifl->ifl_name,
-		conv_etype_str(ifl->ifl_ehdr->e_type));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_ANALYZE), NAME(lmp),
+	    conv_dl_mode(MODE(lmp), 1));
 }
 
 void
-Dbg_file_skip(const char *nname, const char *oname)
+Dbg_file_aout(Lm_list *lml, const char *name, ulong_t dynamic, ulong_t base,
+    ulong_t size, const char *lmid, Aliste lmco)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	if (oname && strcmp(nname, oname))
-		dbg_print(MSG_INTL(MSG_FIL_SKIP_1), nname, oname);
-	else
-		dbg_print(MSG_INTL(MSG_FIL_SKIP_2), nname);
+	dbg_print(lml, MSG_INTL(MSG_FIL_AOUT), name);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_XWORD(dynamic),
+	    EC_ADDR(base));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_S), EC_XWORD(size));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
 }
 
 void
-Dbg_file_reuse(const char *nname, const char *oname)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_INTL(MSG_FIL_REUSE), nname, oname);
-}
-
-void
-Dbg_file_archive(const char *name, int again)
+Dbg_file_elf(Lm_list *lml, const char *name, ulong_t dynamic, ulong_t base,
+    ulong_t size, ulong_t entry, const char *lmid, Aliste lmco)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	if (again)
-		str = MSG_INTL(MSG_STR_AGAIN);
-	else
-		str = MSG_ORIG(MSG_STR_EMPTY);
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_ARCHIVE), name, str);
-}
-
-void
-Dbg_file_analyze(Rt_map * lmp)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_ANALYZE), NAME(lmp),
-	    conv_dlmode_str(MODE(lmp), 1));
-}
-
-void
-Dbg_file_aout(const char *name, ulong_t dynamic, ulong_t base, ulong_t size)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_INTL(MSG_FIL_AOUT), name);
-	dbg_print(MSG_INTL(MSG_FIL_DATA_1), EC_XWORD(dynamic),
-	    EC_ADDR(base), EC_XWORD(size));
-}
-
-void
-Dbg_file_elf(const char *name, ulong_t dynamic, ulong_t base,
-    ulong_t size, ulong_t entry, Lmid_t lmid, Aliste lmco)
-{
-	const char	*str;
-
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	if (base == 0)
@@ -125,46 +78,56 @@ Dbg_file_elf(const char *name, ulong_t dynamic, ulong_t base,
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(MSG_INTL(MSG_FIL_ELF), name, str);
-	dbg_print(MSG_INTL(MSG_FIL_DATA_1), EC_XWORD(dynamic),
-	    EC_ADDR(base), EC_XWORD(size));
-	dbg_print(MSG_INTL(MSG_FIL_DATA_2), EC_XWORD(entry),
-	    EC_XWORD(lmid), EC_XWORD(lmco));
-}
-
-void
-Dbg_file_ldso(const char *name, ulong_t dynamic, ulong_t base, char **envp,
-    auxv_t *auxv)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_LDSO), name);
-	dbg_print(MSG_INTL(MSG_FIL_DATA_3), EC_XWORD(dynamic),
+	dbg_print(lml, MSG_INTL(MSG_FIL_ELF), name, str);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_XWORD(dynamic),
 	    EC_ADDR(base));
-	dbg_print(MSG_INTL(MSG_FIL_DATA_4), EC_ADDR(envp), EC_ADDR(auxv));
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_SE), EC_XWORD(size),
+	    EC_XWORD(entry));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
 }
 
 void
-Dbg_file_prot(const char *name, int prot)
+Dbg_file_ldso(Rt_map *lmp, char **envp, auxv_t *auxv, const char *lmid,
+    Aliste lmco)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_PROT), name, (prot ? '+' : '-'));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_LDSO), PATHNAME(lmp));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_NATPTR(DYN(lmp)),
+	    EC_ADDR(ADDR(lmp)));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_EA), EC_NATPTR(envp),
+	    EC_NATPTR(auxv));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
+	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+
+void
+Dbg_file_prot(Rt_map *lmp, int prot)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_PROT), NAME(lmp), (prot ? '+' : '-'));
 }
 
 void
-Dbg_file_delete(const char *name)
+Dbg_file_delete(Rt_map *lmp)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DELETE), name);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DELETE), NAME(lmp));
 }
 
 static int	hdl_title = 0;
@@ -173,7 +136,7 @@ static Msg	hdl_str = 0;
 void
 Dbg_file_hdl_title(int type)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -198,43 +161,45 @@ Dbg_file_hdl_title(int type)
 }
 
 void
-Dbg_file_hdl_collect(Grp_hdl * ghp, const char *name)
+Dbg_file_hdl_collect(Grp_hdl *ghp, const char *name)
 {
-	const char *str;
+	Lm_list		*lml = ghp->gh_ownlml;
+	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	if (ghp->gh_owner)
-		str = NAME(ghp->gh_owner);
+	if (ghp->gh_ownlmp)
+		str = NAME(ghp->gh_ownlmp);
 	else
 		str = MSG_INTL(MSG_STR_ORPHAN);
 
 	if (hdl_title) {
 		hdl_title = 0;
-		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+		Dbg_util_nl(lml, DBG_NL_STD);
 	}
 	if (name)
-		dbg_print(MSG_INTL(MSG_FIL_HDL_RETAIN), str, name);
+		dbg_print(lml, MSG_INTL(MSG_FIL_HDL_RETAIN), str, name);
 	else
-		dbg_print(MSG_INTL(MSG_FIL_HDL_COLLECT), str,
-		    conv_grphdrflags_str(ghp->gh_flags));
+		dbg_print(lml, MSG_INTL(MSG_FIL_HDL_COLLECT), str,
+		    conv_grphdl_flags(ghp->gh_flags));
 }
 
 void
-Dbg_file_hdl_action(Grp_hdl * ghp, Rt_map * lmp, int type)
+Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type)
 {
+	Lm_list	*lml = LIST(lmp);
 	Msg	str;
 
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
 	if (hdl_title) {
-		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+		Dbg_util_nl(lml, DBG_NL_STD);
 		if (hdl_str) {
 			const char	*name;
 
@@ -242,12 +207,12 @@ Dbg_file_hdl_action(Grp_hdl * ghp, Rt_map * lmp, int type)
 			 * Protect ourselves in case this handle has no
 			 * originating owner.
 			 */
-			if (ghp->gh_owner)
-				name = NAME(ghp->gh_owner);
+			if (ghp->gh_ownlmp)
+				name = NAME(ghp->gh_ownlmp);
 			else
 				name = MSG_INTL(MSG_STR_UNKNOWN);
 
-			dbg_print(MSG_INTL(hdl_str), name);
+			dbg_print(lml, MSG_INTL(hdl_str), name);
 		}
 		hdl_title = 0;
 	}
@@ -277,14 +242,14 @@ Dbg_file_hdl_action(Grp_hdl * ghp, Rt_map * lmp, int type)
 		else
 			mode = MSG_ORIG(MSG_STR_EMPTY);
 
-		dbg_print(MSG_INTL(str), NAME(lmp), mode);
+		dbg_print(lml, MSG_INTL(str), NAME(lmp), mode);
 	}
 }
 
 void
-Dbg_file_bind_entry(Bnd_desc *bdp)
+Dbg_file_bind_entry(Lm_list *lml, Bnd_desc *bdp)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -292,20 +257,21 @@ Dbg_file_bind_entry(Bnd_desc *bdp)
 	/*
 	 * Print the dependency together with the modes of the binding.
 	 */
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_BND_ADD), NAME(bdp->b_caller));
-	dbg_print(MSG_INTL(MSG_FIL_BND_FILE), NAME(bdp->b_depend),
-	    conv_bindent_str(bdp->b_flags));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_BND_ADD), NAME(bdp->b_caller));
+	dbg_print(lml, MSG_INTL(MSG_FIL_BND_FILE), NAME(bdp->b_depend),
+	    conv_bnd_type(bdp->b_flags));
 }
 
 void
-Dbg_file_bindings(Rt_map *lmp, int flag, Word lmflags)
+Dbg_file_bindings(Rt_map *lmp, int flag)
 {
 	const char	*str;
 	Rt_map		*tlmp;
+	Lm_list		*lml = LIST(lmp);
 	int		next = 0;
 
-	if (DBG_NOTCLASS(DBG_INIT))
+	if (DBG_NOTCLASS(DBG_C_INIT))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -315,12 +281,13 @@ Dbg_file_bindings(Rt_map *lmp, int flag, Word lmflags)
 	else
 		str = MSG_ORIG(MSG_SCN_FINI);
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DEP_TITLE), str, conv_binding_str(lmflags));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DEP_TITLE), str,
+	    conv_bnd_obj(lml->lm_flags));
 
 	/* LINTED */
 	for (tlmp = lmp; tlmp; tlmp = (Rt_map *)NEXT(tlmp)) {
-		Bnd_desc **	bdpp;
+		Bnd_desc	**bdpp;
 		Aliste		off;
 
 		/*
@@ -346,40 +313,42 @@ Dbg_file_bindings(Rt_map *lmp, int flag, Word lmflags)
 		}
 
 		if (next++)
-			dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+			Dbg_util_nl(lml, DBG_NL_STD);
 
 		if (DEPENDS(tlmp) == 0)
-			dbg_print(MSG_INTL(MSG_FIL_DEP_NONE), NAME(tlmp));
+			dbg_print(lml, MSG_INTL(MSG_FIL_DEP_NONE), NAME(tlmp));
 		else {
-			dbg_print(MSG_INTL(MSG_FIL_DEP_ENT), NAME(tlmp));
+			dbg_print(lml, MSG_INTL(MSG_FIL_DEP_ENT), NAME(tlmp));
 
 			for (ALIST_TRAVERSE(DEPENDS(tlmp), off, bdpp)) {
-				dbg_print(MSG_INTL(MSG_FIL_BND_FILE),
+				dbg_print(lml, MSG_INTL(MSG_FIL_BND_FILE),
 				    NAME((*bdpp)->b_depend),
-				    conv_bindent_str((*bdpp)->b_flags));
+				    conv_bnd_type((*bdpp)->b_flags));
 			}
 		}
 	}
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 void
-Dbg_file_dlopen(const char *name, const char *from, int mode)
+Dbg_file_dlopen(Rt_map *clmp, const char *name, int mode)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(clmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DLOPEN), name, from,
-	    conv_dlmode_str(mode, 1));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp),
+	    conv_dl_mode(mode, 1));
 }
 
 void
-Dbg_file_dlclose(const char *name, int flag)
+Dbg_file_dlclose(Lm_list *lml, const char *name, int flag)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	if (flag == DBG_DLCLOSE_IGNORE)
@@ -387,104 +356,102 @@ Dbg_file_dlclose(const char *name, int flag)
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DLCLOSE), name, str);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DLCLOSE), name, str);
 }
 
 void
-Dbg_file_dldump(const char *ipath, const char *opath, int flags)
+Dbg_file_dldump(Rt_map *lmp, const char *path, int flags)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DLDUMP), ipath, opath,
-		conv_dlflag_str(flags, 0));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DLDUMP), NAME(lmp), path,
+		conv_dl_flag(flags, 0));
 }
 
 void
-Dbg_file_lazyload(const char *file, const char *from, const char *symname)
+Dbg_file_lazyload(Rt_map *clmp, const char *fname, const char *sname)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(clmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_LAZYLOAD), file, from,
-	    _Dbg_sym_dem(symname));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_LAZYLOAD), fname, NAME(clmp),
+	    Dbg_demangle_name(sname));
 }
 
 void
-Dbg_file_nl()
+Dbg_file_preload(Lm_list *lml, const char *name)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-	if (DBG_NOTDETAIL())
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_PRELOAD), name);
 }
 
 void
-Dbg_file_preload(const char *name)
+Dbg_file_needed(Rt_map *lmp, const char *name)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_INTL(MSG_FIL_PRELOAD), name);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_NEEDED), name, NAME(lmp));
 }
 
 void
-Dbg_file_needed(const char *name, const char *parent)
+Dbg_file_filter(Lm_list *lml, const char *filter, const char *filtee,
+    int config)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_NEEDED), name, parent);
-}
-
-void
-Dbg_file_filter(const char *filter, const char *filtee, int config)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_STD);
 	if (config)
-		dbg_print(MSG_INTL(MSG_FIL_FILTER_1), filter, filtee);
+		dbg_print(lml, MSG_INTL(MSG_FIL_FILTER_1), filter, filtee);
 	else
-		dbg_print(MSG_INTL(MSG_FIL_FILTER_2), filter, filtee);
+		dbg_print(lml, MSG_INTL(MSG_FIL_FILTER_2), filter, filtee);
 }
 
 void
-Dbg_file_filtee(const char *filter, const char *filtee, int audit)
+Dbg_file_filtee(Lm_list *lml, const char *filter, const char *filtee, int audit)
 {
 	if (audit) {
-		if (DBG_NOTCLASS(DBG_AUDITING | DBG_FILES))
+		if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
 			return;
 
-		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-		dbg_print(MSG_INTL(MSG_FIL_FILTEE_3), filtee);
+		Dbg_util_nl(lml, DBG_NL_STD);
+		dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_3), filtee);
 	} else {
-		if (DBG_NOTCLASS(DBG_FILES))
+		if (DBG_NOTCLASS(DBG_C_FILES))
 			return;
 
-		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+		Dbg_util_nl(lml, DBG_NL_STD);
 		if (filter)
-			dbg_print(MSG_INTL(MSG_FIL_FILTEE_1), filtee, filter);
+			dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_1), filtee,
+			    filter);
 		else
-			dbg_print(MSG_INTL(MSG_FIL_FILTEE_2), filtee);
+			dbg_print(lml, MSG_INTL(MSG_FIL_FILTEE_2), filtee);
 	}
 }
 
 void
-Dbg_file_fixname(const char *oname, const char *nname)
+Dbg_file_fixname(Lm_list *lml, const char *oname, const char *nname)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_FIXNAME), oname, nname);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_FIXNAME), oname, nname);
 }
 
 void
@@ -494,7 +461,7 @@ Dbg_file_output(Ofl_desc *ofl)
 	char		*oname, *nname, *ofile;
 	int		fd;
 
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -514,20 +481,20 @@ Dbg_file_output(Ofl_desc *ofl)
 	 * write out the present Elf memory image.  As this is debugging we
 	 * ignore all errors.
 	 */
-	if ((nname = (char *)malloc(strlen(prefix) + strlen(ofile) + 1)) != 0) {
+	if ((nname = malloc(strlen(prefix) + strlen(ofile) + 1)) != 0) {
 		(void) strcpy(nname, prefix);
 		(void) strcat(nname, ofile);
 		if ((fd = open(nname, O_RDWR | O_CREAT | O_TRUNC,
 		    0666)) != -1) {
-			(void) write(fd, ofl->ofl_ehdr, ofl->ofl_size);
-			close(fd);
+			(void) write(fd, ofl->ofl_nehdr, ofl->ofl_size);
+			(void) close(fd);
 		}
 		free(nname);
 	}
 }
 
 void
-Dbg_file_config_dis(const char *config, int features)
+Dbg_file_config_dis(Lm_list *lml, const char *config, int features)
 {
 	const char	*str;
 	int		error = features & ~CONF_FEATMSK;
@@ -541,19 +508,20 @@ Dbg_file_config_dis(const char *config, int features)
 	else if (error == DBG_CONF_CORRUPT)
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_4);
 	else
-		str = conv_config_str(features);
+		str = conv_config_feat(features);
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_CONFIG_ERR), config, str);
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_FRC);
+	dbg_print(lml, MSG_INTL(MSG_FIL_CONFIG_ERR), config, str);
+	Dbg_util_nl(lml, DBG_NL_FRC);
 }
 
 void
-Dbg_file_config_obj(const char *dir, const char *file, const char *config)
+Dbg_file_config_obj(Lm_list *lml, const char *dir, const char *file,
+    const char *config)
 {
 	char	*name, _name[PATH_MAX];
 
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	if (file) {
@@ -563,12 +531,99 @@ Dbg_file_config_obj(const char *dir, const char *file, const char *config)
 	} else
 		name = (char *)dir;
 
-	dbg_print(MSG_INTL(MSG_FIL_CONFIG), name, config);
+	dbg_print(lml, MSG_INTL(MSG_FIL_CONFIG), name, config);
 }
 
-#if	!defined(_ELF64)
+void
+Dbg_file_del_rescan(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
 
-const Msg
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_DEL_RESCAN));
+}
+
+void
+Dbg_file_mode_promote(Rt_map *lmp, int mode)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_PROMOTE), NAME(lmp),
+	    conv_dl_mode(mode, 0));
+	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
+{
+	Lm_cntl	*lmc;
+	Aliste	off;
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_CNTL_TITLE), EC_XWORD(flmco),
+	    EC_XWORD(tlmco));
+
+	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
+		Rt_map	*lmp;
+
+		/* LINTED */
+		for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
+			dbg_print(lml, MSG_ORIG(MSG_CNTL_ENTRY), EC_XWORD(off),
+			    NAME(lmp));
+	}
+	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_ar_rescan(Lm_list *lml)
+{
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_AR_RESCAN));
+	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_ar(Lm_list *lml, const char *name, int again)
+{
+	const char	*str;
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	if (again)
+		str = MSG_INTL(MSG_STR_AGAIN);
+	else
+		str = MSG_ORIG(MSG_STR_EMPTY);
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_ARCHIVE), name, str);
+}
+
+void
+Dbg_file_generic(Lm_list *lml, Ifl_desc *ifl)
+{
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_BASIC), ifl->ifl_name,
+		conv_ehdr_type(ifl->ifl_ehdr->e_type));
+}
+
+static const Msg
 reject[] = {
 	MSG_STR_EMPTY,
 	MSG_REJ_MACH,		/* MSG_INTL(MSG_REJ_MACH) */
@@ -586,75 +641,34 @@ reject[] = {
 };
 
 void
-Dbg_file_rejected(Rej_desc *rej)
+Dbg_file_rejected(Lm_list *lml, Rej_desc *rej)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(reject[rej->rej_type]), rej->rej_name ?
-	    rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN), conv_reject_str(rej));
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(reject[rej->rej_type]), rej->rej_name ?
+	    rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(rej));
+	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 void
-Dbg_file_del_rescan(void)
+Dbg_file_reuse(Lm_list *lml, const char *nname, const char *oname)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_DEL_RESCAN));
+	dbg_print(lml, MSG_INTL(MSG_FIL_REUSE), nname, oname);
 }
 
 void
-Dbg_file_ar_rescan(void)
+Dbg_file_skip(Lm_list *lml, const char *oname, const char *nname)
 {
-	if (DBG_NOTCLASS(DBG_FILES))
+	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_AR_RESCAN));
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	if (oname && strcmp(nname, oname))
+		dbg_print(lml, MSG_INTL(MSG_FIL_SKIP_1), nname, oname);
+	else
+		dbg_print(lml, MSG_INTL(MSG_FIL_SKIP_2), nname);
 }
-
-void
-Dbg_file_mode_promote(const char *file, int mode)
-{
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_PROMOTE), file, conv_dlmode_str(mode, 0));
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-}
-
-void
-Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
-{
-	Lm_cntl	*lmc;
-	Aliste	off;
-
-	if (DBG_NOTCLASS(DBG_FILES))
-		return;
-	if (DBG_NOTDETAIL())
-		return;
-
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_CNTL_TITLE), EC_XWORD(flmco), EC_XWORD(tlmco));
-
-	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
-		Rt_map	*lmp;
-
-		if (lmc->lc_head == 0) {
-			dbg_print(MSG_ORIG(MSG_CNTL_ENTRY), EC_XWORD(off),
-			    MSG_ORIG(MSG_STR_EMPTY));
-			continue;
-		}
-		for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
-			dbg_print(MSG_ORIG(MSG_CNTL_ENTRY), EC_XWORD(off),
-			    NAME(lmp));
-	}
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-}
-#endif

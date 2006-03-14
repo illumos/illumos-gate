@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
@@ -55,7 +55,7 @@
 #include	<stdarg.h>
 #include	<dlfcn.h>
 #include	<string.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
@@ -184,7 +184,7 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
 
-	DBG_CALL(Dbg_libs_audit(name, nname));
+	DBG_CALL(Dbg_libs_audit(LIST(clmp), name, nname));
 	return (nname);
 }
 
@@ -273,7 +273,8 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 		if (alp->al_objopen == 0)
 			continue;
 
-		DBG_CALL(Dbg_audit_object(alp->al_libname, NAME(nlmp)));
+		DBG_CALL(Dbg_audit_object(LIST(alp->al_lmp), alp->al_libname,
+		    NAME(nlmp)));
 
 		leave(LIST(alp->al_lmp));
 		flags = (*alp->al_objopen)((Link_map *)nlmp, lmid,
@@ -310,7 +311,7 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 }
 
 int
-audit_objopen(Rt_map * clmp, Rt_map * nlmp)
+audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 {
 	Lmid_t		lmid = get_linkmap_id(LIST(nlmp));
 	int		appl = 0, respond = 1, ndx = 0;
@@ -457,7 +458,7 @@ _audit_pltenter(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 #endif
 		(void) enter();
 
-		DBG_CALL(Dbg_audit_symval(alp->al_libname,
+		DBG_CALL(Dbg_audit_symval(LIST(alp->al_lmp), alp->al_libname,
 		    MSG_ORIG(MSG_AUD_PLTENTER), name, prev, sym->st_name));
 	}
 }
@@ -622,7 +623,7 @@ _audit_symbind(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		if ((prev != sym->st_value) && (alp->al_vernum >= LAV_VERSION2))
 			*flags |= LA_SYMB_ALTVALUE;
 
-		DBG_CALL(Dbg_audit_symval(alp->al_libname,
+		DBG_CALL(Dbg_audit_symval(LIST(alp->al_lmp), alp->al_libname,
 		    MSG_ORIG(MSG_AUD_SYMBIND), name, prev, sym->st_value));
 	}
 	return (sym->st_value);
@@ -863,7 +864,8 @@ audit_symget(Audit_list * alp, int info)
 		if (auflag)
 			audit_flags |= auflag;
 
-		DBG_CALL(Dbg_audit_interface(alp->al_libname, sname));
+		DBG_CALL(Dbg_audit_interface(LIST(alp->al_lmp),
+		    alp->al_libname, sname));
 		return (addr);
 	} else
 		return (0);
@@ -875,7 +877,7 @@ audit_symget(Audit_list * alp, int info)
 static int
 audit_disable(char *name, Rt_map *clmp, Grp_hdl *ghp, Audit_list *alp)
 {
-	eprintf(ERR_FATAL, MSG_INTL(MSG_AUD_DISABLED), name);
+	eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_AUD_DISABLED), name);
 	if (ghp)
 		(void) dlclose_intn(ghp, clmp);
 	if (alp)
@@ -892,9 +894,10 @@ int
 audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 {
 	char	*ptr, *next;
+	Lm_list	*clml = LIST(clmp);
 	int	error = 1;
 
-	DBG_CALL(Dbg_audit_lib(adp->ad_name));
+	DBG_CALL(Dbg_audit_lib(clml, adp->ad_name));
 
 	/*
 	 * Mark that we have at least one auditing link map
@@ -921,7 +924,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 			error = audit_disable(ptr, clmp, 0, 0);
 			continue;
 		}
-		lmp = ghp->gh_owner;
+		lmp = ghp->gh_ownlmp;
 
 		/*
 		 * If this auditor has already been loaded, reuse it.
@@ -931,7 +934,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 				return (audit_disable(ptr, clmp, ghp, alp));
 
 			adp->ad_cnt++;
-			DBG_CALL(Dbg_audit_version(alp->al_libname,
+			DBG_CALL(Dbg_audit_version(clml, alp->al_libname,
 			    alp->al_vernum));
 			adp->ad_flags |= alp->al_flags;
 			continue;
@@ -968,7 +971,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 		 */
 		if ((alp->al_version =
 		    (uint_t(*)())audit_symget(alp, AI_LAVERSION)) == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_NOSYM),
+			eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_GEN_NOSYM),
 			    MSG_ORIG(MSG_SYM_LAVERSION));
 			error = audit_disable(ptr, clmp, ghp, alp);
 			continue;
@@ -987,7 +990,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 
 		if ((alp->al_vernum < LAV_VERSION1) ||
 		    (alp->al_vernum > LAV_CURRENT)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_AUD_BADVERS),
+			eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_AUD_BADVERS),
 			    LAV_CURRENT, alp->al_vernum);
 			error = audit_disable(ptr, clmp, ghp, alp);
 			continue;
@@ -997,7 +1000,8 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 			return (audit_disable(ptr, clmp, ghp, alp));
 
 		adp->ad_cnt++;
-		DBG_CALL(Dbg_audit_version(alp->al_libname, alp->al_vernum));
+		DBG_CALL(Dbg_audit_version(clml, alp->al_libname,
+		    alp->al_vernum));
 
 		/*
 		 * Collect any remaining entry points.

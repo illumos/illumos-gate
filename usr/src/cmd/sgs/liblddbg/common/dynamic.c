@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,34 +18,35 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2000,2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<link.h>
+#include	<sgs.h>
 #include	<stdio.h>
-#include	"msg.h"
-#include	"_debug.h"
+#include	<debug.h>
+#include	<conv.h>
+#include	<_debug.h>
+#include	<msg.h>
 
 /*
  * Print out the dynamic section entries.
  */
 void
-Gelf_dyn_title()
+Elf_dyn_title(Lm_list *lml)
 {
-	dbg_print(MSG_INTL(MSG_DYN_TITLE));
+	dbg_print(lml, MSG_INTL(MSG_DYN_TITLE));
 }
 
 void
-Gelf_dyn_print(GElf_Dyn * dyn, int ndx, const char * name, Half mach)
+Elf_dyn_entry(Lm_list *lml, Dyn *dyn, int ndx, const char *name, Half mach)
 {
-	char	index[10];
+	char	index[INDEX_STR_SIZE];
 
-	(void) sprintf(index, MSG_ORIG(MSG_FMT_INDEX), ndx);
-	dbg_print(MSG_INTL(MSG_DYN_ENTRY), index,
-	    /* LINTED */
-	    conv_dyntag_str((Sword)dyn->d_tag, mach),
-	    EC_XWORD(dyn->d_un.d_val), name);
+	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_FMT_INDEX), ndx);
+	dbg_print(lml, MSG_INTL(MSG_DYN_ENTRY), index,
+	    conv_dyn_tag(dyn->d_tag, mach), EC_XWORD(dyn->d_un.d_val), name);
 }

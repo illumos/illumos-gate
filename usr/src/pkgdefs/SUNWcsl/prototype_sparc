@@ -56,8 +56,6 @@ s none usr/ccs/lib/sparcv9/libtermlib.so=../../../../lib/sparcv9/libcurses.so.1
 s none usr/ccs/lib/sparcv9/libtermcap.so=../../../../lib/sparcv9/libcurses.so.1
 s none usr/ccs/lib/sparcv9/libl.so=../../../lib/sparcv9/libl.so.1
 s none usr/ccs/lib/sparcv9/liby.so=../../../lib/sparcv9/liby.so.1
-s none usr/ccs/lib/sparcv9/libld.so.2=../../../../lib/sparcv9/libld.so.2
-s none usr/ccs/lib/sparcv9/libld.so.3=../../../../lib/sparcv9/libld.so.3
 d none usr/lib/cfgadm/sparcv9 755 root bin
 f none usr/lib/cfgadm/sparcv9/scsi.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/scsi.so=./scsi.so.1

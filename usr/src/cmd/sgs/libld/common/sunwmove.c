@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -87,16 +87,16 @@ make_mvsections(Ofl_desc *ofl)
 	}
 
 	if (mv_nums != 0) {
-		if (make_sunwmove(ofl, mv_nums) == S_ERROR)
+		if (ld_make_sunwmove(ofl, mv_nums) == S_ERROR)
 			return (S_ERROR);
 	}
 
 	/*
-	 * Generate the .sunwbss section now
-	 * that we know its size and alignment.
+	 * Generate the .sunwbss section now that we know its size and
+	 * alignment.
 	 */
 	if (size_sunwbss) {
-		if (make_sunwbss(ofl, size_sunwbss,
+		if (ld_make_sunwbss(ofl, size_sunwbss,
 		    align_sunwbss) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -109,7 +109,7 @@ make_mvsections(Ofl_desc *ofl)
 	 */
 	if (size_sunwdata1) {
 		/* LINTED */
-		if (make_sunwdata(ofl, size_sunwdata1,
+		if (ld_make_sunwdata(ofl, size_sunwdata1,
 		    align_sunwdata1) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -121,7 +121,7 @@ make_mvsections(Ofl_desc *ofl)
  * psymp.
  */
 static uintptr_t
-insert_mvitm(Psym_info *psymp, Mv_itm *itm)
+insert_mvitm(Ofl_desc *ofl, Psym_info *psymp, Mv_itm *itm)
 {
 	Listnode *	lnpc, *lnpp, *new;
 	Mv_itm *	mvp;
@@ -166,7 +166,8 @@ insert_mvitm(Psym_info *psymp, Mv_itm *itm)
 
 		if ((itm->mv_start == mvp->mv_start) ||
 		    (small->mv_start + small->mv_length > large->mv_start)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_PSYM_OVERLAP),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_PSYM_OVERLAP),
 			    psymp->psym_symd->sd_file->ifl_name,
 			    itm->mv_isp->is_name,
 			    demangle(psymp->psym_symd->sd_name));
@@ -216,7 +217,7 @@ insert_mvitm(Psym_info *psymp, Mv_itm *itm)
  *	If overlapping occurs, mark it at psymp->psym_flags
  */
 static uintptr_t
-install_mv(Psym_info *psymp, Move *mv, Is_desc *isp)
+install_mv(Ofl_desc *ofl, Psym_info *psymp, Move *mv, Is_desc *isp)
 {
 	Mv_itm *	mvitmp;
 	int 		cnt = mv->m_repeat;
@@ -238,7 +239,7 @@ install_mv(Psym_info *psymp, Move *mv, Is_desc *isp)
 		/*
 		 * Insert the item
 		 */
-		if (insert_mvitm(psymp, mvitmp) == S_ERROR)
+		if (insert_mvitm(ofl, psymp, mvitmp) == S_ERROR)
 			return (S_ERROR);
 		mvitmp++;
 	}
@@ -363,7 +364,7 @@ insert_psym(Ofl_desc *ofl, Psym_info *p1)
  *
  */
 uintptr_t
-sunwmove_preprocess(Ofl_desc *ofl)
+ld_sunwmove_preprocess(Ofl_desc *ofl)
 {
 	Listnode *	lnp;
 	Is_desc *	isp;
@@ -376,11 +377,12 @@ sunwmove_preprocess(Ofl_desc *ofl)
 		Ifl_desc *	ifile = isp->is_file;
 		Xword		i, num;
 
-		DBG_CALL(Dbg_move_input1(ifile->ifl_name));
+		DBG_CALL(Dbg_move_input(ofl->ofl_lml, ifile->ifl_name));
 		mv = (Move *) isp->is_indata->d_buf;
 
 		if (isp->is_shdr->sh_entsize == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_FIL_INVSHENTSIZE),
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_FIL_INVSHENTSIZE),
 			    isp->is_file->ifl_name, isp->is_name, EC_XWORD(0));
 			return (S_ERROR);
 		}
@@ -390,19 +392,23 @@ sunwmove_preprocess(Ofl_desc *ofl)
 
 			if ((ndx >= (Xword) isp->is_file->ifl_symscnt) ||
 			    (ndx == 0)) {
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_PSYM_INVMINFO1),
-				isp->is_file->ifl_name, isp->is_name, i,
-				EC_XWORD(mv->m_info));
-			    return (S_ERROR);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_PSYM_INVMINFO1),
+				    isp->is_file->ifl_name, isp->is_name, i,
+				    EC_XWORD(mv->m_info));
+				return (S_ERROR);
 			}
 			if (mv->m_repeat == 0) {
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_PSYM_INVMREPEAT),
-				isp->is_file->ifl_name, isp->is_name, i,
-				EC_XWORD(mv->m_repeat));
-			    return (S_ERROR);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_PSYM_INVMREPEAT),
+				    isp->is_file->ifl_name, isp->is_name, i,
+				    EC_XWORD(mv->m_repeat));
+				return (S_ERROR);
 			}
+
 			sdp = isp->is_file->ifl_oldndx[ndx];
-			DBG_CALL(Dbg_move_mventry(0, mv, sdp));
+			DBG_CALL(Dbg_move_entry1(ofl->ofl_lml, 0, mv, sdp));
+
 			/*
 			 * Check if this entry has a valid size of not
 			 */
@@ -411,24 +417,24 @@ sunwmove_preprocess(Ofl_desc *ofl)
 			case 1: case 2: case 4: case 8:
 				break;
 			default:
-			    eprintf(ERR_FATAL, MSG_INTL(MSG_PSYM_INVMINFO2),
-				isp->is_file->ifl_name, isp->is_name, i,
-				EC_XWORD(mv->m_info));
-			    return (S_ERROR);
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_PSYM_INVMINFO2),
+				    isp->is_file->ifl_name, isp->is_name, i,
+				    EC_XWORD(mv->m_info));
+				return (S_ERROR);
 			}
 
 			/*
-			 * If this is a global symbol, adjust the visibility
+			 * If this is a global symbol, adjust the visibility.
 			 */
 			if (sdp->sd_aux &&
 			    ((sdp->sd_flags & FLG_SY_VISIBLE) == 0))
-				sym_adjust_vis(sdp, ofl);
+				ld_sym_adjust_vis(sdp, ofl);
 
 			if (sdp->sd_psyminfo == (Psym_info *)NULL) {
 				/*
-				 * Mark the symbol as partial
-				 * and intall the symbol in
-				 * partial symbol list.
+				 * Mark the symbol as partial, and install the
+				 * symbol in the partial symbol list.
 				 */
 				if ((psym =
 				    libld_calloc(sizeof (Psym_info), 1)) == 0)
@@ -437,9 +443,9 @@ sunwmove_preprocess(Ofl_desc *ofl)
 				sdp->sd_psyminfo = psym;
 
 				/*
-				 * Even if the -zredlocsym is in effect,
-				 * the local symbol used for partial
-				 * initialization will be kept.
+				 * Even if the -zredlocsym is in effect, the
+				 * local symbol used for partial initialization
+				 * is kept.
 				 */
 				if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
 				    (ELF_ST_BIND(sdp->sd_sym->st_info) ==
@@ -485,7 +491,7 @@ sunwmove_preprocess(Ofl_desc *ofl)
 			} else
 				psym = sdp->sd_psyminfo;
 
-			if (install_mv(psym, mv, isp) == S_ERROR)
+			if (install_mv(ofl, psym, mv, isp) == S_ERROR)
 				return (S_ERROR);
 			if ((psym->psym_flag & FLG_PSYM_OVERLAP) != 0)
 				errcnt++;
@@ -525,7 +531,7 @@ sunwmove_preprocess(Ofl_desc *ofl)
 				if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
 				    STT_SECTION) {
 					errcnt++;
-					eprintf(ERR_FATAL,
+					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    psym->psym_symd->sd_file->ifl_name,
 					    isp->is_name, i,
@@ -536,7 +542,7 @@ sunwmove_preprocess(Ofl_desc *ofl)
 			} else if ((ofl->ofl_flags1 & FLG_OF1_NOPARTI) != 0) {
 				if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
 				    STT_SECTION) {
-					eprintf(ERR_WARNING,
+					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    psym->psym_symd->sd_file->ifl_name,
 					    isp->is_name, i,

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,12 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 
 pics/%.o:	../common/%.c
@@ -32,6 +32,14 @@ pics/%.o:	../common/%.c
 
 pics/%.o:	%.s
 		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%32.o:	../common/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%64.o:	../common/%.c
+		$(COMPILE.c) -D_ELF64 -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/elfcap.o:	$(ELFCAP)/elfcap.c
@@ -64,10 +72,10 @@ $(LIBRARY):	pics $$(PICS)
 chkmsg:		$(LINTSRCS)
 		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
 
-lint:		$(LINTLIB) $(LINTOUT32) $(SGSLINTOUT)
+.PARALLEL:	$(LINTOUT32) $(LINTOUT64) $(LINTLIB32) $(LINTLIB64)
 
-$(LINTLIB): $$(SRCS)
-		$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1
+lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
+		    .WAIT $(SGSLINTOUT)
 
 catalog:
 

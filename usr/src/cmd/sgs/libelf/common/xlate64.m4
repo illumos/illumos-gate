@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1644,15 +1644,18 @@ $1(Elf64_Nhdr *dst, unsigned char *src, size_t cnt)
 		dst->n_descsz = tomw(src, N1_descsz_$2);
 		dst->n_type = tomw(src, N1_type_$2);
 		nhdr = dst;
+		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + sizeof (Elf64_Nhdr));
 		namestr = src + N1_sizeof;
 		field_sz = S_ROUND(nhdr->n_namesz, sizeof (Elf64_Word));
 		(void)memcpy((void *)dst, namestr, field_sz);
 		desc = namestr + field_sz;
+		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + field_sz);
 		field_sz = nhdr->n_descsz;
 		(void)memcpy(dst, desc, field_sz);
 		field_sz = S_ROUND(field_sz, sizeof (Elf64_Word));
+		/* LINTED */
 		dst = (Elf64_Nhdr *)((char *)dst + field_sz);
 		src = (unsigned char *)desc + field_sz;
 	}

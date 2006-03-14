@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,89 +18,96 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<strings.h>
-#include	<stdio.h>
-#include	<limits.h>
 #include	<dwarf.h>
 #include	<dwarf_ehe_msg.h>
+#include	"_conv.h"
 
-#define	STRBUFSIZE	128
+#define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
+		MSG_DWEHE_SLEB128_SIZE + \
+		MSG_DWEHE_INDIRECT_SIZE + \
+		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
+
 const char *
-conv_dwarf_ehe_str(uint_t flags)
+conv_dwarf_ehe(uint_t flags)
 {
-	static char	string[STRBUFSIZE];
+	static char	string[FLAGSZ];
+	size_t		ret = 0;
 
-	(void) strncpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), STRBUFSIZE);
+	(void) strncpy(string, MSG_ORIG(MSG_GBL_OSQBRKT), FLAGSZ);
 
-	if (flags == DW_EH_PE_omit) {
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_OMIT), STRBUFSIZE);
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), STRBUFSIZE);
-		return (string);
-	}
-	if (flags == DW_EH_PE_absptr) {
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_ABSPTR), STRBUFSIZE);
-		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), STRBUFSIZE);
+	if (flags == DW_EH_PE_omit)
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_OMIT), FLAGSZ);
+	else if (flags == DW_EH_PE_absptr)
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_ABSPTR), FLAGSZ);
+
+	if (ret >= FLAGSZ)
+		return (conv_invalid_val(string, FLAGSZ, flags, 0));
+
+	if ((flags == DW_EH_PE_omit) || (flags == DW_EH_PE_absptr)) {
+		(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
 		return (string);
 	}
 
 	switch (flags & 0x0f) {
-	case DW_EH_PE_absptr:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_ABSPTR), STRBUFSIZE);
-		break;
 	case DW_EH_PE_uleb128:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_ULEB128), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_ULEB128), FLAGSZ);
 		break;
 	case DW_EH_PE_udata2:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA2), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA2), FLAGSZ);
 		break;
 	case DW_EH_PE_udata4:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA4), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA4), FLAGSZ);
 		break;
 	case DW_EH_PE_udata8:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA8), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_UDATA8), FLAGSZ);
 		break;
 	case DW_EH_PE_sleb128:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_SLEB128), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_SLEB128), FLAGSZ);
 		break;
 	case DW_EH_PE_sdata2:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA2), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA2), FLAGSZ);
 		break;
 	case DW_EH_PE_sdata4:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA4), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA4), FLAGSZ);
 		break;
 	case DW_EH_PE_sdata8:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA8), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_SDATA8), FLAGSZ);
 		break;
 	}
+	if (ret >= FLAGSZ)
+		return (conv_invalid_val(string, FLAGSZ, flags, 0));
 
 	switch (flags & 0xf0) {
 	case DW_EH_PE_pcrel:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_PCREL), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_PCREL), FLAGSZ);
 		break;
 	case DW_EH_PE_textrel:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_TEXTREL), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_TEXTREL), FLAGSZ);
 		break;
 	case DW_EH_PE_datarel:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_DATAREL), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_DATAREL), FLAGSZ);
 		break;
 	case DW_EH_PE_funcrel:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_FUNCREL), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_FUNCREL), FLAGSZ);
 		break;
 	case DW_EH_PE_aligned:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_ALIGNED), STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_ALIGNED), FLAGSZ);
 		break;
 	case DW_EH_PE_indirect:
-		(void) strlcat(string, MSG_ORIG(MSG_DWEHE_INDIRECT),
-			STRBUFSIZE);
+		ret = strlcat(string, MSG_ORIG(MSG_DWEHE_INDIRECT), FLAGSZ);
 		break;
 	}
+	if (ret >= FLAGSZ)
+		return (conv_invalid_val(string, FLAGSZ, flags, 0));
 
-	(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), STRBUFSIZE);
+	(void) strlcat(string, MSG_ORIG(MSG_GBL_CSQBRKT), FLAGSZ);
 	return (string);
 }

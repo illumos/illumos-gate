@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ typedef struct rt_map	Rt_map;
 
 /*
  * A binding descriptor.  Establishes the binding relationship between two
- * objects, the caller (originator and the dependency (destination).
+ * objects, the caller (originator) and the dependency (destination).
  */
 typedef struct {
 	Rt_map		*b_caller;	/* caller (originator) of a binding */
@@ -236,7 +236,7 @@ typedef struct {
 #define	LMC_FLG_REANALYZE	0x04	/* repeat analysis (established when */
 					/*	interposers are added */
 
-typedef	struct {
+struct lm_list {
 	/*
 	 * BEGIN: Exposed to rtld_db - don't move, don't delete
 	 */
@@ -257,13 +257,15 @@ typedef	struct {
 	Alist		*lm_lists;	/* active and pending link-map lists */
 	char		***lm_environ;	/* pointer to environment array */
 	Word		lm_tflags;	/* transferable flags */
-	int		lm_obj;		/* total number of objs on link-map */
-	int		lm_init;	/* new obj since last init processing */
-	int		lm_lazy;	/* obj with pending lazy dependencies */
-} Lm_list;
+	uint_t		lm_obj;		/* total number of objs on link-map */
+	uint_t		lm_init;	/* new obj since last init processing */
+	uint_t		lm_lazy;	/* obj with pending lazy dependencies */
+	uint_t		lm_lmid;	/* unique link-map list identifier, */
+	char		*lm_lmidstr;	/* and associated diagnostic string */
+};
 
 #ifdef	_SYSCALL32
-typedef struct {
+struct lm_list32 {
 	/*
 	 * BEGIN: Exposed to rtld_db - don't move, don't delete
 	 */
@@ -282,10 +284,12 @@ typedef struct {
 	Elf32_Addr	lm_lists;
 	Elf32_Addr	lm_environ;
 	Elf32_Word	lm_tflags;
-	int		lm_obj;
-	int		lm_init;
-	int		lm_lazy;
-} Lm_list32;
+	uint_t		lm_obj;
+	uint_t		lm_init;
+	uint_t		lm_lazy;
+	uint_t		lm_lmid;
+	Elf32_Addr	lm_lmidstr;
+};
 #endif /* _SYSCALL32 */
 
 /*
@@ -363,8 +367,9 @@ typedef struct {
  * handle structure returned that describes a group of one or more objects.
  */
 typedef struct {
-	Alist *		gh_depends;	/* handle dependency list */
-	Rt_map *	gh_owner;	/* handle owner and the link-map */
+	Alist		*gh_depends;	/* handle dependency list */
+	Rt_map		*gh_ownlmp;	/* handle owners link-map */
+	Lm_list		*gh_ownlml;	/* handle owners link-map list */
 	uint_t		gh_refcnt;	/* handle reference count */
 	uint_t		gh_flags;	/* handle flags */
 } Grp_hdl;
@@ -800,11 +805,8 @@ extern Lm_list		lml_main;	/* main's link map list */
 extern Lm_list		lml_rtld;	/* rtld's link map list */
 extern Lm_list		*lml_list[];
 
-extern int		do_reloc(uchar_t, uchar_t *, Xword *, const char *,
-			    const char *);
 extern Pltbindtype	elf_plt_write(uintptr_t, uintptr_t, void *, uintptr_t,
 			    Xword);
-extern void		eprintf(Error, const char *, ...);
 extern Rt_map		*is_so_loaded(Lm_list *, const char *, int);
 extern Sym		*lookup_sym(Slookup *, Rt_map **, uint_t *);
 extern int		rt_dldump(Rt_map *, const char *, int, Addr);

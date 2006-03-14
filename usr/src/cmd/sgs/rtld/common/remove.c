@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Remove objects.  Objects need removal from a process as part of:
@@ -57,11 +56,11 @@
 #include	<dlfcn.h>
 #include	<sys/debug.h>
 #include	<sys/avl.h>
-#include	"libc_int.h"
+#include	<libc_int.h>
+#include	<debug.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
-#include	"debug.h"
 #include	"msg.h"
 
 /*
@@ -131,7 +130,7 @@ purge_exit_handlers(Lm_list *lml, Rt_map **tobj)
 	 * satisfy any dlerror() usage.
 	 */
 	if (error)
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ATEXIT), error);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ATEXIT), error);
 
 	free(addr);
 	return (error);
@@ -184,6 +183,8 @@ void
 remove_lml(Lm_list *lml)
 {
 	if (lml && (lml->lm_head == 0)) {
+		if (lml->lm_lmidstr)
+			free(lml->lm_lmidstr);
 		if (lml->lm_alp)
 			free(lml->lm_alp);
 		if (lml->lm_lists)
@@ -243,7 +244,7 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 		lml->lm_peh_lmp = 0;
 	}
 
-	DBG_CALL(Dbg_file_delete(NAME(lmp)));
+	DBG_CALL(Dbg_file_delete(lmp));
 
 	/*
 	 * Unmap the object.
@@ -568,10 +569,10 @@ is_deletable(Alist ** lmalp, Alist ** ghalp, Rt_map * lmp)
  * enced from the objects within the groups that are candidates for deletion.
  */
 static int
-gdp_collect(Alist ** ghalpp, Alist ** lmalpp, Grp_hdl * ghp1)
+gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 {
 	Aliste		off;
-	Grp_desc *	gdp;
+	Grp_desc	*gdp;
 	int		action;
 
 	/*
@@ -764,7 +765,7 @@ free_hdl(Grp_hdl *ghp)
 		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 			Rt_map	*lmp = gdp->gd_depend;
 
-			if (ghp->gh_owner == lmp)
+			if (ghp->gh_ownlmp == lmp)
 				(void) alist_delete(HANDLES(lmp), &ghp, 0);
 			(void) alist_delete(GROUPS(lmp), &ghp, 0);
 		}
@@ -837,7 +838,7 @@ remove_caller(Grp_hdl *ghp, Rt_map *clmp)
  * final deletion of the orphaned handles.
  */
 int
-remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
+remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 {
 	Rt_map *	lmp, ** lmpp;
 	int		rescan = 0;
@@ -1051,8 +1052,8 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 		 * If this handle is already an orphan, or if it's owner is
 		 * deletable there's no need to inspect its dependencies.
 		 */
-		if ((ghp->gh_owner == 0) ||
-		    (FLAGS(ghp->gh_owner) & FLG_RT_DELETE))
+		if ((ghp->gh_ownlmp == 0) ||
+		    (FLAGS(ghp->gh_ownlmp) & FLG_RT_DELETE))
 			continue;
 
 		/*
@@ -1068,7 +1069,7 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 			 * required there's no need to look at any other of the
 			 * handles dependencies.
 			 */
-			if ((lmp == ghp->gh_owner) &&
+			if ((lmp == ghp->gh_ownlmp) &&
 			    (gdp->gd_flags & GPD_REMOVE))
 				break;
 
@@ -1158,7 +1159,7 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 		 */
 		for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
 			Grp_hdl *	ghp = *ghpp;
-			Rt_map *	dlmp = ghp->gh_owner;
+			Rt_map *	dlmp = ghp->gh_ownlmp;
 
 			if (clmp && dlmp &&
 			    ((LIST(dlmp)->lm_flags & LML_FLG_NOAUDIT) == 0) &&
@@ -1278,9 +1279,9 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 			 * If this object is the owner of the handle break that
 			 * association in case the handle is retained.
 			 */
-			if (ghp->gh_owner == lmp) {
+			if (ghp->gh_ownlmp == lmp) {
 				(void) alist_delete(HANDLES(lmp), &ghp, 0);
-				ghp->gh_owner = 0;
+				ghp->gh_ownlmp = 0;
 			}
 
 			(void) alist_delete(GROUPS(lmp), &ghp, 0);
@@ -1319,7 +1320,7 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 			 */
 			(void) list_append(&hdl_list[HDLIST_ORP], ghp);
 
-			if (dbg_mask) {
+			if (DBG_ENABLED) {
 				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ORPHAN));
 				for (ALIST_TRAVERSE(ghp->gh_depends, off1, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
@@ -1358,10 +1359,9 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 	 */
 	do {
 		List		list;
-		Listnode *	lnp;
-		Grp_hdl *	ghp, * oghp = 0;
-
-		DBG_CALL(Dbg_file_del_rescan());
+		Listnode	*lnp;
+		Grp_hdl		*ghp, *oghp = 0;
+		int		title = 0;
 
 		/*
 		 * Effectively clean the HDLIST_ORP list.  Any object that can't
@@ -1373,6 +1373,9 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 		rescan = 0;
 		for (LIST_TRAVERSE(&list, lnp, ghp)) {
 			int	_error, _remove;
+
+			if (title++ == 0)
+				DBG_CALL(Dbg_file_del_rescan(ghp->gh_ownlml));
 
 			if (oghp) {
 				list_delete(&list, oghp);

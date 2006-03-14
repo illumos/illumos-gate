@@ -127,8 +127,7 @@ $SkipUndefFiles = qr{ ^(?:
 	librtld_db\.so\.1 |		#  "	"	"	"
 	libc_db\.so\.1 |		#  "	"	"	"
 	libldstab\.so\.1 |		# link-edit support libraries have
-	libld\.so\.3 |			# callback to the link-editors
-	libld\.so\.2 |			#  "	"	"	"
+	libld\.so\.[2-4] |			# callback to the link-editors
 	liblddbg\.so\.4 |		#  "	"	"	"
 	librtld\.so\.1 |		#  "	"	"	"
 	libnisdb\.so\.2 |		# C++

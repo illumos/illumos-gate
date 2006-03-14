@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 TOOLDIR="${SRC}/cmd/sgs/tools/"
 
@@ -49,14 +49,15 @@ if [ $# -eq 0 ]; then
 fi
 
 #
-# Sort the MSG_INTL() and MSG_ORIG() entries.
+# Sort the MSG_INTL() and MSG_ORIG() entries.  Note, messages can come in _32
+# and _64 flavors - if so strip the suffix and uniquify the output.
 #
 if [ -s CATA_MSG_INTL_LIST ] ; then
-	sort CATA_MSG_INTL_LIST | uniq > _TMP
+	sed -e "s/_32$//" -e "s/_64$//" CATA_MSG_INTL_LIST | sort | uniq > _TMP
 	mv _TMP CATA_MSG_INTL_LIST
 fi
 if [ -s CATA_MSG_ORIG_LIST ] ; then
-	sort CATA_MSG_ORIG_LIST | uniq > _TMP
+	sed -e "s/_32$//" -e "s/_64$//" CATA_MSG_ORIG_LIST | sort | uniq > _TMP
 	mv _TMP CATA_MSG_ORIG_LIST
 fi
 
@@ -66,11 +67,11 @@ fi
 nawk -f  ${TOOLDIR}/getmessage.awk	$*
 
 if [ -s MSG_INTL_LIST ] ; then
-	sort MSG_INTL_LIST | uniq > _TMP
+	sed -e "s/_32$//" -e "s/_64$//" MSG_INTL_LIST | sort | uniq > _TMP
 	mv _TMP MSG_INTL_LIST
 fi
 if [ -s MSG_ORIG_LIST ] ; then
-	sort MSG_ORIG_LIST | uniq > _TMP
+	sed -e "s/_32$//" -e "s/_64$//" MSG_ORIG_LIST | sort | uniq > _TMP
 	mv _TMP MSG_ORIG_LIST
 fi
 

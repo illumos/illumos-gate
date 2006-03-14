@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,7 +63,7 @@
  * Test the compatiblity of two register symbols, 0 pass, >0 fail
  */
 static uintptr_t
-check_regsyms(Sym * sym1, const char * name1, Sym * sym2, const char * name2)
+check_regsyms(Sym *sym1, const char *name1, Sym *sym2, const char *name2)
 {
 	if ((sym1->st_name == 0) && (sym2->st_name == 0))
 		return (0);	/* scratches are always compatible */
@@ -119,7 +119,7 @@ elf_regsyms(Rt_map * lmp)
 				(rsymndx * SYMENT(lmp)));
 
 		for (rp = reglist; rp; rp = rp->rl_next) {
-			const char *	str, * sym1, * sym2;
+			const char	*str, *sym1, *sym2;
 
 			if (rp->rl_sym == symdef) {
 				/*
@@ -135,7 +135,7 @@ elf_regsyms(Rt_map * lmp)
 				continue;
 
 			if ((str = demangle(sym1)) != sym1) {
-				char *	_str = alloca(strlen(str) + 1);
+				char	*_str = alloca(strlen(str) + 1);
 				(void) strcpy(_str, str);
 				sym1 = (const char *)_str;
 			}
@@ -143,11 +143,12 @@ elf_regsyms(Rt_map * lmp)
 
 			if (LIST(lmp)->lm_flags & LML_FLG_TRC_WARN) {
 				(void) printf(MSG_INTL(MSG_LDD_REG_SYMCONF),
-				    conv_sym_SPARC_value_str(symdef->st_value),
+				    conv_sym_SPARC_value(symdef->st_value),
 				    NAME(rp->rl_lmp), sym1, NAME(lmp), sym2);
 			} else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_REG_SYMCONF),
-				    conv_sym_SPARC_value_str(symdef->st_value),
+				eprintf(LIST(lmp), ERR_FATAL,
+				    MSG_INTL(MSG_REG_SYMCONF),
+				    conv_sym_SPARC_value(symdef->st_value),
 				    NAME(rp->rl_lmp), sym1, NAME(lmp), sym2);
 				return (0);
 			}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1122,8 +1122,8 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Determine the handles owner.  Note that an orphaned handle may no
 	 * longer contain its originating owner.
 	 */
-	if (gh.gh_owner) {
-		if ((str = Rtmap_Name((uintptr_t)gh.gh_owner)) == 0)
+	if (gh.gh_ownlmp) {
+		if ((str = Rtmap_Name((uintptr_t)gh.gh_ownlmp)) == 0)
 			return (DCMD_ERR);
 	} else
 		str = (char *)MSG_ORIG(MSG_STR_ORPHANED);
@@ -1399,7 +1399,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_TITLE), addr);
-	dynstr = conv_dyntag_str(dyn.d_tag, M_MACH);
+	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH);
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_LINE1), addr, dynstr, dyn.d_un.d_ptr);
 
 	mdb_set_dot(addr + sizeof (Dyn));
@@ -1437,19 +1437,19 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (byte[EI_MAG2] ? byte[EI_MAG2] : '0'),
 	    (byte[EI_MAG3] ? byte[EI_MAG3] : '0'));
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE2),
-	    conv_eclass_str(ehdr.e_ident[EI_CLASS]),
-	    conv_edata_str(ehdr.e_ident[EI_DATA]));
+	    conv_ehdr_class(ehdr.e_ident[EI_CLASS]),
+	    conv_ehdr_data(ehdr.e_ident[EI_DATA]));
 
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE3),
-	    conv_emach_str(ehdr.e_machine), conv_ever_str(ehdr.e_version));
-	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4), conv_etype_str(ehdr.e_type));
+	    conv_ehdr_mach(ehdr.e_machine), conv_ehdr_vers(ehdr.e_version));
+	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4), conv_ehdr_type(ehdr.e_type));
 
 	/*
 	 * Line up the flags differently depending on wether we
 	 * received a numeric (e.g. "0x200") or text represent-
 	 * ation (e.g. "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_eflags_str(ehdr.e_machine, ehdr.e_flags);
+	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags);
 	if (flgs[0] == '[')
 		mdb_printf(MSG_ORIG(MSG_EHDR_LINE5), flgs);
 	else
@@ -1490,13 +1490,11 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf(MSG_ORIG(MSG_EPHDR_TITLE), addr);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE1), phdr.p_vaddr,
-	    conv_phdrflg_str(phdr.p_flags));
+	    conv_phdr_flags(phdr.p_flags));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE2), phdr.p_paddr,
-	    conv_phdrtyp_str(M_MACH, phdr.p_type));
-	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz,
-	    phdr.p_memsz);
-	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE4), phdr.p_offset,
-	    phdr.p_align);
+	    conv_phdr_type(M_MACH, phdr.p_type));
+	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz, phdr.p_memsz);
+	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE4), phdr.p_offset, phdr.p_align);
 
 	mdb_set_dot(addr + sizeof (Phdr));
 

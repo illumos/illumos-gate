@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -265,7 +265,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 		const char	*fmt;
 
 		if (head->ch_dlflags)
-			fmt = conv_dlflag_str(head->ch_dlflags, 0);
+			fmt = conv_dl_flag(head->ch_dlflags, 0);
 		else
 			fmt = MSG_ORIG(MSG_STR_EMPTY);
 
@@ -287,7 +287,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 		if (head->ch_dlflags &&
 		    (head->ch_dlflags != RTLD_REL_RELATIVE)) {
 			(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_FLAGS),
-			    conv_dlflag_str(head->ch_dlflags, 1));
+			    conv_dl_flag(head->ch_dlflags, 1));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
 				return (1);
@@ -362,12 +362,12 @@ scanconfig(Crle_desc * crle, Addr addr)
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 			if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 				if (head->ch_cnflags & RTC_HDR_64)
-					str = conv_upm_string(str,
+					str = conv_config_upm(str,
 					    MSG_ORIG(MSG_PTH_OLDDLP_64),
 					    MSG_ORIG(MSG_PTH_UPDLP_64),
 					    MSG_PTH_UPDLP_64_SIZE);
 				else
-					str = conv_upm_string(str,
+					str = conv_config_upm(str,
 					    MSG_ORIG(MSG_PTH_OLDDLP),
 					    MSG_ORIG(MSG_PTH_UPDLP),
 					    MSG_PTH_UPDLP_SIZE);
@@ -429,12 +429,12 @@ scanconfig(Crle_desc * crle, Addr addr)
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 			if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 				if (head->ch_cnflags & RTC_HDR_64)
-					str = conv_upm_string(str,
+					str = conv_config_upm(str,
 					    MSG_ORIG(MSG_PTH_OLDTD_64),
 					    MSG_ORIG(MSG_PTH_UPTD_64),
 					    MSG_PTH_UPTD_64_SIZE);
 				else
-					str = conv_upm_string(str,
+					str = conv_config_upm(str,
 					    MSG_ORIG(MSG_PTH_OLDTD),
 					    MSG_ORIG(MSG_PTH_UPTD),
 					    MSG_PTH_UPTD_SIZE);

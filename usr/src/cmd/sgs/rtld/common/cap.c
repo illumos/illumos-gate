@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,12 +33,11 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<limits.h>
-#include	"conv.h"
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
-#include	"_elf.h"
 #include	"msg.h"
-#include	"debug.h"
 
 /*
  * qsort(3c) comparison function.
@@ -95,7 +93,7 @@ hwcap_check(Rej_desc *rej, Ehdr *ehdr)
 
 		if ((val = (cptr->c_un.c_val & ~hwcap)) != 0) {
 			rej->rej_type = SGS_REJ_HWCAP_1;
-			rej->rej_str = conv_hwcap_1_str(val, M_MACH);
+			rej->rej_str = conv_cap_val_hw1(val, M_MACH);
 			return (0);
 		}
 
@@ -162,7 +160,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		_rej.rej_type = SGS_REJ_STR;
 		_rej.rej_name = name;
 		_rej.rej_str = strerror(errno);
-		DBG_CALL(Dbg_file_rejected(&_rej));
+		DBG_CALL(Dbg_file_rejected(lml, &_rej));
 		rejection_inherit(rej, &_rej, 0);
 		return (0);
 	}
@@ -205,7 +203,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0)
 			rejection_inherit(rej, &_rej, &fdesc);
 		else {
-			DBG_CALL(Dbg_cap_hw_candidate(name));
+			DBG_CALL(Dbg_cap_hw_candidate(lml, name));
 
 			/*
 			 * If this object has already been loaded, obtain the
@@ -303,7 +301,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 		 * relocating.  Remove the file descriptor at this point, as it
 		 * is no longer required.
 		 */
-		DBG_CALL(Dbg_file_filtee(NAME(flmp), fdp->fd_nname, 0));
+		DBG_CALL(Dbg_file_filtee(lml, NAME(flmp), fdp->fd_nname, 0));
 
 		nlmp = load_path(lml, nlmco, fdp->fd_nname, flmp, mode,
 		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej);
@@ -398,7 +396,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 		 */
 		if (nlmp == 0) {
 			pnp->p_info = 0;
-			DBG_CALL(Dbg_file_filtee(0, pnp->p_name, audit));
+			DBG_CALL(Dbg_file_filtee(lml, 0, pnp->p_name, audit));
 			if (ghp)
 				(void) dlclose_core(ghp, flmp);
 
@@ -416,8 +414,9 @@ hwcap_filtees(Pnode **pnpp, Aliste nlmco, Dyninfo *dip, Rt_map *flmp,
 {
 	Pnode		*pnp = *pnpp;
 	const char	*dir = pnp->p_name;
+	Lm_list		*flml = LIST(flmp);
 
-	DBG_CALL(Dbg_cap_hw_filter(dir, NAME(flmp)));
+	DBG_CALL(Dbg_cap_hw_filter(flml, dir, flmp));
 
 	if ((pnp = _hwcap_filtees(pnpp, nlmco, flmp, ref, dir, mode,
 	    flags)) != 0)
@@ -427,11 +426,11 @@ hwcap_filtees(Pnode **pnpp, Aliste nlmco, Dyninfo *dip, Rt_map *flmp,
 	 * If no hardware capability filtees have been found, provide suitable
 	 * diagnostics and mark the incoming Pnode as unused.
 	 */
-	if ((LIST(flmp)->lm_flags & LML_FLG_TRC_ENABLE) &&
+	if ((flml->lm_flags & LML_FLG_TRC_ENABLE) &&
 	    (dip->di_flags & FLG_DI_AUXFLTR) && (rtld_flags & RT_FL_WARNFLTR))
 		(void) printf(MSG_INTL(MSG_LDD_HWCAP_NFOUND), dir);
 
-	DBG_CALL(Dbg_cap_hw_filter(dir, 0));
+	DBG_CALL(Dbg_cap_hw_filter(flml, dir, 0));
 
 	pnp = *pnpp;
 	pnp->p_len = 0;

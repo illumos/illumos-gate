@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -34,11 +33,13 @@
  */
 #include	<unistd.h>
 #include	<stdio.h>
+#include	<stdarg.h>
 #include	<string.h>
 #include	<fcntl.h>
 #include	<sys/types.h>
 #include	<sys/mman.h>
 #include	<errno.h>
+#include	<sgs.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
@@ -80,7 +81,7 @@
  *	by libld_malloc() must be 8 byte-aligned.  Even in a 32-bit environment,
  *	u_longlog_t pointers are employed.
  *
- * MAP_ANON arrived un Solaris 8, thus a fall-back is provided for older
+ * MAP_ANON arrived in Solaris 8, thus a fall-back is provided for older
  * systems.
  */
 static void *
@@ -89,7 +90,7 @@ dz_map(size_t size)
 	void	*addr;
 	int	err;
 
-#if defined(MAP_ANON)
+#if	defined(MAP_ANON)
 	static int	noanon = 0;
 
 	if (noanon == 0) {
@@ -99,7 +100,7 @@ dz_map(size_t size)
 
 		if ((errno != EBADF) && (errno != EINVAL)) {
 			err = errno;
-			(void) eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
+			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
 			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 			return (MAP_FAILED);
 		} else
@@ -109,7 +110,7 @@ dz_map(size_t size)
 	if (dz_fd == -1) {
 		if ((dz_fd = open(MSG_ORIG(MSG_PTH_DEVZERO), O_RDONLY)) == -1) {
 			err = errno;
-			(void) eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 			return (MAP_FAILED);
 		}
@@ -118,7 +119,7 @@ dz_map(size_t size)
 	if ((addr = mmap(0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
 	    MAP_PRIVATE, dz_fd, 0)) == MAP_FAILED) {
 		err = errno;
-		(void) eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
 		    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 		return (MAP_FAILED);
 	}
@@ -395,96 +396,6 @@ sdf_add(const char *name, List *lst)
 }
 
 /*
- * Determine a least common multiplier.  Input sections contain an alignment
- * requirement, which elf_update() uses to insure that the section is aligned
- * correctly off of the base of the elf image.  We must also insure that the
- * sections mapping is congruent with this alignment requirement.  For each
- * input section associated with a loadable segment determine whether the
- * segments alignment must be adjusted to compensate for a sections alignment
- * requirements.
- */
-Xword
-lcm(Xword a, Xword b)
-{
-	Xword	_r, _a, _b;
-
-	if ((_a = a) == 0)
-		return (b);
-	if ((_b = b) == 0)
-		return (a);
-
-	if (_a > _b)
-		_a = b, _b = a;
-	while ((_r = _b % _a) != 0)
-		_b = _a, _a = _r;
-	return ((a / _a) * b);
-}
-
-/*
- * Cleanup an Ifl_desc
- */
-void
-ifl_list_cleanup(List *ifl_list)
-{
-	Listnode	*lnp;
-	Ifl_desc	*ifl;
-
-	for (LIST_TRAVERSE(ifl_list, lnp, ifl))
-		if (ifl->ifl_elf)
-			(void) elf_end(ifl->ifl_elf);
-	ifl_list->head = 0;
-	ifl_list->tail = 0;
-}
-
-/*
- * Cleanup all memory that has been dynamically allocated
- * durring libld processing and elf_end() all Elf descriptors that
- * are still open.
- */
-void
-ofl_cleanup(Ofl_desc *ofl)
-{
-	Ld_heap		*chp, *php;
-	Ar_desc		*adp;
-	Listnode	*lnp;
-
-	ifl_list_cleanup(&ofl->ofl_objs);
-	ifl_list_cleanup(&ofl->ofl_sos);
-
-	for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
-		Ar_aux		*aup;
-		Elf_Arsym	*arsym;
-
-		for (arsym = adp->ad_start, aup = adp->ad_aux;
-		    arsym->as_name; ++arsym, ++aup) {
-			if ((aup->au_mem) && (aup->au_mem != FLG_ARMEM_PROC)) {
-				(void) elf_end(aup->au_mem->am_elf);
-
-				/*
-				 * Null out all entries to this member so
-				 * that we don't attempt to elf_end() it again.
-				 */
-				ar_member(adp, arsym, aup, 0);
-			}
-		}
-		(void) elf_end(adp->ad_elf);
-	}
-
-	(void) elf_end(ofl->ofl_elf);
-	(void) elf_end(ofl->ofl_welf);
-
-	for (chp = ld_heap, php = 0; chp; php = chp, chp = chp->lh_next) {
-		if (php)
-			(void) munmap((void *)php,
-			    (size_t)php->lh_end - (size_t)php);
-	}
-	if (php)
-		(void) munmap((void *)php, (size_t)php->lh_end - (size_t)php);
-
-	ld_heap = 0;
-}
-
-/*
  * Add a string, separated by a colon, to an existing string.  Typically used
  * to maintain filter, rpath and audit names, of which there is normally only
  * one string supplied anyway.
@@ -524,7 +435,6 @@ add_string(char *old, char *str)
 	return (new);
 }
 
-
 /*
  * Messaging support - funnel everything through _dgettext() as this provides
  * a stub binding to libc, or a real binding to libintl.
@@ -543,8 +453,8 @@ _libld_msg(Msg mid)
 const char *
 demangle(const char *name)
 {
-	if (Ofl.ofl_flags1 & FLG_OF1_DEMANGL)
-		return (Gelf_sym_dem(name));
+	if (demangle_flag)
+		return (Elf_demangle_name(name));
 	else
 		return (name);
 }

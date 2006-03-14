@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,15 +40,41 @@
 #include	<errno.h>
 #include	<string.h>
 #include	<limits.h>
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
-#include	<debug.h>
+
+/*
+ * Determine a least common multiplier.  Input sections contain an alignment
+ * requirement, which elf_update() uses to insure that the section is aligned
+ * correctly off of the base of the elf image.  We must also insure that the
+ * sections mapping is congruent with this alignment requirement.  For each
+ * input section associated with a loadable segment determine whether the
+ * segments alignment must be adjusted to compensate for a sections alignment
+ * requirements.
+ */
+Xword
+ld_lcm(Xword a, Xword b)
+{
+	Xword	_r, _a, _b;
+
+	if ((_a = a) == 0)
+		return (b);
+	if ((_b = b) == 0)
+		return (a);
+
+	if (_a > _b)
+		_a = b, _b = a;
+	while ((_r = _b % _a) != 0)
+		_b = _a, _a = _r;
+	return ((a / _a) * b);
+}
 
 /*
  * Open the output file and insure the correct access modes.
  */
 uintptr_t
-open_outfile(Ofl_desc * ofl)
+ld_open_outfile(Ofl_desc * ofl)
 {
 	mode_t		mask, mode;
 	struct stat	status;
@@ -79,8 +104,8 @@ open_outfile(Ofl_desc * ofl)
 	    mode)) < 0) {
 		int	err = errno;
 
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), ofl->ofl_name,
-		    strerror(err));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+		    ofl->ofl_name, strerror(err));
 		return (S_ERROR);
 	}
 
@@ -120,7 +145,7 @@ open_outfile(Ofl_desc * ofl)
  *
  *  o	NOBITS sections must be converted into allocated, null filled sections.
  */
-uintptr_t
+static uintptr_t
 pad_outfile(Ofl_desc * ofl)
 {
 	Listnode *	lnp1, * lnp2;
@@ -135,11 +160,13 @@ pad_outfile(Ofl_desc * ofl)
 	 * section headers and data buffers as they relate to the new image.
 	 */
 	if (elf_update(ofl->ofl_welf, ELF_C_NULL) == -1) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_UPDATE), ofl->ofl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 	if ((ehdr = elf_getehdr(ofl->ofl_welf)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR), ofl->ofl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -170,8 +197,8 @@ pad_outfile(Ofl_desc * ofl)
 			    offset);
 
 			if ((data = elf_newdata(oscn)) == NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_NEWDATA),
-				    ofl->ofl_name);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_NEWDATA), ofl->ofl_name);
 				return (S_ERROR);
 			}
 			if ((data->d_buf = libld_calloc(size, 1)) == 0)
@@ -180,7 +207,7 @@ pad_outfile(Ofl_desc * ofl)
 			data->d_type = ELF_T_BYTE;
 			data->d_size = size;
 			data->d_align = 1;
-			data->d_version = ofl->ofl_libver;
+			data->d_version = ofl->ofl_dehdr->e_version;
 		}
 
 		/*
@@ -234,7 +261,7 @@ pad_outfile(Ofl_desc * ofl)
  *		becomes a linked list of input data buffers).
  */
 uintptr_t
-create_outfile(Ofl_desc * ofl)
+ld_create_outfile(Ofl_desc * ofl)
 {
 	Listnode *	lnp1, * lnp2, * lnp3;
 	Sg_desc *	sgp;
@@ -268,27 +295,30 @@ create_outfile(Ofl_desc * ofl)
 	/*
 	 * If there are any ordered section, handle them here.
 	 */
-	if ((ofl->ofl_ordered.head != NULL) && (sort_ordered(ofl) == S_ERROR))
+	if ((ofl->ofl_ordered.head != NULL) &&
+	    (ld_sort_ordered(ofl) == S_ERROR))
 		return (S_ERROR);
 
 	/*
 	 * Tell the access library about our new temporary file.
 	 */
 	if ((ofl->ofl_welf = elf_begin(fd, cmd, 0)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), ofl->ofl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
 	/*
 	 * Obtain a new Elf header.
 	 */
-	if ((ofl->ofl_ehdr = elf_newehdr(ofl->ofl_welf)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_NEWEHDR), ofl->ofl_name);
+	if ((ofl->ofl_nehdr = elf_newehdr(ofl->ofl_welf)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_NEWEHDR),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
-	ofl->ofl_ehdr->e_machine = ofl->ofl_e_machine;
+	ofl->ofl_nehdr->e_machine = ofl->ofl_dehdr->e_machine;
 
-	DBG_CALL(Dbg_util_nl());
+	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
 		int	frst = 0;
 		Phdr	*phdr = &(sgp->sg_phdr);
@@ -375,8 +405,8 @@ create_outfile(Ofl_desc * ofl)
 			 * Get a section descriptor for the section.
 			 */
 			if ((scn = elf_newscn(ofl->ofl_welf)) == NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_NEWSCN),
-				    ofl->ofl_name);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_NEWSCN), ofl->ofl_name);
 				return (S_ERROR);
 			}
 			osp->os_scn = scn;
@@ -388,8 +418,8 @@ create_outfile(Ofl_desc * ofl)
 			 * (refer place_section()) we might as well free it up.
 			 */
 			if ((shdr = elf_getshdr(scn)) == NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
-				    ofl->ofl_name);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
 				return (S_ERROR);
 			}
 			*shdr = *(osp->os_shdr);
@@ -443,12 +473,14 @@ create_outfile(Ofl_desc * ofl)
 				    ((ptype == PT_LOAD) &&
 				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
 				    (isp->is_shdr->sh_size > 0)))) {
+					Lm_list	*lml = ofl->ofl_lml;
+
 					if (ifl->ifl_flags & FLG_IF_IGNORE) {
-						isp->is_flags |= FLG_IS_DISCARD;
-						DBG_CALL(Dbg_unused_sec(isp));
-						continue;
+					    isp->is_flags |= FLG_IS_DISCARD;
+					    DBG_CALL(Dbg_unused_sec(lml, isp));
+					    continue;
 					} else
-						DBG_CALL(Dbg_unused_sec(isp));
+					    DBG_CALL(Dbg_unused_sec(lml, isp));
 				}
 
 				dataidx++;
@@ -481,7 +513,7 @@ create_outfile(Ofl_desc * ofl)
 				 * the old data.
 				 */
 				if ((data = elf_newdata(scn)) == NULL) {
-					eprintf(ERR_ELF,
+					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_NEWDATA),
 					    ofl->ofl_name);
 					return (S_ERROR);
@@ -504,7 +536,8 @@ create_outfile(Ofl_desc * ofl)
 				    (isp->is_shdr->sh_flags & SHF_TLS)) {
 					if (tlsdata == 0)
 						tlsdata = data;
-					tlsdata->d_align = lcm(tlsdata->d_align,
+					tlsdata->d_align =
+					    ld_lcm(tlsdata->d_align,
 					    isp->is_shdr->sh_addralign);
 				}
 
@@ -569,8 +602,8 @@ create_outfile(Ofl_desc * ofl)
 	if (nseg) {
 		if ((ofl->ofl_phdr = elf_newphdr(ofl->ofl_welf,
 		    nseg)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_NEWPHDR),
-			    ofl->ofl_name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_NEWPHDR), ofl->ofl_name);
 			return (S_ERROR);
 		}
 	}
@@ -606,7 +639,8 @@ create_outfile(Ofl_desc * ofl)
 	 */
 	if ((ofl->ofl_size = (size_t)elf_update(ofl->ofl_welf,
 	    ELF_C_WRIMAGE)) == (size_t)-1) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_UPDATE), ofl->ofl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_UPDATE),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 
@@ -619,17 +653,19 @@ create_outfile(Ofl_desc * ofl)
 	 */
 	if ((ofl->ofl_elf = elf_begin(0, ELF_C_IMAGE,
 	    ofl->ofl_welf)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), ofl->ofl_name);
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
-	if ((ofl->ofl_ehdr = elf_getehdr(ofl->ofl_elf)) == NULL) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR), ofl->ofl_name);
+	if ((ofl->ofl_nehdr = elf_getehdr(ofl->ofl_elf)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETEHDR),
+		    ofl->ofl_name);
 		return (S_ERROR);
 	}
 	if (!(flags & FLG_OF_RELOBJ))
 		if ((ofl->ofl_phdr = elf_getphdr(ofl->ofl_elf)) == NULL) {
-			eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETPHDR),
-			    ofl->ofl_name);
+			eprintf(ofl->ofl_lml, ERR_ELF,
+			    MSG_INTL(MSG_ELF_GETPHDR), ofl->ofl_name);
 			return (S_ERROR);
 		}
 
@@ -645,14 +681,15 @@ create_outfile(Ofl_desc * ofl)
 		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
 			if ((osp->os_scn = elf_getscn(ofl->ofl_elf, ++ndx)) ==
 			    NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSCN),
-				    ofl->ofl_name, ndx);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_GETSCN), ofl->ofl_name,
+				    ndx);
 				return (S_ERROR);
 			}
 			if ((osp->os_shdr = elf_getshdr(osp->os_scn)) ==
 			    NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETSHDR),
-				    ofl->ofl_name);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_GETSHDR), ofl->ofl_name);
 				return (S_ERROR);
 			}
 			if ((fixalign == TRUE) && (sgp->sg_fscn != 0) &&
@@ -661,7 +698,7 @@ create_outfile(Ofl_desc * ofl)
 
 				scn = sgp->sg_fscn;
 				if ((fndx = elf_ndxscn(scn)) == SHN_UNDEF) {
-					eprintf(ERR_ELF,
+					eprintf(ofl->ofl_lml, ERR_ELF,
 					    MSG_INTL(MSG_ELF_NDXSCN),
 					    ofl->ofl_name);
 					return (S_ERROR);
@@ -674,8 +711,8 @@ create_outfile(Ofl_desc * ofl)
 
 			if ((osp->os_outdata =
 			    elf_getdata(osp->os_scn, NULL)) == NULL) {
-				eprintf(ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
-				    ofl->ofl_name);
+				eprintf(ofl->ofl_lml, ERR_ELF,
+				    MSG_INTL(MSG_ELF_GETDATA), ofl->ofl_name);
 				return (S_ERROR);
 			}
 
@@ -684,7 +721,7 @@ create_outfile(Ofl_desc * ofl)
 			 * that the segments alignment is appropriate.
 			 */
 			if (_phdr->p_type == PT_LOAD) {
-				_phdr->p_align = (Xword)lcm(_phdr->p_align,
+				_phdr->p_align = ld_lcm(_phdr->p_align,
 				    osp->os_shdr->sh_addralign);
 			}
 		}

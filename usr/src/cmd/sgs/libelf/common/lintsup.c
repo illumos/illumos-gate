@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,33 +18,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc. 
- * All rights reserved. 
- */ 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * Supplimental definitions for lint that help us avoid
- * options like `-x' that filter out things we want to
- * know about as well as things we don't.
- */
-
-/*
- * The public interfaces are allowed to be "declared
- * but not used".
- */
 #include <malloc.h>
 #include <link.h>
-
-
-/*
- * These are from libc.so.1, but are not in it's lint
- * library.
- */
-int	__threaded;
-char *	_dgettext(const char *, const char *);
+#include <sgs.h>

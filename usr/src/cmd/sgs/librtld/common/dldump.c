@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * dldump(3c) creates a new file image from the specified input file.
@@ -162,6 +162,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	Addr		edata;
 	char		*shstr, *_shstr, *ipath = NAME(lmp);
 	prstatus_t	*status = 0, _status;
+	Lm_list		*lml = LIST(lmp);
 
 	if (lmp == lml_main.lm_head) {
 		char	proc[16];
@@ -174,7 +175,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		    (int)getpid());
 		if ((pfd = open(proc, O_RDONLY)) == -1) {
 			err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,
 			    strerror(err));
 			return (1);
 		}
@@ -187,7 +188,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		 */
 		if ((fd = ioctl(pfd, PIOCOPENM, (void *)0)) == -1) {
 			err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), ipath,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC), ipath,
 			    strerror(err));
 			(void) close(pfd);
 			return (1);
@@ -204,7 +205,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		if (!(flags & RTLD_NOHEAP)) {
 			if (ioctl(pfd, PIOCSTATUS, (void *)&_status) == -1) {
 				err = errno;
-				eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC),
+				eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC),
 				    ipath, strerror(err));
 				(void) close(fd);
 				(void) close(pfd);
@@ -220,7 +221,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		 */
 		if ((fd = open(ipath, O_RDONLY, 0)) == -1) {
 			err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), ipath,
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), ipath,
 			    strerror(err));
 			return (1);
 		}
@@ -232,7 +233,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 */
 	(void) elf_version(EV_CURRENT);
 	if ((ielf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), ipath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, 0);
 		return (1);
 	}
@@ -241,7 +242,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	if ((elf_kind(ielf) != ELF_K_ELF) ||
 	    ((iehdr = elf_getehdr(ielf)) == NULL) ||
 	    ((iehdr->e_type != ET_EXEC) && (iehdr->e_type != ET_DYN))) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_IMG_ELF), ipath);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_IMG_ELF), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, 0, 0);
 		return (1);
 	}
@@ -251,13 +252,13 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 */
 	if ((fd = open(opath, (O_RDWR | O_CREAT | O_TRUNC), 0777)) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), opath,
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), opath,
 		    strerror(err));
 		cleanup(ielf, oelf, melf, icache, mcache, 0, 0);
 		return (1);
 	}
 	if ((oelf = elf_begin(fd, ELF_C_WRITE, NULL)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -268,7 +269,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * heap section size.
 	 */
 	if ((iphdr = elf_getphdr(ielf)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETPHDR), ipath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETPHDR), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -300,7 +301,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * segment, and would therefore have the wrong permissions).
 	 */
 	if (status && !data_phdr) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_IMG_DATASEG), ipath);
+		eprintf(lml, ERR_WARNING, MSG_INTL(MSG_IMG_DATASEG), ipath);
 		status = 0;
 	}
 
@@ -308,12 +309,12 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * Obtain the input files section header string table.
 	 */
 	if ((scn = elf_getscn(ielf, iehdr->e_shstrndx)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETSCN), ipath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSCN), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
 	if ((data = elf_getdata(scn, NULL)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), ipath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), ipath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -345,13 +346,13 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	for (scn = 0; scn = elf_nextscn(ielf, scn); _icache++) {
 
 		if ((_icache->c_shdr = shdr = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDR), ipath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDR), ipath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
 
 		if ((_icache->c_data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), ipath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), ipath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
@@ -474,7 +475,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * and disable the heap addition.
 	 */
 	if (!data_cache) {
-		eprintf(ERR_WARNING, MSG_INTL(MSG_IMG_DATASEC), ipath);
+		eprintf(lml, ERR_WARNING, MSG_INTL(MSG_IMG_DATASEC), ipath);
 		status = 0;
 		endx = 0;
 	}
@@ -503,7 +504,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * that isn't calculated as part of elf_update().
 	 */
 	if ((oehdr = elf_newehdr(oelf)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_NEWEHDR), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_NEWEHDR), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -520,7 +521,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * and the data segments size to reflect any new heap section.
 	 */
 	if ((ophdr = elf_newphdr(oelf, iehdr->e_phnum)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_NEWPHDR), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_NEWPHDR), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -561,12 +562,12 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		 * Create a matching section header in the output file.
 		 */
 		if ((scn = elf_newscn(oelf)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_NEWSCN), opath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_NEWSCN), opath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
 		if ((shdr = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_NEWSHDR), opath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_NEWSHDR), opath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
@@ -586,7 +587,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 		 * Create a matching data buffer for this section.
 		 */
 		if ((data = elf_newdata(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_NEWDATA), opath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_NEWDATA), opath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
@@ -696,17 +697,17 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * allow us to write and update the new image.
 	 */
 	if (elf_update(oelf, ELF_C_WRIMAGE) == -1) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_UPDATE), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_UPDATE), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
 	if ((melf = elf_begin(0, ELF_C_IMAGE, oelf)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_BEGIN), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
 	if ((mehdr = elf_getehdr(melf)) == NULL) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETEHDR), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETEHDR), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}
@@ -724,13 +725,13 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	for (scn = 0; scn = elf_nextscn(melf, scn); _mcache++) {
 
 		if ((_mcache->c_shdr = elf_getshdr(scn)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDR), opath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETSHDR), opath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
 
 		if ((_mcache->c_data = elf_getdata(scn, NULL)) == NULL) {
-			eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), opath);
+			eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_GETDATA), opath);
 			cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 			return (1);
 		}
@@ -817,7 +818,7 @@ rt_dldump(Rt_map *lmp, const char *opath, int flags, Addr addr)
 	 * Having completed all section updates write the memory file out.
 	 */
 	if (elf_update(oelf, ELF_C_WRITE) == -1) {
-		eprintf(ERR_ELF, MSG_ORIG(MSG_ELF_UPDATE), opath);
+		eprintf(lml, ERR_ELF, MSG_ORIG(MSG_ELF_UPDATE), opath);
 		cleanup(ielf, oelf, melf, icache, mcache, fd, opath);
 		return (1);
 	}

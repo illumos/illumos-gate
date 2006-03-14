@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 2000 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -30,14 +30,38 @@
 #include	"libld.h"
 
 static const char
-	*_Dbg_decl =	NULL;
+	*Dbg_decl =	NULL;
 
 void
-Dbg_map_version(const char *version, const char *name, int scope)
+Dbg_map_set_atsign(Boolean new)
+{
+	if (DBG_NOTCLASS(DBG_C_MAP))
+		return;
+
+	if (new)
+		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_4);
+	else
+		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_5);
+}
+
+void
+Dbg_map_set_equal(Boolean new)
+{
+	if (DBG_NOTCLASS(DBG_C_MAP))
+		return;
+
+	if (new)
+		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_1);
+	else
+		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_2);
+}
+
+void
+Dbg_map_version(Lm_list *lml, const char *version, const char *name, int scope)
 {
 	const char	*str, *scp;
 
-	if (DBG_NOTCLASS(DBG_MAP | DBG_SYMBOLS))
+	if (DBG_NOTCLASS(DBG_C_MAP | DBG_C_SYMBOLS))
 		return;
 
 	str = MSG_INTL(MSG_MAP_SYM_SCOPE);
@@ -47,65 +71,70 @@ Dbg_map_version(const char *version, const char *name, int scope)
 		scp = MSG_ORIG(MSG_SYM_LOCAL);
 
 	if (version)
-		dbg_print(MSG_INTL(MSG_MAP_SYM_VER_1), str, version,
-		    _Dbg_sym_dem(name), scp);
+		dbg_print(lml, MSG_INTL(MSG_MAP_SYM_VER_1), str, version,
+		    Dbg_demangle_name(name), scp);
 	else
-		dbg_print(MSG_INTL(MSG_MAP_SYM_VER_2), str,
-		    _Dbg_sym_dem(name), scp);
+		dbg_print(lml, MSG_INTL(MSG_MAP_SYM_VER_2), str,
+		    Dbg_demangle_name(name), scp);
 }
 
 void
-Dbg_map_size_new(const char *name)
+Dbg_map_size_new(Lm_list *lml, const char *name)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
-	dbg_print(MSG_INTL(MSG_MAP_SYM_SIZE), _Dbg_sym_dem(name),
+	dbg_print(lml, MSG_INTL(MSG_MAP_SYM_SIZE), Dbg_demangle_name(name),
 	    MSG_INTL(MSG_STR_ADD));
 }
 
 void
-Dbg_map_size_old(Ehdr *ehdr, Sym_desc *sdp)
+Dbg_map_size_old(Ofl_desc *ofl, Sym_desc *sdp)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	Lm_list	*lml = ofl->ofl_lml;
+
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
-	dbg_print(MSG_INTL(MSG_MAP_SYM_SIZE), sdp->sd_name,
+	dbg_print(lml, MSG_INTL(MSG_MAP_SYM_SIZE), sdp->sd_name,
 	    MSG_INTL(MSG_STR_UP_1));
 
 	if (DBG_NOTDETAIL())
 		return;
 
-	Elf_sym_table_entry(MSG_INTL(MSG_STR_UP_2), ehdr, sdp->sd_sym,
+	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_UP_2),
+	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, NULL,
-	    conv_deftag_str(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref));
 }
 
-/*
- * Provide for printing mapfile entered symbols when symbol debugging hasn't
- * been enabled.
- */
 void
-Dbg_map_symbol(Ehdr *ehdr, Sym_desc *sdp)
+Dbg_map_symbol(Ofl_desc *ofl, Sym_desc *sdp)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	Lm_list	*lml = ofl->ofl_lml;
+
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	if (DBG_NOTCLASS(DBG_SYMBOLS))
-		Elf_sym_table_entry(MSG_INTL(MSG_STR_ENTERED), ehdr,
-		    sdp->sd_sym,
+	/*
+	 * Provide for printing mapfile entered symbols when symbol debugging
+	 * hasn't been enabled.
+	 */
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+		Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
+		    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 		    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, NULL,
-		    conv_deftag_str(sdp->sd_ref));
+		    conv_def_tag(sdp->sd_ref));
 }
 
 void
-Dbg_map_dash(const char *name, Sdf_desc *sdf)
+Dbg_map_dash(Lm_list *lml, const char *name, Sdf_desc *sdf)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
 	if (sdf->sdf_flags & FLG_SDF_SONAME)
@@ -113,15 +142,15 @@ Dbg_map_dash(const char *name, Sdf_desc *sdf)
 	else
 		str = MSG_INTL(MSG_MAP_CNT_DEF_2);
 
-	dbg_print(str, name, sdf->sdf_soname);
+	dbg_print(lml, str, name, sdf->sdf_soname);
 }
 
 void
-Dbg_map_sort_orig(Sg_desc *sgp)
+Dbg_map_sort_orig(Lm_list *lml, Sg_desc *sgp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -131,15 +160,15 @@ Dbg_map_sort_orig(Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_INTL(MSG_MAP_SORTSEG), str);
+	dbg_print(lml, MSG_INTL(MSG_MAP_SORTSEG), str);
 }
 
 void
-Dbg_map_sort_fini(Sg_desc *sgp)
+Dbg_map_sort_fini(Lm_list *lml, Sg_desc *sgp)
 {
 	const char	*str;
 
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
@@ -149,75 +178,54 @@ Dbg_map_sort_fini(Sg_desc *sgp)
 	else
 		str = MSG_INTL(MSG_STR_NULL);
 
-	dbg_print(MSG_INTL(MSG_MAP_SEGSORT), str);
+	dbg_print(lml, MSG_INTL(MSG_MAP_SEGSORT), str);
 }
 
 void
-Dbg_map_parse(const char *file)
+Dbg_map_parse(Lm_list *lml, const char *file)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
-	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_MAP_MAPFILE), file);
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_MAP_MAPFILE), file);
 }
 
 void
-Dbg_map_equal(Boolean new)
+Dbg_map_ent(Lm_list *lml, Boolean new, Ent_desc *enp, Ofl_desc *ofl)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
+	dbg_print(lml, MSG_INTL(MSG_MAP_MAP_DIR));
+	Dbg_ent_entry(lml, ofl->ofl_dehdr->e_machine, enp);
 	if (new)
-		_Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_1);
-	else
-		_Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_2);
+		Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_3);
 }
 
 void
-Dbg_map_ent(Boolean new, Ent_desc *enp, Ofl_desc *ofl)
+Dbg_map_pipe(Lm_list *lml, Sg_desc *sgp, const char *sec_name, const Word ndx)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
-	dbg_print(MSG_INTL(MSG_MAP_MAP_DIR));
-	_Dbg_ent_entry(ofl->ofl_e_machine, enp);
-	if (new)
-		_Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_3);
-}
-
-void
-Dbg_map_atsign(Boolean new)
-{
-	if (DBG_NOTCLASS(DBG_MAP))
-		return;
-
-	if (new)
-		_Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_4);
-	else
-		_Dbg_decl = MSG_INTL(MSG_MAP_SEG_DECL_5);
-}
-
-void
-Dbg_map_pipe(Sg_desc *sgp, const char *sec_name, const Word ndx)
-{
-	if (DBG_NOTCLASS(DBG_MAP))
-		return;
-
-	dbg_print(MSG_INTL(MSG_MAP_SEC_ORDER), sgp->sg_name, sec_name,
+	dbg_print(lml, MSG_INTL(MSG_MAP_SEC_ORDER), sgp->sg_name, sec_name,
 	    EC_WORD(ndx));
 }
 
 void
-Dbg_map_seg(Half mach, int ndx, Sg_desc *sgp)
+Dbg_map_seg(Ofl_desc *ofl, int ndx, Sg_desc *sgp)
 {
-	if (DBG_NOTCLASS(DBG_MAP))
+	Lm_list	*lml = ofl->ofl_lml;
+
+	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
 
-	if (_Dbg_decl) {
-		dbg_print(MSG_ORIG(MSG_FMT_STR), _Dbg_decl);
-		_Dbg_seg_desc_entry(mach, ndx, sgp);
-		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-		_Dbg_decl = NULL;
+	if (Dbg_decl) {
+		dbg_print(lml, MSG_ORIG(MSG_FMT_STR), Dbg_decl);
+		Dbg_seg_desc_entry(ofl->ofl_lml,
+		    ofl->ofl_dehdr->e_machine, ndx, sgp);
+		Dbg_util_nl(lml, DBG_NL_STD);
+		Dbg_decl = NULL;
 	}
 }

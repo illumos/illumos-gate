@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +111,8 @@ struct ofl_desc {
 	const char	*ofl_name;	/* full file name */
 	Elf		*ofl_elf;	/* elf_memory() elf descriptor */
 	Elf		*ofl_welf;	/* ELF_C_WRITE elf descriptor */
-	Ehdr		*ofl_ehdr;	/* elf header describing this file */
+	Ehdr		*ofl_dehdr;	/* default elf header, and new elf */
+	Ehdr		*ofl_nehdr;	/*	header describing this file */
 	Phdr		*ofl_phdr;	/* program header descriptor */
 	Phdr		*ofl_tlsphdr;	/* TLS phdr */
 	int		ofl_fd;		/* file descriptor */
@@ -161,9 +160,6 @@ struct ofl_desc {
 	Word		ofl_regsymcnt;	/* no. of output register symbols */
 	Word		ofl_lregsymcnt;	/* no. of local register symbols */
 	Sym_desc	*ofl_dtracesym;	/* ld -zdtrace= */
-	Half		ofl_e_machine;	/* elf header e_machine field setting */
-	Word		ofl_e_flags;	/* elf header e_flags field setting */
-	Word		ofl_libver;	/* max version that libelf can handle */
 	Word		ofl_flags;	/* various state bits, args etc. */
 	Word		ofl_flags1;	/*	more flags */
 	Xword		ofl_segorigin;	/* segment origin (start) */
@@ -247,6 +243,7 @@ struct ofl_desc {
 	Alist		*ofl_dtsfltrs;	/*	associated .dynamic/.dynstrs */
 	Xword		ofl_hwcap_1;	/* hardware capabilities */
 	Xword		ofl_sfcap_1;	/* software capabilities */
+	Lm_list		*ofl_lml;	/* runtime link-map list */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -319,8 +316,6 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
-#define	FLG_OF1_DEMANGL	0x00200000	/* demangle C++ sym name diagnostics */
-
 #define	FLG_OF1_NOHDR	0x00800000	/* no elf header/phdr alignment */
 					/*	needed */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
@@ -976,54 +971,55 @@ typedef struct ar_desc {
  */
 #define	FLG_ARD_EXTRACT	0x00010000	/* archive member has been extracted */
 
-
 /*
- * Function Declarations
+ * Function Declarations.
  */
-extern char		*add_string(char *, char *);
-extern uintptr_t	create_outfile(Ofl_desc *);
-extern Elf64_Off	_elf_getxoff(Elf_Data *);
-extern uintptr_t	ent_setup(Ofl_desc *, Xword);
-extern void		eprintf(Error, const char *, ...);
-extern uintptr_t	finish_libs(Ofl_desc *);
-extern int		ld_main(int, char **);
-extern uintptr_t	ld_support_loadso(const char *);
-extern void		lds_start(const char *, const Half, const char *);
-extern void		lds_atexit(int);
-extern void		lds_file(const char *, const Elf_Kind,
-			    int flags, Elf *);
-extern uintptr_t	lds_input_section(const char *, Shdr **, Word,
-			    const char *, Elf_Scn *, Elf *, Ofl_desc *);
-extern void		lds_input_done(void);
-extern void		lds_section(const char *, Shdr *, Word, Elf_Data *,
-			    Elf *);
-extern Listnode		*list_appendc(List *, const void *);
-extern Listnode		*list_insertc(List *, const void *, Listnode *);
-extern Listnode		*list_prependc(List *, const void *);
-extern Listnode		*list_where(List *, Word);
-extern uintptr_t	make_sections(Ofl_desc *);
-extern void		ofl_cleanup(Ofl_desc *);
-extern uintptr_t	open_outfile(Ofl_desc *);
-extern Ifl_desc		*process_open(const char *, size_t, int, Ofl_desc *,
+#if	defined(_ELF64)
+
+#define	ld_create_outfile	ld64_create_outfile
+#define	ld_ent_setup		ld64_ent_setup
+#define	ld_ofl_cleanup		ld64_ofl_cleanup
+#define	ld_make_sections	ld64_make_sections
+#define	ld_main			ld64_main
+#define	ld_process_open		ld64_process_open
+#define	ld_reloc_init		ld64_reloc_init
+#define	ld_reloc_process	ld64_reloc_process
+#define	ld_sym_add_u		ld64_sym_add_u
+#define	ld_sym_validate		ld64_sym_validate
+#define	ld_update_outfile	ld64_update_outfile
+
+#else
+
+#define	ld_create_outfile	ld32_create_outfile
+#define	ld_ent_setup		ld32_ent_setup
+#define	ld_ofl_cleanup		ld32_ofl_cleanup
+#define	ld_make_sections	ld32_make_sections
+#define	ld_main			ld32_main
+#define	ld_process_open		ld32_process_open
+#define	ld_reloc_init		ld32_reloc_init
+#define	ld_reloc_process	ld32_reloc_process
+#define	ld_sym_add_u		ld32_sym_add_u
+#define	ld_sym_validate		ld32_sym_validate
+#define	ld_update_outfile	ld32_update_outfile
+
+#endif
+
+extern int		ld32_main(int, char **);
+extern int		ld64_main(int, char **);
+
+extern uintptr_t	ld_create_outfile(Ofl_desc *);
+extern uintptr_t	ld_ent_setup(Ofl_desc *, Xword);
+extern void		ld_ofl_cleanup(Ofl_desc *);
+extern uintptr_t	ld_make_sections(Ofl_desc *);
+extern Ifl_desc		*ld_process_open(const char *, size_t, int, Ofl_desc *,
 			    Half, Rej_desc *);
-extern uintptr_t	reloc_init(Ofl_desc *);
-extern uintptr_t	reloc_process(Ofl_desc *);
-extern Sdf_desc		*sdf_find(const char *, List *);
-extern Sdf_desc		*sdf_add(const char *, List *);
-extern void		sec_validate(Ofl_desc *);
-extern uintptr_t	sunwmove_preprocess(Ofl_desc *);
-extern Sym_desc		*sym_add_u(const char *, Ofl_desc *);
-extern Sym_desc		*sym_enter(const char *, Sym *, Word, Ifl_desc *,
-			    Ofl_desc *, Word, Word, Word, Half,
-			    avl_index_t *);
-extern Sym_desc		*sym_find(const char *, Word, avl_index_t *,
-			    Ofl_desc *);
-extern uintptr_t	sym_validate(Ofl_desc *);
-extern uintptr_t	update_outfile(Ofl_desc *);
-extern Ver_desc		*vers_base(Ofl_desc *);
-extern uintptr_t	vers_check_defs(Ofl_desc *);
-extern Ver_desc		*vers_desc(const char *, Word, List *);
-extern Ver_desc		*vers_find(const char *, Word, List *);
+extern uintptr_t	ld_reloc_init(Ofl_desc *);
+extern uintptr_t	ld_reloc_process(Ofl_desc *);
+extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *);
+extern uintptr_t	ld_sym_validate(Ofl_desc *);
+extern uintptr_t	ld_update_outfile(Ofl_desc *);
+
+extern Elf64_Off	_elf_getxoff(Elf_Data *);
 
 #ifdef	__cplusplus
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,13 +48,13 @@
 #include	<dlfcn.h>
 #include	<sys/sysconfig.h>
 #include	<sys/auxv.h>
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"_a.out.h"
 #include	"msg.h"
-#include	"debug.h"
-#include	"conv.h"
 
 
 extern int	_end, _edata, _etext;
@@ -84,7 +83,7 @@ preload(const char *str, Rt_map *lmp)
 	Word		lmflags = lml_main.lm_flags;
 	uint_t		flags;
 
-	DBG_CALL(Dbg_util_nl());
+	DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
 	if ((objs = strdup(str)) == 0)
 		return (0);
@@ -105,7 +104,7 @@ preload(const char *str, Rt_map *lmp)
 		Pnode	*pnp;
 		Rt_map	*nlmp = 0;
 
-		DBG_CALL(Dbg_file_preload(ptr));
+		DBG_CALL(Dbg_file_preload(&lml_main, ptr));
 
 		/*
 		 * If this a secure application, then preload errors are
@@ -301,12 +300,16 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	    AL_CNT_LMLISTS) == 0)
 		return (0);
 	lml_main.lm_flags |= LML_FLG_BASELM;
+	lml_main.lm_lmid = LM_ID_BASE;
+	lml_main.lm_lmidstr = (char *)MSG_ORIG(MSG_LMID_BASE);
 
 	if (alist_append(&lml_rtld.lm_lists, 0, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS) == 0)
 		return (0);
 	lml_rtld.lm_flags |= (LML_FLG_RTLDLM | LML_FLG_NOAUDIT |
 	    LML_FLG_HOLDLOCK);
+	lml_rtld.lm_lmid = LM_ID_LDSO;
+	lml_rtld.lm_lmidstr = (char *)MSG_ORIG(MSG_LMID_LDSO);
 
 	/*
 	 * Determine whether we have a secure executable.
@@ -379,7 +382,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 */
 		if (rtld_getopt(argv, &envp, &auxv, &(lml_main.lm_flags),
 		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1) {
-			eprintf(ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
+			eprintf(&lml_main, ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
 			return (0);
 		}
 		_environ = envp;
@@ -391,8 +394,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 		if ((fd = open(argvname, O_RDONLY)) == -1) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), argvname,
-			    strerror(err));
+			eprintf(&lml_main, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
+			    argvname, strerror(err));
 			return (0);
 		}
 	}
@@ -410,8 +413,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 */
 		(void) fstat(fd, &status);
 		if ((ftp = are_u_this(&rej, fd, &status, argvname)) == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(err_reject[rej.rej_type]),
-			    argvname, conv_reject_str(&rej));
+			eprintf(&lml_main, ERR_FATAL,
+			    MSG_INTL(err_reject[rej.rej_type]), argvname,
+			    conv_reject_desc(&rej));
 			return (0);
 		}
 
@@ -465,8 +469,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 			if (_brk_unlocked((void *)brkbase) == -1) {
 				int	err = errno;
-				eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_BRK),
-				    argvname, strerror(err));
+				eprintf(&lml_main, ERR_FATAL,
+				    MSG_INTL(MSG_SYS_BRK), argvname,
+				    strerror(err));
 			}
 		}
 
@@ -514,8 +519,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			 */
 			lml_main.lm_tflags |= LML_TFLG_NODIRECT;
 #else
-			eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_REJ_UNKFILE),
-			    argvname);
+			eprintf(&lml_main, ERR_FATAL,
+			    MSG_INTL(MSG_ERR_REJ_UNKFILE), argvname);
 			return (0);
 #endif
 		} else if (phdr) {
@@ -694,13 +699,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		ulong_t	mhwcap;
 
 		if ((mhwcap = (HWCAP(mlmp) & ~hwcap)) != 0) {
+			const char	*str = conv_cap_val_hw1(mhwcap, M_MACH);
+
 			if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
 				(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
-				    NAME(mlmp),
-				    conv_hwcap_1_str(mhwcap, M_MACH));
+				    NAME(mlmp), str);
 			} else {
-				eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_BADHWCAP_1),
-				    conv_hwcap_1_str(mhwcap, M_MACH));
+				eprintf(&lml_main, ERR_FATAL,
+				    MSG_INTL(MSG_GEN_BADHWCAP_1), str);
 				return (0);
 			}
 		}
@@ -803,34 +809,56 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	/*
 	 * If debugging was requested initialize things now that any cache has
-	 * been established.
+	 * been established.  A user can specify LD_DEBUG=help to discover the
+	 * list of debugging tokens available without running the application.
+	 * However, don't allow this setting from a configuration file.
+	 *
+	 * Note, to prevent recursion issues caused by loading and binding the
+	 * debugging libraries themselves, a local debugging descriptor is
+	 * initialized.  Once the debugging setup has completed, this local
+	 * descriptor is copied to the global descriptor which effectively
+	 * enables diagnostic output.
 	 */
-	if (rpl_debug)
-		dbg_mask |= dbg_setup(rpl_debug);
-	if (prm_debug)
-		dbg_mask |= dbg_setup(prm_debug);
+	if (rpl_debug || prm_debug) {
+		Dbg_desc	_dbg_desc = {0, 0, 0};
+
+		if (rpl_debug) {
+			uintptr_t	ret;
+
+			if ((ret = dbg_setup(rpl_debug, &_dbg_desc)) == S_ERROR)
+				return (0);
+			if (ret == 0)
+				rtldexit(&lml_main, 0);
+		}
+		if (prm_debug)
+			(void) dbg_setup(prm_debug, &_dbg_desc);
+
+		*dbg_desc = _dbg_desc;
+	}
 
 	/*
 	 * Now that debugging is enabled generate any diagnostics from any
 	 * previous events.
 	 */
 	if (hwcap)
-		DBG_CALL(Dbg_cap_hw_1(hwcap, M_MACH));
+		DBG_CALL(Dbg_cap_val_hw1(&lml_main, hwcap, M_MACH));
 	if (features)
-		DBG_CALL(Dbg_file_config_dis(config->c_name, features));
+		DBG_CALL(Dbg_file_config_dis(&lml_main, config->c_name,
+		    features));
 
-	if (dbg_mask) {
-		DBG_CALL(Dbg_file_ldso(PATHNAME(rlmp), (ulong_t)DYN(rlmp),
-		    ADDR(rlmp), envp, auxv));
+	if (DBG_ENABLED) {
+		DBG_CALL(Dbg_file_ldso(rlmp, envp, auxv,
+		    LIST(rlmp)->lm_lmidstr, ALO_DATA));
 
 		if (FCT(mlmp) == &elf_fct) {
-			DBG_CALL(Dbg_file_elf(PATHNAME(mlmp),
+			DBG_CALL(Dbg_file_elf(&lml_main, PATHNAME(mlmp),
 			    (ulong_t)DYN(mlmp), ADDR(mlmp), MSIZE(mlmp),
-			    ENTRY(mlmp), get_linkmap_id(LIST(mlmp)), ALO_DATA));
+			    ENTRY(mlmp), LIST(mlmp)->lm_lmidstr, ALO_DATA));
 		} else {
-			DBG_CALL(Dbg_file_aout(PATHNAME(mlmp),
+			DBG_CALL(Dbg_file_aout(&lml_main, PATHNAME(mlmp),
 			    (ulong_t)AOUTDYN(mlmp), (ulong_t)ADDR(mlmp),
-			    (ulong_t)MSIZE(mlmp)));
+			    (ulong_t)MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
+			    ALO_DATA));
 		}
 	}
 
@@ -922,7 +950,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if ((rtld_flags & RT_FL_CONFGEN) == 0) {
 		Word	lmflags;
 
-		DBG_CALL(Dbg_file_nl());
+		DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
 		if (relocate_lmc(&lml_main, ALO_DATA, mlmp) == 0)
 			return (0);
@@ -996,7 +1024,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	unused(&lml_main);
 
-	DBG_CALL(Dbg_util_call_main(NAME(mlmp)));
+	DBG_CALL(Dbg_util_call_main(mlmp));
 
 	leave(LIST(mlmp));
 

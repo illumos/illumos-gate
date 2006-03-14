@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,104 +18,69 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-BASEPLAT=	i386
+E_TOOLOBJS =	leb128.o
+L_MACHOBJS32 =	machrel.intel32.o	machsym.intel32.o
+L_MACHOBJS64 =	machrel.amd64.o		machsym.intel64.o	unwind.amd64.o
 
-include		$(SRC)/cmd/sgs/libld/Makefile.com
-COPTFLAG=
-
-LIB64=		libld.so.3
-$(LIB64) :=	SONAME = $(LIB64)
-
-L_MACHSRCS32=	machrel.c machsym.c
-L_MACHSRCS64=	../amd64/machrel.c machsym.c ../amd64/amd64unwind.c \
-		../../tools/common/leb128.c
-
-CHKSRCS =  machrel.c ../amd64/machrel.c ../amd64/amd64unwind.c \
-	    ../../tools/common/leb128.c
-
-PICS64=		$(OBJECTS:%=pics64/%) pics64/amd64unwind.o pics64/leb128.o
-$(PICS64) :=	i386_CFLAGS += $(C_PICFLAGS)
-CTFMERGE_LIB64= $(CTFMERGE) -t -f -L VERSION -o $@ $(PICS64)
-$(PICS64)  :=	CFLAGS += $(CTF_FLAGS)
-$(PICS64)  :=	CFLAGS64 += $(CTF_FLAGS)
-$(PICS64)  :=	CTFCONVERT_POST = $(CTFCONVERT_O)
-$(LIB64)   :=	CTFMERGE_POST = $(CTFMERGE_LIB64)
-$(PICS64) :=	CPPFLAGS +=	-I../../../../uts/intel/amd64/krtld
-$(PICS64) :=	CPPFLAGS += -DELF_TARGET_AMD64
-
-SGSMSGTARG +=	$(SGSMSGINTEL)
-
-.PARALLEL:	$(PICS64)
-
-ROOTFS_DYNLIB64=	$(ROOTFS_LIBDIR)/$(LIB64)
-$(ROOTFS_DYNLIB64) :=	FILEMODE= 755
-
-$(PICS) :=	CPPFLAGS += -I../../../../uts/$(PLAT)/krtld
-$(LINTOUT32) :=	CPPFLAGS += -I../../../../uts/$(PLAT)/krtld
-$(LINTOUT64) :=	CPPFLAGS += -I../../../../uts/$(PLAT)/krtld \
-		-DELF_TARGET_AMD64
+include		../Makefile.com
 
 .KEEP_STATE:
 
-all:		$(DYNLIB) $(LIBLINKS) $(LIB64)
+SGSMSGCHK =	../common/libld.chk.msg
+SGSMSGTARG +=	$(SGSMSGINTEL)
 
-$(LIB64) $(SGSPROTO)/$(LIB64): \
-		pics64 .WAIT $$(PICS64) $(MAPFILES)
-		$(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS64) $(LDLIBS)
-		$(POST_PROCESS_SO)
+#
+# For cross-compilation, it is necessary to trigger the correct include files
+# (see sys/elf.h).
+#
+ELFTARGET64 =	-DELF_TARGET_AMD64
+ELFTARGET32 =	-DELF_TARGET_386
 
-native:		$(SGSPROTO)/$(DYNLIB) $(SGSPROTO)/$(LIB64)
-
-native-proto:
-		-@mkdir -p proto/$(MACH) proto/$(MACH64)
-
-
-lint:		$(LINTLIB64) $(LINTOUT64)
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
-pics64:
-		-@mkdir -p $@
-
-clean: clean64
-
-clean64:
-		-$(RM) $(PICS64)
-
-clobber:	clobber64
-
-clobber64:
-		-$(RM) $(LIB64)
-
-delete:
-		$(RM) $(DYNLIB) $(LIB64)
+all:		$(DYNLIB) $(LIBLINKS)
 
 install \
-package:	all $(ROOTFS_DYNLIB) $(ROOTFS_DYNLIB64)
+package:	all $(ROOTFS_DYNLIB)
 
-#
-# Grab 64bit amd64 files for libld.so.3
-#
-pics64/amd64unwind.o: ../amd64/amd64unwind.c
-		$(COMPILE.c) -o $@ -D_ELF64 ../amd64/amd64unwind.c
+include		../Makefile.targ
+
+# Associate ELF32 and ELF64 objects to the appropriate headers.
+
+pics/%32.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld
+pics/%64.o :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld
+
+# Associate the various lint targets with the appropriate headers/files.
+
+$(LINTOUT32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld \
+		    $(ELFTARGET32)
+$(LINTOUT64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld \
+		    $(ELFTARGET64) -D_ELF64
+$(LINTLIB32) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld \
+		    $(ELFTARGET32)
+$(LINTLIB64) :=	CPPFLAGS += -I$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld \
+		    $(ELFTARGET64) -D_ELF64
+
+LINTSRCS32 +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c)
+LINTSRCS64 +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c)
+
+# Compensate chkmsg with the doreloc family.
+
+CHKSRCS +=	$(G_MACHOBJS32:%32.o=$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c)
+CHKSRCS +=	$(G_MACHOBJS64:%64.o=$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c)
+
+pics/%32.o: \
+		$(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET32) $<
 		$(POST_PROCESS_O)
 
-pics64/machrel.o: ../amd64/machrel.c
-		$(COMPILE.c) -o $@ -D_ELF64 ../amd64/machrel.c
-		$(POST_PROCESS_O)
-
-include		$(SRC)/cmd/sgs/libld/Makefile.targ
-
-pics64/%.o:	$(SRCBASE)/uts/intel/amd64/krtld/%.c
-		$(COMPILE.c) -o $@ -D_ELF64 $<
-		$(POST_PROCESS_O)
-
-pics/%.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
-		$(COMPILE.c) -o $@ $<
+pics/%64.o: \
+		$(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld/%.c
+		$(COMPILE.c) -o $@ $(ELFTARGET64) -D_ELF64 $<
 		$(POST_PROCESS_O)

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,11 +40,10 @@ include		$(SRC)/cmd/sgs/Makefile.com
 MAPFILE=	../common/mapfile-vers
 
 DYNFLAGS +=	-M$(MAPFILE) $(VERSREF)
-LDLIBS +=	$(CONVLIBDIR) -lconv -lc
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
-LINTFLAGS +=	-u
-LINTFLAGS64 +=	-u
-
+LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
+LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
@@ -53,14 +52,13 @@ BLTFILES=	$(BLTDEFS) $(BLTDATA)
 
 SGSMSGCOM=	../common/librtld_db.msg
 SGSMSGINTEL=	../common/librtld_db.intel.msg
-SGSMSGSPARC=	../common/librtld_db.sparc.msg
+SGSMSGSPARCV9=	../common/librtld_db.sparcv9.msg
 SGSMSGTARG=	$(SGSMSGCOM)
 SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA)
 
 SRCS=		../common/llib-lrtld_db
-LINTSRCS=	$(COMOBJS:%.o=../common/%.c) $(PLTSRCS) \
-		$(BLTDATA) ../common/lintsup.c
+LINTSRCS=	$(COMOBJS:%.o=../common/%.c) $(PLTSRCS) $(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES) $(LINTOUTS)
 CLOBBERFILES +=	$(DYNLIB) $(LINTLIB)

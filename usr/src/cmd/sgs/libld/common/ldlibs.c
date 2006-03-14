@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +38,7 @@
 #include	<string.h>
 #include	<limits.h>
 #include	<errno.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -56,7 +55,7 @@ static Listnode *	insert_lib;
  * documented anymore makes it even more unlikely this processing will occur.
  */
 static char *
-compat_YL_YU(char *path, int index)
+compat_YL_YU(Ofl_desc *ofl, char *path, int index)
 {
 	if (index == YLDIR) {
 		if (Llibdir) {
@@ -65,7 +64,8 @@ compat_YL_YU(char *path, int index)
 			 * corresponds for compatibility to -YL (as defined in
 			 * sgs/include/paths.h)
 			 */
-			DBG_CALL(Dbg_libs_ylu(Llibdir, path, index));
+			DBG_CALL(Dbg_libs_ylu(ofl->ofl_lml, Llibdir,
+			    path, index));
 			return (Llibdir);
 		}
 	} else if (index == YUDIR) {
@@ -75,7 +75,8 @@ compat_YL_YU(char *path, int index)
 			 * corresponds for compatibility to -YU (as defined in
 			 * sgs/include/paths.h)
 			 */
-			DBG_CALL(Dbg_libs_ylu(Ulibdir, path, index));
+			DBG_CALL(Dbg_libs_ylu(ofl->ofl_lml, Ulibdir,
+			    path, index));
 			return (Ulibdir);
 		}
 	}
@@ -83,7 +84,7 @@ compat_YL_YU(char *path, int index)
 }
 
 static char *
-process_lib_path(List *list, char *path, Boolean subsflag)
+process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
 {
 	int	i;
 	char	*cp;
@@ -95,12 +96,12 @@ process_lib_path(List *list, char *path, Boolean subsflag)
 		if (cp == NULL) {
 			if (*path == '\0') {
 				if (seenflg)
-					if (list_appendc(list, subsflag ?
-					    compat_YL_YU(dot, i) : dot) == 0)
-						return ((char *)S_ERROR);
+				    if (list_appendc(list, subsflag ?
+					compat_YL_YU(ofl, dot, i) : dot) == 0)
+					    return ((char *)S_ERROR);
 			} else
 				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(path, i) : path) == 0)
+				    compat_YL_YU(ofl, path, i) : path) == 0)
 					return ((char *)S_ERROR);
 			return (cp);
 		}
@@ -109,11 +110,11 @@ process_lib_path(List *list, char *path, Boolean subsflag)
 			*cp = '\0';
 			if (cp == path) {
 				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(dot, i) : dot) == 0)
+				    compat_YL_YU(ofl, dot, i) : dot) == 0)
 					return ((char *)S_ERROR);
 			} else {
 				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(path, i) : path) == 0)
+				    compat_YL_YU(ofl, path, i) : path) == 0)
 					return ((char *)S_ERROR);
 			}
 			path = cp + 1;
@@ -125,12 +126,12 @@ process_lib_path(List *list, char *path, Boolean subsflag)
 
 		if (cp != path) {
 			if (list_appendc(list, subsflag ?
-			    compat_YL_YU(path, i) : path) == 0)
+			    compat_YL_YU(ofl, path, i) : path) == 0)
 				return ((char *)S_ERROR);
 		} else {
 			if (seenflg)
 				if (list_appendc(list, subsflag ?
-				    compat_YL_YU(dot, i) : dot) == 0)
+				    compat_YL_YU(ofl, dot, i) : dot) == 0)
 					return ((char *)S_ERROR);
 		}
 		return (cp);
@@ -143,7 +144,7 @@ process_lib_path(List *list, char *path, Boolean subsflag)
  * adds the indicated path to those to be searched for libraries.
  */
 uintptr_t
-add_libdir(Ofl_desc *ofl, const char *path)
+ld_add_libdir(Ofl_desc *ofl, const char *path)
 {
 	if (insert_lib == NULL) {
 		if (list_prependc(&ofl->ofl_ulibdirs, path) == 0)
@@ -158,7 +159,8 @@ add_libdir(Ofl_desc *ofl, const char *path)
 	 * As -l and -L options can be interspersed, print the library
 	 * search paths each time a new path is added.
 	 */
-	DBG_CALL(Dbg_libs_update(&ofl->ofl_ulibdirs, &ofl->ofl_dlibdirs));
+	DBG_CALL(Dbg_libs_update(ofl->ofl_lml, &ofl->ofl_ulibdirs,
+	    &ofl->ofl_dlibdirs));
 	return (1);
 }
 
@@ -194,14 +196,14 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 	if (ofl->ofl_flags & FLG_OF_DYNLIBS) {
 		(void) snprintf(path, (PATH_MAX + 2), MSG_ORIG(MSG_STR_LIB_SO),
 		    _dir, file);
-		DBG_CALL(Dbg_libs_l(file, path));
+		DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 		if ((fd = open(path, O_RDONLY)) != -1) {
 
 			if ((_path = libld_malloc(strlen(path) + 1)) == 0)
 				return ((Ifl_desc *)S_ERROR);
 			(void) strcpy(_path, path);
 
-			ifl = process_open(_path, dlen, fd, ofl,
+			ifl = ld_process_open(_path, dlen, fd, ofl,
 			    FLG_IF_NEEDED, rej);
 			(void) close(fd);
 			return (ifl);
@@ -223,14 +225,14 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 	 */
 	(void) snprintf(path, (PATH_MAX + 2), MSG_ORIG(MSG_STR_LIB_A),
 	    _dir, file);
-	DBG_CALL(Dbg_libs_l(file, path));
+	DBG_CALL(Dbg_libs_l(ofl->ofl_lml, file, path));
 	if ((fd = open(path, O_RDONLY)) != -1) {
 
 		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
 
-		ifl = process_open(_path, dlen, fd, ofl, FLG_IF_NEEDED, rej);
+		ifl = ld_process_open(_path, dlen, fd, ofl, FLG_IF_NEEDED, rej);
 		(void) close(fd);
 		return (ifl);
 
@@ -261,7 +263,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
  * otherwise process the file appropriately depending on its type.
  */
 uintptr_t
-find_library(const char *name, Ofl_desc *ofl)
+ld_find_library(const char *name, Ofl_desc *ofl)
 {
 	Listnode	*lnp;
 	char		*path;
@@ -303,11 +305,12 @@ find_library(const char *name, Ofl_desc *ofl)
 	 * diagnostic.
 	 */
 	if (rej.rej_type)
-		eprintf(ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_str(&rej));
+		    conv_reject_desc(&rej));
 	else
-		eprintf(ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND), name);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND),
+		    name);
 
 	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (0);
@@ -330,7 +333,7 @@ find_library(const char *name, Ofl_desc *ofl)
  * all taken as dirlist2.
  */
 uintptr_t
-lib_setup(Ofl_desc * ofl)
+ld_lib_setup(Ofl_desc * ofl)
 {
 	char	*path, *cp = NULL;
 
@@ -350,13 +353,13 @@ lib_setup(Ofl_desc * ofl)
 		if ((path = libld_malloc(strlen(cp) + 1)) == 0)
 			return (S_ERROR);
 		(void) strcpy(path, cp);
-		DBG_CALL(Dbg_libs_path(path, LA_SER_DEFAULT, 0));
+		DBG_CALL(Dbg_libs_path(ofl->ofl_lml, path, LA_SER_DEFAULT, 0));
 
 		/*
 		 * Process the first path string (anything up to a null or
 		 * a `;');
 		 */
-		path = process_lib_path(&ofl->ofl_ulibdirs, path, FALSE);
+		path = process_lib_path(ofl, &ofl->ofl_ulibdirs, path, FALSE);
 
 
 		/*
@@ -369,25 +372,28 @@ lib_setup(Ofl_desc * ofl)
 			insert_lib = ofl->ofl_ulibdirs.tail;
 			*path = '\0';
 			++path;
-			cp = process_lib_path(&ofl->ofl_ulibdirs, path, FALSE);
+			cp = process_lib_path(ofl, &ofl->ofl_ulibdirs, path,
+			    FALSE);
 			if (cp == (char *)S_ERROR)
 				return (S_ERROR);
 			else if (cp)
-				eprintf(ERR_WARNING, MSG_INTL(MSG_LIB_MALFORM));
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_LIB_MALFORM));
 		}
 	}
 
 	/*
 	 * Add the default LIBPATH or any -YP supplied path.
 	 */
-	DBG_CALL(Dbg_libs_yp(Plibpath));
-	cp = process_lib_path(&ofl->ofl_dlibdirs, Plibpath, TRUE);
+	DBG_CALL(Dbg_libs_yp(ofl->ofl_lml, Plibpath));
+	cp = process_lib_path(ofl, &ofl->ofl_dlibdirs, Plibpath, TRUE);
 	if (cp == (char *)S_ERROR)
 		return (S_ERROR);
 	else if (cp) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_LIB_BADYP));
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_BADYP));
 		return (S_ERROR);
 	}
-	DBG_CALL(Dbg_libs_init(&ofl->ofl_ulibdirs, &ofl->ofl_dlibdirs));
+	DBG_CALL(Dbg_libs_init(ofl->ofl_lml, &ofl->ofl_ulibdirs,
+	    &ofl->ofl_dlibdirs));
 	return (1);
 }

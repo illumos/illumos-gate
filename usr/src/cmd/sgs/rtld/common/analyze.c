@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,12 +40,12 @@
 #include	<dlfcn.h>
 #include	<errno.h>
 #include	<link.h>
+#include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
 #include	"msg.h"
-#include	"debug.h"
-#include	"conv.h"
 
 static Fct *	vector[] = {
 	&elf_fct,
@@ -360,7 +359,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 		else
 			tracing = 0;
 
-		DBG_CALL(Dbg_util_nl());
+		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
 		for (ALIST_TRAVERSE(COPY(nlmp), off1, lmpp)) {
 			Rt_map *	lmp = *lmpp;
@@ -375,8 +374,8 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 				 * filled memory.
 				 */
 				zero = copy_zerobits(rcp->r_dlmp, rcp->r_dsym);
-				DBG_CALL(Dbg_reloc_copy(NAME(rcp->r_dlmp),
-				    NAME(nlmp), rcp->r_name, zero));
+				DBG_CALL(Dbg_reloc_copy(rcp->r_dlmp, nlmp,
+				    rcp->r_name, zero));
 				if (zero)
 					continue;
 
@@ -392,7 +391,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 			}
 		}
 
-		DBG_CALL(Dbg_util_nl());
+		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
 		free(COPY(nlmp));
 		COPY(nlmp) = 0;
@@ -860,7 +859,7 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 	if (rej) {
 		/* LINTED */
 		(void) snprintf(_reject, PATH_MAX,
-		    MSG_INTL(ldd_reject[rej->rej_type]), conv_reject_str(rej));
+		    MSG_INTL(ldd_reject[rej->rej_type]), conv_reject_desc(rej));
 		if (rej->rej_name)
 			path = rej->rej_name;
 		reject = (char *)_reject;
@@ -924,7 +923,7 @@ update_mode(Rt_map *lmp, int omode, int nmode)
 	pmode |= ((~omode & nmode) &
 	    (RTLD_GLOBAL | RTLD_WORLD | RTLD_NODELETE));
 	if (pmode) {
-		DBG_CALL(Dbg_file_mode_promote(NAME(lmp), pmode));
+		DBG_CALL(Dbg_file_mode_promote(lmp, pmode));
 		MODE(lmp) |= pmode;
 	}
 
@@ -1119,16 +1118,16 @@ file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
 	}
 
 	if (rej->rej_type) {
-		eprintf(ERR_FATAL, MSG_INTL(err_reject[rej->rej_type]),
+		eprintf(lml, ERR_FATAL, MSG_INTL(err_reject[rej->rej_type]),
 		    rej->rej_name ? rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_str(rej));
+		    conv_reject_desc(rej));
 		return;
 	}
 
 	if (secure)
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SEC_OPEN), name);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SEC_OPEN), name);
 	else
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), name,
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), name,
 		    strerror(ENOENT));
 }
 
@@ -1142,7 +1141,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 	fdesc->fd_oname = oname;
 
 	if ((err == 0) && (fdesc->fd_flags & FLG_FD_ALTER))
-		DBG_CALL(Dbg_file_config_obj(oname, 0, nname));
+		DBG_CALL(Dbg_file_config_obj(lml, oname, 0, nname));
 
 	/*
 	 * If we're dealing with a full pathname, determine whether this
@@ -1197,8 +1196,8 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 					    &added) == 0)
 						return (0);
 					if (added)
-						DBG_CALL(Dbg_file_skip(nname,
-						    NAME(nlmp)));
+					    DBG_CALL(Dbg_file_skip(LIST(nlmp),
+						NAME(nlmp), nname));
 					fdesc->fd_nname = nname;
 					fdesc->fd_lmp = nlmp;
 					return (1);
@@ -1232,7 +1231,8 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				if ((nname[0] == '/') && (fpavl_insert(lml,
 				    nlmp, nname, 0) == 0))
 					return (0);
-				DBG_CALL(Dbg_file_skip(nname, NAME(nlmp)));
+				DBG_CALL(Dbg_file_skip(LIST(nlmp), NAME(nlmp),
+				    nname));
 			}
 			fdesc->fd_nname = nname;
 			fdesc->fd_lmp = nlmp;
@@ -1283,7 +1283,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 	if (rej->rej_type) {
 		rej->rej_name = nname;
 		rej->rej_flag = (fdesc->fd_flags & FLG_FD_ALTER);
-		DBG_CALL(Dbg_file_rejected(rej));
+		DBG_CALL(Dbg_file_rejected(lml, rej));
 	}
 	return (0);
 }
@@ -1329,7 +1329,8 @@ find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 				 * as optional, fall through to open the
 				 * original path.
 				 */
-				DBG_CALL(Dbg_libs_found(aname, FLG_FD_ALTER));
+				DBG_CALL(Dbg_libs_found(lml, aname,
+				    FLG_FD_ALTER));
 				if (((ret = file_open(0, lml, oname, aname,
 				    clmp, flags, fdesc, rej)) != 0) ||
 				    ((obj->co_flags & RTC_OBJ_OPTINAL) == 0))
@@ -1339,7 +1340,7 @@ find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 			}
 		}
 	}
-	DBG_CALL(Dbg_libs_found(oname, 0));
+	DBG_CALL(Dbg_libs_found(lml, oname, 0));
 	return (file_open(err, lml, oname, oname, clmp, flags, fdesc, rej));
 }
 
@@ -1350,7 +1351,7 @@ static int
 _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
     uint_t flags, Fdesc * fdesc, Rej_desc *rej, Pnode * dir, int aflag)
 {
-	DBG_CALL(Dbg_libs_found(nname, aflag));
+	DBG_CALL(Dbg_libs_found(lml, nname, aflag));
 	if ((lml->lm_flags & LML_FLG_TRC_SEARCH) &&
 	    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)) {
 		(void) printf(MSG_INTL(MSG_LDD_PTH_TRYING), nname, aflag ?
@@ -1466,7 +1467,7 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 	 * Protect ourselves from building an invalid pathname.
 	 */
 	if ((olen + dir->p_len + 1) >= PATH_MAX) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), nname,
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), nname,
 		    strerror(ENAMETOOLONG));
 			return (0);
 	}
@@ -1720,7 +1721,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 #if	!defined(ISSOLOAD_BASENAME_DISABLED)
 		Rt_map		*nlmp;
 #endif
-		DBG_CALL(Dbg_libs_find(oname));
+		DBG_CALL(Dbg_libs_find(lml, oname));
 
 #if	!defined(ISSOLOAD_BASENAME_DISABLED)
 		if ((nlmp = is_so_loaded(lml, oname, 0)))
@@ -1824,7 +1825,8 @@ load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
 		 * The auditor can indicate that this object should be ignored.
 		 */
 		if ((_name = audit_objsearch(clmp, name, LA_SER_ORIG)) == 0) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_AUDITERM), name);
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_AUDITERM),
+			    name);
 			return (0);
 		}
 
@@ -2092,7 +2094,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_name = name;
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = MSG_INTL(MSG_GEN_NOOPEN);
-			DBG_CALL(Dbg_file_rejected(&_rej));
+			DBG_CALL(Dbg_file_rejected(lml, &_rej));
 			rejection_inherit(rej, &_rej, nfdp);
 			remove_so(lml, nlmp);
 			return (0);
@@ -2125,7 +2127,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_name = name;
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = strerror(ENOENT);
-			DBG_CALL(Dbg_file_rejected(&_rej));
+			DBG_CALL(Dbg_file_rejected(lml, &_rej));
 			rejection_inherit(rej, &_rej, nfdp);
 			return (0);
 		}
@@ -2609,7 +2611,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		if ((flags & LKUP_WEAK) || (LIST(lmp)->lm_lazy == 0))
 			return ((Sym *)0);
 
-		DBG_CALL(Dbg_syms_lazy_rescan(name));
+		DBG_CALL(Dbg_syms_lazy_rescan(LIST(clmp), name));
 
 		/*
 		 * If this request originated from a dlsym(RTLD_NEXT) then start
@@ -2651,9 +2653,9 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
  * an existing descriptor.
  */
 int
-bind_one(Rt_map * clmp, Rt_map * dlmp, uint_t flags)
+bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
 {
-	Bnd_desc **	bdpp, * bdp;
+	Bnd_desc	**bdpp, *bdp;
 	Aliste		off;
 	int		found = ALE_CREATE;
 
@@ -2700,7 +2702,7 @@ bind_one(Rt_map * clmp, Rt_map * dlmp, uint_t flags)
 		if (flags & BND_REFER)
 			FLAGS1(dlmp) |= FL1_RT_USED;
 
-		DBG_CALL(Dbg_file_bind_entry(bdp));
+		DBG_CALL(Dbg_file_bind_entry(LIST(clmp), bdp));
 	}
 	return (found);
 }
@@ -2711,7 +2713,7 @@ bind_one(Rt_map * clmp, Rt_map * dlmp, uint_t flags)
 int
 relocate_finish(Rt_map *lmp, Alist *bound, int textrel, int ret)
 {
-	DBG_CALL(Dbg_reloc_run(NAME(lmp), 0, ret, DBG_REL_FINISH));
+	DBG_CALL(Dbg_reloc_run(lmp, 0, ret, DBG_REL_FINISH));
 
 	/*
 	 * Establish bindings to all objects that have been bound to.

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -365,11 +364,18 @@
 
 @ MSG_EMG_ENOMEM	"internal: Not enough space"
 
-@ MSG_DBG_FMT_DIAG	"%5.5d: "
-@ MSG_DBG_FMT_FILE	"%s.%5.5d"
-@ MSG_DBG_FMT_THREAD	"%5.5d: %d: "
+@ MSG_DBG_PID		"%5.5d: "
+@ MSG_DBG_UNDEF		"debug: "
+@ MSG_DBG_LMID		"%s: "
+@ MSG_DBG_THREAD	"%d: "
+@ MSG_DBG_FILE		"%s.%5.5d"
+
+@ MSG_LMID_BASE		"BASE"
+@ MSG_LMID_LDSO		"LDSO"
+@ MSG_LMID_ALT		"ALT"
+
+@ MSG_LMID_FMT		"%s%d"
+@ MSG_LMID_MAXED	"ALTMAXEDOUT"
 
 @ MSG_AUD_PLTENTER	"la_pltenter"
 @ MSG_AUD_SYMBIND	"la_symbind"
-
-@ MSG_REL_BADROFFSET	"<offset lies outside memory image; relocation discarded>"

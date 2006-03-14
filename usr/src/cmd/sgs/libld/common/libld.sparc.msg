@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,6 +18,11 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
@@ -33,7 +34,7 @@
 @ MSG_REL_UNNOBITS	"relocation error: %s: file %s: symbol %s: \
 			 unsupported number of bits: %d"
 @ MSG_REL_LOSEBITS	"relocation error: %s: file %s: symbol %s: \
-			 value 0x%llx loses %d bits at offset 0x%llx\n"
+			 value 0x%llx loses %d bits at offset 0x%llx"
 @ MSG_REL_UNRELREL	"relocation error: %s: file %s: symbol %s: \
 			 non-relative PLT relocation can not be used in \
 			 building a shared object"

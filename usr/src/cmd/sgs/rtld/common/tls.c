@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,7 +33,6 @@
 #include <libc_int.h>
 #include <_rtld.h>
 #include <_elf.h>
-#include <conv.h>
 #include <msg.h>
 #include <debug.h>
 
@@ -187,7 +186,7 @@ tls_modactivity(Rt_map * lmp, uint_t flag)
 	tmi.tm_flags = 0;
 	tmi.tm_stattlsoffset = 0;
 
-	DBG_CALL(Dbg_tls_modactivity(&tmi, flag));
+	DBG_CALL(Dbg_tls_modactivity(LIST(lmp), &tmi, flag));
 	fptr(&tmi);
 
 	/*
@@ -222,17 +221,15 @@ tls_assign_soffset(Rt_map * lmp)
 int
 tls_report_modules()
 {
-	Rt_map *	lmp;
-	uint_t		tlsmodcnt;
-	uint_t		tlsmodndx;
-	TLS_modinfo **	tlsmodlist;
-	TLS_modinfo *	tlsbuflist;
-	Phdr *		tlsphdr;
+	Rt_map		*lmp;
+	uint_t		tlsmodcnt, tlsmodndx;
+	TLS_modinfo	**tlsmodlist;
+	TLS_modinfo	*tlsbuflist;
+	Phdr		*tlsphdr;
 
 	tlsinitialized++;
 	/*
-	 * Scan through all objects to determine how many have TLS
-	 * storage.
+	 * Scan through all objects to determine how many have TLS storage.
 	 */
 	tlsmodcnt = 0;
 	for (lmp = lml_main.lm_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
@@ -245,11 +242,10 @@ tls_report_modules()
 			continue;
 
 		/*
-		 * If a module has TLS - but the TLS interfaces
-		 * are not present (no libthread?). Then this is
-		 * a fatal condition.
+		 * If a module has TLS - but the TLS interfaces are not present
+		 * (no libthread?). Then this is a fatal condition.
 		 */
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_TLS_NOTLS),
+		eprintf(&lml_main, ERR_FATAL, MSG_INTL(MSG_ERR_TLS_NOTLS),
 		    NAME(lmp));
 		return (0);
 	}
@@ -308,7 +304,8 @@ tls_report_modules()
 		tlsmodndx++;
 	}
 
-	DBG_CALL(Dbg_tls_static_block((void *)tlsmodlist, tls_static_size));
+	DBG_CALL(Dbg_tls_static_block(&lml_main, (void *)tlsmodlist,
+	    tls_static_size));
 	fptr_tls_statmods(tlsmodlist, tls_static_size);
 
 	/*

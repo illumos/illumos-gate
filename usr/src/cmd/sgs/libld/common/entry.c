@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,19 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<memory.h>
-#include	"debug.h"
+#include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -41,7 +40,7 @@
  * segments it can potentially create.   Additional segments may be added
  * using a map file.
  */
-#ifdef _ELF64
+#if	defined(_ELF64)
 /* Phdr packing changes under Elf64 */
 static Sg_desc sg_desc[LD_NUM] = {
 	{{PT_PHDR, PF_R + PF_X, 0, 0, 0, 0, 0, 0},
@@ -183,7 +182,7 @@ static const Ent_desc	ent_desc[] = {
  * the output file descriptor.
  */
 uintptr_t
-ent_setup(Ofl_desc * ofl, Xword segalign)
+ld_ent_setup(Ofl_desc * ofl, Xword segalign)
 {
 	Ent_desc *	enp;
 	Sg_desc *	sgp;
@@ -193,15 +192,17 @@ ent_setup(Ofl_desc * ofl, Xword segalign)
 	 * Initialize the elf library.
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_ELF_LIBELF), EV_CURRENT);
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_LIBELF),
+		    EV_CURRENT);
 		return (S_ERROR);
 	}
 
 	/*
 	 * Initialize internal Global Symbol Table AVL tree
 	 */
-	avl_create(&ofl->ofl_symavl, &sym_avl_comp, sizeof (Sym_avlnode),
-		SGSOFFSETOF(Sym_avlnode, sav_node));
+	avl_create(&ofl->ofl_symavl, &ld_sym_avl_comp, sizeof (Sym_avlnode),
+	    SGSOFFSETOF(Sym_avlnode, sav_node));
+
 	/*
 	 * The datasegment permissions can differ depending on whether
 	 * this object is built statically or dynamically.

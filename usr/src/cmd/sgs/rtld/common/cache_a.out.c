@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1999 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -120,7 +120,7 @@ ask_db(dbp, file)
 		return (NULL);
 	if (verscmp(file + to_min,
 	    &AP(dbp)[ep->dbe_name] + tlop->lo_minor) > 0)
-		eprintf(ERR_WARNING, MSG_INTL(MSG_GEN_OLDREV),
+		eprintf(&lml_main, ERR_WARNING, MSG_INTL(MSG_GEN_OLDREV),
 		    &AP(dbp)[ep->dbe_name], file + to_min);
 	return (&AP(dbp)[ep->dbe_name]);
 }
@@ -130,7 +130,7 @@ ask_db(dbp, file)
  * orginated from the mmapped file or temporarily created
  */
 struct db *
-lo_cache(const char * ds)
+lo_cache(const char *ds)
 {
 	struct db *dbp;			/* database pointer */
 	struct dbd *dbdp;		/* working database descriptor */
@@ -152,7 +152,7 @@ lo_cache(const char * ds)
  * Build a database for the directory "ds".
  */
 static struct db *
-find_so(const char * ds)
+find_so(const char *ds)
 {
 	int fd;				/* descriptor on directory */
 	int n;				/* bytes from getdents */
@@ -259,7 +259,7 @@ find_so(const char * ds)
 			}
 			for (ep = &(dbp->db_hash[index]); ep;
 			    /* LINTED */
-			    ep = (struct dbe *) &AP(dbp)[ep->dbe_next]) {
+			    ep = (struct dbe *)&AP(dbp)[ep->dbe_next]) {
 				/* LINTED */
 				tlop = (struct link_object *)
 				    &AP(dbp)[ep->dbe_lop];
@@ -475,10 +475,10 @@ rest_ok(str)
  * greater than c2p
  */
 static int
-verscmp(const char * c1p, const char * c2p)
+verscmp(const char *c1p, const char *c2p)
 {
-	char *	l_c1p = (char *)c1p;	/* working copy of c1p */
-	char *	l_c2p = (char *)c2p;	/* working copy of c2p */
+	char	*l_c1p = (char *)c1p;	/* working copy of c1p */
+	char	*l_c2p = (char *)c2p;	/* working copy of c2p */
 	int	l_c1p_ok = 0;		/* is c1p a legal string */
 	int	c2p_dig = 0;		/* int that c1p currently */
 					/*	represents */
