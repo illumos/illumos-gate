@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,5 +399,57 @@ fpras_chkfn_type1(void)
 	retl				! 15
 	  mov	FPRAS_BADTRAP, %o0	! 16, how detected
 	SET_SIZE(fpras_chkfn_type1)
+
+#endif	/* lint */
+
+/*
+ * fp_zero() - clear all fp data registers and the fsr
+ */
+
+#if defined(lint) || defined(__lint)
+
+void
+fp_zero(void)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_zero)
+	std	%g0, [%sp + ARGPUSH + STACK_BIAS]
+	fzero	%f0
+	fzero	%f2
+	ldd	[%sp + ARGPUSH + STACK_BIAS], %fsr
+	faddd	%f0, %f2, %f4
+	fmuld	%f0, %f2, %f6
+	faddd	%f0, %f2, %f8
+	fmuld	%f0, %f2, %f10
+	faddd	%f0, %f2, %f12
+	fmuld	%f0, %f2, %f14
+	faddd	%f0, %f2, %f16
+	fmuld	%f0, %f2, %f18
+	faddd	%f0, %f2, %f20
+	fmuld	%f0, %f2, %f22
+	faddd	%f0, %f2, %f24
+	fmuld	%f0, %f2, %f26
+	faddd	%f0, %f2, %f28
+	fmuld	%f0, %f2, %f30
+	faddd	%f0, %f2, %f32
+	fmuld	%f0, %f2, %f34
+	faddd	%f0, %f2, %f36
+	fmuld	%f0, %f2, %f38
+	faddd	%f0, %f2, %f40
+	fmuld	%f0, %f2, %f42
+	faddd	%f0, %f2, %f44
+	fmuld	%f0, %f2, %f46
+	faddd	%f0, %f2, %f48
+	fmuld	%f0, %f2, %f50
+	faddd	%f0, %f2, %f52
+	fmuld	%f0, %f2, %f54
+	faddd	%f0, %f2, %f56
+	fmuld	%f0, %f2, %f58
+	faddd	%f0, %f2, %f60
+	retl
+	fmuld	%f0, %f2, %f62
+	SET_SIZE(fp_zero)
 
 #endif	/* lint */

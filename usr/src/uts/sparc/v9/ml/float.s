@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,9 @@
 #include <sys/asm_linkage.h>
 #include <sys/trap.h>
 #include <sys/machpcb.h>
+#include <sys/machtrap.h>
+#include <sys/machsig.h>
+#include <sys/machthread.h>
 
 #if !defined(lint) && !defined(__lint)
 #include "assym.h"
@@ -523,5 +525,202 @@ _fp_subcc_ccr(void)
 	retl
 	rd	%ccr, %o0			! save ccr
 	SET_SIZE(_fp_subcc_ccr)
+
+#endif	/* lint */
+
+/*
+ * Floating Point Exceptions handled according to type:
+ *	2) unfinished_fpop
+ *		re-execute the faulty instruction(s) using
+ *		software emulation (must do every instruction in FQ)
+ *	3) unimplemented_fpop
+ *		an unimplemented instruction, if it is legal,
+ *		will cause emulation of the instruction (and all
+ *		other instuctions in the FQ)
+ *	4) sequence_error
+ *		panic, this should not happen, and if it does it
+ *		it is the result of a kernel bug
+ *
+ * This code assumes the trap preamble has set up the window environment
+ * for execution of kernel code.
+ * Note: this code could be changed to be part of the cpu-specific
+ * (ie, Spitfire-specific) module code before final release.
+ */
+
+#if defined(lint)
+
+/* ARGSUSED */
+void
+_fp_exception(struct regs *rp, uint64_t fsr)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(_fp_exception)
+	mov	%o7, %l0		! saved return address
+	mov	%o0, %l1		! saved *rp
+	set     FSR_FTT, %o4		! put FSR_FTT in %o4
+	xor	%o4, 0xffffffffffffffff, %o3 ! xor FSR_FTT to get
+	and     %o1, %o3, %o2		! an fsr with a zero'd ftt
+	ldn	[THREAD_REG + T_LWP], %o3 ! get lwp
+	ldn	[%o3 + LWP_FPU], %l3	! get lwp_fpu
+	stx	%o2, [%l3 + FPU_FSR]	! save floating point status
+	and	%o1, %o4, %g2		! get the ftt trap type
+#ifdef  DEBUG
+	brnz,a,pt %g2, fttok
+	  nop
+	set	.badfpfttmsg, %o0	! panic message
+	call	panic			! %o1 has the fsr w/ftt value
+	nop
+fttok:
+#endif  /* DEBUG */
+	srl	%g2, FSR_FTT_SHIFT, %o4	! check ftt
+	cmp	%o4, FTT_SEQ		! sanity check for bogus exceptions
+	!
+	! traps are already enabled to allow other
+	! interrupts while emulating floating point instructions
+	!
+	blt,a,pt %xcc, fpeok
+	nop
+	!
+	! Sequence error or unknown ftt exception.
+	!
+seq_error:
+	set	.badfpexcpmsg, %o0	! panic if bad ftt
+	call	panic
+	sra	%o4, 0, %o1		! mov ftt to o1 for panic message
+
+fpeok:
+	call	fp_kstat_update		! fp_kstat_update(ftt)
+	mov	%o4, %o0		! ftt
+	!
+	! Get the floating point instruction, and run the floating
+	! point simulator. There is no floating point queue, so we fake one.
+	!
+	call	fp_precise		! fp_precise(&regs)
+	mov	%l1, %o0		! saved *rp
+
+fp_ret:
+	rd	%fprs, %g1		! read fprs, save value in %g1
+	st	%g1, [%l3 + FPU_FPRS]	! save fprs
+	jmp	%l0 + 8			! jump to saved return address
+	stx	%fsr, [%l3 + FPU_FSR]	! save fsr
+	SET_SIZE(_fp_exception)
+
+.badfpexcpmsg:
+	.asciz	"unexpected floating point exception %x"
+
+#ifdef	DEBUG
+.badfpfttmsg:
+	.asciz	"No floating point ftt, fsr %llx"
+#endif	/* DEBUG */
+
+#endif	/* lint */
+
+/*
+ * Floating Point Exceptions.
+ * handled according to type:
+ *	1) IEEE_exception
+ *		re-execute the faulty instruction(s) using
+ *		software emulation (must do every instruction in FQ)
+ *
+ * This code assumes the trap preamble has set up the window environment
+ * for execution of kernel code.
+ */
+
+#if defined(lint)
+
+/* ARGSUSED */
+void
+_fp_ieee_exception(struct regs *rp, uint64_t fsr)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(_fp_ieee_exception)
+	mov	%o7, %l0		! saved return address
+	mov	%o0, %l1		! saved *rp
+	mov	%o1, %l2		! saved fsr
+	set	FSR_FTT, %o4		! put FSR_FTT in %o4
+	xor	%o4, 0xffffffffffffffff, %o3 ! ! xor FSR_FTT to get
+	and	%o1, %o3, %o2		! an fsr with a zero'd ftt
+	ldn	[THREAD_REG + T_LWP], %o3 ! get lwp
+	ldn	[%o3 + LWP_FPU], %l3	! get lwp_fpu
+	stx	%o2, [%l3 + FPU_FSR]	! save floating point status
+	stub	%g0, [%l3 + FPU_QCNT]	! clear fpu_qcnt
+	and	%o1, %o4, %g2		! mask out trap type
+#ifdef  DEBUG
+	brnz,a,pt %g2, fttgd
+	  nop
+	set	.badfpfttmsg, %o0	! panic message
+	call	panic			! %o1 has the fsr w/ftt value
+	nop
+fttgd:
+#endif	/* DEBUG */
+	srl	%g2, FSR_FTT_SHIFT, %o4	! check ftt
+	cmp	%o4, FTT_SEQ		! sanity check for bogus exceptions
+	!
+	! traps are already enabled to allow other
+	! interrupts while emulating floating point instructions
+	!
+	blt,a,pt %xcc, fpegd
+	nop
+	!
+	! Sequence error or unknown ftt exception.
+	!
+seq_err:
+	set	.badfpexcpmsg, %o0	! panic if bad ftt
+	call	panic
+	sra	%o4, 0, %o1		! mov ftt to o1 for panic message
+
+fpegd:
+	call	fp_kstat_update		! fp_kstat_update(ftt)
+	mov	%o4, %o0		! ftt
+	!
+	! Call fpu_trap directly, don't bother to run the fp simulator.
+	! The *rp is already in %o0. Clear fpu_qcnt.
+	!
+	set	(T_FP_EXCEPTION_IEEE), %o2	! trap type
+
+	set	FSR_CEXC, %o3
+	and	%l2, %o3, %g2		! mask out cexc
+
+	andcc	%g2, FSR_CEXC_NX, %g0	! check for inexact
+	bnz,a,pt %xcc, fpok
+	or	%g0, FPE_FLTRES, %o3	! fp inexact code
+
+	andcc	%g2, FSR_CEXC_DZ, %g0	! check for divide-by-zero
+	bnz,a,pt %xcc, fpok
+	or	%g0, FPE_FLTDIV, %o3	! fp divide by zero code
+
+	andcc	%g2, FSR_CEXC_UF, %g0	! check for underflow
+	bnz,a,pt %xcc, fpok
+	or	%g0, FPE_FLTUND, %o3	! fp underflow code
+
+	andcc	%g2, FSR_CEXC_OF, %g0	! check for overflow
+	bnz,a,pt %xcc, fpok
+	or	%g0, FPE_FLTOVF, %o3	! fp overflow code
+
+	andcc	%g2, FSR_CEXC_NV, %g0	! check for invalid
+	bnz,a,pn %xcc, fpok
+	or	%g0, FPE_FLTINV, %o3	! fp invalid code
+
+cexec_err:
+	set	.badfpcexcmsg, %o0	! panic message
+	call	panic			! panic if no cexc bit set
+	mov	%g1, %o1
+fpok:
+	mov	%l1, %o0		! saved *rp
+	call	fpu_trap		! fpu_trap(&regs, addr, type, code)
+	ldn	[%o0 + PC_OFF], %o1 	! address of trapping instruction
+
+	rd	%fprs, %g1		! read fprs, save value in %g1
+	st	%g1, [%l3 + FPU_FPRS]	! save fprs
+	jmp	%l0 + 8			! jump to saved return address
+	stx	%fsr, [%l3 + FPU_FSR]	! save fsr
+	SET_SIZE(_fp_ieee_exception)
+
+.badfpcexcmsg:
+	.asciz	"No floating point exception, fsr %llx"
 
 #endif	/* lint */

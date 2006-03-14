@@ -46,7 +46,6 @@ CORE_OBJS +=	hardclk.o
 CORE_OBJS +=	hat_sfmmu.o
 CORE_OBJS +=	hat_kdi.o
 CORE_OBJS +=	mach_copy.o
-CORE_OBJS +=	mach_float.o
 CORE_OBJS +=	mach_mp_startup.o
 CORE_OBJS +=	mach_mp_states.o
 CORE_OBJS +=	mach_sfmmu.o

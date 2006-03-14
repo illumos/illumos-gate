@@ -47,7 +47,6 @@ CORE_OBJS +=	hsvc.o
 CORE_OBJS +=	mach_cpu_states.o
 CORE_OBJS +=	mach_ddi_impl.o
 CORE_OBJS +=    mach_descrip.o
-CORE_OBJS +=	mach_float.o
 CORE_OBJS +=	mach_mp_startup.o
 CORE_OBJS +=	mach_mp_states.o
 CORE_OBJS +=	mach_sfmmu.o

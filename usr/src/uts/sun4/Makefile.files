@@ -104,5 +104,5 @@ INC_PATH	+= -I$(UTSBASE)/sun4
 # since only C headers are included when #defined(lint) is true.
 #
 ASSYM_DEPS	+= genalign.o copy.o ip_ocsum.o
-ASSYM_DEPS	+= mach_float.o common_asm.o
+ASSYM_DEPS	+= common_asm.o
 ASSYM_DEPS	+= proc_init.o subr.o xc.o

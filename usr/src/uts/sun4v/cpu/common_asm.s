@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1264,3 +1263,60 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	SET_SIZE(flush_instr_mem)
 
 #endif /* !lint */
+
+/*
+ * fp_zero() - clear all fp data registers and the fsr
+ */
+
+#if defined(lint) || defined(__lint)
+
+void
+fp_zero(void)
+{}
+
+#else	/* lint */
+
+.global	fp_zero_zero
+.align 8
+fp_zero_zero:
+	.xword	0
+
+	ENTRY_NP(fp_zero)
+	sethi	%hi(fp_zero_zero), %o0
+	ldd	[%o0 + %lo(fp_zero_zero)], %fsr
+	ldd	[%o0 + %lo(fp_zero_zero)], %f0
+	fmovd	%f0, %f2
+	fmovd	%f0, %f4
+	fmovd	%f0, %f6
+	fmovd	%f0, %f8
+	fmovd	%f0, %f10
+	fmovd	%f0, %f12
+	fmovd	%f0, %f14
+	fmovd	%f0, %f16
+	fmovd	%f0, %f18
+	fmovd	%f0, %f20
+	fmovd	%f0, %f22
+	fmovd	%f0, %f24
+	fmovd	%f0, %f26
+	fmovd	%f0, %f28
+	fmovd	%f0, %f30
+	fmovd	%f0, %f32
+	fmovd	%f0, %f34
+	fmovd	%f0, %f36
+	fmovd	%f0, %f38
+	fmovd	%f0, %f40
+	fmovd	%f0, %f42
+	fmovd	%f0, %f44
+	fmovd	%f0, %f46
+	fmovd	%f0, %f48
+	fmovd	%f0, %f50
+	fmovd	%f0, %f52
+	fmovd	%f0, %f54
+	fmovd	%f0, %f56
+	fmovd	%f0, %f58
+	fmovd	%f0, %f60
+	retl
+	fmovd	%f0, %f62
+	SET_SIZE(fp_zero)
+
+#endif	/* lint */

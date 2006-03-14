@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,8 @@
 #include <sys/asm_linkage.h>
 #include <sys/async.h>
 #include <sys/machthread.h>
+#include <sys/vis.h>
+#include <sys/machsig.h>
 
 #if defined(lint)
 caddr_t
@@ -441,5 +442,169 @@ kdi_cpu_index(void)
 	jmp	%g7
 	nop
 	SET_SIZE(kdi_cpu_index)
+
+#endif	/* lint */
+
+/*
+ * The Spitfire floating point code has been changed not to use install/
+ * save/restore/fork/freectx() because of the special memcpy library
+ * routines, which will lose too much performance if they have to go
+ * through the fp_disabled trap (which used to call installctx()). So
+ * now fp_save/fp_restore are called from resume, and they don't care
+ * whether floating point was enabled from the user program via the
+ * fp_enabled trap or from the memcpy library, which just turns on floating
+ * point in the fprs register itself. The new routine lwp_freeregs is
+ * called everywhere freectx is called, and code was added to the sun4u-
+ * specific version of lwp_forkregs (which is called everywhere forkctx
+ * is called) to handle forking the floating point registers.
+ *
+ * Note that for the fprs dirty upper/lower bits are not used for now,
+ * because the #instructions to determine if we need to use them is probably
+ * greater than the #insructions just using them. This is a possible future
+ * optimization, only do it with very careful benchmarking!
+ *
+ * The fp_fksave and and fp_load were split into two routines for the
+ * sake of efficiency between the getfpregs/xregs_getfpregs and
+ * setfpregs/xregs_setfpregs. But note that for saving and restoring
+ * context, both *must* happen. For prmachdep, aka access from [k]adb,
+ * it's OK if only one part happens.
+ */ 
+
+/*
+ * fp_save(kfpu_t *fp)
+ * fp_fksave(kfpu_t *fp)
+ * Store the floating point registers.
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_save(kfpu_t *fp)
+{}
+
+/* ARGSUSED */
+void
+fp_fksave(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_save)
+	ALTENTRY(fp_fksave)
+	BSTORE_FPREGS(%o0, %o1)			! store V9 regs
+	retl
+	stx	%fsr, [%o0 + FPU_FSR]		! store fsr
+	SET_SIZE(fp_fksave)
+	SET_SIZE(fp_save)
+
+#endif	/* lint */
+
+/*
+ * fp_v8_fksave(kfpu_t *fp)
+ *
+ * This is like the above routine but only saves the lower half.
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_v8_fksave(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_v8_fksave)
+	BSTORE_V8_FPREGS(%o0, %o1)		! store V8 regs
+	retl
+	stx	%fsr, [%o0 + FPU_FSR]		! store fsr
+	SET_SIZE(fp_v8_fksave)
+
+#endif	/* lint */
+
+/*
+ * fp_v8p_fksave(kfpu_t *fp)
+ *
+ * This is like the above routine but only saves the upper half.
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_v8p_fksave(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_v8p_fksave)
+	BSTORE_V8P_FPREGS(%o0, %o1)		! store V9 extra regs
+	retl
+	stx	%fsr, [%o0 + FPU_FSR]		! store fsr
+	SET_SIZE(fp_v8p_fksave)
+
+#endif	/* lint */
+
+/*
+ * fp_restore(kfpu_t *fp)
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_restore(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_restore)
+	BLOAD_FPREGS(%o0, %o1)			! load V9 regs
+	retl
+	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
+	SET_SIZE(fp_restore)
+
+#endif	/* lint */
+
+/*
+ * fp_v8_load(kfpu_t *fp)
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_v8_load(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_v8_load)
+	BLOAD_V8_FPREGS(%o0, %o1)		! load V8 regs
+	retl
+	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
+	SET_SIZE(fp_v8_load)
+
+#endif	/* lint */
+
+/*
+ * fp_v8p_load(kfpu_t *fp)
+ */
+
+#if defined(lint) || defined(__lint)
+
+/* ARGSUSED */
+void
+fp_v8p_load(kfpu_t *fp)
+{}
+
+#else	/* lint */
+
+	ENTRY_NP(fp_v8p_load)
+	BLOAD_V8P_FPREGS(%o0, %o1)		! load V9 extra regs
+	retl
+	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
+	SET_SIZE(fp_v8p_load)
 
 #endif	/* lint */
