@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -70,7 +69,6 @@ f none usr/lib/mdb/kvm/amd64/sctp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/specfs.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/sppp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ufs.so 555 root sys
-f none usr/lib/mdb/kvm/amd64/ufs_log.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/uhci.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/usba.so 555 root sys
 f none usr/lib/mdb/kvm/audiosup.so 555 root sys
@@ -95,7 +93,6 @@ f none usr/lib/mdb/kvm/sctp.so 555 root sys
 f none usr/lib/mdb/kvm/specfs.so 555 root sys
 f none usr/lib/mdb/kvm/sppp.so 555 root sys
 f none usr/lib/mdb/kvm/ufs.so 555 root sys
-f none usr/lib/mdb/kvm/ufs_log.so 555 root sys
 f none usr/lib/mdb/kvm/uhci.so 555 root sys
 f none usr/lib/mdb/kvm/usba.so 555 root sys
 d none usr/lib/mdb/proc/amd64 755 root bin

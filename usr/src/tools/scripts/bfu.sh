@@ -5749,6 +5749,14 @@ mondo_loop() {
 	rm -f $rootprefix/kernel/misc/ufs_log
 	rm -f $rootprefix/kernel/misc/sparcv9/ufs_log
 
+	#Remove ufs_log mdb/kmdb modules - now merged in to ufs module
+	rm -f $rootprefix/kernel/kmdb/ufs_log
+	rm -f $rootprefix/kernel/kmdb/sparcv9/ufs_log
+	rm -f $rootprefix/kernel/kmdb/amd64/ufs_log
+	rm -f $rootprefix/usr/lib/mdb/kvm/ufs_log.so
+	rm -f $rootprefix/usr/lib/mdb/kvm/sparcv9/ufs_log.so
+	rm -f $rootprefix/usr/lib/mdb/kvm/amd64/ufs_log.so
+
 	#Remove diskmgtd. If backward BFU, will get re-installed from
 	#archive.
 	rm -f $usr/lib/diskmgtd

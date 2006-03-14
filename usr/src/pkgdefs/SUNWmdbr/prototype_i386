@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -51,7 +50,6 @@ f none kernel/kmdb/amd64/sctp 555 root sys
 f none kernel/kmdb/amd64/specfs 555 root sys
 f none kernel/kmdb/amd64/sppp 555 root sys
 f none kernel/kmdb/amd64/ufs 555 root sys
-f none kernel/kmdb/amd64/ufs_log 555 root sys
 f none kernel/kmdb/amd64/uhci 555 root sys
 f none kernel/kmdb/amd64/usba 555 root sys
 f none kernel/kmdb/audiosup 555 root sys
@@ -76,7 +74,6 @@ f none kernel/kmdb/sctp 555 root sys
 f none kernel/kmdb/specfs 555 root sys
 f none kernel/kmdb/sppp 555 root sys
 f none kernel/kmdb/ufs 555 root sys
-f none kernel/kmdb/ufs_log 555 root sys
 f none kernel/kmdb/uhci 555 root sys
 f none kernel/kmdb/usba 555 root sys
 

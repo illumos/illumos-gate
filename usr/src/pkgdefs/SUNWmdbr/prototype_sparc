@@ -57,7 +57,6 @@ f none kernel/kmdb/sparcv9/specfs 555 root sys
 f none kernel/kmdb/sparcv9/sppp 555 root sys
 f none kernel/kmdb/sparcv9/ssd 555 root sys
 f none kernel/kmdb/sparcv9/ufs 555 root sys
-f none kernel/kmdb/sparcv9/ufs_log 555 root sys
 f none kernel/kmdb/sparcv9/usba 555 root sys
 #
 d none platform 755 root sys

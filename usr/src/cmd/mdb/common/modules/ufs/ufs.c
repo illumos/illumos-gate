@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,8 @@
 #include <sys/fs/ufs_inode.h>
 #include <sys/fs/ufs_acl.h>
 #include <sys/fs/ufs_fs.h>
+
+#include "ufs_cmds.h"
 
 typedef struct inode_walk_data {
 	int iw_inohsz;
@@ -645,6 +646,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "inode", ":[-v]", "display summarized inode_t", inode },
 	{ "acl", ":", "given an inode, display its in core acl's", acl_dcmd },
 	{ "cg", "?[-v]", "display a summarized cylinder group structure", cg },
+	{ "mapentry", ":", "dumps ufslog mapentry", mapentry_dcmd },
+	{ "mapstats", ":", "dumps ufslog stats", mapstats_dcmd },
 	{ NULL }
 };
 
@@ -655,6 +658,8 @@ static const mdb_walker_t walkers[] = {
 		acl_walk_init, acl_walk_step, acl_walk_fini },
 	{ "cg", "walk cg's in bio buffer cache",
 		cg_walk_init, cg_walk_step, NULL },
+	{ "ufslogmap", "walk map entries in a ufs_log mt_map",
+		ufslogmap_walk_init, ufslogmap_walk_step, NULL },
 	{ NULL }
 };
 
