@@ -2916,6 +2916,7 @@ copy_zone(char *src, char *dst)
 
 	(void) snprintf(cmdbuf, sizeof (cmdbuf),
 	    "cd %s && /usr/bin/find . -depth -print | "
+	    "/usr/bin/egrep -v '^\\./\\.zfs$|^\\./\\.zfs/' | "
 	    "/usr/bin/cpio -pdmuP@ %s > %s 2>&1",
 	    src, dst, outfile);
 
@@ -3144,11 +3145,55 @@ done:
 
 #define	RMCOMMAND	"/usr/bin/rm -rf"
 
+/*
+ * Used when moving a zonepath (via copying) to clean up the old path or
+ * the new path if there was an error.
+ *
+ * This function handles the case of a zonepath being a zfs filesystem.
+ * If it is a zfs filesystem, we cannot just remove the whole zonepath
+ * since we can't remove the filesystem itself.  Instead, we have to remove
+ * the contents of the filesystem, but not the .zfs directory.
+ */
+static int
+remove_zonepath(char *zonepath)
+{
+	int status;
+	boolean_t is_zfs = B_FALSE;
+	struct stat buf;
+	char cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 128];
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/.zfs", zonepath);
+
+	if (stat(cmdbuf, &buf) == 0 && S_ISDIR(buf.st_mode))
+		is_zfs = B_TRUE;
+
+	if (is_zfs) {
+		/*
+		 * This doesn't handle the (unlikely) case that there are
+		 * directories or files in the top-level zonepath with white
+		 * space in the names.
+		 */
+		(void) snprintf(cmdbuf, sizeof (cmdbuf),
+		    "cd %s && /usr/bin/ls -A | /usr/bin/egrep -v '^\\.zfs$' | "
+		    "/usr/bin/xargs " RMCOMMAND, zonepath);
+	} else {
+		/*
+		 * "exec" the command so that the returned status is
+		 * that of rm and not the shell.
+		 */
+		(void) snprintf(cmdbuf, sizeof (cmdbuf),
+		    "exec " RMCOMMAND " %s", zonepath);
+	}
+
+	status = do_subproc(cmdbuf);
+
+	return (subproc_status("rm", status));
+
+}
+
 static int
 move_func(int argc, char *argv[])
 {
-	/* 6: "exec " and " " */
-	char cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 6];
 	char *new_zonepath = NULL;
 	int lockfd;
 	int err, arg;
@@ -3325,24 +3370,13 @@ done:
 				 */
 			}
 		} else {
-			int status;
-
 			(void) printf(gettext("Cleaning up zonepath %s..."),
 			    new_zonepath);
 			(void) fflush(stdout);
-
-			/*
-			 * "exec" the command so that the returned status is
-			 * that of rm and not the shell.
-			 */
-			(void) snprintf(cmdbuf, sizeof (cmdbuf),
-			    "exec " RMCOMMAND " %s", new_zonepath);
-
-			status = do_subproc(cmdbuf);
-
+			err = remove_zonepath(new_zonepath);
 			(void) printf("\n");
 
-			if ((err = subproc_status("rm", status)) != Z_OK) {
+			if (err != Z_OK) {
 				errno = err;
 				zperror(gettext("could not remove new "
 				    "zonepath"), B_TRUE);
@@ -3359,24 +3393,13 @@ done:
 	} else {
 		/* The move was successful, cleanup the old zonepath. */
 		if (!fast) {
-			int status;
-
 			(void) printf(
 			    gettext("Cleaning up zonepath %s..."), zonepath);
 			(void) fflush(stdout);
-
-			/*
-			 * "exec" the command so that the returned status is
-			 * that of rm and not the shell.
-			 */
-			(void) snprintf(cmdbuf, sizeof (cmdbuf),
-			    "exec " RMCOMMAND " %s", zonepath);
-
-			status = do_subproc(cmdbuf);
-
+			err = remove_zonepath(zonepath);
 			(void) printf("\n");
 
-			if ((err = subproc_status("rm", status)) != Z_OK) {
+			if (err != Z_OK) {
 				errno = err;
 				zperror(gettext("could not remove zonepath"),
 				    B_TRUE);

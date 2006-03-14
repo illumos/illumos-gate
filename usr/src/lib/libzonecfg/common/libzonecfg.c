@@ -2287,9 +2287,15 @@ zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
 	FILE *mnttab;
 	struct mnttab m;
 	size_t l;
+	int zfsl;
 	int rv = 0;
+	char zfs_path[MAXPATHLEN];
 
 	assert(rootpath != NULL);
+
+	if ((zfsl = snprintf(zfs_path, sizeof (zfs_path), "%s/.zfs/", rootpath))
+	    >= sizeof (zfs_path))
+		return (-1);
 
 	l = strlen(rootpath);
 
@@ -2305,7 +2311,8 @@ zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
 
 	while (!getmntent(mnttab, &m)) {
 		if ((strncmp(rootpath, m.mnt_mountp, l) == 0) &&
-		    (m.mnt_mountp[l] == '/')) {
+		    (m.mnt_mountp[l] == '/') &&
+		    (strncmp(zfs_path, m.mnt_mountp, zfsl) != 0)) {
 			rv++;
 			if (callback == NULL)
 				continue;
@@ -4614,6 +4621,7 @@ get_path_pkgs(char *entry, char **paths, int cnt, char ***pkgs, int *pkg_cnt)
 			 * add_pkg_list starting with the pkg names.
 			 */
 			int j;
+			char	*nlp;
 
 			for (j = 0; j < 4 &&
 			    strtok_r(NULL, " ", &lastp) != NULL; j++);
@@ -4623,6 +4631,11 @@ get_path_pkgs(char *entry, char **paths, int cnt, char ***pkgs, int *pkg_cnt)
 			 */
 			if (j < 4)
 				return (Z_OK);
+
+			/* strip newline from the line */
+			nlp = (lastp + strlen(lastp) - 1);
+			if (*nlp == '\n')
+				*nlp = '\0';
 
 			res = add_pkg_list(lastp, pkgs, pkg_cnt);
 			break;
@@ -4809,6 +4822,9 @@ dir_pkg(char *pkg_name, char **pkg_list, int cnt)
  * Installed: Wed Dec  7 07:13:51 PST 2005 From: mum Obsoletes: 120777-03 \
  *	121087-02 119108-07 Requires: 119575-02 119255-06 Incompatibles:
  *
+ * A backed out patch will have an info line of "backed out\n".  We should
+ * skip these patches.
+ *
  * We also want to add the Obsolete and Incompatible patches to the
  * sw inventory description of this patch.
  */
@@ -4822,6 +4838,9 @@ add_patch(zone_dochandle_t handle, char *patch, char *info)
 	char		*lastp;
 	boolean_t	add_info = B_FALSE;
 	boolean_t	obsolete;
+
+	if (strcmp(info, "backed out\n") == 0)
+		return (Z_OK);
 
 	if ((err = operation_prep(handle)) != Z_OK)
 		return (err);
@@ -4930,7 +4949,8 @@ add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop)
 
 		*ep = '\0';
 		if (unique_patch(handle, p))
-			res = add_patch(handle, p, ep + 1);
+			if ((res = add_patch(handle, p, ep + 1)) != Z_OK)
+				break;
 	}
 
 	return (res);
