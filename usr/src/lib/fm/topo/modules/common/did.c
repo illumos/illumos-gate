@@ -183,8 +183,10 @@ di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
 			}
 			if (lastslot == NULL)
 				*slots = lastslot = newslot;
-			else
+			else {
 				lastslot->snm_next = newslot;
+				lastslot = newslot;
+			}
 			(*nslots)++;
 		}
 	}
