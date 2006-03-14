@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,7 +447,7 @@ xdr_nfslog_diropargs3(XDR *xdrs, diropargs3 *objp)
 {
 	char *name;
 
-	if (!xdr_nfs_fh3(xdrs, objp->dirp))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->dir))
 		return (FALSE);
 	if (objp->name != nfs3nametoolong)
 		name = objp->name;
@@ -469,7 +468,7 @@ xdr_nfslog_LOOKUP3res(XDR *xdrs, LOOKUP3res *objp)
 		return (FALSE);
 	switch (objp->status) {
 	case NFS3_OK:
-		if (!xdr_nfs_fh3(xdrs, &objp->res_u.ok.object))
+		if (!xdr_nfslog_nfs_fh3(xdrs, &objp->res_u.ok.object))
 			return (FALSE);
 		break;
 	}
@@ -547,7 +546,7 @@ xdr_nfslog_GETATTR3res(XDR *xdrs, GETATTR3res *objp)
 bool_t
 xdr_nfslog_ACCESS3args(XDR *xdrs, ACCESS3args *objp)
 {
-	return (xdr_nfs_fh3(xdrs, &objp->object));
+	return (xdr_nfslog_nfs_fh3(xdrs, &objp->object));
 }
 
 bool_t
@@ -559,7 +558,7 @@ xdr_nfslog_ACCESS3res(XDR *xdrs, ACCESS3res *objp)
 bool_t
 xdr_nfslog_SETATTR3args(XDR *xdrs, SETATTR3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->object))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->object))
 		return (FALSE);
 	return (xdr_set_size3(xdrs, &objp->new_attributes.size));
 }
@@ -587,7 +586,7 @@ xdr_nfslog_READLINK3res(XDR *xdrs, READLINK3res *objp)
 bool_t
 xdr_nfslog_READ3args(XDR *xdrs, READ3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->file))
 		return (FALSE);
 	if (!xdr_uint64(xdrs, &objp->offset))
 		return (FALSE);
@@ -623,7 +622,7 @@ xdr_nfslog_READ3res(XDR *xdrs, READ3res *objp)
 bool_t
 xdr_nfslog_WRITE3args(XDR *xdrs, WRITE3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->file))
 		return (FALSE);
 	if (!xdr_uint64(xdrs, &objp->offset))
 		return (FALSE);
@@ -761,7 +760,7 @@ xdr_nfslog_RENAME3res(XDR *xdrs, RENAME3res *objp)
 bool_t
 xdr_nfslog_LINK3args(XDR *xdrs, LINK3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->file))
 		return (FALSE);
 	return (xdr_nfslog_diropargs3(xdrs, &objp->link));
 }
@@ -775,7 +774,7 @@ xdr_nfslog_LINK3res(XDR *xdrs, LINK3res *objp)
 bool_t
 xdr_nfslog_READDIR3args(XDR *xdrs, READDIR3args *objp)
 {
-	return (xdr_nfs_fh3(xdrs, &objp->dir));
+	return (xdr_nfslog_nfs_fh3(xdrs, &objp->dir));
 }
 
 bool_t
@@ -787,7 +786,7 @@ xdr_nfslog_READDIR3res(XDR *xdrs, READDIR3res *objp)
 bool_t
 xdr_nfslog_READDIRPLUS3args(XDR *xdrs, READDIRPLUS3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->dir))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->dir))
 		return (FALSE);
 	if (!xdr_uint32(xdrs, &objp->dircount))
 		return (FALSE);
@@ -855,7 +854,7 @@ xdr_nfslog_READDIRPLUS3res(XDR *xdrs, READDIRPLUS3res *objp)
 bool_t
 xdr_nfslog_FSSTAT3args(XDR *xdrs, FSSTAT3args *objp)
 {
-	return (xdr_nfs_fh3(xdrs, &objp->fsroot));
+	return (xdr_nfslog_nfs_fh3(xdrs, &objp->fsroot));
 }
 
 bool_t
@@ -867,7 +866,7 @@ xdr_nfslog_FSSTAT3res(XDR *xdrs, FSSTAT3res *objp)
 bool_t
 xdr_nfslog_FSINFO3args(XDR *xdrs, FSINFO3args *objp)
 {
-	return (xdr_nfs_fh3(xdrs, &objp->fsroot));
+	return (xdr_nfslog_nfs_fh3(xdrs, &objp->fsroot));
 }
 
 bool_t
@@ -879,7 +878,7 @@ xdr_nfslog_FSINFO3res(XDR *xdrs, FSINFO3res *objp)
 bool_t
 xdr_nfslog_PATHCONF3args(XDR *xdrs, PATHCONF3args *objp)
 {
-	return (xdr_nfs_fh3(xdrs, &objp->object));
+	return (xdr_nfslog_nfs_fh3(xdrs, &objp->object));
 }
 
 bool_t
@@ -891,7 +890,7 @@ xdr_nfslog_PATHCONF3res(XDR *xdrs, PATHCONF3res *objp)
 bool_t
 xdr_nfslog_COMMIT3args(XDR *xdrs, COMMIT3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
+	if (!xdr_nfslog_nfs_fh3(xdrs, &objp->file))
 		return (FALSE);
 	if (!xdr_uint64(xdrs, &objp->offset))
 		return (FALSE);
@@ -902,4 +901,19 @@ bool_t
 xdr_nfslog_COMMIT3res(XDR *xdrs, COMMIT3res *objp)
 {
 	return (xdr_enum(xdrs, (enum_t *)&objp->status));
+}
+
+bool_t
+xdr_nfslog_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
+{
+	nfs_fh3 fh;
+
+	if (objp->fh3_len > NFS_FHMAXDATA || objp->fh3_xlen > NFS_FHMAXDATA) {
+		fh = *objp;
+		fh.fh3_len = NFS_FHMAXDATA;
+		fh.fh3_xlen = NFS_FHMAXDATA;
+		fh.fh3_length = NFS3_OLDFHSIZE;
+		return (xdr_nfs_fh3_server(xdrs, &fh));
+	}
+	return (xdr_nfs_fh3_server(xdrs, objp));
 }

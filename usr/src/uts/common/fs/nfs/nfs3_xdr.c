@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,17 +44,13 @@
 #include <sys/dnlc.h>
 #include <sys/cred.h>
 #include <sys/time.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 
 #include <nfs/nfs.h>
 #include <nfs/rnode.h>
-
-/* Checks if the fh is 32 bytes and returns TRUE if it is, otherwise FALSE */
-#define	XDR_CHECKFHSIZE(x, len, sz)	\
-	(((int32_t)ntohl(len) == NFS3_CURFHSIZE) ? TRUE : \
-	(xdr_rewind(x, sz), FALSE))
 
 /*
  * These are the XDR routines used to serialize and deserialize
@@ -154,65 +149,295 @@ xdr_string3(XDR *xdrs, char **cpp, uint_t maxsize)
 }
 
 /*
- * If the filehandle is not equal to NFS3_CURFHSIZE then
- * rewind/set the pointer back to it's previous location prior to
- * the call.
- * Inlining is only being done for 32 byte fhandles since
- * predominantly the size of the fh is 32 and thus
- * optimizing only this case would be the best.
+ * XDR_INLINE decode a filehandle.
  */
-static void
-xdr_rewind(register XDR *xdrs, uint_t inl_sz)
+bool_t
+xdr_inline_decode_nfs_fh3(uint32_t *ptr, nfs_fh3 *fhp, uint32_t fhsize)
 {
-	uint_t curpos;
+	uchar_t *bp = (uchar_t *)ptr;
+	uchar_t *cp;
+	uint32_t dsize;
+	uintptr_t resid;
 
-	curpos = XDR_GETPOS(xdrs);
-	(void) XDR_SETPOS(xdrs, curpos - inl_sz);
+	/*
+	 * Check to see if what the client sent us is bigger or smaller
+	 * than what we can ever possibly send out. NFS_FHMAXDATA is
+	 * unfortunately badly named as it is no longer the max and is
+	 * really the min of what is sent over the wire.
+	 */
+	if (fhsize > sizeof (fhandle3_t) || fhsize < (sizeof (fsid_t) +
+	    sizeof (ushort_t) + NFS_FHMAXDATA +
+	    sizeof (ushort_t) + NFS_FHMAXDATA)) {
+		return (FALSE);
+	}
+
+	/*
+	 * All internal parts of a filehandle are in native byte order.
+	 *
+	 * Decode what should be fh3_fsid, it is aligned.
+	 */
+	fhp->fh3_fsid.val[0] = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+	fhp->fh3_fsid.val[1] = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+
+	/*
+	 * Decode what should be fh3_len.  fh3_len is two bytes, so we're
+	 * unaligned now.
+	 */
+	cp = (uchar_t *)&fhp->fh3_len;
+	*cp++ = *bp++;
+	*cp++ = *bp++;
+	fhsize -= 2 * BYTES_PER_XDR_UNIT + sizeof (ushort_t);
+
+	/*
+	 * For backwards compatability, the fid length may be less than
+	 * NFS_FHMAXDATA, but it was always encoded as NFS_FHMAXDATA bytes.
+	 */
+	dsize = fhp->fh3_len < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh3_len;
+
+	/*
+	 * Make sure the client isn't sending us a bogus length for fh3x_data.
+	 */
+	if (fhsize < dsize)
+		return (FALSE);
+	bcopy(bp, fhp->fh3_data, dsize);
+	bp += dsize;
+	fhsize -= dsize;
+
+	if (fhsize < sizeof (ushort_t))
+		return (FALSE);
+	cp = (uchar_t *)&fhp->fh3_xlen;
+	*cp++ = *bp++;
+	*cp++ = *bp++;
+	fhsize -= sizeof (ushort_t);
+
+	dsize = fhp->fh3_xlen < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh3_xlen;
+
+	/*
+	 * Make sure the client isn't sending us a bogus length for fh3x_xdata.
+	 */
+	if (fhsize < dsize)
+		return (FALSE);
+	bcopy(bp, fhp->fh3_xdata, dsize);
+	fhsize -= dsize;
+	bp += dsize;
+
+	/*
+	 * We realign things on purpose, so skip any padding
+	 */
+	resid = (uintptr_t)bp % BYTES_PER_XDR_UNIT;
+	if (resid != 0) {
+		if (fhsize < (BYTES_PER_XDR_UNIT - resid))
+			return (FALSE);
+		bp += BYTES_PER_XDR_UNIT - resid;
+		fhsize -= BYTES_PER_XDR_UNIT - resid;
+	}
+
+	/*
+	 * Make sure client didn't send extra bytes
+	 */
+	if (fhsize != 0)
+		return (FALSE);
+	return (TRUE);
 }
 
+static bool_t
+xdr_decode_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
+{
+	uint32_t fhsize;		/* filehandle size */
+	uint32_t bufsize;
+	rpc_inline_t *ptr;
+	uchar_t *bp;
+
+	ASSERT(xdrs->x_op == XDR_DECODE);
+
+	/*
+	 * Retrieve the filehandle length.
+	 */
+	if (!XDR_GETINT32(xdrs, (int32_t *)&fhsize))
+		return (FALSE);
+
+	bzero(objp->fh3_u.data, sizeof (objp->fh3_u.data));
+	objp->fh3_length = 0;
+
+	/*
+	 * Check to see if what the client sent us is bigger or smaller
+	 * than what we can ever possibly send out. NFS_FHMAXDATA is
+	 * unfortunately badly named as it is no longer the max and is
+	 * really the min of what is sent over the wire.
+	 */
+	if (fhsize > sizeof (fhandle3_t) || fhsize < (sizeof (fsid_t) +
+	    sizeof (ushort_t) + NFS_FHMAXDATA +
+	    sizeof (ushort_t) + NFS_FHMAXDATA)) {
+		if (!XDR_CONTROL(xdrs, XDR_SKIPBYTES, &fhsize))
+			return (FALSE);
+		return (TRUE);
+	}
+
+	/*
+	 * bring in fhsize plus any padding
+	 */
+	bufsize = RNDUP(fhsize);
+	ptr = XDR_INLINE(xdrs, bufsize);
+	bp = (uchar_t *)ptr;
+	if (ptr == NULL) {
+		bp = kmem_alloc(bufsize, KM_SLEEP);
+		if (!xdr_opaque(xdrs, (char *)bp, bufsize)) {
+			kmem_free(bp, bufsize);
+			return (FALSE);
+		}
+	}
+
+	objp->fh3_length = sizeof (fhandle3_t);
+
+	if (xdr_inline_decode_nfs_fh3((uint32_t *)bp, objp, fhsize) == FALSE) {
+		/*
+		 * If in the process of decoding we find the file handle
+		 * is not correctly formed, we need to continue decoding
+		 * and trigger an NFS layer error. Set the nfs_fh3_len to
+		 * zero so it gets caught as a bad length.
+		 */
+		bzero(objp->fh3_u.data, sizeof (objp->fh3_u.data));
+		objp->fh3_length = 0;
+	}
+
+	if (ptr == NULL)
+		kmem_free(bp, bufsize);
+	return (TRUE);
+}
+
+/*
+ * XDR_INLINE encode a filehandle.
+ */
+bool_t
+xdr_inline_encode_nfs_fh3(uint32_t **ptrp, uint32_t *ptr_redzone,
+	nfs_fh3 *fhp)
+{
+	uint32_t *ptr = *ptrp;
+	uchar_t *cp;
+	uint_t otw_len, fsize, xsize;   /* otw, file, and export sizes */
+	uint32_t padword;
+
+	fsize = fhp->fh3_len < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh3_len;
+	xsize = fhp->fh3_xlen < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh3_xlen;
+
+	/*
+	 * First get the initial and variable sized part of the filehandle.
+	 */
+	otw_len = sizeof (fhp->fh3_fsid) +
+	    sizeof (fhp->fh3_len) + fsize +
+	    sizeof (fhp->fh3_xlen) + xsize;
+
+	/*
+	 * Round out to a full word.
+	 */
+	otw_len = RNDUP(otw_len);
+	padword = (otw_len / BYTES_PER_XDR_UNIT);	/* includes fhlen */
+
+	/*
+	 * Make sure we don't exceed our buffer.
+	 */
+	if ((ptr + (otw_len / BYTES_PER_XDR_UNIT) + 1) > ptr_redzone)
+		return (FALSE);
+
+	/*
+	 * Zero out the pading.
+	 */
+	ptr[padword] = 0;
+
+	IXDR_PUT_U_INT32(ptr, otw_len);
+
+	/*
+	 * The rest of the filehandle is in native byteorder
+	 */
+	/* fh3_fsid */
+	*ptr++ = (uint32_t)fhp->fh3_fsid.val[0];
+	*ptr++ = (uint32_t)fhp->fh3_fsid.val[1];
+
+	/*
+	 * Since the next pieces are unaligned, we need to
+	 * do bytewise copies.
+	 */
+	cp = (uchar_t *)ptr;
+
+	/* fh3_len + fh3_data */
+	bcopy(&fhp->fh3_len, cp, sizeof (fhp->fh3_len) + fsize);
+	cp += sizeof (fhp->fh3_len) + fsize;
+
+	/* fh3_xlen + fh3_xdata */
+	bcopy(&fhp->fh3_xlen, cp, sizeof (fhp->fh3_xlen) + xsize);
+	cp += sizeof (fhp->fh3_xlen) + xsize;
+
+	/* do necessary rounding/padding */
+	cp = (uchar_t *)RNDUP((uintptr_t)cp);
+	ptr = (uint32_t *)cp;
+
+	/*
+	 * With the above padding, we're word aligned again.
+	 */
+	ASSERT(((uintptr_t)ptr % BYTES_PER_XDR_UNIT) == 0);
+
+	*ptrp = ptr;
+
+	return (TRUE);
+}
+
+static bool_t
+xdr_encode_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
+{
+	uint_t otw_len, fsize, xsize;   /* otw, file, and export sizes */
+	bool_t ret;
+	rpc_inline_t *ptr;
+	rpc_inline_t *buf = NULL;
+	uint32_t *ptr_redzone;
+
+	ASSERT(xdrs->x_op == XDR_ENCODE);
+
+	fsize = objp->fh3_len < NFS_FHMAXDATA ? NFS_FHMAXDATA : objp->fh3_len;
+	xsize = objp->fh3_xlen < NFS_FHMAXDATA ? NFS_FHMAXDATA : objp->fh3_xlen;
+
+	/*
+	 * First get the over the wire size, it is the 4 bytes
+	 * for the length, plus the combined size of the
+	 * file handle components.
+	 */
+	otw_len = BYTES_PER_XDR_UNIT + sizeof (objp->fh3_fsid) +
+	    sizeof (objp->fh3_len) + fsize +
+	    sizeof (objp->fh3_xlen) + xsize;
+	/*
+	 * Round out to a full word.
+	 */
+	otw_len = RNDUP(otw_len);
+
+	/*
+	 * Next try to inline the XDR stream, if that fails (rare)
+	 * allocate a buffer to encode the file handle and then
+	 * copy it using xdr_opaque and free the buffer.
+	 */
+	ptr = XDR_INLINE(xdrs, otw_len);
+	if (ptr == NULL)
+		ptr = buf = kmem_alloc(otw_len, KM_SLEEP);
+
+	ptr_redzone = (uint32_t *)(ptr + (otw_len / BYTES_PER_XDR_UNIT));
+	ret = xdr_inline_encode_nfs_fh3((uint32_t **)&ptr, ptr_redzone, objp);
+
+	if (buf != NULL) {
+		if (ret == TRUE)
+			ret = xdr_opaque(xdrs, (char *)buf, otw_len);
+		kmem_free(buf, otw_len);
+	}
+	return (ret);
+}
+
+/*
+ * XDR a NFSv3 filehandle the naive way.
+ */
 bool_t
 xdr_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	uint_t len;
-	uint_t in_size;
-
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
-
-	in_size = RNDUP(sizeof (fhandle_t)) +	1 * BYTES_PER_XDR_UNIT;
-
-	ptr = XDR_INLINE(xdrs, in_size);
-	if (ptr != NULL) {
-		len = ((xdrs->x_op == XDR_DECODE) ? *ptr : objp->fh3_length);
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-			fhp = (int32_t *)&(objp->fh3_u.data);
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr;
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr = *fhp;
-			}
-			return (TRUE);
-		}
-	}
 
 	if (!xdr_u_int(xdrs, &objp->fh3_length))
 		return (FALSE);
@@ -224,30 +449,21 @@ xdr_nfs_fh3(XDR *xdrs, nfs_fh3 *objp)
 }
 
 /*
- * Will only consider the DECODE case for the fast way
- * since it does not require any additional allocation of
- * memory and thus can just assign the objp to point to
- * the data returned from XDR_INLINE
+ * XDR a NFSv3 filehandle with intelligence on the server.
+ * Encoding goes from our in-memory structure to wire format.
+ * Decoding goes from wire format to our in-memory structure.
  */
 bool_t
-xdr_fastnfs_fh3(register XDR *xdrs, nfs_fh3 **objp)
+xdr_nfs_fh3_server(XDR *xdrs, nfs_fh3 *objp)
 {
-	int32_t *ptr;
-	uint_t in_size;
-
-	if (xdrs->x_op != XDR_DECODE)
-		return (FALSE);
-
-	in_size = RNDUP(sizeof (fhandle_t)) + 1 * BYTES_PER_XDR_UNIT;
-
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if ((ptr != NULL) && (XDR_CHECKFHSIZE(xdrs, *ptr, in_size))) {
-#ifdef _LITTLE_ENDIAN
-		/* Decode the length */
-		*ptr = (int32_t)ntohl(*(uint32_t *)ptr);
-#endif
-		*objp = (nfs_fh3 *) ptr;
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
+		return (xdr_encode_nfs_fh3(xdrs, objp));
+	case XDR_DECODE:
+		return (xdr_decode_nfs_fh3(xdrs, objp));
+	case XDR_FREE:
+		if (objp->fh3_u.data != NULL)
+			bzero(objp->fh3_u.data, sizeof (objp->fh3_u.data));
 		return (TRUE);
 	}
 	return (FALSE);
@@ -256,195 +472,18 @@ xdr_fastnfs_fh3(register XDR *xdrs, nfs_fh3 **objp)
 bool_t
 xdr_diropargs3(XDR *xdrs, diropargs3 *objp)
 {
-	uint32_t size;
-	int32_t *ptr;
-	int32_t *fhp;
-	uint32_t nodesize;
-	uint32_t in_size;
-	int rndup, i;
-	char *cptr;
-
-	if (xdrs->x_op == XDR_DECODE) {
-		objp->dirp = &objp->dir;
-		/* includes: fh, length of fh, and length of name */
-		in_size = RNDUP(sizeof (fhandle_t)) + 2 * BYTES_PER_XDR_UNIT;
-
-		ptr = XDR_INLINE(xdrs, in_size);
-
-		if (ptr != NULL) {
-		    if (XDR_CHECKFHSIZE(xdrs, *ptr, in_size)) {
-			    fhp = (int32_t *)(objp->dir.fh3_u.data);
-			    /* Get length of fhandle and then fh. */
-			    objp->dir.fh3_length = IXDR_GET_U_INT32(ptr);
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp++ = *ptr++;
-			    *fhp = *ptr++;
-
-			    size = IXDR_GET_U_INT32(ptr);
-
-			    if (size >= MAXNAMELEN) {
-				    objp->name = nfs3nametoolong;
-				    if (!XDR_CONTROL(xdrs, XDR_SKIPBYTES,
-						&size))
-					    return (FALSE);
-				    return (TRUE);
-			    }
-			    nodesize = size+1;
-			    if (nodesize == 0)
-				    return (TRUE);
-			    if (objp->name == NULL) {
-				    objp->name = (char *)kmem_alloc(nodesize,
-								    KM_NOSLEEP);
-				    if (objp->name == NULL)
-					    return (FALSE);
-				    objp->flags |= DA_FREENAME;
-			    }
-			    ptr = XDR_INLINE(xdrs, RNDUP(size));
-			    if (ptr == NULL) {
-				if (! xdr_opaque(xdrs, objp->name, size)) {
-					if (objp->flags & DA_FREENAME) {
-						kmem_free(objp->name,
-							nodesize);
-						objp->name = NULL;
-					}
-					return (FALSE);
-				}
-				objp->name[size] = '\0';
-				if (strlen(objp->name) != size) {
-					if (objp->flags & DA_FREENAME) {
-						kmem_free(objp->name,
-							nodesize);
-						objp->name = NULL;
-					}
-					return (FALSE);
-				}
-				return (TRUE);
-			    }
-			    bcopy((char *)ptr, objp->name, size);
-			    objp->name[size] = '\0';
-			    if (strlen(objp->name) != size) {
-				    if (objp->flags & DA_FREENAME) {
-					    kmem_free(objp->name,
-						nodesize);
-					    objp->name = NULL;
-				    }
-				    return (FALSE);
-			    }
-			    return (TRUE);
-		    }
-		}
-		if (objp->name == NULL)
-			objp->flags |= DA_FREENAME;
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, objp->dirp))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->dir))
+			return (FALSE);
+		break;
 	}
-
-	if ((xdrs->x_op == XDR_ENCODE) &&
-	    (objp->dirp->fh3_length == NFS3_CURFHSIZE)) {
-		fhp = (int32_t *)(objp->dirp->fh3_u.data);
-		size = strlen(objp->name);
-		in_size = RNDUP(sizeof (fhandle_t)) +
-			(2 * BYTES_PER_XDR_UNIT) + RNDUP(size);
-
-		ptr = XDR_INLINE(xdrs, in_size);
-		if (ptr != NULL) {
-			IXDR_PUT_U_INT32(ptr, objp->dirp->fh3_length);
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp++;
-			*ptr++ = *fhp;
-
-			IXDR_PUT_U_INT32(ptr, (uint32_t)size);
-
-			bcopy(objp->name, (char *)ptr, size);
-			rndup = BYTES_PER_XDR_UNIT -
-				(size % BYTES_PER_XDR_UNIT);
-			if (rndup != BYTES_PER_XDR_UNIT) {
-				cptr = (char *)ptr + size;
-				for (i = 0; i < rndup; i++)
-					*cptr++ = '\0';
-			}
-			return (TRUE);
-		}
-	}
-	if (xdrs->x_op == XDR_FREE) {
-		if ((objp->name == NULL) || (objp->name == nfs3nametoolong))
-			return (TRUE);
-		size = strlen(objp->name);
-		if (objp->flags & DA_FREENAME)
-			kmem_free(objp->name, size + 1);
-		objp->name = NULL;
-		return (TRUE);
-	}
-	/* Normal case */
-	if (!xdr_nfs_fh3(xdrs, objp->dirp))
-		return (FALSE);
 	return (xdr_string3(xdrs, &objp->name, MAXNAMELEN));
-}
-
-bool_t
-xdr_fastdiropargs3(XDR *xdrs, diropargs3 **objp)
-{
-	int32_t *ptr;
-	uint_t size;
-	uint_t nodesize;
-	struct diropargs3 *da;
-	uint_t in_size;
-	uint_t skipsize;
-
-	if (xdrs->x_op != XDR_DECODE)
-		return (FALSE);
-
-	in_size = RNDUP(sizeof (fhandle_t)) +	1 * BYTES_PER_XDR_UNIT;
-
-	/* includes the fh and fh length */
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if ((ptr != NULL) && (XDR_CHECKFHSIZE(xdrs, *ptr, in_size))) {
-		da = *objp;
-#ifdef _LITTLE_ENDIAN
-		*ptr = (int32_t)ntohl(*(uint32_t *)ptr);
-#endif
-		da->dirp = (nfs_fh3 *)ptr;
-		da->name = NULL;
-		da->flags = 0;
-		if (!XDR_CONTROL(xdrs, XDR_PEEK, (void *)&size)) {
-			da->flags |= DA_FREENAME;
-			return (xdr_string3(xdrs, &da->name, MAXNAMELEN));
-		}
-		if (size >= MAXNAMELEN) {
-			da->name = nfs3nametoolong;
-			skipsize = RNDUP(size) + (1 * BYTES_PER_XDR_UNIT);
-			if (!XDR_CONTROL(xdrs, XDR_SKIPBYTES, &skipsize))
-				return (FALSE);
-			return (TRUE);
-		}
-		nodesize = size + 1;
-		if (nodesize == 0)
-			return (TRUE);
-		ptr = XDR_INLINE(xdrs, 1 * BYTES_PER_XDR_UNIT + RNDUP(size));
-		if (ptr != NULL) {
-			if ((size % BYTES_PER_XDR_UNIT) != 0)
-				/* Plus 1 skips the size */
-				da->name = (char *)(ptr + 1);
-			else {
-				da->name = (char *)ptr;
-				bcopy((char *)(ptr + 1), da->name, size);
-			}
-			da->name[size] = '\0';
-			return (TRUE);
-		}
-		da->flags |= DA_FREENAME;
-		return (xdr_string3(xdrs, &da->name, MAXNAMELEN));
-	}
-	return (FALSE);
 }
 
 static bool_t
@@ -918,7 +957,18 @@ xdr_post_op_fh3(XDR *xdrs, post_op_fh3 *objp)
 		return (FALSE);
 	switch (objp->handle_follows) {
 	case TRUE:
-		return (xdr_nfs_fh3(xdrs, &objp->handle));
+		switch (xdrs->x_op) {
+		case XDR_ENCODE:
+			if (!xdr_nfs_fh3_server(xdrs, &objp->handle))
+				return (FALSE);
+			break;
+		case XDR_FREE:
+		case XDR_DECODE:
+			if (!xdr_nfs_fh3(xdrs, &objp->handle))
+				return (FALSE);
+			break;
+		}
+		return (TRUE);
 	case FALSE:
 		return (TRUE);
 	default:
@@ -1014,8 +1064,17 @@ xdr_GETATTR3vres(XDR *xdrs, GETATTR3vres *objp)
 bool_t
 xdr_SETATTR3args(XDR *xdrs, SETATTR3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->object))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->object))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->object))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_sattr3(xdrs, &objp->new_attributes))
 		return (FALSE);
 
@@ -1060,8 +1119,17 @@ xdr_LOOKUP3res(XDR *xdrs, LOOKUP3res *objp)
 
 	/* xdr_LOOKUP3resok */
 	resokp = &objp->resok;
-	if (!xdr_nfs_fh3(xdrs, &resokp->object))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3_server(xdrs, &resokp->object))
+			return (FALSE);
+		break;
+	case XDR_FREE:
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3(xdrs, &resokp->object))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_post_op_attr(xdrs, &resokp->obj_attributes))
 		return (FALSE);
 	return (xdr_post_op_attr(xdrs, &resokp->dir_attributes));
@@ -1095,52 +1163,17 @@ xdr_LOOKUP3vres(XDR *xdrs, LOOKUP3vres *objp)
 bool_t
 xdr_ACCESS3args(XDR *xdrs, ACCESS3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	int len;
-	uint_t in_size;
-
-	if (xdrs->x_op == XDR_FREE)
-		return (TRUE);
-
-	in_size = RNDUP(sizeof (fhandle_t)) +	2 * BYTES_PER_XDR_UNIT;
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if (ptr != NULL) {
-		len =  (xdrs->x_op == XDR_DECODE) ?
-			*ptr : objp->object.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-			fhp = (int32_t *)&(objp->object.fh3_u.data);
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->object.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				objp->access = IXDR_GET_U_INT32(ptr);
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->object.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_INT32(ptr, objp->access);
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->object))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->object))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->object))
-		return (FALSE);
 	return (xdr_u_int(xdrs, &objp->access));
 }
 
@@ -1184,53 +1217,17 @@ xdr_READLINK3res(XDR *xdrs, READLINK3res *objp)
 bool_t
 xdr_READ3args(XDR *xdrs, READ3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	uint_t in_size;
-	int len;
-
-	if (xdrs->x_op == XDR_FREE)
-		return (TRUE);
-
-	in_size = RNDUP(sizeof (fhandle_t)) + 4 * BYTES_PER_XDR_UNIT;
-	ptr = XDR_INLINE(xdrs, in_size);
-	if (ptr != NULL) {
-		len = (xdrs->x_op == XDR_DECODE) ?
-			*ptr : objp->file.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-			fhp = (int32_t *)& objp->file.fh3_u.data;
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->file.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				IXDR_GET_U_HYPER(ptr, objp->offset);
-				objp->count = IXDR_GET_U_INT32(ptr);
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->file.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_HYPER(ptr, objp->offset);
-				IXDR_PUT_U_INT32(ptr, objp->count);
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->file))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->file))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
-		return (FALSE);
 	if (!xdr_u_longlong_t(xdrs, &objp->offset))
 		return (FALSE);
 	return (xdr_u_int(xdrs, &objp->count));
@@ -1434,78 +1431,17 @@ xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 bool_t
 xdr_WRITE3args(XDR *xdrs, WRITE3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	uint_t in_size;
-	int len;
-
-	in_size = RNDUP(sizeof (fhandle_t)) + 5 * BYTES_PER_XDR_UNIT;
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if (ptr != NULL) {
-		len = (xdrs->x_op == XDR_DECODE) ? *ptr : objp->file.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-			fhp = (int32_t *)&(objp->file.fh3_u.data);
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->file.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				IXDR_GET_U_HYPER(ptr, objp->offset);
-				objp->count = IXDR_GET_U_INT32(ptr);
-				objp->stable = IXDR_GET_ENUM(ptr,
-						enum stable_how);
-				if (xdrs->x_ops == &xdrmblk_ops)
-					return (xdrmblk_getmblk(xdrs,
-					&objp->mblk,
-					(uint_t *)&objp->data.data_len));
-				/*
-				 * It is just as efficient to xdr_bytes
-				 * an array of unknown length as to inline
-				 * copy it.
-				 */
-				return (xdr_bytes(xdrs, &objp->data.data_val,
-						(uint_t *)&objp->data.data_len,
-						nfs3tsize()));
-			}
-
-			if (xdrs->x_op == XDR_ENCODE) {
-				IXDR_PUT_U_INT32(ptr, objp->file.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_HYPER(ptr, objp->offset);
-				IXDR_PUT_U_INT32(ptr, objp->count);
-				IXDR_PUT_ENUM(ptr, objp->stable);
-				return (xdr_bytes(xdrs,
-					(char **)&objp->data.data_val,
-					(uint_t *)&objp->data.data_len,
-					nfs3tsize()));
-			}
-
-			ASSERT(xdrs->x_op == XDR_FREE);
-			if (objp->data.data_val != NULL) {
-				kmem_free(objp->data.data_val,
-					(uint_t)objp->data.data_len);
-				objp->data.data_val = NULL;
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->file))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->file))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
-		return (FALSE);
 	if (!xdr_u_longlong_t(xdrs, &objp->offset))
 		return (FALSE);
 	if (!xdr_u_int(xdrs, &objp->count))
@@ -1784,8 +1720,17 @@ xdr_RENAME3res(XDR *xdrs, RENAME3res *objp)
 bool_t
 xdr_LINK3args(XDR *xdrs, LINK3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->file))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->file))
+			return (FALSE);
+		break;
+	}
 	return (xdr_diropargs3(xdrs, &objp->link));
 }
 
@@ -1816,70 +1761,20 @@ xdr_LINK3res(XDR *xdrs, LINK3res *objp)
 bool_t
 xdr_READDIR3args(XDR *xdrs, READDIR3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	uint_t in_size;
-	int len;
-
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
-	in_size = RNDUP(sizeof (fhandle_t)) + NFS3_COOKIEVERFSIZE +
-		4 * BYTES_PER_XDR_UNIT;
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if (ptr != NULL) {
-		len = (xdrs->x_op == XDR_DECODE) ? *ptr : objp->dir.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-
-			fhp = (int32_t *)&(objp->dir.fh3_u.data);
-
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->dir.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				IXDR_GET_U_HYPER(ptr, objp->cookie);
-				/*
-				 * cookieverf is really an opaque 8 byte
-				 * quantity, but we will treat it as a
-				 * hyper for efficiency, the cost of
-				 * a byteswap here saves bcopys elsewhere
-				 */
-				IXDR_GET_U_HYPER(ptr, objp->cookieverf);
-				objp->count = IXDR_GET_U_INT32(ptr);
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->dir.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_HYPER(ptr, objp->cookie);
-				/*
-				 * cookieverf is really an opaque 8 byte
-				 * quantity, but we will treat it as a
-				 * hyper for efficiency, the cost of
-				 * a byteswap here saves bcopys elsewhere
-				 */
-				IXDR_PUT_U_HYPER(ptr, objp->cookieverf);
-				IXDR_PUT_U_INT32(ptr, objp->count);
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->dir))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->dir))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->dir))
-		return (FALSE);
 	if (!xdr_u_longlong_t(xdrs, &objp->cookie))
 		return (FALSE);
 	/*
@@ -2125,72 +2020,20 @@ xdr_READDIR3vres(XDR *xdrs, READDIR3vres *objp)
 bool_t
 xdr_READDIRPLUS3args(XDR *xdrs, READDIRPLUS3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	uint_t in_size;
-	int len;
-
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
-	in_size = RNDUP(sizeof (fhandle_t)) + NFS3_COOKIEVERFSIZE +
-		5 * BYTES_PER_XDR_UNIT;
-
-	ptr = XDR_INLINE(xdrs, in_size);
-	if (ptr != NULL) {
-		len = (xdrs->x_op == XDR_DECODE) ? *ptr : objp->dir.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-
-			fhp = (int32_t *)&(objp->dir.fh3_u.data);
-
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->dir.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				IXDR_GET_U_HYPER(ptr, objp->cookie);
-				/*
-				 * cookieverf is really an opaque 8 byte
-				 * quantity, but we will treat it as a
-				 * hyper for efficiency, the cost of
-				 * a byteswap here saves bcopys elsewhere
-				 */
-				IXDR_GET_U_HYPER(ptr, objp->cookieverf);
-				objp->dircount = IXDR_GET_U_INT32(ptr);
-				objp->maxcount = IXDR_GET_U_INT32(ptr);
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->dir.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_HYPER(ptr, objp->cookie);
-				/*
-				 * cookieverf is really an opaque 8 byte
-				 * quantity, but we will treat it as a
-				 * hyper for efficiency, the cost of
-				 * a byteswap here saves bcopys elsewhere
-				 */
-				IXDR_PUT_U_HYPER(ptr, objp->cookieverf);
-				IXDR_PUT_U_INT32(ptr, objp->dircount);
-				IXDR_PUT_U_INT32(ptr, objp->maxcount);
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->dir))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->dir))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->dir))
-		return (FALSE);
 	if (!xdr_u_longlong_t(xdrs, &objp->cookie))
 		return (FALSE);
 	/*
@@ -2204,7 +2047,6 @@ xdr_READDIRPLUS3args(XDR *xdrs, READDIRPLUS3args *objp)
 	if (!xdr_u_int(xdrs, &objp->dircount))
 		return (FALSE);
 	return (xdr_u_int(xdrs, &objp->maxcount));
-
 }
 
 /*
@@ -2557,53 +2399,20 @@ xdr_PATHCONF3res(XDR *xdrs, PATHCONF3res *objp)
 bool_t
 xdr_COMMIT3args(XDR *xdrs, COMMIT3args *objp)
 {
-	int32_t *ptr;
-	int32_t *fhp;
-	int len;
-	uint_t in_size;
-
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
-	in_size = RNDUP(sizeof (fhandle_t)) +	4 * BYTES_PER_XDR_UNIT;
-	ptr = XDR_INLINE(xdrs, in_size);
-
-	if (ptr != NULL) {
-		len = (xdrs->x_op == XDR_DECODE) ? *ptr : objp->file.fh3_length;
-
-		if (XDR_CHECKFHSIZE(xdrs, len, in_size)) {
-			fhp = (int32_t *)&(objp->file.fh3_u.data);
-			if (xdrs->x_op == XDR_DECODE) {
-				objp->file.fh3_length = IXDR_GET_U_INT32(ptr);
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp++ = *ptr++;
-				*fhp = *ptr++;
-				IXDR_GET_U_HYPER(ptr, objp->offset);
-				objp->count = IXDR_GET_U_INT32(ptr);
-			} else {
-				IXDR_PUT_U_INT32(ptr, objp->file.fh3_length);
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp++;
-				*ptr++ = *fhp;
-				IXDR_PUT_U_HYPER(ptr, objp->offset);
-				IXDR_PUT_U_INT32(ptr, objp->count);
-			}
-			return (TRUE);
-		}
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->file))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->file))
+			return (FALSE);
+		break;
 	}
-
-	if (!xdr_nfs_fh3(xdrs, &objp->file))
-		return (FALSE);
 	if (!xdr_u_longlong_t(xdrs, &objp->offset))
 		return (FALSE);
 	return (xdr_u_int(xdrs, &objp->count));

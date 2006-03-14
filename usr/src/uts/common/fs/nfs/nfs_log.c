@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1403,7 +1402,7 @@ static struct nfslog_proc_disp nfslog_proc_v3[] = {
 	{xdr_void, xdr_void, FALSE},
 
 	/* NFSPROC3_GETATTR = 1 */
-	{xdr_nfs_fh3, xdr_nfslog_GETATTR3res, FALSE},
+	{xdr_nfslog_nfs_fh3, xdr_nfslog_GETATTR3res, FALSE},
 
 	/* NFSPROC3_SETATTR = 2 */
 	{xdr_nfslog_SETATTR3args, xdr_nfslog_SETATTR3res, TRUE},
@@ -1415,7 +1414,7 @@ static struct nfslog_proc_disp nfslog_proc_v3[] = {
 	{xdr_nfslog_ACCESS3args, xdr_nfslog_ACCESS3res, FALSE},
 
 	/* NFSPROC3_READLINK = 5 */
-	{xdr_nfs_fh3, xdr_nfslog_READLINK3res, FALSE},
+	{xdr_nfslog_nfs_fh3, xdr_nfslog_READLINK3res, FALSE},
 
 	/* NFSPROC3_READ = 6 */
 	{xdr_nfslog_READ3args, xdr_nfslog_READ3res, TRUE},
@@ -1530,7 +1529,7 @@ nfslog_get_exi(
 {
 	struct log_buffer *lb;
 	struct exportinfo *exi_ret = NULL;
-	fhandle_t		*fh = NULL;
+	fhandle_t		*fh;
 	nfs_fh3			*fh3;
 
 	if (exi == NULL)
@@ -1576,8 +1575,8 @@ nfslog_get_exi(
 			if ((req->rq_proc == NFSPROC3_LOOKUP) &&
 				(((LOOKUP3res *)res)->status == NFS3_OK)) {
 				fh3 = &((LOOKUP3res *)res)->res_u.ok.object;
-				if (fh3->fh3_length == sizeof (fhandle_t))
-					fh = &fh3->fh3_u.nfs_fh3_i.fh3_i;
+				exi_ret = checkexport(&fh3->fh3_fsid,
+					FH3TOXFIDP(fh3));
 			}
 			break;
 
@@ -1587,14 +1586,12 @@ nfslog_get_exi(
 					res)->dr_status == NFS_OK)) {
 				fh =
 		&((struct nfsdiropres *)res)->dr_u.dr_drok_u.drok_fhandle;
+				exi_ret = checkexport(&fh->fh_fsid,
+					(fid_t *)&fh->fh_xlen);
 			}
 			break;
 		default:
 			break;
-		}
-		if (fh != NULL) {
-			exi_ret = checkexport(&fh->fh_fsid,
-				(fid_t *)&fh->fh_xlen);
 		}
 	}
 

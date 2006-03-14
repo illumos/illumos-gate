@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,11 +114,11 @@ out:
 		resp->status = puterrno3(error);
 }
 
-fhandle_t *
+void *
 rfs3_getattr_getfh(GETATTR3args *args)
 {
 
-	return ((fhandle_t *)&args->object.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object);
 }
 
 void
@@ -305,11 +304,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.obj_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_setattr_getfh(SETATTR3args *args)
 {
 
-	return ((fhandle_t *)&args->object.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object);
 }
 
 /* ARGSUSED */
@@ -338,7 +337,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		dvp = rootdir;
 		VN_HOLD(dvp);
 	} else {
-		dvp = nfs3_fhtovp(args->what.dirp, exi);
+		dvp = nfs3_fhtovp(&args->what.dir, exi);
 		if (dvp == NULL) {
 			error = ESTALE;
 			goto out;
@@ -365,9 +364,9 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	fhp = args->what.dirp;
+	fhp = &args->what.dir;
 	if (strcmp(args->what.name, "..") == 0 &&
-	    EQFID(&exi->exi_fid, (fid_t *)&fhp->fh3_len)) {
+	    EQFID(&exi->exi_fid, FH3TOFIDP(fhp))) {
 		resp->status = NFS3ERR_NOENT;
 		goto out1;
 	}
@@ -376,7 +375,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	 * If the public filehandle is used then allow
 	 * a multi-component lookup
 	 */
-	if (PUBLIC_FH3(args->what.dirp)) {
+	if (PUBLIC_FH3(&args->what.dir)) {
 		publicfh_flag = TRUE;
 		error = rfs_publicfh_mclookup(args->what.name, dvp, cr, &vp,
 					&exi, &sec);
@@ -465,11 +464,11 @@ out1:
 
 }
 
-fhandle_t *
+void *
 rfs3_lookup_getfh(LOOKUP3args *args)
 {
 
-	return ((fhandle_t *)&args->what.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->what.dir);
 }
 
 /* ARGSUSED */
@@ -595,11 +594,11 @@ out:
 	vattr_to_post_op_attr(vap, &resp->resfail.obj_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_access_getfh(ACCESS3args *args)
 {
 
-	return ((fhandle_t *)&args->object.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object);
 }
 
 /* ARGSUSED */
@@ -706,11 +705,11 @@ out1:
 	vattr_to_post_op_attr(vap, &resp->resfail.symlink_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_readlink_getfh(READLINK3args *args)
 {
 
-	return ((fhandle_t *)&args->symlink.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->symlink);
 }
 
 void
@@ -955,11 +954,11 @@ rfs3_read_free(READ3res *resp)
 	}
 }
 
-fhandle_t *
+void *
 rfs3_read_getfh(READ3args *args)
 {
 
-	return ((fhandle_t *)&args->file.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->file);
 }
 
 #define	MAX_IOVECS	12
@@ -1189,11 +1188,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.file_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_write_getfh(WRITE3args *args)
 {
 
-	return ((fhandle_t *)&args->file.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->file);
 }
 
 void
@@ -1219,7 +1218,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 	dbvap = NULL;
 	davap = NULL;
 
-	dvp = nfs3_fhtovp(args->where.dirp, exi);
+	dvp = nfs3_fhtovp(&args->where.dir, exi);
 	if (dvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -1535,11 +1534,11 @@ out1:
 	vattr_to_wcc_data(dbvap, davap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_create_getfh(CREATE3args *args)
 {
 
-	return ((fhandle_t *)&args->where.dir.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->where.dir);
 }
 
 void
@@ -1559,7 +1558,7 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 	dbvap = NULL;
 	davap = NULL;
 
-	dvp = nfs3_fhtovp(args->where.dirp, exi);
+	dvp = nfs3_fhtovp(&args->where.dir, exi);
 	if (dvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -1676,11 +1675,11 @@ out1:
 	vattr_to_wcc_data(dbvap, davap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_mkdir_getfh(MKDIR3args *args)
 {
 
-	return ((fhandle_t *)&args->where.dir.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->where.dir);
 }
 
 void
@@ -1700,7 +1699,7 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 	dbvap = NULL;
 	davap = NULL;
 
-	dvp = nfs3_fhtovp(args->where.dirp, exi);
+	dvp = nfs3_fhtovp(&args->where.dir, exi);
 	if (dvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -1832,11 +1831,11 @@ out1:
 	vattr_to_wcc_data(dbvap, davap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_symlink_getfh(SYMLINK3args *args)
 {
 
-	return ((fhandle_t *)&args->where.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->where.dir);
 }
 
 void
@@ -1858,7 +1857,7 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 	dbvap = NULL;
 	davap = NULL;
 
-	dvp = nfs3_fhtovp(args->where.dirp, exi);
+	dvp = nfs3_fhtovp(&args->where.dir, exi);
 	if (dvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2018,11 +2017,11 @@ out1:
 	vattr_to_wcc_data(dbvap, davap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_mknod_getfh(MKNOD3args *args)
 {
 
-	return ((fhandle_t *)&args->where.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->where.dir);
 }
 
 void
@@ -2040,7 +2039,7 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	bvap = NULL;
 	avap = NULL;
 
-	vp = nfs3_fhtovp(args->object.dirp, exi);
+	vp = nfs3_fhtovp(&args->object.dir, exi);
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2143,11 +2142,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_remove_getfh(REMOVE3args *args)
 {
 
-	return ((fhandle_t *)&args->object.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object.dir);
 }
 
 void
@@ -2164,7 +2163,7 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 	bvap = NULL;
 	avap = NULL;
 
-	vp = nfs3_fhtovp(args->object.dirp, exi);
+	vp = nfs3_fhtovp(&args->object.dir, exi);
 	if (vp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2250,11 +2249,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.dir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_rmdir_getfh(RMDIR3args *args)
 {
 
-	return ((fhandle_t *)&args->object.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object.dir);
 }
 
 void
@@ -2273,7 +2272,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	struct vattr tbva;
 	struct vattr *tavap;
 	struct vattr tava;
-	nfs_fh3	*fh3;
+	nfs_fh3 *fh3;
 	struct exportinfo *to_exi;
 	vnode_t *srcvp = NULL;
 
@@ -2283,7 +2282,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	tavap = NULL;
 	tvp = NULL;
 
-	fvp = nfs3_fhtovp(args->from.dirp, exi);
+	fvp = nfs3_fhtovp(&args->from.dir, exi);
 	if (fvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2301,8 +2300,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 #endif
 	favap = fbvap;
 
-	fh3 = args->to.dirp;
-	to_exi = checkexport(&fh3->fh3_fsid, (fid_t *)&fh3->fh3_xlen);
+	fh3 = &args->to.dir;
+	to_exi = checkexport(&fh3->fh3_fsid, FH3TOXFIDP(fh3));
 	if (to_exi == NULL) {
 		resp->status = NFS3ERR_ACCES;
 		goto out1;
@@ -2314,7 +2313,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	tvp = nfs3_fhtovp(args->to.dirp, exi);
+	tvp = nfs3_fhtovp(&args->to.dir, exi);
 	if (tvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2465,11 +2464,11 @@ out1:
 	vattr_to_wcc_data(tbvap, tavap, &resp->resfail.todir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_rename_getfh(RENAME3args *args)
 {
 
-	return ((fhandle_t *)&args->from.dirp->fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->from.dir);
 }
 
 void
@@ -2510,8 +2509,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
 #endif
 
-	fh3 = args->link.dirp;
-	to_exi = checkexport(&fh3->fh3_fsid, (fid_t *)&fh3->fh3_xlen);
+	fh3 = &args->link.dir;
+	to_exi = checkexport(&fh3->fh3_fsid, FH3TOXFIDP(fh3));
 	if (to_exi == NULL) {
 		resp->status = NFS3ERR_ACCES;
 		goto out1;
@@ -2523,7 +2522,7 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	dvp = nfs3_fhtovp(args->link.dirp, exi);
+	dvp = nfs3_fhtovp(&args->link.dir, exi);
 	if (dvp == NULL) {
 		error = ESTALE;
 		goto out;
@@ -2611,11 +2610,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.linkdir_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_link_getfh(LINK3args *args)
 {
 
-	return ((fhandle_t *)&args->file.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->file);
 }
 
 /*
@@ -2833,11 +2832,11 @@ out1:
 	vattr_to_post_op_attr(vap, &resp->resfail.dir_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_readdir_getfh(READDIR3args *args)
 {
 
-	return ((fhandle_t *)&args->dir.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->dir);
 }
 
 void
@@ -2869,13 +2868,13 @@ rfs3_readdir_free(READDIR3res *resp)
  * attributes - NFS3_SIZEOF_FATTR3 * BYTES_PER_XDR_UNIT
  * status byte for file handle - 1 *  BYTES_PER_XDR_UNIT
  * length of a file handle - 1 * BYTES_PER_XDR_UNIT
- * Maxmum length of a file handle (NFS3_CURFHSIZE)
+ * Maxmum length of a file handle (NFS3_MAXFHSIZE)
  * name length of the entry to the nearest bytes
  */
 #define	NFS3_READDIRPLUS_ENTRY(namelen)	\
 	((1 + 2 + 1 + 2 + 1 + NFS3_SIZEOF_FATTR3 + 1 + 1) * \
 		BYTES_PER_XDR_UNIT + \
-	NFS3_CURFHSIZE + roundup(namelen, BYTES_PER_XDR_UNIT))
+	NFS3_MAXFHSIZE + roundup(namelen, BYTES_PER_XDR_UNIT))
 
 static int rfs3_readdir_unit = MAXBSIZE;
 
@@ -3200,11 +3199,11 @@ out1:
 	vattr_to_post_op_attr(vap, &resp->resfail.dir_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_readdirplus_getfh(READDIRPLUS3args *args)
 {
 
-	return ((fhandle_t *)&args->dir.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->dir);
 }
 
 void
@@ -3284,11 +3283,11 @@ out:
 	vattr_to_post_op_attr(vap, &resp->resfail.obj_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_fsstat_getfh(FSSTAT3args *args)
 {
 
-	return ((fhandle_t *)&args->fsroot.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->fsroot);
 }
 
 /* ARGSUSED */
@@ -3355,11 +3354,11 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 	    FSF3_HOMOGENEOUS | FSF3_CANSETTIME;
 }
 
-fhandle_t *
+void *
 rfs3_fsinfo_getfh(FSINFO3args *args)
 {
 
-	return ((fhandle_t *)&args->fsroot.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->fsroot);
 }
 
 /* ARGSUSED */
@@ -3437,11 +3436,11 @@ out:
 	vattr_to_post_op_attr(vap, &resp->resfail.obj_attributes);
 }
 
-fhandle_t *
+void *
 rfs3_pathconf_getfh(PATHCONF3args *args)
 {
 
-	return ((fhandle_t *)&args->object.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->object);
 }
 
 void
@@ -3534,11 +3533,11 @@ out1:
 	vattr_to_wcc_data(bvap, avap, &resp->resfail.file_wcc);
 }
 
-fhandle_t *
+void *
 rfs3_commit_getfh(COMMIT3args *args)
 {
 
-	return ((fhandle_t *)&args->file.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->file);
 }
 
 static int

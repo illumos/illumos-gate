@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1527,11 +1526,15 @@ done:
 int
 nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 {
-	fhandle_t fh;
+	nfs_fh3 fh;
+	char buf[NFS3_MAXFHSIZE];
+	char *logptr, logbuf[NFS3_MAXFHSIZE];
+	int l = NFS3_MAXFHSIZE;
 	vnode_t *vp;
 	vnode_t *dvp;
 	struct exportinfo *exi;
 	int error;
+	int vers;
 	STRUCT_HANDLE(nfs_getfh_args, uap);
 
 #ifdef lint
@@ -1588,16 +1591,69 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 		}
 	}
 
+	vers = STRUCT_FGET(uap, vers);
 	exi = nfs_vptoexi(dvp, vp, cr, NULL, &error, FALSE);
 	if (!error) {
-		error = makefh(&fh, vp, exi);
+		if (vers == NFS_VERSION) {
+			error = makefh((fhandle_t *)buf, vp, exi);
+			l = NFS_FHSIZE;
+			logptr = buf;
+		} else if (vers == NFS_V3) {
+			int i, sz;
+
+			error = makefh3(&fh, vp, exi);
+			l = fh.fh3_length;
+			logptr = logbuf;
+			if (!error) {
+				i = 0;
+				sz = sizeof (fsid_t);
+				bcopy(&fh.fh3_fsid, &buf[i], sz);
+				i += sz;
+				sz = sizeof (ushort_t);
+				bcopy(&fh.fh3_len, &buf[i], sz);
+				i += sz;
+				sz = fh.fh3_len;
+				bcopy(fh.fh3_data, &buf[i], sz);
+				i += sz;
+				sz = sizeof (ushort_t);
+				bcopy(&fh.fh3_xlen, &buf[i], sz);
+				i += sz;
+				sz = fh.fh3_xlen;
+				bcopy(fh.fh3_xdata, &buf[i], sz);
+				i += sz;
+			}
+			/*
+			 * If we need to do NFS logging, the filehandle
+			 * must be downsized to 32 bytes.
+			 */
+			if (!error && exi->exi_export.ex_flags & EX_LOG) {
+				i = 0;
+				sz = sizeof (fsid_t);
+				bcopy(&fh.fh3_fsid, &logbuf[i], sz);
+				i += sz;
+				sz = sizeof (ushort_t);
+				bcopy(&fh.fh3_len, &logbuf[i], sz);
+				i += sz;
+				sz = NFS_FHMAXDATA;
+				bcopy(fh.fh3_data, &logbuf[i], sz);
+				i += sz;
+				sz = sizeof (ushort_t);
+				bcopy(&fh.fh3_xlen, &logbuf[i], sz);
+				i += sz;
+				sz = NFS_FHMAXDATA;
+				bcopy(fh.fh3_xdata, &logbuf[i], sz);
+				i += sz;
+			}
+		}
 		if (!error && exi->exi_export.ex_flags & EX_LOG) {
-			nfslog_getfh(exi, &fh, STRUCT_FGETP(uap, fname),
-				UIO_USERSPACE, cr);
+			nfslog_getfh(exi, (fhandle_t *)logptr,
+			    STRUCT_FGETP(uap, fname), UIO_USERSPACE, cr);
 		}
 		exi_rele(exi);
 		if (!error) {
-			if (copyout(&fh, STRUCT_FGETP(uap, fhp), sizeof (fh)))
+			if (copyout(&l, STRUCT_FGETP(uap, lenp), sizeof (int)))
+				error = EFAULT;
+			if (copyout(buf, STRUCT_FGETP(uap, fhp), l))
 				error = EFAULT;
 		}
 	}
@@ -1807,18 +1863,23 @@ int
 makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 {
 	int error;
+	fid_t fid;
 
-	fh->fh3_length = sizeof (fh->fh3_u.nfs_fh3_i);
-	fh->fh3_u.nfs_fh3_i.fh3_i = exi->exi_fh;	/* struct copy */
-
-	error = VOP_FID(vp, (fid_t *)&fh->fh3_len);
-
-	if (error) {
-		/*
-		 * Should be something other than EREMOTE
-		 */
+	bzero(&fid, sizeof (fid));
+	fid.fid_len = MAXFIDSZ;
+	error = VOP_FID(vp, &fid);
+	if (error)
 		return (EREMOTE);
-	}
+
+	bzero(fh, sizeof (nfs_fh3));
+	fh->fh3_fsid = exi->exi_fsid;
+	fh->fh3_len = fid.fid_len;
+	bcopy(fid.fid_data, fh->fh3_data, fh->fh3_len);
+	fh->fh3_xlen = exi->exi_fid.fid_len;
+	bcopy(exi->exi_fid.fid_data, fh->fh3_xdata, fh->fh3_xlen);
+	fh->fh3_length = sizeof (fsid_t)
+			+ sizeof (ushort_t) + fh->fh3_len
+			+ sizeof (ushort_t) + fh->fh3_xlen;
 	return (0);
 }
 
@@ -2052,12 +2113,13 @@ nfs3_fhtovp(nfs_fh3 *fh, struct exportinfo *exi)
 		return (vp);
 	}
 
-	if (fh->fh3_length != NFS3_CURFHSIZE)
+	if (fh->fh3_length < NFS3_OLDFHSIZE ||
+	    fh->fh3_length > NFS3_MAXFHSIZE)
 		return (NULL);
 
 	vfsp = exi->exi_vp->v_vfsp;
 	ASSERT(vfsp != NULL);
-	fidp = (fid_t *)&fh->fh3_len;
+	fidp = FH3TOFIDP(fh);
 
 	error = VFS_VGET(vfsp, &vp, fidp);
 	if (error || vp == NULL)
@@ -2081,15 +2143,18 @@ lm_nfs3_fhtovp(nfs_fh3 *fh)
 	vfs_t *vfsp;
 	vnode_t *vp;
 	int error;
+	fid_t *fidp;
 
-	if (fh->fh3_length != NFS3_CURFHSIZE)
+	if (fh->fh3_length < NFS3_OLDFHSIZE ||
+	    fh->fh3_length > NFS3_MAXFHSIZE)
 		return (NULL);
 
 	vfsp = getvfs(&fh->fh3_fsid);
 	if (vfsp == NULL)
 		return (NULL);
+	fidp = FH3TOFIDP(fh);
 
-	error = VFS_VGET(vfsp, &vp, (fid_t *)&(fh->fh3_len));
+	error = VFS_VGET(vfsp, &vp, fidp);
 	VFS_RELE(vfsp);
 	if (error || vp == NULL)
 		return (NULL);
@@ -2357,7 +2422,7 @@ static struct ex_vol_rename *
 find_volrnm_fh(struct exportinfo *exi, nfs_fh4 *fh4p)
 {
 	struct ex_vol_rename *p = NULL;
-	fhandle_ext_t *fhp;
+	fhandle4_t *fhp;
 
 	/* XXX shouldn't we assert &exported_lock held? */
 	ASSERT(MUTEX_HELD(&exi->exi_vol_rename_lock));
@@ -2368,7 +2433,7 @@ find_volrnm_fh(struct exportinfo *exi, nfs_fh4 *fh4p)
 	fhp = &((nfs_fh4_fmt_t *)fh4p->nfs_fh4_val)->fh4_i;
 	for (p = exi->exi_vol_rename; p != NULL; p = p->vrn_next) {
 		if (bcmp(fhp, &p->vrn_fh_fmt.fh4_i,
-		    sizeof (fhandle_ext_t)) == 0)
+		    sizeof (fhandle4_t)) == 0)
 			break;
 	}
 	return (p);

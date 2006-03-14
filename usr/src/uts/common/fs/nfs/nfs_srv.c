@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +134,7 @@ rfs_getattr(fhandle_t *fhp, struct nfsattrstat *ns, struct exportinfo *exi,
 	TRACE_1(TR_FAC_NFS, TR_RFS_GETATTR_END,
 		"rfs_getattr_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_getattr_getfh(fhandle_t *fhp)
 {
 	return (fhp);
@@ -344,7 +343,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
 		"rfs_setattr_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_setattr_getfh(struct nfssaargs *args)
 {
 	return (&args->saa_fh);
@@ -486,7 +485,7 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
 		"rfs_lookup_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_lookup_getfh(struct nfsdiropargs *da)
 {
 	return (da->da_fhandle);
@@ -612,7 +611,7 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
 		"rfs_readlink_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_readlink_getfh(fhandle_t *fhp)
 {
 	return (fhp);
@@ -923,7 +922,7 @@ rfs_rdfree(struct nfsrdresult *rr)
 	}
 }
 
-fhandle_t *
+void *
 rfs_read_getfh(struct nfsreadargs *ra)
 {
 	return (&ra->ra_fhandle);
@@ -1715,7 +1714,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		"rfs_write_end:(%S)", "async");
 }
 
-fhandle_t *
+void *
 rfs_write_getfh(struct nfswriteargs *wa)
 {
 	return (&wa->wa_fhandle);
@@ -1989,7 +1988,7 @@ out:
 	TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END,
 		"rfs_create_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_create_getfh(struct nfscreatargs *args)
 {
 	return (args->ca_da.da_fhandle);
@@ -2095,7 +2094,7 @@ out:
 		"rfs_remove_end:(%S)", "done");
 }
 
-fhandle_t *
+void *
 rfs_remove_getfh(struct nfsdiropargs *da)
 {
 	return (da->da_fhandle);
@@ -2276,7 +2275,7 @@ out:
 	TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
 		"rfs_rename_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_rename_getfh(struct nfsrnmargs *args)
 {
 	return (args->rna_from.da_fhandle);
@@ -2384,7 +2383,7 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 	TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
 		"rfs_link_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_link_getfh(struct nfslinkargs *args)
 {
 	return (args->la_from);
@@ -2486,7 +2485,7 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
 		"rfs_symlink_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_symlink_getfh(struct nfsslargs *args)
 {
 	return (args->sla_from.da_fhandle);
@@ -2600,7 +2599,7 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 	TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
 		"rfs_mkdir_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_mkdir_getfh(struct nfscreatargs *args)
 {
 	return (args->ca_da.da_fhandle);
@@ -2682,7 +2681,7 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 	TRACE_1(TR_FAC_NFS, TR_RFS_RMDIR_END,
 		"rfs_rmdir_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_rmdir_getfh(struct nfsdiropargs *da)
 {
 	return (da->da_fhandle);
@@ -2815,7 +2814,7 @@ bad:
 	TRACE_1(TR_FAC_NFS, TR_RFS_READDIR_END,
 		"rfs_readdir_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_readdir_getfh(struct nfsrddirargs *rda)
 {
 	return (&rda->rda_fh);
@@ -2864,7 +2863,7 @@ rfs_statfs(fhandle_t *fh, struct nfsstatfs *fs, struct exportinfo *exi,
 	TRACE_1(TR_FAC_NFS, TR_RFS_STATFS_END,
 		"rfs_statfs_end:(%S)", "done");
 }
-fhandle_t *
+void *
 rfs_statfs_getfh(fhandle_t *fh)
 {
 	return (fh);

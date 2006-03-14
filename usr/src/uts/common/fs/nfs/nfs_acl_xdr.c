@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -437,8 +436,17 @@ bool_t
 xdr_GETACL3args(XDR *xdrs, GETACL3args *objp)
 {
 
-	if (!xdr_nfs_fh3(xdrs, &objp->fh))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_u_int(xdrs, &objp->mask))
 		return (FALSE);
 	return (TRUE);
@@ -487,8 +495,17 @@ bool_t
 xdr_SETACL3args(XDR *xdrs, SETACL3args *objp)
 {
 
-	if (!xdr_nfs_fh3(xdrs, &objp->fh))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_secattr(xdrs, &objp->acl))
 		return (FALSE);
 	return (TRUE);
@@ -534,8 +551,17 @@ xdr_SETACL3res(XDR *xdrs, SETACL3res *objp)
 bool_t
 xdr_GETXATTRDIR3args(XDR *xdrs, GETXATTRDIR3args *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->fh))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_FREE:
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_bool(xdrs, &objp->create))
 		return (FALSE);
 	return (TRUE);
@@ -544,8 +570,17 @@ xdr_GETXATTRDIR3args(XDR *xdrs, GETXATTRDIR3args *objp)
 bool_t
 xdr_GETXATTRDIR3resok(XDR *xdrs, GETXATTRDIR3resok *objp)
 {
-	if (!xdr_nfs_fh3(xdrs, &objp->fh))
-		return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
+		if (!xdr_nfs_fh3_server(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	case XDR_FREE:
+	case XDR_DECODE:
+		if (!xdr_nfs_fh3(xdrs, &objp->fh))
+			return (FALSE);
+		break;
+	}
 	if (!xdr_post_op_attr(xdrs, &objp->attr))
 		return (FALSE);
 	return (TRUE);

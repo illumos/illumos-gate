@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -740,10 +739,11 @@ static void
 mount(struct svc_req *rqstp)
 {
 	SVCXPRT *transp;
-	int version;
+	int version, vers;
 	struct fhstatus fhs;
 	struct mountres3 mountres3;
-	char fh3[FHSIZE3];
+	char fh[FHSIZE3];
+	int len = FHSIZE3;
 	char *path, rpath[MAXPATHLEN];
 	struct share *sh = NULL;
 	struct nd_hostservlist *clnames = NULL;
@@ -751,7 +751,6 @@ mount(struct svc_req *rqstp)
 	int error = 0, lofs_tried = 0;
 	int flavor_list[MAX_FLAVORS];
 	int flavor_count;
-	char *fhp;
 	struct netbuf *nb;
 
 	transp = rqstp->rq_xprt;
@@ -832,25 +831,14 @@ mount(struct svc_req *rqstp)
 	/*
 	 * Now get the filehandle.
 	 *
-	 * We assume here that the filehandle returned from
-	 * nfs_getfh() is only 32 bytes which is the size of struct svcfh.
-	 * NFS V2 clients get only the 32 byte filehandle.
-	 * NFS V3 clients get a 64 byte filehandle consisting
-	 * of a 32 byte filehandle followed by 32 bytes of nulls.
+	 * NFS V2 clients get a 32 byte filehandle.
+	 * NFS V3 clients get a 32 or 64 byte filehandle, depending on
+	 * the embedded FIDs.
 	 */
-	if (version == MOUNTVERS3) {
-		mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len =
-								NFS3_CURFHSIZE;
-		mountres3.mountres3_u.mountinfo.fhandle.fhandle3_val = fh3;
-		fhp = fh3;
-		(void) memset(fhp + NFS3_CURFHSIZE, 0,
-						NFS3_FHSIZE-NFS3_CURFHSIZE);
-	} else {
-		fhp = (char *)&fhs.fhstatus_u.fhs_fhandle;
-	}
+	vers = (version == MOUNTVERS3) ? NFS_V3 : NFS_VERSION;
 
 	/* LINTED pointer alignment */
-	while (nfs_getfh(rpath, (fhandle_t *)fhp) < 0) {
+	while (nfs_getfh(rpath, vers, &len, fh) < 0) {
 		if (errno == EINVAL &&
 			(sh = find_lofsentry(rpath, &lofs_tried)) != NULL) {
 			errno = 0;
@@ -860,6 +848,13 @@ mount(struct svc_req *rqstp)
 		syslog(LOG_DEBUG, "mount request: getfh failed on %s: %m",
 			path);
 		break;
+	}
+
+	if (version == MOUNTVERS3) {
+		mountres3.mountres3_u.mountinfo.fhandle.fhandle3_len = len;
+		mountres3.mountres3_u.mountinfo.fhandle.fhandle3_val = fh;
+	} else {
+		bcopy(fh, &fhs.fhstatus_u.fhs_fhandle, NFS_FHSIZE);
 	}
 
 reply:

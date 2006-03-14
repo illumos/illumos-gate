@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,13 +57,13 @@ vop_fid_pseudo(vnode_t *vp, fid_t *fidp)
 	 * XXX nfs4_fid() does nothing and returns EREMOTE.
 	 * XXX nfs3_fid()/nfs_fid() returns nfs filehandle as its fid
 	 * which has a bigger length than local fid.
-	 * NFS_FHMAXDATA_EXT is the size of
-	 * fhandle_ext_t.fh_xdata[NFS_FHMAXDATA_EXT].
+	 * NFS_FH4MAXDATA is the size of
+	 * fhandle4_t.fh_xdata[NFS_FH4MAXDATA].
 	 *
 	 * Note: nfs[2,3,4]_fid() only gets called for diskless clients.
 	 */
 	if (error == EREMOTE ||
-	    (error == 0 && fidp->fid_len > NFS_FHMAXDATA_EXT)) {
+	    (error == 0 && fidp->fid_len > NFS_FH4MAXDATA)) {
 
 		va.va_mask = AT_NODEID;
 		error = VOP_GETATTR(vp, &va, 0, CRED());

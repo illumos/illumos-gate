@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.
  * All rights reserved.
  * Use is subject to license terms.
  */
@@ -165,7 +164,7 @@ acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
 	}
 }
 
-fhandle_t *
+void *
 acl2_getacl_getfh(GETACL2args *args)
 {
 
@@ -238,7 +237,7 @@ acl2_setacl(SETACL2args *args, SETACL2res *resp, struct exportinfo *exi,
 	resp->status = NFS_OK;
 }
 
-fhandle_t *
+void *
 acl2_setacl_getfh(SETACL2args *args)
 {
 
@@ -277,7 +276,7 @@ acl2_getattr(GETATTR2args *args, GETATTR2res *resp, struct exportinfo *exi,
 	resp->status = NFS_OK;
 }
 
-fhandle_t *
+void *
 acl2_getattr_getfh(GETATTR2args *args)
 {
 
@@ -373,7 +372,7 @@ acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
 	resp->status = NFS_OK;
 }
 
-fhandle_t *
+void *
 acl2_access_getfh(ACCESS2args *args)
 {
 
@@ -434,7 +433,7 @@ acl2_getxattrdir(GETXATTRDIR2args *args, GETXATTRDIR2res *resp,
 	resp->status = NFS_OK;
 }
 
-fhandle_t *
+void *
 acl2_getxattrdir_getfh(GETXATTRDIR2args *args)
 {
 	return (&args->fh);
@@ -542,11 +541,11 @@ out1:
 	vattr_to_post_op_attr(vap, &resp->resfail.attr);
 }
 
-fhandle_t *
+void *
 acl3_getacl_getfh(GETACL3args *args)
 {
 
-	return ((fhandle_t *)&args->fh.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->fh);
 }
 
 void
@@ -640,11 +639,11 @@ out1:
 	vattr_to_post_op_attr(vap, &resp->resfail.attr);
 }
 
-fhandle_t *
+void *
 acl3_setacl_getfh(SETACL3args *args)
 {
 
-	return ((fhandle_t *)&args->fh.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->fh);
 }
 
 /* ARGSUSED */
@@ -700,8 +699,8 @@ acl3_getxattrdir(GETXATTRDIR3args *args, GETXATTRDIR3res *resp,
 	resp->status = NFS3_OK;
 }
 
-fhandle_t *
+void *
 acl3_getxattrdir_getfh(GETXATTRDIR3args *args)
 {
-	return ((fhandle_t *)&args->fh.fh3_u.nfs_fh3_i.fh3_i);
+	return (&args->fh);
 }

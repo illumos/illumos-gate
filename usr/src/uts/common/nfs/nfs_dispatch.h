@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +45,7 @@ extern "C" {
  * Indexed by version, proc
  */
 
-struct rpcdisp {
+typedef struct rpcdisp {
 	void	  (*dis_proc)();	/* proc to call */
 	xdrproc_t dis_xdrargs;		/* xdr routine to get args */
 	xdrproc_t dis_fastxdrargs;	/* `fast' xdr routine to get args */
@@ -56,8 +55,8 @@ struct rpcdisp {
 	int	  dis_ressz;		/* size of results */
 	void	  (*dis_resfree)();	/* frees space allocated by proc */
 	int	  dis_flags;		/* flags, see below */
-	fhandle_t *(*dis_getfh)();	/* returns the fhandle for the req */
-};
+	void	  *(*dis_getfh)();	/* returns the fhandle for the req */
+} rpcdisp_t;
 
 #define	RPC_IDEMPOTENT	0x1	/* idempotent or not */
 /*
@@ -70,12 +69,12 @@ struct rpcdisp {
 #define	RPC_AVOIDWORK	0x8	/* do work avoidance for dups */
 #define	RPC_PUBLICFH_OK	0x10	/* allow use of public filehandle */
 
-struct rpc_disptable {
+typedef struct rpc_disptable {
 	int dis_nprocs;
 	char **dis_procnames;
 	kstat_named_t **dis_proccntp;
 	struct rpcdisp *dis_table;
-};
+} rpc_disptable_t;
 
 void	rpc_null(caddr_t *, caddr_t *);
 

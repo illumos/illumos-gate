@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -392,50 +391,62 @@ struct nfs_fid {
 /*
  * "Legacy" filehandles use NFS_FHMAXDATA (10) byte fids. Filesystems that
  * return a larger fid than NFS_FHMAXDATA, such as ZFS's .zfs snapshot
- * directory, can use up to NFS_FHMAXDATA_EXT bytes for their fid.
+ * directory, can use up to (((64 - 8) / 2) - 2) bytes for their fid.
+ * This currently holds for both NFSv3 and NFSv4.
  */
 #define	NFS_FHMAXDATA		10
-#define	NFS_FHMAXDATA_EXT	26
+#define	NFS_FH3MAXDATA		26
+#define	NFS_FH4MAXDATA		26
 
 /*
- * The current nfs file handle size for version 3 is currently 32 which is
- * the same in version 2. It is the object returned from makefh
- * (fhandle_t) which is size of struct svcfh.
- * Thus, if the size of struct svcfh changes or if Version 3 uses some other
+ * The original nfs file handle size for version 3 was 32 which was
+ * the same in version 2; now we're making it bigger to to deal with
+ * ZFS snapshot FIDs.
+ *
+ * If the size of fhandle3_t changes or if Version 3 uses some other
  * filehandle format, this constant may need to change.
  */
 
-#define	NFS3_CURFHSIZE	32
+#define	NFS3_OLDFHSIZE	32
+#define	NFS3_MAXFHSIZE	64
 
 /*
  * This is the actual definition of a legacy filehandle.  There is some
  * dependence on this layout in NFS-related code, particularly in the
  * user-level lock manager, so be careful about changing it.
  *
- * Currently NFSv2 and NFSv3 only use this structure.
+ * Currently only NFSv2 uses this structure.
  */
 
-struct svcfh {
+typedef struct svcfh {
 	fsid_t	fh_fsid;			/* filesystem id */
 	ushort_t fh_len;			/* file number length */
 	char	fh_data[NFS_FHMAXDATA];		/* and data */
 	ushort_t fh_xlen;			/* export file number length */
 	char	fh_xdata[NFS_FHMAXDATA];	/* and data */
-};
-
-typedef struct svcfh fhandle_t;
+} fhandle_t;
 
 /*
- * This is the actual definition of a extended filehandle.  This is currently
- * only used for NFSv4.
+ * This is the in-memory structure for an NFSv3 extended filehandle.
  */
-typedef struct fhandle_ext {
+typedef struct {
+	fsid_t	_fh3_fsid;			/* filesystem id */
+	ushort_t _fh3_len;			/* file number length */
+	char	_fh3_data[NFS_FH3MAXDATA];		/* and data */
+	ushort_t _fh3_xlen;			/* export file number length */
+	char	_fh3_xdata[NFS_FH3MAXDATA];	/* and data */
+} fhandle3_t;
+
+/*
+ * This is the in-memory structure for an NFSv4 extended filehandle.
+ */
+typedef struct {
 	fsid_t	fhx_fsid;			/* filesystem id */
 	ushort_t fhx_len;			/* file number length */
-	char	fhx_data[NFS_FHMAXDATA_EXT];	/* and data */
+	char	fhx_data[NFS_FH4MAXDATA];	/* and data */
 	ushort_t fhx_xlen;			/* export file number length */
-	char	fhx_xdata[NFS_FHMAXDATA_EXT];	/* and data */
-} fhandle_ext_t;
+	char	fhx_xdata[NFS_FH4MAXDATA];	/* and data */
+} fhandle4_t;
 
 /*
  * Arguments to remote write and writecache
@@ -795,54 +806,54 @@ struct mntinfo;		/* defined in nfs/nfs_clnt.h */
 
 extern void rfs_getattr(fhandle_t *, struct nfsattrstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_getattr_getfh(fhandle_t *);
+extern void *rfs_getattr_getfh(fhandle_t *);
 extern void rfs_setattr(struct nfssaargs *, struct nfsattrstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_setattr_getfh(struct nfssaargs *);
+extern void *rfs_setattr_getfh(struct nfssaargs *);
 extern void rfs_lookup(struct nfsdiropargs *, struct nfsdiropres *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_lookup_getfh(struct nfsdiropargs *);
+extern void *rfs_lookup_getfh(struct nfsdiropargs *);
 extern void rfs_readlink(fhandle_t *, struct nfsrdlnres *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_readlink_getfh(fhandle_t *);
+extern void *rfs_readlink_getfh(fhandle_t *);
 extern void rfs_rlfree(struct nfsrdlnres *);
 extern void rfs_read(struct nfsreadargs *, struct nfsrdresult *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_read_getfh(struct nfsreadargs *);
+extern void *rfs_read_getfh(struct nfsreadargs *);
 extern void rfs_rdfree(struct nfsrdresult *);
 extern void rfs_write_sync(struct nfswriteargs *, struct nfsattrstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
 extern void rfs_write(struct nfswriteargs *, struct nfsattrstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_write_getfh(struct nfswriteargs *);
+extern void *rfs_write_getfh(struct nfswriteargs *);
 extern void rfs_create(struct nfscreatargs *, struct nfsdiropres *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_create_getfh(struct nfscreatargs *);
+extern void *rfs_create_getfh(struct nfscreatargs *);
 extern void rfs_remove(struct nfsdiropargs *, enum nfsstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_remove_getfh(struct nfsdiropargs *);
+extern void *rfs_remove_getfh(struct nfsdiropargs *);
 extern void rfs_rename(struct nfsrnmargs *, enum nfsstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_rename_getfh(struct nfsrnmargs *);
+extern void *rfs_rename_getfh(struct nfsrnmargs *);
 extern void rfs_link(struct nfslinkargs *, enum nfsstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_link_getfh(struct nfslinkargs *);
+extern void *rfs_link_getfh(struct nfslinkargs *);
 extern void rfs_symlink(struct nfsslargs *, enum nfsstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_symlink_getfh(struct nfsslargs *);
+extern void *rfs_symlink_getfh(struct nfsslargs *);
 extern void rfs_mkdir(struct nfscreatargs *, struct nfsdiropres *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_mkdir_getfh(struct nfscreatargs *);
+extern void *rfs_mkdir_getfh(struct nfscreatargs *);
 extern void rfs_rmdir(struct nfsdiropargs *, enum nfsstat *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_rmdir_getfh(struct nfsdiropargs *);
+extern void *rfs_rmdir_getfh(struct nfsdiropargs *);
 extern void rfs_readdir(struct nfsrddirargs *, struct nfsrddirres *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_readdir_getfh(struct nfsrddirargs *);
+extern void *rfs_readdir_getfh(struct nfsrddirargs *);
 extern void rfs_rddirfree(struct nfsrddirres *);
 extern void rfs_statfs(fhandle_t *, struct nfsstatfs *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs_statfs_getfh(fhandle_t *);
+extern void *rfs_statfs_getfh(fhandle_t *);
 extern void rfs_srvrinit(void);
 extern void rfs_srvrfini(void);
 
@@ -1008,21 +1019,22 @@ typedef uint64 createverf3;
 
 typedef uint64 writeverf3;
 
-struct nfs_fh3 {
+typedef struct nfs_fh3 {
 	uint_t fh3_length;
 	union nfs_fh3_u {
 		struct nfs_fh3_i {
-			fhandle_t fh3_i;
+			fhandle3_t fh3_i;
 		} nfs_fh3_i;
 		char data[NFS3_FHSIZE];
 	} fh3_u;
-};
-#define	fh3_fsid	fh3_u.nfs_fh3_i.fh3_i.fh_fsid
-#define	fh3_len		fh3_u.nfs_fh3_i.fh3_i.fh_len /* fid length */
-#define	fh3_data	fh3_u.nfs_fh3_i.fh3_i.fh_data /* fid bytes */
-#define	fh3_xlen	fh3_u.nfs_fh3_i.fh3_i.fh_xlen
-#define	fh3_xdata	fh3_u.nfs_fh3_i.fh3_i.fh_xdata
-typedef struct nfs_fh3 nfs_fh3;
+} nfs_fh3;
+#define	fh3_fsid	fh3_u.nfs_fh3_i.fh3_i._fh3_fsid
+#define	fh3_len		fh3_u.nfs_fh3_i.fh3_i._fh3_len
+#define	fh3_data	fh3_u.nfs_fh3_i.fh3_i._fh3_data
+#define	fh3_xlen	fh3_u.nfs_fh3_i.fh3_i._fh3_xlen
+#define	fh3_xdata	fh3_u.nfs_fh3_i.fh3_i._fh3_xdata
+#define	FH3TOFIDP(fh)	((fid_t *)&((fh)->fh3_len))
+#define	FH3TOXFIDP(fh)	((fid_t *)&((fh)->fh3_xlen))
 
 /*
  * Two elements were added to the
@@ -2056,6 +2068,8 @@ extern  COMMIT3res * nfsproc3_commit_3();
 /* the NFS Version 3 XDR functions */
 
 extern bool_t xdr_nfs_fh3(XDR *, nfs_fh3 *);
+extern bool_t xdr_nfslog_nfs_fh3(XDR *, nfs_fh3 *);
+extern bool_t xdr_nfs_fh3_server(XDR *, nfs_fh3 *);
 extern bool_t xdr_diropargs3(XDR *, diropargs3 *);
 extern bool_t xdr_post_op_attr(XDR *, post_op_attr *);
 extern bool_t xdr_post_op_fh3(XDR *, post_op_fh3 *);
@@ -2113,71 +2127,71 @@ struct sec_ol;		/* defined in nfs/export.h */
 
 extern void rfs3_getattr(GETATTR3args *, GETATTR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_getattr_getfh(GETATTR3args *);
+extern void *rfs3_getattr_getfh(GETATTR3args *);
 extern void rfs3_setattr(SETATTR3args *, SETATTR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_setattr_getfh(SETATTR3args *);
+extern void *rfs3_setattr_getfh(SETATTR3args *);
 extern void rfs3_lookup(LOOKUP3args *, LOOKUP3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_lookup_getfh(LOOKUP3args *);
+extern void *rfs3_lookup_getfh(LOOKUP3args *);
 extern void rfs3_access(ACCESS3args *, ACCESS3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_access_getfh(ACCESS3args *);
+extern void *rfs3_access_getfh(ACCESS3args *);
 extern void rfs3_readlink(READLINK3args *, READLINK3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_readlink_getfh(READLINK3args *);
+extern void *rfs3_readlink_getfh(READLINK3args *);
 extern void rfs3_readlink_free(READLINK3res *);
 extern void rfs3_read(READ3args *, READ3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_read_getfh(READ3args *);
+extern void *rfs3_read_getfh(READ3args *);
 extern void rfs3_read_free(READ3res *);
 extern void rfs3_write(WRITE3args *, WRITE3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_write_getfh(WRITE3args *);
+extern void *rfs3_write_getfh(WRITE3args *);
 extern void rfs3_create(CREATE3args *, CREATE3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_create_getfh(CREATE3args *);
+extern void *rfs3_create_getfh(CREATE3args *);
 extern void rfs3_mkdir(MKDIR3args *, MKDIR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_mkdir_getfh(MKDIR3args *);
+extern void *rfs3_mkdir_getfh(MKDIR3args *);
 extern void rfs3_symlink(SYMLINK3args *, SYMLINK3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_symlink_getfh(SYMLINK3args *);
+extern void *rfs3_symlink_getfh(SYMLINK3args *);
 extern void rfs3_mknod(MKNOD3args *, MKNOD3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_mknod_getfh(MKNOD3args *);
+extern void *rfs3_mknod_getfh(MKNOD3args *);
 extern void rfs3_remove(REMOVE3args *, REMOVE3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_remove_getfh(REMOVE3args *);
+extern void *rfs3_remove_getfh(REMOVE3args *);
 extern void rfs3_rmdir(RMDIR3args *, RMDIR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_rmdir_getfh(RMDIR3args *);
+extern void *rfs3_rmdir_getfh(RMDIR3args *);
 extern void rfs3_rename(RENAME3args *, RENAME3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_rename_getfh(RENAME3args *);
+extern void *rfs3_rename_getfh(RENAME3args *);
 extern void rfs3_link(LINK3args *, LINK3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_link_getfh(LINK3args *);
+extern void *rfs3_link_getfh(LINK3args *);
 extern void rfs3_readdir(READDIR3args *, READDIR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_readdir_getfh(READDIR3args *);
+extern void *rfs3_readdir_getfh(READDIR3args *);
 extern void rfs3_readdir_free(READDIR3res *);
 extern void rfs3_readdirplus(READDIRPLUS3args *, READDIRPLUS3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_readdirplus_getfh(READDIRPLUS3args *);
+extern void *rfs3_readdirplus_getfh(READDIRPLUS3args *);
 extern void rfs3_readdirplus_free(READDIRPLUS3res *);
 extern void rfs3_fsstat(FSSTAT3args *, FSSTAT3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_fsstat_getfh(FSSTAT3args *);
+extern void *rfs3_fsstat_getfh(FSSTAT3args *);
 extern void rfs3_fsinfo(FSINFO3args *, FSINFO3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_fsinfo_getfh(FSINFO3args *);
+extern void *rfs3_fsinfo_getfh(FSINFO3args *);
 extern void rfs3_pathconf(PATHCONF3args *, PATHCONF3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_pathconf_getfh(PATHCONF3args *);
+extern void *rfs3_pathconf_getfh(PATHCONF3args *);
 extern void rfs3_commit(COMMIT3args *, COMMIT3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *rfs3_commit_getfh(COMMIT3args *);
+extern void *rfs3_commit_getfh(COMMIT3args *);
 extern void rfs3_srvrinit(void);
 extern void rfs3_srvrfini(void);
 

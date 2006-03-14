@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -944,7 +943,7 @@ void nfs4_debug_mutex_exit(kmutex_t *, char *, int);
 #ifdef VOLATILE_FH_TEST
 
 struct nfs_fh4_fmt {
-	fhandle_ext_t	fh4_i;
+	fhandle4_t	fh4_i;
 	uint32_t	fh4_flag;
 	uint32_t	fh4_volatile_id;
 };
@@ -952,7 +951,7 @@ struct nfs_fh4_fmt {
 #else /* VOLATILE_FH_TEST */
 
 struct nfs_fh4_fmt {
-	fhandle_ext_t	fh4_i;
+	fhandle4_t	fh4_i;
 	uint32_t	fh4_flag;
 };
 

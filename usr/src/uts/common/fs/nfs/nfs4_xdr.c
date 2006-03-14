@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -261,7 +260,7 @@ xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 	uint32_t fhsize;		/* filehandle size */
 	uint32_t bufsize;
 	rpc_inline_t *ptr;
-	uchar_t *buf, *bp;
+	uchar_t *bp;
 
 	ASSERT(xdrs->x_op == XDR_DECODE);
 
@@ -295,9 +294,11 @@ xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 	ptr = XDR_INLINE(xdrs, bufsize);
 	bp = (uchar_t *)ptr;
 	if (ptr == NULL) {
-		bp = buf = kmem_alloc(bufsize, KM_SLEEP);
-		if (!xdr_opaque(xdrs, (char *)bp, bufsize))
+		bp = kmem_alloc(bufsize, KM_SLEEP);
+		if (!xdr_opaque(xdrs, (char *)bp, bufsize)) {
+			kmem_free(bp, bufsize);
 			return (FALSE);
+		}
 	}
 
 	objp->nfs_fh4_val = kmem_zalloc(sizeof (nfs_fh4_fmt_t), KM_SLEEP);
@@ -317,7 +318,7 @@ xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 	}
 
 	if (ptr == NULL)
-		kmem_free(buf, bufsize);
+		kmem_free(bp, bufsize);
 	return (TRUE);
 }
 
@@ -363,12 +364,12 @@ xdr_inline_encode_nfs_fh4(uint32_t **ptrp, uint32_t *ptr_redzone,
 	if ((ptr + (otw_len / BYTES_PER_XDR_UNIT) + 1) > ptr_redzone)
 		return (FALSE);
 
-	IXDR_PUT_U_INT32(ptr, otw_len);
-
 	/*
-	 * Zero out the pading.
+	 * Zero out the padding.
 	 */
 	ptr[padword] = 0;
+
+	IXDR_PUT_U_INT32(ptr, otw_len);
 
 	/*
 	 * The rest of the filehandle is in native byteorder

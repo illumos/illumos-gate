@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.
+ *	Copyright 2006 Sun Microsystems, Inc.
  *	All rights reserved.
  *	Use is subject to license terms.
  */
@@ -330,31 +329,31 @@ extern bool_t xdr_GETXATTRDIR3res(XDR *, GETXATTRDIR3res *);
 /* the service procedures */
 extern void acl2_getacl(GETACL2args *, GETACL2res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl2_getacl_getfh(GETACL2args *);
+extern void *acl2_getacl_getfh(GETACL2args *);
 extern void acl2_getacl_free(GETACL2res *);
 extern void acl2_setacl(SETACL2args *, SETACL2res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl2_setacl_getfh(SETACL2args *);
+extern void *acl2_setacl_getfh(SETACL2args *);
 extern void acl2_getattr(GETATTR2args *, GETATTR2res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl2_getattr_getfh(GETATTR2args *);
+extern void *acl2_getattr_getfh(GETATTR2args *);
 extern void acl2_access(ACCESS2args *, ACCESS2res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl2_access_getfh(ACCESS2args *);
+extern void *acl2_access_getfh(ACCESS2args *);
 extern void acl2_getxattrdir(GETXATTRDIR2args *, GETXATTRDIR2res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl2_getxattrdir_getfh(GETXATTRDIR2args *);
+extern void *acl2_getxattrdir_getfh(GETXATTRDIR2args *);
 
 extern void acl3_getacl(GETACL3args *, GETACL3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl3_getacl_getfh(GETACL3args *);
+extern void *acl3_getacl_getfh(GETACL3args *);
 extern void acl3_getacl_free(GETACL3res *);
 extern void acl3_setacl(SETACL3args *, SETACL3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl3_setacl_getfh(SETACL3args *);
+extern void *acl3_setacl_getfh(SETACL3args *);
 extern void acl3_getxattrdir(GETXATTRDIR3args *, GETXATTRDIR3res *,
 			struct exportinfo *, struct svc_req *, cred_t *);
-extern fhandle_t *acl3_getxattrdir_getfh(GETXATTRDIR3args *);
+extern void *acl3_getxattrdir_getfh(GETXATTRDIR3args *);
 
 #endif
 

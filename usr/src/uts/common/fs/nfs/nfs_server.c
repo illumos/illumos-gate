@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -153,11 +152,11 @@ _info(struct modinfo *modinfop)
  * supports RPC_PUBLICFH_OK, and if the filesystem is explicitly exported
  * public (i.e., not the placeholder).
  */
-#define	PUBLICFH_CHECK(disp, exi, fh) \
+#define	PUBLICFH_CHECK(disp, exi, fsid, xfid) \
 		((disp->dis_flags & RPC_PUBLICFH_OK) && \
 		((exi->exi_export.ex_flags & EX_PUBLIC) || \
 		(exi == exi_public && exportmatch(exi_root, \
-		&fh->fh_fsid, (fid_t *)&fh->fh_xlen))))
+		fsid, xfid))))
 
 static void	nfs_srv_shutdown_all(int);
 static void	rfs4_server_start(int);
@@ -813,7 +812,7 @@ static struct rpcdisp rfsdisptab_v3[] = {
 
 	/* RFS3_GETATTR = 1 */
 	{rfs3_getattr,
-	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (GETATTR3args),
+	    xdr_nfs_fh3_server, NULL_xdrproc_t, sizeof (GETATTR3args),
 	    xdr_GETATTR3res, NULL_xdrproc_t, sizeof (GETATTR3res),
 	    nullfree, (RPC_IDEMPOTENT | RPC_ALLOWANON),
 	    rfs3_getattr_getfh},
@@ -841,7 +840,7 @@ static struct rpcdisp rfsdisptab_v3[] = {
 
 	/* RFS3_READLINK = 5 */
 	{rfs3_readlink,
-	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (READLINK3args),
+	    xdr_nfs_fh3_server, NULL_xdrproc_t, sizeof (READLINK3args),
 	    xdr_READLINK3res, NULL_xdrproc_t, sizeof (READLINK3res),
 	    rfs3_readlink_free, RPC_IDEMPOTENT,
 	    rfs3_readlink_getfh},
@@ -932,21 +931,21 @@ static struct rpcdisp rfsdisptab_v3[] = {
 
 	/* RFS3_FSSTAT = 18 */
 	{rfs3_fsstat,
-	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (FSSTAT3args),
+	    xdr_nfs_fh3_server, NULL_xdrproc_t, sizeof (FSSTAT3args),
 	    xdr_FSSTAT3res, NULL_xdrproc_t, sizeof (FSSTAT3res),
 	    nullfree, RPC_IDEMPOTENT,
 	    rfs3_fsstat_getfh},
 
 	/* RFS3_FSINFO = 19 */
 	{rfs3_fsinfo,
-	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (FSINFO3args),
+	    xdr_nfs_fh3_server, NULL_xdrproc_t, sizeof (FSINFO3args),
 	    xdr_FSINFO3res, NULL_xdrproc_t, sizeof (FSINFO3res),
 	    nullfree, RPC_IDEMPOTENT|RPC_ALLOWANON,
 	    rfs3_fsinfo_getfh},
 
 	/* RFS3_PATHCONF = 20 */
 	{rfs3_pathconf,
-	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (PATHCONF3args),
+	    xdr_nfs_fh3_server, NULL_xdrproc_t, sizeof (PATHCONF3args),
 	    xdr_PATHCONF3res, NULL_xdrproc_t, sizeof (PATHCONF3res),
 	    nullfree, RPC_IDEMPOTENT,
 	    rfs3_pathconf_getfh},
@@ -1461,12 +1460,13 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 #ifdef DEBUG
 	if (rfs_no_fast_xdrargs || (auth_flavor == RPCSEC_GSS) ||
 	    disp->dis_fastxdrargs == NULL_xdrproc_t ||
-	    !SVC_GETARGS(xprt, disp->dis_fastxdrargs, (char *)&args)) {
+	    !SVC_GETARGS(xprt, disp->dis_fastxdrargs, (char *)&args))
 #else
 	if ((auth_flavor == RPCSEC_GSS) ||
 	    disp->dis_fastxdrargs == NULL_xdrproc_t ||
-	    !SVC_GETARGS(xprt, disp->dis_fastxdrargs, (char *)&args)) {
+	    !SVC_GETARGS(xprt, disp->dis_fastxdrargs, (char *)&args))
 #endif
+	{
 		bzero(args, disp->dis_argsz);
 		if (!SVC_GETARGS(xprt, disp->dis_xdrargs, args)) {
 			svcerr_decode(xprt);
@@ -1495,9 +1495,27 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	 * setting the credential if everything is ok.
 	 */
 	if (disp->dis_getfh != NULL) {
-		fhandle_t *fh;
+		void *fh;
+		fsid_t *fsid;
+		fid_t *fid, *xfid;
+		fhandle_t *fh2;
+		nfs_fh3 *fh3;
 
 		fh = (*disp->dis_getfh)(args);
+		switch (req->rq_vers) {
+		case NFS_VERSION:
+			fh2 = (fhandle_t *)fh;
+			fsid = &fh2->fh_fsid;
+			fid = (fid_t *)&fh2->fh_len;
+			xfid = (fid_t *)&fh2->fh_xlen;
+			break;
+		case NFS_V3:
+			fh3 = (nfs_fh3 *)fh;
+			fsid = &fh3->fh3_fsid;
+			fid = FH3TOFIDP(fh3);
+			xfid = FH3TOXFIDP(fh3);
+			break;
+		}
 
 		/*
 		 * Fix for bug 1038302 - corbin
@@ -1519,8 +1537,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		 * Added anon_ok argument to checkauth().
 		 */
 
-		if ((dis_flags & RPC_ALLOWANON) &&
-		    EQFID((fid_t *)&fh->fh_len, (fid_t *)&fh->fh_xlen))
+		if ((dis_flags & RPC_ALLOWANON) && EQFID(fid, xfid))
 			anon_ok = 1;
 		else
 			anon_ok = 0;
@@ -1543,10 +1560,10 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		}
 #endif
 
-		exi = checkexport(&fh->fh_fsid, (fid_t *)&fh->fh_xlen);
+		exi = checkexport(fsid, xfid);
 
 		if (exi != NULL) {
-			publicfh_ok = PUBLICFH_CHECK(disp, exi, fh);
+			publicfh_ok = PUBLICFH_CHECK(disp, exi, fsid, xfid);
 
 			/*
 			 * Don't allow non-V4 clients access
@@ -1686,10 +1703,11 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	 * Serialize and send results struct
 	 */
 #ifdef DEBUG
-	if (rfs_no_fast_xdrres == 0 && res != (char *)&res_buf) {
+	if (rfs_no_fast_xdrres == 0 && res != (char *)&res_buf)
 #else
-	if (res != (char *)&res_buf) {
+	if (res != (char *)&res_buf)
 #endif
+	{
 		if (!svc_sendreply(xprt, disp->dis_fastxdrres, res)) {
 			cmn_err(CE_NOTE, "%s: bad sendreply", pgmname);
 			error++;
