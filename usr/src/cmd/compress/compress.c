@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1603,7 +1603,7 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 {
 	mode_t mode;
 	struct utimbuf timep;
-	acl_t *aclp;
+	acl_t *aclp = NULL;
 	int error;
 
 	if (fclose(outp)) {
@@ -1667,8 +1667,10 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 			    "entries\n"), ofname);
 			perm_stat = 1;
 		}
-		if (aclp)
+		if (aclp) {
 			acl_free(aclp);
+			aclp = NULL;
+		}
 
 		/* Copy ownership */
 		(void) chown(ofname, ifstat->st_uid, ifstat->st_gid);
