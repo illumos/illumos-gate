@@ -51,8 +51,8 @@ extern "C" {
 #define	MMU_BTOPR(x)		MMU_BTOP((x) + MMU_PAGE_OFFSET)
 
 /* MMU map flags */
-#define	MMU_MAP_MP		0
-#define	MMU_MAP_BUF		1
+#define	MMU_MAP_PFN		1
+#define	MMU_MAP_BUF		2
 
 typedef struct px px_t;
 typedef struct px_msiq px_msiq_t;
@@ -62,6 +62,7 @@ extern int px_lib_dev_fini(dev_info_t *dip);
 extern int px_lib_map_vconfig(dev_info_t *dip, ddi_map_req_t *mp,
     pci_config_offset_t off, pci_regspec_t *rp, caddr_t *addrp);
 extern void px_lib_map_attr_check(ddi_map_req_t *mp);
+
 extern int px_lib_intr_devino_to_sysino(dev_info_t *dip, devino_t devino,
     sysino_t *sysino);
 extern int px_lib_intr_getvalid(dev_info_t *dip, sysino_t sysino,
@@ -84,14 +85,14 @@ extern void px_fill_rc_status(px_fault_t *px_fault_p,
 #endif
 
 extern int px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
-    io_attributes_t io_attributes, void *addr, size_t pfn_index, int flag);
+    io_attributes_t attr, void *addr, size_t pfn_index, int flags);
 extern int px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages);
 extern int px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
-    io_attributes_t *attributes_p, r_addr_t *r_addr_p);
-extern int px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p,
+    io_attributes_t *attr_p, r_addr_t *r_addr_p);
+extern int px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p,
     uint64_t *hi_p);
 extern int px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p);
+    io_attributes_t attr, io_addr_t *io_addr_p);
 extern int px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
 

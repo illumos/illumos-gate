@@ -172,7 +172,7 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 	    (uint_t)pg_index, dvma_pg, (uint_t)npages, (uint_t)pfn_index);
 
 	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages, attr,
-	    (void *)mp, pfn_index, MMU_MAP_MP) != DDI_SUCCESS) {
+	    (void *)mp, pfn_index, MMU_MAP_PFN) != DDI_SUCCESS) {
 		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: "
 		    "px_lib_iommu_map failed\n");
 
@@ -188,7 +188,7 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 	ASSERT(PX_HAS_REDZONE(mp));
 
 	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index + npages), 1, attr,
-	    (void *)mp, pfn_index + npages - 1, MMU_MAP_MP) != DDI_SUCCESS) {
+	    (void *)mp, pfn_index + npages - 1, MMU_MAP_PFN) != DDI_SUCCESS) {
 		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: mapping "
 		    "REDZONE page failed\n");
 

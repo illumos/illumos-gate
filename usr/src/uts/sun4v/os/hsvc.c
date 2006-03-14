@@ -654,7 +654,7 @@ hsvc_init(void)
  * group only for itself.
  *
  * Rest of the API groups are currently negotiated on behalf
- * of the px, pcitool, glvc and  Niagara crypto support.  In
+ * of the pcitool, glvc and  Niagara crypto support.  In
  * future, when these drivers are modified to do the negotiation
  * themselves, corresponding entry should be removed from the
  * table below.
@@ -662,7 +662,6 @@ hsvc_init(void)
 static hsvc_info_t  hsvcinfo_unix[] = {
 	{HSVC_REV_1, NULL,	HSVC_GROUP_SUN4V,	1,	0, NULL},
 	{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	0, NULL},
-	{HSVC_REV_1, NULL,	HSVC_GROUP_VPCI,	1,	0, NULL},
 	{HSVC_REV_1, NULL,	HSVC_GROUP_VSC,		1,	0, NULL},
 	{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL},
 	{HSVC_REV_1, NULL,	HSVC_GROUP_NCS,		1,	0, NULL}

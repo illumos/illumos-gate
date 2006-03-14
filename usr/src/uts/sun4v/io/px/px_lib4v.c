@@ -37,6 +37,7 @@
 #include <sys/ivintr.h>
 #include <sys/errno.h>
 #include <sys/hypervisor_api.h>
+#include <sys/hsvc.h>
 #include <px_obj.h>
 #include <sys/machsystm.h>
 #include <sys/hotplug/pci/pcihp.h>
@@ -45,6 +46,17 @@
 
 /* mask for the ranges property in calculating the real PFN range */
 uint_t px_ranges_phi_mask = ((1 << 28) -1);
+
+/*
+ * Hypervisor VPCI services information for the px nexus driver.
+ */
+static	uint64_t	px_vpci_min_ver; /* Negotiated VPCI API minor version */
+static	uint_t		px_vpci_users = 0; /* VPCI API users */
+
+static hsvc_info_t px_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_VPCI, PX_VPCI_MAJOR_VER,
+	PX_VPCI_MINOR_VER, "PX"
+};
 
 int
 px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
@@ -69,7 +81,6 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 * defined by the SUN4V Bus Binding to Open Firmware.
 	 */
 	*dev_hdl = (devhandle_t)((rp->phys_addr >> 32) & DEVHDLE_MASK);
-
 	ddi_prop_free(rp);
 
 	/*
@@ -81,6 +92,24 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	    PCI_BUS_CONF_MAP_PROP, 1);
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
+
+	/*
+	 * Negotiate the API version for VPCI hypervisor services.
+	 */
+	if (px_vpci_users++)
+		return (DDI_SUCCESS);
+
+	if ((ret = hsvc_register(&px_hsvc, &px_vpci_min_ver)) != 0) {
+		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
+		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
+		    px_hsvc.hsvc_modname, px_hsvc.hsvc_group,
+		    px_hsvc.hsvc_major, px_hsvc.hsvc_minor, ret);
+
+		return (DDI_FAILURE);
+	}
+
+	DBG(DBG_ATTACH, dip, "px_lib_dev_init: negotiated VPCI API version, "
+	    "major 0x%lx minor 0x%lx\n", px_hsvc.hsvc_major, px_vpci_min_ver);
 
 	return (DDI_SUCCESS);
 }
@@ -94,6 +123,9 @@ px_lib_dev_fini(dev_info_t *dip)
 	(void) ddi_prop_remove(makedevice(ddi_driver_major(dip),
 	    PCIHP_AP_MINOR_NUM(ddi_get_instance(dip), PCIHP_DEVCTL_MINOR)), dip,
 	    PCI_BUS_CONF_MAP_PROP);
+
+	if (--px_vpci_users == 0)
+		(void) hsvc_unregister(&px_hsvc);
 
 	return (DDI_SUCCESS);
 }
@@ -269,8 +301,7 @@ px_lib_intr_reset(dev_info_t *dip)
 /*ARGSUSED*/
 int
 px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
-    io_attributes_t io_attr, void *addr, size_t pfn_index,
-    int flag)
+    io_attributes_t attr, void *addr, size_t pfn_index, int flags)
 {
 	tsbnum_t	tsb_num = PCI_TSBID_TO_TSBNUM(tsbid);
 	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
@@ -279,8 +310,8 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	int		i, err = DDI_SUCCESS;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: dip 0x%p tsbid 0x%llx "
-	    "pages 0x%x atrr 0x%x addr 0x%p pfn_index 0x%llx, flag 0x%x\n",
-	    dip, tsbid, pages, io_attr, addr, pfn_index, flag);
+	    "pages 0x%x attr 0x%x addr 0x%p pfn_index 0x%llx flags 0x%x\n",
+	    dip, tsbid, pages, attr, addr, pfn_index, flags);
 
 	if ((pfns = pfn_p = kmem_zalloc((pages * sizeof (io_page_list_t)),
 	    KM_NOSLEEP)) == NULL) {
@@ -289,7 +320,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	}
 
 	for (i = 0; i < pages; i++)
-		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flag, i));
+		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flags, i));
 
 	while ((ttes_mapped = pfn_p - pfns) < pages) {
 		uintptr_t	ra = va_to_pa(pfn_p);
@@ -305,7 +336,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 			ttes_mapped = 0;
 			if ((ret = hvio_iommu_map(DIP_TO_HANDLE(dip),
 			    PCI_TSBID(tsb_num, tsb_index + (pfn_p - pfns)),
-			    ttes2map, io_attr, (io_page_list_t *)(ra |
+			    ttes2map, attr, (io_page_list_t *)(ra |
 			    ((uintptr_t)pfn_p & MMU_PAGE_OFFSET)),
 			    &ttes_mapped)) != H_EOK) {
 				DBG(DBG_LIB_DMA, dip, "hvio_iommu_map failed "
@@ -319,7 +350,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 			DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: tsb_num 0x%x "
 			    "tsb_index 0x%lx ttes_to_map 0x%lx attr 0x%x "
 			    "ra 0x%p ttes_mapped 0x%x\n", tsb_num,
-			    tsb_index + (pfn_p - pfns), ttes2map, io_attr,
+			    tsb_index + (pfn_p - pfns), ttes2map, attr,
 			    ra | ((uintptr_t)pfn_p & MMU_PAGE_OFFSET),
 			    ttes_mapped);
 		}
@@ -366,8 +397,8 @@ px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages)
 
 /*ARGSUSED*/
 int
-px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
-    io_attributes_t *attributes_p, r_addr_t *r_addr_p)
+px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
+    r_addr_t *r_addr_p)
 {
 	uint64_t	ret;
 
@@ -375,7 +406,7 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
 	    dip, tsbid);
 
 	if ((ret = hvio_iommu_getmap(DIP_TO_HANDLE(dip), tsbid,
-	    attributes_p, r_addr_p)) != H_EOK) {
+	    attr_p, r_addr_p)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "hvio_iommu_getmap failed, ret 0x%lx\n", ret);
 
@@ -383,7 +414,7 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
 	}
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%x r_addr 0x%llx\n",
-	    *attributes_p, *r_addr_p);
+	    *attr_p, *r_addr_p);
 
 	return (DDI_SUCCESS);
 }
@@ -396,10 +427,10 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
  */
 /*ARGSUSED*/
 int
-px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p, uint64_t *hi_p)
+px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p, uint64_t *hi_p)
 {
-	if ((attrp->dma_attr_addr_lo != 0ull) ||
-	    (attrp->dma_attr_addr_hi != UINT64_MAX)) {
+	if ((attr_p->dma_attr_addr_lo != 0ull) ||
+	    (attr_p->dma_attr_addr_hi != UINT64_MAX)) {
 
 		return (DDI_DMA_BADATTR);
 	}
@@ -413,16 +444,16 @@ px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p, uint64_t *hi_p)
 
 /*ARGSUSED*/
 int
-px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p)
+px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
+    io_addr_t *io_addr_p)
 {
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
-	    "attr 0x%x\n", dip, ra, io_attributes);
+	    "attr 0x%x\n", dip, ra, attr);
 
 	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra,
-	    io_attributes, io_addr_p)) != H_EOK) {
+	    attr, io_addr_p)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "hvio_iommu_getbypass failed, ret 0x%lx\n", ret);
 		return (ret == H_ENOTSUPPORTED ? DDI_ENOTSUP : DDI_FAILURE);

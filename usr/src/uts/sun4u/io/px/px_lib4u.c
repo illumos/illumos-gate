@@ -454,19 +454,18 @@ px_lib_intr_reset(dev_info_t *dip)
 /*ARGSUSED*/
 int
 px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
-    io_attributes_t io_attributes, void *addr, size_t pfn_index,
-    int flag)
+    io_attributes_t attr, void *addr, size_t pfn_index, int flags)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: dip 0x%p tsbid 0x%llx "
-	    "pages 0x%x atrr 0x%x addr 0x%p pfn_index 0x%llx, flag 0x%x\n",
-	    dip, tsbid, pages, io_attributes, addr, pfn_index, flag);
+	    "pages 0x%x attr 0x%x addr 0x%p pfn_index 0x%llx flags 0x%x\n",
+	    dip, tsbid, pages, attr, addr, pfn_index, flags);
 
 	if ((ret = hvio_iommu_map(px_p->px_dev_hdl, pxu_p, tsbid, pages,
-	    io_attributes, addr, pfn_index, flag)) != H_EOK) {
+	    attr, addr, pfn_index, flags)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "px_lib_iommu_map failed, ret 0x%lx\n", ret);
 		return (DDI_FAILURE);
@@ -499,8 +498,8 @@ px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages)
 
 /*ARGSUSED*/
 int
-px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
-    io_attributes_t *attributes_p, r_addr_t *r_addr_p)
+px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
+    r_addr_t *r_addr_p)
 {
 	px_t	*px_p = DIP_TO_STATE(dip);
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
@@ -510,7 +509,7 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
 	    dip, tsbid);
 
 	if ((ret = hvio_iommu_getmap(DIP_TO_HANDLE(dip), pxu_p, tsbid,
-	    attributes_p, r_addr_p)) != H_EOK) {
+	    attr_p, r_addr_p)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "hvio_iommu_getmap failed, ret 0x%lx\n", ret);
 
@@ -518,7 +517,7 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
 	}
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%x r_addr 0x%llx\n",
-	    *attributes_p, *r_addr_p);
+	    *attr_p, *r_addr_p);
 
 	return (DDI_SUCCESS);
 }
@@ -531,7 +530,7 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
  */
 /*ARGSUSED*/
 int
-px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p, uint64_t *hi_p)
+px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p, uint64_t *hi_p)
 {
 	*lo_p = MMU_BYPASS_BASE;
 	*hi_p = MMU_BYPASS_END;
@@ -542,16 +541,16 @@ px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p, uint64_t *hi_p)
 
 /*ARGSUSED*/
 int
-px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p)
+px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
+    io_addr_t *io_addr_p)
 {
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
-	    "attr 0x%x\n", dip, ra, io_attributes);
+	    "attr 0x%x\n", dip, ra, attr);
 
-	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra,
-	    io_attributes, io_addr_p)) != H_EOK) {
+	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra, attr,
+	    io_addr_p)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "hvio_iommu_getbypass failed, ret 0x%lx\n", ret);
 		return (DDI_FAILURE);
@@ -569,7 +568,7 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
 /*ARGSUSED*/
 int
 px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
-	off_t off, size_t len, uint_t cache_flags)
+    off_t off, size_t len, uint_t cache_flags)
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 

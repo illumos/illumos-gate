@@ -398,8 +398,8 @@ px_class_val_t px_default_pil [] = {
 	{0x020000, 0xff0000, 0x6},	/* Network Controller */
 	{0x030000, 0xff0000, 0x9},	/* Display Controller */
 	{0x040000, 0xff0000, 0x9},	/* Multimedia Controller */
-	{0x050000, 0xff0000, 0xb},	/* Memory Controller */
-	{0x060000, 0xff0000, 0xb},	/* Bridge Controller */
+	{0x050000, 0xff0000, 0x9},	/* Memory Controller */
+	{0x060000, 0xff0000, 0x9},	/* Bridge Controller */
 	{0x0c0000, 0xffff00, 0x9},	/* Serial Bus, FireWire (IEEE 1394) */
 	{0x0c0100, 0xffff00, 0x4},	/* Serial Bus, ACCESS.bus */
 	{0x0c0200, 0xffff00, 0x4},	/* Serial Bus, SSA */

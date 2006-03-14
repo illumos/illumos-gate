@@ -115,13 +115,6 @@ struct px {
 	int px_ranges_length;
 	devino_t *px_inos;		/* inos from "interrupts" prop */
 	int px_inos_len;		/* "interrupts" length */
-	int pci_numproxy;		/* upa interrupt proxies */
-	int px_thermal_interrupt;	/* node has thermal interrupt */
-
-	/* Interrupt support */
-	int intr_map_size;
-	struct intr_map *intr_map;
-	struct intr_map_mask *intr_map_mask;
 
 	/* Error handling */
 	px_fault_t px_fault;

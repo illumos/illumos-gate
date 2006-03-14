@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,10 +47,21 @@ extern "C" {
 /* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
 #define	PX_RA_BDF_SHIFT			8
 
-#define	PX_ADDR2PFN(addr, index, flag, i) \
-	((flag == MMU_MAP_MP) ? \
+#define	PX_ADDR2PFN(addr, index, flags, i) \
+	((flags & MMU_MAP_PFN) ? \
 	PX_GET_MP_PFN((ddi_dma_impl_t *)(addr), (index + i)) : \
 	hat_getpfnum(kas.a_hat, ((caddr_t)addr + (MMU_PAGE_SIZE * i))))
+
+/*
+ * VPCI API versioning.
+ *
+ * Currently PX nexus driver supports VPCI API version 1.0.
+ */
+#define	PX_VPCI_MAJOR_VER_1	0x1ull
+#define	PX_VPCI_MAJOR_VER	PX_VPCI_MAJOR_VER_1
+
+#define	PX_VPCI_MINOR_VER_0	0x0ull
+#define	PX_VPCI_MINOR_VER	PX_VPCI_MINOR_VER_0
 
 extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
     pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);
@@ -59,14 +69,14 @@ extern uint64_t hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf,
     pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t data);
 
 extern uint64_t hvio_iommu_map(devhandle_t dev_hdl, tsbid_t tsbid,
-    pages_t pages, io_attributes_t io_attributes,
-    io_page_list_t *io_page_list_p, pages_t *pages_mapped);
+    pages_t pages, io_attributes_t attr, io_page_list_t *io_page_list_p,
+    pages_t *pages_mapped);
 extern uint64_t hvio_iommu_demap(devhandle_t dev_hdl, tsbid_t tsbid,
     pages_t pages, pages_t *pages_demapped);
 extern uint64_t hvio_iommu_getmap(devhandle_t dev_hdl, tsbid_t tsbid,
-    io_attributes_t *attributes_p, r_addr_t *r_addr_p);
+    io_attributes_t *attr_p, r_addr_t *r_addr_p);
 extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p);
+    io_attributes_t attr, io_addr_t *io_addr_p);
 extern uint64_t hvio_dma_sync(devhandle_t dev_hdl, r_addr_t ra,
     size_t num_bytes, io_sync_direction_t io_sync_direction,
     size_t *bytes_synched);
@@ -142,6 +152,7 @@ extern uint64_t hvio_poke(devhandle_t dev_hdl, r_addr_t ra, size_t size,
 extern uint64_t hv_ra2pa(uint64_t ra);
 extern uint64_t hv_hpriv(void *func, uint64_t arg1, uint64_t arg2,
     uint64_t arg3);
+extern int px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr);
 
 #ifdef	__cplusplus
 }

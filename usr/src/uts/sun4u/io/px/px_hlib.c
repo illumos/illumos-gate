@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1600,34 +1599,27 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 
 /* ARGSUSED */
 uint64_t
-hvio_iommu_map(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
-    pages_t pages, io_attributes_t io_attributes,
-    void *addr, size_t pfn_index, int flag)
+hvio_iommu_map(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid, pages_t pages,
+    io_attributes_t io_attr, void *addr, size_t pfn_index, int flags)
 {
 	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
 	uint64_t	attr = MMU_TTE_V;
 	int		i;
 
-	if (io_attributes & PCI_MAP_ATTR_WRITE)
+	if (io_attr & PCI_MAP_ATTR_WRITE)
 		attr |= MMU_TTE_W;
 
-	if (flag == MMU_MAP_MP) {
-		ddi_dma_impl_t  *mp = (ddi_dma_impl_t *)addr;
-
+	if (flags & MMU_MAP_PFN) {
+		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)addr;
 		for (i = 0; i < pages; i++, pfn_index++, tsb_index++) {
-			px_iopfn_t	pfn = PX_GET_MP_PFN(mp, pfn_index);
-
-			pxu_p->tsb_vaddr[tsb_index] =
-			    MMU_PTOB(pfn) | attr;
+			px_iopfn_t pfn = PX_GET_MP_PFN(mp, pfn_index);
+			pxu_p->tsb_vaddr[tsb_index] = MMU_PTOB(pfn) | attr;
 		}
 	} else {
-		caddr_t a = (caddr_t)addr;
-
+		caddr_t	a = (caddr_t)addr;
 		for (i = 0; i < pages; i++, a += MMU_PAGE_SIZE, tsb_index++) {
 			px_iopfn_t pfn = hat_getpfnum(kas.a_hat, a);
-
-			pxu_p->tsb_vaddr[tsb_index] =
-			    MMU_PTOB(pfn) | attr;
+			pxu_p->tsb_vaddr[tsb_index] = MMU_PTOB(pfn) | attr;
 		}
 	}
 
@@ -1642,9 +1634,8 @@ hvio_iommu_demap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
 	int		i;
 
-	for (i = 0; i < pages; i++, tsb_index++) {
+	for (i = 0; i < pages; i++, tsb_index++)
 		pxu_p->tsb_vaddr[tsb_index] = MMU_INVALID_TTE;
-	}
 
 	return (H_EOK);
 }
@@ -1652,7 +1643,7 @@ hvio_iommu_demap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 /* ARGSUSED */
 uint64_t
 hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
-    io_attributes_t *attributes_p, r_addr_t *r_addr_p)
+    io_attributes_t *attr_p, r_addr_t *r_addr_p)
 {
 	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
 	uint64_t	*tte_addr;
@@ -1662,11 +1653,11 @@ hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 
 	if (*tte_addr & MMU_TTE_V) {
 		*r_addr_p = MMU_TTETOPA(*tte_addr);
-		*attributes_p = (*tte_addr & MMU_TTE_W) ?
+		*attr_p = (*tte_addr & MMU_TTE_W) ?
 		    PCI_MAP_ATTR_WRITE:PCI_MAP_ATTR_READ;
 	} else {
 		*r_addr_p = 0;
-		*attributes_p = 0;
+		*attr_p = 0;
 		ret = H_ENOMAP;
 	}
 
@@ -1675,8 +1666,8 @@ hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 
 /* ARGSUSED */
 uint64_t
-hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p)
+hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra, io_attributes_t attr,
+    io_addr_t *io_addr_p)
 {
 	uint64_t	pfn = MMU_BTOP(ra);
 

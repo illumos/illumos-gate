@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,14 +269,14 @@ extern uint64_t hvio_intr_settarget(devhandle_t dev_hdl, sysino_t sysino,
     cpuid_t cpuid);
 
 extern uint64_t hvio_iommu_map(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
-    pages_t pages, io_attributes_t io_attributes,
-    void *addr, size_t pfn_index, int flag);
+    pages_t pages, io_attributes_t attr, void *addr, size_t pfn_index,
+    int flags);
 extern uint64_t hvio_iommu_demap(devhandle_t dev_hdl, pxu_t *pxu_p,
     tsbid_t tsbid, pages_t pages);
 extern uint64_t hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p,
-    tsbid_t tsbid, io_attributes_t *attributes_p, r_addr_t *r_addr_p);
+    tsbid_t tsbid, io_attributes_t *attr_p, r_addr_t *r_addr_p);
 extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra,
-    io_attributes_t io_attributes, io_addr_t *io_addr_p);
+    io_attributes_t attr, io_addr_t *io_addr_p);
 
 /*
  * MSIQ Functions:

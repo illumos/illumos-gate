@@ -108,11 +108,6 @@ px_get_props(px_t *px_p, dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-	px_p->px_thermal_interrupt =
-		ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-				"thermal-interrupt", -1);
-	DBG(DBG_ATTACH, dip, "get_px_properties: thermal_interrupt=%d\n",
-	    px_p->px_thermal_interrupt);
 	return (DDI_SUCCESS);
 }
 
