@@ -283,6 +283,9 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 			    strerror(errno));
 		}
 
+		if (page->pg_uuid != NULL && cma.cma_page_maxretries != 0)
+			fmd_case_uuclose(hdl, page->pg_uuid);
+
 		cma_stats.page_fails.fmds_value.ui64++;
 		return (1); /* give up */
 	}
