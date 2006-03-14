@@ -2281,7 +2281,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	    &notpresent) == 0) {
 		char *path;
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
-		(void) printf("  was %s\n", path);
+		(void) printf("  was %s", path);
 	} else if (vs->vs_aux != 0) {
 		(void) printf("  ");
 

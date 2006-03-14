@@ -890,7 +890,7 @@ zpool_vdev_to_guid(zpool_handle_t *zhp, const char *path)
 	nvlist_t *nvroot;
 	uint64_t guid;
 
-	guid = strtoull(path, &end, 16);
+	guid = strtoull(path, &end, 10);
 	if (guid != 0 && *end == '\0') {
 		search = NULL;
 	} else if (path[0] != '/') {
@@ -1403,7 +1403,7 @@ zpool_vdev_name(zpool_handle_t *zhp, nvlist_t *nv)
 	    &value) == 0) {
 		verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID,
 		    &value) == 0);
-		(void) snprintf(buf, sizeof (buf), "%llx", value);
+		(void) snprintf(buf, sizeof (buf), "%llu", value);
 		path = buf;
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
 
