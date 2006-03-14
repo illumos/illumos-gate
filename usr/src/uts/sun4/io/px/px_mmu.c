@@ -188,7 +188,7 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 	ASSERT(PX_HAS_REDZONE(mp));
 
 	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index + npages), 1, attr,
-	    (void *)mp, pfn_index + npages, MMU_MAP_MP) != DDI_SUCCESS) {
+	    (void *)mp, pfn_index + npages - 1, MMU_MAP_MP) != DDI_SUCCESS) {
 		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: mapping "
 		    "REDZONE page failed\n");
 
