@@ -579,11 +579,13 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	vlen = sizeof (nexthop_val);
 	if (pr_getsockopt(Pr, fd, IPPROTO_IP, IP_NEXTHOP, &nexthop_val,
 	    &vlen) == 0) {
-		(void) inet_ntop(AF_INET, (void *) &nexthop_val, ipaddr,
-		    sizeof (ipaddr));
-		(void) snprintf(buf1, sizeof (buf1), "IP_NEXTHOP(%s),",
-		    ipaddr);
-		(void) strlcat(buf, buf1, sizeof (buf));
+		if (vlen > 0) {
+			(void) inet_ntop(AF_INET, (void *) &nexthop_val,
+			    ipaddr, sizeof (ipaddr));
+			(void) snprintf(buf1, sizeof (buf1), "IP_NEXTHOP(%s),",
+			    ipaddr);
+			(void) strlcat(buf, buf1, sizeof (buf));
+		}
 	}
 
 	buf[strlen(buf) - 1] = '\0';
