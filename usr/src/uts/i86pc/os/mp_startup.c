@@ -358,6 +358,9 @@ extern void *long_mode_64(void);
 	}
 
 	ntss = cp->cpu_tss = &tablesp->ct_tss;
+
+	if ((tablesp->ct_gdt = kmem_zalloc(PAGESIZE, KM_NOSLEEP)) == NULL)
+		panic("mp_startup_init: cpu%d cannot allocate GDT", cpun);
 	cp->cpu_gdt = tablesp->ct_gdt;
 	bcopy(CPU->cpu_gdt, cp->cpu_gdt, NGDT * (sizeof (user_desc_t)));
 

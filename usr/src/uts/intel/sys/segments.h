@@ -526,7 +526,6 @@ void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 #pragma	align	16(idt0)
 extern	gate_desc_t	idt0[NIDT];
 extern	desctbr_t	idt0_default_reg;
-#pragma	align	16(gdt0)
 extern	user_desc_t	gdt0[NGDT];
 
 extern user_desc_t	zero_udesc;

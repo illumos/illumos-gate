@@ -63,8 +63,6 @@ extern void syscall_int(void);
 /*
  * cpu0 and default tables and structures.
  */
-#pragma	align	16(gdt0)
-user_desc_t	gdt0[NGDT];		/* global descriptor table */
 desctbr_t	gdt0_default_r;
 
 #pragma	align	16(idt0)
