@@ -200,6 +200,7 @@ GENUNIX_OBJS +=	\
 		pause.o		\
 		serializer.o	\
 		pci_intr_lib.o	\
+		pci_cap.o	\
 		pgrp.o		\
 		pgrpsys.o	\
 		pid.o		\

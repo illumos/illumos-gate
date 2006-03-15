@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,7 +25,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -37,12 +35,9 @@
 #include <sys/promif.h>		  /* prom_printf */
 #include <sys/disp.h>		  /* prom_printf */
 #include <sys/pcie.h>
+#include <sys/pci_cap.h>
 #include <sys/pcie_impl.h>
 
-static uint16_t pcie_find_cap_reg(ddi_acc_handle_t config_handle,
-    uint8_t cap_id);
-static uint16_t pcie_find_ext_cap_reg(ddi_acc_handle_t config_handle,
-    uint16_t cap_id);
 
 #ifdef  DEBUG
 uint_t pcie_debug_flags = 0;
@@ -169,8 +164,8 @@ pcie_initchild(dev_info_t *cdip)
 		pci_config_put8(config_handle, PCI_BCNF_BCNTRL, bcr);
 	}
 
-	cap_ptr = pcie_find_cap_reg(config_handle, PCI_CAP_ID_PCI_E);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL)
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+		!= DDI_FAILURE)
 		pcie_enable_errors(cdip, config_handle);
 
 	pci_config_teardown(&config_handle);
@@ -209,44 +204,43 @@ pcie_uninitchild(dev_info_t *cdip)
 void
 pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t		cap_ptr, aer_ptr;
-	uint16_t		device_sts;
-	uint16_t		dev_type;
+	uint16_t		cap_ptr, aer_ptr, dev_type, device_sts;
+	int			rval = DDI_FAILURE;
 
-	cap_ptr = pcie_find_cap_reg(config_handle, PCI_CAP_ID_PCI_E);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		aer_ptr = pcie_find_ext_cap_reg(config_handle,
-		    PCIE_EXT_CAP_ID_AER);
-		dev_type = pci_config_get16(
-			config_handle,
-			cap_ptr + PCIE_PCIECAP) &
-		    PCIE_PCIECAP_DEV_TYPE_MASK;
-	} else {
-		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+		!= DDI_FAILURE) {
+		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	}
 
 	/*
 	 * Clear any pending errors
 	 */
 	/* 1. clear the Advanced PCIe Errors */
-	if (aer_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) {
-		pci_config_put32(config_handle, aer_ptr + PCIE_AER_CE_STS, -1);
-		pci_config_put32(config_handle, aer_ptr + PCIE_AER_UCE_STS, -1);
+	if (rval != DDI_FAILURE) {
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CE_STS,
+			-1);
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_UCE_STS,
+			-1);
+
 		if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
-			pci_config_put32(config_handle,
-			    aer_ptr + PCIE_AER_SUCE_STS, -1);
+			PCI_XCAP_PUT32(config_handle, NULL, aer_ptr,
+				PCIE_AER_SUCE_STS, -1);
 		}
 	}
 
 	/* 2. clear the PCIe Errors */
-	device_sts = pci_config_get16(config_handle,
-	    cap_ptr + PCIE_DEVSTS);
-	pci_config_put16(config_handle, cap_ptr + PCIE_DEVSTS,
-	    device_sts);
+	if ((device_sts = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_DEVSTS)) != DDI_FAILURE)
+		PCI_CAP_PUT16(config_handle, PCI_CAP_ID_PCI_E, cap_ptr,
+			PCIE_DEVSTS, device_sts);
 
 	/* 3. clear the Legacy PCI Errors */
 	device_sts = pci_config_get16(config_handle, PCI_CONF_STAT);
 	pci_config_put16(config_handle, PCI_CONF_STAT, device_sts);
+
 	if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
 		device_sts = pci_config_get16(config_handle,
 		    PCI_BCNF_SEC_STATUS);
@@ -258,21 +252,16 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 void
 pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t		cap_ptr, aer_ptr;
-	uint16_t		device_ctl;
-	uint16_t		dev_type;
+	uint16_t		cap_ptr, aer_ptr, dev_type, device_ctl;
 	uint32_t		aer_reg;
+	int			rval = DDI_FAILURE;
 
-	cap_ptr = pcie_find_cap_reg(config_handle, PCI_CAP_ID_PCI_E);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		aer_ptr = pcie_find_ext_cap_reg(config_handle,
-		    PCIE_EXT_CAP_ID_AER);
-		dev_type = pci_config_get16(
-			config_handle,
-			cap_ptr + PCIE_PCIECAP) &
-		    PCIE_PCIECAP_DEV_TYPE_MASK;
-	} else {
-		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+		!= DDI_FAILURE) {
+		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	}
 
 	/*
@@ -283,36 +272,42 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	/*
 	 * Enable PCI-Express Baseline Error Handling
 	 */
-	device_ctl = pci_config_get16(config_handle,
-	    cap_ptr + PCIE_DEVCTL);
-	pci_config_put16(config_handle, cap_ptr + PCIE_DEVCTL,
-	    pcie_base_err_default);
-	PCIE_DBG("%s: device control=0x%x->0x%x\n",
-	    ddi_driver_name(dip), device_ctl,
-	    pci_config_get16(config_handle, cap_ptr + PCIE_DEVCTL));
+	if ((device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_DEVCTL)) != DDI_FAILURE) {
+		PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
+			pcie_base_err_default);
+
+		PCIE_DBG("%s: device control=0x%x->0x%x\n",
+			ddi_driver_name(dip), device_ctl, PCI_CAP_GET16
+			(config_handle, NULL, cap_ptr, PCIE_DEVCTL));
+	}
 
 	/*
 	 * Enable PCI-Express Advanced Error Handling if Exists
 	 */
-	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL) {
+	if (rval == DDI_FAILURE) {
 		return;
 	}
 
 	/* Enable Uncorrectable errors */
-	aer_reg = pci_config_get32(config_handle, aer_ptr + PCIE_AER_UCE_MASK);
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_UCE_MASK,
-	    pcie_aer_uce_mask);
-	PCIE_DBG("%s: AER UCE=0x%x->0x%x\n",
-	    ddi_driver_name(dip), aer_reg,
-	    pci_config_get32(config_handle, aer_ptr + PCIE_AER_UCE_MASK));
+	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+		PCIE_AER_UCE_MASK)) != DDI_FAILURE) {
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr,
+			PCIE_AER_UCE_MASK, pcie_aer_uce_mask);
+		PCIE_DBG("%s: AER UCE=0x%x->0x%x\n", ddi_driver_name(dip),
+			aer_reg, PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+			PCIE_AER_UCE_MASK));
+	}
 
 	/* Enable Correctable errors */
-	aer_reg = pci_config_get32(config_handle, aer_ptr + PCIE_AER_CE_MASK);
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_CE_MASK,
-	    pcie_aer_ce_mask);
-	PCIE_DBG("%s: AER CE=0x%x->0x%x\n",
-	    ddi_driver_name(dip), aer_reg,
-	    pci_config_get32(config_handle, aer_ptr + PCIE_AER_CE_MASK));
+	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+		PCIE_AER_CE_MASK)) != DDI_FAILURE) {
+		PCI_XCAP_PUT32(config_handle, PCIE_EXT_CAP_ID_AER,
+			aer_ptr, PCIE_AER_CE_MASK, pcie_aer_ce_mask);
+		PCIE_DBG("%s: AER CE=0x%x->0x%x\n", ddi_driver_name(dip),
+			aer_reg, PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+			PCIE_AER_CE_MASK));
+	}
 
 	/*
 	 * Enable Secondary Uncorrectable errors if this is a bridge
@@ -323,53 +318,50 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	/*
 	 * Enable secondary bus errors
 	 */
-	aer_reg = pci_config_get32(config_handle, aer_ptr + PCIE_AER_SUCE_MASK);
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_SUCE_MASK,
-	    pcie_aer_suce_mask);
-	PCIE_DBG("%s: AER SUCE=0x%x->0x%x\n",
-	    ddi_driver_name(dip), aer_reg,
-	    pci_config_get32(config_handle, aer_ptr + PCIE_AER_SUCE_MASK));
+	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
+		PCIE_AER_SUCE_MASK)) != DDI_FAILURE) {
+		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_SUCE_MASK,
+			pcie_aer_suce_mask);
+		PCIE_DBG("%s: AER SUCE=0x%x->0x%x\n", ddi_driver_name(dip),
+			aer_reg, PCI_XCAP_GET32(config_handle,
+			PCIE_EXT_CAP_ID_AER, aer_ptr, PCIE_AER_SUCE_MASK));
+	}
 }
 
 /* ARGSUSED */
 void
 pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
-	uint16_t		cap_ptr, aer_ptr;
-	uint16_t		dev_type;
+	uint16_t		cap_ptr, aer_ptr, dev_type;
+	int			rval = DDI_FAILURE;
 
-	cap_ptr = pcie_find_cap_reg(config_handle, PCI_CAP_ID_PCI_E);
-	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		aer_ptr = pcie_find_ext_cap_reg(config_handle,
-		    PCIE_EXT_CAP_ID_AER);
-		dev_type = pci_config_get16(
-			config_handle,
-			cap_ptr + PCIE_PCIECAP) &
-		    PCIE_PCIECAP_DEV_TYPE_MASK;
-	} else {
-		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+		!= DDI_FAILURE) {
+		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	}
 
 	/*
 	 * Disable PCI-Express Baseline Error Handling
 	 */
-	pci_config_put16(config_handle, cap_ptr + PCIE_DEVCTL,
-	    0x0);
+	PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL, 0x0);
 
 	/*
 	 * Disable PCI-Express Advanced Error Handling if Exists
 	 */
-	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL) {
+	if (rval == DDI_FAILURE) {
 		return;
 	}
 
 	/* Disable Uncorrectable errors */
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_UCE_MASK,
-	    PCIE_AER_UCE_BITS);
+	PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_UCE_MASK,
+		PCIE_AER_UCE_BITS);
 
 	/* Disable Correctable errors */
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_CE_MASK,
-	    PCIE_AER_CE_BITS);
+	PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CE_MASK,
+		PCIE_AER_CE_BITS);
 
 	/*
 	 * Disable Secondary Uncorrectable errors if this is a bridge
@@ -380,89 +372,8 @@ pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	/*
 	 * Disable secondary bus errors
 	 */
-	pci_config_put32(config_handle, aer_ptr + PCIE_AER_SUCE_MASK,
-	    PCIE_AER_SUCE_BITS);
-}
-
-/*
- * Helper Function to traverse the pci-express config space looking
- * for the pci-express capability id pointer.
- *
- * @param config_handle	devices pci config space handler
- * @param cap_id	pci-express capability id function is looking for
- * @return		capability offset from base address or NULL if not
- *			found.
- */
-static uint16_t
-pcie_find_cap_reg(ddi_acc_handle_t config_handle, uint8_t cap_id)
-{
-	uint16_t	caps_ptr, cap;
-
-	/*
-	 * Check if capabilities list is supported.  If not then it is a PCI
-	 * device.
-	 */
-	if (pci_config_get16(config_handle, PCI_CONF_STAT) & PCI_STAT_CAP) {
-		caps_ptr = P2ALIGN(pci_config_get8(config_handle,
-				PCI_CONF_CAP_PTR), 4);
-	} else {
-		caps_ptr = PCI_CAP_NEXT_PTR_NULL;
-	}
-
-	while (caps_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		if (caps_ptr < 0x40) {
-			caps_ptr = PCI_CAP_NEXT_PTR_NULL;
-			break;
-		}
-
-		cap = pci_config_get8(config_handle, caps_ptr);
-
-		if (cap == cap_id) {
-			break;
-		}
-
-		caps_ptr = P2ALIGN(pci_config_get8(config_handle,
-				(caps_ptr + PCI_CAP_NEXT_PTR)), 4);
-	}
-
-	return (caps_ptr);
-}
-
-/*
- * Helper Function to traverse the pci-express extended config space looking
- * for the pci-express capability id pointer.
- *
- * @param config_handle	devices pci config space handler
- * @param cap_id	pci-express capability id function is looking for
- * @return		capability offset from base address or NULL if not
- *			found.
- */
-static uint16_t
-pcie_find_ext_cap_reg(ddi_acc_handle_t config_handle, uint16_t cap_id)
-{
-	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
-	uint16_t	offset = P2ALIGN(PCIE_EXT_CAP, 4);
-
-	hdr = pci_config_get32(config_handle, offset);
-	hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-	    PCIE_EXT_CAP_NEXT_PTR_MASK;
-	hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-	    PCIE_EXT_CAP_ID_MASK;
-
-	while ((hdr_next_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) &&
-	    (hdr_cap_id != cap_id)) {
-		offset = P2ALIGN(hdr_next_ptr, 4);
-		hdr = pci_config_get32(config_handle, offset);
-		hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
-		    PCIE_EXT_CAP_NEXT_PTR_MASK;
-		hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-		    PCIE_EXT_CAP_ID_MASK;
-	}
-
-	if (hdr_cap_id == cap_id)
-		return (P2ALIGN(offset, 4));
-
-	return (PCIE_EXT_CAP_NEXT_PTR_NULL);
+	PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_SUCE_MASK,
+		PCIE_AER_SUCE_BITS);
 }
 
 #ifdef	DEBUG

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,38 +35,14 @@
 #include <sys/ddi_implfuncs.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/pci.h>
+#include <sys/pci_cap.h>
 
 /*LINTLIBRARY*/
-
-static uint16_t
-pcix_get_pcix_cap(ddi_acc_handle_t handle)
-{
-	ushort_t caps_ptr, cap;
-
-	/*
-	 * Walk the Capabilities List and locate
-	 * the PCI-X Capability.
-	 */
-	if (pci_config_get16(handle, PCI_CONF_STAT) & PCI_STAT_CAP)
-		caps_ptr = pci_config_get8(handle, PCI_CONF_CAP_PTR);
-	else
-		caps_ptr = PCI_CAP_NEXT_PTR_NULL;
-
-	while (caps_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap = pci_config_get8(handle, caps_ptr);
-		if (cap == PCI_CAP_ID_PCIX)
-			return (caps_ptr);
-
-		caps_ptr = pci_config_get8(handle, caps_ptr + PCI_CAP_NEXT_PTR);
-	}
-
-	return (0);
-}
 
 void
 pcix_set_cmd_reg(dev_info_t *child, uint16_t value)
 {
-	uint16_t pcix_cap_offset, pcix_cmd;
+	uint16_t pcix_cap_ptr, pcix_cmd;
 	ddi_acc_handle_t handle;
 
 	if (pci_config_setup(child, &handle) != DDI_SUCCESS)
@@ -76,36 +51,35 @@ pcix_set_cmd_reg(dev_info_t *child, uint16_t value)
 	/*
 	 * Only modify the Command Register of non-bridge functions.
 	 */
-	if ((pci_config_get8(handle, PCI_CONF_HEADER) &
-	    PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
-		pci_config_teardown(&handle);
-		return;
-	}
+	if ((pci_config_get8(handle, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M)
+		== PCI_HEADER_PPB)
+		goto teardown;
 
-	pcix_cap_offset = pcix_get_pcix_cap(handle);
+	if (PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCIX, &pcix_cap_ptr) ==
+		DDI_FAILURE)
+		goto teardown;
 
-	DEBUG1(DBG_INIT_CLD, child,
-	    "pcix_set_cmd_reg: pcix_cap_offset = %x\n", pcix_cap_offset);
+	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: pcix_cap_ptr = %x\n",
+		pcix_cap_ptr);
 
-	if (pcix_cap_offset) {
-		/*
-		 * Read the PCI-X Command Register.
-		 */
-		pcix_cmd = pci_config_get16(handle, (pcix_cap_offset + 2));
+	/*
+	 * Read the PCI-X Command Register.
+	 */
+	if ((pcix_cmd = PCI_CAP_GET16(handle, NULL, pcix_cap_ptr, 2))
+		== DDI_FAILURE)
+		goto teardown;
 
-		DEBUG1(DBG_INIT_CLD, child,
-		    "pcix_set_cmd_reg: PCI-X CMD "
-		    "Register (Before) %x\n", pcix_cmd);
+	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: PCI-X CMD Register "
+		"(Before) %x\n", pcix_cmd);
 
-		pcix_cmd &= ~(0x1f << 2); /* clear bits 6-2 */
-		pcix_cmd |= value;
+	pcix_cmd &= ~(0x1f << 2); /* clear bits 6-2 */
+	pcix_cmd |= value;
 
-		DEBUG1(DBG_INIT_CLD, child,
-		    "pcix_set_cmd_reg: PCI-X CMD "
-		    "Register (After) %x\n", pcix_cmd);
+	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: PCI-X CMD Register "
+		"(After) %x\n", pcix_cmd);
 
-		pci_config_put16(handle, (pcix_cap_offset + 2), pcix_cmd);
-	}
+	PCI_CAP_PUT16(handle, NULL, pcix_cap_ptr, 2, pcix_cmd);
 
+teardown:
 	pci_config_teardown(&handle);
 }

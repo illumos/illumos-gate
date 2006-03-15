@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/pci.h>
+#include <sys/pci_cap.h>
 #include <sys/pci/pci_nexus.h>
 #include <sys/pci/pci_regs.h>
 #include <sys/ddi.h>
@@ -242,7 +242,7 @@ typedef struct {
 	 * PM support
 	 */
 	ddi_acc_handle_t	ppb_conf_hdl;
-	uint8_t			ppb_pmcsr_offset;
+	uint16_t		ppb_pm_cap_ptr;
 	pci_pwr_t		*ppb_pwr_p;
 
 	/*
@@ -981,8 +981,6 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	char *comp_array[5];
 	int i;
 	ddi_acc_handle_t conf_hdl;
-	uint8_t cap_ptr;
-	uint8_t cap_id;
 	uint8_t pmcsr_bse;
 	uint16_t pmcap;
 
@@ -990,7 +988,6 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	 * Determine if bridge is PM capable.  If not, leave ppb_pwr_p NULL
 	 * and return.
 	 */
-
 	if (pci_config_setup(pdip, &ppb->ppb_conf_hdl) != DDI_SUCCESS) {
 
 		return;
@@ -998,22 +995,11 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 
 	conf_hdl = ppb->ppb_conf_hdl;
 
-	cap_ptr = pci_config_get8(conf_hdl, PCI_BCNF_CAP_PTR);
-
 	/*
-	 * Walk the capabilities searching for a PM entry.
+	 * Locate and store the power management cap_ptr for future references.
 	 */
-	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap_id = pci_config_get8(conf_hdl,
-		    cap_ptr + PCI_CAP_ID);
-		if (cap_id == PCI_CAP_ID_PM) {
-			break;
-		}
-		cap_ptr = pci_config_get8(conf_hdl,
-		    cap_ptr + PCI_CAP_NEXT_PTR);
-	}
-
-	if (cap_ptr == 0) {
+	if ((PCI_CAP_LOCATE(conf_hdl, PCI_CAP_ID_PM, &ppb->ppb_pm_cap_ptr))
+		== DDI_FAILURE) {
 		DEBUG0(DBG_PWR, pdip, "bridge does not support PM. PCI"
 		    " PM data structure not found in config header\n");
 		pci_config_teardown(&conf_hdl);
@@ -1028,14 +1014,16 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	    kmem_zalloc(sizeof (pci_pwr_t), KM_SLEEP);
 	ppb->ppb_pwr_p->pwr_fp = 0;
 
-	/*
-	 * Save offset to pmcsr for future references.
-	 */
-	ppb->ppb_pmcsr_offset = cap_ptr + PCI_PMCSR;
+	pmcsr_bse = PCI_CAP_GET8(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
+		PCI_PMCSR_BSE);
 
-	pmcsr_bse = pci_config_get8(conf_hdl, cap_ptr + PCI_PMCSR_BSE);
+	pmcap = PCI_CAP_GET16(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
+		PCI_PMCAP);
 
-	pmcap = pci_config_get16(conf_hdl, cap_ptr + PCI_PMCAP);
+	if (pmcap == DDI_FAILURE || pmcsr_bse == DDI_FAILURE) {
+		pci_config_teardown(&conf_hdl);
+		return;
+	}
 
 	if (pmcap & PCI_PMCAP_D1) {
 		DEBUG0(DBG_PWR, pdip, "setup: B1 state supported\n");
@@ -1052,10 +1040,10 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 
 	if (pmcsr_bse & PCI_PMCSR_BSE_BPCC_EN) {
 		DEBUG0(DBG_PWR, pdip,
-		    "setup: bridge power/clock control enable\n");
+		"setup: bridge power/clock control enable\n");
 	} else {
 		DEBUG0(DBG_PWR, pdip,
-		    "setup: bridge power/clock control disabled\n");
+		"setup: bridge power/clock control disabled\n");
 
 		kmem_free(ppb->ppb_pwr_p, sizeof (pci_pwr_t));
 		ppb->ppb_pwr_p = NULL;
@@ -1130,7 +1118,7 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	}
 
 	ppb->ppb_pwr_p->current_lvl =
-	    pci_pwr_current_lvl(ppb->ppb_pwr_p);
+		pci_pwr_current_lvl(ppb->ppb_pwr_p);
 }
 
 /*
@@ -1189,8 +1177,9 @@ pci_pwr_current_lvl(pci_pwr_t *pwr_p)
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(pwr_p->pwr_dip));
 
-	pmcsr = pci_config_get16(ppb->ppb_conf_hdl,
-	    ppb->ppb_pmcsr_offset);
+	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
+		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == DDI_FAILURE)
+		return (DDI_FAILURE);
 
 	switch (pmcsr & PCI_PMCSR_STATE_MASK) {
 	case PCI_PMCSR_D0:
@@ -1265,7 +1254,9 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 		pci_pwr_component_idle(ppb->ppb_pwr_p);
 	}
 
-	pmcsr = pci_config_get16(ppb->ppb_conf_hdl, ppb->ppb_pmcsr_offset);
+	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
+		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == DDI_FAILURE)
+		return (DDI_FAILURE);
 
 	/*
 	 * Save the current power level.  This is the actual function level,
@@ -1350,7 +1341,8 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 		}
 	}
 
-	pci_config_put16(ppb->ppb_conf_hdl, ppb->ppb_pmcsr_offset, pmcsr);
+	PCI_CAP_PUT16(ppb->ppb_conf_hdl, NULL, ppb->ppb_pm_cap_ptr, PCI_PMCSR,
+		pmcsr);
 
 	/*
 	 * No bus transactions should occur without waiting for
