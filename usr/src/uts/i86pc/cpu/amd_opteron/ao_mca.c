@@ -509,7 +509,7 @@ ao_ereport_add_resource(nvlist_t *payload, nv_alloc_t *nva, mc_unum_t *unump)
 	}
 
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
-	    DATA_TYPE_NVLIST_ARRAY, nelems, elems);
+	    DATA_TYPE_NVLIST_ARRAY, nelems, elems, NULL);
 
 	for (i = 0; i < nelems; i++)
 		fm_nvlist_destroy(elems[i], FM_NVA_FREE);
@@ -544,7 +544,7 @@ ao_ereport_add_logout(ao_data_t *ao, nvlist_t *payload, nv_alloc_t *nva,
 	if (members & FM_EREPORT_PAYLOAD_FLAG_ADDR_VALID) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_ADDR_VALID,
 		    DATA_TYPE_BOOLEAN_VALUE, (abl->abl_status &
-		    AMD_BANK_STAT_ADDRV) ? B_TRUE : B_FALSE);
+		    AMD_BANK_STAT_ADDRV) ? B_TRUE : B_FALSE, NULL);
 	}
 
 	if (members & FM_EREPORT_PAYLOAD_FLAG_SYND) {
