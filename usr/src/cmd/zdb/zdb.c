@@ -250,14 +250,33 @@ dump_zap_stats(objset_t *os, uint64_t object)
 	}
 
 	(void) printf("\tFat ZAP stats:\n");
-	(void) printf("\t\tPointer table: %llu elements\n",
+
+	(void) printf("\t\tPointer table:\n");
+	(void) printf("\t\t\t%llu elements\n",
 	    (u_longlong_t)zs.zs_ptrtbl_len);
+	(void) printf("\t\t\tzt_blk: %llu\n",
+	    (u_longlong_t)zs.zs_ptrtbl_zt_blk);
+	(void) printf("\t\t\tzt_numblks: %llu\n",
+	    (u_longlong_t)zs.zs_ptrtbl_zt_numblks);
+	(void) printf("\t\t\tzt_shift: %llu\n",
+	    (u_longlong_t)zs.zs_ptrtbl_zt_shift);
+	(void) printf("\t\t\tzt_blks_copied: %llu\n",
+	    (u_longlong_t)zs.zs_ptrtbl_blks_copied);
+	(void) printf("\t\t\tzt_nextblk: %llu\n",
+	    (u_longlong_t)zs.zs_ptrtbl_nextblk);
+
 	(void) printf("\t\tZAP entries: %llu\n",
 	    (u_longlong_t)zs.zs_num_entries);
 	(void) printf("\t\tLeaf blocks: %llu\n",
 	    (u_longlong_t)zs.zs_num_leafs);
 	(void) printf("\t\tTotal blocks: %llu\n",
 	    (u_longlong_t)zs.zs_num_blocks);
+	(void) printf("\t\tzap_block_type: 0x%llx\n",
+	    (u_longlong_t)zs.zs_block_type);
+	(void) printf("\t\tzap_magic: 0x%llx\n",
+	    (u_longlong_t)zs.zs_magic);
+	(void) printf("\t\tzap_salt: 0x%llx\n",
+	    (u_longlong_t)zs.zs_salt);
 
 	(void) printf("\t\tLeafs with 2^n pointers:\n");
 	dump_zap_histogram(zs.zs_leafs_with_2n_pointers);

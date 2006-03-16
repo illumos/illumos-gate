@@ -1025,11 +1025,28 @@ void
 fzap_get_stats(zap_t *zap, zap_stats_t *zs)
 {
 	int bs = FZAP_BLOCK_SHIFT(zap);
-	zs->zs_ptrtbl_len = 1ULL << zap->zap_f.zap_phys->zap_ptrtbl.zt_shift;
 	zs->zs_blocksize = 1ULL << bs;
+
+	/*
+	 * Set zap_phys_t fields
+	 */
 	zs->zs_num_leafs = zap->zap_f.zap_phys->zap_num_leafs;
 	zs->zs_num_entries = zap->zap_f.zap_phys->zap_num_entries;
 	zs->zs_num_blocks = zap->zap_f.zap_phys->zap_freeblk;
+	zs->zs_block_type = zap->zap_f.zap_phys->zap_block_type;
+	zs->zs_magic = zap->zap_f.zap_phys->zap_magic;
+	zs->zs_salt = zap->zap_f.zap_phys->zap_salt;
+
+	/*
+	 * Set zap_ptrtbl fields
+	 */
+	zs->zs_ptrtbl_len = 1ULL << zap->zap_f.zap_phys->zap_ptrtbl.zt_shift;
+	zs->zs_ptrtbl_nextblk = zap->zap_f.zap_phys->zap_ptrtbl.zt_nextblk;
+	zs->zs_ptrtbl_blks_copied =
+	    zap->zap_f.zap_phys->zap_ptrtbl.zt_blks_copied;
+	zs->zs_ptrtbl_zt_blk = zap->zap_f.zap_phys->zap_ptrtbl.zt_blk;
+	zs->zs_ptrtbl_zt_numblks = zap->zap_f.zap_phys->zap_ptrtbl.zt_numblks;
+	zs->zs_ptrtbl_zt_shift = zap->zap_f.zap_phys->zap_ptrtbl.zt_shift;
 
 	if (zap->zap_f.zap_phys->zap_ptrtbl.zt_numblks == 0) {
 		/* the ptrtbl is entirely in the header block. */

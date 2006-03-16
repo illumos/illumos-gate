@@ -273,10 +273,6 @@ typedef struct zap_stats {
 
 	uint64_t zs_blocksize;		/* size of zap blocks */
 
-	uint64_t zs_num_leafs;		/* The number of leaf blocks */
-
-	uint64_t zs_num_entries;	/* The number of zap entries */
-
 	/*
 	 * The number of blocks used.  Note that some blocks may be
 	 * wasted because old ptrtbl's and large name/value blocks are
@@ -284,6 +280,24 @@ typedef struct zap_stats {
 	 * reuse those offsets in the object.)
 	 */
 	uint64_t zs_num_blocks;
+
+	/*
+	 * Pointer table values from zap_ptrtbl in the zap_phys_t
+	 */
+	uint64_t zs_ptrtbl_nextblk;	  /* next (larger) copy start block */
+	uint64_t zs_ptrtbl_blks_copied;   /* number source blocks copied */
+	uint64_t zs_ptrtbl_zt_blk;	  /* starting block number */
+	uint64_t zs_ptrtbl_zt_numblks;    /* number of blocks */
+	uint64_t zs_ptrtbl_zt_shift;	  /* bits to index it */
+
+	/*
+	 * Values of the other members of the zap_phys_t
+	 */
+	uint64_t zs_block_type;		/* ZBT_HEADER */
+	uint64_t zs_magic;		/* ZAP_MAGIC */
+	uint64_t zs_num_leafs;		/* The number of leaf blocks */
+	uint64_t zs_num_entries;	/* The number of zap entries */
+	uint64_t zs_salt;		/* salt to stir into hash function */
 
 	/*
 	 * Histograms.  For all histograms, the last index
@@ -342,4 +356,4 @@ int zap_get_stats(objset_t *ds, uint64_t zapobj, zap_stats_t *zs);
 }
 #endif
 
-#endif /* _SYS_ZAP_H */
+#endif	/* _SYS_ZAP_H */
