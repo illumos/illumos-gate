@@ -204,59 +204,66 @@ long_help(int cmd_num)
 {
 	assert(cmd_num >= CMD_MIN && cmd_num <= CMD_MAX);
 	switch (cmd_num) {
-		case CMD_HELP:
-			return (gettext("Print usage message."));
-		case CMD_BOOT:
-			return (gettext("Activates (boots) specified zone.  "
-			    "The -s flag can be used\n\tto boot the zone in "
-			    "the single-user state."));
-		case CMD_HALT:
-			return (gettext("Halts specified zone, bypassing "
-			    "shutdown scripts and removing runtime\n\t"
-			    "resources of the zone."));
-		case CMD_READY:
-			return (gettext("Prepares a zone for running "
-			    "applications but does not start any user\n\t"
-			    "processes in the zone."));
-		case CMD_REBOOT:
-			return (gettext("Restarts the zone (equivalent to a "
-			    "halt / boot sequence).\n\tFails if the zone is "
-			    "not active."));
-		case CMD_LIST:
-			return (gettext("Lists the current zones, or a "
-			    "specific zone if indicated.  By default,\n\tall "
-			    "running zones are listed, though this can be "
-			    "expanded to all\n\tinstalled zones with the -i "
-			    "option or all configured zones with the\n\t-c "
-			    "option.  When used with the general -z <zone> "
-			    "option, lists only the\n\tspecified zone, but "
-			    "lists it regardless of its state, and the -i "
-			    "and -c\n\toptions are disallowed.  The -v option "
-			    "can be used to display verbose\n\tinformation: "
-			    "zone name, id, current state, root directory and "
-			    "options.\n\tThe -p option can be used to request "
-			    "machine-parsable output.  The -v\n\tand -p "
-			    "options are mutually exclusive.  If neither -v "
-			    "nor -p is used,\n\tjust the zone name is "
-			    "listed."));
-		case CMD_VERIFY:
-			return (gettext("Check to make sure the configuration "
-			    "can safely be instantiated\n\ton the machine: "
-			    "physical network interfaces exist, etc."));
-		case CMD_INSTALL:
-			return (gettext("Install the configuration on to the "
-			    "system."));
-		case CMD_UNINSTALL:
-			return (gettext("Uninstall the configuration from the "
-			    "system.  The -F flag can be used\n\tto force the "
-			    "action."));
-		case CMD_CLONE:
-			return (gettext("Clone the installation of another "
-			    "zone."));
-		case CMD_MOVE:
-			return (gettext("Move the zone to a new zonepath."));
-		default:
-			return ("");
+	case CMD_HELP:
+		return (gettext("Print usage message."));
+	case CMD_BOOT:
+		return (gettext("Activates (boots) specified zone.  "
+		    "The -s flag can be used\n\tto boot the zone in "
+		    "the single-user state."));
+	case CMD_HALT:
+		return (gettext("Halts specified zone, bypassing shutdown "
+		    "scripts and removing runtime\n\tresources of the zone."));
+	case CMD_READY:
+		return (gettext("Prepares a zone for running applications but "
+		    "does not start any user\n\tprocesses in the zone."));
+	case CMD_REBOOT:
+		return (gettext("Restarts the zone (equivalent to a halt / "
+		    "boot sequence).\n\tFails if the zone is not active."));
+	case CMD_LIST:
+		return (gettext("Lists the current zones, or a "
+		    "specific zone if indicated.  By default,\n\tall "
+		    "running zones are listed, though this can be "
+		    "expanded to all\n\tinstalled zones with the -i "
+		    "option or all configured zones with the\n\t-c "
+		    "option.  When used with the general -z <zone> "
+		    "option, lists only the\n\tspecified zone, but "
+		    "lists it regardless of its state, and the -i "
+		    "and -c\n\toptions are disallowed.  The -v option "
+		    "can be used to display verbose\n\tinformation: "
+		    "zone name, id, current state, root directory and "
+		    "options.\n\tThe -p option can be used to request "
+		    "machine-parsable output.  The -v\n\tand -p "
+		    "options are mutually exclusive.  If neither -v "
+		    "nor -p is used,\n\tjust the zone name is listed."));
+	case CMD_VERIFY:
+		return (gettext("Check to make sure the configuration "
+		    "can safely be instantiated\n\ton the machine: "
+		    "physical network interfaces exist, etc."));
+	case CMD_INSTALL:
+		return (gettext("Install the configuration on to the system."));
+	case CMD_UNINSTALL:
+		return (gettext("Uninstall the configuration from the system.  "
+		    "The -F flag can be used\n\tto force the action."));
+	case CMD_CLONE:
+		return (gettext("Clone the installation of another zone."));
+	case CMD_MOVE:
+		return (gettext("Move the zone to a new zonepath."));
+	case CMD_DETACH:
+		return (gettext("Detach the zone from the system. The zone "
+		    "state is changed to\n\t'configured' (but the files under "
+		    "the zonepath are untouched).\n\tThe zone can subsequently "
+		    "be attached, or can be moved to another\n\tsystem and "
+		    "attached there."));
+	case CMD_ATTACH:
+		return (gettext("Attach the zone to the system.  The zone "
+		    "state must be 'configured'\n\tprior to attach; upon "
+		    "successful completion, the zone state will be\n\t"
+		    "'installed'.  The system software on the current "
+		    "system must be\n\tcompatible with the software on the "
+		    "zone's original system.\n\tSpecify -F to force the attach "
+		    "and skip software compatibility tests."));
+	default:
+		return ("");
 	}
 	/* NOTREACHED */
 	return (NULL);

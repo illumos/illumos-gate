@@ -594,11 +594,13 @@ long_help(int cmd_num)
 			    "used to force the action.  If\n\t-t template is "
 			    "given, creates a configuration identical to the\n"
 			    "\tspecified template, except that the zone name "
-			    "is changed from\n\ttemplate to zonename.  '%s -b' "
-			    "results in a blank configuration.\n\t'%s' with no "
-			    "arguments applies the Sun default settings."),
+			    "is changed from\n\ttemplate to zonename.  '%s -a' "
+			    "creates a configuration from a\n\tdetached "
+			    "zonepath.  '%s -b' results in a blank "
+			    "configuration.\n\t'%s' with no arguments applies "
+			    "the Sun default settings."),
 			    cmd_to_str(CMD_CREATE), cmd_to_str(CMD_CREATE),
-			    cmd_to_str(CMD_CREATE));
+			    cmd_to_str(CMD_CREATE), cmd_to_str(CMD_CREATE));
 			return (line);
 		case CMD_EXIT:
 			return (gettext("Exits the program.  The -F flag can "
