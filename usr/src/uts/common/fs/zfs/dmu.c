@@ -487,7 +487,7 @@ dump_bytes(struct backuparg *ba, void *buf, int len)
 	fletcher_4_incremental_native(buf, len, &ba->zc);
 	ba->err = vn_rdwr(UIO_WRITE, ba->vp,
 	    (caddr_t)buf, len,
-	    0, UIO_SYSSPACE, FAPPEND, RLIM_INFINITY, CRED(), &resid);
+	    0, UIO_SYSSPACE, FAPPEND, RLIM64_INFINITY, CRED(), &resid);
 	return (ba->err);
 }
 
@@ -906,7 +906,7 @@ restore_read(struct restorearg *ra, int len)
 		ra->err = vn_rdwr(UIO_READ, ra->vp,
 		    (caddr_t)ra->buf + leftover, ra->bufsize - leftover,
 		    ra->voff, UIO_SYSSPACE, FAPPEND,
-		    RLIM_INFINITY, CRED(), &resid);
+		    RLIM64_INFINITY, CRED(), &resid);
 
 		ra->voff += ra->bufsize - leftover - resid;
 		ra->buflen = ra->bufsize - resid;
