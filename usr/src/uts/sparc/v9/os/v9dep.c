@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,6 +967,13 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	    !(lwp->lwp_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
 
 	tos = (caddr_t)rp->r_sp + STACK_BIAS;
+	/*
+	 * Force proper stack pointer alignment, even in the face of a
+	 * misaligned stack pointer from user-level before the signal.
+	 * Don't use the SA() macro because that rounds up, not down.
+	 */
+	tos = (caddr_t)((uintptr_t)tos & ~(STACK_ALIGN - 1ul));
+
 	if (newstack != 0) {
 		fp = (struct sigframe *)
 		    (SA((uintptr_t)lwp->lwp_sigaltstack.ss_sp) +
@@ -994,19 +1000,14 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	/*
 	 * Make sure process hasn't trashed its stack.
 	 */
-	if (((uintptr_t)fp & (STACK_ALIGN - 1)) != 0 ||
-	    (caddr_t)fp >= p->p_usrstack ||
+	if ((caddr_t)fp >= p->p_usrstack ||
 	    (caddr_t)fp + SA(minstacksz) >= p->p_usrstack) {
 #ifdef DEBUG
 		printf("sendsig: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);
 		printf("sigsp = 0x%p, action = 0x%p, upc = 0x%lx\n",
 		    (void *)fp, (void *)hdlr, rp->r_pc);
-
-		if (((uintptr_t)fp & (STACK_ALIGN - 1)) != 0)
-			printf("bad stack alignment\n");
-		else
-			printf("fp above USRSTACK\n");
+		printf("fp above USRSTACK\n");
 #endif
 		return (0);
 	}
@@ -1233,7 +1234,6 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	volatile int watched = 0;
 	volatile int watched2 = 0;
 	caddr_t tos;
-	caddr32_t tos32;
 
 	/*
 	 * Make sure the current last user window has been flushed to
@@ -1295,16 +1295,13 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	newstack = (sigismember(&u.u_sigonstack, sig) &&
 	    !(lwp->lwp_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
 
+	tos = (void *)(uintptr_t)(uint32_t)rp->r_sp;
 	/*
-	 * Reduce r_sp to a 32 bit value before storing it in tos.  This was
-	 * originally done by casting down to uint32_t and back up to void *,
-	 * but that generated complaints under one compiler.  The uintptr_t cast
-	 * was added to address that, and the temporary 32 bit variable was
-	 * introduced to avoid depending on all compilers to generate the
-	 * desired assembly code for a triple cast in a single expression.
+	 * Force proper stack pointer alignment, even in the face of a
+	 * misaligned stack pointer from user-level before the signal.
+	 * Don't use the SA32() macro because that rounds up, not down.
 	 */
-	tos32 = (uint32_t)rp->r_sp;
-	tos = (void *)(uintptr_t)tos32;
+	tos = (caddr_t)((uintptr_t)tos & ~(STACK_ALIGN32 - 1ul));
 
 	if (newstack != 0) {
 		fp = (struct sigframe32 *)
@@ -1333,19 +1330,14 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	/*
 	 * Make sure process hasn't trashed its stack.
 	 */
-	if (((uintptr_t)fp & (STACK_ALIGN32 - 1)) != 0 ||
-	    (caddr_t)fp >= p->p_usrstack ||
+	if ((caddr_t)fp >= p->p_usrstack ||
 	    (caddr_t)fp + SA32(minstacksz) >= p->p_usrstack) {
 #ifdef DEBUG
 		printf("sendsig32: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);
 		printf("sigsp = 0x%p, action = 0x%p, upc = 0x%lx\n",
 		    (void *)fp, (void *)hdlr, rp->r_pc);
-
-		if (((uintptr_t)fp & (STACK_ALIGN32 - 1)) != 0)
-			printf("bad stack alignment\n");
-		else
-			printf("fp above USRSTACK32\n");
+		printf("fp above USRSTACK32\n");
 #endif
 		return (0);
 	}

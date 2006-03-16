@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,6 +199,12 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	}
 
 	/*
+	 * Force proper stack pointer alignment, even in the face of a
+	 * misaligned stack pointer from user-level before the signal.
+	 */
+	fp = (caddr_t)((uintptr_t)fp & ~(STACK_ENTRY_ALIGN - 1ul));
+
+	/*
 	 * Most of the time during normal execution, the stack pointer
 	 * is aligned on a STACK_ALIGN (i.e. 16 byte) boundary.  However,
 	 * (for example) just after a call instruction (which pushes
@@ -218,19 +224,13 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 	/*
 	 * Now, make sure the resulting signal frame address is sane
 	 */
-	if (((uintptr_t)(sp - STACK_ENTRY_ALIGN) & (STACK_ALIGN - 1ul)) != 0 ||
-	    sp >= (caddr_t)USERLIMIT || fp >= (caddr_t)USERLIMIT) {
+	if (sp >= (caddr_t)USERLIMIT || fp >= (caddr_t)USERLIMIT) {
 #ifdef DEBUG
 		printf("sendsig: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);
 		printf("sigsp = 0x%p, action = 0x%p, upc = 0x%lx\n",
 		    (void *)sp, (void *)hdlr, (uintptr_t)upc);
-
-		if (((uintptr_t)(sp - STACK_ENTRY_ALIGN) &
-		    (STACK_ALIGN - 1ul)) != 0)
-			printf("bad stack alignment\n");
-		else
-			printf("sp above USERLIMIT\n");
+		printf("sp above USERLIMIT\n");
 #endif
 		return (0);
 	}
@@ -435,24 +435,26 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 			fp = (caddr_t)rp->r_sp;
 	} else
 		fp = (caddr_t)rp->r_sp;
+
+	/*
+	 * Force proper stack pointer alignment, even in the face of a
+	 * misaligned stack pointer from user-level before the signal.
+	 * Don't use the SA32() macro because that rounds up, not down.
+	 */
+	fp = (caddr_t)((uintptr_t)fp & ~(STACK_ALIGN32 - 1));
 	sp = fp - minstacksz;
 
 	/*
 	 * Make sure lwp hasn't trashed its stack
 	 */
-	if (((uintptr_t)sp & (STACK_ALIGN32 - 1)) != 0 ||
-	    sp >= (caddr_t)(uintptr_t)USERLIMIT32 ||
+	if (sp >= (caddr_t)(uintptr_t)USERLIMIT32 ||
 	    fp >= (caddr_t)(uintptr_t)USERLIMIT32) {
 #ifdef DEBUG
 		printf("sendsig32: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);
 		printf("sigsp = 0x%p, action = 0x%p, upc = 0x%lx\n",
 		    (void *)sp, (void *)hdlr, (uintptr_t)upc);
-
-		if (((uintptr_t)sp & (STACK_ALIGN32 - 1)) != 0)
-			printf("bad stack alignment\n");
-		else
-			printf("sp above USERLIMIT\n");
+		printf("sp above USERLIMIT\n");
 #endif
 		return (0);
 	}
@@ -653,23 +655,25 @@ sendsig(int sig, k_siginfo_t *sip, void (*hdlr)())
 			fp = (caddr_t)rp->r_sp;
 	} else
 		fp = (caddr_t)rp->r_sp;
+
+	/*
+	 * Force proper stack pointer alignment, even in the face of a
+	 * misaligned stack pointer from user-level before the signal.
+	 * Don't use the SA() macro because that rounds up, not down.
+	 */
+	fp = (caddr_t)((uintptr_t)fp & ~(STACK_ALIGN - 1ul));
 	sp = fp - minstacksz;
 
 	/*
 	 * Make sure lwp hasn't trashed its stack.
 	 */
-	if (((uintptr_t)sp & (STACK_ALIGN - 1ul)) != 0 ||
-	    sp >= (caddr_t)USERLIMIT || fp >= (caddr_t)USERLIMIT) {
+	if (sp >= (caddr_t)USERLIMIT || fp >= (caddr_t)USERLIMIT) {
 #ifdef DEBUG
 		printf("sendsig: bad signal stack cmd=%s, pid=%d, sig=%d\n",
 		    PTOU(p)->u_comm, p->p_pid, sig);
 		printf("sigsp = 0x%p, action = 0x%p, upc = 0x%lx\n",
 		    (void *)sp, (void *)hdlr, (uintptr_t)upc);
-
-		if (((uintptr_t)sp & (STACK_ALIGN - 1ul)) != 0)
-			printf("bad stack alignment\n");
-		else
-			printf("sp above USERLIMIT\n");
+		printf("sp above USERLIMIT\n");
 #endif
 		return (0);
 	}
