@@ -167,10 +167,10 @@ get_usage(zpool_help_t idx) {
 	case HELP_EXPORT:
 		return (gettext("\texport [-f] <pool> ...\n"));
 	case HELP_IMPORT:
-		return (gettext("\timport [-d dir]\n"
-		    "\timport [-d dir] [-f] [-o opts] [-R root] -a\n"
-		    "\timport [-d dir] [-f] [-o opts] [-R root ] <pool | id> "
-		    "[newpool]\n"));
+		return (gettext("\timport [-d dir] [-D]\n"
+		    "\timport [-d dir] [-D] [-f] [-o opts] [-R root] -a\n"
+		    "\timport [-d dir] [-D] [-f] [-o opts] [-R root ]"
+		    " <pool | id> [newpool]\n"));
 	case HELP_IOSTAT:
 		return (gettext("\tiostat [-v] [pool] ... [interval "
 		    "[count]]\n"));
@@ -849,7 +849,10 @@ show_import(nvlist_t *config)
 
 	(void) printf("  pool: %s\n", name);
 	(void) printf("    id: %llu\n", guid);
-	(void) printf(" state: %s\n", health);
+	(void) printf(" state: %s", health);
+	if (pool_state == POOL_STATE_DESTROYED)
+	    (void) printf(" (DESTROYED)");
+	(void) printf("\n");
 
 	switch (reason) {
 	case ZPOOL_STATUS_MISSING_DEV_R:
@@ -892,7 +895,10 @@ show_import(nvlist_t *config)
 	if (strcmp(health, gettext("ONLINE")) == 0) {
 		(void) printf(gettext("action: The pool can be imported"
 		    " using its name or numeric identifier."));
-		if (pool_state != POOL_STATE_EXPORTED)
+	if (pool_state == POOL_STATE_DESTROYED)
+		(void) printf(gettext("  The\n\tpool was destroyed, "
+		    "but can be imported using the '-Df' flags.\n"));
+		else if (pool_state != POOL_STATE_EXPORTED)
 			(void) printf(gettext("  The\n\tpool may be active on "
 			    "on another system, but can be imported using\n\t"
 			    "the '-f' flag.\n"));
@@ -902,7 +908,10 @@ show_import(nvlist_t *config)
 		(void) printf(gettext("action: The pool can be imported "
 		    "despite missing or damaged devices.  The\n\tfault "
 		    "tolerance of the pool may be compromised if imported."));
-		if (pool_state != POOL_STATE_EXPORTED)
+		if (pool_state == POOL_STATE_DESTROYED)
+			(void) printf(gettext("  The\n\tpool was destroyed, "
+			    "but can be imported using the '-Df' flags.\n"));
+		else if (pool_state != POOL_STATE_EXPORTED)
 			(void) printf(gettext("  The\n\tpool may be active on "
 			    "on another system, but can be imported using\n\t"
 			    "the '-f' flag.\n"));
@@ -981,12 +990,15 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 }
 
 /*
- * zpool import [-d dir]
- *       import [-R root] [-d dir] [-f] -a
- *       import [-R root] [-d dir] [-f] <pool | id> [newpool]
+ * zpool import [-d dir] [-D]
+ *       import [-R root] [-D] [-d dir] [-f] -a
+ *       import [-R root] [-D] [-d dir] [-f] <pool | id> [newpool]
  *
  *       -d	Scan in a specific directory, other than /dev/dsk.  More than
  *		one directory can be specified using multiple '-d' options.
+ *
+ *       -D     Scan for previously destroyed pools or import all or only
+ *              specified destroyed pools.
  *
  *       -R	Temporarily import the pool, with all mountpoints relative to
  *		the given root.  The pool will remain exported when the machine
@@ -1008,6 +1020,7 @@ zpool_do_import(int argc, char **argv)
 	int err;
 	nvlist_t *pools;
 	int do_all = FALSE;
+	int do_destroyed = FALSE;
 	char *altroot = NULL;
 	char *mntopts = NULL;
 	int do_force = FALSE;
@@ -1017,9 +1030,10 @@ zpool_do_import(int argc, char **argv)
 	char *searchname;
 	nvlist_t *found_config;
 	int first;
+	uint64_t pool_state;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":fd:R:ao:")) != -1) {
+	while ((c = getopt(argc, argv, ":Dfd:R:ao:")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = TRUE;
@@ -1036,6 +1050,9 @@ zpool_do_import(int argc, char **argv)
 				searchdirs = tmp;
 			}
 			searchdirs[nsearch++] = optarg;
+			break;
+		case 'D':
+			do_destroyed = TRUE;
 			break;
 		case 'f':
 			do_force = TRUE;
@@ -1105,6 +1122,8 @@ zpool_do_import(int argc, char **argv)
 	 *
 	 *	<id>	Find the pool that corresponds to the given GUID/pool
 	 *		name and import that one.
+	 *
+	 *	-D	Above options applies only to destroyed pools.
 	 */
 	if (argc != 0) {
 		char *endptr;
@@ -1124,6 +1143,13 @@ zpool_do_import(int argc, char **argv)
 	while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
 
 		verify(nvpair_value_nvlist(elem, &config) == 0);
+
+		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
+		    &pool_state) == 0);
+		if (!do_destroyed && pool_state == POOL_STATE_DESTROYED)
+			continue;
+		if (do_destroyed && pool_state != POOL_STATE_DESTROYED)
+			continue;
 
 		if (argc == 0) {
 			if (first)

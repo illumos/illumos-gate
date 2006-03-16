@@ -1240,7 +1240,8 @@ vdev_load(vdev_t *vd)
 
 		if (state != POOL_STATE_ACTIVE &&
 		    (spa->spa_load_state == SPA_LOAD_OPEN ||
-		    state != POOL_STATE_EXPORTED)) {
+		    (state != POOL_STATE_EXPORTED &&
+		    state != POOL_STATE_DESTROYED))) {
 			dprintf("pool state not active (%llu)\n", state);
 			nvlist_free(label);
 			return (EBADF);

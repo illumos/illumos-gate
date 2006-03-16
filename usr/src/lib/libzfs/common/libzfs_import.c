@@ -578,7 +578,7 @@ zpool_read_label(int fd)
 			continue;
 
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
-		    &state) != 0 || state > POOL_STATE_EXPORTED) {
+		    &state) != 0 || state > POOL_STATE_DESTROYED) {
 			nvlist_free(config);
 			continue;
 		}
