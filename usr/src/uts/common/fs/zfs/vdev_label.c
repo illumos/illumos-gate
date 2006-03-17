@@ -712,7 +712,7 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
 	zio_t *zio;
-	int c, l, error;
+	int l, error;
 
 	ASSERT(ub->ub_txg <= txg);
 
