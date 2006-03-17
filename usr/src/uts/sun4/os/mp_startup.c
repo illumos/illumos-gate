@@ -227,7 +227,7 @@ warm_flag_set(int cpuid)
 void
 start_cpu(int cpuid, void(*flag_func)(int))
 {
-	extern caddr_t cpu_startup;
+	extern void cpu_startup(int);
 	int timout;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
