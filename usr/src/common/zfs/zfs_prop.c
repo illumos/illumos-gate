@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -142,7 +141,7 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	{ "zoned",	prop_type_boolean,	0,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "on | off", "ZONED", "%5s" },
-	{ "snapdir",	prop_type_index,	ZFS_SNAPDIR_VISIBLE, "visible",
+	{ "snapdir",	prop_type_index,	ZFS_SNAPDIR_HIDDEN, "hidden",
 	    prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "hidden | visible", "SNAPDIR", "%7s" },
