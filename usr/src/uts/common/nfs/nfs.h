@@ -1027,6 +1027,7 @@ typedef struct nfs_fh3 {
 		} nfs_fh3_i;
 		char data[NFS3_FHSIZE];
 	} fh3_u;
+	uint_t fh3_flags;
 } nfs_fh3;
 #define	fh3_fsid	fh3_u.nfs_fh3_i.fh3_i._fh3_fsid
 #define	fh3_len		fh3_u.nfs_fh3_i.fh3_i._fh3_len
@@ -1035,6 +1036,11 @@ typedef struct nfs_fh3 {
 #define	fh3_xdata	fh3_u.nfs_fh3_i.fh3_i._fh3_xdata
 #define	FH3TOFIDP(fh)	((fid_t *)&((fh)->fh3_len))
 #define	FH3TOXFIDP(fh)	((fid_t *)&((fh)->fh3_xlen))
+
+/*
+ * nfs_fh3.fh3_flags values
+ */
+#define	FH_WEBNFS	0x1	/* fh is WebNFS overloaded - see makefh3_ol() */
 
 /*
  * Two elements were added to the

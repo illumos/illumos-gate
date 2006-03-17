@@ -1880,6 +1880,7 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 	fh->fh3_length = sizeof (fsid_t)
 			+ sizeof (ushort_t) + fh->fh3_len
 			+ sizeof (ushort_t) + fh->fh3_xlen;
+	fh->fh3_flags = 0;
 	return (0);
 }
 
@@ -1926,6 +1927,7 @@ makefh3_ol(nfs_fh3 *fh, struct exportinfo *exi, uint_t sec_index)
 	 * Place the length in fh3_length representing the number
 	 * of security flavors (in bytes) in this overloaded fh.
 	 */
+	fh->fh3_flags = FH_WEBNFS;
 	fh->fh3_length = (cnt+1) * sizeof (int32_t);
 
 	c = (char *)&fh->fh3_u.nfs_fh3_i.fh3_i;

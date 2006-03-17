@@ -458,7 +458,10 @@ xdr_nfs_fh3_server(XDR *xdrs, nfs_fh3 *objp)
 {
 	switch (xdrs->x_op) {
 	case XDR_ENCODE:
-		return (xdr_encode_nfs_fh3(xdrs, objp));
+		if (objp->fh3_flags & FH_WEBNFS)
+			return (xdr_nfs_fh3(xdrs, objp));
+		else
+			return (xdr_encode_nfs_fh3(xdrs, objp));
 	case XDR_DECODE:
 		return (xdr_decode_nfs_fh3(xdrs, objp));
 	case XDR_FREE:
