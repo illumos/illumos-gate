@@ -36,13 +36,11 @@
 #include <sys/kobj.h>
 #endif
 
-extern int modrootloaded;
-
 /*
  * Pool configuration repository.
  *
  * The configuration for all pools, in addition to being stored on disk, is
- * stored in /kernel/drv/zpool.cache as a packed nvlist.  The kernel maintains
+ * stored in /etc/zfs/zpool.cache as a packed nvlist.  The kernel maintains
  * this list as pools are created, destroyed, or modified.
  *
  * We have a single nvlist which holds all the configuration information.  When
@@ -81,7 +79,7 @@ spa_config_load(void)
 	 * Open the configuration file.
 	 */
 	(void) snprintf(pathname, sizeof (pathname), "%s%s/%s",
-	    (modrootloaded) ? "./" : "", spa_config_dir, ZPOOL_CACHE_FILE);
+	    (rootdir != NULL) ? "./" : "", spa_config_dir, ZPOOL_CACHE_FILE);
 
 	file = kobj_open_file(pathname);
 	if (file == (struct _buf *)-1)
@@ -119,7 +117,7 @@ spa_config_load(void)
 
 		if (spa_lookup(nvpair_name(nvpair)) != NULL)
 			continue;
-		spa = spa_add(nvpair_name(nvpair));
+		spa = spa_add(nvpair_name(nvpair), NULL);
 
 		/*
 		 * We blindly duplicate the configuration here.  If it's
@@ -212,7 +210,7 @@ out:
 }
 
 /*
- * Sigh.  Inside a local zone, we don't have access to /kernel/drv/zpool.cache,
+ * Sigh.  Inside a local zone, we don't have access to /etc/zfs/zpool.cache,
  * and we don't want to allow the local zone to see all the pools anyway.
  * So we have to invent the ZFS_IOC_CONFIG ioctl to grab the configuration
  * information for all pool visible within the zone.
@@ -267,17 +265,16 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	nvlist_t *config, *nvroot;
 	vdev_t *rvd = spa->spa_root_vdev;
 
+	ASSERT(spa_config_held(spa, RW_READER));
+
 	if (vd == NULL)
 		vd = rvd;
 
 	/*
 	 * If txg is -1, report the current value of spa->spa_config_txg.
-	 * If txg is any other non-zero value, update spa->spa_config_txg.
 	 */
 	if (txg == -1ULL)
 		txg = spa->spa_config_txg;
-	else if (txg != 0 && vd == rvd)
-		spa->spa_config_txg = txg;
 
 	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
@@ -305,4 +302,53 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	nvlist_free(nvroot);
 
 	return (config);
+}
+
+/*
+ * Update all disk labels, generate a fresh config based on the current
+ * in-core state, and sync the global config cache.
+ */
+void
+spa_config_update(spa_t *spa, int what)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	uint64_t txg;
+	int c;
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	spa_config_enter(spa, RW_WRITER, FTAG);
+	txg = spa_last_synced_txg(spa) + 1;
+	if (what == SPA_CONFIG_UPDATE_POOL) {
+		vdev_config_dirty(rvd);
+	} else {
+		/*
+		 * If we have top-level vdevs that were added but have
+		 * not yet been prepared for allocation, do that now.
+		 * (It's safe now because the config cache is up to date,
+		 * so it will be able to translate the new DVAs.)
+		 * See comments in spa_vdev_add() for full details.
+		 */
+		for (c = 0; c < rvd->vdev_children; c++) {
+			vdev_t *tvd = rvd->vdev_child[c];
+			if (tvd->vdev_ms_array == 0) {
+				vdev_init(tvd, txg);
+				vdev_config_dirty(tvd);
+			}
+		}
+	}
+	spa_config_exit(spa, FTAG);
+
+	/*
+	 * Wait for the mosconfig to be regenerated and synced.
+	 */
+	txg_wait_synced(spa->spa_dsl_pool, txg);
+
+	/*
+	 * Update the global config cache to reflect the new mosconfig.
+	 */
+	spa_config_sync();
+
+	if (what == SPA_CONFIG_UPDATE_POOL)
+		spa_config_update(spa, SPA_CONFIG_UPDATE_VDEVS);
 }

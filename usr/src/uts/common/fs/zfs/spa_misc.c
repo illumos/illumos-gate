@@ -172,6 +172,7 @@
 static avl_tree_t spa_namespace_avl;
 kmutex_t spa_namespace_lock;
 static kcondvar_t spa_namespace_cv;
+static int spa_active_count;
 
 kmem_cache_t *spa_buffer_pool;
 int spa_mode;
@@ -214,7 +215,7 @@ spa_lookup(const char *name)
  * exist by calling spa_lookup() first.
  */
 spa_t *
-spa_add(const char *name)
+spa_add(const char *name, const char *altroot)
 {
 	spa_t *spa;
 
@@ -225,11 +226,20 @@ spa_add(const char *name)
 	spa->spa_name = spa_strdup(name);
 	spa->spa_state = POOL_STATE_UNINITIALIZED;
 	spa->spa_freeze_txg = UINT64_MAX;
+	spa->spa_final_txg = UINT64_MAX;
 
 	refcount_create(&spa->spa_refcount);
 	refcount_create(&spa->spa_config_lock.scl_count);
 
 	avl_add(&spa_namespace_avl, spa);
+
+	/*
+	 * Set the alternate root, if there is one.
+	 */
+	if (altroot) {
+		spa->spa_root = spa_strdup(altroot);
+		spa_active_count++;
+	}
 
 	return (spa);
 }
@@ -249,8 +259,10 @@ spa_remove(spa_t *spa)
 	avl_remove(&spa_namespace_avl, spa);
 	cv_broadcast(&spa_namespace_cv);
 
-	if (spa->spa_root)
+	if (spa->spa_root) {
 		spa_strfree(spa->spa_root);
+		spa_active_count--;
+	}
 
 	if (spa->spa_name)
 		spa_strfree(spa->spa_name);
@@ -422,8 +434,7 @@ spa_vdev_enter(spa_t *spa)
 	 */
 	spa_scrub_suspend(spa);
 
-	if (spa->spa_root_vdev != NULL)		/* not spa_create() */
-		mutex_enter(&spa_namespace_lock);
+	mutex_enter(&spa_namespace_lock);
 
 	spa_config_enter(spa, RW_WRITER, spa);
 
@@ -439,30 +450,21 @@ spa_vdev_enter(spa_t *spa)
 int
 spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 {
-	vdev_t *rvd = spa->spa_root_vdev;
-	uint64_t next_txg = spa_last_synced_txg(spa) + 1;
 	int config_changed = B_FALSE;
 
-	/*
-	 * Usually txg == next_txg, but spa_vdev_attach()
-	 * actually needs to wait for the open txg to sync.
-	 */
-	ASSERT(txg >= next_txg);
+	ASSERT(txg > spa_last_synced_txg(spa));
 
 	/*
 	 * Reassess the DTLs.
 	 */
-	if (rvd != NULL)
-		vdev_dtl_reassess(rvd, 0, 0, B_FALSE);
+	vdev_dtl_reassess(spa->spa_root_vdev, 0, 0, B_FALSE);
 
 	/*
-	 * If the config changed, update the in-core cached copy
-	 * and notify the scrub thread that it must restart.
+	 * If the config changed, notify the scrub thread that it must restart.
 	 */
 	if (error == 0 && !list_is_empty(&spa->spa_dirty_list)) {
 		config_changed = B_TRUE;
-		spa_config_set(spa, spa_config_generate(spa, rvd, next_txg, 0));
-		spa_scrub_restart(spa, next_txg);
+		spa_scrub_restart(spa, txg);
 	}
 
 	spa_config_exit(spa, spa);
@@ -471,9 +473,6 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 * Allow scrubbing to resume.
 	 */
 	spa_scrub_resume(spa);
-
-	if (vd == rvd)				/* spa_create() */
-		return (error);
 
 	/*
 	 * Note: this txg_wait_synced() is important because it ensures
@@ -512,7 +511,6 @@ int
 spa_rename(const char *name, const char *newname)
 {
 	spa_t *spa;
-	uint64_t txg;
 	int err;
 
 	/*
@@ -540,13 +538,10 @@ spa_rename(const char *name, const char *newname)
 	 * during the sync.
 	 */
 	vdev_config_dirty(spa->spa_root_vdev);
-	txg = spa_last_synced_txg(spa) + 1;
-
-	spa_config_set(spa, spa_config_generate(spa, NULL, txg, 0));
 
 	spa_config_exit(spa, FTAG);
 
-	txg_wait_synced(spa->spa_dsl_pool, txg);
+	txg_wait_synced(spa->spa_dsl_pool, 0);
 
 	/*
 	 * Sync the updated config cache.
@@ -824,6 +819,12 @@ spa_name_compare(const void *a1, const void *a2)
 	if (s < 0)
 		return (-1);
 	return (0);
+}
+
+int
+spa_busy(void)
+{
+	return (spa_active_count);
 }
 
 void

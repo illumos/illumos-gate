@@ -269,10 +269,13 @@ vdev_config_generate(vdev_t *vd, int getstats)
 nvlist_t *
 vdev_label_read_config(vdev_t *vd)
 {
+	spa_t *spa = vd->vdev_spa;
 	nvlist_t *config = NULL;
 	vdev_phys_t *vp;
 	zio_t *zio;
 	int l;
+
+	ASSERT(spa_config_held(spa, RW_READER));
 
 	if (vdev_is_dead(vd))
 		return (NULL);
@@ -281,7 +284,7 @@ vdev_label_read_config(vdev_t *vd)
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 
-		zio = zio_root(vd->vdev_spa, NULL, NULL, ZIO_FLAG_CANFAIL |
+		zio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL |
 		    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_CONFIG_HELD);
 
 		vdev_label_read(zio, vd, l, vp,
@@ -317,6 +320,8 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	char *buf;
 	size_t buflen;
 	int error;
+
+	ASSERT(spa_config_held(spa, RW_WRITER));
 
 	for (c = 0; c < vd->vdev_children; c++)
 		if ((error = vdev_label_init(vd->vdev_child[c], crtxg)) != 0)
@@ -376,7 +381,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	 * really part of an active pool just yet.  The labels will
 	 * be written again with a meaningful txg by spa_sync().
 	 */
-	label = spa_config_generate(spa, vd, 0ULL, 0);
+	label = spa_config_generate(spa, vd, 0ULL, B_FALSE);
 
 	/*
 	 * Add our creation time.  This allows us to detect multiple vdev
@@ -525,13 +530,14 @@ vdev_uberblock_load(zio_t *zio, vdev_t *vd, uberblock_t *ubbest)
 
 /*
  * Write the uberblock to both labels of all leaves of the specified vdev.
+ * We only get credit for writes to known-visible vdevs; see spa_vdev_add().
  */
 static void
 vdev_uberblock_sync_done(zio_t *zio)
 {
 	uint64_t *good_writes = zio->io_root->io_private;
 
-	if (zio->io_error == 0)
+	if (zio->io_error == 0 && zio->io_vd->vdev_top->vdev_ms_array != 0)
 		atomic_add_64(good_writes, 1);
 }
 
@@ -634,7 +640,7 @@ vdev_sync_label(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
 	/*
 	 * Generate a label describing the top-level config to which we belong.
 	 */
-	label = spa_config_generate(vd->vdev_spa, vd, txg, 0);
+	label = spa_config_generate(vd->vdev_spa, vd, txg, B_FALSE);
 
 	vp = zio_buf_alloc(sizeof (vdev_phys_t));
 	bzero(vp, sizeof (vdev_phys_t));
@@ -699,11 +705,12 @@ vdev_sync_labels(vdev_t *vd, int l, uint64_t txg)
  * at any time, you can just call it again, and it will resume its work.
  */
 int
-spa_sync_labels(spa_t *spa, uint64_t txg)
+vdev_config_sync(vdev_t *uvd, uint64_t txg)
 {
+	spa_t *spa = uvd->vdev_spa;
 	uberblock_t *ub = &spa->spa_uberblock;
 	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_t *vd, *uvd;
+	vdev_t *vd;
 	zio_t *zio;
 	int c, l, error;
 
@@ -712,7 +719,7 @@ spa_sync_labels(spa_t *spa, uint64_t txg)
 	/*
 	 * If this isn't a resync due to I/O errors, and nothing changed
 	 * in this transaction group, and the vdev configuration hasn't changed,
-	 * and this isn't an explicit sync-all, then there's nothing to do.
+	 * then there's nothing to do.
 	 */
 	if (ub->ub_txg < txg && uberblock_update(ub, rvd, txg) == B_FALSE &&
 	    list_is_empty(&spa->spa_dirty_list)) {
@@ -723,6 +730,8 @@ spa_sync_labels(spa_t *spa, uint64_t txg)
 
 	if (txg > spa_freeze_txg(spa))
 		return (0);
+
+	ASSERT(txg <= spa->spa_final_txg);
 
 	dprintf("syncing %s txg %llu\n", spa_name(spa), txg);
 
@@ -774,23 +783,9 @@ spa_sync_labels(spa_t *spa, uint64_t txg)
 	(void) zio_wait(zio);
 
 	/*
-	 * If there are any dirty vdevs, sync the uberblock to all vdevs.
-	 * Otherwise, pick a random top-level vdev that's known to be
-	 * visible in the config cache (see spa_vdev_add() for details).
-	 */
-	if (!list_is_empty(&spa->spa_dirty_list)) {
-		uvd = rvd;
-	} else {
-		do {
-			uvd =
-			    rvd->vdev_child[spa_get_random(rvd->vdev_children)];
-		} while (uvd->vdev_ms_array == 0);
-	}
-
-	/*
-	 * Sync the uberblocks.  If the system dies in the middle of this
-	 * step, there are two cases to consider, and the on-disk state
-	 * is consistent either way:
+	 * Sync the uberblocks to all vdevs in the tree specified by uvd.
+	 * If the system dies in the middle of this step, there are two cases
+	 * to consider, and the on-disk state is consistent either way:
 	 *
 	 * (1)	If none of the new uberblocks made it to disk, then the
 	 *	previous uberblock will be the newest, and the odd labels
@@ -846,18 +841,6 @@ spa_sync_labels(spa_t *spa, uint64_t txg)
 		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
 	}
 	(void) zio_wait(zio);
-
-	/*
-	 * Clear the dirty list.
-	 */
-	while (!list_is_empty(&spa->spa_dirty_list))
-		vdev_config_clean(list_head(&spa->spa_dirty_list));
-
-#ifdef DEBUG
-	for (c = 0; c < rvd->vdev_children; c++) {
-		ASSERT(rvd->vdev_child[c]->vdev_is_dirty == 0);
-	}
-#endif
 
 	return (0);
 }

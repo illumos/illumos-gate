@@ -122,14 +122,17 @@ show_vdev_stats(const char *desc, nvlist_t *nv, int indent)
 void
 show_pool_stats(spa_t *spa)
 {
-	nvlist_t *config = NULL;
-	nvlist_t *nvroot = NULL;
+	nvlist_t *config, *nvroot;
+	char *name;
 
 	spa_config_enter(spa, RW_READER, FTAG);
-	VERIFY(spa_get_stats(spa_name(spa), &config, NULL, 0) == 0);
+	config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
+	spa_config_exit(spa, FTAG);
+
 	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
+	VERIFY(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
+	    &name) == 0);
 
-	show_vdev_stats(spa_name(spa), nvroot, 0);
-	spa_config_exit(spa, FTAG);
+	show_vdev_stats(name, nvroot, 0);
 }

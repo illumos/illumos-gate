@@ -42,7 +42,6 @@
 
 uint64_t physmem;
 vnode_t *rootdir = (vnode_t *)0xabcd1234;
-int modrootloaded = 0;
 
 /*
  * =========================================================================

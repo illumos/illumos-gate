@@ -1144,7 +1144,8 @@ zpool_vdev_detach(zpool_handle_t *zhp, const char *path)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((zc.zc_guid = zpool_vdev_to_guid(zhp, path)) == 0) {
-		zfs_error(dgettext(TEXT_DOMAIN, "%s: no such device in pool"));
+		zfs_error(dgettext(TEXT_DOMAIN, "%s: no such device in pool"),
+		    msg);
 		return (-1);
 	}
 

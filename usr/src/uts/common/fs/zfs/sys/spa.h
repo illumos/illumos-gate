@@ -293,8 +293,8 @@ typedef struct blkptr {
 extern int spa_open(const char *pool, spa_t **, void *tag);
 extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
-extern int spa_create(const char *pool, nvlist_t *config, char *altroot);
-extern int spa_import(const char *pool, nvlist_t *config, char *altroot);
+extern int spa_create(const char *pool, nvlist_t *config, const char *altroot);
+extern int spa_import(const char *pool, nvlist_t *config, const char *altroot);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
 extern int spa_export(char *pool);
@@ -309,6 +309,7 @@ extern void spa_inject_delref(spa_t *spa);
 #define	SPA_ASYNC_REPLACE_DONE	0x02
 #define	SPA_ASYNC_SCRUB		0x04
 #define	SPA_ASYNC_RESILVER	0x08
+#define	SPA_ASYNC_CONFIG_UPDATE	0x10
 
 /* device manipulation */
 extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
@@ -331,12 +332,17 @@ extern void spa_sync_allpools(void);
 /*
  * SPA configuration functions in spa_config.c
  */
+
+#define	SPA_CONFIG_UPDATE_POOL	0
+#define	SPA_CONFIG_UPDATE_VDEVS	1
+
 extern void spa_config_sync(void);
 extern void spa_config_load(void);
 extern nvlist_t *spa_all_configs(uint64_t *);
 extern void spa_config_set(spa_t *spa, nvlist_t *config);
 extern nvlist_t *spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg,
     int getstats);
+extern void spa_config_update(spa_t *spa, int what);
 
 /*
  * Miscellaneous SPA routines in spa_misc.c
@@ -344,7 +350,7 @@ extern nvlist_t *spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg,
 
 /* Namespace manipulation */
 extern spa_t *spa_lookup(const char *name);
-extern spa_t *spa_add(const char *name);
+extern spa_t *spa_add(const char *name, const char *altroot);
 extern void spa_remove(spa_t *spa);
 extern spa_t *spa_next(spa_t *prev);
 

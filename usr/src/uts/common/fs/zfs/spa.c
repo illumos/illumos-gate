@@ -54,8 +54,6 @@
 #include <sys/fs/zfs.h>
 #include <sys/callb.h>
 
-static uint32_t spa_active_count;
-
 /*
  * ==========================================================================
  * SPA state manipulation (open/create/destroy/import/export)
@@ -267,25 +265,24 @@ static int
 spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 {
 	int error = 0;
-	uint64_t config_cache_txg = spa->spa_config_txg;
 	nvlist_t *nvroot = NULL;
 	vdev_t *rvd;
 	uberblock_t *ub = &spa->spa_uberblock;
+	uint64_t config_cache_txg = spa->spa_config_txg;
 	uint64_t pool_guid;
 	zio_t *zio;
 
 	spa->spa_load_state = state;
+
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &nvroot) ||
-	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &pool_guid)) {
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &pool_guid) ||
+	    (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
+	    &spa->spa_config_txg) && mosconfig)) {
 		error = EINVAL;
 		goto out;
 	}
 
-	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
-	    &spa->spa_config_txg);
-
-	if ((spa->spa_load_state == SPA_LOAD_IMPORT ||
-	    spa->spa_load_state == SPA_LOAD_TRYIMPORT) &&
+	if ((state == SPA_LOAD_IMPORT || state == SPA_LOAD_TRYIMPORT) &&
 	    spa_guid_exists(pool_guid, 0)) {
 		error = EEXIST;
 		goto out;
@@ -344,7 +341,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * If the vdev guid sum doesn't match the uberblock, we have an
 	 * incomplete configuration.
 	 */
-	if (rvd->vdev_guid_sum != ub->ub_guid_sum && mosconfig) {
+	if (rvd->vdev_guid_sum != ub->ub_guid_sum && (mosconfig ||
+	    state == SPA_LOAD_IMPORT || state == SPA_LOAD_TRYIMPORT)) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_BAD_GUID_SUM);
 		error = ENXIO;
@@ -447,11 +445,11 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * ZIO_FLAG_CONFIG_HELD flag.
 	 */
 	spa_config_enter(spa, RW_READER, FTAG);
-	if ((error = vdev_load(rvd)) != 0) {
-		spa_config_exit(spa, FTAG);
-		goto out;
-	}
+	error = vdev_load(rvd);
 	spa_config_exit(spa, FTAG);
+
+	if (error)
+		goto out;
 
 	/*
 	 * Propagate the leaf DTLs we just loaded all the way up the tree.
@@ -469,19 +467,15 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
-	/*
-	 * Claim log blocks that haven't been committed yet, and update all
-	 * top-level vdevs to sync any config changes found in vdev_load().
-	 * This must all happen in a single txg.
-	 */
 	if ((spa_mode & FWRITE) && state != SPA_LOAD_TRYIMPORT) {
-		int c;
 		dmu_tx_t *tx;
+		int need_update = B_FALSE;
+		int c;
 
-		spa_config_enter(spa, RW_WRITER, FTAG);
-		vdev_config_dirty(rvd);
-		spa_config_exit(spa, FTAG);
-
+		/*
+		 * Claim log blocks that haven't been committed yet.
+		 * This must all happen in a single txg.
+		 */
 		tx = dmu_tx_create_assigned(spa_get_dsl(spa),
 		    spa_first_txg(spa));
 		dmu_objset_find(spa->spa_name, zil_claim, tx, 0);
@@ -496,45 +490,23 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		txg_wait_synced(spa->spa_dsl_pool, 0);
 
 		/*
-		 * If the config cache is stale relative to the mosconfig,
-		 * sync the config cache.
+		 * If the config cache is stale, or we have uninitialized
+		 * metaslabs (see spa_vdev_add()), then update the config.
 		 */
-		if (config_cache_txg != spa->spa_config_txg) {
-			uint64_t txg;
-			spa_config_enter(spa, RW_WRITER, FTAG);
-			txg = spa_last_synced_txg(spa) + 1;
-			spa_config_set(spa,
-			    spa_config_generate(spa, rvd, txg, 0));
-			spa_config_exit(spa, FTAG);
-			txg_wait_synced(spa->spa_dsl_pool, txg);
-			spa_config_sync();
-		}
+		if (config_cache_txg != spa->spa_config_txg ||
+		    state == SPA_LOAD_IMPORT)
+			need_update = B_TRUE;
+
+		for (c = 0; c < rvd->vdev_children; c++)
+			if (rvd->vdev_child[c]->vdev_ms_array == 0)
+				need_update = B_TRUE;
 
 		/*
-		 * If we have top-level vdevs that were added but have
-		 * not yet been prepared for allocation, do that now.
-		 * (It's safe now because the config cache is up to date,
-		 * so it will be able to translate the new DVAs.)
-		 * See comments in spa_vdev_add() for full details.
+		 * Update the config cache asychronously in case we're the
+		 * root pool, in which case the config cache isn't writable yet.
 		 */
-		for (c = 0; c < rvd->vdev_children; c++) {
-			vdev_t *tvd = rvd->vdev_child[c];
-			if (tvd->vdev_ms_array == 0) {
-				uint64_t txg;
-				ASSERT(tvd->vdev_ms_shift == 0);
-				spa_config_enter(spa, RW_WRITER, FTAG);
-				txg = spa_last_synced_txg(spa) + 1;
-				vdev_init(tvd, txg);
-				vdev_config_dirty(tvd);
-				spa_config_set(spa,
-				    spa_config_generate(spa, rvd, txg, 0));
-				spa_config_exit(spa, FTAG);
-				txg_wait_synced(spa->spa_dsl_pool, txg);
-				ASSERT(tvd->vdev_ms_shift != 0);
-				ASSERT(tvd->vdev_ms_array != 0);
-				spa_config_sync();
-			}
-		}
+		if (need_update)
+			spa_async_request(spa, SPA_ASYNC_CONFIG_UPDATE);
 	}
 
 	error = 0;
@@ -589,8 +561,7 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 
 		spa_activate(spa);
 
-		error = spa_load(spa, spa->spa_config,
-		    SPA_LOAD_OPEN, B_FALSE);
+		error = spa_load(spa, spa->spa_config, SPA_LOAD_OPEN, B_FALSE);
 
 		if (error == EBADF) {
 			/*
@@ -615,9 +586,12 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 			 * information: the state of each vdev after the
 			 * attempted vdev_open().  Return this to the user.
 			 */
-			if (config != NULL && spa->spa_root_vdev != NULL)
+			if (config != NULL && spa->spa_root_vdev != NULL) {
+				spa_config_enter(spa, RW_READER, FTAG);
 				*config = spa_config_generate(spa, NULL, -1ULL,
 				    B_TRUE);
+				spa_config_exit(spa, FTAG);
+			}
 			spa_unload(spa);
 			spa_deactivate(spa);
 			spa->spa_last_open_failed = B_TRUE;
@@ -730,12 +704,13 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
  * Pool Creation
  */
 int
-spa_create(const char *pool, nvlist_t *nvroot, char *altroot)
+spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 {
 	spa_t *spa;
+	vdev_t *rvd;
 	dsl_pool_t *dp;
 	dmu_tx_t *tx;
-	int error;
+	int c, error;
 	uint64_t txg = TXG_INITIAL;
 
 	/*
@@ -746,22 +721,36 @@ spa_create(const char *pool, nvlist_t *nvroot, char *altroot)
 		mutex_exit(&spa_namespace_lock);
 		return (EEXIST);
 	}
-	spa = spa_add(pool);
 
 	/*
 	 * Allocate a new spa_t structure.
 	 */
+	spa = spa_add(pool, altroot);
 	spa_activate(spa);
-
-	if (altroot != NULL) {
-		spa->spa_root = spa_strdup(altroot);
-		atomic_add_32(&spa_active_count, 1);
-	}
 
 	spa->spa_uberblock.ub_txg = txg - 1;
 	spa->spa_ubsync = spa->spa_uberblock;
 
-	error = spa_vdev_add(spa, nvroot);
+	/*
+	 * Create the root vdev.
+	 */
+	spa_config_enter(spa, RW_WRITER, FTAG);
+
+	rvd = spa_config_parse(spa, nvroot, NULL, 0, VDEV_ALLOC_ADD);
+
+	ASSERT(spa->spa_root_vdev == rvd);
+
+	if (rvd == NULL) {
+		error = EINVAL;
+	} else {
+		if ((error = vdev_create(rvd, txg)) == 0) {
+			for (c = 0; c < rvd->vdev_children; c++)
+				vdev_init(rvd->vdev_child[c], txg);
+			vdev_config_dirty(rvd);
+		}
+	}
+
+	spa_config_exit(spa, FTAG);
 
 	if (error) {
 		spa_unload(spa);
@@ -828,7 +817,7 @@ spa_create(const char *pool, nvlist_t *nvroot, char *altroot)
  * then call spa_load() to do the dirty work.
  */
 int
-spa_import(const char *pool, nvlist_t *config, char *altroot)
+spa_import(const char *pool, nvlist_t *config, const char *altroot)
 {
 	spa_t *spa;
 	int error;
@@ -846,25 +835,15 @@ spa_import(const char *pool, nvlist_t *config, char *altroot)
 	}
 
 	/*
-	 * Create an initialize the spa structure
+	 * Create and initialize the spa structure.
 	 */
-	spa = spa_add(pool);
+	spa = spa_add(pool, altroot);
 	spa_activate(spa);
 
 	/*
-	 * Set the alternate root, if there is one.
+	 * Pass off the heavy lifting to spa_load().
 	 */
-	if (altroot != NULL) {
-		spa->spa_root = spa_strdup(altroot);
-		atomic_add_32(&spa_active_count, 1);
-	}
-
-	/*
-	 * Pass off the heavy lifting to spa_load().  We pass TRUE for mosconfig
-	 * so that we don't try to open the pool if the config is damaged.
-	 * Note: on success, spa_load() will update and sync the config cache.
-	 */
-	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_TRUE);
+	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_FALSE);
 
 	if (error) {
 		spa_unload(spa);
@@ -873,6 +852,11 @@ spa_import(const char *pool, nvlist_t *config, char *altroot)
 		mutex_exit(&spa_namespace_lock);
 		return (error);
 	}
+
+	/*
+	 * Update the config cache to include the newly-imported pool.
+	 */
+	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 
 	mutex_exit(&spa_namespace_lock);
 
@@ -905,27 +889,25 @@ spa_tryimport(nvlist_t *tryconfig)
 	if (nvlist_lookup_uint64(tryconfig, ZPOOL_CONFIG_POOL_STATE, &state))
 		return (NULL);
 
-	mutex_enter(&spa_namespace_lock);
-	spa = spa_add(TRYIMPORT_NAME);
-
-	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
-
 	/*
-	 * Initialize the spa_t structure.
+	 * Create and initialize the spa structure.
 	 */
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_add(TRYIMPORT_NAME, NULL);
 	spa_activate(spa);
 
 	/*
-	 * Pass off the heavy lifting to spa_load().  We pass TRUE for mosconfig
-	 * so we don't try to open the pool if the config is damaged.
+	 * Pass off the heavy lifting to spa_load().
 	 */
-	(void) spa_load(spa, tryconfig, SPA_LOAD_TRYIMPORT, B_TRUE);
+	(void) spa_load(spa, tryconfig, SPA_LOAD_TRYIMPORT, B_FALSE);
 
 	/*
 	 * If 'tryconfig' was at least parsable, return the current config.
 	 */
 	if (spa->spa_root_vdev != NULL) {
+		spa_config_enter(spa, RW_READER, FTAG);
 		config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
+		spa_config_exit(spa, FTAG);
 		VERIFY(nvlist_add_string(config, ZPOOL_CONFIG_POOL_NAME,
 		    poolname) == 0);
 		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_POOL_STATE,
@@ -1001,9 +983,6 @@ spa_export_common(char *pool, int new_state)
 		spa_scrub_resume(spa);
 		VERIFY(spa_scrub(spa, POOL_SCRUB_NONE, B_TRUE) == 0);
 
-		if (spa->spa_root != NULL)
-			atomic_add_32(&spa_active_count, -1);
-
 		/*
 		 * We want this to be reflected on every label,
 		 * so mark them all dirty.  spa_unload() will do the
@@ -1012,6 +991,7 @@ spa_export_common(char *pool, int new_state)
 		if (new_state != POOL_STATE_UNINITIALIZED) {
 			spa_config_enter(spa, RW_WRITER, FTAG);
 			spa->spa_state = new_state;
+			spa->spa_final_txg = spa_last_synced_txg(spa) + 1;
 			vdev_config_dirty(spa->spa_root_vdev);
 			spa_config_exit(spa, FTAG);
 		}
@@ -1073,7 +1053,7 @@ int
 spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 {
 	uint64_t txg;
-	int c, c0, children, error;
+	int c, error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd, *tvd;
 
@@ -1084,30 +1064,17 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	if (vd == NULL)
 		return (spa_vdev_exit(spa, vd, txg, EINVAL));
 
-	if (rvd == NULL) {			/* spa_create() */
-		rvd = vd;
-		c0 = 0;
-	} else {
-		c0 = rvd->vdev_children;
-	}
-
-	ASSERT(spa->spa_root_vdev == rvd);
-
 	if ((error = vdev_create(vd, txg)) != 0)
 		return (spa_vdev_exit(spa, vd, txg, error));
-
-	children = vd->vdev_children;
 
 	/*
 	 * Transfer each new top-level vdev from vd to rvd.
 	 */
-	for (c = 0; c < children; c++) {
+	for (c = 0; c < vd->vdev_children; c++) {
 		tvd = vd->vdev_child[c];
-		if (vd != rvd) {
-			vdev_remove_child(vd, tvd);
-			tvd->vdev_id = c0 + c;
-			vdev_add_child(rvd, tvd);
-		}
+		vdev_remove_child(vd, tvd);
+		tvd->vdev_id = rvd->vdev_children;
+		vdev_add_child(rvd, tvd);
 		vdev_config_dirty(tvd);
 	}
 
@@ -1118,29 +1085,19 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	 * fail to open the pool because there are DVAs that the config cache
 	 * can't translate.  Therefore, we first add the vdevs without
 	 * initializing metaslabs; sync the config cache (via spa_vdev_exit());
-	 * initialize the metaslabs; and sync the config cache again.
+	 * and then let spa_config_update() initialize the new metaslabs.
 	 *
 	 * spa_load() checks for added-but-not-initialized vdevs, so that
 	 * if we lose power at any point in this sequence, the remaining
 	 * steps will be completed the next time we load the pool.
 	 */
-	if (vd != rvd) {
-		(void) spa_vdev_exit(spa, vd, txg, 0);
-		txg = spa_vdev_enter(spa);
-		vd = NULL;
-	}
+	(void) spa_vdev_exit(spa, vd, txg, 0);
 
-	/*
-	 * Now that the config is safely on disk, we can use the new space.
-	 */
-	for (c = 0; c < children; c++) {
-		tvd = rvd->vdev_child[c0 + c];
-		ASSERT(tvd->vdev_ms_array == 0);
-		vdev_init(tvd, txg);
-		vdev_config_dirty(tvd);
-	}
+	mutex_enter(&spa_namespace_lock);
+	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
+	mutex_exit(&spa_namespace_lock);
 
-	return (spa_vdev_exit(spa, vd, txg, 0));
+	return (0);
 }
 
 /*
@@ -1795,7 +1752,6 @@ spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force)
 	space_seg_t *ss;
 	uint64_t mintxg, maxtxg;
 	vdev_t *rvd = spa->spa_root_vdev;
-	int advance = ADVANCE_PRE | ADVANCE_ZIL;
 
 	if ((uint_t)type >= POOL_SCRUB_TYPES)
 		return (ENOTSUP);
@@ -1869,8 +1825,6 @@ spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force)
 		mintxg = ss->ss_start - 1;
 		ss = avl_last(&rvd->vdev_dtl_map.sm_root);
 		maxtxg = MIN(ss->ss_end, maxtxg);
-
-		advance |= ADVANCE_PRUNE;
 	}
 
 	mutex_exit(&rvd->vdev_dtl_lock);
@@ -1883,7 +1837,8 @@ spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force)
 		spa->spa_scrub_mintxg = mintxg;
 		spa->spa_scrub_maxtxg = maxtxg;
 		spa->spa_scrub_th = traverse_init(spa, spa_scrub_cb, NULL,
-		    advance, ZIO_FLAG_CANFAIL);
+		    ADVANCE_PRE | ADVANCE_PRUNE | ADVANCE_ZIL,
+		    ZIO_FLAG_CANFAIL);
 		traverse_add_pool(spa->spa_scrub_th, mintxg, maxtxg);
 		spa->spa_scrub_thread = thread_create(NULL, 0,
 		    spa_scrub_thread, spa, 0, &p0, TS_RUN, minclsyspri);
@@ -1931,6 +1886,15 @@ spa_async_thread(spa_t *spa)
 	tasks = spa->spa_async_tasks;
 	spa->spa_async_tasks = 0;
 	mutex_exit(&spa->spa_async_lock);
+
+	/*
+	 * See if the config needs to be updated.
+	 */
+	if (tasks & SPA_ASYNC_CONFIG_UPDATE) {
+		mutex_enter(&spa_namespace_lock);
+		spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
+		mutex_exit(&spa_namespace_lock);
+	}
 
 	/*
 	 * See if any devices need to be reopened.
@@ -1990,7 +1954,8 @@ spa_async_dispatch(spa_t *spa)
 {
 	mutex_enter(&spa->spa_async_lock);
 	if (spa->spa_async_tasks && !spa->spa_async_suspended &&
-	    spa->spa_async_thread == NULL)
+	    spa->spa_async_thread == NULL &&
+	    rootdir != NULL && !vn_is_readonly(rootdir))
 		spa->spa_async_thread = thread_create(NULL, 0,
 		    spa_async_thread, spa, 0, &p0, TS_RUN, maxclsyspri);
 	mutex_exit(&spa->spa_async_lock);
@@ -2053,7 +2018,9 @@ spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
 
 	config = spa_config_generate(spa, NULL, dmu_tx_get_txg(tx), B_FALSE);
 
-	spa_config_set(spa, config);
+	if (spa->spa_config_syncing)
+		nvlist_free(spa->spa_config_syncing);
+	spa->spa_config_syncing = config;
 
 	VERIFY(nvlist_size(config, &nvsize, NV_ENCODE_XDR) == 0);
 
@@ -2084,6 +2051,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 	dsl_pool_t *dp = spa->spa_dsl_pool;
 	objset_t *mos = spa->spa_meta_objset;
 	bplist_t *bpl = &spa->spa_sync_bplist;
+	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
 	dmu_tx_t *tx;
 	int dirty_vdevs;
@@ -2140,8 +2108,45 @@ spa_sync(spa_t *spa, uint64_t txg)
 	/*
 	 * Rewrite the vdev configuration (which includes the uberblock)
 	 * to commit the transaction group.
+	 *
+	 * If there are any dirty vdevs, sync the uberblock to all vdevs.
+	 * Otherwise, pick a random top-level vdev that's known to be
+	 * visible in the config cache (see spa_vdev_add() for details).
+	 * If the write fails, try the next vdev until we're tried them all.
 	 */
-	VERIFY(0 == spa_sync_labels(spa, txg));
+	if (!list_is_empty(&spa->spa_dirty_list)) {
+		VERIFY(vdev_config_sync(rvd, txg) == 0);
+	} else {
+		int children = rvd->vdev_children;
+		int c0 = spa_get_random(children);
+		int c;
+
+		for (c = 0; c < children; c++) {
+			vd = rvd->vdev_child[(c0 + c) % children];
+			if (vd->vdev_ms_array == 0)
+				continue;
+			if (vdev_config_sync(vd, txg) == 0)
+				break;
+		}
+		if (c == children)
+			VERIFY(vdev_config_sync(rvd, txg) == 0);
+	}
+
+	/*
+	 * Clear the dirty config list.
+	 */
+	while ((vd = list_head(&spa->spa_dirty_list)) != NULL)
+		vdev_config_clean(vd);
+
+	/*
+	 * Now that the new config has synced transactionally,
+	 * let it become visible to the config cache.
+	 */
+	if (spa->spa_config_syncing != NULL) {
+		spa_config_set(spa, spa->spa_config_syncing);
+		spa->spa_config_txg = txg;
+		spa->spa_config_syncing = NULL;
+	}
 
 	/*
 	 * Make a stable copy of the fully synced uberblock.
@@ -2213,12 +2218,6 @@ spa_sync_allpools(void)
  * Miscellaneous routines
  * ==========================================================================
  */
-
-int
-spa_busy(void)
-{
-	return (spa_active_count != 0);
-}
 
 /*
  * Remove all pools in the system.

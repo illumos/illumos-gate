@@ -60,9 +60,10 @@ struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
 	 */
-	char		*spa_name;
-	avl_node_t	spa_avl;
-	nvlist_t	*spa_config;
+	char		*spa_name;		/* pool name */
+	avl_node_t	spa_avl;		/* node in spa_namespace_avl */
+	nvlist_t	*spa_config;		/* last synced config */
+	nvlist_t	*spa_config_syncing;	/* currently syncing config */
 	uint64_t	spa_config_txg;		/* txg of last config change */
 	spa_config_lock_t spa_config_lock;	/* configuration changes */
 	kmutex_t	spa_config_cache_lock;	/* for spa_config RW_READER */
@@ -77,6 +78,7 @@ struct spa {
 	dsl_pool_t	*spa_dsl_pool;
 	metaslab_class_t *spa_normal_class;	/* normal data class */
 	uint64_t	spa_first_txg;		/* first txg after spa_open() */
+	uint64_t	spa_final_txg;		/* txg of export/destroy */
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */
 	objset_t	*spa_meta_objset;	/* copy of dp->dp_meta_objset */
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
@@ -104,6 +106,7 @@ struct spa {
 	uint8_t		spa_scrub_stop;		/* tell scrubber to stop */
 	uint8_t		spa_scrub_active;	/* active or suspended? */
 	uint8_t		spa_scrub_type;		/* type of scrub we're doing */
+	uint8_t		spa_scrub_finished;	/* indicator to rotate logs */
 	kmutex_t	spa_async_lock;		/* protect async state */
 	kthread_t	*spa_async_thread;	/* thread doing async task */
 	int		spa_async_suspended;	/* async tasks suspended */
@@ -119,7 +122,6 @@ struct spa {
 	kmutex_t	spa_errlist_lock;	/* error list/ereport lock */
 	avl_tree_t	spa_errlist_last;	/* last error list */
 	avl_tree_t	spa_errlist_scrub;	/* scrub error list */
-	int		spa_scrub_finished;	/* indicator to rotate logs */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function

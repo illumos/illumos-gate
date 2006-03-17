@@ -346,6 +346,7 @@ extern void vn_close(vnode_t *vp);
 
 #define	vn_remove(path, x1, x2)		remove(path)
 #define	vn_rename(from, to, seg)	rename((from), (to))
+#define	vn_is_readonly(vp)		B_FALSE
 
 extern vnode_t *rootdir;
 
