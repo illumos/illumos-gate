@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,7 @@ char *errmsgs[] = {
 	"WARNING: more than NGROUPS_MAX(%d) groups specified.\n",
 	"ERROR: invalid syntax.\n"
 	    "usage:  useradd [-u uid [-o] | -g group | -G group[[,group]...] |"
-	    "-d dir |\n"
+	    "-d dir | -b base_dir |\n"
 	    "\t\t-s shell | -c comment | -m [-k skel_dir] | -f inactive |\n"
 	    "\t\t-e expire | -A authorization [, authorization ...] |\n"
 	    "\t\t-P profile [, profile ...] | -R role [, role ...] |\n"
@@ -43,7 +42,7 @@ char *errmsgs[] = {
 	    "\tuseradd -D [-g group | -b base_dir | -f inactive | -e expire\n"
 	    "\t\t-A authorization [, authorization ...] |\n"
 	    "\t\t-P profile [, profile ...] | -R role [, role ...] |\n"
-	    "\t\t-K key=value ... -p project]\n",
+	    "\t\t-K key=value ... -p project] | [-s shell] | [-k skel_dir]\n",
 	"ERROR: Invalid syntax.\nusage:  userdel [-r] login\n",
 	"ERROR: Invalid syntax.\n"
 	    "usage:  usermod -u uid [-o] | -g group | -G group[[,group]...] |\n"
@@ -95,10 +94,10 @@ char *errmsgs[] = {
 	"ERROR: Invalid key.\n",
 	"ERROR: Missing value specification.\n",
 	"ERROR: Multiple definitions of key ``%s''.\n",
-	"ERROR: Roles most be modified with ``rolemod''.\n",
-	"ERROR: Users most be modified with ``usermod''.\n",
+	"ERROR: Roles must be modified with ``rolemod''.\n",
+	"ERROR: Users must be modified with ``usermod''.\n",
 	"WARNING: gid %ld is reserved.\n",
-	"ERROR: Failed to read /etc/group file due to invaild entry or"
+	"ERROR: Failed to read /etc/group file due to invalid entry or"
 	    " read error.\n",
 };
 

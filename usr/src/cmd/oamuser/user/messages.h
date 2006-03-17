@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,16 +137,16 @@ extern void errmsg(int, ...);
 /* ERROR: Multiple definitions of key ``%s''. */
 #define	M_REDEFINED_KEY	33
 
-/* ERROR: Roles most be modified with rolemod */
+/* ERROR: Roles must be modified with rolemod */
 #define	M_ISROLE	34
 
-/* ERROR: Users most be modified with usermod */
+/* ERROR: Users must be modified with usermod */
 #define	M_ISUSER	35
 
 /* WARNING: gid %d is reserved. */
 #define	M_RESERVED_GID		36
 
-/* ERROR: Failed to read /etc/group file due to invaild entry or read error. */
+/* ERROR: Failed to read /etc/group file due to invalid entry or read error. */
 #define	M_READ_ERROR	37
 
 #endif /* _MESSAGES_H */

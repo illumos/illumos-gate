@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,12 +49,13 @@
 
 /*
  *  useradd [-u uid [-o] | -g group | -G group [[, group]...] | -d dir [-m]
- *		| -s shell | -c comment | -k skel_dir] ]
+ *		| -s shell | -c comment | -k skel_dir | -b base_dir] ]
  *		[ -A authorization [, authorization ...]]
  *		[ -P profile [, profile ...]]
  *		[ -K key=value ]
  *		[ -R role [, role ...]] [-p project [, project ...]] login
- *  useradd -D [ -g group ] [ -b base_dir | -f inactive | -e expire ]
+ *  useradd -D [ -g group ] [ -b base_dir | -f inactive | -e expire |
+ *		-s shell | -k skel_dir ]
  *		[ -A authorization [, authorization ...]]
  *		[ -P profile [, profile ...]] [ -K key=value ]
  *		[ -R role [, role ...]] [-p project [, project ...]] login
@@ -119,6 +119,15 @@ static char *expirestr = NULL;		/* expiration date from command line */
 static char *projects = NULL;		/* project id's from command line */
 
 static char *usertype = NULL;	/* type of user, either role or normal */
+
+typedef enum {
+	BASEDIR	= 0,
+	SKELDIR,
+	SHELL
+} path_opt_t;
+
+
+static void valid_input(path_opt_t, const char *);
 
 int
 main(argc, argv)
@@ -252,8 +261,8 @@ char *argv[];
 			exit(EX_SYNTAX);
 		}
 
-		if (uidstr || oflag || grps || dir || mflag ||
-		    shell || comment || skel_dir) {
+		if (uidstr != NULL || oflag || grps != NULL ||
+		    dir != NULL || mflag || comment != NULL) {
 			if (is_role(usertype))
 				errmsg(M_ARUSAGE);
 			else
@@ -262,7 +271,7 @@ char *argv[];
 		}
 
 		/* Group must be an existing group */
-		if (group) {
+		if (group != NULL) {
 			switch (valid_group(group, &g_ptr, &warning)) {
 			case INVALID:
 				errmsg(M_INVALID, group, "group id");
@@ -286,7 +295,7 @@ char *argv[];
 		}
 
 		/* project must be an existing project */
-		if (projects) {
+		if (projects != NULL) {
 			switch (valid_project(projects, &p_ptr, mybuf,
 			    sizeof (mybuf), &warning)) {
 			case INVALID:
@@ -309,22 +318,13 @@ char *argv[];
 		}
 
 		/* base_dir must be an existing directory */
-		if (base_dir) {
-			if (REL_PATH(base_dir)) {
-				errmsg(M_RELPATH, base_dir);
-				exit(EX_BADARG);
-			}
-			if (stat(base_dir, &statbuf) < 0 &&
-			    (statbuf.st_mode & S_IFMT) != S_IFDIR) {
-				errmsg(M_INVALID, base_dir, "base directory");
-				exit(EX_BADARG);
-			}
-
+		if (base_dir != NULL) {
+			valid_input(BASEDIR, base_dir);
 			usrdefs->defparent = base_dir;
 		}
 
 		/* inactivity period is an integer */
-		if (inactstr) {
+		if (inactstr != NULL) {
 			/* convert inactstr to integer */
 			inact = strtol(inactstr, &ptr, 10);
 			if (*ptr || inact < 0) {
@@ -337,7 +337,7 @@ char *argv[];
 		}
 
 		/* expiration string is a date, newer than today */
-		if (expirestr) {
+		if (expirestr != NULL) {
 			if (*expirestr) {
 				if (valid_expire(expirestr, (time_t *)0)
 				    == INVALID) {
@@ -351,6 +351,14 @@ char *argv[];
 				usrdefs->defexpire = "";
 		}
 
+		if (shell != NULL) {
+			valid_input(SHELL, shell);
+			usrdefs->defshell = shell;
+		}
+		if (skel_dir != NULL) {
+			valid_input(SKELDIR, skel_dir);
+			usrdefs->defskel = skel_dir;
+		}
 		update_def(usrdefs);
 
 		/* change defaults for useradd */
@@ -368,7 +376,7 @@ char *argv[];
 	/* ADD mode */
 
 	/* check syntax */
-	if (optind != argc - 1 || base_dir || (skel_dir && !mflag)) {
+	if (optind != argc - 1 || (skel_dir != NULL && !mflag)) {
 		if (is_role(usertype))
 			errmsg(M_ARUSAGE);
 		else
@@ -391,7 +399,7 @@ char *argv[];
 
 	if (warning)
 		warningmsg(warning, logname);
-	if (uidstr) {
+	if (uidstr != NULL) {
 		/* convert uidstr to integer */
 		errno = 0;
 		uid = (uid_t)strtol(uidstr, &ptr, (int)10);
@@ -425,7 +433,7 @@ char *argv[];
 		}
 	}
 
-	if (group) {
+	if (group != NULL) {
 		switch (valid_group(group, &g_ptr, &warning)) {
 		case INVALID:
 			errmsg(M_INVALID, group, "group id");
@@ -448,7 +456,7 @@ char *argv[];
 
 	} else gid = usrdefs->defgroup;
 
-	if (grps) {
+	if (grps != NULL) {
 		if (!*grps)
 			/* ignore -G "" */
 			grps = (char *)0;
@@ -456,16 +464,22 @@ char *argv[];
 			exit(EX_BADARG);
 	}
 
-	if (projects) {
+	if (projects != NULL) {
 		if (! *projects)
 			projects = (char *)0;
 		else if (! (projlist = valid_lproject(projects)))
 			exit(EX_BADARG);
 	}
 
-	if (!dir) {
+	/* if base_dir is provided, check its validity; otherwise default */
+	if (base_dir != NULL)
+		valid_input(BASEDIR, base_dir);
+	else
+		base_dir = usrdefs->defparent;
+
+	if (dir == NULL) {
 		/* set homedir to home directory made from base_dir */
-		(void) sprintf(homedir, "%s/%s", usrdefs->defparent, logname);
+		(void) sprintf(homedir, "%s/%s", base_dir, logname);
 
 	} else if (REL_PATH(dir)) {
 		errmsg(M_RELPATH, dir);
@@ -484,36 +498,21 @@ char *argv[];
 				errmsg(M_NO_PERM, logname, homedir);
 		}
 	}
+	/*
+	 * if shell, skel_dir are provided, check their validity.
+	 * Otherwise default.
+	 */
+	if (shell != NULL)
+		valid_input(SHELL, shell);
+	else
+		shell = usrdefs->defshell;
 
-	if (shell) {
-		if (REL_PATH(shell)) {
-			errmsg(M_RELPATH, shell);
-			exit(EX_BADARG);
-		}
-		/* check that shell is an executable file */
-		if (stat(shell, &statbuf) < 0 ||
-		    (statbuf.st_mode & S_IFMT) != S_IFREG ||
-		    (statbuf.st_mode & 0555) != 0555) {
+	if (skel_dir != NULL)
+		valid_input(SKELDIR, skel_dir);
+	else
+		skel_dir = usrdefs->defskel;
 
-			errmsg(M_INVALID, shell, "shell");
-			exit(EX_BADARG);
-		}
-	} else shell = usrdefs->defshell;
-
-	if (skel_dir) {
-		if (REL_PATH(skel_dir)) {
-			errmsg(M_RELPATH, skel_dir);
-			exit(EX_BADARG);
-		}
-		if (stat(skel_dir, &statbuf) < 0 &&
-		    (statbuf.st_mode & S_IFMT) != S_IFDIR) {
-
-			errmsg(M_INVALID, skel_dir, "directory");
-			exit(EX_BADARG);
-		}
-	} else skel_dir = usrdefs->defskel;
-
-	if (inactstr) {
+	if (inactstr != NULL) {
 		/* convert inactstr to integer */
 		inact = strtol(inactstr, &ptr, 10);
 		if (*ptr || inact < 0) {
@@ -523,7 +522,7 @@ char *argv[];
 	} else inact = usrdefs->definact;
 
 	/* expiration string is a date, newer than today */
-	if (expirestr) {
+	if (expirestr != NULL) {
 		if (*expirestr) {
 			if (valid_expire(expirestr, (time_t *)0) == INVALID) {
 				errmsg(M_INVALID, expirestr, "expiration date");
@@ -546,7 +545,7 @@ char *argv[];
 	nargv[argindex++] = "passmgmt";
 	nargv[argindex++] = "-a";	/* add */
 
-	if (comment) {
+	if (comment != NULL) {
 		/* comment */
 		nargv[argindex++] = "-c";
 		nargv[argindex++] = comment;
@@ -571,7 +570,7 @@ char *argv[];
 	nargv[argindex++] = inactstring;
 
 	/* set expiration date */
-	if (expirestr) {
+	if (expirestr != NULL) {
 		nargv[argindex++] = "-e";
 		nargv[argindex++] = expirestr;
 	}
@@ -664,14 +663,15 @@ char *argv[];
 	}
 
 	/* add group entry */
-	if (grps && edit_group(logname, (char *)0, gidlist, 0)) {
+	if ((grps != NULL) && edit_group(logname, (char *)0, gidlist, 0)) {
 		errmsg(M_UPDATE, "created");
 		cleanup(logname);
 		exit(EX_UPDATE);
 	}
 
 	/* update project database */
-	if (projects && edit_project(logname, (char *)NULL, projlist, 0)) {
+	if ((projects != NULL) &&
+	    edit_project(logname, (char *)NULL, projlist, 0)) {
 		errmsg(M_UPDATE, "created");
 		cleanup(logname);
 		exit(EX_UPDATE);
@@ -724,5 +724,34 @@ char *logname;
 	default:
 		errmsg(M_UPDATE, "created");
 		break;
+	}
+}
+
+/* Check the validity for shell, base_dir and skel_dir */
+
+void
+valid_input(path_opt_t opt, const char *input)
+{
+	struct stat	statbuf;
+
+	if (REL_PATH(input)) {
+		errmsg(M_RELPATH, input);
+		exit(EX_BADARG);
+	}
+	if (stat(input, &statbuf) == -1) {
+		errmsg(M_INVALID, input, "path");
+		exit(EX_BADARG);
+	}
+	if (opt == SHELL) {
+		if (!S_ISREG(statbuf.st_mode) ||
+		    (statbuf.st_mode & 0555) != 0555) {
+			errmsg(M_INVALID, input, "shell");
+			exit(EX_BADARG);
+		}
+	} else {
+		if (!S_ISDIR(statbuf.st_mode)) {
+			errmsg(M_INVALID, input, "directory");
+			exit(EX_BADARG);
+		}
 	}
 }
