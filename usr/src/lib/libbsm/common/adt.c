@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1281,20 +1280,14 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
  * session model.
  *
  * In the current implementation, the value state->as_have_user_data
- * must be either ADT_HAVE_ALL or ADT_HAVE_TID.  The latter value
- * is to support the adt_set_user() flag of ADT_SETTID.  If another
- * need for setting single audit data is discovered, consider changing
- * the logic to test each individual flag setting rather than "ALL."
+ * must contain all of: ADT_HAVE_{AUID,MASK,TID,ASID}.  These are all set
+ * by adt_set_user() when the ADT_SETTID or ADT_NEW flag is passed in.
  *
- * Future consideration:  Is ADT_HAVE_ALL too strong a test?  There
- * doesn't seem to be a good reason for requiring that ADT_HAVE_IDS
- * be set.
  */
 
 int
 adt_set_proc(const adt_session_data_t *session_data)
 {
-	struct auditinfo_addr	info;
 	int			rc;
 	adt_internal_state_t	*state;
 
@@ -1305,40 +1298,14 @@ adt_set_proc(const adt_session_data_t *session_data)
 
 	assert(state->as_check == ADT_VALID);
 
-	if ((state->as_have_user_data != ADT_HAVE_ALL) &&
-	    ((state->as_have_user_data & ADT_HAVE_TID) == 0)) {
+	if ((state->as_have_user_data & (ADT_HAVE_ALL & ~ADT_HAVE_IDS)) !=
+	    (ADT_HAVE_ALL & ~ADT_HAVE_IDS)) {
 		errno = EINVAL;
 		goto return_err;
 	}
-	/*
-	 * leave tid alone if session copy is not set
-	 * Since info contains tid, you need to get tid from kernel
-	 * so it can be written back.
-	 * All info other than tid is overwritten from session before
-	 * it is written back.
-	 *
-	 * See the note above the function header; if flag by flag
-	 * tests are done, testing for an empty tid should just
-	 * be a test for ADT_HAVE_TID -- and the functions that
-	 * load the terminal id may have to be modified to make
-	 * this appropriate.
-	 */
-	if (state->as_info.ai_termid.at_port ||
-	    state->as_info.ai_termid.at_addr[0] ||
-	    state->as_info.ai_termid.at_addr[1] ||
-	    state->as_info.ai_termid.at_addr[2] ||
-	    state->as_info.ai_termid.at_addr[3]) {
-		info.ai_termid = state->as_info.ai_termid;
-	} else {
-		rc = getaudit_addr(&info, sizeof (info));
-		if (rc < 0)
-			goto return_err;   /* errno set by getaudit_addr() */
-	}
-	info.ai_auid = state->as_info.ai_auid;
-	info.ai_asid = state->as_info.ai_asid;
-	info.ai_mask = state->as_info.ai_mask;
 
-	rc = setaudit_addr(&info, sizeof (info));
+	rc = setaudit_addr((auditinfo_addr_t *)&(state->as_info),
+	    sizeof (auditinfo_addr_t));
 
 	if (rc < 0)
 		goto return_err;	/* errno set by setaudit_addr() */

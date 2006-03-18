@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,9 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Automatically generated code; do not edit
  */
 
 #ifndef _BSM_XLATE_H
@@ -58,7 +56,7 @@ extern "C" {
 #define	ADT_HAVE_TID	0x02
 #define	ADT_HAVE_AUID	0x04
 #define	ADT_HAVE_ASID	0x08
-#define	ADT_HAVE_IDS	0x16
+#define	ADT_HAVE_IDS	0x10
 #define	ADT_HAVE_ALL	(uint32_t)\
 	(ADT_HAVE_MASK | ADT_HAVE_TID | ADT_HAVE_AUID | ADT_HAVE_ASID |\
 	ADT_HAVE_IDS)
