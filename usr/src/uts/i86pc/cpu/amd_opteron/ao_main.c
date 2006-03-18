@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,7 +48,7 @@
  * later, return ENOTSUP and let the generic x86 CPU module load instead.
  * Opteron Rev F is currently defined as Family 0xF Model [0x40 .. 0x5F].
  */
-static uint_t ao_model_limit = 0x40;
+uint_t ao_model_limit = 0x40;
 
 static int
 ao_init(cpu_t *cp, void **datap)
@@ -65,6 +64,13 @@ ao_init(cpu_t *cp, void **datap)
 	return (0);
 }
 
+/*ARGSUSED*/
+static void
+ao_post_mpstartup(void *data)
+{
+	(void) ddi_install_driver("mc-amd");
+}
+
 static void
 ao_fini(void *data)
 {
@@ -74,6 +80,7 @@ ao_fini(void *data)
 const cmi_ops_t _cmi_ops = {
 	ao_init,
 	ao_mca_post_init,
+	ao_post_mpstartup,
 	ao_fini,
 	ao_faulted_enter,
 	ao_faulted_exit,

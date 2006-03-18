@@ -1026,6 +1026,8 @@ done:
 		mp_unmap_warm_reset_vector(warm_reset_vector);
 	hat_unload(kas.a_hat, (caddr_t)(uintptr_t)rm_platter_pa, MMU_PAGESIZE,
 	    HAT_UNLOAD);
+
+	cmi_post_mpstartup();
 }
 
 /*

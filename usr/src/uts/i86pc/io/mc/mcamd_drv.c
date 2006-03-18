@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -926,7 +925,13 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_enter(&cpu_lock);
 
 		cpu = mc->mc_chip->chip_cpus;
-		rc = cmi_scrubber_enable(cpu, mcp->mcp_base, mcp->mcp_ilen);
+
+		if (mc->mc_props.mcp_lim != mc->mc_props.mcp_base) {
+			rc = cmi_scrubber_enable(cpu, mcp->mcp_base,
+			    mcp->mcp_ilen);
+		} else {
+			rc = 0;
+		}
 
 		do {
 			mcamd_mc_register(cpu);
