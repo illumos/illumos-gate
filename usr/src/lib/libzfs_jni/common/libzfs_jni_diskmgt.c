@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ static void get_slice_use(dm_descriptor_t slice, char *name,
 static dmgt_slice_t *get_slice(
     dm_descriptor_t slice, uint32_t blocksize, int *error);
 static void handle_error(const char *format, ...);
-static int slice_in_use(dmgt_slice_t *slice);
+static int slice_in_use(dmgt_slice_t *slice, int *error);
 static int slice_too_small(dmgt_slice_t *slice);
 
 /*
@@ -275,12 +275,16 @@ get_disk_slices(dm_descriptor_t media, const char *name, uint32_t blocksize,
 			    get_slice(slices[j], blocksize, error);
 			if (!*error) {
 
-				sap = (dmgt_slice_t **)realloc(sap,
+				dmgt_slice_t **mem =
+				    (dmgt_slice_t **)realloc(sap,
 				    (nslices + 2) * sizeof (dmgt_slice_t *));
-				if (sap == NULL) {
+
+				if (mem == NULL) {
 					handle_error("out of memory");
 					*error = -1;
 				} else {
+
+					sap = mem;
 
 					/* NULL-terminated array */
 					sap[nslices] = slice;
@@ -297,11 +301,12 @@ get_disk_slices(dm_descriptor_t media, const char *name, uint32_t blocksize,
 	if (*error) {
 		/* Normalize error */
 		*error = -1;
-	}
 
-	if (*error && sap != NULL) {
-		zjni_free_array((void **)sap, (zjni_free_f)dmgt_free_slice);
-		sap = NULL;
+		if (sap != NULL) {
+			zjni_free_array((void **)sap,
+			    (zjni_free_f)dmgt_free_slice);
+			sap = NULL;
+		}
 	}
 
 	return (sap);
@@ -355,10 +360,13 @@ get_disk_usable_slices(dm_descriptor_t media, const char *name,
     uint32_t blocksize, int *in_use, int *error)
 {
 	dmgt_slice_t **slices = get_disk_slices(media, name, blocksize, error);
+	if (*error) {
+		slices = NULL;
+	}
 
 	*in_use = 0;
 
-	if (!*error && slices != NULL) {
+	if (slices != NULL) {
 		int i, nslices;
 
 		for (nslices = 0; slices[nslices] != NULL; nslices++);
@@ -366,14 +374,26 @@ get_disk_usable_slices(dm_descriptor_t media, const char *name,
 		/* Prune slices based on use */
 		for (i = nslices - 1; i >= 0; i--) {
 			dmgt_slice_t *slice = slices[i];
+			int s_in_use;
+
+			/*
+			 * Slice at this index could be NULL if
+			 * removed in earlier iteration
+			 */
 			if (slice == NULL) {
 				continue;
 			}
 
-			if (slice_in_use(slice)) {
+			s_in_use = slice_in_use(slice, error);
+			if (*error) {
+			    break;
+			}
+
+			if (s_in_use) {
 				int j;
 				remove_slice_from_list(slices, i);
 
+				/* Disk is in use */
 				*in_use = 1;
 
 				/*
@@ -381,19 +401,32 @@ get_disk_usable_slices(dm_descriptor_t media, const char *name,
 				 * in-use slice
 				 */
 				for (j = nslices - 1; j >= 0; j--) {
-					if (slices[j] == NULL) {
-						continue;
-					}
-					if (slices_overlap(slice, slices[j])) {
+					dmgt_slice_t *slice2 = slices[j];
+
+					if (slice2 != NULL &&
+					    slices_overlap(slice, slice2)) {
 						remove_slice_from_list(slices,
 						    j);
+						dmgt_free_slice(slice2);
 					}
 				}
-			} else {
-				if (slice_too_small(slice)) {
-					remove_slice_from_list(slices, i);
-				}
+
+				dmgt_free_slice(slice);
+			} else if (slice_too_small(slice)) {
+				remove_slice_from_list(slices, i);
+				dmgt_free_slice(slice);
 			}
+		}
+	}
+
+	if (*error) {
+		/* Normalize error */
+		*error = -1;
+
+		if (slices != NULL) {
+			zjni_free_array((void **)slices,
+			    (zjni_free_f)dmgt_free_slice);
+			slices = NULL;
 		}
 	}
 
@@ -602,41 +635,29 @@ slice_too_small(dmgt_slice_t *slice)
 	return (0);
 }
 
-/* Should go away once 6285992 is fixed */
 static int
-slice_in_use(dmgt_slice_t *slice)
+slice_in_use(dmgt_slice_t *slice, int *error)
 {
-	int in_use = 0;
+	char *msg = NULL;
+	int in_use;
 
-	/* Check use */
-	if (slice->used_name != NULL) {
-
-		in_use = 1;
-
-		/* If the slice contains an unmounted file system... */
-		if (strcmp(DM_USE_FS, slice->used_name) == 0) {
-
-			/* Allow only if file system is not ZFS */
-			if (strcmp(slice->used_by, "zfs") != 0) {
-				in_use = 0;
-			}
-		} else
-
-			/* Uses that don't preclude slice from use by ZFS */
-			if (strcmp(DM_USE_SVM, slice->used_name) == 0 ||
-			    strcmp(DM_USE_VXVM, slice->used_name) == 0 ||
-			    strcmp(DM_USE_LU, slice->used_name) == 0) {
-				in_use = 0;
-			}
+	/* Determine whether this slice could be passed to "zpool -f" */
+	in_use = dm_inuse(slice->name, &msg, DM_WHO_ZPOOL_FORCE, error);
+	if (*error) {
+		handle_error("%s: could not determine usage", slice->name);
 	}
 
 #ifdef DEBUG
 	if (in_use) {
 		(void) fprintf(stderr,
-		    "can't use %s: used name: %s: used by: %s\n",
-		    slice->name, slice->used_name, slice->used_by);
+		    "can't use %s: used name: %s: used by: %s\n  message: %s\n",
+		    slice->name, slice->used_name, slice->used_by, msg);
 	}
 #endif
+
+	if (msg != NULL) {
+		free(msg);
+	}
 
 	return (in_use);
 }
@@ -665,14 +686,21 @@ dmgt_avail_disk_iter(dmgt_disk_iter_f func, void *data)
 		int i;
 
 		/* For each disk... */
-		for (i = 0; disks != NULL && error == 0 && disks[i] != NULL;
-		    i++) {
-			/* Is this disk online? */
+		for (i = 0; disks != NULL && disks[i] != NULL; i++) {
 			dm_descriptor_t disk = (dm_descriptor_t)disks[i];
-			int online = get_disk_online(disk, &error);
+			int online;
+
+			/* Reset error flag for each disk */
+			error = 0;
+
+			/* Is this disk online? */
+			online = get_disk_online(disk, &error);
 			if (!error && online) {
+
+				/* Get a dmgt_disk_t for this dm_descriptor_t */
 				dmgt_disk_t *dp = get_disk(disk, &error);
 				if (!error) {
+
 					/*
 					 * If this disk or any of its
 					 * slices is usable...

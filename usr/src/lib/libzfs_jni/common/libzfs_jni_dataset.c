@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -88,8 +88,10 @@ static void new_VolumeBean(JNIEnv *, VolumeBean_t *);
 static void new_SnapshotBean(JNIEnv *, SnapshotBean_t *);
 static void new_FileSystemSnapshotBean(JNIEnv *, FileSystemSnapshotBean_t *);
 static void new_VolumeSnapshotBean(JNIEnv *, VolumeSnapshotBean_t *);
+static int set_name_in_DatasetBean(JNIEnv *, char *, DatasetBean_t *);
 static int populate_DatasetBean(JNIEnv *, zfs_handle_t *, DatasetBean_t *);
-static int populate_PoolBean(JNIEnv *, zfs_handle_t *, PoolBean_t *);
+static int populate_PoolBean(
+    JNIEnv *, zpool_handle_t *, zfs_handle_t *, PoolBean_t *);
 static int populate_FileSystemBean(
     JNIEnv *, zfs_handle_t *, FileSystemBean_t *);
 static int populate_VolumeBean(
@@ -99,15 +101,14 @@ static int populate_FileSystemSnapshotBean(
     JNIEnv *, zfs_handle_t *, FileSystemSnapshotBean_t *);
 static int populate_VolumeSnapshotBean(
     JNIEnv *, zfs_handle_t *, VolumeSnapshotBean_t *);
-static jobject create_PoolBean(JNIEnv *, zfs_handle_t *);
+static jobject create_PoolBean(JNIEnv *, zpool_handle_t *, zfs_handle_t *);
 static jobject create_FileSystemBean(JNIEnv *, zfs_handle_t *);
 static jobject create_VolumeBean(JNIEnv *, zfs_handle_t *);
 static jobject create_FileSystemSnapshotBean(JNIEnv *, zfs_handle_t *);
 static jobject create_VolumeSnapshotBean(JNIEnv *, zfs_handle_t *);
 static jobject create_DatasetBean(JNIEnv *, zfs_handle_t *);
 static int is_fs_snapshot(zfs_handle_t *);
-static int is_pool(zfs_handle_t *);
-static zfs_handle_t *open_device(JNIEnv *, jstring, zfs_type_t);
+static int is_pool_name(const char *);
 
 /*
  * Static functions
@@ -276,12 +277,11 @@ new_VolumeSnapshotBean(JNIEnv *env, VolumeSnapshotBean_t *bean)
 }
 
 static int
-populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
+set_name_in_DatasetBean(JNIEnv *env, char *name, DatasetBean_t *bean)
 {
 	jstring poolUTF;
 	jstring parentUTF;
 	jstring baseUTF;
-	jobjectArray properties;
 	zjni_Object_t *object = (zjni_Object_t *)bean;
 
 	/*
@@ -292,7 +292,6 @@ populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
 	regex_t re;
 	regmatch_t matches[REGEX_ZFS_NAME_NGROUPS];
 
-	char *name = (char *)zfs_get_name(zhp);
 	if (regcomp(&re, REGEX_ZFS_NAME, REG_EXTENDED) != 0 ||
 	    regexec(&re, name, REGEX_ZFS_NAME_NGROUPS, matches, 0) != 0) {
 		regfree(&re);
@@ -324,6 +323,22 @@ populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
 		    env, object->object, bean->method_setParentName, parentUTF);
 	}
 
+	return (0);
+}
+
+static int
+populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
+{
+	jobjectArray properties;
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+
+	int result = set_name_in_DatasetBean(
+	    env, (char *)zfs_get_name(zhp), bean);
+	if (result != 0) {
+		/* Must not call any more Java methods to preserve exception */
+		return (-1);
+	}
+
 	properties = zjni_get_Dataset_properties(env, zhp);
 	if (properties == NULL) {
 		/* Must not call any more Java methods to preserve exception */
@@ -337,47 +352,47 @@ populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
 }
 
 static int
-populate_PoolBean(JNIEnv *env, zfs_handle_t *zhp, PoolBean_t *bean)
+populate_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp,
+    PoolBean_t *bean)
 {
 	int result = 0;
-	const char *name = zfs_get_name(zhp);
-	zpool_handle_t *zphp = zpool_open_canfail(name);
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+	PoolStatsBean_t *pool_stats = &(bean->interface_PoolStats);
+	DeviceStatsBean_t *dev_stats = (DeviceStatsBean_t *)pool_stats;
+	nvlist_t *devices = zjni_get_root_vdev(zphp);
 
-	if (zphp == NULL) {
+	if (devices == NULL ||
+	    populate_DeviceStatsBean(env, devices, dev_stats, object)) {
 		result = -1;
 	} else {
-		zjni_Object_t *object = (zjni_Object_t *)bean;
-		PoolStatsBean_t *pool_stats = &(bean->interface_PoolStats);
-		DeviceStatsBean_t *dev_stats = (DeviceStatsBean_t *)pool_stats;
-		nvlist_t *devices = zjni_get_root_vdev(zphp);
+		char *msgid;
 
-		if (devices == NULL ||
-		    populate_DeviceStatsBean(env, devices, dev_stats, object)) {
-			result = -1;
+		/* Override value set in populate_DeviceStatsBean */
+		(*env)->CallVoidMethod(env, object->object,
+		    dev_stats->method_setSize,
+		    zpool_get_space_total(zphp));
+
+		(*env)->CallVoidMethod(env, object->object,
+		    pool_stats->method_setPoolState,
+		    zjni_pool_state_to_obj(
+			env, zpool_get_state(zphp)));
+
+		(*env)->CallVoidMethod(env, object->object,
+		    pool_stats->method_setPoolStatus,
+		    zjni_pool_status_to_obj(env,
+			zpool_get_status(zphp, &msgid)));
+
+		/*
+		 * If a root file system does not exist for this pool, the pool
+		 * is likely faulted, so just set its name in the Java object.
+		 * Otherwise, populate all fields of the Java object.
+		 */
+		if (zhp == NULL) {
+		    result = set_name_in_DatasetBean(env,
+			(char *)zpool_get_name(zphp), (DatasetBean_t *)bean);
 		} else {
-			char *msgid;
-
-			/* Override value set in populate_DeviceStatsBean */
-			(*env)->CallVoidMethod(env, object->object,
-			    dev_stats->method_setSize,
-			    zpool_get_space_total(zphp));
-
-			(*env)->CallVoidMethod(env, object->object,
-			    pool_stats->method_setPoolState,
-			    zjni_pool_state_to_obj(
-				env, zpool_get_state(zphp)));
-
-			(*env)->CallVoidMethod(env, object->object,
-			    pool_stats->method_setPoolStatus,
-			    zjni_pool_status_to_obj(env,
-				zpool_get_status(zphp, &msgid)));
-		}
-
-		zpool_close(zphp);
-
-		if (result == 0) {
-			result = populate_FileSystemBean(
-			    env, zhp, (FileSystemBean_t *)bean);
+		    result = populate_FileSystemBean(
+			env, zhp, (FileSystemBean_t *)bean);
 		}
 	}
 
@@ -417,7 +432,7 @@ populate_VolumeSnapshotBean(JNIEnv *env, zfs_handle_t *zhp,
 }
 
 static jobject
-create_PoolBean(JNIEnv *env, zfs_handle_t *zhp)
+create_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp)
 {
 	int result;
 	PoolBean_t bean_obj = {0};
@@ -426,7 +441,7 @@ create_PoolBean(JNIEnv *env, zfs_handle_t *zhp)
 	/* Construct PoolBean */
 	new_PoolBean(env, bean);
 
-	result = populate_PoolBean(env, zhp, bean);
+	result = populate_PoolBean(env, zphp, zhp, bean);
 	if (result) {
 		/* Must not call any more Java methods to preserve exception */
 		return (NULL);
@@ -518,9 +533,7 @@ create_DatasetBean(JNIEnv *env, zfs_handle_t *zhp)
 
 	switch (zfs_get_type(zhp)) {
 	case ZFS_TYPE_FILESYSTEM:
-		object = is_pool(zhp) ?
-		    create_PoolBean(env, zhp) :
-		    create_FileSystemBean(env, zhp);
+		object = create_FileSystemBean(env, zhp);
 		break;
 
 	case ZFS_TYPE_VOLUME:
@@ -573,32 +586,47 @@ is_fs_snapshot(zfs_handle_t *zhp)
 }
 
 static int
-is_pool(zfs_handle_t *zhp)
+is_pool_name(const char *name)
 {
-	return (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM &&
-	    strchr(zfs_get_name(zhp), '/') == NULL);
-}
-
-static zfs_handle_t *
-open_device(JNIEnv *env, jstring nameUTF, zfs_type_t typemask)
-{
-	zfs_handle_t *zhp = NULL;
-
-	if (nameUTF != NULL) {
-		const char *name =
-		    (*env)->GetStringUTFChars(env, nameUTF, NULL);
-
-		zhp = zfs_open(name, typemask);
-
-		(*env)->ReleaseStringUTFChars(env, nameUTF, name);
-	}
-
-	return (zhp);
+	return (strchr(name, '/') == NULL);
 }
 
 /*
  * Package-private functions
  */
+
+/*
+ * Callback function for zpool_iter().  Creates a Pool and adds it to
+ * the given zjni_ArrayList.
+ */
+int
+zjni_create_add_Pool(zpool_handle_t *zphp, void *data)
+{
+	JNIEnv *env = ((zjni_ArrayCallbackData_t *)data)->env;
+	zjni_Collection_t *list = ((zjni_ArrayCallbackData_t *)data)->list;
+
+	/* Get root fs for this pool -- may be NULL if pool is faulted */
+	zfs_handle_t *zhp = zfs_open(zpool_get_name(zphp), ZFS_TYPE_FILESYSTEM);
+
+	jobject bean = create_PoolBean(env, zphp, zhp);
+
+	if (zhp != NULL) {
+	    zfs_close(zhp);
+	}
+
+	zpool_close(zphp);
+
+	if (bean == NULL) {
+		/* Must not call any more Java methods to preserve exception */
+		return (-1);
+	}
+
+	/* Add pool to zjni_ArrayList */
+	(*env)->CallBooleanMethod(env, ((zjni_Object_t *)list)->object,
+	    ((zjni_Collection_t *)list)->method_add, bean);
+
+	return (0);
+}
 
 /*
  * Callback function for zfs_iter_children().  Creates the appropriate
@@ -628,7 +656,7 @@ zjni_create_add_Dataset(zfs_handle_t *zhp, void *data)
 			return (-1);
 		}
 
-		/* Add pool to zjni_ArrayList */
+		/* Add Dataset to zjni_ArrayList */
 		(*env)->CallBooleanMethod(env, ((zjni_Object_t *)list)->object,
 		    ((zjni_Collection_t *)list)->method_add, bean);
 	}
@@ -641,26 +669,52 @@ zjni_get_Datasets_below(JNIEnv *env, jstring parentUTF,
     zfs_type_t parent_typemask, zfs_type_t child_typemask, char *arrayClass)
 {
 	jobjectArray array = NULL;
-	zfs_handle_t *zhp;
 
-	/* Create an array list to hold the children */
-	zjni_DatasetSet_t list_obj = {0};
-	zjni_DatasetSet_t *list = &list_obj;
-	zjni_new_DatasetSet(env, list);
+	if (parentUTF != NULL) {
+		zfs_handle_t *zhp;
+		int error = 1;
+		const char *name =
+		    (*env)->GetStringUTFChars(env, parentUTF, NULL);
 
-	/* Retrieve parent */
-	zhp = open_device(env, parentUTF, parent_typemask);
-	if (zhp != NULL) {
-		zjni_DatasetArrayCallbackData_t data = {0};
-		data.data.env = env;
-		data.data.list = (zjni_Collection_t *)list;
-		data.typemask = child_typemask;
+		/* Create an array list to hold the children */
+		zjni_DatasetSet_t list_obj = {0};
+		zjni_DatasetSet_t *list = &list_obj;
+		zjni_new_DatasetSet(env, list);
 
-		(void) zfs_iter_children(zhp, zjni_create_add_Dataset, &data);
+		/* Retrieve parent dataset */
+		zhp = zfs_open(name, parent_typemask);
 
-		zfs_close(zhp);
+		if (zhp != NULL) {
+			zjni_DatasetArrayCallbackData_t data = {0};
+			data.data.env = env;
+			data.data.list = (zjni_Collection_t *)list;
+			data.typemask = child_typemask;
 
-		if ((*env)->ExceptionOccurred(env) == NULL) {
+			(void) zfs_iter_children(zhp, zjni_create_add_Dataset,
+			    &data);
+
+			zfs_close(zhp);
+
+			if ((*env)->ExceptionOccurred(env) == NULL) {
+				error = 0;
+			}
+		} else
+
+		/* Parent is not a dataset -- see if it's a faulted pool */
+		if ((parent_typemask & ZFS_TYPE_FILESYSTEM) &&
+		    is_pool_name(name)) {
+			zpool_handle_t *zphp = zpool_open_canfail(name);
+
+			if (zphp != NULL) {
+				/* A faulted pool has no datasets */
+				error = 0;
+				zpool_close(zphp);
+			}
+		}
+
+		(*env)->ReleaseStringUTFChars(env, parentUTF, name);
+
+		if (!error) {
 			array = zjni_Collection_to_array(
 			    env, (zjni_Collection_t *)list, arrayClass);
 		}
@@ -692,14 +746,35 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 		jstring pathUTF = (jstring)
 		    ((*env)->GetObjectArrayElement(env, paths, i));
 
-		zfs_handle_t *zhp = open_device(env, pathUTF, ZFS_TYPE_ANY);
-		if (zhp != NULL) {
-			/* Add all dependents of this Dataset to the list */
-			(void) zfs_iter_dependents(zhp,
-			    zjni_create_add_Dataset, &data);
+		if (pathUTF != NULL) {
+			const char *path =
+			    (*env)->GetStringUTFChars(env, pathUTF, NULL);
 
-			/* Add this Dataset to the list (and close zhp) */
-			(void) zjni_create_add_Dataset(zhp, &data);
+			zfs_handle_t *zhp = zfs_open(path, ZFS_TYPE_ANY);
+			if (zhp != NULL) {
+				/* Add all dependents of this Dataset to list */
+				(void) zfs_iter_dependents(zhp,
+				    zjni_create_add_Dataset, &data);
+
+				/* Add this Dataset to list (and close zhp) */
+				(void) zjni_create_add_Dataset(zhp, &data);
+			} else
+
+			/* Path is not a dataset - see if it's a faulted pool */
+			if (is_pool_name(path)) {
+				zpool_handle_t *zphp = zpool_open_canfail(path);
+
+				if (zphp != NULL) {
+					/*
+					 * Add this Pool to list (and
+					 * close zphp)
+					 */
+					(void) zjni_create_add_Pool(zphp,
+					    &data.data);
+				}
+			}
+
+			(*env)->ReleaseStringUTFChars(env, pathUTF, path);
 		}
 	}
 
@@ -719,12 +794,26 @@ jobject
 zjni_get_Dataset(JNIEnv *env, jstring nameUTF, zfs_type_t typemask)
 {
 	jobject device = NULL;
-	zfs_handle_t *zhp = open_device(env, nameUTF, typemask);
-	if (zhp != NULL) {
-		/* Creates an object of the appropriate class */
+	const char *name = (*env)->GetStringUTFChars(env, nameUTF, NULL);
+	zfs_handle_t *zhp = zfs_open(name, typemask);
+
+	if ((typemask & ZFS_TYPE_FILESYSTEM) && is_pool_name(name)) {
+		zpool_handle_t *zphp = zpool_open_canfail(name);
+
+		if (zphp != NULL) {
+			device = create_PoolBean(env, zphp, zhp);
+			zpool_close(zphp);
+		}
+	} else if (zhp != NULL) {
+		/* Creates a Dataset object of the appropriate class */
 		device = create_DatasetBean(env, zhp);
+	}
+
+	if (zhp != NULL) {
 		zfs_close(zhp);
 	}
+
+	(*env)->ReleaseStringUTFChars(env, nameUTF, name);
 
 	return (device);
 }

@@ -140,7 +140,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getImportablePools(
 JNIEXPORT jobjectArray JNICALL
 Java_com_sun_zfs_common_model_SystemDataModel_getPools(JNIEnv *env, jobject obj)
 {
-	zjni_DatasetArrayCallbackData_t data = {0};
+	zjni_ArrayCallbackData_t data = {0};
 	int result;
 
 	/* Create an array list */
@@ -148,11 +148,10 @@ Java_com_sun_zfs_common_model_SystemDataModel_getPools(JNIEnv *env, jobject obj)
 	zjni_ArrayList_t *list = &list_obj;
 	zjni_new_ArrayList(env, list);
 
-	data.data.env = env;
-	data.data.list = (zjni_Collection_t *)list;
-	data.typemask = ZFS_TYPE_FILESYSTEM;
+	data.env = env;
+	data.list = (zjni_Collection_t *)list;
 
-	result = zfs_iter_root(zjni_create_add_Dataset, &data);
+	result = zpool_iter(zjni_create_add_Pool, &data);
 	if (result && (*env)->ExceptionOccurred(env) != NULL) {
 		/* Must not call any more Java methods to preserve exception */
 		return (NULL);
@@ -335,7 +334,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevice(JNIEnv *env,
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env, poolUTF,
 		    NULL);
-		zpool_handle_t *zhp = zpool_open(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		if (zhp != NULL) {
@@ -372,7 +371,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env, poolUTF,
 		    NULL);
-		zpool_handle_t *zhp = zpool_open(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		/* Is the pool valid? */
@@ -409,7 +408,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env,
 		    poolUTF, NULL);
-		zpool_handle_t *zhp = zpool_open(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		/* Is the pool valid? */

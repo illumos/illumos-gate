@@ -53,6 +53,7 @@ jobjectArray zjni_get_Datasets_below(JNIEnv *, jstring,
     zfs_type_t, zfs_type_t, char *);
 jobjectArray zjni_get_Datasets_dependents(JNIEnv *, jobjectArray);
 jobject zjni_get_Dataset(JNIEnv *, jstring, zfs_type_t);
+int zjni_create_add_Pool(zpool_handle_t *, void *);
 int zjni_create_add_Dataset(zfs_handle_t *, void *);
 
 #ifdef __cplusplus
