@@ -233,7 +233,7 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 
 	/* 2. clear the PCIe Errors */
 	if ((device_sts = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-		PCIE_DEVSTS)) != DDI_FAILURE)
+		PCIE_DEVSTS)) != 0xffff)
 		PCI_CAP_PUT16(config_handle, PCI_CAP_ID_PCI_E, cap_ptr,
 			PCIE_DEVSTS, device_sts);
 
@@ -273,7 +273,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 * Enable PCI-Express Baseline Error Handling
 	 */
 	if ((device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-		PCIE_DEVCTL)) != DDI_FAILURE) {
+		PCIE_DEVCTL)) != 0xffff) {
 		PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
 			pcie_base_err_default);
 

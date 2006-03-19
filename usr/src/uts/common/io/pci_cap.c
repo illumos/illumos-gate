@@ -191,30 +191,28 @@ pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
 	uint32_t data;
 
 	if (PCI_CAP_BASE(h, id, &base) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+		return (0xffffffff);
 
 	/*
-	 * Each access to a PCI Configuration Space is checked for
-	 * returned value of -1, in case the a device is offlined
-	 * or if it does not exist.
+	 * Each access to a PCI Configuration Space should be checked
+	 * by the calling function. A returned value of the 2's complement
+	 * of -1 indicates that either the device is offlined or it does not
+	 * exist.
 	 */
 	offset += base;
 
 	switch (size) {
 	case PCI_CAP_CFGSZ_8:
-		if ((data = pci_config_get8(h, offset)) == 0xff)
-			return (DDI_FAILURE);
+		data = pci_config_get8(h, offset);
 		break;
 	case PCI_CAP_CFGSZ_16:
-		if ((data = pci_config_get16(h, offset)) == 0xffff)
-			return (DDI_FAILURE);
+		data = pci_config_get16(h, offset);
 		break;
 	case PCI_CAP_CFGSZ_32:
-		if ((data = pci_config_get32(h, offset)) == 0xffffffff)
-			return (DDI_FAILURE);
+		data = pci_config_get32(h, offset);
 		break;
 	default:
-		return (DDI_FAILURE);
+		data = 0xffffffff;
 	}
 
 	PCI_CAP_DBG("pci_cap_get: %p[x%x]=x%x\n", (void *)h, offset, data);

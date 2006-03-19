@@ -66,7 +66,7 @@ pcix_set_cmd_reg(dev_info_t *child, uint16_t value)
 	 * Read the PCI-X Command Register.
 	 */
 	if ((pcix_cmd = PCI_CAP_GET16(handle, NULL, pcix_cap_ptr, 2))
-		== DDI_FAILURE)
+		== 0xffff)
 		goto teardown;
 
 	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: PCI-X CMD Register "
