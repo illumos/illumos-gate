@@ -1549,8 +1549,20 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 	FILE *fp;
 
 	if (getzoneid() != GLOBAL_ZONEID) {
-		zerror(gettext("must be in the global zone to %s a zone."),
-		    cmd_to_str(cmd_num));
+		switch (cmd_num) {
+		case CMD_HALT:
+			zerror(gettext("use %s to %s this zone."), "halt(1M)",
+			    cmd_to_str(cmd_num));
+			break;
+		case CMD_REBOOT:
+			zerror(gettext("use %s to %s this zone."),
+			    "reboot(1M)", cmd_to_str(cmd_num));
+			break;
+		default:
+			zerror(gettext("must be in the global zone to %s a "
+			    "zone."), cmd_to_str(cmd_num));
+			break;
+		}
 		return (Z_ERR);
 	}
 
@@ -1970,15 +1982,15 @@ verify_fs_zfs(struct zone_fstab *fstab)
 
 	if ((zhp = zfs_open(fstab->zone_fs_special, ZFS_TYPE_ANY)) == NULL) {
 		(void) fprintf(stderr, gettext("could not verify fs %s: "
-			"could not access zfs dataset '%s'\n"),
-			fstab->zone_fs_dir, fstab->zone_fs_special);
+		    "could not access zfs dataset '%s'\n"),
+		    fstab->zone_fs_dir, fstab->zone_fs_special);
 		return (Z_ERR);
 	}
 
 	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
 		(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			"'%s' is not a filesystem\n"),
-			fstab->zone_fs_dir, fstab->zone_fs_special);
+		    "'%s' is not a filesystem\n"),
+		    fstab->zone_fs_dir, fstab->zone_fs_special);
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
@@ -1986,8 +1998,8 @@ verify_fs_zfs(struct zone_fstab *fstab)
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf, sizeof (propbuf),
 	    NULL, NULL, 0, 0) != 0 || strcmp(propbuf, "legacy") != 0) {
 		(void) fprintf(stderr, gettext("could not verify fs %s: "
-			"zfs '%s' mountpoint is not \"legacy\"\n"),
-			fstab->zone_fs_dir, fstab->zone_fs_special);
+		    "zfs '%s' mountpoint is not \"legacy\"\n"),
+		    fstab->zone_fs_dir, fstab->zone_fs_special);
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
@@ -2264,6 +2276,44 @@ verify_datasets(zone_dochandle_t handle)
 }
 
 static int
+verify_limitpriv(zone_dochandle_t handle)
+{
+	char *privname = NULL;
+	int err;
+	priv_set_t *privs;
+
+	if ((privs = priv_allocset()) == NULL) {
+		zperror(gettext("failed to allocate privilege set"), B_FALSE);
+		return (Z_NOMEM);
+	}
+	err = zonecfg_get_privset(handle, privs, &privname);
+	switch (err) {
+	case Z_OK:
+		break;
+	case Z_PRIV_PROHIBITED:
+		(void) fprintf(stderr, gettext("privilege \"%s\" is not "
+		    "permitted within the zone's privilege set\n"), privname);
+		break;
+	case Z_PRIV_REQUIRED:
+		(void) fprintf(stderr, gettext("required privilege \"%s\" is "
+		    "missing from the zone's privilege set\n"), privname);
+		break;
+	case Z_PRIV_UNKNOWN:
+		(void) fprintf(stderr, gettext("unknown privilege \"%s\" "
+		    "specified in the zone's privilege set\n"), privname);
+		break;
+	default:
+		zperror(
+		    gettext("failed to determine the zone's privilege set"),
+		    B_TRUE);
+		break;
+	}
+	free(privname);
+	priv_freeset(privs);
+	return (err);
+}
+
+static int
 verify_details(int cmd_num)
 {
 	zone_dochandle_t handle;
@@ -2380,6 +2430,17 @@ no_net:
 	if (!in_alt_root && verify_pool(handle) != Z_OK)
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_datasets(handle) != Z_OK)
+		return_code = Z_ERR;
+
+	/*
+	 * As the "mount" command is used for patching/upgrading of zones
+	 * or other maintenance processes, the zone's privilege set is not
+	 * checked in this case.  Instead, the default, safe set of
+	 * privileges will be used when this zone is created in the
+	 * kernel.
+	 */
+	if (!in_alt_root && cmd_num != CMD_MOUNT &&
+	    verify_limitpriv(handle) != Z_OK)
 		return_code = Z_ERR;
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
@@ -4074,7 +4135,7 @@ uninstall_func(int argc, char *argv[])
 	err = zonecfg_find_mounts(rootpath, NULL, NULL);
 	if (err) {
 		zerror(gettext("These file-systems are mounted on "
-			"subdirectories of %s.\n"), rootpath);
+		    "subdirectories of %s.\n"), rootpath);
 		(void) zonecfg_find_mounts(rootpath, zfm_print, NULL);
 		return (Z_ERR);
 	}

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -84,6 +85,9 @@ extern "C" {
 #define	Z_RESOLVED_PATH		34	/* resolved path mismatch */
 #define	Z_IPV6_ADDR_PREFIX_LEN	35	/* IPv6 address prefix length needed */
 #define	Z_BOGUS_ADDRESS		36	/* not IPv[4|6] address or host name */
+#define	Z_PRIV_PROHIBITED	37	/* specified privilege is prohibited */
+#define	Z_PRIV_REQUIRED		38	/* required privilege is missing */
+#define	Z_PRIV_UNKNOWN		39	/* specified privilege is unknown */
 
 /*
  * Warning: these are shared with the admin/install consolidation.
@@ -352,7 +356,11 @@ extern	int	zonecfg_enddevperment(zone_dochandle_t);
 /*
  * Privilege-related functions.
  */
-extern	int	zonecfg_get_privset(priv_set_t *);
+extern	int	zonecfg_default_privset(priv_set_t *);
+extern	int	zonecfg_get_privset(zone_dochandle_t, priv_set_t *,
+    char **);
+extern	int	zonecfg_get_limitpriv(zone_dochandle_t, char **);
+extern	int	zonecfg_set_limitpriv(zone_dochandle_t, char *);
 
 /*
  * Higher-level routines.

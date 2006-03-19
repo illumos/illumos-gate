@@ -1,7 +1,4 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,9 +18,15 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libzonecfg/spec/libzonecfg.spec
+#
 
 function	zonecfg_set_root
 include		<libzonecfg.h>
@@ -137,6 +140,18 @@ end
 function	zonecfg_set_pool
 include		<libzonecfg.h>
 declaration	int zonecfg_set_pool(zone_dochandle_t, char *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_get_limitpriv
+include		<libzonecfg.h>
+declaration	int zonecfg_get_limitpriv(zone_dochandle_t, char **)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_set_limitpriv
+include		<libzonecfg.h>
+declaration	int zonecfg_set_limitpriv(zone_dochandle_t, char *)
 version		SUNWprivate_1.1
 end		
 
@@ -626,9 +641,16 @@ declaration	int zonecfg_access(const char *, int)
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_default_privset
+include		<libzonecfg.h>
+declaration	int zonecfg_default_privset(struct priv_set *)
+version		SUNWprivate_1.1
+end
+
 function	zonecfg_get_privset
 include		<libzonecfg.h>
-declaration	int zonecfg_get_privset(struct priv_set *)
+declaration	int zonecfg_get_privset(zone_dochandle_t, priv_set_t *, \
+		    char **)
 version		SUNWprivate_1.1
 end
 

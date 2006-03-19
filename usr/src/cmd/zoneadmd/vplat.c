@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1336,8 +1337,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE,
-		    "could not get zone configuration handle");
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
 		goto bad;
 	}
 	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK ||
@@ -2255,7 +2255,7 @@ devfsadm_call(zlog_t *zlogp, const char *arg)
 	if (status == 0 || status == -1)
 		return (status);
 	zerror(zlogp, B_FALSE, "%s call (%s %s %s) unexpectedly returned %d",
-		    DEVFSADM, DEVFSADM_PATH, arg, zone_name, status);
+	    DEVFSADM, DEVFSADM_PATH, arg, zone_name, status);
 	return (-1);
 }
 
@@ -2272,6 +2272,58 @@ static int
 devfsadm_unregister(zlog_t *zlogp)
 {
 	return (devfsadm_call(zlogp, "-Z"));
+}
+
+static int
+get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
+{
+	int error = -1;
+	zone_dochandle_t handle;
+	char *privname = NULL;
+
+	if (mount_cmd) {
+		if (zonecfg_default_privset(privs) == Z_OK)
+			return (0);
+		zerror(zlogp, B_FALSE,
+		    "failed to determine the zone's default privilege set");
+		return (-1);
+	}
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	switch (zonecfg_get_privset(handle, privs, &privname)) {
+	case Z_OK:
+		error = 0;
+		break;
+	case Z_PRIV_PROHIBITED:
+		zerror(zlogp, B_FALSE, "privilege \"%s\" is not permitted "
+		    "within the zone's privilege set", privname);
+		break;
+	case Z_PRIV_REQUIRED:
+		zerror(zlogp, B_FALSE, "required privilege \"%s\" is missing "
+		    "from the zone's privilege set", privname);
+		break;
+	case Z_PRIV_UNKNOWN:
+		zerror(zlogp, B_FALSE, "unknown privilege \"%s\" specified "
+		    "in the zone's privilege set", privname);
+		break;
+	default:
+		zerror(zlogp, B_FALSE, "failed to determine the zone's "
+		    "privilege set");
+		break;
+	}
+
+	free(privname);
+	zonecfg_fini_handle(handle);
+	return (error);
 }
 
 static int
@@ -2364,13 +2416,13 @@ get_rctls(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 				goto out;
 			}
 			if (nvlist_add_uint64(nvlv[i], "privilege",
-				    rctlblk_get_privilege(rctlblk)) != 0) {
+			    rctlblk_get_privilege(rctlblk)) != 0) {
 				zerror(zlogp, B_FALSE, "%s failed",
 				    "nvlist_add_uint64");
 				goto out;
 			}
 			if (nvlist_add_uint64(nvlv[i], "limit",
-				    rctlblk_get_value(rctlblk)) != 0) {
+			    rctlblk_get_value(rctlblk)) != 0) {
 				zerror(zlogp, B_FALSE, "%s failed",
 				    "nvlist_add_uint64");
 				goto out;
@@ -2435,12 +2487,13 @@ get_zone_pool(zlog_t *zlogp, char *poolbuf, size_t bufsz)
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
+		return (Z_NOMEM);
 	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+	error = zonecfg_get_snapshot_handle(zone_name, handle);
+	if (error != Z_OK) {
 		zerror(zlogp, B_FALSE, "invalid configuration");
 		zonecfg_fini_handle(handle);
-		return (-1);
+		return (error);
 	}
 	error = zonecfg_get_pool(handle, poolbuf, bufsz);
 	zonecfg_fini_handle(handle);
@@ -2776,14 +2829,14 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		return (-1);
 	}
 	priv_emptyset(privs);
-	if (zonecfg_get_privset(privs) != Z_OK) {
-		zerror(zlogp, B_TRUE, "Failed to initialize privileges");
+	if (get_privset(zlogp, privs, mount_cmd) != 0)
 		goto error;
-	}
+
 	if (!mount_cmd && get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of rctls");
 		goto error;
 	}
+
 	if (get_datasets(zlogp, &zfsbuf, &zfsbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of ZFS datasets");
 		goto error;

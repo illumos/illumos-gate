@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,10 @@ typedef int bool;
 #define	RT_RCTL		9
 #define	RT_ATTR		10
 #define	RT_DATASET	11
+#define	RT_LIMITPRIV	12	/* really a property, but for info ... */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_DATASET
+#define	RT_MAX		RT_LIMITPRIV
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -103,9 +104,10 @@ typedef int bool;
 #define	PT_LIMIT	15
 #define	PT_ACTION	16
 #define	PT_RAW		17
+#define	PT_LIMITPRIV	18
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_RAW
+#define	PT_MAX		PT_LIMITPRIV
 
 #define	MAX_EQ_PROP_PAIRS	3
 

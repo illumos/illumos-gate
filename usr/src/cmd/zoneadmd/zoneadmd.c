@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -681,6 +681,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE);
+				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
 		case Z_HALT:
@@ -716,8 +717,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
 			rval = zone_ready(zlogp, B_TRUE);
-			if (rval == 0)
+			if (rval == 0) {
+				eventstream_write(Z_EVT_ZONE_READIED);
 				rval = zone_mount_early(zlogp, zone_id);
+			}
+
 			/*
 			 * Ordinarily, /dev/fd would be mounted inside the zone
 			 * by svc:/system/filesystem/usr:default, but since
@@ -756,6 +760,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
 				(void) zone_halt(zlogp, B_FALSE);
+				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
 		case Z_HALT:
@@ -785,8 +790,10 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
 			rval = zone_halt(zlogp, B_TRUE);
-			if (rval == 0)
+			if (rval == 0) {
+				eventstream_write(Z_EVT_ZONE_HALTED);
 				(void) sema_post(&scratch_sem);
+			}
 			break;
 		default:
 			if (kernelcall)	/* Invalid; can't happen */
@@ -808,6 +815,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				break;
 			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
+			else
+				eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
 		case Z_BOOT:
 			/*
@@ -826,13 +835,19 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			break;
 		case Z_REBOOT:
 			eventstream_write(Z_EVT_ZONE_REBOOTING);
-			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE)) != 0) {
+				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				break;
-			if ((rval = zone_ready(zlogp, B_FALSE)) == 0) {
-				rval = zone_bootup(zlogp, "");
-				audit_put_record(zlogp, uc, rval, "reboot");
-				if (rval != 0)
-					(void) zone_halt(zlogp, B_FALSE);
+			}
+			if ((rval = zone_ready(zlogp, B_FALSE)) != 0) {
+				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
+				break;
+			}
+			rval = zone_bootup(zlogp, "");
+			audit_put_record(zlogp, uc, rval, "reboot");
+			if (rval != 0) {
+				(void) zone_halt(zlogp, B_FALSE);
+				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
 			break;
 		case Z_NOTE_UNINSTALLING:

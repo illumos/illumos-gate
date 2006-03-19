@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -90,6 +91,7 @@
 #define	DTD_ATTR_AUTOBOOT	(const xmlChar *) "autoboot"
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
+#define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -381,24 +383,59 @@ operation_prep(zone_dochandle_t handle)
 }
 
 static int
+fetchprop(xmlNodePtr cur, const xmlChar *propname, char *dst, size_t dstsize)
+{
+	xmlChar *property;
+	size_t srcsize;
+
+	if ((property = xmlGetProp(cur, propname)) == NULL)
+		return (Z_BAD_PROPERTY);
+	srcsize = strlcpy(dst, (char *)property, dstsize);
+	xmlFree(property);
+	if (srcsize >= dstsize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+static int
+fetch_alloc_prop(xmlNodePtr cur, const xmlChar *propname, char **dst)
+{
+	xmlChar *property;
+
+	if ((property = xmlGetProp(cur, propname)) == NULL)
+		return (Z_BAD_PROPERTY);
+	if ((*dst = strdup((char *)property)) == NULL) {
+		xmlFree(property);
+		return (Z_NOMEM);
+	}
+	xmlFree(property);
+	return (Z_OK);
+}
+
+static int
 getrootattr(zone_dochandle_t handle, const xmlChar *propname,
     char *propval, size_t propsize)
 {
 	xmlNodePtr root;
-	xmlChar *property;
-	size_t srcsize;
 	int err;
 
 	if ((err = getroot(handle, &root)) != 0)
 		return (err);
 
-	if ((property = xmlGetProp(root, propname)) == NULL)
-		return (Z_BAD_PROPERTY);
-	srcsize = strlcpy(propval, (char *)property, propsize);
-	xmlFree(property);
-	if (srcsize >= propsize)
-		return (Z_TOO_BIG);
-	return (Z_OK);
+	return (fetchprop(root, propname, propval, propsize));
+}
+
+static int
+get_alloc_rootattr(zone_dochandle_t handle, const xmlChar *propname,
+    char **propval)
+{
+	xmlNodePtr root;
+	int err;
+
+	if ((err = getroot(handle, &root)) != 0)
+		return (err);
+
+	return (fetch_alloc_prop(root, propname, propval));
 }
 
 static int
@@ -769,6 +806,18 @@ int
 zonecfg_set_pool(zone_dochandle_t handle, char *pool)
 {
 	return (setrootattr(handle, DTD_ATTR_POOL, pool));
+}
+
+int
+zonecfg_get_limitpriv(zone_dochandle_t handle, char **limitpriv)
+{
+	return (get_alloc_rootattr(handle, DTD_ATTR_LIMITPRIV, limitpriv));
+}
+
+int
+zonecfg_set_limitpriv(zone_dochandle_t handle, char *limitprivsize)
+{
+	return (setrootattr(handle, DTD_ATTR_LIMITPRIV, limitprivsize));
 }
 
 /*
@@ -1497,36 +1546,6 @@ zonecfg_modify_ipd(zone_dochandle_t handle, struct zone_fstab *oldtabptr,
 	if ((err = zonecfg_add_ipd_core(handle, newtabptr)) != Z_OK)
 		return (err);
 
-	return (Z_OK);
-}
-
-static int
-fetchprop(xmlNodePtr cur, const xmlChar *propname, char *dst, size_t dstsize)
-{
-	xmlChar *property;
-	size_t srcsize;
-
-	if ((property = xmlGetProp(cur, propname)) == NULL)
-		return (Z_BAD_PROPERTY);
-	srcsize = strlcpy(dst, (char *)property, dstsize);
-	xmlFree(property);
-	if (srcsize >= dstsize)
-		return (Z_TOO_BIG);
-	return (Z_OK);
-}
-
-static int
-fetch_alloc_prop(xmlNodePtr cur, const xmlChar *propname, char **dst)
-{
-	xmlChar *property;
-
-	if ((property = xmlGetProp(cur, propname)) == NULL)
-		return (Z_BAD_PROPERTY);
-	if ((*dst = strdup((char *)property)) == NULL) {
-		xmlFree(property);
-		return (Z_NOMEM);
-	}
-	xmlFree(property);
 	return (Z_OK);
 }
 
@@ -2981,6 +3000,15 @@ zonecfg_strerror(int errnum)
 	case Z_BOGUS_ADDRESS:
 		return (dgettext(TEXT_DOMAIN,
 		    "Neither an IPv4 nor an IPv6 address nor a host name"));
+	case Z_PRIV_PROHIBITED:
+		return (dgettext(TEXT_DOMAIN,
+		    "Specified privilege is prohibited"));
+	case Z_PRIV_REQUIRED:
+		return (dgettext(TEXT_DOMAIN,
+		    "Required privilege is missing"));
+	case Z_PRIV_UNKNOWN:
+		return (dgettext(TEXT_DOMAIN,
+		    "Specified privilege is unknown"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown error"));
 	}
@@ -3340,8 +3368,44 @@ zonecfg_endattrent(zone_dochandle_t handle)
 	return (zonecfg_endent(handle));
 }
 
-/* This will ultimately be configurable. */
-static const char *priv_list[] = {
+/*
+ * The privileges available on the system and described in privileges(5)
+ * fall into four categories with respect to non-global zones; those that
+ * are required in order for a non-global zone to boot, those which are in
+ * the default set of privileges available to non-global zones, those
+ * privileges which should not be allowed to be given to non-global zones
+ * and all other privileges, which are optional and potentially useful for
+ * processes executing inside a non-global zone.
+ *
+ * When privileges are added to the system, a determination needs to be
+ * made as to which category the privilege belongs to.  Ideally,
+ * privileges should be fine-grained enough and the mechanisms they cover
+ * virtualized enough so that they can be made available to non-global
+ * zones.
+ */
+
+/*
+ * Set of privileges required in order to get a zone booted and init(1M)
+ * started.  These cannot be removed from the zone's privilege set.
+ */
+static const char *required_priv_list[] = {
+	PRIV_PROC_EXEC,
+	PRIV_PROC_FORK,
+	PRIV_SYS_MOUNT,
+	NULL
+};
+
+/*
+ * Default set of privileges considered safe for all non-global zones.
+ * These privileges are "safe" in the sense that a privileged process in
+ * the zone cannot affect processes in other non-global zones on the
+ * system or in the global zone.  Privileges which are considered by
+ * default, "unsafe", include ones which affect a global resource, such as
+ * the system clock or physical memory.
+ */
+static const char *default_priv_list[] = {
+	PRIV_CONTRACT_EVENT,
+	PRIV_CONTRACT_OBSERVER,
 	PRIV_FILE_CHOWN,
 	PRIV_FILE_CHOWN_SELF,
 	PRIV_FILE_DAC_EXECUTE,
@@ -3366,29 +3430,233 @@ static const char *priv_list[] = {
 	PRIV_SYS_MOUNT,
 	PRIV_SYS_NFS,
 	PRIV_SYS_RESOURCE,
-	PRIV_CONTRACT_EVENT,
-	PRIV_CONTRACT_OBSERVER,
 	NULL
 };
 
+/*
+ * Set of privileges not currently permitted within a non-global zone.
+ * Some of these privileges are overly broad and cover more than one
+ * mechanism in the system.  In other cases, there has not been sufficient
+ * virtualization in the parts of the system the privilege covers to allow
+ * its use within a non-global zone.
+ */
+static const char *prohibited_priv_list[] = {
+	PRIV_DTRACE_KERNEL,
+	PRIV_PROC_ZONE,
+	PRIV_SYS_CONFIG,
+	PRIV_SYS_DEVICES,
+	PRIV_SYS_LINKDIR,
+	PRIV_SYS_NET_CONFIG,
+	PRIV_SYS_RES_CONFIG,
+	PRIV_SYS_SUSER_COMPAT,
+	NULL
+};
+
+/*
+ * Define some of the tokens that priv_str_to_set(3C) recognizes.  Since
+ * the privilege string separator can be any character, although it is
+ * usually a comma character, define these here as well in the event that
+ * they change or are augmented in the future.
+ */
+#define	BASIC_TOKEN		"basic"
+#define	DEFAULT_TOKEN		"default"
+#define	ZONE_TOKEN		"zone"
+#define	TOKEN_PRIV_CHAR		','
+#define	TOKEN_PRIV_STR		","
+
 int
-zonecfg_get_privset(priv_set_t *privs)
+zonecfg_default_privset(priv_set_t *privs)
 {
 	const char **strp;
-	priv_set_t *basic = priv_str_to_set("basic", ",", NULL);
+	priv_set_t *basic;
 
+	basic = priv_str_to_set(BASIC_TOKEN, TOKEN_PRIV_STR, NULL);
 	if (basic == NULL)
-		return (Z_INVAL);
+		return (errno == ENOMEM ? Z_NOMEM : Z_INVAL);
 
 	priv_union(basic, privs);
 	priv_freeset(basic);
 
-	for (strp = priv_list; *strp != NULL; strp++) {
+	for (strp = default_priv_list; *strp != NULL; strp++) {
 		if (priv_addset(privs, *strp) != 0) {
 			return (Z_INVAL);
 		}
 	}
 	return (Z_OK);
+}
+
+void
+append_priv_token(char *priv, char *str, size_t strlen)
+{
+	if (*str != '\0')
+		(void) strlcat(str, TOKEN_PRIV_STR, strlen);
+	(void) strlcat(str, priv, strlen);
+}
+
+/*
+ * Verify that the supplied string is a valid privilege limit set for a
+ * non-global zone.  This string must not only be acceptable to
+ * priv_str_to_set(3C) which parses it, but it also must resolve to a
+ * privilege set that includes certain required privileges and lacks
+ * certain prohibited privileges.
+ */
+static int
+verify_privset(char *privbuf, priv_set_t *privs, char **privname,
+    boolean_t add_default)
+{
+	char *cp;
+	char *lasts;
+	size_t len;
+	priv_set_t *mergeset;
+	const char **strp;
+	char *tmp;
+	const char *token;
+
+	/*
+	 * The verification of the privilege string occurs in several
+	 * phases.  In the first phase, the supplied string is scanned for
+	 * the ZONE_TOKEN token which is not support as part of the
+	 * "limitpriv" property.
+	 *
+	 * Duplicate the supplied privilege string since strtok_r(3C)
+	 * tokenizes its input by null-terminating the tokens.
+	 */
+	if ((tmp = strdup(privbuf)) == NULL)
+		return (Z_NOMEM);
+	for (cp = strtok_r(tmp, TOKEN_PRIV_STR, &lasts); cp != NULL;
+	    cp = strtok_r(NULL, TOKEN_PRIV_STR, &lasts)) {
+		if (strcmp(cp, ZONE_TOKEN) == 0) {
+			free(tmp);
+			if ((*privname = strdup(ZONE_TOKEN)) == NULL)
+				return (Z_NOMEM);
+			else
+				return (Z_PRIV_UNKNOWN);
+		}
+	}
+	free(tmp);
+
+	if (add_default) {
+		/*
+		 * If DEFAULT_TOKEN was specified, a string needs to be
+		 * built containing the privileges from the default, safe
+		 * set along with those of the "limitpriv" property.
+		 */
+		len = strlen(privbuf) + sizeof (BASIC_TOKEN) + 2;
+		for (strp = default_priv_list; *strp != NULL; strp++)
+			len += strlen(*strp) + 1;
+		tmp = alloca(len);
+		*tmp = '\0';
+
+		append_priv_token(BASIC_TOKEN, tmp, len);
+		for (strp = default_priv_list; *strp != NULL; strp++)
+			append_priv_token((char *)*strp, tmp, len);
+		(void) strlcat(tmp, TOKEN_PRIV_STR, len);
+		(void) strlcat(tmp, privbuf, len);
+	} else {
+		tmp = privbuf;
+	}
+
+
+	/*
+	 * In the next phase, attempt to convert the merged privilege
+	 * string into a privilege set.  In the case of an error, either
+	 * there was a memory allocation failure or there was an invalid
+	 * privilege token in the string.  In either case, return an
+	 * appropriate error code but in the event of an invalid token,
+	 * allocate a string containing its name and return that back to
+	 * the caller.
+	 */
+	mergeset = priv_str_to_set(tmp, TOKEN_PRIV_STR, &token);
+	if (mergeset == NULL) {
+		if (token == NULL)
+			return (Z_NOMEM);
+		if ((cp = strchr(token, TOKEN_PRIV_CHAR)) != NULL)
+			*cp = '\0';
+		if ((*privname = strdup(token)) == NULL)
+			return (Z_NOMEM);
+		else
+			return (Z_PRIV_UNKNOWN);
+	}
+
+	/*
+	 * Next, verify that none of the prohibited zone privileges are
+	 * present in the merged privilege set.
+	 */
+	for (strp = prohibited_priv_list; *strp != NULL; strp++) {
+		if (priv_ismember(mergeset, *strp)) {
+			priv_freeset(mergeset);
+			if ((*privname = strdup(*strp)) == NULL)
+				return (Z_NOMEM);
+			else
+				return (Z_PRIV_PROHIBITED);
+		}
+	}
+
+	/*
+	 * Finally, verify that all of the required zone privileges are
+	 * present in the merged privilege set.
+	 */
+	for (strp = required_priv_list; *strp != NULL; strp++) {
+		if (!priv_ismember(mergeset, *strp)) {
+			priv_freeset(mergeset);
+			if ((*privname = strdup(*strp)) == NULL)
+				return (Z_NOMEM);
+			else
+				return (Z_PRIV_REQUIRED);
+		}
+	}
+
+	priv_copyset(mergeset, privs);
+	priv_freeset(mergeset);
+	return (Z_OK);
+}
+
+/*
+ * Fill in the supplied privilege set with either the default, safe set of
+ * privileges suitable for a non-global zone, or one based on the
+ * "limitpriv" property in the zone's configuration.
+ *
+ * In the event of an invalid privilege specification in the
+ * configuration, a string is allocated and returned containing the
+ * "privilege" causing the issue.  It is the caller's responsibility to
+ * free this memory when it is done with it.
+ */
+int
+zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
+    char **privname)
+{
+	char *cp;
+	int err;
+	int limitlen;
+	char *limitpriv = NULL;
+
+	/*
+	 * Attempt to lookup the "limitpriv" property.  If it does not
+	 * exist or matches the string DEFAULT_TOKEN exactly, then the
+	 * default, safe privilege set is returned.
+	 */
+	err = zonecfg_get_limitpriv(handle, &limitpriv);
+	if (err != Z_OK)
+		return (err);
+	limitlen = strlen(limitpriv);
+	if (limitlen == 0 || strcmp(limitpriv, DEFAULT_TOKEN) == 0) {
+		free(limitpriv);
+		return (zonecfg_default_privset(privs));
+	}
+
+	/*
+	 * Check if the string DEFAULT_TOKEN is the first token in a list
+	 * of privileges.
+	 */
+	cp = strchr(limitpriv, TOKEN_PRIV_CHAR);
+	if (cp != NULL &&
+	    strncmp(limitpriv, DEFAULT_TOKEN, cp - limitpriv) == 0)
+		err = verify_privset(cp + 1, privs, privname, B_TRUE);
+	else
+		err = verify_privset(limitpriv, privs, privname, B_FALSE);
+
+	free(limitpriv);
+	return (err);
 }
 
 int
@@ -3920,7 +4188,7 @@ static boolean_t
 is_ping(sysevent_t *ev)
 {
 	if (strcmp(sysevent_get_subclass_name(ev),
-		ZONE_EVENT_PING_SUBCLASS) == 0) {
+	    ZONE_EVENT_PING_SUBCLASS) == 0) {
 		return (B_TRUE);
 	} else {
 		return (B_FALSE);
@@ -3967,11 +4235,11 @@ do_callback(struct znotify *zevtchan, sysevent_t *ev)
 
 		if ((nvlist_lookup_string(l, ZONE_CB_NAME, &zonename) == 0) &&
 		    (nvlist_lookup_string(l, ZONE_CB_NEWSTATE, &newstate)
-			== 0) &&
+		    == 0) &&
 		    (nvlist_lookup_string(l, ZONE_CB_OLDSTATE, &oldstate)
-			== 0) &&
+		    == 0) &&
 		    (nvlist_lookup_uint64(l, ZONE_CB_TIMESTAMP,
-			    (uint64_t *)&when) == 0) &&
+		    (uint64_t *)&when) == 0) &&
 		    (nvlist_lookup_int32(l, ZONE_CB_ZONEID, &zid) == 0)) {
 			ret = zevtchan->zn_callback(zonename, zid, newstate,
 			    oldstate, when, zevtchan->zn_private);
@@ -4144,7 +4412,7 @@ zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
 	}
 
 	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &(zevtchan->zn_eventchan),
-		0) != 0)
+	    0) != 0)
 		goto out2;
 
 	do {
@@ -4624,7 +4892,8 @@ get_path_pkgs(char *entry, char **paths, int cnt, char ***pkgs, int *pkg_cnt)
 			char	*nlp;
 
 			for (j = 0; j < 4 &&
-			    strtok_r(NULL, " ", &lastp) != NULL; j++);
+			    strtok_r(NULL, " ", &lastp) != NULL; j++)
+				;
 			/*
 			 * If there are < 4 fields this entry is corrupt,
 			 * just skip it.

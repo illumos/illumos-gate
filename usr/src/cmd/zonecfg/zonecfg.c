@@ -111,7 +111,7 @@ extern int lex_lineno;
 #define	SHELP_HELP	"help [commands] [syntax] [usage] [<command-name>]"
 #define	SHELP_INFO	"info [<resource-type> [property-name=property-value]*]"
 #define	SHELP_REMOVE	"remove <resource-type> { <property-name>=<property-" \
-	"value> }\n\t(global scope)\nremove <property-name>=<property-value>" \
+	"value> }\n\t(global scope)\nremove <property-name> <property-value>" \
 	"\n\t(resource scope)"
 #define	SHELP_REVERT	"revert [-F]"
 #define	SHELP_SELECT	"select <resource-type> { <property-name>=" \
@@ -154,6 +154,7 @@ static char *res_types[] = {
 	"rctl",
 	"attr",
 	"dataset",
+	"limitpriv",
 	NULL
 };
 
@@ -177,10 +178,11 @@ static char *prop_types[] = {
 	"limit",
 	"action",
 	"raw",
+	"limitpriv",
 	NULL
 };
 
-/* These *must* match the order of the PT_ define's from zonecfg.h */
+/* These *must* match the order of the PROP_VAL_ define's from zonecfg.h */
 static char *prop_val_types[] = {
 	"simple",
 	"complex",
@@ -240,6 +242,7 @@ static const char *set_cmds[] = {
 	"set zonepath=",
 	"set autoboot=",
 	"set pool=",
+	"set limitpriv=",
 	NULL
 };
 
@@ -250,6 +253,7 @@ static const char *fs_res_scope_cmds[] = {
 	"exit",
 	"help",
 	"info",
+	"remove options ",
 	"set dir=",
 	"set raw=",
 	"set special=",
@@ -307,6 +311,7 @@ static const char *rctl_res_scope_cmds[] = {
 	"exit",
 	"help",
 	"info",
+	"remove value ",
 	"set name=",
 	NULL
 };
@@ -722,6 +727,9 @@ usage(bool verbose, uint_t flags)
 			(void) fprintf(fp, "\t%s %s %s\n", cmd_to_str(CMD_ADD),
 			    pt_to_str(PT_OPTIONS),
 			    gettext("<file-system options>"));
+			(void) fprintf(fp, "\t%s %s %s\n",
+			    cmd_to_str(CMD_REMOVE), pt_to_str(PT_OPTIONS),
+			    gettext("<file-system options>"));
 			(void) fprintf(fp, gettext("Consult the file-system "
 			    "specific manual page, such as mount_ufs(1M), "
 			    "for\ndetails about file-system options.  Note "
@@ -768,6 +776,11 @@ usage(bool verbose, uint_t flags)
 			    pt_to_str(PT_NAME), gettext("<string>"));
 			(void) fprintf(fp, "\t%s %s (%s=%s,%s=%s,%s=%s)\n",
 			    cmd_to_str(CMD_ADD), pt_to_str(PT_VALUE),
+			    pt_to_str(PT_PRIV), gettext("<priv-value>"),
+			    pt_to_str(PT_LIMIT), gettext("<number>"),
+			    pt_to_str(PT_ACTION), gettext("<action-value>"));
+			(void) fprintf(fp, "\t%s %s (%s=%s,%s=%s,%s=%s)\n",
+			    cmd_to_str(CMD_REMOVE), pt_to_str(PT_VALUE),
 			    pt_to_str(PT_PRIV), gettext("<priv-value>"),
 			    pt_to_str(PT_LIMIT), gettext("<number>"),
 			    pt_to_str(PT_ACTION), gettext("<action-value>"));
@@ -883,6 +896,8 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_AUTOBOOT));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_POOL));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_LIMITPRIV));
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s, %s\n", rt_to_str(RT_FS),
 		    pt_to_str(PT_DIR), pt_to_str(PT_SPECIAL),
 		    pt_to_str(PT_RAW), pt_to_str(PT_TYPE),
@@ -1295,6 +1310,7 @@ export_func(cmd_t *cmd)
 	struct zone_rctlvaltab *valptr;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
+	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
 	bool need_to_close = FALSE;
@@ -1353,6 +1369,13 @@ export_func(cmd_t *cmd)
 	    strlen(pool) > 0)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_POOL), pool);
+
+	if (zonecfg_get_limitpriv(handle, &limitpriv) == Z_OK &&
+	    strlen(limitpriv) > 0) {
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_LIMITPRIV), limitpriv);
+		free(limitpriv);
+	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
 		zone_perror(zone, err, FALSE);
@@ -2651,6 +2674,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_AUTOBOOT;
 		} else if (prop_type == PT_POOL) {
 			res_type = RT_POOL;
+		} else if (prop_type == PT_LIMITPRIV) {
+			res_type = RT_LIMITPRIV;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -2749,6 +2774,12 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_POOL:
 		if ((err = zonecfg_set_pool(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_LIMITPRIV:
+		if ((err = zonecfg_set_limitpriv(handle, prop_id)) != Z_OK)
 			zone_perror(zone, err, TRUE);
 		else
 			need_to_commit = TRUE;
@@ -3004,6 +3035,21 @@ info_pool(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_POOL), pool);
 	else
 		zone_perror(zone, err, TRUE);
+}
+
+static void
+info_limitpriv(zone_dochandle_t handle, FILE *fp)
+{
+	char *limitpriv;
+	int err;
+
+	if ((err = zonecfg_get_limitpriv(handle, &limitpriv)) == Z_OK) {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_LIMITPRIV),
+		    limitpriv);
+		free(limitpriv);
+	} else {
+		zone_perror(zone, err, TRUE);
+	}
 }
 
 static void
@@ -3376,6 +3422,7 @@ info_func(cmd_t *cmd)
 		info_zonepath(handle, fp);
 		info_autoboot(handle, fp);
 		info_pool(handle, fp);
+		info_limitpriv(handle, fp);
 		info_ipd(handle, fp, cmd);
 		info_fs(handle, fp, cmd);
 		info_net(handle, fp, cmd);
@@ -3395,6 +3442,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_POOL:
 		info_pool(handle, fp);
+		break;
+	case RT_LIMITPRIV:
+		info_limitpriv(handle, fp);
 		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);
