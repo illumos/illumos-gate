@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2445,21 +2444,40 @@ recov_retry:
 	if (!recovery)
 		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
 
-	/* This locks np if it is found */
-	np = servinfo4_to_nfs4_server(svp);
-	ASSERT(np == NULL || MUTEX_HELD(&np->s_lock));
+	mutex_enter(&nfs4_server_lst_lock);
+	np = servinfo4_to_nfs4_server(svp); /* This locks np if it is found */
+	mutex_exit(&nfs4_server_lst_lock);
+	if (!np) {
+		struct nfs4_server *tnp;
+		np = new_nfs4_server(svp, cr);
 
+		mutex_enter(&nfs4_server_lst_lock);
+		tnp = servinfo4_to_nfs4_server(svp);
+		if (tnp) {
+			/*
+			 * another thread snuck in and put server on list.
+			 * since we aren't adding it to the nfs4_server_list
+			 * we need to set the ref count to 0 and destroy it.
+			 */
+			np->s_refcnt = 0;
+			destroy_nfs4_server(np);
+			np = tnp;
+		} else {
+			/*
+			 * do not give list a reference until everything
+			 * succeeds
+			 */
+			mutex_enter(&np->s_lock);
+			insque(np, &nfs4_server_lst);
+		}
+		mutex_exit(&nfs4_server_lst_lock);
+	}
+	ASSERT(MUTEX_HELD(&np->s_lock));
 	/*
-	 * If we find the server already in the list, then just
-	 * return, we've already done SETCLIENTID to that server
+	 * If we find the server already has N4S_CLIENTID_SET, then
+	 * just return, we've already done SETCLIENTID to that server
 	 */
-
-	if (np && (np->s_flags & N4S_CLIENTID_SET)) {
-		/*
-		 * XXX - more is needed here.  SETCLIENTID may not
-		 * be completed.  A VFS lock may prevent multiple
-		 * mounts and provide needed serialization.
-		 */
+	if (np->s_flags & N4S_CLIENTID_SET) {
 		/* add mi to np's mntinfo4_list */
 		nfs4_add_mi_to_server(np, mi);
 		if (!recovery)
@@ -2468,20 +2486,16 @@ recov_retry:
 		nfs4_server_rele(np);
 		return;
 	}
+	mutex_exit(&np->s_lock);
+
 
 	/*
 	 * Drop the mi_recovlock since nfs4_start_op will
 	 * acquire it again for us.
 	 */
-	if (!recovery)
+	if (!recovery) {
 		nfs_rw_exit(&mi->mi_recovlock);
 
-	if (!np)
-		np = new_nfs4_server(svp, cr);
-	else
-		mutex_exit(&np->s_lock);
-
-	if (!recovery) {
 		n4ep->error = nfs4_start_op(mi, NULL, NULL, &recov_state);
 		if (n4ep->error) {
 			nfs4_server_rele(np);
@@ -2489,12 +2503,29 @@ recov_retry:
 		}
 	}
 
-	/*
-	 * Will potentially add np to global list, which transfers
-	 * ownership of the reference to the list.
-	 */
-	mutex_enter(&nfs4_server_lst_lock);
 	mutex_enter(&np->s_lock);
+	while (np->s_flags & N4S_CLIENTID_PEND) {
+		if (!cv_wait_sig(&np->s_clientid_pend, &np->s_lock)) {
+			mutex_exit(&np->s_lock);
+			nfs4_server_rele(np);
+			if (!recovery)
+				nfs4_end_op(mi, NULL, NULL, &recov_state,
+				    recovery);
+			n4ep->error = EINTR;
+			return;
+		}
+	}
+
+	if (np->s_flags & N4S_CLIENTID_SET) {
+		/* XXX copied/pasted from above */
+		/* add mi to np's mntinfo4_list */
+		nfs4_add_mi_to_server(np, mi);
+		mutex_exit(&np->s_lock);
+		nfs4_server_rele(np);
+		if (!recovery)
+			nfs4_end_op(mi, NULL, NULL, &recov_state, recovery);
+		return;
+	}
 
 	/*
 	 * Reset the N4S_CB_PINGED flag. This is used to
@@ -2502,24 +2533,9 @@ recov_retry:
 	 * server. Also we reset the waiter flag.
 	 */
 	np->s_flags &= ~(N4S_CB_PINGED | N4S_CB_WAITER);
-
-	if (np->s_flags & N4S_CLIENTID_SET) {
-		/* XXX copied/pasted from above */
-		/*
-		 * XXX - more is needed here.  SETCLIENTID may not
-		 * be completed.  A VFS lock may prevent multiple
-		 * mounts and provide needed serialization.
-		 */
-		/* add mi to np's mntinfo4_list */
-		nfs4_add_mi_to_server(np, mi);
-		mutex_exit(&np->s_lock);
-		mutex_exit(&nfs4_server_lst_lock);
-		nfs4_server_rele(np);
-		if (!recovery)
-			nfs4_end_op(mi, NULL, NULL, &recov_state, recovery);
-		return;
-	}
-
+	/* any failure must now clear this flag */
+	np->s_flags |= N4S_CLIENTID_PEND;
+	mutex_exit(&np->s_lock);
 	nfs4setclientid_otw(mi, svp, cr, np, n4ep, &retry_inuse);
 
 	if (n4ep->error == EACCES) {
@@ -2532,18 +2548,22 @@ recov_retry:
 			lcr = crdup(cr);
 			(void) crsetugid(lcr, svp->sv_secdata->uid,
 			    crgetgid(cr));
-			crfree(np->s_cred);
-			np->s_cred = lcr;
 		}
 		nfs_rw_exit(&svp->sv_lock);
 
-		if (lcr != NULL)
+		if (lcr != NULL) {
+			mutex_enter(&np->s_lock);
+			crfree(np->s_cred);
+			np->s_cred = lcr;
+			mutex_exit(&np->s_lock);
 			nfs4setclientid_otw(mi, svp, lcr, np, n4ep,
 				&retry_inuse);
+		}
 	}
+	mutex_enter(&np->s_lock);
 	lease_time = np->s_lease_time;
+	np->s_flags &= ~N4S_CLIENTID_PEND;
 	mutex_exit(&np->s_lock);
-	mutex_exit(&nfs4_server_lst_lock);
 
 	if (n4ep->error != 0 || n4ep->stat != NFS4_OK) {
 		/*
@@ -2583,11 +2603,16 @@ recov_retry:
 				retry = TRUE;
 				num_retries = 0;
 		}
+	} else {
+		/* Since everything succeeded give the list a reference count */
+		mutex_enter(&np->s_lock);
+		np->s_refcnt++;
+		mutex_exit(&np->s_lock);
 	}
 
 	if (!recovery)
 		nfs4_end_op(mi, NULL, NULL, &recov_state, recovery);
-	nfs4_server_rele(np);
+
 
 	if (retry && num_retries++ < nfs4_num_sclid_retries) {
 		if (retry_inuse) {
@@ -2595,17 +2620,23 @@ recov_retry:
 			retry_inuse = 0;
 		} else
 			delay(SEC_TO_TICK(nfs4_retry_sclid_delay));
+
+		nfs4_server_rele(np);
 		goto recov_retry;
 	}
 
+
 	if (n4ep->error == 0)
 		n4ep->error = geterrno4(n4ep->stat);
+
+	/* broadcast before release in case no other threads are waiting */
+	cv_broadcast(&np->s_clientid_pend);
+	nfs4_server_rele(np);
 }
 
 int nfs4setclientid_otw_debug = 0;
 
 /*
- * This assumes np is locked down.
  * This function handles the recovery of STALE_CLIENTID for SETCLIENTID_CONFRIM,
  * but nothing else; the calling function must be designed to handle those
  * other errors.
@@ -2625,7 +2656,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 	verifier4 verf;
 	clientid4 tmp_clientid;
 
-	ASSERT(MUTEX_HELD(&np->s_lock));
+	ASSERT(!MUTEX_HELD(&np->s_lock));
 
 	args.ctag = TAG_SETCLIENTID;
 
@@ -2645,6 +2676,8 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 
 	s_args = &argop[2].nfs_argop4_u.opsetclientid;
 
+	mutex_enter(&np->s_lock);
+
 	s_args->client.verifier = np->clidtosend.verifier;
 	s_args->client.id_len = np->clidtosend.id_len;
 	ASSERT(s_args->client.id_len <= NFS4_OPAQUE_LIMIT);
@@ -2660,7 +2693,9 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 	else
 		nfs4_cb_args(np, svp->sv_knconf, s_args);
 
-	rfs4call(mi, &args, &res, cr, &doqueue, RFSCALL_SOFT, ep);
+	mutex_exit(&np->s_lock);
+
+	rfs4call(mi, &args, &res, cr, &doqueue, 0, ep);
 
 	if (ep->error)
 		return;
@@ -2686,6 +2721,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 		}
 #endif
 
+		mutex_enter(&np->s_lock);
 		np->s_lease_time = garp->n4g_ext_res->n4g_leasetime;
 
 		/*
@@ -2697,6 +2733,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 		mutex_enter(&mi->mi_msg_list_lock);
 		mi->mi_lease_period = np->s_lease_time;
 		mutex_exit(&mi->mi_msg_list_lock);
+		mutex_exit(&np->s_lock);
 	}
 
 
@@ -2774,8 +2811,10 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 	rfs4call(mi, &args, &res, cr, &doqueue, 0, ep);
 
 	gethrestime(&after_time);
+	mutex_enter(&np->s_lock);
 	np->propagation_delay.tv_sec =
 		MAX(1, after_time.tv_sec - prop_time.tv_sec);
+	mutex_exit(&np->s_lock);
 
 	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4setlcientid_otw: "
 		"finish time: %ld sec ", after_time.tv_sec));
@@ -2810,14 +2849,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 		return;
 	}
 
-	if (!(np->s_flags & N4S_INSERTED)) {
-		ASSERT(MUTEX_HELD(&nfs4_server_lst_lock));
-		insque(np, &nfs4_server_lst);
-		ASSERT(MUTEX_HELD(&np->s_lock));
-		np->s_flags |= N4S_INSERTED;
-		np->s_refcnt++;		/* list gets a reference */
-	}
-
+	mutex_enter(&np->s_lock);
 	np->clientid = tmp_clientid;
 	np->s_flags |= N4S_CLIENTID_SET;
 
@@ -2834,6 +2866,7 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 		(void) zthread_create(NULL, 0, nfs4_renew_lease_thread, np, 0,
 				    minclsyspri);
 	}
+	mutex_exit(&np->s_lock);
 
 	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 }
@@ -3137,6 +3170,7 @@ new_nfs4_server(struct servinfo4 *svp, cred_t *cr)
 	np->state_ref_count = 0;
 	np->lease_valid = NFS4_LEASE_NOT_STARTED;
 	cv_init(&np->s_cv_otw_count, NULL, CV_DEFAULT, NULL);
+	cv_init(&np->s_clientid_pend, NULL, CV_DEFAULT, NULL);
 	np->s_otw_call_count = 0;
 	cv_init(&np->wait_cb_null, NULL, CV_DEFAULT, NULL);
 	np->zoneid = getzoneid();
@@ -3160,7 +3194,6 @@ add_new_nfs4_server(struct servinfo4 *svp, cred_t *cr)
 	insque(sp, &nfs4_server_lst);
 	sp->s_refcnt++;			/* list gets a reference */
 	sp->clientid = 0;
-	sp->s_flags |= N4S_INSERTED;
 	return (sp);
 }
 
@@ -3303,6 +3336,7 @@ nfs4_move_mi(mntinfo4_t *mi, servinfo4_t *old, servinfo4_t *new)
 }
 
 /*
+ * Need to have the nfs4_server_lst_lock.
  * Search the nfs4_server list to find a match on this servinfo4
  * based on its address.
  *
@@ -3315,7 +3349,7 @@ servinfo4_to_nfs4_server(servinfo4_t *srv_p)
 	nfs4_server_t *np;
 	zoneid_t zoneid = nfs_zoneid();
 
-	mutex_enter(&nfs4_server_lst_lock);
+	ASSERT(MUTEX_HELD(&nfs4_server_lst_lock));
 	for (np = nfs4_server_lst.forw; np != &nfs4_server_lst; np = np->forw) {
 		if (np->zoneid == zoneid &&
 		    np->saddr.len == srv_p->sv_addr.len &&
@@ -3324,11 +3358,9 @@ servinfo4_to_nfs4_server(servinfo4_t *srv_p)
 		    np->s_thread_exit != NFS4_THREAD_EXIT) {
 			mutex_enter(&np->s_lock);
 			np->s_refcnt++;
-			mutex_exit(&nfs4_server_lst_lock);
 			return (np);
 		}
 	}
-	mutex_exit(&nfs4_server_lst_lock);
 	return (NULL);
 }
 
@@ -3426,11 +3458,8 @@ nfs4_server_rele(nfs4_server_t *sp)
 		mutex_exit(&sp->s_lock);
 		return;
 	}
-	if (!(sp->s_flags & N4S_INSERTED)) {
-		destroy_nfs4_server(sp);
-		return;
-	}
 	mutex_exit(&sp->s_lock);
+
 	mutex_enter(&nfs4_server_lst_lock);
 	mutex_enter(&sp->s_lock);
 	if (sp->s_refcnt > 0) {
@@ -3438,11 +3467,8 @@ nfs4_server_rele(nfs4_server_t *sp)
 		mutex_exit(&nfs4_server_lst_lock);
 		return;
 	}
-	if (sp->s_flags & N4S_INSERTED) {
-		remque(sp);
-		sp->forw = sp->back = NULL;
-		sp->s_flags &= ~N4S_INSERTED;
-	}
+	remque(sp);
+	sp->forw = sp->back = NULL;
 	mutex_exit(&nfs4_server_lst_lock);
 	destroy_nfs4_server(sp);
 }
@@ -3451,7 +3477,6 @@ static void
 destroy_nfs4_server(nfs4_server_t *sp)
 {
 	ASSERT(MUTEX_HELD(&sp->s_lock));
-	ASSERT(!(sp->s_flags & N4S_INSERTED));
 	ASSERT(sp->s_refcnt == 0);
 	ASSERT(sp->s_otw_call_count == 0);
 
@@ -3468,6 +3493,7 @@ destroy_nfs4_server(nfs4_server_t *sp)
 	mutex_destroy(&sp->s_lock);
 	cv_destroy(&sp->cv_thread_exit);
 	cv_destroy(&sp->s_cv_otw_count);
+	cv_destroy(&sp->s_clientid_pend);
 	cv_destroy(&sp->wait_cb_null);
 	nfs_rw_destroy(&sp->s_recovlock);
 	kmem_free(sp, sizeof (*sp));

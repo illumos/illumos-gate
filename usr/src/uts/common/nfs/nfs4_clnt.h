@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1186,6 +1185,7 @@ typedef struct nfs4_server {
 	int			state_ref_count;
 	int			s_otw_call_count;
 	kcondvar_t		s_cv_otw_count;
+	kcondvar_t		s_clientid_pend;
 	kmutex_t		s_lock;
 	list_t			s_deleg_list;
 	rpcprog_t		s_program;
@@ -1197,7 +1197,7 @@ typedef struct nfs4_server {
 
 /* nfs4_server flags */
 #define	N4S_CLIENTID_SET	1	/* server has our clientid */
-#define	N4S_INSERTED		0x2	/* server has been put in global list */
+#define	N4S_CLIENTID_PEND	0x2	/* server doesn't have clientid */
 #define	N4S_CB_PINGED		0x4	/* server has sent us a CB_NULL */
 #define	N4S_CB_WAITER		0x8	/* is/has wait{ing/ed} for cb_null */
 #define	N4S_BADOWNER_DEBUG	0x10	/* bad owner err msg per client */
