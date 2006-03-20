@@ -1871,65 +1871,8 @@ _fitos_fdtos_done:
 /*
  * Register windows
  */
-
-/*
- * FILL_32bit_flushw/FILL_64bit_flushw fills a 32/64-bit-wide register window
- * from a 32/64-bit * wide address space via the designated asi.
- * It is used to fill windows in user_flushw to avoid going above TL 2.
- */
-/* TODO: Use the faster FILL based on FILL_32bit_asi/FILL_64bit_asi */
-#define	FILL_32bit_flushw(asi_num)				\
-	mov	asi_num, %asi					;\
-	rdpr	%cwp, %g2					;\
-	sub	%g2, 1, %g2					;\
-	wrpr	%g2, %cwp					;\
-1:	srl	%sp, 0, %sp					;\
-	lda	[%sp + 0]%asi, %l0				;\
-	lda	[%sp + 4]%asi, %l1				;\
-	lda	[%sp + 8]%asi, %l2				;\
-	lda	[%sp + 12]%asi, %l3				;\
-	lda	[%sp + 16]%asi, %l4				;\
-	lda	[%sp + 20]%asi, %l5				;\
-	lda	[%sp + 24]%asi, %l6				;\
-	lda	[%sp + 28]%asi, %l7				;\
-	lda	[%sp + 32]%asi, %i0				;\
-	lda	[%sp + 36]%asi, %i1				;\
-	lda	[%sp + 40]%asi, %i2				;\
-	lda	[%sp + 44]%asi, %i3				;\
-	lda	[%sp + 48]%asi, %i4				;\
-	lda	[%sp + 52]%asi, %i5				;\
-	lda	[%sp + 56]%asi, %i6				;\
-	lda	[%sp + 60]%asi, %i7				;\
-	restored						;\
-	add	%g2, 1, %g2					;\
-	wrpr	%g2, %cwp
-
-#define	FILL_64bit_flushw(asi_num)				\
-	mov	asi_num, %asi					;\
-	rdpr	%cwp, %g2					;\
-	sub	%g2, 1, %g2					;\
-	wrpr	%g2, %cwp					;\
-	ldxa	[%sp + V9BIAS64 + 0]%asi, %l0			;\
-	ldxa	[%sp + V9BIAS64 + 8]%asi, %l1			;\
-	ldxa	[%sp + V9BIAS64 + 16]%asi, %l2			;\
-	ldxa	[%sp + V9BIAS64 + 24]%asi, %l3			;\
-	ldxa	[%sp + V9BIAS64 + 32]%asi, %l4			;\
-	ldxa	[%sp + V9BIAS64 + 40]%asi, %l5			;\
-	ldxa	[%sp + V9BIAS64 + 48]%asi, %l6			;\
-	ldxa	[%sp + V9BIAS64 + 56]%asi, %l7			;\
-	ldxa	[%sp + V9BIAS64 + 64]%asi, %i0			;\
-	ldxa	[%sp + V9BIAS64 + 72]%asi, %i1			;\
-	ldxa	[%sp + V9BIAS64 + 80]%asi, %i2			;\
-	ldxa	[%sp + V9BIAS64 + 88]%asi, %i3			;\
-	ldxa	[%sp + V9BIAS64 + 96]%asi, %i4			;\
-	ldxa	[%sp + V9BIAS64 + 104]%asi, %i5			;\
-	ldxa	[%sp + V9BIAS64 + 112]%asi, %i6			;\
-	ldxa	[%sp + V9BIAS64 + 120]%asi, %i7			;\
-	restored						;\
-	add	%g2, 1, %g2					;\
-	wrpr	%g2, %cwp
-
 .flushw:
+.clean_windows:
 	rdpr	%tnpc, %g1
 	wrpr	%g1, %tpc
 	add	%g1, 4, %g1
@@ -1938,37 +1881,6 @@ _fitos_fdtos_done:
 	mov	T_FLUSH_PCB, %g3
 	ba,pt	%xcc, sys_trap
 	sub	%g0, 1, %g4
-
-.clean_windows:
-	set	trap, %g1
-	mov	T_FLUSH_PCB, %g3
-	sub	%g0, 1, %g4
-	save
-	flushw
-	rdpr	%canrestore, %g2
-	brnz	%g2, 1f
-	nop
-	rdpr	%wstate, %g2
-	btst	1, %g2
-	beq	2f
-	nop
-	FILL_32bit_flushw(ASI_AIUP)
-	ba,a	1f
-	 .empty
-2:
-	FILL_64bit_flushw(ASI_AIUP)
-1:
-	restore
-	wrpr	%g0, %g0, %cleanwin	! no clean windows
-
-	CPU_ADDR(%g4, %g5)
-	ldn	[%g4 + CPU_MPCB], %g4
-	brz,a,pn %g4, 1f
-	  nop
-	ld	[%g4 + MPCB_WSTATE], %g5
-	add	%g5, WSTATE_CLEAN_OFFSET, %g5
-	wrpr	%g0, %g5, %wstate
-1:	FAST_TRAP_DONE
 
 /*
  * .spill_clean: clean the previous window, restore the wstate, and
