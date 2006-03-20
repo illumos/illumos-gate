@@ -1890,7 +1890,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 		for (; !(pxl->pxp == px_p) && pxl->next; pxl = pxl->next);
 		if (pxl->pxp == px_p) {
 			cmn_err(CE_WARN, "px_cb_add_intr: reregister sysino "
-			    "%lx by px_p 0x%p\n", cb_p->sysino, px_p);
+			    "%lx by px_p 0x%p\n", cb_p->sysino, (void *)px_p);
 			return (DDI_FAILURE);
 		}
 
@@ -1935,7 +1935,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 		for (; pxl && (pxl->pxp != px_p); prev = pxl, pxl = pxl->next);
 		if (!pxl) {
 			cmn_err(CE_WARN, "px_cb_rem_intr: can't find px_p 0x%p "
-			    "in registered CB list.", px_p);
+			    "in registered CB list.", (void *)px_p);
 			return;
 		}
 		prev->next = pxl->next;
@@ -1952,7 +1952,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 			cb_p->sysino = f_p->px_fh_sysino;
 
 			PX_INTR_ENABLE(pxp->px_dip, cb_p->sysino, cb_p->cpuid);
-			px_lib_intr_setstate(pxp->px_dip, cb_p->sysino,
+			(void) px_lib_intr_setstate(pxp->px_dip, cb_p->sysino,
 			    INTR_IDLE_STATE);
 		}
 	}
