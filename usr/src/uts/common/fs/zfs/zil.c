@@ -1015,7 +1015,7 @@ zil_free(zilog_t *zilog)
 }
 
 /*
- * return true if there is a valid initial zil log block
+ * return true if the initial log block is not valid
  */
 static int
 zil_empty(zilog_t *zilog)
@@ -1055,7 +1055,7 @@ zil_open(objset_t *os, zil_get_data_t *get_data)
 void
 zil_close(zilog_t *zilog)
 {
-	if (!zil_empty(zilog))
+	if (!zil_is_committed(zilog))
 		txg_wait_synced(zilog->zl_dmu_pool, 0);
 	taskq_destroy(zilog->zl_clean_taskq);
 	zilog->zl_clean_taskq = NULL;
@@ -1312,4 +1312,26 @@ zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 	kmem_free(zr.zr_lrbuf, 2 * SPA_MAXBLOCKSIZE);
 
 	zil_destroy(zilog);
+}
+
+/*
+ * Report whether all transactions are committed
+ */
+int
+zil_is_committed(zilog_t *zilog)
+{
+	lwb_t *lwb;
+
+	if (zilog == NULL || list_head(&zilog->zl_itx_list))
+		return (B_FALSE);
+
+	/*
+	 * A log write buffer at the head of the list that is not UNWRITTEN
+	 * means there's a lwb yet to be freed after a txg commit
+	 */
+	lwb = list_head(&zilog->zl_lwb_list);
+	if (lwb && lwb->lwb_state != UNWRITTEN)
+		return (B_FALSE);
+	ASSERT(zil_empty(zilog));
+	return (B_TRUE);
 }

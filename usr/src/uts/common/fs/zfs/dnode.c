@@ -406,7 +406,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 		ASSERT(!list_link_active(&dn->dn_dirty_link[i]));
 
 	/* clean up any unreferenced dbufs */
-	dnode_evict_dbufs(dn);
+	(void) dnode_evict_dbufs(dn, 0);
 	ASSERT3P(list_head(&dn->dn_dbufs), ==, NULL);
 
 	/*

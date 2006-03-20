@@ -1102,12 +1102,6 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 		zfs_unregister_callbacks(zfsvfs);
 
 	/*
-	 * Make the dmu drop all it dbuf holds so that zfs_inactive
-	 * can then safely free znode/vnodes.
-	 */
-	txg_wait_synced(dmu_objset_pool(os), 0);
-
-	/*
 	 * Switch zfs_inactive to behaviour without an objset.
 	 * It just tosses cached pages and frees the znode & vnode.
 	 * Then re-enable zfs_inactive threads in that new behaviour.
@@ -1127,7 +1121,10 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	/*
 	 * Evict all dbufs so that cached znodes will be freed
 	 */
-	dmu_objset_evict_dbufs(os);
+	if (dmu_objset_evict_dbufs(os, 1)) {
+		txg_wait_synced(dmu_objset_pool(zfsvfs->z_os), 0);
+		(void) dmu_objset_evict_dbufs(os, 0);
+	}
 
 	/*
 	 * Finally close the objset

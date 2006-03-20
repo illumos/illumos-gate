@@ -100,7 +100,7 @@ void dmu_objset_stats(objset_t *os, dmu_objset_stats_t *dds);
 void dmu_objset_find(char *name, void func(char *, void *), void *arg,
     int flags);
 void dmu_objset_byteswap(void *buf, size_t size);
-void dmu_objset_evict_dbufs(objset_t *os);
+int dmu_objset_evict_dbufs(objset_t *os, int try);
 
 /* called from dsl */
 void dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx);

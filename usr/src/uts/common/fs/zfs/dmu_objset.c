@@ -275,8 +275,8 @@ dmu_objset_close(objset_t *os)
 	kmem_free(os, sizeof (objset_t));
 }
 
-void
-dmu_objset_evict_dbufs(objset_t *os)
+int
+dmu_objset_evict_dbufs(objset_t *os, int try)
 {
 	objset_impl_t *osi = os->os;
 	dnode_t *dn;
@@ -310,12 +310,18 @@ dmu_objset_evict_dbufs(objset_t *os)
 			dnode_add_ref(next_dn, FTAG);
 
 		mutex_exit(&osi->os_lock);
-		dnode_evict_dbufs(dn);
+		if (dnode_evict_dbufs(dn, try)) {
+			dnode_rele(dn, FTAG);
+			if (next_dn)
+				dnode_rele(next_dn, FTAG);
+			return (1);
+		}
 		dnode_rele(dn, FTAG);
 		mutex_enter(&osi->os_lock);
 		dn = next_dn;
 	}
 	mutex_exit(&osi->os_lock);
+	return (0);
 }
 
 void
@@ -345,7 +351,7 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 	 * nothing can be added to the list at this point.
 	 */
 	os.os = osi;
-	dmu_objset_evict_dbufs(&os);
+	(void) dmu_objset_evict_dbufs(&os, 0);
 
 	ASSERT3P(list_head(&osi->os_dnodes), ==, osi->os_meta_dnode);
 	ASSERT3P(list_tail(&osi->os_dnodes), ==, osi->os_meta_dnode);

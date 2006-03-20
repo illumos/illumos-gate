@@ -343,8 +343,8 @@ dnode_sync_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
 /*
  * Try to kick all the dnodes dbufs out of the cache...
  */
-void
-dnode_evict_dbufs(dnode_t *dn)
+int
+dnode_evict_dbufs(dnode_t *dn, int try)
 {
 	int progress;
 	int pass = 0;
@@ -391,14 +391,18 @@ dnode_evict_dbufs(dnode_t *dn)
 	} while (progress);
 
 	/*
-	 * This function works fine even if it can't evict everything,
-	 * but all of our callers need this assertion, so let's put it
-	 * here (for now).  Perhaps in the future there will be a try vs
-	 * doall flag.
+	 * This function works fine even if it can't evict everything.
+	 * If were only asked to try to evict everything then
+	 * return an error if we can't. Otherwise panic as the caller
+	 * expects total eviction.
 	 */
 	if (list_head(&dn->dn_dbufs) != NULL) {
-		panic("dangling dbufs (dn=%p, dbuf=%p)\n",
-		    dn, list_head(&dn->dn_dbufs));
+		if (try) {
+			return (1);
+		} else {
+			panic("dangling dbufs (dn=%p, dbuf=%p)\n",
+			    dn, list_head(&dn->dn_dbufs));
+		}
 	}
 
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
@@ -408,7 +412,7 @@ dnode_evict_dbufs(dnode_t *dn)
 		dn->dn_bonus = NULL;
 	}
 	rw_exit(&dn->dn_struct_rwlock);
-
+	return (0);
 }
 
 static int
@@ -436,7 +440,7 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 		dbuf_rele(db, (void *)(uintptr_t)tx->tx_txg);
 	}
 
-	dnode_evict_dbufs(dn);
+	(void) dnode_evict_dbufs(dn, 0);
 	ASSERT3P(list_head(&dn->dn_dbufs), ==, NULL);
 
 	/*

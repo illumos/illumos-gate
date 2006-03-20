@@ -1248,7 +1248,6 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 			dmu_objset_close(os2);
 	}
 
-	txg_wait_synced(dmu_objset_pool(os), 0);
 	zil_close(zilog);
 	dmu_objset_close(os);
 
@@ -3081,7 +3080,6 @@ ztest_run(char *pool)
 		if (za[t].za_th)
 			traverse_fini(za[t].za_th);
 		if (t < zopt_dirs) {
-			txg_wait_synced(spa_get_dsl(spa), 0);
 			zil_close(za[t].za_zilog);
 			dmu_objset_close(za[t].za_os);
 		}
