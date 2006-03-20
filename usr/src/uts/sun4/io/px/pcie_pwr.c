@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -874,7 +873,7 @@ pcie_pwr_resume(dev_info_t *dip)
 		    "DDI_RESUME: nexus restoring %s%d config regs\n",
 		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 
-		if (pci_config_setup(cdip, &config_handle) == DDI_FAILURE) {
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
 			DBG(DBG_PWR, dip, "DDI_RESUME: "
 			    "pci_config_setup for %s%d failed\n",
 			    ddi_driver_name(cdip), ddi_get_instance(cdip));
@@ -1008,7 +1007,7 @@ pcie_pwr_suspend(dev_info_t *dip)
 		    " %s%d\n", ddi_driver_name(cdip), ddi_get_instance(cdip));
 
 		/* PCIe workaround: disable errors during 4K config save */
-		if (pci_config_setup(cdip, &config_handle) == DDI_FAILURE) {
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
 			DBG(DBG_PWR, dip, "DDI_SUSPEND: pci_config_setup "
 			    "for %s%d failed\n",
 			    ddi_driver_name(cdip), ddi_get_instance(cdip));

@@ -62,6 +62,7 @@ static int px_goto_l0(px_t *px_p);
 static int px_pre_pwron_check(px_t *px_p);
 static uint32_t px_identity_chip(px_t *px_p);
 static boolean_t px_cpr_callb(void *arg, int code);
+static uint_t px_cb_intr(caddr_t arg);
 
 /*
  * px_lib_map_registers
@@ -1198,22 +1199,25 @@ px_lib_suspend(dev_info_t *dip)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	px_cb_t		*cb_p = PX2CB(px_p);
 	devhandle_t	dev_hdl, xbus_dev_hdl;
-	uint64_t	ret;
+	uint64_t	ret = H_EOK;
 
 	DBG(DBG_DETACH, dip, "px_lib_suspend: dip 0x%p\n", dip);
 
 	dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_CSR];
 	xbus_dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_XBC];
 
-	if ((ret = hvio_suspend(dev_hdl, pxu_p)) == H_EOK) {
-		px_p->px_cb_p->xbc_attachcnt--;
-		if (px_p->px_cb_p->xbc_attachcnt == 0)
-			if ((ret = hvio_cb_suspend(xbus_dev_hdl, pxu_p))
-			    != H_EOK)
-				px_p->px_cb_p->xbc_attachcnt++;
+	if ((ret = hvio_suspend(dev_hdl, pxu_p)) != H_EOK)
+		goto fail;
+
+	if (--cb_p->attachcnt == 0) {
+		ret = hvio_cb_suspend(xbus_dev_hdl, pxu_p);
+		if (ret != H_EOK)
+			cb_p->attachcnt++;
 	}
 
+fail:
 	return ((ret != H_EOK) ? DDI_FAILURE: DDI_SUCCESS);
 }
 
@@ -1222,6 +1226,7 @@ px_lib_resume(dev_info_t *dip)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	px_cb_t		*cb_p = PX2CB(px_p);
 	devhandle_t	dev_hdl, xbus_dev_hdl;
 	devino_t	pec_ino = px_p->px_inos[PX_INTR_PEC];
 	devino_t	xbc_ino = px_p->px_inos[PX_INTR_XBC];
@@ -1231,32 +1236,10 @@ px_lib_resume(dev_info_t *dip)
 	dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_CSR];
 	xbus_dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_XBC];
 
-	px_p->px_cb_p->xbc_attachcnt++;
-	if (px_p->px_cb_p->xbc_attachcnt == 1)
+	if (++cb_p->attachcnt == 1)
 		hvio_cb_resume(dev_hdl, xbus_dev_hdl, xbc_ino, pxu_p);
+
 	hvio_resume(dev_hdl, pec_ino, pxu_p);
-}
-
-/*
- * Misc Functions:
- * Currently unsupported by hypervisor
- */
-uint64_t
-px_lib_get_cb(dev_info_t *dip)
-{
-	px_t	*px_p = DIP_TO_STATE(dip);
-	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
-
-	return (CSR_XR((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1));
-}
-
-void
-px_lib_set_cb(dev_info_t *dip, uint64_t val)
-{
-	px_t	*px_p = DIP_TO_STATE(dip);
-	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
-
-	CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1, val);
 }
 
 /*ARGSUSED*/
@@ -1286,7 +1269,6 @@ px_lib_clr_errs(px_t *px_p)
 {
 	px_pec_t	*pec_p = px_p->px_pec_p;
 	dev_info_t	*rpdip = px_p->px_dip;
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err = PX_OK, ret;
 	int		acctype = pec_p->pec_safeacc_type;
 	ddi_fm_error_t	derr;
@@ -1302,7 +1284,7 @@ px_lib_clr_errs(px_t *px_p)
 		ndi_fm_acc_err_set(pec_p->pec_acc_hdl, &derr);
 	}
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
 	/* send ereport/handle/clear fire registers */
 	err = px_err_handle(px_p, &derr, PX_LIB_CALL, B_TRUE);
@@ -1310,7 +1292,7 @@ px_lib_clr_errs(px_t *px_p)
 	/* Check all child devices for errors */
 	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 
 	/*
 	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
@@ -1856,6 +1838,186 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
 }
 
+/*
+ * px_cb_add_intr() - Called from attach(9E) to create CB if not yet
+ * created, to add CB interrupt vector always, but enable only once.
+ */
+int
+px_cb_add_intr(px_fault_t *fault_p)
+{
+	px_t		*px_p = DIP_TO_STATE(fault_p->px_fh_dip);
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	px_cb_t		*cb_p = (px_cb_t *)CSR_XR((caddr_t)
+	    pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1);
+	px_cb_list_t	*pxl, *pxl_new;
+	cpuid_t		cpuid;
+
+
+	if (cb_p == NULL) {
+		cb_p = kmem_zalloc(sizeof (px_cb_t), KM_SLEEP);
+		mutex_init(&cb_p->cb_mutex, NULL, MUTEX_DRIVER, NULL);
+		cb_p->px_cb_func = px_cb_intr;
+		pxu_p->px_cb_p = cb_p;
+		CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1,
+		    (uint64_t)cb_p);
+	} else
+		pxu_p->px_cb_p = cb_p;
+
+	mutex_enter(&cb_p->cb_mutex);
+
+	VERIFY(add_ivintr(fault_p->px_fh_sysino, PX_ERR_PIL,
+	    cb_p->px_cb_func, (caddr_t)cb_p, NULL) == 0);
+
+	if (cb_p->pxl == NULL) {
+
+		cpuid = intr_dist_cpuid(),
+		px_ib_intr_enable(px_p, cpuid, fault_p->px_intr_ino);
+
+		pxl = kmem_zalloc(sizeof (px_cb_list_t), KM_SLEEP);
+		pxl->pxp = px_p;
+
+		cb_p->pxl = pxl;
+		cb_p->sysino = fault_p->px_fh_sysino;
+		cb_p->cpuid = cpuid;
+
+	} else {
+		/*
+		 * Find the last pxl or
+		 * stop short at encoutering a redundent, or
+		 * both.
+		 */
+		pxl = cb_p->pxl;
+		for (; !(pxl->pxp == px_p) && pxl->next; pxl = pxl->next);
+		if (pxl->pxp == px_p) {
+			cmn_err(CE_WARN, "px_cb_add_intr: reregister sysino "
+			    "%lx by px_p 0x%p\n", cb_p->sysino, px_p);
+			return (DDI_FAILURE);
+		}
+
+		/* add to linked list */
+		pxl_new = kmem_zalloc(sizeof (px_cb_list_t), KM_SLEEP);
+		pxl_new->pxp = px_p;
+		pxl->next = pxl_new;
+	}
+	cb_p->attachcnt++;
+
+	mutex_exit(&cb_p->cb_mutex);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * px_cb_rem_intr() - Called from detach(9E) to remove its CB
+ * interrupt vector, to shift proxy to the next available px,
+ * or disable CB interrupt when itself is the last.
+ */
+void
+px_cb_rem_intr(px_fault_t *fault_p)
+{
+	px_t		*px_p = DIP_TO_STATE(fault_p->px_fh_dip), *pxp;
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	px_cb_t		*cb_p = PX2CB(px_p);
+	px_cb_list_t	*pxl, *prev;
+	px_fault_t	*f_p;
+
+	ASSERT(cb_p->pxl);
+
+	/* De-list the target px, move the next px up */
+
+	mutex_enter(&cb_p->cb_mutex);
+
+	pxl = cb_p->pxl;
+	if (pxl->pxp == px_p) {
+		cb_p->pxl = pxl->next;
+	} else {
+		prev = pxl;
+		pxl = pxl->next;
+		for (; pxl && (pxl->pxp != px_p); prev = pxl, pxl = pxl->next);
+		if (!pxl) {
+			cmn_err(CE_WARN, "px_cb_rem_intr: can't find px_p 0x%p "
+			    "in registered CB list.", px_p);
+			return;
+		}
+		prev->next = pxl->next;
+	}
+	kmem_free(pxl, sizeof (px_cb_list_t));
+
+	if (fault_p->px_fh_sysino == cb_p->sysino) {
+		px_ib_intr_disable(px_p->px_ib_p, fault_p->px_intr_ino,
+		    IB_INTR_WAIT);
+
+		if (cb_p->pxl) {
+			pxp = cb_p->pxl->pxp;
+			f_p = &pxp->px_cb_fault;
+			cb_p->sysino = f_p->px_fh_sysino;
+
+			PX_INTR_ENABLE(pxp->px_dip, cb_p->sysino, cb_p->cpuid);
+			px_lib_intr_setstate(pxp->px_dip, cb_p->sysino,
+			    INTR_IDLE_STATE);
+		}
+	}
+
+	rem_ivintr(fault_p->px_fh_sysino, NULL);
+	pxu_p->px_cb_p = NULL;
+	cb_p->attachcnt--;
+	if (cb_p->pxl) {
+		mutex_exit(&cb_p->cb_mutex);
+		return;
+	}
+	mutex_exit(&cb_p->cb_mutex);
+
+	mutex_destroy(&cb_p->cb_mutex);
+	CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1, 0ull);
+	kmem_free(cb_p, sizeof (px_cb_t));
+}
+
+/*
+ * px_cb_intr() - sun4u only,  CB interrupt dispatcher
+ */
+uint_t
+px_cb_intr(caddr_t arg)
+{
+	px_cb_t		*cb_p = (px_cb_t *)arg;
+	px_cb_list_t	*pxl = cb_p->pxl;
+	px_t		*pxp = pxl ? pxl->pxp : NULL;
+	px_fault_t	*fault_p;
+
+	while (pxl && pxp && (pxp->px_state != PX_ATTACHED)) {
+		pxl = pxl->next;
+		pxp = (pxl) ? pxl->pxp : NULL;
+	}
+
+	if (pxp) {
+		fault_p = &pxp->px_cb_fault;
+		return (fault_p->px_err_func((caddr_t)fault_p));
+	} else
+		return (DDI_INTR_UNCLAIMED);
+}
+
+/*
+ * px_cb_intr_redist() - sun4u only, CB interrupt redistribution
+ */
+void
+px_cb_intr_redist(px_t	*px_p)
+{
+	px_fault_t	*f_p = &px_p->px_cb_fault;
+	px_cb_t		*cb_p = PX2CB(px_p);
+	devino_t	ino = px_p->px_inos[PX_INTR_XBC];
+	cpuid_t		cpuid;
+
+	mutex_enter(&cb_p->cb_mutex);
+
+	if (cb_p->sysino != f_p->px_fh_sysino) {
+		mutex_exit(&cb_p->cb_mutex);
+		return;
+	}
+
+	cb_p->cpuid = cpuid = intr_dist_cpuid();
+	px_ib_intr_dist_en(px_p->px_dip, cpuid, ino, B_FALSE);
+
+	mutex_exit(&cb_p->cb_mutex);
+}
+
 #ifdef FMA
 void
 px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
@@ -1869,7 +2031,8 @@ px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
  * Only used for temporary PCI-E Fabric Error Handling.
  */
 uint32_t
-px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset) {
+px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset)
+{
 	px_ranges_t	*rp = px_p->px_ranges_p;
 	uint64_t	range_prop, base_addr;
 	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);

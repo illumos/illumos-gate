@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +75,7 @@ px_err_bit_desc_t px_err_cb_tbl[] = {
 
 	/* JBC Jbusint IN - see io erpt doc, section 1.3 */
 	{ JBC_BIT_DESC(UE_ASYN,	fatal_gos,	jbc_in) },
-	{ JBC_BIT_DESC(CE_ASYN,	jbc_jbusint_in,	jbc_in) },
+	{ JBC_BIT_DESC(CE_ASYN,	non_fatal,	jbc_in) },
 	{ JBC_BIT_DESC(JTE,	fatal_gos,	jbc_in) },
 	{ JBC_BIT_DESC(JBE,	jbc_jbusint_in,	jbc_in) },
 	{ JBC_BIT_DESC(JUE,	jbc_jbusint_in,	jbc_in) },
@@ -493,16 +492,10 @@ px_err_cb_intr(caddr_t arg)
 {
 	px_fault_t	*px_fault_p = (px_fault_t *)arg;
 	dev_info_t	*rpdip = px_fault_p->px_fh_dip;
-	dev_info_t	*leafdip;
 	px_t		*px_p = DIP_TO_STATE(rpdip);
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err = PX_OK;
 	int		ret = DDI_FM_OK;
 	int		fatal = 0;
-	int		nonfatal = 0;
-	int		unknown = 0;
-	int		i;
-	boolean_t	chkjbc = B_TRUE;
 	ddi_fm_error_t	derr;
 
 	/* Create the derr */
@@ -511,43 +504,27 @@ px_err_cb_intr(caddr_t arg)
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
-	/* send ereport/handle/clear for ALL fire leaves */
-	for (i = 0; i < PX_CB_MAX_LEAF; i++) {
-		if ((px_p = cb_p->xbc_px_list[i]) == NULL)
-			continue;
+	err |= px_err_handle(px_p, &derr, PX_INTR_CALL, B_TRUE);
 
-		err |= px_err_handle(px_p, &derr, PX_INTR_CALL, chkjbc);
-		chkjbc = B_FALSE;
-	}
-
-	/* Check all child devices for errors on ALL fire leaves */
-	for (i = 0; i < PX_CB_MAX_LEAF; i++) {
-		if ((px_p = cb_p->xbc_px_list[i]) != NULL) {
-			leafdip = px_p->px_dip;
-			ret = ndi_fm_handler_dispatch(leafdip, NULL, &derr);
-			switch (ret) {
-			case DDI_FM_FATAL:
-				fatal++;
-				break;
-			case DDI_FM_NONFATAL:
-				nonfatal++;
-				break;
-			case DDI_FM_UNKNOWN:
-				unknown++;
-				break;
-			default:
-				break;
-			}
-		}
+	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
+	switch (ret) {
+	case DDI_FM_FATAL:
+		fatal++;
+		break;
+	case DDI_FM_NONFATAL:
+	case DDI_FM_UNKNOWN:
+	default:
+		break;
 	}
 
 	/* Set the intr state to idle for the leaf that received the mondo */
+
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 
 	/*
 	 * PX_FATAL_HW error is diagnosed after system recovered from
@@ -575,7 +552,6 @@ px_err_dmc_pec_intr(caddr_t arg)
 	px_fault_t	*px_fault_p = (px_fault_t *)arg;
 	dev_info_t	*rpdip = px_fault_p->px_fh_dip;
 	px_t		*px_p = DIP_TO_STATE(rpdip);
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err = PX_OK;
 	int		ret = DDI_FM_OK;
 	ddi_fm_error_t	derr;
@@ -586,7 +562,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
 	/* send ereport/handle/clear fire registers */
 	err |= px_err_handle(px_p, &derr, PX_INTR_CALL, B_TRUE);
@@ -598,7 +574,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	(void) px_lib_intr_setstate(rpdip, px_fault_p->px_fh_sysino,
 	    INTR_IDLE_STATE);
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 
 	/*
 	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
@@ -719,11 +695,10 @@ int
 px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
     boolean_t chkjbc)
 {
-	px_cb_t			*cb_p = px_p->px_cb_p; /* for fm_mutex */
 	px_err_ss_t		ss;
 	int			err = PX_OK;
 
-	ASSERT(MUTEX_HELD(&cb_p->xbc_fm_mutex));
+	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
 	/* snap shot the current fire registers */
 	px_err_snapshot(px_p, &ss, chkjbc);
@@ -805,7 +780,6 @@ static int
 px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 {
 	dev_info_t		*rpdip = px_p->px_dip;
-	px_cb_t			*cb_p = px_p->px_cb_p; /* for fm_mutex */
 	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t			csr_base;
 	px_err_reg_desc_t	*err_reg_tbl;
@@ -822,7 +796,7 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 	int			err = PX_OK;
 	int			biterr;
 
-	ASSERT(MUTEX_HELD(&cb_p->xbc_fm_mutex));
+	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
 	/* send erport/handle/clear JBC errors */
 	for (reg_id = 0; reg_id < PX_ERR_REG_KEYS; reg_id += 1) {

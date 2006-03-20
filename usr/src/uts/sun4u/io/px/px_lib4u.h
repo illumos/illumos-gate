@@ -64,6 +64,22 @@ typedef enum {
  *
  * SUN4U px specific data structure.
  */
+
+/* Control block soft state structure */
+typedef struct px_cb_list {
+	px_t			*pxp;
+	struct px_cb_list	*next;
+} px_cb_list_t;
+
+typedef struct px_cb {
+	px_cb_list_t	*pxl;		/* linked list px */
+	kmutex_t	cb_mutex;	/* lock for CB */
+	sysino_t	sysino;		/* proxy sysino */
+	cpuid_t		cpuid;		/* proxy cpuid */
+	int		attachcnt;	/* number of attached px */
+	uint_t		(*px_cb_func)(caddr_t); /* CB intr dispatcher */
+} px_cb_t;
+
 typedef struct pxu {
 	uint32_t	chip_id;
 	uint8_t		portid;
@@ -71,6 +87,7 @@ typedef struct pxu {
 	uint32_t	tsb_size;
 	uint64_t	*tsb_vaddr;
 	void		*msiq_mapped_p;
+	px_cb_t		*px_cb_p;
 
 	/* Soft state for suspend/resume */
 	uint64_t	*pec_config_state;
@@ -84,6 +101,8 @@ typedef struct pxu {
 	caddr_t			px_address[4];
 	ddi_acc_handle_t	px_ac[4];
 } pxu_t;
+
+#define	PX2CB(px_p) (((pxu_t *)px_p->px_plat_p)->px_cb_p)
 
 /*
  * Event Queue data structure.

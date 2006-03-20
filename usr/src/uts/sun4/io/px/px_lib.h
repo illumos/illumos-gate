@@ -150,10 +150,14 @@ extern int px_lib_msg_setvalid(dev_info_t *dip, pcie_msg_type_t msg_type,
     pcie_msg_valid_state_t msg_valid_state);
 
 /*
- * CPR Suspend/Resume Functions:
+ * PM/CPR Functions:
  */
 extern int px_lib_suspend(dev_info_t *dip);
 extern void px_lib_resume(dev_info_t *dip);
+extern void px_cpr_add_callb(px_t *);
+extern void px_cpr_rem_callb(px_t *);
+extern int px_lib_pmctl(int cmd, px_t *px_p);
+extern uint_t px_pmeq_intr(caddr_t arg);
 
 /*
  * PCI tool Functions:
@@ -164,18 +168,6 @@ extern int px_lib_tools_bus_reg_ops(dev_info_t *dip, void *arg, int cmd,
     int mode);
 extern int px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd,
     int mode);
-
-/*
- * PPM interface
- */
-extern int px_lib_pmctl(int cmd, px_t *px_p);
-
-/*
- * Misc Functions:
- */
-extern uint64_t px_lib_get_cb(dev_info_t *dip);
-extern void px_lib_set_cb(dev_info_t *dip, uint64_t val);
-extern uint_t px_pmeq_intr(caddr_t arg);
 
 /*
  * Peek and poke access ddi_ctlops helper functions
@@ -199,6 +191,9 @@ typedef struct px_fault {
 
 extern int px_err_add_intr(px_fault_t *px_fault_p);
 extern void px_err_rem_intr(px_fault_t *px_fault_p);
+extern int px_cb_add_intr(px_fault_t *);
+extern void px_cb_rem_intr(px_fault_t *);
+extern void px_cb_intr_redist(px_t *);
 extern uint32_t px_fab_get(px_t *px_p, pcie_req_id_t bdf,
     uint16_t offset);
 extern void px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,

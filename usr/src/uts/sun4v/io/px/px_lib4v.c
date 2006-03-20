@@ -1038,20 +1038,6 @@ px_lib_resume(dev_info_t *dip)
  * Currently unsupported by hypervisor and all functions are noops.
  */
 /*ARGSUSED*/
-uint64_t
-px_lib_get_cb(dev_info_t *dip)
-{
-	return (DDI_SUCCESS);
-}
-
-/*ARGSUSED*/
-void
-px_lib_set_cb(dev_info_t *dip, uint64_t val)
-{
-	/* Noop */
-}
-
-/*ARGSUSED*/
 static int
 px_lib_config_get(dev_info_t *dip, pci_device_t bdf, pci_config_offset_t off,
     uint8_t size, pci_cfg_data_t *data_p)
@@ -1420,7 +1406,6 @@ static void
 px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag)
 {
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
-	px_cb_t	*cb_p = px_p->px_cb_p;
 	ddi_fm_error_t derr;
 
 	derr.fme_status = DDI_FM_NONFATAL;
@@ -1431,11 +1416,11 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag)
 	if (hp)
 		hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
 	(void) ndi_fm_handler_dispatch(px_p->px_dip, NULL, &derr);
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 }
 
 
@@ -1761,7 +1746,6 @@ px_err_add_intr(px_fault_t *px_fault_p)
 	return (ret);
 }
 
-
 /* remove interrupt vector */
 void
 px_err_rem_intr(px_fault_t *px_fault_p)
@@ -1774,6 +1758,24 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
 }
 
+int
+px_cb_add_intr(px_fault_t *f_p)
+{
+	return (px_err_add_intr(f_p));
+}
+
+void
+px_cb_rem_intr(px_fault_t *f_p)
+{
+	px_err_rem_intr(f_p);
+}
+
+void
+px_cb_intr_redist(px_t *px_p)
+{
+	px_ib_intr_dist_en(px_p->px_dip, intr_dist_cpuid(),
+	    px_p->px_inos[PX_INTR_XBC], B_FALSE);
+}
 
 #ifdef FMA
 void

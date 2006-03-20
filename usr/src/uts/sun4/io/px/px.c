@@ -57,6 +57,8 @@ static int px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int px_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 	void *arg, void **result);
+static int px_cb_attach(px_t *);
+static void px_cb_detach(px_t *);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
 
@@ -414,7 +416,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * Make sure we are currently attached
 	 */
 	if (px_p->px_state != PX_ATTACHED) {
-		DBG(DBG_DETACH, dip, "failed - instance not attached\n");
+		DBG(DBG_DETACH, dip, "Instance not attached\n");
 		return (DDI_FAILURE);
 	}
 
@@ -496,6 +498,31 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&px_p->px_mutex);
 		return (DDI_FAILURE);
 	}
+}
+
+int
+px_cb_attach(px_t *px_p)
+{
+	px_fault_t	*fault_p = &px_p->px_cb_fault;
+	dev_info_t	*dip = px_p->px_dip;
+	sysino_t	sysino;
+
+	if (px_lib_intr_devino_to_sysino(dip,
+	    px_p->px_inos[PX_INTR_XBC], &sysino) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	fault_p->px_fh_dip = dip;
+	fault_p->px_fh_sysino = sysino;
+	fault_p->px_err_func = px_err_cb_intr;
+	fault_p->px_intr_ino = px_p->px_inos[PX_INTR_XBC];
+
+	return (px_cb_add_intr(fault_p));
+}
+
+void
+px_cb_detach(px_t *px_p)
+{
+	px_cb_rem_intr(&px_p->px_cb_fault);
 }
 
 /*

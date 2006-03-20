@@ -77,7 +77,12 @@ typedef struct px_nexus_regspec {
 	uint64_t size;
 } px_nexus_regspec_t;
 
-typedef enum { PX_NEW, PX_ATTACHED, PX_DETACHED, PX_SUSPENDED } px_state_t;
+typedef enum {
+	PX_ATTACHED = 1,
+	PX_DETACHED,
+	PX_SUSPENDED
+} px_state_t;
+
 enum { PX_INTR_XBC, PX_INTR_PEC };
 
 #define	PX_ATTACH_RETCODE(obj, op, err) \
@@ -102,8 +107,7 @@ struct px {
 	 */
 	dev_info_t *px_dip;		/* devinfo structure */
 	devhandle_t px_dev_hdl;		/* device handle */
-	px_cb_t *px_cb_p;		/* XBC block */
-	px_ib_t *px_ib_p;			/* interrupt block */
+	px_ib_t *px_ib_p;		/* interrupt block */
 	px_pec_t *px_pec_p;		/* PEC block */
 	px_mmu_t *px_mmu_p;		/* IOMMU block */
 
@@ -117,11 +121,12 @@ struct px {
 	int px_inos_len;		/* "interrupts" length */
 
 	/* Error handling */
-	px_fault_t px_fault;
-	px_fault_t px_cb_fault;
+	px_fault_t	px_fault;
+	px_fault_t	px_cb_fault;
 
 	/* FMA */
-	int px_fm_cap;
+	int		px_fm_cap;
+	kmutex_t	px_fm_mutex;
 	ddi_iblock_cookie_t px_fm_ibc;
 
 	uint32_t	px_dev_caps;

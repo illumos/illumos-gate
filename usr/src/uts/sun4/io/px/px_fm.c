@@ -104,6 +104,12 @@ px_fm_attach(px_t *px_p)
 	    (DDI_FM_ERRCB_CAPABLE | DDI_FM_EREPORT_CAPABLE));
 
 	/*
+	 * Initialize lock to synchronize fabric error handling
+	 */
+	mutex_init(&px_p->px_fm_mutex, NULL, MUTEX_DRIVER,
+	    (void *)px_p->px_fm_ibc);
+
+	/*
 	 * register error callback in parent
 	 */
 	ddi_fm_handler_register(px_p->px_dip, px_fm_callback, px_p);
@@ -118,6 +124,7 @@ void
 px_fm_detach(px_t *px_p)
 {
 	ddi_fm_handler_unregister(px_p->px_dip);
+	mutex_destroy(&px_p->px_fm_mutex);
 	ddi_fm_fini(px_p->px_dip);
 }
 
@@ -326,43 +333,32 @@ int
 px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
 	px_t	*px_p = (px_t *)impl_data;
-	px_cb_t	*cb_p = px_p->px_cb_p;
 	int	err = PX_OK;
 	int	fatal = 0;
 	int	nonfatal = 0;
 	int	unknown = 0;
 	int	ret = DDI_FM_OK;
-	int	i;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
-	for (i = 0; i < PX_CB_MAX_LEAF; i++) {
-		px_p = cb_p->xbc_px_list[i];
-		if (px_p != NULL)
-			err |= px_err_handle(px_p, derr, PX_TRAP_CALL,
-			    (i == 0));
+	err = px_err_handle(px_p, derr, PX_TRAP_CALL, B_TRUE);
+	ret = ndi_fm_handler_dispatch(px_p->px_dip, NULL, derr);
+
+	mutex_exit(&px_p->px_fm_mutex);
+
+	switch (ret) {
+	case DDI_FM_FATAL:
+		fatal++;
+		break;
+	case DDI_FM_NONFATAL:
+		nonfatal++;
+		break;
+	case DDI_FM_UNKNOWN:
+		unknown++;
+		break;
+	default:
+		break;
 	}
-
-	for (i = 0; i < PX_CB_MAX_LEAF; i++) {
-		px_p = cb_p->xbc_px_list[i];
-		if (px_p != NULL) {
-			ret = ndi_fm_handler_dispatch(px_p->px_dip, NULL, derr);
-			switch (ret) {
-			case DDI_FM_FATAL:
-				fatal++;
-				break;
-			case DDI_FM_NONFATAL:
-				nonfatal++;
-				break;
-			case DDI_FM_UNKNOWN:
-				unknown++;
-				break;
-			default:
-				break;
-			}
-		}
-	}
-	mutex_exit(&cb_p->xbc_fm_mutex);
 
 	ret = (fatal != 0) ? DDI_FM_FATAL :
 	    ((nonfatal != 0) ? DDI_FM_NONFATAL :
@@ -774,11 +770,10 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
     pcie_req_id_t rid)
 {
 	dev_info_t	*rpdip = px_p->px_dip;
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err = PX_OK, ret = DDI_FM_OK, fab_err = DDI_FM_OK;
 	ddi_fm_error_t	derr;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -795,7 +790,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
 	/* Check all child devices for errors */
 	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 
 	/*
 	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
@@ -838,10 +833,9 @@ void
 px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr)
 {
 	px_pec_t 	*pec_p = px_p->px_pec_p;
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		acctype = pec_p->pec_safeacc_type;
 
-	ASSERT(MUTEX_HELD(&cb_p->xbc_fm_mutex));
+	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
 	if (derr->fme_flag != DDI_FM_ERR_UNEXPECTED) {
 		return;

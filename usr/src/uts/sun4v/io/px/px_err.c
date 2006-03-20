@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,11 +125,10 @@ px_err_common_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 {
 	px_t		*px_p = DIP_TO_STATE(fault_p->px_fh_dip);
 	dev_info_t	*rpdip = px_p->px_dip;
-	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err, ret;
 	ddi_fm_error_t	derr;
 
-	mutex_enter(&cb_p->xbc_fm_mutex);
+	mutex_enter(&px_p->px_fm_mutex);
 
 	/* Create the derr */
 	bzero(&derr, sizeof (ddi_fm_error_t));
@@ -150,11 +148,11 @@ px_err_common_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	/* Set the intr state to idle for the leaf that received the mondo */
 	if (px_lib_intr_setstate(rpdip, fault_p->px_fh_sysino,
 		INTR_IDLE_STATE) != DDI_SUCCESS) {
-		mutex_exit(&cb_p->xbc_fm_mutex);
+		mutex_exit(&px_p->px_fm_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
-	mutex_exit(&cb_p->xbc_fm_mutex);
+	mutex_exit(&px_p->px_fm_mutex);
 
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
 		PX_FM_PANIC("Fatal System Bus Error has occurred\n");
@@ -270,6 +268,12 @@ px_cb_check_errors(dev_info_t *dip, ddi_fm_error_t *derr,
 		break;
 	case OP_UNKNOWN:
 		err = PX_NONFATAL;
+		if ((epkt->rc_descr.cond == CND_UNMAP) ||
+		    (epkt->rc_descr.cond == CND_UE) ||
+		    (epkt->rc_descr.cond == CND_INT) ||
+		    (epkt->rc_descr.cond == CND_ILL))
+			err |= PX_FATAL_GOS;
+
 		if (epkt->rc_descr.M == 1) {
 			int	ret1, ret2;
 

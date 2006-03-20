@@ -280,11 +280,12 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 
 	/* Redistribute internal interrupts */
 	if (weight == 0) {
-		devino_t	ino_pec = px_p->px_inos[PX_INTR_PEC];
-
 		mutex_enter(&ib_p->ib_intr_lock);
-		px_ib_intr_dist_en(dip, intr_dist_cpuid(), ino_pec, B_FALSE);
+		px_ib_intr_dist_en(dip, intr_dist_cpuid(),
+		    px_p->px_inos[PX_INTR_PEC], B_FALSE);
 		mutex_exit(&ib_p->ib_intr_lock);
+
+		px_cb_intr_redist(px_p);
 	}
 
 	/* Redistribute device interrupts */
