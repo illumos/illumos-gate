@@ -235,7 +235,7 @@ px_msiq_intr(caddr_t arg)
 	msiqhead_t	curr_msiq_rec_cnt, new_msiq_rec_cnt;
 	msgcode_t	msg_code;
 	px_ih_t		*ih_p;
-	int		ret;
+	int		i, ret;
 
 	DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: msiq_id =%x ino=%x pil=%x "
 	    "ih_size=%x ih_lst=%x\n", msiq_p->msiq_id, ino_p->ino_ino,
@@ -294,15 +294,15 @@ px_msiq_intr(caddr_t arg)
 			goto next_rec;
 		}
 
-		ih_p = ino_p->ino_ih_start;
-
 		/*
 		 * Scan through px_ih_t linked list, searching for the
 		 * right px_ih_t, matching MSIQ record data.
 		 */
-		while ((ih_p) && (ih_p->ih_msg_code != msg_code) &&
-		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type))
-			ih_p = ih_p->ih_next;
+		for (i = 0, ih_p = ino_p->ino_ih_start;
+		    ih_p && (i < ino_p->ino_ih_size) &&
+		    ((ih_p->ih_msg_code != msg_code) ||
+		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type));
+		    ih_p = ih_p->ih_next, i++);
 
 		if ((ih_p->ih_msg_code == msg_code) &&
 		    (ih_p->ih_rec_type == msiq_rec_p->msiq_rec_type)) {
@@ -608,11 +608,10 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	    "handle=%p\n", dip, rdip, intr_op, hdlp);
 
 	/* Check for MSI64 support */
-	if (hdlp->ih_cap & DDI_INTR_FLAG_MSI64) {
+	if ((hdlp->ih_cap & DDI_INTR_FLAG_MSI64) && msi_state_p->msi_addr64) {
 		msiq_rec_type = MSI64_REC;
 		msi_type = MSI64_TYPE;
-		msi_addr = msi_state_p->msi_addr64 ?
-		    msi_state_p->msi_addr64:msi_state_p->msi_addr32;
+		msi_addr = msi_state_p->msi_addr64;
 	} else {
 		msiq_rec_type = MSI32_REC;
 		msi_type = MSI32_TYPE;

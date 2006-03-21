@@ -874,7 +874,8 @@ ddi_intr_set_mask(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
-	if (!(hdlp->ih_cap & DDI_INTR_FLAG_MASKABLE)) {
+	if ((hdlp->ih_state != DDI_IHDL_STATE_ENABLE) ||
+	    (!(hdlp->ih_cap & DDI_INTR_FLAG_MASKABLE))) {
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
@@ -899,7 +900,8 @@ ddi_intr_clr_mask(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
-	if (!(hdlp->ih_cap & DDI_INTR_FLAG_MASKABLE)) {
+	if ((hdlp->ih_state != DDI_IHDL_STATE_ENABLE) ||
+	    (!(hdlp->ih_cap & DDI_INTR_FLAG_MASKABLE))) {
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
