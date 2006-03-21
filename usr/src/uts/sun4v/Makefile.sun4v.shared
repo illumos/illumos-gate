@@ -149,12 +149,8 @@ CTFMERGE_GUDIR	= sun4v
 #
 #	machine specific optimization, override default in Makefile.master
 #
-QTOOLS_ROOT=		$(SPRO_ROOT)/sun4v
-sparc_AS=		$(QTOOLS_ROOT)/qas -xregsym=no
-sparcv9_AS=		$(QTOOLS_ROOT)/qas -xregsym=no
-
 CC_XARCH	= -xarch=v9a
-AS_XARCH	= -xarch=v9d
+AS_XARCH	= -xarch=v9v
 COPTIMIZE	= -xO3
 CCMODE		= -Xa
 

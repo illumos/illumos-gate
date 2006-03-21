@@ -53,10 +53,6 @@ STANDLIBS += $(ROOT)/usr/lib/sparcv9/libstanddisasm.so
 KMDB_FPTEST = \
 	$(FINDFP) -x kaif_resume -x kaif_trap_common $@
 
-QTOOLS_ROOT=		$(SPRO_ROOT)/sun4v
-sparc_AS=		$(QTOOLS_ROOT)/qas -xregsym=no
-sparcv9_AS=		$(QTOOLS_ROOT)/qas -xregsym=no
-
 #
 # Uncomment the following line to enable trap accounting.  A DTLB translation
 # will be added for the trap table, and each handler installed by KMDB will use
@@ -69,7 +65,7 @@ CPPFLAGS += $(TRAPCOUNT)
 CPPFLAGS += -Dsun4v
 CPPFLAGS += -I$(SRC)/cmd/mdb/sparc
 CPPFLAGS += -I$(SRC)/cmd/mdb/sparc/v9 -I$(SRC)/cmd/mdb/sparc/v9/kmdb
-ASFLAGS += -xarch=v9d -I$(SRC)/uts/sun4 -I$(SRC)/uts/sun4v $(TRAPCOUNT)
+ASFLAGS += -xarch=v9v -I$(SRC)/uts/sun4 -I$(SRC)/uts/sun4v $(TRAPCOUNT)
 ASFLAGS += -Dsun4v
 ASFLAGS += -I$(SRC)/cmd/mdb/sparc
 ASFLAGS += -I$(SRC)/cmd/mdb/sparc/v9 -I$(SRC)/cmd/mdb/sparc/v9/kmdb
