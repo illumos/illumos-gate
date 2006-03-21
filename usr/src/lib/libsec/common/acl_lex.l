@@ -177,7 +177,7 @@ INHERIT_STR [fdinFS-]+
 				return (NL);
 			}
 <TS>.			{
-				if (grab_string(":\n") != 0) {
+				if (grab_string(":,\n") != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve"
 					    " error string.\n"));
@@ -222,7 +222,7 @@ INHERIT_STR [fdinFS-]+
 <NS>.			{
 				int error;
 				
-				error = grab_string(":\n");
+				error = grab_string(":,\n");
 				if (error != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
 					    "Invalid user/group "
@@ -306,7 +306,7 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = ACE_SYNCHRONIZE;
 				return (ACE_PERM);
 			}
-<PS>{PERM_STR}		{
+<PS>{PERM_STR}/[:,\n]	{
 				int c;
 
 				c = input();
@@ -355,7 +355,7 @@ INHERIT_STR [fdinFS-]+
 				return (ERROR);
 			}
 <PS>. 			{
-				if (grab_string("/:\n") != 0) {
+				if (grab_string("/:,\n") != 0) {
 					acl_error(dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve"
 					    " error string.\n"));
@@ -363,7 +363,7 @@ INHERIT_STR [fdinFS-]+
 					return (ERROR);
 				}
 				acl_error(dgettext(TEXT_DOMAIN,
-				    "Invalid permission '%s' "
+				    "Invalid permission(s) '%s' "
 				    "specified.\n"), yylval.str); 
 				free(yylval.str);
 				yylval.val = EACL_PERM_MASK_ERROR;
@@ -413,7 +413,7 @@ INHERIT_STR [fdinFS-]+
 			}
 <AS>.			{
 				if (yytext[0] != '\n' && yytext[0] != '\0') {
-					if (grab_string(":\n") != 0) {
+					if (grab_string(":,\n") != 0) {
 						acl_error(dgettext(TEXT_DOMAIN,
 						    "Failed to "
 						    "retrieve error "
@@ -512,7 +512,7 @@ INHERIT_STR [fdinFS-]+
 			}
 <AIS>.			{
 				if (yytext[0] != '\n' && yytext[0] != '\0') {
-					if (grab_string(":\n") != 0) {
+					if (grab_string(":,\n") != 0) {
 						acl_error(dgettext(TEXT_DOMAIN,
 						    "Failed to "
 						    "retrieve error "
@@ -537,7 +537,7 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = EACL_INVALID_ACCESS_TYPE;
 				return (ERROR);
 			}
-<US>{ID}		{
+<US>{ID}/[,\n]		{
 				BEGIN ES;
 				yylval.val = atoi(yytext);
 				return (ID);
@@ -586,7 +586,7 @@ INHERIT_STR [fdinFS-]+
 				return (COMMA);
 			}
 <ES>.			{
-				if (grab_string("/:\n") != 0) {
+				if (grab_string("/:,\n") != 0) {
 					acl_error(
 					    dgettext(TEXT_DOMAIN,
 					    "Failed to retrieve error"
@@ -609,8 +609,13 @@ INHERIT_STR [fdinFS-]+
 
 
 /*
- * pull string up to terminator of off input string.
+ * Pull string up to terminator off of input string.
  * used for retrieving illegal data in ACL specification.
+ *
+ * The first set of characters is retrieved from yytext.
+ * subseequent characters are pulled from the input stream,
+ * until either EOF or one of the requested terminators is scene.
+ * Result is returned in yylval.str which is malloced.
  */
 int
 grab_string(char *terminators)
@@ -645,7 +650,7 @@ grab_string(char *terminators)
 			if (done)
 				break;
 				
-			if (cnt >= alloced) {
+			if (cnt + 1 >= alloced) {
 				yylval.str = realloc(yylval.str,
 				    alloced + 80);
 					alloced += 80;
