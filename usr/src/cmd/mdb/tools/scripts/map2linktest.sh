@@ -90,3 +90,8 @@ nawk '
 echo "void _init(void) {}"
 echo "void _info(void) {}"
 echo "void _fini(void) {}"
+#
+# The SunStudio compiler may generate calls to _memcpy and so we
+# need to make sure that the correct symbol exists for these calls.
+#
+echo "void _memcpy(void) {}"

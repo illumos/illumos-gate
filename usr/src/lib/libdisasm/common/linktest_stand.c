@@ -40,3 +40,4 @@ void strlcat(void) {}
 void strncpy(void) {}
 void strncmp(void) {}
 void memcpy(void) {}
+void _memcpy(void) {}

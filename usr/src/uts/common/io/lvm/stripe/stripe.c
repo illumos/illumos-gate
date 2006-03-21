@@ -58,7 +58,7 @@
 md_ops_t		stripe_md_ops;
 #ifndef	lint
 char			_depends_on[] = "drv/md";
-static md_ops_t		*md_interface_ops = &stripe_md_ops;
+md_ops_t		*md_interface_ops = &stripe_md_ops;
 #endif
 
 extern unit_t		md_nunits;
