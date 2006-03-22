@@ -2304,15 +2304,30 @@ The value part of the map can contain:
 			it but causing the default action.
 	### any text	where ### is an RFC 821 compliant error code and
 			"any text" is a message to return for the command.
-			The string should be quoted to avoid surprises,
-			e.g., sendmail may remove spaces otherwise.
+			The entire string should be quoted to avoid
+			surprises:
+
+				"### any text"
+
+			Otherwise sendmail formats the text as email
+			addresses, e.g., it may remove spaces.
 			This type is deprecated, use one of the two
 			ERROR:  entries below instead.
 	ERROR:### any text
 			as above, but useful to mark error messages as such.
+			If quotes need to be used to avoid modifications
+			(see above), they should be placed like this:
+
+				ERROR:"### any text"
+
 	ERROR:D.S.N:### any text
 			where D.S.N is an RFC 1893 compliant error code
-			and the rest as above.
+			and the rest as above.  If quotes need to be used
+			to avoid modifications, they should be placed
+			like this:
+
+				ERROR:D.S.N:"### any text"
+
 	QUARANTINE:any text
 			Quarantine the message using the given text as the
 			quarantining reason.
@@ -2579,7 +2594,7 @@ tokenization.  It might be simpler to use a regex map and apply it
 to $&{currHeader}.
 2. There are no default rulesets coming with this distribution of
 sendmail.  You can write your own or search the WWW for examples.
-3. When using a default ruleset for headers, the name of the header 
+3. When using a default ruleset for headers, the name of the header
 currently being checked can be found in the $&{hdr_name} macro.
 
 After all of the headers are read, the check_eoh ruleset will be called for
@@ -4197,5 +4212,5 @@ M4 DIVERSIONS
    8	DNS based blacklists
    9	special local rulesets (1 and 2)
 
-$Revision: 8.701 $, Last updated $Date: 2005/09/16 20:18:14 $
+$Revision: 8.703 $, Last updated $Date: 2006/01/25 03:23:52 $
 ident	"%Z%%M%	%I%	%E% SMI"

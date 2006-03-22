@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -19,7 +19,7 @@
 # include <libmilter/mfdef.h>
 #endif /* MILTER */
 
-SM_RCSID("@(#)$Id: srvrsmtp.c,v 8.909 2005/06/14 23:33:21 ca Exp $")
+SM_RCSID("@(#)$Id: srvrsmtp.c,v 8.922 2006/02/28 00:42:13 ca Exp $")
 
 #include <sm/time.h>
 #include <sm/fdset.h>
@@ -38,6 +38,9 @@ static SSL_CTX	*srv_ctx = NULL;	/* TLS server context */
 static SSL	*srv_ssl = NULL;	/* per connection context */
 
 static bool	tls_ok_srv = false;
+#if _FFR_DM_ONE
+static bool	NotFirstDelivery = false;
+#endif /* _FFR_DM_ONE */
 
 extern void	tls_set_verify __P((SSL_CTX *, SSL *, bool));
 # define TLS_VERIFY_CLIENT() tls_set_verify(srv_ctx, srv_ssl, \
@@ -223,9 +226,6 @@ static char	*CurSmtpClient;		/* who's at the other end of channel */
 #ifndef MAXBADCOMMANDS
 # define MAXBADCOMMANDS 25	/* maximum number of bad commands */
 #endif /* ! MAXBADCOMMANDS */
-#ifndef MAXNOOPCOMMANDS
-# define MAXNOOPCOMMANDS 20	/* max "noise" commands before slowdown */
-#endif /* ! MAXNOOPCOMMANDS */
 #ifndef MAXHELOCOMMANDS
 # define MAXHELOCOMMANDS 3	/* max HELO/EHLO commands before slowdown */
 #endif /* ! MAXHELOCOMMANDS */
@@ -294,6 +294,24 @@ static bool	smtp_data __P((SMTP_T *, ENVELOPE *));
 									\
 		switch (state)						\
 		{							\
+		  case SMFIR_SHUTDOWN:					\
+			if (MilterLogLevel > 3)				\
+			{						\
+				sm_syslog(LOG_INFO, e->e_id,		\
+					  "Milter: %s=%s, reject=421, errormode=4",	\
+					  str, addr);			\
+				LogUsrErrs = false;			\
+			}						\
+			{						\
+				bool tsave = QuickAbort;		\
+									\
+				QuickAbort = false;			\
+				usrerr("421 4.3.0 closing connection");	\
+				QuickAbort = tsave;			\
+				e->e_sendqueue = NULL;			\
+				goto doquit;				\
+			}						\
+			break;						\
 		  case SMFIR_REPLYCODE:					\
 			if (MilterLogLevel > 3)				\
 			{						\
@@ -507,7 +525,6 @@ smtp(nullserver, d_flags, e)
 #endif /* SASL */
 	int r;
 #if STARTTLS
-	int fdfl;
 	int rfd, wfd;
 	volatile bool tls_active = false;
 	volatile bool smtps = bitnset(D_SMTPS, d_flags);
@@ -813,6 +830,19 @@ smtp(nullserver, d_flags, e)
 			tempfail = true;
 			smtp.sm_milterize = false;
 			break;
+
+		  case SMFIR_SHUTDOWN:
+			if (MilterLogLevel > 3)
+				sm_syslog(LOG_INFO, e->e_id,
+					  "Milter: initialization failed, closing connection");
+			tempfail = true;
+			smtp.sm_milterize = false;
+			message("421 4.7.0 %s closing connection",
+					MyHostName);
+
+			/* arrange to ignore send list */
+			e->e_sendqueue = NULL;
+			goto doquit;
 		}
 	}
 
@@ -1715,97 +1745,26 @@ smtp(nullserver, d_flags, e)
 #  define SSL_ACC(s)	SSL_accept(s)
 
 			tlsstart = curtime();
-			fdfl = fcntl(rfd, F_GETFL);
-			if (fdfl != -1)
-				fcntl(rfd, F_SETFL, fdfl|O_NONBLOCK);
   ssl_retry:
 			if ((r = SSL_ACC(srv_ssl)) <= 0)
 			{
-				int i;
-				bool timedout;
-				time_t left;
-				time_t now = curtime();
-				struct timeval tv;
+				int i, ssl_err;
 
-				/* what to do in this case? */
-				i = SSL_get_error(srv_ssl, r);
+				ssl_err = SSL_get_error(srv_ssl, r);
+				i = tls_retry(srv_ssl, rfd, wfd, tlsstart,
+						TimeOuts.to_starttls, ssl_err,
+						"server");
+				if (i > 0)
+					goto ssl_retry;
 
-				/*
-				**  For SSL_ERROR_WANT_{READ,WRITE}:
-				**  There is no SSL record available yet
-				**  or there is only a partial SSL record
-				**  removed from the network (socket) buffer
-				**  into the SSL buffer. The SSL_accept will
-				**  only succeed when a full SSL record is
-				**  available (assuming a "real" error
-				**  doesn't happen). To handle when a "real"
-				**  error does happen the select is set for
-				**  exceptions too.
-				**  The connection may be re-negotiated
-				**  during this time so both read and write
-				**  "want errors" need to be handled.
-				**  A select() exception loops back so that
-				**  a proper SSL error message can be gotten.
-				*/
-
-				left = TimeOuts.to_starttls - (now - tlsstart);
-				timedout = left <= 0;
-				if (!timedout)
-				{
-					tv.tv_sec = left;
-					tv.tv_usec = 0;
-				}
-
-				if (!timedout && FD_SETSIZE > 0 &&
-				    (rfd >= FD_SETSIZE ||
-				     (i == SSL_ERROR_WANT_WRITE &&
-				      wfd >= FD_SETSIZE)))
-				{
-					if (LogLevel > 5)
-					{
-						sm_syslog(LOG_ERR, NOQID,
-							  "STARTTLS=server, error: fd %d/%d too large",
-							  rfd, wfd);
-						if (LogLevel > 8)
-							tlslogerr("server");
-					}
-					goto tlsfail;
-				}
-
-				/* XXX what about SSL_pending() ? */
-				if (!timedout && i == SSL_ERROR_WANT_READ)
-				{
-					fd_set ssl_maskr, ssl_maskx;
-
-					FD_ZERO(&ssl_maskr);
-					FD_SET(rfd, &ssl_maskr);
-					FD_ZERO(&ssl_maskx);
-					FD_SET(rfd, &ssl_maskx);
-					if (select(rfd + 1, &ssl_maskr, NULL,
-						   &ssl_maskx, &tv) > 0)
-						goto ssl_retry;
-				}
-				if (!timedout && i == SSL_ERROR_WANT_WRITE)
-				{
-					fd_set ssl_maskw, ssl_maskx;
-
-					FD_ZERO(&ssl_maskw);
-					FD_SET(wfd, &ssl_maskw);
-					FD_ZERO(&ssl_maskx);
-					FD_SET(rfd, &ssl_maskx);
-					if (select(wfd + 1, NULL, &ssl_maskw,
-						   &ssl_maskx, &tv) > 0)
-						goto ssl_retry;
-				}
 				if (LogLevel > 5)
 				{
 					sm_syslog(LOG_WARNING, NOQID,
-						  "STARTTLS=server, error: accept failed=%d, SSL_error=%d, timedout=%d, errno=%d",
-						  r, i, (int) timedout, errno);
+						  "STARTTLS=server, error: accept failed=%d, SSL_error=%d, errno=%d, retry=%d",
+						  r, ssl_err, errno, i);
 					if (LogLevel > 8)
 						tlslogerr("server");
 				}
-tlsfail:
 				tls_ok_srv = false;
 				SSL_free(srv_ssl);
 				srv_ssl = NULL;
@@ -1819,9 +1778,6 @@ tlsfail:
 				e->e_sendqueue = NULL;
 				goto doquit;
 			}
-
-			if (fdfl != -1)
-				fcntl(rfd, F_SETFL, fdfl);
 
 			/* ignore return code for now, it's in {verify} */
 			(void) tls_get_info(srv_ssl, true,
@@ -2020,10 +1976,8 @@ tlsfail:
 				q = "accepting invalid domain name";
 			}
 
-			if (gothello)
-			{
+			if (gothello || smtp.sm_gotmail)
 				CLEAR_STATE(cmdbuf);
-			}
 
 #if MILTER
 			if (smtp.sm_milterlist && smtp.sm_milterize &&
@@ -2061,6 +2015,19 @@ tlsfail:
 					tempfail = true;
 					smtp.sm_milterize = false;
 					break;
+
+				  case SMFIR_SHUTDOWN:
+					if (MilterLogLevel > 3)
+						sm_syslog(LOG_INFO, e->e_id,
+							  "Milter: Milter: helo=%s, reject=421 4.7.0 %s closing connection",
+							  p, MyHostName);
+					tempfail = true;
+					smtp.sm_milterize = false;
+					message("421 4.7.0 %s closing connection",
+						MyHostName);
+					/* arrange to ignore send list */
+					e->e_sendqueue = NULL;
+					goto doquit;
 				}
 				if (response != NULL)
 					sm_free(response);
@@ -2497,7 +2464,11 @@ tlsfail:
 				goto rcpt_done;
 			}
 
-			if (e->e_sendmode != SM_DELIVER)
+			if (e->e_sendmode != SM_DELIVER
+#if _FFR_DM_ONE
+			    && (NotFirstDelivery || SM_DM_ONE != e->e_sendmode)
+#endif /* _FFR_DM_ONE */
+			   )
 				e->e_flags |= EF_VRFYONLY;
 
 #if MILTER
@@ -2922,7 +2893,7 @@ tlsfail:
 
 		  case CMDNOOP:		/* noop -- do nothing */
 			DELAY_CONN("NOOP");
-			STOP_IF_ATTACK(checksmtpattack(&n_noop, MAXNOOPCOMMANDS,
+			STOP_IF_ATTACK(checksmtpattack(&n_noop, MaxNOOPCommands,
 							true, "NOOP", e));
 			message("250 2.0.0 OK");
 			break;
@@ -2996,6 +2967,9 @@ doquit:
 			finis(true, true, ExitStat);
 			/* NOTREACHED */
 
+			/* just to avoid bogus warning from some compilers */
+			exit(EX_OSERR);
+
 		  case CMDVERB:		/* set verbose mode */
 			DELAY_CONN("VERB");
 			if (!bitset(SRV_OFFER_EXPN, features) ||
@@ -3005,7 +2979,7 @@ doquit:
 				message("502 5.7.0 Verbose unavailable");
 				break;
 			}
-			STOP_IF_ATTACK(checksmtpattack(&n_noop, MAXNOOPCOMMANDS,
+			STOP_IF_ATTACK(checksmtpattack(&n_noop, MaxNOOPCommands,
 							true, "VERB", e));
 			Verbose = 1;
 			set_delivery_mode(SM_DELIVER, e);
@@ -3066,7 +3040,8 @@ doquit:
 				MILTER_REPLY("unknown");
 				if (state == SMFIR_REPLYCODE ||
 				    state == SMFIR_REJECT ||
-				    state == SMFIR_TEMPFAIL)
+				    state == SMFIR_TEMPFAIL ||
+				    state == SMFIR_SHUTDOWN)
 				{
 					/* MILTER_REPLY already gave an error */
 					break;
@@ -3133,6 +3108,7 @@ smtp_data(smtp, e)
 	char *id;
 	char *oldid;
 	char buf[32];
+	bool rv = true;
 
 	SmtpPhase = "server DATA";
 	if (!smtp->sm_gotmail)
@@ -3206,6 +3182,18 @@ smtp_data(smtp, e)
 			}
 			usrerr(MSG_TEMPFAIL);
 			return true;
+
+		  case SMFIR_SHUTDOWN:
+			if (MilterLogLevel > 3)
+			{
+				sm_syslog(LOG_INFO, e->e_id,
+					  "Milter: cmd=data, reject=421 4.7.0 %s closing connection",
+					  MyHostName);
+				LogUsrErrs = false;
+			}
+			usrerr("421 4.7.0 %s closing connection", MyHostName);
+			e->e_sendqueue = NULL;
+			return false;
 		}
 		LogUsrErrs = savelogusrerrs;
 		if (response != NULL)
@@ -3295,6 +3283,16 @@ smtp_data(smtp, e)
 					  MSG_TEMPFAIL);
 			milteraccept = false;
 			usrerr(MSG_TEMPFAIL);
+			break;
+
+		  case SMFIR_SHUTDOWN:
+			if (MilterLogLevel > 3)
+				sm_syslog(LOG_INFO, e->e_id,
+					  "Milter: data, reject=421 4.7.0 %s closing connection",
+					  MyHostName);
+			milteraccept = false;
+			usrerr("421 4.7.0 %s closing connection", MyHostName);
+			rv = false;
 			break;
 		}
 		if (response != NULL)
@@ -3474,8 +3472,26 @@ smtp_data(smtp, e)
 		}
 		else
 		{
+			int mode;
+
 			/* send to all recipients */
-			sendall(ee, SM_DEFAULT);
+			mode = SM_DEFAULT;
+#if _FFR_DM_ONE
+			if (SM_DM_ONE == e->e_sendmode)
+			{
+				if (NotFirstDelivery)
+				{
+					mode = SM_QUEUE;
+					e->e_sendmode = SM_QUEUE;
+				}
+				else
+				{
+					mode = SM_FORK;
+					NotFirstDelivery = true;
+				}
+			}
+#endif /* _FFR_DM_ONE */
+			sendall(ee, mode);
 		}
 		ee->e_to = NULL;
 	}
@@ -3485,6 +3501,16 @@ smtp_data(smtp, e)
 	CurEnv->e_id = id;
 
 	/* issue success message */
+#if _FFR_MSG_ACCEPT
+	if (MessageAccept != NULL && *MessageAccept != '\0')
+	{
+		char msg[MAXLINE];
+
+		expand(MessageAccept, msg, sizeof msg, e);
+		message("250 2.0.0 %s", msg);
+	}
+	else
+#endif /* _FFR_MSG_ACCEPT */
 	message("250 2.0.0 %s Message accepted for delivery", id);
 	CurEnv->e_id = oldid;
 
@@ -3589,7 +3615,7 @@ smtp_data(smtp, e)
 		macdefine(&e->e_macro, A_PERM,
 			  macid("{quarantine}"), e->e_quarmsg);
 	}
-	return true;
+	return rv;
 }
 /*
 **  LOGUNDELRCPTS -- log undelivered (or all) recipients.

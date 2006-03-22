@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -20,7 +20,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: conf.c,v 8.1070 2005/07/26 05:45:38 ca Exp $")
+SM_RCSID("@(#)$Id: conf.c,v 8.1081 2006/02/24 02:21:53 ca Exp $")
 SM_IDSTR(i2, "%W% (Sun) %G%")
 
 #include <sendmail/pathnames.h>
@@ -360,6 +360,7 @@ setdefaults(e)
 	MaxMimeFieldLength = MaxMimeHeaderLength / 2;
 	MaxForwardEntries = 0;
 	FastSplit = 1;
+	MaxNOOPCommands = MAXNOOPCOMMANDS;
 #if SASL
 	AuthMechanisms = newstr(AUTH_MECHANISMS);
 	AuthRealm = NULL;
@@ -2200,10 +2201,25 @@ shouldqueue(pri, ct)
 	time_t ct;
 {
 	bool rval;
+#if _FFR_MEMSTAT
+	long memfree;
+#endif /* _FFR_MEMSTAT */
 
 	if (tTd(3, 30))
 		sm_dprintf("shouldqueue: CurrentLA=%d, pri=%ld: ",
 			CurrentLA, pri);
+
+#if _FFR_MEMSTAT
+	if (QueueLowMem > 0 &&
+	    sm_memstat_get(MemoryResource, &memfree) >= 0 &&
+	    memfree < QueueLowMem)
+	{
+		if (tTd(3, 30))
+			sm_dprintf("true (memfree=%ld < QueueLowMem)\n",
+				memfree, QueueLowMem);
+		return true;
+	}
+#endif /* _FFR_MEMSTAT */
 	if (CurrentLA < QueueLA)
 	{
 		if (tTd(3, 30))
@@ -2252,6 +2268,9 @@ refuseconnections(name, e, d, active)
 	static int conncnt[MAXDAEMONS];
 	static time_t firstrejtime[MAXDAEMONS];
 	static time_t nextlogtime[MAXDAEMONS];
+#if _FFR_MEMSTAT
+	long memfree;
+#endif /* _FFR_MEMSTAT */
 
 #if XLA
 	if (!xla_smtp_ok())
@@ -2288,6 +2307,19 @@ refuseconnections(name, e, d, active)
 			conncnt[d] = 0;
 	}
 
+
+#if _FFR_MEMSTAT
+	if (RefuseLowMem > 0 &&
+	    sm_memstat_get(MemoryResource, &memfree) >= 0 &&
+	    memfree < RefuseLowMem)
+	{
+# define R_MSG_LM "rejecting connections on daemon %s: free memory: %ld"
+		sm_setproctitle(true, e, R_MSG_LM, name, memfree);
+		if (LogLevel > 8)
+			sm_syslog(LOG_NOTICE, NOQID, R_MSG_LM, name, memfree);
+		return true;
+	}
+#endif /* _FFR_MEMSTAT */
 	sm_getla();
 	if (RefuseLA > 0 && CurrentLA >= RefuseLA)
 	{
@@ -3917,8 +3949,8 @@ vendor_pre_defaults(e)
 	**  /etc/mail/sendmail.cf without this
 	*/
 
-	setuserenv("ISP", NULL);
-	setuserenv("SYSTYPE", NULL);
+	sm_setuserenv("ISP", NULL);
+	sm_setuserenv("SYSTYPE", NULL);
 #endif /* apollo */
 }
 
@@ -3932,7 +3964,7 @@ vendor_post_defaults(e)
 
 	/* Makes sure the SOCK environment variable remains */
 	if (p = getextenv("SOCK"))
-		setuserenv("SOCK", p);
+		sm_setuserenv("SOCK", p);
 #endif /* __QNX__ */
 #if defined(SUN_EXTENSIONS) && defined(SUN_DEFAULT_VALUES)
 	sun_post_defaults(e);
@@ -5348,8 +5380,8 @@ sm_syslog(level, id, fmt, va_alist)
 	va_dcl
 #endif /* __STDC__ */
 {
-	static char *buf = NULL;
-	static size_t bufsize;
+	char *buf;
+	size_t bufsize;
 	char *begin, *end;
 	int save_errno;
 	int seq = 1;
@@ -5373,11 +5405,8 @@ sm_syslog(level, id, fmt, va_alist)
 	else
 		idlen = strlen(id) + SyslogPrefixLen;
 
-	if (buf == NULL)
-	{
-		buf = buf0;
-		bufsize = sizeof buf0;
-	}
+	buf = buf0;
+	bufsize = sizeof buf0;
 
 	for (;;)
 	{
@@ -5419,8 +5448,8 @@ sm_syslog(level, id, fmt, va_alist)
 			(void) sm_io_fprintf(smioerr, SM_TIME_DEFAULT,
 					     "%s: %s\n", id, newstring);
 #endif /* LOG */
-		if (buf == buf0)
-			buf = NULL;
+		if (buf != buf0)
+			sm_free(buf);
 		errno = save_errno;
 		return;
 	}
@@ -5484,8 +5513,8 @@ sm_syslog(level, id, fmt, va_alist)
 		(void) sm_io_fprintf(smioerr, SM_TIME_DEFAULT,
 				     "%s[%d]: %s\n", id, seq, begin);
 #endif /* LOG */
-	if (buf == buf0)
-		buf = NULL;
+	if (buf != buf0)
+		sm_free(buf);
 	errno = save_errno;
 }
 /*
@@ -6091,6 +6120,10 @@ char	*FFRCompileOptions[] =
 	/* What it says :-) */
 	"_FFR_DEPRECATE_MAILER_FLAG_I",
 #endif /* _FFR_DEPRECATE_MAILER_FLAG_I */
+#if _FFR_DM_ONE
+	/* deliver first TA in background, then queue */
+	"_FFR_DM_ONE",
+#endif /* _FFR_DM_ONE */
 #if _FFR_DIGUNIX_SAFECHOWN
 	/* Properly set SAFECHOWN (include/sm/conf.h) for Digital UNIX */
 /* Problem noted by Anne Bennett of Concordia University */
@@ -6207,10 +6240,22 @@ char	*FFRCompileOptions[] =
 /* Randall S. Winchester of the University of Maryland */
 	"_FFR_MAX_FORWARD_ENTRIES",
 #endif /* _FFR_MAX_FORWARD_ENTRIES */
+#if _FFR_MAXKEY
+	/* increase key size for LDAP lookups, see conf.h */
+	"_FFR_MAXKEY",
+#endif /* _FFR_MAXKEY */
+#if _FFR_MAXNOOPCOMMANDS
+	/* runtime option for "MaxNOOPCommands" */
+	"_FFR_MAXNOOPCOMMANDS",
+#endif /* _FFR_MAXNOOPCOMMANDS */
 #if _FFR_MAX_SLEEP_TIME
 	/* Limit sleep(2) time in libsm/clock.c */
 	"_FFR_MAX_SLEEP_TIME",
 #endif /* _FFR_MAX_SLEEP_TIME */
+#if _FFR_MEMSTAT
+	/* Check free memory */
+	"_FFR_MEMSTAT",
+#endif /* _FFR_MEMSTAT */
 #if _FFR_MILTER_NAGLE
 	/* milter: turn off Nagle ("cork" on Linux) */
 	/* John Gardiner Myers of Proofpoint */
@@ -6225,6 +6270,10 @@ char	*FFRCompileOptions[] =
 	/* Old mime7to8 code, the new is broken for at least one example. */
 	"_FFR_MIME7TO8_OLD",
 #endif /* _FFR_MAX_SLEEP_TIME */
+#if _FFR_MSG_ACCEPT
+	/* allow to override "Message accepted for delivery" */
+	"_FFR_MSG_ACCEPT",
+#endif /* _FFR_MSG_ACCEPT */
 #if _FFR_NODELAYDSN_ON_HOLD
 	/* Do not issue a DELAY DSN for mailers that use the hold flag. */
 /* Steven Pitzl */
@@ -6261,7 +6310,7 @@ char	*FFRCompileOptions[] =
 	"_FFR_QUEUE_MACRO",
 #endif /* _FFR_QUEUE_MACRO */
 #if _FFR_QUEUE_RUN_PARANOIA
-	/* Additional checks when doing queue runs. */
+	/* Additional checks when doing queue runs; interval of checks */
 	"_FFR_QUEUE_RUN_PARANOIA",
 #endif /* _FFR_QUEUE_RUN_PARANOIA */
 #if _FFR_QUEUE_SCHED_DBG
@@ -6301,7 +6350,7 @@ char	*FFRCompileOptions[] =
 	**  DN.  In Sendmail 8.13 this "bug" was corrected to
 	**  only return if exactly one attribute matched.
 	**
-	**  Unfortuntately, our configuration uses the former
+	**  Unfortunately, our configuration uses the former
 	**  behaviour.  Attached is a relatively simple patch
 	**  to 8.13.4 which adds a -2 switch (for lack of a
 	**  better option) which returns the single dn/multiple

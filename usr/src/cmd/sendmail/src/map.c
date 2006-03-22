@@ -20,7 +20,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: map.c,v 8.670 2005/06/23 23:11:22 ca Exp $")
+SM_RCSID("@(#)$Id: map.c,v 8.671 2005/10/25 17:55:50 ca Exp $")
 SM_IDSTR(i2, "%W% (Sun) %G%")
 
 #if LDAPMAP
@@ -3551,7 +3551,7 @@ ldapmap_lookup(map, name, av, statp)
 	char *result = NULL;
 	SM_RPOOL_T *rpool;
 	SM_LDAP_STRUCT *lmap = NULL;
-	char keybuf[MAXNAME + 1];
+	char keybuf[MAXKEY];
 
 	if (tTd(38, 20))
 		sm_dprintf("ldapmap_lookup(%s, %s)\n", map->map_mname, name);

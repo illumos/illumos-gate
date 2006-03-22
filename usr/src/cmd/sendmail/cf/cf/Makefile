@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License, (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #  Makefile for configuration files.
 #
-#  Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+#  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 #  Use is subject to license terms.
 #
 #	@(#)Makefile	8.15 (Berkeley) 3/29/98
@@ -49,7 +48,7 @@ RM=	/usr/bin/rm -f
 	test ! -f $@ || $(MV) $@ $@.prev
 	$(M4) ${CFDIR}/m4/cf.m4 $*.mc > $@
 
-ALL=	main.cf subsidiary.cf submit.cf
+ALL=	sendmail.cf submit.cf
 
 all: $(ALL)
 
@@ -84,6 +83,7 @@ M4FILES=\
 	${CFDIR}/feature/limited_masquerade.m4 \
 	${CFDIR}/feature/local_lmtp.m4 \
 	${CFDIR}/feature/local_no_masquerade.m4 \
+	${CFDIR}/feature/local_procmail.m4 \
 	${CFDIR}/feature/lookupdotdomain.m4 \
 	${CFDIR}/feature/loose_relay_check.m4 \
 	${CFDIR}/feature/mailertable.m4 \
@@ -95,9 +95,9 @@ M4FILES=\
 	${CFDIR}/feature/nocanonify.m4 \
 	${CFDIR}/feature/notsticky.m4 \
 	${CFDIR}/feature/nouucp.m4 \
-	${CFDIR}/feature/promiscuous_relay.m4 \
 	${CFDIR}/feature/preserve_local_plus_detail.m4 \
 	${CFDIR}/feature/preserve_luser_host.m4 \
+	${CFDIR}/feature/promiscuous_relay.m4 \
 	${CFDIR}/feature/queuegroup.m4 \
 	${CFDIR}/feature/ratecontrol.m4 \
 	${CFDIR}/feature/redirect.m4 \

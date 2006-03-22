@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2001 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 2000-2001, 2005, 2006 Sendmail, Inc. and its suppliers.
  *      All rights reserved.
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -15,7 +15,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: fflush.c,v 1.44 2005/06/14 23:07:20 ca Exp $")
+SM_RCSID("@(#)$Id: fflush.c,v 1.45 2006/03/03 22:25:00 ca Exp $")
 #include <unistd.h>
 #include <errno.h>
 #include <sm/time.h>
@@ -147,6 +147,7 @@ sm_flush(fp, timeout)
 				return SM_IO_EOF;
 			}
 			SM_IO_WR_TIMEOUT(fp, fd, *timeout);
+			t = 0;
 		}
 	}
 	return 0;

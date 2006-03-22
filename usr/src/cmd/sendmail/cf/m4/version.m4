@@ -1,6 +1,6 @@
 divert(-1)
 #
-# Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
+# Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
 #	All rights reserved.
 # Copyright (c) 1983 Eric P. Allman.  All rights reserved.
 # Copyright (c) 1988, 1993
@@ -12,8 +12,8 @@ divert(-1)
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-VERSIONID(`$Id: version.m4,v 8.138 2005/09/15 21:38:40 ca Exp $')
+VERSIONID(`$Id: version.m4,v 8.147 2006/03/08 19:21:23 ca Exp $')
 #
 divert(0)
 # Configuration version number
-DZ8.13.5`'ifdef(`confCF_VERSION', `/confCF_VERSION')
+DZ8.13.6`'ifdef(`confCF_VERSION', `/confCF_VERSION')

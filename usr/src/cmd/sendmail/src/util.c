@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2004 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: util.c,v 8.383 2004/08/02 18:50:59 ca Exp $")
+SM_RCSID("@(#)$Id: util.c,v 8.392 2006/03/09 19:49:35 ca Exp $")
 
 #include <sysexits.h>
 #include <sm/xtrap.h>
@@ -457,6 +457,8 @@ xalloc(sz)
 #endif /* SM_HEAP_CHECK */
 {
 	register char *p;
+
+	SM_REQUIRE(sz >= 0);
 
 	/* some systems can't handle size zero mallocs */
 	if (sz <= 0)
@@ -972,18 +974,18 @@ fixcrlf(line, stripnl)
 **		mci -- the mailer connection information.
 **
 **	Returns:
-**		none
+**		true iff line was written successfully
 **
 **	Side Effects:
 **		output of l to mci->mci_out.
 */
 
-void
+bool
 putline(l, mci)
 	register char *l;
 	register MCI *mci;
 {
-	putxline(l, strlen(l), mci, PXLF_MAPFROM);
+	return putxline(l, strlen(l), mci, PXLF_MAPFROM);
 }
 /*
 **  PUTXLINE -- putline with flags bits.
@@ -1002,13 +1004,13 @@ putline(l, mci)
 **		    PXLF_NOADDEOL -- don't add an EOL if one wasn't present.
 **
 **	Returns:
-**		none
+**		true iff line was written successfully
 **
 **	Side Effects:
 **		output of l to mci->mci_out.
 */
 
-void
+bool
 putxline(l, len, mci, pxflags)
 	register char *l;
 	size_t len;
@@ -1060,11 +1062,6 @@ putxline(l, len, mci, pxflags)
 				if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT,
 					       '.') == SM_IO_EOF)
 					dead = true;
-				else
-				{
-					/* record progress for DATA timeout */
-					DataProgress = true;
-				}
 				if (TrafficLogFile != NULL)
 					(void) sm_io_putc(TrafficLogFile,
 							  SM_TIME_DEFAULT, '.');
@@ -1077,11 +1074,6 @@ putxline(l, len, mci, pxflags)
 				if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT,
 					       '>') == SM_IO_EOF)
 					dead = true;
-				else
-				{
-					/* record progress for DATA timeout */
-					DataProgress = true;
-				}
 				if (TrafficLogFile != NULL)
 					(void) sm_io_putc(TrafficLogFile,
 							  SM_TIME_DEFAULT,
@@ -1093,15 +1085,10 @@ putxline(l, len, mci, pxflags)
 			while (l < q)
 			{
 				if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT,
-					       (unsigned char) *l++) == SM_IO_EOF)
+				       (unsigned char) *l++) == SM_IO_EOF)
 				{
 					dead = true;
 					break;
-				}
-				else
-				{
-					/* record progress for DATA timeout */
-					DataProgress = true;
 				}
 			}
 			if (dead)
@@ -1117,11 +1104,6 @@ putxline(l, len, mci, pxflags)
 			{
 				dead = true;
 				break;
-			}
-			else
-			{
-				/* record progress for DATA timeout */
-				DataProgress = true;
 			}
 			if (TrafficLogFile != NULL)
 			{
@@ -1146,11 +1128,9 @@ putxline(l, len, mci, pxflags)
 		{
 			if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT, '.') ==
 			    SM_IO_EOF)
-				break;
-			else
 			{
-				/* record progress for DATA timeout */
-				DataProgress = true;
+				dead = true;
+				break;
 			}
 			if (TrafficLogFile != NULL)
 				(void) sm_io_putc(TrafficLogFile,
@@ -1163,11 +1143,9 @@ putxline(l, len, mci, pxflags)
 		{
 			if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT, '>') ==
 			    SM_IO_EOF)
-				break;
-			else
 			{
-				/* record progress for DATA timeout */
-				DataProgress = true;
+				dead = true;
+				break;
 			}
 			if (TrafficLogFile != NULL)
 				(void) sm_io_putc(TrafficLogFile,
@@ -1185,11 +1163,6 @@ putxline(l, len, mci, pxflags)
 				dead = true;
 				break;
 			}
-			else
-			{
-				/* record progress for DATA timeout */
-				DataProgress = true;
-			}
 		}
 		if (dead)
 			break;
@@ -1200,11 +1173,9 @@ putxline(l, len, mci, pxflags)
 		if ((!bitset(PXLF_NOADDEOL, pxflags) || !noeol) &&
 		    sm_io_fputs(mci->mci_out, SM_TIME_DEFAULT,
 				mci->mci_mailer->m_eol) == SM_IO_EOF)
-			break;
-		else
 		{
-			/* record progress for DATA timeout */
-			DataProgress = true;
+			dead = true;
+			break;
 		}
 		if (l < end && *l == '\n')
 		{
@@ -1213,11 +1184,9 @@ putxline(l, len, mci, pxflags)
 			{
 				if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT,
 					       ' ') == SM_IO_EOF)
-					break;
-				else
 				{
-					/* record progress for DATA timeout */
-					DataProgress = true;
+					dead = true;
+					break;
 				}
 
 				if (TrafficLogFile != NULL)
@@ -1226,10 +1195,10 @@ putxline(l, len, mci, pxflags)
 			}
 		}
 
-		/* record progress for DATA timeout */
-		DataProgress = true;
 	} while (l < end);
+	return !dead;
 }
+
 /*
 **  XUNLINK -- unlink a file, doing logging as appropriate.
 **
@@ -2098,6 +2067,9 @@ prog_open(argv, pfd, e)
 	/* run as default user */
 	endpwent();
 	sm_mbdb_terminate();
+#if _FFR_MEMSTAT
+	(void) sm_memstat_close();
+#endif /* _FFR_MEMSTAT */
 	if (setgid(DefGid) < 0 && geteuid() == 0)
 	{
 		syserr("prog_open: setgid(%ld) failed", (long) DefGid);
@@ -2435,6 +2407,7 @@ str2prt(s)
 				*h++ = 'r';
 				break;
 			  default:
+				SM_ASSERT(l >= 2);
 				(void) sm_snprintf(h, l, "%03o",
 					(unsigned int)((unsigned char) c));
 
@@ -2671,11 +2644,11 @@ proc_list_drop(pid, st, other)
 			type = ProcListVec[i].proc_type;
 			if (other != NULL)
 				*other = ProcListVec[i].proc_other;
+			if (CurChildren > 0)
+				CurChildren--;
 			break;
 		}
 	}
-	if (CurChildren > 0)
-		CurChildren--;
 
 
 	if (type == PROC_CONTROL && WIFEXITED(st))
@@ -2734,14 +2707,20 @@ proc_list_clear()
 void
 proc_list_probe()
 {
-	int i;
+	int i, children;
+	int chldwasblocked;
+	pid_t pid;
+
+	children = 0;
+	chldwasblocked = sm_blocksignal(SIGCHLD);
 
 	/* start from 1 since 0 is the daemon itself */
 	for (i = 1; i < ProcListSize; i++)
 	{
-		if (ProcListVec[i].proc_pid == NO_PID)
+		pid = ProcListVec[i].proc_pid;
+		if (pid == NO_PID || pid == CurrentPid)
 			continue;
-		if (kill(ProcListVec[i].proc_pid, 0) < 0)
+		if (kill(pid, 0) < 0)
 		{
 			if (LogLevel > 3)
 				sm_syslog(LOG_DEBUG, CurEnv->e_id,
@@ -2751,9 +2730,21 @@ proc_list_probe()
 			SM_FREE_CLR(ProcListVec[i].proc_task);
 			CurChildren--;
 		}
+		else
+		{
+			++children;
+		}
 	}
 	if (CurChildren < 0)
 		CurChildren = 0;
+	if (chldwasblocked == 0)
+		(void) sm_releasesignal(SIGCHLD);
+	if (LogLevel > 10 && children != CurChildren)
+	{
+		sm_syslog(LOG_ERR, NOQID,
+			  "proc_list_probe: found %d children, expected %d",
+			  children, CurChildren);
+	}
 }
 
 /*
@@ -2861,7 +2852,6 @@ count_open_connections(hostaddr)
 	{
 		if (ProcListVec[i].proc_pid == NO_PID)
 			continue;
-
 		if (hostaddr->sa.sa_family !=
 		    ProcListVec[i].proc_hostaddr.sa.sa_family)
 			continue;

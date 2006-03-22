@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: daemon.c,v 8.661 2005/06/17 21:00:19 ca Exp $")
+SM_RCSID("@(#)$Id: daemon.c,v 8.665 2006/03/02 19:12:00 ca Exp $")
 
 #if defined(SOCK_STREAM) || defined(__GNU_LIBRARY__)
 # define USE_SOCK_STREAM	1
@@ -389,8 +389,8 @@ getrequests(e)
 #endif /* _FFR_QUEUE_RUN_PARANOIA */
 			}
 #if _FFR_QUEUE_RUN_PARANOIA
-			else if (QueueIntvl > 0 &&
-				 lastrun + QueueIntvl + 60 < now)
+			else if (CheckQueueRunners > 0 && QueueIntvl > 0 &&
+				 lastrun + QueueIntvl + CheckQueueRunners < now)
 			{
 
 				/*
@@ -763,7 +763,6 @@ getrequests(e)
 					set_delivery_mode(
 						Daemons[curdaemon].d_dm, e);
 #endif /* _FFR_DM_PER_DAEMON */
-					
 
 				sm_setproctitle(true, e, "startup with %s",
 						anynet_ntoa(&RealHostAddr));
@@ -1495,7 +1494,7 @@ setsockaddroptions(p, d)
 			  case SM_QUEUE:
 			  case SM_DEFER:
 			  case SM_DELIVER:
-			  case SM_FORK:	
+			  case SM_FORK:
 				d->d_dm = *v;
 				break;
 			  default:

@@ -16,7 +16,7 @@
 #include <sendmail.h>
 #include <sm/sem.h>
 
-SM_RCSID("@(#)$Id: queue.c,v 8.949 2005/07/21 00:58:33 ca Exp $")
+SM_RCSID("@(#)$Id: queue.c,v 8.951 2006/03/02 19:13:38 ca Exp $")
 
 #include <dirent.h>
 
@@ -2855,7 +2855,8 @@ gatherq(qgrp, qdir, doall, full, more)
 		if (cf != NULL)
 			(void) sm_io_close(cf, SM_TIME_DEFAULT);
 
-		if ((!doall && shouldqueue(w->w_pri, w->w_ctime)) ||
+		if ((!doall && (shouldqueue(w->w_pri, w->w_ctime) ||
+		    w->w_tooyoung)) ||
 		    bitset(HAS_QUARANTINE, i) ||
 		    bitset(NEED_QUARANTINE, i) ||
 		    bitset(NEED_R|NEED_S, i))
@@ -6854,13 +6855,11 @@ init_shm(qn, owner, hash)
 #endif /* _FFR_SELECT_SHM */
 		if (owner && RunAsUid != 0)
 		{
-	    		i = sm_shmsetowner(ShmId, RunAsUid, RunAsGid,
-					0660);
+			i = sm_shmsetowner(ShmId, RunAsUid, RunAsGid, 0660);
 			if (i != 0)
 				sm_syslog(LOG_ERR, NOQID,
-		  			"key=%ld, sm_shmsetowner=%d, RunAsUid=%d, RunAsGid=%d",
-		  			(long) ShmKey, i,
-	    				RunAsUid, RunAsGid);
+					"key=%ld, sm_shmsetowner=%d, RunAsUid=%d, RunAsGid=%d",
+					(long) ShmKey, i, RunAsUid, RunAsGid);
 		}
 		p = (int *) Pshm;
 		if (owner)

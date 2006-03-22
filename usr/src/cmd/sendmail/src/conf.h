@@ -10,7 +10,7 @@
  * the sendmail distribution.
  *
  *
- *	$Id: conf.h,v 8.568 2005/08/31 21:34:20 ca Exp $
+ *	$Id: conf.h,v 8.570 2005/12/09 18:37:27 ca Exp $
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,6 +73,11 @@ struct rusage;	/* forward declaration to get gcc to shut up in wait.h */
 #define MAXMXHOSTS	100	/* max # of MX records for one host */
 #define SMTPLINELIM	990	/* max SMTP line length */
 #define MAXUDBKEY	128	/* max size of a database key (udb only) */
+#if _FFR_MAXKEY
+# define MAXKEY		1024	/* max size of a database key */
+#else /* _FFR_MAXKEY */
+# define MAXKEY		(MAXNAME + 1)	/* max size of a database key */
+#endif /* _FFR_MAXKEY */
 #define MEMCHUNKSIZE	1024	/* chunk size for memory allocation */
 #define MAXUSERENVIRON	100	/* max envars saved, must be >= 3 */
 #define MAXMAPSTACK	12	/* max # of stacked or sequenced maps */
@@ -86,6 +91,10 @@ struct rusage;	/* forward declaration to get gcc to shut up in wait.h */
 #define MAXMIMEARGS	20	/* max args in Content-Type: */
 #define MAXMIMENESTING	20	/* max MIME multipart nesting */
 #define QUEUESEGSIZE	1000	/* increment for queue size */
+
+#ifndef MAXNOOPCOMMANDS
+# define MAXNOOPCOMMANDS 20	/* max "noise" commands before slowdown */
+#endif /* ! MAXNOOPCOMMANDS */
 
 /*
 **  MAXQFNAME == 2 (size of "qf", "df" prefix)

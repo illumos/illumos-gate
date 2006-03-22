@@ -16,7 +16,7 @@
 #include <sendmail.h>
 #include <string.h>
 
-SM_RCSID("@(#)$Id: mime.c,v 8.137 2004/09/02 21:37:26 ca Exp $")
+SM_RCSID("@(#)$Id: mime.c,v 8.139 2006/03/01 18:07:45 ca Exp $")
 
 /*
 **  MIME support.
@@ -88,6 +88,7 @@ static bool	MapNLtoCRLF;
 **		  MBT_FINAL -- the final boundary
 **		  MBT_INTERMED -- an intermediate boundary
 **		  MBT_NOTSEP -- an end of file
+**		  SM_IO_EOF -- I/O error occurred
 */
 
 struct args
@@ -300,7 +301,8 @@ mime8to7(mci, header, e, boundaries, flags)
 		mci->mci_flags |= MCIF_INMIME;
 
 		/* skip the early "comment" prologue */
-		putline("", mci);
+		if (!putline("", mci))
+			goto writeerr;
 		mci->mci_flags &= ~MCIF_INHEADER;
 		bt = MBT_FINAL;
 		while (sm_io_fgets(e->e_dfp, SM_TIME_DEFAULT, buf, sizeof buf)
@@ -309,8 +311,9 @@ mime8to7(mci, header, e, boundaries, flags)
 			bt = mimeboundary(buf, boundaries);
 			if (bt != MBT_NOTSEP)
 				break;
-			putxline(buf, strlen(buf), mci,
-				 PXLF_MAPFROM|PXLF_STRIP8BIT);
+			if (!putxline(buf, strlen(buf), mci,
+					PXLF_MAPFROM|PXLF_STRIP8BIT))
+				goto writeerr;
 			if (tTd(43, 99))
 				sm_dprintf("  ...%s", buf);
 		}
@@ -321,19 +324,24 @@ mime8to7(mci, header, e, boundaries, flags)
 			auto HDR *hdr = NULL;
 
 			(void) sm_strlcpyn(buf, sizeof buf, 2, "--", bbuf);
-			putline(buf, mci);
+			if (!putline(buf, mci))
+				goto writeerr;
 			if (tTd(43, 35))
 				sm_dprintf("  ...%s\n", buf);
 			collect(e->e_dfp, false, &hdr, e, false);
 			if (tTd(43, 101))
 				putline("+++after collect", mci);
-			putheader(mci, hdr, e, flags);
+			if (!putheader(mci, hdr, e, flags))
+				goto writeerr;
 			if (tTd(43, 101))
 				putline("+++after putheader", mci);
 			bt = mime8to7(mci, hdr, e, boundaries, flags);
+			if (bt == SM_IO_EOF)
+				goto writeerr;
 		}
 		(void) sm_strlcpyn(buf, sizeof buf, 3, "--", bbuf, "--");
-		putline(buf, mci);
+		if (!putline(buf, mci))
+			goto writeerr;
 		if (tTd(43, 35))
 			sm_dprintf("  ...%s\n", buf);
 		boundaries[i] = NULL;
@@ -346,8 +354,9 @@ mime8to7(mci, header, e, boundaries, flags)
 			bt = mimeboundary(buf, boundaries);
 			if (bt != MBT_NOTSEP)
 				break;
-			putxline(buf, strlen(buf), mci,
-				 PXLF_MAPFROM|PXLF_STRIP8BIT);
+			if (!putxline(buf, strlen(buf), mci,
+					PXLF_MAPFROM|PXLF_STRIP8BIT))
+				goto writeerr;
 			if (tTd(43, 99))
 				sm_dprintf("  ...%s", buf);
 		}
@@ -375,18 +384,21 @@ mime8to7(mci, header, e, boundaries, flags)
 		{
 			auto HDR *hdr = NULL;
 
-			putline("", mci);
+			if (!putline("", mci))
+				goto writeerr;
 
 			mci->mci_flags |= MCIF_INMIME;
 			collect(e->e_dfp, false, &hdr, e, false);
 			if (tTd(43, 101))
 				putline("+++after collect", mci);
-			putheader(mci, hdr, e, flags);
+			if (!putheader(mci, hdr, e, flags))
+				goto writeerr;
 			if (tTd(43, 101))
 				putline("+++after putheader", mci);
 			if (hvalue("MIME-Version", hdr) == NULL &&
-			    !bitset(M87F_NO8TO7, flags))
-				putline("MIME-Version: 1.0", mci);
+			    !bitset(M87F_NO8TO7, flags) &&
+			    !putline("MIME-Version: 1.0", mci))
+				goto writeerr;
 			bt = mime8to7(mci, hdr, e, boundaries, flags);
 			mci->mci_flags &= ~MCIF_INMIME;
 			return bt;
@@ -482,11 +494,13 @@ mime8to7(mci, header, e, boundaries, flags)
 
 			(void) sm_snprintf(buf, sizeof buf,
 				"Content-Transfer-Encoding: %.200s", cte);
-			putline(buf, mci);
+			if (!putline(buf, mci))
+				goto writeerr;
 			if (tTd(43, 36))
 				sm_dprintf("  ...%s\n", buf);
 		}
-		putline("", mci);
+		if (!putline("", mci))
+			goto writeerr;
 		mci->mci_flags &= ~MCIF_INHEADER;
 		while (sm_io_fgets(e->e_dfp, SM_TIME_DEFAULT, buf, sizeof buf)
 			!= NULL)
@@ -494,7 +508,8 @@ mime8to7(mci, header, e, boundaries, flags)
 			bt = mimeboundary(buf, boundaries);
 			if (bt != MBT_NOTSEP)
 				break;
-			putline(buf, mci);
+			if (!putline(buf, mci))
+				goto writeerr;
 		}
 		if (sm_io_eof(e->e_dfp))
 			bt = MBT_FINAL;
@@ -507,12 +522,13 @@ mime8to7(mci, header, e, boundaries, flags)
 
 		if (tTd(43, 36))
 			sm_dprintf("  ...Content-Transfer-Encoding: base64\n");
-		putline("Content-Transfer-Encoding: base64", mci);
+		if (!putline("Content-Transfer-Encoding: base64", mci))
+			goto writeerr;
 		(void) sm_snprintf(buf, sizeof buf,
 			"X-MIME-Autoconverted: from 8bit to base64 by %s id %s",
 			MyHostName, e->e_id);
-		putline(buf, mci);
-		putline("", mci);
+		if (!putline(buf, mci) || !putline("", mci))
+			goto writeerr;
 		mci->mci_flags &= ~MCIF_INHEADER;
 		while ((c1 = mime_getchar_crlf(e->e_dfp, boundaries, &bt)) !=
 			SM_IO_EOF)
@@ -520,7 +536,8 @@ mime8to7(mci, header, e, boundaries, flags)
 			if (linelen > 71)
 			{
 				*bp = '\0';
-				putline(buf, mci);
+				if (!putline(buf, mci))
+					goto writeerr;
 				linelen = 0;
 				bp = buf;
 			}
@@ -550,7 +567,8 @@ mime8to7(mci, header, e, boundaries, flags)
 			*bp++ = Base64Code[c2 & 0x3f];
 		}
 		*bp = '\0';
-		putline(buf, mci);
+		if (!putline(buf, mci))
+			goto writeerr;
 	}
 	else
 	{
@@ -573,12 +591,14 @@ mime8to7(mci, header, e, boundaries, flags)
 
 		if (tTd(43, 36))
 			sm_dprintf("  ...Content-Transfer-Encoding: quoted-printable\n");
-		putline("Content-Transfer-Encoding: quoted-printable", mci);
+		if (!putline("Content-Transfer-Encoding: quoted-printable",
+				mci))
+			goto writeerr;
 		(void) sm_snprintf(buf, sizeof buf,
 			"X-MIME-Autoconverted: from 8bit to quoted-printable by %s id %s",
 			MyHostName, e->e_id);
-		putline(buf, mci);
-		putline("", mci);
+		if (!putline(buf, mci) || !putline("", mci))
+			goto writeerr;
 		mci->mci_flags &= ~MCIF_INHEADER;
 		fromstate = 0;
 		c2 = '\n';
@@ -600,7 +620,8 @@ mime8to7(mci, header, e, boundaries, flags)
 					*bp++ = Base16Code['.' & 0x0f];
 				}
 				*bp = '\0';
-				putline(buf, mci);
+				if (!putline(buf, mci))
+					goto writeerr;
 				linelen = fromstate = 0;
 				bp = buf;
 				c2 = c1;
@@ -629,7 +650,8 @@ mime8to7(mci, header, e, boundaries, flags)
 					c2 = '\n';
 				*bp++ = '=';
 				*bp = '\0';
-				putline(buf, mci);
+				if (!putline(buf, mci))
+					goto writeerr;
 				linelen = fromstate = 0;
 				bp = buf;
 				if (c2 == '.')
@@ -667,13 +689,17 @@ mime8to7(mci, header, e, boundaries, flags)
 		if (linelen > 0 || boundaries[0] != NULL)
 		{
 			*bp = '\0';
-			putline(buf, mci);
+			if (!putline(buf, mci))
+				goto writeerr;
 		}
 
 	}
 	if (tTd(43, 3))
 		sm_dprintf("\t\t\tmime8to7=>%s (basic)\n", MimeBoundaryNames[bt]);
 	return bt;
+
+  writeerr:
+	return SM_IO_EOF;
 }
 /*
 **  MIME_GETCHAR -- get a character for MIME processing
@@ -960,7 +986,7 @@ static int	mime_fromqp __P((unsigned char *, unsigned char **, int));
 **		e -- envelope.
 **
 **	Returns:
-**		none.
+**		true iff body was written successfully
 */
 
 static char index_64[128] =
@@ -977,7 +1003,7 @@ static char index_64[128] =
 
 # define CHAR64(c)  (((c) < 0 || (c) > 127) ? -1 : index_64[(c)])
 
-void
+bool
 mime7to8(mci, header, e)
 	register MCI *mci;
 	HDR *header;
@@ -1010,25 +1036,31 @@ mime7to8(mci, header, e)
 		{
 			(void) sm_snprintf(buf, sizeof buf,
 				"Content-Transfer-Encoding: %s", p);
-			putline(buf, mci);
+			if (!putline(buf, mci))
+				goto writeerr;
 		}
-		putline("", mci);
+		if (!putline("", mci))
+			goto writeerr;
 		mci->mci_flags &= ~MCIF_INHEADER;
 		while (sm_io_fgets(e->e_dfp, SM_TIME_DEFAULT, buf, sizeof buf)
 			!= NULL)
-			putline(buf, mci);
-		return;
+		{
+			if (!putline(buf, mci))
+				goto writeerr;
+		}
+		return true;
 	}
 	cataddr(pvp, NULL, buf, sizeof buf, '\0');
 	cte = sm_rpool_strdup_x(e->e_rpool, buf);
 
 	mci->mci_flags |= MCIF_INHEADER;
-	putline("Content-Transfer-Encoding: 8bit", mci);
+	if (!putline("Content-Transfer-Encoding: 8bit", mci))
+		goto writeerr;
 	(void) sm_snprintf(buf, sizeof buf,
 		"X-MIME-Autoconverted: from %.200s to 8bit by %s id %s",
 		cte, MyHostName, e->e_id);
-	putline(buf, mci);
-	putline("", mci);
+	if (!putline(buf, mci) || !putline("", mci))
+		goto writeerr;
 	mci->mci_flags &= ~MCIF_INHEADER;
 
 	/*
@@ -1092,7 +1124,8 @@ mime7to8(mci, header, e)
 		if (*fbufp++ == '\n' || fbufp >= &fbuf[MAXLINE])	\
 		{							\
 			CHK_EOL;					\
-			putxline((char *) fbuf, fbufp - fbuf, mci, pxflags); \
+			if (!putxline((char *) fbuf, fbufp - fbuf, mci, pxflags)) \
+				goto writeerr;				\
 			pxflags &= ~PXLF_NOADDEOL;			\
 			fbufp = fbuf;					\
 		}	\
@@ -1129,8 +1162,11 @@ again:
 				continue;
 
 			if (fbufp - fbuf > 0)
-				putxline((char *) fbuf, fbufp - fbuf - 1, mci,
-					 pxflags);
+			{
+				if (!putxline((char *) fbuf, fbufp - fbuf - 1,
+						mci, pxflags))
+					goto writeerr;
+			}
 			fbufp = fbuf;
 			if (off >= 0 && buf[off] != '\0')
 			{
@@ -1146,7 +1182,8 @@ again:
 	if (fbufp > fbuf)
 	{
 		*fbufp = '\0';
-		putxline((char *) fbuf, fbufp - fbuf, mci, pxflags);
+		if (!putxline((char *) fbuf, fbufp - fbuf, mci, pxflags))
+			goto writeerr;
 	}
 
 	/*
@@ -1156,10 +1193,15 @@ again:
 	**  but so is auto-converting MIME in the first place.
 	*/
 
-	putline("", mci);
+	if (!putline("", mci))
+		goto writeerr;
 
 	if (tTd(43, 3))
 		sm_dprintf("\t\t\tmime7to8 => %s to 8bit done\n", cte);
+	return true;
+
+  writeerr:
+	return false;
 }
 /*
 **  The following is based on Borenstein's "codes.c" module, with simplifying

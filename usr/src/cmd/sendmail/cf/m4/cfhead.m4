@@ -5,7 +5,7 @@
 # Copyright (c) 1988, 1993
 #	The Regents of the University of California.  All rights reserved.
 #
-# Copyright 1993, 1997-2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 1993, 1997-2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # By using this file, you agree to the terms and conditions set

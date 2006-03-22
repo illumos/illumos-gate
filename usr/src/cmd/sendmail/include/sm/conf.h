@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -10,7 +10,7 @@
  * the sendmail distribution.
  *
  *
- *	$Id: conf.h,v 1.125 2005/06/30 01:12:13 ca Exp $
+ *	$Id: conf.h,v 1.128 2006/01/27 18:43:44 ca Exp $
  */
 
 /*
@@ -763,9 +763,11 @@ typedef int		pid_t;
 #  define HASSTRERROR		1	/* has strerror(3) */
 #  define HASGETUSERSHELL	1	/* had getusershell(3) */
 #  define GIDSET_T		gid_t	/* getgroups(2) takes gid_t */
-#  define SOCKADDR_LEN_T	socklen_t
 #  define LA_TYPE		LA_SUBR	/* use getloadavg(3) */
 #  define SFS_TYPE		SFS_MOUNT	/* use <sys/mount.h> statfs() impl */
+#  if DARWIN >= 70000
+#   define SOCKADDR_LEN_T	socklen_t
+#  endif
 #  if DARWIN >= 80000
 #   define SPT_TYPE		SPT_REUSEARGV
 #   define SPT_PADCHAR		'\0'
@@ -922,7 +924,9 @@ extern unsigned int sleepX __P((unsigned int seconds));
 #  ifndef LA_TYPE
 #   define LA_TYPE	LA_SUBR
 #  endif /* ! LA_TYPE */
-#  if defined(__NetBSD__) && defined(__NetBSD_Version__) && __NetBSD_Version__ >= 200040000
+#  if defined(__NetBSD__) && defined(__NetBSD_Version__) && \
+    ((__NetBSD_Version__ >= 200040000 && __NetBSD_Version__ < 200090000) || \
+    (__NetBSD_Version__ >= 299000900))
 #   undef SFS_TYPE
 #   define SFS_TYPE	SFS_STATVFS
 #  else
@@ -938,7 +942,9 @@ extern unsigned int sleepX __P((unsigned int seconds));
 #  if defined(__NetBSD__) && defined(__NetBSD_Version__) && __NetBSD_Version__ >= 104170000
 #   define HASSETUSERCONTEXT	1	/* BSDI-style login classes */
 #  endif
-#  if defined(__NetBSD__) && defined(__NetBSD_Version__) && __NetBSD_Version__ >= 200060000
+#  if defined(__NetBSD__) && defined(__NetBSD_Version__) && \
+    ((__NetBSD_Version__ >= 200060000 && __NetBSD_Version__ < 200090000) || \
+    (__NetBSD_Version__ >= 299000900))
 #   define HASCLOSEFROM	1	/* closefrom(3) added in 2.0F */
 #  endif
 #  if defined(__NetBSD__)
