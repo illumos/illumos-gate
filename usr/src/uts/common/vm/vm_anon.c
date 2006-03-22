@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,8 +281,17 @@ anon_create(pgcnt_t npages, int flags)
 	} else {
 		/*
 		 * 2 Level case.
+		 * anon hdr size needs to be rounded off  to be a multiple
+		 * of ANON_CHUNK_SIZE. This is important as various anon
+		 * related functions depend on this.
+		 * NOTE -
+		 * anon_grow()  makes anon hdr size a multiple of
+		 * ANON_CHUNK_SIZE.
+		 * amp size is <= anon hdr size.
+		 * anon_index + seg_pgs <= anon hdr size.
 		 */
-		nchunks = (ahp->size + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		ahp->size = P2ROUNDUP(npages, ANON_CHUNK_SIZE);
+		nchunks = ahp->size >> ANON_CHUNK_SHIFT;
 
 		ahp->array_chunk = kmem_zalloc(nchunks * sizeof (ulong_t *),
 		    kmemflags);
@@ -305,7 +314,7 @@ anon_release(struct anon_hdr *ahp, pgcnt_t npages)
 	void **ppp;
 	ulong_t nchunks;
 
-	ASSERT(npages == ahp->size);
+	ASSERT(npages <= ahp->size);
 
 	/*
 	 * Single level case.
@@ -316,7 +325,7 @@ anon_release(struct anon_hdr *ahp, pgcnt_t npages)
 		/*
 		 * 2 level case.
 		 */
-		nchunks = (ahp->size + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		nchunks = ahp->size >> ANON_CHUNK_SHIFT;
 		for (i = 0; i < nchunks; i++) {
 			ppp = &ahp->array_chunk[i];
 			if (*ppp != NULL)
@@ -679,11 +688,9 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t oldseg_pgs,
 
 	ahp->array_chunk = level1;
 	ahp->size = newamp_pgs;
-	if (growdown) {
+	if (growdown)
 		*startidx_p = newamp_pgs - totpages;
-		if (oldamp_pgs > ANON_CHUNK_SIZE)
-			*startidx_p -= P2NPHASE(oldseg_pgs, ANON_CHUNK_SIZE);
-	}
+
 	return (newamp_pgs);
 }
 
