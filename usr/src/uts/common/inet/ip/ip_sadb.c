@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +72,8 @@ ipsec_kstat_init(void)
 	KI(ah_stat_in_requests);
 	KI(ah_stat_in_discards);
 	KI(ah_stat_lookup_failure);
+	KI(sadb_acquire_maxpackets);
+	KI(sadb_acquire_qhiwater);
 #undef KI
 
 	kstat_install(ipsec_ksp);
@@ -650,7 +651,8 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	pullup_len = ah_offset + sizeof (ah_t);
 	if (mp->b_rptr + pullup_len > mp->b_wptr) {
 		if (!pullupmsg(mp, pullup_len)) {
-			ipsecah_rl_strlog(0,  SL_WARN | SL_ERROR,
+			ipsec_rl_strlog(ip_mod_info.mi_idnum, 0, 0,
+			    SL_WARN | SL_ERROR,
 			    "ipsec_inbound_ah_sa: Small AH header\n");
 			IP_AH_BUMP_STAT(in_discards);
 			ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,

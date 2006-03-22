@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +81,12 @@ static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t);
 static void sadb_destroy(sadb_t *sp);
 
 static time_t sadb_add_time(time_t base, uint64_t delta);
+
+/*
+ * ipsacq_maxpackets is defined here to make it tunable
+ * from /etc/system.
+ */
+extern uint64_t ipsacq_maxpackets;
 
 #define	SET_EXPIRE(sa, delta, exp) {				\
 	if (((sa)->ipsa_ ## delta) != 0) {				\
@@ -4077,13 +4082,15 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		while (lastone->b_next != NULL)
 			lastone = lastone->b_next;
 		lastone->b_next = mp;
-		if (newbie->ipsacq_numpackets++ == IPSACQ_MAXPACKETS) {
-			newbie->ipsacq_numpackets = IPSACQ_MAXPACKETS;
+		if (newbie->ipsacq_numpackets++ == ipsacq_maxpackets) {
+			newbie->ipsacq_numpackets = ipsacq_maxpackets;
 			lastone = newbie->ipsacq_mp;
 			newbie->ipsacq_mp = lastone->b_next;
 			lastone->b_next = NULL;
 			ip_drop_packet(lastone, B_FALSE, NULL, NULL,
 			    &ipdrops_sadb_acquire_toofull, &sadb_dropper);
+		} else {
+			IP_ACQUIRE_STAT(qhiwater, newbie->ipsacq_numpackets);
 		}
 	}
 
@@ -4926,36 +4933,6 @@ sadb_t_bind_req(queue_t *q, int proto)
 
 	putnext(q, mp);
 	return (B_TRUE);
-}
-
-/*
- * Rate-limiting front-end to strlog() for AH and ESP.	Uses the ndd variables
- * in /dev/ip and the same rate-limiting clock so that there's a single
- * knob to turn to throttle the rate of messages.
- *
- * This function needs to be kept in synch with ipsec_log_policy_failure() in
- * ip.c.  Eventually, ipsec_log_policy_failure() should use this function.
- */
-void
-ipsec_rl_strlog(short mid, short sid, char level, ushort_t sl, char *fmt, ...)
-{
-	va_list adx;
-	hrtime_t current = gethrtime();
-
-	/* Convert interval (in msec) to hrtime (in nsec), which means * 10^6 */
-	if (ipsec_policy_failure_last +
-	    ((hrtime_t)ipsec_policy_log_interval * (hrtime_t)1000000) <=
-	    current) {
-		/*
-		 * Throttle the logging such that I only log one
-		 * message every 'ipsec_policy_log_interval' amount
-		 * of time.
-		 */
-		va_start(adx, fmt);
-		(void) vstrlog(mid, sid, level, sl, fmt, adx);
-		va_end(adx);
-		ipsec_policy_failure_last = current;
-	}
 }
 
 /*

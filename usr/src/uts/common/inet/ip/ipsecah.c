@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,6 +214,8 @@ static ah_kstats_t *ah_kstats;
 
 static int ah_kstat_update(kstat_t *, int);
 
+uint64_t ipsacq_maxpackets = IPSACQ_MAXPACKETS;
+
 static boolean_t
 ah_kstat_init(void)
 {
@@ -254,7 +255,7 @@ ah_kstat_init(void)
 #undef K64
 
 	kstat_install(ah_ksp);
-
+	IP_ACQUIRE_STAT(maxpackets, ipsacq_maxpackets);
 	return (B_TRUE);
 }
 
@@ -4204,20 +4205,6 @@ ah_auth_out_done(mblk_t *ipsec_out)
 	}
 
 	return (IPSEC_STATUS_SUCCESS);
-}
-
-/*
- * Wrapper to allow IP to trigger an AH strlog message if an error
- * condition is found during SA selection.
- */
-void
-ipsecah_rl_strlog(char level, ushort_t sl, char *fmt, ...)
-{
-	va_list adx;
-
-	va_start(adx, fmt);
-	ipsec_rl_strlog(info.mi_idnum, 0, level, sl, fmt, adx);
-	va_end(adx);
 }
 
 /*

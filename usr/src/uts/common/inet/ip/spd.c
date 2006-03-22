@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -799,9 +798,6 @@ ipsec_clone_system_policy(void)
  * Extract the string from ipsec_policy_failure_msgs[type] and
  * log it.
  *
- * This function needs to be kept in synch with ipsec_rl_strlog() in
- * sadb.c.
- * XXX this function should be combined with the ipsec_rl_strlog() function.
  */
 void
 ipsec_log_policy_failure(queue_t *q, int type, char *func_name, ipha_t *ipha,
@@ -811,7 +807,7 @@ ipsec_log_policy_failure(queue_t *q, int type, char *func_name, ipha_t *ipha,
 	char	dbuf[INET6_ADDRSTRLEN];
 	char	*s;
 	char	*d;
-	hrtime_t current = gethrtime();
+	short mid = 0;
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ip6h == NULL && ipha != NULL));
@@ -828,19 +824,43 @@ ipsec_log_policy_failure(queue_t *q, int type, char *func_name, ipha_t *ipha,
 	/* Always bump the policy failure counter. */
 	ipsec_policy_failure_count[type]++;
 
-	/* Convert interval (in msec) to hrtime (in nsec), which means * 10^6 */
-	if (ipsec_policy_failure_last +
-	    ((hrtime_t)ipsec_policy_log_interval * (hrtime_t)1000000) <=
-	    current) {
-		/*
-		 * Throttle the logging such that I only log one message
-		 * every 'ipsec_policy_log_interval' amount of time.
-		 */
-		(void) mi_strlog(q, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
-		    ipsec_policy_failure_msgs[type],
-		    func_name,
-		    (secure ? "secure" : "not secure"), s, d);
-		ipsec_policy_failure_last = current;
+	if (q != NULL) {
+		mid = q->q_qinfo->qi_minfo->mi_idnum;
+	}
+	ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+		ipsec_policy_failure_msgs[type],
+		func_name,
+		(secure ? "secure" : "not secure"), s, d);
+}
+
+/*
+ * Rate-limiting front-end to strlog() for AH and ESP.	Uses the ndd variables
+ * in /dev/ip and the same rate-limiting clock so that there's a single
+ * knob to turn to throttle the rate of messages.
+ */
+void
+ipsec_rl_strlog(short mid, short sid, char level, ushort_t sl, char *fmt, ...)
+{
+	va_list adx;
+	hrtime_t current = gethrtime();
+
+	sl |= SL_CONSOLE;
+	/*
+	 * Throttle logging to stop syslog from being swamped. If variable
+	 * 'ipsec_policy_log_interval' is zero, don't log any messages at
+	 * all, otherwise log only one message every 'ipsec_policy_log_interval'
+	 * msec. Convert interval (in msec) to hrtime (in nsec).
+	 */
+
+	if (ipsec_policy_log_interval) {
+		if (ipsec_policy_failure_last +
+		    ((hrtime_t)ipsec_policy_log_interval * (hrtime_t)1000000) <=
+		    current) {
+			va_start(adx, fmt);
+			(void) vstrlog(mid, sid, level, sl, fmt, adx);
+			va_end(adx);
+			ipsec_policy_failure_last = current;
+		}
 	}
 }
 
@@ -1590,6 +1610,7 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 	ipsec_action_t *ap;
 	const char *reason = "no policy actions found";
 	mblk_t *data_mp, *ipsec_mp;
+	short mid = 0;
 	kstat_named_t *counter = &ipdrops_spd_got_secure;
 
 	data_mp = first_mp->b_cont;
@@ -1640,7 +1661,10 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 		}
 	}
 drop:
-	(void) mi_strlog(q, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
+	if (q != NULL) {
+		mid = q->q_qinfo->qi_minfo->mi_idnum;
+	}
+	ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 	    "ipsec inbound policy mismatch: %s, packet dropped\n",
 	    reason);
 	IPPOL_REFRELE(ipsp);
@@ -2167,6 +2191,8 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 {
 	ipsec_in_t *ii;
 	boolean_t ret;
+	queue_t *q;
+	short mid = 0;
 	mblk_t *mp = mctl_present ? first_mp->b_cont : first_mp;
 	mblk_t *ipsec_mp = mctl_present ? first_mp : NULL;
 	ipsec_latch_t *ipl;
@@ -2196,14 +2222,14 @@ clear:
 					BUMP_MIB(&ip_mib, ipsecInSucceeded);
 					return (first_mp);
 				} else {
-					ip_drop_packet(first_mp, B_TRUE, NULL,
-					    NULL, &ipdrops_spd_got_clear,
-					    &spd_dropper);
 					ipsec_log_policy_failure(
 					    CONNP_TO_WQ(connp),
 					    IPSEC_POLICY_MISMATCH,
 					    "ipsec_check_inbound_policy", ipha,
 					    ip6h, B_FALSE);
+					ip_drop_packet(first_mp, B_TRUE, NULL,
+					    NULL, &ipdrops_spd_got_clear,
+					    &spd_dropper);
 					BUMP_MIB(&ip_mib, ipsecInFailed);
 					return (NULL);
 				}
@@ -2272,8 +2298,11 @@ clear:
 			BUMP_MIB(&ip_mib, ipsecInSucceeded);
 			return (first_mp);
 		}
-		(void) mi_strlog(CONNP_TO_WQ(connp), 0,
-		    SL_ERROR|SL_WARN|SL_CONSOLE,
+		q = CONNP_TO_WQ(connp);
+		if (q != NULL) {
+			mid = q->q_qinfo->qi_minfo->mi_idnum;
+		}
+		ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
 		    "ipsec inbound policy mismatch: %s, packet dropped\n",
 		    reason);
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
@@ -3693,12 +3722,18 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
     uint8_t proto)
 {
 	mblk_t *ipsec_mp;
+	queue_t *q;
+	short mid = 0;
 
 	ASSERT((pol != NULL) || (connp != NULL));
 
 	ipsec_mp = ipsec_alloc_ipsec_out();
 	if (ipsec_mp == NULL) {
-		(void) mi_strlog(CONNP_TO_WQ(connp), 0, SL_ERROR|SL_NOTE,
+		q = CONNP_TO_WQ(connp);
+		if (q != NULL) {
+			mid = q->q_qinfo->qi_minfo->mi_idnum;
+		}
+		ipsec_rl_strlog(mid, 0, 0, SL_ERROR|SL_NOTE,
 		    "ipsec_attach_ipsec_out: Allocation failure\n");
 		BUMP_MIB(&ip_mib, ipOutDiscards);
 		ip_drop_packet(mp, B_FALSE, NULL, NULL, &ipdrops_spd_nomem,

@@ -498,7 +498,6 @@ fcnname/**/_info:							\
 	WSTUB(ipsecah,	sadb_alg_update,	nomod_zero);
 	WSTUB(ipsecah,	sadb_unlinkassoc,	nomod_zero);
 	WSTUB(ipsecah,	sadb_insertassoc,	nomod_zero);
-	WSTUB(ipsecah,	ipsecah_rl_strlog,	nomod_zero);
 	WSTUB(ipsecah,	ipsecah_in_assocfailure,	nomod_zero);
 	WSTUB(ipsecah,	sadb_set_lpkt,		nomod_zero);
 	WSTUB(ipsecah,	ipsecah_icmp_error,	nomod_zero);
