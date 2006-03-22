@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,13 +541,13 @@ lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  * the lofi_ioctl structure.
  */
 struct lofi_ioctl *
-copy_in_lofi_ioctl(const struct lofi_ioctl *ulip)
+copy_in_lofi_ioctl(const struct lofi_ioctl *ulip, int flag)
 {
 	struct lofi_ioctl *klip;
 	int	error;
 
 	klip = kmem_alloc(sizeof (struct lofi_ioctl), KM_SLEEP);
-	error = copyin(ulip, klip, sizeof (struct lofi_ioctl));
+	error = ddi_copyin(ulip, klip, sizeof (struct lofi_ioctl), flag);
 	if (error) {
 		kmem_free(klip, sizeof (struct lofi_ioctl));
 		return (NULL);
@@ -566,11 +565,12 @@ copy_in_lofi_ioctl(const struct lofi_ioctl *ulip)
 }
 
 int
-copy_out_lofi_ioctl(const struct lofi_ioctl *klip, struct lofi_ioctl *ulip)
+copy_out_lofi_ioctl(const struct lofi_ioctl *klip, struct lofi_ioctl *ulip,
+	int flag)
 {
 	int	error;
 
-	error = copyout(klip, ulip, sizeof (struct lofi_ioctl));
+	error = ddi_copyout(klip, ulip, sizeof (struct lofi_ioctl), flag);
 	if (error)
 		return (EFAULT);
 	return (0);
@@ -715,7 +715,7 @@ fake_disk_geometry(struct lofi_state *lsp)
  */
 static int
 lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
-    int *rvalp, struct cred *credp)
+    int *rvalp, struct cred *credp, int ioctl_flag)
 {
 	minor_t	newminor;
 	struct lofi_state *lsp;
@@ -731,7 +731,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	dev_t	newdev;
 	int zalloced = 0;
 
-	klip = copy_in_lofi_ioctl(ulip);
+	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
 		return (EFAULT);
 
@@ -884,7 +884,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 
 	fake_disk_geometry(lsp);
 	mutex_exit(&lofi_lock);
-	(void) copy_out_lofi_ioctl(klip, ulip);
+	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 	free_lofi_ioctl(klip);
 	return (0);
 
@@ -907,7 +907,7 @@ out:
  */
 static int
 lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
-    struct cred *credp)
+    struct cred *credp, int ioctl_flag)
 {
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
@@ -915,7 +915,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	char	namebuf[20];
 	dev_t	newdev;
 
-	klip = copy_in_lofi_ioctl(ulip);
+	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
 		return (EFAULT);
 
@@ -965,7 +965,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	ddi_soft_state_free(lofi_statep, minor);
 	klip->li_minor = minor;
 	mutex_exit(&lofi_lock);
-	(void) copy_out_lofi_ioctl(klip, ulip);
+	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 	free_lofi_ioctl(klip);
 	return (0);
 }
@@ -977,7 +977,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 /*ARGSUSED3*/
 static int
 lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
-    struct cred *credp)
+    struct cred *credp, int ioctl_flag)
 {
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
@@ -987,7 +987,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 #ifdef lint
 	dev = dev;
 #endif
-	klip = copy_in_lofi_ioctl(ulip);
+	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
 		return (EFAULT);
 
@@ -1008,7 +1008,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		}
 		(void) strcpy(klip->li_filename, lsp->ls_filename);
 		mutex_exit(&lofi_lock);
-		error = copy_out_lofi_ioctl(klip, ulip);
+		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
 		return (error);
 	case LOFI_GET_MINOR:
@@ -1019,7 +1019,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 			free_lofi_ioctl(klip);
 			return (ENOENT);
 		}
-		error = copy_out_lofi_ioctl(klip, ulip);
+		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
 		return (error);
 	default:
@@ -1056,28 +1056,28 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		case LOFI_MAP_FILE:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_map_file(dev, lip, 1, rvalp, credp));
+			return (lofi_map_file(dev, lip, 1, rvalp, credp, flag));
 		case LOFI_MAP_FILE_MINOR:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_map_file(dev, lip, 0, rvalp, credp));
+			return (lofi_map_file(dev, lip, 0, rvalp, credp, flag));
 		case LOFI_UNMAP_FILE:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_unmap_file(dev, lip, 1, credp));
+			return (lofi_unmap_file(dev, lip, 1, credp, flag));
 		case LOFI_UNMAP_FILE_MINOR:
 			if ((flag & FWRITE) == 0)
 				return (EPERM);
-			return (lofi_unmap_file(dev, lip, 0, credp));
+			return (lofi_unmap_file(dev, lip, 0, credp, flag));
 		case LOFI_GET_FILENAME:
 			return (lofi_get_info(dev, lip, LOFI_GET_FILENAME,
-			    credp));
+			    credp, flag));
 		case LOFI_GET_MINOR:
 			return (lofi_get_info(dev, lip, LOFI_GET_MINOR,
-			    credp));
+			    credp, flag));
 		case LOFI_GET_MAXMINOR:
-			error = copyout(&lofi_max_files, &lip->li_minor,
-			    sizeof (lofi_max_files));
+			error = ddi_copyout(&lofi_max_files, &lip->li_minor,
+			    sizeof (lofi_max_files), flag);
 			if (error)
 				return (EFAULT);
 			return (0);
@@ -1116,24 +1116,24 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		}
 		return (0);
 	case DKIOCINFO:
-		error = copyout(&lsp->ls_ci, (void *)arg,
-		    sizeof (struct dk_cinfo));
+		error = ddi_copyout(&lsp->ls_ci, (void *)arg,
+		    sizeof (struct dk_cinfo), flag);
 		if (error)
 			return (EFAULT);
 		return (0);
 	case DKIOCG_VIRTGEOM:
 	case DKIOCG_PHYGEOM:
 	case DKIOCGGEOM:
-		error = copyout(&lsp->ls_dkg, (void *)arg,
-		    sizeof (struct dk_geom));
+		error = ddi_copyout(&lsp->ls_dkg, (void *)arg,
+		    sizeof (struct dk_geom), flag);
 		if (error)
 			return (EFAULT);
 		return (0);
 	case DKIOCSTATE:
 		/* the file is always there */
 		dkstate = DKIO_INSERTED;
-		error = copyout(&dkstate, (void *)arg,
-		    sizeof (enum dkio_state));
+		error = ddi_copyout(&dkstate, (void *)arg,
+		    sizeof (enum dkio_state), flag);
 		if (error)
 			return (EFAULT);
 		return (0);
