@@ -315,6 +315,7 @@ COMMON_SUBDIRS = \
 	lib/libgen \
 	lib/libgss \
 	lib/libinetcfg \
+	lib/libinetsvc \
 	lib/libinetutil \
 	lib/libipmp \
 	lib/libipp \
@@ -366,6 +367,7 @@ COMMON_SUBDIRS = \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \
+	lib/print \
 	lib/fm \
 	lib/udapl \
 	psm \

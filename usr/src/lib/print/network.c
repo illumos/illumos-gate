@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +43,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <syslog.h>
+#include <sys/utsname.h>
 
 #include <print/network.h>
 #include <print/misc.h>
@@ -69,7 +69,6 @@ null(int i)
 	syslog(LOG_DEBUG, "null(%d)", i);
 }
 
-
 /*
  *  net_open() opens a tcp connection to the printer port on the host specified
  *	in the arguments passed in.  If the connection is not made in the
@@ -84,6 +83,7 @@ net_open(char *host, int timeout)
 	struct servent *sp;
 	struct sockaddr_in6 sin;
 	void (*old_handler)();
+	static struct utsname uts;
 
 	int	s,
 		lport,
@@ -99,6 +99,7 @@ net_open(char *host, int timeout)
 	if (host == NULL) {
 		return (-1);
 	}
+
 	(void) memset((char *)&sin, NULL, sizeof (sin));
 	if ((hp = getipnodebyname(host, AF_INET6, AI_DEFAULT,
 		    &error_num)) == NULL) {
@@ -121,7 +122,7 @@ retry:
 	 * Try connecting to the server.
 	 *
 	 * Use 0 as lport means that rresvport_af() will bind to a port in
-	 * the anonymous priviledged port range.
+	 * the anonymous privileged port range.
 	 */
 	lport = 0;
 	s = rresvport_af(&lport, AF_INET6);
@@ -137,6 +138,18 @@ retry:
 		(void) close(s);
 		errno = err;
 		if (errno == EADDRINUSE) {
+			goto retry;
+		}
+		/*
+		 * If connecting to the local system fails, try
+		 * again with "localhost" address instead.
+		 */
+		if (uts.nodename[0] == '\0')
+			(void) uname(&uts);
+		if (strcmp(host, uts.nodename) == 0) {
+			IN6_IPADDR_TO_V4MAPPED(htonl(INADDR_LOOPBACK),
+			    &sin.sin6_addr);
+			sin.sin6_family = AF_INET6;
 			goto retry;
 		}
 		if (errno == ECONNREFUSED && timo <= 16) {
@@ -223,6 +236,7 @@ net_response(int nd)
  *  net_printf() sends a text message out to the network connection supplied
  *	using the same semantics as printf(3C) for stdio.
  */
+/*PRINTFLIKE2*/
 int
 net_printf(int nd, char *fmt, ...)
 {
@@ -286,6 +300,7 @@ net_gets(char *buf, int bufSize, int nd)
  *  net_send_message() sends a message out the network connection using
  *	net_printf() and returns the result from net_response()
  */
+/*PRINTFLIKE2*/
 int
 net_send_message(int nd, char *fmt, ...)
 {

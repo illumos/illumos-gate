@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,7 +541,7 @@ job_destroy(job_t *job)
 				}
 
 				if (st.st_uid == getuid()) {
-					unlink(path);
+					(void) unlink(path);
 					free(path);
 					continue;
 				}
@@ -552,14 +551,14 @@ job_destroy(job_t *job)
 					*++p = NULL;
 
 				if (access(p, W_OK) == 0)
-					unlink(path);
+					(void) unlink(path);
 				free(path);
 			}
 		}
 	}
 	(void) seteuid(0); /* get back privilege */
 
-	unlink(cf->jf_src_path);
+	(void) unlink(cf->jf_src_path);
 	(void) _job_unlink_data_file(cf);
 	job_free(job);
 }
@@ -665,7 +664,7 @@ job_store(job_t *job)
 	}
 
 	if (write_buffer(buf, cf->jf_data, strlen(cf->jf_data)) < 0) {
-		unlink(cf->jf_src_path);
+		(void) unlink(cf->jf_src_path);
 		return (-1);
 	}
 
@@ -736,7 +735,7 @@ job_retrieve(char *xFile, char *spool)
 			if (fd >= 0)
 				close(fd);
 			if (lck == 0)
-				unlink(xFile);
+				(void) unlink(xFile);
 			return (NULL);
 		}
 
@@ -775,8 +774,8 @@ job_retrieve(char *xFile, char *spool)
 				tmp->job_id,
 				(tmp->job_printer ? tmp->job_printer : "NULL"),
 				(tmp->job_server ? tmp->job_server : "NULL"));
-			unlink(file->jf_spl_path);  /* control file */
-			unlink(file->jf_src_path);  /* binding file */
+			(void) unlink(file->jf_spl_path);  /* control file */
+			(void) unlink(file->jf_src_path);  /* binding file */
 			free(tmp);
 			free(file);
 			return (NULL);
@@ -862,8 +861,8 @@ job_retrieve(char *xFile, char *spool)
 				tmp->job_id,
 				(tmp->job_printer ? tmp->job_printer : "NULL"),
 				(tmp->job_server ? tmp->job_server : "NULL"));
-			unlink(file->jf_spl_path);  /* control file */
-			unlink(file->jf_src_path);  /* binding file */
+			(void) unlink(file->jf_spl_path);  /* control file */
+			(void) unlink(file->jf_src_path);  /* binding file */
 			free(tmp);
 			free(file);
 			return (NULL);

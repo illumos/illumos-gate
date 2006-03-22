@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,17 +122,17 @@ _file_put_printer(const char *file, const ns_printer_t *printer)
 		}
 		if (lockf(fd, F_TLOCK, 0) == 0)
 			break;
-		close(fd);
+		(void) close(fd);
 	}
 
 	if ((ifp = fdopen(fd, "r")) == NULL) {
-		close(fd);
+		(void) close(fd);
 		free(tmpfile);
 		return (-1);
 	}
 
 	if ((fd = mkstemp(tmpfile)) < 0) {
-		fclose(ifp);
+		(void) fclose(ifp);
 		free(tmpfile);
 		return (-1);
 	}
@@ -181,10 +180,10 @@ _file_put_printer(const char *file, const ns_printer_t *printer)
 		}
 
 		(void) fclose(ofp);
-		rename(tmpfile, file);
+		(void) rename(tmpfile, file);
 	} else {
-		close(fd);
-		unlink(tmpfile);
+		(void) close(fd);
+		(void) unlink(tmpfile);
 		exit_status = -1;
 	}
 
@@ -231,7 +230,7 @@ remote_command(char *command, char *host)
 		if ((fd = rcmd_af(&host, htons(514), pw->pw_name, "root",
 				command, NULL, AF_INET6)) < 0)
 			return (-1);
-		close(fd);
+		(void) close(fd);
 		return (0);
 	} else
 		return (-1);
@@ -373,16 +372,16 @@ nisplus_put_printer(const ns_printer_t *printer)
 		/* Append key/value pairs */
 		for (kvp = printer->attributes; *kvp != NULL; kvp++)
 			if (((*kvp)->key != NULL) && ((*kvp)->value != NULL)) {
-			strlcat(cmd, ":", sizeof (cmd));
-			strncat_escaped(cmd, (*kvp)->key, sizeof (cmd),
-				ESCAPE_CHARS);
-			strlcat(cmd, "=", sizeof (cmd));
-			strncat_escaped(cmd, (*kvp)->value,
-			sizeof (cmd), ESCAPE_CHARS);
+			(void) strlcat(cmd, ":", sizeof (cmd));
+			(void) strncat_escaped(cmd, (*kvp)->key, sizeof (cmd),
+			    ESCAPE_CHARS);
+			(void) strlcat(cmd, "=", sizeof (cmd));
+			(void) strncat_escaped(cmd, (*kvp)->value,
+			    sizeof (cmd), ESCAPE_CHARS);
 	}
 
 		if (len != strlen(cmd))
-			strlcat(cmd, " printers.org_dir", sizeof (cmd));
+			(void) strlcat(cmd, " printers.org_dir", sizeof (cmd));
 		else
 			(void) snprintf(cmd, sizeof (cmd), NISPLUS_REMOVE,
 						printer->name);

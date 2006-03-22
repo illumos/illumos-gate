@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -524,6 +523,35 @@ destroy_basic_cfg(basic_cfg_t *cfg)
 }
 
 /*
+ * Overwrite the socket address with the address specified by the
+ * bind_addr property.
+ */
+static int
+set_bind_addr(struct sockaddr_storage *ss, char *bind_addr)
+{
+	struct addrinfo hints, *res;
+
+	if (bind_addr == NULL || bind_addr[0] == '\0')
+		return (0);
+
+	(void) memset(&hints, 0, sizeof (hints));
+	hints.ai_flags = AI_DEFAULT;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = ss->ss_family;
+	if (getaddrinfo(bind_addr, "", &hints, &res) != 0) {
+		return (-1);
+	} else {
+		void *p = res->ai_addr;
+		struct sockaddr_storage *newss = p;
+
+		(void) memcpy(SS_SINADDR(*ss), SS_SINADDR(*newss),
+		    SS_ADDRLEN(*ss));
+		freeaddrinfo(res);
+		return (0);
+	}
+}
+
+/*
  * valid_props validates all the properties in an array of inetd_prop_t's,
  * marking each property as valid or invalid.  If any properties are invalid,
  * it returns B_FALSE, otherwise it returns B_TRUE.  Note that some properties
@@ -625,13 +653,18 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 	}
 
 	/* Check that the socket type is one of the acceptable values. */
-
 	cfg->istlx = B_FALSE;
 	if ((prop[PT_SOCK_TYPE_INDEX].ip_error == IVE_UNSET) ||
 	    ((sock_type_id = get_sock_type_id(
 	    prop[PT_SOCK_TYPE_INDEX].ip_value.iv_string)) == -1) &&
 	    !(cfg->istlx = is_tlx_service(prop)))
 		prop[PT_SOCK_TYPE_INDEX].ip_error = IVE_INVALID;
+
+	/* Get the bind address */
+	if (!cfg->istlx && ((prop[PT_BIND_ADDR_INDEX].ip_error == IVE_UNSET) ||
+	    ((cfg->bind_addr =
+	    strdup(prop[PT_BIND_ADDR_INDEX].ip_value.iv_string)) == NULL)))
+		prop[PT_BIND_ADDR_INDEX].ip_error = IVE_INVALID;
 
 	/*
 	 * Iterate through all the different protos/netids resulting from the
@@ -787,6 +820,10 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 					ss->ss_family = AF_INET;
 					((struct sockaddr_in *)ss)->sin_addr.
 					    s_addr = htonl(INADDR_ANY);
+				}
+				if (set_bind_addr(ss, cfg->bind_addr) != 0) {
+					prop[PT_BIND_ADDR_INDEX].ip_error =
+					    IVE_INVALID;
 				}
 			}
 		}
@@ -994,6 +1031,7 @@ valid_default_prop(const char *name, const void *value)
 	return (B_FALSE);
 }
 
+/*ARGSUSED*/
 scf_error_t
 read_prop(scf_handle_t *h, inetd_prop_t *iprop, int index, const char *inst,
     const char *pg_name)
