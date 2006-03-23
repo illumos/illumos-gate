@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +56,8 @@ typedef enum {
 	LQS_WHEEL_COUNT_PENDING = 2,		/* wait for wheel count ACK */
 	LQS_SET_VUID_FORMAT_PENDING = 3,	/* wait for set format ACK */
 	LQS_SET_WHEEL_STATE_PENDING = 4,	/* wait for wheel state ACK */
-	LQS_SET_RESOLUTION_PENDING = 5,		/* wait for resolution ACK */
-	LQS_SET_PARMS_PENDING = 6,		/* wait for parameters ACK */
+	LQS_SET_PARMS_PENDING = 5,		/* wait for parameters ACK */
+	LQS_SET_RESOLUTION_PENDING = 6,		/* wait for resolution ACK */
 	LQS_DONE = 7				/* mark end of initialization */
 } consms_lq_state_t;
 

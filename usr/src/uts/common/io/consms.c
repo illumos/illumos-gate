@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -811,7 +810,26 @@ consms_lqs_ack_complete(consms_lq_t *lq, mblk_t *mp)
 
 		case LQS_SET_WHEEL_STATE_PENDING:
 			/*
-			 * Fifth, issue MSIOSRESOLUTION ioctl
+			 * Fifth,  issue MSIOSETPARMS ioctl
+			 * to set the parameters for USB mouse.
+			 */
+			req = mkiocb(MSIOSETPARMS);
+			if (req && ((req->b_cont = allocb(sizeof (Ms_parms),
+			    BPRI_MED)) == NULL)) {
+				freemsg(req);
+				req = NULL;
+			}
+			if (req) {
+				params = (Ms_parms *)req->b_cont->b_wptr;
+				*params = consms_state.consms_ms_parms;
+				req->b_cont->b_wptr += sizeof (Ms_parms);
+			}
+			lq->lq_state++;
+			break;
+
+		case LQS_SET_PARMS_PENDING:
+			/*
+			 * Sixth, issue MSIOSRESOLUTION ioctl
 			 * to set the screen resolution for absolute mouse.
 			 */
 			req = mkiocb(MSIOSRESOLUTION);
@@ -832,25 +850,6 @@ consms_lqs_ack_complete(consms_lq_t *lq, mblk_t *mp)
 			break;
 
 		case LQS_SET_RESOLUTION_PENDING:
-			/*
-			 * Sixth, issue MSIOSETPARMS ioctl
-			 * to set the parameters for USB mouse.
-			 */
-			req = mkiocb(MSIOSETPARMS);
-			if (req && ((req->b_cont = allocb(sizeof (Ms_parms),
-			    BPRI_MED)) == NULL)) {
-				freemsg(req);
-				req = NULL;
-			}
-			if (req) {
-				params = (Ms_parms *)req->b_cont->b_wptr;
-				*params = consms_state.consms_ms_parms;
-				req->b_cont->b_wptr += sizeof (Ms_parms);
-			}
-			lq->lq_state++;
-			break;
-
-		case LQS_SET_PARMS_PENDING:
 			/*
 			 * All jobs are done, lq->lq_state is turned into
 			 * LQS_DONE, and this lq is added into our list.

@@ -176,6 +176,7 @@ static int		usbms_service_wheel_state(
 				uint_t	cmd);
 static void		usbms_ack_ioctl(mblk_t	*);
 static int		usbms_read_input_data_format(usbms_state_t *);
+static mblk_t		*usbms_setup_abs_mouse_event();
 static int		usbms_get_coordinate(
 				uint_t			pos,
 				uint_t			len,
@@ -1032,6 +1033,8 @@ usbms_ioctl(register queue_t		*q,
 	int				err = 0;
 	mblk_t				*datap;
 	ushort_t			transparent = 0;
+	boolean_t			report_abs = B_FALSE;
+	mblk_t	*mb;
 
 	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbms_log_handle,
 		"usbms_ioctl entering");
@@ -1268,6 +1271,15 @@ usbms_ioctl(register queue_t		*q,
 		}
 		datap = mp->b_cont;
 		err = usbms_get_screen_parms(q, datap);
+		/*
+		 * Create the absolute mouse type event.
+		 * It is used for the hotplug absolute mouse.
+		 */
+		if ((!((usbmsp->usbms_idf).xattr & HID_MAIN_ITEM_RELATIVE)) &&
+		    (usbmsp->usbms_rpt_abs == B_FALSE)) {
+			report_abs = B_TRUE;
+		}
+
 		break;
 
 	default:
@@ -1283,6 +1295,14 @@ usbms_ioctl(register queue_t		*q,
 		iocp->ioc_error = 0;
 		mp->b_datap->db_type = M_IOCACK;
 		qreply(q, mp);
+
+		if (report_abs == B_TRUE) {
+			/* send the abs mouse type event to the upper level */
+			if ((mb = usbms_setup_abs_mouse_event()) != NULL) {
+				usbmsp->usbms_rpt_abs = B_TRUE;
+				qreply(q, mb);
+			}
+		}
 	}
 
 	return;
@@ -2174,6 +2194,33 @@ usbms_ack_ioctl(mblk_t	*mp)
 
 
 /*
+ * usbms_setup_abs_mouse_event() :
+ *	Called from MSIOSRESOLUTION ioctl to create
+ *	the absolute mouse type firm event.
+ */
+static mblk_t *
+usbms_setup_abs_mouse_event()
+{
+	mblk_t	*mb;
+	Firm_event *fep;
+
+	if ((mb = allocb(sizeof (Firm_event), BPRI_HI)) != NULL) {
+		fep = (Firm_event *)mb->b_wptr;
+		fep->id = MOUSE_TYPE_ABSOLUTE;
+		fep->pair_type = FE_PAIR_NONE;
+		fep->pair = NULL;
+		fep->value = NULL;
+		mb->b_wptr += sizeof (Firm_event);
+	} else {
+		USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
+		    "No resource to report ABS mouse event");
+	}
+
+	return (mb);
+}
+
+
+/*
  * usbms_read_input_data_format() :
  *	Get the mouse packet length and usages' length.
  *	Check whether X and Y are relative or absolute.
@@ -2192,10 +2239,11 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 	uint32_t	rptcnt, rptsz;
 	usbms_idf *idf = &(usbmsp->usbms_idf);
 	Ms_screen_resolution *res = &(usbmsp->usbms_resolution);
-	Firm_event *fep;
 	mblk_t *mb;
 	register queue_t 	*q;
 	int	rval;
+
+	usbmsp->usbms_rpt_abs = B_FALSE;
 
 	/* allocate hidparser report structure */
 	ms_rpt = kmem_zalloc(sizeof (hidparser_rpt_t), KM_SLEEP);
@@ -2334,24 +2382,12 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 
 		/* The wheel is not supported in current remote kvms. */
 		usbmsp->usbms_num_wheels = 0;
-
-		if ((mb = allocb(sizeof (Firm_event), BPRI_HI)) ==
-		    NULL) {
+		q = usbmsp->usbms_rq_ptr;
+		if ((mb = usbms_setup_abs_mouse_event()) != NULL) {
+			putnext(q, mb);
+		} else {
 
 			return (USB_NO_RESOURCES);
-		} else {
-			/*
-			 * notify the upper that it is an absolute mouse
-			 */
-			q = usbmsp->usbms_rq_ptr;
-
-			fep = (Firm_event *)mb->b_wptr;
-			fep->id = MOUSE_TYPE_ABSOLUTE;
-			fep->pair_type = FE_PAIR_NONE;
-			fep->pair = NULL;
-			fep->value = NULL;
-			mb->b_wptr += sizeof (Firm_event);
-			putnext(q, mb);
 		}
 	}
 

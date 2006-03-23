@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -144,6 +143,10 @@ typedef struct usbms_state {
 
 	Ms_screen_resolution	usbms_resolution;
 
+	/* report the abs mouse event to upper level once */
+
+	boolean_t	usbms_rpt_abs;
+
 	usbms_idf	usbms_idf;
 	struct		usbmousebuf *usbms_buf;
 } usbms_state_t;
@@ -180,6 +183,7 @@ typedef struct usbms_state {
 #define	USBMS_WAIT_X		1	/* Delta X byte */
 #define	USBMS_WAIT_Y    	2	/* Delta Y byte */
 #define	USBMS_WAIT_WHEEL	3	/* Wheel Byte	*/
+
 
 /*
  * default resolution, 1024x768.
