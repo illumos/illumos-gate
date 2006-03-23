@@ -1232,7 +1232,6 @@ nfs4_callback_fini_zone(zoneid_t zoneid, void *data)
 	sp = freelist.forw;
 	while (sp != &freelist) {
 		next = sp->forw;
-		sp->forw = sp->back = NULL;
 		nfs4_server_rele(sp);	/* free the list's reference */
 		sp = next;
 	}
