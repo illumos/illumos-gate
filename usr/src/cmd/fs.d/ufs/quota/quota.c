@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,8 +109,6 @@ main(int argc, char *argv[])
 			break;
 
 		case '?':
-			fprintf(stderr, "quota: %c: unknown option\n",
-				opt);
 			fprintf(stderr, "ufs usage: quota [-v] [username]\n");
 			exit(32);
 		}

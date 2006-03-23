@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -534,10 +534,21 @@ mountfs(struct mnttab *mnt)
 	 * logging option if its not specified.
 	 */
 	if (gflg || findopt(mnt->mnt_mntopts, MNTOPT_GLOBAL)) {
-		if (mnt->mnt_mntopts != '\0')
-			(void) strcat(mnt->mnt_mntopts, ",");
-		(void) strcat(mnt->mnt_mntopts, MNTOPT_LOGGING);
-		args.flags |= UFSMNT_LOGGING;
+		if (!flags & MS_RDONLY) {
+			if (mnt->mnt_mntopts != '\0')
+				(void) strcat(mnt->mnt_mntopts, ",");
+			(void) strcat(mnt->mnt_mntopts, MNTOPT_LOGGING);
+			args.flags |= UFSMNT_LOGGING;
+		} else {
+			/*
+			 * Turn off logging for read only global mounts.
+			 * It was set to logging as default above.
+			 */
+			if (mnt->mnt_mntopts != '\0')
+				(void) strcat(mnt->mnt_mntopts, ",");
+			(void) strcat(mnt->mnt_mntopts, MNTOPT_NOLOGGING);
+			args.flags &= ~UFSMNT_LOGGING;
+		}
 	}
 
 again:	if (mount(mnt->mnt_special, mnt->mnt_mountp, flags, fstype,
