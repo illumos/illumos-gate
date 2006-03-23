@@ -452,6 +452,10 @@ cleanup_cpu_common(int cpuid)
 	/* Free cpu module private data structures, including scrubber. */
 	cpu_uninit_private(cp);
 
+	/* Free cpu ID string and brand string. */
+	kmem_free(cp->cpu_idstr, strlen(cp->cpu_idstr) + 1);
+	kmem_free(cp->cpu_brandstr, strlen(cp->cpu_brandstr) + 1);
+
 	cpu_vm_data_destroy(cp);
 
 	/*
