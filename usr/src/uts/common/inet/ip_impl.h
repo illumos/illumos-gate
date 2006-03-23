@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -397,6 +396,13 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 
 /*
  * These are used by the synchronous streams code in tcp and udp.
+ * When we set the flags for a wakeup from a synchronous stream we
+ * always set RSLEEP in sd_wakeq, even if we have a read thread waiting
+ * to do the io. This is in case the read thread gets interrupted
+ * before completing the io. The RSLEEP flag in sd_wakeq is used to
+ * indicate that there is data available at the synchronous barrier.
+ * The assumption is that subsequent functions calls through rwnext()
+ * will reset sd_wakeq appropriately.
  */
 #define	STR_WAKEUP_CLEAR(stp) {						\
 	mutex_enter(&stp->sd_lock);					\
@@ -409,9 +415,8 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	if (stp->sd_flag & RSLEEP) {					\
 		stp->sd_flag &= ~RSLEEP;				\
 		cv_broadcast(&_RD(stp->sd_wrq)->q_wait);		\
-	} else {							\
-		stp->sd_wakeq |= RSLEEP;				\
 	}								\
+	stp->sd_wakeq |= RSLEEP;					\
 	mutex_exit(&stp->sd_lock);					\
 }
 
