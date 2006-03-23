@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,9 +208,6 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 
 /*
  * zfs_log_write() handles TX_WRITE transactions.
- *
- * We store data in the log buffers if it small enough.
- * Otherwise we flush the data out via dmu_sync().
  */
 ssize_t zfs_immediate_write_sz = 65536;
 
@@ -222,26 +218,57 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	itx_t *itx;
 	uint64_t seq;
 	lr_write_t *lr;
-	int dlen, err;
+	itx_wr_state_t write_state;
+	size_t dlen;
+	int err;
 
 	if (zilog == NULL || zp->z_reap)
 		return (0);
 
-	dlen = (len <= zfs_immediate_write_sz ? len : 0);
+	/*
+	 * Writes are handled in three different ways:
+	 *
+	 * WR_INDIRECT:
+	 *    If the write is greater than zfs_immediate_write_sz then
+	 *    later *if* we need to log the write then dmu_sync() is used
+	 *    to immediately write the block and it's block pointer is put
+	 *    in the log record.
+	 * WR_COPIED:
+	 *    If we know we'll immediately be committing the
+	 *    transaction (FDSYNC (O_DSYNC)), the we allocate a larger
+	 *    log record here for the data and copy the data in.
+	 * WR_NEED_COPY:
+	 *    Otherwise we don't allocate a buffer, and *if* we need to
+	 *    flush the write later then a buffer is allocated and
+	 *    we retrieve the data using the dmu.
+	 */
+	if (len > zfs_immediate_write_sz) {
+		dlen = 0;
+		write_state = WR_INDIRECT;
+	} else if (ioflag & FDSYNC) {
+		dlen = len;
+		write_state = WR_COPIED;
+	} else {
+		dlen = 0;
+		write_state = WR_NEED_COPY;
+	}
 	itx = zil_itx_create(txtype, sizeof (*lr) + dlen);
-	itx->itx_data_copied = 0;
-	if ((ioflag & FDSYNC) && (dlen != 0)) {
+	if (write_state == WR_COPIED) {
 		err = xcopyin(uio->uio_iov->iov_base - len,
-		    (char *)itx + offsetof(itx_t, itx_lr) +  sizeof (*lr),
-		    len);
+		    (char *)itx + offsetof(itx_t, itx_lr) + sizeof (*lr), len);
 		/*
-		 * copyin shouldn't fault as we've already successfully
+		 * xcopyin shouldn't error as we've already successfully
 		 * copied it to a dmu buffer. However if it does we'll get
 		 * the data from the dmu later.
 		 */
-		if (!err)
-			itx->itx_data_copied = 1;
+		if (err) {
+			kmem_free(itx, offsetof(itx_t, itx_lr)
+			    + itx->itx_lr.lrc_reclen);
+			itx = zil_itx_create(txtype, sizeof (*lr));
+			write_state = WR_NEED_COPY;
+		}
 	}
+	itx->itx_wr_state = write_state;
 	lr = (lr_write_t *)&itx->itx_lr;
 	lr->lr_foid = zp->z_id;
 	lr->lr_offset = off;

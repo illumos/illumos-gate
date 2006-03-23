@@ -690,7 +690,7 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t len,
 			return (error);
 		}
 	}
-	itx->itx_data_copied = 1;
+	itx->itx_wr_state = WR_COPIED;
 
 	(void) zil_itx_assign(zv->zv_zilog, itx, tx);
 

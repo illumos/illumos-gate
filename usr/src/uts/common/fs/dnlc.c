@@ -123,9 +123,9 @@ static nc_hash_t *dnlc_free_rotor;
  * normally chosen by a systems administrator
  */
 int ncsize = -1;
-uint32_t dnlc_nentries = 0;	/* current number of name cache entries */
-static int nc_hashsz;		/* size of hash table */
-static int nc_hashmask;		/* size of hash table minus 1 */
+volatile uint32_t dnlc_nentries = 0;	/* current num of name cache entries */
+static int nc_hashsz;			/* size of hash table */
+static int nc_hashmask;			/* size of hash table minus 1 */
 
 /*
  * The dnlc_reduce_cache() taskq queue is activated when there are
@@ -135,13 +135,15 @@ static int nc_hashmask;		/* size of hash table minus 1 */
  *
  * If a parameter is provided to dnlc_reduce_cache(), then we reduce
  * the size down based on ncsize_onepercent - where ncsize_onepercent
- * is 1% of ncsize.
+ * is 1% of ncsize; however, we never let dnlc_reduce_cache() reduce
+ * the size below 3% of ncsize (ncsize_min_percent).
  */
 #define	DNLC_LOW_WATER_DIVISOR_DEFAULT 100
 uint_t dnlc_low_water_divisor = DNLC_LOW_WATER_DIVISOR_DEFAULT;
 uint_t dnlc_nentries_low_water;
 int dnlc_reduce_idle = 1; /* no locking needed */
 uint_t ncsize_onepercent;
+uint_t ncsize_min_percent;
 
 /*
  * If dnlc_nentries hits dnlc_max_nentries (twice ncsize)
@@ -305,6 +307,7 @@ static void dnlc_dir_reclaim(void *unused);
 static void dnlc_dir_abort(dircache_t *dcp);
 static void dnlc_dir_adjust_fhash(dircache_t *dcp);
 static void dnlc_dir_adjust_nhash(dircache_t *dcp);
+static void do_dnlc_reduce_cache(void *);
 
 
 /*
@@ -339,6 +342,7 @@ dnlc_init()
 	}
 	dnlc_max_nentries = ncsize * 2;
 	ncsize_onepercent = ncsize / 100;
+	ncsize_min_percent = ncsize_onepercent * 3;
 
 	/*
 	 * Initialise the hash table.
@@ -965,6 +969,17 @@ dnlc_search(vnode_t *dp, char *name, uchar_t namlen, int hash)
 #error ncache_t name length representation is too small
 #endif
 
+void
+dnlc_reduce_cache(void *reduce_percent)
+{
+	if (dnlc_reduce_idle && (dnlc_nentries >= ncsize || reduce_percent)) {
+		dnlc_reduce_idle = 0;
+		if ((taskq_dispatch(system_taskq, do_dnlc_reduce_cache,
+		    reduce_percent, TQ_NOSLEEP)) == NULL)
+			dnlc_reduce_idle = 1;
+	}
+}
+
 /*
  * Get a new name cache entry.
  * If the dnlc_reduce_cache() taskq isn't keeping up with demand, or memory
@@ -989,11 +1004,7 @@ dnlc_get(uchar_t namlen)
 	}
 	ncp->namlen = namlen;
 	atomic_add_32(&dnlc_nentries, 1);
-	if (dnlc_reduce_idle && (dnlc_nentries >= ncsize)) {
-		dnlc_reduce_idle = 0;
-		(void) taskq_dispatch(system_taskq, dnlc_reduce_cache,
-		    NULL, TQ_SLEEP);
-	}
+	dnlc_reduce_cache(NULL);
 	return (ncp);
 }
 
@@ -1002,14 +1013,12 @@ dnlc_get(uchar_t namlen)
  * cache size to the low water mark if "reduce_percent" is not provided.
  * If "reduce_percent" is provided, reduce cache size by
  * (ncsize_onepercent * reduce_percent).
- *
- * This routine can also be called directly by ZFS's ARC when memory is low.
  */
 /*ARGSUSED*/
-void
-dnlc_reduce_cache(void *reduce_percent)
+static void
+do_dnlc_reduce_cache(void *reduce_percent)
 {
-	nc_hash_t *hp = dnlc_free_rotor;
+	nc_hash_t *hp = dnlc_free_rotor, *start_hp = hp;
 	vnode_t *vp;
 	ncache_t *ncp;
 	int cnt;
@@ -1018,29 +1027,39 @@ dnlc_reduce_cache(void *reduce_percent)
 	if (reduce_percent) {
 		uint_t reduce_cnt;
 
+		/*
+		 * Never try to reduce the current number
+		 * of cache entries below 3% of ncsize.
+		 */
+		if (dnlc_nentries <= ncsize_min_percent) {
+			dnlc_reduce_idle = 1;
+			return;
+		}
 		reduce_cnt = ncsize_onepercent *
 		    (uint_t)(uintptr_t)reduce_percent;
-		if (reduce_cnt > dnlc_nentries)
-			low_water = 0;
+
+		if (reduce_cnt > dnlc_nentries ||
+		    dnlc_nentries - reduce_cnt < ncsize_min_percent)
+			low_water = ncsize_min_percent;
 		else
 			low_water = dnlc_nentries - reduce_cnt;
 	}
 
 	do {
 		/*
-		 * Find the first non empty hash queue without locking
-		 * Recheck we really have entries to avoid
-		 * an infinite loop if all the entries get purged.
+		 * Find the first non empty hash queue without locking.
+		 * Only look at each hash queue once to avoid an infinite loop.
 		 */
 		do {
-			if (++hp == &nc_hash[nc_hashsz]) {
+			if (++hp == &nc_hash[nc_hashsz])
 				hp = nc_hash;
-				if (dnlc_nentries <= low_water) {
-					dnlc_reduce_idle = 1;
-					return;
-				}
-			}
-		} while (hp->hash_next == (ncache_t *)hp);
+		} while (hp->hash_next == (ncache_t *)hp && hp != start_hp);
+
+		/* return if all hash queues are empty. */
+		if (hp->hash_next == (ncache_t *)hp) {
+			dnlc_reduce_idle = 1;
+			return;
+		}
 
 		mutex_enter(&hp->hash_lock);
 		for (cnt = 0, ncp = hp->hash_prev; ncp != (ncache_t *)hp;

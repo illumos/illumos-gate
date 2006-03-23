@@ -139,9 +139,10 @@ typedef struct znode {
 	uint64_t	z_id;		/* object ID for this znode */
 	kmutex_t	z_lock;		/* znode modification lock */
 	krwlock_t	z_map_lock;	/* page map lock */
-	krwlock_t	z_grow_lock;	/* grow block size lock */
-	krwlock_t	z_append_lock;	/* append-mode lock */
+	krwlock_t	z_parent_lock;	/* parent lock for directories */
 	zfs_dirlock_t	*z_dirlocks;	/* directory entry lock list */
+	kmutex_t	z_range_lock;	/* protects changes to z_range_avl */
+	avl_tree_t	z_range_avl;	/* avl tree of file range locks */
 	uint8_t		z_active;	/* znode is in use */
 	uint8_t		z_reap;		/* reap file at last reference */
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
@@ -160,11 +161,22 @@ typedef struct znode {
 	dmu_buf_t	*z_dbuf;	/* buffer containing the z_phys */
 } znode_t;
 
+
 /*
- * The grow_lock is only applicable to "regular" files.
- * The parent_lock is only applicable to directories.
+ * Range locking rules
+ * --------------------
+ * 1. When truncating a file (zfs_create, zfs_setattr, zfs_space) the whole
+ *    file range needs to be locked as RL_WRITER. Only then can the pages be
+ *    freed etc and zp_size reset. zp_size must be set within range lock.
+ * 2. For writes and punching holes (zfs_write & zfs_space) just the range
+ *    being written or freed needs to be locked as RL_WRITER.
+ *    Multiple writes at the end of the file must coordinate zp_size updates
+ *    to ensure data isn't lost. A compare and swap loop is currently used
+ *    to ensure the file size is at least the offset last written.
+ * 3. For reads (zfs_read, zfs_get_data & zfs_putapage) just the range being
+ *    read needs to be locked as RL_READER. A check against zp_size can then
+ *    be made for reading beyond end of file.
  */
-#define	z_parent_lock	z_grow_lock
 
 /*
  * Convert between znode pointers and vnode pointers
@@ -229,7 +241,7 @@ extern void	zfs_set_dataprop(objset_t *);
 extern void	zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx);
 extern void	zfs_time_stamper(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_time_stamper_locked(znode_t *, uint_t, dmu_tx_t *);
-extern int	zfs_grow_blocksize(znode_t *, uint64_t, dmu_tx_t *);
+extern void	zfs_grow_blocksize(znode_t *, uint64_t, dmu_tx_t *);
 extern int	zfs_freesp(znode_t *, uint64_t, uint64_t, int, dmu_tx_t *,
     cred_t *cr);
 extern void	zfs_znode_init(void);

@@ -905,6 +905,7 @@ ZFS_OBJS +=			\
 	zfs_ioctl.o		\
 	zfs_log.o		\
 	zfs_replay.o		\
+	zfs_rlock.o		\
 	zfs_vfsops.o		\
 	zfs_vnops.o		\
 	zfs_znode.o		\

@@ -186,11 +186,17 @@ typedef struct {
 /*
  * ZFS intent log transaction structure
  */
+typedef enum {
+	WR_INDIRECT,	/* indirect - a large write (dmu_sync() data */
+			/* and put blkptr in log, rather than actual data) */
+	WR_COPIED,	/* immediate - data is copied into lr_write_t */
+	WR_NEED_COPY,	/* immediate - data needs to be copied if pushed */
+} itx_wr_state_t;
+
 typedef struct itx {
 	list_node_t	itx_node;	/* linkage on zl_itx_list */
 	void		*itx_private;	/* type-specific opaque data */
-	uint8_t		itx_data_copied; /* TX_WRITE only: write data already */
-					/* copied into itx data buffer */
+	itx_wr_state_t	itx_wr_state;	/* write state */
 	lr_t		itx_lr;		/* common part of log record */
 	/* followed by type-specific part of lr_xx_t and its immediate data */
 } itx_t;
@@ -200,7 +206,7 @@ typedef void zil_parse_blk_func_t(zilog_t *zilog, blkptr_t *bp, void *arg,
 typedef void zil_parse_lr_func_t(zilog_t *zilog, lr_t *lr, void *arg,
     uint64_t txg);
 typedef int zil_replay_func_t();
-typedef int zil_get_data_t(void *arg, lr_write_t *lr);
+typedef int zil_get_data_t(void *arg, lr_write_t *lr, char *dbuf);
 
 extern void	zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
     zil_parse_lr_func_t *parse_lr_func, void *arg, uint64_t txg);

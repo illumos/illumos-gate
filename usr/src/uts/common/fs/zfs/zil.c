@@ -651,9 +651,12 @@ static lwb_t *
 zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 {
 	lr_t *lrc = &itx->itx_lr; /* common log record */
+	lr_write_t *lr;
+	char *dbuf;
 	uint64_t seq = lrc->lrc_seq;
 	uint64_t txg = lrc->lrc_txg;
 	uint64_t reclen = lrc->lrc_reclen;
+	uint64_t dlen = 0;
 	int error;
 
 	if (lwb == NULL)
@@ -664,51 +667,79 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 	 * If it's a write, fetch the data or get its blkptr as appropriate.
 	 */
 	if (lrc->lrc_txtype == TX_WRITE) {
-		lr_write_t *lr = (lr_write_t *)lrc;
+		lr = (lr_write_t *)lrc;
 		if (txg > spa_freeze_txg(zilog->zl_spa))
 			txg_wait_synced(zilog->zl_dmu_pool, txg);
-
-		if (!itx->itx_data_copied &&
-		    (error = zilog->zl_get_data(itx->itx_private, lr)) != 0) {
-			if (error != ENOENT && error != EALREADY) {
-				txg_wait_synced(zilog->zl_dmu_pool, txg);
+		if (itx->itx_wr_state != WR_COPIED) {
+			if (itx->itx_wr_state == WR_NEED_COPY) {
+				dlen = P2ROUNDUP(lr->lr_length,
+				    sizeof (uint64_t));
+				ASSERT(dlen);
+				dbuf = kmem_alloc(dlen, KM_NOSLEEP);
+				/* on memory shortage use dmu_sync */
+				if (dbuf == NULL) {
+					itx->itx_wr_state = WR_INDIRECT;
+					dlen = 0;
+				}
+			} else {
+				ASSERT(itx->itx_wr_state == WR_INDIRECT);
+				dbuf = NULL;
+			}
+			error = zilog->zl_get_data(itx->itx_private, lr, dbuf);
+			if (error) {
+				if (dlen)
+					kmem_free(dbuf, dlen);
+				if (error != ENOENT && error != EALREADY) {
+					txg_wait_synced(zilog->zl_dmu_pool,
+					    txg);
+					mutex_enter(&zilog->zl_lock);
+					zilog->zl_ss_seq =
+					    MAX(seq, zilog->zl_ss_seq);
+					mutex_exit(&zilog->zl_lock);
+					return (lwb);
+				}
 				mutex_enter(&zilog->zl_lock);
-				zilog->zl_ss_seq = MAX(seq, zilog->zl_ss_seq);
-				zil_add_vdev(zilog,
-				    DVA_GET_VDEV(BP_IDENTITY(&(lr->lr_blkptr))),
-				    seq);
+				zil_add_vdev(zilog, DVA_GET_VDEV(BP_IDENTITY(
+				    &(lr->lr_blkptr))), seq);
 				mutex_exit(&zilog->zl_lock);
 				return (lwb);
 			}
-			mutex_enter(&zilog->zl_lock);
-			zil_add_vdev(zilog,
-			    DVA_GET_VDEV(BP_IDENTITY(&(lr->lr_blkptr))), seq);
-			mutex_exit(&zilog->zl_lock);
-			return (lwb);
 		}
 	}
 
-	zilog->zl_cur_used += reclen;
+	zilog->zl_cur_used += (reclen + dlen);
 
 	/*
 	 * If this record won't fit in the current log block, start a new one.
 	 */
-	if (lwb->lwb_nused + reclen > ZIL_BLK_DATA_SZ(lwb)) {
+	if (lwb->lwb_nused + reclen + dlen > ZIL_BLK_DATA_SZ(lwb)) {
 		lwb = zil_lwb_write_start(zilog, lwb);
-		if (lwb == NULL)
+		if (lwb == NULL) {
+			if (dlen)
+				kmem_free(dbuf, dlen);
 			return (NULL);
+		}
 		ASSERT(lwb->lwb_nused == 0);
-		if (reclen > ZIL_BLK_DATA_SZ(lwb)) {
+		if (reclen + dlen > ZIL_BLK_DATA_SZ(lwb)) {
 			txg_wait_synced(zilog->zl_dmu_pool, txg);
 			mutex_enter(&zilog->zl_lock);
 			zilog->zl_ss_seq = MAX(seq, zilog->zl_ss_seq);
 			mutex_exit(&zilog->zl_lock);
+			if (dlen)
+				kmem_free(dbuf, dlen);
 			return (lwb);
 		}
 	}
 
+	lrc->lrc_reclen += dlen;
 	bcopy(lrc, lwb->lwb_buf + lwb->lwb_nused, reclen);
 	lwb->lwb_nused += reclen;
+	if (dlen) {
+		bcopy(dbuf, lwb->lwb_buf + lwb->lwb_nused, dlen);
+		lwb->lwb_nused += dlen;
+		kmem_free(dbuf, dlen);
+		lrc->lrc_reclen -= dlen; /* for kmem_free of itx */
+	}
 	lwb->lwb_max_txg = MAX(lwb->lwb_max_txg, txg);
 	ASSERT3U(lwb->lwb_seq, <, seq);
 	lwb->lwb_seq = seq;

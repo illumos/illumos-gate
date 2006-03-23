@@ -48,6 +48,7 @@
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_rlock.h>
 #include <sys/zap.h>
 #include <sys/dmu.h>
 #include <sys/fs/zfs.h>
@@ -83,9 +84,13 @@ zfs_znode_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	zp->z_vnode->v_data = (caddr_t)zp;
 	mutex_init(&zp->z_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&zp->z_map_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&zp->z_grow_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&zp->z_append_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zp->z_parent_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&zp->z_acl_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	mutex_init(&zp->z_range_lock, NULL, MUTEX_DEFAULT, NULL);
+	avl_create(&zp->z_range_avl, zfs_range_compare,
+	    sizeof (rl_t), offsetof(rl_t, r_node));
+
 	zp->z_dbuf_held = 0;
 	zp->z_dirlocks = 0;
 	return (0);
@@ -100,9 +105,9 @@ zfs_znode_cache_destructor(void *buf, void *cdarg)
 	ASSERT(zp->z_dirlocks == 0);
 	mutex_destroy(&zp->z_lock);
 	rw_destroy(&zp->z_map_lock);
-	rw_destroy(&zp->z_grow_lock);
-	rw_destroy(&zp->z_append_lock);
+	rw_destroy(&zp->z_parent_lock);
 	mutex_destroy(&zp->z_acl_lock);
+	avl_destroy(&zp->z_range_avl);
 
 	ASSERT(zp->z_dbuf_held == 0);
 	ASSERT(ZTOV(zp)->v_count == 0);
@@ -787,47 +792,38 @@ zfs_time_stamper(znode_t *zp, uint_t flag, dmu_tx_t *tx)
 }
 
 /*
- * Grow the block size for a file.  This may involve migrating data
- * from the bonus buffer into a data block (when we grow beyond the
- * bonus buffer data area).
+ * Grow the block size for a file.
  *
  *	IN:	zp	- znode of file to free data in.
  *		size	- requested block size
  *		tx	- open transaction.
  *
- * 	RETURN:	0 if success
- *		error code if failure
- *
  * NOTE: this function assumes that the znode is write locked.
  */
-int
+void
 zfs_grow_blocksize(znode_t *zp, uint64_t size, dmu_tx_t *tx)
 {
 	int		error;
 	u_longlong_t	dummy;
 
-	ASSERT(rw_write_held(&zp->z_grow_lock));
-
 	if (size <= zp->z_blksz)
-		return (0);
+		return;
 	/*
 	 * If the file size is already greater than the current blocksize,
 	 * we will not grow.  If there is more than one block in a file,
 	 * the blocksize cannot change.
 	 */
 	if (zp->z_blksz && zp->z_phys->zp_size > zp->z_blksz)
-		return (0);
+		return;
 
 	error = dmu_object_set_blocksize(zp->z_zfsvfs->z_os, zp->z_id,
 	    size, 0, tx);
 	if (error == ENOTSUP)
-		return (0);
+		return;
 	ASSERT3U(error, ==, 0);
 
 	/* What blocksize did we actually get? */
 	dmu_object_size_from_db(zp->z_dbuf, &zp->z_blksz, &dummy);
-
-	return (0);
 }
 
 /*
@@ -845,8 +841,7 @@ zfs_no_putpage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 }
 
 /*
- * Free space in a file.  Currently, this function only
- * supports freeing space at the end of the file.
+ * Free space in a file.
  *
  *	IN:	zp	- znode of file to free data in.
  *		from	- start of section to free.
@@ -864,12 +859,10 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 	vnode_t *vp = ZTOV(zp);
 	uint64_t size = zp->z_phys->zp_size;
 	uint64_t end = from + len;
-	int have_grow_lock, error;
+	int error;
 
 	if (ZTOV(zp)->v_type == VFIFO)
 		return (0);
-
-	have_grow_lock = RW_WRITE_HELD(&zp->z_grow_lock);
 
 	/*
 	 * Nothing to do if file already at desired length.
@@ -904,16 +897,13 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 		} else {
 			new_blksz = MIN(end, zp->z_zfsvfs->z_max_blksz);
 		}
-		error = zfs_grow_blocksize(zp, new_blksz, tx);
-		ASSERT(error == 0);
+		zfs_grow_blocksize(zp, new_blksz, tx);
 	}
 	if (end > size || len == 0)
 		zp->z_phys->zp_size = end;
 	if (from > size)
 		return (0);
 
-	if (have_grow_lock)
-		rw_downgrade(&zp->z_grow_lock);
 	/*
 	 * Clear any mapped pages in the truncated region.
 	 */
@@ -937,18 +927,12 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 	}
 	rw_exit(&zp->z_map_lock);
 
-	if (!have_grow_lock)
-		rw_enter(&zp->z_grow_lock, RW_READER);
-
 	if (len == 0)
 		len = -1;
 	else if (end > size)
 		len = size - from;
 	VERIFY(0 == dmu_free_range(zp->z_zfsvfs->z_os,
 	    zp->z_id, from, len, tx));
-
-	if (!have_grow_lock)
-		rw_exit(&zp->z_grow_lock);
 
 	return (0);
 }

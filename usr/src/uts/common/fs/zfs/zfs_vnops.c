@@ -56,7 +56,6 @@
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
-#include <sys/refcount.h>  /* temporary for debugging purposes */
 #include <sys/dbuf.h>
 #include <sys/zap.h>
 #include <sys/dirent.h>
@@ -66,6 +65,7 @@
 #include "fs/fs_subr.h"
 #include <sys/zfs_ctldir.h>
 #include <sys/dnlc.h>
+#include <sys/zfs_rlock.h>
 
 /*
  * Programming rules.
@@ -87,7 +87,7 @@
  *	First, if it's the last reference, the vnode/znode
  *	can be freed, so the zp may point to freed memory.  Second, the last
  *	reference will call zfs_zinactive(), which may induce a lot of work --
- *	pushing cached pages (which requires z_grow_lock) and syncing out
+ *	pushing cached pages (which acquires range locks) and syncing out
  *	cached atime changes.  Third, zfs_zinactive() may require a new tx,
  *	which could deadlock the system if you were already holding one.
  *
@@ -183,10 +183,8 @@ zfs_holey(vnode_t *vp, int cmd, offset_t *off)
 	int error;
 	boolean_t hole;
 
-	rw_enter(&zp->z_grow_lock, RW_READER);
 	file_sz = zp->z_phys->zp_size;
 	if (noff >= file_sz)  {
-		rw_exit(&zp->z_grow_lock);
 		return (ENXIO);
 	}
 
@@ -196,7 +194,6 @@ zfs_holey(vnode_t *vp, int cmd, offset_t *off)
 		hole = B_FALSE;
 
 	error = dmu_offset_next(zp->z_zfsvfs->z_os, zp->z_id, hole, &noff);
-	rw_exit(&zp->z_grow_lock);
 
 	/* end of file? */
 	if ((error == ESRCH) || (noff > file_sz)) {
@@ -387,6 +384,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	ssize_t		n, size, cnt, ndone;
 	int		error, i, numbufs;
 	dmu_buf_t	*dbp, **dbpp;
+	rl_t		*rl;
 
 	ZFS_ENTER(zfsvfs);
 
@@ -407,7 +405,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	}
 
 	/*
-	 * Check for region locks
+	 * Check for mandatory locks
 	 */
 	if (MANDMODE((mode_t)zp->z_phys->zp_mode)) {
 		if (error = chklock(vp, FREAD,
@@ -423,10 +421,10 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	zil_commit(zfsvfs->z_log, zp->z_last_itx, ioflag & FRSYNC);
 
 	/*
-	 * Make sure nobody restructures the file (changes block size)
-	 * in the middle of the read.
+	 * Lock the range against changes.
 	 */
-	rw_enter(&zp->z_grow_lock, RW_READER);
+	rl = zfs_range_lock(zp, uio->uio_loffset, uio->uio_resid, RL_READER);
+
 	/*
 	 * If we are reading past end-of-file we can skip
 	 * to the end; but we might still need to set atime.
@@ -485,7 +483,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		dmu_buf_rele_array(dbpp, numbufs, FTAG);
 	}
 out:
-	rw_exit(&zp->z_grow_lock);
+	zfs_range_unlock(zp, rl);
 
 	ZFS_ACCESSTIME_STAMP(zfsvfs, zp);
 	ZFS_EXIT(zfsvfs);
@@ -571,10 +569,6 @@ zfs_prefault_write(ssize_t n, struct uio *uio)
  *
  * Timestamps:
  *	vp - ctime|mtime updated if byte count > 0
- *
- * Note: zfs_write() holds z_append_lock across calls to txg_wait_open().
- * It has to because of the semantics of FAPPEND.  The implication is that
- * we must never grab z_append_lock while in an assigned tx.
  */
 /* ARGSUSED */
 static int
@@ -591,35 +585,47 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	uint64_t	seq = 0;
 	offset_t	woff;
 	ssize_t		n, nbytes;
+	rl_t		*rl;
 	int		max_blksz = zfsvfs->z_max_blksz;
-	int		need_append_lock, error;
-	krw_t		grow_rw = RW_READER;
-
-	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
-		limit = MAXOFFSET_T;
-
-	n = start_resid;
+	int		error;
 
 	/*
 	 * Fasttrack empty write
 	 */
+	n = start_resid;
 	if (n == 0)
 		return (0);
+
+	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
+		limit = MAXOFFSET_T;
 
 	ZFS_ENTER(zfsvfs);
 
 	/*
-	 * Pre-fault the pages to ensure slow (eg NFS) pages don't hold up txg
+	 * Pre-fault the initial pages to ensure slow (eg NFS) pages
+	 * don't hold up txg.
 	 */
 	zfs_prefault_write(MIN(start_resid, SPA_MAXBLOCKSIZE), uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
 	 */
-	need_append_lock = ioflag & FAPPEND;
-	if (need_append_lock) {
-		rw_enter(&zp->z_append_lock, RW_WRITER);
-		woff = uio->uio_loffset = zp->z_phys->zp_size;
+	if (ioflag & FAPPEND) {
+		/*
+		 * Range lock for a file append:
+		 * The value for the start of range will be determined by
+		 * zfs_range_lock() (to guarantee append semantics).
+		 * If this write will cause the block size to increase,
+		 * zfs_range_lock() will lock the entire file, so we must
+		 * later reduce the range after we grow the block size.
+		 */
+		rl = zfs_range_lock(zp, 0, n, RL_APPEND);
+		if (rl->r_len == UINT64_MAX) {
+			/* overlocked, zp_size can't change */
+			woff = uio->uio_loffset = zp->z_phys->zp_size;
+		} else {
+			woff = uio->uio_loffset = rl->r_off;
+		}
 	} else {
 		woff = uio->uio_loffset;
 		/*
@@ -631,13 +637,11 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		}
 
 		/*
-		 * If this write could change the file length,
-		 * we need to synchronize with "appenders".
+		 * If we need to grow the block size then zfs_range_lock()
+		 * will lock a wider range than we request here.
+		 * Later after growing the block size we reduce the range.
 		 */
-		if (woff < limit - n && woff + n > zp->z_phys->zp_size) {
-			need_append_lock = TRUE;
-			rw_enter(&zp->z_append_lock, RW_READER);
-		}
+		rl = zfs_range_lock(zp, woff, n, RL_WRITER);
 	}
 
 	if (woff >= limit) {
@@ -649,26 +653,19 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		n = limit - woff;
 
 	/*
-	 * Check for region locks
+	 * Check for mandatory locks
 	 */
 	if (MANDMODE((mode_t)zp->z_phys->zp_mode) &&
 	    (error = chklock(vp, FWRITE, woff, n, uio->uio_fmode, ct)) != 0)
 		goto no_tx_done;
-top:
-	/*
-	 * Make sure nobody restructures the file (changes block size)
-	 * in the middle of the write.
-	 */
-	rw_enter(&zp->z_grow_lock, grow_rw);
-
 	end_size = MAX(zp->z_phys->zp_size, woff + n);
+top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
 	dmu_tx_hold_write(tx, zp->z_id, woff, MIN(n, max_blksz));
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		dmu_tx_abort(tx);
-		rw_exit(&zp->z_grow_lock);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			goto top;
@@ -676,35 +673,21 @@ top:
 		goto no_tx_done;
 	}
 
-	if (end_size > zp->z_blksz &&
-	    (!ISP2(zp->z_blksz) || zp->z_blksz < max_blksz)) {
+	/*
+	 * If zfs_range_lock() over-locked we grow the blocksize
+	 * and then reduce the lock range.
+	 */
+	if (rl->r_len == UINT64_MAX) {
 		uint64_t new_blksz;
-		/*
-		 * This write will increase the file size beyond
-		 * the current block size so increase the block size.
-		 */
-		if (grow_rw == RW_READER && !rw_tryupgrade(&zp->z_grow_lock)) {
-			dmu_tx_commit(tx);
-			rw_exit(&zp->z_grow_lock);
-			grow_rw = RW_WRITER;
-			goto top;
-		}
+
 		if (zp->z_blksz > max_blksz) {
 			ASSERT(!ISP2(zp->z_blksz));
 			new_blksz = MIN(end_size, SPA_MAXBLOCKSIZE);
 		} else {
 			new_blksz = MIN(end_size, max_blksz);
 		}
-		error = zfs_grow_blocksize(zp, new_blksz, tx);
-		if (error) {
-			tx_bytes = 0;
-			goto tx_done;
-		}
-	}
-
-	if (grow_rw == RW_WRITER) {
-		rw_downgrade(&zp->z_grow_lock);
-		grow_rw = RW_READER;
+		zfs_grow_blocksize(zp, new_blksz, tx);
+		zfs_range_reduce(zp, rl, woff, n);
 	}
 
 	/*
@@ -791,7 +774,6 @@ top:
 		error = dmu_tx_assign(tx, zfsvfs->z_assign);
 		if (error) {
 			dmu_tx_abort(tx);
-			rw_exit(&zp->z_grow_lock);
 			if (error == ERESTART &&
 			    zfsvfs->z_assign == TXG_NOWAIT) {
 				txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
@@ -819,12 +801,10 @@ tx_done:
 	}
 	dmu_tx_commit(tx);
 
-	rw_exit(&zp->z_grow_lock);
 
 no_tx_done:
 
-	if (need_append_lock)
-		rw_exit(&zp->z_append_lock);
+	zfs_range_unlock(zp, rl);
 
 	/*
 	 * If we're in replay mode, or we made no progress, return error.
@@ -845,24 +825,24 @@ no_tx_done:
  * Get data to generate a TX_WRITE intent log record.
  */
 int
-zfs_get_data(void *arg, lr_write_t *lr)
+zfs_get_data(void *arg, lr_write_t *lr, char *buf)
 {
 	zfsvfs_t *zfsvfs = arg;
 	objset_t *os = zfsvfs->z_os;
 	znode_t *zp;
 	uint64_t off = lr->lr_offset;
+	rl_t *rl;
 	int dlen = lr->lr_length;  		/* length of user data */
-	int reclen = lr->lr_common.lrc_reclen;
 	int error = 0;
 
 	ASSERT(dlen != 0);
 
 	/*
-	 * Nothing to do if the file has been removed or truncated.
+	 * Nothing to do if the file has been removed
 	 */
 	if (zfs_zget(zfsvfs, lr->lr_foid, &zp) != 0)
 		return (ENOENT);
-	if (off >= zp->z_phys->zp_size || zp->z_reap) {
+	if (zp->z_reap) {
 		VN_RELE(ZTOV(zp));
 		return (ENOENT);
 	}
@@ -874,29 +854,47 @@ zfs_get_data(void *arg, lr_write_t *lr)
 	 * sync the data and get a pointer to it (indirect) so that
 	 * we don't have to write the data twice.
 	 */
-	if (sizeof (lr_write_t) + dlen <= reclen) { /* immediate write */
-		rw_enter(&zp->z_grow_lock, RW_READER);
+	if (buf != NULL) { /* immediate write */
 		dmu_buf_t *db;
+
+		rl = zfs_range_lock(zp, off, dlen, RL_READER);
+		/* test for truncation needs to be done while range locked */
+		if (off >= zp->z_phys->zp_size) {
+			error = ENOENT;
+			goto out;
+		}
 		VERIFY(0 == dmu_buf_hold(os, lr->lr_foid, off, FTAG, &db));
-		bcopy((char *)db->db_data + off - db->db_offset, lr + 1, dlen);
+		bcopy((char *)db->db_data + off - db->db_offset, buf, dlen);
 		dmu_buf_rele(db, FTAG);
-		rw_exit(&zp->z_grow_lock);
-	} else {
+	} else { /* indirect write */
+		uint64_t boff; /* block starting offset */
+
 		/*
-		 * We have to grab z_grow_lock as RW_WRITER because
-		 * dmu_sync() can't handle concurrent dbuf_dirty() (6313856).
-		 * z_grow_lock will be replaced with a range lock soon,
-		 * which will eliminate the concurrency hit, but dmu_sync()
-		 * really needs more thought.  It shouldn't have to rely on
-		 * the caller to provide MT safety.
+		 * Have to lock the whole block to ensure when it's
+		 * written out and it's checksum is being calculated
+		 * that no one can change the data. We need to re-check
+		 * blocksize after we get the lock in case it's changed!
 		 */
-		rw_enter(&zp->z_grow_lock, RW_WRITER);
+		for (;;) {
+			boff = off & ~(zp->z_blksz - 1);
+			dlen = zp->z_blksz;
+			rl = zfs_range_lock(zp, boff, dlen, RL_READER);
+			if (zp->z_blksz == dlen)
+				break;
+			zfs_range_unlock(zp, rl);
+		}
+		/* test for truncation needs to be done while range locked */
+		if (off >= zp->z_phys->zp_size) {
+			error = ENOENT;
+			goto out;
+		}
 		txg_suspend(dmu_objset_pool(os));
 		error = dmu_sync(os, lr->lr_foid, off, &lr->lr_blkoff,
 		    &lr->lr_blkptr, lr->lr_common.lrc_txg);
 		txg_resume(dmu_objset_pool(os));
-		rw_exit(&zp->z_grow_lock);
 	}
+out:
+	zfs_range_unlock(zp, rl);
 	VN_RELE(ZTOV(zp));
 	return (error);
 }
@@ -1044,6 +1042,7 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	objset_t	*os = zfsvfs->z_os;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
+	rl_t		*rl;
 	int		error;
 	uint64_t	zoid;
 
@@ -1177,17 +1176,16 @@ top:
 				return (error);
 			}
 			/*
-			 * Grab the grow_lock to serialize this change with
-			 * respect to other file manipulations.
+			 * Lock the whole range of the file
 			 */
-			rw_enter(&zp->z_grow_lock, RW_WRITER);
+			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
 			error = zfs_freesp(zp, 0, 0, mode, tx, cr);
 			if (error == 0) {
 				zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
 				seq = zfs_log_truncate(zilog, tx,
 				    TX_TRUNCATE, zp, 0, 0);
 			}
-			rw_exit(&zp->z_grow_lock);
+			zfs_range_unlock(zp, rl);
 			dmu_tx_commit(tx);
 		}
 	}
@@ -1928,6 +1926,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zilog_t		*zilog = zfsvfs->z_log;
 	uint64_t	seq = 0;
 	dmu_tx_t	*tx;
+	rl_t		*rl;
 	uint_t		mask = vap->va_mask;
 	uint_t		mask_applied = 0;
 	vattr_t		oldva;
@@ -1935,7 +1934,6 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	int		saved_mask;
 	uint64_t	new_mode;
 	znode_t		*attrzp;
-	int		have_grow_lock;
 	int		need_policy = FALSE;
 	int		err;
 
@@ -1954,7 +1952,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	ZFS_ENTER(zfsvfs);
 
 top:
-	have_grow_lock = FALSE;
+	rl = NULL;
 	attrzp = NULL;
 
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
@@ -2079,11 +2077,11 @@ top:
 	if (mask & AT_SIZE) {
 		uint64_t off = vap->va_size;
 		/*
-		 * Grab the grow_lock to serialize this change with
-		 * respect to other file manipulations.
+		 * Range lock the entire file, to ensure the truncate
+		 * is serialised.
 		 */
-		rw_enter(&zp->z_grow_lock, RW_WRITER);
-		have_grow_lock = TRUE;
+		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+		ASSERT(rl != NULL);
 		if (off < zp->z_phys->zp_size)
 			dmu_tx_hold_free(tx, zp->z_id, off, DMU_OBJECT_END);
 		else if (zp->z_blksz < zfsvfs->z_max_blksz && off > zp->z_blksz)
@@ -2095,8 +2093,8 @@ top:
 		err = zfs_zget(zp->z_zfsvfs, zp->z_phys->zp_xattr, &attrzp);
 		if (err) {
 			dmu_tx_abort(tx);
-			if (have_grow_lock)
-				rw_exit(&zp->z_grow_lock);
+			if (rl != NULL)
+				zfs_range_unlock(zp, rl);
 			ZFS_EXIT(zfsvfs);
 			return (err);
 		}
@@ -2108,8 +2106,8 @@ top:
 		if (attrzp)
 			VN_RELE(ZTOV(attrzp));
 		dmu_tx_abort(tx);
-		if (have_grow_lock)
-			rw_exit(&zp->z_grow_lock);
+		if (rl != NULL)
+			zfs_range_unlock(zp, rl);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			goto top;
@@ -2192,8 +2190,8 @@ out:
 	if (attrzp)
 		VN_RELE(ZTOV(attrzp));
 
-	if (have_grow_lock)
-		rw_exit(&zp->z_grow_lock);
+	if (rl != NULL)
+		zfs_range_unlock(zp, rl);
 
 	dmu_tx_commit(tx);
 
@@ -2583,13 +2581,14 @@ top:
 			bcopy(link, zp->z_phys + 1, len);
 	} else {
 		dmu_buf_t *dbp;
+
 		zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, 0);
 
-		rw_enter(&zp->z_grow_lock, RW_WRITER);
-		error = zfs_grow_blocksize(zp, len, tx);
-		rw_exit(&zp->z_grow_lock);
-		if (error)
-			goto out;
+		/*
+		 * Nothing can access the znode yet so no locking needed
+		 * for growing the znode's blocksize.
+		 */
+		zfs_grow_blocksize(zp, len, tx);
 
 		VERIFY(0 == dmu_buf_hold(zfsvfs->z_os, zoid, 0, FTAG, &dbp));
 		dmu_buf_will_dirty(dbp, tx);
@@ -2804,15 +2803,15 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
 	dmu_tx_t	*tx;
+	rl_t		*rl;
 	u_offset_t	off;
 	ssize_t		len;
 	caddr_t		va;
 	int		err;
 
 top:
-	rw_enter(&zp->z_grow_lock, RW_READER);
-
 	off = pp->p_offset;
+	rl = zfs_range_lock(zp, off, PAGESIZE, RL_WRITER);
 	len = MIN(PAGESIZE, zp->z_phys->zp_size - off);
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -2821,7 +2820,7 @@ top:
 	err = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (err != 0) {
 		dmu_tx_abort(tx);
-		rw_exit(&zp->z_grow_lock);
+		zfs_range_unlock(zp, rl);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			goto top;
@@ -2839,7 +2838,7 @@ top:
 	(void) zfs_log_write(zilog, tx, TX_WRITE, zp, off, len, 0, NULL);
 	dmu_tx_commit(tx);
 
-	rw_exit(&zp->z_grow_lock);
+	zfs_range_unlock(zp, rl);
 
 	pvn_write_done(pp, B_WRITE | flags);
 	if (offp)
@@ -2875,6 +2874,7 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 	page_t		*pp;
 	size_t		io_len;
 	u_offset_t	io_off;
+	uint64_t	filesz;
 	int		error = 0;
 
 	ZFS_ENTER(zfsvfs);
@@ -2890,17 +2890,18 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 		goto out;
 	}
 
-	if (off > zp->z_phys->zp_size) {
+	filesz = zp->z_phys->zp_size; /* get consistent copy of zp_size */
+	if (off > filesz) {
 		/* past end of file */
 		ZFS_EXIT(zfsvfs);
 		return (0);
 	}
 
-	len = MIN(len, zp->z_phys->zp_size - off);
+	len = MIN(len, filesz - off);
 
 	for (io_off = off; io_off < off + len; io_off += io_len) {
 		if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
-			pp  = page_lookup(vp, io_off,
+			pp = page_lookup(vp, io_off,
 				(flags & (B_INVAL | B_FREE)) ?
 					SE_EXCL : SE_SHARED);
 		} else {
@@ -2914,8 +2915,8 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 			/*
 			 * Found a dirty page to push
 			 */
-			if (err =
-			    zfs_putapage(vp, pp, &io_off, &io_len, flags, cr))
+			err = zfs_putapage(vp, pp, &io_off, &io_len, flags, cr);
+			if (err)
 				error = err;
 		} else {
 			io_len = PAGESIZE;
@@ -3036,7 +3037,7 @@ zfs_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
 /*
  * If we can't find a page in the cache, we will create a new page
  * and fill it with file data.  For efficiency, we may try to fill
- * multiple pages as once (klustering).
+ * multiple pages at once (klustering).
  */
 static int
 zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
@@ -3049,13 +3050,14 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 	u_offset_t io_off, total;
 	uint64_t oid = zp->z_id;
 	size_t io_len;
+	uint64_t filesz;
 	int err;
 
 	/*
 	 * If we are only asking for a single page don't bother klustering.
 	 */
-	if (plsz == PAGESIZE || zp->z_blksz <= PAGESIZE ||
-	    off > zp->z_phys->zp_size) {
+	filesz = zp->z_phys->zp_size; /* get consistent copy of zp_size */
+	if (plsz == PAGESIZE || zp->z_blksz <= PAGESIZE || off > filesz) {
 		io_off = off;
 		io_len = PAGESIZE;
 		pp = page_create_va(vp, io_off, io_len, PG_WAIT, seg, addr);
@@ -3074,9 +3076,8 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 			klen = plsz;
 			koff = P2ALIGN(off, (u_offset_t)klen);
 		}
-		if (klen > zp->z_phys->zp_size)
-			klen = P2ROUNDUP(zp->z_phys->zp_size,
-			    (uint64_t)PAGESIZE);
+		if (klen > filesz)
+			klen = P2ROUNDUP(filesz, (uint64_t)PAGESIZE);
 		pp = pvn_read_kluster(vp, off, seg, addr, &io_off,
 			    &io_len, koff, klen, 0);
 	}
@@ -3153,6 +3154,7 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	page_t		*pp, **pl0 = pl;
+	rl_t		*rl;
 	int		cnt = 0, need_unlock = 0, err = 0;
 
 	ZFS_ENTER(zfsvfs);
@@ -3168,17 +3170,17 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 		return (0);
 	}
 
+	/*
+	 * Make sure nobody restructures the file in the middle of the getpage.
+	 */
+	rl = zfs_range_lock(zp, off, len, RL_READER);
+
 	/* can't fault past EOF */
 	if (off >= zp->z_phys->zp_size) {
+		zfs_range_unlock(zp, rl);
 		ZFS_EXIT(zfsvfs);
 		return (EFAULT);
 	}
-
-	/*
-	 * Make sure nobody restructures the file (changes block size)
-	 * in the middle of the getpage.
-	 */
-	rw_enter(&zp->z_grow_lock, RW_READER);
 
 	/*
 	 * If we already own the lock, then we must be page faulting
@@ -3227,9 +3229,15 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 				else
 					len = 0;
 			}
+			if (err) {
+				/*
+				 * Release any pages we have locked.
+				 */
+				while (pl > pl0)
+					page_unlock(*--pl);
+				goto out;
+			}
 		}
-		if (err)
-			goto out;
 	}
 
 	/*
@@ -3246,18 +3254,11 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 
 	ZFS_ACCESSTIME_STAMP(zfsvfs, zp);
 out:
-	if (err) {
-		/*
-		 * Release any pages we have locked.
-		 */
-		while (pl > pl0)
-			page_unlock(*--pl);
-	}
 	*pl = NULL;
 
 	if (need_unlock)
 		rw_exit(&zp->z_map_lock);
-	rw_exit(&zp->z_grow_lock);
+	zfs_range_unlock(zp, rl);
 
 	ZFS_EXIT(zfsvfs);
 	return (err);
@@ -3385,10 +3386,6 @@ zfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
  *
  * Timestamps:
  *	vp - ctime|mtime updated
- *
- * NOTE: This function is limited in that it will only permit space to
- *   be freed at the end of a file.  In essence, this function simply
- *   allows one to set the file size.
  */
 /* ARGSUSED */
 static int
@@ -3399,6 +3396,7 @@ zfs_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag,
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
+	rl_t		*rl;
 	uint64_t	seq = 0;
 	uint64_t	off, len;
 	int		error;
@@ -3422,14 +3420,25 @@ top:
 	}
 
 	off = bfp->l_start;
-	len = bfp->l_len;
+	len = bfp->l_len; /* 0 means from off to end of file */
 	tx = dmu_tx_create(zfsvfs->z_os);
-	/*
-	 * Grab the grow_lock to serialize this change with
-	 * respect to other file size changes.
-	 */
 	dmu_tx_hold_bonus(tx, zp->z_id);
-	rw_enter(&zp->z_grow_lock, RW_WRITER);
+	/*
+	 * If we will change zp_size (in zfs_freesp) then lock the whole file,
+	 * otherwise just lock the range being freed.
+	 */
+	if (len == 0 || off + len > zp->z_phys->zp_size) {
+		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+	} else {
+		rl = zfs_range_lock(zp, off, len, RL_WRITER);
+		/* recheck, in case zp_size changed */
+		if (off + len > zp->z_phys->zp_size) {
+			/* lost race: file size changed, lock whole file */
+			zfs_range_unlock(zp, rl);
+			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+		}
+	}
+
 	if (off + len > zp->z_blksz && zp->z_blksz < zfsvfs->z_max_blksz &&
 	    off >= zp->z_phys->zp_size) {
 		/*
@@ -3448,7 +3457,7 @@ top:
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		dmu_tx_abort(tx);
-		rw_exit(&zp->z_grow_lock);
+		zfs_range_unlock(zp, rl);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			goto top;
@@ -3464,7 +3473,7 @@ top:
 		seq = zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
 	}
 
-	rw_exit(&zp->z_grow_lock);
+	zfs_range_unlock(zp, rl);
 
 	dmu_tx_commit(tx);
 
