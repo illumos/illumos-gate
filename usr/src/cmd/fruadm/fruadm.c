@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,7 +128,6 @@ pathmatch(const char *path)
 		found_frupath = 1;
 		return (1);
 	}
-
 	return (0);
 }
 
@@ -499,6 +498,7 @@ create_segment(fru_nodehdl_t nodehdl)
 	fru_segdesc_t	seg_desc;
 	fru_segdef_t	def;
 	int	cnt;
+	int	status;
 
 	(void) memset(&seg_desc, 0, sizeof (seg_desc));
 	seg_desc.field.field_perm = 0x6;
@@ -516,11 +516,15 @@ create_segment(fru_nodehdl_t nodehdl)
 		if (cnt == 0) {
 			def.size = FD_SEGMENT_SIZE;
 		}
-		if ((fru_create_segment(nodehdl, &def)) != FRU_SUCCESS) {
+		if ((status = fru_create_segment(nodehdl, &def))
+					!= FRU_SUCCESS) {
 			continue;
 		}
 		return (cnt);
 	}
+	if (status != FRU_SUCCESS)
+		(void) fprintf(stderr, gettext("fru_create_segment():  %s\n"),
+				fru_strerror(status));
 	return (1);
 }
 
@@ -543,6 +547,7 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 	int	found = 0;
 	int	index;
 	int	total_cnt;
+	fru_errno_t	err;
 
 	static  char    *elem_list[] = {"/Geo_North", "/Geo_East",\
 				"/Geo_Alt", "/Geo_Location"};
@@ -580,9 +585,12 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 	/* add a new Iterated Record if complete path is not given */
 	if (iter_cnt == 0) {
 		(void) snprintf(rec_name, sizeof (rec_name), "/%s[+]", *ptr);
-		if ((fru_update_field(nodehdl, segment_name[cnt], 0,
+		if ((err = fru_update_field(nodehdl, segment_name[cnt], 0,
 			rec_name, data, dataLen)) != FRU_SUCCESS) {
-			return (1);
+			(void) fprintf(stderr,
+			gettext("fru_update_field():  %s\n"),
+			fru_strerror(err));
+		return (1);
 		}
 
 		iter_cnt = 1;
@@ -624,6 +632,7 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 	int	elem_cnt;
 	int	add_flag = 1;
 	int	total_cnt;
+	int	status;
 
 	if (service_mode) {
 		ptr = serv_data_list;
@@ -721,8 +730,10 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 		return (1);
 	}
 
-	if ((fru_add_element(nodehdl, segment_name[cnt], *ptr))
+	if ((status = fru_add_element(nodehdl, segment_name[cnt], *ptr))
 						!= FRU_SUCCESS) {
+		(void) fprintf(stderr, gettext("fru_add_element():  %s\n"),
+					fru_strerror(status));
 		return (1);
 	}
 
