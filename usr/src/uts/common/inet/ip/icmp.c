@@ -1592,6 +1592,7 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 		 * case MRT_ASSERT:
 		 * case IP_SEC_OPT:
 		 * case IP_DONTFAILOVER_IF:
+		 * case IP_NEXTHOP:
 		 */
 		default:
 			return (-1);
@@ -2078,6 +2079,7 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		case MRT_ASSERT:
 		case IP_SEC_OPT:
 		case IP_DONTFAILOVER_IF:
+		case IP_NEXTHOP:
 			/*
 			 * "soft" error (negative)
 			 * option not handled at this level
