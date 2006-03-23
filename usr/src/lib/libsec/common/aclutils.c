@@ -215,8 +215,6 @@ acl_trivial(const char *filename)
 	ace_t *acep;
 
 	acl_flavor = pathconf(filename, _PC_ACL_ENABLED);
-	if (acl_flavor == -1)
-		return (-1);
 
 	if (acl_flavor == _ACL_ACE_ENABLED)
 		cntcmd = ACE_GETACLCNT;
@@ -1455,14 +1453,11 @@ cacl_get(acl_inp inp, int get_flag, int type, acl_t **aclp)
 		ace_acl = fpathconf(fd, _PC_ACL_ENABLED);
 	}
 
-	if (ace_acl == -1)
-		return (-1);
-
 	/*
 	 * if acl's aren't supported then
 	 * send it through the old GETACL interface
 	 */
-	if (ace_acl == 0) {
+	if (ace_acl == 0 || ace_acl == -1) {
 		ace_acl = _ACL_ACLENT_ENABLED;
 	}
 
@@ -1656,6 +1651,17 @@ cacl_set(acl_inp *acl_inp, acl_t *aclp, int type)
 		acl_flavor_target = fpathconf(acl_inp->fd, _PC_ACL_ENABLED);
 	}
 
+	/*
+	 * If target returns an error or 0 from pathconf call then
+	 * fall back to UFS/POSIX Draft interface.
+	 * In the case of 0 we will then fail in either acl(2) or
+	 * acl_translate().  We could erroneously get 0 back from
+	 * a file system that is using fs_pathconf() and not answering
+	 * the _PC_ACL_ENABLED question itself.
+	 */
+	if (acl_flavor_target == 0 || acl_flavor_target == -1)
+		acl_flavor_target = _ACL_ACLENT_ENABLED;
+
 	isdir = S_ISDIR(statbuf.st_mode);
 
 	if ((error = acl_translate(aclp, acl_flavor_target, isdir,
@@ -1758,13 +1764,11 @@ acl_strip(const char *file, uid_t owner, gid_t group, mode_t mode)
 
 	acl_flavor = pathconf(file, _PC_ACL_ENABLED);
 
-	if (acl_flavor == -1)
-		return (-1);
 	/*
 	 * force it through aclent flavor when file system doesn't
 	 * understand question
 	 */
-	if (acl_flavor == 0)
+	if (acl_flavor == 0 || acl_flavor == -1)
 		acl_flavor = _ACL_ACLENT_ENABLED;
 
 	if (acl_flavor & _ACL_ACLENT_ENABLED) {
