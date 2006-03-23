@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -9,7 +9,17 @@
 
 PATH=/usr/bin:/usr/sbin:${PATH}
 export PATH
-BRALIAS='"pci8086,7124" "pci8086,7122" "pci8086,7120" "pci1022,7454" "pci8086,3580" "pci8086,3575" "pci8086,2560"'
+BRALIAS="\
+	\"pci8086,7124\" \
+	\"pci8086,7122\" \
+	\"pci8086,7120\" \
+	\"pci1022,7454\" \
+	\"pci8086,3580\" \
+	\"pci8086,3575\" \
+	\"pci8086,2560\" \
+	\"pci8086,2580\" \
+	\"pci8086,2590\" \
+	"
 CPUGART='"pci1022,1103"'
 DRVPERM='* 0644 root sys'
 

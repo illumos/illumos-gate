@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,8 @@ extern "C" {
 #define	INTEL_BR_855GM			0x35808086 /* include 852GM/PM */
 #define	INTEL_BR_855PM			0x33408086
 #define	INTEL_BR_865			0x25708086
+#define	INTEL_BR_910			0x25808086
+#define	INTEL_BR_910M			0x25908086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -115,7 +117,10 @@ extern "C" {
 #define	INTEL_IGD_845G			0x25628086
 #define	INTEL_IGD_855GM			0x35828086
 #define	INTEL_IGD_865G			0x25728086
+#define	INTEL_IGD_910			0x25828086
+#define	INTEL_IGD_910M			0x25928086
 #define	I8XX_CONF_GMADR			0x10 /* offset in PCI config space */
+#define	I915_CONF_GMADR			0x18 /* offset in PCI config space */
 #define	I8XX_CONF_GC			0x52 /* offset in PCI config space */
 
 /* Intel integrated video card graphics mode mask */

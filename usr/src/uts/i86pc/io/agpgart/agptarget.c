@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -321,6 +321,20 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			break;
 		case I8XX_GC_MODE4:
 			kbytes = 16 * 1024; /* 16M preallocated memory */
+			break;
+		default:
+			kbytes = 0; /* an unexpected case */
+		}
+		break;
+	case INTEL_BR_910:
+	case INTEL_BR_910M:
+		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
+		switch (memval & I8XX_GC_MODE_MASK) {
+		case I8XX_GC_MODE1:
+			kbytes = 1024; /* 1M preallocated memory */
+			break;
+		case I8XX_GC_MODE3:
+			kbytes = 8 * 1024; /* 8M preallocated memory */
 			break;
 		default:
 			kbytes = 0; /* an unexpected case */

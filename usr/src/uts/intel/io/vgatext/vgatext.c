@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,12 @@
 #define	I8XX_FB_REGSET		1
 #define	I8XX_PTE_OFFSET		0x10000
 #define	I8XX_PGTBL_CTL		0x2020
+#define	I915_GTTADDR_BAR	4
+#define	I915_FB_REGSET		3
+
+#define	IS_IGD(agp_master) ((agp_master->agpm_dev_type == DEVICE_IS_I810) || \
+		    (agp_master->agpm_dev_type == DEVICE_IS_I830))
+
 #define	DEV2INST(dev)		(getminor(dev) >> 1)
 #define	INST2NODE1(inst)	((inst) << 1)
 #define	INST2NODE2(inst)	(((inst) << 1) + 1)
@@ -760,16 +766,13 @@ vgatext_ioctl(
 
 		if (!agp_master)
 			return (EINVAL);
-		ASSERT((agp_master->agpm_dev_type == DEVICE_IS_I810) ||
-		    (agp_master->agpm_dev_type == DEVICE_IS_I830));
+		ASSERT(IS_IGD(agp_master));
 
-		if ((agp_master->agpm_dev_type != DEVICE_IS_I810) &&
-		    (agp_master->agpm_dev_type != DEVICE_IS_I830))
+		if (!IS_IGD(agp_master))
 			return (EINVAL);
 
 		if (ddi_copyout(&agp_master->agpm_data.agpm_gtt.gtt_info,
-		    (void *)data,
-			sizeof (igd_info_t), mode))
+		    (void *)data, sizeof (igd_info_t), mode))
 			return (EFAULT);
 		break;
 	}
@@ -788,6 +791,7 @@ vgatext_ioctl(
 		if (!agp_master)
 			return (EINVAL);
 		ASSERT(agp_master->agpm_dev_type == DEVICE_IS_I810);
+
 		if (agp_master->agpm_dev_type != DEVICE_IS_I810)
 			return (EINVAL);
 
@@ -816,11 +820,9 @@ vgatext_ioctl(
 		ASSERT(agp_master);
 		if (!agp_master)
 			return (EINVAL);
-		ASSERT((agp_master->agpm_dev_type == DEVICE_IS_I810) ||
-		    (agp_master->agpm_dev_type == DEVICE_IS_I830));
+		ASSERT(IS_IGD(agp_master));
 
-		if ((agp_master->agpm_dev_type != DEVICE_IS_I810) &&
-		    (agp_master->agpm_dev_type != DEVICE_IS_I830))
+		if (!IS_IGD(agp_master))
 			return (EINVAL);
 
 		if (ddi_copyin((void *)data, &seg,
@@ -844,11 +846,9 @@ vgatext_ioctl(
 		ASSERT(agp_master);
 		if (!agp_master)
 			return (EINVAL);
-		ASSERT((agp_master->agpm_dev_type == DEVICE_IS_I810) ||
-		    (agp_master->agpm_dev_type == DEVICE_IS_I830));
+		ASSERT(IS_IGD(agp_master));
 
-		if ((agp_master->agpm_dev_type != DEVICE_IS_I810) &&
-		    (agp_master->agpm_dev_type != DEVICE_IS_I830))
+		if (!IS_IGD(agp_master))
 			return (EINVAL);
 
 		if (ddi_copyin((void *)data, &seg,
@@ -870,11 +870,9 @@ vgatext_ioctl(
 		ASSERT(agp_master);
 		if (!agp_master)
 			return (EINVAL);
-		ASSERT((agp_master->agpm_dev_type == DEVICE_IS_I810) ||
-		    (agp_master->agpm_dev_type == DEVICE_IS_I830));
+		ASSERT(IS_IGD(agp_master));
 
-		if ((agp_master->agpm_dev_type != DEVICE_IS_I810) &&
-		    (agp_master->agpm_dev_type != DEVICE_IS_I830))
+		if (!IS_IGD(agp_master))
 			return (EINVAL);
 
 		if (agp_master->agpm_dev_type == DEVICE_IS_I810)
@@ -1660,6 +1658,8 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_845G:
 	case INTEL_IGD_855GM:
 	case INTEL_IGD_865G:
+	case INTEL_IGD_910:
+	case INTEL_IGD_910M:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */
@@ -1723,10 +1723,19 @@ agp_master_init(struct vgatext_softc *softc)
 
 	if (!detect_i8xx_device(agp_master)) {
 		/* map mmio register set */
-		status = ddi_regs_map_setup(devi, I8XX_MMIO_REGSET,
-		    &agp_master->agpm_data.agpm_gtt.gtt_mmio_base,
-		    0, 0, &i8xx_dev_access,
-		    &agp_master->agpm_data.agpm_gtt.gtt_mmio_handle);
+		if ((agp_master->agpm_id == INTEL_IGD_910) ||
+		    (agp_master->agpm_id == INTEL_IGD_910M)) {
+			status = ddi_regs_map_setup(devi, I915_GTTADDR_BAR,
+			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_base,
+			    0, 0, &i8xx_dev_access,
+			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_handle);
+
+		} else {
+			status = ddi_regs_map_setup(devi, I8XX_MMIO_REGSET,
+			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_base,
+			    0, 0, &i8xx_dev_access,
+			    &agp_master->agpm_data.agpm_gtt.gtt_mmio_handle);
+		}
 
 		if (status != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
@@ -1735,12 +1744,23 @@ agp_master_init(struct vgatext_softc *softc)
 			return (-1);
 		}
 		/* get GTT range base offset */
-		agp_master->agpm_data.agpm_gtt.gtt_addr =
-		    agp_master->agpm_data.agpm_gtt.gtt_mmio_base +
-		    I8XX_PTE_OFFSET;
+		if ((agp_master->agpm_id == INTEL_IGD_910) ||
+		    (agp_master->agpm_id == INTEL_IGD_910M)) {
+			agp_master->agpm_data.agpm_gtt.gtt_addr =
+			    agp_master->agpm_data.agpm_gtt.gtt_mmio_base;
+		} else
+			agp_master->agpm_data.agpm_gtt.gtt_addr =
+			    agp_master->agpm_data.agpm_gtt.gtt_mmio_base +
+			    I8XX_PTE_OFFSET;
+
 		/* get graphics memory size */
-		status = ddi_dev_regsize(devi, I8XX_FB_REGSET,
-		    &reg_size);
+		if ((agp_master->agpm_id == INTEL_IGD_910) ||
+		    (agp_master->agpm_id == INTEL_IGD_910M)) {
+			status = ddi_dev_regsize(devi, I915_FB_REGSET,
+			    &reg_size);
+		} else
+			status = ddi_dev_regsize(devi, I8XX_FB_REGSET,
+			    &reg_size);
 		/*
 		 * if memory size is smaller than a certain value, it means
 		 * the register set number for graphics memory range might
@@ -1755,8 +1775,14 @@ agp_master_init(struct vgatext_softc *softc)
 
 		agp_master->agpm_data.agpm_gtt.gtt_info.igd_apersize =
 		    BYTES2MB(reg_size);
-		value = pci_config_get32(agp_master->agpm_acc_hdl,
-		    I8XX_CONF_GMADR);
+
+		if ((agp_master->agpm_id == INTEL_IGD_910) ||
+		    (agp_master->agpm_id == INTEL_IGD_910M))
+			value = pci_config_get32(agp_master->agpm_acc_hdl,
+			    I915_CONF_GMADR);
+		else
+			value = pci_config_get32(agp_master->agpm_acc_hdl,
+			    I8XX_CONF_GMADR);
 		agp_master->agpm_data.agpm_gtt.gtt_info.igd_aperbase =
 		    value & GTT_BASE_MASK;
 		agp_master->agpm_data.agpm_gtt.gtt_info.igd_devid =
@@ -1793,8 +1819,7 @@ agp_master_end(agp_master_softc_t *master_softc)
 	ASSERT(master_softc);
 
 	/* intel integrated device */
-	if ((master_softc->agpm_dev_type == DEVICE_IS_I810) ||
-	    (master_softc->agpm_dev_type == DEVICE_IS_I830)) {
+	if (IS_IGD(master_softc)) {
 		if (master_softc->agpm_data.agpm_gtt.gtt_mmio_handle != NULL) {
 			ddi_regs_map_free(
 			    &master_softc->agpm_data.agpm_gtt.gtt_mmio_handle);
