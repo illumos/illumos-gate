@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,6 +340,51 @@ struct mode_control_scsi3 {
 
 #define	CTRL_QMOD_RESTRICT	0x0
 #define	CTRL_QMOD_UNRESTRICT	0x1
+
+/*
+ * Informational Exceptions Control Mode Page
+ */
+
+#define	PAGELENGTH_INFO_EXCPT	0x0A
+
+struct mode_info_excpt_page {
+	struct	mode_page mode_page;	/* common mode page header */
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t		log_err	: 1;	/* log errors */
+	uchar_t			: 1;	/* reserved */
+	uchar_t		test	: 1;	/* create test failure */
+	uchar_t		dexcpt	: 1;	/* disable exception */
+	uchar_t		ewasc	: 1;	/* enable warning */
+	uchar_t		ebf	: 1;	/* enable background function */
+	uchar_t			: 1;	/* reserved */
+	uchar_t		perf	: 1;	/* performance */
+	uchar_t		mrie	: 4;	/* method of reporting info. excpts. */
+	uchar_t			: 4;	/* reserved */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t		perf	: 1;	/* performance */
+	uchar_t			: 1;	/* reserved */
+	uchar_t		ebf	: 1;	/* enable background function */
+	uchar_t		ewasc	: 1;	/* enable warning */
+	uchar_t		dexcpt	: 1;	/* disable exception */
+	uchar_t		test	: 1;	/* create test failure */
+	uchar_t			: 1;	/* reserved */
+	uchar_t		log_err	: 1;	/* log errors */
+	uchar_t			: 4;	/* reserved */
+	uchar_t		mrie	: 4;	/* method of reporting info. excpts. */
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	interval_timer[4];	/* interval timer */
+	uchar_t	report_count[4];	/* report count */
+};
+
+#define	MRIE_NO_REPORT		0x0
+#define	MRIE_ASYNCH		0x1
+#define	MRIE_UNIT_ATTN		0x2
+#define	MRIE_COND_RECVD_ERR	0x3
+#define	MRIE_UNCOND_RECVD_ERR	0x4
+#define	MRIE_NO_SENSE		0x5
+#define	MRIE_ONLY_ON_REQUEST	0x6
 
 #ifdef	__cplusplus
 }

@@ -192,6 +192,8 @@ static	int sata_build_msense_page_1a(sata_drive_info_t *, int, uint8_t *);
 static	int sata_build_msense_page_1c(sata_drive_info_t *, int, uint8_t *);
 static	int sata_mode_select_page_8(sata_pkt_txlate_t *,
     struct mode_cache_scsi3 *, int, int *, int *, int *);
+static	int sata_mode_select_page_1c(sata_pkt_txlate_t *,
+    struct mode_info_excpt_page *, int, int *, int *, int *);
 static	int sata_build_lsense_page_0(sata_drive_info_t *, uint8_t *);
 static	int sata_build_lsense_page_10(sata_drive_info_t *, uint8_t *,
     sata_hba_inst_t *);
@@ -216,6 +218,7 @@ static	int sata_smart_read_log(sata_hba_inst_t *, sata_drive_info_t *,
 static	int sata_read_log_ext_directory(sata_hba_inst_t *, sata_drive_info_t *,
     struct read_log_ext_directory *);
 static	void sata_gen_sysevent(sata_hba_inst_t *, sata_address_t *, int);
+static	void sata_xlate_errors(sata_pkt_txlate_t *);
 
 /*
  * SATA Framework will ignore SATA HBA driver cb_ops structure and
@@ -3953,6 +3956,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	struct scsi_pkt	*scsipkt = spx->txlt_scsi_pkt;
 	struct buf	*bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	sata_drive_info_t *sdinfo;
+	sata_id_t *sata_id;
 	struct scsi_extended_sense *sense;
 	int 		len, bdlen, count, alc_len;
 	int		pc;	/* Page Control code */
@@ -3979,15 +3983,6 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 
 	pc = scsipkt->pkt_cdbp[2] >> 6;
-
-	/* Reject not supported request for saved parameters */
-	if (pc == 3) {
-		*scsipkt->pkt_scbp = STATUS_CHECK;
-		sense = sata_arq_sense(spx);
-		sense->es_key = KEY_ILLEGAL_REQUEST;
-		sense->es_add_code = SD_SCSI_SAVING_PARAMS_NOT_SUP;
-		goto done;
-	}
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
 		len = 0;
@@ -4079,6 +4074,9 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 				buf[len++] = 0;
 			}
 		}
+
+		sata_id = &sdinfo->satadrv_id;
+
 		/*
 		 * Add requested pages.
 		 * Page 3 and 4 are obsolete and we are not supporting them.
@@ -4099,12 +4097,27 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 			break;
 		case MODEPAGE_CACHING:
 			/* DAD_MODE_CACHE */
+			/* Reject not supported request for saved parameters */
+			if (pc == 3) {
+				*scsipkt->pkt_scbp = STATUS_CHECK;
+				sense = sata_arq_sense(spx);
+				sense->es_key = KEY_ILLEGAL_REQUEST;
+				sense->es_add_code =
+				    SD_SCSI_SAVING_PARAMS_NOT_SUP;
+				goto done;
+			}
+
 			/* caching */
 			len += sata_build_msense_page_8(sdinfo, pc, buf+len);
 			break;
 		case MODEPAGE_INFO_EXCPT:
 			/* exception cntrl */
-			len += sata_build_msense_page_1c(sdinfo, pc, buf+len);
+			if (sata_id->ai_cmdset82 & SATA_SMART_SUPPORTED) {
+				len += sata_build_msense_page_1c(sdinfo, pc,
+				    buf+len);
+			}
+			else
+				goto err;
 			break;
 		case MODEPAGE_POWER_COND:
 			/* DAD_MODE_POWER_COND */
@@ -4116,9 +4129,13 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 			len += sata_build_msense_page_1(sdinfo, pc, buf+len);
 			len += sata_build_msense_page_8(sdinfo, pc, buf+len);
 			len += sata_build_msense_page_1a(sdinfo, pc, buf+len);
-			len += sata_build_msense_page_1c(sdinfo, pc, buf+len);
+			if (sata_id->ai_cmdset82 & SATA_SMART_SUPPORTED) {
+				len += sata_build_msense_page_1c(sdinfo, pc,
+				    buf+len);
+			}
 			break;
 		default:
+		err:
 			/* Invalid request */
 			*scsipkt->pkt_scbp = STATUS_CHECK;
 			sense = sata_arq_sense(spx);
@@ -4225,8 +4242,7 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 
 	/* Reject not supported request */
-	if (! (scsipkt->pkt_cdbp[1] & 0x10) || /* No support for PF bit = 0 */
-	    (scsipkt->pkt_cdbp[1] & 0x01)) { /* No support for SP (saving) */
+	if (! (scsipkt->pkt_cdbp[1] & 0x10)) { /* No support for PF bit = 0 */
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
 		sense->es_key = KEY_ILLEGAL_REQUEST;
@@ -4292,13 +4308,47 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 		while (pllen > 0) {
 			switch ((int)buf[len]) {
 			case MODEPAGE_CACHING:
+				/* No support for SP (saving) */
+				if (scsipkt->pkt_cdbp[1] & 0x01) {
+					*scsipkt->pkt_scbp = STATUS_CHECK;
+					sense = sata_arq_sense(spx);
+					sense->es_key = KEY_ILLEGAL_REQUEST;
+					sense->es_add_code =
+					    SD_SCSI_INVALID_FIELD_IN_CDB;
+					goto done;
+				}
 				stat = sata_mode_select_page_8(spx,
 				    (struct mode_cache_scsi3 *)&buf[len],
 				    pllen, &pagelen, &rval, &dmod);
 				/*
-				 * The pagelen value indicates number of
+				 * The pagelen value indicates the number of
 				 * parameter bytes already processed.
-				 * The rval is return value from
+				 * The rval is the return value from
+				 * sata_tran_start().
+				 * The stat indicates the overall status of
+				 * the operation(s).
+				 */
+				if (stat != SATA_SUCCESS)
+					/*
+					 * Page processing did not succeed -
+					 * all error info is already set-up,
+					 * just return
+					 */
+					pllen = 0; /* this breaks the loop */
+				else {
+					len += pagelen;
+					pllen -= pagelen;
+				}
+				break;
+
+			case MODEPAGE_INFO_EXCPT:
+				stat = sata_mode_select_page_1c(spx,
+				    (struct mode_info_excpt_page *)&buf[len],
+				    pllen, &pagelen, &rval, &dmod);
+				/*
+				 * The pagelen value indicates the number of
+				 * parameter bytes already processed.
+				 * The rval is the return value from
 				 * sata_tran_start().
 				 * The stat indicates the overall status of
 				 * the operation(s).
@@ -5868,6 +5918,9 @@ sata_build_msense_page_8(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 	 */
 	bzero(buf, PAGELENGTH_DAD_MODE_CACHE_SCSI3);
 
+	/* Saved paramters not supported */
+	if (pcntrl == 3)
+		return (0);
 	if (pcntrl == 0 || pcntrl == 2) {
 		/*
 		 * For now treat current and default parameters as same
@@ -5901,17 +5954,37 @@ sata_build_msense_page_8(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 
 /*
  * Build Mode sense exception cntrl page
- * NOT IMPLEMENTED
  */
 static int
 sata_build_msense_page_1c(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 {
-#ifndef __lock_lint
-	_NOTE(ARGUNUSED(sdinfo))
-	_NOTE(ARGUNUSED(pcntrl))
-	_NOTE(ARGUNUSED(buf))
-#endif
-	return (0);
+	struct mode_info_excpt_page *page = (struct mode_info_excpt_page *)buf;
+	sata_id_t *sata_id = &sdinfo->satadrv_id;
+
+	/*
+	 * Most of the fields are set to 0, being not supported and/or disabled
+	 */
+	bzero(buf, PAGELENGTH_INFO_EXCPT);
+
+	page->mode_page.code = MODEPAGE_INFO_EXCPT;
+	page->mode_page.length = PAGELENGTH_INFO_EXCPT;
+
+	/* Indicate that this is page is saveable */
+	page->mode_page.ps = 1;
+
+	/*
+	 * We will return the same data for default, current and saved page.
+	 * The only changeable bit is dexcpt and that bit is required
+	 * by the ATA specification to be preserved across power cycles.
+	 */
+	if (pcntrl != 1) {
+		page->dexcpt = !(sata_id->ai_features85 & SATA_SMART_SUPPORTED);
+		page->mrie = MRIE_ONLY_ON_REQUEST;
+	}
+	else
+		page->dexcpt = 1;	/* Only changeable parameter */
+
+	return (PAGELENGTH_INFO_EXCPT + sizeof (struct mode_info_excpt_page));
 }
 
 
@@ -6090,55 +6163,109 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	return (SATA_SUCCESS);
 
 failure:
-	scsipkt->pkt_reason = CMD_INCOMPLETE;
-	*scsipkt->pkt_scbp = STATUS_CHECK;
-	sense = sata_arq_sense(spx);
-	switch (spx->txlt_sata_pkt->satapkt_reason) {
-	case SATA_PKT_PORT_ERROR:
-		/*
-		 * We have no device data. Assume no data transfered.
-		 */
-		sense->es_key = KEY_HARDWARE_ERROR;
-		break;
+	sata_xlate_errors(spx);
 
-	case SATA_PKT_DEV_ERROR:
-		if (spx->txlt_sata_pkt->satapkt_cmd.satacmd_status_reg &
-		    SATA_STATUS_ERR) {
-			/*
-			 * determine dev error reason from error
-			 * reg content
-			 */
-			sata_decode_device_error(spx, sense);
-			break;
-		}
-		/* No extended sense key - no info available */
-		break;
+	return (SATA_FAILURE);
+}
 
-	case SATA_PKT_TIMEOUT:
-		/*
-		 * scsipkt->pkt_reason = CMD_TIMEOUT; This causes problems.
-		 */
-		scsipkt->pkt_reason = CMD_INCOMPLETE;
-		/* No extended sense key */
-		break;
+/*
+ * Process mode select informational exceptions control page 0x1c
+ *
+ * The only changeable bit is dexcpt (disable exceptions).
+ * MRIE (method of reporting informational exceptions) must be
+ * "only on request".
+ *
+ * Return SATA_SUCCESS if operation succeeded, SATA_FAILURE otherwise.
+ * If operation resulted in changing device setup, dmod flag should be set to
+ * one (1). If parameters were not changed, dmod flag should be set to 0.
+ * Upon return, if operation required sending command to the device, the rval
+ * should be set to the value returned by sata_hba_start. If operation
+ * did not require device access, rval should be set to TRAN_ACCEPT.
+ * The pagelen should be set to the length of the page.
+ *
+ * This function has to be called with a port mutex held.
+ *
+ * Returns SATA_SUCCESS if operation was successful, SATA_FAILURE otherwise.
+ */
+static	int
+sata_mode_select_page_1c(
+	sata_pkt_txlate_t *spx,
+	struct mode_info_excpt_page *page,
+	int parmlen,
+	int *pagelen,
+	int *rval,
+	int *dmod)
+{
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	sata_drive_info_t *sdinfo;
+	sata_id_t *sata_id;
+	struct scsi_extended_sense *sense;
 
-	case SATA_PKT_ABORTED:
-		scsipkt->pkt_reason = CMD_ABORTED;
-		/* No extended sense key */
-		break;
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	sata_id = &sdinfo->satadrv_id;
 
-	case SATA_PKT_RESET:
-		/*
-		 * pkt aborted either by an explicit reset request from
-		 * a host, or due to error recovery
-		 */
-		scsipkt->pkt_reason = CMD_RESET;
-		break;
+	*dmod = 0;
 
-	default:
-		scsipkt->pkt_reason = CMD_TRAN_ERR;
-		break;
+	/* Verify parameters length. If too short, drop it */
+	if (((PAGELENGTH_INFO_EXCPT + sizeof (struct mode_page)) < parmlen) ||
+	    page->perf || page->test || (page->mrie != MRIE_ONLY_ON_REQUEST)) {
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_INVALID_FIELD_IN_PARAMETER_LIST;
+		*pagelen = parmlen;
+		*rval = TRAN_ACCEPT;
+		return (SATA_FAILURE);
 	}
+
+	*pagelen = PAGELENGTH_INFO_EXCPT + sizeof (struct mode_page);
+
+	if (! (sata_id->ai_cmdset82 & SATA_SMART_SUPPORTED)) {
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_INVALID_FIELD_IN_CDB;
+		*pagelen = parmlen;
+		*rval = TRAN_ACCEPT;
+		return (SATA_FAILURE);
+	}
+
+	/* If already in the state requested, we are done */
+	if (page->dexcpt == ! (sata_id->ai_features85 & SATA_SMART_ENABLED)) {
+		/* nothing to do */
+		*rval = TRAN_ACCEPT;
+		return (SATA_SUCCESS);
+	}
+
+	scmd->satacmd_flags.sata_data_direction = SATA_DIR_NODATA_XFER;
+
+	/* Build SMART_ENABLE or SMART_DISABLE command */
+	scmd->satacmd_addr_type = 0;		/* N/A */
+	scmd->satacmd_lba_mid_lsb = SMART_MAGIC_VAL_1;
+	scmd->satacmd_lba_high_lsb = SMART_MAGIC_VAL_2;
+	scmd->satacmd_features_reg = page->dexcpt ?
+	    SATA_SMART_DISABLE_OPS : SATA_SMART_ENABLE_OPS;
+	scmd->satacmd_device_reg = 0;		/* Always device 0 */
+	scmd->satacmd_cmd_reg = SATAC_SMART;
+
+	/* Transfer command to HBA */
+	if (sata_hba_start(spx, rval) != 0)
+		/*
+		 * Pkt not accepted for execution.
+		 */
+		return (SATA_FAILURE);
+
+	*dmod = 1;	/* At least may have been modified */
+
+	/* Now process return */
+	if (spx->txlt_sata_pkt->satapkt_reason == SATA_PKT_COMPLETED)
+		return (SATA_SUCCESS);
+
+	/* Packet did not complete successfully */
+	sata_xlate_errors(spx);
+
 	return (SATA_FAILURE);
 }
 
@@ -11217,4 +11344,67 @@ sata_gen_sysevent(sata_hba_inst_t *sata_hba_inst, sata_address_t *saddr,
 	}
 
 	nvlist_free(ev_attr_list);
+}
+
+/*
+ * sata_xlate_errors() is used to translate (S)ATA error
+ * information to SCSI information returned in the SCSI
+ * packet.
+ */
+static void
+sata_xlate_errors(sata_pkt_txlate_t *spx)
+{
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	struct scsi_extended_sense *sense;
+
+	scsipkt->pkt_reason = CMD_INCOMPLETE;
+	*scsipkt->pkt_scbp = STATUS_CHECK;
+	sense = sata_arq_sense(spx);
+
+	switch (spx->txlt_sata_pkt->satapkt_reason) {
+	case SATA_PKT_PORT_ERROR:
+		/*
+		 * We have no device data. Assume no data transfered.
+		 */
+		sense->es_key = KEY_HARDWARE_ERROR;
+		break;
+
+	case SATA_PKT_DEV_ERROR:
+		if (spx->txlt_sata_pkt->satapkt_cmd.satacmd_status_reg &
+		    SATA_STATUS_ERR) {
+			/*
+			 * determine dev error reason from error
+			 * reg content
+			 */
+			sata_decode_device_error(spx, sense);
+			break;
+		}
+		/* No extended sense key - no info available */
+		break;
+
+	case SATA_PKT_TIMEOUT:
+		/*
+		 * scsipkt->pkt_reason = CMD_TIMEOUT; This causes problems.
+		 */
+		scsipkt->pkt_reason = CMD_INCOMPLETE;
+		/* No extended sense key */
+		break;
+
+	case SATA_PKT_ABORTED:
+		scsipkt->pkt_reason = CMD_ABORTED;
+		/* No extended sense key */
+		break;
+
+	case SATA_PKT_RESET:
+		/*
+		 * pkt aborted either by an explicit reset request from
+		 * a host, or due to error recovery
+		 */
+		scsipkt->pkt_reason = CMD_RESET;
+		break;
+
+	default:
+		scsipkt->pkt_reason = CMD_TRAN_ERR;
+		break;
+	}
 }
