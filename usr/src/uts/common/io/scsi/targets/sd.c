@@ -9675,6 +9675,7 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 	    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
 
 		size_t sbuflen;
+		uchar_t save_pg;
 
 		/*
 		 * Construct select buffer length based on the
@@ -9697,6 +9698,13 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 		else if (wce_flag == SD_CACHE_DISABLE)
 			mode_caching_page->wce = 0;
 
+		/*
+		 * Save the page if the mode sense says the
+		 * drive supports it.
+		 */
+		save_pg = mode_caching_page->mode_page.ps ?
+				SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
+
 		/* Clear reserved bits before mode select. */
 		mode_caching_page->mode_page.ps = 0;
 
@@ -9717,10 +9725,10 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 		/* Issue mode select to change the cache settings */
 		if (un->un_f_cfg_is_atapi == TRUE) {
 			rval = sd_send_scsi_MODE_SELECT(un, CDB_GROUP1, header,
-			    sbuflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
+			    sbuflen, save_pg, SD_PATH_DIRECT);
 		} else {
 			rval = sd_send_scsi_MODE_SELECT(un, CDB_GROUP0, header,
-			    sbuflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
+			    sbuflen, save_pg, SD_PATH_DIRECT);
 		}
 	}
 
