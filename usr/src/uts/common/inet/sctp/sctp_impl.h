@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,7 @@ extern "C" {
 #include <sys/taskq.h>
 #include <sys/list.h>
 #include <sys/strsun.h>
+#include <sys/zone.h>
 #include <netinet/ip6.h>
 #include <inet/optcom.h>
 #include <netinet/sctp.h>
@@ -73,8 +73,8 @@ typedef struct sctpt_s {
 	if ((fp)->timer_mp != NULL) {					\
 		((sctpt_t *)((fp)->timer_mp->b_rptr))->sctpt_faddr = fp;  \
 		dprint(3, ("faddr_timer_restart: fp=%p %x:%x:%x:%x %d\n", \
-			    (fp), SCTP_PRINTADDR((fp)->faddr),		\
-			    (int)(intvl)));				\
+		    (void *)(fp), SCTP_PRINTADDR((fp)->faddr),		\
+		    (int)(intvl)));					\
 		sctp_timer((sctp), (fp)->timer_mp, (intvl));		\
 		(fp)->timer_running = 1;				\
 	}
@@ -428,16 +428,12 @@ typedef struct sctp_reass_s {
 
 /* debugging */
 #undef	dprint
-#if defined(DEBUG) && !defined(lint)
+#ifdef DEBUG
 extern int sctpdebug;
-
 #define	dprint(level, args)	{ if (sctpdebug > (level)) printf args; }
-
-#else /* define(DEBUG) && !defined(lint) */
-
+#else
 #define	dprint(level, args) {}
-
-#endif /* defined(DEBUG) && !defined(lint) */
+#endif
 
 
 /* Peer address tracking */
@@ -746,7 +742,9 @@ typedef struct sctp_s {
 		sctp_chk_fast_rexmit : 1, /* check for fast rexmit message */
 
 		sctp_prsctp_aware : 1,	/* is peer PR-SCTP aware? */
-		sctp_linklocal : 1;	/* is linklocal assoc. */
+		sctp_linklocal : 1,	/* is linklocal assoc. */
+		sctp_mac_exempt : 1,	/* SO_MAC_EXEMPT */
+		sctp_dummy : 5;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -788,6 +786,7 @@ typedef struct sctp_s {
 #define	sctp_chk_fast_rexmit sctp_bits.sctp_chk_fast_rexmit
 #define	sctp_prsctp_aware sctp_bits.sctp_prsctp_aware
 #define	sctp_linklocal sctp_bits.sctp_linklocal
+#define	sctp_mac_exempt sctp_bits.sctp_mac_exempt
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -901,6 +900,9 @@ typedef struct sctp_s {
 	/* Stats */
 	uint64_t	sctp_msgcount;
 	uint64_t	sctp_prsctpdrop;
+
+	uint_t		sctp_v4label_len;	/* length of cached v4 label */
+	uint_t		sctp_v6label_len;	/* length of cached v6 label */
 } sctp_t;
 
 extern list_t	sctp_g_list;	/* Head of SCTP instance data chain */
@@ -933,13 +935,12 @@ extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    uint_t, zoneid_t);
 extern void	sctp_add_hdr(sctp_t *, uchar_t *, size_t);
 extern void	sctp_check_adv_ack_pt(sctp_t *, mblk_t *, mblk_t *);
-extern boolean_t sctp_allocbuf(void **, uint_t *, boolean_t, void *, uint_t);
 extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
 		    sctp_chunk_hdr_t *);
 
 extern void	sctp_bind_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_bind_hash_remove(sctp_t *);
-extern in_port_t sctp_bindi(sctp_t *, in_port_t, int, int);
+extern int	sctp_bindi(sctp_t *, in_port_t, boolean_t, int, in_port_t *);
 extern int	sctp_bind_add(sctp_t *, const void *, uint32_t, boolean_t,
 		    in_port_t);
 extern int	sctp_bind_del(sctp_t *, const void *, uint32_t, boolean_t);
@@ -949,7 +950,6 @@ extern int	sctp_check_abandoned_msg(sctp_t *, mblk_t *);
 extern void	sctp_chunkify(sctp_t *, int, int);
 extern void	sctp_clean_death(sctp_t *, int);
 extern void	sctp_close_eager(sctp_t *);
-extern boolean_t sctp_cmpbuf(void *, uint_t, boolean_t, void *, uint_t);
 extern int	sctp_compare_faddrsets(sctp_faddr_t *, sctp_faddr_t *);
 extern void	sctp_congest_reset(sctp_t *);
 extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
@@ -966,14 +966,14 @@ extern sctp_t	*sctp_create_eager(sctp_t *);
 extern void	sctp_dispatch_rput(queue_t *, sctp_t *, sctp_hdr_t *, mblk_t *,
 		    uint_t, uint_t, in6_addr_t);
 extern char	*sctp_display(sctp_t *, char *);
-extern void	sctp_display_all();
+extern void	sctp_display_all(void);
 
 extern void	sctp_error_event(sctp_t *, sctp_chunk_hdr_t *);
 
 extern void	sctp_faddr_alive(sctp_t *, sctp_faddr_t *);
 extern int	sctp_faddr_dead(sctp_t *, sctp_faddr_t *, int);
-extern void	sctp_faddr_fini();
-extern void	sctp_faddr_init();
+extern void	sctp_faddr_fini(void);
+extern void	sctp_faddr_init(void);
 extern void	sctp_faddr2hdraddr(sctp_faddr_t *, sctp_t *);
 extern void	sctp_faddr2ire(sctp_t *, sctp_faddr_t *);
 extern void	sctp_fast_rexmit(sctp_t *);
@@ -994,7 +994,6 @@ extern void	sctp_get_faddr_list(sctp_t *, uchar_t *, size_t);
 extern mblk_t	*sctp_get_first_sent(sctp_t *);
 extern mblk_t	*sctp_get_msg_to_send(sctp_t *, mblk_t **, mblk_t *, int  *,
 		    int32_t, uint32_t, sctp_faddr_t *);
-extern in_port_t sctp_get_next_priv_port();
 extern void	sctp_get_saddr_list(sctp_t *, uchar_t *, size_t);
 
 extern int	sctp_handle_error(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
@@ -1039,9 +1038,9 @@ extern mblk_t	*sctp_make_sack(sctp_t *, sctp_faddr_t *, mblk_t *);
 extern void	sctp_maxpsz_set(sctp_t *);
 extern void	sctp_move_faddr_timers(queue_t *, sctp_t *);
 
-extern void	sctp_nd_free();
+extern void	sctp_nd_free(void);
 extern int	sctp_nd_getset(queue_t *, MBLKP);
-extern boolean_t sctp_nd_init();
+extern boolean_t sctp_nd_init(void);
 extern sctp_parm_hdr_t *sctp_next_parm(sctp_parm_hdr_t *, ssize_t *);
 
 extern void	sctp_ootb_shutdown_ack(sctp_t *, mblk_t *, uint_t);
@@ -1065,7 +1064,6 @@ extern void	sctp_rexmit_timer(sctp_t *, sctp_faddr_t *);
 extern sctp_faddr_t *sctp_rotate_faddr(sctp_t *, sctp_faddr_t *);
 
 extern void	sctp_sack(sctp_t *, mblk_t *);
-extern void	sctp_savebuf(void **, uint_t *, boolean_t, void *, uint_t);
 extern int	sctp_secure_restart_check(mblk_t *, sctp_chunk_hdr_t *,
 		    uint32_t, int);
 extern void	sctp_send_abort(sctp_t *, uint32_t, uint16_t, char *, size_t,
@@ -1077,9 +1075,9 @@ extern void	sctp_send_initack(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);
 extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);
-extern void	sctp_set_hdraddrs(sctp_t *);
-extern void	sctp_sets_init();
-extern void	sctp_sets_fini();
+extern int	sctp_set_hdraddrs(sctp_t *, cred_t *);
+extern void	sctp_sets_init(void);
+extern void	sctp_sets_fini(void);
 extern void	sctp_shutdown_event(sctp_t *);
 extern void	sctp_stop_faddr_timers(sctp_t *);
 extern int	sctp_shutdown_received(sctp_t *, sctp_chunk_hdr_t *, int, int);
@@ -1097,7 +1095,7 @@ extern void	sctp_timer_free(mblk_t *);
 extern void	sctp_timer_stop(mblk_t *);
 extern void	sctp_unlink_faddr(sctp_t *, sctp_faddr_t *);
 
-extern in_port_t sctp_update_next_port(in_port_t);
+extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone);
 extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
 extern void	sctp_user_abort(sctp_t *, mblk_t *, boolean_t);
 

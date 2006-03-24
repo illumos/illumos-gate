@@ -1,11 +1,12 @@
 #!/bin/sh
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,11 +22,9 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # idsconfig -- script to setup iDS 5.x for Native LDAP II.
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -3146,6 +3145,8 @@ attributetypes:( 1.3.18.0.2.4.1108 NAME 'printer-aliases' DESC 'Site-specific ad
 attributetypes:( 1.3.6.1.4.1.42.2.27.5.1.63 NAME 'sun-printer-bsdaddr' DESC 'Sets the server, print queue destination name and whether the client generates protocol extensions. "Solaris" specifies a Solaris print server extension. The value is represented by the following value: server "," destination ", Solaris".' SYNTAX '1.3.6.1.4.1.1466.115.121.1.15' SINGLE-VALUE )
 attributetypes:( 1.3.6.1.4.1.42.2.27.5.1.64 NAME 'sun-printer-kvp' DESC 'This attribute contains a set of key value pairs which may have meaning to the print subsystem or may be user defined. Each value is represented by the following: key "=" value.' SYNTAX '1.3.6.1.4.1.1466.115.121.1.15' )
 attributetypes: ( 1.3.6.1.4.1.42.2.27.5.1.57 NAME 'nisplusTimeZone' DESC 'tzone column from NIS+ timezone table' SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:( 1.3.6.1.4.1.42.2.27.5.1.67 NAME 'ipTnetTemplateName' DESC 'Trusted Solaris network template template_name' SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:( 1.3.6.1.4.1.42.2.27.5.1.68 NAME 'ipTnetNumber' DESC 'Trusted Solaris network template ip_address' SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
 EOF
 ) > ${TMPDIR}/schema_attr
 
@@ -3291,6 +3292,16 @@ dn: cn=schema
 changetype: modify
 add: objectclasses
 objectclasses:	( 1.3.6.1.4.1.42.2.27.5.2.12 NAME 'nisplusTimeZoneData' DESC 'NIS+ timezone table data' SUP top STRUCTURAL MUST ( cn ) MAY ( nisplusTimeZone $ description ) )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:  ( 1.3.6.1.4.1.42.2.27.5.2.8 NAME 'ipTnetTemplate' DESC 'Object class for TSOL network templates' SUP 'top' MUST ( objectclass $ ipTnetTemplateName ) MAY ( SolarisAttrKeyValue ) )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:	( 1.3.6.1.4.1.42.2.27.5.2.9 NAME 'ipTnetHost' DESC 'Associates an IP address or wildcard with a TSOL template_name' SUP 'top' AUXILIARY MUST ( objectclass $ ipTnetNumber ) )
 EOF
 ) > ${TMPDIR}/schema_obj
 
@@ -3612,7 +3623,7 @@ add_new_containers()
 
     for ou in people group rpc protocols networks netgroup \
 	aliases hosts services ethers profile printers \
-	SolarisAuthAttr SolarisProfAttr Timezone ; do
+	SolarisAuthAttr SolarisProfAttr Timezone ipTnet ; do
 
 	# Check if nismaps already exist.
 	eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"ou=${ou},${LDAP_BASEDN}\" -s base \"objectclass=*\" ${VERB}"

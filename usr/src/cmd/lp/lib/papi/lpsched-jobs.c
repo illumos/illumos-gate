@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -470,9 +469,9 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
  * Convert R_REQUEST_* results to the equivalent PAPI attribute representation.
  */
 void
-job_status_to_attributes(job_t *job, char *req_id, char *user, size_t size,
-		time_t date, short state, char *destination, char *form,
-		char *charset, short rank, char *file)
+job_status_to_attributes(job_t *job, char *req_id, char *user, char *slabel,
+		size_t size, time_t date, short state, char *destination,
+		char *form, char *charset, short rank, char *file)
 {
 	char buf[BUFSIZ];
 	char *p;
@@ -517,6 +516,8 @@ job_status_to_attributes(job_t *job, char *req_id, char *user, size_t size,
 				"lpsched-file", file);
 	addLPString(&job->attributes, PAPI_ATTR_EXCL,
 				"job-name", file);
+	addLPString(&job->attributes, PAPI_ATTR_EXCL,
+				"tsol-sensitivity-label", slabel);
 }
 
 void

@@ -90,6 +90,7 @@
 #include <sys/zone.h>
 #include <sys/priv_impl.h>
 #include <sys/priv.h>
+#include <tsol/label.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -4440,6 +4441,33 @@ show_zone_create_args(private_t *pri, long offset)
 		(void) printf("%s\textended_error: 0x%p\n", pri->pname,
 		    (void *)args.extended_error);
 
+		if (is_system_labeled()) {
+			char		*label_str = NULL;
+			bslabel_t	zone_label;
+
+			(void) printf("%s\t         match: %d\n", pri->pname,
+			    args.match);
+			(void) printf("%s\t           doi: %d\n", pri->pname,
+			    args.doi);
+
+			if (Pread_string(Proc, (char *)&zone_label,
+			    sizeof (zone_label), (uintptr_t)args.label) != -1) {
+				/* show the label as string */
+				if (label_to_str(&zone_label, &label_str,
+				    M_LABEL, SHORT_NAMES) != 0) {
+					/* have to dump label as raw string */
+					(void) label_to_str(&zone_label,
+					    &label_str, M_INTERNAL,
+					    SHORT_NAMES);
+				}
+			}
+
+			(void) printf("%s\t         label: %s\n",
+			    pri->pname, label_str != NULL ? label_str : "<?>");
+			if (label_str)
+				free(label_str);
+		}
+
 		if (args.zfsbufsz > 0)
 			free(zone_zfs);
 	}
@@ -4494,6 +4522,32 @@ show_zone_create_args32(private_t *pri, long offset)
 
 		(void) printf("%s\textended_error: 0x%x\n", pri->pname,
 		    (caddr32_t)args.extended_error);
+
+		if (is_system_labeled()) {
+			char		*label_str = NULL;
+			bslabel_t	zone_label;
+
+			(void) printf("%s\t         match: %d\n", pri->pname,
+			    args.match);
+			(void) printf("%s\t           doi: %d\n", pri->pname,
+			    args.doi);
+
+			if (Pread_string(Proc, (char *)&zone_label,
+			    sizeof (zone_label), (caddr32_t)args.label) != -1) {
+				/* show the label as string */
+				if (label_to_str(&zone_label, &label_str,
+				    M_LABEL, SHORT_NAMES) != 0) {
+					/* have to dump label as raw string */
+					(void) label_to_str(&zone_label,
+					    &label_str, M_INTERNAL,
+					    SHORT_NAMES);
+				}
+			}
+			(void) printf("%s\t         label: %s\n",
+			    pri->pname, label_str != NULL ? label_str : "<?>");
+			if (label_str)
+				free(label_str);
+		}
 
 		if (args.zfsbufsz > 0)
 			free(zone_zfs);

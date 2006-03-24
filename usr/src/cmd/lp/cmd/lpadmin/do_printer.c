@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,11 +34,16 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/zone.h>
 #include <stdlib.h>
 #include <libintl.h>
-
+#include <sys/tsol/label_macro.h>
+#include <bsm/devices.h>
 #include "lp.h"
 #include "class.h"
+#if defined PS_FAULTED
+#undef	PS_FAULTED
+#endif
 #include "printers.h"
 #include "msgs.h"
 
@@ -59,9 +63,11 @@ extern	void	fromallclasses();
 #endif
 
 extern char		*label;
+
 static void		configure_printer();
 static char		*fullpath();
 char			*nameit();
+static void		pack_white(char *ptr);
 
 /**
  ** do_printer() - CREATE OR CHANGE PRINTER
@@ -630,6 +636,11 @@ static void		configure_printer (list)
 				);
 			done(1);
 		}
+
+		if ((getzoneid() == GLOBAL_ZONEID) && system_labeled &&
+		    (prbufp->device != NULL))
+			update_dev_dbs(p, prbufp->device, "ADD");
+
 	END_CRITICAL
 
 	return;
@@ -682,4 +693,89 @@ char			*nameit (cmd)
 	(void) strcat (copy, " ");
 	(void) strcat (copy, nm);
 	return (copy);
+}
+
+/*
+ * update_dev_dbs - ADD/REMOVE ENTRIES FOR THE PRINTER IN DEVICE
+ * 			ALLOCATION FILES
+ *
+ * We intentionally ignore errors, since we don't want the printer
+ * installation to be viewed as failing just because we didn't add
+ * the device_allocate entry.
+ *
+ *	Input:
+ *		prtname - printer name
+ *		devname - device associated w/ this printer
+ *		func - [ADD|REMOVE] entries in /etc/security/device_allocate
+ *			and /etc/security/device_maps
+ *
+ *	Return:
+ *		Always 'quiet' return.  Failures are ignored.
+ */
+void
+update_dev_dbs(char *prtname, char *devname, char *func)
+{
+	int		fd, status;
+	pid_t		pid;
+
+	pid = fork();
+	switch (pid) {
+	case -1:
+		/* fork failed, just return quietly */
+		return;
+	case 0:
+		/* child */
+		/* redirect to /dev/null */
+		(void) close(1);
+		(void) close(2);
+		fd = open("/dev/null", O_WRONLY);
+		fd = dup(fd);
+
+		if (strcmp(func, "ADD") == 0) {
+			execl("/usr/sbin/add_allocatable", "add_allocatable",
+			    "-n", prtname, "-t", "lp", "-l", devname,
+			    "-o", "minlabel=admin_low:maxlabel=admin_high",
+			    "-a", "*", "-c", "/bin/true", NULL);
+		} else {
+			if (strcmp(func, "REMOVE") == 0) {
+				execl("/usr/sbin/remove_allocatable",
+				    "remove_allocatable", "-n", prtname, NULL);
+			}
+		}
+		_exit(1);
+		/* NOT REACHED */
+	default:
+		waitpid(pid, &status, 0);
+		return;
+	}
+}
+
+/*
+ * pack_white(ptr) trims off multiple occurances of white space from a NULL
+ * terminated string pointed to by "ptr".
+ */
+static void
+pack_white(char *ptr)
+{
+	char	*tptr;
+	char	*mptr;
+	int	cnt;
+
+	if (ptr == NULL)
+		return;
+	cnt = strlen(ptr);
+	if (cnt == 0)
+		return;
+	mptr = (char *)calloc((unsigned)cnt+1, sizeof (char));
+	if (mptr == NULL)
+		return;
+	tptr = strtok(ptr, " \t");
+	while (tptr != NULL) {
+		(void) strcat(mptr, tptr);
+		(void) strcat(mptr, " ");
+		tptr = strtok(NULL, " \t");
+	}
+	cnt = strlen(mptr);
+	(void) strcpy(ptr, mptr);
+	free(mptr);
 }

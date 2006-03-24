@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
 INSERT COMMENT
@@ -105,6 +104,14 @@ privilege PRIV_FILE_DAC_WRITE
 	In order to write files owned by uid 0 in the absence of an
 	effective uid of 0 ALL privileges are required.
 
+privilege PRIV_FILE_DOWNGRADE_SL
+
+	Allows a process to set the sensitivity label of a file or
+	directory to a sensitivity label that does not dominate the
+	existing sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
 basic privilege PRIV_FILE_LINK_ANY
 
 	Allows a process to create hardlinks to files owned by a uid
@@ -133,6 +140,14 @@ privilege PRIV_FILE_SETID
 	different ownership in the presence of PRIV_FILE_OWNER.
 	Additional restrictions apply when creating or modifying a
 	set-uid 0 file.
+
+privilege PRIV_FILE_UPGRADE_SL
+
+	Allows a process to set the sensitivity label of a file or
+	directory to a sensitivity label that dominates the existing
+	sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
 
 privilege PRIV_GART_ACCESS
 
@@ -175,9 +190,32 @@ privilege PRIV_IPC_OWNER
 	Additional restrictions apply if the owner of the object has uid 0
 	and the effective uid of the current process is not 0.
 
+privilege PRIV_NET_BINDMLP
+
+	Allow a process to bind to a port that is configured as a
+	multi-level port(MLP) for the process's zone. This privilege
+	applies to both shared address and zone-specific address MLPs.
+	See tnzonecfg(4) from the Trusted Extensions manual pages for
+	information on configuring MLP ports.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
 privilege PRIV_NET_ICMPACCESS
 
 	Allows a process to send and receive ICMP packets.
+
+privilege PRIV_NET_MAC_AWARE
+
+	Allows a process to set NET_MAC_AWARE process flag by using 
+	setpflags(2). This privilege also allows a process to set
+	SO_MAC_EXEMPT socket option by using setsockopt(3SOCKET).
+	The NET_MAC_AWARE process flag and the SO_MAC_EXEMPT socket
+	option both allow a local process to communicate with an
+	unlabeled peer if the local process' label dominates the
+	peer's default label, or if the local process runs in the
+	global zone.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
 
 privilege PRIV_NET_PRIVADDR
 
@@ -374,6 +412,117 @@ privilege PRIV_SYS_TIME
 	Allows a process to manipulate system time using any of the
 	appropriate system calls: stime, adjtime, ntp_adjtime and
 	the IA specific RTC calls.
+
+privilege PRIV_SYS_TRANS_LABEL
+
+	Allows a process to translate labels that are not dominated
+	by the process' sensitivity label to and from an external
+	string form.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_COLORMAP
+
+	Allows a process to override colormap restrictions.
+        Allows a process to install or remove colormaps.
+        Allows a process to retrieve colormap cell entries allocated
+	by other processes.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_CONFIG
+
+	Allows a process to configure or destroy resources that are
+	permanently retained by the X server.
+        Allows a process to use SetScreenSaver to set the screen
+	saver timeout value.
+        Allows a process to use ChangeHosts to modify the display
+	access control list.
+        Allows a process to use GrabServer.
+        Allows a process to use the SetCloseDownMode request which
+	may retain window, pixmap, colormap, property, cursor, font,
+	or graphic context resources.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_DAC_READ
+
+	Allows a process to read from a window resource that it does
+	not own (has a different user ID).
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_DAC_WRITE
+
+	Allows a process to write to or create a window resource that
+	it does not own (has a different user ID). A newly created
+	window property is created with the window's user ID.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_DEVICES
+
+	Allows a process to perform operations on window input devices.
+        Allows a process to get and set keyboard and pointer controls.
+        Allows a process to modify pointer button and key mappings.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_DGA
+
+	Allows a process to use the direct graphics access (DGA) X protocol
+	extensions. Direct process access to the frame buffer is still
+	required. Thus the process must have MAC and DAC privileges that
+	allow access to the frame buffer, or the frame buffer must be
+        allocated to the process.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_DOWNGRADE_SL
+
+	Allows a process to set the sensitivity label of a window resource
+	to a sensitivity label that does not dominate the existing
+	sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_FONTPATH
+
+	Allows a process to set a font path.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_MAC_READ
+
+	Allows a process to read from a window resource whose sensitivity
+	label is not equal to the process sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_MAC_WRITE
+
+	Allows a process to create a window resource whose sensitivity
+	label is not equal to the process sensitivity label.
+	A newly created window property is created with the window's
+	sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_SELECTION
+
+	Allows a process to request inter-window data moves without the
+	intervention of the selection confirmer.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
+privilege PRIV_WIN_UPGRADE_SL
+
+	Allows a process to set the sensitivity label of a window
+	resource to a sensitivity label that dominates the existing
+	sensitivity label.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
 set PRIV_EFFECTIVE
 
 	Set of privileges currently in effect.

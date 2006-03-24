@@ -3471,6 +3471,7 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	attach_if = ii->ipsec_in_attach_if;
 	ifindex = ii->ipsec_in_ill_index;
 	zoneid = ii->ipsec_in_zoneid;
+	ASSERT(zoneid != ALL_ZONES);
 	v4 = ii->ipsec_in_v4;
 
 	ipsec_in_release_refs(ii);
@@ -4153,8 +4154,13 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 	 * When conn is non-NULL, the zoneid is set by ipsec_init_ipsec_out().
 	 * Otherwise set the zoneid based on the ire.
 	 */
-	if (connp == NULL)
-		io->ipsec_out_zoneid = ire->ire_zoneid;
+	if (connp == NULL) {
+		zoneid_t zoneid = ire->ire_zoneid;
+
+		if (zoneid == ALL_ZONES)
+			zoneid = GLOBAL_ZONEID;
+		io->ipsec_out_zoneid = zoneid;
+	}
 	return (ipsec_mp);
 }
 

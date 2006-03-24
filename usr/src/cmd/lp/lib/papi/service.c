@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,8 @@
 #include <alloca.h>
 #include <libintl.h>
 #include <papi_impl.h>
+
+#include <tsol/label.h>
 
 papi_status_t
 papiServiceCreate(papi_service_t *handle, const char *service_name,
@@ -89,6 +90,38 @@ papiServiceDestroy(papi_service_t handle)
 		papiAttributeListFree(svc->attributes);
 		free(svc);
 	}
+}
+
+/*
+ * interface for passing a peer's connection to gather sensitivity labeling
+ * from for Trusted Solaris.
+ */
+papi_status_t
+papiServiceSetPeer(papi_service_t handle, int peerfd)
+{
+	papi_status_t result = PAPI_OK;
+	service_t *svc = handle;
+
+	if (svc == NULL)
+		return (PAPI_BAD_ARGUMENT);
+
+	if (is_system_labeled) {
+		short status;
+
+		if ((snd_msg(svc, S_PASS_PEER_CONNECTION) < 0) ||
+		    (ioctl(svc->md->writefd, I_SENDFD, peerfd) < 0) ||
+		    (rcv_msg(svc, R_PASS_PEER_CONNECTION, &status) < 0))
+			status = MTRANSMITERR;
+
+		if (status != MOK) {
+			detailed_error(svc,
+				gettext("failed to send peer connection: %s"),
+				lpsched_status_string(status));
+			result = lpsched_status_to_papi_status(status);
+		}
+	}
+
+	return (result);
 }
 
 papi_status_t

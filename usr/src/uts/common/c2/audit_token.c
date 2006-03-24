@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <sys/vfs.h>		/* for sonode */
 #include <sys/socketvar.h>	/* for sonode */
 #include <sys/zone.h>
+#include <sys/tsol/label.h>
 
 /*
  * These are the control tokens
@@ -928,33 +928,6 @@ au_to_ipc_perm(struct kipc_perm *perm)
 	return (m);
 }
 
-#ifdef NOTYET
-/*
- * au_to_label
- * returns:
- *	pointer to au_membuf chain containing a label token.
- */
-token_t *
-au_to_label(bilabel_t *label)
-{
-	token_t *m;			/* local au_membuf */
-	adr_t adr;			/* adr memory stream header */
-	char data_header = AUT_LABEL;	/* header for this token */
-	short bs = sizeof (bilabel_t);
-
-	m = au_getclr();
-
-	adr_start(&adr, memtod(m, char *));
-	adr_char(&adr, &data_header, 1);
-	adr_short(&adr, &bs, 1);
-	adr_char(&adr, (char *)label, bs);
-
-	m->len = adr_count(&adr);
-
-	return (m);
-}
-#endif	/* NOTYET */
-
 token_t *
 au_to_groups(const gid_t *crgroups, uint_t crngroups)
 {
@@ -1143,4 +1116,26 @@ au_to_privset(
 		kmem_free(buf, maxprivbytes);
 
 	return (token);
+}
+
+/*
+ * au_to_label
+ * returns:
+ *	pointer to au_membuf chain containing a sensitivity label token.
+ */
+token_t *
+au_to_label(bslabel_t *label)
+{
+	token_t *m;			/* local au_membuf */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_LABEL;	/* header for this token */
+
+	m = au_getclr();
+
+	adr_start(&adr, memtod(m, char *));
+	adr_char(&adr, &data_header, 1);
+	adr_char(&adr, (char *)label, sizeof (bslabel_t));
+	m->len = adr_count(&adr);
+
+	return (m);
 }

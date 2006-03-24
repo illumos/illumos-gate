@@ -24,7 +24,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libbsm/Makefile
+# lib/libbsm/Makefile.com
 #
 
 LIBRARY =	libbsm.a
@@ -67,7 +67,10 @@ OBJECTS=	adr.o \
 		getacval.o \
 		getauditflags.o \
 		getdaent.o \
+		getdevicerange.o \
 		getdment.o \
+		getdadefs.o \
+		devalloc.o \
 		getfaudflgs.o
 
 #
@@ -94,7 +97,10 @@ CLOBBERFILES +=	$(MAPFILE)
 
 CFLAGS	+=	$(CCVERBOSE)
 DYNFLAGS +=	-M$(MAPFILE)
-LDLIBS +=	-lsocket -lnsl -lmd5 -lc -lsecdb
+
+LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+LDLIBS +=	-lsocket -lnsl -lmd5 -lc -lsecdb $(LAZYLIBS)
+lint :=		LAZYLIBS = -ltsol
 
 COMDIR=		../common
 

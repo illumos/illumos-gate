@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -720,7 +722,6 @@ BSMSUBDIRS=		\
 	auditd		\
 	auditreduce	\
 	auditstat	\
-	dminfo		\
 	praudit		\
 	bsmconv		\
 	bsmrecord	\

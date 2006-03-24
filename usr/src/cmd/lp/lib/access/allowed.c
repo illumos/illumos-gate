@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,13 @@
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "string.h"
@@ -31,6 +36,10 @@
 
 #include "lp.h"
 #include "access.h"
+#include <pwd.h>
+#include <auth_attr.h>
+#include <auth_list.h>
+#include <tsol/label.h>
 
 /**
  ** is_user_admin() - CHECK IF CURRENT USER IS AN ADMINISTRATOR
@@ -45,7 +54,15 @@ is_user_admin (
 is_user_admin ()
 #endif
 {
-	return (Access(Lp_A, W_OK) == -1? 0 : 1);
+	/* For a labeled system, tsol_check_admin_auth is called
+	 * instead of using Access.
+	 */
+	if (is_system_labeled()) {
+		/* Check that user has print admin authorization */
+		return (tsol_check_admin_auth(getuid()));
+	} else {
+		return (Access(Lp_A, W_OK) == -1? 0 : 1);
+	}
 }
 
 /**
@@ -180,4 +197,23 @@ allowed (item, allow, deny)
 	}
 
 	return (0);
+}
+
+/*
+ * Check to see if the specified user has the administer the printing
+ * system authorization.
+ */
+int
+tsol_check_admin_auth(uid_t uid)
+{
+	struct passwd *p;
+	char *name;
+
+	p = getpwuid(uid);
+	if (p != NULL && p->pw_name != NULL)
+		name = p->pw_name;
+	else
+		name = "";
+
+	return (chkauthattr(PRINT_ADMIN_AUTH, name));
 }

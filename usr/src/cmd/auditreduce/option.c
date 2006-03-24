@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,11 +33,6 @@
 
 #include <locale.h>
 #include <sys/zone.h>	/* for max zonename length */
-
-#ifdef	TSOL
-#include <tsol/label.h>
-#endif	/* TSOL */
-
 #include "auditr.h"
 
 /*
@@ -95,9 +89,7 @@ static int	proc_group(char *, gid_t *);
 static int	proc_id(char *, int);
 static int	proc_object(char *);
 static void	proc_pcb(audit_pcb_t *, char *, int);
-#ifdef	TSOL
 static int	proc_slabel(char *);
-#endif	/* TSOL */
 static int	proc_subject(char *);
 static int	proc_sid(char *);
 static int	proc_type(char *);
@@ -203,12 +195,16 @@ start_over:
 			if (proc_id(optarg, opt))
 				error = TRUE;
 			break;
-#ifdef	TSOL
 		case 'l':		/* label range -- reserved for TX */
+			if (!is_system_labeled()) {
+				(void) fprintf(stderr,
+				    gettext("%s option 'l' requires "
+				    "Trusted Extensions.\n"), ar);
+				return (-1);
+			}
 			if (proc_slabel(optarg))
 				error = TRUE;
 			break;
-#endif	/* TSOL */
 		case 's':		/* session ID */
 			if (proc_sid(optarg))
 				error = TRUE;
@@ -1137,7 +1133,6 @@ proc_pcb(audit_pcb_t *pcb, char *suffix, int i)
 }
 
 
-#ifdef	TSOL
 /*
  * .func	proc_slabel - process sensitivity label range argument.
  * .desc	Parse sensitivity label range sl:sl
@@ -1157,67 +1152,101 @@ proc_slabel(char *optstr)
 		error_str = gettext("'l' option specified multiple times");
 		return (-1);
 	}
-
 	flags |= M_LABEL;
-	p = strchr(optstr, ':');
+
+	if ((m_label = malloc(sizeof (m_range_t))) == NULL) {
+		return (-1);
+	}
+	m_label->lower_bound = NULL;
+	m_label->upper_bound = NULL;
+
+	p = strchr(optstr, ';');
 	if (p == NULL) {
 		/* exact label match, lower and upper range bounds the same */
-		if (stobsl(optstr, &m_slabel.lower_bound, NO_CORRECTION,
-		    &error) == 0) {
+		if (str_to_label(optstr, &m_label->lower_bound, MAC_LABEL,
+		    L_NO_CORRECTION, &error) == -1) {
 			(void) sprintf(errbuf,
 			    gettext("invalid sensitivity label (%s) err %d"),
 			    optstr, error);
 			error_str = errbuf;
-			return (-1);
+			goto errout;
 		}
-		m_slabel.upper_bound = m_slabel.lower_bound;
+		m_label->upper_bound = m_label->lower_bound;
 		return (0);
 	}
 	if (p == optstr) {
 		/* lower bound is not specified .. default is admin_low */
-		bsllow(&m_slabel.lower_bound);
-		if (stobsl(p + 1, &m_slabel.upper_bound, NO_CORRECTION,
-		    &error) == 0) {
-			(void) sprintf(errbuf,
-			    gettext("invalid sensitivity label (%s) err %d"),
-			    p + 1, error);
-			error_str = errbuf;
+		if (str_to_label(ADMIN_LOW, &m_label->lower_bound, MAC_LABEL,
+		    L_NO_CORRECTION, &error) == -1) {
+			free(m_label);
 			return (-1);
+		}
+
+		p++;
+		if (*p == '\0') {
+			/* upper bound not specified .. default is admin_high */
+			if (str_to_label(ADMIN_HIGH, &m_label->upper_bound,
+			    MAC_LABEL, L_NO_CORRECTION, &error) == -1) {
+				m_label_free(m_label->lower_bound);
+				free(m_label);
+				return (-1);
+			}
+		} else {
+			if (str_to_label(p, &m_label->upper_bound, MAC_LABEL,
+			    L_NO_CORRECTION, &error) == -1) {
+				(void) sprintf(errbuf, gettext(
+				    "invalid sensitivity label (%s) err %d"),
+				    p, error);
+				error_str = errbuf;
+				goto errout;
+			}
 		}
 		return (0);
 	}
 	*p++ = '\0';
-	if (stobsl(optstr, &m_slabel.lower_bound, NO_CORRECTION, &error) == 0) {
+	if (str_to_label(optstr, &m_label->lower_bound, MAC_LABEL,
+	    L_NO_CORRECTION, &error) == -1) {
 		(void) sprintf(errbuf,
 		    gettext("invalid sensitivity label (%s) err %d"), optstr,
 		    error);
 		error_str = errbuf;
-		return (-1);
+		goto errout;
 	}
-	if (*p == '\0')
+	if (*p == '\0') {
 		/* upper bound is not specified .. default is admin_high */
-		bslhigh(&m_slabel.upper_bound);
-	else {
-		if (stobsl(p, &m_slabel.upper_bound, NO_CORRECTION, &error) ==
-		    0) {
+		if (str_to_label(ADMIN_HIGH, &m_label->upper_bound,
+		    MAC_LABEL, L_NO_CORRECTION, &error) == -1) {
+			m_label_free(m_label->lower_bound);
+			free(m_label);
+			return (-1);
+		}
+	} else {
+		if (str_to_label(p, &m_label->upper_bound, MAC_LABEL,
+		    L_NO_CORRECTION, &error) == -1) {
 			(void) sprintf(errbuf,
 			    gettext("invalid sensitivity label (%s) err %d"),
 			    p, error);
 			error_str = errbuf;
-			return (-1);
+			goto errout;
 		}
 	}
 	/* make sure that upper bound dominates the lower bound */
-	if (!bldominates(&m_slabel.upper_bound, &m_slabel.lower_bound)) {
-		*--p = ':';
+	if (!bldominates(m_label->upper_bound, m_label->lower_bound)) {
+		*--p = ';';
 		(void) sprintf(errbuf,
 		    gettext("invalid sensitivity label range (%s)"), optstr);
 		error_str = errbuf;
-		return (-1);
+		goto errout;
 	}
 	return (0);
+
+errout:
+	m_label_free(m_label->upper_bound);
+	m_label_free(m_label->lower_bound);
+	free(m_label);
+
+	return (-1);
 }
-#endif	/* !TSOL */
 
 /*
  * proc_zonename - pick up zone name.

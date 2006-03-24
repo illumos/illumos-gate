@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +46,7 @@ char	*_lp_msg_fmts[] =
     "S",          	/* 11 - S_CANCEL_REQUEST */
     "H",          	/* 12 - R_CANCEL_REQUEST */
     "SSSSS",       	/* 13 - S_INQUIRE_REQUEST */
-    "HSSLLHSSSS",      	/* 14 - R_INQUIRE_REQUEST */
+    "HSSSLLHSSSS",     	/* 14 - R_INQUIRE_REQUEST */
     "S",          	/* 15 - S_LOAD_PRINTER */
     "H",          	/* 16 - R_LOAD_PRINTER */
     "S",          	/* 17 - S_UNLOAD_PRINTER */
@@ -108,7 +107,7 @@ char	*_lp_msg_fmts[] =
     "SSHH",		/* 72 - S_GET_STATUS */
     "HSHH",		/* 73 - R_GET_STATUS */
     "HSSSSS",		/* 74 - S_INQUIRE_REQUEST_RANK */
-    "HSSLLHSSSHS",	/* 75 - R_INQUIRE_REQUEST_RANK */
+    "HSSSLLHSSSHS",	/* 75 - R_INQUIRE_REQUEST_RANK */
     "SSS",		/* 76 - S_CANCEL */
     "HLS",		/* 77 - R_CANCEL */
     "S",		/* 78 - S_NEW_CHILD */
@@ -136,5 +135,7 @@ char	*_lp_msg_fmts[] =
     "H",          	/* 99 - R_PAPER_CHANGED */
     "S",          	/* 100 - S_PAPER_ALLOWED */
     "HSS",          	/* 101 - R_PAPER_ALLOWED */
+    "",          	/* 102 - S_PASS_PEER_CONNECTION */
+    "H",          	/* 103 - R_PASS_PEER_CONNECTION */
     0,
 };

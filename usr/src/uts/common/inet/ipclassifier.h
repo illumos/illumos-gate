@@ -137,30 +137,32 @@ struct conn_s {
 		conn_dontroute : 1,		/* SO_DONTROUTE state */
 		conn_loopback : 1,		/* SO_LOOPBACK state */
 		conn_broadcast : 1,		/* SO_BROADCAST state */
-		conn_reuseaddr : 1,		/* SO_REUSEADDR state */
 
+		conn_reuseaddr : 1,		/* SO_REUSEADDR state */
 		conn_multicast_loop : 1,	/* IP_MULTICAST_LOOP */
 		conn_multi_router : 1,		/* Wants all multicast pkts */
 		conn_draining : 1,		/* ip_wsrv running */
-		conn_did_putbq : 1,		/* ip_wput did a putbq */
 
+		conn_did_putbq : 1,		/* ip_wput did a putbq */
 		conn_unspec_src : 1,		/* IP_UNSPEC_SRC */
 		conn_policy_cached : 1,		/* Is policy cached/latched ? */
 		conn_in_enforce_policy : 1,	/* Enforce Policy on inbound */
-		conn_out_enforce_policy : 1,	/* Enforce Policy on outbound */
 
+		conn_out_enforce_policy : 1,	/* Enforce Policy on outbound */
 		conn_af_isv6 : 1,		/* ip address family ver 6 */
 		conn_pkt_isv6 : 1,		/* ip packet format ver 6 */
 		conn_ipv6_recvpktinfo : 1,	/* IPV6_RECVPKTINFO option */
-		conn_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
 
+		conn_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
 		conn_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
 		conn_ipv6_recvdstopts : 1,	/* IPV6_RECVDSTOPTS option */
 		conn_ipv6_recvrthdr : 1,	/* IPV6_RECVRTHDR option */
+
 		conn_ipv6_recvrtdstopts : 1,	/* IPV6_RECVRTHDRDSTOPTS */
 		conn_ipv6_v6only : 1,		/* IPV6_V6ONLY */
 		conn_ipv6_recvtclass : 1,	/* IPV6_RECVTCLASS */
 		conn_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU */
+
 		conn_pathmtu_valid : 1,		/* The cached mtu is valid. */
 		conn_ipv6_dontfrag : 1,		/* IPV6_DONTFRAG */
 		/*
@@ -170,6 +172,7 @@ struct conn_s {
 		 */
 		conn_fully_bound : 1,		/* Fully bound connection */
 		conn_recvif : 1,		/* IP_RECVIF option */
+
 		conn_recvslla : 1,		/* IP_RECVSLLA option */
 		conn_mdt_ok : 1,		/* MDT is permitted */
 		conn_nexthop_set : 1,
@@ -258,12 +261,28 @@ struct conn_s {
 	zoneid_t	conn_zoneid;		/* zone connection is in */
 	in6_addr_t	conn_nexthop_v6;	/* nexthop IP address */
 #define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
+	cred_t		*conn_peercred;		/* Peer credentials, if any */
+
+	unsigned int
+		conn_ulp_labeled : 1,		/* ULP label is synced */
+		conn_mlp_type : 2,		/* mlp_type_t; tsol/tndb.h */
+		conn_anon_mlp : 1,		/* user wants anon MLP */
+
+		conn_anon_port : 1,		/* user bound anonymously */
+		conn_mac_exempt : 1,		/* unlabeled with loose MAC */
+		conn_spare : 26;
+
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10
 	int		conn_trace_last;	/* ndx of last used tracebuf */
 	conn_trace_t	conn_trace_buf[CONN_TRACE_MAX];
 #endif
 };
+
+#define	CONN_CRED(connp) ((connp)->conn_peercred == NULL ? \
+	(connp)->conn_cred : (connp)->conn_peercred)
+#define	BEST_CRED(mp, connp) ((DB_CRED(mp) != NULL &&	\
+	crgetlabel(DB_CRED(mp)) != NULL) ? DB_CRED(mp) : CONN_CRED(connp))
 
 /*
  * connf_t - connection fanout data.
@@ -330,7 +349,7 @@ struct connf_s {
 	(((connp)->conn_src == ((ipha)->ipha_dst)) &&			\
 	(((connp)->conn_rem == INADDR_ANY) ||				\
 	((connp)->conn_rem == ((ipha)->ipha_src))))) &&			\
-	((connp)->conn_zoneid == (zoneid)) &&				\
+	((zoneid) == ALL_ZONES || (connp)->conn_zoneid == (zoneid)) &&	\
 	(conn_wantpacket((connp), (ill), (ipha),			\
 	(fanout_flags), (zoneid)) || ((protocol) == IPPROTO_PIM) ||	\
 	((protocol) == IPPROTO_RSVP)))
@@ -499,7 +518,7 @@ void ipcl_proto_insert_v6(conn_t *, uint8_t);
 conn_t *ipcl_classify_v4(mblk_t *, uint8_t, uint_t, zoneid_t);
 conn_t *ipcl_classify_v6(mblk_t *, uint8_t, uint_t, zoneid_t);
 conn_t *ipcl_classify(mblk_t *, zoneid_t);
-conn_t *ipcl_classify_raw(uint8_t, zoneid_t, uint32_t, ipha_t *);
+conn_t *ipcl_classify_raw(mblk_t *, uint8_t, zoneid_t, uint32_t, ipha_t *);
 void	ipcl_globalhash_insert(conn_t *);
 void	ipcl_globalhash_remove(conn_t *);
 void	ipcl_walk(pfv_t, void *);

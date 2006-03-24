@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +80,10 @@
 #include <net/if.h>
 #include <assert.h>
 #include <rpcsvc/daemon_utils.h>
+#include <pwd.h>
+#include <strings.h>
+#include <tsol/label.h>
+#include <zone.h>
 
 extern char *nfs_get_qop_name();
 extern AUTH *nfs_create_ah();
@@ -144,6 +147,8 @@ static	struct	netbuf *get_addr(char *, rpcprog_t, rpcvers_t,
 static	struct	netbuf *get_pubfh(char *, rpcvers_t, mfs_snego_t *,
 	struct netconfig **, char *, ushort_t, struct t_info *, caddr_t *,
 	bool_t, char *);
+
+static int create_homedir(const char *, const char *);
 
 enum type_of_stuff {
 	SERVER_ADDR = 0,
@@ -416,7 +421,6 @@ add_mfs(struct mapfs *mfs, int distance, struct mapfs **mfs_head,
 	struct mapfs **mfs_tail)
 {
 	struct mapfs *tmp, *new;
-	void bcopy();
 
 	for (tmp = *mfs_head; tmp; tmp = tmp->mfs_next)
 		if ((strcmp(tmp->mfs_host, mfs->mfs_host) == 0 &&
@@ -1990,7 +1994,19 @@ try_mnt_slash:
 		    } /* syncaddr */
 		} /* AUTH_DH */
 
-		nfs_sec.sc_uid = cred->aup_uid;
+		/*
+		 * TSOL notes: automountd in tsol extension
+		 * has "read down" capability, i.e. we allow
+		 * a user to trigger an nfs mount into a lower
+		 * labeled zone. We achieve this by always having
+		 * root issue the mount request so that the
+		 * lookup ops can go past /zone/<zone_name>
+		 * on the server side.
+		 */
+		if (is_system_labeled())
+			nfs_sec.sc_uid = (uid_t)0;
+		else
+			nfs_sec.sc_uid = cred->aup_uid;
 		/*
 		 * If AUTH_DH is a chosen flavor now, its data will be stored
 		 * in the sec_data structure via nfs_clnt_secdata().
@@ -2253,7 +2269,7 @@ try_mnt_slash:
 		else
 			sl = service_list;
 
-		_check_services(sl);
+		(void) _check_services(sl);
 	}
 
 	/*
@@ -3598,6 +3614,13 @@ loopbackmount(fsname, dir, mntopts, overlay)
 			"  loopbackmount: fsname=%s, dir=%s, flags=%d\n",
 			fsname, dir, flags);
 
+	if (is_system_labeled()) {
+		if (create_homedir((const char *)fsname,
+		    (const char *)dir) == 0) {
+			return (NFSERR_NOENT);
+		}
+	}
+
 	if (mount(fsname, dir, flags | MS_DATA | MS_OPTIONSTR, fstype,
 	    NULL, 0, optbuf, sizeof (optbuf)) < 0) {
 		syslog(LOG_ERR, "Mount of %s on %s: %m", fsname, dir);
@@ -4213,4 +4236,79 @@ is_v4_mount(char *mntpath)
 	(void) kstat_close(kc);
 
 	return (FALSE);
+}
+
+static int
+create_homedir(const char *src, const char *dst) {
+
+	struct stat stbuf;
+	char *dst_username;
+	struct passwd *pwd, pwds;
+	char buf_pwd[NSS_BUFLEN_PASSWD];
+	int homedir_len;
+	int dst_dir_len;
+	int src_dir_len;
+
+	if (trace > 1)
+		trace_prt(1, "entered create_homedir\n");
+
+	if (stat(src, &stbuf) == 0) {
+		if (trace > 1)
+			trace_prt(1, "src exists\n");
+		return (1);
+	}
+
+	dst_username = strrchr(dst, '/');
+	if (dst_username) {
+		dst_username++; /* Skip over slash */
+		pwd = getpwnam_r(dst_username, &pwds, buf_pwd,
+		    sizeof (buf_pwd));
+		if (pwd == NULL) {
+			return (0);
+		}
+	} else {
+		return (0);
+	}
+
+	homedir_len = strlen(pwd->pw_dir);
+	dst_dir_len = strlen(dst) - homedir_len;
+	src_dir_len = strlen(src) - homedir_len;
+
+	/* Check that the paths are in the same zone */
+	if (src_dir_len < dst_dir_len ||
+	    (strncmp(dst, src, dst_dir_len) != 0)) {
+		if (trace > 1)
+			trace_prt(1, "	paths don't match\n");
+		return (0);
+	}
+	/* Check that mountpoint is an auto_home entry */
+	if (dst_dir_len < 0 ||
+	    (strcmp(pwd->pw_dir, dst + dst_dir_len) != 0)) {
+		return (0);
+	}
+
+	/* Check that source is an home directory entry */
+	if (src_dir_len < 0 ||
+	    (strcmp(pwd->pw_dir, src + src_dir_len) != 0)) {
+		if (trace > 1)
+			trace_prt(1, "	homedir (2) doesn't match %s\n",
+		src+src_dir_len);
+		return (0);
+	}
+
+	if (mkdir(src,
+	    S_IRUSR | S_IWUSR | S_IXUSR | S_IXGRP | S_IXOTH) == -1) {
+		if (trace > 1) {
+			trace_prt(1, "	Couldn't mkdir %s\n", src);
+		}
+		return (0);
+	}
+
+	if (chown(src, pwd->pw_uid, pwd->pw_gid) == -1) {
+		unlink(src);
+		return (0);
+	}
+
+	/* Created new home directory for the user */
+	return (1);
 }

@@ -52,6 +52,7 @@ usr/include/rpcsvc/daemon_utils.h	i386
 usr/include/priv_utils.h	i386
 usr/include/bsm/audit_door_infc.h	i386
 usr/include/bsm/audit_private.h	i386
+usr/include/bsm/devalloc.h	i386
 usr/include/sys/ieeefp.h	i386
 usr/include/sys/winlockio.h	i386
 usr/include/security/pam_impl.h	i386
@@ -782,3 +783,15 @@ usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	i386
 #
 usr/lib/libstanddisasm.so		i386
 usr/lib/amd64/libstanddisasm.so		i386
+
+#
+# TSol: tsol doesn't ship lint source, and tsnet isn't for customers at all.
+lib/libtsnet.so				i386
+lib/llib-ltsnet				i386
+usr/lib/llib-ltsnet			i386
+usr/lib/llib-ltsol			i386
+lib/llib-ltsol				i386
+
+#
+# nss interfaces shared between libnsl and other ON libraries.
+usr/include/nss.h			i386

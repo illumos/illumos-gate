@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +132,11 @@ typedef struct priv_impl_info {
 #define	PRIV_AWARE			0x0002		/* Is privilege aware */
 #define	PRIV_AWARE_INHERIT		0x0004		/* Inherit awareness */
 #define	__PROC_PROTECT			0x0008		/* Private */
-#define	PRIV_USER			(PRIV_DEBUG)	/* User settable */
+#define	NET_MAC_AWARE			0x0010		/* Is MAC aware */
+#define	NET_MAC_AWARE_INHERIT		0x0020		/* Inherit MAC aware */
+
+/* user-settable flags: */
+#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT)
 
 /*
  * Header of the privilege info data structure; multiple structures can
@@ -227,6 +230,9 @@ extern void priv_inverse(priv_set_t *);
 extern void priv_set_PA(cred_t *);
 extern void priv_adjust_PA(cred_t *);
 extern boolean_t priv_can_clear_PA(const cred_t *);
+
+extern int setpflags(uint_t, uint_t, cred_t *);
+extern uint_t getpflags(uint_t, const cred_t *);
 
 #endif /* _KERNEL */
 

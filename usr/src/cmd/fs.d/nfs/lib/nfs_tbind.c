@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +50,9 @@
 #include <nfs/nfs_acl.h>
 #include <nfs/nfssys.h>
 #include <nfs/nfs4.h>
+#include <zone.h>
+#include <sys/socket.h>
+#include <tsol/label.h>
 
 /*
  * Determine valid semantics for most applications.
@@ -93,6 +95,8 @@ struct conn_entry {
  */
 static	int	nofile_increase(int);
 static	int	reuseaddr(int);
+static	int	recvucred(int);
+static  int	anonmlp(int);
 static	void	add_to_poll_list(int, struct netconfig *);
 static	char	*serv_name_to_port_name(char *);
 static	int	bind_to_proto(char *, char *, struct netbuf **,
@@ -234,6 +238,7 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 	struct opthdr *opt;
 	char reqbuf[128];
 	bool_t use_any = FALSE;
+	bool_t gzone = TRUE;
 
 	if ((fd = nfslib_transport_open(nconf)) == -1) {
 		syslog(LOG_ERR, "cannot establish transport service over %s",
@@ -250,7 +255,7 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 		tb.addr.len = 0;
 		tb.addr.buf = 0;
 		use_any = TRUE;
-
+		gzone = (getzoneid() == GLOBAL_ZONEID);
 	} else if (netdir_getbyname(nconf, hs, &addrlist) != 0) {
 
 		syslog(LOG_ERR,
@@ -272,6 +277,31 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 		if (reuseaddr(fd) == -1) {
 			syslog(LOG_WARNING,
 			"couldn't set SO_REUSEADDR option on transport");
+		}
+	} else if (strcmp(nconf->nc_proto, "udp") == 0) {
+		/*
+		 * In order to run MLP on UDP, we need to handle creds.
+		 */
+		if (recvucred(fd) == -1) {
+			syslog(LOG_WARNING,
+			    "couldn't set SO_RECVUCRED option on transport");
+		}
+	}
+
+	/*
+	 * Make non global zone nfs4_callback port MLP
+	 */
+	if (use_any && is_system_labeled() && !gzone) {
+		if (anonmlp(fd) == -1) {
+			/*
+			 * failing to set this option means nfs4_callback
+			 * could fail silently later. So fail it with
+			 * with an error message now.
+			 */
+			syslog(LOG_ERR,
+			    "couldn't set SO_ANON_MLP option on transport");
+			(void) t_close(fd);
+			return (-1);
 		}
 	}
 
@@ -364,29 +394,26 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 }
 
 static int
-reuseaddr(int fd)
+setopt(int fd, int level, int name, int value)
 {
 	struct t_optmgmt req, resp;
-	struct opthdr *opt;
-	char reqbuf[128];
-	int *ip;
+	struct {
+		struct opthdr opt;
+		int value;
+	} reqbuf;
 
-	/* LINTED pointer alignment */
-	opt = (struct opthdr *)reqbuf;
-	opt->level = SOL_SOCKET;
-	opt->name = SO_REUSEADDR;
-	opt->len = sizeof (int);
+	reqbuf.opt.level = level;
+	reqbuf.opt.name = name;
+	reqbuf.opt.len = sizeof (int);
 
-	/* LINTED pointer alignment */
-	ip = (int *)&reqbuf[sizeof (struct opthdr)];
-	*ip = 1;
+	reqbuf.value = value;
 
 	req.flags = T_NEGOTIATE;
-	req.opt.len = sizeof (struct opthdr) + opt->len;
-	req.opt.buf = (char *)opt;
+	req.opt.len = sizeof (reqbuf);
+	req.opt.buf = (char *)&reqbuf;
 
 	resp.flags = 0;
-	resp.opt.buf = reqbuf;
+	resp.opt.buf = (char *)&reqbuf;
 	resp.opt.maxlen = sizeof (reqbuf);
 
 	if (t_optmgmt(fd, &req, &resp) < 0 || resp.flags != T_SUCCESS) {
@@ -394,6 +421,24 @@ reuseaddr(int fd)
 		return (-1);
 	}
 	return (0);
+}
+
+static int
+reuseaddr(int fd)
+{
+	return (setopt(fd, SOL_SOCKET, SO_REUSEADDR, 1));
+}
+
+static int
+recvucred(int fd)
+{
+	return (setopt(fd, SOL_SOCKET, SO_RECVUCRED, 1));
+}
+
+static int
+anonmlp(int fd)
+{
+	return (setopt(fd, SOL_SOCKET, SO_ANON_MLP, 1));
 }
 
 void

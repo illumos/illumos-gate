@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,9 @@ extern void sctp_ddi_init(void);
 extern void sctp_ddi_destroy(void);
 extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
     zoneid_t);
+extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t, uint_t,
+    zoneid_t, mblk_t *);
+
 extern void sctp_input(conn_t *, ipha_t *, mblk_t *, mblk_t *, ill_t *,
     boolean_t, boolean_t);
 extern void sctp_wput(queue_t *, mblk_t *);

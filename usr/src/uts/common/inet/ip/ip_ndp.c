@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +30,7 @@
 #include <sys/stropts.h>
 #include <sys/sysmacros.h>
 #include <sys/errno.h>
-#include <sys/strlog.h>
 #include <sys/dlpi.h>
-#include <sys/sockio.h>
-#include <sys/tiuser.h>
-#include <sys/tihdr.h>
 #include <sys/socket.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
@@ -45,12 +40,9 @@
 #include <sys/zone.h>
 
 #include <net/if.h>
-#include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/route.h>
-#include <sys/sockio.h>
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
@@ -58,9 +50,7 @@
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
-#include <inet/arp.h>
 #include <inet/ip.h>
-#include <inet/ip_multi.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_rts.h>
@@ -762,7 +752,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 			 */
 			ire = ire_ftable_lookup_v6(&ipv6_all_zeros,
 			    &ipv6_all_zeros, &nce->nce_addr, IRE_DEFAULT,
-			    nce->nce_ill->ill_ipif, NULL, ALL_ZONES, 0,
+			    nce->nce_ill->ill_ipif, NULL, ALL_ZONES, 0, NULL,
 			    MATCH_IRE_ILL | MATCH_IRE_TYPE | MATCH_IRE_GW |
 			    MATCH_IRE_DEFAULT);
 			if (ire != NULL) {
@@ -781,7 +771,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
  * walking the hash list.
  */
 void
-ndp_walk_impl(ill_t *ill, pfi_t pfi, uchar_t *arg1, boolean_t trace)
+ndp_walk_impl(ill_t *ill, pfi_t pfi, void *arg1, boolean_t trace)
 {
 
 	nce_t	*nce;
@@ -852,7 +842,7 @@ ndp_walk_impl(ill_t *ill, pfi_t pfi, uchar_t *arg1, boolean_t trace)
 }
 
 void
-ndp_walk(ill_t *ill, pfi_t pfi, uchar_t *arg1)
+ndp_walk(ill_t *ill, pfi_t pfi, void *arg1)
 {
 	ndp_walk_impl(ill, pfi, arg1, B_TRUE);
 }
@@ -869,6 +859,7 @@ ndp_prepend_zone(mblk_t *mp, zoneid_t zoneid)
 	mblk_t		*first_mp;
 	ipsec_out_t	*io;
 
+	ASSERT(zoneid != ALL_ZONES);
 	if (mp->b_datap->db_type == M_CTL) {
 		io = (ipsec_out_t *)mp->b_rptr;
 		ASSERT(io->ipsec_out_type == IPSEC_OUT);

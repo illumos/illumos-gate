@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +55,8 @@
 #include <rpcsvc/daemon_utils.h>
 #include <deflt.h>
 #include <strings.h>
-
+#include <priv.h>
+#include <tsol/label.h>
 
 static void autofs_prog(struct svc_req *, SVCXPRT *);
 static void autofs_mount_1_r(struct autofs_lookupargs *,
@@ -321,6 +321,14 @@ main(argc, argv)
 
 	/* other initializations */
 	(void) rwlock_init(&portmap_cache_lock, USYNC_THREAD, NULL);
+
+	/* on a labeled system, the automounter implements read-down policy */
+	if (is_system_labeled()) {
+		if ((setpflags(NET_MAC_AWARE, 1) == -1) ||
+		    (setpflags(NET_MAC_AWARE_INHERIT, 1) == -1))
+			syslog(LOG_ERR, "ignored failure to set MAC-aware "
+			    "mode: %m");
+	}
 
 	if (!rpc_control(RPC_SVC_MTMODE_SET, &rpc_svc_mode)) {
 		syslog(LOG_ERR, "unable to set automatic MT mode");

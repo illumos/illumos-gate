@@ -93,6 +93,7 @@
 #include "sobj.h"
 #include "sysevent.h"
 #include "rctl.h"
+#include "tsol.h"
 #include "typegraph.h"
 #include "ldi.h"
 #include "vfs.h"
@@ -3388,7 +3389,7 @@ static const mdb_dcmd_t dcmds[] = {
 	/* from net.c */
 	{ "mi", ":[-p] [-d | -m]", "filter and display MI object or payload",
 		mi },
-	{ "netstat", "[-av] [-f inet | inet6 | unix] [-P tcp | udp]",
+	{ "netstat", "[-arv] [-f inet | inet6 | unix] [-P tcp | udp]",
 		"show network statistics", netstat },
 	{ "sonode", "?[-f inet | inet6 | unix | #] "
 		"[-t stream | dgram | raw | #] [-p #]",
@@ -3762,6 +3763,12 @@ static const mdb_walker_t walkers[] = {
 	/* from tsd.c */
 	{ "tsd", "walk list of thread-specific data",
 		tsd_walk_init, tsd_walk_step, tsd_walk_fini },
+
+	/* from tsol.c */
+	{ "tnrh", "walk remote host cache structures",
+	    tnrh_walk_init, tnrh_walk_step, tnrh_walk_fini },
+	{ "tnrhtp", "walk remote host template structures",
+	    tnrhtp_walk_init, tnrhtp_walk_step, tnrhtp_walk_fini },
 
 	/*
 	 * typegraph does not work under kmdb, as it requires too much memory

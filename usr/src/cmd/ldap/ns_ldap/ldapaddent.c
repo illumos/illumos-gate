@@ -3572,6 +3572,10 @@ static struct ttypelist_t ttypelist[] = {
 		filedbmline_comment, "SolarisAuthAttr" },
 	{ NS_LDAP_TYPE_AUUSER, genent_audit_user, dump_audit_user,
 		filedbmline_comment, "SolarisAuditUser" },
+	{ NS_LDAP_TYPE_TNRHDB, genent_tnrhdb, dump_tnrhdb,
+		filedbmline_comment, "ipTnetHost" },
+	{ NS_LDAP_TYPE_TNRHTP, genent_tnrhtp, dump_tnrhtp,
+		filedbmline_comment, "ipTnetTemplate" },
 	{ 0, 0, 0, 0, 0 }
 };
 
@@ -3641,9 +3645,17 @@ dumptable(char *service)
 		(void) snprintf(filter, sizeof (filter),
 		    "(&(objectclass=%s)(!(objectclass=SolarisExecAttr)))",
 		    tt->objclass);
-	} else
+	} else if (strcmp(tt->ttype, NS_LDAP_TYPE_TNRHDB) == 0) {
+		/*
+		 * tnrhtp entries are ipTnet entries with SolarisAttrKeyValue
+		 */
+		(void) snprintf(filter, sizeof (filter),
+		    "(&(objectclass=%s)(SolarisAttrKeyValue=*)))",
+		    tt->objclass);
+	} else {
 		(void) snprintf(filter, sizeof (filter),
 		    "(objectclass=%s)", tt->objclass);
+	}
 
 	if (flags & F_VERBOSE)
 		(void) fprintf(stdout, gettext("FILTER = %s\n"), filter);

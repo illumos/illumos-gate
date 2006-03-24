@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,10 +37,8 @@
  * MULTICAST 3.5.1.1
  */
 
-
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/dlpi.h>
 #include <sys/stropts.h>
 #include <sys/strlog.h>
 #include <sys/strsun.h>
@@ -54,12 +51,8 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#define	_SUN_TPI_VERSION	2
-#include <sys/tihdr.h>
 #include <inet/ipclassifier.h>
 #include <net/if.h>
-#include <net/if_arp.h>
-#include <sys/sockio.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/igmp_var.h>
@@ -69,7 +62,6 @@
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
-#include <inet/arp.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_multi.h>
@@ -1871,6 +1863,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	ill_t 	*ill  = ipif->ipif_ill;	/* Will be the "lower" ill */
 	mblk_t	*first_mp;
 	ipsec_out_t *io;
+	zoneid_t zoneid;
 
 	/*
 	 * We need to make sure this packet goes out on an ipif. If
@@ -1907,7 +1900,9 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	io->ipsec_out_attach_if = B_TRUE;
 	io->ipsec_out_multicast_loop = B_FALSE;
 	io->ipsec_out_dontroute = B_TRUE;
-	io->ipsec_out_zoneid = ilm->ilm_zoneid;
+	if ((zoneid = ilm->ilm_zoneid) == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
+	io->ipsec_out_zoneid = zoneid;
 
 	mp = allocb(size, BPRI_HI);
 	if (mp == NULL) {
@@ -1986,6 +1981,7 @@ igmpv3_sendrpt(ipif_t *ipif, mrec_t *reclist)
 	mrec_t *rp, *cur_reclist;
 	mrec_t *next_reclist = reclist;
 	boolean_t morepkts;
+	zoneid_t zoneid;
 
 	/* if there aren't any records, there's nothing to send */
 	if (reclist == NULL)
@@ -2077,7 +2073,9 @@ nextpkt:
 	io->ipsec_out_attach_if = B_TRUE;
 	io->ipsec_out_multicast_loop = B_FALSE;
 	io->ipsec_out_dontroute = B_TRUE;
-	io->ipsec_out_zoneid = ipif->ipif_zoneid;
+	if ((zoneid = ipif->ipif_zoneid) == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
+	io->ipsec_out_zoneid = zoneid;
 
 	mp = allocb(size, BPRI_HI);
 	if (mp == NULL) {

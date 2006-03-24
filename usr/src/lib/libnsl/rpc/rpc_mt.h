@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -36,6 +35,7 @@
 
 #include <sys/types.h>
 #include <rpc/rpc.h>
+#include <netconfig.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,6 +94,8 @@ extern int	__getpublickey_cached(char *, char *, int *);
 extern void	__getpublickey_flush(const char *);
 extern int	__can_use_af(sa_family_t);
 extern int	__rpc_raise_fd(int);
+extern void	__rpc_set_mac_options(int, const struct netconfig *,
+	rpcprog_t);
 extern void	__tli_sys_strerror(char *, size_t, int, int);
 
 #ifdef	__cplusplus

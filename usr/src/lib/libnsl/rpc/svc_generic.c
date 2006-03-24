@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +51,14 @@
 #include <malloc.h>
 #include <string.h>
 #include <stropts.h>
-
+#include <tsol/label.h>
+#include <nfs/nfs.h>
+#include <nfs/nfs_acl.h>
+#include <rpcsvc/mount.h>
+#include <rpcsvc/nsm_addr.h>
+#include <rpcsvc/rquota.h>
+#include <rpcsvc/sm_inter.h>
+#include <rpcsvc/nlm_prot.h>
 
 extern int __svc_vc_setflag(SVCXPRT *, int);
 
@@ -79,6 +85,22 @@ extern bool_t __rpc_try_doors(const char *, bool_t *);
 
 SVCXPRT_LIST *_svc_xprtlist = NULL;
 extern mutex_t xprtlist_lock;
+
+static SVCXPRT * svc_tli_create_common(int, const struct netconfig *,
+    const struct t_bind *, uint_t, uint_t, boolean_t);
+
+boolean_t
+is_multilevel(rpcprog_t prognum)
+{
+	/* This is a list of identified multilevel service provider */
+	if ((prognum == MOUNTPROG) || (prognum == NFS_PROGRAM) ||
+	    (prognum == NFS_ACL_PROGRAM) || (prognum == NLM_PROG) ||
+	    (prognum == NSM_ADDR_PROGRAM) || (prognum == RQUOTAPROG) ||
+	    (prognum == SM_PROG))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
 
 void
 __svc_free_xprtlist(void)
@@ -162,6 +184,7 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 			const rpcvers_t versnum, const struct netconfig *nconf)
 {
 	SVCXPRT *xprt;
+	boolean_t anon_mlp = B_FALSE;
 
 	if (nconf == NULL) {
 		(void) syslog(LOG_ERR,
@@ -169,7 +192,11 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 				prognum, versnum);
 		return (NULL);
 	}
-	xprt = svc_tli_create(RPC_ANYFD, nconf, NULL, 0, 0);
+
+	/* Some programs need to allocate MLP for multilevel services */
+	if (is_system_labeled() && is_multilevel(prognum))
+		anon_mlp = B_TRUE;
+	xprt = svc_tli_create_common(RPC_ANYFD, nconf, NULL, 0, 0, anon_mlp);
 	if (xprt == NULL)
 		return (NULL);
 	(void) rpcb_unset(prognum, versnum, (struct netconfig *)nconf);
@@ -183,6 +210,13 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
 	return (xprt);
 }
 
+SVCXPRT *
+svc_tli_create(const int fd, const struct netconfig *nconf,
+    const struct t_bind *bindaddr, const uint_t sendsz, const uint_t recvsz)
+{
+	return (svc_tli_create_common(fd, nconf, bindaddr, sendsz, recvsz, 0));
+}
+
 /*
  * If fd is RPC_ANYFD, then it opens a fd for the given transport
  * provider (nconf cannot be NULL then). If the t_state is T_UNBND and
@@ -193,8 +227,9 @@ svc_tp_create(void (*dispatch)(), const rpcprog_t prognum,
  * If sendsz or recvsz are zero, their default values are chosen.
  */
 SVCXPRT *
-svc_tli_create(const int ofd, const struct netconfig *nconf,
-	const struct t_bind *bindaddr, const uint_t sendsz, const uint_t recvsz)
+svc_tli_create_common(const int ofd, const struct netconfig *nconf,
+	const struct t_bind *bindaddr, const uint_t sendsz,
+	const uint_t recvsz, boolean_t mlp_flag)
 {
 	SVCXPRT *xprt = NULL;		/* service handle */
 	struct t_info tinfo;		/* transport info */
@@ -293,6 +328,17 @@ svc_tli_create(const int ofd, const struct netconfig *nconf,
 	switch (state) {
 		bool_t tcp, exclbind;
 	case T_UNBND:
+		/* If this is a labeled system, then ask for an MLP */
+		if (is_system_labeled() &&
+		    (strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+		    strcmp(nconf->nc_protofmly, NC_INET6) == 0)) {
+			(void) __rpc_tli_set_options(fd, SOL_SOCKET,
+			    SO_RECVUCRED, 1);
+			if (mlp_flag)
+				(void) __rpc_tli_set_options(fd, SOL_SOCKET,
+				    SO_ANON_MLP, 1);
+		}
+
 		/*
 		 * {TCP,UDP}_EXCLBIND has the following properties
 		 *    - an fd bound to port P via IPv4 will prevent an IPv6

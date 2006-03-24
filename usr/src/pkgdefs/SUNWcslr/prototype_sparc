@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -142,6 +144,10 @@ s none lib/sparcv9/libthread.so=libthread.so.1
 f none lib/sparcv9/libthread.so.1 755 root bin
 s none lib/sparcv9/libthread_db.so=libc_db.so.1
 s none lib/sparcv9/libthread_db.so.1=libc_db.so.1
+s none lib/sparcv9/libtsnet.so=libtsnet.so.1
+f none lib/sparcv9/libtsnet.so.1 755 root bin
+s none lib/sparcv9/libtsol.so=libtsol.so.2
+f none lib/sparcv9/libtsol.so.2 755 root bin
 s none lib/sparcv9/libumem.so=libumem.so.1
 f none lib/sparcv9/libumem.so.1 0755 root bin
 s none lib/sparcv9/libuuid.so=libuuid.so.1

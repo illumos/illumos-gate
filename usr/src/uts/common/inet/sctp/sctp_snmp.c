@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include <sys/tihdr.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/tsol/tndb.h>
 
 #include <netinet/in.h>
 
@@ -306,16 +306,23 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl)
 	mblk_t			*mp_rem_ctl = NULL;
 	mblk_t			*mp_rem_data;
 	mblk_t			*mp_rem_tail = NULL;
+	mblk_t			*mp_attr_ctl = NULL;
+	mblk_t			*mp_attr_data;
+	mblk_t			*mp_attr_tail = NULL;
 	struct opthdr		*optp;
 	sctp_t			*sctp, *sctp_prev = NULL;
 	sctp_faddr_t		*fp;
 	mib2_sctpConnEntry_t	sce;
 	mib2_sctpConnLocalEntry_t	scle;
 	mib2_sctpConnRemoteEntry_t	scre;
+	mib2_transportMLPEntry_t	mlp;
 	int			i;
 	int			l;
 	int			scanned = 0;
 	zoneid_t		zoneid = Q_TO_CONN(q)->conn_zoneid;
+	conn_t			*connp;
+	boolean_t		needattr;
+	int			idx;
 
 	/*
 	 * Make copies of the original message.
@@ -326,10 +333,13 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl)
 	mp_conn_ctl = copymsg(mpctl);
 	mp_local_ctl = copymsg(mpctl);
 	mp_rem_ctl = copymsg(mpctl);
+	mp_attr_ctl = copymsg(mpctl);
 
 	mpdata = mpctl->b_cont;
 
-	if (!mp_conn_ctl || !mp_local_ctl || !mp_rem_ctl || !mpdata) {
+	if (mp_conn_ctl == NULL || mp_local_ctl == NULL ||
+	    mp_rem_ctl == NULL || mp_attr_ctl == NULL || mpdata == NULL) {
+		freemsg(mp_attr_ctl);
 		freemsg(mp_rem_ctl);
 		freemsg(mp_local_ctl);
 		freemsg(mp_conn_ctl);
@@ -340,6 +350,7 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl)
 	mp_conn_data = mp_conn_ctl->b_cont;
 	mp_local_data = mp_local_ctl->b_cont;
 	mp_rem_data = mp_rem_ctl->b_cont;
+	mp_attr_data = mp_attr_ctl->b_cont;
 
 	/* hostname address parameters are not supported in Solaris */
 	sce.sctpAssocRemHostName.o_length = 0;
@@ -355,6 +366,7 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl)
 	SET_MIB(sctp_mib.sctpMaxInitRetr, sctp_max_init_retr);
 	SET_MIB(sctp_mib.sctpCurrEstab, 0);
 
+	idx = 0;
 	sctp = gsctp;
 	mutex_enter(&sctp_g_lock);
 	while (sctp != NULL) {
@@ -492,6 +504,26 @@ done:
 			(void) snmp_append_data2(mp_rem_data, &mp_rem_tail,
 			    (char *)&scre, sizeof (scre));
 		}
+		connp = sctp->sctp_connp;
+		needattr = B_FALSE;
+		bzero(&mlp, sizeof (mlp));
+		if (connp->conn_mlp_type != mlptSingle) {
+			if (connp->conn_mlp_type == mlptShared ||
+			    connp->conn_mlp_type == mlptBoth)
+				mlp.tme_flags |= MIB2_TMEF_SHARED;
+			if (connp->conn_mlp_type == mlptPrivate ||
+			    connp->conn_mlp_type == mlptBoth)
+				mlp.tme_flags |= MIB2_TMEF_PRIVATE;
+			needattr = B_TRUE;
+		}
+		if (connp->conn_peercred != NULL) {
+			ts_label_t *tsl;
+
+			tsl = crgetlabel(connp->conn_peercred);
+			mlp.tme_doi = label2doi(tsl);
+			mlp.tme_label = *label2bslabel(tsl);
+			needattr = B_TRUE;
+		}
 		WAKE_SCTP(sctp);
 		sce.sctpAssocState = sctp_snmp_state(sctp);
 		sce.sctpAssocInStreams = sctp->sctp_num_istr;
@@ -511,6 +543,10 @@ done:
 		sce.sctpConnEntryInfo.ce_mss = sctp->sctp_mss;
 		(void) snmp_append_data2(mp_conn_data, &mp_conn_tail,
 		    (char *)&sce, sizeof (sce));
+		mlp.tme_connidx = idx++;
+		if (needattr)
+			(void) snmp_append_data2(mp_attr_ctl->b_cont,
+			    &mp_attr_tail, (char *)&mlp, sizeof (mlp));
 next_sctp:
 		sctp_prev = sctp;
 		mutex_enter(&sctp_g_lock);
@@ -554,6 +590,17 @@ next_sctp:
 	optp->name = MIB2_SCTP_CONN_REMOTE;
 	optp->len = msgdsize(mp_rem_data);
 	qreply(q, mp_rem_ctl);
+
+	/* table of MLP attributes */
+	optp = (struct opthdr *)&mp_attr_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_SCTP;
+	optp->name = EXPER_XPORT_MLP;
+	optp->len = msgdsize(mp_attr_data);
+	if (optp->len == 0)
+		freemsg(mp_attr_ctl);
+	else
+		qreply(q, mp_attr_ctl);
 
 	return (mp_ret);
 }

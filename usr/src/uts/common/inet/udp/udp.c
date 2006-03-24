@@ -39,7 +39,6 @@ const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/timod.h>
-#include <sys/tiuser.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/strsubr.h>
@@ -85,10 +84,14 @@ const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
 /*
  * The ipsec_info.h header file is here since it has the definition for the
  * M_CTL message types used by IP to convey information to the ULP. The
- * ipsec_info.h needs the pfkeyv2.h, hence the latters presence.
+ * ipsec_info.h needs the pfkeyv2.h, hence the latter's presence.
  */
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/tnet.h>
+#include <rpc/pmap_prot.h>
 
 /*
  * Synchronization notes:
@@ -249,16 +252,23 @@ static udp_fanout_t *udp_bind_fanout;
 
 /*
  * This controls the rate some ndd info report functions can be used
- * by non-priviledged users.  It stores the last time such info is
+ * by non-privileged users.  It stores the last time such info is
  * requested.  When those report functions are called again, this
  * is checked with the current time and compare with the ndd param
  * udp_ndd_get_info_interval.
  */
 static clock_t udp_last_ndd_get_info_time;
 #define	NDD_TOO_QUICK_MSG \
-	"ndd get info rate too high for non-priviledged users, try again " \
+	"ndd get info rate too high for non-privileged users, try again " \
 	"later.\n"
 #define	NDD_OUT_OF_BUF_MSG	"<< Out of buffer >>\n"
+
+/* Option processing attrs */
+typedef struct udpattrs_s {
+	ip6_pkt_t	*udpattr_ipp;
+	mblk_t		*udpattr_mb;
+	boolean_t	udpattr_credset;
+} udpattrs_t;
 
 static void	udp_addr_req(queue_t *q, mblk_t *mp);
 static void	udp_bind(queue_t *q, mblk_t *mp);
@@ -287,14 +297,12 @@ static mblk_t	*udp_ip_bind_mp(udp_t *udp, t_scalar_t bind_prim,
 static int	udp_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp);
 static  int	udp_unitdata_opt_process(queue_t *q, mblk_t *mp,
-		    int *errorp, void *thisdg_attrs);
+		    int *errorp, udpattrs_t *udpattrs);
 static boolean_t udp_opt_allow_udr_set(t_scalar_t level, t_scalar_t name);
 static int	udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t udp_param_register(udpparam_t *udppa, int cnt);
 static int	udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		    cred_t *cr);
-static int	udp_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
-		    uchar_t **optbufp, uint_t *optlenp);
 static void	udp_report_item(mblk_t *mp, udp_t *udp);
 static void	udp_rput(queue_t *q, mblk_t *mp);
 static void	udp_rput_other(queue_t *, mblk_t *);
@@ -307,12 +315,13 @@ static void	udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha);
 static void	udp_ud_err(queue_t *q, mblk_t *mp, uchar_t *destaddr,
 		    t_scalar_t destlen, t_scalar_t err);
 static void	udp_unbind(queue_t *q, mblk_t *mp);
-static in_port_t udp_update_next_port(in_port_t port, boolean_t random);
+static in_port_t udp_update_next_port(udp_t *udp, in_port_t port,
+    boolean_t random);
 static void	udp_wput(queue_t *q, mblk_t *mp);
 static mblk_t	*udp_output_v4(conn_t *, mblk_t *mp, ipaddr_t v4dst,
 		    uint16_t port, uint_t srcid, int *error);
 static mblk_t	*udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6,
-		    t_scalar_t tudr_optlen, int *error);
+		    int *error);
 static void	udp_wput_other(queue_t *q, mblk_t *mp);
 static void	udp_wput_iocdata(queue_t *q, mblk_t *mp);
 static void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
@@ -459,7 +468,7 @@ udpparam_t udp_param_arr[] = {
 /* END CSTYLED */
 
 /*
- * The smallest anonymous port in the priviledged port range which UDP
+ * The smallest anonymous port in the privileged port range which UDP
  * looks for free port.  Use in the option UDP_ANONPRIVBIND.
  */
 static in_port_t udp_min_anonpriv_port = 512;
@@ -903,17 +912,38 @@ udp_exit(conn_t *connp)
 }
 
 /*
- * Return the next anonymous port in the priviledged port range for
+ * Return the next anonymous port in the privileged port range for
  * bind checking.
+ *
+ * Trusted Extension (TX) notes: TX allows administrator to mark or
+ * reserve ports as Multilevel ports (MLP). MLP has special function
+ * on TX systems. Once a port is made MLP, it's not available as
+ * ordinary port. This creates "holes" in the port name space. It
+ * may be necessary to skip the "holes" find a suitable anon port.
  */
 static in_port_t
-udp_get_next_priv_port(void)
+udp_get_next_priv_port(udp_t *udp)
 {
 	static in_port_t next_priv_port = IPPORT_RESERVED - 1;
+	in_port_t nextport;
+	boolean_t restart = B_FALSE;
 
-	if (next_priv_port < udp_min_anonpriv_port) {
+retry:
+	if (next_priv_port < udp_min_anonpriv_port ||
+	    next_priv_port >= IPPORT_RESERVED) {
 		next_priv_port = IPPORT_RESERVED - 1;
+		if (restart)
+			return (0);
+		restart = B_TRUE;
 	}
+
+	if (is_system_labeled() &&
+	    (nextport = tsol_next_port(crgetzone(udp->udp_connp->conn_cred),
+	    next_priv_port, IPPROTO_UDP, B_FALSE)) != 0) {
+		next_priv_port = nextport;
+		goto retry;
+	}
+
 	return (next_priv_port--);
 }
 
@@ -1098,6 +1128,8 @@ udp_bind(queue_t *q, mblk_t *mp)
 	zoneid_t	zoneid;
 	conn_t		*connp;
 	udp_t		*udp;
+	boolean_t	is_inaddr_any;
+	mlp_type_t	addrtype, mlptype;
 
 	connp = Q_TO_CONN(q);
 	udp = connp->conn_udp;
@@ -1198,10 +1230,10 @@ udp_bind(queue_t *q, mblk_t *mp)
 		 * valid range.
 		 */
 		if (udp->udp_anon_priv_bind) {
-			port = udp_get_next_priv_port();
+			port = udp_get_next_priv_port(udp);
 		} else {
-			port = udp_update_next_port(udp_g_next_port_to_try,
-			    B_TRUE);
+			port = udp_update_next_port(udp,
+			    udp_g_next_port_to_try, B_TRUE);
 		}
 	} else {
 		/*
@@ -1230,6 +1262,11 @@ udp_bind(queue_t *q, mblk_t *mp)
 				return;
 			}
 		}
+	}
+
+	if (port == 0) {
+		udp_err_ack(q, mp, TNOADDR, 0);
+		return;
 	}
 
 	/*
@@ -1286,13 +1323,13 @@ udp_bind(queue_t *q, mblk_t *mp)
 		loopmax = udp_largest_anon_port - udp_smallest_anon_port + 1;
 	}
 
+	is_inaddr_any = V6_OR_V4_INADDR_ANY(v6src);
 	zoneid = connp->conn_zoneid;
+
 	for (;;) {
 		udp_t		*udp1;
-		boolean_t	is_inaddr_any;
 		boolean_t	found_exclbind = B_FALSE;
 
-		is_inaddr_any = V6_OR_V4_INADDR_ANY(v6src);
 		/*
 		 * Walk through the list of udp streams bound to
 		 * requested port with the same IP address.
@@ -1302,8 +1339,17 @@ udp_bind(queue_t *q, mblk_t *mp)
 		mutex_enter(&udpf->uf_lock);
 		for (udp1 = udpf->uf_udp; udp1 != NULL;
 		    udp1 = udp1->udp_bind_hash) {
-			if (lport != udp1->udp_port ||
-			    zoneid != udp1->udp_connp->conn_zoneid)
+			if (lport != udp1->udp_port)
+				continue;
+
+			/*
+			 * On a labeled system, we must treat bindings to ports
+			 * on shared IP addresses by sockets with MAC exemption
+			 * privilege as being in all zones, as there's
+			 * otherwise no way to identify the right receiver.
+			 */
+			if (zoneid != udp1->udp_connp->conn_zoneid &&
+			    !udp->udp_mac_exempt && !udp1->udp_mac_exempt)
 				continue;
 
 			/*
@@ -1321,8 +1367,12 @@ udp_bind(queue_t *q, mblk_t *mp)
 			 * unspec	spec		no
 			 * spec		unspec		no
 			 * spec		spec		yes if A
+			 *
+			 * For labeled systems, SO_MAC_EXEMPT behaves the same
+			 * as UDP_EXCLBIND, except that zoneid is ignored.
 			 */
-			if (udp1->udp_exclbind || udp->udp_exclbind) {
+			if (udp1->udp_exclbind || udp->udp_exclbind ||
+			    udp1->udp_mac_exempt || udp->udp_mac_exempt) {
 				if (V6_OR_V4_INADDR_ANY(
 				    udp1->udp_bound_v6src) ||
 				    is_inaddr_any ||
@@ -1388,7 +1438,7 @@ udp_bind(queue_t *q, mblk_t *mp)
 		}
 
 		if (udp->udp_anon_priv_bind) {
-			port = udp_get_next_priv_port();
+			port = udp_get_next_priv_port(udp);
 		} else {
 			if ((count == 0) && (requested_port != 0)) {
 				/*
@@ -1397,15 +1447,16 @@ udp_bind(queue_t *q, mblk_t *mp)
 				 * requested_port to 0, so that we will
 				 * update udp_g_next_port_to_try below.
 				 */
-				port = udp_update_next_port(
+				port = udp_update_next_port(udp,
 				    udp_g_next_port_to_try, B_TRUE);
 				requested_port = 0;
 			} else {
-				port = udp_update_next_port(port + 1, B_FALSE);
+				port = udp_update_next_port(udp, port + 1,
+				    B_FALSE);
 			}
 		}
 
-		if (++count >= loopmax) {
+		if (port == 0 || ++count >= loopmax) {
 			/*
 			 * We've tried every possible port number and
 			 * there are none available, so send an error
@@ -1466,6 +1517,88 @@ udp_bind(queue_t *q, mblk_t *mp)
 			    (in_port_t)udp->udp_port);
 		}
 
+	}
+
+	connp->conn_anon_port = (is_system_labeled() && requested_port == 0);
+	if (is_system_labeled() && (!connp->conn_anon_port ||
+	    connp->conn_anon_mlp)) {
+		uint16_t mlpport;
+		cred_t *cr = connp->conn_cred;
+		zone_t *zone;
+
+		connp->conn_mlp_type = udp->udp_recvucred ? mlptBoth :
+		    mlptSingle;
+		addrtype = tsol_mlp_addr_type(zoneid, IPV6_VERSION, &v6src);
+		if (addrtype == mlptSingle) {
+			udp_err_ack(q, mp, TNOADDR, 0);
+			connp->conn_anon_port = B_FALSE;
+			connp->conn_mlp_type = mlptSingle;
+			return;
+		}
+		mlpport = connp->conn_anon_port ? PMAPPORT : port;
+		zone = crgetzone(cr);
+		mlptype = tsol_mlp_port_type(zone, IPPROTO_UDP, mlpport,
+		    addrtype);
+		if (mlptype != mlptSingle &&
+		    (connp->conn_mlp_type == mlptSingle ||
+		    secpolicy_net_bindmlp(cr) != 0)) {
+			if (udp->udp_debug) {
+				(void) strlog(UDP_MOD_ID, 0, 1,
+				    SL_ERROR|SL_TRACE,
+				    "udp_bind: no priv for multilevel port %d",
+				    mlpport);
+			}
+			udp_err_ack(q, mp, TACCES, 0);
+			connp->conn_anon_port = B_FALSE;
+			connp->conn_mlp_type = mlptSingle;
+			return;
+		}
+
+		/*
+		 * If we're specifically binding a shared IP address and the
+		 * port is MLP on shared addresses, then check to see if this
+		 * zone actually owns the MLP.  Reject if not.
+		 */
+		if (mlptype == mlptShared && addrtype == mlptShared) {
+			zoneid_t mlpzone;
+
+			mlpzone = tsol_mlp_findzone(IPPROTO_UDP,
+			    htons(mlpport));
+			if (connp->conn_zoneid != mlpzone) {
+				if (udp->udp_debug) {
+					(void) strlog(UDP_MOD_ID, 0, 1,
+					    SL_ERROR|SL_TRACE,
+					    "udp_bind: attempt to bind port "
+					    "%d on shared addr in zone %d "
+					    "(should be %d)",
+					    mlpport, connp->conn_zoneid,
+					    mlpzone);
+				}
+				udp_err_ack(q, mp, TACCES, 0);
+				connp->conn_anon_port = B_FALSE;
+				connp->conn_mlp_type = mlptSingle;
+				return;
+			}
+		}
+		if (connp->conn_anon_port) {
+			int error;
+
+			error = tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			    port, B_TRUE);
+			if (error != 0) {
+				if (udp->udp_debug) {
+					(void) strlog(UDP_MOD_ID, 0, 1,
+					    SL_ERROR|SL_TRACE,
+					    "udp_bind: cannot establish anon "
+					    "MLP for port %d", port);
+				}
+				udp_err_ack(q, mp, TACCES, 0);
+				connp->conn_anon_port = B_FALSE;
+				connp->conn_mlp_type = mlptSingle;
+				return;
+			}
+		}
+		connp->conn_mlp_type = mlptype;
 	}
 
 	/* Pass the protocol number in the message following the address. */
@@ -1769,6 +1902,7 @@ bind_failed:
 	linkb(mp1, mp);
 	linkb(mp1, mp2);
 
+	mblk_setcred(mp1, udp->udp_connp->conn_cred);
 	if (udp->udp_family == AF_INET)
 		mp1 = ip_bind_v4(q, mp1, udp->udp_connp);
 	else
@@ -1819,6 +1953,7 @@ udp_close(queue_t *q)
 	connp->conn_flags &= ~IPCL_UDP;
 	connp->conn_state_flags &=
 	    ~(CONN_CLOSING | CONN_CONDEMNED | CONN_QUIESCED);
+	connp->conn_ulp_labeled = B_FALSE;
 	return (0);
 }
 
@@ -1879,28 +2014,7 @@ udp_close_free(conn_t *connp)
 		udp->udp_sticky_hdrs_len = 0;
 	}
 
-	if (udp->udp_sticky_ipp.ipp_fields & IPPF_HOPOPTS) {
-		kmem_free(udp->udp_sticky_ipp.ipp_hopopts,
-		    udp->udp_sticky_ipp.ipp_hopoptslen);
-		udp->udp_sticky_ipp.ipp_hopopts = NULL;
-	}
-	if (udp->udp_sticky_ipp.ipp_fields & IPPF_RTDSTOPTS) {
-		kmem_free(udp->udp_sticky_ipp.ipp_rtdstopts,
-		    udp->udp_sticky_ipp.ipp_rtdstoptslen);
-		udp->udp_sticky_ipp.ipp_rtdstopts = NULL;
-	}
-	if (udp->udp_sticky_ipp.ipp_fields & IPPF_RTHDR) {
-		kmem_free(udp->udp_sticky_ipp.ipp_rthdr,
-		    udp->udp_sticky_ipp.ipp_rthdrlen);
-		udp->udp_sticky_ipp.ipp_rthdr = NULL;
-	}
-	if (udp->udp_sticky_ipp.ipp_fields & IPPF_DSTOPTS) {
-		kmem_free(udp->udp_sticky_ipp.ipp_dstopts,
-		    udp->udp_sticky_ipp.ipp_dstoptslen);
-		udp->udp_sticky_ipp.ipp_dstopts = NULL;
-	}
-	udp->udp_sticky_ipp.ipp_fields &=
-	    ~(IPPF_HOPOPTS|IPPF_RTDSTOPTS|IPPF_RTHDR|IPPF_DSTOPTS);
+	ip6_pkt_free(&udp->udp_sticky_ipp);
 
 	udp->udp_connp = NULL;
 	connp->conn_udp = NULL;
@@ -2835,10 +2949,20 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
 	connp->conn_zoneid = zoneid;
 
+	/*
+	 * If the caller has the process-wide flag set, then default to MAC
+	 * exempt mode.  This allows read-down to unlabeled hosts.
+	 */
+	if (getpflags(NET_MAC_AWARE, credp) != 0)
+		udp->udp_mac_exempt = B_TRUE;
+
 	if (connp->conn_flags & IPCL_SOCKET) {
 		udp->udp_issocket = B_TRUE;
 		udp->udp_direct_sockfs = B_TRUE;
 	}
+
+	connp->conn_ulp_labeled = is_system_labeled();
+
 	mutex_exit(&connp->conn_lock);
 
 	/*
@@ -2853,6 +2977,7 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	if (udp->udp_family == AF_INET6) {
 		/* Build initial header template for transmit */
 		if ((err = udp_build_hdrs(q, udp)) != 0) {
+error:
 			qprocsoff(UDP_RD(q));
 			udp->udp_connp = NULL;
 			connp->conn_udp = NULL;
@@ -2931,6 +3056,7 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 	conn_t	*connp;
 	udp_t	*udp;
 	ip6_pkt_t *ipp;
+	int	len;
 
 	q = UDP_WR(q);
 	connp = Q_TO_CONN(q);
@@ -2979,6 +3105,12 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case SO_TIMESTAMP:
 			*i1 = udp->udp_timestamp;
 			break;
+		case SO_ANON_MLP:
+			*i1 = udp->udp_anon_mlp;
+			break;	/* goto sizeof (int) option return */
+		case SO_MAC_EXEMPT:
+			*i1 = udp->udp_mac_exempt;
+			break;	/* goto sizeof (int) option return */
 		default:
 			return (-1);
 		}
@@ -2989,10 +3121,12 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		switch (name) {
 		case IP_OPTIONS:
 		case T_IP_OPTIONS:
-			if (udp->udp_ip_rcv_options_len)
-				bcopy(udp->udp_ip_rcv_options, ptr,
-				    udp->udp_ip_rcv_options_len);
-			return (udp->udp_ip_rcv_options_len);
+			len = udp->udp_ip_rcv_options_len - udp->udp_label_len;
+			if (len > 0) {
+				bcopy(udp->udp_ip_rcv_options +
+				    udp->udp_label_len, ptr, len);
+			}
+			return (len);
 		case IP_TOS:
 		case T_IP_TOS:
 			*i1 = (int)udp->udp_type_of_service;
@@ -3153,8 +3287,21 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case IPV6_HOPOPTS:
 			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
 				return (0);
-			bcopy(ipp->ipp_hopopts, ptr, ipp->ipp_hopoptslen);
-			return (ipp->ipp_hopoptslen);
+			if (ipp->ipp_hopoptslen <= udp->udp_label_len_v6)
+				return (0);
+			/*
+			 * The cipso/label option is added by kernel.
+			 * User is not usually aware of this option.
+			 * We copy out the hbh opt after the label option.
+			 */
+			bcopy((char *)ipp->ipp_hopopts + udp->udp_label_len_v6,
+			    ptr, ipp->ipp_hopoptslen - udp->udp_label_len_v6);
+			if (udp->udp_label_len_v6 > 0) {
+				ptr[0] = ((char *)ipp->ipp_hopopts)[0];
+				ptr[1] = (ipp->ipp_hopoptslen -
+				    udp->udp_label_len_v6 + 7) / 8 - 1;
+			}
+			return (ipp->ipp_hopoptslen - udp->udp_label_len_v6);
 		case IPV6_RTHDRDSTOPTS:
 			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
 				return (0);
@@ -3208,12 +3355,14 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
     uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
+	udpattrs_t *attrs = thisdg_attrs;
 	int	*i1 = (int *)invalp;
 	boolean_t onoff = (*i1 == 0) ? 0 : 1;
 	boolean_t checkonly;
 	int	error;
 	conn_t	*connp;
 	udp_t	*udp;
+	uint_t	newlen;
 
 	q = UDP_WR(q);
 	connp = Q_TO_CONN(q);
@@ -3332,6 +3481,55 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (!checkonly)
 				udp->udp_timestamp = onoff;
 			break;
+		case SO_ANON_MLP:
+			if (!checkonly)
+				udp->udp_anon_mlp = onoff;
+			break;
+		case SO_MAC_EXEMPT:
+			if (secpolicy_net_mac_aware(cr) != 0 ||
+			    udp->udp_state != TS_UNBND)
+				return (EACCES);
+			if (!checkonly)
+				udp->udp_mac_exempt = onoff;
+			break;
+		case SCM_UCRED: {
+			struct ucred_s *ucr;
+			cred_t *cr, *newcr;
+			ts_label_t *tsl;
+
+			/*
+			 * Only sockets that have proper privileges and are
+			 * bound to MLPs will have any other value here, so
+			 * this implicitly tests for privilege to set label.
+			 */
+			if (connp->conn_mlp_type == mlptSingle)
+				break;
+			ucr = (struct ucred_s *)invalp;
+			if (inlen != ucredsize ||
+			    ucr->uc_labeloff < sizeof (*ucr) ||
+			    ucr->uc_labeloff + sizeof (bslabel_t) > inlen)
+				return (EINVAL);
+			if (!checkonly) {
+				mblk_t *mb;
+
+				if (attrs == NULL ||
+				    (mb = attrs->udpattr_mb) == NULL)
+					return (EINVAL);
+				if ((cr = DB_CRED(mb)) == NULL)
+					cr = udp->udp_connp->conn_cred;
+				ASSERT(cr != NULL);
+				if ((tsl = crgetlabel(cr)) == NULL)
+					return (EINVAL);
+				newcr = copycred_from_bslabel(cr, UCLABEL(ucr),
+				    tsl->tsl_doi, KM_NOSLEEP);
+				if (newcr == NULL)
+					return (ENOSR);
+				mblk_setcred(mb, newcr);
+				attrs->udpattr_credset = B_TRUE;
+				crfree(newcr);
+			}
+			break;
+		}
 		default:
 			*outlenp = 0;
 			return (EINVAL);
@@ -3346,32 +3544,27 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		case IP_OPTIONS:
 		case T_IP_OPTIONS:
 			/* Save options for use by IP. */
-			if (inlen & 0x3) {
+			newlen = inlen + udp->udp_label_len;
+			if ((inlen & 0x3) || newlen > IP_MAX_OPT_LENGTH) {
 				*outlenp = 0;
 				return (EINVAL);
 			}
 			if (checkonly)
 				break;
 
-			if (udp->udp_ip_snd_options) {
-				mi_free((char *)udp->udp_ip_snd_options);
-				udp->udp_ip_snd_options_len = 0;
-				udp->udp_ip_snd_options = NULL;
+			if (!tsol_option_set(&udp->udp_ip_snd_options,
+			    &udp->udp_ip_snd_options_len,
+			    udp->udp_label_len, invalp, inlen)) {
+				*outlenp = 0;
+				return (ENOMEM);
 			}
-			if (inlen) {
-				udp->udp_ip_snd_options =
-					(uchar_t *)mi_alloc(inlen, BPRI_HI);
-				if (udp->udp_ip_snd_options) {
-					bcopy(invalp, udp->udp_ip_snd_options,
-					    inlen);
-					udp->udp_ip_snd_options_len = inlen;
-				}
-			}
+
 			udp->udp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
 			    UDPH_SIZE + udp->udp_ip_snd_options_len;
 			(void) mi_set_sth_wroff(RD(q), udp->udp_max_hdr_len +
 			    udp_wroff_extra);
 			break;
+
 		case IP_TTL:
 			if (!checkonly) {
 				udp->udp_ttl = (uchar_t)*i1;
@@ -3471,14 +3664,11 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		/*
 		 * Deal with both sticky options and ancillary data
 		 */
-		if (thisdg_attrs == NULL) {
+		sticky = B_FALSE;
+		if (attrs == NULL || (ipp = attrs->udpattr_ipp) == NULL) {
 			/* sticky options, or none */
 			ipp = &udp->udp_sticky_ipp;
 			sticky = B_TRUE;
-		} else {
-			/* ancillary data */
-			ipp = (ip6_pkt_t *)thisdg_attrs;
-			sticky = B_FALSE;
 		}
 
 		switch (name) {
@@ -3739,22 +3929,16 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (checkonly)
 				break;
 
-			if (inlen == 0) {
-				if (sticky &&
-				    (ipp->ipp_fields & IPPF_HOPOPTS) != 0) {
-					kmem_free(ipp->ipp_hopopts,
-					    ipp->ipp_hopoptslen);
-					ipp->ipp_hopopts = NULL;
-					ipp->ipp_hopoptslen = 0;
-				}
+			error = optcom_pkt_set(invalp, inlen, sticky,
+			    (uchar_t **)&ipp->ipp_hopopts,
+			    &ipp->ipp_hopoptslen,
+			    sticky ? udp->udp_label_len_v6 : 0);
+			if (error != 0)
+				return (error);
+			if (ipp->ipp_hopoptslen == 0) {
 				ipp->ipp_fields &= ~IPPF_HOPOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_HOPOPTS;
 			} else {
-				error = udp_pkt_set(invalp, inlen, sticky,
-				    (uchar_t **)&ipp->ipp_hopopts,
-				    &ipp->ipp_hopoptslen);
-				if (error != 0)
-					return (error);
 				ipp->ipp_fields |= IPPF_HOPOPTS;
 			}
 			if (sticky) {
@@ -3790,9 +3974,9 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_RTDSTOPTS;
 			} else {
-				error = udp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_rtdstopts,
-				    &ipp->ipp_rtdstoptslen);
+				    &ipp->ipp_rtdstoptslen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_RTDSTOPTS;
@@ -3829,9 +4013,9 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 				ipp->ipp_fields &= ~IPPF_DSTOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_DSTOPTS;
 			} else {
-				error = udp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_dstopts,
-				    &ipp->ipp_dstoptslen);
+				    &ipp->ipp_dstoptslen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_DSTOPTS;
@@ -3868,9 +4052,9 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 				ipp->ipp_fields &= ~IPPF_RTHDR;
 				ipp->ipp_sticky_ignored |= IPPF_RTHDR;
 			} else {
-				error = udp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_rthdr,
-				    &ipp->ipp_rthdrlen);
+				    &ipp->ipp_rthdrlen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_RTHDR;
@@ -4018,46 +4202,6 @@ udp_build_hdrs(queue_t *q, udp_t *udp)
 }
 
 /*
- * Set optbuf and optlen for the option.
- * If sticky is set allocate memory (if not already present).
- * Otherwise just point optbuf and optlen at invalp and inlen.
- * Returns failure if memory can not be allocated.
- */
-static int
-udp_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
-    uchar_t **optbufp, uint_t *optlenp)
-{
-	uchar_t *optbuf;
-
-	if (!sticky) {
-		*optbufp = invalp;
-		*optlenp = inlen;
-		return (0);
-	}
-	if (inlen == *optlenp) {
-		/* Unchanged length - no need to realocate */
-		bcopy(invalp, *optbufp, inlen);
-		return (0);
-	}
-	if (inlen != 0) {
-		/* Allocate new buffer before free */
-		optbuf = kmem_alloc(inlen, KM_NOSLEEP);
-		if (optbuf == NULL)
-			return (ENOMEM);
-	} else {
-		optbuf = NULL;
-	}
-	/* Free old buffer */
-	if (*optlenp != 0)
-		kmem_free(*optbufp, *optlenp);
-
-	bcopy(invalp, optbuf, inlen);
-	*optbufp = optbuf;
-	*optlenp = inlen;
-	return (0);
-}
-
-/*
  * This routine retrieves the value of an ND variable in a udpparam_t
  * structure.  It is called through nd_getset when a user reads the
  * variable.
@@ -4140,6 +4284,156 @@ udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 	return (0);
 }
 
+/*
+ * Copy hop-by-hop option from ipp->ipp_hopopts to the buffer provided (with
+ * T_opthdr) and return the number of bytes copied.  'dbuf' may be NULL to
+ * just count the length needed for allocation.  If 'dbuf' is non-NULL,
+ * then it's assumed to be allocated to be large enough.
+ *
+ * Returns zero if trimming of the security option causes all options to go
+ * away.
+ */
+static size_t
+copy_hop_opts(const ip6_pkt_t *ipp, uchar_t *dbuf)
+{
+	struct T_opthdr *toh;
+	size_t hol = ipp->ipp_hopoptslen;
+	ip6_hbh_t *dstopt = NULL;
+	const ip6_hbh_t *srcopt = ipp->ipp_hopopts;
+	size_t tlen, olen, plen;
+	boolean_t deleting;
+	const struct ip6_opt *sopt, *lastpad;
+	struct ip6_opt *dopt;
+
+	if ((toh = (struct T_opthdr *)dbuf) != NULL) {
+		toh->level = IPPROTO_IPV6;
+		toh->name = IPV6_HOPOPTS;
+		toh->status = 0;
+		dstopt = (ip6_hbh_t *)(toh + 1);
+	}
+
+	/*
+	 * If labeling is enabled, then skip the label option
+	 * but get other options if there are any.
+	 */
+	if (is_system_labeled()) {
+		dopt = NULL;
+		if (dstopt != NULL) {
+			/* will fill in ip6h_len later */
+			dstopt->ip6h_nxt = srcopt->ip6h_nxt;
+			dopt = (struct ip6_opt *)(dstopt + 1);
+		}
+		sopt = (const struct ip6_opt *)(srcopt + 1);
+		hol -= sizeof (*srcopt);
+		tlen = sizeof (*dstopt);
+		lastpad = NULL;
+		deleting = B_FALSE;
+		/*
+		 * This loop finds the first (lastpad pointer) of any number of
+		 * pads that preceeds the security option, then treats the
+		 * security option as though it were a pad, and then finds the
+		 * next non-pad option (or end of list).
+		 *
+		 * It then treats the entire block as one big pad.  To preserve
+		 * alignment of any options that follow, or just the end of the
+		 * list, it computes a minimal new padding size that keeps the
+		 * same alignment for the next option.
+		 *
+		 * If it encounters just a sequence of pads with no security
+		 * option, those are copied as-is rather than collapsed.
+		 *
+		 * Note that to handle the end of list case, the code makes one
+		 * loop with 'hol' set to zero.
+		 */
+		for (;;) {
+			if (hol > 0) {
+				if (sopt->ip6o_type == IP6OPT_PAD1) {
+					if (lastpad == NULL)
+						lastpad = sopt;
+					sopt = (const struct ip6_opt *)
+					    &sopt->ip6o_len;
+					hol--;
+					continue;
+				}
+				olen = sopt->ip6o_len + sizeof (*sopt);
+				if (olen > hol)
+					olen = hol;
+				if (sopt->ip6o_type == IP6OPT_PADN ||
+				    sopt->ip6o_type == ip6opt_ls) {
+					if (sopt->ip6o_type == ip6opt_ls)
+						deleting = B_TRUE;
+					if (lastpad == NULL)
+						lastpad = sopt;
+					sopt = (const struct ip6_opt *)
+					    ((const char *)sopt + olen);
+					hol -= olen;
+					continue;
+				}
+			} else {
+				/* if nothing was copied at all, then delete */
+				if (tlen == sizeof (*dstopt))
+					return (0);
+				/* last pass; pick up any trailing padding */
+				olen = 0;
+			}
+			if (deleting) {
+				/*
+				 * compute aligning effect of deleted material
+				 * to reproduce with pad.
+				 */
+				plen = ((const char *)sopt -
+				    (const char *)lastpad) & 7;
+				tlen += plen;
+				if (dopt != NULL) {
+					if (plen == 1) {
+						dopt->ip6o_type = IP6OPT_PAD1;
+					} else if (plen > 1) {
+						plen -= sizeof (*dopt);
+						dopt->ip6o_type = IP6OPT_PADN;
+						dopt->ip6o_len = plen;
+						if (plen > 0)
+							bzero(dopt + 1, plen);
+					}
+					dopt = (struct ip6_opt *)
+					    ((char *)dopt + plen);
+				}
+				deleting = B_FALSE;
+				lastpad = NULL;
+			}
+			/* if there's uncopied padding, then copy that now */
+			if (lastpad != NULL) {
+				olen += (const char *)sopt -
+				    (const char *)lastpad;
+				sopt = lastpad;
+				lastpad = NULL;
+			}
+			if (dopt != NULL && olen > 0) {
+				bcopy(sopt, dopt, olen);
+				dopt = (struct ip6_opt *)((char *)dopt + olen);
+			}
+			if (hol == 0)
+				break;
+			tlen += olen;
+			sopt = (const struct ip6_opt *)
+			    ((const char *)sopt + olen);
+			hol -= olen;
+		}
+		/* go back and patch up the length value, rounded upward */
+		if (dstopt != NULL)
+			dstopt->ip6h_len = (tlen - 1) >> 3;
+	} else {
+		tlen = hol;
+		if (dstopt != NULL)
+			bcopy(srcopt, dstopt, hol);
+	}
+
+	tlen += sizeof (*toh);
+	if (toh != NULL)
+		toh->len = tlen;
+
+	return (tlen);
+}
+
 static void
 udp_input(conn_t *connp, mblk_t *mp)
 {
@@ -4160,6 +4454,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 	cred_t			*cr = NULL;
 	queue_t			*q = connp->conn_rq;
 	pid_t			cpid;
+	cred_t			*rcr = connp->conn_cred;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_START,
 	    "udp_rput_start: q %p mp %p", q, mp);
@@ -4502,7 +4797,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->name = SCM_UCRED;
 				toh->len = sizeof (struct T_opthdr) + ucredsize;
 				toh->status = 0;
-				(void) cred2ucred(cr, cpid, &toh[1]);
+				(void) cred2ucred(cr, cpid, &toh[1], rcr);
 				dstopt += toh->len;
 				udi_size -= toh->len;
 			}
@@ -4563,9 +4858,13 @@ udp_input(conn_t *connp, mblk_t *mp)
 		    IPPF_RTHDR|IPPF_IFINDEX)) {
 			if (udp->udp_ipv6_recvhopopts &&
 			    (ipp.ipp_fields & IPPF_HOPOPTS)) {
-				udi_size += sizeof (struct T_opthdr) +
-				    ipp.ipp_hopoptslen;
+				size_t hlen;
+
 				UDP_STAT(udp_in_recvhopopts);
+				hlen = copy_hop_opts(&ipp, NULL);
+				if (hlen == 0)
+					ipp.ipp_fields &= ~IPPF_HOPOPTS;
+				udi_size += hlen;
 			}
 			if ((udp->udp_ipv6_recvdstopts ||
 				udp->udp_old_ipv6_recvdstopts) &&
@@ -4731,19 +5030,11 @@ udp_input(conn_t *connp, mblk_t *mp)
 			}
 			if (udp->udp_ipv6_recvhopopts &&
 			    (ipp.ipp_fields & IPPF_HOPOPTS)) {
-				struct T_opthdr *toh;
+				size_t hlen;
 
-				toh = (struct T_opthdr *)dstopt;
-				toh->level = IPPROTO_IPV6;
-				toh->name = IPV6_HOPOPTS;
-				toh->len = sizeof (struct T_opthdr) +
-				    ipp.ipp_hopoptslen;
-				toh->status = 0;
-				dstopt += sizeof (struct T_opthdr);
-				bcopy(ipp.ipp_hopopts, dstopt,
-				    ipp.ipp_hopoptslen);
-				dstopt += ipp.ipp_hopoptslen;
-				udi_size -= toh->len;
+				hlen = copy_hop_opts(&ipp, dstopt);
+				dstopt += hlen;
+				udi_size -= hlen;
 			}
 			if (udp->udp_ipv6_recvdstopts &&
 			    udp->udp_ipv6_recvrthdr &&
@@ -4803,7 +5094,7 @@ udp_input(conn_t *connp, mblk_t *mp)
 				toh->name = SCM_UCRED;
 				toh->len = sizeof (struct T_opthdr) + ucredsize;
 				toh->status = 0;
-				(void) cred2ucred(cr, cpid, &toh[1]);
+				(void) cred2ucred(cr, cpid, &toh[1], rcr);
 				dstopt += toh->len;
 				udi_size -= toh->len;
 			}
@@ -4882,6 +5173,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 	cred_t			*cr = NULL;
 	udp_t			*udp = Q_TO_UDP(q);
 	pid_t			cpid;
+	cred_t			*rcr = udp->udp_connp->conn_cred;
 
 	TRACE_2(TR_FAC_UDP, TR_UDP_RPUT_START,
 	    "udp_rput_other: q %p mp %p", q, mp);
@@ -5202,7 +5494,7 @@ udp_rput_other(queue_t *q, mblk_t *mp)
 			toh->name = SCM_UCRED;
 			toh->len = sizeof (struct T_opthdr) + ucredsize;
 			toh->status = 0;
-			(void) cred2ucred(cr, cpid, &toh[1]);
+			(void) cred2ucred(cr, cpid, &toh[1], rcr);
 			dstopt += toh->len;
 			udi_size -= toh->len;
 		}
@@ -5376,31 +5668,39 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 {
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl;
+	mblk_t			*mp_attr_ctl;
 	mblk_t			*mp6_conn_ctl;
-	mblk_t			*mp_conn_data;
-	mblk_t			*mp6_conn_data;
-	mblk_t			*mp_conn_tail = NULL;
-	mblk_t			*mp6_conn_tail = NULL;
+	mblk_t			*mp6_attr_ctl;
+	mblk_t			*mp_conn_tail;
+	mblk_t			*mp_attr_tail;
+	mblk_t			*mp6_conn_tail;
+	mblk_t			*mp6_attr_tail;
 	struct opthdr		*optp;
 	mib2_udpEntry_t		ude;
 	mib2_udp6Entry_t	ude6;
+	mib2_transportMLPEntry_t mlp;
 	int			state;
 	zoneid_t		zoneid;
 	int			i;
 	connf_t			*connfp;
 	conn_t			*connp = Q_TO_CONN(q);
 	udp_t			*udp = connp->conn_udp;
+	int			v4_conn_idx;
+	int			v6_conn_idx;
+	boolean_t		needattr;
 
+	mp_conn_ctl = mp_attr_ctl = mp6_conn_ctl = NULL;
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL ||
 	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_conn_ctl = copymsg(mpctl)) == NULL) {
+	    (mp_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_conn_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_attr_ctl = copymsg(mpctl)) == NULL) {
 		freemsg(mp_conn_ctl);
+		freemsg(mp_attr_ctl);
+		freemsg(mp6_conn_ctl);
 		return (0);
 	}
-
-	mp_conn_data = mp_conn_ctl->b_cont;
-	mp6_conn_data = mp6_conn_ctl->b_cont;
 
 	zoneid = connp->conn_zoneid;
 
@@ -5413,6 +5713,9 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	(void) snmp_append_data(mpdata, (char *)&udp_mib, sizeof (udp_mib));
 	optp->len = msgdsize(mpdata);
 	qreply(q, mpctl);
+
+	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
+	v4_conn_idx = v6_conn_idx = 0;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 		connfp = &ipcl_globalhash_fanout[i];
@@ -5437,6 +5740,18 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 				state = MIB2_UDP_connected;
 			else
 				state = MIB2_UDP_unknown;
+
+			needattr = B_FALSE;
+			bzero(&mlp, sizeof (mlp));
+			if (connp->conn_mlp_type != mlptSingle) {
+				if (connp->conn_mlp_type == mlptShared ||
+				    connp->conn_mlp_type == mlptBoth)
+					mlp.tme_flags |= MIB2_TMEF_SHARED;
+				if (connp->conn_mlp_type == mlptPrivate ||
+				    connp->conn_mlp_type == mlptBoth)
+					mlp.tme_flags |= MIB2_TMEF_PRIVATE;
+				needattr = B_TRUE;
+			}
 
 			/*
 			 * Create an IPv4 table entry for IPv4 entries and also
@@ -5472,8 +5787,13 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 					ude.udpEntryInfo.ue_RemoteAddress = 0;
 					ude.udpEntryInfo.ue_RemotePort = 0;
 				}
-				(void) snmp_append_data2(mp_conn_data,
+				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&ude, sizeof (ude));
+				mlp.tme_connidx = v4_conn_idx++;
+				if (needattr)
+					(void) snmp_append_data2(
+					    mp_attr_ctl->b_cont, &mp_attr_tail,
+					    (char *)&mlp, sizeof (mlp));
 			}
 			if (udp->udp_ipversion == IPV6_VERSION) {
 				ude6.udp6EntryInfo.ue_state  = state;
@@ -5490,9 +5810,15 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 					    sin6_null.sin6_addr;
 					ude6.udp6EntryInfo.ue_RemotePort = 0;
 				}
-				(void) snmp_append_data2(mp6_conn_data,
+				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
 				    &mp6_conn_tail, (char *)&ude6,
 				    sizeof (ude6));
+				mlp.tme_connidx = v6_conn_idx++;
+				if (needattr)
+					(void) snmp_append_data2(
+					    mp6_attr_ctl->b_cont,
+					    &mp6_attr_tail, (char *)&mlp,
+					    sizeof (mlp));
 			}
 		}
 	}
@@ -5502,16 +5828,38 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 	    sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_UDP;
 	optp->name = MIB2_UDP_ENTRY;
-	optp->len = msgdsize(mp_conn_data);
+	optp->len = msgdsize(mp_conn_ctl->b_cont);
 	qreply(q, mp_conn_ctl);
+
+	/* table of MLP attributes... */
+	optp = (struct opthdr *)&mp_attr_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_UDP;
+	optp->name = EXPER_XPORT_MLP;
+	optp->len = msgdsize(mp_attr_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp_attr_ctl);
+	else
+		qreply(q, mp_attr_ctl);
 
 	/* IPv6 UDP endpoints */
 	optp = (struct opthdr *)&mp6_conn_ctl->b_rptr[
 	    sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_UDP6;
 	optp->name = MIB2_UDP6_ENTRY;
-	optp->len = msgdsize(mp6_conn_data);
+	optp->len = msgdsize(mp6_conn_ctl->b_cont);
 	qreply(q, mp6_conn_ctl);
+
+	/* table of MLP attributes... */
+	optp = (struct opthdr *)&mp6_attr_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_UDP6;
+	optp->name = EXPER_XPORT_MLP;
+	optp->len = msgdsize(mp6_attr_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp6_attr_ctl);
+	else
+		qreply(q, mp6_attr_ctl);
 
 	return (1);
 }
@@ -5733,15 +6081,17 @@ udp_unbind(queue_t *q, mblk_t *mp)
 
 /*
  * Don't let port fall into the privileged range.
- * Since the extra priviledged ports can be arbitrary we also
+ * Since the extra privileged ports can be arbitrary we also
  * ensure that we exclude those from consideration.
  * udp_g_epriv_ports is not sorted thus we loop over it until
  * there are no changes.
  */
 static in_port_t
-udp_update_next_port(in_port_t port, boolean_t random)
+udp_update_next_port(udp_t *udp, in_port_t port, boolean_t random)
 {
 	int i;
+	in_port_t nextport;
+	boolean_t restart = B_FALSE;
 
 	if (random && udp_random_anon_port != 0) {
 		(void) random_get_pseudo_bytes((uint8_t *)&port,
@@ -5763,8 +6113,15 @@ udp_update_next_port(in_port_t port, boolean_t random)
 	}
 
 retry:
-	if (port < udp_smallest_anon_port || port > udp_largest_anon_port)
+	if (port < udp_smallest_anon_port)
 		port = udp_smallest_anon_port;
+
+	if (port > udp_largest_anon_port) {
+		port = udp_smallest_anon_port;
+		if (restart)
+			return (0);
+		restart = B_TRUE;
+	}
 
 	if (port < udp_smallest_nonpriv_port)
 		port = udp_smallest_nonpriv_port;
@@ -5779,7 +6136,40 @@ retry:
 			goto retry;
 		}
 	}
+
+	if (is_system_labeled() &&
+	    (nextport = tsol_next_port(crgetzone(udp->udp_connp->conn_cred),
+	    port, IPPROTO_UDP, B_TRUE)) != 0) {
+		port = nextport;
+		goto retry;
+	}
+
 	return (port);
+}
+
+static int
+udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
+{
+	int err;
+	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
+	udp_t *udp = Q_TO_UDP(wq);
+
+	err = tsol_compute_label(DB_CREDDEF(mp, udp->udp_connp->conn_cred), dst,
+	    opt_storage, udp->udp_mac_exempt);
+	if (err == 0) {
+		err = tsol_update_options(&udp->udp_ip_snd_options,
+		    &udp->udp_ip_snd_options_len, &udp->udp_label_len,
+		    opt_storage);
+	}
+	if (err != 0) {
+		DTRACE_PROBE4(
+		    tx__ip__log__info__updatelabel__udp,
+		    char *, "queue(1) failed to update options(2) on mp(3)",
+		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
+	} else {
+		IN6_IPADDR_TO_V4MAPPED(dst, &udp->udp_v6lastdst);
+	}
+	return (err);
 }
 
 static mblk_t *
@@ -5788,17 +6178,60 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 {
 	udp_t	*udp = connp->conn_udp;
 	queue_t	*q = connp->conn_wq;
-	mblk_t	*mp1 = (DB_TYPE(mp) == M_DATA ? mp : mp->b_cont);
+	mblk_t	*mp1 = mp;
 	mblk_t	*mp2;
 	ipha_t	*ipha;
 	int	ip_hdr_length;
 	uint32_t ip_len;
 	udpha_t	*udpha;
+	udpattrs_t	attrs;
 
 	*error = 0;
 
+	if (v4dst == INADDR_ANY)
+		v4dst = htonl(INADDR_LOOPBACK);
+
+	/*
+	 * If options passed in, feed it for verification and handling
+	 */
+	attrs.udpattr_credset = B_FALSE;
+	if (DB_TYPE(mp) != M_DATA) {
+		mp1 = mp->b_cont;
+		if (((struct T_unitdata_req *)mp->b_rptr)->OPT_length != 0) {
+			attrs.udpattr_ipp = NULL;
+			attrs.udpattr_mb = mp;
+			if (udp_unitdata_opt_process(q, mp, error, &attrs) < 0)
+				goto done;
+			/*
+			 * Note: success in processing options.
+			 * mp option buffer represented by
+			 * OPT_length/offset now potentially modified
+			 * and contain option setting results
+			 */
+			ASSERT(*error == 0);
+		}
+	}
+
 	/* mp1 points to the M_DATA mblk carrying the packet */
 	ASSERT(mp1 != NULL && DB_TYPE(mp1) == M_DATA);
+
+	/* Check if our saved options are valid; update if not */
+	if (is_system_labeled()) {
+		/* Using UDP MLP requires SCM_UCRED from user */
+		if (connp->conn_mlp_type != mlptSingle &&
+		    !attrs.udpattr_credset) {
+			DTRACE_PROBE4(
+			    tx__ip__log__info__output__udp,
+			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
+			    mblk_t *, mp1, udpattrs_t *, &attrs, queue_t *, q);
+			*error = ECONNREFUSED;
+			goto done;
+		}
+		if ((!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
+		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst) &&
+		    (*error = udp_update_label(q, mp, v4dst)) != 0)
+			goto done;
+	}
 
 	/* Add an IP header */
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE +
@@ -5887,10 +6320,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	/*
 	 * Copy in the destination address
 	 */
-	if (v4dst == INADDR_ANY)
-		ipha->ipha_dst = htonl(INADDR_LOOPBACK);
-	else
-		ipha->ipha_dst = v4dst;
+	ipha->ipha_dst = v4dst;
 
 	/*
 	 * Set ttl based on IP_MULTICAST_TTL to match IPv6 logic.
@@ -5951,6 +6381,8 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	}
 	/* Set UDP length and checksum */
 	*((uint32_t *)&udpha->uha_length) = ip_len;
+	if (DB_CRED(mp) != NULL)
+		mblk_setcred(mp1, DB_CRED(mp));
 
 	if (DB_TYPE(mp) != M_DATA) {
 		ASSERT(mp != mp1);
@@ -6059,10 +6491,12 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		if (CLASSD(dst)) {
 			ASSERT(ipif != NULL);
 			ire = ire_ctable_lookup(dst, 0, 0, ipif,
-			    connp->conn_zoneid, MATCH_IRE_ILL_GROUP);
+			    connp->conn_zoneid, MBLK_GETLABEL(mp),
+			    MATCH_IRE_ILL_GROUP);
 		} else {
 			ASSERT(ipif == NULL);
-			ire = ire_cache_lookup(dst, connp->conn_zoneid);
+			ire = ire_cache_lookup(dst, connp->conn_zoneid,
+			    MBLK_GETLABEL(mp));
 		}
 
 		if (ire == NULL) {
@@ -6226,6 +6660,30 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	IRE_REFRELE(ire);
 }
 
+static boolean_t
+udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
+{
+	udp_t *udp = Q_TO_UDP(wq);
+	int err;
+	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
+
+	err = tsol_compute_label_v6(DB_CREDDEF(mp, udp->udp_connp->conn_cred),
+	    dst, opt_storage, udp->udp_mac_exempt);
+	if (err == 0) {
+		err = tsol_update_sticky(&udp->udp_sticky_ipp,
+		    &udp->udp_label_len_v6, opt_storage);
+	}
+	if (err != 0) {
+		DTRACE_PROBE4(
+		    tx__ip__log__drop__updatelabel__udp6,
+		    char *, "queue(1) failed to update options(2) on mp(3)",
+		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
+	} else {
+		udp->udp_v6lastdst = *dst;
+	}
+	return (err);
+}
+
 /*
  * This routine handles all messages passed downstream.  It either
  * consumes the message or passes it downstream; it never queues a
@@ -6241,7 +6699,6 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 	uint_t		srcid;
 	queue_t		*q = connp->conn_wq;
 	udp_t		*udp = connp->conn_udp;
-	t_scalar_t	optlen;
 	int		error = 0;
 	struct sockaddr_storage ss;
 
@@ -6271,7 +6728,6 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			ASSERT(udp->udp_issocket);
 			UDP_DBGSTAT(udp_data_notconn);
 			/* Not connected; do some more checks below */
-			optlen = 0;
 			break;
 		}
 		/* M_DATA for connected socket */
@@ -6310,7 +6766,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			mp = udp_output_v4(connp, mp, v4dst,
 			    udp->udp_dstport, 0, &error);
 		} else {
-			mp = udp_output_v6(connp, mp, sin6, 0, &error);
+			mp = udp_output_v6(connp, mp, sin6, &error);
 		}
 		if (error != 0) {
 			ASSERT(addr != NULL && addrlen != 0);
@@ -6356,8 +6812,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			addr = (struct sockaddr *)
 			    &mp->b_rptr[tudr->DEST_offset];
 			addrlen = tudr->DEST_length;
-			optlen = tudr->OPT_length;
-			if (optlen != 0)
+			if (tudr->OPT_length != 0)
 				UDP_STAT(udp_out_opt);
 			break;
 		}
@@ -6386,7 +6841,7 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 			 * Destination is a non-IPv4-compatible IPv6 address.
 			 * Send out an IPv6 format packet.
 			 */
-			mp = udp_output_v6(connp, mp, sin6, optlen, &error);
+			mp = udp_output_v6(connp, mp, sin6, &error);
 			if (error != 0)
 				goto ud_error;
 
@@ -6430,26 +6885,6 @@ udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 		break;
 	}
 
-	/*
-	 * If options passed in, feed it for verification and handling
-	 */
-	if (optlen != 0) {
-		ASSERT(DB_TYPE(mp) != M_DATA);
-		if (udp_unitdata_opt_process(q, mp, &error, NULL) < 0) {
-			/* failure */
-			TRACE_2(TR_FAC_UDP, TR_UDP_WPUT_END,
-			    "udp_wput_end: q %p (%S)", q,
-			    "udp_unitdata_opt_process");
-			goto ud_error;
-		}
-		/*
-		 * Note: success in processing options.
-		 * mp option buffer represented by
-		 * OPT_length/offset now potentially modified
-		 * and contain option setting results
-		 */
-	}
-	ASSERT(error == 0);
 	mp = udp_output_v4(connp, mp, v4dst, port, srcid, &error);
 	if (error != 0) {
 ud_error:
@@ -6566,12 +7001,11 @@ udp_wput_data(queue_t *q, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
  * address.
  */
 static mblk_t *
-udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen,
-    int *error)
+udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error)
 {
 	ip6_t		*ip6h;
 	ip6i_t		*ip6i;	/* mp1->b_rptr even if no ip6i_t */
-	mblk_t		*mp1 = (DB_TYPE(mp) == M_DATA ? mp : mp->b_cont);
+	mblk_t		*mp1 = mp;
 	mblk_t		*mp2;
 	int		udp_ip_hdr_len = IPV6_HDR_LEN + UDPH_SIZE;
 	size_t		ip_len;
@@ -6586,12 +7020,11 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen,
 	uint_t		option_exists = 0, is_sticky = 0;
 	uint8_t		*cp;
 	uint8_t		*nxthdr_ptr;
+	in6_addr_t	ip6_dst;
+	udpattrs_t	attrs;
+	boolean_t	opt_present;
 
 	*error = 0;
-
-	/* mp1 points to the M_DATA mblk carrying the packet */
-	ASSERT(mp1 != NULL && DB_TYPE(mp1) == M_DATA);
-	ASSERT(tudr_optlen == 0 || DB_TYPE(mp) != M_DATA);
 
 	/*
 	 * If the local address is a mapped address return
@@ -6611,14 +7044,23 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen,
 	/*
 	 * If TPI options passed in, feed it for verification and handling
 	 */
-	if (tudr_optlen != 0) {
-		if (udp_unitdata_opt_process(q, mp, error, (void *)ipp) < 0) {
-			/* failure */
-			goto done;
+	attrs.udpattr_credset = B_FALSE;
+	opt_present = B_FALSE;
+	if (DB_TYPE(mp) != M_DATA) {
+		mp1 = mp->b_cont;
+		if (((struct T_unitdata_req *)mp->b_rptr)->OPT_length != 0) {
+			attrs.udpattr_ipp = ipp;
+			attrs.udpattr_mb = mp;
+			if (udp_unitdata_opt_process(q, mp, error, &attrs) < 0)
+				goto done;
+			ASSERT(*error == 0);
+			opt_present = B_TRUE;
 		}
-		ignore = ipp->ipp_sticky_ignored;
-		ASSERT(*error == 0);
 	}
+	ignore = ipp->ipp_sticky_ignored;
+
+	/* mp1 points to the M_DATA mblk carrying the packet */
+	ASSERT(mp1 != NULL && DB_TYPE(mp1) == M_DATA);
 
 	if (sin6->sin6_scope_id != 0 &&
 	    IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
@@ -6628,6 +7070,45 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen,
 		 * explicitly set in options_exists.
 		 */
 		option_exists |= IPPF_SCOPE_ID;
+	}
+
+	/*
+	 * Compute the destination address
+	 */
+	ip6_dst = sin6->sin6_addr;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+		ip6_dst = ipv6_loopback;
+
+	/*
+	 * If we're not going to the same destination as last time, then
+	 * recompute the label required.  This is done in a separate routine to
+	 * avoid blowing up our stack here.
+	 */
+	if (is_system_labeled()) {
+		/* Using UDP MLP requires SCM_UCRED from user */
+		if (connp->conn_mlp_type != mlptSingle &&
+		    !attrs.udpattr_credset) {
+			DTRACE_PROBE4(
+			    tx__ip__log__info__output__udp6,
+			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
+			    mblk_t *, mp1, udpattrs_t *, &attrs, queue_t *, q);
+			*error = ECONNREFUSED;
+			goto done;
+		}
+		if ((opt_present ||
+		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst)) &&
+		    (*error = udp_update_label_v6(q, mp, &ip6_dst)) != 0)
+			goto done;
+	}
+
+	/*
+	 * If there's a security label here, then we ignore any options the
+	 * user may try to set.  We keep the peer's label as a hidden sticky
+	 * option.
+	 */
+	if (udp->udp_label_len_v6 > 0) {
+		ignore &= ~IPPF_HOPOPTS;
+		ipp->ipp_fields &= ~IPPF_HOPOPTS;
 	}
 
 	if ((udp->udp_sticky_ipp.ipp_fields == 0) && (ipp->ipp_fields == 0)) {
@@ -6944,10 +7425,7 @@ no_options:
 	/*
 	 * Copy in the destination address
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
-		ip6h->ip6_dst = ipv6_loopback;
-	else
-		ip6h->ip6_dst = sin6->sin6_addr;
+	ip6h->ip6_dst = ip6_dst;
 
 	ip6h->ip6_vcf =
 	    (IPV6_DEFAULT_VERS_AND_FLOW & IPV6_VERS_AND_FLOW_MASK) |
@@ -7045,6 +7523,8 @@ no_options:
 	ip_len = htons(ip_len);
 #endif
 	ip6h->ip6_plen = ip_len;
+	if (DB_CRED(mp) != NULL)
+		mblk_setcred(mp1, DB_CRED(mp));
 
 	if (DB_TYPE(mp) != M_DATA) {
 		ASSERT(mp != mp1);
@@ -7459,7 +7939,7 @@ udp_wput_iocdata(queue_t *q, mblk_t *mp)
 
 static int
 udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
-    void *thisdg_attrs)
+    udpattrs_t *udpattrs)
 {
 	struct T_unitdata_req *udreqp;
 	int is_absreq_failure;
@@ -7471,7 +7951,6 @@ udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 	cr = DB_CREDDEF(mp, connp->conn_cred);
 
 	udreqp = (struct T_unitdata_req *)mp->b_rptr;
-	*errorp = 0;
 
 	/*
 	 * Use upper queue for option processing since the callback
@@ -7479,7 +7958,7 @@ udp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 	 */
 	*errorp = tpi_optcom_buf(_WR(UDP_RD(q)), mp, &udreqp->OPT_length,
 	    udreqp->OPT_offset, cr, &udp_opt_obj,
-	    thisdg_attrs, &is_absreq_failure);
+	    udpattrs, &is_absreq_failure);
 
 	if (*errorp != 0) {
 		/*

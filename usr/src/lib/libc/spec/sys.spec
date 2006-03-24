@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -3432,9 +3431,11 @@ end
 
 function	zone_create
 include		<zone.h>
-declaration	zoneid_t zone_create(const char *zone_name, \
-		    const char *zone_root, const priv_set_t *zone_privs, \
-		    const char *rctlbuf, size_t rctlbufsz, int *)
+declaration	zoneid_t zone_create(const char *name, const char *root, \
+		    const struct priv_set *privs, const char *rctls, \
+		    size_t rctlsz, const char *zfs, size_t zfssz, \
+		    int *extended_error, int match, \
+		    int doi, const bslabel_t *label)
 version		SUNWprivate_1.1
 exception	$return == -1
 end
@@ -3517,5 +3518,15 @@ end
 
 function	_getzonenamebyid
 weak		getzonenamebyid
+version		SUNWprivate_1.1
+end
+
+function	is_system_labeled
+declaration	int is_system_labeled(void)
+version		SUNW_1.22.2
+end
+
+function	_is_system_labeled
+weak		is_system_labeled
 version		SUNWprivate_1.1
 end

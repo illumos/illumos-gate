@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -74,6 +73,11 @@
 extern int defcntl();
 #endif
 #include <archives.h>
+
+/* Trusted Extensions */
+#include <zone.h>
+#include <tsol/label.h>
+#include <sys/tsol/label_macro.h>
 
 /*
  * Source compatibility
@@ -192,8 +196,6 @@ struct	sec_attr {
 	char	attr_len[7];
 	char	attr_info[1];
 } *attr;
-
-#define	ACL_HDR	'A'
 
 /*
  *
@@ -382,7 +384,7 @@ struct	file_list	{
 static	struct	file_list	*exclude_tbl[TABLE_SIZE],
 				*include_tbl[TABLE_SIZE];
 
-static int	append_secattr(char **, int *, acl_t *);
+static int	append_secattr(char **, int *, int, char *, char);
 static void	write_ancillary(union hblock *, char *, int, char);
 
 static void add_file_to_table(struct file_list *table[], char *str);
@@ -464,7 +466,7 @@ static char *getgroup(gid_t);
 static int checkf(char *name, int mode, int howmuch);
 static int writetbuf(char *buffer, int n);
 static int wantit(char *argv[], char **namep, char **dirp, char **comp);
-
+static void append_ext_attr(char *shortname, char **secinfo, int *len);
 static int get_xdata(void);
 static void gen_num(const char *keyword, const u_longlong_t number);
 static void gen_date(const char *keyword, const timestruc_t time_value);
@@ -489,6 +491,15 @@ static int put_extra_attributes(char *longname, char *shortname,
 static int put_xattr_hdr(char *longname, char *shortname, char *prefix,
     int typeflag, int filetype, struct linkbuf *lp);
 static int read_xattr_hdr();
+
+/* Trusted Extensions */
+#define	AUTO_ZONE	"/zone"
+
+static void extract_attr(char **file_ptr, struct sec_attr *);
+static int check_ext_attr(char *filename);
+static void rebuild_comp_path(char *str, char **namep);
+static int rebuild_lk_comp_path(char *str, char **namep);
+
 static void get_parent(char *path, char *dir);
 static char *get_component(char *path);
 static int retry_attrdir_open(char *name);
@@ -512,6 +523,22 @@ static 	int	Pflag;			/* POSIX conformant archive */
 static	int	Eflag;			/* Allow files greater than 8GB */
 static	int	atflag;			/* traverse extended attributes */
 static	int	Dflag;			/* Data change flag */
+/* Trusted Extensions */
+static	int	Tflag;			/* Trusted Extensions attr flags */
+static	int	dir_flag;		/* for attribute extract */
+static	int	mld_flag;		/* for attribute extract */
+static	char	*orig_namep;		/* original namep - unadorned */
+static	int	rpath_flag;		/* MLD real path is rebuilt */
+static	char	real_path[MAXPATHLEN];	/* MLD real path */
+static	int	lk_rpath_flag;		/* linked to real path is rebuilt */
+static	char	lk_real_path[MAXPATHLEN]; /* linked real path */
+static	bslabel_t	bs_label;	/* for attribute extract */
+static	bslabel_t	admin_low;
+static	bslabel_t	admin_high;
+static	int	ignored_aprivs = 0;
+static	int	ignored_fprivs = 0;
+static	int	ignored_fattrs = 0;
+
 static	int	term, chksum, wflag,
 		first = TRUE, defaults_used = FALSE, linkerrok;
 static	blkcnt_t	recno;
@@ -804,6 +831,10 @@ main(int argc, char *argv[])
 			Eflag++;
 			Pflag++;	/* Only POSIX archive made */
 			break;
+		case 'T':
+			Tflag++;	/* Handle Trusted Extensions attrs */
+			pflag++;	/* also set flag for ACL */
+			break;
 		default:
 			(void) fprintf(stderr, gettext(
 			"tar: %c: unknown function modifier\n"), *cp);
@@ -823,6 +854,15 @@ main(int argc, char *argv[])
 	if ((rflag && xflag) || (xflag && tflag) || (rflag && tflag)) {
 		(void) fprintf(stderr, gettext(
 		"tar: specify only one of [ctxru].\n"));
+		usage();
+	}
+	/* Trusted Extensions attribute handling */
+	if (Tflag && ((getzoneid() != GLOBAL_ZONEID) ||
+	    !is_system_labeled())) {
+		(void) fprintf(stderr, gettext(
+		"tar: the 'T' option is only available with "
+		    "Trusted Extensions\nand must be run from "
+		    "the global zone.\n"));
 		usage();
 	}
 	if (cflag && *argv == NULL && Filefile == NULL)
@@ -1000,9 +1040,9 @@ usage(void)
 	if (sysv3_env) {
 		(void) fprintf(stderr, gettext(
 #if defined(O_XATTR)
-		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqvw@[0-7]][bfFk][X...] "
+		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw@[0-7]][bfFk][X...] "
 #else
-		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqvw[0-7]][bfFk][X...] "
+		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw[0-7]][bfFk][X...] "
 #endif
 		"[blocksize] [tarfile] [filename] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
@@ -1011,9 +1051,9 @@ usage(void)
 	{
 		(void) fprintf(stderr, gettext(
 #if defined(O_XATTR)
-		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqvw@[0-7]][bfk][X...] "
+		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw@[0-7]][bfk][X...] "
 #else
-		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqvw[0-7]][bfk][X...] "
+		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw[0-7]][bfk][X...] "
 #endif
 		"[blocksize] [tarfile] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
@@ -2396,13 +2436,22 @@ doxtract(char *argv[])
 	int symflag;
 	int want;
 	acl_t	*aclp = NULL;	/* acl info */
+	char dot[] = ".";		/* dirp for using realpath */
 	timestruc_t	time_zero;	/* used for call to doDirTimes */
 	int		dircreate;
 	int convflag;
-	int cnt;
-
 	time_zero.tv_sec = 0;
 	time_zero.tv_nsec = 0;
+
+	/* reset Trusted Extensions variables */
+	rpath_flag = 0;
+	lk_rpath_flag = 0;
+	dir_flag = 0;
+	mld_flag = 0;
+	bslundef(&bs_label);
+	bsllow(&admin_low);
+	bslhigh(&admin_high);
+	orig_namep = 0;
 
 	dumping = 0;	/* for newvol(), et al:  we are not writing */
 
@@ -2438,6 +2487,26 @@ doxtract(char *argv[])
 		}
 		if (want == -1)
 			break;
+
+/* Trusted Extensions */
+		/*
+		 * During tar extract (x):
+		 * If the pathname of the restored file has been
+		 * reconstructed from the ancillary file,
+		 * use it to process the normal file.
+		 */
+		if (mld_flag) {		/* Skip over .MLD. directory */
+			mld_flag = 0;
+			passtape();
+			continue;
+		}
+		orig_namep = namep;	/* save original */
+		if (rpath_flag) {
+			namep = real_path;	/* use zone path */
+			comp = real_path;	/* use zone path */
+			dirp = dot;		/* work from the top */
+			rpath_flag = 0;		/* reset */
+		}
 
 		if (dirfd != -1)
 			(void) close(dirfd);
@@ -2479,12 +2548,12 @@ doxtract(char *argv[])
 					xattr_linkp = NULL;
 					xattrhead = NULL;
 				} else {
-					fprintf(vfile,
+					(void) fprintf(vfile,
 					    gettext("tar: cannot open %s %s\n"),
 					    dirp, strerror(errno));
 				}
 #else
-				fprintf(vfile,
+				(void) fprintf(vfile,
 				    gettext("tar: cannot open %s %s\n"),
 				    dirp, strerror(errno));
 #endif
@@ -2724,7 +2793,10 @@ doxtract(char *argv[])
 			continue;
 		}
 		if (dblock.dbuf.typeflag == '2') {	/* symlink */
-			linkp = templink;
+			if ((Tflag) && (lk_rpath_flag == 1))
+				linkp = lk_real_path;
+			else
+				linkp = templink;
 			if (Aflag && *linkp == '/')
 				linkp++;
 			if (rmdir(namep) < 0) {
@@ -2864,6 +2936,15 @@ doxtract(char *argv[])
 			continue;
 		}
 
+		if (Tflag && (check_ext_attr(namep) == 0)) {
+			if (errflag)
+				done(1);
+			else
+				Errflg = 1;
+			passtape();
+			continue;
+		}
+
 		if (extno != 0) {	/* file is in pieces */
 			if (extotal < 1 || extotal > MAXEXT)
 				(void) fprintf(stderr, gettext(
@@ -2928,7 +3009,7 @@ filedone:
 				ret = acl_set(namep, aclp);
 			}
 #else
-			ret = acl_set(namep, &aclp);
+			ret = acl_set(namep, aclp);
 #endif
 			if (ret < 0) {
 				if (pflag) {
@@ -2979,13 +3060,24 @@ filedone:
 		}
 		xcnt++;			/* increment # files extracted */
 		}
-		if (dblock.dbuf.typeflag == 'A') { 	/* acl info */
+
+		/*
+		 * Process ancillary file.
+		 *
+		 */
+
+		if (dblock.dbuf.typeflag == 'A') {	/* acl info */
 			char	buf[TBLOCK];
 			char	*secp;
 			char	*tp;
 			int	attrsize;
 			int	cnt;
 
+			/* reset Trusted Extensions flags */
+			dir_flag = 0;
+			mld_flag = 0;
+			lk_rpath_flag = 0;
+			rpath_flag = 0;
 
 			if (pflag) {
 				bytes = stbuf.st_size;
@@ -2997,6 +3089,16 @@ filedone:
 				}
 				tp = secp;
 				blocks = TBLOCKS(bytes);
+
+				/*
+				 * Display a line for each ancillary file.
+				 */
+				if (vflag && Tflag)
+					(void) fprintf(vfile, "x %s(A), %"
+					    FMT_blkcnt_t " bytes, %"
+					    FMT_blkcnt_t " tape blocks\n",
+					    namep, bytes, blocks);
+
 				while (blocks-- > 0) {
 					readtape(buf);
 					if (bytes <= TBLOCK) {
@@ -3049,7 +3151,23 @@ filedone:
 						bytes -= attrsize;
 						break;
 
-					/* SunFed case goes here */
+					/* Trusted Extensions */
+
+					case DIR_TYPE:
+					case LBL_TYPE:
+					case APRIV_TYPE:
+					case FPRIV_TYPE:
+					case COMP_TYPE:
+					case LK_COMP_TYPE:
+					case ATTR_FLAG_TYPE:
+						attrsize =
+						    sizeof (struct sec_attr) +
+						    strlen(&attr->attr_info[0]);
+						bytes -= attrsize;
+						if (Tflag)
+							extract_attr(&namep,
+							    attr);
+						break;
 
 					default:
 						(void) fprintf(stderr, gettext(
@@ -5556,21 +5674,24 @@ int
 append_secattr(
 	char	 **secinfo,	/* existing security info */
 	int	 *secinfo_len,	/* length of existing security info */
-	acl_t	*aclp)
+	int	 size,		/* new attribute size: unit depends on type */
+	char	*attrtext,	/* new attribute text */
+	char	 attr_type)	/* new attribute type */
 {
 	char	*new_secinfo;
-	char	*attrtext;
 	int	newattrsize;
 	int	oldsize;
+	struct sec_attr	*attr;
 
 	/* no need to add */
-	if (aclp == (void *)NULL)
-		return (0);
+	if (attr_type != DIR_TYPE) {
+		if (attrtext == NULL)
+			return (0);
+	}
 
-	switch (acl_type(aclp)) {
-	case ACLENT_T:
-	case ACE_T:
-		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT);
+	switch (attr_type) {
+	case UFSD_ACL:
+	case ACE_ACL:
 		if (attrtext == NULL) {
 			(void) fprintf(stderr, "acltotext failed\n");
 			return (-1);
@@ -5582,15 +5703,28 @@ append_secattr(
 			(void) fprintf(stderr, "can't allocate memory\n");
 			return (-1);
 		}
-		attr->attr_type = (acl_type(aclp) == ACLENT_T) ?
-		    UFSD_ACL : ACE_ACL;
+		attr->attr_type = attr_type;
 		(void) sprintf(attr->attr_len,
-		    "%06o", acl_cnt(aclp)); /* acl entry count */
+		    "%06o", size); /* acl entry count */
 		(void) strcpy((char *)&attr->attr_info[0], attrtext);
 		free(attrtext);
 		break;
 
-	/* SunFed's case goes here */
+	/* Trusted Extensions */
+	case DIR_TYPE:
+	case LBL_TYPE:
+		newattrsize = sizeof (struct sec_attr) + strlen(attrtext);
+		attr = (struct sec_attr *)malloc(newattrsize);
+		if (attr == NULL) {
+			(void) fprintf(stderr,
+			gettext("can't allocate memory\n"));
+			return (-1);
+		}
+		attr->attr_type = attr_type;
+		(void) sprintf(attr->attr_len,
+		    "%06d", size); /* len of attr data */
+		(void) strcpy((char *)&attr->attr_info[0], attrtext);
+		break;
 
 	default:
 		(void) fprintf(stderr, "unrecognized attribute type\n");
@@ -5604,6 +5738,7 @@ append_secattr(
 	if (new_secinfo == NULL) {
 		(void) fprintf(stderr, "can't allocate memory\n");
 		*secinfo_len -= newattrsize;
+		free(attr);
 		return (-1);
 	}
 
@@ -5611,6 +5746,7 @@ append_secattr(
 	(void) memcpy(new_secinfo + oldsize, attr, newattrsize);
 
 	free(*secinfo);
+	free(attr);
 	*secinfo = new_secinfo;
 	return (0);
 }
@@ -6779,7 +6915,17 @@ put_extra_attributes(char *longname, char *shortname, char *prefix,
 
 		/* append security attributes if any */
 		if (aclp != NULL) {
-			(void) append_secattr(&secinfo, &len, aclp);
+			(void) append_secattr(&secinfo, &len, acl_cnt(aclp),
+			    acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT),
+			    (acl_type(aclp) == ACLENT_T) ? UFSD_ACL : ACE_ACL);
+		}
+
+		if (Tflag) {
+			/* append Trusted Extensions extended attributes */
+			append_ext_attr(shortname, &secinfo, &len);
+			(void) write_ancillary(&dblock, secinfo, len, ACL_HDR);
+
+		} else if (aclp != NULL) {
 			(void) write_ancillary(&dblock, secinfo, len, ACL_HDR);
 		}
 	}
@@ -7160,3 +7306,629 @@ chop_endslashes(char *path)
 		}
 	}
 }
+/* Trusted Extensions */
+
+/*
+ * append_ext_attr():
+ *
+ * Append extended attributes and other information into the buffer
+ * that gets written to the ancillary file.
+ *
+ * With option 'T', we create a tarfile which
+ * has an ancillary file each corresponding archived file.
+ * Each ancillary file contains 1 or more of the
+ * following attributes:
+ *
+ *	attribute type        attribute		process procedure
+ *	----------------      ----------------  --------------------------
+ *   	DIR_TYPE       = 'D'   directory flag	append if a directory
+ *    	LBL_TYPE       = 'L'   SL[IL] or SL	append ascii label
+ *
+ *
+ */
+static void
+append_ext_attr(char *shortname, char **secinfo, int *len)
+{
+	bslabel_t	b_slabel;	/* binary sensitvity label */
+	char		*ascii = NULL;	/* ascii label */
+
+	/*
+	 * For each attribute type, append it if it is
+	 * relevant to the file type.
+	 */
+
+	/*
+	 * For attribute type DIR_TYPE,
+	 * append it to the following file type:
+	 *
+	 *	S_IFDIR: directories
+	 */
+
+	/*
+	 * For attribute type LBL_TYPE,
+	 * append it to the following file type:
+	 *
+	 *	S_IFDIR: directories (including mld, sld)
+	 *	S_IFLNK: symbolic link
+	 *	S_IFREG: regular file but not hard link
+	 *	S_IFIFO: FIFO file but not hard link
+	 *	S_IFCHR: char special file but not hard link
+	 *	S_IFBLK: block special file but not hard link
+	 */
+	switch (stbuf.st_mode & S_IFMT) {
+
+	case S_IFDIR:
+
+		/*
+		 * append DIR_TYPE
+		 */
+		(void) append_secattr(secinfo, len, 1,
+			"\0", DIR_TYPE);
+
+		/*
+		 * Get and append attribute types LBL_TYPE.
+		 * For directories, LBL_TYPE contains SL.
+		 */
+		/* get binary sensitivity label */
+		if (getlabel(shortname, &b_slabel) != 0) {
+			(void) fprintf(stderr,
+			    gettext("tar: can't get sensitvity label for "
+			    " %s, getlabel() error: %s\n"),
+			    shortname, strerror(errno));
+		} else {
+			/* get ascii SL */
+			if (bsltos(&b_slabel, &ascii,
+			    0, 0) <= 0) {
+				(void) fprintf(stderr,
+				    gettext("tar: can't get ascii SL for"
+				    " %s\n"), shortname);
+			} else {
+				/* append LBL_TYPE */
+				(void) append_secattr(secinfo, len,
+				    strlen(ascii) + 1, ascii,
+				    LBL_TYPE);
+
+				/* free storage */
+				if (ascii != NULL) {
+					free(ascii);
+					ascii = (char *)0;
+				}
+			}
+
+		}
+		break;
+
+	case S_IFLNK:
+	case S_IFREG:
+	case S_IFIFO:
+	case S_IFCHR:
+	case S_IFBLK:
+
+		/* get binary sensitivity label */
+		if (getlabel(shortname, &b_slabel) != 0) {
+			(void) fprintf(stderr,
+			    gettext("tar: can't get sensitivty label for %s, "
+			    "getlabel() error: %s\n"),
+			    shortname, strerror(errno));
+		} else {
+			/* get ascii IL[SL] */
+			if (bsltos(&b_slabel, &ascii, 0, 0) <= 0) {
+				(void) fprintf(stderr,
+				    gettext("tar: can't translate sensitivity "
+				    " label for %s\n"), shortname);
+			} else {
+				char *cmw_label;
+				size_t  cmw_length;
+
+				cmw_length = strlen("ADMIN_LOW [] ") +
+				    strlen(ascii);
+				if ((cmw_label = malloc(cmw_length)) == NULL) {
+					(void) fprintf(stderr, gettext(
+					    "Insufficient memory for label\n"));
+					exit(1);
+				}
+				/* append LBL_TYPE */
+				(void) snprintf(cmw_label, cmw_length,
+				    "ADMIN_LOW [%s]", ascii);
+				(void) append_secattr(secinfo, len,
+				    strlen(cmw_label) + 1, cmw_label,
+				    LBL_TYPE);
+
+				/* free storage */
+				if (ascii != NULL) {
+					free(cmw_label);
+					free(ascii);
+					ascii = (char *)0;
+				}
+			}
+		}
+		break;
+
+	default:
+		break;
+	} /* end switch for LBL_TYPE */
+
+
+	/* DONE !! */
+	return;
+
+} /* end of append_ext_attr */
+
+
+/*
+ *	Name: extract_attr()
+ *
+ *	Description:
+ *		Process attributes from the ancillary file due to
+ *		the T option.
+ *
+ *	Call by doxtract() as part of the switch case structure.
+ *	Making this a separate routine because the nesting are too
+ *	deep in doxtract, thus, leaving very little space
+ *	on each line for instructions.
+ *
+ * With option 'T', we extract from a TS 8 or TS 2.5 ancillary file
+ *
+ * For option 'T', following are possible attributes in
+ * a TS 8 ancillary file: (NOTE: No IL support)
+ *
+ *	attribute type        attribute		process procedure
+ *	----------------      ----------------  -------------------------
+ *    #	LBL_TYPE       = 'L'   SL               construct binary label
+ *    #	APRIV_TYPE     = 'P'   allowed priv    	construct privileges
+ *    #	FPRIV_TYPE     = 'p'   forced priv	construct privileges
+ *    #	COMP_TYPE      = 'C'   path component	construct real path
+ *    #	DIR_TYPE       = 'D'   directory flag	note it is a directory
+ *    $	UFSD_ACL       = '1'   ACL data		construct ACL entries
+ *	ATTR_FLAG_TYPE = 'F'   file attr flags  construct binary flags
+ *	LK_COMP_TYPE   = 'K'   linked path comp construct linked real path
+ *
+ * note: # = attribute names common between TS 8 & TS 2.5 ancillary
+ *           files.
+ *       $ = ACL attribute is processed for the option 'p', it doesn't
+ *           need option 'T'.
+ *
+ * Trusted Extensions ignores APRIV_TYPE, FPRIV_TYPE, and ATTR_FLAG_TYPE
+ *
+ */
+static void
+extract_attr(char **file_ptr, struct sec_attr *attr)
+{
+	int	reterr, err;
+	char	*dummy_buf;	/* for attribute extract */
+
+	dummy_buf = attr->attr_info;
+
+	switch (attr->attr_type) {
+
+	case DIR_TYPE:
+
+		dir_flag++;
+		break;
+
+	case LBL_TYPE:
+
+		/*
+		 * LBL_TYPE is used to indicate SL for directory, and
+		 * CMW label for other file types.
+		 */
+
+		if (!dir_flag) { /* not directory */
+			/* Skip over IL portion */
+			char *sl_ptr = strchr(dummy_buf, '[');
+
+			if (sl_ptr == NULL)
+				err = 0;
+			else
+				err = stobsl(sl_ptr, &bs_label,
+				    NEW_LABEL, &reterr);
+		} else { /* directory */
+			err = stobsl(dummy_buf, &bs_label,
+			    NEW_LABEL, &reterr);
+		}
+		if (err == 0) {
+			(void) fprintf(stderr, gettext("tar: "
+			    "can't convert %s to binary label\n"),
+			    dummy_buf);
+			bslundef(&bs_label);
+		} else if (!blequal(&bs_label, &admin_low) &&
+		    !blequal(&bs_label, &admin_high)) {
+			bslabel_t *from_label;
+			char *buf;
+			char tempbuf[MAXPATHLEN];
+
+			if (*orig_namep != '/') {
+				/* got relative linked to path */
+				(void) getcwd(tempbuf, (sizeof (tempbuf)));
+				(void) strncat(tempbuf, "/", MAXPATHLEN);
+			} else
+				*tempbuf = '\0';
+
+			buf = real_path;
+			(void) strncat(tempbuf, orig_namep, MAXPATHLEN);
+			from_label = getlabelbypath(tempbuf);
+			if (from_label != NULL) {
+				if (blequal(from_label, &admin_low)) {
+					if ((getpathbylabel(tempbuf, buf,
+					    MAXPATHLEN, &bs_label) == NULL)) {
+						(void) fprintf(stderr,
+						    gettext("tar: "
+						"can't get zone root path for "
+						"%s\n"), tempbuf);
+					} else
+						rpath_flag = 1;
+				}
+				free(from_label);
+			}
+		}
+		break;
+
+	case COMP_TYPE:
+
+		rebuild_comp_path(dummy_buf, file_ptr);
+		break;
+
+	case LK_COMP_TYPE:
+
+		if (rebuild_lk_comp_path(dummy_buf, file_ptr)
+		    == 0) {
+			lk_rpath_flag = 1;
+		} else {
+			(void) fprintf(stderr, gettext("tar: warning: link's "
+			    "target pathname might be invalid.\n"));
+			lk_rpath_flag = 0;
+		}
+		break;
+	case APRIV_TYPE:
+		ignored_aprivs++;
+		break;
+	case FPRIV_TYPE:
+		ignored_fprivs++;
+		break;
+	case ATTR_FLAG_TYPE:
+		ignored_fattrs++;
+		break;
+
+	default:
+
+		break;
+	}
+
+	/* done */
+	return;
+
+}	/* end extract_attr */
+
+
+
+/*
+ *	Name:	rebuild_comp_path()
+ *
+ *	Description:
+ *		Take the string of components passed down by the calling
+ *		routine and parse the values and rebuild the path.
+ *		This routine no longer needs to produce a new real_path
+ *		string because it is produced when the 'L' LABEL_TYPE is
+ *		interpreted. So the only thing done here is to distinguish
+ *		between an SLD and an MLD entry. We only want one, so we
+ *		ignore the MLD entry by setting the mld_flag.
+ *
+ *	return value:
+ *		none
+ */
+static void
+rebuild_comp_path(char *str, char **namep)
+{
+	char		*cp;
+
+	while (*str != '\0') {
+
+		switch (*str) {
+
+		case MLD_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+				str = cp + 2;
+				*cp = ';';
+			}
+			mld_flag = 1;
+			break;
+
+		case SLD_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+				str = cp + 2;
+				*cp = ';';
+			}
+			mld_flag = 0;
+			break;
+
+		case PATH_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+				str = cp + 2;
+				*cp = ';';
+			}
+			break;
+		}
+	}
+	if (rpath_flag)
+		*namep = real_path;
+	return;
+
+} /* end rebuild_comp_path() */
+
+/*
+ *	Name:	rebuild_lk_comp_path()
+ *
+ *	Description:
+ *		Take the string of components passed down by the calling
+ *		routine and parse the values and rebuild the path.
+ *
+ *	return value:
+ *		0 = succeeded
+ *		-1 = failed
+ */
+static int
+rebuild_lk_comp_path(char *str, char **namep)
+{
+	char		*cp;
+	int		reterr;
+	bslabel_t	bslabel;
+	char		*buf;
+	char		pbuf[MAXPATHLEN];
+	char		*ptr1, *ptr2;
+	int		plen;
+	int		use_pbuf;
+	char		tempbuf[MAXPATHLEN];
+	int		mismatch;
+	bslabel_t	*from_label;
+	char		zonename[ZONENAME_MAX];
+	zoneid_t	zoneid;
+
+	/* init stuff */
+	use_pbuf = 0;
+	mismatch = 0;
+
+	/*
+	 * For linked to pathname (LK_COMP_TYPE):
+	 *  - If the linked to pathname is absolute (start with /), we
+	 *    will use it as is.
+	 *  - If it is a relative pathname then it is relative to 1 of 2
+	 *    directories.  For a hardlink, it is relative to the current
+	 *    directory.  For a symbolic link, it is relative to the
+	 *    directory the symbolic link is in.  For the symbolic link
+	 *    case, set a flag to indicate we need to use the prefix of
+	 *    the restored file's pathname with the linked to pathname.
+	 *
+	 *    NOTE: At this point, we have no way to determine if we have
+	 *    a hardlink or a symbolic link.  We will compare the 1st
+	 *    component in the prefix portion of the restore file's
+	 *    pathname to the 1st component in the attribute data
+	 *    (the linked pathname).  If they are the same, we will assume
+	 *    the link pathname to reconstruct is relative to the current
+	 *    directory.  Otherwise, we will set a flag indicate we need
+	 *    to use a prefix with the reconstructed name.  Need to compare
+	 *    both the adorned and unadorned version before deciding a
+	 *    mismatch.
+	 */
+
+	buf = lk_real_path;
+	if (*(str + 1) != '/') { /* got relative linked to path */
+		ptr1 = orig_namep;
+		ptr2 = strrchr(ptr1, '/');
+		plen = ptr2 - ptr1;
+		if (plen > 0) {
+			pbuf[0] = '\0';
+			plen++;		/* include '/' */
+			(void) strncpy(pbuf, ptr1, plen);
+			*(pbuf + plen) = '\0';
+			ptr2 = strchr(pbuf, '/');
+			if (strncmp(pbuf, str + 1, ptr2 - pbuf) != 0)
+				mismatch = 1;
+		}
+
+		if (mismatch == 1)
+			use_pbuf = 1;
+	}
+
+	buf[0] = '\0';
+
+	while (*str != '\0') {
+
+		switch (*str) {
+
+		case MLD_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+
+				/*
+				 * Ignore attempts to backup over .MLD.
+				 */
+				if (strcmp(str, "../") != 0)
+					(void) strncat(buf, str, MAXPATHLEN);
+				str = cp + 2;
+				*cp = ';';
+			}
+			break;
+
+		case SLD_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+
+				/*
+				 * Use the path name in the header if
+				 * error occurs when processing the
+				 * SLD type.
+				 */
+
+				if (!stobsl(str, &bslabel,
+				    NO_CORRECTION, &reterr)) {
+					(void) fprintf(stderr, gettext(
+					    "tar: can't translate to binary"
+					    "SL for SLD, stobsl() error:"
+					    " %s\n"), strerror(errno));
+					return (-1);
+				}
+
+				str = cp + 2;
+				*cp = ';';
+
+				if (use_pbuf == 1) {
+					if (*pbuf != '/') {
+						/* relative linked to path */
+
+						(void) getcwd(tempbuf,
+						    (sizeof (tempbuf)));
+						(void) strncat(tempbuf, "/",
+						    MAXPATHLEN);
+						(void) strncat(tempbuf, pbuf,
+						    MAXPATHLEN);
+					}
+					else
+						(void) strcpy(tempbuf, pbuf);
+
+				} else if (*buf != '/') {
+					/* got relative linked to path */
+
+					(void) getcwd(tempbuf,
+					    (sizeof (tempbuf)));
+					(void) strncat(tempbuf, "/",
+					    MAXPATHLEN);
+				} else
+					*tempbuf = '\0';
+
+				(void) strncat(tempbuf, buf, MAXPATHLEN);
+				*buf = '\0';
+
+				if (blequal(&bslabel, &admin_high)) {
+					bslabel = admin_low;
+				}
+
+
+				/*
+				 * Check for cross-zone symbolic links
+				 */
+				from_label = getlabelbypath(real_path);
+				if (rpath_flag && (from_label != NULL) &&
+				    !blequal(&bslabel, from_label)) {
+					if ((zoneid =
+					    getzoneidbylabel(&bslabel)) == -1) {
+						(void) fprintf(stderr,
+						    gettext("tar: can't get "
+							"zone ID for %s\n"),
+						    tempbuf);
+						return (-1);
+					}
+					if (zone_getattr(zoneid, ZONE_ATTR_NAME,
+					    &zonename, ZONENAME_MAX) == -1) {
+						/* Badly configured zone info */
+						(void) fprintf(stderr,
+						    gettext("tar: can't get "
+							"zonename for %s\n"),
+						    tempbuf);
+						return (-1);
+					}
+					(void) strncpy(buf, AUTO_ZONE,
+					    MAXPATHLEN);
+					(void) strncat(buf, "/",
+					    MAXPATHLEN);
+					(void) strncat(buf, zonename,
+					    MAXPATHLEN);
+				}
+				if (from_label != NULL)
+					free(from_label);
+				(void) strncat(buf, tempbuf, MAXPATHLEN);
+				break;
+			}
+			mld_flag = 0;
+			break;
+
+		case PATH_TYPE:
+
+			str++;
+			if ((cp = strstr(str, ";;")) != NULL) {
+				*cp = '\0';
+				(void) strncat(buf, str, MAXPATHLEN);
+				str = cp + 2;
+				*cp = ';';
+			}
+			break;
+
+		default:
+
+			(void) fprintf(stderr, gettext(
+				"tar: error rebuilding path %s\n"),
+				*namep);
+			*buf = '\0';
+			str++;
+			return (-1);
+		}
+	}
+
+	/*
+	 * Done for LK_COMP_TYPE
+	 */
+
+	return (0);    /* component path is rebuilt successfully */
+
+} /* end rebuild_lk_comp_path() */
+
+/*
+ *	Name: check_ext_attr()
+ *
+ *	Description:
+ *		Check the extended attributes for a file being extracted.
+ *		The attributes being checked here are CMW labels.
+ *		ACLs are not set here because they are set by the
+ *		pflag in doxtract().
+ *
+ *		If the label doesn't match, return 0
+ *		else return 1
+ */
+static int
+check_ext_attr(char *filename)
+{
+	bslabel_t	currentlabel;	/* label from zone */
+
+	if (bltype(&bs_label, SUN_SL_UN)) {
+		/* No label check possible */
+		return (0);
+	}
+	if (getlabel(filename, &currentlabel) != 0) {
+		(void) fprintf(stderr,
+		    gettext("tar: can't get label for "
+			" %s, getlabel() error: %s\n"),
+			filename, strerror(errno));
+		return (0);
+	} else if ((blequal(&currentlabel, &bs_label)) == 0) {
+		char	*src_label = NULL;	/* ascii label */
+
+		/* get current src SL */
+		if (bsltos(&bs_label, &src_label, 0, 0) <= 0) {
+			(void) fprintf(stderr,
+			    gettext("tar: can't interpret requested label for"
+				" %s\n"), filename);
+		} else {
+			(void) fprintf(stderr,
+			    gettext("tar: can't apply label %s to %s\n"),
+				src_label, filename);
+			free(src_label);
+		}
+		(void) fprintf(stderr,
+		    gettext("tar: %s not restored\n"), filename);
+		return (0);
+	}
+	return (1);
+
+}	/* end check_ext_attr */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -34,59 +34,58 @@ extern "C" {
 #endif
 
 /* Option Flags */
-#define	SILENT		0001	/* -s */
-#define	USERID		0002	/* -U <uid> for list_devices(1) */
-#define	LIST		0004	/* -l */
-#define	FREE		0010	/* -n */
-#define	CURRENT 	0020	/* -u */
-#define	FORCE		0040	/* -F */
-#define	FORCE_ALL 	0100	/* -I */
-#define	TYPE		0200	/* -g */
-#define	USERNAME	0400	/* -U <username> for allocate(1) */
+#define	LISTATTRS	0x00000001	/* -a */
+#define	LISTDEFS	0x00000002	/* -d */
+#define	TYPE		0x00000004	/* -g */
+#define	LISTALL		0x00000008	/* -l */
+#define	LISTFREE	0x00000010	/* -n */
+#define	SILENT		0x00000020	/* -s */
+#define	LISTALLOC 	0x00000040	/* -u */
+#define	WINDOWING	0x00000080	/* -w */
+#define	ZONENAME	0x00000100	/* -z */
+#define	BOOT		0x00000200	/* -B */
+#define	FORCE		0x00000400	/* -F */
+#define	FORCE_ALL 	0x00000800	/* -I */
+#define	USERID		0x00001000	/* -U for list_devices */
+#define	USERNAME	0x00002000	/* -U for allocate */
 
 /* Misc. */
 
-#define	ALL	-1
+#define	CLEAN_MOUNT		11	/* Also defined in disk_clean.sh */
 
-/* Error returns start at 4 */
-#define	SYSERROR	4
-#define	DACLCK		5
-#define	DACACC		6
-#define	DEVLST		7
-#define	NALLOCU		8
-#define	NOTAUTH		9
-#define	CNTFRC		10
-#define	CNTDEXEC	11
-#define	NO_DEVICE	12
-#define	DSPMISS		13
-#define	ALLOCERR	14
-#define	IMPORT_ERR	15
-#define	NODAENT		16
-#define	NODMAPENT	17
-#define	SETACL_PERR	18
-#define	CHOWN_PERR	19
-#define	ALLOC		20
-#define	ALLOC_OTHER	21
-#define	NALLOC		22
-#define	AUTHERR		23
-#define	CLEAN_ERR	24
-#define	DEVNAME_ERR	25
-#define	DEVNAME_TOOLONG	26
+#define	ALLOCUERR		1
+#define	CHOWNERR		2
+#define	CLEANERR		3
+#define	CNTDEXECERR		4
+#define	CNTFRCERR		5
+#define	DACACCERR		6
+#define	DAOFFERR		7
+#define	DAUTHERR		8
+#define	DEFATTRSERR		9
+#define	DEVLKERR		10
+#define	DEVLONGERR		11
+#define	DEVNALLOCERR		12
+#define	DEVNAMEERR		13
+#define	DEVSTATEERR		14
+#define	DEVZONEERR		15
+#define	DSPMISSERR		16
+#define	GLOBALERR		17
+#define	LABELRNGERR		18
+#define	LOGINDEVPERMERR		19
+#define	NODAERR			20
+#define	NODMAPERR		21
+#define	PREALLOCERR		22
+#define	SETACLERR		23
+#define	UAUTHERR		24
+#define	ZONEERR			25
 
-/* Tunable Parameters */
-#define	DEV_DIR		"/dev"
-#define	DAC_DIR		"/etc/security/dev"
-#define	SECLIB		"/etc/security/lib"
-#define	ALLOC_MODE	0600
-#define	DEALLOC_MODE    0000
 #define	ALLOC_ERR_MODE  0100
-#define	ALLOC_UID	(uid_t)0	/* root */
-#define	ALLOC_GID	(gid_t)1	/* other */
+#define	ALLOC_INVALID	0700
 
 /* Functions */
-extern int allocate(int optflg, uid_t uid, char *device);
-extern int deallocate(int optflg, uid_t uid, char *device);
-extern int list_devices(int optflg, uid_t uid, char *device);
+extern int allocate(int optflg, uid_t uid, char *device, char *zonename);
+extern int deallocate(int optflg, uid_t uid, char *device, char *zonename);
+extern int list_devices(int optflg, uid_t uid, char *device, char *zonename);
 
 #ifdef	__cplusplus
 }

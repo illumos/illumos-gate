@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -32,18 +31,14 @@
 #include <sys/dlpi.h>
 #include <sys/stropts.h>
 #include <sys/strsun.h>
-#include <sys/strlog.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/zone.h>
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#define	_SUN_TPI_VERSION	2
-#include <sys/tihdr.h>
-#include <net/if.h>
-#include <net/if_arp.h>
 #include <sys/sockio.h>
+#include <net/if.h>
 #include <sys/systm.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -58,7 +53,6 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_if.h>
-#include <inet/ip_ire.h>
 #include <inet/ip_ndp.h>
 #include <inet/ip_multi.h>
 #include <inet/ipclassifier.h>
@@ -66,8 +60,6 @@
 #include <inet/sctp_ip.h>
 #include <inet/ip_listutils.h>
 #include <inet/udp_impl.h>
-
-#include <netinet/igmp.h>
 
 /* igmpv3/mldv2 source filter manipulation */
 static void	ilm_bld_flists(conn_t *conn, void *arg);
@@ -1706,6 +1698,7 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 	ilm->ilm_zoneid = zoneid;
 	ilm->ilm_timer = INFINITY;
 	ilm->ilm_rtx.rtx_timer = INFINITY;
+
 	/*
 	 * IPv4 Multicast groups are joined using ipif.
 	 * IPv6 Multicast groups are joined using ill.

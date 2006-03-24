@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,10 +151,12 @@
 # define	R_PAPER_CHANGED			99
 # define	S_PAPER_ALLOWED			100
 # define	R_PAPER_ALLOWED			101
+# define	S_PASS_PEER_CONNECTION		102
+# define	R_PASS_PEER_CONNECTION		103
 /*
 **	Last available message
 */
-# define	LAST_MESSAGE			102
+# define	LAST_MESSAGE			104
 
 /*
 **      These are the possible status codes returned by the scheduler
@@ -322,6 +323,7 @@ typedef struct
     MQUE *	mque;			/* backlogged message ptr */
     uid_t	uid;			/* Clients UID */
     gid_t	gid;			/* Clients GID */
+    char *	slabel;			/* Clients SLABEL */
     void	(**on_discon)();	/* Clean up functions */
 } MESG;
 

@@ -841,6 +841,13 @@ RSMHDRS= \
 	rsmpi_driver.h	\
 	rsmka_path_int.h
 
+TSOLHDRS=		\
+	label.h		\
+	label_macro.h	\
+	priv.h		\
+	tndb.h		\
+	tsyscall.h
+
 I1394HDRS=		\
 	cmd1394.h	\
 	id1394.h	\
@@ -939,7 +946,8 @@ CHECKHDRS=						\
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
-	$(RSMHDRS:%.h=rsm/%.check)
+	$(RSMHDRS:%.h=rsm/%.check)			\
+	$(TSOLHDRS:%.h=tsol/%.check)
 
 
 .KEEP_STATE:
@@ -984,6 +992,7 @@ CHECKHDRS=						\
 	$(ROOTHOTPLUGHDRS)	\
 	$(ROOTHOTPLUGPCIHDRS)	\
 	$(ROOTRSMHDRS)		\
+	$(ROOTTSOLHDRS)		\
 	$($(MACH)_ROOTHDRS)
 
 
@@ -1029,6 +1038,7 @@ install_h:			\
 	$(ROOTHOTPLUGHDRS)	\
 	$(ROOTHOTPLUGPCIHDRS)	\
 	$(ROOTRSMHDRS)		\
+	$(ROOTTSOLHDRS)		\
 	$($(MACH)_ROOTHDRS)
 
 all_h: $(GENHDRS)

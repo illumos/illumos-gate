@@ -98,8 +98,9 @@ typedef	struct icmp_s {
 	    icmp_ipv6_recvrtdstopts : 1, /* Obsolete IPV6_RECVRTHDRDSTOPTS */
 	    icmp_old_ipv6_recvdstopts : 1, /* Old ver of IPV6_RECVDSTOPTS */
 	    icmp_timestamp : 1,  	/* SO_TIMESTAMP "socket" option */
+	    icmp_mac_exempt : 1,	/* SO_MAC_EXEMPT option */
 
-	    icmp_pad_to_bit_31: 8;
+	    icmp_pad_to_bit_31: 7;
 
 	uint8_t		icmp_type_of_service;
 	uint8_t		icmp_ttl;		/* TTL or hoplimit */
@@ -111,6 +112,10 @@ typedef	struct icmp_s {
 	uint8_t		*icmp_sticky_hdrs;	/* Prebuilt IPv6 hdrs */
 	uint_t		icmp_sticky_hdrs_len;	/* Incl. ip6h and any ip6i */
 	zoneid_t	icmp_zoneid;		/* ID of owning zone */
+	uint_t		icmp_label_len;		/* length of security label */
+	uint_t		icmp_label_len_v6;	/* sec. part of sticky opt */
+	in6_addr_t 	icmp_v6lastdst;		/* most recent destination */
+	mblk_t		*icmp_delabel;		/* send this on close */
 } icmp_t;
 
 #endif	/* _KERNEL */

@@ -481,6 +481,7 @@ extern "C" {
 #define	isphonogram		_isphonogram
 #define	issetugid		_issetugid
 #define	isspecial		_isspecial
+#define	is_system_labeled	_is_system_labeled
 #define	iswalnum		_iswalnum
 #define	iswalpha		_iswalpha
 #define	iswcntrl		_iswcntrl
@@ -1039,6 +1040,7 @@ extern "C" {
 #define	ucred_getegid		_ucred_getegid
 #define	ucred_geteuid		_ucred_geteuid
 #define	ucred_getgroups		_ucred_getgroups
+#define	ucred_getlabel		_ucred_getlabel
 #define	ucred_getpflags		_ucred_getpflags
 #define	ucred_getpid		_ucred_getpid
 #define	ucred_getprivset	_ucred_getprivset

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,12 +270,21 @@ typedef au_id_t auid_t;
 #define	AUDIT_WINDATA	0x0040	/* include interwindow moved data */
 #define	AUDIT_USER	0x0080	/* make audituser(2) un-privileged */
 #define	AUDIT_GROUP	0x0100	/* include group attribute with each record */
-#define	AUDIT_TRAIL	0X0200	/* include trailer token */
+#define	AUDIT_TRAIL	0x0200	/* include trailer token */
 #define	AUDIT_PATH	0x0400	/* allow multiple paths per event */
 #define	AUDIT_SCNT	0x0800	/* sleep user events but not kernel events */
 #define	AUDIT_PUBLIC	0x1000	/* audit even "public" files */
 #define	AUDIT_ZONENAME	0x2000	/* emit zonename token */
 #define	AUDIT_PERZONE	0x4000	/* auditd and audit queue for each zone */
+
+/*
+ * These next (WINDATA*) are used by TSOL. Although per-zone audit is not
+ * used with TSOL, these policies still make sense to be categorized as
+ * "local".
+ */
+#define	AUDIT_WINDATA_DOWN	0x00010000	/* include downgraded data */
+#define	AUDIT_WINDATA_UP	0x00020000	/* include upgraded data */
+
 /*
  * If AUDIT_GLOBAL changes, corresponding changes are required in
  * audit_syscalls.c's setpolicy().
@@ -285,7 +293,8 @@ typedef au_id_t auid_t;
 #define	AUDIT_LOCAL	(AUDIT_CNT | AUDIT_ARGV | AUDIT_ARGE |\
 			AUDIT_PASSWD | AUDIT_SEQ | AUDIT_WINDATA |\
 			AUDIT_USER | AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
-			AUDIT_PUBLIC | AUDIT_SCNT | AUDIT_ZONENAME)
+			AUDIT_PUBLIC | AUDIT_SCNT | AUDIT_ZONENAME |\
+			AUDIT_WINDATA_DOWN | AUDIT_WINDATA_UP)
 
 /*
  * Kernel audit queue control parameters
@@ -580,6 +589,7 @@ void	audit_setppriv(int, int, const struct priv_set *, const cred_t *);
 void	audit_devpolicy(int, const struct devplcysys *);
 void	audit_update_context(proc_t *, cred_t *);
 void	audit_kssl(int, void *, int);
+void	audit_sec_attributes(caddr_t *, struct vnode *);
 
 #endif
 

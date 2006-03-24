@@ -4698,6 +4698,17 @@ weak		ucred_getzoneid
 version		SUNW_1.22
 end
 
+function	ucred_getlabel
+include		<ucred.h>
+declaration	bslabel_t *ucred_getlabel(const ucred_t *) 
+version		SUNW_1.22.2
+end
+
+function	_ucred_getlabel
+weak		ucred_getlabel
+version		SUNW_1.22.2
+end
+
 function	ucred_getpflags
 include		<ucred.h>
 declaration	uint_t ucred_getpflags(const ucred_t *, uint_t)

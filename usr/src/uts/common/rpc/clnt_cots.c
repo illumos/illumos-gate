@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1989,7 +1988,7 @@ use_new_conn:
 	RPCLOG0(8, "connmgr_get: creating new connection\n");
 	rpcerr->re_status = RPC_TLIERROR;
 
-	i = t_kopen(NULL, device, FREAD|FWRITE|FNDELAY, &tiptr, kcred);
+	i = t_kopen(NULL, device, FREAD|FWRITE|FNDELAY, &tiptr, zone_kcred());
 	if (i) {
 		RPCLOG(1, "connmgr_get: can't open cots device, error %d\n", i);
 		rpcerr->re_errno = i;

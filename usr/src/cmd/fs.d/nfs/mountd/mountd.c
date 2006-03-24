@@ -112,6 +112,7 @@ main(int argc, char *argv[])
 	int maxthreads;
 	int maxrecsz = RPC_MAXDATASIZE;
 	bool_t exclbind = TRUE;
+	bool_t can_do_mlp;
 
 	/*
 	 * Mountd requires uid 0 for:
@@ -123,10 +124,13 @@ main(int argc, char *argv[])
 	 *		auditing
 	 *		nfs syscall
 	 *		file dac search (so it can stat all files)
+	 *	Optional privileges:
+	 *		MLP
 	 */
+	can_do_mlp = priv_ineffect(PRIV_NET_BINDMLP);
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, -1, -1,
-		    PRIV_SYS_NFS, PRIV_PROC_AUDIT, PRIV_FILE_DAC_SEARCH,
-		    (char *)NULL) == -1) {
+	    PRIV_SYS_NFS, PRIV_PROC_AUDIT, PRIV_FILE_DAC_SEARCH,
+	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr,
 			"%s must be run as with sufficient privileges\n",
 			argv[0]);
@@ -783,6 +787,19 @@ mount(struct svc_req *rqstp)
 		if (verbose)
 			syslog(LOG_NOTICE, "Rejected mount: %s for %s",
 				host, path);
+		error = EACCES;
+		goto reply;
+	}
+
+	/*
+	 * Trusted Extension doesn't support older versions of nfs(v2, v3).
+	 * To prevent circumventing TX label policy via using an older
+	 * version of nfs client, reject the mount request and log an
+	 * error.
+	 */
+	if (is_system_labeled()) {
+		syslog(LOG_ERR,
+		    "mount rejected: Solaris TX only supports nfs4 clients");
 		error = EACCES;
 		goto reply;
 	}

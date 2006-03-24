@@ -77,6 +77,7 @@ GENUNIX_OBJS +=	\
 		bdev_dsort.o	\
 		bio.o		\
 		bitmap.o	\
+		blabel.o	\
 		callb.o		\
 		callout.o	\
 		chdir.o		\
@@ -162,6 +163,7 @@ GENUNIX_OBJS +=	\
 		kmem.o		\
 		ksyms_snapshot.o	\
 		l_strplumb.o	\
+		labelsys.o	\
 		link.o		\
 		list.o		\
 		lockstat_subr.o	\
@@ -297,6 +299,7 @@ GENUNIX_OBJS +=	\
 		times.o		\
 		timers.o	\
 		thread.o	\
+		tlabel.o	\
 		tnf_res.o	\
 		turnstile.o	\
 		tty_common.o	\
@@ -426,7 +429,7 @@ IP_SCTP_OBJS =	sctp_crc32.o sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_param.o sctp_shutdown.o sctp_common.o \
 		sctp_timer.o sctp_heartbeat.o sctp_hash.o \
 		sctp_ioc.o sctp_bind.o sctp_notify.o sctp_asconf.o \
-		sctp_addr.o
+		sctp_addr.o tn_ipopt.o tnet.o
 
 IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_cksum.o ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \

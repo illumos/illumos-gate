@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,12 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
 # Automagically generate the audit_uevents.h header file.
 #
 DATABASE=audit_event.txt
@@ -30,8 +33,8 @@ HEADER_FILE=audit_uevents.h
 
 cat <<EOF > $HEADER_FILE
 /*
- * Copyright (c) 1993-2001, Sun Microsystems, Inc.
- * All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_BSM_AUDIT_UEVENTS_H
@@ -57,12 +60,31 @@ EOF
 
 nawk -F: '{if ((NF == 4) && substr($1,0,1) != "#")
 		if ($1 >= 2048) {
-			printf("#define	%s	",$2)
-			if (length($2) < 8)
-				printf("	")
-			if (length($2) < 16)
-				printf("	")
-			printf("%s	/* =%s %s */\n",$1,$4,$3)
+			# compute total output line length first
+			tlen = length($2);
+			llen = 8 + tlen;
+			llen += 8 - (llen % 8);
+			if (llen < 32)
+				llen = 32;
+			llen += length($1);
+			llen += 8 - (llen % 8);
+			llen += 5 + length($4) + length($3) + 3;
+
+			# if line is too long, then print the comment first
+			if (llen > 80)
+				printf("/* =%s %s */\n", $4, $3);
+
+			printf("#define\t%s\t", $2)
+			if (tlen < 8)
+				printf("\t");
+			if (tlen < 16)
+				printf("\t")
+			printf("%s", $1);
+
+			if (llen > 80)
+				printf("\n");
+			else
+				printf("\t/* =%s %s */\n", $4, $3);
 		}
 	  }' \
 < $DATABASE >> $HEADER_FILE

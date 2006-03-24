@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -1692,6 +1692,8 @@ read_rt(void)
  * ss is a pointer to the beginning of the data following the
  * rt_msghdr contained in the routing socket message, which consists
  * of a string of concatenated sockaddr structure of different types.
+ *
+ * Extended attributes can be appended at the end of the list.
  */
 static int
 rt_xaddrs(struct rt_addrinfo *info,
@@ -1766,11 +1768,35 @@ rt_xaddrs(struct rt_addrinfo *info,
 			goto xaddr_done;
 		}
 	}
+
+	while (((char *)ss + sizeof (rtm_ext_t)) <= lim) {
+		rtm_ext_t *tp;
+		char *nxt;
+
+		/* LINTED: alignment */
+		tp = (rtm_ext_t *)ss;
+		nxt = (char *)(tp + 1) + tp->rtmex_len;
+
+		if (!IS_P2ALIGNED(tp->rtmex_len, sizeof (uint32_t)) ||
+		    nxt > lim) {
+			break;
+		}
+
+		/* LINTED: alignment */
+		ss = (struct sockaddr_storage *)nxt;
+	}
+
 	if ((char *)ss != lim) {
-		if (!(prev_complaints & XBAD_LONG))
+		if ((char *)ss > lim) {
+			if (!(prev_complaints & XBAD_SHORT))
+				msglog("routing message too short by %d bytes",
+				    (char *)ss - lim);
+			complaints |= XBAD_SHORT;
+		} else if (!(prev_complaints & XBAD_LONG)) {
 			msglog("%d bytes of routing message left over",
 			    lim - (char *)ss);
-		complaints |= XBAD_LONG;
+			complaints |= XBAD_LONG;
+		}
 		retv = -1;
 	}
 xaddr_done:

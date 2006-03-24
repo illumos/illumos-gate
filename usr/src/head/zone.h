@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/zone.h>
 #include <sys/priv.h>
+#include <tsol/label.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,7 +57,8 @@ extern int zone_get_id(const char *, zoneid_t *);
 
 /* System call API */
 extern zoneid_t	zone_create(const char *, const char *,
-    const struct priv_set *, const char *, size_t, const char *, size_t, int *);
+    const struct priv_set *, const char *, size_t, const char *, size_t, int *,
+    int, int, const bslabel_t *);
 extern int	zone_boot(zoneid_t, const char *);
 extern int	zone_destroy(zoneid_t);
 extern ssize_t	zone_getattr(zoneid_t, int, void *, size_t);

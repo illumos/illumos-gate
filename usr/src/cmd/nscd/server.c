@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +69,10 @@
 #include <ucred.h>
 #include <priv.h>
 #include <libscf.h>
+#include <tsol/label.h>
+#include <zone.h>
+
+#define	TSOL_NAME_SERVICE_DOOR	"/var/tsol/doors/name_service_door"
 
 extern int 	optind;
 extern int 	opterr;
@@ -473,6 +476,18 @@ main(int argc, char ** argv)
 	struct sigaction action;
 
 	/*
+	 * The admin model for TX is that labeled zones are managed
+	 * in global zone where most trusted configuration database
+	 * resides.
+	 */
+	if (is_system_labeled() && (getzoneid() != GLOBAL_ZONEID)) {
+		(void) fprintf(stderr,
+		    "With Trusted Extensions nscd runs only in " \
+		    "the global zone.\n");
+		exit(1);
+	}
+
+	/*
 	 *  Special case non-root user  here - he can just print stats
 	 */
 
@@ -802,12 +817,28 @@ main(int argc, char ** argv)
 
 	/* bind to file system */
 
-	if (stat(NAME_SERVICE_DOOR, &buf) < 0) {
+	if (is_system_labeled()) {
+		if (stat(TSOL_NAME_SERVICE_DOOR, &buf) < 0) {
+			int newfd;
+			if ((newfd = creat(TSOL_NAME_SERVICE_DOOR, 0444)) < 0) {
+				logit("Cannot create %s:%s\n",
+				    TSOL_NAME_SERVICE_DOOR, strerror(errno));
+				exit(1);
+			}
+			(void) close(newfd);
+		}
+		if (symlink(TSOL_NAME_SERVICE_DOOR, NAME_SERVICE_DOOR) != 0) {
+			if (errno != EEXIST) {
+				logit("Cannot symlink %s:%s\n",
+				    NAME_SERVICE_DOOR, strerror(errno));
+				exit(1);
+			}
+		}
+	} else if (stat(NAME_SERVICE_DOOR, &buf) < 0) {
 		int newfd;
 		if ((newfd = creat(NAME_SERVICE_DOOR, 0444)) < 0) {
-			logit("Cannot create %s:%s\n",
-				NAME_SERVICE_DOOR,
-				strerror(errno));
+			logit("Cannot create %s:%s\n", NAME_SERVICE_DOOR,
+			    strerror(errno));
 			exit(1);
 		}
 		(void) close(newfd);

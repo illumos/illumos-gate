@@ -39,10 +39,12 @@
 #include <sys/mount.h>
 #include <sys/mntent.h>
 #include <sys/mkdev.h>
+#include <sys/priv.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
+#include <sys/tsol/label.h>
 #include "fs/fs_subr.h"
 
 /*
@@ -118,8 +120,9 @@ static struct modlinkage modlinkage = {
 /*
  * This is the module initialization routine.
  */
+
 int
-_init()
+_init(void)
 {
 	int status;
 
@@ -139,8 +142,9 @@ _init()
  * Don't allow the lofs module to be unloaded for now.
  * There is a memory leak if it gets unloaded.
  */
+
 int
-_fini()
+_fini(void)
 {
 	return (EBUSY);
 }
@@ -203,7 +207,7 @@ lo_mount(struct vfs *vfsp,
 
 	mutex_enter(&vp->v_lock);
 	if (!(uap->flags & MS_OVERLAY) &&
-		(vp->v_count != 1 || (vp->v_flag & VROOT))) {
+	    (vp->v_count != 1 || (vp->v_flag & VROOT))) {
 		mutex_exit(&vp->v_lock);
 		return (EBUSY);
 	}
@@ -216,6 +220,95 @@ lo_mount(struct vfs *vfsp,
 		UIO_SYSSPACE : UIO_USERSPACE, FOLLOW, NULLVPP,
 	    &realrootvp))
 		return (error);
+
+	/*
+	 * Enforce MAC policy if needed.
+	 *
+	 * Loopback mounts must not allow writing up. The dominance test
+	 * is intended to prevent a global zone caller from accidentally
+	 * creating write-up conditions between two labeled zones.
+	 * Local zones can't violate MAC on their own without help from
+	 * the global zone because they can't name a pathname that
+	 * they don't already have.
+	 *
+	 * The special case check for the NET_MAC_AWARE process flag is
+	 * to support the case of the automounter in the global zone. We
+	 * permit automounting of local zone directories such as home
+	 * directories, into the global zone as required by setlabel,
+	 * zonecopy, and saving of desktop sessions. Such mounts are
+	 * trusted not to expose the contents of one zone's directories
+	 * to another by leaking them through the global zone.
+	 */
+	if (is_system_labeled() && crgetzoneid(cr) == GLOBAL_ZONEID) {
+		void *specname;
+		zone_t *from_zptr;
+		zone_t *to_zptr;
+
+		if (uap->flags & MS_SYSSPACE) {
+			specname = uap->spec;
+		} else {
+			specname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+			error = copyinstr(uap->spec, specname, MAXPATHLEN,
+			    NULL);
+			if (error) {
+				kmem_free(specname, MAXPATHLEN);
+				return (error);
+			}
+		}
+		from_zptr = zone_find_by_path(specname);
+		if (!(uap->flags & MS_SYSSPACE))
+			kmem_free(specname, MAXPATHLEN);
+
+		to_zptr = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
+
+		/*
+		 * Special case for zone devfs: the zone for /dev will
+		 * incorrectly appear as the global zone since it's not
+		 * under the zone rootpath.  So for zone devfs check allow
+		 * read-write mounts.
+		 */
+
+		if (from_zptr != to_zptr && !is_zonedevfs) {
+			/*
+			 * We know at this point that the labels aren't equal
+			 * because the zone pointers aren't equal, and zones
+			 * can't share a label.
+			 *
+			 * If the source is the global zone then making
+			 * it available to a local zone must be done in
+			 * read-only mode as the label will become admin_low.
+			 *
+			 * If it is a mount between local zones then if
+			 * the current process is in the global zone and has
+			 * the NET_MAC_AWARE flag, then regular read-write
+			 * access is allowed.  If it's in some other zone, but
+			 * the label on the mount point dominates the original
+			 * source, then allow the mount as read-only
+			 * ("read-down").
+			 */
+			if (from_zptr->zone_id == GLOBAL_ZONEID) {
+				/* make the mount read-only */
+				vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
+			} else { /* cross-zone mount */
+				if (to_zptr->zone_id == GLOBAL_ZONEID &&
+				    /* LINTED: no consequent */
+				    getpflags(NET_MAC_AWARE, cr) != 0) {
+					/* Allow the mount as read-write */
+				} else if (bldominates(
+				    label2bslabel(to_zptr->zone_slabel),
+				    label2bslabel(from_zptr->zone_slabel))) {
+					/* make the mount read-only */
+					vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
+				} else {
+					zone_rele(to_zptr);
+					zone_rele(from_zptr);
+					return (EACCES);
+				}
+			}
+		}
+		zone_rele(to_zptr);
+		zone_rele(from_zptr);
+	}
 
 	/*
 	 * realrootvp may be an AUTOFS node, in which case we

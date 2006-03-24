@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,36 +32,55 @@
 extern "C" {
 #endif
 
-typedef struct {		/* see getdmapent(3) */
-	char *dmap_devname;
-	char *dmap_devtype;
-	char *dmap_devlist;
-} devmap_t;
+#include <stdio.h>
+#include <secdb.h>
 
-devmap_t *getdmapent(void);
-devmap_t *getdmaptype(char *);
-devmap_t *getdmapnam(char *);
-devmap_t *getdmapdev(char *);
-void setdmapent(void);
-void enddmapent(void);
-void setdmapfile(char *);
+/*
+ * These are unsupported, SUN-private interfaces.
+ */
 
-typedef struct {		/* see getdaent(3) */
-	char *da_devname;
-	char *da_devtype;
-	char *da_devmin;
-	char *da_devmax;
-	char *da_devauth;
-	char *da_devexec;
+#define	DAOPT_AUTHS	"auths"
+#define	DAOPT_CSCRIPT	"cleanscript"
+#define	DAOPT_MINLABEL	"minlabel"
+#define	DAOPT_MAXLABEL	"maxlabel"
+#define	DAOPT_ZONE	"zone"
+#define	DA_RESERVED	"reserved"
+
+typedef struct {
+	char	*da_devname;
+	char	*da_devtype;
+	char	*da_devauth;
+	char	*da_devexec;
+	kva_t	*da_devopts;
 } devalloc_t;
 
-devalloc_t *getdaent(void);
-devalloc_t *getdatype(char *);
-devalloc_t *getdanam(char *);
-devalloc_t *getdadev(char *);
-void setdaent(void);
-void enddaent(void);
-void setdafile(char *);
+typedef struct {
+	char	*dmap_devname;
+	char	*dmap_devtype;
+	char	*dmap_devlist;
+	char	**dmap_devarray;
+} devmap_t;
+
+int		getdadmline(char *, int, FILE *);
+
+devalloc_t	*getdaent(void);
+devalloc_t	*getdatype(char *);
+devalloc_t	*getdanam(char *);
+void		setdaent(void);
+void		enddaent(void);
+void		freedaent(devalloc_t *);
+void		setdafile(char *);
+
+devmap_t	*getdmapent(void);
+devmap_t	*getdmaptype(char *);
+devmap_t	*getdmapnam(char *);
+devmap_t	*getdmapdev(char *);
+void		setdmapent(void);
+void		enddmapent(void);
+void		freedmapent(devmap_t *);
+void		setdmapfile(char *);
+char		*getdmapfield(char *);
+char		*getdmapdfield(char *);
 
 #ifdef	__cplusplus
 }

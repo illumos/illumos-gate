@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@
 #include <sys/kmem.h>
 #include <sys/strsubr.h>
 #include <sys/random.h>
+#include <sys/tsol/tnet.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -441,6 +441,7 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	mblk_t			*errmp = NULL;
 	boolean_t		initcollision = B_FALSE;
 	boolean_t		linklocal = B_FALSE;
+	cred_t			*cr;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
@@ -533,7 +534,8 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 		pad = 4 - pad;
 		ipsctplen += pad;
 	}
-	iackmp = allocb(ipsctplen + sctp_wroff_xtra, BPRI_MED);
+	iackmp = allocb_cred(ipsctplen + sctp_wroff_xtra,
+	    CONN_CRED(sctp->sctp_connp));
 	if (iackmp == NULL) {
 		sctp_send_abort(sctp, sctp_init2vtag(ch),
 		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
@@ -692,6 +694,30 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 
 	iackmp->b_wptr = iackmp->b_rptr + ipsctplen;
 	iackmp->b_cont = errmp;		/*  OK if NULL */
+
+	if (is_system_labeled() && (cr = DB_CRED(initmp)) != NULL &&
+	    crgetlabel(cr) != NULL) {
+		conn_t *connp = sctp->sctp_connp;
+		int err, adjust;
+
+		if (isv4)
+			err = tsol_check_label(cr, &iackmp, &adjust,
+			    connp->conn_mac_exempt);
+		else
+			err = tsol_check_label_v6(cr, &iackmp, &adjust,
+			    connp->conn_mac_exempt);
+		if (err != 0) {
+			sctp_send_abort(sctp, sctp_init2vtag(ch),
+			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE);
+			freemsg(iackmp);
+			return;
+		}
+		if (isv4) {
+			iackiph = (ipha_t *)iackmp->b_rptr;
+			adjust += ntohs(iackiph->ipha_length);
+			iackiph->ipha_length = htons(adjust);
+		}
+	}
 
 	/*
 	 * Stash the conn ptr info. for IP only as e don't have any
@@ -1303,7 +1329,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
-			    SCTP_PRINTADDR(src), sctp));
+			    SCTP_PRINTADDR(src), (void *)sctp));
 
 
 			if (sctp != NULL) {
@@ -1316,7 +1342,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
-			    SCTP_PRINTADDR(src), sctp));
+			    SCTP_PRINTADDR(src), (void *)sctp));
 
 			if (sctp != NULL) {
 				return (sctp);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,11 +75,16 @@ extern int genent_prof_attr(char *line, int (*cback)());
 extern int genent_exec_attr(char *line, int (*cback)());
 extern int genent_auth_attr(char *line, int (*cback)());
 extern int genent_audit_user(char *line, int (*cback)());
+extern int genent_tnrhdb(char *line, int (*cback)());
+extern int genent_tnrhtp(char *line, int (*cback)());
+
 extern void dump_user_attr(ns_ldap_result_t *res);
 extern void dump_prof_attr(ns_ldap_result_t *res);
 extern void dump_exec_attr(ns_ldap_result_t *res);
 extern void dump_auth_attr(ns_ldap_result_t *res);
 extern void dump_audit_user(ns_ldap_result_t *res);
+extern void dump_tnrhdb(ns_ldap_result_t *res);
+extern void dump_tnrhtp(ns_ldap_result_t *res);
 
 #ifdef	__cplusplus
 }

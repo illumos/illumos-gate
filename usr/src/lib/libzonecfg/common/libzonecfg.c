@@ -49,8 +49,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include <priv.h>
-
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 
@@ -125,8 +123,8 @@
 #define	ATTACH_FORCED	"SUNWattached.xml"
 #define	PKG_PATH	"/var/sadm/pkg"
 #define	CONTENTS_FILE	"/var/sadm/install/contents"
-#define	ALL_ZONES	"SUNW_PKG_ALLZONES=true\n"
-#define	THIS_ZONE	"SUNW_PKG_THISZONE=true\n"
+#define	SUNW_PKG_ALL_ZONES	"SUNW_PKG_ALLZONES=true\n"
+#define	SUNW_PKG_THIS_ZONE	"SUNW_PKG_THISZONE=true\n"
 #define	VERSION		"VERSION="
 #define	PATCHLIST	"PATCHLIST="
 #define	PATCHINFO	"PATCH_INFO_"
@@ -3417,7 +3415,9 @@ static const char *default_priv_list[] = {
 	PRIV_IPC_DAC_READ,
 	PRIV_IPC_DAC_WRITE,
 	PRIV_IPC_OWNER,
+	PRIV_NET_BINDMLP,
 	PRIV_NET_ICMPACCESS,
+	PRIV_NET_MAC_AWARE,
 	PRIV_NET_PRIVADDR,
 	PRIV_PROC_CHROOT,
 	PRIV_SYS_AUDIT,
@@ -5294,10 +5294,10 @@ get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
 			len = strlen(infop->zpi_version);
 			*(infop->zpi_version + len - 1) = 0;
 
-		} else if (strcmp(buf, ALL_ZONES) == 0) {
+		} else if (strcmp(buf, SUNW_PKG_ALL_ZONES) == 0) {
 			infop->zpi_all_zones = B_TRUE;
 
-		} else if (strcmp(buf, THIS_ZONE) == 0) {
+		} else if (strcmp(buf, SUNW_PKG_THIS_ZONE) == 0) {
 			infop->zpi_this_zone = B_TRUE;
 
 		} else if (strncmp(buf, PATCHINFO, sizeof (PATCHINFO) - 1)

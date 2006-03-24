@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * File with private definitions for the ucred structure for use by the
@@ -36,6 +35,8 @@
 #include <sys/procfs.h>
 #include <sys/cred.h>
 #include <sys/priv.h>
+#include <sys/tsol/label.h>
+#include <sys/tsol/label_macro.h>
 
 #ifdef _KERNEL
 #include <c2/audit.h>
@@ -67,6 +68,7 @@ struct ucred_s {
 	uint32_t	uc_audoff;	/* Audit info offset: 0 - no aud */
 	zoneid_t	uc_zoneid;	/* Zone id */
 	projid_t	uc_projid;	/* Project id */
+	uint32_t	uc_labeloff;	/* label offset: 0 - no label */
 					/* The rest goes here */
 };
 
@@ -81,6 +83,10 @@ struct ucred_s {
 /* Get the process audit info */
 #define	UCAUD(uc)	(auditinfo64_addr_t *)(((uc)->uc_audoff == 0) ? NULL : \
 				((char *)(uc)) + (uc)->uc_audoff)
+
+/* Get peer security label info */
+#define	UCLABEL(uc)	(bslabel_t *)(((uc)->uc_labeloff == 0) ? NULL : \
+				((char *)(uc)) + (uc)->uc_labeloff)
 
 #define	UCRED_CRED_OFF	(sizeof (struct ucred_s))
 
@@ -99,12 +105,14 @@ extern uint32_t ucredsize;
 #define	UCRED_PRIV_OFF	(UCRED_CRED_OFF + sizeof (prcred_t) + \
 			    (ngroups_max - 1) * sizeof (gid_t))
 #define	UCRED_AUD_OFF	(UCRED_PRIV_OFF + priv_prgetprivsize(NULL))
-#define	UCRED_SIZE	(UCRED_AUD_OFF + get_audit_ucrsize())
+#define	UCRED_LABEL_OFF	(UCRED_AUD_OFF + get_audit_ucrsize())
+#define	UCRED_SIZE	(UCRED_LABEL_OFF + sizeof (bslabel_t))
 
 struct proc;
 
 extern struct ucred_s *pgetucred(struct proc *);
-extern struct ucred_s *cred2ucred(const cred_t *, pid_t, void *);
+extern struct ucred_s *cred2ucred(const cred_t *, pid_t, void *,
+    const cred_t *);
 extern int get_audit_ucrsize(void);
 
 #else
@@ -117,7 +125,8 @@ extern int get_audit_ucrsize(void);
 			sizeof (priv_chunk_t) * \
 			((ip)->priv_setsize * (ip)->priv_nsets - 1) + \
 			(ip)->priv_infosize + \
-			sizeof (auditinfo64_addr_t))
+			sizeof (auditinfo64_addr_t) + \
+			sizeof (bslabel_t))
 #endif
 
 extern struct ucred_s *_ucred_alloc(void);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +29,9 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <bsm/devalloc.h>
 
+extern int system_labeled;
 
 static int tape_process(di_minor_t minor, di_node_t node);
 
@@ -60,6 +61,7 @@ DEVFSADM_REMOVE_INIT_V0(tape_remove_cbt);
 static int
 tape_process(di_minor_t minor, di_node_t node)
 {
+	int flags = 0;
 	char l_path[PATH_MAX + 1];
 	char *buf;
 	char *mn;
@@ -98,7 +100,10 @@ tape_process(di_minor_t minor, di_node_t node)
 	(void) strcat(l_path, mn);
 	free(buf);
 
-	(void) devfsadm_mklink(l_path, node, minor, 0);
+	if (system_labeled)
+		flags = DA_ADD|DA_TAPE;
+
+	(void) devfsadm_mklink(l_path, node, minor, flags);
 
 	return (DEVFSADM_CONTINUE);
 }

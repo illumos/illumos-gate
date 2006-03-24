@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1868,48 +1867,6 @@ xclient_token(adr_t *adr)
 }
 
 /*
- * Format of clearance token:
- *	clearance		adr_char*(sizeof (bclear_t))
- */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
-int
-clearance_token(adr_t *adr)
-{
-#ifdef	TSOL
-	bclear_t clearance;
-
-	adrm_char(adr, (char *)&clearance, sizeof (bclear_t));
-	return (-1);
-#else	/* !TSOL */
-	return (-2);
-#endif	/* TSOL */
-}
-
-
-/*
- * Format of ilabel token:
- *	ilabel			adr_char*(sizeof (bilabel_t))
- */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
-int
-ilabel_token(adr_t *adr)
-{
-#ifdef	TSOL
-	bilabel_t ilabel;
-
-	adrm_char(adr, (char *)&ilabel, sizeof (ilabel));
-
-	return (-1);
-#else	/* !TSOL */
-	return (-2);
-#endif	/* TSOL */
-}
-
-/*
  * Format of privilege set token:
  *	priv_set type		string
  *	priv_set		string
@@ -1927,26 +1884,19 @@ privilege_token(adr_t *adr)
  * Format of slabel token:
  *	slabel			adr_char*(sizeof (bslabel_t))
  */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
 int
 slabel_token(adr_t *adr)
 {
-#ifdef	TSOL
 	bslabel_t slabel;
 
 	adrm_char(adr, (char *)&slabel, sizeof (slabel));
 
-	if (flags & M_SLABEL) {
-		if (blinrange(&slabel, &m_slabel))
-			checkflags = checkflags | M_SLABEL;
+	if (flags & M_LABEL) {
+		if (blinrange(&slabel, m_label))
+			checkflags = checkflags | M_LABEL;
 	}
 
 	return (-1);
-#else	/* !TSOL */
-	return (-2);
-#endif	/* TSOL */
 }
 
 

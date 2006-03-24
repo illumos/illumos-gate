@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +55,7 @@
 #include <sys/kmem.h>
 #include <sys/file.h>		/* for accept */
 #include <sys/utssys.h>		/* for fuser */
+#include <sys/tsol/label.h>
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
 #include <c2/audit_kevents.h>
@@ -1432,6 +1432,10 @@ aus_kill(struct t_audit_data *tad)
 		rgid = crgetrgid(cr);
 		au_uwrite(au_to_process(uid, gid, ruid, rgid, pid,
 		    ainfo->ai_auid, ainfo->ai_asid, &ainfo->ai_termid));
+
+		if (is_system_labeled())
+			au_uwrite(au_to_label(CR_SL(cr)));
+
 		crfree(cr);
 	}
 	else
@@ -1865,7 +1869,6 @@ aus_close(struct t_audit_data *tad)
 		if ((vp = fp->f_vnode) != NULL) {
 			attr.va_mask = AT_ALL;
 			if (VOP_GETATTR(vp, &attr, 0, CRED()) == 0) {
-				au_uwrite(au_to_attr(&attr));
 				/*
 				 * When write was not used and the file can be
 				 * considered public, skip the audit.
@@ -1879,6 +1882,8 @@ aus_close(struct t_audit_data *tad)
 					releasef(fd);
 					return;
 				}
+				au_uwrite(au_to_attr(&attr));
+				audit_sec_attributes(&(u_ad), vp);
 			}
 		}
 	}

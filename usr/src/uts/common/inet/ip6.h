@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -348,26 +347,24 @@ extern void	convert2ascii(char *buf, const in6_addr_t *addr);
 extern char	*inet_ntop(int, const void *, char *, int);
 extern int	inet_pton(int, char *, void *);
 extern void	icmp_time_exceeded_v6(queue_t *, mblk_t *, uint8_t,
-		    boolean_t, boolean_t);
+    boolean_t, boolean_t);
 extern void	icmp_unreachable_v6(queue_t *, mblk_t *, uint8_t,
-		    boolean_t, boolean_t);
+    boolean_t, boolean_t);
 extern void	icmp_inbound_error_fanout_v6(queue_t *, mblk_t *, ip6_t *,
-		    icmp6_t *, ill_t *, boolean_t, zoneid_t);
+    icmp6_t *, ill_t *, boolean_t, zoneid_t);
 extern boolean_t conn_wantpacket_v6(conn_t *, ill_t *, ip6_t *, int, zoneid_t);
 extern mblk_t	*ip_add_info_v6(mblk_t *, ill_t *, const in6_addr_t *);
 extern in6addr_scope_t	ip_addr_scope_v6(const in6_addr_t *);
 extern mblk_t	*ip_bind_v6(queue_t *, mblk_t *, conn_t *, ip6_pkt_t *);
 extern void	ip_build_hdrs_v6(uchar_t *, uint_t, ip6_pkt_t *, uint8_t);
-extern void	ip_deliver_local_v6(queue_t *, mblk_t *, ill_t *, uint8_t,
-		    uint_t, uint_t);
 extern int	ip_fanout_send_icmp_v6(queue_t *, mblk_t *, uint_t,
-		    uint_t, uint8_t, uint_t, boolean_t, zoneid_t);
+    uint_t, uint8_t, uint_t, boolean_t, zoneid_t);
 extern int	ip_find_hdr_v6(mblk_t *, ip6_t *, ip6_pkt_t *, uint8_t *);
 extern in6_addr_t ip_get_dst_v6(ip6_t *, boolean_t *);
 extern ip6_rthdr_t	*ip_find_rthdr_v6(ip6_t *, uint8_t *);
 extern int	ip_hdr_complete_v6(ip6_t *, zoneid_t);
 extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
-		    uint16_t *, uint8_t **);
+    uint16_t *, uint8_t **);
 extern int	ip_hdr_length_v6(mblk_t *, ip6_t *);
 extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *);
 extern void	ip_wput_frag_v6(mblk_t *, ire_t *, uint_t, conn_t *, int, int);
@@ -376,13 +373,13 @@ extern void 	ip_wput_ipsec_out_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
 extern int	ip_total_hdrs_len_v6(ip6_pkt_t *);
 extern int	ipsec_ah_get_hdr_size_v6(mblk_t *, boolean_t);
 extern void	ip_wput_local_v6(queue_t *, ill_t *, ip6_t *, mblk_t *,
-		    ire_t *, int);
+    ire_t *, int);
 extern void	ip_wput_md_v6(queue_t *, mblk_t *, conn_t *);
 extern void	ip_output_v6(void *, mblk_t *, void *, int);
 extern void	ip_xmit_v6(mblk_t *, ire_t *, uint_t, conn_t *, int,
-			struct ipsec_out_s *);
+    struct ipsec_out_s *);
 extern void	ip_rput_data_v6(queue_t *, ill_t *, mblk_t *, ip6_t *,
-		    uint_t, mblk_t *);
+    uint_t, mblk_t *);
 extern void	mld_input(queue_t *, mblk_t *, ill_t *);
 extern void	mld_joingroup(ilm_t *);
 extern void	mld_leavegroup(ilm_t *);
@@ -391,15 +388,15 @@ extern void	mld_timeout_start(int);
 
 extern void	pr_addr_dbg(char *, int, const void *);
 extern ipif_t	*ip_newroute_get_src_ipif_v6(ipif_t *, boolean_t,
-		const in6_addr_t *);
+    const in6_addr_t *);
 extern int	ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
-		const in6_addr_t *, int, mcast_record_t, const in6_addr_t *,
-		mblk_t *), ire_t *, conn_t *, boolean_t, const in6_addr_t *,
-		mcast_record_t, const in6_addr_t *, mblk_t *);
+    const in6_addr_t *, int, mcast_record_t, const in6_addr_t *,
+    mblk_t *), ire_t *, conn_t *, boolean_t, const in6_addr_t *,
+    mcast_record_t, const in6_addr_t *, mblk_t *);
 extern void	ip_newroute_ipif_v6(queue_t *, mblk_t *, ipif_t *,
-		in6_addr_t, int, zoneid_t);
+    in6_addr_t, int, zoneid_t);
 extern void	ip_newroute_v6(queue_t *, mblk_t *, const in6_addr_t *,
-		const in6_addr_t *, ill_t *, zoneid_t);
+    const in6_addr_t *, ill_t *, zoneid_t);
 extern void	ip6_kstat_init(void);
 extern size_t	ip6_get_src_preferences(conn_t *, uint32_t *);
 extern int	ip6_set_src_preferences(conn_t *, uint32_t);

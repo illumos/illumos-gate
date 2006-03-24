@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/rctl.h>
 #include <sys/pset.h>
+#include <sys/tsol/label.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,6 +57,11 @@ extern "C" {
 #define	GLOBAL_ZONEID	0
 #define	ZONEID_WIDTH	4	/* for printf */
 
+/*
+ * Special zoneid_t token to refer to all zones.
+ */
+#define	ALL_ZONES	(-1)
+
 /* system call subcodes */
 #define	ZONE_CREATE	0
 #define	ZONE_DESTROY	1
@@ -76,6 +81,7 @@ extern "C" {
 #define	ZONE_ATTR_UNIQID	5
 #define	ZONE_ATTR_POOLID	6
 #define	ZONE_ATTR_INITPID	7
+#define	ZONE_ATTR_SLBL		8
 
 #define	ZONE_EVENT_CHANNEL	"com.sun:zones:status"
 #define	ZONE_EVENT_STATUS_CLASS	"status"
@@ -103,6 +109,9 @@ typedef struct {
 	caddr32_t extended_error;
 	caddr32_t zfsbuf;
 	size32_t  zfsbufsz;
+	int match;
+	int doi;
+	caddr32_t label;
 } zone_def32;
 #endif
 typedef struct {
@@ -115,6 +124,9 @@ typedef struct {
 	int *extended_error;
 	const char *zfsbuf;
 	size_t zfsbufsz;
+	int match;			/* match level */
+	int doi;			/* DOI for label */
+	const bslabel_t *label;		/* label associated with zone */
 } zone_def;
 
 /* extended error information */
@@ -191,7 +203,6 @@ typedef struct zone_cmd_rval {
  * The path to the door used by clients to communicate with zoneadmd.
  */
 #define	ZONE_DOOR_PATH		ZONES_TMPDIR "/%s.zoneadmd_door"
-
 
 #ifdef _KERNEL
 /*
@@ -293,6 +304,10 @@ typedef struct zone {
 	 * List of ZFS datasets exported to this zone.
 	 */
 	list_t		zone_datasets;	/* list of datasets */
+
+	ts_label_t	*zone_slabel;
+	int		zone_match;
+	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
 } zone_t;
 
 /*
@@ -317,8 +332,10 @@ extern void zone_cred_rele(zone_t *);
 extern void zone_task_hold(zone_t *);
 extern void zone_task_rele(zone_t *);
 extern zone_t *zone_find_by_id(zoneid_t);
+extern zone_t *zone_find_by_label(const ts_label_t *);
 extern zone_t *zone_find_by_name(char *);
 extern zone_t *zone_find_by_path(const char *);
+extern zone_t *zone_find_by_any_path(const char *, boolean_t);
 extern zoneid_t getzoneid(void);
 
 /*
@@ -399,11 +416,6 @@ struct zsd_entry {
  * Special processes visible in all zones.
  */
 #define	ZONE_SPECIALPID(x)	 ((x) == 0 || (x) == 1)
-
-/*
- * Special zoneid_t token to refer to all zones.
- */
-#define	ALL_ZONES	(-1)
 
 /*
  * Zone-safe version of thread_create() to be used when the caller wants to

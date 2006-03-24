@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -67,6 +66,8 @@
 #include <sys/rctl.h>
 #include <sys/pool.h>
 #include <sys/zone.h>
+#include <sys/tsol/label.h>
+#include <sys/tsol/tndb.h>
 #include <sys/cpc_impl.h>
 #include <sys/sdt.h>
 #include <sys/reboot.h>
@@ -178,12 +179,14 @@ thread_init(void)
 	    sizeof (turnstile_t), 0,
 	    turnstile_constructor, turnstile_destructor, NULL, NULL, NULL, 0);
 
+	label_init();
 	cred_init();
 
 	rctl_init();
 	project_init();
 	zone_init();
 	task_init();
+	tcache_init();
 	pool_init();
 
 	curthread->t_ts = kmem_cache_alloc(turnstile_cache, KM_SLEEP);

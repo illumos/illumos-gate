@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +48,6 @@
 #include <libintl.h>
 
 #include <adaptor.h>
-
 
 #define	ACK(fp)		{ (void) fputc(NULL, fp); (void) fflush(fp); }
 #define	NACK(fp)	{ (void) fputc('\001', fp); (void) fflush(fp); }
@@ -146,7 +144,6 @@ remote_host_name(FILE *fp)
 	/* It must be someone else */
 	return (hostname);
 }
-
 
 static int
 request_id_no(const char *filename)
@@ -559,7 +556,7 @@ main(int ac, char *av[])
 		exit(1);
 	}
 
-	if (adaptor_client_access(printer, host) < 0) {
+	if (adaptor_client_access(printer, host, fileno(ifp)) < 0) {
 		syslog(LOG_ERR, "%s doesn't have permission to talk to %s",
 			host, printer);
 		(void) fprintf(ofp,

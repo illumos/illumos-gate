@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.
  * All rights reserved.  Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -48,7 +47,6 @@
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/dlpi.h>
 #include <sys/stropts.h>
 #include <sys/strlog.h>
 #include <sys/systm.h>
@@ -58,21 +56,16 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#define	_SUN_TPI_VERSION	2
-#include <sys/tihdr.h>
 #include <sys/vtrace.h>
 #include <sys/debug.h>
 #include <net/if.h>
-#include <net/if_arp.h>
 #include <sys/sockio.h>
-#include <net/route.h>
 #include <netinet/in.h>
 #include <net/if_dl.h>
 
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
-#include <inet/arp.h>
 #include <inet/mib2.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
@@ -2992,7 +2985,7 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 			}
 			mp_loop = copymsg(mp);
 			ire = ire_ctable_lookup(~0, 0, IRE_BROADCAST, NULL,
-			    ALL_ZONES, MATCH_IRE_TYPE);
+			    ALL_ZONES, NULL, MATCH_IRE_TYPE);
 
 			if (mp_loop != NULL && ire != NULL) {
 				IP_RPUT_LOCAL(ipif->ipif_rq, mp_loop,

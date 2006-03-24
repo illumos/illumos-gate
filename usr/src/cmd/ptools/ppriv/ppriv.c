@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Program to examine or set process privileges.
@@ -61,6 +60,7 @@ static boolean_t	exec = B_FALSE;
 static boolean_t	Don = B_FALSE;
 static boolean_t	Doff = B_FALSE;
 static boolean_t	list = B_FALSE;
+static boolean_t	mac_aware = B_FALSE;
 static int		mode = PRIV_STR_PORT;
 
 int
@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	else
 		command = argv[0];
 
-	while ((opt = getopt(argc, argv, "lDNevs:S")) != EOF) {
+	while ((opt = getopt(argc, argv, "lDMNevs:S")) != EOF) {
 		switch (opt) {
 		case 'l':
 			list = B_TRUE;
@@ -86,6 +86,9 @@ main(int argc, char **argv)
 		case 'D':
 			set = B_TRUE;
 			Don = B_TRUE;
+			break;
+		case 'M':
+			mac_aware = B_TRUE;
 			break;
 		case 'N':
 			set = B_TRUE;
@@ -115,7 +118,8 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if ((argc < 1 && !list) || Doff && Don || list && (set || exec))
+	if ((argc < 1 && !list) || Doff && Don || list && (set || exec) ||
+	    (mac_aware && !exec))
 		usage();
 
 	/*
@@ -314,7 +318,7 @@ usage(void)
 {
 	(void) fprintf(stderr,
 	    "usage:\t%s [-v] [-S] [-D|-N] [-s spec] { pid | core } ...\n"
-	    "\t%s -e [-D|-N] [-s spec] cmd [args ...]\n"
+	    "\t%s -e [-D|-N] [-M] [-s spec] cmd [args ...]\n"
 	    "\t%s -l [-v] [privilege ...]\n"
 	    "  (report, set or list process privileges)\n", command,
 	    command, command);
@@ -534,6 +538,13 @@ static void
 privupdate_self(void)
 {
 	int set;
+
+	if (mac_aware) {
+		if (setpflags(NET_MAC_AWARE, 1) != 0)
+			fatal("setpflags(NET_MAC_AWARE)");
+		if (setpflags(NET_MAC_AWARE_INHERIT, 1) != 0)
+			fatal("setpflags(NET_MAC_AWARE_INHERIT)");
+	}
 
 	if (sets != NULL) {
 		priv_set_t *target = priv_allocset();

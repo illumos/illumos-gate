@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +53,9 @@
 #include <rpcsvc/nfs_prot.h>
 #include <assert.h>
 #include "automount.h"
+#include <zone.h>
+#include <priv.h>
+#include <fcntl.h>
 
 static char *check_hier(char *);
 static int natisa(char *, size_t);
@@ -62,9 +64,111 @@ struct mntlist *current_mounts;
 
 static bool_t nodirect_map = FALSE;
 
+/*
+ * If the system is labeled then we need to
+ * have a uniquely-named auto_home map for each zone.
+ * The maps are made unique by appending the zonename.
+ * The home directory is made unique by prepending /zone/<zonename>
+ * for each zone that is dominated by the current zone.
+ * The current zone's home directory mount point is not changed.
+ *
+ * For each auto_home_<zonename> a default template map is created
+ * only if it doesn't exist yet. The default entry is used to declare
+ * local home directories created within each zone. For example:
+ *
+ *	+auto_home_public
+ *      * -fstype=lofs :/zone/public/export/home/&
+ */
+static void
+loadzone_maps(char *mntpnt, char *map, char *opts, char **stack, char ***stkptr)
+{
+	zoneid_t *zids = NULL;
+	zoneid_t my_zoneid;
+	uint_t nzents_saved;
+	uint_t nzents;
+	int i;
+
+	if (!priv_ineffect(PRIV_SYS_MOUNT))
+		return;
+
+	if (zone_list(NULL, &nzents) != 0) {
+		return;
+	}
+	my_zoneid = getzoneid();
+again:
+	if (nzents == 0)
+		return;
+
+	zids = malloc(nzents * sizeof (zoneid_t));
+	nzents_saved = nzents;
+
+	if (zone_list(zids, &nzents) != 0) {
+		free(zids);
+		return;
+	}
+	if (nzents != nzents_saved) {
+		/* list changed, try again */
+		free(zids);
+		goto again;
+	}
+
+	for (i = 0; i < nzents; i++) {
+		char zonename[ZONENAME_MAX];
+		char zoneroot[MAXPATHLEN];
+
+		if (getzonenamebyid(zids[i], zonename, ZONENAME_MAX) != -1) {
+			char appended_map[MAXPATHLEN];
+			char prepended_mntpnt[MAXPATHLEN];
+			char map_path[MAXPATHLEN];
+			int fd;
+
+			(void) snprintf(appended_map, sizeof (appended_map),
+			    "%s_%s", map, zonename);
+
+			/* for current zone, leave mntpnt alone */
+			if (zids[i] != my_zoneid) {
+				(void) snprintf(prepended_mntpnt,
+				    sizeof (prepended_mntpnt),
+				    "/zone/%s%s", zonename, mntpnt);
+				if (zone_getattr(zids[i], ZONE_ATTR_ROOT,
+				    zoneroot, sizeof (zoneroot)) == -1)
+					continue;
+			} else {
+				(void) strcpy(prepended_mntpnt, mntpnt);
+				zoneroot[0] = '\0';
+			}
+
+			dirinit(prepended_mntpnt, appended_map, opts, 0, stack,
+			    stkptr);
+			/*
+			 * Next create auto_home_<zone> maps for each zone
+			 */
+
+			(void) snprintf(map_path, sizeof (map_path),
+			    "/etc/%s", appended_map);
+			/*
+			 * If the map file doesn't exist create a template
+			 */
+			if ((fd = open(map_path, O_RDWR | O_CREAT | O_EXCL,
+			    S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH)) != -1) {
+				int len;
+				char map_rec[MAXPATHLEN];
+
+				len = snprintf(map_rec, sizeof (map_rec),
+				    "+%s\n*\t-fstype=lofs\t:%s/export/home/&\n",
+				    appended_map, zoneroot);
+				if (len <= sizeof (map_rec))
+					(void) write(fd, map_rec, len);
+				(void) close(fd);
+			}
+		}
+	}
+	free(zids);
+}
+
 void
 dirinit(char *mntpnt, char *map, char *opts, int direct, char **stack,
-	char ***stkptr)
+    char ***stkptr)
 {
 	struct autodir *dir;
 	char *p;
@@ -97,6 +201,16 @@ dirinit(char *mntpnt, char *map, char *opts, int direct, char **stack,
 		return;
 	}
 
+	/*
+	 * Home directories are polyinstantiated on
+	 * labeled systems.
+	 */
+	if (is_system_labeled() &&
+	    (strcmp(mntpnt, "/home") == 0) &&
+	    (strcmp(map, "auto_home") == 0)) {
+		(void) loadzone_maps(mntpnt, map, opts, stack, stkptr);
+		return;
+	}
 enter:
 	dir = (struct autodir *)malloc(sizeof (*dir));
 	if (dir == NULL)

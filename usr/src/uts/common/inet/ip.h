@@ -51,6 +51,7 @@ extern "C" {
 #include <sys/avl.h>
 #include <sys/vmem.h>
 #include <sys/squeue.h>
+#include <net/route.h>
 #include <sys/systm.h>
 #include <sys/multidata.h>
 
@@ -124,6 +125,8 @@ typedef uint32_t ipaddr_t;
 #define	IP_SIMPLE_HDR_LENGTH		20
 #define	IP_MAX_HDR_LENGTH		60
 
+#define	IP_MAX_OPT_LENGTH (IP_MAX_HDR_LENGTH-IP_SIMPLE_HDR_LENGTH)
+
 #define	IP_MIN_MTU			(IP_MAX_HDR_LENGTH + 8)	/* 68 bytes */
 
 /*
@@ -133,6 +136,8 @@ typedef uint32_t ipaddr_t;
 #define	IP_MAXPACKET			65535
 #define	IP_SIMPLE_HDR_VERSION \
 	((IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS)
+
+#define	UDPH_SIZE			8
 
 /*
  * Constants and type definitions to support IP IOCTL commands
@@ -2074,6 +2079,104 @@ typedef struct ipndp_s {
 } ipndp_t;
 
 /*
+ * The kernel stores security attributes of all gateways in a database made
+ * up of one or more tsol_gcdb_t elements.  Each tsol_gcdb_t contains the
+ * security-related credentials of the gateway.  More than one gateways may
+ * share entries in the database.
+ *
+ * The tsol_gc_t structure represents the gateway to credential association,
+ * and refers to an entry in the database.  One or more tsol_gc_t entities are
+ * grouped together to form one or more tsol_gcgrp_t, each representing the
+ * list of security attributes specific to the gateway.  A gateway may be
+ * associated with at most one credentials group.
+ */
+struct tsol_gcgrp_s;
+
+extern uchar_t	ip6opt_ls;	/* TX IPv6 enabler */
+
+/*
+ * Gateway security credential record.
+ */
+typedef struct tsol_gcdb_s {
+	uint_t		gcdb_refcnt;	/* reference count */
+	struct rtsa_s	gcdb_attr;	/* security attributes */
+#define	gcdb_mask	gcdb_attr.rtsa_mask
+#define	gcdb_doi	gcdb_attr.rtsa_doi
+#define	gcdb_slrange	gcdb_attr.rtsa_slrange
+} tsol_gcdb_t;
+
+/*
+ * Gateway to credential association.
+ */
+typedef struct tsol_gc_s {
+	uint_t		gc_refcnt;	/* reference count */
+	struct tsol_gcgrp_s *gc_grp;	/* pointer to group */
+	struct tsol_gc_s *gc_prev;	/* previous in list */
+	struct tsol_gc_s *gc_next;	/* next in list */
+	tsol_gcdb_t	*gc_db;		/* pointer to actual credentials */
+} tsol_gc_t;
+
+/*
+ * Gateway credentials group address.
+ */
+typedef struct tsol_gcgrp_addr_s {
+	int		ga_af;		/* address family */
+	in6_addr_t	ga_addr;	/* IPv4 mapped or IPv6 address */
+} tsol_gcgrp_addr_t;
+
+/*
+ * Gateway credentials group.
+ */
+typedef struct tsol_gcgrp_s {
+	uint_t		gcgrp_refcnt;	/* reference count */
+	krwlock_t	gcgrp_rwlock;	/* lock to protect following */
+	uint_t		gcgrp_count;	/* number of credentials */
+	tsol_gc_t	*gcgrp_head;	/* first credential in list */
+	tsol_gc_t	*gcgrp_tail;	/* last credential in list */
+	tsol_gcgrp_addr_t gcgrp_addr;	/* next-hop gateway address */
+} tsol_gcgrp_t;
+
+extern kmutex_t gcgrp_lock;
+
+#define	GC_REFRELE(p) {				\
+	ASSERT((p)->gc_grp != NULL);		\
+	rw_enter(&(p)->gc_grp->gcgrp_rwlock, RW_WRITER); \
+	ASSERT((p)->gc_refcnt > 0);		\
+	if (--((p)->gc_refcnt) == 0)		\
+		gc_inactive(p);			\
+	else					\
+		rw_exit(&(p)->gc_grp->gcgrp_rwlock); \
+}
+
+#define	GCGRP_REFHOLD(p) {			\
+	mutex_enter(&gcgrp_lock);		\
+	++((p)->gcgrp_refcnt);			\
+	ASSERT((p)->gcgrp_refcnt != 0);		\
+	mutex_exit(&gcgrp_lock);		\
+}
+
+#define	GCGRP_REFRELE(p) {			\
+	mutex_enter(&gcgrp_lock);		\
+	ASSERT((p)->gcgrp_refcnt > 0);		\
+	if (--((p)->gcgrp_refcnt) == 0)		\
+		gcgrp_inactive(p);		\
+	ASSERT(MUTEX_HELD(&gcgrp_lock));	\
+	mutex_exit(&gcgrp_lock);		\
+}
+
+/*
+ * IRE gateway security attributes structure, pointed to by tsol_ire_gw_secattr
+ */
+struct tsol_tnrhc;
+
+typedef struct tsol_ire_gw_secattr_s {
+	kmutex_t	igsa_lock;	/* lock to protect following */
+	struct tsol_tnrhc *igsa_rhc;	/* host entry for gateway */
+	tsol_gc_t	*igsa_gc;	/* for prefix IREs */
+	tsol_gcgrp_t	*igsa_gcgrp;	/* for cache IREs */
+} tsol_ire_gw_secattr_t;
+
+/*
  * Following are the macros to increment/decrement the reference
  * count of the IREs and IRBs (ire bucket).
  *
@@ -2306,6 +2409,7 @@ typedef struct ire_s {
 	clock_t		ire_last_used_time;	/* Last used time */
 	struct ire_s 	*ire_fastpath;	/* Pointer to next ire in fastpath */
 	zoneid_t	ire_zoneid;	/* for local address discrimination */
+	tsol_ire_gw_secattr_t *ire_gw_secattr; /* gateway security attributes */
 #ifdef IRE_DEBUG
 	th_trace_t	*ire_trace[IP_TR_HASH_MAX];
 	boolean_t	ire_trace_disable;	/* True when alloc fails */
@@ -2433,6 +2537,8 @@ struct ip6_pkt_s {
 };
 typedef struct ip6_pkt_s ip6_pkt_t;
 
+extern void ip6_pkt_free(ip6_pkt_t *);	/* free storage inside ip6_pkt_t */
+
 /*
  * This structure is used to convey information from IP and the ULP.
  * Currently used for the IP_RECVSLLA and IP_RECVIF options. The
@@ -2447,7 +2553,7 @@ typedef struct in_pktinfo {
 } in_pktinfo_t;
 
 /*
- * flags to tell UDP what IP is sending
+ * flags to tell UDP what IP is sending; in_pkt_flags
  */
 #define	IPF_RECVIF	0x01	/* inbound interface index */
 #define	IPF_RECVSLLA	0x02	/* source link layer address */
@@ -2832,6 +2938,7 @@ extern int	ip_srcid_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 
 extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);
+extern int	ip_opt_get_user(const ipha_t *, uchar_t *);
 extern ill_t	*ip_grab_attach_ill(ill_t *, mblk_t *, int, boolean_t);
 extern ire_t	*conn_set_outgoing_ill(conn_t *, ire_t *, ill_t **);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
@@ -2843,6 +2950,12 @@ extern  void    ip_reprocess_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_restart_optmgmt(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_ioctl_finish(queue_t *, mblk_t *, int, int, ipif_t *,
     ipsq_t *);
+
+extern boolean_t ip_cmpbuf(const void *, uint_t, boolean_t, const void *,
+    uint_t);
+extern boolean_t ip_allocbuf(void **, uint_t *, boolean_t, const void *,
+    uint_t);
+extern void	ip_savebuf(void **, uint_t *, boolean_t, const void *, uint_t);
 
 extern boolean_t	ipsq_pending_mp_cleanup(ill_t *, conn_t *);
 extern void	conn_ioctl_cleanup(conn_t *);
@@ -2861,6 +2974,9 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
 extern mblk_t	*ip_unbind(queue_t *, mblk_t *);
+
+extern void tnet_init(void);
+extern void tnet_fini(void);
 
 /* Hooks for CGTP (multirt routes) filtering module */
 #define	CGTP_FILTER_REV_1	1
@@ -3002,6 +3118,17 @@ struct ill_dls_capab_s {
 	uint_t			ill_dls_soft_ring_cnt; /* Number of soft ring */
 	conn_t			*ill_unbind_conn; /* Conn used during unplumb */
 };
+
+/*
+ * This message is sent by an upper-layer protocol to tell IP that it knows all
+ * about labels and will construct them itself.  IP takes the slow path and
+ * recomputes the label on every packet when this isn't true.
+ */
+#define	IP_ULP_OUT_LABELED		(('O' << 8) + 'L')
+typedef struct out_labeled_s {
+	uint32_t	out_labeled_type;	/* OUT_LABELED */
+	queue_t		*out_qnext;		/* intermediate detection */
+} out_labeled_t;
 
 /*
  * IP squeues exports

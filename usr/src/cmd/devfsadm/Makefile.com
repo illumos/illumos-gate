@@ -32,12 +32,15 @@ COMMON = ..
 
 DEVFSADM_MOD = devfsadm
 
+DEVALLOCSRC =	devalloc.c
+
 PLCYSRC = devpolicy.c plcysubr.c
 
 MODLOADDIR = $(COMMON)/../modload
 
-DEVFSADM_SRC = $(COMMON)/$(DEVFSADM_MOD:%=%.c) $(PLCYSRC:%=$(COMMON)/%)
-DEVFSADM_OBJ = $(DEVFSADM_MOD:%=%.o) $(PLCYSRC:%.c=%.o)
+DEVFSADM_SRC = $(COMMON)/$(DEVFSADM_MOD:%=%.c) \
+		$(DEVALLOCSRC:%=$(COMMON)/%) $(PLCYSRC:%=$(COMMON)/%)
+DEVFSADM_OBJ = $(DEVFSADM_MOD:%=%.o) $(DEVALLOCSRC:%.c=%.o) $(PLCYSRC:%.c=%.o)
 
 DEVFSADM_DAEMON = devfsadmd
 
@@ -118,9 +121,9 @@ LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
-LAZYLIBS = -z lazyload -lzonecfg -z nolazyload
-lint := LAZYLIBS = -lzonecfg
-LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -lcmd $(LAZYLIBS)
+LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg -lbsm $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -lzonecfg -lbsm
+LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -lcmd -ldoor $(LAZYLIBS) -lnsl
 
 SRCS = $(DEVFSADM_SRC) $(LINK_SRCS)
 OBJS = $(DEVFSADM_OBJ) $(LINK_OBJS)

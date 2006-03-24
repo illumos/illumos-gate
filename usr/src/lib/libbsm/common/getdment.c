@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,73 +19,423 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stdio.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <bsm/devices.h>
-#include <sys/errno.h>
+#include <bsm/devalloc.h>
 
-#define	MAXINT 0x7fffffff;
+char *strtok_r(char *, const char *, char **);
+
+/* externs from getdaent.c */
+extern char *trim_white(char *);
+extern int pack_white(char *);
+extern char *getdadmfield(char *, char *);
+extern int getdadmline(char *, int, FILE *);
 
 static struct _dmapbuff {
-	devmap_t _NULLDM;
-	FILE *_dmapf;	/* pointer into /etc/security/device_maps */
-	devmap_t _interpdevmap;
-	char _interpline[BUFSIZ + 1];
-	char *_DEVMAP;
+	FILE		*_dmapf;	/* for /etc/security/device_maps */
+	devmap_t	_interpdevmap;
+	char		_interpdmline[DA_BUFSIZE + 1];
+	char		*_DEVMAP;
 } *__dmapbuff;
 
-#define	NULLDM (_dmap->_NULLDM)
-#define	dmapf (_dmap->_dmapf)
-#define	interpdevmap (_dmap->_interpdevmap)
-#define	interpline (_dmap->_interpline)
-#define	DEVMAP (_dmap->_DEVMAP)
-static devmap_t  *interpret();
-static int matchdev();
-static int matchname();
+#define	dmapf	(_dmap->_dmapf)
+#define	interpdevmap	(_dmap->_interpdevmap)
+#define	interpdmline	(_dmap->_interpdmline)
+#define	DEVMAPS_FILE	(_dmap->_DEVMAP)
+
+devmap_t	*dmap_interpret(char *, devmap_t *);
+static devmap_t	*dmap_interpretf(char *, devmap_t *);
+static devmap_t *dmap_dlexpand(devmap_t *);
+
+int	dmap_matchdev(devmap_t *, char *);
+int	dmap_matchname(devmap_t *, char *);
+
+
 /*
- * trim_white(ptr) trims off leading and trailing white space from a NULL
- * terminated string pointed to by "ptr". The leading white space is skipped
- * by moving the pointer forward. The trailing white space is removed by
- * nulling the white space characters.  The pointer is returned to the white
- * string. If the resulting string is null in length then a NULL pointer is
- * returned. If "ptr" is NULL then a NULL pointer is returned.
+ * _dmapalloc -
+ *	allocates common buffers and structures.
+ *	returns pointer to the new structure, else returns NULL on error.
  */
-static char *
-trim_white(char *ptr)
+static struct _dmapbuff *
+_dmapalloc(void)
 {
-	register char  *tptr;
-	register int    cnt;
-	if (ptr == NULL)
-		return (NULL);
-	while ((*ptr == ' ') || (*ptr == '\t')) {
-		ptr++;
+	struct _dmapbuff *_dmap = __dmapbuff;
+
+	if (_dmap == NULL) {
+		_dmap = (struct _dmapbuff *)calloc((unsigned)1,
+		    (unsigned)sizeof (*__dmapbuff));
+		if (_dmap == NULL)
+			return (NULL);
+		DEVMAPS_FILE = "/etc/security/device_maps";
+		dmapf = NULL;
+		__dmapbuff = _dmap;
 	}
-	cnt = strlen(ptr);
-	if (cnt != 0) {
-		tptr = ptr + cnt - 1;
-		while ((*tptr == ' ') || (*tptr == '\t')) {
-			*tptr = '\0';
-			tptr--;
-		}
-	}
-	if (*ptr == NULL)
-		return (NULL);
-	return (ptr);
+
+	return (_dmap);
 }
+
 /*
- * scan string pointed to by pointer "p"
- * find next colin or end of line. Null it and
- * return pointer to next char.
+ * setdmapent -
+ *	rewinds the device_maps file to the beginning.
+ */
+void
+setdmapent(void)
+{
+	struct _dmapbuff *_dmap = _dmapalloc();
+
+	if (_dmap == NULL)
+		return;
+	if (dmapf == NULL)
+		dmapf = fopen(DEVMAPS_FILE, "r");
+	else
+		rewind(dmapf);
+}
+
+/*
+ * enddmapent -
+ *	closes device_maps file.
+ */
+void
+enddmapent(void)
+{
+	struct _dmapbuff *_dmap = _dmapalloc();
+
+	if (_dmap == NULL)
+		return;
+	if (dmapf != NULL) {
+		(void) fclose(dmapf);
+		dmapf = NULL;
+	}
+}
+
+void
+freedmapent(devmap_t *dmap)
+{
+	char	**darp;
+
+	if ((darp = dmap->dmap_devarray) != NULL) {
+		while (*darp != NULL)
+			free(*darp++);
+		free(dmap->dmap_devarray);
+		dmap->dmap_devarray = NULL;
+	}
+}
+
+/*
+ * setdmapfile -
+ *	changes the default device_maps file to the one specified.
+ *	It does not close the previous file. If this is desired, enddmapent
+ *	should be called prior to setdampfile.
+ */
+void
+setdmapfile(char *file)
+{
+	struct _dmapbuff *_dmap = _dmapalloc();
+
+	if (_dmap == NULL)
+		return;
+	if (dmapf != NULL) {
+		(void) fclose(dmapf);
+		dmapf = NULL;
+	}
+	DEVMAPS_FILE = file;
+}
+
+/*
+ * getdmapent -
+ * 	When first called, returns a pointer to the first devmap_t structure
+ * 	in device_maps; thereafter, it returns a pointer to the next devmap_t
+ *	structure in the file. Thus successive calls can be used to read the
+ *	entire file.
+ *	call to getdmapent should be bracketed by setdmapent and enddmapent.
+ * 	returns pointer to devmap_t found, else returns NULL if no entry found
+ * 	or on error.
+ */
+devmap_t *
+getdmapent(void)
+{
+	devmap_t		*dmap;
+	struct _dmapbuff 	*_dmap = _dmapalloc();
+
+	if ((_dmap == 0) || (dmapf == NULL))
+		return (NULL);
+
+	while (getdadmline(interpdmline, (int)sizeof (interpdmline),
+	    dmapf) != 0) {
+		if ((dmap = dmap_interpret(interpdmline,
+		    &interpdevmap)) == NULL)
+			continue;
+		return (dmap);
+	}
+
+	return (NULL);
+}
+
+/*
+ * getdmapnam -
+ *	searches from the beginning of device_maps for the device specified by
+ *	its name.
+ *	call to getdmapnam should be bracketed by setdmapent and enddmapent.
+ * 	returns pointer to devmapt_t for the device if it is found, else
+ * 	returns NULL if device not found or in case of error.
+ */
+devmap_t *
+getdmapnam(char *name)
+{
+	devmap_t		*dmap;
+	struct _dmapbuff	*_dmap = _dmapalloc();
+
+	if ((name == NULL) || (_dmap == 0) || (dmapf == NULL))
+		return (NULL);
+
+	while (getdadmline(interpdmline, (int)sizeof (interpdmline),
+	    dmapf) != 0) {
+		if (strstr(interpdmline, name) == NULL)
+			continue;
+		if ((dmap = dmap_interpretf(interpdmline,
+		    &interpdevmap)) == NULL)
+			continue;
+		if (dmap_matchname(dmap, name)) {
+			if ((dmap = dmap_dlexpand(dmap)) == NULL)
+				continue;
+			enddmapent();
+			return (dmap);
+		}
+		freedmapent(dmap);
+	}
+
+	return (NULL);
+}
+
+/*
+ * getdmapdev -
+ *	searches from the beginning of device_maps for the device specified by
+ *	its logical name.
+ *	call to getdmapdev should be bracketed by setdmapent and enddmapent.
+ * 	returns  pointer to the devmap_t for the device if device is found,
+ *	else returns NULL if device not found or on error.
+ */
+devmap_t *
+getdmapdev(char *dev)
+{
+	devmap_t		*dmap;
+	struct _dmapbuff	*_dmap = _dmapalloc();
+
+	if ((dev == NULL) || (_dmap == 0) || (dmapf == NULL))
+		return (NULL);
+
+	while (getdadmline(interpdmline, (int)sizeof (interpdmline),
+	    dmapf) != 0) {
+		if ((dmap = dmap_interpret(interpdmline,
+		    &interpdevmap)) == NULL)
+			continue;
+		if (dmap_matchdev(dmap, dev)) {
+			enddmapent();
+			return (dmap);
+		}
+		freedmapent(dmap);
+	}
+
+	return (NULL);
+}
+
+/*
+ * getdmaptype -
+ *	searches from the beginning of device_maps for the device specified by
+ *	its type.
+ *	call to getdmaptype should be bracketed by setdmapent and enddmapent.
+ * 	returns pointer to devmap_t found, else returns NULL if no entry found
+ * 	or on error.
+ */
+devmap_t *
+getdmaptype(char *type)
+{
+	devmap_t		*dmap;
+	struct _dmapbuff	*_dmap = _dmapalloc();
+
+	if ((type == NULL) || (_dmap == 0) || (dmapf == NULL))
+		return (NULL);
+
+	while (getdadmline(interpdmline, (int)sizeof (interpdmline),
+	    dmapf) != 0) {
+		if ((dmap = dmap_interpretf(interpdmline,
+		    &interpdevmap)) == NULL)
+			continue;
+		if (dmap->dmap_devtype != NULL &&
+		    strcmp(type, dmap->dmap_devtype) == 0) {
+			if ((dmap = dmap_dlexpand(dmap)) == NULL)
+				continue;
+			return (dmap);
+		}
+		freedmapent(dmap);
+	}
+
+	return (NULL);
+}
+
+/*
+ * dmap_matchdev -
+ * 	checks if the specified devmap_t is for the device specified.
+ *	returns 1 if it is, else returns 0.
+ */
+int
+dmap_matchdev(devmap_t *dmap, char *dev)
+{
+	char **dva;
+	char *dv;
+
+	if (dmap->dmap_devarray == NULL)
+		return (0);
+	for (dva = dmap->dmap_devarray; (dv = *dva) != NULL; dva ++) {
+		if (strcmp(dv, dev) == 0)
+			return (1);
+	}
+
+	return (0);
+}
+
+/*
+ * dmap_matchtype -
+ *	checks if the specified devmap_t is for the device specified.
+ *	returns 1 if it is, else returns 0.
+ */
+int
+dmap_matchtype(devmap_t *dmap, char *type)
+{
+	if ((dmap->dmap_devtype == NULL) || (type == NULL))
+		return (0);
+
+	return ((strcmp(dmap->dmap_devtype, type) == 0));
+}
+
+/*
+ * dmap_matchname -
+ * 	checks if the specified devmap_t is for the device specified.
+ * 	returns 1 if it is, else returns 0.
+ */
+int
+dmap_matchname(devmap_t *dmap, char *name)
+{
+	if (dmap->dmap_devname == NULL)
+		return (0);
+
+	return ((strcmp(dmap->dmap_devname, name) == 0));
+}
+
+/*
+ * dm_match -
+ *	calls dmap_matchname or dmap_matchtype as appropriate.
+ */
+int
+dm_match(devmap_t *dmap, da_args *dargs)
+{
+	if (dargs->devinfo->devname)
+		return (dmap_matchname(dmap, dargs->devinfo->devname));
+	else if (dargs->devinfo->devtype)
+		return (dmap_matchtype(dmap, dargs->devinfo->devtype));
+
+	return (0);
+}
+
+/*
+ * dmap_interpret -
+ *	calls dmap_interpretf and dmap_dlexpand to parse devmap_t line.
+ *	returns  pointer to parsed devmapt_t entry, else returns NULL on error.
+ */
+devmap_t  *
+dmap_interpret(char *val, devmap_t *dm)
+{
+	if (dmap_interpretf(val, dm) == NULL)
+		return (NULL);
+
+	return (dmap_dlexpand(dm));
+}
+
+/*
+ * dmap_interpretf -
+ * 	parses string "val" and initializes pointers in the given devmap_t to
+ * 	fields in "val".
+ * 	returns pointer to updated devmap_t.
+ */
+static devmap_t  *
+dmap_interpretf(char *val, devmap_t *dm)
+{
+	dm->dmap_devname = getdadmfield(val, KV_TOKEN_DELIMIT);
+	dm->dmap_devtype = getdadmfield(NULL, KV_TOKEN_DELIMIT);
+	dm->dmap_devlist = getdadmfield(NULL, KV_TOKEN_DELIMIT);
+	dm->dmap_devarray = NULL;
+	if (dm->dmap_devname == NULL ||
+	    dm->dmap_devtype == NULL ||
+	    dm->dmap_devlist == NULL)
+		return (NULL);
+
+	return (dm);
+}
+
+/*
+ * dmap_dlexpand -
+ * 	expands dmap_devlist of the form `devlist_generate`
+ *	returns unexpanded form if there is no '\`' or in case of error.
+ */
+static devmap_t *
+dmap_dlexpand(devmap_t *dmp)
+{
+	char	tmplist[DA_BUFSIZE + 1];
+	char	*cp, *cpl, **darp;
+	int	count;
+	FILE	*expansion;
+
+	dmp->dmap_devarray = NULL;
+	if (dmp->dmap_devlist == NULL)
+		return (NULL);
+	if (*(dmp->dmap_devlist) != '`') {
+		(void) strcpy(tmplist, dmp->dmap_devlist);
+	} else {
+		(void) strcpy(tmplist, dmp->dmap_devlist + 1);
+		if ((cp = strchr(tmplist, '`')) != NULL)
+			*cp = '\0';
+		if ((expansion = popen(tmplist, "r")) == NULL)
+			return (NULL);
+		count = fread(tmplist, 1, sizeof (tmplist) - 1, expansion);
+		(void) pclose(expansion);
+		tmplist[count] = '\0';
+	}
+
+	/* cleanup the list */
+	count = pack_white(tmplist);
+	dmp->dmap_devarray = darp =
+	    (char **)malloc((count + 2) * sizeof (char *));
+	if (darp == NULL)
+		return (NULL);
+	cp = tmplist;
+	while ((cp = strtok_r(cp, " ", &cpl)) != NULL) {
+		*darp = strdup(cp);
+		if (*darp == NULL) {
+			freedmapent(dmp);
+			return (NULL);
+		}
+		darp++;
+		cp = NULL;
+	}
+	*darp = NULL;
+
+	return (dmp);
+}
+
+/*
+ * dmapskip -
+ * 	scans input string to find next colon or end of line.
+ *	returns pointer to next char.
  */
 static char *
-dmapskip(register char *p)
+dmapskip(char *p)
 {
 	while (*p && *p != ':' && *p != '\n')
 		++p;
@@ -94,99 +443,32 @@ dmapskip(register char *p)
 		*p = '\0';
 	else if (*p != '\0')
 		*p++ = '\0';
+
 	return (p);
 }
+
 /*
- * scan string pointed to by pointer "p"
- * find next colin or end of line. Null it and
- * return pointer to next char.
+ * dmapdskip -
+ * 	scans input string to find next space or end of line.
+ *	returns pointer to next char.
  */
 static char *
-dmapdskip(register char *p)
+dmapdskip(p)
+	register char *p;
 {
 	while (*p && *p != ' ' && *p != '\n')
 		++p;
 	if (*p != '\0')
 		*p++ = '\0';
+
 	return (p);
 }
 
-/*
- * _dmapalloc() allocates common buffers and structures used by the device
- * maps library routines. Then returns a pointer to a structure.  The
- * returned pointer will be null if there is an error condition.
- */
-static struct _dmapbuff *
-_dmapalloc(void)
-{
-	register struct _dmapbuff *_dmap = __dmapbuff;
-
-	if (_dmap == 0) {
-		_dmap = (struct _dmapbuff *)
-			calloc((unsigned)1, (unsigned)sizeof (*__dmapbuff));
-		if (_dmap == 0)
-			return (0);
-		DEVMAP = "/etc/security/device_maps";
-		__dmapbuff = _dmap;
-	}
-	return (__dmapbuff);
-}
-/*
- * getdmapline(buff,len,stream) reads one device maps line from "stream" into
- * "buff" on "len" bytes.  Continued lines from "stream" are concatinated
- * into one line in "buff". Comments are removed from "buff". The number of
- * characters in "buff" is returned.  If no characters are read or an error
- * occured then "0" is returned
- */
-static int
-getdmapline(char *buff, int len, FILE *stream)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	char *cp;
-	char *ccp;
-	size_t tmpcnt;
-	int charcnt = 0;
-	int fileerr = 0;
-	int contline;
-	if (_dmap == 0)
-		return (0);
-	do {
-		cp = buff;
-		*cp = NULL;
-		do {
-			if ((len - charcnt <= 1) ||
-			    (fgets(cp, len - charcnt, stream) == NULL)) {
-				fileerr = 1;
-				break;
-			}
-			ccp = strpbrk(cp, "\\\n");
-			if (ccp != NULL) {
-				if (*ccp == '\\')
-					contline = 1;
-				else
-					contline = 0;
-				*ccp = NULL;
-			}
-			tmpcnt = strlen(cp);
-			if (tmpcnt != 0) {
-				cp += tmpcnt;
-				charcnt += tmpcnt;
-			}
-		} while ((contline) || (charcnt == 0));
-		ccp = strpbrk(buff, "#");
-		if (ccp != NULL)
-			*ccp = NULL;
-		charcnt = strlen(buff);
-	} while ((fileerr == 0) && (charcnt == 0));
-	if (fileerr && !charcnt)
-		return (0);
-	else
-		return (charcnt);
-}
-char
-*getdmapfield(char *ptr)
+char *
+getdmapfield(char *ptr)
 {
 	static	char	*tptr;
+
 	if (ptr == NULL)
 		ptr = tptr;
 	if (ptr == NULL)
@@ -197,10 +479,12 @@ char
 		return (NULL);
 	if (*ptr == NULL)
 		return (NULL);
+
 	return (ptr);
 }
-char
-*getdmapdfield(char *ptr)
+
+char *
+getdmapdfield(char *ptr)
 {
 	static	char	*tptr;
 	if (ptr != NULL) {
@@ -215,251 +499,6 @@ char
 		return (NULL);
 	if (*ptr == NULL)
 		return (NULL);
+
 	return (ptr);
-}
-/*
- * getdmapdev(dev) searches from the beginning of the file until a logical
- * device matching "dev" is found and returns a pointer to the particular
- * structure in which it was found.  If an EOF or an error is encountered on
- * reading, these functions return a NULL pointer.
- */
-devmap_t *
-getdmapdev(register char  *name)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	devmap_t *dmap;
-	char line[BUFSIZ + 1];
-
-	if (_dmap == 0)
-		return (0);
-	setdmapent();
-	if (!dmapf)
-		return (NULL);
-	while (getdmapline(line, (int)sizeof (line), dmapf) != 0) {
-		if ((dmap = interpret(line)) == NULL)
-			continue;
-		if (matchdev(&dmap, name)) {
-			enddmapent();
-			return (dmap);
-		}
-	}
-	enddmapent();
-	return (NULL);
-}
-/*
- * getdmapnam(name) searches from the beginning of the file until a audit-name
- * matching "name" is found and returns a pointer to the particular structure
- * in which it was found.  If an EOF or an error is encountered on reading,
- * these functions return a NULL pointer.
- */
-devmap_t *
-getdmapnam(register char  *name)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	devmap_t *dmap;
-	char line[BUFSIZ + 1];
-
-	if (_dmap == 0)
-		return (0);
-	setdmapent();
-	if (!dmapf)
-		return (NULL);
-	while (getdmapline(line, (int)sizeof (line), dmapf) != 0) {
-		if ((dmap = interpret(line)) == NULL)
-			continue;
-		if (matchname(&dmap, name)) {
-			enddmapent();
-			return (dmap);
-		}
-	}
-	enddmapent();
-	return (NULL);
-}
-
-/*
- * setdmapent() essentially rewinds the device_maps file to the begining.
- */
-
-void
-setdmapent(void)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-
-
-	if (_dmap == 0)
-		return;
-
-	if (dmapf == NULL) {
-		dmapf = fopen(DEVMAP, "r");
-	} else
-		rewind(dmapf);
-}
-
-
-/*
- * enddmapent() may be called to close the device_maps file when processing
- * is complete.
- */
-
-void
-enddmapent(void)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-
-	if (_dmap == 0)
-		return;
-	if (dmapf != NULL) {
-		(void) fclose(dmapf);
-		dmapf = NULL;
-	}
-}
-
-
-/*
- * setdmapfile(name) changes the default device_maps file to "name" thus
- * allowing alternate device_maps files to be used.  Note: it does not
- * close the previous file . If this is desired, enddmapent should be called
- * prior to it.
- */
-void
-setdmapfile(char *file)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-
-	if (_dmap == 0)
-		return;
-	if (dmapf != NULL) {
-		(void) fclose(dmapf);
-		dmapf = NULL;
-	}
-	DEVMAP = file;
-}
-/*
- * getdmaptype(tp) When first called, returns a pointer to the
- * first devmap_t structure in the file with device-type matching
- * "tp"; thereafter, it returns a pointer to the next devmap_t
- * structure in the file with device-type matching "tp".
- * Thus successive calls can be used to search the
- * entire file for entries having device-type matching "tp".
- * A null pointer is returned on error.
- */
-devmap_t *
-getdmaptype(char *tp)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	char line1[BUFSIZ + 1];
-	devmap_t *dmap;
-
-	if (_dmap == 0)
-		return (0);
-	if (dmapf == NULL && (dmapf = fopen(DEVMAP, "r")) == NULL) {
-		return (NULL);
-	}
-	do {
-		if (getdmapline(line1, (int)sizeof (line1), dmapf) == 0)
-			return (NULL);
-
-		if ((dmap = interpret(line1)) == NULL)
-			return (NULL);
-	} while (strcmp(tp, dmap->dmap_devtype) != 0);
-	return (dmap);
-}
-
-/*
- * getdmapent() When first called, returns a pointer to the first devmap_t
- * structure in the file; thereafter, it returns a pointer to the next devmap_t
- * structure in the file. Thus successive calls can be used to search the
- * entire file.  A null pointer is returned on error.
- */
-devmap_t *
-getdmapent(void)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	char line1[BUFSIZ + 1];
-	devmap_t *dmap;
-
-	if (_dmap == 0)
-		return (0);
-	if (dmapf == NULL && (dmapf = fopen(DEVMAP, "r")) == NULL) {
-		return (NULL);
-	}
-	if (getdmapline(line1, (int)sizeof (line1), dmapf) == 0)
-		return (NULL);
-
-	if ((dmap = interpret(line1)) == NULL)
-		return (NULL);
-	return (dmap);
-}
-/*
- * matchdev(dmapp,dev) The dev_list in the structure pointed to by "dmapp" is
- * searched for string "dev".  If a match occures then a "1" is returned
- * otherwise a "0" is returned.
- */
-static int
-matchdev(devmap_t **dmapp, char *dev)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	devmap_t *dmap = *dmapp;
-	char tmpdev[BUFSIZ + 1];
-	int charcnt;
-	int tmpcnt;
-	char *cp;
-	char *tcp;
-	char *last;
-	charcnt = strlen(dev);
-	if (_dmap == 0)
-		return (0);
-	if (dmap->dmap_devlist == NULL)
-		return (0);
-	(void) strcpy(tmpdev, dmap->dmap_devlist);
-	tcp = tmpdev;
-	while ((cp = strtok_r(tcp, " ", &last)) != NULL) {
-		tcp = NULL;
-		tmpcnt = strlen(cp);
-		if (tmpcnt != charcnt)
-			continue;
-		if (strcmp(cp, dev) == 0)
-			return (1);
-	}
-	return (0);
-}
-/*
- * matchname(dmapp,name) The audit-name in the structure pointed to by "dmapp"
- * is searched for string "name".  If a match occures then a "1" is returned
- * otherwise a "0" is returned.
- */
-static int
-matchname(devmap_t **dmapp, char *name)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-	devmap_t *dmap = *dmapp;
-
-	if (_dmap == 0)
-		return (0);
-	if (dmap->dmap_devname == NULL)
-		return (0);
-	if (strlen(dmap->dmap_devname) != strlen(name))
-		return (0);
-	if (strcmp(dmap->dmap_devname, name) == 0)
-		return (1);
-	return (0);
-}
-/*
- * interpret(val) string "val" is parsed and the pointers in a devmap_t
- * structure are initialized to point to fields in "val". A pointer to this
- * structure is returned.
- */
-static devmap_t  *
-interpret(char *val)
-{
-	register struct _dmapbuff *_dmap = _dmapalloc();
-
-	if (_dmap == 0)
-		return (0);
-	(void) strcpy(interpline, val);
-	interpdevmap.dmap_devname = getdmapfield(interpline);
-	interpdevmap.dmap_devtype = getdmapfield((char *)NULL);
-	interpdevmap.dmap_devlist = getdmapfield((char *)NULL);
-
-	return (&interpdevmap);
 }

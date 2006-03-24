@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
@@ -49,11 +49,11 @@
 #include <inet/ipsecah.h>
 #include "snoop.h"
 
-extern char *dlc_header;
-
+/* ARGSUSED */
 int
 interpret_esp(int flags, uint8_t *hdr, int iplen, int fraglen)
 {
+	/* LINTED: alignment */
 	esph_t *esph = (esph_t *)hdr;
 	esph_t *aligned_esph;
 	esph_t storage;	/* In case hdr isn't aligned. */
@@ -104,6 +104,7 @@ interpret_esp(int flags, uint8_t *hdr, int iplen, int fraglen)
 int
 interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 {
+	/* LINTED: alignment */
 	ah_t *ah = (ah_t *)hdr;
 	ah_t *aligned_ah;
 	ah_t storage;	/* In case hdr isn't aligned. */
@@ -118,7 +119,7 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 
 	if (!IS_P2ALIGNED(hdr, 4)) {
 		aligned_ah = (ah_t *)&storage;
-		bcopy(hdr, storage, sizeof (ah_t));
+		bcopy(hdr, &storage, sizeof (ah_t));
 	} else {
 		aligned_ah = ah;
 	}
@@ -197,6 +198,7 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 	if (fraglen > 0)
 		switch (proto) {
 			case IPPROTO_ENCAP:
+				/* LINTED: alignment */
 				(void) interpret_ip(flags, (struct ip *)data,
 				    new_iplen);
 				break;
@@ -205,27 +207,33 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 				    new_iplen);
 				break;
 			case IPPROTO_ICMP:
-				interpret_icmp(flags, (struct icmp *)data,
-				    new_iplen, fraglen);
+				(void) interpret_icmp(flags,
+				    /* LINTED: alignment */
+				    (struct icmp *)data, new_iplen, fraglen);
 				break;
 			case IPPROTO_ICMPV6:
-				interpret_icmpv6(flags, (icmp6_t *)data,
+				/* LINTED: alignment */
+				(void) interpret_icmpv6(flags, (icmp6_t *)data,
 				    new_iplen, fraglen);
 				break;
 			case IPPROTO_TCP:
-				interpret_tcp(flags, data, new_iplen, fraglen);
+				(void) interpret_tcp(flags,
+				    (struct tcphdr *)data, new_iplen, fraglen);
 				break;
 
 			case IPPROTO_ESP:
-				interpret_esp(flags, data, new_iplen, fraglen);
-				break;
-			case IPPROTO_AH:
-				interpret_ah(flags, data, new_iplen, fraglen);
+				(void) interpret_esp(flags, data, new_iplen,
+				    fraglen);
 				break;
 
+			case IPPROTO_AH:
+				(void) interpret_ah(flags, data, new_iplen,
+				    fraglen);
+				break;
 
 			case IPPROTO_UDP:
-				interpret_udp(flags, data, new_iplen, fraglen);
+				(void) interpret_udp(flags,
+				    (struct udphdr *)data, new_iplen, fraglen);
 				break;
 			/* default case is to not print anything else */
 		}

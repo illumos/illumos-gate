@@ -111,6 +111,9 @@ usb/clients/printer/%.check:  usb/clients/printer/%.h
 rsm/%.check:	rsm/%.h
 	$(DOT_H_CHECK)
 
+tsol/%.check:	tsol/%.h
+	$(DOT_H_CHECK)
+
 ROOTDIR=	$(ROOT)/usr/include/sys
 
 ROOTDKTPDIR=	$(ROOTDIR)/dktp
@@ -162,6 +165,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients/ugen  \
 	$(ROOTDIR)/1394         \
 	$(ROOTDIR)/rsm		\
+	$(ROOTDIR)/tsol		\
 	$($(MACH)_ROOTDIRS)
 
 
@@ -234,6 +238,7 @@ ROOTI2OHDRS= $(I2OHDRS:%=$(ROOTDIR)/i2o/%)
 ROOTHOTPLUGHDRS= $(HOTPLUGHDRS:%=$(ROOTDIR)/hotplug/%)
 ROOTHOTPLUGPCIHDRS= $(HOTPLUGPCIHDRS:%=$(ROOTDIR)/hotplug/pci/%)
 
+ROOTTSOLHDRS= $(TSOLHDRS:%=$(ROOTDIR)/tsol/%)
 
 sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
 		$(ROOTFCHDRS) $(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
@@ -338,6 +343,9 @@ $(ROOTDIR)/1394/%:                    1394/%
 	$(INS.file)
 
 $(ROOTDIR)/rsm/%:	rsm/%
+	$(INS.file)
+
+$(ROOTDIR)/tsol/%:	tsol/%
 	$(INS.file)
 
 $(ROOTDIRS):

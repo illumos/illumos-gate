@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,8 +268,8 @@ extern	int	ndp_resolver(ill_t *, const in6_addr_t *, mblk_t *, zoneid_t);
 extern	int	ndp_sioc_update(ill_t *, lif_nd_req_t *);
 extern	boolean_t	ndp_verify_optlen(nd_opt_hdr_t *, int);
 extern	void	ndp_timer(void *);
-extern	void	ndp_walk(ill_t *, pfi_t, uchar_t *);
-extern	void	ndp_walk_impl(ill_t *, pfi_t, uchar_t *, boolean_t);
+extern	void	ndp_walk(ill_t *, pfi_t, void *);
+extern	void	ndp_walk_impl(ill_t *, pfi_t, void *, boolean_t);
 extern	int	ndp_add(ill_t *, uchar_t *, const in6_addr_t *,
 		    const in6_addr_t *, const in6_addr_t *,
 		    uint32_t, uint16_t, uint16_t, nce_t **);

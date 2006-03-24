@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include	<fcntl.h>
 #include	<dirent.h>
 #include	<string.h>
+#include	<strings.h>
 #include	<errno.h>
 #include	<rmmount.h>
 #include	<locale.h>
@@ -46,6 +47,11 @@
 #include	<string.h>
 #include	<regex.h>
 #include	<ctype.h>
+#include	<zone.h>
+#include	<libcontract.h>
+#include	<sys/contract/process.h>
+#include	<sys/ctfs.h>
+#include	<pwd.h>
 #include	"rmm_int.h"
 
 extern int	audio_only(struct action_arg *);
@@ -65,6 +71,13 @@ struct ident_list **	ident_list = NULL;
 struct action_list **	action_list = NULL;
 char			*prog_name = NULL;
 pid_t			prog_pid = 0;
+
+int		system_labeled = 0;
+uid_t		mnt_uid = -1;
+gid_t		mnt_gid = -1;
+zoneid_t	mnt_zoneid = -1;
+char		mnt_zoneroot[MAXPATHLEN];
+char		mnt_userdir[MAXPATHLEN];
 
 #define	DEFAULT_CONFIG	"/etc/rmmount.conf"
 #define	DEFAULT_DSODIR	"/usr/lib/rmmount"
@@ -160,6 +173,8 @@ main(int argc, char **argv)
 	char			*volume_path;
 	char			*volume_pcfs_id;
 	char			*volume_symdev;
+	char			*volume_zonename;
+	char			*volume_user;
 
 	/*
 	 * Make sure core files appear in a volmgt directory.
@@ -190,6 +205,10 @@ main(int argc, char **argv)
 		return (-1);
 	}
 
+	system_labeled = is_system_labeled();
+	mnt_zoneroot[0] = '\0';
+	mnt_userdir[0] = '\0';
+
 	while ((c = getopt(argc, argv, "d:c:D")) != EOF) {
 		switch (c) {
 		case 'D':
@@ -215,6 +234,11 @@ main(int argc, char **argv)
 	volume_path = getenv("VOLUME_PATH");
 	volume_pcfs_id = getenv("VOLUME_PCFS_ID");
 	volume_symdev = getenv("VOLUME_SYMDEV");
+
+	if (system_labeled) {
+		volume_zonename = getenv("VOLUME_ZONE_NAME");
+		volume_user = getenv("VOLUME_USER");
+	}
 
 	if (volume_action == NULL) {
 		dprintf("%s(%ld): VOLUME_ACTION was null!!\n",
@@ -248,6 +272,43 @@ main(int argc, char **argv)
 		return (-1);
 	}
 
+	if (system_labeled) {
+		if (volume_zonename != NULL &&
+		    strcmp(volume_zonename, GLOBAL_ZONENAME) != 0) {
+			if ((mnt_zoneid =
+			    getzoneidbyname(volume_zonename)) != -1) {
+				if (zone_getattr(mnt_zoneid, ZONE_ATTR_ROOT,
+				    mnt_zoneroot, MAXPATHLEN) == -1) {
+					dprintf("%s(%ld): NO ZONEPATH!!\n",
+					    prog_name, prog_pid);
+					return (-1);
+				}
+			}
+		} else {
+			mnt_zoneid = GLOBAL_ZONEID;
+			mnt_zoneroot[0] = '\0';
+		}
+		if (volume_user != NULL) {
+			struct passwd	 *pw;
+
+			if ((pw = getpwnam(volume_user)) == NULL) {
+				dprintf("%s(%ld) %s\n", prog_name, prog_pid,
+				    ": VOLUME_USER was not a valid user!");
+				return (-1);
+			}
+			mnt_uid = pw->pw_uid;
+			mnt_gid = pw->pw_gid;
+
+			if (snprintf(mnt_userdir, sizeof (mnt_userdir),
+			    "/%s-%s", volume_user, volume_symdev) >=
+			    sizeof (mnt_userdir))
+				return (-1);
+		} else {
+			mnt_uid = 0;
+			mnt_userdir[0] = '\0';
+		}
+	}
+
 	dprintf("%s[%d]: VOLUME_NAME = %s\n", __FILE__, __LINE__, volume_name);
 	dprintf("%s[%d]: VOLUME_PATH = %s\n", __FILE__, __LINE__, volume_path);
 	dprintf("%s[%d]: VOLUME_ACTION = %s\n", __FILE__, __LINE__,
@@ -260,6 +321,12 @@ main(int argc, char **argv)
 		volume_mount_mode);
 	dprintf("%s[%d]: VOLUME_PCFS_ID = %s\n", __FILE__, __LINE__,
 		volume_pcfs_id);
+	if (system_labeled) {
+		dprintf("%s[%d]: VOLUME_ZONE_NAME = %s\n", __FILE__, __LINE__,
+		    volume_zonename);
+		dprintf("%s[%d]: VOLUME_USER = %s\n", __FILE__, __LINE__,
+		    volume_user);
+	}
 
 	/*
 	 * Read in the configuration file to build
@@ -318,7 +385,11 @@ main(int argc, char **argv)
 		}
 		ai = 0;
 		while ((aa[ai] != NULL) && (aa[ai]->aa_path != NULL)) {
-			aa[ai]->aa_type = "unknown";
+			if (system_labeled &&
+			    (strcmp(volume_mediatype, "rmdisk") == 0))
+				aa[ai]->aa_type = "pcfs";
+			else
+				aa[ai]->aa_type = "unknown";
 			ai++;
 		}
 	}
@@ -688,20 +759,76 @@ exec_actions(struct action_arg **aa, bool_t premount)
 				action_list[i]->a_action = act_func;
 			}
 			if (act_func != NULL) {
-				dprintf("%s[%d]: executing action() in %s\n",
-					__FILE__, __LINE__,
-					action_list[i]->a_dsoname);
-				retval = (*act_func)(aa,
-					action_list[i]->a_argc,
-					action_list[i]->a_argv);
-				dprintf("%s[%d]: action() returns %d\n",
-					__FILE__, __LINE__, retval);
-				/*
-				 * If action returns 0, no further actions
-				 * will be executed. (see rmmount.conf(4))
-				 */
-				if (retval == 0)
+			    if (!premount && mnt_zoneid > GLOBAL_ZONEID) {
+				pid_t	pid;
+				int	status;
+				int	ifx;
+				int	tmpl_fd;
+				int err = 0;
+
+				tmpl_fd = open64(CTFS_ROOT "/process/template",
+				    O_RDWR);
+				if (tmpl_fd == -1)
 					break;
+
+				/*
+				 * Deliver no events, don't inherit,
+				 * and allow it to be orphaned.
+				 */
+				err |= ct_tmpl_set_critical(tmpl_fd, 0);
+				err |= ct_tmpl_set_informative(tmpl_fd, 0);
+				err |= ct_pr_tmpl_set_fatal(tmpl_fd,
+				    CT_PR_EV_HWERR);
+				err |= ct_pr_tmpl_set_param(tmpl_fd,
+				    CT_PR_PGRPONLY |
+				    CT_PR_REGENT);
+				if (err || ct_tmpl_activate(tmpl_fd)) {
+					(void) close(tmpl_fd);
+					break;
+				}
+				switch (pid = fork1()) {
+				case 0:
+					(void) ct_tmpl_clear(tmpl_fd);
+					for (ifx = 0; ifx < _NFILE; ifx++)
+						(void) close(ifx);
+
+					if (zone_enter(mnt_zoneid) == -1)
+						_exit(0);
+					(void) (*act_func)(aa,
+						action_list[i]->a_argc,
+						action_list[i]->a_argv);
+					_exit(0);
+				case -1:
+					dprintf("fork1 failed \n ");
+					break;
+				default :
+					(void) ct_tmpl_clear(tmpl_fd);
+					(void) close(tmpl_fd);
+					if (waitpid(pid, &status, 0) < 0) {
+						dprintf("%s(%ld): waitpid() "
+						    "failed (errno %d) \n",
+						    prog_name, prog_pid, errno);
+						break;
+					}
+				    }
+				} else {
+					dprintf("%s[%d]: executing action() "
+					    "in %s\n",
+					    __FILE__, __LINE__,
+					    action_list[i]->a_dsoname);
+					retval = (*act_func)(aa,
+						action_list[i]->a_argc,
+						action_list[i]->a_argv);
+					dprintf("%s[%d]: action() returns %d\n",
+					    __FILE__, __LINE__, retval);
+					/*
+					 * If action returns 0, no further
+					 * actions will be executed.
+					 * (see rmmount.conf(4))
+					 */
+					if (retval == 0)
+						break;
+				}
 			}
 		}
 		i++;
@@ -874,7 +1001,6 @@ exec_mounts(struct action_arg **aa)
 				if (aa[ai]->aa_mountpoint)
 					mnt_ai = ai;
 			}
-
 			if (ma[CMD_SHARE] != NULL) {
 				/*
 				 * export the file system.
@@ -904,10 +1030,17 @@ exec_mounts(struct action_arg **aa)
 			(void) symlink(aa[mnt_ai]->aa_mountpoint, symname);
 		}
 #else	/* !OLD_SLICE_HANDLING_CODE */
-		(void) snprintf(symcontents, sizeof (symcontents),
-			"./%s", name);
-		(void) snprintf(symname, sizeof (symname),
-			"/%s/%s", aa[mnt_ai]->aa_media, symdev);
+		if (system_labeled) {
+			(void) snprintf(symcontents, sizeof (symcontents),
+			    ".%s/%s", mnt_userdir, name);
+			(void) snprintf(symname, sizeof (symname), "%s/%s/%s",
+			    mnt_zoneroot, aa[mnt_ai]->aa_media, symdev);
+		} else {
+			(void) snprintf(symcontents, sizeof (symcontents),
+			    "./%s", name);
+			(void) snprintf(symname, sizeof (symname),
+			    "/%s/%s", aa[mnt_ai]->aa_media, symdev);
+		}
 		(void) unlink(symname);
 		(void) symlink(symcontents, symname);
 #endif	/* !OLD_SLICE_HANDLING_CODE */
@@ -957,10 +1090,9 @@ exec_umounts(struct action_arg **aa)
 
 		dprintf("%s[%d]: mount path = %s\n",
 			__FILE__, __LINE__, mnt_path);
-
-		if ((mountpoint = getmntpoint(mnt_path)) == NULL) {
+		if ((mountpoint = getmntpoint(mnt_path)) == NULL)
 			continue;
-		}
+
 		/*
 		 * find the right mount arguments for this device
 		 */
@@ -1006,7 +1138,6 @@ exec_umounts(struct action_arg **aa)
 		if (ma != NULL) {
 			unshare_mount(aa[ai], ma);
 		}
-
 		/*
 		 * do the actual umount
 		 */
@@ -1020,13 +1151,11 @@ exec_umounts(struct action_arg **aa)
 		}
 
 		/* save a good mountpoint */
-		if (oldmountpoint == NULL) {
+		if (oldmountpoint == NULL)
 			oldmountpoint = strdup(mountpoint);
-		}
 		free(mountpoint);
 		mountpoint = NULL;
 	}
-
 	/*
 	 * clean up our directories and such if all went well
 	 */
@@ -1053,28 +1182,60 @@ exec_umounts(struct action_arg **aa)
 		 * try to remove the symlink
 		 */
 
-		if (snprintf(rmm_mountpoint, sizeof (rmm_mountpoint),
-			"/%s/%s", aa[0]->aa_media, volume_name)
-				>= sizeof (rmm_mountpoint))
-			success = FALSE;
-
-		if (success && (oldmountpoint != NULL) &&
-		    (strcmp(oldmountpoint, rmm_mountpoint) == 0)) {
+		if (system_labeled) {
+			/* Prefix with zoneroot and userdir */
+			if (snprintf(rmm_mountpoint, MAXPATHLEN, "%s/%s%s/%s",
+			    mnt_zoneroot, aa[0]->aa_media, mnt_userdir,
+			    volume_name) >= MAXPATHLEN)
+				success = FALSE;
+		} else {
+			if (snprintf(rmm_mountpoint, sizeof (rmm_mountpoint),
+			    "/%s/%s", aa[0]->aa_media, volume_name)
+			    >= sizeof (rmm_mountpoint))
+				success = FALSE;
+		}
+		if ((system_labeled && success) ||
+		(success && (oldmountpoint != NULL) &&
+		    (strcmp(oldmountpoint, rmm_mountpoint) == 0))) {
 			char    symname[MAXNAMELEN];
 
 			/* remove volmgt mount point */
-			(void) rmdir(oldmountpoint);
+			if (oldmountpoint)
+				(void) rmdir(oldmountpoint);
+			if (system_labeled && (strlen(mnt_userdir) > 0)) {
+				char *p = NULL;
+
+				/*
+				 * We may also need to remove the
+				 * user's private directory which
+				 * we created during mount.
+				 */
+				(void) rmdir(rmm_mountpoint);
+				if (p = rindex(rmm_mountpoint, '/')) {
+					*p = '\0';
+					(void) rmdir(rmm_mountpoint);
+				}
+			}
 
 			/* remove symlink (what harm if it does not exist?) */
-			if (snprintf(symname, sizeof (symname), "/%s/%s",
-				aa[0]->aa_media, symdev) >= sizeof (symname)) {
-				success = FALSE;
+			if (system_labeled) {
+				/* Prefix with zoneroot */
+				if (snprintf(symname, sizeof (symname),
+				    "%s/%s/%s",
+				    mnt_zoneroot, aa[0]->aa_media, symdev)
+				    >= sizeof (symname))
+					success = FALSE;
+			} else {
+				if (snprintf(symname, sizeof (symname),
+				    "/%s/%s",
+				    aa[0]->aa_media, symdev)
+				    >= sizeof (symname))
+					success = FALSE;
 			}
 			if (success)
 				(void) unlink(symname);
 		}
 	}
-
 	if (oldmountpoint != NULL) {
 		free(oldmountpoint);
 	}
@@ -1249,7 +1410,8 @@ hard_mount(struct action_arg *aa, struct mount_args *ma, bool_t *rdonly)
 	 */
 	char		*targ_dir;
 	char		options[RMM_OPTSTRLEN];	/* mount option string */
-	char		*mountpoint = NULL;
+	char		mountpoint[MAXPATHLEN];
+	char		*zonemountpoint;
 	int		mountpoint_bufcount = 0;
 	struct stat 	sb;
 	mode_t		mpmode;
@@ -1330,32 +1492,44 @@ hard_mount(struct action_arg *aa, struct mount_args *ma, bool_t *rdonly)
 		return (FALSE);
 	}
 
-	if (aa->aa_partname) {
-		mountpoint_bufcount = strlen(aa->aa_media) +
-			strlen(targ_dir) + strlen(aa->aa_partname) + 3 + 1;
-		/* 1 - for NULL terminator, 3 - for "/"s */
-		mountpoint = malloc(mountpoint_bufcount);
-		if (mountpoint == NULL) {
-			(void) fprintf(stderr,
-				gettext("%s(%ld) error: malloc failed\n"),
-				prog_name, prog_pid);
+	if (system_labeled && (strlen(mnt_userdir) > 0)) {
+		if (snprintf(mountpoint, MAXPATHLEN, "%s/%s%s",
+		    mnt_zoneroot, aa->aa_media, mnt_userdir) > MAXPATHLEN) {
 			return (FALSE);
+
 		}
-		(void) sprintf(mountpoint, "/%s/%s/%s", aa->aa_media,
-		    targ_dir, aa->aa_partname);
-	} else {
-		mountpoint_bufcount = strlen(aa->aa_media) +
-			strlen(targ_dir) + 2 + 1;
-		/* 1 - for NULL terminator, 2 - for "/"s */
-		mountpoint = malloc(mountpoint_bufcount);
-		if (mountpoint == NULL) {
-			(void) fprintf(stderr,
-				gettext("%s(%ld) error: malloc failed\n"),
-				prog_name, prog_pid);
-			return (FALSE);
-		}
-		(void) sprintf(mountpoint, "/%s/%s", aa->aa_media, targ_dir);
+		(void) makepath(mountpoint, 0700);
+		(void) chown(mountpoint, mnt_uid, mnt_gid);
+		/*
+		 * set the top level directory bits to 0755 so user
+		 * can access it.
+		 */
+		if (snprintf(mountpoint, MAXPATHLEN, "%s/%s", mnt_zoneroot,
+		    aa->aa_media) <= MAXPATHLEN)
+			(void) chmod(mountpoint, 0755);
 	}
+
+	if (aa->aa_partname) {
+		if (snprintf(mountpoint, MAXPATHLEN,
+		    "%s/%s%s/%s/%s", mnt_zoneroot, aa->aa_media, mnt_userdir,
+		    targ_dir, aa->aa_partname) > MAXPATHLEN) {
+			(void) fprintf(stderr,
+				gettext("%s(%ld) error: path too long\n"),
+				prog_name, prog_pid);
+			return (FALSE);
+		}
+	} else {
+		if (snprintf(mountpoint, MAXPATHLEN,
+		    "%s/%s%s/%s", mnt_zoneroot, aa->aa_media, mnt_userdir,
+		    targ_dir) > MAXPATHLEN) {
+			(void) fprintf(stderr,
+				gettext("%s(%ld) error: malloc failed\n"),
+				prog_name, prog_pid);
+			return (FALSE);
+		}
+	}
+
+	zonemountpoint = mountpoint + strlen(mnt_zoneroot);
 
 	/* make our mountpoint */
 	(void) makepath(mountpoint, 0755);
@@ -1455,7 +1629,7 @@ hard_mount(struct action_arg *aa, struct mount_args *ma, bool_t *rdonly)
 			    prog_name, prog_pid, mountpoint, options);
 		}
 		aa->aa_mnt = TRUE;
-		aa->aa_mountpoint = strdup(mountpoint);
+		aa->aa_mountpoint = strdup(zonemountpoint);
 		dprintf(
 		"\nDEBUG: Setting u.g of \"%s\" to %d.%d (me=%d.%d)\n\n",
 		    mountpoint, sb.st_uid, sb.st_gid, getuid(), getgid());
@@ -1489,9 +1663,6 @@ hard_mount(struct action_arg *aa, struct mount_args *ma, bool_t *rdonly)
 		(void) rmdir(mountpoint);			/* cleanup */
 		ret_val = FALSE;
 	}
-	if (mountpoint != NULL)
-		free(mountpoint);
-
 	return (ret_val);
 }
 

@@ -1638,6 +1638,8 @@ startup_modules(void)
 	if (modloadonly("misc", "swapgeneric") == -1)
 		halt("Can't load swapgeneric");
 
+	(void) modloadonly("sys", "lbl_edition");
+
 	dispinit();
 
 	/*

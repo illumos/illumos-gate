@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -35,8 +34,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
-#include <sys/strlog.h>
-#include <sys/dlpi.h>
+#include <sys/strsun.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
@@ -57,7 +55,6 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_ndp.h>
-#include <inet/arp.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_rts.h>
@@ -70,6 +67,9 @@
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <sys/zone.h>
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/tnet.h>
 
 /*
  * Synchronization notes:
@@ -396,18 +396,17 @@ static void	ire_report_ftable(ire_t *ire, char *mp);
 static void	ire_report_ctable(ire_t *ire, char *mp);
 static void	ire_report_mrtun_table(ire_t *ire, char *mp);
 static void	ire_report_srcif_table(ire_t *ire, char *mp);
-static void	ire_walk_ipvers(pfv_t func, char *arg, uchar_t vers,
+static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
     zoneid_t zoneid);
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
-		    pfv_t func, char *arg, uchar_t vers, ill_t *ill);
+    pfv_t func, void *arg, uchar_t vers, ill_t *ill);
 static	void	ire_walk_ill_tables(uint_t match_flags, uint_t ire_type,
-		    pfv_t func, char *arg, size_t ftbl_sz, size_t htbl_sz,
-		    irb_t **ipftbl, size_t ctbl_sz, irb_t *ipctbl, ill_t *ill,
-		    zoneid_t zoneid);
+    pfv_t func, void *arg, size_t ftbl_sz, size_t htbl_sz, irb_t **ipftbl,
+    size_t ctbl_sz, irb_t *ipctbl, ill_t *ill, zoneid_t zoneid);
 static void	ire_delete_host_redirects(ipaddr_t gateway);
 static boolean_t ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask,
-		    ipaddr_t gateway, int type, ipif_t *ipif, zoneid_t zoneid,
-		    uint32_t ihandle, int match_flags);
+    ipaddr_t gateway, int type, const ipif_t *ipif, zoneid_t zoneid,
+    uint32_t ihandle, const ts_label_t *tsl, int match_flags);
 static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt);
 extern void	ill_unlock_ills(ill_t **list, int cnt);
 static void	ire_fastpath_list_add(ill_t *ill, ire_t *ire);
@@ -506,14 +505,14 @@ ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		/* Extract the destination address. */
 		addr = *(ipaddr_t *)addr_ucp;
 		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup(addr, zoneid);
+		ire = ire_cache_lookup(addr, zoneid, NULL);
 		break;
 	}
 	case IPV6_ADDR_LEN: {
 		/* Extract the destination address. */
 		v6addr = *(in6_addr_t *)addr_ucp;
 		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup_v6(&v6addr, zoneid);
+		ire = ire_cache_lookup_v6(&v6addr, zoneid, NULL);
 		break;
 	}
 	default:
@@ -647,7 +646,7 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	bcopy(addr_ucp, &addr, IP_ADDR_LEN);
 
 	/* Try to find the CACHED IRE. */
-	ire = ire_cache_lookup(addr, zoneid);
+	ire = ire_cache_lookup(addr, zoneid, NULL);
 
 	/* Nail it. */
 	if (ire) {
@@ -726,7 +725,7 @@ done:
 	}
 	/* Also look for an IRE_HOST_REDIRECT and remove it if present */
 	ire = ire_route_lookup(addr, 0, 0, IRE_HOST_REDIRECT, NULL, NULL,
-	    ALL_ZONES, MATCH_IRE_TYPE);
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
 
 	/* Nail it. */
 	if (ire) {
@@ -787,8 +786,8 @@ ip_ire_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	if (zoneid == GLOBAL_ZONEID)
 		zoneid = ALL_ZONES;
 
-	ire_walk_v4(ire_report_ftable, (char *)mp->b_cont, zoneid);
-	ire_walk_v4(ire_report_ctable, (char *)mp->b_cont, zoneid);
+	ire_walk_v4(ire_report_ftable, mp->b_cont, zoneid);
+	ire_walk_v4(ire_report_ctable, mp->b_cont, zoneid);
 
 	return (0);
 }
@@ -922,7 +921,7 @@ ip_ire_report_mrtun(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	"ref     ");
 	/*   123 */
 
-	ire_walk_ill_mrtun(0, 0, ire_report_mrtun_table, (char *)mp, NULL);
+	ire_walk_ill_mrtun(0, 0, ire_report_mrtun_table, mp, NULL);
 	return (0);
 }
 
@@ -974,7 +973,7 @@ ip_ire_report_srcif(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	    "type    "
 	    /* ABCDEFGH */
 	    "in/out/forward");
-	ire_walk_srcif_table_v4(ire_report_srcif_table, (char *)mp);
+	ire_walk_srcif_table_v4(ire_report_srcif_table, mp);
 	return (0);
 }
 
@@ -1035,12 +1034,12 @@ ip_ire_req(queue_t *q, mblk_t *mp)
 	 */
 	if (inire->ire_ipversion == IPV6_VERSION) {
 		ire = ire_route_lookup_v6(&inire->ire_addr_v6, 0, 0, 0,
-		    NULL, &sire, zoneid,
+		    NULL, &sire, zoneid, NULL,
 		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT));
 	} else {
 		ASSERT(inire->ire_ipversion == IPV4_VERSION);
 		ire = ire_route_lookup(inire->ire_addr, 0, 0, 0,
-		    NULL, &sire, zoneid,
+		    NULL, &sire, zoneid, NULL,
 		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT));
 	}
 
@@ -1516,7 +1515,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 			mp = first_mp;
 
 			dst_ire = ire_cache_lookup(ipha->ipha_dst,
-			    ire->ire_zoneid);
+			    ire->ire_zoneid, MBLK_GETLABEL(mp));
 		} else {
 			/*
 			 * Get a pointer to the beginning of the IPv6 header.
@@ -1530,7 +1529,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 			save_mp = mp;
 			mp = first_mp;
 			dst_ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    ire->ire_zoneid);
+			    ire->ire_zoneid, MBLK_GETLABEL(mp));
 		}
 		if (dst_ire != NULL) {
 			if (dst_ire->ire_flags & RTF_MULTIRT) {
@@ -1663,8 +1662,15 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
     uchar_t *gateway, uchar_t *in_src_addr, uint_t *max_fragp, mblk_t *fp_mp,
     queue_t *rfq, queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif,
     ill_t *in_ill, ipaddr_t cmask, uint32_t phandle, uint32_t ihandle,
-    uint32_t flags, const iulp_t *ulp_info)
+    uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
 {
+	/*
+	 * Reject IRE security attribute creation/initialization
+	 * if system is not running in Trusted mode.
+	 */
+	if ((gc != NULL || gcgrp != NULL) && !is_system_labeled())
+		return (NULL);
+
 	if (fp_mp != NULL) {
 		/*
 		 * We can't dupb() here as multiple threads could be
@@ -1722,8 +1728,11 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
 	if (type == IRE_CACHE)
 		ire->ire_cmask = cmask;
 
-	ire_init_common(ire, max_fragp, fp_mp, rfq, stq, type, dlureq_mp,
-	    ipif, in_ill, phandle, ihandle, flags, IPV4_VERSION, ulp_info);
+	/* ire_init_common will free the mblks upon encountering any failure */
+	if (!ire_init_common(ire, max_fragp, fp_mp, rfq, stq, type, dlureq_mp,
+	    ipif, in_ill, phandle, ihandle, flags, IPV4_VERSION, ulp_info,
+	    gc, gcgrp))
+		return (NULL);
 
 	return (ire);
 }
@@ -1738,7 +1747,7 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
     uchar_t *in_src_addr, uint_t max_frag, mblk_t *fp_mp, queue_t *rfq,
     queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill,
     ipaddr_t cmask, uint32_t phandle, uint32_t ihandle, uint32_t flags,
-    const iulp_t *ulp_info)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
 {
 	ire_t	*ire;
 	ire_t	*ret_ire;
@@ -1761,7 +1770,7 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 
 	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, in_src_addr,
 	    NULL, fp_mp, rfq, stq, type, dlureq_mp, ipif, in_ill, cmask,
-	    phandle, ihandle, flags, ulp_info);
+	    phandle, ihandle, flags, ulp_info, gc, gcgrp);
 
 	if (ret_ire == NULL) {
 		freeb(ire->ire_mp);
@@ -1789,7 +1798,7 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
     uchar_t *in_src_addr, uint_t *max_fragp, mblk_t *fp_mp, queue_t *rfq,
     queue_t *stq, ushort_t type, mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill,
     ipaddr_t cmask, uint32_t phandle, uint32_t ihandle, uint32_t flags,
-    const iulp_t *ulp_info)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
 {
 	ire_t	*ire;
 	ire_t	*ret_ire;
@@ -1803,7 +1812,7 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 
 	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, in_src_addr,
 	    max_fragp, fp_mp, rfq, stq, type, dlureq_mp, ipif, in_ill,  cmask,
-	    phandle, ihandle, flags, ulp_info);
+	    phandle, ihandle, flags, ulp_info, gc, gcgrp);
 
 	if (ret_ire == NULL) {
 		kmem_cache_free(ire_cache, ire);
@@ -1817,22 +1826,50 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 /*
  * Common to IPv4 and IPv6
  */
-void
+boolean_t
 ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
     queue_t *rfq, queue_t *stq, ushort_t type,
     mblk_t *dlureq_mp, ipif_t *ipif, ill_t *in_ill, uint32_t phandle,
     uint32_t ihandle, uint32_t flags, uchar_t ipversion,
-    const iulp_t *ulp_info)
+    const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp)
 {
 	ire->ire_max_fragp = max_fragp;
 	ire->ire_frag_flag |= (ip_path_mtu_discovery) ? IPH_DF : 0;
 
 	ASSERT(fp_mp == NULL || fp_mp->b_datap->db_type == M_DATA);
-	if (ipif) {
+#ifdef DEBUG
+	if (ipif != NULL) {
 		if (ipif->ipif_isv6)
 			ASSERT(ipversion == IPV6_VERSION);
 		else
 			ASSERT(ipversion == IPV4_VERSION);
+	}
+#endif /* DEBUG */
+
+	/*
+	 * Create/initialize IRE security attribute only in Trusted mode;
+	 * if the passed in gc/gcgrp is non-NULL, we expect that the caller
+	 * has held a reference to it and will release it when this routine
+	 * returns a failure, otherwise we own the reference.  We do this
+	 * prior to initializing the rest IRE fields.
+	 */
+	if (is_system_labeled()) {
+		if ((type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST |
+		    IRE_INTERFACE)) != 0) {
+			/* release references on behalf of caller */
+			if (gc != NULL)
+				GC_REFRELE(gc);
+			if (gcgrp != NULL)
+				GCGRP_REFRELE(gcgrp);
+		} else if (tsol_ire_init_gwattr(ire, ipversion,
+		    gc, gcgrp) != 0) {
+			/* free any caller-allocated mblks upon failure */
+			if (fp_mp != NULL)
+				freeb(fp_mp);
+			if (dlureq_mp != NULL)
+				freeb(dlureq_mp);
+			return (B_FALSE);
+		}
 	}
 
 	ire->ire_fp_mp = fp_mp;
@@ -1883,6 +1920,8 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, mblk_t *fp_mp,
 #ifdef IRE_DEBUG
 	bzero(ire->ire_trace, sizeof (th_trace_t *) * IP_TR_HASH_MAX);
 #endif
+
+	return (B_TRUE);
 }
 
 /*
@@ -1918,7 +1957,7 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 
 	/* If this would be a duplicate, don't bother. */
 	if ((ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ipif,
-	    ipif->ipif_zoneid, match_flags)) != NULL) {
+	    ipif->ipif_zoneid, NULL, match_flags)) != NULL) {
 		/*
 		 * We look for non-deprecated (and non-anycast, non-nolocal)
 		 * ipifs as the best choice. ipifs with check_flags matching
@@ -1976,7 +2015,9 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 	    0,
 	    0,
 	    0,
-	    &ire_uinfo_null);
+	    &ire_uinfo_null,
+	    NULL,
+	    NULL);
 
 	*irep++ = ire_create(
 		(uchar_t *)&addr,		 /* dest address */
@@ -1996,7 +2037,9 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 		0,
 		0,
 		0,
-		&ire_uinfo_null);
+		&ire_uinfo_null,
+		NULL,
+		NULL);
 
 	return (irep);
 }
@@ -2120,7 +2163,7 @@ ire_fastpath_update(ire_t *ire, void *arg)
 		return (B_TRUE);
 
 	ip2dbg(("ire_fastpath_update: trying\n"));
-	mp = arg;
+	mp = (mblk_t *)arg;
 	up = mp->b_rptr;
 	cmplen = mp->b_wptr - up;
 	/* Serialize multiple fast path updates */
@@ -2352,7 +2395,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 	ipaddr_t gw_addr;
 
 	ire = ire_ftable_lookup(group, 0, 0, 0, NULL, NULL, zoneid,
-	    0, MATCH_IRE_DEFAULT);
+	    0, NULL, MATCH_IRE_DEFAULT);
 
 	/* We search a resolvable ire in case of multirouting. */
 	if ((ire != NULL) && (ire->ire_flags & RTF_MULTIRT)) {
@@ -2362,7 +2405,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 		 * may be changed here. In that case, ire_multirt_lookup()
 		 * IRE_REFRELE the original ire and change it.
 		 */
-		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW);
+		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW, NULL);
 		if (cire != NULL)
 			ire_refrele(cire);
 	}
@@ -2389,7 +2432,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid)
 		ire_refrele(ire);
 		ire = ire_ftable_lookup(gw_addr, 0, 0,
 		    IRE_INTERFACE, ipif, NULL, zoneid, 0,
-		    match_flags);
+		    NULL, match_flags);
 		return (ire);
 	case IRE_IF_NORESOLVER:
 	case IRE_IF_RESOLVER:
@@ -2420,7 +2463,8 @@ ire_lookup_local(zoneid_t zoneid)
 		rw_enter(&irb->irb_lock, RW_READER);
 		for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
 			if ((ire->ire_marks & IRE_MARK_CONDEMNED) ||
-			    ire->ire_zoneid != zoneid)
+			    (ire->ire_zoneid != zoneid &&
+			    ire->ire_zoneid != ALL_ZONES))
 				continue;
 			switch (ire->ire_type) {
 			case IRE_LOOPBACK:
@@ -2452,7 +2496,7 @@ ire_lookup_local(zoneid_t zoneid)
  * if this ire is used.
  */
 ill_t *
-ire_to_ill(ire_t *ire)
+ire_to_ill(const ire_t *ire)
 {
 	ill_t *ill = NULL;
 
@@ -2501,19 +2545,19 @@ ire_to_ill(ire_t *ire)
 
 /* Arrange to call the specified function for every IRE in the world. */
 void
-ire_walk(pfv_t func, char *arg)
+ire_walk(pfv_t func, void *arg)
 {
 	ire_walk_ipvers(func, arg, 0, ALL_ZONES);
 }
 
 void
-ire_walk_v4(pfv_t func, char *arg, zoneid_t zoneid)
+ire_walk_v4(pfv_t func, void *arg, zoneid_t zoneid)
 {
 	ire_walk_ipvers(func, arg, IPV4_VERSION, zoneid);
 }
 
 void
-ire_walk_v6(pfv_t func, char *arg, zoneid_t zoneid)
+ire_walk_v6(pfv_t func, void *arg, zoneid_t zoneid)
 {
 	ire_walk_ipvers(func, arg, IPV6_VERSION, zoneid);
 }
@@ -2522,7 +2566,7 @@ ire_walk_v6(pfv_t func, char *arg, zoneid_t zoneid)
  * Walk a particular version. version == 0 means both v4 and v6.
  */
 static void
-ire_walk_ipvers(pfv_t func, char *arg, uchar_t vers, zoneid_t zoneid)
+ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers, zoneid_t zoneid)
 {
 	if (vers != IPV6_VERSION) {
 		ire_walk_ill_tables(0, 0, func, arg, IP_MASK_TABLE_SIZE,
@@ -2541,14 +2585,14 @@ ire_walk_ipvers(pfv_t func, char *arg, uchar_t vers, zoneid_t zoneid)
  * function for every IRE that matches the ill.
  */
 void
-ire_walk_ill(uint_t match_flags, uint_t ire_type, pfv_t func, char *arg,
+ire_walk_ill(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
     ill_t *ill)
 {
 	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, 0, ill);
 }
 
 void
-ire_walk_ill_v4(uint_t match_flags, uint_t ire_type, pfv_t func, char *arg,
+ire_walk_ill_v4(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
     ill_t *ill)
 {
 	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, IPV4_VERSION,
@@ -2556,7 +2600,7 @@ ire_walk_ill_v4(uint_t match_flags, uint_t ire_type, pfv_t func, char *arg,
 }
 
 void
-ire_walk_ill_v6(uint_t match_flags, uint_t ire_type, pfv_t func, char *arg,
+ire_walk_ill_v6(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
     ill_t *ill)
 {
 	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, IPV6_VERSION,
@@ -2568,7 +2612,7 @@ ire_walk_ill_v6(uint_t match_flags, uint_t ire_type, pfv_t func, char *arg,
  */
 static void
 ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type, pfv_t func,
-    char *arg, uchar_t vers, ill_t *ill)
+    void *arg, uchar_t vers, ill_t *ill)
 {
 	if (vers != IPV6_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
@@ -2639,7 +2683,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 		 * routes that can be matched during lookup are also matched
 		 * here.
 		 */
-		if (zoneid != ire->ire_zoneid) {
+		if (zoneid != ire->ire_zoneid && ire->ire_zoneid != ALL_ZONES) {
 			/*
 			 * Note, IRE_INTERFACE can have the stq as NULL. For
 			 * example, if the default multicast route is tied to
@@ -2693,7 +2737,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 			}
 			if (ire->ire_ipversion == IPV4_VERSION) {
 				rire = ire_route_lookup(ire->ire_gateway_addr,
-				    0, 0, 0, ire->ire_ipif, NULL, zoneid,
+				    0, 0, 0, ire->ire_ipif, NULL, zoneid, NULL,
 				    ire_match_flags);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
@@ -2702,7 +2746,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 				mutex_exit(&ire->ire_lock);
 				rire = ire_route_lookup_v6(&gw_addr_v6,
 				    NULL, NULL, 0, ire->ire_ipif, NULL, zoneid,
-				    ire_match_flags);
+				    NULL, ire_match_flags);
 			}
 			if (rire == NULL) {
 				return (B_FALSE);
@@ -2731,7 +2775,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
  */
 static void
 ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
-    char *arg, size_t ftbl_sz, size_t htbl_sz, irb_t **ipftbl,
+    void *arg, size_t ftbl_sz, size_t htbl_sz, irb_t **ipftbl,
     size_t ctbl_sz, irb_t *ipctbl, ill_t *ill, zoneid_t zoneid)
 {
 	irb_t	*irb_ptr;
@@ -2812,7 +2856,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
  * down/deleted or the 'ipv4_ire_srcif_status' report is printed.
  */
 void
-ire_walk_srcif_table_v4(pfv_t func, char *arg)
+ire_walk_srcif_table_v4(pfv_t func, void *arg)
 {
 	irb_t   *irb;
 	ire_t   *ire;
@@ -3154,7 +3198,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		    &ipif->ipif_v6src_addr)) ||
 		    (!ipif->ipif_isv6 &&
 		    ire->ire_src_addr != ipif->ipif_src_addr) ||
-		    (ire->ire_zoneid != ipif->ipif_zoneid)) {
+		    ire->ire_zoneid != ipif->ipif_zoneid) {
 
 			if (ipif != NULL)
 				ipif_refrele(ipif);
@@ -3484,7 +3528,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 			continue;
 		if (ire_match_args(ire1, ire->ire_addr, ire->ire_mask,
 		    ire->ire_gateway_addr, ire->ire_type, ire->ire_ipif,
-		    ire->ire_zoneid, 0, flags)) {
+		    ire->ire_zoneid, 0, NULL, flags)) {
 			/*
 			 * Return the old ire after doing a REFHOLD.
 			 * As most of the callers continue to use the IRE
@@ -3683,7 +3727,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		if (ire->ire_mask == IP_HOST_MASK) {
 			ire_t *lire;
 			lire = ire_ctable_lookup(ire->ire_addr, NULL, IRE_CACHE,
-			    NULL, ALL_ZONES, MATCH_IRE_TYPE);
+			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
 			if (lire != NULL) {
 				ire_refrele(lire);
 				ire_flush_cache_v4(ire, IRE_FLUSH_ADD);
@@ -4187,6 +4231,10 @@ end:
 		ire->ire_in_ill = NULL;
 	}
 
+	if (ire->ire_gw_secattr != NULL) {
+		ire_gw_secattr_free(ire->ire_gw_secattr);
+		ire->ire_gw_secattr = NULL;
+	}
 #ifdef IRE_DEBUG
 	ire_trace_inactive(ire);
 #endif
@@ -4368,7 +4416,8 @@ ire_flush_cache_v4(ire_t *ire, int flag)
  */
 static boolean_t
 ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
-    int type, ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle, int match_flags)
+    int type, const ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle,
+    const ts_label_t *tsl, int match_flags)
 {
 	ill_t *ire_ill = NULL, *dst_ill;
 	ill_t *ipif_ill = NULL;
@@ -4405,7 +4454,8 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    (ire->ire_marks & IRE_MARK_PRIVATE_ADDR))
 		return (B_FALSE);
 
-	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid) {
+	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid &&
+	    ire->ire_zoneid != ALL_ZONES) {
 		/*
 		 * If MATCH_IRE_ZONEONLY has been set and the supplied zoneid is
 		 * valid and does not match that of ire_zoneid, a failure to
@@ -4472,7 +4522,8 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 			    tipif != NULL; tipif = tipif->ipif_next) {
 				if (IPIF_CAN_LOOKUP(tipif) &&
 				    (tipif->ipif_flags & IPIF_UP) &&
-				    (tipif->ipif_zoneid == zoneid))
+				    (tipif->ipif_zoneid == zoneid ||
+				    tipif->ipif_zoneid == ALL_ZONES))
 					break;
 			}
 			mutex_exit(&ire->ire_ipif->ipif_ill->ill_lock);
@@ -4520,7 +4571,10 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
 		(ire_ill == ipif_ill) ||
 		(ire_ill_group != NULL &&
-		ire_ill_group == ipif_ill_group))) {
+		ire_ill_group == ipif_ill_group)) &&
+	    ((!(match_flags & MATCH_IRE_SECATTR)) ||
+		(!is_system_labeled()) ||
+		(tsol_ire_match_gwattr(ire, tsl) == 0))) {
 		/* We found the matched IRE */
 		return (B_TRUE);
 	}
@@ -4533,7 +4587,8 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
  */
 ire_t *
 ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
-    int type, ipif_t *ipif, ire_t **pire, zoneid_t zoneid, int flags)
+    int type, const ipif_t *ipif, ire_t **pire, zoneid_t zoneid,
+    const ts_label_t *tsl, int flags)
 {
 	ire_t *ire = NULL;
 
@@ -4555,13 +4610,13 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 */
 	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_CACHETABLE) != 0) {
 		ire = ire_ctable_lookup(addr, gateway, type, ipif, zoneid,
-		    flags);
+		    tsl, flags);
 		if (ire != NULL)
 			return (ire);
 	}
 	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_FORWARDTABLE) != 0) {
 		ire = ire_ftable_lookup(addr, mask, gateway, type, ipif, pire,
-		    zoneid, 0, flags);
+		    zoneid, 0, tsl, flags);
 	}
 	return (ire);
 }
@@ -4599,8 +4654,8 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
  */
 ire_t *
 ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
-    int type, ipif_t *ipif, ire_t **pire, zoneid_t zoneid, uint32_t ihandle,
-    int flags)
+    int type, const ipif_t *ipif, ire_t **pire, zoneid_t zoneid,
+    uint32_t ihandle, const ts_label_t *tsl, int flags)
 {
 	irb_t *irb_ptr;
 	ire_t *ire = NULL;
@@ -4644,7 +4699,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 			if (ire->ire_marks & IRE_MARK_CONDEMNED)
 				continue;
 			if (ire_match_args(ire, addr, mask, gateway, type, ipif,
-			    zoneid, ihandle, flags))
+			    zoneid, ihandle, tsl, flags))
 				goto found_ire;
 		}
 		rw_exit(&irb_ptr->irb_lock);
@@ -4670,7 +4725,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 					continue;
 				if (ire_match_args(ire, addr, ire->ire_mask,
 				    gateway, type, ipif, zoneid, ihandle,
-				    flags))
+				    tsl, flags))
 					goto found_ire;
 			}
 			rw_exit(&irb_ptr->irb_lock);
@@ -4701,7 +4756,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 					continue;
 				if (ire_match_args(ire, addr, (ipaddr_t)0,
 				    gateway, type, ipif, zoneid, ihandle,
-				    flags))
+				    tsl, flags))
 					goto found_ire;
 			}
 			rw_exit(&irb_ptr->irb_lock);
@@ -4780,7 +4835,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 		    ire = ire_get_next_default_ire(ire, ire_origin)) {
 
 			if (ire_match_args(ire, addr, (ipaddr_t)0,
-			    gateway, type, ipif, zoneid, ihandle, flags)) {
+			    gateway, type, ipif, zoneid, ihandle, tsl, flags)) {
 				int match_flags = 0;
 				ire_t *rire;
 
@@ -4804,7 +4859,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 					match_flags |= MATCH_IRE_ILL_GROUP;
 				}
 				rire = ire_route_lookup(ire->ire_gateway_addr,
-				    0, 0, 0, ire->ire_ipif, NULL, zoneid,
+				    0, 0, 0, ire->ire_ipif, NULL, zoneid, tsl,
 				    match_flags);
 				if (rire != NULL) {
 					ire_refrele(rire);
@@ -4830,7 +4885,8 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 				continue;
 
 			if (ire_match_args(ire, addr, (ipaddr_t)0,
-			    gateway, type, ipif, zoneid, ihandle, flags)) {
+			    gateway, type, ipif, zoneid, ihandle, tsl,
+			    flags)) {
 				IRE_REFHOLD(ire);
 				IRB_REFRELE(irb_ptr);
 				goto found_ire_held;
@@ -4862,7 +4918,7 @@ found_ire_held:
 	 * of lookup is done.
 	 */
 	if (flags & MATCH_IRE_RECURSIVE) {
-		ipif_t	*gw_ipif;
+		const ipif_t *gw_ipif;
 		int match_flags = MATCH_IRE_DSTONLY;
 		ire_t *save_ire;
 
@@ -4893,7 +4949,7 @@ found_ire_held:
 			match_flags |= MATCH_IRE_ILL_GROUP;
 
 		ire = ire_route_lookup(ire->ire_gateway_addr, 0, 0, 0,
-		    ire->ire_ipif, NULL, zoneid, match_flags);
+		    ire->ire_ipif, NULL, zoneid, tsl, match_flags);
 		if (ire == NULL) {
 			/*
 			 * Do not release the parent ire if MATCH_IRE_PARENT
@@ -4932,7 +4988,7 @@ found_ire_held:
 		ire_refrele(ire);
 		ire = ire_route_lookup(gw_addr, 0, 0,
 		    (IRE_CACHETABLE | IRE_INTERFACE), gw_ipif, NULL, zoneid,
-		    match_flags);
+		    tsl, match_flags);
 		if (ire == NULL) {
 			/*
 			 * Do not release the parent ire if MATCH_IRE_PARENT
@@ -4968,14 +5024,43 @@ found_ire_held:
 }
 
 /*
+ * Delete the IRE cache for the gateway and all IRE caches whose
+ * ire_gateway_addr points to this gateway, and allow them to
+ * be created on demand by ip_newroute.
+ */
+void
+ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid)
+{
+	irb_t *irb;
+	ire_t *ire;
+
+	irb = &ip_cache_table[IRE_ADDR_HASH(addr, ip_cache_table_size)];
+	IRB_REFHOLD(irb);
+	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (ire->ire_marks & IRE_MARK_CONDEMNED)
+			continue;
+
+		ASSERT(ire->ire_mask == IP_HOST_MASK);
+		ASSERT(ire->ire_type != IRE_MIPRTUN && ire->ire_in_ill == NULL);
+		if (ire_match_args(ire, addr, ire->ire_mask, 0, IRE_CACHE,
+		    NULL, zoneid, 0, NULL, MATCH_IRE_TYPE)) {
+			ire_delete(ire);
+		}
+	}
+	IRB_REFRELE(irb);
+
+	ire_walk_v4(ire_delete_cache_gw, &addr, zoneid);
+}
+
+/*
  * Looks up cache table for a route.
  * specific lookup can be indicated by
  * passing the MATCH_* flags and the
  * necessary parameters.
  */
 ire_t *
-ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, ipif_t *ipif,
-    zoneid_t zoneid, int flags)
+ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
+    zoneid_t zoneid, const ts_label_t *tsl, int flags)
 {
 	irb_t *irb_ptr;
 	ire_t *ire;
@@ -4996,7 +5081,7 @@ ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, ipif_t *ipif,
 		ASSERT(ire->ire_mask == IP_HOST_MASK);
 		ASSERT(ire->ire_type != IRE_MIPRTUN && ire->ire_in_ill == NULL);
 		if (ire_match_args(ire, addr, ire->ire_mask, gateway, type,
-		    ipif, zoneid, 0, flags)) {
+		    ipif, zoneid, 0, tsl, flags)) {
 			IRE_REFHOLD(ire);
 			rw_exit(&irb_ptr->irb_lock);
 			return (ire);
@@ -5012,7 +5097,7 @@ ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, ipif_t *ipif,
  * to the hidden ones.
  */
 ire_t *
-ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid)
+ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl)
 {
 	irb_t *irb_ptr;
 	ire_t *ire;
@@ -5025,7 +5110,19 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid)
 			continue;
 		}
 		if (ire->ire_addr == addr) {
+			/*
+			 * Finally, check if the security policy has any
+			 * restriction on using this route for the specified
+			 * message.
+			 */
+			if (tsl != NULL &&
+			    ire->ire_gw_secattr != NULL &&
+			    tsol_ire_match_gwattr(ire, tsl) != 0) {
+				continue;
+			}
+
 			if (zoneid == ALL_ZONES || ire->ire_zoneid == zoneid ||
+			    ire->ire_zoneid == ALL_ZONES ||
 			    ire->ire_type == IRE_LOCAL) {
 				IRE_REFHOLD(ire);
 				rw_exit(&irb_ptr->irb_lock);
@@ -5075,7 +5172,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	 */
 	ire = ire_ftable_lookup(cire->ire_addr, cire->ire_cmask, 0,
 	    IRE_INTERFACE, pire->ire_ipif, NULL, ALL_ZONES, cire->ire_ihandle,
-	    match_flags);
+	    NULL, match_flags);
 	if (ire != NULL)
 		return (ire);
 	/*
@@ -5106,7 +5203,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	if (pire->ire_ipif != NULL)
 		match_flags |= MATCH_IRE_ILL_GROUP;
 	ire = ire_ftable_lookup(pire->ire_gateway_addr, 0, 0, IRE_OFFSUBNET,
-	    pire->ire_ipif, NULL, ALL_ZONES, 0, match_flags);
+	    pire->ire_ipif, NULL, ALL_ZONES, 0, NULL, match_flags);
 	if (ire == NULL)
 		return (NULL);
 	/*
@@ -5119,7 +5216,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 
 	match_flags |= MATCH_IRE_IHANDLE;
 	ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE,
-	    gw_ipif, NULL, ALL_ZONES, cire->ire_ihandle, match_flags);
+	    gw_ipif, NULL, ALL_ZONES, cire->ire_ihandle, NULL, match_flags);
 	return (ire);
 }
 
@@ -5154,7 +5251,7 @@ ire_ihandle_lookup_onlink(ire_t *cire)
 	 */
 	ire = ire_ftable_lookup(cire->ire_addr, cire->ire_cmask, 0,
 	    IRE_INTERFACE, NULL, NULL, ALL_ZONES, cire->ire_ihandle,
-	    match_flags);
+	    NULL, match_flags);
 	if (ire != NULL)
 		return (ire);
 	/*
@@ -5249,23 +5346,23 @@ ire_mrtun_lookup(ipaddr_t srcaddr, ill_t *ill)
  * the ipif, this routine might return NULL.
  */
 ire_t *
-ipif_to_ire(ipif_t *ipif)
+ipif_to_ire(const ipif_t *ipif)
 {
 	ire_t	*ire;
 
 	ASSERT(!ipif->ipif_isv6);
 	if (ipif->ipif_ire_type == IRE_LOOPBACK) {
 		ire = ire_ctable_lookup(ipif->ipif_lcl_addr, 0, IRE_LOOPBACK,
-		    ipif, ALL_ZONES, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
+		    ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF));
 	} else if (ipif->ipif_flags & IPIF_POINTOPOINT) {
 		/* In this case we need to lookup destination address. */
 		ire = ire_ftable_lookup(ipif->ipif_pp_dst_addr, IP_HOST_MASK, 0,
-		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
+		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
 		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK));
 	} else {
 		ire = ire_ftable_lookup(ipif->ipif_subnet,
 		    ipif->ipif_net_mask, 0, IRE_INTERFACE, ipif, NULL,
-		    ALL_ZONES, 0, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
+		    ALL_ZONES, 0, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
 		    MATCH_IRE_MASK));
 	}
 	return (ire);
@@ -5730,7 +5827,7 @@ ire_srcif_table_lookup(ipaddr_t dst_addr, int ire_type, ipif_t *ipif,
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
 			continue;
 		if (ire_match_args(ire, dst_addr, ire->ire_mask, 0,
-		    ire_type, ipif, ire->ire_zoneid, 0, flags)) {
+		    ire_type, ipif, ire->ire_zoneid, 0, NULL, flags)) {
 			IRE_REFHOLD(ire);
 			rw_exit(&irb_ptr->irb_lock);
 			return (ire);
@@ -5852,7 +5949,8 @@ ire_add_srcif_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 			continue;
 		/* Has anyone inserted route in the meanwhile ? */
 		if (ire_match_args(ire1, ire->ire_addr, ire->ire_mask, 0,
-		    ire->ire_type, ire->ire_ipif, ire->ire_zoneid, 0, flags)) {
+		    ire->ire_type, ire->ire_ipif, ire->ire_zoneid, 0, NULL,
+		    flags)) {
 			ip1dbg(("ire_add_srcif_v4 : Duplicate entry exists\n"));
 			IRE_REFHOLD(ire1);
 			ire_atomic_end(irb_ptr, ire);
@@ -5996,7 +6094,7 @@ ire_update_srcif_v4(ire_t *ire)
  * This only works in the global zone.
  */
 boolean_t
-ire_multirt_need_resolve(ipaddr_t dst)
+ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl)
 {
 	ire_t	*first_fire;
 	ire_t	*first_cire;
@@ -6009,7 +6107,8 @@ ire_multirt_need_resolve(ipaddr_t dst)
 
 	/* Retrieve the first IRE_HOST that matches the destination */
 	first_fire = ire_ftable_lookup(dst, IP_HOST_MASK, 0, IRE_HOST, NULL,
-	    NULL, ALL_ZONES, 0, MATCH_IRE_MASK | MATCH_IRE_TYPE);
+	    NULL, ALL_ZONES, 0, tsl,
+	    MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_SECATTR);
 
 	/* No route at all */
 	if (first_fire == NULL) {
@@ -6020,7 +6119,7 @@ ire_multirt_need_resolve(ipaddr_t dst)
 	ASSERT(firb != NULL);
 
 	/* Retrieve the first IRE_CACHE ire for that destination. */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID);
+	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl);
 
 	/* No resolved route. */
 	if (first_cire == NULL) {
@@ -6065,7 +6164,7 @@ ire_multirt_need_resolve(ipaddr_t dst)
 	/* At least one route is unresolved; search for a resolvable route. */
 	if (unres_cnt > 0)
 		resolvable = ire_multirt_lookup(&first_cire, &first_fire,
-		    MULTIRT_USESTAMP | MULTIRT_CACHEGW);
+		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, tsl);
 
 	if (first_fire != NULL)
 		ire_refrele(first_fire);
@@ -6128,7 +6227,8 @@ ire_multirt_need_resolve(ipaddr_t dst)
  * This only works in the global zone.
  */
 boolean_t
-ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
+ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
+    const ts_label_t *tsl)
 {
 	clock_t	delta;
 	ire_t	*best_fire = NULL;
@@ -6170,7 +6270,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 	 * if we don't find one, no route for that dest is
 	 * resolved yet.
 	 */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID);
+	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl);
 	if (first_cire != NULL) {
 		cirb = first_cire->ire_bucket;
 	}
@@ -6195,6 +6295,11 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 				continue;
 			if (fire->ire_addr != dst)
 				continue;
+
+			if (fire->ire_gw_secattr != NULL &&
+			    tsol_ire_match_gwattr(fire, tsl) != 0) {
+				continue;
+			}
 
 			gw = fire->ire_gateway_addr;
 
@@ -6224,6 +6329,13 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 					    (IRE_MARK_CONDEMNED |
 						IRE_MARK_HIDDEN))
 						continue;
+
+					if (cire->ire_gw_secattr != NULL &&
+					    tsol_ire_match_gwattr(cire,
+					    tsl) != 0) {
+						continue;
+					}
+
 					/*
 					 * Check if the IRE_CACHE's gateway
 					 * matches the IRE_HOST's gateway.
@@ -6252,7 +6364,8 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 			 * for the gateway?
 			 */
 			gw_ire = ire_route_lookup(gw, 0, 0, 0, NULL, NULL,
-			    ALL_ZONES, MATCH_IRE_RECURSIVE);
+			    ALL_ZONES, tsl,
+			    MATCH_IRE_RECURSIVE | MATCH_IRE_SECATTR);
 
 			ip2dbg(("ire_multirt_lookup: looked up gw_ire %p\n",
 			    (void *)gw_ire));
@@ -6377,13 +6490,19 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 			if (fire->ire_addr != dst)
 				continue;
 
+			if (fire->ire_gw_secattr != NULL &&
+			    tsol_ire_match_gwattr(fire, tsl) != 0) {
+				continue;
+			}
+
 			already_resolved = B_FALSE;
 
 			gw = fire->ire_gateway_addr;
 
 			gw_ire = ire_ftable_lookup(gw, 0, 0, IRE_INTERFACE,
-			    NULL, NULL, ALL_ZONES, 0,
-			    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE);
+			    NULL, NULL, ALL_ZONES, 0, tsl,
+			    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE |
+			    MATCH_IRE_SECATTR);
 
 			/* No resolver for the gateway; we skip this ire. */
 			if (gw_ire == NULL) {
@@ -6409,6 +6528,12 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags)
 					    (IRE_MARK_CONDEMNED |
 						IRE_MARK_HIDDEN))
 						continue;
+
+					if (cire->ire_gw_secattr != NULL &&
+					    tsol_ire_match_gwattr(cire,
+					    tsl) != 0) {
+						continue;
+					}
 
 					/*
 					 * Cache entries are linked to the
@@ -6535,7 +6660,7 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 	ASSERT(CLASSD(group));
 
 	ire = ire_ftable_lookup(group, 0, 0, 0, NULL, NULL, ALL_ZONES, 0,
-	    MATCH_IRE_DEFAULT);
+	    NULL, MATCH_IRE_DEFAULT);
 
 	if (ire == NULL)
 		return (NULL);
@@ -6547,7 +6672,8 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 	ire_refrele(ire);
 	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_addr != group ||
-		    ipif->ipif_zoneid != ire->ire_zoneid) {
+		    (ipif->ipif_zoneid != ire->ire_zoneid &&
+		    ire->ire_zoneid != ALL_ZONES)) {
 			continue;
 		}
 
@@ -6557,7 +6683,7 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 		case IRE_HOST:
 			gw_addr = ire->ire_gateway_addr;
 			gw_ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE,
-			    ipif, NULL, ALL_ZONES, 0, match_flags);
+			    ipif, NULL, ALL_ZONES, 0, NULL, match_flags);
 
 			if (gw_ire != NULL) {
 				if (save_ire != NULL) {
@@ -6625,14 +6751,14 @@ ip_nexthop_route(const struct sockaddr *target, char *ifname)
 		dir = ire_route_lookup(
 		    ((struct sockaddr_in *)target)->sin_addr.s_addr,
 		    0xffffffff,
-		    0, 0, NULL, NULL, ALL_ZONES,
+		    0, 0, NULL, NULL, ALL_ZONES, NULL,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 		break;
 	case AF_INET6:
 		dir = ire_route_lookup_v6(
 		    &((struct sockaddr_in6 *)target)->sin6_addr,
 		    NULL,
-		    0, 0, NULL, NULL, ALL_ZONES,
+		    0, 0, NULL, NULL, ALL_ZONES, NULL,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 		if ((dir != NULL) && (dir->ire_nce == NULL)) {
 			ire_refrele(dir);
@@ -6756,14 +6882,14 @@ ip_nexthop(const struct sockaddr *target, const char *ifname)
 		dir = ire_route_lookup(
 			((struct sockaddr_in *)target)->sin_addr.s_addr,
 			0xffffffff,
-			0, 0, ill->ill_ipif, NULL, ALL_ZONES,
+			0, 0, ill->ill_ipif, NULL, ALL_ZONES, NULL,
 			MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			MATCH_IRE_RECURSIVE|MATCH_IRE_IPIF);
 		break;
 	case AF_INET6:
 		dir = ire_route_lookup_v6(
 			&((struct sockaddr_in6 *)target)->sin6_addr, NULL,
-			0, 0, ill->ill_ipif, NULL, ALL_ZONES,
+			0, 0, ill->ill_ipif, NULL, ALL_ZONES, NULL,
 			MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			MATCH_IRE_RECURSIVE|MATCH_IRE_IPIF);
 		if ((dir != NULL) && (dir->ire_nce == NULL)) {

@@ -48,6 +48,7 @@ extern "C" {
 
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/optcom.h>
 
 #define	UDP_MOD_ID		5607
 
@@ -122,7 +123,9 @@ typedef	struct udp_s {
 		udp_direct_sockfs : 1,	/* direct calls to/from sockfs */
 
 		udp_timestamp : 1,	/* SO_TIMESTAMP "socket" option */
-		udp_pad_to_bit_31 : 3;
+		udp_anon_mlp : 1,		/* SO_ANON_MLP */
+		udp_mac_exempt : 1,		/* SO_MAC_EXEMPT */
+		udp_pad_to_bit_31 : 1;
 
 	uint8_t		udp_type_of_service;	/* IP_TOS option */
 	uint8_t		udp_ttl;		/* TTL or hoplimit */
@@ -146,6 +149,9 @@ typedef	struct udp_s {
 	uint_t		udp_rcv_cnt;		/* total data in rcv_list */
 	uint_t		udp_rcv_msgcnt;		/* total messages in rcv_list */
 	size_t		udp_rcv_hiwat;		/* receive high watermark */
+	uint_t		udp_label_len;		/* length of security label */
+	uint_t		udp_label_len_v6;	/* len of v6 security label */
+	in6_addr_t 	udp_v6lastdst;		/* most recent destination */
 } udp_t;
 
 /* UDP Protocol header */
@@ -156,7 +162,6 @@ typedef	struct udpahdr_s {
 	uint16_t	uha_length;		/* UDP length */
 	uint16_t	uha_checksum;		/* UDP checksum */
 } udpha_t;
-#define	UDPH_SIZE	8
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct udpparam_s {
@@ -244,6 +249,22 @@ extern void	udp_conn_recv(conn_t *, mblk_t *);
 extern boolean_t udp_compute_checksum(void);
 extern void	udp_wput_data(queue_t *, mblk_t *, struct sockaddr *,
 		    socklen_t);
+
+extern int	udp_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
+    uchar_t *ptr);
+extern int	udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
+    uchar_t *ptr);
+extern int	udp_opt_set(queue_t *q, uint_t optset_context,
+    int level, int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
+    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
+
+/*
+ * Object to represent database of options to search passed to
+ * {sock,tpi}optcom_req() interface routine to take care of option
+ * management and associated methods.
+ */
+extern optdb_obj_t	udp_opt_obj;
+extern uint_t		udp_max_optsize;
 
 #endif	/*  _KERNEL */
 

@@ -25,7 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
+const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
 
 /*
  * IP PACKET CLASSIFIER
@@ -110,7 +110,9 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
  *	hdr_len: The size of IP header. It is used to find TCP or UDP header in
  *		 the packet.
  *
- * 	zoneid: The zone in which the returned connection must be.
+ * 	zoneid: The zone in which the returned connection must be; the zoneid
+ *		corresponding to the ire_zoneid on the IRE located for the
+ *		packet's destination address.
  *
  *	For TCP connections, the lookup order is as follows:
  *		5-tuple {src, dst, protocol, local port, remote port}
@@ -122,6 +124,40 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
  *	remote port} lookup is done on ipcl_udp_fanout. Note that,
  *	these interfaces do not handle cases where a packets belongs
  *	to multiple UDP clients, which is handled in IP itself.
+ *
+ * If the destination IRE is ALL_ZONES (indicated by zoneid), then we must
+ * determine which actual zone gets the segment.  This is used only in a
+ * labeled environment.  The matching rules are:
+ *
+ *	- If it's not a multilevel port, then the label on the packet selects
+ *	  the zone.  Unlabeled packets are delivered to the global zone.
+ *
+ *	- If it's a multilevel port, then only the zone registered to receive
+ *	  packets on that port matches.
+ *
+ * Also, in a labeled environment, packet labels need to be checked.  For fully
+ * bound TCP connections, we can assume that the packet label was checked
+ * during connection establishment, and doesn't need to be checked on each
+ * packet.  For others, though, we need to check for strict equality or, for
+ * multilevel ports, membership in the range or set.  This part currently does
+ * a tnrh lookup on each packet, but could be optimized to use cached results
+ * if that were necessary.  (SCTP doesn't come through here, but if it did,
+ * we would apply the same rules as TCP.)
+ *
+ * An implication of the above is that fully-bound TCP sockets must always use
+ * distinct 4-tuples; they can't be discriminated by label alone.
+ *
+ * Note that we cannot trust labels on packets sent to fully-bound UDP sockets,
+ * as there's no connection set-up handshake and no shared state.
+ *
+ * Labels on looped-back packets within a single zone do not need to be
+ * checked, as all processes in the same zone have the same label.
+ *
+ * Finally, for unlabeled packets received by a labeled system, special rules
+ * apply.  We consider only the MLP if there is one.  Otherwise, we prefer a
+ * socket in the zone whose label matches the default label of the sender, if
+ * any.  In any event, the receiving socket must have SO_MAC_EXEMPT set and the
+ * receiver's label must dominate the sender's default label.
  *
  * conn_t	*ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int);
  * conn_t	*ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t);
@@ -203,11 +239,9 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/dlpi.h>
 #include <sys/stropts.h>
 #include <sys/sysmacros.h>
 #include <sys/strsubr.h>
-#include <sys/strlog.h>
 #include <sys/strsun.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/ddi.h>
@@ -225,23 +259,16 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/tcp.h>
-#include <inet/tcp_trace.h>
-#include <inet/ip_multi.h>
-#include <inet/ip_if.h>
-#include <inet/ip_ire.h>
-#include <inet/ip_rts.h>
-#include <inet/optcom.h>
 #include <inet/ip_ndp.h>
 #include <inet/udp_impl.h>
 #include <inet/sctp_ip.h>
 
-#include <sys/ethernet.h>
-#include <net/if_types.h>
 #include <sys/cpuvar.h>
 
-#include <inet/mi.h>
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
+
+#include <sys/tsol/tnet.h>
 
 #ifdef DEBUG
 #define	IPCL_DEBUG
@@ -527,6 +554,16 @@ ipcl_conn_destroy(conn_t *connp)
 	ASSERT(connp->conn_ref == 0);
 	ASSERT(connp->conn_ire_cache == NULL);
 
+	if (connp->conn_peercred != NULL &&
+	    connp->conn_peercred != connp->conn_cred)
+		crfree(connp->conn_peercred);
+	connp->conn_peercred = NULL;
+
+	if (connp->conn_cred != NULL) {
+		crfree(connp->conn_cred);
+		connp->conn_cred = NULL;
+	}
+
 	ipcl_globalhash_remove(connp);
 
 	cv_destroy(&connp->conn_cv);
@@ -537,6 +574,7 @@ ipcl_conn_destroy(conn_t *connp)
 		ASSERT(connp->conn_tcp != NULL);
 		tcp_free(tcp);
 		mp = tcp->tcp_timercache;
+		tcp->tcp_cred = NULL;
 
 		if (tcp->tcp_sack_info != NULL) {
 			bzero(tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
@@ -763,6 +801,7 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 void
 ipcl_hash_insert_wildcard(connf_t *connfp, conn_t *connp)
 {
+	ASSERT(!connp->conn_mac_exempt);
 	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 }
 
@@ -772,6 +811,8 @@ ipcl_proto_insert(conn_t *connp, uint8_t protocol)
 	connf_t	*connfp;
 
 	ASSERT(connp != NULL);
+	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
+	    protocol == IPPROTO_ESP);
 
 	connp->conn_ulp = protocol;
 
@@ -786,6 +827,8 @@ ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
 	connf_t	*connfp;
 
 	ASSERT(connp != NULL);
+	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
+	    protocol == IPPROTO_ESP);
 
 	connp->conn_ulp = protocol;
 
@@ -844,6 +887,69 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 }
 
 /*
+ * Check for a MAC exemption conflict on a labeled system.  Note that for
+ * protocols that use port numbers (UDP, TCP, SCTP), we do this check up in the
+ * transport layer.  This check is for binding all other protocols.
+ *
+ * Returns true if there's a conflict.
+ */
+static boolean_t
+check_exempt_conflict_v4(conn_t *connp)
+{
+	connf_t	*connfp;
+	conn_t *tconn;
+
+	connfp = &ipcl_proto_fanout[connp->conn_ulp];
+	mutex_enter(&connfp->connf_lock);
+	for (tconn = connfp->connf_head; tconn != NULL;
+	    tconn = tconn->conn_next) {
+		/* We don't allow v4 fallback for v6 raw socket */
+		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
+			continue;
+		/* If neither is exempt, then there's no conflict */
+		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
+			continue;
+		/* If both are bound to different specific addrs, ok */
+		if (connp->conn_src != INADDR_ANY &&
+		    tconn->conn_src != INADDR_ANY &&
+		    connp->conn_src != tconn->conn_src)
+			continue;
+		/* These two conflict; fail */
+		break;
+	}
+	mutex_exit(&connfp->connf_lock);
+	return (tconn != NULL);
+}
+
+static boolean_t
+check_exempt_conflict_v6(conn_t *connp)
+{
+	connf_t	*connfp;
+	conn_t *tconn;
+
+	connfp = &ipcl_proto_fanout[connp->conn_ulp];
+	mutex_enter(&connfp->connf_lock);
+	for (tconn = connfp->connf_head; tconn != NULL;
+	    tconn = tconn->conn_next) {
+		/* We don't allow v4 fallback for v6 raw socket */
+		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
+			continue;
+		/* If neither is exempt, then there's no conflict */
+		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
+			continue;
+		/* If both are bound to different addrs, ok */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&tconn->conn_srcv6) &&
+		    !IN6_ARE_ADDR_EQUAL(&connp->conn_srcv6, &tconn->conn_srcv6))
+			continue;
+		/* These two conflict; fail */
+		break;
+	}
+	mutex_exit(&connfp->connf_lock);
+	return (tconn != NULL);
+}
+
+/*
  * (v4, v6) bind hash insertion routines
  */
 int
@@ -865,8 +971,11 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 	connp->conn_lport = lport;
 
 	switch (protocol) {
-	case IPPROTO_UDP:
 	default:
+		if (is_system_labeled() && check_exempt_conflict_v4(connp))
+			return (EADDRINUSE);
+		/* FALLTHROUGH */
+	case IPPROTO_UDP:
 		if (protocol == IPPROTO_UDP) {
 			IPCL_DEBUG_LVL(64,
 			    ("ipcl_bind_insert: connp %p - udp\n",
@@ -891,6 +1000,7 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 	case IPPROTO_TCP:
 
 		/* Insert it in the Bind Hash */
+		ASSERT(connp->conn_zoneid != ALL_ZONES);
 		connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 		if (connp->conn_src != INADDR_ANY) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
@@ -927,8 +1037,11 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 	connp->conn_lport = lport;
 
 	switch (protocol) {
-	case IPPROTO_UDP:
 	default:
+		if (is_system_labeled() && check_exempt_conflict_v6(connp))
+			return (EADDRINUSE);
+		/* FALLTHROUGH */
+	case IPPROTO_UDP:
 		if (protocol == IPPROTO_UDP) {
 			IPCL_DEBUG_LVL(128,
 			    ("ipcl_bind_insert_v6: connp %p - udp\n",
@@ -954,6 +1067,7 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		/* XXX - Need a separate table for IN6_IS_ADDR_UNSPECIFIED? */
 
 		/* Insert it in the Bind Hash */
+		ASSERT(connp->conn_zoneid != ALL_ZONES);
 		connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6)) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
@@ -1055,8 +1169,18 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
-	case IPPROTO_UDP:
 	default:
+		/*
+		 * Check for conflicts among MAC exempt bindings.  For
+		 * transports with port numbers, this is done by the upper
+		 * level per-transport binding logic.  For all others, it's
+		 * done here.
+		 */
+		if (is_system_labeled() && check_exempt_conflict_v4(connp))
+			return (EADDRINUSE);
+		/* FALLTHROUGH */
+
+	case IPPROTO_UDP:
 		up = (uint16_t *)&ports;
 		IPCL_CONN_INIT(connp, protocol, src, rem, ports);
 		if (protocol == IPPROTO_UDP) {
@@ -1128,8 +1252,11 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
-	case IPPROTO_UDP:
 	default:
+		if (is_system_labeled() && check_exempt_conflict_v6(connp))
+			return (EADDRINUSE);
+		/* FALLTHROUGH */
+	case IPPROTO_UDP:
 		up = (uint16_t *)&ports;
 		IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
 		if (protocol == IPPROTO_UDP) {
@@ -1155,6 +1282,11 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
  * v4 packet classifying function. looks up the fanout table to
  * find the conn, the packet belongs to. returns the conn with
  * the reference held, null otherwise.
+ *
+ * If zoneid is ALL_ZONES, then the search rules described in the "Connection
+ * Lookup" comment block are applied.  Labels are also checked as described
+ * above.  If the packet is from the inside (looped back), and is from the same
+ * zone, then label checks are omitted.
  */
 conn_t *
 ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
@@ -1166,6 +1298,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 	uint32_t ports;
 	conn_t	*connp;
 	uint16_t  *up;
+	boolean_t shared_addr;
+	boolean_t unlabeled;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	up = (uint16_t *)((uchar_t *)ipha + hdr_len + TCP_PORTS_OFFSET);
@@ -1184,6 +1318,13 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		}
 
 		if (connp != NULL) {
+			/*
+			 * We have a fully-bound TCP connection.
+			 *
+			 * For labeled systems, there's no need to check the
+			 * label here.  It's known to be good as we checked
+			 * before allowing the connection to become bound.
+			 */
 			CONN_INC_REF(connp);
 			mutex_exit(&connfp->connf_lock);
 			return (connp);
@@ -1192,18 +1333,60 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		mutex_exit(&connfp->connf_lock);
 
 		lport = up[1];
+		unlabeled = B_FALSE;
+		/* Cred cannot be null on IPv4 */
+		if (is_system_labeled())
+			unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+			    TSLF_UNLABELED) != 0;
+		shared_addr = (zoneid == ALL_ZONES);
+		if (shared_addr) {
+			zoneid = tsol_mlp_findzone(protocol, lport);
+			/*
+			 * If no shared MLP is found, tsol_mlp_findzone returns
+			 * ALL_ZONES.  In that case, we assume it's SLP, and
+			 * search for the zone based on the packet label.
+			 *
+			 * If there is such a zone, we prefer to find a
+			 * connection in it.  Otherwise, we look for a
+			 * MAC-exempt connection in any zone whose label
+			 * dominates the default label on the packet.
+			 */
+			if (zoneid == ALL_ZONES)
+				zoneid = tsol_packet_to_zoneid(mp);
+			else
+				unlabeled = B_FALSE;
+		}
+
 		bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 		mutex_enter(&bind_connfp->connf_lock);
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
-			if (IPCL_BIND_MATCH(connp, protocol,
-			    ipha->ipha_dst, lport) &&
-			    connp->conn_zoneid == zoneid)
+			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
+			    lport) &&
+			    (connp->conn_zoneid == zoneid ||
+			    (unlabeled && connp->conn_mac_exempt)))
 				break;
 		}
 
+		/*
+		 * If the matching connection is SLP on a private address, then
+		 * the label on the packet must match the local zone's label.
+		 * Otherwise, it must be in the label range defined by tnrh.
+		 * This is ensured by tsol_receive_label.
+		 */
+		if (connp != NULL && is_system_labeled() &&
+		    !tsol_receive_local(mp, &ipha->ipha_dst, IPV4_VERSION,
+		    shared_addr, connp)) {
+				DTRACE_PROBE3(
+				    tx__ip__log__info__classify__tcp,
+				    char *,
+				    "connp(1) could not receive mp(2)",
+				    conn_t *, connp, mblk_t *, mp);
+			connp = NULL;
+		}
+
 		if (connp != NULL) {
-			/* Have a listner at least */
+			/* Have a listener at least */
 			CONN_INC_REF(connp);
 			mutex_exit(&bind_connfp->connf_lock);
 			return (connp);
@@ -1218,6 +1401,29 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 
 	case IPPROTO_UDP:
 		lport = up[1];
+		unlabeled = B_FALSE;
+		/* Cred cannot be null on IPv4 */
+		if (is_system_labeled())
+			unlabeled = (crgetlabel(DB_CRED(mp))->tsl_flags &
+			    TSLF_UNLABELED) != 0;
+		shared_addr = (zoneid == ALL_ZONES);
+		if (shared_addr) {
+			zoneid = tsol_mlp_findzone(protocol, lport);
+			/*
+			 * If no shared MLP is found, tsol_mlp_findzone returns
+			 * ALL_ZONES.  In that case, we assume it's SLP, and
+			 * search for the zone based on the packet label.
+			 *
+			 * If there is such a zone, we prefer to find a
+			 * connection in it.  Otherwise, we look for a
+			 * MAC-exempt connection in any zone whose label
+			 * dominates the default label on the packet.
+			 */
+			if (zoneid == ALL_ZONES)
+				zoneid = tsol_packet_to_zoneid(mp);
+			else
+				unlabeled = B_FALSE;
+		}
 		fport = up[0];
 		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify %x %x", lport, fport));
 		connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(lport)];
@@ -1226,8 +1432,18 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
-			    connp->conn_zoneid == zoneid)
+			    (connp->conn_zoneid == zoneid ||
+			    (unlabeled && connp->conn_mac_exempt)))
 				break;
+		}
+
+		if (connp != NULL && is_system_labeled() &&
+		    !tsol_receive_local(mp, &ipha->ipha_dst, IPV4_VERSION,
+		    shared_addr, connp)) {
+			DTRACE_PROBE3(tx__ip__log__info__classify__udp,
+			    char *, "connp(1) could not receive mp(2)",
+			    conn_t *, connp, mblk_t *, mp);
+			connp = NULL;
 		}
 
 		if (connp != NULL) {
@@ -1260,7 +1476,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 	uint32_t	ports;
 	conn_t		*connp;
 	uint16_t	*up;
-
+	boolean_t	shared_addr;
+	boolean_t	unlabeled;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 
@@ -1281,6 +1498,13 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		}
 
 		if (connp != NULL) {
+			/*
+			 * We have a fully-bound TCP connection.
+			 *
+			 * For labeled systems, there's no need to check the
+			 * label here.  It's known to be good as we checked
+			 * before allowing the connection to become bound.
+			 */
 			CONN_INC_REF(connp);
 			mutex_exit(&connfp->connf_lock);
 			return (connp);
@@ -1289,14 +1513,51 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		mutex_exit(&connfp->connf_lock);
 
 		lport = up[1];
+		unlabeled = B_FALSE;
+		/* Cred can be null on IPv6 */
+		if (is_system_labeled()) {
+			cred_t *cr = DB_CRED(mp);
+
+			unlabeled = (cr != NULL &&
+			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
+		}
+		shared_addr = (zoneid == ALL_ZONES);
+		if (shared_addr) {
+			zoneid = tsol_mlp_findzone(protocol, lport);
+			/*
+			 * If no shared MLP is found, tsol_mlp_findzone returns
+			 * ALL_ZONES.  In that case, we assume it's SLP, and
+			 * search for the zone based on the packet label.
+			 *
+			 * If there is such a zone, we prefer to find a
+			 * connection in it.  Otherwise, we look for a
+			 * MAC-exempt connection in any zone whose label
+			 * dominates the default label on the packet.
+			 */
+			if (zoneid == ALL_ZONES)
+				zoneid = tsol_packet_to_zoneid(mp);
+			else
+				unlabeled = B_FALSE;
+		}
+
 		bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 		mutex_enter(&bind_connfp->connf_lock);
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
-			    connp->conn_zoneid == zoneid)
+			    (connp->conn_zoneid == zoneid ||
+			    (unlabeled && connp->conn_mac_exempt)))
 				break;
+		}
+
+		if (connp != NULL && is_system_labeled() &&
+		    !tsol_receive_local(mp, &ip6h->ip6_dst, IPV6_VERSION,
+		    shared_addr, connp)) {
+			DTRACE_PROBE3(tx__ip__log__info__classify__tcp6,
+			    char *, "connp(1) could not receive mp(2)",
+			    conn_t *, connp, mblk_t *, mp);
+			connp = NULL;
 		}
 
 		if (connp != NULL) {
@@ -1320,6 +1581,33 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 	case IPPROTO_UDP:
 		up = (uint16_t *)&mp->b_rptr[hdr_len];
 		lport = up[1];
+		unlabeled = B_FALSE;
+		/* Cred can be null on IPv6 */
+		if (is_system_labeled()) {
+			cred_t *cr = DB_CRED(mp);
+
+			unlabeled = (cr != NULL &&
+			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
+		}
+		shared_addr = (zoneid == ALL_ZONES);
+		if (shared_addr) {
+			zoneid = tsol_mlp_findzone(protocol, lport);
+			/*
+			 * If no shared MLP is found, tsol_mlp_findzone returns
+			 * ALL_ZONES.  In that case, we assume it's SLP, and
+			 * search for the zone based on the packet label.
+			 *
+			 * If there is such a zone, we prefer to find a
+			 * connection in it.  Otherwise, we look for a
+			 * MAC-exempt connection in any zone whose label
+			 * dominates the default label on the packet.
+			 */
+			if (zoneid == ALL_ZONES)
+				zoneid = tsol_packet_to_zoneid(mp);
+			else
+				unlabeled = B_FALSE;
+		}
+
 		fport = up[0];
 		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify_v6 %x %x", lport,
 		    fport));
@@ -1329,8 +1617,18 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
-			    connp->conn_zoneid == zoneid)
+			    (connp->conn_zoneid == zoneid ||
+			    (unlabeled && connp->conn_mac_exempt)))
 				break;
+		}
+
+		if (connp != NULL && is_system_labeled() &&
+		    !tsol_receive_local(mp, &ip6h->ip6_dst, IPV6_VERSION,
+		    shared_addr, connp)) {
+			DTRACE_PROBE3(tx__ip__log__info__classify__udp6,
+			    char *, "connp(1) could not receive mp(2)",
+			    conn_t *, connp, mblk_t *, mp);
+			connp = NULL;
 		}
 
 		if (connp != NULL) {
@@ -1348,7 +1646,6 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    lport, fport));
 		break;
 	}
-
 
 	return (NULL);
 }
@@ -1384,52 +1681,96 @@ ipcl_classify(mblk_t *mp, zoneid_t zoneid)
 }
 
 conn_t *
-ipcl_classify_raw(uint8_t protocol, zoneid_t zoneid, uint32_t ports,
-    ipha_t *hdr)
+ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
+    uint32_t ports, ipha_t *hdr)
 {
-	struct connf_s	*connfp;
+	connf_t		*connfp;
 	conn_t		*connp;
 	in_port_t	lport;
 	int		af;
+	boolean_t	shared_addr;
+	boolean_t	unlabeled;
+	const void	*dst;
 
 	lport = ((uint16_t *)&ports)[1];
+
+	unlabeled = B_FALSE;
+	/* Cred can be null on IPv6 */
+	if (is_system_labeled()) {
+		cred_t *cr = DB_CRED(mp);
+
+		unlabeled = (cr != NULL &&
+		    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
+	}
+	shared_addr = (zoneid == ALL_ZONES);
+	if (shared_addr) {
+		zoneid = tsol_mlp_findzone(protocol, lport);
+		/*
+		 * If no shared MLP is found, tsol_mlp_findzone returns
+		 * ALL_ZONES.  In that case, we assume it's SLP, and search for
+		 * the zone based on the packet label.
+		 *
+		 * If there is such a zone, we prefer to find a connection in
+		 * it.  Otherwise, we look for a MAC-exempt connection in any
+		 * zone whose label dominates the default label on the packet.
+		 */
+		if (zoneid == ALL_ZONES)
+			zoneid = tsol_packet_to_zoneid(mp);
+		else
+			unlabeled = B_FALSE;
+	}
+
 	af = IPH_HDR_VERSION(hdr);
+	dst = af == IPV4_VERSION ? (const void *)&hdr->ipha_dst :
+	    (const void *)&((ip6_t *)hdr)->ip6_dst;
 	connfp = &ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport))];
 
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket. */
-		if ((af == (connp->conn_af_isv6 ? IPV4_VERSION :
-		    IPV6_VERSION)) || (connp->conn_zoneid != zoneid)) {
+		if (af == (connp->conn_af_isv6 ? IPV4_VERSION :
+		    IPV6_VERSION))
 			continue;
-		}
 		if (connp->conn_fully_bound) {
 			if (af == IPV4_VERSION) {
-				if (IPCL_CONN_MATCH(connp, protocol,
-				    hdr->ipha_src, hdr->ipha_dst, ports)) {
-					break;
-				}
+				if (!IPCL_CONN_MATCH(connp, protocol,
+				    hdr->ipha_src, hdr->ipha_dst, ports))
+					continue;
 			} else {
-				if (IPCL_CONN_MATCH_V6(connp, protocol,
+				if (!IPCL_CONN_MATCH_V6(connp, protocol,
 				    ((ip6_t *)hdr)->ip6_src,
-				    ((ip6_t *)hdr)->ip6_dst, ports)) {
-					break;
-				}
+				    ((ip6_t *)hdr)->ip6_dst, ports))
+					continue;
 			}
 		} else {
 			if (af == IPV4_VERSION) {
-				if (IPCL_BIND_MATCH(connp, protocol,
-				    hdr->ipha_dst, lport)) {
-					break;
-				}
+				if (!IPCL_BIND_MATCH(connp, protocol,
+				    hdr->ipha_dst, lport))
+					continue;
 			} else {
-				if (IPCL_BIND_MATCH_V6(connp, protocol,
-				    ((ip6_t *)hdr)->ip6_dst, lport)) {
-					break;
-				}
+				if (!IPCL_BIND_MATCH_V6(connp, protocol,
+				    ((ip6_t *)hdr)->ip6_dst, lport))
+					continue;
 			}
 		}
+
+		if (connp->conn_zoneid == zoneid ||
+		    (unlabeled && connp->conn_mac_exempt))
+			break;
+	}
+	/*
+	 * If the connection is fully-bound and connection-oriented (TCP or
+	 * SCTP), then we've already validated the remote system's label.
+	 * There's no need to do it again for every packet.
+	 */
+	if (connp != NULL && is_system_labeled() && (!connp->conn_fully_bound ||
+	    !(connp->conn_flags & (IPCL_TCP|IPCL_SCTPCONN))) &&
+	    !tsol_receive_local(mp, dst, af, shared_addr, connp)) {
+		DTRACE_PROBE3(tx__ip__log__info__classify__rawip,
+		    char *, "connp(1) could not receive mp(2)",
+		    conn_t *, connp, mblk_t *, mp);
+		connp = NULL;
 	}
 
 	if (connp != NULL)
@@ -1797,7 +2138,8 @@ ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
 }
 
 /*
- * To find a TCP listening connection matching the incoming segment.
+ * Finds a TCP/IPv4 listening connection; called by tcp_disconnect to locate
+ * a listener when changing state.
  */
 conn_t *
 ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
@@ -1812,6 +2154,8 @@ ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
 	 */
 	if (laddr == 0)
 		return (NULL);
+
+	ASSERT(zoneid != ALL_ZONES);
 
 	bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 	mutex_enter(&bind_connfp->connf_lock);
@@ -1830,7 +2174,10 @@ ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
 	return (NULL);
 }
 
-
+/*
+ * Finds a TCP/IPv6 listening connection; called by tcp_disconnect to locate
+ * a listener when changing state.
+ */
 conn_t *
 ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
     zoneid_t zoneid)
@@ -1846,6 +2193,7 @@ ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
 	if (IN6_IS_ADDR_UNSPECIFIED(laddr))
 		return (NULL);
 
+	ASSERT(zoneid != ALL_ZONES);
 
 	bind_connfp = &ipcl_bind_fanout[IPCL_BIND_HASH(lport)];
 	mutex_enter(&bind_connfp->connf_lock);

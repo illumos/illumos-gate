@@ -1,5 +1,5 @@
 /*
- * Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -47,6 +47,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* from UCB 8.5 (Berkeley) 2/8/95 */
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/label_macro.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -218,6 +221,38 @@ typedef struct rt_msghdr {
 #define	RTAX_SRC	8
 #define	RTAX_SRCIFP	9
 #define	RTAX_MAX	RTA_NUMBITS	/* size of array to allocate */
+
+/*
+ * Routing socket message extension after sockaddrs.
+ */
+typedef struct rtm_ext_s {
+	uint32_t	rtmex_type;	/* identifier for type of extension */
+	uint32_t	rtmex_len;	/* length of this extension */
+} rtm_ext_t;
+
+#define	RTMEX_GATEWAY_SECATTR	1	/* extension is tsol_rtsecattr */
+#define	RTMEX_MAX	RTMEX_GATEWAY_SECATTR
+
+/*
+ * Trusted Solaris route security attributes extension.
+ */
+typedef struct tsol_rtsecattr_s {
+	uint32_t	rtsa_cnt;	/* number of attributes */
+	struct rtsa_s {
+		uint32_t rtsa_mask;	/* see RTSA_* below */
+		uint32_t rtsa_doi;	/* domain of interpretation */
+		brange_t rtsa_slrange;	/* sensitivity label range */
+	} rtsa_attr[1];
+} tsol_rtsecattr_t;
+
+#define	TSOL_RTSECATTR_SIZE(n) \
+	(sizeof (tsol_rtsecattr_t) + (((n) - 1) * sizeof (struct rtsa_s)))
+
+#define	RTSA_MINSL	0x1	/* minimum sensitivity label is valid */
+#define	RTSA_MAXSL	0x2	/* maximum sensitivity label is valid */
+#define	RTSA_DOI	0x4	/* domain of interpretation is valid */
+#define	RTSA_CIPSO	0x100	/* CIPSO protocol */
+#define	RTSA_SLRANGE (RTSA_MINSL|RTSA_MAXSL)
 
 #ifdef	__cplusplus
 }

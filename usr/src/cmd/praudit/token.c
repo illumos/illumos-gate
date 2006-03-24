@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,9 +64,8 @@
 #include <bsm/audit_record.h>
 #include <bsm/libbsm.h>
 
-#ifdef	TSOL
 #include <tsol/label.h>
-#endif	/* TSOL */
+#include <sys/tsol/label_macro.h>
 
 #include "praudit.h"
 #include "toktable.h"
@@ -2154,10 +2152,8 @@ xclient_token(pr_context_t *context)
 int
 slabel_token(pr_context_t *context)
 {
-#ifdef	TSOL
 	bslabel_t label;
 	int	returnstat;
-	int	s;
 	char	strbuf[2048];
 	char	*sp = strbuf;
 	uval_t	uval;
@@ -2166,9 +2162,9 @@ slabel_token(pr_context_t *context)
 	    sizeof (label))) == 0) {
 		uval.uvaltype = PRA_STRING;
 		if (!(context->format & PRF_RAWM)) {
-			/* print in ASCII form using bltos */
-			s = bsltos(&label, &sp, sizeof (strbuf), 0);
-			if (s > 0) {
+			/* print in ASCII form */
+			if (label_to_str(&label, &sp, M_LABEL,
+			    DEF_NAMES) == 0) {
 				uval.string_val = sp;
 				returnstat = pa_print(context, &uval, 1);
 			} else /* cannot convert to string */
@@ -2185,9 +2181,6 @@ slabel_token(pr_context_t *context)
 		}
 	}
 	return (returnstat);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
 }
 
 /*
@@ -2279,109 +2272,4 @@ privilege_token(pr_context_t *context)
 
 	/* privilege: */
 	return (pa_adr_string(context, returnstat, 1));
-}
-
-/*
- * -----------------------------------------------------------------------
- * ilabel_token() 	: Process information label token and display contents
- * return codes 	: -1 - error
- *			:  0 - successful
- * NOTE: At the time of call, the ilabel token id has been retrieved
- *
- * Format of information label token:
- *	label token id		adr_char
- *	label			adr_opaque, sizeof (bilabel_t) bytes
- * -----------------------------------------------------------------------
- */
-/*ARGSUSED*/
-int
-ilabel_token(pr_context_t *context)
-{
-#ifdef	TSOL
-	bilabel_t label;
-	int	returnstat;
-	int	s;
-	char	strbuf[2048];
-	char	*sp = strbuf;
-	uval_t	uval;
-
-	if ((returnstat = pr_adr_char(context, (char *)&label,
-	    sizeof (label))) == 0) {
-		uval.uvaltype = PRA_STRING;
-		if (!(context->format & PRF_RAWM)) {
-			/* print in ASCII form using bltos */
-			s = biltos(&label, &sp, sizeof (strbuf), 0);
-			if (s > 0) {
-				uval.string_val = sp;
-				returnstat = pa_print(context, &uval, 1);
-			} else /* cannot convert to string */
-				returnstat = 1;
-		}
-		/* print in hexadecimal form */
-		if ((context->format & PRF_RAWM) || (returnstat == 1)) {
-			uval.string_val = hexconvert((char *)&label,
-			    sizeof (bilabel_t), sizeof (bilabel_t));
-			if (uval.string_val) {
-				returnstat = pa_print(context, &uval, 1);
-				free(uval.string_val);
-			}
-		}
-	}
-	return (returnstat);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
-}
-
-/*
- * -----------------------------------------------------------------------
- * clearance_token()	: Process clearance token and display contents
- * return codes 	: -1 - error
- *			:  0 - successful
- * NOTE: At the time of call, the clearance token id has been retrieved
- *
- * Format of clearance token:
- *	clearance token id	adr_char
- *	clearance		adr_char, sizeof (bclear_t) bytes
- * -----------------------------------------------------------------------
- */
-/*ARGSUSED*/
-int
-clearance_token(pr_context_t *context)
-{
-#ifdef	TSOL
-	bclear_t clearance;
-	int	returnstat;
-	int	s;
-	char	strbuf[2048];
-	char	*sp = strbuf;
-	uval_t	uval;
-
-	if ((returnstat = pr_adr_char(context, (char *)&clearance,
-	    sizeof (clearance))) == 0) {
-		uval.uvaltype = PRA_STRING;
-		if (!(context->format & PRF_RAWM)) {
-			/* print in ASCII form using bltos */
-			s = bcleartos(&clearance, &sp, sizeof (strbuf),
-			    SHORT_WORDS);
-			if (s > 0) {
-				uval.string_val = sp;
-				returnstat = pa_print(context, &uval, 1);
-			} else /* cannot convert to string */
-				returnstat = 1;
-		}
-		/* print in hexadecimal form */
-		if ((context->format & PRF_RAWM) || (returnstat == 1)) {
-			uval.string_val = hexconvert((char *)&clearance,
-			    sizeof (bclear_t), sizeof (bclear_t));
-			if (uval.string_val) {
-				returnstat = pa_print(context, &uval, 1);
-				free(uval.string_val);
-			}
-		}
-	}
-	return (returnstat);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
 }

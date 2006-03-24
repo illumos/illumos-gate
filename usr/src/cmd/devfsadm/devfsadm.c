@@ -36,10 +36,18 @@
  * reconfiguration for hotplugging support.
  */
 
-#include "devfsadm_impl.h"
+#include <string.h>
+#include <tsol/label.h>
+#include <bsm/devices.h>
+#include <bsm/devalloc.h>
 #include <utime.h>
+#include "devfsadm_impl.h"
 
-/* globals */
+/* externs from devalloc.c */
+
+extern void  _reset_devalloc(int);
+extern void _update_devalloc_db(devlist_t *, int, int, char *, char *);
+extern int _da_check_for_usb(char *, char *);
 
 /* create or remove nodes or links. unset with -n */
 static int file_mods = TRUE;
@@ -50,12 +58,26 @@ static int cleanup = FALSE;
 /* devlinks -d compatibility */
 static int devlinks_debug = FALSE;
 
-/* turn off device allocation with devfsadm -d */
-static int devalloc_off = FALSE;
+/* flag to check if system is labeled */
+int system_labeled = FALSE;
 
-/* devices to be deallocated with -d */
-static char *devalloc[5] =
-	{DDI_NT_AUDIO, DDI_NT_CD, DDI_NT_FD, DDI_NT_TAPE, NULL};
+/* flag to enable/disable device allocation with -e/-d */
+static int devalloc_flag = 0;
+
+/* flag to update device allocation database for this device type */
+static int update_devdb = 0;
+
+/*
+ * devices to be deallocated with -d :
+ *	audio, floppy, cd, floppy, tape, rmdisk.
+ */
+static char *devalloc_list[10] = {DDI_NT_AUDIO, DDI_NT_CD, DDI_NT_CD_CHAN,
+				    DDI_NT_FD, DDI_NT_TAPE, DDI_NT_BLOCK_CHAN,
+				    DDI_NT_UGEN, DDI_NT_USB_ATTACHMENT_POINT,
+				    DDI_NT_SCSI_NEXUS, NULL};
+
+/* list of allocatable devices */
+static devlist_t devlist;
 
 /* load a single driver only.  set with -i */
 static int single_drv = FALSE;
@@ -210,6 +232,7 @@ static void update_drvconf(major_t);
 int
 main(int argc, char *argv[])
 {
+	struct stat tx_stat;
 	struct passwd *pw;
 	struct group *gp;
 	pid_t pid;
@@ -251,9 +274,25 @@ main(int argc, char *argv[])
 
 	(void) umask(0);
 
+	system_labeled = is_system_labeled();
+	if (system_labeled == FALSE) {
+		/*
+		 * is_system_labeled() will return false in case we are
+		 * starting before the first reboot after Trusted Extensions
+		 * is installed. we check for a well known TX binary to
+		 * to see if TX is installed.
+		 */
+		if (stat(DA_LABEL_CHECK, &tx_stat) == 0)
+			system_labeled = TRUE;
+	}
+
 	parse_args(argc, argv);
 
 	(void) sema_init(&dev_sema, 1, USYNC_THREAD, NULL);
+
+	/* Initialize device allocation list */
+	devlist.audio = devlist.cd = devlist.floppy = devlist.tape =
+	devlist.rmdisk = NULL;
 
 	if (daemon_mode == TRUE) {
 		/*
@@ -311,7 +350,6 @@ main(int argc, char *argv[])
 				(void) rcm_init();
 				login_dev_enable = TRUE;
 			}
-
 			daemon_update();
 		} else {
 			err_print(DAEMON_RUNNING, pid);
@@ -322,6 +360,9 @@ main(int argc, char *argv[])
 	} else {
 		/* not a daemon, so just build /dev and /devices */
 		process_devinfo_tree();
+		if (devalloc_flag != 0)
+			/* Enable/disable device allocation */
+			_reset_devalloc(devalloc_flag);
 	}
 	return (0);
 }
@@ -607,7 +648,7 @@ parse_args(int argc, char *argv[])
 		devlinktab_file = DEVLINKTAB_FILE;
 
 		while ((opt = getopt(argc, argv,
-		    "Cc:dIi:l:np:PR:r:st:vV:x:z:Z:")) != EOF) {
+		    "Cc:deIi:l:np:PR:r:st:vV:x:z:Z:")) != EOF) {
 			if (opt == 'I' || opt == 'P') {
 				if (public_mode)
 					usage();
@@ -626,9 +667,21 @@ parse_args(int argc, char *argv[])
 						    sizeof (char *));
 				classes[num_classes - 1] = optarg;
 				break;
-			case  'd':
+			case 'd':
 				if (daemon_mode == FALSE) {
-					devalloc_off = TRUE;
+					/*
+					 * Device allocation to be disabled.
+					 */
+					devalloc_flag = DA_OFF;
+					build_dev = FALSE;
+				}
+				break;
+			case 'e':
+				if (daemon_mode == FALSE) {
+					/*
+					 * Device allocation to be enabled.
+					 */
+					devalloc_flag = DA_ON;
 					build_dev = FALSE;
 				}
 				break;
@@ -909,6 +962,12 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 	if ((dcip->dci_flags & DCA_NOTIFY_RCM) && rcm_hdl)
 		(void) notify_rcm(node, dcip->dci_minor);
 
+	/* Add new device to device allocation database */
+	if (system_labeled && update_devdb) {
+		_update_devalloc_db(&devlist, 0, DA_ADD, NULL, root_dir);
+		update_devdb = 0;
+	}
+
 	di_fini(node);
 }
 
@@ -986,7 +1045,7 @@ process_devinfo_tree()
 
 	} else if (load_attach_drv == TRUE) {
 		/*
-		 * load and attach all drivers, then walk the entire tree.
+		 * Load and attach all drivers, then walk the entire tree.
 		 * If the cache flag is set, use DINFOCACHE to get cached
 		 * data.
 		 */
@@ -2825,11 +2884,33 @@ devfsadm_mklink_default(char *link, di_node_t node, di_minor_t minor, int flags)
 	    == DEVFSADM_SUCCESS) {
 		linknew = TRUE;
 		add_link_to_cache(link, acontents);
+		if (system_labeled && (flags & DA_ADD)) {
+			/*
+			 * Add this device to the list of allocatable devices.
+			 */
+			int	instance = di_instance(node);
+
+			(void) da_add_list(&devlist, devlink, instance, flags);
+			update_devdb = flags;
+		}
 	} else {
 		linknew = FALSE;
 	}
 
 	if (link_exists == TRUE) {
+		if (system_labeled && (flags & DA_CD)) {
+			/*
+			 * if this is a removable disk, add it
+			 * as that to device allocation database.
+			 */
+			if (_da_check_for_usb(devlink, root_dir) == 1) {
+				int instance = di_instance(node);
+
+				(void) da_add_list(&devlist, devlink, instance,
+				    DA_ADD|DA_RMDISK);
+				update_devdb = DA_RMDISK;
+			}
+		}
 		/* Link exists or was just created */
 		(void) di_devlink_add_link(devlink_cache, link, rcontents,
 		    DI_PRIMARY_LINK);
@@ -2935,6 +3016,19 @@ devfsadm_secondary_link(char *link, char *primary_link, int flags)
 		 */
 		add_link_to_cache(link, lphy_path);
 		linknew = TRUE;
+		if (system_labeled &&
+		    ((flags & DA_AUDIO) && (flags & DA_ADD))) {
+			/*
+			 * Add this device to the list of allocatable devices.
+			 */
+			int	instance = 0;
+
+			op = strrchr(contents, '/');
+			op++;
+			(void) sscanf(op, "%d", &instance);
+			(void) da_add_list(&devlist, devlink, instance, flags);
+			update_devdb = flags;
+		}
 	} else {
 		linknew = FALSE;
 	}
@@ -3228,6 +3322,7 @@ set_logindev_perms(char *devlink)
 static void
 reset_node_permissions(di_node_t node, di_minor_t minor)
 {
+	int devalloc_is_on = 0;
 	int spectype;
 	char phy_path[PATH_MAX + 1];
 	mode_t mode;
@@ -3281,32 +3376,52 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 	}
 
 	/*
-	 * If we are here for deactivating device allocation, set
-	 * default permissions. Otherwise, set default permissions
-	 * only if this is a new device because we want to preserve
-	 * modified user permissions.
-	 * Devfs indicates a new device by faking an access time
-	 * of zero.
+	 * If we are here for a new device
+	 *	If device allocation is on
+	 *	then
+	 *		set ownership to root:other and permissions to 0000
+	 *	else
+	 *		set ownership and permissions as specified in minor_perm
+	 * If we are here for an existing device
+	 *	If device allocation is to be turned on
+	 *	then
+	 *		reset ownership to root:other and permissions to 0000
+	 *	else if device allocation is to be turned off
+	 *		reset ownership and permissions to those specified in
+	 *		minor_perm
+	 *	else
+	 *		preserve exsisting/user-modified ownership and
+	 *		permissions
+	 *
+	 * devfs indicates a new device by faking access time to be zero.
 	 */
+	devalloc_is_on = da_is_on();
 	if (sb.st_atime != 0) {
 		int  i;
 		char *nt;
 
-		if (devalloc_off == FALSE)
+		if ((devalloc_flag == 0) && (devalloc_is_on != 1))
+			/*
+			 * Leave existing devices as they are if we are not
+			 * turning device allocation on/off.
+			 */
 			return;
 
 		nt = di_minor_nodetype(minor);
+
 		if (nt == NULL)
 			return;
-		for (i = 0; devalloc[i]; i++) {
-			if (strcmp(nt, devalloc[i]) == 0)
+
+		for (i = 0; devalloc_list[i]; i++) {
+			if (strcmp(nt, devalloc_list[i]) == 0)
+				/*
+				 * One of the types recognized by devalloc,
+				 * reset attrs.
+				 */
 				break;
 		}
-
-		if (devalloc[i] == NULL)
+		if (devalloc_list[i] == NULL)
 			return;
-
-		/* One of the types recognized by devalloc, reset perms */
 	}
 
 	if (file_mods == FALSE) {
@@ -3315,12 +3430,24 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 		return;
 	}
 
-	if (sb.st_mode != mode) {
+	if ((devalloc_flag == DA_ON) || (devalloc_is_on == 1)) {
+		/*
+		 * we are here either to turn device allocation on
+		 * or to add a new device while device allocation in on
+		 */
+		mode = DEALLOC_MODE;
+		uid = DA_UID;
+		gid = DA_GID;
+	}
+
+	if ((devalloc_is_on == 1) || (devalloc_flag == DA_ON) ||
+	    (sb.st_mode != mode)) {
 		if (chmod(phy_path, mode) == -1)
 			vprint(VERBOSE_MID, CHMOD_FAILED,
 			    phy_path, strerror(errno));
 	}
-	if (sb.st_uid != uid || sb.st_gid != gid) {
+	if ((devalloc_is_on == 1) || (devalloc_flag == DA_ON) ||
+	    (sb.st_uid != uid || sb.st_gid != gid)) {
 		if (chown(phy_path, uid, gid) == -1)
 			vprint(VERBOSE_MID, CHOWN_FAILED,
 			    phy_path, strerror(errno));
@@ -4483,6 +4610,27 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 		}
 	}
 
+	/* update device allocation database */
+	if (system_labeled) {
+		int	ret = 0;
+		int	devtype = 0;
+		char	devname[MAXNAMELEN];
+
+		devname[0] = '\0';
+		if (strstr(node_path, DA_SOUND_NAME))
+			devtype = DA_AUDIO;
+		else if (strstr(node_path, "disk"))
+			devtype = DA_RMDISK;
+		else
+			goto out;
+		ret = da_remove_list(&devlist, NULL, devtype, devname,
+		    sizeof (devname));
+		if (ret != -1)
+			(void) _update_devalloc_db(&devlist, devtype, DA_REMOVE,
+			    devname, root_dir);
+	}
+
+out:
 	/* now log an event */
 	if (nvl) {
 		log_event(EC_DEV_REMOVE, ev_subclass, nvl);
@@ -4610,8 +4758,9 @@ int
 devfsadm_link_valid(char *link)
 {
 	struct stat sb;
-	char devlink[PATH_MAX + 1], *contents;
+	char devlink[PATH_MAX + 1], *contents = NULL;
 	int rv, type;
+	int instance = 0;
 
 	/* prepend link with dev_dir contents */
 	(void) strcpy(devlink, dev_dir);
@@ -4634,6 +4783,13 @@ devfsadm_link_valid(char *link)
 	 * The link exists. Add it to the database
 	 */
 	(void) di_devlink_add_link(devlink_cache, link, contents, type);
+	if (system_labeled && (rv == DEVFSADM_TRUE) &&
+	    strstr(devlink, DA_AUDIO_NAME) && contents) {
+		(void) sscanf(contents, "%*[a-z]%d", &instance);
+		(void) da_add_list(&devlist, devlink, instance,
+		    DA_ADD|DA_AUDIO);
+		_update_devalloc_db(&devlist, 0, DA_ADD, NULL, root_dir);
+	}
 	free(contents);
 
 	return (rv);

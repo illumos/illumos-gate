@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,6 +144,8 @@ void s_print_request ( char * m, MESG * md )
 		rp->secure->req_id = Strdup(s->req_id);
 		rp->secure->user = Strdup(s->user);
 		rp->secure->system = Strdup(s->system);
+		if (md->slabel != NULL)
+			rp->secure->slabel = Strdup(md->slabel);
 		freesecure(s);
 		/*
 		**  There are some anomallies associated w/
@@ -160,6 +161,8 @@ void s_print_request ( char * m, MESG * md )
 		rp->request->outcome = 0;
 		rp->secure->uid = md->uid;
 		rp->secure->gid = md->gid;
+		if (md->slabel != NULL)
+			rp->secure->slabel = Strdup(md->slabel);
     
 		pw = getpwuid(md->uid);
 		endpwent();
@@ -365,6 +368,10 @@ void s_start_change_request (char *m, MESG *md)
     
     if (!(rp = request_by_id(req_id)))
 	status = MUNKNOWN;
+    else if ((md->admin == 0) && (is_system_labeled()) &&
+	    (md->slabel != NULL) && (rp->secure->slabel != NULL) &&
+	    (!STREQU(md->slabel, rp->secure->slabel)))
+	status = MUNKNOWN;
     else if (rp->request->outcome & RS_DONE)
 	status = M2LATE;
     else if (!md->admin && md->uid != rp->secure->uid)
@@ -437,6 +444,10 @@ void s_end_change_request(char *m, MESG *md)
     syslog(LOG_DEBUG, "s_end_change_request(%s)", (req_id ? req_id : "NULL"));
 
     if (!(rp = request_by_id(req_id)))
+	status = MUNKNOWN;
+    else if ((md->admin == 0) && (is_system_labeled()) &&
+	    (md->slabel != NULL) && (rp->secure->slabel != NULL) &&
+	    (!STREQU(md->slabel, rp->secure->slabel)))
 	status = MUNKNOWN;
     else if (!(rp->request->outcome & RS_CHANGING))
 	status = MNOSTART;
@@ -618,6 +629,15 @@ _cancel(MESG *md, char *dest, char *user, char *req_id)
 	    return(Strdup(crp->secure->req_id));
 	}
 
+	/*
+	 * For Trusted Extensions, we need to check the sensitivity label of the
+	 * connection and job before we try to cancel it.
+	 */
+	if ((md->admin == 0) && (is_system_labeled()) &&
+	    (md->slabel != NULL) && (crp->secure->slabel != NULL) &&
+	    (!STREQU(md->slabel, crp->secure->slabel)))
+	    continue;
+
 	crp->reason = MOK;
 	creq_id = Strdup(crp->secure->req_id);
 
@@ -737,14 +757,23 @@ void s_inquire_request(char *m, MESG *md)
 
 	if (*pwheel && !SAME(pwheel, rp->pwheel_name))
 	    continue;
+
+	/*
+	 * For Trusted Extensions, we need to check the sensitivity label of the
+	 * connection and job before we return it to the client.
+	 */
+	if ((md->admin <= 0) && (is_system_labeled()) &&
+	    (md->slabel != NULL) && (rp->secure->slabel != NULL) &&
+	    (!STREQU(md->slabel, rp->secure->slabel)))
+	    continue;
 	
 	if (found) {
 	    GetRequestFiles(found->request, files, sizeof(files));
 	    mputm(md, R_INQUIRE_REQUEST,
 		 MOKMORE,
 		 found->secure->req_id,
-		 found->request->user,
-			/* bgolden 091996, bug 1257405 */
+		 found->request->user, /* bgolden 091996, bug 1257405 */
+		 found->secure->slabel,
 		 found->secure->size,
 		 found->secure->date,
 		 found->request->outcome,
@@ -763,6 +792,7 @@ void s_inquire_request(char *m, MESG *md)
 	     MOK,
 	     found->secure->req_id,
 	     found->request->user, /* bgolden 091996, bug 1257405 */
+	     found->secure->slabel,
 	     found->secure->size,
 	     found->secure->date,
 	     found->request->outcome,
@@ -772,7 +802,7 @@ void s_inquire_request(char *m, MESG *md)
 	     files
 	);
     } else
-	mputm(md, R_INQUIRE_REQUEST, MNOINFO, "", "", 0L, 0L, 0, "", "", "",
+	mputm(md, R_INQUIRE_REQUEST, MNOINFO, "", "", "", 0L, 0L, 0, "", "", "",
 	      "");
 
     return;
@@ -829,6 +859,15 @@ void s_inquire_request_rank(char *m, MESG *md)
 
 		if (*pwheel && !SAME(pwheel, rp->pwheel_name))
 			continue;
+		/*
+		 * For Trusted Extensions, we need to check the sensitivity
+		 * label of the connection and job before we return it to the
+		 * client.
+		 */
+		if ((md->admin <= 0) && (is_system_labeled()) &&
+		    (md->slabel != NULL) && (rp->secure->slabel != NULL) &&
+		    (!STREQU(md->slabel, rp->secure->slabel)))
+			continue;
 
 		if (found) {
 			GetRequestFiles(found->request, files, sizeof(files));
@@ -837,6 +876,7 @@ void s_inquire_request_rank(char *m, MESG *md)
 				found->secure->req_id,
 				found->request->user,
 					/* bgolden 091996, bug 1257405 */
+				found->secure->slabel,
 				found->secure->size,
 				found->secure->date,
 				found->request->outcome,
@@ -858,6 +898,7 @@ void s_inquire_request_rank(char *m, MESG *md)
 			MOK,
 			found->secure->req_id,
 			found->request->user, /* bgolden 091996, bug 1257405 */
+			found->secure->slabel,
 			found->secure->size,
 			found->secure->date,
 			found->request->outcome,
@@ -868,8 +909,8 @@ void s_inquire_request_rank(char *m, MESG *md)
 			files
 		);
 	} else
-		mputm(md, R_INQUIRE_REQUEST_RANK, MNOINFO, "", "", 0L, 0L, 0,
-			"", "", "", 0, "");
+		mputm(md, R_INQUIRE_REQUEST_RANK, MNOINFO, "", "", "", 0L, 0L,
+			0, "", "", "", 0, "");
 }
 
 static int
@@ -1132,4 +1173,34 @@ reqpath(char *file, char **idnumber)
     }
 
     return(path);
+}
+
+/*
+ * The client is sending a peer connection to retreive label information
+ * from.  This is used in the event that the client is an intermediary for
+ * the actual requestor in a Trusted environment.
+ */
+void s_pass_peer_connection(char *m, MESG *md)
+{
+	short	status = MTRANSMITERR;
+	char	*dest;
+	struct strrecvfd recv_fd;
+
+	(void) getmessage(m, S_PASS_PEER_CONNECTION);
+	syslog(LOG_DEBUG, "s_pass_peer_connection()");
+
+	memset(&recv_fd, NULL, sizeof (recv_fd));
+	if (ioctl(md->readfd, I_RECVFD, &recv_fd) == 0) {
+		int fd = recv_fd.fd;
+
+		if (get_peer_label(fd, &md->slabel) == 0) {
+			if (md->admin == 1)
+				md->admin = -1; /* turn off query privilege */
+			status = MOK;
+		}
+
+		close(fd);
+	}
+
+	mputm(md, R_PASS_PEER_CONNECTION, status);
 }

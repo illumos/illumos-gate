@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <sys/atomic.h>
 #include <sys/policy.h>
 #include <sys/fem.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -71,6 +71,9 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/tndb.h>
 
 #define	RFS4_MAXLOCK_TRIES 4	/* Try to get the lock this many times */
 static int rfs4_maxlock_tries = RFS4_MAXLOCK_TRIES;
@@ -134,6 +137,12 @@ static clock_t rfs4_lock_delay = RFS4_LOCK_DELAY;
  */
 #define	DIRENT64_TO_DIRCOUNT(dp) \
 	(3 * BYTES_PER_XDR_UNIT + DIRENT64_NAMELEN((dp)->d_reclen))
+
+/*
+ * types of label comparison
+ */
+#define	EQUALITY_CHECK	0
+#define	DOMINANCE_CHECK	1
 
 time_t rfs4_start_time;			/* Initialized in rfs4_srvrinit */
 
@@ -1164,6 +1173,32 @@ rfs4_op_secinfo_free(nfs_resop4 *resop)
 	resp->SECINFO4resok_val = NULL;
 }
 
+/*
+ * do label check on client label and server's file lable.
+ */
+static boolean_t
+do_rfs4_label_check(bslabel_t *clabel, vnode_t *vp, int flag)
+{
+	bslabel_t *slabel;
+	ts_label_t *tslabel;
+	boolean_t result;
+
+	if ((tslabel = nfs4_getflabel(vp)) == NULL) {
+		return (B_FALSE);
+	}
+	slabel = label2bslabel(tslabel);
+	DTRACE_PROBE4(tx__rfs4__log__info__labelcheck, char *,
+	    "comparing server's file label(1) with client label(2) (vp(3))",
+	    bslabel_t *, slabel, bslabel_t *, clabel, vnode_t *, vp);
+
+	if (flag == EQUALITY_CHECK)
+		result = blequal(clabel, slabel);
+	else
+		result = bldominates(clabel, slabel);
+	label_rele(tslabel);
+	return (result);
+}
+
 /* ARGSUSED */
 static void
 rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
@@ -1176,6 +1211,9 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct vattr va;
 	int checkwriteperm;
 	cred_t *cr = cs->cr;
+	bslabel_t *clabel, *slabel;
+	ts_label_t *tslabel;
+	boolean_t admin_low_client;
 
 #if 0	/* XXX allow access even if !cs->access. Eventually only pseudo fs */
 	if (cs->access == CS_ACCESS_DENIED) {
@@ -1217,26 +1255,51 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = puterrno4(error);
 		return;
 	}
-
 	resp->access = 0;
 	resp->supported = 0;
 
+	if (is_system_labeled()) {
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__opaccess__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if ((tslabel = nfs4_getflabel(vp)) == NULL) {
+				*cs->statusp = resp->status = puterrno4(EACCES);
+				return;
+			}
+			slabel = label2bslabel(tslabel);
+			DTRACE_PROBE3(tx__rfs4__log__info__opaccess__slabel,
+			    char *, "got server label(1) for vp(2)",
+			    bslabel_t *, slabel, vnode_t *, vp);
+
+			admin_low_client = B_FALSE;
+		} else
+			admin_low_client = B_TRUE;
+	}
+
 	if (args->access & ACCESS4_READ) {
 		error = VOP_ACCESS(vp, VREAD, 0, cr);
-		if (!error && !MANDLOCK(vp, va.va_mode))
+		if (!error && !MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client ||
+		    bldominates(clabel, slabel)))
 			resp->access |= ACCESS4_READ;
 		resp->supported |= ACCESS4_READ;
 	}
 	if ((args->access & ACCESS4_LOOKUP) && vp->v_type == VDIR) {
 		error = VOP_ACCESS(vp, VEXEC, 0, cr);
-		if (!error)
+		if (!error && (!is_system_labeled() || admin_low_client ||
+		    bldominates(clabel, slabel)))
 			resp->access |= ACCESS4_LOOKUP;
 		resp->supported |= ACCESS4_LOOKUP;
 	}
 	if (checkwriteperm &&
 	    (args->access & (ACCESS4_MODIFY|ACCESS4_EXTEND))) {
 		error = VOP_ACCESS(vp, VWRITE, 0, cr);
-		if (!error && !MANDLOCK(vp, va.va_mode))
+		if (!error && !MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client ||
+		    blequal(clabel, slabel)))
 			resp->access |=
 			    (args->access & (ACCESS4_MODIFY|ACCESS4_EXTEND));
 		resp->supported |= (ACCESS4_MODIFY|ACCESS4_EXTEND);
@@ -1245,16 +1308,22 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (checkwriteperm &&
 	    (args->access & ACCESS4_DELETE) && vp->v_type == VDIR) {
 		error = VOP_ACCESS(vp, VWRITE, 0, cr);
-		if (!error)
+		if (!error && (!is_system_labeled() || admin_low_client ||
+		    blequal(clabel, slabel)))
 			resp->access |= ACCESS4_DELETE;
 		resp->supported |= ACCESS4_DELETE;
 	}
 	if (args->access & ACCESS4_EXECUTE && vp->v_type != VDIR) {
 		error = VOP_ACCESS(vp, VEXEC, 0, cr);
-		if (!error && !MANDLOCK(vp, va.va_mode))
+		if (!error && !MANDLOCK(vp, va.va_mode) &&
+		    (!is_system_labeled() || admin_low_client ||
+		    bldominates(clabel, slabel)))
 			resp->access |= ACCESS4_EXECUTE;
 		resp->supported |= ACCESS4_EXECUTE;
 	}
+
+	if (is_system_labeled() && !admin_low_client)
+		label_rele(tslabel);
 
 	*cs->statusp = resp->status = NFS4_OK;
 }
@@ -2541,8 +2610,62 @@ do_rfs4_op_lookup(char *nm, uint_t buflen, struct svc_req *req,
 		}
 	}
 
+	/*
+	 * After various NFS checks, do a label check on the path
+	 * component. The label on this path should either be the
+	 * global zone's label or a zone's label. We are only
+	 * interested in the zone's label because exported files
+	 * in global zone is accessible (though read-only) to
+	 * clients. The exportability/visibility check is already
+	 * done before reaching this code.
+	 */
+	if (is_system_labeled()) {
+		bslabel_t *clabel;
+
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__oplookup__clabel, char *,
+		    "got client label from request(1)", struct svc_req *, req);
+
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs4_label_check(clabel, vp, DOMINANCE_CHECK)) {
+				error = EACCES;
+				goto err_out;
+			}
+		} else {
+			/*
+			 * We grant access to admin_low label clients
+			 * only if the client is trusted, i.e. also
+			 * running Solaris Trusted Extension.
+			 */
+			struct sockaddr	*ca;
+			int		addr_type;
+			void		*ipaddr;
+			tsol_tpc_t	*tp;
+
+			ca = (struct sockaddr *)svc_getrpccaller(
+			    req->rq_xprt)->buf;
+			if (ca->sa_family == AF_INET) {
+				addr_type = IPV4_VERSION;
+				ipaddr = &((struct sockaddr_in *)ca)->sin_addr;
+			} else if (ca->sa_family == AF_INET6) {
+				addr_type = IPV6_VERSION;
+				ipaddr = &((struct sockaddr_in6 *)
+				    ca)->sin6_addr;
+			}
+			tp = find_tpc(ipaddr, addr_type, B_FALSE);
+			if (tp == NULL || tp->tpc_tp.tp_doi !=
+			    l_admin_low->tsl_doi || tp->tpc_tp.host_type !=
+			    SUN_CIPSO) {
+				error = EACCES;
+				goto err_out;
+			}
+		}
+	}
+
 	error = makefh4(&cs->fh, vp, cs->exi);
 
+err_out:
 	if (error) {
 		if (is_newvp) {
 			VN_RELE(cs->vp);
@@ -3575,6 +3698,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uint_t len;
 	rfs4_file_t *fp;
 	int in_crit = 0;
+	bslabel_t *clabel;
 
 	/* CURRENT_FH: directory */
 	dvp = cs->vp;
@@ -3666,6 +3790,29 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 				rfs4_file_rele(fp);
 			}
 			return;
+		}
+	}
+
+	/* check label before allowing removal */
+	if (is_system_labeled()) {
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__opremove__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs4_label_check(clabel, vp, EQUALITY_CHECK)) {
+				*cs->statusp = resp->status = NFS4ERR_ACCESS;
+				kmem_free(nm, len);
+				if (in_crit)
+					nbl_end_crit(vp);
+				VN_RELE(vp);
+				if (fp) {
+					rfs4_clear_dont_grant(fp);
+					rfs4_file_rele(fp);
+				}
+				return;
+			}
 		}
 	}
 
@@ -3809,6 +3956,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	rfs4_file_t *fp, *sfp;
 	int in_crit_src, in_crit_targ;
 	int fp_rele_grant_hold, sfp_rele_grant_hold;
+	bslabel_t *clabel;
 
 	fp = sfp = NULL;
 	srcvp = targvp = NULL;
@@ -3898,6 +4046,22 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		kmem_free(onm, olen);
 		kmem_free(nnm, nlen);
 		return;
+	}
+
+	/* check label of the target dir */
+	if (is_system_labeled()) {
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__oprename__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs4_label_check(clabel, ndvp,
+			    EQUALITY_CHECK)) {
+				*cs->statusp = resp->status = NFS4ERR_ACCESS;
+				return;
+			}
+		}
 	}
 
 	/*
@@ -4712,6 +4876,7 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 {
 	SETATTR4args *args = &argop->nfs_argop4_u.opsetattr;
 	SETATTR4res *resp = &resop->nfs_resop4_u.opsetattr;
+	bslabel_t *clabel;
 
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
@@ -4732,6 +4897,22 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		return;
+	}
+
+	/* check label before setting attributes */
+	if (is_system_labeled()) {
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__opsetattr__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs4_label_check(clabel, cs->vp,
+			    EQUALITY_CHECK)) {
+				*cs->statusp = resp->status = NFS4ERR_ACCESS;
+				return;
+			}
+		}
 	}
 
 	*cs->statusp = resp->status =
@@ -5187,6 +5368,14 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 		crfree(cs.basecr);
 	if (cs.cr)
 		crfree(cs.cr);
+	/*
+	 * done with this compound request, free the label
+	 */
+
+	if (req->rq_label != NULL) {
+		kmem_free(req->rq_label, sizeof (bslabel_t));
+		req->rq_label = NULL;
+	}
 }
 
 /*
@@ -5577,6 +5766,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	bool_t trunc;
 	caller_context_t ct;
 	component4 *component;
+	bslabel_t *clabel;
 
 	sarg.sbp = &sb;
 
@@ -5585,6 +5775,20 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	/* Check if the file system is read only */
 	if (rdonly4(cs->exi, dvp, req))
 		return (NFS4ERR_ROFS);
+
+	/* check the label of including directory */
+	if (is_system_labeled()) {
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__opremove__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs4_label_check(clabel, dvp, EQUALITY_CHECK)) {
+				return (NFS4ERR_ACCESS);
+			}
+		}
+	}
 
 	/*
 	 * Get the last component of path name in nm. cs will reference

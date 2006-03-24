@@ -36,6 +36,7 @@
 #include <inet/common.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
+#include <inet/udp_impl.h>
 /*
  * MK_XXX Following 2 includes temporary to import ip6_rthdr_t
  *        definition. May not be needed if we fix ip6_dg_snd_attrs_t
@@ -45,18 +46,8 @@
 #include <inet/ip6.h>
 
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <netinet/ip_mroute.h>
 #include <inet/optcom.h>
-
-extern int	udp_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int	udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int	udp_opt_set(queue_t *q, uint_t optset_context,
-    int level, int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
 
 /*
  * Table of all known options handled on a UDP protocol stack.
@@ -82,6 +73,12 @@ opdes_t	udp_opt_arr[] = {
 	},
 { SO_TIMESTAMP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0
 	},
+{ SO_ANON_MLP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
+    0 },
+{ SO_MAC_EXEMPT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
+    0 },
+{ SCM_UCRED, SOL_SOCKET, OA_W, OA_W, OP_NP, OP_VARLEN|OP_NODEFAULT, 512, 0 },
+
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
 	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },
 { T_IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,

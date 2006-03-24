@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -863,7 +862,7 @@ static boolean_t tl_icon_hasprim(tl_endpt_t *, t_scalar_t, t_scalar_t);
 static void tl_icon_sendmsgs(tl_endpt_t *, mblk_t **);
 static void tl_icon_freemsgs(mblk_t **);
 static void tl_merror(queue_t *, mblk_t *, int);
-static void tl_fill_option(uchar_t *, cred_t *, pid_t, int);
+static void tl_fill_option(uchar_t *, cred_t *, pid_t, int, cred_t *);
 static int tl_default_opt(queue_t *, int, int, uchar_t *);
 static int tl_get_opt(queue_t *, int, int, uchar_t *);
 static int tl_set_opt(queue_t *, uint_t, int, int, uint_t, uchar_t *, uint_t *,
@@ -3242,7 +3241,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 		tl_fill_option(cimp->b_rptr + ci->OPT_offset,
 			DB_CREDDEF(cimp, tep->te_credp),
 			TLPID(cimp, tep),
-			peer_tep->te_flag);
+			peer_tep->te_flag, peer_tep->te_credp);
 	} else if (ooff != 0) {
 		/* Copy option from T_CONN_REQ */
 		ci->OPT_offset = (t_scalar_t)T_ALIGN(ci->SRC_offset +
@@ -3723,7 +3722,8 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 			    cc->RES_length);
 			cc->OPT_length = olen;
 			tl_fill_option(ccmp->b_rptr + cc->OPT_offset,
-			    acc_ep->te_credp, acc_ep->te_cpid, cl_ep->te_flag);
+			    acc_ep->te_credp, acc_ep->te_cpid, cl_ep->te_flag,
+			    cl_ep->te_credp);
 		} else {
 			cc->OPT_offset = 0;
 			cc->OPT_length = 0;
@@ -5212,7 +5212,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 			tl_fill_option(ui_mp->b_rptr + udind->OPT_offset +
 			    oldolen,
 			    DB_CREDDEF(mp, tep->te_credp), TLPID(mp, tep),
-			    peer_tep->te_flag);
+			    peer_tep->te_flag, peer_tep->te_credp);
 		} else {
 			bcopy((void *)((uintptr_t)udreq + ooff),
 				(void *)((uintptr_t)udind + udind->OPT_offset),
@@ -5928,7 +5928,7 @@ tl_merror(queue_t *wq, mblk_t *mp, int error)
 }
 
 static void
-tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag)
+tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag, cred_t *pcr)
 {
 	if (flag & TL_SETCRED) {
 		struct opthdr *opt = (struct opthdr *)buf;
@@ -5953,7 +5953,7 @@ tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag)
 		opt->name = TL_OPT_PEER_UCRED;
 		opt->len = (t_uscalar_t)OPTLEN(ucredsize);
 
-		(void) cred2ucred(cr, cpid, (void *)(opt + 1));
+		(void) cred2ucred(cr, cpid, (void *)(opt + 1), pcr);
 	} else {
 		struct T_opthdr *topt = (struct T_opthdr *)buf;
 		ASSERT(flag & TL_SOCKUCRED);
@@ -5962,7 +5962,7 @@ tl_fill_option(uchar_t *buf, cred_t *cr, pid_t cpid, int flag)
 		topt->name = SCM_UCRED;
 		topt->len = ucredsize + sizeof (*topt);
 		topt->status = 0;
-		(void) cred2ucred(cr, cpid, (void *)(topt + 1));
+		(void) cred2ucred(cr, cpid, (void *)(topt + 1), pcr);
 	}
 }
 

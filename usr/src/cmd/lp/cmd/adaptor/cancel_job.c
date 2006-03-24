@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +82,6 @@ cancel_requestor(const char *printer, const char *user, const char *host)
 	return (buf);
 }
 
-
 /*
  * lpsched_cancel_job() attempts to cancel an lpsched requests that match the
  * passed in criteria.  a message is written for each cancelation or
@@ -123,12 +121,12 @@ lpsched_cancel_job(const char *printer, FILE *ofp, const char *requestor,
 		size_t	size;
 		time_t	date;
 		short	outcome;
-		char *dest, *form, *pwheel, *file, *owner, *reqid;
+		char *dest, *slabel, *form, *pwheel, *file, *owner, *reqid;
 		const char **list_ptr = list;
 		char buf[BUFSIZ];
 
-		if (rcv_msg(R_INQUIRE_REQUEST, &status, &reqid, &owner, &size,
-				&date, &outcome, &dest, &form, &pwheel,
+		if (rcv_msg(R_INQUIRE_REQUEST, &status, &reqid, &owner, &slabel,
+				&size, &date, &outcome, &dest, &form, &pwheel,
 				&file) < 0) {
 			fprintf(ofp,
 			gettext("Failure to communicate with lpsched\n"));

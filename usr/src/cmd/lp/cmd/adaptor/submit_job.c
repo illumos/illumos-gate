@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1999,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,15 +30,21 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <sys/zone.h>
 #include <string.h>
 #include <libintl.h>
 
 #include <syslog.h>
 #include <stdarg.h>
 
+#include <tsol/label.h>
+
 #include "misc.h"
 
 /* lpsched include files */
+#if defined PS_FAULTED
+#undef  PS_FAULTED
+#endif /* PS_FAULTED */
 #include "lp.h"
 #include "msgs.h"
 #include "printers.h"
@@ -85,11 +90,11 @@ static void clean_string(char *ptr)
 	}
 }
 
-
 /*
  * mail() will send a mail message to the requesting user in the event of an
  * error during job submission.
  */
+
 static void
 mail(REQUEST *request, char *req_file, char *fmt, ...)
 {
@@ -97,6 +102,7 @@ mail(REQUEST *request, char *req_file, char *fmt, ...)
 	char buf[BUFSIZ];
 	char *uname;
 	va_list ap;
+	char	*mail_zonename = NULL;
 
 	/*
 	 * Clean-up user name so we don't pass flags to /bin/mail, or
@@ -110,27 +116,59 @@ mail(REQUEST *request, char *req_file, char *fmt, ...)
 	if (*uname == '\0')
 		return;		/* No username found */
 
-	snprintf(buf, sizeof (buf), "/bin/mail %s", uname);
+	/*
+	 * If in the global zone and the system is labeled, mail is
+	 * handled via a local labeled zone that is the same label as the
+	 * request.
+	 */
+	if ((getzoneid() == GLOBAL_ZONEID) && is_system_labeled() &&
+	    slabel != NULL) {
+		if ((mail_zonename = get_labeled_zonename(slabel)) ==
+		    (char *)-1) {
+			/* error during get_labeled_zonename, just return */
+			return;
+		}
+	}
+
+	/*
+	 * If mail_zonename is not NULL, use zlogin to execute /bin/mail
+	 * in the labeled zone 'mail_zonename'.
+	 */
+
+	if (mail_zonename != NULL) {
+		syslog(LOG_DEBUG,
+		    "lpsched: using '/usr/sbin/zlogin %s /bin/mail %s' to mail",
+		    mail_zonename, uname);
+		snprintf(buf, sizeof (buf),
+		    "/usr/sbin/zlogin %s /bin/mail %s",
+		    mail_zonename, uname);
+		Free(mail_zonename);
+	} else {
+		syslog(LOG_DEBUG,
+		    "lpsched: using '/bin/mail %s' to mail",
+		    uname);
+		snprintf(buf, sizeof (buf), "/bin/mail %s", uname);
+	}
 	clean_string(buf);
 	if ((pp = popen(buf, "w+")) == NULL)
 		return;
 	fprintf(pp, gettext("Subject: print request for %s failed\n\n"),
-		request->destination);
+	    request->destination);
 
 	fprintf(pp, gettext("\n\tRequest File: %s"), req_file);
 	fprintf(pp, gettext("\n\tDocument Type: %s"),
-		(request->input_type ? request->input_type :
-			gettext("(unknown)")));
+	    (request->input_type ? request->input_type :
+	    gettext("(unknown)")));
 	fprintf(pp, gettext("\n\tTitle:\t%s"),
-		(request->title ? request->title : gettext("(none)")));
+	    (request->title ? request->title : gettext("(none)")));
 	fprintf(pp, gettext("\n\tCopies:\t%d"), request->copies);
 	fprintf(pp, gettext("\n\tPriority:\t%d"), request->priority);
 	fprintf(pp, gettext("\n\tForm:\t%s"),
-		(request->form ? request->form : gettext("(none)")));
+	    (request->form ? request->form : gettext("(none)")));
 	fprintf(pp, gettext("\n\tOptions:\t%s"),
-		(request->options ? request->options : gettext("(none)")));
+	    (request->options ? request->options : gettext("(none)")));
 	fprintf(pp, gettext("\n\tModes:\t%s"),
-		(request->modes ? request->modes : gettext("(none)")));
+	    (request->modes ? request->modes : gettext("(none)")));
 
 	fprintf(pp, gettext("\n\tReason for Failure:\n\n\t\t"));
 	va_start(ap, fmt);
@@ -505,7 +543,7 @@ lpsched_submit_job(const char *printer, const char *host, char *cf,
 	char	buf[MAXPATHLEN];
 	int	file_no = 0;
 	int	rc = -1;
-	char 	*tmp_dir = (char *)lpsched_temp_dir(printer, host);
+	char 	*tmp_dir;
 	char  *tmp;
 	short status;
 	long  bits;
@@ -514,6 +552,8 @@ lpsched_submit_job(const char *printer, const char *host, char *cf,
 
 	syslog(LOG_DEBUG, "lpsched_submit_job(%s, %s, 0x%x)",
 		(printer ? printer : "NULL"), (cf ? cf : "NULL"), df_list);
+
+	tmp_dir = (char *)lpsched_temp_dir(printer, host);
 
 	if ((printer == NULL) || (host == NULL) || (cf == NULL) ||
 	    (df_list == NULL))
@@ -558,18 +598,21 @@ lpsched_submit_job(const char *printer, const char *host, char *cf,
 	secure.req_id = strdup(buf);
 	secure.uid = LP_UID;
 	secure.gid = 0;
+	secure.slabel = NULL;
 
 	/* save the request file */
 	snprintf(buf, sizeof (buf), "%s/%d-0", host, request_id);
 	if (putrequest(buf, request) < 0) {
-		mail(request, buf, gettext("Can't save print request"));
+		mail(request, buf,
+		    gettext("Can't save print request"));
 		unlink_files(request->file_list);
 		return (-1);
 	}
 
 	/* save the secure file */
 	if (putsecure(buf, &secure) < 0) {
-		mail(request, buf, gettext("Can't save print secure file"));
+		mail(request, buf,
+		    gettext("Can't save print secure file"));
 		snprintf(buf, sizeof (buf), "%s/%s/%d-0", Lp_Tmp, host,
 		    request_id);
 		unlink(buf);
@@ -624,7 +667,8 @@ lpsched_submit_job(const char *printer, const char *host, char *cf,
 				gettext("failure to communicate with lpsched"));
 			break;
 		default:
-			mail(request, buf, gettext("Unknown error: %d"),
+			mail(request, buf,
+			    gettext("Unknown error: %d"),
 				status);
 			break;
 		}

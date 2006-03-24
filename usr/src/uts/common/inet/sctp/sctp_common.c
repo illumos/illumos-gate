@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +28,14 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
+#include <sys/strsubr.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
 #include <sys/socket.h>
 #include <sys/random.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/tnet.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -43,12 +45,12 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_ire.h>
-#include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/sctp_ip.h>
 #include <inet/ipclassifier.h>
+
 #include "sctp_impl.h"
 #include "sctp_addr.h"
 
@@ -86,6 +88,7 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 	sctp_saddr_ipif_t *sp;
 	uint_t	ipif_seqid;
 	int hdrlen;
+	ts_label_t *tsl;
 
 	/* Remove the previous cache IRE */
 	if ((ire = fp->ire) != NULL) {
@@ -102,76 +105,63 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 		fp->state = SCTP_FADDRS_UNCONFIRMED;
 	}
 
+	tsl = crgetlabel(CONN_CRED(sctp->sctp_connp));
+
 	if (fp->isv4) {
 		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, addr4);
-
-		ire = ire_cache_lookup(addr4, sctp->sctp_zoneid);
-		if (ire == NULL) {
-			dprint(3, ("ire2faddr: no ire for %x:%x:%x:%x\n",
-			    SCTP_PRINTADDR(fp->faddr)));
-			/*
-			 * It is tempting to just leave the src addr
-			 * unspecified and let IP figure it out, but we
-			 * *cannot* do this, since IP may choose a src addr
-			 * that is not part of this association... unless
-			 * this sctp has bound to all addrs.  So if the ire
-			 * lookup fails, try to find one in our src addr
-			 * list, unless the sctp has bound to all addrs, in
-			 * which case we change the src addr to unspec.
-			 *
-			 * Note that if this is a v6 endpoint but it does
-			 * not have any v4 address at this point (e.g. may
-			 * have been  deleted), sctp_get_valid_addr() will
-			 * return mapped INADDR_ANY.  In this case, this
-			 * address should be marked not reachable so that
-			 * it won't be used to send data.
-			 */
-			set_saddr(sctp, fp, B_FALSE);
-			goto set_current;
-		}
-		ipif_seqid = ire->ire_ipif->ipif_seqid;
-		dprint(2, ("ire2faddr: got ire for %x:%x:%x:%x, ",
-			SCTP_PRINTADDR(fp->faddr)));
-		dprint(2, ("src = %x\n", ire->ire_src_addr));
-		IN6_IPADDR_TO_V4MAPPED(ire->ire_src_addr, &laddr);
-
-		/* make sure the laddr is part of this association */
-		if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) !=
-		    NULL && !sp->saddr_ipif_dontsrc) {
-			if (sp->saddr_ipif_unconfirmed == 1)
-				sp->saddr_ipif_unconfirmed = 0;
-			fp->saddr = laddr;
-		} else {
-			ip2dbg(("ire2faddr: src addr is not part of assc\n"));
-			set_saddr(sctp, fp, B_FALSE);
-		}
+		ire = ire_cache_lookup(addr4, sctp->sctp_zoneid, tsl);
+		if (ire != NULL)
+			IN6_IPADDR_TO_V4MAPPED(ire->ire_src_addr, &laddr);
 	} else {
-		ire = ire_cache_lookup_v6(&fp->faddr, sctp->sctp_zoneid);
-		if (ire == NULL) {
-			dprint(3, ("ire2faddr: no ire for %x:%x:%x:%x\n",
-			    SCTP_PRINTADDR(fp->faddr)));
-			set_saddr(sctp, fp, B_TRUE);
-			goto set_current;
-		}
-		ipif_seqid = ire->ire_ipif->ipif_seqid;
-		dprint(2, ("ire2faddr: got ire for %x:%x:%x:%x, ",
+		ire = ire_cache_lookup_v6(&fp->faddr, sctp->sctp_zoneid, tsl);
+		if (ire != NULL)
+			laddr = ire->ire_src_addr_v6;
+	}
+
+	if (ire == NULL) {
+		dprint(3, ("ire2faddr: no ire for %x:%x:%x:%x\n",
 		    SCTP_PRINTADDR(fp->faddr)));
+		/*
+		 * It is tempting to just leave the src addr
+		 * unspecified and let IP figure it out, but we
+		 * *cannot* do this, since IP may choose a src addr
+		 * that is not part of this association... unless
+		 * this sctp has bound to all addrs.  So if the ire
+		 * lookup fails, try to find one in our src addr
+		 * list, unless the sctp has bound to all addrs, in
+		 * which case we change the src addr to unspec.
+		 *
+		 * Note that if this is a v6 endpoint but it does
+		 * not have any v4 address at this point (e.g. may
+		 * have been  deleted), sctp_get_valid_addr() will
+		 * return mapped INADDR_ANY.  In this case, this
+		 * address should be marked not reachable so that
+		 * it won't be used to send data.
+		 */
+		set_saddr(sctp, fp, B_FALSE);
+		goto set_current;
+	}
+
+	ipif_seqid = ire->ire_ipif->ipif_seqid;
+	dprint(2, ("ire2faddr: got ire for %x:%x:%x:%x, ",
+	    SCTP_PRINTADDR(fp->faddr)));
+	if (fp->isv4) {
+		dprint(2, ("src = %x\n", ire->ire_src_addr));
+	} else {
 		dprint(2, ("src=%x:%x:%x:%x\n",
 		    SCTP_PRINTADDR(ire->ire_src_addr_v6)));
-		laddr = ire->ire_src_addr_v6;
+	}
 
-		/* make sure the laddr is part of this association */
-
-		if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) !=
-		    NULL && !sp->saddr_ipif_dontsrc) {
-			if (sp->saddr_ipif_unconfirmed == 1)
-				sp->saddr_ipif_unconfirmed = 0;
-			fp->saddr = laddr;
-		} else {
-			dprint(2, ("ire2faddr: src addr is not part "
-				"of assc\n"));
-			set_saddr(sctp, fp, B_TRUE);
-		}
+	/* make sure the laddr is part of this association */
+	if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) != NULL &&
+	    !sp->saddr_ipif_dontsrc) {
+		if (sp->saddr_ipif_unconfirmed == 1)
+			sp->saddr_ipif_unconfirmed = 0;
+		fp->saddr = laddr;
+	} else {
+		dprint(2, ("ire2faddr: src addr is not part of assc\n"));
+		/* set the src to the first saddr and hope for the best */
+		set_saddr(sctp, fp, B_TRUE);
 	}
 
 	/* Cache the IRE */
@@ -227,7 +217,6 @@ set_current:
 	}
 }
 
-/*ARGSUSED*/
 void
 sctp_faddr2ire(sctp_t *sctp, sctp_faddr_t *fp)
 {
@@ -239,7 +228,7 @@ sctp_faddr2ire(sctp_t *sctp, sctp_faddr_t *fp)
 
 	mutex_enter(&ire->ire_lock);
 
-	/* If the cached IRE is going sway, there is no point to update it. */
+	/* If the cached IRE is going away, there is no point to update it. */
 	if (ire->ire_marks & IRE_MARK_CONDEMNED) {
 		mutex_exit(&ire->ire_lock);
 		IRE_REFRELE_NOTR(ire);
@@ -322,9 +311,10 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 		ipsctplen = sctp->sctp_hdr6_len;
 	}
 
-	mp = allocb(ipsctplen + sctp_wroff_xtra + trailer, BPRI_MED);
+	mp = allocb_cred(ipsctplen + sctp_wroff_xtra + trailer,
+	    CONN_CRED(sctp->sctp_connp));
 	if (mp == NULL) {
-		ip1dbg(("sctp_make_mp: error makign mp..\n"));
+		ip1dbg(("sctp_make_mp: error making mp..\n"));
 		return (NULL);
 	}
 	mp->b_rptr += sctp_wroff_xtra;
@@ -470,66 +460,114 @@ sctp_compare_faddrsets(sctp_faddr_t *a1, sctp_faddr_t *a2)
 }
 
 /*
- * Returns 0 on success, -1 on memory allocation failure. If sleep
- * is true, should never fail.
  * Caller must hold conn fanout lock.
  */
-int
-sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep)
+static int
+sctp_add_faddr_entry(sctp_t *sctp, in6_addr_t *addr, int sleep,
+    boolean_t first)
 {
 	sctp_faddr_t *faddr;
 
-	dprint(4, ("add_faddr: %x:%x:%x:%x %d\n", SCTP_PRINTADDR(*addr),
-	    sleep));
+	if (is_system_labeled()) {
+		ts_label_t *tsl;
+		tsol_tpc_t *rhtp;
+		int retv;
 
-	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL) {
-		return (-1);
+		tsl = crgetlabel(CONN_CRED(sctp->sctp_connp));
+		ASSERT(tsl != NULL);
+
+		/* find_tpc automatically does the right thing with IPv4 */
+		rhtp = find_tpc(addr, IPV6_VERSION, B_FALSE);
+		if (rhtp == NULL)
+			return (EACCES);
+
+		retv = EACCES;
+		if (tsl->tsl_doi == rhtp->tpc_tp.tp_doi) {
+			switch (rhtp->tpc_tp.host_type) {
+			case UNLABELED:
+				/*
+				 * Can talk to unlabeled hosts if any of the
+				 * following are true:
+				 *   1. zone's label matches the remote host's
+				 *	default label,
+				 *   2. mac_exempt is on and the zone dominates
+				 *	the remote host's label, or
+				 *   3. mac_exempt is on and the socket is from
+				 *	the global zone.
+				 */
+				if (blequal(&rhtp->tpc_tp.tp_def_label,
+				    &tsl->tsl_label) ||
+				    (sctp->sctp_mac_exempt &&
+				    (sctp->sctp_zoneid == GLOBAL_ZONEID ||
+				    bldominates(&tsl->tsl_label,
+				    &rhtp->tpc_tp.tp_def_label))))
+					retv = 0;
+				break;
+			case SUN_CIPSO:
+				if (_blinrange(&tsl->tsl_label,
+				    &rhtp->tpc_tp.tp_sl_range_cipso) ||
+				    blinlset(&tsl->tsl_label,
+				    rhtp->tpc_tp.tp_sl_set_cipso))
+					retv = 0;
+				break;
+			}
+		}
+		TPC_RELE(rhtp);
+		if (retv != 0)
+			return (retv);
 	}
+
+	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL)
+		return (ENOMEM);
 
 	sctp_init_faddr(sctp, faddr, addr);
 	ASSERT(faddr->next == NULL);
 
-	/* tack it on to the end */
-	if (sctp->sctp_lastfaddr != NULL) {
-		sctp->sctp_lastfaddr->next = faddr;
-	} else {
-		/* list is empty */
-		ASSERT(sctp->sctp_faddrs == NULL);
+	if (sctp->sctp_faddrs == NULL) {
+		ASSERT(sctp->sctp_lastfaddr == NULL);
+		/* only element on list; first and last are same */
+		sctp->sctp_faddrs = sctp->sctp_lastfaddr = faddr;
+	} else if (first) {
+		ASSERT(sctp->sctp_lastfaddr != NULL);
+		faddr->next = sctp->sctp_faddrs;
 		sctp->sctp_faddrs = faddr;
+	} else {
+		sctp->sctp_lastfaddr->next = faddr;
+		sctp->sctp_lastfaddr = faddr;
 	}
-	sctp->sctp_lastfaddr = faddr;
 	sctp->sctp_nfaddrs++;
 
 	return (0);
 }
 
 /*
+ * Add new address to end of list.
+ * Returns 0 on success, or errno on failure:
+ *	ENOMEM	- allocation failure; only for sleep==KM_NOSLEEP
+ *	EACCES	- label is incompatible with caller or connection
+ *		  (labeled [trusted] solaris only)
+ * Caller must hold conn fanout lock.
+ */
+int
+sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep)
+{
+	dprint(4, ("add_faddr: %x:%x:%x:%x %d\n", SCTP_PRINTADDR(*addr),
+	    sleep));
+
+	return (sctp_add_faddr_entry(sctp, addr, sleep, B_FALSE));
+}
+
+/*
+ * Same as sctp_add_faddr above, but put new entry at front of list.
  * Caller must hold conn fanout lock.
  */
 int
 sctp_add_faddr_first(sctp_t *sctp, in6_addr_t *addr, int sleep)
 {
-	sctp_faddr_t *faddr;
-
 	dprint(4, ("add_faddr_first: %x:%x:%x:%x %d\n", SCTP_PRINTADDR(*addr),
 	    sleep));
 
-	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL) {
-		return (-1);
-	}
-	sctp_init_faddr(sctp, faddr, addr);
-	ASSERT(faddr->next == NULL);
-
-	/* Put it at the beginning of the list */
-	if (sctp->sctp_faddrs != NULL) {
-		faddr->next = sctp->sctp_faddrs;
-	} else {
-		sctp->sctp_lastfaddr = faddr;
-	}
-	sctp->sctp_faddrs = faddr;
-	sctp->sctp_nfaddrs++;
-
-	return (0);
+	return (sctp_add_faddr_entry(sctp, addr, sleep, B_TRUE));
 }
 
 sctp_faddr_t *
@@ -914,6 +952,7 @@ sctp_build_hdrs(sctp_t *sctp)
 	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
 	in6_addr_t	src;
 	in6_addr_t	dst;
+
 	/*
 	 * save the existing sctp header and source/dest IP addresses
 	 */
@@ -1028,11 +1067,60 @@ sctp_header_init_ipv6(sctp_t *sctp, int sleep)
 	return (0);
 }
 
+static int
+sctp_v4_label(sctp_t *sctp)
+{
+	uchar_t optbuf[IP_MAX_OPT_LENGTH];
+	const cred_t *cr = CONN_CRED(sctp->sctp_connp);
+	int added;
+
+	if (tsol_compute_label(cr, sctp->sctp_ipha->ipha_dst, optbuf,
+	    sctp->sctp_mac_exempt) != 0)
+		return (EACCES);
+
+	added = tsol_remove_secopt(sctp->sctp_ipha, sctp->sctp_hdr_len);
+	if (added == -1)
+		return (EACCES);
+	sctp->sctp_hdr_len += added;
+	sctp->sctp_sctph = (sctp_hdr_t *)((uchar_t *)sctp->sctp_sctph + added);
+	sctp->sctp_ip_hdr_len += added;
+	if ((sctp->sctp_v4label_len = optbuf[IPOPT_OLEN]) != 0) {
+		sctp->sctp_v4label_len = (sctp->sctp_v4label_len + 3) & ~3;
+		added = tsol_prepend_option(optbuf, sctp->sctp_ipha,
+		    sctp->sctp_hdr_len);
+		if (added == -1)
+			return (EACCES);
+		sctp->sctp_hdr_len += added;
+		sctp->sctp_sctph = (sctp_hdr_t *)((uchar_t *)sctp->sctp_sctph +
+		    added);
+		sctp->sctp_ip_hdr_len += added;
+	}
+	return (0);
+}
+
+static int
+sctp_v6_label(sctp_t *sctp)
+{
+	uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
+	const cred_t *cr = CONN_CRED(sctp->sctp_connp);
+
+	if (tsol_compute_label_v6(cr, &sctp->sctp_ip6h->ip6_dst, optbuf,
+	    sctp->sctp_mac_exempt) != 0)
+		return (EACCES);
+	if (tsol_update_sticky(&sctp->sctp_sticky_ipp, &sctp->sctp_v6label_len,
+	    optbuf) != 0)
+		return (EACCES);
+	if (sctp_build_hdrs(sctp) != 0)
+		return (EACCES);
+	return (0);
+}
+
 /*
  * XXX implement more sophisticated logic
  */
-void
-sctp_set_hdraddrs(sctp_t *sctp)
+/* ARGSUSED */
+int
+sctp_set_hdraddrs(sctp_t *sctp, cred_t *cr)
 {
 	sctp_faddr_t *fp;
 	int gotv4 = 0;
@@ -1048,15 +1136,18 @@ sctp_set_hdraddrs(sctp_t *sctp)
 		/* saddr may be unspec; make_mp() will handle this */
 		IN6_V4MAPPED_TO_IPADDR(&sctp->sctp_primary->saddr,
 		    sctp->sctp_ipha->ipha_src);
-		gotv4 = 1;
-		if (sctp->sctp_ipversion == IPV4_VERSION) {
-			goto copyports;
+		if (!is_system_labeled() || sctp_v4_label(sctp) == 0) {
+			gotv4 = 1;
+			if (sctp->sctp_ipversion == IPV4_VERSION) {
+				goto copyports;
+			}
 		}
 	} else {
 		sctp->sctp_ip6h->ip6_dst = sctp->sctp_primary->faddr;
 		/* saddr may be unspec; make_mp() will handle this */
 		sctp->sctp_ip6h->ip6_src = sctp->sctp_primary->saddr;
-		gotv6 = 1;
+		if (!is_system_labeled() || sctp_v6_label(sctp) == 0)
+			gotv6 = 1;
 	}
 
 	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
@@ -1066,28 +1157,36 @@ sctp_set_hdraddrs(sctp_t *sctp)
 			/* copy in the faddr_t's saddr */
 			IN6_V4MAPPED_TO_IPADDR(&fp->saddr,
 			    sctp->sctp_ipha->ipha_src);
-			gotv4 = 1;
-			if (sctp->sctp_ipversion == IPV4_VERSION || gotv6) {
-				break;
+			if (!is_system_labeled() || sctp_v4_label(sctp) == 0) {
+				gotv4 = 1;
+				if (sctp->sctp_ipversion == IPV4_VERSION ||
+				    gotv6) {
+					break;
+				}
 			}
 		} else if (!gotv6) {
 			sctp->sctp_ip6h->ip6_dst = fp->faddr;
 			/* copy in the faddr_t's saddr */
 			sctp->sctp_ip6h->ip6_src = fp->saddr;
-			gotv6 = 1;
-			if (gotv4) {
-				break;
+			if (!is_system_labeled() || sctp_v6_label(sctp) == 0) {
+				gotv6 = 1;
+				if (gotv4)
+					break;
 			}
 		}
 	}
 
 copyports:
+	if (!gotv4 && !gotv6)
+		return (EACCES);
+
 	/* copy in the ports for good measure */
 	sctp->sctp_sctph->sh_sport = sctp->sctp_lport;
 	sctp->sctp_sctph->sh_dport = sctp->sctp_fport;
 
 	sctp->sctp_sctph6->sh_sport = sctp->sctp_lport;
 	sctp->sctp_sctph6->sh_dport = sctp->sctp_fport;
+	return (0);
 }
 
 void
@@ -1251,8 +1350,9 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	fp = sctp_lookup_faddr(sctp, hdrsaddr);
 	if (fp == NULL) {
 		/* not included; add it now */
-		if (sctp_add_faddr_first(sctp, hdrsaddr, KM_NOSLEEP) == -1)
-			return (ENOMEM);
+		err = sctp_add_faddr_first(sctp, hdrsaddr, KM_NOSLEEP);
+		if (err != 0)
+			return (err);
 
 		/* sctp_faddrs will be the hdr addr */
 		fp = sctp->sctp_faddrs;
@@ -1351,10 +1451,9 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 					goto next;
 
 				/* OK, add it to the faddr set */
-				if (sctp_add_faddr(sctp, &addr,
-					KM_NOSLEEP) != 0) {
-					return (ENOMEM);
-				}
+				err = sctp_add_faddr(sctp, &addr, KM_NOSLEEP);
+				if (err != 0)
+					return (err);
 			}
 		} else if (ph->sph_type == htons(PARM_ADDR6) &&
 		    sctp->sctp_family == AF_INET6) {
@@ -1378,10 +1477,10 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				if (sctp_lookup_faddr(sctp, addr6) != NULL)
 					goto next;
 
-				if (sctp_add_faddr(sctp,
-				    (in6_addr_t *)(ph + 1), KM_NOSLEEP) != 0) {
-					return (ENOMEM);
-				}
+				err = sctp_add_faddr(sctp,
+				    (in6_addr_t *)(ph + 1), KM_NOSLEEP);
+				if (err != 0)
+					return (err);
 			}
 		} else if (ph->sph_type == htons(PARM_FORWARD_TSN)) {
 			if (sctp_options != NULL)
@@ -1570,7 +1669,7 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 		if (compres == SCTP_ADDR_OVERLAP) {
 			dprint(1,
 			    ("new assoc from %x:%x:%x:%x overlaps with %p\n",
-			    SCTP_PRINTADDR(*hdraddr), sctp));
+			    SCTP_PRINTADDR(*hdraddr), (void *)sctp));
 			/*
 			 * While we still hold the lock, we need to
 			 * figure out which addresses have been
@@ -1669,77 +1768,6 @@ sctp_congest_reset(sctp_t *sctp)
 	}
 }
 
-/*
- * Return zero if the buffers are identical in length and content.
- * This is used for comparing extension header buffers.
- * Note that an extension header would be declared different
- * even if all that changed was the next header value in that header i.e.
- * what really changed is the next extension header.
- */
-boolean_t
-sctp_cmpbuf(void *a, uint_t alen, boolean_t b_valid, void *b, uint_t blen)
-{
-	if (!b_valid)
-		blen = 0;
-
-	if (alen != blen)
-		return (B_TRUE);
-	if (alen == 0)
-		return (B_FALSE);	/* Both zero length */
-	return (bcmp(a, b, alen));
-}
-
-/*
- * Preallocate memory for sctp_savebuf(). Returns B_TRUE if ok.
- * Return B_FALSE if memory allocation fails - don't change any state!
- */
-boolean_t
-sctp_allocbuf(void **dstp, uint_t *dstlenp, boolean_t src_valid,
-    void *src, uint_t srclen)
-{
-	void *dst;
-
-	if (!src_valid)
-		srclen = 0;
-
-	ASSERT(*dstlenp == 0);
-	if (src != NULL && srclen != 0) {
-		dst = mi_zalloc(srclen);
-		if (dst == NULL)
-			return (B_FALSE);
-	} else {
-		dst = NULL;
-	}
-	if (*dstp != NULL) {
-		mi_free(*dstp);
-		*dstp = NULL;
-		*dstlenp = 0;
-	}
-	*dstp = dst;
-	if (dst != NULL)
-		*dstlenp = srclen;
-	else
-		*dstlenp = 0;
-	return (B_TRUE);
-}
-
-/*
- * Replace what is in *dst, *dstlen with the source.
- * Assumes sctp_allocbuf has already been called.
- */
-void
-sctp_savebuf(void **dstp, uint_t *dstlenp, boolean_t src_valid,
-    void *src, uint_t srclen)
-{
-	if (!src_valid)
-		srclen = 0;
-
-	ASSERT(*dstlenp == srclen);
-	if (src != NULL && srclen != 0) {
-		bcopy(src, *dstp, srclen);
-	}
-}
-
 static void
 sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr)
 {
@@ -1799,7 +1827,7 @@ faddr_destructor(void *buf, void *cdrarg)
 }
 
 void
-sctp_faddr_init()
+sctp_faddr_init(void)
 {
 	sctp_kmem_faddr_cache = kmem_cache_create("sctp_faddr_cache",
 	    sizeof (sctp_faddr_t), 0, NULL, faddr_destructor,
@@ -1807,7 +1835,7 @@ sctp_faddr_init()
 }
 
 void
-sctp_faddr_fini()
+sctp_faddr_fini(void)
 {
 	kmem_cache_destroy(sctp_kmem_faddr_cache);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +43,7 @@
 #include <sys/debug.h>
 #include <sys/cred_impl.h>
 #include <sys/zone.h>
+#include <sys/tsol/label.h>
 #include <c2/audit.h>
 #include <c2/audit_kernel.h>
 #include <c2/audit_kevents.h>
@@ -427,6 +427,10 @@ audit_finish(
 
 			/* Add an optional group token */
 			AUDIT_SETGROUP(&(u_ad), cr, kctx);
+
+			/* Add token for process SL */
+			if (is_system_labeled())
+				au_write(&(u_ad), au_to_label(CR_SL(cr)));
 
 			if (tad->tad_evmod & PAD_SPRIVUSE)
 				au_write(&(u_ad),

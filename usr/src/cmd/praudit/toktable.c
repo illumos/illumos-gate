@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,14 +115,9 @@ init_tokens(void)
 	table_init(AUT_ACL, "acl", acl_token, T_ENCLOSED);
 	table_init(AUT_ATTR, "attribute", attribute_token, T_ENCLOSED);
 	table_init(AUT_IPC_PERM, "IPC_perm", s5_IPC_perm_token, T_ENCLOSED);
-	table_initx(AUT_LABEL, "cmw label", "cmw_label",
-	    NOFUNC, T_UNKNOWN);
 	table_init(AUT_GROUPS, "group", group_token, T_ELEMENT);
-	table_initx(AUT_ILABEL, "information label", "information_label",
-	    ilabel_token, T_ELEMENT);
-	table_initx(AUT_SLABEL, "sensitivity label", "sensitivity_label",
+	table_initx(AUT_LABEL, "sensitivity label", "sensitivity_label",
 	    slabel_token, T_ELEMENT);
-	table_init(AUT_CLEAR, "clearance", clearance_token, T_ELEMENT);
 	table_init(AUT_PRIV, "privilege", privilege_token, T_EXTENDED);
 	table_initx(AUT_UPRIV, "use of privilege", "use_of_privilege",
 	    useofpriv_token, T_EXTENDED);

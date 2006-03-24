@@ -1740,3 +1740,6 @@ volatile sc_shared_t *volatile *_thr_schedctl(void);
 
 /* private interface to unmount all autofs mounts */
 int _autofssys(enum autofssys_op, void *);
+
+/* label.c */
+extern int is_system_labeled(void);

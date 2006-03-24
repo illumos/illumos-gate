@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,19 +18,15 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(lint) && defined(SCCSIDS)
-static char	*bsm_sccsid =
-		    "@(#)dminfo.c	1.8	05/06/15 SMI; SunOS BSM";
-#endif
-
 #include <locale.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string.h>
 #include <unistd.h>
@@ -70,7 +65,7 @@ printdmapent(dmapp)
 {
 	(void) printf("%s:", dmapp->dmap_devname);
 	(void) printf("%s:", dmapp->dmap_devtype);
-	(void) printf("%s:", dmapp->dmap_devlist);
+	(void) printf("%s", dmapp->dmap_devlist);
 	(void) printf("\n");
 }
 
@@ -82,9 +77,7 @@ printdmapent(dmapp)
  *
  */
 static void
-dmapi_err(exit_code, err_msg)
-int	exit_code;
-char	*err_msg;
+dmapi_err(int exit_code, char *err_msg)
 {
 	if (err_msg != NULL) {
 		(void) fprintf(stderr, "dmapinfo:%s\n", err_msg);
@@ -107,12 +100,12 @@ char	*err_msg;
 			prog_name,
 			"[-u Entry]");
 	}
+
 	exit(exit_code);
 }
 
-
 int
-main(int argc, char *argv[])
+main(int argc, char **argv)
 {
 	devmap_t *dmapp;
 	devmap_t dmap;
@@ -227,12 +220,12 @@ main(int argc, char *argv[])
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devname in entry argument"));
 		}
-		if ((dmap.dmap_devtype = getdmapfield((char *)NULL)) ==
+		if ((dmap.dmap_devtype = getdmapfield(NULL)) ==
 			NULL) {
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devtype in entry Argument"));
 		}
-		if ((dmap.dmap_devlist = getdmapfield((char *)NULL)) ==
+		if ((dmap.dmap_devlist = getdmapfield(NULL)) ==
 			NULL) {
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devlist in entry argument"));
@@ -319,21 +312,27 @@ main(int argc, char *argv[])
 		nptr = getdmapdfield(nptr);
 		while (nptr) {
 			if (verbose) {
-(void) fprintf(stderr, gettext("dmapinfo: Check %s for device (%s).\n"),
-				filename, nptr);
+				(void) fprintf(stderr,
+				    gettext("dmapinfo: "
+					"Check %s for device (%s).\n"),
+				    filename, nptr);
 			}
 			if (getdmapdev(nptr) != NULL) {
 				if (verbose) {
-(void) fprintf(stderr, gettext("dmapinfo: Device (%s) found in %s.\n"),
-					nptr, filename);
+					(void) fprintf(stderr,
+					    gettext("dmapinfo: "
+						"Device (%s) found in %s.\n"),
+					    nptr, filename);
 				}
 				exit(1);
 			}
 			if (verbose) {
-(void) fprintf(stderr, gettext("dmapinfo: Device (%s) not found in %s.\n"),
-					nptr, filename);
+				(void) fprintf(stderr,
+				    gettext("dmapinfo: "
+					"Device (%s) not found in %s.\n"),
+				    nptr, filename);
 			}
-			nptr = getdmapdfield((char *)NULL);
+			nptr = getdmapdfield(NULL);
 		}
 		/*
 		 * Good the entry is uniq. So lets find out how long it is
@@ -390,17 +389,21 @@ main(int argc, char *argv[])
 	 * of 1.
 	 */
 	if (device) {
+		setdmapent();
 		while (argc >= 1) {
 			if ((dmapp = getdmapdev(*argv)) != NULL) {
 				if (verbose) {
 					printdmapent(dmapp);
 				}
 				cntr++;
-			} else if (any == 0)
+			} else if (any == 0) {
+				enddmapent();
 				exit(1);
+			}
 			argc--;
 			argv++;
 		}
+		enddmapent();
 		if (cntr != 0)
 			exit(0);
 		exit(1);
@@ -413,6 +416,7 @@ main(int argc, char *argv[])
 	 * of 1.
 	 */
 	if (name) {
+		setdmapent();
 		while (argc >= 1) {
 			if ((dmapp = getdmapnam(*argv)) != NULL) {
 				if (verbose) {
@@ -424,6 +428,7 @@ main(int argc, char *argv[])
 			argc--;
 			argv++;
 		}
+		enddmapent();
 		if (cntr != 0)
 			exit(0);
 		exit(1);
@@ -438,20 +443,22 @@ main(int argc, char *argv[])
 	 */
 	if (tp) {
 		cntr = 0;
+		setdmapent();
 		while (argc >= 1) {
-			setdmapent();
 			while ((dmapp = getdmaptype(*argv)) != 0) {
 				cntr++;
 				if (verbose) {
 					printdmapent(dmapp);
 				}
 			}
-			enddmapent();
-			if ((any == 0) && (cntr == 0))
+			if ((any == 0) && (cntr == 0)) {
+				enddmapent();
 				exit(1);
+			}
 			argc--;
 			argv++;
 		}
+		enddmapent();
 		if (cntr == 0)
 			exit(1);
 		exit(0);

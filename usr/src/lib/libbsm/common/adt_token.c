@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  * adt_token.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file does not provide any user callable functions.  See adt.c
@@ -41,6 +40,7 @@
 #include <sys/priv_names.h>
 #include <sys/types.h>
 #include <sys/vnode.h>
+#include <tsol/label.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -530,6 +530,9 @@ adt_to_subject(datadef *def, void *p_data, int required,
 			    au_to_newgroups(0, grouplist));
 		}
 	}
+
+	if (is_system_labeled())
+		(void) au_write(event->ae_event_handle, au_to_mylabel());
 }
 
 /*

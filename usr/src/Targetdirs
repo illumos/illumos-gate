@@ -200,6 +200,7 @@ ROOT.BIN= \
 	/usr/include/kerberosv5 \
 	/usr/include/libmilter \
 	/usr/include/sasl \
+	/usr/include/tsol \
 	/usr/lib \
 	/usr/lib/abi \
 	/usr/lib/class \
@@ -860,6 +861,10 @@ $(ROOT)/usr/lib/libthread.so.1:=	REALPATH=../../lib/libthread.so.1
 $(ROOT)/usr/lib/libthread.so:=		REALPATH=../../lib/libthread.so.1
 $(ROOT)/usr/lib/libthread_db.so.1:=	REALPATH=../../lib/libc_db.so.1
 $(ROOT)/usr/lib/libthread_db.so:=	REALPATH=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libtsnet.so.1:=		REALPATH=../../lib/libtsnet.so.1
+$(ROOT)/usr/lib/libtsnet.so:=		REALPATH=../../lib/libtsnet.so.1
+$(ROOT)/usr/lib/libtsol.so.2:=		REALPATH=../../lib/libtsol.so.2
+$(ROOT)/usr/lib/libtsol.so:=		REALPATH=../../lib/libtsol.so.2
 $(ROOT)/usr/lib/libumem.so.1:=		REALPATH=../../lib/libumem.so.1
 $(ROOT)/usr/lib/libumem.so:=		REALPATH=../../lib/libumem.so.1
 $(ROOT)/usr/lib/libuuid.so.1:=		REALPATH=../../lib/libuuid.so.1
@@ -960,6 +965,10 @@ $(ROOT)/usr/lib/llib-lthread.ln:=	REALPATH=../../lib/llib-lthread.ln
 $(ROOT)/usr/lib/llib-lthread:=		REALPATH=../../lib/llib-lthread
 $(ROOT)/usr/lib/llib-lthread_db.ln:=	REALPATH=../../lib/llib-lc_db.ln
 $(ROOT)/usr/lib/llib-lthread_db:=	REALPATH=../../lib/llib-lc_db
+$(ROOT)/usr/lib/llib-ltsnet.ln:=	REALPATH=../../lib/llib-ltsnet.ln
+$(ROOT)/usr/lib/llib-ltsnet:=		REALPATH=../../lib/llib-ltsnet
+$(ROOT)/usr/lib/llib-ltsol.ln:=		REALPATH=../../lib/llib-ltsol.ln
+$(ROOT)/usr/lib/llib-ltsol:=		REALPATH=../../lib/llib-ltsol
 $(ROOT)/usr/lib/llib-lumem.ln:=		REALPATH=../../lib/llib-lumem.ln
 $(ROOT)/usr/lib/llib-lumem:=		REALPATH=../../lib/llib-lumem
 $(ROOT)/usr/lib/llib-luuid.ln:=		REALPATH=../../lib/llib-luuid.ln
@@ -1165,6 +1174,14 @@ $(ROOT)/usr/lib/$(MACH64)/libthread_db.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
 $(ROOT)/usr/lib/$(MACH64)/libthread_db.so:= \
 	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtsnet.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libtsnet.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtsnet.so:= \
+	REALPATH=../../../lib/$(MACH64)/libtsnet.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtsol.so.2:= \
+	REALPATH=../../../lib/$(MACH64)/libtsol.so.2
+$(ROOT)/usr/lib/$(MACH64)/libtsol.so:= \
+	REALPATH=../../../lib/$(MACH64)/libtsol.so.2
 $(ROOT)/usr/lib/$(MACH64)/libumem.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libumem.so.1
 $(ROOT)/usr/lib/$(MACH64)/libumem.so:= \
@@ -1275,6 +1292,10 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lthread.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lthread.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lthread_db.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lc_db.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ltsnet.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ltsnet.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ltsol.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ltsol.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lumem.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lumem.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-luuid.ln:= \
@@ -1402,6 +1423,8 @@ SYM.USRLIB= \
 	/usr/lib/libsendfile.so.1 \
 	/usr/lib/libsocket.so \
 	/usr/lib/libsocket.so.1 \
+	/usr/lib/libsysevent.so \
+	/usr/lib/libsysevent.so.1 \
 	/usr/lib/libtermcap.so \
 	/usr/lib/libtermcap.so.1 \
 	/usr/lib/libtermlib.so \
@@ -1410,8 +1433,10 @@ SYM.USRLIB= \
 	/usr/lib/libthread.so.1 \
 	/usr/lib/libthread_db.so \
 	/usr/lib/libthread_db.so.1 \
-	/usr/lib/libsysevent.so \
-	/usr/lib/libsysevent.so.1 \
+	/usr/lib/libtsnet.so \
+	/usr/lib/libtsnet.so.1 \
+	/usr/lib/libtsol.so \
+	/usr/lib/libtsol.so.2 \
 	/usr/lib/libumem.so \
 	/usr/lib/libumem.so.1 \
 	/usr/lib/libuuid.so \
@@ -1512,6 +1537,10 @@ SYM.USRLIB= \
 	/usr/lib/llib-lthread.ln \
 	/usr/lib/llib-lthread_db \
 	/usr/lib/llib-lthread_db.ln \
+	/usr/lib/llib-ltsnet \
+	/usr/lib/llib-ltsnet.ln \
+	/usr/lib/llib-ltsol \
+	/usr/lib/llib-ltsol.ln \
 	/usr/lib/llib-lumem \
 	/usr/lib/llib-lumem.ln \
 	/usr/lib/llib-luuid \
@@ -1633,6 +1662,10 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libthread.so.1 \
 	/usr/lib/$(MACH64)/libthread_db.so \
 	/usr/lib/$(MACH64)/libthread_db.so.1 \
+	/usr/lib/$(MACH64)/libtsnet.so \
+	/usr/lib/$(MACH64)/libtsnet.so.1 \
+	/usr/lib/$(MACH64)/libtsol.so \
+	/usr/lib/$(MACH64)/libtsol.so.2 \
 	/usr/lib/$(MACH64)/libumem.so \
 	/usr/lib/$(MACH64)/libumem.so.1 \
 	/usr/lib/$(MACH64)/libuuid.so \
@@ -1688,6 +1721,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-ltermlib.ln \
 	/usr/lib/$(MACH64)/llib-lthread.ln \
 	/usr/lib/$(MACH64)/llib-lthread_db.ln \
+	/usr/lib/$(MACH64)/llib-ltsnet.ln \
+	/usr/lib/$(MACH64)/llib-ltsol.ln \
 	/usr/lib/$(MACH64)/llib-lumem.ln \
 	/usr/lib/$(MACH64)/llib-luuid.ln \
 	/usr/lib/$(MACH64)/llib-lxnet.ln \

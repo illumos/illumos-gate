@@ -414,6 +414,7 @@ extern "C" {
 #define	isastream			_isastream
 #define	isatty				_isatty
 #define	issetugid			_issetugid
+#define	is_system_labeled		_is_system_labeled
 #define	jrand48				_jrand48
 #define	kaio				_kaio
 #define	kill				_kill

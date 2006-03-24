@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -34,15 +33,12 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
-#include <sys/strlog.h>
 #include <sys/strsubr.h>
 #include <sys/errno.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
-#include <sys/timod.h>
 #include <sys/socket.h>
 #include <sys/ddi.h>
-#include <sys/cmn_err.h>
 #include <sys/debug.h>		/* for ASSERT */
 #include <sys/policy.h>
 
@@ -53,8 +49,6 @@
 #include <inet/ip.h>
 #include <inet/mib2.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netinet/ip_mroute.h>
 #include "optcom.h"
 
 #include <inet/optcom.h>
@@ -2228,4 +2222,77 @@ opt_length_ok(opdes_t *optd, struct T_opthdr *opt)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
+}
+
+/*
+ * This routine appends a pssed in hop-by-hop option to the existing
+ * option (in this case a cipso label encoded in HOPOPT option). The
+ * passed in option is always padded. The 'reservelen' is the
+ * length of reserved data (label). New memory will be allocated if
+ * the current buffer is not large enough. Return failure if memory
+ * can not be allocated.
+ */
+int
+optcom_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
+    uchar_t **optbufp, uint_t *optlenp, uint_t reservelen)
+{
+	uchar_t *optbuf;
+	uchar_t	*optp;
+
+	if (!sticky) {
+		*optbufp = invalp;
+		*optlenp = inlen;
+		return (0);
+	}
+
+	if (inlen == *optlenp - reservelen) {
+		/* Unchanged length - no need to reallocate */
+		optp = *optbufp + reservelen;
+		bcopy(invalp, optp, inlen);
+		if (reservelen != 0) {
+			/*
+			 * Convert the NextHeader and Length of the
+			 * passed in hop-by-hop header to pads
+			 */
+			optp[0] = IP6OPT_PADN;
+			optp[1] = 0;
+		}
+		return (0);
+	}
+	if (inlen + reservelen > 0) {
+		/* Allocate new buffer before free */
+		optbuf = kmem_alloc(inlen + reservelen, KM_NOSLEEP);
+		if (optbuf == NULL)
+			return (ENOMEM);
+	} else {
+		optbuf = NULL;
+	}
+
+	/* Copy out old reserved data (label) */
+	if (reservelen > 0)
+		bcopy(*optbufp, optbuf, reservelen);
+
+	/* Free old buffer */
+	if (*optlenp != 0)
+		kmem_free(*optbufp, *optlenp);
+
+	if (inlen > 0)
+		bcopy(invalp, optbuf + reservelen, inlen);
+
+	if (reservelen != 0) {
+		/*
+		 * Convert the NextHeader and Length of the
+		 * passed in hop-by-hop header to pads
+		 */
+		optbuf[reservelen] = IP6OPT_PADN;
+		optbuf[reservelen + 1] = 0;
+		/*
+		 * Set the Length of the hop-by-hop header, number of 8
+		 * byte-words following the 1st 8 bytes
+		 */
+		optbuf[1] = (reservelen + inlen - 1) >> 3;
+	}
+	*optbufp = optbuf;
+	*optlenp = inlen + reservelen;
+	return (0);
 }

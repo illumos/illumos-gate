@@ -39,7 +39,6 @@
 #include <sys/proc.h>
 #include <sys/acct.h>
 #include <sys/ipc_impl.h>
-#include <sys/syscall.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/policy.h>
@@ -51,15 +50,11 @@
 #include <sys/modctl.h>
 #include <sys/disp.h>
 #include <sys/zone.h>
-#include <inet/common.h>
 #include <inet/optcom.h>
 #include <sys/sdt.h>
-#include <sys/mount.h>
 #include <sys/vfs.h>
 #include <sys/mntent.h>
 #include <sys/contract_impl.h>
-
-#include <sys/sunddi.h>
 
 /*
  * There are two possible layers of privilege routines and two possible
@@ -500,6 +495,27 @@ secpolicy_net_privaddr(const cred_t *cr, in_port_t port)
 	else
 		return (PRIV_POLICY(cr, PRIV_NET_PRIVADDR, B_FALSE, EACCES,
 		    NULL));
+}
+
+/*
+ * Binding to a multilevel port on a trusted (labeled) system.
+ */
+int
+secpolicy_net_bindmlp(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_NET_BINDMLP, B_FALSE, EACCES,
+	    NULL));
+}
+
+/*
+ * Allow a communication between a zone and an unlabeled host when their
+ * labels don't match.
+ */
+int
+secpolicy_net_mac_aware(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_NET_MAC_AWARE, B_FALSE, EACCES,
+	    NULL));
 }
 
 /*
@@ -1675,6 +1691,12 @@ int
 secpolicy_sti(const cred_t *cr)
 {
 	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+}
+
+boolean_t
+secpolicy_net_reply_equal(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_SYS_CONFIG, B_FALSE, EPERM, NULL));
 }
 
 int

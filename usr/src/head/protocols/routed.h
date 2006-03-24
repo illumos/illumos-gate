@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,18 @@ struct netauth {
 	} au;
 };
 
+struct rip_emetric {
+	uint16_t	rip_metric;
+	uint16_t	rip_mask;
+	uint32_t	rip_token[1];
+};
+
+struct rip_sec_entry {
+	uint32_t	rip_dst;
+	uint32_t	rip_count;
+	struct rip_emetric rip_emetric[1];
+};
+
 struct rip {
 	uint8_t    rip_cmd;		/* request/response */
 	uint8_t    rip_vers;		/* protocol version # */
@@ -116,10 +128,15 @@ struct rip {
 	    struct netinfo ru_nets[1];	/* variable length... */
 	    char    ru_tracefile[1];	/* ditto ... */
 	    struct netauth ru_auth[1];
+	    struct {
+		uint32_t rip_generation;
+		struct rip_sec_entry rip_sec_entry[1];
+	    } ru_tsol;
 	} ripun;
 #define	rip_nets	ripun.ru_nets
 #define	rip_tracefile	ripun.ru_tracefile
 #define	rip_auths	ripun.ru_auth
+#define	rip_tsol	ripun.ru_tsol
 };
 
 struct entryinfo {
@@ -148,6 +165,9 @@ struct entryinfo {
  */
 #define	RIPCMD_POLL		5	/* like request, but anyone answers */
 #define	RIPCMD_POLLENTRY	6	/* like poll, but for entire entry */
+
+#define	RIPCMD_SEC_RESPONSE	51	/* response includes E-metrics */
+#define	RIPCMD_SEC_T_RESPONSE	52	/* tunneling */
 
 #define	RIPCMD_MAX		7
 

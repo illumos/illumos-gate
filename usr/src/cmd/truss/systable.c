@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -410,7 +409,7 @@ const struct systable systable[] = {
 {"rusagesys",	2, DEC, NOV, DEC, HEX},				/* 181 */
 {"portfs",	6, HEX, HEX, DEC, HEX, HEX, HEX, HEX, HEX},	/* 182 */
 {"pollsys",	4, DEC, NOV, HEX, DEC, HEX, HEX},		/* 183 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"labelsys",	2, DEC, NOV, DEC, HEX},				/* 184 */
 {"acl",		4, DEC, NOV, STG, ACL, DEC, HEX},		/* 185 */
 {"auditsys",	4, DEC, NOV, AUD, HEX, HEX, HEX},		/* 186 */
 {"processor_bind", 4, DEC, NOV, IDT, DEC, DEC, HEX},		/* 187 */
@@ -793,6 +792,17 @@ static const struct systable zonetable[] = {
 };
 #define	NZONECODE	(sizeof (zonetable) / sizeof (struct systable))
 
+static const struct systable labeltable[] = {
+{"labelsys", 3, DEC, NOV, HID, HEX, HEX},			/* 0 */
+{"is_system_labeled", 1, DEC, NOV, HID},			/* 1 */
+{"tnrh", 3, DEC, NOV, HID, TND, HEX},				/* 2 */
+{"tnrhtp", 3, DEC, NOV, HID, TND, HEX},				/* 3 */
+{"tnmlp", 3, DEC, NOV, HID, TND, HEX},				/* 4 */
+{"getlabel", 3, DEC, NOV, HID, STG, HEX},			/* 5 */
+{"fgetlabel", 3, DEC, NOV, HID, DEC, HEX},			/* 6 */
+};
+#define	NLABELCODE	(sizeof (labeltable) / sizeof (struct systable))
+
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
 	{ "fork",	SYS_fork1	},
@@ -928,9 +938,14 @@ const	struct sysalias sysalias[] = {
 	{ "getzoneid",		SYS_zone	},
 	{ "zone_list",		SYS_zone	},
 	{ "zone_shutdown",	SYS_zone	},
+	{ "is_system_labeled",	SYS_labelsys	},
+	{ "tnrh",		SYS_labelsys	},
+	{ "tnrhtp",		SYS_labelsys	},
+	{ "tnmlp",		SYS_labelsys	},
+	{ "getlabel",		SYS_labelsys	},
+	{ "fgetlabel",		SYS_labelsys	},
 	{  NULL,	0	}	/* end-of-list */
 };
-
 
 /*
  * Return structure to interpret system call with sub-codes.
@@ -1061,6 +1076,10 @@ subsys(int syscall, int subcode)
 		case SYS_zone:		/* zone family */
 			if ((unsigned)subcode < NZONECODE)
 				stp = &zonetable[subcode];
+			break;
+		case SYS_labelsys:	/* label family */
+			if ((unsigned)subcode < NLABELCODE)
+				stp = &labeltable[subcode];
 			break;
 		}
 	}
@@ -1212,6 +1231,7 @@ getsubcode(private_t *pri)
 		case SYS_rusagesys:	/* rusagesys */
 		case SYS_ucredsys:	/* ucredsys */
 		case SYS_zone:		/* zone */
+		case SYS_labelsys:	/* labelsys */
 			subcode = arg0;
 			break;
 		case SYS_fcntl:		/* fcntl() */
@@ -1271,7 +1291,8 @@ maxsyscalls()
 		+ NPRIVSYSCODE - 1
 		+ NUCREDSYSCODE - 1
 		+ NPORTCODE - 1
-		+ NZONECODE - 1);
+		+ NZONECODE - 1
+		+ NLABELCODE - 1);
 }
 
 /*
@@ -1341,6 +1362,8 @@ nsubcodes(int syscall)
 		return (NPORTCODE);
 	case SYS_zone:		/* zone */
 		return (NZONECODE);
+	case SYS_labelsys:
+		return (NLABELCODE);
 	default:
 		return (1);
 	}

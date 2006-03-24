@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,9 +21,8 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +34,7 @@
 #include "sys/types.h"
 
 #include "lp.h"
+#include "strings.h"
 #include "msgs.h"
 #include "requests.h"
 
@@ -178,16 +177,23 @@ do_user(char **list)
 	user_name = NULL;
 }
 
+
 /*
  * putoline()
  */
 
 void
-putoline(char *request_id, char *user, long size, time_t clock, int state,
-	char *printer, char *form, char *character_set, int rank)
+putoline(char *request_id, char *user, char *slabel, long size, time_t clock,
+	int state, char *printer, char *form, char *character_set, int rank)
 {
 	int showRank;
+	char user_buf[LOGMAX];
 	char date[SZ_DATE_BUFF];
+
+	if ((slabel != NULL) && (slabel[0] != '\0'))
+		snprintf(user_buf, sizeof (user_buf), "%s:%s", user, slabel);
+	else
+		snprintf(user_buf, sizeof (user_buf), "%s", user);
 
 	/*
 	 * This is the basic time format used in the output. It represents
@@ -215,12 +221,11 @@ putoline(char *request_id, char *user, long size, time_t clock, int state,
 		((showRank) ? IDSIZE - 2 : IDSIZE),
 		request_id,
 		LOGMAX-1,
-		user,
+		user_buf,
 		OSIZE,
 		size,
 		((showRank) ? "" : "  "),
 		date);
-
 
 	if (!(verbosity & (V_LONG|V_BITS))) {
 

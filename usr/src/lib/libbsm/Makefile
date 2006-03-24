@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -27,7 +28,6 @@
 # lib/libbsm/Makefile
 #
 
-include ../../Makefile.master
 include ../Makefile.lib
 
 SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
@@ -46,54 +46,13 @@ package :=	TARGET= package
 
 all clean clobber delete install lint package: $(SUBDIRS)
 
-OBJECTS=	adr.o \
-		adrf.o \
-		adrm.o \
-		adt.o \
-		adt_token.o \
-		adt_xlate.o \
-		au_open.o \
-		au_preselect.o \
-		au_to.o \
-		au_usermask.o \
-		audit_allocate.o \
-		audit_class.o \
-		audit_cron.o \
-		audit_crontab.o \
-		audit_at.o \
-		audit_event.o \
-		audit_ftpd.o \
-		audit_halt.o \
-		audit_inetd.o \
-		audit_kadmind.o \
-		audit_krb5kdc.o \
-		audit_mountd.o \
-		audit_newgrp.o \
-		audit_plugin.o \
-		audit_reboot.o \
-		audit_rexd.o \
-		audit_rexecd.o \
-		audit_rshd.o \
-		audit_settid.o \
-		audit_shutdown.o \
-		audit_uadmin.o \
-		audit_user.o \
-		bsm.o \
-		generic.o \
-		getacinfo.o \
-		getacval.o \
-		getauditflags.o \
-		getdaent.o \
-		getdment.o \
-		getfaudflgs.o
-
 COMMONDIR = common
 
 #
 # Macros for libbsm header files. These define user-level only interfaces.
 #
 GENHDRS = audit_uevents.h
-HDRS = libbsm.h devices.h adt.h adt_event.h audit_private.h
+HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h
 COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
 ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
 ROOTCHDRS = 	$(HDRS:%=$(ROOTHDRDIR)/%)
@@ -154,10 +113,8 @@ ARSYMLNK=$(RESAL)/files
 #
 # message catalogue file
 #
-TEXT_DOMAIN= SUNW_OST_OSLIB
-POFILE= libbsm.po
-CATALOG=libbsm.po
-POFILES= $(OBJECTS:%.o=%.po)
+MSGFILES =	`$(GREP) -l gettext $(COMMONDIR)/*.c`
+POFILE =	libbsm.po
 
 #
 # Definitions for XML (DTD AND XSL)
@@ -241,24 +198,9 @@ $(ROOTETCSECURITY):
 $(ROOTETCSECURITY)/%: %.txt
 	$(INS.rename)
 
-%.po: $(COMMONDIR)/%.c
-	$(COMPILE.cpp) $<  > $<.i
-	$(BUILD.po)
+$(POFILE):	 pofile_MSGFILES
 
-_msg: $(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(CATALOG)
-	$(CP) $(POFILE) $(MSGDOMAIN)
-
-catalog: _msg
-
-po_clean:
-	$(RM) $(POFILES) $(POFILE)
-
-clobber: po_clean
-
-$(POFILE): .WAIT $(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
+_msg:	$(MSGDOMAINPOFILE)
 
 # has strings but doesn't use gettext
 adt_xlate.po: $(COMMONDIR)/adt_xlate.c
@@ -267,11 +209,10 @@ adt_xlate.po: $(COMMONDIR)/adt_xlate.c
 	$(SED) "/^domain/d" < messages.po > adt_xlate.po
 	$(RM) messages.po
 
-$(MSGDOMAIN):
-	$(INS.dir)
-
-
 spec $(MACH) $(MACH64) :	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include ../Makefile.targ
+include ../../Makefile.msg.targ

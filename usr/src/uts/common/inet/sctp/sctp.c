@@ -42,6 +42,7 @@
 #include <sys/kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/random.h>
+#include <sys/priv.h>
 
 #include <sys/errno.h>
 #include <sys/signal.h>
@@ -80,7 +81,6 @@ extern mblk_t *sctp_pad_mp;	/* pad unaligned data chunks */
 
 static void	sctp_closei_local(sctp_t *sctp);
 static int	sctp_init_values(sctp_t *, sctp_t *, int);
-void		sctp_display_all();
 static void	sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp);
 static void	sctp_process_recvq(void *);
 static void	sctp_rq_tq_init(void);
@@ -89,7 +89,6 @@ static void	sctp_conn_cache_init();
 static void	sctp_conn_cache_fini();
 static int	sctp_conn_cache_constructor();
 static void	sctp_conn_cache_destructor();
-void		sctp_inc_taskq(void);
 
 /*
  * SCTP receive queue taskq
@@ -192,9 +191,13 @@ sctp_create_eager(sctp_t *psctp)
 	sctp_t	*sctp;
 	mblk_t	*ack_mp, *hb_mp;
 	conn_t	*connp, *pconnp;
+	cred_t *credp;
 
 	if ((connp = ipcl_conn_create(IPCL_SCTPCONN, KM_NOSLEEP)) == NULL)
 		return (NULL);
+
+	connp->conn_ulp_labeled = is_system_labeled();
+
 	sctp = CONN2SCTP(connp);
 
 	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer)) == NULL ||
@@ -221,9 +224,20 @@ sctp_create_eager(sctp_t *psctp)
 		kmem_cache_free(sctp_conn_cache, connp);
 		return (NULL);
 	}
-	if (pconnp->conn_cred != NULL) {
-		connp->conn_cred = pconnp->conn_cred;
-		crhold(connp->conn_cred);
+
+	/*
+	 * If the parent is multilevel, then we'll fix up the remote cred
+	 * when we do sctp_accept_comm.
+	 */
+	if ((credp = pconnp->conn_cred) != NULL) {
+		connp->conn_cred = credp;
+		crhold(credp);
+		/*
+		 * If the caller has the process-wide flag set, then default to
+		 * MAC exempt mode.  This allows read-down to unlabeled hosts.
+		 */
+		if (getpflags(NET_MAC_AWARE, credp) != 0)
+			connp->conn_mac_exempt = B_TRUE;
 	}
 	connp->conn_zoneid = psctp->sctp_zoneid;
 	sctp->sctp_mss = psctp->sctp_mss;
@@ -250,7 +264,8 @@ sctp_clean_death(sctp_t *sctp, int err)
 	    (sctp->sctp_ipversion == IPV4_VERSION ||
 	    sctp->sctp_ipversion == IPV6_VERSION)));
 
-	dprint(3, ("sctp_clean_death %p, state %d\n", sctp, sctp->sctp_state));
+	dprint(3, ("sctp_clean_death %p, state %d\n", (void *)sctp,
+	    sctp->sctp_state));
 
 	sctp->sctp_client_errno = err;
 	/*
@@ -311,7 +326,8 @@ sctp_disconnect(sctp_t *sctp)
 	int	error = 0;
 	sctp_faddr_t *fp;
 
-	dprint(3, ("sctp_disconnect %p, state %d\n", sctp, sctp->sctp_state));
+	dprint(3, ("sctp_disconnect %p, state %d\n", (void *)sctp,
+	    sctp->sctp_state));
 
 	RUN_SCTP(sctp);
 
@@ -421,7 +437,8 @@ sctp_disconnect(sctp_t *sctp)
 void
 sctp_close(sctp_t *sctp)
 {
-	dprint(3, ("sctp_close %p, state %d\n", sctp, sctp->sctp_state));
+	dprint(3, ("sctp_close %p, state %d\n", (void *)sctp,
+	    sctp->sctp_state));
 
 	RUN_SCTP(sctp);
 	sctp->sctp_detached = 1;
@@ -630,7 +647,6 @@ void
 sctp_free(conn_t *connp)
 {
 	sctp_t *sctp = CONN2SCTP(connp);
-	ip6_pkt_t	*ipp;
 	int		cnt;
 
 	/* Unlink it from the global list */
@@ -692,26 +708,7 @@ sctp_free(conn_t *connp)
 		list_destroy(&sctp->sctp_saddrs[cnt].sctp_ipif_list);
 	}
 
-	ipp = &sctp->sctp_sticky_ipp;
-	if (ipp->ipp_rthdrlen != 0) {
-		kmem_free(ipp->ipp_rthdr, ipp->ipp_rthdrlen);
-		ipp->ipp_rthdrlen = 0;
-	}
-
-	if (ipp->ipp_dstoptslen != 0) {
-		kmem_free(ipp->ipp_dstopts, ipp->ipp_dstoptslen);
-		ipp->ipp_dstoptslen = 0;
-	}
-
-	if (ipp->ipp_rtdstoptslen != 0) {
-		kmem_free(ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
-		ipp->ipp_rtdstoptslen = 0;
-	}
-
-	if (ipp->ipp_hopoptslen != 0) {
-		kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
-		ipp->ipp_hopoptslen = 0;
-	}
+	ip6_pkt_free(&sctp->sctp_sticky_ipp);
 
 	if (sctp->sctp_hopopts != NULL) {
 		mi_free(sctp->sctp_hopopts);
@@ -1062,7 +1059,8 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 	in6_addr_t dst;
 	sctp_faddr_t *fp;
 
-	dprint(1, ("sctp_icmp_error: sctp=%p, mp=%p\n", sctp, mp));
+	dprint(1, ("sctp_icmp_error: sctp=%p, mp=%p\n", (void *)sctp,
+	    (void *)mp));
 
 	first_mp = mp;
 
@@ -1302,6 +1300,9 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 
 	if ((sctp_connp = ipcl_conn_create(IPCL_SCTPCONN, sleep)) == NULL)
 		return (NULL);
+
+	sctp_connp->conn_ulp_labeled = is_system_labeled();
+
 	psctp = (sctp_t *)parent;
 
 	sctp = CONN2SCTP(sctp_connp);
@@ -1377,6 +1378,13 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 
 	sctp_connp->conn_cred = credp;
 	crhold(credp);
+
+	/*
+	 * If the caller has the process-wide flag set, then default to MAC
+	 * exempt mode.  This allows read-down to unlabeled hosts.
+	 */
+	if (getpflags(NET_MAC_AWARE, credp) != 0)
+		sctp_connp->conn_mac_exempt = B_TRUE;
 
 	/* Initialize SCTP instance values,  our verf tag must never be 0 */
 	(void) random_get_pseudo_bytes((uint8_t *)&sctp->sctp_lvtag,

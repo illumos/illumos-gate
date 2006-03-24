@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +56,14 @@
 #define	ADDR_V6_WIDTH	23
 #define	ADDR_V4_WIDTH	15
 
-#define	NETSTAT_ALL	0x1
-#define	NETSTAT_VERBOSE	0x2
+#define	NETSTAT_ALL	0x01
+#define	NETSTAT_VERBOSE	0x02
+#define	NETSTAT_ROUTE	0x04
+#define	NETSTAT_V4	0x08
+#define	NETSTAT_V6	0x10
+#define	NETSTAT_UNIX	0x20
+
+#define	NETSTAT_FIRST	0x80000000u
 
 /*
  * Print an IPv4 address and port number in a compact and easy to read format
@@ -790,6 +795,305 @@ netstat_tcp_verbose_header_pr(void)
 	    "Swind", "Snext", "Suna", "Rwind", "Rack", "Rnext", "Rto", "Mss");
 }
 
+static void
+get_ifname(const ire_t *ire, char *intf)
+{
+	ill_t ill;
+
+	*intf = '\0';
+	if (ire->ire_type == IRE_CACHE) {
+		queue_t stq;
+
+		if (mdb_vread(&stq, sizeof (stq), (uintptr_t)ire->ire_stq) ==
+		    -1)
+			return;
+		if (mdb_vread(&ill, sizeof (ill), (uintptr_t)stq.q_ptr) == -1)
+			return;
+		(void) mdb_readstr(intf, MIN(LIFNAMSIZ, ill.ill_name_length),
+		    (uintptr_t)ill.ill_name);
+	} else if (ire->ire_ipif != NULL) {
+		ipif_t ipif;
+		char *cp;
+
+		if (mdb_vread(&ipif, sizeof (ipif),
+		    (uintptr_t)ire->ire_ipif) == -1)
+			return;
+		if (mdb_vread(&ill, sizeof (ill), (uintptr_t)ipif.ipif_ill) ==
+		    -1)
+			return;
+		(void) mdb_readstr(intf, MIN(LIFNAMSIZ, ill.ill_name_length),
+		    (uintptr_t)ill.ill_name);
+		if (ipif.ipif_id != 0) {
+			cp = intf + strlen(intf);
+			(void) mdb_snprintf(cp, LIFNAMSIZ + 1 - (cp - intf),
+			    ":%u", ipif.ipif_id);
+		}
+	}
+}
+
+static void
+get_v4flags(const ire_t *ire, char *flags)
+{
+	(void) strcpy(flags, "U");
+	if (ire->ire_type == IRE_DEFAULT || ire->ire_type == IRE_PREFIX ||
+	    ire->ire_type == IRE_HOST || ire->ire_type == IRE_HOST_REDIRECT)
+		(void) strcat(flags, "G");
+	if (ire->ire_mask == IP_HOST_MASK)
+		(void) strcat(flags, "H");
+	if (ire->ire_type == IRE_HOST_REDIRECT)
+		(void) strcat(flags, "D");
+	if (ire->ire_type == IRE_CACHE)
+		(void) strcat(flags, "A");
+	if (ire->ire_type == IRE_BROADCAST)
+		(void) strcat(flags, "B");
+	if (ire->ire_type == IRE_LOCAL)
+		(void) strcat(flags, "L");
+	if (ire->ire_flags & RTF_MULTIRT)
+		(void) strcat(flags, "M");
+	if (ire->ire_flags & RTF_SETSRC)
+		(void) strcat(flags, "S");
+}
+
+static int
+ip_mask_to_plen(ipaddr_t mask)
+{
+	int i;
+
+	if (mask == 0)
+		return (0);
+	for (i = 32; i > 0; i--, mask >>= 1)
+		if (mask & 1)
+			break;
+	return (i);
+}
+
+static int
+netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+{
+	const ire_t *ire = walk_data;
+	uint_t *opts = cb_data;
+	ipaddr_t gate;
+	char flags[10], intf[LIFNAMSIZ + 1];
+
+	if (ire->ire_ipversion != IPV4_VERSION || ire->ire_in_src_addr != 0 ||
+	    ire->ire_in_ill != NULL)
+		return (WALK_NEXT);
+
+	if (!(*opts & NETSTAT_ALL) && (ire->ire_type == IRE_CACHE ||
+	    ire->ire_type == IRE_BROADCAST || ire->ire_type == IRE_LOCAL))
+		return (WALK_NEXT);
+
+	if (*opts & NETSTAT_FIRST) {
+		*opts &= ~NETSTAT_FIRST;
+		mdb_printf("%<u>%s Table: IPv4%</u>\n",
+		    (*opts & NETSTAT_VERBOSE) ? "IRE" : "Routing");
+		if (*opts & NETSTAT_VERBOSE) {
+			mdb_printf("%<u>%-?s %-*s %-*s %-*s Device Mxfrg Rtt  "
+			    " Ref Flg Out   In/Fwd%</u>\n",
+			    "Address", ADDR_V4_WIDTH, "Destination",
+			    ADDR_V4_WIDTH, "Mask", ADDR_V4_WIDTH, "Gateway");
+		} else {
+			mdb_printf("%<u>%-?s %-*s %-*s Flags Ref  Use   "
+			    "Interface%</u>\n",
+			    "Address", ADDR_V4_WIDTH, "Destination",
+			    ADDR_V4_WIDTH, "Gateway");
+		}
+	}
+
+	gate = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK|IRE_BROADCAST)) ?
+	    ire->ire_src_addr : ire->ire_gateway_addr;
+
+	get_v4flags(ire, flags);
+
+	get_ifname(ire, intf);
+
+	if (*opts & NETSTAT_VERBOSE) {
+		mdb_printf("%?p %-*I %-*I %-*I %-6s %5u%c %4u %3u %-3s %5u "
+		    "%u\n", kaddr, ADDR_V4_WIDTH, ire->ire_addr, ADDR_V4_WIDTH,
+		    ire->ire_mask, ADDR_V4_WIDTH, gate, intf,
+		    ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
+		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt, flags,
+		    ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
+	} else {
+		mdb_printf("%?p %-*I %-*I %-5s %4u %5u %s\n", kaddr,
+		    ADDR_V4_WIDTH, ire->ire_addr, ADDR_V4_WIDTH, gate, flags,
+		    ire->ire_refcnt,
+		    ire->ire_ob_pkt_count + ire->ire_ib_pkt_count, intf);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+netstat_irev4src_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+{
+	const ire_t *ire = walk_data;
+	uint_t *opts = cb_data;
+	ipaddr_t gate;
+	char flags[10], intf[LIFNAMSIZ + 1], srcif[LIFNAMSIZ + 1];
+	char dest[ADDR_V4_WIDTH + 3 + 1];
+	ill_t ill;
+
+	if (ire->ire_ipversion != IPV4_VERSION ||
+	    (ire->ire_in_src_addr == 0 && ire->ire_in_ill == NULL))
+		return (WALK_NEXT);
+
+	if (!(*opts & NETSTAT_ALL) && (ire->ire_type == IRE_CACHE ||
+	    ire->ire_type == IRE_BROADCAST || ire->ire_type == IRE_LOCAL))
+		return (WALK_NEXT);
+
+	if (*opts & NETSTAT_FIRST) {
+		*opts &= ~NETSTAT_FIRST;
+		mdb_printf("\n%<u>%s Table: IPv4 Source-Specific%</u>\n",
+		    (*opts & NETSTAT_VERBOSE) ? "IRE" : "Routing");
+		if (*opts & NETSTAT_VERBOSE) {
+			mdb_printf("%<u>%-?s %-*s In If       %-*s %-*s "
+			    "Out If      Mxfrg Rtt   Ref Flg Out   In/Fwd"
+			    "%</u>\n",
+			    "Address", ADDR_V4_WIDTH+3, "Destination",
+			    ADDR_V4_WIDTH, "Source", ADDR_V4_WIDTH, "Gateway");
+		} else {
+			mdb_printf("%<u>%-?s %-*s In If    %-*s %-*s Flags "
+			    "Ref  Use   Out If%</u>\n",
+			    "Address", ADDR_V4_WIDTH+3, "Destination",
+			    ADDR_V4_WIDTH, "Source", ADDR_V4_WIDTH, "Gateway");
+		}
+	}
+
+	gate = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK|IRE_BROADCAST)) ?
+	    ire->ire_src_addr : ire->ire_gateway_addr;
+
+	get_v4flags(ire, flags);
+
+	get_ifname(ire, intf);
+
+	srcif[0] = '\0';
+	if (mdb_vread(&ill, sizeof (ill), (uintptr_t)ire->ire_in_ill) != -1)
+		(void) mdb_readstr(srcif, MIN(LIFNAMSIZ, ill.ill_name_length),
+		    (uintptr_t)ill.ill_name);
+
+	if (ire->ire_in_src_addr != 0 && ire->ire_addr == 0 &&
+	    ire->ire_mask == 0)
+		strcpy(dest, "  --");
+	else
+		mdb_snprintf(dest, sizeof (dest), "%I/%d", ire->ire_addr,
+		    ip_mask_to_plen(ire->ire_mask));
+
+	if (*opts & NETSTAT_VERBOSE) {
+		mdb_printf("%?p %-*s %-11s %-*I %-*I %-11s %5u%c %4u %3u %-3s "
+		    "%5u %u\n", kaddr, ADDR_V4_WIDTH+3, dest, srcif,
+		    ADDR_V4_WIDTH, ire->ire_in_src_addr, ADDR_V4_WIDTH, gate,
+		    intf, ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
+		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt, flags,
+		    ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
+	} else {
+		mdb_printf("%?p %-*s %-8s %-*I %-*I %-5s %4u %5u %s\n", kaddr,
+		    ADDR_V4_WIDTH+3, dest, srcif, ADDR_V4_WIDTH,
+		    ire->ire_in_src_addr, ADDR_V4_WIDTH, gate, flags,
+		    ire->ire_refcnt,
+		    ire->ire_ob_pkt_count + ire->ire_ib_pkt_count, intf);
+	}
+
+	return (WALK_NEXT);
+}
+
+int
+ip_mask_to_plen_v6(const in6_addr_t *v6mask)
+{
+	int plen;
+	int i;
+	uint32_t val;
+
+	for (i = 3; i >= 0; i--)
+		if (v6mask->s6_addr32[i] != 0)
+			break;
+	if (i < 0)
+		return (0);
+	plen = 32 + 32 * i;
+	val = v6mask->s6_addr32[i];
+	while (!(val & 1)) {
+		val >>= 1;
+		plen--;
+	}
+
+	return (plen);
+}
+
+static int
+netstat_irev6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+{
+	const ire_t *ire = walk_data;
+	uint_t *opts = cb_data;
+	const in6_addr_t *gatep;
+	char deststr[ADDR_V6_WIDTH + 5];
+	char flags[10], intf[LIFNAMSIZ + 1];
+	int masklen;
+
+	if (ire->ire_ipversion != IPV6_VERSION)
+		return (WALK_NEXT);
+
+	if (!(*opts & NETSTAT_ALL) && ire->ire_type == IRE_CACHE)
+		return (WALK_NEXT);
+
+	if (*opts & NETSTAT_FIRST) {
+		*opts &= ~NETSTAT_FIRST;
+		mdb_printf("\n%<u>%s Table: IPv6%</u>\n",
+		    (*opts & NETSTAT_VERBOSE) ? "IRE" : "Routing");
+		if (*opts & NETSTAT_VERBOSE) {
+			mdb_printf("%<u>%-?s %-*s %-*s If    PMTU   Rtt   Ref "
+			    "Flags Out    In/Fwd%</u>\n",
+			    "Address", ADDR_V6_WIDTH+4, "Destination/Mask",
+			    ADDR_V6_WIDTH, "Gateway");
+		} else {
+			mdb_printf("%<u>%-?s %-*s %-*s Flags Ref Use    If"
+			    "%</u>\n",
+			    "Address", ADDR_V6_WIDTH+4, "Destination/Mask",
+			    ADDR_V6_WIDTH, "Gateway");
+		}
+	}
+
+	gatep = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK)) ?
+	    &ire->ire_src_addr_v6 : &ire->ire_gateway_addr_v6;
+
+	masklen = ip_mask_to_plen_v6(&ire->ire_mask_v6);
+	(void) mdb_snprintf(deststr, sizeof (deststr), "%N/%d",
+	    &ire->ire_addr_v6, masklen);
+
+	(void) strcpy(flags, "U");
+	if (ire->ire_type == IRE_DEFAULT || ire->ire_type == IRE_PREFIX ||
+	    ire->ire_type == IRE_HOST || ire->ire_type == IRE_HOST_REDIRECT)
+		(void) strcat(flags, "G");
+	if (masklen == IPV6_ABITS)
+		(void) strcat(flags, "H");
+	if (ire->ire_type == IRE_HOST_REDIRECT)
+		(void) strcat(flags, "D");
+	if (ire->ire_type == IRE_CACHE)
+		(void) strcat(flags, "A");
+	if (ire->ire_type == IRE_LOCAL)
+		(void) strcat(flags, "L");
+	if (ire->ire_flags & RTF_MULTIRT)
+		(void) strcat(flags, "M");
+	if (ire->ire_flags & RTF_SETSRC)
+		(void) strcat(flags, "S");
+
+	get_ifname(ire, intf);
+
+	if (*opts & NETSTAT_VERBOSE) {
+		mdb_printf("%?p %-*s %-*N %-5s %5u%c %5u %3u %-5s %6u %u\n",
+		    kaddr, ADDR_V6_WIDTH+4, deststr, ADDR_V6_WIDTH, gatep,
+		    intf, ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
+		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt,
+		    flags, ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
+	} else {
+		mdb_printf("%?p %-*s %-*N %-5s %3u %6u %s\n", kaddr,
+		    ADDR_V6_WIDTH+4, deststr, ADDR_V6_WIDTH, gatep, flags,
+		    ire->ire_refcnt,
+		    ire->ire_ob_pkt_count + ire->ire_ib_pkt_count, intf);
+	}
+
+	return (WALK_NEXT);
+}
+
 /*ARGSUSED*/
 int
 netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -800,23 +1104,55 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_getopts(argc, argv,
 	    'a', MDB_OPT_SETBITS, NETSTAT_ALL, &opts,
-	    'v', MDB_OPT_SETBITS, NETSTAT_VERBOSE, &opts,
 	    'f', MDB_OPT_STR, &optf,
 	    'P', MDB_OPT_STR, &optP,
+	    'r', MDB_OPT_SETBITS, NETSTAT_ROUTE, &opts,
+	    'v', MDB_OPT_SETBITS, NETSTAT_VERBOSE, &opts,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (optP != NULL) {
 		if ((strcmp("tcp", optP) != 0) && (strcmp("udp", optP) != 0))
 			return (DCMD_USAGE);
-
+		if (opts & NETSTAT_ROUTE)
+			return (DCMD_USAGE);
 	}
 
-	if (optf != NULL) {
-		if ((strcmp("inet", optf) != 0) &&
-		    (strcmp("inet6", optf) != 0) &&
-		    (strcmp("unix", optf) != 0))
+	if (optf == NULL)
+		opts |= NETSTAT_V4 | NETSTAT_V6 | NETSTAT_UNIX;
+	else if (strcmp("inet", optf) == 0)
+		opts |= NETSTAT_V4;
+	else if (strcmp("inet6", optf) == 0)
+		opts |= NETSTAT_V6;
+	else if (strcmp("unix", optf) == 0)
+		opts |= NETSTAT_UNIX;
+	else
+		return (DCMD_USAGE);
+
+	if (opts & NETSTAT_ROUTE) {
+		if (!(opts & (NETSTAT_V4|NETSTAT_V6)))
 			return (DCMD_USAGE);
+		if (opts & NETSTAT_V4) {
+			opts |= NETSTAT_FIRST;
+			if (mdb_walk("ip`ire", netstat_irev4_cb, &opts) == -1) {
+				mdb_warn("failed to walk ip`ire");
+				return (DCMD_ERR);
+			}
+			opts |= NETSTAT_FIRST;
+			if (mdb_walk("ip`ire", netstat_irev4src_cb,
+			    &opts) == -1) {
+				mdb_warn("failed to walk ip`ire");
+				return (DCMD_ERR);
+			}
+		}
+		if (opts & NETSTAT_V6) {
+			opts |= NETSTAT_FIRST;
+			if (mdb_walk("ip`ire", netstat_irev6_cb, &opts) == -1) {
+				mdb_warn("failed to walk ip`ire");
+				return (DCMD_ERR);
+			}
+		}
+		return (DCMD_OK);
 	}
 
 	if ((optP == NULL) || (strcmp("tcp", optP) == 0)) {

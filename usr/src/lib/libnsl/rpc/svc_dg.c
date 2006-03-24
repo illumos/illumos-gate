@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -44,6 +43,7 @@
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <rpc/rpc.h>
 #include <errno.h>
 #include <syslog.h>
@@ -284,6 +284,37 @@ svc_dg_stat(SVCXPRT *xprt)
 	return (XPRT_IDLE);
 }
 
+/*
+ * Find the SCM_UCRED in src and place a pointer to that option alone in dest.
+ * Note that these two 'netbuf' structures might be the same one, so the code
+ * has to be careful about referring to src after changing dest.
+ */
+static void
+extract_cred(const struct netbuf *src, struct netbuf *dest)
+{
+	char *cp = src->buf;
+	unsigned int len = src->len;
+	const struct T_opthdr *opt;
+	unsigned int olen;
+
+	while (len >= sizeof (*opt)) {
+		/* LINTED: pointer alignment */
+		opt = (const struct T_opthdr *)cp;
+		olen = opt->len;
+		if (olen > len || olen < sizeof (*opt) ||
+		    !IS_P2ALIGNED(olen, sizeof (t_uscalar_t)))
+			break;
+		if (opt->level == SOL_SOCKET && opt->name == SCM_UCRED) {
+			dest->buf = cp;
+			dest->len = olen;
+			return;
+		}
+		cp += olen;
+		len -= olen;
+	}
+	dest->len = 0;
+}
+
 static bool_t
 svc_dg_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 {
@@ -354,9 +385,10 @@ again:
 			/* tu_data.addr is already set */
 			tu_data->udata.buf = reply;
 			tu_data->udata.len = (uint_t)replylen;
-			tu_data->opt.len = 0;
+			extract_cred(&tu_data->opt, &tu_data->opt);
 			(void) t_sndudata(xprt->xp_fd, tu_data);
 			tu_data->udata.buf = (char *)rpc_buffer(xprt);
+			tu_data->opt.buf = (char *)su->opts;
 			return (FALSE);
 		}
 	}
@@ -425,7 +457,7 @@ svc_dg_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 
 		slen = (int)XDR_GETPOS(xdrs);
 		tu_data->udata.len = slen;
-		tu_data->opt.len = 0;
+		extract_cred(&su->optbuf, &tu_data->opt);
 try_again:
 		if (t_sndudata(xprt->xp_fd, tu_data) == 0) {
 			stat = TRUE;
@@ -440,6 +472,7 @@ try_again:
 			"svc_dg_reply: t_sndudata error t_errno=%d errno=%d\n",
 				t_errno, errno);
 		}
+		tu_data->opt.buf = (char *)su->opts;
 	}
 	return (stat);
 }

@@ -78,6 +78,7 @@
 #define	PRIV_SETID		0x02	/* needs to change uids */
 #define	PRIV_SETUGID		0x04	/* is setuid/setgid/forced privs */
 #define	PRIV_INCREASE		0x08	/* child runs with more privs */
+#define	MAC_FLAGS		0x10	/* need to adjust MAC flags */
 
 static int execsetid(struct vnode *, struct vattr *, uid_t *, uid_t *);
 static int hold_execsw(struct execsw *);
@@ -515,6 +516,12 @@ gexec(
 			cred->cr_sgid = gid;
 		}
 
+		if (privflags & MAC_FLAGS) {
+			if (!(CR_FLAGS(cred) & NET_MAC_AWARE_INHERIT))
+				CR_FLAGS(cred) &= ~NET_MAC_AWARE;
+			CR_FLAGS(cred) &= ~NET_MAC_AWARE_INHERIT;
+		}
+
 		/*
 		 * Implement the privilege updates:
 		 *
@@ -830,6 +837,11 @@ execsetid(struct vnode *vp, struct vattr *vattrp, uid_t *uidp, uid_t *gidp)
 	    !priv_issubset(&CR_IPRIV(cr), &CR_LPRIV(cr)) ||
 	    !priv_isequalset(&CR_PPRIV(cr), &CR_IPRIV(cr)))
 		privflags |= PRIV_RESET;
+
+	/* If MAC-aware flag(s) are on, need to update cred to remove. */
+	if ((CR_FLAGS(cr) & NET_MAC_AWARE) ||
+	    (CR_FLAGS(cr) & NET_MAC_AWARE_INHERIT))
+		privflags |= MAC_FLAGS;
 
 	/*
 	 * When we introduce the "forced" set then we will need

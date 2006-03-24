@@ -74,11 +74,16 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <stropts.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <strings.h>
+
+#include <libtsnet.h>
+#include <tsol/label.h>
 
 static struct keytab {
 	char	*kt_cp;
@@ -168,6 +173,8 @@ static struct keytab {
 	{"setsrc",	K_SETSRC},
 #define	K_SHOW		43
 	{"show",	K_SHOW},
+#define	K_SECATTR	43
+	{"secattr",	K_SECATTR},
 	{0, 0}
 };
 
@@ -206,14 +213,16 @@ typedef struct rtcmd_irep {
 	su_t ri_ifa;
 	su_t ri_ifp;
 	char *ri_ifp_str;
+	int ri_rtsa_cnt;	/* number of gateway security attributes */
+	struct rtsa_s ri_rtsa;	/* enough space for one attribute */
 } rtcmd_irep_t;
 
 typedef struct	mib_item_s {
-	struct mib_item_s	*next_item;
-	long			group;
-	long			mib_id;
-	long			length;
-	intmax_t		*valp;
+	struct mib_item_s *next_item;
+	long group;
+	long mib_id;
+	long length;
+	intmax_t *valp;
 } mib_item_t;
 
 typedef enum {
@@ -257,18 +266,18 @@ static mib_item_t	*mibget(int sd);
 static char		*netname(struct sockaddr *sa);
 static int		newroute(char **argv);
 static rtcmd_irep_t	*new_rtcmd_irep(void);
-static void		pmsg_addrs(char *cp, int addrs);
-static void		pmsg_common(struct rt_msghdr *rtm);
+static void		pmsg_addrs(const char *cp, size_t len, uint_t addrs);
+static void		pmsg_common(const struct rt_msghdr *rtm, size_t len);
 static void		print_getmsg(rtcmd_irep_t *req_rt,
     struct rt_msghdr *rtm, int msglen);
 static void		print_rtcmd_short(FILE *to, rtcmd_irep_t *rcip,
     boolean_t gw_good, boolean_t to_saved);
 static void		print_rtmsg(struct rt_msghdr *rtm, int msglen);
 static void		quit(char *s, int err) __NORETURN;
-static char		*routename(struct sockaddr *sa);
+static char		*routename(const struct sockaddr *sa);
 static void		rtmonitor(int argc, char *argv[]);
 static int		rtmsg(rtcmd_irep_t *rcip);
-static int		salen(struct sockaddr *sa);
+static int		salen(const struct sockaddr *sa);
 static void		save_route(int argc, char **argv, int do_flush);
 static void		save_string(char **dst, char *src);
 static int		search_rtfile(FILE *fp, FILE *temp_fp, rtcmd_irep_t *rt,
@@ -283,6 +292,7 @@ static void		syntax_bad_keyword(char *keyword);
 static void		syntax_error(char *err, ...);
 static void		usage(char *cp);
 static void		write_to_rtfile(FILE *fp, int argc, char **argv);
+static void		pmsg_secattr(const char *, size_t, const char *);
 
 static pid_t		pid;
 static int		s;
@@ -315,7 +325,7 @@ static int		exit_on_error = B_TRUE;
 
 static struct {
 	struct	rt_msghdr m_rtm;
-	char	m_space[512];
+	char	m_space[BUF_SIZE];
 } m_rtmsg;
 
 /*
@@ -336,7 +346,6 @@ static int ipv6RouteEntrySize;
  */
 #define	BAD_ADDR	-1	/* prefix is invalid */
 #define	NO_PREFIX	-2	/* no prefix was found */
-
 
 void
 usage(char *cp)
@@ -408,7 +417,7 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	if (argc < 2)
-		usage((char *)NULL);
+		usage(NULL);
 
 	while ((ch = getopt(argc, argv, "R:nqdtvfp")) != EOF) {
 		switch (ch) {
@@ -438,7 +447,7 @@ main(int argc, char **argv)
 			break;
 		case '?':
 		default:
-			usage((char *)NULL);
+			usage(NULL);
 			/* NOTREACHED */
 		}
 	}
@@ -815,7 +824,7 @@ delRouteEntry(mib2_ipRouteEntry_t *rp, mib2_ipv6RouteEntry_t *rp6, int seqno)
  * Return the name of the host whose address is given.
  */
 char *
-routename(struct sockaddr *sa)
+routename(const struct sockaddr *sa)
 {
 	char *cp;
 	static char line[MAXHOSTNAMELEN + 1];
@@ -1361,6 +1370,31 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 				return (B_FALSE);
 			}
 			rcip->ri_flags |= RTF_SETSRC;
+			break;
+		case K_SECATTR:
+			if (!NEXTTOKEN) {
+				syntax_arg_missing(keyword_str);
+				return (B_FALSE);
+			}
+			if ((rcip->ri_cmd == RTM_ADD ||
+			    rcip->ri_cmd == RTM_CHANGE) &&
+			    rcip->ri_rtsa_cnt++ < 1 && is_system_labeled()) {
+				int err;
+
+				if (!rtsa_keyword(tok, &rcip->ri_rtsa, &err,
+				    NULL)) {
+					(void) fprintf(stderr, gettext("route: "
+					    "bad security attribute: %s\n"),
+					    tsol_strerror(err, errno));
+					return (B_FALSE);
+				}
+			}
+			if (rcip->ri_rtsa_cnt > 1) {
+				(void) fprintf(stderr,
+				    gettext("route: can't specify more "
+				    "than one security attribute\n"));
+				return (B_FALSE);
+			}
 			break;
 		default:
 			if (dash_keyword) {
@@ -2428,7 +2462,25 @@ rtmsg(rtcmd_irep_t *newrt)
 	 */
 	NEXTADDR(RTA_SRC, newrt->ri_src);
 #undef	NEXTADDR
+
+	if (newrt->ri_rtsa_cnt > 0) {
+		/* LINTED: aligned */
+		rtm_ext_t *rtm_ext = (rtm_ext_t *)cp;
+		tsol_rtsecattr_t *rtsecattr;
+
+		rtm_ext->rtmex_type = RTMEX_GATEWAY_SECATTR;
+		rtm_ext->rtmex_len = TSOL_RTSECATTR_SIZE(1);
+
+		rtsecattr = (tsol_rtsecattr_t *)(rtm_ext + 1);
+		rtsecattr->rtsa_cnt = 1;
+
+		bcopy(&newrt->ri_rtsa, rtsecattr->rtsa_attr,
+		    sizeof (newrt->ri_rtsa));
+		cp = (char *)(rtsecattr->rtsa_attr + 1);
+	}
+
 	rtm.rtm_msglen = l = cp - (char *)&m_rtmsg;
+
 	if (verbose)
 		print_rtmsg(&rtm, l);
 	if (debugonly)
@@ -2522,10 +2574,12 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 		    rtm->rtm_version);
 		return;
 	}
-	if (rtm->rtm_msglen > (ushort_t)msglen) {
+	if (rtm->rtm_msglen != msglen) {
 		(void) printf("message length mismatch, in packet %d, "
 		    "returned %d\n",
 		    rtm->rtm_msglen, msglen);
+		if (msglen > rtm->rtm_msglen)
+			msglen = rtm->rtm_msglen;
 	}
 	/*
 	 * Since rtm->rtm_type is unsigned, we'll just check the case of zero
@@ -2536,26 +2590,29 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 		    rtm->rtm_type);
 		return;
 	}
-	(void) printf("%s: len %d, ", msgtypes[rtm->rtm_type], rtm->rtm_msglen);
+	(void) printf("%s: len %d, ", msgtypes[rtm->rtm_type], msglen);
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 		ifm = (struct if_msghdr *)rtm;
 		(void) printf("if# %d, flags:", ifm->ifm_index);
 		bprintf(stdout, ifm->ifm_flags, ifnetflags);
-		pmsg_addrs((char *)(ifm + 1), ifm->ifm_addrs);
+		pmsg_addrs((const char *)(ifm + 1), msglen - sizeof (*ifm),
+		    ifm->ifm_addrs);
 		break;
 	case RTM_NEWADDR:
 	case RTM_DELADDR:
 		ifam = (struct ifa_msghdr *)rtm;
 		(void) printf("metric %d, flags:", ifam->ifam_metric);
 		bprintf(stdout, ifam->ifam_flags, routeflags);
-		pmsg_addrs((char *)(ifam + 1), ifam->ifam_addrs);
+		pmsg_addrs((const char *)(ifam + 1), msglen - sizeof (*ifam),
+		    ifam->ifam_addrs);
 		break;
 	default:
 		(void) printf("pid: %ld, seq %d, errno %d, flags:",
 			rtm->rtm_pid, rtm->rtm_seq, rtm->rtm_errno);
 		bprintf(stdout, rtm->rtm_flags, routeflags);
-		pmsg_common(rtm);
+		pmsg_common(rtm, msglen);
+		break;
 	}
 }
 
@@ -2665,50 +2722,76 @@ print_getmsg(rtcmd_irep_t *req_rt, struct rt_msghdr *rtm, int msglen)
 	(void) printf("%8d%c ", rtm->rtm_rmx.rmx_mtu, lock(MTU));
 	if (rtm->rtm_rmx.rmx_expire)
 		rtm->rtm_rmx.rmx_expire -= time(0);
-	(void) printf("%8d%c\n", rtm->rtm_rmx.rmx_expire, lock(EXPIRE));
+	(void) printf("%8d%c", rtm->rtm_rmx.rmx_expire, lock(EXPIRE));
 #undef lock
 #undef msec
 #define	RTA_IGN	\
 	(RTA_DST|RTA_GATEWAY|RTA_NETMASK|RTA_IFP|RTA_IFA|RTA_BRD|RTA_SRC)
 	if (verbose) {
-		pmsg_common(rtm);
-	} else if (rtm->rtm_addrs &~ RTA_IGN) {
-		(void) printf("sockaddrs: ");
-		bprintf(stdout, rtm->rtm_addrs, addrnames);
+		pmsg_common(rtm, msglen);
+	} else {
+		const char *sptr, *endptr;
+		const struct sockaddr *sa;
+		uint_t addrs;
+
+		/* Not verbose; just print out the exceptional cases */
+		if (rtm->rtm_addrs &~ RTA_IGN) {
+			(void) printf("\nsockaddrs: ");
+			bprintf(stdout, rtm->rtm_addrs, addrnames);
+		}
+		sptr = (const char *)(rtm + 1);
+		endptr = (const char *)rtm + msglen;
+		addrs = rtm->rtm_addrs;
+		while (addrs != 0 && sptr + sizeof (*sa) <= endptr) {
+			addrs &= addrs - 1;
+			/* LINTED */
+			sa = (const struct sockaddr *)sptr;
+			ADVANCE(sptr, sa);
+		}
+		if (addrs == 0)
+			pmsg_secattr(sptr, endptr - sptr, "    secattr: ");
 		(void) putchar('\n');
 	}
 #undef	RTA_IGN
 }
 
-void
-pmsg_common(struct rt_msghdr *rtm)
+static void
+pmsg_common(const struct rt_msghdr *rtm, size_t msglen)
 {
 	(void) printf("\nlocks: ");
 	bprintf(stdout, (int)rtm->rtm_rmx.rmx_locks, metricnames);
 	(void) printf(" inits: ");
 	bprintf(stdout, (int)rtm->rtm_inits, metricnames);
-	pmsg_addrs(((char *)(rtm + 1)), rtm->rtm_addrs);
+	pmsg_addrs((const char *)(rtm + 1), msglen - sizeof (*rtm),
+	    rtm->rtm_addrs);
 }
 
-void
-pmsg_addrs(char *cp, int addrs)
+static void
+pmsg_addrs(const char *cp, size_t msglen, uint_t addrs)
 {
-	struct sockaddr *sa;
+	const struct sockaddr *sa;
+	const char *maxptr;
 	int i;
 
-	if (addrs == 0)
-		return;
-	(void) printf("\nsockaddrs: ");
-	bprintf(stdout, addrs, addrnames);
-	(void) putchar('\n');
-	for (i = 1; i != 0; i <<= 1) {
-		if (i & addrs) {
-			/* LINTED */
-			sa = (struct sockaddr *)cp;
-			(void) printf(" %s", routename(sa));
-			ADVANCE(cp, sa);
+	if (addrs != 0) {
+		(void) printf("\nsockaddrs: ");
+		bprintf(stdout, addrs, addrnames);
+		(void) putchar('\n');
+		maxptr = cp + msglen;
+		for (i = 1; i != 0 && cp + sizeof (*sa) <= maxptr; i <<= 1) {
+			if (i & addrs) {
+				/* LINTED */
+				sa = (const struct sockaddr *)cp;
+				(void) printf(" %s", routename(sa));
+				ADVANCE(cp, sa);
+			}
 		}
+		if (i != 0)
+			msglen = 0;
+		else
+			msglen = maxptr - cp;
 	}
+	pmsg_secattr(cp, msglen, "secattr: ");
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }
@@ -2834,7 +2917,7 @@ sockaddr(char *addr, struct sockaddr *sa)
 }
 
 int
-salen(struct sockaddr *sa)
+salen(const struct sockaddr *sa)
 {
 	switch (sa->sa_family) {
 	case AF_INET:
@@ -3093,4 +3176,58 @@ mibget(int sd)
 		free(last_item);
 	}
 	return (NULL);
+}
+
+/*
+ * print label security attributes for gateways.
+ */
+static void
+pmsg_secattr(const char *sptr, size_t msglen, const char *labelstr)
+{
+	rtm_ext_t rtm_ext;
+	tsol_rtsecattr_t sp;
+	struct rtsa_s *rtsa = &sp.rtsa_attr[0];
+	const char *endptr;
+	char buf[256];
+	int i;
+
+	if (!is_system_labeled())
+		return;
+
+	endptr = sptr + msglen;
+
+	for (;;) {
+		if (sptr + sizeof (rtm_ext_t) + sizeof (sp) > endptr)
+			return;
+
+		bcopy(sptr, &rtm_ext, sizeof (rtm_ext));
+		sptr += sizeof (rtm_ext);
+		if (rtm_ext.rtmex_type == RTMEX_GATEWAY_SECATTR)
+			break;
+		sptr += rtm_ext.rtmex_len;
+	}
+
+	/* bail if this entry is corrupt or overruns buffer length */
+	if (rtm_ext.rtmex_len < sizeof (sp) ||
+	    sptr + rtm_ext.rtmex_len > endptr)
+		return;
+
+	/* run up just to the end of this extension */
+	endptr = sptr + rtm_ext.rtmex_len;
+
+	bcopy(sptr, &sp, sizeof (sp));
+	sptr += sizeof (sp);
+
+	if (sptr + (sp.rtsa_cnt - 1) * sizeof (*rtsa) != endptr)
+		return;
+
+	for (i = 0; i < sp.rtsa_cnt; i++) {
+		if (i > 0) {
+			/* first element is part of sp initalized above */
+			bcopy(sptr, rtsa, sizeof (*rtsa));
+			sptr += sizeof (*rtsa);
+		}
+		(void) printf("\n%s%s", labelstr, rtsa_to_str(rtsa, buf,
+		    sizeof (buf)));
+	}
 }

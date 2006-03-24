@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,8 +159,8 @@ is_matched(int id, char *user, const char **list)
 #define	HEADER gettext("Rank\tOwner\tJob\tFile(s)\t\t\t\tTotal Size\n")
 
 static int
-job_list(const char *printer, FILE *ofp, const int type, const char **list,
-		const char *status_message, int *rank)
+job_list(const char *printer, FILE *ofp, const int type,
+    const char **list, const char *status_message, int *rank)
 {
 	int count = 0;
 	short status, outcome;
@@ -173,10 +172,11 @@ job_list(const char *printer, FILE *ofp, const int type, const char **list,
 		size_t size;
 		time_t date;
 		int id;
-		char *user, *reqid, *owner, *dest, *form, *pwheel, *file, *host;
+		char *user, *slabel, *reqid, *owner, *dest, *form, *pwheel,
+			*file, *host;
 
-		if (rcv_msg(R_INQUIRE_REQUEST, &status, &reqid, &owner, &size,
-				&date, &outcome, &dest, &form, &pwheel,
+		if (rcv_msg(R_INQUIRE_REQUEST, &status, &reqid, &owner, &slabel,
+				&size, &date, &outcome, &dest, &form, &pwheel,
 				&file) < 0)
 			return (count);
 
@@ -214,6 +214,7 @@ job_list(const char *printer, FILE *ofp, const int type, const char **list,
 
 	return (count);
 }
+
 
 /*
  * lpsched_show_queue() attempts to display the queue of "pending" jobs.  The

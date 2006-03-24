@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -29,6 +28,8 @@
 #define	_INET_IP_IF_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <net/route.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -151,7 +152,7 @@ extern	void	ill_ipif_cache_delete(ire_t *, char *);
 extern	void	ill_delete(ill_t *);
 extern	void	ill_delete_tail(ill_t *);
 extern	int	ill_dl_phys(ill_t *, ipif_t *, mblk_t *, queue_t *);
-extern	int	ill_dls_info(struct sockaddr_dl *, ipif_t *);
+extern	int	ill_dls_info(struct sockaddr_dl *, const ipif_t *);
 extern	void	ill_fastpath_ack(ill_t *, mblk_t *);
 extern	void	ill_fastpath_nack(ill_t *);
 extern	int	ill_fastpath_probe(ill_t *, mblk_t *);
@@ -186,7 +187,7 @@ extern void	ill_group_cleanup(ill_t *);
 extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
 extern	boolean_t ill_is_probeonly(ill_t *);
 
-extern	char	*ipif_get_name(ipif_t *, char *, int);
+extern	char	*ipif_get_name(const ipif_t *, char *, int);
 extern	void	ipif_init(void);
 extern	ipif_t	*ipif_lookup_addr(ipaddr_t, ill_t *, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *);
@@ -255,13 +256,15 @@ extern	int	ip_addr_availability_check(ipif_t *new_ipif);
 extern	int	ip_ill_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	int	ip_ipif_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
+
 extern	int	ip_rt_add(ipaddr_t, ipaddr_t, ipaddr_t, ipaddr_t, int,
-    ipif_t *, ipif_t *, ire_t **, boolean_t, queue_t *, mblk_t *, ipsq_func_t);
+    ipif_t *, ipif_t *, ire_t **, boolean_t, queue_t *, mblk_t *, ipsq_func_t,
+    struct rtsa_s *);
 extern	int	ip_mrtun_rt_add(ipaddr_t, int, ipif_t *, ipif_t *, ire_t **,
     queue_t *, mblk_t *, ipsq_func_t);
 extern	int	ip_rt_add_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, int, ipif_t *, ire_t **,
-    queue_t *, mblk_t *, ipsq_func_t);
+    queue_t *, mblk_t *, ipsq_func_t, struct rtsa_s *);
 extern	int	ip_rt_delete(ipaddr_t, ipaddr_t, ipaddr_t, uint_t, int,
     ipif_t *, ipif_t *, boolean_t, queue_t *, mblk_t *, ipsq_func_t);
 extern	int	ip_mrtun_rt_delete(ipaddr_t, ipif_t *);

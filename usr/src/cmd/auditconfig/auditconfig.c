@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +51,7 @@
 #include <pwd.h>
 #include <libintl.h>
 #include <zone.h>
+#include <tsol/label.h>
 
 #include <bsm/audit.h>
 #include <bsm/audit_record.h>
@@ -117,6 +117,10 @@
 #define	AC_KERN_EVENT 		0
 #define	AC_USER_EVENT 		1
 
+/* defines for policy entry flags: */
+
+#define	AC_TSOL 		1	/* policy is TSOL-only */
+
 #define	NONE(s) (!strlen(s) ? gettext("none") : s)
 
 #define	ALL_POLICIES   (AUDIT_AHLT|\
@@ -131,7 +135,9 @@
 			AUDIT_PATH|\
 			AUDIT_PUBLIC|\
 			AUDIT_ZONENAME|\
-			AUDIT_PERZONE)
+			AUDIT_PERZONE|\
+			AUDIT_WINDATA_DOWN|\
+			AUDIT_WINDATA_UP)
 
 #define	NO_POLICIES  (0)
 
@@ -153,6 +159,7 @@ struct arg_entry {
 struct policy_entry {
 	char *policy_str;
 	uint_t policy_mask;
+	uint_t policy_flags;
 	char *policy_desc;
 };
 
@@ -236,26 +243,39 @@ static struct arg_entry arg2_table[] = {
 #define	ARG2_TBL_SZ (sizeof (arg2_table) / sizeof (struct arg_entry))
 
 static struct policy_entry policy_table[] = {
-	{"ahlt",  AUDIT_AHLT,   "halt machine if it can not record an "
-	    "async event"},
-	{"arge",  AUDIT_ARGE,   "include exec environment args in audit recs"},
-	{"argv",  AUDIT_ARGV,   "include exec command line args in audit recs"},
-	{"cnt",   AUDIT_CNT,    "when no more space, drop recs and keep a cnt"},
-	{"group", AUDIT_GROUP,  "include supplementary groups in audit recs"},
-	{"seq",   AUDIT_SEQ,    "include a sequence number in audit recs"},
-	{"trail", AUDIT_TRAIL,  "include trailer token in audit recs"},
-	{"path",  AUDIT_PATH,   "allow multiple paths per event"},
-	{"public",  AUDIT_PUBLIC,   "audit public files"},
-	{"zonename", AUDIT_ZONENAME,    "generate zonename token"},
-	{"perzone", AUDIT_PERZONE,	"use a separate queue and auditd per "
-	    "zone"},
-	{"all",   ALL_POLICIES, "all policies"},
-	{"none",  NO_POLICIES,  "no policies"}
+	{"ahlt",	AUDIT_AHLT,	NULL,
+	    "halt machine if it can not record an async event"},
+	{"arge",	AUDIT_ARGE,	NULL,
+	    "include exec environment args in audit recs"},
+	{"argv",	AUDIT_ARGV,	NULL,
+	    "include exec command line args in audit recs"},
+	{"cnt",		AUDIT_CNT,	NULL,
+	    "when no more space, drop recs and keep a cnt"},
+	{"group",	AUDIT_GROUP,	NULL,
+	    "include supplementary groups in audit recs"},
+	{"path",	AUDIT_PATH,	NULL,
+	    "allow multiple paths per event"},
+	{"public",	AUDIT_PUBLIC,	NULL,	"audit public files"},
+	{"seq",		AUDIT_SEQ,	NULL,
+	    "include a sequence number in audit recs"},
+	{"trail",	AUDIT_TRAIL,	NULL,
+	    "include trailer token in audit recs"},
+	{"windata_down",	AUDIT_WINDATA_DOWN,	AC_TSOL,
+		"include downgraded information in audit recs"},
+	{"windata_up",		AUDIT_WINDATA_UP,	AC_TSOL,
+		"include upgraded information in audit recs"},
+	{"zonename",	AUDIT_ZONENAME,	NULL,	"generate zonename token"},
+	{"perzone",	AUDIT_PERZONE,	NULL,
+	    "use a separate queue and auditd per zone"},
+	{"all",		ALL_POLICIES,	NULL,	"all policies"},
+	{"none",	NO_POLICIES,	NULL,	"no policies"}
 	};
 
 #define	POLICY_TBL_SZ (sizeof (policy_table) / sizeof (struct policy_entry))
 
 static char *progname;
+
+int	tsol_on;			/* is TSOL installed? */
 
 static au_event_ent_t *egetauevnam();
 static au_event_ent_t *egetauevnum();
@@ -367,6 +387,8 @@ main(argc, argv)
 		strcmp(argv[1], "-h") == 0 ||
 		strcmp(argv[1], "-?") == 0))
 		exit_usage(0);
+
+	tsol_on = is_system_labeled();
 
 	parse_args(argv);
 
@@ -1246,6 +1268,15 @@ do_audit(event, sorf, retval, audit_str)
 				"Could not allocate subject token\n"));
 		if (au_write(rd, tokp) == -1)
 exit_error(gettext("Could not construct subject token of audit record\n"));
+
+		if (tsol_on) {
+			if ((tokp = au_to_mylabel()) == (token_t *)NULL)
+				exit_error(gettext(
+				    "Could not allocate slabel token\n"));
+			if (au_write(rd, tokp) == -1)
+exit_error(gettext("Could not construct slabel token of audit record\n"));
+		}
+
 		if ((tokp = au_to_text(audit_str)) == (token_t *)NULL)
 			exit_error(gettext("Could not allocate text token\n"));
 		if (au_write(rd, tokp) == -1)
@@ -1634,10 +1665,12 @@ do_lspolicy()
 	 *	Print a properly aligned header.
 	 */
 	(void) printf(gettext("policy string    description:\n"));
-	for (i = 0; i < POLICY_TBL_SZ; i++)
-		(void) printf("%-17s%s\n",
-			policy_table[i].policy_str,
-			gettext(policy_table[i].policy_desc));
+	for (i = 0; i < POLICY_TBL_SZ; i++) {
+		if ((policy_table[i].policy_flags & AC_TSOL) && !tsol_on)
+			continue;	/* skip this entry */
+		(void) printf("%-17s%s\n", policy_table[i].policy_str,
+		    gettext(policy_table[i].policy_desc));
+	}
 }
 
 static void
@@ -2295,10 +2328,12 @@ get_policy_ent(policy)
 {
 	int i;
 
-	for (i = 0; i < POLICY_TBL_SZ; i++)
-		if (strcmp(strtolower(policy),
-			policy_table[i].policy_str) == 0)
+	for (i = 0; i < POLICY_TBL_SZ; i++) {
+		if ((policy_table[i].policy_flags & AC_TSOL) && !tsol_on)
+			continue;	/* skip this entry */
+		if (strcmp(strtolower(policy), policy_table[i].policy_str) == 0)
 			return (&policy_table[i]);
+	}
 
 	return ((struct policy_entry *)NULL);
 }
@@ -2389,7 +2424,9 @@ policy2str(policy, policy_str, len)
 
 	*policy_str = '\0';
 
-	for (i = 0, j = 0; i < POLICY_TBL_SZ; i++)
+	for (i = 0, j = 0; i < POLICY_TBL_SZ; i++) {
+		if ((policy_table[i].policy_flags & AC_TSOL) && !tsol_on)
+			continue;	/* skip this entry */
 		if (policy & policy_table[i].policy_mask &&
 		    policy_table[i].policy_mask != ALL_POLICIES) {
 			if (j++)
@@ -2397,6 +2434,7 @@ policy2str(policy, policy_str, len)
 			(void) strlcat(policy_str,
 			    policy_table[i].policy_str, len);
 		}
+	}
 
 	if (*policy_str)
 		return (0);

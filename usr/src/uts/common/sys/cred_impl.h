@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +62,7 @@ extern "C" {
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
 struct zone;		/* forward reference */
+struct ts_label_s;	/* forward reference */
 
 struct cred {
 	uint_t		cr_ref;		/* reference count */
@@ -77,6 +77,7 @@ struct cred {
 	cred_priv_t	cr_priv;	/* privileges */
 	projid_t	cr_projid;	/* project */
 	struct zone	*cr_zone;	/* pointer to per-zone structure */
+	struct ts_label_s *cr_label;	/* pointer to the effective label */
 	gid_t		cr_groups[1];	/* cr_groups size not fixed */
 					/* audit info is defined dynamically */
 					/* and valid only when audit enabled */

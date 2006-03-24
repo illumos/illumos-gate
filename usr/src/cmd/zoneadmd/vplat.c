@@ -106,6 +106,9 @@
 
 #include <libzonecfg.h>
 #include "zoneadmd.h"
+#include <tsol/label.h>
+#include <libtsnet.h>
+#include <sys/priv.h>
 
 #define	V4_ADDR_LEN	32
 #define	V6_ADDR_LEN	128
@@ -118,6 +121,7 @@
 	MNTOPT_RO "," MNTOPT_LOFS_NOSUB "," MNTOPT_NODEVICES
 
 #define	DFSTYPES	"/etc/dfs/fstypes"
+#define	MAXTNZLEN	2048
 
 /*
  * A list of directories which should be created.
@@ -175,6 +179,14 @@ static char kernzone[ZONENAME_MAX];
 
 /* array of cached mount entries for resolve_lofs */
 static struct mnttab *resolve_lofs_mnts, *resolve_lofs_mnt_max;
+
+/* for Trusted Extensions */
+static tsol_zcent_t *get_zone_label(zlog_t *, priv_set_t *);
+static int tsol_mounts(zlog_t *, char *, char *);
+static void tsol_unmounts(zlog_t *, char *);
+static m_label_t *zlabel = NULL;
+static m_label_t *zid_label = NULL;
+static priv_set_t *zprivs = NULL;
 
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
@@ -457,8 +469,24 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode)
 		 * and we don't need to second guess him.
 		 */
 		if (!S_ISDIR(st.st_mode)) {
-			zerror(zlogp, B_FALSE, "%s is not a directory", path);
-			return (-1);
+			if (is_system_labeled() &&
+			    S_ISREG(st.st_mode)) {
+				/*
+				 * The need to mount readonly copies of
+				 * global zone /etc/ files is unique to
+				 * Trusted Extensions.
+				 */
+				if (strncmp(subdir, "/etc/",
+				    strlen("/etc/")) != 0) {
+					zerror(zlogp, B_FALSE,
+					    "%s is not in /etc", path);
+					return (-1);
+				}
+			} else {
+				zerror(zlogp, B_FALSE,
+				    "%s is not a directory", path);
+				return (-1);
+			}
 		}
 	} else if (mkdirp(path, mode) != 0) {
 		if (errno == EROFS)
@@ -689,6 +717,12 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 
 	(void) strcat(zroot, "/");
 	zrootlen = strlen(zroot);
+
+	/*
+	 * For Trusted Extensions unmount each higher level zone's mount
+	 * of our zone's /export/home
+	 */
+	tsol_unmounts(zlogp, zone_name);
 
 	if ((mnttab = fopen(MNTTAB, "r")) == NULL) {
 		zerror(zlogp, B_TRUE, "failed to open %s", MNTTAB);
@@ -959,8 +993,23 @@ check_path(zlog_t *zlogp, const char *path)
 		return (-1);
 	}
 	if (!S_ISDIR(statbuf.st_mode)) {
-		zerror(zlogp, B_FALSE, "%s is not a directory", path);
-		return (-1);
+		if (is_system_labeled() && S_ISREG(statbuf.st_mode)) {
+			/*
+			 * The need to mount readonly copies of
+			 * global zone /etc/ files is unique to
+			 * Trusted Extensions.
+			 * The check for /etc/ via strstr() is to
+			 * allow paths like $ZONEROOT/etc/passwd
+			 */
+			if (strstr(path, "/etc/") == NULL) {
+				zerror(zlogp, B_FALSE,
+				    "%s is not in /etc", path);
+				return (-1);
+			}
+		} else {
+			zerror(zlogp, B_FALSE, "%s is not a directory", path);
+			return (-1);
+		}
 	}
 	if ((res = resolvepath(path, respath, sizeof (respath))) == -1) {
 		zerror(zlogp, B_TRUE, "unable to resolve path %s", path);
@@ -1476,6 +1525,13 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
+
+	/*
+	 * For Trusted Extensions cross-mount each lower level /export/home
+	 */
+	if (tsol_mounts(zlogp, zone_name, rootpath) != 0)
+		goto bad;
+
 	free_fs_data(fs_ptr, num_fs);
 
 	/*
@@ -2706,6 +2762,507 @@ bind_to_pool(zlog_t *zlogp, zoneid_t zoneid)
 	return (0);
 }
 
+/*
+ * Mount lower level home directories into/from current zone
+ * Share exported directories specified in dfstab for zone
+ */
+static int
+tsol_mounts(zlog_t *zlogp, char *zone_name, char *rootpath)
+{
+	zoneid_t *zids = NULL;
+	priv_set_t *zid_privs;
+	const priv_impl_info_t *ip = NULL;
+	uint_t nzents_saved;
+	uint_t nzents;
+	int i;
+	char readonly[] = "ro";
+	struct zone_fstab lower_fstab;
+	char *argv[4];
+
+	if (!is_system_labeled())
+		return (0);
+
+	if (zid_label == NULL) {
+		zid_label = m_label_alloc(MAC_LABEL);
+		if (zid_label == NULL)
+			return (-1);
+	}
+
+	/* Make sure our zone has an /export/home dir */
+	(void) make_one_dir(zlogp, rootpath, "/export/home",
+	    DEFAULT_DIR_MODE);
+
+	lower_fstab.zone_fs_raw[0] = '\0';
+	(void) strlcpy(lower_fstab.zone_fs_type, MNTTYPE_LOFS,
+	    sizeof (lower_fstab.zone_fs_type));
+	lower_fstab.zone_fs_options = NULL;
+	(void) zonecfg_add_fs_option(&lower_fstab, readonly);
+
+	/*
+	 * Get the list of zones from the kernel
+	 */
+	if (zone_list(NULL, &nzents) != 0) {
+		zerror(zlogp, B_TRUE, "unable to list zones");
+		zonecfg_free_fs_option_list(lower_fstab.zone_fs_options);
+		return (-1);
+	}
+again:
+	if (nzents == 0) {
+		zonecfg_free_fs_option_list(lower_fstab.zone_fs_options);
+		return (-1);
+	}
+
+	zids = malloc(nzents * sizeof (zoneid_t));
+	if (zids == NULL) {
+		zerror(zlogp, B_TRUE, "unable to allocate memory");
+		return (-1);
+	}
+	nzents_saved = nzents;
+
+	if (zone_list(zids, &nzents) != 0) {
+		zerror(zlogp, B_TRUE, "unable to list zones");
+		zonecfg_free_fs_option_list(lower_fstab.zone_fs_options);
+		free(zids);
+		return (-1);
+	}
+	if (nzents != nzents_saved) {
+		/* list changed, try again */
+		free(zids);
+		goto again;
+	}
+
+	ip = getprivimplinfo();
+	if ((zid_privs = priv_allocset()) == NULL) {
+		zerror(zlogp, B_TRUE, "%s failed", "priv_allocset");
+		zonecfg_free_fs_option_list(
+		    lower_fstab.zone_fs_options);
+		free(zids);
+		return (-1);
+	}
+
+	for (i = 0; i < nzents; i++) {
+		char zid_name[ZONENAME_MAX];
+		zone_state_t zid_state;
+		char zid_rpath[MAXPATHLEN];
+		struct stat stat_buf;
+
+		if (zids[i] == GLOBAL_ZONEID)
+			continue;
+
+		if (getzonenamebyid(zids[i], zid_name, ZONENAME_MAX) == -1)
+			continue;
+
+		/*
+		 * Do special setup for the zone we are booting
+		 */
+		if (strcmp(zid_name, zone_name) == 0) {
+			struct zone_fstab autofs_fstab;
+			char map_path[MAXPATHLEN];
+			int fd;
+
+			/*
+			 * Create auto_home_<zone> map for this zone
+			 * in the global zone. The local zone entry
+			 * will be created by automount when the zone
+			 * is booted.
+			 */
+
+			(void) snprintf(autofs_fstab.zone_fs_special,
+			    MAXPATHLEN, "auto_home_%s", zid_name);
+
+			(void) snprintf(autofs_fstab.zone_fs_dir, MAXPATHLEN,
+			    "/zone/%s/home", zid_name);
+
+			(void) snprintf(map_path, sizeof (map_path),
+			    "/etc/%s", autofs_fstab.zone_fs_special);
+			/*
+			 * If the map file doesn't exist create a template
+			 */
+			if ((fd = open(map_path, O_RDWR | O_CREAT | O_EXCL,
+			    S_IRUSR | S_IWUSR | S_IRGRP| S_IROTH)) != -1) {
+				int len;
+				char map_rec[MAXPATHLEN];
+
+				len = snprintf(map_rec, sizeof (map_rec),
+				    "+%s\n*\t-fstype=lofs\t:%s/export/home/&\n",
+				    autofs_fstab.zone_fs_special, rootpath);
+				(void) write(fd, map_rec, len);
+				(void) close(fd);
+			}
+
+			/*
+			 * Mount auto_home_<zone> in the global zone if absent.
+			 * If it's already of type autofs, then
+			 * don't mount it again.
+			 */
+			if ((stat(autofs_fstab.zone_fs_dir, &stat_buf) == -1) ||
+			    strcmp(stat_buf.st_fstype, MNTTYPE_AUTOFS) != 0) {
+				char optstr[] = "indirect,ignore,nobrowse";
+
+				(void) make_one_dir(zlogp, "",
+				    autofs_fstab.zone_fs_dir, DEFAULT_DIR_MODE);
+
+				/*
+				 * Mount will fail if automounter has already
+				 * processed the auto_home_<zonename> map
+				 */
+				(void) domount(zlogp, MNTTYPE_AUTOFS, optstr,
+				    autofs_fstab.zone_fs_special,
+				    autofs_fstab.zone_fs_dir);
+			}
+			continue;
+		}
+
+
+		if (zone_get_state(zid_name, &zid_state) != Z_OK ||
+		    (zid_state != ZONE_STATE_MOUNTED &&
+		    zid_state != ZONE_STATE_RUNNING)) {
+
+			/* Skip over zones without mounted filesystems */
+			continue;
+		}
+
+		if (zone_getattr(zids[i], ZONE_ATTR_SLBL, zid_label,
+		    sizeof (m_label_t)) < 0)
+			/* Skip over zones with unspecified label */
+			continue;
+
+		if (zone_getattr(zids[i], ZONE_ATTR_ROOT, zid_rpath,
+		    sizeof (zid_rpath)) == -1)
+			/* Skip over zones with bad path */
+			continue;
+
+		if (zone_getattr(zids[i], ZONE_ATTR_PRIVSET, zid_privs,
+		    sizeof (priv_chunk_t) * ip->priv_setsize) == -1)
+			/* Skip over zones with bad privs */
+			continue;
+
+		/*
+		 * Reading down is valid according to our label model
+		 * but some customers want to disable it because it
+		 * allows execute down and other possible attacks.
+		 * Therefore, we restrict this feature to zones that
+		 * have the NET_MAC_AWARE privilege which is required
+		 * for NFS read-down semantics.
+		 */
+		if ((bldominates(zlabel, zid_label)) &&
+		    (priv_ismember(zprivs, PRIV_NET_MAC_AWARE))) {
+			/*
+			 * Our zone dominates this one.
+			 * Create a lofs mount from lower zone's /export/home
+			 */
+			(void) snprintf(lower_fstab.zone_fs_dir, MAXPATHLEN,
+			    "%s/zone/%s/export/home", rootpath, zid_name);
+
+			/*
+			 * If the target is already an LOFS mount
+			 * then don't do it again.
+			 */
+			if ((stat(lower_fstab.zone_fs_dir, &stat_buf) == -1) ||
+			    strcmp(stat_buf.st_fstype, MNTTYPE_LOFS) != 0) {
+
+				if (snprintf(lower_fstab.zone_fs_special,
+				    MAXPATHLEN, "%s/export",
+				    zid_rpath) > MAXPATHLEN)
+					continue;
+
+				/*
+				 * Make sure the lower-level home exists
+				 */
+				if (make_one_dir(zlogp,
+				    lower_fstab.zone_fs_special,
+				    "/home", DEFAULT_DIR_MODE) != 0)
+					continue;
+
+				(void) strlcat(lower_fstab.zone_fs_special,
+				    "/home", MAXPATHLEN);
+
+				/*
+				 * Mount can fail because the lower-level
+				 * zone may have already done a mount up.
+				 */
+				(void) mount_one(zlogp, &lower_fstab, "");
+			}
+		} else if ((bldominates(zid_label, zlabel)) &&
+		    (priv_ismember(zid_privs, PRIV_NET_MAC_AWARE))) {
+			/*
+			 * This zone dominates our zone.
+			 * Create a lofs mount from our zone's /export/home
+			 */
+			if (snprintf(lower_fstab.zone_fs_dir, MAXPATHLEN,
+			    "%s/zone/%s/export/home", zid_rpath,
+			    zone_name) > MAXPATHLEN)
+				continue;
+
+			/*
+			 * If the target is already an LOFS mount
+			 * then don't do it again.
+			 */
+			if ((stat(lower_fstab.zone_fs_dir, &stat_buf) == -1) ||
+			    strcmp(stat_buf.st_fstype, MNTTYPE_LOFS) != 0) {
+
+				(void) snprintf(lower_fstab.zone_fs_special,
+				    MAXPATHLEN, "%s/export/home", rootpath);
+
+				/*
+				 * Mount can fail because the higher-level
+				 * zone may have already done a mount down.
+				 */
+				(void) mount_one(zlogp, &lower_fstab, "");
+			}
+		}
+	}
+	zonecfg_free_fs_option_list(lower_fstab.zone_fs_options);
+	priv_freeset(zid_privs);
+	free(zids);
+
+	/*
+	 * Now share any exported directories from this zone.
+	 * Each zone can have its own dfstab.
+	 */
+
+	argv[0] = "zoneshare";
+	argv[1] = "-z";
+	argv[2] = zone_name;
+	argv[3] = NULL;
+
+	(void) forkexec(zlogp, "/usr/lib/zones/zoneshare", argv);
+	/* Don't check for errors since they don't affect the zone */
+
+	return (0);
+}
+
+/*
+ * Unmount lofs mounts from higher level zones
+ * Unshare nfs exported directories
+ */
+static void
+tsol_unmounts(zlog_t *zlogp, char *zone_name)
+{
+	zoneid_t *zids = NULL;
+	uint_t nzents_saved;
+	uint_t nzents;
+	int i;
+	char *argv[4];
+	char path[MAXPATHLEN];
+
+	if (!is_system_labeled())
+		return;
+
+	/*
+	 * Get the list of zones from the kernel
+	 */
+	if (zone_list(NULL, &nzents) != 0) {
+		return;
+	}
+
+	if (zid_label == NULL) {
+		zid_label = m_label_alloc(MAC_LABEL);
+		if (zid_label == NULL)
+			return;
+	}
+
+again:
+	if (nzents == 0)
+		return;
+
+	zids = malloc(nzents * sizeof (zoneid_t));
+	if (zids == NULL) {
+		zerror(zlogp, B_TRUE, "unable to allocate memory");
+		return;
+	}
+	nzents_saved = nzents;
+
+	if (zone_list(zids, &nzents) != 0) {
+		free(zids);
+		return;
+	}
+	if (nzents != nzents_saved) {
+		/* list changed, try again */
+		free(zids);
+		goto again;
+	}
+
+	for (i = 0; i < nzents; i++) {
+		char zid_name[ZONENAME_MAX];
+		zone_state_t zid_state;
+		char zid_rpath[MAXPATHLEN];
+
+		if (zids[i] == GLOBAL_ZONEID)
+			continue;
+
+		if (getzonenamebyid(zids[i], zid_name, ZONENAME_MAX) == -1)
+			continue;
+
+		/*
+		 * Skip the zone we are halting
+		 */
+		if (strcmp(zid_name, zone_name) == 0)
+			continue;
+
+		if ((zone_getattr(zids[i], ZONE_ATTR_STATUS, &zid_state,
+		    sizeof (zid_state)) < 0) ||
+		    (zid_state < ZONE_IS_READY))
+			/* Skip over zones without mounted filesystems */
+			continue;
+
+		if (zone_getattr(zids[i], ZONE_ATTR_SLBL, zid_label,
+		    sizeof (m_label_t)) < 0)
+			/* Skip over zones with unspecified label */
+			continue;
+
+		if (zone_getattr(zids[i], ZONE_ATTR_ROOT, zid_rpath,
+		    sizeof (zid_rpath)) == -1)
+			/* Skip over zones with bad path */
+			continue;
+
+		if (zlabel != NULL && bldominates(zid_label, zlabel)) {
+			/*
+			 * This zone dominates our zone.
+			 * Unmount the lofs mount of our zone's /export/home
+			 */
+
+			if (snprintf(path, MAXPATHLEN,
+			    "%s/zone/%s/export/home", zid_rpath,
+			    zone_name) > MAXPATHLEN)
+				continue;
+
+			/* Skip over mount failures */
+			(void) umount(path);
+		}
+	}
+	free(zids);
+
+	/*
+	 * Unmount global zone autofs trigger for this zone
+	 */
+	(void) snprintf(path, MAXPATHLEN, "/zone/%s/home", zone_name);
+	/* Skip over mount failures */
+	(void) umount(path);
+
+	/*
+	 * Next unshare any exported directories from this zone.
+	 */
+
+	argv[0] = "zoneunshare";
+	argv[1] = "-z";
+	argv[2] = zone_name;
+	argv[3] = NULL;
+
+	(void) forkexec(zlogp, "/usr/lib/zones/zoneunshare", argv);
+	/* Don't check for errors since they don't affect the zone */
+
+	/*
+	 * Finally, deallocate any devices in the zone.
+	 */
+
+	argv[0] = "deallocate";
+	argv[1] = "-Isz";
+	argv[2] = zone_name;
+	argv[3] = NULL;
+
+	(void) forkexec(zlogp, "/usr/sbin/deallocate", argv);
+	/* Don't check for errors since they don't affect the zone */
+}
+
+/*
+ * Fetch the Trusted Extensions label and multi-level ports (MLPs) for
+ * this zone.
+ */
+static tsol_zcent_t *
+get_zone_label(zlog_t *zlogp, priv_set_t *privs)
+{
+	FILE *fp;
+	tsol_zcent_t *zcent = NULL;
+	char line[MAXTNZLEN];
+
+	if ((fp = fopen(TNZONECFG_PATH, "r")) == NULL) {
+		zerror(zlogp, B_TRUE, "%s", TNZONECFG_PATH);
+		return (NULL);
+	}
+
+	while (fgets(line, sizeof (line), fp) != NULL) {
+		/*
+		 * Check for malformed database
+		 */
+		if (strlen(line) == MAXTNZLEN - 1)
+			break;
+		if ((zcent = tsol_sgetzcent(line, NULL, NULL)) == NULL)
+			continue;
+		if (strcmp(zcent->zc_name, zone_name) == 0)
+			break;
+		tsol_freezcent(zcent);
+		zcent = NULL;
+	}
+	(void) fclose(fp);
+
+	if (zcent == NULL) {
+		zerror(zlogp, B_FALSE, "zone requires a label assignment. "
+		    "See tnzonecfg(4)");
+	} else {
+		if (zlabel == NULL)
+			zlabel = m_label_alloc(MAC_LABEL);
+		/*
+		 * Save this zone's privileges for later read-down processing
+		 */
+		if ((zprivs = priv_allocset()) == NULL) {
+			zerror(zlogp, B_TRUE, "%s failed", "priv_allocset");
+			return (NULL);
+		} else {
+			priv_copyset(privs, zprivs);
+		}
+	}
+	return (zcent);
+}
+
+/*
+ * Add the Trusted Extensions multi-level ports for this zone.
+ */
+static void
+set_mlps(zlog_t *zlogp, zoneid_t zoneid, tsol_zcent_t *zcent)
+{
+	tsol_mlp_t *mlp;
+	tsol_mlpent_t tsme;
+
+	if (!is_system_labeled())
+		return;
+
+	tsme.tsme_zoneid = zoneid;
+	tsme.tsme_flags = 0;
+	for (mlp = zcent->zc_private_mlp; !TSOL_MLP_END(mlp); mlp++) {
+		tsme.tsme_mlp = *mlp;
+		if (tnmlp(TNDB_LOAD, &tsme) != 0) {
+			zerror(zlogp, B_TRUE, "cannot set zone-specific MLP "
+			    "on %d-%d/%d", mlp->mlp_port,
+			    mlp->mlp_port_upper, mlp->mlp_ipp);
+		}
+	}
+
+	tsme.tsme_flags = TSOL_MEF_SHARED;
+	for (mlp = zcent->zc_shared_mlp; !TSOL_MLP_END(mlp); mlp++) {
+		tsme.tsme_mlp = *mlp;
+		if (tnmlp(TNDB_LOAD, &tsme) != 0) {
+			zerror(zlogp, B_TRUE, "cannot set shared MLP "
+			    "on %d-%d/%d", mlp->mlp_port,
+			    mlp->mlp_port_upper, mlp->mlp_ipp);
+		}
+	}
+}
+
+static void
+remove_mlps(zlog_t *zlogp, zoneid_t zoneid)
+{
+	tsol_mlpent_t tsme;
+
+	if (!is_system_labeled())
+		return;
+
+	(void) memset(&tsme, 0, sizeof (tsme));
+	tsme.tsme_zoneid = zoneid;
+	if (tnmlp(TNDB_FLUSH, &tsme) != 0)
+		zerror(zlogp, B_TRUE, "cannot flush MLPs");
+}
+
 int
 prtmount(const char *fs, void *x) {
 	zerror((zlog_t *)x, B_FALSE, "  %s", fs);
@@ -2816,6 +3373,9 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	int xerr;
 	char *kzone;
 	FILE *fp = NULL;
+	tsol_zcent_t *zcent = NULL;
+	int match = 0;
+	int doi = 0;
 
 	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
 		zerror(zlogp, B_TRUE, "unable to determine zone root");
@@ -2840,6 +3400,17 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (get_datasets(zlogp, &zfsbuf, &zfsbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of ZFS datasets");
 		goto error;
+	}
+
+	if (is_system_labeled()) {
+		zcent = get_zone_label(zlogp, privs);
+		if (zcent) {
+			match = zcent->zc_match;
+			doi = zcent->zc_doi;
+			*zlabel = zcent->zc_label;
+		} else {
+			goto error;
+		}
 	}
 
 	kzone = zone_name;
@@ -2911,7 +3482,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
-	    rctlbufsz, zfsbuf, zfsbufsz, &xerr)) == -1) {
+	    rctlbufsz, zfsbuf, zfsbufsz, &xerr, match, doi, zlabel)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,
@@ -2949,6 +3520,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (!mount_cmd && bind_to_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "WARNING: unable to bind zone to "
 		    "requested pool; using default pool.");
+	set_mlps(zlogp, zoneid, zcent);
 	rval = zoneid;
 	zoneid = -1;
 
@@ -2961,6 +3533,8 @@ error:
 	if (fp != NULL)
 		zonecfg_close_scratch(fp);
 	lofs_discard_mnttab();
+	if (zcent != NULL)
+		tsol_freezcent(zcent);
 	return (rval);
 }
 
@@ -3108,6 +3682,8 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
 		    "unable to unmount file systems in zone");
 		goto error;
 	}
+
+	remove_mlps(zlogp, zoneid);
 
 	if (zone_destroy(zoneid) != 0) {
 		zerror(zlogp, B_TRUE, "unable to destroy zone");

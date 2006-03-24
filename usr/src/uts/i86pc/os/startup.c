@@ -49,18 +49,14 @@
 #include <sys/kstat.h>
 
 #include <sys/reboot.h>
-#include <sys/uadmin.h>
 
 #include <sys/cred.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 
 #include <sys/procfs.h>
-#include <sys/acct.h>
 
 #include <sys/vfs.h>
-#include <sys/dnlc.h>
-#include <sys/var.h>
 #include <sys/cmn_err.h>
 #include <sys/utsname.h>
 #include <sys/debug.h>
@@ -70,11 +66,7 @@
 #include <sys/bootconf.h>
 #include <sys/varargs.h>
 #include <sys/promif.h>
-#include <sys/prom_emul.h>	/* for create_prom_prop */
 #include <sys/modctl.h>		/* for "procfs" hack */
-
-#include <sys/consdev.h>
-#include <sys/frame.h>
 
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -84,11 +76,9 @@
 #include <sys/regset.h>
 #include <sys/clock.h>
 #include <sys/pte.h>
-#include <sys/mmu.h>
 #include <sys/tss.h>
 #include <sys/stack.h>
 #include <sys/trap.h>
-#include <sys/pic.h>
 #include <sys/fp.h>
 #include <vm/anon.h>
 #include <vm/as.h>
@@ -102,7 +92,6 @@
 #include <vm/seg_kp.h>
 #include <sys/memnode.h>
 #include <vm/vm_dep.h>
-#include <sys/swap.h>
 #include <sys/thread.h>
 #include <sys/sysconf.h>
 #include <sys/vm_machparam.h>
@@ -111,14 +100,12 @@
 #include <vm/hat.h>
 #include <vm/hat_i86.h>
 #include <sys/pmem.h>
-#include <sys/instance.h>
 #include <sys/smp_impldefs.h>
 #include <sys/x86_archext.h>
 #include <sys/segments.h>
 #include <sys/clconf.h>
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
-#include <sys/prom_emul.h>
 #include <sys/cpc_impl.h>
 #include <sys/chip.h>
 #include <sys/x86_archext.h>
@@ -1365,6 +1352,8 @@ startup_modules(void)
 	if (modload("fs", "devfs") == -1)
 		halt("Can't load devfs");
 
+	(void) modloadonly("sys", "lbl_edition");
+
 	dispinit();
 
 	/*
@@ -2411,7 +2400,7 @@ uint64_t mtrrdef, pat_attr_reg;
 int	enable_relaxed_mtrr = 0;
 
 void
-setup_mtrr()
+setup_mtrr(void)
 {
 	int i, ecx;
 	int vcnt;
@@ -2463,7 +2452,7 @@ setup_mtrr()
  * On other cpu's its invoked from mp_startup().
  */
 void
-mtrr_sync()
+mtrr_sync(void)
 {
 	uint_t	crvalue, cr0_orig;
 	int	vcnt, i, ecx;
@@ -2512,7 +2501,7 @@ mtrr_sync()
  * resync mtrr so that BIOS is happy. Called from mdboot
  */
 void
-mtrr_resync()
+mtrr_resync(void)
 {
 	if ((x86_feature & X86_PAT) && enable_relaxed_mtrr) {
 		/*
@@ -2525,7 +2514,7 @@ mtrr_resync()
 }
 
 void
-get_system_configuration()
+get_system_configuration(void)
 {
 	char	prop[32];
 	u_longlong_t nodes_ll, cpus_pernode_ll, lvalue;

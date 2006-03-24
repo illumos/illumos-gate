@@ -1,4 +1,24 @@
 #
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -33,7 +53,7 @@ LDAPLISTOBJS=	$(LDAPLISTSRCS:%.c=%.o)
 
 # ldapaddent command
 LDAPADDENTPROG=	ldapaddent
-LDAPADDENTSRCS=	ldapaddent.c ldapaddrbac.c
+LDAPADDENTSRCS=	ldapaddent.c ldapaddrbac.c ldapaddtsol.c
 LDAPADDENTOBJS=	$(LDAPADDENTSRCS:%.c=%.o)
 
 # ldapclient command
@@ -74,7 +94,7 @@ clobber:=       TARGET= clobber
 lint:=          TARGET= lint
 
 # C Pre-Processor flags used by C, CC & lint
-CPPFLAGS +=	-DSUN -DSVR4 -D_SYS_STREAM_H -DSOLARIS_LDAP_CMD \
+CPPFLAGS +=	-DSUN -DSVR4 -DSOLARIS_LDAP_CMD \
 		-I ../../../lib/libldap5/include/ldap \
 		-I ../../../lib/libsldap/common \
 		-I ../../../lib/libnsl/include/rpcsvc \
@@ -87,7 +107,7 @@ ldapsearch :=	LDLIBS += -lldap
 ldapdelete :=	LDLIBS += -lldap
 ldapmodify :=	LDLIBS += -lldap
 ldaplist :=	LDLIBS += -lsldap
-ldapaddent :=	LDLIBS += -lsldap -lnsl
+ldapaddent :=	LDLIBS += -lsldap -lnsl -lsecdb
 ldapclient :=	LDLIBS += -lsldap -lscf
 
 lint :=		LDLIBS += -lldap

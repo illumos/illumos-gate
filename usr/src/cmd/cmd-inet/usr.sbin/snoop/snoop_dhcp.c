@@ -135,7 +135,7 @@ static char *option_types[] = {
 #define	OPTIONS_ARRAY_SIZE	78
 
 int
-interpret_dhcp(int flags, PKT *dp, int len)
+interpret_dhcp(int flags, struct dhcp *dp, int len)
 {
 	if (flags & F_SUM) {
 		if ((memcmp(dp->cookie, bootmagic, sizeof (bootmagic)) == 0) &&

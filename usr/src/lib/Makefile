@@ -184,6 +184,8 @@ SUBDIRS += \
 	libxnet		\
 	libzonecfg	\
 	libzoneinfo	\
+	libtsnet	\
+	libtsol		\
 	gss_mechs/mech_spnego	\
 	gss_mechs/mech_dummy	\
 	gss_mechs/mech_dh	\
@@ -268,6 +270,7 @@ MSGSUBDIRS=		\
 	libsldap	\
 	libslp		\
 	libsmedia	\
+	libtsol		\
 	libuutil	\
 	libwanboot	\
 	libwanbootutil	\
@@ -327,6 +330,7 @@ HDRSUBDIRS= libaio	\
 	libmail		\
 	libmtmalloc	\
 	libnvpair	\
+	libnsl		\
 	libpam		\
 	libpctx		\
 	libpicl		\
@@ -349,6 +353,8 @@ HDRSUBDIRS= libaio	\
 	libtnf		\
 	libtnfctl	\
 	libtnfprobe	\
+	libtsnet	\
+	libtsol		\
 	libvolmgt	\
 	libumem		\
 	libuutil	\
@@ -425,6 +431,7 @@ auditd_plugins: libbsm libnsl libsecdb
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
+libbsm:		libtsol
 libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
@@ -450,9 +457,10 @@ sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
 libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd5
-libsldap:	libldap5
+libsldap:	libldap5 libtsol
 libpool:	libnvpair libexacct
 libproject:	libpool libproc libsecdb
+libtsnet:	libnsl libtsol libsecdb
 libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl

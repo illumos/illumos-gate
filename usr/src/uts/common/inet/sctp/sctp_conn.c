@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,7 @@
 #include <sys/stropts.h>
 #include <sys/strsubr.h>
 #include <sys/socket.h>
+#include <sys/tsol/tndb.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -63,6 +63,8 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	sctp_init_chunk_t	*init;
 	int			err;
 	uint_t			sctp_options;
+	conn_t			*lconnp;
+	cred_t			*cr;
 
 	sctph = (sctp_hdr_t *)(cr_pkt->b_rptr + ip_hdr_len);
 	ASSERT(OK_32PTR(sctph));
@@ -80,6 +82,20 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	if (err != 0)
 		return (err);
 
+	lconnp = listener->sctp_connp;
+	if (lconnp->conn_mlp_type != mlptSingle) {
+		cr = lconnp->conn_peercred = DB_CRED(cr_pkt);
+		if (cr != NULL)
+			crhold(cr);
+		else
+			cr = lconnp->conn_cred;
+	} else {
+		cr = lconnp->conn_cred;
+	}
+
+	if ((err = sctp_set_hdraddrs(acceptor, cr)) != 0)
+		return (err);
+
 	if ((sctp_options & SCTP_PRSCTP_OPTION) &&
 	    listener->sctp_prsctp_aware && sctp_prsctp_enabled) {
 		acceptor->sctp_prsctp_aware = B_TRUE;
@@ -88,8 +104,6 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	}
 	/* The new sctp_t is fully bound now. */
 	acceptor->sctp_connp->conn_fully_bound = B_TRUE;
-
-	sctp_set_hdraddrs(acceptor);
 
 	/* Get  initial TSNs */
 	acceptor->sctp_ltsn = ntohl(iack->sic_inittsn);
@@ -298,7 +312,6 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
  * bind and conn fanouts, sends the INIT, and replies to the client
  * with an OK ack.
  */
-/* ARGSUSED */
 int
 sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 {
@@ -313,6 +326,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 	int		sleep = sctp->sctp_cansleep ? KM_SLEEP : KM_NOSLEEP;
 	int 		hdrlen;
 	ip6_rthdr_t	*rth;
+	int		err;
 	sctp_faddr_t	*cur_fp;
 
 	/*
@@ -406,7 +420,6 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 
 	switch (sctp->sctp_state) {
 	case SCTPS_IDLE: {
-		int			err;
 		struct sockaddr_storage	ss;
 
 		/*
@@ -464,10 +477,10 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		 * OK; set up the peer addr (this may grow after we get
 		 * the INIT ACK from the peer with additional addresses).
 		 */
-		if (sctp_add_faddr(sctp, &dstaddr, sleep) < 0) {
+		if ((err = sctp_add_faddr(sctp, &dstaddr, sleep)) != 0) {
 			mutex_exit(&tbf->tf_lock);
 			WAKE_SCTP(sctp);
-			return (ENOMEM);
+			return (err);
 		}
 		/* No valid src addr, return. */
 		if (sctp->sctp_faddrs->state == SCTP_FADDRS_UNREACH) {
@@ -483,7 +496,11 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		mutex_exit(&tbf->tf_lock);
 
 		/* initialize composite headers */
-		sctp_set_hdraddrs(sctp);
+		if ((err = sctp_set_hdraddrs(sctp, NULL)) != 0) {
+			sctp_conn_hash_remove(sctp);
+			WAKE_SCTP(sctp);
+			return (err);
+		}
 
 		/*
 		 * Massage a routing header (if present) putting the first hop

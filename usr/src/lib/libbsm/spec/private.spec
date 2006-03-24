@@ -242,6 +242,18 @@ declaration	token_t *au_to_xselect(char *pstring, char *type, \
 version		SUNWprivate_1.1
 end		
 
+function	au_to_mylabel
+include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
+declaration	token_t *au_to_mylabel(void)
+version		SUNWprivate_1.1
+end		
+
+function	au_to_label
+include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
+declaration	token_t *au_to_label(bslabel_t *label)
+version		SUNWprivate_1.1
+end		
+
 function	audit_allocate_argv
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
 declaration	int audit_allocate_argv(int flg, int argc, char *argv[])
@@ -644,18 +656,6 @@ declaration	int cannot_audit(int force)
 version		SUNWprivate_1.1
 end		
 
-function	enddaent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void enddaent(void)
-version		SUNWprivate_1.1
-end		
-
-function	enddmapent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void enddmapent(void)
-version		SUNWprivate_1.1
-end		
-
 function	_openac
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>
 declaration	au_acinfo_t *_openac(char *)
@@ -701,96 +701,6 @@ end
 function	_getacflg
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>
 declaration	int _getacflg(au_acinfo_t *, char *, int)
-version		SUNWprivate_1.1
-end		
-
-function	getdadfield
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	char *getdadfield(char *ptr)
-version		SUNWprivate_1.1
-end		
-
-function	getdaent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devalloc_t *getdaent(void)
-version		SUNWprivate_1.1
-end		
-
-function	getdafield
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	char *getdafield(char *ptr)
-version		SUNWprivate_1.1
-end		
-
-function	getdanam
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devalloc_t *getdanam(char *name)
-version		SUNWprivate_1.1
-end		
-
-function	getdatype
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devalloc_t *getdatype(char *tp)
-version		SUNWprivate_1.1
-end		
-
-function	getdmapdev
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devmap_t *getdmapdev(char *name)
-version		SUNWprivate_1.1
-end		
-
-function	getdmapdfield
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	char *getdmapdfield(char *ptr)
-version		SUNWprivate_1.1
-end		
-
-function	getdmapent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devmap_t *getdmapent(void)
-version		SUNWprivate_1.1
-end		
-
-function	getdmapfield
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	char *getdmapfield(char *ptr)
-version		SUNWprivate_1.1
-end		
-
-function	getdmapnam
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devmap_t *getdmapnam(char *name)
-version		SUNWprivate_1.1
-end		
-
-function	getdmaptype
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	devmap_t *getdmaptype(char *tp)
-version		SUNWprivate_1.1
-end		
-
-function	setdaent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void setdaent(void)
-version		SUNWprivate_1.1
-end		
-
-function	setdafile
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void setdafile(char *file)
-version		SUNWprivate_1.1
-end		
-
-function	setdmapent
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void setdmapent(void)
-version		SUNWprivate_1.1
-end		
-
-function	setdmapfile
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void setdmapfile(char *file)
 version		SUNWprivate_1.1
 end		
 
@@ -1123,4 +1033,16 @@ version         SUNWprivate_1.1
 errno           EAGAIN EBADF EBUSY EFBIG EINTR EINVAL EIO \
                         ENXIO EPERM EWOULDBLOCK
 exception       $return == -1
+end
+
+function	au_to_privset
+include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
+declaration	token_t *au_to_privset(const char *priv_type, const priv_set_t *privilege)
+version		SUNWprivate_1.1
+end
+
+function	au_to_uauth
+include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
+declaration	token_t *au_to_uauth(char *text)
+version		SUNWprivate_1.1
 end

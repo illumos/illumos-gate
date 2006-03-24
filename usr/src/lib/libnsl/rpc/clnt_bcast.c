@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -43,6 +42,7 @@
  */
 
 #include "mt.h"
+#include "rpc_mt.h"
 #include <string.h>
 #include <strings.h>
 #include <rpc/rpc.h>
@@ -51,8 +51,6 @@
 #include <netdir.h>
 #ifdef PORTMAP
 #include <rpc/pmap_prot.h>
-#include <rpc/pmap_clnt.h>
-#include <rpc/pmap_rmt.h>
 #endif
 #ifdef RPC_DEBUG
 #include <stdio.h>
@@ -187,11 +185,13 @@ rpc_broadcast_exp(const rpcprog_t prog, const rpcvers_t vers,
 			stat = RPC_CANTSEND;
 			continue;
 		}
+		__rpc_set_mac_options(fd, nconf, prog);
 		if (t_bind(fd, NULL, NULL) == -1) {
 			(void) t_close(fd);
 			stat = RPC_CANTSEND;
 			continue;
 		}
+
 		/* Do protocol specific negotiating for broadcast */
 		if (netdir_options(nconf, ND_SET_BROADCAST, fd, NULL)) {
 			(void) t_close(fd);

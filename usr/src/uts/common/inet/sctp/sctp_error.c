@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
 #include <sys/strsubr.h>
+#include <sys/tsol/tnet.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -161,6 +161,9 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	int		isv4;
 	ire_t		*ire;
 	irb_t		*irb;
+	ts_label_t	*tsl;
+	conn_t		*connp;
+	cred_t		*cr;
 
 	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
 	if (isv4) {
@@ -169,7 +172,14 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		ahlen = sctp->sctp_hdr6_len;
 	}
 
-	hmp = allocb(sctp_wroff_xtra + ahlen, BPRI_MED);
+	/*
+	 * If this is a labeled system, then check to see if we're allowed to
+	 * send a response to this particular sender.  If not, then just drop.
+	 */
+	if (is_system_labeled() && !tsol_can_reply_error(inmp))
+		return;
+
+	hmp = allocb_cred(sctp_wroff_xtra + ahlen, CONN_CRED(sctp->sctp_connp));
 	if (hmp == NULL) {
 		/* XXX no resources */
 		return;
@@ -233,24 +243,48 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		ahip6h->ip6_plen = htons(alen + sizeof (*sh));
 	}
 
-	/* Stash the conn ptr info. for IP */
-	SCTP_STASH_IPINFO(hmp, (ire_t *)NULL);
-
 	BUMP_MIB(&sctp_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	CONN_INC_REF(sctp->sctp_connp);
+	connp = sctp->sctp_connp;
+	if (is_system_labeled() && (cr = DB_CRED(inmp)) != NULL &&
+	    crgetlabel(cr) != NULL) {
+		int err, adjust;
+
+		if (isv4)
+			err = tsol_check_label(cr, &hmp, &adjust,
+			    connp->conn_mac_exempt);
+		else
+			err = tsol_check_label_v6(cr, &hmp, &adjust,
+			    connp->conn_mac_exempt);
+		if (err != 0) {
+			freemsg(hmp);
+			return;
+		}
+		if (isv4) {
+			ahiph = (ipha_t *)hmp->b_rptr;
+			adjust += ntohs(ahiph->ipha_length);
+			ahiph->ipha_length = htons(adjust);
+		}
+	}
+
+	/* Stash the conn ptr info. for IP */
+	SCTP_STASH_IPINFO(hmp, NULL);
+
+	CONN_INC_REF(connp);
 	hmp->b_flag |= MSGHASREF;
-	IP_PUT(hmp, sctp->sctp_connp, sctp->sctp_current == NULL ? B_TRUE :
+	IP_PUT(hmp, connp, sctp->sctp_current == NULL ? B_TRUE :
 	    sctp->sctp_current->isv4);
 	/*
 	 * Let's just mark the IRE for this destination as temporary
 	 * to prevent any DoS attack.
 	 */
+	tsl = cr == NULL ? NULL : crgetlabel(cr);
 	if (isv4)
-		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid);
+		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid, tsl);
 	else
-		ire = ire_cache_lookup_v6(&inip6h->ip6_src, sctp->sctp_zoneid);
+		ire = ire_cache_lookup_v6(&inip6h->ip6_src, sctp->sctp_zoneid,
+		    tsl);
 	/*
 	 * In the normal case the ire would be non-null, however it could be
 	 * null, say, if IP needs to resolve the gateway for this address. We

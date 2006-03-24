@@ -37,10 +37,12 @@
 #include <sys/timod.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/strsubr.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/policy.h>
+#include <sys/priv.h>
 #include <sys/zone.h>
 #include <sys/time.h>
 
@@ -58,7 +60,6 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/ip_ire.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
@@ -71,6 +72,9 @@
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipclassifier.h>
+
+#include <sys/tsol/label.h>
+#include <sys/tsol/tnet.h>
 
 #define	ICMP6 "icmp6"
 major_t	ICMP6_MAJ;
@@ -133,8 +137,6 @@ static int	icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t icmp_param_register(icmpparam_t *icmppa, int cnt);
 static int	icmp_param_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
-static int	icmp_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
-		    uchar_t **optbufp, uint_t *optlenp);
 static void	icmp_rput(queue_t *q, mblk_t *mp);
 static void	icmp_rput_bind_ack(queue_t *q, mblk_t *mp);
 static int	icmp_snmp_get(queue_t *q, mblk_t *mpctl);
@@ -614,6 +616,7 @@ icmp_connect(queue_t *q, mblk_t *mp)
 	linkb(mp1, mp);
 	linkb(mp1, mp2);
 
+	mblk_setcred(mp1, icmp->icmp_credp);
 	putnext(q, mp1);
 }
 
@@ -622,6 +625,10 @@ icmp_close(queue_t *q)
 {
 	icmp_t	*icmp = (icmp_t *)q->q_ptr;
 	int	i1;
+
+	/* tell IP that if we're not here, he can't trust labels */
+	if (is_system_labeled())
+		putnext(WR(q), icmp->icmp_delabel);
 
 	qprocsoff(q);
 
@@ -639,28 +646,8 @@ icmp_close(queue_t *q)
 		icmp->icmp_sticky_hdrs = NULL;
 		icmp->icmp_sticky_hdrs_len = 0;
 	}
-	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_HOPOPTS) {
-		kmem_free(icmp->icmp_sticky_ipp.ipp_hopopts,
-		    icmp->icmp_sticky_ipp.ipp_hopoptslen);
-	}
-	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_RTDSTOPTS) {
-		kmem_free(icmp->icmp_sticky_ipp.ipp_rtdstopts,
-		    icmp->icmp_sticky_ipp.ipp_rtdstoptslen);
-	}
-	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_RTHDR) {
-		kmem_free(icmp->icmp_sticky_ipp.ipp_rthdr,
-		    icmp->icmp_sticky_ipp.ipp_rthdrlen);
-	}
-	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_DSTOPTS) {
-		kmem_free(icmp->icmp_sticky_ipp.ipp_dstopts,
-		    icmp->icmp_sticky_ipp.ipp_dstoptslen);
-	}
-	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_PATHMTU) {
-		kmem_free(icmp->icmp_sticky_ipp.ipp_pathmtu,
-		    icmp->icmp_sticky_ipp.ipp_pathmtulen);
-	}
-	icmp->icmp_sticky_ipp.ipp_fields &=
-	    ~(IPPF_HOPOPTS|IPPF_RTDSTOPTS|IPPF_RTHDR|IPPF_DSTOPTS);
+
+	ip6_pkt_free(&icmp->icmp_sticky_ipp);
 
 	crfree(icmp->icmp_credp);
 
@@ -1295,6 +1282,37 @@ icmp_ip_bind_mp(icmp_t *icmp, t_scalar_t bind_prim, t_scalar_t addr_length,
 	return (mp);
 }
 
+/* ARGSUSED */
+static void
+dummy_func(void *arg)
+{
+}
+
+static mblk_t *
+alloc_wait(queue_t *q, size_t len, int pri, int *errp)
+{
+	mblk_t *mp;
+	bufcall_id_t id;
+	int retv;
+
+	while ((mp = allocb(len, pri)) == NULL) {
+		id = qbufcall(q, len, pri, dummy_func, NULL);
+		if (id == 0) {
+			*errp = ENOMEM;
+			break;
+		}
+		retv = qwait_sig(q);
+		qunbufcall(q, id);
+		if (retv == 0) {
+			*errp = EINTR;
+			break;
+		}
+	}
+	if (mp != NULL)
+		mp->b_wptr += len;
+	return (mp);
+}
+
 /*
  * This is the open routine for icmp.  It allocates a icmp_t structure for
  * the stream and, on the first open of the module, creates an ND table.
@@ -1304,6 +1322,8 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	int	err;
 	icmp_t	*icmp;
+	mblk_t	*mp;
+	out_labeled_t *olp;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -1326,7 +1346,7 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 */
 	err = mi_open_comm(&icmp_g_head, sizeof (icmp_t), q, devp,
 	    flag, sflag, credp);
-	if (err)
+	if (err != 0)
 		return (err);
 
 	/*
@@ -1344,6 +1364,13 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	icmp->icmp_credp = credp;
 	crhold(credp);
+
+	/*
+	 * If the caller has the process-wide flag set, then default to MAC
+	 * exempt mode.  This allows read-down to unlabeled hosts.
+	 */
+	if (getpflags(NET_MAC_AWARE, credp) != 0)
+		icmp->icmp_mac_exempt = B_TRUE;
 
 	icmp->icmp_zoneid = getzoneid();
 
@@ -1386,19 +1413,43 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	if (icmp->icmp_family == AF_INET6) {
 		/* Build initial header template for transmit */
-		int error;
-
-		error = icmp_build_hdrs(q, icmp);
-		if (error != 0) {
-			(void) icmp_close(q);
-			return (error);
-		}
+		err = icmp_build_hdrs(q, icmp);
+		if (err != 0)
+			goto open_error;
 	}
 	/* Set the Stream head write offset. */
 	(void) mi_set_sth_wroff(q, icmp->icmp_max_hdr_len + icmp_wroff_extra);
 	(void) mi_set_sth_hiwat(q, q->q_hiwat);
 
+	if (is_system_labeled()) {
+		/* notify IP that we know about labeling */
+		mp = alloc_wait(q, sizeof (*olp), BPRI_MED, &err);
+		if (mp == NULL)
+			goto open_error;
+		mp->b_datap->db_type = M_CTL;
+		olp = (out_labeled_t *)mp->b_rptr;
+		olp->out_labeled_type = IP_ULP_OUT_LABELED;
+		olp->out_qnext = WR(q)->q_next;
+		putnext(WR(q), mp);
+
+		/* save off a copy for closing */
+		mp = alloc_wait(q, sizeof (*olp), BPRI_MED, &err);
+		if (mp == NULL)
+			goto open_error;
+		mp->b_datap->db_type = M_CTL;
+		olp = (out_labeled_t *)mp->b_rptr;
+		olp->out_labeled_type = IP_ULP_OUT_LABELED;
+		olp->out_qnext = NULL;
+		icmp->icmp_delabel = mp;
+	}
+
 	return (0);
+
+open_error:
+	qprocsoff(q);
+	crfree(credp);
+	(void) mi_close_comm(&icmp_g_head, q);
+	return (err);
 }
 
 /*
@@ -1511,6 +1562,9 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 			break;
 		case SO_TIMESTAMP:
 			*i1 = icmp->icmp_timestamp;
+			break;
+		case SO_MAC_EXEMPT:
+			*i1 = icmp->icmp_mac_exempt;
 			break;
 		/*
 		 * Following three not meaningful for icmp
@@ -1711,8 +1765,17 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 		case IPV6_HOPOPTS:
 			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
 				return (0);
-			bcopy(ipp->ipp_hopopts, ptr, ipp->ipp_hopoptslen);
-			return (ipp->ipp_hopoptslen);
+			if (ipp->ipp_hopoptslen <= icmp->icmp_label_len_v6)
+				return (0);
+			bcopy((char *)ipp->ipp_hopopts +
+			    icmp->icmp_label_len_v6, ptr,
+			    ipp->ipp_hopoptslen - icmp->icmp_label_len_v6);
+			if (icmp->icmp_label_len_v6 > 0) {
+				ptr[0] = ((char *)ipp->ipp_hopopts)[0];
+				ptr[1] = (ipp->ipp_hopoptslen -
+				    icmp->icmp_label_len_v6 + 7) / 8 - 1;
+			}
+			return (ipp->ipp_hopoptslen - icmp->icmp_label_len_v6);
 		case IPV6_RTHDRDSTOPTS:
 			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
 				return (0);
@@ -1966,6 +2029,13 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				icmp->icmp_timestamp = onoff;
 			}
 			break;
+		case SO_MAC_EXEMPT:
+			if (secpolicy_net_mac_aware(cr) != 0 ||
+			    icmp->icmp_state != TS_UNBND)
+				return (EACCES);
+			if (!checkonly)
+				icmp->icmp_mac_exempt = onoff;
+			break;
 		/*
 		 * Following three not meaningful for icmp
 		 * Action is same as "default" so we keep them
@@ -1991,27 +2061,21 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		case IP_OPTIONS:
 		case T_IP_OPTIONS:
 			/* Save options for use by IP. */
-			if (inlen & 0x3) {
+			if ((inlen & 0x3) ||
+			    inlen + icmp->icmp_label_len > IP_MAX_OPT_LENGTH) {
 				*outlenp = 0;
 				return (EINVAL);
 			}
 			if (checkonly)
 				break;
 
-			if (icmp->icmp_ip_snd_options) {
-				mi_free((char *)icmp->icmp_ip_snd_options);
-				icmp->icmp_ip_snd_options_len = 0;
-				icmp->icmp_ip_snd_options = NULL;
+			if (!tsol_option_set(&icmp->icmp_ip_snd_options,
+			    &icmp->icmp_ip_snd_options_len,
+			    icmp->icmp_label_len, invalp, inlen)) {
+				*outlenp = 0;
+				return (ENOMEM);
 			}
-			if (inlen) {
-				icmp->icmp_ip_snd_options =
-				    (uchar_t *)mi_alloc(inlen, BPRI_HI);
-				if (icmp->icmp_ip_snd_options) {
-					bcopy(invalp,
-					    icmp->icmp_ip_snd_options, inlen);
-					icmp->icmp_ip_snd_options_len = inlen;
-				}
-			}
+
 			icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
 			    icmp->icmp_ip_snd_options_len;
 			(void) mi_set_sth_wroff(RD(q), icmp->icmp_max_hdr_len +
@@ -2417,22 +2481,16 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 
 			if (checkonly)
 				break;
-			if (inlen == 0) {
-				if (sticky &&
-				    (ipp->ipp_fields & IPPF_HOPOPTS) != 0) {
-					kmem_free(ipp->ipp_hopopts,
-					    ipp->ipp_hopoptslen);
-					ipp->ipp_hopopts = NULL;
-					ipp->ipp_hopoptslen = 0;
-				}
+			error = optcom_pkt_set(invalp, inlen, sticky,
+			    (uchar_t **)&ipp->ipp_hopopts,
+			    &ipp->ipp_hopoptslen,
+			    sticky ? icmp->icmp_label_len_v6 : 0);
+			if (error != 0)
+				return (error);
+			if (ipp->ipp_hopoptslen == 0) {
 				ipp->ipp_fields &= ~IPPF_HOPOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_HOPOPTS;
 			} else {
-				error = icmp_pkt_set(invalp, inlen, sticky,
-				    (uchar_t **)&ipp->ipp_hopopts,
-				    &ipp->ipp_hopoptslen);
-				if (error != 0)
-					return (error);
 				ipp->ipp_fields |= IPPF_HOPOPTS;
 			}
 			if (sticky) {
@@ -2467,9 +2525,9 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_RTDSTOPTS;
 			} else {
-				error = icmp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_rtdstopts,
-				    &ipp->ipp_rtdstoptslen);
+				    &ipp->ipp_rtdstoptslen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_RTDSTOPTS;
@@ -2506,9 +2564,9 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				ipp->ipp_fields &= ~IPPF_DSTOPTS;
 				ipp->ipp_sticky_ignored |= IPPF_DSTOPTS;
 			} else {
-				error = icmp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_dstopts,
-				    &ipp->ipp_dstoptslen);
+				    &ipp->ipp_dstoptslen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_DSTOPTS;
@@ -2545,9 +2603,9 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				ipp->ipp_fields &= ~IPPF_RTHDR;
 				ipp->ipp_sticky_ignored |= IPPF_RTHDR;
 			} else {
-				error = icmp_pkt_set(invalp, inlen, sticky,
+				error = optcom_pkt_set(invalp, inlen, sticky,
 				    (uchar_t **)&ipp->ipp_rthdr,
-				    &ipp->ipp_rthdrlen);
+				    &ipp->ipp_rthdrlen, 0);
 				if (error != 0)
 					return (error);
 				ipp->ipp_fields |= IPPF_RTHDR;
@@ -2733,46 +2791,6 @@ icmp_build_hdrs(queue_t *q, icmp_t *icmp)
 }
 
 /*
- * Set optbuf and optlen for the option.
- * If sticky is set allocate memory (if not already present).
- * Otherwise just point optbuf and optlen at invalp and inlen.
- * Returns failure if memory can not be allocated.
- */
-static int
-icmp_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
-    uchar_t **optbufp, uint_t *optlenp)
-{
-	uchar_t *optbuf;
-
-	if (!sticky) {
-		*optbufp = invalp;
-		*optlenp = inlen;
-		return (0);
-	}
-	if (inlen == *optlenp) {
-		/* Unchanged length - no need to realocate */
-		bcopy(invalp, *optbufp, inlen);
-		return (0);
-	}
-	if (inlen != 0) {
-		/* Allocate new buffer before free */
-		optbuf = kmem_alloc(inlen, KM_NOSLEEP);
-		if (optbuf == NULL)
-			return (ENOMEM);
-	} else {
-		optbuf = NULL;
-	}
-	/* Free old buffer */
-	if (*optlenp != 0)
-		kmem_free(*optbufp, *optlenp);
-
-	bcopy(invalp, optbuf, inlen);
-	*optbufp = optbuf;
-	*optlenp = inlen;
-	return (0);
-}
-
-/*
  * This routine retrieves the value of an ND variable in a icmpparam_t
  * structure.  It is called through nd_getset when a user reads the
  * variable.
@@ -2857,6 +2875,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	mblk_t			*options_mp = NULL;
 	uint_t			icmp_opt = 0;
 	boolean_t		icmp_ipv6_recvhoplimit = B_FALSE;
+	uint_t			hopstrip;
 
 	icmp = (icmp_t *)q->q_ptr;
 	if (icmp->icmp_restricted) {
@@ -3186,6 +3205,7 @@ icmp_rput(queue_t *q, mblk_t *mp)
 
 	/* Initialize */
 	ipp.ipp_fields = 0;
+	hopstrip = 0;
 
 	ip6h = (ip6_t *)rptr;
 	/*
@@ -3214,6 +3234,52 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			ip6h = (ip6_t *)rptr;
 		}
 		hdr_len = ip_find_hdr_v6(mp, ip6h, &ipp, &nexthdr);
+
+		/*
+		 * We need to lie a bit to the user because users inside
+		 * labeled compartments should not see their own labels.  We
+		 * assume that in all other respects IP has checked the label,
+		 * and that the label is always first among the options.  (If
+		 * it's not first, then this code won't see it, and the option
+		 * will be passed along to the user.)
+		 *
+		 * If we had multilevel ICMP sockets, then the following code
+		 * should be skipped for them to allow the user to see the
+		 * label.
+		 *
+		 * Alignment restrictions in the definition of IP options
+		 * (namely, the requirement that the 4-octet DOI goes on a
+		 * 4-octet boundary) mean that we know exactly where the option
+		 * should start, but we're lenient for other hosts.
+		 *
+		 * Note that there are no multilevel ICMP or raw IP sockets
+		 * yet, thus nobody ever sees the IP6OPT_LS option.
+		 */
+		if ((ipp.ipp_fields & IPPF_HOPOPTS) &&
+		    ipp.ipp_hopoptslen > 5 && is_system_labeled()) {
+			const uchar_t *ucp =
+			    (const uchar_t *)ipp.ipp_hopopts + 2;
+			int remlen = ipp.ipp_hopoptslen - 2;
+
+			while (remlen > 0) {
+				if (*ucp == IP6OPT_PAD1) {
+					remlen--;
+					ucp++;
+				} else if (*ucp == IP6OPT_PADN) {
+					remlen -= ucp[1] + 2;
+					ucp += ucp[1] + 2;
+				} else if (*ucp == ip6opt_ls) {
+					hopstrip = (ucp -
+					    (const uchar_t *)ipp.ipp_hopopts) +
+					    ucp[1] + 2;
+					hopstrip = (hopstrip + 7) & ~7;
+					break;
+				} else {
+					/* label option must be first */
+					break;
+				}
+			}
+		}
 	} else {
 		hdr_len = IPV6_HDR_LEN;
 		ip6i = NULL;
@@ -3293,9 +3359,10 @@ icmp_rput(queue_t *q, mblk_t *mp)
 	if (ipp.ipp_fields & (IPPF_HOPOPTS|IPPF_DSTOPTS|IPPF_RTDSTOPTS|
 	    IPPF_RTHDR|IPPF_IFINDEX)) {
 		if (icmp->icmp_ipv6_recvhopopts &&
-		    (ipp.ipp_fields & IPPF_HOPOPTS)) {
+		    (ipp.ipp_fields & IPPF_HOPOPTS) &&
+		    ipp.ipp_hopoptslen > hopstrip) {
 			udi_size += sizeof (struct T_opthdr) +
-			    ipp.ipp_hopoptslen;
+			    ipp.ipp_hopoptslen - hopstrip;
 			icmp_opt |= IPPF_HOPOPTS;
 		}
 		if ((icmp->icmp_ipv6_recvdstopts ||
@@ -3425,12 +3492,18 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			toh->level = IPPROTO_IPV6;
 			toh->name = IPV6_HOPOPTS;
 			toh->len = sizeof (struct T_opthdr) +
-			    ipp.ipp_hopoptslen;
+			    ipp.ipp_hopoptslen - hopstrip;
 			toh->status = 0;
 			dstopt += sizeof (struct T_opthdr);
-			bcopy(ipp.ipp_hopopts, dstopt,
-			    ipp.ipp_hopoptslen);
-			dstopt += ipp.ipp_hopoptslen;
+			bcopy((char *)ipp.ipp_hopopts + hopstrip, dstopt,
+			    ipp.ipp_hopoptslen - hopstrip);
+			if (hopstrip > 0) {
+				/* copy next header value and fake length */
+				dstopt[0] = ((uchar_t *)ipp.ipp_hopopts)[0];
+				dstopt[1] = ((uchar_t *)ipp.ipp_hopopts)[1] -
+				    hopstrip / 8;
+			}
+			dstopt += ipp.ipp_hopoptslen - hopstrip;
 			udi_size -= toh->len;
 		}
 		if (icmp_opt & IPPF_RTDSTOPTS) {
@@ -3850,7 +3923,34 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp)
 		 */
 		(void) ip_massage_options(ipha);
 	}
+	mblk_setcred(mp, icmp->icmp_credp);
 	putnext(q, mp);
+}
+
+static boolean_t
+icmp_update_label(queue_t *q, icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
+{
+	int err;
+	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
+
+	err = tsol_compute_label(DB_CREDDEF(mp, icmp->icmp_credp), dst,
+	    opt_storage, icmp->icmp_mac_exempt);
+	if (err == 0) {
+		err = tsol_update_options(&icmp->icmp_ip_snd_options,
+		    &icmp->icmp_ip_snd_options_len, &icmp->icmp_label_len,
+		    opt_storage);
+	}
+	if (err != 0) {
+		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		DTRACE_PROBE4(
+		    tx__ip__log__drop__updatelabel__icmp,
+		    char *, "queue(1) failed to update options(2) on mp(3)",
+		    queue_t *, q, char *, opt_storage, mblk_t *, mp);
+		icmp_ud_err(q, mp, err);
+		return (B_FALSE);
+	}
+	IN6_IPADDR_TO_V4MAPPED(dst, &icmp->icmp_v6lastdst);
+	return (B_TRUE);
 }
 
 /*
@@ -3882,6 +3982,27 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	case M_DATA:
 		if (icmp->icmp_hdrincl) {
 			ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
+			ipha = (ipha_t *)mp->b_rptr;
+			if (mp->b_wptr - mp->b_rptr < IP_SIMPLE_HDR_LENGTH) {
+				if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
+					BUMP_MIB(&rawip_mib, rawipOutErrors);
+					freemsg(mp);
+					return;
+				}
+				ipha = (ipha_t *)mp->b_rptr;
+			}
+			/*
+			 * If this connection was used for v6 (inconceivable!)
+			 * or if we have a new destination, then it's time to
+			 * figure a new label.
+			 */
+			if (is_system_labeled() &&
+			    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
+			    V4_PART_OF_V6(icmp->icmp_v6lastdst) !=
+			    ipha->ipha_dst) &&
+			    !icmp_update_label(q, icmp, mp, ipha->ipha_dst)) {
+				return;
+			}
 			icmp_wput_hdrincl(q, mp, icmp);
 			return;
 		}
@@ -3960,6 +4081,9 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		/* Extract and ipaddr */
 		v4dst = sin->sin_addr.s_addr;
 		break;
+
+	default:
+		ASSERT(0);
 	}
 
 	/*
@@ -3983,12 +4107,24 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		 */
 	}
 
+	if (v4dst == INADDR_ANY)
+		v4dst = htonl(INADDR_LOOPBACK);
+
+	/* Check if our saved options are valid; update if not */
+	if (is_system_labeled() &&
+	    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
+	    V4_PART_OF_V6(icmp->icmp_v6lastdst) != v4dst) &&
+	    !icmp_update_label(q, icmp, mp, v4dst)) {
+		return;
+	}
+
 	/* Protocol 255 contains full IP headers */
 	if (icmp->icmp_hdrincl) {
 		freeb(mp);
 		icmp_wput_hdrincl(q, mp1, icmp);
 		return;
 	}
+
 	/* Add an IP header */
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
 	ipha = (ipha_t *)&mp1->b_rptr[-ip_hdr_length];
@@ -4059,10 +4195,7 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	 * Copy in the destination address from the T_UNITDATA
 	 * request
 	 */
-	if (v4dst == INADDR_ANY)
-		ipha->ipha_dst = htonl(INADDR_LOOPBACK);
-	else
-		ipha->ipha_dst = v4dst;
+	ipha->ipha_dst = v4dst;
 
 	/*
 	 * Set ttl based on IP_MULTICAST_TTL to match IPv6 logic.
@@ -4082,15 +4215,42 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	}
 	freeb(mp);
 	BUMP_MIB(&rawip_mib, rawipOutDatagrams);
+	mblk_setcred(mp1, icmp->icmp_credp);
 	putnext(q, mp1);
 #undef	ipha
 #undef tudr
 }
 
+static boolean_t
+icmp_update_label_v6(queue_t *wq, icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
+{
+	int err;
+	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
+
+	err = tsol_compute_label_v6(DB_CREDDEF(mp, icmp->icmp_credp), dst,
+	    opt_storage, icmp->icmp_mac_exempt);
+	if (err == 0) {
+		err = tsol_update_sticky(&icmp->icmp_sticky_ipp,
+		    &icmp->icmp_label_len_v6, opt_storage);
+	}
+	if (err != 0) {
+		BUMP_MIB(&rawip_mib, rawipOutErrors);
+		DTRACE_PROBE4(
+		    tx__ip__log__drop__updatelabel__icmp6,
+		    char *, "queue(1) failed to update options(2) on mp(3)",
+		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
+		icmp_ud_err(wq, mp, err);
+		return (B_FALSE);
+	}
+
+	icmp->icmp_v6lastdst = *dst;
+	return (B_TRUE);
+}
+
 /*
  * icmp_wput_ipv6():
  * Assumes that icmp_wput did some sanity checking on the destination
- * address.
+ * address, but that the label may not yet be correct.
  */
 void
 icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
@@ -4109,6 +4269,7 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	uint_t			option_exists = 0, is_sticky = 0;
 	uint8_t			*cp;
 	uint8_t			*nxthdr_ptr;
+	in6_addr_t		ip6_dst;
 
 	icmp = (icmp_t *)q->q_ptr;
 
@@ -4153,6 +4314,34 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 		 * explicitly set in options_exists.
 		 */
 		option_exists |= IPPF_SCOPE_ID;
+	}
+
+	/*
+	 * Compute the destination address
+	 */
+	ip6_dst = sin6->sin6_addr;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+		ip6_dst = ipv6_loopback;
+
+	/*
+	 * If we're not going to the same destination as last time, then
+	 * recompute the label required.  This is done in a separate routine to
+	 * avoid blowing up our stack here.
+	 */
+	if (is_system_labeled() &&
+	    !IN6_ARE_ADDR_EQUAL(&icmp->icmp_v6lastdst, &ip6_dst) &&
+	    !icmp_update_label_v6(q, icmp, mp, &ip6_dst)) {
+		return;
+	}
+
+	/*
+	 * If there's a security label here, then we ignore any options the
+	 * user may try to set.  We keep the peer's label as a hidden sticky
+	 * option.
+	 */
+	if (icmp->icmp_label_len_v6 > 0) {
+		ignore &= ~IPPF_HOPOPTS;
+		ipp->ipp_fields &= ~IPPF_HOPOPTS;
 	}
 
 	if ((icmp->icmp_sticky_ipp.ipp_fields == 0) &&
@@ -4497,10 +4686,7 @@ no_options:
 	/*
 	 * Copy in the destination address
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
-		ip6h->ip6_dst = ipv6_loopback;
-	else
-		ip6h->ip6_dst = sin6->sin6_addr;
+	ip6h->ip6_dst = ip6_dst;
 
 	ip6h->ip6_vcf =
 		(IPV6_DEFAULT_VERS_AND_FLOW & IPV6_VERS_AND_FLOW_MASK) |
@@ -4622,6 +4808,7 @@ no_options:
 
 	/* We're done. Pass the packet to IP */
 	BUMP_MIB(&rawip_mib, rawipOutDatagrams);
+	mblk_setcred(mp1, icmp->icmp_credp);
 	putnext(q, mp1);
 }
 

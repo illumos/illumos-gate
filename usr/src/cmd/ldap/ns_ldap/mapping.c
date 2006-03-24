@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,6 +30,7 @@
 #include <libintl.h>
 #include <strings.h>
 #include <stdio.h>
+#include <tsol/label.h>
 #include "../../../lib/libsldap/common/ns_sldap.h"
 
 
@@ -67,6 +69,8 @@ static struct mapping maplist[] = {
 	{"exec_attr", "cn", "SolarisExecAttr", NULL},
 	{"user_attr", "uid", "SolarisUserAttr", NULL},
 	{"audit_user", "uid", "SolarisAuditUser", NULL},
+	{"tnrhtp", "ipTnetTemplateName", "ipTnetTemplate", NULL},
+	{"tnrhdb", "ipTnetNumber", "ipTnetHost", NULL},
 	{NULL, NULL, NULL, NULL}
 };
 
@@ -112,10 +116,20 @@ printMapping()
 		"automountMapName",
 		"automountMap");
 	for (i = 0; maplist[i].database != NULL; i++) {
-	/* skip printing shadow */
-	if (strcasecmp(maplist[i].database, "shadow") != 0)
+		/* skip printing shadow */
+		if (strcasecmp(maplist[i].database, "shadow") == 0)
+			continue;
+		if (!is_system_labeled()) {
+			/*
+			 * do not print tnrhdb and tnrhtp if system is
+			 * not configured with Trusted Extensions
+			 */
+			if ((strcasecmp(maplist[i].database, "tnrhdb") == 0) ||
+			    (strcasecmp(maplist[i].database, "tnrhtp") == 0))
+				continue;
+		}
 		(void) fprintf(stdout, "%-15s%-20s%s\n", maplist[i].database,
-			maplist[i].def_type, maplist[i].objectclass);
+		    maplist[i].def_type, maplist[i].objectclass);
 	}
 }
 

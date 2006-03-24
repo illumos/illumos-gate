@@ -189,6 +189,7 @@ f none usr/include/libscf_priv.h 0644 root bin
 f none usr/include/libsysevent.h 644 root bin
 f none usr/include/libsysevent_impl.h 644 root bin
 f none usr/include/libsvm.h 644 root bin
+f none usr/include/libtsnet.h 644 root bin
 f none usr/include/libw.h 644 root bin
 f none usr/include/libzfs.h 644 root bin
 f none usr/include/libzoneinfo.h 644 root bin
@@ -1110,6 +1111,12 @@ f none usr/include/sys/todio.h 0644 root bin
 f none usr/include/sys/tpicommon.h 0644 root bin
 f none usr/include/sys/trap.h 644 root bin
 f none usr/include/sys/ts.h 644 root bin
+d none usr/include/sys/tsol 755 root bin
+f none usr/include/sys/tsol/label.h 644 root bin
+f none usr/include/sys/tsol/label_macro.h 644 root bin
+f none usr/include/sys/tsol/priv.h 644 root bin
+f none usr/include/sys/tsol/tndb.h 644 root bin
+f none usr/include/sys/tsol/tsyscall.h 644 root bin
 f none usr/include/sys/tspriocntl.h 644 root bin
 f none usr/include/sys/ttcompat.h 644 root bin
 f none usr/include/sys/ttold.h 644 root bin
@@ -1173,6 +1180,8 @@ f none usr/include/thread.h 644 root bin
 f none usr/include/thread_db.h 644 root bin
 f none usr/include/time.h 644 root bin
 f none usr/include/tiuser.h 644 root bin
+d none usr/include/tsol 755 root bin
+f none usr/include/tsol/label.h 644 root bin
 f none usr/include/tzfile.h 644 root bin
 f none usr/include/ucontext.h 644 root bin
 f none usr/include/ucred.h 644 root bin

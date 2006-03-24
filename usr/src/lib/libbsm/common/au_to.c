@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,9 @@
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
 #include <string.h>
+#include <zone.h>
+#include <sys/tsol/label.h>
+#include <sys/tsol/label_macro.h>
 
 #define	NGROUPS		16	/* XXX - temporary */
 
@@ -1239,6 +1241,50 @@ au_to_xselect(char *pstring, char *type, short dlen, char *data)
 	adr_short(&adr, &dlen, 1);
 	adr_char(&adr, data, dlen);
 	return (token);
+}
+
+/*
+ * au_to_label
+ * return s:
+ *	pointer to token chain containing a sensitivity label token.
+ */
+token_t *
+au_to_label(bslabel_t *label)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_LABEL;	/* header for this token */
+	short bs = sizeof (bslabel_t);
+
+	token = get_token(sizeof (char) + bs);
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_char(&adr, (char *)label, bs);
+
+	return (token);
+}
+
+/*
+ * au_to_mylabel
+ * return s:
+ *	pointer to a slabel token.
+ */
+token_t *
+au_to_mylabel(void)
+{
+	bslabel_t	slabel;
+	zoneid_t	zid = getzoneid();
+
+	if (zid == GLOBAL_ZONEID) {
+		bsllow(&slabel);
+	} else {
+		if (zone_getattr(zid, ZONE_ATTR_SLBL, &slabel,
+		    sizeof (bslabel_t)) < 0)
+			return (NULL);
+	}
+	return (au_to_label(&slabel));
 }
 
 /*

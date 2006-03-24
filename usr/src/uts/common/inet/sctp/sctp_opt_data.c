@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,171 +62,57 @@
 static int	sctp_getpeeraddrs(sctp_t *, void *, int *);
 
 /*
- * Set optbuf and optlen for the option.
- * Allocate memory (if not already present).
- * Otherwise just point optbuf and optlen at invalp and inlen.
- * Returns failure if memory can not be allocated.
- */
-static int
-sctp_pkt_set(uchar_t *invalp, uint_t inlen, uchar_t **optbufp, uint_t *optlenp)
-{
-	uchar_t *optbuf;
-
-	if (inlen == *optlenp) {
-		/* Unchanged length - no need to realocate */
-		bcopy(invalp, *optbufp, inlen);
-		return (0);
-	}
-	if (inlen != 0) {
-		/* Allocate new buffer before free */
-		optbuf = kmem_zalloc(inlen, KM_NOSLEEP);
-		if (optbuf == NULL)
-			return (ENOMEM);
-	} else {
-		optbuf = NULL;
-	}
-	/* Free old buffer */
-	if (*optlenp != 0)
-		kmem_free(*optbufp, *optlenp);
-
-	bcopy(invalp, optbuf, inlen);
-	*optbufp = optbuf;
-	*optlenp = inlen;
-	return (0);
-}
-
-/*
- * Use the outgoing IP header to create an IP_OPTIONS option the way
- * it was passed down from the application.
- */
-static int
-sctp_opt_get_user(ipha_t *ipha, uchar_t *buf)
-{
-	uchar_t		*opt;
-	int		totallen;
-	uint32_t	optval;
-	uint32_t	optlen;
-	uint32_t	len = 0;
-	uchar_t	*buf1 = buf;
-
-	buf += IP_ADDR_LEN;	/* Leave room for final destination */
-	len += IP_ADDR_LEN;
-	bzero(buf1, IP_ADDR_LEN);
-
-	totallen = ipha->ipha_version_and_hdr_length -
-		(uint8_t)((IP_VERSION << 4) + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-	opt = (uchar_t *)&ipha[1];
-	totallen <<= 2;
-	while (totallen != 0) {
-		switch (optval = opt[IPOPT_OPTVAL]) {
-		case IPOPT_EOL:
-			goto done;
-		case IPOPT_NOP:
-			optlen = 1;
-			break;
-		default:
-			optlen = opt[IPOPT_OLEN];
-		}
-		if (optlen == 0 || optlen > totallen)
-			break;
-
-		switch (optval) {
-			int	off;
-		case IPOPT_SSRR:
-		case IPOPT_LSRR:
-
-			/*
-			 * Insert ipha_dst as the first entry in the source
-			 * route and move down the entries on step.
-			 * The last entry gets placed at buf1.
-			 */
-			buf[IPOPT_OPTVAL] = optval;
-			buf[IPOPT_OLEN] = optlen;
-			buf[IPOPT_OFFSET] = optlen;
-
-			off = optlen - IP_ADDR_LEN;
-			if (off < 0) {
-				/* No entries in source route */
-				break;
-			}
-			/* Last entry in source route */
-			bcopy(opt + off, buf1, IP_ADDR_LEN);
-			off -= IP_ADDR_LEN;
-
-			while (off > 0) {
-				bcopy(opt + off,
-				    buf + off + IP_ADDR_LEN,
-				    IP_ADDR_LEN);
-				off -= IP_ADDR_LEN;
-			}
-			/* ipha_dst into first slot */
-			bcopy(&ipha->ipha_dst,
-			    buf + off + IP_ADDR_LEN,
-			    IP_ADDR_LEN);
-			buf += optlen;
-			len += optlen;
-			break;
-		default:
-			bcopy(opt, buf, optlen);
-			buf += optlen;
-			len += optlen;
-			break;
-		}
-		totallen -= optlen;
-		opt += optlen;
-	}
-done:
-	/* Pad the resulting options */
-	while (len & 0x3) {
-		*buf++ = IPOPT_EOL;
-		len++;
-	}
-	return (len);
-}
-
-
-/*
  * Copy the standard header into its new location,
  * lay in the new options and then update the relevant
  * fields in both sctp_t and the standard header.
- * NOTE: this could be simpler if we trusted bcopy()
- * with overlapping src/dst.
+ * Returns 0 on success, errno otherwise.
  */
 static int
-sctp_opt_set_header(sctp_t *sctp, boolean_t checkonly, const void *ptr,
-    uint_t len)
+sctp_opt_set_header(sctp_t *sctp, const void *ptr, uint_t len)
 {
-	char	buf[SCTP_MAX_HDR_LENGTH];
-	uint_t	sctph_len;
-
-	if (checkonly) {
-		/*
-		 * do not really set, just pretend to - T_CHECK
-		 */
-		if (len != 0) {
-			/*
-			 * there is value supplied, validate it as if
-			 * for a real set operation.
-			 */
-			if ((len > SCTP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
-				return (EINVAL);
-		}
-		return (0);
-	}
+	uint8_t *ip_optp;
+	sctp_hdr_t *new_sctph;
 
 	if ((len > SCTP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
 		return (EINVAL);
-	sctph_len = sizeof (sctp_hdr_t);
-	bcopy(sctp->sctp_sctph, buf, sctph_len);
-	bcopy(ptr, (char *)sctp->sctp_ipha + IP_SIMPLE_HDR_LENGTH, len);
-	len += IP_SIMPLE_HDR_LENGTH;
-	sctp->sctp_sctph = (sctp_hdr_t *)((char *)sctp->sctp_ipha + len);
-	bcopy(buf, sctp->sctp_sctph, sctph_len);
+
+	if (len > IP_MAX_OPT_LENGTH - sctp->sctp_v4label_len)
+		return (EINVAL);
+
+	ip_optp = (uint8_t *)sctp->sctp_ipha + IP_SIMPLE_HDR_LENGTH;
+
+	if (sctp->sctp_v4label_len > 0) {
+		int padlen;
+		uint8_t opt;
+
+		/* convert list termination to no-ops as needed */
+		padlen = sctp->sctp_v4label_len - ip_optp[IPOPT_OLEN];
+		ip_optp += ip_optp[IPOPT_OLEN];
+		opt = len > 0 ? IPOPT_NOP : IPOPT_EOL;
+		while (--padlen >= 0)
+			*ip_optp++ = opt;
+		ASSERT(ip_optp == (uint8_t *)sctp->sctp_ipha +
+		    IP_SIMPLE_HDR_LENGTH + sctp->sctp_v4label_len);
+	}
+
+	/*
+	 * Move the existing SCTP header out where it belongs.
+	 */
+	new_sctph = (sctp_hdr_t *)(ip_optp + len);
+	ovbcopy(sctp->sctp_sctph, new_sctph, sizeof (sctp_hdr_t));
+	sctp->sctp_sctph = new_sctph;
+
+	/*
+	 * Insert the new user-supplied IP options.
+	 */
+	if (len > 0)
+		bcopy(ptr, ip_optp, len);
+
+	len += sctp->sctp_v4label_len;
 	sctp->sctp_ip_hdr_len = len;
 	sctp->sctp_ipha->ipha_version_and_hdr_length =
-		(IP_VERSION << 4) | (len >> 2);
-	len += sctph_len;
-	sctp->sctp_hdr_len = len;
+	    (IP_VERSION << 4) | (len >> 2);
+	sctp->sctp_hdr_len = len + sizeof (sctp_hdr_t);
 
 	if (sctp->sctp_current) {
 		/*
@@ -839,6 +724,9 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SO_RCVBUF:
 			*i1 = sctp->sctp_rwnd;
 			break;
+		case SO_MAC_EXEMPT:
+			*i1 = sctp->sctp_mac_exempt ? SO_MAC_EXEMPT : 0;
+			break;
 		default:
 			retval = EINVAL;
 			break;
@@ -1006,7 +894,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			 * will contain the final destination. Allocate a
 			 * buffer large enough to hold all the options, we
 			 * add IP_ADDR_LEN to SCTP_MAX_IP_OPTIONS_LENGTH since
-			 * sctp_opt_get_user() adds the final destination
+			 * ip_opt_get_user() adds the final destination
 			 * at the start.
 			 */
 			char	*opt_ptr;
@@ -1022,7 +910,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 				 * TODO: Do we have to handle getsockopt on an
 				 * initiator as well?
 				 */
-				opt_len = sctp_opt_get_user(sctp->sctp_ipha,
+				opt_len = ip_opt_get_user(sctp->sctp_ipha,
 				    obuf);
 				ASSERT(opt_len <= sizeof (obuf));
 			} else {
@@ -1148,16 +1036,35 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*optlen = sizeof (sin6_t);
 			break;
 		}
-		case IPV6_HOPOPTS:
+		case IPV6_HOPOPTS: {
+			int len;
+
 			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
 				break;
-			if (buflen < ipp->ipp_hopoptslen) {
+			len = ipp->ipp_hopoptslen - sctp->sctp_v6label_len;
+			if (len <= 0)
+				break;
+			if (buflen < len) {
 				retval = EINVAL;
 				break;
 			}
-			bcopy(ipp->ipp_hopopts, ptr, ipp->ipp_hopoptslen);
-			*optlen  = ipp->ipp_hopoptslen;
+			bcopy((char *)ipp->ipp_hopopts +
+			    sctp->sctp_v6label_len, ptr, len);
+			if (sctp->sctp_v6label_len > 0) {
+				char *cptr = ptr;
+
+				/*
+				 * If the label length is greater than zero,
+				 * then we need to hide the label from user.
+				 * Make it look as though a normal Hop-By-Hop
+				 * Options Header is present here.
+				 */
+				cptr[0] = ((char *)ipp->ipp_hopopts)[0];
+				cptr[1] = (len + 7) / 8 - 1;
+			}
+			*optlen = len;
 			break;
+		}
 		case IPV6_RTHDRDSTOPTS:
 			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
 				break;
@@ -1316,6 +1223,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 * and sctp_opt_get ?
 			 */
 			break;
+		case SO_MAC_EXEMPT:
+			if (secpolicy_net_mac_aware(sctp->sctp_credp) != 0 ||
+			    sctp->sctp_state >= SCTPS_BOUND) {
+				retval = EACCES;
+			} else {
+				sctp->sctp_mac_exempt = onoff;
+				connp->conn_mac_exempt = onoff;
+			}
+			break;
 		default:
 			retval = EINVAL;
 			break;
@@ -1465,8 +1381,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		switch (name) {
 		case IP_OPTIONS:
 		case T_IP_OPTIONS:
-			retval = sctp_opt_set_header(sctp, B_FALSE,
-			    invalp, inlen);
+			retval = sctp_opt_set_header(sctp, invalp, inlen);
 			break;
 		case IP_TOS:
 		case T_IP_TOS:
@@ -1700,8 +1615,9 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 					ire_t	*ire;
 
 					ire = ire_route_lookup_v6(
-					    &sin6->sin6_addr, 0, 0, 0, NULL,
-					    NULL, NULL, MATCH_IRE_DEFAULT);
+					    &sin6->sin6_addr, NULL, NULL, 0,
+					    NULL, NULL, ALL_ZONES, NULL,
+					    MATCH_IRE_DEFAULT);
 					if (ire == NULL) {
 						retval = EHOSTUNREACH;
 						break;
@@ -1722,16 +1638,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 
-			if (inlen == 0) {
+			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
+			    B_TRUE, (uchar_t **)&ipp->ipp_hopopts,
+			    &ipp->ipp_hopoptslen, sctp->sctp_v6label_len);
+			if (retval != 0)
+				break;
+			if (ipp->ipp_hopoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_HOPOPTS;
-			} else {
-				retval = sctp_pkt_set((uchar_t *)invalp, inlen,
-				    (uchar_t **)&ipp->ipp_hopopts,
-				    &ipp->ipp_hopoptslen);
-				if (retval != 0)
-					break;
+			else
 				ipp->ipp_fields |= IPPF_HOPOPTS;
-			}
 			retval = sctp_build_hdrs(sctp);
 			break;
 		}
@@ -1744,16 +1659,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 
-			if (inlen == 0) {
+			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
+			    B_TRUE, (uchar_t **)&ipp->ipp_rtdstopts,
+			    &ipp->ipp_rtdstoptslen, 0);
+			if (retval != 0)
+				break;
+			if (ipp->ipp_rtdstoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
-			} else {
-				retval = sctp_pkt_set((uchar_t *)invalp, inlen,
-				    (uchar_t **)&ipp->ipp_rtdstopts,
-				    &ipp->ipp_rtdstoptslen);
-				if (retval != 0)
-					break;
+			else
 				ipp->ipp_fields |= IPPF_RTDSTOPTS;
-			}
 			retval = sctp_build_hdrs(sctp);
 			break;
 		}
@@ -1766,16 +1680,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 
-			if (inlen == 0) {
+			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
+			    B_TRUE, (uchar_t **)&ipp->ipp_dstopts,
+			    &ipp->ipp_dstoptslen, 0);
+			if (retval != 0)
+				break;
+			if (ipp->ipp_dstoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_DSTOPTS;
-			} else {
-				retval = sctp_pkt_set((uchar_t *)invalp, inlen,
-				    (uchar_t **)&ipp->ipp_dstopts,
-				    &ipp->ipp_dstoptslen);
-				if (retval != 0)
-					break;
+			else
 				ipp->ipp_fields |= IPPF_DSTOPTS;
-			}
 			retval = sctp_build_hdrs(sctp);
 			break;
 		}
@@ -1788,16 +1701,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				break;
 			}
 
-			if (inlen == 0) {
+			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
+			    B_TRUE, (uchar_t **)&ipp->ipp_rthdr,
+			    &ipp->ipp_rthdrlen, 0);
+			if (retval != 0)
+				break;
+			if (ipp->ipp_rthdrlen == 0)
 				ipp->ipp_fields &= ~IPPF_RTHDR;
-			} else {
-				retval = sctp_pkt_set((uchar_t *)invalp, inlen,
-				    (uchar_t **)&ipp->ipp_rthdr,
-				    &ipp->ipp_rthdrlen);
-				if (retval != 0)
-					break;
+			else
 				ipp->ipp_fields |= IPPF_RTHDR;
-			}
 			retval = sctp_build_hdrs(sctp);
 			break;
 		}

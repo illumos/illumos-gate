@@ -38,10 +38,12 @@
 #include <rpc/types.h>
 #include <sys/types32.h>
 #ifdef _KERNEL
-#include <rpc/xdr.h>
+#include <rpc/rpc.h>
 #include <sys/fcntl.h>
 #include <sys/kstat.h>
 #include <sys/dirent.h>
+#include <sys/zone.h>
+#include <sys/tsol/label.h>
 #include <nfs/mount.h>
 #endif
 #include <vm/page.h>
@@ -926,6 +928,8 @@ extern int	nfsauth_access(struct exportinfo *exi, struct svc_req *req);
 extern void	nfsauth_init();
 extern void	nfsauth_fini();
 extern int	nfs_setopts(vnode_t *vp, model_t model, struct nfs_args *args);
+extern int	nfs_mount_label_policy(vfs_t *vfsp, struct netbuf *addr,
+		    struct knetconfig *knconf, cred_t *cr);
 extern void	nfs_srv_stop_all(void);
 extern void	nfs_srv_quiesce_all(void);
 extern void	(*nfs_srv_quiesce_func)(void);

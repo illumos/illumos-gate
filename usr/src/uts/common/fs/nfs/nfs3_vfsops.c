@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +56,7 @@
 #include <sys/class.h>
 #include <sys/socket.h>
 #include <sys/netconfig.h>
+#include <sys/tsol/tnet.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -222,6 +222,7 @@ nfs3_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	int flags, addr_type;
 	char *p, *pf;
 	zone_t *zone = nfs_zone();
+	zone_t *mntzone = NULL;
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (EPERM);
@@ -680,22 +681,34 @@ more:
 	/*
 	 * Determine the zone we're being mounted into.
 	 */
+	zone_hold(mntzone = zone);		/* start with this assumption */
 	if (getzoneid() == GLOBAL_ZONEID) {
-		zone_t *mntzone;
-
+		zone_rele(mntzone);
 		mntzone = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
 		ASSERT(mntzone != NULL);
-		zone_rele(mntzone);
 		if (mntzone != zone) {
 			error = EBUSY;
 			goto errout;
 		}
 	}
 
+	if (is_system_labeled()) {
+		error = nfs_mount_label_policy(vfsp, &svp->sv_addr,
+		    svp->sv_knconf, cr);
+
+		if (error > 0)
+			goto errout;
+
+		if (error == -1) {
+			/* change mount to read-only to prevent write-down */
+			vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
+		}
+	}
+
 	/*
 	 * Stop the mount from going any further if the zone is going away.
 	 */
-	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(mntzone) >= ZONE_IS_SHUTTING_DOWN) {
 		error = EBUSY;
 		goto errout;
 	}
@@ -704,7 +717,7 @@ more:
 	 * Get root vnode.
 	 */
 proceed:
-	error = nfs3rootvp(&rtvp, vfsp, svp_head, flags, cr, zone);
+	error = nfs3rootvp(&rtvp, vfsp, svp_head, flags, cr, mntzone);
 
 	if (error)
 		goto errout;
@@ -744,6 +757,9 @@ errout:
 
 	if (rtvp != NULL)
 		VN_RELE(rtvp);
+
+	if (mntzone != NULL)
+		zone_rele(mntzone);
 
 	return (error);
 }

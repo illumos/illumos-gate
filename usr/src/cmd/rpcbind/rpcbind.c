@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -97,7 +96,9 @@ static int check_netconfig(void);
 
 static boolean_t check_hostserv(struct netconfig *, const char *, const char *);
 static void rpcb_check_init(void);
-
+static int setopt_reuseaddr(int);
+static int setopt_anon_mlp(int);
+static int setup_callit(int);
 
 /* Global variables */
 #ifdef ND_DEBUG
@@ -139,6 +140,7 @@ main(int argc, char *argv[])
 	void *nc_handle;	/* Net config handle */
 	struct rlimit rl;
 	int maxrecsz = RPC_MAXDATASIZE;
+	boolean_t can_do_mlp;
 
 	parseargs(argc, argv);
 
@@ -167,8 +169,10 @@ main(int argc, char *argv[])
 	 * These privileges are required for the t_bind check rpcbind uses
 	 * to determine whether a service is still live or not.
 	 */
+	can_do_mlp = priv_ineffect(PRIV_NET_BINDMLP);
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, DAEMON_UID,
-	    DAEMON_GID, PRIV_NET_PRIVADDR, PRIV_SYS_NFS, (char *)NULL) == -1) {
+	    DAEMON_GID, PRIV_NET_PRIVADDR, PRIV_SYS_NFS,
+	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		fprintf(stderr, "Insufficient privileges\n");
 		exit(1);
 	}
@@ -399,9 +403,6 @@ init_transport(struct netconfig *nconf)
 	int status;	/* bound checking ? */
 	static int msgprt = 0;
 
-	static int setopt_reuseaddr(int);
-	static int setup_callit(int);
-
 	if ((nconf->nc_semantics != NC_TPI_CLTS) &&
 		(nconf->nc_semantics != NC_TPI_COTS) &&
 		(nconf->nc_semantics != NC_TPI_COTS_ORD))
@@ -430,6 +431,14 @@ init_transport(struct netconfig *nconf)
 		syslog(LOG_ERR, "%s: cannot open connection: %s",
 				nconf->nc_netid, t_errlist[t_errno]);
 		return (1);
+	}
+
+	if (is_system_labeled() &&
+	    (strcmp(nconf->nc_protofmly, NC_INET) == 0 ||
+	    strcmp(nconf->nc_protofmly, NC_INET6) == 0) &&
+	    setopt_anon_mlp(fd) == -1) {
+		syslog(LOG_ERR, "%s: couldn't set SO_ANON_MLP option",
+		    nconf->nc_netid);
 	}
 
 	/*
@@ -769,34 +778,45 @@ parseargs(int argc, char *argv[])
 }
 
 static int
-setopt_reuseaddr(int fd)
+setopt_int(int fd, int level, int name, int value)
 {
 	struct t_optmgmt req, resp;
-	struct opthdr *opt;
-	char reqbuf[128];
-	int *ip;
+	struct {
+		struct opthdr opt;
+		int value;
+	} optdata;
 
-	opt = (struct opthdr *)reqbuf;
-	opt->level = SOL_SOCKET;
-	opt->name = SO_REUSEADDR;
-	opt->len = sizeof (int);
+	optdata.opt.level = level;
+	optdata.opt.name = name;
+	optdata.opt.len = sizeof (int);
 
-	ip = (int *)&reqbuf[sizeof (struct opthdr)];
-	*ip = 1;
+	optdata.value = value;
 
 	req.flags = T_NEGOTIATE;
-	req.opt.len = sizeof (struct opthdr) + opt->len;
-	req.opt.buf = (char *)opt;
+	req.opt.len = sizeof (optdata);
+	req.opt.buf = (char *)&optdata;
 
 	resp.flags = 0;
-	resp.opt.buf = reqbuf;
-	resp.opt.maxlen = sizeof (reqbuf);
+	resp.opt.buf = (char *)&optdata;
+	resp.opt.maxlen = sizeof (optdata);
 
 	if (t_optmgmt(fd, &req, &resp) < 0 || resp.flags != T_SUCCESS) {
 		t_error("t_optmgmt");
 		return (-1);
 	}
 	return (0);
+}
+
+static int
+setopt_reuseaddr(int fd)
+{
+	return (setopt_int(fd, SOL_SOCKET, SO_REUSEADDR, 1));
+}
+
+static int
+setopt_anon_mlp(int fd)
+{
+	return (setopt_int(fd, SOL_SOCKET, SO_ANON_MLP, 1));
 }
 
 static int

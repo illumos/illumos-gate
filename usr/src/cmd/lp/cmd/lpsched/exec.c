@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,11 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <pwd.h>
+#include <zone.h>
+#if defined PS_FAULTED
+#undef  PS_FAULTED
+#endif /* PS_FAULTED */
 #include <dial.h>
 
 #include <stdlib.h>
@@ -38,7 +42,7 @@
 #include "dial.h"
 #include "lpsched.h"
 #include <syslog.h>
-#include <pwd.h>
+#include "tsol/label.h"
 
 #define Done(EC,ERRNO)	done(((EC) << 8),ERRNO)
 
@@ -256,6 +260,7 @@ execvpe(char *name, char *const argv[], char *const envp[])
 }
 
 static char time_buf[50];
+
 /**
  ** exec() - FORK AND EXEC CHILD PROCESS
  **/
@@ -304,6 +309,8 @@ exec(int type, ...)
 	char *av[ARG_MAX];
 	char **envp = NULL;
 	int ac = 0;
+	char	*mail_zonename = NULL;
+	char	*slabel = NULL;
 
 	syslog(LOG_DEBUG, "exec(%s)", _exec_name(type));
 
@@ -440,7 +447,6 @@ exec(int type, ...)
 	for (i = 0; i < OpenMax; i++)
 		if (i != ChildMd->writefd)
 			Close (i);
-
 	setpgrp();
 
 	/* Set a default path */
@@ -716,6 +722,14 @@ exec(int type, ...)
 			addenv (&envp, "ALIAS_USERNAME",
 				request->request->user);
 		}
+		/*
+		 * Add the sensitivity label to the environment for
+		 * banner page and header/footer processing
+		 */
+
+		if (is_system_labeled() && request->secure->slabel != NULL)
+			addenv(&envp, "SLABEL", request->secure->slabel);
+
 		/*
 		 * Add the system name to the user name (ala system!user)
 		 * unless it is already there. RFS users may have trouble
@@ -1016,9 +1030,8 @@ exec(int type, ...)
 					request->request->alert);
 		} else {
 			char *user = strdup(request->secure->user);
-			procuid = Lp_Uid;
-			procgid = Lp_Gid;
 			clean_string(user);
+			slabel = request->secure->slabel;
 
 			if ((request->request->actions & ACT_WRITE) &&
 			    (!request->secure->system ||
@@ -1032,9 +1045,41 @@ exec(int type, ...)
 				av[ac++] = arg_string(TRUSTED, "/bin/sh");
 				av[ac++] = arg_string(TRUSTED, "-c");
 				av[ac++] = arg_string(TRUSTED, "%s", argbuf);
-			} else {
+			} else if ((getzoneid() == GLOBAL_ZONEID) &&
+				   is_system_labeled() && (slabel != NULL)) {
+				/*
+				 * If in the global zone and the system is
+				 * labeled, mail is handled via a local
+				 * labeled zone that is the same label as
+				 * the request.
+				 */
+				if ((mail_zonename =
+				    get_labeled_zonename(slabel)) ==
+				    (char *)-1) {
+					/*
+					 * Cannot find labeled zone, just
+					 * return 0.
+					 */
+					return(0);
+				}
+			}
+			if (mail_zonename == NULL) {
+				procuid = Lp_Uid;
+				procgid = Lp_Gid;
 				av[ac++] = arg_string(TRUSTED, "%s", BINMAIL);
 				av[ac++] = arg_string(UNTRUSTED, "%s", user);
+			} else {
+				procuid = getuid();
+				procgid = getgid();
+				av[ac++] = arg_string(TRUSTED, "%s",
+				    "/usr/sbin/zlogin");
+				av[ac++] = arg_string(TRUSTED, "%s",
+				    mail_zonename);
+				av[ac++] = arg_string(TRUSTED, "%s",
+				    BINMAIL);
+				av[ac++] = arg_string(UNTRUSTED, "%s",
+				    user);
+				Free(mail_zonename);
 			}
 
 			free(user);
@@ -1070,7 +1115,7 @@ exec(int type, ...)
 
 	for (i = 0; av[i] != NULL; i++)
 		syslog(LOG_DEBUG, "exec: av[%d] = %s", i, av[i]);
-	for (i = 0; av[i] != NULL; i++)
+	for (i = 0; envp[i] != NULL; i++)
 		syslog(LOG_DEBUG, "exec: envp[%d] = %s", i, envp[i]);
 
 	execvpe(av[0], av, envp);

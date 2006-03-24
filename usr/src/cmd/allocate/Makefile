@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,87 +33,123 @@ ROOTSECDEV =	$(ROOTSEC)/dev
 ROOTSECLIB =	$(ROOTSEC)/lib
 ROOTDIRS =	$(ROOTSECDEV) $(ROOTSECLIB)
 
-PROG1 =		allocate
-PROG2 =		mkdevmaps mkdevalloc
-PROG3 =		audio_clean
-PROG =		$(PROG1) $(PROG2) $(PROG3)
-DEFILE =	deallocate
-LISTFILE =	list_devices
 RTLCKS =	audio fd0 sr0 st0 st1
-SCRIPTS =	st_clean fd_clean sr_clean
+SCRIPTS =	fd_clean  sr_clean  st_clean
 ALLSCRIPTS =	allscripts.sh
 
-POFILE=		allocate_all.po
-POFILES=	$(OBJS:%.o=%.po) $(ALLSCRIPTS:%.sh=%.po)
+PROGalloc =	allocate
+PROGmkdevalloc =	mkdevalloc
+PROGdminfo =	dminfo
+PROGaudio =	audio_clean
+PROG =		$(PROGalloc) $(PROGmkdevalloc) $(PROGdminfo) $(PROGaudio)
 
-# make DFLAGS=-DDEBUG
+LINKPROGalloc =	deallocate list_devices
+LINKPROGmkdevalloc = mkdevmaps
 
-DFLAGS=
+
+POFILE =	allocate_all.po
+POFILES =	$(OBJS:%.o=%.po) $(ALLSCRIPTS:%.sh=%.po)
+
+DFLAGS +=	-D_REENTRANT
 CPPFLAGS +=	$(DFLAGS)
 
-ROOTPROG =	$(PROG1:%=$(ROOTUSRSBIN)/%) $(PROG2:%=$(ROOTUSRSBIN)/%) \
-		$(PROG3:%=$(ROOTSECLIB)/%)
-ROOTLOCKS=	$(RTLCKS:%=$(ROOTSECDEV)/%)
-ROOTSCRIPTS=	$(SCRIPTS:%=$(ROOTSECLIB)/%)
+ROOTLOCKS =	$(RTLCKS:%=$(ROOTSECDEV)/%)
+ROOTSCRIPTS =	$(SCRIPTS:%=$(ROOTSECLIB)/%)
 
-CLOBBERFILES += $(SCRIPTS)
+ROOTPROG =	$(PROGallocate:%=$(ROOTUSRSBIN)/%) \
+		$(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%) \
+		$(PROGdminfo:%=$(ROOTUSRSBIN)/%) \
+		$(PROGaudio:%=$(ROOTSECLIB)/%)
+ROOTLINKalloc =	$(LINKPROGalloc:%=$(ROOTUSRSBIN)/%)
+ROOTLINKmkdevalloc = $(LINKPROGmkdevalloc:%=$(ROOTUSRSBIN)/%)
+ROOTLINKS =	$(ROOTLINKalloc) $(ROOTLINKmkdevalloc)
 
-allocate :=	POBJS = allocate.o  allocate3.o
-mkdevmaps :=	POBJS = mkdevmaps.o
-mkdevalloc :=	POBJS = mkdevalloc.o
-audio_clean :=	POBJS = audio_clean.o
+PROGallocOBJS =		allocate.o allocate3.o
+PROGmkdevallocOBJS =	mkdevalloc.o
+PROGdminfoOBJS =	dminfo.o
+PROGaudioOBJS =		audio_clean.o
 
-OBJS =		allocate.o allocate3.o audio_clean.o mkdevmaps.o mkdevalloc.o
+OBJS =		$(PROGallocOBJS) \
+		$(PROGmkdevallocOBJS) \
+		$(PROGdminfoOBJS) \
+		$(PROGaudioOBJS)
+
 SRCS =		$(OBJS:%.o=%.c)
 
-FILEMODE=       0755
-DIRMODE=        0755
-OWNER=          root
-GROUP=          sys
-
+$(ROOTUSRSBIN)/% :=	FILEMODE = 555
+$(ROOTUSRSBIN)/allocate :=	FILEMODE = 4555
 $(ROOTUSRSBIN)/% :=     OWNER = root 
 $(ROOTUSRSBIN)/% :=     GROUP = bin 
+$(ROOTSECDEV)/% :=	FILEMODE = 0400
+$(ROOTSECDEV)/% :=	OWNER = root
+$(ROOTSECDEV)/% :=	GROUP = bin
+$(ROOTSECLIB)/% :=	FILEMODE = 0555
+$(ROOTSECLIB)/% :=	OWNER = root
+$(ROOTSECLIB)/% :=	GROUP = sys
 
-$(ROOTUSRSBIN)/allocate := 	FILEMODE = 04755
-$(ROOTUSRSBIN)/deallocate :=	FILEMODE = 04755
-$(ROOTUSRSBIN)/list_devices :=	FILEMODE = 04755
+LAZYLIBS =	$(ZLAZYLOAD) -ltsol -lgen $(ZNOLAZYLOAD)
+lint :=		LDLIBS += -lbsm -lsec -lsecdb -ltsol -lgen
+$(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb $(LAZYLIBS)
+$(PROGmkdevalloc) :=	LDLIBS += -lbsm
+$(PROGdminfo) :=	LDLIBS += -lbsm
+$(PROGaudio) :=		LDLIBS += -lbsm
 
-$(ROOTSECDEV)/% :=		FILEMODE = 0400
-$(ROOTSECDEV)/% :=              OWNER = root
-$(ROOTSECDEV)/% :=              GROUP = bin
-
-$(ROOTSECLIB)/% :=		FILEMODE = 0751
-
-allocate :=	LDLIBS += -lbsm -lsec -lsecdb
+CLOBBERFILES +=	$(SCRIPTS)
 
 .KEEP_STATE:
 
 all :		$(PROG) $(RTLCKS) $(SCRIPTS)
 
-install :	all $(ROOTDIRS) $(ROOTPROG) $(ROOTLOCKS) $(ROOTSCRIPTS)
-		$(RM) $(ROOTUSRSBIN)/$(DEFILE)
-		$(LN) $(ROOTUSRSBIN)/$(PROG1) $(ROOTUSRSBIN)/$(DEFILE)
-		$(RM) $(ROOTUSRSBIN)/$(LISTFILE)
-		$(LN) $(ROOTUSRSBIN)/$(PROG1) $(ROOTUSRSBIN)/$(LISTFILE)
-
-$(PROG) :	$$(POBJS)
-		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
+install :	$(PROG) $(ROOTDIRS) $(ROOTPROG) $(ROOTLOCKS) \
+		$(ROOTSCRIPTS) $(ROOTLINKS)
 
 $(RTLCKS):
 		$(TOUCH) $@
 
-$(ROOTDIRS):
+$(ROOTSECLIB)/%: %.sh
+		$(INS.rename)
+
+$(PROGalloc) :	$(PROGallocOBJS)
+		$(LINK.c) $(PROGallocOBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+$(PROGmkdevalloc) :	$(PROGmkdevallocOBJS)
+			$(LINK.c) $(PROGmkdevallocOBJS) -o $@ $(LDLIBS)
+			$(POST_PROCESS)
+
+$(PROGdminfo) :	$(PROGdminfoOBJS)
+		$(LINK.c) $(PROGdminfoOBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+$(PROGaudio) :	$(PROGaudioOBJS)
+		$(LINK.c) $(PROGaudioOBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+$(ROOTDIRS) :
 		$(INS.dir)
 
 $(ROOTSECDEV)/%: %
 		$(INS.file)
 
 $(ROOTSECLIB)/%: %
+		$(RM) $@
 		$(INS.file)
 
+$(ROOTSECLIB)/audio_clean :	audio_clean
+				$(RM) $@
+				$(INS.file) $(@F)
+
+$(ROOTLINKalloc) :	$(PROGalloc:%=$(ROOTUSRSBIN)/%)
+			$(RM) $@
+			$(LN) $(PROGalloc:%=$(ROOTUSRSBIN)/%) $@
+
+$(ROOTLINKmkdevalloc) :	$(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%)
+			$(RM) $@
+			$(LN) $(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%) $@
+
 $(POFILE):      $(POFILES)
-		$(RM) $@; $(CAT) $(POFILES) > $@; $(RM)  $(POFILES)
+		$(RM) $@
+		$(CAT) $(POFILES) > $@
 
 #
 # Concatenate all the scripts into one before we build the catalogue.
@@ -124,7 +160,8 @@ $(ALLSCRIPTS):	$(SCRIPTS:%=%.sh)
 		$(CAT) $(SCRIPTS:%=%.sh) > $@
 
 clean :
-		$(RM) $(OBJS) $(RTLCKS) $(ALLSCRIPTS)
+		$(RM) $(PROG) $(RTLCKS) $(OBJS) \
+		$(SCRIPTS) $(ALLSCRIPTS) $(POFILE) $(POFILES)
 
 lint :		lint_SRCS
 

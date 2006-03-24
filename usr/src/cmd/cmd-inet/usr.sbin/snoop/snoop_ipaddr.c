@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -40,8 +40,10 @@
 #include <string.h>
 #include <signal.h>
 #include <setjmp.h>
+#include <arpa/inet.h>
+#include "snoop.h"
 
-sigjmp_buf nisjmp;
+static sigjmp_buf nisjmp;
 
 #define	MAXHASH 1024  /* must be a power of 2 */
 
@@ -70,16 +72,16 @@ struct hostdata6 {
 	struct in6_addr	h6_addr;
 };
 
-static struct hostdata *addhost(int, void *, char *, char **);
+static struct hostdata *addhost(int, const void *, const char *, char **);
 
-struct hostdata4 *h_table4[MAXHASH];
-struct hostdata6 *h_table6[MAXHASH];
+static struct hostdata4 *h_table4[MAXHASH];
+static struct hostdata6 *h_table6[MAXHASH];
 
 #define	iphash(e)  ((e) & (MAXHASH-1))
 
+/* ARGSUSED */
 static void
-wakeup(n)
-	int n;
+wakeup(int n)
 {
 	siglongjmp(nisjmp, 1);
 }
@@ -135,7 +137,7 @@ iplookup(struct in_addr ipaddr)
 }
 
 static struct hostdata *
-ip6lookup(struct in6_addr *ip6addr)
+ip6lookup(const struct in6_addr *ip6addr)
 {
 	struct hostdata6 *h;
 	struct hostent *hp = NULL;
@@ -182,9 +184,9 @@ ip6lookup(struct in6_addr *ip6addr)
 }
 
 static struct hostdata *
-addhost(int family, void *ipaddr, char *name, char **aliases)
+addhost(int family, const void *ipaddr, const char *name, char **aliases)
 {
-	register struct hostdata **hp, *n = NULL;
+	struct hostdata **hp, *n = NULL;
 	extern FILE *namefile;
 	int hashval;
 	static char aname[128];
@@ -203,7 +205,8 @@ addhost(int family, void *ipaddr, char *name, char **aliases)
 		if (n->h_hostname == NULL)
 			goto alloc_failed;
 
-		((struct hostdata4 *)n)->h4_addr = *(struct in_addr *)ipaddr;
+		((struct hostdata4 *)n)->h4_addr =
+		    *(const struct in_addr *)ipaddr;
 		hashval = ((struct in_addr *)ipaddr)->s_addr;
 		hp = (struct hostdata **)&h_table4[iphash(hashval)];
 		break;
@@ -219,7 +222,7 @@ addhost(int family, void *ipaddr, char *name, char **aliases)
 
 		memcpy(&((struct hostdata6 *)n)->h6_addr, ipaddr,
 		    sizeof (struct in6_addr));
-		hashval = ((int *)ipaddr)[3];
+		hashval = ((const int *)ipaddr)[3];
 		hp = (struct hostdata **)&h_table6[iphash(hashval)];
 		break;
 	default:
@@ -233,7 +236,7 @@ addhost(int family, void *ipaddr, char *name, char **aliases)
 
 	if (namefile != NULL) {
 		if (family == AF_INET) {
-			np = inet_ntoa(*(struct in_addr *)ipaddr);
+			np = inet_ntoa(*(const struct in_addr *)ipaddr);
 			if (np) {
 				(void) fprintf(namefile, "%s\t%s", np, name);
 				if (aliases) {
@@ -280,22 +283,18 @@ alloc_failed:
 }
 
 char *
-addrtoname(family, ipaddr)
-	int family;
-	void *ipaddr;
+addrtoname(int family, const void *ipaddr)
 {
 	switch (family) {
 	case AF_INET:
-		return (iplookup(*(struct in_addr *)ipaddr)->h_hostname);
+		return (iplookup(*(const struct in_addr *)ipaddr)->h_hostname);
 	case AF_INET6:
-		return (ip6lookup((struct in6_addr *)ipaddr)->h_hostname);
-	default:
-		fprintf(stderr, "snoop: ERROR: unknown address family: %d\n",
-		    family);
-		exit(1);
+		return (ip6lookup((const struct in6_addr *)ipaddr)->h_hostname);
 	}
-	/* Never reached... */
-	return (NULL);
+	(void) fprintf(stderr, "snoop: ERROR: unknown address family: %d\n",
+	    family);
+	exit(1);
+	/* NOTREACHED */
 }
 
 void
@@ -324,14 +323,15 @@ load_names(fname)
 		if (inet_pton(AF_INET6, addr, (void *)&addrv6) == 1) {
 			family = AF_INET6;
 			naddr = (void *)&addrv6;
-		} else if ((addrv4 = inet_addr(addr)) != -1) {
+		} else if ((addrv4 = inet_addr(addr)) != (ulong_t)-1) {
 			family = AF_INET;
 			naddr = (void *)&addrv4;
 		}
 		name = strtok(NULL, SEPARATORS);
 		if (name == NULL)
 			continue;
-		while ((alias = strtok(NULL, SEPARATORS)) && (*alias != '#')) {
+		while ((alias = strtok(NULL, SEPARATORS)) != NULL &&
+		    (*alias != '#')) {
 			(void) addhost(family, naddr, alias, NULL);
 		}
 		(void) addhost(family, naddr, name, NULL);

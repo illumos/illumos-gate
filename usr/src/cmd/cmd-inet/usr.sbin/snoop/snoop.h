@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/bufmod.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -127,6 +127,7 @@ extern char *prot_nest_prefix;
 extern char *get_sum_line(void);
 extern char *get_detail_line(int, int);
 extern struct timeval prev_time;
+extern void process_pkt(struct sb_hdr *, char *, int, int);
 extern char *getflag(int, int, char *, char *);
 extern void show_header(char *, char *, int);
 extern void xdr_init(char *, int);
@@ -173,6 +174,7 @@ extern char *concat_args(char **, int);
 extern int pf_compile(char *, int);
 extern void compile(char *, int);
 extern void load_names(char *);
+extern void cap_write(struct sb_hdr *, char *, int, int);
 extern void cap_open_read(char *);
 extern void cap_open_write(char *);
 extern void cap_read(int, int, int, void (*)(), int);
@@ -187,9 +189,9 @@ extern void show_pktinfo(int, int, char *, char *, struct timeval *,
 extern void show_line(char *);
 extern char *getxdr_time(void);
 extern char *showxdr_time(char *);
-extern char *addrtoname(int, void *);
+extern char *addrtoname(int, const void *);
 extern char *show_string(const char *, int, int);
-extern void pr_err(char *, ...);
+extern void pr_err(const char *, ...);
 extern void check_retransmit(char *, ulong_t);
 extern char *nameof_prog(int);
 extern char *getproto(int);
@@ -219,14 +221,40 @@ extern void interpret_solarnet_fw(int, int, int, int, int, char *, int);
 extern void interpret_ldap(int, char *, int, int, int);
 extern void interpret_icmp(int, struct icmp *, int, int);
 extern void interpret_icmpv6(int, icmp6_t *, int, int);
-extern int interpret_ip(int, struct ip *, int);
-extern int interpret_ipv6(int, ip6_t *, int);
+extern int interpret_ip(int, const struct ip *, int);
+extern int interpret_ipv6(int, const ip6_t *, int);
 extern int interpret_ppp(int, uchar_t *, int);
 extern int interpret_pppoe(int, poep_t *, int);
+struct tcphdr;
+extern int interpret_tcp(int, struct tcphdr *, int, int);
+struct udphdr;
+extern int interpret_udp(int, struct udphdr *, int, int);
+extern int interpret_esp(int, uint8_t *, int, int);
+extern int interpret_ah(int, uint8_t *, int, int);
+struct sctp_hdr;
+extern void interpret_sctp(int, struct sctp_hdr *, int, int);
+extern void interpret_mip_cntrlmsg(int, uchar_t *, int);
+struct dhcp;
+extern int interpret_dhcp(int, struct dhcp *, int);
+struct tftphdr;
+extern int interpret_tftp(int, struct tftphdr *, int);
+extern int interpret_http(int, char *, int);
+struct ntpdata;
+extern int interpret_ntp(int, struct ntpdata *, int);
+extern void interpret_netbios_ns(int, uchar_t *, int);
+extern void interpret_netbios_datagram(int, uchar_t *, int);
+extern void interpret_netbios_ses(int, uchar_t *, int);
+extern void interpret_slp(int, char *, int);
+struct rip;
+extern int interpret_rip(int, struct rip *, int);
+struct rip6;
+extern int interpret_rip6(int, struct rip6 *, int);
+extern int interpret_socks_call(int, char *, int);
+extern int interpret_socks_reply(int, char *, int);
 extern void init_ldap(void);
 extern boolean_t arp_for_ether(char *, struct ether_addr *);
 extern char *ether_ouiname(uint32_t);
-char *tohex(char *p, int len);
+extern char *tohex(char *p, int len);
 extern char *printether(struct ether_addr *);
 extern char *print_ethertype(int);
 
@@ -256,6 +284,17 @@ extern interface_t INTERFACES[], *interface;
 extern char *device;
 
 extern char *dlc_header;
+
+extern char *src_name, *dst_name;
+
+extern char *prot_prefix;
+extern char *prot_nest_prefix;
+extern char *prot_title;
+
+/* Keep track of how many nested IP headers we have. */
+extern unsigned int encap_levels, total_encap_levels;
+
+extern int quitting;
 
 /*
  * Global error recovery routine: used to reset snoop variables after

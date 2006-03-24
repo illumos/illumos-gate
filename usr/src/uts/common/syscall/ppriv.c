@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,6 @@
 #include <sys/cred_impl.h>
 #include <sys/errno.h>
 #include <sys/proc.h>
-#include <sys/debug.h>
 #include <sys/priv_impl.h>
 #include <sys/policy.h>
 #include <sys/ddi.h>
@@ -210,22 +208,27 @@ getprivimplinfo(void *buf, size_t bufsize)
 }
 
 /*
- * Set privilege flags
+ * Set process flags in the given target cred.  If NULL is specified, then
+ * CRED() is used; otherwise the cred is assumed to be modifiable (i.e. newly
+ * crdup'ed, or equivalent).  Some flags are set in the proc rather than cred;
+ * for these, curproc is always used.
  *
  * For now we cheat: the flags are actually bit masks so we can simplify
  * some; we do make sure that the arguments are valid, though.
  */
 
-static int
-setpflags(uint_t flag, uint_t val)
+int
+setpflags(uint_t flag, uint_t val, cred_t *tcr)
 {
 	cred_t *cr, *pcr;
 	proc_t *p = curproc;
 	uint_t newflags;
+	boolean_t use_curcred = (tcr == NULL);
 
 	if (val > 1 || (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
+	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
 	    flag != __PROC_PROTECT)) {
-		return (set_errno(EINVAL));
+		return (EINVAL);
 	}
 
 	if (flag == __PROC_PROTECT) {
@@ -238,11 +241,13 @@ setpflags(uint_t flag, uint_t val)
 		return (0);
 	}
 
-	cr = cralloc();
-
-	mutex_enter(&p->p_crlock);
-
-	pcr = p->p_cred;
+	if (use_curcred) {
+		cr = cralloc();
+		mutex_enter(&p->p_crlock);
+		pcr = p->p_cred;
+	} else {
+		cr = pcr = tcr;
+	}
 
 	newflags = CR_FLAGS(pcr);
 
@@ -253,20 +258,38 @@ setpflags(uint_t flag, uint_t val)
 
 	/* No change */
 	if (CR_FLAGS(pcr) == newflags) {
-		mutex_exit(&p->p_crlock);
-		crfree(cr);
+		if (use_curcred) {
+			mutex_exit(&p->p_crlock);
+			crfree(cr);
+		}
 		return (0);
+	}
+
+	/*
+	 * Need net_mac_aware priv to turn either net_mac_aware* flag on
+	 * current cred.
+	 */
+	if ((flag == NET_MAC_AWARE || flag == NET_MAC_AWARE_INHERIT) &&
+	    (val == 1) && use_curcred) {
+		if (secpolicy_net_mac_aware(cr) != 0) {
+			mutex_exit(&p->p_crlock);
+			crfree(cr);
+			return (EPERM);
+		}
 	}
 
 	/* Trying to unset PA; if we can't, return an error */
 	if (flag == PRIV_AWARE && val == 0 && !priv_can_clear_PA(pcr)) {
-		mutex_exit(&p->p_crlock);
-		crfree(cr);
-		return (set_errno(EPERM));
+		if (use_curcred) {
+			mutex_exit(&p->p_crlock);
+			crfree(cr);
+		}
+		return (EPERM);
 	}
 
 	/* Committed to changing the flag */
-	crcopy_to(pcr, cr);
+	if (use_curcred)
+		crcopy_to(pcr, cr);
 	if (flag == PRIV_AWARE) {
 		if (val != 0)
 			priv_set_PA(cr);
@@ -276,11 +299,11 @@ setpflags(uint_t flag, uint_t val)
 		CR_FLAGS(cr) = newflags;
 	}
 
-	p->p_cred = cr;
-
-	mutex_exit(&p->p_crlock);
-
-	crset(p, cr);
+	if (use_curcred) {
+		p->p_cred = cr;
+		mutex_exit(&p->p_crlock);
+		crset(p, cr);
+	}
 
 	return (0);
 }
@@ -288,13 +311,14 @@ setpflags(uint_t flag, uint_t val)
 /*
  * Getpflags.  Currently only implements single bit flags.
  */
-static uint_t
-getpflags(uint_t flag)
+uint_t
+getpflags(uint_t flag, const cred_t *cr)
 {
-	if (flag != PRIV_DEBUG && flag != PRIV_AWARE)
-		return (set_errno(EINVAL));
+	if (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
+	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT)
+		return ((uint_t)-1);
 
-	return ((CR_FLAGS(CRED()) & flag) != 0);
+	return ((CR_FLAGS(cr) & flag) != 0);
 }
 
 /*
@@ -303,6 +327,8 @@ getpflags(uint_t flag)
 int
 privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
 {
+	int retv;
+
 	switch (code) {
 	case PRIVSYS_SETPPRIV:
 		if (bufsize < sizeof (priv_set_t))
@@ -315,10 +341,11 @@ privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
 	case PRIVSYS_GETIMPLINFO:
 		return (getprivimplinfo(buf, bufsize));
 	case PRIVSYS_SETPFLAGS:
-		return (setpflags((uint_t)op, (uint_t)type));
+		retv = setpflags((uint_t)op, (uint_t)type, NULL);
+		return (retv != 0 ? set_errno(retv) : 0);
 	case PRIVSYS_GETPFLAGS:
-		return ((int)getpflags((uint_t)op));
-
+		retv = (int)getpflags((uint_t)op, CRED());
+		return (retv == -1 ? set_errno(EINVAL) : retv);
 	}
 	return (set_errno(EINVAL));
 }

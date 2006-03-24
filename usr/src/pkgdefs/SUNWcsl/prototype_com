@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -245,6 +247,10 @@ s none usr/lib/libthread.so=../../lib/libthread.so.1
 s none usr/lib/libthread.so.1=../../lib/libthread.so.1
 s none usr/lib/libthread_db.so=../../lib/libc_db.so.1
 s none usr/lib/libthread_db.so.1=../../lib/libc_db.so.1
+s none usr/lib/libtsnet.so.1=../../lib/libtsnet.so.1
+s none usr/lib/libtsnet.so=../../lib/libtsnet.so.1
+s none usr/lib/libtsol.so.2=../../lib/libtsol.so.2
+s none usr/lib/libtsol.so=../../lib/libtsol.so.2
 s none usr/lib/libumem.so=../../lib/libumem.so.1
 s none usr/lib/libumem.so.1=../../lib/libumem.so.1
 s none usr/lib/libuuid.so=../../lib/libuuid.so.1

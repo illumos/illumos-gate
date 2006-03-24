@@ -54,6 +54,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <sys/multidata_impl.h>
 #include <sys/pattr.h>
 #include <sys/policy.h>
+#include <sys/priv.h>
 #include <sys/zone.h>
 
 #include <sys/errno.h>
@@ -95,6 +96,10 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <inet/ipp_common.h>
 #include <sys/squeue.h>
 #include <inet/kssl/ksslapi.h>
+#include <sys/tsol/label.h>
+#include <sys/tsol/tnet.h>
+#include <sys/sdt.h>
+#include <rpc/pmap_prot.h>
 
 /*
  * TCP Notes: aka FireEngine Phase I (PSARC 2002/433)
@@ -217,7 +222,6 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
  * directly from IP and needs to policy check to see if TH_RST
  * can be sent out.
  */
-
 
 extern major_t TCP6_MAJ;
 
@@ -838,7 +842,6 @@ static int	tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp,
 static boolean_t tcp_allow_connopt_set(int level, int name);
 int		tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr);
 int		tcp_opt_get(queue_t *q, int level, int name, uchar_t *ptr);
-static int	tcp_opt_get_user(ipha_t *ipha, uchar_t *ptr);
 int		tcp_opt_set(queue_t *q, uint_t optset_context, int level,
 		    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
 		    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr,
@@ -891,8 +894,9 @@ static int	tcp_host_param_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
 static void	tcp_timer(void *arg);
 static void	tcp_timer_callback(void *);
-static in_port_t tcp_update_next_port(in_port_t port, boolean_t random);
-static in_port_t tcp_get_next_priv_port(void);
+static in_port_t tcp_update_next_port(in_port_t port, const tcp_t *tcp,
+    boolean_t random);
+static in_port_t tcp_get_next_priv_port(const tcp_t *);
 static void	tcp_wput_sock(queue_t *q, mblk_t *mp);
 void		tcp_wput_accept(queue_t *q, mblk_t *mp);
 static void	tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent);
@@ -912,7 +916,6 @@ static void	tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now,
 		    int num_sack_blk);
 static void	tcp_wsrv(queue_t *q);
 static int	tcp_xmit_end(tcp_t *tcp);
-void		tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len);
 static mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
 		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
 		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
@@ -930,15 +933,8 @@ static boolean_t tcp_check_policy(tcp_t *, mblk_t *, ipha_t *, ip6_t *,
 		    boolean_t, boolean_t);
 static void	tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp,
 		    boolean_t ipsec_mctl);
-static boolean_t tcp_cmpbuf(void *a, uint_t alen,
-		    boolean_t b_valid, void *b, uint_t blen);
-static boolean_t tcp_allocbuf(void **dstp, uint_t *dstlenp,
-		    boolean_t src_valid, void *src, uint_t srclen);
-static void	tcp_savebuf(void **dstp, uint_t *dstlenp,
-		    boolean_t src_valid, void *src, uint_t srclen);
 static mblk_t	*tcp_setsockopt_mp(int level, int cmd,
 		    char *opt, int optlen);
-static int	tcp_pkt_set(uchar_t *, uint_t, uchar_t **, uint_t *);
 static int	tcp_build_hdrs(queue_t *, tcp_t *);
 static void	tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp,
 		    uint32_t seg_seq, uint32_t seg_ack, int seg_len,
@@ -1107,7 +1103,7 @@ static uint16_t	tcp_g_epriv_ports[TCP_NUM_EPRIV_PORTS] = { 2049, 4045 };
 kmutex_t tcp_epriv_port_lock;
 
 /*
- * The smallest anonymous port in the priviledged port range which TCP
+ * The smallest anonymous port in the privileged port range which TCP
  * looks for free port.  Use in the option TCP_ANONPRIVBIND.
  */
 static in_port_t tcp_min_anonpriv_port = 512;
@@ -1360,14 +1356,14 @@ static tcpparam_t tcp_mdt_max_pbufs_param =
 
 /*
  * This controls the rate some ndd info report functions can be used
- * by non-priviledged users.  It stores the last time such info is
+ * by non-privileged users.  It stores the last time such info is
  * requested.  When those report functions are called again, this
  * is checked with the current time and compare with the ndd param
  * tcp_ndd_get_info_interval.
  */
 static clock_t tcp_last_ndd_get_info_time = 0;
 #define	NDD_TOO_QUICK_MSG \
-	"ndd get info rate too high for non-priviledged users, try again " \
+	"ndd get info rate too high for non-privileged users, try again " \
 	"later.\n"
 #define	NDD_OUT_OF_BUF_MSG	"<< Out of buffer >>\n"
 
@@ -1724,6 +1720,10 @@ tcp_cleanup(tcp_t *tcp)
 	tcp_iphc_len = tcp->tcp_iphc_len;
 	tcp_hdr_grown = tcp->tcp_hdr_grown;
 
+	if (connp->conn_cred != NULL)
+		crfree(connp->conn_cred);
+	if (connp->conn_peercred != NULL)
+		crfree(connp->conn_peercred);
 	bzero(connp, sizeof (conn_t));
 	bzero(tcp, sizeof (tcp_t));
 
@@ -2410,9 +2410,16 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	ASSERT(eager->tcp_ack_tid == 0);
 
 	econnp->conn_dev = aconnp->conn_dev;
+	if (eager->tcp_cred != NULL)
+		crfree(eager->tcp_cred);
 	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
 	econnp->conn_zoneid = aconnp->conn_zoneid;
 	aconnp->conn_cred = NULL;
+
+	econnp->conn_mac_exempt = aconnp->conn_mac_exempt;
+	aconnp->conn_mac_exempt = B_FALSE;
+
+	ASSERT(aconnp->conn_peercred == NULL);
 
 	/* Do the IPC initialization */
 	CONN_INC_REF(econnp);
@@ -2475,6 +2482,9 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	conn_t		*connp = tcp->tcp_connp;
 	boolean_t	ire_cacheable = B_FALSE;
 	zoneid_t	zoneid = connp->conn_zoneid;
+	int		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
+			    MATCH_IRE_SECATTR;
+	ts_label_t	*tsl = crgetlabel(CONN_CRED(connp));
 	ill_t		*ill = NULL;
 	boolean_t	incoming = (ire_mp == NULL);
 
@@ -2493,16 +2503,25 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		 * ire, if it exists, will be marked private.
 		 * If that is not available, use the interface ire
 		 * for the nexthop.
+		 *
+		 * TSol: tcp_update_label will detect label mismatches based
+		 * only on the destination's label, but that would not
+		 * detect label mismatches based on the security attributes
+		 * of routes or next hop gateway. Hence we need to pass the
+		 * label to ire_ftable_lookup below in order to locate the
+		 * right prefix (and/or) ire cache. Similarly we also need
+		 * pass the label to the ire_cache_lookup below to locate
+		 * the right ire that also matches on the label.
 		 */
 		if (tcp->tcp_connp->conn_nexthop_set) {
 			ire = ire_ctable_lookup(tcp->tcp_connp->conn_rem,
 			    tcp->tcp_connp->conn_nexthop_v4, 0, NULL, zoneid,
-			    MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW);
+			    tsl, MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW);
 			if (ire == NULL) {
 				ire = ire_ftable_lookup(
 				    tcp->tcp_connp->conn_nexthop_v4,
 				    0, 0, IRE_INTERFACE, NULL, NULL, zoneid, 0,
-				    MATCH_IRE_TYPE);
+				    tsl, match_flags);
 				if (ire == NULL)
 					return (0);
 			} else {
@@ -2510,7 +2529,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			}
 		} else {
 			ire = ire_cache_lookup(tcp->tcp_connp->conn_rem,
-			    zoneid);
+			    zoneid, tsl);
 			if (ire != NULL) {
 				ire_cacheable = B_TRUE;
 				ire_uinfo = (ire_mp != NULL) ?
@@ -2522,7 +2541,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 					ire = ire_ftable_lookup(
 					    tcp->tcp_connp->conn_rem,
 					    0, 0, 0, NULL, &sire, zoneid, 0,
-					    (MATCH_IRE_RECURSIVE |
+					    tsl, (MATCH_IRE_RECURSIVE |
 					    MATCH_IRE_DEFAULT));
 					if (ire == NULL)
 						return (0);
@@ -2601,7 +2620,6 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 		 */
 		ill_t	*dst_ill = NULL;
 		ipif_t  *dst_ipif = NULL;
-		int match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT;
 
 		ASSERT(connp->conn_outgoing_ill == connp->conn_incoming_ill);
 
@@ -2619,7 +2637,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			dst_ipif = dst_ill->ill_ipif;
 		}
 		ire = ire_ctable_lookup_v6(&tcp->tcp_connp->conn_remv6,
-		    0, 0, dst_ipif, zoneid, match_flags);
+		    0, 0, dst_ipif, zoneid, tsl, match_flags);
 
 		if (ire != NULL) {
 			ire_cacheable = B_TRUE;
@@ -2631,7 +2649,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 				ire = ire_ftable_lookup_v6(
 				    &tcp->tcp_connp->conn_remv6,
 				    0, 0, 0, dst_ipif, &sire, zoneid,
-				    0, match_flags);
+				    0, tsl, match_flags);
 				if (ire == NULL) {
 					if (dst_ill != NULL)
 						ill_refrele(dst_ill);
@@ -2955,6 +2973,11 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	uint_t	origipversion;
 	int	err;
 	queue_t *q = tcp->tcp_wq;
+	conn_t	*connp;
+	mlp_type_t addrtype, mlptype;
+	zone_t	*zone;
+	cred_t	*cr;
+	in_port_t mlp_port;
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
@@ -3134,14 +3157,41 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	 * still check for ports only in the range > tcp_smallest_non_priv_port,
 	 * unless TCP_ANONPRIVBIND option is set.
 	 */
+	mlptype = mlptSingle;
+	mlp_port = requested_port;
 	if (requested_port == 0) {
 		requested_port = tcp->tcp_anon_priv_bind ?
-		    tcp_get_next_priv_port() :
-		    tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
+		    tcp_get_next_priv_port(tcp) :
+		    tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
+		if (requested_port == 0) {
+			tcp_err_ack(tcp, mp, TNOADDR, 0);
+			return;
+		}
 		user_specified = B_FALSE;
+
+		/*
+		 * If the user went through one of the RPC interfaces to create
+		 * this socket and RPC is MLP in this zone, then give him an
+		 * anonymous MLP.
+		 */
+		cr = DB_CREDDEF(mp, tcp->tcp_cred);
+		connp = tcp->tcp_connp;
+		if (connp->conn_anon_mlp && is_system_labeled()) {
+			zone = crgetzone(cr);
+			addrtype = tsol_mlp_addr_type(zone->zone_id,
+			    IPV6_VERSION, &v6addr);
+			if (addrtype == mlptSingle) {
+				tcp_err_ack(tcp, mp, TNOADDR, 0);
+				return;
+			}
+			mlptype = tsol_mlp_port_type(zone, IPPROTO_TCP,
+			    PMAPPORT, addrtype);
+			mlp_port = PMAPPORT;
+		}
 	} else {
 		int i;
 		boolean_t priv = B_FALSE;
+
 		/*
 		 * If the requested_port is in the well-known privileged range,
 		 * verify that the stream was opened by a privileged user.
@@ -3151,6 +3201,7 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 		 *   changes
 		 * - the atomic assignment of the elements of the array
 		 */
+		cr = DB_CREDDEF(mp, tcp->tcp_cred);
 		if (requested_port < tcp_smallest_nonpriv_port) {
 			priv = B_TRUE;
 		} else {
@@ -3163,8 +3214,6 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 			}
 		}
 		if (priv) {
-			cred_t *cr = DB_CREDDEF(mp, tcp->tcp_cred);
-
 			if (secpolicy_net_privaddr(cr, requested_port) != 0) {
 				if (tcp->tcp_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
@@ -3177,12 +3226,87 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 			}
 		}
 		user_specified = B_TRUE;
+
+		connp = tcp->tcp_connp;
+		if (is_system_labeled()) {
+			zone = crgetzone(cr);
+			addrtype = tsol_mlp_addr_type(zone->zone_id,
+			    IPV6_VERSION, &v6addr);
+			if (addrtype == mlptSingle) {
+				tcp_err_ack(tcp, mp, TNOADDR, 0);
+				return;
+			}
+			mlptype = tsol_mlp_port_type(zone, IPPROTO_TCP,
+			    requested_port, addrtype);
+		}
+	}
+
+	if (mlptype != mlptSingle) {
+		if (secpolicy_net_bindmlp(cr) != 0) {
+			if (tcp->tcp_debug) {
+				(void) strlog(TCP_MOD_ID, 0, 1,
+				    SL_ERROR|SL_TRACE,
+				    "tcp_bind: no priv for multilevel port %d",
+				    requested_port);
+			}
+			tcp_err_ack(tcp, mp, TACCES, 0);
+			return;
+		}
+
+		/*
+		 * If we're specifically binding a shared IP address and the
+		 * port is MLP on shared addresses, then check to see if this
+		 * zone actually owns the MLP.  Reject if not.
+		 */
+		if (mlptype == mlptShared && addrtype == mlptShared) {
+			zoneid_t mlpzone;
+
+			mlpzone = tsol_mlp_findzone(IPPROTO_TCP,
+			    htons(mlp_port));
+			if (connp->conn_zoneid != mlpzone) {
+				if (tcp->tcp_debug) {
+					(void) strlog(TCP_MOD_ID, 0, 1,
+					    SL_ERROR|SL_TRACE,
+					    "tcp_bind: attempt to bind port "
+					    "%d on shared addr in zone %d "
+					    "(should be %d)",
+					    mlp_port, connp->conn_zoneid,
+					    mlpzone);
+				}
+				tcp_err_ack(tcp, mp, TACCES, 0);
+				return;
+			}
+		}
+
+		if (!user_specified) {
+			err = tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			    requested_port, B_TRUE);
+			if (err != 0) {
+				if (tcp->tcp_debug) {
+					(void) strlog(TCP_MOD_ID, 0, 1,
+					    SL_ERROR|SL_TRACE,
+					    "tcp_bind: cannot establish anon "
+					    "MLP for port %d",
+					    requested_port);
+				}
+				tcp_err_ack(tcp, mp, TSYSERR, err);
+				return;
+			}
+			connp->conn_anon_port = B_TRUE;
+		}
+		connp->conn_mlp_type = mlptype;
 	}
 
 	allocated_port = tcp_bindi(tcp, requested_port, &v6addr,
 	    tcp->tcp_reuseaddr, B_FALSE, bind_to_req_port_only, user_specified);
 
 	if (allocated_port == 0) {
+		connp->conn_mlp_type = mlptSingle;
+		if (connp->conn_anon_port) {
+			connp->conn_anon_port = B_FALSE;
+			(void) tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			    requested_port, B_FALSE);
+		}
 		if (bind_to_req_port_only) {
 			if (tcp->tcp_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
@@ -3227,7 +3351,13 @@ do_bind:
 			    IPV6_ADDR_LEN);
 		}
 	}
-	if (!mp1) {
+	if (mp1 == NULL) {
+		if (connp->conn_anon_port) {
+			connp->conn_anon_port = B_FALSE;
+			(void) tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			    requested_port, B_FALSE);
+		}
+		connp->conn_mlp_type = mlptSingle;
 		tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
 		return;
 	}
@@ -3314,7 +3444,8 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 	int count = 0;
 	/* maximum number of times to run around the loop */
 	int loopmax;
-	zoneid_t zoneid = tcp->tcp_connp->conn_zoneid;
+	conn_t *connp = tcp->tcp_connp;
+	zoneid_t zoneid = connp->conn_zoneid;
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -3349,6 +3480,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		uint16_t	lport;
 		tf_t		*tbf;
 		tcp_t		*ltcp;
+		conn_t		*lconnp;
 
 		lport = htons(port);
 
@@ -3368,10 +3500,21 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		mutex_enter(&tbf->tf_lock);
 		for (ltcp = tbf->tf_tcp; ltcp != NULL;
 		    ltcp = ltcp->tcp_bind_hash) {
-			if (lport != ltcp->tcp_lport ||
-			    ltcp->tcp_connp->conn_zoneid != zoneid) {
+			if (lport != ltcp->tcp_lport)
 				continue;
-			}
+
+			lconnp = ltcp->tcp_connp;
+
+			/*
+			 * On a labeled system, we must treat bindings to ports
+			 * on shared IP addresses by sockets with MAC exemption
+			 * privilege as being in all zones, as there's
+			 * otherwise no way to identify the right receiver.
+			 */
+			if (lconnp->conn_zoneid != zoneid &&
+			    !lconnp->conn_mac_exempt &&
+			    !connp->conn_mac_exempt)
+				continue;
 
 			/*
 			 * If TCP_EXCLBIND is set for either the bound or
@@ -3388,6 +3531,9 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * unspec	spec		no
 			 * spec		unspec		no
 			 * spec		spec		yes if A
+			 *
+			 * For labeled systems, SO_MAC_EXEMPT behaves the same
+			 * as UDP_EXCLBIND, except that zoneid is ignored.
 			 *
 			 * Note:
 			 *
@@ -3416,7 +3562,8 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * in future, we can change this going back semantics,
 			 * we can add the above check.
 			 */
-			if (ltcp->tcp_exclbind || tcp->tcp_exclbind) {
+			if (ltcp->tcp_exclbind || tcp->tcp_exclbind ||
+			    lconnp->conn_mac_exempt || connp->conn_mac_exempt) {
 				if (V6_OR_V4_INADDR_ANY(
 				    ltcp->tcp_bound_source_v6) ||
 				    V6_OR_V4_INADDR_ANY(*laddr) ||
@@ -3538,7 +3685,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		}
 
 		if (tcp->tcp_anon_priv_bind) {
-			port = tcp_get_next_priv_port();
+			port = tcp_get_next_priv_port(tcp);
 		} else {
 			if (count == 0 && user_specified) {
 				/*
@@ -3547,12 +3694,15 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 */
 				port =
 				    tcp_update_next_port(tcp_next_port_to_try,
-					B_TRUE);
+					tcp, B_TRUE);
 				user_specified = B_FALSE;
 			} else {
-				port = tcp_update_next_port(port + 1, B_FALSE);
+				port = tcp_update_next_port(port + 1, tcp,
+				    B_FALSE);
 			}
 		}
+		if (port == 0)
+			break;
 
 		/*
 		 * Don't let this loop run forever in the case where
@@ -3821,9 +3971,6 @@ tcp_close(queue_t *q, int flags)
 	qprocsoff(q);
 	inet_minor_free(ip_minor_arena, connp->conn_dev);
 
-	ASSERT(connp->conn_cred != NULL);
-	crfree(connp->conn_cred);
-	tcp->tcp_cred = connp->conn_cred = NULL;
 	tcp->tcp_cpid = -1;
 
 	/*
@@ -4327,31 +4474,9 @@ tcp_free(tcp_t *tcp)
 	ASSERT(tcp->tcp_rthdrlen == 0);
 
 	ipp = &tcp->tcp_sticky_ipp;
-	if ((ipp->ipp_fields & (IPPF_HOPOPTS | IPPF_RTDSTOPTS |
-	    IPPF_DSTOPTS | IPPF_RTHDR)) != 0) {
-		if ((ipp->ipp_fields & IPPF_HOPOPTS) != 0) {
-			kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
-			ipp->ipp_hopopts = NULL;
-			ipp->ipp_hopoptslen = 0;
-		}
-		if ((ipp->ipp_fields & IPPF_RTDSTOPTS) != 0) {
-			kmem_free(ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
-			ipp->ipp_rtdstopts = NULL;
-			ipp->ipp_rtdstoptslen = 0;
-		}
-		if ((ipp->ipp_fields & IPPF_DSTOPTS) != 0) {
-			kmem_free(ipp->ipp_dstopts, ipp->ipp_dstoptslen);
-			ipp->ipp_dstopts = NULL;
-			ipp->ipp_dstoptslen = 0;
-		}
-		if ((ipp->ipp_fields & IPPF_RTHDR) != 0) {
-			kmem_free(ipp->ipp_rthdr, ipp->ipp_rthdrlen);
-			ipp->ipp_rthdr = NULL;
-			ipp->ipp_rthdrlen = 0;
-		}
-		ipp->ipp_fields &= ~(IPPF_HOPOPTS | IPPF_RTDSTOPTS |
-		    IPPF_DSTOPTS | IPPF_RTHDR);
-	}
+	if (ipp->ipp_fields & (IPPF_HOPOPTS | IPPF_RTDSTOPTS | IPPF_DSTOPTS |
+	    IPPF_RTHDR))
+		ip6_pkt_free(ipp);
 
 	/*
 	 * Free memory associated with the tcp/ip header template.
@@ -5096,6 +5221,59 @@ tcp_get_conn(void *arg)
 	return ((void *)connp);
 }
 
+/*
+ * Update the cached label for the given tcp_t.  This should be called once per
+ * connection, and before any packets are sent or tcp_process_options is
+ * invoked.  Returns B_FALSE if the correct label could not be constructed.
+ */
+static boolean_t
+tcp_update_label(tcp_t *tcp, const cred_t *cr)
+{
+	conn_t *connp = tcp->tcp_connp;
+
+	if (tcp->tcp_ipversion == IPV4_VERSION) {
+		uchar_t optbuf[IP_MAX_OPT_LENGTH];
+		int added;
+
+		if (tsol_compute_label(cr, tcp->tcp_remote, optbuf,
+		    connp->conn_mac_exempt) != 0)
+			return (B_FALSE);
+
+		added = tsol_remove_secopt(tcp->tcp_ipha, tcp->tcp_hdr_len);
+		if (added == -1)
+			return (B_FALSE);
+		tcp->tcp_hdr_len += added;
+		tcp->tcp_tcph = (tcph_t *)((uchar_t *)tcp->tcp_tcph + added);
+		tcp->tcp_ip_hdr_len += added;
+		if ((tcp->tcp_label_len = optbuf[IPOPT_OLEN]) != 0) {
+			tcp->tcp_label_len = (tcp->tcp_label_len + 3) & ~3;
+			added = tsol_prepend_option(optbuf, tcp->tcp_ipha,
+			    tcp->tcp_hdr_len);
+			if (added == -1)
+				return (B_FALSE);
+			tcp->tcp_hdr_len += added;
+			tcp->tcp_tcph = (tcph_t *)
+			    ((uchar_t *)tcp->tcp_tcph + added);
+			tcp->tcp_ip_hdr_len += added;
+		}
+	} else {
+		uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
+
+		if (tsol_compute_label_v6(cr, &tcp->tcp_remote_v6, optbuf,
+		    connp->conn_mac_exempt) != 0)
+			return (B_FALSE);
+		if (tsol_update_sticky(&tcp->tcp_sticky_ipp,
+		    &tcp->tcp_label_len, optbuf) != 0)
+			return (B_FALSE);
+		if (tcp_build_hdrs(tcp->tcp_rq, tcp) != 0)
+			return (B_FALSE);
+	}
+
+	connp->conn_ulp_labeled = 1;
+
+	return (B_TRUE);
+}
+
 /* BEGIN CSTYLED */
 /*
  *
@@ -5232,6 +5410,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
 	ire_t		*ire;
+	cred_t		*credp;
 
 	if (tcp->tcp_state != TCPS_LISTEN)
 		goto error2;
@@ -5375,6 +5554,46 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	if (connp->conn_nexthop_set) {
 		econnp->conn_nexthop_set = connp->conn_nexthop_set;
 		econnp->conn_nexthop_v4 = connp->conn_nexthop_v4;
+	}
+
+	/*
+	 * TSOL: tsol_input_proc() needs the eager's cred before the
+	 * eager is accepted
+	 */
+	econnp->conn_cred = eager->tcp_cred = credp = connp->conn_cred;
+	crhold(credp);
+
+	/*
+	 * If the caller has the process-wide flag set, then default to MAC
+	 * exempt mode.  This allows read-down to unlabeled hosts.
+	 */
+	if (getpflags(NET_MAC_AWARE, credp) != 0)
+		econnp->conn_mac_exempt = B_TRUE;
+
+	if (is_system_labeled()) {
+		cred_t *cr;
+
+		if (connp->conn_mlp_type != mlptSingle) {
+			cr = econnp->conn_peercred = DB_CRED(mp);
+			if (cr != NULL)
+				crhold(cr);
+			else
+				cr = econnp->conn_cred;
+			DTRACE_PROBE2(mlp_syn_accept, conn_t *,
+			    econnp, cred_t *, cr)
+		} else {
+			cr = econnp->conn_cred;
+			DTRACE_PROBE2(syn_accept, conn_t *,
+			    econnp, cred_t *, cr)
+		}
+
+		if (!tcp_update_label(eager, cr)) {
+			DTRACE_PROBE3(
+			    tx__ip__log__error__connrequest__tcp,
+			    char *, "eager connp(1) label on SYN mp(2) failed",
+			    conn_t *, econnp, mblk_t *, mp);
+			goto error3;
+		}
 	}
 
 	eager->tcp_hard_binding = B_TRUE;
@@ -5530,7 +5749,6 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	    NULL, NULL, eager->tcp_iss, B_FALSE, NULL, B_FALSE);
 	if (mp1 == NULL)
 		goto error1;
-	mblk_setcred(mp1, tcp->tcp_cred);
 	DB_CPID(mp1) = tcp->tcp_cpid;
 
 	/*
@@ -6107,7 +6325,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 		 * tcp_bindi will pick an unused port, insert the connection
 		 * in the bind hash and transition to BOUND state.
 		 */
-		lport = tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
+		lport = tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
 		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
 		if (lport == 0) {
@@ -6140,6 +6358,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	if (mp1) {
 		/* Hang onto the T_OK_ACK for later. */
 		linkb(mp1, mp);
+		mblk_setcred(mp1, tcp->tcp_cred);
 		if (tcp->tcp_family == AF_INET)
 			mp1 = ip_bind_v4(tcp->tcp_wq, mp1, tcp->tcp_connp);
 		else {
@@ -6304,7 +6523,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 		 * tcp_bindi will pick an unused port, insert the connection
 		 * in the bind hash and transition to BOUND state.
 		 */
-		lport = tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
+		lport = tcp_update_next_port(tcp_next_port_to_try, tcp, B_TRUE);
 		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
 		if (lport == 0) {
@@ -6330,6 +6549,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	if (mp1) {
 		/* Hang onto the T_OK_ACK for later. */
 		linkb(mp1, mp);
+		mblk_setcred(mp1, tcp->tcp_cred);
 		mp1 = ip_bind_v6(tcp->tcp_wq, mp1, tcp->tcp_connp,
 		    &tcp->tcp_sticky_ipp);
 		BUMP_MIB(&tcp_mib, tcpActiveOpens);
@@ -7798,6 +8018,7 @@ tcp_header_init_ipv4(tcp_t *tcp)
 {
 	tcph_t		*tcph;
 	uint32_t	sum;
+	conn_t		*connp;
 
 	/*
 	 * This is a simple initialization. If there's
@@ -7813,6 +8034,11 @@ tcp_header_init_ipv4(tcp_t *tcp)
 			return (ENOMEM);
 		}
 	}
+
+	/* options are gone; may need a new label */
+	connp = tcp->tcp_connp;
+	connp->conn_mlp_type = mlptSingle;
+	connp->conn_ulp_labeled = !is_system_labeled();
 	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
 	tcp->tcp_ipha = (ipha_t *)tcp->tcp_iphc;
 	tcp->tcp_ip6h = NULL;
@@ -7854,6 +8080,7 @@ tcp_header_init_ipv6(tcp_t *tcp)
 {
 	tcph_t	*tcph;
 	uint32_t	sum;
+	conn_t	*connp;
 
 	/*
 	 * This is a simple initialization. If there's
@@ -7877,6 +8104,12 @@ tcp_header_init_ipv6(tcp_t *tcp)
 			return (ENOMEM);
 		}
 	}
+
+	/* options are gone; may need a new label */
+	connp = tcp->tcp_connp;
+	connp->conn_mlp_type = mlptSingle;
+	connp->conn_ulp_labeled = !is_system_labeled();
+
 	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
 	tcp->tcp_ipversion = IPV6_VERSION;
 	tcp->tcp_hdr_len = IPV6_HDR_LEN + sizeof (tcph_t);
@@ -9147,6 +9380,15 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	crhold(connp->conn_cred);
 	tcp->tcp_cpid = curproc->p_pid;
 	connp->conn_zoneid = zoneid;
+	connp->conn_mlp_type = mlptSingle;
+	connp->conn_ulp_labeled = !is_system_labeled();
+
+	/*
+	 * If the caller has the process-wide flag set, then default to MAC
+	 * exempt mode.  This allows read-down to unlabeled hosts.
+	 */
+	if (getpflags(NET_MAC_AWARE, credp) != 0)
+		connp->conn_mac_exempt = B_TRUE;
 
 	connp->conn_dev = conn_dev;
 
@@ -9345,6 +9587,12 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 			*i1 = tcp->tcp_snd_zcopy_on ?
 			    SO_SND_COPYAVOID : 0;
 			break;
+		case SO_ANON_MLP:
+			*i1 = connp->conn_anon_mlp;
+			break;
+		case SO_MAC_EXEMPT:
+			*i1 = connp->conn_mac_exempt;
+			break;
 		default:
 			return (-1);
 		}
@@ -9406,17 +9654,18 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 			 * as the last entry. The first 4 bytes of the option
 			 * will contain the final destination.
 			 */
-			char	*opt_ptr;
 			int	opt_len;
-			opt_ptr = (char *)tcp->tcp_ipha + IP_SIMPLE_HDR_LENGTH;
-			opt_len = (char *)tcp->tcp_tcph - opt_ptr;
+
+			opt_len = (char *)tcp->tcp_tcph - (char *)tcp->tcp_ipha;
+			opt_len -= tcp->tcp_label_len + IP_SIMPLE_HDR_LENGTH;
+			ASSERT(opt_len >= 0);
 			/* Caller ensures enough space */
 			if (opt_len > 0) {
 				/*
 				 * TODO: Do we have to handle getsockopt on an
 				 * initiator as well?
 				 */
-				return (tcp_opt_get_user(tcp->tcp_ipha, ptr));
+				return (ip_opt_get_user(tcp->tcp_ipha, ptr));
 			}
 			return (0);
 			}
@@ -9536,8 +9785,16 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 		case IPV6_HOPOPTS:
 			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
 				return (0);
-			bcopy(ipp->ipp_hopopts, ptr, ipp->ipp_hopoptslen);
-			return (ipp->ipp_hopoptslen);
+			if (ipp->ipp_hopoptslen <= tcp->tcp_label_len)
+				return (0);
+			bcopy((char *)ipp->ipp_hopopts + tcp->tcp_label_len,
+			    ptr, ipp->ipp_hopoptslen - tcp->tcp_label_len);
+			if (tcp->tcp_label_len > 0) {
+				ptr[0] = ((char *)ipp->ipp_hopopts)[0];
+				ptr[1] = (ipp->ipp_hopoptslen -
+				    tcp->tcp_label_len + 7) / 8 - 1;
+			}
+			return (ipp->ipp_hopoptslen - tcp->tcp_label_len);
 		case IPV6_RTHDRDSTOPTS:
 			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
 				return (0);
@@ -9585,7 +9842,8 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
     void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
-	tcp_t	*tcp = Q_TO_TCP(q);
+	conn_t	*connp = Q_TO_CONN(q);
+	tcp_t	*tcp = connp->conn_tcp;
 	int	*i1 = (int *)invalp;
 	boolean_t onoff = (*i1 == 0) ? 0 : 1;
 	boolean_t checkonly;
@@ -9713,7 +9971,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			break;
 		case SO_DONTROUTE:
 			/*
-			 * SO_DONTROUTE, SO_USELOOPBACK and SO_BROADCAST are
+			 * SO_DONTROUTE, SO_USELOOPBACK, and SO_BROADCAST are
 			 * only of interest to IP.  We track them here only so
 			 * that we can report their current value.
 			 */
@@ -9812,6 +10070,23 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 					return (EOPNOTSUPP);
 				}
 				tcp->tcp_snd_zcopy_aware = 1;
+			}
+			break;
+		case SO_ANON_MLP:
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				connp->conn_anon_mlp = onoff;
+				mutex_exit(&connp->conn_lock);
+			}
+			break;
+		case SO_MAC_EXEMPT:
+			if (secpolicy_net_mac_aware(cr) != 0 ||
+			    IPCL_IS_BOUND(connp))
+				return (EACCES);
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				connp->conn_mac_exempt = onoff;
+				mutex_exit(&connp->conn_lock);
 			}
 			break;
 		default:
@@ -10241,6 +10516,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			break;
 		case IPV6_HOPOPTS: {
 			ip6_hbh_t *hopts = (ip6_hbh_t *)invalp;
+
 			/*
 			 * Sanity checks - minimum size, size a multiple of
 			 * eight bytes, and matching size passed in.
@@ -10252,22 +10528,15 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			if (inlen == 0) {
-				if ((ipp->ipp_fields & IPPF_HOPOPTS) != 0) {
-					kmem_free(ipp->ipp_hopopts,
-					    ipp->ipp_hopoptslen);
-					ipp->ipp_hopopts = NULL;
-					ipp->ipp_hopoptslen = 0;
-				}
+			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
+			    (uchar_t **)&ipp->ipp_hopopts,
+			    &ipp->ipp_hopoptslen, tcp->tcp_label_len);
+			if (reterr != 0)
+				return (reterr);
+			if (ipp->ipp_hopoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_HOPOPTS;
-			} else {
-				reterr = tcp_pkt_set(invalp, inlen,
-				    (uchar_t **)&ipp->ipp_hopopts,
-				    &ipp->ipp_hopoptslen);
-				if (reterr != 0)
-					return (reterr);
+			else
 				ipp->ipp_fields |= IPPF_HOPOPTS;
-			}
 			reterr = tcp_build_hdrs(q, tcp);
 			if (reterr != 0)
 				return (reterr);
@@ -10287,22 +10556,15 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			if (inlen == 0) {
-				if ((ipp->ipp_fields & IPPF_RTDSTOPTS) != 0) {
-					kmem_free(ipp->ipp_rtdstopts,
-					    ipp->ipp_rtdstoptslen);
-					ipp->ipp_rtdstopts = NULL;
-					ipp->ipp_rtdstoptslen = 0;
-				}
+			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
+			    (uchar_t **)&ipp->ipp_rtdstopts,
+			    &ipp->ipp_rtdstoptslen, 0);
+			if (reterr != 0)
+				return (reterr);
+			if (ipp->ipp_rtdstoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
-			} else {
-				reterr = tcp_pkt_set(invalp, inlen,
-				    (uchar_t **)&ipp->ipp_rtdstopts,
-				    &ipp->ipp_rtdstoptslen);
-				if (reterr != 0)
-					return (reterr);
+			else
 				ipp->ipp_fields |= IPPF_RTDSTOPTS;
-			}
 			reterr = tcp_build_hdrs(q, tcp);
 			if (reterr != 0)
 				return (reterr);
@@ -10322,22 +10584,15 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			if (inlen == 0) {
-				if ((ipp->ipp_fields & IPPF_DSTOPTS) != 0) {
-					kmem_free(ipp->ipp_dstopts,
-					    ipp->ipp_dstoptslen);
-					ipp->ipp_dstopts = NULL;
-					ipp->ipp_dstoptslen = 0;
-				}
+			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
+			    (uchar_t **)&ipp->ipp_dstopts,
+			    &ipp->ipp_dstoptslen, 0);
+			if (reterr != 0)
+				return (reterr);
+			if (ipp->ipp_dstoptslen == 0)
 				ipp->ipp_fields &= ~IPPF_DSTOPTS;
-			} else {
-				reterr = tcp_pkt_set(invalp, inlen,
-				    (uchar_t **)&ipp->ipp_dstopts,
-				    &ipp->ipp_dstoptslen);
-				if (reterr != 0)
-					return (reterr);
+			else
 				ipp->ipp_fields |= IPPF_DSTOPTS;
-			}
 			reterr = tcp_build_hdrs(q, tcp);
 			if (reterr != 0)
 				return (reterr);
@@ -10357,22 +10612,15 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			if (inlen == 0) {
-				if ((ipp->ipp_fields & IPPF_RTHDR) != 0) {
-					kmem_free(ipp->ipp_rthdr,
-					    ipp->ipp_rthdrlen);
-					ipp->ipp_rthdr = NULL;
-					ipp->ipp_rthdrlen = 0;
-				}
+			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
+			    (uchar_t **)&ipp->ipp_rthdr,
+			    &ipp->ipp_rthdrlen, 0);
+			if (reterr != 0)
+				return (reterr);
+			if (ipp->ipp_rthdrlen == 0)
 				ipp->ipp_fields &= ~IPPF_RTHDR;
-			} else {
-				reterr = tcp_pkt_set(invalp, inlen,
-				    (uchar_t **)&ipp->ipp_rthdr,
-				    &ipp->ipp_rthdrlen);
-				if (reterr != 0)
-					return (reterr);
+			else
 				ipp->ipp_fields |= IPPF_RTHDR;
-			}
 			reterr = tcp_build_hdrs(q, tcp);
 			if (reterr != 0)
 				return (reterr);
@@ -10545,116 +10793,6 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 }
 
 /*
- * Set optbuf and optlen for the option.
- * Allocate memory (if not already present).
- * Otherwise just point optbuf and optlen at invalp and inlen.
- * Returns failure if memory can not be allocated.
- */
-static int
-tcp_pkt_set(uchar_t *invalp, uint_t inlen, uchar_t **optbufp, uint_t *optlenp)
-{
-	uchar_t *optbuf;
-
-	if (inlen == *optlenp) {
-		/* Unchanged length - no need to realocate */
-		bcopy(invalp, *optbufp, inlen);
-		return (0);
-	}
-	if (inlen != 0) {
-		/* Allocate new buffer before free */
-		optbuf = kmem_alloc(inlen, KM_NOSLEEP);
-		if (optbuf == NULL)
-			return (ENOMEM);
-	} else {
-		optbuf = NULL;
-	}
-	/* Free old buffer */
-	if (*optlenp != 0)
-		kmem_free(*optbufp, *optlenp);
-
-	bcopy(invalp, optbuf, inlen);
-	*optbufp = optbuf;
-	*optlenp = inlen;
-	return (0);
-}
-
-
-/*
- * Use the outgoing IP header to create an IP_OPTIONS option the way
- * it was passed down from the application.
- */
-static int
-tcp_opt_get_user(ipha_t *ipha, uchar_t *buf)
-{
-	ipoptp_t	opts;
-	uchar_t		*opt;
-	uint8_t		optval;
-	uint8_t		optlen;
-	uint32_t	len = 0;
-	uchar_t	*buf1 = buf;
-
-	buf += IP_ADDR_LEN;	/* Leave room for final destination */
-	len += IP_ADDR_LEN;
-	bzero(buf1, IP_ADDR_LEN);
-
-	for (optval = ipoptp_first(&opts, ipha);
-	    optval != IPOPT_EOL;
-	    optval = ipoptp_next(&opts)) {
-		opt = opts.ipoptp_cur;
-		optlen = opts.ipoptp_len;
-		switch (optval) {
-			int	off;
-		case IPOPT_SSRR:
-		case IPOPT_LSRR:
-
-			/*
-			 * Insert ipha_dst as the first entry in the source
-			 * route and move down the entries on step.
-			 * The last entry gets placed at buf1.
-			 */
-			buf[IPOPT_OPTVAL] = optval;
-			buf[IPOPT_OLEN] = optlen;
-			buf[IPOPT_OFFSET] = optlen;
-
-			off = optlen - IP_ADDR_LEN;
-			if (off < 0) {
-				/* No entries in source route */
-				break;
-			}
-			/* Last entry in source route */
-			bcopy(opt + off, buf1, IP_ADDR_LEN);
-			off -= IP_ADDR_LEN;
-
-			while (off > 0) {
-				bcopy(opt + off,
-				    buf + off + IP_ADDR_LEN,
-				    IP_ADDR_LEN);
-				off -= IP_ADDR_LEN;
-			}
-			/* ipha_dst into first slot */
-			bcopy(&ipha->ipha_dst,
-			    buf + off + IP_ADDR_LEN,
-			    IP_ADDR_LEN);
-			buf += optlen;
-			len += optlen;
-			break;
-		default:
-			bcopy(opt, buf, optlen);
-			buf += optlen;
-			len += optlen;
-			break;
-		}
-	}
-done:
-	/* Pad the resulting options */
-	while (len & 0x3) {
-		*buf++ = IPOPT_EOL;
-		len++;
-	}
-	return (len);
-}
-
-/*
  * Transfer any source route option from ipha to buf/dst in reversed form.
  */
 static int
@@ -10774,41 +10912,46 @@ static int
 tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly, uchar_t *ptr, uint_t len)
 {
 	uint_t	tcph_len;
-	char	*ip_optp;
+	uint8_t	*ip_optp;
 	tcph_t	*new_tcph;
+
+	if ((len > TCP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
+		return (EINVAL);
+
+	if (len > IP_MAX_OPT_LENGTH - tcp->tcp_label_len)
+		return (EINVAL);
 
 	if (checkonly) {
 		/*
 		 * do not really set, just pretend to - T_CHECK
 		 */
-		if (len != 0) {
-			/*
-			 * there is value supplied, validate it as if
-			 * for a real set operation.
-			 */
-			if ((len > TCP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
-				return (EINVAL);
-		}
 		return (0);
 	}
 
-	if ((len > TCP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
-		return (EINVAL);
+	ip_optp = (uint8_t *)tcp->tcp_ipha + IP_SIMPLE_HDR_LENGTH;
+	if (tcp->tcp_label_len > 0) {
+		int padlen;
+		uint8_t opt;
 
-	ip_optp = (char *)tcp->tcp_ipha + IP_SIMPLE_HDR_LENGTH;
+		/* convert list termination to no-ops */
+		padlen = tcp->tcp_label_len - ip_optp[IPOPT_OLEN];
+		ip_optp += ip_optp[IPOPT_OLEN];
+		opt = len > 0 ? IPOPT_NOP : IPOPT_EOL;
+		while (--padlen >= 0)
+			*ip_optp++ = opt;
+	}
 	tcph_len = tcp->tcp_tcp_hdr_len;
 	new_tcph = (tcph_t *)(ip_optp + len);
-	ovbcopy((char *)tcp->tcp_tcph, (char *)new_tcph, tcph_len);
+	ovbcopy(tcp->tcp_tcph, new_tcph, tcph_len);
 	tcp->tcp_tcph = new_tcph;
 	bcopy(ptr, ip_optp, len);
 
-	len += IP_SIMPLE_HDR_LENGTH;
+	len += IP_SIMPLE_HDR_LENGTH + tcp->tcp_label_len;
 
 	tcp->tcp_ip_hdr_len = len;
 	tcp->tcp_ipha->ipha_version_and_hdr_length =
-		(IP_VERSION << 4) | (len >> 2);
-	len += tcph_len;
-	tcp->tcp_hdr_len = len;
+	    (IP_VERSION << 4) | (len >> 2);
+	tcp->tcp_hdr_len = len + tcph_len;
 	if (!TCP_IS_DETACHED(tcp)) {
 		/* Always allocate room for all options. */
 		(void) mi_set_sth_wroff(tcp->tcp_rq,
@@ -12601,7 +12744,6 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		mp1 = tcp_xmit_mp(tcp, tcp->tcp_xmit_head, tcp->tcp_mss,
 		    NULL, NULL, tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (mp1) {
-			mblk_setcred(mp1, tcp->tcp_cred);
 			DB_CPID(mp1) = tcp->tcp_cpid;
 			TCP_RECORD_TRACE(tcp, mp1, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, tcp->tcp_wq, mp1);
@@ -14723,57 +14865,59 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		optlen += sizeof (struct T_opthdr) + sizeof (uint_t);
 		addflag |= TCP_IPV6_RECVTCLASS;
 	}
-	/* If app asked for hopbyhop headers and it has changed ... */
+	/*
+	 * If app asked for hopbyhop headers and it has changed ...
+	 * For security labels, note that (1) security labels can't change on
+	 * a connected socket at all, (2) we're connected to at most one peer,
+	 * (3) if anything changes, then it must be some other extra option.
+	 */
 	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVHOPOPTS) &&
-	    tcp_cmpbuf(tcp->tcp_hopopts, tcp->tcp_hopoptslen,
-		(ipp->ipp_fields & IPPF_HOPOPTS),
-		ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
-		optlen += sizeof (struct T_opthdr) + ipp->ipp_hopoptslen;
+	    ip_cmpbuf(tcp->tcp_hopopts, tcp->tcp_hopoptslen,
+	    (ipp->ipp_fields & IPPF_HOPOPTS),
+	    ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
+		optlen += sizeof (struct T_opthdr) + ipp->ipp_hopoptslen -
+		    tcp->tcp_label_len;
 		addflag |= TCP_IPV6_RECVHOPOPTS;
-		if (!tcp_allocbuf((void **)&tcp->tcp_hopopts,
-		    &tcp->tcp_hopoptslen,
-		    (ipp->ipp_fields & IPPF_HOPOPTS),
+		if (!ip_allocbuf((void **)&tcp->tcp_hopopts,
+		    &tcp->tcp_hopoptslen, (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen))
 			return (mp);
 	}
 	/* If app asked for dst headers before routing headers ... */
 	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVRTDSTOPTS) &&
-	    tcp_cmpbuf(tcp->tcp_rtdstopts, tcp->tcp_rtdstoptslen,
+	    ip_cmpbuf(tcp->tcp_rtdstopts, tcp->tcp_rtdstoptslen,
 		(ipp->ipp_fields & IPPF_RTDSTOPTS),
 		ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
 		optlen += sizeof (struct T_opthdr) +
 		    ipp->ipp_rtdstoptslen;
 		addflag |= TCP_IPV6_RECVRTDSTOPTS;
-		if (!tcp_allocbuf((void **)&tcp->tcp_rtdstopts,
-		    &tcp->tcp_rtdstoptslen,
-		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
+		if (!ip_allocbuf((void **)&tcp->tcp_rtdstopts,
+		    &tcp->tcp_rtdstoptslen, (ipp->ipp_fields & IPPF_RTDSTOPTS),
 		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen))
 			return (mp);
 	}
 	/* If app asked for routing headers and it has changed ... */
 	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVRTHDR) &&
-	    tcp_cmpbuf(tcp->tcp_rthdr, tcp->tcp_rthdrlen,
-		(ipp->ipp_fields & IPPF_RTHDR),
-		ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
+	    ip_cmpbuf(tcp->tcp_rthdr, tcp->tcp_rthdrlen,
+	    (ipp->ipp_fields & IPPF_RTHDR),
+	    ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
 		optlen += sizeof (struct T_opthdr) + ipp->ipp_rthdrlen;
 		addflag |= TCP_IPV6_RECVRTHDR;
-		if (!tcp_allocbuf((void **)&tcp->tcp_rthdr,
-		    &tcp->tcp_rthdrlen,
-		    (ipp->ipp_fields & IPPF_RTHDR),
+		if (!ip_allocbuf((void **)&tcp->tcp_rthdr,
+		    &tcp->tcp_rthdrlen, (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen))
 			return (mp);
 	}
 	/* If app asked for dest headers and it has changed ... */
 	if ((tcp->tcp_ipv6_recvancillary &
-		(TCP_IPV6_RECVDSTOPTS | TCP_OLD_IPV6_RECVDSTOPTS)) &&
-	    tcp_cmpbuf(tcp->tcp_dstopts, tcp->tcp_dstoptslen,
-		(ipp->ipp_fields & IPPF_DSTOPTS),
-		ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
+	    (TCP_IPV6_RECVDSTOPTS | TCP_OLD_IPV6_RECVDSTOPTS)) &&
+	    ip_cmpbuf(tcp->tcp_dstopts, tcp->tcp_dstoptslen,
+	    (ipp->ipp_fields & IPPF_DSTOPTS),
+	    ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
 		optlen += sizeof (struct T_opthdr) + ipp->ipp_dstoptslen;
 		addflag |= TCP_IPV6_RECVDSTOPTS;
-		if (!tcp_allocbuf((void **)&tcp->tcp_dstopts,
-		    &tcp->tcp_dstoptslen,
-		    (ipp->ipp_fields & IPPF_DSTOPTS),
+		if (!ip_allocbuf((void **)&tcp->tcp_dstopts,
+		    &tcp->tcp_dstoptslen, (ipp->ipp_fields & IPPF_DSTOPTS),
 		    ipp->ipp_dstopts, ipp->ipp_dstoptslen))
 			return (mp);
 	}
@@ -14857,15 +15001,16 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_HOPOPTS;
-		toh->len = sizeof (*toh) + ipp->ipp_hopoptslen;
+		toh->len = sizeof (*toh) + ipp->ipp_hopoptslen -
+		    tcp->tcp_label_len;
 		toh->status = 0;
 		optptr += sizeof (*toh);
-		bcopy(ipp->ipp_hopopts, optptr, ipp->ipp_hopoptslen);
-		optptr += ipp->ipp_hopoptslen;
+		bcopy((uchar_t *)ipp->ipp_hopopts + tcp->tcp_label_len, optptr,
+		    ipp->ipp_hopoptslen - tcp->tcp_label_len);
+		optptr += ipp->ipp_hopoptslen - tcp->tcp_label_len;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		tcp_savebuf((void **)&tcp->tcp_hopopts,
-		    &tcp->tcp_hopoptslen,
+		ip_savebuf((void **)&tcp->tcp_hopopts, &tcp->tcp_hopoptslen,
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen);
 	}
@@ -14880,7 +15025,7 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		optptr += ipp->ipp_rtdstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		tcp_savebuf((void **)&tcp->tcp_rtdstopts,
+		ip_savebuf((void **)&tcp->tcp_rtdstopts,
 		    &tcp->tcp_rtdstoptslen,
 		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
 		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
@@ -14896,8 +15041,7 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		optptr += ipp->ipp_rthdrlen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		tcp_savebuf((void **)&tcp->tcp_rthdr,
-		    &tcp->tcp_rthdrlen,
+		ip_savebuf((void **)&tcp->tcp_rthdr, &tcp->tcp_rthdrlen,
 		    (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen);
 	}
@@ -14912,8 +15056,7 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		optptr += ipp->ipp_dstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		tcp_savebuf((void **)&tcp->tcp_dstopts,
-		    &tcp->tcp_dstoptslen,
+		ip_savebuf((void **)&tcp->tcp_dstopts, &tcp->tcp_dstoptslen,
 		    (ipp->ipp_fields & IPPF_DSTOPTS),
 		    ipp->ipp_dstopts, ipp->ipp_dstoptslen);
 	}
@@ -15094,6 +15237,12 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			if (tcp->tcp_state != TCPS_SYN_SENT)
 				goto after_syn_sent;
 
+			if (is_system_labeled() &&
+			    !tcp_update_label(tcp, CONN_CRED(tcp->tcp_connp))) {
+				tcp_bind_failed(tcp, mp, EHOSTUNREACH);
+				return;
+			}
+
 			ASSERT(q == tcp->tcp_rq);
 			/*
 			 * tcp_adapt_ire() does not adjust
@@ -15162,21 +15311,9 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
 			    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 			if (syn_mp) {
-				cred_t *cr;
 				pid_t pid;
 
-				/*
-				 * Obtain the credential from the
-				 * thread calling connect(); the credential
-				 * lives on in the second mblk which
-				 * originated from T_CONN_REQ and is echoed
-				 * with the T_BIND_ACK from ip.  If none
-				 * can be found, default to the creator
-				 * of the socket.
-				 */
-				if (mp->b_cont == NULL ||
-				    (cr = DB_CRED(mp->b_cont)) == NULL) {
-					cr = tcp->tcp_cred;
+				if (mp->b_cont == NULL) {
 					pid = tcp->tcp_cpid;
 				} else {
 					pid = DB_CPID(mp->b_cont);
@@ -15184,7 +15321,6 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 
 				TCP_RECORD_TRACE(tcp, syn_mp,
 				    TCP_TRACE_SEND_PKT);
-				mblk_setcred(syn_mp, cr);
 				DB_CPID(syn_mp) = pid;
 				tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 			}
@@ -15593,34 +15729,39 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 {
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl = NULL;
-	mblk_t			*mp_conn_data;
+	mblk_t			*mp_conn_tail;
+	mblk_t			*mp_attr_ctl = NULL;
+	mblk_t			*mp_attr_tail;
 	mblk_t			*mp6_conn_ctl = NULL;
-	mblk_t			*mp6_conn_data;
-	mblk_t			*mp_conn_tail = NULL;
-	mblk_t			*mp6_conn_tail = NULL;
+	mblk_t			*mp6_conn_tail;
+	mblk_t			*mp6_attr_ctl = NULL;
+	mblk_t			*mp6_attr_tail;
 	struct opthdr		*optp;
 	mib2_tcpConnEntry_t	tce;
 	mib2_tcp6ConnEntry_t	tce6;
+	mib2_transportMLPEntry_t mlp;
 	connf_t			*connfp;
 	conn_t			*connp;
 	int			i;
 	boolean_t 		ispriv;
 	zoneid_t 		zoneid;
+	int			v4_conn_idx;
+	int			v6_conn_idx;
 
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL ||
 	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_conn_ctl = copymsg(mpctl)) == NULL) {
-		if (mp_conn_ctl != NULL)
-			freemsg(mp_conn_ctl);
-		if (mp6_conn_ctl != NULL)
-			freemsg(mp6_conn_ctl);
+	    (mp_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_conn_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_attr_ctl = copymsg(mpctl)) == NULL) {
+		freemsg(mp_conn_ctl);
+		freemsg(mp_attr_ctl);
+		freemsg(mp6_conn_ctl);
+		freemsg(mp6_attr_ctl);
 		return (0);
 	}
 
 	/* build table of connections -- need count in fixed part */
-	mp_conn_data = mp_conn_ctl->b_cont;
-	mp6_conn_data = mp6_conn_ctl->b_cont;
 	SET_MIB(tcp_mib.tcpRtoAlgorithm, 4);   /* vanj */
 	SET_MIB(tcp_mib.tcpRtoMin, tcp_rexmit_interval_min);
 	SET_MIB(tcp_mib.tcpRtoMax, tcp_rexmit_interval_max);
@@ -15631,6 +15772,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	    secpolicy_net_config((Q_TO_CONN(q))->conn_cred, B_TRUE) == 0;
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
 
+	v4_conn_idx = v6_conn_idx = 0;
+	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
+
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 
 		connfp = &ipcl_globalhash_fanout[i];
@@ -15640,6 +15784,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
 			tcp_t *tcp;
+			boolean_t needattr;
 
 			if (connp->conn_zoneid != zoneid)
 				continue;	/* not in this zone */
@@ -15655,6 +15800,26 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			if (tce.tcpConnState == MIB2_TCP_established ||
 			    tce.tcpConnState == MIB2_TCP_closeWait)
 				BUMP_MIB(&tcp_mib, tcpCurrEstab);
+
+			needattr = B_FALSE;
+			bzero(&mlp, sizeof (mlp));
+			if (connp->conn_mlp_type != mlptSingle) {
+				if (connp->conn_mlp_type == mlptShared ||
+				    connp->conn_mlp_type == mlptBoth)
+					mlp.tme_flags |= MIB2_TMEF_SHARED;
+				if (connp->conn_mlp_type == mlptPrivate ||
+				    connp->conn_mlp_type == mlptBoth)
+					mlp.tme_flags |= MIB2_TMEF_PRIVATE;
+				needattr = B_TRUE;
+			}
+			if (connp->conn_peercred != NULL) {
+				ts_label_t *tsl;
+
+				tsl = crgetlabel(connp->conn_peercred);
+				mlp.tme_doi = label2doi(tsl);
+				mlp.tme_label = *label2bslabel(tsl);
+				needattr = B_TRUE;
+			}
 
 			/* Create a message to report on IPv6 entries */
 			if (tcp->tcp_ipversion == IPV6_VERSION) {
@@ -15692,8 +15857,14 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			tce6.tcp6ConnEntryInfo.ce_rto =  tcp->tcp_rto;
 			tce6.tcp6ConnEntryInfo.ce_mss =  tcp->tcp_mss;
 			tce6.tcp6ConnEntryInfo.ce_state = tcp->tcp_state;
-			(void) snmp_append_data2(mp6_conn_data, &mp6_conn_tail,
-			    (char *)&tce6, sizeof (tce6));
+
+			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
+			    &mp6_conn_tail, (char *)&tce6, sizeof (tce6));
+
+			mlp.tme_connidx = v6_conn_idx++;
+			if (needattr)
+				(void) snmp_append_data2(mp6_attr_ctl->b_cont,
+				    &mp6_attr_tail, (char *)&mlp, sizeof (mlp));
 			}
 			/*
 			 * Create an IPv4 table entry for IPv4 entries and also
@@ -15747,8 +15918,16 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				tce.tcpConnEntryInfo.ce_mss =  tcp->tcp_mss;
 				tce.tcpConnEntryInfo.ce_state =
 				    tcp->tcp_state;
-				(void) snmp_append_data2(mp_conn_data,
+
+				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&tce, sizeof (tce));
+
+				mlp.tme_connidx = v4_conn_idx++;
+				if (needattr)
+					(void) snmp_append_data2(
+					    mp_attr_ctl->b_cont,
+					    &mp_attr_tail, (char *)&mlp,
+					    sizeof (mlp));
 			}
 		}
 	}
@@ -15768,16 +15947,38 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 	    sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP;
 	optp->name = MIB2_TCP_CONN;
-	optp->len = msgdsize(mp_conn_data);
+	optp->len = msgdsize(mp_conn_ctl->b_cont);
 	qreply(q, mp_conn_ctl);
+
+	/* table of MLP attributes... */
+	optp = (struct opthdr *)&mp_attr_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_TCP;
+	optp->name = EXPER_XPORT_MLP;
+	optp->len = msgdsize(mp_attr_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp_attr_ctl);
+	else
+		qreply(q, mp_attr_ctl);
 
 	/* table of IPv6 connections... */
 	optp = (struct opthdr *)&mp6_conn_ctl->b_rptr[
 	    sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_TCP6;
 	optp->name = MIB2_TCP6_CONN;
-	optp->len = msgdsize(mp6_conn_data);
+	optp->len = msgdsize(mp6_conn_ctl->b_cont);
 	qreply(q, mp6_conn_ctl);
+
+	/* table of IPv6 MLP attributes... */
+	optp = (struct opthdr *)&mp6_attr_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_TCP6;
+	optp->name = EXPER_XPORT_MLP;
+	optp->len = msgdsize(mp6_attr_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp6_attr_ctl);
+	else
+		qreply(q, mp6_attr_ctl);
 	return (1);
 }
 
@@ -16633,11 +16834,16 @@ tcp_unbind(tcp_t *tcp, mblk_t *mp)
  * but instead the code relies on:
  * - the fact that the address of the array and its size never changes
  * - the atomic assignment of the elements of the array
+ *
+ * Returns 0 if there are no more ports available.
+ *
+ * TS note: skip multilevel ports.
  */
 static in_port_t
-tcp_update_next_port(in_port_t port, boolean_t random)
+tcp_update_next_port(in_port_t port, const tcp_t *tcp, boolean_t random)
 {
 	int i;
+	boolean_t restart = B_FALSE;
 
 	if (random && tcp_random_anon_port != 0) {
 		(void) random_get_pseudo_bytes((uint8_t *)&port,
@@ -16659,8 +16865,15 @@ tcp_update_next_port(in_port_t port, boolean_t random)
 	}
 
 retry:
-	if (port < tcp_smallest_anon_port || port > tcp_largest_anon_port)
+	if (port < tcp_smallest_anon_port)
 		port = (in_port_t)tcp_smallest_anon_port;
+
+	if (port > tcp_largest_anon_port) {
+		if (restart)
+			return (0);
+		restart = B_TRUE;
+		port = (in_port_t)tcp_smallest_anon_port;
+	}
 
 	if (port < tcp_smallest_nonpriv_port)
 		port = (in_port_t)tcp_smallest_nonpriv_port;
@@ -16671,30 +16884,47 @@ retry:
 			/*
 			 * Make sure whether the port is in the
 			 * valid range.
-			 *
-			 * XXX Note that if tcp_g_epriv_ports contains
-			 * all the anonymous ports this will be an
-			 * infinite loop.
 			 */
 			goto retry;
 		}
+	}
+	if (is_system_labeled() &&
+	    (i = tsol_next_port(crgetzone(tcp->tcp_cred), port,
+	    IPPROTO_TCP, B_TRUE)) != 0) {
+		port = i;
+		goto retry;
 	}
 	return (port);
 }
 
 /*
- * Return the next anonymous port in the priviledged port range for
+ * Return the next anonymous port in the privileged port range for
  * bind checking.  It starts at IPPORT_RESERVED - 1 and goes
  * downwards.  This is the same behavior as documented in the userland
  * library call rresvport(3N).
+ *
+ * TS note: skip multilevel ports.
  */
 static in_port_t
-tcp_get_next_priv_port(void)
+tcp_get_next_priv_port(const tcp_t *tcp)
 {
 	static in_port_t next_priv_port = IPPORT_RESERVED - 1;
+	in_port_t nextport;
+	boolean_t restart = B_FALSE;
 
-	if (next_priv_port < tcp_min_anonpriv_port) {
+retry:
+	if (next_priv_port < tcp_min_anonpriv_port ||
+	    next_priv_port >= IPPORT_RESERVED) {
 		next_priv_port = IPPORT_RESERVED - 1;
+		if (restart)
+			return (0);
+		restart = B_TRUE;
+	}
+	if (is_system_labeled() &&
+	    (nextport = tsol_next_port(crgetzone(tcp->tcp_cred),
+	    next_priv_port, IPPROTO_TCP, B_FALSE)) != 0) {
+		next_priv_port = nextport;
+		goto retry;
 	}
 	return (next_priv_port--);
 }
@@ -17435,9 +17665,6 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 		q->q_qinfo = &tcp_winit;
 		listener = eager->tcp_listener;
 		eager->tcp_issocket = B_TRUE;
-		eager->tcp_cred = econnp->conn_cred =
-		    listener->tcp_connp->conn_cred;
-		crhold(econnp->conn_cred);
 		econnp->conn_zoneid = listener->tcp_connp->conn_zoneid;
 
 		/* Put the ref for IP */
@@ -17660,8 +17887,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			return;
 		}
 		if (type == T_SVR4_OPTMGMT_REQ) {
-			cred_t	*cr = DB_CREDDEF(mp,
-			    tcp->tcp_cred);
+			cred_t	*cr = DB_CREDDEF(mp, tcp->tcp_cred);
 			if (snmpcom_req(q, mp, tcp_snmp_set, tcp_snmp_get,
 			    cr)) {
 				/*
@@ -17945,12 +18171,15 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
+	mblk_setcred(mp, CONN_CRED(connp));
+
 	ipha = (ipha_t *)mp->b_rptr;
 	src = ipha->ipha_src;
 	dst = ipha->ipha_dst;
 
 	/*
-	 * Drop off slow path for IPv6 and also if options are present.
+	 * Drop off fast path for IPv6 and also if options are present or
+	 * we need to resolve a TS label.
 	 */
 	if (tcp->tcp_ipversion != IPV4_VERSION ||
 	    !IPCL_IS_CONNECTED(connp) ||
@@ -17959,6 +18188,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	    connp->conn_nexthop_set ||
 	    connp->conn_xmit_if_ill != NULL ||
 	    connp->conn_nofailover_ill != NULL ||
+	    !connp->conn_ulp_labeled ||
 	    ipha->ipha_ident == IP_HDR_INCLUDED ||
 	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
 	    IPP_ENABLED(IPP_LOCAL_OUT)) {
@@ -17987,7 +18217,8 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		mutex_exit(&connp->conn_lock);
 		if (ire != NULL)
 			IRE_REFRELE_NOTR(ire);
-		ire = ire_cache_lookup(dst, connp->conn_zoneid);
+		ire = ire_cache_lookup(dst, connp->conn_zoneid,
+		    MBLK_GETLABEL(mp));
 		if (ire == NULL) {
 			if (tcp->tcp_snd_zcopy_aware)
 				mp = tcp_zcopy_backoff(tcp, mp, 0);
@@ -18018,6 +18249,12 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		 */
 		if (!cached)
 			IRE_REFRELE_NOTR(ire);
+
+		/*
+		 * Rampart note: no need to select a new label here, since
+		 * labels are not allowed to change during the life of a TCP
+		 * connection.
+		 */
 	}
 
 	if (ire->ire_flags & RTF_MULTIRT ||
@@ -18759,6 +18996,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	ill_zerocopy_capab_t *zc_cap = NULL;
 	uint16_t	*up;
 	int		err;
+	conn_t		*connp;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -18795,9 +19033,11 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	    tcp->tcp_ip_hdr_len == IP_SIMPLE_HDR_LENGTH) ||
 	    (tcp->tcp_ipversion == IPV6_VERSION &&
 	    tcp->tcp_ip_hdr_len == IPV6_HDR_LEN));
-	ASSERT(tcp->tcp_connp != NULL);
-	ASSERT(CONN_IS_MD_FASTPATH(tcp->tcp_connp));
-	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(tcp->tcp_connp));
+
+	connp = tcp->tcp_connp;
+	ASSERT(connp != NULL);
+	ASSERT(CONN_IS_MD_FASTPATH(connp));
+	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(connp));
 
 	/*
 	 * Note that tcp will only declare at most 2 payload spans per
@@ -18828,33 +19068,35 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	 * in proceeding any further, and we should just hand everything
 	 * off to the legacy path.
 	 */
-	mutex_enter(&tcp->tcp_connp->conn_lock);
-	ire = tcp->tcp_connp->conn_ire_cache;
-	ASSERT(!(tcp->tcp_connp->conn_state_flags & CONN_INCIPIENT));
+	mutex_enter(&connp->conn_lock);
+	ire = connp->conn_ire_cache;
+	ASSERT(!(connp->conn_state_flags & CONN_INCIPIENT));
 	if (ire != NULL && ((af == AF_INET && ire->ire_addr == dst) ||
 	    (af == AF_INET6 && IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6,
 	    &tcp->tcp_ip6h->ip6_dst))) &&
 	    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
 		IRE_REFHOLD(ire);
-		mutex_exit(&tcp->tcp_connp->conn_lock);
+		mutex_exit(&connp->conn_lock);
 	} else {
 		boolean_t cached = B_FALSE;
+		ts_label_t *tsl;
 
 		/* force a recheck later on */
 		tcp->tcp_ire_ill_check_done = B_FALSE;
 
 		TCP_DBGSTAT(tcp_ire_null1);
-		tcp->tcp_connp->conn_ire_cache = NULL;
-		mutex_exit(&tcp->tcp_connp->conn_lock);
+		connp->conn_ire_cache = NULL;
+		mutex_exit(&connp->conn_lock);
 
 		/* Release the old ire */
 		if (ire != NULL)
 			IRE_REFRELE_NOTR(ire);
 
+		tsl = crgetlabel(CONN_CRED(connp));
 		ire = (af == AF_INET) ?
-		    ire_cache_lookup(dst, tcp->tcp_connp->conn_zoneid) :
+		    ire_cache_lookup(dst, connp->conn_zoneid, tsl) :
 		    ire_cache_lookup_v6(&tcp->tcp_ip6h->ip6_dst,
-		    tcp->tcp_connp->conn_zoneid);
+		    connp->conn_zoneid, tsl);
 
 		if (ire == NULL) {
 			TCP_STAT(tcp_ire_null);
@@ -18869,10 +19111,10 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		 * unplumb thread has not yet started cleaning up the conns.
 		 * Hence we don't need to grab the conn lock.
 		 */
-		if (!(tcp->tcp_connp->conn_state_flags & CONN_CLOSING)) {
+		if (!(connp->conn_state_flags & CONN_CLOSING)) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-				tcp->tcp_connp->conn_ire_cache = ire;
+				connp->conn_ire_cache = ire;
 				cached = B_TRUE;
 			}
 			rw_exit(&ire->ire_bucket->irb_lock);
@@ -18917,7 +19159,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		TCP_STAT(tcp_mdt_conn_halted2);
 		tcp->tcp_mdt = B_FALSE;
 		ip1dbg(("tcp_multisend: disabling MDT for connp %p on "
-		    "interface %s\n", (void *)tcp->tcp_connp, ill->ill_name));
+		    "interface %s\n", (void *)connp, ill->ill_name));
 		/* IRE will be released prior to returning */
 		goto legacy_send_no_md;
 	}
@@ -21129,6 +21371,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	void		*addr;
 	queue_t		*q = tcp_g_q;
 	tcp_t		*tcp = Q_TO_TCP(q);
+	cred_t		*cr;
 
 	if (!tcp_send_rst_chk()) {
 		tcp_rst_unsent++;
@@ -21253,6 +21496,35 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		BUMP_MIB(&tcp_mib, tcpOutRsts);
 		BUMP_MIB(&tcp_mib, tcpOutControl);
 	}
+
+	/* IP trusts us to set up labels when required. */
+	if (is_system_labeled() && (cr = DB_CRED(mp)) != NULL &&
+	    crgetlabel(cr) != NULL) {
+		int err, adjust;
+
+		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
+			err = tsol_check_label(cr, &mp, &adjust,
+			    tcp->tcp_connp->conn_mac_exempt);
+		else
+			err = tsol_check_label_v6(cr, &mp, &adjust,
+			    tcp->tcp_connp->conn_mac_exempt);
+		if (mctl_present)
+			ipsec_mp->b_cont = mp;
+		else
+			ipsec_mp = mp;
+		if (err != 0) {
+			freemsg(ipsec_mp);
+			return;
+		}
+		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
+			ipha = (ipha_t *)mp->b_rptr;
+			adjust += ntohs(ipha->ipha_length);
+			ipha->ipha_length = htons(adjust);
+		} else {
+			ip6h = (ip6_t *)mp->b_rptr;
+		}
+	}
+
 	if (mctl_present) {
 		ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
 
@@ -21263,9 +21535,15 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	}
 	/*
 	 * NOTE:  one might consider tracing a TCP packet here, but
-	 * this function has no active TCP state nd no tcp structure
-	 * which has trace buffer.  If we traced here, we would have
+	 * this function has no active TCP state and no tcp structure
+	 * that has a trace buffer.  If we traced here, we would have
 	 * to keep a local trace buffer in tcp_record_trace().
+	 *
+	 * TSol note: The mblk that contains the incoming packet was
+	 * reused by tcp_xmit_listener_reset, so it already contains
+	 * the right credentials and we don't need to call mblk_setcred.
+	 * Also the conn's cred is not right since it is associated
+	 * with tcp_g_q.
 	 */
 	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, ipsec_mp);
 
@@ -21452,7 +21730,15 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len)
 		if (ipsec_mp == NULL)
 			return;
 	}
-
+	if (is_system_labeled() && !tsol_can_reply_error(mp)) {
+		DTRACE_PROBE2(
+		    tx__ip__log__error__nolistener__tcp,
+		    char *, "Could not reply with RST to mp(1)",
+		    mblk_t *, mp);
+		ip2dbg(("tcp_xmit_listeners_reset: not permitted to reply\n"));
+		freemsg(ipsec_mp);
+		return;
+	}
 
 	rptr = mp->b_rptr;
 
@@ -24268,77 +24554,6 @@ done:
 		TCP_STAT(tcp_time_wait_syn_fail);
 	}
 	freemsg(mp);
-}
-
-/*
- * Return zero if the buffers are identical in length and content.
- * This is used for comparing extension header buffers.
- * Note that an extension header would be declared different
- * even if all that changed was the next header value in that header i.e.
- * what really changed is the next extension header.
- */
-static boolean_t
-tcp_cmpbuf(void *a, uint_t alen, boolean_t b_valid, void *b, uint_t blen)
-{
-	if (!b_valid)
-		blen = 0;
-
-	if (alen != blen)
-		return (B_TRUE);
-	if (alen == 0)
-		return (B_FALSE);	/* Both zero length */
-	return (bcmp(a, b, alen));
-}
-
-/*
- * Preallocate memory for tcp_savebuf(). Returns B_TRUE if ok.
- * Return B_FALSE if memory allocation fails - don't change any state!
- */
-static boolean_t
-tcp_allocbuf(void **dstp, uint_t *dstlenp, boolean_t src_valid,
-    void *src, uint_t srclen)
-{
-	void *dst;
-
-	if (!src_valid)
-		srclen = 0;
-
-	ASSERT(*dstlenp == 0);
-	if (src != NULL && srclen != 0) {
-		dst = mi_alloc(srclen, BPRI_MED);
-		if (dst == NULL)
-			return (B_FALSE);
-	} else {
-		dst = NULL;
-	}
-	if (*dstp != NULL) {
-		mi_free(*dstp);
-		*dstp = NULL;
-		*dstlenp = 0;
-	}
-	*dstp = dst;
-	if (dst != NULL)
-		*dstlenp = srclen;
-	else
-		*dstlenp = 0;
-	return (B_TRUE);
-}
-
-/*
- * Replace what is in *dst, *dstlen with the source.
- * Assumes tcp_allocbuf has already been called.
- */
-static void
-tcp_savebuf(void **dstp, uint_t *dstlenp, boolean_t src_valid,
-    void *src, uint_t srclen)
-{
-	if (!src_valid)
-		srclen = 0;
-
-	ASSERT(*dstlenp == srclen);
-	if (src != NULL && srclen != 0) {
-		bcopy(src, *dstp, srclen);
-	}
 }
 
 /*

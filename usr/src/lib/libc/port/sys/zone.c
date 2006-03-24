@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,14 +36,15 @@
 #include <sys/priv.h>
 #include <priv_private.h>
 #include <zone.h>
+#include <sys/tsol/label.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <errno.h>
 
-extern zoneid_t
+zoneid_t
 zone_create(const char *name, const char *root, const struct priv_set *privs,
     const char *rctls, size_t rctlsz, const char *zfs, size_t zfssz,
-    int *extended_error)
+    int *extended_error, int match, int doi, const bslabel_t *label)
 {
 	zone_def  zd;
 	priv_data_t *d;
@@ -60,6 +60,9 @@ zone_create(const char *name, const char *root, const struct priv_set *privs,
 	zd.zfsbuf = zfs;
 	zd.zfsbufsz = zfssz;
 	zd.extended_error = extended_error;
+	zd.match = match;
+	zd.doi = doi;
+	zd.label = label;
 
 	return ((zoneid_t)syscall(SYS_zone, ZONE_CREATE, &zd));
 }

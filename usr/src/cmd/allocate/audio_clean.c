@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stropts.h>
 #include <unistd.h>
-
+#include <bsm/devices.h>
 #include <sys/audioio.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
@@ -67,54 +68,32 @@
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
 #endif
 
-#define	BUF_SIZE 512
-#define	DMINFO	"dminfo -v -n"	/* Cmd to xlate name to device */
-#define	AUDIO	"/dev/audio"	/* Device name of audio device */
-
-static char *Audio_dev = AUDIO;
-
 #ifdef	DEBUG
 static void print_info(audio_info_t *);
 static void print_prinfo(audio_prinfo_t *);
 #endif	/* DEBUG */
 
 static void
-usage(char *prog, int verbose)
+usage(char *prog)
 {
-	if (verbose)
-		(void) fprintf(stderr,
-		    gettext("usage: %s [-I|-s|-f|-i] device\n"), prog);
-}
-
-/*
- * Return the first substring in string before the ':' in "item"
- */
-static void
-first_field(char *string, char *item)
-{
-	item = string;
-
-	while (*item != ':')
-		item++;
-	*item = 0;
+	(void) fprintf(stderr, "%s%s", prog,
+	    gettext(" : usage:[-I|-s|-f|-i] device\n"));
 }
 
 int
-main(int argc, char *argv[])
+main(int argc, char **argv)
 {
-	int	err = 0;
+	int		err = 0;
+	int		Audio_fd;
+	int		forced = 0;		/* Command line options */
+	int		initial = 0;
+	int		standard = 0;
+	int		verbose = 1;		/* default is to be verbose */
+	int		c;
+	char		*prog, *devname, *devpath;
+	devmap_t	*dm;
 	struct stat	st;
 	audio_info_t	info;
-	int	i;
-	char	cmd_str[BUF_SIZE];
-	char	map[BUF_SIZE];
-	char	*prog;
-	FILE	*fp;
-	int	Audio_fd;
-	int	forced = 0;		/* Command line options */
-	int	initial = 0;
-	int	standard = 0;
-	int	verbose = 1;		/* default is to be verbose */
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -126,8 +105,8 @@ main(int argc, char *argv[])
 	 * the same thing.
 	 */
 
-	while ((i = getopt(argc, argv, "Iifs")) != EOF) {
-		switch (i) {
+	while ((c = getopt(argc, argv, "Iifs")) != -1) {
+		switch (c) {
 		case 'I':
 			verbose = 0;
 			initial++;
@@ -152,54 +131,49 @@ main(int argc, char *argv[])
 		case '?':
 			err++;
 			break;
+		default:
+			err++;
+			break;
 		}
 		if (err) {
-			usage(prog, verbose);
+			if (verbose)
+				usage(prog);
 			exit(1);
 		}
-		argc -= optind;
-		argv += optind;
 	}
 
-	if (argv[0] == NULL) {	/* no device name */
-		usage(prog, verbose);
-		exit(1);
-	}
-
-	if (strlen(argv[0]) > (BUF_SIZE - sizeof (DMINFO) - 2)) {
-		(void) fprintf(stderr, gettext("device name %s too long\n"),
-		    argv[0]);
-		exit(1);
-	}
-
-	(void) strcpy(cmd_str, DMINFO);
-	(void) strcat(cmd_str, " ");
-	(void) strcat(cmd_str, argv[0]);	/* device name */
-
-	if ((fp = popen(cmd_str, "r")) == NULL) {
+	if ((argc - optind) != 1) {
 		if (verbose)
-			(void) fprintf(stderr,
-			    gettext("%s couldn't execute \"%s\"\n"), prog,
-			    cmd_str);
+			usage(prog);
 		exit(1);
+	} else {
+		devname = argv[optind];
 	}
 
-	if (fread(map, 1, BUF_SIZE, fp) == 0) {
+	setdmapent();
+	if ((dm = getdmapnam(devname)) == NULL) {
+		enddmapent();
 		if (verbose)
-			(void) fprintf(stderr,
-			    gettext("%s no results from \"%s\"\n"), prog,
-			    cmd_str);
-		exit(1);
+			(void) fprintf(stderr, "%s%s",
+			    devname,
+			    gettext(" : No such allocatable device\n"));
+			exit(1);
 	}
-
-	(void) pclose(fp);
-
-	first_field(map, Audio_dev);  /* Put the 1st field in dev */
+	enddmapent();
+	if (dm->dmap_devarray == NULL || dm->dmap_devarray[0] == NULL) {
+		if (verbose)
+			(void) fprintf(stderr, "%s%s",
+			    devname,
+			    gettext(" : No such allocatable device\n"));
+			exit(1);
+	}
+	devpath = strdup(dm->dmap_devarray[0]);
+	freedmapent(dm);
 
 	/*
 	 * Validate and open the audio device
 	 */
-	err = stat(Audio_dev, &st);
+	err = stat(devpath, &st);
 
 	if (err < 0) {
 		if (verbose) {
@@ -213,7 +187,7 @@ main(int argc, char *argv[])
 		if (verbose)
 			(void) fprintf(stderr,
 			    gettext("%s: %s is not an audio device\n"), prog,
-			    Audio_dev);
+			    devpath);
 		exit(1);
 	}
 
@@ -222,26 +196,18 @@ main(int argc, char *argv[])
 	 * using it we check to see if we're going to hang before we
 	 * do anything.
 	 */
-	/* Try it quickly, first */
-	Audio_fd = open(Audio_dev, O_WRONLY | O_NDELAY);
+	Audio_fd = open(devpath, O_WRONLY | O_NDELAY);
 
 	if ((Audio_fd < 0) && (errno == EBUSY)) {
 		if (verbose)
 			(void) fprintf(stderr, gettext("%s: waiting for %s..."),
-			    prog, Audio_dev);
-
-		/* Now hang until it's open */
-		Audio_fd = open(Audio_dev, O_WRONLY);
-		if (Audio_fd < 0) {
-			if (verbose)
-				perror(Audio_dev);
-			exit(1);
-		}
+			    prog, devpath);
+		exit(0);
 	} else if (Audio_fd < 0) {
 		if (verbose) {
 			(void) fprintf(stderr, gettext("%s: error opening "),
 			    prog);
-			perror(Audio_dev);
+			perror(devpath);
 		}
 		exit(1);
 	}
@@ -253,6 +219,7 @@ main(int argc, char *argv[])
 
 	if (ioctl(Audio_fd, AUDIO_GETINFO, &info) != 0)  {
 		perror("Ioctl AUDIO_GETINFO error");
+		(void) close(Audio_fd);
 		exit(1);
 	}
 
@@ -265,12 +232,14 @@ main(int argc, char *argv[])
 	if (ioctl(Audio_fd, AUDIO_SETINFO, &info) != 0) {
 		if (verbose)
 			perror(gettext("Ioctl AUDIO_SETINFO error"));
+		(void) close(Audio_fd);
 		exit(1);
 	}
 
 #ifdef	DEBUG
 	if (ioctl(Audio_fd, AUDIO_GETINFO, &info) != 0)  {
 		perror("Ioctl AUDIO_GETINFO-2 error");
+		(void) close(Audio_fd);
 		exit(1);
 	}
 

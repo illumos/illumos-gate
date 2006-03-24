@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -59,10 +58,9 @@
 #include <alloca.h>
 #include <stdlib.h>
 #include <zone.h>
+#include <tsol/label.h>
 
-extern const char *inet_ntop(int, const void *, char *, socklen_t);
 extern bool_t __svc_get_door_ucred(const SVCXPRT *, ucred_t *);
-
 
 /*
  * This routine is typically called on the server side if the server
@@ -494,6 +492,8 @@ __rpc_tli_set_options(int fd, int optlevel, int optname, int optval)
 	case SO_REUSEADDR:
 	case SO_DGRAM_ERRIND:
 	case SO_RECVUCRED:
+	case SO_ANON_MLP:
+	case SO_MAC_EXEMPT:
 	case TCP_EXCLBIND:
 	case UDP_EXCLBIND:
 		/* LINTED */
@@ -546,5 +546,36 @@ __tli_sys_strerror(char *buf, size_t buflen, int tli_err, int sys_err)
 	} else {
 		errorstr = t_strerror(tli_err);
 		(void) strlcpy(buf, errorstr, buflen);
+	}
+}
+
+/*
+ * Depending on the specified RPC number, attempt to set mac_exempt
+ * option on the opened socket; these requests need to be able to do MAC
+ * MAC read-down operations.  Privilege is needed to set this option.
+ */
+
+void
+__rpc_set_mac_options(int fd, const struct netconfig *nconf, rpcprog_t prognum)
+{
+	int ret = 0;
+
+	if (!is_system_labeled())
+		return;
+
+	if (strcmp(nconf->nc_protofmly, NC_INET) != 0 &&
+	    strcmp(nconf->nc_protofmly, NC_INET6) != 0)
+		return;
+
+	if (is_multilevel(prognum)) {
+		ret = __rpc_tli_set_options(fd, SOL_SOCKET, SO_MAC_EXEMPT, 1);
+		if (ret < 0) {
+			char errorstr[100];
+
+			__tli_sys_strerror(errorstr, sizeof (errorstr),
+			    t_errno, errno);
+			(void) syslog(LOG_ERR, "rpc_set_mac_options: %s",
+			    errorstr);
+		}
 	}
 }

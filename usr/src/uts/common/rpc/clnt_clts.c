@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1428,6 +1427,7 @@ endpnt_get(struct knetconfig *config, int useresvport)
 	int			error;
 	int			retval;
 	zoneid_t		zoneid = rpc_zoneid();
+	cred_t			*cr;
 
 	RPCLOG(1, "endpnt_get: protofmly %s, ", config->knc_protofmly);
 	RPCLOG(1, "rdev %ld\n", config->knc_rdev);
@@ -1633,8 +1633,9 @@ top:
 	/*
 	 * The transport should be opened with sufficient privs
 	 */
+	cr = zone_kcred();
 	error = t_kopen(NULL, config->knc_rdev, FREAD|FWRITE|FNDELAY, &tiptr,
-	    kcred);
+	    cr);
 	if (error) {
 		RPCLOG(1, "endpnt_get: t_kopen: %d\n", error);
 		goto bad;
@@ -1647,14 +1648,14 @@ top:
 	 * Allow the kernel to push the module on behalf of the user.
 	 */
 	error = strioctl(tiptr->fp->f_vnode, I_PUSH, (intptr_t)"rpcmod", 0,
-			K_TO_K, kcred, &retval);
+	    K_TO_K, cr, &retval);
 	if (error) {
 		RPCLOG(1, "endpnt_get: kstr_push on rpcmod failed %d\n", error);
 		goto bad;
 	}
 
 	error = strioctl(tiptr->fp->f_vnode, RPC_CLIENT, 0, 0, K_TO_K,
-				kcred, &retval);
+	    cr, &retval);
 	if (error) {
 		RPCLOG(1, "endpnt_get: strioctl failed %d\n", error);
 		goto bad;
@@ -1666,7 +1667,7 @@ top:
 	new->e_wq = tiptr->fp->f_vnode->v_stream->sd_wrq->q_next;
 
 	error = strioctl(tiptr->fp->f_vnode, I_PUSH, (intptr_t)"timod", 0,
-			K_TO_K, kcred, &retval);
+	    K_TO_K, cr, &retval);
 	if (error) {
 		RPCLOG(1, "endpnt_get: kstr_push on timod failed %d\n", error);
 		goto bad;
@@ -1704,8 +1705,8 @@ top:
 			 * reopen with all privileges
 			 */
 			error = t_kopen(NULL, config->knc_rdev,
-					FREAD|FWRITE|FNDELAY,
-					&new->e_tiptr, kcred);
+			    FREAD|FWRITE|FNDELAY,
+			    &new->e_tiptr, cr);
 			if (error) {
 				RPCLOG(1, "endpnt_get: t_kopen: %d\n", error);
 					new->e_tiptr = NULL;

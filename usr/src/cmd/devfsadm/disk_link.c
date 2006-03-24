@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <bsm/devalloc.h>
 
 #define	DISK_SUBPATH_MAX 100
 #define	RM_STALE 0x01
@@ -45,6 +45,8 @@
 #define	MN_SMI		"h"
 #define	MN_EFI		"wd"
 #define	ASCIIWWNSIZE	255
+
+extern int system_labeled;
 
 static int disk_callback_chan(di_minor_t minor, di_node_t node);
 static int disk_callback_nchan(di_minor_t minor, di_node_t node);
@@ -209,6 +211,8 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 	char slice[4];
 	char *mn;
 	char *ctrl;
+	char *nt = NULL;
+	int  nflags = 0;
 
 	if (strstr(mn = di_minor_name(minor), ",raw")) {
 		dir = "rdsk";
@@ -255,7 +259,17 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 	}
 	(void) strcat(l_path, slice);
 
-	(void) devfsadm_mklink(l_path, node, minor, 0);
+	if (system_labeled) {
+		nt = di_minor_nodetype(minor);
+		if ((nt != NULL) &&
+		    ((strcmp(nt, DDI_NT_CD) == 0) ||
+		    (strcmp(nt, DDI_NT_CD_CHAN) == 0) ||
+		    (strcmp(nt, DDI_NT_BLOCK_CHAN) == 0))) {
+			nflags = DA_ADD|DA_CD;
+		}
+	}
+
+	(void) devfsadm_mklink(l_path, node, minor, nflags);
 
 	if ((flags & RM_STALE) == RM_STALE) {
 		(void) strcpy(stale_re, "^");

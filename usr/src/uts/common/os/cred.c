@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,9 +49,7 @@
 #include <sys/kmem.h>
 #include <sys/user.h>
 #include <sys/proc.h>
-#include <sys/acct.h>
 #include <sys/syscall.h>
-#include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/atomic.h>
 #include <sys/ucred.h>
@@ -60,12 +57,14 @@
 #include <sys/modctl.h>
 #include <c2/audit.h>
 #include <sys/zone.h>
+#include <sys/tsol/label.h>
 
 static struct kmem_cache *cred_cache;
 static size_t crsize = 0;
 static int audoff = 0;
 uint32_t ucredsize;
 cred_t *kcred;
+static cred_t *dummycr;
 
 int rstlink;		/* link(2) restricted to files owned by user? */
 
@@ -74,6 +73,7 @@ static int get_c2audit_load(void);
 #define	CR_AUINFO(c)	(auditinfo_addr_t *)((audoff == 0) ? NULL : \
 			    ((char *)(c)) + audoff)
 
+#define	REMOTE_PEER_CRED(c)	((c)->cr_gid == -1)
 
 /*
  * Initialize credentials data structures.
@@ -106,6 +106,19 @@ cred_init(void)
 		NULL, NULL, NULL, NULL, NULL, 0);
 
 	/*
+	 * dummycr is used to copy initial state for creds.
+	 */
+	dummycr = cralloc();
+	bzero(dummycr, crsize);
+	dummycr->cr_ref = 1;
+	dummycr->cr_uid = -1;
+	dummycr->cr_gid = -1;
+	dummycr->cr_ruid = -1;
+	dummycr->cr_rgid = -1;
+	dummycr->cr_suid = -1;
+	dummycr->cr_sgid = -1;
+
+	/*
 	 * kcred is used by anything that needs all privileges; it's
 	 * also the template used for crget as it has all the compatible
 	 * sets filled in.
@@ -130,7 +143,8 @@ cred_init(void)
 		priv_delset(&CR_IPRIV(kcred), PRIV_FILE_LINK_ANY);
 
 	CR_EPRIV(kcred) = CR_PPRIV(kcred) = CR_IPRIV(kcred);
-	/* CR_FLAGS(kcred) == 0, courtesy of bzero() */
+
+	CR_FLAGS(kcred) = NET_MAC_AWARE;
 
 	/*
 	 * Set up credentials of p0.
@@ -150,6 +164,7 @@ cralloc(void)
 	cred_t *cr = kmem_cache_alloc(cred_cache, KM_SLEEP);
 	cr->cr_ref = 1;		/* So we can crfree() */
 	cr->cr_zone = NULL;
+	cr->cr_label = NULL;
 	return (cr);
 }
 
@@ -165,6 +180,8 @@ crget(void)
 	bcopy(kcred, cr, crsize);
 	cr->cr_ref = 1;
 	zone_cred_hold(cr->cr_zone);
+	if (cr->cr_label)
+		label_hold(cr->cr_label);
 	return (cr);
 }
 
@@ -220,12 +237,15 @@ crhold(cred_t *cr)
 
 /*
  * Release previous hold on a cred structure.  Free it if refcnt == 0.
+ * If cred uses label different from zone label, free it.
  */
 void
 crfree(cred_t *cr)
 {
 	if (atomic_add_32_nv(&cr->cr_ref, -1) == 0) {
 		ASSERT(cr != kcred);
+		if (cr->cr_label)
+			label_rele(cr->cr_label);
 		if (cr->cr_zone)
 			zone_cred_rele(cr->cr_zone);
 		kmem_cache_free(cred_cache, cr);
@@ -246,6 +266,8 @@ crcopy(cred_t *cr)
 	bcopy(cr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
+	if (newcr->cr_label)
+		label_hold(cr->cr_label);
 	crfree(cr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 	return (newcr);
@@ -264,6 +286,8 @@ crcopy_to(cred_t *oldcr, cred_t *newcr)
 	bcopy(oldcr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
+	if (newcr->cr_label)
+		label_hold(newcr->cr_label);
 	crfree(oldcr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 }
@@ -281,6 +305,8 @@ crdup(cred_t *cr)
 	bcopy(cr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
+	if (newcr->cr_label)
+		label_hold(newcr->cr_label);
 	newcr->cr_ref = 1;
 	return (newcr);
 }
@@ -297,6 +323,8 @@ crdup_to(cred_t *oldcr, cred_t *newcr)
 	bcopy(oldcr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
+	if (newcr->cr_label)
+		label_hold(newcr->cr_label);
 	newcr->cr_ref = 1;
 }
 
@@ -304,7 +332,7 @@ crdup_to(cred_t *oldcr, cred_t *newcr)
  * Return the (held) credentials for the current running process.
  */
 cred_t *
-crgetcred()
+crgetcred(void)
 {
 	cred_t *cr;
 	proc_t *p;
@@ -500,13 +528,35 @@ crgetauinfo_modifiable(cred_t *cr)
 zoneid_t
 crgetzoneid(const cred_t *cr)
 {
-	return (cr->cr_zone->zone_id);
+	return (cr->cr_zone == NULL ?
+	    (cr->cr_uid == -1 ? (zoneid_t)-1 : GLOBAL_ZONEID) :
+	    cr->cr_zone->zone_id);
 }
 
 projid_t
 crgetprojid(const cred_t *cr)
 {
 	return (cr->cr_projid);
+}
+
+zone_t *
+crgetzone(const cred_t *cr)
+{
+	return (cr->cr_zone);
+}
+
+struct ts_label_s *
+crgetlabel(const cred_t *cr)
+{
+	return (cr->cr_label ?
+	    cr->cr_label :
+	    (cr->cr_zone ? cr->cr_zone->zone_slabel : NULL));
+}
+
+boolean_t
+crisremote(const cred_t *cr)
+{
+	return (REMOTE_PEER_CRED(cr));
 }
 
 #define	BADID(x)	((x) != -1 && (unsigned int)(x) > MAXUID)
@@ -618,12 +668,12 @@ cred2prcred(const cred_t *cr, prcred_t *pcrp)
 }
 
 static int
-cred2ucaud(const cred_t *cr, auditinfo64_addr_t *ainfo)
+cred2ucaud(const cred_t *cr, auditinfo64_addr_t *ainfo, const cred_t *rcr)
 {
 	auditinfo_addr_t	*ai;
 	au_tid_addr_t	tid;
 
-	if (secpolicy_audit_getattr(CRED()) != 0)
+	if (secpolicy_audit_getattr(rcr) != 0)
 		return (-1);
 
 	ai = CR_AUINFO(cr);	/* caller makes sure this is non-NULL */
@@ -642,13 +692,26 @@ cred2ucaud(const cred_t *cr, auditinfo64_addr_t *ainfo)
 	return (0);
 }
 
+void
+cred2uclabel(const cred_t *cr, bslabel_t *labelp)
+{
+	ts_label_t	*tslp;
+
+	if ((tslp = crgetlabel(cr)) != NULL)
+		bcopy(&tslp->tsl_label, labelp, sizeof (bslabel_t));
+}
+
 /*
  * Convert a credential into a "ucred".  Allow the caller to specify
  * and aligned buffer, e.g., in an mblk, so we don't have to allocate
  * memory and copy it twice.
+ *
+ * This function may call cred2ucaud(), which calls CRED(). Since this
+ * can be called from an interrupt thread, receiver's cred (rcr) is needed
+ * to determine whether audit info should be included.
  */
 struct ucred_s *
-cred2ucred(const cred_t *cr, pid_t pid, void *buf)
+cred2ucred(const cred_t *cr, pid_t pid, void *buf, const cred_t *rcr)
 {
 	struct ucred_s *uc;
 
@@ -663,14 +726,32 @@ cred2ucred(const cred_t *cr, pid_t pid, void *buf)
 	uc->uc_credoff = UCRED_CRED_OFF;
 	uc->uc_privoff = UCRED_PRIV_OFF;
 	uc->uc_audoff = UCRED_AUD_OFF;
+	uc->uc_labeloff = UCRED_LABEL_OFF;
 	uc->uc_pid = pid;
 	uc->uc_projid = cr->cr_projid;
 	uc->uc_zoneid = crgetzoneid(cr);
 
-	cred2prcred(cr, UCCRED(uc));
-	cred2prpriv(cr, UCPRIV(uc));
-	if (audoff == 0 || cred2ucaud(cr, UCAUD(uc)) != 0)
+	/*
+	 * Note that cred2uclabel() call should not be factored out
+	 * to the bottom of the if-else. UCXXX() macros depend on
+	 * uc_xxxoff values to work correctly.
+	 */
+	if (REMOTE_PEER_CRED(cr)) {
+		/*
+		 * other than label, the rest of cred info about a
+		 * remote peer isn't available.
+		 */
+		cred2uclabel(cr, UCLABEL(uc));
+		uc->uc_credoff = 0;
+		uc->uc_privoff = 0;
 		uc->uc_audoff = 0;
+	} else {
+		cred2prcred(cr, UCCRED(uc));
+		cred2prpriv(cr, UCPRIV(uc));
+		if (audoff == 0 || cred2ucaud(cr, UCAUD(uc), rcr) != 0)
+			uc->uc_audoff = 0;
+		cred2uclabel(cr, UCLABEL(uc));
+	}
 
 	return (uc);
 }
@@ -689,7 +770,7 @@ pgetucred(proc_t *p)
 	crhold(cr);
 	mutex_exit(&p->p_crlock);
 
-	uc = cred2ucred(cr, p->p_pid, NULL);
+	uc = cred2ucred(cr, p->p_pid, NULL, CRED());
 	crfree(cr);
 
 	return (uc);
@@ -761,4 +842,65 @@ crsetzone(cred_t *cr, zone_t *zptr)
 	zone_cred_hold(zptr);
 	if (oldzptr)
 		zone_cred_rele(oldzptr);
+}
+
+/*
+ * Create a new cred based on the supplied label
+ */
+cred_t *
+newcred_from_bslabel(bslabel_t *blabel, uint32_t doi, int flags)
+{
+	ts_label_t *lbl = labelalloc(blabel, doi, flags);
+	cred_t *cr = NULL;
+
+	if (lbl != NULL) {
+		if ((cr = kmem_cache_alloc(cred_cache, flags)) != NULL) {
+			bcopy(dummycr, cr, crsize);
+			cr->cr_label = lbl;
+		} else {
+			label_rele(lbl);
+		}
+	}
+
+	return (cr);
+}
+
+/*
+ * Derive a new cred from the existing cred, but with a different label.
+ * To be used when a cred is being shared, but the label needs to be changed
+ * by a caller without affecting other users
+ */
+cred_t *
+copycred_from_bslabel(cred_t *cr, bslabel_t *blabel, uint32_t doi, int flags)
+{
+	ts_label_t *lbl = labelalloc(blabel, doi, flags);
+	cred_t *newcr = NULL;
+
+	if (lbl != NULL) {
+		if ((newcr = kmem_cache_alloc(cred_cache, flags)) != NULL) {
+			bcopy(cr, newcr, crsize);
+			if (newcr->cr_zone)
+				zone_cred_hold(newcr->cr_zone);
+			newcr->cr_label = lbl;
+			newcr->cr_ref = 1;
+		} else {
+			label_rele(lbl);
+		}
+	}
+
+	return (newcr);
+}
+
+/*
+ * This function returns a pointer to the kcred-equivalent in the current zone.
+ */
+cred_t *
+zone_kcred(void)
+{
+	zone_t *zone;
+
+	if ((zone = CRED()->cr_zone) != NULL)
+		return (zone->zone_kcred);
+	else
+		return (kcred);
 }

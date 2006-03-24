@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is an internal header file. Not to be shipped.
@@ -49,6 +48,27 @@ extern "C" {
 #define	SET_DATE_AUTH		"solaris.system.date"
 #define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
 #define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"
+
+/*
+ * Authorizations used by Trusted Solaris.
+ */
+#define	BYPASS_FILE_VIEW_AUTH	"solaris.label.win.noview"
+#define	DEVICE_CONFIG_AUTH	"solaris.device.config"
+#define	FILE_CHOWN_AUTH		"solaris.file.chown"
+#define	FILE_DOWNGRADE_SL_AUTH	"solaris.label.file.downgrade"
+#define	FILE_OWNER_AUTH		"solaris.file.owner"
+#define	FILE_UPGRADE_SL_AUTH	"solaris.label.file.upgrade"
+#define	PRINT_ADMIN_AUTH	"solaris.print.admin"
+#define	PRINT_CANCEL_AUTH	"solaris.print.cancel"
+#define	PRINT_LIST_AUTH		"solaris.print.list"
+#define	PRINT_MAC_AUTH		"solaris.label.print"
+#define	PRINT_NOBANNER_AUTH	"solaris.print.nobanner"
+#define	PRINT_POSTSCRIPT_AUTH	"solaris.print.ps"
+#define	PRINT_UNLABELED_AUTH	"solaris.print.unlabeled"
+#define	SHUTDOWN_AUTH		"solaris.system.shutdown"
+#define	SYS_ACCRED_SET_AUTH	"solaris.label.range"
+#define	WIN_DOWNGRADE_SL_AUTH	"solaris.label.win.downgrade"
+#define	WIN_UPGRADE_SL_AUTH	"solaris.label.win.upgrade"
 
 #ifdef	__cplusplus
 }

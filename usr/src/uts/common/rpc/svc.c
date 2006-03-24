@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +211,7 @@
 #include <sys/vtrace.h>
 #include <sys/zone.h>
 #include <nfs/nfs.h>
+#include <sys/tsol/label_macro.h>
 
 #define	RQCRED_SIZE	400	/* this size is excessive */
 
@@ -1305,6 +1305,8 @@ svc_getreq(
 	    "svc_getreq_start:");
 
 	ASSERT(clone_xprt->xp_master != NULL);
+	ASSERT(!is_system_labeled() || DB_CRED(mp) != NULL ||
+	    mp->b_datap->db_type != M_DATA);
 
 	/*
 	 * Firstly, allocate the authentication parameters' storage
@@ -1324,6 +1326,28 @@ svc_getreq(
 	msg.rm_call.cb_cred.oa_base = cred_area;
 	msg.rm_call.cb_verf.oa_base = &(cred_area[MAX_AUTH_BYTES]);
 	r.rq_clntcred = &(cred_area[2 * MAX_AUTH_BYTES]);
+
+	/*
+	 * underlying transport recv routine may modify mblk data
+	 * and make it difficult to extract label afterwards. So
+	 * get the label from the raw mblk data now.
+	 */
+	if (is_system_labeled()) {
+		mblk_t *lmp;
+
+		r.rq_label = kmem_alloc(sizeof (bslabel_t), KM_SLEEP);
+		if (DB_CRED(mp) != NULL)
+			lmp = mp;
+		else {
+			ASSERT(mp->b_cont != NULL);
+			lmp = mp->b_cont;
+			ASSERT(DB_CRED(lmp) != NULL);
+		}
+		bcopy(label2bslabel(crgetlabel(DB_CRED(lmp))), r.rq_label,
+		    sizeof (bslabel_t));
+	} else {
+		r.rq_label = NULL;
+	}
 
 	/*
 	 * Now receive a message from the transport.
@@ -1410,6 +1434,9 @@ svc_getreq(
 		}
 	}
 
+	if (r.rq_label != NULL)
+		kmem_free(r.rq_label, sizeof (bslabel_t));
+
 	/*
 	 * Free authentication parameters' storage
 	 */
@@ -1442,7 +1469,6 @@ svc_clone_free(SVCXPRT *clone_xprt)
 	/* Fre credentials from crget() */
 	if (clone_xprt->xp_cred)
 		crfree(clone_xprt->xp_cred);
-
 	kmem_free(clone_xprt, sizeof (SVCXPRT));
 }
 
@@ -1479,6 +1505,7 @@ svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 
 	/* Restore per-thread fields (xp_cred) */
 	clone_xprt->xp_cred = cred;
+
 
 	/*
 	 * NOTICE: There is no transport-type specific code now.
@@ -2378,6 +2405,9 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 	SVCPOOL *pool = xprt->xp_pool;
 
 	TRACE_0(TR_FAC_KRPC, TR_SVC_QUEUEREQ_START, "svc_queuereq_start");
+
+	ASSERT(!is_system_labeled() || DB_CRED(mp) != NULL ||
+	    mp->b_datap->db_type != M_DATA);
 
 	/*
 	 * Step 1.

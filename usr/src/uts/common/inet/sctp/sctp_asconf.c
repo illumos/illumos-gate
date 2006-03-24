@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1138,28 +1137,23 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	uint16_t	type;
 	mblk_t		*mp;
 	sctp_faddr_t	*nfp;
-	sctp_parm_hdr_t	*oph;
+	sctp_parm_hdr_t	*oph = ph;
+	int		err;
 
 	*cont = 1;
 
 	/* Send back an authorization error if addip is disabled */
 	if (!sctp_addip_enabled) {
-		mp = sctp_asconf_adderr(SCTP_ERR_UNAUTHORIZED, ph, cid);
-		if (mp == NULL)
-			*cont = -1;
-		return (mp);
+		err = SCTP_ERR_UNAUTHORIZED;
+		goto error_handler;
 	}
 	/* Check input */
 	if (ntohs(ph->sph_len) < (sizeof (*ph) * 2)) {
-		mp = sctp_asconf_adderr(SCTP_ERR_BAD_MANDPARM, ph, cid);
-		if (mp == NULL) {
-			*cont = -1;
-		}
-		return (mp);
+		err = SCTP_ERR_BAD_MANDPARM;
+		goto error_handler;
 	}
 
 	type = ntohs(ph->sph_type);
-	oph = ph;
 	ph = (sctp_parm_hdr_t *)((char *)ph + sizeof (sctp_parm_hdr_t) +
 	    sizeof (cid));
 	mp = sctp_check_addip_addr(ph, oph, cont, cid, &addr);
@@ -1172,12 +1166,8 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 			/* Address is already part of association */
 			dprint(1, ("addip: addr already here: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
-			mp = sctp_asconf_adderr(SCTP_ERR_BAD_MANDPARM, oph,
-			    cid);
-			if (mp == NULL) {
-				*cont = -1;
-			}
-			return (mp);
+			err = SCTP_ERR_BAD_MANDPARM;
+			goto error_handler;
 		}
 
 		if (!act) {
@@ -1185,13 +1175,17 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 		}
 		/* Add the new address */
 		mutex_enter(&sctp->sctp_conn_tfp->tf_lock);
-		if (sctp_add_faddr(sctp, &addr, KM_NOSLEEP) != 0) {
-			mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
+		err = sctp_add_faddr(sctp, &addr, KM_NOSLEEP);
+		mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
+		if (err == ENOMEM) {
 			/* no memory */
 			*cont = -1;
 			return (NULL);
 		}
-		mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
+		if (err != 0) {
+			err = SCTP_ERR_BAD_MANDPARM;
+			goto error_handler;
+		}
 		sctp_intf_event(sctp, addr, SCTP_ADDR_ADDED, 0);
 	} else if (type == PARM_DEL_IP) {
 		nfp = sctp_lookup_faddr(sctp, &addr);
@@ -1202,34 +1196,22 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 			 */
 			dprint(1, ("delip: addr not here: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
-			mp = sctp_asconf_adderr(SCTP_ERR_BAD_MANDPARM, oph,
-			    cid);
-			if (mp == NULL) {
-				*cont = -1;
-			}
-			return (mp);
+			err = SCTP_ERR_BAD_MANDPARM;
+			goto error_handler;
 		}
 		if (sctp->sctp_faddrs == nfp && nfp->next == NULL) {
 			/* Peer is trying to delete last address */
 			dprint(1, ("delip: del last addr: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
-			mp = sctp_asconf_adderr(SCTP_ERR_DEL_LAST_ADDR, oph,
-			    cid);
-			if (mp == NULL) {
-				*cont = -1;
-			}
-			return (mp);
+			err = SCTP_ERR_DEL_LAST_ADDR;
+			goto error_handler;
 		}
 		if (nfp == fp) {
 			/* Peer is trying to delete source address */
 			dprint(1, ("delip: del src addr: %x:%x:%x:%x\n",
 			    SCTP_PRINTADDR(addr)));
-			mp = sctp_asconf_adderr(SCTP_ERR_DEL_SRC_ADDR, oph,
-			    cid);
-			if (mp == NULL) {
-				*cont = -1;
-			}
-			return (mp);
+			err = SCTP_ERR_DEL_SRC_ADDR;
+			goto error_handler;
 		}
 		if (!act) {
 			return (NULL);
@@ -1267,6 +1249,12 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 
 	/* Successful, don't need to return anything. */
 	return (NULL);
+
+error_handler:
+	mp = sctp_asconf_adderr(err, oph, cid);
+	if (mp == NULL)
+		*cont = -1;
+	return (mp);
 }
 
 /*

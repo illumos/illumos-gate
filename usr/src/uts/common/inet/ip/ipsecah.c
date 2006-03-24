@@ -66,6 +66,7 @@
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
 #include <sys/kstat.h>
+#include <sys/strsubr.h>
 
 /* Packet dropper for AH drops. */
 static ipdropper_t ah_dropper;
@@ -4080,6 +4081,12 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		nip6h->ip6_plen = htons((uint16_t)length);
 	}
 
+	if (is_system_labeled()) {
+		/*
+		 * inherit the label by setting it in the new ip header
+		 */
+		mblk_setcred(phdr_mp, DB_CRED(mp));
+	}
 	return (IPSEC_STATUS_SUCCESS);
 
 ah_in_discard:
@@ -4195,6 +4202,13 @@ ah_auth_out_done(mblk_t *ipsec_out)
 		length = ntohs(nip6h->ip6_plen);
 		length += (sizeof (ah_t) + align_len);
 		nip6h->ip6_plen = htons((uint16_t)length);
+	}
+
+	if (is_system_labeled()) {
+		/*
+		 * inherit the label by setting it in the new ip header
+		 */
+		mblk_setcred(phdr_mp, DB_CRED(mp));
 	}
 
 	/* Skip the original IP header */

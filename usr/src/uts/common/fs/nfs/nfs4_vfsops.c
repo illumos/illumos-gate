@@ -57,6 +57,8 @@
 #include <sys/netconfig.h>
 #include <sys/dnlc.h>
 #include <sys/list.h>
+#include <sys/mntent.h>
+#include <sys/tsol/label.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -332,6 +334,7 @@ nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	char *userbufptr;
 	zone_t *zone = nfs_zone();
 	nfs4_error_t n4e;
+	zone_t *mntzone = NULL;
 
 	if (secpolicy_fs_mount(cr, mvp, vfsp) != 0)
 		return (EPERM);
@@ -725,22 +728,34 @@ more:
 	/*
 	 * Determine the zone we're being mounted into.
 	 */
+	zone_hold(mntzone = zone);		/* start with this assumption */
 	if (getzoneid() == GLOBAL_ZONEID) {
-		zone_t *mntzone;
-
+		zone_rele(mntzone);
 		mntzone = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
 		ASSERT(mntzone != NULL);
-		zone_rele(mntzone);
 		if (mntzone != zone) {
 			error = EBUSY;
 			goto errout;
 		}
 	}
 
+	if (is_system_labeled()) {
+		error = nfs_mount_label_policy(vfsp, &svp->sv_addr,
+		    svp->sv_knconf, cr);
+
+		if (error > 0)
+			goto errout;
+
+		if (error == -1) {
+			/* change mount to read-only to prevent write-down */
+			vfs_setmntopt(vfsp, MNTOPT_RO, NULL, 0);
+		}
+	}
+
 	/*
 	 * Stop the mount from going any further if the zone is going away.
 	 */
-	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(mntzone) >= ZONE_IS_SHUTTING_DOWN) {
 		error = EBUSY;
 		goto errout;
 	}
@@ -749,7 +764,7 @@ more:
 	 * Get root vnode.
 	 */
 proceed:
-	error = nfs4rootvp(&rtvp, vfsp, svp_head, flags, cr, zone);
+	error = nfs4rootvp(&rtvp, vfsp, svp_head, flags, cr, mntzone);
 
 	if (error)
 		goto errout;
@@ -792,10 +807,12 @@ errout:
 			/*
 			 * In this error path we need to sfh4_rele() before
 			 * we free the mntinfo4_t as sfh4_rele() has a
-			 * dependancy on mi_fh_lock.
+			 * dependency on mi_fh_lock.
 			 */
-			if (rtvp != NULL)
+			if (rtvp != NULL) {
 				VN_RELE(rtvp);
+				rtvp = NULL;
+			}
 			if (mi->mi_io_kstats) {
 				kstat_delete(mi->mi_io_kstats);
 				mi->mi_io_kstats = NULL;
@@ -809,6 +826,8 @@ errout:
 				mi->mi_recov_ksp = NULL;
 			}
 			nfs_free_mi4(mi);
+			if (mntzone != NULL)
+				zone_rele(mntzone);
 			return (error);
 		}
 		sv4_free(svp_head);
@@ -816,6 +835,9 @@ errout:
 
 	if (rtvp != NULL)
 		VN_RELE(rtvp);
+
+	if (mntzone != NULL)
+		zone_rele(mntzone);
 
 	return (error);
 }

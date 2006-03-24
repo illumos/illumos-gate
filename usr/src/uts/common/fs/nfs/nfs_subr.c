@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -32,7 +31,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
-#include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/time.h>
@@ -61,6 +60,10 @@
 #include <sys/callb.h>
 #include <sys/atomic.h>
 #include <sys/list.h>
+#include <sys/tsol/tnet.h>
+#include <sys/priv.h>
+
+#include <inet/ip6.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -277,6 +280,11 @@ static char	*nfs_getsrvnames(mntinfo_t *, size_t *);
 extern int sec_clnt_geth(CLIENT *, struct sec_data *, cred_t *, AUTH **);
 extern void sec_clnt_freeh(AUTH *);
 extern void sec_clnt_freeinfo(struct sec_data *);
+
+/*
+ * used in mount policy
+ */
+extern ts_label_t *getflabel_cipso(vfs_t *);
 
 /*
  * EIO or EINTR are not recoverable errors.
@@ -914,17 +922,19 @@ rfs3call(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 
 static int
 rfscall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
-    xdrproc_t xdrres, caddr_t resp, cred_t *cr, int *douprintf,
+    xdrproc_t xdrres, caddr_t resp, cred_t *icr, int *douprintf,
     enum clnt_stat *rpc_status, int flags, failinfo_t *fi)
 {
 	CLIENT *client;
 	struct chtab *ch;
+	cred_t *cr = icr;
 	enum clnt_stat status;
 	struct rpc_err rpcerr;
 	struct timeval wait;
 	int timeo;		/* in units of hz */
 	int my_rsize, my_wsize;
 	bool_t tryagain;
+	bool_t cred_cloned = FALSE;
 	k_sigset_t smask;
 	servinfo_t *svp;
 	struct nfs_clnt *nfscl;
@@ -1024,6 +1034,13 @@ failoverretry:
 			if (fi->fhp && fi->copyproc)
 				(*fi->copyproc)(fi->fhp, fi->vp);
 		}
+	}
+
+	/* For TSOL, use a new cred which has net_mac_aware flag */
+	if (!cred_cloned && is_system_labeled()) {
+		cred_cloned = TRUE;
+		cr = crdup(icr);
+		(void) setpflags(NET_MAC_AWARE, 1, cr);
 	}
 
 	/*
@@ -1252,6 +1269,8 @@ failoverretry:
 				 * the transfer size changed.
 				 */
 				clfree_impl(client, ch, nfscl);
+				if (cred_cloned)
+					crfree(cr);
 				return (ENFS_TRYAGAIN);
 			}
 		}
@@ -1348,6 +1367,8 @@ failoverretry:
 	}
 
 	clfree_impl(client, ch, nfscl);
+	if (cred_cloned)
+		crfree(cr);
 
 	ASSERT(rpcerr.re_status == RPC_SUCCESS || rpcerr.re_errno != 0);
 
@@ -1449,11 +1470,13 @@ acl3call(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 
 static int
 aclcall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
-    xdrproc_t xdrres, caddr_t resp, cred_t *cr, int *douprintf,
+    xdrproc_t xdrres, caddr_t resp, cred_t *icr, int *douprintf,
     int flags, failinfo_t *fi)
 {
 	CLIENT *client;
 	struct chtab *ch;
+	cred_t *cr = icr;
+	bool_t cred_cloned = FALSE;
 	enum clnt_stat status;
 	struct rpc_err rpcerr;
 	struct timeval wait;
@@ -1562,6 +1585,13 @@ failoverretry:
 		}
 	}
 
+	/* For TSOL, use a new cred which has net_mac_aware flag */
+	if (!cred_cloned && is_system_labeled()) {
+		cred_cloned = TRUE;
+		cr = crdup(icr);
+		(void) setpflags(NET_MAC_AWARE, 1, cr);
+	}
+
 	/*
 	 * acl_clget() calls clnt_tli_kinit() which clears the xid, so we
 	 * are guaranteed to reprocess the retry as a new request.
@@ -1581,8 +1611,11 @@ failoverretry:
 			goto failoverretry;
 		}
 	}
-	if (rpcerr.re_errno != 0)
+	if (rpcerr.re_errno != 0) {
+		if (cred_cloned)
+			crfree(cr);
 		return (rpcerr.re_errno);
+	}
 
 	if (svp->sv_knconf->knc_semantics == NC_TPI_COTS_ORD ||
 	    svp->sv_knconf->knc_semantics == NC_TPI_COTS) {
@@ -1823,6 +1856,8 @@ failoverretry:
 				 * the transfer size changed.
 				 */
 				clfree_impl(client, ch, nfscl);
+				if (cred_cloned)
+					crfree(cr);
 				return (ENFS_TRYAGAIN);
 			}
 #endif
@@ -1921,6 +1956,8 @@ failoverretry:
 	}
 
 	clfree_impl(client, ch, nfscl);
+	if (cred_cloned)
+		crfree(cr);
 
 	ASSERT(rpcerr.re_status == RPC_SUCCESS || rpcerr.re_errno != 0);
 
@@ -4971,4 +5008,112 @@ zoneid_t
 nfs_zoneid(void)
 {
 	return (nfs_global_client_only != 0 ? GLOBAL_ZONEID : getzoneid());
+}
+
+/*
+ * nfs_mount_label_policy:
+ *	Determine whether the mount is allowed according to MAC check,
+ *	by comparing (where appropriate) label of the remote server
+ *	against the label of the zone being mounted into.
+ *
+ *	Returns:
+ *		 0 :	access allowed
+ *		-1 :	read-only access allowed (i.e., read-down)
+ *		>0 :	error code, such as EACCES
+ */
+int
+nfs_mount_label_policy(vfs_t *vfsp, struct netbuf *addr,
+    struct knetconfig *knconf, cred_t *cr)
+{
+	int		addr_type;
+	void		*ipaddr;
+	bslabel_t	*server_sl, *mntlabel;
+	zone_t		*mntzone = NULL;
+	ts_label_t	*zlabel;
+	tsol_tpc_t	*tp;
+	ts_label_t	*tsl = NULL;
+	int		retv;
+
+	/*
+	 * Get the zone's label.  Each zone on a labeled system has a label.
+	 */
+	mntzone = zone_find_by_any_path(refstr_value(vfsp->vfs_mntpt), B_FALSE);
+	zlabel = mntzone->zone_slabel;
+	ASSERT(zlabel != NULL);
+	label_hold(zlabel);
+
+	if (strcmp(knconf->knc_protofmly, NC_INET) == 0) {
+		addr_type = IPV4_VERSION;
+		ipaddr = &((struct sockaddr_in *)addr->buf)->sin_addr;
+	} else if (strcmp(knconf->knc_protofmly, NC_INET6) == 0) {
+		addr_type = IPV6_VERSION;
+		ipaddr = &((struct sockaddr_in6 *)addr->buf)->sin6_addr;
+	} else {
+		retv = 0;
+		goto out;
+	}
+
+	retv = EACCES;				/* assume the worst */
+
+	/*
+	 * Next, get the assigned label of the remote server.
+	 */
+	tp = find_tpc(ipaddr, addr_type, B_FALSE);
+	if (tp == NULL)
+		goto out;			/* error getting host entry */
+
+	if (tp->tpc_tp.tp_doi != zlabel->tsl_doi)
+		goto rel_tpc;			/* invalid domain */
+	if ((tp->tpc_tp.host_type != SUN_CIPSO) &&
+	    (tp->tpc_tp.host_type != UNLABELED))
+		goto rel_tpc;			/* invalid hosttype */
+
+	if (tp->tpc_tp.host_type == SUN_CIPSO) {
+		tsl = getflabel_cipso(vfsp);
+		if (tsl == NULL)
+			goto rel_tpc;		/* error getting server lbl */
+
+		server_sl = label2bslabel(tsl);
+	} else {	/* UNLABELED */
+		server_sl = &tp->tpc_tp.tp_def_label;
+	}
+
+	mntlabel = label2bslabel(zlabel);
+
+	/*
+	 * Now compare labels to complete the MAC check.  If the labels
+	 * are equal or if the requestor is in the global zone and has
+	 * NET_MAC_AWARE, then allow read-write access.   (Except for
+	 * mounts into the global zone itself; restrict these to
+	 * read-only.)
+	 *
+	 * If the requestor is in some other zone, but his label
+	 * dominates the server, then allow read-down.
+	 *
+	 * Otherwise, access is denied.
+	 */
+	if (blequal(mntlabel, server_sl) ||
+	    (crgetzoneid(cr) == GLOBAL_ZONEID &&
+	    getpflags(NET_MAC_AWARE, cr) != 0)) {
+		if ((mntzone == global_zone) ||
+		    !blequal(mntlabel, server_sl))
+			retv = -1;		/* read-only */
+		else
+			retv = 0;		/* access OK */
+	} else if (bldominates(mntlabel, server_sl)) {
+		retv = -1;			/* read-only */
+	} else {
+		retv = EACCES;
+	}
+
+	if (tsl != NULL)
+		label_rele(tsl);
+
+rel_tpc:
+	TPC_RELE(tp);
+out:
+	if (mntzone)
+		zone_rele(mntzone);
+	label_rele(zlabel);
+	return (retv);
 }

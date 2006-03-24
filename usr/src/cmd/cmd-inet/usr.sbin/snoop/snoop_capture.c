@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,27 +56,37 @@
 
 #include "snoop.h"
 
-void scan();
+/*
+ * Old header format.
+ * Actually two concatenated structs:  nit_bufhdr + nit_head
+ */
+struct ohdr {
+	/* nit_bufhdr */
+	int	o_msglen;
+	int	o_totlen;
+	/* nit_head */
+	struct timeval o_time;
+	int	o_drops;
+	int	o_len;
+};
+
+static void scan(char *, int, int, int, int, void (*)(), int, int, int);
 void convert_to_network();
 void convert_from_network();
-void convert_old();
-extern int quitting;
+static void convert_old(struct ohdr *);
 extern sigjmp_buf jmp_env, ojmp_env;
-int netfd;
-union DL_primitives netdl;			/* info_ack for interface */
-char *bufp;	/* pointer to read buffer */
+static int netfd;
+static union DL_primitives netdl;		/* info_ack for interface */
+static char *bufp;	/* pointer to read buffer */
 
-extern unsigned int encap_levels;
-
-static int strioctl(int, int, int, int, char *);
+static int strioctl(int, int, int, int, void *);
 
 /*
  * Convert a device id to a ppa value
  * e.g. "le0" -> 0
  */
-int
-device_ppa(device)
-	char *device;
+static int
+device_ppa(char *device)
 {
 	char *p;
 	char *tp;
@@ -97,9 +106,8 @@ device_ppa(device)
  * Level 1 devices: "le0" -> "/dev/le0".
  * Level 2 devices: "le0" -> "/dev/le".
  */
-char *
-device_path(device)
-	char *device;
+static char *
+device_path(char *device)
 {
 	static char buff[IF_NAMESIZE + 1];
 	struct stat st;
@@ -223,8 +231,9 @@ check_device(char **devicep, int *ppap)
 
 	/* allow limited functionality even is interface isn't known */
 	if (interface->mac_type == -1) {
-		fprintf(stderr, "snoop: WARNING: Mac Type = %x not supported\n",
-			netdl.info_ack.dl_mac_type);
+		fprintf(stderr,
+		    "snoop: WARNING: Mac Type = %lx not supported\n",
+		    netdl.info_ack.dl_mac_type);
 	}
 
 	/* for backward compatibility, allow known interface mtu_sizes */
@@ -244,6 +253,7 @@ check_device(char **devicep, int *ppap)
  * push the streams buffer module and packet filter module, set various buffer
  * parameters.
  */
+/* ARGSUSED */
 void
 initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	char *device;
@@ -252,7 +262,6 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	struct Pf_ext_packetfilt *fp;
 	int ppa;
 {
-	union DL_primitives dl;
 	extern int Pflg;
 
 	/*
@@ -281,7 +290,7 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	dlpromiscon(netfd, DL_PROMISC_SAP);
 
 	if (ioctl(netfd, DLIOCRAW, 0) < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("ioctl: DLIOCRAW: %s: %m", device_path(device));
 	}
 
@@ -290,38 +299,38 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 		 * push and configure the packet filtering module
 		 */
 		if (ioctl(netfd, I_PUSH, "pfmod") < 0) {
-			close(netfd);
+			(void) close(netfd);
 			pr_err("ioctl: I_PUSH pfmod: %s: %m",
 			    device_path(device));
 		}
 
 		if (strioctl(netfd, PFIOCSETF, -1, sizeof (*fp),
 		    (char *)fp) < 0) {
-			close(netfd);
+			(void) close(netfd);
 			pr_err("PFIOCSETF: %s: %m", device_path(device));
 		}
 	}
 
 	if (ioctl(netfd, I_PUSH, "bufmod") < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("push bufmod: %s: %m", device_path(device));
 	}
 
 	if (strioctl(netfd, SBIOCSTIME, -1, sizeof (struct timeval),
 	    (char *)timeout) < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("SBIOCSTIME: %s: %m", device_path(device));
 	}
 
 	if (strioctl(netfd, SBIOCSCHUNK, -1, sizeof (uint_t),
 	    (char *)&chunksize) < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("SBIOCGCHUNK: %s: %m", device_path(device));
 	}
 
 	if (strioctl(netfd, SBIOCSSNAP, -1, sizeof (uint_t),
 	    (char *)&snaplen) < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("SBIOCSSNAP: %s: %m", device_path(device));
 	}
 
@@ -330,7 +339,7 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	 * accumulated before the device reached its final configuration.
 	 */
 	if (ioctl(netfd, I_FLUSH, FLUSHR) < 0) {
-		close(netfd);
+		(void) close(netfd);
 		pr_err("I_FLUSH: %s: %m", device_path(device));
 	}
 }
@@ -383,7 +392,7 @@ net_read(chunksize, filter, proc, flags)
 	}
 
 	free(bufp);
-	close(netfd);
+	(void) close(netfd);
 
 	if (!quitting) {
 		if (r < 0)
@@ -422,13 +431,9 @@ corrupt(volatile char *pktp, volatile char *pstop, char *buf,
 }
 #endif /* DEBUG */
 
-void
-scan(buf, len, filter, cap, old, proc, first, last, flags)
-	char *buf;
-	int len, filter, cap, old;
-	void (*proc)();
-	int first, last;
-	int flags;
+static void
+scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
+    int first, int last, int flags)
 {
 	volatile char *bp, *bufstop;
 	volatile struct sb_hdr *hdrp;
@@ -481,7 +486,7 @@ scan(buf, len, filter, cap, old, proc, first, last, flags)
 			 * capture file, convert the header.
 			 */
 			if (old) {
-				convert_old(hdrp);
+				convert_old((struct ohdr *)hdrp);
 			}
 
 			nhdrp = &nhdr;
@@ -685,34 +690,33 @@ static int capfile_out;
  * |	 word 0	   |	 word 1	   |	 word 2	   |	 word 3
  *
  */
-const char *snoop_id = "snoop\0\0\0";
-const int snoop_idlen = 8;
-const int snoop_version = 2;
+static const char *snoop_id = "snoop\0\0\0";
+static const int snoop_idlen = 8;
+static const int snoop_version = 2;
 
 void
 cap_open_write(name)
 	char *name;
 {
 	int vers;
-	int rc;
 
 	capfile_out = open(name, O_CREAT | O_TRUNC | O_RDWR, 0666);
 	if (capfile_out < 0)
 		pr_err("%s: %m", name);
 
 	vers = htonl(snoop_version);
-	if ((rc = nwrite(capfile_out, snoop_id, snoop_idlen)) == -1)
+	if (nwrite(capfile_out, snoop_id, snoop_idlen) == -1)
 		cap_write_error("snoop_id");
 
-	if ((rc = nwrite(capfile_out, &vers, sizeof (int))) == -1)
+	if (nwrite(capfile_out, &vers, sizeof (int)) == -1)
 		cap_write_error("version");
 }
 
 
 void
-cap_close()
+cap_close(void)
 {
-	close(capfile_out);
+	(void) close(capfile_out);
 }
 
 static char *cap_buffp = NULL;
@@ -737,7 +741,7 @@ cap_open_read(name)
 	cap_len = st.st_size;
 
 	cap_buffp = mmap(0, cap_len, PROT_READ, MAP_PRIVATE, capfile_in, 0);
-	close(capfile_in);
+	(void) close(capfile_in);
 	if ((int)cap_buffp == -1)
 		pr_err("couldn't mmap %s: %m", name);
 
@@ -810,9 +814,10 @@ cap_read(first, last, filter, proc, flags)
 
 	scan(cap_buffp, cap_len, filter, 1, !cap_new, proc, first, last, flags);
 
-	munmap(cap_buffp, cap_len);
+	(void) munmap(cap_buffp, cap_len);
 }
 
+/* ARGSUSED */
 void
 cap_write(hdrp, pktp, num, flags)
 	struct sb_hdr *hdrp;
@@ -823,7 +828,6 @@ cap_write(hdrp, pktp, num, flags)
 	static int first = 1;
 	struct sb_hdr nhdr;
 	extern boolean_t qflg;
-	int rc;
 
 	if (hdrp == NULL)
 		return;
@@ -831,7 +835,7 @@ cap_write(hdrp, pktp, num, flags)
 	if (first) {
 		first = 0;
 		mac = htonl(interface->mac_type);
-		if ((rc = nwrite(capfile_out, &mac, sizeof (int))) == -1)
+		if (nwrite(capfile_out, &mac, sizeof (int)) == -1)
 			cap_write_error("mac_type");
 	}
 
@@ -847,10 +851,10 @@ cap_write(hdrp, pktp, num, flags)
 	nhdr.sbh_timestamp.tv_sec = htonl(hdrp->sbh_timestamp.tv_sec);
 	nhdr.sbh_timestamp.tv_usec = htonl(hdrp->sbh_timestamp.tv_usec);
 
-	if ((rc = nwrite(capfile_out, &nhdr, sizeof (nhdr))) == -1)
+	if (nwrite(capfile_out, &nhdr, sizeof (nhdr)) == -1)
 		cap_write_error("packet header");
 
-	if ((rc = nwrite(capfile_out, pktp, pktlen)) == -1)
+	if (nwrite(capfile_out, pktp, pktlen) == -1)
 		cap_write_error("packet");
 
 	if (! qflg)
@@ -858,26 +862,11 @@ cap_write(hdrp, pktp, num, flags)
 }
 
 /*
- * Old header format.
- * Actually two concatenated structs:  nit_bufhdr + nit_head
- */
-struct ohdr {
-	/* nit_bufhdr */
-	int	o_msglen;
-	int	o_totlen;
-	/* nit_head */
-	struct timeval o_time;
-	int	o_drops;
-	int	o_len;
-};
-
-/*
  * Convert a packet header from
  * old to new format.
  */
-void
-convert_old(ohdrp)
-	struct ohdr *ohdrp;
+static void
+convert_old(struct ohdr *ohdrp)
 {
 	struct sb_hdr nhdr;
 
@@ -891,7 +880,7 @@ convert_old(ohdrp)
 }
 
 static int
-strioctl(int fd, int cmd, int timout, int len, char *dp)
+strioctl(int fd, int cmd, int timout, int len, void *dp)
 {
 	struct	strioctl	sioc;
 	int	rc;

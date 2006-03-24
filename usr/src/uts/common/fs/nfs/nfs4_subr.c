@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,9 +38,10 @@
 #include <sys/session.h>
 #include <sys/thread.h>
 #include <sys/dnlc.h>
-#include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <sys/list.h>
 #include <sys/sdt.h>
+#include <sys/policy.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -1208,17 +1208,19 @@ static unsigned int minimum_timeo[] = {
 
 static int
 nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
-    xdrproc_t xdrres, caddr_t resp, cred_t *cr, int *doqueue,
+    xdrproc_t xdrres, caddr_t resp, cred_t *icr, int *doqueue,
     enum clnt_stat *rpc_statusp, int flags, struct nfs4_clnt *nfscl)
 {
 	CLIENT *client;
 	struct chtab *ch;
+	cred_t *cr = icr;
 	struct rpc_err rpcerr;
 	enum clnt_stat status;
 	int error;
 	struct timeval wait;
 	int timeo;		/* in units of hz */
 	bool_t tryagain, is_recov;
+	bool_t cred_cloned = FALSE;
 	k_sigset_t smask;
 	servinfo4_t *svp;
 #ifdef DEBUG
@@ -1238,6 +1240,13 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 		return (EIO);
 	}
 	mutex_exit(&mi->mi_lock);
+
+	/* For TSOL, use a new cred which has net_mac_aware flag */
+	if (!cred_cloned && is_system_labeled()) {
+		cred_cloned = TRUE;
+		cr = crdup(icr);
+		(void) setpflags(NET_MAC_AWARE, 1, cr);
+	}
 
 	/*
 	 * clget() calls clnt_tli_kinit() which clears the xid, so we
@@ -1281,6 +1290,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 		if (mi->mi_flags & MI4_SHUTDOWN) {
 			mutex_exit(&mi->mi_lock);
 			clfree4(client, ch, nfscl);
+			if (cred_cloned)
+				crfree(cr);
 			return (EIO);
 		}
 		mutex_exit(&mi->mi_lock);
@@ -1288,6 +1299,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 		if ((mi->mi_vfsp->vfs_flag & VFS_UNMOUNTED) &&
 		    (!is_recov || !firstcall)) {
 			clfree4(client, ch, nfscl);
+			if (cred_cloned)
+				crfree(cr);
 			return (EIO);
 		}
 
@@ -1297,6 +1310,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 			    !is_recov || !firstcall) {
 				mutex_exit(&mi->mi_lock);
 				clfree4(client, ch, nfscl);
+				if (cred_cloned)
+					crfree(cr);
 				return (EIO);
 			}
 			mutex_exit(&mi->mi_lock);
@@ -1391,6 +1406,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 				mi->mi_flags |= MI4_TIMEDOUT;
 				mutex_exit(&mi->mi_lock);
 				clfree4(client, ch, nfscl);
+				if (cred_cloned)
+					crfree(cr);
 				return (EIO);
 			}
 
@@ -1404,6 +1421,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 			if (mi->mi_vers == 4 && FAILOVER_MOUNT4(mi) &&
 			    (error = try_failover(status)) != 0) {
 				clfree4(client, ch, nfscl);
+				if (cred_cloned)
+					crfree(cr);
 				*rpc_statusp = status;
 				return (error);
 			}
@@ -1526,6 +1545,8 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	}
 
 	clfree4(client, ch, nfscl);
+	if (cred_cloned)
+		crfree(cr);
 
 	ASSERT(rpcerr.re_status == RPC_SUCCESS || rpcerr.re_errno != 0);
 

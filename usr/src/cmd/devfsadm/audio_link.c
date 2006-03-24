@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,9 +31,12 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <stdio.h>
+#include <bsm/devalloc.h>
 
 #define	MAX_AUDIO_LINK 100
 #define	RE_SIZE 64
+
+extern int system_labeled;
 
 static void check_audio_link(char *secondary_link,
 				const char *primary_link_format);
@@ -117,6 +119,7 @@ minor_fini(void)
 static int
 audio_process(di_minor_t minor, di_node_t node)
 {
+	int flags = 0;
 	char path[PATH_MAX + 1];
 	char *buf;
 	char *mn;
@@ -209,7 +212,10 @@ audio_process(di_minor_t minor, di_node_t node)
 		return (DEVFSADM_CONTINUE);
 	}
 
-	(void) devfsadm_mklink(path, node, minor, 0);
+	if (system_labeled)
+		flags = DA_ADD|DA_AUDIO;
+
+	(void) devfsadm_mklink(path, node, minor, flags);
 	return (DEVFSADM_CONTINUE);
 }
 
@@ -219,17 +225,21 @@ check_audio_link(char *secondary_link, const char *primary_link_format)
 {
 	char primary_link[PATH_MAX + 1];
 	int i;
+	int flags = 0;
 
 	/* if link is present, return */
 	if (devfsadm_link_valid(secondary_link) == DEVFSADM_TRUE) {
 		return;
 	}
 
+	if (system_labeled)
+		flags = DA_ADD|DA_AUDIO;
+
 	for (i = 0; i < MAX_AUDIO_LINK; i++) {
 		(void) sprintf(primary_link, primary_link_format, i);
 		if (devfsadm_link_valid(primary_link) == DEVFSADM_TRUE) {
 			(void) devfsadm_secondary_link(secondary_link,
-						primary_link, 0);
+						primary_link, flags);
 			break;
 		}
 	}

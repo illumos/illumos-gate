@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _TAR_H
 #define	_TAR_H
@@ -68,6 +70,25 @@ extern "C" {
 #define	TOWRITE		00002
 #define	TOEXEC		00001
 
+/*
+ *      Types used in ancillary files
+ */
+#define	ACL_HDR		'A'	/* Access Control List */
+#define	LBL_TYPE	'L'	/* Trusted Extensions file label */
+#define	DIR_TYPE	'D'	/* Trusted Extensions directory label */
+/*
+ * Attribute types used in Trusted Solaris ancillary files
+ * that are interpreted for backward compatibility
+ */
+#define	SLD_TYPE	'S'	/* single-level directory component */
+#define	PATH_TYPE	'P'	/* Path component */
+#define	MLD_TYPE	'M'	/* multi-level directory component */
+#define	FILE_TYPE	'F'	/* Have to handle files differently */
+#define	APRIV_TYPE	'P'	/* allowed privileges data type in file */
+#define	FPRIV_TYPE	'p'	/* forced privileges data type in file */
+#define	COMP_TYPE	'C'	/* path components, use for MLD */
+#define	ATTR_FLAG_TYPE	'F'	/* file attribute flag bytes data type */
+#define	LK_COMP_TYPE	'K'	/* link data path component */
 #ifdef	__cplusplus
 }
 #endif

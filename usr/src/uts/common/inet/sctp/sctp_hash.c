@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +29,8 @@
 #include <sys/socket.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/strsun.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/tnet.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -339,6 +339,7 @@ done:
 	return (sctp);
 }
 
+/* called by ipsec_sctp_pol */
 conn_t *
 sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
     uint_t ipif_seqid, zoneid_t zoneid)
@@ -347,6 +348,37 @@ sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 
 	if ((sctp = sctp_conn_match(src, dst, ports, ipif_seqid,
 	    zoneid)) == NULL) {
+		/* Not in conn fanout; check listen fanout */
+		if ((sctp = listen_match(dst, ports, ipif_seqid,
+		    zoneid)) == NULL) {
+			return (NULL);
+		}
+	}
+	return (sctp->sctp_connp);
+}
+
+conn_t *
+sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
+    uint_t ipif_seqid, zoneid_t zoneid, mblk_t *mp)
+{
+	sctp_t *sctp;
+
+	if ((sctp = sctp_conn_match(src, dst, ports, ipif_seqid,
+	    zoneid)) == NULL) {
+		if (zoneid == ALL_ZONES) {
+			zoneid = tsol_mlp_findzone(IPPROTO_SCTP,
+			    htons(ntohl(ports) & 0xFFFF));
+			/*
+			 * If no shared MLP is found, tsol_mlp_findzone returns
+			 * ALL_ZONES.  In that case, we assume it's SLP, and
+			 * search for the zone based on the packet label.
+			 * That will also return ALL_ZONES on failure.
+			 */
+			if (zoneid == ALL_ZONES)
+				zoneid = tsol_packet_to_zoneid(mp);
+			if (zoneid == ALL_ZONES)
+				return (NULL);
+		}
 		/* Not in conn fanout; check listen fanout */
 		if ((sctp = listen_match(dst, ports, ipif_seqid,
 		    zoneid)) == NULL) {
@@ -400,7 +432,7 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 		dst = &map_dst;
 		isv4 = B_TRUE;
 	}
-	if ((connp = sctp_find_conn(src, dst, ports, ipif_seqid, zoneid)) ==
+	if ((connp = sctp_fanout(src, dst, ports, ipif_seqid, zoneid, mp)) ==
 	    NULL) {
 		ip_fanout_sctp_raw(mp, recv_ill, ipha, isv4,
 		    ports, mctl_present, flags, ip_policy,

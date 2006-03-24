@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
+#include <strings.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -40,114 +42,106 @@
 #include <netinet/if_ether.h>
 #include "snoop.h"
 
-#define	NULL 0
-
-extern void interpret_mip_cntrlmsg(int, uchar_t *, int);
-
 struct porttable {
 	int	pt_num;
 	char	*pt_short;
-	char	*pt_long;
 };
 
-struct porttable pt_udp[] = {
-	7,	"ECHO",		"Echo",
-	9,	"DISCARD",	"Discard",
-	13,	"DAYTIME",	"Daytime",
-	19,	"CHARGEN",	"Character generator",
-	37,	"TIME",		"Time",
-	42,	"NAME",		"Host name server",
-	53,	"DNS",		"Domain Name Server",
-	67,	"BOOTPS",	"Bootstrap Protocol Server",
-	68,	"BOOTPC",	"Boostrap Protocol Client",
-	69,	"TFTP",		"Trivial File Transfer Protocol",
-	79,	"FINGER",	"Finger",
-/*	111,	"PORTMAP",	"Portmapper", Just Sun RPC */
-	123,	"NTP",		"Network Time Protocol",
-	137,	"NBNS",		"Netbios name service",
-	138,	"NBDG",		"Netbios datagram service",
-	389,	"LDAP",		"Lightweight Directory Access Protocol",
-	427,	"SLP",		"Service Location Protocol",
+static const struct porttable pt_udp[] = {
+	{ IPPORT_ECHO,		"ECHO" },
+	{ IPPORT_DISCARD,	"DISCARD" },
+	{ IPPORT_DAYTIME,	"DAYTIME" },
+	{ 19,			"CHARGEN" },
+	{ IPPORT_TIMESERVER,	"TIME" },
+	{ IPPORT_NAMESERVER,	"NAME" },
+	{ 53,			"DNS" },
+	{ IPPORT_BOOTPS,	"BOOTPS" },
+	{ IPPORT_BOOTPC,	"BOOTPC" },
+	{ IPPORT_TFTP,		"TFTP" },
+	{ IPPORT_FINGER,	"FINGER" },
+/*	{ 111,			"PORTMAP" }, Just Sun RPC */
+	{ 123,			"NTP" },
+	{ 137,			"NBNS" },
+	{ 138,			"NBDG" },
+	{ 389,			"LDAP" },
+	{ 427,			"SLP" },
 /* Mobile IP defines a set of new control messages sent over UDP port 434 */
-	434,	"Mobile IP",	"Mobile IP Control Messages",
-	512,	"BIFF",		"BIFF",
-	513,	"WHO",		"WHO",
-	514,	"SYSLOG",	"SYSLOG",
-	517,	"TALK",		"TALK",
-	520,	"RIP",		"Routing Information Protocol",
-	550,	"NEW-RWHO",	"NEW-RWHO",
-	560,	"RMONITOR",	"RMONITOR",
-	561,	"MONITOR",	"MONITOR",
-	521,	"RIPng",	"Routing Information Protocol for IPv6",
-	1080,	"SOCKS",	"SOCKS Gateway",
-	0,	NULL,		"",
+	{ 434,			"Mobile IP" },
+	{ IPPORT_BIFFUDP,	"BIFF" },
+	{ IPPORT_WHOSERVER,	"WHO" },
+	{ 514,			"SYSLOG" },
+	{ 517,			"TALK" },
+	{ IPPORT_ROUTESERVER,	"RIP" },
+	{ 521,			"RIPng" },
+	{ 550,			"NEW-RWHO" },
+	{ 560,			"RMONITOR" },
+	{ 561,			"MONITOR" },
+	{ 1080,			"SOCKS" },
+	{ 0,			NULL }
 };
 
-struct porttable pt_tcp[] = {
-	1,	"TCPMUX",	"TCPMUX",
-	7,	"ECHO",		"Echo",
-	9,	"DISCARD",	"Discard",
-	11,	"SYSTAT",	"Active users",
-	13,	"DAYTIME",	"Daytime",
-	15,	"NETSTAT",	"Who is up",
-	19,	"CHARGEN",	"Character generator",
-	20,	"FTP-DATA",	"File Transfer Protocol (data)",
-	21,	"FTP",		"File Transfer Protocol",
-	23,	"TELNET",	"Terminal connection",
-	25,	"SMTP",		"Simple Mail Transport Protocol",
-	37,	"TIME",		"Time",
-	39,	"RLP",		"Resource Location Protocol",
-	42,	"NAMESERVER",	"Host Name Server",
-	43,	"NICNAME",	"Who is",
-	53,	"DNS",		"Domain Name Server",
-	67,	"BOOTPS",	"Bootstrap Protocol Server",
-	68,	"BOOTPC",	"Bootstrap Protocol Client",
-	69,	"TFTP",		"Trivial File Transfer Protocol",
-	70,	"GOPHER",	"Internet Gopher Protocol",
-	77,	"RJE",		"RJE service (private)",
-	79,	"FINGER",	"Finger",
-	80,	"HTTP",		"HyperText Transfer Protocol",
-	87,	"LINK",		"Link",
-	95,	"SUPDUP",	"SUPDUP Protocol",
-	101,	"HOSTNAME",	"NIC Host Name Server",
-	102,	"ISO-TSAP",	"ISO-TSAP",
-	103,	"X400",		"X400 Mail service",
-	104,	"X400-SND",	"X400 Mail service",
-	105,	"CSNET-NS",	"CSNET-NS",
-	109,	"POP-2",	"POP-2",
-/*	111,	"PORTMAP",	"Portmapper", Just Sun RPC */
-	113,	"AUTH",		"Authentication Service",
-	117,	"UUCP-PATH",	"UUCP Path Service",
-	119,	"NNTP",		"Network News Transfer Protocol",
-	123,	"NTP",		"Network Time Protocol",
-	139,	"NBT",		"Netbios over TCP",
-	143,	"IMAP",		"Internet Message Access Protocol",
-	144,	"NeWS",		"Network extensible Window System",
-	389,	"LDAP",		"Lightweight Directory Access Protocol",
-	427,	"SLP",		"Service Location Protocol",
-	443,	"HTTPS",	"HTTP over SSL",
-	445,    "SMB",          "Direct Hosted Server Message Block",
-	512,	"EXEC",		"EXEC",
-	513,	"RLOGIN",	"RLOGIN",
-	514,	"RSHELL",	"RSHELL",
-	515,	"PRINTER",	"PRINTER",
-	530,	"COURIER",	"COURIER",
-	540,	"UUCP",		"UUCP",
-	600,	"PCSERVER",	"PCSERVER",
-	1524,	"INGRESLOCK",	"INGRESLOCK",
-	1080,	"SOCKS",	"SOCKS Gateway",
-	2904,	"M2UA",		"SS7 MTP2 User Adaption Layer",
-	2905,	"M3UA",		"SS7 MTP3 User Adaption Layer",
-	6000,	"XWIN",		"X Window System",
-	8080,	"HTTP (proxy)",	"HyperText Transfer Protocol (proxy)",
-	9900,	"IUA",		"ISDN Q.921 User Adaption Layer",
-	0,	NULL,		"",
+static struct porttable pt_tcp[] = {
+	{ 1,			"TCPMUX" },
+	{ IPPORT_ECHO,		"ECHO" },
+	{ IPPORT_DISCARD,	"DISCARD" },
+	{ IPPORT_SYSTAT,	"SYSTAT" },
+	{ IPPORT_DAYTIME,	"DAYTIME" },
+	{ IPPORT_NETSTAT,	"NETSTAT" },
+	{ 19,			"CHARGEN" },
+	{ 20,			"FTP-DATA" },
+	{ IPPORT_FTP,		"FTP" },
+	{ IPPORT_TELNET,	"TELNET" },
+	{ IPPORT_SMTP,		"SMTP" },
+	{ IPPORT_TIMESERVER,	"TIME" },
+	{ 39,			"RLP" },
+	{ IPPORT_NAMESERVER,	"NAMESERVER" },
+	{ IPPORT_WHOIS,		"NICNAME" },
+	{ 53,			"DNS" },
+	{ 70,			"GOPHER" },
+	{ IPPORT_RJE,		"RJE" },
+	{ IPPORT_FINGER,	"FINGER" },
+	{ 80,			"HTTP" },
+	{ IPPORT_TTYLINK,	"LINK" },
+	{ IPPORT_SUPDUP,	"SUPDUP" },
+	{ 101,			"HOSTNAME" },
+	{ 102,			"ISO-TSAP" },
+	{ 103,			"X400" },
+	{ 104,			"X400-SND" },
+	{ 105,			"CSNET-NS" },
+	{ 109,			"POP-2" },
+/*	{ 111,			"PORTMAP" }, Just Sun RPC */
+	{ 113,			"AUTH" },
+	{ 117,			"UUCP-PATH" },
+	{ 119,			"NNTP" },
+	{ 123,			"NTP" },
+	{ 139,			"NBT" },
+	{ 143,			"IMAP" },
+	{ 144,			"NeWS" },
+	{ 389,			"LDAP" },
+	{ 427,			"SLP" },
+	{ 443,			"HTTPS" },
+	{ 445,			"SMB" },
+	{ IPPORT_EXECSERVER,	"EXEC" },
+	{ IPPORT_LOGINSERVER,	"RLOGIN" },
+	{ IPPORT_CMDSERVER,	"RSHELL" },
+	{ 515,			"PRINTER" },
+	{ 530,			"COURIER" },
+	{ 540,			"UUCP" },
+	{ 600,			"PCSERVER" },
+	{ 1080,			"SOCKS" },
+	{ 1524,			"INGRESLOCK" },
+	{ 2904,			"M2UA" },
+	{ 2905,			"M3UA" },
+	{ 6000,			"XWIN" },
+	{ 8080,			"HTTP (proxy)" },
+	{ 9900,			"IUA" },
+	{ 0,			NULL },
 };
 
 char *
 getportname(int proto, in_port_t port)
 {
-	struct porttable *p, *pt;
+	const struct porttable *p, *pt;
 
 	switch (proto) {
 	case IPPROTO_SCTP: /* fallthru */
@@ -166,7 +160,7 @@ getportname(int proto, in_port_t port)
 int
 reservedport(int proto, int port)
 {
-	struct porttable *p, *pt;
+	const struct porttable *p, *pt;
 
 	switch (proto) {
 	case IPPROTO_TCP: pt = pt_tcp; break;
@@ -186,13 +180,13 @@ reservedport(int proto, int port)
  * See TFTP interpreter.
  */
 #define	MAXTRANS 64
-struct ttable {
+static struct ttable {
 	int t_port;
-	int (*t_proc)();
+	int (*t_proc)(int, char *, int);
 } transients [MAXTRANS];
 
 int
-add_transient(int port, int (*proc)())
+add_transient(int port, int (*proc)(int, char *, int))
 {
 	static struct ttable *next = transients;
 
@@ -266,7 +260,7 @@ interpret_syslog(int flags, char dir, int port, const char *syslogstr,
 			data++;
 			datalen--;
 
-			strlcpy(buffer, data, sizeof (buffer));
+			(void) strlcpy(buffer, data, sizeof (buffer));
 			composit = strtoul(buffer, &end, 0);
 			data += end - buffer;
 			if (*data == '>') {
@@ -306,11 +300,11 @@ interpret_syslog(int flags, char dir, int port, const char *syslogstr,
 		static char syslog[] = "SYSLOG:  ";
 		show_header(syslog, syslog, dlen);
 		show_space();
-		(void) sprintf(get_detail_line(0, 80),
+		(void) snprintf(get_detail_line(0, 0), MAXLINE,
 		    "%s%sPriority: %.*s%s(%s.%s)", prot_nest_prefix, syslog,
 		    priostrlen, syslogstr, bogus ? "" : " ",
 		    facilstr, pristr);
-		(void) sprintf(get_line(0, 0),
+		(void) snprintf(get_line(0, 0), get_line_remain(),
 			"\"%s\"",
 			show_string(syslogstr, dlen, 60));
 		show_trailer();
@@ -323,7 +317,7 @@ int
 interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
     char *data, int dlen)
 {
-	char *pn;
+	const char *pn;
 	int dir, port, which;
 	char pbuff[16], hbuff[32];
 	struct ttable *ttabp;
@@ -373,25 +367,29 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 
 	if (dlen > 0) {
 		switch (which) {
-		case  67:
-		case  68:
-			interpret_dhcp(flags, data, dlen);
+		case  IPPORT_BOOTPS:
+		case  IPPORT_BOOTPC:
+			(void) interpret_dhcp(flags, (struct dhcp *)data,
+			    dlen);
 			return (1);
-		case  69:
-			interpret_tftp(flags, data, dlen);
+		case  IPPORT_TFTP:
+			(void) interpret_tftp(flags, (struct tftphdr *)data,
+			    dlen);
 			return (1);
 		case  80:
 		case  8080:
-			interpret_http(flags, data, dlen);
+			(void) interpret_http(flags, data, dlen);
 			return (1);
 		case 123:
-			interpret_ntp(flags, data, dlen);
+			(void) interpret_ntp(flags, (struct ntpdata *)data,
+			    dlen);
 			return (1);
 		case 137:
-			interpret_netbios_ns(flags, data, dlen);
+			interpret_netbios_ns(flags, (uchar_t *)data, dlen);
 			return (1);
 		case 138:
-			interpret_netbios_datagram(flags, data, dlen);
+			interpret_netbios_datagram(flags, (uchar_t *)data,
+			    dlen);
 			return (1);
 		case 139:
 		case 445:
@@ -400,7 +398,7 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 			 * on port 139.  The same interpreter can be used
 			 * for both.
 			 */
-			interpret_netbios_ses(flags, data, dlen);
+			interpret_netbios_ses(flags, (uchar_t *)data, dlen);
 			return (1);
 		case 389:
 			interpret_ldap(flags, data, dlen, src, dst);
@@ -411,34 +409,36 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		case 434:
 			interpret_mip_cntrlmsg(flags, (uchar_t *)data, dlen);
 			return (1);
-		case 520:
-			interpret_rip(flags, data, dlen);
+		case IPPORT_ROUTESERVER:
+			(void) interpret_rip(flags, (struct rip *)data, dlen);
 			return (1);
 		case 521:
-			interpret_rip6(flags, data, dlen);
+			(void) interpret_rip6(flags, (struct rip6 *)data,
+			    dlen);
 			return (1);
 		case 1080:
 			if (dir == 'C')
-				interpret_socks_call(flags, data, dlen);
+				(void) interpret_socks_call(flags, data, dlen);
 			else
-				interpret_socks_reply(flags, data, dlen);
+				(void) interpret_socks_reply(flags, data,
+				    dlen);
 			return (1);
 		}
 	}
 
 	if (flags & F_SUM) {
-		(void) sprintf(get_sum_line(),
+		(void) snprintf(get_sum_line(), MAXLINE,
 			"%s %c port=%d %s",
 			pn, dir, port,
 			show_string(data, dlen, 20));
 	}
 
 	if (flags & F_DTAIL) {
-		(void) sprintf(pbuff, "%s:  ", pn);
-		(void) sprintf(hbuff, "%s:  ", pn);
+		(void) snprintf(pbuff, sizeof (pbuff), "%s:  ", pn);
+		(void) snprintf(hbuff, sizeof (hbuff), "%s:  ", pn);
 		show_header(pbuff, hbuff, dlen);
 		show_space();
-		(void) sprintf(get_line(0, 0),
+		(void) snprintf(get_line(0, 0), get_line_remain(),
 			"\"%s\"",
 			show_string(data, dlen, 60));
 		show_trailer();
@@ -479,7 +479,7 @@ show_string(const char *str, int dlen, int maxlen)
 				*pp++ = c;
 				printable++;
 			} else {
-				(void) sprintf(pp,
+				(void) snprintf(pp, TBSIZE - (pp - tbuff),
 					isdigit(*(p + 1)) ?
 					"\\%03o" : "\\%o", c);
 				pp += strlen(pp);

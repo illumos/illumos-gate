@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +76,7 @@
 #include <sys/utrap.h>
 #include <sys/lgrp_user.h>
 #include <sys/door.h>
+#include <sys/tsol/tndb.h>
 #include "ramdata.h"
 #include "print.h"
 #include "proto.h"
@@ -2310,6 +2310,7 @@ prt_zga(private_t *pri, int raw, long val)
 		case ZONE_ATTR_UNIQID:	s = "ZONE_ATTR_UNIQID"; break;
 		case ZONE_ATTR_POOLID:	s = "ZONE_ATTR_POOLID"; break;
 		case ZONE_ATTR_INITPID:	s = "ZONE_ATTR_INITPID"; break;
+		case ZONE_ATTR_SLBL:	s = "ZONE_ATTR_SLBL"; break;
 		}
 	}
 
@@ -2329,6 +2330,30 @@ prt_atc(private_t *pri, int raw, long val)
 		outstring(pri, "AT_FDCWD");
 	else
 		prt_dec(pri, 0, val);
+}
+
+/*
+ * Print Trusted Networking database operation codes (labelsys; tn*)
+ */
+static void
+prt_tnd(private_t *pri, int raw, long val)
+{
+	const char *s = NULL;
+
+	if (!raw) {
+		switch ((tsol_dbops_t)val) {
+		case TNDB_NOOP:		s = "TNDB_NOOP";	break;
+		case TNDB_LOAD:		s = "TNDB_LOAD";	break;
+		case TNDB_DELETE:	s = "TNDB_DELETE";	break;
+		case TNDB_FLUSH:	s = "TNDB_FLUSH";	break;
+		case TNDB_GET:		s = "TNDB_GET";		break;
+		}
+	}
+
+	if (s == NULL)
+		prt_dec(pri, 0, val);
+	else
+		outstring(pri, s);
 }
 
 /*
@@ -2501,5 +2526,6 @@ void (* const Print[])() = {
 	prt_lio,	/* LIO -- print LIO_XX flags */
 	prt_dfl,	/* DFL -- print door_create() flags */
 	prt_dpm,	/* DPM -- print DOOR_PARAM_XX flags */
+	prt_tnd,	/* TND -- print trusted network data base opcode */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

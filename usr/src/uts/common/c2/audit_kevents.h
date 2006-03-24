@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +37,7 @@ extern "C" {
  *
  *	0		Reserved as an invalid event number.
  *	1 -   511	Allocated for Solaris kernel
- *	512 -  1023	Allocated for Trusted Solaris kernel
+ *	512 -  1023	Allocated for Trusted Solaris/Trusted Extensions kernel
  *	1024 -  2047	(reserved but not allocated)
  *	2048 - 32767	Reserved for the Solaris TCB application.
  *	32768 - 65535	Available for other Trusted applications.
@@ -165,11 +164,9 @@ extern "C" {
 #define	AUE_ASYNC_DAEMON_EXIT	114	/* =no async_daemon(2) exited */
 #define	AUE_NFSSVC_EXIT		115	/* =no nfssvc(2) exited */
 /*
- * 116 - 127 are available for future growth (old SunOS_CMW events
+ * 116 - 129 are available for future growth (old SunOS_CMW events
  * that had no libbsm or praudit support or references)
  */
-#define	AUE_WRITEL		128	/* =no writel(2) */
-#define	AUE_WRITEVL		129	/* =no writevl(2) */
 #define	AUE_GETAUID		130	/* =aa getauid(2) */
 #define	AUE_SETAUID		131	/* =aa setauid(2) */
 #define	AUE_GETAUDIT		132	/* =aa getaudit(2) */
@@ -219,10 +216,10 @@ extern "C" {
 #define	AUE_MSGSNDL		176	/* =no msgsndl(2) */
 #define	AUE_SEMGETL		177	/* =no semgetl(2) */
 #define	AUE_SHMGETL		178	/* =no shmgetl(2) */
-#define	AUE_GETMLDADORN		179	/* =no getmldadorn(2) */
-#define	AUE_GETSLDNAME		180	/* =no getsldname(2) */
-#define	AUE_MLDLSTAT		181	/* =no mldlstat(2) */
-#define	AUE_MLDSTAT		182	/* =no mldstat(2) */
+/*				179	    OBSOLETE */
+/*				180	    OBSOLETE */
+/*				181	    OBSOLETE */
+/*				182	    OBSOLETE */
 #define	AUE_SOCKET		183	/* =nt socket(2) */
 #define	AUE_SENDTO		184	/* =nt sendto(2) */
 #define	AUE_PIPE		185	/* =no pipe(2) */
@@ -336,12 +333,17 @@ extern "C" {
 #define	AUE_CONFIGKSSL		293	/* =as kernel SSL */
 
 /*
+ * Trusted Solaris/Trusted Extensions kernel audit events
+ *	512 -  1023	allocated for Trusted Solaris/Trusted Extensions
+ */
+
+/*
  * Maximum number of kernel events in the event to class table
  * leave a couple extra ones just incase somebody wants to load a new
  * driver with build in auditing
  */
 
-#define	MAX_KEVENTS		512
+#define	MAX_KEVENTS		580
 
 #ifdef __cplusplus
 }

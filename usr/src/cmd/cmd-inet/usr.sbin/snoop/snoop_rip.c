@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +37,10 @@
 #include <protocols/routed.h>
 #include "snoop.h"
 
-static char *show_cmd(int);
+static const char *show_cmd(int);
+static int get_numtokens(unsigned int);
+static const struct rip_sec_entry *rip_next_sec_entry(
+    const struct rip_sec_entry *, int);
 
 int
 interpret_rip(int flags, struct rip *rip, int fraglen)
@@ -46,6 +48,9 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 	const struct netinfo *nip;
 	const struct entryinfo *ep;
 	const struct netauth *nap;
+	const struct rip_sec_entry *rsep, *rsn;
+	const struct rip_emetric *rep;
+	const uint32_t *tokp;
 	int len, count;
 	const char *cmdstr, *auth;
 	struct in_addr dst;
@@ -68,6 +73,8 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 		case RIPCMD_TRACEOFF:	cmdstr = "Traceoff";	break;
 		case RIPCMD_POLL:	cmdstr = "Poll";	break;
 		case RIPCMD_POLLENTRY:	cmdstr = "Poll entry";	break;
+		case RIPCMD_SEC_RESPONSE: cmdstr = "R - SEC";	break;
+		case RIPCMD_SEC_T_RESPONSE: cmdstr = "R - SEC_T"; break;
 		default: cmdstr = "?"; break;
 		}
 
@@ -108,6 +115,26 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 			len = 0;
 			break;
 
+		case RIPCMD_SEC_RESPONSE:
+		case RIPCMD_SEC_T_RESPONSE:
+			if (len < sizeof (rip->rip_tsol.rip_generation))
+				break;
+			len -= sizeof (rip->rip_tsol.rip_generation);
+			count = 0;
+			rsep = rip->rip_tsol.rip_sec_entry;
+			while (len > 0) {
+				rsn = rip_next_sec_entry(rsep, len);
+				if (rsn == NULL)
+					break;
+				len -= (const char *)rsn - (const char *)rsep;
+				rsep = rsn;
+				count++;
+			}
+			(void) snprintf(get_sum_line(), MAXLINE,
+			    "%s %s (%d destinations%s)", ripvers, cmdstr,
+			    count, (len != 0 ? "?" : ""));
+			break;
+
 		default:
 			(void) snprintf(get_sum_line(), MAXLINE,
 			    "%s %d (%s)", ripvers, rip->rip_cmd, cmdstr);
@@ -121,12 +148,11 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 		len = fraglen - 4;
 		show_header("RIP:  ", "Routing Information Protocol", fraglen);
 		show_space();
-		(void) snprintf(get_line((char *)(uintptr_t)rip->rip_cmd -
-		    dlc_header, 1), get_line_remain(), "Opcode = %d (%s)",
-		    rip->rip_cmd, show_cmd(rip->rip_cmd));
-		(void) snprintf(get_line((char *)(uintptr_t)rip->rip_vers -
-		    dlc_header, 1), get_line_remain(), "Version = %d",
-		    rip->rip_vers);
+		(void) snprintf(get_line(0, 0), get_line_remain(),
+		    "Opcode = %d (%s)", rip->rip_cmd,
+		    show_cmd(rip->rip_cmd));
+		(void) snprintf(get_line(0, 0), get_line_remain(),
+		    "Version = %d", rip->rip_vers);
 
 		switch (rip->rip_cmd) {
 		case RIPCMD_REQUEST:
@@ -156,9 +182,7 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 						    nap->au.au_pw);
 					} else if (nap->a_type ==
 					    RIP_AUTH_MD5) {
-						(void) snprintf(get_line
-						    ((char *)nip - dlc_header,
-							sizeof (*nip)),
+						(void) snprintf(get_line(0, 0),
 						    get_line_remain(),
 						    " *** Auth MD5 pkt len %d, "
 						    "keyid %d, sequence %08lX, "
@@ -166,7 +190,7 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 						    ntohs(nap->au.a_md5.
 							md5_pkt_len),
 						    nap->au.a_md5.md5_keyid,
-						    ntohl(nap->au.a_md5.
+						    (long)ntohl(nap->au.a_md5.
 							md5_seqno),
 						    ntohs(nap->au.a_md5.
 							md5_auth_len));
@@ -189,15 +213,13 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 				}
 				if (nip->n_family == RIP_AF_UNSPEC &&
 				    rip->rip_cmd == RIPCMD_REQUEST) {
-					(void) snprintf(get_line((char *)nip -
-					    dlc_header, sizeof (*nip)),
+					(void) snprintf(get_line(0, 0),
 					    get_line_remain(),
 					    " *** All routes");
 					continue;
 				}
 				if (nip->n_family != RIP_AF_INET) {
-					(void) snprintf(get_line((char *)nip -
-					    dlc_header, sizeof (*nip)),
+					(void) snprintf(get_line(0, 0),
 					    get_line_remain(),
 					    " *** Address Family %d?",
 					    ntohs(nip->n_family));
@@ -231,8 +253,7 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 				}
 				dst.s_addr = nip->n_nhop;
 				mval = ntohl(nip->n_metric);
-				(void) snprintf(get_line((char *)nip -
-				    dlc_header, sizeof (*nip)),
+				(void) snprintf(get_line(0, 0),
 				    get_line_remain(),
 				    "%-31s %-15s %-6d %d%s",
 				    addrstr,
@@ -252,44 +273,105 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 			ep = (const struct entryinfo *)rip->rip_nets;
 			/* LINTED */
 			sin = (const struct sockaddr_in *)&ep->rtu_dst;
-			(void) snprintf(get_line((char *)sin - dlc_header,
-			    sizeof (struct sockaddr)), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Destination = %s %s",
 			    inet_ntoa(sin->sin_addr),
 			    addrtoname(AF_INET, (void *)&sin->sin_addr));
 			/* LINTED */
 			sin = (const struct sockaddr_in *)&ep->rtu_router;
-			(void) snprintf(get_line((char *)sin - dlc_header,
-			    sizeof (struct sockaddr)), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Router      = %s %s",
 			    inet_ntoa(sin->sin_addr),
 			    addrtoname(AF_INET, (void *)&sin->sin_addr));
-			(void) snprintf(get_line((char *)&ep->rtu_flags -
-			    dlc_header, 2), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Flags = %4x", (unsigned)ep->rtu_flags);
-			(void) snprintf(get_line((char *)&ep->rtu_state -
-			    dlc_header, 2), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "State = %d", ep->rtu_state);
-			(void) snprintf(get_line((char *)&ep->rtu_timer -
-			    dlc_header, 4), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Timer = %d", ep->rtu_timer);
-			(void) snprintf(get_line((char *)&ep->rtu_metric -
-			    dlc_header, 4), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Metric = %d", ep->rtu_metric);
-			(void) snprintf(get_line((char *)&ep->int_flags -
-			    dlc_header, 4), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Int flags = %8x", ep->int_flags);
-			(void) snprintf(get_line((char *)ep->int_name -
-			    dlc_header, sizeof (ep->int_name)),
-			    get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Int name = \"%.*s\"", sizeof (ep->int_name),
 			    ep->int_name);
 			break;
 
+		case RIPCMD_SEC_RESPONSE:
+		case RIPCMD_SEC_T_RESPONSE:
+			if (len < sizeof (rip->rip_tsol.rip_generation))
+				break;
+			len -= sizeof (rip->rip_tsol.rip_generation);
+			show_space();
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    "Generation = %u",
+			    (unsigned)ntohl(rip->rip_tsol.rip_generation));
+			rsep = rip->rip_tsol.rip_sec_entry;
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    "Address         E-METRIC");
+			rsep = rip->rip_tsol.rip_sec_entry;
+			while (len > 0) {
+				char *cp;
+				int blen, num;
+
+				rsn = rip_next_sec_entry(rsep, len);
+				if (rsn == NULL)
+					break;
+				dst.s_addr = rsep->rip_dst;
+				cp = get_line(0, 0);
+				blen = get_line_remain();
+				(void) snprintf(cp, blen, "%-16s ",
+				    inet_ntoa(dst));
+				cp += 17;
+				blen -= 17;
+				rep = rsep->rip_emetric;
+				for (count = ntohl(rsep->rip_count); count > 0;
+				    count--) {
+					(void) snprintf(cp, blen, "metric=%d",
+					    ntohs(rep->rip_metric));
+					blen -= strlen(cp);
+					cp += strlen(cp);
+					tokp = rep->rip_token;
+					num = get_numtokens(
+					    ntohs(rep->rip_mask));
+					/* advance to the next emetric */
+					rep = (const struct rip_emetric *)
+					    &rep->rip_token[num];
+					if (num > 0) {
+						(void) snprintf(cp, blen,
+						    ",tokens=%lx",
+						    (long)ntohl(*tokp));
+						tokp++;
+						num--;
+					} else {
+						(void) strlcpy(cp, ",no tokens",
+						    blen);
+					}
+					while (num > 0) {
+						blen -= strlen(cp);
+						cp += strlen(cp);
+						(void) snprintf(cp, blen,
+						    ",%lx",
+						    (long)ntohl(*tokp));
+						tokp++;
+						num--;
+					}
+					blen -= strlen(cp);
+					cp += strlen(cp);
+				}
+				if (rsep->rip_count == 0) {
+					(void) strlcpy(cp,
+					    "NULL (not reachable)", blen);
+				}
+				len -= (const char *)rsn - (const char *)rsep;
+				rsep = rsn;
+			}
+			break;
+
 		case RIPCMD_TRACEON:
 		case RIPCMD_TRACEOFF:
-			(void) snprintf(get_line((char *)rip->rip_tracefile -
-			    dlc_header, 2), get_line_remain(),
+			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Trace file = %.*s", len, rip->rip_tracefile);
 			len = 0;
 			break;
@@ -299,7 +381,7 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 	return (fraglen - len);
 }
 
-static char *
+static const char *
 show_cmd(int c)
 {
 	switch (c) {
@@ -315,6 +397,44 @@ show_cmd(int c)
 		return ("route poll");
 	case RIPCMD_POLLENTRY:
 		return ("route poll entry");
+	case RIPCMD_SEC_RESPONSE:
+		return ("route sec response");
+	case RIPCMD_SEC_T_RESPONSE:
+		return ("route sec_t response");
 	}
 	return ("?");
+}
+
+static int
+get_numtokens(unsigned int mask)
+{
+	int num = 0;
+
+	while (mask != 0) {
+		num++;
+		mask &= mask - 1;
+	}
+	return (num);
+}
+
+static const struct rip_sec_entry *
+rip_next_sec_entry(const struct rip_sec_entry *rsep, int len)
+{
+	const struct rip_emetric *rep;
+	const char *limit = (const char *)rsep + len;
+	long count;
+
+	if ((const char *)(rep = rsep->rip_emetric) > limit)
+		return (NULL);
+	count = ntohl(rsep->rip_count);
+	while (count > 0) {
+		if ((const char *)rep->rip_token > limit)
+			return (NULL);
+		rep = (struct rip_emetric *)
+		    &rep->rip_token[get_numtokens(ntohs(rep->rip_mask))];
+		if ((const char *)rep > limit)
+			return (NULL);
+		count--;
+	}
+	return ((const struct rip_sec_entry *)rep);
 }

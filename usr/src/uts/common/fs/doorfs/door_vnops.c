@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,8 @@
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 #include <fs/fs_subr.h>
-
+#include <sys/zone.h>
+#include <sys/tsol/label.h>
 
 kmutex_t	door_knob;
 static int	door_open(struct vnode **vpp, int flag, struct cred *cr);
@@ -71,6 +71,27 @@ const fs_operation_def_t door_vnodeops_template[] = {
 static int
 door_open(struct vnode **vpp, int flag, struct cred *cr)
 {
+	/*
+	 * MAC policy for doors.  Restrict cross-zone open()s so that only
+	 * door servers in the global zone can have clients from other zones.
+	 * For other zones, client must be within the same zone as server.
+	 */
+	if (is_system_labeled()) {
+		zone_t		*server_zone, *client_zone;
+		door_node_t	*dp = VTOD((*vpp));
+
+		mutex_enter(&door_knob);
+		if (DOOR_INVALID(dp)) {
+			mutex_exit(&door_knob);
+			return (0);
+		}
+		client_zone = curproc->p_zone;
+		server_zone = dp->door_target->p_zone;
+		mutex_exit(&door_knob);
+		if (server_zone != global_zone &&
+		    server_zone != client_zone)
+			return (EACCES);
+	}
 	return (0);
 }
 

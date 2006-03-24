@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,6 +209,7 @@ usb_process(di_minor_t minor, di_node_t node)
 	char *l_path, *p_path, *buf, *devfspath;
 	char *minor_nm, *drvr_nm, *name = (char *)NULL;
 	int i, index;
+	int flags = 0;
 	int create_secondary_link = 0;
 
 	minor_nm = di_minor_name(minor);
@@ -345,7 +345,7 @@ usb_process(di_minor_t minor, di_node_t node)
 
 	devfsadm_print(debug_mid, "mklink %s -> %s\n", l_path, p_path);
 
-	(void) devfsadm_mklink(l_path, node, minor, 0);
+	(void) devfsadm_mklink(l_path, node, minor, flags);
 
 	if (create_secondary_link) {
 		/*
@@ -376,6 +376,7 @@ ugen_create_link(char *p_path, char *node_name,
 	char ugen_RE[128];
 	devfsadm_enumerate_t ugen_rules[1];
 	char l_path[PATH_MAX];
+	int flags = 0;
 
 	devfsadm_print(debug_mid, "ugen_create_link: p_path=%s name=%s\n",
 	    p_path, node_name);
@@ -418,7 +419,7 @@ ugen_create_link(char *p_path, char *node_name,
 
 	devfsadm_print(debug_mid, "mklink %s -> %s\n", l_path, p_path);
 
-	(void) devfsadm_mklink(l_path, node, minor, 0);
+	(void) devfsadm_mklink(l_path, node, minor, flags);
 
 	free(buf);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <bsm/libbsm.h>
+#include <sys/tsol/label.h>
 #include "toktable.h"	/* ../praudit */
 #include "sysplugin.h"
 #include "systoken.h"
@@ -1381,46 +1381,6 @@ xclient_token(parse_context_t *ctx)
 
 	return (0);
 }
-/*
- * Format of clearance token:
- *	clearance		adr_char*(sizeof (bclear_t))
- *
- * ifdef TSOL because of bclear_t
- */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
-int
-clearance_token(parse_context_t *ctx)
-{
-#ifdef	TSOL
-
-	ctx->adr.adr_now += sizeof (bclear_t);
-
-	return (0);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
-}
-/*
- * Format of ilabel token:
- *	ilabel			adr_char*(sizeof (bilabel_t))
- */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
-int
-ilabel_token(parse_context_t *ctx)
-{
-#ifdef	TSOL
-
-	ctx->adr.adr_now += sizeof (bilabel_t);
-
-	return (0);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
-}
 
 /*
  * -----------------------------------------------------------------------
@@ -1445,22 +1405,23 @@ privilege_token(parse_context_t *ctx)
 
 /*
  * Format of slabel token:
- *	slabel			adr_char*(sizeof (bslabel_t))
+ *	label ID                1 byte
+ *	compartment length      1 byte
+ *	classification          2 bytes
+ *	compartment words       <compartment length> * 4 bytes
  */
-#ifndef	TSOL
-/* ARGSUSED */
-#endif	/* !TSOL */
 int
 slabel_token(parse_context_t *ctx)
 {
-#ifdef	TSOL
+	char	c;
 
-	ctx->adr.adr_now += sizeof (bslabel_t);
+	ctx->adr.adr_now += sizeof (char);	/* label ID */
+	adrm_char(&(ctx->adr), &c, 1);
+
+	ctx->adr.adr_now += sizeof (ushort_t);	/* classification */
+	ctx->adr.adr_now += 4 * c;		/* compartments */
 
 	return (0);
-#else	/* !TSOL */
-	return (-1);
-#endif	/* TSOL */
 }
 
 /*

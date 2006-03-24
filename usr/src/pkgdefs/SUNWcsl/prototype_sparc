@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -288,6 +290,10 @@ s none usr/lib/sparcv9/libtermlib.so=../../../lib/sparcv9/libcurses.so.1
 s none usr/lib/sparcv9/libtermlib.so.1=../../../lib/sparcv9/libcurses.so.1
 s none usr/lib/sparcv9/libthread.so.1=../../../lib/sparcv9/libthread.so.1
 s none usr/lib/sparcv9/libthread.so=../../../lib/sparcv9/libthread.so.1
+s none usr/lib/sparcv9/libtsnet.so.1=../../../lib/sparcv9/libtsnet.so.1
+s none usr/lib/sparcv9/libtsnet.so=../../../lib/sparcv9/libtsnet.so.1
+s none usr/lib/sparcv9/libtsol.so.2=../../../lib/sparcv9/libtsol.so.2
+s none usr/lib/sparcv9/libtsol.so=../../../lib/sparcv9/libtsol.so.2
 s none usr/lib/sparcv9/libumem.so=../../../lib/sparcv9/libumem.so.1
 s none usr/lib/sparcv9/libumem.so.1=../../../lib/sparcv9/libumem.so.1
 s none usr/lib/sparcv9/libuutil.so.1=../../../lib/sparcv9/libuutil.so.1

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +38,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/smedia.h>
+#include <tsol/label.h>
 #include "smserver.h"
 #include <bsm/audit.h>
 #include <bsm/libbsm.h>
@@ -221,6 +220,10 @@ audit_audit(door_data_t *door_dp)
 			(void) au_write(ad, au_to_newgroups(ng, grplst));
 		}
 	}
+
+	if (is_system_labeled())
+		(void) au_write(ad, au_to_mylabel());
+
 	if (strlen(door_dp->audit_text) != 0) {
 		(void) au_write(ad, au_to_text(door_dp->audit_text));
 	}

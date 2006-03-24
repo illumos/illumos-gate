@@ -811,6 +811,7 @@ PORTSYS=			\
 	getpeerucred.o		\
 	inst_sync.o		\
 	issetugid.o		\
+	label.o			\
 	libc_link.o		\
 	libc_open.o		\
 	lockf.o			\

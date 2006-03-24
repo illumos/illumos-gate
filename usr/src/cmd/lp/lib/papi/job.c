@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -783,6 +782,7 @@ papiJobQuery(papi_service_t handle, const char *printer, const int32_t job_id,
 		*request_id = NULL,
 		*charset = NULL,
 		*user = NULL,
+		*slabel = NULL,
 		*file = NULL;
 	time_t date = 0;
 	size_t size = 0;
@@ -801,7 +801,7 @@ papiJobQuery(papi_service_t handle, const char *printer, const int32_t job_id,
 		return (PAPI_SERVICE_UNAVAILABLE);
 
 	if (rcv_msg(svc, R_INQUIRE_REQUEST_RANK, &rc, &request_id,
-			&user, &size, &date, &state, &dest, &form,
+			&user, &slabel, &size, &date, &state, &dest, &form,
 			&charset, &rank, &file) < 0) {
 		detailed_error(svc,
 			gettext("failed to read response from scheduler"));
@@ -814,7 +814,7 @@ papiJobQuery(papi_service_t handle, const char *printer, const int32_t job_id,
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);
 
-	job_status_to_attributes(j, request_id, user, size, date, state,
+	job_status_to_attributes(j, request_id, user, slabel, size, date, state,
 				dest, form, charset, rank, file);
 
 	snprintf(req_id, sizeof (req_id), "%d-0", job_id);

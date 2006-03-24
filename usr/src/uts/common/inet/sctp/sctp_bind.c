@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,8 @@
 #include <sys/socket.h>
 #include <sys/random.h>
 #include <sys/policy.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/tnet.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -66,7 +67,10 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 	 * the same port.
 	 */
 	if (*requested_port == 0) {
-		*requested_port = sctp_update_next_port(sctp_next_port_to_try);
+		*requested_port = sctp_update_next_port(sctp_next_port_to_try,
+		    crgetzone(sctp->sctp_credp));
+		if (*requested_port == 0)
+			return (EACCES);
 		*user_specified = 0;
 	} else {
 		int i;
@@ -101,7 +105,7 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 				dprint(1,
 				    ("sctp_bind(x): no prive for port %d",
 				    *requested_port));
-				return (TACCES);
+				return (EACCES);
 			}
 		}
 		*user_specified = 1;
@@ -201,28 +205,21 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 	}
 	bind_to_req_port_only = requested_port == 0 ? B_FALSE : B_TRUE;
 
-	if (sctp_select_port(sctp, &requested_port, &user_specified) != 0) {
-		err = EPERM;
+	err = sctp_select_port(sctp, &requested_port, &user_specified);
+	if (err != 0)
 		goto done;
-	}
 
 	if ((err = sctp_bind_add(sctp, sa, 1, B_TRUE,
 	    user_specified == 1 ? htons(requested_port) : 0)) != 0) {
 		goto done;
 	}
-	allocated_port = sctp_bindi(sctp, requested_port,
-	    bind_to_req_port_only, user_specified);
-	if (allocated_port == 0) {
+	err = sctp_bindi(sctp, requested_port, bind_to_req_port_only,
+	    user_specified, &allocated_port);
+	if (err != 0) {
 		sctp_free_saddrs(sctp);
-		if (bind_to_req_port_only) {
-			err = EADDRINUSE;
-			goto done;
-		} else {
-			err = EADDRNOTAVAIL;
-			goto done;
-		}
+	} else {
+		ASSERT(sctp->sctp_state == SCTPS_BOUND);
 	}
-	ASSERT(sctp->sctp_state == SCTPS_BOUND);
 done:
 	WAKE_SCTP(sctp);
 	return (err);
@@ -438,26 +435,30 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 }
 
 /*
- * If the "bind_to_req_port_only" parameter is set, if the requested port
- * number is available, return it, If not return 0
+ * Returns 0 for success, errno value otherwise.
  *
- * If "bind_to_req_port_only" parameter is not set and
- * If the requested port number is available, return it.  If not, return
- * the first anonymous port we happen across.  If no anonymous ports are
- * available, return 0. addr is the requested local address, if any.
+ * If the "bind_to_req_port_only" parameter is set and the requested port
+ * number is available, then set allocated_port to it.  If not available,
+ * return an error.
  *
- * In either case, when succeeding update the sctp_t to record the port number
+ * If the "bind_to_req_port_only" parameter is not set and the requested port
+ * number is available, then set allocated_port to it.  If not available,
+ * find the first anonymous port we can and set allocated_port to that.  If no
+ * anonymous ports are available, return an error.
+ *
+ * In either case, when succeeding, update the sctp_t to record the port number
  * and insert it in the bind hash table.
  */
-in_port_t
-sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
-    int user_specified)
+int
+sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
+    int user_specified, in_port_t *allocated_port)
 {
 	/* number of times we have run around the loop */
 	int count = 0;
 	/* maximum number of times to run around the loop */
 	int loopmax;
 	zoneid_t zoneid = sctp->sctp_zoneid;
+	zone_t *zone = crgetzone(sctp->sctp_credp);
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -507,8 +508,17 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
 		    lsctp = lsctp->sctp_bind_hash) {
 
 			if (lport != lsctp->sctp_lport ||
-			    lsctp->sctp_zoneid != zoneid ||
 			    lsctp->sctp_state < SCTPS_BOUND)
+				continue;
+
+			/*
+			 * On a labeled system, we must treat bindings to ports
+			 * on shared IP addresses by sockets with MAC exemption
+			 * privilege as being in all zones, as there's
+			 * otherwise no way to identify the right receiver.
+			 */
+			if (lsctp->sctp_zoneid != zoneid &&
+			    !lsctp->sctp_mac_exempt && !sctp->sctp_mac_exempt)
 				continue;
 
 			addrcmp = sctp_compare_saddrs(sctp, lsctp);
@@ -535,6 +545,61 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
 			/* The port number is busy */
 			mutex_exit(&tbf->tf_lock);
 		} else {
+			conn_t *connp = sctp->sctp_connp;
+
+			if (is_system_labeled()) {
+				mlp_type_t addrtype, mlptype;
+
+				/*
+				 * On a labeled system we must check the type
+				 * of the binding requested by the user (either
+				 * MLP or SLP on shared and private addresses),
+				 * and that the user's requested binding
+				 * is permitted.
+				 */
+				addrtype = tsol_mlp_addr_type(zone->zone_id,
+				    sctp->sctp_ipversion,
+				    sctp->sctp_ipversion == IPV4_VERSION ?
+				    (void *)&sctp->sctp_ipha->ipha_src :
+				    (void *)&sctp->sctp_ip6h->ip6_src);
+
+				/*
+				 * tsol_mlp_addr_type returns the possibilities
+				 * for the selected address.  Since all local
+				 * addresses are either private or shared, the
+				 * return value mlptSingle means "local address
+				 * not valid (interface not present)."
+				 */
+				if (addrtype == mlptSingle) {
+					mutex_exit(&tbf->tf_lock);
+					return (EADDRNOTAVAIL);
+				}
+				mlptype = tsol_mlp_port_type(zone, IPPROTO_SCTP,
+				    port, addrtype);
+				if (mlptype != mlptSingle) {
+					if (secpolicy_net_bindmlp(connp->
+					    conn_cred) != 0) {
+						mutex_exit(&tbf->tf_lock);
+						return (EACCES);
+					}
+					/*
+					 * If we're binding a shared MLP, then
+					 * make sure that this zone is the one
+					 * that owns that MLP.  Shared MLPs can
+					 * be owned by at most one zone.
+					 */
+
+					if (mlptype == mlptShared &&
+					    addrtype == mlptShared &&
+					    connp->conn_zoneid !=
+					    tsol_mlp_findzone(IPPROTO_SCTP,
+					    lport)) {
+						mutex_exit(&tbf->tf_lock);
+						return (EACCES);
+					}
+					connp->conn_mlp_type = mlptype;
+				}
+			}
 			/*
 			 * This port is ours. Insert in fanout and mark as
 			 * bound to prevent others from getting the port
@@ -542,7 +607,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
 			 */
 			sctp->sctp_state = SCTPS_BOUND;
 			sctp->sctp_lport = lport;
-			sctp->sctp_sctph->sh_sport = sctp->sctp_lport;
+			sctp->sctp_sctph->sh_sport = lport;
 
 			ASSERT(&sctp_bind_fanout[SCTP_BIND_HASH(port)] == tbf);
 			sctp_bind_hash_insert(tbf, sctp, 1);
@@ -552,17 +617,17 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
 			/*
 			 * We don't want sctp_next_port_to_try to "inherit"
 			 * a port number supplied by the user in a bind.
-			 */
-			if (user_specified != 0)
-				return (port);
-
-			/*
+			 *
 			 * This is the only place where sctp_next_port_to_try
 			 * is updated. After the update, it may or may not
 			 * be in the valid range.
 			 */
-			sctp_next_port_to_try = port + 1;
-			return (port);
+			if (user_specified == 0)
+				sctp_next_port_to_try = port + 1;
+
+			*allocated_port = port;
+
+			return (0);
 		}
 
 		if ((count == 0) && (user_specified)) {
@@ -570,18 +635,22 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
 			 * We may have to return an anonymous port. So
 			 * get one to start with.
 			 */
-			port = sctp_update_next_port(sctp_next_port_to_try);
+			port = sctp_update_next_port(sctp_next_port_to_try,
+			    zone);
 			user_specified = 0;
 		} else {
-			port = sctp_update_next_port(port + 1);
+			port = sctp_update_next_port(port + 1, zone);
 		}
+		if (port == 0)
+			break;
 
 		/*
 		 * Don't let this loop run forever in the case where
 		 * all of the anonymous ports are in use.
 		 */
 	} while (++count < loopmax);
-	return (0);
+
+	return (bind_to_req_port_only ? EADDRINUSE : EADDRNOTAVAIL);
 }
 
 /*
@@ -597,13 +666,21 @@ sctp_bindi(sctp_t *sctp, in_port_t port, int bind_to_req_port_only,
  * - the atomic assignment of the elements of the array
  */
 in_port_t
-sctp_update_next_port(in_port_t port)
+sctp_update_next_port(in_port_t port, zone_t *zone)
 {
 	int i;
+	boolean_t restart = B_FALSE;
 
 retry:
-	if (port < sctp_smallest_anon_port || port > sctp_largest_anon_port)
+	if (port < sctp_smallest_anon_port)
 		port = sctp_smallest_anon_port;
+
+	if (port > sctp_largest_anon_port) {
+		if (restart)
+			return (0);
+		restart = B_TRUE;
+		port = sctp_smallest_anon_port;
+	}
 
 	if (port < sctp_smallest_nonpriv_port)
 		port = sctp_smallest_nonpriv_port;
@@ -622,5 +699,12 @@ retry:
 			goto retry;
 		}
 	}
+
+	if (is_system_labeled() &&
+	    (i = tsol_next_port(zone, port, IPPROTO_SCTP, B_TRUE)) != 0) {
+		port = i;
+		goto retry;
+	}
+
 	return (port);
 }

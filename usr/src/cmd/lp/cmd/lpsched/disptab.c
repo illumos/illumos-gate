@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,6 +138,8 @@ static DISPATCH			dispatch_table[] = {
 /* R_PAPER_CHANGED          */  0,			D_BADMSG,
 /* S_PAPER_ALLOWED          */  s_paper_allowed,	0,
 /* R_PAPER_ALLOWED          */  0,			D_BADMSG,
+/* S_PASS_PEER_CONNECTION   */  s_pass_peer_connection,	0,
+/* R_PASS_PEER_CONNECTION   */  0,			D_BADMSG,
 };
 
 static char *			dispatch_names[] = {
@@ -244,6 +245,8 @@ static char *			dispatch_names[] = {
 "R_PAPER_CHANGED",
 "S_PAPER_ALLOWED",
 "R_PAPER_ALLOWED",
+"S_PASS_PEER_CONNECTION",
+"R_PASS_PEER_CONNECTION",
 };
 
 /* see include/msgs.h */

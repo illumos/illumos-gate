@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +92,21 @@ struct __FILE;		/* structure tag for type FILE defined in stdio.h */
 #define	USERATTR_LIMPRIV_KW		"limitpriv"
 #define	USERATTR_DFLTPRIV_KW		"defaultpriv"
 #define	USERATTR_LOCK_AFTER_RETRIES_KW	"lock_after_retries"
+#define	USERATTR_CLEARANCE		"clearance"
+#define	USERATTR_LABELVIEW		"labelview"
+#define	USERATTR_LABELVIEW_EXTERNAL	"external"
+#define	USERATTR_LABELVIEW_HIDESL	"hidesl"
+#define	USERATTR_HIDESL			USERATTR_LABELVIEW_HIDESL
+#define	USERATTR_LABELVIEW_INTERNAL	"internal"
+#define	USERATTR_LABELVIEW_SHOWSL	"showsl"
+#define	USERATTR_LABELTRANS		"labeltrans"
+#define	USERATTR_LOCK_NO		"no"
+#define	USERATTR_LOCK_YES		"yes"
+#define	USERATTR_MINLABEL		"min_label"
+#define	USERATTR_PASSWD			"password"
+#define	USERATTR_PASSWD_AUTOMATIC	"automatic"
+#define	USERATTR_PASSWD_MANUAL		"manual"
+#define	USERATTR_TYPE_ROLE		USERATTR_TYPE_NONADMIN_KW
 
 
 /*

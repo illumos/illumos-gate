@@ -41,9 +41,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#include <sys/open.h>
 #include <sys/user.h>
-#include <sys/termios.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -56,15 +54,11 @@
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <inet/nca/ncadoorhdr.h>
 
 #include <sys/isa_defs.h>
 #include <sys/inttypes.h>
 #include <sys/systm.h>
 #include <sys/cpuvar.h>
-#include <sys/atomic.h>
 #include <sys/filio.h>
 #include <sys/sendfile.h>
 #include <sys/ddi.h>

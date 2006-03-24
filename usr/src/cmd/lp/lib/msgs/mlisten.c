@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,9 @@
 # include	<fcntl.h>
 # include	<errno.h>
 #include	<syslog.h>
+#include <user_attr.h>
+#include <secdb.h>
+#include <pwd.h>
 
 # include	"lp.h"
 # include	"msgs.h"
@@ -328,7 +330,21 @@ mlisten()
 		md->type = MD_UNKNOWN;
 		md->uid = recbuf.uid;
 
+		/*
+		 * Determine if a print administrator is contacting lpsched.
+		 * currently, root, lp and users with the "solaris.print.admin"
+		 * privilege are print administrators
+		 */
 		md->admin = (md->uid == 0 || md->uid == Lp_Uid);
+		if (md->admin == 0) { 
+			struct passwd *pw = NULL;
+
+			if ((pw = getpwuid(md->uid)) != NULL)
+				md->admin = chkauthattr("solaris.print.admin",
+							pw->pw_name);
+		}
+	
+		get_peer_label(md->readfd, &md->slabel);
 
 		if (mlistenadd(md, POLLIN) != 0)
 		    return(NULL);

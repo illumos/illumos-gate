@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,17 +36,15 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
-
-#include <netinet/in.h>
-#include <netinet/ip6.h>
-#include <netinet/tcp_seq.h>
-#include <netinet/sctp.h>
+/* swilly code in sys/socketvar.h turns off DEBUG */
+#ifdef __lint
+#define	DEBUG
+#endif
 
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/ip_ire.h>
 #include <inet/sctp_ip.h>
 #include <inet/ipclassifier.h>
 
@@ -589,7 +586,8 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		 * data was moved into chunks, or during retransmission,
 		 * or things like snoop is running.
 		 */
-		nmp = allocb(sctp_wroff_xtra + hdrlen + sacklen, BPRI_MED);
+		nmp = allocb_cred(sctp_wroff_xtra + hdrlen + sacklen,
+		    CONN_CRED(sctp->sctp_connp));
 		if (nmp == NULL) {
 			if (error !=  NULL)
 				*error = ENOMEM;
@@ -601,6 +599,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		mp = nmp;
 	} else {
 		mp->b_rptr -= (hdrlen + sacklen);
+		mblk_setcred(mp, CONN_CRED(sctp->sctp_connp));
 	}
 	bcopy(hdr, mp->b_rptr, hdrlen);
 	if (sacklen) {
@@ -1210,10 +1209,10 @@ sctp_output(sctp_t *sctp)
 		ASSERT(cansend >= seglen - pad - xtralen);
 		cansend -= (seglen - pad - xtralen);
 		dprint(2, ("sctp_output: Sending packet %d bytes, tsn %x "
-			"ssn %d to %p (rwnd %d, cansend %d, lastack_rxd %x)\n",
-			seglen - xtralen, ntohl(sdc->sdh_tsn),
-			ntohs(sdc->sdh_ssn), fp, sctp->sctp_frwnd, cansend,
-			sctp->sctp_lastack_rxd));
+		    "ssn %d to %p (rwnd %d, cansend %d, lastack_rxd %x)\n",
+		    seglen - xtralen, ntohl(sdc->sdh_tsn),
+		    ntohs(sdc->sdh_ssn), (void *)fp, sctp->sctp_frwnd,
+		    cansend, sctp->sctp_lastack_rxd));
 		sctp_set_iplen(sctp, head);
 		sctp_add_sendq(sctp, head);
 		/* arm rto timer (if not set) */
@@ -1348,7 +1347,7 @@ sctp_make_ftsn_chunk(sctp_t *sctp, sctp_faddr_t *fp, sctp_ftsn_set_t *sets,
 		xtralen = sctp->sctp_hdr_len + sctp_wroff_xtra;
 	else
 		xtralen = sctp->sctp_hdr6_len + sctp_wroff_xtra;
-	ftsn_mp = allocb(xtralen + seglen, BPRI_MED);
+	ftsn_mp = allocb_cred(xtralen + seglen, CONN_CRED(sctp->sctp_connp));
 	if (ftsn_mp == NULL)
 		return (NULL);
 	ftsn_mp->b_rptr += xtralen;
@@ -1818,8 +1817,8 @@ try_bundle:
 	}
 	dprint(2, ("sctp_rexmit: Sending packet %d bytes, tsn %x "
 	    "ssn %d to %p (rwnd %d, lastack_rxd %x)\n",
-	    seglen, ntohl(sdc->sdh_tsn), ntohs(sdc->sdh_ssn), fp,
-	    sctp->sctp_frwnd, sctp->sctp_lastack_rxd));
+	    seglen, ntohl(sdc->sdh_tsn), ntohs(sdc->sdh_ssn),
+	    (void *)fp, sctp->sctp_frwnd, sctp->sctp_lastack_rxd));
 
 	sctp_set_iplen(sctp, head);
 	sctp_add_sendq(sctp, head);

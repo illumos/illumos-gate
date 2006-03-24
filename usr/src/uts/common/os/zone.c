@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -186,11 +185,11 @@
 #include <sys/priv_impl.h>
 #include <sys/cred.h>
 #include <c2/audit.h>
-#include <sys/ddi.h>
 #include <sys/debug.h>
 #include <sys/file.h>
 #include <sys/kmem.h>
 #include <sys/mutex.h>
+#include <sys/note.h>
 #include <sys/pathname.h>
 #include <sys/proc.h>
 #include <sys/project.h>
@@ -210,7 +209,6 @@
 #include <sys/pool.h>
 #include <sys/pool_pset.h>
 #include <sys/pset.h>
-#include <sys/log.h>
 #include <sys/sysmacros.h>
 #include <sys/callb.h>
 #include <sys/vmparam.h>
@@ -218,7 +216,6 @@
 
 #include <sys/door.h>
 #include <sys/cpuvar.h>
-#include <sys/fs/snode.h>
 
 #include <sys/uadmin.h>
 #include <sys/session.h>
@@ -228,6 +225,7 @@
 #include <sys/rctl.h>
 #include <sys/fss.h>
 #include <sys/zone.h>
+#include <sys/tsol/label.h>
 
 /*
  * cv used to signal that all references to the zone have been released.  This
@@ -255,7 +253,7 @@ static zone_key_t zsd_keyval = 0;
 static list_t zsd_registered_keys;
 
 int zone_hash_size = 256;
-static mod_hash_t *zonehashbyname, *zonehashbyid;
+static mod_hash_t *zonehashbyname, *zonehashbyid, *zonehashbylabel;
 static kmutex_t zonehash_lock;
 static uint_t zonecount;
 static id_space_t *zoneid_space;
@@ -323,6 +321,7 @@ static kcondvar_t mount_cv;
 static kmutex_t mount_lock;
 
 const char * const zone_initname = "/sbin/init";
+static char * const zone_prefix = "/zone/";
 
 static int zone_shutdown(zoneid_t zoneid);
 
@@ -337,8 +336,10 @@ static int zone_shutdown(zoneid_t zoneid);
  *     error reporting when zone_create() fails.
  * Version 3 alters the zone_create system call in order to support the
  *     import of ZFS datasets to zones.
+ * Version 4 alters the zone_create system call in order to support
+ *     Trusted Extensions.
  */
-static const int ZONE_SYSCALL_API_VERSION = 3;
+static const int ZONE_SYSCALL_API_VERSION = 4;
 
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
@@ -998,6 +999,51 @@ zone_zsd_init(void)
 }
 
 /*
+ * Compute a hash value based on the contents of the label and the DOI.  The
+ * hash algorithm is somewhat arbitrary, but is based on the observation that
+ * humans will likely pick labels that differ by amounts that work out to be
+ * multiples of the number of hash chains, and thus stirring in some primes
+ * should help.
+ */
+static uint_t
+hash_bylabel(void *hdata, mod_hash_key_t key)
+{
+	const ts_label_t *lab = (ts_label_t *)key;
+	const uint32_t *up, *ue;
+	uint_t hash;
+	int i;
+
+	_NOTE(ARGUNUSED(hdata));
+
+	hash = lab->tsl_doi + (lab->tsl_doi << 1);
+	/* we depend on alignment of label, but not representation */
+	up = (const uint32_t *)&lab->tsl_label;
+	ue = up + sizeof (lab->tsl_label) / sizeof (*up);
+	i = 1;
+	while (up < ue) {
+		/* using 2^n + 1, 1 <= n <= 16 as source of many primes */
+		hash += *up + (*up << ((i % 16) + 1));
+		up++;
+		i++;
+	}
+	return (hash);
+}
+
+/*
+ * All that mod_hash cares about here is zero (equal) versus non-zero (not
+ * equal).  This may need to be changed if less than / greater than is ever
+ * needed.
+ */
+static int
+hash_labelkey_cmp(mod_hash_key_t key1, mod_hash_key_t key2)
+{
+	ts_label_t *lab1 = (ts_label_t *)key1;
+	ts_label_t *lab2 = (ts_label_t *)key2;
+
+	return (label_equal(lab1, lab2) ? 0 : 1);
+}
+
+/*
  * Called by main() to initialize the zones framework.
  */
 void
@@ -1063,20 +1109,42 @@ zone_init(void)
 	 * pool_default hasn't been initialized yet, so we let pool_init() take
 	 * care of making the global zone is in the default pool.
 	 */
+
+	/*
+	 * Initialize zone label.
+	 * mlp are initialized when tnzonecfg is loaded.
+	 */
+	zone0.zone_slabel = l_admin_low;
+	rw_init(&zone0.zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
+	label_hold(l_admin_low);
+
 	mutex_enter(&zonehash_lock);
 	zone_uniqid(&zone0);
 	ASSERT(zone0.zone_uniqid == GLOBAL_ZONEUNIQID);
-	mutex_exit(&zonehash_lock);
+
 	zonehashbyid = mod_hash_create_idhash("zone_by_id", zone_hash_size,
 	    mod_hash_null_valdtor);
 	zonehashbyname = mod_hash_create_strhash("zone_by_name",
 	    zone_hash_size, mod_hash_null_valdtor);
+	/*
+	 * maintain zonehashbylabel only for labeled systems
+	 */
+	if (is_system_labeled())
+		zonehashbylabel = mod_hash_create_extended("zone_by_label",
+		    zone_hash_size, mod_hash_null_keydtor,
+		    mod_hash_null_valdtor, hash_bylabel, NULL,
+		    hash_labelkey_cmp, KM_SLEEP);
 	zonecount = 1;
 
 	(void) mod_hash_insert(zonehashbyid, (mod_hash_key_t)GLOBAL_ZONEID,
 	    (mod_hash_val_t)&zone0);
 	(void) mod_hash_insert(zonehashbyname, (mod_hash_key_t)zone0.zone_name,
 	    (mod_hash_val_t)&zone0);
+	if (is_system_labeled())
+		(void) mod_hash_insert(zonehashbylabel,
+		    (mod_hash_key_t)zone0.zone_slabel, (mod_hash_val_t)&zone0);
+	mutex_exit(&zonehash_lock);
+
 	/*
 	 * We avoid setting zone_kcred until now, since kcred is initialized
 	 * sometime after zone_zsd_init() and before zone_init().
@@ -1126,6 +1194,8 @@ zone_free(zone_t *zone)
 		kmem_free(zone->zone_rootpath, zone->zone_rootpathlen);
 	if (zone->zone_name != NULL)
 		kmem_free(zone->zone_name, ZONENAME_MAX);
+	if (zone->zone_slabel != NULL)
+		label_rele(zone->zone_slabel);
 	if (zone->zone_nodename != NULL)
 		kmem_free(zone->zone_nodename, _SYS_NMLN);
 	if (zone->zone_domain != NULL)
@@ -1139,6 +1209,7 @@ zone_free(zone_t *zone)
 	id_free(zoneid_space, zone->zone_id);
 	mutex_destroy(&zone->zone_lock);
 	cv_destroy(&zone->zone_cv);
+	rw_destroy(&zone->zone_mlps.mlpl_rwlock);
 	kmem_free(zone, sizeof (zone_t));
 }
 
@@ -1513,6 +1584,24 @@ zone_find_all_by_id(zoneid_t zoneid)
 }
 
 static zone_t *
+zone_find_all_by_label(const ts_label_t *label)
+{
+	mod_hash_val_t hv;
+	zone_t *zone = NULL;
+
+	ASSERT(MUTEX_HELD(&zonehash_lock));
+
+	/*
+	 * zonehashbylabel is not maintained for unlabeled systems
+	 */
+	if (!is_system_labeled())
+		return (NULL);
+	if (mod_hash_find(zonehashbylabel, (mod_hash_key_t)label, &hv) == 0)
+		zone = (zone_t *)hv;
+	return (zone);
+}
+
+static zone_t *
 zone_find_all_by_name(char *name)
 {
 	mod_hash_val_t hv;
@@ -1553,6 +1642,34 @@ zone_find_by_id(zoneid_t zoneid)
 		return (NULL);
 	}
 	zone_hold(zone);
+	mutex_exit(&zonehash_lock);
+	return (zone);
+}
+
+/*
+ * Similar to zone_find_by_id, but using zone label as the key.
+ */
+zone_t *
+zone_find_by_label(const ts_label_t *label)
+{
+	zone_t *zone;
+
+	mutex_enter(&zonehash_lock);
+	if ((zone = zone_find_all_by_label(label)) == NULL) {
+		mutex_exit(&zonehash_lock);
+		return (NULL);
+	}
+	mutex_enter(&zone_status_lock);
+	if (zone_status_get(zone) > ZONE_IS_DOWN) {
+		/*
+		 * For all practical purposes the zone doesn't exist.
+		 */
+		mutex_exit(&zone_status_lock);
+		zone = NULL;
+	} else {
+		mutex_exit(&zone_status_lock);
+		zone_hold(zone);
+	}
 	mutex_exit(&zonehash_lock);
 	return (zone);
 }
@@ -2591,6 +2708,23 @@ zone_create_error(int er_error, int er_ext, int *er_out) {
 	return (set_errno(er_error));
 }
 
+static int
+zone_set_label(zone_t *zone, const bslabel_t *lab, uint32_t doi)
+{
+	ts_label_t *tsl;
+	bslabel_t blab;
+
+	/* Get label from user */
+	if (copyin(lab, &blab, sizeof (blab)) != 0)
+		return (EFAULT);
+	tsl = labelalloc(&blab, doi, KM_NOSLEEP);
+	if (tsl == NULL)
+		return (ENOMEM);
+
+	zone->zone_slabel = tsl;
+	return (0);
+}
+
 /*
  * Parses a comma-separated list of ZFS datasets into a per-zone dictionary.
  */
@@ -2643,7 +2777,8 @@ parse_zfs(zone_t *zone, caddr_t ubuf, size_t buflen)
 /*
  * System call to create/initialize a new zone named 'zone_name', rooted
  * at 'zone_root', with a zone-wide privilege limit set of 'zone_privs',
- * and initialized with the zone-wide rctls described in 'rctlbuf'.
+ * and initialized with the zone-wide rctls described in 'rctlbuf', and
+ * with labeling set by 'match', 'doi', and 'label'.
  *
  * If extended error is non-null, we may use it to return more detailed
  * error information.
@@ -2652,7 +2787,8 @@ static zoneid_t
 zone_create(const char *zone_name, const char *zone_root,
     const priv_set_t *zone_privs, size_t zone_privssz,
     caddr_t rctlbuf, size_t rctlbufsz,
-    caddr_t zfsbuf, size_t zfsbufsz, int *extended_error)
+    caddr_t zfsbuf, size_t zfsbufsz, int *extended_error,
+    int match, uint32_t doi, const bslabel_t *label)
 {
 	struct zsched_arg zarg;
 	nvlist_t *rctls = NULL;
@@ -2687,6 +2823,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	    offsetof(struct zsd_entry, zsd_linkage));
 	list_create(&zone->zone_datasets, sizeof (zone_dataset_t),
 	    offsetof(zone_dataset_t, zd_linkage));
+	rw_init(&zone->zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
 
 	if ((error = zone_set_name(zone, zone_name)) != 0) {
 		zone_free(zone);
@@ -2728,6 +2865,23 @@ zone_create(const char *zone_name, const char *zone_root,
 	}
 
 	/*
+	 * Read in the trusted system parameters:
+	 * match flag and sensitivity label.
+	 */
+	zone->zone_match = match;
+	if (is_system_labeled()) {
+		error = zone_set_label(zone, label, doi);
+		if (error != 0) {
+			zone_free(zone);
+			return (set_errno(error));
+		}
+	} else {
+		/* all zones get an admin_low label if system is not labeled */
+		zone->zone_slabel = l_admin_low;
+		label_hold(l_admin_low);
+	}
+
+	/*
 	 * Stop all lwps since that's what normally happens as part of fork().
 	 * This needs to happen before we grab any locks to avoid deadlock
 	 * (another lwp in the process could be waiting for the held lock).
@@ -2765,8 +2919,13 @@ zone_create(const char *zone_name, const char *zone_root,
 	mutex_enter(&zonehash_lock);
 	/*
 	 * Make sure zone doesn't already exist.
+	 *
+	 * If the system and zone are labeled,
+	 * make sure no other zone exists that has the same label.
 	 */
-	if ((ztmp = zone_find_all_by_name(zone->zone_name)) != NULL) {
+	if ((ztmp = zone_find_all_by_name(zone->zone_name)) != NULL ||
+	    (zone->zone_slabel != NULL &&
+	    (ztmp = zone_find_all_by_label(zone->zone_slabel)) != NULL)) {
 		zone_status_t status;
 
 		status = zone_status_get(ztmp);
@@ -2813,6 +2972,11 @@ zone_create(const char *zone_name, const char *zone_root,
 	(void) strcpy(str, zone->zone_name);
 	(void) mod_hash_insert(zonehashbyname, (mod_hash_key_t)str,
 	    (mod_hash_val_t)(uintptr_t)zone);
+	if (is_system_labeled()) {
+		(void) mod_hash_insert(zonehashbylabel,
+		    (mod_hash_key_t)zone->zone_slabel, (mod_hash_val_t)zone);
+	}
+
 	/*
 	 * Insert into active list.  At this point there are no 'hold's
 	 * on the zone, but everyone else knows not to use it, so we can
@@ -2836,6 +3000,11 @@ zone_create(const char *zone_name, const char *zone_root,
 		 */
 		mutex_enter(&zonehash_lock);
 		list_remove(&zone_active, zone);
+		if (is_system_labeled()) {
+			ASSERT(zone->zone_slabel != NULL);
+			(void) mod_hash_destroy(zonehashbylabel,
+			    (mod_hash_key_t)zone->zone_slabel);
+		}
 		(void) mod_hash_destroy(zonehashbyname,
 		    (mod_hash_key_t)(uintptr_t)zone->zone_name);
 		(void) mod_hash_destroy(zonehashbyid,
@@ -2979,6 +3148,42 @@ zone_empty(zone_t *zone)
 	if (waitstatus == 0)
 		return (EINTR);
 	return (0);
+}
+
+/*
+ * This function implements the policy for zone visibility.
+ *
+ * In standard Solaris, a non-global zone can only see itself.
+ *
+ * In Trusted Extensions, a labeled zone can lookup any zone whose label
+ * it dominates. For this test, the label of the global zone is treated as
+ * admin_high so it is special-cased instead of being checked for dominance.
+ *
+ * Returns true if zone attributes are viewable, false otherwise.
+ */
+static boolean_t
+zone_list_access(zone_t *zone)
+{
+
+	if (curproc->p_zone == global_zone ||
+	    curproc->p_zone == zone) {
+		return (B_TRUE);
+	} else if (is_system_labeled()) {
+		bslabel_t *curproc_label;
+		bslabel_t *zone_label;
+
+		curproc_label = label2bslabel(curproc->p_zone->zone_slabel);
+		zone_label = label2bslabel(zone->zone_slabel);
+
+		if (zone->zone_id != GLOBAL_ZONEID &&
+		    bldominates(curproc_label, zone_label)) {
+			return (B_TRUE);
+		} else {
+			return (B_FALSE);
+		}
+	} else {
+		return (B_FALSE);
+	}
 }
 
 /*
@@ -3237,6 +3442,9 @@ zone_destroy(zoneid_t zoneid)
 	    (mod_hash_key_t)zone->zone_name);
 	(void) mod_hash_destroy(zonehashbyid,
 	    (mod_hash_key_t)(uintptr_t)zone->zone_id);
+	if (is_system_labeled() && zone->zone_slabel != NULL)
+		(void) mod_hash_destroy(zonehashbylabel,
+		    (mod_hash_key_t)zone->zone_slabel);
 	mutex_exit(&zonehash_lock);
 
 	/*
@@ -3274,6 +3482,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	zone_status_t zone_status;
 	pid_t initpid;
 	boolean_t global = (curproc->p_zone == global_zone);
+	boolean_t curzone = (curproc->p_zone->zone_id == zoneid);
 
 	mutex_enter(&zonehash_lock);
 	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
@@ -3289,9 +3498,11 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	mutex_exit(&zonehash_lock);
 
 	/*
-	 * If not in the global zone, don't show information about other zones.
+	 * If not in the global zone, don't show information about other zones,
+	 * unless the system is labeled and the local zone's label dominates
+	 * the other zone.
 	 */
-	if (!global && curproc->p_zone != zone) {
+	if (!zone_list_access(zone)) {
 		zone_rele(zone);
 		return (set_errno(EINVAL));
 	}
@@ -3311,12 +3522,29 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			bcopy(zone->zone_rootpath, zonepath, size);
 			zonepath[size - 1] = '\0';
 		} else {
-			/*
-			 * Caller is not in the global zone, just return
-			 * faked-up path for current zone.
-			 */
-			zonepath = "/";
-			size = 2;
+			if (curzone || !is_system_labeled()) {
+				/*
+				 * Caller is not in the global zone.
+				 * if the query is on the current zone
+				 * or the system is not labeled,
+				 * just return faked-up path for current zone.
+				 */
+				zonepath = "/";
+				size = 2;
+			} else {
+				/*
+				 * Return related path for current zone.
+				 */
+				int prefix_len = strlen(zone_prefix);
+				int zname_len = strlen(zone->zone_name);
+
+				size = prefix_len + zname_len + 1;
+				zonepath = kmem_alloc(size, KM_SLEEP);
+				bcopy(zone_prefix, zonepath, prefix_len);
+				bcopy(zone->zone_name, zonepath +
+					prefix_len, zname_len);
+				zonepath[size - 1] = '\0';
+			}
 		}
 		if (bufsize > size)
 			bufsize = size;
@@ -3325,7 +3553,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			if (err != 0 && err != ENAMETOOLONG)
 				error = EFAULT;
 		}
-		if (global)
+		if (global || (is_system_labeled() && !curzone))
 			kmem_free(zonepath, size);
 		break;
 
@@ -3387,6 +3615,17 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			if (buf != NULL && copyout(&poolid, buf, size) != 0)
 				error = EFAULT;
 		}
+		break;
+	case ZONE_ATTR_SLBL:
+		size = sizeof (bslabel_t);
+		if (bufsize > size)
+			bufsize = size;
+		if (zone->zone_slabel == NULL)
+			error = EINVAL;
+		else if (buf != NULL &&
+		    copyout(label2bslabel(zone->zone_slabel), buf,
+		    bufsize) != 0)
+			error = EFAULT;
 		break;
 	case ZONE_ATTR_INITPID:
 		size = sizeof (initpid);
@@ -3778,6 +4017,7 @@ out:
  * Systemcall entry point for zone_list(2).
  *
  * Processes running in a (non-global) zone only see themselves.
+ * On labeled systems, they see all zones whose label they dominate.
  */
 static int
 zone_list(zoneid_t *zoneidlist, uint_t *numzones)
@@ -3785,47 +4025,79 @@ zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 	zoneid_t *zoneids;
 	zone_t *zone;
 	uint_t user_nzones, real_nzones;
-	int error = 0;
-	uint_t i;
+	uint_t domi_nzones;
+	int error;
 
 	if (copyin(numzones, &user_nzones, sizeof (uint_t)) != 0)
 		return (set_errno(EFAULT));
 
 	if (curproc->p_zone != global_zone) {
-		/* just return current zone */
-		real_nzones = 1;
-		zoneids = kmem_alloc(sizeof (zoneid_t), KM_SLEEP);
-		zoneids[0] = curproc->p_zone->zone_id;
+		bslabel_t *mybslab;
+
+		if (!is_system_labeled()) {
+			/* just return current zone */
+			real_nzones = domi_nzones = 1;
+			zoneids = kmem_alloc(sizeof (zoneid_t), KM_SLEEP);
+			zoneids[0] = curproc->p_zone->zone_id;
+		} else {
+			/* return all zones that are dominated */
+			mutex_enter(&zonehash_lock);
+			real_nzones = zonecount;
+			domi_nzones = 0;
+			if (real_nzones > 0) {
+				zoneids = kmem_alloc(real_nzones *
+				    sizeof (zoneid_t), KM_SLEEP);
+				mybslab = label2bslabel(curproc->p_zone->
+				    zone_slabel);
+				for (zone = list_head(&zone_active);
+				    zone != NULL;
+				    zone = list_next(&zone_active, zone)) {
+					if (zone->zone_id == GLOBAL_ZONEID)
+						continue;
+					if (bldominates(mybslab,
+					    label2bslabel(zone->zone_slabel))) {
+						zoneids[domi_nzones++] =
+						    zone->zone_id;
+					}
+				}
+			}
+			mutex_exit(&zonehash_lock);
+		}
 	} else {
 		mutex_enter(&zonehash_lock);
 		real_nzones = zonecount;
-		if (real_nzones) {
+		domi_nzones = 0;
+		if (real_nzones > 0) {
 			zoneids = kmem_alloc(real_nzones * sizeof (zoneid_t),
 			    KM_SLEEP);
-			i = 0;
 			for (zone = list_head(&zone_active); zone != NULL;
 			    zone = list_next(&zone_active, zone))
-				zoneids[i++] = zone->zone_id;
-			ASSERT(i == real_nzones);
+				zoneids[domi_nzones++] = zone->zone_id;
+			ASSERT(domi_nzones == real_nzones);
 		}
 		mutex_exit(&zonehash_lock);
 	}
 
-	if (user_nzones > real_nzones)
-		user_nzones = real_nzones;
-
-	if (copyout(&real_nzones, numzones, sizeof (uint_t)) != 0)
+	/*
+	 * If user has allocated space for fewer entries than we found, then
+	 * return only up to his limit.  Either way, tell him exactly how many
+	 * we found.
+	 */
+	if (domi_nzones < user_nzones)
+		user_nzones = domi_nzones;
+	error = 0;
+	if (copyout(&domi_nzones, numzones, sizeof (uint_t)) != 0) {
 		error = EFAULT;
-	else if (zoneidlist != NULL && user_nzones != 0) {
+	} else if (zoneidlist != NULL && user_nzones != 0) {
 		if (copyout(zoneids, zoneidlist,
 		    user_nzones * sizeof (zoneid_t)) != 0)
 			error = EFAULT;
 	}
 
-	if (real_nzones)
+	if (real_nzones > 0)
 		kmem_free(zoneids, real_nzones * sizeof (zoneid_t));
 
-	if (error)
+	if (error != 0)
 		return (set_errno(error));
 	else
 		return (0);
@@ -3834,7 +4106,8 @@ zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 /*
  * Systemcall entry point for zone_lookup(2).
  *
- * Non-global zones are only able to see themselves.
+ * Non-global zones are only able to see themselves and (on labeled systems)
+ * the zones they dominate.
  */
 static zoneid_t
 zone_lookup(const char *zone_name)
@@ -3858,15 +4131,20 @@ zone_lookup(const char *zone_name)
 	mutex_enter(&zonehash_lock);
 	zone = zone_find_all_by_name(kname);
 	kmem_free(kname, ZONENAME_MAX);
-	if (zone == NULL || zone_status_get(zone) < ZONE_IS_READY ||
-	    (curproc->p_zone != global_zone && curproc->p_zone != zone)) {
-		/* in non-global zone, can only lookup own name */
+	/*
+	 * In a non-global zone, can only lookup global and own name.
+	 * In Trusted Extensions zone label dominance rules apply.
+	 */
+	if (zone == NULL ||
+	    zone_status_get(zone) < ZONE_IS_READY ||
+	    !zone_list_access(zone)) {
 		mutex_exit(&zonehash_lock);
 		return (set_errno(EINVAL));
+	} else {
+		zoneid = zone->zone_id;
+		mutex_exit(&zonehash_lock);
+		return (zoneid);
 	}
-	zoneid = zone->zone_id;
-	mutex_exit(&zonehash_lock);
-	return (zoneid);
 }
 
 static int
@@ -3912,6 +4190,9 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 			zs.zfsbufsz = zs32.zfsbufsz;
 			zs.extended_error =
 			    (int *)(unsigned long)zs32.extended_error;
+			zs.match = zs32.match;
+			zs.doi = zs32.doi;
+			zs.label = (const bslabel_t *)(uintptr_t)zs32.label;
 #else
 			panic("get_udatamodel() returned bogus result\n");
 #endif
@@ -3921,7 +4202,8 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		    zs.zone_privs, zs.zone_privssz,
 		    (caddr_t)zs.rctlbuf, zs.rctlbufsz,
 		    (caddr_t)zs.zfsbuf, zs.zfsbufsz,
-		    zs.extended_error));
+		    zs.extended_error, zs.match, zs.doi,
+		    zs.label));
 	case ZONE_BOOT:
 		return (zone_boot((zoneid_t)(uintptr_t)arg1,
 		    (const char *)arg2));
@@ -4260,4 +4542,66 @@ zone_dataset_visible(const char *dataset, int *write)
 	}
 
 	return (0);
+}
+
+/*
+ * zone_find_by_any_path() -
+ *
+ * kernel-private routine similar to zone_find_by_path(), but which
+ * effectively compares against zone paths rather than zonerootpath
+ * (i.e., the last component of zonerootpaths, which should be "root/",
+ * are not compared.)  This is done in order to accurately identify all
+ * paths, whether zone-visible or not, including those which are parallel
+ * to /root/, such as /dev/, /home/, etc...
+ *
+ * If the specified path does not fall under any zone path then global
+ * zone is returned.
+ *
+ * The treat_abs parameter indicates whether the path should be treated as
+ * an absolute path although it does not begin with "/".  (This supports
+ * nfs mount syntax such as host:any/path.)
+ *
+ * The caller is responsible for zone_rele of the returned zone.
+ */
+zone_t *
+zone_find_by_any_path(const char *path, boolean_t treat_abs)
+{
+	zone_t *zone;
+	int path_offset = 0;
+
+	if (path == NULL) {
+		zone_hold(global_zone);
+		return (global_zone);
+	}
+
+	if (*path != '/') {
+		ASSERT(treat_abs);
+		path_offset = 1;
+	}
+
+	mutex_enter(&zonehash_lock);
+	for (zone = list_head(&zone_active); zone != NULL;
+	    zone = list_next(&zone_active, zone)) {
+		char	*c;
+		size_t	pathlen;
+
+		if (zone == global_zone)	/* skip global zone */
+			continue;
+
+		/* scan backwards to find start of last component */
+		c = zone->zone_rootpath + zone->zone_rootpathlen - 2;
+		do {
+			c--;
+		} while (*c != '/');
+
+		pathlen = c - zone->zone_rootpath + 1;
+		if (strncmp(path, zone->zone_rootpath + path_offset,
+		    pathlen - path_offset) == 0)
+			break;
+	}
+	if (zone == NULL)
+		zone = global_zone;
+	zone_hold(zone);
+	mutex_exit(&zonehash_lock);
+	return (zone);
 }

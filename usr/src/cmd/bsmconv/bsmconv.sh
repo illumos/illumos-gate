@@ -1,11 +1,11 @@
 #! /bin/sh
 #
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,8 +20,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,18 +142,25 @@ then
     printf "${form}\n" $PROG
 fi
 
-# Initial device allocation files
+# Initialize device allocation
 
-form=`gettext "%s: INFO: initializing device allocation files."`
+form=`gettext "%s: INFO: initializing device allocation."`
 printf "${form}\n" $PROG
-if [ ! -f ${ROOT}/$DEVALLOC ]
+if [ -x /usr/bin/plabel ]
 then
-	mkdevalloc > ${ROOT}/$DEVALLOC
+	# Trusted Extensions is installed.
+	/usr/sbin/devfsadm -e
+else
+	if [ ! -f ${ROOT}/${DEVALLOC} ]
+	then
+		mkdevalloc > ${ROOT}/$DEVALLOC
+	fi
+	if [ ! -f ${ROOT}/${DEVMAPS} ]
+	then
+		mkdevmaps > ${ROOT}/$DEVMAPS
+	fi
 fi
-if [ ! -f $DEVMAPS ]
-then
-	mkdevmaps > ${ROOT}/$DEVMAPS
-fi
+
 
 # enable auditd.  Since we're running as single user, auditd won't
 # actually start until reboot.

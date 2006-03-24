@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +38,7 @@
 #include <syslog.h>
 #include <pwd.h>
 #include <netinet/in.h>
+#include <tsol/label.h>
 #include <locale.h>
 #include "generic.h"
 
@@ -197,6 +197,8 @@ char	*cmdbuf;	/* command line to be executed locally */
 	/* add subject token */
 	(void) au_write(rd,
 		au_to_subject_ex(uid, uid, gid, uid, gid, pid, pid, &tid));
+	if (is_system_labeled())
+		(void) au_write(rd, au_to_mylabel());
 
 	/* add reason for failure */
 	(void) au_write(rd, au_to_text(msg));
@@ -306,6 +308,8 @@ char	*cmdbuf;	/* command line to be executed locally */
 	/* add subject token */
 	(void) au_write(rd,
 		au_to_subject_ex(uid, uid, gid, uid, gid, pid, pid, &tid));
+	if (is_system_labeled())
+		(void) au_write(rd, au_to_mylabel());
 
 	/* add hostname of machine requesting service */
 	(void) snprintf(buf, sizeof (buf), dgettext(bsm_dom,

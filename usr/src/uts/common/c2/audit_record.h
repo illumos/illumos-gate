@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +36,7 @@
 #include <sys/socket.h>
 #include <sys/acl.h>
 
-#if defined(TSOL) && defined(_KERNEL)
 #include <sys/tsol/label.h>
-#endif /* TSOL && _KERNEL */
 
 #ifdef __cplusplus
 extern "C" {
@@ -303,15 +300,7 @@ token_t *au_to_socket_ex(short, short, char *, char *);
 token_t *au_to_sock_inet(struct sockaddr_in *);
 token_t *au_to_exec_args(const char *, ssize_t);
 token_t *au_to_exec_env(const char *, ssize_t);
-
-#ifdef TSOL
-token_t	*au_to_clearance(bclear_t *);
-token_t	*au_to_host(void);
-token_t	*au_to_ilabel(bilabel_t *);
-token_t	*au_to_priv(priv_t, int);
-token_t	*au_to_privilege(priv_set_t *, char);
-token_t	*au_to_slabel(bslabel_t *);
-#endif	/* TSOL */
+token_t	*au_to_label(bslabel_t *);
 token_t	*au_to_privset(const char *, const priv_set_t *, char, int);
 
 void	au_uwrite();
@@ -735,6 +724,7 @@ extern token_t *au_to_ipc(char, int);
 extern token_t *au_to_ipc_perm(struct ipc_perm *);
 extern token_t *au_to_iport(ushort_t);
 extern token_t *au_to_me(void);
+extern token_t *au_to_mylabel(void);
 extern token_t *au_to_opaque(char *, short);
 extern token_t *au_to_path(char *);
 extern token_t *au_to_privset(const char *, const priv_set_t *);
@@ -745,6 +735,7 @@ extern token_t *au_to_process_ex(au_id_t, uid_t, gid_t, uid_t, gid_t,
 extern token_t *au_to_return32(char, uint32_t);
 extern token_t *au_to_return64(char, uint64_t);
 extern token_t *au_to_seq(int);
+extern token_t *au_to_label(bslabel_t *);
 extern token_t *au_to_socket(struct oldsocket *);
 extern token_t *au_to_socket_ex(short, short,
 				struct sockaddr *, struct sockaddr *);

@@ -53,7 +53,7 @@
 
 #include "snoop.h"
 
-int snaplen;
+static int snaplen;
 char *device = NULL;
 
 /* Global error recovery variables */
@@ -61,12 +61,9 @@ sigjmp_buf jmp_env, ojmp_env;		/* error recovery jmp buf */
 int snoop_nrecover;			/* number of recoveries on curr pkt */
 int quitting;				/* user termination flag */
 
-extern int encap_levels;		/* variables needing reset on error */
-extern unsigned int total_encap_levels;
-
-struct snoop_handler *snoop_hp;		/* global alarm handler head */
-struct snoop_handler *snoop_tp;		/* global alarm handler tail */
-time_t snoop_nalarm;			/* time of next alarm */
+static struct snoop_handler *snoop_hp;		/* global alarm handler head */
+static struct snoop_handler *snoop_tp;		/* global alarm handler tail */
+static time_t snoop_nalarm;			/* time of next alarm */
 
 /* protected interpreter output areas */
 #define	MAXSUM		8
@@ -76,10 +73,10 @@ static char *detail_line;
 static char *line;
 static char *encap;
 
-int audio;
+static int audio;
 int maxcount;	/* maximum no of packets to capture */
 int count;	/* count of packets captured */
-int sumcount;
+static int sumcount;
 int x_offset = -1;
 int x_length = 0x7fffffff;
 FILE *namefile;
@@ -91,17 +88,15 @@ boolean_t zflg = B_FALSE;		/* debugging packet corrupt flag */
 #endif
 struct Pf_ext_packetfilt pf;
 
-void usage();
+static void usage(void);
 void show_count();
-void snoop_sigrecover(int sig, siginfo_t *info, void *p);
+static void snoop_sigrecover(int sig, siginfo_t *info, void *p);
 static char *protmalloc(size_t);
 static void resetperm(void);
 
 int
 main(int argc, char **argv)
 {
-	extern char *optarg;
-	extern int optind;
 	int c;
 	int filter = 0;
 	int flags = F_SUM;
@@ -120,8 +115,6 @@ main(int argc, char **argv)
 	char self[MAXHOSTNAMELEN + 1];
 	char *argstr = NULL;
 	void (*proc)();
-	extern void cap_write();
-	extern void process_pkt();
 	char *audiodev;
 	int ret;
 	struct sigaction sigact;
@@ -170,7 +163,7 @@ main(int argc, char **argv)
 	/* Initialize a master signal handler */
 	sigact.sa_handler = NULL;
 	sigact.sa_sigaction = snoop_sigrecover;
-	sigemptyset(&sigact.sa_mask);
+	(void) sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = SA_ONSTACK|SA_SIGINFO;
 
 	/* Register master signal handler */
@@ -231,7 +224,7 @@ main(int argc, char **argv)
 	if (sigsetjmp(jmp_env, 1)) {
 		exit(1);
 	}
-	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
+	(void) setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 
 	while ((c = getopt(argc, argv, "at:CPDSi:o:Nn:s:d:vVp:f:c:x:?rqz"))
 				!= EOF) {
@@ -491,7 +484,7 @@ main(int argc, char **argv)
 		net_read(chunksize, filter, proc, flags);
 
 		if (!(flags & F_NOW))
-			printf("\n");
+			(void) printf("\n");
 	}
 
 	if (ocapfile)
@@ -500,7 +493,7 @@ main(int argc, char **argv)
 	return (0);
 }
 
-int tone[] = {
+static int tone[] = {
 0x076113, 0x153333, 0x147317, 0x144311, 0x147315, 0x050353, 0x037103, 0x051106,
 0x157155, 0x142723, 0x133273, 0x134664, 0x051712, 0x024465, 0x026447, 0x072473,
 0x136715, 0x126257, 0x135256, 0x047344, 0x034476, 0x027464, 0x036062, 0x133334,
@@ -524,7 +517,7 @@ click(len)
 	len = len ? len : 4;
 
 	if (audio) {
-		write(audio, tone, len);
+		(void) write(audio, tone, len);
 	}
 }
 
@@ -561,16 +554,16 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 	int i, start;
 
 	if (flags & F_NUM) {
-		sprintf(lp, "%3d ", num);
+		(void) sprintf(lp, "%3d ", num);
 		lp += strlen(lp);
 	}
 	tm = localtime(&tvp->tv_sec);
 
 	if (flags & F_TIME) {
 		if (flags & F_ATIME) {
-			sprintf(lp, "%d:%02d:%d.%05d ",
+			(void) sprintf(lp, "%d:%02d:%d.%05d ",
 				tm->tm_hour, tm->tm_min, tm->tm_sec,
-				tvp->tv_usec / 10);
+				(int)tvp->tv_usec / 10);
 			lp += strlen(lp);
 		} else {
 			if (flags & F_RTIME) {
@@ -586,44 +579,44 @@ show_pktinfo(flags, num, src, dst, ptvp, tvp, drops, len)
 				usec += 1000000;
 				sec  -= 1;
 			}
-			sprintf(lp, "%3d.%05d ", sec, usec / 10);
+			(void) sprintf(lp, "%3d.%05d ", sec, usec / 10);
 			lp += strlen(lp);
 		}
 	}
 
 	if (flags & F_WHO) {
-		sprintf(lp, "%12s -> %-12s ", src, dst);
+		(void) sprintf(lp, "%12s -> %-12s ", src, dst);
 		lp += strlen(lp);
 	}
 
 	if (flags & F_DROPS) {
-		sprintf(lp, "drops: %d ", drops);
+		(void) sprintf(lp, "drops: %d ", drops);
 		lp += strlen(lp);
 	}
 
 	if (flags & F_LEN) {
-		sprintf(lp, "length: %4d  ", len);
+		(void) sprintf(lp, "length: %4d  ", len);
 		lp += strlen(lp);
 	}
 
 	if (flags & F_SUM) {
 		if (flags & F_ALLSUM)
-			printf("________________________________\n");
+			(void) printf("________________________________\n");
 
 		start = flags & F_ALLSUM ? 0 : sumcount - 1;
-		sprintf(encap, "  (%d encap)", total_encap_levels - 1);
-		printf("%s%s%s\n", line, sumline[start],
+		(void) sprintf(encap, "  (%d encap)", total_encap_levels - 1);
+		(void) printf("%s%s%s\n", line, sumline[start],
 		    ((flags & F_ALLSUM) || (total_encap_levels == 1)) ? "" :
 			encap);
 
 		for (i = start + 1; i < sumcount; i++)
-			printf("%s%s\n", line, sumline[i]);
+			(void) printf("%s%s\n", line, sumline[i]);
 
 		sumcount = 0;
 	}
 
 	if (flags & F_DTAIL) {
-		printf("%s\n\n", detail_line);
+		(void) printf("%s\n\n", detail_line);
 		detail_line[0] = '\0';
 	}
 }
@@ -658,7 +651,7 @@ get_detail_line(off, len)
 	int off, len;
 {
 	if (detail_line[0]) {
-		printf("%s\n", detail_line);
+		(void) printf("%s\n", detail_line);
 		detail_line[0] = '\0';
 	}
 	return (detail_line);
@@ -667,27 +660,32 @@ get_detail_line(off, len)
 /*
  * Print an error.
  * Works like printf (fmt string and variable args)
- * except that it will subsititute an error message
+ * except that it will substitute an error message
  * for a "%m" string (like syslog) and it calls
  * long_jump - it doesn't return to where it was
  * called from - it goes to the last setjmp().
  */
+/* VARARGS1 */
 void
-pr_err(char *fmt, ...)
+pr_err(const char *fmt, ...)
 {
 	va_list ap;
-	char buf[BUFSIZ], *p2;
-	char *p1;
+	char buf[1024], *p2;
+	const char *p1;
 
-	strcpy(buf, "snoop: ");
+	(void) strcpy(buf, "snoop: ");
 	p2 = buf + strlen(buf);
 
-	for (p1 = fmt; *p1; p1++) {
+	/*
+	 * Note that we terminate the buffer with '\n' and '\0'.
+	 */
+	for (p1 = fmt; *p1 != '\0' && p2 < buf + sizeof (buf) - 2; p1++) {
 		if (*p1 == '%' && *(p1+1) == 'm') {
-			char *errstr;
+			const char *errstr;
 
-			if ((errstr = strerror(errno)) != (char *)NULL) {
-				(void) strcpy(p2, errstr);
+			if ((errstr = strerror(errno)) != NULL) {
+				*p2 = '\0';
+				(void) strlcat(buf, errstr, sizeof (buf));
 				p2 += strlen(p2);
 			}
 			p1++;
@@ -700,6 +698,7 @@ pr_err(char *fmt, ...)
 	*p2 = '\0';
 
 	va_start(ap, fmt);
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) vfprintf(stderr, buf, ap);
 	va_end(ap);
 	snoop_sigrecover(-1, NULL, NULL);	/* global error recovery */
@@ -710,8 +709,8 @@ pr_err(char *fmt, ...)
  * PLEASE keep this up to date!
  * Naive users *love* this stuff.
  */
-void
-usage()
+static void
+usage(void)
 {
 	(void) fprintf(stderr, "\nUsage:  snoop\n");
 	(void) fprintf(stderr,
@@ -793,8 +792,8 @@ snoop_alarm(int s_sec, void (*s_handler)())
 	volatile sigset_t s_mask;
 	volatile int ret = -1;
 
-	sigemptyset((sigset_t *)&s_mask);
-	sigaddset((sigset_t *)&s_mask, SIGALRM);
+	(void) sigemptyset((sigset_t *)&s_mask);
+	(void) sigaddset((sigset_t *)&s_mask, SIGALRM);
 	if (s_sec < 0)
 		return (-1);
 
@@ -812,7 +811,7 @@ snoop_alarm(int s_sec, void (*s_handler)())
 			snoop_hp = snoop_tp = (struct snoop_handler *)sh;
 
 			snoop_nalarm = sh->s_time;
-			alarm(sh->s_time - now);
+			(void) alarm(sh->s_time - now);
 		} else {
 			snoop_tp->s_next = (struct snoop_handler *)sh;
 			snoop_tp = (struct snoop_handler *)sh;
@@ -905,7 +904,7 @@ snoop_recover(void)
  * out the signal blocking.
  */
 /*ARGSUSED*/
-void
+static void
 snoop_sigrecover(int sig, siginfo_t *info, void *p)
 {
 	volatile time_t now;
@@ -934,7 +933,7 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 		/* Setup next alarm */
 		if (nalarm) {
 			snoop_nalarm = nalarm;
-			alarm(nalarm - now);
+			(void) alarm(nalarm - now);
 		} else {
 			snoop_nalarm = 0;
 		}
@@ -979,7 +978,7 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 			return;
 		}
 		if (snoop_nrecover >= SNOOP_MAXRECOVER) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 				"snoop: WARNING: skipping from packet %d\n",
 				count);
 			snoop_nrecover = 0;
@@ -988,13 +987,13 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 			return;
 		}
 	} else if (snoop_nrecover >= SNOOP_MAXRECOVER) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 			"snoop: ERROR: cannot recover from packet %d\n", count);
 		exit(1);
 	}
 
 #ifdef DEBUG
-	fprintf(stderr, "snoop_sigrecover(%d, %p, %p)\n", sig, info, p);
+	(void) fprintf(stderr, "snoop_sigrecover(%d, %p, %p)\n", sig, info, p);
 #endif /* DEBUG */
 
 	/*
@@ -1006,7 +1005,8 @@ snoop_sigrecover(int sig, siginfo_t *info, void *p)
 		return;
 	} else if (sig != -1 && sig != SIGALRM) {
 		/* Inform user that snoop has taken a fault */
-		fprintf(stderr, "WARNING: received signal %d from packet %d\n",
+		(void) fprintf(stderr,
+		    "WARNING: received signal %d from packet %d\n",
 				sig, count);
 	}
 

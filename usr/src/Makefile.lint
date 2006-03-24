@@ -350,6 +350,8 @@ COMMON_SUBDIRS = \
 	lib/libsmbios \
 	lib/libsmedia \
 	lib/libthread \
+	lib/libtsnet \
+	lib/libtsol \
 	lib/libumem \
 	lib/libuutil \
 	lib/libwanboot \

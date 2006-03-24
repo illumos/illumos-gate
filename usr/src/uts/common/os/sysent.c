@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +82,7 @@ int	hrtsys();
 int	ioctl();
 int	issetugid();
 int	kill();
+int	labelsys();
 int	link();
 off32_t	lseek32();
 off_t	lseek64();
@@ -664,7 +664,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 181 */ SYSENT_CI("rusagesys",	rusagesys, 	2),
 	/* 182 */ SYSENT_LOADABLE(),		/* portfs */
 	/* 183 */ SYSENT_CI("pollsys",		pollsys,	4),
-	/* 184 */ SYSENT_LOADABLE(),		/* tsolsys */
+	/* 184 */ SYSENT_CI("labelsys",		labelsys,	5),
 	/* 185 */ SYSENT_CI("acl",		acl,		4),
 	/* 186 */ SYSENT_AP("auditsys",		auditsys,	2),
 	/* 187 */ SYSENT_CI("processor_bind",	processor_bind,	4),
@@ -742,7 +742,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_NOSYS(),
 			SYSENT_CI("open64",	open64,		3)),
 	/* 226 */ SYSENT_LOADABLE(),		/* rpcsys */
-	/* 227 */ SYSENT_CL("zone",		zone,		6),
+	/* 227 */ SYSENT_CL("zone",		zone,		5),
 	/* 228 */ SYSENT_LOADABLE(),		/* autofssys */
 	/* 229 */ SYSENT_CI("getcwd",		getcwd,		2),
 	/* 230 */ SYSENT_CI("so_socket",	so_socket,	5),
@@ -1042,7 +1042,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 181 */ SYSENT_CI("rusagesys",	rusagesys,	2),
 	/* 182 */ SYSENT_LOADABLE32(),		/* portfs */
 	/* 183 */ SYSENT_CI("pollsys",		pollsys,	4),
-	/* 184 */ SYSENT_LOADABLE32(),		/* tsolsys */
+	/* 184 */ SYSENT_CI("labelsys",		labelsys,	5),
 	/* 185 */ SYSENT_CI("acl",		acl,		4),
 	/* 186 */ SYSENT_AP("auditsys",		auditsys,	2),
 	/* 187 */ SYSENT_CI("processor_bind",	processor_bind,	4),

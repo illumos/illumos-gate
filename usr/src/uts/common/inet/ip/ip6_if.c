@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -38,7 +37,6 @@
 #include <sys/stream.h>
 #include <sys/dlpi.h>
 #include <sys/stropts.h>
-#include <sys/strlog.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/kstat.h>
@@ -48,14 +46,10 @@
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/socket.h>
-#define	_SUN_TPI_VERSION	2
-#include <sys/tihdr.h>
 #include <sys/isa_defs.h>
 #include <net/if.h>
-#include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/route.h>
-#include <sys/sockio.h>
 #include <netinet/in.h>
 #include <netinet/igmp_var.h>
 #include <netinet/ip6.h>
@@ -63,10 +57,8 @@
 #include <netinet/in.h>
 
 #include <inet/common.h>
-#include <inet/mi.h>
 #include <inet/nd.h>
 #include <inet/mib2.h>
-#include <inet/arp.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_multi.h>
@@ -79,8 +71,8 @@
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
 
-#include <netinet/igmp.h>
-#include <netinet/ip_mroute.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/tnet.h>
 
 static in6_addr_t	ipv6_ll_template =
 			{(uint32_t)V6_LINKLOCAL, 0x0, 0x0, 0x0};
@@ -225,7 +217,9 @@ repeat:
 		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
 		for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
-			if (zoneid != ALL_ZONES && ipif->ipif_zoneid != zoneid)
+			if (zoneid != ALL_ZONES &&
+			    ipif->ipif_zoneid != zoneid &&
+			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
 			/* Allow the ipif to be down */
 			if ((!ptp && (IN6_ARE_ADDR_EQUAL(
@@ -332,7 +326,8 @@ ip_remote_addr_ok_v6(const in6_addr_t *addr, const in6_addr_t *subnet_mask)
 int
 ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
     const in6_addr_t *gw_addr, const in6_addr_t *src_addr, int flags,
-    ipif_t *ipif_arg, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func)
+    ipif_t *ipif_arg, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    struct rtsa_s *sp)
 {
 	ire_t	*ire;
 	ire_t	*gw_ire = NULL;
@@ -341,6 +336,9 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	uint_t	type;
 	int	match_flags = MATCH_IRE_TYPE;
 	int	error;
+	tsol_gc_t *gc = NULL;
+	tsol_gcgrp_t *gcgrp = NULL;
+	boolean_t gcgrp_xtraref = B_FALSE;
 
 	if (ire_arg != NULL)
 		*ire_arg = NULL;
@@ -433,6 +431,14 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	if (!(flags & RTF_GATEWAY)) {
 		queue_t	*stq;
 
+		if (sp != NULL) {
+			ip2dbg(("ip_rt_add_v6: gateway security attributes "
+			    "cannot be set with interface route\n"));
+			if (ipif_refheld)
+				ipif_refrele(ipif);
+			return (EINVAL);
+		}
+
 		/*
 		 * As the interface index specified with the RTA_IFP sockaddr is
 		 * the same for all ipif's off of an ill, the matching logic
@@ -470,7 +476,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 */
 		match_flags |= MATCH_IRE_MASK;
 		ire = ire_ftable_lookup_v6(dst_addr, mask, 0, IRE_INTERFACE,
-		    ipif, NULL, ALL_ZONES, 0, match_flags);
+		    ipif, NULL, ALL_ZONES, 0, NULL, match_flags);
 		if (ire != NULL) {
 			ire_refrele(ire);
 			if (ipif_refheld)
@@ -501,7 +507,9 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		    0,
 		    0,
 		    flags,
-		    &ire_uinfo_null);
+		    &ire_uinfo_null,
+		    NULL,
+		    NULL);
 		if (ire == NULL) {
 			if (ipif_refheld)
 				ipif_refrele(ipif);
@@ -551,7 +559,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	if (ipif_arg != NULL)
 		match_flags |= MATCH_IRE_ILL;
 	gw_ire = ire_ftable_lookup_v6(gw_addr, 0, 0, IRE_INTERFACE, ipif_arg,
-	    NULL, ALL_ZONES, 0, match_flags);
+	    NULL, ALL_ZONES, 0, NULL, match_flags);
 	if (gw_ire == NULL)
 		return (ENETUNREACH);
 
@@ -572,11 +580,43 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 
 	/* check for a duplicate entry */
 	ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type, ipif_arg,
-	    NULL, ALL_ZONES, 0, match_flags | MATCH_IRE_MASK | MATCH_IRE_GW);
+	    NULL, ALL_ZONES, 0, NULL,
+	    match_flags | MATCH_IRE_MASK | MATCH_IRE_GW);
 	if (ire != NULL) {
 		ire_refrele(gw_ire);
 		ire_refrele(ire);
 		return (EEXIST);
+	}
+
+	/* Security attribute exists */
+	if (sp != NULL) {
+		tsol_gcgrp_addr_t ga;
+
+		/* find or create the gateway credentials group */
+		ga.ga_af = AF_INET6;
+		ga.ga_addr = *gw_addr;
+
+		/* we hold reference to it upon success */
+		gcgrp = gcgrp_lookup(&ga, B_TRUE);
+		if (gcgrp == NULL) {
+			ire_refrele(gw_ire);
+			return (ENOMEM);
+		}
+
+		/*
+		 * Create and add the security attribute to the group; a
+		 * reference to the group is made upon allocating a new
+		 * entry successfully.  If it finds an already-existing
+		 * entry for the security attribute in the group, it simply
+		 * returns it and no new reference is made to the group.
+		 */
+		gc = gc_create(sp, gcgrp, &gcgrp_xtraref);
+		if (gc == NULL) {
+			/* release reference held by gcgrp_lookup */
+			GCGRP_REFRELE(gcgrp);
+			ire_refrele(gw_ire);
+			return (ENOMEM);
+		}
 	}
 
 	/* Create the IRE. */
@@ -598,8 +638,19 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	    0,
 	    0,
 	    flags,
-	    &gw_ire->ire_uinfo);		/* Inherit ULP info from gw */
+	    &gw_ire->ire_uinfo,			/* Inherit ULP info from gw */
+	    gc,					/* security attribute */
+	    NULL);
+	/*
+	 * The ire holds a reference to the 'gc' and the 'gc' holds a
+	 * reference to the 'gcgrp'. We can now release the extra reference
+	 * the 'gcgrp' acquired in the gcgrp_lookup, if it was not used.
+	 */
+	if (gcgrp_xtraref)
+		GCGRP_REFRELE(gcgrp);
 	if (ire == NULL) {
+		if (gc != NULL)
+			GC_REFRELE(gc);
 		ire_refrele(gw_ire);
 		return (ENOMEM);
 	}
@@ -644,6 +695,17 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 				return (res);
 			}
 		}
+	}
+
+	/*
+	 * Now that the prefix IRE entry has been created, delete any
+	 * existing gateway IRE cache entries as well as any IRE caches
+	 * using the gateway, and force them to be created through
+	 * ip_newroute_v6.
+	 */
+	if (gc != NULL) {
+		ASSERT(gcgrp != NULL);
+		ire_clookup_delete_cache_gw_v6(gw_addr, ALL_ZONES);
 	}
 
 save_ire:
@@ -768,10 +830,10 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 
 		if (ipif->ipif_ire_type == IRE_LOOPBACK)
 			ire = ire_ctable_lookup_v6(dst_addr, 0, IRE_LOOPBACK,
-			    ipif, ALL_ZONES, match_flags);
+			    ipif, ALL_ZONES, NULL, match_flags);
 		if (ire == NULL)
 			ire = ire_ftable_lookup_v6(dst_addr, mask, 0,
-			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0,
+			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
 			    match_flags);
 	} else if (err == EINPROGRESS) {
 		return (err);
@@ -802,11 +864,11 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		else
 			type = IRE_PREFIX;
 		ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type,
-		    ipif_arg, NULL, ALL_ZONES, 0, match_flags);
+		    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags);
 		if (ire == NULL && type == IRE_HOST) {
 			ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr,
 			    IRE_HOST_REDIRECT, ipif_arg, NULL, ALL_ZONES, 0,
-			    match_flags);
+			    NULL, match_flags);
 		}
 	}
 
@@ -1419,7 +1481,9 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		    0,
 		    0,
 		    ifrt->ifrt_flags,
-		    &ifrt->ifrt_iulp_info);
+		    &ifrt->ifrt_iulp_info,
+		    NULL,
+		    NULL);
 		if (ire == NULL) {
 			mutex_exit(&ipif->ipif_saved_ire_lock);
 			kmem_free(ipif_saved_irep,
@@ -1528,6 +1592,7 @@ typedef struct candidate {
 #define	cand_srcaddr	cand_ipif->ipif_v6lcl_addr
 #define	cand_flags	cand_ipif->ipif_flags
 #define	cand_ill	cand_ipif->ipif_ill
+#define	cand_zoneid	cand_ipif->ipif_zoneid
 
 /* information about the destination for source address selection */
 typedef struct dstinfo {
@@ -1787,6 +1852,23 @@ rule_prefix(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
 }
 
 /*
+ * Prefer to use zone-specific addresses when possible instead of all-zones
+ * addresses.
+ */
+/* ARGSUSED2 */
+static rule_res_t
+rule_zone_specific(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
+{
+	if ((bc->cand_zoneid == ALL_ZONES) ==
+	    (cc->cand_zoneid == ALL_ZONES))
+		return (CAND_TIE);
+	else if (cc->cand_zoneid == ALL_ZONES)
+		return (CAND_AVOID);
+	else
+		return (CAND_PREFER);
+}
+
+/*
  * Determine the best source address given a destination address and a
  * destination ill.  If no suitable source address is found, it returns
  * NULL. If there is a usable address pointed to by the usesrc
@@ -1828,6 +1910,7 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	boolean_t	first_candidate = B_TRUE;
 	rule_res_t	rule_result;
 	phyint_t	*phyi;
+	tsol_tpc_t	*src_rhtp, *dst_rhtp;
 
 	/*
 	 * The list of ordering rules.  They are applied in the order they
@@ -1845,6 +1928,7 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		rule_label,
 		rule_temporary,
 		rule_prefix,
+		rule_zone_specific,
 		NULL
 	};
 
@@ -1866,6 +1950,26 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		}
 	} else {
 		dstinfo.dst_ill = dstill;
+	}
+
+	/*
+	 * If we're dealing with an unlabeled destination on a labeled system,
+	 * make sure that we ignore source addresses that are incompatible with
+	 * the destination's default label.  That destination's default label
+	 * must dominate the minimum label on the source address.
+	 *
+	 * (Note that this has to do with Trusted Solaris.  It's not related to
+	 * the labels described by ip6_asp_lookup.)
+	 */
+	dst_rhtp = NULL;
+	if (is_system_labeled()) {
+		dst_rhtp = find_tpc(dst, IPV6_VERSION, B_FALSE);
+		if (dst_rhtp == NULL)
+			return (NULL);
+		if (dst_rhtp->tpc_tp.host_type != UNLABELED) {
+			TPC_RELE(dst_rhtp);
+			dst_rhtp = NULL;
+		}
 	}
 
 	dstinfo.dst_addr = dst;
@@ -1936,8 +2040,36 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 			if (!IPIF_VALID_IPV6_SOURCE(ipif))
 				continue;
 
-			if (zoneid != ALL_ZONES && ipif->ipif_zoneid != zoneid)
+			if (zoneid != ALL_ZONES &&
+			    ipif->ipif_zoneid != zoneid &&
+			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
+
+			/*
+			 * Check compatibility of local address for
+			 * destination's default label if we're on a labeled
+			 * system.  Incompatible addresses can't be used at
+			 * all and must be skipped over.
+			 */
+			if (dst_rhtp != NULL) {
+				boolean_t incompat;
+
+				src_rhtp = find_tpc(&ipif->ipif_v6lcl_addr,
+				    IPV6_VERSION, B_FALSE);
+				if (src_rhtp == NULL)
+					continue;
+				incompat =
+				    src_rhtp->tpc_tp.host_type != SUN_CIPSO ||
+				    src_rhtp->tpc_tp.tp_doi !=
+				    dst_rhtp->tpc_tp.tp_doi ||
+				    (!_blinrange(&dst_rhtp->tpc_tp.tp_def_label,
+				    &src_rhtp->tpc_tp.tp_sl_range_cipso) &&
+				    !blinlset(&dst_rhtp->tpc_tp.tp_def_label,
+				    src_rhtp->tpc_tp.tp_sl_set_cipso));
+				TPC_RELE(src_rhtp);
+				if (incompat)
+					continue;
+			}
 
 			if (first_candidate) {
 				/*
@@ -2013,6 +2145,9 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 
 	if (usesrc_ill != NULL)
 		ill_refrele(usesrc_ill);
+
+	if (dst_rhtp != NULL)
+		TPC_RELE(dst_rhtp);
 
 	if (ipif == NULL) {
 		rw_exit(&ill_g_lock);
@@ -2152,7 +2287,9 @@ ipif_recreate_interface_routes_v6(ipif_t *old_ipif, ipif_t *ipif)
 	    0,
 	    0,
 	    0,
-	    &ire_uinfo_null);
+	    &ire_uinfo_null,
+	    NULL,
+	    NULL);
 
 	if (ire != NULL) {
 		ire_t *ret_ire;
@@ -2505,6 +2642,22 @@ ipif_up_done_v6(ipif_t *ipif)
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
+
+		/*
+		 * If we're on a labeled system then make sure that zone-
+		 * private addresses have proper remote host database entries.
+		 */
+		if (is_system_labeled() &&
+		    ipif->ipif_ire_type != IRE_LOOPBACK) {
+			if (ip6opt_ls == 0) {
+				cmn_err(CE_WARN, "IPv6 not enabled "
+				    "via /etc/system");
+				return (EINVAL);
+			}
+			if (!tsol_check_interface_address(ipif))
+				return (EINVAL);
+		}
+
 		/* Register the source address for __sin6_src_id */
 		err = ip_srcid_insert(&ipif->ipif_v6lcl_addr,
 		    ipif->ipif_zoneid);
@@ -2541,7 +2694,9 @@ ipif_up_done_v6(ipif_t *ipif)
 		    0,
 		    0,
 		    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE : 0,
-		    &ire_uinfo_null);
+		    &ire_uinfo_null,
+		    NULL,
+		    NULL);
 	}
 
 	/*
@@ -2581,7 +2736,9 @@ ipif_up_done_v6(ipif_t *ipif)
 		    0,
 		    0,
 		    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE : 0,
-		    &ire_uinfo_null);
+		    &ire_uinfo_null,
+		    NULL,
+		    NULL);
 	}
 
 	/*
@@ -2608,7 +2765,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		 * this tunnel interface.
 		 */
 		isdup = ire_ftable_lookup_v6(first_addr, &prefix_mask, 0,
-		    IRE_IF_NORESOLVER, ill->ill_ipif, NULL, ALL_ZONES, 0,
+		    IRE_IF_NORESOLVER, ill->ill_ipif, NULL, ALL_ZONES, 0, NULL,
 		    (MATCH_IRE_SRC | MATCH_IRE_MASK));
 
 		if (isdup == NULL) {
@@ -2632,7 +2789,9 @@ ipif_up_done_v6(ipif_t *ipif)
 			    0,
 			    0,
 			    RTF_UP,
-			    &ire_uinfo_null);
+			    &ire_uinfo_null,
+			    NULL,
+			    NULL);
 		} else {
 			ire_refrele(isdup);
 		}

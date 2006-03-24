@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -34,6 +33,9 @@
 #include <limits.h>
 #include <ctype.h>
 #include <sys/mc.h>
+#include <bsm/devalloc.h>
+
+extern int system_labeled;
 
 static int lp(di_minor_t minor, di_node_t node);
 static int serial_dialout(di_minor_t minor, di_node_t node);
@@ -151,16 +153,20 @@ vt00(di_minor_t minor, di_node_t node)
 static int
 diskette(di_minor_t minor, di_node_t node)
 {
+	int flags = 0;
 	char *a2;
 	char link[PATH_MAX];
 	char *addr = di_bus_addr(node);
 	char *mn = di_minor_name(minor);
 
+	if (system_labeled)
+		flags = DA_ADD|DA_FLOPPY;
+
 	if (strcmp(addr, "0,0") == 0) {
 		if (strcmp(mn, "c") == 0) {
-			(void) devfsadm_mklink("diskette", node, minor, 0);
+			(void) devfsadm_mklink("diskette", node, minor, flags);
 		} else if (strcmp(mn, "c,raw") == 0) {
-			(void) devfsadm_mklink("rdiskette", node, minor, 0);
+			(void) devfsadm_mklink("rdiskette", node, minor, flags);
 		}
 
 	}
@@ -171,11 +177,13 @@ diskette(di_minor_t minor, di_node_t node)
 			if (strcmp(mn, "c") == 0) {
 				(void) strcpy(link, "diskette");
 				(void) strcat(link, a2);
-				(void) devfsadm_mklink(link, node, minor, 0);
+				(void) devfsadm_mklink(link, node, minor,
+				    flags);
 			} else if (strcmp(mn, "c,raw") == 0) {
 				(void) strcpy(link, "rdiskette");
 				(void) strcat(link, a2);
-				(void) devfsadm_mklink(link, node, minor, 0);
+				(void) devfsadm_mklink(link, node, minor,
+				    flags);
 			}
 		}
 	}

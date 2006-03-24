@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
 #include <inet/kssl/kssl.h>
+#include <sys/tsol/label.h>
 
 static void add_return_token(caddr_t *, unsigned int scid, int err, int rval);
 
@@ -300,6 +300,8 @@ audit_savepath(
 			return (0);
 	}
 
+	tad->tad_ctrl |= PAD_NOPATH;		/* prevent possible reentry */
+
 	audit_pathbuild(pnp);
 	tad->tad_vn = vp;
 
@@ -348,6 +350,7 @@ audit_savepath(
 	if (tad->tad_ctrl & PAD_MLD)
 		tad->tad_ctrl |= PAD_PATHFND;
 
+	tad->tad_ctrl &= ~PAD_NOPATH;		/* restore */
 	return (0);
 }
 
@@ -703,6 +706,7 @@ audit_attributes(struct vnode *vp)
 			tad->tad_ctrl |= PAD_NOAUDIT;
 		} else {
 			au_uwrite(au_to_attr(&attr));
+			audit_sec_attributes(&(u_ad), vp);
 		}
 	}
 }
@@ -920,6 +924,10 @@ audit_core_finish(int code)
 		/* Add an optional group token */
 		AUDIT_SETGROUP(&(u_ad), cr, kctx);
 
+		/* Add slabel token */
+		if (is_system_labeled())
+			au_write(&(u_ad), au_to_label(CR_SL(cr)));
+
 		/* Add a return token (should use f argument) */
 		add_return_token((caddr_t *)&(u_ad), tad->tad_scid, 0, 0);
 
@@ -1124,6 +1132,7 @@ audit_closef(struct file *fp)
 
 	if (getattr_ret == 0) {
 		au_write((caddr_t *)&(ad), au_to_attr(&attr));
+		audit_sec_attributes((caddr_t *)&(ad), vp);
 	}
 
 	/* Add a subject token */
@@ -1131,6 +1140,10 @@ audit_closef(struct file *fp)
 
 	/* add an optional group token */
 	AUDIT_SETGROUP((caddr_t *)&(ad), cr, kctx);
+
+	/* add slabel token */
+	if (is_system_labeled())
+		au_write((caddr_t *)&(ad), au_to_label(CR_SL(cr)));
 
 	/* add a return token */
 	add_return_token((caddr_t *)&(ad), tad->tad_scid, 0, 0);
@@ -1324,6 +1337,10 @@ audit_reboot(void)
 
 		/* add an optional group token */
 		AUDIT_SETGROUP(&(u_ad), cr, kctx);
+
+		/* add slabel token */
+		if (is_system_labeled())
+			au_uwrite(au_to_label(CR_SL(cr)));
 
 		/* add a return token */
 		add_return_token((caddr_t *)&(u_ad), tad->tad_scid, 0, 0);
@@ -2158,6 +2175,10 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	/* add an optional group token */
 	AUDIT_SETGROUP((caddr_t *)&(ad), cr, kctx);
 
+	/* add slabel token */
+	if (is_system_labeled())
+		au_write((caddr_t *)&ad, au_to_label(CR_SL(cr)));
+
 	switch (cmd) {
 	case CRYPTO_LOAD_DEV_DISABLED:
 		if (error == 0 && rv == CRYPTO_SUCCESS) {
@@ -2307,6 +2328,10 @@ audit_kssl(int cmd, void *params, int error)
 	/* add an optional group token */
 	AUDIT_SETGROUP((caddr_t *)&ad, cr, kctx);
 
+	/* Add slabel token */
+	if (is_system_labeled())
+		au_write(&(u_ad), au_to_label(CR_SL(cr)));
+
 	switch (cmd) {
 	case KSSL_ADD_ENTRY: {
 		char buf[32];
@@ -2349,3 +2374,35 @@ audit_kssl(int cmd, void *params, int error)
 
 	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, 0);
 }
+
+/*
+ * ROUTINE:	AUDIT_SEC_ATTRIBUTES
+ * PURPOSE:	Add security attributes
+ * CALLBY:	AUDIT_ATTRIBUTES
+ *		AUDIT_CLOSEF
+ *		AUS_CLOSE
+ * NOTE:
+ * TODO:
+ * QUESTION:
+ */
+
+void
+audit_sec_attributes(caddr_t *ad, struct vnode *vp)
+{
+	/* Dump the SL */
+	if (is_system_labeled()) {
+		ts_label_t	*tsl;
+		bslabel_t	*bsl;
+
+		tsl = getflabel(vp);
+		if (tsl == NULL)
+			return;			/* nothing else to do */
+
+		bsl = label2bslabel(tsl);
+		if (bsl == NULL)
+			return;			/* nothing else to do */
+		au_write(ad, au_to_label(bsl));
+		label_rele(tsl);
+	}
+
+}	/* AUDIT_SEC_ATTRIBUTES */

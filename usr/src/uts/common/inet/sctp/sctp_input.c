@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,14 +381,15 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	}
 	/* If app asked for hopbyhop headers and it has changed ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVHOPOPTS) &&
-	    sctp_cmpbuf(sctp->sctp_hopopts, sctp->sctp_hopoptslen,
+	    ip_cmpbuf(sctp->sctp_hopopts, sctp->sctp_hopoptslen,
 		(ipp->ipp_fields & IPPF_HOPOPTS),
 		ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
-		optlen += sizeof (*cmsg) + ipp->ipp_hopoptslen;
+		optlen += sizeof (*cmsg) + ipp->ipp_hopoptslen -
+		    sctp->sctp_v6label_len;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
 		addflag |= SCTP_IPV6_RECVHOPOPTS;
-		if (!sctp_allocbuf((void **)&sctp->sctp_hopopts,
+		if (!ip_allocbuf((void **)&sctp->sctp_hopopts,
 		    &sctp->sctp_hopoptslen,
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen))
@@ -397,14 +397,14 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	}
 	/* If app asked for dst headers before routing headers ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVRTDSTOPTS) &&
-	    sctp_cmpbuf(sctp->sctp_rtdstopts, sctp->sctp_rtdstoptslen,
+	    ip_cmpbuf(sctp->sctp_rtdstopts, sctp->sctp_rtdstoptslen,
 		(ipp->ipp_fields & IPPF_RTDSTOPTS),
 		ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_rtdstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
 		addflag |= SCTP_IPV6_RECVRTDSTOPTS;
-		if (!sctp_allocbuf((void **)&sctp->sctp_rtdstopts,
+		if (!ip_allocbuf((void **)&sctp->sctp_rtdstopts,
 		    &sctp->sctp_rtdstoptslen,
 		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
 		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen))
@@ -412,14 +412,14 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	}
 	/* If app asked for routing headers and it has changed ... */
 	if (sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVRTHDR) {
-		if (sctp_cmpbuf(sctp->sctp_rthdr, sctp->sctp_rthdrlen,
+		if (ip_cmpbuf(sctp->sctp_rthdr, sctp->sctp_rthdrlen,
 		    (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
 			optlen += sizeof (*cmsg) + ipp->ipp_rthdrlen;
 			if (hdrlen == 0)
 				hdrlen = sizeof (struct T_unitdata_ind);
 			addflag |= SCTP_IPV6_RECVRTHDR;
-			if (!sctp_allocbuf((void **)&sctp->sctp_rthdr,
+			if (!ip_allocbuf((void **)&sctp->sctp_rthdr,
 			    &sctp->sctp_rthdrlen,
 			    (ipp->ipp_fields & IPPF_RTHDR),
 			    ipp->ipp_rthdr, ipp->ipp_rthdrlen))
@@ -428,14 +428,14 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	}
 	/* If app asked for dest headers and it has changed ... */
 	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVDSTOPTS) &&
-	    sctp_cmpbuf(sctp->sctp_dstopts, sctp->sctp_dstoptslen,
+	    ip_cmpbuf(sctp->sctp_dstopts, sctp->sctp_dstoptslen,
 		(ipp->ipp_fields & IPPF_DSTOPTS),
 		ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_dstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
 		addflag |= SCTP_IPV6_RECVDSTOPTS;
-		if (!sctp_allocbuf((void **)&sctp->sctp_dstopts,
+		if (!ip_allocbuf((void **)&sctp->sctp_dstopts,
 		    &sctp->sctp_dstoptslen,
 		    (ipp->ipp_fields & IPPF_DSTOPTS),
 		    ipp->ipp_dstopts, ipp->ipp_dstoptslen))
@@ -546,7 +546,7 @@ noancillary:
 		optptr += ipp->ipp_hopoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		sctp_savebuf((void **)&sctp->sctp_hopopts,
+		ip_savebuf((void **)&sctp->sctp_hopopts,
 		    &sctp->sctp_hopoptslen,
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen);
@@ -562,7 +562,7 @@ noancillary:
 		optptr += ipp->ipp_rtdstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		sctp_savebuf((void **)&sctp->sctp_rtdstopts,
+		ip_savebuf((void **)&sctp->sctp_rtdstopts,
 		    &sctp->sctp_rtdstoptslen,
 		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
 		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
@@ -578,7 +578,7 @@ noancillary:
 		optptr += ipp->ipp_rthdrlen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		sctp_savebuf((void **)&sctp->sctp_rthdr,
+		ip_savebuf((void **)&sctp->sctp_rthdr,
 		    &sctp->sctp_rthdrlen,
 		    (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen);
@@ -594,7 +594,7 @@ noancillary:
 		optptr += ipp->ipp_dstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		sctp_savebuf((void **)&sctp->sctp_dstopts,
+		ip_savebuf((void **)&sctp->sctp_dstopts,
 		    &sctp->sctp_dstoptslen,
 		    (ipp->ipp_fields & IPPF_DSTOPTS),
 		    ipp->ipp_dstopts, ipp->ipp_dstoptslen);
@@ -1207,7 +1207,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	dc = (sctp_data_hdr_t *)ch;
 	tsn = ntohl(dc->sdh_tsn);
 
-	dprint(3, ("sctp_data_chunk: mp=%p tsn=%x\n", mp, tsn));
+	dprint(3, ("sctp_data_chunk: mp=%p tsn=%x\n", (void *)mp, tsn));
 
 	/* Check for duplicates */
 	if (SEQ_LT(tsn, sctp->sctp_ftsn)) {
@@ -1628,7 +1628,7 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 		if (sctp->sctp_sack_toggle < 2) {
 			/* no need to SACK right now */
 			dprint(2, ("sctp_make_sack: %p no sack (toggle)\n",
-			    sctp));
+			    (void *)sctp));
 			return (NULL);
 		} else if (sctp->sctp_sack_toggle >= 2) {
 			sctp->sctp_sack_toggle = 0;
@@ -1636,7 +1636,8 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 	}
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
-		dprint(2, ("sctp_make_sack: %p no sack (already)\n", sctp));
+		dprint(2, ("sctp_make_sack: %p no sack (already)\n",
+		    (void *)sctp));
 		return (NULL);
 	}
 
@@ -1686,7 +1687,8 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 	sctp_set_iplen(sctp, smp);
 
 	dprint(2, ("sctp_sack: sending to %p %x:%x:%x:%x\n",
-	    sctp->sctp_lastdata, SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
+	    (void *)sctp->sctp_lastdata,
+	    SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
 
 	sctp->sctp_active = lbolt64;
 
@@ -3453,7 +3455,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 
 	/* Have a valid sctp for this packet */
 	fp = sctp_lookup_faddr(sctp, &src);
-	dprint(2, ("sctp_dispatch_rput: mp=%p fp=%p sctp=%p\n", mp, fp, sctp));
+	dprint(2, ("sctp_dispatch_rput: mp=%p fp=%p sctp=%p\n", (void *)mp,
+	    (void *)fp, (void *)sctp));
 
 	gotdata = 0;
 	trysend = 0;
@@ -3688,6 +3691,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				BUMP_MIB(&sctp_mib, sctpPassiveEstab);
 				if (mlen > ntohs(ch->sch_len)) {
 					eager->sctp_cookie_mp = dupb(mp);
+					mblk_setcred(eager->sctp_cookie_mp,
+					    CONN_CRED(eager->sctp_connp));
 					/*
 					 * If no mem, just let
 					 * the peer retransmit.

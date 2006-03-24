@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 
 #
@@ -38,8 +40,10 @@ POFILE=zoneadmd_all.po
 POFILES= $(OBJS:%.o=%.po)
 
 CFLAGS += $(CCVERBOSE)
+LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsol
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair -lpool \
-	-lgen -lbsm -lcontract -lzfs
+	-lgen -lbsm -lcontract -lzfs -ltsnet $(LAZYLIBS)
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

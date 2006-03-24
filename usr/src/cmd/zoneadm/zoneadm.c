@@ -398,7 +398,7 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 static int
 lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 {
-	char root[MAXPATHLEN];
+	char root[MAXPATHLEN], *cp;
 	int err;
 
 	(void) strlcpy(zent->zname, zone_name, sizeof (zent->zname));
@@ -407,13 +407,33 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 
 	zent->zid = zid;
 
-	if ((err = zone_get_zonepath(zent->zname, root, sizeof (root))) !=
-	    Z_OK) {
-		errno = err;
-		zperror2(zent->zname, gettext("could not get zone path"));
-		return (Z_ERR);
+	/*
+	 * For labeled zones which query the zone path of lower-level
+	 * zones, the path needs to be adjusted to drop the final
+	 * "/root" component. This adjusted path is then useful
+	 * for reading down any exported directories from the
+	 * lower-level zone.
+	 */
+	if (is_system_labeled() && zent->zid != ZONE_ID_UNDEFINED) {
+		if (zone_getattr(zent->zid, ZONE_ATTR_ROOT, zent->zroot,
+		    sizeof (zent->zroot)) == -1) {
+			zperror2(zent->zname,
+			    gettext("could not get zone path."));
+			return (Z_ERR);
+		}
+		cp = zent->zroot + strlen(zent->zroot) - 5;
+		if (cp > zent->zroot && strcmp(cp, "/root") == 0)
+			*cp = 0;
+	} else {
+		if ((err = zone_get_zonepath(zent->zname, root,
+		    sizeof (root))) != Z_OK) {
+			errno = err;
+			zperror2(zent->zname,
+			    gettext("could not get zone path."));
+			return (Z_ERR);
+		}
+		(void) strlcpy(zent->zroot, root, sizeof (zent->zroot));
 	}
-	(void) strlcpy(zent->zroot, root, sizeof (zent->zroot));
 
 	if ((err = zone_get_state(zent->zname, &zent->zstate_num)) != Z_OK) {
 		errno = err;
@@ -1342,7 +1362,12 @@ fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 	 */
 	result = getzonenamebyid(zid, zeptr->zname, sizeof (zeptr->zname));
 	assert(result >= 0);
-	(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
+	if (!is_system_labeled()) {
+		(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
+	} else {
+		(void) zone_getattr(zid, ZONE_ATTR_ROOT, zeptr->zroot,
+		    sizeof (zeptr->zroot));
+	}
 	zeptr->zstate_str = "running";
 }
 
@@ -1395,7 +1420,7 @@ list_func(int argc, char *argv[])
 			    cmd_to_str(CMD_LIST));
 			return (Z_ERR);
 		}
-		if (zone_id == GLOBAL_ZONEID) {
+		if (zone_id == GLOBAL_ZONEID || is_system_labeled()) {
 			retv = zone_print_list(min_state, verbose, parsable);
 		} else {
 			retv = Z_OK;
@@ -3022,6 +3047,14 @@ unconfigure_zone(char *zonepath)
 		zperror2(target_zone, gettext("could not set state"));
 		return (Z_ERR);
 	}
+
+	/*
+	 * Trusted Extensions requires that cloned zones use the
+	 * same sysid configuration, so it is not appropriate to
+	 * unconfigure the zone.
+	 */
+	if (is_system_labeled())
+		return (Z_OK);
 
 	/*
 	 * Check if the zone is already sys-unconfiged.  This saves us

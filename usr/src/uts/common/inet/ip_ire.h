@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -128,6 +127,7 @@ extern "C" {
 					/* zones or shared IREs */
 #define	MATCH_IRE_MARK_PRIVATE_ADDR	0x8000	/* Match IRE ire_marks with */
 						/* IRE_MARK_PRIVATE_ADDR. */
+#define	MATCH_IRE_SECATTR	0x10000	/* Match gateway security attributes */
 
 /* Structure for ire_cache_count() */
 typedef struct {
@@ -176,6 +176,8 @@ extern uint_t	ire_mrtun_count;
 extern uint_t ire_srcif_table_count;
 
 #ifdef _KERNEL
+struct ts_label_s;
+
 extern	ipaddr_t	ip_plen_to_mask(uint_t);
 extern	in6_addr_t	*ip_plen_to_mask_v6(uint_t, in6_addr_t *);
 
@@ -194,8 +196,8 @@ extern	void	ip_ire_req(queue_t *, mblk_t *);
 extern	int	ip_mask_to_plen(ipaddr_t);
 extern	int	ip_mask_to_plen_v6(const in6_addr_t *);
 
-extern	ire_t	*ipif_to_ire(ipif_t *);
-extern	ire_t	*ipif_to_ire_v6(ipif_t *);
+extern	ire_t	*ipif_to_ire(const ipif_t *);
+extern	ire_t	*ipif_to_ire_v6(const ipif_t *);
 
 extern	int	ire_add(ire_t **, queue_t *, mblk_t *, ipsq_func_t);
 extern	int	ire_add_mrtun(ire_t **, queue_t *, mblk_t *, ipsq_func_t);
@@ -206,19 +208,24 @@ extern	int	ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q,
 extern	void	ire_atomic_end(irb_t *irb_ptr, ire_t *ire);
 
 extern	void	ire_cache_count(ire_t *, char *);
-extern	ire_t	*ire_cache_lookup(ipaddr_t, zoneid_t);
-extern	ire_t	*ire_cache_lookup_v6(const in6_addr_t *, zoneid_t);
+extern	ire_t	*ire_cache_lookup(ipaddr_t, zoneid_t,
+    const struct ts_label_s *);
+extern	ire_t	*ire_cache_lookup_v6(const in6_addr_t *, zoneid_t,
+    const struct ts_label_s *);
 extern	void	ire_cache_reclaim(ire_t *, char *);
 
 extern	void	ire_check_bcast_present(ipif_t *, ipaddr_t, int, boolean_t *,
     boolean_t *);
+
 extern	ire_t	*ire_create_mp(uchar_t *, uchar_t *, uchar_t *, uchar_t *,
     uchar_t *, uint_t, mblk_t *, queue_t *, queue_t *, ushort_t, mblk_t *,
-    ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *);
+    ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *,
+    tsol_gc_t *, tsol_gcgrp_t *);
 
 extern	ire_t	*ire_create(uchar_t *, uchar_t *, uchar_t *, uchar_t *,
     uchar_t *, uint_t *, mblk_t *, queue_t *, queue_t *, ushort_t, mblk_t *,
-    ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *);
+    ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *,
+    tsol_gc_t *, tsol_gcgrp_t *);
 
 extern	ire_t	**ire_check_and_create_bcast(ipif_t *, ipaddr_t,
     ire_t **, int);
@@ -226,32 +233,38 @@ extern	ire_t	**ire_create_bcast(ipif_t *, ipaddr_t, ire_t **);
 extern	ire_t	*ire_init(ire_t *, uchar_t *, uchar_t *, uchar_t *,
     uchar_t *, uchar_t *, uint_t *, mblk_t *, queue_t *, queue_t *, ushort_t,
     mblk_t *, ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t,
-    const iulp_t *);
+    const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *);
 
-extern	void	ire_init_common(ire_t *, uint_t *, mblk_t *, queue_t *,
+extern	boolean_t ire_init_common(ire_t *, uint_t *, mblk_t *, queue_t *,
     queue_t *, ushort_t, mblk_t *, ipif_t *, ill_t *, uint32_t,
-    uint32_t, uint32_t, uchar_t, const iulp_t *);
+    uint32_t, uint32_t, uchar_t, const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *);
 
 extern	ire_t	*ire_create_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, uint_t *, mblk_t *, queue_t *,
     queue_t *, ushort_t, mblk_t *, ipif_t *,
-    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *);
+    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
+    tsol_gc_t *, tsol_gcgrp_t *);
 
 extern	ire_t	*ire_create_mp_v6(const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, mblk_t *, queue_t *,
     queue_t *, ushort_t, mblk_t *, ipif_t *,
-    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *);
+    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
+    tsol_gc_t *, tsol_gcgrp_t *);
 
 extern	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, uint_t *, mblk_t *, queue_t *,
     queue_t *, ushort_t, mblk_t *, ipif_t *,
-    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *);
+    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
+    tsol_gc_t *, tsol_gcgrp_t *);
 
-extern	ire_t	*ire_ctable_lookup(ipaddr_t, ipaddr_t, int, ipif_t *,
-    zoneid_t, int);
+extern	void	ire_clookup_delete_cache_gw(ipaddr_t, zoneid_t);
+extern	void	ire_clookup_delete_cache_gw_v6(const in6_addr_t *, zoneid_t);
+
+extern	ire_t	*ire_ctable_lookup(ipaddr_t, ipaddr_t, int, const ipif_t *,
+    zoneid_t, const struct ts_label_s *, int);
 
 extern	ire_t	*ire_ctable_lookup_v6(const in6_addr_t *, const in6_addr_t *,
-    int, ipif_t *, zoneid_t, int);
+    int, const ipif_t *, zoneid_t, const struct ts_label_s *, int);
 
 extern	void	ire_delete(ire_t *);
 extern	void	ire_delete_cache_gw(ire_t *, char *);
@@ -267,11 +280,13 @@ extern	boolean_t ire_fastpath_update(ire_t *, void *);
 extern	void	ire_flush_cache_v4(ire_t *, int);
 extern	void	ire_flush_cache_v6(ire_t *, int);
 
-extern	ire_t	*ire_ftable_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int, ipif_t *,
-    ire_t **, zoneid_t, uint32_t, int);
+extern	ire_t	*ire_ftable_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int,
+    const ipif_t *, ire_t **, zoneid_t, uint32_t,
+    const struct ts_label_s *, int);
 
 extern	ire_t	*ire_ftable_lookup_v6(const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, int, ipif_t *, ire_t **, zoneid_t, uint32_t, int);
+    const in6_addr_t *, int, const ipif_t *, ire_t **, zoneid_t,
+    uint32_t, const struct ts_label_s *, int);
 
 extern	ire_t	*ire_ihandle_lookup_onlink(ire_t *);
 extern	ire_t	*ire_ihandle_lookup_offlink(ire_t *, ire_t *);
@@ -287,28 +302,33 @@ extern ire_t	*ire_mrtun_lookup(ipaddr_t, ill_t *);
 
 extern	void	ire_refrele(ire_t *);
 extern	void	ire_refrele_notr(ire_t *);
-extern	ire_t	*ire_route_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int, ipif_t *,
-    ire_t **, zoneid_t, int);
+extern	ire_t	*ire_route_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int,
+    const ipif_t *, ire_t **, zoneid_t, const struct ts_label_s *, int);
 
 extern	ire_t	*ire_route_lookup_v6(const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, int, ipif_t *, ire_t **, zoneid_t, int);
+    const in6_addr_t *, int, const ipif_t *, ire_t **, zoneid_t,
+    const struct ts_label_s *, int);
 
 extern	ire_t	*ire_srcif_table_lookup(ipaddr_t, int, ipif_t *, ill_t *, int);
-extern ill_t	*ire_to_ill(ire_t *);
+extern ill_t	*ire_to_ill(const ire_t *);
 
-extern	void	ire_walk(pfv_t, char *);
-extern	void	ire_walk_ill(uint_t, uint_t, pfv_t, char *, ill_t *);
+extern	void	ire_walk(pfv_t, void *);
+extern	void	ire_walk_ill(uint_t, uint_t, pfv_t, void *, ill_t *);
 extern	void	ire_walk_ill_mrtun(uint_t, uint_t, pfv_t, void *, ill_t *);
-extern	void	ire_walk_ill_v4(uint_t, uint_t, pfv_t, char *, ill_t *);
-extern	void	ire_walk_ill_v6(uint_t, uint_t, pfv_t, char *, ill_t *);
-extern	void	ire_walk_v4(pfv_t, char *, zoneid_t);
-extern	void	ire_walk_srcif_table_v4(pfv_t, char *);
-extern	void	ire_walk_v6(pfv_t, char *, zoneid_t);
+extern	void	ire_walk_ill_v4(uint_t, uint_t, pfv_t, void *, ill_t *);
+extern	void	ire_walk_ill_v6(uint_t, uint_t, pfv_t, void *, ill_t *);
+extern	void	ire_walk_v4(pfv_t, void *, zoneid_t);
+extern	void	ire_walk_srcif_table_v4(pfv_t, void *);
+extern	void	ire_walk_v6(pfv_t, void *, zoneid_t);
 
-extern boolean_t	ire_multirt_lookup(ire_t **, ire_t **, uint32_t);
-extern boolean_t	ire_multirt_need_resolve(ipaddr_t);
-extern boolean_t	ire_multirt_lookup_v6(ire_t **, ire_t **, uint32_t);
-extern boolean_t	ire_multirt_need_resolve_v6(const in6_addr_t *);
+extern boolean_t	ire_multirt_lookup(ire_t **, ire_t **, uint32_t,
+    const struct ts_label_s *);
+extern boolean_t	ire_multirt_need_resolve(ipaddr_t,
+    const struct ts_label_s *);
+extern boolean_t	ire_multirt_lookup_v6(ire_t **, ire_t **, uint32_t,
+    const struct ts_label_s *);
+extern boolean_t	ire_multirt_need_resolve_v6(const in6_addr_t *,
+    const struct ts_label_s *);
 
 extern ire_t	*ipif_lookup_multi_ire(ipif_t *, ipaddr_t);
 extern ire_t	*ipif_lookup_multi_ire_v6(ipif_t *, const in6_addr_t *);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,13 @@
 extern "C" {
 #endif
 
+/*
+ * Maximum number of route security attributes that can be
+ * configured per route destination through the routing
+ * socket message.
+ */
+#define	TSOL_RTSA_REQUEST_MAX	1	/* one per route destination */
+
 #ifdef _KERNEL
 extern	void	ip_rts_change(int, ipaddr_t, ipaddr_t,
     ipaddr_t, ipaddr_t, ipaddr_t, int, int,
@@ -41,21 +47,22 @@ extern	void	ip_rts_change(int, ipaddr_t, ipaddr_t,
 extern	void	ip_rts_change_v6(int, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, int, int, int);
 
-extern	void	ip_rts_ifmsg(ipif_t *);
+extern	void	ip_rts_ifmsg(const ipif_t *);
 
-extern	void	ip_rts_newaddrmsg(int, int, ipif_t *);
+extern	void	ip_rts_newaddrmsg(int, int, const ipif_t *);
 
 extern	int	ip_rts_request(queue_t *, mblk_t *, cred_t *);
 
 extern	void	ip_rts_rtmsg(int, ire_t *, int);
 
-extern	mblk_t	*rts_alloc_msg(int, int, sa_family_t);
+extern	mblk_t	*rts_alloc_msg(int, int, sa_family_t, uint_t);
 
-extern	size_t	rts_data_msg_size(int, sa_family_t);
+extern	size_t	rts_data_msg_size(int, sa_family_t, uint_t);
 
 extern	void	rts_fill_msg_v6(int, int, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, ipif_t *, mblk_t *);
+    const in6_addr_t *, const in6_addr_t *, const ipif_t *, mblk_t *,
+    uint_t, const tsol_gc_t *);
 
 extern	size_t	rts_header_msg_size(int);
 

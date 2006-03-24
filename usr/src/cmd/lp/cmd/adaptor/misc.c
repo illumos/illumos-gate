@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,8 @@
 
 #include <syslog.h>
 
+#include <tsol/label.h>
+
 #include "misc.h"
 
 /* lpsched include files */
@@ -47,7 +48,6 @@
 #include "printers.h"
 
 static char Msg[MSGMAX];
-
 
 /*
  * Format and send message to lpsched
@@ -216,14 +216,31 @@ lpsched_spooler_accepting_jobs(const char *printer)
  * has access to communicate with the scheduler.  In Solaris this currently
  * has no meaning.  The host is automatically allowed access.
  */
+char *slabel = NULL;
+
 int
-lpsched_client_access(const char *printer, const char *host)
+lpsched_client_access(const char *printer, const char *host, int peerfd)
 {
-	syslog(LOG_DEBUG, "lpsched_client_access(%s, %s)",
-		(printer ? printer : "NULL"), (host ? host : "NULL"));
+	syslog(LOG_DEBUG, "lpsched_client_access(%s, %s, %d)",
+		(printer ? printer : "NULL"), (host ? host : "NULL"),
+		peerfd);
 
 	if ((printer == NULL) || (host == NULL))
 		return (-1);
+
+	if (is_system_labeled) {
+		short status = MOK;
+		extern MESG *lp_Md;	/* liblpmsg supplies this */
+
+		if ((snd_msg(S_PASS_PEER_CONNECTION) < 0) ||
+		    (ioctl(lp_Md->writefd, I_SENDFD, peerfd) < 0) ||
+		    (rcv_msg(R_PASS_PEER_CONNECTION, &status) < 0))
+			status = MTRANSMITERR;
+		if (status != MOK)
+			return (-1);
+
+		get_peer_label(peerfd, &slabel);
+	}
 
 	return (0);
 }

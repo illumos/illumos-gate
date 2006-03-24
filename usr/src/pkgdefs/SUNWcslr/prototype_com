@@ -17,6 +17,8 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
+
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -144,6 +146,9 @@ f none lib/libthread.so.1 755 root bin
 s none lib/libthread.so=libthread.so.1
 s none lib/libthread_db.so.1=libc_db.so.1
 s none lib/libthread_db.so=libc_db.so.1
+f none lib/libtsnet.so.1 755 root bin
+f none lib/libtsol.so.2 755 root bin
+s none lib/libtsol.so=libtsol.so.2
 s none lib/libw.so=libw.so.1
 f none lib/libw.so.1 755 root bin
 s none lib/libumem.so=libumem.so.1
