@@ -1652,6 +1652,42 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 				if (error != 0)
 					return (error);
 			}
+		} else if (tohp->level == SOL_SOCKET &&
+		    tohp->name == SCM_TIMESTAMP) {
+			timestruc_t *timestamp;
+
+			if (oldflg)
+				continue;
+
+			cmsg->cmsg_level = tohp->level;
+			cmsg->cmsg_type = tohp->name;
+
+			timestamp =
+			    (timestruc_t *)P2ROUNDUP((intptr_t)&tohp[1],
+			    sizeof (intptr_t));
+
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				struct timeval *time_native;
+
+				cmsg->cmsg_len = sizeof (struct timeval) +
+				    sizeof (struct cmsghdr);
+				time_native =
+				    (struct timeval *)CMSG_CONTENT(cmsg);
+				time_native->tv_sec = timestamp->tv_sec;
+				time_native->tv_usec =
+				    timestamp->tv_nsec / (NANOSEC / MICROSEC);
+			} else {
+				struct timeval32 *time32;
+
+				cmsg->cmsg_len = sizeof (struct timeval32) +
+				    sizeof (struct cmsghdr);
+				time32 = (struct timeval32 *)CMSG_CONTENT(cmsg);
+				time32->tv_sec = (time32_t)timestamp->tv_sec;
+				time32->tv_usec =
+				    (int32_t)(timestamp->tv_nsec /
+				    (NANOSEC / MICROSEC));
+			}
+
 		} else {
 			if (oldflg)
 				continue;

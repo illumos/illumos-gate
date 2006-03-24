@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,7 +121,8 @@ typedef	struct udp_s {
 		udp_issocket : 1,	/* socket mode */
 		udp_direct_sockfs : 1,	/* direct calls to/from sockfs */
 
-		udp_pad_to_bit_31 : 4;
+		udp_timestamp : 1,	/* SO_TIMESTAMP "socket" option */
+		udp_pad_to_bit_31 : 3;
 
 	uint8_t		udp_type_of_service;	/* IP_TOS option */
 	uint8_t		udp_ttl;		/* TTL or hoplimit */
@@ -210,6 +210,7 @@ typedef struct {				/* Class "net" kstats */
 	kstat_named_t	udp_in_recvrthdr;
 	kstat_named_t	udp_in_recvpktinfo;
 	kstat_named_t	udp_in_recvtclass;
+	kstat_named_t	udp_in_timestamp;
 #ifdef DEBUG
 	kstat_named_t	udp_data_conn;
 	kstat_named_t	udp_data_notconn;

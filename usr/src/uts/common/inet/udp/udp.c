@@ -35,6 +35,7 @@ const char udp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <sys/stropts.h>
 #include <sys/strlog.h>
 #include <sys/strsun.h>
+#include <sys/time.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/timod.h>
@@ -213,6 +214,7 @@ udp_stat_t udp_statistics = {
 	{ "udp_in_recvrthdr",		KSTAT_DATA_UINT64 },
 	{ "udp_in_recvpktinfo",		KSTAT_DATA_UINT64 },
 	{ "udp_in_recvtclass",		KSTAT_DATA_UINT64 },
+	{ "udp_in_timestamp",		KSTAT_DATA_UINT64 },
 #ifdef DEBUG
 	{ "udp_data_conn",		KSTAT_DATA_UINT64 },
 	{ "udp_data_notconn",		KSTAT_DATA_UINT64 },
@@ -2974,6 +2976,9 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case SO_RECVUCRED:
 			*i1 = udp->udp_recvucred;
 			break;	/* goto sizeof (int) option return */
+		case SO_TIMESTAMP:
+			*i1 = udp->udp_timestamp;
+			break;
 		default:
 			return (-1);
 		}
@@ -3322,6 +3327,10 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		case SO_RECVUCRED:
 			if (!checkonly)
 				udp->udp_recvucred = onoff;
+			break;
+		case SO_TIMESTAMP:
+			if (!checkonly)
+				udp->udp_timestamp = onoff;
 			break;
 		default:
 			*outlenp = 0;
@@ -4374,7 +4383,17 @@ udp_input(conn_t *connp, mblk_t *mp)
 			udi_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
 			UDP_STAT(udp_in_recvttl);
 		}
-
+		/*
+		 * If SO_TIMESTAMP is set allocate the appropriate sized
+		 * buffer. Since gethrestime() expects a pointer aligned
+		 * argument, we allocate space necessary for extra
+		 * alignment (even though it might not be used).
+		 */
+		if (udp->udp_timestamp) {
+			udi_size += sizeof (struct T_opthdr) +
+			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+			UDP_STAT(udp_in_timestamp);
+		}
 		ASSERT(IPH_HDR_LENGTH((ipha_t *)rptr) == IP_SIMPLE_HDR_LENGTH);
 
 		/* Allocate a message block for the T_UNITDATA_IND structure. */
@@ -4502,6 +4521,23 @@ udp_input(conn_t *connp, mblk_t *mp)
 				dstptr = (uint8_t *)dstopt;
 				*dstptr = ((ipha_t *)rptr)->ipha_ttl;
 				dstopt += sizeof (uint8_t);
+				udi_size -= toh->len;
+			}
+			if (udp->udp_timestamp) {
+				struct	T_opthdr *toh;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = SOL_SOCKET;
+				toh->name = SCM_TIMESTAMP;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				/* Align for gethrestime() */
+				dstopt = (char *)P2ROUNDUP((intptr_t)dstopt,
+				    sizeof (intptr_t));
+				gethrestime((timestruc_t *)dstopt);
+				dstopt += sizeof (timestruc_t);
 				udi_size -= toh->len;
 			}
 

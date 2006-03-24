@@ -42,6 +42,7 @@
 #include <sys/kmem.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/time.h>
 
 #include <sys/socket.h>
 #include <sys/isa_defs.h>
@@ -1508,6 +1509,9 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 		case SO_DGRAM_ERRIND:
 			*i1 = icmp->icmp_dgram_errind;
 			break;
+		case SO_TIMESTAMP:
+			*i1 = icmp->icmp_timestamp;
+			break;
 		/*
 		 * Following three not meaningful for icmp
 		 * Action is same as "default" to which we fallthrough
@@ -1956,6 +1960,11 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		case SO_DGRAM_ERRIND:
 			if (!checkonly)
 				icmp->icmp_dgram_errind = onoff;
+			break;
+		case SO_TIMESTAMP:
+			if (!checkonly) {
+				icmp->icmp_timestamp = onoff;
+			}
 			break;
 		/*
 		 * Following three not meaningful for icmp
@@ -3068,6 +3077,16 @@ icmp_rput(queue_t *q, mblk_t *mp)
 			udi_size += sizeof (struct T_opthdr) +
 			    sizeof (uint_t);
 		}
+		/*
+		 * If SO_TIMESTAMP is set allocate the appropriate sized
+		 * buffer. Since gethrestime() expects a pointer aligned
+		 * argument, we allocate space necessary for extra
+		 * alignment (even though it might not be used).
+		 */
+		if (icmp->icmp_timestamp) {
+			udi_size += sizeof (struct T_opthdr) +
+			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+		}
 		mp1 = allocb(udi_size, BPRI_MED);
 		if (mp1 == NULL) {
 			freemsg(mp);
@@ -3116,6 +3135,23 @@ icmp_rput(queue_t *q, mblk_t *mp)
 				*dstptr = pinfo->in_pkt_ifindex;
 				dstopt += sizeof (uint_t);
 				freeb(options_mp);
+				udi_size -= toh->len;
+			}
+			if (icmp->icmp_timestamp) {
+				struct	T_opthdr *toh;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = SOL_SOCKET;
+				toh->name = SCM_TIMESTAMP;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				/* Align for gethrestime() */
+				dstopt = (char *)P2ROUNDUP((intptr_t)dstopt,
+				    sizeof (intptr_t));
+				gethrestime((timestruc_t *)dstopt);
+				dstopt += sizeof (timestruc_t);
 				udi_size -= toh->len;
 			}
 
