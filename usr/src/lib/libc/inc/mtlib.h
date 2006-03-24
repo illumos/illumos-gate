@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -115,16 +114,16 @@ extern	void	assert_no_libc_locks_held(void);
 /*
  * Cheap check to tell if stdio needs to lock for MT progs.
  * Referenced directly in port/stdio/flush.c and FLOCKFILE and
- * FUNLOCKFILE macros.  __threaded gets set to 1 when the first
+ * FUNLOCKFILE macros.  __libc_threaded gets set to 1 when the first
  * thread (beyond the main thread) is created in _thrp_create().
  */
-extern	int	__threaded;
+extern	int	__libc_threaded;
 
 #define	FILELOCKING(iop)	(GET_IONOLOCK(iop) == 0)
 
 #define	FLOCKFILE(lk, iop) \
 	{ \
-		if (__threaded && FILELOCKING(iop)) \
+		if (__libc_threaded && FILELOCKING(iop)) \
 			lk = _flockget((iop)); \
 		else \
 			lk = NULL; \

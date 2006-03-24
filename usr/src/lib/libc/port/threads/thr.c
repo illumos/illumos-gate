@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +35,17 @@
 #undef errno
 extern int errno;
 
-int __threaded = 0;	/* zero until first thr_create() */
+/*
+ * Between Solaris 2.5 and Solaris 9, __threaded was used to indicate
+ * "we are linked with libthread".  The Sun Workshop 6 update 1 compilation
+ * system used it illegally (it is a consolidation private symbol).
+ * To accommodate this and possibly other abusers of the symbol,
+ * we make it always equal to 1 now that libthread has been folded
+ * into libc.  The new __libc_threaded symbol is used to indicate
+ * the new meaning, "more than one thread exists".
+ */
+int __threaded = 1;		/* always equal to 1 */
+int __libc_threaded = 0;	/* zero until first thr_create() */
 
 /*
  * thr_concurrency and pthread_concurrency are not used by the library.
@@ -712,7 +721,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 		udp->ndaemons++;
 	if (flags & THR_NEW_LWP)
 		thr_concurrency++;
-	__threaded = 1;		/* inform stdio */
+	__libc_threaded = 1;		/* inform stdio */
 	lmutex_unlock(&udp->link_lock);
 
 	if (__td_event_report(self, TD_CREATE, udp)) {
@@ -1600,7 +1609,7 @@ _postfork1_child()
 	udp->nthreads = 1;
 	udp->ndaemons = 0;
 	udp->uberflags.uf_mt = 0;
-	__threaded = 0;
+	__libc_threaded = 0;
 	for (i = 0; i < udp->hash_size; i++)
 		udp->thr_hash_table[i].hash_bucket = NULL;
 	self->ul_lwpid = __lwp_self();

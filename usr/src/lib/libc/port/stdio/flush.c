@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,8 +141,8 @@ static int _fflush_u_iops(void);
 static FILE *getiop(FILE *, rmutex_t *, mbstate_t *);
 
 #define	GETIOP(fp, lk, mb)	{FILE *ret; \
-	if ((ret = getiop((fp), __threaded ? (lk) : NULL, (mb))) != NULL) { \
-		if (__threaded) \
+	if ((ret = getiop((fp), __libc_threaded? (lk): NULL, (mb))) != NULL) { \
+		if (__libc_threaded) \
 			(void) __rw_unlock(&_first_link_lock); \
 		return (ret); \
 	}; \
@@ -186,7 +186,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	int i;
 	struct _link_ *lp;
 
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_rdlock(&_first_link_lock);
 
 	lp = &__first_link;
@@ -199,7 +199,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 		}
 	} while ((lp = lp->next) != NULL);
 
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_unlock(&_first_link_lock);
 }
 
@@ -233,7 +233,7 @@ _findiop(void)
 	FPDECL(fp);
 	int i;
 
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_wrlock(&_first_link_lock);
 
 	if (lastlink == NULL) {
@@ -288,7 +288,7 @@ rescan:
 	 * Need to allocate another and put it in the linked list.
 	 */
 	if ((pkgp = malloc(sizeof (Pkg))) == NULL) {
-		if (__threaded)
+		if (__libc_threaded)
 			(void) __rw_unlock(&_first_link_lock);
 		return (NULL);
 	}
@@ -355,7 +355,7 @@ rescan:
 	fp->_ptr = 0;
 	fp->_base = 0;
 	fp->_flag = 0377; /* claim the fp by setting low 8 bits */
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_unlock(&_first_link_lock);
 
 	return (fp);
@@ -562,7 +562,7 @@ _fflush_u_iops(void)		/* flush all buffers */
 	struct _link_ *lp;
 	int res = 0;
 
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_rdlock(&_first_link_lock);
 
 	lp = &__first_link;
@@ -596,7 +596,7 @@ _fflush_u_iops(void)		/* flush all buffers */
 		    }
 		}
 	} while ((lp = lp->next) != NULL);
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_unlock(&_first_link_lock);
 	return (res);
 }
@@ -658,10 +658,10 @@ fclose(FILE *iop)
 	iop->_flag = 0;			/* marks it as available */
 	FUNLOCKFILE(lk);
 
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_wrlock(&_first_link_lock);
 	fcloses++;
-	if (__threaded)
+	if (__libc_threaded)
 		(void) __rw_unlock(&_first_link_lock);
 
 	return (res);
