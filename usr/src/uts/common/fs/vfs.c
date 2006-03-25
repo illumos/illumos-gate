@@ -1416,9 +1416,17 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 
 		/*
 		 * If this isn't a remount, set up the vopstats before
-		 * anyone can touch this
+		 * anyone can touch this. We only allow spliced file
+		 * systems (file systems which are in the namespace) to
+		 * have the VFS_STATS flag set.
+		 * NOTE: PxFS mounts the underlying file system with
+		 * MS_NOSPLICE set and copies those vfs_flags to its private
+		 * vfs structure. As a result, PxFS should never have
+		 * the VFS_STATS flag or else we might access the vfs
+		 * statistics-related fields prior to them being
+		 * properly initialized.
 		 */
-		if (!remount && vswp->vsw_flag & VSW_STATS) {
+		if (!remount && (vswp->vsw_flag & VSW_STATS) && splice) {
 			initialize_vopstats(&vfsp->vfs_vopstats);
 			/*
 			 * We need to set vfs_vskap to NULL because there's
