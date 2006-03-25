@@ -104,6 +104,11 @@ pcelx:*				0600 root sys 0666 root sys	/dev/pcelx*
 ipf:*				0600 root sys 0666 root sys	/dev/ipf
 pfil:*				0600 root sys 0666 root sys	/dev/pfil
 scsi_vhci:devctl	0600 root sys 0666 root sys /devices/scsi_vhci:devctl
+fbt:fbt			0600 root sys 0644 root sys /dev/dtrace/provider/fbt
+lockstat:*		0600 root sys 0644 root sys /dev/dtrace/provider/lockstat
+profile:profile		0600 root sys 0644 root sys /dev/dtrace/provider/profile
+sdt:sdt			0600 root sys 0644 root sys /dev/dtrace/provider/sdt
+systrace:systrace	0600 root sys 0644 root sys /dev/dtrace/provider/systrace
 EOF
 }
 
@@ -275,6 +280,10 @@ zfs:*
 zfs:zfs
 scsi_vhci:*
 kssl:*
+fbt:fbt
+profile:profile
+sdt:sdt
+systrace:systrace
 EOF
 }
 

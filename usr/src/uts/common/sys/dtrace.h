@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1112,14 +1111,16 @@ typedef uint8_t dtrace_class_t;		/* architectural dependency class */
 #define	DTRACE_PRIV_USER	0x0002
 #define	DTRACE_PRIV_PROC	0x0004
 #define	DTRACE_PRIV_OWNER	0x0008
+#define	DTRACE_PRIV_ZONEOWNER	0x0010
 
 #define	DTRACE_PRIV_ALL	\
 	(DTRACE_PRIV_KERNEL | DTRACE_PRIV_USER | \
-	DTRACE_PRIV_PROC | DTRACE_PRIV_OWNER)
+	DTRACE_PRIV_PROC | DTRACE_PRIV_OWNER | DTRACE_PRIV_ZONEOWNER)
 
 typedef struct dtrace_ppriv {
 	uint32_t dtpp_flags;			/* privilege flags */
 	uid_t dtpp_uid;				/* user ID */
+	zoneid_t dtpp_zoneid;			/* zone ID */
 } dtrace_ppriv_t;
 
 typedef struct dtrace_attribute {
@@ -1603,7 +1604,7 @@ typedef struct dof_helper {
  *   dtrace_probe()          <-- Fire the specified probe
  *
  * 2.2  int dtrace_register(const char *name, const dtrace_pattr_t *pap,
- *          uint32_t priv, uid_t uid, const dtrace_pops_t *pops, void *arg,
+ *          uint32_t priv, cred_t *cr, const dtrace_pops_t *pops, void *arg,
  *          dtrace_provider_id_t *idp)
  *
  * 2.2.1  Overview
@@ -1632,16 +1633,25 @@ typedef struct dof_helper {
  *     DTRACE_PRIV_OWNER    <= This flag places an additional constraint on
  *                             the privilege requirements above. These probes
  *                             require either (a) a user ID matching the user
- *                             ID passed as the fourth argument to
- *                             dtrace_register() or (b) the PRIV_PROC_OWNER
- *                             privilege.
+ *                             ID of the cred passed in the fourth argument
+ *                             or (b) the PRIV_PROC_OWNER privilege.
+ *
+ *     DTRACE_PRIV_ZONEOWNER<= This flag places an additional constraint on
+ *                             the privilege requirements above. These probes
+ *                             require either (a) a zone ID matching the zone
+ *                             ID of the cred passed in the fourth argument
+ *                             or (b) the PRIV_PROC_ZONE privilege.
  *
  *   Note that these flags designate the _visibility_ of the probes, not
  *   the conditions under which they may or may not fire.
  *
- *   The fourth argument is a user ID that is associated with the provider.
- *   This argument should be 0 if the privilege flags don't include
- *   DTRACE_PRIV_OWNER.
+ *   The fourth argument is the credential that is associated with the
+ *   provider.  This argument should be NULL if the privilege flags don't
+ *   include DTRACE_PRIV_OWNER or DTRACE_PRIV_ZONEOWNER.  If non-NULL, the
+ *   framework stashes the uid and zoneid represented by this credential
+ *   for use at probe-time, in implicit predicates.  These limit visibility
+ *   of the probes to users and/or zones which have sufficient privilege to
+ *   access them.
  *
  *   The fifth argument is a DTrace provider operations vector, which provides
  *   the implementation for the Framework-to-Provider API.  (See Section 1,
@@ -1937,7 +1947,7 @@ typedef struct dtrace_pops {
 typedef uintptr_t	dtrace_provider_id_t;
 
 extern int dtrace_register(const char *, const dtrace_pattr_t *, uint32_t,
-    uid_t, const dtrace_pops_t *, void *, dtrace_provider_id_t *);
+    cred_t *, const dtrace_pops_t *, void *, dtrace_provider_id_t *);
 extern int dtrace_unregister(dtrace_provider_id_t);
 extern int dtrace_condense(dtrace_provider_id_t);
 extern void dtrace_invalidate(dtrace_provider_id_t);

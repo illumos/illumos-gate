@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,8 +96,7 @@ static const struct {
 	{ EDT_BADTRUNC, "Invalid truncation" },
 	{ EDT_BUSY, "DTrace cannot be used when kernel debugger is active" },
 	{ EDT_ACCESS, "DTrace requires additional privileges" },
-	{ EDT_GNOENT, "DTrace device not available on system" },
-	{ EDT_ZNOENT, "DTrace device not available in local zone" },
+	{ EDT_NOENT, "DTrace device not available on system" },
 	{ EDT_BRICKED, "Abort due to systemic unresponsiveness" },
 	{ EDT_HARDWIRE, "Failed to load language definitions" },
 	{ EDT_ELFVERSION, "libelf is out-of-date with respect to libdtrace" },

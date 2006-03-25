@@ -39,7 +39,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <zone.h>
 #include <assert.h>
 
 #define	_POSIX_PTHREAD_SEMANTICS
@@ -820,10 +819,7 @@ dt_vopen(int version, int flags, int *errp,
 		dt_provmod_destroy(&provmod);
 		switch (err) {
 		case ENOENT:
-			if (getzoneid() != GLOBAL_ZONEID)
-				err = EDT_ZNOENT;
-			else
-				err = EDT_GNOENT;
+			err = EDT_NOENT;
 			break;
 		case EBUSY:
 			err = EDT_BUSY;

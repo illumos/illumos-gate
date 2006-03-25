@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -785,29 +784,68 @@ dtrace_bzero(void *dst, size_t len)
 }
 
 /*
- * This privilege checks should be used by actions and subroutines to
- * verify the credentials of the process that enabled the invoking ECB.
+ * This privilege check should be used by actions and subroutines to
+ * verify that the user credentials of the process that enabled the
+ * invoking ECB match the target credentials
  */
 static int
-dtrace_priv_proc_common(dtrace_state_t *state)
+dtrace_priv_proc_common_user(dtrace_state_t *state)
 {
-	uid_t uid = state->dts_cred.dcr_uid;
-	gid_t gid = state->dts_cred.dcr_gid;
-	cred_t *cr;
-	proc_t *proc;
+	cred_t *cr, *s_cr = state->dts_cred.dcr_cred;
+
+	/*
+	 * We should always have a non-NULL state cred here, since if cred
+	 * is null (anonymous tracing), we fast-path bypass this routine.
+	 */
+	ASSERT(s_cr != NULL);
 
 	if ((cr = CRED()) != NULL &&
-	    uid == cr->cr_uid &&
-	    uid == cr->cr_ruid &&
-	    uid == cr->cr_suid &&
-	    gid == cr->cr_gid &&
-	    gid == cr->cr_rgid &&
-	    gid == cr->cr_sgid &&
-	    (proc = ttoproc(curthread)) != NULL &&
-	    !(proc->p_flag & SNOCD))
+	    s_cr->cr_uid == cr->cr_uid &&
+	    s_cr->cr_uid == cr->cr_ruid &&
+	    s_cr->cr_uid == cr->cr_suid &&
+	    s_cr->cr_gid == cr->cr_gid &&
+	    s_cr->cr_gid == cr->cr_rgid &&
+	    s_cr->cr_gid == cr->cr_sgid)
 		return (1);
 
-	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_UPRIV;
+	return (0);
+}
+
+/*
+ * This privilege check should be used by actions and subroutines to
+ * verify that the zone of the process that enabled the invoking ECB
+ * matches the target credentials
+ */
+static int
+dtrace_priv_proc_common_zone(dtrace_state_t *state)
+{
+	cred_t *cr, *s_cr = state->dts_cred.dcr_cred;
+
+	/*
+	 * We should always have a non-NULL state cred here, since if cred
+	 * is null (anonymous tracing), we fast-path bypass this routine.
+	 */
+	ASSERT(s_cr != NULL);
+
+	if ((cr = CRED()) != NULL &&
+	    s_cr->cr_zone == cr->cr_zone)
+		return (1);
+
+	return (0);
+}
+
+/*
+ * This privilege check should be used by actions and subroutines to
+ * verify that the process has not setuid or changed credentials.
+ */
+static int
+dtrace_priv_proc_common_nocd()
+{
+	proc_t *proc;
+
+	if ((proc = ttoproc(curthread)) != NULL &&
+	    !(proc->p_flag & SNOCD))
+		return (1);
 
 	return (0);
 }
@@ -815,10 +853,26 @@ dtrace_priv_proc_common(dtrace_state_t *state)
 static int
 dtrace_priv_proc_destructive(dtrace_state_t *state)
 {
-	if (state->dts_cred.dcr_action & DTRACE_CRA_PROC_DESTRUCTIVE)
-		return (1);
+	int action = state->dts_cred.dcr_action;
 
-	return (dtrace_priv_proc_common(state));
+	if (((action & DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE) == 0) &&
+	    dtrace_priv_proc_common_zone(state) == 0)
+		goto bad;
+
+	if (((action & DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER) == 0) &&
+	    dtrace_priv_proc_common_user(state) == 0)
+		goto bad;
+
+	if (((action & DTRACE_CRA_PROC_DESTRUCTIVE_CREDCHG) == 0) &&
+	    dtrace_priv_proc_common_nocd() == 0)
+		goto bad;
+
+	return (1);
+
+bad:
+	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_UPRIV;
+
+	return (0);
 }
 
 static int
@@ -827,7 +881,14 @@ dtrace_priv_proc_control(dtrace_state_t *state)
 	if (state->dts_cred.dcr_action & DTRACE_CRA_PROC_CONTROL)
 		return (1);
 
-	return (dtrace_priv_proc_common(state));
+	if (dtrace_priv_proc_common_zone(state) &&
+	    dtrace_priv_proc_common_user(state) &&
+	    dtrace_priv_proc_common_nocd())
+		return (1);
+
+	cpu_core[CPU->cpu_id].cpuc_dtrace_flags |= CPU_DTRACE_UPRIV;
+
+	return (0);
 }
 
 static int
@@ -4719,22 +4780,36 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			 * we're examining a user context.
 			 */
 			if (ecb->dte_cond & DTRACE_COND_OWNER) {
-				uid_t uid = ecb->dte_state->dts_cred.dcr_uid;
-				gid_t gid = ecb->dte_state->dts_cred.dcr_gid;
 				cred_t *cr;
+				cred_t *s_cr =
+				    ecb->dte_state->dts_cred.dcr_cred;
 				proc_t *proc;
 
+				ASSERT(s_cr != NULL);
+
 				if ((cr = CRED()) == NULL ||
-				    uid != cr->cr_uid ||
-				    uid != cr->cr_ruid ||
-				    uid != cr->cr_suid ||
-				    gid != cr->cr_gid ||
-				    gid != cr->cr_rgid ||
-				    gid != cr->cr_sgid ||
+				    s_cr->cr_uid != cr->cr_uid ||
+				    s_cr->cr_uid != cr->cr_ruid ||
+				    s_cr->cr_uid != cr->cr_suid ||
+				    s_cr->cr_gid != cr->cr_gid ||
+				    s_cr->cr_gid != cr->cr_rgid ||
+				    s_cr->cr_gid != cr->cr_sgid ||
 				    (proc = ttoproc(curthread)) == NULL ||
 				    (proc->p_flag & SNOCD))
 					continue;
+			}
 
+			if (ecb->dte_cond & DTRACE_COND_ZONEOWNER) {
+				cred_t *cr;
+				cred_t *s_cr =
+				    ecb->dte_state->dts_cred.dcr_cred;
+
+				ASSERT(s_cr != NULL);
+
+				if ((cr = CRED()) == NULL ||
+				    s_cr->cr_zone->zone_id !=
+				    cr->cr_zone->zone_id)
+					continue;
 			}
 		}
 
@@ -5421,11 +5496,12 @@ dtrace_badname(const char *s)
 }
 
 static void
-dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp)
+dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp, zoneid_t *zoneidp)
 {
 	uint32_t priv;
 
 	*uidp = crgetuid(cr);
+	*zoneidp = crgetzoneid(cr);
 	if (PRIV_POLICY_ONLY(cr, PRIV_ALL, B_FALSE)) {
 		priv = DTRACE_PRIV_ALL;
 	} else {
@@ -5438,6 +5514,8 @@ dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp)
 			priv |= DTRACE_PRIV_PROC;
 		if (PRIV_POLICY_ONLY(cr, PRIV_PROC_OWNER, B_FALSE))
 			priv |= DTRACE_PRIV_OWNER;
+		if (PRIV_POLICY_ONLY(cr, PRIV_PROC_ZONE, B_FALSE))
+			priv |= DTRACE_PRIV_ZONEOWNER;
 	}
 
 	*privp = priv;
@@ -5483,7 +5561,8 @@ out:
  * a probe tuple, or some globbed expressions for elements of a probe tuple.
  */
 static int
-dtrace_match_priv(const dtrace_probe_t *prp, uint32_t priv, uid_t uid)
+dtrace_match_priv(const dtrace_probe_t *prp, uint32_t priv, uid_t uid,
+    zoneid_t zoneid)
 {
 	if (priv != DTRACE_PRIV_ALL) {
 		uint32_t ppriv = prp->dtpr_provider->dtpv_priv.dtpp_flags;
@@ -5506,8 +5585,18 @@ dtrace_match_priv(const dtrace_probe_t *prp, uint32_t priv, uid_t uid)
 		 * Need to have permissions to the process, but don't...
 		 */
 		if (((ppriv & ~match) & DTRACE_PRIV_OWNER) != 0 &&
-		    uid != prp->dtpr_provider->dtpv_priv.dtpp_uid)
+		    uid != prp->dtpr_provider->dtpv_priv.dtpp_uid) {
 			return (0);
+		}
+
+		/*
+		 * Need to be in the same zone unless we possess the
+		 * privilege to examine all zones.
+		 */
+		if (((ppriv & ~match) & DTRACE_PRIV_ZONEOWNER) != 0 &&
+		    zoneid != prp->dtpr_provider->dtpv_priv.dtpp_zoneid) {
+			return (0);
+		}
 	}
 
 	return (1);
@@ -5520,7 +5609,7 @@ dtrace_match_priv(const dtrace_probe_t *prp, uint32_t priv, uid_t uid)
  */
 static int
 dtrace_match_probe(const dtrace_probe_t *prp, const dtrace_probekey_t *pkp,
-    uint32_t priv, uid_t uid)
+    uint32_t priv, uid_t uid, zoneid_t zoneid)
 {
 	dtrace_provider_t *pvp = prp->dtpr_provider;
 	int rv;
@@ -5540,7 +5629,7 @@ dtrace_match_probe(const dtrace_probe_t *prp, const dtrace_probekey_t *pkp,
 	if ((rv = pkp->dtpk_nmatch(prp->dtpr_name, pkp->dtpk_name, 0)) <= 0)
 		return (rv);
 
-	if (dtrace_match_priv(prp, priv, uid) == 0)
+	if (dtrace_match_priv(prp, priv, uid, zoneid) == 0)
 		return (0);
 
 	return (rv);
@@ -5687,7 +5776,7 @@ dtrace_match_nonzero(const char *s, const char *p, int depth)
 
 static int
 dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
-    int (*matched)(dtrace_probe_t *, void *), void *arg)
+    zoneid_t zoneid, int (*matched)(dtrace_probe_t *, void *), void *arg)
 {
 	dtrace_probe_t template, *probe;
 	dtrace_hash_t *hash = NULL;
@@ -5702,7 +5791,7 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 	 */
 	if (pkp->dtpk_id != DTRACE_IDNONE) {
 		if ((probe = dtrace_probe_lookup_id(pkp->dtpk_id)) != NULL &&
-		    dtrace_match_probe(probe, pkp, priv, uid) > 0) {
+		    dtrace_match_probe(probe, pkp, priv, uid, zoneid) > 0) {
 			(void) (*matched)(probe, arg);
 			nmatched++;
 		}
@@ -5744,7 +5833,8 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 	if (hash == NULL) {
 		for (i = 0; i < dtrace_nprobes; i++) {
 			if ((probe = dtrace_probes[i]) == NULL ||
-			    dtrace_match_probe(probe, pkp, priv, uid) <= 0)
+			    dtrace_match_probe(probe, pkp, priv, uid,
+			    zoneid) <= 0)
 				continue;
 
 			nmatched++;
@@ -5764,7 +5854,7 @@ dtrace_match(const dtrace_probekey_t *pkp, uint32_t priv, uid_t uid,
 	for (probe = dtrace_hash_lookup(hash, &template); probe != NULL;
 	    probe = *(DTRACE_HASHNEXT(hash, probe))) {
 
-		if (dtrace_match_probe(probe, pkp, priv, uid) <= 0)
+		if (dtrace_match_probe(probe, pkp, priv, uid, zoneid) <= 0)
 			continue;
 
 		nmatched++;
@@ -5844,7 +5934,7 @@ dtrace_probekey(const dtrace_probedesc_t *pdp, dtrace_probekey_t *pkp)
  */
 int
 dtrace_register(const char *name, const dtrace_pattr_t *pap, uint32_t priv,
-    uid_t uid, const dtrace_pops_t *pops, void *arg, dtrace_provider_id_t *idp)
+    cred_t *cr, const dtrace_pops_t *pops, void *arg, dtrace_provider_id_t *idp)
 {
 	dtrace_provider_t *provider;
 
@@ -5899,7 +5989,10 @@ dtrace_register(const char *name, const dtrace_pattr_t *pap, uint32_t priv,
 
 	provider->dtpv_attr = *pap;
 	provider->dtpv_priv.dtpp_flags = priv;
-	provider->dtpv_priv.dtpp_uid = uid;
+	if (cr != NULL) {
+		provider->dtpv_priv.dtpp_uid = crgetuid(cr);
+		provider->dtpv_priv.dtpp_zoneid = crgetzoneid(cr);
+	}
 	provider->dtpv_pops = *pops;
 
 	if (pops->dtps_provide == NULL) {
@@ -6344,7 +6437,7 @@ dtrace_probe_lookup(dtrace_provider_id_t prid, const char *mod,
 	pkey.dtpk_id = DTRACE_IDNONE;
 
 	mutex_enter(&dtrace_lock);
-	match = dtrace_match(&pkey, DTRACE_PRIV_ALL, 0,
+	match = dtrace_match(&pkey, DTRACE_PRIV_ALL, 0, 0,
 	    dtrace_probe_lookup_match, &id);
 	mutex_exit(&dtrace_lock);
 
@@ -6491,6 +6584,7 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	dtrace_probekey_t pkey;
 	uint32_t priv;
 	uid_t uid;
+	zoneid_t zoneid;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	dtrace_ecb_create_cache = NULL;
@@ -6505,9 +6599,10 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	}
 
 	dtrace_probekey(desc, &pkey);
-	dtrace_cred2priv(CRED(), &priv, &uid);
+	dtrace_cred2priv(CRED(), &priv, &uid, &zoneid);
 
-	return (dtrace_match(&pkey, priv, uid, dtrace_ecb_create_enable, enab));
+	return (dtrace_match(&pkey, priv, uid, zoneid, dtrace_ecb_create_enable,
+	    enab));
 }
 
 /*
@@ -8836,12 +8931,26 @@ dtrace_ecb_create(dtrace_state_t *state, dtrace_probe_t *probe,
 		 * enough to see, we need to enable the appropriate implicit
 		 * predicate bits to prevent the ecb from activating at
 		 * revealing times.
+		 *
+		 * Providers specifying DTRACE_PRIV_USER at register time
+		 * are stating that they need the /proc-style privilege
+		 * model to be enforced, and this is what DTRACE_COND_OWNER
+		 * and DTRACE_COND_ZONEOWNER will then do at probe time.
 		 */
 		prov = probe->dtpr_provider;
 		if (!(state->dts_cred.dcr_visible & DTRACE_CRV_ALLPROC) &&
 		    (prov->dtpv_priv.dtpp_flags & DTRACE_PRIV_USER))
 			ecb->dte_cond |= DTRACE_COND_OWNER;
 
+		if (!(state->dts_cred.dcr_visible & DTRACE_CRV_ALLZONE) &&
+		    (prov->dtpv_priv.dtpp_flags & DTRACE_PRIV_USER))
+			ecb->dte_cond |= DTRACE_COND_ZONEOWNER;
+
+		/*
+		 * If the provider shows us kernel innards and the user
+		 * is lacking sufficient privilege, enable the
+		 * DTRACE_COND_USERMODE implicit predicate.
+		 */
 		if (!(state->dts_cred.dcr_visible & DTRACE_CRV_KERNEL) &&
 		    (prov->dtpv_priv.dtpp_flags & DTRACE_PRIV_KERNEL))
 			ecb->dte_cond |= DTRACE_COND_USERMODE;
@@ -9014,7 +9123,8 @@ dtrace_buffer_alloc(dtrace_buffer_t *bufs, size_t size, int flags,
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 
-	if (crgetuid(CRED()) != 0 && size > dtrace_nonroot_maxsize)
+	if (size > dtrace_nonroot_maxsize &&
+	    !PRIV_POLICY_CHOICE(CRED(), PRIV_ALL, B_FALSE))
 		return (EFBIG);
 
 	cp = cpu_list;
@@ -11071,36 +11181,128 @@ dtrace_state_create(dev_t *devp, cred_t *cr)
 	state->dts_activity = DTRACE_ACTIVITY_INACTIVE;
 
 	/*
-	 * Set up the credentials for this instantiation.
+	 * Depending on the user credentials, we set flag bits which alter probe
+	 * visibility or the amount of destructiveness allowed.  In the case of
+	 * actual anonymous tracing, or the possession of all privileges, all of
+	 * the normal checks are bypassed.
 	 */
 	if (cr == NULL || PRIV_POLICY_ONLY(cr, PRIV_ALL, B_FALSE)) {
 		state->dts_cred.dcr_visible = DTRACE_CRV_ALL;
 		state->dts_cred.dcr_action = DTRACE_CRA_ALL;
 	} else {
-		state->dts_cred.dcr_uid = crgetuid(cr);
-		state->dts_cred.dcr_gid = crgetgid(cr);
+		/*
+		 * Set up the credentials for this instantiation.  We take a
+		 * hold on the credential to prevent it from disappearing on
+		 * us; this in turn prevents the zone_t referenced by this
+		 * credential from disappearing.  This means that we can
+		 * examine the credential and the zone from probe context.
+		 */
+		crhold(cr);
+		state->dts_cred.dcr_cred = cr;
 
+		/*
+		 * CRA_PROC means "we have *some* privilege for dtrace" and
+		 * unlocks the use of variables like pid, zonename, etc.
+		 */
 		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_USER, B_FALSE) ||
 		    PRIV_POLICY_ONLY(cr, PRIV_DTRACE_PROC, B_FALSE)) {
 			state->dts_cred.dcr_action |= DTRACE_CRA_PROC;
 		}
 
-		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_USER, B_FALSE) &&
-		    PRIV_POLICY_ONLY(cr, PRIV_PROC_OWNER, B_FALSE)) {
-			state->dts_cred.dcr_visible |= DTRACE_CRV_ALLPROC;
-			state->dts_cred.dcr_action |=
-			    DTRACE_CRA_PROC_DESTRUCTIVE;
+		/*
+		 * dtrace_user allows use of syscall and profile providers.
+		 * If the user also has proc_owner and/or proc_zone, we
+		 * extend the scope to include additional visibility and
+		 * destructive power.
+		 */
+		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_USER, B_FALSE)) {
+			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_OWNER, B_FALSE)) {
+				state->dts_cred.dcr_visible |=
+				    DTRACE_CRV_ALLPROC;
+
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER;
+			}
+
+			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_ZONE, B_FALSE)) {
+				state->dts_cred.dcr_visible |=
+				    DTRACE_CRV_ALLZONE;
+
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE;
+			}
+
+			/*
+			 * If we have all privs in whatever zone this is,
+			 * we can do destructive things to processes which
+			 * have altered credentials.
+			 */
+			if (priv_isequalset(priv_getset(cr, PRIV_EFFECTIVE),
+			    cr->cr_zone->zone_privset)) {
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_CREDCHG;
+			}
 		}
 
+		/*
+		 * Holding the dtrace_kernel privilege also implies that
+		 * the user has the dtrace_user privilege from a visibility
+		 * perspective.  But without further privileges, some
+		 * destructive actions are not available.
+		 */
 		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_KERNEL, B_FALSE)) {
+			/*
+			 * Make all probes in all zones visible.  However,
+			 * this doesn't mean that all actions become available
+			 * to all zones.
+			 */
 			state->dts_cred.dcr_visible |= DTRACE_CRV_KERNEL |
-			    DTRACE_CRV_ALLPROC;
+			    DTRACE_CRV_ALLPROC | DTRACE_CRV_ALLZONE;
+
 			state->dts_cred.dcr_action |= DTRACE_CRA_KERNEL |
 			    DTRACE_CRA_PROC;
-
+			/*
+			 * Holding proc_owner means that destructive actions
+			 * for *this* zone are allowed.
+			 */
 			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_OWNER, B_FALSE))
 				state->dts_cred.dcr_action |=
-				    DTRACE_CRA_PROC_DESTRUCTIVE;
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER;
+
+			/*
+			 * Holding proc_zone means that destructive actions
+			 * for this user/group ID in all zones is allowed.
+			 */
+			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_ZONE, B_FALSE))
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE;
+
+			/*
+			 * If we have all privs in whatever zone this is,
+			 * we can do destructive things to processes which
+			 * have altered credentials.
+			 */
+			if (priv_isequalset(priv_getset(cr, PRIV_EFFECTIVE),
+			    cr->cr_zone->zone_privset)) {
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_CREDCHG;
+			}
+		}
+
+		/*
+		 * Holding the dtrace_proc privilege gives control over fasttrap
+		 * and pid providers.  We need to grant wider destructive
+		 * privileges in the event that the user has proc_owner and/or
+		 * proc_zone.
+		 */
+		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_PROC, B_FALSE)) {
+			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_OWNER, B_FALSE))
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER;
+
+			if (PRIV_POLICY_ONLY(cr, PRIV_PROC_ZONE, B_FALSE))
+				state->dts_cred.dcr_action |=
+				    DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE;
 		}
 	}
 
@@ -11620,6 +11822,12 @@ dtrace_state_destroy(dtrace_state_t *state)
 	 */
 	dtrace_enabling_retract(state);
 	ASSERT(state->dts_nretained == 0);
+
+	/*
+	 * Release the credential hold we took in dtrace_state_create().
+	 */
+	if (state->dts_cred.dcr_cred != NULL)
+		crfree(state->dts_cred.dcr_cred);
 
 	/*
 	 * Now we need to disable and destroy any enabled probes.  Because any
@@ -13136,6 +13344,7 @@ dtrace_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	dtrace_state_t *state;
 	uint32_t priv;
 	uid_t uid;
+	zoneid_t zoneid;
 
 	if (getminor(*devp) == DTRACEMNRN_HELPER)
 		return (0);
@@ -13150,7 +13359,7 @@ dtrace_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	 * If no DTRACE_PRIV_* bits are set in the credential, then the
 	 * caller lacks sufficient permission to do anything with DTrace.
 	 */
-	dtrace_cred2priv(cred_p, &priv, &uid);
+	dtrace_cred2priv(cred_p, &priv, &uid, &zoneid);
 	if (priv == DTRACE_PRIV_NONE)
 		return (EACCES);
 
@@ -13606,6 +13815,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		int m = 0;
 		uint32_t priv;
 		uid_t uid;
+		zoneid_t zoneid;
 
 		if (copyin((void *)arg, &desc, sizeof (desc)) != 0)
 			return (EFAULT);
@@ -13631,8 +13841,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 			pkey.dtpk_id = DTRACE_IDNONE;
 		}
 
-		uid = crgetuid(cr);
-		dtrace_cred2priv(cr, &priv, &uid);
+		dtrace_cred2priv(cr, &priv, &uid, &zoneid);
 
 		mutex_enter(&dtrace_lock);
 
@@ -13640,7 +13849,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 			for (i = desc.dtpd_id; i <= dtrace_nprobes; i++) {
 				if ((probe = dtrace_probes[i - 1]) != NULL &&
 				    (m = dtrace_match_probe(probe, &pkey,
-				    priv, uid)) != 0)
+				    priv, uid, zoneid)) != 0)
 					break;
 			}
 
@@ -13652,7 +13861,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		} else {
 			for (i = desc.dtpd_id; i <= dtrace_nprobes; i++) {
 				if ((probe = dtrace_probes[i - 1]) != NULL &&
-				    dtrace_match_priv(probe, priv, uid))
+				    dtrace_match_priv(probe, priv, uid, zoneid))
 					break;
 			}
 		}

@@ -2283,7 +2283,8 @@ static const char *standard_devs[] = {
 	"openprom",
 #endif
 	"cpu/self/cpuid",
-	"dtrace/helper",
+	"dtrace/*",
+	"dtrace/provider/*",
 	"zfs",
 	NULL
 };

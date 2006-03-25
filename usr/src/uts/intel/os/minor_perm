@@ -42,12 +42,13 @@ devinfo:devinfo,ro 0444 root sys
 dtrace:* 0666 root sys
 dump:dump 0660 root sys
 fasttrap:fasttrap 0666 root sys
+fbt:fbt 0644 root sys
 fd:* 0666 root sys
 id:* 0640 root sys
 kstat:* 0666 root sys
 ksyms:* 0666 root sys
 lo:* 0666 root sys
-lockstat:* 0600 root sys
+lockstat:* 0644 root sys
 lofi:* 0600 root sys
 lofi:ctl 0644 root sys
 log:conslog 0666 root sys
@@ -60,6 +61,7 @@ mm:null 0666 root sys
 mm:zero 0666 root sys
 msm:l 0666 root sys
 openeepr:openprom 0640 root sys
+profile:profile 0644 root sys
 ptc:* 0666 root sys
 pts:* 0644 root sys
 pts:0 0620 root tty
@@ -73,9 +75,11 @@ sgen:* 0600 root sys
 cmdk:* 0640 root sys
 st:* 0666 root sys
 sbpro:* 0600 root sys
+sdt:sdt 0644 root sys
 sy:tty 0666 root tty
 sysmsg:msglog 0600 root sys
 sysmsg:sysmsg 0600 root sys
+systrace:systrace 0644 root sys
 winlock:* 0666 root sys
 asy:[a-z] 0666 root sys
 asy:[a-z],cu 0600 uucp uucp

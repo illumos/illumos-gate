@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -914,6 +913,7 @@ typedef struct dtrace_mstate {
 
 #define	DTRACE_COND_OWNER	0x1
 #define	DTRACE_COND_USERMODE	0x2
+#define	DTRACE_COND_ZONEOWNER	0x4
 
 #define	DTRACE_PROBEKEY_MAXDEPTH	8	/* max glob recursion depth */
 
@@ -1039,31 +1039,38 @@ typedef struct dtrace_helptrace {
 /*
  * DTrace Credentials
  *
- * In probe context, we don't have the flexibility to examine the credentials
- * of the DTrace consumer that created a particular enabling.  Instead, we use
- * the Least Privilege interfaces to cache the consumer's credentials in a
- * dtrace_cred_t structure. That structure contains two important sets of
- * credentials that limit the consumer's breadth of visibility and what
- * actions the consumer may take.
+ * In probe context, we have limited flexibility to examine the credentials
+ * of the DTrace consumer that created a particular enabling.  We use
+ * the Least Privilege interfaces to cache the consumer's cred pointer and
+ * some facts about that credential in a dtrace_cred_t structure. These
+ * can limit the consumer's breadth of visibility and what actions the
+ * consumer may take.
  */
 #define	DTRACE_CRV_ALLPROC		0x01
 #define	DTRACE_CRV_KERNEL		0x02
+#define	DTRACE_CRV_ALLZONE		0x04
 
-#define	DTRACE_CRV_ALL		(DTRACE_CRV_ALLPROC | DTRACE_CRV_KERNEL)
+#define	DTRACE_CRV_ALL		(DTRACE_CRV_ALLPROC | DTRACE_CRV_KERNEL | \
+	DTRACE_CRV_ALLZONE)
 
-#define	DTRACE_CRA_PROC			0x0001
-#define	DTRACE_CRA_PROC_DESTRUCTIVE	0x0002
-#define	DTRACE_CRA_PROC_CONTROL		0x0004
-#define	DTRACE_CRA_KERNEL		0x0008
-#define	DTRACE_CRA_KERNEL_DESTRUCTIVE	0x0010
+#define	DTRACE_CRA_PROC				0x0001
+#define	DTRACE_CRA_PROC_CONTROL			0x0002
+#define	DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER	0x0004
+#define	DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE	0x0008
+#define	DTRACE_CRA_PROC_DESTRUCTIVE_CREDCHG	0x0010
+#define	DTRACE_CRA_KERNEL			0x0020
+#define	DTRACE_CRA_KERNEL_DESTRUCTIVE		0x0040
 
 #define	DTRACE_CRA_ALL		(DTRACE_CRA_PROC | \
-	DTRACE_CRA_PROC_DESTRUCTIVE | DTRACE_CRA_PROC_CONTROL | \
-	DTRACE_CRA_KERNEL | DTRACE_CRA_KERNEL_DESTRUCTIVE)
+	DTRACE_CRA_PROC_CONTROL | \
+	DTRACE_CRA_PROC_DESTRUCTIVE_ALLUSER | \
+	DTRACE_CRA_PROC_DESTRUCTIVE_ALLZONE | \
+	DTRACE_CRA_PROC_DESTRUCTIVE_CREDCHG | \
+	DTRACE_CRA_KERNEL | \
+	DTRACE_CRA_KERNEL_DESTRUCTIVE)
 
 typedef struct dtrace_cred {
-	uid_t			dcr_uid;
-	gid_t			dcr_gid;
+	cred_t			*dcr_cred;
 	uint8_t			dcr_destructive;
 	uint8_t			dcr_visible;
 	uint16_t		dcr_action;

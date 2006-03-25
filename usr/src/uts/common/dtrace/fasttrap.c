@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1278,7 +1277,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	fasttrap_bucket_t *bucket;
 	char provname[DTRACE_PROVNAMELEN];
 	proc_t *p;
-	uid_t uid = (uid_t)-1;
+	cred_t *cred;
 
 	ASSERT(strlen(name) < sizeof (fp->ftp_name));
 	ASSERT(pattr != NULL);
@@ -1306,8 +1305,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 
 	/*
 	 * Make sure the process exists, isn't a child created as the result
-	 * of a vfork(2), and isn't a zombie (but may be in fork). Record the
-	 * process's uid to pass to dtrace_register().
+	 * of a vfork(2), and isn't a zombie (but may be in fork).
 	 */
 	mutex_enter(&pidlock);
 	if ((p = prfind(pid)) == NULL) {
@@ -1328,8 +1326,13 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 */
 	p->p_dtrace_probes++;
 
+	/*
+	 * Grab the credentials for this process so we have
+	 * something to pass to dtrace_register().
+	 */
 	mutex_enter(&p->p_crlock);
-	uid = crgetruid(p->p_cred);
+	crhold(p->p_cred);
+	cred = p->p_cred;
 	mutex_exit(&p->p_crlock);
 	mutex_exit(&p->p_lock);
 
@@ -1351,6 +1354,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 			mutex_enter(&fp->ftp_mtx);
 			mutex_exit(&bucket->ftb_mtx);
 			fasttrap_provider_free(new_fp);
+			crfree(cred);
 			return (fp);
 		}
 	}
@@ -1367,11 +1371,12 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	if (snprintf(provname, sizeof (provname), "%s%u", name, (uint_t)pid) >=
 	    sizeof (provname) ||
 	    dtrace_register(provname, pattr,
-	    DTRACE_PRIV_PROC | DTRACE_PRIV_OWNER, uid,
+	    DTRACE_PRIV_PROC | DTRACE_PRIV_OWNER | DTRACE_PRIV_ZONEOWNER, cred,
 	    pattr == &pid_attr ? &pid_pops : &usdt_pops, new_fp,
 	    &new_fp->ftp_provid) != 0) {
 		mutex_exit(&bucket->ftb_mtx);
 		fasttrap_provider_free(new_fp);
+		crfree(cred);
 		return (NULL);
 	}
 
@@ -1381,6 +1386,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	mutex_enter(&new_fp->ftp_mtx);
 	mutex_exit(&bucket->ftb_mtx);
 
+	crfree(cred);
 	return (new_fp);
 }
 
@@ -2005,7 +2011,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (ddi_create_minor_node(devi, "fasttrap", S_IFCHR, 0,
 	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
-	    dtrace_register("fasttrap", &fasttrap_attr, DTRACE_PRIV_USER, 0,
+	    dtrace_register("fasttrap", &fasttrap_attr, DTRACE_PRIV_USER, NULL,
 	    &fasttrap_pops, NULL, &fasttrap_id) != 0) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
