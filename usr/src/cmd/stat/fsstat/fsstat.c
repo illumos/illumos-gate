@@ -47,7 +47,19 @@
 #include <ctype.h>
 #include <libintl.h>
 
-#define	OPTIONS	"PT:afginv"
+/*
+ * For now, parsable output is turned off.  Once we gather feedback and
+ * stablize the output format, we'll turn it back on.  This prevents
+ * the situation where users build tools which depend on a specific
+ * format before we declare the output stable.
+ */
+#define	PARSABLE_OUTPUT	0
+
+#if PARSABLE_OUTPUT
+#define	OPTIONS	"FPT:afginv"
+#else
+#define	OPTIONS	"FT:afginv"
+#endif
 
 /* Time stamp values */
 #define	NODATE	0	/* Default:  No time stamp */
@@ -55,7 +67,7 @@
 #define	UDATE	2	/* Internal representation of Unix time */
 
 #define	RETRY_DELAY	250	/* Timeout for poll() */
-#define	HEADERLINES	22	/* Number of lines between display headers */
+#define	HEADERLINES	12	/* Number of lines between display headers */
 
 #define	LBUFSZ		64	/* Generic size for local buffer */
 
@@ -107,8 +119,8 @@ static int	vs_i = 0;	/* Index of current vs[] slot */
 static void
 usage()
 {
-	(void) fprintf(stderr,
-	    gettext("Usage: %s [-a|f|i|n|v] [-P] [ fstype | fspath ]... "
+	(void) fprintf(stderr, gettext(
+	    "Usage: %s [-a|f|i|n|v] [-T d|u] {-F | {fstype | fspath}...} "
 	    "[interval [count]]\n"), cmdname);
 	exit(2);
 }
@@ -173,11 +185,7 @@ nicenum(uint64_t num, char unit, char *buf)
 #define	RAWVAL(ptr, member) ((ptr)->member.value.ui64)
 #define	DELTA(member)	\
 	(newvsp->member.value.ui64 - (oldvsp ? oldvsp->member.value.ui64 : 0))
-#define	OLDPRINTSTAT(isnice, nicestring, niceval, rawstring, rawval)	\
-		(isnice) ? 						\
-			(void) printf((nicestring), (niceval))		\
-		:							\
-			(void) printf((rawstring), (rawval))
+
 #define	PRINTSTAT(isnice, nicestring, rawstring, rawval, unit, buf)	\
 	(isnice) ?	 						\
 		(void) printf((nicestring), nicenum(rawval, unit, buf))	\
@@ -753,7 +761,7 @@ void
 set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 {
 	int		i, j;
-	struct statvfs	statvfsbuf;
+	struct statvfs statvfsbuf;
 
 	for (i = 0; i < nentities; i++) {
 		entity_t	*ep = &entities[i];
@@ -883,9 +891,15 @@ main(int argc, char *argv[])
 			usage();
 			break;
 
+		case 'F':	/* Only display available FStypes */
+			fstypes_only = B_TRUE;
+			break;
+
+#if PARSABLE_OUTPUT
 		case 'P':	/* Parsable output */
 			dispflag |= DISP_RAW;
 			break;
+#endif /* PARSABLE_OUTPUT */
 
 		case 'T':	/* Timestamp */
 			if (optarg) {
@@ -927,11 +941,13 @@ main(int argc, char *argv[])
 		}
 	}
 
+#if PARSABLE_OUTPUT
 	if ((dispflag & DISP_RAW) && (timestamp != NODATE)) {
 		(void) fprintf(stderr, gettext(
 			"-P and -T options are mutually exclusive\n"));
 		usage();
 	}
+#endif /* PARSABLE_OUTPUT */
 
 	/* Gather the list of filesystem types */
 	if ((nfstypes = build_fstype_list(&fstypes)) == 0) {
@@ -946,13 +962,24 @@ main(int argc, char *argv[])
 	if (nentities == -1)	/* Set of operands didn't parse properly  */
 		usage();
 
-	/*
-	 * If we had no operands (except for interval/count) then we
-	 * fill in the entities[] array with all the fstypes.
-	 */
-	if (nentities == 0) {
-		fstypes_only = B_TRUE;
+	if ((nentities == 0) && (fstypes_only == B_FALSE)) {
+		(void) fprintf(stderr, gettext(
+		    "Must specify -F or at least one fstype or mount point\n"));
+		usage();
+	}
 
+	if ((nentities > 0) && (fstypes_only == B_TRUE)) {
+		(void) fprintf(stderr, gettext(
+		    "Cannot use -F with fstypes or mount points\n"));
+		usage();
+	}
+
+	/*
+	 * If we had no operands (except for interval/count) and we
+	 * requested FStypes only (-F), then fill in the entities[]
+	 * array with all available fstypes.
+	 */
+	if ((nentities == 0) && (fstypes_only == B_TRUE)) {
 		if ((entities = calloc(nfstypes, sizeof (entity_t))) == NULL) {
 			(void) fprintf(stderr,
 			    gettext("Can't calloc fstype stats\n"));
@@ -995,8 +1022,7 @@ main(int argc, char *argv[])
 			entities[j].e_ksname[0] = 0;
 
 			/*
-			 * If we're only displaying the fstypes (default
-			 * with no other entities requested) then don't
+			 * If we're only displaying FStypes (-F) then don't
 			 * complain about any file systems that might not
 			 * be loaded.  Otherwise, let the user know that
 			 * he chose poorly.
