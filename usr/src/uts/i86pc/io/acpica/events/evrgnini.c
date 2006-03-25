@@ -158,7 +158,16 @@ AcpiEvSystemMemoryRegionSetup (
     {
         if (*RegionContext)
         {
-            ACPI_MEM_FREE (*RegionContext);
+            LocalRegionContext = (ACPI_MEM_SPACE_CONTEXT *) *RegionContext;
+
+            /* Delete a cached mapping if present */
+
+            if (LocalRegionContext->MappedLength)
+            {
+                AcpiOsUnmapMemory (LocalRegionContext->MappedLogicalAddress,
+                    LocalRegionContext->MappedLength);
+            }
+            ACPI_MEM_FREE (LocalRegionContext);
             *RegionContext = NULL;
         }
         return_ACPI_STATUS (AE_OK);

@@ -294,9 +294,18 @@ AcpiUtDeleteInternalObj (
             HandlerDesc = Object->Region.Handler;
             if (HandlerDesc)
             {
-                if (HandlerDesc->AddressSpace.Hflags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)
+                if (HandlerDesc->AddressSpace.Hflags & 
+                        ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)
                 {
-                    ObjPointer = SecondDesc->Extra.RegionContext;
+                    /* Deactivate region and free region context */
+
+		    if (HandlerDesc->AddressSpace.Setup)
+		    {
+			HandlerDesc->AddressSpace.Setup (Object,
+                            ACPI_REGION_DEACTIVATE,
+			    HandlerDesc->AddressSpace.Context,
+			    &SecondDesc->Extra.RegionContext);
+		    }
                 }
 
                 AcpiUtRemoveReference (HandlerDesc);

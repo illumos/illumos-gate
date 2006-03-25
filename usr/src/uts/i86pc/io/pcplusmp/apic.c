@@ -1085,7 +1085,7 @@ acpi_probe(void)
 			break;
 		case APIC_RESERVED:
 		default:
-			goto cleanup;
+			break;	/* ignore unknown items as per ACPI spec */
 		}
 
 		/* advance to next entry */

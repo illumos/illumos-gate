@@ -479,7 +479,8 @@ AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress,
 	/* FUTUREWORK: test PhysicalAddress for > 32 bits */
 	*LogicalAddress = psm_map_new((paddr_t)PhysicalAddress,
 		(size_t)Size, PSM_PROT_WRITE | PSM_PROT_READ);
-	return (AE_OK);
+
+	return (*LogicalAddress == NULL ? AE_NO_MEMORY : AE_OK);
 }
 
 void
@@ -496,7 +497,7 @@ AcpiOsGetPhysicalAddress(void *LogicalAddress,
 {
 
 	/* UNIMPLEMENTED: not invoked by ACPI CA code */
-	return (AE_OK);
+	return (AE_NOT_IMPLEMENTED);
 }
 
 
