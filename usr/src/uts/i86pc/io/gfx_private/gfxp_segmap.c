@@ -145,7 +145,11 @@ gfxp_ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	dev_a.prot = (uchar_t)prot;
 	dev_a.maxprot = (uchar_t)maxprot;
 	dev_a.hat_attr = hat_attr;
+#if DEBUG
+	dev_a.hat_flags = 0;
+#else
 	dev_a.hat_flags = HAT_LOAD_LOCK;
+#endif
 	dev_a.devmap_data = NULL;
 
 	error = as_map(as, *addrp, len, segdev_create, &dev_a);
