@@ -35,6 +35,7 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 {
 	Byte		*byte =	&(ehdr->e_ident[0]);
 	const char	*flgs;
+	int		xshdr = 0;
 
 	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_INTL(MSG_ELF_HEADER));
@@ -51,7 +52,7 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	dbg_print(lml, MSG_ORIG(MSG_ELF_TYPE), conv_ehdr_type(ehdr->e_type));
 
 	/*
-	 * Line up the flags differently depending on wether we received a
+	 * Line up the flags differently depending on whether we received a
 	 * numeric (e.g. "0x200") or text representation (e.g.
 	 * "[ EF_SPARC_SUN_US1 ]").
 	 */
@@ -61,45 +62,49 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	else
 		dbg_print(lml, MSG_ORIG(MSG_ELF_FLAGS), flgs);
 
-	if ((ehdr->e_shnum == 0) && (ehdr->e_shstrndx == SHN_XINDEX))
+	/*
+	 * The e_shnum, e_shstrndx and e_phnum entries may have a different
+	 * meaning if extended sections exist.
+	 */
+	if ((ehdr->e_shnum == 0) && (ehdr->e_shstrndx == SHN_XINDEX)) {
 		dbg_print(lml, MSG_ORIG(MSG_ELFX_ESIZE),
 		    EC_ADDR(ehdr->e_entry), ehdr->e_ehsize);
-	else
+		xshdr++;
+	} else
 		dbg_print(lml, MSG_ORIG(MSG_ELF_ESIZE), EC_ADDR(ehdr->e_entry),
 		    ehdr->e_ehsize, ehdr->e_shstrndx);
 
-	if ((ehdr->e_shnum == 0) && shdr0 && (shdr0->sh_size != 0))
+	if ((ehdr->e_shnum == 0) && (shdr0 != NULL) && (shdr0->sh_size != 0)) {
 		dbg_print(lml, MSG_ORIG(MSG_ELFX_SHOFF), EC_OFF(ehdr->e_shoff),
 		    ehdr->e_shentsize);
-	else
+		xshdr++;
+	} else
 		dbg_print(lml, MSG_ORIG(MSG_ELF_SHOFF), EC_OFF(ehdr->e_shoff),
 		    ehdr->e_shentsize, ehdr->e_shnum);
 
-	dbg_print(lml, MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
-	    ehdr->e_phentsize, ehdr->e_phnum);
+	if (ehdr->e_phoff == PN_XNUM) {
+		dbg_print(lml, MSG_ORIG(MSG_ELFX_PHOFF), EC_OFF(ehdr->e_phoff),
+		    ehdr->e_phentsize);
+		xshdr++;
+	} else
+		dbg_print(lml, MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
+		    ehdr->e_phentsize, ehdr->e_phnum);
 
-	if ((ehdr->e_shnum != 0) || (shdr0 == NULL) ||
-	    (shdr0->sh_size == 0))
+	if ((xshdr == 0) || (shdr0 == NULL))
 		return;
 
 	/*
-	 * If we have Extended ELF headers - print shdr0
+	 * If we have Extended ELF headers - print shdr[0].
 	 */
+	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_TITLE));
-	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr0->sh_addr),
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_ADDR), EC_ADDR(shdr0->sh_addr),
 	    conv_sec_flags(shdr0->sh_flags));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
 	    conv_sec_type(ehdr->e_machine, shdr0->sh_type));
-	dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr0->sh_offset),
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_OFFSET), EC_OFF(shdr0->sh_offset),
 	    EC_XWORD(shdr0->sh_entsize));
-
-	if (ehdr->e_shstrndx == SHN_XINDEX)
-		dbg_print(lml, MSG_ORIG(MSG_SHD0_LINK),
-		    EC_WORD(shdr0->sh_link), conv_sec_info(shdr0->sh_info,
-		    shdr0->sh_flags));
-	else
-		dbg_print(lml, MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr0->sh_link),
-		    conv_sec_info(shdr0->sh_info, shdr0->sh_flags));
-
-	dbg_print(lml, MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr0->sh_addralign));
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_LINK), EC_WORD(shdr0->sh_link),
+	    EC_WORD(shdr0->sh_info));
+	dbg_print(lml, MSG_ORIG(MSG_SHD0_ALIGN), EC_XWORD(shdr0->sh_addralign));
 }

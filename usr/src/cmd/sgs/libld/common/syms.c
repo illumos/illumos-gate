@@ -328,7 +328,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * Record the section index.  This is possible because the
 	 * `ifl_isdesc' table is filled before we start symbol processing.
 	 */
-	if ((sdflags & FLG_SY_SPECSEC) || (shndx == SHN_UNDEF))
+	if ((sdflags & FLG_SY_SPECSEC) || (nsym->st_shndx == SHN_UNDEF))
 		sdp->sd_isc = NULL;
 	else {
 		sdp->sd_isc = ifl->ifl_isdesc[shndx];
@@ -355,10 +355,10 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * Mark any COMMON symbols as 'tentative'.
 	 */
 	if (sdflags & FLG_SY_SPECSEC) {
-		if (shndx == SHN_COMMON)
+		if (nsym->st_shndx == SHN_COMMON)
 			sdp->sd_flags |= FLG_SY_TENTSYM;
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-		else if (shndx == SHN_X86_64_LCOMMON)
+		else if (nsym->st_shndx == SHN_X86_64_LCOMMON)
 			sdp->sd_flags |= FLG_SY_TENTSYM;
 #endif
 	}
@@ -373,7 +373,8 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * Under -Bnodirect, all exported interfaces are tagged to
 		 * prevent direct binding to them.
 		 */
-		if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) && (shndx != SHN_UNDEF))
+		if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
+		    (nsym->st_shndx != SHN_UNDEF))
 			sdp->sd_flags1 |= FLG_SY1_NDIR;
 
 	} else {
@@ -384,7 +385,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * field.  If this symbol is ever overridden by a REF_REL_NEED
 		 * definition, sa_bindto is used when building a 'translator'.
 		 */
-		if (shndx != SHN_UNDEF)
+		if (nsym->st_shndx != SHN_UNDEF)
 			sdp->sd_aux->sa_bindto = ifl;
 
 		/*
@@ -410,9 +411,9 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 
 	/*
 	 * Reclassify any SHN_SUNW_IGNORE symbols to SHN_UNDEF so as to
-	 * simplify fucture processing.
+	 * simplify future processing.
 	 */
-	if (shndx == SHN_SUNW_IGNORE) {
+	if (nsym->st_shndx == SHN_SUNW_IGNORE) {
 		sdp->sd_shndx = shndx = SHN_UNDEF;
 		sdp->sd_flags |= FLG_SY_REDUCED;
 		sdp->sd_flags1 |=
@@ -426,11 +427,12 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 */
 	if ((etype == ET_REL) &&
 	    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL) &&
-	    ((shndx == SHN_UNDEF) || ((sdflags & FLG_SY_SPECSEC) &&
+	    ((nsym->st_shndx == SHN_UNDEF) || ((sdflags & FLG_SY_SPECSEC) &&
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-	    ((shndx == SHN_COMMON) || (shndx == SHN_X86_64_LCOMMON)))))
+	    ((nsym->st_shndx == SHN_COMMON) ||
+	    (nsym->st_shndx == SHN_X86_64_LCOMMON)))))
 #else
-	    (shndx == SHN_COMMON))))
+	    (nsym->st_shndx == SHN_COMMON))))
 #endif
 		sdp->sd_flags |= FLG_SY_GLOBREF;
 
@@ -453,7 +455,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 *	(interposed) definitions of a symbol (refer to ldmap_out()),
 	 *	and can be quite expensive.
 	 */
-	if (shndx == SHN_UNDEF) {
+	if (nsym->st_shndx == SHN_UNDEF) {
 		sap->sa_rfile = ifl->ifl_name;
 	} else {
 		if (sdp->sd_ref == REF_DYN_SEEN) {
@@ -600,7 +602,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 	}
 
 	if (name && (sdp = ld_sym_find(name, SYM_NOHASH, 0, ofl)) &&
-	    (sdp->sd_shndx == SHN_UNDEF)) {
+	    (sdp->sd_sym->st_shndx == SHN_UNDEF)) {
 		uchar_t	bind;
 
 		/*
@@ -806,7 +808,8 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 	Word	symvis, oflags = ofl->ofl_flags, oflags1 = ofl->ofl_flags1;
 	Sym	*sym = sdp->sd_sym;
 
-	if ((sdp->sd_ref == REF_REL_NEED) && (sdp->sd_shndx != SHN_UNDEF)) {
+	if ((sdp->sd_ref == REF_REL_NEED) &&
+	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		/*
 		 * If scoping is enabled, reduce any nonversioned global
 		 * symbols (any symbol that has been processed for relocations
@@ -945,7 +948,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
 		Is_desc *	isp;
-		int		shndx, undeferr = 0;
+		int		undeferr = 0;
 
 		sdp = sav->sav_symdesc;
 
@@ -969,14 +972,13 @@ ld_sym_validate(Ofl_desc *ofl)
 		}
 
 		sym = sdp->sd_sym;
-		shndx = sdp->sd_shndx;
 
 		/*
 		 * Sanity check TLS.
 		 */
 		if ((ELF_ST_TYPE(sym->st_info) == STT_TLS) &&
-		    (sym->st_size != 0) && (shndx != SHN_UNDEF) &&
-		    (shndx != SHN_COMMON)) {
+		    (sym->st_size != 0) && (sym->st_shndx != SHN_UNDEF) &&
+		    (sym->st_shndx != SHN_COMMON)) {
 			Is_desc *	isp = sdp->sd_isc;
 			Ifl_desc *	ifl = sdp->sd_file;
 
@@ -1005,7 +1007,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * give a fatal error.
 		 */
 		if (!(oflags & FLG_OF_RELOBJ) &&
-		    ELF_ST_VISIBILITY(sym->st_other) && (shndx == SHN_UNDEF) &&
+		    ELF_ST_VISIBILITY(sym->st_other) &&
+		    (sym->st_shndx == SHN_UNDEF) &&
 		    (ELF_ST_BIND(sym->st_info) != STB_WEAK)) {
 			sym_undef_entry(ofl, sdp, BNDLOCAL);
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -1029,7 +1032,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * file.
 		 */
 		if (sdp->sd_flags1 & FLG_SY1_IGNORE)
-			sdp->sd_shndx = shndx = SHN_SUNW_IGNORE;
+			sdp->sd_shndx = SHN_SUNW_IGNORE;
 
 		if (undef) {
 			/*
@@ -1059,7 +1062,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			 * would be incorrect.
 			 */
 			if (!(sdp->sd_flags & FLG_SY_REGSYM) &&
-			    ((shndx == SHN_UNDEF) &&
+			    ((sym->st_shndx == SHN_UNDEF) &&
 			    ((ELF_ST_BIND(sym->st_info) != STB_WEAK) &&
 			    ((sdp->sd_flags &
 			    (FLG_SY_PARENT | FLG_SY_EXTERN)) == 0)) ||
@@ -1158,7 +1161,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * definitions must be associated with a version.
 		 */
 		if (verdesc && (sdp->sd_ref == REF_REL_NEED) &&
-		    (shndx != SHN_UNDEF) &&
+		    (sym->st_shndx != SHN_UNDEF) &&
 		    (!(sdp->sd_flags1 & FLG_SY1_LOCL)) &&
 		    (sdp->sd_aux->sa_overndx == 0)) {
 			sym_undef_entry(ofl, sdp, NOVERSION);
@@ -1186,7 +1189,8 @@ ld_sym_validate(Ofl_desc *ofl)
 		 *
 		 * Also refer to make_mvsections() in sunwmove.c
 		 */
-		if ((shndx == SHN_COMMON) && ((!(oflags & FLG_OF_RELOBJ)) ||
+		if ((sym->st_shndx == SHN_COMMON) &&
+		    (((oflags & FLG_OF_RELOBJ) == 0) ||
 		    ((sdp->sd_flags1 & FLG_SY1_LOCL) &&
 		    (oflags & FLG_OF_PROCRED)))) {
 			int countbss = 0;
@@ -1225,7 +1229,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * .lbss. TLS or partially initialized symbols do not need to be
 		 * considered yet.
 		 */
-		if (shndx == SHN_X86_64_LCOMMON) {
+		if (sym->st_shndx == SHN_X86_64_LCOMMON) {
 			lbsssize = (Xword)S_ROUND(lbsssize, sym->st_value) +
 				sym->st_size;
 			if (sym->st_value > lbssalign)
@@ -1403,7 +1407,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	 */
 	if ((sdp = ofl->ofl_dtracesym) != 0) {
 		if ((sdp->sd_ref != REF_REL_NEED) ||
-		    (sdp->sd_shndx == SHN_UNDEF)) {
+		    (sdp->sd_sym->st_shndx == SHN_UNDEF)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_DTRACE),
 			    demangle((char *)sdp->sd_name));
@@ -1660,7 +1664,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * Reclassify any SHN_SUNW_IGNORE symbols to SHN_UNDEF
 			 * so as to simplify future processing.
 			 */
-			if (shndx == SHN_SUNW_IGNORE) {
+			if (sym->st_shndx == SHN_SUNW_IGNORE) {
 				sdp->sd_shndx = shndx = SHN_UNDEF;
 				sdp->sd_flags1 |=
 				    (FLG_SY1_IGNORE | FLG_SY1_ELIM);
@@ -1689,7 +1693,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			/*
 			 * Assign an input section.
 			 */
-			if ((shndx != SHN_UNDEF) &&
+			if ((sym->st_shndx != SHN_UNDEF) &&
 			    ((sdp->sd_flags & FLG_SY_SPECSEC) == 0))
 				sdp->sd_isc = ifl->ifl_isdesc[shndx];
 
@@ -1711,12 +1715,12 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * will be created.
 			 */
 			if ((type = ELF_ST_TYPE(sym->st_info)) == STT_SECTION) {
-				if (shndx == SHN_UNDEF) {
+				if (sym->st_shndx == SHN_UNDEF) {
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_SYM_INVSHNDX),
 					    demangle(sdp->sd_name),
 					    ifl->ifl_name,
-					    conv_sym_shndx(shndx));
+					    conv_sym_shndx(sym->st_shndx));
 				}
 				continue;
 			}
@@ -1724,8 +1728,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			/*
 			 * Sanity check for TLS
 			 */
-			if ((sym->st_size != 0) &&
-			    ((type == STT_TLS) && (shndx != SHN_COMMON))) {
+			if ((sym->st_size != 0) && ((type == STT_TLS) &&
+			    (sym->st_shndx != SHN_COMMON))) {
 				Is_desc	*isp = sdp->sd_isc;
 
 				if ((isp == 0) || (isp->is_shdr == 0) ||
@@ -1748,13 +1752,14 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * against it.
 			 */
 			if (((sdp->sd_flags & FLG_SY_SPECSEC) &&
-			    ((shndx == SHN_COMMON)) ||
-			    ((type == STT_FILE) && (shndx != SHN_ABS))) ||
+			    ((sym->st_shndx == SHN_COMMON)) ||
+			    ((type == STT_FILE) &&
+			    (sym->st_shndx != SHN_ABS))) ||
 			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0))) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle(sdp->sd_name), ifl->ifl_name,
-				    conv_sym_shndx(shndx));
+				    conv_sym_shndx(sym->st_shndx));
 				sdp->sd_isc = NULL;
 				sdp->sd_flags |= FLG_SY_INVALID;
 				continue;
@@ -1846,7 +1851,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * discarded, then discard the symbol itself.
 		 */
 		if (((sdflags & FLG_SY_SPECSEC) == 0) &&
-		    (shndx != SHN_UNDEF)) {
+		    (sym->st_shndx != SHN_UNDEF)) {
 			Is_desc	*isp;
 
 			if (shndx >= ifl->ifl_shnum) {
@@ -1858,7 +1863,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 */
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX), demangle(name),
-				    ifl->ifl_name, conv_sym_shndx(shndx));
+				    ifl->ifl_name,
+				    conv_sym_shndx(sym->st_shndx));
 				continue;
 			}
 
@@ -1908,7 +1914,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * After we've compared a defined symbol in one shared
 		 * object, flag the symbol so we don't compare it again.
 		 */
-		if ((etype == ET_DYN) && (shndx != SHN_UNDEF) &&
+		if ((etype == ET_DYN) && (sym->st_shndx != SHN_UNDEF) &&
 		    ((sdp->sd_flags & FLG_SY_SOFOUND) == 0))
 			sdp->sd_flags |= FLG_SY_SOFOUND;
 
@@ -1983,7 +1989,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			wsym = wsdp->sd_sym;
 
 			if ((ELF_ST_BIND(wsym->st_info) != STB_WEAK) ||
-			    (wsdp->sd_shndx == SHN_UNDEF) ||
+			    (wsdp->sd_sym->st_shndx == SHN_UNDEF) ||
 			    (wsdp->sd_flags & FLG_SY_SPECSEC))
 				continue;
 
@@ -2010,7 +2016,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				if ((ssdp->sd_file == ifl) &&
 				    (wsdp->sd_file == ifl) &&
 				    (wsym->st_size == ssym->st_size) &&
-				    (ssdp->sd_shndx != SHN_UNDEF) &&
+				    (ssdp->sd_sym->st_shndx != SHN_UNDEF) &&
 				    (ELF_ST_BIND(ssym->st_info) != STB_WEAK) &&
 				    ((ssdp->sd_flags & FLG_SY_SPECSEC) == 0)) {
 					ssdp->sd_aux->sa_linkndx =

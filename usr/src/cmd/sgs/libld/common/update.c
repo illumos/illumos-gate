@@ -59,7 +59,7 @@ sym_hash_compare(Sym_s_list * s1, Sym_s_list * s2)
 static Addr
 update_osym(Ofl_desc *ofl)
 {
-	Listnode	*lnp1, *lnp2;
+	Listnode	*lnp1;
 	Sym_desc	*sdp;
 	Sym_avlnode	*sav;
 	Sg_desc		*sgp, *tsgp = 0, *dsgp = 0, *esgp = 0;
@@ -206,17 +206,23 @@ update_osym(Ofl_desc *ofl)
 	 * we have empty segments (reservations) record them for setting _end.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Phdr *		phd = &(sgp->sg_phdr);
+		Phdr	*phd = &(sgp->sg_phdr);
+		Os_desc	**ospp;
+		Aliste	off;
 
 		if (phd->p_type == PT_LOAD) {
-			if (sgp->sg_osdescs.head != NULL) {
-			    Word _flags = phd->p_flags & (PF_W | PF_R);
+			if (sgp->sg_osdescs != NULL) {
+			    Word	_flags = phd->p_flags & (PF_W | PF_R);
+
 			    if (_flags == PF_R) {
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-				Os_desc * osp = sgp->sg_osdescs.head->data;
-				Shdr * shdr = osp->os_shdr;
+				Shdr	*shdr;
+
+				osp = (Os_desc *)sgp->sg_osdescs->al_data[0];
+				shdr = osp->os_shdr;
+
 				if (((shdr->sh_flags & SHF_AMD64_LARGE)) == 0)
-				    tsgp = sgp;
+					tsgp = sgp;
 #else
 				tsgp = sgp;
 #endif
@@ -229,8 +235,10 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Generate a section symbol for each output section.
 		 */
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
 			Word	sectndx;
+
+			osp = *ospp;
 
 			sym = &_sym;
 			sym->st_value = osp->os_shdr->sh_addr;
@@ -379,12 +387,18 @@ update_osym(Ofl_desc *ofl)
 			 * no sections to establish an index for _end, so assign
 			 * it as an absolute.
 			 */
-			if (sgp->sg_osdescs.tail) {
-				Os_desc *	tosp;
+			if (sgp->sg_osdescs != NULL) {
+				Os_desc	**ospp;
+				Alist	*alp = sgp->sg_osdescs;
+				Aliste	last = alp->al_next - alp->al_size;
 
-				tosp = (Os_desc *)sgp->sg_osdescs.tail->data;
+				/*
+				 * Determine the last section for this segment.
+				 */
 				/* LINTED */
-				end_ndx = elf_ndxscn(tosp->os_scn);
+				ospp = (Os_desc **)((char *)alp + last);
+				/* LINTED */
+				end_ndx = elf_ndxscn((*ospp)->os_scn);
 			} else {
 				end_ndx = SHN_ABS;
 				end_abs = 1;
@@ -2667,16 +2681,16 @@ ld_update_outfile(Ofl_desc *ofl)
 	Addr		size, etext, vaddr = ofl->ofl_segorigin;
 	Listnode	*lnp1, *lnp2;
 	Sg_desc		*sgp;
-	Os_desc		*osp;
+	Os_desc		**ospp, *osp;
 	int		phdrndx = 0, capndx = 0, segndx = -1, secndx;
 	Ehdr		*ehdr = ofl->ofl_nehdr;
-	List		osecs;
 	Shdr		*hshdr;
 	Phdr		*_phdr = 0, *dtracephdr = 0;
 	Word		phdrsz = ehdr->e_phnum *ehdr->e_phentsize, shscnndx;
 	Word		flags = ofl->ofl_flags, ehdrsz = ehdr->e_ehsize;
 	Boolean		nobits;
 	Off		offset;
+	Aliste		off;
 
 	/*
 	 * Loop through the segment descriptors and pick out what we need.
@@ -2882,8 +2896,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * section descriptors associated with them (ie. some form of
 		 * input section has been matched to this segment).
 		 */
-		osecs = sgp->sg_osdescs;
-		if (osecs.head == NULL)
+		if (sgp->sg_osdescs == NULL)
 			continue;
 
 		/*
@@ -2891,22 +2904,29 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * information provided from elf_update().
 		 * Allow for multiple NOBITS sections.
 		 */
-		osp = (Os_desc *)osecs.head->data;
+		osp = (Os_desc *)sgp->sg_osdescs->al_data[0];
 		hshdr = osp->os_shdr;
 
 		phdr->p_filesz = 0;
 		phdr->p_memsz = 0;
 		phdr->p_offset = offset = hshdr->sh_offset;
+
 		nobits = ((hshdr->sh_type == SHT_NOBITS) &&
-			((sgp->sg_flags & FLG_SG_PHREQ) == 0));
-		for (LIST_TRAVERSE(&osecs, lnp2, osp)) {
-			Shdr *	shdr = osp->os_shdr;
+		    ((sgp->sg_flags & FLG_SG_PHREQ) == 0));
+
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Shdr	*shdr;
+
+			osp = *ospp;
+			shdr = osp->os_shdr;
 
 			p_align = 0;
 			if (shdr->sh_addralign > p_align)
 				p_align = shdr->sh_addralign;
+
 			offset = (Off)S_ROUND(offset, shdr->sh_addralign);
 			offset += shdr->sh_size;
+
 			if (shdr->sh_type != SHT_NOBITS) {
 				if (nobits) {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -3052,8 +3072,11 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		secndx = 0;
 		hshdr = 0;
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
-			Shdr *	shdr = osp->os_shdr;
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Shdr	*shdr;
+
+			osp = *ospp;
+			shdr = osp->os_shdr;
 
 			if (shdr->sh_link)
 			    shdr->sh_link =

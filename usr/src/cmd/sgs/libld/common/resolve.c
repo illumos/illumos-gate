@@ -26,7 +26,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"   /* SVR4 6.2/18.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4 6.2/18.2 */
 
 /*
  * Symbol table resolution
@@ -124,8 +124,10 @@ sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 static void
 /* ARGSUSED4 */
 sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
+	Word	shndx = nsym->st_shndx;
+
 	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 
 	/*
@@ -143,7 +145,7 @@ sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * override the reference name so that any undefined symbol
 		 * diagnostics will refer to the relocatable object name.
 		 */
-		if (nshndx == SHN_UNDEF)
+		if (shndx == SHN_UNDEF)
 			sdp->sd_aux->sa_rfile = ifl->ifl_name;
 
 		/*
@@ -151,15 +153,13 @@ sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * it is a global or weak reference (see build_osym(), where
 		 * REF_DYN_NEED definitions are returned back to undefines).
 		 */
-		if (((nshndx == SHN_UNDEF) ||
-		    ((nsymflags & FLG_SY_SPECSEC) &&
-		    (nshndx == SHN_COMMON))) &&
+		if (((shndx == SHN_UNDEF) || ((nsymflags & FLG_SY_SPECSEC) &&
+		    (shndx == SHN_COMMON))) &&
 		    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL))
 			sdp->sd_flags |= FLG_SY_GLOBREF;
 
-	} else if ((nshndx != SHN_UNDEF) &&
-	    (ofl->ofl_dtflags_1 & DF_1_TRANS) &&
-	    !sdp->sd_aux->sa_bindto && (sdp->sd_ref == REF_REL_NEED) &&
+	} else if ((shndx != SHN_UNDEF) && (ofl->ofl_dtflags_1 & DF_1_TRANS) &&
+	    (sdp->sd_aux->sa_bindto == 0) && (sdp->sd_ref == REF_REL_NEED) &&
 	    (ifl->ifl_ehdr->e_type == ET_DYN)) {
 		/*
 		 * If building a translator then record the symbol
@@ -189,7 +189,8 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * to this symbol.  Instead let the 'generic' weak binding take place.
 	 */
 	if ((ELF_ST_BIND(osym->st_info) == STB_WEAK) &&
-	    (sdp->sd_shndx == SHN_UNDEF) && !(ifl->ifl_flags & FLG_IF_NEEDED))
+	    (sdp->sd_sym->st_shndx == SHN_UNDEF) &&
+	    ((ifl->ifl_flags & FLG_IF_NEEDED) == 0))
 		return;
 
 	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
@@ -239,7 +240,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		}
 		sdp->sd_ref = REF_REL_NEED;
 
-		if (nshndx == SHN_UNDEF) {
+		if (nsym->st_shndx == SHN_UNDEF) {
 			/*
 			 * If this is an undefined symbol it must be a
 			 * relocatable object overriding a shared object.  In
@@ -263,8 +264,9 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * it is a global or weak reference (see build_osym(), where
 		 * REF_DYN_NEED definitions are returned back to undefines).
 		 */
-		if (((nshndx == SHN_UNDEF) ||
-		    ((nsymflags & FLG_SY_SPECSEC) && (nshndx == SHN_COMMON))) &&
+		if (((nsym->st_shndx == SHN_UNDEF) ||
+		    ((nsymflags & FLG_SY_SPECSEC) &&
+		    (nsym->st_shndx == SHN_COMMON))) &&
 		    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL))
 			sdp->sd_flags |= FLG_SY_GLOBREF;
 		else
@@ -324,15 +326,16 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Update the input section descriptor to that of the new input file
 	 */
-	if (((nsymflags & FLG_SY_SPECSEC) == 0) && (nshndx != SHN_UNDEF))
+	if (((nsymflags & FLG_SY_SPECSEC) == 0) &&
+	    (nsym->st_shndx != SHN_UNDEF)) {
 		if ((sdp->sd_isc = ifl->ifl_isdesc[nshndx]) == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_NOSECDEF), demangle(sdp->sd_name),
 			    ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
+	}
 }
-
 
 /*
  * Resolve two undefines (only called for two relocatable objects).
@@ -519,7 +522,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 				return;
 			else {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-					nshndx, nsymflags);
+				    nshndx, nsymflags);
 				return;
 			}
 		}
@@ -657,22 +660,22 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 	/*
-	 * If original and new are both COMMON but
-	 * different size model, take the small one.
+	 * If the original and new symbols are both COMMON, but of a different
+	 * size model, take the small one.
 	 */
-	if ((sdp->sd_shndx == SHN_COMMON) &&
-	    (nshndx == SHN_X86_64_LCOMMON)) {
+	if ((sdp->sd_sym->st_shndx == SHN_COMMON) &&
+	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
 		/*
-		 * Take the original one.
+		 * Take the original symbol.
 		 */
 		return;
-	} else if ((sdp->sd_shndx == SHN_X86_64_LCOMMON) &&
-	    (nshndx == SHN_COMMON)) {
+
+	} else if ((sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
+	    (nsym->st_shndx == SHN_COMMON)) {
 		/*
 		 * Take the new symbol.
 		 */
-		sym_override(sdp, nsym, ifl, ofl, ndx,
-		    nshndx, nsymflags);
+		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
 		return;
 	}
 #endif
@@ -686,16 +689,16 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if ((osym->st_value != nsym->st_value) &&
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-	    (sdp->sd_shndx == SHN_COMMON) &&
+	    (sdp->sd_sym->st_shndx == SHN_COMMON) &&
 	    (nsymflags & FLG_SY_SPECSEC) &&
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-	    (nshndx == SHN_COMMON)) ||
+	    (nsym->st_shndx == SHN_COMMON)) ||
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-	    (sdp->sd_shndx == SHN_X86_64_LCOMMON) &&
+	    (sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
 	    (nsymflags & FLG_SY_SPECSEC) &&
-	    (nshndx == SHN_X86_64_LCOMMON))) {
+	    (nsym->st_shndx == SHN_X86_64_LCOMMON))) {
 #else
-	    (nshndx == SHN_COMMON))) {
+	    (nsym->st_shndx == SHN_COMMON))) {
 #endif
 		const char	*emsg = MSG_INTL(MSG_SYM_DEFTAKEN);
 		const char	*file;
@@ -802,19 +805,19 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 					emsg = MSG_INTL(MSG_SYM_DEFUPDATE);
 				}
 				sym_promote(sdp, nsym, ifl, ofl, ndx,
-					nshndx, nsymflags);
+				    nshndx, nsymflags);
 			}
 		} else if (obind != nbind) {
 			if ((obind == STB_WEAK) && (nbind != STB_WEAK)) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-					nshndx, nsymflags);
+				    nshndx, nsymflags);
 				file = ifl->ifl_name;
 			} else
 				file = sdp->sd_file->ifl_name;
 		} else {
 			if (osym->st_size < nsym->st_size) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-					nshndx, nsymflags);
+				    nshndx, nsymflags);
 				file = ifl->ifl_name;
 			} else
 				file = sdp->sd_file->ifl_name;
@@ -841,10 +844,10 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    (((obind == STB_WEAK) && (nbind != STB_WEAK)) &&
 		    (!((ofile != nfile) && (ofile == ET_REL)))))
 			sym_override(sdp, nsym, ifl, ofl, ndx,
-				nshndx, nsymflags);
+			    nshndx, nsymflags);
 		else
 			sym_promote(sdp, nsym, ifl, ofl, ndx,
-				nshndx, nsymflags);
+			    nshndx, nsymflags);
 	}
 
 	/*
@@ -903,7 +906,8 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 */
 	if (sdp->sd_flags & FLG_SY_TENTSYM)
 		row = SYM_TENTATIVE;
-	else if (sdp->sd_shndx == SHN_UNDEF)
+	else if ((sdp->sd_sym->st_shndx == SHN_UNDEF) ||
+	    (sdp->sd_sym->st_shndx == SHN_SUNW_IGNORE))
 		row = SYM_UNDEFINED;
 	else
 		row = SYM_DEFINED;
@@ -931,16 +935,17 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 * Determine the new symbols definition (defines column in Action[]).
 	 */
 	if ((nsymflags & FLG_SY_SPECSEC) &&
-	    (nshndx == SHN_COMMON)) {
+	    (nsym->st_shndx == SHN_COMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 	} else if ((nsymflags & FLG_SY_SPECSEC) &&
-	    (nshndx == SHN_X86_64_LCOMMON)) {
+	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;
 #endif
-	} else if ((nshndx == SHN_UNDEF) || (nshndx == SHN_SUNW_IGNORE)) {
+	} else if ((nsym->st_shndx == SHN_UNDEF) ||
+	    (nsym->st_shndx == SHN_SUNW_IGNORE)) {
 		column = SYM_UNDEFINED;
 		nshndx = SHN_UNDEF;
 	} else {
@@ -969,7 +974,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 * generated when the -m option is in effect and is used to list
 	 * multiple (interposed) definitions of a symbol (refer to ldmap_out()).
 	 */
-	if ((ofl->ofl_flags & FLG_OF_GENMAP) && (nshndx != SHN_UNDEF) &&
+	if ((ofl->ofl_flags & FLG_OF_GENMAP) && (nsym->st_shndx != SHN_UNDEF) &&
 	    ((nsymflags & FLG_SY_SPECSEC) == 0))
 		if (list_appendc(&sdp->sd_aux->sa_dfiles, ifl->ifl_name) == 0)
 			return (S_ERROR);
@@ -985,7 +990,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 * new symbol must be promoted to the versioning of the output file.
 	 */
 	if ((sdp->sd_file == ifl) && (nfile == ET_REL) && (ifl->ifl_versym) &&
-	    (nshndx != SHN_UNDEF))
+	    (nsym->st_shndx != SHN_UNDEF))
 		ld_vers_promote(sdp, ndx, ifl, ofl);
 
 	/*
@@ -1010,7 +1015,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 		 * information) simply augments a relocatables definition.
 		 */
 		if ((sdp->sd_flags & (FLG_SY_EXTERN | FLG_SY_PARENT)) ||
-		    ((sdp->sd_shndx != SHN_UNDEF) &&
+		    ((sdp->sd_sym->st_shndx != SHN_UNDEF) &&
 		    (sdp->sd_ref == REF_REL_NEED)))
 			sdp->sd_flags |= FLG_SY_MAPUSED;
 	}

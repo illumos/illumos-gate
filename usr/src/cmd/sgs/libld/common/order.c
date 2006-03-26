@@ -270,37 +270,40 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
  * there are any SHF_ORDERED key sections, and if so set up sort key values.
  */
 void
-ld_sec_validate(Ofl_desc * ofl)
+ld_sec_validate(Ofl_desc *ofl)
 {
-	Listnode *	lnp1;
-	Sg_desc *	sgp;
+	Listnode	*lnp1;
+	Sg_desc		*sgp;
 	int 		key = 1;
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Listnode *	lnp2;
-		Sec_order *	scop;
-		Os_desc *	osp;
+		Sec_order	**scopp;
+		Os_desc		**ospp;
+		Aliste		off;
 
-		for (LIST_TRAVERSE(&sgp->sg_secorder, lnp2, scop))
-			if (!(scop->sco_flags & FLG_SGO_USED))
+		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
+			Sec_order	*scop = *scopp;
+
+			if ((scop->sco_flags & FLG_SGO_USED) == 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MAP_SECORDER),
 				    sgp->sg_name, scop->sco_secname);
-
+			}
+		}
 		if ((sgp->sg_flags & FLG_SG_KEY) == 0)
 			continue;
 
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
-			Listnode *	lnp3;
-			Is_desc *	isp;
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Listnode	*lnp2;
+			Is_desc		*isp;
+			Os_desc		*osp = *ospp;
 
 			if ((osp->os_flags & FLG_OS_ORDER_KEY) == 0)
 				continue;
 
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp3, isp)) {
-				if (isp->is_flags & FLG_IS_KEY) {
+			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
+				if (isp->is_flags & FLG_IS_KEY)
 					isp->is_key = key++;
-				}
 			}
 		}
 	}

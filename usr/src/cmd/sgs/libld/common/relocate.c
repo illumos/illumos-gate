@@ -366,8 +366,8 @@ disp_inspect(Ofl_desc *ofl, Rel_desc *rld, Boolean rlocal)
 			 * collect all symbols that define a memory area.
 			 */
 			if (((sdp = ifl->ifl_oldndx[ondx]) == 0) ||
-			    (sdp->sd_shndx == SHN_UNDEF) ||
-			    (sdp->sd_shndx >= SHN_LORESERVE) ||
+			    (sdp->sd_sym->st_shndx == SHN_UNDEF) ||
+			    (sdp->sd_sym->st_shndx >= SHN_LORESERVE) ||
 			    (sdp->sd_ref != REF_REL_NEED) ||
 			    (sdp->sd_file != ifl) ||
 			    (sdp->sd_sym->st_size == 0))
@@ -550,7 +550,7 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 				 * anything but a ABS symbol.
 				 */
 				if ((((sdp->sd_flags & FLG_SY_SPECSEC) == 0) ||
-				    (sdp->sd_shndx != SHN_ABS)) ||
+				    (sdp->sd_sym->st_shndx != SHN_ABS)) ||
 				    (sdp->sd_aux && sdp->sd_aux->sa_symspec)) {
 					rsp->rel_rtype = M_R_RELATIVE;
 					if (ld_add_outrel((FLG_REL_GOT |
@@ -677,7 +677,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	/*
 	 * Catch absolutes - these may cause a text relocation.
 	 */
-	if ((sdp->sd_flags & FLG_SY_SPECSEC) && (sdp->sd_shndx == SHN_ABS)) {
+	if ((sdp->sd_flags & FLG_SY_SPECSEC) && (sym->st_shndx == SHN_ABS)) {
 		if ((ofl->ofl_flags1 & FLG_OF1_ABSEXEC) == 0)
 			return (ld_add_outrel(NULL, rsp, ofl));
 
@@ -1063,7 +1063,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		local = TRUE;
 	} else if (!(reld->rel_flags & FLG_REL_LOAD)) {
 		local = TRUE;
-	} else if (sdp->sd_shndx != SHN_UNDEF) {
+	} else if (sdp->sd_sym->st_shndx != SHN_UNDEF) {
 		if (reld->rel_isdesc &&
 		    reld->rel_isdesc->is_shdr->sh_type == SHT_SUNW_dof) {
 			local = TRUE;
@@ -1373,15 +1373,16 @@ reloc_segments(int wr_flag, Ofl_desc *ofl)
 	Is_desc		*isp;
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Os_desc		*osp;
-		Listnode	*lnp2;
+		Os_desc	**ospp;
+		Aliste	off;
 
 		if ((sgp->sg_phdr.p_flags & PF_W) != wr_flag)
 			continue;
 
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
 			Is_desc		*risp;
 			Listnode	*lnp3;
+			Os_desc		*osp = *ospp;
 
 			osp->os_szoutrels = 0;
 			for (LIST_TRAVERSE(&(osp->os_relisdescs), lnp3, risp)) {
@@ -1867,10 +1868,12 @@ ld_reloc_process(Ofl_desc *ofl)
 		 *	which the relocation must be applied (sh_info).
 		 */
 		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-			Listnode *	lnp2;
-			Os_desc *	osp;
+			Os_desc **ospp;
+			Aliste	off;
 
-			for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+			for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+				Os_desc	*osp = *ospp;
+
 				if (osp->os_relosdesc == 0)
 					continue;
 
@@ -1997,7 +2000,7 @@ ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
 	 */
 	if (((ofl->ofl_flags & FLG_OF_PURETXT) == 0) &&
 	    (ELF_ST_BIND(orsp->rel_sym->sd_sym->st_info) == STB_WEAK) &&
-	    (orsp->rel_sym->sd_shndx == SHN_UNDEF))
+	    (orsp->rel_sym->sd_sym->st_shndx == SHN_UNDEF))
 		return;
 
 	if (reloc_title) {

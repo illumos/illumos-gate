@@ -146,14 +146,13 @@ ld_open_outfile(Ofl_desc * ofl)
  *  o	NOBITS sections must be converted into allocated, null filled sections.
  */
 static uintptr_t
-pad_outfile(Ofl_desc * ofl)
+pad_outfile(Ofl_desc *ofl)
 {
-	Listnode *	lnp1, * lnp2;
+	Listnode	*lnp;
 	off_t		offset;
-	Elf_Scn *	oscn = 0;
-	Sg_desc *	sgp;
-	Os_desc *	osp;
-	Ehdr *		ehdr;
+	Elf_Scn		*oscn = 0;
+	Sg_desc		*sgp;
+	Ehdr		*ehdr;
 
 	/*
 	 * Update all the elf structures.  This will assign offsets to the
@@ -179,8 +178,10 @@ pad_outfile(Ofl_desc * ofl)
 	/*
 	 * Traverse the segment list looking for loadable segments.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Phdr *	phdr = &(sgp->sg_phdr);
+	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp, sgp)) {
+		Phdr	*phdr = &(sgp->sg_phdr);
+		Os_desc	**ospp, *osp;
+		Aliste	off;
 
 		/*
 		 * If we've already processed a loadable segment, the `scn'
@@ -215,8 +216,11 @@ pad_outfile(Ofl_desc * ofl)
 		 * offset of each section. Retain the final section descriptor
 		 * as this will be where any padding buffer will be added.
 		 */
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
-			Shdr *	shdr = osp->os_shdr;
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Shdr	*shdr;
+
+			osp = *ospp;
+			shdr = osp->os_shdr;
 
 			offset = (off_t)S_ROUND(offset, shdr->sh_addralign);
 			offset += shdr->sh_size;
@@ -261,15 +265,16 @@ pad_outfile(Ofl_desc * ofl)
  *		becomes a linked list of input data buffers).
  */
 uintptr_t
-ld_create_outfile(Ofl_desc * ofl)
+ld_create_outfile(Ofl_desc *ofl)
 {
-	Listnode *	lnp1, * lnp2, * lnp3;
-	Sg_desc *	sgp;
-	Os_desc *	osp;
-	Is_desc *	isp;
-	Elf_Scn	*	scn;
-	Elf_Data *	tlsdata = 0;
-	Shdr *		shdr;
+	Listnode	*lnp1;
+	Sg_desc		*sgp;
+	Os_desc		**ospp;
+	Is_desc		*isp;
+	Elf_Scn		*scn;
+	Elf_Data	*tlsdata = 0;
+	Shdr		*shdr;
+	Aliste		off;
 	Word		flags = ofl->ofl_flags;
 	size_t		ndx = 0, fndx = 0;
 	Elf_Cmd		cmd;
@@ -370,7 +375,7 @@ ld_create_outfile(Ofl_desc * ofl)
 			} else if (ptype == PT_SUNWCAP) {
 				if (ofl->ofl_oscap)
 					nseg++;
-			} else if ((sgp->sg_osdescs.head) ||
+			} else if ((sgp->sg_osdescs != NULL) ||
 			    (sgp->sg_flags & FLG_SG_EMPTY)) {
 				if (((sgp->sg_flags & FLG_SG_EMPTY) == 0) &&
 				    ((sgp->sg_flags & FLG_SG_PHREQ) == 0)) {
@@ -398,7 +403,10 @@ ld_create_outfile(Ofl_desc * ofl)
 		}
 
 		shidx = 0;
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Listnode	*lnp2;
+			Os_desc		*osp = *ospp;
+
 			shidx++;
 
 			/*
@@ -456,7 +464,7 @@ ld_create_outfile(Ofl_desc * ofl)
 			}
 
 			dataidx = 0;
-			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp3, isp)) {
+			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
 				Elf_Data *	data;
 				Ifl_desc *	ifl = isp->is_file;
 
@@ -675,10 +683,14 @@ ld_create_outfile(Ofl_desc * ofl)
 	 * relocations).
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Phdr *	_phdr = &(sgp->sg_phdr);
+		Phdr	*_phdr = &(sgp->sg_phdr);
+		Os_desc	**ospp;
+		Aliste	off;
 		Boolean	recorded = FALSE;
 
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Os_desc	*osp = *ospp;
+
 			if ((osp->os_scn = elf_getscn(ofl->ofl_elf, ++ndx)) ==
 			    NULL) {
 				eprintf(ofl->ofl_lml, ERR_ELF,

@@ -313,6 +313,7 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 		ident = M_ID_TLSBSS;
 		ofl->ofl_istlsbss = isec;
 		shdr->sh_flags |= SHF_TLS;
+
 	} else if (which == MAKE_BSS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_BSS);
 		ofl->ofl_isbss = isec;
@@ -1739,8 +1740,9 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 		return (S_ERROR);
 
 	if (osp) {
-		Listnode *	lnp;
-		Is_desc *	risp;
+		Listnode	*lnp;
+		Is_desc		*risp;
+
 		/*
 		 * We associate the input relocation sections - with
 		 * the newly created output relocation section.
@@ -1751,10 +1753,11 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 		 */
 		for (LIST_TRAVERSE(&(osp->os_relisdescs), lnp, risp)) {
 			risp->is_osdesc = rosp;
+
 			/*
-			 * If the input relocation section had
-			 * the SHF_GROUP flag set - propogate it to
-			 * the output relocation section.
+			 * If the input relocation section had the SHF_GROUP
+			 * flag set - propogate it to the output relocation
+			 * section.
 			 */
 			if (risp->is_shdr->sh_flags & SHF_GROUP) {
 				rosp->os_shdr->sh_flags |= SHF_GROUP;
@@ -2224,22 +2227,27 @@ ld_make_sections(Ofl_desc *ofl)
 				return (S_ERROR);
 		}
 	} else {
-		size_t	reloc_size = 0;
-
 		/*
-		 * Create the required output relocation sections.
+		 * Create the required output relocation sections.  Note, new
+		 * sections may be added to the section list that is being
+		 * traversed.  These insertions can move the elements of the
+		 * Alist such that a section descriptor is re-read.  Recursion
+		 * is prevented by maintaining a previous section pointer and
+		 * insuring that this pointer isn't re-examined.
 		 */
 		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-			Os_desc		*osp;
-			Listnode	*lnp2;
+			Os_desc	**ospp, *posp = 0;
+			Aliste	off;
 
-			for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
-				if (osp->os_szoutrels &&
+			for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+				Os_desc	*osp = *ospp;
+
+				if ((osp != posp) && osp->os_szoutrels &&
 				    (osp != ofl->ofl_osplt)) {
 					if (make_reloc(ofl, osp) == S_ERROR)
 						return (S_ERROR);
-					reloc_size += reloc_size;
 				}
+				posp = osp;
 			}
 		}
 

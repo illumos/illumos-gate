@@ -56,12 +56,14 @@ Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 		dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM),
 		    Dbg_demangle_name(sgp->sg_sizesym->sd_name));
 
-	if (sgp->sg_secorder.head) {
-		Listnode	*lnp;
-		Sec_order	*scop;
+	if (sgp->sg_secorder) {
+		Aliste		off;
+		Sec_order	**scopp;
 
 		dbg_print(lml, MSG_ORIG(MSG_SEG_ORDER));
-		for (LIST_TRAVERSE(&sgp->sg_secorder, lnp, scop)) {
+		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
+			Sec_order	*scop = *scopp;
+
 			dbg_print(lml, MSG_ORIG(MSG_SEG_SECTION),
 			    scop->sco_secname, EC_WORD(scop->sco_index));
 		}

@@ -140,9 +140,6 @@ typedef struct {
 	Half		dft_ndx;	/* eventual ndx into .dynamic */
 } Dfltr_desc;
 
-#define	AL_CNT_DFLTR	4
-#define	AL_CNT_GROUP	20
-
 /*
  * Per-symbol filtee descriptor.  This associates symbol definitions with
  * their filtees.
@@ -152,7 +149,14 @@ typedef struct {
 	Aliste		sft_off;	/* offset into dtstr descriptor */
 } Sfltr_desc;
 
-#define	AL_CNT_SFLTR	20
+/*
+ * Define Alist initialization sizes.
+ */
+#define	AL_CNT_DFLTR	4		/* ofl_dtsfltrs initial alist count */
+#define	AL_CNT_GROUP	20		/* ifl_groups initial alist count */
+#define	AL_CNT_SFLTR	20		/* ofl_symfltrs initial alist count */
+#define	AL_CNT_OSDESC	40		/* sg_osdescs initial alist count */
+#define	AL_CNT_SECORDER	40		/* sg_secorder initial alist count */
 
 /*
  * Return codes for {tls|got}_fixups() routines

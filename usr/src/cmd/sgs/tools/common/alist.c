@@ -22,14 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sgs.h>
-#include <string.h>
-
-/*
+ *
  * Alist manipulation.  An Alist is a list of elements formed into an array.
  * Traversal of the list is an array scan, which because of the locality of
  * each reference is probably more efficient than a link-list traversal.
@@ -43,11 +36,22 @@
  * the list, at the same time elements are being deleted.  Therefore, the next
  * element is always determined as an offset from the beginning of the list.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sgs.h>
+#include <string.h>
+
+/*
+ * Insert a value into an Alist.  An offset of 0 indicates that the value should
+ * be appended to the Alist.  A non-zero offset indicates the position at which
+ * the value should be inserted.
+ */
 void *
-alist_append(Alist ** alpp, const void * item, size_t size, int cnt)
+alist_insert(Alist **alpp, const void *item, size_t size, int cnt, Aliste off)
 {
-	Alist *	alp = *alpp;
-	void *	new;
+	Alist	*alp = *alpp;
+	void	*new;
 
 	if (alp == 0) {
 		Aliste	bsize, esize = (Aliste)S_ROUND(size, sizeof (void *));
@@ -78,7 +82,18 @@ alist_append(Alist ** alpp, const void * item, size_t size, int cnt)
 		alp->al_end = bsize;
 	}
 
-	new = (void *)((char *)alp + alp->al_next);
+	/*
+	 * An appended item is added to the next available array element.
+	 * An inserted item requires that the data items that exist at the point
+	 * of insertion be shifted prior to the insertion.
+	 */
+	if ((off == 0) || (off == alp->al_next)) {
+		new = (void *)((char *)alp + alp->al_next);
+	} else {
+		new = (void *)((char *)alp + off);
+		(void) memmove((void *)((char *)new + alp->al_size), new,
+		    (alp->al_next - off));
+	}
 	alp->al_next += alp->al_size;
 
 	/*
@@ -93,6 +108,15 @@ alist_append(Alist ** alpp, const void * item, size_t size, int cnt)
 
 	*alpp = alp;
 	return (new);
+}
+
+/*
+ * Append a value to an Alist.
+ */
+void *
+alist_append(Alist **alpp, const void *item, size_t size, int cnt)
+{
+	return (alist_insert(alpp, item, size, cnt, 0));
 }
 
 /*

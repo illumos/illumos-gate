@@ -1093,7 +1093,8 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 	sc_order->sco_secname = sec_name;
 	sc_order->sco_index = ++index;
 
-	if (list_appendc(&(sgp->sg_secorder), sc_order) == 0)
+	if (alist_append(&(sgp->sg_secorder), &sc_order,
+	    sizeof (Sec_order *), AL_CNT_SECORDER) == 0)
 		return (S_ERROR);
 
 	DBG_CALL(Dbg_map_pipe(ofl->ofl_lml, sgp, sec_name, index));

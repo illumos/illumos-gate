@@ -1099,7 +1099,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 	 * In the event that the position of the sting table has changed,
 	 * as a result of deleted sections, update the ehdr->e_shstrndx.
 	 */
-	if (shstrndx > 0 && shnum > 0 &&
+	if ((shstrndx > 0) && (shnum > 0) &&
 	    (sec_table[shstrndx].secno < shnum)) {
 		if (sec_table[shstrndx].secno < SHN_LORESERVE) {
 			dst_ehdr.e_shstrndx =
@@ -1107,6 +1107,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 		} else {
 			Elf_Scn		*_scn;
 			GElf_Shdr	shdr0;
+
 			/*
 			 * If shstrndx requires 'Extended ELF Sections'
 			 * then it is stored in shdr[0].sh_link
@@ -1121,9 +1122,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 			shdr0.sh_link = sec_table[shstrndx].secno;
 			(void) gelf_update_shdr(_scn, &shdr0);
 		}
-
 	}
-
 
 	if (src_ehdr->e_phnum != 0) {
 		size_t align = gelf_fsize(dst_elf, ELF_T_ADDR, 1, EV_CURRENT);

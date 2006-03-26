@@ -1016,9 +1016,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_INTERPOSE)) == 0) {
 				zinflag = TRUE;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
+				ofl->ofl_flags1 |= FLG_OF1_IGNPRC;
 
 			/*
-			 * The following options just need vaildation as they
+			 * The following options just need validation as they
 			 * are interpreted on the second pass through the
 			 * command line arguments.
 			 */
@@ -1038,7 +1041,6 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_DIRECT)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NODIRECT)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_GROUPPERM)) &&
-			    strcmp(optarg, MSG_ORIG(MSG_ARG_IGNORE)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_LAZYLOAD)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOGROUPPERM)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_NOLAZYLOAD)) &&
@@ -1305,8 +1307,7 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
-					ofl->ofl_flags1 |=
-					    (FLG_OF1_IGNORE | FLG_OF1_IGNPRC);
+					ofl->ofl_flags1 |= FLG_OF1_IGNORE;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_RECORD)) == 0) {
 					ofl->ofl_flags1 &= ~FLG_OF1_IGNORE;

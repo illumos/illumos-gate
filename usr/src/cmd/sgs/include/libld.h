@@ -545,10 +545,9 @@ struct sg_desc {			/* output segment descriptor */
 	Xword		sg_round;	/* data rounding required (mapfile) */
 	Xword		sg_length;	/* maximum segment length; if 0 */
 					/*	segment is not specified */
-	List		sg_osdescs;	/* list of output section descriptors */
-	List		sg_secorder;	/* List of section ordering */
-					/*	which specify section */
-					/*	ordering for the segment */
+	Alist		*sg_osdescs;	/* list of output section descriptors */
+	Alist		*sg_secorder;	/* list specifying section ordering */
+					/*	for the segment */
 	Half		sg_flags;
 	Sym_desc	*sg_sizesym;	/* size symbol for this segment */
 	Xword		sg_addralign;	/* LCM of sh_addralign */

@@ -256,7 +256,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			 * defined in a shared library, convert it to an
 			 * absolute.
 			 */
-			if ((sdp->sd_shndx == SHN_UNDEF) ||
+			if ((sdp->sd_sym->st_shndx == SHN_UNDEF) ||
 			    (sdp->sd_ref != REF_REL_NEED)) {
 				sdp->sd_shndx = sdp->sd_sym->st_shndx = SHN_ABS;
 				sdp->sd_sym->st_info =
@@ -274,7 +274,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 					sdp->sd_flags |= FLG_SY_MAPUSED;
 
 			} else if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-			    (sdp->sd_shndx != SHN_ABS) &&
+			    (sdp->sd_sym->st_shndx != SHN_ABS) &&
 			    (sdp->sd_ref == REF_REL_NEED)) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_VER_DEFINED), name,

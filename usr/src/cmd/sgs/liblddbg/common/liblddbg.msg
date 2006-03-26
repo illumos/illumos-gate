@@ -1152,35 +1152,42 @@
 @ MSG_ELF_FLAGS		"  e_flags:    %18s"
 @ MSG_ELF_FLAGS_FMT	"  e_flags:    %s"
 @ MSG_ELF_ESIZE		"  e_entry:    %#18llx  e_ehsize:     %2d  \
-			 e_shstrndx:   %2d"
+			 e_shstrndx:  %d"
 @ MSG_ELFX_ESIZE	"  e_entry:    %#18llx  e_ehsize:     %2d  \
-			 e_shstrndx: [sh[0].sh_link]"
+			 e_shstrndx:  SHN_XINDEX  (see shdr[0].sh_link)"
 @ MSG_ELF_SHOFF		"  e_shoff:    %#18llx  e_shentsize:  %2d  \
-			 e_shnum:      %2d"
+			 e_shnum:     %d"
 @ MSG_ELFX_SHOFF	"  e_shoff:    %#18llx  e_shentsize:  %2d  \
-			 e_shnum:    [sh[0].sh_size]"
+			 e_shnum:     0  (see shdr[0].sh_size)"
 @ MSG_ELF_PHOFF		"  e_phoff:    %#18llx  e_phentsize:  %2d  \
-			 e_phnum:      %2d"
+			 e_phnum:     %d"
+@ MSG_ELFX_PHOFF	"  e_phoff:    %#18llx  e_phentsize:  %2d  \
+			 e_phnum:     PN_XNUM  (see shdr[0].sh_info)"
 
 # Shdr[0] messages
 
-@ MSG_SHD0_TITLE	"Section Header[0]: {ELF Ehdr extensions}"
-@ MSG_SHD0_SIZE		"    sh_size:      %-6lld [shnum]  sh_type:    %s"
-@ MSG_SHD0_LINK		"    sh_link:      %-6d [strndx] sh_info:    %s"
+@ MSG_SHD0_TITLE	"Section Header[0]:  (ELF Ehdr extensions)"
+@ MSG_SHD0_ADDR		"    sh_addr:      %-6lld               sh_flags:   %s"
+@ MSG_SHD0_SIZE		"    sh_size:      %-6lld (e_shnum)     sh_type:    %s"
+@ MSG_SHD0_OFFSET	"    sh_offset:    %-6lld               \
+			 sh_entsize: %lld"
+@ MSG_SHD0_LINK		"    sh_link:      %-6d (e_shstrndx)  sh_info:    \
+			 %d (e_phnum)"
+@ MSG_SHD0_ALIGN	"    sh_addralign: %-6lld"
 
 # Section header messages
 
 @ MSG_SHD_ADDR_32	"    sh_addr:      %#-10llx  sh_flags:   %s"
 @ MSG_SHD_SIZE_32	"    sh_size:      %#-10llx  sh_type:    %s"
 @ MSG_SHD_OFFSET_32	"    sh_offset:    %#-10llx  sh_entsize: %#llx"
-@ MSG_SHD_ALIGN_32	"    sh_addralign: %#-10llx"
 @ MSG_SHD_LINK_32	"    sh_link:      %-10d  sh_info:    %s"
+@ MSG_SHD_ALIGN_32	"    sh_addralign: %#-10llx"
 
 @ MSG_SHD_ADDR_64	"    sh_addr:      %#-18llx  sh_flags:   %s"
 @ MSG_SHD_SIZE_64	"    sh_size:      %#-18llx  sh_type:    %s"
 @ MSG_SHD_OFFSET_64	"    sh_offset:    %#-18llx  sh_entsize: %#llx"
-@ MSG_SHD_ALIGN_64	"    sh_addralign: %#-18llx"
 @ MSG_SHD_LINK_64	"    sh_link:      %-18d  sh_info:    %s"
+@ MSG_SHD_ALIGN_64	"    sh_addralign: %#-18llx"
 
 # Program header messages
 

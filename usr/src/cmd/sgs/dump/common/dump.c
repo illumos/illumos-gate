@@ -1731,6 +1731,9 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 					if (p_dyn.d_un.d_val & DF_1_NOKSYMS)
 					    (void) strcat(value,
 						(const char *)"NOKSYMS ");
+					if (p_dyn.d_un.d_val & DF_1_NORELOC)
+					    (void) strcat(value,
+						(const char *)"NORELOC ");
 				}
 				if (v_flag && strlen(value))
 					(void) printf("%s", value);

@@ -56,7 +56,6 @@ void
 ld_map_out(Ofl_desc * ofl)
 {
 	Listnode *	lnp1, * lnp2, * lnp3;
-	Os_desc *	osp;
 	Sg_desc *	sgp;
 	Is_desc *	isp;
 	Sym_avlnode	*sav;
@@ -83,10 +82,15 @@ ld_map_out(Ofl_desc * ofl)
 			MSG_INTL(MSG_ENT_ITM_SIZE));
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		Os_desc	**ospp;
+		Aliste	off;
+
 		if (sgp->sg_phdr.p_type != PT_LOAD)
 			continue;
 
-		for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp2, osp)) {
+		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+			Os_desc *osp = *ospp;
+
 			(void) printf(MSG_INTL(MSG_ENT_MAP_ENTRY_1),
 			    osp->os_name, EC_ADDR(osp->os_shdr->sh_addr),
 			    EC_XWORD(osp->os_shdr->sh_size));

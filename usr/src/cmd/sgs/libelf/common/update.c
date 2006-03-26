@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ *
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,6 @@
  *	someday.
  */
 
-
 static size_t
 _elf_upd_lib(Elf * elf)
 {
@@ -111,7 +110,6 @@ _elf_upd_lib(Elf * elf)
 	unsigned	ver = eh->e_version;
 	register char	*p = (char *)eh->e_ident;
 	size_t		scncnt;
-
 
 	/*
 	 * Ehdr and Phdr table go first
@@ -137,22 +135,28 @@ _elf_upd_lib(Elf * elf)
 		eh->e_phentsize = 0;
 	}
 
-
 	/*
-	 * Loop through sections, skipping index zero.
-	 * Compute section size before changing hi.
-	 * Allow null buffers for NOBITS.
+	 * Obtain the first section header.  Typically, this section has NULL
+	 * contents, however in the case of Extended ELF Sections this section
+	 * is used to hold an alternative e_shnum, e_shstrndx and e_phnum.
+	 * On initial allocation (see _elf_snode) the elements of this section
+	 * would have been zeroed.  The e_shnum is initialized later, after the
+	 * section header count has been determined.  The e_shstrndx and
+	 * e_phnum may have already been initialized by the caller (for example,
+	 * gelf_update_shdr() in mcs(1)).
 	 */
-
 	if ((s = elf->ed_hdscn) == 0) {
 		eh->e_shnum = 0;
 		scncnt = 0;
 	} else {
-		scncnt = 1;
-		*(Shdr *)s->s_shdr = _elf_snode_init.sb_shdr;
 		s = s->s_next;
+		scncnt = 1;
 	}
 
+	/*
+	 * Loop through sections.  Compute section size before changing hi.
+	 * Allow null buffers for NOBITS.
+	 */
 	hibit = 0;
 	for (; s != 0; s = s->s_next) {
 		register Dnode	*d;

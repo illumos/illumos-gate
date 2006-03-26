@@ -1393,7 +1393,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 * be tagged with the FLG_OS_OUTREL flag.
 		 */
 		if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-		    (sdp->sd_shndx == SHN_COMMON)) {
+		    (sdp->sd_sym->st_shndx == SHN_COMMON)) {
 			if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_TLS)
 				ofl->ofl_flags1 |= FLG_OF1_BSSOREL;
 			else
@@ -1513,7 +1513,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 {
 	Word		flags = ofl->ofl_flags;
 	Sym_desc	*sdp = rsp->rel_sym;
-	Word		shndx = rsp->rel_sym->sd_shndx;
+	Word		shndx = sdp->sd_sym->st_shndx;
 
 	/*
 	 * if ((shared object) and (not pc relative relocation) and

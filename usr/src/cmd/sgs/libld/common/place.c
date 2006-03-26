@@ -69,26 +69,6 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 }
 
 /*
- * Determine if section ordering is turned on.  If so, return the appropriate
- * os_txtndx.  This information is derived from the Sg_desc->sg_segorder
- * list that was built up from the Mapfile.
- */
-static int
-set_os_txtndx(Is_desc *isp, Sg_desc *sgp)
-{
-	Listnode *	lnp;
-	Sec_order *	scop;
-
-	for (LIST_TRAVERSE(&sgp->sg_secorder, lnp, scop)) {
-		if (strcmp(scop->sco_secname, isp->is_name) == 0) {
-			scop->sco_flags |= FLG_SGO_USED;
-			return ((int)scop->sco_index);
-		}
-	}
-	return (0);
-}
-
-/*
  * Place a section into the appropriate segment.
  */
 Os_desc *
@@ -97,11 +77,30 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	Listnode *	lnp1, * lnp2;
 	Ent_desc *	enp;
 	Sg_desc	*	sgp;
-	Os_desc	*	osp;
+	Os_desc		**ospp, *osp;
+	Aliste		off1, off2;
 	int		os_ndx;
 	Shdr *		shdr = isp->is_shdr;
 	Xword		shflagmask, shflags = shdr->sh_flags;
 	Ifl_desc *	ifl = isp->is_file;
+
+	/*
+	 * Define any sections that must be thought of as referenced.  These
+	 * sections may not be referenced externaly in a manner ld(1) can
+	 * discover, but they must be retained (ie. not removed by -zignore).
+	 */
+	static const Msg RefSecs[] = {
+		MSG_SCN_INIT,		/* MSG_ORIG(MSG_SCN_INIT) */
+		MSG_SCN_FINI,		/* MSG_ORIG(MSG_SCN_FINI) */
+		MSG_SCN_EX_RANGES,	/* MSG_ORIG(MSG_SCN_EX_RANGES) */
+		MSG_SCN_EX_SHARED,	/* MSG_ORIG(MSG_SCN_EX_SHARED) */
+		MSG_SCN_CTORS,		/* MSG_ORIG(MSG_SCN_CTORS) */
+		MSG_SCN_DTORS,		/* MSG_ORIG(MSG_SCN_DTORS) */
+		MSG_SCN_EHFRAME,	/* MSG_ORIG(MSG_SCN_EHFRAME) */
+		MSG_SCN_EHFRAME_HDR,	/* MSG_ORIG(MSG_SCN_EHFRAME_HDR) */
+		MSG_SCN_JCR,		/* MSG_ORIG(MSG_SCN_JCR) */
+		0
+	};
 
 	DBG_CALL(Dbg_sec_in(ofl->ofl_lml, isp));
 
@@ -229,8 +228,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	}
 
 	/*
-	 * Assign the is_namehash value now that we've settled
-	 * on the final name for the section.
+	 * Assign a hash value now that the section name has been finalized.
 	 */
 	isp->is_namehash = sgs_str_hash(isp->is_name);
 
@@ -238,12 +236,13 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		enp->ec_flags |= FLG_EC_USED;
 
 	/*
-	 * If the link is not 0, then the isp is going to be appened
-	 * to the output section where the input section pointed by
-	 * link is placed.
+	 * If the link is not 0, then the input section is going to be appended
+	 * to the output section.  The append occurs at the input section
+	 * pointed to by the link.
 	 */
 	if (link != 0) {
 		osp = isp->is_file->ifl_isdesc[link]->is_osdesc;
+
 		/*
 		 * If this is a COMDAT section, then see if this
 		 * section is a keeper and/or if it is to be discarded.
@@ -276,21 +275,34 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 
 		if (list_appendc(&(osp->os_isdescs), isp) == 0)
 			return ((Os_desc *)S_ERROR);
+
 		isp->is_osdesc = osp;
 		sgp = osp->os_sgdesc;
+
 		DBG_CALL(Dbg_sec_added(ofl->ofl_lml, osp, sgp));
 		return (osp);
 	}
 
 	/*
-	 * call the function set_os_txtndx() to set the
-	 * os_txtndx field based upon the sg_segorder list that
-	 * was built from a Mapfile.  If there is no match then
-	 * os_txtndx will be set to 0.
-	 *
-	 * for now this value will be held in os_ndx.
+	 * Determine if section ordering is turned on.  If so, return the
+	 * appropriate os_txtndx.  This information is derived from the
+	 * Sg_desc->sg_segorder list that was built up from the Mapfile.
 	 */
-	os_ndx = set_os_txtndx(isp, sgp);
+	os_ndx = 0;
+	if (sgp->sg_secorder) {
+		Aliste		off;
+		Sec_order	**scopp;
+
+		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
+			Sec_order	*scop = *scopp;
+
+			if (strcmp(scop->sco_secname, isp->is_name) == 0) {
+				scop->sco_flags |= FLG_SGO_USED;
+				os_ndx = scop->sco_index;
+				break;
+			}
+		}
+	}
 
 	/*
 	 * Setup the masks to flagout when matching sections
@@ -303,24 +315,26 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 * Traverse the input section list for the output section we have been
 	 * assigned.  If we find a matching section simply add this new section.
 	 */
-	lnp2 = NULL;
-	for (LIST_TRAVERSE(&(sgp->sg_osdescs), lnp1, osp)) {
-		Shdr *	_shdr = osp->os_shdr;
+	off2 = 0;
+	for (ALIST_TRAVERSE(sgp->sg_osdescs, off1, ospp)) {
+		Shdr	*_shdr;
 
-		if ((ident == osp->os_scnsymndx) &&
+		osp = *ospp;
+		_shdr = osp->os_shdr;
+
+		if ((ident == osp->os_scnsymndx) && (ident != M_ID_REL) &&
+		    (isp->is_namehash == osp->os_namehash) &&
+		    (shdr->sh_type != SHT_GROUP) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&
 		    ((shdr->sh_type == _shdr->sh_type) ||
 		    ((shdr->sh_type == SHT_SUNW_COMDAT) &&
 		    (_shdr->sh_type == SHT_PROGBITS))) &&
 		    ((shflags & ~shflagmask) ==
 		    (_shdr->sh_flags & ~shflagmask)) &&
-		    (ident != M_ID_REL) && (shdr->sh_type != SHT_GROUP) &&
-		    (isp->is_namehash == osp->os_namehash) &&
 		    (strcmp(isp->is_name, osp->os_name) == 0)) {
 			/*
-			 * If this is a COMDAT section, then see if this
-			 * section is a keeper and/or if it is to
-			 * be discarded.
+			 * If this is a COMDAT section, determine if this
+			 * section is a keeper, and/or if it is to be discarded.
 			 */
 			if (shdr->sh_type == SHT_SUNW_COMDAT) {
 				Listnode *	clist;
@@ -394,12 +408,12 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 			 * See -zignore comments when creating a new output
 			 * section below.
 			 */
-			if (((ifl && (ifl->ifl_flags & FLG_IF_IGNORE)) ||
-			    DBG_ENABLED) &&
+			if (((ifl &&
+			    (ifl->ifl_flags & FLG_IF_IGNORE)) || DBG_ENABLED) &&
 			    (osp->os_flags & FLG_OS_SECTREF)) {
 				isp->is_flags |= FLG_IS_SECTREF;
 				if (ifl)
-				    ifl->ifl_flags |= FLG_IF_FILEREF;
+					ifl->ifl_flags |= FLG_IF_FILEREF;
 			}
 
 			DBG_CALL(Dbg_sec_added(ofl->ofl_lml, osp, sgp));
@@ -407,8 +421,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		}
 
 		/*
-		 * check to see if we need to worry about section
-		 * ordering.
+		 * Do we need to worry about section ordering?
 		 */
 		if (os_ndx) {
 			if (osp->os_txtndx) {
@@ -416,7 +429,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 					/* insert section here. */
 					break;
 				else {
-					lnp2 = lnp1;
+					off2 = off1;
 					continue;
 				}
 			} else {
@@ -424,7 +437,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 				break;
 			}
 		} else if (osp->os_txtndx) {
-			lnp2 = lnp1;
+			off2 = off1;
 			continue;
 		}
 
@@ -435,7 +448,8 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		 */
 		if (ident < osp->os_scnsymndx)
 			break;
-		lnp2 = lnp1;
+
+		off2 = off1;
 	}
 
 	/*
@@ -477,11 +491,11 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	osp->os_namehash = isp->is_namehash;
 	osp->os_txtndx = os_ndx;
 	osp->os_sgdesc = sgp;
+
 	if (ifl && (shdr->sh_type == SHT_PROGBITS)) {
 		/*
-		 * Trying to preserved the possibly intended meaning of
-		 * sh_link/sh_info. See the translate_link()
-		 * in update.c.
+		 * Try to preserved the intended meaning of sh_link/sh_info.
+		 * See the translate_link() in update.c.
 		 */
 		osp->os_shdr->sh_link = shdr->sh_link;
 		if (shdr->sh_flags & SHF_INFO_LINK)
@@ -489,31 +503,29 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	}
 
 	/*
-	 * When -zignore is in effect, sections and files that are not
-	 * referenced * from other sections, will be eliminated from the
-	 * object being produced. Some sections, although unreferenced,
-	 * are special, and must not be eliminated.  Determine if this new
-	 * output section is one of those special sections, and if so mark
-	 * it artificially as referenced.
-	 * Any input section and file associated to this output section
-	 * will also be marked as referenced, and thus won't be eliminated
+	 * When -zignore is in effect, user supplied sections and files that are
+	 * not referenced from other sections, are eliminated from the object
+	 * being produced.  Some sections, although unreferenced, are special,
+	 * and must not be eliminated.  Determine if this new output section is
+	 * one of those special sections, and if so mark it artificially as
+	 * referenced.  Any input section and file associated to this output
+	 * section is also be marked as referenced, and thus won't be eliminated
 	 * from the final output.
 	 */
-	if ((strcmp(osp->os_name, MSG_ORIG(MSG_SCN_INIT)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_FINI)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_EX_RANGES)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_EX_SHARED)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_CTORS)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_DTORS)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_EHFRAME)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_EHFRAME_HDR)) == 0) ||
-	    (strcmp(osp->os_name, MSG_ORIG(MSG_SCN_JCR)) == 0)) {
-		osp->os_flags |= FLG_OS_SECTREF;
+	if (ifl && ((ofl->ofl_flags1 & FLG_OF1_IGNPRC) || DBG_ENABLED)) {
+		const Msg	*refsec;
 
-		if ((ifl && (ifl->ifl_flags & FLG_IF_IGNORE)) || DBG_ENABLED) {
-			isp->is_flags |= FLG_IS_SECTREF;
-			if (ifl)
-			    ifl->ifl_flags |= FLG_IF_FILEREF;
+		for (refsec = RefSecs; *refsec; refsec++) {
+			if (strcmp(osp->os_name, MSG_ORIG(*refsec)) == 0) {
+				osp->os_flags |= FLG_OS_SECTREF;
+
+				if ((ifl->ifl_flags & FLG_IF_IGNORE) ||
+				    DBG_ENABLED) {
+					isp->is_flags |= FLG_IS_SECTREF;
+					ifl->ifl_flags |= FLG_IF_FILEREF;
+				}
+				break;
+			}
 		}
 	}
 
@@ -540,13 +552,11 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 * user that we have done so.  This could only happen through the use
 	 * of a mapfile.
 	 */
-	if (sgp->sg_phdr.p_type == PT_LOAD) {
-		if (!(osp->os_shdr->sh_flags & SHF_ALLOC)) {
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_SCN_NONALLOC), ofl->ofl_name,
-			    osp->os_name);
-			osp->os_shdr->sh_flags |= SHF_ALLOC;
-		}
+	if ((sgp->sg_phdr.p_type == PT_LOAD) &&
+	    ((osp->os_shdr->sh_flags & SHF_ALLOC) == 0)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_SCN_NONALLOC),
+		    ofl->ofl_name, osp->os_name);
+		osp->os_shdr->sh_flags |= SHF_ALLOC;
 	}
 
 	/*
@@ -567,11 +577,21 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 
 	DBG_CALL(Dbg_sec_created(ofl->ofl_lml, osp, sgp));
 	isp->is_osdesc = osp;
-	if (lnp2) {
-		if (list_insertc(&(sgp->sg_osdescs), osp, lnp2) == 0)
+
+	if (off2) {
+		/*
+		 * Insert the new section after the section identified by off2.
+		 */
+		off2 += sizeof (Os_desc *);
+		if (alist_insert(&(sgp->sg_osdescs), &osp,
+		    sizeof (Os_desc *), AL_CNT_OSDESC, off2) == 0)
 			return ((Os_desc *)S_ERROR);
 	} else {
-		if (list_prependc(&(sgp->sg_osdescs), osp) == 0)
+		/*
+		 * Prepend this section to the section list.
+		 */
+		if (alist_insert(&(sgp->sg_osdescs), &osp,
+		    sizeof (Os_desc *), AL_CNT_OSDESC, ALO_DATA) == 0)
 			return ((Os_desc *)S_ERROR);
 	}
 	return (osp);
