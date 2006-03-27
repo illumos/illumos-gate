@@ -1308,11 +1308,23 @@ sizeofmembers(int psum)
 			sum++;
 		sum += hdrsize;
 
+		/*
+		 * If the current item, and the next item are both ELF
+		 * objects, then add padding to current item so that the
+		 * next item will have PADSZ alignment.
+		 *
+		 * In any other case, set the padding to 0. If the
+		 * item comes from another archive, it may be carrying
+		 * a non-zero padding value from that archive that does
+		 * not apply to the one we are about to build.
+		 */
 		if ((fptr->ar_flag & (F_CLASS32 | F_CLASS64)) &&
 		    fptr->ar_next &&
 		    (fptr->ar_next->ar_flag & (F_CLASS32 | F_CLASS64))) {
 			fptr->ar_padding = pad(psum + sum + hdrsize);
 			sum += fptr->ar_padding;
+		} else {
+			fptr->ar_padding = 0;
 		}
 	}
 	return (sum);
