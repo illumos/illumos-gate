@@ -209,4 +209,9 @@ addlsimegatargets()
 
 addlsimegatargets
 
-check_add_drv -i '"pci1000,408.1000.2" "pci1028,13.1028.16c" "pci1028,13.1028.16d" "pci1000,408.1028.2" "pci1000,407.1000.532"' -b "$BASEDIR" -c scsi lsimega
+# We should all use main PCI ID entries. The 4-tuple entries are used to patch 
+# specific cards, or they will be wrongly matched by other drivers.
+# "amr" driver contains entry "pci1000,532"
+# "ncrs" contains entry "pci1000,2"
+
+check_add_drv -i '"pci1028,13" "pci1000,407" "pci1000,407.1000.532" "pci1000,408" "pci1000,408.1000.2"' -b "$BASEDIR" -c scsi lsimega
