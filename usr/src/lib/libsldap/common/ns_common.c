@@ -1099,6 +1099,32 @@ sortServerPref(char **srvlist, char **preflist,
 	return (retsrvs);
 }
 
+/*
+ * FUNCTION:	__s_api_removeBadServers
+ *	Contacts the ldap cache manager for marking the
+ *	problem servers as down, so that the server is
+ *	not contacted until the TTL expires.
+ */
+void
+__s_api_removeBadServers(char ** Servers)
+{
+
+	char	**host;
+
+	if (Servers == NULL)
+		return;
+
+	for (host = Servers; *host != NULL; host++) {
+		if (__s_api_removeServer(*host) < 0) {
+			/*
+			 * Couldn't remove server from
+			 * server list. Log a warning.
+			 */
+			syslog(LOG_WARNING, "libsldap: could "
+				"not remove %s from servers list", *host);
+		}
+	}
+}
 
 /*
  * FUNCTION:	__s_api_free2dArray

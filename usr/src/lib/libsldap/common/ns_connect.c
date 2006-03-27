@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +64,9 @@ static mutex_t	nscdLock = DEFAULTMUTEX;
 static int	nscdChecked = 0;
 static pid_t	checkedPid = -1;
 static int	isNscd = 0;
+
+/* Number of hostnames to allocate memory for */
+#define	NUMTOMALLOC	32
 
 
 /*
@@ -599,11 +601,12 @@ freeConnection(Connection *con)
  * Success: returns the pointer to the Connection structure
  * Failure: returns NULL, error code and message should be in errorp
  */
+
 static int
 makeConnection(Connection **conp, const char *serverAddr,
 	const ns_cred_t *auth, ConnectionID *cID, int timeoutSec,
 	ns_ldap_error_t **errorp, int fail_if_new_pwd_reqd,
-	int nopasswd_acct_mgmt)
+	int nopasswd_acct_mgmt, char ***badsrvrs)
 {
 	Connection *con = NULL;
 	ConnectionID id;
@@ -613,6 +616,8 @@ makeConnection(Connection **conp, const char *serverAddr,
 	char *hReq, *host = NULL;
 	LDAP *ld = NULL;
 	int passwd_mgmt = 0;
+	int totalbad = 0; /* Number of servers contacted unsuccessfully */
+	short	memerr = 0; /* Variable for tracking memory allocation errors */
 
 	if (conp == NULL || errorp == NULL || auth == NULL)
 		return (NS_LDAP_INVALID_PARAM);
@@ -729,15 +734,49 @@ makeConnection(Connection **conp, const char *serverAddr,
 		if (rc == NS_LDAP_INTERNAL && *errorp != NULL) {
 			if ((*errorp)->status == LDAP_CONNECT_ERROR ||
 				(*errorp)->status == LDAP_SERVER_DOWN) {
-				if (__s_api_removeServer(host) < 0) {
-					/*
-					 * Couldn't remove server from
-					 * server list. Log a warning.
-					 */
-					syslog(LOG_WARNING, "libsldap: could "
-					    "not remove %s from servers list",
-					    host);
+				/* Reset memory allocation error */
+				memerr = 0;
+				/*
+				 * We contacted a server that we could
+				 * not either authenticate to or contact.
+				 * If it is due to authentication, then
+				 * we need to try the server again. So,
+				 * do not remove the server yet, but
+				 * add it to the bad server list.
+				 * The caller routine will remove
+				 * the servers if:
+				 *	a). A good server is found or
+				 *	b). All the possible methods
+				 *	    are tried without finding
+				 *	    a good server
+				 */
+				if (*badsrvrs == NULL) {
+				    if (!(*badsrvrs = (char **)malloc
+					(sizeof (char *) * NUMTOMALLOC))) {
+					memerr = 1;
+				    }
+				/* Allocate memory in chunks of NUMTOMALLOC */
+				} else if ((totalbad % NUMTOMALLOC) ==
+					    NUMTOMALLOC - 1) {
+				    char **tmpptr;
+				    if (!(tmpptr = (char **)realloc(*badsrvrs,
+					    (sizeof (char *) * NUMTOMALLOC *
+					    ((totalbad/NUMTOMALLOC) + 2))))) {
+					memerr = 1;
+				    } else {
+					*badsrvrs = tmpptr;
+				    }
 				}
+				/*
+				 * Store host only if there were no unsuccessful
+				 * memory allocations above
+				 */
+				if (!memerr &&
+				    !((*badsrvrs)[totalbad++] = strdup(host))) {
+					memerr = 1;
+					totalbad--;
+				}
+				(*badsrvrs)[totalbad] = NULL;
 			}
 		}
 
@@ -750,6 +789,9 @@ makeConnection(Connection **conp, const char *serverAddr,
 		sinfo.saslMechanisms = NULL;
 		__s_api_free2dArray(sinfo.controls);
 		sinfo.controls = NULL;
+		/* Return if we had memory allocation errors */
+		if (memerr)
+			return (NS_LDAP_MEMORY);
 		if (*errorp) {
 			/*
 			 * If openConnection() failed due to
@@ -1792,6 +1834,7 @@ __s_api_getConnection(
 	ns_cred_t	anon;
 	int		version = NS_LDAP_V2;
 	void		**paramVal = NULL;
+	char		**badSrvrs = NULL; /* List of problem hostnames */
 
 	if ((session == NULL) || (sessionId == NULL)) {
 		return (NS_LDAP_INVALID_PARAM);
@@ -1885,7 +1928,8 @@ __s_api_getConnection(
 			/* using specified auth method */
 			rc = makeConnection(&con, server, cred,
 				sessionId, timeoutSec, errorp,
-				fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
+				fail_if_new_pwd_reqd, nopasswd_acct_mgmt,
+				&badSrvrs);
 			if (rc == NS_LDAP_SUCCESS ||
 				rc == NS_LDAP_SUCCESS_WITH_INFO) {
 				*session = con;
@@ -1895,11 +1939,19 @@ __s_api_getConnection(
 			/* for every cred level */
 			for (cNext = cLevel; *cNext != NULL; cNext++) {
 				if (**cNext == NS_LDAP_CRED_ANON) {
-					/* make connection anonymously */
+					/*
+					 * make connection anonymously
+					 * Free the down server list before
+					 * looping through
+					 */
+					if (badSrvrs && *badSrvrs) {
+						__s_api_free2dArray(badSrvrs);
+						badSrvrs = NULL;
+					}
 					rc = makeConnection(&con, server, &anon,
 						sessionId, timeoutSec, errorp,
 						fail_if_new_pwd_reqd,
-						nopasswd_acct_mgmt);
+						nopasswd_acct_mgmt, &badSrvrs);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==
 						NS_LDAP_SUCCESS_WITH_INFO) {
@@ -1918,10 +1970,18 @@ __s_api_getConnection(
 					if (rc != NS_LDAP_SUCCESS) {
 						continue;
 					}
+					/*
+					 * Free the down server list before
+					 * looping through
+					 */
+					if (badSrvrs && *badSrvrs) {
+						__s_api_free2dArray(badSrvrs);
+						badSrvrs = NULL;
+					}
 					rc = makeConnection(&con, server, authp,
 						sessionId, timeoutSec, errorp,
 						fail_if_new_pwd_reqd,
-						nopasswd_acct_mgmt);
+						nopasswd_acct_mgmt, &badSrvrs);
 					(void) __ns_ldap_freeCred(&authp);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==
@@ -1944,6 +2004,18 @@ __s_api_getConnection(
 done:
 	(void) __ns_ldap_freeParam((void ***)&aMethod);
 	(void) __ns_ldap_freeParam((void ***)&cLevel);
+
+	if (badSrvrs && *badSrvrs) {
+		/*
+		 * At this point, either we have a successful
+		 * connection or exhausted all the possible auths.
+		 * and creds. Mark the problem servers as down
+		 * so that the problem servers are not contacted
+		 * again until the refresh_ttl expires.
+		 */
+		(void) __s_api_removeBadServers(badSrvrs);
+		__s_api_free2dArray(badSrvrs);
+	}
 	return (rc);
 }
 
