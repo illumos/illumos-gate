@@ -10385,6 +10385,22 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	ilm_t		*ilm;
 	uint_t	nexthdr_offset;
 
+	if (DB_TYPE(mp) == M_CTL) {
+		io = (ipsec_out_t *)mp->b_rptr;
+		if (!io->ipsec_out_secure) {
+			mp = mp->b_cont;
+			freeb(first_mp);
+			first_mp = mp;
+			mctl_present = B_FALSE;
+		} else {
+			mctl_present = B_TRUE;
+			mp = first_mp->b_cont;
+			ipsec_out_to_in(first_mp);
+		}
+	} else {
+		mctl_present = B_FALSE;
+	}
+
 	nexthdr = ip6h->ip6_nxt;
 	mibptr = ill->ill_ip6_mib;
 
@@ -10414,21 +10430,6 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	}
 	}
 
-	if (DB_TYPE(mp) == M_CTL) {
-		io = (ipsec_out_t *)mp->b_rptr;
-		if (!io->ipsec_out_secure) {
-			mp = mp->b_cont;
-			freeb(first_mp);
-			first_mp = mp;
-			mctl_present = B_FALSE;
-		} else {
-			mctl_present = B_TRUE;
-			mp = first_mp->b_cont;
-			ipsec_out_to_in(first_mp);
-		}
-	} else {
-		mctl_present = B_FALSE;
-	}
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
