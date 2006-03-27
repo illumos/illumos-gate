@@ -347,7 +347,7 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	    list_link_active(&dn->dn_dirty_link[2]) |
 	    list_link_active(&dn->dn_dirty_link[3]);
 	mutex_exit(&dn->dn_objset->os_lock);
-	if (dn->dn_assigned_tx || dirty)
+	if (dirty || dn->dn_assigned_tx || dn->dn_phys->dn_nlevels == 0)
 		return;
 
 	/*
