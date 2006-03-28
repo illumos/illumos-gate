@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,8 +162,8 @@ static int		ibnex_bus_power(dev_info_t *, void *,
 			    pm_bus_power_op_t, void *, void *);
 int			ibnex_pseudo_create_pi(ibnex_node_data_t *,
 			    dev_info_t *);
-int			ibnex_pseudo_config_one(
-			    ibnex_node_data_t *, char *, char *, dev_info_t *);
+static int		ibnex_pseudo_config_one(
+			    ibnex_node_data_t *, char *, dev_info_t *);
 static int		ibnex_pseudo_mdi_config_one(int, void *, dev_info_t **,
 			    char *, char *);
 static void		ibnex_config_pseudo_all(dev_info_t *);
@@ -1110,7 +1109,8 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
-		IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_ONE");
+		IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_ONE, "
+		    "parent %p", parent);
 
 		len = strlen((char *)devname) + 1;
 		device_name = i_ddi_strdup(devname, KM_SLEEP);
@@ -1140,8 +1140,10 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 				ndi_devi_exit(parent, circ);
 				ret = ibnex_ioc_bus_config_one(&parent, flag,
 				    op, devname, child, &need_bus_config);
-				if (!need_bus_config)
+				if (!need_bus_config) {
+					kmem_free(device_name, len);
 					return (ret);
+				}
 
 				ndi_devi_enter(parent, &circ);
 			} else if ((strncmp(cname,
@@ -1172,10 +1174,11 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 					    flag, devname, child, cname,
 					    caddr);
 					mutex_exit(&ibnex.ibnex_mutex);
+					kmem_free(device_name, len);
 					return (ret);
 				}
 				mutex_enter(&ibnex.ibnex_mutex);
-				ret = ibnex_pseudo_config_one(NULL, cname,
+				ret = ibnex_pseudo_config_one(NULL,
 				    caddr, parent);
 				mutex_exit(&ibnex.ibnex_mutex);
 			}
@@ -1216,9 +1219,11 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		/*FALLTHRU*/
 	case BUS_CONFIG_DRIVER:
 		if (op == BUS_CONFIG_ALL)
-			IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_ALL");
+			IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_ALL, "
+			    "parent %p", parent);
 		else
-			IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_DRIVER");
+			IBTF_DPRINTF_L4("ibnex", "\tbus_config: CONFIG_DRIVER"
+			    ", parent %p", parent);
 
 		/*
 		 * Drive CONFIG requests for IB Nexus parent through
@@ -2070,7 +2075,7 @@ ibnex_config_pseudo_all(dev_info_t *pdip)
 
 	for (nodep = ibnex.ibnex_pseudo_node_head;
 	    nodep; nodep = nodep->node_next) {
-		(void) ibnex_pseudo_config_one(nodep, NULL, NULL, pdip);
+		(void) ibnex_pseudo_config_one(nodep, NULL, pdip);
 	}
 }
 
@@ -2078,28 +2083,32 @@ ibnex_config_pseudo_all(dev_info_t *pdip)
 /*
  * ibnex_pseudo_config_one()
  */
-int
-ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *cname, char *caddr,
+static int
+ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *caddr,
     dev_info_t *pdip)
 {
-	int			rval, len;
-	char			*node_addr;
+	int			rval;
 
-	IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one:Begin");
+	IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one(%p, %p, %p):Begin",
+	    node_data, caddr, pdip);
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
 	if (node_data == NULL) {
-		IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one:"
-		    "cname = %s caddr = %s", cname, caddr);
+		IBTF_DPRINTF_L4("ibnex", "\tpseudo_config_one: caddr = %s",
+		    caddr);
 
-		len = strlen(cname) + strlen(caddr) + 2;
-		node_addr = (char *)kmem_alloc(len, KM_SLEEP);
-
-		(void) snprintf(node_addr, len, "%s,%s", cname, caddr);
+		/*
+		 * This function is now called with PHCI / HCA driver
+		 * as parent. The format of devicename is :
+		 * 	<driver_name>@<driver_name>,<unit_address>
+		 * The "caddr" part of the devicename matches the
+		 * format of pseudo_node_addr.
+		 *
+		 * Use "caddr" to find a matching Pseudo node entry.
+		 */
 		node_data = ibnex_is_node_data_present(IBNEX_PSEUDO_NODE,
-		    (void *)node_addr, 0, 0);
-		kmem_free(node_addr, len);
+		    (void *)caddr, 0, 0);
 	}
 
 	/*
@@ -2172,6 +2181,9 @@ ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *cname, char *caddr,
  *	2. Called for IB Nexus as parent, not IB HCA as
  *	   parent.
  *	3. Calls mdi_vhci_bus_config()
+ * This function skips checks for node_state, initializing
+ * node_state, node_dip, etc. These checks and initializations
+ * are done when BUS_CONFIG is called with PHCI as the parent.
  */
 static int
 ibnex_pseudo_mdi_config_one(int flag, void *devname, dev_info_t **child,
@@ -2194,55 +2206,16 @@ ibnex_pseudo_mdi_config_one(int flag, void *devname, dev_info_t **child,
 	    (void *)node_addr, 0, 0);
 	kmem_free(node_addr, len);
 
-	/*
-	 * prevent any races
-	 * we have seen this node_data and it has been initialized
-	 * Note that node_dip is already NULL if unconfigure is in
-	 * progress.
-	 */
-	if (node_data && node_data->node_dip) {
-		return ((node_data->node_state == IBNEX_CFGADM_CONFIGURING) ?
-		    IBNEX_BUSY : IBNEX_SUCCESS);
-	} else if (node_data == NULL) {
+	if (node_data == NULL) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tpseudo_mdi_config_one: Invalid node");
 		return (IBNEX_FAILURE);
 	}
 
-	/*
-	 * Return EBUSY if another configure/unconfigure
-	 * operation is in progress
-	 */
-	if (node_data->node_state == IBNEX_CFGADM_UNCONFIGURING) {
-		return (IBNEX_BUSY);
-	}
-
-	if (node_data->node_state == IBNEX_CFGADM_CONFIGURED)
-		return (IBNEX_SUCCESS);
-
-	/*
-	 * Prevent configuring pseudo nodes specifically unconfigured
-	 * by cfgadm. This is done by checking if this is a newly
-	 * created node, not yet configured by BUS_CONFIG or cfgadm
-	 */
-	if (node_data->node_data.pseudo_node.pseudo_new_node != 1)
-		return (IBNEX_FAILURE);
-	node_data->node_data.pseudo_node.pseudo_new_node = 0;
-
-	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
-
 	mutex_exit(&ibnex.ibnex_mutex);
 	rval = mdi_vhci_bus_config(ibnex.ibnex_dip, flag, BUS_CONFIG_ONE,
 	    devname, child, node_data->node_data.pseudo_node.pseudo_node_addr);
 	mutex_enter(&ibnex.ibnex_mutex);
-
-	if (rval == MDI_SUCCESS)
-		node_data->node_state = IBNEX_CFGADM_CONFIGURED;
-	else {
-		node_data->node_dip = NULL;
-		node_data->node_state = IBNEX_CFGADM_UNCONFIGURED;
-		node_data->node_data.pseudo_node.pseudo_new_node = 1;
-	}
 
 	return (rval);
 }

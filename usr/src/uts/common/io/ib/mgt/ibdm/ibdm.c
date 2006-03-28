@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1349,6 +1348,7 @@ ibdm_probe_gid_thread(void *args)
 		ibdm_ioc_info_t *ioc_info;
 		uint8_t		niocs, ii;
 
+		ASSERT(gid_info->gl_iou);
 		mutex_enter(&gid_info->gl_mutex);
 		niocs = gid_info->gl_iou->iou_info.iou_num_ctrl_slots;
 		gid_info->gl_state = IBDM_GET_IOC_DETAILS;
@@ -3283,6 +3283,7 @@ ibdm_pkt_timeout_hdlr(void *arg)
 	ibdm_timeout_cb_args_t	*cb_args = arg;
 	ibdm_dp_gidinfo_t	*gid_info;
 	int			srv_ent;
+	uint_t			new_gl_state;
 
 	IBTF_DPRINTF_L2("ibdm", "\tpkt_timeout_hdlr: gid_info: %p "
 	    "rtype 0x%x iocidx 0x%x srvidx %d", cb_args->cb_gid_info,
@@ -3320,11 +3321,12 @@ ibdm_pkt_timeout_hdlr(void *arg)
 	    cb_args->cb_req_type, cb_args->cb_ioc_num,
 	    cb_args->cb_srvents_start);
 
+	new_gl_state = IBDM_GID_PROBING_COMPLETE;
 	switch (cb_args->cb_req_type) {
 
 	case IBDM_REQ_TYPE_CLASSPORTINFO:
 	case IBDM_REQ_TYPE_IOUINFO:
-		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
+		new_gl_state = IBDM_GID_PROBING_FAILED;
 		if (--gid_info->gl_pending_cmds == 0)
 			probe_done = B_TRUE;
 		if (gid_info->gl_timeout_id)
@@ -3377,7 +3379,7 @@ ibdm_pkt_timeout_hdlr(void *arg)
 		break;
 	}
 	if (probe_done == B_TRUE) {
-		gid_info->gl_state = IBDM_GID_PROBING_COMPLETE;
+		gid_info->gl_state = new_gl_state;
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_notify_newgid_iocs(gid_info);
 		mutex_enter(&ibdm.ibdm_mutex);
