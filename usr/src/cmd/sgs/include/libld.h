@@ -316,8 +316,6 @@ struct ofl_desc {
 					/*	section */
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
-#define	FLG_OF1_NOHDR	0x00800000	/* no elf header/phdr alignment */
-					/*	needed */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
 #define	FLG_OF1_EXTRACT	0x02000000	/* archive member has been extracted */
 #define	FLG_OF1_RESCAN	0x04000000	/* any archives should be rescanned */
@@ -1017,8 +1015,6 @@ extern uintptr_t	ld_reloc_process(Ofl_desc *);
 extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *);
 extern uintptr_t	ld_sym_validate(Ofl_desc *);
 extern uintptr_t	ld_update_outfile(Ofl_desc *);
-
-extern Elf64_Off	_elf_getxoff(Elf_Data *);
 
 #ifdef	__cplusplus
 }

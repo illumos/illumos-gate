@@ -113,6 +113,7 @@ conv_dyn_flag(Xword flags)
 		MSG_DF1_IGNMULDEF_SIZE + \
 		MSG_DF1_NOKSYMS_SIZE + \
 		MSG_DF1_NORELOC_SIZE + \
+		MSG_DF1_NOHDR_SIZE + \
 		CONV_INV_STRSIZE + MSG_GBL_CSQBRKT_SIZE
 
 const char *
@@ -141,6 +142,7 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_IGNMULDEF,	MSG_ORIG(MSG_DF1_IGNMULDEF) },
 		{ DF_1_NOKSYMS,		MSG_ORIG(MSG_DF1_NOKSYMS) },
 		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
+		{ DF_1_NOHDR,		MSG_ORIG(MSG_DF1_NOHDR) },
 		{ 0,			0 }
 	};
 

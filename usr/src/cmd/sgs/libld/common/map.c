@@ -2441,14 +2441,14 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	    !(ofl->ofl_flags & FLG_OF_RELOBJ) &&
 	    !(ofl->ofl_osinterp) &&
 	    (ofl->ofl_flags1 & FLG_OF1_VADDR))
-		ofl->ofl_flags1 |= FLG_OF1_NOHDR;
+		ofl->ofl_dtflags_1 |= DF_1_NOHDR;
 
 	/*
 	 * If the output file is a relocatable file,
 	 * then ?N have no effect. Knock it off.
 	 */
 	if (ofl->ofl_flags & FLG_OF_RELOBJ)
-		ofl->ofl_flags1 &= ~FLG_OF1_NOHDR;
+		ofl->ofl_dtflags_1 &= ~DF_1_NOHDR;
 
 	return (1);
 }

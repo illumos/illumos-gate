@@ -1094,3 +1094,4 @@ Bugid   Risk Synopsis
 6280209 elfdump cores on memory model 0x3
 6197234 elfdump and dump don't handle 64-bit symbols correctly
 6398893 Extended section processing needs some work
+6397256 ldd dumps core in elf_fix_name

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,8 +53,7 @@
 #include	<sys/stat.h>
 #include	<fcntl.h>
 #include	<dirent.h>
-#include	<libelf.h>
-#include	<gelf.h>
+#include	<_libelf.h>
 #include	<errno.h>
 #include	<stdio.h>
 #include	<string.h>
@@ -656,7 +654,7 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 	int		fd;
 	Elf *		elf;
 	GElf_Ehdr	ehdr;
-	Xword		dyflags = 0;
+	GElf_Xword	dyflags = 0;
 	Listnode *	lnp;
 	Hash_tbl *	tbl;
 	Addr		ino = (Addr)status->st_ino;
@@ -734,34 +732,8 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 	 * to insure it isn't marked as non-dumpable (libdl.so.1 falls into
 	 * this category).
 	 */
-	if (flags & RTC_OBJ_DUMP) {
-		Elf_Scn *	scn = NULL;
-		Elf_Data *	data;
-		GElf_Shdr	shdr;
-		GElf_Dyn	dyn;
-
-		while (scn = elf_nextscn(elf, scn)) {
-			int	num, _num;
-
-			if (gelf_getshdr(scn, &shdr) == NULL)
-				break;
-			if (shdr.sh_type != SHT_DYNAMIC)
-				continue;
-			if ((data = elf_getdata(scn, NULL)) == NULL)
-				break;
-
-			num = shdr.sh_size / shdr.sh_entsize;
-			for (_num = 0; _num < num; _num++) {
-				(void) gelf_getdyn(data, _num, &dyn);
-				if (dyn.d_tag != DT_FLAGS_1)
-					continue;
-
-				dyflags = dyn.d_un.d_val;
-				break;
-			}
-			break;
-		}
-	}
+	if (flags & RTC_OBJ_DUMP)
+		dyflags = _gelf_getdyndtflags_1(elf);
 
 	/*
 	 * Dynamic executables can be examined to determine their dependencies,

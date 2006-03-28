@@ -2956,7 +2956,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		if ((_phdr == 0) && (phdr->p_type == PT_LOAD) &&
 		    ((ofl->ofl_osinterp) || (flags & FLG_OF_DYNAMIC)) &&
-		    (!(ofl->ofl_flags1 & FLG_OF1_NOHDR))) {
+		    (!(ofl->ofl_dtflags_1 & DF_1_NOHDR))) {
 			size = (Addr)S_ROUND((phdrsz + ehdrsz),
 			    hshdr->sh_addralign);
 			phdr->p_offset -= size;
@@ -3005,7 +3005,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		/*
 		 * Adjust the address offset and p_align if needed.
 		 */
-		if (!(ofl->ofl_flags1 & (FLG_OF1_NOHDR | FLG_OF1_VADDR))) {
+		if (!((ofl->ofl_flags1 & FLG_OF1_VADDR) ||
+			(ofl->ofl_dtflags_1 & DF_1_NOHDR))) {
 			if (phdr->p_align != 0)
 				vaddr += phdr->p_offset % phdr->p_align;
 			else
@@ -3022,7 +3023,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		if ((_phdr == 0) && (phdr->p_type == PT_LOAD)) {
 			_phdr = phdr;
 
-			if (!(ofl->ofl_flags1 & FLG_OF1_NOHDR)) {
+			if (!(ofl->ofl_dtflags_1 & DF_1_NOHDR)) {
 				if (ofl->ofl_osinterp)
 					ofl->ofl_phdr[0].p_vaddr =
 					    vaddr + ehdrsz;
@@ -3043,7 +3044,7 @@ ld_update_outfile(Ofl_desc *ofl)
 					vaddr += size;
 			} else {
 				/*
-				 * If the FLG_OF1_NOHDR flag was set, PT_PHDR
+				 * If the DF_1_NOHDR flag was set, PT_PHDR
 				 * will not be part of any loadable segment.
 				 */
 				ofl->ofl_phdr[0].p_vaddr = 0;

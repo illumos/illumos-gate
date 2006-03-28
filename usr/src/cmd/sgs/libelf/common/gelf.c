@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
-#include "gelf.h"
+#include "_libelf.h"
 #include "decl.h"
 #include "msg.h"
 
@@ -1086,4 +1085,37 @@ gelf_update_cap(Elf_Data *dst, int ndx, GElf_Cap *src)
 
 	ELFUNLOCK(EDATA_ELF(dst));
 	return (rc);
+}
+
+/*
+ * If the specified object has a dynamic section, and that section
+ * contains a DT_FLAGS_1 entry, then return the value of that entry.
+ * Otherwise, return 0.
+ */
+GElf_Xword
+_gelf_getdyndtflags_1(Elf *elf)
+{
+	Elf_Scn *scn = NULL;
+	Elf_Data *data;
+	GElf_Shdr shdr;
+	GElf_Dyn dyn;
+	int i, n;
+
+	while (scn = elf_nextscn(elf, scn)) {
+		if (gelf_getshdr(scn, &shdr) == NULL)
+			break;
+		if (shdr.sh_type != SHT_DYNAMIC)
+			continue;
+		if (data = elf_getdata(scn, NULL)) {
+			n = shdr.sh_size / shdr.sh_entsize;
+			for (i = 0; i < n; i++) {
+				(void) gelf_getdyn(data, i, &dyn);
+				if (dyn.d_tag == DT_FLAGS_1) {
+					return (dyn.d_un.d_val);
+				}
+			}
+		}
+		break;
+	}
+	return (0);
 }

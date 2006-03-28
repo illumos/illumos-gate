@@ -1196,6 +1196,106 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 	}
 }
 
+
+/*
+ * The items in a dynamic section are displayed using a small set
+ * of standard output styles. To reduce code size and promote
+ * consistency, the following family of functions, all named
+ * with the prefix "pdynitem_", are used by dump_dynamic().
+ *
+ * entry:
+ *	name - Name of element
+ *	p_dyn - Pointer to struct describing element
+ *	elf_file, link - Used to look up a string from the string table
+ *		in the ELF file.
+ *	bitdesc - Pointer to NULL terminated array of PDYNITEM_BITDESC
+ *		structs describing the allowed bit values.
+ */
+#define	Fmttag		"%-15.15s "
+#define	Fmtptr		"%#llx"
+
+void
+pdynitem_addr(const char *name, GElf_Dyn *p_dyn)
+{
+	(void) printf(Fmttag, name);
+	(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
+}
+
+void
+pdynitem_val(const char *name, GElf_Dyn *p_dyn)
+{
+	(void) printf(Fmttag, name);
+	(void) printf(Fmtptr, EC_XWORD(p_dyn->d_un.d_val));
+}
+
+void
+pdynitem_depval(const char *name, GElf_Dyn *p_dyn)
+{
+	(void) printf(Fmttag, name);
+	(void) printf(Fmtptr "  (deprecated value)",
+			EC_XWORD(p_dyn->d_un.d_val));
+}
+
+void
+pdynitem_ign(const char *name)
+{
+	(void) printf(Fmttag "(ignored)", name);
+}
+
+void
+pdynitem_str(const char *name, GElf_Dyn *p_dyn, Elf *elf_file, GElf_Word link)
+{
+	char *str;
+
+	(void) printf(Fmttag, name);
+	if (v_flag) {	/* Look up the string */
+		str = (char *)elf_strptr(elf_file, link, p_dyn->d_un.d_ptr);
+		if (!(str && *str))
+			str = (char *)UNKNOWN;
+		(void) printf("%s", str);
+	} else {	/* Show the address */
+		(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
+	}
+}
+
+/*
+ * Arrays of this type are used for the values argument to
+ * pdynitem_bitmask(). It maps a bit value to a human readable
+ * name string. The final element of such an array must always
+ * be NULL.
+ */
+typedef struct {
+	int bit;		/* Bit Value */
+	const char *name;	/* Name corresponding to bit */
+} PDYNITEM_BITDESC;
+
+void
+pdynitem_bitmask(const char *name, GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
+{
+	char buf[512];
+
+	(void) printf(Fmttag, name);
+	if (v_flag) {
+		buf[0] = '\0';
+		for (; bitdesc->bit; bitdesc++) {
+			if (p_dyn->d_un.d_val &	bitdesc->bit)
+				(void) strlcat(buf, bitdesc->name,
+					sizeof (buf));
+		}
+		if (buf[0]) {
+			(void) printf("%s", buf);
+			return;
+		}
+	}
+
+	/* We don't have a string, or one is not requested. Show address */
+	(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
+
+}
+
+#undef Fmttag
+#undef Fmtptr
+
 /*
  * Print dynamic linking information.  Input is an ELF
  * file descriptor, the SCNTAB structure, the number of
@@ -1204,17 +1304,73 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 static void
 dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 {
+	/*
+	 * Map dynamic bit fields to readable strings. These tables
+	 * must be kept in sync with the definitions in <link.h>.
+	 *
+	 * The string displayed is always the same as the name used
+	 * for the constant, with the prefix removed. The BITDESC macro
+	 * generate both PDYNITEM_BITDESC fields from the base name.
+	 */
+#define	BITDESC(prefix, item) { prefix ## item, #item " " }
+
+	static PDYNITEM_BITDESC dyn_dt_flags[] = {	/* DT_FLAGS */
+		BITDESC(DF_, ORIGIN),
+		BITDESC(DF_, SYMBOLIC),
+		BITDESC(DF_, TEXTREL),
+		BITDESC(DF_, BIND_NOW),
+		BITDESC(DF_, STATIC_TLS),
+		{ 0 }
+	};
+
+	static PDYNITEM_BITDESC dyn_dt_flags_1[] = {	/* DT_FLAGS_1 */
+		BITDESC(DF_1_, NOW),
+		BITDESC(DF_1_, GLOBAL),
+		BITDESC(DF_1_, GROUP),
+		BITDESC(DF_1_, NODELETE),
+		BITDESC(DF_1_, LOADFLTR),
+		BITDESC(DF_1_, INITFIRST),
+		BITDESC(DF_1_, NOOPEN),
+		BITDESC(DF_1_, ORIGIN),
+		BITDESC(DF_1_, DIRECT),
+		BITDESC(DF_1_, TRANS),
+		BITDESC(DF_1_, INTERPOSE),
+		BITDESC(DF_1_, NODEFLIB),
+		BITDESC(DF_1_, NODUMP),
+		BITDESC(DF_1_, CONFALT),
+		BITDESC(DF_1_, ENDFILTEE),
+		BITDESC(DF_1_, DISPRELDNE),
+		BITDESC(DF_1_, DISPRELPND),
+		BITDESC(DF_1_, NODIRECT),
+		BITDESC(DF_1_, IGNMULDEF),
+		BITDESC(DF_1_, NOKSYMS),
+		BITDESC(DF_1_, NOHDR),
+		BITDESC(DF_1_, NORELOC),
+		{ 0 }
+	};
+
+	static PDYNITEM_BITDESC dyn_dt_feature_1[] = {	/* DT_FEATURE_1 */
+		BITDESC(DTF_1_, PARINIT),
+		BITDESC(DTF_1_, CONFEXP),
+		{ 0 }
+	};
+
+	static PDYNITEM_BITDESC dyn_dt_posflag_1[] = {	/* DT_POSFLAG_1 */
+		BITDESC(DF_P1_, LAZYLOAD),
+		BITDESC(DF_P1_, GROUPPERM),
+		{ 0 }
+	};
+
+#undef	BITDESC
+
 	Elf_Data	*dyn_data;
 	GElf_Dyn	p_dyn;
 	GElf_Phdr	p_phdr;
 	GElf_Ehdr	p_ehdr;
-	char		*dt_name;
 	int		index = 1;
 	int		lib_scns = num_scns;
 	SCNTAB		*l_scns = p_scns;
 	int		header_num = 0;
-#define	Fmttag		"%-15.15s "
-#define	Fmtptr		"%#llx"
 
 	if (!p_flag)
 		(void) printf("\n  **** DYNAMIC SECTION INFORMATION ****\n");
@@ -1244,585 +1400,234 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 
 		(void) gelf_getdyn(dyn_data, ii++, &p_dyn);
 		while (p_dyn.d_tag != DT_NULL) {
-			char	value[256];
-
 			(void) printf("[%d]\t", index++);
 
+			/*
+			 * It would be nice to use a table driven loop
+			 * here, but the address space is too sparse
+			 * and irregular. A switch is simple and robust.
+			 */
 			switch (p_dyn.d_tag) {
 			/*
 			 * Start of generic flags.
 			 */
 			case (DT_NEEDED):
-				(void) printf(Fmttag, (const char *)"NEEDED");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-					    EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("NEEDED", &p_dyn, elf_file, link);
 				break;
 			case (DT_PLTRELSZ):
-				(void) printf(Fmttag, (const char *)"PLTSZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("PLTSZ", &p_dyn);
 				break;
 			case (DT_PLTGOT):
-				(void) printf(Fmttag, (const char *)"PLTGOT");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("PLTGOT", &p_dyn);
 				break;
 			case (DT_HASH):
-				(void) printf(Fmttag, (const char *)"HASH");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("HASH", &p_dyn);
 				break;
 			case (DT_STRTAB):
-				(void) printf(Fmttag, (const char *)"STRTAB");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("STRTAB", &p_dyn);
 				break;
 			case (DT_SYMTAB):
-				(void) printf(Fmttag, (const char *)"SYMTAB");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("SYMTAB", &p_dyn);
 				break;
 			case (DT_RELA):
-				(void) printf(Fmttag, (const char *)"RELA");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("RELA", &p_dyn);
 				break;
 			case (DT_RELASZ):
-				(void) printf(Fmttag, (const char *)"RELASZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("RELASZ", &p_dyn);
 				break;
 			case (DT_RELAENT):
-				(void) printf(Fmttag, (const char *)"RELAENT");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("RELAENT", &p_dyn);
 				break;
 			case (DT_STRSZ):
-				(void) printf(Fmttag, (const char *)"STRSZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("STRSZ", &p_dyn);
 				break;
 			case (DT_SYMENT):
-				(void) printf(Fmttag, (const char *)"SYMENT");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("SYMENT", &p_dyn);
 				break;
 			case (DT_INIT):
-				(void) printf(Fmttag, (const char *)"INIT");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("INIT", &p_dyn);
 				break;
 			case (DT_FINI):
-				(void) printf(Fmttag, (const char *)"FINI");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("FINI", &p_dyn);
 				break;
 			case (DT_SONAME):
-				(void) printf(Fmttag, (const char *)"SONAME");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("SONAME", &p_dyn, elf_file, link);
 				break;
 			case (DT_RPATH):
-				(void) printf(Fmttag, (const char *)"RPATH");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("RPATH", &p_dyn, elf_file, link);
 				break;
 			case (DT_SYMBOLIC):
-				(void) printf(Fmttag, (const char *)"SYMB");
-				(void) printf("%s", (const char *)"(ignored)");
+				pdynitem_ign("SYMB");
 				break;
 			case (DT_REL):
-				(void) printf(Fmttag, (const char *)"REL");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("REL", &p_dyn);
 				break;
 			case (DT_RELSZ):
-				(void) printf(Fmttag, (const char *)"RELSZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("RELSZ", &p_dyn);
 				break;
 			case (DT_RELENT):
-				(void) printf(Fmttag, (const char *)"RELENT");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("RELENT", &p_dyn);
 				break;
 			case (DT_PLTREL):
-				(void) printf(Fmttag, (const char *)"PLTREL");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("PLTREL", &p_dyn);
 				break;
 			case (DT_DEBUG):
-				(void) printf(Fmttag, (const char *)"DEBUG");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("DEBUG", &p_dyn);
 				break;
 			case (DT_TEXTREL):
-				(void) printf(Fmttag, (const char *)"TEXTREL");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_val));
+				pdynitem_addr("TEXTREL", &p_dyn);
 				break;
 			case (DT_JMPREL):
-				(void) printf(Fmttag, (const char *)"JMPREL");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("JMPREL", &p_dyn);
 				break;
 			case (DT_BIND_NOW):
-				(void) printf(Fmttag, (const char *)"BIND_NOW");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_val));
+				pdynitem_val("BIND_NOW", &p_dyn);
 				break;
 			case (DT_INIT_ARRAY):
-				(void) printf(Fmttag,
-					(const char *)"INIT_ARRAY");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("INIT_ARRAY", &p_dyn);
 				break;
 			case (DT_FINI_ARRAY):
-				(void) printf(Fmttag,
-					(const char *)"FINI_ARRAY");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("FINI_ARRAY", &p_dyn);
 				break;
 			case (DT_INIT_ARRAYSZ):
-				(void) printf(Fmttag,
-					(const char *)"INIT_ARRAYSZ");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("INIT_ARRAYSZ", &p_dyn);
 				break;
 			case (DT_FINI_ARRAYSZ):
-				(void) printf(Fmttag,
-					(const char *)"FINI_ARRAYSZ");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("FINI_ARRAYSZ", &p_dyn);
 				break;
 			case (DT_RUNPATH):
-				(void) printf(Fmttag, (const char *)"RUNPATH");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("RUNPATH", &p_dyn,
+					elf_file, link);
 				break;
 			case (DT_FLAGS):
-				(void) printf(Fmttag,
-				    (const char *)"FLAGS");
-				value[0] = '\0';
-				if (v_flag) {
-					if (p_dyn.d_un.d_val & DF_ORIGIN)
-					    (void) strcat(value,
-						(const char *)"ORIGIN ");
-					if (p_dyn.d_un.d_val & DF_SYMBOLIC)
-					    (void) strcat(value,
-						(const char *)"SYMBOLIC ");
-					if (p_dyn.d_un.d_val & DF_TEXTREL)
-					    (void) strcat(value,
-						(const char *)"TEXTREL ");
-					if (p_dyn.d_un.d_val & DF_BIND_NOW)
-					    (void) strcat(value,
-						(const char *)"BIND_NOW ");
-					if (p_dyn.d_un.d_val & DF_STATIC_TLS)
-					    (void) strcat(value,
-						(const char *)"STATIC_TLS ");
-				}
-				if (v_flag && strlen(value))
-					(void) printf("%s", value);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_bitmask("FLAGS", &p_dyn,
+					dyn_dt_flags);
 				break;
+
 			case (DT_PREINIT_ARRAY):
-				(void) printf(Fmttag,
-					(const char *)"PRINIT_ARRAY");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("PRINIT_ARRAY", &p_dyn);
 				break;
 			case (DT_PREINIT_ARRAYSZ):
-				(void) printf(Fmttag,
-					(const char *)"PRINIT_ARRAYSZ");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("PRINIT_ARRAYSZ", &p_dyn);
 				break;
 			/*
 			 * DT_LOOS - DT_HIOS range.
 			 */
 			case (DT_SUNW_AUXILIARY):
-				(void) printf(Fmttag,
-					(const char *)"SUNW_AUXILIARY");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("SUNW_AUXILIARY", &p_dyn,
+					elf_file, link);
 				break;
 			case (DT_SUNW_RTLDINF):
-				(void) printf(Fmttag,
-					(const char *)"SUNW_RTLDINF");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("SUNW_RTLDINF", &p_dyn);
 				break;
 			case (DT_SUNW_FILTER):
-				(void) printf(Fmttag,
-					(const char *)"SUNW_FILTER");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("SUNW_FILTER", &p_dyn,
+					elf_file, link);
 				break;
 			case (DT_SUNW_CAP):
-				(void) printf(Fmttag,
-					(const char *)"SUNW_CAP");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("SUNW_CAP", &p_dyn);
 				break;
 
 			/*
 			 * SUNW: DT_VALRNGLO - DT_VALRNGHI range.
 			 */
 			case (DT_CHECKSUM):
-				(void) printf(Fmttag,
-					(const char *)"CHECKSUM");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("CHECKSUM", &p_dyn);
 				break;
 			case (DT_PLTPADSZ):
-				(void) printf(Fmttag,
-					(const char *)"PLTPADSZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("PLTPADSZ", &p_dyn);
 				break;
 			case (DT_MOVEENT):
-				(void) printf(Fmttag,
-					(const char *)"MOVEENT");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("MOVEENT", &p_dyn);
 				break;
 			case (DT_MOVESZ):
-				(void) printf(Fmttag,
-					(const char *)"MOVESZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("MOVESZ", &p_dyn);
 				break;
 			case (DT_FEATURE_1):
-				(void) printf(Fmttag,
-					(const char *)"FEATURE_1");
-				value[0] = '\0';
-				if (v_flag) {
-					if (p_dyn.d_un.d_val & DTF_1_PARINIT)
-					    (void) strcat(value,
-						(const char *)"PARINIT ");
-					if (p_dyn.d_un.d_val & DTF_1_CONFEXP)
-					    (void) strcat(value,
-						(const char *)"CONFEXP ");
-				}
-				if (v_flag && strlen(value))
-					(void) printf("%s", value);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_bitmask("FEATURE_1", &p_dyn,
+					dyn_dt_feature_1);
 				break;
 			case (DT_POSFLAG_1):
-				(void) printf(Fmttag,
-					(const char *)"POSFLAG_1");
-				value[0] = '\0';
-				if (v_flag) {
-					if (p_dyn.d_un.d_val & DF_P1_LAZYLOAD)
-					    (void) strcat(value,
-						(const char *)"LAZYLOAD ");
-					if (p_dyn.d_un.d_val & DF_P1_GROUPPERM)
-					    (void) strcat(value,
-						(const char *)"GROUPPERM ");
-				}
-				if (v_flag && strlen(value))
-					(void) printf("%s", value);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_bitmask("POSFLAG_1", &p_dyn,
+					dyn_dt_posflag_1);
 				break;
 			case (DT_SYMINSZ):
-				(void) printf(Fmttag,
-					(const char *)"SYMINSZ");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("SYMINSZ", &p_dyn);
 				break;
 			case (DT_SYMINENT):
-				(void) printf(Fmttag,
-					(const char *)"SYMINENT");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("SYMINENT", &p_dyn);
 				break;
 
 			/*
 			 * SUNW: DT_ADDRRNGLO - DT_ADDRRNGHI range.
 			 */
 			case (DT_CONFIG):
-				(void) printf(Fmttag, (const char *)"CONFIG");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("CONFIG", &p_dyn, elf_file, link);
 				break;
 			case (DT_DEPAUDIT):
-				(void) printf(Fmttag,
-					(const char *)"DEPAUDIT");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("DEPAUDIT", &p_dyn,
+					elf_file, link);
 				break;
 			case (DT_AUDIT):
-				(void) printf(Fmttag,
-					(const char *)"AUDIT");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("AUDIT", &p_dyn, elf_file, link);
 				break;
 			case (DT_PLTPAD):
-				(void) printf(Fmttag,
-					(const char *)"PLTPAD");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("PLTPAD", &p_dyn);
 				break;
 			case (DT_MOVETAB):
-				(void) printf(Fmttag,
-					(const char *)"MOVETAB");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("MOVETAB", &p_dyn);
 				break;
 			case (DT_SYMINFO):
-				(void) printf(Fmttag,
-					(const char *)"SYMINFO");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("SYMINFO", &p_dyn);
 				break;
 
 			/*
 			 * SUNW: generic range.
 			 */
 			case (DT_RELACOUNT):
-				(void) printf(Fmttag,
-					(const char *)"RELACOUNT");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("RELACOUNT", &p_dyn);
 				break;
 			case (DT_RELCOUNT):
-				(void) printf(Fmttag,
-					(const char *)"RELCOUNT");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("RELCOUNT", &p_dyn);
 				break;
 			case (DT_FLAGS_1):
-				(void) printf(Fmttag,
-				    (const char *)"FLAGS_1");
-				value[0] = '\0';
-				if (v_flag) {
-					if (p_dyn.d_un.d_val & DF_1_NOW)
-					    (void) strcat(value,
-						(const char *)"NOW ");
-					if (p_dyn.d_un.d_val & DF_1_GLOBAL)
-					    (void) strcat(value,
-						(const char *)"GLOBAL ");
-					if (p_dyn.d_un.d_val & DF_1_GROUP)
-					    (void) strcat(value,
-						(const char *)"GROUP ");
-					if (p_dyn.d_un.d_val & DF_1_NODELETE)
-					    (void) strcat(value,
-						(const char *)"NODELETE ");
-					if (p_dyn.d_un.d_val & DF_1_LOADFLTR)
-					    (void) strcat(value,
-						(const char *)"LOADFLTR ");
-					if (p_dyn.d_un.d_val & DF_1_INITFIRST)
-					    (void) strcat(value,
-						(const char *)"INITFIRST ");
-					if (p_dyn.d_un.d_val & DF_1_NOOPEN)
-					    (void) strcat(value,
-						(const char *)"NOOPEN ");
-					if (p_dyn.d_un.d_val & DF_1_ORIGIN)
-					    (void) strcat(value,
-						(const char *)"ORIGIN ");
-					if (p_dyn.d_un.d_val & DF_1_DIRECT)
-					    (void) strcat(value,
-						(const char *)"DIRECT ");
-					if (p_dyn.d_un.d_val & DF_1_TRANS)
-					    (void) strcat(value,
-						(const char *)"TRANS ");
-					if (p_dyn.d_un.d_val & DF_1_INTERPOSE)
-					    (void) strcat(value,
-						(const char *)"INTERPOSE ");
-					if (p_dyn.d_un.d_val & DF_1_NODEFLIB)
-					    (void) strcat(value,
-						(const char *)"NODEFLIB ");
-					if (p_dyn.d_un.d_val & DF_1_NODUMP)
-					    (void) strcat(value,
-						(const char *)"NODUMP ");
-					if (p_dyn.d_un.d_val & DF_1_CONFALT)
-					    (void) strcat(value,
-						(const char *)"CONFALT ");
-					if (p_dyn.d_un.d_val & DF_1_ENDFILTEE)
-					    (void) strcat(value,
-						(const char *)"ENDFILTEE ");
-					if (p_dyn.d_un.d_val & DF_1_DISPRELDNE)
-					    (void) strcat(value,
-						(const char *)"DISPRELDONE ");
-					if (p_dyn.d_un.d_val & DF_1_DISPRELPND)
-					    (void) strcat(value,
-						(const char *)"DISPRELPND ");
-					if (p_dyn.d_un.d_val & DF_1_IGNMULDEF)
-					    (void) strcat(value,
-						(const char *)"IGNMULDEF ");
-					if (p_dyn.d_un.d_val & DF_1_NOKSYMS)
-					    (void) strcat(value,
-						(const char *)"NOKSYMS ");
-					if (p_dyn.d_un.d_val & DF_1_NORELOC)
-					    (void) strcat(value,
-						(const char *)"NORELOC ");
-				}
-				if (v_flag && strlen(value))
-					(void) printf("%s", value);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_bitmask("FLAGS_1", &p_dyn,
+					dyn_dt_flags_1);
 				break;
 			case (DT_VERSYM):
-				(void) printf(Fmttag, (const char *)"VERSYM");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("VERSYM", &p_dyn);
 				break;
 			case (DT_VERDEF):
-				(void) printf(Fmttag, (const char *)"VERDEF");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("VERDEF", &p_dyn);
 				break;
 			case (DT_VERDEFNUM):
-				(void) printf(Fmttag,
-				    (const char *)"VERDEFNUM");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_addr("VERDEFNUM", &p_dyn);
 				break;
 			case (DT_VERNEED):
-				(void) printf(Fmttag, (const char *)"VERNEED");
-				(void) printf(Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_addr("VERNEED", &p_dyn);
 				break;
 			case (DT_VERNEEDNUM):
-				(void) printf(Fmttag,
-				    (const char *)"VERNEEDNUM");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("VERNEEDNUM", &p_dyn);
 				break;
 			case (DT_AUXILIARY):
-				(void) printf(Fmttag,
-					(const char *)"AUXILIARY");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("AUXILIARY", &p_dyn,
+					elf_file, link);
 				break;
 			case (DT_USED):
-				(void) printf(Fmttag, (const char *)"USED");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("USED", &p_dyn, elf_file, link);
 				break;
 			case (DT_FILTER):
-				(void) printf(Fmttag, (const char *)"FILTER");
-				if (v_flag)
-					dt_name = (char *)elf_strptr(elf_file,
-					    link, p_dyn.d_un.d_ptr);
-				if (dt_name == NULL)
-					dt_name = (char *)UNKNOWN;
-				if (v_flag && strlen(dt_name))
-					(void) printf("%s", dt_name);
-				else
-					(void) printf(Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+				pdynitem_str("FILTER", &p_dyn, elf_file, link);
 				break;
 
 			/*
 			 * SUNW: machine specific range.
 			 */
 			case (DT_SPARC_REGISTER):
-				(void) printf(Fmttag,
-					(const char *)"REGISTER");
-				(void) printf(Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_val("REGISTER", &p_dyn);
 				break;
 			case (DT_DEPRECATED_SPARC_REGISTER):
-				(void) printf(Fmttag,
-					(const char *)"REGISTER");
-				(void) printf("%#llx  (deprecated value)",
-					EC_XWORD(p_dyn.d_un.d_val));
+				pdynitem_depval("REGISTER", &p_dyn);
 				break;
 			default:
 				(void) printf("%lld", EC_XWORD(p_dyn.d_tag));

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -96,8 +95,7 @@
 #include	<fcntl.h>
 #include	<stdio.h>
 #include	<string.h>
-#include	<libelf.h>
-#include	<gelf.h>
+#include	<_libelf.h>
 #include	<stdlib.h>
 #include	<unistd.h>
 #include	<wait.h>
@@ -532,6 +530,22 @@ elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 	 */
 	if (ehdr.e_phnum && !dynamic) {
 		(void) fprintf(stderr, MSG_INTL(MSG_USP_NODYNORSO), cname,
+		    fname);
+		return (1);
+	}
+
+	/*
+	 * If there is a dynamic section, then check for the DF_1_NOHDR
+	 * flag, and bail if it is present. Those objects are created using
+	 * the ?N mapfile option: The ELF header and program headers are
+	 * not mapped as part of the first segment, and virtual addresses
+	 * are computed without them. If ldd tries to interpret such
+	 * a file, it will become confused and generate bad output or
+	 * crash. Such objects are always special purpose files (like an OS
+	 * kernel) --- files for which the ldd operation doesn't make sense.
+	 */
+	if (dynamic && (_gelf_getdyndtflags_1(elf) & DF_1_NOHDR)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_USP_NOHDR), cname,
 		    fname);
 		return (1);
 	}

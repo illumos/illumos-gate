@@ -184,4 +184,5 @@ SUNWprivate_1.1 {
 	_elf32_xlatetof;
 	_elf32_xlatetom;
 	_elf_version;
+	_gelf_getdyndtflags_1;
 };

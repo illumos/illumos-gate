@@ -60,7 +60,7 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 	    ((isp->is_flags & FLG_IS_EXTERNAL) == 0))
 		osp->os_sgdesc->sg_flags |= FLG_SG_PHREQ;
 
-	if ((ofl->ofl_flags1 & FLG_OF1_NOHDR) &&
+	if ((ofl->ofl_dtflags_1 & DF_1_NOHDR) &&
 	    (osp->os_sgdesc->sg_phdr).p_type != PT_LOAD)
 		return;
 
@@ -494,7 +494,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 
 	if (ifl && (shdr->sh_type == SHT_PROGBITS)) {
 		/*
-		 * Try to preserved the intended meaning of sh_link/sh_info.
+		 * Try to preserve the intended meaning of sh_link/sh_info.
 		 * See the translate_link() in update.c.
 		 */
 		osp->os_shdr->sh_link = shdr->sh_link;

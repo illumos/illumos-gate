@@ -226,10 +226,12 @@ typedef struct {
 #define	DF_1_IGNMULDEF	0x00040000	/* internal: krtld ignore muldefs */
 #define	DF_1_NOKSYMS	0x00080000	/* internal: don't export object's */
 					/*	symbols via /dev/ksyms */
+#define	DF_1_NOHDR	0x00100000	/* mapfile ?N:1st segment mapping */
+					/*	omits ELF & program headers */
 #define	DF_1_NORELOC	0x00400000	/* internal: unrelocated object */
 
 /*
- * Values set to DT_FEATURE tag's d_val.
+ * Values set to DT_FEATURE_1 tag's d_val.
  */
 #define	DTF_1_PARINIT	0x00000001	/* partially initialization feature */
 #define	DTF_1_CONFEXP	0x00000002	/* configuration file expected */

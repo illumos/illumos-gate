@@ -282,10 +282,11 @@ ld_create_outfile(Ofl_desc *ofl)
 	int		fd, nseg = 0, shidx = 0, dataidx = 0, ptloadidx = 0;
 
 	/*
-	 * If FLG_OF1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
+	 * If DF_1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
 	 * we need to do alignment adjustment.
 	 */
-	if (ofl->ofl_flags1 & (FLG_OF1_NOHDR | FLG_OF1_VADDR)) {
+	if ((ofl->ofl_flags1 & FLG_OF1_VADDR) ||
+	    (ofl->ofl_dtflags_1 & DF_1_NOHDR)) {
 		fixalign = TRUE;
 	}
 
@@ -398,7 +399,7 @@ ld_create_outfile(Ofl_desc *ofl)
 			ptloadidx++;
 			if (sgp->sg_flags & FLG_SG_NOHDR) {
 				fixalign = TRUE;
-				ofl->ofl_flags1 |= FLG_OF1_NOHDR;
+				ofl->ofl_dtflags_1 |= DF_1_NOHDR;
 			}
 		}
 

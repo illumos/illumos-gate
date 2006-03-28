@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +34,8 @@
 
 #include <thread.h>
 #include <note.h>
-#include <libelf.h>
+#include <_libelf.h>
 #include <sys/machelf.h>
-#include <gelf.h>
 #include <msg.h>
 
 
@@ -449,26 +447,26 @@ typedef enum
 #endif
 
 
-extern Member *		_elf_armem(Elf *, char *, size_t);
+extern Member		*_elf_armem(Elf *, char *, size_t);
 extern void		_elf_arinit(Elf *);
 extern Okay		_elf_cook(Elf *);
 extern Okay		_elf_cookscn(Elf_Scn * s);
 extern Okay		_elf32_cookscn(Elf_Scn * s);
 extern Okay		_elf64_cookscn(Elf_Scn * s);
-extern Dnode *		_elf_dnode(void);
-extern Elf_Data *	_elf_locked_getdata(Elf_Scn *, Elf_Data *);
+extern Dnode		*_elf_dnode(void);
+extern Elf_Data		*_elf_locked_getdata(Elf_Scn *, Elf_Data *);
 extern size_t		_elf32_entsz(Elf32_Word, unsigned);
 extern size_t		_elf64_entsz(Elf64_Word, unsigned);
 extern Okay		_elf_inmap(Elf *);
-extern char *		_elf_outmap(int, size_t, unsigned *);
+extern char		*_elf_outmap(int, size_t, unsigned *);
 extern size_t		_elf_outsync(int, char *, size_t, unsigned);
 extern size_t		_elf32_msize(Elf_Type, unsigned);
 extern size_t		_elf64_msize(Elf_Type, unsigned);
 extern Elf_Type		_elf32_mtype(Elf *, Elf32_Word, unsigned);
 extern Elf_Type		_elf64_mtype(Elf *, Elf64_Word, unsigned);
-extern char *		_elf_read(int, off_t, size_t);
-extern Snode32 *	_elf32_snode(void);
-extern Snode64 *	_elf64_snode(void);
+extern char		*_elf_read(int, off_t, size_t);
+extern Snode32		*_elf32_snode(void);
+extern Snode64		*_elf64_snode(void);
 extern void		_elf_unmap(char *, size_t);
 extern Okay		_elf_vm(Elf *, size_t, size_t);
 extern int		_elf32_ehdr(Elf *, int);

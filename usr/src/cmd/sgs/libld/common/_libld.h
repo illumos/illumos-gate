@@ -37,6 +37,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libld.h>
+#include <_libelf.h>
 #include <debug.h>
 #include <conv.h>
 #include <msg.h>
