@@ -33,3 +33,9 @@ sparc {
 i386 {
 	SUNWprivate_1.1;
 }
+sparcv9 {
+	SUNWprivate_1.1;
+}
+amd64 {
+	SUNWprivate_1.1;
+}

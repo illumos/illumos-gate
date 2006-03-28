@@ -54,11 +54,6 @@ typedef struct _tsol_binary_level_lrange {	/* Level Range */
 
 typedef	m_range_t	blrange_t;
 
-#define	NMLP_MAX	0x10
-#define	NSLS_MAX	0x4
-
-typedef m_label_t blset_t[NSLS_MAX];
-
 typedef struct tsol_mlp_s {
 	uchar_t mlp_ipp;
 	uint16_t mlp_port;

@@ -105,7 +105,7 @@ papiServiceSetPeer(papi_service_t handle, int peerfd)
 	if (svc == NULL)
 		return (PAPI_BAD_ARGUMENT);
 
-	if (is_system_labeled) {
+	if (is_system_labeled()) {
 		short status;
 
 		if ((snd_msg(svc, S_PASS_PEER_CONNECTION) < 0) ||

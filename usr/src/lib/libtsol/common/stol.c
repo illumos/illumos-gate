@@ -103,10 +103,6 @@ htol(char *s, m_label_t *l)
 		goto error;
 	}
 	lp = (uchar_t *)&(((_mac_label_impl_t *)l)->_comps);
-	if (LCLASS(l) < LOW_CLASS ||
-	    LCLASS(l) > HIGH_CLASS) {
-		goto error;
-	}
 	if (h[0] == '-' && h[3] == '-') {
 		uchar_t size;
 

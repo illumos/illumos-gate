@@ -1335,7 +1335,7 @@ interpret_cipso_tagtype1(const uchar_t *opt)
 		    "Categories = None");
 	}
 	cipso2sl(opt, &sl, &ishigh);
-	if (is_system_labeled) {
+	if (is_system_labeled()) {
 		if (bsltos(&sl, &plabel, ALABEL_MAXLEN,
 		    LONG_CLASSIFICATION|LONG_WORDS|VIEW_INTERNAL) < 0) {
 			(void) snprintf(get_line(0, 0), get_line_remain(),

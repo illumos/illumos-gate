@@ -94,6 +94,11 @@ typedef struct _binary_level_range_impl {	/* Level Range */
 	_mac_label_impl_t upper_bound;
 } _brange_impl_t, brange_t;
 
+#define	NMLP_MAX	0x10
+#define	NSLS_MAX	0x4
+
+typedef _mac_label_impl_t blset_t[NSLS_MAX];
+
 /* Label Identifier Types */
 
 #define	SUN_MAC_ID	0x41	/* MAC label, legacy SUN_SL_ID */

@@ -45,6 +45,7 @@
 #include <strings.h>
 #include <libtsnet.h>
 #include <tsol/label.h>
+#include <sys/tsol/label_macro.h>
 #include <sys/types.h>
 #include <nss.h>
 #include <secdb.h>

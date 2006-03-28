@@ -228,7 +228,7 @@ lpsched_client_access(const char *printer, const char *host, int peerfd)
 	if ((printer == NULL) || (host == NULL))
 		return (-1);
 
-	if (is_system_labeled) {
+	if (is_system_labeled()) {
 		short status = MOK;
 		extern MESG *lp_Md;	/* liblpmsg supplies this */
 
