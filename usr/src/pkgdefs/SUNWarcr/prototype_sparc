@@ -71,6 +71,7 @@ f none lib/sparcv9/llib-lelf.ln 644 root bin
 f none lib/sparcv9/llib-lgen.ln 644 root bin
 f none lib/sparcv9/llib-lintl.ln 644 root bin
 f none lib/sparcv9/llib-lkstat.ln 644 root bin
+f none lib/sparcv9/llib-lmd.ln 644 root bin
 f none lib/sparcv9/llib-lmd5.ln 644 root bin
 f none lib/sparcv9/llib-lnsl.ln 644 root bin
 f none lib/sparcv9/llib-lnvpair.ln 644 root bin

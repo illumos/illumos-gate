@@ -98,6 +98,8 @@ s none lib/sparcv9/libkstat.so=libkstat.so.1
 f none lib/sparcv9/libkstat.so.1 755 root bin
 f none lib/sparcv9/libld.so.4 755 root bin
 f none lib/sparcv9/liblddbg.so.4 755 root bin
+s none lib/sparcv9/libmd.so=libmd.so.1
+f none lib/sparcv9/libmd.so.1 755 root bin
 s none lib/sparcv9/libmd5.so=libmd5.so.1
 f none lib/sparcv9/libmd5.so.1 755 root bin
 s none lib/sparcv9/libmp.so=libmp.so.2

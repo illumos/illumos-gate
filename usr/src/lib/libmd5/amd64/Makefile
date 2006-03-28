@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -25,9 +24,12 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# lib/libmd5/amd64/Makefile
+#
 
-MAPDIR= ../spec/amd64
 include ../Makefile.com
-include $(SRC)/lib/Makefile.lib.64
+include ../../Makefile.lib.64
+
+BUILD.SO=	$(LD) -o $@ -G -64 $(DYNFLAGS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

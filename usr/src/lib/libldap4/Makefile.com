@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,7 +72,7 @@ LOCFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
 CPPFLAGS =	$(LOCFLAGS) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 DYNFLAGS +=	-M $(MAPFILE)
-LDLIBS +=	-lsocket -lnsl -lresolv -lc -lmd5
+LDLIBS +=	-lsocket -lnsl -lresolv -lc -lmd
 
 .KEEP_STATE:
 

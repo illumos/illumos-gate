@@ -65,6 +65,7 @@ SUBDIRS += \
 	libc			.WAIT	\
 	libmapmalloc		.WAIT	\
 	../cmd/sgs/libelf	.WAIT	\
+	libmd				\
 	libmd5				\
 	librsm				\
 	libmp			.WAIT	\
@@ -217,8 +218,7 @@ SUBDIRS += \
 
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
-	libc_psr	.WAIT	\
-	libmd5_psr	.WAIT
+	libc_psr	.WAIT
 $(CLOSED_BUILD)sparc_SUBDIRS += \
 	$(CLOSED)/lib/libprtdiag	.WAIT	\
 	$(CLOSED)/lib/libprtdiag_psr	\
@@ -328,6 +328,7 @@ HDRSUBDIRS= libaio	\
         liblaadm        \
 	libmacadm	\
 	libmail		\
+	libmd		\
 	libmtmalloc	\
 	libnvpair	\
 	libnsl		\
@@ -451,12 +452,12 @@ libmacadm:	libdevinfo
 libuuid:	libsocket
 libinetutil:	libsocket
 libsecdb:	libcmd libnsl
-librt:		libaio libmd5
-libsasl:	libgss libsocket pkcs11 libmd5
+librt:		libaio libmd
+libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket
 libsocket:	libnsl
-libldap5:	libsasl libsocket libnsl libmd5
+libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol
 libpool:	libnvpair libexacct
 libproject:	libpool libproc libsecdb
@@ -466,7 +467,7 @@ libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
 pam_modules:	libproject passwdutil $(SMARTCARD)
-libscf:		libuutil
+libscf:		libuutil libmd
 libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv

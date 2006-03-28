@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -23,7 +23,7 @@ include ../../Makefile.lib
 LIBS=		$(DYNLIB) $(LINTLIB)
 SRCS=		$(SASLOBJS:%.o=../lib/%.c) $(COMMONOBJS:%.o=$(PLUGDIR)/%.c)
 $(LINTLIB):= 	SRCS = $(SRCDIR)/$(LINTSRC)
-LDLIBS +=	-lsocket -lc -lmd5
+LDLIBS +=	-lsocket -lc -lmd
 LINTFLAGS +=	-DPIC
 LINTFLAGS64 +=	-DPIC
 

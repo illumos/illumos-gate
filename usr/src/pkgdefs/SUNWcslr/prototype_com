@@ -98,6 +98,8 @@ f none lib/liblaadm.so.1 755 root bin
 f none lib/libld.so.4 755 root bin
 f none lib/liblddbg.so.4 755 root bin
 f none lib/libmacadm.so.1 755 root bin
+s none lib/libmd.so=libmd.so.1
+f none lib/libmd.so.1 755 root bin
 s none lib/libmd5.so=libmd5.so.1
 f none lib/libmd5.so.1 755 root bin
 s none lib/libmp.so=libmp.so.2

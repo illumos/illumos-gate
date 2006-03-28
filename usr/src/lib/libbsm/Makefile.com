@@ -99,7 +99,7 @@ CFLAGS	+=	$(CCVERBOSE)
 DYNFLAGS +=	-M$(MAPFILE)
 
 LAZYLIBS =	$(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-LDLIBS +=	-lsocket -lnsl -lmd5 -lc -lsecdb $(LAZYLIBS)
+LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb $(LAZYLIBS)
 lint :=		LAZYLIBS = -ltsol
 
 COMDIR=		../common

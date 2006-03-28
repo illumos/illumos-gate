@@ -1,29 +1,29 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _MD5_H
-#define	_MD5_H
+#ifndef	__MD4_H
+#define	__MD4_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+
 /*
- * MD5.H - header file for MD5C.C
+ * MD4C.C - RSA Data Security, Inc., MD4 message-digest algorithm
  */
 
 /*
- * Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
- * rights reserved.
+ * Copyright (C) 1990-2, RSA Data Security, Inc. All rights reserved.
  *
  * License to copy and use this software is granted provided that it
- * is identified as the "RSA Data Security, Inc. MD5 Message-Digest
+ * is identified as the "RSA Data Security, Inc. MD4 Message-Digest
  * Algorithm" in all material mentioning or referencing this software
  * or this function.
  *
  * License is also granted to make and use derivative works provided
  * that such works are identified as "derived from the RSA Data
- * Security, Inc. MD5 Message-Digest Algorithm" in all material
+ * Security, Inc. MD4 Message-Digest Algorithm" in all material
  * mentioning or referencing the derived work.
  *
  * RSA Data Security, Inc. makes no representations concerning either
@@ -35,16 +35,23 @@
  * documentation and/or software.
  */
 
-#include <sys/md5.h>
-
-#ifdef __cplusplus
+#ifdef	__cplusplus
 extern "C" {
 #endif
 
-void md5_calc(unsigned char *, unsigned char *, unsigned int);
+/* MD4 context. */
+typedef struct {
+	ulong_t state[4];	/* state (ABCD) */
+	ulong_t count[2];	/* number of bits, modulo 2^64 (lsb first) */
+	unsigned char buffer[64];	/* input buffer */
+} MD4_CTX;
 
-#ifdef __cplusplus
+void MD4Init(MD4_CTX *);
+void MD4Update(MD4_CTX *, const void *_RESTRICT_KYWD, size_t);
+void MD4Final(void *, MD4_CTX *);
+
+#ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _MD5_H */
+#endif	/* __MD4_H */

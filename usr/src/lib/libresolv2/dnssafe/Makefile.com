@@ -41,7 +41,7 @@ include ../../../Makefile.lib
 
 LIBNAME=	$(LIBRARY:%.a=%)
 LIBS=		$(DYNLIB)
-LDLIBS +=	-lmd5 -lresolv -lc
+LDLIBS +=	-lmd -lresolv -lc
 
 MAPDIR =	../spec/$(TRANSMACH)
 SPECMAPFILE =	$(MAPDIR)/mapfile

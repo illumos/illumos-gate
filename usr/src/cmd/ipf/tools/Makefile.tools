@@ -1,9 +1,9 @@
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		ipf ipfs ipmon ipnat ippool ipfstat
@@ -44,7 +44,7 @@ ipfstat.o	:=	CPPFLAGS += -DSTATETOP
 ipfstat		:=	LDLIBS += -lcurses
 
 ipf		:=	LDLIBS += -lsocket -lnsl
-ipftest		:=	LDLIBS += -lsocket -lnsl -lmd5
+ipftest		:=	LDLIBS += -lsocket -lnsl -lmd
 ipfstat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
 ipmon		:=	LDLIBS += -lsocket -lnsl
 ipnat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf

@@ -201,6 +201,7 @@ f none usr/include/locale.h 644 root bin
 f none usr/include/macros.h 644 root bin
 f none usr/include/maillock.h 644 root bin
 f none usr/include/malloc.h 644 root bin
+f none usr/include/md4.h 644 root bin
 f none usr/include/md5.h 644 root bin
 f none usr/include/mdmn_changelog.h 644 root bin
 f none usr/include/memory.h 644 root bin
@@ -467,6 +468,8 @@ f none usr/include/security/pkcs11t.h 644 root bin
 f none usr/include/semaphore.h 644 root bin
 f none usr/include/setjmp.h 644 root bin
 f none usr/include/sgtty.h 644 root bin
+f none usr/include/sha1.h 644 root bin
+f none usr/include/sha2.h 644 root bin
 f none usr/include/shadow.h 644 root bin
 f none usr/include/siginfo.h 644 root bin
 f none usr/include/signal.h 644 root bin
@@ -1014,6 +1017,8 @@ f none usr/include/sys/semaphore.h 644 root bin
 f none usr/include/sys/sendfile.h 644 root bin
 f none usr/include/sys/ser_sync.h 644 root bin
 f none usr/include/sys/session.h 644 root bin
+f none usr/include/sys/sha1.h 644 root bin
+f none usr/include/sys/sha2.h 644 root bin
 f none usr/include/sys/share.h 644 root bin
 f none usr/include/sys/shm.h 644 root bin
 f none usr/include/sys/shm_impl.h 644 root bin

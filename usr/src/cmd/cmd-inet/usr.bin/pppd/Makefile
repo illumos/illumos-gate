@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/usr.bin/pppd/Makefile
@@ -24,7 +24,7 @@ clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 lint:=		TARGET= lint
 
-LDLIBS +=	-lpam -lmd5 -lsocket -lnsl
+LDLIBS +=	-lpam -lmd -lsocket -lnsl
 
 #
 # We need absolute path to /etc/ppp/plugins and /usr/lib/inet/ppp, not
@@ -48,16 +48,15 @@ all:		$(PROG) $(SUBDIRS)
 CPPFLAGS +=	-DHAVE_CRYPT_H -DUSE_CRYPT
 CPPFLAGS +=	-DCHAPMS -DMSLANMAN
 CPPFLAGS +=	-DCHAPMSV2
-OBJS +=		chap_ms.o md4.o sha1.o
+OBJS +=		chap_ms.o
 EXOBJS +=	mschap_test.o
 CLOBBERFILES +=	mschap_test
 
 # This is used *only* for testing the portability of the libraries
 # required for MS-CHAPv1.  It is not needed in any normal system and
 # is not built by default.
-mschap_test:	mschap_test.o chap_ms.o md4.o sha1.o
-	$(LINK.c) -o mschap_test mschap_test.o chap_ms.o md4.o sha1.o \
-		$(LDFLAGS)
+mschap_test:	mschap_test.o chap_ms.o
+	$(LINK.c) -o mschap_test mschap_test.o chap_ms.o $(LDFLAGS)
 	@echo "Run with 'mschap_test 00000000000000000000000000000000 hello'"
 	@echo
 	@echo "Output should be:"

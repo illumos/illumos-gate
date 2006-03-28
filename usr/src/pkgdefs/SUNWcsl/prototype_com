@@ -163,6 +163,8 @@ f none usr/lib/libmalloc.so.1 755 root bin
 s none usr/ccs/lib/libmalloc.so=../../lib/libmalloc.so.1
 s none usr/lib/libmapmalloc.so=./libmapmalloc.so.1
 f none usr/lib/libmapmalloc.so.1 755 root bin
+s none usr/lib/libmd.so.1=../../lib/libmd.so.1
+s none usr/lib/libmd.so=../../lib/libmd.so.1
 s none usr/lib/libmd5.so.1=../../lib/libmd5.so.1
 s none usr/lib/libmd5.so=../../lib/libmd5.so.1
 f none usr/lib/libmenu.so.1 755 root bin

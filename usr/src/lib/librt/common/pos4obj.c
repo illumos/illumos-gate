@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -44,7 +43,6 @@
 #include "pos4.h"
 #include "pos4obj.h"
 
-#define	MD5LEN		16
 #define	HASHSTRLEN	32
 
 static	char	*__pos4obj_name(const char *, const char *);
@@ -99,7 +97,7 @@ __pos4obj_name(const char *path, const char *type)
 	size_t	len;
 	char	*dfile;
 	unsigned char	hashbuf[HASHSTRLEN + 1];
-	unsigned char	md5_digest[MD5LEN];
+	unsigned char	md5_digest[MD5_DIGEST_LENGTH];
 
 	/*
 	 * If the path is path_max - strlen(type) characters or less,
@@ -235,7 +233,7 @@ __pos4obj_md5toa(unsigned char *dest, unsigned char *src)
 	/* LINTED pointer cast may result in improper alignment */
 	p = (uint32_t *)src;
 
-	for (i = 0; i < (MD5LEN / 4); i++)
+	for (i = 0; i < (MD5_DIGEST_LENGTH / 4); i++)
 		(void) snprintf((char *)dest + (i * 8), 9, "%.8x", *p++);
 
 	dest[HASHSTRLEN] = '\0';

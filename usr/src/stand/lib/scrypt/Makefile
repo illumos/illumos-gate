@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,18 +19,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY = libscrypt.a
-OBJECTS = sha1.o hmac_sha1.o des3.o des.o aes.o cbc.o
+COBJECTS = hmac_sha1.o des3.o des.o aes.o cbc.o
+SHA1_OBJS = sha1.o
+OBJECTS = $(COBJECTS) $(SHA1_OBJS)
 
 include ../Makefile.com
 
 CMNDIR  = $(TOPDIR)/common/net/wanboot/crypt
-SRCS	= $(OBJECTS:%.o=$(CMNDIR)/%.c)
+SHA1DIR  = $(TOPDIR)/common/crypto/sha1
+SRCS	= $(COBJECTS:%.o=$(CMNDIR)/%.c) $(SHA1_OBJS:%.o=$(SHA1DIR)/%.c)
 
 include ../Makefile.targ

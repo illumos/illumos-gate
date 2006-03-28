@@ -201,6 +201,7 @@ ROOT.BIN= \
 	/usr/include/libmilter \
 	/usr/include/sasl \
 	/usr/include/tsol \
+	/usr/include/security \
 	/usr/lib \
 	/usr/lib/abi \
 	/usr/lib/class \
@@ -810,6 +811,8 @@ $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
+$(ROOT)/usr/lib/libmd.so.1:=		REALPATH=../../lib/libmd.so.1
+$(ROOT)/usr/lib/libmd.so:=		REALPATH=../../lib/libmd.so.1
 $(ROOT)/usr/lib/libmd5.so.1:=		REALPATH=../../lib/libmd5.so.1
 $(ROOT)/usr/lib/libmd5.so:=		REALPATH=../../lib/libmd5.so.1
 $(ROOT)/usr/lib/libmeta.so.1:=		REALPATH=../../lib/libmeta.so.1
@@ -1080,6 +1083,10 @@ $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/liblddbg.so.4:= \
 	REALPATH=../../../lib/$(MACH64)/liblddbg.so.4
+$(ROOT)/usr/lib/$(MACH64)/libmd.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libmd.so.1
+$(ROOT)/usr/lib/$(MACH64)/libmd.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmd.so.1
 $(ROOT)/usr/lib/$(MACH64)/libmd5.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libmd5.so.1
 $(ROOT)/usr/lib/$(MACH64)/libmd5.so:= \
@@ -1382,6 +1389,8 @@ SYM.USRLIB= \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
+	/usr/lib/libmd.so \
+	/usr/lib/libmd.so.1 \
 	/usr/lib/libmd5.so \
 	/usr/lib/libmd5.so.1 \
 	/usr/lib/libmeta.so \
@@ -1615,6 +1624,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \
+	/usr/lib/$(MACH64)/libmd.so \
+	/usr/lib/$(MACH64)/libmd.so.1 \
 	/usr/lib/$(MACH64)/libmd5.so \
 	/usr/lib/$(MACH64)/libmd5.so.1 \
 	/usr/lib/$(MACH64)/libmp.so \

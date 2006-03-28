@@ -166,6 +166,8 @@ f none usr/lib/sparcv9/liblgrp.so.1 755 root bin
 s none usr/lib/sparcv9/liblgrp.so=liblgrp.so.1
 f none usr/lib/sparcv9/libmalloc.so.1 755 root bin
 s none usr/lib/sparcv9/libmalloc.so=libmalloc.so.1
+s none usr/lib/sparcv9/libmd.so.1=../../../lib/sparcv9/libmd.so.1
+s none usr/lib/sparcv9/libmd.so=../../../lib/sparcv9/libmd.so.1
 s none usr/lib/sparcv9/libmd5.so.1=../../../lib/sparcv9/libmd5.so.1
 s none usr/lib/sparcv9/libmd5.so=../../../lib/sparcv9/libmd5.so.1
 f none usr/lib/sparcv9/libmenu.so.1 755 root bin

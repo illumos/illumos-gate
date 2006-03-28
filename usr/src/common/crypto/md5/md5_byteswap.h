@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,24 @@ load_little_16(uint16_t *addr)
 #if !defined(__GNUC__)
 extern	uint32_t load_little_32(uint32_t *);
 #endif	/* !__GNUC__ */
+
+/* Placate lint */
+#if defined(__lint)
+uint32_t
+load_little_32(uint32_t *addr)
+{
+	return (*addr);
+}
+#endif	/* __lint */
+
+#else	/* !sun4u */
+
+/* big endian -- will work on little endian, but slowly */
+/* Since we do byte operations, we don't have to check for alignment. */
+#define	LOAD_LITTLE_32(addr)	\
+	((addr)[0] | ((addr)[1] << 8) | ((addr)[2] << 16) | ((addr)[3] << 24))
+
+#endif	/* sun4u */
 
 #if defined(sun4v)
 
@@ -241,23 +259,6 @@ extern	uint32_t load_little_32_f(uint32_t *);
 #endif	/* !__GNUC__ */
 #endif	/* sun4v */
 
-/* Placate lint */
-#if defined(__lint)
-uint32_t
-load_little_32(uint32_t *addr)
-{
-	return (*addr);
-}
-#endif	/* __lint */
-
-#else	/* !sun4u */
-
-/* big endian -- will work on little endian, but slowly */
-/* Since we do byte operations, we don't have to check for alignment. */
-#define	LOAD_LITTLE_32(addr)	\
-	((addr)[0] | ((addr)[1] << 8) | ((addr)[2] << 16) | ((addr)[3] << 24))
-
-#endif	/* sun4u */
 #endif	/* _LITTLE_ENDIAN */
 
 #ifdef	__cplusplus

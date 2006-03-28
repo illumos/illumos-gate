@@ -120,7 +120,7 @@ SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CFLAGS +=	$(CCVERBOSE) $(LOCFLAGS)
 CFLAGS64 +=	$(LOCFLAGS)
-LDLIBS +=	-lsasl -lsocket -lnsl -lmd5 -lc
+LDLIBS +=	-lsasl -lsocket -lnsl -lmd -lc
 
 .KEEP_STATE:
 

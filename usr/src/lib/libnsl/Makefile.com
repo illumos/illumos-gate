@@ -207,8 +207,8 @@ CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 
 CFLAGS +=	-v
 
-LAZYLIBS = $(ZLAZYLOAD) -lmp -lmd5 -lscf $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lmd5
+LAZYLIBS = $(ZLAZYLOAD) -lmp -lmd -lscf $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -lmd
 LDLIBS +=	$(LAZYLIBS) -lc
 DYNFLAGS +=	$(MAPOPTS)
 

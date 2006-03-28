@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,8 +71,6 @@ BLOWFISH_COBJECTS = blowfish_cbc_crypt.o blowfish_impl.o
 ARCFOUR_COBJECTS = arcfour_crypt.o
 DES_COBJECTS = des_cbc_crypt.o des_impl.o des_ks.o
 RSA_COBJECTS = rsa_impl.o
-SHA1_COBJECTS = sha1.o
-SHA2_COBJECTS = sha2.o
 BIGNUM_COBJECTS = bignumimpl.o
 
 AES_OBJECTS = $(AES_COBJECTS) $(AES_PSR_OBJECTS)
@@ -127,8 +124,6 @@ BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 DESDIR=		$(SRC)/common/crypto/des
 RSADIR=		$(SRC)/common/crypto/rsa
-SHA1DIR=	$(SRC)/common/crypto/sha1
-SHA2DIR=	$(SRC)/common/crypto/sha2
 BIGNUMDIR=	$(SRC)/common/bignum
 BERDIR=		../../../libldap5/sources/ldap/ber
 
@@ -152,7 +147,7 @@ SRCS =	\
 	$(BIGNUM_PSR_SRCS)
 
 LIBS    =       $(DYNLIB)
-LDLIBS  +=      -lc -lmd5
+LDLIBS  +=      -lc -lmd
 
 MAPDIR  = ../spec/$(TRANSMACH)
 SPECMAPFILE = $(MAPDIR)/mapfile

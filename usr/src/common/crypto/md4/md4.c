@@ -1,5 +1,5 @@
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
  * documentation and/or software.
  */
 
-#include	<string.h>
+#include	<strings.h>
 #include	<sys/types.h>
 
 #include	"md4.h"
@@ -52,9 +52,9 @@
 #define	S33 11
 #define	S34 15
 
-static void MD4Transform(u_long [4], unsigned char [64]);
-static void Encode(unsigned char *, u_long *, unsigned int);
-static void Decode(u_long *, unsigned char *, unsigned int);
+static void MD4Transform(ulong_t [4], unsigned char [64]);
+static void Encode(unsigned char *, ulong_t *, unsigned int);
+static void Decode(ulong_t *, unsigned char *, unsigned int);
 
 static unsigned char PADDING[64] = {
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -82,11 +82,11 @@ static unsigned char PADDING[64] = {
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 #define	GG(a, b, c, d, x, s) { \
-		(a) += G((b), (c), (d)) + (x) + (u_long)0x5a827999; \
+		(a) += G((b), (c), (d)) + (x) + (ulong_t)0x5a827999; \
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 #define	HH(a, b, c, d, x, s) { \
-		(a) += H((b), (c), (d)) + (x) + (u_long)0x6ed9eba1; \
+		(a) += H((b), (c), (d)) + (x) + (ulong_t)0x6ed9eba1; \
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 
@@ -115,20 +115,18 @@ MD4Init(context)
  * context.
  */
 void
-MD4Update(context, input, inputLen)
-	MD4_CTX *context;		/* context */
-	unsigned char *input;		/* input block */
-	unsigned int inputLen;		/* length of input block */
+MD4Update(MD4_CTX *context, const void *_RESTRICT_KYWD inptr, size_t inputLen)
 {
 	unsigned int i, index, partLen;
+	uchar_t *input = (uchar_t *)inptr;
 
 	/* Compute number of bytes mod 64 */
 	index = (unsigned int)((context->count[0] >> 3) & 0x3F);
 	/* Update number of bits */
-	if ((context->count[0] += ((u_long)inputLen << 3))
-	    < ((u_long)inputLen << 3))
+	if ((context->count[0] += ((ulong_t)inputLen << 3))
+	    < ((ulong_t)inputLen << 3))
 		context->count[1]++;
-	context->count[1] += ((u_long)inputLen >> 29);
+	context->count[1] += ((ulong_t)inputLen >> 29);
 
 	partLen = 64 - index;
 
@@ -136,12 +134,11 @@ MD4Update(context, input, inputLen)
 	 * Transform as many times as possible.
 	 */
 	if (inputLen >= partLen) {
-		(void) memcpy((char *)&context->buffer[index],
-		    (char *)input, partLen);
-		MD4Transform(context->state, context->buffer);
+		bcopy(input, &context->buffer[index], partLen);
+		MD4Transform(context->state, (uchar_t *)context->buffer);
 
 		for (i = partLen; i + 63 < inputLen; i += 64) {
-			MD4Transform(context->state, &input[i]);
+			MD4Transform(context->state, (uchar_t *)&input[i]);
 		}
 
 		index = 0;
@@ -150,8 +147,7 @@ MD4Update(context, input, inputLen)
 	}
 
 	/* Buffer remaining input */
-	(void) memcpy((char *)&context->buffer[index],
-	    (char *)&input[i], inputLen-i);
+	bcopy(&input[i], &context->buffer[index], inputLen - i);
 }
 
 /*
@@ -159,9 +155,7 @@ MD4Update(context, input, inputLen)
  *	the message digest and zeroizing the context.
  */
 void
-MD4Final(digest, context)
-	unsigned char digest[16];		/* message digest */
-	MD4_CTX *context;			/* context */
+MD4Final(void *digest, MD4_CTX *context)
 {
 	unsigned char bits[8];
 	unsigned int index, padLen;
@@ -181,19 +175,17 @@ MD4Final(digest, context)
 	/* Store state in digest */
 	Encode(digest, context->state, 16);
 
-	/*
-	 * Zeroize sensitive information.
-	 */
-	(void) memset((char *)context, 0, sizeof (*context));
+	/* zeroize sensitive information */
+	bzero(context, sizeof (*context));
 }
 
 /*
  * MD4 basic transformation. Transforms state based on block.
  */
 static void
-MD4Transform(u_long state[4], unsigned char block[64])
+MD4Transform(ulong_t state[4], unsigned char block[64])
 {
-	u_long a = state[0], b = state[1], c = state[2], d = state[3], x[16];
+	ulong_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
 
 	Decode(x, block, 64);
@@ -258,20 +250,18 @@ MD4Transform(u_long state[4], unsigned char block[64])
 	state[2] += c;
 	state[3] += d;
 
-	/*
-	 * Zeroize sensitive information.
-	 */
-	(void) memset((char *)x, 0, sizeof (x));
+	/* zeroize sensitive information */
+	bzero(x, sizeof (*x));
 }
 
 /*
- * Encodes input (u_long) into output (unsigned char). Assumes len is
+ * Encodes input (ulong_t) into output (unsigned char). Assumes len is
  * a multiple of 4.
  */
 static void
 Encode(output, input, len)
 	unsigned char *output;
-	u_long *input;
+	ulong_t *input;
 	unsigned int len;
 {
 	unsigned int i, j;
@@ -285,20 +275,20 @@ Encode(output, input, len)
 }
 
 /*
- * Decodes input (unsigned char) into output (u_long). Assumes len is
+ * Decodes input (unsigned char) into output (ulong_t). Assumes len is
  * a multiple of 4.
  */
 static void
 Decode(output, input, len)
-	u_long *output;
+	ulong_t *output;
 	unsigned char *input;
 	unsigned int len;
 {
 	unsigned int i, j;
 
 	for (i = 0, j = 0; j < len; i++, j += 4)
-		output[i] = ((u_long)input[j]) |
-			(((u_long)input[j+1]) << 8) |
-			(((u_long)input[j+2]) << 16) |
-			(((u_long)input[j+3]) << 24);
+		output[i] = ((ulong_t)input[j]) |
+			(((ulong_t)input[j+1]) << 8) |
+			(((ulong_t)input[j+2]) << 16) |
+			(((ulong_t)input[j+3]) << 24);
 }

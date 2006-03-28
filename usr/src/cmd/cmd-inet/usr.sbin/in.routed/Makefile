@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +33,7 @@ LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \
 
 CPPFLAGS +=	$(_D_XOPEN_EXTN)
 CFLAGS +=	$(CCVERBOSE)
-LDLIBS +=	-lxnet -lmd5 -lsocket
+LDLIBS +=	-lxnet -lmd -lsocket
 CLEAN_FILES +=	$(ROUTEDOBJS) $(RTQUERYOBJS)
 CLOBBERFILES +=	$(ROUTEDPROG) $(RTQUERYPROG)
 #

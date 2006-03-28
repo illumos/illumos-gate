@@ -173,6 +173,8 @@ f none usr/lib/amd64/liblgrp.so.1 755 root bin
 s none usr/lib/amd64/liblgrp.so=liblgrp.so.1
 f none usr/lib/amd64/libmalloc.so.1 755 root bin
 s none usr/lib/amd64/libmalloc.so=libmalloc.so.1
+s none usr/lib/amd64/libmd.so.1=../../../lib/amd64/libmd.so.1
+s none usr/lib/amd64/libmd.so=../../../lib/amd64/libmd.so.1
 s none usr/lib/amd64/libmd5.so.1=../../../lib/amd64/libmd5.so.1
 s none usr/lib/amd64/libmd5.so=../../../lib/amd64/libmd5.so.1
 f none usr/lib/amd64/libmenu.so.1 755 root bin

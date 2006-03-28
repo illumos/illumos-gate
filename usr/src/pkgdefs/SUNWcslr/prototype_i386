@@ -95,6 +95,8 @@ s none lib/amd64/libkstat.so=libkstat.so.1
 f none lib/amd64/libkstat.so.1 755 root bin
 f none lib/amd64/libld.so.4 755 root bin
 f none lib/amd64/liblddbg.so.4 755 root bin
+s none lib/amd64/libmd.so=libmd.so.1
+f none lib/amd64/libmd.so.1 755 root bin
 s none lib/amd64/libmd5.so=libmd5.so.1
 f none lib/amd64/libmd5.so.1 755 root bin
 s none lib/amd64/libmp.so=libmp.so.2

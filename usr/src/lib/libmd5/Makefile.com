@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -31,51 +30,31 @@
 LIBRARY= libmd5.a
 VERS= .1
 
-OBJECTS= md5.o
-COMMON= $(SRC)/common/crypto/md5
-
 include ../../Makefile.lib
-
-# install this library in the root filesystem
 include ../../Makefile.rootfs
 
-LIBS= $(DYNLIB) $(LINTLIB)
+MAPFILES=       $(SRCDIR)/mapfile-vers $(MAPFILE-FLTR)
+MAPOPTS=        $(MAPFILES:%=-M %)
 
-# Macros to help build the shared object
-MAPFILE= $(MAPDIR)/mapfile
-DYNFLAGS += -M$(MAPFILE)
-CPPFLAGS += -D__RESTRICT
-CFLAGS += $(CCVERBOSE)
+DYNFLAGS +=     -F libmd.so.1 $(MAPOPTS)
 
-DYNFLAGS +=	$(BDIRECT)
-LDLIBS +=	-lc
+LIBS =          $(DYNLIB) $(LINTLIB)
 
-# Macros to help build the lint library
-LINTSRC= $(LINTLIB:%.ln=%)
-$(LINTLIB) := SRCS= ../$(LINTSRC)
-SRCS= $(OBJECTS:%.o=$(COMMON)/%.c)
-ROOTLINT= $(LINTSRC:%=$(ROOTLIBDIR)/%)
-$(ROOTLIBDIR)/%: ../%
-	$(INS.file)
+SRCDIR =        ../common
+$(LINTLIB) :=   SRCS = $(SRCDIR)/llib-lmd5
 
-# The md5 code is very careful about data alignment
-# but lint doesn't know that, so just shut lint up.
-lint := LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
-lint := LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN
+
+# Redefine shared object build rule to use $(LD) directly (this avoids .init
+# and .fini sections being added).  Also, since there are no OBJECTS, turn
+# off CTF.
+
+BUILD.SO=       $(LD) -o $@ -G $(DYNFLAGS)
+CTFMERGE_LIB=   :
 
 .KEEP_STATE:
 
-$(DYNLIB): $(MAPFILE)
+all: $(LIBS)
 
-$(MAPFILE):
-	@cd $(MAPDIR); pwd; $(MAKE) mapfile
+include ../../Makefile.targ
 
-all: $(LIBS) fnamecheck
-
-lint: lintcheck
-
-include $(SRC)/lib/Makefile.targ
-
-pics/%.o: $(COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+$(DYNLIB):      $(MAPFILES)

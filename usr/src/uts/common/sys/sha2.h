@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,16 +34,6 @@
 extern "C" {
 #endif
 
-#define	SHA256			0
-#define	SHA256_HMAC		1
-#define	SHA256_HMAC_GEN		2
-#define	SHA384			3
-#define	SHA384_HMAC		4
-#define	SHA384_HMAC_GEN		5
-#define	SHA512			6
-#define	SHA512_HMAC		7
-#define	SHA512_HMAC_GEN		8
-
 #define	SHA2_HMAC_MIN_KEY_LEN	8	/* SHA2-HMAC min key length in bits */
 #define	SHA2_HMAC_MAX_KEY_LEN	INT_MAX /* SHA2-HMAC max key length in bits */
 
@@ -55,8 +44,23 @@ extern "C" {
 #define	SHA256_HMAC_BLOCK_SIZE	64	/* SHA256-HMAC block size */
 #define	SHA512_HMAC_BLOCK_SIZE	128	/* SHA512-HMAC block size */
 
+#define	SHA256			0
+#define	SHA256_HMAC		1
+#define	SHA256_HMAC_GEN		2
+#define	SHA384			3
+#define	SHA384_HMAC		4
+#define	SHA384_HMAC_GEN		5
+#define	SHA512			6
+#define	SHA512_HMAC		7
+#define	SHA512_HMAC_GEN		8
 
-/* SHA2 context. */
+/*
+ * SHA2 context.
+ * The contents of this structure are a private interface between the
+ * Init/Update/Final calls of the functions defined below.
+ * Callers must never attempt to read or write any of the fields
+ * in this strucutre directly.
+ */
 typedef struct 	{
 	uint32_t algotype;		/* Algorithm Type */
 
@@ -77,11 +81,61 @@ typedef struct 	{
 	} buf_un;
 } SHA2_CTX;
 
+typedef SHA2_CTX SHA256_CTX;
+typedef SHA2_CTX SHA384_CTX;
+typedef SHA2_CTX SHA512_CTX;
+
 extern void SHA2Init(uint64_t mech, SHA2_CTX *);
 
-extern void SHA2Update(SHA2_CTX *, const uint8_t *, uint32_t);
+extern void SHA2Update(SHA2_CTX *, const void *, size_t);
 
-extern void SHA2Final(uint8_t *, SHA2_CTX *);
+extern void SHA2Final(void *, SHA2_CTX *);
+
+extern void SHA256Init(SHA256_CTX *);
+
+extern void SHA256Update(SHA256_CTX *, const void *, size_t);
+
+extern void SHA256Final(void *, SHA256_CTX *);
+
+extern void SHA384Init(SHA384_CTX *);
+
+extern void SHA384Update(SHA384_CTX *, const void *, size_t);
+
+extern void SHA384Final(void *, SHA384_CTX *);
+
+extern void SHA512Init(SHA512_CTX *);
+
+extern void SHA512Update(SHA512_CTX *, const void *, size_t);
+
+extern void SHA512Final(void *, SHA512_CTX *);
+
+#ifdef _SHA2_IMPL
+/*
+ * The following types/functions are all private to the implementation
+ * of the SHA2 functions and must not be used by consumers of the interface
+ */
+
+/*
+ * List of support mechanisms in this module.
+ *
+ * It is important to note that in the module, division or modulus calculations
+ * are used on the enumerated type to determine which mechanism is being used;
+ * therefore, changing the order or additional mechanisms should be done
+ * carefully
+ */
+typedef enum sha2_mech_type {
+	SHA256_MECH_INFO_TYPE,		/* SUN_CKM_SHA256 */
+	SHA256_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_SHA256_HMAC */
+	SHA256_HMAC_GEN_MECH_INFO_TYPE,	/* SUN_CKM_SHA256_HMAC_GENERAL */
+	SHA384_MECH_INFO_TYPE,		/* SUN_CKM_SHA384 */
+	SHA384_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_SHA384_HMAC */
+	SHA384_HMAC_GEN_MECH_INFO_TYPE,	/* SUN_CKM_SHA384_HMAC_GENERAL */
+	SHA512_MECH_INFO_TYPE,		/* SUN_CKM_SHA512 */
+	SHA512_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_SHA512_HMAC */
+	SHA512_HMAC_GEN_MECH_INFO_TYPE	/* SUN_CKM_SHA512_HMAC_GENERAL */
+} sha2_mech_type_t;
+
+#endif /* _SHA2_IMPL */
 
 #ifdef	__cplusplus
 }
