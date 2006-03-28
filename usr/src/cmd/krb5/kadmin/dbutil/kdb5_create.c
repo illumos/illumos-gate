@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,9 +274,9 @@ kdb5_create(argc, argv)
 	pw_str = malloc(pw_size);
 	
 	retval = krb5_read_password(util_context,
-			    gettext("Enter KDC database master key:"),
+			    gettext("Enter KDC database master key"),
 			    gettext("Re-enter KDC database "
-				    "master key to verify:"),
+				    "master key to verify"),
 			    pw_str, &pw_size);
 	if (retval) {
 		com_err(argv[0], retval,

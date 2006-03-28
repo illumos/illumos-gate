@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -734,10 +734,10 @@ kadmin_cpw(argc, argv)
 	unsigned int i = sizeof (newpw) - 1;
 	
 		snprintf(prompt1, sizeof (prompt1),
-			gettext("Enter password for principal \"%.900s\": "),
+			gettext("Enter password for principal \"%.900s\""),
 			*argv);
 		snprintf(prompt2, sizeof (prompt2),
-			gettext("Re-enter password for principal \"%.900s\": "),
+			gettext("Re-enter password for principal \"%.900s\""),
 			*argv);
 	retval = krb5_read_password(context, prompt1, prompt2,
 				    newpw, &i);
@@ -1118,10 +1118,10 @@ kadmin_addprinc(argc, argv)
     } else if (pass == NULL) {
 	unsigned int i = sizeof (newpw) - 1;
 	snprintf(prompt1, sizeof (prompt1),
-		gettext("Enter password for principal \"%.900s\": "),
+		gettext("Enter password for principal \"%.900s\""),
 		canon);
 	snprintf(prompt2, sizeof (prompt1),
-		gettext("Re-enter password for principal \"%.900s\": "),
+		gettext("Re-enter password for principal \"%.900s\""),
 		canon);
 	retval = krb5_read_password(context, prompt1, prompt2,
 		    newpw, &i);

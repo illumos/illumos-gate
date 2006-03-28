@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,8 +139,10 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
 
 skip_create:
     retval = krb5_rc_resolve_full(context, &rcache, cachename);
-    if (retval)
+    if (retval) {
+	rcache = 0;
 	goto cleanup;
+    }
 
     /*
      * First try to recover the replay cache; if that doesn't work,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_init.c,v 1.13.2.2 2000/05/09 13:17:14 raeburn Exp $
@@ -924,19 +924,16 @@ cleanup:
 		free(server);
 
 	/*
-	 * Creds server and client members may actually be different
-	 * from when initially passed into the get_init_* functions.
-	 * So we must free the members we allocated above since get_init
-	 * zeros the members out, without freeing first.
+	 * cred's server and client pointers could have been overwritten
+	 * by the krb5_get_init_* functions.  If the addresses are different
+	 * before and after the calls then we must free the memory that
+	 * was allocated before the call.
 	 */
-	if (clientp != NULL) {
+	if (clientp && clientp != creds.client)
 		krb5_free_principal(handle->context, clientp);
-		clientp = NULL;
-	}
-	if (serverp != NULL) {
+
+	if (serverp && serverp != creds.server)
 		krb5_free_principal(handle->context, serverp);
-		serverp = NULL;
-	}
 
 	krb5_free_cred_contents(handle->context, &creds);
 

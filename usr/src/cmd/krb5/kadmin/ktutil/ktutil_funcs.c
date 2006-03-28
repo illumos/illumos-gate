@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +169,7 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
 	}
 
 	(void) snprintf(promptstr, sizeof(promptstr),
-		gettext("Password for %.1000s: "), princ_str);
+		gettext("Password for %.1000s"), princ_str);
         retval = krb5_read_password(context, promptstr, NULL, password.data,
 				    &password.length);
 	if (retval)

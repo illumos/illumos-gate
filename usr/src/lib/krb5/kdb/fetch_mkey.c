@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -108,10 +108,10 @@ krb5_db_fetch_mkey(context, mname, etype, fromkeyboard, twice, keyfile,
 	krb5_data scratch;
 
 	krb5_mkey_pwd_prompt1 = dgettext(TEXT_DOMAIN,
-					"Enter KDC database master key:");
+					"Enter KDC database master key");
 	krb5_mkey_pwd_prompt2 = dgettext(TEXT_DOMAIN,
 					"Re-enter KDC database master "
-					"key to verify:");
+					"key to verify");
 	if ((retval = krb5_read_password(context, krb5_mkey_pwd_prompt1,
 					 twice ? krb5_mkey_pwd_prompt2 : 0,
 					 password, &size)))

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,7 +49,7 @@ switch (errorno) {
 			"Changing password for %s."));
 	case 12:
 		return(dgettext(TEXT_DOMAIN,
-			"Old password:"));
+			"Old password"));
 	case 13:
 		return(dgettext(TEXT_DOMAIN,
 			"while reading new password."));
