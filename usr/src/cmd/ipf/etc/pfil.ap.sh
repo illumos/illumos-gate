@@ -1,6 +1,6 @@
 #!/sbin/sh
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,6 +46,7 @@ case "$MACH" in
 #qfe	-1	0	pfil
 #eri	-1	0	pfil
 #ce	-1	0	pfil
+#e1000g	-1	0	pfil
 #bge	-1	0	pfil
 #be	-1	0	pfil
 #vge	-1	0	pfil
