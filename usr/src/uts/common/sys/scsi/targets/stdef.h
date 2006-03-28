@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -829,9 +828,21 @@ _NOTE(SCHEME_PROTECTS_DATA("save sharing",
 #define	ST_PRESERVE_RESERVE		0x008
 #define	ST_RESERVATION_CONFLICT 	0x010
 #define	ST_LOST_RESERVE			0x020
+#define	ST_APPLICATION_RESERVATIONS	0x040
+#define	ST_LOST_RESERVE_BETWEEN_OPENS  \
+		(ST_RESERVE | ST_LOST_RESERVE | ST_PRESERVE_RESERVE)
 
-#define	ST_RESERVE_SUPPORTED(un)	\
-			((un->un_dp->options & ST_NO_RESERVE_RELEASE) == 0)
+/*
+ * Service action defines for Persistant Reservation Commands
+ */
+#define	ST_SA_SCSI3_REGISTER			0x00
+#define	ST_SA_SCSI3_RESERVE			0x01
+#define	ST_SA_SCSI3_RELEASE			0x02
+#define	ST_SA_SCSI3_CLEAR			0x03
+#define	ST_SA_SCSI3_PREEMPT			0x04
+#define	ST_SA_SCSI3_PREEMPTANDABORT		0x05
+#define	ST_SA_SCSI3_REGISTERANDIGNOREKEY	0x06
+#define	ST_SA_MASK				0x1f
 
 #define	ST_RESERVATION_DELAY		500000
 

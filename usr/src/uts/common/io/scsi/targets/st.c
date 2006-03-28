@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -479,8 +479,10 @@ static void st_clear_pe(struct scsi_tape *un);
 static void st_wait_for_io(struct scsi_tape *un);
 static int st_set_devconfig_page(struct scsi_tape *un, int compression_on);
 static int st_set_datacomp_page(struct scsi_tape *un, int compression_on);
-static int st_tape_reservation_init(dev_t dev);
-static int st_reserve_release(dev_t dev, int command);
+static int st_reserve_release(struct scsi_tape *un, int command);
+static int st_check_cdb_for_need_to_reserve(struct scsi_tape *un, caddr_t cdb);
+static int st_check_cmd_for_need_to_reserve(struct scsi_tape *un, uchar_t cmd,
+    int count);
 static int st_take_ownership(dev_t dev);
 static int st_check_asc_ascq(struct scsi_tape *un);
 static int st_check_clean_bit(dev_t dev);
@@ -1062,7 +1064,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (un->un_dev && (un->un_rsvd_status & ST_RESERVE) &&
 		    !DEVI_IS_DEVICE_REMOVED(devi)) {
 			mutex_enter(ST_MUTEX);
-			(void) st_cmd(un->un_dev, SCMD_RELEASE, 0, SYNC_CMD);
+			(void) st_reserve_release(un, ST_RELEASE);
 			mutex_exit(ST_MUTEX);
 		}
 
@@ -2012,7 +2014,7 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	 */
 	if (flag & (FNDELAY | FNONBLOCK)) {
 		if (un->un_fileno < 0 || (un->un_fileno == 0 &&
-			un->un_blkno == 0)) {
+		    un->un_blkno == 0)) {
 			un->un_state = ST_STATE_OFFLINE;
 		} else {
 			/*
@@ -2039,25 +2041,19 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		rval = 0;
 	} else {
 		/*
-		 * If reserve/release is supported on this drive.
-		 * then call st_tape_reservation_init().
+		 * Not opening O_NDELAY.
 		 */
 		un->un_state = ST_STATE_OPENING;
 
-		if (ST_RESERVE_SUPPORTED(un)) {
-			rval = st_tape_reservation_init(dev);
-			if (rval) {
-				goto exit;
-			}
-		}
 		rval = st_tape_init(dev);
 		if (rval) {
 			/*
-			 * Release the tape unit, if no preserve reserve
+			 * Release the tape unit, if reserved and not
+			 * preserve reserve.
 			 */
-			if ((ST_RESERVE_SUPPORTED(un)) &&
-			    !(un->un_rsvd_status & ST_PRESERVE_RESERVE)) {
-				(void) st_reserve_release(dev, ST_RELEASE);
+			if ((un->un_rsvd_status &
+			    (ST_RESERVE | ST_PRESERVE_RESERVE)) == ST_RESERVE) {
+				(void) st_reserve_release(un, ST_RELEASE);
 			}
 		} else {
 			un->un_state = ST_STATE_OPEN_PENDING_IO;
@@ -2084,53 +2080,6 @@ busy:
 	mutex_exit(ST_MUTEX);
 	return (rval);
 
-}
-
-#define	ST_LOST_RESERVE_BETWEEN_OPENS  \
-		(ST_RESERVE | ST_LOST_RESERVE | ST_PRESERVE_RESERVE)
-
-int
-st_tape_reservation_init(dev_t dev)
-{
-	int rval = 0;
-
-	GET_SOFT_STATE(dev);
-
-	ASSERT(mutex_owned(ST_MUTEX));
-
-	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_tape_reservation_init(dev = 0x%lx)\n", dev);
-
-	/*
-	 * Issue a Throw-Away reserve command to clear the
-	 * check condition.
-	 * If the current behaviour of reserve/release is to
-	 * hold reservation across opens , and if a Bus reset
-	 * has been issued between opens then this command
-	 * would set the ST_LOST_RESERVE flags in rsvd_status.
-	 * In this case return an EACCES so that user knows that
-	 * reservation has been lost in between opens.
-	 * If this error is not returned and we continue with
-	 * successful open , then user may think position of the
-	 * tape is still the same but inreality we would rewind the
-	 * tape and continue from BOT.
-	 */
-	rval = st_reserve_release(dev, ST_RESERVE);
-
-	if (rval) {
-		if ((un->un_rsvd_status & ST_LOST_RESERVE_BETWEEN_OPENS) ==
-			ST_LOST_RESERVE_BETWEEN_OPENS) {
-				un->un_rsvd_status &=
-					~(ST_LOST_RESERVE | ST_RESERVE);
-				un->un_errno = EACCES;
-				return (EACCES);
-		}
-		rval = st_reserve_release(dev, ST_RESERVE);
-	}
-	if (rval == 0)
-		un->un_rsvd_status |= ST_INIT_RESERVE;
-
-	return (rval);
 }
 
 static int
@@ -2170,7 +2119,7 @@ st_tape_init(dev_t dev)
 		if (un->un_rsvd_status & ST_RESERVATION_CONFLICT) {
 			un->un_state = ST_STATE_CLOSED;
 			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-				"st_tape_init: RESERVATION CONFLICT\n");
+			    "st_tape_init: RESERVATION CONFLICT\n");
 			rval = EACCES;
 			goto exit;
 		}
@@ -2181,11 +2130,15 @@ st_tape_init(dev_t dev)
 	 * anything out about yet.
 	 */
 	if (un->un_dp->type == ST_TYPE_INVALID) {
-		if (st_determine_generic(dev)) {
+		rval = st_determine_generic(dev);
+		if (rval) {
+			if (rval != EACCES) {
+				rval = EIO;
+			}
 			un->un_state = ST_STATE_CLOSED;
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "st_open: EIO invalid type\n");
-			rval = EIO;
+			    "st_tape_init: %s invalid type\n",
+			    rval == EACCES ? "EACCES" : "EIO");
 			goto exit;
 		}
 		/*
@@ -2343,7 +2296,8 @@ st_tape_init(dev_t dev)
 			} else {
 				un->un_state = ST_STATE_CLOSED;
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_open EIO no media, not opened O_NONBLOCK|O_EXCL\n");
+				    "st_tape_init EIO no media, not opened "
+				    "O_NONBLOCK|O_EXCL\n");
 				rval = EIO;
 				goto exit;
 			}
@@ -2362,30 +2316,43 @@ st_tape_init(dev_t dev)
 	un->un_bsize = un->un_dp->bsize;
 
 	if (un->un_restore_pos) {
-		if (st_validate_tapemarks(un, un->un_save_fileno,
-		    un->un_save_blkno) != 0) {
+		rval = st_validate_tapemarks(un, un->un_save_fileno,
+		    un->un_save_blkno);
+		if (rval != 0) {
+			if (rval != EACCES) {
+				rval = EIO;
+			}
 			un->un_restore_pos = 0;
 			un->un_laststate = un->un_state;
 			un->un_state = ST_STATE_CLOSED;
-			rval = EIO;
 			goto exit;
 		}
 		un->un_restore_pos = 0;
 	}
 
-	if ((un->un_fileno < 0) && st_loadtape(dev)) {
-		un->un_laststate = un->un_state;
-		un->un_state = ST_STATE_CLOSED;
-		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_open : EIO can't open tape\n");
-		rval = EIO;
-		goto exit;
+	if (un->un_fileno < 0) {
+		rval = st_loadtape(dev);
+		if (rval) {
+			if (rval != EACCES) {
+				rval = EIO;
+			}
+			un->un_laststate = un->un_state;
+			un->un_state = ST_STATE_CLOSED;
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_tape_init: %s can't open tape\n",
+			    rval == EACCES ? "EACCES" : "EIO");
+			goto exit;
+		}
 	}
 
 	/*
 	 * do a mode sense to pick up state of current write-protect,
+	 * Could cause reserve and fail due to conflict.
 	 */
-	(void) st_modesense(un);
+	rval = st_modesense(un);
+	if (rval == EACCES) {
+		goto exit;
+	}
 
 	/*
 	 * If we are opening the tape for writing, check
@@ -2430,7 +2397,7 @@ st_tape_init(dev_t dev)
 		un->un_laststate = un->un_state;
 		un->un_state = ST_STATE_CLOSED;
 		ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_open: EIO can't determine density\n");
+		    "st_tape_init: EIO can't determine density\n");
 		rval = EIO;
 		goto exit;
 	}
@@ -2699,17 +2666,6 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	if (st_report_soft_errors_on_close &&
 	    (un->un_dp->options & ST_SOFT_ERROR_REPORTING) &&
 	    (last_state != ST_STATE_OFFLINE)) {
-		/*
-		 * Make sure we have reserve the tape unit.
-		 * This is the case when we do a O_NDELAY open and
-		 * then do a close without any I/O.
-		 */
-		if (!(un->un_rsvd_status & ST_INIT_RESERVE) &&
-			ST_RESERVE_SUPPORTED(un)) {
-			if ((err = st_tape_reservation_init(dev))) {
-				goto error;
-			}
-		}
 		(void) st_report_soft_errors(dev, flag);
 	}
 
@@ -2739,15 +2695,16 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		 * and any subsequent open will stall on
 		 * the first TEST_UNIT_READY until the rewind
 		 * completes.
-		 *
 		 */
-		if (!(un->un_rsvd_status & ST_INIT_RESERVE) &&
-			ST_RESERVE_SUPPORTED(un)) {
-			if ((err = st_tape_reservation_init(dev))) {
-				goto error;
-			}
-		}
-		if (ST_RESERVE_SUPPORTED(un)) {
+
+		/*
+		 * Used to be if reserve was not supported we'd send an
+		 * asynchronious rewind. Comments above may be slightly invalid
+		 * as the immediate bit was never set. Doing an immedate rewind
+		 * makes sense, I think fixes to not ready status might handle
+		 * the problems described above.
+		 */
+		if (un->un_sd->sd_inq->inq_ansi < 2) {
 			(void) st_cmd(dev, SCMD_REWIND, 0, SYNC_CMD);
 		} else {
 			(void) st_cmd(dev, SCMD_REWIND, 0, ASYNC_CMD);
@@ -2773,13 +2730,11 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	 * Release the tape unit, if default reserve/release
 	 * behaviour.
 	 */
-	if (ST_RESERVE_SUPPORTED(un) &&
-		!(un->un_rsvd_status & ST_PRESERVE_RESERVE) &&
-		    (un->un_rsvd_status & ST_INIT_RESERVE)) {
-		(void) st_reserve_release(dev, ST_RELEASE);
+	if ((un->un_rsvd_status &
+	    (ST_RESERVE | ST_PRESERVE_RESERVE)) == ST_RESERVE) {
+		(void) st_reserve_release(un, ST_RELEASE);
 	}
 
-error:
 	/*
 	 * clear up state
 	 */
@@ -3174,13 +3129,14 @@ st_strategy(struct buf *bp)
 		 * If we haven't done/checked reservation on the tape unit
 		 * do it now.
 		 */
-		if (!(un->un_rsvd_status & ST_INIT_RESERVE)) {
-		    if (ST_RESERVE_SUPPORTED(un)) {
-				if (st_tape_reservation_init(dev)) {
+		if ((un->un_rsvd_status &
+		    (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) == 0) {
+			if ((un->un_dp->options & ST_NO_RESERVE_RELEASE) == 0) {
+				if (st_reserve_release(un, ST_RESERVE)) {
 					st_bioerror(bp, un->un_errno);
 					goto exit;
 				}
-		    } else if (un->un_state == ST_STATE_OPEN_PENDING_IO) {
+			} else if (un->un_state == ST_STATE_OPEN_PENDING_IO) {
 				/*
 				 * Enter here to restore position for possible
 				 * resets when the device was closed and opened
@@ -3191,7 +3147,7 @@ st_strategy(struct buf *bp)
 				    0, SYNC_CMD);
 				un->un_state = ST_STATE_OPEN_PENDING_IO;
 			}
-		    un->un_rsvd_status |= ST_INIT_RESERVE;
+			un->un_rsvd_status |= ST_INIT_RESERVE;
 		}
 
 		/*
@@ -3206,7 +3162,7 @@ st_strategy(struct buf *bp)
 			un->un_state = ST_STATE_INITIALIZING;
 			if (st_tape_init(dev)) {
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-					"stioctl : OFFLINE init failure ");
+				    "stioctl : OFFLINE init failure ");
 				un->un_state = ST_STATE_OFFLINE;
 				un->un_fileno = -1;
 				goto b_done_err;
@@ -4182,12 +4138,12 @@ check_commands:
 			/*
 			 * Check if Reserve/Release is supported.
 			 */
-			if (!(ST_RESERVE_SUPPORTED(un))) {
+			if (un->un_dp->options & ST_NO_RESERVE_RELEASE) {
 				rval = ENOTTY;
 				break;
 			}
 
-			rval = st_reserve_release(dev, ST_RESERVE);
+			rval = st_reserve_release(un, ST_RESERVE);
 
 			if (rval == 0) {
 				un->un_rsvd_status |= ST_PRESERVE_RESERVE;
@@ -4203,10 +4159,20 @@ check_commands:
 			/*
 			 * Check if Reserve/Release is supported.
 			 */
-			if (!(ST_RESERVE_SUPPORTED(un))) {
+			if (un->un_dp->options & ST_NO_RESERVE_RELEASE) {
 				rval = ENOTTY;
 				break;
 			}
+
+			/*
+			 * Used to just clear ST_PRESERVE_RESERVE which
+			 * made the reservation release at next close.
+			 * As the user may have opened and then done a
+			 * persistant reservation we now need to drop
+			 * the reservation without closing if the user
+			 * attempts to do this.
+			 */
+			rval = st_reserve_release(un, ST_RELEASE);
 
 			un->un_rsvd_status &= ~ST_PRESERVE_RESERVE;
 
@@ -4221,7 +4187,7 @@ check_commands:
 			/*
 			 * Check if Reserve/Release is supported.
 			 */
-			if (!(ST_RESERVE_SUPPORTED(un))) {
+			if (un->un_dp->options & ST_NO_RESERVE_RELEASE) {
 				rval = ENOTTY;
 				break;
 			}
@@ -4238,7 +4204,7 @@ check_commands:
 			 * since reserve can succeed without tape being
 			 * present in the drive.
 			 */
-			(void) st_reserve_release(dev, ST_RESERVE);
+			(void) st_reserve_release(un, ST_RESERVE);
 
 			rval = st_take_ownership(dev);
 
@@ -4340,7 +4306,7 @@ check_commands:
 		}
 
 	case USCSICMD:
-		{
+	{
 		cred_t	*cr;
 #ifdef _MULTI_DATAMODEL
 		/*
@@ -4351,21 +4317,21 @@ check_commands:
 		struct uscsi_cmd32	*ucmd_32_ptr = &ucmd_32;
 #endif /* _MULTI_DATAMODEL */
 
-			/*
-			 * Run a generic USCSI command
-			 */
-			struct uscsi_cmd ucmd;
-			struct uscsi_cmd *ucmd_ptr = &ucmd;
-			enum uio_seg uioseg;
+		/*
+		 * Run a generic USCSI command
+		 */
+		struct uscsi_cmd ucmd;
+		struct uscsi_cmd *ucmd_ptr = &ucmd;
+		enum uio_seg uioseg;
 
-			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-				"st_ioctl: USCSICMD\n");
+		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
+			"st_ioctl: USCSICMD\n");
 
-			cr = ddi_get_cred();
-			if ((drv_priv(cred_p) != 0) && (drv_priv(cr) != 0)) {
-				rval = EPERM;
-				break;
-			}
+		cr = ddi_get_cred();
+		if ((drv_priv(cred_p) != 0) && (drv_priv(cr) != 0)) {
+			rval = EPERM;
+			break;
+		}
 
 #ifdef _MULTI_DATAMODEL
 		switch (ddi_model_convert_from(flag & FMODELS)) {
@@ -4395,28 +4361,17 @@ check_commands:
 #endif /* _MULTI_DATAMODEL */
 
 
-			/*
-			 * If we haven't done/checked reservation on the
-			 * tape unit do it now.
-			 */
-			if (ST_RESERVE_SUPPORTED(un) &&
-				!(un->un_rsvd_status & ST_INIT_RESERVE)) {
-				if (rval = st_tape_reservation_init(dev))
-					goto exit;
-			}
-
-			/*
-			 * although st_ioctl_cmd() never makes use of these
-			 * now, we are just being safe and consistent
-			 */
-			ucmd.uscsi_flags &= ~(USCSI_NOINTR | USCSI_NOPARITY |
-			    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD);
+		/*
+		 * although st_ioctl_cmd() never makes use of these
+		 * now, we are just being safe and consistent
+		 */
+		ucmd.uscsi_flags &= ~(USCSI_NOINTR | USCSI_NOPARITY |
+		    USCSI_OTAG | USCSI_HTAG | USCSI_HEAD);
 
 
-			uioseg = (flag & FKIOCTL) ?
-			    UIO_SYSSPACE : UIO_USERSPACE;
+		uioseg = (flag & FKIOCTL) ?  UIO_SYSSPACE : UIO_USERSPACE;
 
-			rval = st_ioctl_cmd(dev, &ucmd, uioseg, uioseg, uioseg);
+		rval = st_ioctl_cmd(dev, &ucmd, uioseg, uioseg, uioseg);
 
 
 #ifdef _MULTI_DATAMODEL
@@ -4450,8 +4405,8 @@ check_commands:
 		}
 #endif /* _MULTI_DATAMODEL */
 
-			break;
-		}
+		break;
+	}
 
 	case MTIOCTOP:
 		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -4625,15 +4580,6 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 	un->un_status = 0;
 
 	/*
-	 * If we haven't done/checked reservation on the tape unit
-	 * do it now.
-	 */
-	if (ST_RESERVE_SUPPORTED(un) &&
-		!(un->un_rsvd_status & ST_INIT_RESERVE)) {
-		if (rval = st_tape_reservation_init(dev))
-			return (rval);
-	}
-	/*
 	 * if we are going to mess with a tape, we have to make sure we have
 	 * one and are not offline (i.e. no tape is initialized).  We let
 	 * commands pass here that don't actually touch the tape, except for
@@ -4656,13 +4602,17 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 			/*
 			 * reinitialize by normal means
 			 */
-			if (st_tape_init(dev)) {
+			rval = st_tape_init(dev);
+			if (rval) {
 				un->un_state = ST_STATE_INITIALIZING;
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_mtioctop : OFFLINE init failure ");
 				un->un_state = ST_STATE_OFFLINE;
 				un->un_fileno = -1;
-				return (EIO);
+				if (rval != EACCES) {
+					rval = EIO;
+				}
+				return (rval);
 			}
 			un->un_state = ST_STATE_OPEN_PENDING_IO;
 			break;
@@ -4837,24 +4787,23 @@ st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag)
 		 * initializing, and then send in the load command, no
 		 * matter what.
 		 *
-		 * we try the load twice because some drives fail the first
 		 * load after a media change by the user.
 		 */
 
 		if (un->un_state > ST_STATE_INITIALIZING)
 			(void) st_check_density_or_wfm(dev, 1, 0, NO_STEPBACK);
-
-		if (st_cmd(dev, SCMD_LOAD, 1, SYNC_CMD) &&
-		    st_cmd(dev, SCMD_LOAD, 1, SYNC_CMD)) {
+		rval = st_cmd(dev, SCMD_LOAD, 1, SYNC_CMD);
+		if (rval) {
+			if (rval != EACCES) {
+				rval = EIO;
+			}
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "st_mtioctop : EIO : MTLOAD\n");
-			rval = EIO;
-
+			    "st_mtioctop : %s : MTLOAD\n",
+			    rval == EACCES ? "EACCES" : "EIO");
 			/*
 			 * If load tape fails, who knows what happened...
 			 */
 			un->un_fileno = -1;
-			rval = EIO;
 			break;
 		}
 
@@ -5715,6 +5664,20 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 
 	flag = (kcmd->uscsi_flags & USCSI_READ) ? B_READ : B_WRITE;
 
+	/* check to see if this command requires the drive to be reserved */
+	err = st_check_cdb_for_need_to_reserve(un, &kcdb[0]);
+
+	if (err) {
+		goto exit_free;
+	}
+
+	/*
+	 * Get buffer resources...
+	 */
+	while (un->un_sbuf_busy)
+		cv_wait(&un->un_sbuf_cv, ST_MUTEX);
+	un->un_sbuf_busy = 1;
+
 #ifdef STDEBUG
 	if (st_debug > 6) {
 		st_clean_print(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -5745,13 +5708,6 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 		kcmd->uscsi_rqlen = 0;
 		kcmd->uscsi_rqresid = 0;
 	}
-
-	/*
-	 * Get buffer resources...
-	 */
-	while (un->un_sbuf_busy)
-		cv_wait(&un->un_sbuf_cv, ST_MUTEX);
-	un->un_sbuf_busy = 1;
 
 	un->un_srqbufp = krqbuf;
 	bp = un->un_sbufp;
@@ -6923,7 +6879,7 @@ st_set_density(dev_t dev)
 static int
 st_loadtape(dev_t dev)
 {
-	int rval = 0;
+	int rval;
 
 	GET_SOFT_STATE(dev);
 
@@ -6935,9 +6891,8 @@ st_loadtape(dev_t dev)
 	/*
 	 * 'LOAD' the tape to BOT by rewinding
 	 */
-	if (st_cmd(dev, SCMD_REWIND, 1, SYNC_CMD)) {
-		rval = -1;
-	} else {
+	rval = st_cmd(dev, SCMD_REWIND, 1, SYNC_CMD);
+	if (rval == 0) {
 		st_init(un);
 		un->un_density_known = 0;
 	}
@@ -7101,6 +7056,13 @@ st_cmd(dev_t dev, int com, int count, int wait)
 	if (st_debug)
 		st_debug_cmds(un, com, count, wait);
 #endif
+
+	/* check to see if this command requires the drive to be reserved */
+	err = st_check_cmd_for_need_to_reserve(un, com, count);
+
+	if (err) {
+		return (err);
+	}
 
 	while (un->un_sbuf_busy)
 		cv_wait(&un->un_sbuf_cv, ST_MUTEX);
@@ -7966,7 +7928,11 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 			break;
 
 		case SCMD_REWIND:
-			fixbit = 0;
+			if (bp->b_flags & B_ASYNC) {
+				fixbit = 1;
+			} else {
+				fixbit = 0;
+			}
 			count = 0;
 			un->un_lastop = ST_OP_CTL;
 			tval = un->un_dp->rewind_timeout;
@@ -8307,8 +8273,8 @@ st_check_media(dev_t dev, enum mtio_state state)
 	mutex_enter(ST_MUTEX);
 
 	ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-		"st_check_media:state=%x, mediastate=%x\n",
-		state, un->un_mediastate);
+	    "st_check_media:state=%x, mediastate=%x\n",
+	    state, un->un_mediastate);
 
 	prev_state = un->un_mediastate;
 
@@ -8376,19 +8342,25 @@ retry:
 		 * fails, set it back
 		 */
 		un->un_state = ST_STATE_INITIALIZING;
-		/*
-		 * If we haven't done/checked reservation on the
-		 * tape unit do it now.
-		 */
-		if (ST_RESERVE_SUPPORTED(un) &&
-			!(un->un_rsvd_status & ST_INIT_RESERVE)) {
-				if (rval = st_tape_reservation_init(dev)) {
-					mutex_exit(ST_MUTEX);
-					goto done;
-				}
-		}
 
-		if (st_cmd(dev, SCMD_TEST_UNIT_READY, 0, SYNC_CMD)) {
+		/*
+		 * If not reserved fail as getting reservation conflict
+		 * will make this hang forever.
+		 */
+		if ((un->un_rsvd_status &
+		    (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) == 0) {
+			mutex_exit(ST_MUTEX);
+			rval = EACCES;
+			goto done;
+		}
+		rval = st_cmd(dev, SCMD_TEST_UNIT_READY, 0, SYNC_CMD);
+		if (rval == EACCES) {
+			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_check_media: TUR got Reservation Conflict\n");
+			mutex_exit(ST_MUTEX);
+			goto done;
+		}
+		if (rval) {
 			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "st_check_media: TUR failed, going to retry\n");
 			un->un_mediastate = prev_state;
@@ -8573,8 +8545,8 @@ st_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	}
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-		"st_media_watch_cb:state=%x, specified=%x\n",
-		state, un->un_specified_mediastate);
+	    "st_media_watch_cb:state=%x, specified=%x\n",
+	    state, un->un_specified_mediastate);
 
 	/*
 	 * now signal the waiting thread if this is *not* the specified state;
@@ -8594,7 +8566,7 @@ st_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 			    un, drv_usectohz((clock_t)MEDIA_ACCESS_DELAY));
 		} else {
 			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-				"st_media_watch_cb:immediate cv_broadcast\n");
+			    "st_media_watch_cb:immediate cv_broadcast\n");
 			cv_broadcast(&un->un_state_cv);
 		}
 	}
@@ -8612,7 +8584,7 @@ st_delayed_cv_broadcast(void *arg)
 	struct scsi_tape *un = arg;
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-		"st_delayed_cv_broadcast:delayed cv_broadcast\n");
+	    "st_delayed_cv_broadcast:delayed cv_broadcast\n");
 
 	mutex_enter(ST_MUTEX);
 	cv_broadcast(&un->un_state_cv);
@@ -8988,6 +8960,14 @@ reset_target:
 		if ((pkt->pkt_state & STATE_GOT_TARGET) &&
 		    ((pkt->pkt_statistics & (STAT_BUS_RESET | STAT_DEV_RESET |
 			STAT_ABORTED)) == 0)) {
+
+			/*
+			 * If we haven't reserved the drive don't reset it.
+			 */
+			if ((un->un_rsvd_status &
+			    (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) == 0) {
+				return (rval);
+			}
 
 			mutex_exit(ST_MUTEX);
 
@@ -9870,6 +9850,13 @@ st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt)
 		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG, "unit busy\n");
 		if ((int)un->un_retry_ct++ < st_retry_count) {
 			action = QUE_BUSY_COMMAND;
+		} else if ((un->un_rsvd_status &
+		    (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) == 0) {
+			/*
+			 * If this is a command done before reserve is done
+			 * don't reset.
+			 */
+			action = COMMAND_DONE_ERROR;
 		} else {
 			ST_DEBUG2(ST_DEVINFO, st_label, CE_WARN,
 			    "unit busy too long\n");
@@ -10072,16 +10059,41 @@ st_set_state(struct scsi_tape *un)
 		case SCMD_RESERVE:
 			un->un_rsvd_status |= ST_RESERVE;
 			un->un_rsvd_status &=
-				~(ST_RELEASE | ST_LOST_RESERVE |
-					ST_RESERVATION_CONFLICT);
+			    ~(ST_RELEASE | ST_LOST_RESERVE |
+			    ST_RESERVATION_CONFLICT);
 			un->un_lastop = saved_lastop;
 			break;
 		case SCMD_RELEASE:
 			un->un_rsvd_status |= ST_RELEASE;
 			un->un_rsvd_status &=
-				~(ST_RESERVE | ST_LOST_RESERVE |
-					ST_RESERVATION_CONFLICT);
+			    ~(ST_RESERVE | ST_LOST_RESERVE |
+			    ST_RESERVATION_CONFLICT);
 			un->un_lastop = saved_lastop;
+			break;
+		case SCMD_PERSISTENT_RESERVE_IN:
+			ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+			    "PGR_IN command\n");
+			break;
+		case SCMD_PERSISTENT_RESERVE_OUT:
+			switch (sp->pkt_cdbp[1] & ST_SA_MASK) {
+			case ST_SA_SCSI3_RESERVE:
+			case ST_SA_SCSI3_PREEMPT:
+			case ST_SA_SCSI3_PREEMPTANDABORT:
+				un->un_rsvd_status |=
+				    ST_APPLICATION_RESERVATIONS;
+				ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+				    "PGR Reserve and set: entering"
+				    " ST_APPLICATION_RESERVATIONS mode");
+				break;
+			case ST_SA_SCSI3_RELEASE:
+			case ST_SA_SCSI3_CLEAR:
+				un->un_rsvd_status &=
+				    ~ST_APPLICATION_RESERVATIONS;
+				ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+				    "PGR Release and reset: exiting"
+				    " ST_APPLICATION_RESERVATIONS mode");
+				break;
+			}
 			break;
 		case SCMD_TEST_UNIT_READY:
 		case SCMD_READ_BLKLIM:
@@ -10783,8 +10795,149 @@ st_set_pe_flag(struct scsi_tape *un)
 	}
 }
 
-int
-st_reserve_release(dev_t dev, int cmd)
+/*
+ * List of commands that are allowed to be done while another host holds
+ * the reservation.
+ */
+struct {
+	uchar_t cmd;
+	uchar_t byte;	/* byte to look for data */
+	uint32_t mask;	/* bits that matter in the above data */
+} rcmds[] = {
+	{ SCMD_TEST_UNIT_READY, 0, 0 }, /* may fail on older drives */
+	{ SCMD_REQUEST_SENSE, 0, 0 },
+	{ SCMD_READ_BLKLIM, 0, 0 },
+	{ SCMD_INQUIRY, 0, 0 },
+	{ SCMD_RESERVE, 0, 0 },
+	{ SCMD_RELEASE, 0, 0 },
+	{ SCMD_DOORLOCK, 4, 3 },	/* allow (unlock) media access only */
+	{ SCMD_REPORT_DENSITIES, 0, 0 },
+	{ SCMD_LOG_SENSE_G1, 0, 0 },
+	{ SCMD_PERSISTENT_RESERVE_IN, 0, 0 },
+	{ SCMD_PERSISTENT_RESERVE_OUT, 0, 0 },
+	{ SCMD_REPORT_LUNS, 0, 0 }
+};
+
+static int
+st_do_reserve(struct scsi_tape *un)
+{
+	int rval;
+
+	/*
+	 * Issue a Throw-Away reserve command to clear the
+	 * check condition.
+	 * If the current behaviour of reserve/release is to
+	 * hold reservation across opens , and if a Bus reset
+	 * has been issued between opens then this command
+	 * would set the ST_LOST_RESERVE flags in rsvd_status.
+	 * In this case return an EACCES so that user knows that
+	 * reservation has been lost in between opens.
+	 * If this error is not returned and we continue with
+	 * successful open , then user may think position of the
+	 * tape is still the same but inreality we would rewind the
+	 * tape and continue from BOT.
+	 */
+	rval = st_reserve_release(un, ST_RESERVE);
+	if (rval) {
+		if ((un->un_rsvd_status & ST_LOST_RESERVE_BETWEEN_OPENS) ==
+		    ST_LOST_RESERVE_BETWEEN_OPENS) {
+			un->un_rsvd_status &= ~(ST_LOST_RESERVE | ST_RESERVE);
+			un->un_errno = EACCES;
+			return (EACCES);
+		}
+		rval = st_reserve_release(un, ST_RESERVE);
+	}
+	if (rval == 0) {
+		un->un_rsvd_status |= ST_INIT_RESERVE;
+	}
+
+	return (rval);
+}
+
+static int
+st_check_cdb_for_need_to_reserve(struct scsi_tape *un, caddr_t cdb)
+{
+	int i;
+	int rval = 0;
+
+	/*
+	 * If already reserved no need to do it again.
+	 * Also if Reserve and Release are disabled Just return.
+	 */
+	if ((un->un_rsvd_status & (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) ||
+	    (un->un_dp->options & ST_NO_RESERVE_RELEASE)) {
+		ST_DEBUG6(ST_DEVINFO, st_label, CE_NOTE,
+		    "st_check_cdb_for_need_to_reserve() reserve unneeded 0x%x",
+		    cdb[0]);
+		return (0);
+	}
+
+	/* See if command is on the list */
+	for (i = 0; i < ST_NUM_MEMBERS(rcmds); i++) {
+		if ((uchar_t)cdb[0] == rcmds[i].cmd) {
+			/*
+			 * cmd is on list.
+			 * if byte is zero always allowed.
+			 */
+			if (rcmds[i].byte == 0) {
+				return (rval);
+			}
+			if (((cdb[rcmds[i].byte]) & (rcmds[i].mask)) == 0) {
+				return (rval);
+			}
+			break;
+		}
+	}
+
+	ST_DEBUG6(ST_DEVINFO, st_label, CE_NOTE,
+	    "Command 0x%x requires reservation", cdb[0]);
+
+	rval = st_do_reserve(un);
+
+	return (rval);
+}
+
+static int
+st_check_cmd_for_need_to_reserve(struct scsi_tape *un, uchar_t cmd, int cnt)
+{
+	int i;
+	int rval = 0;
+
+	if ((un->un_rsvd_status & (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) ||
+	    (un->un_dp->options & ST_NO_RESERVE_RELEASE)) {
+		ST_DEBUG6(ST_DEVINFO, st_label, CE_NOTE,
+		    "st_check_cmd_for_need_to_reserve() reserve unneeded 0x%x",
+		    cmd);
+		return (0);
+	}
+
+	/* See if command is on the list */
+	for (i = 0; i < ST_NUM_MEMBERS(rcmds); i++) {
+		if (cmd == rcmds[i].cmd) {
+			/*
+			 * cmd is on list.
+			 * if byte is zero always allowed.
+			 */
+			if (rcmds[i].byte == 0) {
+				return (rval);
+			}
+			if (((rcmds[i].mask) & cnt) == 0) {
+				return (rval);
+			}
+			break;
+		}
+	}
+
+	ST_DEBUG6(ST_DEVINFO, st_label, CE_NOTE,
+	    "Cmd 0x%x requires reservation", cmd);
+
+	rval = st_do_reserve(un);
+
+	return (rval);
+}
+
+static int
+st_reserve_release(struct scsi_tape *un, int cmd)
 {
 	struct uscsi_cmd	uscsi_cmd;
 	struct uscsi_cmd	*com = &uscsi_cmd;
@@ -10792,12 +10945,11 @@ st_reserve_release(dev_t dev, int cmd)
 	char			cdb[CDB_GROUP0];
 
 
-	GET_SOFT_STATE(dev);
 	ASSERT(mutex_owned(ST_MUTEX));
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-		"st_reserve_release: %s \n", (cmd == ST_RELEASE)?
-				"Releasing":"Reserving");
+	    "st_reserve_release: %s \n",
+	    (cmd == ST_RELEASE)?  "Releasing":"Reserving");
 
 	bzero(cdb, CDB_GROUP0);
 	if (cmd == ST_RELEASE) {
@@ -10811,26 +10963,27 @@ st_reserve_release(dev_t dev, int cmd)
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
-	rval = st_ioctl_cmd(dev, com,
-		UIO_SYSSPACE, UIO_SYSSPACE, UIO_SYSSPACE);
+	rval = st_ioctl_cmd(un->un_dev, com, UIO_SYSSPACE, UIO_SYSSPACE,
+	    UIO_SYSSPACE);
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-		"st_reserve_release: rval(1)=%d\n", rval);
+	    "st_reserve_release: rval(1)=%d\n", rval);
 
 	if (rval) {
-		if (com->uscsi_status == STATUS_RESERVATION_CONFLICT)
+		if (com->uscsi_status == STATUS_RESERVATION_CONFLICT) {
 			rval = EACCES;
+		}
 		/*
 		 * dynamically turn off reserve/release support
 		 * in case of drives which do not support
 		 * reserve/release command(ATAPI drives).
 		 */
 		if (un->un_status == KEY_ILLEGAL_REQUEST) {
-			if (ST_RESERVE_SUPPORTED(un)) {
+			if (un->un_dp->options & ST_NO_RESERVE_RELEASE) {
 				un->un_dp->options |= ST_NO_RESERVE_RELEASE;
 				ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-					"Tape unit does not support "
-					"reserve/release \n");
+				    "Tape unit does not support "
+				    "reserve/release \n");
 			}
 			rval = 0;
 		}
@@ -10850,7 +11003,7 @@ st_take_ownership(dev_t dev)
 		"st_take_ownership: Entering ...\n");
 
 
-	rval = st_reserve_release(dev, ST_RESERVE);
+	rval = st_reserve_release(un, ST_RESERVE);
 	/*
 	 * XXX -> Should reset be done only if we get EACCES.
 	 * .
@@ -10873,9 +11026,9 @@ st_take_ownership(dev_t dev)
 		/*
 		 * remove the check condition.
 		 */
-		(void) st_reserve_release(dev, ST_RESERVE);
-		if ((rval = st_reserve_release(dev, ST_RESERVE)) != 0) {
-			if ((st_reserve_release(dev, ST_RESERVE)) != 0) {
+		(void) st_reserve_release(un, ST_RESERVE);
+		if ((rval = st_reserve_release(un, ST_RESERVE)) != 0) {
+			if ((st_reserve_release(un, ST_RESERVE)) != 0) {
 				rval = (un->un_rsvd_status &
 					ST_RESERVATION_CONFLICT) ? EACCES : EIO;
 				return (rval);
@@ -10954,7 +11107,8 @@ st_create_errstats(struct scsi_tape *un, int instance)
 static int
 st_validate_tapemarks(struct scsi_tape *un, int fileno, daddr_t blkno)
 {
-	dev_t 	dev;
+	dev_t dev;
+	int rval;
 
 	ASSERT(MUTEX_HELD(&un->un_sd->sd_mutex));
 	ASSERT(mutex_owned(ST_MUTEX));
@@ -10969,31 +11123,34 @@ st_validate_tapemarks(struct scsi_tape *un, int fileno, daddr_t blkno)
 	 * so as not to rewind tape on RESETS: Gee, Has life ever
 	 * been simple in tape land ?
 	 */
-	if (st_cmd(dev, SCMD_REWIND, 0, SYNC_CMD)) {
+	rval = st_cmd(dev, SCMD_REWIND, 0, SYNC_CMD);
+	if (rval) {
 		scsi_log(ST_DEVINFO, st_label, CE_WARN,
 		"Failed to restore the last file and block position: In"
 		" this state, Tape will be loaded at BOT during next open");
 		un->un_fileno = -1;
-		return (1);
+		return (rval);
 	}
 
 	if (fileno) {
-		if (st_cmd(dev, SCMD_SPACE, Fmk(fileno), SYNC_CMD)) {
+		rval = st_cmd(dev, SCMD_SPACE, Fmk(fileno), SYNC_CMD);
+		if (rval) {
 			scsi_log(ST_DEVINFO, st_label, CE_WARN,
 			"Failed to restore the last file position: In this "
 			" state, Tape will be loaded at BOT during next open");
 			un->un_fileno = -1;
-			return (2);
+			return (rval);
 		}
 	}
 
 	if (blkno) {
-		if (st_cmd(dev, SCMD_SPACE, Blk(blkno), SYNC_CMD)) {
+		rval = st_cmd(dev, SCMD_SPACE, Blk(blkno), SYNC_CMD);
+		if (rval) {
 			scsi_log(ST_DEVINFO, st_label, CE_WARN,
 			"Failed to restore the last block position: In this"
 			" state, tape will be loaded at BOT during next open");
 			un->un_fileno = -1;
-			return (3);
+			return (rval);
 		}
 	}
 
