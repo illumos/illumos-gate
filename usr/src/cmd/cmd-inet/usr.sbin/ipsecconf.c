@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3016,7 +3015,8 @@ do_port_adds(ips_conf_t *cptr)
 	if (ret != 0 && !ipsecconf_qflag) {
 		warnx(
 		    gettext("Could not add IPv4 policy for sport %d, dport %d"),
-		    cptr->ips_src_port_min, cptr->ips_dst_port_min);
+		    ntohs(cptr->ips_src_port_min),
+		    ntohs(cptr->ips_dst_port_min));
 
 	}
 
@@ -4895,8 +4895,8 @@ dump_conf(ips_conf_t *conf)
 	    inet_ntop(af, addr_ptr(isv4, &conf->ips_dst_mask_v6, &addr),
 		buf, INET6_ADDRSTRLEN));
 
-	(void) printf("Source port %d\n", conf->ips_src_port_min);
-	(void) printf("Dest port %d\n", conf->ips_dst_port_min);
+	(void) printf("Source port %d\n", ntohs(conf->ips_src_port_min));
+	(void) printf("Dest port %d\n", ntohs(conf->ips_dst_port_min));
 	(void) printf("ULP %d\n", conf->ips_ulp_prot);
 
 	(void) printf("ICMP type %d-%d code %d-%d", conf->ips_icmp_type,
