@@ -30,6 +30,7 @@
 #include <sys/cpuvar.h>
 #include <sys/ddi_implfuncs.h>
 #include <sys/hypervisor_api.h>
+#include <sys/hsvc.h>
 #include <px_obj.h>
 #include <sys/pci_tools.h>
 #include <px_tools_var.h>
@@ -55,6 +56,13 @@ int pxtool_iomem_delay_usec = 25000;
 /* Number of inos per root complex. */
 int pxtool_num_inos = INTERRUPT_MAPPING_ENTRIES;
 
+/* Verify hypervisor version for DIAG functions ra2pa and hpriv. */
+#define	PXTOOL_HYP_VER_UNINIT	0
+#define	PXTOOL_HYP_VER_BAD	1
+#define	PXTOOL_HYP_VER_OK	2
+
+static int pxtool_hyp_version = PXTOOL_HYP_VER_UNINIT;
+
 /* Swap endianness. */
 static uint64_t
 pxtool_swap_endian(uint64_t data, int size)
@@ -78,6 +86,47 @@ pxtool_swap_endian(uint64_t data, int size)
 	return (returned_data.data64);
 }
 
+static void
+pxtool_validate_diag_hyp_svc(dev_info_t *dip, int *diag_svc_status_p)
+{
+	uint64_t pxtool_diag_maj_ver;
+	uint64_t pxtool_diag_min_ver;
+	int ret;
+
+	if (*diag_svc_status_p == PXTOOL_HYP_VER_UNINIT) {
+
+		*diag_svc_status_p = PXTOOL_HYP_VER_BAD;
+
+		/*
+		 * Verify that hypervisor DIAG API has been
+		 * negotiated (by unix).
+		 */
+		if ((ret = hsvc_version(HSVC_GROUP_DIAG,
+		    &pxtool_diag_maj_ver, &pxtool_diag_min_ver)) != 0) {
+			DBG(DBG_TOOLS, dip,
+			    "diag hypervisor svc not negotiated: "
+			    "grp:0x%lx, errno:%d\n", HSVC_GROUP_DIAG, ret);
+
+		} else if (pxtool_diag_maj_ver == 1) {
+			/*
+			 * Major version 1 is OK.
+			 *
+			 * Code maintainers: if the version changes, check for
+			 * API changes in hv_ra2pa() and hv_hpriv() before
+			 * accepting the new version.
+			 */
+			*diag_svc_status_p = PXTOOL_HYP_VER_OK;
+
+		} else {
+			DBG(DBG_TOOLS, dip,
+			    "diag hypervisor svc: bad major number: "
+			    "grp:0x%lx, maj:0x%lx, min:0x%lx\n",
+			    HSVC_GROUP_DIAG, pxtool_diag_maj_ver,
+			    pxtool_diag_min_ver);
+		}
+	}
+}
+
 static int
 pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
     uint64_t *data_p, boolean_t is_big_endian, boolean_t is_write)
@@ -93,6 +142,14 @@ pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
 	    "pxtool_phys_access: dev_addr:0x%" PRIx64 "\n", dev_addr);
 	DBG(DBG_TOOLS, dip, "    data_addr:0x%" PRIx64 ", is_write:%s\n",
 	    data_p, (is_write ? "yes" : "no"));
+
+	if (pxtool_hyp_version != PXTOOL_HYP_VER_OK) {
+		pxtool_validate_diag_hyp_svc(dip, &pxtool_hyp_version);
+		if (pxtool_hyp_version != PXTOOL_HYP_VER_OK) {
+			DBG(DBG_TOOLS, dip, "Couldn't validate diag hyp svc\n");
+			return (EPERM);
+		}
+	}
 
 	if ((rfunc = va_to_pa((void *)px_phys_acc_4v))  == (uint64_t)-1) {
 		DBG(DBG_TOOLS, dip, "Error getting real addr for function\n");

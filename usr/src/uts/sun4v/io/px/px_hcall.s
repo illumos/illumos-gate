@@ -31,7 +31,9 @@
 
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
+#include <sys/dditypes.h>
 #include <px_ioapi.h>
+#include "px_lib4v.h"
 
 #if defined(lint) || defined(__lint)
 
@@ -87,7 +89,7 @@ hvio_poke(devhandle_t dev_hdl, r_addr_t ra, uint64_t sizes, uint64_t data,
 /*ARGSUSED*/
 uint64_t
 hvio_dma_sync(devhandle_t dev_hdl, r_addr_t ra, size_t num_bytes,
-    int io_sync_direction, size_t *bytes_synched)
+    io_sync_direction_t io_sync_direction, size_t *bytes_synched)
 { return (0); }
 
 /*ARGSUSED*/

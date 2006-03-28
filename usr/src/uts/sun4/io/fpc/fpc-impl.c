@@ -81,6 +81,13 @@ static int event_field_offset[NUM_TOTAL_COUNTERS] = {
 	PIC2_EVT_SEL_SHIFT		/* LPU counter 2 */
 };
 
+/* For determining platform suitability at _init time. */
+int
+fpc_init_platform_check()
+{
+	return (fpc_platform_check());
+}
+
 /*ARGSUSED*/
 void
 fpc_common_node_setup(dev_info_t *dip, int *index_p)
@@ -130,10 +137,11 @@ fpc_perfcnt_module_fini(dev_info_t *dip)
 
 	for (i = 0; i < NUM_LEAVES; i++) {
 		fpc_platform_node_fini(node_data[i].plat_data_p);
-		if (node_data[i].name != NULL)
+		if (node_data[i].name != NULL) {
 			kmem_free(node_data[i].name,
 			    strlen(node_data[i].name) + 1);
-		mutex_destroy(&node_data[i].mutex);
+			mutex_destroy(&node_data[i].mutex);
+		}
 	}
 
 	fpc_platform_module_fini(dip);

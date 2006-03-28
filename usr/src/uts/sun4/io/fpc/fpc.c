@@ -68,6 +68,8 @@ static struct modlinkage ml = {
 int
 _init(void)
 {
+	if (fpc_init_platform_check() != SUCCESS)
+		return (ENODEV);
 	return (mod_install(&ml));
 }
 

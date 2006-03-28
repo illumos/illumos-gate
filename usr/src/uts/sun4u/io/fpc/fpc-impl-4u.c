@@ -105,6 +105,14 @@ static ldi_ident_t ldi_identifier;
 static boolean_t ldi_identifier_valid = B_FALSE;
 static cred_t *credentials = NULL;
 
+/* Called by _init to determine if it is OK to install driver. */
+int
+fpc_platform_check()
+{
+	return (SUCCESS);
+}
+
+/* Called during attach to do module-wide initialization. */
 int
 fpc_platform_module_init(dev_info_t *dip)
 {
@@ -116,7 +124,6 @@ fpc_platform_module_init(dev_info_t *dip)
 		ldi_identifier_valid = B_TRUE;
 	return ((status == 0) ? DDI_SUCCESS : DDI_FAILURE);
 }
-
 
 int
 fpc_platform_node_init(dev_info_t *dip, int *avail)

@@ -117,6 +117,10 @@ typedef enum fire_perfcnt {
 #define	PCIE_A_REGS_AVAIL	0x2
 #define	PCIE_B_REGS_AVAIL	0x4
 
+/* For checking platform from _init before installing module */
+extern int fpc_init_platform_check();
+
+/* Low level module initialization done at attach time. */
 extern int fpc_perfcnt_module_init(dev_info_t *dip, int *avail);
 extern int fpc_perfcnt_module_fini(dev_info_t *dip);
 

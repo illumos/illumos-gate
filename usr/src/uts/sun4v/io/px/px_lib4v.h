@@ -28,13 +28,50 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * SUN4V IO API - Version 1.11
- */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Fasttrap numbers for VPCI hypervisor functions.
+ */
+
+#define	HVIO_IOMMU_MAP		0xb0
+#define	HVIO_IOMMU_DEMAP	0xb1
+#define	HVIO_IOMMU_GETMAP	0xb2
+#define	HVIO_IOMMU_GETBYPASS	0xb3
+
+#define	HVIO_CONFIG_GET		0xb4
+#define	HVIO_CONFIG_PUT		0xb5
+
+#define	HVIO_PEEK		0xb6
+#define	HVIO_POKE		0xb7
+
+#define	HVIO_DMA_SYNC		0xb8
+
+#define	HVIO_MSIQ_CONF		0xc0
+#define	HVIO_MSIQ_INFO		0xc1
+#define	HVIO_MSIQ_GETVALID	0xc2
+#define	HVIO_MSIQ_SETVALID	0xc3
+#define	HVIO_MSIQ_GETSTATE	0xc4
+#define	HVIO_MSIQ_SETSTATE	0xc5
+#define	HVIO_MSIQ_GETHEAD	0xc6
+#define	HVIO_MSIQ_SETHEAD	0xc7
+#define	HVIO_MSIQ_GETTAIL	0xc8
+
+#define	HVIO_MSI_GETVALID	0xc9
+#define	HVIO_MSI_SETVALID	0xca
+#define	HVIO_MSI_GETMSIQ	0xcb
+#define	HVIO_MSI_SETMSIQ	0xcc
+#define	HVIO_MSI_GETSTATE	0xcd
+#define	HVIO_MSI_SETSTATE	0xce
+
+#define	HVIO_MSG_GETMSIQ	0xd0
+#define	HVIO_MSG_SETMSIQ	0xd1
+#define	HVIO_MSG_GETVALID	0xd2
+#define	HVIO_MSG_SETVALID	0xd3
+
+#ifndef _ASM
 
 /*
  * The device handle uniquely identifies a SUN4V device.
@@ -55,7 +92,7 @@ extern "C" {
 /*
  * VPCI API versioning.
  *
- * Currently PX nexus driver supports VPCI API version 1.0.
+ * Currently PX nexus driver supports VPCI API version 1.0
  */
 #define	PX_VPCI_MAJOR_VER_1	0x1ull
 #define	PX_VPCI_MAJOR_VER	PX_VPCI_MAJOR_VER_1
@@ -153,6 +190,8 @@ extern uint64_t hv_ra2pa(uint64_t ra);
 extern uint64_t hv_hpriv(void *func, uint64_t arg1, uint64_t arg2,
     uint64_t arg3);
 extern int px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr);
+
+#endif /* _ASM */
 
 #ifdef	__cplusplus
 }

@@ -34,6 +34,7 @@
 #include <sys/machthread.h>
 #include <sys/privregs.h>
 #include <sys/hypervisor_api.h>
+#include "fpc-impl-4v.h"
 
 /*LINTLIBRARY*/
 

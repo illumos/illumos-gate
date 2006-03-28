@@ -47,6 +47,7 @@ typedef struct {
 
 /* Functions exported by platform specific file. */
 
+extern int fpc_platform_check();
 extern int fpc_platform_module_init(dev_info_t *dip);
 extern int fpc_platform_node_init(dev_info_t *dip, int *avail);
 extern void fpc_platform_node_fini(void *arg);
