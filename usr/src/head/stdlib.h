@@ -169,13 +169,17 @@ extern void swab(const char *, char *, ssize_t);
 	!defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64)
 extern int	mkstemp(char *);
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int	mkstemps(char *, int);
+#endif
 #endif /* defined(__EXTENSIONS__) ... */
 
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int	mkstemp64(char *);
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int	mkstemps64(char *, int);
+#endif
 #endif	/* _LARGEFILE64_SOURCE... */
 
 #if defined(__EXTENSIONS__) || \
@@ -272,13 +276,17 @@ extern void swab();
 	!defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64)
 extern int	mkstemp();
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int	mkstemps();
+#endif
 #endif	/* defined(__EXTENSIONS__) ... */
 
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int	mkstemp64();
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int	mkstemps64();
+#endif
 #endif	/* _LARGEFILE64_SOURCE... */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
