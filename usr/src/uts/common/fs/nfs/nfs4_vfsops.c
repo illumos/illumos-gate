@@ -328,7 +328,7 @@ nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	STRUCT_DECL(nfs_args, args);	/* nfs mount arguments */
 	STRUCT_DECL(knetconfig, knconf_tmp);
 	STRUCT_DECL(netbuf, addr_tmp);
-	int flags, addr_type;
+	int flags, addr_type, removed;
 	char *p, *pf;
 	struct pathname pn;
 	char *userbufptr;
@@ -766,8 +766,11 @@ more:
 proceed:
 	error = nfs4rootvp(&rtvp, vfsp, svp_head, flags, cr, mntzone);
 
-	if (error)
+	if (error) {
+		/* if nfs4rootvp failed, it will free svp_head */
+		svp_head = NULL;
 		goto errout;
+	}
 
 	mi = VTOMI4(rtvp);
 
@@ -804,33 +807,19 @@ errout:
 			nfs4_async_stop(vfsp);
 			nfs4_async_manager_stop(vfsp);
 			nfs4_remove_mi_from_server(mi, NULL);
-			/*
-			 * In this error path we need to sfh4_rele() before
-			 * we free the mntinfo4_t as sfh4_rele() has a
-			 * dependency on mi_fh_lock.
-			 */
-			if (rtvp != NULL) {
+			if (rtvp != NULL)
 				VN_RELE(rtvp);
-				rtvp = NULL;
-			}
-			if (mi->mi_io_kstats) {
-				kstat_delete(mi->mi_io_kstats);
-				mi->mi_io_kstats = NULL;
-			}
-			if (mi->mi_ro_kstats) {
-				kstat_delete(mi->mi_ro_kstats);
-				mi->mi_ro_kstats = NULL;
-			}
-			if (mi->mi_recov_ksp) {
-				kstat_delete(mi->mi_recov_ksp);
-				mi->mi_recov_ksp = NULL;
-			}
-			nfs_free_mi4(mi);
 			if (mntzone != NULL)
 				zone_rele(mntzone);
+			/* need to remove it from the zone */
+			removed = nfs4_mi_zonelist_remove(mi);
+			if (removed)
+				zone_rele(mi->mi_zone);
+			MI4_RELE(mi);
 			return (error);
 		}
-		sv4_free(svp_head);
+		if (svp_head)
+			sv4_free(svp_head);
 	}
 
 	if (rtvp != NULL)
@@ -1600,7 +1589,7 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	nfs4_fname_t *mfname;
 	nfs4_error_t e;
 	char *orig_sv_path;
-	int orig_sv_pathlen, num_retry;
+	int orig_sv_pathlen, num_retry, removed;
 	cred_t *lcr = NULL, *tcr = cr;
 
 	nfsstatsp = zone_getspecific(nfsstat_zone_key, nfs_zone());
@@ -1649,6 +1638,8 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	mi->mi_grace_wait = 0;
 	mi->mi_error = 0;
 	mi->mi_srvsettime = 0;
+
+	mi->mi_count = 1;
 
 	mi->mi_tsize = nfs4_tsize(svp->sv_knconf);
 	mi->mi_stsize = mi->mi_tsize;
@@ -1893,15 +1884,18 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	 * Start the manager thread responsible for handling async worker
 	 * threads.
 	 */
+	MI4_HOLD(mi);
 	VFS_HOLD(vfsp);	/* add reference for thread */
 	mi->mi_manager_thread = zthread_create(NULL, 0, nfs4_async_manager,
 					vfsp, 0, minclsyspri);
 	ASSERT(mi->mi_manager_thread != NULL);
+
 	/*
 	 * Create the thread that handles over-the-wire calls for
 	 * VOP_INACTIVE.
 	 * This needs to happen after the manager thread is created.
 	 */
+	MI4_HOLD(mi);
 	mi->mi_inactive_thread = zthread_create(NULL, 0, nfs4_inactive_thread,
 					mi, 0, minclsyspri);
 	ASSERT(mi->mi_inactive_thread != NULL);
@@ -1929,8 +1923,6 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 bad:
 	/*
 	 * An error occurred somewhere, need to clean up...
-	 *
-	 * XXX Should not svp be cleaned too?
 	 */
 	if (lcr != NULL)
 		crfree(lcr);
@@ -1946,19 +1938,17 @@ bad:
 	}
 	nfs4_async_stop(vfsp);
 	nfs4_async_manager_stop(vfsp);
-	if (mi->mi_io_kstats) {
-		kstat_delete(mi->mi_io_kstats);
-		mi->mi_io_kstats = NULL;
-	}
-	if (mi->mi_ro_kstats) {
-		kstat_delete(mi->mi_ro_kstats);
-		mi->mi_ro_kstats = NULL;
-	}
-	if (mi->mi_recov_ksp) {
-		kstat_delete(mi->mi_recov_ksp);
-		mi->mi_recov_ksp = NULL;
-	}
-	nfs_free_mi4(mi);
+	removed = nfs4_mi_zonelist_remove(mi);
+	if (removed)
+		zone_rele(mi->mi_zone);
+
+	/*
+	 * This releases the initial "hold" of the mi since it will never
+	 * be referenced by the vfsp.  Also, when mount returns to vfs.c
+	 * with an error, the vfsp will be destroyed, not rele'd.
+	 */
+	MI4_RELE(mi);
+
 	*rtvpp = NULL;
 	return (error);
 }
@@ -1971,6 +1961,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 {
 	mntinfo4_t *mi;
 	ushort_t omax;
+	int removed;
 
 	if (secpolicy_fs_unmount(cr, vfsp) != 0)
 		return (EPERM);
@@ -2033,19 +2024,12 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 */
 	destroy_rtable4(vfsp, cr);
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
+
 	nfs4_remove_mi_from_server(mi, NULL);
-	if (mi->mi_io_kstats) {
-		kstat_delete(mi->mi_io_kstats);
-		mi->mi_io_kstats = NULL;
-	}
-	if (mi->mi_ro_kstats) {
-		kstat_delete(mi->mi_ro_kstats);
-		mi->mi_ro_kstats = NULL;
-	}
-	if (mi->mi_recov_ksp) {
-		kstat_delete(mi->mi_recov_ksp);
-		mi->mi_recov_ksp = NULL;
-	}
+	removed = nfs4_mi_zonelist_remove(mi);
+	if (removed)
+		zone_rele(mi->mi_zone);
+
 	return (0);
 }
 
@@ -2390,24 +2374,10 @@ void
 nfs4_freevfs(vfs_t *vfsp)
 {
 	mntinfo4_t *mi;
-	servinfo4_t *svp;
 
-	/* free up the resources */
+	/* need to release the initial hold */
 	mi = VFTOMI4(vfsp);
-	svp = mi->mi_servers;
-	mi->mi_servers = mi->mi_curr_serv = NULL;
-	sv4_free(svp);
-	NFS4_DEBUG(nfs4_client_lease_debug, (CE_NOTE, "nfs4_freevfs: "
-		"free mi %p", (void *)mi));
-
-	/*
-	 * By this time we should have already deleted the
-	 * mi kstats in the unmount code. If they are still around
-	 * somethings wrong
-	 */
-	ASSERT(mi->mi_io_kstats == NULL);
-
-	nfs_free_mi4(mi);
+	MI4_RELE(mi);
 }
 
 /*
@@ -2994,7 +2964,9 @@ nfs4_remove_mi_from_server_nolock(mntinfo4_t *mi, nfs4_server_t *sp)
 		return;
 	}
 
+	VFS_HOLD(mi->mi_vfsp);
 	remove_mi(sp, mi);
+	VFS_RELE(mi->mi_vfsp);
 
 	if (sp->mntinfo4_list == NULL) {
 		/* last fs unmounted, kill the thread */
@@ -3553,13 +3525,12 @@ static void
 async_free_mount(vfs_t *vfsp, cred_t *cr)
 {
 	freemountargs_t *args;
-
 	args = kmem_alloc(sizeof (freemountargs_t), KM_SLEEP);
 	args->fm_vfsp = vfsp;
 	VFS_HOLD(vfsp);
+	MI4_HOLD(VFTOMI4(vfsp));
 	args->fm_cr = cr;
 	crhold(cr);
-
 	(void) zthread_create(NULL, 0, nfs4_free_mount_thread, args, 0,
 	    minclsyspri);
 }
@@ -3567,9 +3538,12 @@ async_free_mount(vfs_t *vfsp, cred_t *cr)
 static void
 nfs4_free_mount_thread(freemountargs_t *args)
 {
+	mntinfo4_t *mi;
 	nfs4_free_mount(args->fm_vfsp, args->fm_cr);
-	VFS_RELE(args->fm_vfsp);
+	mi = VFTOMI4(args->fm_vfsp);
 	crfree(args->fm_cr);
+	VFS_RELE(args->fm_vfsp);
+	MI4_RELE(mi);
 	kmem_free(args, sizeof (freemountargs_t));
 	zthread_exit();
 	/* NOTREACHED */
@@ -3586,6 +3560,7 @@ nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
 	callb_cpr_t	cpr_info;
 	kmutex_t	cpr_lock;
 	boolean_t	async_thread;
+	int		removed;
 
 	/*
 	 * We need to participate in the CPR framework if this is a kernel
@@ -3658,28 +3633,24 @@ nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
 	 * We need to explicitly stop the manager thread; the asyc worker
 	 * threads can timeout and exit on their own.
 	 */
-	nfs4_async_manager_stop(vfsp);
+	mutex_enter(&mi->mi_async_lock);
+	mi->mi_max_threads = 0;
+	cv_broadcast(&mi->mi_async_work_cv);
+	mutex_exit(&mi->mi_async_lock);
+	if (mi->mi_manager_thread)
+		nfs4_async_manager_stop(vfsp);
 
 	destroy_rtable4(vfsp, cr);
 
 	nfs4_remove_mi_from_server(mi, NULL);
-
-	if (mi->mi_io_kstats) {
-		kstat_delete(mi->mi_io_kstats);
-		mi->mi_io_kstats = NULL;
-	}
-	if (mi->mi_ro_kstats) {
-		kstat_delete(mi->mi_ro_kstats);
-		mi->mi_ro_kstats = NULL;
-	}
-	if (mi->mi_recov_ksp) {
-		kstat_delete(mi->mi_recov_ksp);
-		mi->mi_recov_ksp = NULL;
-	}
 
 	if (async_thread) {
 		mutex_enter(&cpr_lock);
 		CALLB_CPR_EXIT(&cpr_info);	/* drops cpr_lock */
 		mutex_destroy(&cpr_lock);
 	}
+
+	removed = nfs4_mi_zonelist_remove(mi);
+	if (removed)
+		zone_rele(mi->mi_zone);
 }

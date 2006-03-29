@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1146,6 +1145,7 @@ nfs4_async_manager(vfs_t *vfsp)
 			    MAX(mi->mi_max_threads, max_threads)) {
 				mi->mi_threads++;
 				mutex_exit(&mi->mi_async_lock);
+				MI4_HOLD(mi);
 				VFS_HOLD(vfsp);	/* hold for new thread */
 				(void) zthread_create(NULL, 0, nfs4_async_start,
 				    vfsp, 0, minclsyspri);
@@ -1180,6 +1180,7 @@ nfs4_async_manager(vfs_t *vfsp)
 	 */
 	CALLB_CPR_EXIT(&cprinfo);
 	VFS_RELE(vfsp);	/* release thread's hold */
+	MI4_RELE(mi);
 	zthread_exit();
 }
 
@@ -1377,6 +1378,7 @@ nfs4_async_start(struct vfs *vfsp)
 					cv_signal(&mi->mi_async_cv);
 				CALLB_CPR_EXIT(&cprinfo);
 				VFS_RELE(vfsp);	/* release thread's hold */
+				MI4_RELE(mi);
 				zthread_exit();
 				/* NOTREACHED */
 			}
@@ -1468,7 +1470,6 @@ nfs4_inactive_thread(mntinfo4_t *mi)
 {
 	struct nfs4_async_reqs *args;
 	callb_cpr_t cprinfo;
-	int call_nfs_free_mi4 = 0;
 	vfs_t *vfsp = mi->mi_vfsp;
 
 	CALLB_CPR_INIT(&cprinfo, &mi->mi_async_lock, callb_generic_cpr,
@@ -1480,13 +1481,7 @@ nfs4_inactive_thread(mntinfo4_t *mi)
 		if (args == NULL) {
 			mutex_enter(&mi->mi_lock);
 			/*
-			 * During regular operation (ie, unmount
-			 * or a failed mount), the async manager thread always
-			 * exits before MI4_DEAD is set by nfs_free_mi4().
-			 *
-			 * When a zone is shutting down, however, we set
-			 * MI4_DEAD before the async manager thread is done, and
-			 * we don't want to exit until the async manager is done
+			 * We don't want to exit until the async manager is done
 			 * with its work; hence the check for mi_manager_thread
 			 * being NULL.
 			 *
@@ -1494,8 +1489,7 @@ nfs4_inactive_thread(mntinfo4_t *mi)
 			 * mi_inact_req_cv when it's done, at which point we'll
 			 * wake up and exit.
 			 */
-			if (mi->mi_manager_thread == NULL &&
-			    (mi->mi_flags & MI4_DEAD))
+			if (mi->mi_manager_thread == NULL)
 				goto die;
 			mi->mi_flags |= MI4_INACTIVE_IDLE;
 			mutex_exit(&mi->mi_lock);
@@ -1517,31 +1511,19 @@ nfs4_inactive_thread(mntinfo4_t *mi)
 	}
 die:
 	mutex_exit(&mi->mi_lock);
-	call_nfs_free_mi4 = (mi->mi_inactive_thread == NULL);
 	mi->mi_inactive_thread = NULL;
 	cv_signal(&mi->mi_async_cv);
+
 	/*
 	 * There is no explicit call to mutex_exit(&mi->mi_async_lock) since
 	 * CALLB_CPR_EXIT is actually responsible for releasing 'mi_async_lock'.
 	 */
 	CALLB_CPR_EXIT(&cprinfo);
-	if (call_nfs_free_mi4) {
-		if (mi->mi_io_kstats) {
-			kstat_delete(mi->mi_io_kstats);
-			mi->mi_io_kstats = NULL;
-		}
-		if (mi->mi_ro_kstats) {
-			kstat_delete(mi->mi_ro_kstats);
-			mi->mi_ro_kstats = NULL;
-		}
-		if (mi->mi_recov_ksp) {
-			kstat_delete(mi->mi_recov_ksp);
-			mi->mi_recov_ksp = NULL;
-		}
-		nfs_free_mi4(mi);
-	}
+
 	NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 	    "nfs4_inactive_thread exiting for vfs %p\n", (void *)vfsp));
+
+	MI4_RELE(mi);
 	zthread_exit();
 	/* NOTREACHED */
 }
@@ -2146,8 +2128,12 @@ nfs4_async_inactive(vnode_t *vp, cred_t *cr)
 		 * Throw away the delegation here so rp4_addfree()'s attempt to
 		 * return any existing delegations becomes a no-op.
 		 */
-		if (rp->r_deleg_type != OPEN_DELEGATE_NONE)
+		if (rp->r_deleg_type != OPEN_DELEGATE_NONE) {
+			(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER,
+				FALSE);
 			(void) nfs4delegreturn(rp, NFS4_DR_DISCARD);
+			nfs_rw_exit(&mi->mi_recovlock);
+		}
 		nfs4_clear_open_streams(rp);
 
 		rp4_addfree(rp, cr);
@@ -2785,59 +2771,72 @@ nfs4_mi_shutdown(zoneid_t zoneid, void *data)
 	NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 	    "nfs4_mi_shutdown zone %d\n", zoneid));
 	ASSERT(mig != NULL);
-again:
-	mutex_enter(&mig->mig_lock);
-	for (mi = list_head(&mig->mig_list); mi != NULL;
-	    mi = list_next(&mig->mig_list, mi)) {
-		/*
-		 * If we've done the shutdown work for this FS, skip.
-		 * Once we go off the end of the list, we're done.
-		 */
-		if (mi->mi_flags & MI4_DEAD)
-			continue;
+	for (;;) {
+		mutex_enter(&mig->mig_lock);
+		mi = list_head(&mig->mig_list);
+		if (mi == NULL) {
+			mutex_exit(&mig->mig_lock);
+			break;
+		}
 
-		/*
-		 * We will do work, so not done.  Get a hold on the FS.
-		 */
 		NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 		    "nfs4_mi_shutdown stopping vfs %p\n", (void *)mi->mi_vfsp));
-		VFS_HOLD(mi->mi_vfsp);
-
 		/*
 		 * purge the DNLC for this filesystem
 		 */
 		(void) dnlc_purge_vfsp(mi->mi_vfsp, 0);
-
-		mutex_enter(&mi->mi_async_lock);
 		/*
 		 * Tell existing async worker threads to exit.
 		 */
+		mutex_enter(&mi->mi_async_lock);
 		mi->mi_max_threads = 0;
 		cv_broadcast(&mi->mi_async_work_cv);
 		/*
-		 * Set the appropriate flags so both the async manager and the
-		 * inactive thread start getting ready to exit when they're done
-		 * with their current work.
+		 * Set the appropriate flags, signal and wait for both the
+		 * async manager and the inactive thread to exit when they're
+		 * done with their current work.
 		 */
 		mutex_enter(&mi->mi_lock);
 		mi->mi_flags |= (MI4_ASYNC_MGR_STOP|MI4_DEAD);
 		mutex_exit(&mi->mi_lock);
-		/*
-		 * Wake up async manager thread.  When it is done it will wake
-		 * up the inactive thread which will then exit.
-		 */
-		cv_broadcast(&mi->mi_async_reqs_cv);
 		mutex_exit(&mi->mi_async_lock);
-
+		if (mi->mi_manager_thread) {
+			nfs4_async_manager_stop(mi->mi_vfsp);
+		}
+		if (mi->mi_inactive_thread) {
+			mutex_enter(&mi->mi_async_lock);
+			cv_signal(&mi->mi_inact_req_cv);
+			/*
+			 * Wait for the inactive thread to exit.
+			 */
+			while (mi->mi_inactive_thread != NULL) {
+				cv_wait(&mi->mi_async_cv, &mi->mi_async_lock);
+			}
+			mutex_exit(&mi->mi_async_lock);
+		}
 		/*
-		 * Drop lock and release FS, which may change list, then repeat.
-		 * We're done when every mi has been done or the list is empty.
+		 * Wait for the recovery thread to complete, that is, it will
+		 * signal when it is done using the "mi" structure and about
+		 * to exit
 		 */
+		mutex_enter(&mi->mi_lock);
+		while (mi->mi_in_recovery > 0)
+			cv_wait(&mi->mi_cv_in_recov, &mi->mi_lock);
+		mutex_exit(&mi->mi_lock);
+		/*
+		 * We're done when every mi has been done or the list is empty.
+		 * This one is done, remove it from the list.
+		 */
+		list_remove(&mig->mig_list, mi);
 		mutex_exit(&mig->mig_lock);
+		zone_rele(mi->mi_zone);
+		/*
+		 * Release hold on vfs and mi done to prevent race with zone
+		 * shutdown. This releases the hold in nfs4_mi_zonelist_add.
+		 */
 		VFS_RELE(mi->mi_vfsp);
-		goto again;
+		MI4_RELE(mi);
 	}
-	mutex_exit(&mig->mig_lock);
 	/*
 	 * Tell each renew thread in the zone to exit
 	 */
@@ -2867,7 +2866,6 @@ nfs4_mi_free_globals(struct mi4_globals *mig)
 	list_destroy(&mig->mig_list);	/* makes sure the list is empty */
 	mutex_destroy(&mig->mig_lock);
 	kmem_free(mig, sizeof (*mig));
-
 }
 
 /* ARGSUSED */
@@ -2900,20 +2898,38 @@ nfs4_mi_zonelist_add(mntinfo4_t *mi)
 	mig = zone_getspecific(mi4_list_key, mi->mi_zone);
 	mutex_enter(&mig->mig_lock);
 	list_insert_head(&mig->mig_list, mi);
+	/*
+	 * hold added to eliminate race with zone shutdown -this will be
+	 * released in mi_shutdown
+	 */
+	MI4_HOLD(mi);
+	VFS_HOLD(mi->mi_vfsp);
 	mutex_exit(&mig->mig_lock);
 }
 
 /*
  * Remove an NFS mount from the per-zone list of NFS mounts.
  */
-static void
+int
 nfs4_mi_zonelist_remove(mntinfo4_t *mi)
 {
 	struct mi4_globals *mig;
+	int ret = 0;
 
 	mig = zone_getspecific(mi4_list_key, mi->mi_zone);
 	mutex_enter(&mig->mig_lock);
-	list_remove(&mig->mig_list, mi);
+	mutex_enter(&mi->mi_lock);
+	/* if this mi is marked dead, then the zone already released it */
+	if (!(mi->mi_flags & MI4_DEAD)) {
+		list_remove(&mig->mig_list, mi);
+
+		/* release the holds put on in zonelist_add(). */
+		VFS_RELE(mi->mi_vfsp);
+		MI4_RELE(mi);
+		ret = 1;
+	}
+	mutex_exit(&mi->mi_lock);
+
 	/*
 	 * We can be called asynchronously by VFS_FREEVFS() after the zone
 	 * shutdown/destroy callbacks have executed; if so, clean up the zone's
@@ -2922,72 +2938,43 @@ nfs4_mi_zonelist_remove(mntinfo4_t *mi)
 	if (list_head(&mig->mig_list) == NULL &&
 	    mig->mig_destructor_called == B_TRUE) {
 		nfs4_mi_free_globals(mig);
-		return;
+		return (ret);
 	}
 	mutex_exit(&mig->mig_lock);
+	return (ret);
 }
 
 void
 nfs_free_mi4(mntinfo4_t *mi)
 {
 	nfs4_open_owner_t	*foop;
-	nfs4_oo_hash_bucket_t	*bucketp;
+	nfs4_oo_hash_bucket_t   *bucketp;
 	nfs4_debug_msg_t	*msgp;
 	int i;
+	servinfo4_t 		*svp;
 
-	/*
-	 * Tell the thread for over the wire inactive calls to exit.
-	 *
-	 * By the time we get here the last VFS_RELE() has already been called,
-	 * or this is an aborted mount; in either case the async manager thread
-	 * should be dead by now.  The recovery thread has called recov_done(),
-	 * but may not have exited yet.
-	 */
 	mutex_enter(&mi->mi_lock);
 	ASSERT(mi->mi_recovthread == NULL);
 	ASSERT(mi->mi_flags & MI4_ASYNC_MGR_STOP);
-	mi->mi_flags |= MI4_DEAD;
 	mutex_exit(&mi->mi_lock);
-
 	mutex_enter(&mi->mi_async_lock);
 	ASSERT(mi->mi_threads == 0);
 	ASSERT(mi->mi_manager_thread == NULL);
-
-	/*
-	 * If we are the inactive thread NULL mi_inactive_thread
-	 * then return. The inactive thread will detect MI4_DEAD
-	 * and call nfs_free_mi4 directly so that the cleanup and
-	 * thread exit can occur.
-	 */
-	if (mi->mi_inactive_thread == curthread) {
-		mi->mi_inactive_thread = NULL;
-		mutex_exit(&mi->mi_async_lock);
-		return;
-	}
-
-	/*
-	 * Wake up the inactive thread.
-	 */
-	cv_signal(&mi->mi_inact_req_cv);
-
-	/*
-	 * Wait for the inactive thread to exit.
-	 */
-	while (mi->mi_inactive_thread != NULL) {
-		cv_wait(&mi->mi_async_cv, &mi->mi_async_lock);
-	}
-
 	mutex_exit(&mi->mi_async_lock);
-
-	/*
-	 * Wait for the recovery thread to complete, that is, it will signal
-	 * when it is done using the "mi" structure and about to exit.
-	 */
-	mutex_enter(&mi->mi_lock);
-	while (mi->mi_in_recovery > 0)
-		cv_wait(&mi->mi_cv_in_recov, &mi->mi_lock);
-	mutex_exit(&mi->mi_lock);
-
+	svp = mi->mi_servers;
+	sv4_free(svp);
+	if (mi->mi_io_kstats) {
+		kstat_delete(mi->mi_io_kstats);
+		mi->mi_io_kstats = NULL;
+	}
+	if (mi->mi_ro_kstats) {
+		kstat_delete(mi->mi_ro_kstats);
+		mi->mi_ro_kstats = NULL;
+	}
+	if (mi->mi_recov_ksp) {
+		kstat_delete(mi->mi_recov_ksp);
+		mi->mi_recov_ksp = NULL;
+	}
 	mutex_enter(&mi->mi_msg_list_lock);
 	while (msgp = list_head(&mi->mi_msg_list)) {
 		list_remove(&mi->mi_msg_list, msgp);
@@ -2995,12 +2982,10 @@ nfs_free_mi4(mntinfo4_t *mi)
 	}
 	mutex_exit(&mi->mi_msg_list_lock);
 	list_destroy(&mi->mi_msg_list);
-
 	if (mi->mi_rootfh != NULL)
 		sfh4_rele(&mi->mi_rootfh);
 	if (mi->mi_srvparentfh != NULL)
 		sfh4_rele(&mi->mi_srvparentfh);
-
 	mutex_destroy(&mi->mi_lock);
 	mutex_destroy(&mi->mi_async_lock);
 	mutex_destroy(&mi->mi_msg_list_lock);
@@ -3012,7 +2997,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 	cv_destroy(&mi->mi_async_work_cv);
 	cv_destroy(&mi->mi_async_cv);
 	cv_destroy(&mi->mi_inact_req_cv);
-
 	/*
 	 * Destroy the oo hash lists and mutexes for the cred hash table.
 	 */
@@ -3028,7 +3012,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 		list_destroy(&bucketp->b_oo_hash_list);
 		mutex_destroy(&bucketp->b_lock);
 	}
-
 	/*
 	 * Empty and destroy the freed open owner list.
 	 */
@@ -3038,16 +3021,27 @@ nfs_free_mi4(mntinfo4_t *mi)
 		nfs4_destroy_open_owner(foop);
 		foop = list_head(&mi->mi_foo_list);
 	}
-
 	list_destroy(&mi->mi_foo_list);
 	list_destroy(&mi->mi_bseqid_list);
 	list_destroy(&mi->mi_lost_state);
 	avl_destroy(&mi->mi_filehandles);
 	fn_rele(&mi->mi_fname);
-	nfs4_mi_zonelist_remove(mi);
-	zone_rele(mi->mi_zone);
-
 	kmem_free(mi, sizeof (*mi));
+}
+void
+mi_hold(mntinfo4_t *mi)
+{
+	atomic_add_32(&mi->mi_count, 1);
+	ASSERT(mi->mi_count != 0);
+}
+
+void
+mi_rele(mntinfo4_t *mi)
+{
+	ASSERT(mi->mi_count != 0);
+	if (atomic_add_32_nv(&mi->mi_count, -1) == 0) {
+		nfs_free_mi4(mi);
+	}
 }
 
 vnode_t    nfs4_xattr_notsupp_vnode;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -418,7 +417,7 @@ start_recovery(recov_info_t *recovp, mntinfo4_t *mi,
 	 * recovery thread.
 	 */
 	VFS_HOLD(mi->mi_vfsp);
-
+	MI4_HOLD(mi);
 again:
 	switch (recovp->rc_action) {
 	case NR_FAILOVER:
@@ -626,6 +625,7 @@ out_no_thread:
 	mutex_exit(&mi->mi_lock);
 
 	VFS_RELE(mi->mi_vfsp);
+	MI4_RELE(mi);
 	/*
 	 * Free up resources that were allocated for us.
 	 */
@@ -1243,7 +1243,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 	bool_t recov_fail = FALSE;
 	callb_cpr_t cpr_info;
 	kmutex_t cpr_lock;
-	vfs_t *tvfsp;
 
 	nfs4_queue_event(RE_START, mi, NULL, mi->mi_recovflags,
 	    recovp->rc_vp1, recovp->rc_vp2, 0, NULL, 0, TAG_NONE, TAG_NONE,
@@ -1545,9 +1544,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 	if (recovp->rc_vp2 != NULL)
 		VN_RELE(recovp->rc_vp2);
 
-	/* Once we broadcast complete, the mi structure could be freed */
-	tvfsp = mi->mi_vfsp;
-
 	/* now we are done using the mi struct, signal the waiters */
 	mutex_enter(&mi->mi_lock);
 	mi->mi_in_recovery--;
@@ -1555,8 +1551,8 @@ nfs4_recov_thread(recov_info_t *recovp)
 		cv_broadcast(&mi->mi_cv_in_recov);
 	mutex_exit(&mi->mi_lock);
 
-	VFS_RELE(tvfsp);
-
+	VFS_RELE(mi->mi_vfsp);
+	MI4_RELE(mi);
 	kmem_free(recovp, sizeof (recov_info_t));
 	mutex_enter(&cpr_lock);
 	CALLB_CPR_EXIT(&cpr_info);

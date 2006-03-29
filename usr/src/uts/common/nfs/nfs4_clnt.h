@@ -910,6 +910,7 @@ typedef struct mntinfo4 {
 	len_t		mi_maxfilesize; /* for pathconf _PC_FILESIZEBITS */
 	int		mi_curread;	/* current read size */
 	int		mi_curwrite;	/* current write size */
+	uint_t 		mi_count; 	/* ref count */
 	/*
 	 * async I/O management.  There may be a pool of threads to handle
 	 * async I/O requests, etc., plus there is always one thread that
@@ -1028,7 +1029,7 @@ typedef struct mntinfo4 {
  *	MI4_MOUNTING		 mount in progress, don't failover
  *	MI4_POSIX_LOCK		 if server is using POSIX locking
  *	MI4_LOCK_DEBUG		 cmn_err'd posix lock err msg
- *	MI4_DEAD		 mount has been terminated
+ *	MI4_DEAD		 zone has released it
  *	MI4_INACTIVE_IDLE	 inactive thread idle
  *	MI4_BADOWNER_DEBUG	 badowner error msg per mount
  *	MI4_ASYNC_MGR_STOP	 tell async manager to die
@@ -1085,6 +1086,14 @@ typedef struct mntinfo4 {
 #define	MI4R_SRV_REBOOT		0x20	/* server has rebooted */
 #define	MI4R_LOST_STATE		0x40
 #define	MI4R_BAD_SEQID		0x80
+
+#define	MI4_HOLD(mi) {		\
+	mi_hold(mi);		\
+}
+
+#define	MI4_RELE(mi) {		\
+	mi_rele(mi);		\
+}
 
 /*
  * vfs pointer to mount info
@@ -1303,6 +1312,7 @@ extern void	nfs4_printfhandle(nfs4_fhandle_t *);
 extern void	nfs_free_mi4(mntinfo4_t *);
 extern void	sv4_free(servinfo4_t *);
 extern void	nfs4_mi_zonelist_add(mntinfo4_t *);
+extern int	nfs4_mi_zonelist_remove(mntinfo4_t *);
 extern int 	nfs4_secinfo_recov(mntinfo4_t *, vnode_t *, vnode_t *);
 extern void	nfs4_secinfo_init(void);
 extern void	nfs4_secinfo_fini(void);
@@ -1324,6 +1334,10 @@ extern void	nfs4open_confirm(vnode_t *, seqid4*, stateid4 *, cred_t *,
 		    nfs4_error_t *, int *);
 extern void	nfs4_error_zinit(nfs4_error_t *);
 extern void	nfs4_error_init(nfs4_error_t *, int);
+
+extern void 	mi_hold(mntinfo4_t *);
+extern void	mi_rele(mntinfo4_t *);
+
 #ifdef DEBUG
 extern int	nfs4_consistent_type(vnode_t *);
 #endif
