@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include <rpc/rpc.h>
 #include <rpc/types.h>
@@ -54,7 +54,7 @@ extern char *__nis_server;   /* if set, use only this server for binding */
 extern "C" {
 
 extern void __nis_get_environment(); /* in libc/port/gen/nss_common.c */
-#define       MGR_CHECK_INTERVAL      300
+#define	MGR_CHECK_INTERVAL	300
 
 /*
  * Initializes the client cache. Allocates the global data strucuture
@@ -80,49 +80,64 @@ __nis_CacheInit(NisCache **cache)
 		checked_env = 1;
 	}
 
-	if (cur_cache && !cur_cache->okay()) {
-		    cur_cache = NULL;
-	}
-
-	/* Verify cachemgr still running; checkUp() is no-op for local cache */
-	if (cur_cache && gettimeofday(&now, 0) != -1 &&
-		now.tv_sec > then.tv_sec+MGR_CHECK_INTERVAL) {
-		if (cur_cache->checkUp()) {
-			then = now;
-		} else {
-			cur_cache = NULL;
-		}
-	}
-
-	if (cur_cache == NULL) {
+	if (mgr_cache) {
 		/*
-		 *  If an explicit server for binding has been set, then
-		 *  we can't use the shared cache because its server
-		 *  rankings will conflict with ours.
+		 * The manager cache is defined and will always be
+		 * available so there's no need to check its validity.
+		 * As a precaution we make sure cur_cache is set to
+		 * mgr_cache and log a message if we have to correct it.
 		 */
-		if (!__nis_server) {
-			cur_cache = new NisClientCache(status);
-			if (cur_cache == NULL) {
-				status = NIS_NOMEMORY;
-			} else if (status != NIS_SUCCESS) {
-				delete cur_cache;
+		if (cur_cache != mgr_cache) {
+			syslog(LOG_WARNING, "__nis_CacheInit: "
+				"cur_cache=%lx is not mgr_cache=%lx, corrected",
+				cur_cache, mgr_cache);
+			cur_cache = mgr_cache;
+		}
+	} else {
+		/*
+		 * We dont have a manager cache so we check the validity
+		 * of the current cache and create one as necessary.
+		 */
+		if (cur_cache && !cur_cache->okay()) {
+			    cur_cache = NULL;
+		}
+		/*
+		 * Verify cachemgr still running
+		 * checkUp() is no-op for local cache
+		 */
+		if (cur_cache && gettimeofday(&now, 0) != -1 &&
+			now.tv_sec > then.tv_sec+MGR_CHECK_INTERVAL) {
+			if (cur_cache->checkUp()) {
+				then = now;
+			} else {
 				cur_cache = NULL;
 			}
 		}
-		if (cur_cache == NULL) {
-			status = NIS_NOMEMORY;
-		} else if (status != NIS_SUCCESS) {
-			delete cur_cache;
-			cur_cache = NULL;
-		}
 
 		if (cur_cache == NULL) {
-			cur_cache = new NisLocalCache(status);
+			/*
+			 *  If an explicit server for binding has been set, then
+			 *  we can't use the shared cache because its server
+			 *  rankings will conflict with ours.
+			 */
+			if (!__nis_server) {
+				cur_cache = new NisClientCache(status);
+				if (cur_cache == NULL) {
+					status = NIS_NOMEMORY;
+				} else if (status != NIS_SUCCESS) {
+					delete cur_cache;
+					cur_cache = NULL;
+				}
+			}
+
 			if (cur_cache == NULL) {
-				status = NIS_NOMEMORY;
-			} else if (status != NIS_SUCCESS) {
-				delete cur_cache;
-				cur_cache = NULL;
+				cur_cache = new NisLocalCache(status);
+				if (cur_cache == NULL) {
+					status = NIS_NOMEMORY;
+				} else if (status != NIS_SUCCESS) {
+					delete cur_cache;
+					cur_cache = NULL;
+				}
 			}
 		}
 	}
