@@ -285,7 +285,6 @@ COMMON_SUBDIRS= \
 	SUNWrsg \
 	SUNWrsgk \
 	SUNWsacom \
-	SUNWsadmi \
 	SUNWsasnm \
 	SUNWsbp2 \
 	SUNWscpr  \

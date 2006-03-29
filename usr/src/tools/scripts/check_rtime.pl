@@ -88,9 +88,6 @@ $SkipFiles = qr{ ^(?:
 	libm\.so\.2 |			# temporary; delivered by compiler group
 	geniconvtbl\.so |		# 4384329
 	libssagent\.so\.1 |		# 4328854
-	libdmi\.so\.1 |			#  "  "
-	libdmici\.so\.1 |		#  "  "
-	libdmimi\.so\.1 |		#  "  "
 	libpsvcplugin_psr\.so\.1 |	# 4385799
 	libpsvcpolicy_psr\.so\.1 |	#  "  "
 	libpsvcpolicy\.so\.1 |		#  "  "

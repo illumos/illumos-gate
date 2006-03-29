@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -90,11 +89,6 @@ MODEL_TWEAK|/usr/lib/libc.so.1|i386,amd64|ntohl|public
 MODEL_TWEAK|/usr/lib/libc.so.1|i386,amd64|ntohs|public
 MODEL_TWEAK|/usr/lib/libc.so.1|*|__trans_lower|public
 MODEL_TWEAK|/usr/lib/libc.so.1|*|__trans_upper|public
-MODEL_TWEAK|/usr/lib/libdmi.so.1|*|dmi_error|public
-MODEL_TWEAK|/usr/lib/libdmi.so.1|*|freeDmiString|public
-MODEL_TWEAK|/usr/lib/libdmi.so.1|*|newDmiString|public
-MODEL_TWEAK|/usr/lib/libdmi.so.1|*|printDmiDataUnion|public
-MODEL_TWEAK|/usr/lib/libdmi.so.1|*|printDmiString|public
 MODEL_TWEAK|/usr/lib/libresolv.so.2|*|res_mkupdrec|public
 MODEL_TWEAK|/usr/lib/libresolv.so.2|*|__p_rr|private
 MODEL_TWEAK|/usr/dt/lib/libDtSvc.so.1|*|DtActionInvoke|public

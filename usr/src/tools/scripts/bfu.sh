@@ -2836,6 +2836,75 @@ remove_eof_face() {
 	rm -rf $usr/vmsys
 }
 
+remove_eof_dmi() {
+	# Packages to remove
+	typeset -r dmi_pkgs='SUNWsadmi'
+	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
+	typeset pkg
+
+	printf 'Removing DMI... '
+
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	#
+	for pkg in $dmi_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
+
+	#
+	# In case that didn't work, do it manually.
+	# Remove DMI from $rootprefix/var/sadm/install/contents
+	#
+	for pkg in $dmi_pkgs
+	do
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ $rootprefix/var/sadm/install/contents.$$
+			rm /tmp/contents.$$
+		fi
+	done
+
+	#
+	# Cleanup any remaining DMI files, symlinks, and directories.
+	#
+	rm -rf $usr/lib/dmi
+	rm -rf $rootprefix/var/dmi
+	rm -rf $rootprefix/etc/dmi
+	rm -f $usr/lib/libdmi.so
+	rm -f $usr/lib/libdmici.so
+	rm -f $usr/lib/libdmimi.so
+	rm -f $usr/lib/libdmi.so.1
+	rm -f $usr/lib/libdmici.so.1
+	rm -f $usr/lib/libdmimi.so.1
+	rm -f $usr/lib/sparcv9/libdmi.so
+	rm -f $usr/lib/sparcv9/libdmici.so
+	rm -f $usr/lib/sparcv9/libdmimi.so
+	rm -f $usr/lib/sparcv9/libdmi.so.1
+	rm -f $usr/lib/sparcv9/libdmici.so.1
+	rm -f $usr/lib/sparcv9/libdmimi.so.1
+	rm -f $usr/lib/amd64/libdmi.so
+	rm -f $usr/lib/amd64/libdmici.so
+	rm -f $usr/lib/amd64/libdmimi.so
+	rm -f $usr/lib/amd64/libdmi.so.1
+	rm -f $usr/lib/amd64/libdmici.so.1
+	rm -f $usr/lib/amd64/libdmimi.so.1
+	rm -f $usr/sbin/dmi_cmd
+	rm -f $usr/sbin/dmiget
+	rm -f $rootprefix/etc/init.d/init.dmi
+	rm -f $rootprefix/etc/rc0.d/K07dmi
+	rm -f $rootprefix/etc/rc1.d/K07dmi
+	rm -f $rootprefix/etc/rc2.d/K07dmi
+	rm -f $rootprefix/etc/rcS.d/K07dmi
+	rm -f $rootprefix/etc/rc3.d/S77dmi
+}
+
 remove_properties() {
 
 	#
@@ -4845,6 +4914,15 @@ mondo_loop() {
 	#
 	if [ -d $usr/oasys -o -d $usr/vmsys ]; then
 		remove_eof_face
+	fi
+
+	#
+	# Remove DMI
+	#
+	if [ -d $usr/lib/dmi -o \
+	     -d $rootprefix/etc/dmi -o \
+	     -d $rootprefix/var/dmi ]; then
+	        remove_eof_dmi
 	fi
 
 	#

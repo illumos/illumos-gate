@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -438,10 +438,8 @@ static void print_usage()
 	exit(1);
 }
 
-
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int arg;
 	int Fails ; 
@@ -715,4 +713,6 @@ main(argc, argv)
 	}
 
 	dispatcher_loop();
+
+	return (0);
 }

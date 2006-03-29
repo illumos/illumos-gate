@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 # cmd/agents/Makefile
 
@@ -65,7 +65,6 @@ TARG_SYS:sh =                           \
 ROOTDIR	: sh=echo ${ROOTDIR:-"`pwd`"}
 PKGLOC	: sh=echo ${PKGLOC:-'${ROOTDIR}/PACKAGES.`uname -p`'}
 
-$(CLOSED_BUILD)DMI= $(CLOSED)/cmd/agents/dmi2.0
 $(CLOSED_BUILD)AGENTS= $(CLOSED)/cmd/agents/agents
 
 all	:=		TARGET = all
@@ -74,7 +73,7 @@ install	:=		TARGET = install
 lint	:=		TARGET = lint
 realclobber :=		TARGET = realclobber
 
-SUBDIRS = snmp $(DMI) $(AGENTS)
+SUBDIRS = snmp $(AGENTS)
 
 #
 # all
@@ -92,18 +91,10 @@ OWNER=		root
 GROUP=		sys
 ROOTVAR=	$(ROOT)/var
 
-ROOTDIRS=	$(ROOTETC)/dmi \
-		$(ROOTETC)/dmi/ciagent \
-		$(ROOTETC)/dmi/conf \
-		$(ROOTETC)/snmp \
+ROOTDIRS=	$(ROOTETC)/snmp \
 		$(ROOTETC)/snmp/conf \
-		$(ROOTLIB)/dmi \
 		$(ROOTLIB)/snmp \
 		$(ROOTBIN) \
-		$(ROOTVAR)/dmi \
-		$(ROOTVAR)/dmi/db \
-		$(ROOTVAR)/dmi/map \
-		$(ROOTVAR)/dmi/mif \
 		$(ROOTVAR)/snmp \
 		$(ROOTVAR)/snmp/mib
 
@@ -129,12 +120,5 @@ lint:  $(SUBDIRS)
 # We need a real make clobber with sccs clean.
 
 realclobber: $(SUBDIRS)
-
-package:
-	cd ../../pkgdefs; pwd; $(MAKE) awk_pkginfo
-	cd ../../pkgdefs/SUNWmibii; pwd; $(MAKE) install
-	cd ../../pkgdefs/SUNWsacom; pwd; $(MAKE) install
-	cd ../../pkgdefs/SUNWsadmi; pwd; $(MAKE) install
-	cd ../../pkgdefs/SUNWsasnm; pwd; $(MAKE) install
 
 include $(SRC)/cmd/Makefile.targ
