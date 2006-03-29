@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -461,26 +460,27 @@ apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
  * to indicate this system supports MSI.
  */
 int
-apic_check_msi_support(dev_info_t *dip)
+apic_check_msi_support()
 {
-
-	dev_info_t *rootdip;
+	dev_info_t *cdip;
 	char dev_type[16];
 	int dev_len;
 
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: dip: 0x%p\n",
-	    (void *)dip));
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support:\n"));
 
-	/* check whether the device or its ancestors have PCI-E capability */
-	for (rootdip = ddi_root_node(); dip != rootdip;
-	    dip = ddi_get_parent(dip)) {
+	/*
+	 * check whether the first level children of root_node have
+	 * PCI-E capability
+	 */
+	for (cdip = ddi_get_child(ddi_root_node()); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
 
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: dip: 0x%p,"
-		    " driver: %s, binding: %s, nodename: %s\n", (void *)dip,
-		    ddi_driver_name(dip), ddi_binding_name(dip),
-		    ddi_node_name(dip)));
+		DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: cdip: 0x%p,"
+		    " driver: %s, binding: %s, nodename: %s\n", (void *)cdip,
+		    ddi_driver_name(cdip), ddi_binding_name(cdip),
+		    ddi_node_name(cdip)));
 		dev_len = sizeof (dev_type);
-		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 		    "device_type", (caddr_t)dev_type, &dev_len)
 		    != DDI_PROP_SUCCESS)
 			continue;
@@ -647,7 +647,7 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			 * apic_check_msi_support() to check whether msi
 			 * is supported first
 			 */
-			if (apic_check_msi_support(dip) == PSM_SUCCESS)
+			if (apic_check_msi_support() == PSM_SUCCESS)
 				apic_support_msi = 1;
 			else
 				apic_support_msi = -1;

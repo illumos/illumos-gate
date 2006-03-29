@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,10 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcihp.h>
+#if defined(__i386) || defined(__amd64)
+#include <sys/pci_intr_lib.h>
+#include <sys/psm.h>
+#endif
 
 /*
  * For PCI Hotplug support, the misc/pcihp module provides devctl control
@@ -70,6 +73,20 @@ static int ppb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
 static int ppb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
+#if defined(__i386) || defined(__amd64)
+static int ppb_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
+	ddi_intr_handle_impl_t *, void *);
+
+/*
+ * Not to allow MSI by default except special case like AMD8132 with
+ * MSI enabled.
+ * However, this flag can be patched to allow MSI if needed.
+ *  0 = default value, MSI is allowed only for special case
+ *  1 = MSI supported without check
+ * -1 = MSI not supported at all
+ */
+int ppb_support_msi = 0;
+#endif
 
 struct bus_ops ppb_bus_ops = {
 	BUSO_REV,
@@ -100,7 +117,11 @@ struct bus_ops ppb_bus_ops = {
 	NULL,		/* (*bus_fm_access_enter)(); 	*/
 	NULL,		/* (*bus_fm_access_exit)(); 	*/
 	NULL,		/* (*bus_power)(); 	*/
+#if defined(__i386) || defined(__amd64)
+	ppb_intr_ops	/* (*bus_intr_op)(); 		*/
+#else
 	i_ddi_intr_ops	/* (*bus_intr_op)(); 		*/
+#endif
 };
 
 /*
@@ -847,6 +868,90 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 		pci_config_teardown(&config_handle);
 	}
 }
+
+#if defined(__i386) || defined(__amd64)
+
+#define	PCI_VENID_AMD			0x1022
+#define	PCI_DEVID_8132			0x7458
+#define	PCI_MSI_MAPPING_CAP_OFF		0xF4
+#define	PCI_MSI_MAPPING_CAP_MASK	0xFF01000F
+#define	PCI_MSI_MAPPING_ENABLE		0xA8010008
+
+extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+		psm_intr_op_t, int *);
+
+/*
+ * ppb_intr_ops
+ */
+static int
+ppb_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
+    ddi_intr_handle_impl_t *hdlp, void *result)
+{
+	ddi_acc_handle_t config_handle;
+	ddi_intr_handle_impl_t tmp_hdl;
+	uint_t msi_mapping;
+	int types = 0;
+
+	if (intr_op != DDI_INTROP_SUPPORTED_TYPES)
+		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
+
+	DDI_INTR_NEXDBG((CE_CONT,
+	    "ppb_intr_ops: pdip 0x%p, rdip 0x%p, op %x handle 0x%p\n",
+	    (void *)pdip, (void *)rdip, intr_op, (void *)hdlp));
+
+	/* Fixed interrupt is supported by default */
+	*(int *)result = DDI_INTR_TYPE_FIXED;
+
+	if (psm_intr_ops == NULL || ppb_support_msi == -1) {
+		/* MSI is not allowed */
+		DDI_INTR_NEXDBG((CE_CONT, "ppb_intr_ops: psm_intr_ops == NULL "
+		    "or MSI is not allowed\n"));
+	} else if (ppb_support_msi == 1) {
+		/* MSI is always allowed */
+		DDI_INTR_NEXDBG((CE_CONT,
+		    "ppb_intr_ops: MSI is always allowed\n"));
+		if (pci_msi_get_supported_type(rdip, &types) == DDI_SUCCESS) {
+			*(int *)result |= types;
+			bzero(&tmp_hdl, sizeof (ddi_intr_handle_impl_t));
+			tmp_hdl.ih_type = *(int *)result;
+			(void) (*psm_intr_ops)(rdip, &tmp_hdl,
+			    PSM_INTR_OP_CHECK_MSI, result);
+		}
+	} else if (pci_config_setup(pdip, &config_handle) == DDI_SUCCESS) {
+		/*
+		 * ppb_support_msi == 0
+		 * only for check special case like AMD8132 which supports MSI
+		 */
+		if ((pci_config_get16(config_handle, PCI_CONF_VENID) ==
+		    PCI_VENID_AMD) && (pci_config_get16(config_handle,
+		    PCI_CONF_DEVID) == PCI_DEVID_8132)) {
+			msi_mapping = pci_config_get32(config_handle,
+					PCI_MSI_MAPPING_CAP_OFF);
+			/* make sure MSI enable bit is on */
+			if ((msi_mapping & PCI_MSI_MAPPING_CAP_MASK) ==
+				PCI_MSI_MAPPING_ENABLE) {
+				/* MSI/X is enable */
+				DDI_INTR_NEXDBG((CE_CONT, "ppb_intr_ops: "
+				    "MSI is allowed for AMD8132\n"));
+				if (pci_msi_get_supported_type(rdip, &types)
+				    == DDI_SUCCESS) {
+					*(int *)result |= types;
+					bzero(&tmp_hdl,
+					    sizeof (ddi_intr_handle_impl_t));
+					tmp_hdl.ih_type = *(int *)result;
+					(void) (*psm_intr_ops)(rdip, &tmp_hdl,
+					    PSM_INTR_OP_CHECK_MSI, result);
+				}
+			}
+		}
+		pci_config_teardown(&config_handle);
+	}
+	DDI_INTR_NEXDBG((CE_CONT,
+	    "ppb_intr_ops: rdip 0x%p, returns supported types: 0x%x\n",
+	    (void *)rdip, *(int *)result));
+	return (DDI_SUCCESS);
+}
+#endif
 
 static int
 ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)

@@ -252,7 +252,7 @@ int	apic_forceload = 0;
 
 int	apic_intr_policy = INTR_ROUND_ROBIN_WITH_AFFINITY;
 
-static int	apic_next_bind_cpu = 2; /* For round robin assignment */
+static int	apic_next_bind_cpu = 1; /* For round robin assignment */
 					/* start with cpu 1 */
 
 int	apic_coarse_hrtime = 1;		/* 0 - use accurate slow gethrtime() */
@@ -3734,12 +3734,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		 * not up, then post_cpu_start will handle it.
 		 */
 	} else {
-		/*
-		 * We change bind_cpu only for every two calls
-		 * as most drivers still do 2 add_intrs for every
-		 * interrupt
-		 */
-		bind_cpu = (apic_next_bind_cpu++) / 2;
+		bind_cpu = apic_next_bind_cpu++;
 		if (bind_cpu >= apic_nproc) {
 			apic_next_bind_cpu = 1;
 			bind_cpu = 0;
