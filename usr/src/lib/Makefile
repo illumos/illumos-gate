@@ -218,12 +218,10 @@ SUBDIRS += \
 
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
-	libc_psr	.WAIT
-$(CLOSED_BUILD)sparc_SUBDIRS += \
-	$(CLOSED)/lib/libprtdiag	.WAIT	\
-	$(CLOSED)/lib/libprtdiag_psr	\
-	$(CLOSED)/lib/librsc
-sparc_SUBDIRS += \
+	libc_psr	.WAIT	\
+	libprtdiag	.WAIT	\
+	libprtdiag_psr	\
+	librsc		\
 	libfruutils	.WAIT	\
 	libfru		\
 	libwrsmconf	\
@@ -285,11 +283,9 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 MSGSUBDIRS += \
 	$($(MACH)_MSGSUBDIRS)
 
-sparc_MSGSUBDIRS=
-
-$(CLOSED_BUILD)sparc_MSGSUBDIRS +=	\
-	$(CLOSED)/lib/libprtdiag	\
-	$(CLOSED)/lib/libprtdiag_psr
+sparc_MSGSUBDIRS=	\
+	libprtdiag	\
+	libprtdiag_psr
 
 HDRSUBDIRS= libaio	\
 	auditd_plugins	\

@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/serengeti/Makefile.serengeti
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,12 +94,10 @@ include $(UTSTREE)/sun4u/serengeti/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
+#	Define modules
 #
 SERENGETI_KMODS	= cheetah cheetahplus  
-SERENGETI_KMODS	+= wrsm
-$(CLOSED_BUILD)CLOSED_SERENGETI_KMODS = platmod sbdp sgcn sghsc sgsbbc
-$(CLOSED_BUILD)CLOSED_SERENGETI_KMODS += ssm wrsmplat
+SERENGETI_KMODS	+= platmod sbdp sgcn sghsc sgsbbc ssm wrsm wrsmplat
 
 #
 #       Everybody needs to know how to build modstubs.o and to locate unix.o

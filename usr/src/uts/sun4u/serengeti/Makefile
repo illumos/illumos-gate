@@ -19,7 +19,6 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/serengeti/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -61,14 +60,13 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber: genassym unix .WAIT \
-	$(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS)
+def all clean clean.lint clobber: genassym unix .WAIT $(SERENGETI_KMODS)
 
-modlist:	unix $(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS)
+modlist:	unix $(SERENGETI_KMODS)
 
 lintlib:	unix
 
-modlintlib:	$(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS)
+modlintlib:	$(SERENGETI_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire
  
@@ -86,14 +84,10 @@ install:	$(ROOT_SERENGETI_DIR) $(USR_SERENGETI_DIR) \
 		$(USR_SERENGETI_LIB_DIR) \
 		$(SERENGETI_CRYPTO_LINKS) \
 		genassym unix .WAIT \
-		$(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS)
+		$(SERENGETI_KMODS)
 
 genassym unix $(SERENGETI_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_SERENGETI_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/serengeti/$@; pwd; \
-	    $(MAKE) $(NO_STATE) $(TARGET)
 
 $(SERENGETI_CRYPTO_LINKS): $(ROOT_SERENGETI_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_SERENGETI_CRYPTO_DIR_64)/$@;

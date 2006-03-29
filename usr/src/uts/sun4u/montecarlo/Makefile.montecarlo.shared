@@ -19,8 +19,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/montecarlo/Makefile.impl
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,11 +74,9 @@ include $(UTSTREE)/sun4u/montecarlo/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-# Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
+# Define modules
 #
-MONTECARLO_KMODS = ttymux_dacf
-
-$(CLOSED_BUILD)CLOSED_MONTECARLO_KMODS = acebus pcf8574_nct pcf8591_nct scsb
+MONTECARLO_KMODS = acebus pcf8574_nct pcf8591_nct scsb ttymux_dacf
 
 #
 # we need the official MONTECARLO name here, and for the sun4u/montecarlo

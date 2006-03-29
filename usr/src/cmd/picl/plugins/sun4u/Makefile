@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -31,20 +31,14 @@
 
 include $(SRC)/Makefile.master
 
-CLOSED_SUN4U=$(CLOSED)/cmd/picl/plugins/sun4u
-
 SUBDIRS= lib .WAIT envmon .WAIT \
 	frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw2plus taco enchilada chicago blade mpxu ents \
+	cherrystone lw2plus lw8 taco enchilada chicago blade mpxu ents \
 	chalupa silverstone sebring snowbird schumacher seattle boston .WAIT
 
-$(CLOSED_BUILD)SUBDIRS += $(CLOSED_SUN4U)/lw8
-
 MSGSUBDIRS=	lib frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw2plus taco enchilada chicago blade envmon mpxu ents \
+	cherrystone lw2plus lw8 taco enchilada chicago blade envmon mpxu ents \
 	silverstone sebring snowbird
-
-$(CLOSED_BUILD)MSGSUBDIRS += $(CLOSED_SUN4U)/lw8
 
 all :=		TARGET= all
 install :=	TARGET= install

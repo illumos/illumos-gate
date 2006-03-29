@@ -39,11 +39,9 @@ include ../Makefile.sunfire
 FILEMODE	 = 644
 GROUP = bin
 
-HDRS=			ac.h environ.h fhc.h simmstat.h sysctrl.h
-CLOSEDHDRS=		sram.h
+HDRS=			ac.h environ.h fhc.h simmstat.h sysctrl.h sram.h
 
 ROOTHDRS=		$(HDRS:%=$(USR_SUNFIRE_ISYS_DIR)/%)
-$(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(USR_SUNFIRE_ISYS_DIR)/%)
 
 ROOTDIR=		$(ROOT)/usr/share/src
 ROOTDIRS=		$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
@@ -52,8 +50,6 @@ ROOTLINK=		$(ROOTDIR)/uts/$(PLATFORM)/sys
 LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 
 CHECKHDRS=		$(HDRS:%.h=%.check)
-$(CLOSED_BUILD)CHECKHDRS += \
-	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/sun4u/sunfire/sys/%.check)
 
 .KEEP_STATE:
 
@@ -67,9 +63,6 @@ check:	$(CHECKHDRS)
 # install rules
 #
 $(USR_SUNFIRE_ISYS_DIR)/%:	% $(USR_SUNFIRE_ISYS_DIR)
-	$(INS.file)
-
-$(USR_SUNFIRE_ISYS_DIR)/%:	$(CLOSED)/uts/sun4u/sunfire/sys/%
 	$(INS.file)
 
 $(ROOTDIRS):

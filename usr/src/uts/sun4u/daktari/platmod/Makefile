@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,7 @@ LINTS		= $(DAKTARI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DAKTARI_MISC_DIR)/$(MODULE)
 
 PLAT_DIR	= .
-HERE		= ../platmod
+HERE		= ../daktari/platmod
 
 #
 #	Include common rules.

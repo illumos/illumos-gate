@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	Global definitions for sun4u starcat implementation specific modules.
 #
@@ -80,26 +80,25 @@ include $(UTSTREE)/sun4u/starcat/Makefile.files
 include $(UTSTREE)/sun4u/Makefile.sun4u
 
 #
-#	Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
+#	Define modules
 #
+STARCAT_KMODS	+= axq
+STARCAT_KMODS	+= cvc
 STARCAT_KMODS	+= cvcredir
+STARCAT_KMODS	+= dman
 STARCAT_KMODS	+= dr
-
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	= platmod
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= axq
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= cvc
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= dman
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= drmach
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= fcgp2
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= gptwo_pci
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= gptwo_wci
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= iosram
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= mboxsc
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= sc_gptwocfg
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= schpc
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= sckmdrv
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= scosmb
-$(CLOSED_BUILD)CLOSED_STARCAT_KMODS	+= wrsmplat
+STARCAT_KMODS	+= drmach
+STARCAT_KMODS	+= fcgp2
+STARCAT_KMODS	+= gptwo_pci
+STARCAT_KMODS	+= gptwo_wci
+STARCAT_KMODS	+= iosram
+STARCAT_KMODS	+= mboxsc
+STARCAT_KMODS	+= platmod
+STARCAT_KMODS	+= sc_gptwocfg
+STARCAT_KMODS	+= schpc
+STARCAT_KMODS	+= sckmdrv
+STARCAT_KMODS	+= scosmb
+STARCAT_KMODS	+= wrsmplat
 
 #
 #	Define CPU modules.

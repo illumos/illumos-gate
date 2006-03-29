@@ -451,7 +451,7 @@ sparc_SUBDIRS=		\
 	dcs		\
 	fruadm		\
 	prtfru		\
-	$(CLOSED)/cmd/scadm	\
+	scadm		\
 	sckmd		\
 	sf880drd	\
 	stmsboot	\
@@ -613,6 +613,7 @@ MSGSUBDIRS=		\
 	rm		\
 	rmdir		\
 	rmformat	\
+	scadm		\
 	script		\
 	sdiff		\
 	sgs		\
@@ -678,7 +679,6 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
 	$(CLOSED)/cmd/printf	\
-	$(CLOSED)/cmd/scadm	\
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\
 	$(CLOSED)/cmd/tail	\

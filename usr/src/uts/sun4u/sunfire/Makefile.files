@@ -46,6 +46,8 @@ SYSCTRL_OBJS	+= sysctrl.o sysctrl_quiesce.o sysctrl_dr.o sysctrl_asm.o
 
 SIMMSTAT_OBJS	+= simmstat.o
 
+SRAM_OBJS	+= sram.o
+
 #
 # Miscellaneous
 #

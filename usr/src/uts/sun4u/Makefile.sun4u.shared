@@ -177,12 +177,12 @@ IMPLEMENTATIONS		+= boston .WAIT
 IMPLEMENTATIONS		+= seattle .WAIT
 IMPLEMENTATIONS		+= chicago .WAIT
 IMPLEMENTATIONS		+= sunfire .WAIT
+IMPLEMENTATIONS		+= lw8 .WAIT
+IMPLEMENTATIONS		+= makaha .WAIT
 
 $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	= chalupa .WAIT
 $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents .WAIT
 $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= lw2plus .WAIT
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= lw8 .WAIT
-$(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= makaha .WAIT
 
 #
 #	machine specific optimization, override default in Makefile.master
@@ -388,14 +388,14 @@ DRV_KMODS	+= pmugpio
 DRV_KMODS	+= pmc
 DRV_KMODS	+= trapstat
 DRV_KMODS	+= dmfe
+DRV_KMODS	+= rmc_comm
+DRV_KMODS	+= rmcadm
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= i2bsc 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= m1535ppm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mi2cv
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= rmc_comm
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= rmcadm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= rmclomv
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= scmi2c
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= sf
@@ -472,9 +472,9 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #	sun4u 'TOD' Modules (/platform/.../kernel/tod):
 #
 TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
-TOD_KMODS	+= todm5819 todblade todbq4802
+TOD_KMODS	+= todm5819 todblade todbq4802 todsg
 
-$(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5819p_rmc todsg todstarcat todm5823
+$(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5819p_rmc todstarcat todm5823
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):

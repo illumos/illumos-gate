@@ -19,7 +19,6 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/montecarlo/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -61,16 +60,15 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber modlist: $(MONTECARLO_KMODS) \
-	$(CLOSED_MONTECARLO_KMODS)
+def all clean.lint clean clobber modlist: $(MONTECARLO_KMODS)
 
-modlintlib:	$(MONTECARLO_KMODS) $(CLOSED_MONTECARLO_KMODS)
+modlintlib:	$(MONTECARLO_KMODS)
 
 install:        $(ROOT_MONTECARLO_DIR) $(USR_MONTECARLO_DIR) \
                 $(USR_MONTECARLO_INC_DIR) \
                 $(USR_MONTECARLO_SBIN_DIR) \
                 $(USR_MONTECARLO_LIB_DIR) \
-                .WAIT $(MONTECARLO_KMODS) $(CLOSED_MONTECARLO_KMODS) \
+                .WAIT $(MONTECARLO_KMODS) \
 		se.conf ttymux.conf
 
 se.conf:	$(ROOT_MONTECARLO_DRV_DIR)
@@ -111,10 +109,6 @@ lint.platmod:   modlintlib
 
 $(MONTECARLO_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_MONTECARLO_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/montecarlo/$@; pwd; \
-	    $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

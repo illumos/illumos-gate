@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
 #	This makefile drives the production of the sun4u starcat platform
@@ -61,14 +61,14 @@ check		:=	TARGET= check
 .KEEP_STATE:
 
 def all clean clobber clean.lint: genassym unix .WAIT \
-		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
+		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS)
 
 modlist:	unix \
-		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
+		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS)
 
 lintlib:	unix
 
-modlintlib:	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
+modlintlib:	$(STARCAT_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-15000
 
@@ -86,14 +86,10 @@ install: $(ROOT_STARCAT_DIR) $(USR_STARCAT_DIR) \
 	$(USR_STARCAT_LIB_DIR) \
 	$(STARCAT_CRYPTO_LINKS) \
 	genassym unix .WAIT $(STARCAT_CPU_KMODS) \
-	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
+	$(STARCAT_KMODS)
 
 genassym unix $(STARCAT_KMODS) $(STARCAT_CPU_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-$(CLOSED_STARCAT_KMODS): FRC
-	cd $(CLOSED)/uts/sun4u/starcat/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
 
 $(STARCAT_CRYPTO_LINKS): $(ROOT_STARCAT_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_STARCAT_CRYPTO_DIR_64)/$@;
