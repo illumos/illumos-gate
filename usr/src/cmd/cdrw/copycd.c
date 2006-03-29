@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -374,6 +373,19 @@ copy_cd(void)
 	if ((device_type != DVD_PLUS) && (device_type != DVD_PLUS_W)) {
 		ensure_media_space(total_nblks, end_tno);
 		write_init(audio_cd ? TRACK_MODE_AUDIO : TRACK_MODE_DATA);
+	}
+
+	/*
+	 * Simulation writing can't happen on DVD+RW's
+	 * or DVD+R's. According to the MMC spec this
+	 * operation is not supported. So we should
+	 * bail out if the user tries to do a simulation
+	 * write.
+	 */
+	if (simulation && (device_type == DVD_PLUS_W ||
+	    device_type == DVD_PLUS)) {
+		err_msg(gettext("Media does not support simulated writing.\n"));
+		exit(1);
 	}
 
 	if (device_type == DVD_PLUS_W) {
