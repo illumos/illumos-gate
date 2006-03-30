@@ -123,6 +123,9 @@
 #define	CONSOLE_LOGIN_FMRI	"svc:/system/console-login:default"
 #define	FS_MINIMAL_FMRI		"svc:/system/filesystem/minimal:default"
 
+#define	VERTEX_REMOVED	0	/* vertex has been freed  */
+#define	VERTEX_INUSE	1	/* vertex is still in use */
+
 static uu_list_pool_t *graph_edge_pool, *graph_vertex_pool;
 static uu_list_t *dgraph;
 static pthread_mutex_t dgraph_lock;
@@ -329,6 +332,7 @@ graph_remove_vertex(graph_vertex_t *v)
 
 	assert(uu_list_numnodes(v->gv_dependencies) == 0);
 	assert(uu_list_numnodes(v->gv_dependents) == 0);
+	assert(v->gv_refs == 0);
 
 	startd_free(v->gv_name, strlen(v->gv_name) + 1);
 	uu_list_destroy(v->gv_dependencies);
@@ -388,6 +392,39 @@ graph_remove_edge(graph_vertex_t *v, graph_vertex_t *dv)
 			break;
 		}
 	}
+}
+
+static void
+remove_inst_vertex(graph_vertex_t *v)
+{
+	graph_edge_t *e;
+	graph_vertex_t *sv;
+	int i;
+
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(uu_list_numnodes(v->gv_dependents) == 1);
+	assert(uu_list_numnodes(v->gv_dependencies) == 0);
+	assert(v->gv_refs == 0);
+	assert((v->gv_flags & GV_CONFIGURED) == 0);
+
+	e = uu_list_first(v->gv_dependents);
+	sv = e->ge_vertex;
+	graph_remove_edge(sv, v);
+
+	for (i = 0; up_svcs[i] != NULL; ++i) {
+		if (up_svcs_p[i] == v)
+			up_svcs_p[i] = NULL;
+	}
+
+	if (manifest_import_p == v)
+		manifest_import_p = NULL;
+
+	graph_remove_vertex(v);
+
+	if (uu_list_numnodes(sv->gv_dependencies) == 0 &&
+	    uu_list_numnodes(sv->gv_dependents) == 0 &&
+	    sv->gv_refs == 0)
+		graph_remove_vertex(sv);
 }
 
 static void
@@ -807,6 +844,34 @@ graph_unset_restarter(graph_vertex_t *v)
 	v->gv_restarter_channel = NULL;
 }
 
+/*
+ * Return VERTEX_REMOVED when the vertex passed in argument is deleted from the
+ * dgraph otherwise return VERTEX_INUSE.
+ */
+static int
+free_if_unrefed(graph_vertex_t *v)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+
+	if (v->gv_refs > 0)
+		return (VERTEX_INUSE);
+
+	if (v->gv_type == GVT_SVC &&
+	    uu_list_numnodes(v->gv_dependents) == 0 &&
+	    uu_list_numnodes(v->gv_dependencies) == 0) {
+		graph_remove_vertex(v);
+		return (VERTEX_REMOVED);
+	} else if (v->gv_type == GVT_INST &&
+	    (v->gv_flags & GV_CONFIGURED) == 0 &&
+	    uu_list_numnodes(v->gv_dependents) == 1 &&
+	    uu_list_numnodes(v->gv_dependencies) == 0) {
+		remove_inst_vertex(v);
+		return (VERTEX_REMOVED);
+	}
+
+	return (VERTEX_INUSE);
+}
+
 static void
 delete_depgroup(graph_vertex_t *v)
 {
@@ -824,12 +889,8 @@ delete_depgroup(graph_vertex_t *v)
 
 		switch (dv->gv_type) {
 		case GVT_INST:		/* instance dependency */
-			break;
-
 		case GVT_SVC:		/* service dependency */
-			if (uu_list_numnodes(dv->gv_dependents) == 0 &&
-			    uu_list_numnodes(dv->gv_dependencies) == 0)
-				graph_remove_vertex(dv);
+			(void) free_if_unrefed(dv);
 			break;
 
 		case GVT_FILE:		/* file dependency */
@@ -2393,12 +2454,46 @@ handle_cycle(const char *fmri, int *path)
 }
 
 /*
- * When run on the dependencies of a vertex, populates list with
- * graph_edge_t's which point to the instance vertices (no GVT_GROUP nodes)
- * on which the vertex depends.
+ * Increment the vertex's reference count to prevent the vertex removal
+ * from the dgraph.
+ */
+static void
+vertex_ref(graph_vertex_t *v)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+
+	v->gv_refs++;
+}
+
+/*
+ * Decrement the vertex's reference count and remove the vertex from
+ * the dgraph when possible.
+ *
+ * Return VERTEX_REMOVED when the vertex has been removed otherwise
+ * return VERTEX_INUSE.
  */
 static int
-append_insts(graph_edge_t *e, uu_list_t *list)
+vertex_unref(graph_vertex_t *v)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
+	assert(v->gv_refs > 0);
+
+	v->gv_refs--;
+
+	return (free_if_unrefed(v));
+}
+
+/*
+ * When run on the dependencies of a vertex, populates list with
+ * graph_edge_t's which point to the service vertices or the instance
+ * vertices (no GVT_GROUP nodes) on which the vertex depends.
+ *
+ * Increment the vertex's reference count once the vertex is inserted
+ * in the list. The vertex won't be able to be deleted from the dgraph
+ * while it is referenced.
+ */
+static int
+append_svcs_or_insts(graph_edge_t *e, uu_list_t *list)
 {
 	graph_vertex_t *v = e->ge_vertex;
 	graph_edge_t *new;
@@ -2411,7 +2506,7 @@ append_insts(graph_edge_t *e, uu_list_t *list)
 
 	case GVT_GROUP:
 		r = uu_list_walk(v->gv_dependencies,
-		    (uu_walk_fn_t *)append_insts, list, 0);
+		    (uu_walk_fn_t *)append_svcs_or_insts, list, 0);
 		assert(r == 0);
 		return (UU_WALK_NEXT);
 
@@ -2431,6 +2526,14 @@ append_insts(graph_edge_t *e, uu_list_t *list)
 	uu_list_node_init(new, &new->ge_link, graph_edge_pool);
 	r = uu_list_insert_before(list, NULL, new);
 	assert(r == 0);
+
+	/*
+	 * Because we are inserting the vertex in a list, we don't want
+	 * the vertex to be freed while the list is in use. In order to
+	 * achieve that, increment the vertex's reference count.
+	 */
+	vertex_ref(v);
+
 	return (UU_WALK_NEXT);
 }
 
@@ -2617,6 +2720,7 @@ refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 	uu_list_t *old_deps;
 	int ret = 0;
 	graph_edge_t *e;
+	graph_vertex_t *vv;
 
 	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
 	assert(v->gv_type == GVT_INST);
@@ -2632,7 +2736,7 @@ refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 		old_deps = startd_list_create(graph_edge_pool, NULL, 0);
 
 		err = uu_list_walk(v->gv_dependencies,
-		    (uu_walk_fn_t *)append_insts, old_deps, 0);
+		    (uu_walk_fn_t *)append_svcs_or_insts, old_deps, 0);
 		assert(err == 0);
 	}
 
@@ -2691,8 +2795,10 @@ refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 		for (e = uu_list_first(old_deps);
 		    e != NULL;
 		    e = uu_list_next(old_deps, e)) {
-			if (eval_subgraph(e->ge_vertex, h) ==
-			    ECONNABORTED)
+			vv = e->ge_vertex;
+
+			if (vertex_unref(vv) == VERTEX_INUSE &&
+			    eval_subgraph(vv, h) == ECONNABORTED)
 				aborted = B_TRUE;
 		}
 
@@ -4108,36 +4214,6 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 	return (err);
 }
 
-
-static void
-remove_inst_vertex(graph_vertex_t *v)
-{
-	graph_edge_t *e;
-	graph_vertex_t *sv;
-	int i;
-
-	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
-	assert(uu_list_numnodes(v->gv_dependents) == 1);
-
-	e = uu_list_first(v->gv_dependents);
-	sv = e->ge_vertex;
-	graph_remove_edge(sv, v);
-
-	for (i = 0; up_svcs[i] != NULL; ++i) {
-		if (up_svcs_p[i] == v)
-			up_svcs_p[i] = NULL;
-	}
-
-	if (manifest_import_p == v)
-		manifest_import_p = NULL;
-
-	graph_remove_vertex(v);
-
-	if (uu_list_numnodes(sv->gv_dependencies) == 0 &&
-	    uu_list_numnodes(sv->gv_dependents) == 0)
-		graph_remove_vertex(sv);
-}
-
 /*
  * If a vertex for fmri exists and it is enabled, send _DISABLE to the
  * restarter.  If it is running, send _STOP.  Send _REMOVE_INSTANCE.  Delete
@@ -4177,7 +4253,7 @@ dgraph_remove_instance(const char *fmri, scf_handle_t *h)
 		old_deps = startd_list_create(graph_edge_pool, NULL, 0);
 
 		err = uu_list_walk(v->gv_dependencies,
-		    (uu_walk_fn_t *)append_insts, old_deps, 0);
+		    (uu_walk_fn_t *)append_svcs_or_insts, old_deps, 0);
 		assert(err == 0);
 	}
 
@@ -4202,15 +4278,19 @@ dgraph_remove_instance(const char *fmri, scf_handle_t *h)
 	 * If there are no (non-service) dependents, the vertex can be
 	 * completely removed.
 	 */
-	if (v != milestone && uu_list_numnodes(v->gv_dependents) == 1)
+	if (v != milestone && v->gv_refs == 0 &&
+	    uu_list_numnodes(v->gv_dependents) == 1)
 		remove_inst_vertex(v);
 
 	if (milestone > MILESTONE_NONE) {
 		void *cookie = NULL;
 
 		while ((e = uu_list_teardown(old_deps, &cookie)) != NULL) {
-			while (eval_subgraph(e->ge_vertex, h) == ECONNABORTED)
-				libscf_handle_rebind(h);
+			v = e->ge_vertex;
+
+			if (vertex_unref(v) == VERTEX_INUSE)
+				while (eval_subgraph(v, h) == ECONNABORTED)
+					libscf_handle_rebind(h);
 
 			startd_free(e, sizeof (*e));
 		}
@@ -4713,16 +4793,18 @@ reject:
 	/*
 	 * Set milestone, removing the old one if this was the last reference.
 	 */
-	if (milestone > MILESTONE_NONE &&
-	    (milestone->gv_flags & GV_CONFIGURED) == 0)
-		remove_inst_vertex(milestone);
+	if (milestone > MILESTONE_NONE)
+		(void) vertex_unref(milestone);
 
 	if (isall)
 		milestone = NULL;
 	else if (isnone)
 		milestone = MILESTONE_NONE;
-	else
+	else {
 		milestone = nm;
+		/* milestone should count as a reference */
+		vertex_ref(milestone);
+	}
 
 	/* Clear all GV_INSUBGRAPH bits. */
 	for (v = uu_list_first(dgraph); v != NULL; v = uu_list_next(dgraph, v))
