@@ -37,7 +37,6 @@
 #include <sys/errno.h>
 #include <sys/open.h>
 #include <sys/cred.h>
-#include <sys/cred_impl.h>
 #include <sys/kmem.h>
 #include <sys/ascii.h>
 #include <sys/consdev.h>
