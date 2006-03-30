@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,6 +48,13 @@ dt_program_create(dtrace_hdl_t *dtp)
 		dt_list_append(&dtp->dt_programs, pgp);
 	else
 		(void) dt_set_errno(dtp, EDT_NOMEM);
+
+	/*
+	 * By default, programs start with DOF version 1 so that output files
+	 * containing DOF are backward compatible. If a program requires new
+	 * DOF features, the version is increased as needed.
+	 */
+	pgp->dp_dofversion = DOF_VERSION_1;
 
 	return (pgp);
 }
@@ -425,6 +431,10 @@ dt_header_decl(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 	if (fprintf(infop->dthi_out, ");\n") < 0)
 		return (dt_set_errno(dtp, errno));
 
+	if (fprintf(infop->dthi_out, "extern int "
+	    "__dtraceenabled_%s___%s(void);\n", infop->dthi_pfname, fname) < 0)
+		return (dt_set_errno(dtp, errno));
+
 	return (0);
 }
 
@@ -479,6 +489,14 @@ dt_header_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 	}
 
 	if (fprintf(infop->dthi_out, ")\n") < 0)
+		return (dt_set_errno(dtp, errno));
+
+	if (fprintf(infop->dthi_out, "#define\t%s_%s_ENABLED() \\\n",
+	    infop->dthi_pmname, mname) < 0)
+		return (dt_set_errno(dtp, errno));
+
+	if (fprintf(infop->dthi_out, "\t__dtraceenabled_%s___%s()\n",
+	    infop->dthi_pfname, fname) < 0)
 		return (dt_set_errno(dtp, errno));
 
 	return (0);

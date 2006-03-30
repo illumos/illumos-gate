@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -498,6 +498,7 @@ dt_probe_destroy(dt_probe_t *prp)
 	for (pip = prp->pr_inst; pip != NULL; pip = pip_next) {
 		pip_next = pip->pi_next;
 		dt_free(dtp, pip->pi_offs);
+		dt_free(dtp, pip->pi_enoffs);
 		dt_free(dtp, pip);
 	}
 
@@ -508,10 +509,12 @@ dt_probe_destroy(dt_probe_t *prp)
 
 int
 dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
-    const char *fname, const char *rname, uint32_t offset)
+    const char *fname, const char *rname, uint32_t offset, int isenabled)
 {
 	dtrace_hdl_t *dtp = pvp->pv_hdl;
 	dt_probe_instance_t *pip;
+	uint32_t **offs;
+	uint_t *noffs, *maxoffs;
 
 	assert(fname != NULL);
 
@@ -526,7 +529,15 @@ dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
 		if ((pip = dt_zalloc(dtp, sizeof (*pip))) == NULL)
 			return (-1);
 
-		if ((pip->pi_offs = dt_alloc(dtp, sizeof (uint32_t))) == NULL) {
+		if ((pip->pi_offs = dt_zalloc(dtp,
+		    sizeof (uint32_t))) == NULL) {
+			dt_free(dtp, pip);
+			return (-1);
+		}
+
+		if ((pip->pi_enoffs = dt_zalloc(dtp,
+		    sizeof (uint32_t))) == NULL) {
+			dt_free(dtp, pip->pi_offs);
 			dt_free(dtp, pip);
 			return (-1);
 		}
@@ -540,34 +551,48 @@ dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
 			}
 			(void) strcpy(pip->pi_rname, rname);
 		}
+
 		pip->pi_noffs = 0;
 		pip->pi_maxoffs = 1;
+		pip->pi_nenoffs = 0;
+		pip->pi_maxenoffs = 1;
+
 		pip->pi_next = prp->pr_inst;
 
 		prp->pr_inst = pip;
 	}
 
-	if (pip->pi_noffs == pip->pi_maxoffs) {
-		uint_t new_max = pip->pi_maxoffs * 2;
+	if (isenabled) {
+		offs = &pip->pi_enoffs;
+		noffs = &pip->pi_nenoffs;
+		maxoffs = &pip->pi_maxenoffs;
+	} else {
+		offs = &pip->pi_offs;
+		noffs = &pip->pi_noffs;
+		maxoffs = &pip->pi_maxoffs;
+	}
+
+	if (*noffs == *maxoffs) {
+		uint_t new_max = *maxoffs * 2;
 		uint32_t *new_offs = dt_alloc(dtp, sizeof (uint32_t) * new_max);
 
 		if (new_offs == NULL)
 			return (-1);
 
-		bcopy(pip->pi_offs, new_offs,
-		    sizeof (uint32_t) * pip->pi_maxoffs);
+		bcopy(*offs, new_offs, sizeof (uint32_t) * *maxoffs);
 
-		dt_free(dtp, pip->pi_offs);
-		pip->pi_maxoffs = new_max;
-		pip->pi_offs = new_offs;
+		dt_free(dtp, *offs);
+		*maxoffs = new_max;
+		*offs = new_offs;
 	}
 
-	dt_dprintf("defined probe %s:%s %s() +0x%x (%s)\n",
+	dt_dprintf("defined probe %s %s:%s %s() +0x%x (%s)\n",
+	    isenabled ? "(is-enabled)" : "",
 	    pvp->pv_desc.dtvd_name, prp->pr_ident->di_name, fname, offset,
 	    rname != NULL ? rname : fname);
 
-	assert(pip->pi_noffs < pip->pi_maxoffs);
-	pip->pi_offs[pip->pi_noffs++] = offset;
+	assert(*noffs < *maxoffs);
+	*offs[(*noffs)++] = offset;
 
 	return (0);
 }

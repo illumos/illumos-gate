@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -183,8 +184,6 @@ static dtrace_ecb_t	*dtrace_ecb_create_cache; /* cached created ECB */
 static dtrace_genid_t	dtrace_probegen;	/* current probe generation */
 static dtrace_helpers_t *dtrace_deferred_pid;	/* deferred helper list */
 static dtrace_enabling_t *dtrace_retained;	/* list of retained enablings */
-static dtrace_state_t	*dtrace_state;		/* temporary variable */
-static int		dtrace_err;		/* temporary variable */
 
 /*
  * DTrace Locking
@@ -6638,10 +6637,10 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 {
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
 	dof_hdr_t *dof = (dof_hdr_t *)daddr;
-	dof_sec_t *str_sec, *prb_sec, *arg_sec, *off_sec;
+	dof_sec_t *str_sec, *prb_sec, *arg_sec, *off_sec, *enoff_sec;
 	dof_provider_t *provider;
 	dof_probe_t *probe;
-	uint32_t *off;
+	uint32_t *off, *enoff;
 	uint8_t *arg;
 	char *strtab;
 	uint_t i, nprobes;
@@ -6664,6 +6663,17 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
 	off = (uint32_t *)(uintptr_t)(daddr + off_sec->dofs_offset);
 	arg = (uint8_t *)(uintptr_t)(daddr + arg_sec->dofs_offset);
+	enoff = NULL;
+
+	/*
+	 * See dtrace_helper_provider_validate().
+	 */
+	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 &&
+	    provider->dofpv_prenoffs != 0) {
+		enoff_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
+		    provider->dofpv_prenoffs * dof->dofh_secsize);
+		enoff = (uint32_t *)(uintptr_t)(daddr + enoff_sec->dofs_offset);
+	}
 
 	nprobes = prb_sec->dofs_size / prb_sec->dofs_entsize;
 
@@ -6690,6 +6700,13 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 		dhpb.dthpb_base = probe->dofpr_addr;
 		dhpb.dthpb_offs = off + probe->dofpr_offidx;
 		dhpb.dthpb_noffs = probe->dofpr_noffs;
+		if (enoff != NULL) {
+			dhpb.dthpb_enoffs = enoff + probe->dofpr_enoffidx;
+			dhpb.dthpb_nenoffs = probe->dofpr_nenoffs;
+		} else {
+			dhpb.dthpb_enoffs = NULL;
+			dhpb.dthpb_nenoffs = 0;
+		}
 		dhpb.dthpb_args = arg + probe->dofpr_argidx;
 		dhpb.dthpb_nargc = probe->dofpr_nargc;
 		dhpb.dthpb_xargc = probe->dofpr_xargc;
@@ -10015,7 +10032,7 @@ dtrace_dof_create(dtrace_state_t *state)
 
 	dof->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_NATIVE;
 	dof->dofh_ident[DOF_ID_ENCODING] = DOF_ENCODE_NATIVE;
-	dof->dofh_ident[DOF_ID_VERSION] = DOF_VERSION_1;
+	dof->dofh_ident[DOF_ID_VERSION] = DOF_VERSION;
 	dof->dofh_ident[DOF_ID_DIFVERS] = DIF_VERSION;
 	dof->dofh_ident[DOF_ID_DIFIREG] = DIF_DIR_NREGS;
 	dof->dofh_ident[DOF_ID_DIFTREG] = DIF_DTR_NREGS;
@@ -10733,7 +10750,8 @@ dtrace_dof_slurp(dof_hdr_t *dof, dtrace_vstate_t *vstate, cred_t *cr,
 		return (-1);
 	}
 
-	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1) {
+	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 &&
+	    dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_2) {
 		dtrace_dof_error(dof, "DOF version mismatch");
 		return (-1);
 	}
@@ -12456,7 +12474,7 @@ static int
 dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 {
 	uintptr_t daddr = (uintptr_t)dof;
-	dof_sec_t *str_sec, *prb_sec, *arg_sec, *off_sec;
+	dof_sec_t *str_sec, *prb_sec, *arg_sec, *off_sec, *enoff_sec;
 	dof_provider_t *provider;
 	dof_probe_t *probe;
 	uint8_t *arg;
@@ -12472,6 +12490,18 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 		return (-1);
 	}
 
+	/*
+	 * The section needs to be large enough to contain the DOF provider
+	 * structure appropriate for the given version.
+	 */
+	if (sec->dofs_size <
+	    ((dof->dofh_ident[DOF_ID_VERSION] == DOF_VERSION_1) ?
+	    offsetof(dof_provider_t, dofpv_prenoffs) :
+	    sizeof (dof_provider_t))) {
+		dtrace_dof_error(dof, "provider section too small");
+		return (-1);
+	}
+
 	provider = (dof_provider_t *)(uintptr_t)(daddr + sec->dofs_offset);
 	str_sec = dtrace_dof_sect(dof, DOF_SECT_STRTAB, provider->dofpv_strtab);
 	prb_sec = dtrace_dof_sect(dof, DOF_SECT_PROBES, provider->dofpv_probes);
@@ -12480,6 +12510,13 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 
 	if (str_sec == NULL || prb_sec == NULL ||
 	    arg_sec == NULL || off_sec == NULL)
+		return (-1);
+
+	enoff_sec = NULL;
+
+	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 &&
+	    provider->dofpv_prenoffs != 0 && (enoff_sec = dtrace_dof_sect(dof,
+	    DOF_SECT_PRENOFFS, provider->dofpv_prenoffs)) == NULL)
 		return (-1);
 
 	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
@@ -12543,13 +12580,42 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 			return (-1);
 		}
 
-
-		if (probe->dofpr_offidx + probe->dofpr_noffs <
+		/*
+		 * The offset count must not wrap the index and there must be
+		 * at least one offset. The offsets must also not overflow the
+		 * section's data.
+		 */
+		if (probe->dofpr_offidx + probe->dofpr_noffs <=
 		    probe->dofpr_offidx ||
 		    (probe->dofpr_offidx + probe->dofpr_noffs) *
 		    off_sec->dofs_entsize > off_sec->dofs_size) {
 			dtrace_dof_error(dof, "invalid probe offset");
 			return (-1);
+		}
+
+		if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1) {
+			/*
+			 * If there's no is-enabled offset section, make sure
+			 * there aren't any is-enabled offsets. Otherwise
+			 * perform the same checks as for probe offsets
+			 * (immediately above), except that having zero
+			 * is-enabled offsets is permitted.
+			 */
+			if (enoff_sec == NULL) {
+				if (probe->dofpr_enoffidx != 0 ||
+				    probe->dofpr_nenoffs != 0) {
+					dtrace_dof_error(dof, "is-enabled "
+					    "offsets with null section");
+					return (-1);
+				}
+			} else if (probe->dofpr_enoffidx +
+			    probe->dofpr_nenoffs < probe->dofpr_enoffidx ||
+			    (probe->dofpr_enoffidx + probe->dofpr_nenoffs) *
+			    enoff_sec->dofs_entsize > enoff_sec->dofs_size) {
+				dtrace_dof_error(dof, "invalid is-enabled "
+				    "offset");
+				return (-1);
+			}
 		}
 
 		if (probe->dofpr_argidx + probe->dofpr_xargc <
@@ -12615,7 +12681,8 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 	dtrace_helpers_t *help;
 	dtrace_vstate_t *vstate;
 	dtrace_enabling_t *enab = NULL;
-	int i, gen, rv, nhelpers = 0, destroy = 1;
+	int i, gen, rv, nhelpers = 0, nprovs = 0, destroy = 1;
+	uintptr_t daddr = (uintptr_t)dof;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 
@@ -12628,6 +12695,27 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 	    dhp != NULL ? dhp->dofhp_addr : 0, B_FALSE)) != 0) {
 		dtrace_dof_destroy(dof);
 		return (rv);
+	}
+
+	/*
+	 * Look for helper providers and validate their descriptions.
+	 */
+	if (dhp != NULL) {
+		for (i = 0; i < dof->dofh_secnum; i++) {
+			dof_sec_t *sec = (dof_sec_t *)(uintptr_t)(daddr +
+			    dof->dofh_secoff + i * dof->dofh_secsize);
+
+			if (sec->dofs_type != DOF_SECT_PROVIDER)
+				continue;
+
+			if (dtrace_helper_provider_validate(dof, sec) != 0) {
+				dtrace_enabling_destroy(enab);
+				dtrace_dof_destroy(dof);
+				return (-1);
+			}
+
+			nprovs++;
+		}
 	}
 
 	/*
@@ -12655,7 +12743,6 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 			(void) dtrace_helper_destroygen(help->dthps_generation);
 			dtrace_enabling_destroy(enab);
 			dtrace_dof_destroy(dof);
-			dtrace_err = rv;
 			return (-1);
 		}
 
@@ -12665,43 +12752,18 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 	if (nhelpers < enab->dten_ndesc)
 		dtrace_dof_error(dof, "unmatched helpers");
 
-	if (dhp != NULL) {
-		uintptr_t daddr = (uintptr_t)dof;
-		int err = 0, count = 0;
-
-		/*
-		 * Look for helper probes.
-		 */
-		for (i = 0; i < dof->dofh_secnum; i++) {
-			dof_sec_t *sec = (dof_sec_t *)(uintptr_t)(daddr +
-			    dof->dofh_secoff + i * dof->dofh_secsize);
-
-			if (sec->dofs_type != DOF_SECT_PROVIDER)
-				continue;
-
-			if (dtrace_helper_provider_validate(dof, sec) != 0) {
-				err = 1;
-				break;
-			}
-
-			count++;
-		}
-
-		dhp->dofhp_dof = (uint64_t)(uintptr_t)dof;
-		if (err == 0 && count > 0 &&
-		    dtrace_helper_provider_add(dhp) == 0)
-			destroy = 0;
-		else
-			dhp = NULL;
-	}
-
 	gen = help->dthps_generation++;
 	dtrace_enabling_destroy(enab);
 
-	if (dhp != NULL) {
-		mutex_exit(&dtrace_lock);
-		dtrace_helper_provider_register(curproc, help, dhp);
-		mutex_enter(&dtrace_lock);
+	if (dhp != NULL && nprovs > 0) {
+		dhp->dofhp_dof = (uint64_t)(uintptr_t)dof;
+		if (dtrace_helper_provider_add(dhp) == 0) {
+			mutex_exit(&dtrace_lock);
+			dtrace_helper_provider_register(curproc, help, dhp);
+			mutex_enter(&dtrace_lock);
+
+			destroy = 0;
+		}
 	}
 
 	if (destroy)
@@ -13460,7 +13522,6 @@ dtrace_ioctl_helper(int cmd, intptr_t arg, int *rv)
 			return (rval);
 
 		mutex_enter(&dtrace_lock);
-		dtrace_err = 0;
 
 		/*
 		 * dtrace_helper_slurp() takes responsibility for the dof --

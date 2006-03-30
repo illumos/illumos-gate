@@ -52,7 +52,6 @@
 #include <sys/vmsystm.h>
 #include <sys/prsystm.h>
 
-
 #include <vm/as.h>
 #include <vm/seg.h>
 #include <vm/seg_dev.h>
@@ -510,7 +509,7 @@ fasttrap_tracepoint_enable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	 * like to install. If we can't find a match, and have an allocated
 	 * tracepoint ready to go, enable that one now.
 	 *
-	 * A tracepoint whose proc is defunct is also considered defunct.
+	 * A tracepoint whose process is defunct is also considered defunct.
 	 */
 again:
 	mutex_enter(&bucket->ftb_mtx);
@@ -535,17 +534,26 @@ again:
 		 */
 		ASSERT(tp->ftt_ids != NULL || tp->ftt_retids != NULL);
 
-		if (probe->ftp_type == DTFTP_RETURN ||
-		    probe->ftp_type == DTFTP_POST_OFFSETS) {
-			id->fti_next = tp->ftt_retids;
-			membar_producer();
-			tp->ftt_retids = id;
-			membar_producer();
-		} else {
+		switch (id->fti_ptype) {
+		case DTFTP_ENTRY:
+		case DTFTP_OFFSETS:
+		case DTFTP_IS_ENABLED:
 			id->fti_next = tp->ftt_ids;
 			membar_producer();
 			tp->ftt_ids = id;
 			membar_producer();
+			break;
+
+		case DTFTP_RETURN:
+		case DTFTP_POST_OFFSETS:
+			id->fti_next = tp->ftt_retids;
+			membar_producer();
+			tp->ftt_retids = id;
+			membar_producer();
+			break;
+
+		default:
+			ASSERT(0);
 		}
 
 		mutex_exit(&bucket->ftb_mtx);
@@ -603,20 +611,29 @@ again:
 	ASSERT(new_tp->ftt_ids == NULL);
 	ASSERT(new_tp->ftt_retids == NULL);
 
-	if (probe->ftp_type == DTFTP_RETURN ||
-	    probe->ftp_type == DTFTP_POST_OFFSETS) {
-		id->fti_next = NULL;
-		new_tp->ftt_retids = id;
-	} else {
+	switch (id->fti_ptype) {
+	case DTFTP_ENTRY:
+	case DTFTP_OFFSETS:
+	case DTFTP_IS_ENABLED:
 		id->fti_next = NULL;
 		new_tp->ftt_ids = id;
+		break;
+
+	case DTFTP_RETURN:
+	case DTFTP_POST_OFFSETS:
+		id->fti_next = NULL;
+		new_tp->ftt_retids = id;
+		break;
+
+	default:
+		ASSERT(0);
 	}
 
 	/*
 	 * If the ISA-dependent initialization goes to plan, go back to the
 	 * beginning and try to install this freshly made tracepoint.
 	 */
-	if (fasttrap_tracepoint_init(p, probe, new_tp, pc) == 0)
+	if (fasttrap_tracepoint_init(p, new_tp, pc, id->fti_ptype) == 0)
 		goto again;
 
 	new_tp->ftt_ids = NULL;
@@ -639,6 +656,7 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 
 	pid = probe->ftp_pid;
 	pc = probe->ftp_tps[index].fit_tp->ftt_pc;
+	id = &probe->ftp_tps[index].fit_id;
 
 	ASSERT(probe->ftp_tps[index].fit_tp->ftt_pid == pid);
 
@@ -659,13 +677,22 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	 */
 	ASSERT(tp != NULL);
 
-	if (probe->ftp_type == DTFTP_RETURN ||
-	    probe->ftp_type == DTFTP_POST_OFFSETS) {
-		ASSERT(tp->ftt_retids != NULL);
-		idp = &tp->ftt_retids;
-	} else {
+	switch (id->fti_ptype) {
+	case DTFTP_ENTRY:
+	case DTFTP_OFFSETS:
+	case DTFTP_IS_ENABLED:
 		ASSERT(tp->ftt_ids != NULL);
 		idp = &tp->ftt_ids;
+		break;
+
+	case DTFTP_RETURN:
+	case DTFTP_POST_OFFSETS:
+		ASSERT(tp->ftt_retids != NULL);
+		idp = &tp->ftt_retids;
+		break;
+
+	default:
+		ASSERT(0);
 	}
 
 	while ((*idp)->fti_probe != probe) {
@@ -1548,7 +1575,6 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 		pp->ftp_fsize = pdata->ftps_size;
 		pp->ftp_pid = pdata->ftps_pid;
 		pp->ftp_ntps = pdata->ftps_noffs;
-		pp->ftp_type = pdata->ftps_type;
 
 		for (i = 0; i < pdata->ftps_noffs; i++) {
 			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
@@ -1560,6 +1586,7 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 
 			pp->ftp_tps[i].fit_tp = tp;
 			pp->ftp_tps[i].fit_id.fti_probe = pp;
+			pp->ftp_tps[i].fit_id.fti_ptype = pdata->ftps_type;
 		}
 
 		pp->ftp_id = dtrace_probe_create(provider->ftp_provid,
@@ -1589,7 +1616,6 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 			pp->ftp_fsize = pdata->ftps_size;
 			pp->ftp_pid = pdata->ftps_pid;
 			pp->ftp_ntps = 1;
-			pp->ftp_type = pdata->ftps_type;
 
 			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
 			    KM_SLEEP);
@@ -1600,6 +1626,7 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 
 			pp->ftp_tps[0].fit_tp = tp;
 			pp->ftp_tps[0].fit_id.fti_probe = pp;
+			pp->ftp_tps[0].fit_id.fti_ptype = pdata->ftps_type;
 
 			pp->ftp_id = dtrace_probe_create(provider->ftp_provid,
 			    pdata->ftps_mod, pdata->ftps_func, name_str,
@@ -1712,7 +1739,8 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 	fasttrap_probe_t *pp;
 	fasttrap_tracepoint_t *tp;
 	size_t size;
-	int i;
+	int i, j;
+	uint32_t ntps;
 
 	mutex_enter(&provider->ftp_mtx);
 
@@ -1722,31 +1750,31 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 		return;
 	}
 
-	atomic_add_32(&fasttrap_total, dhpb->dthpb_noffs);
+	ntps = dhpb->dthpb_noffs + dhpb->dthpb_nenoffs;
+
+	atomic_add_32(&fasttrap_total, ntps);
 
 	if (fasttrap_total > fasttrap_max) {
-		atomic_add_32(&fasttrap_total, -dhpb->dthpb_noffs);
+		atomic_add_32(&fasttrap_total, -ntps);
 		mutex_exit(&provider->ftp_mtx);
 		return;
 	}
 
-	size = sizeof (fasttrap_probe_t) +
-	    sizeof (pp->ftp_tps[0]) * (dhpb->dthpb_noffs - 1);
+	ASSERT(dhpb->dthpb_noffs > 0);
+	size = sizeof (fasttrap_probe_t) + sizeof (pp->ftp_tps[0]) * (ntps - 1);
 	pp = kmem_zalloc(size, KM_SLEEP);
 
 	pp->ftp_prov = provider;
 	pp->ftp_pid = provider->ftp_pid;
-	pp->ftp_ntps = dhpb->dthpb_noffs;
-#ifdef __sparc
-	pp->ftp_type = DTFTP_POST_OFFSETS;
-#else
-	pp->ftp_type = DTFTP_OFFSETS;
-#endif
+	pp->ftp_ntps = ntps;
 	pp->ftp_nargs = dhpb->dthpb_xargc;
 	pp->ftp_xtypes = dhpb->dthpb_xtypes;
 	pp->ftp_ntypes = dhpb->dthpb_ntypes;
 
-	for (i = 0; i < pp->ftp_ntps; i++) {
+	/*
+	 * First create a tracepoint for each actual point of interest.
+	 */
+	for (i = 0; i < dhpb->dthpb_noffs; i++) {
 		tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t), KM_SLEEP);
 
 		tp->ftt_proc = provider->ftp_proc;
@@ -1755,6 +1783,26 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 
 		pp->ftp_tps[i].fit_tp = tp;
 		pp->ftp_tps[i].fit_id.fti_probe = pp;
+#ifdef __sparc
+		pp->ftp_tps[i].fit_id.fti_ptype = DTFTP_POST_OFFSETS;
+#else
+		pp->ftp_tps[i].fit_id.fti_ptype = DTFTP_OFFSETS;
+#endif
+	}
+
+	/*
+	 * Then create a tracepoint for each is-enabled point.
+	 */
+	for (j = 0; i < ntps; i++, j++) {
+		tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t), KM_SLEEP);
+
+		tp->ftt_proc = provider->ftp_proc;
+		tp->ftt_pc = dhpb->dthpb_base + dhpb->dthpb_enoffs[j];
+		tp->ftt_pid = provider->ftp_pid;
+
+		pp->ftp_tps[i].fit_tp = tp;
+		pp->ftp_tps[i].fit_id.fti_probe = pp;
+		pp->ftp_tps[i].fit_id.fti_ptype = DTFTP_IS_ENABLED;
 	}
 
 	/*

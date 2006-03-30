@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -599,8 +600,9 @@ typedef struct dof_hdr {
 #define	DOF_ENCODE_NATIVE	DOF_ENCODE_LSB
 #endif
 
-#define	DOF_VERSION_1	1	/* DOF_ID_VERSION */
-#define	DOF_VERSION	DOF_VERSION_1
+#define	DOF_VERSION_1	1	/* DOF version 1: Solaris 10 FCS */
+#define	DOF_VERSION_2	2	/* DOF version 2: Solaris Express 6/06 */
+#define	DOF_VERSION	DOF_VERSION_2	/* Latest DOF version */
 
 #define	DOF_FL_VALID	0	/* mask of all valid dofh_flags bits */
 
@@ -645,6 +647,7 @@ typedef struct dof_sec {
 #define	DOF_SECT_XLIMPORT	23	/* dof_xlator_t */
 #define	DOF_SECT_XLEXPORT	24	/* dof_xlator_t */
 #define	DOF_SECT_PREXPORT	25	/* dof_secidx_t array (exported objs) */
+#define	DOF_SECT_PRENOFFS	26	/* uint32_t array (enabled offsets) */
 
 #define	DOF_SECF_LOAD		1	/* section should be loaded */
 
@@ -719,6 +722,7 @@ typedef struct dof_provider {
 	dof_attr_t dofpv_funcattr;	/* function attributes */
 	dof_attr_t dofpv_nameattr;	/* name attributes */
 	dof_attr_t dofpv_argsattr;	/* args attributes */
+	dof_secidx_t dofpv_prenoffs;	/* link to DOF_SECT_PRENOFFS section */
 } dof_provider_t;
 
 typedef struct dof_probe {
@@ -732,7 +736,10 @@ typedef struct dof_probe {
 	uint8_t dofpr_nargc;		/* native argument count */
 	uint8_t dofpr_xargc;		/* translated argument count */
 	uint16_t dofpr_noffs;		/* number of offset entries for probe */
-	uint32_t dofpr_pad;		/* reserved for future use */
+	uint32_t dofpr_enoffidx;	/* index of first is-enabled offset */
+	uint16_t dofpr_nenoffs;		/* number of is-enabled offsets */
+	uint16_t dofpr_pad1;		/* reserved for future use */
+	uint32_t dofpr_pad2;		/* reserved for future use */
 } dof_probe_t;
 
 typedef struct dof_xlator {
@@ -2082,7 +2089,9 @@ typedef struct dtrace_helper_probedesc {
 	char *dthpb_name; 			/* probe name */
 	uint64_t dthpb_base;			/* base address */
 	uint32_t *dthpb_offs;			/* offsets array */
+	uint32_t *dthpb_enoffs;			/* is-enabled offsets array */
 	uint32_t dthpb_noffs;			/* offsets count */
+	uint32_t dthpb_nenoffs;			/* is-enabled offsets count */
 	uint8_t *dthpb_args;			/* argument mapping array */
 	uint8_t dthpb_xargc;			/* translated argument count */
 	uint8_t dthpb_nargc;			/* native argument count */

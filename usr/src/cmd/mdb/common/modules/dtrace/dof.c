@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -828,19 +828,20 @@ dof_sect_strtab(uintptr_t addr, dof_sec_t *sec)
 }
 
 static int
-dof_sect_provider(uintptr_t addr, dof_sec_t *sec, dof_sec_t *dofs)
+dof_sect_provider(dof_hdr_t *dofh, uintptr_t addr, dof_sec_t *sec,
+    dof_sec_t *dofs)
 {
 	dof_provider_t pv;
 	dof_probe_t *pb;
-	char *strtab;
-	uint32_t *offs;
+	char *strtab, *p;
+	uint32_t *offs, *enoffs;
 	uint8_t *args = NULL;
 	size_t sz;
 	int i, j;
 	dof_stridx_t narg, xarg;
 
-	if (mdb_vread(&pv, sizeof (dof_provider_t),
-	    addr + sec->dofs_offset) != sizeof (dof_provider_t)) {
+	sz = MIN(sec->dofs_size, sizeof (dof_provider_t));
+	if (mdb_vread(&pv, sz, addr + sec->dofs_offset) != sz) {
 		mdb_warn("failed to read DOF provider");
 		return (-1);
 	}
@@ -870,13 +871,25 @@ dof_sect_provider(uintptr_t addr, dof_sec_t *sec, dof_sec_t *dofs)
 	offs = mdb_alloc(sz, UM_SLEEP | UM_GC);
 	if (mdb_vread(offs, sz, addr + dofs[pv.dofpv_proffs].dofs_offset)
 	    != sz) {
-		mdb_warn("failed to read offs");
+		mdb_warn("failed to read offsets");
 		return (-1);
 	}
 
+	enoffs = NULL;
+	if (dofh->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 ||
+	    pv.dofpv_prenoffs == 0) {
+		sz = dofs[pv.dofpv_prenoffs].dofs_size;
+		enoffs = mdb_alloc(sz, UM_SLEEP | UM_GC);
+		if (mdb_vread(enoffs, sz, addr +
+		    dofs[pv.dofpv_prenoffs].dofs_offset) != sz) {
+			mdb_warn("failed to read is-enabled offsets");
+			return (-1);
+		}
+	}
+
 	sz = dofs[pv.dofpv_probes].dofs_size;
-	pb = mdb_alloc(sz, UM_SLEEP | UM_GC);
-	if (mdb_vread(pb, sz, addr + dofs[pv.dofpv_probes].dofs_offset) != sz) {
+	p = mdb_alloc(sz, UM_SLEEP | UM_GC);
+	if (mdb_vread(p, sz, addr + dofs[pv.dofpv_probes].dofs_offset) != sz) {
 		mdb_warn("failed to read probes");
 		return (-1);
 	}
@@ -884,39 +897,56 @@ dof_sect_provider(uintptr_t addr, dof_sec_t *sec, dof_sec_t *dofs)
 	(void) mdb_inc_indent(2);
 
 	for (i = 0; i < sz / dofs[pv.dofpv_probes].dofs_entsize; i++) {
+		pb = (dof_probe_t *)(uintptr_t)(p +
+		    i * dofs[pv.dofpv_probes].dofs_entsize);
+
 		mdb_printf("%lx probe %s:%s {\n", (ulong_t)(addr +
 		    dofs[pv.dofpv_probes].dofs_offset +
 		    i * dofs[pv.dofpv_probes].dofs_entsize),
-		    strtab + pb[i].dofpr_func,
-		    strtab + pb[i].dofpr_name);
+		    strtab + pb->dofpr_func,
+		    strtab + pb->dofpr_name);
 
 		(void) mdb_inc_indent(2);
-		mdb_printf("addr: %p\n", (ulong_t)pb[i].dofpr_addr);
+		mdb_printf("addr: %p\n", (ulong_t)pb->dofpr_addr);
 		mdb_printf("offs: ");
-		for (j = 0; j < pb[i].dofpr_noffs; j++) {
+		for (j = 0; j < pb->dofpr_noffs; j++) {
 			mdb_printf("%s %x", "," + (j == 0),
-			    offs[pb[i].dofpr_offidx + j]);
+			    offs[pb->dofpr_offidx + j]);
 		}
 		mdb_printf("\n");
 
+		if (dofh->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1) {
+			mdb_printf("enoffs: ");
+			if (enoffs == NULL) {
+				if (pb->dofpr_nenoffs != 0)
+					mdb_printf("<error>");
+			} else {
+				for (j = 0; j < pb->dofpr_nenoffs; j++) {
+					mdb_printf("%s %x", "," + (j == 0),
+					    enoffs[pb->dofpr_enoffidx + j]);
+				}
+			}
+			mdb_printf("\n");
+		}
+
 		mdb_printf("nargs:");
-		narg = pb[i].dofpr_nargv;
-		for (j = 0; j < pb[i].dofpr_nargc; j++) {
+		narg = pb->dofpr_nargv;
+		for (j = 0; j < pb->dofpr_nargc; j++) {
 			mdb_printf("%s %s", "," + (j == 0), strtab + narg);
 			narg += strlen(strtab + narg) + 1;
 		}
 		mdb_printf("\n");
 		mdb_printf("xargs:");
-		xarg = pb[i].dofpr_xargv;
-		for (j = 0; j < pb[i].dofpr_xargc; j++) {
+		xarg = pb->dofpr_xargv;
+		for (j = 0; j < pb->dofpr_xargc; j++) {
 			mdb_printf("%s %s", "," + (j == 0), strtab + xarg);
 			xarg += strlen(strtab + xarg) + 1;
 		}
 		mdb_printf("\n");
 		mdb_printf("map:  ");
-		for (j = 0; j < pb[i].dofpr_xargc; j++) {
+		for (j = 0; j < pb->dofpr_xargc; j++) {
 			mdb_printf("%s %d->%d", "," + (j == 0),
-			    args[pb[i].dofpr_argidx + j], j);
+			    args[pb->dofpr_argidx + j], j);
 		}
 
 		(void) mdb_dec_indent(2);
@@ -990,7 +1020,7 @@ dofdump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_inc_indent(2);
 		switch (dofs[i].dofs_type) {
 		case DOF_SECT_PROVIDER:
-			(void) dof_sect_provider(addr, &dofs[i], dofs);
+			(void) dof_sect_provider(&dofh, addr, &dofs[i], dofs);
 			break;
 		case DOF_SECT_STRTAB:
 			(void) dof_sect_strtab(addr, &dofs[i]);

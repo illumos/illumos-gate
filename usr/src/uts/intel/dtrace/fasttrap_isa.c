@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,10 +41,10 @@
  * Lossless User-Land Tracing on x86
  * ---------------------------------
  *
- * Most instructions' execution is not dependent on their address; for these
- * instrutions it is sufficient to copy them into the user process's address
- * space and execute them. To effectively single-step an instruction in
- * user-land, we copy out the following sequence of instructions to scratch
+ * The execution of most instructions is not dependent on the address; for
+ * these instructions it is sufficient to copy them into the user process's
+ * address space and execute them. To effectively single-step an instruction
+ * in user-land, we copy out the following sequence of instructions to scratch
  * space in the user thread's ulwp_t structure.
  *
  * We then set the program counter (%eip or %rip) to point to this scratch
@@ -222,8 +222,8 @@ fasttrap_anarg(struct regs *rp, int function_entry, int argno)
 
 /*ARGSUSED*/
 int
-fasttrap_tracepoint_init(proc_t *p, fasttrap_probe_t *probe,
-    fasttrap_tracepoint_t *tp, uintptr_t pc)
+fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
+    fasttrap_probe_type_t type)
 {
 	uint8_t instr[FASTTRAP_MAX_INSTR_SIZE + 10];
 	size_t len = FASTTRAP_MAX_INSTR_SIZE;
@@ -737,6 +737,7 @@ fasttrap_pid_probe(struct regs *rp)
 	fasttrap_tracepoint_t *tp, tp_local;
 	pid_t pid;
 	dtrace_icookie_t cookie;
+	uint_t is_enabled = 0;
 
 	/*
 	 * It's possible that a user (in a veritable orgy of bad planning)
@@ -809,7 +810,7 @@ fasttrap_pid_probe(struct regs *rp)
 			for (id = tp->ftt_ids; id != NULL; id = id->fti_next) {
 				fasttrap_probe_t *probe = id->fti_probe;
 
-				if (probe->ftp_type == DTFTP_ENTRY) {
+				if (id->fti_ptype == DTFTP_ENTRY) {
 					/*
 					 * We note that this was an entry
 					 * probe to help ustack() find the
@@ -822,6 +823,15 @@ fasttrap_pid_probe(struct regs *rp)
 					    rp->r_r8);
 					DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_ENTRY);
 					dtrace_interrupt_enable(cookie);
+				} else if (id->fti_ptype == DTFTP_IS_ENABLED) {
+					/*
+					 * Note that in this case, we don't
+					 * call dtrace_probe() since it's only
+					 * an artificial probe meant to change
+					 * the flow of control so that it
+					 * encounters the true probe.
+					 */
+					is_enabled = 1;
 				} else if (probe->ftp_argmap == NULL) {
 					dtrace_probe(probe->ftp_id, rp->r_rdi,
 					    rp->r_rsi, rp->r_rdx, rp->r_rcx,
@@ -858,7 +868,7 @@ fasttrap_pid_probe(struct regs *rp)
 			for (id = tp->ftt_ids; id != NULL; id = id->fti_next) {
 				fasttrap_probe_t *probe = id->fti_probe;
 
-				if (probe->ftp_type == DTFTP_ENTRY) {
+				if (id->fti_ptype == DTFTP_ENTRY) {
 					/*
 					 * We note that this was an entry
 					 * probe to help ustack() find the
@@ -870,6 +880,15 @@ fasttrap_pid_probe(struct regs *rp)
 					    s3, s4, s5);
 					DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_ENTRY);
 					dtrace_interrupt_enable(cookie);
+				} else if (id->fti_ptype == DTFTP_IS_ENABLED) {
+					/*
+					 * Note that in this case, we don't
+					 * call dtrace_probe() since it's only
+					 * an artificial probe meant to change
+					 * the flow of control so that it
+					 * encounters the true probe.
+					 */
+					is_enabled = 1;
 				} else if (probe->ftp_argmap == NULL) {
 					dtrace_probe(probe->ftp_id, s0, s1,
 					    s2, s3, s4);
@@ -904,6 +923,29 @@ fasttrap_pid_probe(struct regs *rp)
 	 */
 	rp->r_pc = pc + tp->ftt_size;
 
+	/*
+	 * If there's an is-enabled probe connected to this tracepoint it
+	 * means that there was a 'xorl %eax, %eax' or 'xorq %rax, %rax'
+	 * instruction that was placed there by DTrace when the binary was
+	 * linked. As this probe is, in fact, enabled, we need to stuff 1
+	 * into %eax or %rax. Accordingly, we can bypass all the instruction
+	 * emulation logic since we know the inevitable result. It's possible
+	 * that a user could construct a scenario where the 'is-enabled'
+	 * probe was on some other instruction, but that would be a rather
+	 * exotic way to shoot oneself in the foot.
+	 */
+	if (is_enabled) {
+		rp->r_r0 = 1;
+		new_pc = rp->r_pc;
+		goto done;
+	}
+
+	/*
+	 * We emulate certain types of instructions to ensure correctness
+	 * (in the case of position dependent instructions) or optimize
+	 * common cases. The rest we have the thread execute back in user-
+	 * land.
+	 */
 	switch (tp->ftt_type) {
 	case FASTTRAP_T_RET:
 	case FASTTRAP_T_RET16:
@@ -1393,6 +1435,7 @@ fasttrap_pid_probe(struct regs *rp)
 		panic("fasttrap: mishandled an instruction");
 	}
 
+done:
 	/*
 	 * If there were no return probes when we first found the tracepoint,
 	 * we should feel no obligation to honor any return probes that were

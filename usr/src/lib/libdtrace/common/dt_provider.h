@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -67,8 +67,11 @@ typedef struct dt_probe_instance {
 	char pi_fname[DTRACE_FUNCNAMELEN]; /* function name */
 	char pi_rname[DTRACE_FUNCNAMELEN + 20]; /* mangled relocation name */
 	uint32_t *pi_offs;		/* offsets into the function */
+	uint32_t *pi_enoffs;		/* is-enabled offsets */
 	uint_t pi_noffs;		/* number of offsets */
 	uint_t pi_maxoffs;		/* size of pi_offs allocation */
+	uint_t pi_nenoffs;		/* number of is-enabled offsets */
+	uint_t pi_maxenoffs;		/* size of pi_enoffs allocation */
 	struct dt_probe_instance *pi_next; /* next instance in the list */
 } dt_probe_instance_t;
 
@@ -104,7 +107,7 @@ extern void dt_probe_declare(dt_provider_t *, dt_probe_t *);
 extern void dt_probe_destroy(dt_probe_t *);
 
 extern int dt_probe_define(dt_provider_t *, dt_probe_t *,
-    const char *, const char *, uint32_t);
+    const char *, const char *, uint32_t, int);
 
 extern dt_node_t *dt_probe_tag(dt_probe_t *, uint_t, dt_node_t *);
 

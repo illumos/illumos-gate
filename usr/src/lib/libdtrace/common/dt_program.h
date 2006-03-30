@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ struct dtrace_prog {
 	dt_list_t dp_stmts;	/* linked list of dt_stmt_t's */
 	ulong_t **dp_xrefs;	/* array of translator reference bitmaps */
 	uint_t dp_xrefslen;	/* length of dp_xrefs array */
+	uint8_t dp_dofversion;	/* DOF version this program requires */
 };
 
 extern dtrace_prog_t *dt_program_create(dtrace_hdl_t *);

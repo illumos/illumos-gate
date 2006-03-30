@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -309,7 +308,7 @@ fasttrap_return_common(struct regs *rp, uintptr_t pc, pid_t pid,
 	for (id = tp->ftt_retids; id != NULL; id = id->fti_next) {
 		fasttrap_probe_t *probe = id->fti_probe;
 
-		if (probe->ftp_type == DTFTP_POST_OFFSETS) {
+		if (id->fti_ptype == DTFTP_POST_OFFSETS) {
 			if (probe->ftp_argmap == NULL) {
 				dtrace_probe(probe->ftp_id, rp->r_o0, rp->r_o1,
 				    rp->r_o2, rp->r_o3, rp->r_o4);
@@ -394,7 +393,7 @@ fasttrap_pid_probe(struct regs *rp)
 	uintptr_t orig_pc = pc;
 	fasttrap_bucket_t *bucket;
 	kmutex_t *pid_mtx;
-	uint_t fake_restore = 0;
+	uint_t fake_restore = 0, is_enabled = 0;
 	dtrace_icookie_t cookie;
 
 	/*
@@ -453,12 +452,18 @@ fasttrap_pid_probe(struct regs *rp)
 
 	for (id = tp->ftt_ids; id != NULL; id = id->fti_next) {
 		fasttrap_probe_t *probe = id->fti_probe;
-		int isentry;
+		int isentry = (id->fti_ptype == DTFTP_ENTRY);
+
+		if (id->fti_ptype == DTFTP_IS_ENABLED) {
+			is_enabled = 1;
+			continue;
+		}
+
 		/*
 		 * We note that this was an entry probe to help ustack() find
 		 * the first caller.
 		 */
-		if ((isentry = (probe->ftp_type == DTFTP_ENTRY)) != 0) {
+		if (isentry) {
 			cookie = dtrace_interrupt_disable();
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_ENTRY);
 		}
@@ -480,7 +485,25 @@ fasttrap_pid_probe(struct regs *rp)
 	tp = &tp_local;
 
 	/*
-	 * We emulate certain types of instructions do ensure correctness
+	 * If there's an is-enabled probe conntected to this tracepoint it
+	 * means that there was a 'mov %g0, %o0' instruction that was placed
+	 * there by DTrace when the binary was linked. As this probe is, in
+	 * fact, enabled, we need to stuff 1 into %o0. Accordingly, we can
+	 * bypass all the instruction emulation logic since we know the
+	 * inevitable result. It's possible that a user could construct a
+	 * scenario where the 'is-enabled' probe was on some other
+	 * instruction, but that would be a rather exotic way to shoot oneself
+	 * in the foot.
+	 */
+	if (is_enabled) {
+		rp->r_o0 = 1;
+		pc = rp->r_npc;
+		npc = pc + 4;
+		goto done;
+	}
+
+	/*
+	 * We emulate certain types of instructions to ensure correctness
 	 * (in the case of position dependent instructions) or optimize
 	 * common cases. The rest we have the thread execute back in user-
 	 * land.
@@ -928,6 +951,7 @@ fasttrap_pid_probe(struct regs *rp)
 	ASSERT(pc != rp->r_g7 + 4);
 	ASSERT(pc != rp->r_g7 + 8);
 
+done:
 	/*
 	 * If there were no return probes when we first found the tracepoint,
 	 * we should feel no obligation to honor any return probes that were
@@ -1029,8 +1053,8 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 }
 
 int
-fasttrap_tracepoint_init(proc_t *p, fasttrap_probe_t *probe,
-    fasttrap_tracepoint_t *tp, uintptr_t pc)
+fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
+    fasttrap_probe_type_t type)
 {
 	uint32_t instr;
 	int32_t disp;
@@ -1224,7 +1248,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_probe_t *probe,
 			 * (near FASTTRAP_T_SAVE) for details.
 			 */
 			if (fasttrap_optimize_save != 0 &&
-			    probe->ftp_type == DTFTP_ENTRY &&
+			    type == DTFTP_ENTRY &&
 			    I(instr) == 1 && RD(instr) == R_SP)
 				tp->ftt_type = FASTTRAP_T_SAVE;
 			break;

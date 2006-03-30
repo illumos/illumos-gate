@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -62,6 +62,7 @@ dt_dof_init(dtrace_hdl_t *dtp)
 	dt_buf_create(dtp, &ddo->ddo_probes, "probe data", 0);
 	dt_buf_create(dtp, &ddo->ddo_args, "probe args", 0);
 	dt_buf_create(dtp, &ddo->ddo_offs, "probe offs", 0);
+	dt_buf_create(dtp, &ddo->ddo_enoffs, "probe is-enabled offs", 0);
 	dt_buf_create(dtp, &ddo->ddo_rels, "probe rels", 0);
 
 	dt_buf_create(dtp, &ddo->ddo_xlms, "xlate members", 0);
@@ -83,6 +84,7 @@ dt_dof_fini(dtrace_hdl_t *dtp)
 	dt_buf_destroy(dtp, &ddo->ddo_probes);
 	dt_buf_destroy(dtp, &ddo->ddo_args);
 	dt_buf_destroy(dtp, &ddo->ddo_offs);
+	dt_buf_destroy(dtp, &ddo->ddo_enoffs);
 	dt_buf_destroy(dtp, &ddo->ddo_rels);
 
 	dt_buf_destroy(dtp, &ddo->ddo_xlms);
@@ -122,6 +124,7 @@ dt_dof_reset(dtrace_hdl_t *dtp, dtrace_prog_t *pgp)
 	dt_buf_reset(dtp, &ddo->ddo_probes);
 	dt_buf_reset(dtp, &ddo->ddo_args);
 	dt_buf_reset(dtp, &ddo->ddo_offs);
+	dt_buf_reset(dtp, &ddo->ddo_enoffs);
 	dt_buf_reset(dtp, &ddo->ddo_rels);
 
 	dt_buf_reset(dtp, &ddo->ddo_xlms);
@@ -428,15 +431,27 @@ dof_add_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 
 	dofpr.dofpr_nargc = prp->pr_nargc;
 	dofpr.dofpr_xargc = prp->pr_xargc;
-	dofpr.dofpr_pad = 0;
+	dofpr.dofpr_pad1 = 0;
+	dofpr.dofpr_pad2 = 0;
 
 	for (pip = prp->pr_inst; pip != NULL; pip = pip->pi_next) {
+		dt_dprintf("adding probe for %s:%s\n", pip->pi_fname,
+		    prp->pr_name);
+
 		dofpr.dofpr_func = dof_add_string(ddo, pip->pi_fname);
+
+		assert(pip->pi_noffs > 0);
+
 		dofpr.dofpr_offidx =
 		    dt_buf_len(&ddo->ddo_offs) / sizeof (uint32_t);
 		dofpr.dofpr_noffs = pip->pi_noffs;
-
 		dt_buf_write(dtp, &ddo->ddo_offs, pip->pi_offs,
+		    pip->pi_noffs * sizeof (uint32_t), sizeof (uint32_t));
+
+		dofpr.dofpr_enoffidx =
+		    dt_buf_len(&ddo->ddo_enoffs) / sizeof (uint32_t);
+		dofpr.dofpr_nenoffs = pip->pi_nenoffs;
+		dt_buf_write(dtp, &ddo->ddo_enoffs, pip->pi_enoffs,
 		    pip->pi_noffs * sizeof (uint32_t), sizeof (uint32_t));
 
 		/*
@@ -497,6 +512,7 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 	dt_buf_reset(dtp, &ddo->ddo_probes);
 	dt_buf_reset(dtp, &ddo->ddo_args);
 	dt_buf_reset(dtp, &ddo->ddo_offs);
+	dt_buf_reset(dtp, &ddo->ddo_enoffs);
 	dt_buf_reset(dtp, &ddo->ddo_rels);
 
 	(void) dt_idhash_iter(pvp->pv_probes, dof_add_probe, ddo);
@@ -513,10 +529,17 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 
 	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_args, sizeof (uint8_t));
 
+	assert(dt_buf_len(&ddo->ddo_offs) > 0);
+
 	dofpv.dofpv_proffs = dof_add_lsect(ddo, NULL, DOF_SECT_PROFFS,
 	    sizeof (uint_t), 0, sizeof (uint_t), dt_buf_len(&ddo->ddo_offs));
 
 	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_offs, sizeof (uint_t));
+
+	dofpv.dofpv_prenoffs = dof_add_lsect(ddo, NULL, DOF_SECT_PRENOFFS,
+	    sizeof (uint_t), 0, sizeof (uint_t), dt_buf_len(&ddo->ddo_enoffs));
+
+	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_enoffs, sizeof (uint_t));
 
 	dofpv.dofpv_strtab = ddo->ddo_strsec;
 	dofpv.dofpv_name = dof_add_string(ddo, pvp->pv_desc.dtvd_name);
@@ -549,7 +572,7 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 }
 
 static int
-dof_hdr(dtrace_hdl_t *dtp, dof_hdr_t *hp)
+dof_hdr(dtrace_hdl_t *dtp, uint8_t dofversion, dof_hdr_t *hp)
 {
 	/*
 	 * If our config values cannot fit in a uint8_t, we can't generate a
@@ -574,7 +597,7 @@ dof_hdr(dtrace_hdl_t *dtp, dof_hdr_t *hp)
 		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_ILP32;
 
 	hp->dofh_ident[DOF_ID_ENCODING] = DOF_ENCODE_NATIVE;
-	hp->dofh_ident[DOF_ID_VERSION] = DOF_VERSION_1;
+	hp->dofh_ident[DOF_ID_VERSION] = dofversion;
 	hp->dofh_ident[DOF_ID_DIFVERS] = dtp->dt_conf.dtc_difversion;
 	hp->dofh_ident[DOF_ID_DIFIREG] = dtp->dt_conf.dtc_difintregs;
 	hp->dofh_ident[DOF_ID_DIFTREG] = dtp->dt_conf.dtc_diftupregs;
@@ -617,7 +640,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 
 	flags |= dtp->dt_dflags;
 
-	if (dof_hdr(dtp, &h) != 0)
+	if (dof_hdr(dtp, pgp->dp_dofversion, &h) != 0)
 		return (NULL);
 
 	if (dt_dof_reset(dtp, pgp) != 0)
@@ -885,7 +908,8 @@ dtrace_getopt_dof(dtrace_hdl_t *dtp)
 
 	len += sizeof (dof_optdesc_t) * nopts;
 
-	if ((dof = dt_zalloc(dtp, len)) == NULL || dof_hdr(dtp, dof) != 0) {
+	if ((dof = dt_zalloc(dtp, len)) == NULL ||
+	    dof_hdr(dtp, DOF_VERSION, dof) != 0) {
 		dt_free(dtp, dof);
 		return (NULL);
 	}

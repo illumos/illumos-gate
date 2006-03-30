@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,7 @@ typedef struct fasttrap_tracepoint fasttrap_tracepoint_t;
 struct fasttrap_id {
 	fasttrap_probe_t *fti_probe;		/* referrring probe */
 	fasttrap_id_t *fti_next;		/* enabled probe list on tp */
+	fasttrap_probe_type_t fti_ptype;	/* probe type */
 };
 
 typedef struct fasttrap_id_tp {
@@ -109,12 +110,11 @@ struct fasttrap_probe {
 	fasttrap_provider_t *ftp_prov;		/* this probe's provider */
 	uintptr_t ftp_faddr;			/* associated function's addr */
 	size_t ftp_fsize;			/* associated function's size */
-	fasttrap_probe_type_t ftp_type;		/* type of probe */
-	uint_t ftp_enabled;			/* is this probe enabled */
 	uint64_t ftp_gen;			/* modification generation */
 	uint64_t ftp_ntps;			/* number of tracepoints */
 	uint8_t *ftp_argmap;			/* native to translated args */
 	uint8_t ftp_nargs;			/* translated argument count */
+	uint8_t ftp_enabled;			/* is this probe enabled */
 	char *ftp_xtypes;			/* translated types index */
 	char *ftp_ntypes;			/* native types index */
 	fasttrap_id_tp_t ftp_tps[1];		/* flexible array */
@@ -125,26 +125,26 @@ struct fasttrap_probe {
 &(id)->fti_probe->ftp_tps[0])
 
 struct fasttrap_tracepoint {
-	fasttrap_proc_t		*ftt_proc;	/* associated process struct */
-	uintptr_t		ftt_pc;		/* address of tracepoint */
-	pid_t			ftt_pid;	/* pid of tracepoint */
-	fasttrap_machtp_t	ftt_mtp;	/* ISA-specific portion */
-	fasttrap_id_t		*ftt_ids;	/* NULL-terminated list */
-	fasttrap_id_t		*ftt_retids;	/* NULL-terminated list */
-	fasttrap_tracepoint_t	*ftt_next;	/* link in global hash */
+	fasttrap_proc_t *ftt_proc;		/* associated process struct */
+	uintptr_t ftt_pc;			/* address of tracepoint */
+	pid_t ftt_pid;				/* pid of tracepoint */
+	fasttrap_machtp_t ftt_mtp;		/* ISA-specific portion */
+	fasttrap_id_t *ftt_ids;			/* NULL-terminated list */
+	fasttrap_id_t *ftt_retids;		/* NULL-terminated list */
+	fasttrap_tracepoint_t *ftt_next;	/* link in global hash */
 };
 
 typedef struct fasttrap_bucket {
-	kmutex_t		ftb_mtx;
-	void 			*ftb_data;
+	kmutex_t ftb_mtx;			/* bucket lock */
+	void *ftb_data;				/* data payload */
 
-	uint8_t		ftb_pad[64 - sizeof (kmutex_t) - sizeof (void *)];
+	uint8_t ftb_pad[64 - sizeof (kmutex_t) - sizeof (void *)];
 } fasttrap_bucket_t;
 
 typedef struct fasttrap_hash {
-	ulong_t			fth_nent;
-	ulong_t			fth_mask;
-	fasttrap_bucket_t	*fth_table;
+	ulong_t fth_nent;			/* power-of-2 num. of entries */
+	ulong_t fth_mask;			/* fth_nent - 1 */
+	fasttrap_bucket_t *fth_table;		/* array of buckets */
 } fasttrap_hash_t;
 
 /*
@@ -170,8 +170,8 @@ extern fasttrap_hash_t		fasttrap_tpoints;
 /*
  * Must be implemented by fasttrap_isa.c
  */
-extern int fasttrap_tracepoint_init(proc_t *, fasttrap_probe_t *,
-    fasttrap_tracepoint_t *, uintptr_t);
+extern int fasttrap_tracepoint_init(proc_t *, fasttrap_tracepoint_t *,
+    uintptr_t, fasttrap_probe_type_t);
 extern int fasttrap_tracepoint_install(proc_t *, fasttrap_tracepoint_t *);
 extern int fasttrap_tracepoint_remove(proc_t *, fasttrap_tracepoint_t *);
 
