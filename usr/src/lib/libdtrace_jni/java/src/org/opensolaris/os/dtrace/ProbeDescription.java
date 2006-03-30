@@ -110,16 +110,47 @@ public final class ProbeDescription implements Serializable,
     private final String name;
 
     /**
-     * Creates a probe description that specifies only the unqualified
+     * Creates a fully qualified probe description from the name given
+     * in the format <i>{@code provider:module:function:name}</i> or
+     * else a probe description that specifies only the unqualified
      * probe name.
      *
+     * @param probeName either the fully qualified name in the format
+     * <i>{@code provider:module:function:name}</i> or else (if no colon
+     * is present) the unqualified name interpreted as {@code
+     * :::probeName}
      * @see ProbeDescription#ProbeDescription(String probeProvider,
      * String probeModule, String probeFunction, String probeName)
+     * @see ProbeDescription#parse(String s)
      */
     public
     ProbeDescription(String probeName)
     {
-	this(null, null, null, probeName);
+	if ((probeName != null) && (probeName.indexOf(':') >= 0)) {
+	    ProbeDescription p;
+	    try {
+		p = ProbeDescription.parse(probeName);
+	    } catch (ParseException e) {
+		p = null;
+	    }
+
+	    if (p == null) {
+		provider = "";
+		module = "";
+		function = "";
+		name = ((probeName == null) ? "" : probeName);
+	    } else {
+		provider = p.provider;
+		module = p.module;
+		function = p.function;
+		name = p.name;
+	    }
+	} else {
+	    provider = "";
+	    module = "";
+	    function = "";
+	    name = ((probeName == null) ? "" : probeName);
+	}
     }
 
     /**

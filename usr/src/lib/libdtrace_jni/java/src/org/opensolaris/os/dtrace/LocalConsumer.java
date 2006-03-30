@@ -60,43 +60,23 @@ public class LocalConsumer implements Consumer {
 
     private static native void _loadJniTable();
 
+    // Undocumented configuration options
     private static boolean debug;
     private static int maxConsumers;
 
     static {
-	// configure logging
-	logger.addHandler(new ConsoleHandler());
-        logger.setLevel(Level.OFF);
-
-	// Undocumented configuration options using java -Doption=value
-	String property;
-	property = System.getProperty("JAVA_DTRACE_MAX_CONSUMERS");
-	if (property != null && property.length() != 0) {
-	    try {
-		maxConsumers = Integer.parseInt(property);
-	    } catch (NumberFormatException e) {
-		e.printStackTrace();
-		System.exit(1);
-	    }
-	}
-	property = System.getProperty("JAVA_DTRACE_API_DEBUG");
-	if (property != null && property.length() != 0) {
-	    try {
-		int i = Integer.parseInt(property);
-		debug = (i != 0);
-	    } catch (NumberFormatException e) {
-		System.err.println("Warning: property ignored: " +
-			"JAVA_DTRACE_API_DEBUG=" + property);
-	    }
-	}
+	LocalConsumer.configureLogging();
+	// Undocumented configuration options settable using
+	// java -Doption=value
+	LocalConsumer.getConfigurationOptions();
 
 	Utility.loadLibrary("libdtrace_jni.so.1", debug);
 
 	_checkVersion(DTRACE_JNI_VERSION);
+	_setDebug(debug);
 	if (maxConsumers > 0) {
 	    _setMaximumConsumers(maxConsumers);
 	}
-	_setDebug(debug);
 
 	//
 	// Last of all in case configuration options affect the loading
@@ -187,14 +167,91 @@ public class LocalConsumer implements Consumer {
     // dtrace_work().
     //
     private Object consumerLock;
+
     //
-    // Synchronization lock used to ensure that stop() does not return
-    // until this consumer is actually stopped.
+    // stopLock is a synchronization lock used to ensure that the stop()
+    // method does not return until this consumer has actually stopped.
+    // Correct lock ordering is needed to ensure that listeners cannot
+    // deadlock this consumer:
+    // 1. stop() grabs the lock on this consumer before determining if
+    //    this consumer is running (to ensure valid state).
+    // 2. Once stop() determines that this consumer is actually running,
+    //    it releases the lock on this consumer.  Failing to release the
+    //    lock makes it possible for a ConsumerListener to deadlock this
+    //    consumer by calling any synchronized LocalConcumer method
+    //    (because the listener called by the worker thread prevents the
+    //    worker thread from finishing while it waits for stop() to
+    //    release the lock, which it will never do until the worker
+    //    thread finishes).
+    // 3. stop() interrupts this consumer and grabs the stopLock, then
+    //    waits on the stopLock for this consumer to stop (i.e. for the
+    //    worker thread to finish).
+    // 4. The interrupted worker thread grabs the stopLock when it
+    //    finishes so it can notify waiters on the stopLock (in this
+    //    case the stop() method) that the worker thread is finished.
+    //    The workEnded flag (whose access is protected by the
+    //    stopLock), is used in case the interrupted worker thread
+    //    finishes and grabs the stopLock before the stop() method does.
+    //    Setting the flag in that case tells the stop() method it has
+    //    nothing to wait for (otherwise stop() would wait forever,
+    //    since there is no one left after the worker thread finishes to
+    //    notify the stop() method to stop waiting).
+    // 5. The worker thread updates the state member to STOPPED and
+    //    notifies listeners while it holds the stopLock and before it
+    //    notifies waiters on the stopLock.  This is to ensure that
+    //    state has been updated to STOPPED and that listeners have
+    //    executed consumerStopped() before the stop() method returns,
+    //    to ensure valid state and in case the caller of stop() is
+    //    relying on anything having been done by consumerStopped()
+    //    before it proceeds to the next statement.
+    // 6. The worker thread notifies waiters on the stopLock before
+    //    releasing it.  stop() returns.
     //
     private Object stopLock;
     private boolean workEnded;
 
     private static int sequence = 0;
+
+    private static void
+    configureLogging()
+    {
+	logger.setUseParentHandlers(false);
+	Handler handler = new ConsoleHandler();
+	handler.setLevel(Level.ALL);
+	logger.addHandler(handler);
+        logger.setLevel(Level.OFF);
+    }
+
+    private static Integer
+    getIntegerProperty(String name)
+    {
+	Integer value = null;
+	String property = System.getProperty(name);
+	if (property != null && property.length() != 0) {
+	    try {
+		value = Integer.parseInt(property);
+		System.out.println(name + "=" + value);
+	    } catch (NumberFormatException e) {
+		System.err.println("Warning: property ignored: " +
+			name + "=" + property);
+	    }
+	}
+	return value;
+    }
+
+    private static void
+    getConfigurationOptions()
+    {
+	Integer property;
+	property = getIntegerProperty("JAVA_DTRACE_API_DEBUG");
+	if (property != null) {
+	    debug = (property != 0);
+	}
+	property = getIntegerProperty("JAVA_DTRACE_MAX_CONSUMERS");
+	if (property != null) {
+	    maxConsumers = property;
+	}
+    }
 
     /**
      * Creates a consumer that interacts with the native DTrace library
@@ -429,7 +486,7 @@ public class LocalConsumer implements Consumer {
     setOptions(Option[] options) throws DTraceException
     {
 	for (Option o : options) {
-	    setOption(o.getOption(), o.getValue());
+	    setOption(o.getName(), o.getValue());
 	}
     }
 
@@ -569,29 +626,18 @@ public class LocalConsumer implements Consumer {
 	    }
 	} finally {
 	    synchronized (stopLock) {
-		// Notify the stop() method to stop waiting
-		workEnded = true;
-		stopLock.notifyAll();
-	    }
-
-	    // Waits for stop() to finish
-	    synchronized (this) {
-		//
-		// The stop() method may have updated the state and
-		// notified listeners already.  Note that whoever
-		// updates the state and notifies listeners must be
-		// holding the lock on this LocalConsumer.  If we update
-		// the state and notify listeners here while stop() is
-		// waiting, counting on stop() to hold the lock for us
-		// in the meantime, then a ConsumerListener could
-		// deadlock the application by calling a synchronized
-		// LocalConsumer method.
-		//
-		if (state == State.STARTED) {
+		// Notify listeners while holding stopLock to guarantee
+		// that listeners finish executing consumerStopped()
+		// before the stop() method returns.
+		synchronized (this) {
 		    state = State.STOPPED;
 		    fireConsumerStopped(new ConsumerEvent(this,
 			    System.nanoTime()));
 		}
+
+		// Notify the stop() method to stop waiting
+		workEnded = true;
+		stopLock.notifyAll();
 	    }
 	}
     }
@@ -700,86 +746,91 @@ public class LocalConsumer implements Consumer {
 	t.start();
     }
 
-    public synchronized void
+    public void
     stop()
     {
-	switch (state) {
-	    case INIT:
-		throw new IllegalStateException("consumer not open");
-	    case OPEN:
-	    case COMPILED:
-		throw new IllegalStateException("go() not called");
-	    case GO:
-		try {
-		    synchronized (LocalConsumer.class) {
-			_stop();
-		    }
-		    state = State.STOPPED;
-		} catch (DTraceException e) {
-		    if (exceptionHandler != null) {
-			exceptionHandler.handleException(e);
-		    } else {
-			e.printStackTrace();
-		    }
-		}
-		break;
-	    case STARTED:
-		//
-		// Calls no libdtrace methods, so no synchronization is
-		// needed.  Sets a native flag that causes the consumer
-		// thread to exit the consumer loop and call native
-		// dtrace_stop() at the end of the current interval
-		// (after grabbing the global Consumer.class lock
-		// required for any libdtrace call).
-		//
-		_interrupt();
+	boolean running = false;
 
-		synchronized (stopLock) {
-		    //
-		    // If the work() thread got the stopLock first, then
-		    // we have nothing to wait for.  (Calling wait() on
-		    // the stopLock can only deadlock this LocalConsumer
-		    // in that case.)  However, we still need to notify
-		    // listeners here, since we're holding the lock on
-		    // this LocalConsumer.
-		    //
-		    while (!workEnded) {
-			try {
-			    stopLock.wait();
-			} catch (InterruptedException e) {
-			    logger.warning(e.toString());
-			    // do nothing but re-check the condition for waiting
+	synchronized (this) {
+	    switch (state) {
+		case INIT:
+		    throw new IllegalStateException("consumer not open");
+		case OPEN:
+		case COMPILED:
+		    throw new IllegalStateException("go() not called");
+		case GO:
+		    try {
+			synchronized (LocalConsumer.class) {
+			    _stop();
+			}
+			state = State.STOPPED;
+		    } catch (DTraceException e) {
+			if (exceptionHandler != null) {
+			    exceptionHandler.handleException(e);
+			} else {
+			    e.printStackTrace();
 			}
 		    }
-		}
+		    break;
+		case STARTED:
+		    running = true;
+		    break;
+		case STOPPED:
+		    //
+		    // The work() thread that runs the native consumer
+		    // loop may have terminated because of the exit()
+		    // action in a DTrace program.  In that case, a
+		    // RuntimeException is inappropriate because there
+		    // is no misuse of the API.  Creating a new checked
+		    // exception type to handle this case seems to offer
+		    // no benefit for the trouble to the caller.
+		    // Instead, the situation calls for stop() to be
+		    // quietly tolerant.
+		    //
+		    if (stopCalled) {
+			throw new IllegalStateException(
+				"consumer already stopped");
+		    }
+		    logger.info("consumer already stopped");
+		    break;
+		case CLOSED:
+		    throw new IllegalStateException("consumer closed");
+		default:
+		    throw new IllegalArgumentException("unknown state: " +
+			    state);
+	    }
 
-		state = State.STOPPED;
-		fireConsumerStopped(new ConsumerEvent(this,
-			System.nanoTime()));
-		break;
-	    case STOPPED:
-		//
-		// The work() thread that runs the native consumer loop
-		// may have terminated because of the exit() action in a
-		// DTrace program.  In that case, a RuntimeException is
-		// inappropriate because there is no misuse of the API
-		// Creating a new checked exception type to handle this
-		// case seems to offer no benefit for the trouble to the
-		// caller.  Instead, the situation calls for stop() to
-		// be quietly tolerant.
-		//
-		if (stopCalled) {
-		    throw new IllegalStateException("consumer already stopped");
-		}
-		logger.info("consumer already stopped");
-		break;
-	    case CLOSED:
-		throw new IllegalStateException("consumer closed");
-	    default:
-		throw new IllegalArgumentException("unknown state: " + state);
+	    stopCalled = true;
 	}
 
-	stopCalled = true;
+	if (running) {
+	    //
+	    // Calls no libdtrace methods, so no synchronization is
+	    // needed.  Sets a native flag that causes the consumer
+	    // thread to exit the consumer loop and call native
+	    // dtrace_stop() at the end of the current interval (after
+	    // grabbing the global Consumer.class lock required for any
+	    // libdtrace call).
+	    //
+	    _interrupt();
+
+	    synchronized (stopLock) {
+		//
+		// Wait for work() to set workEnded.  If the work()
+		// thread got the stopLock first, then workEnded is
+		// already set.
+		//
+		while (!workEnded) {
+		    try {
+			stopLock.wait();
+		    } catch (InterruptedException e) {
+			logger.warning(e.toString());
+			// do nothing but re-check the condition for
+			// waiting
+		    }
+		}
+	    }
+	}
     }
 
     public synchronized void

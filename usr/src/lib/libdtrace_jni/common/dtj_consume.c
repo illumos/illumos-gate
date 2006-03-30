@@ -2154,7 +2154,7 @@ dtj_consume(dtj_java_consumer_t *jc)
 		(*jenv)->CallVoidMethod(jenv, jc->dtjj_caller,
 		    g_interval_began_jm);
 		if ((*jenv)->ExceptionCheck(jenv)) {
-			WRAP_EXCEPTION(jenv);
+			/* Don't wrap exception thrown from ConsumerListener */
 			(*jenv)->MonitorExit(jenv, jc->dtjj_consumer_lock);
 			return (DTJ_ERR);
 		}
@@ -2224,7 +2224,7 @@ dtj_consume(dtj_java_consumer_t *jc)
 		    g_interval_ended_jm);
 		(*jenv)->MonitorExit(jenv, jc->dtjj_consumer_lock);
 		if ((*jenv)->ExceptionCheck(jenv)) {
-			WRAP_EXCEPTION(jenv);
+			/* Don't wrap exception thrown from ConsumerListener */
 			return (DTJ_ERR);
 		}
 

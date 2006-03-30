@@ -101,7 +101,7 @@ public final class Option implements Serializable {
 	    BeanInfo info = Introspector.getBeanInfo(Option.class);
 	    PersistenceDelegate persistenceDelegate =
 		    new DefaultPersistenceDelegate(
-		    new String[] {"option", "value"})
+		    new String[] {"name", "value"})
 	    {
 		/*
 		 * Need to prevent DefaultPersistenceDelegate from using
@@ -539,7 +539,7 @@ public final class Option implements Serializable {
     public static final String ustackframes = "ustackframes";
 
     /** @serial */
-    private final String option;
+    private final String name;
     /** @serial */
     private final String value;
 
@@ -549,37 +549,37 @@ public final class Option implements Serializable {
      * specify that the named option be unset, use {@link
      * Option#VALUE_UNSET}.
      *
-     * @param opt DTrace option name
+     * @param optionName DTrace option name
      * @throws NullPointerException if the given option name is {@code
      * null}
-     * @see #Option(String opt, String val)
+     * @see #Option(String optionName, String optionValue)
      */
     public
-    Option(String opt)
+    Option(String optionName)
     {
-	this(opt, Option.VALUE_SET);
+	this(optionName, Option.VALUE_SET);
     }
 
     /**
      * Creates an option with the given name and value.
      *
-     * @param opt DTrace option name
-     * @param val DTrace option value
+     * @param optionName DTrace option name
+     * @param optionValue DTrace option value
      * @throws NullPointerException if the given option name or value is
      * {@code null}
      */
     public
-    Option(String opt, String val)
+    Option(String optionName, String optionValue)
     {
-	option = opt;
-	value = val;
+	name = optionName;
+	value = optionValue;
 	validate();
     }
 
     private void
     validate()
     {
-	if (option == null) {
+	if (name == null) {
 	    throw new NullPointerException("option name is null");
 	}
 	if (value == null) {
@@ -593,9 +593,9 @@ public final class Option implements Serializable {
      * @return non-null option name
      */
     public String
-    getOption()
+    getName()
     {
-	return option;
+	return name;
     }
 
     /**
@@ -625,7 +625,7 @@ public final class Option implements Serializable {
     {
 	if (o instanceof Option) {
 	    Option opt = (Option)o;
-	    return (option.equals(opt.option) &&
+	    return (name.equals(opt.name) &&
 		    value.equals(opt.value));
 	}
 	return false;
@@ -639,7 +639,7 @@ public final class Option implements Serializable {
     hashCode()
     {
 	int hash = 17;
-	hash = (37 * hash) + option.hashCode();
+	hash = (37 * hash) + name.hashCode();
 	hash = (37 * hash) + value.hashCode();
 	return hash;
     }
@@ -671,8 +671,8 @@ public final class Option implements Serializable {
     {
 	StringBuffer buf = new StringBuffer();
 	buf.append(Option.class.getName());
-	buf.append("[option = ");
-	buf.append(option);
+	buf.append("[name = ");
+	buf.append(name);
 	buf.append(", value = ");
 	buf.append(value);
 	buf.append(']');
