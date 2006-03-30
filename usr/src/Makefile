@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -273,7 +273,7 @@ EXPORT_SRC:
 	@cd uts/sun4u/seattle;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/littleneck;	pwd;	$(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
+	@cd uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/mpxu;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/serengeti;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/starcat;	pwd;	$(MAKE) EXPORT_SRC
