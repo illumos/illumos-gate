@@ -499,7 +499,7 @@ CLONE_OBJS +=	clone.o
 CN_OBJS +=	cons.o
 
 DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o
-		
+
 DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o dls_soft_ring.o
 
 GLD_OBJS +=     gld.o gldutil.o
@@ -673,14 +673,6 @@ VUIDM5P_OBJS += vuidmice.o vuidm5p.o
 VUIDPS2_OBJS += vuidmice.o vuidps2.o
 
 SYSINIT_OBJS +=	sysinit.o sysinit_ddi.o
-
-DADK_OBJS +=	dadk.o
-
-GDA_OBJS +=	gda.o
-
-STRATEGY_OBJS += strategy.o
-
-CMDK_OBJS +=	cmdk.o
 
 HPCSVC_OBJS += hpcsvc.o
 

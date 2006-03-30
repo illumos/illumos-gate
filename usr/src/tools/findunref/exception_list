@@ -48,7 +48,6 @@
 ./src/cmd/oawk/EXPLAIN
 ./src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
 ./src/cmd/vi/port/ex.news
-./closed/uts/common/io/dktp/controller/ata/capacity.notes
 ./src/cmd/ssh/doc/*
 
 #

@@ -129,6 +129,13 @@ AGPGART_OBJS	+=	agpgart.o \
 AGPTARGET_OBJS	+=	agptarget.o
 AMD64GART_OBJS	+=	amd64_gart.o
 
+GHD_OBJS +=	ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
+		ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
+
+ATA_OBJS +=	$(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
+		ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
+		sil3xxx.o
+
 include $(SRC)/common/mc/mc-amd/Makefile.mcamd
 MCAMD_OBJS	+= \
 	$(MCAMD_CMN_OBJS) \

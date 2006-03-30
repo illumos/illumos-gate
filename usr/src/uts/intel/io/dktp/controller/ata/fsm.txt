@@ -1,0 +1,74 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+
+	/*
+	 * The interrupt reason can be interpreted
+	 * from other bits as follows:
+	 *
+	 *  DRQ  IO  CoD
+	 *  ---  --  ---
+	 *    0   0    1  Idle
+	 *    1   0    1  Send ATAPI CDB to device
+	 *    1   1    0  Data from device
+	 *    1   0    0  Data to device
+	 *    1   1    1  Future use
+	 *    0   1    1  Status ready
+	 *
+	 */
+
+			ACTION
+
+			ATAPI Status Bits
+Current	|			
+State	|	idle	cdb	datain		dataout		status
+        |-----------------------------------------------------------------
+idle	|	cmd	cmd	cmd		cmd		cmd
+command	|	*	sendcdb	*		*		rd-intr-reason
+cdb	|	*	*	start-xfer	start-xfer	rd-intr-reason	
+datain	|	*	*	continue-xfer	*		rd-intr-reason
+dataout	|	*	*	*		continue-xfer	rd-intr-reason
+
+
+
+			NEXT-STATE
+
+			ATAPI Status Bits
+Current	|			
+State	|	idle	cdb	datain		dataout		status
+ 	|-----------------------------------------------------------------
+idle	|	command	command	command		command		command
+command	|	*	cdb	*		*		*
+cdb	|	*	*	datain		dataout		(idle)
+datain	|	*	*	datain		*		(idle)
+dataout	|	*	*	*		dataout		(idle)
+
+
+
+States marked '*' should be invalid but some non-complaint drives
+don't transition correctly between states. 

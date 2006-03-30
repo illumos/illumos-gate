@@ -245,6 +245,7 @@ DRV_KMODS	+= pci
 DRV_KMODS	+= pcie_pci
 DRV_KMODS	+= npe
 
+DRV_KMODS	+= ata
 DRV_KMODS	+= fd
 DRV_KMODS	+= fdc
 DRV_KMODS	+= kb8042
@@ -264,7 +265,6 @@ DRV_KMODS	+= cpc
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= power
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= ata
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audiovia823x
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audioens
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audioixp

@@ -111,9 +111,17 @@ XMEMFS_OBJS +=		\
 #
 #	Driver modules
 #
-SD_OBJS += sd.o sd_xbuf.o
+CMDK_OBJS +=	cmdk.o
 
 CMLB_OBJS += cmlb.o
+
+DADK_OBJS +=	dadk.o
+
+GDA_OBJS +=	gda.o
+
+SD_OBJS += sd.o sd_xbuf.o
+
+STRATEGY_OBJS += strategy.o
 
 VGATEXT_OBJS += vgatext.o vgasubr.o
 
