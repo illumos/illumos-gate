@@ -35,6 +35,7 @@
  */
 #include	<stdio.h>
 #include	<string.h>
+#include	<unistd.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
@@ -214,19 +215,9 @@ update_osym(Ofl_desc *ofl)
 			if (sgp->sg_osdescs != NULL) {
 			    Word	_flags = phd->p_flags & (PF_W | PF_R);
 
-			    if (_flags == PF_R) {
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
-				Shdr	*shdr;
-
-				osp = (Os_desc *)sgp->sg_osdescs->al_data[0];
-				shdr = osp->os_shdr;
-
-				if (((shdr->sh_flags & SHF_AMD64_LARGE)) == 0)
-					tsgp = sgp;
-#else
+			    if (_flags == PF_R)
 				tsgp = sgp;
-#endif
-			    } else if (_flags == (PF_W | PF_R))
+			    else if (_flags == (PF_W | PF_R))
 				dsgp = sgp;
 			} else if (sgp->sg_flags & FLG_SG_EMPTY)
 			    esgp = sgp;
@@ -381,6 +372,21 @@ update_osym(Ofl_desc *ofl)
 
 		if (sgp) {
 			end = sgp->sg_phdr.p_vaddr + sgp->sg_phdr.p_memsz;
+
+			/*
+			 * If the last loadable segment is a read-only segment,
+			 * then the application which uses the symbol _end to
+			 * find the beginning of writable heap area may cause
+			 * segmentation violation. We adjust the value of the
+			 * _end to skip to the next page boundary.
+			 *
+			 * 6401812 System interface which returs beginning
+			 *	   heap would be nice.
+			 * When the above RFE is implemented, the changes below
+			 * could be changed in a better way.
+			 */
+			if ((sgp->sg_phdr.p_flags & PF_W) == 0)
+			    end = (Addr) S_ROUND(end, sysconf(_SC_PAGESIZE));
 
 			/*
 			 * If we're dealing with a memory reservation there are

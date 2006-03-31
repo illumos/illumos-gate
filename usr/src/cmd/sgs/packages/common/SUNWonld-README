@@ -1095,3 +1095,4 @@ Bugid   Risk Synopsis
 6197234 elfdump and dump don't handle 64-bit symbols correctly
 6398893 Extended section processing needs some work
 6397256 ldd dumps core in elf_fix_name
+6327926 ld does not set etext symbol correctly for AMD64 medium model (D)
