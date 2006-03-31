@@ -281,7 +281,7 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 				pciepci = 1;
 			} else
 				hdlp->ih_pri = priority;
-			behavior = (int)hdlp->ih_scratch2;
+			behavior = (int)(uintptr_t)hdlp->ih_scratch2;
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_ALLOC_VECTORS, result);
 

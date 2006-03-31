@@ -1057,10 +1057,10 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 			addthisarg = STRDUP(numstr);
 			break;
 		case STRING:
-			addthisarg = STRDUP((const char *)value.v);
+			addthisarg = STRDUP((const char *)(uintptr_t)value.v);
 			break;
 		case NODEPTR :
-			namep = (struct node *)value.v;
+			namep = (struct node *)(uintptr_t)value.v;
 			addthisarg = ipath2str(NULL, ipath(namep));
 			break;
 		default:
@@ -1268,7 +1268,7 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 				break;
 			}
 		valuep->t = STRING;
-		valuep->v = (unsigned long long)stable(outbuf);
+		valuep->v = (uintptr_t)stable(outbuf);
 	}
 
 	if (errbuf[0] != '\0') {
@@ -1614,7 +1614,7 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 	if (nvlist_lookup_string(embnvp, FM_FMRI_SCHEME, &scheme) == 0) {
 		if (strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
 			valuep->t = NODEPTR;
-			valuep->v = (unsigned long long)hc_fmri_nodeize(embnvp);
+			valuep->v = (uintptr_t)hc_fmri_nodeize(embnvp);
 			return (0);
 		}
 	}
@@ -1638,7 +1638,7 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 		char *val;
 		valuep->t = STRING;
 		(void) nvpair_value_string(nvpair, &val);
-		valuep->v = (unsigned long long)stable(val);
+		valuep->v = (uintptr_t)stable(val);
 		break;
 	}
 
@@ -1726,7 +1726,7 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 		if (not_array == 1 || index >= nelem)
 			goto invalid;
 		valuep->t = STRING;
-		valuep->v = (unsigned long long)stable(val[index]);
+		valuep->v = (uintptr_t)stable(val[index]);
 		break;
 	}
 
@@ -1866,7 +1866,7 @@ platform_payloadprop_values(const char *propstr, int *nvals)
 				retvals = MALLOC(sizeof (struct evalue));
 				retvals->t = NODEPTR;
 				retvals->v =
-				    (unsigned long long)hc_fmri_nodeize(embnvp);
+				    (uintptr_t)hc_fmri_nodeize(embnvp);
 				return (retvals);
 			}
 		}
@@ -1907,7 +1907,7 @@ platform_payloadprop_values(const char *propstr, int *nvals)
 			    &scheme) == 0 &&
 			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
 				retvals[hccount].t = NODEPTR;
-				retvals[hccount].v = (unsigned long long)
+				retvals[hccount].v = (uintptr_t)
 				    hc_fmri_nodeize(nvap[i]);
 				hccount++;
 			}
@@ -1942,7 +1942,7 @@ platform_payloadprop_values(const char *propstr, int *nvals)
 		retvals = MALLOC(sizeof (struct evalue));
 		retvals->t = STRING;
 		(void) nvpair_value_string(nvpair, &val);
-		retvals->v = (unsigned long long)stable(val);
+		retvals->v = (uintptr_t)stable(val);
 		return (retvals);
 	}
 
@@ -2068,7 +2068,7 @@ platform_payloadprop_values(const char *propstr, int *nvals)
 		retvals = MALLOC(sizeof (struct evalue) * nel);
 		for (i = 0; i < nel; i++) {
 			retvals[i].t = STRING;
-			retvals[i].v = (unsigned long long)stable(val[i]);
+			retvals[i].v = (uintptr_t)stable(val[i]);
 		}
 		return (retvals);
 	}

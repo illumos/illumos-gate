@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -249,19 +248,20 @@ extern "C" {
 #define	AMD_NB_CFG_GENCRCERRBYTE1	0x00020000
 
 /* Generic bank status register bits */
-#define	AMD_BANK_STAT_VALID		0x8000000000000000
-#define	AMD_BANK_STAT_OVER		0x4000000000000000
-#define	AMD_BANK_STAT_UC		0x2000000000000000
-#define	AMD_BANK_STAT_EN		0x1000000000000000
-#define	AMD_BANK_STAT_MISCV		0x0800000000000000
-#define	AMD_BANK_STAT_ADDRV		0x0400000000000000
-#define	AMD_BANK_STAT_PCC		0x0200000000000000
+#define	AMD_BANK_STAT_VALID		0x8000000000000000ULL
+#define	AMD_BANK_STAT_OVER		0x4000000000000000ULL
+#define	AMD_BANK_STAT_UC		0x2000000000000000ULL
+#define	AMD_BANK_STAT_EN		0x1000000000000000ULL
+#define	AMD_BANK_STAT_MISCV		0x0800000000000000ULL
+#define	AMD_BANK_STAT_ADDRV		0x0400000000000000ULL
+#define	AMD_BANK_STAT_PCC		0x0200000000000000ULL
 
-#define	AMD_BANK_STAT_CECC		0x0000400000000000
-#define	AMD_BANK_STAT_UECC		0x0000200000000000
-#define	AMD_BANK_STAT_SCRUB		0x0000010000000000
+#define	AMD_BANK_STAT_CECC		0x0000400000000000ULL
+#define	AMD_BANK_STAT_UECC		0x0000200000000000ULL
+#define	AMD_BANK_STAT_SCRUB		0x0000010000000000ULL
 
-#define	AMD_BANK_STAT_SYND_MASK		0x007f800000000000 /* syndrome[7:0] */
+	/* syndrome[7:0] */
+#define	AMD_BANK_STAT_SYND_MASK		0x007f800000000000ULL
 #define	AMD_BANK_STAT_SYND_SHIFT	47
 
 #define	AMD_BANK_SYND(stat) \

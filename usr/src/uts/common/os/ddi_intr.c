@@ -277,7 +277,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	tmp_hdl.ih_type = type;
 	tmp_hdl.ih_inum = inum;
 	tmp_hdl.ih_scratch1 = count;
-	tmp_hdl.ih_scratch2 = (void *)behavior;
+	tmp_hdl.ih_scratch2 = (void *)(uintptr_t)behavior;
 	tmp_hdl.ih_dip = dip;
 
 	if (i_ddi_intr_ops(dip, dip, DDI_INTROP_ALLOC,

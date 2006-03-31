@@ -155,13 +155,13 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	MEMORY_DEV "/platform/ssm@0,0/memory-controller@%x,400000"
 #define	IO_DEV "/platform/ssm@0,0/pci@%s"
 #define	DISK0_BASE_PATH "/ssm@0,0/pci@18,600000/scsi@2/sd@0,0"
-#define	DISK0_DEV "/platform"##DISK0_BASE_PATH
+#define	DISK0_DEV "/platform" DISK0_BASE_PATH
 #define	DISK1_BASE_PATH "/ssm@0,0/pci@18,600000/scsi@2/sd@1,0"
-#define	DISK1_DEV "/platform"##DISK1_BASE_PATH
+#define	DISK1_DEV "/platform" DISK1_BASE_PATH
 #define	DISK0_BASE_PATH_PCIX "/ssm@0,0/pci@18,700000/scsi@2/sd@0,0"
-#define	DISK0_DEV_PCIX "/platform"##DISK0_BASE_PATH_PCIX
+#define	DISK0_DEV_PCIX "/platform" DISK0_BASE_PATH_PCIX
 #define	DISK1_BASE_PATH_PCIX "/ssm@0,0/pci@18,700000/scsi@2/sd@1,0"
-#define	DISK1_DEV_PCIX "/platform"##DISK1_BASE_PATH_PCIX
+#define	DISK1_DEV_PCIX "/platform" DISK1_BASE_PATH_PCIX
 #define	TAPE_DEV "/platform/ssm@0,0/pci@18,600000/scsi@2/st@5,0"
 #define	TAPE_DEV_PCIX "/platform/ssm@0,0/pci@18,700000/scsi@2/st@5,0"
 #define	DVD_DEV "/platform/ssm@0,0/pci@18,700000/ide@3/sd@0,0"

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,7 +202,7 @@ sysevent_dup(sysevent_t *ev)
 		return (NULL);
 	bcopy(ev, copy, attr_offset);
 
-	nvl = (nvlist_t *)SE_ATTR_PTR(ev);
+	nvl = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 	if (nvl && nvlist_dup(nvl, &cnvl, 0) != 0) {
 		free(copy);
 		return (NULL);
@@ -219,7 +219,7 @@ sysevent_dup(sysevent_t *ev)
 void
 sysevent_free(sysevent_t *ev)
 {
-	nvlist_t *attr_list = (nvlist_t *)SE_ATTR_PTR(ev);
+	nvlist_t *attr_list = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 
 	if (attr_list)
 		nvlist_free(attr_list);
@@ -248,7 +248,7 @@ sysevent_get_attr_list(sysevent_t *ev, nvlist_t **nvlist)
 
 	/* Duplicate attribute for an unpacked sysevent buffer */
 	if (SE_FLAG(ev) != SE_PACKED_BUF) {
-		nvl = (nvlist_t *)SE_ATTR_PTR(ev);
+		nvl = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 		if (nvl == NULL) {
 			return (0);
 		}
@@ -373,7 +373,7 @@ sysevent_attr_next(sysevent_t *ev, sysevent_attr_t *attr)
 		return (NULL);
 	}
 
-	nvl = (nvlist_t *)SE_ATTR_PTR(ev);
+	nvl = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 	return (nvlist_next_nvpair(nvl, nvp));
 }
 
@@ -398,7 +398,7 @@ sysevent_lookup_attr(sysevent_t *ev, char *name, int datatype,
 	 * nvlist_look mataches name only. So we walk
 	 * nvlist manually here.
 	 */
-	nvl = (nvlist_t *)SE_ATTR_PTR(ev);
+	nvl = (nvlist_t *)(uintptr_t)SE_ATTR_PTR(ev);
 	nvp = nvlist_next_nvpair(nvl, NULL);
 	while (nvp) {
 		if ((strcmp(name, nvpair_name(nvp)) == 0) &&

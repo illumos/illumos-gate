@@ -218,10 +218,10 @@ mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
 	return (rc);
 }
 
-#else
+#endif	/* sparc */
+
 /*ARGSUSED*/
 static int
-#endif	/* sparc */
 mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 {
 	/*

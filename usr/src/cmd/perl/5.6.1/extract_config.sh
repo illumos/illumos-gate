@@ -1,7 +1,7 @@
 #!/bin/ksh -p
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,7 @@ printf 'sparc_C_PICFLAGS = %s\n' "$cccdlflags"
 printf 'i386_C_PICFLAGS = %s\n' "$cccdlflags"
 printf 'C_PICFLAGS = %s\n' "$cccdlflags"
 printf 'DYNFLAGS += $(ZIGNORE)\n'
+printf 'CFLAGS += -_gcc=-w\n'
 
 # Global stuff.
 printf 'PERL_VERSION = %s\n' $version

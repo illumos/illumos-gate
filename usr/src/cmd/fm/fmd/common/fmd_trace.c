@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,11 +52,23 @@ fmd_trace_create(void)
 	/*
 	 * We require 8-byte alignment of fmd_tracerec_t to store hrtime_t's.
 	 * Since the trailing flexible array member is of type uintptr_t, we
-	 * must make it a multiple of 2 if we are compiling 32-bit; otherwise
-	 * uintptr_t is 8 bytes so any value of tb_frames is acceptable.
+	 * may need to allocate an additional element if we are compiling
+	 * 32-bit; otherwise uintptr_t is 8 bytes so any value of tb_frames is
+	 * acceptable.
+	 *
+	 * tb_frames includes the first element, whose size is reflected in
+	 * sizeof (fmd_tracerec_t).  Therefore, if fmd_tracerec_t's size is
+	 * 0 mod 8, we must be sure the total number of frames is odd.
+	 * Otherwise, we need at least one extra frame, so the total count
+	 * must be even.  This will continue to work even if the sizes or
+	 * types of other fmd_tracerec_t members are changed.
 	 */
 #ifdef _ILP32
-	tbp->tb_frames = P2ROUNDUP(tbp->tb_frames, 2);
+	/*CONSTCOND*/
+	if (sizeof (fmd_tracerec_t) % sizeof (hrtime_t) == 0)
+		tbp->tb_frames = (tbp->tb_frames & ~1UL) + 1;
+	else
+		tbp->tb_frames = P2ROUNDUP(tbp->tb_frames, 2);
 #endif
 	tbp->tb_size = sizeof (fmd_tracerec_t) +
 	    sizeof (uintptr_t) * (MAX(tbp->tb_frames, 1) - 1);

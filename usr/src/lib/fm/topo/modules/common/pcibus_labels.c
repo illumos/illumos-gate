@@ -181,7 +181,7 @@ pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out)
 		    "label method argument not found.\n");
 		return (-1);
 	}
-	dp = (did_t *)ptr;
+	dp = (did_t *)(uintptr_t)ptr;
 
 	/*
 	 * Is there a slotname associated with the device?

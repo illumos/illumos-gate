@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -227,21 +227,6 @@ AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
 #	all kernel implementations.
 #
 
-#
-# XX64	Compiling with -xc99=%all on build 55 merge makes the
-#	kmem_alloc double map parts of the kernel data causing
-#	horrible overwriting and forces a hardware reset in
-#	segkp_create().  Until the origin of this problem can
-#	be tracked down (i.e. is it a deliberate C89 -> C99 semantic
-#	change for which the kernel needs repair, or is it just a
-#	bug in the x86 compiler?) disabling C99 for kernel compilation
-#	when using the Devpro compiler
-#
-i386_C99MODE		= $(C99_DISABLE)
-$(__GNUC)i386_C99MODE	= $(C99_ENABLE)
-sparc_C99MODE		= $(C99_DISABLE)
-C99MODE			= $($(MACH)_C99MODE)
-
 # Override the default, the kernel is squeaky clean
 CERRWARN = -errtags=yes -errwarn=%all
 
@@ -252,7 +237,7 @@ CFLAGS_uts		+= $(ILDOFF)
 CFLAGS_uts		+= $(XAOPT)
 CFLAGS_uts		+= $(CTF_FLAGS)
 CFLAGS_uts		+= $(CERRWARN)
-CFLAGS_uts		+= $(C99MODE)
+CFLAGS_uts		+= $(C99_ENABLE)
 CFLAGS_uts		+= $(EXTRA_CFLAGS)
 
 #

@@ -241,7 +241,7 @@ topo_fmri_expand(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 	return (0);
 }
 
-static struct rsrc {
+struct rsrc {
 	int rs_err;
 	int rs_flag;
 	nvlist_t **rs_fprop;

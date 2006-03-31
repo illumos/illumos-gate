@@ -618,7 +618,7 @@ si_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Initialize the mutex. */
 		mutex_init(&si_ctlp->sictl_mutex, NULL, MUTEX_DRIVER,
-				(void *)(uint64_t)si_ctlp->sictl_intr_pri);
+				(void *)(uintptr_t)si_ctlp->sictl_intr_pri);
 
 		attach_state |= ATTACH_PROGRESS_MUTEX_INIT;
 
@@ -1860,9 +1860,9 @@ si_alloc_port_state(si_ctl_state_t *si_ctlp, int port)
 
 	si_portp = si_ctlp->sictl_ports[port];
 	mutex_init(&si_portp->siport_mutex, NULL, MUTEX_DRIVER,
-				(void *)(uint64_t)si_ctlp->sictl_intr_pri);
+				(void *)(uintptr_t)si_ctlp->sictl_intr_pri);
 	mutex_init(&si_portp->siport_mop_mutex, NULL, MUTEX_DRIVER,
-				(void *)(uint64_t)si_ctlp->sictl_intr_pri);
+				(void *)(uintptr_t)si_ctlp->sictl_intr_pri);
 	mutex_enter(&si_portp->siport_mutex);
 
 	/* allocate prb & sgt pkts for this port. */

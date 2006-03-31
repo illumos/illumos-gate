@@ -185,7 +185,7 @@ hsvc_dump(void)
 	    hsvc_groups, hsvc_avail);
 
 	for (hsvcp = hsvc_groups; hsvcp != NULL; hsvcp = hsvcp->next) {
-		prom_printf(" hsvcp: %p (0x%lx 0x%lx 0x%lx) ref: %d clients: "
+		prom_printf(" hsvcp: %p (0x%lx 0x%lx 0x%lx) ref: %ld clients: "
 		    "%p\n", hsvcp, hsvcp->group, hsvcp->major, hsvcp->minor,
 		    hsvcp->refcnt, hsvcp->clients);
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,7 +71,7 @@ CPPFLAGS += $(PERL_COREFLAGS) $(PERL_LFFLAGS)
 LDLIBS += $(PERL_LDLIBS)
 
 # Compiler replacement rules
-SED_UN_CC	= -e "s!'$(CC)!'cc!"
+SED_UN_CC	= -e "s!'$(CC) -_gcc=-w!'cc!"
 SED_UN_CC_E	= -e "s!'$(REAL_CC)!'cc!"
 
 all :=		TARGET = all

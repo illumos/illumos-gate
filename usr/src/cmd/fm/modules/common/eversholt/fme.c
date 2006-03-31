@@ -656,7 +656,7 @@ globals_destructor(void *left, void *right, void *arg)
 {
 	struct evalue *evp = (struct evalue *)right;
 	if (evp->t == NODEPTR)
-		tree_free((struct node *)evp->v);
+		tree_free((struct node *)(uintptr_t)evp->v);
 	evp->v = NULL;
 	FREE(evp);
 }
@@ -823,8 +823,8 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			(void) sprintf(suffixbuf, "%llu", gval->v);
 			suffix = suffixbuf;
 		} else {
-			out(O_ALTFP, " \"%s\"", (char *)gval->v);
-			suffix = (char *)gval->v;
+			out(O_ALTFP, " \"%s\"", (char *)(uintptr_t)gval->v);
+			suffix = (char *)(uintptr_t)gval->v;
 		}
 
 		nname = strlen(serdname) + strlen(suffix) + 2;
@@ -1399,6 +1399,7 @@ boom:
 	nvlist_free(f);
 	out(O_DIE, "%s", failure);
 	/*NOTREACHED*/
+	return (NULL);
 }
 
 static uint_t
@@ -1417,7 +1418,7 @@ percentof(uint_t part, uint_t whole)
 	return ((p / whole / 10) + (((p / whole % 10) >= 5) ? 1 : 0));
 }
 
-static struct rsl {
+struct rsl {
 	struct event *suspect;
 	nvlist_t *asru;
 	nvlist_t *fru;
@@ -1626,9 +1627,10 @@ addpayloadprop(const char *lhs, struct evalue *rhs, nvlist_t *fault)
 			    "cannot add payloadprop \"%s\" to fault", lhs);
 	} else {
 		out(O_ALTFP|O_VERB2, "addpayloadprop: %s=\"%s\"",
-		    lhs, (char *)rhs->v);
+		    lhs, (char *)(uintptr_t)rhs->v);
 
-		if (nvlist_add_string(fault, lhs, (char *)rhs->v) != 0)
+		if (nvlist_add_string(fault, lhs, (char *)(uintptr_t)rhs->v) !=
+		    0)
 			out(O_DIE,
 			    "cannot add payloadprop \"%s\" to fault", lhs);
 	}

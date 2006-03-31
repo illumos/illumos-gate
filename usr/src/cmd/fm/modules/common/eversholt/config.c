@@ -613,7 +613,7 @@ config_confprop(struct node *np, struct config *croot, struct evalue *valuep)
 		return (1);
 
 	valuep->t = STRING;
-	valuep->v = (unsigned long long)stable(s);
+	valuep->v = (uintptr_t)stable(s);
 
 	return (0);
 }
@@ -720,7 +720,7 @@ config_is_type(struct node *np, struct config *croot, struct evalue *valuep)
 	for (i = 0; typestrings[i] != NULL; i++) {
 		s = config_getprop(cp, stable(typestrings[i]));
 		if (s != NULL) {
-			valuep->v = (unsigned long long)stable(s);
+			valuep->v = (uintptr_t)stable(s);
 			break;
 		}
 	}

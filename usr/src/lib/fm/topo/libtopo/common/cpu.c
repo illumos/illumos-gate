@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -298,7 +298,7 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
 	int err;
-	uint32_t cpuid;
+	ulong_t cpuid;
 	char *str, *s, *end;
 	char *serial = NULL;
 	nvlist_t *fmri;
@@ -334,7 +334,7 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	err = nvlist_add_uint8(fmri, FM_VERSION, CPU_SCHEME_VERSION1);
 	err |= nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_CPU);
-	err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_ID, cpuid);
+	err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_ID, (uint32_t)cpuid);
 	err |= nvlist_add_uint8(fmri, FM_FMRI_CPU_MASK, 0);
 	if (serial != NULL)
 		err |= nvlist_add_string(fmri, FM_FMRI_CPU_SERIAL_ID,

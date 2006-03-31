@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,36 +26,20 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG:sh=	cd ..; basename `pwd`
-OBJS= $(PROG).o translate.o
-SRCS= $(OBJS:%.o=../%.c)
-
-include ../../Makefile.cmd
-
-INCS +=	-I../../../lib/libzpool/common
-INCS +=	-I../../../uts/common/fs/zfs
-
-LDLIBS += -lzpool -lzfs
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
-
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
-
 .KEEP_STATE:
 
-all: $(PROG)
+NOT_NATIVE = $(POUND_SIGN)              # tell Makefile.com we're native
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+include ../Makefile.com
 
-clean:
+CC =		$(NATIVECC)
+LD =		$(NATIVELD)
+CFLAGS =	$(NATIVE_CFLAGS)
+CPPFLAGS =	$(MY_NATIVE_CPPFLAGS)
+LDFLAGS =	$(MY_NATIVE_LDFLAGS)
+LDLIBS =	$(MY_NATIVE_LDLIBS)
+POST_PROCESS =
 
-lint:	lint_SRCS
+all install:	$(PROG)
 
-%.o: ../%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
-include ../../Makefile.targ
+catalog:

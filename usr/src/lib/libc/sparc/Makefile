@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -98,9 +99,7 @@ FPASMOBJS=			\
 	fpgetsticky.o		\
 	fpsetmask.o		\
 	fpsetrnd.o		\
-	fpsetsticky.o
-
-$(__GNUC)FPASMOBJS +=		\
+	fpsetsticky.o		\
 	__quad.o
 
 ATOMICOBJS=			\
@@ -1067,8 +1066,8 @@ TIL=				\
 
 $(TIL:%=pics/%) := CFLAGS += $(LIBCBASE)/threads/sparc.il
 
-# special kludge for gcc inlines with 'cas':
-$(__GNUC)pics/synch.o pics/lwp.o := sparc_XARCH = -xarch=v8plus
+# special kludge for inlines with 'cas':
+pics/synch.o pics/lwp.o := sparc_CFLAGS += -_gcc=-Wa,-xarch=v8plus
 
 # Files in port/fp subdirectory that need base.il inline template
 IL=				\

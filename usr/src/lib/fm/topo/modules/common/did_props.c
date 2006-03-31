@@ -505,7 +505,8 @@ label_set(tnode_t *tn, did_t *pd,
 	mp = did_mod(pd);
 	if (topo_mod_nvalloc(mp, &in, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
-	if (nvlist_add_uint64(in, TOPO_METH_LABEL_ARG_NVL, (uint64_t)pd) != 0) {
+	if (nvlist_add_uint64(in, TOPO_METH_LABEL_ARG_NVL, (uintptr_t)pd) !=
+	    0) {
 		nvlist_free(in);
 		return (topo_mod_seterrno(mp, EMOD_NOMEM));
 	}

@@ -169,7 +169,7 @@ cpu_phys2virt(uint32_t cpuid, uint32_t *cpuvidp)
 
 	for (idx = 0, mcmp = cpu.cpu_mdesc_cpus;
 	    idx < cpu.cpu_mdesc_ncpus; idx++, mcmp++) {
-		if (mcmp->cpumap_pid == (uint64_t)-1)
+		if (mcmp->cpumap_pid == (uint32_t)-1)
 			continue; /* ignore invalid value */
 		if (mcmp->cpumap_pid == cpuid) {
 			*cpuvidp = mcmp->cpumap_id;

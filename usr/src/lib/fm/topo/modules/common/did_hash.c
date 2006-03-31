@@ -66,7 +66,7 @@ did_dnhash(di_node_t key)
 	if (key_divisor == 0)
 		key_divisor = sizeof (*key);
 
-	keyn = (uint64_t)key;
+	keyn = (uintptr_t)key;
 
 	return (keyn / key_divisor);
 }

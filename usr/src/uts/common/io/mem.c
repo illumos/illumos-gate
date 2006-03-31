@@ -434,8 +434,8 @@ mmioctl_vtop(intptr_t data)
 	else {
 		if (copyin((void *)data, &vtop32, sizeof (mem_vtop32_t)))
 			return (EFAULT);
-		mem_vtop.m_as = (struct as *)vtop32.m_as;
-		mem_vtop.m_va = (void *)vtop32.m_va;
+		mem_vtop.m_as = (struct as *)(uintptr_t)vtop32.m_as;
+		mem_vtop.m_va = (void *)(uintptr_t)vtop32.m_va;
 
 		if (mem_vtop.m_as != NULL)
 			return (EINVAL);

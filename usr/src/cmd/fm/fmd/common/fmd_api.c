@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -76,6 +75,10 @@ static const fmd_conf_ops_t *const _fmd_prop_ops[] = {
 	&fmd_conf_time,		/* FMD_TYPE_TIME */
 	&fmd_conf_size,		/* FMD_TYPE_SIZE */
 };
+
+static void fmd_api_verror(fmd_module_t *, int, const char *, va_list)
+    __NORETURN;
+static void fmd_api_error(fmd_module_t *, int, const char *, ...) __NORETURN;
 
 /*
  * fmd_api_vxerror() provides the engine underlying the fmd_hdl_[v]error() API

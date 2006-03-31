@@ -108,7 +108,7 @@ meta_gethspnmentbyid(
 	nm.hspid = hspid;
 	nm.ret_hspid = MD_HSPID_WILD;
 	nm.hspname_len = MAXPATHLEN;
-	nm.hspname = (uint64_t)device_name;
+	nm.hspname = (uintptr_t)device_name;
 
 	if (metaioctl(MD_IOCGET_HSP_NM, &nm, &nm.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &nm.mde);
@@ -148,7 +148,7 @@ meta_gethspnmentbyname(
 	nm.hspid = MD_HSPID_WILD;
 	nm.ret_hspid = MD_HSPID_WILD;
 	nm.hspname_len = strlen(device_name) + 1;
-	nm.hspname = (uint64_t)device_name;
+	nm.hspname = (uintptr_t)device_name;
 
 	/*
 	 * The ioctl expects the a hsp name and return its hsp_self_id.
@@ -727,7 +727,10 @@ add_self_name(
 	md_mnnode_desc	*mnside;
 
 	p = strrchr(uname, '/');
-	p = (p == NULL? uname : ++p);
+	if (p == NULL)
+		p = uname;
+	else
+		p++;
 
 	/*
 	 * The valid qualified name

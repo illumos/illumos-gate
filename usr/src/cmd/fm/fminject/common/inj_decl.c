@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -158,7 +158,7 @@ inj_decl_create(inj_declmem_t *dlm)
 
 	inj_list_append(&decl->decl_members, dlm);
 	(void) inj_strhash_insert(&decl->decl_memhash, dlm->dlm_name,
-	    (uintmax_t)dlm);
+	    (uintptr_t)dlm);
 
 	return (decl);
 }
@@ -180,7 +180,7 @@ inj_decl_addmem(inj_decl_t *decl, inj_declmem_t *dlm)
 
 	inj_list_append(&decl->decl_members, dlm);
 	(void) inj_strhash_insert(&decl->decl_memhash, dlm->dlm_name,
-	    (uintmax_t)dlm);
+	    (uintptr_t)dlm);
 }
 
 /*
@@ -261,5 +261,5 @@ inj_decl_finish(inj_decl_t *decl, const char *name, inj_itemtype_t type)
 		return;
 	}
 
-	(void) inj_strhash_insert(hash, name, (uintmax_t)decl);
+	(void) inj_strhash_insert(hash, name, (uintptr_t)decl);
 }

@@ -176,7 +176,7 @@ dld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
 		if (minor > 0 && minor <= DLD_MAX_PPA + 1) {
-			*resp = (void *)(minor - 1);
+			*resp = (void *)(uintptr_t)(minor - 1);
 			rc = DDI_SUCCESS;
 		}
 		break;

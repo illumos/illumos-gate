@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License, (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -122,18 +122,18 @@ etc:	$($(MACH)_ETC)
 lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 	mkdir -p $(MACH)/i18n_pics
 	cd $(MACH)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR)/libc_i18n.a
-	check_fnames -s $(C_SYNONYMS_H) -l $(MACH)/$(DYNLIB) \
+	$(CHECK_FNAMES) -s $(C_SYNONYMS_H) -l $(MACH)/$(DYNLIB) \
 		$(MACH)/pics/*.o $(MACH)/i18n_pics/*.o
 
 lib64:	$(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS)
 	mkdir -p $(MACH64)/i18n_pics
 	cd $(MACH64)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR64)/libc_i18n.a
-	check_fnames -s $(C_SYNONYMS_H) -l $(MACH64)/$(DYNLIB) \
+	$(CHECK_FNAMES) -s $(C_SYNONYMS_H) -l $(MACH64)/$(DYNLIB) \
 		$(MACH64)/pics/*.o $(MACH64)/i18n_pics/*.o
 
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
-	check_fnames -s $(C_SYNONYMS_H) -l $(@D)/$(@F) $(@D)/pics/*.o
+	$(CHECK_FNAMES) -s $(C_SYNONYMS_H) -l $(@D)/$(@F) $(@D)/pics/*.o
 
 $($(MACH)_ETC): FRC
 	@cd $(@); pwd; $(MAKE) $(TARGET)

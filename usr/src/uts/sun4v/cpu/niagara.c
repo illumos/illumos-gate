@@ -96,7 +96,7 @@ cpu_setup(void)
 	status = hsvc_register(&niagara_hsvc, &niagara_sup_minor);
 	if (status != 0) {
 		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
-		    "group: 0x%x major: 0x%x minor: 0x%x errno: %d\n",
+		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
 		    niagara_hsvc.hsvc_modname, niagara_hsvc.hsvc_group,
 		    niagara_hsvc.hsvc_major, niagara_hsvc.hsvc_minor, status);
 		niagara_hsvc_available = B_FALSE;

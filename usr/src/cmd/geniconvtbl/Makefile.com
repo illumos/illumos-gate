@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,17 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Use is subject to license terms.
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/geniconvtbl/Makefile.com
 
+$(NOT_NATIVE)NATIVE_BUILD = $(POUND_SIGN)
 
 ITM	= geniconvtbl.so
 PROG	= geniconvtbl
-NATIVEPROG=	$(PROG).native
-$(NATIVEPROG) :=        CC=$(NATIVECC)
-$(NATIVEPROG) :=        CPPFLAGS= -I. -I..
-$(NATIVEPROG) :=        LDLIBS= -lgen
 
 SRCSH1  = iconv_tm.h hash.h
 SRCCH1  = itmcomp.h itm_util.h maptype.h
@@ -87,7 +82,7 @@ OBJS	= $(SRCSC1:%.c=%.o) $(YTABC:.c=.o) $(LEXYY:.c=.o)
 
 CHECKHDRS = $(HDRS%.h=%.check)
 
-CLOBBERFILES=	$(ITM) $(NATIVEPROG)
+CLOBBERFILES=	$(ITM)
 CLEANFILES = 	$(OBJS) $(YTABC) $(YTABH) $(LEXYY) $(YOUT) \
 		$(POFILES) $(POFILE)
 
@@ -101,6 +96,10 @@ $(ITM) :=	sparc_CFLAGS += -xregs=no%appl
 $(ITM) :=	sparcv9_CFLAGS += -xregs=no%appl
 
 LDLIBS += -lgen
+
+MY_NATIVE_CPPFLAGS = -D_FILE_OFFSET_BITS=64 -I. -I..
+MY_NATIVE_LDFLAGS = $(NES_MAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%)
+MY_NATIVE_LDLIBS = -lgen
 
 #
 # Message catalog
@@ -121,9 +120,6 @@ POFILE= geniconvtbl_.po
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-
-$(NATIVEPROG): $(SRCS)
-	$(LINK.c) $(SRCS) -o $@ $(LDLIBS)
 
 $(ITM): $(SRCI)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -M$(MAPFILE) -o $@ $(SRCI) $(LDLIBS)

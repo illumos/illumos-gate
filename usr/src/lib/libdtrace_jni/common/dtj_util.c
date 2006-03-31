@@ -1186,8 +1186,8 @@ dtj_pointer_list_entry_cmp(const void *v1, const void *v2, void *arg)
 	 * It is not valid to compare pointers using the relational operators
 	 * unless they point to elements in the same array.
 	 */
-	uint64_t x = (uint64_t)p1->dple_ptr;
-	uint64_t y = (uint64_t)p2->dple_ptr;
+	uint64_t x = (uintptr_t)p1->dple_ptr;
+	uint64_t y = (uintptr_t)p2->dple_ptr;
 	int rc;
 	rc = ((x > y) ? 1 : ((x < y) ? -1 : 0));
 	return (rc);

@@ -60,10 +60,9 @@ CHKSRCS=	$(SRCBASE)/uts/common/krtld/reloc.h
 
 BASEPLAT =	sparc
 
-# __GNUC is overridden in the environment when building with gcc
-__GNUC:sh=		echo \\043
+include		$(SRC)/Makefile.master
 
-# We build sparc objects with cc by default
+# This is safe because linking is done only with the primary compiler.
 MAPFILE-ORDER =		../common/mapfile-order-devpro
 $(__GNUC)MAPFILE-ORDER =	../common/mapfile-order-gcc
 

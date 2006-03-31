@@ -632,8 +632,8 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		 * based on Resource Management policies.
 		 */
 		if ((ret = px_msi_alloc(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, (int)hdlp->ih_scratch2, &msi_num,
-		    (int *)result)) != DDI_SUCCESS) {
+		    hdlp->ih_scratch1, (int)(uintptr_t)hdlp->ih_scratch2,
+		    &msi_num, (int *)result)) != DDI_SUCCESS) {
 			DBG(DBG_INTROPS, dip, "px_msix_ops: MSI allocation "
 			    "failed, rdip 0x%p inum 0x%x count 0x%x\n",
 			    rdip, hdlp->ih_inum, hdlp->ih_scratch1);

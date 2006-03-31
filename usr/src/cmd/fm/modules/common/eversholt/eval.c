@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -156,11 +156,11 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 
 	if (funcname == L_fru) {
 		valuep->t = NODEPTR;
-		valuep->v = (unsigned long long)eval_fru(np);
+		valuep->v = (uintptr_t)eval_fru(np);
 		return (1);
 	} else if (funcname == L_asru) {
 		valuep->t = NODEPTR;
-		valuep->v = (unsigned long long)eval_asru(np);
+		valuep->v = (uintptr_t)eval_asru(np);
 		return (1);
 	} else if (funcname == L_defined) {
 		ASSERTeq(np->t, T_GLOBID, ptree_nodetype2str);
@@ -199,7 +199,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 				break;
 			case STRING:
 				out(O_ALTFP|O_VERB2, "found: \"%s\"",
-				    (char *)valuep->v);
+				    (char *)(uintptr_t)valuep->v);
 				break;
 			default:
 				out(O_ALTFP|O_VERB2, "found: undefined");
@@ -242,8 +242,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 				out(O_ALTFP|O_VERB2,
 				    " (%llu)", payloadvalp->v);
 			else
-				out(O_ALTFP|O_VERB2,
-				    " (\"%s\")", (char *)payloadvalp->v);
+				out(O_ALTFP|O_VERB2, " (\"%s\")",
+				    (char *)(uintptr_t)payloadvalp->v);
 		}
 
 		/* add to table of payload properties for current problem */
@@ -298,7 +298,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 				    "(%llu) ", cmpval.v);
 			else
 				out(O_ALTFP|O_VERB2,
-				    "(\"%s\") ", (char *)cmpval.v);
+				    "(\"%s\") ", (char *)(uintptr_t)cmpval.v);
 		}
 
 		/* get the payload values and check for a match */
@@ -329,8 +329,10 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 				 * original tree value.
 				 */
 				if (preval.t == NODEPTR &&
-				    ((struct node *)(preval.v))->t == T_NAME) {
-					tree_free((struct node *)preval.v);
+				    ((struct node *)(uintptr_t)(preval.v))->t ==
+				    T_NAME) {
+					tree_free((struct node *)(uintptr_t)
+					    preval.v);
 				}
 
 				if (vals[i].v == cmpval.v) {
@@ -346,7 +348,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 
 			for (i = 0; i < nvals; i++) {
 				if (vals[i].t == NODEPTR) {
-					tree_free((struct node *)vals[i].v);
+					tree_free((struct node *)(uintptr_t)
+					    vals[i].v);
 					break;
 				}
 			}
@@ -376,6 +379,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		outfl(O_DIE, np->file, np->line,
 		    "eval_func: unexpected func: %s", funcname);
 	/*NOTREACHED*/
+	return (0);
 }
 
 static struct node *
@@ -603,6 +607,7 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
 		    ptree_nodetype2str(np->t));
 	}
 	/*NOTREACHED*/
+	return (0);
 }
 
 /*
@@ -689,33 +694,37 @@ check_expr_args(struct evalue *lp, struct evalue *rp, enum datatype dtype,
 		struct node *np)
 {
 	/* auto-convert T_NAMES to strings */
-	if (lp->t == NODEPTR && ((struct node *)(lp->v))->t == T_NAME) {
-		char *s = ipath2str(NULL, ipath((struct node *)lp->v));
+	if (lp->t == NODEPTR && ((struct node *)(uintptr_t)(lp->v))->t ==
+	    T_NAME) {
+		char *s = ipath2str(NULL,
+		    ipath((struct node *)(uintptr_t)lp->v));
 		lp->t = STRING;
-		lp->v = (unsigned long long)stable(s);
+		lp->v = (uintptr_t)stable(s);
 		FREE(s);
 		out(O_ALTFP|O_VERB2, "convert lhs path to \"%s\"",
-		    (char *)lp->v);
+		    (char *)(uintptr_t)lp->v);
 	}
 	if (rp != NULL &&
-	    rp->t == NODEPTR && ((struct node *)(rp->v))->t == T_NAME) {
-		char *s = ipath2str(NULL, ipath((struct node *)rp->v));
+	    rp->t == NODEPTR && ((struct node *)(uintptr_t)(rp->v))->t ==
+	    T_NAME) {
+		char *s = ipath2str(NULL,
+		    ipath((struct node *)(uintptr_t)rp->v));
 		rp->t = STRING;
-		rp->v = (unsigned long long)stable(s);
+		rp->v = (uintptr_t)stable(s);
 		FREE(s);
 		out(O_ALTFP|O_VERB2, "convert rhs path to \"%s\"",
-		    (char *)rp->v);
+		    (char *)(uintptr_t)rp->v);
 	}
 
 	/* auto-convert strings to numbers */
 	if (dtype == UINT64) {
 		if (lp->t == STRING) {
 			lp->t = UINT64;
-			lp->v = strtoull((char *)lp->v, NULL, 0);
+			lp->v = strtoull((char *)(uintptr_t)lp->v, NULL, 0);
 		}
 		if (rp != NULL && rp->t == STRING) {
 			rp->t = UINT64;
-			rp->v = strtoull((char *)rp->v, NULL, 0);
+			rp->v = strtoull((char *)(uintptr_t)rp->v, NULL, 0);
 		}
 	}
 
@@ -821,7 +830,8 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		} else {
 			out(O_ALTFP|O_VERB2,
 			    "assign $%s=\"%s\"",
-			    np->u.expr.left->u.globid.s, (char *)gval->v);
+			    np->u.expr.left->u.globid.s,
+			    (char *)(uintptr_t)gval->v);
 		}
 
 		/*
@@ -1230,12 +1240,12 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 
 		/* return address of struct node */
 		valuep->t = NODEPTR;
-		valuep->v = (unsigned long long)np;
+		valuep->v = (uintptr_t)np;
 		return (1);
 
 	case T_QUOTE:
 		valuep->t = STRING;
-		valuep->v = (unsigned long long)np->u.quote.s;
+		valuep->v = (uintptr_t)np->u.quote.s;
 		return (1);
 
 	case T_FUNC:
@@ -1253,6 +1263,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		    ptree_nodetype2str(np->t));
 	}
 	/*NOTREACHED*/
+	return (0);
 }
 
 /*

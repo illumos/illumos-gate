@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,7 +55,7 @@ clean	:= TARGET = clean
 test	:= TARGET = test
 
 # Compiler replacement rules
-SED_CC		= -e "s!'cc'!'$(CC)'!"
+SED_CC		= -e "s!'cc'!'$(CC) -_gcc=-w'!"
 SED_CC_E	= -e "s!'cc -E'!'$(REAL_CC) -E'!"
 
 # distrib holds the perl source, contrib holds the SMI modules.

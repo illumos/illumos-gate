@@ -1303,12 +1303,14 @@ gld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 			rc = DDI_FAILURE;
 		} else if (minor <= GLD_MAX_STYLE1_MINOR) {
 			/* Style 1:  calculate the PPA from the minor */
-			*resultp = (void *)GLD_STYLE1_MINOR_TO_PPA(minor);
+			*resultp = (void *)(uintptr_t)
+			    GLD_STYLE1_MINOR_TO_PPA(minor);
 			rc = DDI_SUCCESS;
 		} else {
 			/* Clone:  look for it.  Not a static mapping */
 			if ((devinfo = gld_finddevinfo((dev_t)arg)) != NULL) {
-				*resultp = (void *)ddi_get_instance(devinfo);
+				*resultp = (void *)(uintptr_t)
+				    ddi_get_instance(devinfo);
 				rc = DDI_SUCCESS;
 			}
 		}
