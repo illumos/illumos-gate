@@ -312,8 +312,8 @@ typedef struct si_prb {
 #define	ATTENTION_BIT	0x80000000
 #define	IS_ATTENTION_RAISED(slot_status)	(slot_status & ATTENTION_BIT)
 
-#define	SI3124_DEV_ID	3124
-#define	SI3132_DEV_ID	3132
+#define	SI3124_DEV_ID	0x3124
+#define	SI3132_DEV_ID	0x3132
 
 #define	PM_CSR(devid)	 ((devid == SI3124_DEV_ID) ? 0x68 : 0x58)
 

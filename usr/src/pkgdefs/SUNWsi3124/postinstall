@@ -127,4 +127,7 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pci1095,3124"' -b "$BASEDIR" -m '* 0644 root sys' si3124
+check_add_drv -i \
+    '"pci1095,3124"
+     "pci1095,3132"'\
+     -b "$BASEDIR" -m '* 0644 root sys' si3124
