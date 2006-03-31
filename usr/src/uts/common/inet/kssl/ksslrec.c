@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -918,9 +917,23 @@ end:
 	return (rv);
 }
 
+#define	IS_BAD_PRE_MASTER_SECRET(pms, pmslen, ssl)			\
+	(pms == NULL || pmslen != SSL3_PRE_MASTER_SECRET_LEN ||		\
+	pms[0] != ssl->major_version || pms[1] != ssl->minor_version)
+
+#define	FAKE_PRE_MASTER_SECRET(pms, pmslen, ssl, buf) {			\
+		KSSL_COUNTER(bad_pre_master_secret, 1);			\
+		pms = buf;						\
+		pmslen = SSL3_PRE_MASTER_SECRET_LEN;			\
+		pms[0] = ssl->major_version;				\
+		pms[1] = ssl->minor_version;				\
+		(void) random_get_pseudo_bytes(&buf[2], pmslen - 2);	\
+}
+
 static int
 kssl_generate_tls_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 {
+	uchar_t buf[SSL3_PRE_MASTER_SECRET_LEN];
 	uchar_t seed[SSL3_RANDOM_LENGTH * 2];
 
 	/*
@@ -933,6 +946,14 @@ kssl_generate_tls_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 	bcopy(ssl->server_random, seed + SSL3_RANDOM_LENGTH,
 		SSL3_RANDOM_LENGTH);
 
+	/* if pms is bad fake it to thwart Bleichenbacher attack */
+	if (IS_BAD_PRE_MASTER_SECRET(pms, pmslen, ssl)) {
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "Under Bleichenbacher attack");
+#endif	/* DEBUG */
+		FAKE_PRE_MASTER_SECRET(pms, pmslen, ssl, buf);
+	}
+
 	return (kssl_tls_PRF(ssl,
 		pms, pmslen,
 		(uchar_t *)TLS_MASTER_SECRET_LABEL,
@@ -941,6 +962,7 @@ kssl_generate_tls_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 		ssl->sid.master_secret,
 		(size_t)sizeof (ssl->sid.master_secret)));
 }
+
 
 static void
 kssl_generate_ssl_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
@@ -952,18 +974,13 @@ kssl_generate_ssl_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 	ms = ssl->sid.master_secret;
 
 	/* if pms is bad fake it to thwart Bleichenbacher attack */
-	if (pms == NULL || pmslen != SSL3_PRE_MASTER_SECRET_LEN ||
-	    pms[0] != ssl->major_version || pms[1] != ssl->minor_version) {
+	if (IS_BAD_PRE_MASTER_SECRET(pms, pmslen, ssl)) {
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "Under Bleichenbacher attack");
 #endif	/* DEBUG */
-		KSSL_COUNTER(bad_pre_master_secret, 1);
-		pms = buf;
-		pmslen = SSL3_PRE_MASTER_SECRET_LEN;
-		pms[0] = ssl->major_version;
-		pms[1] = ssl->minor_version;
-		(void) random_get_pseudo_bytes(&buf[2], pmslen - 2);
+		FAKE_PRE_MASTER_SECRET(pms, pmslen, ssl, buf);
 	}
+
 	kssl_ssl3_key_material_derive_step(ssl, pms, pmslen, 1, ms, 0);
 	kssl_ssl3_key_material_derive_step(ssl, pms, pmslen, 2, ms + hlen, 0);
 	kssl_ssl3_key_material_derive_step(ssl, pms, pmslen, 3, ms + 2 * hlen,
