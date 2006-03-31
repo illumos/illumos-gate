@@ -885,7 +885,7 @@ pci_msix_init(dev_info_t *rdip)
 
 	if (rnumber == 0) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
-		    "no mtaching reg number for offset 0x%x\n", breg));
+		    "no matching reg number for offset 0x%x\n", breg));
 
 		goto fail3;
 	}
@@ -934,6 +934,38 @@ pci_msix_fini(ddi_intr_msix_t *msix_p)
 	kmem_free(msix_p, sizeof (ddi_intr_msix_t));
 }
 
+
+/*
+ * pci_msix_dup:
+ *	This function duplicates the address and data pair of one msi-x
+ *	vector to another msi-x vector.
+ */
+int
+pci_msix_dup(dev_info_t *rdip, int org_inum, int dup_inum)
+{
+	ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+	uint64_t	addr;
+	uint64_t	data;
+	uintptr_t	off;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_dup: dip = %p, inum = 0x%x, "
+	    "to_vector = 0x%x\n", (void *)rdip, org_inum, dup_inum));
+
+	/* Offset into the original inum's entry in the MSI-X table */
+	off = (uintptr_t)msix_p->msix_tbl_addr +
+	    (org_inum * PCI_MSIX_VECTOR_SIZE);
+
+	/* For the MSI-X number passed in, get the "data" and "addr" fields */
+	addr = ddi_get64(msix_p->msix_tbl_hdl,
+	    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET));
+
+	data = ddi_get32(msix_p->msix_tbl_hdl,
+	    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET));
+
+	/* Program new vector with these existing values */
+	return (pci_msi_configure(rdip, DDI_INTR_TYPE_MSIX, 1, dup_inum, addr,
+	    data));
+}
 
 
 /*

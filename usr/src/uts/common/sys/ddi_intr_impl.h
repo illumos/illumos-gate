@@ -87,6 +87,13 @@ typedef struct ddi_intr_handle_impl {
 	void			*ih_cb_arg2;
 
 	/*
+	 * The following 3 members are used to support MSI-X specific features
+	 */
+	uint_t			ih_flags;	/* Misc flags */
+	uint_t			ih_dup_cnt;	/* # of dupped msi-x vectors */
+	struct ddi_intr_handle_impl	*ih_main;
+						/* pntr to the main vector */
+	/*
 	 * The next set of members are for 'scratch' purpose only.
 	 * The DDI interrupt framework uses them internally and their
 	 * interpretation is left to the framework. For now,
@@ -116,6 +123,9 @@ typedef struct ddi_intr_handle_impl {
 
 #define	DDI_INTR_SUP_TYPES	DDI_INTR_TYPE_FIXED|DDI_INTR_TYPE_MSI|\
 				DDI_INTR_TYPE_MSIX
+
+/* values for ih_flags */
+#define	DDI_INTR_MSIX_DUP	0x01	/* MSI-X vector which has been dupped */
 
 struct av_softinfo;
 
@@ -154,8 +164,6 @@ typedef struct ddi_softint_hdl_impl {
  * device. If no MSI-X is enabled then it is NULL
  */
 typedef struct ddi_intr_msix {
-	uint_t			msix_intrs_in_use;	/* MSI-X intrs in use */
-
 	/* MSI-X Table related information */
 	ddi_acc_handle_t	msix_tbl_hdl;		/* MSI-X table handle */
 	uint32_t		*msix_tbl_addr;		/* MSI-X table addr */
@@ -231,6 +239,21 @@ void	i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *);
 	hdlp->ih_cb_func = func; \
 	hdlp->ih_cb_arg1 = arg1; \
 	hdlp->ih_cb_arg2 = arg2;
+
+#ifdef DEBUG
+#define	I_DDI_VERIFY_MSIX_HANDLE(hdlp)					\
+	if ((hdlp->ih_type == DDI_INTR_TYPE_MSIX) && 			\
+	    (hdlp->ih_flags & DDI_INTR_MSIX_DUP)) {			\
+		ASSERT(hdlp->ih_dip == hdlp->ih_main->ih_dip);		\
+		ASSERT(hdlp->ih_type == hdlp->ih_main->ih_type);	\
+		ASSERT(hdlp->ih_vector == hdlp->ih_main->ih_vector);	\
+		ASSERT(hdlp->ih_ver == hdlp->ih_main->ih_ver);		\
+		ASSERT(hdlp->ih_cap == hdlp->ih_main->ih_cap);		\
+		ASSERT(hdlp->ih_pri == hdlp->ih_main->ih_pri);		\
+	}
+#else
+#define	I_DDI_VERIFY_MSIX_HANDLE(hdlp)
+#endif
 
 #else	/* _KERNEL */
 

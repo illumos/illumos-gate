@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +36,7 @@ static int intr_pci_walk_step(mdb_walk_state_t *);
 static int intr_px_walk_step(mdb_walk_state_t *);
 static void intr_pci_print_items(mdb_walk_state_t *);
 static void intr_px_print_items(mdb_walk_state_t *);
-static char *intr_get_intr_type(msiq_rec_type_t);
+static char *intr_get_intr_type(uint16_t type);
 static void intr_print_banner(void);
 
 typedef struct intr_info {
@@ -45,12 +44,12 @@ typedef struct intr_info {
 	uint32_t	inum;
 	uint32_t	num;
 	uint32_t	pil;
+	uint16_t	intr_type;
 	uint16_t	mondo;
 	uint8_t		ino_ino;
 	uint_t		intr_state;
 	int		instance;
 	int		shared;
-	msiq_rec_type_t intr_type;
 	char		driver_name[12];
 	char		pathname[MAXNAMELEN];
 }
@@ -227,7 +226,7 @@ intr_pci_print_items(mdb_walk_state_t *wsp)
 
 			info.instance = devinfo.devi_instance;
 			info.inum = ih.ih_inum;
-			info.intr_type = INTX_REC;
+			info.intr_type = DDI_INTR_TYPE_FIXED;
 			info.num = 0;
 			info.intr_state = ih.ih_intr_state;
 			info.ino_ino = list.ino_ino;
@@ -258,6 +257,7 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 	char			name[MODMAXNAMELEN + 1];
 	struct dev_info		devinfo;
 	intr_info_t		info;
+	devinfo_intr_t		intr_p;
 
 	if (mdb_vread(&px_ib, sizeof (px_ib_t), wsp->walk_addr) == -1) {
 		mdb_warn("intr: failed to read px interrupt block "
@@ -310,7 +310,14 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 
 			info.instance = devinfo.devi_instance;
 			info.inum = px_ih.ih_inum;
-			info.intr_type = px_ih.ih_rec_type;
+
+			/* Read the type used, keep PCIe messages separate */
+			(void) mdb_vread(&intr_p, sizeof (devinfo_intr_t),
+			    (uintptr_t)devinfo.devi_intr_p);
+			if (px_ih.ih_rec_type != MSG_REC) {
+				info.intr_type = intr_p.devi_intr_curr_type;
+			}
+
 			info.num = px_ih.ih_msg_code;
 			info.intr_state = px_ih.ih_intr_state;
 			info.ino_ino = px_list.ino_ino;
@@ -331,17 +338,17 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 }
 
 static char *
-intr_get_intr_type(msiq_rec_type_t rec_type)
+intr_get_intr_type(uint16_t type)
 {
-	switch (rec_type) {
-		case	MSG_REC:
-			return ("PCIe");
-		case	MSI32_REC:
-		case	MSI64_REC:
-			return ("MSI");
-		case	INTX_REC:
-		default:
+	switch (type) {
+		case	DDI_INTR_TYPE_FIXED:
 			return ("Fixed");
+		case	DDI_INTR_TYPE_MSI:
+			return ("MSI");
+		case	DDI_INTR_TYPE_MSIX:
+			return ("MSI-X");
+		default:
+			return ("PCIe");
 	}
 }
 
@@ -370,7 +377,7 @@ intr_print_elements(intr_info_t info)
 		mdb_printf(" %5s\t",
 		    info.shared ? "yes" : "no");
 		mdb_printf(" %s\t", intr_get_intr_type(info.intr_type));
-		if (strcmp("Fixed", intr_get_intr_type(info.intr_type)) == 0) {
+		if (info.intr_type == DDI_INTR_TYPE_FIXED) {
 			mdb_printf("  --- \t");
 		} else {
 			mdb_printf(" %4d\t", info.num);
@@ -390,8 +397,13 @@ intr_print_elements(intr_info_t info)
 		mdb_printf("Inum:\t\t%d\n", info.inum);
 		mdb_printf("Interrupt Type:\t%s\n",
 		    intr_get_intr_type(info.intr_type));
-		if (strcmp("MSI", intr_get_intr_type(info.intr_type)) == 0)
-			mdb_printf("MSI/X Number:\t%s\n", info.num);
+		if (info.intr_type == DDI_INTR_TYPE_MSI) {
+			mdb_printf("MSI Number:\t%d\n", info.num);
+		} else if (info.intr_type == DDI_INTR_TYPE_MSIX) {
+			mdb_printf("MSI-X Number:\t%d\n", info.num);
+		} else if (!info.intr_type) {
+			mdb_printf("PCIe Message #:\t%d\n", info.num);
+		}
 
 		mdb_printf("Shared Intr:\t%s\n",
 		    info.shared ? "yes" : "no");

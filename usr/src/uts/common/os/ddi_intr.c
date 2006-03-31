@@ -37,6 +37,7 @@
 #include <sys/autoconf.h>
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>	/* include prototypes */
+#include <sys/atomic.h>
 
 /*
  * New DDI interrupt framework
@@ -280,10 +281,13 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	tmp_hdl.ih_scratch2 = (void *)(uintptr_t)behavior;
 	tmp_hdl.ih_dip = dip;
 
+	i_ddi_intr_devi_init(dip);
+
 	if (i_ddi_intr_ops(dip, dip, DDI_INTROP_ALLOC,
 	    &tmp_hdl, (void *)actualp) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: allocation "
 		    "failed\n"));
+		i_ddi_intr_devi_fini(dip);
 		return (*actualp ? DDI_EAGAIN : DDI_INTR_NOTFOUND);
 	}
 
@@ -291,7 +295,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	    &tmp_hdl, (void *)&pri)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: get priority "
 		    "failed\n"));
-		return (ret);
+		goto fail;
 	}
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: getting capability\n"));
@@ -300,11 +304,12 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	    &tmp_hdl, (void *)&cap)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: get capability "
 		    "failed\n"));
-		return (ret);
+		goto fail;
 	}
 
-	/* Save current interrupt type, supported and current intr count */
-	i_ddi_intr_devi_init(dip);
+	/*
+	 * Save current interrupt type, supported and current intr count.
+	 */
 	i_ddi_intr_set_current_type(dip, type);
 	i_ddi_intr_set_supported_nintrs(dip, nintrs);
 	i_ddi_intr_set_current_nintrs(dip,
@@ -332,6 +337,13 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	}
 
 	return (DDI_SUCCESS);
+
+fail:
+	(void) i_ddi_intr_ops(tmp_hdl.ih_dip, tmp_hdl.ih_dip,
+	    DDI_INTROP_FREE, &tmp_hdl, NULL);
+	i_ddi_intr_devi_fini(dip);
+
+	return (ret);
 }
 
 
@@ -347,7 +359,10 @@ ddi_intr_free(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
-	if (hdlp->ih_state != DDI_IHDL_STATE_ALLOC) {
+	if (((hdlp->ih_flags & DDI_INTR_MSIX_DUP) &&
+	    (hdlp->ih_state != DDI_IHDL_STATE_ADDED)) ||
+	    ((hdlp->ih_state != DDI_IHDL_STATE_ALLOC) &&
+	    (!(hdlp->ih_flags & DDI_INTR_MSIX_DUP)))) {
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
@@ -357,18 +372,23 @@ ddi_intr_free(ddi_intr_handle_t h)
 
 	rw_exit(&hdlp->ih_rwlock);
 	if (ret == DDI_SUCCESS) {
-		i_ddi_intr_set_current_nintrs(hdlp->ih_dip,
-		    i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1);
+		/* This would be the dup vector */
+		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
+			atomic_dec_32(&hdlp->ih_main->ih_dup_cnt);
+		else {
+			i_ddi_intr_set_current_nintrs(hdlp->ih_dip,
+			    i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1);
 
-		if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
-			i_ddi_intr_devi_fini(hdlp->ih_dip);
-		} else {
-			if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
-				i_ddi_set_intr_handle(hdlp->ih_dip,
-				    hdlp->ih_inum, NULL);
+			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
+				i_ddi_intr_devi_fini(hdlp->ih_dip);
+			} else {
+				if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
+					i_ddi_set_intr_handle(hdlp->ih_dip,
+					    hdlp->ih_inum, NULL);
+			}
+
+			i_ddi_free_intr_phdl(hdlp);
 		}
-
-		i_ddi_free_intr_phdl(hdlp);
 		rw_destroy(&hdlp->ih_rwlock);
 		kmem_free(hdlp, sizeof (ddi_intr_handle_impl_t));
 	}
@@ -619,7 +639,8 @@ ddi_intr_add_handler(ddi_intr_handle_t h, ddi_intr_handler_t inthandler,
 }
 
 int
-ddi_intr_dup_handler(ddi_intr_handle_t org, int vector, ddi_intr_handle_t *dup)
+ddi_intr_dup_handler(ddi_intr_handle_t org, int dup_inum,
+    ddi_intr_handle_t *dup)
 {
 	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)org;
 	ddi_intr_handle_impl_t	*dup_hdlp;
@@ -628,42 +649,42 @@ ddi_intr_dup_handler(ddi_intr_handle_t org, int vector, ddi_intr_handle_t *dup)
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_dup_handler: hdlp = 0x%p\n",
 	    (void *)hdlp));
 
-	/* Do some input argument checking ("dup" is not allocated) */
-	if ((hdlp == NULL) || (dup != NULL))
+	/* Do some input argument checking ("dup" handle is not allocated) */
+	if ((hdlp == NULL) || (*dup != NULL))
 		return (DDI_EINVAL);
 
 	rw_enter(&hdlp->ih_rwlock, RW_READER);
 
 	/* Do some input argument checking */
 	if ((hdlp->ih_state == DDI_IHDL_STATE_ALLOC) ||	/* intr handle alloc? */
-	    (hdlp->ih_type != DDI_INTR_TYPE_MSIX)) {	/* only MSI-X allowed */
+	    (hdlp->ih_type != DDI_INTR_TYPE_MSIX) ||	/* only MSI-X allowed */
+	    (hdlp->ih_flags & DDI_INTR_MSIX_DUP)) {	/* only dup original */
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
 
+	hdlp->ih_scratch1 = dup_inum;
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
-	    DDI_INTROP_DUPVEC, hdlp, (void *)&vector);
+	    DDI_INTROP_DUPVEC, hdlp, NULL);
 
 	if (ret == DDI_SUCCESS) {
 		dup_hdlp = (ddi_intr_handle_impl_t *)
-		    kmem_zalloc(sizeof (ddi_intr_handle_impl_t), KM_SLEEP);
+		    kmem_alloc(sizeof (ddi_intr_handle_impl_t), KM_SLEEP);
 
-		dup = (ddi_intr_handle_t *)dup_hdlp;
+		atomic_add_32(&hdlp->ih_dup_cnt, 1);
+
+		*dup = (ddi_intr_handle_t)dup_hdlp;
+		bcopy(hdlp, dup_hdlp, sizeof (ddi_intr_handle_impl_t));
+
+		/* These fields are unique to each dupped msi-x vector */
 		rw_init(&dup_hdlp->ih_rwlock, NULL, RW_DRIVER, NULL);
-		rw_enter(&dup_hdlp->ih_rwlock, RW_WRITER);
-		dup_hdlp->ih_ver = DDI_INTR_VERSION;
 		dup_hdlp->ih_state = DDI_IHDL_STATE_ADDED;
-		dup_hdlp->ih_dip = hdlp->ih_dip;
-		dup_hdlp->ih_type = hdlp->ih_type;
-		dup_hdlp->ih_pri = hdlp->ih_pri;
-		dup_hdlp->ih_cap = hdlp->ih_cap;
-		dup_hdlp->ih_inum = hdlp->ih_inum;
-		/* What about MSI-X vector */
+		dup_hdlp->ih_inum = dup_inum;
+		dup_hdlp->ih_flags |= DDI_INTR_MSIX_DUP;
+		dup_hdlp->ih_dup_cnt = 0;
 
-		dup_hdlp->ih_cb_func = hdlp->ih_cb_func;
-		dup_hdlp->ih_cb_arg1 = hdlp->ih_cb_arg1;
-		dup_hdlp->ih_cb_arg2 = hdlp->ih_cb_arg2;
-		rw_exit(&dup_hdlp->ih_rwlock);
+		/* Point back to original vector */
+		dup_hdlp->ih_main = hdlp;
 	}
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -674,7 +695,7 @@ int
 ddi_intr_remove_handler(ddi_intr_handle_t h)
 {
 	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)h;
-	int			ret;
+	int			ret = DDI_SUCCESS;
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_remove_handler: hdlp = %p\n",
 	    (void *)hdlp));
@@ -683,9 +704,19 @@ ddi_intr_remove_handler(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
+
 	if (hdlp->ih_state != DDI_IHDL_STATE_ADDED) {
-		rw_exit(&hdlp->ih_rwlock);
-		return (DDI_EINVAL);
+		ret = DDI_EINVAL;
+		goto done;
+	} else if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
+		goto done;
+
+	ASSERT(hdlp->ih_dup_cnt == 0);
+	if (hdlp->ih_dup_cnt > 0) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_remove_handler: MSI-X "
+		    "dup_cnt %d is not 0\n", hdlp->ih_dup_cnt));
+		ret = DDI_FAILURE;
+		goto done;
 	}
 
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
@@ -698,6 +729,7 @@ ddi_intr_remove_handler(ddi_intr_handle_t h)
 		hdlp->ih_cb_arg2 = NULL;
 	}
 
+done:
 	rw_exit(&hdlp->ih_rwlock);
 	return (ret);
 }
@@ -724,6 +756,8 @@ ddi_intr_enable(ddi_intr_handle_t h)
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
+
+	I_DDI_VERIFY_MSIX_HANDLE(hdlp);
 
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_ENABLE, hdlp, NULL);
@@ -754,6 +788,8 @@ ddi_intr_disable(ddi_intr_handle_t h)
 		rw_exit(&hdlp->ih_rwlock);
 		return (DDI_EINVAL);
 	}
+
+	I_DDI_VERIFY_MSIX_HANDLE(hdlp);
 
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_DISABLE, hdlp, NULL);

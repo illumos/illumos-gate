@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,14 +167,12 @@ px_pec_msg_add_intr(px_t *px_p)
 
 	DBG(DBG_MSG, px_p->px_dip, "px_pec_msg_add_intr\n");
 
-	/* Initilize handle */
+	/* Initialize handle */
+	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_cb_func = (ddi_intr_handler_t *)px_err_fabric_intr;
-	hdl.ih_cb_arg1 = NULL;
-	hdl.ih_cb_arg2 = NULL;
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
-	hdl.ih_inum = 0;
 
 	/* Add correctable error message handler */
 	hdl.ih_pri = PX_ERR_LOW_PIL;
@@ -265,11 +262,11 @@ px_pec_msg_rem_intr(px_t *px_p)
 
 	DBG(DBG_MSG, px_p->px_dip, "px_pec_msg_rem_intr: dip 0x%p\n", dip);
 
-	/* Initilize handle */
+	/* Initialize handle */
+	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
-	hdl.ih_inum = 0;
 
 	if (pec_p->pec_corr_msg_msiq_id >= 0) {
 		px_lib_msg_setvalid(dip, PCIE_CORR_MSG, PCIE_MSG_INVALID);

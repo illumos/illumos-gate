@@ -261,7 +261,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (px_lib_dev_init(dip, &dev_hdl) != DDI_SUCCESS)
 			goto err_bad_dev_init;
 
-		/* Initilize device handle */
+		/* Initialize device handle */
 		px_p->px_dev_hdl = dev_hdl;
 
 		/*
@@ -560,15 +560,12 @@ px_pwr_setup(dev_info_t *dip)
 	    DDI_INTR_PRI(px_pwr_pil));
 	cv_init(&px_p->px_l23ready_cv, NULL, CV_DRIVER, NULL);
 
-
-
-	/* Initilize handle */
+	/* Initialize handle */
+	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_cb_arg1 = px_p;
-	hdl.ih_cb_arg2 = NULL;
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
-	hdl.ih_inum = 0;
 	hdl.ih_pri = px_pwr_pil;
 
 	/* Add PME_TO_ACK message handler */
@@ -616,11 +613,11 @@ px_pwr_teardown(dev_info_t *dip)
 	if (!PCIE_PMINFO(dip) || !PCIE_NEXUS_PMINFO(dip))
 		return;
 
-	/* Initilize handle */
+	/* Initialize handle */
+	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
-	hdl.ih_inum = 0;
 
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_INVALID);
 	(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC, PCIE_PME_ACK_MSG,
@@ -1306,12 +1303,8 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			/*
 			 * Double check supported interrupt types vs.
 			 * what the host bridge supports.
-			 *
-			 * NOTE:
-			 * Currently MSI-X is disabled since px driver
-			 * don't fully support this feature.
 			 */
-			*(int *)result |= (intr_types & DDI_INTR_TYPE_MSI);
+			*(int *)result |= intr_types;
 		}
 
 		return (ret);

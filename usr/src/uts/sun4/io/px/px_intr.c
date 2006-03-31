@@ -632,19 +632,52 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		 * based on Resource Management policies.
 		 */
 		if ((ret = px_msi_alloc(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, (int)(uintptr_t)hdlp->ih_scratch2,
-		    &msi_num, (int *)result)) != DDI_SUCCESS) {
-			DBG(DBG_INTROPS, dip, "px_msix_ops: MSI allocation "
-			    "failed, rdip 0x%p inum 0x%x count 0x%x\n",
-			    rdip, hdlp->ih_inum, hdlp->ih_scratch1);
+		    hdlp->ih_scratch1, (uintptr_t)hdlp->ih_scratch2, &msi_num,
+		    (int *)result)) != DDI_SUCCESS) {
+			DBG(DBG_INTROPS, dip, "px_msix_ops: allocation "
+			    "failed, rdip 0x%p type 0x%d inum 0x%x "
+			    "count 0x%x\n", rdip, hdlp->ih_type, hdlp->ih_inum,
+			    hdlp->ih_scratch1);
 
 			return (ret);
+		}
+
+		if ((hdlp->ih_type == DDI_INTR_TYPE_MSIX) &&
+		    (i_ddi_get_msix(rdip) == NULL)) {
+			ddi_intr_msix_t		*msix_p;
+
+			if (msix_p = pci_msix_init(rdip)) {
+				i_ddi_set_msix(rdip, msix_p);
+				break;
+			}
+
+			DBG(DBG_INTROPS, dip, "px_msix_ops: MSI-X allocation "
+			    "failed, rdip 0x%p inum 0x%x\n", rdip,
+			    hdlp->ih_inum);
+
+			(void) px_msi_free(px_p, rdip, hdlp->ih_inum,
+			    hdlp->ih_scratch1);
+
+			return (DDI_FAILURE);
 		}
 
 		break;
 	case DDI_INTROP_FREE:
 		(void) pci_msi_disable_mode(rdip, hdlp->ih_type, hdlp->ih_inum);
 		(void) pci_msi_unconfigure(rdip, hdlp->ih_type, hdlp->ih_inum);
+
+		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+			goto msi_free;
+
+		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
+			break;
+
+		if (((i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1) == 0) &&
+		    (i_ddi_get_msix(rdip))) {
+			pci_msix_fini(i_ddi_get_msix(rdip));
+			i_ddi_set_msix(rdip, NULL);
+		}
+msi_free:
 		(void) px_msi_free(px_p, rdip, hdlp->ih_inum,
 		    hdlp->ih_scratch1);
 		break;
@@ -685,8 +718,11 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		hdlp->ih_vector = msi_num;
 		break;
 	case DDI_INTROP_DUPVEC:
-		DBG(DBG_INTROPS, dip, "px_msix_ops: DupIsr is not supported\n");
-		ret = DDI_ENOTSUP;
+		DBG(DBG_INTROPS, dip, "px_msix_ops: dupisr - inum: %x, "
+		    "new_vector: %x\n", hdlp->ih_inum, hdlp->ih_scratch1);
+
+		ret = pci_msix_dup(hdlp->ih_dip, hdlp->ih_inum,
+		    hdlp->ih_scratch1);
 		break;
 	case DDI_INTROP_REMISR:
 		msi_num = hdlp->ih_vector;
@@ -728,6 +764,9 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
 			return (ret);
 
+		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
+			break;
+
 		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
 		    &msiq_id)) != DDI_SUCCESS)
 			return (ret);
@@ -747,6 +786,9 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if ((ret = px_lib_msi_setvalid(dip, msi_num,
 		    PCI_MSI_INVALID)) != DDI_SUCCESS)
 			return (ret);
+
+		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
+			break;
 
 		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
 		    &msiq_id)) != DDI_SUCCESS)

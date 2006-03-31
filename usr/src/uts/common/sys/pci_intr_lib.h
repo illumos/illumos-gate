@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +51,7 @@ extern	int	pci_msi_get_supported_type(dev_info_t *rdip, int *typesp);
 
 extern  ddi_intr_msix_t	*pci_msix_init(dev_info_t *rdip);
 extern void	pci_msix_fini(ddi_intr_msix_t *msix_p);
+extern int	pci_msix_dup(dev_info_t *rdip, int org_inum, int dup_inum);
 
 extern	int	pci_intx_get_cap(dev_info_t *dip, int *flagsp);
 extern int	pci_intx_set_mask(dev_info_t *dip);
