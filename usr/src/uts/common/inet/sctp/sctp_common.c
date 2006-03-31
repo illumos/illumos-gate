@@ -59,8 +59,10 @@ static void sctp_init_faddr(sctp_t *, sctp_faddr_t *, in6_addr_t *);
 
 /* Set the source address.  Refer to comments in sctp_ire2faddr(). */
 static void
-set_saddr(sctp_t *sctp, sctp_faddr_t *fp, boolean_t v6)
+set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
+	boolean_t v6 = !fp->isv4;
+
 	if (sctp->sctp_bound_to_all) {
 		V6_SET_ZERO(fp->saddr);
 	} else {
@@ -138,7 +140,7 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 		 * address should be marked not reachable so that
 		 * it won't be used to send data.
 		 */
-		set_saddr(sctp, fp, B_FALSE);
+		set_saddr(sctp, fp);
 		goto set_current;
 	}
 
@@ -161,7 +163,7 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 	} else {
 		dprint(2, ("ire2faddr: src addr is not part of assc\n"));
 		/* set the src to the first saddr and hope for the best */
-		set_saddr(sctp, fp, B_TRUE);
+		set_saddr(sctp, fp);
 	}
 
 	/* Cache the IRE */

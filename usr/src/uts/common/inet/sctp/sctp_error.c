@@ -163,7 +163,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	irb_t		*irb;
 	ts_label_t	*tsl;
 	conn_t		*connp;
-	cred_t		*cr;
+	cred_t		*cr = NULL;
 
 	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
 	if (isv4) {
