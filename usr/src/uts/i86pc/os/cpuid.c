@@ -751,8 +751,7 @@ cpuid_pass1(cpu_t *cpu)
 				 */
 				for (i = 1; i < ncpu_per_core; i <<= 1)
 					coreid_shift++;
-				cpi->cpi_coreid =
-				    apic_id & ((1 << coreid_shift) - 1);
+				cpi->cpi_coreid = apic_id >> coreid_shift;
 			} else if (feature & X86_HTT) {
 				/*
 				 * Single-core multi-threaded processors.
