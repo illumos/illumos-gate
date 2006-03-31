@@ -418,11 +418,7 @@ SHA1Final(void *digest, SHA1_CTX *ctx)
 	bzero(ctx, sizeof (*ctx));
 }
 
-#if	defined(__amd64)
-typedef uint64_t sha1word;
-#else
 typedef uint32_t sha1word;
-#endif
 
 /*
  * sparc optimization:
