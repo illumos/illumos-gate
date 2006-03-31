@@ -14523,9 +14523,8 @@ est:
 				if (!canputnext(tcp->tcp_rq))
 					tcp->tcp_rwnd -= seg_len;
 			}
-		} else if (((flags & (TH_PUSH|TH_FIN)) ||
-		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_rq->q_hiwat >> 3) &&
-		    (sqp != NULL)) {
+		} else if ((flags & (TH_PUSH|TH_FIN)) ||
+		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_rq->q_hiwat >> 3) {
 			if (tcp->tcp_rcv_list != NULL) {
 				/*
 				 * Enqueue the new segment first and then
@@ -14565,8 +14564,7 @@ est:
 		 * for a push bit. This provides resiliency against
 		 * implementations that do not correctly generate push bits.
 		 */
-		if ((sqp != NULL) && tcp->tcp_rcv_list != NULL &&
-		    tcp->tcp_push_tid == 0) {
+		if (tcp->tcp_rcv_list != NULL && tcp->tcp_push_tid == 0) {
 			/*
 			 * The connection may be closed at this point, so don't
 			 * do anything for a detached tcp.
