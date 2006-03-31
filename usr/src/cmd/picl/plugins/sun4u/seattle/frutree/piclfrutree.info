@@ -112,13 +112,13 @@ name:/frutree/chassis/PS1
 
 /* chassis fruid prom */
 name:/frutree/chassis/PDB
-	REFNODE power-distribution-board fru WITH name:/platform/i2c@1f,530000/pdb-fru-prom@0,62
+	REFNODE power-distribution-board fru WITH name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
 
 name:/frutree/chassis/PDB/power-distribution-board
 	PROP FRUDataAvailable void r
-	REFPROP _seeprom_source name:/platform/i2c@1f,530000/pdb-fru-prom@0,62
+	REFPROP _seeprom_source name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
 
-name:/platform/i2c@1f,530000/pdb-fru-prom@0,62
+name:/platform/i2c@1f,530000/pdb-fru-prom@0,32
 	REFPROP _fru_parent /frutree/chassis/PDB/power-distribution-board
 
 #include "system-board.info"

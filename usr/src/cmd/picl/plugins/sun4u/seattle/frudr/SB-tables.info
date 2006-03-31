@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,6 +214,14 @@ name:/frutree/chassis/PDB
 	PROP Class string r 0 "temperature-sensor"
 	REFPROP _temperature-sensor_ name:RMCLOMV/pdb_t_disk
 	ENDROW
+	ROW
+	PROP Class string r 0 "temperature-sensor"
+	REFPROP _temperature-sensor_ name:RMCLOMV/pdb_t_ps0
+	ENDROW
+	ROW
+	PROP Class string r 0 "temperature-sensor"
+	REFPROP _temperature-sensor_ name:RMCLOMV/pdb_t_ps1
+	ENDROW
 	ENDTABLE
 
 /*
@@ -259,6 +267,10 @@ name:RMCLOMV/chassis_serial_number
 	REFPROP _fru_parent name:/frutree/chassis
 	PROP Label string r 0 "CHASSISSERIAL"
 name:RMCLOMV/pdb_t_disk
+	REFPROP _fru_parent name:/frutree/chassis/PDB/power-distribution-board
+name:RMCLOMV/pdb_t_ps0
+	REFPROP _fru_parent name:/frutree/chassis/PDB/power-distribution-board
+name:RMCLOMV/pdb_t_ps1
 	REFPROP _fru_parent name:/frutree/chassis/PDB/power-distribution-board
 name:RMCLOMV/fiob_t_amb
 	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/FIOB/front-io-board-1

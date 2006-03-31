@@ -335,6 +335,19 @@ name:/frutree/chassis/MB/system-board/FIOB/front-io-board-2
 	    ENDNODE
 	ENDNODE
 
+/*
+ * PDB nodes for 1U and 2U. Note that we should have only one of these
+ * two nodes for each platform (1U/2U).
+ */
+name:/frutree/chassis/PDB/power-distribution-board
+	REFNODE FT6 location WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+	REFNODE HDDFB location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+
+name:/frutree/chassis/PDB/power-distribution-board/HDDFB
+	PROP Label string r 0 "HDDFB"
+	NODE fan-connector-board fru
+	ENDNODE
+
 /* 
  * Add dvdrom fru nodes for disks which are present
  */
@@ -400,10 +413,10 @@ name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD2
 name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD3
 	REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@3,0
 
-/*
- * System Fans 1U
- */
 
+/*
+ * System Fans for Seattle 1U
+ */
 #ifndef FCB0_1U
 #define FCB0_1U /frutree/chassis/MB/system-board/FIOB/front-io-board-1/FCB0/fan-connector-board
 #endif
@@ -412,126 +425,138 @@ name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/HDD3
 #define FCB1_1U /frutree/chassis/MB/system-board/FIOB/front-io-board-1/FCB1/fan-connector-board
 #endif
 
-name:FCB0_1U
-NODE FT0 location
-    PROP Label string r 0 "FT0"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-name:FCB0_1U
-NODE FT1 location
-    PROP Label string r 0 "FT1"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-name:FCB0_1U
-NODE FT2 location
-    PROP Label string r 0 "FT2"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-name:FCB1_1U
-NODE FT3 location
-    PROP Label string r 0 "FT3"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-name:FCB1_1U
-NODE FT4 location
-    PROP Label string r 0 "FT4"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-name:FCB1_1U
-NODE FT5 location
-    PROP Label string r 0 "FT5"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-	NODE F1 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F1"
-	ENDNODE
-    ENDNODE
-ENDNODE
-
-/* populate fan locations with fans which are present */
-name:FCB0_1U/FT0/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft0_f0
-name:FCB0_1U/FT0/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft0_f1
-name:FCB0_1U/FT1/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft1_f0
-name:FCB0_1U/FT1/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft1_f1
-name:FCB0_1U/FT2/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft2_f0
-name:FCB0_1U/FT2/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft2_f1
-name:FCB1_1U/FT3/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft3_f0
-name:FCB1_1U/FT3/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft3_f1
-name:FCB1_1U/FT4/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft4_f0
-name:FCB1_1U/FT4/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft4_f1
-name:FCB1_1U/FT5/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft5_f0
-name:FCB1_1U/FT5/fan-tray/F1
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft5_f1
+#ifndef PDB_1U
+#define PDB_1U /frutree/chassis/PDB/power-distribution-board
+#endif
 
 /*
- * System Fans 2U
+ * As per FSD rev 0.19, in Seattle 1U, two fans are integrated into
+ * a single assembly and share a connector. We assume therefore that
+ * every fan tray in Seattle 1U contains both fans, so the presence
+ * of either fan node (under RMCLOMV) is indicative of the presence
+ * of the containing fan tray. In other words, either we have the
+ * fan tray with both fans present, or we have no fan tray at all.
  */
+name:FCB0_1U
+    NODE FT0 location
+	PROP Label string r 0 "FT0"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft0_f0
+    ENDNODE
+    NODE FT1 location
+	PROP Label string r 0 "FT1"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft1_f0
+    ENDNODE
+    NODE FT2 location
+	PROP Label string r 0 "FT2"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft2_f0
+    ENDNODE
 
+name:FCB1_1U
+    NODE FT3 location
+	PROP Label string r 0 "FT3"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft3_f0
+    ENDNODE
+    NODE FT4 location
+	PROP Label string r 0 "FT4"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft4_f0
+    ENDNODE
+    NODE FT5 location
+	PROP Label string r 0 "FT5"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft5_f0
+    ENDNODE
+
+name:PDB_1U/FT6
+    PROP Label string r 0 "FT6"
+    PROP SlotType string r 0 "fan-tray"
+    REFNODE fan-tray fru WITH name:RMCLOMV/pdb_ft6_f0
+
+/*
+ * Create fan nodes for Seattle 1U
+ *
+ * Note that although we could create the F0 and F1 nodes on each
+ * tray conditionally, based on the ftN_f0 and ftN_f1 rmclomv nodes,
+ * it won't add any value; we've already based the creation of the
+ * fan-tray node to the existence of ftN_f0.
+ */
+name:FCB0_1U/FT0/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB0_1U/FT1/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB0_1U/FT2/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT3/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT4/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:FCB1_1U/FT5/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+name:PDB_1U/FT6/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
+
+/*
+ * System Fans for Seattle 2U
+ */
 #ifndef FCB0_2U
 #define FCB0_2U /frutree/chassis/MB/system-board/FIOB/front-io-board-2/FCB0/fan-connector-board
 #endif
@@ -540,85 +565,103 @@ name:FCB1_1U/FT5/fan-tray/F1
 #define FCB1_2U /frutree/chassis/MB/system-board/FIOB/front-io-board-2/FCB1/fan-connector-board
 #endif
 
-name:FCB0_2U
-NODE FT0 location
-    PROP Label string r 0 "FT0"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
-    ENDNODE
-ENDNODE
+#ifndef PDB_2U
+#define PDB_2U /frutree/chassis/PDB/power-distribution-board/HDDFB/fan-connector-board
+#endif
 
+/*
+ * In Seattle 2U, each fan assembly has only one fan (except for the pdb),
+ * so the presence of f0 is indicative of the presence of the fan tray.
+ */
 name:FCB0_2U
-NODE FT1 location
-    PROP Label string r 0 "FT1"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
+    NODE FT0 location
+	PROP Label string r 0 "FT0"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft0_f0
     ENDNODE
-ENDNODE
-
-name:FCB0_2U
-NODE FT2 location
-    PROP Label string r 0 "FT2"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
+    NODE FT1 location
+	PROP Label string r 0 "FT1"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft1_f0
     ENDNODE
-ENDNODE
+    NODE FT2 location
+	PROP Label string r 0 "FT2"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft2_f0
+    ENDNODE
 
 name:FCB1_2U
-NODE FT3 location
-    PROP Label string r 0 "FT3"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
+    NODE FT3 location
+	PROP Label string r 0 "FT3"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft3_f0
     ENDNODE
-ENDNODE
-
-name:FCB1_2U
-NODE FT4 location
-    PROP Label string r 0 "FT4"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
+    NODE FT4 location
+	PROP Label string r 0 "FT4"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft4_f0
     ENDNODE
-ENDNODE
-
-name:FCB1_2U
-NODE FT5 location
-    PROP Label string r 0 "FT5"
-    NODE fan-tray fru
-	NODE F0 location
-	    PROP SlotType string r 0 "fan-unit"
-    	    PROP Label string r 0 "F0"
-	ENDNODE
+    NODE FT5 location
+	PROP Label string r 0 "FT5"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/ft5_f0
     ENDNODE
-ENDNODE
 
-/* populate fan locations with fans which are present */
-name:FCB0_2U/FT0/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft0_f0
-name:FCB0_2U/FT1/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft1_f0
-name:FCB0_2U/FT2/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft2_f0
-name:FCB1_2U/FT3/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft3_f0
-name:FCB1_2U/FT4/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft4_f0
-name:FCB1_2U/FT5/fan-tray/F0
-	REFNODE fan-unit fru WITH name:RMCLOMV/ft5_f0
+name:PDB_2U
+    NODE FT6 location
+	PROP Label string r 0 "FT6"
+	PROP SlotType string r 0 "fan-tray"
+	REFNODE fan-tray fru WITH name:RMCLOMV/pdb_hddfb_ft6_f0
+    ENDNODE
+
+/*
+ * Create fan nodes for Seattle 2U
+ */
+name:FCB0_2U/FT0/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB0_2U/FT1/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB0_2U/FT2/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT3/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT4/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:FCB1_2U/FT5/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+
+name:PDB_2U/FT6/fan-tray
+    NODE F0 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F0"
+    ENDNODE
+    NODE F1 location
+	PROP SlotType string r 0 "fan-unit"
+	PROP Label string r 0 "F1"
+    ENDNODE
 
 /*
  * PCI Riser Card Right
