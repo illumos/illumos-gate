@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,11 +79,13 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	volatile uint64_t	mondo_vector;
 	int32_t			r_upaid = -1;
 	int32_t			slave = 0;
-	int32_t			upa_portid;
+	int32_t			portid;
 	int			len, ret;
 
-	if ((upa_portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1) {
+	if (((portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1) ||
+	    ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "portid", -1)) != -1)) {
 		if (ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "upa-interrupt-slave", 0) != 0) {
 
@@ -94,9 +95,9 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 		/*
 		 * Translate the interrupt property by stuffing in the
-		 * portid for those devices which have a upa-portid.
+		 * portid for those devices which have a portid.
 		 */
-		hdlp->ih_vector |= (UPAID_TO_IGN(upa_portid) << 6);
+		hdlp->ih_vector |= (UPAID_TO_IGN(portid) << 6);
 	}
 
 	/*
@@ -156,16 +157,18 @@ int
 rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	int32_t		upa_portid;
+	int32_t		portid;
 	int		len;
 
-	if ((upa_portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1) {
+	if (((portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1) ||
+	    ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "portid", -1)) != -1)) {
 		/*
 		 * Translate the interrupt property by stuffing in the
-		 * portid for those devices which have a upa-portid.
+		 * portid for those devices which have a portid.
 		 */
-		hdlp->ih_vector |= (UPAID_TO_IGN(upa_portid) << 6);
+		hdlp->ih_vector |= (UPAID_TO_IGN(portid) << 6);
 	}
 
 	/*
