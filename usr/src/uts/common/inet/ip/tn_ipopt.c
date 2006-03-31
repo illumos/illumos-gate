@@ -1433,7 +1433,7 @@ tsol_option_set(uchar_t **opts, uint_t *optlen, uint_t labellen,
 		/* need more room */
 		newopts = (uchar_t *)mi_alloc(newlen, BPRI_HI);
 		if (newopts == NULL)
-			return (ENOMEM);
+			return (B_FALSE);
 		/*
 		 * The supplied *opts can't be NULL in this case,
 		 * since there's an existing label.
@@ -1465,5 +1465,5 @@ tsol_option_set(uchar_t **opts, uint_t *optlen, uint_t labellen,
 	}
 
 	*optlen = newlen;
-	return (0);
+	return (B_TRUE);
 }
