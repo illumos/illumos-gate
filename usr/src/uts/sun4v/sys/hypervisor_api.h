@@ -129,8 +129,6 @@ extern "C" {
 #define	MMU_STAT_AREA		0xfc
 #endif /* SET_MMU_STATS */
 
-#define	HV_NCS_REQUEST		0x110
-
 #define	HV_RA2PA		0x200
 #define	HV_HPRIV		0x201
 

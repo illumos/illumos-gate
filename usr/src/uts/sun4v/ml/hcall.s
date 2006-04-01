@@ -201,11 +201,6 @@ hv_mach_desc(uint64_t buffer_ra, uint64_t *buffer_sizep)
 	
 /*ARGSUSED*/	
 uint64_t
-hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
-{ return (0); }
-
-/*ARGSUSED*/	
-uint64_t
 hv_ra2pa(uint64_t ra)
 { return (0); }
 
@@ -667,16 +662,6 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	retl
 	stx   %o1, [%o4]
 	SET_SIZE(hv_mach_desc)
-
-	/*
-	 * hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
-	 */
-	ENTRY(hv_ncs_request)
-	mov	HV_NCS_REQUEST, %o5
-	ta	FAST_TRAP
-	retl
-	nop
-	SET_SIZE(hv_ncs_request)
 
 	/*
 	 * hv_ra2pa(uint64_t ra)

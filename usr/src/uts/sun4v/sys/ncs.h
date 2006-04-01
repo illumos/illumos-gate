@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,15 @@
 extern "C" {
 #endif
 
+/*
+ * NCS HV API versioni definitions.
+ */
+#define	NCS_MAJOR_VER		1
+#define	NCS_MINOR_VER		0
+
+#define	HV_NCS_REQUEST		0x110
+
+#ifndef _ASM
 /* Forward typedefs */
 typedef union ma_ctl		ma_ctl_t;
 typedef union ma_mpa		ma_mpa_t;
@@ -54,6 +62,7 @@ union ma_ctl {
 		uint64_t	length:6;
 	} bits;
 };
+#endif	/* !_ASM */
 
 /* Values for ma_ctl operation field */
 #define	MA_OP_LOAD		0x0
@@ -93,7 +102,7 @@ union ma_ma {
 	} bits;
 };
 
-#endif	/* _ASM */
+#endif	/* !_ASM */
 
 
 /*
@@ -102,7 +111,7 @@ union ma_ma {
 
 #ifndef _ASM
 #include <sys/mutex.h>
-#endif	/* _ASM */
+#endif	/* !_ASM */
 
 /*
  * NCS API definitions
@@ -128,6 +137,7 @@ union ma_ma {
 #define	NCS_SYNC	0
 #define	NCS_ASYNC	1
 
+#ifndef _ASM
 typedef struct ncs_qconf_arg {
 	uint64_t	nq_mid;
 	uint64_t	nq_base;
@@ -141,7 +151,6 @@ typedef struct ncs_qtail_update_arg {
 	uint64_t	nu_syncflag;
 } ncs_qtail_update_arg_t;
 
-#ifndef _ASM
 /*
  * The interface to the MAU is via the following data structures. The
  * structure consists of a copy of all relevant registers required to perform
@@ -179,9 +188,9 @@ typedef struct ncs_hvdesc {
 #define	NCS_HVDESC_SIZE_EXPECTED	(1 << NCS_HVDESC_SHIFT)
 #define	NCS_HVDESC_SIZE_ACTUAL		(sizeof (ncs_hvdesc_t))
 
-#endif	/* _ASM */
-
 extern uint64_t hv_ncs_request(int, uint64_t, size_t);
+
+#endif	/* !_ASM */
 
 #ifdef	__cplusplus
 }
