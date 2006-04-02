@@ -128,7 +128,7 @@ zio_checksum_error(zio_t *zio)
 	    BP_GET_CHECKSUM(bp);
 	int byteswap = BP_SHOULD_BYTESWAP(bp);
 	void *data = zio->io_data;
-	uint64_t size = zio->io_size;
+	uint64_t size = ZIO_GET_IOSIZE(zio);
 	zio_block_tail_t *zbt = (zio_block_tail_t *)((char *)data + size) - 1;
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 	zio_cksum_t actual_cksum, expected_cksum;

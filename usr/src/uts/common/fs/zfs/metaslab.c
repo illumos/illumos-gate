@@ -161,18 +161,18 @@ metaslab_group_destroy(metaslab_group_t *mg)
 	kmem_free(mg, sizeof (metaslab_group_t));
 }
 
-void
-metaslab_group_add(metaslab_group_t *mg, metaslab_t *msp, uint64_t weight)
+static void
+metaslab_group_add(metaslab_group_t *mg, metaslab_t *msp)
 {
 	mutex_enter(&mg->mg_lock);
 	ASSERT(msp->ms_group == NULL);
 	msp->ms_group = mg;
-	msp->ms_weight = weight;
+	msp->ms_weight = 0;
 	avl_add(&mg->mg_metaslab_tree, msp);
 	mutex_exit(&mg->mg_lock);
 }
 
-void
+static void
 metaslab_group_remove(metaslab_group_t *mg, metaslab_t *msp)
 {
 	mutex_enter(&mg->mg_lock);
@@ -182,9 +182,11 @@ metaslab_group_remove(metaslab_group_t *mg, metaslab_t *msp)
 	mutex_exit(&mg->mg_lock);
 }
 
-void
+static void
 metaslab_group_sort(metaslab_group_t *mg, metaslab_t *msp, uint64_t weight)
 {
+	ASSERT(MUTEX_HELD(&msp->ms_lock));
+
 	mutex_enter(&mg->mg_lock);
 	ASSERT(msp->ms_group == mg);
 	avl_remove(&mg->mg_metaslab_tree, msp);
@@ -195,277 +197,32 @@ metaslab_group_sort(metaslab_group_t *mg, metaslab_t *msp, uint64_t weight)
 
 /*
  * ==========================================================================
- * Metaslabs
+ * The first-fit block allocator
  * ==========================================================================
  */
-void
-metaslab_init(metaslab_group_t *mg, space_map_obj_t *smo, metaslab_t **mspp,
-	uint64_t start, uint64_t size, uint64_t txg)
+static void
+metaslab_ff_load(space_map_t *sm)
 {
-	vdev_t *vd = mg->mg_vd;
-	metaslab_t *msp;
-	int fm;
-
-	msp = kmem_zalloc(sizeof (metaslab_t), KM_SLEEP);
-
-	msp->ms_smo = smo;
-
-	space_map_create(&msp->ms_map, start, size, vd->vdev_ashift,
-	    &msp->ms_lock);
-
-	for (fm = 0; fm < TXG_SIZE; fm++) {
-		space_map_create(&msp->ms_allocmap[fm], start, size,
-		    vd->vdev_ashift, &msp->ms_lock);
-		space_map_create(&msp->ms_freemap[fm], start, size,
-		    vd->vdev_ashift, &msp->ms_lock);
-	}
-
-	/*
-	 * If we're opening an existing pool (txg == 0) or creating
-	 * a new one (txg == TXG_INITIAL), all space is available now.
-	 * If we're adding space to an existing pool, the new space
-	 * does not become available until after this txg has synced.
-	 * We enforce this by assigning an initial weight of 0 to new space.
-	 *
-	 * (Transactional allocations for this txg would actually be OK;
-	 * it's intent log allocations that cause trouble.  If we wrote
-	 * a log block in this txg and lost power, the log replay would be
-	 * based on the DVA translations that had been synced in txg - 1.
-	 * Those translations would not include this metaslab's vdev.)
-	 */
-	metaslab_group_add(mg, msp, txg > TXG_INITIAL ? 0 : size);
-
-	if (txg == 0) {
-		/*
-		 * We're opening the pool.  Make the metaslab's
-		 * free space available immediately.
-		 */
-		vdev_space_update(vd, size, smo->smo_alloc);
-		metaslab_sync_done(msp, 0);
-	} else {
-		/*
-		 * We're adding a new metaslab to an already-open pool.
-		 * Declare all of the metaslab's space to be free.
-		 *
-		 * Note that older transaction groups cannot allocate
-		 * from this metaslab until its existence is committed,
-		 * because we set ms_last_alloc to the current txg.
-		 */
-		smo->smo_alloc = 0;
-		msp->ms_usable_space = size;
-		mutex_enter(&msp->ms_lock);
-		space_map_add(&msp->ms_map, start, size);
-		msp->ms_map_incore = 1;
-		mutex_exit(&msp->ms_lock);
-
-		/* XXX -- we'll need a call to picker_init here */
-		msp->ms_dirty[txg & TXG_MASK] |= MSD_ADD;
-		msp->ms_last_alloc = txg;
-		vdev_dirty(vd, VDD_ADD, txg);
-		(void) txg_list_add(&vd->vdev_ms_list, msp, txg);
-	}
-
-	*mspp = msp;
+	ASSERT(sm->sm_ppd == NULL);
+	sm->sm_ppd = kmem_zalloc(64 * sizeof (uint64_t), KM_SLEEP);
 }
 
-void
-metaslab_fini(metaslab_t *msp)
+static void
+metaslab_ff_unload(space_map_t *sm)
 {
-	int fm;
-	metaslab_group_t *mg = msp->ms_group;
-
-	vdev_space_update(mg->mg_vd, -msp->ms_map.sm_size,
-	    -msp->ms_smo->smo_alloc);
-
-	metaslab_group_remove(mg, msp);
-
-	/* XXX -- we'll need a call to picker_fini here */
-
-	mutex_enter(&msp->ms_lock);
-
-	space_map_vacate(&msp->ms_map, NULL, NULL);
-	msp->ms_map_incore = 0;
-	space_map_destroy(&msp->ms_map);
-
-	for (fm = 0; fm < TXG_SIZE; fm++) {
-		space_map_destroy(&msp->ms_allocmap[fm]);
-		space_map_destroy(&msp->ms_freemap[fm]);
-	}
-
-	mutex_exit(&msp->ms_lock);
-
-	kmem_free(msp, sizeof (metaslab_t));
+	kmem_free(sm->sm_ppd, 64 * sizeof (uint64_t));
+	sm->sm_ppd = NULL;
 }
 
-/*
- * Write a metaslab to disk in the context of the specified transaction group.
- */
-void
-metaslab_sync(metaslab_t *msp, uint64_t txg)
-{
-	vdev_t *vd = msp->ms_group->mg_vd;
-	spa_t *spa = vd->vdev_spa;
-	objset_t *os = spa->spa_meta_objset;
-	space_map_t *allocmap = &msp->ms_allocmap[txg & TXG_MASK];
-	space_map_t *freemap = &msp->ms_freemap[txg & TXG_MASK];
-	space_map_t *freed_map = &msp->ms_freemap[TXG_CLEAN(txg) & TXG_MASK];
-	space_map_obj_t *smo = msp->ms_smo;
-	uint8_t *dirty = &msp->ms_dirty[txg & TXG_MASK];
-	uint64_t alloc_delta;
-	dmu_buf_t *db;
-	dmu_tx_t *tx;
-
-	dprintf("%s offset %llx\n", vdev_description(vd), msp->ms_map.sm_start);
-
-	mutex_enter(&msp->ms_lock);
-
-	if (*dirty & MSD_ADD)
-		vdev_space_update(vd, msp->ms_map.sm_size, 0);
-
-	if (*dirty & (MSD_ALLOC | MSD_FREE)) {
-		tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
-
-		if (smo->smo_object == 0) {
-			ASSERT(smo->smo_objsize == 0);
-			ASSERT(smo->smo_alloc == 0);
-			smo->smo_object = dmu_object_alloc(os,
-			    DMU_OT_SPACE_MAP, 1 << SPACE_MAP_BLOCKSHIFT,
-			    DMU_OT_SPACE_MAP_HEADER, sizeof (*smo), tx);
-			ASSERT(smo->smo_object != 0);
-			dmu_write(os, vd->vdev_ms_array, sizeof (uint64_t) *
-			    (msp->ms_map.sm_start >> vd->vdev_ms_shift),
-			    sizeof (uint64_t), &smo->smo_object, tx);
-		}
-
-		alloc_delta = allocmap->sm_space - freemap->sm_space;
-		vdev_space_update(vd, 0, alloc_delta);
-		smo->smo_alloc += alloc_delta;
-
-		if (msp->ms_last_alloc == txg && msp->ms_map.sm_space == 0 &&
-		    (*dirty & MSD_CONDENSE) == 0) {
-			space_map_t *sm = &msp->ms_map;
-			space_map_t *tsm;
-			int i;
-
-			ASSERT(msp->ms_map_incore);
-
-			space_map_merge(freemap, freed_map);
-			space_map_vacate(allocmap, NULL, NULL);
-
-			/*
-			 * Write out the current state of the allocation
-			 * world.  The current metaslab is full, minus
-			 * stuff that's been freed this txg (freed_map),
-			 * minus allocations from txgs in the future.
-			 */
-			space_map_add(sm, sm->sm_start, sm->sm_size);
-			for (i = 1; i < TXG_CONCURRENT_STATES; i++) {
-				tsm = &msp->ms_allocmap[(txg + i) & TXG_MASK];
-				space_map_iterate(tsm, space_map_remove, sm);
-			}
-			space_map_iterate(freed_map, space_map_remove, sm);
-
-			space_map_write(sm, smo, os, tx);
-
-			ASSERT(sm->sm_space == 0);
-			ASSERT(freemap->sm_space == 0);
-			ASSERT(allocmap->sm_space == 0);
-
-			*dirty |= MSD_CONDENSE;
-		} else {
-			space_map_sync(allocmap, NULL, smo, SM_ALLOC, os, tx);
-			space_map_sync(freemap, freed_map, smo, SM_FREE,
-			    os, tx);
-		}
-
-		VERIFY(0 == dmu_bonus_hold(os, smo->smo_object, FTAG, &db));
-		dmu_buf_will_dirty(db, tx);
-		ASSERT3U(db->db_size, ==, sizeof (*smo));
-		bcopy(smo, db->db_data, db->db_size);
-		dmu_buf_rele(db, FTAG);
-
-		dmu_tx_commit(tx);
-	}
-
-	*dirty &= ~(MSD_ALLOC | MSD_FREE | MSD_ADD);
-
-	mutex_exit(&msp->ms_lock);
-
-	(void) txg_list_add(&vd->vdev_ms_list, msp, TXG_CLEAN(txg));
-}
-
-/*
- * Called after a transaction group has completely synced to mark
- * all of the metaslab's free space as usable.
- */
-void
-metaslab_sync_done(metaslab_t *msp, uint64_t txg)
-{
-	uint64_t weight;
-	uint8_t *dirty = &msp->ms_dirty[txg & TXG_MASK];
-	space_map_obj_t *smo = msp->ms_smo;
-
-	dprintf("%s offset %llx txg %llu\n",
-	    vdev_description(msp->ms_group->mg_vd), msp->ms_map.sm_start, txg);
-
-	mutex_enter(&msp->ms_lock);
-
-	ASSERT3U((*dirty & (MSD_ALLOC | MSD_FREE | MSD_ADD)), ==, 0);
-
-	msp->ms_usable_space = msp->ms_map.sm_size - smo->smo_alloc;
-	msp->ms_usable_end = smo->smo_objsize;
-
-	weight = msp->ms_usable_space;
-
-	if (txg != 0) {
-		space_map_t *freed_map =
-		    &msp->ms_freemap[TXG_CLEAN(txg) & TXG_MASK];
-
-		/* XXX -- we'll need a call to picker_fini here */
-
-		/* If we're empty, don't bother sticking around */
-		if (msp->ms_usable_space == 0) {
-			space_map_vacate(&msp->ms_map, NULL, NULL);
-			msp->ms_map_incore = 0;
-			ASSERT3U(freed_map->sm_space, ==, 0);
-			weight = 0;
-		} else {
-			/* Add the freed blocks to the available space map */
-			if (msp->ms_map_incore)
-				space_map_merge(freed_map, &msp->ms_map);
-			else
-				space_map_vacate(freed_map, NULL, NULL);
-			weight += msp->ms_map.sm_size;
-		}
-
-		if (msp->ms_last_alloc == txg)
-			/* Safe to use for allocation now */
-			msp->ms_last_alloc = 0;
-
-		*dirty = 0;
-	}
-
-	mutex_exit(&msp->ms_lock);
-
-	metaslab_group_sort(msp->ms_group, msp, weight);
-}
-
-/*
- * The first-fit block picker.  No picker_init or picker_fini,
- * this is just an experiment to see how it feels to separate out
- * the block selection policy from the map updates.
- * Note: the 'cursor' argument is a form of PPD.
- */
 static uint64_t
-metaslab_pick_block(space_map_t *sm, uint64_t size, uint64_t *cursor)
+metaslab_ff_alloc(space_map_t *sm, uint64_t size)
 {
 	avl_tree_t *t = &sm->sm_root;
 	uint64_t align = size & -size;
+	uint64_t *cursor = (uint64_t *)sm->sm_ppd + highbit(align) - 1;
 	space_seg_t *ss, ssearch;
 	avl_index_t where;
-	int tried_once = 0;
 
-again:
 	ssearch.ss_start = *cursor;
 	ssearch.ss_end = *cursor + size;
 
@@ -483,35 +240,351 @@ again:
 		ss = AVL_NEXT(t, ss);
 	}
 
-	/* If we couldn't find a block after cursor, search again */
-	if (tried_once == 0) {
-		tried_once = 1;
-		*cursor = 0;
-		goto again;
-	}
+	/*
+	 * If we know we've searched the whole map (*cursor == 0), give up.
+	 * Otherwise, reset the cursor to the beginning and try again.
+	 */
+	if (*cursor == 0)
+		return (-1ULL);
 
-	return (-1ULL);
+	*cursor = 0;
+	return (metaslab_ff_alloc(sm, size));
 }
 
+/* ARGSUSED */
+static void
+metaslab_ff_claim(space_map_t *sm, uint64_t start, uint64_t size)
+{
+	/* No need to update cursor */
+}
+
+/* ARGSUSED */
+static void
+metaslab_ff_free(space_map_t *sm, uint64_t start, uint64_t size)
+{
+	/* No need to update cursor */
+}
+
+static space_map_ops_t metaslab_ff_ops = {
+	metaslab_ff_load,
+	metaslab_ff_unload,
+	metaslab_ff_alloc,
+	metaslab_ff_claim,
+	metaslab_ff_free
+};
+
+/*
+ * ==========================================================================
+ * Metaslabs
+ * ==========================================================================
+ */
+metaslab_t *
+metaslab_init(metaslab_group_t *mg, space_map_obj_t *smo,
+	uint64_t start, uint64_t size, uint64_t txg)
+{
+	vdev_t *vd = mg->mg_vd;
+	metaslab_t *msp;
+
+	msp = kmem_zalloc(sizeof (metaslab_t), KM_SLEEP);
+
+	msp->ms_smo_syncing = *smo;
+
+	/*
+	 * We create the main space map here, but we don't create the
+	 * allocmaps and freemaps until metaslab_sync_done().  This serves
+	 * two purposes: it allows metaslab_sync_done() to detect the
+	 * addition of new space; and for debugging, it ensures that we'd
+	 * data fault on any attempt to use this metaslab before it's ready.
+	 */
+	space_map_create(&msp->ms_map, start, size,
+	    vd->vdev_ashift, &msp->ms_lock);
+
+	metaslab_group_add(mg, msp);
+
+	/*
+	 * If we're opening an existing pool (txg == 0) or creating
+	 * a new one (txg == TXG_INITIAL), all space is available now.
+	 * If we're adding space to an existing pool, the new space
+	 * does not become available until after this txg has synced.
+	 */
+	if (txg <= TXG_INITIAL)
+		metaslab_sync_done(msp, 0);
+
+	if (txg != 0) {
+		/*
+		 * The vdev is dirty, but the metaslab isn't -- it just needs
+		 * to have metaslab_sync_done() invoked from vdev_sync_done().
+		 * [We could just dirty the metaslab, but that would cause us
+		 * to allocate a space map object for it, which is wasteful
+		 * and would mess up the locality logic in metaslab_weight().]
+		 */
+		ASSERT(TXG_CLEAN(txg) == spa_last_synced_txg(vd->vdev_spa));
+		vdev_dirty(vd, 0, NULL, txg);
+		vdev_dirty(vd, VDD_METASLAB, msp, TXG_CLEAN(txg));
+	}
+
+	return (msp);
+}
+
+void
+metaslab_fini(metaslab_t *msp)
+{
+	metaslab_group_t *mg = msp->ms_group;
+	int t;
+
+	vdev_space_update(mg->mg_vd, -msp->ms_map.sm_size,
+	    -msp->ms_smo.smo_alloc);
+
+	metaslab_group_remove(mg, msp);
+
+	mutex_enter(&msp->ms_lock);
+
+	space_map_unload(&msp->ms_map);
+	space_map_destroy(&msp->ms_map);
+
+	for (t = 0; t < TXG_SIZE; t++) {
+		space_map_destroy(&msp->ms_allocmap[t]);
+		space_map_destroy(&msp->ms_freemap[t]);
+	}
+
+	mutex_exit(&msp->ms_lock);
+
+	kmem_free(msp, sizeof (metaslab_t));
+}
+
+#define	METASLAB_ACTIVE_WEIGHT	(1ULL << 63)
+
 static uint64_t
-metaslab_getblock(metaslab_t *msp, uint64_t size, uint64_t txg)
+metaslab_weight(metaslab_t *msp)
 {
 	space_map_t *sm = &msp->ms_map;
+	space_map_obj_t *smo = &msp->ms_smo;
 	vdev_t *vd = msp->ms_group->mg_vd;
-	uint64_t offset;
+	uint64_t weight, space;
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
-	ASSERT(msp->ms_map_incore);
-	ASSERT(sm->sm_space != 0);
-	ASSERT(P2PHASE(size, 1ULL << vd->vdev_ashift) == 0);
 
-	offset = metaslab_pick_block(sm, size,
-	    &msp->ms_map_cursor[highbit(size & -size) - vd->vdev_ashift - 1]);
-	if (offset != -1ULL) {
-		space_map_remove(sm, offset, size);
-		space_map_add(&msp->ms_allocmap[txg & TXG_MASK], offset, size);
+	/*
+	 * The baseline weight is the metaslab's free space.
+	 */
+	space = sm->sm_size - smo->smo_alloc;
+	weight = space;
+
+	/*
+	 * Modern disks have uniform bit density and constant angular velocity.
+	 * Therefore, the outer recording zones are faster (higher bandwidth)
+	 * than the inner zones by the ratio of outer to inner track diameter,
+	 * which is typically around 2:1.  We account for this by assigning
+	 * higher weight to lower metaslabs (multiplier ranging from 2x to 1x).
+	 * In effect, this means that we'll select the metaslab with the most
+	 * free bandwidth rather than simply the one with the most free space.
+	 */
+	weight = 2 * weight -
+	    ((sm->sm_start >> vd->vdev_ms_shift) * weight) / vd->vdev_ms_count;
+	ASSERT(weight >= space && weight <= 2 * space);
+
+	/*
+	 * For locality, assign higher weight to metaslabs we've used before.
+	 */
+	if (smo->smo_object != 0)
+		weight *= 2;
+	ASSERT(weight >= space && weight <= 4 * space);
+
+	/*
+	 * If this metaslab is one we're actively using, adjust its weight to
+	 * make it preferable to any inactive metaslab so we'll polish it off.
+	 */
+	weight |= (msp->ms_weight & METASLAB_ACTIVE_WEIGHT);
+
+	return (weight);
+}
+
+static int
+metaslab_activate(metaslab_t *msp)
+{
+	space_map_t *sm = &msp->ms_map;
+
+	ASSERT(MUTEX_HELD(&msp->ms_lock));
+
+	if (msp->ms_weight < METASLAB_ACTIVE_WEIGHT) {
+		int error = space_map_load(sm, &metaslab_ff_ops,
+		    SM_FREE, &msp->ms_smo,
+		    msp->ms_group->mg_vd->vdev_spa->spa_meta_objset);
+		if (error) {
+			metaslab_group_sort(msp->ms_group, msp, 0);
+			return (error);
+		}
+		metaslab_group_sort(msp->ms_group, msp,
+		    msp->ms_weight | METASLAB_ACTIVE_WEIGHT);
 	}
-	return (offset);
+	ASSERT(sm->sm_loaded);
+	ASSERT(msp->ms_weight >= METASLAB_ACTIVE_WEIGHT);
+
+	return (0);
+}
+
+static void
+metaslab_passivate(metaslab_t *msp, uint64_t size)
+{
+	metaslab_group_sort(msp->ms_group, msp, MIN(msp->ms_weight, size - 1));
+	ASSERT(msp->ms_weight < METASLAB_ACTIVE_WEIGHT);
+}
+
+/*
+ * Write a metaslab to disk in the context of the specified transaction group.
+ */
+void
+metaslab_sync(metaslab_t *msp, uint64_t txg)
+{
+	vdev_t *vd = msp->ms_group->mg_vd;
+	spa_t *spa = vd->vdev_spa;
+	objset_t *mos = spa->spa_meta_objset;
+	space_map_t *allocmap = &msp->ms_allocmap[txg & TXG_MASK];
+	space_map_t *freemap = &msp->ms_freemap[txg & TXG_MASK];
+	space_map_t *freed_map = &msp->ms_freemap[TXG_CLEAN(txg) & TXG_MASK];
+	space_map_t *sm = &msp->ms_map;
+	space_map_obj_t *smo = &msp->ms_smo_syncing;
+	dmu_buf_t *db;
+	dmu_tx_t *tx;
+	int t;
+
+	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
+
+	/*
+	 * The only state that can actually be changing concurrently with
+	 * metaslab_sync() is the metaslab's ms_map.  No other thread can
+	 * be modifying this txg's allocmap, freemap, freed_map, or smo.
+	 * Therefore, we only hold ms_lock to satify space_map ASSERTs.
+	 * We drop it whenever we call into the DMU, because the DMU
+	 * can call down to us (e.g. via zio_free()) at any time.
+	 */
+	mutex_enter(&msp->ms_lock);
+
+	if (smo->smo_object == 0) {
+		ASSERT(smo->smo_objsize == 0);
+		ASSERT(smo->smo_alloc == 0);
+		mutex_exit(&msp->ms_lock);
+		smo->smo_object = dmu_object_alloc(mos,
+		    DMU_OT_SPACE_MAP, 1 << SPACE_MAP_BLOCKSHIFT,
+		    DMU_OT_SPACE_MAP_HEADER, sizeof (*smo), tx);
+		ASSERT(smo->smo_object != 0);
+		dmu_write(mos, vd->vdev_ms_array, sizeof (uint64_t) *
+		    (sm->sm_start >> vd->vdev_ms_shift),
+		    sizeof (uint64_t), &smo->smo_object, tx);
+		mutex_enter(&msp->ms_lock);
+	}
+
+	space_map_walk(freemap, space_map_add, freed_map);
+
+	if (sm->sm_loaded && spa_sync_pass(spa) == 1 && smo->smo_objsize >=
+	    2 * sizeof (uint64_t) * avl_numnodes(&sm->sm_root)) {
+		/*
+		 * The in-core space map representation is twice as compact
+		 * as the on-disk one, so it's time to condense the latter
+		 * by generating a pure allocmap from first principles.
+		 *
+		 * This metaslab is 100% allocated,
+		 * minus the content of the in-core map (sm),
+		 * minus what's been freed this txg (freed_map),
+		 * minus allocations from txgs in the future
+		 * (because they haven't been committed yet).
+		 */
+		space_map_vacate(allocmap, NULL, NULL);
+		space_map_vacate(freemap, NULL, NULL);
+
+		space_map_add(allocmap, allocmap->sm_start, allocmap->sm_size);
+
+		space_map_walk(sm, space_map_remove, allocmap);
+		space_map_walk(freed_map, space_map_remove, allocmap);
+
+		for (t = 1; t < TXG_CONCURRENT_STATES; t++)
+			space_map_walk(&msp->ms_allocmap[(txg + t) & TXG_MASK],
+			    space_map_remove, allocmap);
+
+		mutex_exit(&msp->ms_lock);
+		space_map_truncate(smo, mos, tx);
+		mutex_enter(&msp->ms_lock);
+	}
+
+	space_map_sync(allocmap, SM_ALLOC, smo, mos, tx);
+	space_map_sync(freemap, SM_FREE, smo, mos, tx);
+
+	mutex_exit(&msp->ms_lock);
+
+	VERIFY(0 == dmu_bonus_hold(mos, smo->smo_object, FTAG, &db));
+	dmu_buf_will_dirty(db, tx);
+	ASSERT3U(db->db_size, ==, sizeof (*smo));
+	bcopy(smo, db->db_data, db->db_size);
+	dmu_buf_rele(db, FTAG);
+
+	dmu_tx_commit(tx);
+}
+
+/*
+ * Called after a transaction group has completely synced to mark
+ * all of the metaslab's free space as usable.
+ */
+void
+metaslab_sync_done(metaslab_t *msp, uint64_t txg)
+{
+	space_map_obj_t *smo = &msp->ms_smo;
+	space_map_obj_t *smosync = &msp->ms_smo_syncing;
+	space_map_t *sm = &msp->ms_map;
+	space_map_t *freed_map = &msp->ms_freemap[TXG_CLEAN(txg) & TXG_MASK];
+	metaslab_group_t *mg = msp->ms_group;
+	vdev_t *vd = mg->mg_vd;
+	int t;
+
+	mutex_enter(&msp->ms_lock);
+
+	/*
+	 * If this metaslab is just becoming available, initialize its
+	 * allocmaps and freemaps and add its capacity to the vdev.
+	 */
+	if (freed_map->sm_size == 0) {
+		for (t = 0; t < TXG_SIZE; t++) {
+			space_map_create(&msp->ms_allocmap[t], sm->sm_start,
+			    sm->sm_size, sm->sm_shift, sm->sm_lock);
+			space_map_create(&msp->ms_freemap[t], sm->sm_start,
+			    sm->sm_size, sm->sm_shift, sm->sm_lock);
+		}
+		vdev_space_update(vd, sm->sm_size, 0);
+	}
+
+	vdev_space_update(vd, 0, smosync->smo_alloc - smo->smo_alloc);
+
+	ASSERT(msp->ms_allocmap[txg & TXG_MASK].sm_space == 0);
+	ASSERT(msp->ms_freemap[txg & TXG_MASK].sm_space == 0);
+
+	/*
+	 * If there's a space_map_load() in progress, wait for it to complete
+	 * so that we have a consistent view of the in-core space map.
+	 * Then, add everything we freed in this txg to the map.
+	 */
+	space_map_load_wait(sm);
+	space_map_vacate(freed_map, sm->sm_loaded ? space_map_free : NULL, sm);
+
+	*smo = *smosync;
+
+	/*
+	 * If the map is loaded but no longer active, evict it as soon as all
+	 * future allocations have synced.  (If we unloaded it now and then
+	 * loaded a moment later, the map wouldn't reflect those allocations.)
+	 */
+	if (sm->sm_loaded && msp->ms_weight < METASLAB_ACTIVE_WEIGHT) {
+		int evictable = 1;
+
+		for (t = 1; t < TXG_CONCURRENT_STATES; t++)
+			if (msp->ms_allocmap[(txg + t) & TXG_MASK].sm_space)
+				evictable = 0;
+
+		if (evictable)
+			space_map_unload(sm);
+	}
+
+	metaslab_group_sort(mg, msp, metaslab_weight(msp));
+
+	mutex_exit(&msp->ms_lock);
 }
 
 /*
@@ -526,11 +599,8 @@ metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg)
 	uint64_t vdev = DVA_GET_VDEV(dva);
 	uint64_t offset = DVA_GET_OFFSET(dva);
 	uint64_t size = DVA_GET_ASIZE(dva);
-	objset_t *os = spa->spa_meta_objset;
 	vdev_t *vd;
 	metaslab_t *msp;
-	space_map_t *sm;
-	space_map_obj_t *smo;
 	int error;
 
 	if ((vd = vdev_lookup_top(spa, vdev)) == NULL)
@@ -540,123 +610,69 @@ metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg)
 		return (ENXIO);
 
 	msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
-	sm = &msp->ms_map;
-	smo = msp->ms_smo;
 
 	if (DVA_GET_GANG(dva))
 		size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
 
 	mutex_enter(&msp->ms_lock);
 
-	if (msp->ms_map_incore == 0) {
-		error = space_map_load(sm, smo, SM_FREE, os,
-		    msp->ms_usable_end, sm->sm_size - msp->ms_usable_space);
-		ASSERT(error == 0);
-		if (error) {
-			mutex_exit(&msp->ms_lock);
-			return (error);
-		}
-		msp->ms_map_incore = 1;
-		/* XXX -- we'll need a call to picker_init here */
-		bzero(msp->ms_map_cursor, sizeof (msp->ms_map_cursor));
+	error = metaslab_activate(msp);
+	if (error) {
+		mutex_exit(&msp->ms_lock);
+		return (error);
 	}
 
-	space_map_remove(sm, offset, size);
+	if (msp->ms_allocmap[txg & TXG_MASK].sm_space == 0)
+		vdev_dirty(vd, VDD_METASLAB, msp, txg);
+
+	space_map_claim(&msp->ms_map, offset, size);
 	space_map_add(&msp->ms_allocmap[txg & TXG_MASK], offset, size);
-
-	if ((msp->ms_dirty[txg & TXG_MASK] & MSD_ALLOC) == 0) {
-		msp->ms_dirty[txg & TXG_MASK] |= MSD_ALLOC;
-		msp->ms_last_alloc = txg;
-		vdev_dirty(vd, VDD_ALLOC, txg);
-		(void) txg_list_add(&vd->vdev_ms_list, msp, txg);
-	}
 
 	mutex_exit(&msp->ms_lock);
 
 	return (0);
 }
 
-static int
-metaslab_usable(metaslab_t *msp, uint64_t size, uint64_t txg)
-{
-	/*
-	 * Enforce segregation across transaction groups.
-	 */
-	/* XXX -- We should probably not assume we know what ms_weight means */
-	if (msp->ms_last_alloc == txg)
-		return (msp->ms_map.sm_space >= size && msp->ms_weight >= size);
-
-	if (msp->ms_last_alloc != 0)
-		return (0);
-
-	if (msp->ms_map.sm_space >= size && msp->ms_weight >= size)
-		return (1);
-
-	/* XXX -- the weight test should be in terms of MINFREE */
-	return (msp->ms_usable_space >= size && msp->ms_weight >= size);
-}
-
 static metaslab_t *
-metaslab_pick(metaslab_group_t *mg, uint64_t size, uint64_t txg)
+metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t *offp,
+	uint64_t txg)
 {
-	metaslab_t *msp;
-	avl_tree_t *t = &mg->mg_metaslab_tree;
+	metaslab_t *msp = NULL;
+	uint64_t offset = -1ULL;
 
-	mutex_enter(&mg->mg_lock);
-	for (msp = avl_first(t); msp != NULL; msp = AVL_NEXT(t, msp))
-		if (metaslab_usable(msp, size, txg))
-			break;
-	mutex_exit(&mg->mg_lock);
+	for (;;) {
+		mutex_enter(&mg->mg_lock);
+		msp = avl_first(&mg->mg_metaslab_tree);
+		if (msp == NULL || msp->ms_weight < size) {
+			mutex_exit(&mg->mg_lock);
+			return (NULL);
+		}
+		mutex_exit(&mg->mg_lock);
 
-	return (msp);
-}
-
-static metaslab_t *
-metaslab_group_alloc(spa_t *spa, metaslab_group_t *mg, uint64_t size,
-    uint64_t *offp, uint64_t txg)
-{
-	metaslab_t *msp;
-	int error;
-
-	while ((msp = metaslab_pick(mg, size, txg)) != NULL) {
-		space_map_obj_t *smo = msp->ms_smo;
 		mutex_enter(&msp->ms_lock);
-		if (!metaslab_usable(msp, size, txg)) {
+
+		if (metaslab_activate(msp) != 0) {
 			mutex_exit(&msp->ms_lock);
 			continue;
 		}
-		if (msp->ms_map_incore == 0) {
-			error = space_map_load(&msp->ms_map, smo, SM_FREE,
-			    spa->spa_meta_objset, msp->ms_usable_end,
-			    msp->ms_map.sm_size - msp->ms_usable_space);
-			ASSERT(error == 0);
-			if (error) {
-				mutex_exit(&msp->ms_lock);
-				metaslab_group_sort(mg, msp, 0);
-				continue;
-			}
-			msp->ms_map_incore = 1;
-			/* XXX -- we'll need a call to picker_init here */
-			bzero(msp->ms_map_cursor, sizeof (msp->ms_map_cursor));
-		}
-		*offp = metaslab_getblock(msp, size, txg);
-		if (*offp != -1ULL) {
-			if ((msp->ms_dirty[txg & TXG_MASK] & MSD_ALLOC) == 0) {
-				vdev_t *vd = mg->mg_vd;
-				msp->ms_dirty[txg & TXG_MASK] |= MSD_ALLOC;
-				msp->ms_last_alloc = txg;
-				vdev_dirty(vd, VDD_ALLOC, txg);
-				(void) txg_list_add(&vd->vdev_ms_list,
-				    msp, txg);
-			}
-			mutex_exit(&msp->ms_lock);
-			return (msp);
-		}
+
+		if ((offset = space_map_alloc(&msp->ms_map, size)) != -1ULL)
+			break;
+
+		metaslab_passivate(msp, size);
+
 		mutex_exit(&msp->ms_lock);
-		metaslab_group_sort(msp->ms_group, msp, size - 1);
 	}
 
-	return (NULL);
+	if (msp->ms_allocmap[txg & TXG_MASK].sm_space == 0)
+		vdev_dirty(mg->mg_vd, VDD_METASLAB, msp, txg);
+
+	space_map_add(&msp->ms_allocmap[txg & TXG_MASK], offset, size);
+
+	mutex_exit(&msp->ms_lock);
+
+	*offp = offset;
+	return (msp);
 }
 
 /*
@@ -686,7 +702,7 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 		asize = vdev_psize_to_asize(vd, psize);
 		ASSERT(P2PHASE(asize, 1ULL << vd->vdev_ashift) == 0);
 
-		msp = metaslab_group_alloc(spa, mg, asize, &offset, txg);
+		msp = metaslab_group_alloc(mg, asize, &offset, txg);
 		if (msp != NULL) {
 			ASSERT(offset != -1ULL);
 
@@ -716,8 +732,6 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 				 */
 				mg->mg_bias = ((su - vu) *
 				    (int64_t)mg->mg_aliquot) / (1024 * 4);
-
-				dprintf("bias = %lld\n", mg->mg_bias);
 			}
 
 			if (atomic_add_64_nv(&mc->mc_allocated, asize) >=
@@ -737,8 +751,6 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 		mc->mc_allocated = 0;
 	} while ((mg = mg->mg_next) != rotor);
 
-	dprintf("spa=%p, psize=%llu, txg=%llu: no\n", spa, psize, txg);
-
 	DVA_SET_VDEV(dva, 0);
 	DVA_SET_OFFSET(dva, 0);
 	DVA_SET_GANG(dva, 0);
@@ -751,7 +763,7 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
  * transaction group.
  */
 void
-metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg)
+metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg, boolean_t now)
 {
 	uint64_t vdev = DVA_GET_VDEV(dva);
 	uint64_t offset = DVA_GET_OFFSET(dva);
@@ -783,13 +795,15 @@ metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg)
 
 	mutex_enter(&msp->ms_lock);
 
-	if ((msp->ms_dirty[txg & TXG_MASK] & MSD_FREE) == 0) {
-		msp->ms_dirty[txg & TXG_MASK] |= MSD_FREE;
-		vdev_dirty(vd, VDD_FREE, txg);
-		(void) txg_list_add(&vd->vdev_ms_list, msp, txg);
+	if (now) {
+		space_map_remove(&msp->ms_allocmap[txg & TXG_MASK],
+		    offset, size);
+		space_map_free(&msp->ms_map, offset, size);
+	} else {
+		if (msp->ms_freemap[txg & TXG_MASK].sm_space == 0)
+			vdev_dirty(vd, VDD_METASLAB, msp, txg);
+		space_map_add(&msp->ms_freemap[txg & TXG_MASK], offset, size);
 	}
-
-	space_map_add(&msp->ms_freemap[txg & TXG_MASK], offset, size);
 
 	mutex_exit(&msp->ms_lock);
 }

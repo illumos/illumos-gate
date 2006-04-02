@@ -82,7 +82,8 @@ struct traverse_handle {
 	spa_t		*th_spa;
 	blkptr_cb_t	*th_func;
 	void		*th_arg;
-	int		th_advance;
+	uint16_t	th_advance;
+	uint16_t	th_locked;
 	int		th_zio_flags;
 	list_t		th_seglist;
 	traverse_blk_cache_t th_cache[ZB_DEPTH][ZB_MAXLEVEL];

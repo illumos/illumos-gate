@@ -54,13 +54,13 @@ vdev_root_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 			lasterror = error;
 			continue;
 		}
-
-		*asize += cvd->vdev_asize;
-		*ashift = MAX(*ashift, cvd->vdev_ashift);
 	}
 
 	if (lasterror)
 		vd->vdev_stat.vs_aux = VDEV_AUX_NO_REPLICAS;
+
+	*asize = 0;
+	*ashift = 0;
 
 	return (lasterror);
 }

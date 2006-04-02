@@ -77,7 +77,7 @@ vdev_getops(const char *type)
 uint64_t
 vdev_default_asize(vdev_t *vd, uint64_t psize)
 {
-	uint64_t asize = P2ROUNDUP(psize, 1ULL << vd->vdev_ashift);
+	uint64_t asize = P2ROUNDUP(psize, 1ULL << vd->vdev_top->vdev_ashift);
 	uint64_t csize;
 	uint64_t c;
 
@@ -299,7 +299,6 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	vd->vdev_ops = ops;
 	vd->vdev_state = VDEV_STATE_CLOSED;
 
-	mutex_init(&vd->vdev_dirty_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	space_map_create(&vd->vdev_dtl_map, 0, -1ULL, 0, &vd->vdev_dtl_lock);
 	space_map_create(&vd->vdev_dtl_scrub, 0, -1ULL, 0, &vd->vdev_dtl_lock);
@@ -328,13 +327,12 @@ vdev_free_common(vdev_t *vd)
 	txg_list_destroy(&vd->vdev_ms_list);
 	txg_list_destroy(&vd->vdev_dtl_list);
 	mutex_enter(&vd->vdev_dtl_lock);
-	space_map_vacate(&vd->vdev_dtl_map, NULL, NULL);
+	space_map_unload(&vd->vdev_dtl_map);
 	space_map_destroy(&vd->vdev_dtl_map);
 	space_map_vacate(&vd->vdev_dtl_scrub, NULL, NULL);
 	space_map_destroy(&vd->vdev_dtl_scrub);
 	mutex_exit(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dtl_lock);
-	mutex_destroy(&vd->vdev_dirty_lock);
 
 	if (vd == spa->spa_root_vdev)
 		spa->spa_root_vdev = NULL;
@@ -352,7 +350,7 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 {
 	vdev_ops_t *ops;
 	char *type;
-	uint64_t guid = 0, offline = 0;
+	uint64_t guid = 0;
 	vdev_t *vd;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
@@ -401,6 +399,11 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	    &vd->vdev_not_present);
 
 	/*
+	 * Get the alignment requirement.
+	 */
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASHIFT, &vd->vdev_ashift);
+
+	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
 	 */
 	if (parent && !parent->vdev_parent && alloctype == VDEV_ALLOC_LOAD) {
@@ -408,24 +411,18 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 		    &vd->vdev_ms_array);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_METASLAB_SHIFT,
 		    &vd->vdev_ms_shift);
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASHIFT,
-		    &vd->vdev_ashift);
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASIZE,
 		    &vd->vdev_asize);
 	}
 
 	/*
-	 * If we're a leaf vdev, try to load the DTL object
-	 * and the offline state.
+	 * If we're a leaf vdev, try to load the DTL object and offline state.
 	 */
-	vd->vdev_offline = B_FALSE;
 	if (vd->vdev_ops->vdev_op_leaf && alloctype == VDEV_ALLOC_LOAD) {
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DTL,
 		    &vd->vdev_dtl.smo_object);
-
-		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &offline)
-		    == 0)
-			vd->vdev_offline = offline;
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE,
+		    &vd->vdev_offline);
 	}
 
 	/*
@@ -447,7 +444,7 @@ vdev_free(vdev_t *vd)
 	 */
 	vdev_close(vd);
 
-	ASSERT(!vd->vdev_is_dirty);
+	ASSERT(!list_link_active(&vd->vdev_dirty_node));
 
 	/*
 	 * Free all children.
@@ -499,13 +496,13 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 	svd->vdev_ms_count = 0;
 
 	tvd->vdev_mg = svd->vdev_mg;
-	tvd->vdev_mg->mg_vd = tvd;
 	tvd->vdev_ms = svd->vdev_ms;
-	tvd->vdev_smo = svd->vdev_smo;
 
 	svd->vdev_mg = NULL;
 	svd->vdev_ms = NULL;
-	svd->vdev_smo = NULL;
+
+	if (tvd->vdev_mg != NULL)
+		tvd->vdev_mg->mg_vd = tvd;
 
 	tvd->vdev_stat.vs_alloc = svd->vdev_stat.vs_alloc;
 	tvd->vdev_stat.vs_space = svd->vdev_stat.vs_space;
@@ -520,11 +517,9 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 			(void) txg_list_add(&tvd->vdev_dtl_list, vd, t);
 		if (txg_list_remove_this(&spa->spa_vdev_txg_list, svd, t))
 			(void) txg_list_add(&spa->spa_vdev_txg_list, tvd, t);
-		tvd->vdev_dirty[t] = svd->vdev_dirty[t];
-		svd->vdev_dirty[t] = 0;
 	}
 
-	if (svd->vdev_is_dirty) {
+	if (list_link_active(&svd->vdev_dirty_node)) {
 		vdev_config_clean(svd);
 		vdev_config_dirty(tvd);
 	}
@@ -560,15 +555,16 @@ vdev_add_parent(vdev_t *cvd, vdev_ops_t *ops)
 	ASSERT(spa_config_held(spa, RW_WRITER));
 
 	mvd = vdev_alloc_common(spa, cvd->vdev_id, 0, ops);
+
+	mvd->vdev_asize = cvd->vdev_asize;
+	mvd->vdev_ashift = cvd->vdev_ashift;
+	mvd->vdev_state = cvd->vdev_state;
+
 	vdev_remove_child(pvd, cvd);
 	vdev_add_child(pvd, mvd);
 	cvd->vdev_id = mvd->vdev_children;
 	vdev_add_child(mvd, cvd);
 	vdev_top_update(cvd->vdev_top, cvd->vdev_top);
-
-	mvd->vdev_asize = cvd->vdev_asize;
-	mvd->vdev_ashift = cvd->vdev_ashift;
-	mvd->vdev_state = cvd->vdev_state;
 
 	if (mvd == mvd->vdev_top)
 		vdev_top_transfer(cvd, mvd);
@@ -590,6 +586,7 @@ vdev_remove_parent(vdev_t *cvd)
 	ASSERT(mvd->vdev_children == 1);
 	ASSERT(mvd->vdev_ops == &vdev_mirror_ops ||
 	    mvd->vdev_ops == &vdev_replacing_ops);
+	cvd->vdev_ashift = mvd->vdev_ashift;
 
 	vdev_remove_child(mvd, cvd);
 	vdev_remove_child(pvd, mvd);
@@ -608,13 +605,13 @@ int
 vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
+	objset_t *mos = spa->spa_meta_objset;
 	metaslab_class_t *mc = spa_metaslab_class_select(spa);
-	uint64_t c;
+	uint64_t m;
 	uint64_t oldc = vd->vdev_ms_count;
 	uint64_t newc = vd->vdev_asize >> vd->vdev_ms_shift;
-	space_map_obj_t *smo = vd->vdev_smo;
-	metaslab_t **mspp = vd->vdev_ms;
-	int ret;
+	metaslab_t **mspp;
+	int error;
 
 	if (vd->vdev_ms_shift == 0)	/* not being allocated from yet */
 		return (0);
@@ -623,77 +620,43 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 
 	ASSERT(oldc <= newc);
 
-	vd->vdev_smo = kmem_zalloc(newc * sizeof (*smo), KM_SLEEP);
-	vd->vdev_ms = kmem_zalloc(newc * sizeof (*mspp), KM_SLEEP);
-	vd->vdev_ms_count = newc;
-
-	if (vd->vdev_mg == NULL) {
-		if (txg == 0) {
-			dmu_buf_t *db;
-			uint64_t *ms_array;
-
-			ms_array = kmem_zalloc(newc * sizeof (uint64_t),
-			    KM_SLEEP);
-
-			if ((ret = dmu_read(spa->spa_meta_objset,
-			    vd->vdev_ms_array, 0,
-			    newc * sizeof (uint64_t), ms_array)) != 0) {
-				kmem_free(ms_array, newc * sizeof (uint64_t));
-				goto error;
-			}
-
-			for (c = 0; c < newc; c++) {
-				if (ms_array[c] == 0)
-					continue;
-				if ((ret = dmu_bonus_hold(
-				    spa->spa_meta_objset, ms_array[c],
-				    FTAG, &db)) != 0) {
-					kmem_free(ms_array,
-					    newc * sizeof (uint64_t));
-					goto error;
-				}
-				ASSERT3U(db->db_size, ==, sizeof (*smo));
-				bcopy(db->db_data, &vd->vdev_smo[c],
-				    db->db_size);
-				ASSERT3U(vd->vdev_smo[c].smo_object, ==,
-				    ms_array[c]);
-				dmu_buf_rele(db, FTAG);
-			}
-			kmem_free(ms_array, newc * sizeof (uint64_t));
-		}
+	if (vd->vdev_mg == NULL)
 		vd->vdev_mg = metaslab_group_create(mc, vd);
-	}
 
-	for (c = 0; c < oldc; c++) {
-		vd->vdev_smo[c] = smo[c];
-		vd->vdev_ms[c] = mspp[c];
-		mspp[c]->ms_smo = &vd->vdev_smo[c];
-	}
-
-	for (c = oldc; c < newc; c++)
-		metaslab_init(vd->vdev_mg, &vd->vdev_smo[c], &vd->vdev_ms[c],
-		    c << vd->vdev_ms_shift, 1ULL << vd->vdev_ms_shift, txg);
+	mspp = kmem_zalloc(newc * sizeof (*mspp), KM_SLEEP);
 
 	if (oldc != 0) {
-		kmem_free(smo, oldc * sizeof (*smo));
-		kmem_free(mspp, oldc * sizeof (*mspp));
+		bcopy(vd->vdev_ms, mspp, oldc * sizeof (*mspp));
+		kmem_free(vd->vdev_ms, oldc * sizeof (*mspp));
+	}
+
+	vd->vdev_ms = mspp;
+	vd->vdev_ms_count = newc;
+
+	for (m = oldc; m < newc; m++) {
+		space_map_obj_t smo = { 0, 0, 0 };
+		if (txg == 0) {
+			uint64_t object = 0;
+			error = dmu_read(mos, vd->vdev_ms_array,
+			    m * sizeof (uint64_t), sizeof (uint64_t), &object);
+			if (error)
+				return (error);
+			if (object != 0) {
+				dmu_buf_t *db;
+				error = dmu_bonus_hold(mos, object, FTAG, &db);
+				if (error)
+					return (error);
+				ASSERT3U(db->db_size, ==, sizeof (smo));
+				bcopy(db->db_data, &smo, db->db_size);
+				ASSERT3U(smo.smo_object, ==, object);
+				dmu_buf_rele(db, FTAG);
+			}
+		}
+		vd->vdev_ms[m] = metaslab_init(vd->vdev_mg, &smo,
+		    m << vd->vdev_ms_shift, 1ULL << vd->vdev_ms_shift, txg);
 	}
 
 	return (0);
-
-error:
-	/*
-	 * On error, undo any partial progress we may have made, and restore the
-	 * old metaslab values.
-	 */
-	kmem_free(vd->vdev_smo, newc * sizeof (*smo));
-	kmem_free(vd->vdev_ms, newc * sizeof (*mspp));
-
-	vd->vdev_smo = smo;
-	vd->vdev_ms = mspp;
-	vd->vdev_ms_count = oldc;
-
-	return (ret);
 }
 
 void
@@ -704,14 +667,10 @@ vdev_metaslab_fini(vdev_t *vd)
 
 	if (vd->vdev_ms != NULL) {
 		for (m = 0; m < count; m++)
-			metaslab_fini(vd->vdev_ms[m]);
+			if (vd->vdev_ms[m] != NULL)
+				metaslab_fini(vd->vdev_ms[m]);
 		kmem_free(vd->vdev_ms, count * sizeof (metaslab_t *));
 		vd->vdev_ms = NULL;
-	}
-
-	if (vd->vdev_smo != NULL) {
-		kmem_free(vd->vdev_smo, count * sizeof (space_map_obj_t));
-		vd->vdev_smo = NULL;
 	}
 }
 
@@ -726,7 +685,7 @@ vdev_open(vdev_t *vd)
 	int c;
 	uint64_t osize = 0;
 	uint64_t asize, psize;
-	uint64_t ashift = -1ULL;
+	uint64_t ashift = 0;
 
 	ASSERT(vd->vdev_state == VDEV_STATE_CLOSED ||
 	    vd->vdev_state == VDEV_STATE_CANT_OPEN ||
@@ -793,7 +752,7 @@ vdev_open(vdev_t *vd)
 		psize = osize;
 		asize = osize - (VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE);
 	} else {
-		if (osize < SPA_MINDEVSIZE -
+		if (vd->vdev_parent != NULL && osize < SPA_MINDEVSIZE -
 		    (VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE)) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_TOO_SMALL);
@@ -808,14 +767,15 @@ vdev_open(vdev_t *vd)
 	if (vd->vdev_asize == 0) {
 		/*
 		 * This is the first-ever open, so use the computed values.
+		 * For testing purposes, a higher ashift can be requested.
 		 */
 		vd->vdev_asize = asize;
-		vd->vdev_ashift = ashift;
+		vd->vdev_ashift = MAX(ashift, vd->vdev_ashift);
 	} else {
 		/*
 		 * Make sure the alignment requirement hasn't increased.
 		 */
-		if (ashift > vd->vdev_ashift) {
+		if (ashift > vd->vdev_top->vdev_ashift) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_BAD_LABEL);
 			return (EINVAL);
@@ -965,17 +925,18 @@ vdev_init(vdev_t *vd, uint64_t txg)
 }
 
 void
-vdev_dirty(vdev_t *vd, uint8_t flags, uint64_t txg)
+vdev_dirty(vdev_t *vd, int flags, void *arg, uint64_t txg)
 {
-	vdev_t *tvd = vd->vdev_top;
+	ASSERT(vd == vd->vdev_top);
+	ASSERT(ISP2(flags));
 
-	mutex_enter(&tvd->vdev_dirty_lock);
-	if ((tvd->vdev_dirty[txg & TXG_MASK] & flags) != flags) {
-		tvd->vdev_dirty[txg & TXG_MASK] |= flags;
-		(void) txg_list_add(&tvd->vdev_spa->spa_vdev_txg_list,
-		    tvd, txg);
-	}
-	mutex_exit(&tvd->vdev_dirty_lock);
+	if (flags & VDD_METASLAB)
+		(void) txg_list_add(&vd->vdev_ms_list, arg, txg);
+
+	if (flags & VDD_DTL)
+		(void) txg_list_add(&vd->vdev_dtl_list, arg, txg);
+
+	(void) txg_list_add(&vd->vdev_spa->spa_vdev_txg_list, vd, txg);
 }
 
 void
@@ -1031,11 +992,8 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		if (scrub_done)
 			space_map_vacate(&vd->vdev_dtl_scrub, NULL, NULL);
 		mutex_exit(&vd->vdev_dtl_lock);
-		if (txg != 0) {
-			vdev_t *tvd = vd->vdev_top;
-			vdev_dirty(tvd, VDD_DTL, txg);
-			(void) txg_list_add(&tvd->vdev_dtl_list, vd, txg);
-		}
+		if (txg != 0)
+			vdev_dirty(vd->vdev_top, VDD_DTL, vd, txg);
 		return;
 	}
 
@@ -1068,6 +1026,7 @@ vdev_dtl_load(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 	space_map_obj_t *smo = &vd->vdev_dtl;
+	objset_t *mos = spa->spa_meta_objset;
 	dmu_buf_t *db;
 	int error;
 
@@ -1076,16 +1035,15 @@ vdev_dtl_load(vdev_t *vd)
 	if (smo->smo_object == 0)
 		return (0);
 
-	if ((error = dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object,
-	    FTAG, &db)) != 0)
+	if ((error = dmu_bonus_hold(mos, smo->smo_object, FTAG, &db)) != 0)
 		return (error);
+
 	ASSERT3U(db->db_size, ==, sizeof (*smo));
 	bcopy(db->db_data, smo, db->db_size);
 	dmu_buf_rele(db, FTAG);
 
 	mutex_enter(&vd->vdev_dtl_lock);
-	error = space_map_load(&vd->vdev_dtl_map, smo, SM_ALLOC,
-	    spa->spa_meta_objset, smo->smo_objsize, smo->smo_alloc);
+	error = space_map_load(&vd->vdev_dtl_map, NULL, SM_ALLOC, smo, mos);
 	mutex_exit(&vd->vdev_dtl_lock);
 
 	return (error);
@@ -1097,10 +1055,9 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	spa_t *spa = vd->vdev_spa;
 	space_map_obj_t *smo = &vd->vdev_dtl;
 	space_map_t *sm = &vd->vdev_dtl_map;
+	objset_t *mos = spa->spa_meta_objset;
 	space_map_t smsync;
 	kmutex_t smlock;
-	avl_tree_t *t = &sm->sm_root;
-	space_seg_t *ss;
 	dmu_buf_t *db;
 	dmu_tx_t *tx;
 
@@ -1111,27 +1068,25 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 
 	if (vd->vdev_detached) {
 		if (smo->smo_object != 0) {
-			int err = dmu_object_free(spa->spa_meta_objset,
-			    smo->smo_object, tx);
+			int err = dmu_object_free(mos, smo->smo_object, tx);
 			ASSERT3U(err, ==, 0);
 			smo->smo_object = 0;
 		}
 		dmu_tx_commit(tx);
+		dprintf("detach %s committed in txg %llu\n",
+		    vdev_description(vd), txg);
 		return;
 	}
 
 	if (smo->smo_object == 0) {
 		ASSERT(smo->smo_objsize == 0);
 		ASSERT(smo->smo_alloc == 0);
-		smo->smo_object = dmu_object_alloc(spa->spa_meta_objset,
+		smo->smo_object = dmu_object_alloc(mos,
 		    DMU_OT_SPACE_MAP, 1 << SPACE_MAP_BLOCKSHIFT,
 		    DMU_OT_SPACE_MAP_HEADER, sizeof (*smo), tx);
 		ASSERT(smo->smo_object != 0);
 		vdev_config_dirty(vd->vdev_top);
 	}
-
-	VERIFY(0 == dmu_free_range(spa->spa_meta_objset, smo->smo_object,
-	    0, smo->smo_objsize, tx));
 
 	mutex_init(&smlock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -1141,21 +1096,18 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	mutex_enter(&smlock);
 
 	mutex_enter(&vd->vdev_dtl_lock);
-	for (ss = avl_first(t); ss != NULL; ss = AVL_NEXT(t, ss))
-		space_map_add(&smsync, ss->ss_start, ss->ss_end - ss->ss_start);
+	space_map_walk(sm, space_map_add, &smsync);
 	mutex_exit(&vd->vdev_dtl_lock);
 
-	smo->smo_objsize = 0;
-	smo->smo_alloc = smsync.sm_space;
+	space_map_truncate(smo, mos, tx);
+	space_map_sync(&smsync, SM_ALLOC, smo, mos, tx);
 
-	space_map_sync(&smsync, NULL, smo, SM_ALLOC, spa->spa_meta_objset, tx);
 	space_map_destroy(&smsync);
 
 	mutex_exit(&smlock);
 	mutex_destroy(&smlock);
 
-	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object,
-	    FTAG, &db));
+	VERIFY(0 == dmu_bonus_hold(mos, smo->smo_object, FTAG, &db));
 	dmu_buf_will_dirty(db, tx);
 	ASSERT3U(db->db_size, ==, sizeof (*smo));
 	bcopy(smo, db->db_data, db->db_size);
@@ -1297,45 +1249,30 @@ vdev_sync_done(vdev_t *vd, uint64_t txg)
 }
 
 void
-vdev_add_sync(vdev_t *vd, uint64_t txg)
-{
-	spa_t *spa = vd->vdev_spa;
-	dmu_tx_t *tx = dmu_tx_create_assigned(spa->spa_dsl_pool, txg);
-
-	ASSERT(vd == vd->vdev_top);
-
-	if (vd->vdev_ms_array == 0)
-		vd->vdev_ms_array = dmu_object_alloc(spa->spa_meta_objset,
-		    DMU_OT_OBJECT_ARRAY, 0, DMU_OT_NONE, 0, tx);
-
-	ASSERT(vd->vdev_ms_array != 0);
-
-	vdev_config_dirty(vd);
-
-	dmu_tx_commit(tx);
-}
-
-void
 vdev_sync(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
 	vdev_t *lvd;
 	metaslab_t *msp;
-	uint8_t *dirtyp = &vd->vdev_dirty[txg & TXG_MASK];
-	uint8_t dirty = *dirtyp;
-
-	mutex_enter(&vd->vdev_dirty_lock);
-	*dirtyp &= ~(VDD_ALLOC | VDD_FREE | VDD_ADD | VDD_DTL);
-	mutex_exit(&vd->vdev_dirty_lock);
+	dmu_tx_t *tx;
 
 	dprintf("%s txg %llu pass %d\n",
 	    vdev_description(vd), (u_longlong_t)txg, spa_sync_pass(spa));
 
-	if (dirty & VDD_ADD)
-		vdev_add_sync(vd, txg);
+	if (vd->vdev_ms_array == 0 && vd->vdev_ms_shift != 0) {
+		ASSERT(vd == vd->vdev_top);
+		tx = dmu_tx_create_assigned(spa->spa_dsl_pool, txg);
+		vd->vdev_ms_array = dmu_object_alloc(spa->spa_meta_objset,
+		    DMU_OT_OBJECT_ARRAY, 0, DMU_OT_NONE, 0, tx);
+		ASSERT(vd->vdev_ms_array != 0);
+		vdev_config_dirty(vd);
+		dmu_tx_commit(tx);
+	}
 
-	while ((msp = txg_list_remove(&vd->vdev_ms_list, txg)) != NULL)
+	while ((msp = txg_list_remove(&vd->vdev_ms_list, txg)) != NULL) {
 		metaslab_sync(msp, txg);
+		(void) txg_list_add(&vd->vdev_ms_list, msp, TXG_CLEAN(txg));
+	}
 
 	while ((lvd = txg_list_remove(&vd->vdev_dtl_list, txg)) != NULL)
 		vdev_dtl_sync(lvd, txg);
@@ -1425,36 +1362,37 @@ vdev_offline(spa_t *spa, uint64_t guid, int istmp)
 
 	dprintf("OFFLINE: %s\n", vdev_description(vd));
 
-	/* vdev is already offlined, do nothing */
-	if (vd->vdev_offline)
-		return (spa_vdev_exit(spa, NULL, txg, 0));
-
 	/*
-	 * If this device's top-level vdev has a non-empty DTL,
-	 * don't allow the device to be offlined.
-	 *
-	 * XXX -- we should make this more precise by allowing the offline
-	 * as long as the remaining devices don't have any DTL holes.
+	 * If the device isn't already offline, try to offline it.
 	 */
-	if (vd->vdev_top->vdev_dtl_map.sm_space != 0)
-		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+	if (!vd->vdev_offline) {
+		/*
+		 * If this device's top-level vdev has a non-empty DTL,
+		 * don't allow the device to be offlined.
+		 *
+		 * XXX -- make this more precise by allowing the offline
+		 * as long as the remaining devices don't have any DTL holes.
+		 */
+		if (vd->vdev_top->vdev_dtl_map.sm_space != 0)
+			return (spa_vdev_exit(spa, NULL, txg, EBUSY));
 
-	/*
-	 * Set this device to offline state and reopen its top-level vdev.
-	 * If this action results in the top-level vdev becoming unusable,
-	 * undo it and fail the request.
-	 */
-	vd->vdev_offline = B_TRUE;
-	vdev_reopen(vd->vdev_top);
-	if (vdev_is_dead(vd->vdev_top)) {
-		vd->vdev_offline = B_FALSE;
+		/*
+		 * Offline this device and reopen its top-level vdev.
+		 * If this action results in the top-level vdev becoming
+		 * unusable, undo it and fail the request.
+		 */
+		vd->vdev_offline = B_TRUE;
 		vdev_reopen(vd->vdev_top);
-		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+		if (vdev_is_dead(vd->vdev_top)) {
+			vd->vdev_offline = B_FALSE;
+			vdev_reopen(vd->vdev_top);
+			return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+		}
 	}
 
 	vd->vdev_tmpoffline = istmp;
-	if (!istmp)
-		vdev_config_dirty(vd->vdev_top);
+
+	vdev_config_dirty(vd->vdev_top);
 
 	return (spa_vdev_exit(spa, NULL, txg, 0));
 }
@@ -1613,11 +1551,9 @@ vdev_stat_update(zio_t *zio)
 				vdev_dtl_dirty(&pvd->vdev_dtl_scrub, txg, 1);
 		}
 		if (!(flags & ZIO_FLAG_IO_REPAIR)) {
-			vdev_t *tvd = vd->vdev_top;
 			if (vdev_dtl_contains(&vd->vdev_dtl_map, txg, 1))
 				return;
-			vdev_dirty(tvd, VDD_DTL, txg);
-			(void) txg_list_add(&tvd->vdev_dtl_list, vd, txg);
+			vdev_dirty(vd->vdev_top, VDD_DTL, vd, txg);
 			for (pvd = vd; pvd != NULL; pvd = pvd->vdev_parent)
 				vdev_dtl_dirty(&pvd->vdev_dtl_map, txg, 1);
 		}
@@ -1788,10 +1724,8 @@ vdev_config_dirty(vdev_t *vd)
 	} else {
 		ASSERT(vd == vd->vdev_top);
 
-		if (!vd->vdev_is_dirty) {
+		if (!list_link_active(&vd->vdev_dirty_node))
 			list_insert_head(&spa->spa_dirty_list, vd);
-			vd->vdev_is_dirty = B_TRUE;
-		}
 	}
 }
 
@@ -1803,10 +1737,8 @@ vdev_config_clean(vdev_t *vd)
 	ASSERT(spa_config_held(spa, RW_WRITER) ||
 	    dsl_pool_sync_context(spa_get_dsl(spa)));
 
-	ASSERT(vd->vdev_is_dirty);
-
+	ASSERT(list_link_active(&vd->vdev_dirty_node));
 	list_remove(&spa->spa_dirty_list, vd);
-	vd->vdev_is_dirty = B_FALSE;
 }
 
 /*

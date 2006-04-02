@@ -152,6 +152,8 @@
 uint64_t
 vdev_label_offset(uint64_t psize, int l, uint64_t offset)
 {
+	ASSERT(offset < sizeof (vdev_label_t));
+
 	return (offset + l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
 	    0 : psize - VDEV_LABELS * sizeof (vdev_label_t)));
 }
@@ -253,14 +255,12 @@ vdev_config_generate(vdev_t *vd, int getstats)
 		kmem_free(child, vd->vdev_children * sizeof (nvlist_t *));
 
 	} else {
-		if (!vd->vdev_tmpoffline) {
-		    if (vd->vdev_offline)
+		if (vd->vdev_offline && !vd->vdev_tmpoffline)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_OFFLINE,
-				B_TRUE) == 0);
-		    else
+			    B_TRUE) == 0);
+		else
 			(void) nvlist_remove(nv, ZPOOL_CONFIG_OFFLINE,
-				DATA_TYPE_UINT64);
-		}
+			    DATA_TYPE_UINT64);
 	}
 
 	return (nv);
@@ -314,7 +314,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	nvlist_t *label;
 	vdev_phys_t *vp;
 	vdev_boot_header_t *vb;
-	uberblock_phys_t *ubphys;
+	uberblock_t *ub;
 	zio_t *zio;
 	int l, c, n;
 	char *buf;
@@ -411,10 +411,10 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	/*
 	 * Initialize uberblock template.
 	 */
-	ubphys = zio_buf_alloc(sizeof (uberblock_phys_t));
-	bzero(ubphys, sizeof (uberblock_phys_t));
-	ubphys->ubp_uberblock = spa->spa_uberblock;
-	ubphys->ubp_uberblock.ub_txg = 0;
+	ub = zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd));
+	bzero(ub, VDEV_UBERBLOCK_SIZE(vd));
+	*ub = spa->spa_uberblock;
+	ub->ub_txg = 0;
 
 	/*
 	 * Write everything in parallel.
@@ -432,19 +432,17 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 		    offsetof(vdev_label_t, vl_boot_header),
 		    sizeof (vdev_boot_header_t), NULL, NULL);
 
-		for (n = 0; n < VDEV_UBERBLOCKS; n++) {
-
-			vdev_label_write(zio, vd, l, ubphys,
-			    offsetof(vdev_label_t, vl_uberblock[n]),
-			    sizeof (uberblock_phys_t), NULL, NULL);
-
+		for (n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
+			vdev_label_write(zio, vd, l, ub,
+			    VDEV_UBERBLOCK_OFFSET(vd, n),
+			    VDEV_UBERBLOCK_SIZE(vd), NULL, NULL);
 		}
 	}
 
 	error = zio_wait(zio);
 
 	nvlist_free(label);
-	zio_buf_free(ubphys, sizeof (uberblock_phys_t));
+	zio_buf_free(ub, VDEV_UBERBLOCK_SIZE(vd));
 	zio_buf_free(vb, sizeof (vdev_boot_header_t));
 	zio_buf_free(vp, sizeof (vdev_phys_t));
 
@@ -486,12 +484,11 @@ vdev_uberblock_compare(uberblock_t *ub1, uberblock_t *ub2)
 static void
 vdev_uberblock_load_done(zio_t *zio)
 {
-	uberblock_phys_t *ubphys = zio->io_data;
-	uberblock_t *ub = &ubphys->ubp_uberblock;
+	uberblock_t *ub = zio->io_data;
 	uberblock_t *ubbest = zio->io_private;
 	spa_t *spa = zio->io_spa;
 
-	ASSERT3U(zio->io_size, ==, sizeof (uberblock_phys_t));
+	ASSERT3U(zio->io_size, ==, VDEV_UBERBLOCK_SIZE(zio->io_vd));
 
 	if (zio->io_error == 0 && uberblock_verify(ub) == 0) {
 		mutex_enter(&spa->spa_uberblock_lock);
@@ -518,11 +515,11 @@ vdev_uberblock_load(zio_t *zio, vdev_t *vd, uberblock_t *ubbest)
 		return;
 
 	for (l = 0; l < VDEV_LABELS; l++) {
-		for (n = 0; n < VDEV_UBERBLOCKS; n++) {
+		for (n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
 			vdev_label_read(zio, vd, l,
-			    zio_buf_alloc(sizeof (uberblock_phys_t)),
-			    offsetof(vdev_label_t, vl_uberblock[n]),
-			    sizeof (uberblock_phys_t),
+			    zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd)),
+			    VDEV_UBERBLOCK_OFFSET(vd, n),
+			    VDEV_UBERBLOCK_SIZE(vd),
 			    vdev_uberblock_load_done, ubbest);
 		}
 	}
@@ -542,13 +539,12 @@ vdev_uberblock_sync_done(zio_t *zio)
 }
 
 static void
-vdev_uberblock_sync(zio_t *zio, uberblock_phys_t *ubphys, vdev_t *vd,
-	uint64_t txg)
+vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd, uint64_t txg)
 {
 	int l, c, n;
 
 	for (c = 0; c < vd->vdev_children; c++)
-		vdev_uberblock_sync(zio, ubphys, vd->vdev_child[c], txg);
+		vdev_uberblock_sync(zio, ub, vd->vdev_child[c], txg);
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return;
@@ -556,36 +552,38 @@ vdev_uberblock_sync(zio_t *zio, uberblock_phys_t *ubphys, vdev_t *vd,
 	if (vdev_is_dead(vd))
 		return;
 
-	n = txg & (VDEV_UBERBLOCKS - 1);
+	n = txg & (VDEV_UBERBLOCK_COUNT(vd) - 1);
 
-	ASSERT(ubphys->ubp_uberblock.ub_txg == txg);
+	ASSERT(ub->ub_txg == txg);
 
 	for (l = 0; l < VDEV_LABELS; l++)
-		vdev_label_write(zio, vd, l, ubphys,
-		    offsetof(vdev_label_t, vl_uberblock[n]),
-		    sizeof (uberblock_phys_t), vdev_uberblock_sync_done, NULL);
+		vdev_label_write(zio, vd, l, ub,
+		    VDEV_UBERBLOCK_OFFSET(vd, n),
+		    VDEV_UBERBLOCK_SIZE(vd),
+		    vdev_uberblock_sync_done, NULL);
 
 	dprintf("vdev %s in txg %llu\n", vdev_description(vd), txg);
 }
 
 static int
-vdev_uberblock_sync_tree(spa_t *spa, uberblock_t *ub, vdev_t *uvd, uint64_t txg)
+vdev_uberblock_sync_tree(spa_t *spa, uberblock_t *ub, vdev_t *vd, uint64_t txg)
 {
-	uberblock_phys_t *ubphys;
+	uberblock_t *ubbuf;
+	size_t size = vd->vdev_top ? VDEV_UBERBLOCK_SIZE(vd) : SPA_MAXBLOCKSIZE;
 	uint64_t *good_writes;
 	zio_t *zio;
 	int error;
 
-	ubphys = zio_buf_alloc(sizeof (uberblock_phys_t));
-	bzero(ubphys, sizeof (uberblock_phys_t));
-	ubphys->ubp_uberblock = *ub;
+	ubbuf = zio_buf_alloc(size);
+	bzero(ubbuf, size);
+	*ubbuf = *ub;
 
 	good_writes = kmem_zalloc(sizeof (uint64_t), KM_SLEEP);
 
 	zio = zio_root(spa, NULL, good_writes,
 	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
 
-	vdev_uberblock_sync(zio, ubphys, uvd, txg);
+	vdev_uberblock_sync(zio, ubbuf, vd, txg);
 
 	error = zio_wait(zio);
 
@@ -602,7 +600,7 @@ vdev_uberblock_sync_tree(spa_t *spa, uberblock_t *ub, vdev_t *uvd, uint64_t txg)
 		error = EIO;
 
 	kmem_free(good_writes, sizeof (uint64_t));
-	zio_buf_free(ubphys, sizeof (uberblock_phys_t));
+	zio_buf_free(ubbuf, size);
 
 	return (error);
 }

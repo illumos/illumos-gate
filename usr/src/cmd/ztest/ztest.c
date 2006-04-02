@@ -110,10 +110,11 @@ static char *zopt_pool = cmdname;
 
 static uint64_t zopt_vdevs = 5;
 static uint64_t zopt_vdevtime;
+static int zopt_ashift = SPA_MINBLOCKSHIFT;
 static int zopt_mirrors = 2;
 static int zopt_raidz = 4;
 static size_t zopt_vdev_size = SPA_MINDEVSIZE;
-static int zopt_dirs = 7;
+static int zopt_datasets = 7;
 static int zopt_threads = 23;
 static uint64_t zopt_passtime = 60;	/* 60 seconds */
 static uint64_t zopt_killrate = 70;	/* 70% kill rate */
@@ -341,6 +342,7 @@ usage(void)
 	(void) printf("Usage: %s\n"
 	    "\t[-v vdevs (default: %llu)]\n"
 	    "\t[-s size_of_each_vdev (default: %s)]\n"
+	    "\t[-a alignment_shift (default: %d) (use 0 for random)]\n"
 	    "\t[-m mirror_copies (default: %d)]\n"
 	    "\t[-r raidz_disks (default: %d)]\n"
 	    "\t[-d datasets (default: %d)]\n"
@@ -351,17 +353,17 @@ usage(void)
 	    "\t[-p pool_name (default: %s)]\n"
 	    "\t[-f file directory for vdev files (default: %s)]\n"
 	    "\t[-V(erbose)] (use multiple times for ever more blather)\n"
-	    "\t[-E(xisting)] (use existing pool instead of creating new one\n"
-	    "\t[-I(mport)] (discover and import existing pools)\n"
+	    "\t[-E(xisting)] (use existing pool instead of creating new one)\n"
 	    "\t[-T time] total run time (default: %llu sec)\n"
 	    "\t[-P passtime] time per pass (default: %llu sec)\n"
 	    "",
 	    cmdname,
 	    (u_longlong_t)zopt_vdevs,		/* -v */
 	    nice_vdev_size,			/* -s */
+	    zopt_ashift,			/* -a */
 	    zopt_mirrors,			/* -m */
 	    zopt_raidz,				/* -r */
-	    zopt_dirs,			/* -d */
+	    zopt_datasets,			/* -d */
 	    zopt_threads,			/* -t */
 	    nice_gang_bang,			/* -g */
 	    zopt_init,				/* -i */
@@ -404,14 +406,14 @@ process_options(int argc, char **argv)
 	zio_gang_bang = 32 << 10;
 
 	while ((opt = getopt(argc, argv,
-	    "v:s:m:r:c:d:t:g:i:k:p:f:VEIT:P:S")) != EOF) {
+	    "v:s:a:m:r:d:t:g:i:k:p:f:VET:P:")) != EOF) {
 		value = 0;
 		switch (opt) {
 		    case 'v':
 		    case 's':
+		    case 'a':
 		    case 'm':
 		    case 'r':
-		    case 'c':
 		    case 'd':
 		    case 't':
 		    case 'g':
@@ -428,6 +430,9 @@ process_options(int argc, char **argv)
 		    case 's':
 			zopt_vdev_size = MAX(SPA_MINDEVSIZE, value);
 			break;
+		    case 'a':
+			zopt_ashift = value;
+			break;
 		    case 'm':
 			zopt_mirrors = value;
 			break;
@@ -435,7 +440,7 @@ process_options(int argc, char **argv)
 			zopt_raidz = MAX(1, value);
 			break;
 		    case 'd':
-			zopt_dirs = MAX(1, value);
+			zopt_datasets = MAX(1, value);
 			break;
 		    case 't':
 			zopt_threads = MAX(1, value);
@@ -478,11 +483,20 @@ process_options(int argc, char **argv)
 	zopt_maxfaults = MAX(zopt_mirrors, 1) * (zopt_raidz >= 2 ? 2 : 1) - 1;
 }
 
+static uint64_t
+ztest_get_ashift(void)
+{
+	if (zopt_ashift == 0)
+		return (SPA_MINBLOCKSHIFT + ztest_random(3));
+	return (zopt_ashift);
+}
+
 static nvlist_t *
 make_vdev_file(size_t size)
 {
 	char dev_name[MAXPATHLEN];
 	uint64_t vdev;
+	uint64_t ashift = ztest_get_ashift();
 	int fd;
 	nvlist_t *file;
 
@@ -505,6 +519,7 @@ make_vdev_file(size_t size)
 	VERIFY(nvlist_alloc(&file, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_TYPE, VDEV_TYPE_FILE) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_PATH, dev_name) == 0);
+	VERIFY(nvlist_add_uint64(file, ZPOOL_CONFIG_ASHIFT, ashift) == 0);
 
 	return (file);
 }
@@ -828,7 +843,6 @@ vdev_lookup_by_path(vdev_t *vd, const char *path)
 	return (NULL);
 }
 
-
 /*
  * Verify that we can attach and detach devices.
  */
@@ -841,6 +855,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	nvlist_t *root, *file;
 	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
 	uint64_t leaf, top;
+	uint64_t ashift = ztest_get_ashift();
 	size_t oldsize, newsize;
 	char oldpath[MAXPATHLEN], newpath[MAXPATHLEN];
 	int replacing;
@@ -917,6 +932,8 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 		expected_error = EBUSY;
 	else if (newsize < oldsize)
 		expected_error = EOVERFLOW;
+	else if (ashift > oldvd->vdev_top->vdev_ashift)
+		expected_error = EDOM;
 	else
 		expected_error = 0;
 
@@ -940,6 +957,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	VERIFY(nvlist_alloc(&file, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_TYPE, VDEV_TYPE_FILE) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_PATH, newpath) == 0);
+	VERIFY(nvlist_add_uint64(file, ZPOOL_CONFIG_ASHIFT, ashift) == 0);
 
 	VERIFY(nvlist_alloc(&root, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(root, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT) == 0);
@@ -2691,6 +2709,7 @@ ztest_replace_one_disk(spa_t *spa, uint64_t vdev)
 	nvlist_t *file, *root;
 	int error;
 	uint64_t guid;
+	uint64_t ashift = ztest_get_ashift();
 	vdev_t *vd;
 
 	(void) sprintf(dev_name, ztest_dev_template, zopt_dir, zopt_pool, vdev);
@@ -2701,6 +2720,7 @@ ztest_replace_one_disk(spa_t *spa, uint64_t vdev)
 	VERIFY(nvlist_alloc(&file, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_TYPE, VDEV_TYPE_FILE) == 0);
 	VERIFY(nvlist_add_string(file, ZPOOL_CONFIG_PATH, dev_name) == 0);
+	VERIFY(nvlist_add_uint64(file, ZPOOL_CONFIG_ASHIFT, ashift) == 0);
 
 	VERIFY(nvlist_alloc(&root, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(root, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT) == 0);
@@ -2714,7 +2734,11 @@ ztest_replace_one_disk(spa_t *spa, uint64_t vdev)
 		guid = vd->vdev_guid;
 	spa_config_exit(spa, FTAG);
 	error = spa_vdev_attach(spa, guid, root, B_TRUE);
-	if (error != 0 && error != EBUSY && error != ENOTSUP && error != ENODEV)
+	if (error != 0 &&
+	    error != EBUSY &&
+	    error != ENOTSUP &&
+	    error != ENODEV &&
+	    error != EDOM)
 		fatal(0, "spa_vdev_attach(in-place) = %d", error);
 
 	nvlist_free(file);
@@ -3032,8 +3056,8 @@ ztest_run(char *pool)
 		za[0].za_kill -= ztest_random(zopt_passtime * NANOSEC);
 
 	for (t = 0; t < zopt_threads; t++) {
-		d = t % zopt_dirs;
-		if (t < zopt_dirs) {
+		d = t % zopt_datasets;
+		if (t < zopt_datasets) {
 			ztest_replay_t zr;
 			(void) rw_rdlock(&ztest_shared->zs_name_lock);
 			(void) snprintf(name, 100, "%s/%s_%d", pool, pool, d);
@@ -3082,7 +3106,7 @@ ztest_run(char *pool)
 			fatal(0, "thr_join(%d) = %d", t, error);
 		if (za[t].za_th)
 			traverse_fini(za[t].za_th);
-		if (t < zopt_dirs) {
+		if (t < zopt_datasets) {
 			zil_close(za[t].za_zilog);
 			dmu_objset_close(za[t].za_os);
 		}
@@ -3105,7 +3129,7 @@ ztest_run(char *pool)
 	if (zs->zs_enospc_count != 0) {
 		(void) rw_rdlock(&ztest_shared->zs_name_lock);
 		(void) snprintf(name, 100, "%s/%s_%d", pool, pool,
-		    (int)ztest_random(zopt_dirs));
+		    (int)ztest_random(zopt_datasets));
 		if (zopt_verbose >= 3)
 			(void) printf("Destroying %s to free up space\n", name);
 		dmu_objset_find(name, ztest_destroy_cb, NULL,
@@ -3226,7 +3250,7 @@ main(int argc, char **argv)
 	if (zopt_verbose >= 1) {
 		(void) printf("%llu vdevs, %d datasets, %d threads,"
 		    " %llu seconds...\n",
-		    (u_longlong_t)zopt_vdevs, zopt_dirs, zopt_threads,
+		    (u_longlong_t)zopt_vdevs, zopt_datasets, zopt_threads,
 		    (u_longlong_t)zopt_time);
 	}
 

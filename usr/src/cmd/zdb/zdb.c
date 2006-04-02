@@ -366,7 +366,7 @@ static void
 dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 {
 	uint64_t alloc, offset, entry;
-	int mapshift = sm->sm_shift;
+	uint8_t mapshift = sm->sm_shift;
 	uint64_t mapstart = sm->sm_start;
 	char *ddata[] = { "ALLOC", "FREE", "CONDENSE", "INVALID" };
 
@@ -412,7 +412,7 @@ static void
 dump_metaslab(metaslab_t *msp)
 {
 	char freebuf[5];
-	space_map_obj_t *smo = msp->ms_smo;
+	space_map_obj_t *smo = &msp->ms_smo;
 	vdev_t *vd = msp->ms_group->mg_vd;
 	spa_t *spa = vd->vdev_spa;
 
@@ -921,13 +921,13 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	dnode_t *dn;
 	void *bonus = NULL;
 	size_t bsize = 0;
-	char iblk[6], dblk[6], lsize[6], psize[6], bonus_size[6], segsize[6];
+	char iblk[6], dblk[6], lsize[6], asize[6], bonus_size[6], segsize[6];
 	char aux[50];
 	int error;
 
 	if (*print_header) {
 		(void) printf("\n    Object  lvl   iblk   dblk  lsize"
-		    "  psize  type\n");
+		    "  asize  type\n");
 		*print_header = 0;
 	}
 
@@ -948,7 +948,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	nicenum(doi.doi_data_block_size, dblk);
 	nicenum(doi.doi_data_block_size * (doi.doi_max_block_offset + 1),
 	    lsize);
-	nicenum(doi.doi_physical_blks << 9, psize);
+	nicenum(doi.doi_physical_blks << 9, asize);
 	nicenum(doi.doi_bonus_size, bonus_size);
 
 	aux[0] = '\0';
@@ -963,7 +963,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 	(void) printf("%10lld  %3u  %5s  %5s  %5s  %5s  %s%s\n",
 	    (u_longlong_t)object, doi.doi_indirection, iblk, dblk, lsize,
-	    psize, dmu_ot[doi.doi_type].ot_name, aux);
+	    asize, dmu_ot[doi.doi_type].ot_name, aux);
 
 	if (doi.doi_bonus_type != DMU_OT_NONE && verbosity > 3) {
 		(void) printf("%10s  %3s  %5s  %5s  %5s  %5s  %s\n",
@@ -1214,11 +1214,9 @@ zdb_space_map_load(spa_t *spa)
 		vd = rvd->vdev_child[c];
 		for (m = 0; m < vd->vdev_ms_count; m++) {
 			metaslab_t *msp = vd->vdev_ms[m];
-			space_map_t *sm = &msp->ms_allocmap[0];
 			mutex_enter(&msp->ms_lock);
-			error = space_map_load(sm, msp->ms_smo, SM_ALLOC,
-			    spa->spa_meta_objset, msp->ms_usable_end,
-			    sm->sm_size - msp->ms_usable_space);
+			error = space_map_load(&msp->ms_allocmap[0], NULL,
+			    SM_ALLOC, &msp->ms_smo, spa->spa_meta_objset);
 			mutex_exit(&msp->ms_lock);
 			if (error)
 				fatal("%s bad space map #%d, error %d",
@@ -1314,7 +1312,7 @@ zdb_leak(space_map_t *sm, uint64_t start, uint64_t size)
 }
 
 static void
-zdb_space_map_vacate(spa_t *spa)
+zdb_space_map_unload(spa_t *spa)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
@@ -1327,6 +1325,7 @@ zdb_space_map_vacate(spa_t *spa)
 			mutex_enter(&msp->ms_lock);
 			space_map_vacate(&msp->ms_allocmap[0], zdb_leak,
 			    &msp->ms_allocmap[0]);
+			space_map_unload(&msp->ms_allocmap[0]);
 			space_map_vacate(&msp->ms_freemap[0], NULL, NULL);
 			mutex_exit(&msp->ms_lock);
 		}
@@ -1534,7 +1533,7 @@ dump_block_stats(spa_t *spa)
 	th = traverse_init(spa, zdb_blkptr_cb, &zcb, advance, flags);
 	th->th_noread = zdb_noread;
 
-	traverse_add_pool(th, 0, spa_first_txg(spa));
+	traverse_add_pool(th, 0, spa_first_txg(spa) + TXG_CONCURRENT_STATES);
 
 	while (traverse_more(th) == EAGAIN)
 		continue;
@@ -1556,7 +1555,7 @@ dump_block_stats(spa_t *spa)
 	 * Report any leaked segments.
 	 */
 	if (!dump_opt['L'])
-		zdb_space_map_vacate(spa);
+		zdb_space_map_unload(spa);
 
 	if (dump_opt['L'])
 		(void) printf("\n\n *** Live pool traversal; "

@@ -48,6 +48,7 @@ static int
 vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 {
 	vdev_disk_t *dvd;
+	struct dk_minfo dkm;
 	int error;
 
 	/*
@@ -153,27 +154,25 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 		return (EINVAL);
 	}
 
-	*ashift = SPA_MINBLOCKSHIFT;
-
-
+	/*
+	 * If we own the whole disk, try to enable disk write caching.
+	 * We ignore errors because it's OK if we can't do it.
+	 */
 	if (vd->vdev_wholedisk == 1) {
-
-		int wce, rc;
-
-		/*
-		 * Enable disk write caching if we own the whole disk.
-		 * Ignore errors as this is a performance optimization,
-		 * we work just fine w/o it.
-		 */
-		error = 0;
-		wce = 1;
-		rc = ldi_ioctl(dvd->vd_lh, DKIOCSETWCE, (intptr_t)&wce,
-			FKIOCTL, kcred, &error);
-
-		if (rc || error)
-			dprintf("%s: DKIOCSETWCE failed %d,%d",
-				vdev_description(vd), rc, error);
+		int wce = 1;
+		(void) ldi_ioctl(dvd->vd_lh, DKIOCSETWCE, (intptr_t)&wce,
+		    FKIOCTL, kcred, NULL);
 	}
+
+	/*
+	 * Determine the device's minimum transfer size.
+	 * If the ioctl isn't supported, assume DEV_BSIZE.
+	 */
+	if (ldi_ioctl(dvd->vd_lh, DKIOCGMEDIAINFO, (intptr_t)&dkm,
+	    FKIOCTL, kcred, NULL) != 0)
+		dkm.dki_lbsize = DEV_BSIZE;
+
+	*ashift = highbit(MAX(dkm.dki_lbsize, SPA_MINBLOCKSIZE)) - 1;
 
 	return (0);
 }

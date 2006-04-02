@@ -147,12 +147,9 @@ struct vdev {
 	uint64_t	vdev_ms_count;	/* number of metaslabs		*/
 	metaslab_group_t *vdev_mg;	/* metaslab group		*/
 	metaslab_t	**vdev_ms;	/* metaslab array		*/
-	space_map_obj_t	*vdev_smo;	/* metaslab space map array	*/
 	txg_list_t	vdev_ms_list;	/* per-txg dirty metaslab lists	*/
 	txg_list_t	vdev_dtl_list;	/* per-txg dirty DTL lists	*/
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
-	uint8_t		vdev_dirty[TXG_SIZE]; /* per-txg dirty flags	*/
-	uint8_t		vdev_is_dirty;	/* on config dirty list?	*/
 	uint8_t		vdev_reopen_wanted; /* async reopen wanted?	*/
 	list_node_t	vdev_dirty_node; /* config dirty list		*/
 
@@ -163,13 +160,13 @@ struct vdev {
 	space_map_obj_t	vdev_dtl;	/* dirty time log on-disk state	*/
 	txg_node_t	vdev_dtl_node;	/* per-txg dirty DTL linkage	*/
 	uint64_t	vdev_wholedisk;	/* true if this is a whole disk */
+	uint64_t	vdev_offline;	/* device taken offline?	*/
 	char		*vdev_path;	/* vdev path (if any)		*/
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	uint64_t	vdev_fault_arg; /* fault injection paramater	*/
 	int		vdev_fault_mask; /* zio types to fault		*/
 	uint8_t		vdev_fault_mode; /* fault injection mode	*/
 	uint8_t		vdev_cache_active; /* vdev_cache and vdev_queue	*/
-	uint8_t		vdev_offline;	/* device taken offline?	*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
@@ -185,14 +182,21 @@ struct vdev {
 	 * incorrect.
 	 */
 	kmutex_t	vdev_dtl_lock;	/* vdev_dtl_{map,resilver}	*/
-	kmutex_t	vdev_dirty_lock; /* vdev_dirty[]		*/
 	kmutex_t	vdev_stat_lock;	/* vdev_stat			*/
 };
 
 #define	VDEV_SKIP_SIZE		(8 << 10)
 #define	VDEV_BOOT_HEADER_SIZE	(8 << 10)
 #define	VDEV_PHYS_SIZE		(112 << 10)
-#define	VDEV_UBERBLOCKS		((128 << 10) >> UBERBLOCK_SHIFT)
+#define	VDEV_UBERBLOCK_RING	(128 << 10)
+
+#define	VDEV_UBERBLOCK_SHIFT(vd)	\
+	MAX((vd)->vdev_top->vdev_ashift, UBERBLOCK_SHIFT)
+#define	VDEV_UBERBLOCK_COUNT(vd)	\
+	(VDEV_UBERBLOCK_RING >> VDEV_UBERBLOCK_SHIFT(vd))
+#define	VDEV_UBERBLOCK_OFFSET(vd, n)	\
+	offsetof(vdev_label_t, vl_uberblock[(n) << VDEV_UBERBLOCK_SHIFT(vd)])
+#define	VDEV_UBERBLOCK_SIZE(vd)		(1ULL << VDEV_UBERBLOCK_SHIFT(vd))
 
 #define	VDEV_BOOT_MAGIC		0x2f5b007b10c	/* ZFS boot block	*/
 #define	VDEV_BOOT_VERSION	1		/* version number	*/
@@ -211,11 +215,17 @@ typedef struct vdev_phys {
 } vdev_phys_t;
 
 typedef struct vdev_label {
-	char			vl_pad[VDEV_SKIP_SIZE];		/*   8K	*/
-	vdev_boot_header_t	vl_boot_header;			/*   8K	*/
-	vdev_phys_t		vl_vdev_phys;			/* 112K	*/
-	uberblock_phys_t	vl_uberblock[VDEV_UBERBLOCKS];	/* 128K	*/
+	char		vl_pad[VDEV_SKIP_SIZE];			/*   8K	*/
+	vdev_boot_header_t vl_boot_header;			/*   8K	*/
+	vdev_phys_t	vl_vdev_phys;				/* 112K	*/
+	char		vl_uberblock[VDEV_UBERBLOCK_RING];	/* 128K	*/
 } vdev_label_t;							/* 256K total */
+
+/*
+ * vdev_dirty() flags
+ */
+#define	VDD_METASLAB	0x01
+#define	VDD_DTL		0x02
 
 /*
  * Size and offset of embedded boot loader region on each label.
@@ -223,14 +233,6 @@ typedef struct vdev_label {
  */
 #define	VDEV_BOOT_OFFSET	(2 * sizeof (vdev_label_t))
 #define	VDEV_BOOT_SIZE		(7ULL << 19)			/* 3.5M	*/
-
-/*
- * vdev_dirty[] flags
- */
-#define	VDD_ALLOC	0x01	/* allocated from in this txg		*/
-#define	VDD_FREE	0x02	/* freed to in this txg			*/
-#define	VDD_ADD		0x04	/* added to the pool in this txg	*/
-#define	VDD_DTL		0x08	/* dirty time log entry in this txg	*/
 
 /*
  * Size of label regions at the start and end of each leaf device.
@@ -264,7 +266,7 @@ extern void vdev_remove_parent(vdev_t *cvd);
 extern int vdev_load(vdev_t *vd);
 extern void vdev_sync(vdev_t *vd, uint64_t txg);
 extern void vdev_sync_done(vdev_t *vd, uint64_t txg);
-extern void vdev_dirty(vdev_t *vd, uint8_t flags, uint64_t txg);
+extern void vdev_dirty(vdev_t *vd, int flags, void *arg, uint64_t txg);
 
 /*
  * Available vdev types.

@@ -80,7 +80,7 @@ vdev_mirror_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 		}
 
 		*asize = MIN(*asize - 1, cvd->vdev_asize - 1) + 1;
-		*ashift = cvd->vdev_ashift;
+		*ashift = MAX(*ashift, cvd->vdev_ashift);
 	}
 
 	if (numerrors == vd->vdev_children) {
@@ -127,6 +127,13 @@ vdev_mirror_scrub_done(zio_t *zio)
 	mm->mm_error = zio->io_error;
 	mm->mm_tried = 1;
 	mm->mm_skipped = 0;
+}
+
+static void
+vdev_mirror_repair_done(zio_t *zio)
+{
+	ASSERT(zio->io_private == zio->io_parent);
+	vdev_mirror_map_free(zio->io_private);
 }
 
 /*
@@ -341,9 +348,18 @@ vdev_mirror_io_done(zio_t *zio)
 
 	if (good_copies && (spa_mode & FWRITE) &&
 	    (unexpected_errors || (zio->io_flags & ZIO_FLAG_RESILVER))) {
+		zio_t *rio;
+
 		/*
 		 * Use the good data we have in hand to repair damaged children.
+		 *
+		 * We issue all repair I/Os as children of 'rio' to arrange
+		 * that vdev_mirror_map_free(zio) will be invoked after all
+		 * repairs complete, but before we advance to the next stage.
 		 */
+		rio = zio_null(zio, zio->io_spa,
+		    vdev_mirror_repair_done, zio, ZIO_FLAG_CANFAIL);
+
 		for (c = 0; c < vd->vdev_children; c++) {
 			/*
 			 * Don't rewrite known good children.
@@ -368,12 +384,16 @@ vdev_mirror_io_done(zio_t *zio)
 			    vdev_description(cvd),
 			    zio->io_offset, mm[c].mm_error);
 
-			zio_nowait(zio_vdev_child_io(zio, zio->io_bp, cvd,
+			zio_nowait(zio_vdev_child_io(rio, zio->io_bp, cvd,
 			    zio->io_offset, zio->io_data, zio->io_size,
 			    ZIO_TYPE_WRITE, zio->io_priority,
 			    ZIO_FLAG_IO_REPAIR | ZIO_FLAG_CANFAIL |
 			    ZIO_FLAG_DONT_PROPAGATE, NULL, NULL));
 		}
+
+		zio_nowait(rio);
+		zio_wait_children_done(zio);
+		return;
 	}
 
 	vdev_mirror_map_free(zio);

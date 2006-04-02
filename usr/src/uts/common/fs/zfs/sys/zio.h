@@ -125,6 +125,7 @@ enum zio_compress {
 
 #define	ZIO_FLAG_RESILVER		0x01000
 #define	ZIO_FLAG_SCRUB			0x02000
+#define	ZIO_FLAG_SUBBLOCK		0x04000
 
 #define	ZIO_FLAG_NOBOOKMARK		0x10000
 

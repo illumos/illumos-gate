@@ -206,7 +206,7 @@ vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 		}
 
 		*asize = MIN(*asize - 1, cvd->vdev_asize - 1) + 1;
-		*ashift = cvd->vdev_ashift;
+		*ashift = MAX(*ashift, cvd->vdev_ashift);
 	}
 
 	*asize *= vd->vdev_children;
@@ -232,11 +232,12 @@ static uint64_t
 vdev_raidz_asize(vdev_t *vd, uint64_t psize)
 {
 	uint64_t asize;
+	uint64_t ashift = vd->vdev_top->vdev_ashift;
 	uint64_t cols = vd->vdev_children;
 
-	asize = psize >> vd->vdev_ashift;
+	asize = ((psize - 1) >> ashift) + 1;
 	asize += (asize + cols - 2) / (cols - 1);
-	asize = P2ROUNDUP(asize, VDEV_RAIDZ_ALIGN) << vd->vdev_ashift;
+	asize = P2ROUNDUP(asize, VDEV_RAIDZ_ALIGN) << ashift;
 
 	return (asize);
 }
@@ -254,28 +255,28 @@ vdev_raidz_child_done(zio_t *zio)
 static void
 vdev_raidz_repair_done(zio_t *zio)
 {
-	zio_buf_free(zio->io_data, zio->io_size);
+	ASSERT(zio->io_private == zio->io_parent);
+	vdev_raidz_map_free(zio->io_private);
 }
 
 static void
 vdev_raidz_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
+	vdev_t *tvd = vd->vdev_top;
 	vdev_t *cvd;
 	blkptr_t *bp = zio->io_bp;
 	raidz_map_t *rm;
 	raidz_col_t *rc;
 	int c;
 
-	rm = vdev_raidz_map_alloc(zio, vd->vdev_ashift, vd->vdev_children);
+	rm = vdev_raidz_map_alloc(zio, tvd->vdev_ashift, vd->vdev_children);
 
 	if (DVA_GET_GANG(ZIO_GET_DVA(zio))) {
 		ASSERT3U(rm->rm_asize, ==,
 		    vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE));
-		ASSERT3U(zio->io_size, ==, SPA_GANGBLOCKSIZE);
 	} else {
 		ASSERT3U(rm->rm_asize, ==, DVA_GET_ASIZE(ZIO_GET_DVA(zio)));
-		ASSERT3U(zio->io_size, ==, BP_GET_PSIZE(bp));
 	}
 
 	if (zio->io_type == ZIO_TYPE_WRITE) {
@@ -549,34 +550,40 @@ done:
 
 	if (zio->io_error == 0 && (spa_mode & FWRITE) &&
 	    (unexpected_errors || (zio->io_flags & ZIO_FLAG_RESILVER))) {
+		zio_t *rio;
+
 		/*
 		 * Use the good data we have in hand to repair damaged children.
+		 *
+		 * We issue all repair I/Os as children of 'rio' to arrange
+		 * that vdev_raidz_map_free(zio) will be invoked after all
+		 * repairs complete, but before we advance to the next stage.
 		 */
+		rio = zio_null(zio, zio->io_spa,
+		    vdev_raidz_repair_done, zio, ZIO_FLAG_CANFAIL);
+
 		for (c = 0; c < rm->rm_cols; c++) {
 			rc = &rm->rm_col[c];
 			cvd = vd->vdev_child[rc->rc_col];
 
-			if (rc->rc_error) {
-				/*
-				 * Make a copy of the data because we're
-				 * going to free the RAID-Z map below.
-				 */
-				void *data = zio_buf_alloc(rc->rc_size);
-				bcopy(rc->rc_data, data, rc->rc_size);
+			if (rc->rc_error == 0)
+				continue;
 
-				dprintf("%s resilvered %s @ 0x%llx error %d\n",
-				    vdev_description(vd),
-				    vdev_description(cvd),
-				    zio->io_offset, rc->rc_error);
+			dprintf("%s resilvered %s @ 0x%llx error %d\n",
+			    vdev_description(vd),
+			    vdev_description(cvd),
+			    zio->io_offset, rc->rc_error);
 
-				zio_nowait(zio_vdev_child_io(zio, NULL, cvd,
-				    rc->rc_offset, data, rc->rc_size,
-				    ZIO_TYPE_WRITE, zio->io_priority,
-				    ZIO_FLAG_IO_REPAIR | ZIO_FLAG_CANFAIL |
-				    ZIO_FLAG_DONT_PROPAGATE,
-				    vdev_raidz_repair_done, NULL));
-			}
+			zio_nowait(zio_vdev_child_io(rio, NULL, cvd,
+			    rc->rc_offset, rc->rc_data, rc->rc_size,
+			    ZIO_TYPE_WRITE, zio->io_priority,
+			    ZIO_FLAG_IO_REPAIR | ZIO_FLAG_CANFAIL |
+			    ZIO_FLAG_DONT_PROPAGATE, NULL, NULL));
 		}
+
+		zio_nowait(rio);
+		zio_wait_children_done(zio);
+		return;
 	}
 
 	vdev_raidz_map_free(zio);

@@ -28,6 +28,7 @@
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/dmu.h>
+#include <sys/zio.h>
 #include <sys/space_map.h>
 
 /*
@@ -54,22 +55,24 @@ space_map_seg_compare(const void *x1, const void *x2)
 }
 
 void
-space_map_create(space_map_t *sm, uint64_t start, uint64_t size, uint64_t shift,
+space_map_create(space_map_t *sm, uint64_t start, uint64_t size, uint8_t shift,
 	kmutex_t *lp)
 {
+	bzero(sm, sizeof (*sm));
+
 	avl_create(&sm->sm_root, space_map_seg_compare,
 	    sizeof (space_seg_t), offsetof(struct space_seg, ss_node));
+
 	sm->sm_start = start;
-	sm->sm_end = start + size;
 	sm->sm_size = size;
 	sm->sm_shift = shift;
-	sm->sm_space = 0;
 	sm->sm_lock = lp;
 }
 
 void
 space_map_destroy(space_map_t *sm)
 {
+	ASSERT(!sm->sm_loaded && !sm->sm_loading);
 	VERIFY3U(sm->sm_space, ==, 0);
 	avl_destroy(&sm->sm_root);
 }
@@ -85,7 +88,7 @@ space_map_add(space_map_t *sm, uint64_t start, uint64_t size)
 	ASSERT(MUTEX_HELD(sm->sm_lock));
 	VERIFY(size != 0);
 	VERIFY3U(start, >=, sm->sm_start);
-	VERIFY3U(end, <=, sm->sm_end);
+	VERIFY3U(end, <=, sm->sm_start + sm->sm_size);
 	VERIFY(sm->sm_space + size <= sm->sm_size);
 	VERIFY(P2PHASE(start, 1ULL << sm->sm_shift) == 0);
 	VERIFY(P2PHASE(size, 1ULL << sm->sm_shift) == 0);
@@ -201,18 +204,12 @@ space_map_vacate(space_map_t *sm, space_map_func_t *func, space_map_t *mdest)
 }
 
 void
-space_map_iterate(space_map_t *sm, space_map_func_t *func, space_map_t *mdest)
+space_map_walk(space_map_t *sm, space_map_func_t *func, space_map_t *mdest)
 {
 	space_seg_t *ss;
 
 	for (ss = avl_first(&sm->sm_root); ss; ss = AVL_NEXT(&sm->sm_root, ss))
 		func(mdest, ss->ss_start, ss->ss_end - ss->ss_start);
-}
-
-void
-space_map_merge(space_map_t *src, space_map_t *dest)
-{
-	space_map_vacate(src, space_map_add, dest);
 }
 
 void
@@ -266,24 +263,56 @@ space_map_union(space_map_t *smd, space_map_t *sms)
 	}
 }
 
+/*
+ * Wait for any in-progress space_map_load() to complete.
+ */
+void
+space_map_load_wait(space_map_t *sm)
+{
+	ASSERT(MUTEX_HELD(sm->sm_lock));
+
+	while (sm->sm_loading)
+		cv_wait(&sm->sm_load_cv, sm->sm_lock);
+}
+
+/*
+ * Note: space_map_load() will drop sm_lock across dmu_read() calls.
+ * The caller must be OK with this.
+ */
 int
-space_map_load(space_map_t *sm, space_map_obj_t *smo, uint8_t maptype,
-	objset_t *os, uint64_t end, uint64_t space)
+space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
+	space_map_obj_t *smo, objset_t *os)
 {
 	uint64_t *entry, *entry_map, *entry_map_end;
 	uint64_t bufsize, size, offset;
 	uint64_t mapstart = sm->sm_start;
+	uint64_t end = smo->smo_objsize;
+	uint64_t space = smo->smo_alloc;
 
 	ASSERT(MUTEX_HELD(sm->sm_lock));
-	VERIFY3U(sm->sm_space, ==, 0);
 
-	bufsize = MIN(end, SPACE_MAP_CHUNKSIZE);
-	entry_map = kmem_alloc(bufsize, KM_SLEEP);
+	space_map_load_wait(sm);
+
+	if (sm->sm_loaded)
+		return (0);
+
+	sm->sm_loading = B_TRUE;
+
+	ASSERT(sm->sm_ops == NULL);
+	VERIFY3U(sm->sm_space, ==, 0);
 
 	if (maptype == SM_FREE) {
 		space_map_add(sm, sm->sm_start, sm->sm_size);
 		space = sm->sm_size - space;
 	}
+
+	bufsize = 1ULL << SPACE_MAP_BLOCKSHIFT;
+	entry_map = zio_buf_alloc(bufsize);
+
+	mutex_exit(sm->sm_lock);
+	if (end > bufsize)
+		dmu_prefetch(os, smo->smo_object, bufsize, end - bufsize);
+	mutex_enter(sm->sm_lock);
 
 	for (offset = 0; offset < end; offset += bufsize) {
 		size = MIN(end - offset, bufsize);
@@ -292,8 +321,11 @@ space_map_load(space_map_t *sm, space_map_obj_t *smo, uint8_t maptype,
 
 		dprintf("object=%llu  offset=%llx  size=%llx\n",
 		    smo->smo_object, offset, size);
-		VERIFY(0 == dmu_read(os, smo->smo_object, offset, size,
-		    entry_map));
+
+		mutex_exit(sm->sm_lock);
+		VERIFY3U(dmu_read(os, smo->smo_object, offset, size,
+		    entry_map), ==, 0);
+		mutex_enter(sm->sm_lock);
 
 		entry_map_end = entry_map + (size / sizeof (uint64_t));
 		for (entry = entry_map; entry < entry_map_end; entry++) {
@@ -310,14 +342,65 @@ space_map_load(space_map_t *sm, space_map_obj_t *smo, uint8_t maptype,
 	}
 	VERIFY3U(sm->sm_space, ==, space);
 
-	kmem_free(entry_map, bufsize);
+	zio_buf_free(entry_map, bufsize);
+
+	sm->sm_loading = B_FALSE;
+	sm->sm_loaded = B_TRUE;
+	sm->sm_ops = ops;
+
+	cv_broadcast(&sm->sm_load_cv);
+
+	if (ops != NULL)
+		ops->smop_load(sm);
 
 	return (0);
 }
 
 void
-space_map_sync(space_map_t *sm, space_map_t *dest, space_map_obj_t *smo,
-    uint8_t maptype, objset_t *os, dmu_tx_t *tx)
+space_map_unload(space_map_t *sm)
+{
+	ASSERT(MUTEX_HELD(sm->sm_lock));
+
+	if (sm->sm_loaded && sm->sm_ops != NULL)
+		sm->sm_ops->smop_unload(sm);
+
+	sm->sm_loaded = B_FALSE;
+	sm->sm_ops = NULL;
+
+	space_map_vacate(sm, NULL, NULL);
+}
+
+uint64_t
+space_map_alloc(space_map_t *sm, uint64_t size)
+{
+	uint64_t start;
+
+	start = sm->sm_ops->smop_alloc(sm, size);
+	if (start != -1ULL)
+		space_map_remove(sm, start, size);
+	return (start);
+}
+
+void
+space_map_claim(space_map_t *sm, uint64_t start, uint64_t size)
+{
+	sm->sm_ops->smop_claim(sm, start, size);
+	space_map_remove(sm, start, size);
+}
+
+void
+space_map_free(space_map_t *sm, uint64_t start, uint64_t size)
+{
+	space_map_add(sm, start, size);
+	sm->sm_ops->smop_free(sm, start, size);
+}
+
+/*
+ * Note: space_map_sync() will drop sm_lock across dmu_write() calls.
+ */
+void
+space_map_sync(space_map_t *sm, uint8_t maptype,
+	space_map_obj_t *smo, objset_t *os, dmu_tx_t *tx)
 {
 	spa_t *spa = dmu_objset_spa(os);
 	void *cookie = NULL;
@@ -335,9 +418,14 @@ space_map_sync(space_map_t *sm, space_map_t *dest, space_map_obj_t *smo,
 	    maptype == SM_ALLOC ? 'A' : 'F', avl_numnodes(&sm->sm_root),
 	    sm->sm_space);
 
+	if (maptype == SM_ALLOC)
+		smo->smo_alloc += sm->sm_space;
+	else
+		smo->smo_alloc -= sm->sm_space;
+
 	bufsize = (8 + avl_numnodes(&sm->sm_root)) * sizeof (uint64_t);
-	bufsize = MIN(bufsize, SPACE_MAP_CHUNKSIZE);
-	entry_map = kmem_alloc(bufsize, KM_SLEEP);
+	bufsize = MIN(bufsize, 1ULL << SPACE_MAP_BLOCKSHIFT);
+	entry_map = zio_buf_alloc(bufsize);
 	entry_map_end = entry_map + (bufsize / sizeof (uint64_t));
 	entry = entry_map;
 
@@ -350,9 +438,6 @@ space_map_sync(space_map_t *sm, space_map_t *dest, space_map_obj_t *smo,
 		size = ss->ss_end - ss->ss_start;
 		start = (ss->ss_start - sm->sm_start) >> sm->sm_shift;
 
-		if (dest)
-			space_map_add(dest, ss->ss_start, size);
-
 		sm->sm_space -= size;
 		size >>= sm->sm_shift;
 
@@ -360,8 +445,10 @@ space_map_sync(space_map_t *sm, space_map_t *dest, space_map_obj_t *smo,
 			run_len = MIN(size, SM_RUN_MAX);
 
 			if (entry == entry_map_end) {
+				mutex_exit(sm->sm_lock);
 				dmu_write(os, smo->smo_object, smo->smo_objsize,
 				    bufsize, entry_map, tx);
+				mutex_enter(sm->sm_lock);
 				smo->smo_objsize += bufsize;
 				entry = entry_map;
 			}
@@ -378,30 +465,23 @@ space_map_sync(space_map_t *sm, space_map_t *dest, space_map_obj_t *smo,
 
 	if (entry != entry_map) {
 		size = (entry - entry_map) * sizeof (uint64_t);
+		mutex_exit(sm->sm_lock);
 		dmu_write(os, smo->smo_object, smo->smo_objsize,
 		    size, entry_map, tx);
+		mutex_enter(sm->sm_lock);
 		smo->smo_objsize += size;
 	}
 
-	kmem_free(entry_map, bufsize);
+	zio_buf_free(entry_map, bufsize);
 
 	VERIFY3U(sm->sm_space, ==, 0);
 }
 
 void
-space_map_write(space_map_t *sm, space_map_obj_t *smo, objset_t *os,
-    dmu_tx_t *tx)
+space_map_truncate(space_map_obj_t *smo, objset_t *os, dmu_tx_t *tx)
 {
-	uint64_t oldsize = smo->smo_objsize;
-
-	VERIFY(0 == dmu_free_range(os, smo->smo_object, 0,
-	    smo->smo_objsize, tx));
+	VERIFY(dmu_free_range(os, smo->smo_object, 0, -1ULL, tx) == 0);
 
 	smo->smo_objsize = 0;
-
-	VERIFY3U(sm->sm_space, ==, smo->smo_alloc);
-	space_map_sync(sm, NULL, smo, SM_ALLOC, os, tx);
-
-	dprintf("write sm object %llu from %llu to %llu bytes in txg %llu\n",
-	    smo->smo_object, oldsize, smo->smo_objsize, dmu_tx_get_txg(tx));
+	smo->smo_alloc = 0;
 }

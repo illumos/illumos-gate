@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,13 +44,9 @@ extern "C" {
  * version mismatch.  If the ub_magic field is moved, applications that
  * expect the magic number in the first word won't work.
  */
-
-#define	UBERBLOCK_SHIFT		(10)
-#define	UBERBLOCK_SIZE		(1ULL << UBERBLOCK_SHIFT)
-
 #define	UBERBLOCK_MAGIC		0x00bab10c		/* oo-ba-bloc!	*/
-
 #define	UBERBLOCK_VERSION	1ULL
+#define	UBERBLOCK_SHIFT		10			/* up to 1K	*/
 
 struct uberblock {
 	uint64_t	ub_magic;	/* UBERBLOCK_MAGIC		*/
@@ -61,13 +56,6 @@ struct uberblock {
 	uint64_t	ub_timestamp;	/* UTC time of last sync	*/
 	blkptr_t	ub_rootbp;	/* MOS objset_phys_t		*/
 };
-
-typedef struct uberblock_phys {
-	uberblock_t	ubp_uberblock;
-	char		ubp_pad[UBERBLOCK_SIZE - sizeof (uberblock_t) -
-	    sizeof (zio_block_tail_t)];
-	zio_block_tail_t ubp_zbt;
-} uberblock_phys_t;
 
 #ifdef	__cplusplus
 }

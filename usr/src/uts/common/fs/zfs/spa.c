@@ -341,8 +341,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * If the vdev guid sum doesn't match the uberblock, we have an
 	 * incomplete configuration.
 	 */
-	if (rvd->vdev_guid_sum != ub->ub_guid_sum && (mosconfig ||
-	    state == SPA_LOAD_IMPORT || state == SPA_LOAD_TRYIMPORT)) {
+	if (rvd->vdev_guid_sum != ub->ub_guid_sum && mosconfig) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_BAD_GUID_SUM);
 		error = ENXIO;
@@ -842,8 +841,10 @@ spa_import(const char *pool, nvlist_t *config, const char *altroot)
 
 	/*
 	 * Pass off the heavy lifting to spa_load().
+	 * Pass TRUE for mosconfig because the user-supplied config
+	 * is actually the one to trust when doing an import.
 	 */
-	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_FALSE);
+	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_TRUE);
 
 	if (error) {
 		spa_unload(spa);
@@ -898,8 +899,10 @@ spa_tryimport(nvlist_t *tryconfig)
 
 	/*
 	 * Pass off the heavy lifting to spa_load().
+	 * Pass TRUE for mosconfig because the user-supplied config
+	 * is actually the one to trust when doing an import.
 	 */
-	(void) spa_load(spa, tryconfig, SPA_LOAD_TRYIMPORT, B_FALSE);
+	(void) spa_load(spa, tryconfig, SPA_LOAD_TRYIMPORT, B_TRUE);
 
 	/*
 	 * If 'tryconfig' was at least parsable, return the current config.
@@ -1163,7 +1166,11 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	if (newvd->vdev_psize < vdev_get_rsize(oldvd))
 		return (spa_vdev_exit(spa, newrootvd, txg, EOVERFLOW));
 
-	if (newvd->vdev_ashift != oldvd->vdev_ashift && oldvd->vdev_ashift != 0)
+	/*
+	 * The new device cannot have a higher alignment requirement
+	 * than the top-level vdev.
+	 */
+	if (newvd->vdev_ashift > oldvd->vdev_top->vdev_ashift)
 		return (spa_vdev_exit(spa, newrootvd, txg, EDOM));
 
 	/*
@@ -1228,8 +1235,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	/*
 	 * Mark newvd's DTL dirty in this txg.
 	 */
-	vdev_dirty(tvd, VDD_DTL, txg);
-	(void) txg_list_add(&tvd->vdev_dtl_list, newvd, txg);
+	vdev_dirty(tvd, VDD_DTL, newvd, txg);
 
 	(void) spa_vdev_exit(spa, newrootvd, open_txg, 0);
 
@@ -1356,12 +1362,11 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 
 	/*
 	 * If the device we just detached was smaller than the others,
-	 * it may be possible to add metaslabs (i.e. grow the pool).  We ignore
-	 * the error here because the detach still succeeded - we just weren't
-	 * able to reinitialize the metaslabs.  This pool is in for a world of
-	 * hurt, in any case.
+	 * it may be possible to add metaslabs (i.e. grow the pool).
+	 * vdev_metaslab_init() can't fail because the existing metaslabs
+	 * are already in core, so there's nothing to read from disk.
 	 */
-	(void) vdev_metaslab_init(tvd, txg);
+	VERIFY(vdev_metaslab_init(tvd, txg) == 0);
 
 	vdev_config_dirty(tvd);
 
@@ -1372,11 +1377,10 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 * But first make sure we're not on any *other* txg's DTL list,
 	 * to prevent vd from being accessed after it's freed.
 	 */
-	vdev_dirty(tvd, VDD_DTL, txg);
-	vd->vdev_detached = B_TRUE;
 	for (t = 0; t < TXG_SIZE; t++)
 		(void) txg_list_remove_this(&tvd->vdev_dtl_list, vd, t);
-	(void) txg_list_add(&tvd->vdev_dtl_list, vd, txg);
+	vd->vdev_detached = B_TRUE;
+	vdev_dirty(tvd, VDD_DTL, vd, txg);
 
 	dprintf("detached %s in txg %llu\n", vd->vdev_path, txg);
 
@@ -1798,10 +1802,13 @@ spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force)
 	if (rvd->vdev_dtl_map.sm_space == 0) {
 		/*
 		 * The pool-wide DTL is empty.
-		 * If this is a resilver, there's nothing to do.
+		 * If this is a resilver, there's nothing to do except
+		 * check whether any in-progress replacements have completed.
 		 */
-		if (type == POOL_SCRUB_RESILVER)
+		if (type == POOL_SCRUB_RESILVER) {
 			type = POOL_SCRUB_NONE;
+			spa_async_request(spa, SPA_ASYNC_REPLACE_DONE);
+		}
 	} else {
 		/*
 		 * The pool-wide DTL is non-empty.

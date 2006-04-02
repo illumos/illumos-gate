@@ -405,7 +405,6 @@ static int
 blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	blkptr_t bp;
-	dva_t *dva;
 	dmu_object_type_info_t *doti;
 	zio_compress_info_t *zct;
 	zio_checksum_info_t *zci;
@@ -439,17 +438,20 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
-		dva = &bp.blk_dva[i];
-		mdb_printf("DVA[%d]: vdev_id %lld / %llx\n", i,
-		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva));
-		mdb_printf("DVA[%d]:                    GRID:  %04x\t"
-		    "ASIZE: %llx\n", i, DVA_GET_GRID(dva), DVA_GET_ASIZE(dva));
+		dva_t *dva = &bp.blk_dva[i];
+		mdb_printf("DVA[%d]: GANG: %-5s  GRID: %2x  ASIZE: %5x  "
+		    "vdev %llu  offset %llx\n",
+		    i,
+		    DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
+		    DVA_GET_GRID(dva),
+		    DVA_GET_ASIZE(dva),
+		    DVA_GET_VDEV(dva),
+		    DVA_GET_OFFSET(dva));
 	}
 	mdb_printf("LSIZE:  %-16llx\t\tPSIZE: %llx\n",
 	    BP_GET_LSIZE(&bp), BP_GET_PSIZE(&bp));
-	mdb_printf("ENDIAN: %6s             GANG:  %-5s\tTYPE:  %s\n",
+	mdb_printf("ENDIAN: %-6s  TYPE: %s\n",
 	    BP_GET_BYTEORDER(&bp) ? "LITTLE" : "BIG",
-	    DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
 	    doti[BP_GET_TYPE(&bp)].ot_name);
 	mdb_printf("BIRTH:  %-16llx   LEVEL: %-2d\tFILL:  %llx\n",
 	    bp.blk_birth, BP_GET_LEVEL(&bp), bp.blk_fill);
@@ -1146,7 +1148,7 @@ typedef struct mdb_metaslab {
 	space_map_t ms_allocmap[TXG_SIZE];
 	space_map_t ms_freemap[TXG_SIZE];
 	space_map_t ms_map;
-	uint64_t ms_usable_space;
+	space_map_obj_t ms_smo;
 } mdb_metaslab_t;
 
 /*
@@ -1170,7 +1172,7 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint64_t ms_allocmap[TXG_SIZE] = {0, 0, 0, 0};
 	uint64_t ms_freemap[TXG_SIZE] = {0, 0, 0, 0};
 	uint64_t ms_map = 0;
-	uint64_t ms_usable_space = 0;
+	uint64_t avail = 0;
 	int i, j;
 	int havecompressed = TRUE;
 	int shift = 20;
@@ -1282,7 +1284,7 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    GETMEMB(vdev_ms[j], struct metaslab,
 			    ms_map, ms.ms_map) ||
 			    GETMEMB(vdev_ms[j], struct metaslab,
-			    ms_usable_space, ms.ms_usable_space)) {
+			    ms_smo, ms.ms_smo)) {
 				return (DCMD_ERR);
 			}
 
@@ -1295,7 +1297,7 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			ms_freemap[2] += ms.ms_freemap[2].sm_space;
 			ms_freemap[3] += ms.ms_freemap[3].sm_space;
 			ms_map += ms.ms_map.sm_space;
-			ms_usable_space += ms.ms_usable_space;
+			avail += ms.ms_map.sm_size - ms.ms_smo.smo_alloc;
 		}
 	}
 
@@ -1310,8 +1312,7 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    ms_freemap[2] >> shift, suffix,
 	    ms_freemap[3] >> shift, suffix);
 	mdb_printf("ms_map = %llu%s\n", ms_map >> shift, suffix);
-	mdb_printf("ms_usable_space = %llu%s\n",
-	    ms_usable_space >> shift, suffix);
+	mdb_printf("avail = %llu%s\n", avail >> shift, suffix);
 
 	return (DCMD_OK);
 }

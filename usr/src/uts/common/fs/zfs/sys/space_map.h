@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,13 +35,20 @@
 extern "C" {
 #endif
 
+typedef struct space_map_ops space_map_ops_t;
+
 typedef struct space_map {
-	avl_tree_t	sm_root;	/* Root of the AVL tree */
-	uint64_t	sm_start;	/* Start of map (inclusive) */
-	uint64_t	sm_end;		/* End of map (exclusive) */
-	uint64_t	sm_size;	/* Size of map (end - start) */
-	uint64_t	sm_shift;	/* Unit shift */
-	uint64_t	sm_space;	/* Sum of all segments in the map */
+	avl_tree_t	sm_root;	/* AVL tree of map segments */
+	uint64_t	sm_space;	/* sum of all segments in the map */
+	uint64_t	sm_start;	/* start of map */
+	uint64_t	sm_size;	/* size of map */
+	uint8_t		sm_shift;	/* unit shift */
+	uint8_t		sm_pad[3];	/* unused */
+	uint8_t		sm_loaded;	/* map loaded? */
+	uint8_t		sm_loading;	/* map loading? */
+	kcondvar_t	sm_load_cv;	/* map load completion */
+	space_map_ops_t	*sm_ops;	/* space map block picker ops vector */
+	void		*sm_ppd;	/* picker-private data */
 	kmutex_t	*sm_lock;	/* pointer to lock that protects map */
 } space_map_t;
 
@@ -57,6 +63,14 @@ typedef struct space_map_obj {
 	uint64_t	smo_objsize;	/* size of the object */
 	uint64_t	smo_alloc;	/* space allocated from the map */
 } space_map_obj_t;
+
+struct space_map_ops {
+	void	(*smop_load)(space_map_t *sm);
+	void	(*smop_unload)(space_map_t *sm);
+	uint64_t (*smop_alloc)(space_map_t *sm, uint64_t size);
+	void	(*smop_claim)(space_map_t *sm, uint64_t start, uint64_t size);
+	void	(*smop_free)(space_map_t *sm, uint64_t start, uint64_t size);
+};
 
 /*
  * debug entry
@@ -112,29 +126,33 @@ typedef struct space_map_obj {
  */
 #define	SPACE_MAP_BLOCKSHIFT	12
 
-#define	SPACE_MAP_CHUNKSIZE	(1<<20)
-
 typedef void space_map_func_t(space_map_t *sm, uint64_t start, uint64_t size);
 
 extern void space_map_create(space_map_t *sm, uint64_t start, uint64_t size,
-    uint64_t shift, kmutex_t *lp);
+    uint8_t shift, kmutex_t *lp);
 extern void space_map_destroy(space_map_t *sm);
 extern void space_map_add(space_map_t *sm, uint64_t start, uint64_t size);
 extern void space_map_remove(space_map_t *sm, uint64_t start, uint64_t size);
 extern int space_map_contains(space_map_t *sm, uint64_t start, uint64_t size);
 extern void space_map_vacate(space_map_t *sm,
     space_map_func_t *func, space_map_t *mdest);
-extern void space_map_iterate(space_map_t *sm,
+extern void space_map_walk(space_map_t *sm,
     space_map_func_t *func, space_map_t *mdest);
-extern void space_map_merge(space_map_t *dest, space_map_t *src);
 extern void space_map_excise(space_map_t *sm, uint64_t start, uint64_t size);
 extern void space_map_union(space_map_t *smd, space_map_t *sms);
 
-extern int space_map_load(space_map_t *sm, space_map_obj_t *smo,
-    uint8_t maptype, objset_t *os, uint64_t end, uint64_t space);
-extern void space_map_sync(space_map_t *sm, space_map_t *dest,
-    space_map_obj_t *smo, uint8_t maptype, objset_t *os, dmu_tx_t *tx);
-extern void space_map_write(space_map_t *sm, space_map_obj_t *smo,
+extern void space_map_load_wait(space_map_t *sm);
+extern int space_map_load(space_map_t *sm, space_map_ops_t *ops,
+    uint8_t maptype, space_map_obj_t *smo, objset_t *os);
+extern void space_map_unload(space_map_t *sm);
+
+extern uint64_t space_map_alloc(space_map_t *sm, uint64_t size);
+extern void space_map_claim(space_map_t *sm, uint64_t start, uint64_t size);
+extern void space_map_free(space_map_t *sm, uint64_t start, uint64_t size);
+
+extern void space_map_sync(space_map_t *sm, uint8_t maptype,
+    space_map_obj_t *smo, objset_t *os, dmu_tx_t *tx);
+extern void space_map_truncate(space_map_obj_t *smo,
     objset_t *os, dmu_tx_t *tx);
 
 #ifdef	__cplusplus

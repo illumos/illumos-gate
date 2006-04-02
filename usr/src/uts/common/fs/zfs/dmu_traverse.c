@@ -283,17 +283,19 @@ traverse_callback(traverse_handle_t *th, zseg_t *zseg, traverse_blk_cache_t *bc)
 	if (bc->bc_errno == 0 && bc->bc_blkptr.blk_birth >= zseg->seg_maxtxg)
 		return (0);
 
-	if (bc->bc_errno == 0) {
+	/*
+	 * Debugging: verify that the order we visit things agrees with the
+	 * order defined by compare_bookmark().  We don't check this for
+	 * log blocks because there's no defined ordering for them; they're
+	 * always visited (or not) as part of visiting the objset_phys_t.
+	 */
+	if (bc->bc_errno == 0 && bc != &th->th_zil_cache) {
 		zbookmark_t *zb = &bc->bc_bookmark;
 		zbookmark_t *szb = &zseg->seg_start;
 		zbookmark_t *ezb = &zseg->seg_end;
 		zbookmark_t *lzb = &th->th_lastcb;
 		dnode_phys_t *dnp = bc->bc_dnode;
 
-		/*
-		 * Debugging: verify that the order we visit things
-		 * agrees with the order defined by compare_bookmark().
-		 */
 		ASSERT(compare_bookmark(zb, ezb, dnp, th->th_advance) <= 0);
 		ASSERT(compare_bookmark(zb, szb, dnp, th->th_advance) == 0);
 		ASSERT(compare_bookmark(lzb, zb, dnp, th->th_advance) < 0 ||
@@ -477,15 +479,14 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 	zbookmark_t *zb = &bc->bc_bookmark;
 	zseg_t *zseg = list_head(&th->th_seglist);
 
-	if (bp->blk_birth <= zseg->seg_mintxg ||
-	    bp->blk_birth >= zseg->seg_maxtxg)
+	if (bp->blk_birth <= zseg->seg_mintxg)
 		return;
 
 	if (claim_txg != 0 || bp->blk_birth < spa_first_txg(th->th_spa)) {
 		zb->zb_object = 0;
 		zb->zb_blkid = bp->blk_cksum.zc_word[3];
 		bc->bc_blkptr = *bp;
-		(void) th->th_func(bc, th->th_spa, th->th_arg);
+		(void) traverse_callback(th, zseg, bc);
 	}
 }
 
@@ -502,15 +503,14 @@ traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 		lr_write_t *lr = (lr_write_t *)lrc;
 		blkptr_t *bp = &lr->lr_blkptr;
 
-		if (bp->blk_birth <= zseg->seg_mintxg ||
-		    bp->blk_birth >= zseg->seg_maxtxg)
+		if (bp->blk_birth <= zseg->seg_mintxg)
 			return;
 
 		if (claim_txg != 0 && bp->blk_birth >= claim_txg) {
 			zb->zb_object = lr->lr_foid;
 			zb->zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
 			bc->bc_blkptr = *bp;
-			(void) th->th_func(bc, th->th_spa, th->th_arg);
+			(void) traverse_callback(th, zseg, bc);
 		}
 	}
 }
@@ -588,6 +588,20 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 		dn = &((objset_phys_t *)bc->bc_data)->os_meta_dnode;
 
 		SET_BOOKMARK(&bc->bc_bookmark, objset, 0, -1, 0);
+
+		/*
+		 * If we're traversing an open snapshot, we know that it
+		 * can't be deleted (because it's open) and it can't change
+		 * (because it's a snapshot).  Therefore, once we've gotten
+		 * from the uberblock down to the snapshot's objset_phys_t,
+		 * we no longer need to synchronize with spa_sync(); we're
+		 * traversing a completely static block tree from here on.
+		 */
+		if (th->th_advance & ADVANCE_NOLOCK) {
+			ASSERT(th->th_locked);
+			rw_exit(spa_traverse_rwlock(th->th_spa));
+			th->th_locked = 0;
+		}
 
 		rc = traverse_read(th, bc, &dsp->ds_bp, dn);
 
@@ -669,7 +683,7 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 		/*
 		 * Give spa_sync() a chance to run.
 		 */
-		if (spa_traverse_wanted(th->th_spa)) {
+		if (th->th_locked && spa_traverse_wanted(th->th_spa)) {
 			th->th_syncs++;
 			return (EAGAIN);
 		}
@@ -723,14 +737,15 @@ traverse_more(traverse_handle_t *th)
 
 	save_txg = zseg->seg_mintxg;
 
-	if (!(th->th_advance & ADVANCE_NOLOCK))
-		rw_enter(rw, RW_READER);
+	rw_enter(rw, RW_READER);
+	th->th_locked = 1;
 
 	rc = traverse_segment(th, zseg, mosbp);
 	ASSERT(rc == ERANGE || rc == EAGAIN || rc == EINTR);
 
-	if (!(th->th_advance & ADVANCE_NOLOCK))
+	if (th->th_locked)
 		rw_exit(rw);
+	th->th_locked = 0;
 
 	zseg->seg_mintxg = save_txg;
 

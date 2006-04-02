@@ -762,10 +762,9 @@ zio_done(zio_t *zio)
 		 * at the block level.  We ignore these errors if the
 		 * device is currently unavailable.
 		 */
-		if (zio->io_error != ECKSUM && zio->io_vd &&
-		    !vdev_is_dead(zio->io_vd))
+		if (zio->io_error != ECKSUM && vd != NULL && !vdev_is_dead(vd))
 			zfs_ereport_post(FM_EREPORT_ZFS_IO,
-			    zio->io_spa, zio->io_vd, zio, 0, 0);
+			    zio->io_spa, vd, zio, 0, 0);
 
 		if ((zio->io_error == EIO ||
 		    !(zio->io_flags & ZIO_FLAG_SPECULATIVE)) &&
@@ -1238,7 +1237,7 @@ zio_dva_free(zio_t *zio)
 
 	ASSERT(!BP_IS_HOLE(bp));
 
-	metaslab_free(zio->io_spa, dva, zio->io_txg);
+	metaslab_free(zio->io_spa, dva, zio->io_txg, B_FALSE);
 
 	BP_ZERO(bp);
 
@@ -1288,14 +1287,29 @@ static void
 zio_vdev_io_setup(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
+	vdev_t *tvd = vd->vdev_top;
+	uint64_t align = 1ULL << tvd->vdev_ashift;
 
 	/* XXPOLICY */
-	if (zio->io_retries == 0 && vd == vd->vdev_top)
+	if (zio->io_retries == 0 && vd == tvd)
 		zio->io_flags |= ZIO_FLAG_FAILFAST;
 
 	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) && vd->vdev_children == 0) {
 		zio->io_flags |= ZIO_FLAG_PHYSICAL;
 		zio->io_offset += VDEV_LABEL_START_SIZE;
+	}
+
+	if (P2PHASE(zio->io_size, align) != 0) {
+		uint64_t asize = P2ROUNDUP(zio->io_size, align);
+		char *abuf = zio_buf_alloc(asize);
+		ASSERT(vd == tvd);
+		if (zio->io_type == ZIO_TYPE_WRITE) {
+			bcopy(zio->io_data, abuf, zio->io_size);
+			bzero(abuf + zio->io_size, asize - zio->io_size);
+		}
+		zio_push_transform(zio, abuf, asize, asize);
+		ASSERT(!(zio->io_flags & ZIO_FLAG_SUBBLOCK));
+		zio->io_flags |= ZIO_FLAG_SUBBLOCK;
 	}
 
 	zio_next_stage(zio);
@@ -1305,10 +1319,12 @@ static void
 zio_vdev_io_start(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
+	uint64_t align = 1ULL << zio->io_vd->vdev_top->vdev_ashift;
 
-	ASSERT(P2PHASE(zio->io_offset, 1ULL << zio->io_vd->vdev_ashift) == 0);
-	ASSERT(P2PHASE(zio->io_size, 1ULL << zio->io_vd->vdev_ashift) == 0);
-	ASSERT(bp == NULL || ZIO_GET_IOSIZE(zio) == zio->io_size);
+	ASSERT(P2PHASE(zio->io_offset, align) == 0);
+	ASSERT(P2PHASE(zio->io_size, align) == 0);
+	ASSERT(bp == NULL ||
+	    P2ROUNDUP(ZIO_GET_IOSIZE(zio), align) == zio->io_size);
 	ASSERT(zio->io_type != ZIO_TYPE_WRITE || (spa_mode & FWRITE));
 
 	vdev_io_start(zio);
@@ -1349,6 +1365,17 @@ zio_vdev_io_assess(zio_t *zio)
 	vdev_t *tvd = vd->vdev_top;
 
 	ASSERT(zio->io_vsd == NULL);
+
+	if (zio->io_flags & ZIO_FLAG_SUBBLOCK) {
+		void *abuf;
+		uint64_t asize;
+		ASSERT(vd == tvd);
+		zio_pop_transform(zio, &abuf, &asize, &asize);
+		if (zio->io_type == ZIO_TYPE_READ)
+			bcopy(abuf, zio->io_data, zio->io_size);
+		zio_buf_free(abuf, asize);
+		zio->io_flags &= ~ZIO_FLAG_SUBBLOCK;
+	}
 
 	if (zio_injection_enabled && !zio->io_error)
 		zio->io_error = zio_handle_fault_injection(zio, EIO);
@@ -1660,7 +1687,7 @@ zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg)
 
 	spa_config_enter(spa, RW_READER, FTAG);
 
-	metaslab_free(spa, BP_IDENTITY(bp), txg);
+	metaslab_free(spa, BP_IDENTITY(bp), txg, B_FALSE);
 
 	spa_config_exit(spa, FTAG);
 }
