@@ -36,6 +36,9 @@
 #include <sys/unique.h>
 #include <sys/zfs_context.h>
 
+static int dsl_dataset_destroy_begin_sync(dsl_dir_t *dd,
+    void *arg, dmu_tx_t *tx);
+
 #define	DOS_REF_MAX	(1ULL << 62)
 
 #define	DSL_DEADLIST_BLOCKSIZE	SPA_MAXBLOCKSIZE
@@ -370,7 +373,7 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 
 	mutex_enter(&ds->ds_lock);
 	if ((DS_MODE_LEVEL(mode) == DS_MODE_PRIMARY &&
-	    ds->ds_phys->ds_restoring && !DS_MODE_IS_RESTORE(mode)) ||
+	    ds->ds_phys->ds_inconsistent && !DS_MODE_IS_INCONSISTENT(mode)) ||
 	    (ds->ds_open_refcount + weight > DOS_REF_MAX)) {
 		mutex_exit(&ds->ds_lock);
 		dsl_dataset_close(ds, DS_MODE_NONE, tag);
@@ -612,7 +615,6 @@ dsl_dataset_create_sync(dsl_dir_t *pds, const char *fullname,
 	return (0);
 }
 
-
 int
 dsl_dataset_destroy(const char *name)
 {
@@ -642,16 +644,65 @@ dsl_dataset_destroy(const char *name)
 	} else {
 		char buf[MAXNAMELEN];
 		char *cp;
-
+		objset_t *os;
+		uint64_t obj;
 		dsl_dir_t *pds;
+
 		if (dd->dd_phys->dd_parent_obj == 0) {
 			dsl_dir_close(dd, FTAG);
 			return (EINVAL);
 		}
+
+		err = dmu_objset_open(name, DMU_OST_ANY,
+		    DS_MODE_PRIMARY | DS_MODE_INCONSISTENT, &os);
+		if (err) {
+			dsl_dir_close(dd, FTAG);
+			return (err);
+		}
+
 		/*
-		 * Make sure it's not dirty before we destroy it.
+		 * Check for errors and mark this ds as inconsistent, in
+		 * case we crash while freeing the objects.
 		 */
+		err = dsl_dir_sync_task(os->os->os_dsl_dataset->ds_dir,
+		    dsl_dataset_destroy_begin_sync, os->os->os_dsl_dataset, 0);
+		if (err) {
+			dmu_objset_close(os);
+			dsl_dir_close(dd, FTAG);
+			return (err);
+		}
+
+		/*
+		 * remove the objects in open context, so that we won't
+		 * have too much to do in syncing context.
+		 */
+		for (obj = 0; err == 0;
+		    err = dmu_object_next(os, &obj, FALSE)) {
+			dmu_tx_t *tx = dmu_tx_create(os);
+			dmu_tx_hold_free(tx, obj, 0, DMU_OBJECT_END);
+			dmu_tx_hold_bonus(tx, obj);
+			err = dmu_tx_assign(tx, TXG_WAIT);
+			if (err) {
+				/*
+				 * Perhaps there is not enough disk
+				 * space.  Just deal with it from
+				 * dsl_dataset_destroy_sync().
+				 */
+				dmu_tx_abort(tx);
+				continue;
+			}
+			VERIFY(0 == dmu_object_free(os, obj, tx));
+			dmu_tx_commit(tx);
+		}
+		dmu_objset_close(os);
+		if (err != ESRCH) {
+			dsl_dir_close(dd, FTAG);
+			return (err);
+		}
+
+		/* Make sure it's not dirty before we finish destroying it. */
 		txg_wait_synced(dd->dd_pool, 0);
+
 		/*
 		 * Blow away the dsl_dir + head dataset.
 		 * dsl_dir_destroy_sync() will call
@@ -888,7 +939,7 @@ dsl_dataset_rollback_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	    ds->ds_prev->ds_phys->ds_compressed_bytes;
 	ds->ds_phys->ds_uncompressed_bytes =
 	    ds->ds_prev->ds_phys->ds_uncompressed_bytes;
-	ds->ds_phys->ds_restoring = ds->ds_prev->ds_phys->ds_restoring;
+	ds->ds_phys->ds_inconsistent = ds->ds_prev->ds_phys->ds_inconsistent;
 	ds->ds_phys->ds_unique_bytes = 0;
 
 	dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
@@ -897,6 +948,28 @@ dsl_dataset_rollback_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	dprintf("new deadlist obj = %llx\n", ds->ds_phys->ds_deadlist_obj);
 	ds->ds_open_refcount = 0;
 	dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+dsl_dataset_destroy_begin_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg;
+
+	/*
+	 * Can't delete a head dataset if there are snapshots of it.
+	 * (Except if the only snapshots are from the branch we cloned
+	 * from.)
+	 */
+	if (ds->ds_prev != NULL &&
+	    ds->ds_prev->ds_phys->ds_next_snap_obj == ds->ds_object)
+		return (EINVAL);
+
+	/* Mark it as inconsistent on-disk, in case we crash */
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+	ds->ds_phys->ds_inconsistent = TRUE;
 
 	return (0);
 }
@@ -1274,7 +1347,7 @@ dsl_dataset_snapshot_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	dsphys->ds_used_bytes = ds->ds_phys->ds_used_bytes;
 	dsphys->ds_compressed_bytes = ds->ds_phys->ds_compressed_bytes;
 	dsphys->ds_uncompressed_bytes = ds->ds_phys->ds_uncompressed_bytes;
-	dsphys->ds_restoring = ds->ds_phys->ds_restoring;
+	dsphys->ds_inconsistent = ds->ds_phys->ds_inconsistent;
 	dsphys->ds_bp = ds->ds_phys->ds_bp;
 	dmu_buf_rele(dbuf, FTAG);
 

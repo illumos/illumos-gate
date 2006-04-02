@@ -1055,9 +1055,12 @@ ztest_destroy_cb(char *name, void *arg)
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
 	ASSERT3U(error, ==, 0);
 	error = dmu_object_info(os, ZTEST_DIROBJ, &doi);
-	ASSERT3U(error, ==, 0);
-	ASSERT3U(doi.doi_type, ==, DMU_OT_UINT64_OTHER);
-	ASSERT3S(doi.doi_physical_blks, >=, 0);
+	if (error != ENOENT) {
+		/* We could have crashed in the middle of destroying it */
+		ASSERT3U(error, ==, 0);
+		ASSERT3U(doi.doi_type, ==, DMU_OT_UINT64_OTHER);
+		ASSERT3S(doi.doi_physical_blks, >=, 0);
+	}
 	dmu_objset_close(os);
 
 	/*

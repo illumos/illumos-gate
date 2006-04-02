@@ -130,8 +130,8 @@ void zfs_znode_byteswap(void *buf, size_t size);
 #define	DS_MODE_LEVEL(x)	((x) & (DS_MODE_LEVELS - 1))
 #define	DS_MODE_READONLY	0x8
 #define	DS_MODE_IS_READONLY(x)	((x) & DS_MODE_READONLY)
-#define	DS_MODE_RESTORE		0x10
-#define	DS_MODE_IS_RESTORE(x)	((x) & DS_MODE_RESTORE)
+#define	DS_MODE_INCONSISTENT	0x10
+#define	DS_MODE_IS_INCONSISTENT(x)	((x) & DS_MODE_INCONSISTENT)
 
 #define	DS_FIND_SNAPSHOTS	0x01
 

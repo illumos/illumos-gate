@@ -727,8 +727,8 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)ds->ds_fsid_guid);
 	(void) printf("\t\tguid = %llu\n",
 	    (u_longlong_t)ds->ds_guid);
-	(void) printf("\t\trestoring = %llu\n",
-	    (u_longlong_t)ds->ds_restoring);
+	(void) printf("\t\tinconsistent = %llu\n",
+	    (u_longlong_t)ds->ds_inconsistent);
 	(void) printf("\t\tbp = %s\n", blkbuf);
 }
 

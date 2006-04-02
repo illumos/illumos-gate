@@ -65,7 +65,7 @@ typedef struct dsl_dataset_phys {
 	 */
 	uint64_t ds_fsid_guid;
 	uint64_t ds_guid;
-	uint64_t ds_restoring; /* boolean */
+	uint64_t ds_inconsistent; /* boolean */
 	blkptr_t ds_bp;
 	uint64_t ds_pad[8]; /* pad out to 256 bytes for good measure */
 } dsl_dataset_phys_t;

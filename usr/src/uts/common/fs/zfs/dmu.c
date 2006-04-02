@@ -169,7 +169,7 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 	}
 
 	flags = DB_RF_CANFAIL | DB_RF_NEVERWAIT;
-	if (length >= zfetch_array_rd_sz)
+	if (length > zfetch_array_rd_sz)
 		flags |= DB_RF_NOPREFETCH;
 
 	err = dnode_hold(os->os, object, FTAG, &dn);
@@ -791,7 +791,7 @@ replay_incremental_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	/* The point of no (unsuccessful) return. */
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_restoring = TRUE;
+	ds->ds_phys->ds_inconsistent = TRUE;
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (0);
@@ -843,7 +843,7 @@ replay_full_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	    ds, drrb->drr_type, tx);
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_restoring = TRUE;
+	ds->ds_phys->ds_inconsistent = TRUE;
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (0);
@@ -871,20 +871,21 @@ replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 
 	/* set snapshot's creation time and guid */
 	VERIFY(0 == dsl_dataset_open_spa(dd->dd_pool->dp_spa, drrb->drr_toname,
-	    DS_MODE_PRIMARY | DS_MODE_READONLY | DS_MODE_RESTORE, FTAG, &ds));
+	    DS_MODE_PRIMARY | DS_MODE_READONLY | DS_MODE_INCONSISTENT,
+	    FTAG, &ds));
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_creation_time = drrb->drr_creation_time;
 	ds->ds_phys->ds_guid = drrb->drr_toguid;
-	ds->ds_phys->ds_restoring = FALSE;
+	ds->ds_phys->ds_inconsistent = FALSE;
 
 	dsl_dataset_close(ds, DS_MODE_PRIMARY, FTAG);
 
 	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool,
 	    dd->dd_phys->dd_head_dataset_obj,
-	    NULL, DS_MODE_STANDARD | DS_MODE_RESTORE, FTAG, &ds));
+	    NULL, DS_MODE_STANDARD | DS_MODE_INCONSISTENT, FTAG, &ds));
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_restoring = FALSE;
+	ds->ds_phys->ds_inconsistent = FALSE;
 	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
 
 	return (0);
@@ -1267,7 +1268,7 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 	cp = strchr(tosnap, '@');
 	*cp = '\0';
 	ra.err = dmu_objset_open(tosnap, DMU_OST_ANY,
-	    DS_MODE_PRIMARY | DS_MODE_RESTORE, &os);
+	    DS_MODE_PRIMARY | DS_MODE_INCONSISTENT, &os);
 	*cp = '@';
 	ASSERT3U(ra.err, ==, 0);
 
