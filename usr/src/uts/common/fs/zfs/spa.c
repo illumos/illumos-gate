@@ -275,12 +275,13 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	spa->spa_load_state = state;
 
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &nvroot) ||
-	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &pool_guid) ||
-	    (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
-	    &spa->spa_config_txg) && mosconfig)) {
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &pool_guid)) {
 		error = EINVAL;
 		goto out;
 	}
+
+	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
+	    &spa->spa_config_txg);
 
 	if ((state == SPA_LOAD_IMPORT || state == SPA_LOAD_TRYIMPORT) &&
 	    spa_guid_exists(pool_guid, 0)) {
