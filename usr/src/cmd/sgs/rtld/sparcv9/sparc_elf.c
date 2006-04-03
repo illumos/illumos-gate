@@ -232,6 +232,20 @@ elf_plt_write(uintptr_t addr, uintptr_t vaddr, void *rptr, uintptr_t symval,
 	return (PLT_T_FULL);
 }
 
+
+
+/*
+ * Once relocated, the following 6 instruction sequence moves
+ * a 64-bit immediate value into register %g1
+ */
+#define	VAL64_TO_G1 \
+/* 0x00 */	0x0b, 0x00, 0x00, 0x00,	/* sethi %hh(value), %g5 */ \
+/* 0x04 */	0x8a, 0x11, 0x60, 0x00,	/* or %g5, %hm(value), %g5 */ \
+/* 0x08 */	0x8b, 0x29, 0x70, 0x20,	/* sllx %g5, 32, %g5 */ \
+/* 0x0c */	0x03, 0x00, 0x00, 0x00,	/* sethi %lm(value), %g1 */ \
+/* 0x10 */	0x82, 0x10, 0x60, 0x00,	/* or %g1, %lo(value), %g1 */ \
+/* 0x14 */	0x82, 0x10, 0x40, 0x05	/* or %g1, %g5, %g1 */
+
 /*
  * Local storage space created on the stack created for this glue
  * code includes space for:
@@ -244,15 +258,17 @@ static const Byte dyn_plt_template[] = {
 /* 0x8 */	0x82, 0x10, 0x20, 0xb0,	/* mov 176, %g1	*/
 /* 0xc */	0x9d, 0xe3, 0xbf, 0x40,	/* save %sp, -192, %sp	*/
 /* 0x10 */	0xc2, 0x77, 0xa7, 0xef,	/* stx %g1, [%fp + 2031] */
-/* 0x14 */	0x0b, 0x00, 0x00, 0x00,	/* sethi %hh(dyn_data), %g5 */
-/* 0x18 */	0x8a, 0x11, 0x60, 0x00,	/* or %g5, %hm(dyn_data), %g5	*/
-/* 0x1c */	0x8b, 0x29, 0x70, 0x20,	/* sllx %g5, 32, %g5	*/
-/* 0x20 */	0x03, 0x00, 0x00, 0x00,	/* sethi %lm(dyn_data), %g1	*/
-/* 0x24 */	0x82, 0x10, 0x60, 0x00,	/* or %g1, %lo(dyn_data), %g1	*/
-/* 0x28 */	0x82, 0x10, 0x40, 0x05,	/* or %g1, %g5, %g1	*/
-/* 0x2c */	0x40, 0x00, 0x00, 0x00,	/* call <rel_addr>	*/
-/* 0x30 */	0xc2, 0x77, 0xa7, 0xf7,	/* stx %g1, [%fp + 2039] */
-/* 0x34 */	0x01, 0x00, 0x00, 0x00	/* nop ! for 8-byte alignment */
+
+					/* store prev stack size */
+/* 0x14 */	VAL64_TO_G1,		/* dyn_data to g1 */
+/* 0x2c */	0xc2, 0x77, 0xa7, 0xf7,	/* stx %g1, [%fp + 2039] */
+
+/* 0x30 */	VAL64_TO_G1,		/* elf_plt_trace() addr to g1 */
+
+					/* Call to elf_plt_trace() via g1 */
+/* 0x48 */	0x9f, 0xc0, 0x60, 0x00,	/* jmpl ! link r[15] to addr in g1 */
+/* 0x4c */	0x01, 0x00, 0x00, 0x00	/* nop ! for jmpl delay slot *AND* */
+					/*	to get 8-byte alignment */
 };
 
 
@@ -268,7 +284,7 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
  * the dynamic plt entry is:
  *
  *	brnz,a,pt	%fp, 1f
- *	 sub     	%sp, %fp, %g1
+ *	sub     	%sp, %fp, %g1
  *	mov     	SA(MINFRAME), %g1
  * 1:
  *	save    	%sp, -(SA(MINFRAME) + (2 * CLONGSIZE)), %sp
@@ -276,6 +292,8 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
  *	! store prev stack size
  *	stx     	%g1, [%fp + STACK_BIAS - (2 * CLONGSIZE)]
  *
+ * 2:
+ *	! move dyn_data to %g1
  *	sethi   	%hh(dyn_data), %g5
  *	or      	%g5, %hm(dyn_data), %g5
  *	sllx    	%g5, 32, %g5
@@ -283,17 +301,94 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
  *	or      	%g1, %lo(dyn_data), %g1
  *	or      	%g1, %g5, %g1
  *
- *	! store dyn_data ptr and call
- *	call    	elf_plt_trace
+ *	! store dyn_data ptr on frame (from %g1)
  *	 stx     	%g1, [%fp + STACK_BIAS - CLONGSIZE]
+ *
+ *	! Move address of elf_plt_trace() into %g1
+ *	[Uses same 6 instructions as shown at label 2: above. Not shown.]
+ *
+ *	! Use JMPL to make call. CALL instruction is limited to 30-bits.
+ *	! of displacement.
+ *	jmp1		%g1, %o7
+ *
+ *	! JMPL has a delay slot that must be filled. And, the sequence
+ *	! of instructions needs to have 8-byte alignment. This NOP does both.
+ *	! The alignment is needed for the data we put following the
+ *	! instruction.
  *	nop
- * * dyn data:
+ *
+ * dyn data:
  *	Addr		reflmp
  *	Addr		deflmp
  *	Word		symndx
  *	Word		sb_flags
  *	Sym		symdef  (Elf64_Sym = 24-bytes)
  */
+
+
+/*
+ * Relocate the instructions given by the VAL64_TO_G1 macro above.
+ *
+ * entry:
+ *	lml - link map list
+ *	dyndata - Value being relocated (addend)
+ *	code_base - Address of 1st instruction in sequence.
+ *
+ * exit:
+ *	Returns TRUE for success, FALSE for failure.
+ */
+static int
+reloc_val64_to_g1(Lm_list *lml, Addr *dyndata, Byte *code_base)
+{
+	Xword	symvalue;
+
+	/*
+	 * relocating:
+	 *	sethi	%hh(dyndata), %g5
+	 */
+	symvalue = (Xword)dyndata;
+	if (do_reloc(R_SPARC_HH22, code_base,
+	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
+		return (0);
+	}
+
+	/*
+	 * relocating:
+	 *	or	%g5, %hm(dyndata), %g5
+	 */
+	symvalue = (Xword)dyndata;
+	if (do_reloc(R_SPARC_HM10, code_base + 4,
+	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
+		return (0);
+	}
+
+	/*
+	 * relocating:
+	 *	sethi	%lm(dyndata), %g1
+	 */
+	symvalue = (Xword)dyndata;
+	if (do_reloc(R_SPARC_LM22, code_base + 12,
+	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
+		return (0);
+	}
+
+	/*
+	 * relocating:
+	 *	or	%g1, %lo(dyndata), %g1
+	 */
+	symvalue = (Xword)dyndata;
+	if (do_reloc(R_SPARC_LO10, code_base + 16,
+	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
+		return (0);
+	}
+
+	return (1);
+}
+
 static caddr_t
 elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
     Sym * sym, uint_t symndx, ulong_t pltndx, caddr_t to, uint_t sb_flags,
@@ -328,7 +423,6 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 	 */
 	if (*(Word *)dyn_plt == 0) {
 		Sym	*symp;
-		Xword	symvalue;
 		Lm_list	*lml = LIST(rlmp);
 
 		(void) memcpy((void *)dyn_plt, dyn_plt_template,
@@ -337,61 +431,13 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 
 		/*
 		 * relocating:
-		 *	sethi	%hh(dyndata), %g5
+		 *	VAL64_TO_G1(dyndata)
+		 *	VAL64_TO_G1(&elf_plt_trace)
 		 */
-		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_HH22, (Byte *)(dyn_plt + 0x14),
-		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
-			*fail = 1;
-			return (0);
-		}
-
-		/*
-		 * relocating:
-		 *	or	%g5, %hm(dyndata), %g5
-		 */
-		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_HM10, (Byte *)(dyn_plt + 0x18),
-		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
-			*fail = 1;
-			return (0);
-		}
-
-		/*
-		 * relocating:
-		 *	sethi	%lm(dyndata), %g1
-		 */
-		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_LM22, (Byte *)(dyn_plt + 0x20),
-		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
-			*fail = 1;
-			return (0);
-		}
-
-		/*
-		 * relocating:
-		 *	or	%g1, %lo(dyndata), %g1
-		 */
-		symvalue = (Xword)dyndata;
-		if (do_reloc(R_SPARC_LO10, (Byte *)(dyn_plt + 0x24),
-		    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
-			*fail = 1;
-			return (0);
-		}
-
-		/*
-		 * relocating:
-		 *	call	elf_plt_trace
-		 */
-		symvalue = (Xword)((Addr)&elf_plt_trace -
-		    (Addr)(dyn_plt + 0x2c));
-		if (do_reloc(R_SPARC_WDISP30, (Byte *)(dyn_plt + 0x2c),
-		    &symvalue, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
-		    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
+		if (!(reloc_val64_to_g1(lml, dyndata,
+					(Byte *) (dyn_plt + 0x14)) &&
+			reloc_val64_to_g1(lml, (Addr *)&elf_plt_trace,
+					(Byte *) (dyn_plt + 0x30)))) {
 			*fail = 1;
 			return (0);
 		}
