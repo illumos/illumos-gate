@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/modctl.h>
 #include <sys/systeminfo.h>
+#include <sys/resource.h>
 
 #include <libelf.h>
 #include <strings.h>
@@ -742,6 +743,7 @@ dt_vopen(int version, int flags, int *errp,
 	dt_module_t *dmp;
 	dt_provmod_t *provmod = NULL;
 	int i, err;
+	struct rlimit rl;
 
 	const dt_intrinsic_t *dinp;
 	const dt_typedef_t *dtyp;
@@ -791,6 +793,19 @@ dt_vopen(int version, int flags, int *errp,
 
 	if (vector != NULL || (flags & DTRACE_O_NODEV))
 		goto alloc; /* do not attempt to open dtrace device */
+
+	/*
+	 * Before we get going, crank our limit on file descriptors up to the
+	 * hard limit.  This is to allow for the fact that libproc keeps file
+	 * descriptors to objects open for the lifetime of the proc handle;
+	 * without raising our hard limit, we would have an acceptably small
+	 * bound on the number of processes that we could concurrently
+	 * instrument with the pid provider.
+	 */
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		rl.rlim_cur = rl.rlim_max;
+		(void) setrlimit(RLIMIT_NOFILE, &rl);
+	}
 
 	/*
 	 * Get the device path of each of the providers.  We hold them open

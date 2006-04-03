@@ -184,6 +184,7 @@ static dtrace_ecb_t	*dtrace_ecb_create_cache; /* cached created ECB */
 static dtrace_genid_t	dtrace_probegen;	/* current probe generation */
 static dtrace_helpers_t *dtrace_deferred_pid;	/* deferred helper list */
 static dtrace_enabling_t *dtrace_retained;	/* list of retained enablings */
+static dtrace_dynvar_t	dtrace_dynhash_sink;	/* end of dynamic hash chains */
 
 /*
  * DTrace Locking
@@ -388,6 +389,10 @@ dtrace_load##bits(uintptr_t addr)					\
 #else
 #define	dtrace_loadptr	dtrace_load32
 #endif
+
+#define	DTRACE_DYNHASH_FREE	0
+#define	DTRACE_DYNHASH_SINK	1
+#define	DTRACE_DYNHASH_VALID	2
 
 #define	DTRACE_MATCH_NEXT	0
 #define	DTRACE_MATCH_DONE	1
@@ -1025,7 +1030,7 @@ dtrace_dynvar_t *
 dtrace_dynvar(dtrace_dstate_t *dstate, uint_t nkeys,
     dtrace_key_t *key, size_t dsize, dtrace_dynvar_op_t op)
 {
-	uint64_t hashval = 1;
+	uint64_t hashval = DTRACE_DYNHASH_VALID;
 	dtrace_dynhash_t *hash = dstate->dtds_hash;
 	dtrace_dynvar_t *free, *new_free, *next, *dvar, *start, *prev = NULL;
 	processorid_t me = CPU->cpu_id, cpu = me;
@@ -1088,12 +1093,13 @@ dtrace_dynvar(dtrace_dstate_t *dstate, uint_t nkeys,
 	hashval += (hashval << 15);
 
 	/*
-	 * There is a remote chance (ideally, 1 in 2^32) that our hashval
-	 * comes out to be 0.  We rely on a zero hashval denoting a free
-	 * element; if this actually happens, we set the hashval to 1.
+	 * There is a remote chance (ideally, 1 in 2^31) that our hashval
+	 * comes out to be one of our two sentinel hash values.  If this
+	 * actually happens, we set the hashval to be a value known to be a
+	 * non-sentinel value.
 	 */
-	if (hashval == 0)
-		hashval = 1;
+	if (hashval == DTRACE_DYNHASH_FREE || hashval == DTRACE_DYNHASH_SINK)
+		hashval = DTRACE_DYNHASH_VALID;
 
 	/*
 	 * Yes, it's painful to do a divide here.  If the cycle count becomes
@@ -1127,26 +1133,45 @@ top:
 	dtrace_membar_consumer();
 
 	start = hash[bucket].dtdh_chain;
-	ASSERT(start == NULL || start->dtdv_hashval != 0 ||
-	    op != DTRACE_DYNVAR_DEALLOC);
+	ASSERT(start != NULL && (start->dtdv_hashval == DTRACE_DYNHASH_SINK ||
+	    start->dtdv_hashval != DTRACE_DYNHASH_FREE ||
+	    op != DTRACE_DYNVAR_DEALLOC));
 
 	for (dvar = start; dvar != NULL; dvar = dvar->dtdv_next) {
 		dtrace_tuple_t *dtuple = &dvar->dtdv_tuple;
 		dtrace_key_t *dkey = &dtuple->dtt_key[0];
 
 		if (dvar->dtdv_hashval != hashval) {
-			if (dvar->dtdv_hashval == 0) {
+			if (dvar->dtdv_hashval == DTRACE_DYNHASH_SINK) {
 				/*
-				 * We've gone off the rails.  Somewhere
-				 * along the line, one of the members of this
-				 * hash chain was deleted.  We could assert
-				 * that either the dirty list or the rinsing
-				 * list is non-NULL.  (The dtrace_sync() in
-				 * dtrace_dynvar_clean() would validate this
-				 * assertion.)
+				 * We've reached the sink, and therefore the
+				 * end of the hash chain; we can kick out of
+				 * the loop knowing that we have seen a valid
+				 * snapshot of state.
 				 */
-				ASSERT(op != DTRACE_DYNVAR_DEALLOC);
-				goto top;
+				ASSERT(dvar->dtdv_next == NULL);
+				ASSERT(dvar == &dtrace_dynhash_sink);
+				break;
+			}
+
+			if (dvar->dtdv_hashval == DTRACE_DYNHASH_FREE) {
+				/*
+				 * We've gone off the rails:  somewhere along
+				 * the line, one of the members of this hash
+				 * chain was deleted.  Note that we could also
+				 * detect this by simply letting this loop run
+				 * to completion, as we would eventually hit
+				 * the end of the dirty list.  However, we
+				 * want to avoid running the length of the
+				 * dirty list unnecessarily (it might be quite
+				 * long), so we catch this as early as
+				 * possible by detecting the hash marker.  In
+				 * this case, we simply set dvar to NULL and
+				 * break; the conditional after the loop will
+				 * send us back to top.
+				 */
+				dvar = NULL;
+				break;
 			}
 
 			goto next;
@@ -1175,7 +1200,7 @@ top:
 			return (dvar);
 
 		ASSERT(dvar->dtdv_next == NULL ||
-		    dvar->dtdv_next->dtdv_hashval != 0);
+		    dvar->dtdv_next->dtdv_hashval != DTRACE_DYNHASH_FREE);
 
 		if (prev != NULL) {
 			ASSERT(hash[bucket].dtdh_chain != dvar);
@@ -1199,10 +1224,10 @@ top:
 		dtrace_membar_producer();
 
 		/*
-		 * Now clear the hash value to indicate that it's free.
+		 * Now set the hash value to indicate that it's free.
 		 */
 		ASSERT(hash[bucket].dtdh_chain != dvar);
-		dvar->dtdv_hashval = 0;
+		dvar->dtdv_hashval = DTRACE_DYNHASH_FREE;
 
 		dtrace_membar_producer();
 
@@ -1226,6 +1251,19 @@ top:
 next:
 		prev = dvar;
 		continue;
+	}
+
+	if (dvar == NULL) {
+		/*
+		 * If dvar is NULL, it is because we went off the rails:
+		 * one of the elements that we traversed in the hash chain
+		 * was deleted while we were traversing it.  In this case,
+		 * we assert that we aren't doing a dealloc (deallocs lock
+		 * the hash bucket to prevent themselves from racing with
+		 * one another), and retry the hash chain traversal.
+		 */
+		ASSERT(op != DTRACE_DYNVAR_DEALLOC);
+		goto top;
 	}
 
 	if (op != DTRACE_DYNVAR_ALLOC) {
@@ -1359,7 +1397,7 @@ retry:
 				goto retry;
 			}
 
-			ASSERT(clean->dtdv_hashval == 0);
+			ASSERT(clean->dtdv_hashval == DTRACE_DYNHASH_FREE);
 
 			/*
 			 * Now we'll move the clean list to the free list.
@@ -1411,7 +1449,7 @@ retry:
 		dkey->dttk_size = kesize;
 	}
 
-	ASSERT(dvar->dtdv_hashval == 0);
+	ASSERT(dvar->dtdv_hashval == DTRACE_DYNHASH_FREE);
 	dvar->dtdv_hashval = hashval;
 	dvar->dtdv_next = start;
 
@@ -1427,7 +1465,7 @@ retry:
 	 * to the dirty list and _not_ to the free list.  This is to prevent
 	 * races with allocators, above.
 	 */
-	dvar->dtdv_hashval = 0;
+	dvar->dtdv_hashval = DTRACE_DYNHASH_FREE;
 
 	dtrace_membar_producer();
 
@@ -11000,6 +11038,19 @@ dtrace_dstate_init(dtrace_dstate_t *dstate, size_t size)
 	dstate->dtds_hash = dstate->dtds_base;
 
 	/*
+	 * Set all of our hash buckets to point to the single sink, and (if
+	 * it hasn't already been set), set the sink's hash value to be the
+	 * sink sentinel value.  The sink is needed for dynamic variable
+	 * lookups to know that they have iterated over an entire, valid hash
+	 * chain.
+	 */
+	for (i = 0; i < hashsize; i++)
+		dstate->dtds_hash[i].dtdh_chain = &dtrace_dynhash_sink;
+
+	if (dtrace_dynhash_sink.dtdv_hashval != DTRACE_DYNHASH_SINK)
+		dtrace_dynhash_sink.dtdv_hashval = DTRACE_DYNHASH_SINK;
+
+	/*
 	 * Determine number of active CPUs.  Divide free list evenly among
 	 * active CPUs.
 	 */
@@ -11841,6 +11892,21 @@ dtrace_state_destroy(dtrace_state_t *state)
 	dtrace_enabling_retract(state);
 	ASSERT(state->dts_nretained == 0);
 
+	if (state->dts_activity == DTRACE_ACTIVITY_ACTIVE ||
+	    state->dts_activity == DTRACE_ACTIVITY_DRAINING) {
+		/*
+		 * We have managed to come into dtrace_state_destroy() on a
+		 * hot enabling -- almost certainly because of a disorderly
+		 * shutdown of a consumer.  (That is, a consumer that is
+		 * exiting without having called dtrace_stop().) In this case,
+		 * we're going to set our activity to be KILLED, and then
+		 * issue a sync to be sure that everyone is out of probe
+		 * context before we start blowing away ECBs.
+		 */
+		state->dts_activity = DTRACE_ACTIVITY_KILLED;
+		dtrace_sync();
+	}
+
 	/*
 	 * Release the credential hold we took in dtrace_state_create().
 	 */
@@ -11848,11 +11914,11 @@ dtrace_state_destroy(dtrace_state_t *state)
 		crfree(state->dts_cred.dcr_cred);
 
 	/*
-	 * Now we need to disable and destroy any enabled probes.  Because any
-	 * DTRACE_PRIV_KERNEL probes may actually be slowing our progress
-	 * (especially if they're all enabled), we take two passes through
-	 * the ECBs:  in the first, we disable just DTRACE_PRIV_KERNEL probes,
-	 * and in the second we disable whatever is left over.
+	 * Now we can safely disable and destroy any enabled probes.  Because
+	 * any DTRACE_PRIV_KERNEL probes may actually be slowing our progress
+	 * (especially if they're all enabled), we take two passes through the
+	 * ECBs:  in the first, we disable just DTRACE_PRIV_KERNEL probes, and
+	 * in the second we disable whatever is left over.
 	 */
 	for (match = DTRACE_PRIV_KERNEL; ; match = 0) {
 		for (i = 0; i < state->dts_necbs; i++) {
@@ -13242,8 +13308,8 @@ dtrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_enter(&dtrace_provider_lock);
 	mutex_enter(&dtrace_lock);
 
-	if (ddi_soft_state_init(&dtrace_softstate, sizeof (dtrace_state_t) +
-	    NCPU * sizeof (dtrace_buffer_t), 0) != 0) {
+	if (ddi_soft_state_init(&dtrace_softstate,
+	    sizeof (dtrace_state_t), 0) != 0) {
 		cmn_err(CE_NOTE, "/dev/dtrace failed to initialize soft state");
 		mutex_exit(&cpu_lock);
 		mutex_exit(&dtrace_provider_lock);

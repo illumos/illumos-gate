@@ -205,9 +205,7 @@ fbt_provide_module(void *arg, struct modctl *ctl)
 	for (i = 1; i < nsyms; i++) {
 		uint8_t *instr, *limit;
 		Sym *sym = (Sym *)(symhdr->sh_addr + i * symsize);
-#ifdef __amd64
 		int j;
-#endif
 
 		if (ELF_ST_TYPE(sym->st_info) != STT_FUNC)
 			continue;
@@ -357,16 +355,26 @@ again:
 			instr += size;
 			goto again;
 		}
+#else
+		if (!(size == 1 &&
+		    (*instr == FBT_POPL_EBP || *instr == FBT_LEAVE) &&
+		    (*(instr + 1) == FBT_RET ||
+		    *(instr + 1) == FBT_RET_IMM16))) {
+			instr += size;
+			goto again;
+		}
+#endif
 
 		/*
-		 * Because we are only looking for a one-byte marker here,
-		 * there is an increased likelihood of erroneously interpreting
-		 * a jump table to be an instrumentable instruction.  We
-		 * obviously want to avoid that, so we resort to some heuristic
-		 * sleeze:  we'll treat this instruction as being contained
-		 * within a pointer, and see if that pointer points to within
-		 * the body of the function.  If it does, we refuse to
-		 * instrument it.
+		 * We (desperately) want to avoid erroneously instrumenting a
+		 * jump table, especially given that our markers are pretty
+		 * short:  two bytes on x86, and just one byte on amd64.  To
+		 * determine if we're looking at a true instruction sequence
+		 * or an inline jump table that happens to contain the same
+		 * byte sequences, we resort to some heuristic sleeze:  we
+		 * treat this instruction as being contained within a pointer,
+		 * and see if that pointer points to within the body of the
+		 * function.  If it does, we refuse to instrument it.
 		 */
 		for (j = 0; j < sizeof (uintptr_t); j++) {
 			uintptr_t check = (uintptr_t)instr - j;
@@ -385,15 +393,6 @@ again:
 				goto again;
 			}
 		}
-#else
-		if (!(size == 1 &&
-		    (*instr == FBT_POPL_EBP || *instr == FBT_LEAVE) &&
-		    (*(instr + 1) == FBT_RET ||
-		    *(instr + 1) == FBT_RET_IMM16))) {
-			instr += size;
-			goto again;
-		}
-#endif
 
 		/*
 		 * We have a winner!

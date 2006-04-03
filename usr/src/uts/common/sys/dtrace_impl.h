@@ -938,21 +938,22 @@ typedef struct dtrace_mstate {
  *                                    |                          |  |  |
  *                                    v                          |  |  |
  *                               +----------+     exit() action  |  |  |
- *                               | DRAINING |<-------------------+  |  |
- *                               +----------+                       |  |
- *                                    |                             |  |
- *                     dtrace_stop(), |                             |  |
- *                       before END   |                             |  |
- *                                    |                             |  |
- *                                    v                             |  |
- * +---------+                   +----------+                       |  |
- * | STOPPED |<------------------| COOLDOWN |<----------------------+  |
- * +---------+   dtrace_stop(),  +----------+     dtrace_stop(),       |
- *                 after END                       before END          |
- *                                                                     |
- *                                +--------+                           |
- *                                | KILLED |<--------------------------+
- *                                +--------+     deadman timeout
+ * +-----------------------------| DRAINING |<-------------------+  |  |
+ * |                             +----------+                       |  |
+ * |                                  |                             |  |
+ * |                   dtrace_stop(), |                             |  |
+ * |                     before END   |                             |  |
+ * |                                  |                             |  |
+ * |                                  v                             |  |
+ * | +---------+                 +----------+                       |  |
+ * | | STOPPED |<----------------| COOLDOWN |<----------------------+  |
+ * | +---------+  dtrace_stop(), +----------+     dtrace_stop(),       |
+ * |                after END                       before END         |
+ * |                                                                   |
+ * |                              +--------+                           |
+ * +----------------------------->| KILLED |<--------------------------+
+ *       deadman timeout or       +--------+     deadman timeout or
+ *        killed consumer                         killed consumer
  *
  * Note that once a DTrace consumer has stopped tracing, there is no way to
  * restart it; if a DTrace consumer wishes to restart tracing, it must reopen
@@ -965,7 +966,7 @@ typedef enum dtrace_activity {
 	DTRACE_ACTIVITY_DRAINING,		/* before stopping */
 	DTRACE_ACTIVITY_COOLDOWN,		/* while stopping */
 	DTRACE_ACTIVITY_STOPPED,		/* after stopping */
-	DTRACE_ACTIVITY_KILLED			/* killed due to deadman */
+	DTRACE_ACTIVITY_KILLED			/* killed */
 } dtrace_activity_t;
 
 /*
