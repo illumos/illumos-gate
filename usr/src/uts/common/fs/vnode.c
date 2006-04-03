@@ -118,9 +118,13 @@ int vopstats_enabled = 1;
 	vfs_t *vfsp = (vp)->v_vfsp;					\
 	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
 		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
-		vsp->counter.value.ui64++;				\
+		uint64_t *stataddr = &(vsp->n##counter.value.ui64);	\
+		extern void __dtrace_probe___fsinfo_##counter(vnode_t *, \
+		    size_t, uint64_t *);				\
+		__dtrace_probe___fsinfo_##counter(vp, 0, stataddr);	\
+		(*stataddr)++;						\
 		if ((vsp = vfsp->vfs_fstypevsp) != NULL) {		\
-			vsp->counter.value.ui64++;			\
+			vsp->n##counter.value.ui64++;			\
 		}							\
 	}								\
 }
@@ -129,10 +133,14 @@ int vopstats_enabled = 1;
 	vfs_t *vfsp = (vp)->v_vfsp;					\
 	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
 		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
-		vsp->counter.value.ui64++;				\
+		uint64_t *stataddr = &(vsp->n##counter.value.ui64);	\
+		extern void __dtrace_probe___fsinfo_##counter(vnode_t *, \
+		    size_t, uint64_t *);				\
+		__dtrace_probe___fsinfo_##counter(vp, bytesval, stataddr); \
+		(*stataddr)++;						\
 		vsp->bytecounter.value.ui64 += bytesval;		\
 		if ((vsp = vfsp->vfs_fstypevsp) != NULL) {		\
-			vsp->counter.value.ui64++;			\
+			vsp->n##counter.value.ui64++;			\
 			vsp->bytecounter.value.ui64 += bytesval;	\
 		}							\
 	}								\
@@ -2697,7 +2705,7 @@ fop_open(
 		 * Use the saved vp just in case the vnode ptr got trashed
 		 * by the error.
 		 */
-		VOPSTATS_UPDATE(vp, nopen);
+		VOPSTATS_UPDATE(vp, open);
 		if ((vp->v_type == VREG) && (mode & FREAD))
 			atomic_add_32(&(vp->v_rdcnt), -1);
 		if ((vp->v_type == VREG) && (mode & FWRITE))
@@ -2711,7 +2719,7 @@ fop_open(
 		 * casing each filesystem. Adjust the vnode counts to
 		 * reflect the vnode switch.
 		 */
-		VOPSTATS_UPDATE(*vpp, nopen);
+		VOPSTATS_UPDATE(*vpp, open);
 		if (*vpp != vp && *vpp != NULL) {
 			vn_copypath(vp, *vpp);
 			if (((*vpp)->v_type == VREG) && (mode & FREAD))
@@ -2739,7 +2747,7 @@ fop_close(
 	int err;
 
 	err = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr);
-	VOPSTATS_UPDATE(vp, nclose);
+	VOPSTATS_UPDATE(vp, close);
 	/*
 	 * Check passed in count to handle possible dups. Vnode counts are only
 	 * kept on regular files
@@ -2769,7 +2777,7 @@ fop_read(
 	ssize_t	resid_start = uiop->uio_resid;
 
 	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, nread,
+	VOPSTATS_UPDATE_IO(vp, read,
 	    read_bytes, (resid_start - uiop->uio_resid));
 	return (err);
 }
@@ -2786,7 +2794,7 @@ fop_write(
 	ssize_t	resid_start = uiop->uio_resid;
 
 	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
-	VOPSTATS_UPDATE_IO(vp, nwrite,
+	VOPSTATS_UPDATE_IO(vp, write,
 	    write_bytes, (resid_start - uiop->uio_resid));
 	return (err);
 }
@@ -2803,7 +2811,7 @@ fop_ioctl(
 	int	err;
 
 	err = (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp);
-	VOPSTATS_UPDATE(vp, nioctl);
+	VOPSTATS_UPDATE(vp, ioctl);
 	return (err);
 }
 
@@ -2817,7 +2825,7 @@ fop_setfl(
 	int	err;
 
 	err = (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr);
-	VOPSTATS_UPDATE(vp, nsetfl);
+	VOPSTATS_UPDATE(vp, setfl);
 	return (err);
 }
 
@@ -2831,7 +2839,7 @@ fop_getattr(
 	int	err;
 
 	err = (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr);
-	VOPSTATS_UPDATE(vp, ngetattr);
+	VOPSTATS_UPDATE(vp, getattr);
 	return (err);
 }
 
@@ -2846,7 +2854,7 @@ fop_setattr(
 	int	err;
 
 	err = (*(vp)->v_op->vop_setattr)(vp, vap, flags, cr, ct);
-	VOPSTATS_UPDATE(vp, nsetattr);
+	VOPSTATS_UPDATE(vp, setattr);
 	return (err);
 }
 
@@ -2860,7 +2868,7 @@ fop_access(
 	int	err;
 
 	err = (*(vp)->v_op->vop_access)(vp, mode, flags, cr);
-	VOPSTATS_UPDATE(vp, naccess);
+	VOPSTATS_UPDATE(vp, access);
 	return (err);
 }
 
@@ -2878,7 +2886,7 @@ fop_lookup(
 
 	ret = (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
 	if (ret == 0 && *vpp) {
-		VOPSTATS_UPDATE(*vpp, nlookup);
+		VOPSTATS_UPDATE(*vpp, lookup);
 		if ((*vpp)->v_path == NULL) {
 			vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
 		}
@@ -2903,7 +2911,7 @@ fop_create(
 	ret = (*(dvp)->v_op->vop_create)
 				(dvp, name, vap, excl, mode, vpp, cr, flag);
 	if (ret == 0 && *vpp) {
-		VOPSTATS_UPDATE(*vpp, ncreate);
+		VOPSTATS_UPDATE(*vpp, create);
 		if ((*vpp)->v_path == NULL) {
 			vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
 		}
@@ -2921,7 +2929,7 @@ fop_remove(
 	int	err;
 
 	err = (*(dvp)->v_op->vop_remove)(dvp, nm, cr);
-	VOPSTATS_UPDATE(dvp, nremove);
+	VOPSTATS_UPDATE(dvp, remove);
 	return (err);
 }
 
@@ -2935,7 +2943,7 @@ fop_link(
 	int	err;
 
 	err = (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr);
-	VOPSTATS_UPDATE(tdvp, nlink);
+	VOPSTATS_UPDATE(tdvp, link);
 	return (err);
 }
 
@@ -2950,7 +2958,7 @@ fop_rename(
 	int	err;
 
 	err = (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr);
-	VOPSTATS_UPDATE(sdvp, nrename);
+	VOPSTATS_UPDATE(sdvp, rename);
 	return (err);
 }
 
@@ -2966,7 +2974,7 @@ fop_mkdir(
 
 	ret = (*(dvp)->v_op->vop_mkdir)(dvp, dirname, vap, vpp, cr);
 	if (ret == 0 && *vpp) {
-		VOPSTATS_UPDATE(*vpp, nmkdir);
+		VOPSTATS_UPDATE(*vpp, mkdir);
 		if ((*vpp)->v_path == NULL) {
 			vn_setpath(rootdir, dvp, *vpp, dirname,
 			    strlen(dirname));
@@ -2986,7 +2994,7 @@ fop_rmdir(
 	int	err;
 
 	err = (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr);
-	VOPSTATS_UPDATE(dvp, nrmdir);
+	VOPSTATS_UPDATE(dvp, rmdir);
 	return (err);
 }
 
@@ -3001,7 +3009,7 @@ fop_readdir(
 	ssize_t	resid_start = uiop->uio_resid;
 
 	err = (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp);
-	VOPSTATS_UPDATE_IO(vp, nreaddir,
+	VOPSTATS_UPDATE_IO(vp, readdir,
 	    readdir_bytes, (resid_start - uiop->uio_resid));
 	return (err);
 }
@@ -3017,7 +3025,7 @@ fop_symlink(
 	int	err;
 
 	err = (*(dvp)->v_op->vop_symlink) (dvp, linkname, vap, target, cr);
-	VOPSTATS_UPDATE(dvp, nsymlink);
+	VOPSTATS_UPDATE(dvp, symlink);
 	return (err);
 }
 
@@ -3030,7 +3038,7 @@ fop_readlink(
 	int	err;
 
 	err = (*(vp)->v_op->vop_readlink)(vp, uiop, cr);
-	VOPSTATS_UPDATE(vp, nreadlink);
+	VOPSTATS_UPDATE(vp, readlink);
 	return (err);
 }
 
@@ -3043,7 +3051,7 @@ fop_fsync(
 	int	err;
 
 	err = (*(vp)->v_op->vop_fsync)(vp, syncflag, cr);
-	VOPSTATS_UPDATE(vp, nfsync);
+	VOPSTATS_UPDATE(vp, fsync);
 	return (err);
 }
 
@@ -3053,7 +3061,7 @@ fop_inactive(
 	cred_t *cr)
 {
 	/* Need to update stats before vop call since we may lose the vnode */
-	VOPSTATS_UPDATE(vp, ninactive);
+	VOPSTATS_UPDATE(vp, inactive);
 	(*(vp)->v_op->vop_inactive)(vp, cr);
 }
 
@@ -3065,7 +3073,7 @@ fop_fid(
 	int	err;
 
 	err = (*(vp)->v_op->vop_fid)(vp, fidp);
-	VOPSTATS_UPDATE(vp, nfid);
+	VOPSTATS_UPDATE(vp, fid);
 	return (err);
 }
 
@@ -3078,7 +3086,7 @@ fop_rwlock(
 	int	ret;
 
 	ret = ((*(vp)->v_op->vop_rwlock)(vp, write_lock, ct));
-	VOPSTATS_UPDATE(vp, nrwlock);
+	VOPSTATS_UPDATE(vp, rwlock);
 	return (ret);
 }
 
@@ -3089,7 +3097,7 @@ fop_rwunlock(
 	caller_context_t *ct)
 {
 	(*(vp)->v_op->vop_rwunlock)(vp, write_lock, ct);
-	VOPSTATS_UPDATE(vp, nrwunlock);
+	VOPSTATS_UPDATE(vp, rwunlock);
 }
 
 int
@@ -3101,7 +3109,7 @@ fop_seek(
 	int	err;
 
 	err = (*(vp)->v_op->vop_seek)(vp, ooff, noffp);
-	VOPSTATS_UPDATE(vp, nseek);
+	VOPSTATS_UPDATE(vp, seek);
 	return (err);
 }
 
@@ -3113,7 +3121,7 @@ fop_cmp(
 	int	err;
 
 	err = (*(vp1)->v_op->vop_cmp)(vp1, vp2);
-	VOPSTATS_UPDATE(vp1, ncmp);
+	VOPSTATS_UPDATE(vp1, cmp);
 	return (err);
 }
 
@@ -3131,7 +3139,7 @@ fop_frlock(
 
 	err = (*(vp)->v_op->vop_frlock)
 				(vp, cmd, bfp, flag, offset, flk_cbp, cr);
-	VOPSTATS_UPDATE(vp, nfrlock);
+	VOPSTATS_UPDATE(vp, frlock);
 	return (err);
 }
 
@@ -3148,7 +3156,7 @@ fop_space(
 	int	err;
 
 	err = (*(vp)->v_op->vop_space)(vp, cmd, bfp, flag, offset, cr, ct);
-	VOPSTATS_UPDATE(vp, nspace);
+	VOPSTATS_UPDATE(vp, space);
 	return (err);
 }
 
@@ -3160,7 +3168,7 @@ fop_realvp(
 	int	err;
 
 	err = (*(vp)->v_op->vop_realvp)(vp, vpp);
-	VOPSTATS_UPDATE(vp, nrealvp);
+	VOPSTATS_UPDATE(vp, realvp);
 	return (err);
 }
 
@@ -3181,7 +3189,7 @@ fop_getpage(
 
 	err = (*(vp)->v_op->vop_getpage)
 			(vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
-	VOPSTATS_UPDATE(vp, ngetpage);
+	VOPSTATS_UPDATE(vp, getpage);
 	return (err);
 }
 
@@ -3196,7 +3204,7 @@ fop_putpage(
 	int	err;
 
 	err = (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr);
-	VOPSTATS_UPDATE(vp, nputpage);
+	VOPSTATS_UPDATE(vp, putpage);
 	return (err);
 }
 
@@ -3216,7 +3224,7 @@ fop_map(
 
 	err = (*(vp)->v_op->vop_map)
 			(vp, off, as, addrp, len, prot, maxprot, flags, cr);
-	VOPSTATS_UPDATE(vp, nmap);
+	VOPSTATS_UPDATE(vp, map);
 	return (err);
 }
 
@@ -3263,7 +3271,7 @@ fop_addmap(
 					(int64_t)delta);
 		}
 	}
-	VOPSTATS_UPDATE(vp, naddmap);
+	VOPSTATS_UPDATE(vp, addmap);
 	return (error);
 }
 
@@ -3314,7 +3322,7 @@ fop_delmap(
 					(int64_t)(-delta));
 		}
 	}
-	VOPSTATS_UPDATE(vp, ndelmap);
+	VOPSTATS_UPDATE(vp, delmap);
 	return (error);
 }
 
@@ -3330,7 +3338,7 @@ fop_poll(
 	int	err;
 
 	err = (*(vp)->v_op->vop_poll)(vp, events, anyyet, reventsp, phpp);
-	VOPSTATS_UPDATE(vp, npoll);
+	VOPSTATS_UPDATE(vp, poll);
 	return (err);
 }
 
@@ -3344,7 +3352,7 @@ fop_dump(
 	int	err;
 
 	err = (*(vp)->v_op->vop_dump)(vp, addr, lbdn, dblks);
-	VOPSTATS_UPDATE(vp, ndump);
+	VOPSTATS_UPDATE(vp, dump);
 	return (err);
 }
 
@@ -3358,7 +3366,7 @@ fop_pathconf(
 	int	err;
 
 	err = (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr);
-	VOPSTATS_UPDATE(vp, npathconf);
+	VOPSTATS_UPDATE(vp, pathconf);
 	return (err);
 }
 
@@ -3374,7 +3382,7 @@ fop_pageio(
 	int	err;
 
 	err = (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr);
-	VOPSTATS_UPDATE(vp, npageio);
+	VOPSTATS_UPDATE(vp, pageio);
 	return (err);
 }
 
@@ -3386,7 +3394,7 @@ fop_dumpctl(
 {
 	int	err;
 	err = (*(vp)->v_op->vop_dumpctl)(vp, action, blkp);
-	VOPSTATS_UPDATE(vp, ndumpctl);
+	VOPSTATS_UPDATE(vp, dumpctl);
 	return (err);
 }
 
@@ -3399,7 +3407,7 @@ fop_dispose(
 	cred_t *cr)
 {
 	/* Must do stats first since it's possible to lose the vnode */
-	VOPSTATS_UPDATE(vp, ndispose);
+	VOPSTATS_UPDATE(vp, dispose);
 	(*(vp)->v_op->vop_dispose)(vp, pp, flag, dn, cr);
 }
 
@@ -3413,7 +3421,7 @@ fop_setsecattr(
 	int	err;
 
 	err = (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr);
-	VOPSTATS_UPDATE(vp, nsetsecattr);
+	VOPSTATS_UPDATE(vp, setsecattr);
 	return (err);
 }
 
@@ -3427,7 +3435,7 @@ fop_getsecattr(
 	int	err;
 
 	err = (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr);
-	VOPSTATS_UPDATE(vp, ngetsecattr);
+	VOPSTATS_UPDATE(vp, getsecattr);
 	return (err);
 }
 
@@ -3442,7 +3450,7 @@ fop_shrlock(
 	int	err;
 
 	err = (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr);
-	VOPSTATS_UPDATE(vp, nshrlock);
+	VOPSTATS_UPDATE(vp, shrlock);
 	return (err);
 }
 
@@ -3452,6 +3460,6 @@ fop_vnevent(vnode_t *vp, vnevent_t vnevent)
 	int	err;
 
 	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent);
-	VOPSTATS_UPDATE(vp, nvnevent);
+	VOPSTATS_UPDATE(vp, vnevent);
 	return (err);
 }

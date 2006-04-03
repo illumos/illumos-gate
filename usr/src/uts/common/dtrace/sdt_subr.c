@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +51,14 @@ static dtrace_pattr_t fpu_attr = {
 { DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_ISA },
 };
 
+static dtrace_pattr_t fsinfo_attr = {
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
+};
+
 static dtrace_pattr_t stab_attr = {
 { DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 { DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
@@ -77,6 +84,7 @@ sdt_provider_t sdt_providers[] = {
 	{ "proc", "__proc_", &stab_attr, 0 },
 	{ "io", "__io_", &stab_attr, 0 },
 	{ "mib", "__mib_", &stab_attr, 0 },
+	{ "fsinfo", "__fsinfo_", &fsinfo_attr, 0 },
 	{ "sdt", NULL, &sdt_attr, 0 },
 	{ NULL }
 };
@@ -138,6 +146,8 @@ sdt_argdesc_t sdt_args[] = {
 	{ "io", "wait-done", 1, 0, "buf_t *", "devinfo_t *" },
 	{ "io", "wait-done", 2, 0, "buf_t *", "fileinfo_t *" },
 	{ "mib", NULL, 0, 0, "int" },
+	{ "fsinfo", NULL, 0, 0, "vnode_t *", "fileinfo_t *" },
+	{ "fsinfo", NULL, 1, 1, "int", "int" },
 	{ NULL }
 };
 
