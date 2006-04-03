@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,23 +81,23 @@ __set_authtoken_attr(char *name, char *oldpw, char *oldrpcpw,
 		if (repositories & i) {
 			buf = NULL;
 
-			if (rops[i].lock && (err = rops[i].lock()))  {
+			if (rops[i]->lock && (err = rops[i]->lock()))  {
 				return (err);
 			}
 
-			if (rops[i].getpwnam) {
-				err = rops[i].getpwnam(name, items, rep, &buf);
+			if (rops[i]->getpwnam) {
+				err = rops[i]->getpwnam(name, items, rep, &buf);
 			}
 
-			if ((err == PWU_SUCCESS) && rops[i].update)
-				err = rops[i].update(items, rep, buf);
+			if ((err == PWU_SUCCESS) && rops[i]->update)
+				err = rops[i]->update(items, rep, buf);
 
-			if ((err == PWU_SUCCESS) && rops[i].putpwnam)
-				err = rops[i].putpwnam(name, oldpw, oldrpcpw,
+			if ((err == PWU_SUCCESS) && rops[i]->putpwnam)
+				err = rops[i]->putpwnam(name, oldpw, oldrpcpw,
 					rep, buf);
 
-			if (rops[i].unlock)
-				(void) rops[i].unlock();
+			if (rops[i]->unlock)
+				(void) rops[i]->unlock();
 
 			if (buf) {
 				(void) free(buf);

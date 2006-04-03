@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,8 +30,7 @@
 
 LIBRARY=	passwdutil.a
 VERS=		.1
-OBJ=		init.o		\
-		__check_history.o \
+OBJ=		__check_history.o \
 		__set_authtoken_attr.o \
 		__get_authtoken_attr.o \
 		__user_to_authenticate.o \

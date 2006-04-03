@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ __user_to_authenticate(char *name, pwu_repository_t *rep, char **auth_user,
 	/* Loop over repositories until we find the user */
 	while (i <= REP_LAST) {
 		if (repositories & i) {
-			pwu_res = rops[i].user_to_authenticate(name, rep,
+			pwu_res = rops[i]->user_to_authenticate(name, rep,
 							auth_user, auth_self);
 			if (pwu_res != PWU_NOT_FOUND)
 				return (pwu_res);

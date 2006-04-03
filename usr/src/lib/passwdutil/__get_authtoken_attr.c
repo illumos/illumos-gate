@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ __get_authtoken_attr(char *name, pwu_repository_t *rep, attrlist *item)
 	/* Loop over repositories until the user is found */
 	while ((i <= REP_LAST) && (res == PWU_NOT_FOUND)) {
 		if (repositories & i)
-			res = rops[i].getattr(name, item, rep);
+			res = rops[i]->getattr(name, item, rep);
 		i <<= 1;
 	}
 	return (res);

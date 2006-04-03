@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@ __incr_failed_count(char *username, char *repname, int max_failures)
 	int ret;
 	void *buf;
 	attrlist items[1];
-	repops_t *ops = &rops[REP_FILES];
+	repops_t *ops = rops[REP_FILES];
 
 	/* account locking only defined for files */
 	if (strcmp(repname, "files") != 0)
@@ -82,7 +82,7 @@ __rst_failed_count(char *username, char *repname)
 	int ret;
 	void *buf;
 	attrlist items[1];
-	repops_t *ops = &rops[REP_FILES];
+	repops_t *ops = rops[REP_FILES];
 
 	/* account locking only defined for files */
 	if (strcmp(repname, "files") != 0)

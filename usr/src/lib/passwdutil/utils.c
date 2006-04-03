@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,29 @@
 #define	MINWEEKS	-1
 #define	MAXWEEKS	-1
 #define	WARNWEEKS	-1
+
+extern repops_t files_repops, nis_repops,
+	nisplus_repops, ldap_repops, nss_repops;
+
+repops_t *rops[REP_LAST+1] = {
+	NULL,
+	&files_repops,
+	&nis_repops,
+	NULL,
+	&nisplus_repops,
+	NULL,
+	NULL,
+	NULL,
+	&ldap_repops,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	&nss_repops,
+};
 
 void
 free_pwd(struct passwd *pw)

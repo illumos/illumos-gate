@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +68,8 @@ __check_history(char *user, char *passwd, pwu_repository_t *rep)
 	/* Loop over repositories until the user is found */
 	while ((i <= REP_LAST) && (res == PWU_NOT_FOUND)) {
 		if (repositories & i)
-			if (rops[i].checkhistory != NULL)
-				res = rops[i].checkhistory(user, passwd, rep);
+			if (rops[i]->checkhistory != NULL)
+				res = rops[i]->checkhistory(user, passwd, rep);
 		i <<= 1;
 	}
 	return (res);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,27 +36,8 @@
 #define	DEBUG_SYSLOG	1
 #define	DEBUG_STDERR	2
 
+/* Change and recompile or modify with a debugger */
 int debug_enabled = 0;
-
-void
-debug_init(void)
-{
-	char *env;
-
-	env = getenv("PASSWDUTIL_DEBUG");
-
-	if (env == NULL)
-		debug_enabled = DEBUG_NONE;
-
-	else if (strcmp(env, "syslog") == 0)
-		debug_enabled = DEBUG_SYSLOG;
-	else if (strcmp(env, "stderr") == 0)
-		debug_enabled = DEBUG_STDERR;
-	else {
-		(void) fprintf(stderr, "Invalid value for PASSWDUTIL_DEBUG\n");
-		debug_enabled = DEBUG_NONE;
-	}
-}
 
 /*PRINTFLIKE1*/
 void
