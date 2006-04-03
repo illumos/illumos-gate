@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * convert binary audit records to syslog messages and
@@ -517,6 +516,14 @@ filter(const char *input, uint32_t sequence, char *output,
 	if (first) {
 		first = 0;
 
+		/*
+		 * Any member or submember of parse_context_t which utilizes
+		 * allocated memory must free() the memory after calling
+		 * parse_token() for both the preselected and non-preselected
+		 * cases.
+		 * New additions to parse_context_t or its submembers need to
+		 * have this same treatment.
+		 */
 		initial_ctx.out.sf_eventid = 0;
 		initial_ctx.out.sf_reclen = 0;
 		initial_ctx.out.sf_pass = 0;
@@ -601,6 +608,41 @@ filter(const char *input, uint32_t sequence, char *output,
 				    "syslog tossed (event=%d) buffer %u\n",
 				    ctx.out.sf_eventid, sequence);
 #endif
+
+			/*
+			 * Members or submembers of parse_context_t which
+			 * utilize allocated memory need to free() the memory
+			 * here to handle the case of not being preselected as
+			 * well as below for when the event is preselected.
+			 * New additions to parse_context_t or any of its
+			 * submembers need to get the same treatment.
+			 */
+			if (ctx.out.sf_uauthlen > 0) {
+				free(ctx.out.sf_uauth);
+				ctx.out.sf_uauth = NULL;
+				ctx.out.sf_uauthlen = 0;
+			}
+			if (ctx.out.sf_pathlen > 0) {
+				free(ctx.out.sf_path);
+				ctx.out.sf_path = NULL;
+				ctx.out.sf_pathlen = 0;
+			}
+			if (ctx.out.sf_atpathlen > 0) {
+				free(ctx.out.sf_atpath);
+				ctx.out.sf_atpath = NULL;
+				ctx.out.sf_atpathlen = 0;
+			}
+			if (ctx.out.sf_textlen > 0) {
+				free(ctx.out.sf_text);
+				ctx.out.sf_text = NULL;
+				ctx.out.sf_textlen = 0;
+			}
+			if (ctx.out.sf_zonelen > 0) {
+				free(ctx.out.sf_zonename);
+				ctx.out.sf_zonename = NULL;
+				ctx.out.sf_zonelen = 0;
+			}
+
 			return (-1);	/* tell caller it was tossed */
 		}
 		bp = output;
