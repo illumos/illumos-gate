@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -569,8 +569,11 @@ show_sctp_flags(sctp_t *sctp)
 	mdb_printf("\tndelay\t\t\t%d\n", sctp->sctp_ndelay);
 	mdb_printf("\tcondemned\t\t%d\n", sctp->sctp_condemned);
 	mdb_printf("\tchk_fast_rexmit\t\t%d\n", sctp->sctp_chk_fast_rexmit);
+
 	mdb_printf("\tprsctp_aware\t\t%d\n", sctp->sctp_prsctp_aware);
 	mdb_printf("\tlinklocal\t\t%d\n", sctp->sctp_linklocal);
+	mdb_printf("\tmac_exempt\t\t%d\n", sctp->sctp_mac_exempt);
+	mdb_printf("\trexmitting\t\t%d\n", sctp->sctp_rexmitting);
 
 	mdb_printf("\trecvsndrcvinfo\t\t%d\n", sctp->sctp_recvsndrcvinfo);
 	mdb_printf("\trecvassocevnt\t\t%d\n", sctp->sctp_recvassocevnt);
@@ -832,11 +835,13 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "max_init_rxt\t%?d\tpa_max_rxt\t%?d\n"
 		    "pp_max_rxt\t%?d\trto_max\t\t%?u\n"
 		    "rto_min\t\t%?u\trto_initial\t%?u\n"
-		    "init_rto_max\t%?u\n", sctp.sctp_cookie_mp,
+		    "init_rto_max\t%?u\n"
+		    "rxt_nxttsn\t%?u\trxt_maxtsn\t%?u\n", sctp.sctp_cookie_mp,
 		    sctp.sctp_strikes, sctp.sctp_max_init_rxt,
 		    sctp.sctp_pa_max_rxt, sctp.sctp_pp_max_rxt,
 		    sctp.sctp_rto_max, sctp.sctp_rto_min,
-		    sctp.sctp_rto_initial, sctp.sctp_init_rto_max);
+		    sctp.sctp_rto_initial, sctp.sctp_init_rto_max,
+		    sctp.sctp_rxt_nxttsn, sctp.sctp_rxt_maxtsn);
 	}
 
 	if (opts & MDB_SCTP_SHOW_CONN) {

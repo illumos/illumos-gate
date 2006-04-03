@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -46,9 +47,46 @@
 #include "sctp_addr.h"
 
 mib2_sctp_t	sctp_mib;
-kstat_t		*sctp_mibkp;	/* kstat exporting sctp_mib data */
+static kstat_t	*sctp_mibkp;	/* kstat exporting sctp_mib data */
+static kstat_t	*sctp_kstat;	/* kstat exporting general sctp stats */
 
 static int sctp_snmp_state(sctp_t *sctp);
+
+/*
+ * The following kstats are for debugging purposes.  They keep
+ * track of problems which should not happen normally.  But in
+ * those cases which they do happen, these kstats would be handy
+ * for engineers to diagnose the problems.  They are not intended
+ * to be consumed by customers.
+ */
+sctp_kstat_t sctp_statistics = {
+	{ "sctp_add_faddr",			KSTAT_DATA_UINT64 },
+	{ "sctp_add_timer",			KSTAT_DATA_UINT64 },
+	{ "sctp_conn_create",			KSTAT_DATA_UINT64 },
+	{ "sctp_find_next_tq",			KSTAT_DATA_UINT64 },
+	{ "sctp_fr_add_hdr",			KSTAT_DATA_UINT64 },
+	{ "sctp_fr_not_found",			KSTAT_DATA_UINT64 },
+	{ "sctp_output_failed",			KSTAT_DATA_UINT64 },
+	{ "sctp_rexmit_failed",			KSTAT_DATA_UINT64 },
+	{ "sctp_send_init_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_cookie_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_cookie_ack_failed",	KSTAT_DATA_UINT64 },
+	{ "sctp_send_err_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_sack_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_shutdown_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_shutdown_ack_failed",	KSTAT_DATA_UINT64 },
+	{ "sctp_send_shutdown_comp_failed",	KSTAT_DATA_UINT64 },
+	{ "sctp_send_user_abort_failed",	KSTAT_DATA_UINT64 },
+	{ "sctp_send_asconf_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_asconf_ack_failed",	KSTAT_DATA_UINT64 },
+	{ "sctp_send_ftsn_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_send_hb_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_return_hb_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_ss_rexmit_failed",		KSTAT_DATA_UINT64 },
+	{ "sctp_cl_connect",			KSTAT_DATA_UINT64 },
+	{ "sctp_cl_assoc_change",		KSTAT_DATA_UINT64 },
+	{ "sctp_cl_check_addrs",		KSTAT_DATA_UINT64 },
+};
 
 static int
 sctp_kstat_update(kstat_t *kp, int rw)
@@ -261,8 +299,8 @@ sctp_kstat_init(void)
 		{ "sctpInClosed",		KSTAT_DATA_INT32, 0 }
 	};
 
-	sctp_mibkp = kstat_create("sctp", 0, "sctp", "mib2", KSTAT_TYPE_NAMED,
-	    NUM_OF_FIELDS(sctp_named_kstat_t), 0);
+	sctp_mibkp = kstat_create(SCTP_MOD_NAME, 0, "sctp", "mib2",
+	    KSTAT_TYPE_NAMED, NUM_OF_FIELDS(sctp_named_kstat_t), 0);
 
 	if (sctp_mibkp == NULL)
 		return;
@@ -276,6 +314,13 @@ sctp_kstat_init(void)
 	sctp_mibkp->ks_update = sctp_kstat_update;
 
 	kstat_install(sctp_mibkp);
+
+	if ((sctp_kstat = kstat_create(SCTP_MOD_NAME, 0, "sctpstat",
+	    "net", KSTAT_TYPE_NAMED, NUM_OF_FIELDS(sctp_statistics),
+	    KSTAT_FLAG_VIRTUAL)) != NULL) {
+		sctp_kstat->ks_data = &sctp_statistics;
+		kstat_install(sctp_kstat);
+	}
 }
 
 void
@@ -284,6 +329,10 @@ sctp_kstat_fini(void)
 	if (sctp_mibkp != NULL) {
 		kstat_delete(sctp_mibkp);
 		sctp_mibkp = NULL;
+	}
+	if (sctp_kstat != NULL) {
+		kstat_delete(sctp_kstat);
+		sctp_kstat = NULL;
 	}
 }
 

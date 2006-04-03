@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1648,6 +1649,7 @@ checks_done:
 	    (sizeof (sctp_sack_frag_t) * sctp->sctp_sack_gaps);
 	smp = sctp_make_mp(sctp, sendto, slen);
 	if (smp == NULL) {
+		SCTP_KSTAT(sctp_send_sack_failed);
 		return (NULL);
 	}
 	sch = (sctp_chunk_hdr_t *)smp->b_wptr;
@@ -1742,6 +1744,7 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 		if (head == NULL) {
 			sctp->sctp_adv_pap = adv_pap;
 			freemsg(nmp);
+			SCTP_KSTAT(sctp_send_ftsn_failed);
 			return (ENOMEM);
 		}
 		SCTP_MSG_SET_ABANDONED(meta);
@@ -1831,6 +1834,7 @@ sctp_cumack(sctp_t *sctp, uint32_t tsn, mblk_t **first_unacked)
 				}
 				if (SCTP_CHUNK_ISACKED(mp))
 					continue;
+				SCTP_CHUNK_SET_SACKCNT(mp, 0);
 				SCTP_CHUNK_ACKED(mp);
 				ASSERT(fp->suna >= chunklen);
 				fp->suna -= chunklen;
@@ -2780,7 +2784,7 @@ ret:
 			fp->cwnd = fp->suna + sctp_maxburst * fp->sfa_pmss;
 		}
 		fp->acked = 0;
-		return (trysend);
+		goto check_ss_rxmit;
 	}
 	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
 		if (cumack_forward && fp->acked && !fast_recovery &&
@@ -2806,6 +2810,31 @@ ret:
 			fp->cwnd = fp->suna + sctp_maxburst * fp->sfa_pmss;
 		}
 		fp->acked = 0;
+	}
+check_ss_rxmit:
+	/*
+	 * If this is a SACK following a timeout, check if there are
+	 * still unacked chunks (sent before the timeout) that we can
+	 * send.
+	 */
+	if (sctp->sctp_rexmitting) {
+		if (SEQ_LT(sctp->sctp_lastack_rxd, sctp->sctp_rxt_maxtsn)) {
+			/*
+			 * As we are in retransmission phase, we may get a
+			 * SACK which indicates some new chunks are received
+			 * but cum_tsn does not advance.  During this
+			 * phase, the other side advances cum_tsn only because
+			 * it receives our retransmitted chunks.  Only
+			 * this signals that some chunks are still
+			 * missing.
+			 */
+			if (cumack_forward)
+				sctp_ss_rexmit(sctp);
+		} else {
+			sctp->sctp_rexmitting = B_FALSE;
+			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
+			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
+		}
 	}
 	return (trysend);
 }
@@ -3551,7 +3580,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_SHUTDOWN:
 				sctp_shutdown_event(sctp);
 				trysend = sctp_shutdown_received(sctp, ch,
-				    0, 0);
+				    B_FALSE, B_FALSE, fp);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				break;
 			case CHUNK_SHUTDOWN_ACK:
@@ -3906,10 +3935,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			switch (ch->sch_id) {
 			case CHUNK_ABORT:
 				/* Pass gathered wisdom to IP for keeping */
-				for (fp = sctp->sctp_faddrs; fp != NULL;
-				    fp = fp->next) {
-					sctp_faddr2ire(sctp, fp);
-				}
+				sctp_update_ire(sctp);
 				sctp_process_abort(sctp, ch, 0);
 				goto done;
 			case CHUNK_SHUTDOWN_COMPLETE:
@@ -3919,10 +3945,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				    NULL);
 
 				/* Pass gathered wisdom to IP for keeping */
-				for (fp = sctp->sctp_faddrs; fp != NULL;
-				    fp = fp->next) {
-					sctp_faddr2ire(sctp, fp);
-				}
+				sctp_update_ire(sctp);
 				sctp_clean_death(sctp, 0);
 				goto done;
 			case CHUNK_SHUTDOWN_ACK:
@@ -3935,7 +3958,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				goto done;
 			case CHUNK_COOKIE:
 				(void) sctp_shutdown_received(sctp, NULL,
-				    1, 0);
+				    B_TRUE, B_FALSE, fp);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				break;
 			case CHUNK_HEARTBEAT:
@@ -3953,7 +3976,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			switch (ch->sch_id) {
 			case CHUNK_SHUTDOWN:
 				trysend = sctp_shutdown_received(sctp, ch,
-				    0, 0);
+				    B_FALSE, B_FALSE, fp);
 				break;
 			case CHUNK_SACK:
 				trysend = sctp_got_sack(sctp, ch);

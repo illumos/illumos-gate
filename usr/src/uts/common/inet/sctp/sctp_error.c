@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -102,8 +103,11 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 	sctp_faddr_t *fp = sctp->sctp_current;
 
 	mp = sctp_make_mp(sctp, fp, 0);
-	if (mp == NULL)
+	if (mp == NULL) {
+		SCTP_KSTAT(sctp_send_user_abort_failed);
 		return;
+	}
+
 	/*
 	 * Create abort chunk.
 	 */
@@ -366,6 +370,7 @@ sctp_send_err(sctp_t *sctp, mblk_t *emp, sctp_faddr_t *dest)
 	} else {
 		sendmp = sctp_make_mp(sctp, dest, 0);
 		if (sendmp == NULL) {
+			SCTP_KSTAT(sctp_send_err_failed);
 			freemsg(emp);
 			return;
 		}

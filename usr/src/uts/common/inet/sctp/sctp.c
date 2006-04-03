@@ -324,7 +324,6 @@ int
 sctp_disconnect(sctp_t *sctp)
 {
 	int	error = 0;
-	sctp_faddr_t *fp;
 
 	dprint(3, ("sctp_disconnect %p, state %d\n", (void *)sctp,
 	    sctp->sctp_state));
@@ -375,8 +374,7 @@ sctp_disconnect(sctp_t *sctp)
 		sctp_send_shutdown(sctp, 0);
 
 		/* Pass gathered wisdom to IP for keeping */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next)
-			sctp_faddr2ire(sctp, fp);
+		sctp_update_ire(sctp);
 
 		/*
 		 * If lingering on close then wait until the shutdown
@@ -1298,9 +1296,10 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 	if (credp == NULL)
 		return (NULL);
 
-	if ((sctp_connp = ipcl_conn_create(IPCL_SCTPCONN, sleep)) == NULL)
+	if ((sctp_connp = ipcl_conn_create(IPCL_SCTPCONN, sleep)) == NULL) {
+		SCTP_KSTAT(sctp_conn_create);
 		return (NULL);
-
+	}
 	sctp_connp->conn_ulp_labeled = is_system_labeled();
 
 	psctp = (sctp_t *)parent;
@@ -1698,6 +1697,7 @@ sctp_find_next_tq(sctp_t *sctp)
 		sctp->sctp_recvq_tq = tq;
 		return (B_TRUE);
 	}
+	SCTP_KSTAT(sctp_find_next_tq);
 	return (B_FALSE);
 }
 

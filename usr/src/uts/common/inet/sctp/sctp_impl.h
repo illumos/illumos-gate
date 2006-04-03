@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -60,36 +61,6 @@ typedef struct sctpt_s {
 	struct sctp_s *sctpt_sctp;	/* The parameter we are to pass in */
 	struct sctp_faddr_s *sctpt_faddr;
 } sctpt_t;
-
-/*
- * faddr timer mblks are not allocated until first use. This macro
- * will allocate the timer mblk if necessary, set the faddr, and then
- * start the timer.
- */
-#define	SCTP_FADDR_TIMER_RESTART(sctp, fp, intvl)			\
-	if ((fp)->timer_mp == NULL) {					\
-		(fp)->timer_mp = sctp_timer_alloc((sctp), sctp_rexmit_timer); \
-	}								\
-	if ((fp)->timer_mp != NULL) {					\
-		((sctpt_t *)((fp)->timer_mp->b_rptr))->sctpt_faddr = fp;  \
-		dprint(3, ("faddr_timer_restart: fp=%p %x:%x:%x:%x %d\n", \
-		    (void *)(fp), SCTP_PRINTADDR((fp)->faddr),		\
-		    (int)(intvl)));					\
-		sctp_timer((sctp), (fp)->timer_mp, (intvl));		\
-		(fp)->timer_running = 1;				\
-	}
-
-#define	SCTP_FADDR_TIMER_STOP(fp)				\
-	if ((fp)->timer_running && (fp)->timer_mp != NULL) {	\
-		sctp_timer_stop((fp)->timer_mp);		\
-		(fp)->timer_running = 0;			\
-	}
-
-#define	SCTP_CALC_RXT(fp, max)		\
-{					\
-	if (((fp)->rto <<= 1) > (max))	\
-		(fp)->rto = (max);	\
-}
 
 /*
  * Maximum number of duplicate TSNs we can report. This is currently
@@ -183,6 +154,31 @@ extern sctpparam_t sctp_param_arr[];
  */
 extern sctpparam_t sctp_wroff_xtra_param;
 #define	sctp_wroff_xtra	sctp_wroff_xtra_param.sctp_param_val
+
+/*
+ * Retransmission timer start and stop macro for a given faddr.
+ */
+#define	SCTP_FADDR_TIMER_RESTART(sctp, fp, intvl)			\
+{									\
+	dprint(3, ("faddr_timer_restart: fp=%p %x:%x:%x:%x %d\n",	\
+	    (void *)(fp), SCTP_PRINTADDR((fp)->faddr), (int)(intvl)));	\
+	sctp_timer((sctp), (fp)->timer_mp, (intvl));			\
+	(fp)->timer_running = 1;					\
+}
+
+#define	SCTP_FADDR_TIMER_STOP(fp)			\
+	ASSERT((fp)->timer_mp != NULL);			\
+	if ((fp)->timer_running) {			\
+		sctp_timer_stop((fp)->timer_mp);	\
+		(fp)->timer_running = 0;		\
+	}
+
+#define	SCTP_CALC_RXT(fp, max)		\
+{					\
+	if (((fp)->rto <<= 1) > (max))	\
+		(fp)->rto = (max);	\
+}
+
 
 #define	SCTP_MAX_COMBINED_HEADER_LENGTH	(60 + 12) /* Maxed out ip + sctp */
 #define	SCTP_MAX_IP_OPTIONS_LENGTH	(60 - IP_SIMPLE_HDR_LENGTH)
@@ -384,6 +380,40 @@ extern sin6_t	sctp_sin6_null;	/* Zero address for quick clears */
 #define	SCTP_IS_DETACHED(sctp)		((sctp)->sctp_detached)
 
 extern mib2_sctp_t	sctp_mib;	/* SNMP fixed size info */
+
+/* SCTP kstat */
+typedef struct sctp_kstat_s {
+	kstat_named_t	sctp_add_faddr;
+	kstat_named_t	sctp_add_timer;
+	kstat_named_t	sctp_conn_create;
+	kstat_named_t	sctp_find_next_tq;
+	kstat_named_t	sctp_fr_add_hdr;
+	kstat_named_t	sctp_fr_not_found;
+	kstat_named_t	sctp_output_failed;
+	kstat_named_t	sctp_rexmit_failed;
+	kstat_named_t	sctp_send_init_failed;
+	kstat_named_t	sctp_send_cookie_failed;
+	kstat_named_t	sctp_send_cookie_ack_failed;
+	kstat_named_t	sctp_send_err_failed;
+	kstat_named_t	sctp_send_sack_failed;
+	kstat_named_t	sctp_send_shutdown_failed;
+	kstat_named_t	sctp_send_shutdown_ack_failed;
+	kstat_named_t	sctp_send_shutdown_comp_failed;
+	kstat_named_t	sctp_send_user_abort_failed;
+	kstat_named_t	sctp_send_asconf_failed;
+	kstat_named_t	sctp_send_asconf_ack_failed;
+	kstat_named_t	sctp_send_ftsn_failed;
+	kstat_named_t	sctp_send_hb_failed;
+	kstat_named_t	sctp_return_hb_failed;
+	kstat_named_t	sctp_ss_rexmit_failed;
+	kstat_named_t	sctp_cl_connect;
+	kstat_named_t	sctp_cl_assoc_change;
+	kstat_named_t	sctp_cl_check_addrs;
+} sctp_kstat_t;
+
+extern sctp_kstat_t sctp_statistics;
+
+#define	SCTP_KSTAT(x)		(sctp_statistics.x.value.ui64++)
 
 /*
  * Object to represent database of options to search passed to
@@ -744,7 +774,9 @@ typedef struct sctp_s {
 		sctp_prsctp_aware : 1,	/* is peer PR-SCTP aware? */
 		sctp_linklocal : 1,	/* is linklocal assoc. */
 		sctp_mac_exempt : 1,	/* SO_MAC_EXEMPT */
-		sctp_dummy : 5;
+		sctp_rexmitting : 1,	/* SCTP is retransmitting */
+
+		sctp_dummy : 4;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -787,6 +819,7 @@ typedef struct sctp_s {
 #define	sctp_prsctp_aware sctp_bits.sctp_prsctp_aware
 #define	sctp_linklocal sctp_bits.sctp_linklocal
 #define	sctp_mac_exempt sctp_bits.sctp_mac_exempt
+#define	sctp_rexmitting sctp_bits.sctp_rexmitting
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -903,6 +936,8 @@ typedef struct sctp_s {
 
 	uint_t		sctp_v4label_len;	/* length of cached v4 label */
 	uint_t		sctp_v6label_len;	/* length of cached v6 label */
+	uint32_t	sctp_rxt_nxttsn;	/* Next TSN to be rexmitted */
+	uint32_t	sctp_rxt_maxtsn;	/* Max TSN sent at time out */
 } sctp_t;
 
 extern list_t	sctp_g_list;	/* Head of SCTP instance data chain */
@@ -919,8 +954,7 @@ extern mblk_t *sctp_pad_mp;
 extern void	sctp_ack_timer(sctp_t *);
 extern size_t	sctp_adaption_code_param(sctp_t *, uchar_t *);
 extern void	sctp_adaption_event(sctp_t *);
-extern int	sctp_add_faddr(sctp_t *, in6_addr_t *, int);
-extern int	sctp_add_faddr_first(sctp_t *, in6_addr_t *, int);
+extern int	sctp_add_faddr(sctp_t *, in6_addr_t *, int, boolean_t);
 extern boolean_t sctp_add_ftsn_set(sctp_ftsn_set_t **, sctp_faddr_t *, mblk_t *,
 		    uint_t *, uint32_t *);
 extern boolean_t sctp_add_recvq(sctp_t *, mblk_t *, boolean_t);
@@ -974,8 +1008,6 @@ extern void	sctp_faddr_alive(sctp_t *, sctp_faddr_t *);
 extern int	sctp_faddr_dead(sctp_t *, sctp_faddr_t *, int);
 extern void	sctp_faddr_fini(void);
 extern void	sctp_faddr_init(void);
-extern void	sctp_faddr2hdraddr(sctp_faddr_t *, sctp_t *);
-extern void	sctp_faddr2ire(sctp_t *, sctp_faddr_t *);
 extern void	sctp_fast_rexmit(sctp_t *);
 extern void	sctp_fill_sack(sctp_t *, unsigned char *, int);
 extern void	sctp_free_faddr_timers(sctp_t *);
@@ -990,6 +1022,7 @@ extern int	sctp_get_addrlist(sctp_t *, const void *, uint32_t *,
 		    uchar_t **, int *, size_t *);
 extern int	sctp_get_addrparams(sctp_t *, sctp_t *, mblk_t *,
 		    sctp_chunk_hdr_t *, uint_t *);
+extern void	sctp_get_ire(sctp_t *, sctp_faddr_t *);
 extern void	sctp_get_faddr_list(sctp_t *, uchar_t *, size_t);
 extern mblk_t	*sctp_get_first_sent(sctp_t *);
 extern mblk_t	*sctp_get_msg_to_send(sctp_t *, mblk_t **, mblk_t *, int  *,
@@ -1014,7 +1047,6 @@ extern uint32_t	sctp_init2vtag(sctp_chunk_hdr_t *);
 extern void	sctp_intf_event(sctp_t *, in6_addr_t, int, int);
 extern void	sctp_input_data(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_instream_cleanup(sctp_t *, boolean_t);
-extern void	sctp_ire2faddr(sctp_t *, sctp_faddr_t *);
 extern int	sctp_is_a_faddr_clean(sctp_t *);
 
 extern void	sctp_kstat_init(void);
@@ -1075,16 +1107,19 @@ extern void	sctp_send_initack(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);
 extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);
-extern int	sctp_set_hdraddrs(sctp_t *, cred_t *);
+extern void	sctp_set_faddr_current(sctp_t *, sctp_faddr_t *);
+extern int	sctp_set_hdraddrs(sctp_t *);
 extern void	sctp_sets_init(void);
 extern void	sctp_sets_fini(void);
 extern void	sctp_shutdown_event(sctp_t *);
 extern void	sctp_stop_faddr_timers(sctp_t *);
-extern int	sctp_shutdown_received(sctp_t *, sctp_chunk_hdr_t *, int, int);
+extern int	sctp_shutdown_received(sctp_t *, sctp_chunk_hdr_t *, boolean_t,
+		    boolean_t, sctp_faddr_t *);
 extern void	sctp_shutdown_complete(sctp_t *);
 extern void	sctp_set_if_mtu(sctp_t *);
 extern void	sctp_set_iplen(sctp_t *, mblk_t *);
 extern void	sctp_set_ulp_prop(sctp_t *);
+extern void	sctp_ss_rexmit(sctp_t *);
 extern size_t	sctp_supaddr_param_len(sctp_t *);
 extern size_t	sctp_supaddr_param(sctp_t *, uchar_t *);
 
@@ -1095,6 +1130,7 @@ extern void	sctp_timer_free(mblk_t *);
 extern void	sctp_timer_stop(mblk_t *);
 extern void	sctp_unlink_faddr(sctp_t *, sctp_faddr_t *);
 
+extern void	sctp_update_ire(sctp_t *sctp);
 extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone);
 extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
 extern void	sctp_user_abort(sctp_t *, mblk_t *, boolean_t);

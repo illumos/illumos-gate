@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -744,6 +745,7 @@ sctp_send_cookie_ack(sctp_t *sctp)
 	camp = sctp_make_mp(sctp, NULL, sizeof (*cach));
 	if (camp == NULL) {
 		/* XXX should abort, but don't have the inmp anymore */
+		SCTP_KSTAT(sctp_send_cookie_ack_failed);
 		return;
 	}
 
@@ -1024,6 +1026,7 @@ sendcookie:
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 		if (errmp != NULL)
 			freeb(errmp);
+		SCTP_KSTAT(sctp_send_cookie_failed);
 		return;
 	}
 	/*

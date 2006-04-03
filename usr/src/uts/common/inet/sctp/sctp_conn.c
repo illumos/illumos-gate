@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -93,7 +94,7 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 		cr = lconnp->conn_cred;
 	}
 
-	if ((err = sctp_set_hdraddrs(acceptor, cr)) != 0)
+	if ((err = sctp_set_hdraddrs(acceptor)) != 0)
 		return (err);
 
 	if ((sctp_options & SCTP_PRSCTP_OPTION) &&
@@ -275,6 +276,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 				kmem_free(flist, fsize);
 			sctp_close_eager(eager);
 			BUMP_MIB(&sctp_mib, sctpListenDrop);
+			SCTP_KSTAT(sctp_cl_connect);
 			return (NULL);
 		}
 		/* The clustering module frees these list */
@@ -477,7 +479,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		 * OK; set up the peer addr (this may grow after we get
 		 * the INIT ACK from the peer with additional addresses).
 		 */
-		if ((err = sctp_add_faddr(sctp, &dstaddr, sleep)) != 0) {
+		if ((err = sctp_add_faddr(sctp, &dstaddr, sleep,
+		    B_FALSE)) != 0) {
 			mutex_exit(&tbf->tf_lock);
 			WAKE_SCTP(sctp);
 			return (err);
@@ -496,7 +499,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		mutex_exit(&tbf->tf_lock);
 
 		/* initialize composite headers */
-		if ((err = sctp_set_hdraddrs(sctp, NULL)) != 0) {
+		if ((err = sctp_set_hdraddrs(sctp)) != 0) {
 			sctp_conn_hash_remove(sctp);
 			WAKE_SCTP(sctp);
 			return (err);

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -661,11 +662,7 @@ sctp_set_prim(sctp_t *sctp, const void *invalp, uint_t inlen)
 	if (fp->state != SCTP_FADDRS_ALIVE || fp == sctp->sctp_current) {
 		return (0);
 	}
-	sctp->sctp_current = fp;
-	sctp->sctp_mss = fp->sfa_pmss;
-	/* Reset the addrs in the composite header */
-	sctp_faddr2hdraddr(fp, sctp);
-	sctp_set_ulp_prop(sctp);
+	sctp_set_faddr_current(sctp, fp);
 
 	return (0);
 }

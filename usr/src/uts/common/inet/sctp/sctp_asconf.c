@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -416,6 +417,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	hmp = sctp_make_mp(sctp, fp, sizeof (*ach) + sizeof (*idp));
 	if (hmp == NULL) {
 		/* Let the peer retransmit */
+		SCTP_KSTAT(sctp_send_asconf_ack_failed);
 		return;
 	}
 	ach = (sctp_chunk_hdr_t *)hmp->b_wptr;
@@ -478,6 +480,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 				alist = kmem_alloc(asize, KM_NOSLEEP);
 				if (alist == NULL) {
 					freeb(hmp);
+					SCTP_KSTAT(sctp_cl_assoc_change);
 					return;
 				}
 			}
@@ -488,6 +491,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 					if (acount > 0)
 						kmem_free(alist, asize);
 					freeb(hmp);
+					SCTP_KSTAT(sctp_cl_assoc_change);
 					return;
 				}
 			}
@@ -927,6 +931,7 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	ipmp = sctp_make_mp(sctp, fp, 0);
 	if (ipmp == NULL) {
 		SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+		SCTP_KSTAT(sctp_send_asconf_failed);
 		return;
 	}
 	mp = sctp->sctp_cxmit_list;
@@ -1175,7 +1180,7 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 		}
 		/* Add the new address */
 		mutex_enter(&sctp->sctp_conn_tfp->tf_lock);
-		err = sctp_add_faddr(sctp, &addr, KM_NOSLEEP);
+		err = sctp_add_faddr(sctp, &addr, KM_NOSLEEP, B_FALSE);
 		mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
 		if (err == ENOMEM) {
 			/* no memory */
@@ -1223,13 +1228,7 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 			sctp->sctp_primary = fp;
 		}
 		if (sctp->sctp_current == nfp) {
-			sctp->sctp_current = fp;
-			sctp->sctp_mss = fp->sfa_pmss;
-			sctp_faddr2hdraddr(fp, sctp);
-
-			if (!SCTP_IS_DETACHED(sctp)) {
-				sctp_set_ulp_prop(sctp);
-			}
+			sctp_set_faddr_current(sctp, fp);
 		}
 		if (sctp->sctp_lastdata == nfp) {
 			sctp->sctp_lastdata = fp;
@@ -1376,15 +1375,7 @@ sctp_setprim_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	if (nfp->state != SCTP_FADDRS_ALIVE || nfp == sctp->sctp_current) {
 		return (NULL);
 	}
-	sctp->sctp_current = nfp;
-	sctp->sctp_mss = nfp->sfa_pmss;
-
-	/* Reset the addrs in the composite header */
-	sctp_faddr2hdraddr(nfp, sctp);
-	if (!SCTP_IS_DETACHED(sctp)) {
-		sctp_set_ulp_prop(sctp);
-	}
-
+	sctp_set_faddr_current(sctp, nfp);
 	return (NULL);
 }
 

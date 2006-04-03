@@ -83,6 +83,8 @@ extern "C" {
 #define	TCP_DEV_NAME	"/dev/tcp"
 #define	TCP6_DEV_NAME	"/dev/tcp6"
 
+#define	SCTP_MOD_NAME	"sctp"
+
 /* Minor numbers */
 #define	IPV4_MINOR	0
 #define	IPV6_MINOR	1

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -313,6 +314,7 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			ASSERT(size == 0);
 			if (!caller_hold_lock)
 				WAKE_SCTP(sctp);
+			SCTP_KSTAT(sctp_cl_check_addrs);
 			return (err);
 		}
 		ASSERT(addrlist != NULL);

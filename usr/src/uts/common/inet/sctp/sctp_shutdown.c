@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,7 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 		sendmp = sctp_make_mp(sctp, fp,
 		    sizeof (*sch) + sizeof (*ctsn));
 		if (sendmp == NULL) {
+			SCTP_KSTAT(sctp_send_shutdown_failed);
 			goto done;
 		}
 		sch = (sctp_chunk_hdr_t *)sendmp->b_wptr;
@@ -142,14 +143,13 @@ done:
 }
 
 int
-sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, int crwsd,
-    int rexmit)
+sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
+    boolean_t rexmit, sctp_faddr_t *fp)
 {
 	mblk_t *samp;
 	sctp_chunk_hdr_t *sach;
 	uint32_t *tsn;
 	int trysend = 0;
-	sctp_faddr_t *fp;
 
 	if (sctp->sctp_state != SCTPS_SHUTDOWN_ACK_SENT)
 		sctp->sctp_state = SCTPS_SHUTDOWN_RECEIVED;
@@ -172,15 +172,20 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, int crwsd,
 	if (sctp->sctp_xmit_head != NULL || sctp->sctp_xmit_unsent != NULL)
 		return (1);
 
-	/* rotate faddrs if we are retransmitting */
-	if (!rexmit)
-		fp = sctp->sctp_current;
-	else
-		fp = sctp_rotate_faddr(sctp, sctp->sctp_shutdown_faddr);
+	if (fp == NULL) {
+		/* rotate faddrs if we are retransmitting */
+		if (!rexmit)
+			fp = sctp->sctp_current;
+		else
+			fp = sctp_rotate_faddr(sctp, sctp->sctp_shutdown_faddr);
+	}
+	sctp->sctp_shutdown_faddr = fp;
 
 	samp = sctp_make_mp(sctp, fp, sizeof (*sach));
-	if (samp == NULL)
+	if (samp == NULL) {
+		SCTP_KSTAT(sctp_send_shutdown_ack_failed);
 		goto dotimer;
+	}
 
 	sach = (sctp_chunk_hdr_t *)samp->b_wptr;
 	sach->sch_id = CHUNK_SHUTDOWN_ACK;
@@ -226,6 +231,7 @@ sctp_shutdown_complete(sctp_t *sctp)
 	scmp = sctp_make_mp(sctp, NULL, sizeof (*scch));
 	if (scmp == NULL) {
 		/* XXX use timer approach */
+		SCTP_KSTAT(sctp_send_shutdown_comp_failed);
 		return;
 	}
 
@@ -271,11 +277,13 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 
 	/*
 	 * Check to see if we can reuse the incoming mblk.  There should
-	 * not be other reference.  Since this packet comes from below,
+	 * not be other reference and the db_base of the mblk should be
+	 * properly aligned.  Since this packet comes from below,
 	 * there should be enough header space to fill in what the lower
 	 * layers want to add.  And we will not stash anything there.
 	 */
-	if (DB_REF(inmp) != 1) {
+	if (!IS_P2ALIGNED(DB_BASE(inmp), sizeof (ire_t *)) ||
+	    DB_REF(inmp) != 1) {
 		mp1 = allocb(MBLKL(inmp) + sctp_wroff_xtra, BPRI_MED);
 		if (mp1 == NULL) {
 			freeb(inmp);

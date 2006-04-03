@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -81,6 +82,7 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 	/* Create an IP header, returning to the src addr from the heartbt */
 	smp = sctp_make_mp(sctp, fp, len);
 	if (smp == NULL) {
+		SCTP_KSTAT(sctp_return_hb_failed);
 		return;
 	}
 
@@ -126,8 +128,10 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 		sizeof (fp->hb_secret) +
 		sizeof (fp->faddr);
 	hbmp = sctp_make_mp(sctp, fp, hblen);
-	if (hbmp == NULL)
+	if (hbmp == NULL) {
+		SCTP_KSTAT(sctp_send_hb_failed);
 		return;
+	}
 
 	cp = (sctp_chunk_hdr_t *)hbmp->b_wptr;
 	cp->sch_id = CHUNK_HEARTBEAT;

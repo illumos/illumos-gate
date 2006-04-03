@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -166,6 +167,7 @@ sctp_timer_alloc(sctp_t *sctp, pfv_t func)
 		sctpt->sctpt_pfv = func;
 		return (mp);
 	}
+	SCTP_KSTAT(sctp_add_timer);
 	return (NULL);
 }
 
@@ -578,7 +580,8 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 	case SCTPS_SHUTDOWN_PENDING:
 	case SCTPS_SHUTDOWN_RECEIVED:
 		if (sctp->sctp_state == SCTPS_SHUTDOWN_RECEIVED) {
-			(void) sctp_shutdown_received(sctp, NULL, 0, 1);
+			(void) sctp_shutdown_received(sctp, NULL, B_FALSE,
+			    B_TRUE, NULL);
 		}
 
 		if (sctp->sctp_xmit_head == NULL &&
@@ -645,7 +648,8 @@ rxmit_init:
 		ASSERT(sctp->sctp_xmit_unsent == NULL);
 
 		BUMP_LOCAL(sctp->sctp_T2expire);
-		(void) sctp_shutdown_received(sctp, NULL, 0, 1);
+		(void) sctp_shutdown_received(sctp, NULL, B_FALSE, B_TRUE,
+		    NULL);
 		BUMP_MIB(&sctp_mib, sctpTimRetrans);
 		break;
 	default:
