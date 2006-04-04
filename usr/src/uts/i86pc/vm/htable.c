@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -70,9 +69,18 @@ uint_t htable_reserve_cnt;
 htable_t *htable_reserve_pool;
 
 /*
- * This variable is so that we can tune this via /etc/system
+ * Used to hand test htable_steal().
  */
-uint_t htable_steal_passes = 10;
+#ifdef DEBUG
+ulong_t force_steal = 0;
+ulong_t ptable_cnt = 0;
+#endif
+
+/*
+ * This variable is so that we can tune this via /etc/system
+ * Any value works, but a power of two <= mmu.ptes_per_table is best.
+ */
+uint_t htable_steal_passes = 8;
 
 /*
  * mutex stuff for access to htable hash
@@ -149,7 +157,6 @@ ptable_alloc(htable_t *ht)
 	 * w/o eating up any kernel address space.
 	 */
 	ht->ht_pfn = PFN_INVALID;
-	HATSTAT_INC(hs_ptable_allocs);
 	atomic_add_32(&active_ptables, 1);
 
 	if (use_boot_reserve) {
@@ -191,9 +198,25 @@ ptable_alloc(htable_t *ht)
 		 * Note that we have to do this test here, since the test in
 		 * page_create_throttle() would let the NOSLEEP allocation
 		 * go through and deplete the page reserves.
+		 *
+		 * The !NOMEMWAIT() lets pageout, fsflush, etc. skip this check.
 		 */
-		if (freemem <= throttlefree + 1)
+		if (!NOMEMWAIT() && freemem <= throttlefree + 1)
 			return;
+
+#ifdef DEBUG
+		/*
+		 * This code makes htable_ steal() easier to test. By setting
+		 * force_steal we force pagetable allocations to fall
+		 * into the stealing code. Roughly 1 in ever "force_steal"
+		 * page table allocations will fail.
+		 */
+		if (ht->ht_hat != kas.a_hat && force_steal > 1 &&
+		    ++ptable_cnt > force_steal) {
+			ptable_cnt = 0;
+			return;
+		}
+#endif /* DEBUG */
 
 		/*
 		 * This code is temporary, so don't review too critically.
@@ -236,6 +259,7 @@ ptable_alloc(htable_t *ht)
 	if (pfn == PFN_INVALID)
 		panic("ptable_alloc(): Invalid PFN!!");
 	ht->ht_pfn = pfn;
+	HATSTAT_INC(hs_ptable_allocs);
 }
 
 /*
@@ -400,12 +424,14 @@ htable_steal(uint_t cnt)
 	htable_t	*ht;
 	htable_t	*higher;
 	uint_t		h;
+	uint_t		h_start;
+	static uint_t	h_seed = 0;
 	uint_t		e;
 	uintptr_t	va;
 	x86pte_t	pte;
 	uint_t		stolen = 0;
 	uint_t		pass;
-	uint_t		threshhold;
+	uint_t		threshold;
 
 	/*
 	 * Limit htable_steal_passes to something reasonable
@@ -416,28 +442,91 @@ htable_steal(uint_t cnt)
 		htable_steal_passes = mmu.ptes_per_table;
 
 	/*
-	 * Loop through all hats. The 1st pass takes cached htables that
+	 * Loop through all user hats. The 1st pass takes cached htables that
 	 * aren't in use. The later passes steal by removing mappings, too.
 	 */
 	atomic_add_32(&htable_dont_cache, 1);
-	for (pass = 1; pass <= htable_steal_passes && stolen < cnt; ++pass) {
-		threshhold = pass / htable_steal_passes;
-		hat = kas.a_hat->hat_next;
+	for (pass = 0; pass <= htable_steal_passes && stolen < cnt; ++pass) {
+		threshold = pass * mmu.ptes_per_table / htable_steal_passes;
+		hat = kas.a_hat;
 		for (;;) {
 
 			/*
-			 * move to next hat
+			 * Clear the victim flag and move to next hat
 			 */
 			mutex_enter(&hat_list_lock);
-			hat->hat_flags &= ~HAT_VICTIM;
-			cv_broadcast(&hat_list_cv);
-			do {
-				hat = hat->hat_prev;
-			} while (hat->hat_flags & HAT_VICTIM);
-			if (stolen == cnt || hat == kas.a_hat->hat_next) {
+			if (hat != kas.a_hat) {
+				hat->hat_flags &= ~HAT_VICTIM;
+				cv_broadcast(&hat_list_cv);
+			}
+			hat = hat->hat_next;
+
+			/*
+			 * Skip any hat that is already being stolen from.
+			 *
+			 * We skip SHARED hats, as these are dummy
+			 * hats that host ISM shared page tables.
+			 *
+			 * We also skip if HAT_FREEING because hat_pte_unmap()
+			 * won't zero out the PTE's. That would lead to hitting
+			 * stale PTEs either here or under hat_unload() when we
+			 * steal and unload the same page table in competing
+			 * threads.
+			 */
+			while (hat != NULL &&
+			    (hat->hat_flags &
+			    (HAT_VICTIM | HAT_SHARED | HAT_FREEING)) != 0)
+				hat = hat->hat_next;
+
+			if (hat == NULL) {
 				mutex_exit(&hat_list_lock);
 				break;
 			}
+
+			/*
+			 * Are we finished?
+			 */
+			if (stolen == cnt) {
+				/*
+				 * Try to spread the pain of stealing,
+				 * move victim HAT to the end of the HAT list.
+				 */
+				if (pass >= 1 && cnt == 1 &&
+				    kas.a_hat->hat_prev != hat) {
+
+					/* unlink victim hat */
+					if (hat->hat_prev)
+						hat->hat_prev->hat_next =
+						    hat->hat_next;
+					else
+						kas.a_hat->hat_next =
+						    hat->hat_next;
+					if (hat->hat_next)
+						hat->hat_next->hat_prev =
+						    hat->hat_prev;
+					else
+						kas.a_hat->hat_prev =
+						    hat->hat_prev;
+
+
+					/* relink at end of hat list */
+					hat->hat_next = NULL;
+					hat->hat_prev = kas.a_hat->hat_prev;
+					if (hat->hat_prev)
+						hat->hat_prev->hat_next = hat;
+					else
+						kas.a_hat->hat_next = hat;
+					kas.a_hat->hat_prev = hat;
+
+				}
+
+				mutex_exit(&hat_list_lock);
+				break;
+			}
+
+			/*
+			 * Mark the HAT as a stealing victim.
+			 */
 			hat->hat_flags |= HAT_VICTIM;
 			mutex_exit(&hat_list_lock);
 
@@ -457,14 +546,16 @@ htable_steal(uint_t cnt)
 			/*
 			 * Don't steal on first pass.
 			 */
-			if (pass == 1 || stolen == cnt)
+			if (pass == 0 || stolen == cnt)
 				continue;
 
 			/*
-			 * search the active htables for one to steal
+			 * Search the active htables for one to steal.
+			 * Start at a different hash bucket every time to
+			 * help spread the pain of stealing.
 			 */
-			for (h = 0; h < hat->hat_num_hash && stolen < cnt;
-			    ++h) {
+			h = h_start = h_seed++ % hat->hat_num_hash;
+			do {
 				higher = NULL;
 				HTABLE_ENTER(h);
 				for (ht = hat->hat_ht_hash[h]; ht;
@@ -475,11 +566,8 @@ htable_steal(uint_t cnt)
 					 */
 					if (ht->ht_busy != 0 ||
 					    (ht->ht_flags & HTABLE_SHARED_PFN)||
-					    ht->ht_level == TOP_LEVEL(hat) ||
-					    (ht->ht_level >=
-					    mmu.max_page_level &&
-					    ht->ht_valid_cnt > 0) ||
-					    ht->ht_valid_cnt < threshhold ||
+					    ht->ht_level > 0 ||
+					    ht->ht_valid_cnt > threshold ||
 					    ht->ht_lock_cnt != 0)
 						continue;
 
@@ -556,23 +644,14 @@ htable_steal(uint_t cnt)
 					ht->ht_next = list;
 					list = ht;
 					++stolen;
-
-					/*
-					 * If this is the last steal, then move
-					 * the hat list head, so that we start
-					 * here next time.
-					 */
-					if (stolen == cnt) {
-						mutex_enter(&hat_list_lock);
-						kas.a_hat->hat_next = hat;
-						mutex_exit(&hat_list_lock);
-					}
 					break;
 				}
 				HTABLE_EXIT(h);
 				if (higher != NULL)
 					htable_release(higher);
-			}
+				if (++h == hat->hat_num_hash)
+					h = 0;
+			} while (stolen < cnt && h != h_start);
 		}
 	}
 	atomic_add_32(&htable_dont_cache, -1);
@@ -692,6 +771,7 @@ htable_alloc(
 		 * allocate a page for the hardware page table if needed
 		 */
 		if (ht != NULL && !is_bare) {
+			ht->ht_hat = hat;
 			ptable_alloc(ht);
 			if (ht->ht_pfn == PFN_INVALID) {
 				kmem_cache_free(htable_cache, ht);
@@ -701,22 +781,29 @@ htable_alloc(
 	}
 
 	/*
-	 * if allocations failed resort to stealing
+	 * If allocations failed, kick off a kmem_reap() and resort to
+	 * htable steal(). We may spin here if the system is very low on
+	 * memory. If the kernel itself has consumed all memory and kmem_reap()
+	 * can't free up anything, then we'll really get stuck here.
+	 * That should only happen in a system where the administrator has
+	 * misconfigured VM parameters via /etc/system.
 	 */
-	if (ht == NULL && can_steal_post_boot) {
+	while (ht == NULL && can_steal_post_boot) {
+		kmem_reap();
 		ht = htable_steal(1);
 		HATSTAT_INC(hs_steals);
 
 		/*
-		 * if we had to steal for a bare htable, release the
-		 * page for the pagetable
+		 * If we stole for a bare htable, release the pagetable page.
 		 */
 		if (ht != NULL && is_bare)
 			ptable_free(ht);
 	}
 
 	/*
-	 * All attempts to allocate or steal failed...
+	 * All attempts to allocate or steal failed. This should only happen
+	 * if we run out of memory during boot, due perhaps to a huge
+	 * boot_archive. At this point there's no way to continue.
 	 */
 	if (ht == NULL)
 		panic("htable_alloc(): couldn't steal\n");
@@ -2164,20 +2251,15 @@ hat_dump(void)
 	hat_t *hat;
 	uint_t h;
 	htable_t *ht;
-	int count;
 
 	/*
-	 * kas.a_hat is the head of the circular list, but not an element of
-	 * the list. Once we pass kas.a_hat->hat_next a second time, we
-	 * know we've iterated through every hat structure.
+	 * Dump all page tables
 	 */
-	for (hat = kas.a_hat, count = 0; hat != kas.a_hat->hat_next ||
-	    count++ == 0; hat = hat->hat_next) {
+	for (hat = kas.a_hat; hat != NULL; hat = hat->hat_next) {
 		for (h = 0; h < hat->hat_num_hash; ++h) {
 			for (ht = hat->hat_ht_hash[h]; ht; ht = ht->ht_next) {
-				if ((ht->ht_flags & HTABLE_VLP) == 0) {
+				if ((ht->ht_flags & HTABLE_VLP) == 0)
 					dump_page(ht->ht_pfn);
-				}
 			}
 		}
 	}

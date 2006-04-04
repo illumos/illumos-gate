@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -532,7 +531,7 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 do_report_maps(pfn_t pfn)
 {
-	struct hat *hatp, *end;
+	struct hat *hatp;
 	struct hat hat;
 	htable_t *ht;
 	htable_t htable;
@@ -545,23 +544,11 @@ do_report_maps(pfn_t pfn)
 	x86pte32_t *pte32 = (x86pte32_t *)&buf;
 	physaddr_t paddr;
 	size_t len;
-	int count;
-
-	if (mdb_vread(&hat, sizeof (hat), (uintptr_t)khat) == -1) {
-		mdb_warn("Couldn't read khat\n");
-		return (DCMD_ERR);
-	}
-
-	end = hat.hat_next;
 
 	/*
-	 * The hats are kept in a circular list with khat at the head, but
-	 * not part of the list proper. Accordingly, we know when we pass
-	 * knat.hat_next a second time that we've iterated through every
-	 * hat structure.
+	 * The hats are kept in a list with khat at the head.
 	 */
-	for (hatp = khat, count = 0; hatp != end || count++ == 0;
-	    hatp = hat.hat_next) {
+	for (hatp = khat; hatp != NULL; hatp = hat.hat_next) {
 		/*
 		 * read the hat and its hash table
 		 */
@@ -677,7 +664,7 @@ report_maps_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 do_ptable_dcmd(pfn_t pfn)
 {
-	struct hat *hatp, *end;
+	struct hat *hatp;
 	struct hat hat;
 	htable_t *ht;
 	htable_t htable;
@@ -691,23 +678,11 @@ do_ptable_dcmd(pfn_t pfn)
 	x86pte32_t *pte32 = (x86pte32_t *)&buf;
 	physaddr_t paddr;
 	size_t len;
-	int count;
-
-	if (mdb_vread(&hat, sizeof (hat), (uintptr_t)khat) == -1) {
-		mdb_warn("Couldn't read khat\n");
-		return (DCMD_ERR);
-	}
-
-	end = hat.hat_next;
 
 	/*
-	 * The hats are kept in a circular list with khat at the head, but
-	 * not part of the list proper. Accordingly, we know when we pass
-	 * knat.hat_next a second time that we've iterated through every
-	 * hat structure.
+	 * The hats are kept in a list with khat at the head.
 	 */
-	for (hatp = khat, count = 0; hatp != end || count++ == 0;
-	    hatp = hat.hat_next) {
+	for (hatp = khat; hatp != NULL; hatp = hat.hat_next) {
 		/*
 		 * read the hat and its hash table
 		 */

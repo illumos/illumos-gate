@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -334,21 +333,26 @@ hat_alloc(struct as *as)
 #endif
 
 	/*
-	 * Put it in the global list of all hats (used by stealing, etc.)
+	 * Put it at the start of the global list of all hats (used by stealing)
+	 *
+	 * kas.a_hat is not in the list but is instead used to find the
+	 * first and last items in the list.
+	 *
+	 * - kas.a_hat->hat_next points to the start of the user hats.
+	 *   The list ends where hat->hat_next == NULL
+	 *
+	 * - kas.a_hat->hat_prev points to the last of the user hats.
+	 *   The list begins where hat->hat_prev == NULL
 	 */
 	mutex_enter(&hat_list_lock);
-	if (kas.a_hat->hat_next != NULL) {
-		hat->hat_next = kas.a_hat->hat_next;
-		hat->hat_prev = kas.a_hat->hat_next->hat_prev;
-		kas.a_hat->hat_next->hat_prev->hat_next = hat;
-		kas.a_hat->hat_next->hat_prev = hat;
-	} else {
-		hat->hat_next = hat;
-		hat->hat_prev = hat;
-	}
+	hat->hat_prev = NULL;
+	hat->hat_next = kas.a_hat->hat_next;
+	if (hat->hat_next)
+		hat->hat_next->hat_prev = hat;
+	else
+		kas.a_hat->hat_prev = hat;
 	kas.a_hat->hat_next = hat;
 	mutex_exit(&hat_list_lock);
-
 
 	return (hat);
 }
@@ -361,7 +365,15 @@ void
 hat_free_start(hat_t *hat)
 {
 	ASSERT(AS_WRITE_HELD(hat->hat_as, &hat->hat_as->a_lock));
+
+	/*
+	 * If the hat is currently a stealing victim, wait for the stealing
+	 * to finish.  Once we mark it as HAT_FREEING, htable_steal()
+	 * won't look at its pagetables anymore.
+	 */
 	mutex_enter(&hat_list_lock);
+	while (hat->hat_flags & HAT_VICTIM)
+		cv_wait(&hat_list_cv, &hat_list_lock);
 	hat->hat_flags |= HAT_FREEING;
 	mutex_exit(&hat_list_lock);
 }
@@ -387,21 +399,19 @@ hat_free_end(hat_t *hat)
 	ASSERT(CPU->cpu_current_hat != hat);
 
 	/*
-	 * If the hat is currently a stealing victim, wait for the stealing
-	 * to finish.  Once we've removed it from the list, nobody can
-	 * find these htables anymore.
+	 * Remove it from the list of HATs
 	 */
 	mutex_enter(&hat_list_lock);
-	while (hat->hat_flags & HAT_VICTIM)
-		cv_wait(&hat_list_cv, &hat_list_lock);
-	hat->hat_next->hat_prev = hat->hat_prev;
-	hat->hat_prev->hat_next = hat->hat_next;
-	if (kas.a_hat->hat_next == hat) {
+	if (hat->hat_prev)
+		hat->hat_prev->hat_next = hat->hat_next;
+	else
 		kas.a_hat->hat_next = hat->hat_next;
-		if (kas.a_hat->hat_next == hat)
-			kas.a_hat->hat_next = NULL;
-	}
+	if (hat->hat_next)
+		hat->hat_next->hat_prev = hat->hat_prev;
+	else
+		kas.a_hat->hat_prev = hat->hat_prev;
 	mutex_exit(&hat_list_lock);
+	hat->hat_next = hat->hat_prev = NULL;
 
 	/*
 	 * Make a pass through the htables freeing them all up.
@@ -686,8 +696,11 @@ hat_init()
 
 	/*
 	 * The kernel hat's next pointer serves as the head of the hat list .
+	 * The kernel hat's prev pointer tracks the last hat on the list for
+	 * htable_steal() to use.
 	 */
 	kas.a_hat->hat_next = NULL;
+	kas.a_hat->hat_prev = NULL;
 
 	/*
 	 * Allocate an htable hash bucket for the kernel
