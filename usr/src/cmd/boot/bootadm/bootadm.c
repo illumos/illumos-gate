@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,6 +160,8 @@ typedef struct {
 #define	GRUB_backup_menu	"/etc/lu/GRUB_backup_menu"
 #define	GRUB_slice_mntpt	"/tmp/GRUB_slice_mntpt"
 #define	LU_ACTIVATE_FILE	"/etc/lu/DelayUpdate/activate.sh"
+#define	GRUB_fdisk		"/etc/lu/GRUB_fdisk"
+#define	GRUB_fdisk_target	"/etc/lu/GRUB_fdisk_target"
 
 #define	INSTALLGRUB		"/sbin/installgrub"
 #define	STAGE1			"/boot/grub/stage1"
@@ -1983,6 +1984,34 @@ update_archive(char *root, char *opt)
 }
 
 static void
+update_fdisk(void)
+{
+	struct stat sb;
+	char cmd[PATH_MAX];
+	int ret1, ret2;
+
+	assert(stat(GRUB_fdisk, &sb) == 0);
+	assert(stat(GRUB_fdisk_target, &sb) == 0);
+
+	(void) snprintf(cmd, sizeof (cmd), "/sbin/fdisk -F %s `/bin/cat %s`",
+	    GRUB_fdisk, GRUB_fdisk_target);
+
+	bam_print(UPDATING_FDISK);
+	if (exec_cmd(cmd, NULL, 0) != 0) {
+		bam_error(FDISK_UPDATE_FAILED);
+	}
+
+	/*
+	 * We are done, remove the files.
+	 */
+	ret1 = unlink(GRUB_fdisk);
+	ret2 = unlink(GRUB_fdisk_target);
+	if (ret1 != 0 || ret2 != 0) {
+		bam_error(FILE_REMOVE_FAILED, GRUB_fdisk, GRUB_fdisk_target);
+	}
+}
+
+static void
 restore_grub_slice(void)
 {
 	struct stat sb;
@@ -2060,6 +2089,7 @@ update_all(char *root, char *opt)
 	FILE *fp;
 	char multibt[PATH_MAX];
 	error_t ret = BAM_SUCCESS;
+	int ret1, ret2;
 
 	assert(root);
 	assert(opt == NULL);
@@ -2119,6 +2149,27 @@ update_all(char *root, char *opt)
 out:
 	if (stat(GRUB_slice, &sb) == 0) {
 		restore_grub_slice();
+	}
+
+	/*
+	 * Update fdisk table as we go down. Updating it when
+	 * the system is running will confuse biosdev.
+	 */
+	ret1 = stat(GRUB_fdisk, &sb);
+	ret2 = stat(GRUB_fdisk_target, &sb);
+	if ((ret1 == 0) && (ret2 == 0)) {
+		update_fdisk();
+	} else if ((ret1 == 0) ^ (ret2 == 0)) {
+		/*
+		 * It is an error for one file to be
+		 * present and the other absent.
+		 * It is normal for both files to be
+		 * absent - it indicates that no fdisk
+		 * update is required.
+		 */
+		bam_error(MISSING_FDISK_FILE,
+		    ret1 ? GRUB_fdisk : GRUB_fdisk_target);
+		ret = BAM_ERROR;
 	}
 
 	return (ret);
