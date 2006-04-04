@@ -1813,7 +1813,6 @@ netaddr_match(enum direction which, char *netname)
 			pr_err("net %s not known", netname);
 		addr = np->n_net;
 	}
-	addr = ntohl(addr);
 
 	/*
 	 * Left justify the address and figure
