@@ -240,25 +240,15 @@ lo_mount(struct vfs *vfsp,
 	 * to another by leaking them through the global zone.
 	 */
 	if (is_system_labeled() && crgetzoneid(cr) == GLOBAL_ZONEID) {
-		void *specname;
-		zone_t *from_zptr;
-		zone_t *to_zptr;
+		char	specname[MAXPATHLEN];
+		zone_t	*from_zptr;
+		zone_t	*to_zptr;
 
-		if (uap->flags & MS_SYSSPACE) {
-			specname = uap->spec;
-		} else {
-			specname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			error = copyinstr(uap->spec, specname, MAXPATHLEN,
-			    NULL);
-			if (error) {
-				kmem_free(specname, MAXPATHLEN);
-				return (error);
-			}
-		}
+		if (vnodetopath(NULL, realrootvp, specname,
+		    sizeof (specname), CRED()) != 0)
+			return (EACCES);
+
 		from_zptr = zone_find_by_path(specname);
-		if (!(uap->flags & MS_SYSSPACE))
-			kmem_free(specname, MAXPATHLEN);
-
 		to_zptr = zone_find_by_path(refstr_value(vfsp->vfs_mntpt));
 
 		/*
