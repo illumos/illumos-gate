@@ -326,6 +326,7 @@ COMMON_SUBDIRS = \
 	lib/liblm \
 	lib/libmacadm \
 	lib/libmalloc \
+	lib/libmapid \
 	lib/libmd \
 	lib/libmp \
 	lib/libnsl \

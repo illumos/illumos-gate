@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,8 @@
 #include <nfs/nfs4.h>
 #include <nfs/nfssys.h>
 #include <nfs/nfsid_map.h>
-#include "nfsmapid_resolv.h"
+#include <nfs/mapid.h>
+#include <sys/sdt.h>
 
 /*
  * We cannot use the backend nscd as it may make syscalls that may
@@ -65,56 +65,18 @@ extern struct passwd *_uncached_getpwuid_r(uid_t, struct passwd *, char *, int);
 extern struct passwd *_uncached_getpwnam_r(const char *, struct passwd *,
     char *, int);
 
-/*
- * is timestamp a == b?
- */
-#define	TIMESTRUC_EQ(a, b) \
-	(((a).tv_sec == (b).tv_sec) && ((a).tv_nsec == (b).tv_nsec))
-
-#define	UID_MAX_STR_LEN	11	/* Digits in UID_MAX + 1 */
+#define		UID_MAX_STR_LEN		11	/* Digits in UID_MAX + 1 */
+#define		DIAG_FILE		"/var/run/nfs4_domain"
 
 /*
- * domain*: describe nfsmapid domain currently in use
- * nfs_*  : describe nfsmapid domain specified by /etc/default/nfs
- * dns_*  : describe nfsmapid domain speficied by /etc/resolv.conf
- *
- * domain_cfg_lock: rwlock used to serialize access/changes to the
- * vars listed above (between nfsmapid service threads).
- *
- * Each nfsmapid thread holds the rdlock and stats the config files.
- * If the mtime is different, then they get the writelock and update
- * the cached info.
- *
- * If the domain is set via /etc/default/nfs, then we don't have
- * to look at resolv.conf.
+ * idmap_kcall() takes a door descriptor as it's argument when we
+ * need to (re)establish the in-kernel door handles. When we only
+ * want to flush the id kernel caches, we don't redo the door setup.
  */
-timestruc_t	nfs_mtime = {0};
-uint32_t	nfs_domain_len = 0;
-char		nfs_domain[NS_MAXCDNAME + 1] = {0};
+#define		FLUSH_KCACHES_ONLY	(int)-1
 
-timestruc_t	dns_mtime = {0};
-uint32_t	dns_domain_len = 0;
-char		dns_domain[NS_MAXCDNAME + 1] = {0};
-
-uint32_t	cur_domain_len = 0;
-char		cur_domain[NS_MAXCDNAME + 1] = {0};
-#define		CUR_DOMAIN_NULL()		cur_domain[0] == '\0'
-
-timestruc_t	zapped_mtime = {0};
-
-#define		ZAP_DOMAIN(which) {		\
-		which##_domain[0] = '\0';	\
-		which##_domain_len = 0;		\
-		which##_mtime = zapped_mtime;	\
-}
-
-rwlock_t	domain_cfg_lock = DEFAULTRWLOCK;
-
-/*
- * Diags
- */
-#define	DIAG_FILE	"/var/run/nfs4_domain"
 FILE		*n4_fp;
+int		 n4_fd;
 
 extern size_t	pwd_buflen;
 extern size_t	grp_buflen;
@@ -123,19 +85,17 @@ extern thread_t	sig_thread;
 /*
  * Prototypes
  */
-extern void	check_domain(int);
-extern void	idmap_kcall(int);
-extern int	standard_domain_str(const char *);
-extern int	_nfssys(int, void *);
-static int	valid_domain(const char *);
-static int	validate_id_str(const char *);
-static int	get_mtime(char *, timestruc_t *);
-static void	get_nfs_domain(void);
-static void	get_dns_domain(void);
-static int	extract_domain(char *, char **, char **);
-extern void	update_diag_file(char *);
+extern void	 check_domain(int);
+extern void	 idmap_kcall(int);
+extern int	 _nfssys(int, void *);
+extern int	 valid_domain(const char *);
+extern int	 validate_id_str(const char *);
+extern int	 extract_domain(char *, char **, char **);
+extern void	 update_diag_file(char *);
+extern void	*cb_update_domain(void *);
+extern int	 cur_domain_null(void);
 
-static void
+void
 nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res result;
@@ -188,7 +148,7 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 	 * group validity. Note that we only look at the domain iff
 	 * the local domain is configured.
 	 */
-	if (!CUR_DOMAIN_NULL() && !valid_domain(domain)) {
+	if (!cur_domain_null() && !valid_domain(domain)) {
 		result.status = NFSMAPID_BADDOMAIN;
 		result.u_res.uid = UID_NOBODY;
 		goto done;
@@ -221,7 +181,7 @@ done:
 }
 
 /* ARGSUSED1 */
-static void
+void
 nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res	 result;
@@ -235,7 +195,7 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	size_t			 pw_str_len;
 	char			*at_str;
 	size_t			 at_str_len;
-	char			 dom_str[NS_MAXCDNAME + 1];
+	char			 dom_str[DNAMEMAX];
 	size_t			 dom_str_len;
 
 	if (uid < 0 || uid > UID_MAX) {
@@ -250,17 +210,14 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 
 	/*
 	 * Make local copy of domain for further manipuation
+	 * NOTE: mapid_get_domain() returns a ptr to TSD.
 	 */
-	(void) rw_rdlock(&domain_cfg_lock);
-	if (CUR_DOMAIN_NULL()) {
+	if (cur_domain_null()) {
 		dom_str_len = 0;
 		dom_str[0] = '\0';
 	} else {
-		dom_str_len = cur_domain_len;
-		bcopy(cur_domain, dom_str, cur_domain_len);
-		dom_str[dom_str_len] = '\0';
+		dom_str_len = strlcpy(dom_str, mapid_get_domain(), DNAMEMAX);
 	}
-	(void) rw_unlock(&domain_cfg_lock);
 
 	/*
 	 * We want to encode the uid into a literal string... :
@@ -333,7 +290,7 @@ done:
 	}
 }
 
-static void
+void
 nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res	result;
@@ -387,7 +344,7 @@ nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 	 * group validity. Note that we only look at the domain iff
 	 * the local domain is configured.
 	 */
-	if (!CUR_DOMAIN_NULL() && !valid_domain(domain)) {
+	if (!cur_domain_null() && !valid_domain(domain)) {
 		result.status = NFSMAPID_BADDOMAIN;
 		result.u_res.gid = GID_NOBODY;
 		goto done;
@@ -420,7 +377,7 @@ done:
 }
 
 /* ARGSUSED1 */
-static void
+void
 nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 {
 	struct mapid_res	 result;
@@ -433,7 +390,7 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	size_t			 gr_str_len;
 	char			*at_str;
 	size_t			 at_str_len;
-	char			 dom_str[NS_MAXCDNAME + 1];
+	char			 dom_str[DNAMEMAX];
 	size_t			 dom_str_len;
 
 	if (gid < 0 || gid > UID_MAX) {
@@ -448,17 +405,16 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 
 	/*
 	 * Make local copy of domain for further manipuation
+	 * NOTE: mapid_get_domain() returns a ptr to TSD.
 	 */
-	(void) rw_rdlock(&domain_cfg_lock);
-	if (CUR_DOMAIN_NULL()) {
+	if (cur_domain_null()) {
 		dom_str_len = 0;
 		dom_str[0] = '\0';
 	} else {
-		dom_str_len = cur_domain_len;
-		bcopy(cur_domain, dom_str, cur_domain_len);
+		dom_str_len = strlen(mapid_get_domain());
+		bcopy(mapid_get_domain(), dom_str, dom_str_len);
 		dom_str[dom_str_len] = '\0';
 	}
-	(void) rw_unlock(&domain_cfg_lock);
 
 	/*
 	 * We want to encode the gid into a literal string... :
@@ -573,7 +529,23 @@ nfsmapid_func(void *cookie, char *argp, size_t arg_size,
 	(void) door_return((char *)&mapres, sizeof (struct mapid_res), NULL, 0);
 }
 
-static int
+/*
+ * mapid_get_domain() always returns a ptr to TSD, so the
+ * check for a NULL domain is not a simple comparison with
+ * NULL but we need to check the contents of the TSD data.
+ */
+int
+cur_domain_null(void)
+{
+	char	*p;
+
+	if ((p = mapid_get_domain()) == NULL)
+		return (1);
+
+	return (p[0] == '\0');
+}
+
+int
 extract_domain(char *cp, char **upp, char **dpp)
 {
 	/*
@@ -587,27 +559,24 @@ extract_domain(char *cp, char **upp, char **dpp)
 	return (1);
 }
 
-static int
+int
 valid_domain(const char *dom)
 {
 	const char	*whoami = "valid_domain";
 
-	if (!standard_domain_str(dom)) {
-		syslog(LOG_ERR, gettext("%s: Invalid domain name %s. Check "
-			"configuration file and restart daemon."), whoami, dom);
+	if (!mapid_stdchk_domain(dom)) {
+		syslog(LOG_ERR, gettext("%s: Invalid inbound domain name %s."),
+			whoami, dom);
 		return (0);
 	}
 
-	(void) rw_rdlock(&domain_cfg_lock);
-	if (strcasecmp(dom, cur_domain) == 0) {
-		(void) rw_unlock(&domain_cfg_lock);
-		return (1);
-	}
-	(void) rw_unlock(&domain_cfg_lock);
-	return (0);
+	/*
+	 * NOTE: mapid_get_domain() returns a ptr to TSD.
+	 */
+	return (strcasecmp(dom, mapid_get_domain()) == 0);
 }
 
-static int
+int
 validate_id_str(const char *id)
 {
 	while (*id) {
@@ -617,152 +586,18 @@ validate_id_str(const char *id)
 	return (1);
 }
 
-static int
-get_mtime(char *fname, timestruc_t *mtim)
-{
-	struct stat st;
-	int err;
-
-	if ((err = stat(fname, &st)) != 0)
-		return (err);
-
-	*mtim = st.st_mtim;
-	return (0);
-}
-
-static void
-get_nfs_domain(void)
-{
-	const char	*whoami = "get_nfs_domain";
-	char		*ndomain;
-	timestruc_t	 ntime;
-
-	/*
-	 * If we can't get stats for the config file, then
-	 * zap the NFS domain info.  If mtime hasn't changed,
-	 * then there's no work to do, so just return.
-	 */
-	if (get_mtime(NFSADMIN, &ntime) != 0) {
-		ZAP_DOMAIN(nfs);
-		return;
-	}
-
-	if (TIMESTRUC_EQ(ntime, nfs_mtime))
-		return;
-
-	/*
-	 * Get NFSMAPID_DOMAIN value from /etc/default/nfs for now.
-	 * Note: defread() returns a ptr to TSD.
-	 */
-	if (defopen(NFSADMIN) == 0) {
-		ndomain = (char *)defread("NFSMAPID_DOMAIN=");
-
-		/* close default file */
-		(void) defopen(NULL);
-
-		/*
-		 * NFSMAPID_DOMAIN was set so its time for validation.
-		 * If its okay, then update NFS domain and return.  If not,
-		 * complain about invalid domain.
-		 */
-		if (ndomain) {
-			if (standard_domain_str(ndomain)) {
-				nfs_domain_len = strlen(ndomain);
-				(void) strncpy(nfs_domain, ndomain,
-								NS_MAXCDNAME);
-				nfs_mtime = ntime;
-				return;
-			}
-
-			syslog(LOG_ERR, gettext("%s: Invalid domain name %s. "
-				"Check configuration file and restart daemon."),
-				whoami, ndomain);
-		}
-	}
-
-	/*
-	 * So the NFS config file changed but it couldn't be opened or
-	 * it didn't specify NFSMAPID_DOMAIN or it specified an invalid
-	 * NFSMAPID_DOMAIN.  Time to zap current NFS domain info.
-	 */
-	ZAP_DOMAIN(nfs);
-}
-
-static void
-get_dns_domain(void)
-{
-#ifdef DEBUG
-	const char	*whoami = "get_dns_domain";
-#endif
-	timestruc_t	 ntime = {0};
-
-	/*
-	 * If we can't get stats for the config file, then
-	 * zap the DNS domain info.  If mtime hasn't changed,
-	 * then there's no work to do, so just return.
-	 */
-	errno = 0;
-	if (get_mtime(_PATH_RESCONF, &ntime) != 0) {
-		switch (errno) {
-			case ENOENT:
-				/*
-				 * The resolver defaults to obtaining the
-				 * domain off of the NIS domainname(1M) if
-				 * /etc/resolv.conf does not exist, so we
-				 * move forward.
-				 */
-				IDMAP_DBG("%s: no %s file", whoami,
-				    _PATH_RESCONF);
-				break;
-
-			default:
-				ZAP_DOMAIN(dns);
-				return;
-		}
-	} else if (TIMESTRUC_EQ(ntime, dns_mtime)) {
-		IDMAP_DBG("%s: no mtime changes in %s", whoami, _PATH_RESCONF);
-		return;
-	}
-
-	/*
-	 * Re-initialize resolver to zap DNS domain from previous
-	 * resolv_init() calls.
-	 */
-	(void) resolv_init();
-
-	/*
-	 * Update cached DNS domain.  No need for validation since
-	 * domain comes from resolver.  If resolver doesn't return the
-	 * domain, then zap the DNS domain.  This shouldn't ever happen,
-	 * and if it does, the machine has bigger problems (so no need
-	 * to generating a message that says DNS appears to be broken).
-	 */
-	(void) rw_rdlock(&dns_data_lock);
-	if (sysdns_domain[0] != '\0') {
-		(void) strncpy(dns_domain, sysdns_domain, NS_MAXCDNAME);
-		dns_mtime = ntime;
-		dns_domain_len = strlen(sysdns_domain);
-		(void) rw_unlock(&dns_data_lock);
-		return;
-	}
-	(void) rw_unlock(&dns_data_lock);
-
-	ZAP_DOMAIN(dns);
-}
-
 void
-idmap_kcall(int did)
+idmap_kcall(int door_id)
 {
 	struct nfsidmap_args args;
 
-	if (did >= 0) {
+	if (door_id >= 0) {
 		args.state = 1;
-		args.did = did;
+		args.did = door_id;
 	} else {
 		args.state = 0;
 		args.did = 0;
 	}
-
 	(void) _nfssys(NFS_IDMAP, &args);
 }
 
@@ -773,125 +608,48 @@ idmap_kcall(int did)
  * otherwise, the DNS domain is used.
  */
 void
-check_domain(int flush)
+check_domain(int sighup)
 {
 	const char	*whoami = "check_domain";
-	char		*new_domain;
-	int		 new_dlen = 0;
 	static int	 setup_done = 0;
-
-	get_nfs_domain();
-	if (nfs_domain_len != 0) {
-		new_domain = nfs_domain;
-		new_dlen = nfs_domain_len;
-		IDMAP_DBG("%s: NFS File Domain: %s", whoami, nfs_domain);
-		goto dname_chkd;
-	}
+	static cb_t	 cb;
 
 	/*
-	 * If called in response to a SIGHUP,
-	 * reset any cached DNS TXT RR state.
+	 * Construct the arguments to be passed to libmapid interface
+	 * If called in response to a SIGHUP, reset any cached DNS TXT
+	 * RR state.
 	 */
-	get_dns_txt_domain(flush);
-	if (dns_txt_domain_len != 0) {
-		new_domain = dns_txt_domain;
-		new_dlen = dns_txt_domain_len;
-		IDMAP_DBG("%s: DNS TXT Record: %s", whoami, dns_txt_domain);
-	} else {
-		/*
-		 * We're either here because:
-		 *
-		 *  . NFSMAPID_DOMAIN was not set in /etc/default/nfs
-		 *  . No suitable DNS TXT resource record exists
-		 *  . DNS server is not responding to requests
-		 *
-		 * in either case, we want to default to using the
-		 * system configured DNS domain. If this fails, then
-		 * dns_domain will be empty and dns_domain_len will
-		 * be 0.
-		 */
-		get_dns_domain();
-		new_domain = dns_domain;
-		new_dlen = dns_domain_len;
-		IDMAP_DBG("%s: Default DNS Domain: %s", whoami, dns_domain);
-	}
-
-dname_chkd:
-	/*
-	 * Update cur_domain if new_domain is different.  Set flush
-	 * to guarantee that kernel idmapping caches are flushed.
-	 */
-	if (strncasecmp(new_domain, cur_domain, NS_MAXCDNAME)) {
-		(void) rw_wrlock(&domain_cfg_lock);
-		(void) strncpy(cur_domain, new_domain, NS_MAXCDNAME);
-		cur_domain_len = new_dlen;
-		update_diag_file(new_domain);
-		DTRACE_PROBE1(nfsmapid, daemon__domain, cur_domain);
-		(void) rw_unlock(&domain_cfg_lock);
-		flush = 1;
-	}
+	cb.fcn = cb_update_domain;
+	cb.signal = sighup;
+	mapid_reeval_domain(&cb);
 
 	/*
 	 * Restart the signal handler thread if we're still setting up
 	 */
 	if (!setup_done) {
 		setup_done = 1;
-		IDMAP_DBG("%s: Initial setup done !", whoami, NULL);
 		if (thr_continue(sig_thread)) {
 			syslog(LOG_ERR, gettext("%s: Fatal error: signal "
 			    "handler thread could not be restarted."), whoami);
 			exit(6);
 		}
-
-		/*
-		 * We force bail here so we don't end up flushing kernel
-		 * caches until we _know_ we're up.
-		 */
-		return;
 	}
-
-	/*
-	 * If caller requested flush or if domain has changed, then
-	 * flush kernel idmapping caches.
-	 */
-	if (flush)
-		idmap_kcall(-1);
-}
-
-
-/*
- * Based on the recommendations from
- *	RFC1033  DOMAIN ADMINISTRATORS OPERATIONS GUIDE
- *	RFC1035  DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION
- * check if a given domain name string is valid.
- */
-int
-standard_domain_str(const char *ds)
-{
-	int	i;
-
-	for (i = 0; *ds && i < NS_MAXCDNAME; i++, ds++) {
-		if (!isalpha(*ds) && !isdigit(*ds) && (*ds != '.') &&
-				(*ds != '-') && (*ds != '_'))
-			return (0);
-	}
-	if (i == NS_MAXCDNAME)
-		return (0);
-	return (1);
 }
 
 /*
  * Need to be able to open the DIAG_FILE before nfsmapid(1m)
  * releases it's root priviledges. The DIAG_FILE then remains
- * open for the duration of this nfsmapid instance via n4_fp.
+ * open for the duration of this nfsmapid instance via n4_fd.
  */
 void
 open_diag_file()
 {
 	static int	msg_done = 0;
 
-	if ((n4_fp = fopen(DIAG_FILE, "w+")) != NULL)
+	if ((n4_fp = fopen(DIAG_FILE, "w+")) != NULL) {
+		n4_fd = fileno(n4_fp);
 		return;
+	}
 
 	if (msg_done)
 		return;
@@ -908,10 +666,35 @@ open_diag_file()
 void
 update_diag_file(char *new)
 {
-	rewind(n4_fp);
-	ftruncate(fileno(n4_fp), 0);
-	fprintf(n4_fp, "%.*s\n", NS_MAXCDNAME, new);
-	fflush(n4_fp);
+	char	buf[DNAMEMAX];
+	ssize_t	n;
+	size_t	len;
+
+	(void) lseek(n4_fd, (off_t)0, SEEK_SET);
+	(void) ftruncate(n4_fd, 0);
+	(void) snprintf(buf, DNAMEMAX, "%s\n", new);
+
+	len = strlen(buf);
+	n = write(n4_fd, buf, len);
+	if (n < 0 || n < len)
+		syslog(LOG_DEBUG, "Could not write %s to diag file", new);
+	fsync(n4_fd);
 
 	syslog(LOG_DEBUG, "nfsmapid domain = %s", new);
+}
+
+/*
+ * Callback function for libmapid. This will be called
+ * by the lib, everytime the nfsmapid(1m) domain changes.
+ */
+void *
+cb_update_domain(void *arg)
+{
+	char	*new_dname = (char *)arg;
+
+	DTRACE_PROBE1(nfsmapid, daemon__domain, new_dname);
+	update_diag_file(new_dname);
+	idmap_kcall(FLUSH_KCACHES_ONLY);
+
+	return (NULL);
 }

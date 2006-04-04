@@ -214,6 +214,7 @@ SUBDIRS += \
 	libzpool	\
 	libzfs		\
 	libzfs_jni	\
+	libmapid	\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -367,6 +368,7 @@ HDRSUBDIRS= libaio	\
 	../cmd/sendmail/libmilter	\
 	fm		\
 	udapl		\
+	libmapid	\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -444,6 +446,7 @@ $(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
 			$(CLOSED)/lib/libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo
 libnsl:		libmd5 libscf
+libmapid:	libresolv libcmd
 libmacadm:	libdevinfo
 libuuid:	libsocket
 libinetutil:	libsocket

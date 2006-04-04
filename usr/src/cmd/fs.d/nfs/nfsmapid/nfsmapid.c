@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <door.h>
+#include <thread.h>
 #include <priv_utils.h>
 #include <locale.h>
 #include <strings.h>
@@ -45,7 +45,6 @@
 #include <errno.h>
 #include <pwd.h>
 #include <grp.h>
-#include "nfsmapid_resolv.h"
 
 extern struct group *_uncached_getgrgid_r(gid_t, struct group *, char *, int);
 extern struct group *_uncached_getgrnam_r(const char *, struct group *,
@@ -64,7 +63,6 @@ extern void	nfsmapid_func(void *, char *, size_t, door_desc_t *, uint_t);
 
 extern void	check_domain(int);
 extern void	idmap_kcall(int);
-extern rwlock_t domain_cfg_lock;
 extern void	open_diag_file(void);
 
 size_t		pwd_buflen = 0;
@@ -121,7 +119,6 @@ sig_handler(void *arg)
 	struct timespec	tmout;
 	int		ret;
 
-	tmout.tv_sec = nfscfg_domain_tmout;
 	tmout.tv_nsec = 0;
 	(void) sigemptyset(&sigset);
 	(void) sigaddset(&sigset, SIGHUP);
@@ -129,10 +126,10 @@ sig_handler(void *arg)
 #ifdef	DEBUG
 	(void) sigaddset(&sigset, SIGINT);
 #endif
-	IDMAP_DBG("sig_handler started !", NULL, NULL);
 
 	/*CONSTCOND*/
 	while (1) {
+		tmout.tv_sec = nfscfg_domain_tmout;
 		if ((ret = sigtimedwait(&sigset, &si, &tmout)) != 0) {
 			/*
 			 * EAGAIN: no signals arrived during timeout.
@@ -207,20 +204,10 @@ daemon_init(void)
 	char *grp_buf;
 
 	/*
-	 * Initialize resolver
-	 */
-	(void) resolv_init();
-
-	/*
 	 * passwd/group reentrant interfaces limits
 	 */
 	pwd_buflen = (size_t)sysconf(_SC_GETPW_R_SIZE_MAX);
 	grp_buflen = (size_t)sysconf(_SC_GETGR_R_SIZE_MAX);
-
-	/*
-	 * Initialize lock
-	 */
-	(void) rwlock_init(&domain_cfg_lock, USYNC_THREAD, NULL);
 
 	/*
 	 * MT initialization is done first so that if there is the
@@ -345,12 +332,14 @@ main(int argc, char **argv)
 	/*
 	 * Initialize the daemon to basic + sys_nfs
 	 */
+#ifndef	DEBUG
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
 	    DAEMON_UID, DAEMON_GID, PRIV_SYS_NFS, (char *)NULL) == -1) {
 		(void) fprintf(stderr, gettext("%s PRIV_SYS_NFS privilege "
 			"missing\n"), MyName);
 		exit(1);
 	}
+#endif
 
 	/*
 	 * Take away a subset of basic, while this is not the absolute

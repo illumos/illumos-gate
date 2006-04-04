@@ -273,6 +273,7 @@ f none usr/include/nfs/lm.h 644 root bin
 f none usr/include/nfs/lm_impl.h 644 root bin
 f none usr/include/nfs/lm_nlm.h 644 root bin
 f none usr/include/nfs/lm_server.h 644 root bin
+f none usr/include/nfs/mapid.h 644 root bin
 f none usr/include/nfs/mount.h 644 root bin
 f none usr/include/nfs/nfs.h 644 root bin
 f none usr/include/nfs/nfs4.h 644 root bin
