@@ -2109,12 +2109,18 @@ recov_retry:
 
 	if ((e.error != 0) ||
 	    (va.va_type != VDIR)) {
+		if (need_start_op)
+			nfs4_end_fop(mi, rootvp, NULL, OH_LOOKUP,
+			    &recov_state, FALSE);
 		if (e.error == 0)
 			e.error = EIO;
 		goto out;
 	}
 
 	if (e.stat != NFS4_OK) {
+		if (need_start_op)
+			nfs4_end_fop(mi, rootvp, NULL, OH_LOOKUP,
+			    &recov_state, FALSE);
 		e.error = EIO;
 		goto out;
 	}
@@ -2158,6 +2164,9 @@ recov_retry:
 			}
 
 			if (e.stat != NFS4_OK) {
+				if (need_start_op)
+					nfs4_end_fop(mi, rootvp, NULL,
+					    OH_LOOKUP, &recov_state, FALSE);
 				e.error = EIO;
 				goto out;
 			}
