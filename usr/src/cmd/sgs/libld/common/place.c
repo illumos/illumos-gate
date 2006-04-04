@@ -305,15 +305,22 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	}
 
 	/*
-	 * Setup the masks to flagout when matching sections
+	 * Mask of section header flags to ignore when
+	 * matching sections. We are more strict with
+	 * relocatable objects, ignoring only the order
+	 * flags, and keeping sections apart if they differ
+	 * otherwise. This follows the policy that sections
+	 * in a relative object should only be merged if their
+	 * flags are the same, and avoids destroying information
+	 * prematurely. For final products however, we ignore all
+	 * flags that do not prevent a merge.
 	 */
-	shflagmask = ALL_SHF_ORDER;
-	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
-		shflagmask = ALL_SHF_IGNORE;
+	shflagmask = (ofl->ofl_flags & FLG_OF_RELOBJ)
+		? ALL_SHF_ORDER : ALL_SHF_IGNORE;
 
 	/*
 	 * Traverse the input section list for the output section we have been
-	 * assigned.  If we find a matching section simply add this new section.
+	 * assigned. If we find a matching section simply add this new section.
 	 */
 	off2 = 0;
 	for (ALIST_TRAVERSE(sgp->sg_osdescs, off1, ospp)) {

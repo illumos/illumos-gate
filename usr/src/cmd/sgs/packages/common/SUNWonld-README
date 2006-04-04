@@ -1097,3 +1097,4 @@ Bugid   Risk Synopsis
 6397256 ldd dumps core in elf_fix_name
 6327926 ld does not set etext symbol correctly for AMD64 medium model (D)
 6390410 64-bit LD_PROFILE can fail: relocation error when binding profile plt
+6382945 AMD64-GCC: dbx: internal error: dwarf reference attribute out of bounds

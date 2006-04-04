@@ -58,11 +58,41 @@ extern "C" {
 #define	SYM_NOHASH	(~(Word)0)
 
 /*
- * Define MACROs to be used for input sections to flagout
- * when matching sections.
+ * Macro that can be used to represent both ORDER flags
+ * in a section header.
  */
 #define	ALL_SHF_ORDER	(SHF_ORDERED | SHF_LINK_ORDER)
-#define	ALL_SHF_IGNORE	(ALL_SHF_ORDER | SHF_GROUP)
+
+/*
+ * The linker merges (concatenates) sections with the same name and
+ * compatible section header flags. When comparing these flags,
+ * there are some that should not be included in the decision.
+ * The ALL_SHF_IGNORE constant defines these flags.
+ *
+ * NOTE: SHF_MERGE|SHF_STRINGS:
+ * The compiler is allowed to set the SHF_MERGE|SHF_STRINGS flags in
+ * order to tell the linker that:
+ *
+ *      1) There is nothing in the section except null terminated strings.
+ *      2) If two compatible sections both have these flags set, it is
+ *		OK to combine identical strings into single instances.
+ *		In this case, the two sections would be modified to both
+ *		reference a single string copy.
+ *
+ * This is a different meaning than the simple concatenating of sections
+ * that the linker always does. It is a hint that an additional optimization
+ * is possible, but not required. This means that sections that do not
+ * share the same SHF_MERGE|SHF_STRINGS values can be merged (concatenated),
+ * but cannot have their duplicate strings combined. Hence, the values
+ * of SHF_MERGE|SHF_STRINGS should be ignored when deciding whether two
+ * sections can be merged (concatenated).
+ *
+ * We do not currently implement the SHF_MERGE|SHF_STRINGS optimization,
+ * but it is possible to add it. If we did, the procedure would be to
+ * first combine the compatible sections that have these flag bits set,
+ * and then to concatenate any others to the result.
+ */
+#define	ALL_SHF_IGNORE	(ALL_SHF_ORDER | SHF_GROUP | SHF_MERGE | SHF_STRINGS)
 
 /*
  * Define symbol reference types for use in symbol resolution.
