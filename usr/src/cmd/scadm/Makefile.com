@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -83,7 +83,13 @@ IFLAGS = -I$(SRCDIR) -I$(USR_PSM_INCL_DIR) \
 
 CPPFLAGS = $(IFLAGS) $(CPPFLAGS.master) -D_SYSCALL32
 
+LINKED_DIRS     = $(PLATLINKS:%=$(USR_PLAT_DIR)/%)
+LINKED_SBIN_DIRS = $(PLATLINKS:%=$(USR_PLAT_DIR)/%/sbin)
+
 .PARALLEL: $(OBJS)
+
+$(LINKED_SBIN_DIRS): $(LINKED_DIRS)
+	-$(INS.dir.root.sys)
 
 %.o:	common/%.c
 	$(COMPILE.c) -o $@ $<
