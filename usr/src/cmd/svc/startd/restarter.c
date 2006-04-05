@@ -719,6 +719,10 @@ restarter_delete_inst(restarter_inst_t *ri)
 
 	startd_free((void *)ri->ri_i.i_fmri, strlen(ri->ri_i.i_fmri) + 1);
 	startd_free(ri->ri_logstem, PATH_MAX);
+	if (ri->ri_common_name != NULL)
+		startd_free(ri->ri_common_name, max_scf_value_size);
+	if (ri->ri_C_common_name != NULL)
+		startd_free(ri->ri_C_common_name, max_scf_value_size);
 	startd_free(ri->ri_utmpx_prefix, max_scf_value_size);
 	(void) pthread_mutex_destroy(&ri->ri_lock);
 	(void) pthread_mutex_destroy(&ri->ri_queue_lock);
