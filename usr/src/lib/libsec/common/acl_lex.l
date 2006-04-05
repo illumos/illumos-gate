@@ -736,11 +736,9 @@ aclent_entry_type(int type, int owning, int *ret)
 	case GROUP_TOK:
 		*ret = (owning == 0) ? GROUP : GROUP_OBJ;
 		break;
-
 	case OTHER_TOK:
 		*ret = OTHER_OBJ;
 		break;
-
 	case MASK_TOK:
 		*ret = CLASS_OBJ;
 		break;
@@ -793,29 +791,29 @@ get_id(int entry_type, char *name, int *id)
 	struct group *gr;
 	int error;
 
-	if (entry_type == USER_TOK || entry_type == DEFAULT_USER_TOK) {
-		pw = getpwnam(name);
-		if (pw) {
-			*id = pw->pw_uid;
-			return (0);
-		} 
-	} else {
-		gr = getgrnam(name);
-		if (gr) {
-			*id = gr->gr_gid;
-			return (0);
-		} 
-	}
-
 	/*
-	 * getpwnam or getgrnam failed, try and see if
-	 * they are numeric strings.
+	 * First see if uid/gid is an all-numeric value
+	 * otherwise, try getpwnam/getgrnam.
 	 */
 	error = acl_str_to_id(name, id);
 
-	if (error)
-		return (error);
-	return (0);
+	if (error != 0) {
+		if (entry_type == USER_TOK || entry_type == DEFAULT_USER_TOK) {
+			pw = getpwnam(name);
+			if (pw) {
+				*id = pw->pw_uid;
+				error = 0;
+			} 
+		} else {
+			gr = getgrnam(name);
+			if (gr) {
+				*id = gr->gr_gid;
+				error = 0;
+			} 
+		}
+	} 
+
+	return (error);
 }
 /*
  * reset beginning state to TS and set character position
