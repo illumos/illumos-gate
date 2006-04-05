@@ -592,7 +592,7 @@ dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
 	    rname != NULL ? rname : fname);
 
 	assert(*noffs < *maxoffs);
-	*offs[(*noffs)++] = offset;
+	(*offs)[(*noffs)++] = offset;
 
 	return (0);
 }
