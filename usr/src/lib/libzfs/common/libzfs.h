@@ -219,8 +219,8 @@ extern int zfs_clone(zfs_handle_t *, const char *);
 extern int zfs_snapshot(const char *);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
 extern int zfs_rename(zfs_handle_t *, const char *);
-extern int zfs_backup(zfs_handle_t *, zfs_handle_t *);
-extern int zfs_restore(const char *, int, int, int);
+extern int zfs_send(zfs_handle_t *, zfs_handle_t *);
+extern int zfs_receive(const char *, int, int, int);
 
 /*
  * Miscellaneous functions.

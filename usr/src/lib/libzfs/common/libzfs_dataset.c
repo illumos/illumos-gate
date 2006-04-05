@@ -2282,7 +2282,7 @@ zfs_snapshot(const char *path)
  * Dumps a backup of tosnap, incremental from fromsnap if it isn't NULL.
  */
 int
-zfs_backup(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
+zfs_send(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
 {
 	zfs_cmd_t zc = { 0 };
 	int ret;
@@ -2302,15 +2302,15 @@ zfs_backup(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
 		switch (errno) {
 		case EPERM:
 			/*
-			 * User doesn't have permission to do a backup
+			 * User doesn't have permission to do a send
 			 */
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot backup '%s': "
+			zfs_error(dgettext(TEXT_DOMAIN, "cannot send '%s': "
 			    "permission denied"), zhp_to->zfs_name);
 			break;
 
 		case EXDEV:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot do incremental backup from %s:\n"
+			    "cannot send incremental from %s:\n"
 			    "it is not an earlier snapshot from the "
 			    "same fs as %s"),
 			    zhp_from->zfs_name, zhp_to->zfs_name);
@@ -2338,13 +2338,13 @@ zfs_backup(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
 		case EFAULT:
 		case EROFS:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot write backup stream: %s"),
+			    "cannot write stream: %s"),
 			    strerror(errno));
 			break;
 
 		case EINTR:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "backup failed: signal recieved"));
+			    "send failed: signal received"));
 			break;
 
 		default:
@@ -2359,7 +2359,7 @@ zfs_backup(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
  * Restores a backup of tosnap from stdin.
  */
 int
-zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
+zfs_receive(const char *tosnap, int isprefix, int verbose, int dryrun)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
@@ -2387,7 +2387,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 
 	if (size < 0 || bytes != sizeof (drr)) {
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "cannot restore: invalid backup stream "
+		    "cannot receive: invalid stream "
 		    "(couldn't read first record)"));
 		return (-1);
 	}
@@ -2397,7 +2397,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	if (drrb->drr_magic != DMU_BACKUP_MAGIC &&
 	    drrb->drr_magic != BSWAP_64(DMU_BACKUP_MAGIC)) {
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "cannot restore: invalid backup stream "
+		    "cannot receive: invalid stream "
 		    "(invalid magic number)"));
 		return (-1);
 	}
@@ -2407,7 +2407,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		if (drrb->drr_magic == BSWAP_64(DMU_BACKUP_MAGIC))
 			drrb->drr_version = BSWAP_64(drrb->drr_version);
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "cannot restore: only backup version 0x%llx is supported, "
+		    "cannot receive: only stream version 0x%llx is supported, "
 		    "stream is version %llx."),
 		    DMU_BACKUP_VERSION, drrb->drr_version);
 		return (-1);
@@ -2420,7 +2420,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	if (isprefix) {
 		if (strchr(tosnap, '@') != NULL) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: "
+			    "cannot receive: "
 			    "argument to -d must be a filesystem"));
 			return (-1);
 		}
@@ -2441,7 +2441,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		cp = strchr(drr.drr_u.drr_begin.drr_toname, '@');
 		if (cp == NULL || strlen(tosnap) + strlen(cp) >= MAXNAMELEN) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: invalid snapshot name"));
+			    "cannot receive: invalid snapshot name"));
 			return (-1);
 		}
 		(void) strcat(zc.zc_filename, cp);
@@ -2460,7 +2460,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		h = zfs_open(zc.zc_name, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		if (h == NULL) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore incrememtal backup: destination\n"
+			    "cannot receive incrememtal stream: destination\n"
 			    "filesystem %s does not exist"),
 			    zc.zc_name);
 			return (-1);
@@ -2479,13 +2479,13 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 
 		(void) strcpy(zc.zc_name, zc.zc_filename);
 
-		/* make sure they aren't trying to restore into the root */
+		/* make sure they aren't trying to receive into the root */
 		if (strchr(zc.zc_name, '/') == NULL) {
 			cp = strchr(zc.zc_name, '@');
 			if (cp)
 				*cp = '\0';
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: destination fs %s already exists"),
+			    "cannot receive: destination fs %s already exists"),
 			    zc.zc_name);
 			return (-1);
 		}
@@ -2497,7 +2497,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 			h = zfs_open(tosnap, ZFS_TYPE_FILESYSTEM);
 			if (h == NULL) {
 				zfs_error(dgettext(TEXT_DOMAIN,
-				    "cannot restore: "
+				    "cannot receive: "
 				    "%s is an invalid destination"),
 				    tosnap);
 				return (-1);
@@ -2544,7 +2544,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 				continue;
 ancestorerr:
 				zfs_error(dgettext(TEXT_DOMAIN,
-				    "cannot restore: couldn't %s ancestor %s"),
+				    "cannot receive: couldn't %s ancestor %s"),
 				    opname, zc.zc_name);
 				return (-1);
 			}
@@ -2555,7 +2555,7 @@ ancestorerr:
 		*cp = '\0';
 		if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) == 0) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore full backup: "
+			    "cannot receive full stream: "
 			    "destination filesystem %s already exists"),
 			    zc.zc_name);
 			return (-1);
@@ -2570,8 +2570,8 @@ ancestorerr:
 	zc.zc_cookie = STDIN_FILENO;
 	zc.zc_intsz = isprefix;
 	if (verbose) {
-		(void) printf("%s %s backup of %s into %s\n",
-		    dryrun ? "would restore" : "restoring",
+		(void) printf("%s %s stream of %s into %s\n",
+		    dryrun ? "would receive" : "receiving",
 		    drrb->drr_fromguid ? "incremental" : "full",
 		    drr.drr_u.drr_begin.drr_toname,
 		    zc.zc_filename);
@@ -2584,13 +2584,13 @@ ancestorerr:
 		switch (errno) {
 		case ENODEV:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: "
+			    "cannot receive: "
 			    "most recent snapshot does not "
-			    "match incremental backup source"));
+			    "match incremental source"));
 			break;
 		case ETXTBSY:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: "
+			    "cannot receive: "
 			    "destination has been modified since "
 			    "most recent snapshot --\n"
 			    "use 'zfs rollback' to discard changes"));
@@ -2602,41 +2602,41 @@ ancestorerr:
 				*cp = '\0';
 			}
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore to %s: destination already exists"),
+			    "cannot receive to %s: destination already exists"),
 			    zc.zc_filename);
 			break;
 		case ENOENT:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: destination does not exist"));
+			    "cannot receive: destination does not exist"));
 			break;
 		case EBUSY:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: destination is in use"));
+			    "cannot receive: destination is in use"));
 			break;
 		case ENOSPC:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: out of space"));
+			    "cannot receive: out of space"));
 			break;
 		case EDQUOT:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: quota exceeded"));
+			    "cannot receive: quota exceeded"));
 			break;
 		case EINTR:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "restore failed: signal recieved"));
+			    "receive failed: signal received"));
 			break;
 		case EINVAL:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: invalid backup stream"));
+			    "cannot receive: invalid stream"));
 			break;
 		case ECKSUM:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: invalid backup stream "
+			    "cannot receive: invalid stream "
 			    "(checksum mismatch)"));
 			break;
 		case EPERM:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: permission denied"));
+			    "cannot receive: permission denied"));
 			break;
 		default:
 			zfs_baderror(errno);
@@ -2682,7 +2682,7 @@ ancestorerr:
 		zfs_nicenum(bytes, buf1, sizeof (buf1));
 		zfs_nicenum(bytes/delta, buf2, sizeof (buf1));
 
-		(void) printf("restored %sb backup in %lu seconds (%sb/sec)\n",
+		(void) printf("received %sb stream in %lu seconds (%sb/sec)\n",
 		    buf1, delta, buf2);
 	}
 	return (0);

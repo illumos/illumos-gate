@@ -64,8 +64,8 @@ static int zfs_do_snapshot(int argc, char **argv);
 static int zfs_do_unmount(int argc, char **argv);
 static int zfs_do_share(int argc, char **argv);
 static int zfs_do_unshare(int argc, char **argv);
-static int zfs_do_backup(int argc, char **argv);
-static int zfs_do_restore(int argc, char **argv);
+static int zfs_do_send(int argc, char **argv);
+static int zfs_do_receive(int argc, char **argv);
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -84,7 +84,6 @@ _umem_logging_init(void)
 }
 
 typedef enum {
-	HELP_BACKUP,
 	HELP_CLONE,
 	HELP_CREATE,
 	HELP_DESTROY,
@@ -92,9 +91,10 @@ typedef enum {
 	HELP_INHERIT,
 	HELP_LIST,
 	HELP_MOUNT,
+	HELP_RECEIVE,
 	HELP_RENAME,
-	HELP_RESTORE,
 	HELP_ROLLBACK,
+	HELP_SEND,
 	HELP_SET,
 	HELP_SHARE,
 	HELP_SNAPSHOT,
@@ -140,8 +140,8 @@ static zfs_command_t command_table[] = {
 	{ NULL },
 	{ "unshare",	zfs_do_unshare,		HELP_UNSHARE		},
 	{ NULL },
-	{ "backup",	zfs_do_backup,		HELP_BACKUP		},
-	{ "restore",	zfs_do_restore,		HELP_RESTORE		},
+	{ "send",	zfs_do_send,		HELP_SEND		},
+	{ "receive",	zfs_do_receive,		HELP_RECEIVE		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -152,8 +152,6 @@ static const char *
 get_usage(zfs_help_t idx)
 {
 	switch (idx) {
-	case HELP_BACKUP:
-		return (gettext("\tbackup [-i <snapshot>] <snapshot>\n"));
 	case HELP_CLONE:
 		return (gettext("\tclone <snapshot> <filesystem|volume>\n"));
 	case HELP_CREATE:
@@ -178,14 +176,16 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tmount\n"
 		    "\tmount [-o opts] [-O] -a\n"
 		    "\tmount [-o opts] [-O] <filesystem>\n"));
+	case HELP_RECEIVE:
+		return (gettext("\treceive [-vn] <filesystem|volume|snapshot>\n"
+		    "\treceive [-vn] -d <filesystem>\n"));
 	case HELP_RENAME:
 		return (gettext("\trename <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"));
-	case HELP_RESTORE:
-		return (gettext("\trestore [-vn] <filesystem|volume|snapshot>\n"
-		    "\trestore [-vn] -d <filesystem>\n"));
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
+	case HELP_SEND:
+		return (gettext("\tsend [-i <snapshot>] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume> ...\n"));
@@ -1692,12 +1692,12 @@ zfs_do_snapshot(int argc, char **argv)
 }
 
 /*
- * zfs backup [-i <fs@snap>] <fs@snap>
+ * zfs send [-i <fs@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
 static int
-zfs_do_backup(int argc, char **argv)
+zfs_do_send(int argc, char **argv)
 {
 	char *fromname = NULL;
 	zfs_handle_t *zhp_from = NULL, *zhp_to;
@@ -1736,7 +1736,7 @@ zfs_do_backup(int argc, char **argv)
 
 	if (isatty(STDOUT_FILENO)) {
 		(void) fprintf(stderr,
-		    gettext("Error: Backup stream can not be written "
+		    gettext("Error: Stream can not be written "
 			    "to a terminal.\n"
 			    "You must redirect standard output.\n"));
 		return (1);
@@ -1749,7 +1749,7 @@ zfs_do_backup(int argc, char **argv)
 	if ((zhp_to = zfs_open(argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
-	err = zfs_backup(zhp_to, zhp_from);
+	err = zfs_send(zhp_to, zhp_from);
 
 	if (zhp_from)
 		zfs_close(zhp_from);
@@ -1759,12 +1759,12 @@ zfs_do_backup(int argc, char **argv)
 }
 
 /*
- * zfs restore <fs@snap>
+ * zfs receive <fs@snap>
  *
  * Restore a backup stream from stdin.
  */
 static int
-zfs_do_restore(int argc, char **argv)
+zfs_do_receive(int argc, char **argv)
 {
 	int c, err;
 	int isprefix = FALSE;
@@ -1816,7 +1816,7 @@ zfs_do_restore(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_restore(argv[0], isprefix, verbose, dryrun);
+	err = zfs_receive(argv[0], isprefix, verbose, dryrun);
 	return (err != 0);
 }
 
@@ -2751,6 +2751,12 @@ main(int argc, char **argv)
 		 */
 		if (strcmp(cmdname, "umount") == 0)
 			cmdname = "unmount";
+
+		/*
+		 * The 'recv' command is an alias for 'receive'
+		 */
+		if (strcmp(cmdname, "recv") == 0)
+			cmdname = "receive";
 
 		/*
 		 * Special case '-?'

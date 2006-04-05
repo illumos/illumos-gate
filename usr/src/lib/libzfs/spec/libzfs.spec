@@ -24,10 +24,6 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-function zfs_backup
-version SUNWprivate_1.1
-end
-
 function zfs_clone
 version SUNWprivate_1.1
 end
@@ -172,6 +168,10 @@ function zfs_prop_to_name
 version SUNWprivate_1.1
 end
 
+function zfs_receive
+version SUNWprivate_1.1
+end
+
 function zfs_refresh_properties
 version SUNWprivate_1.1
 end
@@ -180,11 +180,11 @@ function zfs_rename
 version SUNWprivate_1.1
 end
 
-function zfs_restore
+function zfs_rollback
 version SUNWprivate_1.1
 end
 
-function zfs_rollback
+function zfs_send
 version SUNWprivate_1.1
 end
 
