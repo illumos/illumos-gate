@@ -91,7 +91,10 @@
  *	cached atime changes.  Third, zfs_zinactive() may require a new tx,
  *	which could deadlock the system if you were already holding one.
  *
- *  (3)	Always pass zfsvfs->z_assign as the second argument to dmu_tx_assign().
+ *  (3)	All range locks must be grabbed before calling dmu_tx_assign(),
+ *	as they can span dmu_tx_assign() calls.
+ *
+ *  (4)	Always pass zfsvfs->z_assign as the second argument to dmu_tx_assign().
  *	In normal operation, this will be TXG_NOWAIT.  During ZIL replay,
  *	it will be a specific txg.  Either way, dmu_tx_assign() never blocks.
  *	This is critical because we don't want to block while holding locks.
@@ -107,14 +110,14 @@
  *	If dmu_tx_assign() returns ERESTART and zfsvfs->z_assign is TXG_NOWAIT,
  *	then drop all locks, call txg_wait_open(), and try again.
  *
- *  (4)	If the operation succeeded, generate the intent log entry for it
+ *  (5)	If the operation succeeded, generate the intent log entry for it
  *	before dropping locks.  This ensures that the ordering of events
  *	in the intent log matches the order in which they actually occurred.
  *
- *  (5)	At the end of each vnode op, the DMU tx must always commit,
+ *  (6)	At the end of each vnode op, the DMU tx must always commit,
  *	regardless of whether there were any errors.
  *
- *  (6)	After dropping all locks, invoke zil_commit(zilog, seq, ioflag)
+ *  (7)	After dropping all locks, invoke zil_commit(zilog, seq, ioflag)
  *	to ensure that synchronous semantics are provided when necessary.
  *
  * In general, this is how things should be ordered in each vnode op:
@@ -1161,9 +1164,12 @@ top:
 			tx = dmu_tx_create(os);
 			dmu_tx_hold_bonus(tx, zoid);
 			dmu_tx_hold_free(tx, zoid, 0, DMU_OBJECT_END);
+			/* Lock the whole range of the file */
+			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
 			error = dmu_tx_assign(tx, zfsvfs->z_assign);
 			if (error) {
 				dmu_tx_abort(tx);
+				zfs_range_unlock(zp, rl);
 				if (dl)
 					zfs_dirent_unlock(dl);
 				VN_RELE(ZTOV(zp));
@@ -1175,10 +1181,6 @@ top:
 				ZFS_EXIT(zfsvfs);
 				return (error);
 			}
-			/*
-			 * Lock the whole range of the file
-			 */
-			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
 			error = zfs_freesp(zp, 0, 0, mode, tx, cr);
 			if (error == 0) {
 				zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
