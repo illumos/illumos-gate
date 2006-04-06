@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -86,6 +85,7 @@ int is_amd64;
 #ifdef	BOOTAMD64
 extern void amd64_handoff(uint64_t);
 extern int amd64_config_cpu();
+extern uint32_t amd64_special_hw(void);
 
 int amd64_elf64;
 uint64_t elf64_go2;
@@ -144,7 +144,7 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	is_amd64 = amd64_config_cpu();
 	if (verbosemode && is_amd64)
 		printf("cpu is amd64 capable\n");
-	if (is_amd64 == 0)
+	if (is_amd64 == 0 && !amd64_special_hw())
 		(void) bsetprop(NULL, "CPU_not_amd64", "true", sizeof ("true"));
 #endif  /* BOOTAMD64 */
 

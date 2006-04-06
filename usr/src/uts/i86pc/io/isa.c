@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -564,9 +563,6 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 	};
 	int asy_intrs[] = {0x4, 0x3};
 
-	struct regspec lp_regs = {1, 0x378, 8};
-	int lp_intr = 7;
-
 	struct regspec i8042_regs[] = {
 		{1, 0x60, 0x1},
 		{1, 0x64, 0x1}
@@ -614,15 +610,6 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 		    "interrupts", asy_intrs[i]);
 		(void) ndi_devi_bind_driver(xdip, 0);
 	}
-
-	/* parallel port */
-	ndi_devi_alloc_sleep(isa_dip, "lp",
-	    (pnode_t)DEVI_SID_NODEID, &xdip);
-	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
-	    "reg", (int *)&lp_regs, 3);
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
-	    "interrupts", lp_intr);
-	(void) ndi_devi_bind_driver(xdip, 0);
 
 	/* i8042 node */
 	ndi_devi_alloc_sleep(isa_dip, "i8042",

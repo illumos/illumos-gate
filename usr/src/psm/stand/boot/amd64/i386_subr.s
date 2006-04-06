@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +175,7 @@ amd64_cpuid_insn(uint32_t eax, struct amd64_cpuid_regs *vcr)
 
 #else	/* __lint */
 
-        ENTRY(amd64_cpuid_insn)
+	ENTRY(amd64_cpuid_insn)
 	pushl	%ebp
 	movl	%esp, %ebp
 	pushl	%ebx
@@ -221,4 +220,25 @@ amd64_cpuid_supported(void) { return (1); }
 1:
 	ret
 	SET_SIZE(amd64_cpuid_supported)
+#endif	/* __lint */
+
+#if defined(__lint)
+
+unsigned
+amd64_special_hw(void) { return (1); }
+
+#else
+	ENTRY(amd64_special_hw)
+	movl	$0x564d5868, %eax
+	movl	$0xa, %ecx
+	movl	$0x5658, %edx
+	inl	(%dx)
+	movl	$0x564d5868, %ecx
+	xorl	%eax, %eax
+	cmpl	%ecx, %ebx
+	jne	1f
+	incl	%eax
+1:
+	ret
+	SET_SIZE(amd64_special_hw)
 #endif	/* __lint */
