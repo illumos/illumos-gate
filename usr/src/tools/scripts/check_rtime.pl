@@ -258,6 +258,15 @@ sub cmp_os_ver {
 	return (eval "$diff $op 0" ? 1 : 0);
 }
 
+# This script relies on ldd returning output reflecting only the binary 
+# contents.  But if LD_PRELOAD* environment variables are present, libraries
+# named by them will also appear in the output, disrupting our analysis.
+# So, before we get too far, scrub the environment.
+
+delete($ENV{LD_PRELOAD});
+delete($ENV{LD_PRELOAD_32});
+delete($ENV{LD_PRELOAD_64});
+
 # Establish a program name for any error diagnostics.
 chomp($Prog = `basename $0`);
 
