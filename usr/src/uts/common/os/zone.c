@@ -1140,9 +1140,11 @@ zone_init(void)
 	    (mod_hash_val_t)&zone0);
 	(void) mod_hash_insert(zonehashbyname, (mod_hash_key_t)zone0.zone_name,
 	    (mod_hash_val_t)&zone0);
-	if (is_system_labeled())
+	if (is_system_labeled()) {
+		zone0.zone_flags |= ZF_HASHED_LABEL;
 		(void) mod_hash_insert(zonehashbylabel,
 		    (mod_hash_key_t)zone0.zone_slabel, (mod_hash_val_t)&zone0);
+	}
 	mutex_exit(&zonehash_lock);
 
 	/*
@@ -1936,6 +1938,8 @@ zone_set_root(zone_t *zone, const char *upath)
 	zone->zone_rootvp = vp;		/* we hold a reference to vp */
 	zone->zone_rootpath = path;
 	zone->zone_rootpathlen = pathlen;
+	if (pathlen > 5 && strcmp(path + pathlen - 5, "/lu/") == 0)
+		zone->zone_flags |= ZF_IS_SCRATCH;
 	return (0);
 
 out:
@@ -2799,6 +2803,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	int error2 = 0;
 	char *str;
 	cred_t *zkcr;
+	boolean_t insert_label_hash;
 
 	if (secpolicy_zone_config(CRED()) != 0)
 		return (set_errno(EPERM));
@@ -2869,16 +2874,18 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * match flag and sensitivity label.
 	 */
 	zone->zone_match = match;
-	if (is_system_labeled()) {
+	if (is_system_labeled() && !(zone->zone_flags & ZF_IS_SCRATCH)) {
 		error = zone_set_label(zone, label, doi);
 		if (error != 0) {
 			zone_free(zone);
 			return (set_errno(error));
 		}
+		insert_label_hash = B_TRUE;
 	} else {
 		/* all zones get an admin_low label if system is not labeled */
 		zone->zone_slabel = l_admin_low;
 		label_hold(l_admin_low);
+		insert_label_hash = B_FALSE;
 	}
 
 	/*
@@ -2924,7 +2931,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	 * make sure no other zone exists that has the same label.
 	 */
 	if ((ztmp = zone_find_all_by_name(zone->zone_name)) != NULL ||
-	    (zone->zone_slabel != NULL &&
+	    (insert_label_hash &&
 	    (ztmp = zone_find_all_by_label(zone->zone_slabel)) != NULL)) {
 		zone_status_t status;
 
@@ -2972,9 +2979,10 @@ zone_create(const char *zone_name, const char *zone_root,
 	(void) strcpy(str, zone->zone_name);
 	(void) mod_hash_insert(zonehashbyname, (mod_hash_key_t)str,
 	    (mod_hash_val_t)(uintptr_t)zone);
-	if (is_system_labeled()) {
+	if (insert_label_hash) {
 		(void) mod_hash_insert(zonehashbylabel,
 		    (mod_hash_key_t)zone->zone_slabel, (mod_hash_val_t)zone);
+		zone->zone_flags |= ZF_HASHED_LABEL;
 	}
 
 	/*
@@ -3000,7 +3008,7 @@ zone_create(const char *zone_name, const char *zone_root,
 		 */
 		mutex_enter(&zonehash_lock);
 		list_remove(&zone_active, zone);
-		if (is_system_labeled()) {
+		if (zone->zone_flags & ZF_HASHED_LABEL) {
 			ASSERT(zone->zone_slabel != NULL);
 			(void) mod_hash_destroy(zonehashbylabel,
 			    (mod_hash_key_t)zone->zone_slabel);
@@ -3168,7 +3176,7 @@ zone_list_access(zone_t *zone)
 	if (curproc->p_zone == global_zone ||
 	    curproc->p_zone == zone) {
 		return (B_TRUE);
-	} else if (is_system_labeled()) {
+	} else if (is_system_labeled() && !(zone->zone_flags & ZF_IS_SCRATCH)) {
 		bslabel_t *curproc_label;
 		bslabel_t *zone_label;
 
@@ -3442,7 +3450,7 @@ zone_destroy(zoneid_t zoneid)
 	    (mod_hash_key_t)zone->zone_name);
 	(void) mod_hash_destroy(zonehashbyid,
 	    (mod_hash_key_t)(uintptr_t)zone->zone_id);
-	if (is_system_labeled() && zone->zone_slabel != NULL)
+	if (zone->zone_flags & ZF_HASHED_LABEL)
 		(void) mod_hash_destroy(zonehashbylabel,
 		    (mod_hash_key_t)zone->zone_slabel);
 	mutex_exit(&zonehash_lock);
@@ -4023,7 +4031,7 @@ static int
 zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 {
 	zoneid_t *zoneids;
-	zone_t *zone;
+	zone_t *zone, *myzone;
 	uint_t user_nzones, real_nzones;
 	uint_t domi_nzones;
 	int error;
@@ -4031,14 +4039,15 @@ zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 	if (copyin(numzones, &user_nzones, sizeof (uint_t)) != 0)
 		return (set_errno(EFAULT));
 
-	if (curproc->p_zone != global_zone) {
+	myzone = curproc->p_zone;
+	if (myzone != global_zone) {
 		bslabel_t *mybslab;
 
 		if (!is_system_labeled()) {
 			/* just return current zone */
 			real_nzones = domi_nzones = 1;
 			zoneids = kmem_alloc(sizeof (zoneid_t), KM_SLEEP);
-			zoneids[0] = curproc->p_zone->zone_id;
+			zoneids[0] = myzone->zone_id;
 		} else {
 			/* return all zones that are dominated */
 			mutex_enter(&zonehash_lock);
@@ -4047,13 +4056,20 @@ zone_list(zoneid_t *zoneidlist, uint_t *numzones)
 			if (real_nzones > 0) {
 				zoneids = kmem_alloc(real_nzones *
 				    sizeof (zoneid_t), KM_SLEEP);
-				mybslab = label2bslabel(curproc->p_zone->
-				    zone_slabel);
+				mybslab = label2bslabel(myzone->zone_slabel);
 				for (zone = list_head(&zone_active);
 				    zone != NULL;
 				    zone = list_next(&zone_active, zone)) {
 					if (zone->zone_id == GLOBAL_ZONEID)
 						continue;
+					if (zone != myzone &&
+					    (zone->zone_flags & ZF_IS_SCRATCH))
+						continue;
+					/*
+					 * Note that a label always dominates
+					 * itself, so myzone is always included
+					 * in the list.
+					 */
 					if (bldominates(mybslab,
 					    label2bslabel(zone->zone_slabel))) {
 						zoneids[domi_nzones++] =

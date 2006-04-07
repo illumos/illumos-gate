@@ -256,9 +256,17 @@ lo_mount(struct vfs *vfsp,
 		 * incorrectly appear as the global zone since it's not
 		 * under the zone rootpath.  So for zone devfs check allow
 		 * read-write mounts.
+		 *
+		 * Second special case for scratch zones used for Live Upgrade:
+		 * this is used to mount the zone's root from /root to /a in
+		 * the scratch zone.  As with the other special case, this
+		 * appears to be outside of the zone because it's not under
+		 * the zone rootpath, which is $ZONEPATH/lu in the scratch
+		 * zone case.
 		 */
 
-		if (from_zptr != to_zptr && !is_zonedevfs) {
+		if (from_zptr != to_zptr && !is_zonedevfs &&
+		    !(to_zptr->zone_flags & ZF_IS_SCRATCH)) {
 			/*
 			 * We know at this point that the labels aren't equal
 			 * because the zone pointers aren't equal, and zones

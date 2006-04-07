@@ -215,6 +215,8 @@ typedef struct zone_cmd_rval {
 
 /* zone_flags */
 #define	ZF_DESTROYED		0x1	/* ZSD destructor callbacks run */
+#define	ZF_HASHED_LABEL		0x2	/* zone has a unique label */
+#define	ZF_IS_SCRATCH		0x4	/* scratch zone */
 
 struct pool;
 
@@ -334,8 +336,8 @@ extern void zone_task_rele(zone_t *);
 extern zone_t *zone_find_by_id(zoneid_t);
 extern zone_t *zone_find_by_label(const ts_label_t *);
 extern zone_t *zone_find_by_name(char *);
-extern zone_t *zone_find_by_path(const char *);
 extern zone_t *zone_find_by_any_path(const char *, boolean_t);
+extern zone_t *zone_find_by_path(const char *);
 extern zoneid_t getzoneid(void);
 
 /*

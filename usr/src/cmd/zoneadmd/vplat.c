@@ -722,7 +722,8 @@ unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 	 * For Trusted Extensions unmount each higher level zone's mount
 	 * of our zone's /export/home
 	 */
-	tsol_unmounts(zlogp, zone_name);
+	if (!unmount_cmd)
+		tsol_unmounts(zlogp, zone_name);
 
 	if ((mnttab = fopen(MNTTAB, "r")) == NULL) {
 		zerror(zlogp, B_TRUE, "failed to open %s", MNTTAB);
@@ -1529,7 +1530,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	/*
 	 * For Trusted Extensions cross-mount each lower level /export/home
 	 */
-	if (tsol_mounts(zlogp, zone_name, rootpath) != 0)
+	if (!mount_cmd && tsol_mounts(zlogp, zone_name, rootpath) != 0)
 		goto bad;
 
 	free_fs_data(fs_ptr, num_fs);
@@ -2915,12 +2916,10 @@ again:
 
 
 		if (zone_get_state(zid_name, &zid_state) != Z_OK ||
-		    (zid_state != ZONE_STATE_MOUNTED &&
-		    zid_state != ZONE_STATE_RUNNING)) {
-
+		    (zid_state != ZONE_STATE_READY &&
+		    zid_state != ZONE_STATE_RUNNING))
 			/* Skip over zones without mounted filesystems */
 			continue;
-		}
 
 		if (zone_getattr(zids[i], ZONE_ATTR_SLBL, zid_label,
 		    sizeof (m_label_t)) < 0)
@@ -3402,9 +3401,9 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		goto error;
 	}
 
-	if (is_system_labeled()) {
+	if (!mount_cmd && is_system_labeled()) {
 		zcent = get_zone_label(zlogp, privs);
-		if (zcent) {
+		if (zcent != NULL) {
 			match = zcent->zc_match;
 			doi = zcent->zc_doi;
 			*zlabel = zcent->zc_label;
@@ -3520,7 +3519,8 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (!mount_cmd && bind_to_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "WARNING: unable to bind zone to "
 		    "requested pool; using default pool.");
-	set_mlps(zlogp, zoneid, zcent);
+	if (!mount_cmd)
+		set_mlps(zlogp, zoneid, zcent);
 	rval = zoneid;
 	zoneid = -1;
 
