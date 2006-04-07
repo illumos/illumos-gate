@@ -464,7 +464,8 @@ uint64_t dmu_object_max_nonzero_offset(objset_t *os, uint64_t object);
 typedef struct dmu_objset_stats {
 	dmu_objset_type_t dds_type;
 	uint8_t dds_is_snapshot;
-	uint8_t dds_pad[3];
+	uint8_t dds_inconsistent;
+	uint8_t dds_pad[2];
 
 	uint64_t dds_creation_time;
 	uint64_t dds_creation_txg;

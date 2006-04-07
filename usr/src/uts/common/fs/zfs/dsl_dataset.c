@@ -694,14 +694,14 @@ dsl_dataset_destroy(const char *name)
 			VERIFY(0 == dmu_object_free(os, obj, tx));
 			dmu_tx_commit(tx);
 		}
+		/* Make sure it's not dirty before we finish destroying it. */
+		txg_wait_synced(dd->dd_pool, 0);
+
 		dmu_objset_close(os);
 		if (err != ESRCH) {
 			dsl_dir_close(dd, FTAG);
 			return (err);
 		}
-
-		/* Make sure it's not dirty before we finish destroying it. */
-		txg_wait_synced(dd->dd_pool, 0);
 
 		/*
 		 * Blow away the dsl_dir + head dataset.
@@ -1424,6 +1424,7 @@ dsl_dataset_stats(dsl_dataset_t *ds, dmu_objset_stats_t *dds)
 		dds->dds_num_clones = ds->ds_phys->ds_num_children - 1;
 	}
 
+	dds->dds_inconsistent = ds->ds_phys->ds_inconsistent;
 	dds->dds_last_txg = ds->ds_phys->ds_bp.blk_birth;
 
 	dds->dds_objects_used = ds->ds_phys->ds_bp.blk_fill;

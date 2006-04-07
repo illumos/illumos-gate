@@ -335,18 +335,14 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	/*
 	 * We don't need to use any locking to check for dirtyness
 	 * because it's OK if we get stale data -- the dnode may become
-	 * dirty immediately after our check anyway.  However, we need
-	 * the lock to ensure that the link isn't changing while we call
-	 * list_link_active(), to satisfy its assertions.  This is just
-	 * a means to avoid the expensive count when we aren't sure we
+	 * dirty immediately after our check anyway.  This is just a
+	 * means to avoid the expensive count when we aren't sure we
 	 * need it.  We need to be able to deal with a dirty dnode.
 	 */
-	mutex_enter(&dn->dn_objset->os_lock);
 	dirty = list_link_active(&dn->dn_dirty_link[0]) |
 	    list_link_active(&dn->dn_dirty_link[1]) |
 	    list_link_active(&dn->dn_dirty_link[2]) |
 	    list_link_active(&dn->dn_dirty_link[3]);
-	mutex_exit(&dn->dn_objset->os_lock);
 	if (dirty || dn->dn_assigned_tx || dn->dn_phys->dn_nlevels == 0)
 		return;
 

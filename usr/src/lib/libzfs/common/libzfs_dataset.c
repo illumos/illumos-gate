@@ -234,11 +234,54 @@ make_dataset_handle(const char *path)
 {
 	zfs_handle_t *zhp = zfs_malloc(sizeof (zfs_handle_t));
 
+top:
 	(void) strlcpy(zhp->zfs_name, path, sizeof (zhp->zfs_name));
 
 	if (get_stats(zhp) != 0) {
 		free(zhp);
 		return (NULL);
+	}
+
+	if (zhp->zfs_dmustats.dds_inconsistent) {
+		zfs_cmd_t zc = { 0 };
+		int err;
+
+		/*
+		 * If it is dds_inconsistent, then we've caught it in
+		 * the middle of a 'zfs receive' or 'zfs destroy', and
+		 * it is inconsistent from the ZPL's point of view, so
+		 * can't be mounted.  However, it could also be that we
+		 * have crashed in the middle of one of those
+		 * operations, in which case we need to get rid of the
+		 * inconsistent state.  We do that by either rolling
+		 * back to the previous snapshot (which will fail if
+		 * there is none), or destroying the filesystem.  Note
+		 * that if we are still in the middle of an active
+		 * 'receive' or 'destroy', then the rollback and destroy
+		 * will fail with EBUSY and we will drive on as usual.
+		 */
+
+		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+
+		if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+			(void) zvol_remove_link(zhp->zfs_name);
+			zc.zc_objset_type = DMU_OST_ZVOL;
+		} else {
+			zc.zc_objset_type = DMU_OST_ZFS;
+		}
+
+		/* If we can successfully roll it back, reget the stats */
+		if (zfs_ioctl(ZFS_IOC_ROLLBACK, &zc) == 0)
+			goto top;
+		/*
+		 * If we can sucessfully destroy it, pretend that it
+		 * never existed.
+		 */
+		if (zfs_ioctl(ZFS_IOC_DESTROY, &zc) == 0) {
+			free(zhp);
+			errno = ENOENT;
+			return (NULL);
+		}
 	}
 
 	/*
