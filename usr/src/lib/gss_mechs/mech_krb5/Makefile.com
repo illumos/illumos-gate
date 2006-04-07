@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -463,7 +463,7 @@ OS_FLAGS = -DHAVE_LIBSOCKET -DHAVE_LIBNSL -DTIME_WITH_SYS_TIME \
 	-DHAVE_ERRNO -DHAVE_STRFTIME -DHAVE_STRPTIME -DHAVE_STRERROR \
 	-DHAVE_STAT -DSIZEOF_INT=4 -DPROVIDE_KERNEL_IMPORT \
 	-DHAVE_STDINT_H -DPOSIX_SIGNALS -DHAVE_GETENV -DHAVE_SETENV \
-	-DHAVE_UNSETENV -DHAVE_FCHMOD
+	-DHAVE_UNSETENV -DHAVE_FCHMOD -DHAVE_STRUCT_LIFCONF
 
 CPPFLAGS += -I$(REL_PATH)krb5/ccache/file $(OS_FLAGS)
 

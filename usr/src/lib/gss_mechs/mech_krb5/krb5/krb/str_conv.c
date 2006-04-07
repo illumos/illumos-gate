@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,14 +161,18 @@ krb5_string_to_timestamp(char *string, krb5_timestamp *timestampp)
     struct tm timebuf;
     time_t now, ret_time;
     char *s;
+/*
+ * Solaris Kerberos:
+ * The format strings shouldn't conflict with SCCS keywords
+ */
     static const char * const atime_format_table[] = {
-	"%Y%m%d%H%M%S",		/* yyyymmddhhmmss		*/
+	"%Y" "%m" "%d" "%H" "%M" "%S",		/* yyyymmddhhmmss */
 	"%Y.%m.%d.%H.%M.%S",	/* yyyy.mm.dd.hh.mm.ss		*/
-	"%y%m%d%H%M%S",		/* yymmddhhmmss			*/
+	"%y" "%m" "%d" "%H" "%M" "%S",		/* yymmddhhmmss	*/
 	"%y.%m.%d.%H.%M.%S",	/* yy.mm.dd.hh.mm.ss		*/
-	"%y%m%d%H%M",		/* yymmddhhmm			*/
-	"%H%M%S",		/* hhmmss			*/
-	"%H%M",			/* hhmm				*/
+	"%y" "%m" "%d" "%H" "%M",		/* yymmddhhmm		*/
+	"%H" "%M" "%S",		/* hhmmss			*/
+	"%H" "%M",			/* hhmm				*/
 	"%T",			/* hh:mm:ss			*/
 	"%R",			/* hh:mm			*/
 	/* The following not really supported unless native strptime present */
