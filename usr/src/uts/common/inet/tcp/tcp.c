@@ -15309,9 +15309,21 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 			syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
 			    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 			if (syn_mp) {
+				cred_t *cr;
 				pid_t pid;
 
-				if (mp->b_cont == NULL) {
+				/*
+				 * Obtain the credential from the
+				 * thread calling connect(); the credential
+				 * lives on in the second mblk which
+				 * originated from T_CONN_REQ and is echoed
+				 * with the T_BIND_ACK from ip.  If none
+				 * can be found, default to the creator
+				 * of the socket.
+				 */
+				if (mp->b_cont == NULL ||
+				    (cr = DB_CRED(mp->b_cont)) == NULL) {
+					cr = tcp->tcp_cred;
 					pid = tcp->tcp_cpid;
 				} else {
 					pid = DB_CPID(mp->b_cont);
@@ -15319,6 +15331,7 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 
 				TCP_RECORD_TRACE(tcp, syn_mp,
 				    TCP_TRACE_SEND_PKT);
+				mblk_setcred(syn_mp, cr);
 				DB_CPID(syn_mp) = pid;
 				tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 			}
@@ -18169,7 +18182,8 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
-	mblk_setcred(mp, CONN_CRED(connp));
+	if (DB_CRED(mp) == NULL)
+		mblk_setcred(mp, CONN_CRED(connp));
 
 	ipha = (ipha_t *)mp->b_rptr;
 	src = ipha->ipha_src;
