@@ -328,6 +328,10 @@ function zpool_remove_zvol_links
 version SUNWprivate_1.1
 end
 
+function zpool_upgrade
+version SUNWprivate_1.1
+end
+
 function zpool_vdev_online
 version SUNWprivate_1.1
 end

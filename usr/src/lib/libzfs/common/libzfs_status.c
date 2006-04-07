@@ -177,11 +177,21 @@ check_status(nvlist_t *config, int isimport)
 	vdev_stat_t *vs;
 	uint_t vsc;
 	uint64_t nerr;
+	uint64_t version;
 
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
+	    &version) == 0);
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
 	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
 	    (uint64_t **)&vs, &vsc) == 0);
+
+	/*
+	 * Newer on-disk version.
+	 */
+	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
+	    vs->vs_aux == VDEV_AUX_VERSION_NEWER)
+		return (ZPOOL_STATUS_VERSION_NEWER);
 
 	/*
 	 * Check that the config is complete.
@@ -244,11 +254,10 @@ check_status(nvlist_t *config, int isimport)
 		return (ZPOOL_STATUS_RESILVERING);
 
 	/*
-	 * We currently have no way to detect the following errors:
-	 *
-	 * 	CORRUPT_CACHE
-	 * 	VERSION_MISMATCH
+	 * Outdated, but usable, version
 	 */
+	if (version < ZFS_VERSION)
+		return (ZPOOL_STATUS_VERSION_OLDER);
 
 	return (ZPOOL_STATUS_OK);
 }

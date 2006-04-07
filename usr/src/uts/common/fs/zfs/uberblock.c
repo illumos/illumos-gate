@@ -50,8 +50,11 @@ uberblock_update(uberblock_t *ub, vdev_t *rvd, uint64_t txg)
 {
 	ASSERT(ub->ub_txg < txg);
 
+	/*
+	 * We explicitly do not set ub_version here, so that older versions
+	 * continue to be written with the previous uberblock version.
+	 */
 	ub->ub_magic = UBERBLOCK_MAGIC;
-	ub->ub_version = UBERBLOCK_VERSION;
 	ub->ub_txg = txg;
 	ub->ub_guid_sum = rvd->vdev_guid_sum;
 	ub->ub_timestamp = gethrestime_sec();

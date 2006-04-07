@@ -293,6 +293,26 @@ add_config(pool_list_t *pl, const char *path, nvlist_t *config)
 }
 
 /*
+ * Returns true if the named pool matches the given GUID.
+ */
+boolean_t
+pool_active(const char *name, uint64_t guid)
+{
+	zpool_handle_t *zhp;
+	uint64_t theguid;
+
+	if ((zhp = zpool_open_silent(name)) == NULL)
+		return (B_FALSE);
+
+	verify(nvlist_lookup_uint64(zhp->zpool_config, ZPOOL_CONFIG_POOL_GUID,
+	    &theguid) == 0);
+
+	zpool_close(zhp);
+
+	return (theguid == guid);
+}
+
+/*
  * Convert our list of pools into the definitive set of configurations.  We
  * start by picking the best config for each toplevel vdev.  Once that's done,
  * we assemble the toplevel vdevs into a full config for the pool.  We make a
@@ -481,9 +501,7 @@ get_configs(pool_list_t *pl)
 		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 		    &guid) == 0);
 
-		(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
-		if (zfs_ioctl(ZFS_IOC_POOL_GUID, &zc) == 0 &&
-		    guid == zc.zc_guid) {
+		if (pool_active(name, guid)) {
 			nvlist_free(config);
 			continue;
 		}
@@ -706,7 +724,6 @@ zpool_in_use(int fd, pool_state_t *state, char **namestr)
 	nvlist_t *config;
 	char *name;
 	int ret;
-	zfs_cmd_t zc = { 0 };
 	uint64_t guid, vdev_guid;
 	zpool_handle_t *zhp;
 	nvlist_t *pool_config;
@@ -732,16 +749,12 @@ zpool_in_use(int fd, pool_state_t *state, char **namestr)
 	case POOL_STATE_ACTIVE:
 		/*
 		 * For an active pool, we have to determine if it's really part
-		 * of an active pool (in which case the pool will exist and the
-		 * guid will be the same), or whether it's part of an active
-		 * pool that was disconnected without being explicitly exported.
-		 *
-		 * We use the direct ioctl() first to avoid triggering an error
-		 * message if the pool cannot be opened.
+		 * of a currently active pool (in which case the pool will exist
+		 * and the guid will be the same), or whether it's part of an
+		 * active pool that was disconnected without being explicitly
+		 * exported.
 		 */
-		(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
-		if (zfs_ioctl(ZFS_IOC_POOL_GUID, &zc) == 0 &&
-		    guid == zc.zc_guid) {
+		if (pool_active(name, guid)) {
 			/*
 			 * Because the device may have been removed while
 			 * offlined, we only report it as active if the vdev is

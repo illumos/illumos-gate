@@ -235,7 +235,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 
 	objset_t	*os = zfsvfs->z_os;
 	uint64_t	zoid;
-	uint64_t	version = ZFS_VERSION;
+	uint64_t	version = ZPL_VERSION;
 	int		i, error;
 	dmu_object_info_t doi;
 	dmu_objset_stats_t *stats;
@@ -258,15 +258,15 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		dmu_tx_commit(tx);
 	}
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_VERSION_OBJ, 8, 1,
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_OBJ, 8, 1,
 	    &version);
 	if (error) {
 		return (error);
-	} else if (version != ZFS_VERSION) {
+	} else if (version != ZPL_VERSION) {
 		(void) printf("Mismatched versions:  File system "
 		    "is version %lld on-disk format, which is "
 		    "incompatible with this software version %lld!",
-		    (u_longlong_t)version, ZFS_VERSION);
+		    (u_longlong_t)version, ZPL_VERSION);
 		return (ENOTSUP);
 	}
 
@@ -942,7 +942,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 {
 	zfsvfs_t	zfsvfs;
 	uint64_t	moid, doid, roid = 0;
-	uint64_t	version = ZFS_VERSION;
+	uint64_t	version = ZPL_VERSION;
 	int		error;
 	znode_t		*rootzp = NULL;
 	vnode_t		*vp;
@@ -964,7 +964,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 	 * Set starting attributes.
 	 */
 
-	error = zap_update(os, moid, ZFS_VERSION_OBJ, 8, 1, &version, tx);
+	error = zap_update(os, moid, ZPL_VERSION_OBJ, 8, 1, &version, tx);
 	ASSERT(error == 0);
 
 	/*

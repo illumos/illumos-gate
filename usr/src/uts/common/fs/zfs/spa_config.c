@@ -279,7 +279,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_VERSION,
-	    UBERBLOCK_VERSION) == 0);
+	    spa->spa_uberblock.ub_version) == 0);
 	VERIFY(nvlist_add_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    spa_name(spa)) == 0);
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_POOL_STATE,

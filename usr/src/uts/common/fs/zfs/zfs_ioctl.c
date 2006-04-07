@@ -424,20 +424,6 @@ zfs_ioc_pool_configs(zfs_cmd_t *zc)
 }
 
 static int
-zfs_ioc_pool_guid(zfs_cmd_t *zc)
-{
-	spa_t *spa;
-	int error;
-
-	error = spa_open(zc->zc_name, &spa, FTAG);
-	if (error == 0) {
-		zc->zc_guid = spa_guid(spa);
-		spa_close(spa, FTAG);
-	}
-	return (error);
-}
-
-static int
 zfs_ioc_pool_stats(zfs_cmd_t *zc)
 {
 	nvlist_t *config;
@@ -539,6 +525,20 @@ zfs_ioc_pool_freeze(zfs_cmd_t *zc)
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error == 0) {
 		spa_freeze(spa);
+		spa_close(spa, FTAG);
+	}
+	return (error);
+}
+
+static int
+zfs_ioc_pool_upgrade(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	int error;
+
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error == 0) {
+		spa_upgrade(spa);
 		spa_close(spa, FTAG);
 	}
 	return (error);
@@ -1182,11 +1182,11 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_import,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_export,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_configs,		zfs_secpolicy_none,	no_name },
-	{ zfs_ioc_pool_guid,		zfs_secpolicy_read,	pool_name },
 	{ zfs_ioc_pool_stats,		zfs_secpolicy_read,	pool_name },
 	{ zfs_ioc_pool_tryimport,	zfs_secpolicy_config,	no_name },
 	{ zfs_ioc_pool_scrub,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_freeze,		zfs_secpolicy_config,	no_name },
+	{ zfs_ioc_pool_upgrade,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_add,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_remove,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_online,		zfs_secpolicy_config,	pool_name },

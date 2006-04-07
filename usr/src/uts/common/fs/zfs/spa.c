@@ -326,6 +326,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * If we weren't able to find a single valid uberblock, return failure.
 	 */
 	if (ub->ub_txg == 0) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
 		error = ENXIO;
 		goto out;
 	}
@@ -333,7 +335,9 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	/*
 	 * If the pool is newer than the code, we can't open it.
 	 */
-	if (ub->ub_version > UBERBLOCK_VERSION) {
+	if (ub->ub_version > ZFS_VERSION) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_VERSION_NEWER);
 		error = ENOTSUP;
 		goto out;
 	}
@@ -729,6 +733,7 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	spa_activate(spa);
 
 	spa->spa_uberblock.ub_txg = txg - 1;
+	spa->spa_uberblock.ub_version = ZFS_VERSION;
 	spa->spa_ubsync = spa->spa_uberblock;
 
 	/*
@@ -2266,4 +2271,22 @@ vdev_t *
 spa_lookup_by_guid(spa_t *spa, uint64_t guid)
 {
 	return (vdev_lookup_by_guid(spa->spa_root_vdev, guid));
+}
+
+void
+spa_upgrade(spa_t *spa)
+{
+	spa_config_enter(spa, RW_WRITER, FTAG);
+
+	/*
+	 * This should only be called for a non-faulted pool, and since a
+	 * future version would result in an unopenable pool, this shouldn't be
+	 * possible.
+	 */
+	ASSERT(spa->spa_uberblock.ub_version <= ZFS_VERSION);
+
+	spa->spa_uberblock.ub_version = ZFS_VERSION;
+	vdev_config_dirty(spa->spa_root_vdev);
+
+	spa_config_exit(spa, FTAG);
 }

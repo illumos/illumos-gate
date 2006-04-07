@@ -1590,3 +1590,28 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t ***list, size_t *nelem)
 
 	return (0);
 }
+
+/*
+ * Upgrade a ZFS pool to the latest on-disk version.
+ */
+int
+zpool_upgrade(zpool_handle_t *zhp)
+{
+	zfs_cmd_t zc = { 0 };
+
+	(void) strcpy(zc.zc_name, zhp->zpool_name);
+	if (zfs_ioctl(ZFS_IOC_POOL_UPGRADE, &zc) != 0) {
+		switch (errno) {
+		case EPERM:
+			zfs_error(dgettext(TEXT_DOMAIN, "cannot upgrade '%s': "
+			    "permission denied"), zhp->zpool_name);
+			break;
+		default:
+			zfs_baderror(errno);
+		}
+
+		return (-1);
+	}
+
+	return (0);
+}

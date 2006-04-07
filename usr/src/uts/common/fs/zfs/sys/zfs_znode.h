@@ -58,7 +58,7 @@ extern "C" {
 #define	ZFS_FSID		"FSID"
 #define	ZFS_DELETE_QUEUE	"DELETE_QUEUE"
 #define	ZFS_ROOT_OBJ		"ROOT"
-#define	ZFS_VERSION_OBJ		"VERSION"
+#define	ZPL_VERSION_OBJ		"VERSION"
 #define	ZFS_PROP_BLOCKPERPAGE	"BLOCKPERPAGE"
 #define	ZFS_PROP_NOGROWBLOCKS	"NOGROWBLOCKS"
 
@@ -66,11 +66,11 @@ extern "C" {
 #define	ZFS_FLAG_NOGROWBLOCKS	0x2
 
 /*
- * ZFS version - rev'd whenever an incompatible on-disk format change
+ * ZPL version - rev'd whenever an incompatible on-disk format change
  * occurs.  Independent of SPA/DMU/ZAP versioning.
  */
 
-#define	ZFS_VERSION		1ULL
+#define	ZPL_VERSION		1ULL
 
 #define	ZFS_MAX_BLOCKSIZE	(SPA_MAXBLOCKSIZE)
 

@@ -45,12 +45,11 @@ extern "C" {
  * expect the magic number in the first word won't work.
  */
 #define	UBERBLOCK_MAGIC		0x00bab10c		/* oo-ba-bloc!	*/
-#define	UBERBLOCK_VERSION	1ULL
 #define	UBERBLOCK_SHIFT		10			/* up to 1K	*/
 
 struct uberblock {
 	uint64_t	ub_magic;	/* UBERBLOCK_MAGIC		*/
-	uint64_t	ub_version;	/* UBERBLOCK_VERSION		*/
+	uint64_t	ub_version;	/* ZFS_VERSION			*/
 	uint64_t	ub_txg;		/* txg of last sync		*/
 	uint64_t	ub_guid_sum;	/* sum of all vdev guids	*/
 	uint64_t	ub_timestamp;	/* UTC time of last sync	*/

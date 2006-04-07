@@ -397,6 +397,7 @@ extern void spa_strfree(char *);
 extern uint64_t spa_get_random(uint64_t range);
 extern void sprintf_blkptr(char *buf, int len, blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
+extern void spa_upgrade(spa_t *spa);
 extern void spa_evict_all(void);
 extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid);
 

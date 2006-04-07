@@ -108,13 +108,14 @@ typedef enum {
 	ZPOOL_STATUS_CORRUPT_POOL,	/* pool metadata is corrupted */
 	ZPOOL_STATUS_CORRUPT_DATA,	/* data errors in user (meta)data */
 	ZPOOL_STATUS_FAILING_DEV,	/* device experiencing errors */
-	ZPOOL_STATUS_VERSION_MISMATCH,	/* bad on-disk version */
+	ZPOOL_STATUS_VERSION_NEWER,	/* newer on-disk version */
 
 	/*
 	 * The following are not faults per se, but still an error possibly
 	 * requiring administrative attention.  There is no corresponding
 	 * message ID.
 	 */
+	ZPOOL_STATUS_VERSION_OLDER,	/* older on-disk version */
 	ZPOOL_STATUS_RESILVERING,	/* device being resilvered */
 	ZPOOL_STATUS_OFFLINE_DEV,	/* device online */
 
@@ -153,6 +154,7 @@ extern nvlist_t *zpool_find_import(int, char **);
  * Miscellaneous pool functions
  */
 extern char *zpool_vdev_name(zpool_handle_t *, nvlist_t *);
+extern int zpool_upgrade(zpool_handle_t *);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the

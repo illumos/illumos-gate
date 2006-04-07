@@ -107,6 +107,11 @@ const char *zfs_prop_default_string(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 
 /*
+ * On-disk format version.
+ */
+#define	ZFS_VERSION			1ULL
+
+/*
  * The following are configuration names used in the nvlist describing a pool's
  * configuration.
  */
@@ -183,7 +188,9 @@ typedef enum vdev_aux {
 	VDEV_AUX_NO_REPLICAS,	/* insufficient number of replicas	*/
 	VDEV_AUX_BAD_GUID_SUM,	/* vdev guid sum doesn't match		*/
 	VDEV_AUX_TOO_SMALL,	/* vdev size is too small		*/
-	VDEV_AUX_BAD_LABEL	/* the label is OK but invalid		*/
+	VDEV_AUX_BAD_LABEL,	/* the label is OK but invalid		*/
+	VDEV_AUX_VERSION_NEWER,	/* on-disk version is too new		*/
+	VDEV_AUX_VERSION_OLDER	/* on-disk version is too old		*/
 } vdev_aux_t;
 
 /*
@@ -279,11 +286,11 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_IMPORT,
 	ZFS_IOC_POOL_EXPORT,
 	ZFS_IOC_POOL_CONFIGS,
-	ZFS_IOC_POOL_GUID,
 	ZFS_IOC_POOL_STATS,
 	ZFS_IOC_POOL_TRYIMPORT,
 	ZFS_IOC_POOL_SCRUB,
 	ZFS_IOC_POOL_FREEZE,
+	ZFS_IOC_POOL_UPGRADE,
 	ZFS_IOC_VDEV_ADD,
 	ZFS_IOC_VDEV_REMOVE,
 	ZFS_IOC_VDEV_ONLINE,

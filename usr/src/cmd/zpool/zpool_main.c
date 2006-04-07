@@ -69,6 +69,8 @@ static int zpool_do_scrub(int, char **);
 static int zpool_do_import(int, char **);
 static int zpool_do_export(int, char **);
 
+static int zpool_do_upgrade(int, char **);
+
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
  * debugging facilities.
@@ -100,7 +102,8 @@ typedef enum {
 	HELP_ONLINE,
 	HELP_REPLACE,
 	HELP_SCRUB,
-	HELP_STATUS
+	HELP_STATUS,
+	HELP_UPGRADE
 } zpool_help_t;
 
 
@@ -141,6 +144,7 @@ static zpool_command_t command_table[] = {
 	{ NULL },
 	{ "import",	zpool_do_import,	HELP_IMPORT		},
 	{ "export",	zpool_do_export,	HELP_EXPORT		},
+	{ "upgrade",	zpool_do_upgrade,	HELP_UPGRADE		}
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -188,6 +192,10 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tscrub [-s] <pool> ...\n"));
 	case HELP_STATUS:
 		return (gettext("\tstatus [-vx] [pool] ...\n"));
+	case HELP_UPGRADE:
+		return (gettext("\tupgrade\n"
+		    "\tupgrade -v\n"
+		    "\tupgrade <-a | pool>\n"));
 	}
 
 	abort();
@@ -793,6 +801,10 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 			(void) printf(gettext("insufficient replicas"));
 			break;
 
+		case VDEV_AUX_VERSION_NEWER:
+			(void) printf(gettext("newer version"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
@@ -882,6 +894,16 @@ show_import(nvlist_t *config)
 		    "corrupted.\n"));
 		break;
 
+	case ZPOOL_STATUS_VERSION_OLDER:
+		(void) printf(gettext("status: The pool is formatted using an "
+		    "older on-disk version.\n"));
+		break;
+
+	case ZPOOL_STATUS_VERSION_NEWER:
+		(void) printf(gettext("status: The pool is formatted using an "
+		    "incompatible version.\n"));
+		break;
+
 	default:
 		/*
 		 * No other status can be seen when importing pools.
@@ -893,40 +915,48 @@ show_import(nvlist_t *config)
 	 * Print out an action according to the overall state of the pool.
 	 */
 	if (strcmp(health, gettext("ONLINE")) == 0) {
-		(void) printf(gettext("action: The pool can be imported"
-		    " using its name or numeric identifier."));
-	if (pool_state == POOL_STATE_DESTROYED)
-		(void) printf(gettext("  The\n\tpool was destroyed, "
-		    "but can be imported using the '-Df' flags.\n"));
-		else if (pool_state != POOL_STATE_EXPORTED)
-			(void) printf(gettext("  The\n\tpool may be active on "
-			    "on another system, but can be imported using\n\t"
-			    "the '-f' flag.\n"));
+		if (reason == ZPOOL_STATUS_VERSION_OLDER)
+			(void) printf(gettext("action: The pool can be "
+			    "imported using its name or numeric identifier, "
+			    "though\n\tsome features will not be available "
+			    "without an explicit 'zpool upgrade'.\n"));
 		else
-			(void) printf("\n");
+			(void) printf(gettext("action: The pool can be "
+			    "imported using its name or numeric "
+			    "identifier.\n"));
 	} else if (strcmp(health, gettext("DEGRADED")) == 0) {
 		(void) printf(gettext("action: The pool can be imported "
 		    "despite missing or damaged devices.  The\n\tfault "
-		    "tolerance of the pool may be compromised if imported."));
-		if (pool_state == POOL_STATE_DESTROYED)
-			(void) printf(gettext("  The\n\tpool was destroyed, "
-			    "but can be imported using the '-Df' flags.\n"));
-		else if (pool_state != POOL_STATE_EXPORTED)
-			(void) printf(gettext("  The\n\tpool may be active on "
-			    "on another system, but can be imported using\n\t"
-			    "the '-f' flag.\n"));
-		else
-			(void) printf("\n");
+		    "tolerance of the pool may be compromised if imported.\n"));
 	} else {
-		if (reason == ZPOOL_STATUS_MISSING_DEV_R ||
-		    reason == ZPOOL_STATUS_MISSING_DEV_NR ||
-		    reason == ZPOOL_STATUS_BAD_GUID_SUM)
+		switch (reason) {
+		case ZPOOL_STATUS_VERSION_NEWER:
+			(void) printf(gettext("action: The pool cannot be "
+			    "imported.  Access the pool on a system running "
+			    "newer\n\tsoftware, or recreate the pool from "
+			    "backup.\n"));
+			break;
+		case ZPOOL_STATUS_MISSING_DEV_R:
+		case ZPOOL_STATUS_MISSING_DEV_NR:
+		case ZPOOL_STATUS_BAD_GUID_SUM:
 			(void) printf(gettext("action: The pool cannot be "
 			    "imported. Attach the missing\n\tdevices and try "
 			    "again.\n"));
-		else
+			break;
+		default:
 			(void) printf(gettext("action: The pool cannot be "
 			    "imported due to damaged devices or data.\n"));
+		}
+	}
+
+	if (strcmp(health, gettext("FAULTED")) != 0) {
+		if (pool_state == POOL_STATE_DESTROYED)
+			(void) printf(gettext("\tThe pool was destroyed, "
+			    "but can be imported using the '-Df' flags.\n"));
+		else if (pool_state != POOL_STATE_EXPORTED)
+			(void) printf(gettext("\tThe pool may be active on "
+			    "on another system, but can be imported using\n\t"
+			    "the '-f' flag.\n"));
 	}
 
 	if (msgid != NULL)
@@ -959,13 +989,20 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	zpool_handle_t *zhp;
 	char *name;
 	uint64_t state;
+	uint64_t version;
 
 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    &name) == 0);
 
 	verify(nvlist_lookup_uint64(config,
 	    ZPOOL_CONFIG_POOL_STATE, &state) == 0);
-	if (state != POOL_STATE_EXPORTED && !force) {
+	verify(nvlist_lookup_uint64(config,
+	    ZPOOL_CONFIG_VERSION, &version) == 0);
+	if (version > ZFS_VERSION) {
+		(void) fprintf(stderr, gettext("cannot import '%s': pool "
+		    "is formatted using a newer ZFS version\n"), name);
+		return (1);
+	} else if (state != POOL_STATE_EXPORTED && !force) {
 		(void) fprintf(stderr, gettext("cannot import '%s': pool "
 		    "may be in use from other system\n"), name);
 		(void) fprintf(stderr, gettext("use '-f' to import anyway\n"));
@@ -2324,6 +2361,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			(void) printf(gettext("insufficient replicas"));
 			break;
 
+		case VDEV_AUX_VERSION_NEWER:
+			(void) printf(gettext("newer version"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
@@ -2529,6 +2570,24 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "from a backup source.\n"));
 		break;
 
+	case ZPOOL_STATUS_VERSION_OLDER:
+		(void) printf(gettext("status: The pool is formatted using an "
+		    "older on-disk format.  The pool can\n\tstill be used, but "
+		    "some features are unavailable.\n"));
+		(void) printf(gettext("action: Upgrade the pool using 'zpool "
+		    "upgrade'.  Once this is done, the\n\tpool will no longer "
+		    "be accessible on older software versions.\n"));
+		break;
+
+	case ZPOOL_STATUS_VERSION_NEWER:
+		(void) printf(gettext("status: The pool has been upgraded to a "
+		    "newer, incompatible on-disk version.\n\tThe pool cannot "
+		    "be accessed on this system.\n"));
+		(void) printf(gettext("action: Access the pool from a system "
+		    "running more recent software, or\n\trestore the pool from "
+		    "backup.\n"));
+		break;
+
 	default:
 		/*
 		 * The remaining errors can't actually be generated, yet.
@@ -2639,6 +2698,191 @@ zpool_do_status(int argc, char **argv)
 				(void) printf(gettext("pool '%s' is healthy\n"),
 				    argv[i]);
 		}
+	}
+
+	return (ret);
+}
+
+typedef struct upgrade_cbdata {
+	int	cb_all;
+	int	cb_first;
+	int	cb_newer;
+} upgrade_cbdata_t;
+
+static int
+upgrade_cb(zpool_handle_t *zhp, void *arg)
+{
+	upgrade_cbdata_t *cbp = arg;
+	nvlist_t *config;
+	uint64_t version;
+	int ret = 0;
+
+	config = zpool_get_config(zhp, NULL);
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
+	    &version) == 0);
+
+	if (!cbp->cb_newer && version < ZFS_VERSION) {
+		if (!cbp->cb_all) {
+			if (cbp->cb_first) {
+				(void) printf(gettext("The following pools are "
+				    "out of date, and can be upgraded.  After "
+				    "being\nupgraded, these pools will no "
+				    "longer be accessible by older software "
+				    "versions.\n\n"));
+				(void) printf(gettext("VER  POOL\n"));
+				(void) printf(gettext("---  ------------\n"));
+				cbp->cb_first = FALSE;
+			}
+
+			(void) printf("%2llu   %s\n", version,
+			    zpool_get_name(zhp));
+		} else {
+			cbp->cb_first = FALSE;
+			ret = zpool_upgrade(zhp);
+			if (ret == 0)
+				(void) printf(gettext("Successfully upgraded "
+				    "'%s'\n"), zpool_get_name(zhp));
+		}
+	} else if (cbp->cb_newer && version > ZFS_VERSION) {
+		assert(!cbp->cb_all);
+
+		if (cbp->cb_first) {
+			(void) printf(gettext("The following pools are "
+			    "formatted using a newer software version and\n"
+			    "cannot be accessed on the current system.\n\n"));
+			(void) printf(gettext("VER  POOL\n"));
+			(void) printf(gettext("---  ------------\n"));
+			cbp->cb_first = FALSE;
+		}
+
+		(void) printf("%2llu   %s\n", version,
+		    zpool_get_name(zhp));
+	}
+
+	zpool_close(zhp);
+	return (ret);
+}
+
+/* ARGSUSED */
+static int
+upgrade_one(zpool_handle_t *zhp, void *unused)
+{
+	nvlist_t *config;
+	uint64_t version;
+	int ret;
+
+	config = zpool_get_config(zhp, NULL);
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
+	    &version) == 0);
+
+	if (version == ZFS_VERSION) {
+		(void) printf(gettext("Pool '%s' is already formatted "
+		    "using the current version.\n"), zpool_get_name(zhp));
+		return (0);
+	}
+
+	ret = zpool_upgrade(zhp);
+	if (ret == 0)
+		(void) printf(gettext("Successfully upgraded '%s'\n"),
+		    zpool_get_name(zhp));
+
+	return (ret != 0);
+}
+
+/*
+ * zpool upgrade
+ * zpool upgrade -v
+ * zpool upgrade <-a | pool>
+ *
+ * With no arguments, display downrev'd ZFS pool available for upgrade.
+ * Individual pools can be upgraded by specifying the pool, and '-a' will
+ * upgrade all pools.
+ */
+int
+zpool_do_upgrade(int argc, char **argv)
+{
+	int c;
+	upgrade_cbdata_t cb = { 0 };
+	int ret = 0;
+	boolean_t showversions = B_FALSE;
+
+	/* check options */
+	while ((c = getopt(argc, argv, "av")) != -1) {
+		switch (c) {
+		case 'a':
+			cb.cb_all = TRUE;
+			break;
+		case 'v':
+			showversions = B_TRUE;
+			break;
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(FALSE);
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (showversions) {
+		if (cb.cb_all || argc != 0) {
+			(void) fprintf(stderr, gettext("-v option is "
+			    "incompatible with other arguments\n"));
+			usage(FALSE);
+		}
+	} else if (cb.cb_all) {
+		if (argc != 0) {
+			(void) fprintf(stderr, gettext("-a option is "
+			    "incompatible with other arguments\n"));
+			usage(FALSE);
+		}
+	}
+
+	(void) printf(gettext("This system is currently running ZFS version "
+	    "%llu.\n\n"), ZFS_VERSION);
+	cb.cb_first = TRUE;
+	if (showversions) {
+		(void) printf(gettext("The following versions are "
+		    "suppored:\n\n"));
+		(void) printf(gettext("VER  DESCRIPTION\n"));
+		(void) printf("---  -----------------------------------------"
+		    "---------------\n");
+		(void) printf(gettext(" 1   Initial ZFS version.\n\n"));
+		(void) printf(gettext("For more information on a particular "
+		    "version, including supported releases, see:\n\n"));
+		(void) printf("http://www.opensolaris.org/os/community/zfs/"
+		    "version/N\n\n");
+		(void) printf(gettext("Where 'N' is the version number.\n"));
+	} else if (argc == 0) {
+		int notfound;
+
+		ret = zpool_iter(upgrade_cb, &cb);
+		notfound = cb.cb_first;
+
+		if (!cb.cb_all && ret == 0) {
+			if (!cb.cb_first)
+				(void) printf("\n");
+			cb.cb_first = B_TRUE;
+			cb.cb_newer = B_TRUE;
+			ret = zpool_iter(upgrade_cb, &cb);
+			if (!cb.cb_first) {
+				notfound = B_FALSE;
+				(void) printf("\n");
+			}
+		}
+
+		if (ret == 0) {
+			if (notfound)
+				(void) printf(gettext("All pools are formatted "
+				    "using this version.\n"));
+			else if (!cb.cb_all)
+				(void) printf(gettext("Use 'zpool upgrade -v' "
+				    "for a list of available versions and "
+				    "their associated\nfeatures.\n"));
+		}
+	} else {
+		ret = for_each_pool(argc, argv, FALSE, upgrade_one, NULL);
 	}
 
 	return (ret);
