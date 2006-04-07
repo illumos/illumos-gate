@@ -3523,7 +3523,7 @@ end
 
 function	is_system_labeled
 declaration	int is_system_labeled(void)
-version		SUNW_1.22.2
+version		SUNW_1.23
 end
 
 function	_is_system_labeled

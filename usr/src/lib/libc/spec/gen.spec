@@ -2016,13 +2016,13 @@ end
 function	mkdtemp
 include		<stdlib.h>
 declaration	char *mkdtemp(char *template)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == 0
 end
 
 function	_mkdtemp
 weak		mkdtemp
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	mkfifo
@@ -2054,13 +2054,13 @@ end
 function        mkstemps
 include         <stdlib.h>
 declaration     int mkstemps(char *template, int suffixlen)
-version         SUNW_1.22.1
+version         SUNW_1.23
 exception       $return == -1
 end
 
 function        _mkstemps
 weak            mkstemps
-version         SUNW_1.22.1
+version         SUNW_1.23
 end
 
 function	mktemp
@@ -4701,12 +4701,12 @@ end
 function	ucred_getlabel
 include		<ucred.h>
 declaration	bslabel_t *ucred_getlabel(const ucred_t *) 
-version		SUNW_1.22.2
+version		SUNW_1.23
 end
 
 function	_ucred_getlabel
 weak		ucred_getlabel
-version		SUNW_1.22.2
+version		SUNW_1.23
 end
 
 function	ucred_getpflags

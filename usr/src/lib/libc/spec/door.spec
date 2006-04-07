@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -27,13 +26,13 @@
 function	door_bind
 include		<door.h>
 declaration	int door_bind(int d)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_call
 include		<door.h>
 declaration	int door_call(int did, door_arg_t *arg)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == -1
 end
 
@@ -44,26 +43,26 @@ declaration	int door_create( \
 				size_t arg_size, door_desc_t *dp, \
 				uint_t n_desc), \
 			void *cookie, uint_t attributes)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == -1
 end
 
 function	door_cred
 include		<door.h>
 declaration	int door_cred(door_cred_t *dc)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_ucred
 include		<door.h>
 declaration	int door_ucred(ucred_t **)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_info
 include		<door.h>
 declaration	int door_info(int did, door_info_t *di)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == -1
 end
 
@@ -71,14 +70,14 @@ function	door_return
 include		<door.h>
 declaration	int door_return(char *data_ptr, size_t data_size, \
 			door_desc_t *desc_ptr, uint_t desc_size)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == -1
 end
 
 function	door_revoke
 include		<door.h>
 declaration	int door_revoke(int did)
-version		SUNW_1.22.1
+version		SUNW_1.23
 exception	$return == -1
 end
 
@@ -91,25 +90,25 @@ function	door_server_create
 include		<door.h>
 declaration	void (*door_server_create(void(*create_proc)(door_info_t*))) \
 			(door_info_t *)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_unbind
 include		<door.h>
 declaration	int door_unbind(void)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_getparam
 include		<door.h>
 declaration	int door_getparam(int fd, int type, size_t *out)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	door_setparam
 include		<door.h>
 declaration	int door_setparam(int fd, int type, size_t val)
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	_door_bind

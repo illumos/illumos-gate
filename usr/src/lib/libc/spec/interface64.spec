@@ -239,13 +239,13 @@ function	mkstemps64
 include		<stdlib.h>
 declaration	int mkstemps64(char *template, int suffixlen)
 arch		sparc i386
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	_mkstemps64
 weak		mkstemps64
 arch		sparc i386
-version		SUNW_1.22.1
+version		SUNW_1.23
 end
 
 function	mmap64
