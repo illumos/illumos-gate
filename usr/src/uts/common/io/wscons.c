@@ -182,12 +182,11 @@ static void	wcrstrt(void *);
 static void	wcstart(void);
 static void	wc_open_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
 static void	wc_close_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
-static void	wc_polled_putchar(struct cons_polledio_arg *arg,
-			unsigned char c);
-static boolean_t wc_polled_ischar(struct cons_polledio_arg *arg);
-static int	wc_polled_getchar(struct cons_polledio_arg *arg);
-static void	wc_polled_enter(struct cons_polledio_arg *arg);
-static void	wc_polled_exit(struct cons_polledio_arg *arg);
+static void	wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c);
+static boolean_t wc_polled_ischar(cons_polledio_arg_t arg);
+static int	wc_polled_getchar(cons_polledio_arg_t arg);
+static void	wc_polled_enter(cons_polledio_arg_t arg);
+static void	wc_polled_exit(cons_polledio_arg_t arg);
 static void	wc_get_size(struct wscons *wscons);
 static void	wc_modechg_cb(tem_modechg_cb_arg_t arg);
 
@@ -369,7 +368,7 @@ wcopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 			wscons.wc_polledio.cons_polledio_version =
 				CONSPOLLEDIO_V0;
 			wscons.wc_polledio.cons_polledio_argument =
-				(struct cons_polledio_arg *)&wscons;
+				(cons_polledio_arg_t)&wscons;
 			wscons.wc_polledio.cons_polledio_enter =
 				wc_polled_enter;
 			wscons.wc_polledio.cons_polledio_exit =
@@ -1346,7 +1345,7 @@ wcvnrele(minor_t unit, vnode_t *vp)
  */
 
 static void
-wc_polled_putchar(struct cons_polledio_arg *arg, unsigned char c)
+wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c)
 {
 	if (c == '\n')
 		wc_polled_putchar(arg, '\r');
@@ -1367,7 +1366,7 @@ wc_polled_putchar(struct cons_polledio_arg *arg, unsigned char c)
  * shared between Solaris and the OBP.
  */
 static int
-wc_polled_getchar(struct cons_polledio_arg *arg)
+wc_polled_getchar(cons_polledio_arg_t arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 
@@ -1383,7 +1382,7 @@ wc_polled_getchar(struct cons_polledio_arg *arg)
 }
 
 static boolean_t
-wc_polled_ischar(struct cons_polledio_arg *arg)
+wc_polled_ischar(cons_polledio_arg_t arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 
@@ -1395,7 +1394,7 @@ wc_polled_ischar(struct cons_polledio_arg *arg)
 }
 
 static void
-wc_polled_enter(struct cons_polledio_arg *arg)
+wc_polled_enter(cons_polledio_arg_t arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 
@@ -1409,7 +1408,7 @@ wc_polled_enter(struct cons_polledio_arg *arg)
 }
 
 static void
-wc_polled_exit(struct cons_polledio_arg *arg)
+wc_polled_exit(cons_polledio_arg_t arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 

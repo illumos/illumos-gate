@@ -299,10 +299,10 @@ static void conskbd_mux_upstream_msg(conskbd_lower_queue_t *, mblk_t *);
 static void conskbd_legacy_upstream_msg(conskbd_lower_queue_t *, mblk_t *);
 static void conskbd_lqs_ack_complete(conskbd_lower_queue_t *, mblk_t *);
 
-static void conskbd_polledio_enter(struct cons_polledio_arg *);
-static void conskbd_polledio_exit(struct cons_polledio_arg *);
-static int  conskbd_polledio_ischar(struct cons_polledio_arg *);
-static int  conskbd_polledio_getchar(struct cons_polledio_arg *);
+static void conskbd_polledio_enter(cons_polledio_arg_t);
+static void conskbd_polledio_exit(cons_polledio_arg_t);
+static int  conskbd_polledio_ischar(cons_polledio_arg_t);
+static int  conskbd_polledio_getchar(cons_polledio_arg_t);
 static void conskbd_polledio_setled(struct kbtrans_hardware *, int);
 
 static void conskbd_streams_setled(struct kbtrans_hardware *, int);
@@ -565,12 +565,12 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 
 	conskbd.conskbd_polledio.cons_polledio_version = CONSPOLLEDIO_V1;
 	conskbd.conskbd_polledio.cons_polledio_argument =
-	    (struct cons_polledio_arg *)&conskbd;
+	    (cons_polledio_arg_t)&conskbd;
 	conskbd.conskbd_polledio.cons_polledio_putchar = NULL;
 	conskbd.conskbd_polledio.cons_polledio_getchar =
-	    (int (*)(struct cons_polledio_arg *)) conskbd_polledio_getchar;
+	    (int (*)(cons_polledio_arg_t)) conskbd_polledio_getchar;
 	conskbd.conskbd_polledio.cons_polledio_ischar =
-	    (boolean_t (*)(struct cons_polledio_arg *))conskbd_polledio_ischar;
+	    (boolean_t (*)(cons_polledio_arg_t))conskbd_polledio_ischar;
 	conskbd.conskbd_polledio.cons_polledio_enter = conskbd_polledio_enter;
 	conskbd.conskbd_polledio.cons_polledio_exit = conskbd_polledio_exit;
 	qprocson(q);
@@ -2199,7 +2199,7 @@ conskbd_override_kbtrans(queue_t *q, mblk_t *mp)
 
 
 static void
-conskbd_polledio_enter(struct cons_polledio_arg *arg)
+conskbd_polledio_enter(cons_polledio_arg_t arg)
 {
 	conskbd_state_t		*conskbdp;
 	struct cons_polledio		*cb;
@@ -2216,7 +2216,7 @@ conskbd_polledio_enter(struct cons_polledio_arg *arg)
 }	/* conskbd_polledio_enter() */
 
 static void
-conskbd_polledio_exit(struct cons_polledio_arg *arg)
+conskbd_polledio_exit(cons_polledio_arg_t arg)
 {
 	conskbd_state_t		*conskbdp;
 	struct cons_polledio		*cb;
@@ -2233,7 +2233,7 @@ conskbd_polledio_exit(struct cons_polledio_arg *arg)
 }	/* conskbd_polledio_exit() */
 
 static int
-conskbd_polledio_getchar(struct cons_polledio_arg *arg)
+conskbd_polledio_getchar(cons_polledio_arg_t arg)
 {
 	conskbd_state_t  *conskbdp;
 
@@ -2244,7 +2244,7 @@ conskbd_polledio_getchar(struct cons_polledio_arg *arg)
 }	/* conskbd_polledio_getchar() */
 
 static int
-conskbd_polledio_ischar(struct cons_polledio_arg *arg)
+conskbd_polledio_ischar(cons_polledio_arg_t arg)
 {
 	conskbd_state_t  *conskbdp;
 

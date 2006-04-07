@@ -152,8 +152,7 @@ enum keystate { KEY_PRESSED = 0, KEY_RELEASED = 1 };
  * This allows better type-checking than "void *", helping to ensure
  * that the structure passed in is the structure used in the callback.
  */
-struct cons_polledio_arg;
-typedef struct cons_polledio_arg	*cons_polledio_arg_t;
+typedef struct __cons_polledio_arg	*cons_polledio_arg_t;
 
 /*
  * This is the structure that is used to handle polled I/O.  It is filled
@@ -170,46 +169,46 @@ typedef struct cons_polledio {
 	/*
 	 * Argument that is passed to the following routines.
 	 */
-	struct cons_polledio_arg	*cons_polledio_argument;
+	cons_polledio_arg_t	cons_polledio_argument;
 
 	/*
 	 * Pointer to the routine and its argument that handles putting
 	 * characters out to the polled device.
 	 */
-	void		(*cons_polledio_putchar)(struct cons_polledio_arg *,
+	void		(*cons_polledio_putchar)(cons_polledio_arg_t,
 				uchar_t);
 
 	/*
 	 * Pointer to the routine and its argument that handles getting
 	 * characters from the polled device.  This routine is blocking.
 	 */
-	int		(*cons_polledio_getchar)(struct cons_polledio_arg *);
+	int		(*cons_polledio_getchar)(cons_polledio_arg_t);
 
 	/*
 	 * Pointer to the routine and its argument that checks to see
 	 * if a character is pending input.  This routine is non-blocking.
 	 */
-	boolean_t	(*cons_polledio_ischar)(struct cons_polledio_arg *);
+	boolean_t	(*cons_polledio_ischar)(cons_polledio_arg_t);
 
 	/*
 	 * Initialize the polled subsystem.  This routine is called once
 	 * per mode change from non-polled to polled mode.
 	 */
-	void		(*cons_polledio_enter)(struct cons_polledio_arg *);
+	void		(*cons_polledio_enter)(cons_polledio_arg_t);
 
 	/*
 	 * Restore the non-polled subsystem.  This routine is called once
 	 * per mode change from non-polled to polled mode.
 	 */
-	void		(*cons_polledio_exit)(struct cons_polledio_arg *);
+	void		(*cons_polledio_exit)(cons_polledio_arg_t);
 
 
 	/* Routine to set the LED's in polled mode */
-	void	(*cons_polledio_setled)(struct cons_polledio_arg *, int);
+	void	(*cons_polledio_setled)(cons_polledio_arg_t, int);
 
 	/* Routine to indicate that a scande is available in polled mode */
 	boolean_t	(*cons_polledio_keycheck)(
-			    struct cons_polledio_arg *,
+			    cons_polledio_arg_t,
 			    kbtrans_key_t *, enum keystate *);
 } cons_polledio_t;
 

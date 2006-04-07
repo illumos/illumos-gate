@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,9 +181,9 @@ static void	async_resume(struct asyncline *async);
 static void	asy_program(struct asycom *asy, int mode);
 static void	asyinit(struct asycom *asy);
 static void	asy_waiteot(struct asycom *asy);
-static void	asyputchar(struct cons_polledio_arg *, uchar_t c);
-static int	asygetchar(struct cons_polledio_arg *);
-static boolean_t	asyischar(struct cons_polledio_arg *);
+static void	asyputchar(cons_polledio_arg_t, uchar_t c);
+static int	asygetchar(cons_polledio_arg_t);
+static boolean_t	asyischar(cons_polledio_arg_t);
 
 static int	asymctl(struct asycom *, int, int);
 static int	asytodm(int, int);
@@ -850,7 +850,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Fill in the polled I/O structure.
 	 */
 	asy->polledio.cons_polledio_version = CONSPOLLEDIO_V0;
-	asy->polledio.cons_polledio_argument = (struct cons_polledio_arg *)asy;
+	asy->polledio.cons_polledio_argument = (cons_polledio_arg_t)asy;
 	asy->polledio.cons_polledio_putchar = asyputchar;
 	asy->polledio.cons_polledio_getchar = asygetchar;
 	asy->polledio.cons_polledio_ischar = asyischar;
@@ -3854,7 +3854,7 @@ async_iocdata(queue_t *q, mblk_t *mp)
  * Do not use interrupts.  If char is LF, put out CR, LF.
  */
 static void
-asyputchar(struct cons_polledio_arg *arg, uchar_t c)
+asyputchar(cons_polledio_arg_t arg, uchar_t c)
 {
 	struct asycom *asy = (struct asycom *)arg;
 
@@ -3876,7 +3876,7 @@ asyputchar(struct cons_polledio_arg *arg, uchar_t c)
  * available, return 0. Run in polled mode, no interrupts.
  */
 static boolean_t
-asyischar(struct cons_polledio_arg *arg)
+asyischar(cons_polledio_arg_t arg)
 {
 	struct asycom *asy = (struct asycom *)arg;
 
@@ -3888,7 +3888,7 @@ asyischar(struct cons_polledio_arg *arg)
  * Get a character. Run in polled mode, no interrupts.
  */
 static int
-asygetchar(struct cons_polledio_arg *arg)
+asygetchar(cons_polledio_arg_t arg)
 {
 	struct asycom *asy = (struct asycom *)arg;
 

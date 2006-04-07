@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -70,10 +69,10 @@ static void usbkbm_unpack_usb_packet(usbkbm_state_t *, process_key_callback_t,
 			uchar_t *, int);
 static boolean_t usbkbm_is_modkey(uchar_t);
 static void usbkbm_reioctl(void	*);
-static int usbkbm_polled_getchar(struct cons_polledio_arg *);
-static boolean_t usbkbm_polled_ischar(struct cons_polledio_arg *);
-static void usbkbm_polled_enter(struct cons_polledio_arg *);
-static void usbkbm_polled_exit(struct cons_polledio_arg *);
+static int usbkbm_polled_getchar(cons_polledio_arg_t);
+static boolean_t usbkbm_polled_ischar(cons_polledio_arg_t);
+static void usbkbm_polled_enter(cons_polledio_arg_t);
+static void usbkbm_polled_exit(cons_polledio_arg_t);
 static void usbkbm_mctl_receive(queue_t *, mblk_t *);
 static enum kbtrans_message_response usbkbm_ioctl(queue_t *, mblk_t *);
 static int usbkbm_kioccmd(usbkbm_state_t *, mblk_t *, char, size_t *);
@@ -450,7 +449,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 				    CONSPOLLEDIO_V1;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_argument =
-				(struct cons_polledio_arg *)usbkbmd;
+				(cons_polledio_arg_t)usbkbmd;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_putchar = NULL;
 
@@ -467,10 +466,10 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 				usbkbm_polled_exit;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_setled =
-		(void (*)(struct cons_polledio_arg *, int))usbkbm_polled_setled;
+		(void (*)(cons_polledio_arg_t, int))usbkbm_polled_setled;
 
 	usbkbmd->usbkbm_polled_info.cons_polledio_keycheck =
-		(boolean_t (*)(struct cons_polledio_arg *, int *,
+		(boolean_t (*)(cons_polledio_arg_t, int *,
 		enum keystate *))usbkbm_polled_keycheck;
 	/*
 	 * The head and the tail pointing at the same byte means empty or
@@ -1579,7 +1578,7 @@ usbkbm_polled_setled(struct kbtrans_hardware *hw, int led_state)
  * This is a pass-thru routine to get a character at poll time.
  */
 static int
-usbkbm_polled_getchar(struct cons_polledio_arg *arg)
+usbkbm_polled_getchar(cons_polledio_arg_t arg)
 {
 	usbkbm_state_t			*usbkbmd;
 
@@ -1593,7 +1592,7 @@ usbkbm_polled_getchar(struct cons_polledio_arg *arg)
  * at poll time.
  */
 static boolean_t
-usbkbm_polled_ischar(struct cons_polledio_arg *arg)
+usbkbm_polled_ischar(cons_polledio_arg_t arg)
 {
 	usbkbm_state_t			*usbkbmd;
 
@@ -1608,7 +1607,7 @@ usbkbm_polled_ischar(struct cons_polledio_arg *arg)
  *	This routine is called at poll time to set the state for polled input.
  */
 static void
-usbkbm_polled_enter(struct cons_polledio_arg *arg)
+usbkbm_polled_enter(cons_polledio_arg_t arg)
 {
 	usbkbm_state_t			*usbkbmd;
 	hid_polled_handle_t		hid_polled_handle;
@@ -1643,7 +1642,7 @@ usbkbm_polled_enter(struct cons_polledio_arg *arg)
  *	input.
  */
 static void
-usbkbm_polled_exit(struct cons_polledio_arg *arg)
+usbkbm_polled_exit(cons_polledio_arg_t arg)
 {
 	usbkbm_state_t			*usbkbmd;
 	hid_polled_handle_t		hid_polled_handle;

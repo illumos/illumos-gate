@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,8 +160,8 @@ static void kb8042_type4_cmd(struct kb8042 *kb8042, int cmd);
 static void kb8042_ioctlmsg(struct kb8042 *kb8042, queue_t *, mblk_t *);
 static void kb8042_iocdatamsg(queue_t *, mblk_t *);
 static void kb8042_process_key(struct kb8042 *, kbtrans_key_t, enum keystate);
-static int kb8042_polled_ischar(struct cons_polledio_arg *arg);
-static int kb8042_polled_getchar(struct cons_polledio_arg *arg);
+static int kb8042_polled_ischar(cons_polledio_arg_t arg);
+static int kb8042_polled_getchar(cons_polledio_arg_t arg);
 static void kb8042_cleanup(struct kb8042 *kb8042);
 
 static struct kbtrans_callbacks kb8042_callbacks = {
@@ -682,18 +681,18 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kb8042->polledio.cons_polledio_version = CONSPOLLEDIO_V1;
 	kb8042->polledio.cons_polledio_argument =
-		(struct cons_polledio_arg *)kb8042;
+		(cons_polledio_arg_t)kb8042;
 	kb8042->polledio.cons_polledio_putchar = NULL;
 	kb8042->polledio.cons_polledio_getchar =
-		(int (*)(struct cons_polledio_arg *))kb8042_polled_getchar;
+		(int (*)(cons_polledio_arg_t))kb8042_polled_getchar;
 	kb8042->polledio.cons_polledio_ischar =
-		(boolean_t (*)(struct cons_polledio_arg *))kb8042_polled_ischar;
+		(boolean_t (*)(cons_polledio_arg_t))kb8042_polled_ischar;
 	kb8042->polledio.cons_polledio_enter = NULL;
 	kb8042->polledio.cons_polledio_exit = NULL;
 	kb8042->polledio.cons_polledio_setled =
-		(void (*)(struct cons_polledio_arg *, int))kb8042_polled_setled;
+		(void (*)(cons_polledio_arg_t, int))kb8042_polled_setled;
 	kb8042->polledio.cons_polledio_keycheck =
-		(boolean_t (*)(struct cons_polledio_arg *, int *,
+		(boolean_t (*)(cons_polledio_arg_t, int *,
 		enum keystate *))kb8042_polled_keycheck;
 
 	qprocson(qp);
@@ -1450,7 +1449,7 @@ kb8042_type4_cmd(struct kb8042 *kb8042, int cmd)
  * This is a pass-thru routine to get a character at poll time.
  */
 static int
-kb8042_polled_getchar(struct cons_polledio_arg *arg)
+kb8042_polled_getchar(cons_polledio_arg_t arg)
 {
 	struct kb8042	*kb8042;
 
@@ -1463,7 +1462,7 @@ kb8042_polled_getchar(struct cons_polledio_arg *arg)
  * This is a pass-thru routine to get a character at poll time.
  */
 static int
-kb8042_polled_ischar(struct cons_polledio_arg *arg)
+kb8042_polled_ischar(cons_polledio_arg_t arg)
 {
 	struct kb8042	*kb8042;
 
