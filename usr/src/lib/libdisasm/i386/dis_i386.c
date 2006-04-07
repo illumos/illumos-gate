@@ -72,8 +72,8 @@ get_byte(void *data)
 	uchar_t byte;
 	dis_handle_t *dhp = data;
 
-	if (dhp->dh_read(dhp->dh_data, dhp->dh_addr, &byte,
-	    sizeof (byte)) < sizeof (byte))
+	if (dhp->dh_read(dhp->dh_data, dhp->dh_addr, &byte, sizeof (byte)) !=
+	    sizeof (byte))
 		return (-1);
 
 	dhp->dh_addr++;

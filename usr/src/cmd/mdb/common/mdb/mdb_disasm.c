@@ -191,6 +191,7 @@ typedef struct dis_buf {
 	mdb_tgt_addr_t	db_nextaddr;
 	uchar_t		db_buf[DISBUFSZ];
 	ssize_t		db_bufsize;
+	boolean_t	db_readerr;
 } dis_buf_t;
 
 /*
@@ -267,9 +268,19 @@ libdisasm_read(void *data, uint64_t pc, void *buf, size_t buflen)
 	size_t len;
 
 	if (pc - db->db_addr >= db->db_bufsize) {
-		if ((db->db_bufsize = mdb_tgt_aread(db->db_tgt, db->db_as,
-		    db->db_buf, sizeof (db->db_buf), pc)) == -1)
+		if (mdb_tgt_aread(db->db_tgt, db->db_as, db->db_buf,
+		    sizeof (db->db_buf), pc) != -1) {
+			db->db_bufsize = sizeof (db->db_buf);
+		} else if (mdb_tgt_aread(db->db_tgt, db->db_as, db->db_buf,
+		    buflen, pc) != -1) {
+			db->db_bufsize = buflen;
+		} else {
+			if (!db->db_readerr)
+				mdb_warn("failed to read instruction at %#lr",
+				    (uintptr_t)pc);
+			db->db_readerr = B_TRUE;
 			return (-1);
+		}
 		db->db_addr = pc;
 	}
 
@@ -300,11 +311,16 @@ libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 	dis_set_data(dhp, &db);
 
 	/*
-	 * Attempt to disassemble the instruction
+	 * Attempt to disassemble the instruction.  If this fails because of an
+	 * unknown opcode, drive on anyway.  If it fails because we couldn't
+	 * read from the target, bail out immediately.
 	 */
 	if (dis_disassemble(dhp, pc, buf, len) != 0)
 		(void) mdb_snprintf(buf, len,
 		    "***ERROR--unknown op code***");
+
+	if (db.db_readerr)
+		return (pc);
 
 	/*
 	 * Return the updated location
@@ -322,9 +338,13 @@ libdisasm_previns(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 	/*
 	 * Set the libdisasm data to point to our buffer.  This will be
 	 * passed as the first argument to the lookup and read functions.
+	 * We set 'readerr' to B_TRUE to turn off the mdb_warn() in
+	 * libdisasm_read, because the code works by probing backwards until a
+	 * valid address is found.
 	 */
 	db.db_tgt = t;
 	db.db_as = as;
+	db.db_readerr = B_TRUE;
 
 	dis_set_data(dhp, &db);
 
