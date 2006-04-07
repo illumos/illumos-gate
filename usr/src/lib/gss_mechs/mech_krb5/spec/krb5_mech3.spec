@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -803,5 +803,28 @@ declaration	int foreach_localaddr (void *, \
 		    int (*pass1fn)(void *, struct sockaddr *), \
 		    int (*betweenfn)(void *), \
 		    int (*pass2fn)(void *, struct sockaddr *))
+version		SUNWprivate_1.1
+end
+
+function	krb5_change_password
+include		<k5-int.h>
+declaration	krb5_error_code \
+		krb5_change_password (krb5_context context, \
+			krb5_creds *creds, char *newpw, \
+			int *result_code, \
+			krb5_data *result_code_string, \
+			krb5_data *result_string)
+version		SUNWprivate_1.1
+end
+
+function	krb5_set_password
+include		<k5-int.h>
+declaration	krb5_set_password (krb5_context context,\
+			krb5_creds *creds,\
+			char *newpw,\
+			krb5_principal change_password_for,\
+			int *result_code,\
+			krb5_data *result_code_string,\
+			krb5_data *result_string)
 version		SUNWprivate_1.1
 end

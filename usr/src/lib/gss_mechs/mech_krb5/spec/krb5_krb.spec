@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -365,3 +365,58 @@ declaration	krb5_error_code krb5_decode_ticket \
 			(const krb5_data *code, krb5_ticket **rep)
 version		SUNWprivate_1.1
 end
+
+function	krb5_init_keyblock
+include		<k5-int.h>
+declaration	krb5_error_code krb5_init_keyblock \
+			(krb5_context, krb5_enctype enctype, \
+			size_t length, krb5_keyblock **out)
+version		SUNWprivate_1.1
+end
+
+function	krb5_init_allocated_keyblock
+include		<k5-int.h>
+declaration	krb5_error_code krb5_init_allocated_keyblock \
+			(krb5_context, krb5_enctype enctype, \
+			unsigned int length)
+version		SUNWprivate_1.1
+end
+
+function	krb5_get_key_enctype
+include		<k5-int.h>
+declaration	krb5_enctype krb5_get_key_enctype(krb5_keyblock *)
+version		SUNWprivate_1.1
+end
+
+function	krb5_get_key_length
+include		<k5-int.h>
+declaration	unsigned int krb5_get_key_length(krb5_keyblock *)
+version		SUNWprivate_1.1
+end
+
+function	krb5_get_key_data
+include		<k5-int.h>
+declaration	krb5_octet *krb5_get_key_data(krb5_keyblock *)
+version		SUNWprivate_1.1
+end
+
+function	krb5_set_key_enctype
+include		<k5-int.h>
+declaration	void krb5_set_key_enctype(krb5_keyblock *, krb5_enctype)
+version		SUNWprivate_1.1
+end
+
+function	krb5_set_key_data
+include		<k5-int.h>
+declaration	void krb5_set_key_data(krb5_keyblock *,\
+                		krb5_octet *)
+version		SUNWprivate_1.1
+end
+
+function	krb5_set_key_length
+include		<k5-int.h>
+declaration	void krb5_set_key_length(krb5_keyblock *,\
+	                 unsigned int)
+version		SUNWprivate_1.1
+end
+

@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -356,4 +356,27 @@ declaration	krb5_error_code krb5int_pbkdf2_hmac_sha1 ( \
 version		SUNWprivate_1.1
 end
 
+function	krb5_string_to_key
+include		<k5-int.h>
+declaration	krb5_error_code krb5_string_to_key(krb5_context context,\
+			const krb5_encrypt_block *eblock,\
+		   	krb5_keyblock *keyblock, const krb5_data *data,\
+		   	const krb5_data *salt)
+version		SUNWprivate_1.1
+end
+
+function	krb5_use_enctype
+include		<k5-int.h>
+declaration	krb5_error_code krb5_use_enctype(krb5_context context,\
+			krb5_encrypt_block *eblock,\
+	                krb5_enctype enctype)
+version		SUNWprivate_1.1
+end
+
+function	krb5_checksum_size
+include		<k5-int.h>
+declaration	size_t krb5_checksum_size(krb5_context context, \
+			krb5_cksumtype ctype)
+version		SUNWprivate_1.1
+end
 

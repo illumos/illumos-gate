@@ -28,7 +28,7 @@ CRYPTO = cksumtype_to_string.o \
 	keyed_checksum_types.o keyed_cksum.o \
 	make_random_key.o string_to_cksumtype.o \
 	string_to_enctype.o string_to_key.o valid_cksumtype.o \
-	valid_enctype.o pkcs11slot.o state.o pbkdf2.o
+	valid_enctype.o pkcs11slot.o state.o pbkdf2.o old_api_glue.o
 
 CRYPTO_UTS= cksumtypes.o decrypt.o encrypt.o encrypt_length.o \
 	etypes.o nfold.o verify_checksum.o default_state.o \
@@ -115,7 +115,8 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	recvauth.o  send_tgs.o  sendauth.o  srv_rcache.o  str_conv.o \
 	tgtname.o  valid_times.o  walk_rtree.o appdefault.o deltat.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
-	vfy_increds.o vic_opt.o krb5_libinit.o
+	vfy_increds.o vic_opt.o krb5_libinit.o chpw.o \
+	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o
 
 K5_KRB_UTS= copy_athctr.o copy_auth.o copy_cksum.o copy_key.o \
 	copy_princ.o init_ctx.o kfree.o parse.o ser_actx.o \
@@ -131,7 +132,7 @@ K5_OS=	an_to_ln.o def_realm.o ccdefname.o free_krbhs.o free_hstrl.o \
 	read_msg.o read_pwd.o realm_dom.o sendto_kdc.o sn2princ.o \
 	unlck_file.o ustime.o write_msg.o safechown.o \
 	prompter.o realm_iter.o foreachaddr.o \
-	dnsglue.o dnssrv.o thread_safe.o
+	dnsglue.o dnssrv.o thread_safe.o changepw.o
 
 K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 

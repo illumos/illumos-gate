@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,9 +158,9 @@
 
 /*
  * Solaris Kerberos:
- *   KRB5_OLD_CRYPTO is not needed or supported anymore.
+ *   Samba needs a couple of these interfaces so old crypto is enabled.
  */
-/* #define KRB5_OLD_CRYPTO */
+#define KRB5_OLD_CRYPTO
 
 
 #ifndef KRB5INT_BEGIN_DECLS 
@@ -658,9 +658,28 @@ krb5_boolean KRB5_CALLCONV is_keyed_cksum
         (krb5_cksumtype ctype);
 #endif
 
-/* #ifdef KRB5_OLD_CRYPTO
- * this mit block removed for Solaris Kerberos
-#endif KRB5_OLD_CRYPTO */
+
+#ifdef KRB5_OLD_CRYPTO
+/*
+ * old cryptosystem routine prototypes.  These are now layered
+ * on top of the functions above.
+ */
+krb5_error_code KRB5_CALLCONV krb5_use_enctype
+        (krb5_context context,
+                krb5_encrypt_block * eblock,
+                krb5_enctype enctype);
+
+krb5_error_code KRB5_CALLCONV krb5_string_to_key
+        (krb5_context context,
+                const krb5_encrypt_block * eblock,
+                krb5_keyblock * keyblock,
+                const krb5_data * data,
+                const krb5_data * salt);
+
+size_t KRB5_CALLCONV krb5_checksum_size
+	(krb5_context context,
+		krb5_cksumtype ctype);
+#endif /* KRB5_OLD_CRYPTO */
 
 /*
  * end "encryption.h"
@@ -1560,6 +1579,46 @@ krb5_error_code KRB5_CALLCONV  krb5_init_keyblock
 		 * It is legal to pass in a length of 0, in which
 		 * case contents are left unallocated.
 		 */
+
+/*
+ * Solaris Kerberos
+ * Start - keyblock API (MIT will ship this also in a future release)
+ */
+/*
+ * Similiar to krb5_init_keyblock but this routine expects the
+ * keyblock to already be allocated.
+ */
+krb5_error_code KRB5_CALLCONV krb5_init_allocated_keyblock
+        (krb5_context,
+	        krb5_enctype,
+	        unsigned int,
+                krb5_keyblock *);
+
+krb5_enctype KRB5_CALLCONV krb5_get_key_enctype
+        (krb5_keyblock *);
+
+unsigned int KRB5_CALLCONV krb5_get_key_length
+        (krb5_keyblock *);
+
+krb5_octet KRB5_CALLCONV *krb5_get_key_data
+        (krb5_keyblock *);
+
+void KRB5_CALLCONV krb5_set_key_enctype
+        (krb5_keyblock *,
+                 krb5_enctype);
+
+void KRB5_CALLCONV krb5_set_key_data
+        (krb5_keyblock *,
+                 krb5_octet *);
+
+void KRB5_CALLCONV krb5_set_key_length
+        (krb5_keyblock *,
+                 unsigned int);
+/*
+ * Solaris Kerberos
+ * End - keyblock API
+ */
+
 krb5_error_code KRB5_CALLCONV krb5_copy_keyblock
 	(krb5_context,
 		const krb5_keyblock *,

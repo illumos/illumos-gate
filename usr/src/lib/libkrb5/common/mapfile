@@ -1,0 +1,273 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This is a mapfile that defines a filter for mech_krb5 so that
+# a new public library can be made to access certain functions in
+# the private library.
+#
+# New functions can be added as needed.
+#
+
+{
+    global:
+
+# com_err.h
+        com_err =		FUNCTION FILTER mech_krb5.so.1;
+        com_err_va =		FUNCTION FILTER mech_krb5.so.1;
+        error_message = 	FUNCTION FILTER mech_krb5.so.1;
+
+# krb5.h (non-private and non-deprecated)
+        krb5_c_encrypt =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_decrypt =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_encrypt_length =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_block_size =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_init_state =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_free_state =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_make_random_key =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_random_make_octets =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_string_to_key =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_string_to_key_with_params =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_enctype_compare =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_make_checksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_verify_checksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_checksum_length =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_keyed_checksum_types =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_valid_enctype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_valid_cksumtype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_is_coll_proof_cksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_c_is_keyed_cksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_gen_new =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_initialize =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_destroy =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_close =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_store_cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_retrieve_cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_get_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_get_principal =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_start_seq_get =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_next_cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_end_seq_get =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_remove_cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_set_flags =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_get_type =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_get_type =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_get_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_close =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_get_entry =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_start_seq_get =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_next_entry =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_end_seq_get =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_init_context =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_init_secure_context =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_context =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_default_tgs_enctypes =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_permitted_enctypes =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_is_thread_safe =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_tgt_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_credentials =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_credentials_validate =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_credentials_renew =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_req =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_req_extended =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_rep =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_rep =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_error =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_error =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_safe =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_priv =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_parse_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_unparse_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_unparse_name_ext =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_principal_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_address_search =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_address_compare =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_address_order =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_realm_compare =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_principal_compare =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_init_keyblock =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_keyblock =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_keyblock_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_data =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_principal =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_addresses =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_ticket =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_authdata =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_authenticator =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_copy_checksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_server_rcache =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_build_principal_ext =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_build_principal =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_resolve =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_default_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_default =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_keytab_entry_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_remove_entry =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_add_entry =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_principal2salt =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_resolve =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_default_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_set_default_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_default =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cc_copy_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_principal =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_authenticator =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_addresses =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_authdata =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_ticket =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_error =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_cred_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_checksum =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_checksum_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_keyblock =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_keyblock_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_ap_rep_enc_part =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_data =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_data_contents =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_unparsed_name =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_cksumtypes =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_us_timeofday =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_timeofday =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_os_localaddr =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_default_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_default_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_default_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_sname_to_principal =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_change_password =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_password =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_password_using_ccache =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_profile =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_req =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kt_read_service_key =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_safe =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_priv =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_sendauth =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_recvauth =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_recvauth_version =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_ncred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_mk_1cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_rd_cred =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_fwd_tgt_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_init =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_free =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setflags =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getflags =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_set_checksum_func =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_get_checksum_func =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setaddrs =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getaddrs =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setports =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setuseruserkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getsendsubkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getrecvsubkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setsendsubkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setrecvsubkey =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getlocalseqnumber =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getremoteseqnumber =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_setrcache =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getrcache =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_getauthenticator =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_read_password =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_aname_to_localname =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_host_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_host_realm =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_kuserok =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_auth_con_genaddrs =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_real_time =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_enctype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_salttype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_cksumtype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_timestamp =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_deltat =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_enctype_to_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_salttype_to_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_cksumtype_to_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_timestamp_to_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_timestamp_to_sfstring =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_deltat_to_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_xfree_wrap =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_xfree =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_prompter_posix =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_init =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_tkt_life =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_renew_life =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_forwardable =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_proxiable =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_etype_list =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_address_list =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_preauth_list =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_opt_set_salt =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_password =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_init_creds_keytab =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_verify_init_creds_opt_init =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_verify_init_creds_opt_set_ap_req_nofail =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_verify_init_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_validated_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_renewed_creds =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_decode_ticket =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_appdefault_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_appdefault_boolean =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_realm_iterator_create =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_realm_iterator =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_realm_iterator_free =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_free_realm_string =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_prompt_types =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_string_to_key =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_use_enctype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_init_allocated_keyblock =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_key_enctype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_key_length =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_get_key_data =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_key_enctype =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_key_data =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_set_key_length =	FUNCTION FILTER mech_krb5.so.1;
+
+# krb5.h - priv/deprecated
+        krb5_string_to_key =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_use_enctype =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_checksum_size =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_kt_free_entry  =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_auth_con_getlocalsubkey =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_auth_con_getremotesubkey =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_set_default_tgs_ktypes =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_ktypes =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_ap_req =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_ap_rep =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_cred =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_decrypt_tkt_part =	FUNCTION FILTER mech_krb5.so.1;
+	valid_cksumtype =	FUNCTION FILTER mech_krb5.so.1;
+
+# k5-int.h (needed by Samba, openssl, etc)
+	decode_krb5_ap_req =	FUNCTION FILTER mech_krb5.so.1;
+	encode_krb5_ap_req =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_rc_get_lifespan =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_rc_initialize =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_rc_default	=	FUNCTION FILTER mech_krb5.so.1;
+	krb5_rc_destroy =	FUNCTION FILTER mech_krb5.so.1;
+
+};

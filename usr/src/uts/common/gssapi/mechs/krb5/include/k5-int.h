@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -679,6 +679,25 @@ extern void krb5int_free_addrlist (struct addrlist *);
 extern int krb5int_grow_addrlist (struct addrlist *, int);
 extern int krb5int_add_host_to_list (struct addrlist *, const char *,
 			int, int, int, int);
+
+krb5_error_code
+krb5int_locate_server (krb5_context,
+		       const krb5_data *realm,
+		       struct addrlist *,
+		       /* Only meaningful for kdc, really...  */
+		       int want_masters,
+		       /* look up [realms]->$realm->$name in krb5.conf */
+		       const char *profilename,
+		       /* SRV record lookup */
+		       const char *dnsname,
+		       int is_stream_service,
+		       /* Port numbers, in network order!  For profile
+			  version only, DNS code gets port numbers
+			  itself.  Use 0 for dflport2 if there's no
+			  secondary port (most common, except kdc
+			  case).  */
+		       int dflport1, int dflport2,
+		       int family);
 
 #endif /* _KERNEL */
 
@@ -1610,6 +1629,9 @@ krb5_error_code encode_krb5_enc_sam_response_enc_2
 
 krb5_error_code encode_krb5_sam_response_2
 	(const krb5_sam_response_2 * , krb5_data **);
+
+krb5_error_code encode_krb5_setpw_req
+        (const krb5_principal target, char *password, krb5_data **code);
 
 /*************************************************************************
  * End of prototypes for krb5_encode.c

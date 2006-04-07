@@ -1,5 +1,5 @@
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -17,6 +17,7 @@ SUBDIRS= \
 	kinit	\
 	klist \
 	kproplog \
+	krb5-config \
 	slave
 
 all :=		TARGET= all

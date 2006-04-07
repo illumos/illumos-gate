@@ -137,6 +137,7 @@ SUBDIRS += \
 	nametoaddr	\
 	ncad_addr	\
 	gss_mechs/mech_krb5	.WAIT	\
+	libkrb5	.WAIT	\
 	krb5	.WAIT
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/smartcard
@@ -369,6 +370,7 @@ HDRSUBDIRS= libaio	\
 	fm		\
 	udapl		\
 	libmapid	\
+	libkrb5		\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \

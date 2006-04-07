@@ -165,6 +165,8 @@ d none usr/include/ipp/ipgpc 755 root bin
 f none usr/include/ipp/ipgpc/ipgpc.h 644 root bin
 f none usr/include/iso646.h 644 root bin
 d none usr/include/kerberosv5 755 root bin
+f none usr/include/kerberosv5/com_err.h 644 root bin
+f none usr/include/kerberosv5/krb5.h 644 root bin
 f none usr/include/kerberosv5/mit_copyright.h 644 root bin
 f none usr/include/kerberosv5/mit-sipb-copyright.h 644 root bin
 f none usr/include/kstat.h 644 root bin

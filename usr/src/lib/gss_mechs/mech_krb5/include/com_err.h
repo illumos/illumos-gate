@@ -1,4 +1,9 @@
 /*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Header file for common error description library.
  *
  * Copyright 1988, Student Information Processing Board of the
@@ -48,12 +53,16 @@ extern void KRB5_CALLCONV com_err_va
 extern /*@observer@*//*@dependent@*/ const char * KRB5_CALLCONV error_message
 	(errcode_t)
        /*@modifies internalState@*/;
-extern errcode_t KRB5_CALLCONV add_error_table
-	(/*@dependent@*/ const struct error_table *)
-       /*@modifies internalState@*/;
-extern errcode_t KRB5_CALLCONV remove_error_table
-	(const struct error_table *)
-       /*@modifies internalState@*/;
+
+/*
+ * Solaris Kerberos
+ * {add_,remove_}error_table have been removed here as they don't exist
+ * in the Solaris mech.
+ *
+ * initialize_krb5_error_table is not be needed anymore but Samba still
+ * calls it so we make it a no-op.
+ */
+#define initialize_krb5_error_table()
 
 #if !defined(_WIN32)
 /*
