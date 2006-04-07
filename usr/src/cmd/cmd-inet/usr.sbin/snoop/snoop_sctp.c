@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,6 +738,8 @@ parse_data_chunk(int flags, uint8_t cflags, const void *data, int datalen)
 	}
 
 	ppid = ntohl(dcp->sdc_payload_id);
+	/* This is the actual data len, excluding the data chunk header. */
+	datalen -= sizeof (*dcp);
 
 	if (flags & F_DTAIL) {
 		(void) snprintf(get_line(0, 0), get_line_remain(),
@@ -758,13 +760,13 @@ parse_data_chunk(int flags, uint8_t cflags, const void *data, int datalen)
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    "Payload Protocol ID = 0x%.8x", ppid);
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-		    "Data Length = %d", datalen - sizeof (*dcp));
+		    "Data Length = %d", datalen);
 		show_space();
 	}
 	if (flags & F_SUM) {
-		SUMAPPEND((scratch, MAXLINE, "tsn %x str %hu/%hu ppid %x ",
-		    ntohl(dcp->sdc_tsn), ntohs(dcp->sdc_sid),
-		    ntohs(dcp->sdc_ssn), ppid));
+		SUMAPPEND((scratch, MAXLINE, "len %d tsn %x str %hu/%hu "
+		    "ppid %x ", datalen, ntohl(dcp->sdc_tsn),
+		    ntohs(dcp->sdc_sid), ntohs(dcp->sdc_ssn), ppid));
 	}
 
 	/*
@@ -785,10 +787,9 @@ parse_data_chunk(int flags, uint8_t cflags, const void *data, int datalen)
 
 	payload = (char *)(dcp + 1);
 	if (!interpret_reserved(flags, IPPROTO_SCTP, sport, dport, payload,
-	    datalen - sizeof (*dcp)) && ppid != 0) {
+	    datalen) && ppid != 0) {
 
-		interpret_protoid(flags, ppid, payload,
-		    datalen - sizeof (*dcp));
+		interpret_protoid(flags, ppid, payload, datalen);
 	}
 
 	/*
