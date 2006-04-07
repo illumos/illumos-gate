@@ -244,7 +244,6 @@ top:
 
 	if (zhp->zfs_dmustats.dds_inconsistent) {
 		zfs_cmd_t zc = { 0 };
-		int err;
 
 		/*
 		 * If it is dds_inconsistent, then we've caught it in
