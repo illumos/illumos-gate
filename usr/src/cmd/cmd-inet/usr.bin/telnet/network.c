@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,8 +55,15 @@ static char sccsid[] = "@(#)network.c	8.1 (Berkeley) 6/6/93";
 
 Ring	netoring;
 Ring	netiring;
-static unsigned char netobuf[2*BUFSIZ];
-static unsigned char netibuf[BUFSIZ];
+
+/*
+ * Use large buffers to handle larger tickets when doing
+ * Kerberos authentication.  Microsoft generates large
+ * tickets that exceed the buffer size which causes authentication
+ * to fail.
+ */
+static unsigned char netobuf[10*BUFSIZ];
+static unsigned char netibuf[10*BUFSIZ];
 
 /*
  * Initialize internal network data structures.

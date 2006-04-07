@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,68 @@ typedef struct _queue {
 #define QSIZE(q) (sizeof((q)->elem)/sizeof((q)->elem[0]))
 #define QELEM(q,i) ((q)->elem[(i)%QSIZE(q)])
 
+/*
+ * mask(max) is 2 ** 64 - 1, and half is 2 ** 63.
+ * |-------------------------------|-----------------------------|
+ * 0                              half                           mask
+ *		   |-------------------------------|
+ *                       half range ( 2 ** 63 )
+ *
+ * Here, the distance between n1 and n2 is used, if it falls
+ * in the "half range", normal integer comparison is enough.
+ *
+ * If the distance is bigger than half of the range, one of them must
+ * have passed the 'mask' point while the other one didn't.  In this
+ * case, the result should be the reverse of normal comparison, i.e.
+ * the smaller one is considered bigger.
+ *
+ * If we shift the smaller value by adding 'mask' to it,
+ * the distance will be in half range again.
+ *
+ * The assumption is that the out of order event will not
+ * happen too often.  If the distance is really bigger than half range,
+ * (1 is expected, but half + 2 arrives) we really don't know if it's a
+ * GAP token or an OLD token that wrapped.
+ */
+static int
+after(gssint_uint64 n1, gssint_uint64 n2, gssint_uint64 mask)
+{
+	int bigger;
+	gssint_uint64 diff;
+	gssint_uint64 half;
+
+	/*
+	 * rule 1: same number.
+	 * This may be ambiguous, but the caller of this function,
+	 * g_order_check already takes care of it.
+	 */
+	if (n1 == n2)
+		return (0);
+
+	half = 1 + (mask >> 1);
+
+	if (n1 > n2) {
+		diff = n1 - n2;
+		bigger = 1;
+	} else {
+		diff = n2 - n1;
+		bigger = 0;
+	}
+
+	/* rule 2: in the same half range, normal comparison is enough */
+	if (diff < half)
+		return bigger;
+
+	n1 &= half;
+
+	/* rule 3: different half, and n1 is on upper, n2 is bigger */
+	/* rule 4: different half, and n1 is on lower, n1 is bigger */
+	if (n1 != 0)
+		return (0);
+
+	return (1);
+}
+
 static void
 queue_insert(queue *q, int after, gssint_uint64 seqnum)
 {
@@ -96,7 +158,7 @@ g_order_init(void **vqueue, gssint_uint64 seqnum,
    queue *q;
 
    if ((q = (queue *) MALLOC(sizeof(queue))) == NULL)
-      return(ENOMEM);
+      return (ENOMEM);
 
    q->do_replay = do_replay;
    q->do_sequence = do_sequence;
@@ -108,7 +170,7 @@ g_order_init(void **vqueue, gssint_uint64 seqnum,
    q->elem[q->start] = ((gssint_uint64)0 - 1) & q->mask;
 
    *vqueue = (void *) q;
-   return(0);
+   return (0);
 }
 
 gss_int32
@@ -121,80 +183,65 @@ g_order_check(void **vqueue, gssint_uint64 seqnum)
    q = (queue *) (*vqueue);
 
    if (!q->do_replay && !q->do_sequence)
-      return(GSS_S_COMPLETE);
+      return (GSS_S_COMPLETE);
 
    /* All checks are done relative to the initial sequence number, to
-	avoid (or at least put off) the pain of wrapping.	 */
+      avoid (or at least put off) the pain of wrapping.  */
+   seqnum -= q->firstnum;
 
-   /* wraparound case */
-   if (seqnum < q->firstnum) {
-	/* if 32 bit, put seqnum into 64 bit range */	
-	if (q->mask != ~(gssint_uint64)0) {
-		seqnum |= 0x100000000ULL;
-		seqnum -= q->firstnum;
-	} else {
-		/*
-		 * 64 bit wraparound, just add the number of
-		 * elements before the wraparound point
-		 * to get the normalized seqnum.
-		 */
-		seqnum += (~(gssint_uint64)0) - q->firstnum;
-	}
-   } else {
 	/*
-	 * Normally (as long as seqnum >= firstnum), just subtract
-	 * the firstnum to get the relative 'seqnum'.
+	 * If we're only doing 32-bit values, adjust for that again.
+	 * Note that this will probably be the wrong thing to if we get
+	 * 2**32 messages sent with 32-bit sequence numbers.
 	 */
-	seqnum -= q->firstnum;
-   }
+   seqnum &= q->mask;
 
    /* rule 1: expected sequence number */
-
    expected = (QELEM(q,q->start+q->length-1)+1) & q->mask;
    if (seqnum == expected) {
-	queue_insert(q, q->start+q->length-1, seqnum);
-	return(GSS_S_COMPLETE);
+      queue_insert(q, q->start+q->length-1, seqnum);
+      return (GSS_S_COMPLETE);
    }
 
    /* rule 2: > expected sequence number */
-
-   if ((seqnum > expected)) {
-	queue_insert(q, q->start+q->length-1, seqnum);
-	if (q->do_replay && !q->do_sequence)
-	 return(GSS_S_COMPLETE);
-	else
-         return(GSS_S_GAP_TOKEN);
+   if (after(seqnum, expected, q->mask)) {
+      queue_insert(q, q->start+q->length-1, seqnum);
+      if (q->do_replay && !q->do_sequence)
+         return (GSS_S_COMPLETE);
+      else
+         return (GSS_S_GAP_TOKEN);
    }
 
    /* rule 3: seqnum < seqnum(first) */
-   if (seqnum < QELEM(q,q->start)) {
-      if (q->do_replay)
-	    return(GSS_S_OLD_TOKEN);
+   if (after(QELEM(q,q->start), seqnum, q->mask)) {
+      if (q->do_replay && !q->do_sequence)
+         return (GSS_S_OLD_TOKEN);
       else
-	    return(GSS_S_UNSEQ_TOKEN);
+         return (GSS_S_UNSEQ_TOKEN);
    }
 
    /* rule 4+5: seqnum in [seqnum(first),seqnum(last)]  */
 
    else {
       if (seqnum == QELEM(q,q->start+q->length-1))
-	 return(GSS_S_DUPLICATE_TOKEN);
+         return (GSS_S_DUPLICATE_TOKEN);
 
       for (i=q->start; i<q->start+q->length-1; i++) {
-	 if (seqnum == QELEM(q,i))
-	    return(GSS_S_DUPLICATE_TOKEN);
-	 if ((seqnum > QELEM(q,i)) && (seqnum < QELEM(q,i+1))) {
-	    queue_insert(q, i, seqnum);
-	    if (q->do_replay && !q->do_sequence)
-	       return(GSS_S_COMPLETE);
-	    else
-	       return(GSS_S_UNSEQ_TOKEN);
-	 }
+         if (seqnum == QELEM(q,i))
+            return (GSS_S_DUPLICATE_TOKEN);
+         if (after(seqnum, QELEM(q,i), q->mask) && 
+             after(QELEM(q,i+1), seqnum, q->mask)) {
+            queue_insert(q, i, seqnum);
+            if (q->do_replay && !q->do_sequence)
+               return (GSS_S_COMPLETE);
+            else
+               return (GSS_S_UNSEQ_TOKEN);
+         }
       }
    }
 
    /* this should never happen */
-   return(GSS_S_FAILURE);
+   return (GSS_S_FAILURE);
 }
 
 void
@@ -218,7 +265,7 @@ gss_uint32
 g_queue_size(void *vqueue, size_t *sizep)
 {
     *sizep += sizeof(queue);
-    return 0;
+    return (0);
 }
 
 gss_uint32
@@ -228,7 +275,7 @@ g_queue_externalize(void *vqueue, unsigned char **buf, size_t *lenremain)
     *buf += sizeof(queue);
     *lenremain -= sizeof(queue);
     
-    return 0;
+    return (0);
 }
 
 gss_uint32
@@ -242,5 +289,5 @@ g_queue_internalize(void **vqueue, unsigned char **buf, size_t *lenremain)
     *buf += sizeof(queue);
     *lenremain -= sizeof(queue);
     *vqueue = q;
-    return 0;
+    return (0);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -441,7 +441,7 @@ kg_seal(context, minor_status, context_handle, conf_req_flag, qop_req,
 
     ctx = (krb5_gss_ctx_id_rec *) context_handle;
 
-    if (ctx->subkey == NULL || !(ctx->gss_flags & GSS_C_PROT_READY_FLAG)) {
+    if (ctx->subkey == NULL && !ctx->established) {
 	*minor_status = KG_CTX_INCOMPLETE;
 	return(GSS_S_NO_CONTEXT);
     }
