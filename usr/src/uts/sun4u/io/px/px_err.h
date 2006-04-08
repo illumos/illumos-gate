@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@ extern "C" {
 
 typedef enum {
 	PX_ERR_JBC,
+	PX_ERR_UBC,
 	PX_ERR_MMU,
 	PX_ERR_IMU,
 	PX_ERR_TLU_UE,
@@ -51,6 +51,36 @@ typedef enum {
 
 void px_err_reg_enable(px_t *px_p, px_err_id_t id);
 void px_err_reg_disable(px_t *px_p, px_err_id_t id);
+
+#define	PX_ERR_EN_ALL			-1ull
+#define	PX_ERR_MASK_NONE		0ull
+
+#define	LPU_INTR_ENABLE 0ull
+#define	LPU_INTR_DISABLE -1ull
+
+extern uint64_t px_tlu_ue_intr_mask;
+extern uint64_t px_tlu_ue_log_mask;
+extern uint64_t px_tlu_ue_count_mask;
+
+extern uint64_t px_tlu_ce_intr_mask;
+extern uint64_t px_tlu_ce_log_mask;
+extern uint64_t px_tlu_ce_count_mask;
+
+extern uint64_t px_tlu_oe_intr_mask;
+extern uint64_t px_tlu_oe_log_mask;
+extern uint64_t px_tlu_oe_count_mask;
+
+extern uint64_t px_mmu_intr_mask;
+extern uint64_t px_mmu_log_mask;
+extern uint64_t px_mmu_count_mask;
+
+extern uint64_t px_imu_intr_mask;
+extern uint64_t px_imu_log_mask;
+extern uint64_t px_imu_count_mask;
+
+extern uint64_t px_ilu_intr_mask;
+extern uint64_t px_ilu_log_mask;
+extern uint64_t px_ilu_count_mask;
 
 #ifdef	__cplusplus
 }

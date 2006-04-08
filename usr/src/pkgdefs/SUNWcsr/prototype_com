@@ -81,6 +81,7 @@ i i.defpasswd
 i i.vfstab
 i i.manifest
 i r.manifest
+i i.ttydefs
 #
 # source locations relative to the prototype file
 #
@@ -305,7 +306,7 @@ e syslogconf etc/syslog.conf 644 root sys
 s none etc/tar=../usr/sbin/tar
 s none etc/telinit=../sbin/init
 d none etc/tm 755 root sys
-f none etc/ttydefs 644 root sys
+e ttydefs etc/ttydefs 644 root sys
 e ttysrch etc/ttysrch 644 root sys
 s none etc/uadmin=../sbin/uadmin
 s none etc/umount=../sbin/umount

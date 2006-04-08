@@ -38,6 +38,7 @@
 #include <sys/machsystm.h>	/* intr_dist_add */
 #include <sys/ddi_impldefs.h>
 #include <sys/cpuvar.h>
+#include <sys/time.h>
 #include "px_obj.h"
 
 /*LINTLIBRARY*/
@@ -48,6 +49,8 @@ static void px_ib_cpu_ticks_to_ih_nsec(px_ib_t *ib_p, px_ih_t *ih_p,
 static uint_t px_ib_intr_reset(void *arg);
 static void px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
     char *path_name, int instance);
+
+extern uint64_t xc_tick_jump_limit;
 
 int
 px_ib_attach(px_t *px_p)
@@ -172,7 +175,8 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	uint32_t	old_cpu_id;
 	sysino_t	sysino;
 	intr_valid_state_t	enabled = 0;
-	hrtime_t	start_time;
+	hrtime_t	start_time, prev, curr, interval, jump;
+	hrtime_t	intr_timeout;
 	intr_state_t	intr_state;
 	int		e = DDI_SUCCESS;
 
@@ -208,11 +212,27 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	/* Busy wait on pending interrupts */
 	PX_INTR_DISABLE(dip, sysino);
 
-	for (start_time = gethrtime(); !panicstr &&
+	intr_timeout = px_intrpend_timeout;
+	jump = TICK_TO_NSEC(xc_tick_jump_limit);
+
+	for (curr = start_time = gethrtime(); !panicstr &&
 	    ((e = px_lib_intr_getstate(dip, sysino, &intr_state)) ==
 		DDI_SUCCESS) &&
 	    (intr_state == INTR_DELIVERED_STATE); /* */) {
-		if (gethrtime() - start_time > px_intrpend_timeout) {
+		/*
+		 * If we have a really large jump in hrtime, it is most
+		 * probably because we entered the debugger (or OBP,
+		 * in general). So, we adjust the timeout accordingly
+		 * to prevent declaring an interrupt timeout. The
+		 * master-interrupt mechanism in OBP should deliver
+		 * the interrupts properly.
+		 */
+		prev = curr;
+		curr = gethrtime();
+		interval = curr - prev;
+		if (interval > jump)
+			intr_timeout += interval;
+		if (curr - start_time > intr_timeout) {
 			cmn_err(CE_WARN,
 			    "%s%d: px_ib_intr_dist_en: sysino 0x%lx(ino 0x%x) "
 			    "from cpu id 0x%x to 0x%x timeout",

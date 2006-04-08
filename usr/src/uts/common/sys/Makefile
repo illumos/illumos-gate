@@ -663,7 +663,8 @@ FMFSHDRS=			\
 FMIOHDRS=			\
 	ddi.h			\
 	pci.h			\
-	sun4upci.h
+	sun4upci.h		\
+	opl_mc_fm.h
 
 FSHDRS=				\
 	autofs.h		\

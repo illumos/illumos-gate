@@ -179,6 +179,7 @@ IMPLEMENTATIONS		+= chicago .WAIT
 IMPLEMENTATIONS		+= sunfire .WAIT
 IMPLEMENTATIONS		+= lw8 .WAIT
 IMPLEMENTATIONS		+= makaha .WAIT
+IMPLEMENTATIONS		+= opl .WAIT
 
 $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	= chalupa .WAIT
 $(CLOSED_BUILD)CLOSED_IMPLEMENTATIONS	+= ents .WAIT
@@ -299,6 +300,7 @@ $(IF_TRAPTRACE_OBJ)us3_common_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)us3_cheetah_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)us3_cheetahplus_asm.o :=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)us3_jalapeno_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)opl_olympus_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 
 # Comment these out if you don't want dispatcher lock statistics.
 
@@ -433,6 +435,7 @@ SYS_KMODS	+=
 MISC_KMODS	+= obpsym bootdev vis cpr platmod md5 sha1 i2c_svc
 MISC_KMODS	+= sbd
 
+MISC_KMODS	+= opl_cfg
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= zuluvm
 
@@ -472,7 +475,7 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #	sun4u 'TOD' Modules (/platform/.../kernel/tod):
 #
 TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
-TOD_KMODS	+= todm5819 todblade todbq4802 todsg
+TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
 
 $(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5819p_rmc todstarcat todm5823
 
@@ -480,3 +483,4 @@ $(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5819p_rmc todstarcat todm5823
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
 #
 PCBE_KMODS	+= us234_pcbe
+PCBE_KMODS	+= opl_pcbe

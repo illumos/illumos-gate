@@ -44,11 +44,13 @@
 #include <sys/hotplug/pci/pciehpc.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
+#include "px_tools_var.h"
 #include <px_regs.h>
 #include <px_csr.h>
 #include <sys/machsystm.h>
 #include "px_lib4u.h"
 #include "px_err.h"
+#include "oberon_regs.h"
 
 #pragma weak jbus_stst_order
 
@@ -56,6 +58,7 @@ extern void jbus_stst_order();
 
 ulong_t px_mmu_dvma_end = 0xfffffffful;
 uint_t px_ranges_phi_mask = 0xfffffffful;
+uint64_t *px_oberon_ubc_scratch_regs;
 
 static int px_goto_l23ready(px_t *px_p);
 static int px_goto_l0(px_t *px_p);
@@ -168,8 +171,11 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	case FIRE_VER_20:
 		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 2.0\n");
 		break;
+	case OBERON_VER_10:
+		DBG(DBG_ATTACH, dip, "Oberon Hardware Version 1.0\n");
+		break;
 	default:
-		cmn_err(CE_WARN, "%s%d: FIRE Hardware Version Unknown\n",
+		cmn_err(CE_WARN, "%s%d: PX Hardware Version Unknown\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
@@ -197,6 +203,8 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	pxu_p->tsb_size = iommu_tsb_cookie_to_size(pxu_p->tsb_cookie);
 	pxu_p->tsb_vaddr = iommu_tsb_cookie_to_va(pxu_p->tsb_cookie);
 
+	pxu_p->tsb_paddr = va_to_pa(pxu_p->tsb_vaddr);
+
 	/*
 	 * Create "virtual-dma" property to support child devices
 	 * needing to know DVMA range.
@@ -222,19 +230,39 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	/*
 	 * Initialize all the interrupt handlers
 	 */
-	px_err_reg_enable(px_p, PX_ERR_JBC);
-	px_err_reg_enable(px_p, PX_ERR_MMU);
-	px_err_reg_enable(px_p, PX_ERR_IMU);
-	px_err_reg_enable(px_p, PX_ERR_TLU_UE);
-	px_err_reg_enable(px_p, PX_ERR_TLU_CE);
-	px_err_reg_enable(px_p, PX_ERR_TLU_OE);
-	px_err_reg_enable(px_p, PX_ERR_ILU);
-	px_err_reg_enable(px_p, PX_ERR_LPU_LINK);
-	px_err_reg_enable(px_p, PX_ERR_LPU_PHY);
-	px_err_reg_enable(px_p, PX_ERR_LPU_RX);
-	px_err_reg_enable(px_p, PX_ERR_LPU_TX);
-	px_err_reg_enable(px_p, PX_ERR_LPU_LTSSM);
-	px_err_reg_enable(px_p, PX_ERR_LPU_GIGABLZ);
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		px_err_reg_enable(px_p, PX_ERR_UBC);
+		px_err_reg_enable(px_p, PX_ERR_MMU);
+		px_err_reg_enable(px_p, PX_ERR_IMU);
+		px_err_reg_enable(px_p, PX_ERR_TLU_UE);
+		px_err_reg_enable(px_p, PX_ERR_TLU_CE);
+		px_err_reg_enable(px_p, PX_ERR_TLU_OE);
+		px_err_reg_enable(px_p, PX_ERR_ILU);
+
+		px_fabric_die_rc_ue |= PCIE_AER_UCE_UC;
+		break;
+
+	case PX_CHIP_FIRE:
+		px_err_reg_enable(px_p, PX_ERR_JBC);
+		px_err_reg_enable(px_p, PX_ERR_MMU);
+		px_err_reg_enable(px_p, PX_ERR_IMU);
+		px_err_reg_enable(px_p, PX_ERR_TLU_UE);
+		px_err_reg_enable(px_p, PX_ERR_TLU_CE);
+		px_err_reg_enable(px_p, PX_ERR_TLU_OE);
+		px_err_reg_enable(px_p, PX_ERR_ILU);
+		px_err_reg_enable(px_p, PX_ERR_LPU_LINK);
+		px_err_reg_enable(px_p, PX_ERR_LPU_PHY);
+		px_err_reg_enable(px_p, PX_ERR_LPU_RX);
+		px_err_reg_enable(px_p, PX_ERR_LPU_TX);
+		px_err_reg_enable(px_p, PX_ERR_LPU_LTSSM);
+		px_err_reg_enable(px_p, PX_ERR_LPU_GIGABLZ);
+		break;
+	default:
+		cmn_err(CE_WARN, "%s%d: PX primary bus Unknown\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		return (DDI_FAILURE);
+	}
 
 	/* Initilize device handle */
 	*dev_hdl = (devhandle_t)csr_base;
@@ -255,19 +283,36 @@ px_lib_dev_fini(dev_info_t *dip)
 	/*
 	 * Deinitialize all the interrupt handlers
 	 */
-	px_err_reg_disable(px_p, PX_ERR_JBC);
-	px_err_reg_disable(px_p, PX_ERR_MMU);
-	px_err_reg_disable(px_p, PX_ERR_IMU);
-	px_err_reg_disable(px_p, PX_ERR_TLU_UE);
-	px_err_reg_disable(px_p, PX_ERR_TLU_CE);
-	px_err_reg_disable(px_p, PX_ERR_TLU_OE);
-	px_err_reg_disable(px_p, PX_ERR_ILU);
-	px_err_reg_disable(px_p, PX_ERR_LPU_LINK);
-	px_err_reg_disable(px_p, PX_ERR_LPU_PHY);
-	px_err_reg_disable(px_p, PX_ERR_LPU_RX);
-	px_err_reg_disable(px_p, PX_ERR_LPU_TX);
-	px_err_reg_disable(px_p, PX_ERR_LPU_LTSSM);
-	px_err_reg_disable(px_p, PX_ERR_LPU_GIGABLZ);
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		px_err_reg_disable(px_p, PX_ERR_UBC);
+		px_err_reg_disable(px_p, PX_ERR_MMU);
+		px_err_reg_disable(px_p, PX_ERR_IMU);
+		px_err_reg_disable(px_p, PX_ERR_TLU_UE);
+		px_err_reg_disable(px_p, PX_ERR_TLU_CE);
+		px_err_reg_disable(px_p, PX_ERR_TLU_OE);
+		px_err_reg_disable(px_p, PX_ERR_ILU);
+		break;
+	case PX_CHIP_FIRE:
+		px_err_reg_disable(px_p, PX_ERR_JBC);
+		px_err_reg_disable(px_p, PX_ERR_MMU);
+		px_err_reg_disable(px_p, PX_ERR_IMU);
+		px_err_reg_disable(px_p, PX_ERR_TLU_UE);
+		px_err_reg_disable(px_p, PX_ERR_TLU_CE);
+		px_err_reg_disable(px_p, PX_ERR_TLU_OE);
+		px_err_reg_disable(px_p, PX_ERR_ILU);
+		px_err_reg_disable(px_p, PX_ERR_LPU_LINK);
+		px_err_reg_disable(px_p, PX_ERR_LPU_PHY);
+		px_err_reg_disable(px_p, PX_ERR_LPU_RX);
+		px_err_reg_disable(px_p, PX_ERR_LPU_TX);
+		px_err_reg_disable(px_p, PX_ERR_LPU_LTSSM);
+		px_err_reg_disable(px_p, PX_ERR_LPU_GIGABLZ);
+		break;
+	default:
+		cmn_err(CE_WARN, "%s%d: PX primary bus Unknown\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		return (DDI_FAILURE);
+	}
 
 	iommu_tsb_free(pxu_p->tsb_cookie);
 
@@ -393,12 +438,14 @@ px_lib_intr_setstate(dev_info_t *dip, sysino_t sysino,
 int
 px_lib_intr_gettarget(dev_info_t *dip, sysino_t sysino, cpuid_t *cpuid)
 {
+	px_t		*px_p = DIP_TO_STATE(dip);
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t	ret;
 
 	DBG(DBG_LIB_INT, dip, "px_lib_intr_gettarget: dip 0x%p sysino 0x%llx\n",
 	    dip, sysino);
 
-	if ((ret = hvio_intr_gettarget(DIP_TO_HANDLE(dip),
+	if ((ret = hvio_intr_gettarget(DIP_TO_HANDLE(dip), pxu_p,
 	    sysino, cpuid)) != H_EOK) {
 		DBG(DBG_LIB_INT, dip, "hvio_intr_gettarget failed, ret 0x%lx\n",
 		    ret);
@@ -414,12 +461,14 @@ px_lib_intr_gettarget(dev_info_t *dip, sysino_t sysino, cpuid_t *cpuid)
 int
 px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino, cpuid_t cpuid)
 {
+	px_t		*px_p = DIP_TO_STATE(dip);
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t	ret;
 
 	DBG(DBG_LIB_INT, dip, "px_lib_intr_settarget: dip 0x%p sysino 0x%llx "
 	    "cpuid 0x%x\n", dip, sysino, cpuid);
 
-	if ((ret = hvio_intr_settarget(DIP_TO_HANDLE(dip),
+	if ((ret = hvio_intr_settarget(DIP_TO_HANDLE(dip), pxu_p,
 	    sysino, cpuid)) != H_EOK) {
 		DBG(DBG_LIB_INT, dip, "hvio_intr_settarget failed, ret 0x%lx\n",
 		    ret);
@@ -531,10 +580,14 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
  */
 /*ARGSUSED*/
 int
-px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p, uint64_t *hi_p)
+px_lib_dma_bypass_rngchk(dev_info_t *dip, ddi_dma_attr_t *attr_p,
+    uint64_t *lo_p, uint64_t *hi_p)
 {
-	*lo_p = MMU_BYPASS_BASE;
-	*hi_p = MMU_BYPASS_END;
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	*lo_p = hvio_get_bypass_base(pxu_p);
+	*hi_p = hvio_get_bypass_end(pxu_p);
 
 	return (DDI_SUCCESS);
 }
@@ -546,12 +599,14 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
     io_addr_t *io_addr_p)
 {
 	uint64_t	ret;
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
 	    "attr 0x%x\n", dip, ra, attr);
 
-	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra, attr,
-	    io_addr_p)) != H_EOK) {
+	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), pxu_p, ra,
+	    attr, io_addr_p)) != H_EOK) {
 		DBG(DBG_LIB_DMA, dip,
 		    "hvio_iommu_getbypass failed, ret 0x%lx\n", ret);
 		return (DDI_FAILURE);
@@ -572,10 +627,18 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     off_t off, size_t len, uint_t cache_flags)
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_dma_sync: dip 0x%p rdip 0x%p "
 	    "handle 0x%llx off 0x%x len 0x%x flags 0x%x\n",
 	    dip, rdip, handle, off, len, cache_flags);
+
+	/*
+	 * No flush needed for Oberon
+	 */
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON)
+		return (DDI_SUCCESS);
 
 	/*
 	 * jbus_stst_order is found only in certain cpu modules.
@@ -1242,6 +1305,122 @@ px_lib_resume(dev_info_t *dip)
 	hvio_resume(dev_hdl, pec_ino, pxu_p);
 }
 
+/*
+ * Generate a unique Oberon UBC ID based on the Logicial System Board and
+ * the IO Channel from the portid property field.
+ */
+static uint64_t
+oberon_get_ubc_id(dev_info_t *dip)
+{
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	uint64_t	ubc_id;
+
+	/*
+	 * Generate a unique 6 bit UBC ID using the 2 IO_Channel#[1:0] bits and
+	 * the 4 LSB_ID[3:0] bits from the Oberon's portid property.
+	 */
+	ubc_id = (((pxu_p->portid >> OBERON_PORT_ID_IOC) &
+	    OBERON_PORT_ID_IOC_MASK) | (((pxu_p->portid >>
+	    OBERON_PORT_ID_LSB) & OBERON_PORT_ID_LSB_MASK)
+	    << OBERON_UBC_ID_LSB));
+
+	return (ubc_id);
+}
+
+/*
+ * Oberon does not have a UBC scratch register, so alloc an array of scratch
+ * registers when needed and use a unique UBC ID as an index. This code
+ * can be simplified if we use a pre-allocated array. They are currently
+ * being dynamically allocated because it's only needed by the Oberon.
+ */
+static void
+oberon_set_cb(dev_info_t *dip, uint64_t val)
+{
+	uint64_t	ubc_id;
+
+	if (px_oberon_ubc_scratch_regs == NULL)
+		px_oberon_ubc_scratch_regs =
+		    (uint64_t *)kmem_zalloc(sizeof (uint64_t)*
+		    OBERON_UBC_ID_MAX, KM_SLEEP);
+
+	ubc_id = oberon_get_ubc_id(dip);
+
+	px_oberon_ubc_scratch_regs[ubc_id] = val;
+
+	/*
+	 * Check if any scratch registers are still in use. If all scratch
+	 * registers are currently set to zero, then deallocate the scratch
+	 * register array.
+	 */
+	for (ubc_id = 0; ubc_id < OBERON_UBC_ID_MAX; ubc_id++) {
+		if (px_oberon_ubc_scratch_regs[ubc_id] != NULL)
+			return;
+	}
+
+	/*
+	 * All scratch registers are set to zero so deallocate the scratch
+	 * register array and set the pointer to NULL.
+	 */
+	kmem_free(px_oberon_ubc_scratch_regs,
+	    (sizeof (uint64_t)*OBERON_UBC_ID_MAX));
+
+	px_oberon_ubc_scratch_regs = NULL;
+}
+
+/*
+ * Oberon does not have a UBC scratch register, so use an allocated array of
+ * scratch registers and use the unique UBC ID as an index into that array.
+ */
+static uint64_t
+oberon_get_cb(dev_info_t *dip)
+{
+	uint64_t	ubc_id;
+
+	if (px_oberon_ubc_scratch_regs == NULL)
+		return (0);
+
+	ubc_id = oberon_get_ubc_id(dip);
+
+	return (px_oberon_ubc_scratch_regs[ubc_id]);
+}
+
+/*
+ * Misc Functions:
+ * Currently unsupported by hypervisor
+ */
+static uint64_t
+px_get_cb(dev_info_t *dip)
+{
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	/*
+	 * Oberon does not currently have Scratchpad registers.
+	 */
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON)
+		return (oberon_get_cb(dip));
+
+	return (CSR_XR((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1));
+}
+
+static void
+px_set_cb(dev_info_t *dip, uint64_t val)
+{
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	/*
+	 * Oberon does not currently have Scratchpad registers.
+	 */
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+		oberon_set_cb(dip, val);
+		return;
+	}
+
+	CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1, val);
+}
+
 /*ARGSUSED*/
 int
 px_lib_map_vconfig(dev_info_t *dip,
@@ -1806,6 +1985,15 @@ px_identity_chip(px_t *px_p)
 		return (PX_CHIP_ID(PX_CHIP_FIRE, revision, 0x00));
 	}
 
+	/* Check for Oberon driver binding name */
+	if (strcmp(name, "pciex108e,80f8") == 0) {
+		DBG(DBG_ATTACH, dip, "px_identity_chip: %s%d: "
+		    "name %s module-revision %d\n", ddi_driver_name(dip),
+		    ddi_get_instance(dip), name, revision);
+
+		return (PX_CHIP_ID(PX_CHIP_OBERON, revision, 0x00));
+	}
+
 	DBG(DBG_ATTACH, dip, "%s%d: Unknown PCI Express Host bridge %s %x\n",
 	    ddi_driver_name(dip), ddi_get_instance(dip), name, revision);
 
@@ -1847,8 +2035,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 {
 	px_t		*px_p = DIP_TO_STATE(fault_p->px_fh_dip);
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
-	px_cb_t		*cb_p = (px_cb_t *)CSR_XR((caddr_t)
-	    pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1);
+	px_cb_t		*cb_p = (px_cb_t *)px_get_cb(fault_p->px_fh_dip);
 	px_cb_list_t	*pxl, *pxl_new;
 	cpuid_t		cpuid;
 
@@ -1858,8 +2045,7 @@ px_cb_add_intr(px_fault_t *fault_p)
 		mutex_init(&cb_p->cb_mutex, NULL, MUTEX_DRIVER, NULL);
 		cb_p->px_cb_func = px_cb_intr;
 		pxu_p->px_cb_p = cb_p;
-		CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1,
-		    (uint64_t)cb_p);
+		px_set_cb(fault_p->px_fh_dip, (uint64_t)cb_p);
 	} else
 		pxu_p->px_cb_p = cb_p;
 
@@ -1967,7 +2153,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 	mutex_exit(&cb_p->cb_mutex);
 
 	mutex_destroy(&cb_p->cb_mutex);
-	CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1, 0ull);
+	px_set_cb(fault_p->px_fh_dip, 0ull);
 	kmem_free(cb_p, sizeof (px_cb_t));
 }
 
@@ -2039,8 +2225,7 @@ px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset)
 	uint32_t	val;
 
 	/* Get Fire's Physical Base Address */
-	range_prop = (((uint64_t)(rp[bank].parent_high & 0x7ff)) << 32) |
-	    rp[bank].parent_low;
+	range_prop = px_get_range_prop(px_p, rp, bank);
 
 	/* Get config space first. */
 	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
@@ -2058,8 +2243,7 @@ px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
 	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
 
 	/* Get Fire's Physical Base Address */
-	range_prop = (((uint64_t)(rp[bank].parent_high & 0x7ff)) << 32) |
-	    rp[bank].parent_low;
+	range_prop = px_get_range_prop(px_p, rp, bank);
 
 	/* Get config space first. */
 	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
@@ -2170,6 +2354,31 @@ px_cpr_callb(void *arg, int code)
 }
 
 /*
+ * fetch chip's range propery's value
+ */
+uint64_t
+px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+{
+	pxu_t *pxu_p = (pxu_t *)px_p->px_plat_p;
+	uint64_t mask, range_prop;
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		mask = OBERON_RANGE_PROP_MASK;
+		break;
+	case PX_CHIP_FIRE:
+		mask = FIRE_RANGE_PROP_MASK;
+		break;
+	default:
+		mask = FIRE_RANGE_PROP_MASK;
+	}
+	range_prop = (((uint64_t)(rp[bank].parent_high & mask)) << 32) |
+		rp[bank].parent_low;
+
+	return (range_prop);
+}
+
+/*
  * add cpr callback
  */
 void
@@ -2189,14 +2398,69 @@ px_cpr_rem_callb(px_t *px_p)
 }
 
 /*ARGSUSED*/
+static uint_t
+px_hp_intr(caddr_t arg1, caddr_t arg2)
+{
+	px_t *px_p = (px_t *)arg1;
+	int rval;
+
+	rval = pciehpc_intr(px_p->px_dip);
+
+#ifdef  DEBUG
+	if (rval == DDI_INTR_UNCLAIMED)
+	    cmn_err(CE_WARN, "%s%d: UNCLAIMED intr\n",
+		ddi_driver_name(px_p->px_dip),
+		ddi_get_instance(px_p->px_dip));
+#endif
+
+	return (rval);
+}
+
 int
 px_lib_hotplug_init(dev_info_t *dip, void *arg)
 {
-	return (DDI_ENOTSUP);
+	px_t	*px_p = DIP_TO_STATE(dip);
+	uint64_t ret;
+
+	if ((ret = hvio_hotplug_init(dip, arg)) == DDI_SUCCESS) {
+		sysino_t sysino;
+
+		if (px_lib_intr_devino_to_sysino(px_p->px_dip,
+		    px_p->px_inos[PX_INTR_HOTPLUG], &sysino) !=
+		    DDI_SUCCESS) {
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "%s%d: devino_to_sysino fails\n",
+			    ddi_driver_name(px_p->px_dip),
+			    ddi_get_instance(px_p->px_dip));
+#endif
+			return (DDI_FAILURE);
+		}
+
+		VERIFY(add_ivintr(sysino, PX_PCIEHP_PIL,
+		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL) == 0);
+	}
+
+	return (ret);
 }
 
-/*ARGSUSED*/
 void
 px_lib_hotplug_uninit(dev_info_t *dip)
 {
+	if (hvio_hotplug_uninit(dip) == DDI_SUCCESS) {
+		px_t	*px_p = DIP_TO_STATE(dip);
+		sysino_t sysino;
+
+		if (px_lib_intr_devino_to_sysino(px_p->px_dip,
+		    px_p->px_inos[PX_INTR_HOTPLUG], &sysino) !=
+		    DDI_SUCCESS) {
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "%s%d: devino_to_sysino fails\n",
+			    ddi_driver_name(px_p->px_dip),
+			    ddi_get_instance(px_p->px_dip));
+#endif
+			return;
+		}
+
+		rem_ivintr(sysino, NULL);
+	}
 }

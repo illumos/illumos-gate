@@ -1,14 +1,13 @@
 #!/sbin/sh
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -48,17 +47,27 @@ getproparg() {
 
 DCS=/usr/lib/dcs
 platform=`/sbin/uname -i`
-starfire="SUNW,Ultra-Enterprise-10000"
-starcat="SUNW,Sun-Fire-15000"
+e10k="SUNW,Ultra-Enterprise-10000"
+sf15k="SUNW,Sun-Fire-15000"
+opl="SUNW,SPARC-Enterprise"
+fjopl="FJSV,SPARC-Enterprise"
+tmpopl="SUNW,OPL-Enterprise"
 
 args=""
-if [ $platform = "$starcat" ]; then
+if [ $platform = "$sf15k" ]; then
 	args="$args `getproparg -a dcs/ah_auth`"
 	args="$args `getproparg -e dcs/esp_encr`"
 	args="$args `getproparg -u dcs/esp_auth`"
+elif [ $platform = "$opl" -o \
+       $platform = "$fjopl" -o \
+       $platform = "$tmpopl" ]; then
+	args="-l"
 fi
 
-if [ $platform = "$starfire" -o $platform = "$starcat" ]; then
+if [ $platform = "$e10k" -o $platform = "$sf15k" -o \
+     $platform = "$opl" -o \
+     $platform = "$fjopl" -o \
+     $platform = "$tmpopl" ]; then
 	$DCS $args			# Fail if can't execute
 	exit				# Use dcs's exit status
 else

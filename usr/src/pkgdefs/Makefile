@@ -47,6 +47,8 @@ sparc_SUBDIRS= \
 	SUNWdcsu \
 	SUNWdrcr.u \
 	SUNWdrr.u \
+        SUNWdscpr.u \
+        SUNWdscpu.u \
 	SUNWefcl \
 	SUNWefcr \
 	SUNWefcu \

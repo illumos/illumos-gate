@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +62,7 @@
 #define	OPT_STR	""
 #endif /* SCKMD_DEBUG */
 
-#define	SCKM_DEV	"/dev/sckmdrv"
+#define	KM_DEV	"/dev/kmdrv"
 
 #define	SCKMD_MAX_MSG_SIZE	1024
 #define	SCKMD_ERR_MSG_SIZE	512
@@ -163,8 +162,8 @@ main(int argc, char **argv)
 	}
 
 	/* open driver */
-	if ((fd = open(SCKM_DEV, O_RDONLY)) == -1) {
-		sckmd_log(LOG_ERR, "error initializing sckm driver: %s\n",
+	if ((fd = open(KM_DEV, O_RDONLY)) == -1) {
+		sckmd_log(LOG_ERR, "error initializing km driver: %s\n",
 		    strerror(errno));
 		exit(1);
 	}

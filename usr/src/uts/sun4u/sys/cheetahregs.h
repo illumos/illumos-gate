@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -30,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/machasi.h>
+#include <sys/cpu_impl.h>
 #ifdef _KERNEL
 #include <sys/fpras.h>
 #endif /* _KERNEL */
@@ -41,66 +41,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * Definitions of UltraSparc III cpu implementations as specified
- * in version register
- */
-#define	CHEETAH_IMPL			0x14
-#define	IS_CHEETAH(impl)		((impl) == CHEETAH_IMPL)
-#define	CHEETAH_MAJOR_VERSION(rev)	(((rev) >> 4) & 0xf)
-#define	CHEETAH_MINOR_VERSION(rev)	((rev) & 0xf)
-
-/*
- * Definitions of UltraSPARC III+ cpu implementation as specified
- * in version register
- */
-#define	CHEETAH_PLUS_IMPL		0x15
-#define	IS_CHEETAH_PLUS(impl)		((impl) == CHEETAH_PLUS_IMPL)
-#define	CHEETAH_PLUS_MAJOR_VERSION(rev)	CHEETAH_MAJOR_VERSION(rev)
-#define	CHEETAH_PLUS_MINOR_VERSION(rev)	CHEETAH_MINOR_VERSION(rev)
-
-/*
- * Definitions of UltraSPARC IIIi cpu implementation as specified
- * in version register.  Jalapeno major and minor rev's are in
- * the same location and are the same size as Cheetah/Cheetah+.
- */
-#define	JALAPENO_IMPL			0x16
-#define	IS_JALAPENO(impl)		((impl) == JALAPENO_IMPL)
-#define	JALAPENO_MAJOR_VERSION(rev)	CHEETAH_MAJOR_VERSION(rev)
-#define	JALAPENO_MINOR_VERSION(rev)	CHEETAH_MINOR_VERSION(rev)
-
-/*
- * Definitions of UltraSPARC IV cpu implementation as specified
- * in version register. Jaguar major and minor rev's are in
- * the same location and are the same size as Cheetah/Cheetah+.
- */
-#define	JAGUAR_IMPL			0x18
-#define	IS_JAGUAR(impl)			((impl) == JAGUAR_IMPL)
-#define	JAGUAR_MAJOR_VERSION(rev)	CHEETAH_MAJOR_VERSION(rev)
-#define	JAGUAR_MINOR_VERSION(rev)	CHEETAH_MINOR_VERSION(rev)
-
-/*
- * Definitions of UltraSPARC IIIi+ cpu implementation as specified
- * in version register.  Serrano major and minor rev's are in
- * the same location and are the same size as Cheetah/Cheetah+.
- */
-#define	SERRANO_IMPL			0x22
-#define	IS_SERRANO(impl)		((impl) == SERRANO_IMPL)
-#define	SERRANO_MAJOR_VERSION(rev)	CHEETAH_MAJOR_VERSION(rev)
-#define	SERRANO_MINOR_VERSION(rev)	CHEETAH_MINOR_VERSION(rev)
-
-/*
- * Definitions of UltraSPARC IV+ cpu implementation as specified
- * in version register. Panther major and minor rev's are in
- * the same location and are the same size as Cheetah/Cheetah+.
- */
-#define	PANTHER_IMPL			0x19
-#define	IS_PANTHER(impl)		((impl) == PANTHER_IMPL)
-#define	PANTHER_MAJOR_VERSION(rev)	CHEETAH_MAJOR_VERSION(rev)
-#define	PANTHER_MINOR_VERSION(rev)	CHEETAH_MINOR_VERSION(rev)
-
-#define	CPU_IMPL_IS_CMP(impl)		(IS_JAGUAR(impl) || IS_PANTHER(impl))
 
 /*
  * Cheetah includes the process info in its mask to make things

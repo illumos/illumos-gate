@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -48,6 +47,15 @@
 #include <sys/async.h>
 #include <sys/fm/protocol.h>
 
+#ifdef sun4u
+#include <sys/cheetahregs.h>
+#include <sys/fm/cpu/UltraSPARC-III.h>
+#include <cmd_opl.h>
+#else /* sun4u */
+#include <sys/niagararegs.h>
+#include <sys/fm/cpu/UltraSPARC-T1.h>
+#endif /* sun4u */
+
 #define	CMD_CPU_UEC_INCR	10
 #define	CPU_FRU_FMRI		FM_FMRI_SCHEME_HC":///" \
     FM_FMRI_LEGACY_HC"="
@@ -61,7 +69,18 @@ static const char *const cpu_names[] = {
 	"ultraSPARC-IV",
 	"ultraSPARC-IVplus",
 	"ultraSPARC-IIIiplus",
-	"ultraSPARC-T1"
+	"ultraSPARC-T1",
+	"SPARC64-VI"
+};
+
+/*
+ * This needs to be in sync with cpu_family_t.
+ */
+static const faminfo_t fam_info_tbl[] = {
+	{ CMD_CPU_FAM_UNSUPPORTED,	B_FALSE },
+	{ CMD_CPU_FAM_CHEETAH,		B_TRUE },
+	{ CMD_CPU_FAM_NIAGARA,		B_FALSE },
+	{ CMD_CPU_FAM_SPARC64,		B_FALSE }
 };
 
 static cmd_cpu_t *cpu_lookup_by_cpuid(uint32_t);
@@ -686,7 +705,7 @@ cpu_lookup_by_cpuid(uint32_t cpuid)
 	return (NULL);
 }
 
-static char *
+char *
 cpu_getfrustr(fmd_hdl_t *hdl, uint32_t cpuid)
 {
 	kstat_named_t *kn;
@@ -904,7 +923,7 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
  * residing at the indicated cpuid are the same.  We do this by comparing the
  * serial IDs from the three entities.
  */
-static cmd_cpu_t *
+cmd_cpu_t *
 cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
 {
 	cmd_cpu_t *cpu;
@@ -1331,7 +1350,8 @@ typedef struct {
 static famdata_t famdata_tbl[] = {
 	{"UltraSPARC-III",	CMD_CPU_FAM_CHEETAH},
 	{"UltraSPARC-IV",	CMD_CPU_FAM_CHEETAH},
-	{"UltraSPARC-T",	CMD_CPU_FAM_NIAGARA}
+	{"UltraSPARC-T",	CMD_CPU_FAM_NIAGARA},
+	{"SPARC64-VI",		CMD_CPU_FAM_SPARC64}
 };
 
 cpu_family_t
@@ -1384,4 +1404,67 @@ cmd_cpu_check_support(void)
 	}
 	(void) kstat_close(kc);
 	return (CMD_CPU_FAM_UNSUPPORTED);
+}
+
+boolean_t
+cmd_cpu_ecache_support(void)
+{
+	cpu_family_t value;
+
+	value = cmd_cpu_check_support();
+	return (fam_info_tbl[value].ecache_flush_needed);
+}
+
+/*
+ * This is derived from "cmd_cpu_lookup()".
+ * The difference here is that it does not do
+ * "fmd_nvl_fmri_expand" since these are for the sibling CPUs.
+ * They are not part of the original fmri page.
+ */
+cmd_cpu_t *
+cmd_sibcpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
+{
+	cmd_cpu_t *cpu;
+	uint8_t vers;
+	const char *scheme;
+	uint32_t cpuid;
+
+	if (nvlist_lookup_pairs(asru, 0,
+	    FM_VERSION, DATA_TYPE_UINT8, &vers,
+	    FM_FMRI_SCHEME, DATA_TYPE_STRING, &scheme,
+	    FM_FMRI_CPU_ID, DATA_TYPE_UINT32, &cpuid,
+	    NULL) != 0 || (vers != CPU_SCHEME_VERSION0 &&
+	    vers != CPU_SCHEME_VERSION1) ||
+	    strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
+		CMD_STAT_BUMP(bad_cpu_asru);
+		return (NULL);
+	}
+
+	cpu = cpu_lookup_by_cpuid(cpuid);
+
+	if (cpu != NULL && (!fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) ||
+	    fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl))) {
+		fmd_hdl_debug(hdl, "sibcpu_lookup: discarding old state\n");
+		cmd_cpu_destroy(hdl, cpu);
+		cpu = NULL;
+	}
+
+	/*
+	 * Check to see if the CPU described by the ereport has been removed
+	 * from the system.  If it has, return to the caller without a CPU.
+	 */
+	if (!fmd_nvl_fmri_present(hdl, asru) ||
+	    fmd_nvl_fmri_unusable(hdl, asru)) {
+		fmd_hdl_debug(hdl, "sibcpu_lookup: discarding old ereport\n");
+		return (NULL);
+	}
+
+	if (cpu == NULL) {
+		const char *cpuname = class + sizeof ("ereport.cpu");
+
+		cpu = cpu_create(hdl, asru, cpuid, cpu_nname2type(hdl, cpuname,
+		    (size_t)(strchr(cpuname, '.') - cpuname)));
+	}
+
+	return (cpu);
 }

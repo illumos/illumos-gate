@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +52,7 @@
  * Do not use any instruction that modifies condition codes as the 
  * caller may depend on these to remain unchanged across the macro.
  */
-#if defined(CHEETAH)
+#if defined(CHEETAH) || defined(OLYMPUS_C)
 
 #define	GET_NATIVE_TIME(out, scr1, scr2) \
 	rd	STICK, out
@@ -907,6 +906,13 @@ adj_shift:
  * With UltraSPARC-III the combination of supporting mixed-speed CPUs
  * and variable clock rate for power management requires that we
  * use %stick to implement this routine.
+ *
+ * For OPL platforms that support the "sleep" instruction, we
+ * conditionally (ifdef'ed) insert a "sleep" instruction in
+ * the loop. Note that theoritically we should have move (duplicated)
+ * the code down to spitfire/us3/opl specific asm files - but this
+ * is alot of code duplication just to add one "sleep" instruction.
+ * We chose less code duplication for this.
  */
 
 #if defined(lint)
@@ -935,7 +941,11 @@ usec_delay(int n)
 	GET_NATIVE_TIME(%o2, %o3, %o4)
 	add	%o1, %o2, %o1
 
-1:	cmp	%o1, %o2
+1:
+#ifdef	_OPL
+	.word 0x81b01060		! insert "sleep" instruction
+#endif /* _OPL */			! use byte code for now
+	cmp	%o1, %o2
 	GET_NATIVE_TIME(%o2, %o3, %o4)
 	bgeu,pt	%xcc, 1b
 	nop
@@ -1251,11 +1261,31 @@ prefetch_page_r(void *pp)
         retl
         prefetch        [%o0+STRIDE2], #n_reads
         SET_SIZE(prefetch_page_r)
-#else	/* SPITFIRE || HUMMINGBIRD */
+
+#elif defined(OLYMPUS_C)
+	!
+	!	Prefetch strides for Olympus-C
+	!
+
+#define STRIDE1	512
+#define STRIDE2	640
+	
+	ENTRY(prefetch_page_w)
+        prefetch        [%o0+STRIDE1], #n_writes
+	retl
+        prefetch        [%o0+STRIDE2], #n_writes
+	SET_SIZE(prefetch_page_w)
+
+	ENTRY(prefetch_page_r)
+        prefetch        [%o0+STRIDE1], #n_writes
+	retl
+        prefetch        [%o0+STRIDE2], #n_writes
+	SET_SIZE(prefetch_page_r)
+#else	/* OLYMPUS_C */
 
 #error "You need to fix this for your new cpu type."
 
-#endif	/* SPITFIRE || HUMMINGBIRD */
+#endif	/* OLYMPUS_C */
 
 #endif	/* lint */
 
@@ -1278,11 +1308,16 @@ prefetch_smap_w(void *smp)
 
 #define	PREFETCH_Q_LEN 3
 
-#else	/* SPITFIRE || HUMMINGBIRD */
+#elif defined(OLYMPUS_C)
+	!
+	! (TBD) Use length of one for now.
+#define	PREFETCH_Q_LEN	1
+
+#else 	/* OLYMPUS_C */
 
 #error You need to fix this for your new cpu type.
 
-#endif	/* SPITFIRE || HUMMINGBIRD */
+#endif	/* OLYMPUS_C */
 
 #include <vm/kpm.h>
 

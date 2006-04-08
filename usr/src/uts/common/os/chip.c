@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -230,11 +229,11 @@ chip_cpu_init(cpu_t *cp)
 	 * On sun4v platforms, the chip infrastructure is currently being
 	 * leveraged to implement core level load balancing.
 	 */
-#ifdef	sun4v
+#ifdef	DO_CORELEVEL_LOADBAL
 	cid = chip_plat_get_coreid(cp);
 #else
 	cid = chip_plat_get_chipid(cp);
-#endif /* sun4v */
+#endif /* DO_CORELEVEL_LOADBAL */
 
 	chp = chip_find(cid);
 	if (chp == NULL) {

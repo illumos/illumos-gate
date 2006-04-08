@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +173,7 @@ drerr_set_c(int log, sbd_error_t **ep, int e_code, char *fmt, ...)
  * Memlist support.
  */
 void
-memlist_delete(struct memlist *mlist)
+dr_memlist_delete(struct memlist *mlist)
 {
 	register struct memlist	*ml;
 
@@ -185,7 +184,7 @@ memlist_delete(struct memlist *mlist)
 }
 
 int
-memlist_intersect(struct memlist *al, struct memlist *bl)
+dr_memlist_intersect(struct memlist *al, struct memlist *bl)
 {
 	uint64_t	astart, aend, bstart, bend;
 
@@ -220,7 +219,7 @@ memlist_intersect(struct memlist *al, struct memlist *bl)
 }
 
 void
-memlist_coalesce(struct memlist *mlist)
+dr_memlist_coalesce(struct memlist *mlist)
 {
 	uint64_t	end, nend;
 
@@ -260,3 +259,199 @@ memlist_dump(struct memlist *mlist)
 		printf("memlist> 0x%lx, 0x%lx\n", ml->address, ml->size);
 }
 #endif
+
+struct memlist *
+dr_memlist_dup(struct memlist *mlist)
+{
+	struct memlist *hl = NULL, *tl, **mlp;
+
+	if (mlist == NULL)
+		return (NULL);
+
+	mlp = &hl;
+	tl = *mlp;
+	for (; mlist; mlist = mlist->next) {
+		*mlp = GETSTRUCT(struct memlist, 1);
+		(*mlp)->address = mlist->address;
+		(*mlp)->size = mlist->size;
+		(*mlp)->prev = tl;
+		tl = *mlp;
+		mlp = &((*mlp)->next);
+	}
+	*mlp = NULL;
+
+	return (hl);
+}
+
+struct memlist *
+dr_memlist_add_span(struct memlist *mlist, uint64_t base, uint64_t len)
+{
+	struct memlist	*ml, *tl, *nl;
+
+	if (len == 0ull)
+		return (NULL);
+
+	if (mlist == NULL) {
+		mlist = GETSTRUCT(struct memlist, 1);
+		mlist->address = base;
+		mlist->size = len;
+		mlist->next = mlist->prev = NULL;
+
+		return (mlist);
+	}
+
+	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
+		if (base < ml->address) {
+			if ((base + len) < ml->address) {
+				nl = GETSTRUCT(struct memlist, 1);
+				nl->address = base;
+				nl->size = len;
+				nl->next = ml;
+				if ((nl->prev = ml->prev) != NULL)
+					nl->prev->next = nl;
+				ml->prev = nl;
+				if (mlist == ml)
+					mlist = nl;
+			} else {
+				ml->size = MAX((base + len),
+					(ml->address + ml->size)) -
+					base;
+				ml->address = base;
+			}
+			break;
+
+		} else if (base <= (ml->address + ml->size)) {
+			ml->size = MAX((base + len),
+				(ml->address + ml->size)) -
+				MIN(ml->address, base);
+			ml->address = MIN(ml->address, base);
+			break;
+		}
+	}
+	if (ml == NULL) {
+		nl = GETSTRUCT(struct memlist, 1);
+		nl->address = base;
+		nl->size = len;
+		nl->next = NULL;
+		nl->prev = tl;
+		tl->next = nl;
+	}
+
+	dr_memlist_coalesce(mlist);
+
+	return (mlist);
+}
+
+struct memlist *
+dr_memlist_del_span(struct memlist *mlist, uint64_t base, uint64_t len)
+{
+	uint64_t	end;
+	struct memlist	*ml, *tl, *nlp;
+
+	if (mlist == NULL)
+		return (NULL);
+
+	end = base + len;
+	if ((end <= mlist->address) || (base == end))
+		return (mlist);
+
+	for (tl = ml = mlist; ml; tl = ml, ml = nlp) {
+		uint64_t	mend;
+
+		nlp = ml->next;
+
+		if (end <= ml->address)
+			break;
+
+		mend = ml->address + ml->size;
+		if (base < mend) {
+			if (base <= ml->address) {
+				ml->address = end;
+				if (end >= mend)
+					ml->size = 0ull;
+				else
+					ml->size = mend - ml->address;
+			} else {
+				ml->size = base - ml->address;
+				if (end < mend) {
+					struct memlist	*nl;
+					/*
+					 * splitting an memlist entry.
+					 */
+					nl = GETSTRUCT(struct memlist, 1);
+					nl->address = end;
+					nl->size = mend - nl->address;
+					if ((nl->next = nlp) != NULL)
+						nlp->prev = nl;
+					nl->prev = ml;
+					ml->next = nl;
+					nlp = nl;
+				}
+			}
+			if (ml->size == 0ull) {
+				if (ml == mlist) {
+					if ((mlist = nlp) != NULL)
+						nlp->prev = NULL;
+					FREESTRUCT(ml, struct memlist, 1);
+					if (mlist == NULL)
+						break;
+					ml = nlp;
+				} else {
+					if ((tl->next = nlp) != NULL)
+						nlp->prev = tl;
+					FREESTRUCT(ml, struct memlist, 1);
+					ml = tl;
+				}
+			}
+		}
+	}
+
+	return (mlist);
+}
+
+/*
+ * add span without merging
+ */
+struct memlist *
+dr_memlist_cat_span(struct memlist *mlist, uint64_t base, uint64_t len)
+{
+	struct memlist	*ml, *tl, *nl;
+
+	if (len == 0ull)
+		return (NULL);
+
+	if (mlist == NULL) {
+		mlist = GETSTRUCT(struct memlist, 1);
+		mlist->address = base;
+		mlist->size = len;
+		mlist->next = mlist->prev = NULL;
+
+		return (mlist);
+	}
+
+	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
+		if (base < ml->address) {
+			nl = GETSTRUCT(struct memlist, 1);
+			nl->address = base;
+			nl->size = len;
+			nl->next = ml;
+			if ((nl->prev = ml->prev) != NULL)
+				nl->prev->next = nl;
+			ml->prev = nl;
+			if (mlist == ml)
+				mlist = nl;
+			break;
+		}
+	}
+
+	if (ml == NULL) {
+		nl = GETSTRUCT(struct memlist, 1);
+		nl->address = base;
+		nl->size = len;
+		nl->next = NULL;
+		nl->prev = tl;
+		tl->next = nl;
+	}
+
+	return (mlist);
+}

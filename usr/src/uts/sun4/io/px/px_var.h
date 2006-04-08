@@ -83,7 +83,7 @@ typedef enum {
 	PX_SUSPENDED
 } px_state_t;
 
-enum { PX_INTR_XBC, PX_INTR_PEC };
+enum { PX_INTR_XBC, PX_INTR_PEC, PX_INTR_HOTPLUG };
 
 #define	PX_ATTACH_RETCODE(obj, op, err) \
 	((err) ? (obj) << 8 | (op) << 4 | (err) & 0xf : DDI_SUCCESS)

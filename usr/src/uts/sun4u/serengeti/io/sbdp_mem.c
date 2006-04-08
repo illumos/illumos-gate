@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1495,7 +1495,7 @@ mc_check_sibling_cpu(pnode_t nodeid)
 		 * be attempted if any of the cores are marked
 		 * as being in reset.
 		 */
-		for (i = 0; i < SBD_MAX_CORES_PER_CMP; i++) {
+		for (i = 0; i < SBDP_MAX_CORES_PER_CMP; i++) {
 			unit = SG_PORTID_TO_CPU_UNIT(portid, i);
 			if (sbdp_is_cpu_present(wnode, bd, unit) &&
 			    sbdp_is_cpu_in_reset(wnode, bd, unit)) {

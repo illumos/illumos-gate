@@ -286,7 +286,8 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 		align = 1; /* align on 1 page boundary */
 
 		/* do a range check and get the limits */
-		ret = px_lib_dma_bypass_rngchk(attrp, &syslo, &syshi);
+		ret = px_lib_dma_bypass_rngchk(px_p->px_dip, attrp,
+				&syslo, &syshi);
 		if (ret != DDI_SUCCESS)
 			return (ret);
 	} else { /* MMU_XLATE or PEER_TO_PEER */
@@ -674,7 +675,8 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 {
 	uint_t clustsz = px_dvma_page_cache_clustsz;
 	uint_t entries = px_dvma_page_cache_entries;
-	io_attributes_t attr = PX_GET_TTE_ATTR(mp->dmai_rflags);
+	io_attributes_t attr = PX_GET_TTE_ATTR(mp->dmai_rflags,
+	    mp->dmai_attr.dma_attr_flags);
 	int i = mmu_p->mmu_dvma_addr_scan_start;
 	uint8_t *lock_addr = mmu_p->mmu_dvma_cache_locks + i;
 	px_dvma_addr_t dvma_pg;
@@ -750,7 +752,8 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	uint_t npages = PX_DMA_WINNPGS(mp);
 	px_dvma_addr_t dvma_pg, dvma_pg_index;
 	void *dvma_addr;
-	uint64_t tte = PX_GET_TTE_ATTR(mp->dmai_rflags);
+	uint64_t tte = PX_GET_TTE_ATTR(mp->dmai_rflags,
+	    mp->dmai_attr.dma_attr_flags);
 	int sleep = dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP;
 	dev_info_t *dip = mp->dmai_rdip;
 	int	ret = DDI_SUCCESS;
@@ -1031,7 +1034,8 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 	size_t sz = cookie_no * sizeof (ddi_dma_cookie_t);
 	px_dma_win_t *win_p = kmem_zalloc(sizeof (px_dma_win_t) + sz,
 		waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP);
-	io_attributes_t	attr = PX_GET_TTE_ATTR(mp->dmai_rflags);
+	io_attributes_t	attr = PX_GET_TTE_ATTR(mp->dmai_rflags,
+	    mp->dmai_attr.dma_attr_flags);
 
 	if (!win_p)
 		goto noresource;
@@ -1193,7 +1197,8 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	uint64_t count_max, bypass_addr = 0;
 	px_dma_win_t **win_pp = (px_dma_win_t **)&mp->dmai_winlst;
 	ddi_dma_cookie_t *cookie0_p;
-	io_attributes_t attr = PX_GET_TTE_ATTR(mp->dmai_rflags);
+	io_attributes_t attr = PX_GET_TTE_ATTR(mp->dmai_rflags,
+	    mp->dmai_attr.dma_attr_flags);
 	dev_info_t *dip = px_p->px_dip;
 
 	ASSERT(PX_DMA_ISPTP(mp) || PX_DMA_ISBYPASS(mp));

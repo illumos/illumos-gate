@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,8 +120,9 @@ typedef struct dcs_alg {
  * -a  control the IPsec AH algorithm ("none", "md5", or "sha1")
  * -e  control the IPsec ESP encr algorithm ("none", "des", or "3des")
  * -u  control the IPsec ESP auth algorithm ("none", "md5", or "sha1")
+ * -l  control the use of libdscp for endpoint authentication.
  */
-#define	OPT_STR		"d:Ss:a:e:u:"
+#define	OPT_STR		"d:Ss:a:e:u:l"
 
 #else /* DCS_DEBUG */
 
@@ -133,8 +133,9 @@ typedef struct dcs_alg {
  * -a  control the IPsec AH algorithm ("none", "md5", or "sha1")
  * -e  control the IPsec ESP encr algorithm ("none", "des", or "3des")
  * -u  control the IPsec ESP auth algorithm ("none", "md5", or "sha1")
+ * -l  control the use of libdscp for endpoint authentication.
  */
-#define	OPT_STR		"s:a:e:u:"
+#define	OPT_STR		"s:a:e:u:l"
 
 #endif /* DCS_DEBUG */
 
@@ -273,6 +274,7 @@ typedef enum {
 extern ulong_t	dcs_debug;
 extern int	standalone;
 extern ulong_t	max_sessions;
+extern int	use_libdscp;
 
 
 /*

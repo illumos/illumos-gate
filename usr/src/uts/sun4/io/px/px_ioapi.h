@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,13 +102,14 @@ typedef enum intr_valid_state {
  *
  *		PCI_MAP_ATTR_READ	0x01 - xfr direction is from memory
  *		PCI_MAP_ATTR_WRITE	0x02 - xfr direction is to memory
+ *		PCI_MAP_ATTR_RO		0x04 - enable relaxed ordering
  *
- *		Bits 63:2 are unused and must be set to zero for this
+ *		Bits 63:3 are unused and must be set to zero for this
  *		version of the specification.
  *
  *		Note: For compatibility with future versions of this
- *		specification, the caller must set 63:2 to zero.
- *		The implementation shall ignore bits 63:2
+ *		specification, the caller must set 63:3 to zero.
+ *		The implementation shall ignore bits 63:3
  *
  * r_addr -	64-bit Real Address.
  *
@@ -196,7 +196,8 @@ typedef uint64_t pci_device_t;
 
 typedef enum io_attributes {
 	PCI_MAP_ATTR_READ 	= (uint32_t)0x01,
-	PCI_MAP_ATTR_WRITE 	= (uint32_t)0x02
+	PCI_MAP_ATTR_WRITE 	= (uint32_t)0x02,
+	PCI_MAP_ATTR_RO		= (uint32_t)0x04
 } io_attributes_t;
 
 typedef enum io_sync_direction {

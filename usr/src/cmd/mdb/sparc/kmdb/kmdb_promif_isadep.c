@@ -113,7 +113,7 @@ walk_cpus_cb(pnode_t node, void *arg, void *result)
 	walk_cpu_data_t *wcd = arg;
 
 	/*
-	 * Sun4v dosen't support port_id on guest.
+	 * Sun4v doesn't support port_id on guest.
 	 */
 #ifndef	sun4v
 	int port_id;
@@ -154,6 +154,31 @@ kmdb_prom_enter_mon(void)
 {
 	prom_enter_mon();
 }
+
+#ifndef	sun4v
+pnode_t
+kmdb_prom_getcpu_propnode(pnode_t node)
+{
+	int val;
+	pnode_t pnode;
+	char name[OBP_MAXPROPNAME];
+
+
+	/*
+	 * Check for the CMT case where cpu nodes are "strand" nodes
+	 * In this case, the "cpu node" properties are contained in
+	 * its parent "core" node.
+	 */
+	if (prom_getprop(node, "portid", (caddr_t)&val) == -1 &&
+	    prom_getprop(node, "upa-portid", (caddr_t)&val) == -1 &&
+	    prom_getprop((pnode = prom_parentnode(node)),
+			"name", name) != -1 &&
+	    strcmp(name, "core") == 0)
+		return (pnode);
+
+	return (node);
+}
+#endif	/* sun4v */
 
 void
 kmdb_prom_exit_to_mon(void)

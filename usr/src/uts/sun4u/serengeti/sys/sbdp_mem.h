@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
 
 #define	SBDP_MAX_MCS_PER_NODE		4
 #define	SBDP_MAX_MEM_NODES_PER_BOARD	4
+#define	SBDP_MAX_CORES_PER_CMP		2
 
 typedef uint64_t mc_dc_regs_t[SBDP_MAX_MCS_PER_NODE];
 

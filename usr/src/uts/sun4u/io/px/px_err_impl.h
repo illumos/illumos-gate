@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +84,11 @@ typedef struct px_err_reg_desc {
 } px_err_reg_desc_t;
 
 /*
+ * Macro to test for the JBC or UBC error id.
+ */
+#define	PX_ERR_XBC(id)	(((id) == PX_ERR_JBC)||((id) == PX_ERR_UBC))
+
+/*
  * Macro to create the error handling forward declaration
  *
  * The error handlers examines error, determine the nature of the error
@@ -141,10 +145,11 @@ PX_ERPT_SEND_DEC(do_not);
 
 
 /*
- * JBC error handling and ereport forward declarations
+ * JBC/UBC error handling and ereport forward declarations
  */
 
 #define	PX_ERR_JBC_CLASS(n)	PCIEX_FIRE "." FIRE_JBC_ ## n
+#define	PX_ERR_UBC_CLASS(n)	PCIEX_OBERON "." FIRE_UBC_ ## n
 
 /*
  * Fire JBC error Handling Forward Declarations
@@ -175,6 +180,9 @@ PX_ERPT_SEND_DEC(jbc_out);
 PX_ERPT_SEND_DEC(jbc_odcd);
 PX_ERPT_SEND_DEC(jbc_idc);
 PX_ERPT_SEND_DEC(jbc_csr);
+
+/* Oberon UBC error ereport Forward Declarations */
+PX_ERPT_SEND_DEC(ubc_fatal);
 
 
 /*
@@ -218,6 +226,7 @@ PX_ERPT_SEND_DEC(mmu);
  */
 
 #define	PX_ERR_PEC_CLASS(n)	PCIEX_FIRE "." FIRE_PEC_ ## n
+#define	PX_ERR_PEC_OB_CLASS(n)	PCIEX_OBERON "." FIRE_PEC_ ## n
 
 int px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,

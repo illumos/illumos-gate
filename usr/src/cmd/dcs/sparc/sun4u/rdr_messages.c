@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,10 +55,14 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <dlfcn.h>
 #include <netdb.h>
+#include <libdscp.h>
 #include <sys/socket.h>
+#include <sys/systeminfo.h>
 #include <netinet/tcp.h>
 
+#include "dcs.h"
 #include "remote_cfg.h"
 #include "rdr_param_types.h"
 #include "rdr_messages.h"
@@ -84,7 +87,6 @@ typedef struct {
 	int	function_strlen;
 	int	function_pad_sz;
 } rdr_variable_message_info_t;
-
 
 /*
  * A table of maximum sizes for each message type. Message size is
@@ -131,6 +133,30 @@ struct {
 
 static const int RDR_ALIGN_64_BIT = 8;   /* 8 bytes */
 
+/*
+ * Interfaces for dynamic use of libdscp.
+ */
+
+#define	LIBDSCP_PATH	"/usr/platform/%s/lib/libdscp.so.1"
+
+#define	LIBDSCP_BIND	"dscpBind"
+#define	LIBDSCP_SECURE	"dscpSecure"
+#define	LIBDSCP_AUTH	"dscpAuth"
+
+typedef enum {
+	LIBDSCP_UNKNOWN = 0,
+	LIBDSCP_AVAILABLE,
+	LIBDSCP_UNAVAILABLE
+} dscp_status_t;
+
+typedef struct {
+	dscp_status_t	status;
+	int		(*bind)(int, int, int);
+	int		(*secure)(int, int);
+	int		(*auth)(int, struct sockaddr *, int);
+} libdscp_t;
+
+static libdscp_t libdscp;
 
 /*
  * Static Function Declarations
@@ -143,6 +169,10 @@ static int rdr_setopt(int fd, int name, int level);
 
 static int rdr_bind(int fd, struct sockaddr *addr);
 
+static int rdr_secure(int fd, struct sockaddr *addr);
+
+static int rdr_auth(struct sockaddr *addr, int len);
+
 static int rdr_snd(int fd, rdr_msg_hdr_t *hdr, char *data, int data_sz,
 			int timeout);
 static int rdr_snd_raw(int fd, char *msg, int data_sz, int timeout);
@@ -150,7 +180,6 @@ static int rdr_snd_raw(int fd, char *msg, int data_sz, int timeout);
 static int rdr_rcv(int fd, rdr_msg_hdr_t *hdr, char **data, int timeout);
 
 static int rdr_rcv_raw(int fd, char *msg, int data_size, int timeout);
-
 
 /*
  * Data Validation Routines
@@ -270,7 +299,7 @@ static int pack_rsrc_info_request(rsrc_info_params_t *params, char **buf,
 static int unpack_rsrc_info_request(rsrc_info_params_t *params,
 			const char *buf);
 static int pack_rsrc_info_reply(rsrc_info_params_t *params, char **buf,
-			int *buf_size);
+			int *buf_size, int encoding);
 static int unpack_rsrc_info_reply(rsrc_info_params_t *params, const char *buf);
 
 /*
@@ -311,6 +340,11 @@ static int cleanup_errstring(char **errstring);
 
 static void cleanup_variable_ap_id_info(
 			rdr_variable_message_info_t *var_msg_info);
+
+/*
+ * Functions for loading libdscp.
+ */
+static int load_libdscp(libdscp_t *libdscp);
 
 /*
  * Public Functions
@@ -358,6 +392,11 @@ rdr_init(int fd, struct sockaddr *addr, int *opts, int num_opts, int blog)
 
 	if ((opts == NULL) || (num_opts < 0)) {
 		num_opts = 0;
+	}
+
+	/* turn on security features */
+	if (rdr_secure(fd, addr) != RDR_OK) {
+		return (RDR_NET_ERR);
 	}
 
 	/* bind the address, if is not already bound */
@@ -457,8 +496,15 @@ rdr_connect_srv(int fd)
 	struct sockaddr_storage	faddr;
 
 
+	/* accept the connection */
 	faddr_len = sizeof (faddr);
 	if ((newfd = accept(fd, (struct sockaddr *)&faddr, &faddr_len)) == -1) {
+		return (RDR_BAD_FD);
+	}
+
+	/* if the peer doesn't authenticate properly, reject */
+	if (rdr_auth((struct sockaddr *)&faddr, faddr_len) != RDR_OK) {
+		(void) close(newfd);
 		return (RDR_BAD_FD);
 	}
 
@@ -486,7 +532,7 @@ rdr_reject(int fd)
 	}
 
 	/* then close it */
-	close(fd);
+	(void) close(fd);
 
 	return (RDR_OK);
 }
@@ -500,7 +546,7 @@ rdr_reject(int fd)
 int
 rdr_close(int fd)
 {
-	close(fd);
+	(void) close(fd);
 
 	return (RDR_OK);
 }
@@ -718,8 +764,16 @@ rdr_snd_msg(int fd, rdr_msg_hdr_t *hdr, cfga_params_t *param, int timeout)
 				err = pack_rsrc_info_request(rparam, &pack_buf,
 				    &pack_buf_sz);
 			} else {
-				err = pack_rsrc_info_reply(rparam, &pack_buf,
-				    &pack_buf_sz);
+				if ((hdr->major_version == 1) &&
+				    (hdr->minor_version == 0)) {
+					err = pack_rsrc_info_reply(rparam,
+					    &pack_buf, &pack_buf_sz,
+					    NV_ENCODE_NATIVE);
+				} else {
+					err = pack_rsrc_info_reply(rparam,
+					    &pack_buf, &pack_buf_sz,
+					    NV_ENCODE_XDR);
+				}
 			}
 			break;
 		}
@@ -1289,6 +1343,69 @@ rdr_bind(int fd, struct sockaddr *addr)
 	return (RDR_OK);
 }
 
+
+/*
+ * rdr_secure:
+ *
+ * Activate security features for a socket.
+ *
+ * Some platforms have libdscp, which provides additional
+ * security features.  An attempt is made to load libdscp
+ * and use these features.
+ *
+ * Nothing is done if libdscp is not available.
+ */
+static int
+rdr_secure(int fd, struct sockaddr *addr)
+{
+	struct sockaddr_in	*sin;
+	int			port;
+	int			error;
+
+	if (use_libdscp == 0) {
+		return (RDR_OK);
+	}
+
+	if (load_libdscp(&libdscp) != 1) {
+		return (RDR_ERROR);
+	}
+
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
+	sin = (struct sockaddr_in *)addr;
+	port = ntohs(sin->sin_port);
+	error = libdscp.bind(0, fd, port);
+
+	if ((error != DSCP_OK) && (error != DSCP_ERROR_ALREADY)) {
+		return (RDR_ERROR);
+	}
+
+	if (libdscp.secure(0, fd) != DSCP_OK) {
+		return (RDR_ERROR);
+	}
+	return (RDR_OK);
+}
+
+/*
+ * rdr_auth:
+ *
+ * Authenticate if a connection is really from the service
+ * processor.  This is dependent upon functionality from
+ * libdscp, so an attempt to load and use libdscp is made.
+ *
+ * Without libdscp, this function does nothing.
+ */
+static int
+rdr_auth(struct sockaddr *addr, int len)
+{
+	if (use_libdscp != 0) {
+		if ((load_libdscp(&libdscp) == 0) ||
+		    (libdscp.auth(0, addr, len) != DSCP_OK)) {
+			return (RDR_ERROR);
+		}
+	}
+
+	return (RDR_OK);
+}
 
 /*
  * rdr_snd:
@@ -3916,7 +4033,8 @@ unpack_rsrc_info_request(rsrc_info_params_t *params, const char *buf)
  * Handle packing a resource info reply message.
  */
 static int
-pack_rsrc_info_reply(rsrc_info_params_t *params, char **buf, int *buf_size)
+pack_rsrc_info_reply(rsrc_info_params_t *params, char **buf, int *buf_size,
+    int encoding)
 {
 	char				*bufptr;
 	rdr_rsrc_info_reply_t		rsrc_info_data;
@@ -3932,7 +4050,8 @@ pack_rsrc_info_reply(rsrc_info_params_t *params, char **buf, int *buf_size)
 	/*
 	 * Pack snapshot handle data.
 	 */
-	pack_status = ri_pack(params->hdl, &rsrc_info_bufp, &rsrc_info_size);
+	pack_status = ri_pack(params->hdl, &rsrc_info_bufp, &rsrc_info_size,
+	    encoding);
 	if (pack_status != 0) {
 		return (RDR_ERROR);
 	}
@@ -4362,4 +4481,77 @@ cleanup_variable_ap_id_info(rdr_variable_message_info_t *var_msg_info)
 			var_msg_info->ap_id_chars = NULL;
 		}
 	}
+}
+
+/*
+ * load_libdscp:
+ *
+ * Try to dynamically link with libdscp.
+ *
+ * Returns:	0 if libdscp not available,
+ *		1 if libdscp is available.
+ */
+static int
+load_libdscp(libdscp_t *libdscp)
+{
+	int		len;
+	void		*lib;
+	static char	platform[100];
+	static char	pathname[MAXPATHLEN];
+
+	/*
+	 * Only try to load libdscp once.  Use the saved
+	 * status in the libdscp interface to know the
+	 * results of previous attempts.
+	 */
+	if (libdscp->status == LIBDSCP_AVAILABLE) {
+		return (1);
+	}
+	if (libdscp->status == LIBDSCP_UNAVAILABLE) {
+		return (0);
+	}
+
+	/*
+	 * Construct a platform specific pathname for libdscp.
+	 */
+	len = sysinfo(SI_PLATFORM, platform, sizeof (platform));
+	if ((len < 0) || (len > sizeof (platform))) {
+		return (0);
+	}
+	len = snprintf(pathname, MAXPATHLEN, LIBDSCP_PATH, platform);
+	if (len >= MAXPATHLEN) {
+		libdscp->status = LIBDSCP_UNAVAILABLE;
+		return (0);
+	}
+
+	/*
+	 * Try dynamically loading libdscp.
+	 */
+	if ((lib = dlopen(pathname, RTLD_LAZY)) == NULL) {
+		libdscp->status = LIBDSCP_UNAVAILABLE;
+		return (0);
+	}
+
+	/*
+	 * Try to resolve all the symbols.
+	 */
+	libdscp->bind = (int (*)(int, int, int))dlsym(lib, LIBDSCP_BIND);
+	libdscp->secure = (int (*)(int, int))dlsym(lib, LIBDSCP_SECURE);
+	libdscp->auth = (int (*)(int, struct sockaddr *, int))dlsym(lib,
+	    LIBDSCP_AUTH);
+
+	if ((libdscp->bind == NULL) ||
+	    (libdscp->secure == NULL) ||
+	    (libdscp->auth == NULL)) {
+		(void) dlclose(lib);
+		libdscp->status = LIBDSCP_UNAVAILABLE;
+		return (0);
+	}
+
+	/*
+	 * Success.
+	 * Update the status to indicate libdscp is available.
+	 */
+	libdscp->status = LIBDSCP_AVAILABLE;
+	return (1);
 }

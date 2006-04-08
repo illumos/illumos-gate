@@ -56,7 +56,7 @@ typedef struct cma_subscriber {
 	const char *subr_class;
 	const char *subr_sname;
 	uint_t subr_svers;
-	void (*subr_func)(fmd_hdl_t *, nvlist_t *, nvlist_t *, const char *);
+	int (*subr_func)(fmd_hdl_t *, nvlist_t *, nvlist_t *, const char *);
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
@@ -129,6 +129,7 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 	char *uuid = NULL;
 	nvlist_t **nva;
 	uint_t nvc = 0;
+	uint_t keepopen;
 	int err = 0;
 
 	err |= nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
@@ -139,6 +140,7 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 		return;
 	}
 
+	keepopen = nvc;
 	while (nvc-- != 0 && !fmd_case_uuclosed(hdl, uuid)) {
 		nvlist_t *nvl = *nva++;
 		const cma_subscriber_t *subr;
@@ -147,9 +149,22 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 		if ((subr = nvl2subr(hdl, nvl, &asru)) == NULL)
 			continue;
 
-		if (subr->subr_func != NULL)
-			subr->subr_func(hdl, nvl, asru, uuid);
+		/*
+		 * A handler returns CMA_RA_SUCCESS to indicate that
+		 * from this suspects  point-of-view the case may be
+		 * closed, CMA_RA_FAILURE otherwise.
+		 * A handler must not close the case itself.
+		 */
+		if (subr->subr_func != NULL) {
+			err = subr->subr_func(hdl, nvl, asru, uuid);
+
+			if (err == CMA_RA_SUCCESS)
+				keepopen--;
+		}
 	}
+
+	if (!keepopen)
+		fmd_case_uuclose(hdl, uuid);
 }
 
 static void
@@ -157,12 +172,18 @@ cma_recv_one(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	const cma_subscriber_t *subr;
 	nvlist_t *asru;
+	int err;
 
 	if ((subr = nvl2subr(hdl, nvl, &asru)) == NULL)
 		return;
 
-	if (subr->subr_func != NULL)
-		subr->subr_func(hdl, nvl, asru, NULL);
+	if (subr->subr_func != NULL) {
+		err = subr->subr_func(hdl, nvl, asru, NULL);
+
+		if (err != CMA_RA_SUCCESS)
+			fmd_hdl_debug(hdl, "failed to offline cpu\n");
+	}
+
 }
 
 /*ARGSUSED*/

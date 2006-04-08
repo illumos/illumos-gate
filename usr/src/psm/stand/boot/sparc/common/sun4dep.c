@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@ setup_aux(void)
 	pnode_t node;
 	/* big enough for OBP_NAME and for a reasonably sized OBP_COMPATIBLE. */
 	static char cpubuf[5 * OBP_MAXDRVNAME];
+	char dname[OBP_MAXDRVNAME];
 	extern uint_t icache_flush;
 	extern char *cpulist;
 
@@ -61,8 +61,19 @@ setup_aux(void)
 		    nlen > sizeof (cpubuf) ||
 		    prom_getprop(node, OBP_NAME, cpubuf) <= 0)
 			prom_panic("no name in cpu node");
+
 		/* nlen includes the terminating null character */
-		if ((clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0) {
+
+		/*
+		 * For the CMT case, need check the parent "core"
+		 * node for the compatible property.
+		 */
+		if ((clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0 ||
+		    ((node = prom_parentnode(node)) != OBP_NONODE &&
+		    node != OBP_BADNODE &&
+		    (clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0 &&
+		    prom_getprop(node, OBP_DEVICETYPE, dname) > 0 &&
+		    strcmp(dname, "core") == 0)) {
 			if ((clen + nlen) > sizeof (cpubuf))
 				prom_panic("cpu node \"compatible\" too long");
 			/* read in compatible, leaving space for ':' */

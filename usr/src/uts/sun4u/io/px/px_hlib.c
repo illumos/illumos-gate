@@ -32,9 +32,11 @@
 #include <sys/machsystm.h>	/* lddphys() */
 #include <sys/iommutsb.h>
 #include <sys/pci.h>
+#include <sys/hotplug/pci/pciehpc.h>
 #include <pcie_pwr.h>
 #include <px_obj.h>
 #include "px_regs.h"
+#include "oberon_regs.h"
 #include "px_csr.h"
 #include "px_lib4u.h"
 
@@ -45,45 +47,57 @@
 /*
  * Registers in the PEC Module.
  * LPU_RESET should be set to 0ull during resume
+ *
+ * This array is in reg,chip form. PX_CHIP_UNIDENTIFIED is for all chips
+ * or PX_CHIP_FIRE for Fire only, or PX_CHIP_OBERON for Oberon only.
  */
-static uint64_t	pec_config_state_regs[] = {
-	PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE,
-	ILU_ERROR_LOG_ENABLE,
-	ILU_INTERRUPT_ENABLE,
-	TLU_CONTROL,
-	TLU_OTHER_EVENT_LOG_ENABLE,
-	TLU_OTHER_EVENT_INTERRUPT_ENABLE,
-	TLU_DEVICE_CONTROL,
-	TLU_LINK_CONTROL,
-	TLU_UNCORRECTABLE_ERROR_LOG_ENABLE,
-	TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE,
-	TLU_CORRECTABLE_ERROR_LOG_ENABLE,
-	TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE,
-	LPU_LINK_LAYER_INTERRUPT_MASK,
-	LPU_PHY_INTERRUPT_MASK,
-	LPU_RECEIVE_PHY_INTERRUPT_MASK,
-	LPU_TRANSMIT_PHY_INTERRUPT_MASK,
-	LPU_GIGABLAZE_GLUE_INTERRUPT_MASK,
-	LPU_LTSSM_INTERRUPT_MASK,
-	LPU_RESET,
-	LPU_DEBUG_CONFIG,
-	LPU_INTERRUPT_MASK,
-	LPU_LINK_LAYER_CONFIG,
-	LPU_FLOW_CONTROL_UPDATE_CONTROL,
-	LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD,
-	LPU_TXLINK_REPLAY_TIMER_THRESHOLD,
-	LPU_REPLAY_BUFFER_MAX_ADDRESS,
-	LPU_TXLINK_RETRY_FIFO_POINTER,
-	LPU_LTSSM_CONFIG2,
-	LPU_LTSSM_CONFIG3,
-	LPU_LTSSM_CONFIG4,
-	LPU_LTSSM_CONFIG5,
-	DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE,
-	DMC_DEBUG_SELECT_FOR_PORT_A,
-	DMC_DEBUG_SELECT_FOR_PORT_B
+static struct px_pec_regs {
+	uint64_t reg;
+	uint64_t chip;
+} pec_config_state_regs[] = {
+	{PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{ILU_ERROR_LOG_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{ILU_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_CONTROL, PX_CHIP_UNIDENTIFIED},
+	{TLU_OTHER_EVENT_LOG_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_OTHER_EVENT_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_DEVICE_CONTROL, PX_CHIP_UNIDENTIFIED},
+	{TLU_LINK_CONTROL, PX_CHIP_UNIDENTIFIED},
+	{TLU_UNCORRECTABLE_ERROR_LOG_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_CORRECTABLE_ERROR_LOG_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{DLU_LINK_LAYER_CONFIG, PX_CHIP_OBERON},
+	{DLU_FLOW_CONTROL_UPDATE_CONTROL, PX_CHIP_OBERON},
+	{DLU_TXLINK_REPLAY_TIMER_THRESHOLD, PX_CHIP_OBERON},
+	{LPU_LINK_LAYER_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_PHY_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_RECEIVE_PHY_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_TRANSMIT_PHY_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_GIGABLAZE_GLUE_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_LTSSM_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_RESET, PX_CHIP_FIRE},
+	{LPU_DEBUG_CONFIG, PX_CHIP_FIRE},
+	{LPU_INTERRUPT_MASK, PX_CHIP_FIRE},
+	{LPU_LINK_LAYER_CONFIG, PX_CHIP_FIRE},
+	{LPU_FLOW_CONTROL_UPDATE_CONTROL, PX_CHIP_FIRE},
+	{LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, PX_CHIP_FIRE},
+	{LPU_TXLINK_REPLAY_TIMER_THRESHOLD, PX_CHIP_FIRE},
+	{LPU_REPLAY_BUFFER_MAX_ADDRESS, PX_CHIP_FIRE},
+	{LPU_TXLINK_RETRY_FIFO_POINTER, PX_CHIP_FIRE},
+	{LPU_LTSSM_CONFIG2, PX_CHIP_FIRE},
+	{LPU_LTSSM_CONFIG3, PX_CHIP_FIRE},
+	{LPU_LTSSM_CONFIG4, PX_CHIP_FIRE},
+	{LPU_LTSSM_CONFIG5, PX_CHIP_FIRE},
+	{DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE, PX_CHIP_UNIDENTIFIED},
+	{DMC_DEBUG_SELECT_FOR_PORT_A, PX_CHIP_UNIDENTIFIED},
+	{DMC_DEBUG_SELECT_FOR_PORT_B, PX_CHIP_UNIDENTIFIED}
 };
-#define	PEC_SIZE (sizeof (pec_config_state_regs))
-#define	PEC_KEYS (PEC_SIZE / sizeof (uint64_t))
+
+#define	PEC_KEYS	\
+	((sizeof (pec_config_state_regs))/sizeof (struct px_pec_regs))
+
+#define	PEC_SIZE	(PEC_KEYS * sizeof (uint64_t))
 
 /*
  * Registers for the MMU module.
@@ -110,18 +124,29 @@ static uint64_t ib_config_state_regs[] = {
 #define	IB_MAP_SIZE (INTERRUPT_MAPPING_ENTRIES * sizeof (uint64_t))
 
 /*
- * Registers for the CB module.
+ * Registers for the JBC module.
  * JBC_ERROR_STATUS_CLEAR needs to be cleared. (-1ull)
  */
-static uint64_t	cb_config_state_regs[] = {
+static uint64_t	jbc_config_state_regs[] = {
 	JBUS_PARITY_CONTROL,
 	JBC_FATAL_RESET_ENABLE,
 	JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE,
 	JBC_ERROR_LOG_ENABLE,
 	JBC_INTERRUPT_ENABLE
 };
-#define	CB_SIZE (sizeof (cb_config_state_regs))
-#define	CB_KEYS (CB_SIZE / sizeof (uint64_t))
+#define	JBC_SIZE (sizeof (jbc_config_state_regs))
+#define	JBC_KEYS (JBC_SIZE / sizeof (uint64_t))
+
+/*
+ * Registers for the UBC module.
+ * UBC_ERROR_STATUS_CLEAR needs to be cleared. (-1ull)
+ */
+static uint64_t	ubc_config_state_regs[] = {
+	UBC_ERROR_LOG_ENABLE,
+	UBC_INTERRUPT_ENABLE
+};
+#define	UBC_SIZE (sizeof (ubc_config_state_regs))
+#define	UBC_KEYS (UBC_SIZE / sizeof (uint64_t))
 
 static uint64_t	msiq_config_other_regs[] = {
 	ERR_COR_MAPPING,
@@ -140,20 +165,43 @@ static uint64_t	msiq_config_other_regs[] = {
 
 static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p);
+static void jbc_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
+static void ubc_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
 
 /*
- * Initialize the module, but do not enable interrupts.
+ * Initialize the bus, but do not enable interrupts.
  */
 /* ARGSUSED */
 void
 hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
+{
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		ubc_init(xbc_csr_base, pxu_p);
+		break;
+	case PX_CHIP_FIRE:
+		jbc_init(xbc_csr_base, pxu_p);
+		break;
+	default:
+		DBG(DBG_CB, NULL, "hvio_cb_init - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		break;
+	}
+}
+
+/*
+ * Initialize the JBC module, but do not enable interrupts.
+ */
+/* ARGSUSED */
+static void
+jbc_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 {
 	uint64_t val;
 
 	/* Check if we need to enable inverted parity */
 	val = (1ULL << JBUS_PARITY_CONTROL_P_EN);
 	CSR_XS(xbc_csr_base, JBUS_PARITY_CONTROL, val);
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBUS_PARITY_CONTROL: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBUS_PARITY_CONTROL: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBUS_PARITY_CONTROL));
 
 	val = (1 << JBC_FATAL_RESET_ENABLE_SPARE_P_INT_EN) |
@@ -165,7 +213,7 @@ hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 	    (1 << JBC_FATAL_RESET_ENABLE_JTCEEI_P_INT_EN) |
 	    (1 << JBC_FATAL_RESET_ENABLE_JTCEER_P_INT_EN);
 	CSR_XS(xbc_csr_base, JBC_FATAL_RESET_ENABLE, val);
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_FATAL_RESET_ENABLE: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBC_FATAL_RESET_ENABLE: 0x%llx\n",
 		CSR_XR(xbc_csr_base, JBC_FATAL_RESET_ENABLE));
 
 	/*
@@ -173,23 +221,60 @@ hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 	 */
 	CSR_XS(xbc_csr_base, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE, -1ull);
 	DBG(DBG_CB, NULL,
-	    "hvio_cb_init, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
+	    "jbc_init, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
 
 	/*
-	 * CSR_V CB's interrupt regs (log, enable, status, clear)
+	 * CSR_V JBC's interrupt regs (log, enable, status, clear)
 	 */
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_ERROR_LOG_ENABLE: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBC_ERROR_LOG_ENABLE: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBC_ERROR_LOG_ENABLE));
 
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_INTERRUPT_ENABLE: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBC_INTERRUPT_ENABLE: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBC_INTERRUPT_ENABLE));
 
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_INTERRUPT_STATUS: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBC_INTERRUPT_STATUS: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBC_INTERRUPT_STATUS));
 
-	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_ERROR_STATUS_CLEAR: 0x%llx\n",
+	DBG(DBG_CB, NULL, "jbc_init, JBC_ERROR_STATUS_CLEAR: 0x%llx\n",
 	    CSR_XR(xbc_csr_base, JBC_ERROR_STATUS_CLEAR));
+}
+
+/*
+ * Initialize the UBC module, but do not enable interrupts.
+ */
+/* ARGSUSED */
+static void
+ubc_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
+{
+	/*
+	 * Enable Uranus bus error log bits.
+	 */
+	CSR_XS(xbc_csr_base, UBC_ERROR_LOG_ENABLE, -1ull);
+	DBG(DBG_CB, NULL, "ubc_init, UBC_ERROR_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_ERROR_LOG_ENABLE));
+
+	/*
+	 * Clear Uranus bus errors.
+	 */
+	CSR_XS(xbc_csr_base, UBC_ERROR_STATUS_CLEAR, -1ull);
+	DBG(DBG_CB, NULL, "ubc_init, UBC_ERROR_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_ERROR_STATUS_CLEAR));
+
+	/*
+	 * CSR_V UBC's interrupt regs (log, enable, status, clear)
+	 */
+	DBG(DBG_CB, NULL, "ubc_init, UBC_ERROR_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_ERROR_LOG_ENABLE));
+
+	DBG(DBG_CB, NULL, "ubc_init, UBC_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_INTERRUPT_ENABLE));
+
+	DBG(DBG_CB, NULL, "ubc_init, UBC_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_INTERRUPT_STATUS));
+
+	DBG(DBG_CB, NULL, "ubc_init, UBC_ERROR_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, UBC_ERROR_STATUS_CLEAR));
 }
 
 /*
@@ -267,6 +352,20 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = CSR_XR(csr_base, TLU_CONTROL);
 	val |= (TLU_CONTROL_L0S_TIM_DEFAULT << TLU_CONTROL_L0S_TIM) |
 	    (1ull << TLU_CONTROL_NPWR_EN) | TLU_CONTROL_CONFIG_DEFAULT;
+
+	/*
+	 * For Oberon, NPWR_EN is set to 0 to prevent PIO reads from blocking
+	 * behind non-posted PIO writes. This blocking could cause a master or
+	 * slave timeout on the host bus if multiple serialized PIOs were to
+	 * suffer Completion Timeouts because the CTO delays for each PIO ahead
+	 * of the read would accumulate. Since the Olympus processor can have
+	 * only 1 PIO outstanding, there is no possibility of PIO accesses from
+	 * a given CPU to a given device being re-ordered by the PCIe fabric;
+	 * therefore turning off serialization should be safe from a PCIe
+	 * ordering perspective.
+	 */
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON)
+		val &= ~(1ull << TLU_CONTROL_NPWR_EN);
 
 	/*
 	 * Set Detect.Quiet. This will disable automatic link
@@ -1433,6 +1532,37 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 
 /* ARGSUSED */
 static void
+dlu_init(caddr_t csr_base, pxu_t *pxu_p)
+{
+uint64_t val;
+
+	CSR_XS(csr_base, DLU_INTERRUPT_MASK, 0ull);
+	DBG(DBG_TLU, NULL, "dlu_init - DLU_INTERRUPT_MASK: 0x%llx\n",
+	    CSR_XR(csr_base, DLU_INTERRUPT_MASK));
+
+	val = (1ull << DLU_LINK_LAYER_CONFIG_VC0_EN);
+	CSR_XS(csr_base, DLU_LINK_LAYER_CONFIG, val);
+	DBG(DBG_TLU, NULL, "dlu_init - DLU_LINK_LAYER_CONFIG: 0x%llx\n",
+	    CSR_XR(csr_base, DLU_LINK_LAYER_CONFIG));
+
+	val = (1ull << DLU_FLOW_CONTROL_UPDATE_CONTROL_FC0_U_NP_EN) |
+	    (1ull << DLU_FLOW_CONTROL_UPDATE_CONTROL_FC0_U_P_EN);
+
+	CSR_XS(csr_base, DLU_FLOW_CONTROL_UPDATE_CONTROL, val);
+	DBG(DBG_TLU, NULL, "dlu_init - DLU_FLOW_CONTROL_UPDATE_CONTROL: "
+	    "0x%llx\n", CSR_XR(csr_base, DLU_FLOW_CONTROL_UPDATE_CONTROL));
+
+	val = (DLU_TXLINK_REPLAY_TIMER_THRESHOLD_DEFAULT <<
+	    DLU_TXLINK_REPLAY_TIMER_THRESHOLD_RPLAY_TMR_THR);
+
+	CSR_XS(csr_base, DLU_TXLINK_REPLAY_TIMER_THRESHOLD, val);
+
+	DBG(DBG_TLU, NULL, "dlu_init - DLU_TXLINK_REPLAY_TIMER_THRESHOLD: "
+	    "0x%llx\n", CSR_XR(csr_base, DLU_TXLINK_REPLAY_TIMER_THRESHOLD));
+}
+
+/* ARGSUSED */
+static void
 dmc_init(caddr_t csr_base, pxu_t *pxu_p)
 {
 	uint64_t val;
@@ -1478,7 +1608,20 @@ hvio_pec_init(caddr_t csr_base, pxu_t *pxu_p)
 
 	ilu_init(csr_base, pxu_p);
 	tlu_init(csr_base, pxu_p);
-	lpu_init(csr_base, pxu_p);
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		dlu_init(csr_base, pxu_p);
+		break;
+	case PX_CHIP_FIRE:
+		lpu_init(csr_base, pxu_p);
+		break;
+	default:
+		DBG(DBG_PEC, NULL, "hvio_pec_init - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		break;
+	}
+
 	dmc_init(csr_base, pxu_p);
 
 /*
@@ -1500,27 +1643,90 @@ hvio_pec_init(caddr_t csr_base, pxu_t *pxu_p)
 }
 
 /*
+ * Convert a TTE to physical address
+ */
+static r_addr_t
+mmu_tte_to_pa(uint64_t tte, pxu_t *pxu_p)
+{
+	uint64_t pa_mask;
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		pa_mask = MMU_OBERON_PADDR_MASK;
+		break;
+	case PX_CHIP_FIRE:
+		pa_mask = MMU_FIRE_PADDR_MASK;
+		break;
+	default:
+		DBG(DBG_MMU, NULL, "mmu_tte_to_pa - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		pa_mask = 0;
+		break;
+	}
+	return ((tte & pa_mask) >> MMU_PAGE_SHIFT);
+}
+
+/*
+ * Return MMU bypass noncache bit for chip
+ */
+static r_addr_t
+mmu_bypass_noncache(pxu_t *pxu_p)
+{
+	r_addr_t bypass_noncache_bit;
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		bypass_noncache_bit = MMU_OBERON_BYPASS_NONCACHE;
+		break;
+	case PX_CHIP_FIRE:
+		bypass_noncache_bit = MMU_FIRE_BYPASS_NONCACHE;
+		break;
+	default:
+		DBG(DBG_MMU, NULL,
+		    "mmu_bypass_nocache - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		bypass_noncache_bit = 0;
+		break;
+	}
+	return (bypass_noncache_bit);
+}
+
+/*
+ * Calculate number of TSB entries for the chip.
+ */
+/* ARGSUSED */
+static uint_t
+mmu_tsb_entries(caddr_t csr_base, pxu_t *pxu_p)
+{
+	uint64_t tsb_ctrl;
+	uint_t obp_tsb_entries, obp_tsb_size;
+
+	tsb_ctrl = CSR_XR(csr_base, MMU_TSB_CONTROL);
+
+	obp_tsb_size = tsb_ctrl & 0xF;
+
+	obp_tsb_entries = MMU_TSBSIZE_TO_TSBENTRIES(obp_tsb_size);
+
+	return (obp_tsb_entries);
+}
+
+/*
  * Initialize the module, but do not enable interrupts.
  */
 void
 hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
-	uint64_t	val, i, tsb_ctrl, obp_tsb_pa, *base_tte_addr;
-	uint_t		obp_tsb_entries, obp_tsb_size;
+	uint64_t	val, i, obp_tsb_pa, *base_tte_addr;
+	uint_t obp_tsb_entries;
 
 	bzero(pxu_p->tsb_vaddr, pxu_p->tsb_size);
 
 	/*
 	 * Preserve OBP's TSB
 	 */
-	val = CSR_XR(csr_base, MMU_TSB_CONTROL);
+	obp_tsb_pa = CSR_XR(csr_base, MMU_TSB_CONTROL) & MMU_TSB_PA_MASK;
 
-	tsb_ctrl = CSR_XR(csr_base, MMU_TSB_CONTROL);
-
-	obp_tsb_pa = tsb_ctrl &  0x7FFFFFFE000;
-	obp_tsb_size = tsb_ctrl & 0xF;
-
-	obp_tsb_entries = MMU_TSBSIZE_TO_TSBENTRIES(obp_tsb_size);
+	obp_tsb_entries = mmu_tsb_entries(csr_base, pxu_p);
 
 	base_tte_addr = pxu_p->tsb_vaddr +
 		((pxu_p->tsb_size >> 3) - obp_tsb_entries);
@@ -1609,17 +1815,54 @@ hvio_iommu_map(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid, pages_t pages,
 	if (io_attr & PCI_MAP_ATTR_WRITE)
 		attr |= MMU_TTE_W;
 
+	if ((PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) &&
+	    (io_attr & PCI_MAP_ATTR_RO))
+		attr |= MMU_TTE_RO;
+
+	if (attr & MMU_TTE_RO) {
+		DBG(DBG_MMU, NULL, "hvio_iommu_map: pfn_index=0x%x "
+		    "pages=0x%x attr = 0x%lx\n", pfn_index, pages, attr);
+	}
+
 	if (flags & MMU_MAP_PFN) {
 		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)addr;
 		for (i = 0; i < pages; i++, pfn_index++, tsb_index++) {
 			px_iopfn_t pfn = PX_GET_MP_PFN(mp, pfn_index);
 			pxu_p->tsb_vaddr[tsb_index] = MMU_PTOB(pfn) | attr;
+
+			/*
+			 * Oberon will need to flush the corresponding TTEs in
+			 * Cache. We only need to flush every cache line.
+			 * Extra PIO's are expensive.
+			 */
+			if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+				if ((i == (pages-1))||!((tsb_index+1) & 0x7)) {
+					CSR_XS(dev_hdl,
+					    MMU_TTE_CACHE_FLUSH_ADDRESS,
+					    (pxu_p->tsb_paddr+
+					    (tsb_index*MMU_TTE_SIZE)));
+				}
+			}
 		}
 	} else {
 		caddr_t	a = (caddr_t)addr;
 		for (i = 0; i < pages; i++, a += MMU_PAGE_SIZE, tsb_index++) {
 			px_iopfn_t pfn = hat_getpfnum(kas.a_hat, a);
 			pxu_p->tsb_vaddr[tsb_index] = MMU_PTOB(pfn) | attr;
+
+			/*
+			 * Oberon will need to flush the corresponding TTEs in
+			 * Cache. We only need to flush every cache line.
+			 * Extra PIO's are expensive.
+			 */
+			if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+				if ((i == (pages-1))||!((tsb_index+1) & 0x7)) {
+					CSR_XS(dev_hdl,
+					    MMU_TTE_CACHE_FLUSH_ADDRESS,
+					    (pxu_p->tsb_paddr+
+					    (tsb_index*MMU_TTE_SIZE)));
+				}
+			}
 		}
 	}
 
@@ -1634,8 +1877,23 @@ hvio_iommu_demap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
 	int		i;
 
-	for (i = 0; i < pages; i++, tsb_index++)
+	for (i = 0; i < pages; i++, tsb_index++) {
 		pxu_p->tsb_vaddr[tsb_index] = MMU_INVALID_TTE;
+
+			/*
+			 * Oberon will need to flush the corresponding TTEs in
+			 * Cache. We only need to flush every cache line.
+			 * Extra PIO's are expensive.
+			 */
+			if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+				if ((i == (pages-1))||!((tsb_index+1) & 0x7)) {
+					CSR_XS(dev_hdl,
+					    MMU_TTE_CACHE_FLUSH_ADDRESS,
+					    (pxu_p->tsb_paddr+
+					    (tsb_index*MMU_TTE_SIZE)));
+				}
+			}
+	}
 
 	return (H_EOK);
 }
@@ -1652,7 +1910,7 @@ hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 	tte_addr = (uint64_t *)(pxu_p->tsb_vaddr) + tsb_index;
 
 	if (*tte_addr & MMU_TTE_V) {
-		*r_addr_p = MMU_TTETOPA(*tte_addr);
+		*r_addr_p = mmu_tte_to_pa(*tte_addr, pxu_p);
 		*attr_p = (*tte_addr & MMU_TTE_W) ?
 		    PCI_MAP_ATTR_WRITE:PCI_MAP_ATTR_READ;
 	} else {
@@ -1666,13 +1924,59 @@ hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
 
 /* ARGSUSED */
 uint64_t
-hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra, io_attributes_t attr,
-    io_addr_t *io_addr_p)
+hvio_get_bypass_base(pxu_t *pxu_p)
+{
+	uint64_t base;
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		base = MMU_OBERON_BYPASS_BASE;
+		break;
+	case PX_CHIP_FIRE:
+		base = MMU_FIRE_BYPASS_BASE;
+		break;
+	default:
+		DBG(DBG_MMU, NULL,
+		    "hvio_get_bypass_base - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		base = 0;
+		break;
+	}
+	return (base);
+}
+
+/* ARGSUSED */
+uint64_t
+hvio_get_bypass_end(pxu_t *pxu_p)
+{
+	uint64_t end;
+
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		end = MMU_OBERON_BYPASS_END;
+		break;
+	case PX_CHIP_FIRE:
+		end = MMU_FIRE_BYPASS_END;
+		break;
+	default:
+		DBG(DBG_MMU, NULL,
+		    "hvio_get_bypass_end - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		end = 0;
+		break;
+	}
+	return (end);
+}
+
+/* ARGSUSED */
+uint64_t
+hvio_iommu_getbypass(devhandle_t dev_hdl, pxu_t *pxu_p, r_addr_t ra,
+    io_attributes_t attr, io_addr_t *io_addr_p)
 {
 	uint64_t	pfn = MMU_BTOP(ra);
 
-	*io_addr_p = MMU_BYPASS_BASE | ra |
-	    (pf_is_memory(pfn) ? 0 : MMU_BYPASS_NONCACHE);
+	*io_addr_p = hvio_get_bypass_base(pxu_p) | ra |
+	    (pf_is_memory(pfn) ? 0 : mmu_bypass_noncache(pxu_p));
 
 	return (H_EOK);
 }
@@ -1812,10 +2116,23 @@ hvio_intr_setstate(devhandle_t dev_hdl, sysino_t sysino,
  * has not been set via intr_settarget.
  */
 uint64_t
-hvio_intr_gettarget(devhandle_t dev_hdl, sysino_t sysino, cpuid_t *cpuid)
+hvio_intr_gettarget(devhandle_t dev_hdl, pxu_t *pxu_p, sysino_t sysino,
+    cpuid_t *cpuid)
 {
-	*cpuid = CSRA_FR((caddr_t)dev_hdl, INTERRUPT_MAPPING,
-	    SYSINO_TO_DEVINO(sysino), ENTRIES_T_JPID);
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		*cpuid = CSRA_FR((caddr_t)dev_hdl, INTERRUPT_MAPPING,
+		    SYSINO_TO_DEVINO(sysino), ENTRIES_T_DESTID);
+		break;
+	case PX_CHIP_FIRE:
+		*cpuid = CSRA_FR((caddr_t)dev_hdl, INTERRUPT_MAPPING,
+		    SYSINO_TO_DEVINO(sysino), ENTRIES_T_JPID);
+		break;
+	default:
+		DBG(DBG_CB, NULL, "hvio_intr_gettarget - "
+		    "unknown chip type: 0x%x\n", PX_CHIP_TYPE(pxu_p));
+		return (EINVAL);
+	}
 
 	return (H_EOK);
 }
@@ -1825,7 +2142,8 @@ hvio_intr_gettarget(devhandle_t dev_hdl, sysino_t sysino, cpuid_t *cpuid)
  * sysino to the target cpu value defined by the argument cpuid.
  */
 uint64_t
-hvio_intr_settarget(devhandle_t dev_hdl, sysino_t sysino, cpuid_t cpuid)
+hvio_intr_settarget(devhandle_t dev_hdl, pxu_t *pxu_p, sysino_t sysino,
+    cpuid_t cpuid)
 {
 
 	uint64_t	val, intr_controller;
@@ -1838,10 +2156,27 @@ hvio_intr_settarget(devhandle_t dev_hdl, sysino_t sysino, cpuid_t cpuid)
 	 */
 	intr_controller = 0x1ull << (cpuid % 4);
 
-	val = (((cpuid & INTERRUPT_MAPPING_ENTRIES_T_JPID_MASK) <<
-	    INTERRUPT_MAPPING_ENTRIES_T_JPID) |
-	    ((intr_controller & INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM_MASK)
-	    << INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM));
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		val = (((cpuid &
+		    INTERRUPT_MAPPING_ENTRIES_T_DESTID_MASK) <<
+		    INTERRUPT_MAPPING_ENTRIES_T_DESTID) |
+		    ((intr_controller &
+		    INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM_MASK)
+		    << INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM));
+		break;
+	case PX_CHIP_FIRE:
+		val = (((cpuid & INTERRUPT_MAPPING_ENTRIES_T_JPID_MASK) <<
+		    INTERRUPT_MAPPING_ENTRIES_T_JPID) |
+		    ((intr_controller &
+		    INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM_MASK)
+		    << INTERRUPT_MAPPING_ENTRIES_INT_CNTRL_NUM));
+		break;
+	default:
+		DBG(DBG_CB, NULL, "hvio_intr_settarget - "
+		    "unknown chip type: 0x%x\n", PX_CHIP_TYPE(pxu_p));
+		return (EINVAL);
+	}
 
 	/* For EQ interrupts, set DATA MONDO bit */
 	if ((ino >= PX_DEFAULT_MSIQ_1ST_DEVINO) &&
@@ -2309,8 +2644,12 @@ hvio_suspend(devhandle_t dev_hdl, pxu_t *pxu_p)
 	/* Save the PEC configuration states */
 	pxu_p->pec_config_state = config_state;
 	for (i = 0; i < PEC_KEYS; i++) {
-		pxu_p->pec_config_state[i] =
-		    CSR_XR((caddr_t)dev_hdl, pec_config_state_regs[i]);
+		if ((pec_config_state_regs[i].chip == PX_CHIP_TYPE(pxu_p)) ||
+		    (pec_config_state_regs[i].chip == PX_CHIP_UNIDENTIFIED)) {
+			pxu_p->pec_config_state[i] =
+			    CSR_XR((caddr_t)dev_hdl,
+			    pec_config_state_regs[i].reg);
+		    }
 	}
 
 	/* Save the MMU configuration states */
@@ -2380,8 +2719,11 @@ hvio_resume(devhandle_t dev_hdl, devino_t devino, pxu_t *pxu_p)
 	CSR_XS((caddr_t)dev_hdl, LPU_RESET, 0ull);
 
 	for (i = 0; i < PEC_KEYS; i++) {
-		CSR_XS((caddr_t)dev_hdl, pec_config_state_regs[i],
-		    pxu_p->pec_config_state[i]);
+		if ((pec_config_state_regs[i].chip == PX_CHIP_TYPE(pxu_p)) ||
+		    (pec_config_state_regs[i].chip == PX_CHIP_UNIDENTIFIED)) {
+			CSR_XS((caddr_t)dev_hdl, pec_config_state_regs[i].reg,
+			    pxu_p->pec_config_state[i]);
+		    }
 	}
 
 	/* Enable PCI-E interrupt */
@@ -2403,10 +2745,27 @@ hvio_resume(devhandle_t dev_hdl, devino_t devino, pxu_t *pxu_p)
 uint64_t
 hvio_cb_suspend(devhandle_t dev_hdl, pxu_t *pxu_p)
 {
-	uint64_t	*config_state;
-	int		i;
+	uint64_t *config_state, *cb_regs;
+	int i, cb_size, cb_keys;
 
-	config_state = kmem_zalloc(CB_SIZE, KM_NOSLEEP);
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		cb_size = UBC_SIZE;
+		cb_keys = UBC_KEYS;
+		cb_regs = ubc_config_state_regs;
+		break;
+	case PX_CHIP_FIRE:
+		cb_size = JBC_SIZE;
+		cb_keys = JBC_KEYS;
+		cb_regs = jbc_config_state_regs;
+		break;
+	default:
+		DBG(DBG_CB, NULL, "hvio_cb_suspend - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		break;
+	}
+
+	config_state = kmem_zalloc(cb_size, KM_NOSLEEP);
 
 	if (config_state == NULL) {
 		return (H_EIO);
@@ -2414,9 +2773,9 @@ hvio_cb_suspend(devhandle_t dev_hdl, pxu_t *pxu_p)
 
 	/* Save the configuration states */
 	pxu_p->xcb_config_state = config_state;
-	for (i = 0; i < CB_KEYS; i++) {
+	for (i = 0; i < cb_keys; i++) {
 		pxu_p->xcb_config_state[i] =
-		    CSR_XR((caddr_t)dev_hdl, cb_config_state_regs[i]);
+		    CSR_XR((caddr_t)dev_hdl, cb_regs[i]);
 	}
 
 	return (H_EOK);
@@ -2426,20 +2785,42 @@ void
 hvio_cb_resume(devhandle_t pci_dev_hdl, devhandle_t xbus_dev_hdl,
     devino_t devino, pxu_t *pxu_p)
 {
-	sysino_t	sysino;
-	int		i;
+	sysino_t sysino;
+	uint64_t *cb_regs;
+	int i, cb_size, cb_keys;
 
-	/*
-	 * No reason to have any reset bits high until an error is
-	 * detected on the link.
-	 */
-	CSR_XS((caddr_t)xbus_dev_hdl, JBC_ERROR_STATUS_CLEAR, -1ull);
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		cb_size = UBC_SIZE;
+		cb_keys = UBC_KEYS;
+		cb_regs = ubc_config_state_regs;
+		/*
+		 * No reason to have any reset bits high until an error is
+		 * detected on the link.
+		 */
+		CSR_XS((caddr_t)xbus_dev_hdl, UBC_ERROR_STATUS_CLEAR, -1ull);
+		break;
+	case PX_CHIP_FIRE:
+		cb_size = JBC_SIZE;
+		cb_keys = JBC_KEYS;
+		cb_regs = jbc_config_state_regs;
+		/*
+		 * No reason to have any reset bits high until an error is
+		 * detected on the link.
+		 */
+		CSR_XS((caddr_t)xbus_dev_hdl, JBC_ERROR_STATUS_CLEAR, -1ull);
+		break;
+	default:
+		DBG(DBG_CB, NULL, "hvio_cb_resume - unknown chip type: 0x%x\n",
+		    PX_CHIP_TYPE(pxu_p));
+		break;
+	}
 
 	ASSERT(pxu_p->xcb_config_state);
 
 	/* Restore the configuration states */
-	for (i = 0; i < CB_KEYS; i++) {
-		CSR_XS((caddr_t)xbus_dev_hdl, cb_config_state_regs[i],
+	for (i = 0; i < cb_keys; i++) {
+		CSR_XS((caddr_t)xbus_dev_hdl, cb_regs[i],
 		    pxu_p->xcb_config_state[i]);
 	}
 
@@ -2448,7 +2829,7 @@ hvio_cb_resume(devhandle_t pci_dev_hdl, devhandle_t xbus_dev_hdl,
 
 	(void) hvio_intr_setstate(pci_dev_hdl, sysino, INTR_IDLE_STATE);
 
-	kmem_free(pxu_p->xcb_config_state, CB_SIZE);
+	kmem_free(pxu_p->xcb_config_state, cb_size);
 
 	pxu_p->xcb_config_state = NULL;
 }
@@ -2602,4 +2983,335 @@ px_enable_detect_quiet(caddr_t csr_base)
 	tlu_ctrl = CSR_XR(csr_base, TLU_CONTROL);
 	tlu_ctrl |= (1ull << TLU_REMAIN_DETECT_QUIET);
 	CSR_XS(csr_base, TLU_CONTROL, tlu_ctrl);
+}
+
+static uint_t
+oberon_hp_pwron(caddr_t csr_base)
+{
+	volatile uint64_t reg;
+
+#ifdef  DEBUG
+	cmn_err(CE_CONT, "oberon_hp_pwron the slot\n");
+#endif
+
+	/* Check Leaf Reset status */
+	reg = CSR_XR(csr_base, ILU_ERROR_LOG_ENABLE);
+	if (!(reg & (1ull << ILU_ERROR_LOG_ENABLE_SPARE3))) {
+#ifdef DEBUG
+		cmn_err(CE_WARN, "oberon_hp_pwron fails: leaf not reset\n");
+#endif
+		goto fail;
+	}
+
+	/* Check Slot status */
+	reg = CSR_XR(csr_base, TLU_SLOT_STATUS);
+	if (!(reg & (1ull << TLU_SLOT_STATUS_PSD)) ||
+	    (reg & (1ull << TLU_SLOT_STATUS_MRLS)) ||
+	    (reg & (1ull << TLU_SLOT_STATUS_PWFD))) {
+#ifdef DEBUG
+		cmn_err(CE_WARN, "oberon_hp_pwron fails: slot status %lx\n",
+		    reg);
+#endif
+		goto fail;
+	}
+
+	/* Blink power LED, this is done from pciehpc already */
+
+	/* Turn on slot power */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, PWREN);
+
+	/* wait to check power state */
+	delay(drv_usectohz(25000));
+
+	return (DDI_SUCCESS);
+
+fail:
+	return (DDI_FAILURE);
+}
+
+static uint_t
+oberon_hp_pwroff(caddr_t csr_base)
+{
+	volatile uint64_t reg;
+
+#ifdef  DEBUG
+	cmn_err(CE_CONT, "oberon_hp_pwroff the slot\n");
+#endif
+
+	/* Blink power LED, this is done from pciehpc already */
+
+	/* Clear Slot Event */
+	CSR_BS(csr_base, TLU_SLOT_STATUS, PSDC);
+
+	/* DRN_TR_DIS on */
+	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
+
+	/* Disable port */
+	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
+
+	/* check time or link status */
+	delay(drv_usectohz(10000));
+
+	/* DRN_TR_DIS off/ CK_EN off */
+	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
+	if ((reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LDN_P)) ||
+	    (reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LDN_S))) {
+		CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
+	}
+	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
+
+	/* PCIE reset */
+	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
+
+	/* PCIE clock stop */
+	CSR_BC(csr_base, HOTPLUG_CONTROL, CLKEN);
+
+	/* Turn off slot power */
+	CSR_BC(csr_base, TLU_SLOT_CONTROL, PWFDEN);
+	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+	CSR_BC(csr_base, TLU_SLOT_STATUS, PWFD);
+
+	/* write 0 to bit 7 of ILU Error Log Enable Register */
+	CSR_BS(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3);
+
+	/* Power LED off */
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
+	reg = pcie_slotctl_pwr_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_OFF);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	/* Indicator LED blink */
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_ATTN_INDICATOR_MASK;
+	reg = pcie_slotctl_attn_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_BLINK);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	/* Notify to SCF */
+	CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
+
+	/*
+	 * Check Leaf Reset
+	 * XXX - We don't need to wait for this any more.
+	 */
+
+	/* Indicator LED off */
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_ATTN_INDICATOR_MASK;
+	reg = pcie_slotctl_attn_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_OFF);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	return (DDI_SUCCESS);
+}
+
+static uint_t oberon_hp_pwrledon(caddr_t csr_base)
+{
+	volatile uint64_t reg;
+
+#ifdef  DEBUG
+	cmn_err(CE_CONT, "oberon_hp_pwrledon the slot\n");
+#endif
+
+	CSR_BS(csr_base, TLU_SLOT_CONTROL, PWFDEN);
+
+	/* Turn on slot clock */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, CLKEN);
+
+	/* Release PCI-E Reset */
+	delay(drv_usectohz(100000));
+	CSR_BS(csr_base, HOTPLUG_CONTROL, N_PERST);
+
+	/*
+	 * Open events' mask
+	 * This should be done from pciehpc already
+	 */
+
+	/*
+	 * Initialize Leaf
+	 * SPLS = 00b, SPLV = 11001b, i.e. 25W
+	 */
+	reg = CSR_XR(csr_base, TLU_SLOT_CAPABILITIES);
+	reg &= ~(TLU_SLOT_CAPABILITIES_SPLS_MASK <<
+	    TLU_SLOT_CAPABILITIES_SPLS);
+	reg &= ~(TLU_SLOT_CAPABILITIES_SPLV_MASK <<
+	    TLU_SLOT_CAPABILITIES_SPLS);
+	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLS);
+	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
+
+	/* Enable PCIE port */
+	CSR_BS(csr_base, DLU_PORT_CONTROL, CK_EN);
+	CSR_BC(csr_base, FLP_PORT_CONTROL, PORT_DIS);
+
+	/* wait for the LUP_P/LUP_S */
+	delay(drv_usectohz(10000));
+	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
+	if (!(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_P)) &&
+	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S)))
+		goto fail;
+
+	/* Turn on Power LED */
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
+	reg = pcie_slotctl_pwr_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_ON);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	/* Notify to SCF */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
+	return (DDI_SUCCESS);
+
+fail:
+	/* Link up is failed */
+	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
+	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
+	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
+	delay(drv_usectohz(150));
+
+	CSR_BC(csr_base, HOTPLUG_CONTROL, CLKEN);
+	delay(drv_usectohz(100));
+
+	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
+	reg = pcie_slotctl_pwr_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_OFF);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	CSR_BC(csr_base, TLU_SLOT_CONTROL, PWFDEN);
+
+	return (DDI_FAILURE);
+}
+
+static uint_t
+oberon_hpreg_get(void *cookie, off_t off)
+{
+	caddr_t csr_base = *(caddr_t *)cookie;
+	volatile uint64_t val = -1ull;
+
+	switch (off) {
+	case PCIE_SLOTCAP:
+		val = CSR_XR(csr_base, TLU_SLOT_CAPABILITIES);
+		break;
+	case PCIE_SLOTCTL:
+		val = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+
+		/* Get the power state */
+		val |= (CSR_XR(csr_base, HOTPLUG_CONTROL) &
+		    (1ull << HOTPLUG_CONTROL_PWREN)) ?
+		    0 : PCIE_SLOTCTL_PWR_CONTROL;
+		break;
+	case PCIE_SLOTSTS:
+		val = CSR_XR(csr_base, TLU_SLOT_STATUS);
+		break;
+	default:
+#ifdef  DEBUG
+		cmn_err(CE_WARN, "oberon_hpreg_get(): "
+		    "unsupported offset 0x%lx\n", off);
+#endif
+		break;
+	}
+
+	return ((uint_t)val);
+}
+
+static uint_t
+oberon_hpreg_put(void *cookie, off_t off, uint_t val)
+{
+	caddr_t csr_base = *(caddr_t *)cookie;
+	volatile uint64_t pwr_state_on, pwr_fault, reg;
+	uint16_t pwr_led_state, pwr_led_ctrl;
+	uint_t pwr_off, ret = DDI_SUCCESS;
+
+#ifdef DEBUG
+	cmn_err(CE_CONT, "oberon_hpreg_put 0x%lx: cur %x, new %x\n",
+	    off, oberon_hpreg_get(cookie, off), val);
+#endif
+
+	switch (off) {
+	case PCIE_SLOTCTL:
+		/*
+		 * Depending on the current state, insertion or removal
+		 * will go through their respective sequences.
+		 */
+		reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+		pwr_led_state = pcie_slotctl_pwr_indicator_get(reg);
+		pwr_led_ctrl = pcie_slotctl_pwr_indicator_get(val);
+
+		pwr_state_on = CSR_BR(csr_base, HOTPLUG_CONTROL, PWREN);
+		pwr_off = val & PCIE_SLOTCTL_PWR_CONTROL;
+
+		if (!pwr_off && !pwr_state_on)
+			ret = oberon_hp_pwron(csr_base);
+		else if (pwr_off && pwr_state_on) {
+			pwr_fault = CSR_XR(csr_base, TLU_SLOT_STATUS) &
+			    (1ull << TLU_SLOT_STATUS_PWFD);
+
+			if (pwr_fault)
+				CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+			else
+				ret = oberon_hp_pwroff(csr_base);
+		} else if (pwr_state_on &&
+		    (pwr_led_state == PCIE_SLOTCTL_INDICATOR_STATE_BLINK) &&
+		    (pwr_led_ctrl == PCIE_SLOTCTL_INDICATOR_STATE_ON))
+			ret = oberon_hp_pwrledon(csr_base);
+		else
+			CSR_XS(csr_base, TLU_SLOT_CONTROL, val);
+		break;
+	case PCIE_SLOTSTS:
+		CSR_XS(csr_base, TLU_SLOT_STATUS, val);
+		break;
+	default:
+#ifdef  DEBUG
+		cmn_err(CE_WARN, "oberon_hpreg_put(): "
+		    "unsupported offset 0x%lx\n", off);
+#endif
+		ret = DDI_FAILURE;
+		break;
+	}
+
+	return (ret);
+}
+
+int
+hvio_hotplug_init(dev_info_t *dip, void *arg)
+{
+	pciehpc_regops_t *regops = (pciehpc_regops_t *)arg;
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
+		if (!CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
+		    TLU_SLOT_CAPABILITIES, HP)) {
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "%s%d: hotplug capabale not set\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
+#endif
+			return (DDI_FAILURE);
+		}
+
+		regops->get = oberon_hpreg_get;
+		regops->put = oberon_hpreg_put;
+
+		/* cookie is the csr_base */
+		regops->cookie = (void *)&pxu_p->px_address[PX_REG_CSR];
+
+		return (DDI_SUCCESS);
+	}
+
+	return (DDI_ENOTSUP);
+}
+
+int
+hvio_hotplug_uninit(dev_info_t *dip)
+{
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON)
+		return (DDI_SUCCESS);
+
+	return (DDI_FAILURE);
 }

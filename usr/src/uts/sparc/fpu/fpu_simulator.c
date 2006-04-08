@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +106,15 @@ struct fpuinfo_kstat fpuinfo = {
 	{ "fpu_sim_fqtoi",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fmovcc",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fmovr",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fmadds",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fmaddd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fmsubs",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fmsubd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnmadds",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnmaddd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnmsubs",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_fnmsubd",		KSTAT_DATA_UINT64},
+	{ "fpu_sim_invalid",		KSTAT_DATA_UINT64},
 };
 
 struct visinfo_kstat visinfo = {
@@ -182,241 +190,315 @@ _fp_fpu_simulator(
 	 */
 	pfpsd->fp_direction = GSR_IM(gsr) ? GSR_IRND(gsr) : fsr.rnd;
 	pfpsd->fp_precision = fsr.rnp;
-	nfcc = nrd & 0x3;
-	if (inst.op3 == 0x35) {		/* fpop2 */
-		fsr.cexc = 0;
-		*pfsr = fsr;
-		if ((inst.opcode & 0xf) == 0) {
-			if ((fp_notp) && (inst.prec == 0))
+
+	if (inst.op3 == 0x37) { /* IMPDEP2B FMA-fused opcode */
+		fp_fma_inst_type *fma_inst;
+		uint32_t	nrs3;
+		unpacked	us3;
+		unpacked	ust;
+		fma_inst = (fp_fma_inst_type *) &inst;
+		nrs2 = fma_inst->rs2;
+		nrs3 = fma_inst->rs3;
+		switch (fma_inst->var) {
+		case fmadd:
+			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				_fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				_fp_add(pfpsd, &ust, &us3, &ud);
+				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fmadds,
+				fpu_sim_fmaddd, fpu_sim_invalid);
+			break;
+		case fmsub:
+			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				_fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				_fp_sub(pfpsd, &ust, &us3, &ud);
+				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
+			}
+			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fmsubs,
+				fpu_sim_fmsubd, fpu_sim_invalid);
+			break;
+		case fnmadd:
+			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				if (ust.fpclass == fp_quiet ||
+					ust.fpclass == fp_signaling) {
+				    _fp_pack(pfpsd, &ust, nrd, fma_inst->sz);
+				} else {
+				    _fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				    _fp_add(pfpsd, &ust, &us3, &ud);
+				    ud.sign ^= 1;
+				    _fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
+				}
+			}
+			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmadds,
+				fpu_sim_fnmaddd, fpu_sim_invalid);
+			break;
+		case fnmsub:
+			_fp_unpack(pfpsd, &us1, nrs1, fma_inst->sz);
+			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
+			_fp_mul(pfpsd, &us1, &us2, &ust);
+			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
+				if (ust.fpclass == fp_quiet ||
+					ust.fpclass == fp_signaling) {
+				    _fp_pack(pfpsd, &ust, nrd, fma_inst->sz);
+				} else {
+				    _fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				    _fp_sub(pfpsd, &ust, &us3, &ud);
+				    ud.sign ^= 1;
+				    _fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
+				}
+			}
+			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmsubs,
+				fpu_sim_fnmsubd, fpu_sim_invalid);
+		}
+	} else {
+		nfcc = nrd & 0x3;
+		if (inst.op3 == 0x35) {		/* fpop2 */
+			fsr.cexc = 0;
+			*pfsr = fsr;
+			if ((inst.opcode & 0xf) == 0) {
+				if ((fp_notp) && (inst.prec == 0))
+					return (ftt_unimplemented);
+				FPUINFO_KSTAT(fpu_sim_fmovcc);
+				return (fmovcc(pfpsd, inst, pfsr)); /* fmovcc */
+			} else if ((inst.opcode & 0x7) == 1) {
+				if ((fp_notp) && (inst.prec == 0))
+					return (ftt_unimplemented);
+				FPUINFO_KSTAT(fpu_sim_fmovr);
+				return (fmovr(pfpsd, inst));	/* fmovr */
+			}
+		}
+		/* ibit not valid for fpop1 instructions */
+		if ((fp_notp) && (inst.ibit != 0))
+			return (ftt_unimplemented);
+		if ((fp_notp) && (inst.prec == 0)) { /* fxto[sdq], fito[sdq] */
+			if ((inst.opcode != flltos) &&
+			    (inst.opcode != flltod) &&
+			    (inst.opcode != flltox) &&
+			    (inst.opcode != fitos) &&
+			    (inst.opcode != fitod) &&
+			    (inst.opcode != fitox)) {
 				return (ftt_unimplemented);
-			FPUINFO_KSTAT(fpu_sim_fmovcc);
-			return (fmovcc(pfpsd, inst, pfsr));	/* fmovcc */
-		} else if ((inst.opcode & 0x7) == 1) {
-			if ((fp_notp) && (inst.prec == 0))
+			}
+		}
+		switch (inst.opcode) {
+		case fmovs:		/* also covers fmovd, fmovq */
+			if (inst.prec < 2) {	/* fmovs */
+				_fp_unpack_word(pfpsd, &usr, nrs2);
+				_fp_pack_word(pfpsd, &usr, nrd);
+				FPUINFO_KSTAT(fpu_sim_fmovs);
+			} else {		/* fmovd */
+				_fp_unpack_extword(pfpsd, &lusr, nrs2);
+				_fp_pack_extword(pfpsd, &lusr, nrd);
+				if (inst.prec > 2) {		/* fmovq */
+				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
+				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
+				    FPUINFO_KSTAT(fpu_sim_fmovq);
+				} else {
+				    FPUINFO_KSTAT(fpu_sim_fmovd);
+				}
+			}
+			break;
+		case fabss:		/* also covers fabsd, fabsq */
+			if (inst.prec < 2) {	/* fabss */
+				_fp_unpack_word(pfpsd, &usr, nrs2);
+				usr &= 0x7fffffff;
+				_fp_pack_word(pfpsd, &usr, nrd);
+				FPUINFO_KSTAT(fpu_sim_fabss);
+			} else {		/* fabsd */
+				_fp_unpack_extword(pfpsd, &lusr, nrs2);
+				lusr &= 0x7fffffffffffffff;
+				_fp_pack_extword(pfpsd, &lusr, nrd);
+				if (inst.prec > 2) {		/* fabsq */
+				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
+				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
+				    FPUINFO_KSTAT(fpu_sim_fabsq);
+				} else {
+				    FPUINFO_KSTAT(fpu_sim_fabsd);
+				}
+			}
+			break;
+		case fnegs:		/* also covers fnegd, fnegq */
+			if (inst.prec < 2) {	/* fnegs */
+				_fp_unpack_word(pfpsd, &usr, nrs2);
+				usr ^= 0x80000000;
+				_fp_pack_word(pfpsd, &usr, nrd);
+				FPUINFO_KSTAT(fpu_sim_fnegs);
+			} else {		/* fnegd */
+				_fp_unpack_extword(pfpsd, &lusr, nrs2);
+				lusr ^= 0x8000000000000000;
+				_fp_pack_extword(pfpsd, &lusr, nrd);
+				if (inst.prec > 2) {		/* fnegq */
+				    _fp_unpack_extword(pfpsd, &lusr, nrs2+2);
+				    lusr ^= 0x0000000000000000;
+				    _fp_pack_extword(pfpsd, &lusr, nrd+2);
+				    FPUINFO_KSTAT(fpu_sim_fnegq);
+				} else {
+				    FPUINFO_KSTAT(fpu_sim_fnegd);
+				}
+			}
+			break;
+		case fadd:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_add(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd, inst.prec);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fadds,
+			    fpu_sim_faddd, fpu_sim_faddq);
+			break;
+		case fsub:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_sub(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd, inst.prec);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fsubs,
+			    fpu_sim_fsubd, fpu_sim_fsubq);
+			break;
+		case fmul:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_mul(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd, inst.prec);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fmuls,
+			    fpu_sim_fmuld, fpu_sim_fmulq);
+			break;
+		case fsmuld:
+			if ((fp_notp) && (inst.prec != 1))
 				return (ftt_unimplemented);
-			FPUINFO_KSTAT(fpu_sim_fmovr);
-			return (fmovr(pfpsd, inst));		/* fmovr */
-		}
-	}
-	/* ibit not valid for fpop1 instructions */
-	if ((fp_notp) && (inst.ibit != 0))
-		return (ftt_unimplemented);
-	if ((fp_notp) && (inst.prec == 0)) {	/* fxto[sdq], fito[sdq] */
-		if ((inst.opcode != flltos) &&
-		    (inst.opcode != flltod) &&
-		    (inst.opcode != flltox) &&
-		    (inst.opcode != fitos) &&
-		    (inst.opcode != fitod) &&
-		    (inst.opcode != fitox)) {
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_mul(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd,
+				(enum fp_op_type) ((int)inst.prec+1));
+			FPUINFO_KSTAT(fpu_sim_fsmuld);
+			break;
+		case fdmulx:
+			if ((fp_notp) && (inst.prec != 2))
+				return (ftt_unimplemented);
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_mul(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd,
+				(enum fp_op_type) ((int)inst.prec+1));
+			FPUINFO_KSTAT(fpu_sim_fdmulx);
+			break;
+		case fdiv:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			_fp_div(pfpsd, &us1, &us2, &ud);
+			_fp_pack(pfpsd, &ud, nrd, inst.prec);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fdivs,
+			    fpu_sim_fdivd, fpu_sim_fdivq);
+			break;
+		case fcmp:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			cc = _fp_compare(pfpsd, &us1, &us2, 0);
+			if (!(pfpsd->fp_current_exceptions & pfpsd->fp_fsrtem))
+				switch (nfcc) {
+				case fcc_0:
+					fsr.fcc0 = cc;
+					break;
+				case fcc_1:
+					fsr.fcc1 = cc;
+					break;
+				case fcc_2:
+					fsr.fcc2 = cc;
+					break;
+				case fcc_3:
+					fsr.fcc3 = cc;
+					break;
+				}
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fcmps,
+			    fpu_sim_fcmpd, fpu_sim_fcmpq);
+			break;
+		case fcmpe:
+			_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
+			_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
+			cc = _fp_compare(pfpsd, &us1, &us2, 1);
+			if (!(pfpsd->fp_current_exceptions & pfpsd->fp_fsrtem))
+				switch (nfcc) {
+				case fcc_0:
+					fsr.fcc0 = cc;
+					break;
+				case fcc_1:
+					fsr.fcc1 = cc;
+					break;
+				case fcc_2:
+					fsr.fcc2 = cc;
+					break;
+				case fcc_3:
+					fsr.fcc3 = cc;
+					break;
+				}
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fcmpes,
+				fpu_sim_fcmped, fpu_sim_fcmpeq);
+			break;
+		case fsqrt:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			_fp_sqrt(pfpsd, &us1, &ud);
+			_fp_pack(pfpsd, &ud, nrd, inst.prec);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fsqrts,
+			    fpu_sim_fsqrtd, fpu_sim_fsqrtq);
+			break;
+		case ftoi:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			pfpsd->fp_direction = fp_tozero;
+			/* Force rounding toward zero. */
+			_fp_pack(pfpsd, &us1, nrd, fp_op_int32);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fstoi,
+			    fpu_sim_fdtoi, fpu_sim_fqtoi);
+			break;
+		case ftoll:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			pfpsd->fp_direction = fp_tozero;
+			/* Force rounding toward zero. */
+			_fp_pack(pfpsd, &us1, nrd, fp_op_int64);
+			FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fstox,
+			    fpu_sim_fdtox, fpu_sim_fqtox);
+			break;
+		case flltos:
+			_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_single);
+			FPUINFO_KSTAT(fpu_sim_fxtos);
+			break;
+		case flltod:
+			_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_double);
+			FPUINFO_KSTAT(fpu_sim_fxtod);
+			break;
+		case flltox:
+			_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_extended);
+			FPUINFO_KSTAT(fpu_sim_fxtoq);
+			break;
+		case fitos:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_single);
+			FPUINFO_KSTAT(fpu_sim_fitos);
+			break;
+		case fitod:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_double);
+			FPUINFO_KSTAT(fpu_sim_fitod);
+			break;
+		case fitox:
+			_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
+			_fp_pack(pfpsd, &us1, nrd, fp_op_extended);
+			FPUINFO_KSTAT(fpu_sim_fitoq);
+			break;
+		default:
 			return (ftt_unimplemented);
 		}
-	}
-	switch (inst.opcode) {
-	case fmovs:		/* also covers fmovd, fmovq */
-		if (inst.prec < 2) {	/* fmovs */
-			_fp_unpack_word(pfpsd, &usr, nrs2);
-			_fp_pack_word(pfpsd, &usr, nrd);
-			FPUINFO_KSTAT(fpu_sim_fmovs);
-		} else {		/* fmovd */
-			_fp_unpack_extword(pfpsd, &lusr, nrs2);
-			_fp_pack_extword(pfpsd, &lusr, nrd);
-			if (inst.prec > 2) {		/* fmovq */
-				_fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				_fp_pack_extword(pfpsd, &lusr, nrd+2);
-				FPUINFO_KSTAT(fpu_sim_fmovq);
-			} else {
-				FPUINFO_KSTAT(fpu_sim_fmovd);
-			}
-		}
-		break;
-	case fabss:		/* also covers fabsd, fabsq */
-		if (inst.prec < 2) {	/* fabss */
-			_fp_unpack_word(pfpsd, &usr, nrs2);
-			usr &= 0x7fffffff;
-			_fp_pack_word(pfpsd, &usr, nrd);
-			FPUINFO_KSTAT(fpu_sim_fabss);
-		} else {		/* fabsd */
-			_fp_unpack_extword(pfpsd, &lusr, nrs2);
-			lusr &= 0x7fffffffffffffff;
-			_fp_pack_extword(pfpsd, &lusr, nrd);
-			if (inst.prec > 2) {		/* fabsq */
-				_fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				_fp_pack_extword(pfpsd, &lusr, nrd+2);
-				FPUINFO_KSTAT(fpu_sim_fabsq);
-			} else {
-				FPUINFO_KSTAT(fpu_sim_fabsd);
-			}
-		}
-		break;
-	case fnegs:		/* also covers fnegd, fnegq */
-	if (inst.prec < 2) {	/* fnegs */
-			_fp_unpack_word(pfpsd, &usr, nrs2);
-			usr ^= 0x80000000;
-			_fp_pack_word(pfpsd, &usr, nrd);
-			FPUINFO_KSTAT(fpu_sim_fnegs);
-		} else {		/* fnegd */
-			_fp_unpack_extword(pfpsd, &lusr, nrs2);
-			lusr ^= 0x8000000000000000;
-			_fp_pack_extword(pfpsd, &lusr, nrd);
-			if (inst.prec > 2) {		/* fnegq */
-				_fp_unpack_extword(pfpsd, &lusr, nrs2+2);
-				lusr ^= 0x0000000000000000;
-				_fp_pack_extword(pfpsd, &lusr, nrd+2);
-				FPUINFO_KSTAT(fpu_sim_fnegq);
-			} else {
-				FPUINFO_KSTAT(fpu_sim_fnegd);
-			}
-		}
-		break;
-	case fadd:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_add(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, inst.prec);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fadds,
-		    fpu_sim_faddd, fpu_sim_faddq);
-		break;
-	case fsub:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_sub(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, inst.prec);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fsubs,
-		    fpu_sim_fsubd, fpu_sim_fsubq);
-		break;
-	case fmul:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_mul(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, inst.prec);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fmuls,
-		    fpu_sim_fmuld, fpu_sim_fmulq);
-		break;
-	case fsmuld:
-		if ((fp_notp) && (inst.prec != 1))
-			return (ftt_unimplemented);
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_mul(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, (enum fp_op_type) ((int)inst.prec+1));
-		FPUINFO_KSTAT(fpu_sim_fsmuld);
-		break;
-	case fdmulx:
-		if ((fp_notp) && (inst.prec != 2))
-			return (ftt_unimplemented);
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_mul(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, (enum fp_op_type) ((int)inst.prec+1));
-		FPUINFO_KSTAT(fpu_sim_fdmulx);
-		break;
-	case fdiv:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		_fp_div(pfpsd, &us1, &us2, &ud);
-		_fp_pack(pfpsd, &ud, nrd, inst.prec);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fdivs,
-		    fpu_sim_fdivd, fpu_sim_fdivq);
-		break;
-	case fcmp:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		cc = _fp_compare(pfpsd, &us1, &us2, 0);
-		if (!(pfpsd->fp_current_exceptions & pfpsd->fp_fsrtem))
-			switch (nfcc) {
-			case fcc_0:
-				fsr.fcc0 = cc;
-				break;
-			case fcc_1:
-				fsr.fcc1 = cc;
-				break;
-			case fcc_2:
-				fsr.fcc2 = cc;
-				break;
-			case fcc_3:
-				fsr.fcc3 = cc;
-				break;
-			}
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fcmps,
-		    fpu_sim_fcmpd, fpu_sim_fcmpq);
-		break;
-	case fcmpe:
-		_fp_unpack(pfpsd, &us1, nrs1, inst.prec);
-		_fp_unpack(pfpsd, &us2, nrs2, inst.prec);
-		cc = _fp_compare(pfpsd, &us1, &us2, 1);
-		if (!(pfpsd->fp_current_exceptions & pfpsd->fp_fsrtem))
-			switch (nfcc) {
-			case fcc_0:
-				fsr.fcc0 = cc;
-				break;
-			case fcc_1:
-				fsr.fcc1 = cc;
-				break;
-			case fcc_2:
-				fsr.fcc2 = cc;
-				break;
-			case fcc_3:
-				fsr.fcc3 = cc;
-				break;
-			}
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fcmpes,
-			fpu_sim_fcmped, fpu_sim_fcmpeq);
-		break;
-	case fsqrt:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		_fp_sqrt(pfpsd, &us1, &ud);
-		_fp_pack(pfpsd, &ud, nrd, inst.prec);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fsqrts,
-		    fpu_sim_fsqrtd, fpu_sim_fsqrtq);
-		break;
-	case ftoi:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		pfpsd->fp_direction = fp_tozero;
-		/* Force rounding toward zero. */
-		_fp_pack(pfpsd, &us1, nrd, fp_op_int32);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fstoi,
-		    fpu_sim_fdtoi, fpu_sim_fqtoi);
-		break;
-	case ftoll:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		pfpsd->fp_direction = fp_tozero;
-		/* Force rounding toward zero. */
-		_fp_pack(pfpsd, &us1, nrd, fp_op_int64);
-		FPUINFO_KSTAT_PREC(inst.prec, fpu_sim_fstox,
-		    fpu_sim_fdtox, fpu_sim_fqtox);
-		break;
-	case flltos:
-		_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_single);
-		FPUINFO_KSTAT(fpu_sim_fxtos);
-		break;
-	case flltod:
-		_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_double);
-		FPUINFO_KSTAT(fpu_sim_fxtod);
-		break;
-	case flltox:
-		_fp_unpack(pfpsd, &us1, nrs2, fp_op_int64);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_extended);
-		FPUINFO_KSTAT(fpu_sim_fxtoq);
-		break;
-	case fitos:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_single);
-		FPUINFO_KSTAT(fpu_sim_fitos);
-		break;
-	case fitod:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_double);
-		FPUINFO_KSTAT(fpu_sim_fitod);
-		break;
-	case fitox:
-		_fp_unpack(pfpsd, &us1, nrs2, inst.prec);
-		_fp_pack(pfpsd, &us1, nrd, fp_op_extended);
-		FPUINFO_KSTAT(fpu_sim_fitoq);
-		break;
-	default:
-		return (ftt_unimplemented);
 	}
 	fsr.cexc = pfpsd->fp_current_exceptions;
 	if (pfpsd->fp_current_exceptions) {	/* Exception(s) occurred. */
@@ -449,6 +531,7 @@ _fp_fpu_simulator(
 	*pfsr = fsr;
 	return (ftt_none);
 }
+
 
 /*
  * fpu_vis_sim simulates fpu and vis instructions;
@@ -495,7 +578,8 @@ fpu_vis_sim(
 					pregs, (ulong_t *)pregs->r_sp, pfp);
 			return (ftt);
 	} else if ((fp.inst.hibits == 2) &&
-	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35))) {
+	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
+	    (fp.inst.op3 == 0x37))) {
 		ftt =  _fp_fpu_simulator(pfpsd, fp.inst, pfsr, gsr);
 		if (ftt == ftt_none || ftt == ftt_ieee) {
 			pregs->r_pc = pregs->r_npc;
@@ -573,7 +657,8 @@ fp_emulator(
 		return (ftt);
 
 	if ((fp.inst.hibits == 2) &&
-	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35))) {
+	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
+	    (fp.inst.op3 == 0x37))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pregs->r_pc = pregs->r_npc;
@@ -612,7 +697,8 @@ again:
 	if (ftt != ftt_none)
 		return (ftt);
 	if ((fp.inst.hibits == 2) &&		/* fpops */
-	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35))) {
+	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
+	    (fp.inst.op3 == 0x37))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pfpu->fpu_fsr = tfsr;

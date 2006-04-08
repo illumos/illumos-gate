@@ -58,6 +58,9 @@ d none platform/SUNW,Netra-T12 755 root sys
 d none platform/SUNW,Netra-T4 755 root sys
 d none platform/SUNW,Netra-CP2300 755 root sys
 d none platform/SUNW,Netra-CP3010 755 root sys
+d none platform/SUNW,SPARC-Enterprise 755 root sys
+s none platform/FJSV,SPARC-Enterprise=SUNW,SPARC-Enterprise
+s none platform/SUNW,OPL-Enterprise=SUNW,SPARC-Enterprise
 d none platform/SUNW,Serverblade1 755 root sys
 d none platform/SUNW,Sun-Blade-100 755 root sys
 d none platform/SUNW,Sun-Blade-1000 755 root sys
@@ -129,6 +132,8 @@ d none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/sparcv9 755 root bin
 d none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP2300/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
+d none platform/SUNW,SPARC-Enterprise/lib/sparcv9 755 root bin
+f none platform/SUNW,SPARC-Enterprise/lib/sparcv9/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9/libc_psr 755 root bin
 f none platform/sun4u/lib/sparcv9/libc_psr.so.1 755 root bin
@@ -239,6 +244,8 @@ d none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib 755 root bin
 d none platform/SUNW,UltraSPARC-IIi-Netract/lib 755 root bin
 d none platform/SUNW,Netra-CP2300/lib 755 root bin
 d none platform/SUNW,Netra-CP3010/lib 755 root bin
+d none platform/SUNW,SPARC-Enterprise/lib 755 root bin
+f none platform/SUNW,SPARC-Enterprise/lib/libc_psr.so.1 755 root bin
 f none platform/sun4u/lib/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib 755 root sys
 v none platform/sun4u-us3/lib/libc_psr.so.1 755 root bin

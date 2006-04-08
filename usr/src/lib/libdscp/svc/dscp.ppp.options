@@ -1,0 +1,112 @@
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# dscp.ppp.options
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# These are options for running  pppd(1M) to provide a DSCP
+# link between a service processor and a domain in OPL.  All
+# options are explicitly set here so that site customizations
+# of the global options files will not affect DSCP.
+#
+
+#
+# Generic pppd options.
+#
+persist
+noplink
+lock
+nolog
+maxfail 0
+holdoff 5
+noproxyarp
+linkname dscp
+
+#
+# Physical link properties.
+#
+sync
+local
+nocrtscts
+nocdtrcts
+default-fcs
+mtu 1500
+mru 1500
+
+#
+# Configure LCP.
+#
+passive
+noendpoint
+lcp-echo-failure 6
+lcp-echo-interval 5
+lcp-max-configure 10
+lcp-max-failure 10
+lcp-max-terminate 3
+lcp-restart 3
+
+#
+# Configure the IPv4 NCP.
+# IP addresses are given by the peer.
+#
+0:0
+noipv6
+noipdefault
+nodefaultroute
+ipcp-accept-local
+ipcp-accept-remote
+ipcp-max-configure 10
+ipcp-max-failure 10
+ipcp-max-terminate 3
+ipcp-restart 3
+
+#
+# Disable all authentication.
+#
+noauth
+noident
+nopam
+refuse-pap
+refuse-chap
+refuse-mschap
+refuse-mschapv2
+
+#
+# Disable all compression.
+#
+novj
+noccp
+nopcomp
+noaccomp
+nobsdcomp
+
+#
+# Disable all scripts.
+#
+init /bin/true
+welcome /bin/true
+connect /bin/true
+disconnect /bin/true

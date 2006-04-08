@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,6 +190,7 @@ sfmmu_remap_kernel(void)
 	sfmmu_set_tlb();
 }
 
+#ifndef UTSB_PHYS
 /*
  * Unmap all references to user TSBs from the TLB of the current processor.
  */
@@ -216,6 +216,7 @@ sfmmu_clear_user_tsbs()
 		va += MMU_PAGESIZE;
 	}
 }
+#endif /* UTSB_PHYS */
 
 /*
  * Setup the kernel's locked tte's
@@ -242,9 +243,11 @@ sfmmu_set_tlb(void)
 	(void) prom_dtlb_load(index - 2, *(uint64_t *)&ktext_tte, textva);
 	index -= 3;
 
+#ifndef UTSB_PHYS
 	utsb_dtlb_ttenum = index--;
 	utsb4m_dtlb_ttenum = index--;
 	sfmmu_clear_user_tsbs();
+#endif /* UTSB_PHYS */
 
 	if (!ktsb_phys && enable_bigktsb) {
 		int i;

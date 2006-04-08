@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1280,6 +1279,13 @@ extern uint_t  tsb_slab_pamask;
  * may be up to 4M in size.  For now, only hardware supported TSB sizes
  * are supported, though the slabs are usually 4M in size.
  *
+ * sun4u platforms that define UTSB_PHYS use physical addressing to access
+ * the user TSBs at TL>0.  The first user TSB base is in the MMU I/D TSB Base
+ * registers.  The second TSB base uses a dedicated scratchpad register which
+ * requires a definition of SCRATCHPAD_UTSBREG in mach_sfmmu.h.  The layout for
+ * both registers is equivalent to sun4v below, except the TSB PA range is
+ * [46..13] for sun4u.
+ *
  * sun4v platforms
  * ---------------
  * On sun4v platforms, we use two dedicated scratchpad registers as pseudo
@@ -1516,9 +1522,9 @@ extern void	sfmmu_hblk_hash_add(struct hmehash_bucket *, struct hme_blk *,
  * functions exported to machine dependent VM code
  */
 extern void	sfmmu_patch_ktsb(void);
-#ifndef sun4v
+#ifndef UTSB_PHYS
 extern void	sfmmu_patch_utsb(void);
-#endif /* sun4v */
+#endif /* UTSB_PHYS */
 extern pfn_t	sfmmu_vatopfn(caddr_t, sfmmu_t *, tte_t *);
 extern void	sfmmu_vatopfn_suspended(caddr_t, sfmmu_t *, tte_t *);
 #ifdef	DEBUG

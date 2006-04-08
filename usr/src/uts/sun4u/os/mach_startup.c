@@ -29,6 +29,7 @@
 #include <sys/archsystm.h>
 #include <sys/vm.h>
 #include <sys/cpu.h>
+#include <sys/cpupart.h>
 #include <sys/atomic.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
@@ -70,6 +71,22 @@ struct fpras_chkfngrp *fpras_chkfngrps;
 struct fpras_chkfngrp *fpras_chkfngrps_base;
 int fpras_frequency = -1;
 int64_t fpras_interval = -1;
+
+/*
+ * Halt idling cpus optimization
+ *
+ * This optimation is only enabled in platforms that have
+ * the CPU halt support. The cpu_halt_cpu() support is provided
+ * in the cpu module and it is referenced here with a pragma weak.
+ * The presence of this routine automatically enable the halt idling
+ * cpus functionality if the global switch enable_halt_idle_cpus
+ * is set (default is set).
+ *
+ */
+#pragma weak	cpu_halt_cpu
+extern void	cpu_halt_cpu();
+
+int		enable_halt_idle_cpus = 1; /* global switch */
 
 void
 setup_trap_table(void)
@@ -174,18 +191,206 @@ mach_memscrub(void)
 	 * Startup memory scrubber, if not running fpu emulation code.
 	 */
 
+#ifndef _HW_MEMSCRUB_SUPPORT
 	if (fpu_exists) {
 		if (memscrub_init()) {
 			cmn_err(CE_WARN,
 			    "Memory scrubber failed to initialize");
 		}
 	}
+#endif /* _HW_MEMSCRUB_SUPPORT */
+}
+
+/*
+ * Halt the calling CPU until awoken via an interrupt
+ * This routine should only be invoked if cpu_halt_cpu()
+ * exists and is supported, see mach_cpu_halt_idle()
+ */
+static void
+cpu_halt(void)
+{
+	cpu_t		*cpup = CPU;
+	processorid_t	cpun = cpup->cpu_id;
+	cpupart_t	*cp = cpup->cpu_part;
+	int		hset_update = 1;
+	uint_t		pstate;
+	extern uint_t	getpstate(void);
+	extern void	setpstate(uint_t);
+
+	/*
+	 * If this CPU is online, and there's multiple CPUs
+	 * in the system, then we should notate our halting
+	 * by adding ourselves to the partition's halted CPU
+	 * bitmap. This allows other CPUs to find/awaken us when
+	 * work becomes available.
+	 */
+	if (CPU->cpu_flags & CPU_OFFLINE || ncpus == 1)
+		hset_update = 0;
+
+	/*
+	 * Add ourselves to the partition's halted CPUs bitmask
+	 * and set our HALTED flag, if necessary.
+	 *
+	 * When a thread becomes runnable, it is placed on the queue
+	 * and then the halted cpuset is checked to determine who
+	 * (if anyone) should be awoken. We therefore need to first
+	 * add ourselves to the halted cpuset, and then check if there
+	 * is any work available.
+	 */
+	if (hset_update) {
+		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
+		membar_producer();
+		CPUSET_ATOMIC_ADD(cp->cp_haltset, cpun);
+	}
+
+	/*
+	 * Check to make sure there's really nothing to do.
+	 * Work destined for this CPU may become available after
+	 * this check. We'll be notified through the clearing of our
+	 * bit in the halted CPU bitmask, and a poke.
+	 */
+	if (disp_anywork()) {
+		if (hset_update) {
+			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		}
+		return;
+	}
+
+	/*
+	 * We're on our way to being halted.
+	 *
+	 * Disable interrupts now, so that we'll awaken immediately
+	 * after halting if someone tries to poke us between now and
+	 * the time we actually halt.
+	 *
+	 * We check for the presence of our bit after disabling interrupts.
+	 * If it's cleared, we'll return. If the bit is cleared after
+	 * we check then the poke will pop us out of the halted state.
+	 *
+	 * The ordering of the poke and the clearing of the bit by cpu_wakeup
+	 * is important.
+	 * cpu_wakeup() must clear, then poke.
+	 * cpu_halt() must disable interrupts, then check for the bit.
+	 */
+	pstate = getpstate();
+	setpstate(pstate & ~PSTATE_IE);
+
+	if (hset_update && !CPU_IN_SET(cp->cp_haltset, cpun)) {
+		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+		setpstate(pstate);
+		return;
+	}
+
+	/*
+	 * The check for anything locally runnable is here for performance
+	 * and isn't needed for correctness. disp_nrunnable ought to be
+	 * in our cache still, so it's inexpensive to check, and if there
+	 * is anything runnable we won't have to wait for the poke.
+	 */
+	if (cpup->cpu_disp->disp_nrunnable != 0) {
+		if (hset_update) {
+			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		}
+		setpstate(pstate);
+		return;
+	}
+
+	/*
+	 * Halt the strand.
+	 */
+	if (&cpu_halt_cpu)
+		cpu_halt_cpu();
+
+	/*
+	 * We're no longer halted
+	 */
+	setpstate(pstate);
+	if (hset_update) {
+		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+	}
+}
+
+/*
+ * If "cpu" is halted, then wake it up clearing its halted bit in advance.
+ * Otherwise, see if other CPUs in the cpu partition are halted and need to
+ * be woken up so that they can steal the thread we placed on this CPU.
+ * This function is only used on MP systems.
+ * This function should only be invoked if cpu_halt_cpu()
+ * exists and is supported, see mach_cpu_halt_idle()
+ */
+static void
+cpu_wakeup(cpu_t *cpu, int bound)
+{
+	uint_t		cpu_found;
+	int		result;
+	cpupart_t	*cp;
+
+	cp = cpu->cpu_part;
+	if (CPU_IN_SET(cp->cp_haltset, cpu->cpu_id)) {
+		/*
+		 * Clear the halted bit for that CPU since it will be
+		 * poked in a moment.
+		 */
+		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpu->cpu_id);
+		/*
+		 * We may find the current CPU present in the halted cpuset
+		 * if we're in the context of an interrupt that occurred
+		 * before we had a chance to clear our bit in cpu_halt().
+		 * Poking ourself is obviously unnecessary, since if
+		 * we're here, we're not halted.
+		 */
+		if (cpu != CPU)
+			poke_cpu(cpu->cpu_id);
+		return;
+	} else {
+		/*
+		 * This cpu isn't halted, but it's idle or undergoing a
+		 * context switch. No need to awaken anyone else.
+		 */
+		if (cpu->cpu_thread == cpu->cpu_idle_thread ||
+		    cpu->cpu_disp_flags & CPU_DISP_DONTSTEAL)
+			return;
+	}
+
+	/*
+	 * No need to wake up other CPUs if the thread we just enqueued
+	 * is bound.
+	 */
+	if (bound)
+		return;
+
+	/*
+	 * See if there's any other halted CPUs. If there are, then
+	 * select one, and awaken it.
+	 * It's possible that after we find a CPU, somebody else
+	 * will awaken it before we get the chance.
+	 * In that case, look again.
+	 */
+	do {
+		CPUSET_FIND(cp->cp_haltset, cpu_found);
+		if (cpu_found == CPUSET_NOTINSET)
+			return;
+
+		ASSERT(cpu_found >= 0 && cpu_found < NCPU);
+		CPUSET_ATOMIC_XDEL(cp->cp_haltset, cpu_found, result);
+	} while (result < 0);
+
+	if (cpu_found != CPU->cpu_id)
+		poke_cpu(cpu_found);
 }
 
 void
 mach_cpu_halt_idle()
 {
-	/* no suport for halting idle CPU */
+	if (enable_halt_idle_cpus) {
+		if (&cpu_halt_cpu) {
+			idle_cpu = cpu_halt;
+			disp_enq_thread = cpu_wakeup;
+		}
+	}
 }
 
 /*ARGSUSED*/

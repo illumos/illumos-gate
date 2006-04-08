@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,7 +356,9 @@ int
 get_portid(pnode_t node, pnode_t *cmpp)
 {
 	int portid;
+	int i;
 	char dev_type[OBP_MAXPROPNAME];
+	pnode_t cpu_parent;
 
 	if (cmpp != NULL)
 		*cmpp = OBP_NONODE;
@@ -369,14 +370,24 @@ get_portid(pnode_t node, pnode_t *cmpp)
 	if (GETPROP(node, "device_type", (caddr_t)&dev_type) == -1)
 		return (-1);
 
-	/* On a CMP core, the "portid" is in the parent */
+	/*
+	 * For a virtual cpu node that is a CMP core, the "portid"
+	 * is in the parent node.
+	 * For a virtual cpu node that is a CMT strand, the "portid" is
+	 * in its grandparent node.
+	 * So we iterate up as far as 2 levels to get the "portid".
+	 */
 	if (strcmp(dev_type, "cpu") == 0) {
-		node = prom_parentnode(node);
-		if (GETPROP(node, "portid", (caddr_t)&portid) != -1) {
-			if (cmpp != NULL)
-				*cmpp = node;
-
-			return (portid);
+		cpu_parent = node = prom_parentnode(node);
+		for (i = 0; i < 2; i++) {
+			if (node == OBP_NONODE || node == OBP_BADNODE)
+				break;
+			if (GETPROP(node, "portid", (caddr_t)&portid) != -1) {
+				if (cmpp != NULL)
+					*cmpp = cpu_parent;
+				return (portid);
+			}
+			node = prom_parentnode(node);
 		}
 	}
 
@@ -458,6 +469,7 @@ fill_cpu(pnode_t node)
 
 	cpunode = &cpunodes[cpuid];
 	cpunode->portid = portid;
+	cpunode->nodeid = node;
 
 	if (cpu_get_cpu_unum(cpuid, unum, UNUM_NAMLEN, &size) != 0) {
 		cpunode->fru_fmri[0] = '\0';
@@ -466,9 +478,23 @@ fill_cpu(pnode_t node)
 		    "%s%s", CPU_FRU_FMRI, unum);
 	}
 
+	if (cmpnode) {
+		/*
+		 * For the CMT case, the parent "core" node contains
+		 * properties needed below, use it instead of the
+		 * cpu node.
+		 */
+		if ((GETPROP(cmpnode, "device_type", namebuf) > 0) &&
+		    (strcmp(namebuf, "core") == 0)) {
+			node = cmpnode;
+		}
+	}
+
 	(void) GETPROP(node, (cmpnode ? "compatible" : "name"), namebuf);
 	namebufp = namebuf;
 	if (strncmp(namebufp, "SUNW,", 5) == 0)
+		namebufp += 5;
+	else if (strncmp(namebufp, "FJSV,", 5) == 0)
 		namebufp += 5;
 	(void) strcpy(cpunode->name, namebufp);
 
@@ -506,8 +532,6 @@ fill_cpu(pnode_t node)
 	(void) GETPROP(node, "#dtlb-entries", (caddr_t)&tlbsize);
 	ASSERT(tlbsize < USHRT_MAX); /* since we cast it */
 	cpunode->dtlb_size = (ushort_t)tlbsize;
-
-	cpunode->nodeid = node;
 
 	if (cmpnode != OBP_NONODE) {
 		/*
@@ -580,32 +604,42 @@ int
 get_portid_ddi(dev_info_t *dip, dev_info_t **cmpp)
 {
 	int portid;
+	int i;
 	char dev_type[OBP_MAXPROPNAME];
 	int len = OBP_MAXPROPNAME;
+	dev_info_t *cpu_parent;
 
 	if (cmpp != NULL)
 		*cmpp = NULL;
 
 	if ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "portid", -1)) != -1)
+	    DDI_PROP_DONTPASS, "portid", -1)) != -1)
 		return (portid);
 	if ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1)
+	    DDI_PROP_DONTPASS, "upa-portid", -1)) != -1)
 		return (portid);
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN_AND_VAL_BUF,
-		DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
-		&len) != 0)
+	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
+	    &len) != 0)
 		return (-1);
 
-	/* On a CMP core, the "portid" is in the parent */
+	/*
+	 * For a virtual cpu node that is a CMP core, the "portid"
+	 * is in the parent node.
+	 * For a virtual cpu node that is a CMT strand, the "portid" is
+	 * in its grandparent node.
+	 * So we iterate up as far as 2 levels to get the "portid".
+	 */
 	if (strcmp(dev_type, "cpu") == 0) {
-		dip = ddi_get_parent(dip);
-		if ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "portid", -1)) != -1) {
-			if (cmpp != NULL)
-				*cmpp = dip;
-
-			return (portid);
+		cpu_parent = dip = ddi_get_parent(dip);
+		for (i = 0; dip != NULL && i < 2; i++) {
+			if ((portid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+			    DDI_PROP_DONTPASS, "portid", -1)) != -1) {
+				if (cmpp != NULL)
+					*cmpp = cpu_parent;
+				return (portid);
+			}
+			dip = ddi_get_parent(dip);
 		}
 	}
 
@@ -618,7 +652,6 @@ get_portid_ddi(dev_info_t *dip, dev_info_t **cmpp)
  * since it is called very early in the boot cycle before (before
  * setup_ddi()).  Sigh...someday this will all be cleaned up.
  */
-
 void
 fill_cpu_ddi(dev_info_t *dip)
 {
@@ -626,11 +659,12 @@ fill_cpu_ddi(dev_info_t *dip)
 	struct cpu_node *cpunode;
 	processorid_t cpuid;
 	int portid;
-	int len;
+	int len = OBP_MAXPROPNAME;
 	int tlbsize;
 	dev_info_t *cmpnode;
 	char namebuf[OBP_MAXPROPNAME], unum[UNUM_NAMLEN];
 	char *namebufp;
+	char dev_type[OBP_MAXPROPNAME];
 
 	if ((portid = get_portid_ddi(dip, &cmpnode)) == -1) {
 		cmn_err(CE_PANIC, "portid not found");
@@ -649,6 +683,20 @@ fill_cpu_ddi(dev_info_t *dip)
 
 	cpunode = &cpunodes[cpuid];
 	cpunode->portid = portid;
+	cpunode->nodeid = ddi_get_nodeid(dip);
+
+	if (cmpnode != NULL) {
+		/*
+		 * For the CMT case, the parent "core" node contains
+		 * properties needed below, use it instead of the
+		 * cpu node.
+		 */
+		if ((ddi_prop_op(DDI_DEV_T_ANY, cmpnode, PROP_LEN_AND_VAL_BUF,
+		    DDI_PROP_DONTPASS, "device_type",
+		    (caddr_t)dev_type, &len) == DDI_PROP_SUCCESS) &&
+		    (strcmp(dev_type, "core") == 0))
+			dip = cmpnode;
+	}
 
 	if (cpu_get_cpu_unum(cpuid, unum, UNUM_NAMLEN, &len) != 0) {
 		cpunode->fru_fmri[0] = '\0';
@@ -665,6 +713,8 @@ fill_cpu_ddi(dev_info_t *dip)
 	namebufp = namebuf;
 	if (strncmp(namebufp, "SUNW,", 5) == 0)
 		namebufp += 5;
+	else if (strncmp(namebufp, "FJSV,", 5) == 0)
+		namebufp += 5;
 	(void) strcpy(cpunode->name, namebufp);
 
 	cpunode->implementation = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
@@ -678,7 +728,7 @@ fill_cpu_ddi(dev_info_t *dip)
 		cpunode->version = REMAP_CHEETAH_MASK(cpunode->version);
 	}
 
-	cpunode->clock_freq = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	cpunode->clock_freq = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "clock-frequency", 0);
 
 	ASSERT(cpunode->clock_freq != 0);
@@ -699,8 +749,6 @@ fill_cpu_ddi(dev_info_t *dip)
 	    DDI_PROP_DONTPASS, "#dtlb-entries", 0);
 	ASSERT(tlbsize < USHRT_MAX); /* since we cast it */
 	cpunode->dtlb_size = (ushort_t)tlbsize;
-
-	cpunode->nodeid = ddi_get_nodeid(dip);
 
 	if (cmpnode != NULL) {
 		/*

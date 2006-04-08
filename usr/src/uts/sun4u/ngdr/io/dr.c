@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +114,9 @@ static	dr_devname_t	dr_devattr[] = {
 	{ DRMACH_DEVTYPE_MEM,	SBD_COMP_MEM },
 	{ DRMACH_DEVTYPE_CPU,	SBD_COMP_CPU },
 	{ DRMACH_DEVTYPE_PCI,	SBD_COMP_IO },
+#if defined(DRMACH_DEVTYPE_SBUS)
 	{ DRMACH_DEVTYPE_SBUS,	SBD_COMP_IO },
+#endif
 #if defined(DRMACH_DEVTYPE_WCI)
 	{ DRMACH_DEVTYPE_WCI,	SBD_COMP_IO },
 #endif
@@ -448,7 +449,7 @@ _init(void)
 	 * soft state structure each time a node is attached.
 	 */
 	err = ddi_soft_state_init((void **)&dr_g.softsp,
-					sizeof (dr_softstate_t), 1);
+		sizeof (dr_softstate_t), 1);
 	if (err)
 		return (err);
 
@@ -546,12 +547,9 @@ dr_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 }
 
 /*
- * Enable/disable Starcat DR features.
+ * Enable/disable DR features.
  */
-#ifndef _STARFIRE
 int dr_enable = 1;
-int slot1_dr_enable = 1;
-#endif /* _STARFIRE */
 
 /*ARGSUSED3*/
 static int
@@ -576,7 +574,6 @@ dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		return (ENXIO);
 	}
 
-#ifndef _STARFIRE
 	if (!dr_enable) {
 		switch (cmd) {
 			case SBD_CMD_STATUS:
@@ -587,24 +584,10 @@ dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				return (ENOTSUP);
 		}
 	}
-#endif /* _STARFIRE */
 
 	bd = DR_MINOR2BNUM(getminor(dev));
 	if (bd >= MAX_BOARDS)
 		return (ENXIO);
-
-#ifndef _STARFIRE
-	if (!slot1_dr_enable && (bd & 0x1)) {
-		switch (cmd) {
-			case SBD_CMD_STATUS:
-			case SBD_CMD_GETNCM:
-			case SBD_CMD_PASSTHRU:
-				break;
-			default:
-				return (ENOTSUP);
-		}
-	}
-#endif /* _STARFIRE */
 
 	/* get and initialize storage for new handle */
 	hp = GETSTRUCT(dr_handle_t, 1);
@@ -695,7 +678,7 @@ dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		/* Board changed state. Log a sysevent. */
 		if (rv == 0)
 			(void) drmach_log_sysevent(hp->h_bd->b_num, "",
-						    SE_SLEEP, 1);
+				SE_SLEEP, 1);
 		/* Fall through */
 
 	default:
@@ -917,7 +900,7 @@ dr_copyin_iocmd(dr_handle_t *hp)
 		bzero((caddr_t)&scmd32, sizeof (sbd_cmd32_t));
 
 		if (ddi_copyin((void *)hp->h_iap, (void *)&scmd32,
-				sizeof (sbd_cmd32_t), hp->h_mode)) {
+			sizeof (sbd_cmd32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
 				"%s: (32bit) failed to copyin "
 					"sbdcmd-struct", f);
@@ -944,7 +927,7 @@ dr_copyin_iocmd(dr_handle_t *hp)
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyin((void *)hp->h_iap, (void *)scp,
-			sizeof (sbd_cmd_t), hp->h_mode) != 0) {
+		sizeof (sbd_cmd_t), hp->h_mode) != 0) {
 		cmn_err(CE_WARN,
 			"%s: failed to copyin sbdcmd-struct", f);
 		return (EFAULT);
@@ -994,7 +977,7 @@ dr_copyout_iocmd(dr_handle_t *hp)
 		}
 
 		if (ddi_copyout((void *)&scmd32, (void *)hp->h_iap,
-				sizeof (sbd_cmd32_t), hp->h_mode)) {
+			sizeof (sbd_cmd32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
 				"%s: (32bit) failed to copyout "
 					"sbdcmd-struct", f);
@@ -1003,7 +986,7 @@ dr_copyout_iocmd(dr_handle_t *hp)
 	} else
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)scp, (void *)hp->h_iap,
-			sizeof (sbd_cmd_t), hp->h_mode) != 0) {
+		sizeof (sbd_cmd_t), hp->h_mode) != 0) {
 		cmn_err(CE_WARN,
 			"%s: failed to copyout sbdcmd-struct", f);
 		return (EFAULT);
@@ -1036,7 +1019,7 @@ dr_copyout_errs(dr_handle_t *hp)
 			MAXPATHLEN);
 		if (ddi_copyout((void *)serr32p,
 			(void *)&((sbd_ioctl_arg32_t *)hp->h_iap)->i_err,
-				sizeof (sbd_error32_t), hp->h_mode)) {
+			sizeof (sbd_error32_t), hp->h_mode)) {
 			cmn_err(CE_WARN,
 				"%s: (32bit) failed to copyout", f);
 			return (EFAULT);
@@ -1046,7 +1029,7 @@ dr_copyout_errs(dr_handle_t *hp)
 #endif /* _MULTI_DATAMODEL */
 	if (ddi_copyout((void *)hp->h_err,
 		(void *)&hp->h_iap->i_err,
-			sizeof (sbd_error_t), hp->h_mode)) {
+		sizeof (sbd_error_t), hp->h_mode)) {
 		cmn_err(CE_WARN,
 			"%s: failed to copyout", f);
 		return (EFAULT);
@@ -1371,7 +1354,7 @@ dr_connect(dr_handle_t *hp)
 		/*
 		 * Board already has devices present.
 		 */
-		PR_ALL("%s: devices already present (0x%x)\n",
+		PR_ALL("%s: devices already present (0x%lx)\n",
 			f, DR_DEVS_PRESENT(bp));
 		return;
 	}
@@ -1408,7 +1391,7 @@ dr_disconnect(dr_handle_t *hp)
 	 * unattached can be disconnected.
 	 */
 	devset = hp->h_devset & DR_DEVS_PRESENT(bp) &
-			DR_DEVS_UNATTACHED(bp);
+		DR_DEVS_UNATTACHED(bp);
 
 	if ((devset == 0) && DR_DEVS_PRESENT(bp)) {
 		dr_op_err(CE_IGNORE, hp, ESBD_EMPTY_BD, bp->b_path);
@@ -2017,8 +2000,8 @@ dr_detach_update_state(dr_handle_t *hp,
 			hp->h_bd->b_ostate = SBD_STAT_UNCONFIGURED;
 			(void) drv_getparm(TIME, (void *)&hp->h_bd->b_time);
 		} else if ((bp->b_state != DR_STATE_PARTIAL) &&
-				(DR_DEVS_ATTACHED(bp) !=
-					DR_DEVS_PRESENT(bp))) {
+			(DR_DEVS_ATTACHED(bp) !=
+			DR_DEVS_PRESENT(bp))) {
 			/*
 			 * Some devices remain attached.
 			 */
@@ -2248,7 +2231,7 @@ dr_dev_status(dr_handle_t *hp)
 		if (ncm > 1)
 			sz32  += sizeof (sbd_dev_stat32_t) * (ncm - 1);
 		pnstat = (pbsz - sizeof (sbd_stat32_t))/
-				sizeof (sbd_dev_stat32_t);
+			sizeof (sbd_dev_stat32_t);
 	}
 
 	sz += sz32;
@@ -2489,7 +2472,7 @@ dr_get_ncm(dr_handle_t *hp)
 	devset = DR_DEVS_PRESENT(hp->h_bd);
 	if (hp->h_sbdcmd.cmd_cm.c_id.c_type != SBD_COMP_NONE)
 		devset &= DEVSET(hp->h_sbdcmd.cmd_cm.c_id.c_type,
-				DEVSET_ANYUNIT);
+			DEVSET_ANYUNIT);
 
 	/*
 	 * Handle CPUs first to deal with possible CMP
@@ -2597,7 +2580,7 @@ dr_dev2devset(sbd_comp_id_t *cid)
 			devset =  DEVSET(SBD_COMP_CPU, DEVSET_ANYUNIT);
 			devset |= DEVSET(SBD_COMP_MEM, DEVSET_ANYUNIT);
 			devset |= DEVSET(SBD_COMP_IO,  DEVSET_ANYUNIT);
-			PR_ALL("%s: COMP_NONE devset = 0x%x\n", f, devset);
+			PR_ALL("%s: COMP_NONE devset = 0x%lx\n", f, devset);
 			break;
 
 		case SBD_COMP_CPU:
@@ -2618,7 +2601,7 @@ dr_dev2devset(sbd_comp_id_t *cid)
 				devset = DEVSET(SBD_COMP_CMP, unit);
 			}
 
-			PR_ALL("%s: CPU devset = 0x%x\n", f, devset);
+			PR_ALL("%s: CPU devset = 0x%lx\n", f, devset);
 			break;
 
 		case SBD_COMP_MEM:
@@ -2635,7 +2618,7 @@ dr_dev2devset(sbd_comp_id_t *cid)
 			} else
 				devset = DEVSET(cid->c_type, unit);
 
-			PR_ALL("%s: MEM devset = 0x%x\n", f, devset);
+			PR_ALL("%s: MEM devset = 0x%lx\n", f, devset);
 			break;
 
 		case SBD_COMP_IO:
@@ -2647,7 +2630,7 @@ dr_dev2devset(sbd_comp_id_t *cid)
 			} else
 				devset = DEVSET(cid->c_type, unit);
 
-			PR_ALL("%s: IO devset = 0x%x\n", f, devset);
+			PR_ALL("%s: IO devset = 0x%lx\n", f, devset);
 			break;
 
 		default:
@@ -2879,9 +2862,9 @@ dr_dev_found(void *data, const char *name, int unum, drmachid_t id)
 
 	/* render dynamic attachment point path of this unit */
 	(void) snprintf(dp->du_common.sbdev_path,
-			sizeof (dp->du_common.sbdev_path),
-			(nt == SBD_COMP_MEM ? "%s::%s" : "%s::%s%d"),
-			bp->b_path, name, DR_UNUM2SBD_UNUM(unum));
+		sizeof (dp->du_common.sbdev_path),
+		(nt == SBD_COMP_MEM ? "%s::%s" : "%s::%s%d"),
+		bp->b_path, name, DR_UNUM2SBD_UNUM(unum, nt));
 
 	dp->du_common.sbdev_id = id;
 	DR_DEV_SET_PRESENT(&dp->du_common);
@@ -3011,7 +2994,7 @@ dr_check_unit_attached(dr_common_unit_t *cp)
 		memlist_read_lock();
 		for (ml = phys_install; ml; ml = ml->next)
 			if ((endpa <= ml->address) ||
-					(basepa >= (ml->address + ml->size)))
+				(basepa >= (ml->address + ml->size)))
 				continue;
 			else
 				break;
@@ -3208,7 +3191,7 @@ dr_board_discovery(dr_board_t *bp)
 		 * information necessary to re-configure the device
 		 * back online, e.g. memlist.
 		 */
-		PR_ALL("%s: some devices LOST (0x%x)...\n", f, devs_lost);
+		PR_ALL("%s: some devices LOST (0x%lx)...\n", f, devs_lost);
 
 		for (ut = 0; ut < MAX_CPU_UNITS_PER_BOARD; ut++) {
 			if (!DEVSET_IN_SET(devs_lost, SBD_COMP_CPU, ut))
@@ -3256,13 +3239,13 @@ dr_board_init(dr_board_t *bp, dev_info_t *dip, int bd)
 	bp->b_dip = dip;
 
 	bp->b_dev[NIX(SBD_COMP_CPU)] = GETSTRUCT(dr_dev_unit_t,
-						MAX_CPU_UNITS_PER_BOARD);
+		MAX_CPU_UNITS_PER_BOARD);
 
 	bp->b_dev[NIX(SBD_COMP_MEM)] = GETSTRUCT(dr_dev_unit_t,
-						MAX_MEM_UNITS_PER_BOARD);
+		MAX_MEM_UNITS_PER_BOARD);
 
 	bp->b_dev[NIX(SBD_COMP_IO)] = GETSTRUCT(dr_dev_unit_t,
-						MAX_IO_UNITS_PER_BOARD);
+		MAX_IO_UNITS_PER_BOARD);
 
 	/*
 	 * Initialize the devlists
@@ -3328,19 +3311,19 @@ dr_board_destroy(dr_board_t *bp)
 	 * Free up MEM unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_MEM)],
-			dr_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
+		dr_dev_unit_t, MAX_MEM_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_MEM)] = NULL;
 	/*
 	 * Free up CPU unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_CPU)],
-			dr_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
+		dr_dev_unit_t, MAX_CPU_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_CPU)] = NULL;
 	/*
 	 * Free up IO unit structs.
 	 */
 	FREESTRUCT(bp->b_dev[NIX(SBD_COMP_IO)],
-			dr_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
+		dr_dev_unit_t, MAX_IO_UNITS_PER_BOARD);
 	bp->b_dev[NIX(SBD_COMP_IO)] = NULL;
 
 	mutex_destroy(&bp->b_lock);

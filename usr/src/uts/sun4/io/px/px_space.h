@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,64 +89,6 @@ extern uint_t px_disable_fdvma;
 extern uint_t px_iommu_ctx_lock_failure;
 extern uint_t px_preserve_iommu_tsb;
 extern uintptr_t px_kmem_clid;
-
-#define	PX_ERR_EN_ALL			-1ull
-#define	PX_ERR_MASK_NONE		0ull
-
-extern uint64_t px_tlu_ue_intr_mask;
-extern uint64_t px_tlu_ue_log_mask;
-extern uint64_t px_tlu_ue_count_mask;
-
-extern uint64_t px_tlu_ce_intr_mask;
-extern uint64_t px_tlu_ce_log_mask;
-extern uint64_t px_tlu_ce_count_mask;
-
-extern uint64_t px_tlu_oe_intr_mask;
-extern uint64_t px_tlu_oe_log_mask;
-extern uint64_t px_tlu_oe_count_mask;
-
-extern uint64_t px_mmu_intr_mask;
-extern uint64_t px_mmu_log_mask;
-extern uint64_t px_mmu_count_mask;
-
-extern uint64_t px_imu_intr_mask;
-extern uint64_t px_imu_log_mask;
-extern uint64_t px_imu_count_mask;
-
-#define	LPU_INTR_ENABLE 0ull
-#define	LPU_INTR_DISABLE -1ull
-
-extern uint64_t px_ilu_intr_mask;
-extern uint64_t px_ilu_log_mask;
-extern uint64_t px_ilu_count_mask;
-
-extern uint64_t px_cb_intr_mask;
-extern uint64_t px_cb_log_mask;
-extern uint64_t px_cb_count_mask;
-
-extern uint64_t px_lpul_intr_mask;
-extern uint64_t px_lpul_log_mask;
-extern uint64_t px_lpul_count_mask;
-
-extern uint64_t px_lpup_intr_mask;
-extern uint64_t px_lpup_log_mask;
-extern uint64_t px_lpup_count_mask;
-
-extern uint64_t px_lpur_intr_mask;
-extern uint64_t px_lpur_log_mask;
-extern uint64_t px_lpur_count_mask;
-
-extern uint64_t px_lpux_intr_mask;
-extern uint64_t px_lpux_log_mask;
-extern uint64_t px_lpux_count_mask;
-
-extern uint64_t px_lpus_intr_mask;
-extern uint64_t px_lpus_log_mask;
-extern uint64_t px_lpus_count_mask;
-
-extern uint64_t px_lpug_intr_mask;
-extern uint64_t px_lpug_log_mask;
-extern uint64_t px_lpug_count_mask;
 
 /* timeout length in micro seconds */
 #define	PX_MSEC_TO_USEC	1000

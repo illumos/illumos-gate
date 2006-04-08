@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2841,65 +2840,6 @@ drmach_fini(void)
 	mutex_destroy(&drmach_i_lock);
 }
 
-static struct memlist *
-memlist_add_span(struct memlist *mlist, uint64_t base, uint64_t len)
-{
-	struct memlist	*ml, *tl, *nl;
-
-	if (len == 0ull)
-		return (NULL);
-
-	if (mlist == NULL) {
-		mlist = GETSTRUCT(struct memlist, 1);
-		mlist->address = base;
-		mlist->size = len;
-		mlist->next = mlist->prev = NULL;
-
-		return (mlist);
-	}
-
-	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
-		if (base < ml->address) {
-			if ((base + len) < ml->address) {
-				nl = GETSTRUCT(struct memlist, 1);
-				nl->address = base;
-				nl->size = len;
-				nl->next = ml;
-				if ((nl->prev = ml->prev) != NULL)
-					nl->prev->next = nl;
-				ml->prev = nl;
-				if (mlist == ml)
-					mlist = nl;
-			} else {
-				ml->size = MAX((base + len),
-						(ml->address + ml->size)) -
-						base;
-				ml->address = base;
-			}
-			break;
-
-		} else if (base <= (ml->address + ml->size)) {
-			ml->size = MAX((base + len),
-					(ml->address + ml->size)) -
-					MIN(ml->address, base);
-			ml->address = MIN(ml->address, base);
-			break;
-		}
-	}
-	if (ml == NULL) {
-		nl = GETSTRUCT(struct memlist, 1);
-		nl->address = base;
-		nl->size = len;
-		nl->next = NULL;
-		nl->prev = tl;
-		tl->next = nl;
-	}
-
-	memlist_coalesce(mlist);
-
-	return (mlist);
-}
-
 static void
 drmach_mem_read_madr(drmach_mem_t *mp, int bank, uint64_t *madr)
 {
@@ -5032,14 +4972,14 @@ sbd_error_t *
 drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 {
 	drmach_board_t		*bp;
-	drmach_device_t		*dp[SBD_MAX_CORES_PER_CMP];
+	drmach_device_t		*dp[MAX_CORES_PER_CMP];
 	dr_mbox_msg_t		*obufp;
 	sbd_error_t		*err;
 	dr_testboard_reply_t	tbr;
 	int			cpylen;
 	char			*copts;
 	int			is_io;
-	cpu_flag_t		oflags[SBD_MAX_CORES_PER_CMP];
+	cpu_flag_t		oflags[MAX_CORES_PER_CMP];
 
 	if (!DRMACH_IS_BOARD_ID(id))
 		return (drerr_new(0, ESTC_INAPPROP, NULL));
@@ -5137,7 +5077,7 @@ drmach_board_test(drmachid_t id, drmach_opts_t *opts, int force)
 			int i;
 
 			mutex_enter(&cpu_lock);
-			for (i = 0; i < SBD_MAX_CORES_PER_CMP; i++) {
+			for (i = 0; i < MAX_CORES_PER_CMP; i++) {
 				if (dp[i] != NULL) {
 					(void) drmach_iocage_cpu_return(dp[i],
 					    oflags[i]);
@@ -7641,7 +7581,7 @@ drmach_iocage_cmp_acquire(drmach_device_t **dpp, cpu_flag_t *oflags)
 	 * and attempt to acquire them. Bail out if an
 	 * error is encountered.
 	 */
-	for (curr = 0; curr < SBD_MAX_CORES_PER_CMP; curr++) {
+	for (curr = 0; curr < MAX_CORES_PER_CMP; curr++) {
 
 		/* check for the end of the list */
 		if (dpp[curr] == NULL) {

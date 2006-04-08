@@ -1,10 +1,9 @@
-#
+
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +49,9 @@ d none usr/platform/sun4u-us3 755 root sys
 #
 # other platform directories
 #
+d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
+s none usr/platform/FJSV,SPARC-Enterprise=SUNW,SPARC-Enterprise
+s none usr/platform/SUNW,OPL-Enterprise=SUNW,SPARC-Enterprise
 d none usr/platform/SUNW,Ultra-2 755 root sys
 d none usr/platform/SUNW,Ultra-250 755 root sys
 d none usr/platform/SUNW,Ultra-4 755 root sys
@@ -95,6 +97,11 @@ s none usr/platform/SUNW,Sun-Blade-1000/sbin=../sun4u/sbin
 s none usr/platform/SUNW,Sun-Blade-1500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,Sun-Blade-2500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,A70/sbin=../sun4u/sbin
+d none usr/platform/SUNW,SPARC-Enterprise/sbin 755 root bin
+s none usr/platform/SUNW,SPARC-Enterprise/sbin/eeprom=../../sun4u/sbin/eeprom
+s none usr/platform/SUNW,SPARC-Enterprise/sbin/fruadm=../../sun4u/sbin/fruadm
+s none usr/platform/SUNW,SPARC-Enterprise/sbin/prtdiag=../../sun4u/sbin/prtdiag
+s none usr/platform/SUNW,SPARC-Enterprise/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Sun-Fire-V445/sbin 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V445/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Sun-Fire-V445/sbin/prtdiag=../../sun4u/sbin/prtdiag
@@ -145,6 +152,7 @@ f none usr/platform/sun4u/lib/libprtdiag.so.1 755 root bin
 s none usr/platform/sun4u/lib/libprtdiag.so=./libprtdiag.so.1
 f none usr/platform/SUNW,Netra-CP3010/lib/libprtdiag_psr.so.1 644 root bin
 f none usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,SPARC-Enterprise/lib/libprtdiag_psr.so.1 644 root bin
 s none usr/platform/sun4u/lib/libprtdiag_psr.so.1=../../SUNW,Ultra-2/lib/libprtdiag_psr.so.1
 f none usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1 644 root bin
 f none usr/platform/SUNW,Ultra-4/lib/libprtdiag_psr.so.1 644 root bin
@@ -164,6 +172,7 @@ s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libprtdiag_psr.so.1=../..
 #
 d none usr/platform/sun4u/lib 755 root bin
 d none usr/platform/sun4u-us3/lib 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
 d none usr/platform/SUNW,Ultra-2/lib 755 root bin
 d none usr/platform/SUNW,Ultra-250/lib 755 root bin
 d none usr/platform/SUNW,Ultra-4/lib 755 root bin

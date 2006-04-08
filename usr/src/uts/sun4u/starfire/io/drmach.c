@@ -1142,65 +1142,6 @@ drmach_write_mc_asr(drmachid_t id, uint_t mcreg)
 	return (err);
 }
 
-static struct memlist *
-memlist_add_span(struct memlist *mlist, uint64_t base, uint64_t len)
-{
-	struct memlist	*ml, *tl, *nl;
-
-	if (len == 0ull)
-		return (NULL);
-
-	if (mlist == NULL) {
-		mlist = GETSTRUCT(struct memlist, 1);
-		mlist->address = base;
-		mlist->size = len;
-		mlist->next = mlist->prev = NULL;
-
-		return (mlist);
-	}
-
-	for (tl = ml = mlist; ml; tl = ml, ml = ml->next) {
-		if (base < ml->address) {
-			if ((base + len) < ml->address) {
-				nl = GETSTRUCT(struct memlist, 1);
-				nl->address = base;
-				nl->size = len;
-				nl->next = ml;
-				if ((nl->prev = ml->prev) != NULL)
-					nl->prev->next = nl;
-				ml->prev = nl;
-				if (mlist == ml)
-					mlist = nl;
-			} else {
-				ml->size = MAX((base + len),
-						(ml->address + ml->size)) -
-						base;
-				ml->address = base;
-			}
-			break;
-
-		} else if (base <= (ml->address + ml->size)) {
-			ml->size = MAX((base + len),
-					(ml->address + ml->size)) -
-					MIN(ml->address, base);
-			ml->address = MIN(ml->address, base);
-			break;
-		}
-	}
-	if (ml == NULL) {
-		nl = GETSTRUCT(struct memlist, 1);
-		nl->address = base;
-		nl->size = len;
-		nl->next = NULL;
-		nl->prev = tl;
-		tl->next = nl;
-	}
-
-	memlist_coalesce(mlist);
-
-	return (mlist);
-}
-
 static sbd_error_t *
 drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 	uint64_t t_slice_offset, caddr_t buf, int buflen)
@@ -3696,7 +3637,6 @@ drmach_unconfigure(drmachid_t id, int flags)
 	drmach_device_t	*dp;
 	pnode_t		 nodeid;
 	dev_info_t	*dip, *fdip = NULL;
-	uint_t 		ddi_flags;
 
 	if (!DRMACH_IS_DEVICE_ID(id))
 		return (drerr_new(0, ESTF_INAPPROP, NULL));
@@ -3717,17 +3657,15 @@ drmach_unconfigure(drmachid_t id, int flags)
 	 */
 	ddi_release_devi(dip);
 
-	ddi_flags = 0;
-
-	if (flags & DRMACH_DEVI_REMOVE)
-		ddi_flags |= DEVI_BRANCH_DESTROY | DEVI_BRANCH_EVENT;
+	if (flags & DEVI_BRANCH_DESTROY)
+		flags |= DEVI_BRANCH_EVENT;
 
 	/*
 	 * Force flag is no longer necessary. See starcat/io/drmach.c
 	 * for details.
 	 */
 	ASSERT(e_ddi_branch_held(dip));
-	if (e_ddi_branch_unconfigure(dip, &fdip, ddi_flags)) {
+	if (e_ddi_branch_unconfigure(dip, &fdip, flags)) {
 		sbd_error_t	*err;
 		char		*path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 

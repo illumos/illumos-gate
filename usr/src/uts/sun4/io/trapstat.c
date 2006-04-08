@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +44,9 @@
 #include <sys/trapstat.h>
 #ifdef sun4v
 #include <sys/hypervisor_api.h>
+#endif
+#ifndef sun4v
+#include <sys/chip.h>
 #endif
 
 /* BEGIN CSTYLED */
@@ -1399,6 +1401,14 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 #undef TSTAT_ENABLED_BA
 #undef TSTAT_DISABLED_BA
 
+#ifndef sun4v
+/*
+ * See Section A.6 in SPARC v9 Manual.
+ * max branch = 4*((2^21)-1) = 8388604
+ */
+#define	MAX_BICC_BRANCH_DISPLACEMENT (4 * ((1 << 21) - 1))
+#endif
+
 static void
 trapstat_setup(processorid_t cpu)
 {
@@ -1407,6 +1417,9 @@ trapstat_setup(processorid_t cpu)
 	int i;
 	caddr_t va;
 	pfn_t *pfn;
+	cpu_t *cp;
+	uint_t strand_idx;
+	size_t tstat_offset;
 #endif
 
 	ASSERT(tcpu->tcpu_pfn == NULL);
@@ -1422,7 +1435,29 @@ trapstat_setup(processorid_t cpu)
 	 * align our instruction base address appropriately.
 	 */
 #ifndef sun4v
-	tcpu->tcpu_ibase = (caddr_t)((KERNELBASE - tstat_total_size)
+	tstat_offset = tstat_total_size;
+
+	cp = cpu_get(cpu);
+	ASSERT(cp != NULL);
+	if ((strand_idx = cpu ^ chip_plat_get_coreid(cp)) != 0) {
+		/*
+		 * On sun4u platforms with multiple CPUs sharing the MMU
+		 * (Olympus-C has 2 strands per core), each CPU uses a
+		 * disjoint trap table.  The indexing is based on the
+		 * strand id, which is obtained by XOR'ing the cpuid with
+		 * the coreid.
+		 */
+		tstat_offset += tstat_total_size * strand_idx;
+
+		/*
+		 * Offset must be less than the maximum PC-relative branch
+		 * displacement for Bicc variants.  See the Implementation
+		 * Details comment.
+		 */
+		ASSERT(tstat_offset <= MAX_BICC_BRANCH_DISPLACEMENT);
+	}
+
+	tcpu->tcpu_ibase = (caddr_t)((KERNELBASE - tstat_offset)
 		& TSTAT_TBA_MASK);
 	tcpu->tcpu_dbase = tcpu->tcpu_ibase + TSTAT_INSTR_SIZE;
 	tcpu->tcpu_vabase = tcpu->tcpu_ibase;

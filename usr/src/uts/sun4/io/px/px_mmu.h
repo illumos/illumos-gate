@@ -43,9 +43,10 @@ typedef uint64_t px_window_t;
 /*
  * boiler plate for tte (everything except the pfn)
  */
-#define	PX_GET_TTE_ATTR(flags)\
+#define	PX_GET_TTE_ATTR(flags, attr)\
 	(((flags & DDI_DMA_READ) ? PCI_MAP_ATTR_WRITE : 0) | \
-	((flags & DDI_DMA_WRITE) ? PCI_MAP_ATTR_READ : 0))
+	((flags & DDI_DMA_WRITE) ? PCI_MAP_ATTR_READ : 0) | \
+	((attr & DDI_DMA_RELAXED_ORDERING) ? PCI_MAP_ATTR_RO : 0))
 
 /*
  * mmu block soft state structure:

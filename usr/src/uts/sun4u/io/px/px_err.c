@@ -40,10 +40,83 @@
 #include <px_regs.h>
 #include <px_csr.h>
 #include <sys/membar.h>
+#include <sys/machcpuvar.h>
+#include <sys/platform_module.h>
 #include "pcie_pwr.h"
 #include "px_lib4u.h"
 #include "px_err.h"
 #include "px_err_impl.h"
+#include "oberon_regs.h"
+
+uint64_t px_tlu_ue_intr_mask	= PX_ERR_EN_ALL;
+uint64_t px_tlu_ue_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_tlu_ue_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_tlu_ce_intr_mask	= PX_ERR_MASK_NONE;
+uint64_t px_tlu_ce_log_mask	= PX_ERR_MASK_NONE;
+uint64_t px_tlu_ce_count_mask	= PX_ERR_MASK_NONE;
+
+/*
+ * Do not enable Link Interrupts
+ */
+uint64_t px_tlu_oe_intr_mask	= PX_ERR_EN_ALL & ~0x80000000800;
+uint64_t px_tlu_oe_log_mask	= PX_ERR_EN_ALL & ~0x80000000800;
+uint64_t px_tlu_oe_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_mmu_intr_mask	= PX_ERR_EN_ALL;
+uint64_t px_mmu_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_mmu_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_imu_intr_mask	= PX_ERR_EN_ALL;
+uint64_t px_imu_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_imu_count_mask	= PX_ERR_EN_ALL;
+
+/*
+ * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_S) |
+ * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_P);
+ */
+uint64_t px_ilu_intr_mask	= (((uint64_t)0x10 << 32) | 0x10);
+uint64_t px_ilu_log_mask	= (((uint64_t)0x10 << 32) | 0x10);
+uint64_t px_ilu_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_ubc_intr_mask	= PX_ERR_EN_ALL;
+uint64_t px_ubc_log_mask		= PX_ERR_EN_ALL;
+uint64_t px_ubc_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_jbc_intr_mask	= PX_ERR_EN_ALL;
+uint64_t px_jbc_log_mask		= PX_ERR_EN_ALL;
+uint64_t px_jbc_count_mask	= PX_ERR_EN_ALL;
+
+/*
+ * LPU Intr Registers are reverse encoding from the registers above.
+ * 1 = disable
+ * 0 = enable
+ *
+ * Log and Count are however still the same.
+ */
+uint64_t px_lpul_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpul_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpul_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_lpup_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpup_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpup_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_lpur_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpur_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpur_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_lpux_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpux_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpux_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_lpus_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpus_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpus_count_mask	= PX_ERR_EN_ALL;
+
+uint64_t px_lpug_intr_mask	= LPU_INTR_DISABLE;
+uint64_t px_lpug_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_lpug_count_mask	= PX_ERR_EN_ALL;
 
 /*
  * JBC error bit table
@@ -59,7 +132,7 @@
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
 	PX_ERR_JBC_CLASS(bit)
-px_err_bit_desc_t px_err_cb_tbl[] = {
+px_err_bit_desc_t px_err_jbc_tbl[] = {
 	/* JBC FATAL - see io erpt doc, section 1.1 */
 	{ JBC_BIT_DESC(MB_PEA,	fatal_hw,	jbc_fatal) },
 	{ JBC_BIT_DESC(CPE,	fatal_hw,	jbc_fatal) },
@@ -105,8 +178,49 @@ px_err_bit_desc_t px_err_cb_tbl[] = {
 	{ JBC_BIT_DESC(EBUS_TO,	jbc_csr,	jbc_csr) }
 };
 
-#define	px_err_cb_keys \
-	(sizeof (px_err_cb_tbl)) / (sizeof (px_err_bit_desc_t))
+#define	px_err_jbc_keys \
+	(sizeof (px_err_jbc_tbl)) / (sizeof (px_err_bit_desc_t))
+
+/*
+ * UBC error bit table
+ */
+#define	UBC_BIT_DESC(bit, hdl, erpt) \
+	UBC_INTERRUPT_STATUS_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_UBC_CLASS(bit) }, \
+	{ UBC_INTERRUPT_STATUS_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_UBC_CLASS(bit)
+px_err_bit_desc_t px_err_ubc_tbl[] = {
+	/* UBC FATAL  */
+	{ UBC_BIT_DESC(DMARDUEA,	non_fatal,	ubc_fatal) },
+	{ UBC_BIT_DESC(DMAWTUEA,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(MEMRDAXA,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(MEMWTAXA,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(DMARDUEB,	non_fatal,	ubc_fatal) },
+	{ UBC_BIT_DESC(DMAWTUEB,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(MEMRDAXB,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(MEMWTAXB,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(PIOWTUE,		fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(PIOWBEUE,	fatal_sw,	ubc_fatal) },
+	{ UBC_BIT_DESC(PIORBEUE,	fatal_sw,	ubc_fatal) }
+};
+
+#define	px_err_ubc_keys \
+	(sizeof (px_err_ubc_tbl)) / (sizeof (px_err_bit_desc_t))
+
+
+char *ubc_class_eid_qualifier[] = {
+	"-mem",
+	"-channel",
+	"-cpu",
+	"-path"
+};
+
 
 /*
  * DMC error bit tables
@@ -173,6 +287,7 @@ px_err_bit_desc_t px_err_mmu_tbl[] = {
 };
 #define	px_err_mmu_keys (sizeof (px_err_mmu_tbl)) / (sizeof (px_err_bit_desc_t))
 
+
 /*
  * PEC error bit tables
  */
@@ -210,12 +325,24 @@ px_err_bit_desc_t px_err_ilu_tbl[] = {
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
 	PX_ERR_PEC_CLASS(bit)
+#define	TLU_UC_OB_BIT_DESC(bit, hdl, erpt) \
+	TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_OB_CLASS(bit) }, \
+	{ TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit)
 px_err_bit_desc_t px_err_tlu_ue_tbl[] = {
 	/* PCI-E Receive Uncorrectable Errors - see io erpt doc, section 3.2 */
 	{ TLU_UC_BIT_DESC(UR,		pciex_ue,	pciex_rx_ue) },
 	{ TLU_UC_BIT_DESC(UC,		pciex_ue,	pciex_rx_ue) },
 
 	/* PCI-E Transmit Uncorrectable Errors - see io erpt doc, section 3.3 */
+	{ TLU_UC_OB_BIT_DESC(ECRC,	pciex_ue,	pciex_rx_ue) },
 	{ TLU_UC_BIT_DESC(CTO,		pciex_ue,	pciex_tx_ue) },
 	{ TLU_UC_BIT_DESC(ROF,		pciex_ue,	pciex_tx_ue) },
 
@@ -233,6 +360,7 @@ px_err_bit_desc_t px_err_tlu_ue_tbl[] = {
 };
 #define	px_err_tlu_ue_keys \
 	(sizeof (px_err_tlu_ue_tbl)) / (sizeof (px_err_bit_desc_t))
+
 
 /*
  * PEC CE errors implementation is incomplete pending PCIE generic
@@ -261,6 +389,7 @@ px_err_bit_desc_t px_err_tlu_ce_tbl[] = {
 #define	px_err_tlu_ce_keys \
 	(sizeof (px_err_tlu_ce_tbl)) / (sizeof (px_err_bit_desc_t))
 
+
 /* pec oe errors */
 #define	TLU_OE_BIT_DESC(bit, hdl, erpt) \
 	TLU_OTHER_EVENT_STATUS_CLEAR_ ## bit ## _P, \
@@ -273,6 +402,17 @@ px_err_bit_desc_t px_err_tlu_ce_tbl[] = {
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
 	PX_ERR_PEC_CLASS(bit)
+#define	TLU_OE_OB_BIT_DESC(bit, hdl, erpt) \
+	TLU_OTHER_EVENT_STATUS_CLEAR_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_OB_CLASS(bit) }, \
+	{ TLU_OTHER_EVENT_STATUS_CLEAR_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_OB_CLASS(bit)
 px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	/*
 	 * TLU Other Event Status (receive only) - see io erpt doc, section 3.7
@@ -288,6 +428,7 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	{ TLU_OE_BIT_DESC(IIP,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(EDP,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(EHP,		fatal_gos,	pciex_oe) },
+	{ TLU_OE_OB_BIT_DESC(TLUEITMO,	fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LIN,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LRS,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LDN,		tlu_ldn,	pciex_oe) },
@@ -302,6 +443,7 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 
 #define	px_err_tlu_oe_keys \
 	(sizeof (px_err_tlu_oe_tbl)) / (sizeof (px_err_bit_desc_t))
+
 
 /*
  * All the following tables below are for LPU Interrupts.  These interrupts
@@ -415,6 +557,15 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
 	px_err_ ## pre ## _keys, \
 	0
 
+#define	MnT6_ob(pre) \
+	B_FALSE, \
+	&px_ ## pre ## _intr_mask, \
+	&px_ ## pre ## _log_mask, \
+	&px_ ## pre ## _count_mask, \
+	px_err_ ## pre ## _ob_tbl, \
+	px_err_ ## pre ## _ob_keys, \
+	0
+
 /* LPU Registers Addresses */
 #define	LR4(pre) \
 	NULL, \
@@ -436,7 +587,7 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
 	TLU_ ## pre ## _INTERRUPT_STATUS, \
 	TLU_ ## pre ## _STATUS_CLEAR
 
-/* Registers Addresses for JBC, MMU, IMU and ILU */
+/* Registers Addresses for JBC, UBC, MMU, IMU and ILU */
 #define	R4(pre) \
 	pre ## _ERROR_LOG_ENABLE, \
 	pre ## _INTERRUPT_ENABLE, \
@@ -449,7 +600,8 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
  * It is located in px_err.h
  */
 px_err_reg_desc_t px_err_reg_tbl[] = {
-	{ MnT6(cb),	R4(JBC),		  "JBC Error"},
+	{ MnT6(jbc),	R4(JBC),		  "JBC Error"},
+	{ MnT6(ubc),	R4(UBC),		  "UBC Error"},
 	{ MnT6(mmu),	R4(MMU),		  "MMU Error"},
 	{ MnT6(imu),	R4(IMU),		  "IMU Error"},
 	{ MnT6(tlu_ue),	TR4(UNCORRECTABLE_ERROR), "TLU UE"},
@@ -461,7 +613,7 @@ px_err_reg_desc_t px_err_reg_tbl[] = {
 	{ MnT6(lpur),	LR4(RECEIVE_PHY),	  "LPU RX Phy Layer"},
 	{ MnT6(lpux),	LR4(TRANSMIT_PHY),	  "LPU TX Phy Layer"},
 	{ MnT6(lpus),	LR4(LTSSM),		  "LPU LTSSM"},
-	{ MnT6(lpug),	LR4(GIGABLAZE_GLUE),	  "LPU GigaBlaze Glue"}
+	{ MnT6(lpug),	LR4(GIGABLAZE_GLUE),	  "LPU GigaBlaze Glue"},
 };
 #define	PX_ERR_REG_KEYS (sizeof (px_err_reg_tbl)) / (sizeof (px_err_reg_tbl[0]))
 
@@ -469,7 +621,7 @@ typedef struct px_err_ss {
 	uint64_t err_status[PX_ERR_REG_KEYS];
 } px_err_ss_t;
 
-static void px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chkjbc);
+static void px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chk_cb);
 static int  px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr,
     px_err_ss_t *ss);
 static int  px_err_check_severity(px_t *px_p, ddi_fm_error_t *derr,
@@ -477,11 +629,11 @@ static int  px_err_check_severity(px_t *px_p, ddi_fm_error_t *derr,
 
 /*
  * px_err_cb_intr:
- * Interrupt handler for the JBC block.
+ * Interrupt handler for the JBC/UBC block.
  * o lock
  * o create derr
- * o px_err_handle(leaf1, with jbc)
- * o px_err_handle(leaf2, without jbc)
+ * o px_err_handle(leaf1, with cb)
+ * o px_err_handle(leaf2, without cb)
  * o dispatch (leaf1)
  * o dispatch (leaf2)
  * o unlock
@@ -541,7 +693,7 @@ px_err_cb_intr(caddr_t arg)
  * Interrupt handler for the DMC/PEC block.
  * o lock
  * o create derr
- * o px_err_handle(leaf, with jbc)
+ * o px_err_handle(leaf, with cb)
  * o dispatch (leaf)
  * o unlock
  * o handle error: fatal? fm_panic() : return INTR_CLAIMED)
@@ -600,7 +752,8 @@ px_err_reg_enable(px_t *px_p, px_err_id_t id)
 	caddr_t			csr_base;
 	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 
-	if (id == PX_ERR_JBC)
+	/* Get the correct CSR BASE */
+	if (PX_ERR_XBC(id))
 		csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
 	else
 		csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
@@ -642,7 +795,8 @@ px_err_reg_disable(px_t *px_p, px_err_id_t id)
 	caddr_t			csr_base;
 	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 
-	if (id == PX_ERR_JBC)
+	/* Get the correct CSR BASE */
+	if (PX_ERR_XBC(id))
 		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_XBC];
 	else
 		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_CSR];
@@ -651,6 +805,7 @@ px_err_reg_disable(px_t *px_p, px_err_id_t id)
 
 	switch (id) {
 	case PX_ERR_JBC:
+	case PX_ERR_UBC:
 	case PX_ERR_MMU:
 	case PX_ERR_IMU:
 	case PX_ERR_TLU_UE:
@@ -687,13 +842,13 @@ px_err_reg_disable(px_t *px_p, px_err_id_t id)
  * @param px_p		leaf in which to check access
  * @param derr		fm err data structure to be updated
  * @param caller	PX_TRAP_CALL | PX_INTR_CALL
- * @param chkjbc	whether to handle jbc registers
+ * @param chk_cb	whether to handle cb registers
  * @return err		PX_OK | PX_NONFATAL |
  *                      PX_FATAL_GOS | PX_FATAL_HW | PX_STUCK_FATAL
  */
 int
 px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
-    boolean_t chkjbc)
+    boolean_t chk_cb)
 {
 	px_err_ss_t		ss;
 	int			err = PX_OK;
@@ -701,7 +856,7 @@ px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
 	ASSERT(MUTEX_HELD(&px_p->px_fm_mutex));
 
 	/* snap shot the current fire registers */
-	px_err_snapshot(px_p, &ss, chkjbc);
+	px_err_snapshot(px_p, &ss, chk_cb);
 
 	/* check for safe access */
 	px_err_safeacc_check(px_p, derr);
@@ -731,14 +886,14 @@ px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
 /*
  * px_err_snapshot:
  * Take a current snap shot of all the fire error registers.  This includes
- * JBC, DMC, and PEC, unless chkjbc == false;
+ * JBC/UBC, DMC, and PEC, unless chk_cb == false;
  *
  * @param px_p		leaf in which to take the snap shot.
  * @param ss		pre-allocated memory to store the snap shot.
- * @param chkjbc	boolean on whether to store jbc register.
+ * @param chk_cb	boolean on whether to store jbc/ubc register.
  */
 static void
-px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chkjbc)
+px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chk_cb)
 {
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t	xbc_csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
@@ -746,21 +901,40 @@ px_err_snapshot(px_t *px_p, px_err_ss_t *ss, boolean_t chkjbc)
 	px_err_reg_desc_t *reg_desc;
 	int reg_id;
 
-	/* snapshot JBC interrupt status */
-	reg_id = PX_ERR_JBC;
-	if (chkjbc == B_TRUE) {
+	switch (PX_CHIP_TYPE(pxu_p)) {
+	case PX_CHIP_OBERON:
+		reg_id = PX_ERR_UBC;
+		break;
+	case PX_CHIP_FIRE:
+		reg_id = PX_ERR_JBC;
+		break;
+	default:
+		DBG(DBG_ERR_INTR, NULL, "px_err_snapshot - "
+		    "unknown chip type: 0x%x\n", PX_CHIP_TYPE(pxu_p));
+		reg_id = 0;
+		break;
+	}
+
+	/* snapshot CB interrupt status */
+	if (chk_cb == B_TRUE) {
 		reg_desc = &px_err_reg_tbl[reg_id];
-		ss->err_status[reg_id] = CSR_XR(xbc_csr_base,
-		    reg_desc->status_addr);
+		/* Only look at enabled groups. */
+		if (reg_desc->enabled == B_TRUE)	{
+			ss->err_status[reg_id] = CSR_XR(xbc_csr_base,
+			    reg_desc->status_addr);
+		}
 	} else {
 		ss->err_status[reg_id] = 0;
 	}
 
 	/* snapshot DMC/PEC interrupt status */
-	for (reg_id = 1; reg_id < PX_ERR_REG_KEYS; reg_id += 1) {
+	for (reg_id = 2; reg_id < PX_ERR_REG_KEYS; reg_id += 1) {
 		reg_desc = &px_err_reg_tbl[reg_id];
-		ss->err_status[reg_id] = CSR_XR(pec_csr_base,
-		    reg_desc->status_addr);
+		/* Only look at enabled groups. */
+		if (reg_desc->enabled == B_TRUE)	{
+			ss->err_status[reg_id] = CSR_XR(pec_csr_base,
+			    reg_desc->status_addr);
+		}
 	}
 }
 
@@ -803,12 +977,15 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 		/* Get the correct register description table */
 		err_reg_tbl = &px_err_reg_tbl[reg_id];
 
+		/* Only look at enabled groups. */
+		if (err_reg_tbl->enabled != B_TRUE)
+			continue;
+
 		/* Get the correct CSR BASE */
-		if (reg_id == PX_ERR_JBC) {
+		if (PX_ERR_XBC(reg_id))
 			csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
-		} else {
+		else
 			csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
-		}
 
 		/* Get pointers to masks and register addresses */
 		log_mask = err_reg_tbl->log_mask_p;
@@ -859,9 +1036,7 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 						    err_bit_desc->class_name);
 				}
 			}
-
 		}
-
 		/* Print register status */
 		if (ss_reg & *log_mask)
 			DBG(DBG_ERR_INTR, rpdip, "<%x>=%16llx %s\n",
@@ -1002,6 +1177,105 @@ PX_ERPT_SEND_DEC(do_not)
 	return (PX_OK);
 }
 
+/* UBC FATAL - see io erpt doc, section 1.1 */
+/* ARGSUSED */
+PX_ERPT_SEND_DEC(ubc_fatal)
+{
+	char		buf[FM_MAX_CLASS];
+	uint64_t	memory_ue_log, marked;
+	char		unum[FM_MAX_CLASS];
+	int		unum_length;
+	uint64_t	device_id = 0;
+	uint8_t		cpu_version = 0;
+	nvlist_t	*resource = NULL;
+
+	unum[0] = '\0';
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+
+	memory_ue_log = CSR_XR(csr_base, UBC_MEMORY_UE_LOG);
+	marked = (memory_ue_log >> UBC_MEMORY_UE_LOG_MARKED) &
+	    UBC_MEMORY_UE_LOG_MARKED_MASK;
+
+	if ((strstr(class_name, "ubc.piowtue") != NULL) ||
+	    (strstr(class_name, "ubc.piowbeue") != NULL) ||
+	    (strstr(class_name, "ubc.piorbeue") != NULL) ||
+	    (strstr(class_name, "ubc.dmarduea") != NULL) ||
+	    (strstr(class_name, "ubc.dmardueb") != NULL)) {
+		int eid = (memory_ue_log >> UBC_MEMORY_UE_LOG_EID) &
+		    UBC_MEMORY_UE_LOG_EID_MASK;
+		(void) strncat(buf, ubc_class_eid_qualifier[eid],
+		    FM_MAX_CLASS);
+
+		if (eid == UBC_EID_MEM) {
+			uint64_t phys_addr = memory_ue_log &
+			    MMU_OBERON_PADDR_MASK;
+			uint64_t offset = (uint64_t)-1;
+
+			resource = fm_nvlist_create(NULL);
+			if (&plat_get_mem_unum) {
+				if ((plat_get_mem_unum(0,
+				    phys_addr, 0, B_TRUE, 0, unum,
+				    FM_MAX_CLASS, &unum_length)) != 0)
+					unum[0] = '\0';
+			}
+			fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
+					NULL, unum, NULL, offset);
+
+		} else if (eid == UBC_EID_CPU) {
+			int cpuid = (marked & UBC_MARKED_MAX_CPUID_MASK);
+			char sbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
+
+			resource = fm_nvlist_create(NULL);
+			cpu_version = cpunodes[cpuid].version;
+			device_id = cpunodes[cpuid].device_id;
+			(void) snprintf(sbuf, sizeof (sbuf), "%lX",
+			    device_id);
+			(void) fm_fmri_cpu_set(resource,
+			    FM_CPU_SCHEME_VERSION, NULL, cpuid,
+			    &cpu_version, sbuf);
+		}
+	}
+
+	if (resource) {
+		ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+		    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+		    OBERON_UBC_ELE, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_ERROR_LOG_ENABLE),
+		    OBERON_UBC_IE, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_INTERRUPT_ENABLE),
+		    OBERON_UBC_IS, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_INTERRUPT_STATUS),
+		    OBERON_UBC_ESS, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_ERROR_STATUS_SET),
+		    OBERON_UBC_MUE, DATA_TYPE_UINT64, memory_ue_log,
+		    OBERON_UBC_UNUM, DATA_TYPE_STRING, unum,
+		    OBERON_UBC_DID, DATA_TYPE_UINT64, device_id,
+		    OBERON_UBC_CPUV, DATA_TYPE_UINT32, cpu_version,
+		    OBERON_UBC_RESOURCE, DATA_TYPE_NVLIST, resource,
+		    NULL);
+		fm_nvlist_destroy(resource, FM_NVA_FREE);
+	} else {
+		ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+		    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+		    OBERON_UBC_ELE, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_ERROR_LOG_ENABLE),
+		    OBERON_UBC_IE, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_INTERRUPT_ENABLE),
+		    OBERON_UBC_IS, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_INTERRUPT_STATUS),
+		    OBERON_UBC_ESS, DATA_TYPE_UINT64,
+		    CSR_XR(csr_base, UBC_ERROR_STATUS_SET),
+		    OBERON_UBC_MUE, DATA_TYPE_UINT64, memory_ue_log,
+		    OBERON_UBC_UNUM, DATA_TYPE_STRING, unum,
+		    OBERON_UBC_DID, DATA_TYPE_UINT64, device_id,
+		    OBERON_UBC_CPUV, DATA_TYPE_UINT32, cpu_version,
+		    NULL);
+	}
+
+	return (PX_OK);
+}
 
 /* JBC FATAL - see io erpt doc, section 1.1 */
 PX_ERPT_SEND_DEC(jbc_fatal)
@@ -1352,6 +1626,7 @@ px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 * errors for a period of time within which the occuring of the
 	 * disabled errors become rbne, that is non fatal.
 	 */
+
 	if (!(imu_log_enable & imu_intr_enable & mask))
 		err = PX_FATAL_SW;
 
@@ -1456,6 +1731,7 @@ PX_ERPT_SEND_DEC(mmu_tfar_tfsr)
 	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,19 +35,19 @@
 #include "rsrc_info.h"
 #include "rsrc_info_impl.h"
 
-static int ap_list_pack(ri_ap_t *, char **, size_t *);
+static int ap_list_pack(ri_ap_t *, char **, size_t *, int);
 static int ap_list_unpack(char *, size_t, ri_ap_t **);
-static int ap_pack(ri_ap_t *, char **, size_t *);
+static int ap_pack(ri_ap_t *, char **, size_t *, int);
 static int ap_unpack(char *, size_t, ri_ap_t *);
-static int dev_list_pack(ri_dev_t *, char **, size_t *);
+static int dev_list_pack(ri_dev_t *, char **, size_t *, int);
 static int dev_list_unpack(char *, size_t, ri_dev_t **);
-static int dev_pack(ri_dev_t *, char **, size_t *);
+static int dev_pack(ri_dev_t *, char **, size_t *, int);
 static int dev_unpack(char *, size_t, ri_dev_t *);
-static int client_list_pack(ri_client_t *, char **, size_t *);
+static int client_list_pack(ri_client_t *, char **, size_t *, int);
 static int client_list_unpack(char *, size_t, ri_client_t **);
-static int client_pack(ri_client_t *, char **, size_t *);
+static int client_pack(ri_client_t *, char **, size_t *, int);
 static int client_unpack(char *, size_t, ri_client_t *);
-static int pack_add_byte_array(nvlist_t *, char *, nvlist_t *);
+static int pack_add_byte_array(nvlist_t *, char *, nvlist_t *, int);
 static int lookup_unpack_byte_array(nvlist_t *, char *, nvlist_t **);
 static void ri_ap_free(ri_ap_t *);
 
@@ -132,7 +131,7 @@ ri_client_free(ri_client_t *client)
  * Pack everything contained in the handle up inside out.
  */
 int
-ri_pack(ri_hdl_t *hdl, caddr_t *bufp, size_t *sizep)
+ri_pack(ri_hdl_t *hdl, caddr_t *bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -162,27 +161,29 @@ ri_pack(ri_hdl_t *hdl, caddr_t *bufp, size_t *sizep)
 		goto fail;
 	}
 
-	if (ap_list_pack(hdl->aps, &buf, &size) != 0 ||
+	if (ap_list_pack(hdl->aps, &buf, &size, encoding) != 0 ||
 	    nvlist_add_byte_array(nvl, RI_HDL_APS, (uchar_t *)buf, size) != 0) {
 		goto fail;
 	}
 
 	s_free(buf);
-	if (client_list_pack(hdl->cpu_cap_clients, &buf, &size) != 0 ||
+	if (client_list_pack(hdl->cpu_cap_clients, &buf, &size,
+	    encoding) != 0 ||
 	    nvlist_add_byte_array(nvl, RI_HDL_CPU_CAPS, (uchar_t *)buf,
 	    size) != 0) {
 		goto fail;
 	}
 
 	s_free(buf);
-	if (client_list_pack(hdl->mem_cap_clients, &buf, &size) != 0 ||
+	if (client_list_pack(hdl->mem_cap_clients, &buf, &size,
+	    encoding) != 0 ||
 	    nvlist_add_byte_array(nvl, RI_HDL_MEM_CAPS, (uchar_t *)buf,
 	    size) != 0) {
 		goto fail;
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -205,7 +206,7 @@ fail:
  * Pack a list of attachment point handles.
  */
 static int
-ap_list_pack(ri_ap_t *aplist, char **bufp, size_t *sizep)
+ap_list_pack(ri_ap_t *aplist, char **bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -223,7 +224,7 @@ ap_list_pack(ri_ap_t *aplist, char **bufp, size_t *sizep)
 
 	while (aplist != NULL) {
 		s_free(buf);
-		if (ap_pack(aplist, &buf, &size) != 0)
+		if (ap_pack(aplist, &buf, &size, encoding) != 0)
 			goto fail;
 
 		if (nvlist_add_byte_array(nvl, RI_AP_T, (uchar_t *)buf,
@@ -236,7 +237,7 @@ ap_list_pack(ri_ap_t *aplist, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -259,7 +260,7 @@ fail:
  * Pack a list of ri_dev_t's.
  */
 static int
-dev_list_pack(ri_dev_t *devlist, char **bufp, size_t *sizep)
+dev_list_pack(ri_dev_t *devlist, char **bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -277,7 +278,7 @@ dev_list_pack(ri_dev_t *devlist, char **bufp, size_t *sizep)
 
 	while (devlist != NULL) {
 		s_free(buf);
-		if (dev_pack(devlist, &buf, &size) != 0)
+		if (dev_pack(devlist, &buf, &size, encoding) != 0)
 			goto fail;
 
 		if (nvlist_add_byte_array(nvl, RI_DEV_T, (uchar_t *)buf,
@@ -290,7 +291,7 @@ dev_list_pack(ri_dev_t *devlist, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -313,7 +314,8 @@ fail:
  * Pack a list of ri_client_t's.
  */
 static int
-client_list_pack(ri_client_t *client_list, char **bufp, size_t *sizep)
+client_list_pack(ri_client_t *client_list, char **bufp, size_t *sizep,
+    int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -331,7 +333,7 @@ client_list_pack(ri_client_t *client_list, char **bufp, size_t *sizep)
 
 	while (client_list != NULL) {
 		s_free(buf);
-		if (client_pack(client_list, &buf, &size) != 0)
+		if (client_pack(client_list, &buf, &size, encoding) != 0)
 			goto fail;
 
 		if (nvlist_add_byte_array(nvl, RI_CLIENT_T, (uchar_t *)buf,
@@ -344,7 +346,7 @@ client_list_pack(ri_client_t *client_list, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -364,7 +366,7 @@ fail:
 }
 
 static int
-ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep)
+ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -375,10 +377,11 @@ ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep)
 		return (-1);
 	}
 
-	if (pack_add_byte_array(ap->conf_props, RI_AP_PROPS, nvl) != 0)
+	if (pack_add_byte_array(ap->conf_props, RI_AP_PROPS, nvl,
+	    encoding) != 0)
 		goto fail;
 
-	if (dev_list_pack(ap->cpus, &buf, &size) != 0)
+	if (dev_list_pack(ap->cpus, &buf, &size, encoding) != 0)
 		goto fail;
 
 	if (nvlist_add_byte_array(nvl, RI_AP_CPUS, (uchar_t *)buf,
@@ -388,7 +391,7 @@ ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (dev_list_pack(ap->mems, &buf, &size) != 0)
+	if (dev_list_pack(ap->mems, &buf, &size, encoding) != 0)
 		goto fail;
 
 	if (nvlist_add_byte_array(nvl, RI_AP_MEMS, (uchar_t *)buf,
@@ -398,7 +401,7 @@ ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (dev_list_pack(ap->ios, &buf, &size) != 0)
+	if (dev_list_pack(ap->ios, &buf, &size, encoding) != 0)
 		goto fail;
 
 	if (nvlist_add_byte_array(nvl, RI_AP_IOS, (uchar_t *)buf,
@@ -408,7 +411,7 @@ ap_pack(ri_ap_t *ap, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -428,7 +431,7 @@ fail:
 }
 
 static int
-dev_pack(ri_dev_t *dev, char **bufp, size_t *sizep)
+dev_pack(ri_dev_t *dev, char **bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -439,10 +442,11 @@ dev_pack(ri_dev_t *dev, char **bufp, size_t *sizep)
 		return (-1);
 	}
 
-	if (pack_add_byte_array(dev->conf_props, RI_DEV_PROPS, nvl) != 0)
+	if (pack_add_byte_array(dev->conf_props, RI_DEV_PROPS, nvl,
+	    encoding) != 0)
 		goto fail;
 
-	if (client_list_pack(dev->rcm_clients, &buf, &size) != 0)
+	if (client_list_pack(dev->rcm_clients, &buf, &size, encoding) != 0)
 		goto fail;
 
 	if (nvlist_add_byte_array(nvl, RI_DEV_CLIENTS, (uchar_t *)buf,
@@ -453,7 +457,7 @@ dev_pack(ri_dev_t *dev, char **bufp, size_t *sizep)
 	}
 
 	s_free(buf);
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -473,7 +477,7 @@ fail:
 }
 
 static int
-client_pack(ri_client_t *client, char **bufp, size_t *sizep)
+client_pack(ri_client_t *client, char **bufp, size_t *sizep, int encoding)
 {
 	nvlist_t	*nvl = NULL;
 	char		*buf = NULL;
@@ -485,7 +489,7 @@ client_pack(ri_client_t *client, char **bufp, size_t *sizep)
 	}
 
 	if (pack_add_byte_array(client->usg_props, RI_CLIENT_USAGE_PROPS,
-	    nvl) != 0) {
+	    nvl, encoding) != 0) {
 		goto fail;
 	}
 
@@ -494,11 +498,11 @@ client_pack(ri_client_t *client, char **bufp, size_t *sizep)
 	 * in the call to ri_init.
 	 */
 	if (client->v_props != NULL && pack_add_byte_array(client->v_props,
-	    RI_CLIENT_VERB_PROPS, nvl) != 0) {
+	    RI_CLIENT_VERB_PROPS, nvl, encoding) != 0) {
 		goto fail;
 	}
 
-	if (nvlist_pack(nvl, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail\n"));
 		goto fail;
 	}
@@ -521,12 +525,13 @@ fail:
  * Pack nvlist_t and add as byte array to another nvlist_t.
  */
 static int
-pack_add_byte_array(nvlist_t *nvl_packme, char *name, nvlist_t *nvl)
+pack_add_byte_array(nvlist_t *nvl_packme, char *name, nvlist_t *nvl,
+    int encoding)
 {
 	char	*buf = NULL;
 	size_t	size = 0;
 
-	if (nvlist_pack(nvl_packme, &buf, &size, NV_ENCODE_NATIVE, 0) != 0) {
+	if (nvlist_pack(nvl_packme, &buf, &size, encoding, 0) != 0) {
 		dprintf((stderr, "nvlist_pack fail (%s)\n", name));
 		s_free(buf);
 		return (-1);

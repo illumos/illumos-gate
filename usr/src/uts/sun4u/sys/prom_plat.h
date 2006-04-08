@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,6 +262,15 @@ extern	void		prom_starfire_add_cpu(uint_t cpuid);
 extern	void		prom_starfire_rm_cpu(uint_t cpuid);
 extern	int		prom_starfire_move_cpu0(uint_t cpuid);
 extern	void		prom_starfire_init_console(uint_t cpuid);
+
+/*
+ * OPL-specific routines
+ */
+extern	void		prom_opl_get_tod(time_t *time, int64_t *stickval);
+extern	void		prom_opl_set_diff(int64_t diff);
+extern	int		prom_attach_notice(int bn);
+extern	int		prom_detach_notice(int bn);
+extern	int		prom_opl_switch_console(int bn);
 
 /*
  * The client program implementation is required to provide a wrapper

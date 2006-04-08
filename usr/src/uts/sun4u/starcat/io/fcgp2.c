@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,9 +120,9 @@ struct gfc_ops_v gp2_pov[] = {
 	{	"rb!",			gfc_register_store},
 	{	"claim-address",	gfc_claim_address},
 	{	"master-interrupt",	gfc_master_intr},
-	{	"schizo,claim-memory",	gfc_claim_memory},
-	{	"schizo,release-memory",	gfc_release_memory},
-	{	"schizo,vtop",	gfc_vtop},
+	{	"claim-memory",		gfc_claim_memory},
+	{	"release-memory",	gfc_release_memory},
+	{	"vtop",			gfc_vtop},
 	{	FC_CONFIG_CHILD,	gfc_config_child},
 	{	FC_GET_FCODE_SIZE,	gfc_get_fcode_size},
 	{	FC_GET_FCODE,		gfc_get_fcode},
@@ -653,7 +653,7 @@ gfc_claim_address(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 /*
  * gfc_claim_memory
  *
- * schizo,claim-memory ( align size vhint -- vaddr)
+ * claim-memory ( align size vhint -- vaddr)
  */
 static int
 gfc_claim_memory(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
@@ -723,7 +723,7 @@ gfc_claim_memory(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 /*
  * gfc_release_memory
  *
- * schizo,release-memory ( size vaddr -- )
+ * release-memory ( size vaddr -- )
  */
 static int
 gfc_release_memory(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
@@ -777,7 +777,7 @@ gfc_release_memory(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 /*
  * gfc_vtop
  *
- * schizo,vtop ( vaddr -- paddr.lo paddr.hi)
+ * vtop ( vaddr -- paddr.lo paddr.hi)
  */
 static int
 gfc_vtop(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)

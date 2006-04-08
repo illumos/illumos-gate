@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,7 +147,9 @@ typedef struct {
 #define	is_suspend	is_cm.c_sflags
 #define	is_time		is_cm.c_time
 
-#define	SBD_MAX_CORES_PER_CMP	2
+/* This constant must be the max of the max cores on all platforms */
+
+#define	SBD_MAX_CORES_PER_CMP	8
 
 typedef struct {
 	sbd_cm_stat_t	ps_cm;
@@ -576,6 +577,23 @@ typedef struct {
 #define	ESGT_NO_SEPROM_SPACE	4026	/* No SEPROM space */
 #define	ESGT_NOT_SUPP		4027	/* Operation not supported */
 #define	ESGT_NO_MEM		4028	/* No Memory */
+
+/* opl error codes */
+
+#define	EOPL_GETPROP		5001	/* Cannot read property value */
+#define	EOPL_BNUM		5002	/* Invalid board number */
+#define	EOPL_CONFIGBUSY		5003
+	/* Cannot proceed; Board is configured or busy */
+#define	EOPL_PROBE		5004	/* Firmware probe failed */
+#define	EOPL_DEPROBE		5005	/* Firmware deprobe failed */
+#define	EOPL_SUPPORT		5006	/* Operation not supported */
+#define	EOPL_DRVFAIL		5007	/* Device driver failure */
+#define	EOPL_UNKPTCMD		5008	/* Unrecognized platform command */
+#define	EOPL_NOTID		5009	/* drmach parameter is not a valid ID */
+#define	EOPL_INAPPROP		5010
+	/* drmach parameter is inappropriate for operation */
+#define	EOPL_INTERNAL		5011	/* Unexpected internal condition */
+#define	EOPL_FINDDEVICE		5012	/* Firmware cannot find node. */
 
 #ifdef	__cplusplus
 }

@@ -450,6 +450,7 @@ sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
 	fruadm		\
+	prtdscp		\
 	prtfru		\
 	scadm		\
 	sckmd		\
@@ -687,6 +688,7 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 
 sparc_MSGSUBDIRS=	\
 	fruadm		\
+	prtdscp		\
 	prtfru		\
 	stmsboot	\
 	wrsmconf	\

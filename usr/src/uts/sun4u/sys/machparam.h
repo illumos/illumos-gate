@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -291,7 +290,7 @@ extern "C" {
 
 #define	PFN_TO_BUSTYPE(pfn)	(((pfn) >> 19) & 0x1FF)
 #define	BUSTYPE_TO_PFN(btype, pfn)			\
-	(((btype) << 19) | ((pfn) & 0x7FFFF))
+	(((pfn_t)(btype) << 19) | ((pfn) & 0x7FFFF))
 #define	IO_BUSTYPE(pfn)	((PFN_TO_BUSTYPE(pfn) & 0x100) >> 8)
 
 #ifdef	_STARFIRE

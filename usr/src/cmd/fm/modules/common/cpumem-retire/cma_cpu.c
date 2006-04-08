@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,8 +97,8 @@ cpu_blacklist(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru)
 	return (0);
 }
 
-static void
-cpu_offline(fmd_hdl_t *hdl, const char *uuid, uint_t cpuid, int cpustate)
+static int
+cpu_offline(fmd_hdl_t *hdl, uint_t cpuid, int cpustate)
 {
 	int i;
 
@@ -108,21 +107,22 @@ cpu_offline(fmd_hdl_t *hdl, const char *uuid, uint_t cpuid, int cpustate)
 		if (p_online(cpuid, cpustate) != -1) {
 			fmd_hdl_debug(hdl, "offlined cpu %u\n", cpuid);
 			cma_stats.cpu_flts.fmds_value.ui64++;
-			if (uuid != NULL)
-				fmd_case_uuclose(hdl, uuid);
-			return;
+			return (CMA_RA_SUCCESS);
 		}
 	}
 
 	fmd_hdl_debug(hdl, "failed to offline %u: %s\n", cpuid,
 	    strerror(errno));
 	cma_stats.cpu_fails.fmds_value.ui64++;
+	return (CMA_RA_FAILURE);
 }
 
-void
+int
+/* ARGSUSED 3 */
 cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 {
 	uint_t cpuid, cpuvid;
+	int err = 0;
 
 	/*
 	 * This added expansion is needed to cover the situation where a
@@ -133,13 +133,13 @@ cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		fmd_hdl_debug(hdl, "failed to expand cpu asru\n");
 		cma_stats.bad_flts.fmds_value.ui64++;
-		return;
+		return (CMA_RA_FAILURE);
 	}
 
 	if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_ID, &cpuid) != 0) {
 		fmd_hdl_debug(hdl, "cpu fault missing '%s'\n", FM_FMRI_CPU_ID);
 		cma_stats.bad_flts.fmds_value.ui64++;
-		return;
+		return (CMA_RA_FAILURE);
 	}
 
 	/*
@@ -156,7 +156,7 @@ cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		if (cma.cma_cpu_forcedoffline)
 			cpustate |= P_FORCED;
 
-		cpu_offline(hdl, uuid, cpuid, cpustate);
+		err = cpu_offline(hdl, cpuid, cpustate);
 	} else {
 		fmd_hdl_debug(hdl, "suppressed offline of CPU %u\n", cpuid);
 		cma_stats.cpu_supp.fmds_value.ui64++;
@@ -169,4 +169,6 @@ cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		fmd_hdl_debug(hdl, "suppressed blacklist of CPU %u\n", cpuid);
 		cma_stats.cpu_blsupp.fmds_value.ui64++;
 	}
+
+	return (err);
 }

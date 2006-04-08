@@ -2593,8 +2593,13 @@ cpuset_find(cpuset_t *s)
 	/*
 	 * Find a cpu in the cpuset
 	 */
-	for (i = 0; (i < CPUSET_WORDS && cpu == (uint_t)-1); i++)
+	for (i = 0; i < CPUSET_WORDS; i++) {
 		cpu = (uint_t)(lowbit(s->cpub[i]) - 1);
+		if (cpu != (uint_t)-1) {
+			cpu += i * BT_NBIPUL;
+			break;
+		}
+	}
 	return (cpu);
 }
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,72 +145,6 @@ uint_t px_preserve_mmu_tsb = 1;
  */
 uintptr_t px_kmem_clid = 0;
 
-uint64_t px_tlu_ue_intr_mask	= PX_ERR_EN_ALL;
-uint64_t px_tlu_ue_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_tlu_ue_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_tlu_ce_intr_mask	= PX_ERR_MASK_NONE;
-uint64_t px_tlu_ce_log_mask	= PX_ERR_MASK_NONE;
-uint64_t px_tlu_ce_count_mask	= PX_ERR_MASK_NONE;
-
-/*
- * Do not enable Link Interrupts
- */
-uint64_t px_tlu_oe_intr_mask	= PX_ERR_EN_ALL & ~0x80000000800;
-uint64_t px_tlu_oe_log_mask	= PX_ERR_EN_ALL & ~0x80000000800;
-uint64_t px_tlu_oe_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_mmu_intr_mask	= PX_ERR_EN_ALL;
-uint64_t px_mmu_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_mmu_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_imu_intr_mask	= PX_ERR_EN_ALL;
-uint64_t px_imu_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_imu_count_mask	= PX_ERR_EN_ALL;
-
-/*
- * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_S) |
- * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_P);
- */
-uint64_t px_ilu_intr_mask	= (((uint64_t)0x10 << 32) | 0x10);
-uint64_t px_ilu_log_mask	= (((uint64_t)0x10 << 32) | 0x10);
-uint64_t px_ilu_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_cb_intr_mask	= PX_ERR_EN_ALL;
-uint64_t px_cb_log_mask		= PX_ERR_EN_ALL;
-uint64_t px_cb_count_mask	= PX_ERR_EN_ALL;
-
-/*
- * LPU Intr Registers are reverse encoding from the registers above.
- * 1 = disable
- * 0 = enable
- *
- * Log and Count are however still the same.
- */
-uint64_t px_lpul_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpul_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpul_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_lpup_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpup_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpup_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_lpur_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpur_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpur_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_lpux_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpux_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpux_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_lpus_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpus_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpus_count_mask	= PX_ERR_EN_ALL;
-
-uint64_t px_lpug_intr_mask	= LPU_INTR_DISABLE;
-uint64_t px_lpug_log_mask	= PX_ERR_EN_ALL;
-uint64_t px_lpug_count_mask	= PX_ERR_EN_ALL;
-
 /* timeout in micro seconds for receiving PME_To_ACK */
 uint64_t px_pme_to_ack_timeout	= PX_PME_TO_ACK_TIMEOUT;
 
@@ -232,7 +165,8 @@ uint32_t px_fabric_die_rc_ue = PCIE_AER_UCE_UR |
     PCIE_AER_UCE_TO |
     PCIE_AER_UCE_RO |
     PCIE_AER_UCE_FCP |
-    PCIE_AER_UCE_DLP;
+    PCIE_AER_UCE_DLP |
+    PCIE_AER_UCE_ECRC;
 
 /* Fire PCIe Error that should cause panics even under protected access */
 uint32_t px_fabric_die_rc_ce_gos = 0;

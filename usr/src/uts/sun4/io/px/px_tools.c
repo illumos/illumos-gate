@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,6 +360,7 @@ pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
 	int rval;
 	dev_info_t *dip = px_p->px_dip;
 	uint32_t base_offset = 0;
+	extern uint64_t px_get_range_prop(px_t *, px_ranges_t *, int);
 
 	/*
 	 * Assume that requested entity is small enough to be on the same page.
@@ -385,9 +385,7 @@ pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
 	if (rval != DDI_SUCCESS)
 		return (NULL);
 	else {
-		range_base =
-		    (((uint64_t)(rp->parent_high & 0x7ff)) << 32) +
-		    rp->parent_low;
+		range_base = px_get_range_prop(px_p, rp, 0);
 		DBG(DBG_TOOLS, dip, "range base:0x%" PRIx64 "\n", range_base);
 		return (base_offset + range_base);
 	}

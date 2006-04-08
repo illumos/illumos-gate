@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,15 +39,33 @@
 #include <sys/x_call.h>
 #include <sys/cheetahregs.h>
 #include <sys/spitregs.h>
+#include <sys/opl_olympus_regs.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * Define UTSB_PHYS if user TSB is always accessed via physical address.
- * On sun4u platform, user TSB is accessed via virtual address.
+ * On sun4u platforms, user TSBs are accessed via virtual address by default.
+ * Platforms that support ASI_SCRATCHPAD registers can define UTSB_PHYS in the
+ * platform Makefile to access user TSBs via physical address but must also
+ * designate one ASI_SCRATCHPAD register to hold the second user TSB.  To
+ * designate the user TSB scratchpad register, platforms must provide a
+ * definition for SCRATCHPAD_UTSBREG below.
+ *
+ * Platforms that use UTSB_PHYS do not allocate 2 locked TLB entries to access
+ * the user TSBs.
  */
-#undef	UTSB_PHYS
+#if defined(UTSB_PHYS)
+
+#if defined(_OPL)
+#define	SCRATCHPAD_UTSBREG	OPL_SCRATCHPAD_UTSBREG4
+#else
+#error "Compiling UTSB_PHYS but no SCRATCHPAD_UTSBREG specified"
+#endif
+
+#endif /* UTSB_PHYS */
+
 
 #ifdef _ASM
 
@@ -80,8 +97,6 @@ extern "C" {
 	movrnz	qlp, ASI_MEM, tmp;				\
 	mov	tmp, %asi
 
-#define	SETUP_UTSB_ATOMIC_ASI(tmp1, tmp2)			\
-	mov	ASI_NQUAD_LD, %asi
 /*
  * Macro to swtich to alternate global register on sun4u platforms
  * (not applicable to sun4v platforms)
@@ -225,6 +240,8 @@ label/**/1:
 	bnz,pt	%xcc, label/**/4;	/* if ref bit set-skip ahead */	\
 	  nop;								\
 	GET_CPU_IMPL(tmp1);						\
+	cmp	tmp1, SPITFIRE_IMPL;					\
+	blt	%icc, label/**/2;	/* skip flush if FJ-OPL cpus */	\
 	cmp	tmp1, CHEETAH_IMPL;					\
 	bl,a	%icc, label/**/1;					\
 	/* update reference bit */					\
@@ -272,6 +289,8 @@ label/**/4:								\
 	bnz,pn	%xcc, label/**/4;	/* nothing to do */		\
 	  nop;								\
 	GET_CPU_IMPL(tmp1);						\
+	cmp	tmp1, SPITFIRE_IMPL;					\
+	blt	%icc, label/**/2;	/* skip flush if FJ-OPL cpus */	\
 	cmp	tmp1, CHEETAH_IMPL;					\
 	bl,a	%icc, label/**/1;					\
 	/* update reference bit */					\
@@ -293,6 +312,8 @@ label/**/2:								\
 label/**/4:								\
 	/* END CSTYLED */
 
+
+#ifndef UTSB_PHYS
 
 /*
  * Synthesize TSB base register contents for a process with
@@ -359,21 +380,6 @@ label/**/_tsbreg_vamask:						;\
 	or	tsbreg, tmp3, tsbreg					;\
 	/* END CSTYLED */
 
-/*
- * Load TSB base register.  In the single TSB case this register
- * contains utsb_vabase, bits 21:13 of tsbinfo->tsb_va, and the
- * TSB size code in bits 2:0.  See hat_sfmmu.h for the layout in
- * the case where we have multiple TSBs per process.
- *
- * In:
- *   tsbreg = value to load (ro)
- */
-#define	LOAD_TSBREG(tsbreg, tmp1, tmp2)					\
-	mov	MMU_TSB, tmp1;						\
-	sethi	%hi(FLUSH_ADDR), tmp2;					\
-	stxa	tsbreg, [tmp1]ASI_DMMU;		/* dtsb reg */		\
-	stxa	tsbreg, [tmp1]ASI_IMMU;		/* itsb reg */		\
-	flush	tmp2
 
 /*
  * Load the locked TSB TLB entry.
@@ -424,7 +430,7 @@ label/**/_resv_offset:							;\
 	sllx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	srlx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	or	tmp1, resva, resva					;\
-9:	/* END CSYLED */
+9:	/* END CSTYLED */
 
 /*
  * Determine the pointer of the entry in the first TSB to probe given
@@ -438,7 +444,7 @@ label/**/_resv_offset:							;\
  * Out: tsbe_ptr = TSB entry address
  *
  * Note: This function is patched at runtime for performance reasons.
- * 	 Any changes here require sfmmu_patch_utsb fixed.
+ *	 Any changes here require sfmmu_patch_utsb fixed.
  */
 
 #define	GET_1ST_TSBE_PTR(tsbp8k, tsbe_ptr, tmp, label)			\
@@ -453,54 +459,6 @@ label/**/_get_1st_tsbe_ptr:						;\
 	/* or-in bits 41:22 of the VA to form the real pointer. */	;\
 	or	tsbe_ptr, tmp, tsbe_ptr					\
 	/* END CSTYLED */
-
-
-/*
- * Will probe the first TSB, and if it finds a match, will insert it
- * into the TLB and retry.
- *
- * tsbe_ptr = precomputed first TSB entry pointer (in, ro)
- * vpg_4m = 4M virtual page number for tag matching  (in, ro)
- * label = where to branch to if this is a miss (text)
- * %asi = atomic ASI to use for the TSB access
- *
- * For trapstat, we have to explicily use these registers.
- * g4 = location tag will be retrieved into from TSB (out)
- * g5 = location data(tte) will be retrieved into from TSB (out)
- */
-#define	PROBE_1ST_DTSB(tsbe_ptr, vpg_4m, label)	/* g4/g5 clobbered */	\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
-	  nop								;\
-	TT_TRACE(trace_tsbhit)						;\
-	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	/* trapstat expects tte in %g5 */				;\
-	retry				/* retry faulted instruction */	;\
-label/**/1:								\
-	/* END CSTYLED */
-
-
-/*
- * Same as above, only if the TTE doesn't have the execute
- * bit set, will branch to exec_fault directly.
- */
-#define	PROBE_1ST_ITSB(tsbe_ptr, vpg_4m, label)				\
-	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
-	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
-	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
-	  nop								;\
-	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
-	bz,pn	%icc, exec_fault					;\
-	  nop								;\
-	TT_TRACE(trace_tsbhit)						;\
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
-	retry				/* retry faulted instruction */	;\
-label/**/1:								\
-	/* END CSTYLED */
-
 
 /*
  * Determine the base address of the second TSB given the 8K TSB
@@ -565,6 +523,196 @@ label/**/_get_2nd_tsb_base:						;\
 	/* tmp1 = TSB size code */					\
 	GET_TSBE_POINTER(MMU_PAGESHIFT4M, tsbe_ptr, tagacc, tmp1, tmp2)
 
+#endif /* UTSB_PHYS */
+
+
+#ifdef UTSB_PHYS
+
+/*
+ * Synthesize a TSB base register contents for a process.
+ *
+ * In:
+ *   tsbinfo = TSB info pointer (ro)
+ *   tsbreg, tmp1 = scratch registers
+ * Out:
+ *   tsbreg = value to program into TSB base register
+ */
+
+#define	MAKE_UTSBREG_PHYS(tsbinfo, tsbreg, tmp1)			\
+	ldx	[tsbinfo + TSBINFO_PADDR], tsbreg;		\
+	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1;		\
+	and	tmp1, TSB_SOFTSZ_MASK, tmp1;			\
+	or	tsbreg, tmp1, tsbreg;				\
+
+/*
+ * Load TSB base register into a dedicated scratchpad register.
+ * This register contains utsb_pabase in bits 63:13, and TSB size
+ * code in bits 2:0.
+ *
+ * In:
+ *   tsbreg = value to load (ro)
+ *   regnum = constant or register
+ *   tmp1 = scratch register
+ * Out:
+ *   Specified scratchpad register updated
+ *
+ * Note: If this is enabled on Panther, a membar #Sync is required
+ *	 following an ASI store to the scratchpad registers.
+ */
+
+#define	SET_UTSBREG(regnum, tsbreg, tmp1)				\
+	mov	regnum, tmp1;						\
+	stxa	tsbreg, [tmp1]ASI_SCRATCHPAD;	/* save tsbreg */	\
+
+/*
+ * Get TSB base register from the scratchpad
+ *
+ * In:
+ *   regnum = constant or register
+ *   tsbreg = scratch
+ * Out:
+ *   tsbreg = tsbreg from the specified scratchpad register
+ */
+
+#define	GET_UTSBREG(regnum, tsbreg)					\
+	mov	regnum, tsbreg;						\
+	ldxa	[tsbreg]ASI_SCRATCHPAD, tsbreg
+
+/*
+ * Determine the pointer of the entry in the first TSB to probe given
+ * the 8K TSB pointer register contents.
+ *
+ * In:
+ *   tagacc = tag access register
+ *   tsbe_ptr = 8K TSB pointer register
+ *   tmp = scratch registers
+ *
+ * Out: tsbe_ptr = TSB entry address
+ *
+ * Note: This macro is a nop since the 8K TSB pointer register
+ *	 is the entry pointer and does not need to be decoded.
+ *	 It is defined to allow for code sharing with sun4v.
+ */
+
+#define	GET_1ST_TSBE_PTR(tagacc, tsbe_ptr, tmp1, tmp2)
+
+/*
+ * Get the location in the 2nd TSB of the tsbe for this fault.
+ * Assumes that the second TSB only contains 4M mappings.
+ *
+ * In:
+ *   tagacc = tag access register (not clobbered)
+ *   tsbe = 2nd TSB base register
+ *   tmp1, tmp2 = scratch registers
+ * Out:
+ *   tsbe = pointer to the tsbe in the 2nd TSB
+ */
+
+#define	GET_2ND_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)			\
+	and	tsbe, TSB_SOFTSZ_MASK, tmp2;	/* tmp2=szc */		\
+	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;	/* tsbbase */		\
+	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
+	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
+	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
+	srlx	tagacc, MMU_PAGESHIFT4M, tmp2; 				\
+	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
+	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;	/* entry num --> ptr */	\
+	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
+
+/*
+ * Read the 2nd TSB base register.  This is not done in GET_2ND_TSBE_PTR as
+ * an optimization since the TLB miss trap handler entries have potentially
+ * already loaded the 2nd TSB base reg when we invoke GET_2ND_TSBE_PTR.
+ *
+ * Out:
+ *   tsbreg = contents of the 2nd TSB base register
+ */
+#define	GET_2ND_TSBREG(tsbreg)						\
+	GET_UTSBREG(SCRATCHPAD_UTSBREG, tsbreg);
+
+/*
+ * Load the 2nd TSB base into a dedicated scratchpad register which
+ * is used as a pseudo TSB base register.
+ *
+ * In:
+ *   tsbreg = value to load (ro)
+ *   regnum = constant or register
+ *   tmp1 = scratch register
+ * Out:
+ *   Specified scratchpad register updated
+ */
+#define	LOAD_2ND_TSBREG(tsbreg, tmp1)					\
+	SET_UTSBREG(SCRATCHPAD_UTSBREG, tsbreg, tmp1);
+
+#endif /* UTSB_PHYS */
+
+
+/*
+ * Load TSB base register.  In the single TSB case this register
+ * contains utsb_vabase, bits 21:13 of tsbinfo->tsb_va, and the
+ * TSB size code in bits 2:0.  See hat_sfmmu.h for the layout in
+ * the case where we have multiple TSBs per process.
+ *
+ * In:
+ *   tsbreg = value to load (ro)
+ */
+#define	LOAD_TSBREG(tsbreg, tmp1, tmp2)					\
+	mov	MMU_TSB, tmp1;						\
+	sethi	%hi(FLUSH_ADDR), tmp2;					\
+	stxa	tsbreg, [tmp1]ASI_DMMU;		/* dtsb reg */		\
+	stxa	tsbreg, [tmp1]ASI_IMMU;		/* itsb reg */		\
+	flush	tmp2
+
+#ifdef UTSB_PHYS
+#define	UTSB_PROBE_ASI	ASI_QUAD_LDD_PHYS
+#else
+#define	UTSB_PROBE_ASI	ASI_NQUAD_LD
+#endif
+
+/*
+ * Will probe the first TSB, and if it finds a match, will insert it
+ * into the TLB and retry.
+ *
+ * tsbe_ptr = precomputed first TSB entry pointer (in, ro)
+ * vpg_4m = 4M virtual page number for tag matching  (in, ro)
+ * label = where to branch to if this is a miss (text)
+ * %asi = atomic ASI to use for the TSB access
+ *
+ * For trapstat, we have to explicily use these registers.
+ * g4 = location tag will be retrieved into from TSB (out)
+ * g5 = location data(tte) will be retrieved into from TSB (out)
+ */
+#define	PROBE_1ST_DTSB(tsbe_ptr, vpg_4m, label)	/* g4/g5 clobbered */	\
+	/* BEGIN CSTYLED */						\
+	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
+	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
+	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
+	  nop								;\
+	TT_TRACE(trace_tsbhit)						;\
+	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
+	/* trapstat expects tte in %g5 */				;\
+	retry				/* retry faulted instruction */	;\
+label/**/1:								\
+	/* END CSTYLED */
+
+/*
+ * Same as above, only if the TTE doesn't have the execute
+ * bit set, will branch to exec_fault directly.
+ */
+#define	PROBE_1ST_ITSB(tsbe_ptr, vpg_4m, label)				\
+	/* BEGIN CSTYLED */						\
+	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
+	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
+	bne,pn	%xcc, label/**/1	/* branch if !match */		;\
+	  nop								;\
+	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
+	bz,pn	%icc, exec_fault					;\
+	  nop								;\
+	TT_TRACE(trace_tsbhit)						;\
+	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
+	retry				/* retry faulted instruction */	;\
+label/**/1:								\
+	/* END CSTYLED */
 
 /*
  * vpg_4m = 4M virtual page number for tag matching (in)
@@ -577,7 +725,7 @@ label/**/_get_2nd_tsb_base:						;\
  */
 #define	PROBE_2ND_DTSB(tsbe_ptr, vpg_4m, label)				\
 	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
+	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
 	/* since we are looking at 2nd tsb, if it's valid, it must be 4M */ ;\
 	cmp	%g4, vpg_4m						;\
 	bne,pn	%xcc, label/**/1					;\
@@ -599,7 +747,7 @@ label/**/1:								\
  */
 #define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
 	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
+	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
 	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
 	  or	%g0, TTE4M, %g6						;\
@@ -621,7 +769,7 @@ label/**/1:								;\
  */
 #define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
 	/* BEGIN CSTYLED */						\
-	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
+	ldda	[tsbe_ptr]UTSB_PROBE_ASI, %g4 /* g4 = tag, g5 = data */	;\
 	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
 	  or	%g0, TTE4M, %g6						;\

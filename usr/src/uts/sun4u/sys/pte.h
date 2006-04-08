@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +42,9 @@ extern "C" {
  * use a V8 compiler all manipulations in C will be done using the bit fields
  * or as 2 integers.  In assembly code we will deal with it as a double (using
  * ldx and stx).  The structure is defined to force a double alignment.
- * Note that USIIi uses bits <47:40> for diag, and <49:48> are reserved.
+ * Note that USIIi uses bits [47:41] for diag, and [49:48] are reserved.
+ * Note that pa[46:32] includes USIIi diag bits [46:41] and USIII reserved
+ * bits [46:43].
  */
 typedef union {
 	struct tte {
@@ -55,9 +56,9 @@ typedef union {
 		uint32_t	hmenum:3;	/* sw - # of hment in hme_blk */
 
 		uint32_t	rsv:7;		/* former rsv:1 lockcnt:6 */
-		uint32_t	sz2:1;		/* Panther sz2[48] */
-		uint32_t	diag:5;		/* See USII Note above. */
-		uint32_t	pahi:11;	/* pa[42:32] */
+		uint32_t	sz2:1;		/* sz2[48] Panther, Olympus-C */
+		uint32_t	diag:1;		/* See USII Note above. */
+		uint32_t	pahi:15;	/* pa[46:32] See Note above */
 		uint32_t	palo:19;	/* pa[31:13] */
 		uint32_t	no_sync:1;	/* sw - ghost unload */
 
@@ -146,16 +147,20 @@ typedef union {
 #define	TTE_PAGEMASK(sz)	(~TTE_PAGE_OFFSET(sz))
 #define	TTE_PFNMASK(sz)		(~(TTE_PAGE_OFFSET(sz) >> MMU_PAGESHIFT))
 
-#define	TTE_PA_LSHIFT		21	/* used to do sllx on tte to get pa */
+#define	TTE_PA_LSHIFT		17	/* used to do sllx on tte to get pa */
 
 #ifndef _ASM
 
 #define	TTE_PASHIFT		19	/* used to manage pahi and palo */
 #define	TTE_PALOMASK		((1 << TTE_PASHIFT) -1)
-/* PFN is defined as bits [40-13] of the physical address */
+/*
+ * Spitfire PFN is defined as bits [40:13] of the physical address.
+ * Cheetah PFN is defined as bits [42:13] of the physical address.
+ * Olympus-C PFN is defined as bits [46:13] of the physical address.
+ */
 #define	TTE_TO_TTEPFN(ttep)						\
-	((((ttep)->tte_pahi << TTE_PASHIFT) | (ttep)->tte_palo) &	\
-	TTE_PFNMASK(TTE_CSZ(ttep)))
+	(((((pfn_t)((ttep)->tte_pahi)) << TTE_PASHIFT) |		\
+	(ttep)->tte_palo) & TTE_PFNMASK(TTE_CSZ(ttep)))
 /*
  * This define adds the vaddr page offset to obtain a correct pfn
  */
@@ -198,11 +203,11 @@ typedef union {
 #define	TTE_PROT_INT			(TTE_WRPRM_INT | TTE_PRIV_INT)
 
 /*
- * Define to clear the high-order 2 bits of the 43-bit PA in a tte.  The
- * Spitfire tte has PFN in [40-13] and uses [42-41] as part of Diag bits.
+ * Define to clear the high-order 6 bits of the 47-bit PA in a tte.  The
+ * Spitfire tte has PFN in [40:13] and uses [46:41] as part of Diag bits.
  */
-#define	TTE_SPITFIRE_PFNHI_CLEAR	0x3
-#define	TTE_SPITFIRE_PFNHI_SHIFT	32+9
+#define	TTE_SPITFIRE_PFNHI_CLEAR	0x3f
+#define	TTE_SPITFIRE_PFNHI_SHIFT	41
 
 #ifndef ASM
 
@@ -265,7 +270,7 @@ typedef union {
 		(ttep)->tte_bit.nfo = 1;	\
 		(ttep)->tte_bit.ie = 1;		\
 		(ttep)->tte_bit.sz2 = 1;	\
-		(ttep)->tte_bit.pahi = 0x7ff;	\
+		(ttep)->tte_bit.pahi = 0x7fff;	\
 		(ttep)->tte_bit.palo = 0x7ffff;	\
 		(ttep)->tte_bit.exec_perm = 1;	\
 		(ttep)->tte_bit.l = 1;		\

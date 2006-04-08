@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,11 +34,9 @@
 
 #include <fcdriver/fcdriver.h>
 
-static void schizo_vtop(fcode_env_t *, fc_cell_t, fstack_t *, fstack_t *);
-
 /*
- * claim under /openprom/client-services is only used by schizo Fcode, we
- * call "schizo,claim-memory" service.
+ * claim under /openprom/client-services is used by schizo and oberon Fcode, we
+ * call "claim-memory" service.
  */
 void
 claim(fcode_env_t *env)
@@ -50,11 +47,11 @@ claim(fcode_env_t *env)
 	fc_cell_t vaddr;
 	int error;
 
-	CHECK_DEPTH(env, 3, "schizo,claim-memory");
+	CHECK_DEPTH(env, 3, "claim-memory");
 	hint = (void *)POP(DS);
 	size = POP(DS);
 	align = POP(DS);
-	error = fc_run_priv(env->private, "schizo,claim-memory", 3, 1,
+	error = fc_run_priv(env->private, "claim-memory", 3, 1,
 	    fc_int2cell(align), fc_size2cell(size), fc_ptr2cell(hint), &vaddr);
 	if (error)
 		throw_from_fclib(env, 1, "client-services/claim failed\n");
@@ -69,10 +66,10 @@ release(fcode_env_t *env)
 	void *addr;
 	int error;
 
-	CHECK_DEPTH(env, 2, "schizo,release-memory");
+	CHECK_DEPTH(env, 2, "release-memory");
 	addr = (void *)POP(DS);
 	size = POP(DS);
-	error = fc_run_priv(env->private, "schizo,release-memory", 2, 0,
+	error = fc_run_priv(env->private, "release-memory", 2, 0,
 	    fc_size2cell(size), fc_ptr2cell(addr));
 	if (error)
 		throw_from_fclib(env, 1, "client-services/release failed\n");
@@ -86,9 +83,9 @@ fc_vtop(fcode_env_t *env)
 	fc_cell_t physlo, physhi;
 	int error;
 
-	CHECK_DEPTH(env, 1, "schizo,vtop");
+	CHECK_DEPTH(env, 1, "vtop");
 	vaddr = (void *)POP(DS);
-	error = fc_run_priv(env->private, "schizo,vtop", 1, 2,
+	error = fc_run_priv(env->private, "vtop", 1, 2,
 	    fc_ptr2cell(vaddr), &physlo, &physhi);
 	if (error)
 		throw_from_fclib(env, 1, "fc_vtop: '>physical' failed\n");

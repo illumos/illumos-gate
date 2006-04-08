@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -33,6 +32,7 @@
 #include <sys/sun4asi.h>
 #include <sys/machasi.h>
 #include <sys/bitmap.h>
+#include <sys/opl_olympus_regs.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -74,6 +74,15 @@ extern "C" {
 	or	r, PC_PORT_ID, r;		\
 	lduwa	[r]ASI_IO, r;			\
 	wrpr	scr, 0, %pstate
+
+#elif	defined(_OPL)
+/*
+ * For OPL platform, we get CPU_INDEX from ASI_EIDR.
+ */
+#define	CPU_INDEX(r, scr)		\
+	ldxa	[%g0]ASI_EIDR, r;	\
+	and	r, 0xfff, r
+
 
 #else /* _STARFIRE */
 

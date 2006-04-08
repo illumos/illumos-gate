@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,14 +82,6 @@
 #include <cmd_state.h>
 #include <cmd_fmri.h>
 
-#ifdef sun4u
-#include <sys/cheetahregs.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
-#else /* sun4u */
-#include <sys/niagararegs.h>
-#include <sys/fm/cpu/UltraSPARC-T1.h>
-#endif /* sun4u */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -104,7 +95,8 @@ typedef enum cmd_cpu_type {
 	CPU_ULTRASPARC_IV,
 	CPU_ULTRASPARC_IVplus,
 	CPU_ULTRASPARC_IIIiplus,
-	CPU_ULTRASPARC_T1
+	CPU_ULTRASPARC_T1,
+	CPU_SPARC64_VI
 } cmd_cpu_type_t;
 
 typedef struct cmd_cpu_cases {
@@ -122,6 +114,27 @@ typedef struct cmd_cpu_cases {
 	cmd_case_t cpuc_freg;		/* Floatpnt reg errors (frc, fru) */
 	cmd_case_t cpuc_mau;		/* Modular arith errors (MAU) */
 	cmd_case_t cpuc_l2ctl;		/* L2$ directory, VUAD parity */
+	cmd_case_t cpuc_opl_inv_sfsr;	/* Olympus-C cpu inv-sfsr errors */
+	cmd_case_t cpuc_opl_ue_det_cpu;	/* Olympus-C cpu det. ue (eid=CPU) */
+	cmd_case_t cpuc_opl_ue_det_io;	/* Olympus-C io det. ue (eid=CPU) */
+	cmd_case_t cpuc_opl_mtlb;	/* Olympus-C mtlb errors */
+	cmd_case_t cpuc_opl_tlbp;	/* Olympus-C tlbp errors */
+	cmd_case_t cpuc_opl_inv_urg;	/* Olympus-C inv-urg invalid urgent */
+	cmd_case_t cpuc_opl_cre;	/* Olympus-C cre urgent errors */
+	cmd_case_t cpuc_opl_tsb_ctx;	/* Olympus-C tsb_ctx urgent errors */
+	cmd_case_t cpuc_opl_tsbp;	/* Olympus-C tsbp urgent errors */
+	cmd_case_t cpuc_opl_pstate;	/* Olympus-C pstate urgent errors */
+	cmd_case_t cpuc_opl_tstate;	/* Olympus-C tstate urgent errors */
+	cmd_case_t cpuc_opl_iug_f;	/* Olympus-C iug_f urgent errors */
+	cmd_case_t cpuc_opl_iug_r;	/* Olympus-C iug_r urgent errors */
+	cmd_case_t cpuc_opl_sdc;	/* Olympus-C sdc urgent errors */
+	cmd_case_t cpuc_opl_wdt;	/* Olympus-C wdt urgent errors */
+	cmd_case_t cpuc_opl_dtlb;	/* Olympus-C dtlb urgent errors */
+	cmd_case_t cpuc_opl_itlb;	/* Olympus-C itlb urgent errors */
+	cmd_case_t cpuc_opl_core_err;	/* Olympus-C core-err urgent errors */
+	cmd_case_t cpuc_opl_dae;	/* Olympus-C dae urgent errors */
+	cmd_case_t cpuc_opl_iae;	/* Olympus-C iae urgent errors */
+	cmd_case_t cpuc_opl_uge;	/* Olympus-C uge urgent errors */
 } cmd_cpu_cases_t;
 
 /*
@@ -384,6 +397,27 @@ struct cmd_cpu {
 #define	cpu_freg		cpu_cases.cpuc_freg
 #define	cpu_mau			cpu_cases.cpuc_mau
 #define	cpu_l2ctl		cpu_cases.cpuc_l2ctl
+#define	cpu_opl_inv_sfsr	cpu_cases.cpuc_opl_inv_sfsr
+#define	cpu_opl_ue_det_cpu	cpu_cases.cpuc_opl_ue_det_cpu
+#define	cpu_opl_ue_det_io	cpu_cases.cpuc_opl_ue_det_io
+#define	cpu_opl_mtlb		cpu_cases.cpuc_opl_mtlb
+#define	cpu_opl_tlbp		cpu_cases.cpuc_opl_tlbp
+#define	cpu_opl_inv_urg		cpu_cases.cpuc_opl_inv_urg
+#define	cpu_opl_cre		cpu_cases.cpuc_opl_cre
+#define	cpu_opl_tsb_ctx		cpu_cases.cpuc_opl_tsb_ctx
+#define	cpu_opl_tsbp		cpu_cases.cpuc_opl_tsbp
+#define	cpu_opl_pstate		cpu_cases.cpuc_opl_pstate
+#define	cpu_opl_tstate		cpu_cases.cpuc_opl_tstate
+#define	cpu_opl_iug_f		cpu_cases.cpuc_opl_iug_f
+#define	cpu_opl_iug_r		cpu_cases.cpuc_opl_iug_r
+#define	cpu_opl_sdc		cpu_cases.cpuc_opl_sdc
+#define	cpu_opl_wdt		cpu_cases.cpuc_opl_wdt
+#define	cpu_opl_dtlb		cpu_cases.cpuc_opl_dtlb
+#define	cpu_opl_itlb		cpu_cases.cpuc_opl_itlb
+#define	cpu_opl_core_err	cpu_cases.cpuc_opl_core_err
+#define	cpu_opl_dae		cpu_cases.cpuc_opl_dae
+#define	cpu_opl_iae		cpu_cases.cpuc_opl_iae
+#define	cpu_opl_uge		cpu_cases.cpuc_opl_uge
 
 #define	cpu_asru_nvl		cpu_asru.fmri_nvl
 #define	cpu_fru_nvl		cpu_fru.fmri_nvl
@@ -564,6 +598,10 @@ extern cmd_evdisp_t cmd_l2ctl(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
 extern cmd_cpu_t *cmd_cpu_lookup_from_detector(fmd_hdl_t *, nvlist_t *,
     const char *);
 
+extern char *cpu_getfrustr(fmd_hdl_t *, uint32_t);
+extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *);
+extern cmd_cpu_t *cmd_sibcpu_lookup(fmd_hdl_t *, nvlist_t *, const char *);
+
 extern nvlist_t *cmd_cpu_create_fault(fmd_hdl_t *, cmd_cpu_t *, const char *,
     nvlist_t *, uint_t);
 
@@ -578,10 +616,17 @@ extern char *cmd_cpu_serdnm_create(fmd_hdl_t *, cmd_cpu_t *, const char *);
 typedef enum {
     CMD_CPU_FAM_UNSUPPORTED,
     CMD_CPU_FAM_CHEETAH,
-    CMD_CPU_FAM_NIAGARA
+    CMD_CPU_FAM_NIAGARA,
+    CMD_CPU_FAM_SPARC64
 } cpu_family_t;
 
+typedef struct faminfo {
+	cpu_family_t fam_value;
+	boolean_t ecache_flush_needed;
+} faminfo_t;
+
 extern cpu_family_t cmd_cpu_check_support(void);
+extern boolean_t cmd_cpu_ecache_support(void);
 
 extern int cmd_xr_fill(fmd_hdl_t *, nvlist_t *, cmd_xr_t *, cmd_errcl_t);
 
@@ -590,6 +635,12 @@ extern int cmd_cpu_synd_check(uint16_t);
 #else /* sun4u */
 extern int cmd_cpu_synd_check(uint32_t);
 #endif /* sun4u */
+
+typedef struct opl_cpu_list {
+	uint32_t cpuid;
+	struct opl_cpu_list *next_cpu;
+	cmd_cpu_t *opl_cmd_cpu;
+} opl_cpu_list_t;
 
 #ifdef __cplusplus
 }

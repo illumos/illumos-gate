@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +101,28 @@ typedef enum cmd_ptrsubtype {
 	CMD_PTR_CPU_MAU,
 	CMD_PTR_CPU_L2CTL,
 	CMD_PTR_DP_CASE,
-	CMD_PTR_DP_PAGE_DEFER
+	CMD_PTR_DP_PAGE_DEFER,
+	CMD_PTR_CPU_INV_SFSR,
+	CMD_PTR_CPU_UE_DET_CPU,
+	CMD_PTR_CPU_UE_DET_IO,
+	CMD_PTR_CPU_MTLB,
+	CMD_PTR_CPU_TLBP,
+	CMD_PTR_CPU_UGESR_INV_URG,
+	CMD_PTR_CPU_UGESR_CRE,
+	CMD_PTR_CPU_UGESR_TSB_CTX,
+	CMD_PTR_CPU_UGESR_TSBP,
+	CMD_PTR_CPU_UGESR_PSTATE,
+	CMD_PTR_CPU_UGESR_TSTATE,
+	CMD_PTR_CPU_UGESR_IUG_F,
+	CMD_PTR_CPU_UGESR_IUG_R,
+	CMD_PTR_CPU_UGESR_SDC,
+	CMD_PTR_CPU_UGESR_WDT,
+	CMD_PTR_CPU_UGESR_DTLB,
+	CMD_PTR_CPU_UGESR_ITLB,
+	CMD_PTR_CPU_UGESR_CORE_ERR,
+	CMD_PTR_CPU_UGESR_DAE,
+	CMD_PTR_CPU_UGESR_IAE,
+	CMD_PTR_CPU_UGESR_UGE
 } cmd_ptrsubtype_t;
 
 /*

@@ -221,6 +221,7 @@ SUBDIRS += \
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
 	libc_psr	.WAIT	\
+	libdscp		\
 	libprtdiag	.WAIT	\
 	libprtdiag_psr	\
 	librsc		\
@@ -379,6 +380,7 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/smartcard
 
 sparc_HDRSUBDIRS=	\
+	libdscp		\
 	libwrsmconf
 
 all :=		TARGET= all

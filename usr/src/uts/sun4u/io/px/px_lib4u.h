@@ -86,6 +86,8 @@ typedef struct pxu {
 	uint16_t	tsb_cookie;
 	uint32_t	tsb_size;
 	uint64_t	*tsb_vaddr;
+	uint64_t	tsb_paddr;	/* Only used for Oberon */
+
 	void		*msiq_mapped_p;
 	px_cb_t		*px_cb_p;
 
@@ -136,7 +138,8 @@ typedef	struct eq_rec {
 
 #define	MMU_INVALID_TTE		0ull
 #define	MMU_TTE_VALID(tte)	(((tte) & MMU_TTE_V) == MMU_TTE_V)
-#define	MMU_TTETOPA(x)		((x & 0x7ffffffffff) >> MMU_PAGE_SHIFT)
+#define	MMU_OBERON_PADDR_MASK	0x7fffffffffff
+#define	MMU_FIRE_PADDR_MASK	0x7ffffffffff
 
 /*
  * control register decoding
@@ -146,16 +149,26 @@ typedef	struct eq_rec {
 #define	MMU_TSBSIZE_TO_TSBENTRIES(s)	((1 << (s)) << (13 - 3))
 
 /*
- * For mmu bypass addresses, bit 43 specifies cacheability.
+ * For Fire mmu bypass addresses, bit 43 specifies cacheability.
  */
-#define	MMU_BYPASS_NONCACHE	 (1ull << 43)
+#define	MMU_FIRE_BYPASS_NONCACHE	 (1ull << 43)
+
+/*
+ * For Oberon mmu bypass addresses, bit 47 specifies cacheability.
+ */
+#define	MMU_OBERON_BYPASS_NONCACHE	 (1ull << 47)
 
 /*
  * The following macros define the address ranges supported for DVMA
- * and mmu bypass transfers.
+ * and mmu bypass transfers. For Oberon, bit 63 is used for ordering.
  */
-#define	MMU_BYPASS_BASE		0xFFFC000000000000ull
-#define	MMU_BYPASS_END		0xFFFC01FFFFFFFFFFull
+#define	MMU_FIRE_BYPASS_BASE		0xFFFC000000000000ull
+#define	MMU_FIRE_BYPASS_END		0xFFFC01FFFFFFFFFFull
+
+#define	MMU_OBERON_BYPASS_BASE		0x7FFC000000000000ull
+#define	MMU_OBERON_BYPASS_END		0x7FFC01FFFFFFFFFFull
+
+#define	MMU_TSB_PA_MASK		0x7FFFFFFFE000
 
 /*
  * The following macros are for loading and unloading io tte
@@ -164,6 +177,7 @@ typedef	struct eq_rec {
 #define	MMU_TTE_SIZE		8
 #define	MMU_TTE_V		(1ull << 63)
 #define	MMU_TTE_W		(1ull << 1)
+#define	MMU_TTE_RO		(1ull << 62)	/* Oberon Relaxed Ordering */
 
 #define	INO_BITS		6	/* INO#s are 6 bits long */
 #define	IGN_BITS		5	/* IGN#s are 5 bits long */
@@ -248,7 +262,8 @@ typedef	struct eq_rec {
  */
 typedef enum {
 	PX_CHIP_UNIDENTIFIED = 0,
-	PX_CHIP_FIRE = 1
+	PX_CHIP_FIRE = 1,
+	PX_CHIP_OBERON = 2
 } px_chip_id_t;
 
 /*
@@ -256,16 +271,18 @@ typedef enum {
  * 0x00 <chip_type> <version#> <module-revision#>
  */
 #define	PX_CHIP_ID(t, v, m)	(((t) << 16) | ((v) << 8) | (m))
-#define	PX_ID_CHIP_TYPE(id)	((id) >> 16)
-#define	PX_CHIP_TYPE(pxu_p)	PX_ID_CHIP_TYPE(PX_CHIP_ID((pxu_p)->chip_id))
-#define	PX_CHIP_REV(pxu_p)	PX_CHIP_ID(((pxu_p)->chip_id) & 0xFF)
-#define	PX_CHIP_VER(pxu_p)	PX_CHIP_ID((((pxu_p)->chip_id) >> 8) & 0xFF)
+#define	PX_CHIP_TYPE(pxu_p)	(((pxu_p)->chip_id) >> 16)
+#define	PX_CHIP_REV(pxu_p)	 (((pxu_p)->chip_id) & 0xFF)
+#define	PX_CHIP_VER(pxu_p)	 ((((pxu_p)->chip_id) >> 8) & 0xFF)
 
 /*
  * Fire hardware specific version definitions.
  */
 #define	FIRE_VER_10	PX_CHIP_ID(PX_CHIP_FIRE, 0x01, 0x00)
 #define	FIRE_VER_20	PX_CHIP_ID(PX_CHIP_FIRE, 0x03, 0x00)
+#define	OBERON_VER_10	PX_CHIP_ID(PX_CHIP_OBERON, 0x00, 0x00)
+#define	FIRE_RANGE_PROP_MASK	0x7ff
+#define	OBERON_RANGE_PROP_MASK	0x7fff
 
 extern void hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
 extern void hvio_ib_init(caddr_t csr_base, pxu_t *pxu_p);
@@ -282,10 +299,10 @@ extern uint64_t hvio_intr_getstate(devhandle_t dev_hdl, sysino_t sysino,
     intr_state_t *intr_state);
 extern uint64_t hvio_intr_setstate(devhandle_t dev_hdl, sysino_t sysino,
     intr_state_t intr_state);
-extern uint64_t hvio_intr_gettarget(devhandle_t dev_hdl, sysino_t sysino,
-    cpuid_t *cpuid);
-extern uint64_t hvio_intr_settarget(devhandle_t dev_hdl, sysino_t sysino,
-    cpuid_t cpuid);
+extern uint64_t hvio_intr_gettarget(devhandle_t dev_hdl, pxu_t *pxu_p,
+    sysino_t sysino, cpuid_t *cpuid);
+extern uint64_t hvio_intr_settarget(devhandle_t dev_hdl, pxu_t *pxu_p,
+    sysino_t sysino, cpuid_t cpuid);
 
 extern uint64_t hvio_iommu_map(devhandle_t dev_hdl, pxu_t *pxu_p, tsbid_t tsbid,
     pages_t pages, io_attributes_t attr, void *addr, size_t pfn_index,
@@ -294,8 +311,12 @@ extern uint64_t hvio_iommu_demap(devhandle_t dev_hdl, pxu_t *pxu_p,
     tsbid_t tsbid, pages_t pages);
 extern uint64_t hvio_iommu_getmap(devhandle_t dev_hdl, pxu_t *pxu_p,
     tsbid_t tsbid, io_attributes_t *attr_p, r_addr_t *r_addr_p);
-extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra,
-    io_attributes_t attr, io_addr_t *io_addr_p);
+extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, pxu_t *pxu_p,
+    r_addr_t ra, io_attributes_t attr, io_addr_t *io_addr_p);
+extern uint64_t hvio_get_bypass_base(pxu_t *pxu_p);
+extern uint64_t hvio_get_bypass_end(pxu_t *pxu_p);
+extern uint64_t px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank);
+
 
 /*
  * MSIQ Functions:
@@ -361,6 +382,12 @@ extern int px_link_retrain(caddr_t csr_base);
 extern void px_enable_detect_quiet(caddr_t csr_base);
 
 extern void px_lib_clr_errs(px_t *px_p);
+
+/*
+ * Hotplug functions:
+ */
+extern int hvio_hotplug_init(dev_info_t *dip, void *arg);
+extern int hvio_hotplug_uninit(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

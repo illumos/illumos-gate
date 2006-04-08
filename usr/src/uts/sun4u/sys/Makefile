@@ -75,6 +75,7 @@ $(CLOSED_BUILD)CLOSED_SUN4_HDRS=	\
 HDRS=	\
 	cheetahregs.h		\
 	cpr_impl.h		\
+	cpu_impl.h		\
 	ecc_kstat.h		\
 	envctrl.h		\
 	envctrl_gen.h		\
@@ -90,6 +91,7 @@ HDRS=	\
 	machsystm.h		\
 	machthread.h		\
 	mmu.h			\
+	opl_module.h		\
 	prom_plat.h		\
 	pte.h			\
 	sbd_ioctl.h		\
@@ -116,6 +118,7 @@ $(CLOSED_BUILD)CLOSED_HDRS=	\
 	memtestio_chp.h		\
 	memtestio_ja.h		\
 	memtestio_jg.h		\
+	memtestio_oc.h		\
 	memtestio_pn.h		\
 	memtestio_sf.h		\
 	memtestio_sr.h		\

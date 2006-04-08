@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -88,9 +87,11 @@ cmp_delete_cpu(processorid_t cpuid)
  * Register is set to either the lowest numbered on-line sibling core, if
  * one exists, or else to this core.
  */
+/* ARGSUSED */
 void
 cmp_error_resteer(processorid_t cpuid)
 {
+#ifndef	_CMP_NO_ERROR_STEERING
 	cpuset_t mycores;
 	cpu_t *cpu;
 	chipid_t chipid;
@@ -120,6 +121,10 @@ cmp_error_resteer(processorid_t cpuid)
 	if (i == NCPU) {
 		xc_one(cpuid, (xcfunc_t *)set_cmp_error_steering, 0, 0);
 	}
+#else
+	/* Not all CMP's support (e.g. Olympus-C by Fujitsu) error steering */
+	return;
+#endif /* _CMP_NO_ERROR_STEERING */
 }
 
 chipid_t
@@ -147,12 +152,27 @@ chip_plat_get_chipid(cpu_t *cp)
 }
 
 /*
- * We don't have any multi-threaded cores on sun4u yet.
+ * Return the "core id" for the given cpu_t
+ * The "core id" space spans uniquely across all
+ * cpu chips.
  */
 id_t
 chip_plat_get_coreid(cpu_t *cp)
 {
-	return (cp->cpu_id);
+	int impl;
+
+	impl = cpunodes[cp->cpu_id].implementation;
+
+	if (IS_OLYMPUS_C(impl)) {
+		/*
+		 * Currently only Fujitsu Olympus-c processor supports
+		 * multi-stranded cores. Return the cpu_id with
+		 * the strand bit masked out.
+		 */
+		return ((id_t)((uint_t)cp->cpu_id & ~(0x1)));
+	} else {
+		return (cp->cpu_id);
+	}
 }
 
 void
@@ -167,7 +187,7 @@ chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 
 	if (IS_JAGUAR(impl)) {
 		cd->chipd_type = CHIP_CMP_SPLIT_CACHE;
-	} else if (IS_PANTHER(impl)) {
+	} else if (IS_PANTHER(impl) || IS_OLYMPUS_C(impl)) {
 		cd->chipd_type = CHIP_CMP_SHARED_CACHE;
 	} else {
 		cd->chipd_type = CHIP_DEFAULT;

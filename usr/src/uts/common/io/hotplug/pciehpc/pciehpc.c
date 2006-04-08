@@ -746,9 +746,14 @@ pciehpc_enable_intr(pciehpc_t *ctrl_p)
 	reg = pciehpc_reg_get16(ctrl_p,
 		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
 
-	/* enable all interrupts */
-	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
-		PCIE_SLOTCTL, reg | SLOTCTL_SUPPORTED_INTRS_MASK);
+	/* enable interrupts */
+	if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED)
+		pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+			PCIE_SLOTCTL, reg | SLOTCTL_SUPPORTED_INTRS_MASK);
+	else
+		pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+			PCIE_SLOTCTL, reg | (SLOTCTL_SUPPORTED_INTRS_MASK &
+					~PCIE_SLOTCTL_PWR_FAULT_EN));
 
 	return (DDI_SUCCESS);
 }
@@ -1075,9 +1080,45 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	control &= ~PCIE_SLOTCTL_PWR_CONTROL;
 	pciehpc_issue_hpc_command(ctrl_p, control);
 
-	/* NOTE - any check to make sure power is really turned ON? */
+	/* check power is really turned ON? */
+	control =  pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	if (control & PCIE_SLOTCTL_PWR_CONTROL) {
+		PCIEHPC_DEBUG((CE_NOTE,
+		    "slot %d fails to turn on power on connect\n",
+		    ctrl_p->slot.slotNum));
 
-	/* NOTE - what about power-fault on the slot? */
+		goto cleanup1;
+	}
+
+	/* check power-fault on the slot? */
+	status = pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+	if (status & PCIE_SLOTSTS_PWR_FAULT_DETECTED) {
+		PCIEHPC_DEBUG((CE_NOTE,
+		    "slot %d detects power fault on connect\n",
+		    ctrl_p->slot.slotNum));
+
+		/* set power control to OFF */
+		control =  pciehpc_reg_get16(ctrl_p,
+			ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+		control |= PCIE_SLOTCTL_PWR_CONTROL;
+		pciehpc_issue_hpc_command(ctrl_p, control);
+
+		/* clear the status */
+		pciehpc_reg_put16(ctrl_p,
+			ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS, status);
+		goto cleanup1;
+	}
+
+	/* enable all interrupts */
+	pciehpc_reg_put16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS, status);
+
+	control = pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+		PCIE_SLOTCTL, control | SLOTCTL_SUPPORTED_INTRS_MASK);
 
 	/* 3. Set power LED to be ON */
 	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_ON);
@@ -1092,6 +1133,10 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	ctrl_p->slot.slot_state = HPC_SLOT_CONNECTED;
 	mutex_exit(&ctrl_p->pciehpc_mutex);
 	return (HPC_SUCCESS);
+
+cleanup1:
+	/* set power led to OFF */
+	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_OFF);
 
 cleanup:
 	mutex_exit(&ctrl_p->pciehpc_mutex);
@@ -1176,6 +1221,13 @@ pciehpc_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	/* 3. Set power LED to be OFF */
 	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_OFF);
 	pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
+
+	/* disable interrupt of power fault detection */
+	control = pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+		PCIE_SLOTCTL, control | (SLOTCTL_SUPPORTED_INTRS_MASK &
+				~PCIE_SLOTCTL_PWR_FAULT_EN));
 
 	ctrl_p->slot.slot_state = HPC_SLOT_DISCONNECTED;
 	mutex_exit(&ctrl_p->pciehpc_mutex);

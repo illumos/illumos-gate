@@ -1191,7 +1191,7 @@ hat_init(void)
 	((struct hme_blk *)hblk_reserve)->hblk_nextpa =
 				va_to_pa((caddr_t)hblk_reserve);
 
-#ifndef sun4v
+#ifndef UTSB_PHYS
 	/*
 	 * Reserve some kernel virtual address space for the locked TTEs
 	 * that allow us to probe the TSB from TL>0.
@@ -2065,7 +2065,7 @@ sfmmu_memload_batchsmall(struct hat *hat, caddr_t vaddr, page_t **pps,
  * Construct a tte for a page:
  *
  * tte_valid = 1
- * tte_size2 = size & TTE_SZ2_BITS (Panther-only)
+ * tte_size2 = size & TTE_SZ2_BITS (Panther and Olympus-C only)
  * tte_size = size
  * tte_nfo = attr & HAT_NOFAULT
  * tte_ie = attr & HAT_STRUCTURE_LE
@@ -12190,7 +12190,7 @@ tte_t  *gorig[NCPU], *gcur[NCPU], *gnew[NCPU];
 void
 chk_tte(tte_t *orig_old, tte_t *cur, tte_t *new, struct hme_blk *hmeblkp)
 {
-	uint_t i, j, k;
+	pfn_t i, j, k;
 	int cpuid = CPU->cpu_id;
 
 	gorig[cpuid] = orig_old;
@@ -12208,14 +12208,12 @@ chk_tte(tte_t *orig_old, tte_t *cur, tte_t *new, struct hme_blk *hmeblkp)
 			k = TTE_TO_TTEPFN(new);
 			if (i != j) {
 				/* remap error? */
-				panic("chk_tte: bad pfn, 0x%x, 0x%x",
-					i, j);
+				panic("chk_tte: bad pfn, 0x%lx, 0x%lx", i, j);
 			}
 
 			if (i != k) {
 				/* remap error? */
-				panic("chk_tte: bad pfn2, 0x%x, 0x%x",
-					i, k);
+				panic("chk_tte: bad pfn2, 0x%lx, 0x%lx", i, k);
 			}
 		} else {
 			if (TTE_IS_VALID(new)) {
@@ -12225,8 +12223,7 @@ chk_tte(tte_t *orig_old, tte_t *cur, tte_t *new, struct hme_blk *hmeblkp)
 			i = TTE_TO_TTEPFN(orig_old);
 			k = TTE_TO_TTEPFN(new);
 			if (i != k) {
-				panic("chk_tte: bad pfn3, 0x%x, 0x%x",
-					i, k);
+				panic("chk_tte: bad pfn3, 0x%lx, 0x%lx", i, k);
 			}
 		}
 	} else {
@@ -12235,8 +12232,8 @@ chk_tte(tte_t *orig_old, tte_t *cur, tte_t *new, struct hme_blk *hmeblkp)
 			if (TTE_IS_VALID(new)) {
 				k = TTE_TO_TTEPFN(new);
 				if (j != k) {
-					panic("chk_tte: bad pfn4, 0x%x, 0x%x",
-						j, k);
+					panic("chk_tte: bad pfn4, 0x%lx, 0x%lx",
+					    j, k);
 				}
 			} else {
 				panic("chk_tte: why here?");

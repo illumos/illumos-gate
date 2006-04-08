@@ -419,6 +419,17 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 	return (DDI_SUCCESS);
 }
 
+/*
+ * fetch chip's range propery's value. For sun4v, config space base
+ * is not used (pxtool_get_phys_addr) will return zero, so just return
+ * zero for px_get_range_prop().
+ */
+/*ARGSUSED*/
+uint64_t
+px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+{
+	return (0);
+}
 
 /*
  * Checks dma attributes against system bypass ranges
@@ -427,7 +438,8 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
  */
 /*ARGSUSED*/
 int
-px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p, uint64_t *hi_p)
+px_lib_dma_bypass_rngchk(dev_info_t *dip, ddi_dma_attr_t *attr_p,
+    uint64_t *lo_p, uint64_t *hi_p)
 {
 	if ((attr_p->dma_attr_addr_lo != 0ull) ||
 	    (attr_p->dma_attr_addr_hi != UINT64_MAX)) {

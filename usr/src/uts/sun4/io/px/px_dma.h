@@ -233,9 +233,9 @@ extern int px_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
 
 #define	PX_GET_MP_TTE(tte) \
 	(((uint64_t)(uintptr_t)(tte) >> 5) << (32 + 5) | \
-			((uint32_t)(uintptr_t)(tte)) & 0x12)
+			((uint32_t)(uintptr_t)(tte)) & 0x16)
 #define	PX_SAVE_MP_TTE(mp, tte)	\
-	(mp)->dmai_tte = (caddr_t)((uintptr_t)HI32(tte) | ((tte) & 0x12))
+	(mp)->dmai_tte = (caddr_t)((uintptr_t)HI32(tte) | ((tte) & 0x16))
 
 #define	PX_GET_MP_PFN1(mp, page_no) \
 	(((px_iopfn_t *)(mp)->dmai_pfnlst)[page_no])

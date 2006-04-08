@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1191,7 +1190,13 @@ ptl1_panic(u_int reason)
 	! Flushing D$ erases old data in D$, so that it will not be loaded.
 	! Since we can afford only 2 registers (%g2 and %g3) for this job, we
 	! flush entire D$.
+	! For FJ OPL processors (IMPL values < SPITFIRE_IMPL), DC flushing
+	! is not needed.
 	!
+	GET_CPU_IMPL(%g2)
+	cmp	%g2, SPITFIRE_IMPL
+	blt,pn	%icc, 1f		! Skip flushing for OPL processors
+	 nop
 	sethi	%hi(dcache_size), %g2
 	ld	[%g2 + %lo(dcache_size)], %g2
 	sethi	%hi(dcache_linesize), %g3
@@ -1201,6 +1206,7 @@ ptl1_panic(u_int reason)
 	membar	#Sync
 	brnz,pt	%g2, 0b
 	  sub	%g2, %g3, %g2
+1:
 	!
 	! increment the entry counter.
 	! save CPU state if this is the first entry.

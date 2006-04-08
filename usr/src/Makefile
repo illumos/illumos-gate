@@ -275,6 +275,7 @@ EXPORT_SRC:
 	@cd $(CLOSED)/uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/mpxu;	pwd;	$(MAKE) EXPORT_SRC
+	@cd uts/sun4u/opl;      pwd;    $(MAKE) EXPORT_SRC
 	@cd uts/sun4u/serengeti;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/starcat;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/taco;	pwd;	$(MAKE) EXPORT_SRC

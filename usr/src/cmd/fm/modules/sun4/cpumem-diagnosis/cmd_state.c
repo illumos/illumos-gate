@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +43,10 @@
 
 #include <string.h>
 #include <fm/fmd_api.h>
+
+#ifdef sun4u
+#include <cmd_opl.h>
+#endif
 
 /* Must be in sync with cmd_ptrsubtype_t */
 static cmd_case_closer_f *const cmd_case_closers[] = {
@@ -73,7 +76,28 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 #else
 	NULL,			/* CMD_PTR_DP_CASE */
 #endif
-	NULL			/* CMD_PTR_DP_PAGE_DEFER */
+	NULL,			/* CMD_PTR_DP_PAGE_DEFER */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_INV_SFSR */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UE_DET_CPU */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UE_DET_IO */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_MTLB */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_TLBP */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_INV_URG */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_CRE */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_TSB_CTX */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_TSBP */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_PSTATE */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_TSTATE */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_IUG_F */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_IUG_R */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_SDC */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_WDT */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_DTLB */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_ITLB */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_CORE_ERR */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_DAE */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_IAE */
+	cmd_cpuerr_close	/* CMD_PTR_CPU_UGESR_UGE */
 };
 
 fmd_case_t *

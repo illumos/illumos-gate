@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -338,7 +337,11 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	  or	%o0, %lo(sfmmu_panic5), %o0	! give up.
 4:
 	stxa	%o0,[%o5]ASI_DMMU		! Setup tag access
+#ifdef	OLYMPUS_SHARED_FTLB
+	stxa	%g1,[%g0]ASI_DTLB_IN
+#else
 	stxa	%g1,[%g3]ASI_DTLB_ACCESS	! Displace entry at idx
+#endif
 	membar	#Sync
 	retl
 	  wrpr	%g0, %o3, %pstate		! enable interrupts
@@ -399,16 +402,24 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	/*
 	 * set ktsb_phys to 1 if the processor supports ASI_QUAD_LDD_PHYS.
 	 * returns the detection value in %o0.
+	 *
+	 * Currently ASI_QUAD_LDD_PHYS is supported in processors as follows
+	 *  - cheetah+ and later (greater or equal to CHEETAH_PLUS_IMPL)
+	 *  - FJ OPL Olympus-C and later  (less than SPITFIRE_IMPL)
+	 *
 	 */
 	ENTRY_NP(sfmmu_setup_4lp)
 	GET_CPU_IMPL(%o0);
 	cmp	%o0, CHEETAH_PLUS_IMPL
-	blt,a,pt %icc, 4f
+	bge,pt	%icc, 4f
+	  mov	1, %o1
+	cmp	%o0, SPITFIRE_IMPL
+	bge,a,pn %icc, 3f
 	  clr	%o1
+4:
 	set	ktsb_phys, %o2
-	mov	1, %o1
 	st	%o1, [%o2]
-4:	retl
+3:	retl
 	mov	%o1, %o0
 	SET_SIZE(sfmmu_setup_4lp)
 
@@ -446,7 +457,24 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	 */
 	ldx	[%o0 + SFMMU_TSB], %o1		! %o1 = first tsbinfo
 	ldx	[%o1 + TSBINFO_NEXTPTR], %g2	! %g2 = second tsbinfo
-	brz,pt	%g2, 4f
+
+#ifdef UTSB_PHYS
+	/*
+	 * UTSB_PHYS accesses user TSBs via physical addresses.  The first
+	 * TSB is in the MMU I/D TSB Base registers.  The second TSB uses a
+	 * designated ASI_SCRATCHPAD register as a pseudo TSB base register.
+	 */
+	MAKE_UTSBREG_PHYS(%o1, %o2, %o3)	! %o2 = first utsbreg
+	LOAD_TSBREG(%o2, %o3, %o4)		! write TSB base register
+
+	brz,a,pt %g2, 2f
+	  mov   -1, %o2				! use -1 if no second TSB
+
+	MAKE_UTSBREG_PHYS(%g2, %o2, %o3)	! %o2 = second utsbreg
+2:
+	LOAD_2ND_TSBREG(%o2, %o3)		! write 2nd pseudo TSB base register
+#else /* UTSB_PHYS */
+	brz,pt  %g2, 4f
 	  nop
 	/*
 	 * We have a second TSB for this process, so we need to 
@@ -485,6 +513,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	sll	%o2, DTACC_SHIFT, %o2		! %o1 = first TSB TLB index
 	RESV_OFFSET(%o1, %g3, %o3, sfmmu_tsb_1st)	! or-in bits of TSB VA
 	LOAD_TSBTTE(%o1, %o2, %g3, %o4)		! load first TSB locked TTE
+#endif /* UTSB_PHYS */
 
 6:	ldx	[%o0 + SFMMU_ISMBLKPA], %o1	! copy members of sfmmu
 	CPU_TSBMISS_AREA(%o2, %o3)		! we need to access from
@@ -639,4 +668,3 @@ prefetch_tsbe_write(struct tsbe *tsbep)
 
 #ifndef lint
 #endif	/* lint */
-

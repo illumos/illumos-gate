@@ -31,6 +31,7 @@
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
 #include <sys/sun4asi.h>
+#include <sys/spitregs.h>
 #include <sys/cheetahregs.h>
 #include <sys/machtrap.h>
 #include <sys/machthread.h>
@@ -855,7 +856,9 @@
  * to stop RED state entry if the store queue has many
  * pending bad stores (PRM, Chapter 11).
  */
-#define ASYNC_TRAP(ttype, ttlabel)\
+#define ASYNC_TRAP(ttype, ttlabel, table_name)\
+	.global	table_name	;\
+table_name:			;\
 	membar	#Sync		;\
 	TT_TRACE(ttlabel)	;\
 	ba	async_err	;\
@@ -1063,6 +1066,41 @@ tt1_dtlbmiss:
  * could live in this file but currently it seems better to allow
  * it to fall thru to sfmmu_tsb_miss.
  */
+#ifdef UTSB_PHYS
+#define	DTLB_MISS(table_name)						;\
+	.global	table_name/**/_dtlbmiss					;\
+table_name/**/_dtlbmiss:						;\
+	HAT_PERCPU_DBSTAT(TSBMISS_DTLBMISS) /* 3 instr ifdef DEBUG */	;\
+	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
+	ldxa	[%g0]ASI_DMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
+	ldxa	[%g6]ASI_DMMU, %g2		/* g2 = tag access */	;\
+	sllx	%g2, TAGACC_CTX_LSHIFT, %g3				;\
+	srlx	%g3, TAGACC_CTX_LSHIFT, %g3	/* g3 = ctx */		;\
+	cmp	%g3, INVALID_CONTEXT					;\
+	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
+	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
+	mov	SCRATCHPAD_UTSBREG, %g3				;\
+	ldxa	[%g3]ASI_SCRATCHPAD, %g3	/* g3 = 2nd tsb reg */	;\
+	brgez,pn %g3, sfmmu_udtlb_slowpath	/* branch if 2 TSBs */	;\
+	  nop								;\
+	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4	/* g4 = tag, %g5 data */;\
+	cmp	%g4, %g7						;\
+	bne,pn	%xcc, sfmmu_tsb_miss_tt		/* no 4M TSB, miss */	;\
+	  mov	%g0, %g3			/* clear 4M tsbe ptr */	;\
+	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
+	stxa	%g5, [%g0]ASI_DTLB_IN	/* trapstat expects TTE */	;\
+	retry				/* in %g5 */			;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	.align 128
+#else /* UTSB_PHYS */
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
@@ -1096,6 +1134,7 @@ table_name/**/_dtlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	.align 128
+#endif /* UTSB_PHYS */
 
 #if defined(cscope)
 /*
@@ -1115,6 +1154,41 @@ tt1_itlbmiss:
  * by sfmmu_patch_ktsb at runtime.
  * MUST be EXACTLY 32 instructions or we'll break.
  */
+#ifdef UTSB_PHYS
+#define	ITLB_MISS(table_name)						 \
+	.global	table_name/**/_itlbmiss					;\
+table_name/**/_itlbmiss:						;\
+	HAT_PERCPU_DBSTAT(TSBMISS_ITLBMISS) /* 3 instr ifdef DEBUG */	;\
+	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
+	ldxa	[%g0]ASI_IMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
+	ldxa	[%g6]ASI_IMMU, %g2		/* g2 = tag access */	;\
+	sllx	%g2, TAGACC_CTX_LSHIFT, %g3				;\
+	srlx	%g3, TAGACC_CTX_LSHIFT, %g3	/* g3 = ctx */		;\
+	cmp	%g3, INVALID_CONTEXT					;\
+	ble,pn	%xcc, sfmmu_kitlb_miss					;\
+	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
+	mov	SCRATCHPAD_UTSBREG, %g3				;\
+	ldxa	[%g3]ASI_SCRATCHPAD, %g3	/* g3 = 2nd tsb reg */	;\
+	brgez,pn %g3, sfmmu_uitlb_slowpath	/* branch if 2 TSBs */	;\
+	  nop								;\
+	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */	;\
+	cmp	%g4, %g7						;\
+	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* br if 8k ptr miss */		;\
+	  mov	%g0, %g3		/* no 4M TSB */			;\
+	andcc	%g5, TTE_EXECPRM_INT, %g0 /* check execute bit */	;\
+	bz,pn	%icc, exec_fault					;\
+	  nop								;\
+	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
+	stxa	%g5, [%g0]ASI_ITLB_IN	/* trapstat expects %g5 */	;\
+	retry								;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	unimp	0							;\
+	.align 128
+#else /* UTSB_PHYS */
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
@@ -1148,6 +1222,7 @@ table_name/**/_itlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	.align 128
+#endif /* UTSB_PHYS */
 
 
 /*
@@ -1278,7 +1353,7 @@ trap_table0:
 	NOT; NOT;			/* 006 - 007 reserved */
 	IMMU_EXCEPTION;			/* 008	instruction access exception */
 	NOT;				/* 009	instruction access MMU miss */
-	ASYNC_TRAP(T_INSTR_ERROR, trace_gen);
+	ASYNC_TRAP(T_INSTR_ERROR, trace_gen, tt0_iae);
 					/* 00A	instruction access error */
 	NOT; NOT4;			/* 00B - 00F reserved */
 	ILLTRAP_INSTR;			/* 010	illegal instruction */
@@ -1296,7 +1371,7 @@ trap_table0:
 	NOT; NOT; NOT4;			/* 02A - 02F reserved */
 	DMMU_EXCEPTION;			/* 030	data access exception */
 	NOT;				/* 031	data access MMU miss */
-	ASYNC_TRAP(T_DATA_ERROR, trace_gen);
+	ASYNC_TRAP(T_DATA_ERROR, trace_gen, tt0_dae);
 					/* 032	data access error */
 	NOT;				/* 033	data access protection */
 	DMMU_EXC_AG_NOT_ALIGNED;	/* 034	mem address not aligned */
@@ -1306,7 +1381,7 @@ trap_table0:
 	NOT;				/* 038	LDQF mem address not aligned */
 	NOT;				/* 039	STQF mem address not aligned */
 	NOT; NOT; NOT4;			/* 03A - 03F reserved */
-	NOT;				/* 040	async data error */
+	LABELED_BAD(tt0_asdat);		/* 040	async data error */
 	LEVEL_INTERRUPT(1);		/* 041	interrupt level 1 */
 	LEVEL_INTERRUPT(2);		/* 042	interrupt level 2 */
 	LEVEL_INTERRUPT(3);		/* 043	interrupt level 3 */
@@ -1432,7 +1507,7 @@ trap_table0:
 	NOT4; NOT4; NOT4; NOT4;		/* 1F0 - 1FF reserved */
 trap_table1:
 	NOT4; NOT4; NOT; NOT;		/* 000 - 009 unused */
-	ASYNC_TRAP(T_INSTR_ERROR + T_TL1, trace_gen);
+	ASYNC_TRAP(T_INSTR_ERROR + T_TL1, trace_gen, tt1_iae);
 					/* 00A	instruction access error */
 	NOT; NOT4;			/* 00B - 00F unused */
 	NOT4; NOT4; NOT4; NOT4;		/* 010 - 01F unused */
@@ -1441,12 +1516,14 @@ trap_table1:
 	NOT4; NOT4;			/* 028 - 02F unused */
 	DMMU_EXCEPTION_TL1;		/* 030 	data access exception */
 	NOT;				/* 031 unused */
-	ASYNC_TRAP(T_DATA_ERROR + T_TL1, trace_gen);
+	ASYNC_TRAP(T_DATA_ERROR + T_TL1, trace_gen, tt1_dae);
 					/* 032	data access error */
 	NOT;				/* 033	unused */
 	MISALIGN_ADDR_TL1;		/* 034	mem address not aligned */
 	NOT; NOT; NOT; NOT4; NOT4	/* 035 - 03F unused */
-	NOT4; NOT4; NOT4; NOT4;		/* 040 - 04F unused */
+	LABELED_BAD(tt1_asdat);		/* 040	async data error */
+	NOT; NOT; NOT;			/* 041 - 043 unused */
+	NOT4; NOT4; NOT4;		/* 044 - 04F unused */
 	NOT4; NOT4; NOT4; NOT4;		/* 050 - 05F unused */
 	NOT;				/* 060	unused */
 	GOTO(kmdb_trap_tl1);		/* 061	PA watchpoint */
@@ -2608,13 +2685,15 @@ mmu_trap_tl1_4:
 	add     %g6, CPU_TL1_HDLR, %g6		! %g6 = &cpu_m.tl1_hdlr (VA)
 	GET_CPU_IMPL(%g5)
 	cmp	%g5, CHEETAH_IMPL
-	bl,pn	%icc, 3f
-	sethi	%hi(dcache_line_mask), %g5
+	bl,pt	%icc, 3f
+	 cmp	%g5, SPITFIRE_IMPL
 	stxa	%g0, [%g7]ASI_DC_INVAL
 	membar	#Sync
 	ba,pt	%xcc, 2f
-	nop
+	 nop
 3:
+	bl,pt	%icc, 2f
+	 sethi	%hi(dcache_line_mask), %g5
 	ld	[%g5 + %lo(dcache_line_mask)], %g5
 	and	%g6, %g5, %g5
 	stxa	%g0, [%g5]ASI_DC_TAG
@@ -2932,4 +3011,3 @@ fast_trap_dummy_call:
 	nop
 
 #endif	/* lint */
-

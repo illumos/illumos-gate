@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,11 +47,23 @@ extern "C" {
 #define	DR_MAXNUM_NT		3
 
 /* used to map sbd_comp_type_t to array index */
-#define	NIX(t) 						\
-	(((t) == SBD_COMP_CPU) ? 0 :			\
-	((t) == SBD_COMP_MEM) ? 1 :			\
-	((t) == SBD_COMP_IO) ? 2 :			\
+#define	NIX(t)							\
+	(((t) == SBD_COMP_CPU) ? 0 :				\
+	((t) == SBD_COMP_MEM) ? 1 :				\
+	((t) == SBD_COMP_IO) ? 2 :				\
 	((t) == SBD_COMP_CMP) ? 0 : DR_MAXNUM_NT)
+
+#define	BIX(t)							\
+	(((t) == SBD_COMP_CPU) ? 0 :				\
+	((t) == SBD_COMP_MEM) ? 32 :				\
+	((t) == SBD_COMP_IO) ? 40 :				\
+	((t) == SBD_COMP_CMP) ? 0 : 0)
+
+#define	NMASK(t)						\
+	(((t) == SBD_COMP_CPU) ? ((dr_devset_t)0xffffffff) :	\
+	((t) == SBD_COMP_MEM) ? ((dr_devset_t)0x1) :		\
+	((t) == SBD_COMP_IO) ? ((dr_devset_t)0x1ff) :		\
+	((t) == SBD_COMP_CMP) ? ((dr_devset_t)0xffffffff) : 0)
 
 /*
  * helper macros for constructing and reporting internal error messages.
@@ -84,22 +95,23 @@ extern "C" {
 /*
  * Format of dr_devset_t bit masks:
  *
- *       32                  16        8         0
- *        |....|....|....|IIII|....|...M|CCCC|CCCC|
+ * 64        48        40        32        24        16        8         0
+ *  |....|...I|IIII|IIII|....|...M|CCCC|CCCC|CCCC|CCCC|CCCC|CCCC|CCCC|CCCC|
  *
  * 1 = indicates respective component present/attached.
  * I = I/O, M = Memory, C = CPU.
  */
-#define	DEVSET_ANYUNIT		(-1)
-#define	_NT2DEVPOS(t, u)	((NIX(t) << 3) + (u))
-#define	_DEVSET_MASK		0x000f01ff
-#define	_CMP_DEVSET_MASK	0x11
+#define	_NT2DEVPOS(t, u)	(BIX(t) + (u))
+#define	_DEVSET_MASK		((dr_devset_t)0x1ff01ffffffff)
+#define	_CMP_DEVSET_MASK	((dr_devset_t)0x11111111)
+#define	DEVSET_ONEUNIT		((dr_devset_t)1)
+#define	DEVSET_ANYUNIT		(dr_devset_t)(-1)
 #define	DEVSET(t, u) \
 	(((u) == DEVSET_ANYUNIT) ? \
-		(dr_devset_t)((0xff << _NT2DEVPOS((t), 0)) & _DEVSET_MASK) : \
+		((NMASK(t) << _NT2DEVPOS((t), 0)) & _DEVSET_MASK) : \
 	((t) == SBD_COMP_CMP) ? \
-		(dr_devset_t)(_CMP_DEVSET_MASK << _NT2DEVPOS((t), (u))) : \
-	(dr_devset_t)(1 << _NT2DEVPOS((t), (u))))
+		(_CMP_DEVSET_MASK << _NT2DEVPOS((t), (u))) : \
+		(DEVSET_ONEUNIT << _NT2DEVPOS((t), (u))))
 
 #define	DEVSET_IN_SET(ds, t, u)	(((ds) & DEVSET((t), (u))) != 0)
 #define	DEVSET_ADD(ds, t, u)	((ds) |= DEVSET((t), (u)))
@@ -175,7 +187,17 @@ extern "C" {
  * CMP Specific Helpers
  */
 #define	DR_CMP_CORE_UNUM(cmp, core)	(cmp + (core * 4))
-#define	DR_UNUM2SBD_UNUM(unum)		(unum & 0x3)
+/*
+ * DR_UNUM2SBD_UNUM should be set to (unum & (max #of CMP on board - 1))
+ * for all the platforms.  So far, all sun4u platforms supported have
+ * the same limit so 0x3 works.  One day we might have to make this
+ * a platform specific macro.
+ */
+
+#define	DR_UNUM2SBD_UNUM(n, d)		((d == SBD_COMP_IO) ? (n & 0xf) : \
+					(d == SBD_COMP_CPU) ? (n & 0x3) : \
+					(d == SBD_COMP_CMP) ? (n & 0x3) : \
+						(n))
 
 /*
  * Some stuff to assist in debug.
@@ -213,7 +235,7 @@ extern uint_t	dr_debug;
 #define	DR_BSLOCK	0x01	/* for blocking status (protected by b_slock) */
 
 typedef const char	*fn_t;
-typedef uint32_t	dr_devset_t;	/* TODO: fix limitation */
+typedef uint64_t	dr_devset_t;	/* TODO: fix limitation */
 
 /*
  * Unsafe devices based on dr.conf prop "unsupported-io-drivers"

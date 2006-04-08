@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +63,7 @@
 #include <sys/mmu.h>
 #include <sys/x_call.h>
 #include <sys/cpu_module.h>
-#include <sys/cheetahregs.h>
+#include <sys/cpu_impl.h>
 
 #include <sys/autoconf.h>
 #include <sys/cmn_err.h>
@@ -159,8 +158,13 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 	}
 
 	/* read in the CPU speed */
-	clock_freq = (unsigned int)ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "clock-frequency", 0);
+
+	/*
+	 * If the property is not found in the CPU node, it has to be
+	 * kept in the core or cmp node so we just keep looking.
+	 */
+	clock_freq = (unsigned int)ddi_prop_get_int(DDI_DEV_T_ANY,
+		dip, 0, "clock-frequency", 0);
 
 	ASSERT(clock_freq != 0);
 
@@ -168,6 +172,7 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 	 * The ecache property string is not the same
 	 * for all CPU implementations.
 	 */
+
 	switch (cp->sbc_cpu_impl) {
 	case BLACKBIRD_IMPL:
 	case CHEETAH_IMPL:
@@ -175,6 +180,7 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 		cache_str = "ecache-size";
 		break;
 	case JAGUAR_IMPL:
+	case OLYMPUS_C_IMPL:
 		cache_str = "l2-cache-size";
 		break;
 	case PANTHER_IMPL:
@@ -189,8 +195,14 @@ dr_cpu_set_prop(dr_cpu_unit_t *cp)
 
 	if (cache_str != NULL) {
 		/* read in the ecache size */
-		ecache_size = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, cache_str, 0);
+		/*
+		 * If the property is not found in the CPU node,
+		 * it has to be kept in the core or cmp node so
+		 * we just keep looking.
+		 */
+
+		ecache_size = ddi_prop_get_int(DDI_DEV_T_ANY,
+			dip, 0, cache_str, 0);
 	}
 
 	ASSERT(ecache_size != 0);
@@ -280,7 +292,8 @@ dr_pre_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * one message should be printed, no matter how
 		 * many cores are actually present.
 		 */
-		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum);
+		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum,
+			SBD_COMP_CPU);
 		if (curr_cpu >= next_cpu) {
 			cmn_err(CE_CONT, "OS configure %s",
 			    up->sbc_cm.sbdev_path);
@@ -331,13 +344,12 @@ dr_attach_cpu(dr_handle_t *hp, dr_common_unit_t *cp)
 	if (err) {
 		DRERR_SET_C(&cp->sbdev_error, &err);
 
-		err = drmach_unconfigure(cp->sbdev_id, DRMACH_DEVI_REMOVE);
+		err = drmach_unconfigure(cp->sbdev_id, DEVI_BRANCH_DESTROY);
 		if (err)
 			sbd_err_clear(&err);
 	} else if ((rv = cpu_configure(cpuid)) != 0) {
 		dr_dev_err(CE_WARN, cp, dr_errno2ecode(rv));
-		err = drmach_unconfigure(cp->sbdev_id,
-				DRMACH_DEVI_REMOVE);
+		err = drmach_unconfigure(cp->sbdev_id, DEVI_BRANCH_DESTROY);
 		if (err)
 			sbd_err_clear(&err);
 	}
@@ -421,7 +433,7 @@ dr_pre_release_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 	/* allocate status struct storage. */
 	ds = (sbd_dev_stat_t *) kmem_zalloc(sizeof (sbd_dev_stat_t) *
-			MAX_CPU_UNITS_PER_BOARD, KM_SLEEP);
+		MAX_CPU_UNITS_PER_BOARD, KM_SLEEP);
 
 	cix = dr_cpu_status(hp, devset, ds);
 
@@ -473,7 +485,7 @@ dr_pre_release_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 				if (disp_bound_threads(cp, 0)) {
 					cmn_err(CE_WARN, "%s: thread(s) "
 						"bound to cpu %d",
-						f, cp->cpu_id);
+							f, cp->cpu_id);
 				}
 				rv = -1;
 				break;
@@ -553,7 +565,8 @@ dr_pre_detach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 		 * one message should be printed, no matter how
 		 * many cores are actually present.
 		 */
-		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum);
+		curr_cpu = DR_UNUM2SBD_UNUM(up->sbc_cm.sbdev_unum,
+			SBD_COMP_CPU);
 		if (curr_cpu >= next_cpu) {
 			cmn_err(CE_CONT, "OS unconfigure %s\n",
 			    up->sbc_cm.sbdev_path);
@@ -581,7 +594,7 @@ dr_pre_detach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 				if (disp_bound_threads(cp, 0)) {
 					cmn_err(CE_WARN, "%s: thread(s) "
 						"bound to cpu %d",
-						f, cp->cpu_id);
+							f, cp->cpu_id);
 				}
 				goto err;
 			}
@@ -618,7 +631,7 @@ dr_detach_cpu(dr_handle_t *hp, dr_common_unit_t *cp)
 	} else if ((rv = cpu_unconfigure(cpuid)) != 0) {
 		dr_dev_err(CE_IGNORE, cp, dr_errno2ecode(rv));
 	} else {
-		err = drmach_unconfigure(cp->sbdev_id, DRMACH_DEVI_REMOVE);
+		err = drmach_unconfigure(cp->sbdev_id, DEVI_BRANCH_DESTROY);
 		if (err) {
 			DRERR_SET_C(&cp->sbdev_error, &err);
 		}
@@ -696,7 +709,7 @@ dr_fill_cmp_stat(sbd_cpu_stat_t *csp, int ncores, int impl, sbd_cmp_stat_t *psp)
 	 * on the data for the first core.
 	 */
 	psp->ps_type = SBD_COMP_CMP;
-	psp->ps_unit = DR_UNUM2SBD_UNUM(csp->cs_unit);
+	psp->ps_unit = DR_UNUM2SBD_UNUM(csp->cs_unit, SBD_COMP_CMP);
 	strncpy(psp->ps_name, csp->cs_name, sizeof (psp->ps_name));
 	psp->ps_cond = csp->cs_cond;
 	psp->ps_busy = csp->cs_busy;
@@ -721,7 +734,8 @@ dr_fill_cmp_stat(sbd_cpu_stat_t *csp, int ncores, int impl, sbd_cmp_stat_t *psp)
 		 * The following properties should be the same
 		 * for all the cores of the CMP.
 		 */
-		ASSERT(psp->ps_unit == DR_UNUM2SBD_UNUM(csp[core].cs_unit));
+		ASSERT(psp->ps_unit == DR_UNUM2SBD_UNUM(
+			csp[core].cs_unit, SBD_COMP_CMP));
 		ASSERT(psp->ps_speed == csp[core].cs_speed);
 
 		psp->ps_cpuid[core] = csp[core].cs_cpuid;
@@ -761,6 +775,7 @@ dr_cpu_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 	int		ncpu;
 	dr_board_t	*bp;
 	sbd_cpu_stat_t	cstat[MAX_CORES_PER_CMP];
+	int		impl;
 
 	bp = hp->h_bd;
 	ncpu = 0;
@@ -810,6 +825,11 @@ dr_cpu_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 			}
 
 			dr_fill_cpu_stat(cp, &pstat, &cstat[ncores++]);
+			/*
+			 * We should set impl here because the last core
+			 * found might be EMPTY or not present.
+			 */
+			impl = cp->sbc_cpu_impl;
 		}
 
 		if (ncores == 0) {
@@ -825,9 +845,10 @@ dr_cpu_status(dr_handle_t *hp, dr_devset_t devset, sbd_dev_stat_t *dsp)
 		 * found, assuming that all cores will have the
 		 * same implementation.
 		 */
-		if (CPU_IMPL_IS_CMP(cp->sbc_cpu_impl)) {
+
+		if (CPU_IMPL_IS_CMP(impl)) {
 			psp = (sbd_cmp_stat_t *)dsp;
-			dr_fill_cmp_stat(cstat, ncores, cp->sbc_cpu_impl, psp);
+			dr_fill_cmp_stat(cstat, ncores, impl, psp);
 		} else {
 			ASSERT(ncores == 1);
 			bcopy(cstat, dsp, sizeof (sbd_cpu_stat_t));
@@ -888,8 +909,8 @@ dr_cancel_cpu(dr_cpu_unit_t *up)
 			if (cpu_flagged_nointr(up->sbc_cpu_flags)) {
 				if (cpu_intr_disable(cp) != 0) {
 					cmn_err(CE_WARN, "%s: failed to "
-					    "disable interrupts on cpu %d",
-					    f, up->sbc_cpu_id);
+					"disable interrupts on cpu %d",
+						f, up->sbc_cpu_id);
 				}
 			}
 		}

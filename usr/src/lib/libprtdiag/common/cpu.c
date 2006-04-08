@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,18 +58,18 @@
  * is passed in or the clock-frequency property does not exist, the
  * function returns 0.
  */
-int
+uint_t
 get_cpu_freq(Prom_node *pnode)
 {
 	Prop *prop;
-	int *value;
+	uint_t *value;
 
 	/* find the property */
 	if ((prop = find_prop(pnode, "clock-frequency")) == NULL) {
 		return (0);
 	}
 
-	if ((value = (int *)get_prop_val(prop)) == NULL) {
+	if ((value = (uint_t *)get_prop_val(prop)) == NULL) {
 		return (0);
 	}
 

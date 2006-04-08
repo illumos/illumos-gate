@@ -89,8 +89,8 @@ extern int px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 extern int px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages);
 extern int px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
     io_attributes_t *attr_p, r_addr_t *r_addr_p);
-extern int px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attr_p, uint64_t *lo_p,
-    uint64_t *hi_p);
+extern int px_lib_dma_bypass_rngchk(dev_info_t *dip, ddi_dma_attr_t *attr_p,
+    uint64_t *lo_p, uint64_t *hi_p);
 extern int px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
     io_attributes_t attr, io_addr_t *io_addr_p);
 extern int px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip,

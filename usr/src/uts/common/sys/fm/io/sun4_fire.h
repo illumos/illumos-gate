@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,7 @@ extern "C" {
  */
 
 #define	PCIEX_FIRE		"fire"
+#define	PCIEX_OBERON		"oberon"
 
 /* FIRE's JBUS ereport classes */
 #define	FIRE_JBC_MB_PEA			"jbc.mb_pea"
@@ -71,6 +71,18 @@ extern "C" {
 #define	FIRE_JBC_UNSOL_INTR		"jbc.unsol_intr"
 #define	FIRE_JBC_EBUS_TO		"jbc.ebus_to"
 
+/* OBERON's UBC ereport classes */
+#define	FIRE_UBC_DMARDUEA		"ubc.dmarduea"
+#define	FIRE_UBC_DMAWTUEA		"ubc.dmawtuea"
+#define	FIRE_UBC_MEMRDAXA		"ubc.memrdaxa"
+#define	FIRE_UBC_MEMWTAXA		"ubc.memwtaxa"
+#define	FIRE_UBC_DMARDUEB		"ubc.dmardueb"
+#define	FIRE_UBC_DMAWTUEB		"ubc.dmawtueb"
+#define	FIRE_UBC_MEMRDAXB		"ubc.memrdaxb"
+#define	FIRE_UBC_MEMWTAXB		"ubc.memwtaxb"
+#define	FIRE_UBC_PIOWTUE		"ubc.piowtue"
+#define	FIRE_UBC_PIOWBEUE		"ubc.piowbeue"
+#define	FIRE_UBC_PIORBEUE		"ubc.piorbeue"
 
 /* FIRE's DMC ereport classes */
 #define	FIRE_DMC_MSI_NOT_EN		"dmc.msi_not_en"
@@ -95,6 +107,7 @@ extern "C" {
 #define	FIRE_DMC_TBW_ERR		"dmc.tbw_err"
 #define	FIRE_DMC_TBW_DPE		"dmc.tbw_dpe"
 #define	FIRE_DMC_TTC_CAE		"dmc.ttc_cae"
+#define	FIRE_DMC_TTC_DUE		"dmc.ttc_due"
 
 
 /* FIRE's PEC ereport classes */
@@ -121,7 +134,7 @@ extern "C" {
 #define	FIRE_PEC_UC			"pec.uc"
 #define	FIRE_PEC_CTO			"pec.cto"
 #define	FIRE_PEC_MFP			"pec.mfp"
-#define	FIRE_PEC_PP			"pec.pp"
+#define	FIRE_PEC_PP			"pec.pois"
 #define	FIRE_PEC_FCP			"pec.fcp"
 #define	FIRE_PEC_DLP			"pec.dlp"
 #define	FIRE_PEC_TE			"pec.te"
@@ -131,6 +144,13 @@ extern "C" {
 #define	FIRE_PEC_BDP			"pec.bdp"
 #define	FIRE_PEC_BTP			"pec.btp"
 #define	FIRE_PEC_RE			"pec.re"
+#define	FIRE_PEC_IHB_UE			"pec.ihb_ue"
+#define	FIRE_PEC_ECRC			"pec.ecrc"
+#define	FIRE_PEC_EIUE			"pec.eiue"
+#define	FIRE_PEC_ERBUE			"pec.erbue"
+#define	FIRE_PEC_EHBUE			"pec.ehbue"
+#define	FIRE_PEC_EDBUE			"pec.edbue"
+#define	FIRE_PEC_TLUEITMO		"pec.tlueitmo"
 
 /* Primary error */
 #define	FIRE_PRIMARY			"primary"
@@ -189,6 +209,17 @@ extern "C" {
 #define	FIRE_JBC_JOTEL1			"jbc-jotel1"
 #define	FIRE_JBC_JOTEL2			"jbc-jotel2"
 #define	FIRE_JBC_MTEL			"jbc-mtel"
+
+/* UBC ereport payload */
+#define	OBERON_UBC_ELE			"ubc-ele"
+#define	OBERON_UBC_IE			"ubc-ie"
+#define	OBERON_UBC_IS			"ubc-is"
+#define	OBERON_UBC_ESS			"ubc-ess"
+#define	OBERON_UBC_MUE			"ubc-mue"
+#define	OBERON_UBC_UNUM			"ubc-unum"
+#define	OBERON_UBC_DID			"ubc-did"
+#define	OBERON_UBC_CPUV			"ubc-cpuv"
+#define	OBERON_UBC_RESOURCE		"resource"
 
 #ifdef	__cplusplus
 }

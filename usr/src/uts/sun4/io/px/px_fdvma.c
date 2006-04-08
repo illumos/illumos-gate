@@ -87,7 +87,7 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	DBG(DBG_FAST_DVMA | DBG_CONT, dip, "cookie: %x+%x\n",
 		cp->dmac_address, cp->dmac_size);
 
-	attr = PX_GET_TTE_ATTR(mp->dmai_rflags);
+	attr = PX_GET_TTE_ATTR(mp->dmai_rflags, mp->dmai_attr.dma_attr_flags);
 
 	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages, attr,
 	    (void *)a, 0, MMU_MAP_BUF) != DDI_SUCCESS) {

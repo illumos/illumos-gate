@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,6 +278,8 @@ label:
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tte, tagtarget, tmp1)		;\
 label:
 
+#endif /* UTSB_PHYS */
+
 /*
  * Load a 32M/256M Panther TSB entry into the TSB at TL > 0,
  *   for ITLB synthesis.
@@ -355,8 +356,6 @@ label:									;\
 	set	TTE4M, tmp						;\
 	sllx	tmp, TTE_SZ_SHFT, tmp					;\
 	or	tte, tmp, tte
-
-#endif /* UTSB_PHYS */
 
 /*
  * Load an entry into the TSB at TL=0.
@@ -972,10 +971,10 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	SET_SIZE(sfmmu_kpm_patch_tsbm)
 
 	ENTRY_NP(sfmmu_patch_utsb)
-#ifdef sun4v
+#ifdef UTSB_PHYS
 	retl
 	nop
-#else /* sun4v */
+#else /* UTSB_PHYS */
 	/*
 	 * We need to hot patch utsb_vabase and utsb4m_vabase
 	 */
@@ -1044,7 +1043,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 
 	ret
 	restore
-#endif /* sun4v */
+#endif /* UTSB_PHYS */
 	SET_SIZE(sfmmu_patch_utsb)
 
 
@@ -1420,9 +1419,12 @@ hblk_add_panic2:
 	mov	%o2, %g3
 #ifndef sun4v
 	GET_CPU_IMPL(%g2)
-	cmp %g2, CHEETAH_IMPL
-	bge %icc, hblk_hash_rm_1
-	and	%o4, %g4, %g2
+	cmp 	%g2, CHEETAH_IMPL
+	bge,a,pt %icc, hblk_hash_rm_1
+	  and	%o4, %g4, %g2
+	cmp	%g2, SPITFIRE_IMPL
+	blt	%icc, hblk_hash_rm_2		/* no flushing needed for OPL */
+	  and	%o4, %g4, %g2
 	stxa	%g0, [%g2]ASI_DC_TAG		/* flush prev pa from dcache */
 	add	%o4, HMEBLK_NEXT, %o4
 	and	%o4, %g4, %g2
@@ -2111,7 +2113,7 @@ label/**/4:								;\
 	TTE_SUSPEND_INT_SHIFT(hmentoff)					;\
 	btst	tte, hmentoff						;\
 	bz,pt	%xcc, foundlabel					;\
-	 nop								;\
+	  nop								;\
 									;\
 	/*								;\
 	 * Mapping is suspended, so goto suspend label.			;\
@@ -2176,7 +2178,15 @@ sfmmu_kprot_patch_ktsb4m_szcode:
 	/* %g3 = second TSB entry ptr now, %g2 preserved */
 
 #else /* sun4v */
+#ifdef UTSB_PHYS
+	/* g1 = first TSB entry ptr */
+	GET_2ND_TSBREG(%g3)
+	brlz,a,pt %g3, 9f		/* check for 2nd TSB */
+	  mov	%g0, %g3		/* clear second tsbe ptr */
 
+	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5) 
+	/* %g3 = second TSB entry ptr now, %g2 preserved */
+#else /* UTSB_PHYS */
 	brgez,pt %g1, 9f		/* check for 2nd TSB */
 	  mov	%g0, %g3		/* clear second tsbe ptr */
 
@@ -2185,8 +2195,8 @@ sfmmu_kprot_patch_ktsb4m_szcode:
 	/* %g3 = second TSB entry ptr now, %g7 clobbered */
 	mov	%g1, %g7
 	GET_1ST_TSBE_PTR(%g7, %g1, %g5, sfmmu_uprot)
-
-#endif /* sun4v */
+#endif /* UTSB_PHYS */
+#endif /* sun4v */ 
 9:
 	CPU_TSBMISS_AREA(%g6, %g7)
 	HAT_PERCPU_STAT16(%g6, TSBMISS_UPROTS, %g7)
@@ -2375,7 +2385,6 @@ dktsb4m_kpmcheck:
 	.align	64
 	ALTENTRY(sfmmu_uitlb_fastpath)
 
-	SETUP_UTSB_ATOMIC_ASI(%g4, %g5)
 	PROBE_1ST_ITSB(%g1, %g7, uitlb_fast_8k_probefail)
 	/* g4 - g5 = clobbered by PROBE_1ST_ITSB */
 	ba,pn	%xcc, sfmmu_tsb_miss_tt
@@ -2395,16 +2404,13 @@ dktsb4m_kpmcheck:
 	.align 64
 	ALTENTRY(sfmmu_udtlb_fastpath)
 
-	SETUP_UTSB_ATOMIC_ASI(%g4, %g6)
 	PROBE_1ST_DTSB(%g1, %g7, udtlb_fast_8k_probefail)
 	/* g4 - g5 = clobbered by PROBE_1ST_DTSB */
 	ba,pn	%xcc, sfmmu_tsb_miss_tt
 	  mov	%g0, %g3
 
-#endif /* sun4v */
-
 	/*
-	 * User instruction miss w/ multiple TSBs.
+	 * User instruction miss w/ multiple TSBs (sun4v).
 	 * The first probe covers 8K, 64K, and 512K page sizes,
 	 * because 64K and 512K mappings are replicated off 8K
 	 * pointer.  Second probe covers 4M page size only.
@@ -2422,10 +2428,7 @@ dktsb4m_kpmcheck:
 	.align	64
 	ALTENTRY(sfmmu_uitlb_slowpath)
 
-#ifdef sun4v
-	SETUP_UTSB_ATOMIC_ASI(%g4, %g5)
 	GET_1ST_TSBE_PTR(%g2, %g1, %g4, %g5)
-
 	PROBE_1ST_ITSB(%g1, %g7, uitlb_8k_probefail)
 	/* g4 - g5 = clobbered here */
 
@@ -2434,17 +2437,47 @@ dktsb4m_kpmcheck:
 	srlx	%g2, TAG_VALO_SHIFT, %g7
 	PROBE_2ND_ITSB(%g3, %g7)
 	/* NOT REACHED */
-#else /* sun4v */
-	mov	%g1, %g3	/* save tsb8k reg in %g3 */
-	SETUP_UTSB_ATOMIC_ASI(%g4, %g5)
-	GET_1ST_TSBE_PTR(%g3, %g1, %g5, sfmmu_uitlb)
 
+#else /* sun4v */
+
+	/*
+	 * User instruction miss w/ multiple TSBs (sun4u).
+	 * The first probe covers 8K, 64K, and 512K page sizes,
+	 * because 64K and 512K mappings are replicated off 8K
+	 * pointer.  Second probe covers 4M page size only.
+	 *
+	 * Just like sfmmu_udtlb_slowpath, except:
+	 *   o Uses ASI_ITLB_IN
+	 *   o checks for execute permission
+	 *   o No ISM prediction.
+	 *
+	 * g1 = tsb8k pointer register
+	 * g2 = tag access register
+	 * g3 = 2nd tsbreg if defined UTSB_PHYS, else scratch
+	 * g4 - g6 = scratch registers
+	 * g7 = TSB tag to match
+	 */
+	.align	64
+	ALTENTRY(sfmmu_uitlb_slowpath)
+
+#ifdef UTSB_PHYS
+	/*
+	 * g1 = 1st TSB entry pointer
+	 * g3 = 2nd TSB base register
+	 * Need 2nd TSB entry pointer for 2nd probe.
+	 */
 	PROBE_1ST_ITSB(%g1, %g7, uitlb_8k_probefail)
-	/* g4 - g5 = clobbered here */
+
+	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+#else /* UTSB_PHYS */
+	mov	%g1, %g3	/* save tsb8k reg in %g3 */
+	GET_1ST_TSBE_PTR(%g3, %g1, %g5, sfmmu_uitlb)
+	PROBE_1ST_ITSB(%g1, %g7, uitlb_8k_probefail)
 
 	mov	%g2, %g6	/* GET_2ND_TSBE_PTR clobbers tagacc */
 	mov	%g3, %g7	/* copy tsb8k reg in %g7 */
 	GET_2ND_TSBE_PTR(%g6, %g7, %g3, %g4, %g5, sfmmu_uitlb)
+#endif /* UTSB_PHYS */
 	/* g1 = first TSB pointer, g3 = second TSB pointer */
 	srlx	%g2, TAG_VALO_SHIFT, %g7
 	PROBE_2ND_ITSB(%g3, %g7, isynth)
@@ -2462,13 +2495,12 @@ dktsb4m_kpmcheck:
 	 *
 	 * g1 = tsb8k pointer register
 	 * g2 = tag access register
-	 * g3 - g6 = scratch registers
+	 * g3 = 2nd tsbreg if defined UTSB_PHYS, else scratch
+	 * g4 - g6 = scratch registers
 	 * g7 = TSB tag to match
 	 */
 	.align 64
 	ALTENTRY(sfmmu_udtlb_slowpath)
-
-	SETUP_UTSB_ATOMIC_ASI(%g4, %g6)
 
 	/*
 	 * Check for ISM.  If it exists, look for 4M mappings in the second TSB
@@ -2499,8 +2531,10 @@ udtlb_miss_probefirst:
 	brgz,pn	%g6, sfmmu_tsb_miss_tt
 	  nop
 #else /* sun4v */
+#ifndef UTSB_PHYS
 	mov	%g1, %g4
 	GET_1ST_TSBE_PTR(%g4, %g1, %g5, sfmmu_udtlb)
+#endif UTSB_PHYS
 	PROBE_1ST_DTSB(%g1, %g7, udtlb_first_probefail)
 
 	/*
@@ -2511,7 +2545,9 @@ udtlb_miss_probefirst:
 	 */
 	brgz,pn	%g6, sfmmu_tsb_miss_tt
 	  nop
+#ifndef UTSB_PHYS
 	ldxa	[%g0]ASI_DMMU_TSB_8K, %g3
+#endif UTSB_PHYS
 	/* fall through in 8K->4M probe order */
 #endif /* sun4v */
 
@@ -2526,16 +2562,21 @@ udtlb_miss_probesecond:
 	 */
 #ifdef sun4v
 	/* GET_2ND_TSBE_PTR(tagacc, tsbe_ptr, tmp1, tmp2) */
-	/* tagacc (%g2) not destroyed */
 	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
 	/* %g2 is okay, no need to reload, %g3 = second tsbe ptr */
-#else
+#else /* sun4v */
+#ifdef UTSB_PHYS
+	GET_2ND_TSBREG(%g3)
+	GET_2ND_TSBE_PTR(%g2, %g3, %g4, %g5)
+	/* tagacc (%g2) is okay, no need to reload, %g3 = second tsbe ptr */
+#else /* UTSB_PHYS */
 	mov	%g3, %g7
 	GET_2ND_TSBE_PTR(%g2, %g7, %g3, %g4, %g5, sfmmu_udtlb)
 	/* %g2 clobbered, %g3 =second tsbe ptr */
 	mov	MMU_TAG_ACCESS, %g2
 	ldxa	[%g2]ASI_DMMU, %g2
-#endif
+#endif /* UTSB_PHYS */
+#endif /* sun4v */
 
 	srlx	%g2, TAG_VALO_SHIFT, %g7
 	PROBE_2ND_DTSB(%g3, %g7, udtlb_4m_probefail)
@@ -2670,18 +2711,22 @@ tsb_4M:
 tsb_32M:
 #ifndef sun4v
 	GET_CPU_IMPL(%g5)
+	cmp	%g5, OLYMPUS_C_IMPL
+	be,pn	%xcc, 0f
+	  nop
 	cmp	%g5, PANTHER_IMPL
 	bne,pt	%xcc, tsb_pagefault
 	  nop
 #endif
 
+0:
 	ldn	[%g6 + (TSBMISS_SCRATCH + TSB_TAGACC)], %g3
 	sllx	%g3, TAGACC_CTX_LSHIFT, %g5
 #ifdef sun4v
-	brz,pn	%g5, 6f
-#else        
+        brz,pn	%g5, 6f
+#else
 	brz,pn	%g5, tsb_pagefault
-#endif        
+#endif
 	  lduh	[%g6 + TSBMISS_HATFLAGS], %g4
 	and	%g4, HAT_32M_FLAG, %g5
 	brz,pn	%g5, tsb_256M
@@ -2813,10 +2858,10 @@ tsb_user:
 tsb_user8k:
 	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = first TSB ptr
 
-#ifndef sun4v
-	mov	ASI_N, %g7	! user TSBs always accessed by VA
+#ifndef UTSB_PHYS
+	mov	ASI_N, %g7	! user TSBs accessed by VA
 	mov	%g7, %asi
-#endif /* sun4v */
+#endif /* UTSB_PHYS */
 
 	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 5)
 
@@ -2843,10 +2888,10 @@ tsb_user4m:
 	brz,pn	%g1, 5f	/* Check to see if we have 2nd TSB programmed */
 	  nop
 
-#ifndef sun4v
-        mov     ASI_N, %g7      ! user TSBs always accessed by VA
-        mov     %g7, %asi
-#endif
+#ifndef UTSB_PHYS
+	mov	ASI_N, %g7	! user TSBs accessed by VA
+	mov	%g7, %asi
+#endif /* UTSB_PHYS */
 
         TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 6)
 

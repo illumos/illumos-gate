@@ -532,7 +532,7 @@ extern caddr_t ecache_init_scrub_flush_area(caddr_t alloc_base);
 extern uint64_t ecache_flush_address(void);
 
 #pragma weak load_platform_modules
-#pragma weak starcat_startup_memlist
+#pragma weak plat_startup_memlist
 #pragma weak ecache_init_scrub_flush_area
 #pragma weak ecache_flush_address
 
@@ -963,12 +963,12 @@ startup_memlist(void)
 	PRM_DEBUG(alloc_base);
 
 	/*
-	 * Starcat needs its special structures assigned in 32-bit virtual
-	 * address space because its probing routines execute FCode, and FCode
-	 * can't handle 64-bit virtual addresses...
+	 * Platforms like Starcat and OPL need special structures assigned in
+	 * 32-bit virtual address space because their probing routines execute
+	 * FCode, and FCode can't handle 64-bit virtual addresses...
 	 */
-	if (&starcat_startup_memlist) {
-		alloc_base = starcat_startup_memlist(alloc_base);
+	if (&plat_startup_memlist) {
+		alloc_base = plat_startup_memlist(alloc_base);
 		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
 		    ecache_alignsize);
 		PRM_DEBUG(alloc_base);

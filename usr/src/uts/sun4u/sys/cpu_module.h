@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,9 +60,10 @@ void	cpu_kdi_init(struct kdi *);
  *
  * set Panther CPU implementation details
  *
- * mmu_init_mmu_page_sizes changes the mmu_page_sizes variable from
- *	The default 4 page sizes to 6 page sizes for Panther-only domains,
- *	and is called from fillsysinfo.c:check_cpus_set at early bootup time.
+ * On Panther-only domains and Olympus-C, mmu_init_mmu_page_sizes
+ * changes the mmu_page_sizes variable from the default 4 page sizes
+ * to 6 page sizes and is called from fillsysinfo.c:check_cpus_set
+ * at early bootup time.
  */
 void	cpu_fiximp(pnode_t dnode);
 #pragma weak cpu_fix_allpanther

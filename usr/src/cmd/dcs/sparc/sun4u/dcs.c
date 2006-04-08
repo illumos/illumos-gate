@@ -145,6 +145,7 @@ int (*dcs_cmd[])(rdr_msg_hdr_t *, cfga_params_t *) = {
  * strictly decreasing.
  */
 dcs_ver_t ver_supp[] = {
+	{ 1, 1 },
 	{ 1, 0 }
 };
 
@@ -160,6 +161,8 @@ int	standalone = 0;			 /* control standalone mode	    */
 boolean_t inetd = B_FALSE;		 /* control daemon mode		    */
 ulong_t	max_sessions = DCS_MAX_SESSIONS; /* control maximum active sessions */
 int	dcsfd = STDIN_FILENO;		 /* fd for the DCS reserved port    */
+int	use_libdscp = 0;		 /* control use of libdscp */
+sa_family_t use_family = AF_INET6;	/* control use of AF_INET/AF_INET6 */
 
 /*
  * Array of acceptable -a, -e and -u arguments.
@@ -285,6 +288,11 @@ main(int argc, char **argv)
 				exit(1);
 			}
 
+			break;
+
+		case 'l':
+			use_libdscp = 1;
+			use_family = AF_INET;
 			break;
 
 		default:
@@ -476,7 +484,7 @@ init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
 
 	if (inetd == B_FALSE || standalone) {
 		/* in standalone mode, init fd for reserved port */
-		if ((dcsfd = rdr_open(AF_INET6)) == -1) {
+		if ((dcsfd = rdr_open(use_family)) == -1) {
 			DCS_DBG(DBG_ALL, "rdr_open failed");
 			return (-1);
 		}
@@ -531,16 +539,24 @@ init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
 		req_port = se->s_port;
 	}
 
-	/* initialize our local address */
-	sin6 = (struct sockaddr_in6 *)&ss;
-	(void) memset(sin6, 0, sizeof (*sin6));
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_port = htons(req_port);
-	sin6->sin6_addr = in6addr_any;
+	(void) memset(&ss, 0, sizeof (ss));
+	if (use_family == AF_INET) {
+		/* initialize our local address */
+		sin = (struct sockaddr_in *)&ss;
+		sin->sin_family = AF_INET;
+		sin->sin_port = htons(req_port);
+		sin->sin_addr.s_addr = htonl(INADDR_ANY);
+	} else {
+		/* initialize our local address */
+		sin6 = (struct sockaddr_in6 *)&ss;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = htons(req_port);
+		sin6->sin6_addr = in6addr_any;
+	}
 
 	num_sock_opts = sizeof (sock_opts) / sizeof (*sock_opts);
 
-	init_status = rdr_init(pfd->fd, (struct sockaddr *)sin6,
+	init_status = rdr_init(pfd->fd, (struct sockaddr *)&ss,
 	    sock_opts, num_sock_opts, DCS_BACKLOG);
 
 	if (init_status != RDR_OK) {
