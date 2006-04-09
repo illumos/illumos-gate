@@ -173,6 +173,7 @@ struct vdev {
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
 	uint64_t	vdev_not_present; /* not present during import	*/
 	hrtime_t	vdev_last_try;	/* last reopen time		*/
+	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must

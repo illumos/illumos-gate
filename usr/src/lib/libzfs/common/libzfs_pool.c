@@ -46,12 +46,30 @@
  * 'buf'.
  */
 static int
-zpool_name_valid(const char *pool, char *buf, size_t buflen)
+zpool_name_valid(const char *pool, boolean_t isopen, char *buf, size_t buflen)
 {
 	namecheck_err_t why;
 	char what;
+	int ret;
 
-	if (pool_namecheck(pool, &why, &what) != 0) {
+	ret = pool_namecheck(pool, &why, &what);
+
+	/*
+	 * The rules for reserved pool names were extended at a later point.
+	 * But we need to support users with existing pools that may now be
+	 * invalid.  So we only check for this expanded set of names during a
+	 * create (or import), and only in userland.
+	 */
+	if (ret == 0 && !isopen &&
+	    (strncmp(pool, "mirror", 6) == 0 ||
+	    strncmp(pool, "raidz", 5) == 0 ||
+	    strncmp(pool, "spare", 5) == 0)) {
+		ret = -1;
+		why = NAME_ERR_RESERVED;
+	}
+
+
+	if (ret != 0) {
 		if (buf != NULL) {
 			switch (why) {
 			case NAME_ERR_TOOLONG:
@@ -142,7 +160,7 @@ zpool_open_canfail(const char *pool)
 	/*
 	 * Make sure the pool name is valid.
 	 */
-	if (!zpool_name_valid(pool, NULL, 0)) {
+	if (!zpool_name_valid(pool, B_TRUE, NULL, 0)) {
 		zfs_error(dgettext(TEXT_DOMAIN, "cannot open '%s': invalid "
 		    "pool name"), pool);
 		return (NULL);
@@ -338,7 +356,7 @@ zpool_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	int err;
 	char reason[64];
 
-	if (!zpool_name_valid(pool, reason, sizeof (reason))) {
+	if (!zpool_name_valid(pool, B_FALSE, reason, sizeof (reason))) {
 		zfs_error(dgettext(TEXT_DOMAIN, "cannot create '%s': %s"),
 		    pool, reason);
 		return (-1);
@@ -688,7 +706,7 @@ zpool_import(nvlist_t *config, const char *newname, const char *altroot)
 	    &origname) == 0);
 
 	if (newname != NULL) {
-		if (!zpool_name_valid(newname, NULL, 0)) {
+		if (!zpool_name_valid(newname, B_FALSE, NULL, 0)) {
 			zfs_error(dgettext(TEXT_DOMAIN, "cannot import '%s': "
 			    "invalid pool name"), newname);
 			return (-1);

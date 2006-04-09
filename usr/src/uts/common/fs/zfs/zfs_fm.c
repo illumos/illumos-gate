@@ -122,6 +122,14 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 	if (zio && zio_should_retry(zio))
 		return;
 
+	/*
+	 * If this is not a read or write zio, ignore the error.  This can occur
+	 * if the DKIOCFLUSHWRITECACHE ioctl fails.
+	 */
+	if (zio && zio->io_type != ZIO_TYPE_READ &&
+	    zio->io_type != ZIO_TYPE_WRITE)
+		return;
+
 	if ((ereport = fm_nvlist_create(NULL)) == NULL)
 		return;
 

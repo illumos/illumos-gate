@@ -174,6 +174,12 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 
 	*ashift = highbit(MAX(dkm.dki_lbsize, SPA_MINBLOCKSIZE)) - 1;
 
+	/*
+	 * Clear the nowritecache bit, so that on a vdev_reopen() we will
+	 * try again.
+	 */
+	vd->vdev_nowritecache = B_FALSE;
+
 	return (0);
 }
 
@@ -249,6 +255,11 @@ vdev_disk_io_start(zio_t *zio)
 
 		case DKIOCFLUSHWRITECACHE:
 
+			if (vd->vdev_nowritecache) {
+				zio->io_error = ENOTSUP;
+				break;
+			}
+
 			zio->io_dk_callback.dkc_callback = vdev_disk_ioctl_done;
 			zio->io_dk_callback.dkc_cookie = zio;
 
@@ -263,8 +274,17 @@ vdev_disk_io_start(zio_t *zio)
 				 * upon completion.
 				 */
 				return;
+			} else if (error == ENOTSUP) {
+				/*
+				 * If we get ENOTSUP, we know that no future
+				 * attempts will ever succeed.  In this case we
+				 * set a persistent bit so that we don't bother
+				 * with the ioctl in the future.
+				 */
+				vd->vdev_nowritecache = B_TRUE;
 			}
 			zio->io_error = error;
+
 			break;
 
 		default:
