@@ -21,7 +21,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,10 +610,10 @@ ssh_gssapi_build_ctx(Gssctxt **ctx, int client, gss_OID mech)
 {
 	Gssctxt *newctx;
 
-	ssh_gssapi_delete_ctx(ctx);
 
 	newctx = (Gssctxt*)xmalloc(sizeof (Gssctxt));
 	memset(newctx, 0, sizeof(Gssctxt));
+
 
 	newctx->local = client;
 	newctx->desired_mech = ssh_gssapi_dup_oid(mech);
@@ -627,6 +627,10 @@ ssh_gssapi_build_ctx(Gssctxt **ctx, int client, gss_OID mech)
 	newctx->dst_name = GSS_C_NO_NAME;
 	newctx->creds = GSS_C_NO_CREDENTIAL;
 	newctx->deleg_creds = GSS_C_NO_CREDENTIAL;
+
+	newctx->default_creds = (*ctx != NULL) ? (*ctx)->default_creds : 0;
+
+	ssh_gssapi_delete_ctx(ctx);
 
 	*ctx = newctx;
 }

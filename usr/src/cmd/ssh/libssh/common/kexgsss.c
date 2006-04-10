@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,8 +46,10 @@
 #include "ssh2.h"
 #include "ssh-gss.h"
 #include "monitor_wrap.h"
+#include "auth.h"
 
 Gssctxt *xxx_gssctxt;
+extern Authctxt *x_authctxt;
 
 static void kex_gss_send_error(Gssctxt *ctxt);
 
@@ -88,9 +90,9 @@ kexgss_server(Kex *kex)
 		fatal("Couldn't match the negotiated GSS key exchange");
 	}
 
-	ssh_gssapi_build_ctx(&ctxt, 0, oid);
+	ssh_gssapi_build_ctx(&xxx_gssctxt, 0, oid);
 
-	xxx_gssctxt = ctxt;
+	ctxt = xxx_gssctxt;
 
 	do {
 		debug("Wait SSH2_MSG_GSSAPI_INIT");
@@ -194,6 +196,8 @@ kexgss_server(Kex *kex)
 		kex->session_id_len = 20;
 		kex->session_id = xmalloc(kex->session_id_len);
 		(void) memcpy(kex->session_id, hash, kex->session_id_len);
+	} else if (x_authctxt != NULL && x_authctxt->success) {
+		ssh_gssapi_storecreds(ctxt, x_authctxt);
 	}
 
 	/* Should fix kex_dh_hash to output hash length */
