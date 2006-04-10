@@ -3155,7 +3155,14 @@ dtrace_vpanic(const char *format, va_list alist)
 	call	panic_trigger			/* %eax = panic_trigger() */
 
 vpanic_common:
-	cmpl	$0, %eax
+	/*
+	 * The panic_trigger result is in %eax from the call above, and
+	 * dtrace_panic places it in %eax before branching here.
+	 * The rdmsr instructions that follow below will clobber %eax so
+	 * we stash the panic_trigger result in %r11d.
+	 */
+	movl	%eax, %r11d
+	cmpl	$0, %r11d
 	je	0f
 
 	/*
@@ -3243,7 +3250,7 @@ vpanic_common:
 	movq	REGOFF_RDI(%rsp), %rdi		/* format */
 	movq	REGOFF_RSI(%rsp), %rsi		/* alist */
 	movq	%rsp, %rdx			/* struct regs */
-	movl	%eax, %ecx			/* on_panic_stack */
+	movl	%r11d, %ecx			/* on_panic_stack */
 	call	panicsys
 	addq	$REGSIZE, %rsp
 	popq	%rdi

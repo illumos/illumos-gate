@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -56,8 +55,8 @@ extern "C" {
  * same representation for *both* 32-bit and 64-bit producers and consumers.
  */
 #define	ERPT_MAGIC	0xf00d4eddU
-#define	ERPT_MAX_ERRS	32
-#define	ERPT_DATA_SZ	(3 * 1024)
+#define	ERPT_MAX_ERRS	16
+#define	ERPT_DATA_SZ	(6 * 1024)
 #define	ERPT_EVCH_MAX	256
 #define	ERPT_HIWAT	64
 

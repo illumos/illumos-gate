@@ -490,7 +490,7 @@ ao_ereport_create_resource_elem(nvlist_t **nvlp, nv_alloc_t *nva,
 	    "memory-controller", unump->unum_mc,
 	    "dimm", unump->unum_dimms[dimmnum]);
 
-	fm_nvlist_destroy(snvl, FM_NVA_FREE);
+	fm_nvlist_destroy(snvl, nva ? FM_NVA_RETAIN : FM_NVA_FREE);
 }
 
 static void
@@ -512,7 +512,7 @@ ao_ereport_add_resource(nvlist_t *payload, nv_alloc_t *nva, mc_unum_t *unump)
 	    DATA_TYPE_NVLIST_ARRAY, nelems, elems, NULL);
 
 	for (i = 0; i < nelems; i++)
-		fm_nvlist_destroy(elems[i], FM_NVA_FREE);
+		fm_nvlist_destroy(elems[i], nva ? FM_NVA_RETAIN : FM_NVA_FREE);
 }
 
 static void
@@ -595,7 +595,7 @@ ao_ereport_post(const ao_cpu_logout_t *acl,
     int bankno, const ao_error_disp_t *aed)
 {
 	ao_data_t *ao = acl->acl_ao;
-	errorq_elem_t *eqep;
+	errorq_elem_t *eqep, *scr_eqep;
 	nvlist_t *ereport, *detector;
 	nv_alloc_t *nva = NULL;
 	char buf[FM_MAX_CLASS];
@@ -604,9 +604,23 @@ ao_ereport_post(const ao_cpu_logout_t *acl,
 		if ((eqep = errorq_reserve(ereport_errorq)) == NULL)
 			return;
 		ereport = errorq_elem_nvl(ereport_errorq, eqep);
-		nva = errorq_elem_nva(ereport_errorq, eqep);
+
+		/*
+		 * Now try to allocate another element for scratch space and
+		 * use that for further scratch space (eg for constructing
+		 * nvlists to add the main ereport).  If we can't reserve
+		 * a scratch element just fallback to working within the
+		 * element we already have, and hope for the best.  All this
+		 * is necessary because the fixed buffer nv allocator does
+		 * not reclaim freed space and nvlist construction is
+		 * expensive.
+		 */
+		if ((scr_eqep = errorq_reserve(ereport_errorq)) != NULL)
+			nva = errorq_elem_nva(ereport_errorq, scr_eqep);
+		else
+			nva = errorq_elem_nva(ereport_errorq, eqep);
 	} else {
-		ereport = fm_nvlist_create(nva);
+		ereport = fm_nvlist_create(NULL);
 	}
 
 	/*
@@ -625,16 +639,27 @@ ao_ereport_post(const ao_cpu_logout_t *acl,
 	    FM_ENA_FMT1), detector, NULL);
 
 	/*
+	 * We're done with 'detector' so reclaim the scratch space.
+	 */
+	if (panicstr) {
+		fm_nvlist_destroy(detector, FM_NVA_RETAIN);
+		nv_alloc_reset(nva);
+	} else {
+		fm_nvlist_destroy(detector, FM_NVA_FREE);
+	}
+
+	/*
 	 * Encode the error-specific data that was saved in the logout area.
 	 */
 	ao_ereport_add_logout(ao, ereport, nva, acl, bankno, aed);
 
 	if (panicstr) {
 		errorq_commit(ereport_errorq, eqep, ERRORQ_SYNC);
+		if (scr_eqep)
+			errorq_cancel(ereport_errorq, scr_eqep);
 	} else {
 		(void) fm_ereport_post(ereport, EVCH_TRYHARD);
 		fm_nvlist_destroy(ereport, FM_NVA_FREE);
-		fm_nvlist_destroy(detector, FM_NVA_FREE);
 	}
 }
 
