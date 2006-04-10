@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Emulation of select() system call using _pollsys() system call.
@@ -353,12 +352,22 @@ select_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 	if (tv == NULL)
 		tsp = NULL;
 	else {
+		/* check timeval validity */
 		if (tv->tv_usec < 0 || tv->tv_usec >= MICROSEC) {
 			errno = EINVAL;
 			return (-1);
 		}
+		/*
+		 * Convert timeval to timespec.
+		 * To preserve compatibility with past behavior,
+		 * when select was built upon poll(2), which has a
+		 * minimum non-zero timeout of 1 millisecond, force
+		 * a minimum non-zero timeout of 500 microseconds.
+		 */
 		ts.tv_sec = tv->tv_sec;
 		ts.tv_nsec = tv->tv_usec * 1000;
+		if (ts.tv_nsec != 0 && ts.tv_nsec < 500000)
+			ts.tv_nsec = 500000;
 		tsp = &ts;
 	}
 
