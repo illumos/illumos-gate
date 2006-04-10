@@ -387,7 +387,7 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	    sub_state == SIGSUBST_PANIC_REBOOT))
 		(void) (rmc_req_now)(&req, RMC_COMM_DREQ_URGENT);
 	else
-		(void) (rmc_req_res)(&req, NULL, 2000);
+		(void) (rmc_req_now)(&req, 0);
 }
 
 /*
