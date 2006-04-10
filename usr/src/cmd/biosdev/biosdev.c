@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -111,16 +110,26 @@ static int debug = 0;			/* used for enabling debug output */
 
 /* Local function prototypes */
 static void new_disk_list_entry(di_node_t node);
-static int find_disks_callback(di_node_t node, di_minor_t minor, void *arg);
+static int i_disktype(di_node_t node, di_minor_t minor, void *arg);
 static void build_disk_list();
+static int search_disklist_match_path(char *path);
 static void free_disks();
-static int matchpcibdf(di_node_t node, void *arg);
-static int matchusbserial(di_node_t node, void *arg);
-static di_node_t search_tree_forpcibdf(int bus, int dev, int fn);
+static void cleanup_and_exit(int);
+
 static int match_edd(biosdev_data_t *bd);
 static int match_first_block(biosdev_data_t *bd);
-static void cleanup_and_exit(int);
-static int find_path_index_in_disk_list(char *path);
+
+static di_node_t search_tree_match_pcibdf(di_node_t node, int bus, int dev,
+    int fn);
+static int i_match_pcibdf(di_node_t node, void *arg);
+
+static di_node_t search_tree_match_usbserialno(di_node_t node,
+    uint64_t serialno);
+static int i_match_usbserialno(di_node_t node, void *arg);
+
+static di_node_t search_children_match_busaddr(di_node_t node,
+    char *matchbusaddr);
+
 
 
 static void
@@ -155,7 +164,7 @@ new_disk_list_entry(di_node_t node)
 
 /* ARGSUSED */
 static int
-find_disks_callback(di_node_t node, di_minor_t minor, void *arg)
+i_disktype(di_node_t node, di_minor_t minor, void *arg)
 {
 	char *minortype;
 
@@ -176,7 +185,7 @@ build_disk_list()
 {
 	int ret;
 	ret = di_walk_minor(root_node, DDI_NT_BLOCK, 0, NULL,
-	    find_disks_callback);
+	    i_disktype);
 	if (ret != 0) {
 		(void) fprintf(stderr, "di_walk_minor failed errno %d\n",
 		    errno);
@@ -198,7 +207,7 @@ free_disks()
 }
 
 static int
-matchpcibdf(di_node_t node, void *arg)
+i_match_pcibdf(di_node_t node, void *arg)
 {
 	pcibdf_t *pbp;
 	int len;
@@ -249,7 +258,7 @@ matchpcibdf(di_node_t node, void *arg)
 }
 
 static di_node_t
-search_tree_forpcibdf(int bus, int dev, int fn)
+search_tree_match_pcibdf(di_node_t node, int bus, int dev, int fn)
 {
 	pcibdf_t pb;
 	pb.busnum = bus;
@@ -257,13 +266,13 @@ search_tree_forpcibdf(int bus, int dev, int fn)
 	pb.funcnum = fn;
 	pb.di_node = DI_NODE_NIL;
 
-	(void) di_walk_node(root_node, DI_WALK_CLDFIRST, &pb, matchpcibdf);
+	(void) di_walk_node(node, DI_WALK_CLDFIRST, &pb, i_match_pcibdf);
 	return (pb.di_node);
 
 }
 
 static int
-matchusbserial(di_node_t node, void *arg)
+i_match_usbserialno(di_node_t node, void *arg)
 {
 	int len;
 	char *serialp;
@@ -272,9 +281,10 @@ matchusbserial(di_node_t node, void *arg)
 	usbsp = (usbser_t *)arg;
 
 	len = di_prop_lookup_bytes(DDI_DEV_T_ANY, node, "usb-serialno",
-		(uchar_t **)&serialp);
+	    (uchar_t **)&serialp);
 
-	if ((len > 0) && (strcmp((char *)&usbsp->serialno, serialp) == 0)) {
+	if ((len > 0) && (strncmp((char *)&usbsp->serialno, serialp,
+	    sizeof (uint64_t)) == 0)) {
 		usbsp->node = node;
 		return (DI_WALK_TERMINATE);
 	}
@@ -282,7 +292,7 @@ matchusbserial(di_node_t node, void *arg)
 }
 
 static di_node_t
-match_usb(di_node_t node, uint64_t serialno)
+search_tree_match_usbserialno(di_node_t node, uint64_t serialno)
 {
 
 	usbser_t usbs;
@@ -290,13 +300,15 @@ match_usb(di_node_t node, uint64_t serialno)
 	usbs.serialno = serialno;
 	usbs.node = DI_NODE_NIL;
 
-	(void) di_walk_node(node, DI_WALK_CLDFIRST, &usbs, matchusbserial);
+	(void) di_walk_node(node, DI_WALK_CLDFIRST, &usbs, i_match_usbserialno);
 	return (usbs.node);
 }
 
-
+/*
+ * returns the index to the disklist to the disk with matching path
+ */
 static int
-find_path_index_in_disk_list(char *path)
+search_disklist_match_path(char *path)
 {
 	int i;
 	for (i = 0; i < disk_list_valid; i++)
@@ -306,6 +318,29 @@ find_path_index_in_disk_list(char *path)
 	return (-1);
 }
 
+/*
+ * Find first child of 'node' whose unit address is 'matchbusaddr'
+ */
+static di_node_t
+search_children_match_busaddr(di_node_t node, char *matchbusaddr)
+{
+	di_node_t cnode;
+	char *busaddr;
+
+	if (matchbusaddr == NULL)
+		return (DI_NODE_NIL);
+
+
+	for (cnode = di_child_node(node); cnode != DI_NODE_NIL;
+	    cnode = di_sibling_node(cnode)) {
+		busaddr = di_bus_addr(cnode);
+		if (busaddr == NULL)
+			continue;
+		if (strncmp(busaddr, matchbusaddr, MAXNAMELEN) == 0)
+			break;
+	}
+	return (cnode);
+}
 
 /*
  * Construct a physical device pathname from EDD and verify the
@@ -315,11 +350,11 @@ find_path_index_in_disk_list(char *path)
 static int
 match_edd(biosdev_data_t *bdata)
 {
-	di_node_t node;
-	char *devfspath;
+	di_node_t node, cnode = DI_NODE_NIL;
+	char *devfspath = NULL;
 	fn48_t *bd;
 	int index;
-	char path[MAXPATHLEN];
+	char busaddrbuf[MAXNAMELEN];
 
 	if (!bdata->edd_valid) {
 		if (debug)
@@ -345,14 +380,13 @@ match_edd(biosdev_data_t *bdata)
 	}
 	if (debug)
 		(void) printf("match_edd bdf %d %d %d\n",
-			bd->interfacepath.pci.bus,
-			bd->interfacepath.pci.device,
-			bd->interfacepath.pci.function);
+		    bd->interfacepath.pci.bus,
+		    bd->interfacepath.pci.device,
+		    bd->interfacepath.pci.function);
 
 	/* look into devinfo tree and find a node with matching pci b/d/f */
-	node = search_tree_forpcibdf(bd->interfacepath.pci.bus,
-		bd->interfacepath.pci.device,
-		bd->interfacepath.pci.function);
+	node = search_tree_match_pcibdf(root_node, bd->interfacepath.pci.bus,
+	    bd->interfacepath.pci.device, bd->interfacepath.pci.function);
 
 	if (node == DI_NODE_NIL) {
 		if (debug)
@@ -361,56 +395,89 @@ match_edd(biosdev_data_t *bdata)
 		return (-1);
 	}
 
-	/* construct a path */
-	devfspath = di_devfs_path(node);
-
 	if (debug)
-		(void) printf("interface type %s\n", bd->interface_type);
+		(void) printf("interface type %s pci channel %x target %x\n",
+		    bd->interface_type, bd->interfacepath.pci.channel,
+		    bd->devicepath.scsi.target);
 
 	if (strncmp(bd->interface_type, "SCSI", 4) == 0) {
 
-		/* at this time sd doesnot support luns greater than uchar_t */
-		(void) snprintf(path, MAXPATHLEN, "%s/sd@%x,%x", devfspath,
+		(void) snprintf(busaddrbuf, MAXNAMELEN, "%x,%x",
 		    bd->devicepath.scsi.target, bd->devicepath.scsi.lun_lo);
 
-	} else if (strncmp(bd->interface_type, "ATAPI", 5) == 0) {
+		cnode = search_children_match_busaddr(node, busaddrbuf);
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/sd@%x,0",
-		    devfspath, bd->interfacepath.pci.channel,
-		    bd->devicepath.ata.chan);
+	} else if ((strncmp(bd->interface_type, "ATAPI", 5) == 0) ||
+	    (strncmp(bd->interface_type, "ATA", 3) == 0) ||
+	    (strncmp(bd->interface_type, "SATA", 4) == 0)) {
 
-	} else if (strncmp(bd->interface_type, "ATA", 3) == 0) {
+		if (strncmp(di_node_name(node), "pci-ide", 7) == 0) {
+			/*
+			 * Legacy using pci-ide
+			 * the child should be ide@<x>, where x is
+			 * the channel number
+			 */
+			(void) snprintf(busaddrbuf, MAXNAMELEN, "%d",
+			    bd->interfacepath.pci.channel);
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%x,0",
-		    devfspath, bd->interfacepath.pci.channel,
-		    bd->devicepath.ata.chan);
+			if ((cnode = search_children_match_busaddr(node,
+			    busaddrbuf)) != DI_NODE_NIL) {
 
-	} else if (strncmp(bd->interface_type, "SATA", 4) == 0) {
+				(void) snprintf(busaddrbuf, MAXNAMELEN, "%x,0",
+				    bd->devicepath.ata.chan);
+				cnode = search_children_match_busaddr(cnode,
+				    busaddrbuf);
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%x,0",
-		    devfspath, bd->interfacepath.pci.channel,
-		    bd->devicepath.ata.chan);
+				if (cnode == DI_NODE_NIL)
+					if (debug)
+						(void) printf("Interface %s "
+						    "using pci-ide no "
+						    "grandchild at %s\n",
+						    bd->interface_type,
+						    busaddrbuf);
+			} else {
+				if (debug)
+					(void) printf("Interface %s using "
+					    "pci-ide, with no child at %s\n",
+					    bd->interface_type, busaddrbuf);
+			}
+		} else {
+			if (strncmp(bd->interface_type, "SATA", 4) == 0) {
+				/*
+				 * The current EDD (EDD-2) spec does not
+				 * address port number. This is work in
+				 * progress.
+				 * Interprete the first field of device path
+				 * as port number. Needs to be revisited
+				 * with port multiplier support.
+				 */
+				(void) snprintf(busaddrbuf, MAXNAMELEN, "%x,0",
+				    bd->devicepath.ata.chan);
+
+				cnode = search_children_match_busaddr(node,
+				    busaddrbuf);
+			} else {
+				if (debug)
+					(void) printf("Interface %s, not using"
+					    " pci-ide\n", bd->interface_type);
+			}
+		}
 
 	} else if (strncmp(bd->interface_type, "USB", 3) == 0) {
-		(void) printf("USB\n");
-		node = match_usb(node, bd->devicepath.usb.usb_serial_id);
-		if (node != DI_NODE_NIL) {
-			if (debug)
-				(void) printf("usb path %s\n",
-				    di_devfs_path(node));
-			(void) snprintf(path, MAXPATHLEN, "%s", devfspath);
-		} else
-			return (-1);
+		cnode = search_tree_match_usbserialno(node,
+		    bd->devicepath.usb.usb_serial_id);
 	} else {
 		if (debug)
 			(void) printf("sorry not supported interface %s\n",
-		    bd->interface_type);
-		return (-1);
+			    bd->interface_type);
 	}
 
-	index = find_path_index_in_disk_list(path);
-	if (index >= 0) {
-		return (index);
+	if (cnode != DI_NODE_NIL) {
+		devfspath = di_devfs_path(cnode);
+		index = search_disklist_match_path(devfspath);
+		di_devfs_path_free(devfspath);
+		if (index >= 0)
+			return (index);
 	}
 
 	return (-1);
@@ -572,7 +639,7 @@ main(int argc, char *argv[])
 			(void) printf("0x%x %s matchcount %d\n",
 			    i + STARTING_DRVNUM,
 			    disk_list[mapinfo[i].disklist_index],
-				mapinfo[i].matchcount);
+			    mapinfo[i].matchcount);
 		}
 	}
 
