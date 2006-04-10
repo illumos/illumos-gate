@@ -2783,8 +2783,9 @@ upgrade_one(zpool_handle_t *zhp, void *unused)
 
 	ret = zpool_upgrade(zhp);
 	if (ret == 0)
-		(void) printf(gettext("Successfully upgraded '%s'\n"),
-		    zpool_get_name(zhp));
+		(void) printf(gettext("Successfully upgraded '%s' "
+		    "from version %llu to version %llu\n"), zpool_get_name(zhp),
+		    (u_longlong_t)version, (u_longlong_t)ZFS_VERSION);
 
 	return (ret != 0);
 }
@@ -2848,8 +2849,10 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext("VER  DESCRIPTION\n"));
 		(void) printf("---  -----------------------------------------"
 		    "---------------\n");
-		(void) printf(gettext(" 1   Initial ZFS version.\n\n"));
-		(void) printf(gettext("For more information on a particular "
+		(void) printf(gettext(" 1   Initial ZFS version.\n"));
+		(void) printf(gettext(" 2   Ditto blocks "
+		    "(replicated metadata)\n"));
+		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
 		    "version/N\n\n");

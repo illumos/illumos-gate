@@ -35,12 +35,29 @@
  * Virtual device vector for the pool's root vdev.
  */
 
+/*
+ * We should be able to tolerate one failure with absolutely no damage
+ * to our metadata.  Two failures will take out space maps, a bunch of
+ * indirect block trees, meta dnodes, dnodes, etc.  Probably not a happy
+ * place to live.  When we get smarter, we can liberalize this policy.
+ * e.g. If we haven't lost two consecutive top-level vdevs, then we are
+ * probably fine.  Adding bean counters during alloc/free can make this
+ * future guesswork more accurate.
+ */
+/*ARGSUSED*/
+static int
+too_many_errors(vdev_t *vd, int numerrors)
+{
+	return (numerrors > 0);
+}
+
 static int
 vdev_root_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 {
 	vdev_t *cvd;
 	int c, error;
 	int lasterror = 0;
+	int numerrors = 0;
 
 	if (vd->vdev_children == 0) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_BAD_LABEL;
@@ -52,17 +69,20 @@ vdev_root_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 
 		if ((error = vdev_open(cvd)) != 0) {
 			lasterror = error;
+			numerrors++;
 			continue;
 		}
 	}
 
-	if (lasterror)
+	if (too_many_errors(vd, numerrors)) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_NO_REPLICAS;
+		return (lasterror);
+	}
 
 	*asize = 0;
 	*ashift = 0;
 
-	return (lasterror);
+	return (0);
 }
 
 static void
@@ -77,7 +97,7 @@ vdev_root_close(vdev_t *vd)
 static void
 vdev_root_state_change(vdev_t *vd, int faulted, int degraded)
 {
-	if (faulted > 0)
+	if (too_many_errors(vd, faulted))
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_NO_REPLICAS);
 	else if (degraded != 0)

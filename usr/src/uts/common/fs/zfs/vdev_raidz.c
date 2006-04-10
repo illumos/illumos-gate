@@ -272,12 +272,7 @@ vdev_raidz_io_start(zio_t *zio)
 
 	rm = vdev_raidz_map_alloc(zio, tvd->vdev_ashift, vd->vdev_children);
 
-	if (DVA_GET_GANG(ZIO_GET_DVA(zio))) {
-		ASSERT3U(rm->rm_asize, ==,
-		    vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE));
-	} else {
-		ASSERT3U(rm->rm_asize, ==, DVA_GET_ASIZE(ZIO_GET_DVA(zio)));
-	}
+	ASSERT3U(rm->rm_asize, ==, vdev_psize_to_asize(vd, zio->io_size));
 
 	if (zio->io_type == ZIO_TYPE_WRITE) {
 
@@ -357,11 +352,10 @@ vdev_raidz_io_done(zio_t *zio)
 	vdev_t *cvd;
 	raidz_map_t *rm = zio->io_vsd;
 	raidz_col_t *rc;
-	blkptr_t *bp = zio->io_bp;
 	int unexpected_errors = 0;
 	int c;
 
-	ASSERT(bp != NULL);	/* XXX need to add code to enforce this */
+	ASSERT(zio->io_bp != NULL);  /* XXX need to add code to enforce this */
 
 	zio->io_error = 0;
 	zio->io_numerrors = 0;

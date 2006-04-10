@@ -56,6 +56,8 @@ struct dsl_pool;
 struct dnode;
 struct drr_begin;
 struct drr_end;
+struct zbookmark;
+struct spa;
 
 typedef struct objset objset_t;
 typedef struct dmu_tx dmu_tx_t;
@@ -262,6 +264,12 @@ void dmu_object_set_checksum(objset_t *os, uint64_t object, uint8_t checksum,
 void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
     dmu_tx_t *tx);
 
+/*
+ * Decide how many copies of a given block we should make.  Can be from
+ * 1 to SPA_DVAS_PER_BP.
+ */
+int dmu_get_replication_level(struct spa *spa, struct zbookmark *zb,
+    dmu_object_type_t ot);
 /*
  * The bonus data is accessed more or less like a regular buffer.
  * You must dmu_bonus_hold() to get the buffer, which will give you a

@@ -437,20 +437,28 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		zct[i].ci_name = local_strdup(buf);
 	}
 
-	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
+	/*
+	 * Super-ick warning:  This code is also duplicated in
+	 * cmd/zdb.c .   Yeah, I hate code replication, too.
+	 */
+	for (i = 0; i < BP_GET_NDVAS(&bp); i++) {
 		dva_t *dva = &bp.blk_dva[i];
-		mdb_printf("DVA[%d]: GANG: %-5s  GRID: %2x  ASIZE: %5x  "
-		    "vdev %llu  offset %llx\n",
-		    i,
-		    DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
-		    DVA_GET_GRID(dva),
-		    DVA_GET_ASIZE(dva),
-		    DVA_GET_VDEV(dva),
-		    DVA_GET_OFFSET(dva));
+
+		mdb_printf("DVA[%d]: vdev_id %lld / %llx\n", i,
+		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva));
+		mdb_printf("DVA[%d]:       GANG: %-5s  GRID:  %04x\t"
+		    "ASIZE: %llx\n", i, DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
+		    DVA_GET_GRID(dva), DVA_GET_ASIZE(dva));
+		mdb_printf("DVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", i,
+		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva), BP_GET_PSIZE(&bp),
+		    BP_SHOULD_BYTESWAP(&bp) ? "e" : "",
+		    !DVA_GET_GANG(dva) && BP_GET_LEVEL(&bp) != 0 ? "i" : "",
+		    DVA_GET_GANG(dva) ? "g" : "",
+		    BP_GET_COMPRESS(&bp) != 0 ? "d" : "");
 	}
 	mdb_printf("LSIZE:  %-16llx\t\tPSIZE: %llx\n",
 	    BP_GET_LSIZE(&bp), BP_GET_PSIZE(&bp));
-	mdb_printf("ENDIAN: %-6s  TYPE: %s\n",
+	mdb_printf("ENDIAN: %6s\t\t\t\t\tTYPE:  %s\n",
 	    BP_GET_BYTEORDER(&bp) ? "LITTLE" : "BIG",
 	    doti[BP_GET_TYPE(&bp)].ot_name);
 	mdb_printf("BIRTH:  %-16llx   LEVEL: %-2d\tFILL:  %llx\n",

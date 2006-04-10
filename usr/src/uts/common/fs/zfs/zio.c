@@ -248,8 +248,6 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		zio->io_bp = bp;
 		zio->io_bp_copy = *bp;
 		zio->io_bp_orig = *bp;
-		/* XXBP - Need to inherit this when it matters */
-		zio->io_dva_index = 0;
 	}
 	zio->io_done = done;
 	zio->io_private = private;
@@ -279,6 +277,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		if (pio->io_child != NULL)
 			pio->io_child->io_sibling_prev = zio;
 		pio->io_child = zio;
+		zio->io_ndvas = pio->io_ndvas;
 		mutex_exit(&pio->io_lock);
 	}
 
@@ -310,7 +309,6 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
     int priority, int flags, zbookmark_t *zb)
 {
 	zio_t *zio;
-	dva_t *dva;
 
 	ASSERT3U(size, ==, BP_GET_LSIZE(bp));
 
@@ -325,9 +323,6 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 	 */
 	zio->io_bp = &zio->io_bp_copy;
 
-	bp = zio->io_bp;
-	dva = ZIO_GET_DVA(zio);
-
 	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF) {
 		uint64_t csize = BP_GET_PSIZE(bp);
 		void *cbuf = zio_buf_alloc(csize);
@@ -336,7 +331,7 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 		zio->io_pipeline |= 1U << ZIO_STAGE_READ_DECOMPRESS;
 	}
 
-	if (DVA_GET_GANG(dva)) {
+	if (BP_IS_GANG(bp)) {
 		uint64_t gsize = SPA_GANGBLOCKSIZE;
 		void *gbuf = zio_buf_alloc(gsize);
 
@@ -348,7 +343,7 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 }
 
 zio_t *
-zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
+zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
     zio_done_func_t *done, void *private, int priority, int flags,
     zbookmark_t *zb)
@@ -371,6 +366,7 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
 
 	zio->io_checksum = checksum;
 	zio->io_compress = compress;
+	zio->io_ndvas = ncopies;
 
 	if (compress != ZIO_COMPRESS_OFF)
 		zio->io_async_stages |= 1U << ZIO_STAGE_WRITE_COMPRESS;
@@ -380,6 +376,10 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
 		BP_ZERO(bp);
 		BP_SET_LSIZE(bp, size);
 		BP_SET_PSIZE(bp, size);
+	} else {
+		/* Make sure someone doesn't change their mind on overwrites */
+		ASSERT(MIN(zio->io_ndvas + BP_IS_GANG(bp),
+		    spa_max_replication(spa)) == BP_GET_NDVAS(bp));
 	}
 
 	return (zio);
@@ -393,7 +393,6 @@ zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
 {
 	zio_t *zio;
 
-	/* XXBP - We need to re-evaluate when to insert pipeline stages */
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags,
 	    ZIO_STAGE_OPEN, ZIO_REWRITE_PIPELINE);
@@ -401,6 +400,9 @@ zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
 	zio->io_bookmark = *zb;
 	zio->io_checksum = checksum;
 	zio->io_compress = ZIO_COMPRESS_OFF;
+
+	if (pio != NULL)
+		ASSERT3U(zio->io_ndvas, <=, BP_GET_NDVAS(bp));
 
 	return (zio);
 }
@@ -441,7 +443,6 @@ zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		return (zio_null(pio, spa, NULL, NULL, 0));
 	}
 
-	/* XXBP - We need to re-evaluate when to insert pipeline stages */
 	zio = zio_create(pio, spa, txg, bp, NULL, 0, done, private,
 	    ZIO_TYPE_FREE, ZIO_PRIORITY_FREE, 0,
 	    ZIO_STAGE_OPEN, ZIO_FREE_PIPELINE);
@@ -471,7 +472,6 @@ zio_claim(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	ASSERT3U(spa->spa_uberblock.ub_rootbp.blk_birth, <, spa_first_txg(spa));
 	ASSERT3U(spa_first_txg(spa), <=, txg);
 
-	/* XXBP - We need to re-evaluate when to insert pipeline stages */
 	zio = zio_create(pio, spa, txg, bp, NULL, 0, done, private,
 	    ZIO_TYPE_CLAIM, ZIO_PRIORITY_NOW, 0,
 	    ZIO_STAGE_OPEN, ZIO_CLAIM_PIPELINE);
@@ -623,7 +623,7 @@ zio_vdev_child_io(zio_t *zio, blkptr_t *bp, vdev_t *vd, uint64_t offset,
 	cio = zio_create(zio, zio->io_spa, zio->io_txg, bp, data, size,
 	    done, private, type, priority,
 	    (zio->io_flags & ZIO_FLAG_VDEV_INHERIT) | ZIO_FLAG_CANFAIL | flags,
-	    ZIO_STAGE_VDEV_IO_SETUP - 1, pipeline);
+	    ZIO_STAGE_VDEV_IO_START - 1, pipeline);
 
 	cio->io_vd = vd;
 	cio->io_offset = offset;
@@ -748,8 +748,13 @@ zio_done(zio_t *zio)
 		ASSERT(bp->blk_pad[2] == 0);
 		ASSERT(bcmp(bp, &zio->io_bp_copy, sizeof (blkptr_t)) == 0);
 		if (zio->io_type == ZIO_TYPE_WRITE && !BP_IS_HOLE(bp) &&
-		    !(zio->io_flags & ZIO_FLAG_IO_REPAIR))
+		    !(zio->io_flags & ZIO_FLAG_IO_REPAIR)) {
 			ASSERT(!BP_SHOULD_BYTESWAP(bp));
+			if (zio->io_ndvas != 0)
+				ASSERT3U(zio->io_ndvas, <=, BP_GET_NDVAS(bp));
+			ASSERT(BP_COUNT_GANG(bp) == 0 ||
+			    (BP_COUNT_GANG(bp) == BP_GET_NDVAS(bp)));
+		}
 	}
 
 	if (vd != NULL)
@@ -902,6 +907,7 @@ zio_write_compress(zio_t *zio)
 			BP_ZERO(bp);
 			zio->io_pipeline = ZIO_WAIT_FOR_CHILDREN_PIPELINE;
 		} else {
+			ASSERT3U(BP_GET_NDVAS(bp), ==, 0);
 			BP_SET_LSIZE(bp, lsize);
 			BP_SET_PSIZE(bp, csize);
 			BP_SET_COMPRESS(bp, compress);
@@ -946,7 +952,7 @@ zio_gang_pipeline(zio_t *zio)
 	 * By default, the pipeline assumes that we're dealing with a gang
 	 * block.  If we're not, strip out any gang-specific stages.
 	 */
-	if (!DVA_GET_GANG(ZIO_GET_DVA(zio)))
+	if (!BP_IS_GANG(zio->io_bp))
 		zio->io_pipeline &= ~ZIO_GANG_STAGES;
 
 	zio_next_stage(zio);
@@ -968,7 +974,7 @@ zio_get_gang_header(zio_t *zio)
 	uint64_t gsize = SPA_GANGBLOCKSIZE;
 	void *gbuf = zio_buf_alloc(gsize);
 
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
+	ASSERT(BP_IS_GANG(bp));
 
 	zio_push_transform(zio, gbuf, gsize, gsize);
 
@@ -987,7 +993,7 @@ zio_read_gang_members(zio_t *zio)
 	uint64_t gsize, gbufsize, loff, lsize;
 	int i;
 
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
+	ASSERT(BP_IS_GANG(zio->io_bp));
 
 	zio_gang_byteswap(zio);
 	zio_pop_transform(zio, (void **)&gbh, &gsize, &gbufsize);
@@ -1019,7 +1025,7 @@ zio_rewrite_gang_members(zio_t *zio)
 	uint64_t gsize, gbufsize, loff, lsize;
 	int i;
 
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
+	ASSERT(BP_IS_GANG(zio->io_bp));
 	ASSERT3U(zio->io_size, ==, SPA_GANGBLOCKSIZE);
 
 	zio_gang_byteswap(zio);
@@ -1054,7 +1060,7 @@ zio_free_gang_members(zio_t *zio)
 	uint64_t gsize, gbufsize;
 	int i;
 
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
+	ASSERT(BP_IS_GANG(zio->io_bp));
 
 	zio_gang_byteswap(zio);
 	zio_pop_transform(zio, (void **)&gbh, &gsize, &gbufsize);
@@ -1079,7 +1085,7 @@ zio_claim_gang_members(zio_t *zio)
 	uint64_t gsize, gbufsize;
 	int i;
 
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
+	ASSERT(BP_IS_GANG(zio->io_bp));
 
 	zio_gang_byteswap(zio);
 	zio_pop_transform(zio, (void **)&gbh, &gsize, &gbufsize);
@@ -1100,17 +1106,23 @@ static void
 zio_write_allocate_gang_member_done(zio_t *zio)
 {
 	zio_t *pio = zio->io_parent;
-	dva_t *cdva = ZIO_GET_DVA(zio);
-	dva_t *pdva = ZIO_GET_DVA(pio);
+	dva_t *cdva = zio->io_bp->blk_dva;
+	dva_t *pdva = pio->io_bp->blk_dva;
 	uint64_t asize;
+	int d;
 
-	ASSERT(DVA_GET_GANG(pdva));
+	ASSERT3U(pio->io_ndvas, ==, zio->io_ndvas);
+	ASSERT3U(BP_GET_NDVAS(zio->io_bp), <=, BP_GET_NDVAS(pio->io_bp));
+	ASSERT3U(zio->io_ndvas, <=, BP_GET_NDVAS(zio->io_bp));
+	ASSERT3U(pio->io_ndvas, <=, BP_GET_NDVAS(pio->io_bp));
 
-	/* XXBP - Need to be careful here with multiple DVAs */
 	mutex_enter(&pio->io_lock);
-	asize = DVA_GET_ASIZE(pdva);
-	asize += DVA_GET_ASIZE(cdva);
-	DVA_SET_ASIZE(pdva, asize);
+	for (d = 0; d < BP_GET_NDVAS(pio->io_bp); d++) {
+		ASSERT(DVA_GET_GANG(&pdva[d]));
+		asize = DVA_GET_ASIZE(&pdva[d]);
+		asize += DVA_GET_ASIZE(&cdva[d]);
+		DVA_SET_ASIZE(&pdva[d], asize);
+	}
 	mutex_exit(&pio->io_lock);
 }
 
@@ -1118,41 +1130,50 @@ static void
 zio_write_allocate_gang_members(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = ZIO_GET_DVA(zio);
+	dva_t *dva = bp->blk_dva;
+	spa_t *spa = zio->io_spa;
 	zio_gbh_phys_t *gbh;
+	uint64_t txg = zio->io_txg;
 	uint64_t resid = zio->io_size;
 	uint64_t maxalloc = P2ROUNDUP(zio->io_size >> 1, SPA_MINBLOCKSIZE);
 	uint64_t gsize, loff, lsize;
 	uint32_t gbps_left;
+	int ndvas = zio->io_ndvas;
+	int gbh_ndvas = MIN(ndvas + 1, spa_max_replication(spa));
 	int error;
-	int i;
+	int i, d;
 
 	gsize = SPA_GANGBLOCKSIZE;
 	gbps_left = SPA_GBH_NBLKPTRS;
 
-	error = metaslab_alloc(zio->io_spa, gsize, dva, zio->io_txg);
+	error = metaslab_alloc(spa, gsize, bp, gbh_ndvas, txg, NULL);
 	if (error == ENOSPC)
 		panic("can't allocate gang block header");
 	ASSERT(error == 0);
 
-	DVA_SET_GANG(dva, 1);
+	for (d = 0; d < gbh_ndvas; d++)
+		DVA_SET_GANG(&dva[d], 1);
 
-	bp->blk_birth = zio->io_txg;
+	bp->blk_birth = txg;
 
 	gbh = zio_buf_alloc(gsize);
 	bzero(gbh, gsize);
 
+	/* We need to test multi-level gang blocks */
+	if (maxalloc >= zio_gang_bang && (lbolt & 0x1) == 0)
+		maxalloc = MAX(maxalloc >> 2, SPA_MINBLOCKSIZE);
+
 	for (loff = 0, i = 0; loff != zio->io_size;
 	    loff += lsize, resid -= lsize, gbps_left--, i++) {
 		blkptr_t *gbp = &gbh->zg_blkptr[i];
-		dva = &gbp->blk_dva[0];
+		dva = gbp->blk_dva;
 
 		ASSERT(gbps_left != 0);
 		maxalloc = MIN(maxalloc, resid);
 
 		while (resid <= maxalloc * gbps_left) {
-			error = metaslab_alloc(zio->io_spa, maxalloc, dva,
-			    zio->io_txg);
+			error = metaslab_alloc(spa, maxalloc, gbp, ndvas,
+			    txg, bp);
 			if (error == 0)
 				break;
 			ASSERT3U(error, ==, ENOSPC);
@@ -1166,9 +1187,9 @@ zio_write_allocate_gang_members(zio_t *zio)
 			BP_SET_LSIZE(gbp, lsize);
 			BP_SET_PSIZE(gbp, lsize);
 			BP_SET_COMPRESS(gbp, ZIO_COMPRESS_OFF);
-			gbp->blk_birth = zio->io_txg;
-			zio_nowait(zio_rewrite(zio, zio->io_spa,
-			    zio->io_checksum, zio->io_txg, gbp,
+			gbp->blk_birth = txg;
+			zio_nowait(zio_rewrite(zio, spa,
+			    zio->io_checksum, txg, gbp,
 			    (char *)zio->io_data + loff, lsize,
 			    zio_write_allocate_gang_member_done, NULL,
 			    zio->io_priority, zio->io_flags,
@@ -1176,8 +1197,8 @@ zio_write_allocate_gang_members(zio_t *zio)
 		} else {
 			lsize = P2ROUNDUP(resid / gbps_left, SPA_MINBLOCKSIZE);
 			ASSERT(lsize != SPA_MINBLOCKSIZE);
-			zio_nowait(zio_write_allocate(zio, zio->io_spa,
-			    zio->io_checksum, zio->io_txg, gbp,
+			zio_nowait(zio_write_allocate(zio, spa,
+			    zio->io_checksum, txg, gbp,
 			    (char *)zio->io_data + loff, lsize,
 			    zio_write_allocate_gang_member_done, NULL,
 			    zio->io_priority, zio->io_flags));
@@ -1189,6 +1210,12 @@ zio_write_allocate_gang_members(zio_t *zio)
 	zio->io_pipeline |= 1U << ZIO_STAGE_GANG_CHECKSUM_GENERATE;
 
 	zio_push_transform(zio, gbh, gsize, gsize);
+	/*
+	 * As much as we'd like this to be zio_wait_children_ready(),
+	 * updating our ASIZE doesn't happen until the io_done callback,
+	 * so we have to wait for that to finish in order for our BP
+	 * to be stable.
+	 */
 	zio_wait_children_done(zio);
 }
 
@@ -1201,10 +1228,12 @@ static void
 zio_dva_allocate(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = ZIO_GET_DVA(zio);
 	int error;
 
 	ASSERT(BP_IS_HOLE(bp));
+	ASSERT3U(BP_GET_NDVAS(bp), ==, 0);
+	ASSERT3U(zio->io_ndvas, >, 0);
+	ASSERT3U(zio->io_ndvas, <=, spa_max_replication(zio->io_spa));
 
 	/* For testing, make some blocks above a certain size be gang blocks */
 	if (zio->io_size >= zio_gang_bang && (lbolt & 0x3) == 0) {
@@ -1214,7 +1243,8 @@ zio_dva_allocate(zio_t *zio)
 
 	ASSERT3U(zio->io_size, ==, BP_GET_PSIZE(bp));
 
-	error = metaslab_alloc(zio->io_spa, zio->io_size, dva, zio->io_txg);
+	error = metaslab_alloc(zio->io_spa, zio->io_size, bp, zio->io_ndvas,
+	    zio->io_txg, NULL);
 
 	if (error == 0) {
 		bp->blk_birth = zio->io_txg;
@@ -1233,11 +1263,13 @@ static void
 zio_dva_free(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = ZIO_GET_DVA(zio);
+	dva_t *dva = bp->blk_dva;
+	int d;
 
 	ASSERT(!BP_IS_HOLE(bp));
 
-	metaslab_free(zio->io_spa, dva, zio->io_txg, B_FALSE);
+	for (d = 0; d < BP_GET_NDVAS(bp); d++)
+		metaslab_free(zio->io_spa, &dva[d], zio->io_txg, B_FALSE);
 
 	BP_ZERO(bp);
 
@@ -1248,31 +1280,17 @@ static void
 zio_dva_claim(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = ZIO_GET_DVA(zio);
+	dva_t *dva = bp->blk_dva;
+	int error = 0;
+	int d;
 
 	ASSERT(!BP_IS_HOLE(bp));
 
-	zio->io_error = metaslab_claim(zio->io_spa, dva, zio->io_txg);
-
-	zio_next_stage(zio);
-}
-
-static void
-zio_dva_translate(zio_t *zio)
-{
-	spa_t *spa = zio->io_spa;
-	dva_t *dva = ZIO_GET_DVA(zio);
-	uint64_t vdev = DVA_GET_VDEV(dva);
-	uint64_t offset = DVA_GET_OFFSET(dva);
-
-	ASSERT3U(zio->io_size, ==, ZIO_GET_IOSIZE(zio));
-
-	zio->io_offset = offset;
-
-	if ((zio->io_vd = vdev_lookup_top(spa, vdev)) == NULL)
-		zio->io_error = ENXIO;
-	else if (offset + zio->io_size > zio->io_vd->vdev_asize)
-		zio->io_error = EOVERFLOW;
+	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
+		error = metaslab_claim(zio->io_spa, &dva[d], zio->io_txg);
+		if (error)
+			zio->io_error = error;
+	}
 
 	zio_next_stage(zio);
 }
@@ -1284,17 +1302,26 @@ zio_dva_translate(zio_t *zio)
  */
 
 static void
-zio_vdev_io_setup(zio_t *zio)
+zio_vdev_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
-	vdev_t *tvd = vd->vdev_top;
-	uint64_t align = 1ULL << tvd->vdev_ashift;
+	vdev_t *tvd = vd ? vd->vdev_top : NULL;
+	blkptr_t *bp = zio->io_bp;
+	uint64_t align;
 
-	/* XXPOLICY */
+	if (vd == NULL) {
+		/* The mirror_ops handle multiple DVAs in a single BP */
+		vdev_mirror_ops.vdev_op_io_start(zio);
+		return;
+	}
+
+	align = 1ULL << tvd->vdev_ashift;
+
 	if (zio->io_retries == 0 && vd == tvd)
 		zio->io_flags |= ZIO_FLAG_FAILFAST;
 
-	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) && vd->vdev_children == 0) {
+	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) &&
+	    vd->vdev_children == 0) {
 		zio->io_flags |= ZIO_FLAG_PHYSICAL;
 		zio->io_offset += VDEV_LABEL_START_SIZE;
 	}
@@ -1312,15 +1339,6 @@ zio_vdev_io_setup(zio_t *zio)
 		zio->io_flags |= ZIO_FLAG_SUBBLOCK;
 	}
 
-	zio_next_stage(zio);
-}
-
-static void
-zio_vdev_io_start(zio_t *zio)
-{
-	blkptr_t *bp = zio->io_bp;
-	uint64_t align = 1ULL << zio->io_vd->vdev_top->vdev_ashift;
-
 	ASSERT(P2PHASE(zio->io_offset, align) == 0);
 	ASSERT(P2PHASE(zio->io_size, align) == 0);
 	ASSERT(bp == NULL ||
@@ -1335,7 +1353,11 @@ zio_vdev_io_start(zio_t *zio)
 static void
 zio_vdev_io_done(zio_t *zio)
 {
-	vdev_io_done(zio);
+	if (zio->io_vd == NULL)
+		/* The mirror_ops handle multiple DVAs in a single BP */
+		vdev_mirror_ops.vdev_op_io_done(zio);
+	else
+		vdev_io_done(zio);
 }
 
 /* XXPOLICY */
@@ -1348,7 +1370,7 @@ zio_should_retry(zio_t *zio)
 		return (B_FALSE);
 	if (zio->io_delegate_list != NULL)
 		return (B_FALSE);
-	if (vd != vd->vdev_top)
+	if (vd && vd != vd->vdev_top)
 		return (B_FALSE);
 	if (zio->io_flags & ZIO_FLAG_DONT_RETRY)
 		return (B_FALSE);
@@ -1362,7 +1384,7 @@ static void
 zio_vdev_io_assess(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
-	vdev_t *tvd = vd->vdev_top;
+	vdev_t *tvd = vd ? vd->vdev_top : NULL;
 
 	ASSERT(zio->io_vsd == NULL);
 
@@ -1394,7 +1416,7 @@ zio_vdev_io_assess(zio_t *zio)
 		/* XXPOLICY */
 		zio->io_flags &= ~ZIO_FLAG_FAILFAST;
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
-		zio->io_stage = ZIO_STAGE_VDEV_IO_SETUP - 1;
+		zio->io_stage = ZIO_STAGE_VDEV_IO_START - 1;
 
 		dprintf("retry #%d for %s to %s offset %llx\n",
 		    zio->io_retries, zio_type_name[zio->io_type],
@@ -1404,8 +1426,8 @@ zio_vdev_io_assess(zio_t *zio)
 		return;
 	}
 
-	if (zio->io_error != 0 && !(zio->io_flags & ZIO_FLAG_SPECULATIVE) &&
-	    zio->io_error != ECKSUM) {
+	if (zio->io_error != 0 && zio->io_error != ECKSUM &&
+	    !(zio->io_flags & ZIO_FLAG_SPECULATIVE) && vd) {
 		/*
 		 * Poor man's hotplug support.  Even if we're done retrying this
 		 * I/O, try to reopen the vdev to see if it's still attached.
@@ -1480,8 +1502,8 @@ zio_gang_checksum_generate(zio_t *zio)
 	zio_cksum_t zc;
 	zio_gbh_phys_t *gbh = zio->io_data;
 
+	ASSERT(BP_IS_GANG(zio->io_bp));
 	ASSERT3U(zio->io_size, ==, SPA_GANGBLOCKSIZE);
-	ASSERT(DVA_GET_GANG(ZIO_GET_DVA(zio)));
 
 	zio_set_gang_verifier(zio, &gbh->zg_tail.zbt_cksum);
 
@@ -1518,9 +1540,11 @@ zio_checksum_verified(zio_t *zio)
 void
 zio_set_gang_verifier(zio_t *zio, zio_cksum_t *zcp)
 {
-	zcp->zc_word[0] = DVA_GET_VDEV(ZIO_GET_DVA(zio));
-	zcp->zc_word[1] = DVA_GET_OFFSET(ZIO_GET_DVA(zio));
-	zcp->zc_word[2] = zio->io_bp->blk_birth;
+	blkptr_t *bp = zio->io_bp;
+
+	zcp->zc_word[0] = DVA_GET_VDEV(BP_IDENTITY(bp));
+	zcp->zc_word[1] = DVA_GET_OFFSET(BP_IDENTITY(bp));
+	zcp->zc_word[2] = bp->blk_birth;
 	zcp->zc_word[3] = 0;
 }
 
@@ -1552,8 +1576,6 @@ zio_pipe_stage_t *zio_pipeline[ZIO_STAGE_DONE + 2] = {
 	zio_dva_claim,
 	zio_gang_checksum_generate,
 	zio_ready,
-	zio_dva_translate,
-	zio_vdev_io_setup,
 	zio_vdev_io_start,
 	zio_vdev_io_done,
 	zio_vdev_io_assess,
@@ -1656,7 +1678,7 @@ zio_alloc_blk(spa_t *spa, int checksum, uint64_t size, blkptr_t *bp,
 
 	BP_ZERO(bp);
 
-	error = metaslab_alloc(spa, size, BP_IDENTITY(bp), txg);
+	error = metaslab_alloc(spa, size, bp, 1, txg, NULL);
 
 	if (error == 0) {
 		BP_SET_CHECKSUM(bp, checksum);
@@ -1681,7 +1703,7 @@ zio_alloc_blk(spa_t *spa, int checksum, uint64_t size, blkptr_t *bp,
 void
 zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg)
 {
-	ASSERT(DVA_GET_GANG(BP_IDENTITY(bp)) == 0);
+	ASSERT(!BP_IS_GANG(bp));
 
 	dprintf_bp(bp, "txg %llu: ", txg);
 

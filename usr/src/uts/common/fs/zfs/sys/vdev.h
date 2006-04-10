@@ -80,6 +80,7 @@ extern void vdev_stat_update(zio_t *zio);
 extern void vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type,
     boolean_t complete);
 extern int vdev_getspec(spa_t *spa, uint64_t vdev, char **vdev_spec);
+extern void vdev_propagate_state(vdev_t *vd);
 extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
     vdev_aux_t aux);
 

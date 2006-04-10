@@ -52,60 +52,60 @@
  *
  * spa_namespace_lock (global mutex)
  *
- * 	This lock must be acquired to do any of the following:
+ *	This lock must be acquired to do any of the following:
  *
- * 		- Lookup a spa_t by name
- * 		- Add or remove a spa_t from the namespace
- * 		- Increase spa_refcount from non-zero
- * 		- Check if spa_refcount is zero
- * 		- Rename a spa_t
+ *		- Lookup a spa_t by name
+ *		- Add or remove a spa_t from the namespace
+ *		- Increase spa_refcount from non-zero
+ *		- Check if spa_refcount is zero
+ *		- Rename a spa_t
  *		- add/remove/attach/detach devices
- * 		- Held for the duration of create/destroy/import/export
+ *		- Held for the duration of create/destroy/import/export
  *
- * 	It does not need to handle recursion.  A create or destroy may
- * 	reference objects (files or zvols) in other pools, but by
- * 	definition they must have an existing reference, and will never need
- * 	to lookup a spa_t by name.
+ *	It does not need to handle recursion.  A create or destroy may
+ *	reference objects (files or zvols) in other pools, but by
+ *	definition they must have an existing reference, and will never need
+ *	to lookup a spa_t by name.
  *
  * spa_refcount (per-spa refcount_t protected by mutex)
  *
- * 	This reference count keep track of any active users of the spa_t.  The
- * 	spa_t cannot be destroyed or freed while this is non-zero.  Internally,
- * 	the refcount is never really 'zero' - opening a pool implicitly keeps
- * 	some references in the DMU.  Internally we check against SPA_MINREF, but
- * 	present the image of a zero/non-zero value to consumers.
+ *	This reference count keep track of any active users of the spa_t.  The
+ *	spa_t cannot be destroyed or freed while this is non-zero.  Internally,
+ *	the refcount is never really 'zero' - opening a pool implicitly keeps
+ *	some references in the DMU.  Internally we check against SPA_MINREF, but
+ *	present the image of a zero/non-zero value to consumers.
  *
  * spa_config_lock (per-spa crazy rwlock)
  *
- * 	This SPA special is a recursive rwlock, capable of being acquired from
- * 	asynchronous threads.  It has protects the spa_t from config changes,
- * 	and must be held in the following circumstances:
+ *	This SPA special is a recursive rwlock, capable of being acquired from
+ *	asynchronous threads.  It has protects the spa_t from config changes,
+ *	and must be held in the following circumstances:
  *
- * 		- RW_READER to perform I/O to the spa
- * 		- RW_WRITER to change the vdev config
+ *		- RW_READER to perform I/O to the spa
+ *		- RW_WRITER to change the vdev config
  *
  * spa_config_cache_lock (per-spa mutex)
  *
- * 	This mutex prevents the spa_config nvlist from being updated.  No
+ *	This mutex prevents the spa_config nvlist from being updated.  No
  *      other locks are required to obtain this lock, although implicitly you
  *      must have the namespace lock or non-zero refcount to have any kind
  *      of spa_t pointer at all.
  *
  * The locking order is fairly straightforward:
  *
- * 		spa_namespace_lock	->	spa_refcount
+ *		spa_namespace_lock	->	spa_refcount
  *
- * 	The namespace lock must be acquired to increase the refcount from 0
- * 	or to check if it is zero.
+ *	The namespace lock must be acquired to increase the refcount from 0
+ *	or to check if it is zero.
  *
- * 		spa_refcount 		->	spa_config_lock
+ *		spa_refcount		->	spa_config_lock
  *
- * 	There must be at least one valid reference on the spa_t to acquire
- * 	the config lock.
+ *	There must be at least one valid reference on the spa_t to acquire
+ *	the config lock.
  *
- * 		spa_namespace_lock	->	spa_config_lock
+ *		spa_namespace_lock	->	spa_config_lock
  *
- * 	The namespace lock must always be taken before the config lock.
+ *	The namespace lock must always be taken before the config lock.
  *
  *
  * The spa_namespace_lock and spa_config_cache_lock can be acquired directly and
@@ -114,53 +114,53 @@
  * The namespace is manipulated using the following functions, all which require
  * the spa_namespace_lock to be held.
  *
- * 	spa_lookup()		Lookup a spa_t by name.
+ *	spa_lookup()		Lookup a spa_t by name.
  *
- * 	spa_add()		Create a new spa_t in the namespace.
+ *	spa_add()		Create a new spa_t in the namespace.
  *
- * 	spa_remove()		Remove a spa_t from the namespace.  This also
- * 				frees up any memory associated with the spa_t.
+ *	spa_remove()		Remove a spa_t from the namespace.  This also
+ *				frees up any memory associated with the spa_t.
  *
- * 	spa_next()		Returns the next spa_t in the system, or the
- * 				first if NULL is passed.
+ *	spa_next()		Returns the next spa_t in the system, or the
+ *				first if NULL is passed.
  *
- * 	spa_evict_all()		Shutdown and remove all spa_t structures in
- * 				the system.
+ *	spa_evict_all()		Shutdown and remove all spa_t structures in
+ *				the system.
  *
  *	spa_guid_exists()	Determine whether a pool/device guid exists.
  *
  * The spa_refcount is manipulated using the following functions:
  *
- * 	spa_open_ref()		Adds a reference to the given spa_t.  Must be
- * 				called with spa_namespace_lock held if the
- * 				refcount is currently zero.
+ *	spa_open_ref()		Adds a reference to the given spa_t.  Must be
+ *				called with spa_namespace_lock held if the
+ *				refcount is currently zero.
  *
- * 	spa_close()		Remove a reference from the spa_t.  This will
- * 				not free the spa_t or remove it from the
- * 				namespace.  No locking is required.
+ *	spa_close()		Remove a reference from the spa_t.  This will
+ *				not free the spa_t or remove it from the
+ *				namespace.  No locking is required.
  *
- * 	spa_refcount_zero()	Returns true if the refcount is currently
- * 				zero.  Must be called with spa_namespace_lock
- * 				held.
+ *	spa_refcount_zero()	Returns true if the refcount is currently
+ *				zero.  Must be called with spa_namespace_lock
+ *				held.
  *
  * The spa_config_lock is manipulated using the following functions:
  *
- * 	spa_config_enter()	Acquire the config lock as RW_READER or
- * 				RW_WRITER.  At least one reference on the spa_t
- * 				must exist.
+ *	spa_config_enter()	Acquire the config lock as RW_READER or
+ *				RW_WRITER.  At least one reference on the spa_t
+ *				must exist.
  *
- * 	spa_config_exit()	Release the config lock.
+ *	spa_config_exit()	Release the config lock.
  *
- * 	spa_config_held()	Returns true if the config lock is currently
- * 				held in the given state.
+ *	spa_config_held()	Returns true if the config lock is currently
+ *				held in the given state.
  *
  * The vdev configuration is protected by spa_vdev_enter() / spa_vdev_exit().
  *
- * 	spa_vdev_enter()	Acquire the namespace lock and the config lock
+ *	spa_vdev_enter()	Acquire the namespace lock and the config lock
  *				for writing.
  *
- * 	spa_vdev_exit()		Release the config lock, wait for all I/O
- * 				to complete, sync the updated configs to the
+ *	spa_vdev_exit()		Release the config lock, wait for all I/O
+ *				to complete, sync the updated configs to the
  *				cache, and release the namespace lock.
  *
  * The spa_name() function also requires either the spa_namespace_lock
@@ -173,6 +173,7 @@ static avl_tree_t spa_namespace_avl;
 kmutex_t spa_namespace_lock;
 static kcondvar_t spa_namespace_cv;
 static int spa_active_count;
+static int spa_max_replication_override = SPA_DVAS_PER_BP;
 
 kmem_cache_t *spa_buffer_pool;
 int spa_mode;
@@ -617,8 +618,7 @@ spa_get_random(uint64_t range)
 void
 sprintf_blkptr(char *buf, int len, blkptr_t *bp)
 {
-	/* XXBP - Need to see if we want all DVAs or not */
-	dva_t *dva = BP_IDENTITY(bp);
+	int d;
 
 	if (bp == NULL) {
 		(void) snprintf(buf, len, "<NULL>");
@@ -630,20 +630,27 @@ sprintf_blkptr(char *buf, int len, blkptr_t *bp)
 		return;
 	}
 
-	(void) snprintf(buf, len, "[L%llu %s] vdev=%llu offset=%llx "
-	    "size=%llxL/%llxP/%llxA %s %s %s %s "
-	    "birth=%llu fill=%llu cksum=%llx:%llx:%llx:%llx",
+	(void) snprintf(buf, len, "[L%llu %s] %llxL/%llxP ",
 	    (u_longlong_t)BP_GET_LEVEL(bp),
 	    dmu_ot[BP_GET_TYPE(bp)].ot_name,
-	    (u_longlong_t)DVA_GET_VDEV(dva),
-	    (u_longlong_t)DVA_GET_OFFSET(dva),
 	    (u_longlong_t)BP_GET_LSIZE(bp),
-	    (u_longlong_t)BP_GET_PSIZE(bp),
-	    (u_longlong_t)DVA_GET_ASIZE(dva),
+	    (u_longlong_t)BP_GET_PSIZE(bp));
+
+	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
+		dva_t *dva = &bp->blk_dva[d];
+		(void) snprintf(buf + strlen(buf), len - strlen(buf),
+		    "DVA[%d]=<%llu:%llx:%llx> ", d,
+		    (u_longlong_t)DVA_GET_VDEV(dva),
+		    (u_longlong_t)DVA_GET_OFFSET(dva),
+		    (u_longlong_t)DVA_GET_ASIZE(dva));
+	}
+
+	(void) snprintf(buf + strlen(buf), len - strlen(buf),
+	    "%s %s %s %s birth=%llu fill=%llu cksum=%llx:%llx:%llx:%llx",
 	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
 	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name,
 	    BP_GET_BYTEORDER(bp) == 0 ? "BE" : "LE",
-	    DVA_GET_GANG(dva) == 0 ? "contiguous" : "gang",
+	    BP_IS_GANG(bp) ? "gang" : "contiguous",
 	    (u_longlong_t)bp->blk_birth,
 	    (u_longlong_t)bp->blk_fill,
 	    (u_longlong_t)bp->blk_cksum.zc_word[0],
@@ -796,8 +803,29 @@ spa_get_asize(spa_t *spa, uint64_t lsize)
 	/*
 	 * For now, the worst case is 512-byte RAID-Z blocks, in which
 	 * case the space requirement is exactly 2x; so just assume that.
+	 * Add to this the fact that we can have up to 3 DVAs per bp, and
+	 * we have to multiply by a total of 6x.
 	 */
-	return (lsize << 1);
+	return (lsize * 6);
+}
+
+uint64_t
+spa_version(spa_t *spa)
+{
+	return (spa->spa_ubsync.ub_version);
+}
+
+int
+spa_max_replication(spa_t *spa)
+{
+	/*
+	 * As of ZFS_VERSION == ZFS_VERSION_DITTO_BLOCKS, we are able to
+	 * handle BPs with more than one DVA allocated.  Set our max
+	 * replication level accordingly.
+	 */
+	if (spa_version(spa) < ZFS_VERSION_DITTO_BLOCKS)
+		return (1);
+	return (MIN(SPA_DVAS_PER_BP, spa_max_replication_override));
 }
 
 /*

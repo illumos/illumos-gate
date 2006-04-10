@@ -61,9 +61,6 @@ typedef enum zio_stage {
 
 	ZIO_STAGE_READY,			/* RWFCI */
 
-	ZIO_STAGE_DVA_TRANSLATE,		/* RW--- */
-
-	ZIO_STAGE_VDEV_IO_SETUP,		/* RW--I */
 	ZIO_STAGE_VDEV_IO_START,		/* RW--I */
 	ZIO_STAGE_VDEV_IO_DONE,			/* RW--I */
 	ZIO_STAGE_VDEV_IO_ASSESS,		/* RW--I */
@@ -88,8 +85,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_READ_DECOMPRESS))
 
 #define	ZIO_VDEV_IO_PIPELINE					\
-	((1U << ZIO_STAGE_VDEV_IO_SETUP) |			\
-	(1U << ZIO_STAGE_VDEV_IO_START) |			\
+	((1U << ZIO_STAGE_VDEV_IO_START) |			\
 	(1U << ZIO_STAGE_VDEV_IO_DONE) |			\
 	(1U << ZIO_STAGE_VDEV_IO_ASSESS))
 
@@ -103,8 +99,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_READ_PIPELINE					\
-	((1U << ZIO_STAGE_DVA_TRANSLATE) |			\
-	ZIO_READ_PHYS_PIPELINE)
+	ZIO_READ_PHYS_PIPELINE
 
 #define	ZIO_WRITE_PHYS_PIPELINE					\
 	((1U << ZIO_STAGE_OPEN) |				\
@@ -116,8 +111,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_WRITE_COMMON_PIPELINE				\
-	((1U << ZIO_STAGE_DVA_TRANSLATE) |			\
-	ZIO_WRITE_PHYS_PIPELINE)
+	ZIO_WRITE_PHYS_PIPELINE
 
 #define	ZIO_WRITE_PIPELINE					\
 	((1U << ZIO_STAGE_WRITE_COMPRESS) |			\
@@ -193,6 +187,7 @@ typedef enum zio_stage {
 #define	ZIO_ERROR_PIPELINE_MASK					\
 	ZIO_WAIT_FOR_CHILDREN_PIPELINE
 
+typedef struct zio_transform zio_transform_t;
 struct zio_transform {
 	void		*zt_data;
 	uint64_t	zt_size;

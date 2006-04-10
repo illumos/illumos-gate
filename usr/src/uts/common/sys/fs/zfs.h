@@ -109,7 +109,23 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 /*
  * On-disk format version.
  */
-#define	ZFS_VERSION			1ULL
+#define	ZFS_VERSION_1			1ULL
+#define	ZFS_VERSION_2			2ULL
+#define	ZFS_VERSION			ZFS_VERSION_2
+
+/*
+ * Symbolic names for the changes that caused a ZFS_VERSION switch.
+ * Used in the code when checking for presence or absence of a feature.
+ * Feel free to define multiple symbolic names for each version if there
+ * were multiple changes to on-disk structures during that version.
+ *
+ * NOTE: When checking the current ZFS_VERSION in your code, be sure
+ *       to use spa_version() since it reports the version of the
+ *       last synced uberblock.  Checking the in-flight version can
+ *       be dangerous in some cases.
+ */
+#define	ZFS_VERSION_INITIAL		ZFS_VERSION_1
+#define	ZFS_VERSION_DITTO_BLOCKS	ZFS_VERSION_2
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

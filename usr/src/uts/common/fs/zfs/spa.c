@@ -940,9 +940,12 @@ spa_tryimport(nvlist_t *tryconfig)
  * configuration from the cache afterwards.
  */
 static int
-spa_export_common(char *pool, int new_state)
+spa_export_common(char *pool, int new_state, nvlist_t **oldconfig)
 {
 	spa_t *spa;
+
+	if (oldconfig)
+		*oldconfig = NULL;
 
 	if (!(spa_mode & FWRITE))
 		return (EROFS);
@@ -1011,6 +1014,9 @@ spa_export_common(char *pool, int new_state)
 		spa_deactivate(spa);
 	}
 
+	if (oldconfig && spa->spa_config)
+		VERIFY(nvlist_dup(spa->spa_config, oldconfig, 0) == 0);
+
 	if (new_state != POOL_STATE_UNINITIALIZED) {
 		spa_remove(spa);
 		spa_config_sync();
@@ -1026,16 +1032,16 @@ spa_export_common(char *pool, int new_state)
 int
 spa_destroy(char *pool)
 {
-	return (spa_export_common(pool, POOL_STATE_DESTROYED));
+	return (spa_export_common(pool, POOL_STATE_DESTROYED, NULL));
 }
 
 /*
  * Export a storage pool.
  */
 int
-spa_export(char *pool)
+spa_export(char *pool, nvlist_t **oldconfig)
 {
-	return (spa_export_common(pool, POOL_STATE_EXPORTED));
+	return (spa_export_common(pool, POOL_STATE_EXPORTED, oldconfig));
 }
 
 /*
@@ -1045,7 +1051,7 @@ spa_export(char *pool)
 int
 spa_reset(char *pool)
 {
-	return (spa_export_common(pool, POOL_STATE_UNINITIALIZED));
+	return (spa_export_common(pool, POOL_STATE_UNINITIALIZED, NULL));
 }
 
 
@@ -1497,7 +1503,7 @@ spa_scrub_io_done(zio_t *zio)
 
 	mutex_enter(&spa->spa_scrub_lock);
 	if (zio->io_error && !(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
-		vdev_t *vd = zio->io_vd;
+		vdev_t *vd = zio->io_vd ? zio->io_vd : spa->spa_root_vdev;
 		spa->spa_scrub_errors++;
 		mutex_enter(&vd->vdev_stat_lock);
 		vd->vdev_stat.vs_scrub_errors++;
@@ -1535,9 +1541,12 @@ static int
 spa_scrub_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 {
 	blkptr_t *bp = &bc->bc_blkptr;
-	vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[0]));
+	vdev_t *vd = spa->spa_root_vdev;
+	dva_t *dva = bp->blk_dva;
+	int needs_resilver = B_FALSE;
+	int d;
 
-	if (bc->bc_errno || vd == NULL) {
+	if (bc->bc_errno) {
 		/*
 		 * We can't scrub this block, but we can continue to scrub
 		 * the rest of the pool.  Note the error and move along.
@@ -1546,43 +1555,52 @@ spa_scrub_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 		spa->spa_scrub_errors++;
 		mutex_exit(&spa->spa_scrub_lock);
 
-		if (vd != NULL) {
-			mutex_enter(&vd->vdev_stat_lock);
-			vd->vdev_stat.vs_scrub_errors++;
-			mutex_exit(&vd->vdev_stat_lock);
-		}
+		mutex_enter(&vd->vdev_stat_lock);
+		vd->vdev_stat.vs_scrub_errors++;
+		mutex_exit(&vd->vdev_stat_lock);
 
 		return (ERESTART);
 	}
 
 	ASSERT(bp->blk_birth < spa->spa_scrub_maxtxg);
 
-	/*
-	 * Keep track of how much data we've examined so that
-	 * zpool(1M) status can make useful progress reports.
-	 */
-	mutex_enter(&vd->vdev_stat_lock);
-	vd->vdev_stat.vs_scrub_examined += BP_GET_ASIZE(bp);
-	mutex_exit(&vd->vdev_stat_lock);
+	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
+		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[d]));
 
-	if (spa->spa_scrub_type == POOL_SCRUB_RESILVER) {
-		if (DVA_GET_GANG(&bp->blk_dva[0])) {
-			/*
-			 * Gang members may be spread across multiple vdevs,
-			 * so the best we can do is look at the pool-wide DTL.
-			 * XXX -- it would be better to change our allocation
-			 * policy to ensure that this can't happen.
-			 */
-			vd = spa->spa_root_vdev;
+		ASSERT(vd != NULL);
+
+		/*
+		 * Keep track of how much data we've examined so that
+		 * zpool(1M) status can make useful progress reports.
+		 */
+		mutex_enter(&vd->vdev_stat_lock);
+		vd->vdev_stat.vs_scrub_examined += DVA_GET_ASIZE(&dva[d]);
+		mutex_exit(&vd->vdev_stat_lock);
+
+		if (spa->spa_scrub_type == POOL_SCRUB_RESILVER) {
+			if (DVA_GET_GANG(&dva[d])) {
+				/*
+				 * Gang members may be spread across multiple
+				 * vdevs, so the best we can do is look at the
+				 * pool-wide DTL.
+				 * XXX -- it would be better to change our
+				 * allocation policy to ensure that this can't
+				 * happen.
+				 */
+				vd = spa->spa_root_vdev;
+			}
+			if (vdev_dtl_contains(&vd->vdev_dtl_map,
+			    bp->blk_birth, 1))
+				needs_resilver = B_TRUE;
 		}
-		if (vdev_dtl_contains(&vd->vdev_dtl_map, bp->blk_birth, 1)) {
-			spa_scrub_io_start(spa, bp, ZIO_PRIORITY_RESILVER,
-			    ZIO_FLAG_RESILVER, &bc->bc_bookmark);
-		}
-	} else {
+	}
+
+	if (spa->spa_scrub_type == POOL_SCRUB_EVERYTHING)
 		spa_scrub_io_start(spa, bp, ZIO_PRIORITY_SCRUB,
 		    ZIO_FLAG_SCRUB, &bc->bc_bookmark);
-	}
+	else if (needs_resilver)
+		spa_scrub_io_start(spa, bp, ZIO_PRIORITY_RESILVER,
+		    ZIO_FLAG_RESILVER, &bc->bc_bookmark);
 
 	return (0);
 }

@@ -75,7 +75,7 @@ int arc_referenced(arc_buf_t *buf);
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
     arc_done_func_t *done, void *private, int priority, int flags,
     uint32_t arc_flags, zbookmark_t *zb);
-int arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
+int arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *done, void *private, int priority, int flags,
     uint32_t arc_flags, zbookmark_t *zb);

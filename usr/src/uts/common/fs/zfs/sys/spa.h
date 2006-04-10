@@ -234,6 +234,16 @@ typedef struct blkptr {
 	(DVA_GET_ASIZE(&(bp)->blk_dva[0]) + DVA_GET_ASIZE(&(bp)->blk_dva[1]) + \
 	DVA_GET_ASIZE(&(bp)->blk_dva[2]))
 
+#define	BP_GET_NDVAS(bp)	\
+	(!!DVA_GET_ASIZE(&(bp)->blk_dva[0]) + \
+	!!DVA_GET_ASIZE(&(bp)->blk_dva[1]) + \
+	!!DVA_GET_ASIZE(&(bp)->blk_dva[2]))
+
+#define	BP_COUNT_GANG(bp)	\
+	(DVA_GET_GANG(&(bp)->blk_dva[0]) + \
+	DVA_GET_GANG(&(bp)->blk_dva[1]) + \
+	DVA_GET_GANG(&(bp)->blk_dva[2]))
+
 #define	DVA_EQUAL(dva1, dva2)	\
 	((dva1)->dva_word[1] == (dva2)->dva_word[1] && \
 	(dva1)->dva_word[0] == (dva2)->dva_word[0])
@@ -248,9 +258,9 @@ typedef struct blkptr {
 	(zcp)->zc_word[3] = w3;			\
 }
 
-#define	BP_IS_HOLE(bp)		((bp)->blk_birth == 0)
-
 #define	BP_IDENTITY(bp)		(&(bp)->blk_dva[0])
+#define	BP_IS_GANG(bp)		DVA_GET_GANG(BP_IDENTITY(bp))
+#define	BP_IS_HOLE(bp)		((bp)->blk_birth == 0)
 
 #define	BP_ZERO(bp)				\
 {						\
@@ -281,7 +291,7 @@ typedef struct blkptr {
 
 #define	BP_SHOULD_BYTESWAP(bp)	(BP_GET_BYTEORDER(bp) != ZFS_HOST_BYTEORDER)
 
-#define	BP_SPRINTF_LEN	256
+#define	BP_SPRINTF_LEN	320
 
 #include <sys/dmu.h>
 
@@ -297,7 +307,7 @@ extern int spa_create(const char *pool, nvlist_t *config, const char *altroot);
 extern int spa_import(const char *pool, nvlist_t *config, const char *altroot);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
-extern int spa_export(char *pool);
+extern int spa_export(char *pool, nvlist_t **oldconfig);
 extern int spa_reset(char *pool);
 extern void spa_async_request(spa_t *spa, int flag);
 extern void spa_async_suspend(spa_t *spa);
@@ -387,6 +397,8 @@ extern struct metaslab_class *spa_metaslab_class_select(spa_t *spa);
 extern uint64_t spa_get_alloc(spa_t *spa);
 extern uint64_t spa_get_space(spa_t *spa);
 extern uint64_t spa_get_asize(spa_t *spa, uint64_t lsize);
+extern uint64_t spa_version(spa_t *spa);
+extern int spa_max_replication(spa_t *spa);
 extern int spa_busy(void);
 
 /* Miscellaneous support routines */

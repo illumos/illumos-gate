@@ -82,8 +82,6 @@ dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
 	dmu_buf_impl_t *db;
 	int err;
 
-	/* dataset_verify(dd); */
-
 	err = dnode_hold(os->os, object, FTAG, &dn);
 	if (err)
 		return (err);
@@ -1425,7 +1423,8 @@ int
 dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
     blkptr_t *bp, uint64_t txg)
 {
-	dsl_pool_t *dp = os->os->os_dsl_dataset->ds_dir->dd_pool;
+	objset_impl_t *osi = os->os;
+	dsl_pool_t *dp = osi->os_dsl_dataset->ds_dir->dd_pool;
 	tx_state_t *tx = &dp->dp_tx;
 	dmu_buf_impl_t *db;
 	blkptr_t *blk;
@@ -1508,7 +1507,7 @@ dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
 		}
 		arc_release(db->db_d.db_data_old[txg&TXG_MASK], db);
 		if (!BP_IS_HOLE(blk)) {
-			(void) arc_free(NULL, os->os->os_spa, txg, blk,
+			(void) arc_free(NULL, osi->os_spa, txg, blk,
 			    NULL, NULL, ARC_WAIT);
 		}
 		kmem_free(blk, sizeof (blkptr_t));
@@ -1520,13 +1519,14 @@ dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
 	blk = kmem_alloc(sizeof (blkptr_t), KM_SLEEP);
 	blk->blk_birth = 0; /* mark as invalid */
 
-	zb.zb_objset = os->os->os_dsl_dataset->ds_object;
+	zb.zb_objset = osi->os_dsl_dataset->ds_object;
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
-	err = arc_write(NULL, os->os->os_spa,
-	    zio_checksum_select(db->db_dnode->dn_checksum, os->os->os_checksum),
-	    zio_compress_select(db->db_dnode->dn_compress, os->os->os_compress),
+	err = arc_write(NULL, osi->os_spa,
+	    zio_checksum_select(db->db_dnode->dn_checksum, osi->os_checksum),
+	    zio_compress_select(db->db_dnode->dn_compress, osi->os_compress),
+	    dmu_get_replication_level(osi->os_spa, &zb, db->db_dnode->dn_type),
 	    txg, blk, db->db_d.db_data_old[txg&TXG_MASK], NULL, NULL,
 	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT, &zb);
 	ASSERT(err == 0);
@@ -1556,7 +1556,7 @@ dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
 		 * XXX should we be ignoring the return code?
 		 */
 		if (!BP_IS_HOLE(blk)) {
-			(void) arc_free(NULL, os->os->os_spa, txg, blk,
+			(void) arc_free(NULL, osi->os_spa, txg, blk,
 			    NULL, NULL, ARC_WAIT);
 		}
 		kmem_free(blk, sizeof (blkptr_t));
@@ -1623,6 +1623,24 @@ dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 	dn->dn_compress = compress;
 	dnode_setdirty(dn, tx);
 	dnode_rele(dn, FTAG);
+}
+
+/*
+ * XXX - eventually, this should take into account per-dataset (or
+ *       even per-object?) user requests for higher levels of replication.
+ */
+int
+dmu_get_replication_level(spa_t *spa, zbookmark_t *zb, dmu_object_type_t ot)
+{
+	int ncopies = 1;
+
+	if (dmu_ot[ot].ot_metadata)
+		ncopies++;
+	if (zb->zb_level != 0)
+		ncopies++;
+	if (zb->zb_objset == 0 && zb->zb_object == 0)
+		ncopies++;
+	return (MIN(ncopies, spa_max_replication(spa)));
 }
 
 int

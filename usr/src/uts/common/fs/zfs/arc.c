@@ -2186,7 +2186,7 @@ arc_write_done(zio_t *zio)
 }
 
 int
-arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
+arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *done, void *private, int priority, int flags,
     uint32_t arc_flags, zbookmark_t *zb)
@@ -2205,7 +2205,7 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
 	acb->acb_byteswap = (arc_byteswap_func_t *)-1;
 	hdr->b_acb = acb;
 	hdr->b_flags |= ARC_IO_IN_PROGRESS;
-	rzio = zio_write(pio, spa, checksum, compress, txg, bp,
+	rzio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
 	    buf->b_data, hdr->b_size, arc_write_done, buf, priority, flags, zb);
 
 	if (arc_flags & ARC_WAIT)

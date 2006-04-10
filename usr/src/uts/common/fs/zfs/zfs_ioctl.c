@@ -392,7 +392,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 static int
 zfs_ioc_pool_export(zfs_cmd_t *zc)
 {
-	return (spa_export(zc->zc_name));
+	return (spa_export(zc->zc_name, NULL));
 }
 
 static int

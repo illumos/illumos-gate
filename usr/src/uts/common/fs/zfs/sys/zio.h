@@ -34,6 +34,7 @@
 #include <sys/avl.h>
 #include <sys/dkio.h>
 #include <sys/fs/zfs.h>
+#include <sys/zio_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,9 +59,8 @@ typedef struct zio_block_tail {
 	(SPA_GBH_NBLKPTRS * sizeof (blkptr_t))) /\
 	sizeof (uint64_t))
 
-#define	ZIO_GET_DVA(zio)	(&(zio)->io_bp->blk_dva[(zio)->io_dva_index])
 #define	ZIO_GET_IOSIZE(zio)	\
-	(DVA_GET_GANG(ZIO_GET_DVA(zio)) ? \
+	(BP_IS_GANG((zio)->io_bp) ? \
 	SPA_GANGBLOCKSIZE : BP_GET_PSIZE((zio)->io_bp))
 
 typedef struct zio_gbh {
@@ -152,7 +152,6 @@ enum zio_compress {
 
 typedef struct zio zio_t;
 typedef void zio_done_func_t(zio_t *zio);
-typedef struct zio_transform zio_transform_t;
 
 extern uint8_t zio_priority_table[ZIO_PRIORITY_TABLE_SIZE];
 extern char *zio_type_name[ZIO_TYPES];
@@ -190,9 +189,9 @@ struct zio {
 	zio_t		*io_root;
 	spa_t		*io_spa;
 	zbookmark_t	io_bookmark;
-	int		io_checksum;
-	int		io_compress;
-	int		io_dva_index;
+	enum zio_checksum io_checksum;
+	enum zio_compress io_compress;
+	int		io_ndvas;
 	uint64_t	io_txg;
 	blkptr_t	*io_bp;
 	blkptr_t	io_bp_copy;
@@ -225,8 +224,8 @@ struct zio {
 
 	/* Internal pipeline state */
 	int		io_flags;
-	uint8_t		io_type;
-	uint8_t		io_stage;
+	enum zio_type	io_type;
+	enum zio_stage	io_stage;
 	uint8_t		io_stalled;
 	uint8_t		io_priority;
 	struct dk_callback io_dk_callback;
@@ -257,7 +256,7 @@ extern zio_t *zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
     int priority, int flags, zbookmark_t *zb);
 
 extern zio_t *zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
-    uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
+    int ncopies, uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
     zio_done_func_t *done, void *private, int priority, int flags,
     zbookmark_t *zb);
 

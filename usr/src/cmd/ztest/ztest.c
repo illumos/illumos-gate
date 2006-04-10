@@ -2825,9 +2825,6 @@ ztest_spa_import_export(char *oldname, char *newname)
 	if (error)
 		fatal(0, "spa_open('%s') = %d", oldname, error);
 
-	ASSERT(spa->spa_config != NULL);
-
-	VERIFY(nvlist_dup(spa->spa_config, &config, 0) == 0);
 	pool_guid = spa_guid(spa);
 	spa_close(spa, FTAG);
 
@@ -2836,7 +2833,7 @@ ztest_spa_import_export(char *oldname, char *newname)
 	/*
 	 * Export it.
 	 */
-	error = spa_export(oldname);
+	error = spa_export(oldname, &config);
 	if (error)
 		fatal(0, "spa_export('%s') = %d", oldname, error);
 

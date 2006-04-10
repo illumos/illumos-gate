@@ -122,9 +122,8 @@ int
 zio_checksum_error(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = ZIO_GET_DVA(zio);
 	zio_cksum_t zc = bp->blk_cksum;
-	uint_t checksum = DVA_GET_GANG(dva) ? ZIO_CHECKSUM_GANG_HEADER :
+	uint_t checksum = BP_IS_GANG(bp) ? ZIO_CHECKSUM_GANG_HEADER :
 	    BP_GET_CHECKSUM(bp);
 	int byteswap = BP_SHOULD_BYTESWAP(bp);
 	void *data = zio->io_data;
@@ -159,7 +158,7 @@ zio_checksum_error(zio_t *zio)
 		}
 		zc = expected_cksum;
 	} else {
-		ASSERT(!DVA_GET_GANG(dva));
+		ASSERT(!BP_IS_GANG(bp));
 		ci->ci_func[byteswap](data, size, &actual_cksum);
 	}
 

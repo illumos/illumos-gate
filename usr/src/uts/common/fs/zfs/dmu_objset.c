@@ -679,7 +679,9 @@ dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx)
 	zb.zb_level = -1;
 	zb.zb_blkid = 0;
 	err = arc_write(NULL, os->os_spa, os->os_md_checksum,
-	    os->os_md_compress, tx->tx_txg, &os->os_rootbp, abuf, killer, os,
+	    os->os_md_compress,
+	    dmu_get_replication_level(os->os_spa, &zb, DMU_OT_OBJSET),
+	    tx->tx_txg, &os->os_rootbp, abuf, killer, os,
 	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT, &zb);
 	ASSERT(err == 0);
 	VERIFY(arc_buf_remove_ref(abuf, FTAG) == 1);

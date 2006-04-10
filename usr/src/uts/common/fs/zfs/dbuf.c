@@ -2029,7 +2029,9 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
-	(void) arc_write(zio, os->os_spa, checksum, compress, txg,
+
+	(void) arc_write(zio, os->os_spa, checksum, compress,
+	    dmu_get_replication_level(os->os_spa, &zb, dn->dn_type), txg,
 	    db->db_blkptr, *data, dbuf_write_done, db,
 	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_NOWAIT, &zb);
 	/*

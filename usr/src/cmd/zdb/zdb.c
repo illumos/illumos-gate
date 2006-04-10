@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
@@ -84,8 +85,9 @@ usage(void)
 	    "Usage: %s [-udibcsvLU] [-O order] [-B os:obj:level:blkid] "
 	    "dataset [object...]\n"
 	    "       %s -C [pool]\n"
-	    "       %s -l dev\n",
-	    cmdname, cmdname, cmdname);
+	    "       %s -l dev\n"
+	    "       %s -R vdev:offset:size:flags\n",
+	    cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "	-u uberblock\n");
 	(void) fprintf(stderr, "	-d datasets\n");
@@ -102,6 +104,8 @@ usage(void)
 	(void) fprintf(stderr, "	-U use zpool.cache in /tmp\n");
 	(void) fprintf(stderr, "	-B objset:object:level:blkid -- "
 	    "simulate bad block\n");
+	(void) fprintf(stderr, "        -R read and display block from a"
+	    "device\n");
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
 	(void) fprintf(stderr, "Default is to dump everything non-verbosely\n");
@@ -523,20 +527,41 @@ blkid2offset(dnode_phys_t *dnp, int level, uint64_t blkid)
 	    dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT);
 }
 
+static void
+sprintf_blkptr_compact(char *blkbuf, blkptr_t *bp, int alldvas)
+{
+	dva_t *dva = bp->blk_dva;
+	int ndvas = alldvas ? BP_GET_NDVAS(bp) : 1;
+	int i;
+
+	blkbuf[0] = '\0';
+
+	for (i = 0; i < ndvas; i++)
+		(void) sprintf(blkbuf + strlen(blkbuf), "%llu:%llx:%llx ",
+		    (u_longlong_t)DVA_GET_VDEV(&dva[i]),
+		    (u_longlong_t)DVA_GET_OFFSET(&dva[i]),
+		    (u_longlong_t)DVA_GET_ASIZE(&dva[i]));
+
+	(void) sprintf(blkbuf + strlen(blkbuf), "%llxL/%llxP F=%llu B=%llu",
+	    (u_longlong_t)BP_GET_LSIZE(bp),
+	    (u_longlong_t)BP_GET_PSIZE(bp),
+	    (u_longlong_t)bp->blk_fill,
+	    (u_longlong_t)bp->blk_birth);
+}
+
 /* ARGSUSED */
 static int
 zdb_indirect_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 {
 	zbookmark_t *zb = &bc->bc_bookmark;
 	blkptr_t *bp = &bc->bc_blkptr;
-	dva_t *dva = &bp->blk_dva[0];
 	void *data = bc->bc_data;
 	dnode_phys_t *dnp = bc->bc_dnode;
-	char buffer[300];
+	char blkbuf[BP_SPRINTF_LEN + 80];
 	int l;
 
 	if (bc->bc_errno) {
-		(void) sprintf(buffer,
+		(void) sprintf(blkbuf,
 		    "Error %d reading <%llu, %llu, %lld, %llu>: ",
 		    bc->bc_errno,
 		    (u_longlong_t)zb->zb_objset,
@@ -581,37 +606,28 @@ zdb_indirect_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 		ASSERT3U(fill, ==, bp->blk_fill);
 	}
 
-	(void) sprintf(buffer, "%16llx ",
+	(void) sprintf(blkbuf, "%16llx ",
 	    (u_longlong_t)blkid2offset(dnp, zb->zb_level, zb->zb_blkid));
 
 	ASSERT(zb->zb_level >= 0);
 
 	for (l = dnp->dn_nlevels - 1; l >= -1; l--) {
 		if (l == zb->zb_level) {
-			(void) sprintf(buffer + strlen(buffer), "L%llx",
+			(void) sprintf(blkbuf + strlen(blkbuf), "L%llx",
 			    (u_longlong_t)zb->zb_level);
 		} else {
-			(void) sprintf(buffer + strlen(buffer), " ");
+			(void) sprintf(blkbuf + strlen(blkbuf), " ");
 		}
 	}
 
 out:
 	if (bp->blk_birth == 0) {
-		(void) sprintf(buffer + strlen(buffer), "<hole>");
-		(void) printf("%s\n", buffer);
+		(void) sprintf(blkbuf + strlen(blkbuf), "<hole>");
+		(void) printf("%s\n", blkbuf);
 	} else {
-		// XXBP - Need to print number of active BPs here
-		(void) sprintf(buffer + strlen(buffer),
-		    "vdev=%llu off=%llx %llxL/%llxP/%llxA F=%llu B=%llu",
-		    (u_longlong_t)DVA_GET_VDEV(dva),
-		    (u_longlong_t)DVA_GET_OFFSET(dva),
-		    (u_longlong_t)BP_GET_LSIZE(bp),
-		    (u_longlong_t)BP_GET_PSIZE(bp),
-		    (u_longlong_t)DVA_GET_ASIZE(dva),
-		    (u_longlong_t)bp->blk_fill,
-		    (u_longlong_t)bp->blk_birth);
-
-		(void) printf("%s\n", buffer);
+		sprintf_blkptr_compact(blkbuf + strlen(blkbuf), bp,
+		    dump_opt['d'] > 5 ? 1 : 0);
+		(void) printf("%s\n", blkbuf);
 	}
 
 	return (bc->bc_errno ? ERESTART : 0);
@@ -762,18 +778,12 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	(void) printf("\n");
 
 	while (bplist_iterate(&bpl, &itor, bp) == 0) {
+		char blkbuf[BP_SPRINTF_LEN];
+
 		ASSERT(bp->blk_birth != 0);
-		// XXBP - Do we want to see all DVAs, or just one?
-		(void) printf("\tItem %3llu: vdev=%llu off=%llx "
-		    "%llxL/%llxP/%llxA F=%llu B=%llu\n",
-		    (u_longlong_t)itor - 1,
-		    (u_longlong_t)DVA_GET_VDEV(&bp->blk_dva[0]),
-		    (u_longlong_t)DVA_GET_OFFSET(&bp->blk_dva[0]),
-		    (u_longlong_t)BP_GET_LSIZE(bp),
-		    (u_longlong_t)BP_GET_PSIZE(bp),
-		    (u_longlong_t)DVA_GET_ASIZE(&bp->blk_dva[0]),
-		    (u_longlong_t)bp->blk_fill,
-		    (u_longlong_t)bp->blk_birth);
+		sprintf_blkptr_compact(blkbuf, bp, dump_opt['d'] > 5 ? 1 : 0);
+		(void) printf("\tItem %3llu: %s\n",
+		    (u_longlong_t)itor - 1, blkbuf);
 	}
 
 	bplist_close(&bpl);
@@ -1228,71 +1238,79 @@ zdb_space_map_load(spa_t *spa)
 static int
 zdb_space_map_claim(spa_t *spa, blkptr_t *bp, zbookmark_t *zb)
 {
-	dva_t *dva = &bp->blk_dva[0];
-	uint64_t vdev = DVA_GET_VDEV(dva);
-	uint64_t offset = DVA_GET_OFFSET(dva);
-	uint64_t size = DVA_GET_ASIZE(dva);
+	dva_t *dva = bp->blk_dva;
 	vdev_t *vd;
 	metaslab_t *msp;
 	space_map_t *allocmap, *freemap;
 	int error;
+	int d;
+	blkptr_t blk = *bp;
 
-	if ((vd = vdev_lookup_top(spa, vdev)) == NULL)
-		return (ENXIO);
+	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
+		uint64_t vdev = DVA_GET_VDEV(&dva[d]);
+		uint64_t offset = DVA_GET_OFFSET(&dva[d]);
+		uint64_t size = DVA_GET_ASIZE(&dva[d]);
 
-	if ((offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count)
-		return (ENXIO);
+		if ((vd = vdev_lookup_top(spa, vdev)) == NULL)
+			return (ENXIO);
 
-	if (DVA_GET_GANG(dva)) {
+		if ((offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count)
+			return (ENXIO);
+
+		msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
+		allocmap = &msp->ms_allocmap[0];
+		freemap = &msp->ms_freemap[0];
+
+		/* Prepare our copy of the bp in case we need to read GBHs */
+		if (DVA_GET_GANG(&dva[d])) {
+			size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
+			DVA_SET_ASIZE(&blk.blk_dva[d], size);
+			DVA_SET_GANG(&blk.blk_dva[d], 0);
+		}
+
+		mutex_enter(&msp->ms_lock);
+		if (space_map_contains(freemap, offset, size)) {
+			mutex_exit(&msp->ms_lock);
+			return (EAGAIN);	/* allocated more than once */
+		}
+
+		if (!space_map_contains(allocmap, offset, size)) {
+			mutex_exit(&msp->ms_lock);
+			return (ESTALE);	/* not allocated at all */
+		}
+
+		space_map_remove(allocmap, offset, size);
+		space_map_add(freemap, offset, size);
+
+		mutex_exit(&msp->ms_lock);
+	}
+
+	if (BP_IS_GANG(bp)) {
 		zio_gbh_phys_t gbh;
-		blkptr_t blk = *bp;
 		int g;
 
 		/* LINTED - compile time assert */
 		ASSERT(sizeof (zio_gbh_phys_t) == SPA_GANGBLOCKSIZE);
-		size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
-		DVA_SET_GANG(&blk.blk_dva[0], 0);
-		DVA_SET_ASIZE(&blk.blk_dva[0], size);
+
 		BP_SET_CHECKSUM(&blk, ZIO_CHECKSUM_GANG_HEADER);
 		BP_SET_PSIZE(&blk, SPA_GANGBLOCKSIZE);
 		BP_SET_LSIZE(&blk, SPA_GANGBLOCKSIZE);
 		BP_SET_COMPRESS(&blk, ZIO_COMPRESS_OFF);
-		error = zio_wait(zio_read(NULL, spa, &blk,
-		    &gbh, SPA_GANGBLOCKSIZE, NULL, NULL,
-		    ZIO_PRIORITY_SYNC_READ,
+		error = zio_wait(zio_read(NULL, spa, &blk, &gbh,
+		    SPA_GANGBLOCKSIZE, NULL, NULL, ZIO_PRIORITY_SYNC_READ,
 		    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD, zb));
 		if (error)
 			return (error);
 		if (BP_SHOULD_BYTESWAP(&blk))
 			byteswap_uint64_array(&gbh, SPA_GANGBLOCKSIZE);
 		for (g = 0; g < SPA_GBH_NBLKPTRS; g++) {
-			if (gbh.zg_blkptr[g].blk_birth == 0)
+			if (BP_IS_HOLE(&gbh.zg_blkptr[g]))
 				break;
 			error = zdb_space_map_claim(spa, &gbh.zg_blkptr[g], zb);
 			if (error)
 				return (error);
 		}
 	}
-
-	msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
-	allocmap = &msp->ms_allocmap[0];
-	freemap = &msp->ms_freemap[0];
-
-	mutex_enter(&msp->ms_lock);
-	if (space_map_contains(freemap, offset, size)) {
-		mutex_exit(&msp->ms_lock);
-		return (EAGAIN);	/* allocated more than once */
-	}
-
-	if (!space_map_contains(allocmap, offset, size)) {
-		mutex_exit(&msp->ms_lock);
-		return (ESTALE);	/* not allocated at all */
-	}
-
-	space_map_remove(allocmap, offset, size);
-	space_map_add(freemap, offset, size);
-
-	mutex_exit(&msp->ms_lock);
 
 	return (0);
 }
@@ -1448,7 +1466,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 
 	zcb->zcb_readfails = 0;
 
-	ASSERT(bp->blk_birth != 0);
+	ASSERT(!BP_IS_HOLE(bp));
 
 	zdb_count_block(spa, zcb, bp, type);
 
@@ -1511,13 +1529,13 @@ dump_block_stats(spa_t *spa)
 		    spa->spa_sync_bplist_obj));
 
 		while (bplist_iterate(bpl, &itor, &blk) == 0) {
-			zdb_count_block(spa, &zcb, &blk, DMU_OT_DEFERRED);
 			if (dump_opt['b'] >= 4) {
 				char blkbuf[BP_SPRINTF_LEN];
 				sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, &blk);
 				(void) printf("[%s] %s\n",
 				    "deferred free", blkbuf);
 			}
+			zdb_count_block(spa, &zcb, &blk, DMU_OT_DEFERRED);
 		}
 
 		bplist_close(bpl);
@@ -1703,6 +1721,321 @@ dump_zpool(spa_t *spa)
 		exit(rc);
 }
 
+#define	ZDB_FLAG_CHECKSUM	0x0001
+#define	ZDB_FLAG_DECOMPRESS	0x0002
+#define	ZDB_FLAG_BSWAP		0x0004
+#define	ZDB_FLAG_GBH		0x0008
+#define	ZDB_FLAG_INDIRECT	0x0010
+#define	ZDB_FLAG_PHYS		0x0020
+#define	ZDB_FLAG_RAW		0x0040
+#define	ZDB_FLAG_PRINT_BLKPTR	0x0080
+
+int flagbits[256];
+
+static void
+zdb_print_blkptr(blkptr_t *bp, int flags)
+{
+	dva_t *dva = bp->blk_dva;
+	int d;
+
+	if (flags & ZDB_FLAG_BSWAP)
+		byteswap_uint64_array((void *)bp, sizeof (blkptr_t));
+	/*
+	 * Super-ick warning:  This code is also duplicated in
+	 * cmd/mdb/common/modules/zfs/zfs.c .  Yeah, I hate code
+	 * replication, too.
+	 */
+	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
+		(void) printf("\tDVA[%d]: vdev_id %lld / %llx\n", d,
+		    DVA_GET_VDEV(&dva[d]), DVA_GET_OFFSET(&dva[d]));
+		(void) printf("\tDVA[%d]:       GANG: %-5s  GRID:  %04llx\t"
+		    "ASIZE: %llx\n", d,
+		    DVA_GET_GANG(&dva[d]) ? "TRUE" : "FALSE",
+		    DVA_GET_GRID(&dva[d]), DVA_GET_ASIZE(&dva[d]));
+		(void) printf("\tDVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", d,
+		    DVA_GET_VDEV(&dva[d]), DVA_GET_OFFSET(&dva[d]),
+		    BP_GET_PSIZE(bp),
+		    BP_SHOULD_BYTESWAP(bp) ? "e" : "",
+		    !DVA_GET_GANG(&dva[d]) && BP_GET_LEVEL(bp) != 0 ?
+		    "d" : "",
+		    DVA_GET_GANG(&dva[d]) ? "g" : "",
+		    BP_GET_COMPRESS(bp) != 0 ? "d" : "");
+	}
+	(void) printf("\tLSIZE:  %-16llx\t\tPSIZE: %llx\n",
+	    BP_GET_LSIZE(bp), BP_GET_PSIZE(bp));
+	(void) printf("\tENDIAN: %6s\t\t\t\t\tTYPE:  %s\n",
+	    BP_GET_BYTEORDER(bp) ? "LITTLE" : "BIG",
+	    dmu_ot[BP_GET_TYPE(bp)].ot_name);
+	(void) printf("\tBIRTH:  %-16llx   LEVEL: %-2llu\tFILL:  %llx\n",
+	    (u_longlong_t)bp->blk_birth, BP_GET_LEVEL(bp),
+	    (u_longlong_t)bp->blk_fill);
+	(void) printf("\tCKFUNC: %-16s\t\tCOMP:  %s\n",
+	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
+	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name);
+	(void) printf("\tCKSUM:  %llx:%llx:%llx:%llx\n",
+	    (u_longlong_t)bp->blk_cksum.zc_word[0],
+	    (u_longlong_t)bp->blk_cksum.zc_word[1],
+	    (u_longlong_t)bp->blk_cksum.zc_word[2],
+	    (u_longlong_t)bp->blk_cksum.zc_word[3]);
+}
+
+static void
+zdb_dump_indirect(blkptr_t *bp, int nbps, int flags)
+{
+	int i;
+
+	for (i = 0; i < nbps; i++)
+		zdb_print_blkptr(&bp[i], flags);
+}
+
+static void
+zdb_dump_gbh(void *buf, int flags)
+{
+	zdb_dump_indirect((blkptr_t *)buf, SPA_GBH_NBLKPTRS, flags);
+}
+
+static void
+zdb_dump_block_raw(void *buf, uint64_t size, int flags)
+{
+	if (flags & ZDB_FLAG_BSWAP)
+		byteswap_uint64_array(buf, size);
+	(void) write(2, buf, size);
+}
+
+static void
+zdb_dump_block(char *label, void *buf, uint64_t size, int flags)
+{
+	uint64_t *d = (uint64_t *)buf;
+	int nwords = size / sizeof (uint64_t);
+	int do_bswap = !!(flags & ZDB_FLAG_BSWAP);
+	int i, j;
+	char *hdr, *c;
+
+
+	if (do_bswap)
+		hdr = " 7 6 5 4 3 2 1 0   f e d c b a 9 8";
+	else
+		hdr = " 0 1 2 3 4 5 6 7   8 9 a b c d e f";
+
+	(void) printf("\n%s\n%6s   %s  0123456789abcdef\n", label, "", hdr);
+
+	for (i = 0; i < nwords; i += 2) {
+		(void) printf("%06llx:  %016llx  %016llx  ",
+		    (u_longlong_t)(i * sizeof (uint64_t)),
+		    (u_longlong_t)(do_bswap ? BSWAP_64(d[i]) : d[i]),
+		    (u_longlong_t)(do_bswap ? BSWAP_64(d[i + 1]) : d[i + 1]));
+
+		c = (char *)&d[i];
+		for (j = 0; j < 2 * sizeof (uint64_t); j++)
+			(void) printf("%c", isprint(c[j]) ? c[j] : '.');
+		(void) printf("\n");
+	}
+}
+
+/*
+ * There are two acceptable formats:
+ *	leaf_name	  - For example: c1t0d0 or /tmp/ztest.0a
+ *	child[.child]*    - For example: 0.1.1
+ *
+ * The second form can be used to specify arbitrary vdevs anywhere
+ * in the heirarchy.  For example, in a pool with a mirror of
+ * RAID-Zs, you can specify either RAID-Z vdev with 0.0 or 0.1 .
+ */
+static vdev_t *
+zdb_vdev_lookup(vdev_t *vdev, char *path)
+{
+	char *s, *p, *q;
+	int i;
+
+	if (vdev == NULL)
+		return (NULL);
+
+	/* First, assume the x.x.x.x format */
+	i = (int)strtoul(path, &s, 10);
+	if (s == path || (s && *s != '.' && *s != '\0'))
+		goto name;
+	if (i < 0 || i >= vdev->vdev_children)
+		return (NULL);
+
+	vdev = vdev->vdev_child[i];
+	if (*s == '\0')
+		return (vdev);
+	return (zdb_vdev_lookup(vdev, s+1));
+
+name:
+	for (i = 0; i < vdev->vdev_children; i++) {
+		vdev_t *vc = vdev->vdev_child[i];
+
+		if (vc->vdev_path == NULL) {
+			vc = zdb_vdev_lookup(vc, path);
+			if (vc == NULL)
+				continue;
+			else
+				return (vc);
+		}
+
+		p = strrchr(vc->vdev_path, '/');
+		p = p ? p + 1 : vc->vdev_path;
+		q = &vc->vdev_path[strlen(vc->vdev_path) - 2];
+
+		if (strcmp(vc->vdev_path, path) == 0)
+			return (vc);
+		if (strcmp(p, path) == 0)
+			return (vc);
+		if (strcmp(q, "s0") == 0 && strncmp(p, path, q - p) == 0)
+			return (vc);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Read a block from a pool and print it out.  The syntax of the
+ * block descriptor is:
+ *
+ *	pool:vdev_specifier:offset:size[:flags]
+ *
+ *	pool           - The name of the pool you wish to read from
+ *	vdev_specifier - Which vdev (see comment for zdb_vdev_lookup)
+ *	offset         - offset, in hex, in bytes
+ *	size           - Amount of data to read, in hex, in bytes
+ *	flags          - A string of characters specifying options
+ *		 b: Decode a blkptr at given offset within block
+ *		*c: Calculate and display checksums
+ *		*d: Decompress data before dumping
+ *		 e: Byteswap data before dumping
+ *		*g: Display data as a gang block header
+ *		*i: Display as an indirect block
+ *		 p: Do I/O to physical offset
+ *		 r: Dump raw data to stdout
+ *
+ *              * = not yet implemented
+ */
+static void
+zdb_read_block(char *thing, spa_t **spap)
+{
+	spa_t *spa = *spap;
+	int flags = 0;
+	uint64_t offset = 0, size = 0, blkptr_offset = 0;
+	zio_t *zio;
+	vdev_t *vd;
+	void *buf;
+	char *s, *p, *dup, *spa_name, *vdev, *flagstr;
+	int i, error, zio_flags;
+
+	dup = strdup(thing);
+	s = strtok(dup, ":");
+	spa_name = s ? s : "";
+	s = strtok(NULL, ":");
+	vdev = s ? s : "";
+	s = strtok(NULL, ":");
+	offset = strtoull(s ? s : "", NULL, 16);
+	s = strtok(NULL, ":");
+	size = strtoull(s ? s : "", NULL, 16);
+	s = strtok(NULL, ":");
+	flagstr = s ? s : "";
+
+	s = NULL;
+	if (size == 0)
+		s = "size must not be zero";
+	if (!IS_P2ALIGNED(size, DEV_BSIZE))
+		s = "size must be a multiple of sector size";
+	if (!IS_P2ALIGNED(offset, DEV_BSIZE))
+		s = "offset must be a multiple of sector size";
+	if (s) {
+		(void) printf("Invalid block specifier: %s  - %s\n", thing, s);
+		free(dup);
+		return;
+	}
+
+	for (s = strtok(flagstr, ":"); s; s = strtok(NULL, ":")) {
+		for (i = 0; flagstr[i]; i++) {
+			int bit = flagbits[flagstr[i]];
+
+			if (bit == 0) {
+				(void) printf("***Invalid flag: %c\n",
+				    flagstr[i]);
+				continue;
+			}
+			flags |= bit;
+
+			/* If it's not something with an argument, keep going */
+			if ((bit & (ZDB_FLAG_CHECKSUM | ZDB_FLAG_DECOMPRESS |
+			    ZDB_FLAG_PRINT_BLKPTR)) == 0)
+				continue;
+
+			p = &flagstr[i + 1];
+			if (bit == ZDB_FLAG_PRINT_BLKPTR)
+				blkptr_offset = strtoull(p, &p, 16);
+			if (*p != ':' && *p != '\0') {
+				(void) printf("***Invalid flag arg: '%s'\n", s);
+				free(dup);
+				return;
+			}
+		}
+	}
+
+	if (spa == NULL || spa->spa_name == NULL ||
+	    strcmp(spa->spa_name, spa_name)) {
+		if (spa && spa->spa_name)
+			spa_close(spa, (void *)zdb_read_block);
+		error = spa_open(spa_name, spap, (void *)zdb_read_block);
+		if (error)
+			fatal("Failed to open pool '%s': errno = %d\n",
+			    spa_name, error);
+		spa = *spap;
+	}
+
+	vd = zdb_vdev_lookup(spa->spa_root_vdev, vdev);
+	if (vd == NULL) {
+		(void) printf("***Invalid vdev: %s\n", vdev);
+		free(dup);
+		return;
+	} else {
+		if (vd->vdev_path)
+			(void) printf("Found vdev: %s\n", vd->vdev_path);
+		else
+			(void) printf("Found vdev type: %s\n",
+			    vd->vdev_ops->vdev_op_type);
+	}
+
+	buf = umem_alloc(size, UMEM_NOFAIL);
+
+	zio_flags = ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_QUEUE |
+	    ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_DONT_RETRY | ZIO_FLAG_NOBOOKMARK;
+
+	if (flags & ZDB_FLAG_PHYS)
+		zio_flags |= ZIO_FLAG_PHYSICAL;
+
+	zio = zio_root(spa, NULL, NULL, 0);
+	/* XXX todo - cons up a BP so RAID-Z will be happy */
+	zio_nowait(zio_vdev_child_io(zio, NULL, vd, offset, buf, size,
+	    ZIO_TYPE_READ, ZIO_PRIORITY_SYNC_READ, zio_flags, NULL, NULL));
+	error = zio_wait(zio);
+
+	if (error) {
+		(void) printf("Read of %s failed, error: %d\n", thing, error);
+		goto out;
+	}
+
+	if (flags & ZDB_FLAG_PRINT_BLKPTR)
+		zdb_print_blkptr((blkptr_t *)(void *)
+		    ((uintptr_t)buf + (uintptr_t)blkptr_offset), flags);
+	else if (flags & ZDB_FLAG_RAW)
+		zdb_dump_block_raw(buf, size, flags);
+	else if (flags & ZDB_FLAG_INDIRECT)
+		zdb_dump_indirect((blkptr_t *)buf, size / sizeof (blkptr_t),
+		    flags);
+	else if (flags & ZDB_FLAG_GBH)
+		zdb_dump_gbh(buf, flags);
+	else
+		zdb_dump_block(thing, buf, size, flags);
+
+out:
+	umem_free(buf, size);
+	free(dup);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1721,7 +2054,7 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLO:B:Ul")) != -1) {
+	while ((c = getopt(argc, argv, "udibcsvCLO:B:UlR")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -1731,6 +2064,7 @@ main(int argc, char **argv)
 		case 's':
 		case 'C':
 		case 'l':
+		case 'R':
 			dump_opt[c]++;
 			dump_all = 0;
 			break;
@@ -1801,7 +2135,7 @@ main(int argc, char **argv)
 	}
 
 	for (c = 0; c < 256; c++) {
-		if (dump_all && c != 'L' && c != 'l')
+		if (dump_all && c != 'L' && c != 'l' && c != 'R')
 			dump_opt[c] = 1;
 		if (dump_opt[c])
 			dump_opt[c] += verbose;
@@ -1820,6 +2154,27 @@ main(int argc, char **argv)
 
 	if (dump_opt['l']) {
 		dump_label(argv[0]);
+		return (0);
+	}
+
+	if (dump_opt['R']) {
+		flagbits['b'] = ZDB_FLAG_PRINT_BLKPTR;
+		flagbits['c'] = ZDB_FLAG_CHECKSUM;
+		flagbits['d'] = ZDB_FLAG_DECOMPRESS;
+		flagbits['e'] = ZDB_FLAG_BSWAP;
+		flagbits['g'] = ZDB_FLAG_GBH;
+		flagbits['i'] = ZDB_FLAG_INDIRECT;
+		flagbits['p'] = ZDB_FLAG_PHYS;
+		flagbits['r'] = ZDB_FLAG_RAW;
+
+		spa = NULL;
+		while (argv[0]) {
+			zdb_read_block(argv[0], &spa);
+			argv++;
+			argc--;
+		}
+		if (spa)
+			spa_close(spa, (void *)zdb_read_block);
 		return (0);
 	}
 

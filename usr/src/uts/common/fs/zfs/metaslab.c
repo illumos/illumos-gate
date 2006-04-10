@@ -352,14 +352,19 @@ metaslab_fini(metaslab_t *msp)
 	kmem_free(msp, sizeof (metaslab_t));
 }
 
-#define	METASLAB_ACTIVE_WEIGHT	(1ULL << 63)
+#define	METASLAB_WEIGHT_PRIMARY		(1ULL << 63)
+#define	METASLAB_WEIGHT_SECONDARY	(1ULL << 62)
+#define	METASLAB_ACTIVE_MASK		\
+	(METASLAB_WEIGHT_PRIMARY | METASLAB_WEIGHT_SECONDARY)
+#define	METASLAB_SMO_BONUS_MULTIPLIER	2
 
 static uint64_t
 metaslab_weight(metaslab_t *msp)
 {
+	metaslab_group_t *mg = msp->ms_group;
 	space_map_t *sm = &msp->ms_map;
 	space_map_obj_t *smo = &msp->ms_smo;
-	vdev_t *vd = msp->ms_group->mg_vd;
+	vdev_t *vd = mg->mg_vd;
 	uint64_t weight, space;
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
@@ -387,26 +392,27 @@ metaslab_weight(metaslab_t *msp)
 	 * For locality, assign higher weight to metaslabs we've used before.
 	 */
 	if (smo->smo_object != 0)
-		weight *= 2;
-	ASSERT(weight >= space && weight <= 4 * space);
+		weight *= METASLAB_SMO_BONUS_MULTIPLIER;
+	ASSERT(weight >= space &&
+	    weight <= 2 * METASLAB_SMO_BONUS_MULTIPLIER * space);
 
 	/*
 	 * If this metaslab is one we're actively using, adjust its weight to
 	 * make it preferable to any inactive metaslab so we'll polish it off.
 	 */
-	weight |= (msp->ms_weight & METASLAB_ACTIVE_WEIGHT);
+	weight |= (msp->ms_weight & METASLAB_ACTIVE_MASK);
 
 	return (weight);
 }
 
 static int
-metaslab_activate(metaslab_t *msp)
+metaslab_activate(metaslab_t *msp, uint64_t activation_weight)
 {
 	space_map_t *sm = &msp->ms_map;
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 
-	if (msp->ms_weight < METASLAB_ACTIVE_WEIGHT) {
+	if ((msp->ms_weight & METASLAB_ACTIVE_MASK) == 0) {
 		int error = space_map_load(sm, &metaslab_ff_ops,
 		    SM_FREE, &msp->ms_smo,
 		    msp->ms_group->mg_vd->vdev_spa->spa_meta_objset);
@@ -415,10 +421,10 @@ metaslab_activate(metaslab_t *msp)
 			return (error);
 		}
 		metaslab_group_sort(msp->ms_group, msp,
-		    msp->ms_weight | METASLAB_ACTIVE_WEIGHT);
+		    msp->ms_weight | activation_weight);
 	}
 	ASSERT(sm->sm_loaded);
-	ASSERT(msp->ms_weight >= METASLAB_ACTIVE_WEIGHT);
+	ASSERT(msp->ms_weight & METASLAB_ACTIVE_MASK);
 
 	return (0);
 }
@@ -426,8 +432,8 @@ metaslab_activate(metaslab_t *msp)
 static void
 metaslab_passivate(metaslab_t *msp, uint64_t size)
 {
-	metaslab_group_sort(msp->ms_group, msp, MIN(msp->ms_weight, size - 1));
-	ASSERT(msp->ms_weight < METASLAB_ACTIVE_WEIGHT);
+	metaslab_group_sort(msp->ms_group, msp, MIN(msp->ms_weight, size));
+	ASSERT((msp->ms_weight & METASLAB_ACTIVE_MASK) == 0);
 }
 
 /*
@@ -571,7 +577,7 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 	 * future allocations have synced.  (If we unloaded it now and then
 	 * loaded a moment later, the map wouldn't reflect those allocations.)
 	 */
-	if (sm->sm_loaded && msp->ms_weight < METASLAB_ACTIVE_WEIGHT) {
+	if (sm->sm_loaded && (msp->ms_weight & METASLAB_ACTIVE_MASK) == 0) {
 		int evictable = 1;
 
 		for (t = 1; t < TXG_CONCURRENT_STATES; t++)
@@ -616,7 +622,7 @@ metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg)
 
 	mutex_enter(&msp->ms_lock);
 
-	error = metaslab_activate(msp);
+	error = metaslab_activate(msp, METASLAB_WEIGHT_SECONDARY);
 	if (error) {
 		mutex_exit(&msp->ms_lock);
 		return (error);
@@ -633,25 +639,76 @@ metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg)
 	return (0);
 }
 
-static metaslab_t *
-metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t *offp,
-	uint64_t txg)
+static uint64_t
+metaslab_distance(metaslab_t *msp, dva_t *dva)
+{
+	uint64_t ms_shift = msp->ms_group->mg_vd->vdev_ms_shift;
+	uint64_t offset = DVA_GET_OFFSET(dva) >> ms_shift;
+	uint64_t start = msp->ms_map.sm_start >> ms_shift;
+
+	if (msp->ms_group->mg_vd->vdev_id != DVA_GET_VDEV(dva))
+		return (1ULL << 63);
+
+	if (offset < start)
+		return ((start - offset) << ms_shift);
+	if (offset > start)
+		return ((offset - start) << ms_shift);
+	return (0);
+}
+
+static uint64_t
+metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t txg,
+    uint64_t min_distance, dva_t *dva, int d)
 {
 	metaslab_t *msp = NULL;
 	uint64_t offset = -1ULL;
+	avl_tree_t *t = &mg->mg_metaslab_tree;
+	uint64_t activation_weight;
+	uint64_t target_distance;
+	int i;
+
+	activation_weight = METASLAB_WEIGHT_PRIMARY;
+	for (i = 0; i < d; i++)
+		if (DVA_GET_VDEV(&dva[i]) == mg->mg_vd->vdev_id)
+			activation_weight = METASLAB_WEIGHT_SECONDARY;
 
 	for (;;) {
 		mutex_enter(&mg->mg_lock);
-		msp = avl_first(&mg->mg_metaslab_tree);
-		if (msp == NULL || msp->ms_weight < size) {
-			mutex_exit(&mg->mg_lock);
-			return (NULL);
+		for (msp = avl_first(t); msp; msp = AVL_NEXT(t, msp)) {
+			if (msp->ms_weight < size) {
+				mutex_exit(&mg->mg_lock);
+				return (-1ULL);
+			}
+
+			if (activation_weight == METASLAB_WEIGHT_PRIMARY)
+				break;
+
+			target_distance = min_distance +
+			    (msp->ms_smo.smo_alloc ? 0 : min_distance >> 1);
+
+			for (i = 0; i < d; i++)
+				if (metaslab_distance(msp, &dva[i]) <
+				    target_distance)
+					break;
+			if (i == d)
+				break;
 		}
 		mutex_exit(&mg->mg_lock);
+		if (msp == NULL)
+			return (-1ULL);
 
 		mutex_enter(&msp->ms_lock);
 
-		if (metaslab_activate(msp) != 0) {
+		if ((msp->ms_weight & METASLAB_WEIGHT_SECONDARY) &&
+		    activation_weight == METASLAB_WEIGHT_PRIMARY) {
+			metaslab_passivate(msp,
+			    (msp->ms_weight & ~METASLAB_ACTIVE_MASK) /
+			    METASLAB_SMO_BONUS_MULTIPLIER);
+			mutex_exit(&msp->ms_lock);
+			continue;
+		}
+
+		if (metaslab_activate(msp, activation_weight) != 0) {
 			mutex_exit(&msp->ms_lock);
 			continue;
 		}
@@ -659,7 +716,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t *offp,
 		if ((offset = space_map_alloc(&msp->ms_map, size)) != -1ULL)
 			break;
 
-		metaslab_passivate(msp, size);
+		metaslab_passivate(msp, size - 1);
 
 		mutex_exit(&msp->ms_lock);
 	}
@@ -671,22 +728,24 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t *offp,
 
 	mutex_exit(&msp->ms_lock);
 
-	*offp = offset;
-	return (msp);
+	return (offset);
 }
 
 /*
  * Allocate a block for the specified i/o.
  */
-int
-metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
+static int
+metaslab_alloc_one(spa_t *spa, uint64_t psize, dva_t *dva, int d,
+    dva_t *hintdva, uint64_t txg)
 {
-	metaslab_t *msp;
 	metaslab_group_t *mg, *rotor;
 	metaslab_class_t *mc;
 	vdev_t *vd;
+	int dshift = 3;
+	int all_zero;
 	uint64_t offset = -1ULL;
 	uint64_t asize;
+	uint64_t distance;
 
 	mc = spa_metaslab_class_select(spa);
 
@@ -695,17 +754,50 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 	 * Note that there's no locking on mc_rotor or mc_allocated because
 	 * nothing actually breaks if we miss a few updates -- we just won't
 	 * allocate quite as evenly.  It all balances out over time.
+	 *
+	 * If we are doing ditto blocks, try to spread them across consecutive
+	 * vdevs.  If we're forced to reuse a vdev before we've allocated
+	 * all of our ditto blocks, then try and spread them out on that
+	 * vdev as much as possible.  If it turns out to not be possible,
+	 * gradually lower our standards until anything becomes acceptable.
+	 * Also, allocating on consecutive vdevs (as opposed to random vdevs)
+	 * gives us hope of containing our fault domains to something we're
+	 * able to reason about.  Otherwise, any two top-level vdev failures
+	 * will guarantee the loss of data.  With consecutive allocation,
+	 * only two adjacent top-level vdev failures will result in data loss.
+	 *
+	 * If we are doing gang blocks (hintdva is non-NULL), try to keep
+	 * ourselves on the same vdev as our gang block header.  That
+	 * way, we can hope for locality in vdev_cache, plus it makes our
+	 * fault domains something tractable.
 	 */
-	mg = rotor = mc->mc_rotor;
+	if (hintdva) {
+		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&hintdva[d]));
+		mg = vd->vdev_mg;
+	} else if (d != 0) {
+		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[d - 1]));
+		mg = vd->vdev_mg->mg_next;
+	} else {
+		mg = mc->mc_rotor;
+	}
+	rotor = mg;
+
+top:
+	all_zero = B_TRUE;
 	do {
 		vd = mg->mg_vd;
+
+		distance = vd->vdev_asize >> dshift;
+		if (distance <= (1ULL << vd->vdev_ms_shift))
+			distance = 0;
+		else
+			all_zero = B_FALSE;
+
 		asize = vdev_psize_to_asize(vd, psize);
 		ASSERT(P2PHASE(asize, 1ULL << vd->vdev_ashift) == 0);
 
-		msp = metaslab_group_alloc(mg, asize, &offset, txg);
-		if (msp != NULL) {
-			ASSERT(offset != -1ULL);
-
+		offset = metaslab_group_alloc(mg, asize, txg, distance, dva, d);
+		if (offset != -1ULL) {
 			/*
 			 * If we've just selected this metaslab group,
 			 * figure out whether the corresponding vdev is
@@ -740,10 +832,10 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 				mc->mc_allocated = 0;
 			}
 
-			DVA_SET_VDEV(dva, vd->vdev_id);
-			DVA_SET_OFFSET(dva, offset);
-			DVA_SET_GANG(dva, 0);
-			DVA_SET_ASIZE(dva, asize);
+			DVA_SET_VDEV(&dva[d], vd->vdev_id);
+			DVA_SET_OFFSET(&dva[d], offset);
+			DVA_SET_GANG(&dva[d], 0);
+			DVA_SET_ASIZE(&dva[d], asize);
 
 			return (0);
 		}
@@ -751,11 +843,44 @@ metaslab_alloc(spa_t *spa, uint64_t psize, dva_t *dva, uint64_t txg)
 		mc->mc_allocated = 0;
 	} while ((mg = mg->mg_next) != rotor);
 
-	DVA_SET_VDEV(dva, 0);
-	DVA_SET_OFFSET(dva, 0);
-	DVA_SET_GANG(dva, 0);
+	if (!all_zero) {
+		dshift++;
+		ASSERT(dshift < 64);
+		goto top;
+	}
+
+	bzero(&dva[d], sizeof (dva_t));
 
 	return (ENOSPC);
+}
+
+int
+metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp, int ncopies,
+    uint64_t txg, blkptr_t *hintbp)
+{
+	int d, error;
+	dva_t *dva = bp->blk_dva;
+	dva_t *hintdva = hintbp->blk_dva;
+
+	ASSERT(ncopies > 0 && ncopies <= spa_max_replication(spa));
+	ASSERT(BP_GET_NDVAS(bp) == 0);
+	ASSERT(hintbp == NULL || ncopies <= BP_GET_NDVAS(hintbp));
+
+	for (d = 0; d < ncopies; d++) {
+		error = metaslab_alloc_one(spa, psize, dva, d, hintdva, txg);
+		if (error) {
+			for (d--; d >= 0; d--) {
+				ASSERT(DVA_IS_VALID(&dva[d]));
+				metaslab_free(spa, &dva[d], txg, B_TRUE);
+				bzero(&dva[d], sizeof (dva_t));
+			}
+			return (ENOSPC);
+		}
+	}
+	ASSERT(error == 0);
+	ASSERT(BP_GET_NDVAS(bp) == ncopies);
+
+	return (0);
 }
 
 /*

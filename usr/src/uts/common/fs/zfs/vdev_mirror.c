@@ -35,25 +35,85 @@
  * Virtual device vector for mirroring.
  */
 
+typedef struct mirror_child {
+	vdev_t		*mc_vd;
+	uint64_t	mc_offset;
+	int		mc_error;
+	short		mc_tried;
+	short		mc_skipped;
+} mirror_child_t;
+
 typedef struct mirror_map {
-	int	mm_error;
-	short	mm_tried;
-	short	mm_skipped;
+	int		mm_children;
+	int		mm_replacing;
+	int		mm_preferred;
+	int		mm_root;
+	mirror_child_t	mm_child[1];
 } mirror_map_t;
 
 static mirror_map_t *
 vdev_mirror_map_alloc(zio_t *zio)
 {
-	zio->io_vsd = kmem_zalloc(zio->io_vd->vdev_children *
-	    sizeof (mirror_map_t), KM_SLEEP);
-	return (zio->io_vsd);
+	mirror_map_t *mm = NULL;
+	mirror_child_t *mc;
+	vdev_t *vd = zio->io_vd;
+	int c, d;
+
+	if (vd == NULL) {
+		dva_t *dva = zio->io_bp->blk_dva;
+		spa_t *spa = zio->io_spa;
+
+		c = BP_GET_NDVAS(zio->io_bp);
+
+		mm = kmem_zalloc(offsetof(mirror_map_t, mm_child[c]), KM_SLEEP);
+		mm->mm_children = c;
+		mm->mm_replacing = B_FALSE;
+		mm->mm_preferred = spa_get_random(c);
+		mm->mm_root = B_TRUE;
+
+		/*
+		 * Check the other, lower-index DVAs to see if they're on
+		 * the same vdev as the child we picked.  If they are, use
+		 * them since they are likely to have been allocated from
+		 * the primary metaslab in use at the time, and hence are
+		 * more likely to have locality with single-copy data.
+		 */
+		for (c = mm->mm_preferred, d = c - 1; d >= 0; d--) {
+			if (DVA_GET_VDEV(&dva[d]) == DVA_GET_VDEV(&dva[c]))
+				mm->mm_preferred = d;
+		}
+
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			mc->mc_vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[c]));
+			mc->mc_offset = DVA_GET_OFFSET(&dva[c]);
+		}
+	} else {
+		c = vd->vdev_children;
+
+		mm = kmem_zalloc(offsetof(mirror_map_t, mm_child[c]), KM_SLEEP);
+		mm->mm_children = c;
+		mm->mm_replacing = (vd->vdev_ops == &vdev_replacing_ops);
+		mm->mm_preferred = mm->mm_replacing ? 0 : spa_get_random(c);
+		mm->mm_root = B_FALSE;
+
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			mc->mc_vd = vd->vdev_child[c];
+			mc->mc_offset = zio->io_offset;
+		}
+	}
+
+	zio->io_vsd = mm;
+	return (mm);
 }
 
 static void
 vdev_mirror_map_free(zio_t *zio)
 {
-	kmem_free(zio->io_vsd,
-	    zio->io_vd->vdev_children * sizeof (mirror_map_t));
+	mirror_map_t *mm = zio->io_vsd;
+
+	kmem_free(mm, offsetof(mirror_map_t, mm_child[mm->mm_children]));
 	zio->io_vsd = NULL;
 }
 
@@ -103,30 +163,31 @@ vdev_mirror_close(vdev_t *vd)
 static void
 vdev_mirror_child_done(zio_t *zio)
 {
-	mirror_map_t *mm = zio->io_private;
+	mirror_child_t *mc = zio->io_private;
 
-	mm->mm_error = zio->io_error;
-	mm->mm_tried = 1;
-	mm->mm_skipped = 0;
+	mc->mc_error = zio->io_error;
+	mc->mc_tried = 1;
+	mc->mc_skipped = 0;
 }
 
 static void
 vdev_mirror_scrub_done(zio_t *zio)
 {
-	mirror_map_t *mm = zio->io_private;
+	mirror_child_t *mc = zio->io_private;
 
 	if (zio->io_error == 0) {
 		zio_t *pio = zio->io_parent;
 		mutex_enter(&pio->io_lock);
+		ASSERT3U(zio->io_size, >=, pio->io_size);
 		bcopy(zio->io_data, pio->io_data, pio->io_size);
 		mutex_exit(&pio->io_lock);
 	}
 
 	zio_buf_free(zio->io_data, zio->io_size);
 
-	mm->mm_error = zio->io_error;
-	mm->mm_tried = 1;
-	mm->mm_skipped = 0;
+	mc->mc_error = zio->io_error;
+	mc->mc_tried = 1;
+	mc->mc_skipped = 0;
 }
 
 static void
@@ -144,60 +205,42 @@ static int
 vdev_mirror_child_select(zio_t *zio)
 {
 	mirror_map_t *mm = zio->io_vsd;
-	vdev_t *vd = zio->io_vd;
-	vdev_t *cvd;
+	mirror_child_t *mc;
 	uint64_t txg = zio->io_txg;
 	int i, c;
 
 	ASSERT(zio->io_bp == NULL || zio->io_bp->blk_birth == txg);
 
 	/*
-	 * Select the child we'd like to read from absent any errors.
-	 * The current policy is to alternate sides at 8M granularity.
-	 * XXX -- investigate other policies for read distribution.
-	 */
-	c = (zio->io_offset >> (SPA_MAXBLOCKSHIFT + 6)) % vd->vdev_children;
-
-	/*
-	 * If this is a replacing vdev, always try child 0 (the source) first.
-	 */
-	if (vd->vdev_ops == &vdev_replacing_ops)
-		c = 0;
-
-	/*
 	 * Try to find a child whose DTL doesn't contain the block to read.
 	 * If a child is known to be completely inaccessible (indicated by
 	 * vdev_is_dead() returning B_TRUE), don't even try.
 	 */
-	for (i = 0; i < vd->vdev_children; i++, c++) {
-		if (c >= vd->vdev_children)
+	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++) {
+		if (c >= mm->mm_children)
 			c = 0;
-		if (mm[c].mm_tried || mm[c].mm_skipped)
+		mc = &mm->mm_child[c];
+		if (mc->mc_tried || mc->mc_skipped)
 			continue;
-		cvd = vd->vdev_child[c];
-		if (vdev_is_dead(cvd)) {
-			mm[c].mm_error = ENXIO;
-			mm[c].mm_tried = 1;	/* don't even try */
-			mm[c].mm_skipped = 1;
+		if (vdev_is_dead(mc->mc_vd)) {
+			mc->mc_error = ENXIO;
+			mc->mc_tried = 1;	/* don't even try */
+			mc->mc_skipped = 1;
 			continue;
 		}
-		if (!vdev_dtl_contains(&cvd->vdev_dtl_map, txg, 1))
+		if (!vdev_dtl_contains(&mc->mc_vd->vdev_dtl_map, txg, 1))
 			return (c);
-		mm[c].mm_error = ESTALE;
-		mm[c].mm_skipped = 1;
+		mc->mc_error = ESTALE;
+		mc->mc_skipped = 1;
 	}
 
 	/*
 	 * Every device is either missing or has this txg in its DTL.
-	 * If we don't have any sibling replicas to consult, look for
-	 * any child we haven't already tried before giving up.
+	 * Look for any child we haven't already tried before giving up.
 	 */
-	if (vd == vd->vdev_top || vd->vdev_parent->vdev_children <= 1) {
-		for (c = 0; c < vd->vdev_children; c++) {
-			if (!mm[c].mm_tried)
-				return (c);
-		}
-	}
+	for (c = 0; c < mm->mm_children; c++)
+		if (!mm->mm_child[c].mc_tried)
+			return (c);
 
 	/*
 	 * Every child failed.  There's no place left to look.
@@ -208,28 +251,28 @@ vdev_mirror_child_select(zio_t *zio)
 static void
 vdev_mirror_io_start(zio_t *zio)
 {
-	vdev_t *vd = zio->io_vd;
 	mirror_map_t *mm;
+	mirror_child_t *mc;
 	int c, children;
 
 	mm = vdev_mirror_map_alloc(zio);
 
 	if (zio->io_type == ZIO_TYPE_READ) {
-		if ((zio->io_flags & ZIO_FLAG_SCRUB) &&
-		    vd->vdev_ops != &vdev_replacing_ops) {
+		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_replacing) {
 			/*
 			 * For scrubbing reads we need to allocate a read
 			 * buffer for each child and issue reads to all
 			 * children.  If any child succeeds, it will copy its
 			 * data into zio->io_data in vdev_mirror_scrub_done.
 			 */
-			for (c = 0; c < vd->vdev_children; c++) {
+			for (c = 0; c < mm->mm_children; c++) {
+				mc = &mm->mm_child[c];
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-				    vd->vdev_child[c], zio->io_offset,
+				    mc->mc_vd, mc->mc_offset,
 				    zio_buf_alloc(zio->io_size), zio->io_size,
 				    zio->io_type, zio->io_priority,
-				    ZIO_FLAG_CANFAIL, vdev_mirror_scrub_done,
-				    &mm[c]));
+				    ZIO_FLAG_CANFAIL,
+				    vdev_mirror_scrub_done, mc));
 			}
 			zio_wait_children_done(zio);
 			return;
@@ -248,23 +291,23 @@ vdev_mirror_io_start(zio_t *zio)
 		 * first child happens to have a DTL entry here as well.
 		 * All other writes go to all children.
 		 */
-		if ((zio->io_flags & ZIO_FLAG_RESILVER) &&
-		    vd->vdev_ops == &vdev_replacing_ops &&
-		    !vdev_dtl_contains(&vd->vdev_child[0]->vdev_dtl_map,
+		if ((zio->io_flags & ZIO_FLAG_RESILVER) && mm->mm_replacing &&
+		    !vdev_dtl_contains(&mm->mm_child[0].mc_vd->vdev_dtl_map,
 		    zio->io_txg, 1)) {
-			c = vd->vdev_children - 1;
+			c = mm->mm_children - 1;
 			children = 1;
 		} else {
 			c = 0;
-			children = vd->vdev_children;
+			children = mm->mm_children;
 		}
 	}
 
 	while (children--) {
+		mc = &mm->mm_child[c];
 		zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-		    vd->vdev_child[c], zio->io_offset, zio->io_data,
-		    zio->io_size, zio->io_type, zio->io_priority,
-		    ZIO_FLAG_CANFAIL, vdev_mirror_child_done, &mm[c]));
+		    mc->mc_vd, mc->mc_offset,
+		    zio->io_data, zio->io_size, zio->io_type, zio->io_priority,
+		    ZIO_FLAG_CANFAIL, vdev_mirror_child_done, mc));
 		c++;
 	}
 
@@ -274,20 +317,19 @@ vdev_mirror_io_start(zio_t *zio)
 static void
 vdev_mirror_io_done(zio_t *zio)
 {
-	vdev_t *vd = zio->io_vd;
-	vdev_t *cvd;
 	mirror_map_t *mm = zio->io_vsd;
+	mirror_child_t *mc;
 	int c;
 	int good_copies = 0;
 	int unexpected_errors = 0;
 
-	ASSERT(mm != NULL);
-
 	zio->io_error = 0;
 	zio->io_numerrors = 0;
 
-	for (c = 0; c < vd->vdev_children; c++) {
-		if (mm[c].mm_tried && mm[c].mm_error == 0) {
+	for (c = 0; c < mm->mm_children; c++) {
+		mc = &mm->mm_child[c];
+
+		if (mc->mc_tried && mc->mc_error == 0) {
 			good_copies++;
 			continue;
 		}
@@ -296,10 +338,10 @@ vdev_mirror_io_done(zio_t *zio)
 		 * We preserve any EIOs because those may be worth retrying;
 		 * whereas ECKSUM and ENXIO are more likely to be persistent.
 		 */
-		if (mm[c].mm_error) {
+		if (mc->mc_error) {
 			if (zio->io_error != EIO)
-				zio->io_error = mm[c].mm_error;
-			if (!mm[c].mm_skipped)
+				zio->io_error = mc->mc_error;
+			if (!mc->mc_skipped)
 				unexpected_errors++;
 			zio->io_numerrors++;
 		}
@@ -308,11 +350,12 @@ vdev_mirror_io_done(zio_t *zio)
 	if (zio->io_type == ZIO_TYPE_WRITE) {
 		/*
 		 * XXX -- for now, treat partial writes as success.
+		 * XXX -- For a replacing vdev, we need to make sure the
+		 *	  new child succeeds.
 		 */
 		/* XXPOLICY */
 		if (good_copies != 0)
 			zio->io_error = 0;
-		ASSERT(mm != NULL);
 		vdev_mirror_map_free(zio);
 		zio_next_stage(zio);
 		return;
@@ -325,17 +368,16 @@ vdev_mirror_io_done(zio_t *zio)
 	 */
 	/* XXPOLICY */
 	if (good_copies == 0 && (c = vdev_mirror_child_select(zio)) != -1) {
-		ASSERT(c >= 0 && c < vd->vdev_children);
-		cvd = vd->vdev_child[c];
-		dprintf("%s: retrying i/o (err=%d) on child %s\n",
-		    vdev_description(zio->io_vd), zio->io_error,
-		    vdev_description(cvd));
+		ASSERT(c >= 0 && c < mm->mm_children);
+		mc = &mm->mm_child[c];
+		dprintf("retrying i/o (err=%d) on child %s\n",
+		    zio->io_error, vdev_description(mc->mc_vd));
 		zio->io_error = 0;
 		zio_vdev_io_redone(zio);
-		zio_nowait(zio_vdev_child_io(zio, zio->io_bp, cvd,
-		    zio->io_offset, zio->io_data, zio->io_size,
+		zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
+		    mc->mc_vd, mc->mc_offset, zio->io_data, zio->io_size,
 		    ZIO_TYPE_READ, zio->io_priority, ZIO_FLAG_CANFAIL,
-		    vdev_mirror_child_done, &mm[c]));
+		    vdev_mirror_child_done, mc));
 		zio_wait_children_done(zio);
 		return;
 	}
@@ -360,7 +402,7 @@ vdev_mirror_io_done(zio_t *zio)
 		rio = zio_null(zio, zio->io_spa,
 		    vdev_mirror_repair_done, zio, ZIO_FLAG_CANFAIL);
 
-		for (c = 0; c < vd->vdev_children; c++) {
+		for (c = 0; c < mm->mm_children; c++) {
 			/*
 			 * Don't rewrite known good children.
 			 * Not only is it unnecessary, it could
@@ -368,24 +410,23 @@ vdev_mirror_io_done(zio_t *zio)
 			 * power while rewriting the only good copy,
 			 * there would be no good copies left!
 			 */
-			cvd = vd->vdev_child[c];
+			mc = &mm->mm_child[c];
 
-			if (mm[c].mm_error == 0) {
-				if (mm[c].mm_tried)
+			if (mc->mc_error == 0) {
+				if (mc->mc_tried)
 					continue;
-				if (!vdev_dtl_contains(&cvd->vdev_dtl_map,
+				if (!vdev_dtl_contains(&mc->mc_vd->vdev_dtl_map,
 				    zio->io_txg, 1))
 					continue;
-				mm[c].mm_error = ESTALE;
+				mc->mc_error = ESTALE;
 			}
 
-			dprintf("%s resilvered %s @ 0x%llx error %d\n",
-			    vdev_description(vd),
-			    vdev_description(cvd),
-			    zio->io_offset, mm[c].mm_error);
+			dprintf("resilvered %s @ 0x%llx error %d\n",
+			    vdev_description(mc->mc_vd), mc->mc_offset,
+			    mc->mc_error);
 
-			zio_nowait(zio_vdev_child_io(rio, zio->io_bp, cvd,
-			    zio->io_offset, zio->io_data, zio->io_size,
+			zio_nowait(zio_vdev_child_io(rio, zio->io_bp, mc->mc_vd,
+			    mc->mc_offset, zio->io_data, zio->io_size,
 			    ZIO_TYPE_WRITE, zio->io_priority,
 			    ZIO_FLAG_IO_REPAIR | ZIO_FLAG_CANFAIL |
 			    ZIO_FLAG_DONT_PROPAGATE, NULL, NULL));

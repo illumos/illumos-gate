@@ -232,7 +232,7 @@ dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree)
 	uint64_t space, resv;
 
 	/*
-	 * Reserve about 1% (1/128), or at least 16MB, for allocation
+	 * Reserve about 1.6% (1/64), or at least 32MB, for allocation
 	 * efficiency.
 	 * XXX The intent log is not accounted for, so it must fit
 	 * within this slop.
@@ -242,7 +242,7 @@ dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree)
 	 * (e.g. make it possible to rm(1) files from a full pool).
 	 */
 	space = spa_get_space(dp->dp_spa);
-	resv = MAX(space >> 7, SPA_MINDEVSIZE >> 2);
+	resv = MAX(space >> 6, SPA_MINDEVSIZE >> 1);
 	if (netfree)
 		resv >>= 1;
 

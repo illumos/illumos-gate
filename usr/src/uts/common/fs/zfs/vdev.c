@@ -847,19 +847,8 @@ void
 vdev_reopen(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
-	vdev_t *rvd = spa->spa_root_vdev;
-	int c;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
-
-	if (vd == rvd) {
-		for (c = 0; c < rvd->vdev_children; c++)
-			vdev_reopen(rvd->vdev_child[c]);
-		return;
-	}
-
-	/* only valid for top-level vdevs */
-	ASSERT3P(vd, ==, vd->vdev_top);
 
 	vdev_close(vd);
 	(void) vdev_open(vd);
@@ -867,11 +856,7 @@ vdev_reopen(vdev_t *vd)
 	/*
 	 * Reassess root vdev's health.
 	 */
-	rvd->vdev_state = VDEV_STATE_HEALTHY;
-	for (c = 0; c < rvd->vdev_children; c++) {
-		uint64_t state = rvd->vdev_child[c]->vdev_state;
-		rvd->vdev_state = MIN(rvd->vdev_state, state);
-	}
+	vdev_propagate_state(spa->spa_root_vdev);
 }
 
 int
@@ -1741,6 +1726,39 @@ vdev_config_clean(vdev_t *vd)
 	list_remove(&spa->spa_dirty_list, vd);
 }
 
+void
+vdev_propagate_state(vdev_t *vd)
+{
+	vdev_t *rvd = vd->vdev_spa->spa_root_vdev;
+	int degraded = 0, faulted = 0;
+	int corrupted = 0;
+	int c;
+	vdev_t *child;
+
+	for (c = 0; c < vd->vdev_children; c++) {
+		child = vd->vdev_child[c];
+		if (child->vdev_state <= VDEV_STATE_CANT_OPEN)
+			faulted++;
+		else if (child->vdev_state == VDEV_STATE_DEGRADED)
+			degraded++;
+
+		if (child->vdev_stat.vs_aux == VDEV_AUX_CORRUPT_DATA)
+			corrupted++;
+	}
+
+	vd->vdev_ops->vdev_op_state_change(vd, faulted, degraded);
+
+	/*
+	 * Root special: if there is a toplevel vdev that cannot be
+	 * opened due to corrupted metadata, then propagate the root
+	 * vdev's aux state as 'corrupt' rather than 'insufficient
+	 * replicas'.
+	 */
+	if (corrupted && vd == rvd && rvd->vdev_state == VDEV_STATE_CANT_OPEN)
+		vdev_set_state(rvd, B_FALSE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+}
+
 /*
  * Set a vdev's state.  If this is during an open, we don't update the parent
  * state, because we're in the process of opening children depth-first.
@@ -1810,36 +1828,6 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 	if (isopen)
 		return;
 
-	if (vd->vdev_parent != NULL) {
-		int c;
-		int degraded = 0, faulted = 0;
-		int corrupted = 0;
-		vdev_t *parent, *child;
-
-		parent = vd->vdev_parent;
-		for (c = 0; c < parent->vdev_children; c++) {
-			child = parent->vdev_child[c];
-			if (child->vdev_state <= VDEV_STATE_CANT_OPEN)
-				faulted++;
-			else if (child->vdev_state == VDEV_STATE_DEGRADED)
-				degraded++;
-
-			if (child->vdev_stat.vs_aux == VDEV_AUX_CORRUPT_DATA)
-				corrupted++;
-		}
-
-		vd->vdev_parent->vdev_ops->vdev_op_state_change(
-		    vd->vdev_parent, faulted, degraded);
-
-		/*
-		 * Root special: if this is a toplevel vdev that cannot be
-		 * opened due to corrupted metadata, then propagate the root
-		 * vdev's aux state as 'corrupt' rather than 'insufficient
-		 * replicas'.
-		 */
-		if (corrupted && vd == vd->vdev_top)
-			vdev_set_state(vd->vdev_spa->spa_root_vdev,
-			    B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-	}
+	if (vd->vdev_parent != NULL)
+		vdev_propagate_state(vd->vdev_parent);
 }
