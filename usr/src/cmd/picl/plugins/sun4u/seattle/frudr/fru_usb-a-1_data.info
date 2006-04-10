@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI" 
@@ -68,7 +68,7 @@
 #endif
 id("%Z%%M% %I%     %E% SMI")
 
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pciex@0/usb@1c/picl?bus-addr=1
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pci@0/usb@1c/picl?bus-addr=1
         REFPROP _location_parent name:/frutree/chassis/MB/system-board/USB0
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pciex@0/usb@1c,3/picl?bus-addr=1
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pci@0/usb@1c,3/picl?bus-addr=1
         REFPROP _location_parent name:/frutree/chassis/MB/system-board/USB0

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,11 +73,11 @@ id("%Z%%M%	%I%	%E% SMI")
 /*
  * Front panel EHCI devices
  */
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@1/pciex@0/usb@1c,3/obp-device@7/picl?bus-addr=3
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@1/pci@0/usb@1c,3/usb@7/picl?bus-addr=3
         REFPROP _location_parent name:/frutree/chassis/MB/system-board/FIOB/front-IO-board/USB2
 
 /*
  * Front panel OHCI devices 
  */
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@1/pciex@0/usb@1c,2/obp-device@1/picl?bus-addr=3
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@1/pci@0/usb@1c,2/usb@1/picl?bus-addr=3
         REFPROP _location_parent name:/frutree/chassis/MB/system-board/FIOB/front-IO-board/USB2
