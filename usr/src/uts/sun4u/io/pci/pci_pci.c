@@ -1020,7 +1020,7 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	pmcap = PCI_CAP_GET16(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
 		PCI_PMCAP);
 
-	if (pmcap == 0xffff || pmcsr_bse == 0xff) {
+	if (pmcap == PCI_CAP_EINVAL16 || pmcsr_bse == PCI_CAP_EINVAL8) {
 		pci_config_teardown(&conf_hdl);
 		return;
 	}
@@ -1178,7 +1178,7 @@ pci_pwr_current_lvl(pci_pwr_t *pwr_p)
 	    ddi_get_instance(pwr_p->pwr_dip));
 
 	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
-		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == 0xffff)
+		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
 	switch (pmcsr & PCI_PMCSR_STATE_MASK) {
@@ -1255,7 +1255,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 	}
 
 	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
-		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == 0xffff)
+		ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
 	/*

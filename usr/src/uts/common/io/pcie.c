@@ -233,7 +233,7 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 
 	/* 2. clear the PCIe Errors */
 	if ((device_sts = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-		PCIE_DEVSTS)) != 0xffff)
+		PCIE_DEVSTS)) != PCI_CAP_EINVAL16)
 		PCI_CAP_PUT16(config_handle, PCI_CAP_ID_PCI_E, cap_ptr,
 			PCIE_DEVSTS, device_sts);
 
@@ -273,7 +273,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 * Enable PCI-Express Baseline Error Handling
 	 */
 	if ((device_ctl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-		PCIE_DEVCTL)) != 0xffff) {
+		PCIE_DEVCTL)) != PCI_CAP_EINVAL16) {
 		PCI_CAP_PUT16(config_handle, NULL, cap_ptr, PCIE_DEVCTL,
 			pcie_base_err_default);
 
@@ -291,7 +291,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 
 	/* Enable Uncorrectable errors */
 	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
-		PCIE_AER_UCE_MASK)) != DDI_FAILURE) {
+		PCIE_AER_UCE_MASK)) != PCI_CAP_EINVAL32) {
 		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr,
 			PCIE_AER_UCE_MASK, pcie_aer_uce_mask);
 		PCIE_DBG("%s: AER UCE=0x%x->0x%x\n", ddi_driver_name(dip),
@@ -301,7 +301,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 
 	/* Enable Correctable errors */
 	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
-		PCIE_AER_CE_MASK)) != DDI_FAILURE) {
+		PCIE_AER_CE_MASK)) != PCI_CAP_EINVAL32) {
 		PCI_XCAP_PUT32(config_handle, PCIE_EXT_CAP_ID_AER,
 			aer_ptr, PCIE_AER_CE_MASK, pcie_aer_ce_mask);
 		PCIE_DBG("%s: AER CE=0x%x->0x%x\n", ddi_driver_name(dip),
@@ -319,7 +319,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 * Enable secondary bus errors
 	 */
 	if ((aer_reg = PCI_XCAP_GET32(config_handle, NULL, aer_ptr,
-		PCIE_AER_SUCE_MASK)) != DDI_FAILURE) {
+		PCIE_AER_SUCE_MASK)) != PCI_CAP_EINVAL32) {
 		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_SUCE_MASK,
 			pcie_aer_suce_mask);
 		PCIE_DBG("%s: AER SUCE=0x%x->0x%x\n", ddi_driver_name(dip),

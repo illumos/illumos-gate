@@ -62,7 +62,7 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
 
-	if (status == 0xffff || !(status & PCI_STAT_CAP))
+	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
 		return (DDI_FAILURE);
 
 	/* PCIE and PCIX Version 2 contain Extended Config Space */
@@ -77,7 +77,7 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 			search_ext = 1;
 		else if (id == PCI_CAP_ID_PCIX) {
 			if ((pcix_cmd = pci_config_get16(h, base +
-				PCI_PCIX_COMMAND)) != 0xffff)
+				PCI_PCIX_COMMAND)) != PCI_CAP_EINVAL16)
 				continue;
 			if ((pcix_cmd & PCI_PCIX_VER_MASK) == PCI_PCIX_VER_2)
 				search_ext = 1;
@@ -93,7 +93,7 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 		return (DDI_FAILURE);
 
 	for (base = PCIE_EXT_CAP; base && i < index; i++) {
-		if ((xcaps_hdr = pci_config_get32(h, base)) == 0xffffffff)
+		if ((xcaps_hdr = pci_config_get32(h, base)) == PCI_CAP_EINVAL32)
 			break;
 
 		id = (xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT)
@@ -105,7 +105,7 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 	if (!base || i < index)
 		return (DDI_FAILURE);
 
-	if ((xcaps_hdr = pci_config_get32(h, base)) == 0xffffffff)
+	if ((xcaps_hdr = pci_config_get32(h, base)) == PCI_CAP_EINVAL32)
 		return (DDI_FAILURE);
 
 	id = ((xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK) |
@@ -130,7 +130,7 @@ pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
 
-	if (status == 0xffff || !(status & PCI_STAT_CAP))
+	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
 		return (DDI_FAILURE);
 
 	for (base = pci_config_get8(h, PCI_CONF_CAP_PTR); base;
@@ -158,13 +158,13 @@ pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p)
 
 	status = pci_config_get16(h, PCI_CONF_STAT);
 
-	if (status == 0xffff || !(status & PCI_STAT_CAP))
+	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
 		return (DDI_FAILURE);
 
 	for (base = PCIE_EXT_CAP; base; base = (xcaps_hdr >>
 		PCIE_EXT_CAP_NEXT_PTR_SHIFT) & PCIE_EXT_CAP_NEXT_PTR_MASK) {
 
-		if ((xcaps_hdr = pci_config_get32(h, base)) == 0xffffffff)
+		if ((xcaps_hdr = pci_config_get32(h, base)) == PCI_CAP_EINVAL32)
 			break;
 
 		if (((xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT) &
@@ -191,7 +191,7 @@ pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
 	uint32_t data;
 
 	if (PCI_CAP_BASE(h, id, &base) != DDI_SUCCESS)
-		return (0xffffffff);
+		return (PCI_CAP_EINVAL32);
 
 	/*
 	 * Each access to a PCI Configuration Space should be checked
@@ -212,7 +212,7 @@ pci_cap_get(ddi_acc_handle_t h, pci_config_size_t size,
 		data = pci_config_get32(h, offset);
 		break;
 	default:
-		data = 0xffffffff;
+		data = PCI_CAP_EINVAL32;
 	}
 
 	PCI_CAP_DBG("pci_cap_get: %p[x%x]=x%x\n", (void *)h, offset, data);
@@ -275,7 +275,7 @@ pci_cap_read(ddi_acc_handle_t h, uint32_t id, uint16_t base,
 		return (DDI_FAILURE);
 
 	for (ptr = buf_p, i = 0; i < nwords; i++, base += 4) {
-		if ((*ptr++ = pci_config_get32(h, base)) == 0xffffffff)
+		if ((*ptr++ = pci_config_get32(h, base)) == PCI_CAP_EINVAL32)
 			return (DDI_FAILURE);
 	}
 

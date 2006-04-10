@@ -54,6 +54,11 @@ int pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p);
 #define PCI_CAP_DBG		_NOTE(CONSTANTCONDITION) if (0) printf
 #endif /* DEBUG */
 
+/* 2's complement of -1, added here to ameliorate testing for invalid data */
+#define	PCI_CAP_EINVAL8		0xff
+#define	PCI_CAP_EINVAL16	0xffff
+#define	PCI_CAP_EINVAL32	0xffffffff
+
 /*
  * Supported Config Size Reads/Writes
  */
@@ -110,12 +115,6 @@ extern int pci_cap_put(ddi_acc_handle_t h, pci_config_size_t size,
 
 extern int pci_cap_read(ddi_acc_handle_t h, uint32_t id, uint16_t base,
 		uint32_t *buf_p, uint32_t nwords);
-
-extern int pci_cap_count(ddi_acc_handle_t h);
-
-extern void pci_cap_print(ddi_acc_handle_t h);
-
-extern void pci_cap_dump(uint32_t *buf_p, uint32_t nwords);
 
 #ifdef __cplusplus
 }

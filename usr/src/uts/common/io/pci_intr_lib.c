@@ -104,7 +104,7 @@ pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
 	if ((PCI_CAP_LOCATE(*h, PCI_CAP_ID_MSI, caps_ptr) == DDI_SUCCESS) &&
 		(type == DDI_INTR_TYPE_MSI)) {
 		if ((*msi_ctrl = PCI_CAP_GET16(*h, NULL, *caps_ptr,
-			PCI_MSI_CTRL)) == 0xffff)
+			PCI_MSI_CTRL)) == PCI_CAP_EINVAL16)
 			goto done;
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: MSI "
@@ -116,7 +116,7 @@ pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
 	if ((PCI_CAP_LOCATE(*h, PCI_CAP_ID_MSI_X, caps_ptr) == DDI_SUCCESS) &&
 		(type == DDI_INTR_TYPE_MSIX)) {
 		if ((*msi_ctrl = PCI_CAP_GET16(*h, NULL, *caps_ptr,
-			PCI_MSIX_CTRL)) == 0xffff)
+			PCI_MSIX_CTRL)) == PCI_CAP_EINVAL16)
 			goto done;
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: MSI-X "
@@ -491,7 +491,7 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
 
 		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
-			offset)) == 0xffffffff)
+			offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
 		mask_bits |= (1 << inum);
@@ -554,7 +554,7 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
 		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
 		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
-			offset)) == DDI_FAILURE)
+			offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
 		mask_bits &= ~(1 << inum);
@@ -621,7 +621,7 @@ pci_msi_get_pending(dev_info_t *rdip, int type, int inum, int *pendingp)
 		    PCI_MSI_64BIT_PENDING : PCI_MSI_32BIT_PENDING;
 
 		if ((pending_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
-			offset)) == DDI_FAILURE)
+			offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
 		*pendingp = pending_bits & ~(1 >> inum);
