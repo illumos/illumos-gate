@@ -47,6 +47,7 @@
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dr.h>
+#include <sys/taskq.h>
 
 #include <sys/sata/impl/sata.h>
 #include <sys/sata/sata_hba.h>
@@ -98,7 +99,6 @@ static 	struct scsi_pkt *sata_scsi_init_pkt(struct scsi_address *,
 static 	void sata_scsi_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
 static 	void sata_scsi_dmafree(struct scsi_address *, struct scsi_pkt *);
 static 	void sata_scsi_sync_pkt(struct scsi_address *, struct scsi_pkt *);
-static 	int sata_scsi_get_name(struct scsi_device *, char *, int);
 
 
 /*
@@ -132,6 +132,12 @@ static 	int sata_fetch_device_identify_data(sata_hba_inst_t *,
 static	void sata_update_port_info(sata_hba_inst_t *, sata_device_t *);
 static	void sata_update_port_scr(sata_port_scr_t *, sata_device_t *);
 static	int sata_set_udma_mode(sata_hba_inst_t *, sata_drive_info_t *);
+static	int sata_set_cache_mode(sata_hba_inst_t *, sata_drive_info_t *, int);
+static	int sata_set_drive_features(sata_hba_inst_t *,
+    sata_drive_info_t *, int flag);
+static	int sata_init_write_cache_mode(sata_hba_inst_t *,
+    sata_drive_info_t *sdinfo);
+static	int sata_initialize_device(sata_hba_inst_t *, sata_drive_info_t *);
 
 /* Event processing functions */
 static	void sata_event_daemon(void *);
@@ -146,8 +152,6 @@ static	void sata_process_device_detached(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_device_attached(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_port_pwr_change(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_cntrl_pwr_level_change(sata_hba_inst_t *);
-static	int sata_restore_drive_settings(sata_hba_inst_t *,
-    sata_drive_info_t *);
 
 /* Local functions for ioctl */
 static	int32_t sata_get_port_num(sata_hba_inst_t *,  struct devctl_iocdata *);
@@ -279,6 +283,9 @@ static	kmutex_t sata_mutex;		/* protects sata_hba_list */
 static	kmutex_t sata_log_mutex;	/* protects log */
 
 static 	char sata_log_buf[256];
+
+/* Default write cache setting */
+int sata_write_cache = 1;
 
 /*
  * Linked list of HBA instances
@@ -475,6 +482,7 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 	sata_hba_inst_t	*sata_hba_inst;
 	scsi_hba_tran_t *scsi_tran = NULL;
 	int hba_attach_state = 0;
+	char taskq_name[MAXPATHLEN];
 
 	SATADBG3(SATA_DBG_HBA_IF, NULL,
 	    "sata_hba_attach: node %s (%s%d)\n",
@@ -570,6 +578,20 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 	sata_hba_inst->satahba_tran = sata_tran;
 	sata_hba_inst->satahba_dip = dip;
 
+	/*
+	 * Create a task queue to handle emulated commands completion
+	 * Use node name, dash, instance number as the queue name.
+	 */
+	taskq_name[0] = '\0';
+	(void) strlcat(taskq_name, DEVI(dip)->devi_node_name,
+	    sizeof (taskq_name));
+	(void) snprintf(taskq_name + strlen(taskq_name),
+	    sizeof (taskq_name) - strlen(taskq_name),
+	    "-%d", DEVI(dip)->devi_instance);
+	sata_hba_inst->satahba_taskq = taskq_create(taskq_name, 1,
+	    minclsyspri, 1, sata_tran->sata_tran_hba_num_cports,
+	    TASKQ_DYNAMIC);
+
 	hba_attach_state |= HBA_ATTACH_STAGE_SETUP;
 
 	/*
@@ -643,8 +665,11 @@ fail:
 		if (sata_hba_list == NULL)
 			sata_event_thread_control(0);
 	}
-	if (hba_attach_state & HBA_ATTACH_STAGE_SETUP)
+
+	if (hba_attach_state & HBA_ATTACH_STAGE_SETUP) {
 		(void) ddi_prop_remove(DDI_DEV_T_ANY, dip, "sata");
+		taskq_destroy(sata_hba_inst->satahba_taskq);
+	}
 
 	if (hba_attach_state & HBA_ATTACH_STAGE_SCSI_ATTACHED)
 		(void) scsi_hba_detach(dip);
@@ -780,6 +805,10 @@ sata_hba_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		scsi_hba_tran_free(sata_hba_inst->satahba_scsi_tran);
+
+		(void) ddi_prop_remove(DDI_DEV_T_ANY, dip, "sata");
+
+		taskq_destroy(sata_hba_inst->satahba_taskq);
 
 		mutex_destroy(&sata_hba_inst->satahba_mutex);
 		kmem_free((void *)sata_hba_inst,
@@ -2668,8 +2697,8 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
  * SCMD_START_STOP
  * SCMD_READ_CAPACITY
  * SCMD_REQUEST_SENSE
- * SCMD_LOG_SENSE_G1	(unimplemented)
- * SCMD_LOG_SELECT_G1	(unimplemented)
+ * SCMD_LOG_SENSE_G1
+ * SCMD_LOG_SELECT_G1
  * SCMD_MODE_SENSE	(specific pages)
  * SCMD_MODE_SENSE_G1	(specific pages)
  * SCMD_MODE_SELECT	(specific pages)
@@ -3429,7 +3458,12 @@ sata_txlt_invalid_command(sata_pkt_txlate_t *spx)
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
 }
 
@@ -3464,7 +3498,12 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    spx->txlt_scsi_pkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*spx->txlt_scsi_pkt->pkt_comp)(spx->txlt_scsi_pkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+		    (void *)spx->txlt_scsi_pkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
 }
 
@@ -3646,10 +3685,14 @@ done:
 	    scsipkt->pkt_reason);
 
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	    scsipkt->pkt_comp != NULL) {
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
-
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
+	}
 	return (TRAN_ACCEPT);
 }
 
@@ -3703,7 +3746,11 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
 }
 
@@ -3757,7 +3804,11 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 
 	return (TRAN_ACCEPT);
 }
@@ -3811,7 +3862,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 		    scsipkt->pkt_comp != NULL)
 			/* scsi callback required */
-			(*scsipkt->pkt_comp)(scsipkt);
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+			    TQ_SLEEP) == 0)
+				/* Scheduling the callback failed */
+				return (TRAN_BUSY);
 
 		return (TRAN_ACCEPT);
 	}
@@ -3935,7 +3990,11 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 
 	return (TRAN_ACCEPT);
 }
@@ -4185,7 +4244,11 @@ done:
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 
 	return (TRAN_ACCEPT);
 }
@@ -4440,7 +4503,11 @@ done:
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 
 	return (rval);
 }
@@ -4649,7 +4716,11 @@ done:
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 
 	return (TRAN_ACCEPT);
 }
@@ -5477,7 +5548,11 @@ sata_txlt_lba_out_of_range(sata_pkt_txlate_t *spx)
 	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
-		(*scsipkt->pkt_comp)(scsipkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
 }
 
@@ -7091,7 +7166,7 @@ sata_make_device_nodes(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst)
 	int			rval;
 
 	/*
-	 * Walk through pre-probed sata ports info in sata_scsi
+	 * Walk through pre-probed sata ports info in sata_hba_inst structure
 	 */
 	for (ncport = 0; ncport < SATA_NUM_CPORTS(sata_hba_inst); ncport++) {
 		cportinfo = SATA_CPORT_INFO(sata_hba_inst, ncport);
@@ -7131,9 +7206,6 @@ sata_make_device_nodes(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst)
 				continue;
 
 			mutex_enter(&cportinfo->cport_mutex);
-			sata_save_drive_settings(
-			    SATA_CPORTINFO_DRV_INFO(cportinfo));
-
 			if ((sata_device.satadev_type &
 			    SATA_VALID_DEV_TYPE) == 0) {
 				/*
@@ -7146,10 +7218,17 @@ sata_make_device_nodes(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst)
 				continue;
 			}
 			cportinfo->cport_dev_type = sata_device.satadev_type;
+			mutex_exit(&cportinfo->cport_mutex);
 
+			if (sata_initialize_device(sata_hba_inst,
+			    SATA_CPORTINFO_DRV_INFO(cportinfo)) != SATA_SUCCESS)
+				/* Retry */
+				(void) sata_initialize_device(sata_hba_inst,
+				    SATA_CPORTINFO_DRV_INFO(cportinfo));
+
+			mutex_enter(&cportinfo->cport_mutex);
 			sata_show_drive_info(sata_hba_inst,
 			    SATA_CPORTINFO_DRV_INFO(cportinfo));
-
 			mutex_exit(&cportinfo->cport_mutex);
 			cdip = sata_create_target_node(pdip, sata_hba_inst,
 			    &sata_device.satadev_addr);
@@ -7207,8 +7286,6 @@ sata_make_device_nodes(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst)
 					continue;
 				}
 				mutex_enter(&cportinfo->cport_mutex);
-				sata_save_drive_settings(
-					pmportinfo->pmport_sata_drive);
 				if ((sata_device.satadev_type &
 				    SATA_VALID_DEV_TYPE) == 0) {
 					/*
@@ -7221,10 +7298,18 @@ sata_make_device_nodes(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst)
 				}
 				pmportinfo->pmport_dev_type =
 				    sata_device.satadev_type;
+				mutex_exit(&cportinfo->cport_mutex);
+				if (sata_initialize_device(sata_hba_inst,
+				    pmportinfo->pmport_sata_drive) !=
+				    SATA_SUCCESS)
+					/* Retry */
+					(void) sata_initialize_device(
+					    sata_hba_inst,
+					    pmportinfo->pmport_sata_drive);
 
+				mutex_enter(&cportinfo->cport_mutex);
 				sata_show_drive_info(sata_hba_inst,
 				    pmportinfo->pmport_sata_drive);
-
 				mutex_exit(&cportinfo->cport_mutex);
 				cdip = sata_create_target_node(pdip,
 				    sata_hba_inst, &sata_device.satadev_addr);
@@ -7376,6 +7461,16 @@ sata_create_target_node(dev_info_t *dip, sata_hba_inst_t *sata_hba_inst,
 	}
 
 	/*
+	 * Set default write cache mode
+	 */
+	rval = sata_init_write_cache_mode(sata_hba_inst, sdinfo);
+	if (rval != SATA_SUCCESS) {
+		sata_log(sata_hba_inst, CE_WARN, "sata_create_target_node: "
+		    "cannot set deafult write cache mode for "
+		    "device at port %d", sata_addr->cport);
+	}
+
+	/*
 	 * Now, try to attach the driver. If probing of the device fails,
 	 * the target node may be removed
 	 */
@@ -7418,6 +7513,7 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 {
 	sata_cport_info_t *cportinfo;
 	sata_drive_info_t *sdinfo;
+	boolean_t init_device = B_FALSE;
 	int rval;
 
 	/* We only care about host sata cport for now */
@@ -7525,6 +7621,12 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 				kmem_free(sdinfo, sizeof (sata_drive_info_t));
 				return (SATA_SUCCESS);
 			}
+			/*
+			 * Since we are adding device, presumably new one,
+			 * indicate that it  should be initalized,
+			 * as well as some internal framework states).
+			 */
+			init_device = B_TRUE;
 		}
 
 		cportinfo->cport_dev_type = SATA_DTYPE_UNKNOWN;
@@ -7539,7 +7641,71 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	 * Figure out what kind of device we are really
 	 * dealing with.
 	 */
-	return (sata_probe_device(sata_hba_inst, sata_device));
+	rval = sata_probe_device(sata_hba_inst, sata_device);
+
+	/* Set initial device features, if necessary */
+	if (rval == SATA_SUCCESS && init_device == B_TRUE) {
+		if (sata_initialize_device(sata_hba_inst, sdinfo) !=
+		    SATA_SUCCESS)
+			/* retry */
+			(void) sata_initialize_device(sata_hba_inst, sdinfo);
+	}
+	return (rval);
+}
+
+/*
+ * Initialize device
+ * Specified device is initialized to a default state.
+ * At this point only read cache and UDMA modes are set here.
+ * Write cache mode should be set when a disk is configured.
+ *
+ * Only SATA disks are initialized for now.
+ *
+ * Returns SATA_SUCCESS if all device features are set successfully,
+ * SATA_FAILURE otherwise
+ */
+static int
+sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
+    sata_drive_info_t *sdinfo)
+{
+
+	sata_save_drive_settings(sdinfo);
+
+	sdinfo->satadrv_settings |= SATA_DEV_READ_AHEAD;
+
+	return (sata_set_drive_features(sata_hba_inst, sdinfo, 0));
+}
+
+
+/*
+ * Initialize write cache mode.
+ *
+ * The default write cache setting is provided by sata_write_cache
+ * static variable:
+ * 1 - enable
+ * 0 - disable
+ * any other value - current drive setting
+ *
+ * In the future, it may be overridden by the
+ * disk-write-cache-enable property setting, if it is defined.
+ * Returns SATA_SUCCESS if all device features are set successfully,
+ * SATA_FAILURE otherwise.
+ */
+static int
+sata_init_write_cache_mode(sata_hba_inst_t *sata_hba_inst,
+    sata_drive_info_t *sdinfo)
+{
+	if (sata_write_cache == 1)
+		sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
+	else if (sata_write_cache == 0)
+		sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
+	/*
+	 * When sata_write_cache value is not 0 or 1,
+	 * a current setting of the drive's write cache is used.
+	 *
+	 * Now set the write cache mode
+	 */
+	return (sata_set_drive_features(sata_hba_inst, sdinfo, 0));
 }
 
 
@@ -7756,13 +7922,6 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 		new_sdinfo.satadrv_type = SATA_DTYPE_ATADISK;
 		if (sata_identify_device(sata_hba_inst, &new_sdinfo) == 0) {
 			/* Got something responding to ATA Identify Device */
-			if (sata_set_udma_mode(sata_hba_inst, &new_sdinfo) !=
-			    SATA_SUCCESS) {
-				/* Try one more time */
-				if (sata_set_udma_mode(sata_hba_inst,
-				    &new_sdinfo) != SATA_SUCCESS)
-					goto failure;
-			}
 			sata_device->satadev_type = new_sdinfo.satadrv_type;
 			break;
 		}
@@ -8869,6 +9028,95 @@ failure:
 
 
 /*
+ * Set device caching mode.
+ * One of the following operations should be specified:
+ * SATAC_SF_ENABLE_READ_AHEAD
+ * SATAC_SF_DISABLE_READ_AHEAD
+ * SATAC_SF_ENABLE_WRITE_CACHE
+ * SATAC_SF_DISABLE_WRITE_CACHE
+ *
+ * If operation fails, system log messgage is emitted.
+ * Returns SATA_SUCCESS when the operation succeeds, SATA_FAILURE otherwise.
+ */
+
+static int
+sata_set_cache_mode(sata_hba_inst_t *sata_hba_inst, sata_drive_info_t *sdinfo,
+    int cache_op)
+{
+	sata_pkt_t *spkt;
+	sata_cmd_t *scmd;
+	sata_pkt_txlate_t *spx;
+	int rval = SATA_SUCCESS;
+	char *infop;
+
+	ASSERT(sdinfo != NULL);
+	ASSERT(sata_hba_inst != NULL);
+	ASSERT(cache_op == SATAC_SF_ENABLE_READ_AHEAD ||
+	    cache_op == SATAC_SF_DISABLE_READ_AHEAD ||
+	    cache_op == SATAC_SF_ENABLE_WRITE_CACHE ||
+	    cache_op == SATAC_SF_DISABLE_WRITE_CACHE);
+
+
+	/* Prepare packet for SET FEATURES COMMAND */
+	spx = kmem_zalloc(sizeof (sata_pkt_txlate_t), KM_SLEEP);
+	spx->txlt_sata_hba_inst = sata_hba_inst;
+	spx->txlt_scsi_pkt = NULL;	/* No scsi pkt involved */
+	spkt = sata_pkt_alloc(spx, SLEEP_FUNC);
+	if (spkt == NULL) {
+		rval = SATA_FAILURE;
+		goto failure;
+	}
+	/* Fill sata_pkt */
+	spkt->satapkt_device.satadev_addr = sdinfo->satadrv_addr;
+	/* Timeout 30s */
+	spkt->satapkt_time = sata_default_pkt_time;
+	/* Synchronous mode, no callback, interrupts */
+	spkt->satapkt_op_mode =
+	    SATA_OPMODE_SYNCH | SATA_OPMODE_INTERRUPTS;
+	spkt->satapkt_comp = NULL;
+	scmd = &spkt->satapkt_cmd;
+	scmd->satacmd_flags.sata_data_direction = SATA_DIR_NODATA_XFER;
+	scmd->satacmd_flags.sata_ignore_dev_reset = B_TRUE;
+	scmd->satacmd_addr_type = 0;
+	scmd->satacmd_device_reg = 0;
+	scmd->satacmd_status_reg = 0;
+	scmd->satacmd_error_reg = 0;
+	scmd->satacmd_cmd_reg = SATAC_SET_FEATURES;
+	scmd->satacmd_features_reg = cache_op;
+
+	/* Transfer command to HBA */
+	if (((*SATA_START_FUNC(sata_hba_inst))(
+	    SATA_DIP(sata_hba_inst), spkt) != 0) ||
+	    (spkt->satapkt_reason != SATA_PKT_COMPLETED)) {
+		/* Pkt execution failed */
+		switch (cache_op) {
+		case SATAC_SF_ENABLE_READ_AHEAD:
+			infop = "enabling read ahead failed";
+			break;
+		case SATAC_SF_DISABLE_READ_AHEAD:
+			infop = "disabling read ahead failed";
+			break;
+		case SATAC_SF_ENABLE_WRITE_CACHE:
+			infop = "enabling write cache failed";
+			break;
+		case SATAC_SF_DISABLE_WRITE_CACHE:
+			infop = "disabling write cache failed";
+			break;
+		}
+		SATA_LOG_D((sata_hba_inst, CE_WARN, "%s", infop));
+		rval = SATA_FAILURE;
+	}
+failure:
+	/* Free allocated resources */
+	if (spkt != NULL)
+		sata_pkt_free(spx);
+	(void) kmem_free(spx, sizeof (sata_pkt_txlate_t));
+	return (rval);
+}
+
+
+
+/*
  * Update port SCR block
  */
 static void
@@ -9363,42 +9611,42 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 				(void) strlcat(buf1, "link lost/established, ",
 				    SATA_EVENT_MAX_MSG_LENGTH);
 
-				if (pstats->link_lost < 0xffffffffffffffff)
+				if (pstats->link_lost < 0xffffffffffffffffULL)
 					pstats->link_lost++;
 				if (pstats->link_established <
-				    0xffffffffffffffff)
+				    0xffffffffffffffffULL)
 					pstats->link_established++;
 				linkevent = 0;
 			} else if (linkevent & SATA_EVNT_LINK_LOST) {
 				(void) strlcat(buf1, "link lost, ",
 				    SATA_EVENT_MAX_MSG_LENGTH);
 
-				if (pstats->link_lost < 0xffffffffffffffff)
+				if (pstats->link_lost < 0xffffffffffffffffULL)
 					pstats->link_lost++;
 			} else {
 				(void) strlcat(buf1, "link established, ",
 				    SATA_EVENT_MAX_MSG_LENGTH);
 				if (pstats->link_established <
-				    0xffffffffffffffff)
+				    0xffffffffffffffffULL)
 					pstats->link_established++;
 			}
 		}
 		if (event & SATA_EVNT_DEVICE_ATTACHED) {
 			(void) strlcat(buf1, "device attached, ",
 			    SATA_EVENT_MAX_MSG_LENGTH);
-			if (pstats->device_attached < 0xffffffffffffffff)
+			if (pstats->device_attached < 0xffffffffffffffffULL)
 				pstats->device_attached++;
 		}
 		if (event & SATA_EVNT_DEVICE_DETACHED) {
 			(void) strlcat(buf1, "device detached, ",
 			    SATA_EVENT_MAX_MSG_LENGTH);
-			if (pstats->device_detached < 0xffffffffffffffff)
+			if (pstats->device_detached < 0xffffffffffffffffULL)
 				pstats->device_detached++;
 		}
 		if (event & SATA_EVNT_PWR_LEVEL_CHANGED) {
 			SATADBG1(SATA_DBG_EVENTS, sata_hba_inst,
 			    "port %d power level changed", cport);
-			if (pstats->port_pwr_changed < 0xffffffffffffffff)
+			if (pstats->port_pwr_changed < 0xffffffffffffffffULL)
 				pstats->port_pwr_changed++;
 		}
 
@@ -9427,7 +9675,7 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 				(void) strlcat(buf1, "device reset, ",
 				    SATA_EVENT_MAX_MSG_LENGTH);
 				if (sdinfo->satadrv_stats.drive_reset <
-				    0xffffffffffffffff)
+				    0xffffffffffffffffULL)
 					sdinfo->satadrv_stats.drive_reset++;
 				sdinfo->satadrv_event_flags |=
 				    SATA_EVNT_DEVICE_RESET;
@@ -9463,7 +9711,7 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 
 		mutex_enter(&sata_hba_inst->satahba_mutex);
 		if (sata_hba_inst->satahba_stats.ctrl_pwr_change <
-		    0xffffffffffffffff)
+		    0xffffffffffffffffULL)
 			sata_hba_inst->satahba_stats.ctrl_pwr_change++;
 
 		sata_hba_inst->satahba_event_flags |=
@@ -9927,7 +10175,7 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 	old_sdinfo = *sdinfo;	/* local copy of the drive info */
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 
-	if (sata_restore_drive_settings(sata_hba_inst, &old_sdinfo) ==
+	if (sata_set_drive_features(sata_hba_inst, &old_sdinfo, 1) ==
 	    SATA_FAILURE) {
 		/*
 		 * Restoring drive setting failed.
@@ -10531,30 +10779,34 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 
 
 /*
- * sata_restore_drive_settings function compares current device setting
- * with the saved device setting and, if there is a difference, restores
- * device setting to the stored state.
+ * sata_set_drive_featues function compares current device features setting
+ * with the saved device features settings and, if there is a difference,
+ * it restores device features setting to the previously saved state.
  * Device Identify data has to be current.
  * At the moment only read ahead and write cache settings are considered.
  *
  * This function cannot be called in the interrupt context (it may sleep).
  *
+ * The input argument sdinfo should point to the drive info structure
+ * to be updated after features are set.
+ *
  * Returns TRUE if successful or there was nothing to do.
- * Returns FALSE if device setting could not be restored.
+ * Returns FALSE if device features cound not be set .
  *
  * Note: This function may fail the port, making it inaccessible.
  * Explicit port disconnect/connect or physical device
  * detach/attach is required to re-evaluate it's state afterwards
  */
+
 static int
-sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
-    sata_drive_info_t *sdinfo)
+sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
+    sata_drive_info_t *sdinfo, int restore)
 {
-	sata_pkt_t *spkt;
-	sata_cmd_t *scmd;
-	sata_pkt_txlate_t *spx;
 	int rval = SATA_SUCCESS;
 	sata_drive_info_t new_sdinfo;
+	char *finfo = "sata_set_drive_features: cannot";
+	char *finfox;
+	int cache_op;
 
 	bzero(&new_sdinfo, sizeof (sata_drive_info_t));
 	new_sdinfo.satadrv_addr = sdinfo->satadrv_addr;
@@ -10564,14 +10816,13 @@ sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
 		 * Cannot get device identification - retry later
 		 */
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_restore_drive_settings: "
-		    "cannot fetch device identify data\n"));
+		    "%s fetch device identify data\n", finfo));
 		return (SATA_FAILURE);
 	}
 	/* Arbitrarily set UDMA mode */
 	if (sata_set_udma_mode(sata_hba_inst, &new_sdinfo) != SATA_SUCCESS) {
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_restore_drive_settings: cannot set UDMA mode\n"));
+		    "%s set UDMA mode\n", finfo));
 		return (SATA_FAILURE);
 	}
 
@@ -10579,7 +10830,7 @@ sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
 	    !(new_sdinfo.satadrv_id.ai_cmdset82 & SATA_WRITE_CACHE)) {
 		/* None of the features is supported - do nothing */
 		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
-		    "restorable features not supported\n", NULL);
+		    "settable features not supported\n", NULL);
 		return (SATA_SUCCESS);
 	}
 
@@ -10589,89 +10840,50 @@ sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
 	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
 		/* Nothing to do */
 		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
-		    "nothing to restore\n", NULL);
+		    "no device features to set\n", NULL);
 		return (SATA_SUCCESS);
 	}
 
-	/* Prepare packet for SET FEATURES COMMAND */
-	spx = kmem_zalloc(sizeof (sata_pkt_txlate_t), KM_SLEEP);
-	spx->txlt_sata_hba_inst = sata_hba_inst;
-	spx->txlt_scsi_pkt = NULL;		/* No scsi pkt involved */
-	spkt = sata_pkt_alloc(spx, SLEEP_FUNC);
-	if (spkt == NULL) {
-		kmem_free(spx, sizeof (sata_pkt_txlate_t));
-		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_restore_drive_settings: could not "
-		    "restore device settings\n"));
-		return (SATA_FAILURE);
-	}
-
-	/* Fill sata_pkt */
-	spkt->satapkt_device.satadev_addr = sdinfo->satadrv_addr;
-	/* Timeout 30s */
-	spkt->satapkt_time = sata_default_pkt_time;
-	/* Synchronous mode, no callback  */
-	spkt->satapkt_op_mode = SATA_OPMODE_SYNCH | SATA_OPMODE_INTERRUPTS;
-	spkt->satapkt_comp = NULL;
-	scmd = &spkt->satapkt_cmd;
-	scmd->satacmd_flags.sata_data_direction = SATA_DIR_NODATA_XFER;
-	scmd->satacmd_flags.sata_ignore_dev_reset = B_TRUE;
-	scmd->satacmd_addr_type = 0;
-	scmd->satacmd_device_reg = 0;
-	scmd->satacmd_status_reg = 0;
-	scmd->satacmd_error_reg = 0;
-	scmd->satacmd_cmd_reg = SATAC_SET_FEATURES;
+	finfox = (restore != 0) ? " restore device features" :
+	    " initialize device features\n";
 
 	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_LOOK_AHEAD) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD))) {
 		if (sdinfo->satadrv_settings & SATA_DEV_READ_AHEAD)
 			/* Enable read ahead / read cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_ENABLE_READ_AHEAD;
+			cache_op = SATAC_SF_ENABLE_READ_AHEAD;
 		else
 			/* Disable read ahead  / read cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_DISABLE_READ_AHEAD;
+			cache_op = SATAC_SF_DISABLE_READ_AHEAD;
 
-		/* Transfer command to HBA */
-		if (((*SATA_START_FUNC(sata_hba_inst))
-		    (SATA_DIP(sata_hba_inst), spkt) != 0) ||
-		    (spkt->satapkt_reason != SATA_PKT_COMPLETED)) {
+		/* Try to set read cache mode */
+		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
+		    cache_op) != SATA_SUCCESS) {
 			/* Pkt execution failed */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_restore_drive_settings: could not "
-			    "restore device settings\n"));
 			rval = SATA_FAILURE;
 		}
 	}
-	/* Note that the sata packet is not removed, so it could be re-used */
 
 	if (!((new_sdinfo.satadrv_id.ai_features85 & SATA_WRITE_CACHE) &&
 	    (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE))) {
 		if (sdinfo->satadrv_settings & SATA_DEV_WRITE_CACHE)
 			/* Enable write cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_ENABLE_WRITE_CACHE;
+			cache_op = SATAC_SF_ENABLE_WRITE_CACHE;
 		else
 			/* Disable write cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_DISABLE_WRITE_CACHE;
+			cache_op = SATAC_SF_DISABLE_WRITE_CACHE;
 
-		/* Transfer command to HBA */
-		if (((*SATA_START_FUNC(sata_hba_inst))(
-		    SATA_DIP(sata_hba_inst), spkt) != 0) ||
-		    (spkt->satapkt_reason != SATA_PKT_COMPLETED)) {
+		/* Try to set write cache mode */
+		if (sata_set_cache_mode(sata_hba_inst, &new_sdinfo,
+		    cache_op) != SATA_SUCCESS) {
 			/* Pkt execution failed */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_restore_drive_settings: could not "
-			    "restore device settings\n"));
 			rval = SATA_FAILURE;
 		}
 	}
 
-	/* Free allocated resources */
-	sata_pkt_free(spx);
-	(void) kmem_free(spx, sizeof (sata_pkt_txlate_t));
+	if (rval == SATA_FAILURE)
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "%s %s", finfo, finfox));
 
 	/*
 	 * We need to fetch Device Identify data again
@@ -10681,8 +10893,7 @@ sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
 		 * Cannot get device identification - retry later
 		 */
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_restore_drive_settings: "
-		    "cannot re-fetch device identify data\n"));
+		    "%s cannot re-fetch device identify data\n"));
 		rval = SATA_FAILURE;
 	}
 	/* Copy device sata info. */

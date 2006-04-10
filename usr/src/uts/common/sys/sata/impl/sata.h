@@ -80,6 +80,7 @@ struct sata_hba_inst {
 	struct scsi_hba_tran	*satahba_scsi_tran; /* scsi_hba_tran */
 	struct sata_hba_tran	*satahba_tran;	/* sata_hba_tran */
 	kmutex_t		satahba_mutex;	/* sata hba cntrl mutex */
+	struct taskq		*satahba_taskq;	/* cmd completion task queue */
 
 						/*
 						 * HBA event flags:
@@ -548,6 +549,10 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 	spx->txlt_sata_hba_inst->\
 	satahba_dev_port[spx->txlt_sata_pkt->\
 	satapkt_device.satadev_addr.cport]->cport_mutex
+
+#define	SATA_TXLT_TASKQ(spx) \
+	spx->txlt_sata_hba_inst->\
+	satahba_taskq
 
 /*
  * Minor number construction for devctl and attachment point nodes.
