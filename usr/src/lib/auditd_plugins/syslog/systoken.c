@@ -1308,6 +1308,19 @@ zonename_token(parse_context_t *ctx)
 	return (0);
 }
 
+/*
+ * Format of fmri token:
+ *	fmri token id		adr_char
+ *	fmri			adr_string
+ */
+int
+fmri_token(parse_context_t *ctx)
+{
+	skip_bytes(ctx);
+
+	return (0);
+}
+
 int
 xcolormap_token(parse_context_t *ctx)
 {

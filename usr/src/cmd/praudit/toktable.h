@@ -175,6 +175,7 @@ extern int	header32_ex_token();
  */
 
 extern int	arbitrary_data_token();
+extern int	fmri_token();
 extern int	s5_IPC_token();
 extern int	path_token();
 extern int	path_attr_token();

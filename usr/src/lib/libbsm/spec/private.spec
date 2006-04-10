@@ -1046,3 +1046,9 @@ include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bs
 declaration	token_t *au_to_uauth(char *text)
 version		SUNWprivate_1.1
 end
+
+function	au_to_fmri
+include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
+declaration	token_t *au_to_fmri(char *fmri)
+version		SUNWprivate_1.1
+end

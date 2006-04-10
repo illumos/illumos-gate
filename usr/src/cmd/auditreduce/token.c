@@ -1592,6 +1592,31 @@ zonename_token(adr_t *adr)
 }
 
 /*
+ * fmri_token():
+ *
+ * Format of fmri token:
+ * 	fmri				adr_string
+ */
+int
+fmri_token(adr_t *adr)
+{
+	if ((flags & M_OBJECT) && (obj_flag == OBJ_FMRI)) {
+		char	*fmri_name;
+
+		get_string(adr, &fmri_name);
+
+		/* match token against service instance */
+		if (scf_cmp_pattern(fmri_name, &fmri) == 1) {
+			checkflags |= M_OBJECT;
+		}
+		free(fmri_name);
+	} else {
+		skip_string(adr);
+	}
+	return (-1);
+}
+
+/*
  * Format of xatom token:
  */
 int

@@ -56,6 +56,7 @@ extern "C" {
 #include <unistd.h>
 #include <libgen.h>
 #include <stdlib.h>
+#include <libscf_priv.h>
 
 #include <bsm/audit.h>
 #include <bsm/audit_record.h>

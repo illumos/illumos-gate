@@ -62,6 +62,7 @@ gid_t	obj_group;		/* object group */
 uid_t	obj_owner;		/* object owner */
 int	subj_id;		/* subject identifier  */
 char	ipc_type;		/* 'o' object type - tell what type of IPC */
+scf_pattern_t fmri;		/* 'o' fmri value */
 
 /*
  * File selection options

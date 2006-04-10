@@ -1314,3 +1314,31 @@ au_to_zonename(char *name)
 
 	return (token);
 }
+
+/*
+ * au_to_fmri
+ * return s:
+ *	pointer to a fmri token.
+ */
+token_t *
+au_to_fmri(char *fmri)
+{
+	token_t *token;			/* local token */
+	adr_t adr;			/* adr memory stream header */
+	char data_header = AUT_FMRI;	/* header for this token */
+	short bytes;			/* length of string */
+
+	if (fmri == NULL)
+		return (NULL);
+
+	bytes = strlen(fmri) + 1;
+	token = get_token((int)(sizeof (char) + sizeof (short) + bytes));
+	if (token == NULL)
+		return (NULL);
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_short(&adr, &bytes, 1);
+	adr_char(&adr, fmri, bytes);
+
+	return (token);
+}

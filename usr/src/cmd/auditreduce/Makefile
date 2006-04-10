@@ -42,7 +42,7 @@ POFILES=main.po option.po proc.po time.po token.po
 CPPFLAGS += -I$(TABLEDIR) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsol
-LDLIBS += -lnsl -lbsm  $(LAZYLIBS)
+LDLIBS += -lnsl -lbsm -lscf $(LAZYLIBS)
 
 .KEEP_STATE:
 

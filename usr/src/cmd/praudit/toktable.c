@@ -89,6 +89,7 @@ init_tokens(void)
 	 */
 
 	table_init(AUT_DATA, "arbitrary", arbitrary_data_token, T_EXTENDED);
+	table_init(AUT_FMRI, "fmri", fmri_token, T_ELEMENT);
 	table_init(AUT_IPC, "IPC", s5_IPC_token, T_ENCLOSED);
 	table_init(AUT_PATH, "path", path_token, T_ELEMENT);
 	table_init(AUT_XATPATH, "path_attr", path_attr_token, T_ELEMENT);

@@ -74,6 +74,7 @@ extern void	header32_ex_token(adr_t *, parse_context_t *);
  */
 
 extern void	arbitrary_data_token(adr_t *, parse_context_t *);
+extern void	fmri_token(adr_t *, parse_context_t *);
 extern void	s5_IPC_token(adr_t *, parse_context_t *);
 extern void	path_token(adr_t *, parse_context_t *);
 extern void	subject32_token();

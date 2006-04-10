@@ -2006,6 +2006,24 @@ zonename_token(pr_context_t *context)
 
 /*
  * -----------------------------------------------------------------------
+ * fmri_token(): Process fmri token and display contents
+ * return codes	: -1 - error
+ *		:  0 - successful
+ * NOTE: At the time of call, the fmri token id has been retrieved
+ *
+ * Format of fmri token:
+ *	fmri token id		adr_char
+ * 	service instance name	adr_string
+ * -----------------------------------------------------------------------
+ */
+int
+fmri_token(pr_context_t *context)
+{
+	return (pa_adr_string(context, 0, 1));
+}
+
+/*
+ * -----------------------------------------------------------------------
  * xatom_token()	: Process Xatom token and display contents in hex.
  * return codes		: -1 - error
  *			:  0 - successful

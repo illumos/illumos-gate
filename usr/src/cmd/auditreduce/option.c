@@ -55,6 +55,7 @@ static obj_ent_t obj_tbl[] = {
 			{ "file", OBJ_PATH },
 			{ "filegroup", OBJ_FGROUP },
 			{ "fileowner", OBJ_FOWNER },
+			{ "fmri", OBJ_FMRI },
 			{ "lp", OBJ_LP   },
 			{ "msgqid", OBJ_MSG  },
 			{ "msgqgroup", OBJ_MSGGROUP },
@@ -95,6 +96,7 @@ static int	proc_sid(char *);
 static int	proc_type(char *);
 static int	proc_user(char *, uid_t *);
 static int	proc_zonename(char *);
+static int	proc_fmri(char *);
 
 /*
  * .func	process_options - process command line options.
@@ -408,6 +410,9 @@ proc_object(char *optarg)
 	case OBJ_SHMOWNER:
 	case OBJ_POWNER:
 		return (proc_user(obj_val, &obj_owner));
+		/* NOTREACHED */
+	case OBJ_FMRI:
+		return (proc_fmri(obj_val));
 		/* NOTREACHED */
 	case OBJ_LP: /* lp objects have not yet been defined */
 	default: /* impossible */
@@ -1269,5 +1274,37 @@ proc_zonename(char *optstr)
 	}
 	zonename = strdup(optstr);
 	flags |= M_ZONENAME;
+	return (0);
+}
+
+/*
+ * proc_frmi - set up frmi for pattern matching.
+ *	Logic ripped off of scf_walk_fmri()
+ *		Thanks to the smf team.
+ *
+ * ret 0:	OK
+ * ret -1:	error
+ */
+static int
+proc_fmri(char *optstr)
+{
+	if (strpbrk(optstr, "*?[") != NULL) {
+		/* have a pattern to glob for */
+
+		fmri.sp_type = PATTERN_GLOB;
+		if (optstr[0] == '*' ||
+		    (strlen(optstr) >= 4 && optstr[3] == ':')) {
+			fmri.sp_arg = strdup(optstr);
+		} else if ((fmri.sp_arg = malloc(strlen(optstr) + 6)) != NULL) {
+			(void) snprintf(fmri.sp_arg, strlen(optstr) + 6,
+			    "svc:/%s", optstr);
+		}
+	} else {
+		fmri.sp_type = PATTERN_PARTIAL;
+		fmri.sp_arg = strdup(optstr);
+	}
+	if (fmri.sp_arg == NULL)
+		return (-1);
+
 	return (0);
 }

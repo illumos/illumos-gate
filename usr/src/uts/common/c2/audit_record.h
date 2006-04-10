@@ -83,6 +83,7 @@ extern "C" {
  * Data token types
  */
 
+#define	AUT_FMRI		((char)0x20)
 #define	AUT_DATA		((char)0x21)
 #define	AUT_IPC			((char)0x22)
 #define	AUT_PATH		((char)0x23)
@@ -714,6 +715,7 @@ extern token_t *au_to_data(char, char, char, char *);
 extern token_t *au_to_exec_args(char **);
 extern token_t *au_to_exec_env(char **);
 extern token_t *au_to_exit(int, int);
+extern token_t *au_to_fmri(char *);
 extern token_t *au_to_groups(int *);
 extern token_t *au_to_newgroups(int, gid_t *);
 extern token_t *au_to_header(au_event_t, au_emod_t);

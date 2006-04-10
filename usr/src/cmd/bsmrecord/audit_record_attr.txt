@@ -57,6 +57,7 @@ token=text:text
 token=tid:terminal_adr
 token=uauth:use_of_privilege
 token=zone:zonename
+token=fmri:service_instance
 
 token=head:header
 token=subj:subject
