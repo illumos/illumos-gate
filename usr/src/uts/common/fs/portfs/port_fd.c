@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -292,8 +291,14 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		pkevp->portkev_user = user;
 	}
 
+	mutex_enter(&pkevp->portkev_lock);
 	pkevp->portkev_events = 0;	/* no fired events */
 	pdp->pd_events = events;	/* events associated */
+	/*
+	 * allow new events.
+	 */
+	pkevp->portkev_flags |= PORT_KEV_VALID;
+	mutex_exit(&pkevp->portkev_lock);
 
 	/*
 	 * do VOP_POLL and cache this poll fd.
@@ -343,13 +348,14 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	}
 
 	/*
-	 * Check if events detected.
-	 * revents was already set after the VOP_POLL above or
-	 * it was updated in port_bind_pollhead().
+	 * Check if new events where detected and no events have been
+	 * delivered. The revents was already set after the VOP_POLL
+	 * above or it was updated in port_bind_pollhead().
 	 */
 	mutex_enter(&pkevp->portkev_lock);
-	if (revents) {
+	if (revents && (pkevp->portkev_flags & PORT_KEV_VALID)) {
 		ASSERT((pkevp->portkev_flags & PORT_KEV_DONEQ) == 0);
+		pkevp->portkev_flags &= ~PORT_KEV_VALID;
 		revents = revents & (pdp->pd_events | POLLHUP | POLLERR);
 		/* send events to the event port */
 		pkevp->portkev_events = revents;
@@ -358,10 +364,6 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		 */
 		(void) port_send_event(pkevp);
 	} else {
-		/*
-		 * events can be submitted
-		 */
-		pkevp->portkev_flags |= PORT_KEV_VALID;
 		mutex_exit(&pkevp->portkev_lock);
 	}
 
