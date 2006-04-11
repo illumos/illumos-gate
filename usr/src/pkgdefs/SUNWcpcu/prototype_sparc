@@ -43,7 +43,6 @@
 #
 d none usr/bin/sparcv9 755 root bin
 f none usr/bin/sparcv9/cputrack 555 root bin
-f none usr/include/libdscp.h 644 root bin
 d none usr/kernel/pcbe/sparcv9 755 root sys
 f none usr/kernel/pcbe/sparcv9/pcbe.4.6 755 root sys
 f none usr/kernel/pcbe/sparcv9/pcbe.62 755 root sys
