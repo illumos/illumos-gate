@@ -449,7 +449,7 @@ dmu_tx_hold_free_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	zio_t *zio;
 
 	/* first block */
-	if (off != 0 /* || dn->dn_maxblkid == 0 */)
+	if (off != 0)
 		dmu_tx_count_write(tx, dn, off, 1);
 	/* last block */
 	if (len != DMU_OBJECT_END)
@@ -465,32 +465,36 @@ dmu_tx_hold_free_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	 * blocks, and all the level-1 blocks.  The above count_write's
 	 * will take care of the level-0 blocks.
 	 */
-	shift = dn->dn_datablkshift + dn->dn_indblkshift - SPA_BLKPTRSHIFT;
-	start = off >> shift;
-	end = dn->dn_datablkshift ? ((off+len) >> shift) : 0;
+	if (dn->dn_nlevels > 1) {
+		shift = dn->dn_datablkshift + dn->dn_indblkshift -
+		    SPA_BLKPTRSHIFT;
+		start = off >> shift;
+		end = dn->dn_datablkshift ? ((off+len) >> shift) : 0;
 
-	zio = zio_root(tx->tx_pool->dp_spa, NULL, NULL, ZIO_FLAG_CANFAIL);
-	for (i = start+1; i < end; i++) {
-		uint64_t ibyte = i << shift;
-		err = dnode_next_offset(dn, FALSE, &ibyte, 2, 1);
-		i = ibyte >> shift;
-		if (err == ESRCH)
-			break;
+		zio = zio_root(tx->tx_pool->dp_spa,
+		    NULL, NULL, ZIO_FLAG_CANFAIL);
+		for (i = start; i <= end; i++) {
+			uint64_t ibyte = i << shift;
+			err = dnode_next_offset(dn, FALSE, &ibyte, 2, 1);
+			i = ibyte >> shift;
+			if (err == ESRCH)
+				break;
+			if (err) {
+				tx->tx_err = err;
+				return;
+			}
+
+			err = dmu_tx_check_ioerr(zio, dn, 1, i);
+			if (err) {
+				tx->tx_err = err;
+				return;
+			}
+		}
+		err = zio_wait(zio);
 		if (err) {
 			tx->tx_err = err;
 			return;
 		}
-
-		err = dmu_tx_check_ioerr(zio, dn, 1, i);
-		if (err) {
-			tx->tx_err = err;
-			return;
-		}
-	}
-	err = zio_wait(zio);
-	if (err) {
-		tx->tx_err = err;
-		return;
 	}
 
 	dmu_tx_count_dnode(tx, dn);

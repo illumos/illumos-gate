@@ -1180,8 +1180,11 @@ dnode_next_offset_level(dnode_t *dn, boolean_t hole, uint64_t *offset,
 				return (hole ? 0 : ESRCH);
 			return (error);
 		}
-		(void) dbuf_read(db, NULL,
-		    DB_RF_MUST_SUCCEED | DB_RF_HAVESTRUCT);
+		error = dbuf_read(db, NULL, DB_RF_CANFAIL | DB_RF_HAVESTRUCT);
+		if (error) {
+			dbuf_rele(db, FTAG);
+			return (error);
+		}
 		data = db->db.db_data;
 	}
 
@@ -1275,7 +1278,7 @@ dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *offset,
 
 	for (lvl = minlvl; lvl <= maxlvl; lvl++) {
 		error = dnode_next_offset_level(dn, hole, offset, lvl, blkfill);
-		if (error == 0)
+		if (error != ESRCH)
 			break;
 	}
 
@@ -1284,8 +1287,8 @@ dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *offset,
 
 	rw_exit(&dn->dn_struct_rwlock);
 
-	if (initial_offset > *offset)
-		return (ESRCH);
+	if (error == 0 && initial_offset > *offset)
+		error = ESRCH;
 
 	return (error);
 }

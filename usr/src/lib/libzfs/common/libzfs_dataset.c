@@ -2073,6 +2073,15 @@ zfs_destroy(zfs_handle_t *zhp)
 			    zhp->zfs_name);
 			break;
 
+		case EIO:
+			/*
+			 * I/O error.
+			 */
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "cannot destroy '%s': I/O error"),
+			    zhp->zfs_name);
+			break;
+
 		case ENOENT:
 			/*
 			 * We've hit a race condition where the dataset has been
