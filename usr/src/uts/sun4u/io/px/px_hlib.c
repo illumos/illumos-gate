@@ -2990,16 +2990,12 @@ oberon_hp_pwron(caddr_t csr_base)
 {
 	volatile uint64_t reg;
 
-#ifdef  DEBUG
-	cmn_err(CE_CONT, "oberon_hp_pwron the slot\n");
-#endif
+	DBG(DBG_HP, NULL, "oberon_hp_pwron the slot\n");
 
 	/* Check Leaf Reset status */
 	reg = CSR_XR(csr_base, ILU_ERROR_LOG_ENABLE);
 	if (!(reg & (1ull << ILU_ERROR_LOG_ENABLE_SPARE3))) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "oberon_hp_pwron fails: leaf not reset\n");
-#endif
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: leaf not reset\n");
 		goto fail;
 	}
 
@@ -3008,10 +3004,8 @@ oberon_hp_pwron(caddr_t csr_base)
 	if (!(reg & (1ull << TLU_SLOT_STATUS_PSD)) ||
 	    (reg & (1ull << TLU_SLOT_STATUS_MRLS)) ||
 	    (reg & (1ull << TLU_SLOT_STATUS_PWFD))) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "oberon_hp_pwron fails: slot status %lx\n",
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: slot status %lx\n",
 		    reg);
-#endif
 		goto fail;
 	}
 
@@ -3034,9 +3028,7 @@ oberon_hp_pwroff(caddr_t csr_base)
 {
 	volatile uint64_t reg;
 
-#ifdef  DEBUG
-	cmn_err(CE_CONT, "oberon_hp_pwroff the slot\n");
-#endif
+	DBG(DBG_HP, NULL, "oberon_hp_pwroff the slot\n");
 
 	/* Blink power LED, this is done from pciehpc already */
 
@@ -3110,9 +3102,7 @@ static uint_t oberon_hp_pwrledon(caddr_t csr_base)
 {
 	volatile uint64_t reg;
 
-#ifdef  DEBUG
-	cmn_err(CE_CONT, "oberon_hp_pwrledon the slot\n");
-#endif
+	DBG(DBG_HP, NULL, "oberon_hp_pwrledon the slot\n");
 
 	CSR_BS(csr_base, TLU_SLOT_CONTROL, PWFDEN);
 
@@ -3148,8 +3138,11 @@ static uint_t oberon_hp_pwrledon(caddr_t csr_base)
 	delay(drv_usectohz(10000));
 	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
 	if (!(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_P)) &&
-	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S)))
+	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S))) {
+		DBG(DBG_HP, NULL, "oberon_hp_pwrledon fails to enable "
+		    "PCI-E port\n");
 		goto fail;
+	}
 
 	/* Turn on Power LED */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
@@ -3207,10 +3200,8 @@ oberon_hpreg_get(void *cookie, off_t off)
 		val = CSR_XR(csr_base, TLU_SLOT_STATUS);
 		break;
 	default:
-#ifdef  DEBUG
-		cmn_err(CE_WARN, "oberon_hpreg_get(): "
+		DBG(DBG_HP, NULL, "oberon_hpreg_get(): "
 		    "unsupported offset 0x%lx\n", off);
-#endif
 		break;
 	}
 
@@ -3225,10 +3216,8 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 	uint16_t pwr_led_state, pwr_led_ctrl;
 	uint_t pwr_off, ret = DDI_SUCCESS;
 
-#ifdef DEBUG
-	cmn_err(CE_CONT, "oberon_hpreg_put 0x%lx: cur %x, new %x\n",
+	DBG(DBG_HP, NULL, "oberon_hpreg_put 0x%lx: cur %x, new %x\n",
 	    off, oberon_hpreg_get(cookie, off), val);
-#endif
 
 	switch (off) {
 	case PCIE_SLOTCTL:
@@ -3264,10 +3253,8 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 		CSR_XS(csr_base, TLU_SLOT_STATUS, val);
 		break;
 	default:
-#ifdef  DEBUG
-		cmn_err(CE_WARN, "oberon_hpreg_put(): "
+		DBG(DBG_HP, NULL, "oberon_hpreg_put(): "
 		    "unsupported offset 0x%lx\n", off);
-#endif
 		ret = DDI_FAILURE;
 		break;
 	}
@@ -3285,10 +3272,8 @@ hvio_hotplug_init(dev_info_t *dip, void *arg)
 	if (PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) {
 		if (!CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
 		    TLU_SLOT_CAPABILITIES, HP)) {
-#ifdef	DEBUG
-			cmn_err(CE_WARN, "%s%d: hotplug capabale not set\n",
+			DBG(DBG_HP, NULL, "%s%d: hotplug capabale not set\n",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
-#endif
 			return (DDI_FAILURE);
 		}
 

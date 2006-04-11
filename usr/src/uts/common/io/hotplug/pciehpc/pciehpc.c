@@ -380,7 +380,7 @@ pciehpc_probe_hpc(pciehpc_t *ctrl_p)
 int
 pciehpc_slotinfo_init(pciehpc_t *ctrl_p)
 {
-	uint32_t slot_capabilities;
+	uint32_t slot_capabilities, link_capabilities;
 	pciehpc_slot_t *p = &ctrl_p->slot;
 
 	/*
@@ -420,11 +420,18 @@ pciehpc_slotinfo_init(pciehpc_t *ctrl_p)
 		B_TRUE : B_FALSE;
 
 	/*
-	 * PCI-E (draft) version 1.1 defines EMI Lock Present bit
+	 * PCI-E version 1.1 defines EMI Lock Present bit
 	 * in Slot Capabilities register. Check for it.
 	 */
 	ctrl_p->has_emi_lock = (slot_capabilities &
 		PCIE_SLOTCAP_EMI_LOCK_PRESENT) ? B_TRUE : B_FALSE;
+
+	link_capabilities = pciehpc_reg_get32(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_LINKCAP);
+	ctrl_p->dll_active_rep = (link_capabilities &
+		PCIE_LINKCAP_DLL_ACTIVE_REP_CAPABLE) ? B_TRUE : B_FALSE;
+	if (ctrl_p->dll_active_rep)
+		cv_init(&ctrl_p->slot.dll_active_cv, NULL, CV_DRIVER, NULL);
 
 	/* initialize synchronization conditional variable */
 	cv_init(&ctrl_p->slot.cmd_comp_cv, NULL, CV_DRIVER, NULL);
@@ -468,6 +475,9 @@ pciehpc_slotinfo_uninit(pciehpc_t *ctrl_p)
 	    ctrl_p->slot.attn_btn_threadp = NULL;
 	    mutex_exit(&ctrl_p->pciehpc_mutex);
 	}
+
+	if (ctrl_p->dll_active_rep)
+		cv_destroy(&ctrl_p->slot.dll_active_cv);
 
 	return (DDI_SUCCESS);
 }
@@ -676,6 +686,12 @@ pciehpc_hpc_init(pciehpc_t *ctrl_p)
 	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
 		PCIE_SLOTCTL, reg);
 
+	/* clear any interrupt status bits */
+	reg = pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+	pciehpc_reg_put16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS, reg);
+
 	/* initialize the interrupt mutex */
 	mutex_init(&ctrl_p->pciehpc_mutex, NULL, MUTEX_DRIVER,
 		(void *)PCIEHPC_INTR_PRI);
@@ -746,7 +762,10 @@ pciehpc_enable_intr(pciehpc_t *ctrl_p)
 	reg = pciehpc_reg_get16(ctrl_p,
 		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
 
-	/* enable interrupts */
+	/*
+	 * enable interrupts: power fault detection interrupt is enabled
+	 * only when the slot is 'connected', i.e. power is ON
+	 */
 	if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED)
 		pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
 			PCIE_SLOTCTL, reg | SLOTCTL_SUPPORTED_INTRS_MASK);
@@ -819,7 +838,7 @@ int
 pciehpc_intr(dev_info_t *dip)
 {
 	pciehpc_t *ctrl_p;
-	uint16_t status;
+	uint16_t status, control;
 
 	/* get the soft state structure for this dip */
 	if ((ctrl_p = pciehpc_get_soft_state(dip)) == NULL)
@@ -877,9 +896,23 @@ pciehpc_intr(dev_info_t *dip)
 
 	/* check for power fault interrupt */
 	if (status & PCIE_SLOTSTS_PWR_FAULT_DETECTED) {
-	    /* send the event to HPS framework */
-	    (void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
-		HPC_EVENT_SLOT_POWER_FAULT, HPC_EVENT_NORMAL);
+	    PCIEHPC_DEBUG3((CE_NOTE,
+		"pciehpc_intr(): POWER FAULT interrupt received"
+		" on slot %d\n", ctrl_p->slot.slotNum));
+	    control =  pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	    if (control & PCIE_SLOTCTL_PWR_FAULT_EN) {
+		/* disable power fault detction interrupt */
+		pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+		    PCIE_SLOTCTL, control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
+
+		/* turn on ATTN LED */
+		pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
+
+		/* send the event to HPS framework */
+		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
+		    HPC_EVENT_SLOT_POWER_FAULT, HPC_EVENT_NORMAL);
+	    }
 	}
 
 	/* check for MRL SENSOR CHANGED interrupt */
@@ -895,7 +928,40 @@ pciehpc_intr(dev_info_t *dip)
 	    PCIEHPC_DEBUG3((CE_NOTE,
 		"pciehpc_intr(): PRESENCE CHANGED interrupt received"
 		" on slot %d\n", ctrl_p->slot.slotNum));
-	    /* For now (phase-I), no action is taken on this event */
+
+	    if (status & PCIE_SLOTSTS_PRESENCE_DETECTED) {
+		/* card is inserted into the slot */
+
+		/* send the event to HPS framework */
+		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
+		    HPC_EVENT_SLOT_INSERTION, HPC_EVENT_NORMAL);
+	    } else {
+		/* card is removed from the slot */
+
+		/* make sure to disable power fault detction interrupt */
+		control =  pciehpc_reg_get16(ctrl_p,
+		    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+		if (control & PCIE_SLOTCTL_PWR_FAULT_EN)
+		    pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
+			PCIE_SLOTCTL, control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
+
+		/* turn off ATTN LED */
+		pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
+
+		/* send the event to HPS framework */
+		(void) hpc_slot_event_notify(ctrl_p->slot.slot_handle,
+		    HPC_EVENT_SLOT_REMOVAL, HPC_EVENT_NORMAL);
+	    }
+	}
+
+	/* check for DLL state changed interrupt */
+	if (ctrl_p->dll_active_rep &&
+		(status & PCIE_SLOTSTS_DLL_STATE_CHANGED)) {
+	    PCIEHPC_DEBUG3((CE_NOTE,
+		"pciehpc_intr(): DLL STATE CHANGED interrupt received"
+		" on slot %d\n", ctrl_p->slot.slotNum));
+
+	    cv_signal(&ctrl_p->slot.dll_active_cv);
 	}
 
 	mutex_exit(&ctrl_p->pciehpc_mutex);
@@ -1001,8 +1067,7 @@ int
 pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	void *data, uint_t flags)
 {
-	uint16_t status;
-	uint16_t control;
+	uint16_t status, control;
 
 	pciehpc_t *ctrl_p = (pciehpc_t *)ops_arg;
 
@@ -1063,11 +1128,11 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	 *	1. Set power LED to blink and ATTN led to OFF.
 	 *	2. Set power control ON in Slot Control Reigster and
 	 *	   wait for Command Completed Interrupt or 1 sec timeout.
-	 *	3. Set power LED to be ON.
-	 *	4. If Data Link Layer State Changed events are supported
+	 *	3. If Data Link Layer State Changed events are supported
 	 *	   then wait for the event to indicate Data Layer Link
 	 *	   is active. The time out value for this event is 1 second.
-	 *	   This is specified in PCI-E (draft) version 1.1.
+	 *	   This is specified in PCI-E version 1.1.
+	 *	4. Set power LED to be ON.
 	 */
 
 	/* 1. set power LED to blink & ATTN led to OFF */
@@ -1080,7 +1145,34 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	control &= ~PCIE_SLOTCTL_PWR_CONTROL;
 	pciehpc_issue_hpc_command(ctrl_p, control);
 
-	/* check power is really turned ON? */
+	/* 3. wait for DLL State Change event, if it's supported */
+	if (ctrl_p->dll_active_rep) {
+		status =  pciehpc_reg_get16(ctrl_p,
+		    ctrl_p->pcie_caps_reg_offset + PCIE_LINKSTS);
+
+		if (!(status & PCIE_LINKSTS_DLL_LINK_ACTIVE)) {
+			/* wait 1 sec for the DLL State Changed event */
+			(void) cv_timedwait(&ctrl_p->slot.dll_active_cv,
+			    &ctrl_p->pciehpc_mutex,
+			    ddi_get_lbolt() +
+			    SEC_TO_TICK(PCIEHPC_DLL_STATE_CHANGE_TIMEOUT));
+
+			/* check Link status */
+			status =  pciehpc_reg_get16(ctrl_p,
+			    ctrl_p->pcie_caps_reg_offset +
+			    PCIE_LINKSTS);
+			if (!(status & PCIE_LINKSTS_DLL_LINK_ACTIVE))
+				goto cleanup2;
+		}
+
+		/* wait 100ms after DLL_LINK_ACTIVE field reads 1b */
+		delay(drv_usectohz(100000));
+	} else {
+		/* wait 1 sec for link to come up */
+		delay(drv_usectohz(1000000));
+	}
+
+	/* check power is really turned ON */
 	control =  pciehpc_reg_get16(ctrl_p,
 		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
 	if (control & PCIE_SLOTCTL_PWR_CONTROL) {
@@ -1091,48 +1183,41 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 		goto cleanup1;
 	}
 
-	/* check power-fault on the slot? */
-	status = pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
-	if (status & PCIE_SLOTSTS_PWR_FAULT_DETECTED) {
-		PCIEHPC_DEBUG((CE_NOTE,
-		    "slot %d detects power fault on connect\n",
-		    ctrl_p->slot.slotNum));
+	/* enable power fault detection interrupt */
+	control |= PCIE_SLOTCTL_PWR_FAULT_EN;
+	pciehpc_issue_hpc_command(ctrl_p, control);
 
-		/* set power control to OFF */
-		control =  pciehpc_reg_get16(ctrl_p,
-			ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
-		control |= PCIE_SLOTCTL_PWR_CONTROL;
-		pciehpc_issue_hpc_command(ctrl_p, control);
-
-		/* clear the status */
-		pciehpc_reg_put16(ctrl_p,
-			ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS, status);
-		goto cleanup1;
-	}
-
-	/* enable all interrupts */
-	pciehpc_reg_put16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS, status);
-
-	control = pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
-	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
-		PCIE_SLOTCTL, control | SLOTCTL_SUPPORTED_INTRS_MASK);
-
-	/* 3. Set power LED to be ON */
+	/* 4. Set power LED to be ON */
 	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_ON);
 
-	/*
-	 * NOTE - needs work for pci-e 1.1 features
-	 * - if EMI Lock is present then it should be turned ON
-	 * - if DLL State Change events are supported then we need
-	 *   to wait for DLL Active event.
-	 */
+	/* if EMI is present, turn it ON */
+	if (ctrl_p->has_emi_lock) {
+		status =  pciehpc_reg_get16(ctrl_p,
+		    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+
+		if (!(status & PCIE_SLOTSTS_EMI_LOCK_SET)) {
+			control =  pciehpc_reg_get16(ctrl_p,
+			    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+			control |= PCIE_SLOTCTL_EMI_LOCK_CONTROL;
+			pciehpc_issue_hpc_command(ctrl_p, control);
+
+			/* wait 1 sec after toggling the state of EMI lock */
+			delay(drv_usectohz(1000000));
+		}
+	}
 
 	ctrl_p->slot.slot_state = HPC_SLOT_CONNECTED;
 	mutex_exit(&ctrl_p->pciehpc_mutex);
 	return (HPC_SUCCESS);
+
+cleanup2:
+	control =  pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	/* if power is ON, set power control to OFF */
+	if (!(control & PCIE_SLOTCTL_PWR_CONTROL)) {
+		control |= PCIE_SLOTCTL_PWR_CONTROL;
+		pciehpc_issue_hpc_command(ctrl_p, control);
+	}
 
 cleanup1:
 	/* set power led to OFF */
@@ -1205,6 +1290,12 @@ pciehpc_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	/* 1. set power LED to blink */
 	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_BLINK);
 
+	/* disable power fault detection interrupt */
+	control = pciehpc_reg_get16(ctrl_p,
+		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+	control &= ~PCIE_SLOTCTL_PWR_FAULT_EN;
+	pciehpc_issue_hpc_command(ctrl_p, control);
+
 	/* 2. set power control to OFF */
 	control =  pciehpc_reg_get16(ctrl_p,
 		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
@@ -1222,12 +1313,21 @@ pciehpc_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 	pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_OFF);
 	pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
 
-	/* disable interrupt of power fault detection */
-	control = pciehpc_reg_get16(ctrl_p,
-		ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
-	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset +
-		PCIE_SLOTCTL, control | (SLOTCTL_SUPPORTED_INTRS_MASK &
-				~PCIE_SLOTCTL_PWR_FAULT_EN));
+	/* if EMI is present, turn it OFF */
+	if (ctrl_p->has_emi_lock) {
+		status =  pciehpc_reg_get16(ctrl_p,
+		    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+
+		if (status & PCIE_SLOTSTS_EMI_LOCK_SET) {
+			control =  pciehpc_reg_get16(ctrl_p,
+			    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTCTL);
+			control |= PCIE_SLOTCTL_EMI_LOCK_CONTROL;
+			pciehpc_issue_hpc_command(ctrl_p, control);
+
+			/* wait 1 sec after toggling the state of EMI lock */
+			delay(drv_usectohz(1000000));
+		}
+	}
 
 	ctrl_p->slot.slot_state = HPC_SLOT_DISCONNECTED;
 	mutex_exit(&ctrl_p->pciehpc_mutex);

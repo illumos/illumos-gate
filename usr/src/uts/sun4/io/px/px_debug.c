@@ -107,6 +107,8 @@ static char *px_debug_sym [] = {	/* same sequence as px_debug_bit */
 
 	/* 52 */ "tools",
 	/* 53 */ "phys_acc",
+
+	/* 54 */ "hotplug",
 	/* LAST */ "unknown"
 };
 

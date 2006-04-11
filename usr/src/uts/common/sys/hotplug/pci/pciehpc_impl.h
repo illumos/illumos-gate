@@ -62,6 +62,7 @@ typedef struct pciehpc_slot
 	boolean_t	attn_btn_pending;
 	kthread_t	*attn_btn_threadp;	/* ATTN button event thread */
 	boolean_t	attn_btn_thread_exit;
+	kcondvar_t	dll_active_cv;		/* DLL State Changed intr */
 } pciehpc_slot_t;
 
 typedef enum {
@@ -106,6 +107,9 @@ typedef struct pciehpc
 	boolean_t		has_mrl;	/* Do we have MRL? */
 	boolean_t		has_emi_lock;	/* Do we have EMI Lock? */
 
+	/* link capablities */
+	boolean_t	dll_active_rep;	/* Do we report DLL DL_Active state? */
+
 	/* register read/write ops for non-standard HPC (e.g: OPL) */
 	pciehpc_regops_t	regops;
 
@@ -140,20 +144,27 @@ typedef struct pciehpc_ops pciehpc_ops_t;
 #define	PCIEHPC_CMD_WAIT_TIME	10000
 #define	PCIEHPC_CMD_WAIT_RETRY	100
 
+/*
+ * PCI-E HPC Dll State Change time out in seconds
+ */
+#define	PCIEHPC_DLL_STATE_CHANGE_TIMEOUT 1
+
 #define	SLOTCTL_SUPPORTED_INTRS_MASK	\
 	(PCIE_SLOTCTL_ATTN_BTN_EN \
 	| PCIE_SLOTCTL_PWR_FAULT_EN \
 	| PCIE_SLOTCTL_MRL_SENSOR_EN \
 	| PCIE_SLOTCTL_PRESENCE_CHANGE_EN \
 	| PCIE_SLOTCTL_CMD_INTR_EN \
-	| PCIE_SLOTCTL_HP_INTR_EN)
+	| PCIE_SLOTCTL_HP_INTR_EN \
+	| PCIE_SLOTCTL_DLL_STATE_EN)
 
 #define	SLOT_STATUS_EVENTS	\
 	(PCIE_SLOTSTS_ATTN_BTN_PRESSED \
 	| PCIE_SLOTSTS_PWR_FAULT_DETECTED \
 	| PCIE_SLOTSTS_MRL_SENSOR_CHANGED \
 	| PCIE_SLOTSTS_COMMAND_COMPLETED \
-	| PCIE_SLOTSTS_PRESENCE_CHANGED)
+	| PCIE_SLOTSTS_PRESENCE_CHANGED \
+	| PCIE_SLOTSTS_DLL_STATE_CHANGED)
 
 /*
  * function prototype defintions for common native mode functions in
