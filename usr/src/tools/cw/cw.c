@@ -302,6 +302,7 @@
 #define	CW_F_EXEC	0x04
 #define	CW_F_ECHO	0x08
 #define	CW_F_XLATE	0x10
+#define	CW_F_PROG	0x20
 
 typedef enum cw_compiler {
 	CW_C_CC = 0,
@@ -348,8 +349,8 @@ typedef struct cw_ictx {
 	int		i_oldargc;
 	char		**i_oldargv;
 	pid_t		i_pid;
-	int		i_fd[2];
 	char		i_discard[MAXPATHLEN];
+	char		*i_stderr;
 } cw_ictx_t;
 
 static const char *progname;
@@ -577,6 +578,11 @@ do_gcc(cw_ictx_t *ctx)
 	int in_output = 0, seen_o = 0, c_files = 0;
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
+
+	if (ctx->i_flags & CW_F_PROG) {
+		newae(ctx->i_ae, "--version");
+		return;
+	}
 
 	newae(ctx->i_ae, "-fident");
 	newae(ctx->i_ae, "-finline");
@@ -1328,6 +1334,11 @@ do_cc(cw_ictx_t *ctx)
 	int in_output = 0, seen_o = 0;
 	cw_op_t op = CW_O_LINK;
 
+	if (ctx->i_flags & CW_F_PROG) {
+		newae(ctx->i_ae, "-V");
+		return;
+	}
+
 	while (--ctx->i_oldargc > 0) {
 		char *arg = *++ctx->i_oldargv;
 
@@ -1411,6 +1422,12 @@ prepctx(cw_ictx_t *ctx)
 
 	newae(ctx->i_ae, program);
 
+	if (ctx->i_flags & CW_F_PROG) {
+		(void) printf("%s: %s\n", (ctx->i_flags & CW_F_SHADOW) ?
+		    "shadow" : "primary", program);
+		(void) fflush(stdout);
+	}
+
 	if (!(ctx->i_flags & CW_F_XLATE))
 		return;
 
@@ -1475,38 +1492,47 @@ invoke(cw_ictx_t *ctx)
 static int
 reap(cw_ictx_t *ctx)
 {
-	int stat, ret = 0;
+	int status, ret = 0;
 	char buf[1024];
 	struct stat s;
 
 	do {
-		(void) waitpid(ctx->i_pid, &stat, 0);
-		if (stat != 0) {
-			if (WIFSIGNALED(stat)) {
-				ret = -WTERMSIG(stat);
+		(void) waitpid(ctx->i_pid, &status, 0);
+		if (status != 0) {
+			if (WIFSIGNALED(status)) {
+				ret = -WTERMSIG(status);
 				break;
-			} else if (WIFEXITED(stat)) {
-				ret = WEXITSTATUS(stat);
+			} else if (WIFEXITED(status)) {
+				ret = WEXITSTATUS(status);
 				break;
 			}
 		}
-	} while (!WIFEXITED(stat) && !WIFSIGNALED(stat));
+	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
 	(void) unlink(ctx->i_discard);
 
-	if (fstat(ctx->i_fd[0], &s) < 0) {
+	if (stat(ctx->i_stderr, &s) < 0) {
 		cw_perror("stat failed on child cleanup");
 		return (-1);
 	}
 	if (s.st_size != 0) {
-		FILE *f = fdopen(ctx->i_fd[0], "r");
+		FILE *f;
 
-		while (fgets(buf, sizeof (buf), f))
-			(void) fprintf(stderr, "%s", buf);
-		(void) fflush(stderr);
-		(void) fclose(f);
+		if ((f = fopen(ctx->i_stderr, "r")) != NULL) {
+			while (fgets(buf, sizeof (buf), f))
+				(void) fprintf(stderr, "%s", buf);
+			(void) fflush(stderr);
+			(void) fclose(f);
+		}
 	}
-	(void) close(ctx->i_fd[0]);
+	(void) unlink(ctx->i_stderr);
+	free(ctx->i_stderr);
+
+	/*
+	 * cc returns an error code when given -V; we want that to succeed.
+	 */
+	if (ctx->i_flags & CW_F_PROG)
+		return (0);
 
 	return (ret);
 }
@@ -1528,19 +1554,26 @@ exec_ctx(cw_ictx_t *ctx, int block)
 	(void) strlcat(ctx->i_discard, ".o", MAXPATHLEN);
 	free(file);
 
-	if (pipe(ctx->i_fd) < 0) {
-		cw_perror("pipe creation failed");
+	if ((ctx->i_stderr = tempnam(NULL, ".cw")) == NULL) {
+		nomem();
 		return (-1);
 	}
 
 	if ((ctx->i_pid = fork()) == 0) {
-		(void) close(ctx->i_fd[0]);
+		int fd;
+
 		(void) fclose(stderr);
-		if (dup2(ctx->i_fd[1], 2) < 0) {
+		if ((fd = open(ctx->i_stderr, O_WRONLY | O_CREAT | O_EXCL,
+		    0666)) < 0) {
+			cw_perror("open failed for standard error");
+			exit(1);
+		}
+		if (dup2(fd, 2) < 0) {
 			cw_perror("dup2 failed for standard error");
 			exit(1);
 		}
-		(void) close(ctx->i_fd[1]);
+		if (fd != 2)
+			(void) close(fd);
 		if (freopen("/dev/fd/2", "w", stderr) == NULL) {
 			cw_perror("freopen failed for /dev/fd/2");
 			exit(1);
@@ -1553,7 +1586,6 @@ exec_ctx(cw_ictx_t *ctx, int block)
 		cw_perror("fork failed");
 		return (1);
 	}
-	(void) close(ctx->i_fd[1]);
 
 	if (block)
 		return (reap(ctx));
@@ -1643,15 +1675,35 @@ main(int argc, char **argv)
 		ctx->i_compiler = CW_C_GCC;
 	}
 
-	ctx->i_oldargc = argc;
-	ctx->i_oldargv = argv;
-
+	/*
+	 * -_compiler - tell us the path to the primary compiler only
+	 */
 	if (argc > 1 && strcmp(argv[1], "-_compiler") == 0) {
 		ctx->i_flags &= ~CW_F_XLATE;
 		prepctx(ctx);
 		(void) printf("%s\n", ctx->i_ae->ael_head->ae_arg);
 		return (0);
 	}
+
+	/*
+	 * -_versions - tell us the cw version, paths to all compilers, and
+	 *		ask each for its version if we know how.
+	 */
+	if (argc > 1 && strcmp(argv[1], "-_versions") == 0) {
+		(void) printf("%s", "cw version %I%");
+		if (!do_shadow)
+			(void) printf(" (SHADOW MODE DISABLED)");
+		(void) printf("\n");
+		(void) fflush(stdout);
+		ctx->i_flags &= ~CW_F_ECHO;
+		ctx->i_flags |= CW_F_PROG|CW_F_EXEC;
+		argc--;
+		argv++;
+		do_serial = 1;
+	}
+
+	ctx->i_oldargc = argc;
+	ctx->i_oldargv = argv;
 
 	ret |= exec_ctx(ctx, do_serial);
 

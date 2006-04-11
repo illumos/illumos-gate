@@ -341,10 +341,11 @@ ONC_PLUS:
 #
 
 cc-version:
-	@if [ -x "$($(MACH)_CC)" ]; then			\
+	@if $($(MACH)_CC) -_versions >/dev/null 2>/dev/null; then \
 		$(ECHO) 32-bit compiler;			\
 		$(ECHO) $($(MACH)_CC);				\
-		$($(MACH)_CC) -V 2>&1 | head -1;		\
+		$($(MACH)_CC) -_versions 2>&1 |			\
+		    $(EGREP) '^(cw|cc|gcc|primary|shadow)';	\
 	else							\
 		__COMPILER=`$($(MACH)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
 		if [ -z "$$__COMPILER" ]; then			\
@@ -359,10 +360,11 @@ cc-version:
 	fi
 
 cc64-version:
-	@if [ -x "$($(MACH64)_CC)" ]; then			\
+	@if $($(MACH64)_CC) -_versions >/dev/null 2>/dev/null; then \
 		$(ECHO) 64-bit compiler;			\
 		$(ECHO) $($(MACH64)_CC);			\
-		$($(MACH64)_CC) -V 2>&1 | head -1;		\
+		$($(MACH64)_CC) -_versions 2>&1 |		\
+		    $(EGREP) '^(cw|cc|gcc|primary|shadow)';	\
 	else							\
 		__COMPILER=`$($(MACH64)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
 		if [ -z "$$__COMPILER" ]; then			\

@@ -138,6 +138,7 @@ CHGRP=		$(TRUE)
 MV=		/usr/bin/mv -f
 RM=		/usr/bin/rm -f
 GREP=		/usr/bin/grep
+EGREP=		/usr/bin/egrep
 SED=		/usr/bin/sed
 NAWK=		/usr/bin/nawk
 CP=		/usr/bin/cp -f
