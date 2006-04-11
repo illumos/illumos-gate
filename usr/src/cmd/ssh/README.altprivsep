@@ -1,4 +1,4 @@
-   Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+   Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
    Use is subject to license terms.
 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -125,16 +125,17 @@ A.    References
     No privilege or privileged resources are needed to implement the
     parts (a)-(d) mentioned in section 3.
 
-    An ssh server requires practically all privileges for user
-    authentication (e) (at least PAM does), particularly
-    PRIV_PROC_SETID, for logging the user in.
 
-
-    For key exchange and server authentication an ssh server requires:
+    For key exchange and server authentication (e) an ssh server requires:
 
      - Access to the host's ssh private keys.
 
      - Access to the host's GSS-API acceptor credentials.  [SSHv2-only]
+
+
+    An ssh server requires practically all privileges for user
+    authentication (f) (at least PAM does), particularly
+    PRIV_PROC_SETID, for logging the user in.
 
 
     Post-authentication an ssh server requires the following privileges:

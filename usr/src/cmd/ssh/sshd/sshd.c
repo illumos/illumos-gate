@@ -41,7 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1776,7 +1776,7 @@ authenticated:
 		 * If the monitor fatal()s it will audit/record a logout, so
 		 * we'd better do something to really mean it: shutdown the
 		 * socket but leave the child alone -- it's been disconnected
-		 * and we hope it exits, but killing any pid from a privleged
+		 * and we hope it exits, but killing any pid from a privileged
 		 * monitor could be dangerous.
 		 *
 		 * NOTE: Order matters -- these fatal cleanups must come before
@@ -1868,6 +1868,12 @@ authenticated:
 		permanently_set_uid(authctxt->pw);
 		destroy_sensitive_data();
 		ssh_gssapi_server_mechs(NULL); /* release cached mechs list */
+
+#ifdef HAVE_BSM
+		fatal_remove_cleanup(
+			(void (*)(void *))audit_failed_login_cleanup,
+			(void *)authctxt);
+#endif /* HAVE_BSM */
 
 		/* Logged-in session. */
 		do_authenticated(authctxt);
