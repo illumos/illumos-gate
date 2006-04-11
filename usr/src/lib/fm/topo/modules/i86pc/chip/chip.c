@@ -52,6 +52,9 @@
 #define	MAX(a, b)	((a) > (b) ? (a) : (b))
 #endif
 
+#define	MAX_DIMMNUM	7
+#define	MAX_CSNUM	7
+
 /*
  * Enumerates the processing chips, or sockets, (as distinct from cores) in a
  * system.  For each chip found, the necessary nodes (one or more cores, and
@@ -318,10 +321,11 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 	uint64_t csnum;
 	uint_t ncs;
 
-	if (nvlist_lookup_nvlist_array(mc, "cslist", &csarr, &ncs) != 0)
+	if (nvlist_lookup_nvlist_array(mc, "cslist", &csarr, &ncs) != 0 ||
+	    ncs == 0)
 		return (-1);
 
-	if (topo_node_range_create(mod, pnode, name, 0, ncs) < 0)
+	if (topo_node_range_create(mod, pnode, name, 0, MAX_CSNUM) < 0)
 		return (-1);
 
 	thp = topo_mod_handle(mod);
@@ -388,10 +392,11 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc)
 
 	thp = topo_mod_handle(mod);
 
-	if (nvlist_lookup_nvlist_array(mc, "dimmlist", &dimmarr, &ndimm) != 0)
+	if (nvlist_lookup_nvlist_array(mc, "dimmlist", &dimmarr, &ndimm) != 0 ||
+	    ndimm == 0)
 		return (-1);
 
-	if (topo_node_range_create(mod, pnode, name, 0, ndimm) < 0)
+	if (topo_node_range_create(mod, pnode, name, 0, MAX_DIMMNUM) < 0)
 		return (-1);
 
 	for (i = 0; i < ndimm; i++) {
