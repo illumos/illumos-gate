@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.
+ * All rights reserved. Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -188,6 +188,12 @@ i2c_transfer_alloc(i2c_client_hdl_t hdl,
 	i2c_transfer_alloc_t *i2cw;
 	int sleep;
 	int size;
+
+	/*
+	 * set i2c to NULL in case the caller just checks i2c
+	 * to determine failures.
+	 */
+	*i2c = NULL;
 
 	if (flags & I2C_SLEEP) {
 		sleep = KM_SLEEP;
