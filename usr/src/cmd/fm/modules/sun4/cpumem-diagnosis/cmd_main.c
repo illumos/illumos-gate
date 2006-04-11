@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -57,6 +56,10 @@
 #include <sys/async.h>
 
 cmd_t cmd;
+
+#ifdef sun4u
+cmd_list_t opl_cpu_list;
+#endif	/* sun4u */
 
 typedef struct cmd_subscriber {
 	const char *subr_class;
@@ -131,25 +134,25 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.asic.*.sdi.sdi-dp", 	cmd_dp_ex },
 	{ "ereport.asic.*.cp.cp-dp", 	cmd_dp_cp },
 	{ "ereport.asic.*.rp.rp-dp", 	cmd_dp_cp },
-	{ "ereport.asic.mac.mi-ue",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.ptrl-ue",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.mi-ce",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.ptrl-ce",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.mi-cmpe",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.ptrl-cmpe",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.mi-sue",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.ptrl-sue",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.mi-mue",			opl_cmd_mac_common },
-	{ "ereport.asic.mac.ptrl-mue",			opl_cmd_mac_common },
-	{ "ereport.cpu.*.ue-mem",			opl_cmd_cpu_hdlr_mem },
+	{ "ereport.asic.mac.mi-ue",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-ue",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.mi-ce",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-ce",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.mi-cmpe",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-cmpe",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.mi-sue",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-sue",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.mi-mue",			cmd_opl_mac_common },
+	{ "ereport.asic.mac.ptrl-mue",			cmd_opl_mac_common },
+	{ "ereport.cpu.*.ue-mem",			cmd_opl_cpu_mem },
 	{ "ereport.cpu.*.ue-channel",			cmd_nop },
-	{ "ereport.cpu.*.ue-cpu",		opl_cmd_ue_cpu_det_cpu },
+	{ "ereport.cpu.*.ue-cpu",			cmd_opluecpu_detcpu },
 	{ "ereport.cpu.*.ue-path",			cmd_nop },
-	{ "ereport.cpu.*.inv-sfsr",			opl_cmd_oplinv_sfsr },
+	{ "ereport.cpu.*.inv-sfsr",			cmd_oplinv_sfsr },
 	{ "ereport.cpu.*.berr",				cmd_nop },
 	{ "ereport.cpu.*.bto",				cmd_nop },
-	{ "ereport.cpu.*.mtlb",				opl_cmd_oplmtlb },
-	{ "ereport.cpu.*.tlbp",				opl_cmd_opltlbp },
+	{ "ereport.cpu.*.mtlb",				cmd_oplmtlb },
+	{ "ereport.cpu.*.tlbp",				cmd_opltlbp },
 	{ "ereport.cpu.*.inv-urg",			cmd_oplinv_urg },
 	{ "ereport.cpu.*.cre",				cmd_oplcre },
 	{ "ereport.cpu.*.tsb-ctx",			cmd_opltsb_ctx },
@@ -166,25 +169,25 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.dae",				cmd_opldae },
 	{ "ereport.cpu.*.iae",				cmd_opliae },
 	{ "ereport.cpu.*.uge",				cmd_opluge },
-	{ "ereport.io.oberon.ubc.dmarduea-mem",		opl_cmd_io_hdlr_mem },
+	{ "ereport.io.oberon.ubc.dmarduea-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.dmarduea-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.dmarduea-cpu",		opl_cmd_ue_cpu_det_io },
+	{ "ereport.io.oberon.ubc.dmarduea-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.dmarduea-path",	cmd_nop },
-	{ "ereport.io.oberon.ubc.dmardueb-mem",		opl_cmd_io_hdlr_mem },
+	{ "ereport.io.oberon.ubc.dmardueb-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.dmardueb-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.dmardueb-cpu",		opl_cmd_ue_cpu_det_io },
+	{ "ereport.io.oberon.ubc.dmardueb-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.dmardueb-path",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piowtue-mem",		opl_cmd_io_hdlr_mem },
+	{ "ereport.io.oberon.ubc.piowtue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piowtue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piowtue-cpu",		opl_cmd_ue_cpu_det_io },
+	{ "ereport.io.oberon.ubc.piowtue-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piowtue-path",		cmd_nop },
-	{ "ereport.io.oberon.ubc.piowbeue-mem",		opl_cmd_io_hdlr_mem },
+	{ "ereport.io.oberon.ubc.piowbeue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piowbeue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piowbeue-cpu",		opl_cmd_ue_cpu_det_io },
+	{ "ereport.io.oberon.ubc.piowbeue-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piowbeue-path",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piorbeue-mem",		opl_cmd_io_hdlr_mem },
+	{ "ereport.io.oberon.ubc.piorbeue-mem",		cmd_opl_io_mem },
 	{ "ereport.io.oberon.ubc.piorbeue-channel",	cmd_nop },
-	{ "ereport.io.oberon.ubc.piorbeue-cpu",		opl_cmd_ue_cpu_det_io },
+	{ "ereport.io.oberon.ubc.piorbeue-cpu",		cmd_opluecpu_detio },
 	{ "ereport.io.oberon.ubc.piorbeue-path",	cmd_nop },
 #else /* i.e. sun4v */
 	{ "ereport.cpu.*.irc",		cmd_irc },
@@ -295,7 +298,7 @@ cmd_gc(fmd_hdl_t *hdl)
 	cmd_mem_gc(hdl);
 }
 
-static cmd_stat_t cmd_stats = {
+static const cmd_stat_t cmd_stats = {
 	{ "bad_det", FMD_TYPE_UINT64, "detector missing or malformed" },
 	{ "bad_cpu_asru", FMD_TYPE_UINT64, "CPU ASRU missing or malformed" },
 	{ "bad_mem_asru", FMD_TYPE_UINT64, "memory ASRU missing or malformed" },
@@ -500,6 +503,10 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	bzero(&cmd, sizeof (cmd_t));
 
+#ifdef sun4u
+	bzero(&opl_cpu_list, sizeof (cmd_list_t));
+#endif	/* sun4u */
+
 	cmd.cmd_stats = (cmd_stat_t *)fmd_stat_create(hdl, FMD_STAT_NOALLOC,
 	    sizeof (cmd_stats) / sizeof (fmd_stat_t),
 	    (fmd_stat_t *)&cmd_stats);
@@ -531,12 +538,9 @@ _fmd_init(fmd_hdl_t *hdl)
 	cmd.cmd_iorxefrx_window = fmd_prop_get_int64(hdl, "iorxefrx_window");
 
 #ifdef sun4u
-	if (cmd_cpu_ecache_support()) {
-		if (cmd_ecache_init() < 0) {
-			_fmd_fini(hdl);
-			fmd_hdl_abort(hdl,
-			    "failed to find device for E-cache flush");
-		}
+	if (cmd_cpu_ecache_support() && cmd_ecache_init() < 0) {
+		_fmd_fini(hdl);
+		fmd_hdl_abort(hdl, "failed to find device for E-cache flush");
 	}
 #endif
 

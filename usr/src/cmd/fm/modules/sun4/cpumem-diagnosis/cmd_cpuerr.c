@@ -97,7 +97,7 @@ cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
 		return (CMD_EVD_UNUSED);				\
 									\
 	return (cmd_cpuerr_common(hdl, ep, cpu, &cpu->cpu_##casenm,	\
-	    ptr, ntname, ntname "_n", ntname "_t", fltname, clcode)); 	\
+	    ptr, ntname, ntname "_n", ntname "_t", fltname, clcode));	\
 }
 
 CMD_CPU_SIMPLEHANDLER(txce, l2tag, CMD_PTR_CPU_L2TAG, "l2tag", "l2cachetag")
@@ -166,9 +166,9 @@ CMD_CPU_UEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "freg")
 
 #ifdef sun4u
 /*
- * The following macro handles UE errors for CPUs.
- * It handles the error cases in which there is no "resource",
- * only detector info. is available.
+ * The following macro handles UEs or CPU errors.
+ * It handles the error cases in which there is with or
+ * without "resource".
  *
  * If the "fltname" "core" is to be generated, the sibling CPUs
  * within the core will be added to the suspect list.
@@ -177,107 +177,80 @@ CMD_CPU_UEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "freg")
  * If the "fltname" "strand" is to be generated, the strand
  * itself will be in the suspect list.
  */
-#define	CMD_OPL_UEHANDLER(name, casenm, ptr, fltname)			\
+#define	CMD_OPL_UEHANDLER(name, casenm, ptr, fltname, has_rsrc)		\
 cmd_evdisp_t								\
 cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
     const char *class, cmd_errcl_t clcode)				\
 {									\
 	cmd_cpu_t *cpu;							\
-	nvlist_t  *det;							\
 	cmd_case_t *cc;							\
-	uint8_t cpumask, version = 1;					\
 	cmd_evdisp_t rc;						\
+	nvlist_t  *rsrc = NULL;						\
+	uint8_t cpumask, version = 1;					\
+	uint8_t lookup_rsrc = has_rsrc;					\
 									\
 	fmd_hdl_debug(hdl,						\
-	    "Enter CMD_OPL_UEHANDLER for class %x\n", clcode);		\
+	    "Enter cmd_opl_ue_cpu for class %x\n", clcode);		\
 									\
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) ==	\
-	    NULL || cpu->cpu_faulting)					\
-		return (CMD_EVD_UNUSED);				\
+	if (lookup_rsrc) {						\
+		if (nvlist_lookup_nvlist(nvl,				\
+		    FM_EREPORT_PAYLOAD_NAME_RESOURCE, &rsrc) != 0)	\
+			return (CMD_EVD_BAD);				\
 									\
-	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det);	\
-	if (nvlist_lookup_uint8(det, FM_VERSION, &version) != 0 ||	\
-	    version > FM_CPU_SCHEME_VERSION ||				\
-	    nvlist_lookup_uint8(det, FM_FMRI_CPU_MASK, &cpumask) != 0)	\
-		return (CMD_EVD_BAD);					\
+		if ((cpu = cmd_cpu_lookup(hdl, rsrc,			\
+		    CPU_EREPORT_STRING)) == NULL || cpu->cpu_faulting)	\
+			return (CMD_EVD_UNUSED);			\
+	} else {							\
+		if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl,	\
+		    class)) == NULL || cpu->cpu_faulting)		\
+			return (CMD_EVD_UNUSED);			\
 									\
-	cc = &cpu->cpu_##casenm;					\
-	rc = opl_cpuue_handler(hdl, ep, class, fltname,			\
-	    ptr, cpu, cc, cpumask);					\
-	return (rc);							\
-}
-
-CMD_OPL_UEHANDLER(oplinv_urg, opl_inv_urg, CMD_PTR_CPU_UGESR_INV_URG, "core")
-CMD_OPL_UEHANDLER(oplcre, opl_cre, CMD_PTR_CPU_UGESR_CRE, "core")
-CMD_OPL_UEHANDLER(opltsb_ctx, opl_tsb_ctx, CMD_PTR_CPU_UGESR_TSB_CTX, "core")
-CMD_OPL_UEHANDLER(opltsbp, opl_tsbp, CMD_PTR_CPU_UGESR_TSBP, "core")
-CMD_OPL_UEHANDLER(oplpstate, opl_pstate, CMD_PTR_CPU_UGESR_PSTATE, "core")
-CMD_OPL_UEHANDLER(opltstate, opl_tstate, CMD_PTR_CPU_UGESR_TSTATE, "core")
-CMD_OPL_UEHANDLER(opliug_f, opl_iug_f, CMD_PTR_CPU_UGESR_IUG_F, "core")
-CMD_OPL_UEHANDLER(opliug_r, opl_iug_r, CMD_PTR_CPU_UGESR_IUG_R, "core")
-CMD_OPL_UEHANDLER(oplsdc, opl_sdc, CMD_PTR_CPU_UGESR_SDC, "chip")
-CMD_OPL_UEHANDLER(oplwdt, opl_wdt, CMD_PTR_CPU_UGESR_WDT, "core")
-CMD_OPL_UEHANDLER(opldtlb, opl_dtlb, CMD_PTR_CPU_UGESR_DTLB, "core")
-CMD_OPL_UEHANDLER(oplitlb, opl_itlb, CMD_PTR_CPU_UGESR_ITLB, "core")
-CMD_OPL_UEHANDLER(oplcore_err, opl_core_err, CMD_PTR_CPU_UGESR_CORE_ERR, "core")
-CMD_OPL_UEHANDLER(opldae, opl_dae, CMD_PTR_CPU_UGESR_DAE, "core")
-CMD_OPL_UEHANDLER(opliae, opl_iae, CMD_PTR_CPU_UGESR_IAE, "core")
-CMD_OPL_UEHANDLER(opluge, opl_uge, CMD_PTR_CPU_UGESR_UGE, "core")
-#endif
-
-/*
- * The following macro handles UE errors for CPUs.
- * The difference in this one compared to the "CMD_CPU_UEHANDLER"
- * is that the "asru" here is getting pulled from the resource
- * of this ereport instead of from detector.
- *
- * If the "fltname" "core" is to be generated, the sibling CPUs
- * within the core will be added to the suspect list.
- * If the "fltname" "chip" is to be generated, the sibling CPUs
- * within the chip will be added to the suspect list.
- * If the "fltname" "strand" is to be generated, the strand
- * itself will be in the suspect list.
- */
-#define	CMD_GENCPU_UEHANDLER(name, casenm, ptr, fltname)		\
-cmd_evdisp_t								\
-opl_cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
-    const char *class, cmd_errcl_t clcode)				\
-{									\
-	cmd_cpu_t *cpu;							\
-	nvlist_t *rsrc = NULL;						\
-	cmd_case_t *cc;							\
-	uint8_t cpumask, version = 1;					\
-	cmd_evdisp_t rc;						\
-									\
-	fmd_hdl_debug(hdl,						\
-	    "Enter CMD_GENCPU_UEHANDLER for class %x\n", clcode);	\
-									\
-	if (nvlist_lookup_nvlist(nvl,					\
-	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, &rsrc) != 0)		\
-		return (CMD_EVD_BAD);					\
-									\
-	if ((cpu = cmd_cpu_lookup(hdl, rsrc, CPU_EREPORT_STRING))	\
-	    == NULL || cpu->cpu_faulting)				\
-		return (CMD_EVD_UNUSED);				\
+		(void) nvlist_lookup_nvlist(nvl,			\
+		    FM_EREPORT_DETECTOR, &rsrc);			\
+	}								\
 									\
 	if (nvlist_lookup_uint8(rsrc, FM_VERSION, &version) != 0 ||	\
 	    version > FM_CPU_SCHEME_VERSION ||				\
 	    nvlist_lookup_uint8(rsrc, FM_FMRI_CPU_MASK, &cpumask) != 0)	\
 		return (CMD_EVD_BAD);					\
 									\
-	cc = &cpu->cpu_opl_##casenm;					\
-	rc = opl_cpuue_handler(hdl, ep, class, fltname,			\
+	cc = &cpu->cpu_##casenm;					\
+	rc = cmd_opl_ue_cpu(hdl, ep, class, fltname,			\
 	    ptr, cpu, cc, cpumask);					\
 	return (rc);							\
 }
 
-#ifdef sun4u
-CMD_GENCPU_UEHANDLER(oplinv_sfsr, inv_sfsr, CMD_PTR_CPU_INV_SFSR, "strand")
-CMD_GENCPU_UEHANDLER(ue_cpu_det_cpu, ue_det_cpu, CMD_PTR_CPU_UE_DET_CPU, "chip")
-CMD_GENCPU_UEHANDLER(ue_cpu_det_io, ue_det_io, CMD_PTR_CPU_UE_DET_IO, "chip")
-CMD_GENCPU_UEHANDLER(oplmtlb, mtlb, CMD_PTR_CPU_MTLB, "core")
-CMD_GENCPU_UEHANDLER(opltlbp, tlbp, CMD_PTR_CPU_TLBP, "core")
-#endif
+/*
+ * CPU errors without resource
+ */
+CMD_OPL_UEHANDLER(oplinv_urg, opl_inv_urg, CMD_PTR_CPU_UGESR_INV_URG, "core", 0)
+CMD_OPL_UEHANDLER(oplcre, opl_cre, CMD_PTR_CPU_UGESR_CRE, "core", 0)
+CMD_OPL_UEHANDLER(opltsb_ctx, opl_tsb_ctx, CMD_PTR_CPU_UGESR_TSB_CTX, "core", 0)
+CMD_OPL_UEHANDLER(opltsbp, opl_tsbp, CMD_PTR_CPU_UGESR_TSBP, "core", 0)
+CMD_OPL_UEHANDLER(oplpstate, opl_pstate, CMD_PTR_CPU_UGESR_PSTATE, "core", 0)
+CMD_OPL_UEHANDLER(opltstate, opl_tstate, CMD_PTR_CPU_UGESR_TSTATE, "core", 0)
+CMD_OPL_UEHANDLER(opliug_f, opl_iug_f, CMD_PTR_CPU_UGESR_IUG_F, "core", 0)
+CMD_OPL_UEHANDLER(opliug_r, opl_iug_r, CMD_PTR_CPU_UGESR_IUG_R, "core", 0)
+CMD_OPL_UEHANDLER(oplsdc, opl_sdc, CMD_PTR_CPU_UGESR_SDC, "chip", 0)
+CMD_OPL_UEHANDLER(oplwdt, opl_wdt, CMD_PTR_CPU_UGESR_WDT, "core", 0)
+CMD_OPL_UEHANDLER(opldtlb, opl_dtlb, CMD_PTR_CPU_UGESR_DTLB, "core", 0)
+CMD_OPL_UEHANDLER(oplitlb, opl_itlb, CMD_PTR_CPU_UGESR_ITLB, "core", 0)
+CMD_OPL_UEHANDLER(oplcore_err, opl_core_err, CMD_PTR_CPU_UGESR_CORE_ERR,
+"core", 0)
+CMD_OPL_UEHANDLER(opldae, opl_dae, CMD_PTR_CPU_UGESR_DAE, "core", 0)
+CMD_OPL_UEHANDLER(opliae, opl_iae, CMD_PTR_CPU_UGESR_IAE, "core", 0)
+CMD_OPL_UEHANDLER(opluge, opl_uge, CMD_PTR_CPU_UGESR_UGE, "core", 0)
+
+/*
+ * UEs with resource
+ */
+CMD_OPL_UEHANDLER(oplinv_sfsr, opl_invsfsr, CMD_PTR_CPU_INV_SFSR, "strand", 1)
+CMD_OPL_UEHANDLER(opluecpu_detcpu, oplue_detcpu, CMD_PTR_CPU_UE_DET_CPU,
+"chip", 1)
+CMD_OPL_UEHANDLER(opluecpu_detio, oplue_detio, CMD_PTR_CPU_UE_DET_IO, "chip", 1)
+CMD_OPL_UEHANDLER(oplmtlb, opl_mtlb, CMD_PTR_CPU_MTLB, "core", 1)
+CMD_OPL_UEHANDLER(opltlbp, opl_tlbp, CMD_PTR_CPU_TLBP, "core", 1)
+#endif	/* sun4u */
 
 typedef struct errdata {
 	cmd_serd_t *ed_serd;

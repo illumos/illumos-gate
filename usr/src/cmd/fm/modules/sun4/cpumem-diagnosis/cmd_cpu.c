@@ -1416,55 +1416,25 @@ cmd_cpu_ecache_support(void)
 }
 
 /*
- * This is derived from "cmd_cpu_lookup()".
- * The difference here is that it does not do
- * "fmd_nvl_fmri_expand" since these are for the sibling CPUs.
- * They are not part of the original fmri page.
+ * This function builds the fmri of the
+ * given cpuid based on the cpu scheme.
  */
-cmd_cpu_t *
-cmd_sibcpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
+nvlist_t *
+cmd_cpu_fmri_create(uint32_t cpuid, uint8_t cpumask)
 {
-	cmd_cpu_t *cpu;
-	uint8_t vers;
-	const char *scheme;
-	uint32_t cpuid;
+	nvlist_t *fmri;
 
-	if (nvlist_lookup_pairs(asru, 0,
-	    FM_VERSION, DATA_TYPE_UINT8, &vers,
-	    FM_FMRI_SCHEME, DATA_TYPE_STRING, &scheme,
-	    FM_FMRI_CPU_ID, DATA_TYPE_UINT32, &cpuid,
-	    NULL) != 0 || (vers != CPU_SCHEME_VERSION0 &&
-	    vers != CPU_SCHEME_VERSION1) ||
-	    strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
-		CMD_STAT_BUMP(bad_cpu_asru);
+	if ((errno = nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0)) != 0)
+		return (NULL);
+
+	if (nvlist_add_uint8(fmri, FM_VERSION,
+	    FM_CPU_SCHEME_VERSION) != 0 || nvlist_add_string(fmri,
+	    FM_FMRI_SCHEME, FM_FMRI_SCHEME_CPU) != 0 ||
+	    nvlist_add_uint32(fmri, FM_FMRI_CPU_ID, cpuid) != 0 ||
+	    nvlist_add_uint8(fmri, FM_FMRI_CPU_MASK, cpumask) != 0) {
+		nvlist_free(fmri);
 		return (NULL);
 	}
 
-	cpu = cpu_lookup_by_cpuid(cpuid);
-
-	if (cpu != NULL && (!fmd_nvl_fmri_present(hdl, cpu->cpu_asru_nvl) ||
-	    fmd_nvl_fmri_unusable(hdl, cpu->cpu_asru_nvl))) {
-		fmd_hdl_debug(hdl, "sibcpu_lookup: discarding old state\n");
-		cmd_cpu_destroy(hdl, cpu);
-		cpu = NULL;
-	}
-
-	/*
-	 * Check to see if the CPU described by the ereport has been removed
-	 * from the system.  If it has, return to the caller without a CPU.
-	 */
-	if (!fmd_nvl_fmri_present(hdl, asru) ||
-	    fmd_nvl_fmri_unusable(hdl, asru)) {
-		fmd_hdl_debug(hdl, "sibcpu_lookup: discarding old ereport\n");
-		return (NULL);
-	}
-
-	if (cpu == NULL) {
-		const char *cpuname = class + sizeof ("ereport.cpu");
-
-		cpu = cpu_create(hdl, asru, cpuid, cpu_nname2type(hdl, cpuname,
-		    (size_t)(strchr(cpuname, '.') - cpuname)));
-	}
-
-	return (cpu);
+	return (fmri);
 }

@@ -36,6 +36,12 @@
 extern "C" {
 #endif
 
+typedef struct opl_cpu {
+	cmd_list_t oc_list;
+	cmd_cpu_t *oc_cmd_cpu;
+	uint32_t oc_cpuid;
+} opl_cpu_t;
+
 extern cmd_evdisp_t cmd_oplinv_urg(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_oplcre(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
@@ -68,33 +74,38 @@ extern cmd_evdisp_t cmd_opliae(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_opluge(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_oplmtlb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_oplmtlb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_opltlbp(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_opltlbp(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_oplinv_sfsr(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_oplinv_sfsr(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_ue_cpu_det_cpu(fmd_hdl_t *, fmd_event_t *,
+extern cmd_evdisp_t cmd_opluecpu_detcpu(fmd_hdl_t *, fmd_event_t *,
     nvlist_t *, const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_ue_cpu_det_io(fmd_hdl_t *, fmd_event_t *,
+extern cmd_evdisp_t cmd_opluecpu_detio(fmd_hdl_t *, fmd_event_t *,
     nvlist_t *, const char *, cmd_errcl_t);
 
-extern cmd_evdisp_t opl_cmd_mac_common(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_opl_mac_common(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_cpu_hdlr_mem(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_opl_cpu_mem(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
-extern cmd_evdisp_t opl_cmd_io_hdlr_mem(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+extern cmd_evdisp_t cmd_opl_io_mem(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
-extern nvlist_t *opl_cmd_cpu_asru_create(uint32_t, uint8_t);
-extern nvlist_t *opl_cmd_cpu_rsrc_create(fmd_hdl_t *, uint32_t);
-extern opl_cpu_list_t *opl_alloc_struct(fmd_hdl_t *, uint32_t, int);
-extern void opl_free_struct(fmd_hdl_t *, opl_cpu_list_t *);
+extern nvlist_t *opl_cpursrc_create(fmd_hdl_t *, uint32_t);
+extern cmd_list_t *opl_cpulist_insert(fmd_hdl_t *, uint32_t, int);
+extern void opl_cpulist_free(fmd_hdl_t *, cmd_list_t *);
 extern uint8_t opl_avg(uint_t, uint_t);
 
-extern cmd_evdisp_t opl_cpuue_handler(fmd_hdl_t *, fmd_event_t *,
+extern cmd_evdisp_t cmd_opl_ue_cpu(fmd_hdl_t *, fmd_event_t *,
     const char *, const char *, cmd_ptrsubtype_t, cmd_cpu_t *, cmd_case_t *,
     uint8_t);
+
+extern cmd_list_t *opl_cpulist_insert(fmd_hdl_t *, uint32_t, int);
+extern int cmd_fmri_hc_set(fmd_hdl_t *, nvlist_t *, int, const nvlist_t *,
+    nvlist_t *, int, ...);
+
+extern cmd_list_t opl_cpu_list;
 
 #define	CPU_EREPORT_STRING	"ereport.cpu.SPARC64-VI."
 #define	OPL_CMU_SIGN		"CMU"
@@ -102,7 +113,7 @@ extern cmd_evdisp_t opl_cpuue_handler(fmd_hdl_t *, fmd_event_t *,
 #define	OPL_CPU_FRU_FMRI	FM_FMRI_SCHEME_HC":///" \
     FM_FMRI_LEGACY_HC"="OPL_CMU_SIGN
 #define	STR_BUFLEN		32
-#define	LIST_SIZE		5
+#define	NPAIRS			5
 
 /*
  * Mask for getting the fault address

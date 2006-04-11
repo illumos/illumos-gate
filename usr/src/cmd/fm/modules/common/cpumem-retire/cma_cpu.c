@@ -122,7 +122,7 @@ int
 cma_cpu_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 {
 	uint_t cpuid, cpuvid;
-	int err = 0;
+	int err = CMA_RA_FAILURE;
 
 	/*
 	 * This added expansion is needed to cover the situation where a

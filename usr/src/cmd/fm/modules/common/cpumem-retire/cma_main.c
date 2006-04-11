@@ -172,17 +172,12 @@ cma_recv_one(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	const cma_subscriber_t *subr;
 	nvlist_t *asru;
-	int err;
 
 	if ((subr = nvl2subr(hdl, nvl, &asru)) == NULL)
 		return;
 
-	if (subr->subr_func != NULL) {
-		err = subr->subr_func(hdl, nvl, asru, NULL);
-
-		if (err != CMA_RA_SUCCESS)
-			fmd_hdl_debug(hdl, "failed to offline cpu\n");
-	}
+	if (subr->subr_func != NULL)
+		(void) subr->subr_func(hdl, nvl, asru, NULL);
 
 }
 

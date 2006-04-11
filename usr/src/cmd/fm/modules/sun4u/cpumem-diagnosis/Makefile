@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4u
 
@@ -30,7 +30,8 @@ sun4u_SRCS = cmd_ecache.c \
 		cmd_dp.c \
 		cmd_dperr.c \
 		cmd_dp_page.c \
-		cmd_opl.c
+		cmd_opl.c \
+		cmd_oplerr.c
 
 INCDIRS = $(SRC)/uts/sun4u
 
