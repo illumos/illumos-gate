@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +46,7 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/pathname.h>
 #include <sys/signal.h>
 #include <sys/user.h>
 #include <sys/strsubr.h>
@@ -65,6 +65,7 @@
 #include <sys/ddi.h>
 #include <sys/vtrace.h>
 #include <sys/policy.h>
+#include <sys/tsol/label.h>
 
 /*
  * Define the routines/data structures used in this file.
@@ -136,6 +137,61 @@ fifo_getinfo()
 }
 
 /*
+ * Trusted Extensions enforces a restrictive policy for
+ * writing via cross-zone named pipes. A privileged global
+ * zone process may expose a named pipe by loopback mounting
+ * it from a lower-level zone to a higher-level zone. The
+ * kernel-enforced mount policy for lofs mounts ensures
+ * that such mounts are read-only in the higher-level
+ * zone. But this is not sufficient to prevent writing
+ * down via fifos.  This function prevents writing down
+ * by comparing the zone of the process which is requesting
+ * write access with the zone owning the named pipe rendezvous.
+ * For write access the zone of the named pipe must equal the
+ * zone of the writing process. Writing up is possible since
+ * the named pipe can be opened for read by a process in a
+ * higher level zone.
+ *
+ * An exception is made for the global zone to support trusted
+ * processes which enforce their own data flow policies.
+ */
+static boolean_t
+tsol_fifo_access(vnode_t *vp, int flag, cred_t *crp)
+{
+	fifonode_t	*fnp = VTOF(vp);
+
+	if (is_system_labeled() &&
+	    (flag & FWRITE) &&
+	    (!(fnp->fn_flag & ISPIPE))) {
+		zone_t	*proc_zone;
+
+		proc_zone = crgetzone(crp);
+		if (proc_zone != global_zone) {
+			char		vpath[MAXPATHLEN];
+			zone_t		*fifo_zone;
+
+			/*
+			 * Get the pathname and use it to find
+			 * the zone of the fifo.
+			 */
+			if (vnodetopath(rootdir, vp, vpath, sizeof (vpath),
+			    kcred) == 0) {
+				fifo_zone = zone_find_by_path(vpath);
+				zone_rele(fifo_zone);
+
+				if (fifo_zone != global_zone &&
+				    fifo_zone != proc_zone) {
+					return (B_FALSE);
+				}
+			} else {
+				return (B_FALSE);
+			}
+		}
+	}
+	return (B_TRUE);
+}
+
+/*
  * Open and stream a FIFO.
  * If this is the first open of the file (FIFO is not streaming),
  * initialize the fifonode and attach a stream to the vnode.
@@ -156,6 +212,9 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 	ASSERT(vp->v_type == VFIFO);
 	ASSERT(vn_matchops(vp, fifo_vnodeops));
 
+	if (!tsol_fifo_access(vp, flag, crp))
+		return (EACCES);
+
 	mutex_enter(&fn_lock->flk_lock);
 	/*
 	 * If we are the first reader, wake up any writers that
@@ -173,7 +232,6 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 	 * may be waiting around.  wait for all of them to
 	 * wake up before proceeding (i.e. fn_rsynccnt == 0)
 	 */
-
 	if (flag & FWRITE) {
 		fnp->fn_wcnt++;		/* record writer present */
 		if (! (fnp->fn_flag & ISPIPE))
@@ -1448,7 +1506,6 @@ fifo_setattr(
 int
 fifo_access(vnode_t *vp, int mode, int flags, cred_t *crp)
 {
-
 	if (VTOF(vp)->fn_realvp)
 		return (VOP_ACCESS(VTOF(vp)->fn_realvp, mode, flags, crp));
 	else

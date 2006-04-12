@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,6 +399,21 @@ fifovp(vnode_t *vp, cred_t *crp)
 
 	fdp->fifo_lock.flk_ref = 1;
 	fnp = &fdp->fifo_fnode[0];
+
+	/*
+	 * In Trusted Extensions cross-zone named pipes
+	 * are supported subject to the MAC policy. Since
+	 * cross-zone access is done using lofs mounts,
+	 * it is necessary to use the real vnode so that
+	 * matching ends of the fifo can find each other.
+	 */
+	if (is_system_labeled()) {
+		vnode_t	*rvp;
+
+		if (VOP_REALVP(vp, &rvp) == 0)
+			vp = rvp;
+	}
+
 	fnp->fn_realvp	= vp;
 	fnp->fn_wcnt	= 0;
 	fnp->fn_rcnt	= 0;

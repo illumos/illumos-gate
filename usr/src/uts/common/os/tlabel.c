@@ -274,50 +274,27 @@ errout:
 ts_label_t *
 getflabel(vnode_t *vp)
 {
-	vfs_t		*vfsp, *rvfsp, *nvfs;
+	vfs_t		*vfsp, *rvfsp;
 	vnode_t		*rvp, *rvp2;
 	zone_t		*zone;
 	ts_label_t	*zl;
 	boolean_t	vfs_is_held = B_FALSE;
-	refstr_t	*resource_ref = NULL;
-	char		*resource = NULL;
 	char		vpath[MAXPATHLEN];
 
 	ASSERT(vp);
-	vfsp = rvfsp = nvfs = vp->v_vfsp;
+	vfsp = vp->v_vfsp;
 	if (vfsp == NULL)
 		return (NULL);
 
-	rvp = rvp2 = vp;
+	rvp = vp;
 
 	/*
-	 * Get rid of all but the last loopback vfs, since the last such mount
-	 * has the correct resource to use (except for nfs case, handled later).
+	 * Traverse lofs mounts and fattach'es to get the real vnode
 	 */
-	while (strcmp(vfssw[nvfs->vfs_fstype].vsw_name, "lofs") == 0) {
+	if (VOP_REALVP(rvp, &rvp2) == 0)
 		rvp = rvp2;
-		rvfsp = nvfs;
-		if ((rvp2 = realvp(rvp)) == NULL)
-			break;
-		if (((nvfs = rvp2->v_vfsp) == NULL) || (nvfs == rvfsp))
-			break;
-	}
 
-	/*
-	 * rvp/rvfsp now represent the preliminary vnode/vfs we may use.  Now
-	 * check if the next vfs is nfs; if so, then it has the correct info
-	 * to use.  And finally, for some cases on loop-back mounts there will
-	 * be no resource; for these, use the underlying vfs also.
-	 */
-	if (strcmp(vfssw[rvfsp->vfs_fstype].vsw_name, "lofs") == 0) {
-		if (((rvp2 = realvp(rvp)) != NULL) &&
-		    ((nvfs = rvp2->v_vfsp) != NULL) &&
-		    ((strcmp(vfssw[nvfs->vfs_fstype].vsw_name, "nfs") == 0)) ||
-		    (rvfsp->vfs_resource == NULL)) {
-			rvp = rvp2;
-			rvfsp = nvfs;
-		}
-	}
+	rvfsp = rvp->v_vfsp;
 
 	/* rvp/rvfsp now represent the real vnode/vfs we will be using */
 
@@ -338,36 +315,26 @@ getflabel(vnode_t *vp)
 		}
 	}
 
-	if (rvfsp->vfs_resource) {
-		resource_ref = vfs_getresource(rvfsp);
-		resource = (char *)refstr_value(resource_ref);
+	if (vnodetopath(rootdir, rvp, vpath, sizeof (vpath), kcred) != 0) {
+		return (NULL);
 	}
 
 	/*
-	 * Sanity check - resource may be weird for some cases, like devices.
-	 * In this case, the label must be "local", so just use the mount point.
+	 * Sanity check - vpath may be weird for some cases, like devices.
 	 */
-	if ((resource == NULL) || (*resource != '/')) {
-		if (resource_ref)
-			refstr_rele(resource_ref);
-		if (rvfsp->vfs_mntpt) {
-			resource_ref = vfs_getmntpoint(rvfsp);
-			resource = (char *)refstr_value(resource_ref);
-		}
-		if ((resource == NULL) || (*resource != '/')) {
-			zone = curproc->p_zone;
-			zone_hold(zone);
-			goto zone_out;
-		}
+	if (*vpath != '/') {
+		zone = curproc->p_zone;
+		zone_hold(zone);
+		goto zone_out;
 	}
 
 	VFS_HOLD(vfsp);
 	vfs_is_held = B_TRUE;
 
-	zone = zone_find_by_any_path(resource, B_FALSE);
+	zone = zone_find_by_any_path(vpath, B_FALSE);
 
 	/*
-	 * If the vfs source zone is properly set to a non-global zone, or
+	 * If the vnode source zone is properly set to a non-global zone, or
 	 * any zone if the mount is R/W, then use the label of that zone.
 	 */
 	if ((zone != global_zone) || ((vfsp->vfs_flag & VFS_RDONLY) != 0))
@@ -388,14 +355,6 @@ getflabel(vnode_t *vp)
 	 * Always build our own path for the file, to be sure it's simplified
 	 * (i.e., no ".", "..", "//", and so on).
 	 */
-	if (vnodetopath(NULL, vp, vpath, sizeof (vpath), CRED()) != 0) {
-		if (vfs_is_held)
-			VFS_RELE(vfsp);
-		if (resource_ref)
-			refstr_rele(resource_ref);
-		zone_rele(zone);
-		return (NULL);
-	}
 
 	zone_rele(zone);
 	zone = zone_find_by_any_path(vpath, B_FALSE);
@@ -475,9 +434,6 @@ zone_out:
 	if (vfs_is_held)
 		VFS_RELE(vfsp);
 
-	if (resource_ref)
-		refstr_rele(resource_ref);
-
 	/*
 	 * Now that we have the "home" zone for the file, return the slabel
 	 * of that zone.
@@ -490,8 +446,6 @@ zone_out:
 out_high:
 	if (vfs_is_held)
 		VFS_RELE(vfsp);
-	if (resource_ref)
-		refstr_rele(resource_ref);
 
 	label_hold(l_admin_high);
 	zone_rele(zone);
