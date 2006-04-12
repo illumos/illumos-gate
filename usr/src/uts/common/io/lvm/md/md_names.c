@@ -2806,8 +2806,8 @@ md_getdevnum(
 			 * device's name, not miniroot's name.
 			 */
 			if (MD_UPGRADE)
-				drvnm = md_targ_major_to_name(
-						md_getmajor(retval));
+				drvnm = md_targ_major_to_name(md_getmajor
+					(md_xlate_mini_2_targ(retval)));
 			else
 				drvnm = ddi_major_to_name(
 						md_getmajor(retval));
