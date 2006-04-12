@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, (the "License").
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -144,6 +144,7 @@ boolean_t use_icmp_ts = _B_FALSE;	/* Use ICMP timestamp request */
 boolean_t use_udp = _B_FALSE;		/* Use UDP instead of ICMP */
 boolean_t probe_all = _B_FALSE;		/* probe all the IP addresses */
 boolean_t nflag = _B_FALSE;		/* do not reverse lookup addresses */
+boolean_t bypass = _B_FALSE;		/* bypass IPsec policy */
 static int family_input = AF_UNSPEC;	/* address family supplied by user */
 int datalen = DEFAULT_DATALEN;		/* How much data */
 int ts_flag;				/* timestamp flag value */
@@ -254,7 +255,7 @@ main(int argc, char *argv[])
 	setbuf(stdout, (char *)0);
 
 	while ((c = getopt(argc, argv,
-	    "aA:c:dF:G:g:I:i:LlnP:p:rRSsTt:UvX:x:Y0123?")) != -1) {
+	    "aA:c:dbF:G:g:I:i:LlnP:p:rRSsTt:UvX:x:Y0123?")) != -1) {
 		switch ((char)c) {
 		case 'A':
 			if (strcmp(optarg, "inet") == 0) {
@@ -285,6 +286,10 @@ main(int argc, char *argv[])
 
 		case 'd':
 			options |= SO_DEBUG;
+			break;
+
+		case 'b':
+			bypass = _B_TRUE;
 			break;
 
 		case 'F':
@@ -1190,6 +1195,7 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 	struct sockaddr_in6 sin6;
 	struct sockaddr_in sin;
 	struct sockaddr *sp;
+	struct ipsec_req req;
 	size_t slen;
 	int on = 1;
 	uchar_t char_op;
@@ -1209,6 +1215,23 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 	/* revert to non-privileged user after opening sockets */
 	(void) __priv_bracket(PRIV_OFF);
 
+	if (bypass) {
+		(void) memset(&req, 0, sizeof (req));
+		req.ipsr_ah_req = IPSEC_PREF_NEVER;
+		req.ipsr_esp_req = IPSEC_PREF_NEVER;
+
+		if (setsockopt(recv_sock, (family == AF_INET) ? IPPROTO_IP :
+		    IPPROTO_IPV6, IP_SEC_OPT, &req, sizeof (req)) < 0) {
+			if (errno == EPERM)
+				Fprintf(stderr, "%s: Insufficient privilege "
+				    "to bypass IPsec policy.\n", progname);
+			else
+				Fprintf(stderr, "%s: setsockopt %s\n", progname,
+				    strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+
 	/*
 	 * We always receive on raw icmp socket. But the sending socket can be
 	 * raw icmp or udp, depending on the use of -U flag.
@@ -1219,6 +1242,21 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 			Fprintf(stderr, "%s: socket %s\n", progname,
 			    strerror(errno));
 			exit(EXIT_FAILURE);
+		}
+
+		if (bypass) {
+			if (setsockopt(send_sock, (family == AF_INET) ?
+			    IPPROTO_IP : IPPROTO_IPV6, IP_SEC_OPT, &req,
+			    sizeof (req)) < 0) {
+				if (errno == EPERM)
+					Fprintf(stderr, "%s: Insufficient "
+					    "privilege to bypass IPsec "
+					    "policy.\n", progname);
+				else
+					Fprintf(stderr, "%s: setsockopt %s\n",
+					    progname, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
 		}
 
 		/*
@@ -2230,7 +2268,7 @@ usage(char *cmdname)
 	Fprintf(stderr, "usage: %s host [timeout]\n", cmdname);
 	Fprintf(stderr,
 /* CSTYLED */
-"usage: %s -s [-l | U] [adLnRrv] [-A addr_family] [-c traffic_class]\n\t"
+"usage: %s -s [-l | U] [abdLnRrv] [-A addr_family] [-c traffic_class]\n\t"
 "[-g gateway [-g gateway ...]] [-F flow_label] [-I interval]\n\t"
 "[-i interface] [-P tos] [-p port] [-t ttl] host [data_size] [npackets]\n",
 	    cmdname);
