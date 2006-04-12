@@ -145,12 +145,12 @@ krb5_error_code ktutil_add(context, list, princ_str, kvno,
     memset((char *) entry, 0, sizeof(*entry));
 
     if (!lp) {		/* if list is empty, start one */
-        lp = (krb5_kt_list) malloc(sizeof(krb5_kt_list));
+        lp = (krb5_kt_list) malloc(sizeof(*lp));
 	if (!lp) {
 	    return ENOMEM;
 	}
     } else {
-        lp->next = (krb5_kt_list) malloc(sizeof(krb5_kt_list));
+        lp->next = (krb5_kt_list) malloc(sizeof(*lp));
 	if (!lp->next) {
 	    return ENOMEM;
 	}
