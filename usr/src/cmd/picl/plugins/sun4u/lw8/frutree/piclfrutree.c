@@ -2082,6 +2082,69 @@ post_frudr_event(char *ename, picl_nodehdl_t parenth, picl_nodehdl_t fruh)
 }
 
 /*
+ * updates the picl node 'loc' with the new fru handle (PICL_PROP_SC_HANDLE)
+ * (helper function for frudr_evhandler, when a stale fru handle is
+ * detected)
+ */
+static void
+update_fru_hdl(picl_nodehdl_t loc, fru_hdl_t newsgfruhdl)
+{
+	picl_prophdl_t	schproph;
+	int		err;
+
+	err = ptree_get_prop_by_name(loc, PICL_PROP_SC_HANDLE, &schproph);
+	if (err == PICL_SUCCESS) {
+		if (ptree_delete_prop(schproph) == PICL_SUCCESS) {
+			(void) ptree_destroy_prop(schproph);
+		}
+	}
+	(void) add_prop_ull(loc, (uint64_t)newsgfruhdl, PICL_PROP_SC_HANDLE);
+}
+
+/*
+ * Get the fru handle of loc by iterating through the parent's children.
+ * Sets fruhdl and returns PICL_SUCCESS unless an error is encountered.
+ */
+static int
+get_fruhdl_from_parent(picl_nodehdl_t loc, fru_hdl_t *fruhdl)
+{
+	picl_nodehdl_t	parlocnodeh;
+	fru_hdl_t	parsgfruhdl;
+	sgfrunode_t	*cp;
+	sgfrunode_t	*fruchildren;
+	char		nodename[PICL_PROPNAMELEN_MAX];
+	int		err;
+	int		num_children;
+	int		i;
+
+	err = ptree_get_propval_by_name(loc, PICL_PROP_NAME, (void *)nodename,
+	    PICL_PROPNAMELEN_MAX);
+	if (err != PICL_SUCCESS)
+		return (err);
+	err = ptree_get_propval_by_name(loc, PICL_PROP_PARENT, &parlocnodeh,
+	    sizeof (picl_nodehdl_t));
+	if (err != PICL_SUCCESS)
+		return (err);
+	if ((err = ptree_get_propval_by_name(parlocnodeh, PICL_PROP_SC_HANDLE,
+	    &parsgfruhdl, sizeof (parsgfruhdl))) != PICL_SUCCESS)
+		return (err);
+	/* find children of the parent node */
+	fruchildren = get_node_children(parsgfruhdl, &num_children);
+	if (fruchildren == NULL)
+		return (PICL_FAILURE);
+	for (i = 0, cp = fruchildren; i < num_children; i++, cp++) {
+		/* find the child we're interested in */
+		if (strcmp(cp->nodename, nodename) == 0) {
+			*fruhdl = cp->handle;
+			free(fruchildren);
+			return (PICL_SUCCESS);
+		}
+	}
+	free(fruchildren);
+	return (PICL_FAILURE);
+}
+
+/*
  * handle EC_DR picl events
  */
 /*ARGSUSED*/
@@ -2096,6 +2159,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 	picl_nodehdl_t		fruh;
 	picl_nodehdl_t		locnodeh;
 	fru_hdl_t		sgfruhdl;
+	fru_hdl_t		sgfruhdl_from_parent;
 
 	if (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) != 0)
 		return;
@@ -2248,7 +2312,21 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 	} else {
 		/*
 		 * fru has been inserted (or may need to update)
+		 *
+		 * sgfruhdl may be stale due to hotplugging. We check this
+		 * by getting the fru_hdl_t from the parent's children
+		 * and compare it to the cached value in sgfruhdl.  If we
+		 * have a stale handle, we update the cached value and
+		 * use it in the call to add_subtree.
 		 */
+		if (get_fruhdl_from_parent(locnodeh, &sgfruhdl_from_parent) ==
+		    PICL_SUCCESS) {
+			if (sgfruhdl != sgfruhdl_from_parent) {
+				update_fru_hdl(locnodeh, sgfruhdl_from_parent);
+				sgfruhdl = sgfruhdl_from_parent;
+			}
+		}
+
 		(void) add_subtree(locnodeh, sgfruhdl);
 	}
 	nvlist_free(nvlp);
@@ -3064,8 +3142,6 @@ add_env_nodes(picl_nodehdl_t nodeh, char *nodename, picl_prophdl_t tblhdl)
 		/*
 		 * check values from kstat entry are within valid range
 		 */
-		if (SG_INFO_VALUESTATUS(env->sd_infostamp) != SG_INFO_VALUE_OK)
-			continue;
 		if (env->sd_id.id.sensor_type < SG_SENSOR_TYPE_CURRENT)
 			continue;
 		if (env->sd_id.id.sensor_type == SG_SENSOR_TYPE_ENVDB)
