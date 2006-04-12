@@ -775,6 +775,28 @@ lo_rename(
 	if (IS_ZONEDEVFS(odvp))
 		return (EACCES);
 	/*
+	 * If we are coming from a loop back mounted fs, that has been
+	 * mounted in the same filesystem as where we want to move to,
+	 * and that filesystem is read/write, but the lofs filesystem is
+	 * read only, we don't want to allow a rename of the file. The
+	 * vn_rename code checks to be sure the target is read/write already
+	 * so that is not necessary here. However, consider the following
+	 * example:
+	 *		/ - regular root fs
+	 *		/foo - directory in root
+	 *		/foo/bar - file in foo directory(in root fs)
+	 *		/baz - directory in root
+	 *		mount -F lofs -o ro /foo /baz - all still in root
+	 *			directory
+	 * The fact that we mounted /foo on /baz read only should stop us
+	 * from renaming the file /foo/bar /bar, but it doesn't since
+	 * / is read/write. We are still renaming here since we are still
+	 * in the same filesystem, it is just that we do not check to see
+	 * if the filesystem we are coming from in this case is read only.
+	 */
+	if (odvp->v_vfsp->vfs_flag & VFS_RDONLY)
+		return (EROFS);
+	/*
 	 * We need to make sure we're not trying to remove a mount point for a
 	 * filesystem mounted on top of lofs, which only we know about.
 	 */
