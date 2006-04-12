@@ -382,7 +382,9 @@ typedef struct tcphdr {
 	if (type == ETHERTYPE_IPV6)				\
 		ipq = erip->ip6q;				\
 	if ((type == ETHERTYPE_IPV4 || type == ETHERTYPE_IPV6) && \
-		(IS_NOT_MULTICAST(ehp)) && (ipq)) {		\
+		(IS_NOT_MULTICAST(ehp)) && (ipq) && 		\
+		(((ether_cmp(ehp, &erip->ouraddr) == 0) || 	\
+		(ether_cmp(ehp, &etherbroadcastaddr) == 0)))) { \
 		bp->b_rptr += ETHERHEADER_SIZE;			\
 		start_offset = 0;				\
 		end_offset = bp->b_wptr - bp->b_rptr;		\
@@ -425,7 +427,9 @@ typedef struct tcphdr {
 	if (type == ETHERTYPE_IPV6)				\
 		ipq = erip->ip6q;				\
 	if ((type == ETHERTYPE_IPV4 || type == ETHERTYPE_IPV6) && \
-		(IS_NOT_MULTICAST(ehp)) && (ipq)) {		\
+		(IS_NOT_MULTICAST(ehp)) && (ipq) && 		\
+		(((ether_cmp(ehp, &erip->ouraddr) == 0) || 	\
+		(ether_cmp(ehp, &etherbroadcastaddr) == 0)))) { \
 		bp->b_rptr += ETHERHEADER_SIZE;			\
 		if (canputnext(ipq))				\
 			(void) putnext(ipq, bp);		\
@@ -1780,31 +1784,6 @@ eri_close(queue_t *rq)
 
 	sbp = (struct eristr *)rq->q_ptr;
 
-	/*
-	 * If the stream was closed without calling eripoffreq,
-	 * update the counters.
-	 */
-	if (sbp->sb_flags & ERI_SALLPHYS) {
-		sbp->sb_flags &= ~ERI_SALLPHYS;
-		++promisc_cnt;
-	}
-	if (sbp->sb_flags & ERI_SALLSAP) {
-		sbp->sb_flags &= ~ERI_SALLSAP;
-		++sap_cnt;
-	}
-	if (sbp->sb_flags & ERI_SALLMULTI) {
-		sbp->sb_flags &= ~ERI_SALLMULTI;
-		++all_multi_cnt;
-	}
-
-	erip = sbp->sb_erip;
-	if (erip) {
-		mutex_enter(&erip->intrlock);
-		erip->promisc_cnt -= promisc_cnt;
-		erip->all_sap_cnt -= sap_cnt;
-		erip->all_multi_cnt -= all_multi_cnt;
-		mutex_exit(&erip->intrlock);
-	}
 
 	/*
 	 * Implicit detach Stream from interface.
@@ -6732,8 +6711,8 @@ eri_process_ndd_ioctl(queue_t *wq, mblk_t *mp, int cmd)
 {
 
 	struct	eristr	*sbp = (struct eristr *)wq->q_ptr;
-	struct	eri		*erip = sbp->sb_erip;
-	struct	eri		*erip1;
+	struct	eri		*erip = NULL;
+	struct	eri		*erip1 = NULL;
 
 	uint32_t old_ipg1, old_ipg2, old_use_int_xcvr, old_autoneg;
 	int32_t old_device;
