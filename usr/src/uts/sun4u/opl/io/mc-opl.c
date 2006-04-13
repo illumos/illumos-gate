@@ -126,7 +126,7 @@ static kmutex_t mcmutex;
 void *mc_statep;
 
 #ifdef	DEBUG
-int oplmc_debug = 1;
+int oplmc_debug = 0;
 #endif
 
 static int mc_debug_show_all;
