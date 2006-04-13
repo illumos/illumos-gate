@@ -98,7 +98,8 @@ is_in_triedlist(kcf_provider_desc_t *pd, kcf_prov_tried_t *triedl)
  * provider. Return true if found.
  */
 static boolean_t
-is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me)
+is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me,
+    crypto_func_group_t fg)
 {
 	kcf_prov_mech_desc_t *prov_chain;
 
@@ -106,7 +107,8 @@ is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me)
 	if (prov_chain != NULL) {
 		ASSERT(me->me_num_hwprov > 0);
 		for (; prov_chain != NULL; prov_chain = prov_chain->pm_next) {
-			if (prov_chain->pm_prov_desc == pd) {
+			if (prov_chain->pm_prov_desc == pd &&
+			    IS_FG_SUPPORTED(prov_chain, fg)) {
 				return (B_TRUE);
 			}
 		}
@@ -127,16 +129,16 @@ is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me)
  */
 int
 kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
-    crypto_mech_type_t mech_type_2, offset_t offset_1, offset_t offset_2,
-    boolean_t call_restrict, kcf_provider_desc_t *old,
-    kcf_provider_desc_t **new)
+    crypto_mech_type_t mech_type_2, boolean_t call_restrict,
+    kcf_provider_desc_t *old, kcf_provider_desc_t **new, crypto_func_group_t fg)
 {
-	kcf_provider_desc_t *provider, *gpd = NULL, *real_pd = old;
+	kcf_provider_desc_t *provider, *real_pd = old;
+	kcf_provider_desc_t *gpd = NULL;	/* good provider */
+	kcf_provider_desc_t *bpd = NULL;	/* busy provider */
 	kcf_provider_list_t *p;
 	kcf_ops_class_t class;
 	kcf_mech_entry_t *me;
 	kcf_mech_entry_tab_t *me_tab;
-	caddr_t *ops;
 	int index, len, gqlen = INT_MAX, rv = CRYPTO_SUCCESS;
 
 	/* get the mech entry for the specified mechanism */
@@ -181,13 +183,12 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
 
-			if (!KCF_IS_PROV_USABLE(provider) ||
-			    (call_restrict && provider->pd_restricted)) {
+			if (call_restrict && provider->pd_restricted) {
 				p = p->pl_next;
 				continue;
 			}
 
-			if (!is_valid_provider_for_mech(provider, me)) {
+			if (!is_valid_provider_for_mech(provider, me, fg)) {
 				p = p->pl_next;
 				continue;
 			}
@@ -214,8 +215,10 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 				}
 			}
 
-			if (KCF_PROV_NULL_ENTRY_POINT(provider, offset_1,
-			    offset_2, ops)) {
+			if (provider->pd_state != KCF_PROV_READY) {
+				/* choose BUSY if no READY providers */
+				if (provider->pd_state == KCF_PROV_BUSY)
+					bpd = provider;
 				p = p->pl_next;
 				continue;
 			}
@@ -232,6 +235,9 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 		if (gpd != NULL) {
 			real_pd = gpd;
 			KCF_PROV_REFHOLD(real_pd);
+		} else if (bpd != NULL) {
+			real_pd = bpd;
+			KCF_PROV_REFHOLD(real_pd);
 		} else {
 			/* can't find provider */
 			real_pd = NULL;
@@ -247,17 +253,12 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 			goto out;
 		}
 
-		if (!is_valid_provider_for_mech(old, me)) {
+		if (!is_valid_provider_for_mech(old, me, fg)) {
 			real_pd = NULL;
 			rv = CRYPTO_MECHANISM_INVALID;
 			goto out;
 		}
 
-		if (KCF_PROV_NULL_ENTRY_POINT(old, offset_1, offset_2, ops)) {
-			real_pd = NULL;
-			rv = CRYPTO_NOT_SUPPORTED;
-			goto out;
-		}
 		KCF_PROV_REFHOLD(real_pd);
 	}
 out:
@@ -280,7 +281,9 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
     boolean_t call_restrict, kcf_provider_desc_t *old,
     kcf_provider_desc_t **new)
 {
-	kcf_provider_desc_t *provider, *gpd = NULL, *real_pd = old;
+	kcf_provider_desc_t *provider, *real_pd = old;
+	kcf_provider_desc_t *gpd = NULL;	/* good provider */
+	kcf_provider_desc_t *bpd = NULL;	/* busy provider */
 	kcf_provider_list_t *p;
 	caddr_t *ops;
 	int len, gqlen = INT_MAX, rv = CRYPTO_SUCCESS;
@@ -312,14 +315,20 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
 
-			if (!KCF_IS_PROV_USABLE(provider) ||
-			    (call_restrict && provider->pd_restricted)) {
+			if (call_restrict && provider->pd_restricted) {
+				p = p->pl_next;
+				continue;
+			}
+			if (KCF_PROV_NULL_ENTRY_POINT(provider, offset_1,
+			    offset_2, ops)) {
 				p = p->pl_next;
 				continue;
 			}
 
-			if (KCF_PROV_NULL_ENTRY_POINT(provider, offset_1,
-			    offset_2, ops)) {
+			if (provider->pd_state != KCF_PROV_READY) {
+				/* choose BUSY if no READY providers */
+				if (provider->pd_state == KCF_PROV_BUSY)
+					bpd = provider;
 				p = p->pl_next;
 				continue;
 			}
@@ -336,6 +345,9 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 
 		if (gpd != NULL) {
 			real_pd = gpd;
+			KCF_PROV_REFHOLD(real_pd);
+		} else if (bpd != NULL) {
+			real_pd = bpd;
 			KCF_PROV_REFHOLD(real_pd);
 		} else {
 			/* can't find provider */

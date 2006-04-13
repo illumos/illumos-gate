@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,7 +138,6 @@ size_t crypto_max_buffer_len = CRYPTO_MAX_BUFFER_LEN;
 	(data).cd_offset = 0;					\
 	(data).cd_length = len;
 
-static crypto_mech_type_t random_mech = CRYPTO_MECH_INVALID;
 static struct kmem_cache *crypto_session_cache;
 static crypto_minor_t **crypto_minors = NULL;
 static dev_info_t *crypto_dip = NULL;
@@ -160,14 +158,9 @@ static kcondvar_t crypto_cv;
 #define	DONT_RETURN_LIST		B_FALSE
 
 #define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
-#define	CRYPTO_DIGEST_OFFSET(f)		offsetof(crypto_digest_ops_t, f)
-#define	CRYPTO_CIPHER_OFFSET(f)		offsetof(crypto_cipher_ops_t, f)
-#define	CRYPTO_SIGN_OFFSET(f)		offsetof(crypto_sign_ops_t, f)
-#define	CRYPTO_VERIFY_OFFSET(f)		offsetof(crypto_verify_ops_t, f)
 #define	CRYPTO_RANDOM_OFFSET(f)		offsetof(crypto_random_number_ops_t, f)
 #define	CRYPTO_SESSION_OFFSET(f)	offsetof(crypto_session_ops_t, f)
 #define	CRYPTO_OBJECT_OFFSET(f)		offsetof(crypto_object_ops_t, f)
-#define	CRYPTO_KEY_OFFSET(f)		offsetof(crypto_key_ops_t, f)
 #define	CRYPTO_PROVIDER_OFFSET(f)	\
 	offsetof(crypto_provider_management_ops_t, f)
 
@@ -2342,10 +2335,10 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	size_t mech_rctl_bytes = 0;
 	size_t key_rctl_bytes = 0;
 	size_t carry;
-	offset_t offset;
 	int error = 0;
 	int rv;
 	boolean_t allocated_by_crypto_module = B_FALSE;
+	crypto_func_group_t fg;
 
 	STRUCT_INIT(encrypt_init, mode);
 
@@ -2372,14 +2365,15 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	bcopy(STRUCT_FADDR(encrypt_init, ei_mech), &mech.cm_type,
 	    sizeof (crypto_mech_type_t));
 
-	if (init == crypto_encrypt_init_prov)
-	    offset = CRYPTO_CIPHER_OFFSET(encrypt_init);
-	else
-	    offset = CRYPTO_CIPHER_OFFSET(decrypt_init);
+	if (init == crypto_encrypt_init_prov) {
+		fg = CRYPTO_FG_ENCRYPT;
+	} else {
+		fg = CRYPTO_FG_DECRYPT;
+	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(cipher_ops), offset, CHECK_RESTRICT_FALSE,
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider, fg))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -2937,9 +2931,8 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(digest_ops), CRYPTO_DIGEST_OFFSET(digest_init),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_DIGEST)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3597,10 +3590,10 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	size_t mech_rctl_bytes = 0;
 	size_t key_rctl_bytes = 0;
 	size_t carry;
-	offset_t offset_1, offset_2;
 	int error = 0;
 	int rv;
 	boolean_t allocated_by_crypto_module = B_FALSE;
+	crypto_func_group_t fg;
 
 	STRUCT_INIT(sign_init, mode);
 
@@ -3632,26 +3625,22 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	    init == crypto_verify_recover_init_prov);
 
 	if (init == crypto_sign_init_prov) {
-		offset_1 = CRYPTO_OPS_OFFSET(sign_ops);
-		offset_2 = CRYPTO_SIGN_OFFSET(sign_init);
+		fg =  CRYPTO_FG_SIGN;
 		ctxpp = &sp->sd_sign_ctx;
 	} else if (init == crypto_verify_init_prov) {
-		offset_1 = CRYPTO_OPS_OFFSET(verify_ops);
-		offset_2 = CRYPTO_VERIFY_OFFSET(verify_init);
+		fg =  CRYPTO_FG_VERIFY;
 		ctxpp = &sp->sd_verify_ctx;
 	} else if (init == crypto_sign_recover_init_prov) {
-		offset_1 = CRYPTO_OPS_OFFSET(sign_ops);
-		offset_2 = CRYPTO_SIGN_OFFSET(sign_recover_init);
+		fg =  CRYPTO_FG_SIGN_RECOVER;
 		ctxpp = &sp->sd_sign_recover_ctx;
 	} else {
-		offset_1 = CRYPTO_OPS_OFFSET(verify_ops);
-		offset_2 = CRYPTO_VERIFY_OFFSET(verify_recover_init);
+		fg =  CRYPTO_FG_VERIFY_RECOVER;
 		ctxpp = &sp->sd_verify_recover_ctx;
 	}
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    offset_1, offset_2, CHECK_RESTRICT_FALSE, sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider, fg))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4089,10 +4078,7 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (random_mech == CRYPTO_MECH_INVALID)
-		random_mech = crypto_mech2id_common(SUN_RANDOM, B_FALSE);
-
-	if ((rv = kcf_get_hardware_provider(random_mech, CRYPTO_MECH_INVALID,
+	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops), CRYPTO_RANDOM_OFFSET(seed_random),
 	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
 	    != CRYPTO_SUCCESS) {
@@ -4182,10 +4168,7 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (random_mech == CRYPTO_MECH_INVALID)
-		random_mech = crypto_mech2id_common(SUN_RANDOM, B_FALSE);
-
-	if ((rv = kcf_get_hardware_provider(random_mech, CRYPTO_MECH_INVALID,
+	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(random_ops),
 	    CRYPTO_RANDOM_OFFSET(generate_random), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
@@ -5144,9 +5127,8 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_generate),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_GENERATE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -5278,9 +5260,8 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_generate_pair),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_GENERATE_KEY_PAIR)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -5432,9 +5413,8 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_wrap),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_WRAP)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -5599,9 +5579,8 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_unwrap),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_UNWRAP)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -5770,9 +5749,8 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	    sizeof (crypto_mech_type_t));
 
 	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
-	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_derive),
-	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
-	    != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_DERIVE)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
