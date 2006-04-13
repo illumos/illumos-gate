@@ -98,9 +98,9 @@ htol(char *s, m_label_t *l)
 	size_t	len = sizeof (_mac_label_impl_t) - 4;
 	int	bytes;
 
-	/* unpack classification */
-	if (!unhex(&h, lp, 2)) {
-		goto error;
+	/* unpack 16 bit signed classification */
+	if (!unhex(&h, lp, 2) || (LCLASS(l) < 0)) {
+		return (-1);
 	}
 	lp = (uchar_t *)&(((_mac_label_impl_t *)l)->_comps);
 	if (h[0] == '-' && h[3] == '-') {
@@ -109,7 +109,7 @@ htol(char *s, m_label_t *l)
 		/* length specified of internal text label */
 		h++;	/* skip '-' */
 		if (!unhex(&h, &size, 1)) {
-			goto error;
+			return (-1);
 		}
 		size *= sizeof (uint32_t);	/* words to bytes */
 		if (size > len) {
@@ -117,21 +117,18 @@ htol(char *s, m_label_t *l)
 			 * internal label greater than will fit in current
 			 * binary.
 			 */
-			goto error;
+			return (-1);
 		}
 		bzero(lp, len);
 		h++;	/* skip '-' */
-		bytes = strlen(h)/2;
-	} else {
-		bytes = (strlen(h) + 1)/2;
 	}
-	if ((bytes > len) || !unhex(&h, lp, bytes)) {
-		goto error;
+	bytes = strlen(h)/2;
+	if ((bytes > len) ||
+	    (bytes*2 != strlen(h)) ||
+	    !unhex(&h, lp, bytes)) {
+		return (-1);
 	}
 	return (0);
-error:
-	errno = EINVAL;
-	return (-1);
 }
 
 static int
@@ -162,8 +159,9 @@ convert_id(m_label_type_t t)
  *
  *	Exit	l = parsed label value.
  *		e = index into string of error.
- *		  = M_BAD_STRING (-1) or could be zero, indicates entire string,
- *	        e = M_BAD_LABEL (-3), problems with l
+ *		  = M_BAD_STRING (-3 L_BAD_LABEL) or could be zero,
+ *		    indicates entire string,
+ *	        e = M_BAD_LABEL (-2 L_BAD_CLASSIFICATION), problems with l
  *
  *	Returns	 0, success.
  *		-1, failure
@@ -179,18 +177,24 @@ int
 str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
     int *e)
 {
-	char		*s = (char *)str;
+	char		*s = strdup(str);
+	char		*st = s;
 	char		*p;
 	labeld_data_t	call;
 	labeld_data_t	*callp = &call;
 	size_t		bufsize = sizeof (labeld_data_t);
 	size_t		datasize;
-	int		err;
+	int		err = M_BAD_LABEL;
 	int		id = convert_id(t);
 	boolean_t	new = B_FALSE;
 
+	if (st == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
 	if (*l == NULL) {
 		if ((*l = m_label_alloc(t)) == NULL) {
+			free(st);
 			return (-1);
 		}
 		if (id == -1) {
@@ -217,6 +221,7 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 
 	/* accept a leading '[' and trailing ']' for old times sake */
 	if (*s == '[') {
+		*s = ' ';
 		s++;
 		while (isspace(*s)) {
 			s++;
@@ -237,23 +242,26 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 	id = _MGETTYPE(*l);
 	if (IS_LOW(s)) {
 		_LOW_LABEL(*l, id);
-		return (0);
+		goto goodlabel;
 	} else if (IS_HIGH(s)) {
 		_HIGH_LABEL(*l, id);
-		return (0);
+		goto goodlabel;
 	} else if (IS_HEX(f, s)) {
-		int herr;
-
-		herr = htol(s, *l);
-		return (herr);
+		if (htol(s, *l) != 0) {
+			/* whole string in error */
+			err = 0;
+			goto badlabel;
+		}
+		goto goodlabel;
 	}
 #define	slcall callp->param.acall.cargs.sl_arg
 #define	slret callp->param.aret.rvals.sl_ret
 	/* now try label server */
 
-	datasize = CALL_SIZE(sl_call_t, strlen(str) + 1);
+	datasize = CALL_SIZE(sl_call_t, strlen(st) + 1);
 	if (datasize > bufsize) {
 		if ((callp = malloc(datasize)) == NULL) {
+			free(st);
 			return (-1);
 		}
 		bufsize = datasize;
@@ -263,12 +271,12 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 	slcall.flags = f;
 	if (new)
 		slcall.flags |= L_NEW_LABEL;
-	(void) strcpy(slcall.string, str);
+	(void) strcpy(slcall.string, st);
 	/*
 	 * callp->reterr = L_GOOD_LABEL (-1) == OK;
 	 *		   L_BAD_CLASSIFICATION (-2) == bad input
 	 *			classification: class
-	 *		   L_BAD_LABEL (-3) == either sring or input label bad
+	 *		   L_BAD_LABEL (-3) == either string or input label bad
 	 *		   O'E == offset in string 0 == entire string.
 	 */
 	if (__call_labeld(&callp, &bufsize, &datasize) == SUCCESS) {
@@ -276,19 +284,16 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 		err = callp->reterr;
 		if (callp != &call) {
 			/* free allocated buffer */
-			(void) free(callp);
+			free(callp);
 		}
 		switch (err) {
 		case _M_GOOD_LABEL:	/* L_GOOD_LABEL */
 			**l = slret.label;
-			return (0);
+			goto goodlabel;
 		case M_BAD_LABEL:	/* L_BAD_CLASSIFICATION */
 		case M_BAD_STRING:	/* L_BAD_LABEL */
 		default:
-			errno = EINVAL;
-			if (e != NULL)
-				*e = err;
-			return (-1);
+			goto badlabel;
 		}
 	}
 	switch (callp->reterr) {
@@ -299,13 +304,19 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 		errno = EINVAL;
 		break;
 	}
+	free(st);
 	return (-1);
 
 badlabel:
 	errno = EINVAL;
+	free(st);
 	if (e != NULL)
-		*e = M_BAD_LABEL;
+		*e = err;
 	return (-1);
+
+goodlabel:
+	free(st);
+	return (0);
 }
 #undef	slcall
 #undef	slret
