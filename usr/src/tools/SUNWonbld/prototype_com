@@ -57,6 +57,7 @@ f none opt/onbld/bin/SamplePkgLinks 644 root bin
 f none opt/onbld/bin/acr 555 root bin
 f none opt/onbld/bin/bfu 555 root bin
 f none opt/onbld/bin/bldenv 555 root bin
+f none opt/onbld/bin/bringovercheck 555 root bin
 f none opt/onbld/bin/build_cscope 555 root bin
 f none opt/onbld/bin/cddlchk 555 root bin
 f none opt/onbld/bin/check_fnames 555 root bin
@@ -80,6 +81,7 @@ f none opt/onbld/bin/mkacr 555 root bin
 f none opt/onbld/bin/mkbfu 555 root bin
 f none opt/onbld/bin/nightly 555 root bin
 f none opt/onbld/bin/protocmp.terse 555 root bin
+f none opt/onbld/bin/sccscheck 555 root bin
 f none opt/onbld/bin/sccscp 555 root bin
 f none opt/onbld/bin/sccshist 555 root bin
 f none opt/onbld/bin/sccsmv 555 root bin
@@ -109,6 +111,7 @@ d none opt/onbld/man/man1 755 root bin
 f none opt/onbld/man/man1/Install.1 644 root bin
 f none opt/onbld/man/man1/acr.1 644 root bin
 f none opt/onbld/man/man1/bldenv.1 644 root bin
+f none opt/onbld/man/man1/bringovercheck.1 644 root bin
 f none opt/onbld/man/man1/cddlchk.1 644 root bin
 f none opt/onbld/man/man1/check_rtime.1 644 root bin
 f none opt/onbld/man/man1/checkpaths.1 644 root bin
@@ -121,6 +124,7 @@ f none opt/onbld/man/man1/intf_check.1 644 root bin
 f none opt/onbld/man/man1/make_pkg_db.1 644 root bin
 f none opt/onbld/man/man1/mkacr.1 644 root bin
 f none opt/onbld/man/man1/nightly.1 644 root bin
+f none opt/onbld/man/man1/sccscheck.1 644 root bin
 f none opt/onbld/man/man1/sccscp.1 644 root bin
 f none opt/onbld/man/man1/sccsmv.1 644 root bin
 f none opt/onbld/man/man1/sccsrm.1 644 root bin

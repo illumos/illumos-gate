@@ -71,6 +71,21 @@ include $(UTSTREE)/intel/Makefile.files
 include $(UTSTREE)/common/Makefile.files
 
 #
+# ----- TRANSITIONAL SECTION --------------------------------------------------
+#
+
+#
+#	Not everything which *should* be a module is a module yet. The
+#	following is a list of such objects which are currently part of
+#	genunix but which might someday become kmods.  This must be
+#	defined before we include Makefile.uts, or else genunix's build
+#	won't be as parallel as we might like.
+#
+NOT_YET_KMODS	 = $(OLDPTY_OBJS) $(PTY_OBJS) $(MOD_OBJS)
+
+#
+# ----- END OF TRANSITIONAL SECTION -------------------------------------------
+#
 #	Include machine independent rules. Note that this does not imply
 #	that the resulting module from rules in Makefile.uts is	machine
 #	independent. Only that the build rules are machine independent.
@@ -182,20 +197,6 @@ OPTION_DEFS	 = -DC2_AUDIT
 #	files.
 #
 ALL_DEFS	 = $(DEBUG_DEFS) $(OPTION_DEFS)
-
-#
-# ----- TRANSITIONAL SECTION --------------------------------------------------
-#
-
-#
-#	Not everything which *should* be a module is a module yet. The
-#	following is a list of such objects which are currently part of
-#	the base kernel but should soon become kmods.
-#
-NOT_YET_KMODS	 = $(OLDPTY_OBJS) $(PTY_OBJS) $(MOD_OBJS)
-
-#
-# ----- END OF TRANSITIONAL SECTION -------------------------------------------
 
 #
 #	The kernels modules which are "implementation architecture"

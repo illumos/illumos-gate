@@ -32,6 +32,7 @@ SHFILES= \
 	bfu \
 	bldenv \
 	build_cscope \
+	bringovercheck \
 	checkpaths \
 	checkproto \
 	check_fnames \
@@ -45,6 +46,7 @@ SHFILES= \
 	mkbfu \
 	nightly \
 	protocmp.terse \
+	sccscheck \
 	sccscp \
 	sccshist \
 	sccsmv \
@@ -67,6 +69,7 @@ MAN1FILES= \
 	Install.1 \
 	acr.1 \
 	bldenv.1 \
+	bringovercheck.1 \
 	cddlchk.1 \
 	checkpaths.1 \
 	check_rtime.1 \
@@ -75,6 +78,7 @@ MAN1FILES= \
 	jstyle.1 \
 	mkacr.1 \
 	nightly.1 \
+	sccscheck.1 \
 	sccscp.1 \
 	sccsmv.1 \
 	sccsrm.1 \
