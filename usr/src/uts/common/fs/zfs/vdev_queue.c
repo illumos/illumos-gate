@@ -118,7 +118,7 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 	avl_add(&vq->vq_deadline_tree, zio);
 	avl_add(zio->io_vdev_tree, zio);
 
-	if ((zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)) &&
+	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
 	    ++vq->vq_scrub_count >= vq->vq_scrub_limit)
 		spa_scrub_throttle(zio->io_spa, 1);
 }
@@ -126,7 +126,7 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 static void
 vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 {
-	if ((zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)) &&
+	if ((zio->io_flags & ZIO_FLAG_SCRUB_THREAD) &&
 	    vq->vq_scrub_count-- >= vq->vq_scrub_limit)
 		spa_scrub_throttle(zio->io_spa, -1);
 

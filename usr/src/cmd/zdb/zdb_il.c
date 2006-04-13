@@ -43,7 +43,7 @@
 extern uint8_t dump_opt[256];
 
 static void
-print_log_bp(blkptr_t *bp, const char *prefix)
+print_log_bp(const blkptr_t *bp, const char *prefix)
 {
 	char blkbuf[BP_SPRINTF_LEN];
 
@@ -130,13 +130,13 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, lr_write_t *lr)
 		} else {
 			zbookmark_t zb;
 
-			ASSERT3U(bp->blk_cksum.zc_word[2], ==,
+			ASSERT3U(bp->blk_cksum.zc_word[ZIL_ZC_OBJSET], ==,
 			    dmu_objset_id(zilog->zl_os));
 
-			zb.zb_objset = bp->blk_cksum.zc_word[2];
+			zb.zb_objset = bp->blk_cksum.zc_word[ZIL_ZC_OBJSET];
 			zb.zb_object = 0;
 			zb.zb_level = -1;
-			zb.zb_blkid = bp->blk_cksum.zc_word[3];
+			zb.zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
 
 			error = zio_wait(zio_read(NULL, zilog->zl_spa,
 			    bp, buf, BP_GET_LSIZE(bp), NULL, NULL,
@@ -300,7 +300,7 @@ print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 		claim = "won't claim";
 
 	(void) printf("\tBlock seqno %llu, %s%s\n",
-	    (u_longlong_t)bp->blk_cksum.zc_word[3], claim, blkbuf);
+	    (u_longlong_t)bp->blk_cksum.zc_word[ZIL_ZC_SEQ], claim, blkbuf);
 }
 
 static void
@@ -329,7 +329,7 @@ print_log_stats(int verbose)
 void
 dump_intent_log(zilog_t *zilog)
 {
-	zil_header_t *zh = zilog->zl_header;
+	const zil_header_t *zh = zilog->zl_header;
 	int verbose = MAX(dump_opt['d'], dump_opt['i']);
 	int i;
 
@@ -347,7 +347,7 @@ dump_intent_log(zilog_t *zilog)
 
 	if (verbose >= 2) {
 		(void) printf("\n");
-		zil_parse(zilog, print_log_block, print_log_record, NULL,
+		(void) zil_parse(zilog, print_log_block, print_log_record, NULL,
 		    zh->zh_claim_txg);
 		print_log_stats(verbose);
 	}

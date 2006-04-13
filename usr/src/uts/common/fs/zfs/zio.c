@@ -1263,13 +1263,8 @@ static void
 zio_dva_free(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = bp->blk_dva;
-	int d;
 
-	ASSERT(!BP_IS_HOLE(bp));
-
-	for (d = 0; d < BP_GET_NDVAS(bp); d++)
-		metaslab_free(zio->io_spa, &dva[d], zio->io_txg, B_FALSE);
+	metaslab_free(zio->io_spa, bp, zio->io_txg, B_FALSE);
 
 	BP_ZERO(bp);
 
@@ -1279,18 +1274,7 @@ zio_dva_free(zio_t *zio)
 static void
 zio_dva_claim(zio_t *zio)
 {
-	blkptr_t *bp = zio->io_bp;
-	dva_t *dva = bp->blk_dva;
-	int error = 0;
-	int d;
-
-	ASSERT(!BP_IS_HOLE(bp));
-
-	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
-		error = metaslab_claim(zio->io_spa, &dva[d], zio->io_txg);
-		if (error)
-			zio->io_error = error;
-	}
+	zio->io_error = metaslab_claim(zio->io_spa, zio->io_bp, zio->io_txg);
 
 	zio_next_stage(zio);
 }
@@ -1669,8 +1653,7 @@ zio_next_stage_async(zio_t *zio)
  * Try to allocate an intent log block.  Return 0 on success, errno on failure.
  */
 int
-zio_alloc_blk(spa_t *spa, int checksum, uint64_t size, blkptr_t *bp,
-    uint64_t txg)
+zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *bp, uint64_t txg)
 {
 	int error;
 
@@ -1681,10 +1664,10 @@ zio_alloc_blk(spa_t *spa, int checksum, uint64_t size, blkptr_t *bp,
 	error = metaslab_alloc(spa, size, bp, 1, txg, NULL);
 
 	if (error == 0) {
-		BP_SET_CHECKSUM(bp, checksum);
 		BP_SET_LSIZE(bp, size);
 		BP_SET_PSIZE(bp, size);
 		BP_SET_COMPRESS(bp, ZIO_COMPRESS_OFF);
+		BP_SET_CHECKSUM(bp, ZIO_CHECKSUM_ZILOG);
 		BP_SET_TYPE(bp, DMU_OT_INTENT_LOG);
 		BP_SET_LEVEL(bp, 0);
 		BP_SET_BYTEORDER(bp, ZFS_HOST_BYTEORDER);
@@ -1705,11 +1688,9 @@ zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg)
 {
 	ASSERT(!BP_IS_GANG(bp));
 
-	dprintf_bp(bp, "txg %llu: ", txg);
-
 	spa_config_enter(spa, RW_READER, FTAG);
 
-	metaslab_free(spa, BP_IDENTITY(bp), txg, B_FALSE);
+	metaslab_free(spa, bp, txg, B_FALSE);
 
 	spa_config_exit(spa, FTAG);
 }

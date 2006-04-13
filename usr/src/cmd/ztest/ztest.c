@@ -1216,7 +1216,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	/*
 	 * Put a random number of objects in there.
 	 */
-	objects = ztest_random(50);
+	objects = ztest_random(20);
 	seq = 0;
 	while (objects-- != 0) {
 		uint64_t object;
@@ -1237,7 +1237,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 		if (ztest_random(5) == 0) {
 			zil_commit(zilog, seq, FSYNC);
 		}
-		if (ztest_random(5) == 0) {
+		if (ztest_random(100) == 0) {
 			error = zil_suspend(zilog);
 			if (error == 0) {
 				zil_resume(zilog);
@@ -2670,13 +2670,14 @@ static void
 ztest_obliterate_one_disk(uint64_t vdev)
 {
 	int fd;
-	char dev_name[MAXPATHLEN];
+	char dev_name[MAXPATHLEN], copy_name[MAXPATHLEN];
 	size_t fsize;
 
 	if (zopt_maxfaults < 2)
 		return;
 
 	(void) sprintf(dev_name, ztest_dev_template, zopt_dir, zopt_pool, vdev);
+	(void) snprintf(copy_name, MAXPATHLEN, "%s.old", dev_name);
 
 	fd = open(dev_name, O_RDWR);
 
@@ -2687,12 +2688,13 @@ ztest_obliterate_one_disk(uint64_t vdev)
 	 * Determine the size.
 	 */
 	fsize = lseek(fd, 0, SEEK_END);
+
 	(void) close(fd);
 
 	/*
-	 * Remove it.
+	 * Rename the old device to dev_name.old (useful for debugging).
 	 */
-	VERIFY(remove(dev_name) == 0);
+	VERIFY(rename(dev_name, copy_name) == 0);
 
 	/*
 	 * Create a new one.

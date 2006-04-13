@@ -407,7 +407,7 @@ extern boolean_t spa_guid_exists(uint64_t pool_guid, uint64_t device_guid);
 extern char *spa_strdup(const char *);
 extern void spa_strfree(char *);
 extern uint64_t spa_get_random(uint64_t range);
-extern void sprintf_blkptr(char *buf, int len, blkptr_t *bp);
+extern void sprintf_blkptr(char *buf, int len, const blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
 extern void spa_upgrade(spa_t *spa);
 extern void spa_evict_all(void);

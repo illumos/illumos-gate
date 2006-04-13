@@ -426,7 +426,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	error = zap_lookup(spa->spa_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ERRLOG_LAST,
 	    sizeof (uint64_t), 1, &spa->spa_errlog_last);
-	if (error != 0 &&error != ENOENT) {
+	if (error != 0 && error != ENOENT) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
 		error = EIO;
@@ -1530,7 +1530,7 @@ spa_scrub_io_start(spa_t *spa, blkptr_t *bp, int priority, int flags,
 	if (zb->zb_level == -1 && BP_GET_TYPE(bp) != DMU_OT_OBJSET)
 		flags |= ZIO_FLAG_SPECULATIVE;	/* intent log block */
 
-	flags |= ZIO_FLAG_CANFAIL;
+	flags |= ZIO_FLAG_SCRUB_THREAD | ZIO_FLAG_CANFAIL;
 
 	zio_nowait(zio_read(NULL, spa, bp, data, size,
 	    spa_scrub_io_done, NULL, priority, flags, zb));

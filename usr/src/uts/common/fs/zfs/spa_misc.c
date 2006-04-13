@@ -616,7 +616,7 @@ spa_get_random(uint64_t range)
 }
 
 void
-sprintf_blkptr(char *buf, int len, blkptr_t *bp)
+sprintf_blkptr(char *buf, int len, const blkptr_t *bp)
 {
 	int d;
 
@@ -637,7 +637,7 @@ sprintf_blkptr(char *buf, int len, blkptr_t *bp)
 	    (u_longlong_t)BP_GET_PSIZE(bp));
 
 	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
-		dva_t *dva = &bp->blk_dva[d];
+		const dva_t *dva = &bp->blk_dva[d];
 		(void) snprintf(buf + strlen(buf), len - strlen(buf),
 		    "DVA[%d]=<%llu:%llx:%llx> ", d,
 		    (u_longlong_t)DVA_GET_VDEV(dva),

@@ -57,7 +57,8 @@ typedef struct zil_header {
 	uint64_t zh_claim_txg;	/* txg in which log blocks were claimed */
 	uint64_t zh_replay_seq;	/* highest replayed sequence number */
 	blkptr_t zh_log;	/* log chain */
-	uint64_t zit_pad[6];
+	uint64_t zh_claim_seq;	/* highest claimed sequence number */
+	uint64_t zh_pad[5];
 } zil_header_t;
 
 /*
@@ -78,6 +79,14 @@ typedef struct zil_trailer {
 #define	ZIL_MIN_BLKSZ	4096
 #define	ZIL_MAX_BLKSZ	SPA_MAXBLOCKSIZE
 #define	ZIL_BLK_DATA_SZ(lwb)	((lwb)->lwb_sz - sizeof (zil_trailer_t))
+
+/*
+ * The words of a log block checksum.
+ */
+#define	ZIL_ZC_GUID_0	0
+#define	ZIL_ZC_GUID_1	1
+#define	ZIL_ZC_OBJSET	2
+#define	ZIL_ZC_SEQ	3
 
 /*
  * Intent log transaction types and record structures
@@ -208,7 +217,7 @@ typedef void zil_parse_lr_func_t(zilog_t *zilog, lr_t *lr, void *arg,
 typedef int zil_replay_func_t();
 typedef int zil_get_data_t(void *arg, lr_write_t *lr, char *dbuf);
 
-extern void	zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
+extern uint64_t	zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
     zil_parse_lr_func_t *parse_lr_func, void *arg, uint64_t txg);
 
 extern void	zil_init(void);
@@ -222,7 +231,7 @@ extern void	zil_close(zilog_t *zilog);
 
 extern void	zil_replay(objset_t *os, void *arg, uint64_t *txgp,
     zil_replay_func_t *replay_func[TX_MAX_TYPE], void (*rm_wait)(void *));
-extern void	zil_destroy(zilog_t *zilog);
+extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
 
 extern itx_t	*zil_itx_create(int txtype, size_t lrsize);
 extern uint64_t zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx);

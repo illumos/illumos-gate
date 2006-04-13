@@ -49,8 +49,9 @@ extern void metaslab_sync_done(metaslab_t *msp, uint64_t txg);
 
 extern int metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp,
     int ncopies, uint64_t txg, blkptr_t *hintbp);
-extern void metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg, boolean_t now);
-extern int metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg);
+extern void metaslab_free(spa_t *spa, const blkptr_t *bp, uint64_t txg,
+    boolean_t now);
+extern int metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg);
 
 extern metaslab_class_t *metaslab_class_create(void);
 extern void metaslab_class_destroy(metaslab_class_t *mc);

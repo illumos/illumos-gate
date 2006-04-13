@@ -389,7 +389,9 @@ vdev_mirror_io_done(zio_t *zio)
 		ASSERT(zio->io_error != 0);
 
 	if (good_copies && (spa_mode & FWRITE) &&
-	    (unexpected_errors || (zio->io_flags & ZIO_FLAG_RESILVER))) {
+	    (unexpected_errors ||
+	    (zio->io_flags & ZIO_FLAG_RESILVER) ||
+	    ((zio->io_flags & ZIO_FLAG_SCRUB) && mm->mm_replacing))) {
 		zio_t *rio;
 
 		/*
@@ -415,7 +417,8 @@ vdev_mirror_io_done(zio_t *zio)
 			if (mc->mc_error == 0) {
 				if (mc->mc_tried)
 					continue;
-				if (!vdev_dtl_contains(&mc->mc_vd->vdev_dtl_map,
+				if (!(zio->io_flags & ZIO_FLAG_SCRUB) &&
+				    !vdev_dtl_contains(&mc->mc_vd->vdev_dtl_map,
 				    zio->io_txg, 1))
 					continue;
 				mc->mc_error = ESTALE;

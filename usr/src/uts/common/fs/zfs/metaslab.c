@@ -593,52 +593,6 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 	mutex_exit(&msp->ms_lock);
 }
 
-/*
- * Intent log support: upon opening the pool after a crash, notify the SPA
- * of blocks that the intent log has allocated for immediate write, but
- * which are still considered free by the SPA because the last transaction
- * group didn't commit yet.
- */
-int
-metaslab_claim(spa_t *spa, dva_t *dva, uint64_t txg)
-{
-	uint64_t vdev = DVA_GET_VDEV(dva);
-	uint64_t offset = DVA_GET_OFFSET(dva);
-	uint64_t size = DVA_GET_ASIZE(dva);
-	vdev_t *vd;
-	metaslab_t *msp;
-	int error;
-
-	if ((vd = vdev_lookup_top(spa, vdev)) == NULL)
-		return (ENXIO);
-
-	if ((offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count)
-		return (ENXIO);
-
-	msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
-
-	if (DVA_GET_GANG(dva))
-		size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
-
-	mutex_enter(&msp->ms_lock);
-
-	error = metaslab_activate(msp, METASLAB_WEIGHT_SECONDARY);
-	if (error) {
-		mutex_exit(&msp->ms_lock);
-		return (error);
-	}
-
-	if (msp->ms_allocmap[txg & TXG_MASK].sm_space == 0)
-		vdev_dirty(vd, VDD_METASLAB, msp, txg);
-
-	space_map_claim(&msp->ms_map, offset, size);
-	space_map_add(&msp->ms_allocmap[txg & TXG_MASK], offset, size);
-
-	mutex_exit(&msp->ms_lock);
-
-	return (0);
-}
-
 static uint64_t
 metaslab_distance(metaslab_t *msp, dva_t *dva)
 {
@@ -735,7 +689,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t txg,
  * Allocate a block for the specified i/o.
  */
 static int
-metaslab_alloc_one(spa_t *spa, uint64_t psize, dva_t *dva, int d,
+metaslab_alloc_dva(spa_t *spa, uint64_t psize, dva_t *dva, int d,
     dva_t *hintdva, uint64_t txg)
 {
 	metaslab_group_t *mg, *rotor;
@@ -746,6 +700,8 @@ metaslab_alloc_one(spa_t *spa, uint64_t psize, dva_t *dva, int d,
 	uint64_t offset = -1ULL;
 	uint64_t asize;
 	uint64_t distance;
+
+	ASSERT(!DVA_IS_VALID(&dva[d]));
 
 	mc = spa_metaslab_class_select(spa);
 
@@ -854,41 +810,12 @@ top:
 	return (ENOSPC);
 }
 
-int
-metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp, int ncopies,
-    uint64_t txg, blkptr_t *hintbp)
-{
-	int d, error;
-	dva_t *dva = bp->blk_dva;
-	dva_t *hintdva = hintbp->blk_dva;
-
-	ASSERT(ncopies > 0 && ncopies <= spa_max_replication(spa));
-	ASSERT(BP_GET_NDVAS(bp) == 0);
-	ASSERT(hintbp == NULL || ncopies <= BP_GET_NDVAS(hintbp));
-
-	for (d = 0; d < ncopies; d++) {
-		error = metaslab_alloc_one(spa, psize, dva, d, hintdva, txg);
-		if (error) {
-			for (d--; d >= 0; d--) {
-				ASSERT(DVA_IS_VALID(&dva[d]));
-				metaslab_free(spa, &dva[d], txg, B_TRUE);
-				bzero(&dva[d], sizeof (dva_t));
-			}
-			return (ENOSPC);
-		}
-	}
-	ASSERT(error == 0);
-	ASSERT(BP_GET_NDVAS(bp) == ncopies);
-
-	return (0);
-}
-
 /*
  * Free the block represented by DVA in the context of the specified
  * transaction group.
  */
-void
-metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg, boolean_t now)
+static void
+metaslab_free_dva(spa_t *spa, const dva_t *dva, uint64_t txg, boolean_t now)
 {
 	uint64_t vdev = DVA_GET_VDEV(dva);
 	uint64_t offset = DVA_GET_OFFSET(dva);
@@ -896,19 +823,15 @@ metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg, boolean_t now)
 	vdev_t *vd;
 	metaslab_t *msp;
 
+	ASSERT(DVA_IS_VALID(dva));
+
 	if (txg > spa_freeze_txg(spa))
 		return;
 
-	if ((vd = vdev_lookup_top(spa, vdev)) == NULL) {
-		cmn_err(CE_WARN, "metaslab_free(): bad vdev %llu",
-		    (u_longlong_t)vdev);
-		ASSERT(0);
-		return;
-	}
-
-	if ((offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count) {
-		cmn_err(CE_WARN, "metaslab_free(): bad offset %llu",
-		    (u_longlong_t)offset);
+	if ((vd = vdev_lookup_top(spa, vdev)) == NULL ||
+	    (offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count) {
+		cmn_err(CE_WARN, "metaslab_free_dva(): bad DVA %llu:%llu",
+		    (u_longlong_t)vdev, (u_longlong_t)offset);
 		ASSERT(0);
 		return;
 	}
@@ -931,4 +854,109 @@ metaslab_free(spa_t *spa, dva_t *dva, uint64_t txg, boolean_t now)
 	}
 
 	mutex_exit(&msp->ms_lock);
+}
+
+/*
+ * Intent log support: upon opening the pool after a crash, notify the SPA
+ * of blocks that the intent log has allocated for immediate write, but
+ * which are still considered free by the SPA because the last transaction
+ * group didn't commit yet.
+ */
+static int
+metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
+{
+	uint64_t vdev = DVA_GET_VDEV(dva);
+	uint64_t offset = DVA_GET_OFFSET(dva);
+	uint64_t size = DVA_GET_ASIZE(dva);
+	vdev_t *vd;
+	metaslab_t *msp;
+	int error;
+
+	ASSERT(DVA_IS_VALID(dva));
+
+	if ((vd = vdev_lookup_top(spa, vdev)) == NULL ||
+	    (offset >> vd->vdev_ms_shift) >= vd->vdev_ms_count)
+		return (ENXIO);
+
+	msp = vd->vdev_ms[offset >> vd->vdev_ms_shift];
+
+	if (DVA_GET_GANG(dva))
+		size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
+
+	mutex_enter(&msp->ms_lock);
+
+	error = metaslab_activate(msp, METASLAB_WEIGHT_SECONDARY);
+	if (error) {
+		mutex_exit(&msp->ms_lock);
+		return (error);
+	}
+
+	if (msp->ms_allocmap[txg & TXG_MASK].sm_space == 0)
+		vdev_dirty(vd, VDD_METASLAB, msp, txg);
+
+	space_map_claim(&msp->ms_map, offset, size);
+	space_map_add(&msp->ms_allocmap[txg & TXG_MASK], offset, size);
+
+	mutex_exit(&msp->ms_lock);
+
+	return (0);
+}
+
+int
+metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp, int ndvas,
+    uint64_t txg, blkptr_t *hintbp)
+{
+	dva_t *dva = bp->blk_dva;
+	dva_t *hintdva = hintbp->blk_dva;
+	int d;
+	int error = 0;
+
+	ASSERT(ndvas > 0 && ndvas <= spa_max_replication(spa));
+	ASSERT(BP_GET_NDVAS(bp) == 0);
+	ASSERT(hintbp == NULL || ndvas <= BP_GET_NDVAS(hintbp));
+
+	for (d = 0; d < ndvas; d++) {
+		error = metaslab_alloc_dva(spa, psize, dva, d, hintdva, txg);
+		if (error) {
+			for (d--; d >= 0; d--) {
+				metaslab_free_dva(spa, &dva[d], txg, B_TRUE);
+				bzero(&dva[d], sizeof (dva_t));
+			}
+			return (error);
+		}
+	}
+	ASSERT(error == 0);
+	ASSERT(BP_GET_NDVAS(bp) == ndvas);
+
+	return (0);
+}
+
+void
+metaslab_free(spa_t *spa, const blkptr_t *bp, uint64_t txg, boolean_t now)
+{
+	const dva_t *dva = bp->blk_dva;
+	int ndvas = BP_GET_NDVAS(bp);
+	int d;
+
+	ASSERT(!BP_IS_HOLE(bp));
+
+	for (d = 0; d < ndvas; d++)
+		metaslab_free_dva(spa, &dva[d], txg, now);
+}
+
+int
+metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
+{
+	const dva_t *dva = bp->blk_dva;
+	int ndvas = BP_GET_NDVAS(bp);
+	int d, error;
+	int last_error = 0;
+
+	ASSERT(!BP_IS_HOLE(bp));
+
+	for (d = 0; d < ndvas; d++)
+		if ((error = metaslab_claim_dva(spa, &dva[d], txg)) != 0)
+			last_error = error;
+
+	return (last_error);
 }

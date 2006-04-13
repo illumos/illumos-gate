@@ -484,7 +484,7 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 
 	if (claim_txg != 0 || bp->blk_birth < spa_first_txg(th->th_spa)) {
 		zb->zb_object = 0;
-		zb->zb_blkid = bp->blk_cksum.zc_word[3];
+		zb->zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
 		bc->bc_blkptr = *bp;
 		(void) traverse_callback(th, zseg, bc);
 	}
@@ -539,7 +539,7 @@ traverse_zil(traverse_handle_t *th, traverse_blk_cache_t *bc)
 
 	zilog = zil_alloc(dp->dp_meta_objset, zh);
 
-	zil_parse(zilog, traverse_zil_block, traverse_zil_record, th,
+	(void) zil_parse(zilog, traverse_zil_block, traverse_zil_record, th,
 	    claim_txg);
 
 	zil_free(zilog);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +74,7 @@ struct zilog {
 	kmutex_t	zl_lock;	/* protects most zilog_t fields */
 	struct dsl_pool	*zl_dmu_pool;	/* DSL pool */
 	spa_t		*zl_spa;	/* handle for read/write log */
-	zil_header_t	*zl_header;	/* log header buffer */
+	const zil_header_t *zl_header;	/* log header buffer */
 	objset_t	*zl_os;		/* object set we're logging */
 	zil_get_data_t	*zl_get_data;	/* callback to get object content */
 	uint64_t	zl_itx_seq;	/* itx sequence number */
@@ -85,6 +84,9 @@ struct zilog {
 	uint32_t	zl_suspend;	/* log suspend count */
 	kcondvar_t	zl_cv_write;	/* for waiting to write to log */
 	kcondvar_t	zl_cv_seq;	/* for committing a sequence */
+	kcondvar_t	zl_cv_suspend;	/* log suspend completion */
+	uint8_t		zl_suspending;	/* log is currently suspending */
+	uint8_t		zl_keep_first;	/* keep first log block in destroy */
 	uint8_t		zl_stop_replay;	/* don't replay any further */
 	uint8_t		zl_stop_sync;	/* for debugging */
 	uint8_t		zl_writer;	/* boolean: write setup in progress */
@@ -97,7 +99,6 @@ struct zilog {
 	list_t		zl_vdev_list;	/* list of [vdev, seq] pairs */
 	taskq_t		*zl_clean_taskq; /* runs lwb and itx clean tasks */
 	avl_tree_t	zl_dva_tree;	/* track DVAs during log parse */
-	kmutex_t	zl_destroy_lock; /* serializes zil_destroy() calls */
 };
 
 typedef struct zil_dva_node {

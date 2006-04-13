@@ -125,7 +125,8 @@ enum zio_compress {
 
 #define	ZIO_FLAG_RESILVER		0x01000
 #define	ZIO_FLAG_SCRUB			0x02000
-#define	ZIO_FLAG_SUBBLOCK		0x04000
+#define	ZIO_FLAG_SCRUB_THREAD		0x04000
+#define	ZIO_FLAG_SUBBLOCK		0x08000
 
 #define	ZIO_FLAG_NOBOOKMARK		0x10000
 
@@ -137,7 +138,8 @@ enum zio_compress {
 	ZIO_FLAG_IO_REPAIR |		\
 	ZIO_FLAG_SPECULATIVE |		\
 	ZIO_FLAG_RESILVER |		\
-	ZIO_FLAG_SCRUB)
+	ZIO_FLAG_SCRUB |		\
+	ZIO_FLAG_SCRUB_THREAD)
 
 #define	ZIO_FLAG_VDEV_INHERIT		\
 	(ZIO_FLAG_GANG_INHERIT |	\
@@ -282,8 +284,7 @@ extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     uint64_t size, void *data, int checksum,
     zio_done_func_t *done, void *private, int priority, int flags);
 
-extern int zio_alloc_blk(spa_t *spa, int checksum, uint64_t size,
-    blkptr_t *bp, uint64_t txg);
+extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *bp, uint64_t txg);
 extern void zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg);
 
 extern int zio_wait(zio_t *zio);

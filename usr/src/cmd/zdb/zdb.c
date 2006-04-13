@@ -1468,8 +1468,6 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 
 	ASSERT(!BP_IS_HOLE(bp));
 
-	zdb_count_block(spa, zcb, bp, type);
-
 	if (dump_opt['b'] >= 4) {
 		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, bp);
 		(void) printf("objset %llu object %llu offset 0x%llx %s\n",
@@ -1479,6 +1477,8 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 			zb->zb_level, zb->zb_blkid),
 		    blkbuf);
 	}
+
+	zdb_count_block(spa, zcb, bp, type);
 
 	return (0);
 }

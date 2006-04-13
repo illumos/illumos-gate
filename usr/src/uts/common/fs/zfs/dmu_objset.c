@@ -541,7 +541,7 @@ dmu_objset_destroy(const char *name)
 	 */
 	error = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_EXCLUSIVE, &os);
 	if (error == 0) {
-		zil_destroy(dmu_objset_zil(os));
+		zil_destroy(dmu_objset_zil(os), B_FALSE);
 		dmu_objset_close(os);
 	}
 

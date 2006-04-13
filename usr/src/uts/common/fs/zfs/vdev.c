@@ -1502,7 +1502,7 @@ vdev_stat_update(zio_t *zio)
 		if ((flags & ZIO_FLAG_IO_REPAIR) &&
 		    zio->io_delegate_list == NULL) {
 			mutex_enter(&vd->vdev_stat_lock);
-			if (flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER))
+			if (flags & ZIO_FLAG_SCRUB_THREAD)
 				vs->vs_scrub_repaired += zio->io_size;
 			else
 				vs->vs_self_healed += zio->io_size;
@@ -1530,7 +1530,7 @@ vdev_stat_update(zio_t *zio)
 	if (type == ZIO_TYPE_WRITE) {
 		if (txg == 0 || vd->vdev_children != 0)
 			return;
-		if (flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)) {
+		if (flags & ZIO_FLAG_SCRUB_THREAD) {
 			ASSERT(flags & ZIO_FLAG_IO_REPAIR);
 			for (pvd = vd; pvd != NULL; pvd = pvd->vdev_parent)
 				vdev_dtl_dirty(&pvd->vdev_dtl_scrub, txg, 1);
