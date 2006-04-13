@@ -3218,6 +3218,10 @@ push_lb(mddb_set_t *s)
 	} else {
 		lbp->lb_revision = MDDB_REV_LB;
 	}
+	/*
+	 * The updates to the mediator hosts are done
+	 * by the callers of this function.
+	 */
 	return (writelocall(s));
 }
 
@@ -3752,13 +3756,17 @@ writestart(
 
 		setidentifier(s, &lbp->lb_ident);
 
-		if (err = push_lb(s))
+		if (err = push_lb(s)) {
+			(void) upd_med(s, "writestart(0)");
 			return (err);
+		}
 
 		(void) upd_med(s, "writestart(0)");
 
-		if (err = push_lb(s))
+		if (err = push_lb(s)) {
+			(void) upd_med(s, "writestart(1)");
 			return (err);
+		}
 
 		(void) upd_med(s, "writestart(1)");
 
@@ -5462,6 +5470,7 @@ load_old_replicas(
 	uint_t		len, sz;
 	char		*minor_name;
 	int		write_lb = 0;
+	int		rval;
 
 	/* The only error path out of get_mbs_n_lbs() is MDDB_E_TAGDATA */
 	if (retval = get_mbs_n_lbs(s, &write_lb))
@@ -6026,7 +6035,9 @@ load_old_replicas(
 	 * by updated driver name - write out locator block.
 	 */
 	if (write_lb) {
-		if (push_lb(s))
+		rval = push_lb(s);
+		(void) upd_med(s, "load_old_replicas(0)");
+		if (rval)
 			goto errout;
 	}
 
@@ -6956,6 +6967,7 @@ mddb_lb_did_convert(mddb_set_t *s, uint_t doit, uint_t *blk_cnt)
 	if (doit) {
 		did_blkp->blk_magic = MDDB_MAGIC_DI;
 		retval = push_lb(s);
+		(void) upd_med(s, "mddb_lb_did_convert(0)");
 		single_thread_end(s);
 		mddb_setexit(s);
 		if (retval != 0)
@@ -7723,6 +7735,7 @@ update_locatorblock(mddb_set_t *s, md_dev64_t dev, ddi_devid_t didptr)
 		}
 	} /* end for */
 	retval = push_lb(s);
+	(void) upd_med(s, "update_locatorblock(0)");
 err_out:
 	return (retval);
 }
@@ -8080,6 +8093,9 @@ delnewside(
 	uniqtime32(&lbp->lb_timestamp);
 	/* write new locator to all devices */
 	err = writelocall(s);
+
+	(void) upd_med(s, "delnewside(0)");
+
 	computefreeblks(s); /* recompute always it may be larger */
 	if (err) {
 		if (writeretry(s)) {
@@ -10644,6 +10660,7 @@ mvl_out:
 
 	if (push_lb(s) != 0)
 		cnt = -1;
+	(void) upd_med(s, "mddb_validate_lb(0)");
 	single_thread_end(s);
 	mddb_setexit(s);
 	return (cnt);
@@ -11490,6 +11507,7 @@ mddb_optrecfix(mddb_optrec_parm_t *mop)
 	if (alc < ((lc + 1) / 2)) {
 		md_set_setstatus(setno, MD_SET_TOOFEW);
 		(void) push_lb(s);
+		(void) upd_med(s, "mddb_optrecfix(0)");
 		single_thread_end(s);
 		mddb_setexit(s);
 		return (0);
@@ -11500,6 +11518,7 @@ mddb_optrecfix(mddb_optrec_parm_t *mop)
 
 	/* Push changed locator block out to disk */
 	(void) push_lb(s);
+	(void) upd_med(s, "mddb_optrecfix(1)");
 
 	/* Recheck for TOOFEW after writing out locator blocks */
 	alc = 0;
@@ -11874,6 +11893,7 @@ write_out_mddb:
 		 */
 		if (push_lb(s))
 			mddb_err = 1;
+		(void) upd_med(s, "mddb_check_write_ioctl(0)");
 
 		/* Write out locator names to all replicas */
 		lnp = s->s_lnp;
@@ -12334,6 +12354,12 @@ md_imp_db(
 		mddb_setexit(s);
 		return (err);
 	}
+
+	/*
+	 * Update lb, no need to update the mediator because
+	 * the diskset will only exist on the importing node
+	 * and as such a mediator adds no value.
+	 */
 
 	/* Update lb */
 	if ((err = writelocall(s)) != 0) {
