@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -105,25 +104,20 @@ _DEL_BIND8
 #
 SVCCFG_REPOSITORY=$PKG_INSTALL_ROOT/etc/svc/repository.db
 export SVCCFG_REPOSITORY
-if [ ! -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
-	#
-	# smf(5) is not presently running for the destination environment.	
-	# It is safe to remove the manifests from the repository.
-	#
-	svccfg delete svc:/network/aggregation
-	svccfg delete svc:/network/datalink-init
-	svccfg delete svc:/network/datalink
-else
-	#
-	# Local package install.  Need to disable the services first
-	# before deleting.
-	#
-	svcadm disable -s svc:/network/aggregation
-	svccfg delete svc:/network/aggregation
-	svcadm disable -s svc:/network/datalink-init
-	svccfg delete svc:/network/datalink-init
-	svcadm disable -s svc:/network/datalink
-	svccfg delete svc:/network/datalink
+if [ -x /usr/sbin/svcadm -a -x /usr/sbin/svccfg -a \
+    -f $PKG_INSTALL_ROOT/var/svc/manifest/network/datalink.xml ]; then
+	if [ -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
+		#
+		# Local package install.  Need to disable the services first
+		# before deleting.
+		#
+		svcadm disable -s svc:/network/aggregation >/dev/null 2>&1
+		svcadm disable -s svc:/network/datalink-init >/dev/null 2>&1
+		svcadm disable -s svc:/network/datalink >/dev/null 2>&1
+	fi
+	svccfg delete svc:/network/aggregation >/dev/null 2>&1
+	svccfg delete svc:/network/datalink-init >/dev/null 2>&1
+	svccfg delete svc:/network/datalink >/dev/null 2>&1
 fi
 
 #

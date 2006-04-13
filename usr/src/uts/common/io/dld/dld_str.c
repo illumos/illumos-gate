@@ -63,9 +63,13 @@ static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
 static vmem_t		*minor_arenap;
 static uint32_t		minor_count;
+static mod_hash_t	*str_hashp;
 
 #define	MINOR_TO_PTR(minor)	((void *)(uintptr_t)(minor))
 #define	PTR_TO_MINOR(ptr)	((minor_t)(uintptr_t)(ptr))
+
+#define	STR_HASHSZ		64
+#define	STR_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
 
 /*
  * Some notes on entry points, flow-control, queueing and locking:
@@ -135,26 +139,79 @@ static uint32_t		minor_count;
  */
 uint_t dld_max_q_count = (16 * 1024 *1024);
 
+/*
+ * dld_finddevinfo() returns the dev_info_t * corresponding to a particular
+ * dev_t. It searches str_hashp (a table of dld_str_t's) for streams that
+ * match dev_t. If a stream is found and it is attached, its dev_info_t *
+ * is returned.
+ */
+typedef struct i_dld_str_state_s {
+	major_t		ds_major;
+	minor_t		ds_minor;
+	dev_info_t	*ds_dip;
+} i_dld_str_state_t;
+
+/* ARGSUSED */
+static uint_t
+i_dld_str_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	i_dld_str_state_t	*statep = arg;
+	dld_str_t		*dsp = (dld_str_t *)val;
+
+	if (statep->ds_major != dsp->ds_major)
+		return (MH_WALK_CONTINUE);
+
+	ASSERT(statep->ds_minor != 0);
+
+	/*
+	 * Access to ds_ppa and ds_mh need to be protected by ds_lock.
+	 */
+	rw_enter(&dsp->ds_lock, RW_READER);
+	if (statep->ds_minor <= DLD_MAX_MINOR) {
+		/*
+		 * Style 1: minor can be derived from the ppa. we
+		 * continue to walk until we find a matching stream
+		 * in attached state.
+		 */
+		if (statep->ds_minor == DLS_PPA2MINOR(dsp->ds_ppa) &&
+		    dsp->ds_mh != NULL) {
+			statep->ds_dip = mac_devinfo_get(dsp->ds_mh);
+			rw_exit(&dsp->ds_lock);
+			return (MH_WALK_TERMINATE);
+		}
+	} else {
+		/*
+		 * Clone: a clone minor is unique. we can terminate the
+		 * walk if we find a matching stream -- even if we fail
+		 * to obtain the devinfo.
+		 */
+		if (statep->ds_minor == dsp->ds_minor) {
+			if (dsp->ds_mh != NULL)
+				statep->ds_dip = mac_devinfo_get(dsp->ds_mh);
+			rw_exit(&dsp->ds_lock);
+			return (MH_WALK_TERMINATE);
+		}
+	}
+	rw_exit(&dsp->ds_lock);
+	return (MH_WALK_CONTINUE);
+}
+
 static dev_info_t *
 dld_finddevinfo(dev_t dev)
 {
-	minor_t		minor = getminor(dev);
-	char		*drvname = ddi_major_to_name(getmajor(dev));
-	char		name[MAXNAMELEN];
-	dls_vlan_t	*dvp = NULL;
-	dev_info_t	*dip = NULL;
+	i_dld_str_state_t	state;
 
-	if (drvname == NULL || minor == 0 || minor > DLD_MAX_PPA + 1)
+	state.ds_minor = getminor(dev);
+	state.ds_major = getmajor(dev);
+	state.ds_dip = NULL;
+
+	if (state.ds_minor == 0)
 		return (NULL);
 
-	(void) snprintf(name, MAXNAMELEN, "%s%d", drvname, (int)minor - 1);
-	if (dls_vlan_hold(name, &dvp, B_FALSE) != 0)
-		return (NULL);
-
-	dip = mac_devinfo_get(dvp->dv_dlp->dl_mh);
-	dls_vlan_rele(dvp);
-	return (dip);
+	mod_hash_walk(str_hashp, i_dld_str_walker, &state);
+	return (state.ds_dip);
 }
+
 
 /*
  * devo_getinfo: getinfo(9e)
@@ -175,8 +232,12 @@ dld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		if (minor > 0 && minor <= DLD_MAX_PPA + 1) {
-			*resp = (void *)(uintptr_t)(minor - 1);
+		if (minor > 0 && minor <= DLD_MAX_MINOR) {
+			*resp = (void *)(uintptr_t)DLS_MINOR2INST(minor);
+			rc = DDI_SUCCESS;
+		} else if (minor > DLD_MAX_MINOR &&
+		    (devinfo = dld_finddevinfo((dev_t)arg)) != NULL) {
+			*resp = (void *)(uintptr_t)ddi_get_instance(devinfo);
 			rc = DDI_SUCCESS;
 		}
 		break;
@@ -498,6 +559,15 @@ dld_str_init(void)
 	    MINOR_TO_PTR(DLD_MAX_MINOR + 1), MAXMIN, 1, NULL, NULL, NULL, 0,
 	    VM_SLEEP | VMC_IDENTIFIER);
 	ASSERT(minor_arenap != NULL);
+
+	/*
+	 * Create a hash table for maintaining dld_str_t's.
+	 * The ds_minor field (the clone minor number) of a dld_str_t
+	 * is used as a key for this hash table because this number is
+	 * globally unique (allocated from "dld_minor_arena").
+	 */
+	str_hashp = mod_hash_create_idhash("dld_str_hash", STR_HASHSZ,
+	    mod_hash_null_valdtor);
 }
 
 /*
@@ -523,6 +593,7 @@ dld_str_fini(void)
 	 */
 	kmem_cache_destroy(str_cachep);
 	vmem_destroy(minor_arenap);
+	mod_hash_destroy_idhash(str_hashp);
 	return (0);
 }
 
@@ -533,6 +604,7 @@ dld_str_t *
 dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 {
 	dld_str_t	*dsp;
+	int		err;
 
 	/*
 	 * Allocate an object from the cache.
@@ -567,6 +639,9 @@ dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 	 */
 	noenable(WR(rq));
 
+	err = mod_hash_insert(str_hashp, STR_HASH_KEY(dsp->ds_minor),
+	    (mod_hash_val_t)dsp);
+	ASSERT(err == 0);
 	return (dsp);
 }
 
@@ -578,7 +653,7 @@ dld_str_destroy(dld_str_t *dsp)
 {
 	queue_t		*rq;
 	queue_t		*wq;
-
+	mod_hash_val_t	val;
 	/*
 	 * Clear the queue pointers.
 	 */
@@ -615,6 +690,10 @@ dld_str_destroy(dld_str_t *dsp)
 		freeb(dsp->ds_tx_flow_mp);
 		dsp->ds_tx_flow_mp = NULL;
 	}
+
+	(void) mod_hash_remove(str_hashp, STR_HASH_KEY(dsp->ds_minor), &val);
+	ASSERT(dsp == (dld_str_t *)val);
+
 	/*
 	 * Free the object back to the cache.
 	 */
@@ -643,6 +722,7 @@ str_constructor(void *buf, void *cdrarg, int kmflags)
 	 * Initialize the DLPI state machine.
 	 */
 	dsp->ds_dlstate = DL_UNATTACHED;
+	dsp->ds_ppa = (t_uscalar_t)-1;
 
 	mutex_init(&dsp->ds_thr_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&dsp->ds_lock, NULL, RW_DRIVER, NULL);
@@ -841,6 +921,7 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 	 */
 	dsp->ds_mnh = mac_notify_add(dsp->ds_mh, str_notify, (void *)dsp);
 
+	dsp->ds_ppa = ppa;
 	dsp->ds_dc = dc;
 	dsp->ds_dlstate = DL_UNBOUND;
 
@@ -872,6 +953,7 @@ dld_str_detach(dld_str_t *dsp)
 	 * Close the channel.
 	 */
 	dls_close(dsp->ds_dc);
+	dsp->ds_ppa = (t_uscalar_t)-1;
 	dsp->ds_dc = NULL;
 	dsp->ds_mh = NULL;
 
@@ -921,7 +1003,10 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		/*
 		 * Pass the packet on.
 		 */
-		putnext(dsp->ds_rq, mp);
+		if (canputnext(dsp->ds_rq))
+			putnext(dsp->ds_rq, mp);
+		else
+			freemsg(mp);
 
 		/*
 		 * Move on to the next packet in the chain.
@@ -953,8 +1038,10 @@ dld_str_rx_fastpath(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		/*
 		 * Pass the packet on.
 		 */
-		putnext(dsp->ds_rq, mp);
-
+		if (canputnext(dsp->ds_rq))
+			putnext(dsp->ds_rq, mp);
+		else
+			freemsg(mp);
 		/*
 		 * Move on to the next packet in the chain.
 		 */
@@ -1010,7 +1097,10 @@ dld_str_rx_unitdata(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		/*
 		 * Send the message.
 		 */
-		putnext(dsp->ds_rq, ud_mp);
+		if (canputnext(dsp->ds_rq))
+			putnext(dsp->ds_rq, ud_mp);
+		else
+			freemsg(ud_mp);
 
 		/*
 		 * Move on to the next packet in the chain.

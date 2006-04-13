@@ -54,10 +54,8 @@
 #define	AGGR_DRIVER_NAME	"aggr"
 
 /* device info ptr, only one for instance 0 */
-dev_info_t *aggr_dip;
+dev_info_t *aggr_dip = NULL;
 
-static void aggr_dev_init(void);
-static int aggr_dev_fini(void);
 static int aggr_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int aggr_attach(dev_info_t *, ddi_attach_cmd_t);
 static int aggr_detach(dev_info_t *, ddi_detach_cmd_t);
@@ -132,33 +130,13 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int err;
-
-	aggr_dev_init();
-
-	if ((err = mod_install(&modlinkage)) != 0) {
-		(void) aggr_dev_fini();
-		return (err);
-	}
-
-	aggr_dip = NULL;
-	return (0);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int err;
-
-	if ((err = aggr_dev_fini()) != 0)
-		return (err);
-
-	if ((err = mod_remove(&modlinkage)) != 0) {
-		aggr_dev_init();
-		return (err);
-	}
-
-	return (0);
+	return (mod_remove(&modlinkage));
 }
 
 int
@@ -214,33 +192,6 @@ aggr_wput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 }
 
-static void
-aggr_dev_init(void)
-{
-	aggr_port_init();
-	aggr_grp_init();
-	aggr_lacp_init();
-}
-
-static int
-aggr_dev_fini(void)
-{
-	int err;
-
-	if ((err = aggr_grp_fini()) != 0)
-		return (err);
-	if ((err = aggr_port_fini()) != 0) {
-		/*
-		 * re-initialize the groups to keep a consistent
-		 * state.
-		 */
-		aggr_grp_init();
-	}
-	aggr_lacp_fini();
-
-	return (err);
-}
-
 /*ARGSUSED*/
 static int
 aggr_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
@@ -274,6 +225,9 @@ aggr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		aggr_dip = dip;
+		aggr_port_init();
+		aggr_grp_init();
+		aggr_lacp_init();
 		return (DDI_SUCCESS);
 
 	case DDI_RESUME:
@@ -295,7 +249,9 @@ aggr_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		aggr_dip = NULL;
 		ddi_remove_minor_node(dip, AGGR_DEVNAME_CTL);
-
+		aggr_port_fini();
+		aggr_grp_fini();
+		aggr_lacp_fini();
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:

@@ -138,16 +138,12 @@ aggr_grp_init(void)
 	aggr_grp_cnt = 0;
 }
 
-int
+void
 aggr_grp_fini(void)
 {
-	if (aggr_grp_cnt > 0)
-		return (EBUSY);
-
 	rw_destroy(&aggr_grp_lock);
 	mod_hash_destroy_idhash(aggr_grp_hash);
 	kmem_cache_destroy(aggr_grp_cache);
-	return (0);
 }
 
 uint_t
