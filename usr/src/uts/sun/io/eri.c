@@ -1773,10 +1773,6 @@ eri_close(queue_t *rq)
 {
 	struct	eristr	*sbp;
 	struct	eristr	**prevsbp;
-	int	promisc_cnt = 0;
-	int	sap_cnt = 0;
-	int	all_multi_cnt = 0;
-	struct eri	*erip;
 
 	ASSERT(rq->q_ptr);
 
