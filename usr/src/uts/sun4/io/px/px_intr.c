@@ -899,6 +899,8 @@ static struct {
 };
 
 static uint32_t pxintr_ks_instance;
+static char ih_devpath[MAXPATHLEN];
+static char ih_buspath[MAXPATHLEN];
 kmutex_t pxintr_ks_template_lock;
 
 int
@@ -910,8 +912,6 @@ px_ks_update(kstat_t *ksp, int rw)
 	px_t *px_p = ib_p->ib_px_p;
 	devino_t ino;
 	sysino_t sysino;
-	char ih_devpath[MAXPATHLEN];
-	char ih_buspath[MAXPATHLEN];
 
 	ino = ih_p->ih_ino_p->ino_ino;
 	(void) px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,8 @@ static struct {
 	{ "buspath",	KSTAT_DATA_STRING },
 };
 
+static char ih_devpath[MAXPATHLEN];
+static char ih_buspath[MAXPATHLEN];
 static uint32_t pci_ks_inst;
 static kmutex_t pci_ks_template_lock;
 
@@ -78,8 +79,6 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	dev_info_t		*dip = ih_p->ih_dip;
 	int			maxlen =
 				    sizeof (pci_ks_template.ihks_name.value.c);
-	char			ih_devpath[MAXPATHLEN];
-	char			ih_buspath[MAXPATHLEN];
 	apic_get_intr_t	intrinfo;
 
 	(void) snprintf(pci_ks_template.ihks_name.value.c, maxlen, "%s%d",
