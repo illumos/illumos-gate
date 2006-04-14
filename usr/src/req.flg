@@ -28,6 +28,7 @@
 echo_file usr/src/Makefile
 echo_file usr/src/Targetdirs
 echo_file usr/src/Makefile.master
+echo_file usr/src/Makefile.noget
 echo_file usr/src/Makefile.master.64
 echo_file usr/src/Makefile.msg.targ
 echo_file usr/src/Makefile.psm

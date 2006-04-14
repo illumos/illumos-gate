@@ -348,6 +348,11 @@ build() {
 	cd $SRC
 	/bin/time $MAKE -e install 2>&1 | \
 	    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
+
+	echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
+
+	egrep 'sccs(check|  get)' $SRC/${INSTALLOG}.out >> $mail_msg_file
+
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
 		egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
@@ -1727,6 +1732,7 @@ fi
 	# it supports -K and ParallelMake doesn't.
 	# 
 	rm -f $TMPDIR/make-state
+	export SRC=$srcroot
 	if /usr/ccs/bin/make -K $TMPDIR/make-state -e $target 2>/dev/null; then
 		continue
 	fi
@@ -1830,12 +1836,20 @@ if [ "$n_FLAG" = "n" ]; then
 	done
 
 	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
-	staffer $TEAMWARE/bin/bringover -c "nightly update" -p $BRINGOVER_WS \
-	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 | \
-		tee -a  $mail_msg_file >> $LOGFILE
-	if [ $? -eq 1 ]
-	then
-		echo "trouble with bringover, quitting at `date`." >> $LOGFILE
+
+	(staffer $TEAMWARE/bin/bringover -c "nightly update" -p $BRINGOVER_WS \
+	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 ||
+		touch $TMPDIR/bringover_failed
+
+         staffer bringovercheck $CODEMGR_WS	      
+
+	) | tee -a  $mail_msg_file >> $LOGFILE
+
+	if [ -f $TMPDIR/bringover_failed ]; then 
+		rm -f $TMPDIR/bringover_failed
+		build_ok=n
+		echo "trouble with bringover, quitting at `date`." | 
+			tee -a $mail_msg_file >> $LOGFILE
 		exit 1
 	fi
 
