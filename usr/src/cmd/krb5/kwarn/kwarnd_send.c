@@ -1,5 +1,25 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +59,10 @@
  *  %S  second
  *
  */
+
+extern char myhostname[];
+extern char progname[];
+
 
 static void openfail(int);
 static void eof(void);
@@ -108,10 +132,10 @@ warn_send(char *receipient, char *msg)
 				time(&tod);
 				cftime(time_buf, "%c", &tod);
 				(void) fprintf(fp, gettext(
-				    "\r\n\007\007\007\tMessage [ %s ] ...\r\n"),
-				    time_buf);
+	    "\r\n\007\007\007\tMessage from %s@%s [ %s ] ...\r\n"),
+					    progname, myhostname, time_buf);
 				sleep(1);
-				fprintf(fp, gettext("\r\nmessage: %s"), msg);
+				fprintf(fp, gettext("\r\nMessage to %s"), msg);
 				fflush(fp);
 
 /*	Since "end of file" received, send <EOT> message to receipient.	*/

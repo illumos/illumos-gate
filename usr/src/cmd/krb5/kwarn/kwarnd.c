@@ -1,5 +1,25 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,6 +46,8 @@
 #include <strings.h>
 #include <syslog.h>
 #include <thread.h>
+#include <netdb.h>
+#include <libgen.h>
 #include "kwarnd.h"
 
 #define	MAXTHREADS 64
@@ -36,7 +58,7 @@ extern void kwarnprog_1(struct svc_req *, register SVCXPRT *);
 static void usage(void);
 static void detachfromtty(void);
 extern int svc_create_local_service(void (*) (),
-					u_long, u_long, char *, char *);
+					ulong_t, ulong_t, char *, char *);
 extern void kwarnd_check_warning_list(void);
 extern bool_t loadConfigFile(void);
 
@@ -44,6 +66,10 @@ extern bool_t loadConfigFile(void);
 int _rpcpmstart = 0;		/* Started by a port monitor ? */
 int _rpcfdtype;			/* Whether Stream or Datagram ? */
 int _rpcsvcdirty;		/* Still serving ? */
+
+char myhostname[MAXHOSTNAMELEN] = {0};
+char progname[MAXNAMELEN] = {0};
+
 
 int
 main(argc, argv)
@@ -61,11 +87,13 @@ char **argv;
 	/* set locale and domain for internationalization */
 	setlocale(LC_ALL, "");
 
-#if !defined(TEXT_DOMAIN) 
-#define TEXT_DOMAIN "SYS_TEST" 
-#endif 
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN "SYS_TEST"
+#endif
 
 	textdomain(TEXT_DOMAIN);
+
+	(void) strlcpy(progname, basename(argv[0]), sizeof (progname));
 
 	/*
 	 * take special note that "_getuid()" is called here. This is necessary
@@ -73,7 +101,7 @@ char **argv;
 	 * with a special routine that is provided as part of kwarnd. However,
 	 * the call below MUST call the real getuid() to ensure it is running
 	 * as root.
-	*/
+	 */
 
 #ifdef DEBUG
 	(void) setuid(0);		/* DEBUG: set ruid to root */
@@ -101,6 +129,8 @@ char **argv;
 	if (optind != argc) {
 		usage();
 	}
+
+	(void) gethostname(myhostname, sizeof (myhostname));
 
 	/*
 	 * Started by inetd if name of module just below stream
@@ -172,7 +202,7 @@ char **argv;
 		    gettext("kwarnd start: \n"));
 	}
 
- 	(void) signal(SIGCHLD, SIG_IGN);
+	(void) signal(SIGCHLD, SIG_IGN);
 
 	if (thr_create(NULL, 0,
 			(void *(*)(void *))kwarnd_check_warning_list, NULL,
@@ -204,7 +234,7 @@ char **argv;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage: kwarnd [-d]\n"));
+	(void) fprintf(stderr, gettext("usage: %s [-d]\n"), progname);
 	exit(1);
 }
 
