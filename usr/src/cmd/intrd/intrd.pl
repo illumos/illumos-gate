@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -142,14 +141,14 @@ sub do_reconfig_cpu($$$);	# private function
 #  ->{"tot"}            == cpu:<cpuid>:sys:cpu_nsec_{user + kernel + idle}
 #  ->{"crtime"}         == cpu:<cpuid>:sys:crtime
 #  ->{"ivecs"}
-#     ->{<cookie#>}     iterates over pci_intrs::config:cookie
-#        ->{"time"}     == pci_intrs:<ivec#>:config:time (in nsec)
-#        ->{"pil"}      == pci_intrs:<ivec#>:config:pil
-#        ->{"crtime"}   == pci_intrs:<ivec#>:config:crtime
-#        ->{"ino"}      == pci_intrs:<ivec#>:config:ino
-#        ->{"buspath"}  == pci_intrs:<ivec#>:config:buspath
-#        ->{"name"}     == pci_intrs:<ivec#>:config:name
-#        ->{"ihs"}      == pci_intrs:<ivec#>:config:ihs
+#     ->{<cookie#>}     iterates over pci_intrs::<nexus>:cookie
+#        ->{"time"}     == pci_intrs:<ivec#>:<nexus>:time (in nsec)
+#        ->{"pil"}      == pci_intrs:<ivec#>:<nexus>:pil
+#        ->{"crtime"}   == pci_intrs:<ivec#>:<nexus>:crtime
+#        ->{"ino"}      == pci_intrs:<ivec#>:<nexus>:ino
+#        ->{"buspath"}  == pci_intrs:<ivec#>:<nexus>:buspath
+#        ->{"name"}     == pci_intrs:<ivec#>:<nexus>:name
+#        ->{"ihs"}      == pci_intrs:<ivec#>:<nexus>:ihs
 #
 
 sub getstat($)
@@ -209,11 +208,11 @@ sub getstat($)
 	# Iterate over the ivecs. If the cpu is not on-line, ignore the
 	# ivecs mapped to it, if any.
 	#
-	# Record pci_intrs:{inum}:config:time, snaptime, crtime, pil,
+	# Record pci_intrs:{inum}:<nexus>:time, snaptime, crtime, pil,
 	# ino, name, and buspath. Check $minsnap/$maxsnap.
 
 	foreach my $inst (values(%{$ks->{pci_intrs}})) {
-		my $intrcfg = $inst->{config};
+		my $intrcfg = (values(%$inst))[0]; 
 		my $cpu = $intrcfg->{cpu};
 
 		next unless exists $stat{$cpu};

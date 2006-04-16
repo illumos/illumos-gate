@@ -155,7 +155,7 @@ void pci_kstat_create(kstat_t **kspp, dev_info_t *rootnex_dip,
 	pci_kstat_private_t *private_data;
 
 	*kspp = kstat_create("pci_intrs", atomic_inc_32_nv(&pci_ks_inst),
-	    "config", "interrupts", KSTAT_TYPE_NAMED,
+	    _MODULE_NAME, "interrupts", KSTAT_TYPE_NAMED,
 	    sizeof (pci_ks_template) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL);
 	if (*kspp != NULL) {
