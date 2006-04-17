@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +46,8 @@ ROOTLIBCRON =	$(ROOTLIB)/cron
 
 PROG1 =		cron
 PROG2 =		at atq atrm crontab
-XPG4PROG =	at
+XPG6PROG =	crontab
+XPG4PROG =	at crontab
 PROG =		$(PROG1) $(PROG2)
 
 SCRIPT =	batch
@@ -62,6 +62,7 @@ ROOTDIRS =	$(ROOTSPCRON) $(ROOTCROND) \
 
 ROOTPROG =	$(PROG1:%=$(ROOTUSRSBIN)/%) $(PROG2:%=$(ROOTBIN)/%)	\
 		$(SCRIPT:%=$(ROOTBIN)/%) \
+		$(XPG6PROG:%=$(ROOTXPG6BIN)/%) \
 		$(XPG4PROG:%=$(ROOTXPG4BIN)/%) \
 		$(XPG4SCRIPT:%.xpg4=$(ROOTXPG4BIN)/%)
 
@@ -77,24 +78,34 @@ ATRMOBJS=	atrm.o
 ATQOBJS=	atq.o
 CRONTABOBJS=	crontab.o
 
-XPG4ATOBJS=	$(ATOBJS:%=atobjs.xpg4/%) $(COMMONOBJS:%=atobjs.xpg4/%) \
-		$(XPG4OBJS:%=atobjs.xpg4/%)
+# /usr/xpg*/bin/crontab isn't linked with values-xpg*.o since it isn't
+# required by any specific behavior differences; this makes these
+# setuid variants less likely to accidently trip over differences that
+# could unintentionally open up a security hole.
+XPG4COMMONOBJS=	$(COMMONOBJS:%=objs.xpg4/%)
+XPG4CTOBJS=	$(CRONTABOBJS:%=objs.xpg4/%)
+XPG4ATOBJS=	$(ATOBJS:%=objs.xpg4/%) $(XPG4OBJS:%=objs.xpg4/%)
+XPG6COMMONOBJS=	$(COMMONOBJS:%=objs.xpg6/%)
+XPG6CTOBJS=	$(CRONTABOBJS:%=objs.xpg6/%)
 
 cron :=		POBJS = $(CRONOBJS) $(COMMONOBJ2)
 at :=		POBJS = $(ATOBJS) $(COMMONOBJS)
-at.xpg4 :=	POBJS = $(XPG4ATOBJS)
+at.xpg4 :=	POBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
 atrm :=		POBJS = $(ATRMOBJS) $(COMMONOBJS)
 atq :=		POBJS = $(ATQOBJS) $(COMMONOBJS)
-crontab :=	POBJS = crontab.o $(COMMONOBJS)
+crontab :=	POBJS = $(CRONTABOBJS) $(COMMONOBJS)
+crontab.xpg4 :=	POBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
+crontab.xpg6 :=	POBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
 
-at.o atobjs.xpg4/at.o funcs.o permit.o crontab.o elm.o := CFLAGS += $(CCVERBOSE)
+at.o objs.xpg4/at.o funcs.o objs.xpg4/funcs.o objs.xpg6/funcs.o permit.o \
+objs.xpg4/permit.o objs.xpg6/permit.o crontab.o objs.xpg4/crontab.o \
+objs.xpg6/crontab.o elm.o := CFLAGS += $(CCVERBOSE)
 
-XPG4POBJS =	atobjs.xpg4/at.o atobjs.xpg4/att1.o		\
-		atobjs.xpg4/att2.o atobjs.xpg4/funcs.o			\
-		atobjs.xpg4/permit.o atobjs.xpg4/values-xpg4.o
 NOBJS=		$(CRONOBJS) $(ATOBJS) $(ATRMOBJS) $(ATQOBJS) $(CRONTABOBJS) \
 		$(COMMONOBJS)
-OBJS =		$(NOBJS) $(XPG4ATOBJS)
+OBJS =		$(NOBJS) $(XPG4COMMONOBJS) $(XPG4ATOBJS) $(XPG4CTOBJS) \
+		$(XPG6COMMONOBJS) $(XPG6CTOBJS)
+		
 SRCS =		$(NOBJS:%.o=%.c)
 
 CLOBBERFILES +=	$(SCRIPT) $(XPG4SCRIPT)
@@ -116,6 +127,10 @@ $(ROOTBIN)/atq :=		OWNER = root
 $(ROOTBIN)/atq :=		GROUP = sys
 $(ROOTBIN)/crontab :=		FILEMODE = 04555
 $(ROOTBIN)/crontab :=		OWNER = root
+$(ROOTXPG6BIN)/crontab :=	FILEMODE = 04555
+$(ROOTXPG6BIN)/crontab :=	OWNER = root
+$(ROOTXPG4BIN)/crontab :=	FILEMODE = 04555
+$(ROOTXPG4BIN)/crontab :=	OWNER = root
 $(ROOTUSRSBIN)/cron :=		FILEMODE = 0555
 $(ROOTUSRSBIN)/cron :=		OWNER = root
 $(ROOTUSRSBIN)/cron :=		GROUP = sys
@@ -128,10 +143,13 @@ atq :=		LDLIBS += -lsecdb
 atrm :=		LDLIBS += -lsecdb
 cron :=		LDLIBS += -lcmd -lpam -lproject -lcontract
 crontab :=	LDLIBS += -lsecdb -lpam
+crontab.xpg6 :=	LDLIBS += -lsecdb -lpam
+crontab.xpg4 :=	LDLIBS += -lsecdb -lpam
 
 lint :=		LDLIBS += -lproject -lsecdb -lcontract -lpam
 
 $(XPG4) := CFLAGS += -DXPG4
+$(XPG6) := CFLAGS += -DXPG6
 
 $(ROOTSVCSYSTEM)/cron.xml := OWNER = root
 $(ROOTSVCSYSTEM)/cron.xml := GROUP = sys
@@ -144,7 +162,7 @@ $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 
 .KEEP_STATE:
 
-all :		$(PROG) $(XPG4) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
+all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
 
 install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
 		$(ROOTMANIFEST) $(ROOTMETHOD)
@@ -153,17 +171,27 @@ $(PROG) :	$$(POBJS)
 		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-$(XPG4) :	atobjs.xpg4 $(XPG4POBJS)
-		$(LINK.c) $(XPG4POBJS) -o $@ $(LDLIBS)
+$(XPG4) :	objs.xpg4 $$(POBJS)
+		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-atobjs.xpg4/%.o:	%.c
+$(XPG6) :	objs.xpg6 $$(POBJS)
+		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+objs.xpg6/%.o:	%.c
 	$(COMPILE.c) -o $@ $<
 
-atobjs.xpg4:
+objs.xpg6:
 	-@mkdir -p $@
 
-atobjs.xpg4/values-xpg4.o:	../../lib/common/common/values-xpg4.c
+objs.xpg4/%.o:	%.c
+	$(COMPILE.c) -o $@ $<
+
+objs.xpg4:
+	-@mkdir -p $@
+
+objs.xpg4/values-xpg4.o:	../../lib/common/common/values-xpg4.c
 	$(COMPILE.c) -o $@ ../../lib/common/common/values-xpg4.c
 
 att1.c :	att1.y
@@ -176,7 +204,7 @@ att2.c :	att2.l att2.ed att1.c
 		ed - lex.yy.c < att2.ed
 		$(MV) lex.yy.c att2.c
 
-# Don't re-install direcories installed by Targetdirs
+# Don't re-install directories installed by Targetdirs
 #$(ROOTDIRS):
 #		$(INS.dir)
 
@@ -194,6 +222,6 @@ clean :
 lint :		lint_SRCS
 
 strip :
-		$(STRIP) $(PROG) $(XPG4)
+		$(STRIP) $(PROG) $(XPG4) $(XPG6)
 
 include		../Makefile.targ

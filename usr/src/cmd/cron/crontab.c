@@ -48,6 +48,15 @@
 #include <security/pam_appl.h>
 #include "cron.h"
 
+#if defined(XPG4)
+#define	VIPATH	"/usr/xpg4/bin/vi"
+#elif defined(XPG6)
+#define	VIPATH	"/usr/xpg6/bin/vi"
+#else
+#define	_XPG_NOTDEFINED
+#define	VIPATH	"vi"
+#endif
+
 #define	TMPFILE		"_cron"		/* prefix for tmp file */
 #define	CRMODE		0600	/* mode for creating crontabs */
 
@@ -276,11 +285,16 @@ main(int argc, char **argv)
 			if (stat(edtemp, &stbuf) < 0)
 				crabort("can't stat temporary file");
 			omodtime = stbuf.st_mtime;
+#ifdef _XPG_NOTDEFINED
 			editor = getenv("VISUAL");
-			if (editor == NULL)
+			if (editor == NULL) {
+#endif
 				editor = getenv("EDITOR");
-			if (editor == NULL)
-				editor = "ed";
+				if (editor == NULL)
+					editor = VIPATH;
+#ifdef _XPG_NOTDEFINED
+			}
+#endif
 			(void) snprintf(buf, sizeof (buf),
 				"%s %s", editor, edtemp);
 			sleep(1);
