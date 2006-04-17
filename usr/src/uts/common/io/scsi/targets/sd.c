@@ -22347,11 +22347,6 @@ sd_dkio_get_geometry(dev_t dev, caddr_t arg, int flag, int geom_validated)
 		return (ENXIO);
 	}
 
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
 	if (geom_validated == FALSE) {
 		/*
 		 * sd_validate_geometry does not spin a disk up
@@ -22367,6 +22362,18 @@ sd_dkio_get_geometry(dev_t dev, caddr_t arg, int flag, int geom_validated)
 	}
 	if (rval)
 		return (rval);
+
+	/*
+	 * It is possible that un_solaris_size is 0(uninitialized)
+	 * after sd_unit_attach. Reservation conflict may cause the
+	 * above situation. Thus, the zero check of un_solaris_size
+	 * should occur after the sd_validate_geometry() call.
+	 */
+#if defined(__i386) || defined(__amd64)
+	if (un->un_solaris_size == 0) {
+		return (EIO);
+	}
+#endif
 
 	/*
 	 * Make a local copy of the soft state geometry to avoid some potential
@@ -22428,11 +22435,26 @@ sd_dkio_set_geometry(dev_t dev, caddr_t arg, int flag)
 		return (ENXIO);
 	}
 
+	/*
+	 * Make sure the geometry is valid before setting the geometry.
+	 */
+	if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
+		return (rval);
+	}
+	mutex_enter(SD_MUTEX(un));
+
+	if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
+		mutex_exit(SD_MUTEX(un));
+		return (rval);
+	}
+	mutex_exit(SD_MUTEX(un));
+
 #if defined(__i386) || defined(__amd64)
 	if (un->un_solaris_size == 0) {
 		return (EIO);
 	}
 #endif
+
 	/*
 	 * We need to copy the user specified geometry into local
 	 * storage and then update the softstate. We don't want to hold
@@ -22495,11 +22517,6 @@ sd_dkio_get_partition(dev_t dev, caddr_t arg, int flag, int geom_validated)
 		return (ENXIO);
 	}
 
-#if defined(__i386) || defined(__amd64)
-	if (un->un_solaris_size == 0) {
-		return (EIO);
-	}
-#endif
 	/*
 	 * Make sure the geometry is valid before getting the partition
 	 * information.
@@ -22523,6 +22540,18 @@ sd_dkio_get_partition(dev_t dev, caddr_t arg, int flag, int geom_validated)
 		}
 	}
 	mutex_exit(SD_MUTEX(un));
+
+	/*
+	 * It is possible that un_solaris_size is 0(uninitialized)
+	 * after sd_unit_attach. Reservation conflict may cause the
+	 * above situation. Thus, the zero check of un_solaris_size
+	 * should occur after the sd_validate_geometry() call.
+	 */
+#if defined(__i386) || defined(__amd64)
+	if (un->un_solaris_size == 0) {
+		return (EIO);
+	}
+#endif
 
 #ifdef _MULTI_DATAMODEL
 	switch (ddi_model_convert_from(flag & FMODELS)) {
@@ -22609,9 +22638,26 @@ sd_dkio_set_partition(dev_t dev, caddr_t arg, int flag)
 		return (ENOTSUP);
 	}
 	mutex_exit(SD_MUTEX(un));
+
+	/*
+	 * Make sure the geometry is valid before setting the partitions.
+	 */
+	if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
+		return (rval);
+	}
+	mutex_enter(SD_MUTEX(un));
+
+	if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
+		mutex_exit(SD_MUTEX(un));
+		return (rval);
+	}
+	mutex_exit(SD_MUTEX(un));
+
+#if defined(__i386) || defined(__amd64)
 	if (un->un_solaris_size == 0) {
 		return (EIO);
 	}
+#endif
 
 #ifdef _MULTI_DATAMODEL
 	switch (ddi_model_convert_from(flag & FMODELS)) {
