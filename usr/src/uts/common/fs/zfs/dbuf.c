@@ -1394,7 +1394,6 @@ dbuf_do_evict(void *private)
 	if (!MUTEX_HELD(&db->db_mtx))
 		mutex_enter(&db->db_mtx);
 
-	ASSERT(db->db_buf == buf);
 	ASSERT(refcount_is_zero(&db->db_holds));
 
 	if (db->db_state != DB_EVICTING) {

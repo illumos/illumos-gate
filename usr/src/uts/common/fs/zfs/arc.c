@@ -1077,8 +1077,8 @@ arc_do_user_evicts(void)
 		buf->b_hdr = NULL;
 		mutex_exit(&arc_eviction_mtx);
 
-		ASSERT(buf->b_efunc != NULL);
-		VERIFY(buf->b_efunc(buf) == 0);
+		if (buf->b_efunc != NULL)
+			VERIFY(buf->b_efunc(buf) == 0);
 
 		buf->b_efunc = NULL;
 		buf->b_private = NULL;
@@ -1943,15 +1943,16 @@ arc_buf_evict(arc_buf_t *buf)
 		mutex_exit(&arc_eviction_mtx);
 		return (0);
 	} else if (buf->b_data == NULL) {
+		arc_buf_t copy = *buf; /* structure assignment */
 		/*
-		 * We are on the eviction list, pull us off.
+		 * We are on the eviction list.  Process this buffer
+		 * now but let arc_do_user_evicts() do the reaping.
 		 */
-		bufp = &arc_eviction_list;
-		while (*bufp != buf)
-			bufp = &(*bufp)->b_next;
-		*bufp = buf->b_next;
+		buf->b_efunc = NULL;
+		buf->b_hdr = NULL;
 		mutex_exit(&arc_eviction_mtx);
-		goto out;
+		VERIFY(copy.b_efunc(&copy) == 0);
+		return (1);
 	} else {
 		/*
 		 * Prevent a race with arc_evict()
@@ -1998,7 +1999,7 @@ arc_buf_evict(arc_buf_t *buf)
 		mutex_exit(&old_state->mtx);
 	}
 	mutex_exit(hash_lock);
-out:
+
 	VERIFY(buf->b_efunc(buf) == 0);
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;

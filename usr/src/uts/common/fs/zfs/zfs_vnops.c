@@ -2823,6 +2823,13 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 top:
 	off = pp->p_offset;
 	rl = zfs_range_lock(zp, off, PAGESIZE, RL_WRITER);
+	/*
+	 * Can't push pages past end-of-file.
+	 */
+	if (off >= zp->z_phys->zp_size) {
+		zfs_range_unlock(zp, rl);
+		return (EIO);
+	}
 	len = MIN(PAGESIZE, zp->z_phys->zp_size - off);
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -3087,8 +3094,9 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 			klen = plsz;
 			koff = P2ALIGN(off, (u_offset_t)klen);
 		}
-		if (klen > filesz)
-			klen = P2ROUNDUP(filesz, (uint64_t)PAGESIZE);
+		ASSERT(koff <= filesz);
+		if (koff + klen > filesz)
+			klen = P2ROUNDUP(filesz, (uint64_t)PAGESIZE) - koff;
 		pp = pvn_read_kluster(vp, off, seg, addr, &io_off,
 			    &io_len, koff, klen, 0);
 	}

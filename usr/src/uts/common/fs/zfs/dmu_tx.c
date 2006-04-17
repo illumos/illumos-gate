@@ -318,7 +318,7 @@ dmu_tx_hold_write(dmu_tx_t *tx, uint64_t object, uint64_t off, int len)
 {
 	ASSERT(tx->tx_txg == 0);
 	ASSERT(len < DMU_MAX_ACCESS);
-	ASSERT(UINT64_MAX - off >= len - 1);
+	ASSERT(len == 0 || UINT64_MAX - off >= len - 1);
 
 	dmu_tx_hold_object_impl(tx, tx->tx_objset, object, THT_WRITE,
 	    dmu_tx_hold_write_impl, off, len);
