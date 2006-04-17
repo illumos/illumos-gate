@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1568,6 +1567,10 @@ ecc_ue_is_fatal(struct async_flt *ecc)
 /*
  * pci_ecc_classify, called by ecc_handler to classify ecc errors
  * and determine if we should panic or not.
+ *
+ * Note that it is possible yet extremely rare for more than one
+ * primary error bit to be set.  We classify the ecc error based
+ * on the first set bit that is found.
  */
 void
 pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
@@ -1592,8 +1595,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 	/*
 	 * Determine the primary error type.
 	 */
-	switch (err) {
-	case COMMON_ECC_UE_AFSR_E_PIO:
+	if (err & COMMON_ECC_UE_AFSR_E_PIO) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_PIO_UE;
@@ -1606,9 +1608,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 				PCI_ECC_PIO_CE : PCI_ECC_SEC_PIO_CE;
 			return;
 		}
-		break;
-
-	case COMMON_ECC_UE_AFSR_E_DRD:
+	} else if (err & COMMON_ECC_UE_AFSR_E_DRD) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_DRD_UE;
@@ -1621,9 +1621,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 				PCI_ECC_DRD_CE : PCI_ECC_SEC_DRD_CE;
 			return;
 		}
-		break;
-
-	case COMMON_ECC_UE_AFSR_E_DWR:
+	} else if (err & COMMON_ECC_UE_AFSR_E_DWR) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_DWR_UE;
@@ -1636,10 +1634,6 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 				PCI_ECC_DWR_CE : PCI_ECC_SEC_DWR_CE;
 			return;
 		}
-		break;
-
-	default:
-		return;
 	}
 }
 
