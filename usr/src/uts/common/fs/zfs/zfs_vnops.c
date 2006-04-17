@@ -1875,7 +1875,7 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	vap->va_nodeid = zp->z_id;
 	vap->va_nlink = MIN(pzp->zp_links, UINT32_MAX);	/* nlink_t limit! */
 	vap->va_size = pzp->zp_size;
-	vap->va_rdev = pzp->zp_rdev;
+	vap->va_rdev = vp->v_rdev;
 	vap->va_seq = zp->z_seq;
 
 	ZFS_TIME_DECODE(&vap->va_atime, pzp->zp_atime);

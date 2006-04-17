@@ -255,6 +255,7 @@ extern void	zfs_delete_wait_empty(zfsvfs_t *zfsvfs);
 extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);
+extern dev_t	zfs_cmpldev(uint64_t);
 
 extern uint64_t zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
     znode_t *dzp, znode_t *zp, char *name);

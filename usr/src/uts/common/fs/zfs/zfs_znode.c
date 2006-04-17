@@ -32,6 +32,7 @@
 #include <sys/sysmacros.h>
 #include <sys/resource.h>
 #include <sys/mntent.h>
+#include <sys/mkdev.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
@@ -327,6 +328,63 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 }
 
 /*
+ * define a couple of values we need available
+ * for both 64 and 32 bit environments.
+ */
+#ifndef NBITSMINOR64
+#define	NBITSMINOR64	32
+#endif
+#ifndef MAXMAJ64
+#define	MAXMAJ64	0xffffffffUL
+#endif
+#ifndef	MAXMIN64
+#define	MAXMIN64	0xffffffffUL
+#endif
+
+/*
+ * Create special expldev for ZFS private use.
+ * Can't use standard expldev since it doesn't do
+ * what we want.  The standard expldev() takes a
+ * dev32_t in LP64 and expands it to a long dev_t.
+ * We need an interface that takes a dev32_t in ILP32
+ * and expands it to a long dev_t.
+ */
+static uint64_t
+zfs_expldev(dev_t dev)
+{
+#ifndef _LP64
+	major_t major = (major_t)dev >> NBITSMINOR32 & MAXMAJ32;
+	return (((uint64_t)major << NBITSMINOR64) |
+	    ((minor_t)dev & MAXMIN32));
+#else
+	return (dev);
+#endif
+}
+
+/*
+ * Special cmpldev for ZFS private use.
+ * Can't use standard cmpldev since it takes
+ * a long dev_t and compresses it to dev32_t in
+ * LP64.  We need to do a compaction of a long dev_t
+ * to a dev32_t in ILP32.
+ */
+dev_t
+zfs_cmpldev(uint64_t dev)
+{
+#ifndef _LP64
+	minor_t minor = (minor_t)dev & MAXMIN64;
+	major_t major = (major_t)(dev >> NBITSMINOR64) & MAXMAJ64;
+
+	if (major > MAXMAJ32 || minor > MAXMIN32)
+		return (NODEV32);
+
+	return (((dev32_t)major << NBITSMINOR32) | minor);
+#else
+	return (dev);
+#endif
+}
+
+/*
  * Construct a new znode/vnode and intialize.
  *
  * This does not do a call to dmu_set_user() that is
@@ -377,7 +435,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 		break;
 	case VBLK:
 	case VCHR:
-		vp->v_rdev = (dev_t)zp->z_phys->zp_rdev;
+		vp->v_rdev = zfs_cmpldev(zp->z_phys->zp_rdev);
 		/*FALLTHROUGH*/
 	case VFIFO:
 	case VSOCK:
@@ -528,7 +586,7 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, uint64_t *oid, dmu_tx_t *tx, cred_t *cr,
 		flag |= IS_XATTR;
 
 	if (vap->va_type == VBLK || vap->va_type == VCHR) {
-		pzp->zp_rdev = vap->va_rdev;
+		pzp->zp_rdev = zfs_expldev(vap->va_rdev);
 	}
 
 	if (vap->va_type == VDIR) {
