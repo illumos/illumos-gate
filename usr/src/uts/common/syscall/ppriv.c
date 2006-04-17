@@ -266,12 +266,20 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 	}
 
 	/*
-	 * Need net_mac_aware priv to turn either net_mac_aware* flag on
-	 * current cred.
+	 * Setting either the NET_MAC_AWARE or NET_MAC_AWARE_INHERIT
+	 * flags is a restricted operation.
+	 *
+	 * When invoked via the PRIVSYS_SETPFLAGS syscall
+	 * we require that the current cred has the net_mac_aware
+	 * privilege in its effective set.
+	 *
+	 * When called from within the kernel by label-aware
+	 * services such as NFS, we don't require a privilege check.
+	 *
 	 */
 	if ((flag == NET_MAC_AWARE || flag == NET_MAC_AWARE_INHERIT) &&
 	    (val == 1) && use_curcred) {
-		if (secpolicy_net_mac_aware(cr) != 0) {
+		if (secpolicy_net_mac_aware(pcr) != 0) {
 			mutex_exit(&p->p_crlock);
 			crfree(cr);
 			return (EPERM);
