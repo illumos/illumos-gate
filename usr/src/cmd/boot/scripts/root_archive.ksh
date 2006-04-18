@@ -119,6 +119,14 @@ packmedia()
 
 	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
 
+	# copy the install menu to menu.lst so we have a menu
+	# on the install media
+	#
+	if [ -f "${MINIROOT}/boot/grub/install_menu" ] ; then
+		cp ${MINIROOT}/boot/grub/install_menu \
+		    ${MEDIA}/boot/grub/menu.lst
+	fi
+
 	cd "$MEDIA/$RELEASE/Tools/Boot"
 	ln -sf ../../../boot/x86.miniroot
 	ln -sf ../../../boot/multiboot
