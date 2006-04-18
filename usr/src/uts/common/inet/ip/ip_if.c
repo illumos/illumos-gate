@@ -6230,8 +6230,59 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	 * these routes to be added, but create them as interface routes
 	 * since the gateway is an interface address.
 	 */
-	if ((ipif != NULL) && (ipif->ipif_ire_type == IRE_LOOPBACK))
+	if ((ipif != NULL) && (ipif->ipif_ire_type == IRE_LOOPBACK)) {
 		flags &= ~RTF_GATEWAY;
+		if (gw_addr == INADDR_LOOPBACK && dst_addr == INADDR_LOOPBACK &&
+		    mask == IP_HOST_MASK) {
+			ire = ire_ctable_lookup(dst_addr, 0, IRE_LOOPBACK, ipif,
+			    ALL_ZONES, NULL, match_flags);
+			if (ire != NULL) {
+				ire_refrele(ire);
+				if (ipif_refheld)
+					ipif_refrele(ipif);
+				return (EEXIST);
+			}
+			ip1dbg(("ipif_up_done: 0x%p creating IRE 0x%x"
+			    "for 0x%x\n", (void *)ipif,
+			    ipif->ipif_ire_type,
+			    ntohl(ipif->ipif_lcl_addr)));
+			ire = ire_create(
+			    (uchar_t *)&dst_addr,	/* dest address */
+			    (uchar_t *)&mask,		/* mask */
+			    (uchar_t *)&ipif->ipif_src_addr,
+			    NULL,			/* no gateway */
+			    NULL,
+			    &ipif->ipif_mtu,
+			    NULL,
+			    ipif->ipif_rq,		/* recv-from queue */
+			    NULL,			/* no send-to queue */
+			    ipif->ipif_ire_type,	/* LOOPBACK */
+			    NULL,
+			    ipif,
+			    NULL,
+			    0,
+			    0,
+			    0,
+			    (ipif->ipif_flags & IPIF_PRIVATE) ?
+			    RTF_PRIVATE : 0,
+			    &ire_uinfo_null,
+			    NULL,
+			    NULL);
+
+			if (ire == NULL) {
+				if (ipif_refheld)
+					ipif_refrele(ipif);
+				return (ENOMEM);
+			}
+			error = ire_add(&ire, q, mp, func);
+			if (error == 0)
+				goto save_ire;
+			if (ipif_refheld)
+				ipif_refrele(ipif);
+			return (error);
+
+		}
+	}
 
 	/*
 	 * Traditionally, interface routes are ones where RTF_GATEWAY isn't set

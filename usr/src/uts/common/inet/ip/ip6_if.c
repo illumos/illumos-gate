@@ -376,8 +376,60 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 * these routes to be added, but create them as interface routes
 	 * since the gateway is an interface address.
 	 */
-	if ((ipif != NULL) && (ipif->ipif_ire_type == IRE_LOOPBACK))
+	if ((ipif != NULL) && (ipif->ipif_ire_type == IRE_LOOPBACK)) {
 		flags &= ~RTF_GATEWAY;
+		if (IN6_ARE_ADDR_EQUAL(gw_addr, &ipv6_loopback) &&
+		    IN6_ARE_ADDR_EQUAL(dst_addr, &ipv6_loopback) &&
+		    IN6_ARE_ADDR_EQUAL(mask, &ipv6_all_ones)) {
+			ire = ire_ctable_lookup_v6(dst_addr, 0, IRE_LOOPBACK,
+			    ipif, ALL_ZONES, NULL, match_flags);
+			if (ire != NULL) {
+				ire_refrele(ire);
+				if (ipif_refheld)
+					ipif_refrele(ipif);
+				return (EEXIST);
+			}
+			ip1dbg(("ipif_up_done: 0x%p creating IRE 0x%x"
+			    "for 0x%x\n", (void *)ipif,
+			    ipif->ipif_ire_type,
+			    ntohl(ipif->ipif_lcl_addr)));
+			ire = ire_create_v6(
+			    dst_addr,
+			    mask,
+			    &ipif->ipif_v6src_addr,
+			    NULL,
+			    &ipif->ipif_mtu,
+			    NULL,
+			    NULL,
+			    NULL,
+			    ipif->ipif_net_type,
+			    ipif->ipif_resolver_mp,
+			    ipif,
+			    NULL,
+			    0,
+			    0,
+			    flags,
+			    &ire_uinfo_null,
+			    NULL,
+			    NULL);
+			if (ire == NULL) {
+				if (ipif_refheld)
+					ipif_refrele(ipif);
+				return (ENOMEM);
+			}
+			error = ire_add(&ire, q, mp, func);
+			if (error == 0)
+				goto save_ire;
+			/*
+			 * In the result of failure, ire_add() will have already
+			 * deleted the ire in question, so there is no need to
+			 * do that here.
+			 */
+			if (ipif_refheld)
+				ipif_refrele(ipif);
+			return (error);
+		}
+	}
 
 	/*
 	 * Traditionally, interface routes are ones where RTF_GATEWAY isn't set
