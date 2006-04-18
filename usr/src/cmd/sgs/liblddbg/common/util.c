@@ -313,6 +313,56 @@ Dbg_util_collect(Rt_map *lmp, int ndx, int flag)
 	dbg_print(lml, MSG_INTL(MSG_UTL_COLLECT), ndx, NAME(lmp), str);
 }
 
+static const Msg	tags[] = {
+	MSG_CI_NULL,		/* MSG_ORIG(MSG_CI_NULL) */
+	MSG_CI_VERSION,		/* MSG_ORIG(MSG_CI_VERSION) */
+	MSG_CI_ATEXIT,		/* MSG_ORIG(MSG_CI_ATEXIT) */
+	MSG_CI_LCMESSAGES,	/* MSG_ORIG(MSG_CI_LCMESSAGES) */
+	MSG_CI_BIND_GUARD,	/* MSG_ORIG(MSG_CI_BIND_GUARD) */
+	MSG_CI_BIND_CLEAR,	/* MSG_ORIG(MSG_CI_BIND_CLEAR) */
+	MSG_CI_THR_SELF,	/* MSG_ORIG(MSG_CI_THR_SELF) */
+	MSG_CI_TLS_MODADD,	/* MSG_ORIG(MSG_CI_TLS_MODADD) */
+	MSG_CI_TLS_MODREM,	/* MSG_ORIG(MSG_CI_TLS_MODREM) */
+	MSG_CI_TLS_STATMOD,	/* MSG_ORIG(MSG_CI_TLS_STATMOD) */
+	MSG_CI_THRINIT		/* MSG_ORIG(MSG_CI_THRINIT) */
+};
+
+void
+Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
+{
+	const char	*str;
+	static char	string[CONV_INV_STRSIZE];
+
+	if (DBG_NOTDETAIL())
+		return;
+
+	if (tag < CI_MAX)
+		str = MSG_ORIG(tags[tag]);
+	else
+		str = conv_invalid_val(string, CONV_INV_STRSIZE, tag, 0);
+
+	dbg_print(LIST(lmp), MSG_INTL(MSG_UTL_LCINTERFACE), NAME(lmp), str,
+	    EC_NATPTR(val));
+}
+
+void
+Dbg_unused_lcinterface(Rt_map *nlmp, Rt_map *olmp, int tag)
+{
+	const char	*str;
+	static char	string[CONV_INV_STRSIZE];
+
+	if (DBG_NOTCLASS(DBG_C_UNUSED))
+		return;
+
+	if (tag < CI_MAX)
+		str = MSG_ORIG(tags[tag]);
+	else
+		str = conv_invalid_val(string, CONV_INV_STRSIZE, tag, 0);
+
+	dbg_print(LIST(nlmp), MSG_INTL(MSG_USD_LCINTERFACE), NAME(nlmp), str,
+	    NAME(olmp));
+}
+
 /*
  * Generic new line generator.  To prevent multiple newlines from being
  * generated, a flag is maintained in the global debug descriptor.  This flag

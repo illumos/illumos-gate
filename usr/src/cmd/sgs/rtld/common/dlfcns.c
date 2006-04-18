@@ -605,45 +605,6 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	    (path ? path : MSG_ORIG(MSG_STR_ZERO)), mode));
 
 	/*
-	 * Check for magic link-map list values:
-	 *
-	 *  LM_ID_BASE:		Operate on the PRIMARY (executables) link map
-	 *  LM_ID_LDSO:		Operation on ld.so.1's link map
-	 *  LM_ID_NEWLM: 	Create a new link-map.
-	 */
-	if (lml == (Lm_list *)LM_ID_NEWLM) {
-		if ((lml = calloc(sizeof (Lm_list), 1)) == 0)
-			return (0);
-
-		/*
-		 * Establish the new link-map flags from the callers and those
-		 * explicitly provided.
-		 */
-		lml->lm_tflags = LIST(clmp)->lm_tflags;
-		if (flags & FLG_RT_AUDIT) {
-			/*
-			 * Unset any auditing flags - an auditor shouldn't be
-			 * audited.  Insure all audit dependencies are loaded.
-			 */
-			lml->lm_tflags &= ~LML_TFLG_AUD_MASK;
-			lml->lm_tflags |=
-			    (LML_TFLG_NOLAZYLD | LML_TFLG_LOADFLTR);
-			lml->lm_flags |= LML_FLG_NOAUDIT;
-		}
-
-		if ((list_append(&dynlm_list, lml) == 0) ||
-		    (newlmid(lml) == 0)) {
-			free(lml);
-			return (0);
-		}
-	} else if ((uintptr_t)lml < LM_ID_NUM) {
-		if ((uintptr_t)lml == LM_ID_BASE)
-			lml = &lml_main;
-		else if ((uintptr_t)lml == LM_ID_LDSO)
-			lml = &lml_rtld;
-	}
-
-	/*
 	 * If the path specified is null then we're operating on global
 	 * objects.  Associate a dummy handle with the link-map list.
 	 */
@@ -782,9 +743,51 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 {
 	Rt_map	*dlmp = 0;
 	Grp_hdl	*ghp;
+	int	objcnt;
 
 	/*
-	 * Determine the link-map that has just been loaded.
+	 * Check for magic link-map list values:
+	 *
+	 *  LM_ID_BASE:		Operate on the PRIMARY (executables) link map
+	 *  LM_ID_LDSO:		Operation on ld.so.1's link map
+	 *  LM_ID_NEWLM: 	Create a new link-map.
+	 */
+	if (lml == (Lm_list *)LM_ID_NEWLM) {
+		if ((lml = calloc(sizeof (Lm_list), 1)) == 0)
+			return (0);
+
+		/*
+		 * Establish the new link-map flags from the callers and those
+		 * explicitly provided.
+		 */
+		lml->lm_tflags = LIST(clmp)->lm_tflags;
+		if (flags & FLG_RT_AUDIT) {
+			/*
+			 * Unset any auditing flags - an auditor shouldn't be
+			 * audited.  Insure all audit dependencies are loaded.
+			 */
+			lml->lm_tflags &= ~LML_TFLG_AUD_MASK;
+			lml->lm_tflags |=
+			    (LML_TFLG_NOLAZYLD | LML_TFLG_LOADFLTR);
+			lml->lm_flags |= LML_FLG_NOAUDIT;
+		}
+
+		if ((list_append(&dynlm_list, lml) == 0) ||
+		    (newlmid(lml) == 0)) {
+			free(lml);
+			return (0);
+		}
+	} else if ((uintptr_t)lml < LM_ID_NUM) {
+		if ((uintptr_t)lml == LM_ID_BASE)
+			lml = &lml_main;
+		else if ((uintptr_t)lml == LM_ID_LDSO)
+			lml = &lml_rtld;
+	}
+
+	objcnt = lml->lm_obj;
+
+	/*
+	 * Open the required object on the associated link-map list.
 	 */
 	if ((ghp = dlmopen_core(lml, path, mode, clmp, flags,
 	    (orig | PN_SER_DLOPEN))) != 0) {
@@ -802,7 +805,7 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	 * trigger used() processing on return from a dlopen().
 	 */
 	if (loaded && dlmp)
-		*loaded = LIST(dlmp)->lm_init;
+		*loaded = lml->lm_obj - objcnt;
 
 	load_completion(dlmp, clmp);
 	return (ghp);
@@ -1236,7 +1239,6 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	}
 
 	load_completion(llmp, clmp);
-
 	return (error);
 }
 

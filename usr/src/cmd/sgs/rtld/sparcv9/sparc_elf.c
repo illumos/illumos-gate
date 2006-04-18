@@ -328,60 +328,58 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
 
 /*
  * Relocate the instructions given by the VAL64_TO_G1 macro above.
+ * The arguments parallel those of do_reloc().
  *
  * entry:
+ *	off - Address of 1st instruction in sequence.
+ *	value - Value being relocated (addend)
+ *	sym - Name of value being relocated.
  *	lml - link map list
- *	dyndata - Value being relocated (addend)
- *	code_base - Address of 1st instruction in sequence.
  *
  * exit:
  *	Returns TRUE for success, FALSE for failure.
  */
 static int
-reloc_val64_to_g1(Lm_list *lml, Addr *dyndata, Byte *code_base)
+reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 {
-	Xword	symvalue;
+	Xword	tmp_value;
 
 	/*
 	 * relocating:
-	 *	sethi	%hh(dyndata), %g5
+	 *	sethi	%hh(value), %g5
 	 */
-	symvalue = (Xword)dyndata;
-	if (do_reloc(R_SPARC_HH22, code_base,
-	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	tmp_value = (Xword)value;
+	if (do_reloc(R_SPARC_HH22, off, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
 
 	/*
 	 * relocating:
-	 *	or	%g5, %hm(dyndata), %g5
+	 *	or	%g5, %hm(value), %g5
 	 */
-	symvalue = (Xword)dyndata;
-	if (do_reloc(R_SPARC_HM10, code_base + 4,
-	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	tmp_value = (Xword)value;
+	if (do_reloc(R_SPARC_HM10, off + 4, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
 
 	/*
 	 * relocating:
-	 *	sethi	%lm(dyndata), %g1
+	 *	sethi	%lm(value), %g1
 	 */
-	symvalue = (Xword)dyndata;
-	if (do_reloc(R_SPARC_LM22, code_base + 12,
-	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	tmp_value = (Xword)value;
+	if (do_reloc(R_SPARC_LM22, off + 12, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
 
 	/*
 	 * relocating:
-	 *	or	%g1, %lo(dyndata), %g1
+	 *	or	%g1, %lo(value), %g1
 	 */
-	symvalue = (Xword)dyndata;
-	if (do_reloc(R_SPARC_LO10, code_base + 16,
-	    &symvalue, MSG_ORIG(MSG_SYM_LADYNDATA),
+	tmp_value = (Xword)value;
+	if (do_reloc(R_SPARC_LO10, off + 16, &tmp_value, sym,
 	    MSG_ORIG(MSG_SPECFIL_DYNPLT), lml) == 0) {
 		return (0);
 	}
@@ -434,10 +432,11 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		 *	VAL64_TO_G1(dyndata)
 		 *	VAL64_TO_G1(&elf_plt_trace)
 		 */
-		if (!(reloc_val64_to_g1(lml, dyndata,
-					(Byte *) (dyn_plt + 0x14)) &&
-			reloc_val64_to_g1(lml, (Addr *)&elf_plt_trace,
-					(Byte *) (dyn_plt + 0x30)))) {
+		if (!(reloc_val64_to_g1((Byte *) (dyn_plt + 0x14), dyndata,
+					MSG_ORIG(MSG_SYM_LADYNDATA), lml) &&
+			reloc_val64_to_g1((Byte *) (dyn_plt + 0x30),
+					(Addr *)&elf_plt_trace,
+					MSG_ORIG(MSG_SYM_ELFPLTTRACE), lml))) {
 			*fail = 1;
 			return (0);
 		}

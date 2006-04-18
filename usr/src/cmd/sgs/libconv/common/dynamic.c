@@ -327,6 +327,12 @@ conv_bnd_type(uint_t flags)
 	return ((const char *)string);
 }
 
+/*
+ * Note, conv_bnd_obj() is called with either:
+ *	LML_FLG_OBJADDED (possibly with LML_FLG_OBJREEVAL added), or
+ *	LML_FLG_OBJDELETED, or
+ *	LML_FLG_ATEXIT.
+ */
 #define	BINDOSZ	MSG_GBL_OSQBRKT_SIZE + \
 		MSG_BND_ADDED_SIZE + \
 		MSG_BND_REEVAL_SIZE + \
@@ -344,8 +350,9 @@ conv_bnd_obj(uint_t flags)
 		{ 0,			0 }
 	};
 
-	if (flags == 0)
-		return (MSG_ORIG(MSG_STR_EMPTY));
+	if ((flags & (LML_FLG_OBJADDED | LML_FLG_OBJREEVAL |
+	    LML_FLG_OBJDELETED | LML_FLG_ATEXIT)) == 0)
+		return (MSG_ORIG(MSG_BND_REVISIT));
 
 	/*
 	 * Note, we're not worried about unknown flags for this family, only

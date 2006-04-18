@@ -30,18 +30,6 @@
 #include	"libld.h"
 
 void
-Dbg_unused_rtldinfo(Rt_map *lmp)
-{
-	Lm_list	*lml = LIST(lmp);
-
-	if (DBG_NOTCLASS(DBG_C_UNUSED))
-		return;
-
-	dbg_print(lml, MSG_INTL(MSG_USD_RTLDINFO), NAME(lmp),
-	    NAME(lml->lm_info_lmp));
-}
-
-void
 Dbg_unused_unref(Rt_map *lmp, const char *depend)
 {
 	if (DBG_NOTCLASS(DBG_C_UNUSED))

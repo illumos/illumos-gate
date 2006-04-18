@@ -2075,9 +2075,9 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 	 * dynamic structure.
 	 */
 	if (ld) {
-		uint_t	dyncnt = 0;
-		Xword	pltpadsz = 0;
-		void	*rtldinfo;
+		uint_t		dyncnt = 0;
+		Xword		pltpadsz = 0;
+		Rti_desc	*rti;
 
 		/* CSTYLED */
 		for ( ; ld->d_tag != DT_NULL; ++ld, dyncnt++) {
@@ -2322,29 +2322,22 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				pltpadsz = ld->d_un.d_val;
 				break;
 			case DT_SUNW_RTLDINF:
-				if ((lml->lm_info_lmp != 0) &&
-				    (lml->lm_info_lmp != lmp)) {
-					DBG_CALL(Dbg_unused_rtldinfo(lmp));
-					break;
-				}
-				lml->lm_info_lmp = lmp;
-				rtldinfo = (void *)(ld->d_un.d_ptr + base);
-
 				/*
-				 * We maintain a list of DT_SUNW_RTLDINFO
-				 * structures for a given object.  This permits
-				 * the RTLDINFO structures to be grouped
-				 * functionly inside of a shared object.
-				 *
-				 * For example, we could have one for
-				 * thread_init, and another for atexit
-				 * reservations.
+				 * Maintain a list of RTLDINFO structures.
+				 * Typically, libc is the only supplier, and
+				 * only one structure is provided.  However,
+				 * multiple suppliers and multiple structures
+				 * are supported.  For example, one structure
+				 * may provide thread_init, and another
+				 * structure may provide atexit reservations.
 				 */
-				if (alist_append(&lml->lm_rtldinfo, &rtldinfo,
-				    sizeof (void *), AL_CNT_RTLDINFO) == 0) {
+				if ((rti = alist_append(&lml->lm_rti, 0,
+				    sizeof (Rti_desc), AL_CNT_RTLDINFO)) == 0) {
 					remove_so(0, lmp);
 					return (0);
 				}
+				rti->rti_lmp = lmp;
+				rti->rti_info = (void *)(ld->d_un.d_ptr + base);
 				break;
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
@@ -2604,14 +2597,15 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 			if (pptr->p_align > align)
 				align = pptr->p_align;
 
-		} else if (pptr->p_type == PT_DYNAMIC)
+		} else if (pptr->p_type == PT_DYNAMIC) {
 			mld = (Dyn *)(pptr->p_vaddr);
-		else if (pptr->p_type == PT_TLS)
+		} else if ((pptr->p_type == PT_TLS) && pptr->p_memsz) {
 			tlph = pptr;
-		else if (pptr->p_type == PT_SUNWCAP)
+		} else if (pptr->p_type == PT_SUNWCAP) {
 			cap = (Cap *)(pptr->p_vaddr);
-		else if (pptr->p_type == PT_SUNW_UNWIND)
+		} else if (pptr->p_type == PT_SUNW_UNWIND) {
 			unwindph = pptr;
+		}
 	}
 
 #if defined(MAP_ALIGN)
@@ -2770,6 +2764,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	if (tlph) {
 		PTTLS(lmp) = phdr + (tlph - phdr0);
 		tls_assign_soffset(lmp);
+		lml->lm_tls++;
 	}
 
 	if (unwindph)

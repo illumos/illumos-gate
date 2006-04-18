@@ -38,6 +38,7 @@ OBJS=		$(BLTOBJ) $(COMOBJ)
 
 MAPFILE=	../common/mapfile-vers
 
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
 LLDFLAGS =	'-R$$ORIGIN/../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../lib/$(MACH64)'
 LDFLAGS +=	$(VERSREF) $(USE_PROTO) -M$(MAPFILE) $(LLDFLAGS)

@@ -309,6 +309,7 @@ typedef struct {
 #define	RT_FL2_FTL2WARN	0x00000080	/* convert fatal to warning messages */
 #define	RT_FL2_BINDNOW	0x00000100	/* LD_BIND_NOW in effect */
 #define	RT_FL2_BINDLAZY	0x00000200	/* disable RTLD_NOW (and LD_BIND_NOW) */
+#define	RT_FL2_PLMSETUP	0x00000400	/* primary link-map set up complete */
 
 /*
  * Information flags for env_info.
@@ -320,7 +321,15 @@ typedef struct {
 					/*	from configuration file */
 
 /*
- * Binding flags for the bindguard routines
+ * RTLDINFO descriptor.
+ */
+typedef struct {
+	Rt_map		*rti_lmp;	/* RTLDINFO provider */
+	Lc_interface	*rti_info;	/* RTLDINFO data */
+} Rti_desc;
+
+/*
+ * Binding flags for the bindguard routines.
  */
 #define	THR_FLG_RTLD	0x00000001	/* rtldlock bind_guard() flag */
 #define	THR_FLG_MASK	THR_FLG_RTLD	/* mask for all THR_FLG flags */
@@ -398,6 +407,8 @@ typedef struct {
 /*
  * Data declarations.
  */
+extern Lc_desc		glcs[];		/* global external interfaces */
+
 extern Rt_lock		rtldlock;	/* rtld lock */
 
 extern List		dynlm_list;	/* dynamic list of link-maps */
@@ -478,8 +489,6 @@ extern Dl_argsinfo	argsinfo;	/* process argument, environment and */
 
 extern const char	*err_strs[];	/* diagnostic error string headers */
 extern const char	*nosym_str;	/* MSG_GEN_NOSYM message cache */
-
-extern void		(*thrinit)();	/* thread initialization */
 
 extern ulong_t		hwcap;		/* hardware capabilities */
 extern ulong_t		sfcap;		/* software capabilities */
@@ -601,8 +610,10 @@ extern Rt_cond		*rt_cond_create(void);
 extern int		rt_cond_wait(Rt_cond *, Rt_lock *);
 extern int		rt_bind_guard(int);
 extern int		rt_bind_clear(int);
+extern int		rt_get_extern(Lm_list *, Rt_map *);
 extern int		rt_mutex_lock(Rt_lock *);
 extern int		rt_mutex_unlock(Rt_lock *);
+extern void		rt_thr_init(Lm_list *);
 extern thread_t		rt_thr_self(void);
 extern void		rtld_db_dlactivity(Lm_list *);
 extern void		rtld_db_preinit(Lm_list *);
@@ -617,9 +628,8 @@ extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    char **, int, uid_t, uid_t, gid_t, gid_t, void *,
 			    int, uint_t);
 extern void		tls_assign_soffset(Rt_map *);
-extern void		tls_setroutines(Lm_list *, void *, void *, void *);
-extern void		tls_modactivity(Rt_map *, uint_t);
-extern int		tls_report_modules();
+extern void		tls_modaddrem(Rt_map *, uint_t);
+extern int		tls_statmod(Lm_list *, Rt_map *);
 extern Rt_map		**tsort(Rt_map *, int, int);
 extern void		unused(Lm_list *);
 extern int		update_mode(Rt_map *, int, int);

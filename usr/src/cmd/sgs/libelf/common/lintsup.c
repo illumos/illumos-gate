@@ -32,3 +32,4 @@
 #include <malloc.h>
 #include <link.h>
 #include <sgs.h>
+#include <_libelf.h>

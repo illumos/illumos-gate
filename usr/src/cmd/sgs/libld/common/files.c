@@ -353,7 +353,7 @@ process_cap(const char *name, Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 {
 	Cap	*cdata;
 
-	Dbg_cap_sec_title(ofl);
+	DBG_CALL(Dbg_cap_sec_title(ofl));
 
 	for (cdata = (Cap *)cisp->is_indata->d_buf;
 	    cdata->c_tag != CA_SUNW_NULL; cdata++) {

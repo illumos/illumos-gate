@@ -75,8 +75,9 @@ ELFCAP=		$(SRC)/common/elfcap
 DLLIB =		$(VAR_DL_LIB)
 package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
-CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/uts/common/krtld \
-		    -I$(ELFCAP) $(VAR_LIBLD_CPPFLAGS)
+CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
+		    -I$(SRCBASE)/uts/common/krtld -I$(ELFCAP) \
+		    $(VAR_LIBLD_CPPFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc
 

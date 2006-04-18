@@ -60,7 +60,6 @@ SUNWprivate_1.2 {
 		_dlsym;
 		 dlsym;
 
-		_ld_concurrency;	# Provides libthread initialization
 		_ld_libc;		# provides libc initialization
 
 		_elf_rtbndr;		# dbx expects to find these

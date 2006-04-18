@@ -1,0 +1,527 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Implementation of all external interfaces between ld.so.1 and libc.
+ *
+ * This file started as a set of routines that provided synchronization and
+ * locking operations using calls to libthread.  libthread has merged with libc,
+ * and things have gotten a little simpler.  This file continues to establish
+ * and redirect various events within ld.so.1 to interfaces within libc.
+ *
+ * Until libc is loaded and relocated, any external interfaces are captured
+ * locally.  Each link-map list maintains its own set of external vectors, as
+ * each link-map list typically provides its own libc.  Although this per-link-
+ * map list vectoring provides a degree of flexibility, there is a protocol
+ * expected when calling various libc interfaces.
+ *
+ * i.	Any new alternative link-map list should call CI_THRINIT, and then call
+ *	CI_TLS_MODADD to register any TLS for each object of that link-map list
+ *	(this item is labeled i. as auditors can be the first objects loaded,
+ *	and they exist on their own lik-map list).
+ *
+ * ii.	For the primary link-map list, CI_TLS_STATMOD must be called first to
+ *	register any static TLS.  This routine is called regardless of there
+ *	being any TLS, as this routine also establishes the link-map list as the
+ *	primary list and fixes the association of uberdata).  CI_THRINIT should
+ *	then be called.
+ *
+ * iii.	Any objects added to an existing link-map list (primary or alternative)
+ *	should call CI_TLS_MODADD to register any additional TLS.
+ *
+ * These events are established by:
+ *
+ * i.	Typically, libc is loaded as part of the primary dependencies of any
+ *	link-map list (since the Unified Process Model (UPM), libc can't be
+ *	lazily loaded).  To minimize the possibility of loading and registering
+ *	objects, and then tearing them down (because of a relocation error),
+ *	external vectors are established as part of load_completion().  This
+ *	routine is called on completion of any operation that can cause objects
+ *	to be loaded.  This point of control insures the objects have been fully
+ *	analyzed and relocated, and moved to their controlling link-map list.
+ *	The external vectors are established prior to any .inits being fired.
+ *
+ * ii.	Calls to CI_THRINIT, and CI_TLS_MODADD also occur as part of
+ *	load_completion().  CI_THRINIT is only called once for each link-map
+ *	control list.
+ *
+ * iii.	Calls to CI_TLS_STATMOD, and CI_THRINIT occur for the primary link-map
+ *	list in the final stages of setup().
+ *
+ * The interfaces provide by libc can be divided into two families.  The first
+ * family consists of those interfaces that should be called from the link-map
+ * list.  It's possible that these interfaces convey state concerning the
+ * link-map list they are part of:
+ *
+ *	CI_ATEXIT
+ *	CI TLS_MODADD
+ *	CI_TLS_MODREM
+ *	CI_TLS_STATMOD
+ *	CI_THRINIT
+ *
+ * The second family are global in nature, that is, the link-map list from
+ * which they are called provides no state information.  In fact, for
+ * CI_BIND_GUARD, the calling link-map isn't even known.  The link-map can only
+ * be deduced after ld.so.1's global lock has been obtained.  Therefore, the
+ * following interfaces are also maintained as global:
+ *
+ *	CI_LCMESSAGES
+ *	CI_BIND_GUARD
+ *	CI_BIND_CLEAR
+ *	CI_THR_SELF
+ *
+ * Note, it is possible that these global interfaces are obtained from an
+ * alternative link-map list that gets torn down because of a processing
+ * failure (unlikely, because the link-map list components must be analyzed
+ * and relocated prior to load_completion(), but perhaps the tear down is still
+ * a possibility).  Thus the global interfaces may have to be replaced.  Once
+ * the interfaces have been obtained from the primary link-map, they can
+ * remain fixed, as the primary link-map isn't going to go anywhere.
+ *
+ * The last wrinkle in the puzzle is what happens if an alternative link-map
+ * is loaded with no libc dependency?  In this case, the alternative objects
+ * can not call CI_THRINIT, can not be allowed to use TLS, and will not receive
+ * any atexit processing.
+ *
+ * The history of these external interfaces is defined by their version:
+ *
+ * TI_VERSION == 1
+ *	Under this model libthread provided rw_rwlock/rw_unlock, through which
+ *	all rt_mutex_lock/rt_mutex_unlock calls were vectored.
+ *	Under libc/libthread these interfaces provided _sigon/_sigoff (unlike
+ *	lwp/libthread that provided signal blocking via bind_guard/bind_clear).
+ *
+ * TI_VERSION == 2
+ *	Under this model only libthreads bind_guard/bind_clear and thr_self
+ *	interfaces were used.  Both libthreads blocked signals under the
+ *	bind_guard/bind_clear interfaces.   Lower level locking is derived
+ *	from internally bound _lwp_ interfaces.  This removes recursive
+ *	problems encountered when obtaining locking interfaces from libthread.
+ *	The use of mutexes over reader/writer locks also enables the use of
+ *	condition variables for controlling thread concurrency (allows access
+ *	to objects only after their .init has completed).
+ *
+ * NOTE, the TI_VERSION indicated the ti_interface version number, where the
+ * ti_interface was a large vector of functions passed to both libc (to override
+ * the thread stub interfaces) and ld.so.1.  ld.so.1 used only a small subset of
+ * these interfaces.
+ *
+ * CI_VERSION == 1
+ *	Introduced with CI_VERSION & CI_ATEXIT
+ *
+ * CI_VERSION == 2 (Solaris 8 update 2).
+ *	Added support for CI_LCMESSAGES
+ *
+ * CI_VERSION == 3 (Solaris 9).
+ *	Added the following versions to the CI table:
+ *
+ *		CI_BIND_GUARD, CI_BIND_CLEAR, CI_THR_SELF
+ *		CI_TLS_MODADD, CI_TLS_MOD_REMOVE, CI_TLS_STATMOD
+ *
+ *	This version introduced the DT_SUNW_RTLDINFO structure as a mechanism
+ *	to handshake with ld.so.1.
+ *
+ * CI_VERSION == 4 (Solaris 10).
+ *	Added the CI_THRINIT handshake as part of the libc/libthread unified
+ *	process model.  libc now initializes the current thread pointer from
+ *	this interface (and no longer relies on the INITFIRST flag - which
+ *	others have started to camp out on).
+ *
+ * Release summary:
+ *
+ *	Solaris 8	CI_ATEXIT via _ld_libc()
+ *			TI_* via _ld_concurrency()
+ *
+ *	Solaris 9	CI_ATEXIT and CI_LCMESSAGES via _ld_libc()
+ *			CI_* via RTLDINFO and _ld_libc()  - new libthread
+ *			TI_* via _ld_concurrency()  - old libthread
+ *
+ *	Solaris 10	CI_ATEXIT and CI_LCMESSAGES via _ld_libc()
+ *			CI_* via RTLDINFO and _ld_libc()  - new libthread
+ */
+#include	"_synonyms.h"
+
+#include	<sys/debug.h>
+#include	<synch.h>
+#include	<signal.h>
+#include	<thread.h>
+#include	<synch.h>
+#include	<strings.h>
+#include	<stdio.h>
+#include	<debug.h>
+#include	<libc_int.h>
+#include	"_elf.h"
+#include	"_rtld.h"
+
+/*
+ * This interface provides the unified process model communication between
+ * ld.so.1 and libc.  This interface is supplied through RTLDINFO.
+ */
+void
+get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
+{
+	int		tag, threaded = 0;
+	Lm_list		*lml;
+	Lc_desc		*lcp;
+
+	if ((lmp == 0) || (funcs == 0))
+		return;
+
+	lml = LIST(lmp);
+	lcp = &lml->lm_lcs[0];
+
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+
+	for (tag = funcs->ci_tag; tag; tag = (++funcs)->ci_tag) {
+		char	*gptr;
+		char	*lptr = funcs->ci_un.ci_ptr;
+
+		DBG_CALL(Dbg_util_lcinterface(lmp, tag, lptr));
+
+		if (tag >= CI_MAX)
+			continue;
+
+		/*
+		 * Maintain all interfaces on a per-link-map basis.  Note, for
+		 * most interfaces, only the first interface is used for any
+		 * link-map list.  This prevents accidents with developers who
+		 * manage to load two different versions of libc.
+		 */
+		if ((lcp[tag].lc_lmp) &&
+		    (tag != CI_LCMESSAGES) && (tag != CI_VERSION)) {
+			DBG_CALL(Dbg_unused_lcinterface(lmp,
+			    lcp[tag].lc_lmp, tag));
+			continue;
+		}
+
+		lcp[tag].lc_un.lc_ptr = lptr;
+		lcp[tag].lc_lmp = lmp;
+
+		gptr = glcs[tag].lc_un.lc_ptr;
+
+		/*
+		 * Process any interfaces that must be maintained on a global
+		 * basis.
+		 */
+		switch (tag) {
+		case CI_ATEXIT:
+			break;
+
+		case CI_LCMESSAGES:
+			/*
+			 * At startup, ld.so.1 can establish a locale from one
+			 * of the locale family of environment variables (see
+			 * ld_str_env() and readenv_user()).  During process
+			 * execution the locale can also be changed by the user.
+			 * This interface is called from libc should the locale
+			 * be modified.  Presently, only one global locale is
+			 * maintained for all link-map lists, and only objects
+			 * on the primrary link-map may change this locale.
+			 */
+			if ((lml->lm_flags & LML_FLG_BASELM) &&
+			    ((gptr == 0) || (strcmp(gptr, lptr) != 0))) {
+				/*
+				 * If we've obtained a message locale (typically
+				 * supplied via libc's setlocale()), then
+				 * register the locale for use in dgettext() so
+				 * as to reestablish the locale for ld.so.1's
+				 * messages.
+				 */
+				if (gptr) {
+					free((void *)gptr);
+					rtld_flags |= RT_FL_NEWLOCALE;
+				}
+				glcs[tag].lc_un.lc_ptr = strdup(lptr);
+
+				/*
+				 * Clear any cached messages.
+				 */
+				err_strs[ERR_NONE] = 0;
+				err_strs[ERR_WARNING] = 0;
+				err_strs[ERR_FATAL] = 0;
+				err_strs[ERR_ELF] = 0;
+
+				nosym_str = 0;
+			}
+			break;
+
+		case CI_BIND_GUARD:
+		case CI_BIND_CLEAR:
+		case CI_THR_SELF:
+			/*
+			 * If the global vector is unset, or this is the primary
+			 * link-map, set the global vector.
+			 */
+			if ((gptr == 0) || (lml->lm_flags & LML_FLG_BASELM))
+				glcs[tag].lc_un.lc_ptr = lptr;
+
+			/* FALLTHROUGH */
+
+		case CI_TLS_MODADD:
+		case CI_TLS_MODREM:
+		case CI_TLS_STATMOD:
+		case CI_THRINIT:
+			threaded++;
+			break;
+
+		case CI_VERSION:
+			if ((rtld_flags2 & RT_FL2_RTLDSEEN) == 0) {
+				rtld_flags2 |= RT_FL2_RTLDSEEN;
+
+				if (funcs->ci_un.ci_val >= CI_V_FOUR) {
+					Listnode	*lnp;
+					Lm_list		*lml2;
+
+					rtld_flags2 |= RT_FL2_UNIFPROC;
+
+					/*
+					 * We might have seen auditor which is
+					 * not dependent on libc.  Such an
+					 * auditor's link map list has
+					 * LML_FLG_HOLDLOCK set.  This lock
+					 * needs to be dropped.  Refer to
+					 * audit_setup() in audit.c.
+					 */
+					if ((rtld_flags2 & RT_FL2_HASAUDIT) ==
+					    0)
+					break;
+
+					/*
+					 * Yes, we did. Take care of them.
+					 */
+					for (LIST_TRAVERSE(&dynlm_list, lnp,
+					    lml2)) {
+						Rt_map *map =
+						    (Rt_map *)lml2->lm_head;
+
+						if (FLAGS(map) & FLG_RT_AUDIT) {
+							lml2->lm_flags &=
+							    ~LML_FLG_HOLDLOCK;
+						}
+					}
+				}
+			}
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	if (threaded == 0)
+		return;
+
+	/*
+	 * If a version of libc gives us only a subset of the TLS interfaces -
+	 * it's confused and we discard the whole lot.
+	 */
+	if ((lcp[CI_TLS_MODADD].lc_un.lc_func &&
+	    lcp[CI_TLS_MODREM].lc_un.lc_func &&
+	    lcp[CI_TLS_STATMOD].lc_un.lc_func) == 0) {
+		lcp[CI_TLS_MODADD].lc_un.lc_func = 0;
+		lcp[CI_TLS_MODREM].lc_un.lc_func = 0;
+		lcp[CI_TLS_STATMOD].lc_un.lc_func = 0;
+	}
+
+	/*
+	 * Indicate that we're now thread capable, and enable concurrency if
+	 * requested.
+	 */
+	if ((rtld_flags & RT_FL_NOCONCUR) == 0)
+		rtld_flags |= RT_FL_CONCUR;
+	if ((lml->lm_flags & LML_FLG_RTLDLM) == 0)
+		rtld_flags |= RT_FL_THREADS;
+}
+
+/*
+ * At this point we know we have a set of objects that have been fully analyzed
+ * and relocated.  Prior to the next major step of running .init sections (ie.
+ * running user code), retrieve any RTLDINFO interfaces.
+ */
+int
+rt_get_extern(Lm_list *lml, Rt_map *lmp)
+{
+	if (lml->lm_rti) {
+		Aliste		off;
+		Rti_desc	*rti;
+
+		for (ALIST_TRAVERSE(lml->lm_rti, off, rti))
+			get_lcinterface(rti->rti_lmp, rti->rti_info);
+
+		free(lml->lm_rti);
+		lml->lm_rti = 0;
+	}
+
+	/*
+	 * Perform some sanity checks.  If we have TLS requirements we better
+	 * have the associated external interfaces.
+	 */
+	if (lml->lm_tls && (lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func == 0)) {
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ERR_TLS_NOTLS),
+		    NAME(lmp));
+		return (0);
+	}
+	return (1);
+}
+
+static int	bindmask = 0;
+
+int
+rt_bind_guard(int bindflag)
+{
+	int	(*fptr)(int);
+
+	if ((fptr = glcs[CI_BIND_GUARD].lc_un.lc_func) != NULL) {
+		return ((*fptr)(bindflag));
+	} else {
+		if ((bindflag & bindmask) == 0) {
+			bindmask |= bindflag;
+			return (1);
+		}
+		return (0);
+	}
+}
+
+int
+rt_bind_clear(int bindflag)
+{
+	int	(*fptr)(int);
+
+	if ((fptr = glcs[CI_BIND_CLEAR].lc_un.lc_func) != NULL) {
+		return ((*fptr)(bindflag));
+	} else {
+		if (bindflag == 0)
+			return (bindmask);
+		else {
+			bindmask &= ~bindflag;
+			return (0);
+		}
+	}
+}
+
+/*
+ * Make sure threads have been initialized.  This interface is called once for
+ * each link-map list.
+ */
+void
+rt_thr_init(Lm_list *lml)
+{
+	void	(*fptr)(void);
+
+	if ((fptr = (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != 0) {
+		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = 0;
+		leave((Lm_list *)0);
+		(*fptr)();
+		(void) enter();
+	}
+}
+
+thread_t
+rt_thr_self()
+{
+	thread_t	(*fptr)(void);
+
+	if ((fptr = (thread_t (*)())glcs[CI_THR_SELF].lc_un.lc_func) != NULL)
+		return ((*fptr)());
+
+	return (1);
+}
+
+int
+rt_mutex_lock(Rt_lock * mp)
+{
+	return (_lwp_mutex_lock((lwp_mutex_t *)mp));
+}
+
+int
+rt_mutex_unlock(Rt_lock * mp)
+{
+	return (_lwp_mutex_unlock((lwp_mutex_t *)mp));
+}
+
+Rt_cond *
+rt_cond_create()
+{
+	return (calloc(1, sizeof (Rt_cond)));
+}
+
+int
+rt_cond_wait(Rt_cond * cvp, Rt_lock * mp)
+{
+	return (_lwp_cond_wait(cvp, (lwp_mutex_t *)mp));
+}
+
+int
+rt_cond_broadcast(Rt_cond * cvp)
+{
+	return (_lwp_cond_broadcast(cvp));
+}
+
+#ifdef	EXPAND_RELATIVE
+
+/*
+ * Mutex interfaces to resolve references from any objects extracted from
+ * libc_pic.a.  Note, as ld.so.1 is essentially single threaded these can be
+ * noops.
+ */
+#pragma weak lmutex_lock = __mutex_lock
+#pragma weak _private_mutex_lock = __mutex_lock
+#pragma weak mutex_lock = __mutex_lock
+#pragma weak _mutex_lock = __mutex_lock
+/* ARGSUSED */
+int
+__mutex_lock(mutex_t *mp)
+{
+	return (0);
+}
+
+#pragma weak lmutex_unlock = __mutex_unlock
+#pragma weak _private_mutex_unlock = __mutex_unlock
+#pragma weak mutex_unlock = __mutex_unlock
+#pragma weak _mutex_unlock = __mutex_unlock
+/* ARGSUSED */
+int
+__mutex_unlock(mutex_t *mp)
+{
+	return (0);
+}
+
+/*
+ * This is needed to satisfy sysconf() (case _SC_THREAD_STACK_MIN)
+ */
+#pragma weak thr_min_stack = _thr_min_stack
+size_t
+_thr_min_stack()
+{
+#ifdef _LP64
+	return (8 * 1024);
+#else
+	return (4 * 1024);
+#endif
+}
+
+#endif	/* EXPAND_RELATIVE */

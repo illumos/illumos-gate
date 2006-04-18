@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,6 +17,11 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # pragma ident	"%Z%%M%	%I%	%E% SMI"
 # 
@@ -344,13 +345,13 @@
 @ MSG_LMLIST_LINE0	"   lists: 0x%0?p Alist[used %u: total %u]\n"
 
 @ MSG_LMC_LINE1		"Lm_cntl: 0x%p\n"
-@ MSG_LMC_LINE2		"   head: 0x%0?p\t     tail: 0x%0?p\n"
-@ MSG_LMC_LINE3		"  flags: 0x%08x\t      now: 0x%0?p\n"
+@ MSG_LMC_LINE2		"   head: 0x%0?p\t      tail: 0x%0?p\n"
+@ MSG_LMC_LINE3		"  flags: 0x%08x\t       now: 0x%0?p\n"
 @ MSG_LMC_LINE4		"         [ %#b ]\n"
 
-@ MSG_LMLIST_LINE1	"    head: 0x%0?p\t     tail: 0x%0?p\n"
-@ MSG_LMLIST_LINE2	"   audit: 0x%0?p\t  preexec: 0x%0?p\n"
-@ MSG_LMLIST_LINE3	"  handle: 0x%0?p\t      obj: %4d  init: %4d  \
+@ MSG_LMLIST_LINE1	"    head: 0x%0?p\t      tail: 0x%0?p\n"
+@ MSG_LMLIST_LINE2	"   audit: 0x%0?p\t  rtldinfo: 0x%0?p\n"
+@ MSG_LMLIST_LINE3	"  handle: 0x%0?p\t       obj: %4d  init: %4d  \
 			 lazy: %4d\n"
 @ MSG_LMLIST_LINE4	"   flags: 0x%08x\n"
 @ MSG_LMLIST_LINE5	"  tflags: 0x%08x\n"

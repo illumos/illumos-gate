@@ -59,8 +59,6 @@ List		dynlm_list =	{ 0, 0 };	/* dynamic list of link-maps */
 
 Reglist *	reglist = 0;			/* list of register symbols */
 
-void		(*thrinit)() = 0;		/* thread initialization */
-
 ulong_t		hwcap = 0;			/* hardware capabilities */
 ulong_t		sfcap = 0;			/* software capabilities */
 
@@ -99,6 +97,8 @@ uint_t		rtld_flags2 = 0;
 /*
  * Various other global data.
  */
+Lc_desc		glcs[CI_MAX];		/* global external interfaces */
+
 const char	*procname = (const char *)0;
 const char	*rtldname = MSG_ORIG(MSG_FIL_RTLD);
 
@@ -116,8 +116,6 @@ Isa_desc	*isa;			/* isalist descriptor */
 uint_t		audit_argcnt = 64;	/* no. of stack args to copy (default */
 					/*	is all) */
 Audit_desc	*auditors = 0;		/* global auditors (LD_AUDIT) */
-
-const char	*locale = 0;		/* locale environment definition */
 
 const char	*rpl_audit = 0;		/* replaceable LD_AUDIT string */
 const char	*rpl_debug = 0;		/* replaceable LD_DEBUG string */

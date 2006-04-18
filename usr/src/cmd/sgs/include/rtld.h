@@ -30,7 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Global include file for the runtime linker support library.
+ * Global include file for the runtime linker.
  */
 #include <time.h>
 #include <sgs.h>
@@ -39,6 +39,7 @@
 #include <machdep.h>
 #include <sys/avl.h>
 #include <alist.h>
+#include <libc_int.h>
 
 #ifdef	_SYSCALL32
 #include <inttypes.h>
@@ -83,14 +84,13 @@ typedef struct {
 /*
  * Private structure for communication between rtld_db and rtld.
  *
- * 	We must bump the version number whenever a update in one of
- *	the structures/fields that rtld_db reads is updated.  This hopefully
- *	permits rtld_db implementations of the future recognize corefiles
- *	produced on older system and deal accordingly.
+ * We must bump the version number when ever an update in one of the
+ * structures/fields that rtld_db reads is updated.  This hopefully permits
+ * rtld_db implementations of the future to recognize core files produced on
+ * older systems and deal with these core files accordingly.
  *
- *	As of version 'RTLD_DB_VERSION <= 2' the following fields
- *	were valid for core file examination (basically the public
- *	Link_map):
+ * As of version 'RTLD_DB_VERSION <= 2' the following fields were valid for core
+ * file examination (basically the public Link_map):
  *
  *		ADDR()
  *		NAME()
@@ -98,7 +98,7 @@ typedef struct {
  *		NEXT()
  *		PREV()
  *
- *	Valid fields for RTLD_DB_VERSION3
+ * Valid fields for RTLD_DB_VERSION3
  *
  *		PATHNAME()
  *		PADSTART()
@@ -107,18 +107,18 @@ typedef struct {
  *		FLAGS()
  *		FLAGS1()
  *
- *	Valid fields for RTLD_DB_VERSION4
+ * Valid fields for RTLD_DB_VERSION4
  *
  *		TLSMODID()
  *
- *	Valid fields for RTLD_DB_VERSION5
+ * Valid fields for RTLD_DB_VERSION5
  *
  *		Added rtld_flags & FLG_RT_RELOCED to stable flags range
  *
  */
 #define	R_RTLDDB_VERSION1	1	/* base version level - used for core */
 					/*	file examination */
-#define	R_RTLDDB_VERSION2	2	/* minor revision - not relavant for */
+#define	R_RTLDDB_VERSION2	2	/* minor revision - not relevant for */
 					/*	core files */
 #define	R_RTLDDB_VERSION3	3
 #define	R_RTLDDB_VERSION4	4
@@ -141,6 +141,25 @@ typedef struct rtld_db_priv32 {
 } Rtld_db_priv32;
 #endif	/* _SYSCALL32 */
 
+/*
+ * External function definitions.  ld.so.1 must convey information to libc in
+ * regards to threading.  libc also provides routines for atexit() and message
+ * localization.  libc provides the necessary interfaces via its RTLDINFO
+ * structure and/or later _ld_libc() calls.
+ *
+ * These external functions are maintained for each link-map list, and used
+ * where appropriate.  The functions are associated with the object that
+ * provided them, so that should the object be deleted (say, from an alternative
+ * link-map), the functions can be removed.
+ */
+typedef struct {
+	Rt_map	*lc_lmp;			/* function provider */
+	union {
+		int		(*lc_func)();	/* external function pointer */
+		uintptr_t	lc_val;		/* external value */
+		char    	*lc_ptr;	/* external character pointer */
+	} lc_un;
+} Lc_desc;
 
 /*
  * Link map list definition.  Link-maps are used to describe each loaded object.
@@ -248,10 +267,7 @@ struct lm_list {
 	/*
 	 * END: Exposed to rtld_db - don't move, don't delete
 	 */
-	int		(*lm_peh)();	/* atexit() preexec_exit_handlers */
-	Rt_map		*lm_peh_lmp;	/* and object that contributed them */
-	Rt_map		*lm_info_lmp;	/* the first object with rtld_info */
-	Alist		*lm_rtldinfo;	/* list of RTLDINFO tables */
+	Alist		*lm_rti;	/* list of RTLDINFO tables */
 	Audit_list	*lm_alp;	/* audit list descripter */
 	avl_tree_t	*lm_fpavl;	/* avl tree of objects loaded */
 	Alist		*lm_lists;	/* active and pending link-map lists */
@@ -260,8 +276,10 @@ struct lm_list {
 	uint_t		lm_obj;		/* total number of objs on link-map */
 	uint_t		lm_init;	/* new obj since last init processing */
 	uint_t		lm_lazy;	/* obj with pending lazy dependencies */
+	uint_t		lm_tls;		/* new obj that require TLS */
 	uint_t		lm_lmid;	/* unique link-map list identifier, */
 	char		*lm_lmidstr;	/* and associated diagnostic string */
+	Lc_desc		lm_lcs[CI_MAX];	/* external libc functions */
 };
 
 #ifdef	_SYSCALL32
@@ -276,10 +294,7 @@ struct lm_list32 {
 	/*
 	 * END: Exposed to rtld_db - don't move, don't delete
 	 */
-	Elf32_Addr	lm_peh;
-	Elf32_Addr	lm_peh_lmp;
-	Elf32_Addr	lm_info_lmp;
-	Elf32_Addr	lm_alp;
+	Elf32_Addr	lm_rti;
 	Elf32_Addr	lm_fpavl;
 	Elf32_Addr	lm_lists;
 	Elf32_Addr	lm_environ;
@@ -287,8 +302,10 @@ struct lm_list32 {
 	uint_t		lm_obj;
 	uint_t		lm_init;
 	uint_t		lm_lazy;
+	uint_t		lm_tls;
 	uint_t		lm_lmid;
 	Elf32_Addr	lm_lmidstr;
+	Elf32_Addr	lm_lcs[CI_MAX];
 };
 #endif /* _SYSCALL32 */
 
@@ -661,6 +678,8 @@ typedef struct rt_map32 {
 #define	FL1_RT_SYMSFLTR	0x00004000	/* symbol is acting as a standard */
 #define	FL1_RT_SYMAFLTR	0x00008000	/*	or auxiliary filter */
 #define	MSK_RT_FILTER	0x0000f000	/* mask for all filter possibilites */
+
+#define	FL1_RT_TLSADD	0x00010000	/* objects TLS has been registered */
 
 /*
  * The following range of bits are reserved to hold LML_TFLG_AUD_ values

@@ -33,11 +33,11 @@
  */
 
 #include <stdlib.h>
-#include <debug.h>
+#include <stdio.h>
 #include "msg.h"
 
 void
 exit(int status)
 {
-	dbg_print(0, _ld_msg((Msg)&__ld_msg[0]), status);
+	(void) printf("%s: %d\n", _ld_msg((Msg)&__ld_msg[0]), status);
 }

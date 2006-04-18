@@ -972,7 +972,7 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_LMLIST_LINE1), lml.lm_head, lml.lm_tail);
-	mdb_printf(MSG_ORIG(MSG_LMLIST_LINE2), lml.lm_alp, lml.lm_peh_lmp);
+	mdb_printf(MSG_ORIG(MSG_LMLIST_LINE2), lml.lm_alp, lml.lm_rti);
 	mdb_printf(MSG_ORIG(MSG_LMLIST_LINE3), lml.lm_handle, lml.lm_obj,
 	    lml.lm_init, lml.lm_lazy);
 

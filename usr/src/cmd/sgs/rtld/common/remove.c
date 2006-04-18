@@ -76,11 +76,12 @@ purge_exit_handlers(Lm_list *lml, Rt_map **tobj)
 	Rt_map			**_tobj;
 	Lc_addr_range_t		*addr, *_addr;
 	int			error;
+	int			(*fptr)(Lc_addr_range_t *, uint_t);
 
 	/*
 	 * Has a callback been established?
 	 */
-	if (lml->lm_peh == 0)
+	if ((fptr = lml->lm_lcs[CI_ATEXIT].lc_un.lc_func) == NULL)
 		return (0);
 
 	/*
@@ -120,9 +121,7 @@ purge_exit_handlers(Lm_list *lml, Rt_map **tobj)
 	_addr->lb = _addr->ub = 0;
 
 	leave(LIST(*tobj));
-
-	error = (* lml->lm_peh)(addr, (num - 1));
-
+	error = (*fptr)(addr, (num - 1));
 	(void) enter();
 
 	/*
@@ -191,11 +190,11 @@ remove_lml(Lm_list *lml)
 			free(lml->lm_lists);
 
 		/*
-		 * Cleanup rtldinfo in the case where it was allocated but
-		 * not called (see _relocate_so()).
+		 * Cleanup any pending RTLDINFO in the case where it was
+		 * allocated but not called (see _relocate_lmc()).
 		 */
-		if (lml->lm_rtldinfo)
-			free(lml->lm_rtldinfo);
+		if (lml->lm_rti)
+			free(lml->lm_rti);
 		if (lml->lm_fpavl) {
 			/*
 			 * As we are freeing the link-map list, all nodes must
@@ -235,13 +234,25 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 		lm_delete(lml, lmp);
 
 	/*
-	 * If this object contributed the preexec_exit_handler() routine for
-	 * the current link-map list, mark the list as no-longer containing a
-	 * preexec_exit_handler() routine.
+	 * If this object contributed any local external vectors for the current
+	 * link-map list, remove the vectors.  If this object contributed any
+	 * global external vectors we should find some new candidates, or leave
+	 * this object lying around.
 	 */
-	if (lml && (lml->lm_peh_lmp == lmp)) {
-		lml->lm_peh = 0;
-		lml->lm_peh_lmp = 0;
+	if (lml) {
+		int	tag;
+
+		for (tag = 0; tag < CI_MAX; tag++) {
+			if (lml->lm_lcs[tag].lc_lmp == lmp) {
+				lml->lm_lcs[tag].lc_lmp = 0;
+				lml->lm_lcs[tag].lc_un.lc_val = 0;
+			}
+			if (glcs[tag].lc_lmp == lmp) {
+				ASSERT(glcs[tag].lc_lmp != 0);
+				glcs[tag].lc_lmp = 0;
+				glcs[tag].lc_un.lc_val = 0;
+			}
+		}
 	}
 
 	DBG_CALL(Dbg_file_delete(lmp));
@@ -1291,7 +1302,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			 * Complete the link-map deletion if appropriate.
 			 */
 			if (FLAGS(lmp) & FLG_RT_DELETE) {
-				tls_modactivity(lmp, TM_FLG_MODREM);
+				tls_modaddrem(lmp, TM_FLG_MODREM);
 				remove_so(LIST(lmp), lmp);
 			}
 		}

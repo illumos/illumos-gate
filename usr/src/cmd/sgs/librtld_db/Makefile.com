@@ -39,6 +39,7 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 MAPFILE=	../common/mapfile-vers
 
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
 DYNFLAGS +=	-M$(MAPFILE) $(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 

@@ -545,7 +545,7 @@
 @ MSG_USD_UNREF		"file=%s  unreferenced: unused dependency of %s"
 @ MSG_USD_FILECYCLIC	"file=%s  unused: cyclic group [%d] member: \
 			 unreferenced outside of group"
-@ MSG_USD_RTLDINFO	"file=%s  unused RTLDINFO: using RTLDINFO \
+@ MSG_USD_LCINTERFACE	"file=%s  unused interface [%s]: using interface \
 			 from previously loaded object: file=%s"
 
 # Segment messages
@@ -687,6 +687,8 @@
 @ MSG_UTL_SCC_TITLE	"  cycle detected - sorting cyclic dependencies in %s"
 @ MSG_UTL_SCC_SUBI	"reverse load-order"
 @ MSG_UTL_SCC_SUBF	"load-order"
+
+@ MSG_UTL_LCINTERFACE	"file=%s;  provides interface [%s]: 0x%llx"
 
 # Generic strings
 
@@ -1204,3 +1206,17 @@
 # Syminfo formats
 
 @ MSG_SYMINFO_UNKFLAG	" 0x%x"
+
+# Lc_interface interface tags.
+
+@ MSG_CI_NULL		"NULL"
+@ MSG_CI_VERSION	"VERSION"
+@ MSG_CI_ATEXIT		"ATEXIT"
+@ MSG_CI_LCMESSAGES	"LCMESSAGES"
+@ MSG_CI_BIND_GUARD	"BIND_GUARD"
+@ MSG_CI_BIND_CLEAR	"BIND_CLEAR"
+@ MSG_CI_THR_SELF	"THR_SELF"
+@ MSG_CI_TLS_MODADD	"TLS_MODADD"
+@ MSG_CI_TLS_MODREM	"TLS_MODREM"
+@ MSG_CI_TLS_STATMOD	"TLS_STATMOD"
+@ MSG_CI_THRINIT	"THRINIT"

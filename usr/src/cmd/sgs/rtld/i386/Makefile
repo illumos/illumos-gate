@@ -32,8 +32,8 @@ BASEPLAT =	i386
 # secondary lists (less frequently used code, ie. profiling support).
 
 P_COMOBJS=	debugdata.o \
-		analyze.o	elf.o		globals.o	malloc.o \
-		mutex.o		paths.o		setup.o		util.o \
+		analyze.o	elf.o		external.o	globals.o \
+		malloc.o	paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
 		getcwd.o	remove.o	move.o		tls.o \
 		cap.o

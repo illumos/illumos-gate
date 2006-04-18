@@ -176,6 +176,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	size_t		eaddr, esize;
 	char		*str, *argvname;
 	Mmap		*mmaps;
+	Word		lmflags;
 
 	/*
 	 * Now that ld.so has relocated itself, initialize our own 'environ' so
@@ -612,14 +613,16 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 					mmaps[mmapcnt].m_perm = perm;
 					mmapcnt++;
 
-				} else if (pptr->p_type == PT_DYNAMIC)
+				} else if (pptr->p_type == PT_DYNAMIC) {
 					dyn = (Dyn *)(pptr->p_vaddr + base);
-				else if (pptr->p_type == PT_TLS)
+				} else if ((pptr->p_type == PT_TLS) &&
+				    pptr->p_memsz) {
 					tlsphdr = pptr;
-				else if (pptr->p_type == PT_SUNW_UNWIND)
+				} else if (pptr->p_type == PT_SUNW_UNWIND) {
 					unwindphdr = pptr;
-				else if (pptr->p_type == PT_SUNWCAP)
+				} else if (pptr->p_type == PT_SUNWCAP) {
 					cap = (Cap *)(pptr->p_vaddr + base);
+				}
 				pptr = (Phdr *)((ulong_t)pptr + phsize);
 			}
 
@@ -639,6 +642,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			if (tlsphdr) {
 				PTTLS(mlmp) = tlsphdr;
 				tls_assign_soffset(mlmp);
+				lml_main.lm_tls++;
 			}
 			if (unwindphdr)
 				PTUNWIND(mlmp) = unwindphdr;
@@ -948,35 +952,11 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * loaded.
 	 */
 	if ((rtld_flags & RT_FL_CONFGEN) == 0) {
-		Word	lmflags;
 
 		DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
 		if (relocate_lmc(&lml_main, ALO_DATA, mlmp) == 0)
 			return (0);
-
-		/*
-		 * Sort the .init sections of all objects we've added.  If
-		 * we're tracing we only need to execute this under ldd(1)
-		 * with the -i or -u options.
-		 */
-		lmflags = lml_main.lm_flags;
-		if (((lmflags & LML_FLG_TRC_ENABLE) == 0) ||
-		    (lmflags & (LML_FLG_TRC_INIT | LML_FLG_TRC_UNREF))) {
-			if ((tobj = tsort(mlmp, LIST(mlmp)->lm_init,
-			    RT_SORT_REV)) == (Rt_map **)S_ERROR)
-				return (0);
-		}
-
-		/*
-		 * If we are tracing we're done.  This is the one legitimate use
-		 * of a direct call to rtldexit() rather than return, as we
-		 * don't want to return and jump to the application.
-		 */
-		if (lmflags & LML_FLG_TRC_ENABLE) {
-			unused(&lml_main);
-			rtldexit(&lml_main, 0);
-		}
 
 		/*
 		 * Inform the debuggers we're here and stable.  Newer debuggers
@@ -993,20 +973,20 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			r_debug.rtd_rdebug.r_flags |= RD_FL_ODBG;
 			(void) getpid();
 		}
-
-		/*
-		 * Initialize any initial TLS storage.
-		 */
-		if (tls_report_modules() == 0)
-			return (0);
 	}
 
 	/*
-	 * Call any necessary auditing routines, clean up any file descriptors
-	 * and such, and then fire all dependencies .init sections.
+	 * Indicate preinit activity, and call any auditing routines.  These
+	 * routines are called before initializing any threads via libc, or
+	 * before collecting the complete set of .inits on the primary link-map.
+	 * Although most libc interfaces are encapsulated in local routines
+	 * within libc, they have been known to escape (ie. call a .plt).  As
+	 * the appcert auditor uses preinit as a trigger to establish some
+	 * external interfaces to the main link-maps libc, we need to activate
+	 * this trigger before exercising any code within libc.  Additionally,
+	 * I wouldn't put it past an auditor to add additional objects to the
+	 * primary link-map.  Hence, we collect .inits after the audit call.
 	 */
-	rtld_flags |= RT_FL_APPLIC;
-
 	rd_event(&lml_main, RD_PREINIT, 0);
 
 	if ((lml_main.lm_tflags | FLAGS1(mlmp)) & LML_TFLG_AUD_ACTIVITY)
@@ -1014,6 +994,59 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if ((lml_main.lm_tflags | FLAGS1(mlmp)) & LML_TFLG_AUD_PREINIT)
 		audit_preinit(mlmp);
 
+	/*
+	 * If we're creating initial configuration information, we're done
+	 * now that the auditing step has been called.
+	 */
+	if (rtld_flags & RT_FL_CONFGEN) {
+		leave(LIST(mlmp));
+		return (mlmp);
+	}
+
+	/*
+	 * Sort the .init sections of all objects we've added.  If we're
+	 * tracing we only need to execute this under ldd(1) with the -i or -u
+	 * options.
+	 */
+	lmflags = lml_main.lm_flags;
+	if (((lmflags & LML_FLG_TRC_ENABLE) == 0) ||
+	    (lmflags & (LML_FLG_TRC_INIT | LML_FLG_TRC_UNREF))) {
+		if ((tobj = tsort(mlmp, LIST(mlmp)->lm_init,
+		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
+			return (0);
+	}
+
+	/*
+	 * If we are tracing we're done.  This is the one legitimate use of a
+	 * direct call to rtldexit() rather than return, as we don't want to
+	 * return and jump to the application.
+	 */
+	if (lmflags & LML_FLG_TRC_ENABLE) {
+		unused(&lml_main);
+		rtldexit(&lml_main, 0);
+	}
+
+	/*
+	 * Establish any static TLS for this primary link-map.  Note, regardless
+	 * of whether TLS is available, an initial handshake occurs with libc to
+	 * indicate we're processing the primary link-map.  Having identified
+	 * the primary link-map, initialize threads.
+	 */
+	if (rt_get_extern(&lml_main, mlmp) == 0)
+		return (0);
+	if (tls_statmod(&lml_main, mlmp) == 0)
+		return (0);
+
+	rt_thr_init(&lml_main);
+
+	rtld_flags2 |= RT_FL2_PLMSETUP;
+	rtld_flags |= RT_FL_APPLIC;
+
+	/*
+	 * Fire all dependencies .init sections.  Identify any unused
+	 * dependencies, and leave the runtime linker - effectively calling
+	 * the dynamic executables entry point.
+	 */
 	call_array(PREINITARRAY(mlmp), (uint_t)PREINITARRAYSZ(mlmp), mlmp,
 		SHT_PREINIT_ARRAY);
 

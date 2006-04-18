@@ -46,7 +46,7 @@ OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(TOOLOBJ)
 MAPFILE=	../common/mapfile-vers
 
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
-		-I$(SRCBASE)/uts/$(ARCH)/sys \
+		-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master)
 LLDFLAGS =	$(VAR_ELFDUMP_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_LD_LLDFLAGS64)

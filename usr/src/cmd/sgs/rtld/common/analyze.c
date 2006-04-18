@@ -290,36 +290,11 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 		lml->lm_flags |= LML_FLG_OBJADDED;
 
 		/*
-		 * None of the following processing is necessary under ldd().
+		 * Process any move data (not necessary under ldd()).
 		 */
-		if ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0) {
-			/*
-			 * Process any move data.
-			 */
-			if (FLAGS(lmp) & FLG_RT_MOVE)
-				move_data(lmp);
-
-			/*
-			 * Process any DT_SUNW_RTLDINFO information now the
-			 * object is relocated, and remove the RTLDINFO
-			 * infrastructure as it won't be needed anymore.
-			 *
-			 * We wait until lmp == lm_info_lmp, as it's at this
-			 * stage we know the object contributing RTLDINFO has
-			 * been properly relocated.
-			 */
-			if ((FCT(lmp) == &elf_fct) && (lml->lm_rtldinfo) &&
-			    (lmp == lml->lm_info_lmp)) {
-				Aliste		off;
-				Lc_interface **	funcs;
-
-				for (ALIST_TRAVERSE(lml->lm_rtldinfo,
-				    off, funcs))
-					get_lcinterface(lmp, *funcs);
-				free(lml->lm_rtldinfo);
-				lml->lm_rtldinfo = 0;
-			}
-		}
+		if ((FLAGS(lmp) & FLG_RT_MOVE) &&
+		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
+			move_data(lmp);
 
 		/*
 		 * Determine if this object is a filter, and if a load filter
@@ -1196,7 +1171,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 					    &added) == 0)
 						return (0);
 					if (added)
-					    DBG_CALL(Dbg_file_skip(LIST(nlmp),
+					    DBG_CALL(Dbg_file_skip(LIST(clmp),
 						NAME(nlmp), nname));
 					fdesc->fd_nname = nname;
 					fdesc->fd_lmp = nlmp;
@@ -1231,7 +1206,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				if ((nname[0] == '/') && (fpavl_insert(lml,
 				    nlmp, nname, 0) == 0))
 					return (0);
-				DBG_CALL(Dbg_file_skip(LIST(nlmp), NAME(nlmp),
+				DBG_CALL(Dbg_file_skip(LIST(clmp), NAME(nlmp),
 				    nname));
 			}
 			fdesc->fd_nname = nname;
@@ -1598,12 +1573,6 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc)
 	 * Identify this as a new object.
 	 */
 	FLAGS(nlmp) |= FLG_RT_NEWLOAD;
-
-	/*
-	 * Report module loads to TLS module activity.
-	 */
-	if (nlmp)
-		tls_modactivity(nlmp, TM_FLG_MODADD);
 
 	return (nlmp);
 }

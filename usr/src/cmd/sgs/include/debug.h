@@ -353,6 +353,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_edge_in	Dbg64_util_edge_in
 #define	Dbg_util_edge_out	Dbg64_util_edge_out
 #define	Dbg_util_intoolate	Dbg64_util_intoolate
+#define	Dbg_util_lcinterface	Dbg64_util_lcinterface
 #define	Dbg_util_nl		Dbg64_util_nl
 #define	Dbg_util_no_init	Dbg64_util_no_init
 #define	Dbg_util_scc_entry	Dbg64_util_scc_entry
@@ -361,7 +362,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_wait		Dbg64_util_wait
 
 #define	Dbg_unused_file		Dbg64_unused_file
-#define	Dbg_unused_rtldinfo	Dbg64_unused_rtldinfo
+#define	Dbg_unused_lcinterface	Dbg64_unused_lcinterface
 #define	Dbg_unused_sec		Dbg64_unused_sec
 #define	Dbg_unused_unref	Dbg64_unused_unref
 
@@ -544,6 +545,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_edge_in	Dbg32_util_edge_in
 #define	Dbg_util_edge_out	Dbg32_util_edge_out
 #define	Dbg_util_intoolate	Dbg32_util_intoolate
+#define	Dbg_util_lcinterface	Dbg32_util_lcinterface
 #define	Dbg_util_nl		Dbg32_util_nl
 #define	Dbg_util_no_init	Dbg32_util_no_init
 #define	Dbg_util_scc_entry	Dbg32_util_scc_entry
@@ -552,7 +554,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_wait		Dbg32_util_wait
 
 #define	Dbg_unused_file		Dbg32_unused_file
-#define	Dbg_unused_rtldinfo	Dbg32_unused_rtldinfo
+#define	Dbg_unused_lcinterface	Dbg32_unused_lcinterface
 #define	Dbg_unused_sec		Dbg32_unused_sec
 #define	Dbg_unused_unref	Dbg32_unused_unref
 
@@ -777,6 +779,7 @@ extern	void	Dbg_util_edge_in(Lm_list *, Rt_map *, uint_t, Rt_map *,
 		    int, int);
 extern	void	Dbg_util_edge_out(Rt_map *, Rt_map *);
 extern	void	Dbg_util_intoolate(Rt_map *);
+extern	void	Dbg_util_lcinterface(Rt_map *, int, char *);
 extern	void	Dbg_util_nl(Lm_list *, int);
 extern	void	Dbg_util_no_init(Rt_map *);
 extern	void	Dbg_util_str(Lm_list *, const char *);
@@ -785,7 +788,7 @@ extern	void	Dbg_util_scc_title(Lm_list *, int);
 extern	void	Dbg_util_wait(Rt_map *, Rt_map *, int);
 
 extern	void	Dbg_unused_file(Lm_list *, const char *, int, uint_t);
-extern	void	Dbg_unused_rtldinfo(Rt_map *);
+extern	void	Dbg_unused_lcinterface(Rt_map *, Rt_map *, int);
 extern	void	Dbg_unused_sec(Lm_list *, Is_desc *);
 extern	void	Dbg_unused_unref(Rt_map *, const char *);
 

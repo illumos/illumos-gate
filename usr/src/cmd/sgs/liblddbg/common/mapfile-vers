@@ -38,7 +38,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.50 {
+SUNWprivate_4.51 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -371,6 +371,8 @@ SUNWprivate_4.50 {
 		Dbg64_util_edge_in;
 		Dbg32_util_edge_out;
 		Dbg64_util_edge_out;
+		Dbg32_util_lcinterface;
+		Dbg64_util_lcinterface;
 		Dbg32_util_intoolate;
 		Dbg64_util_intoolate;
 		Dbg32_util_nl;
@@ -388,8 +390,8 @@ SUNWprivate_4.50 {
 
 		Dbg32_unused_file;
 		Dbg64_unused_file;
-		Dbg32_unused_rtldinfo;
-		Dbg64_unused_rtldinfo;
+		Dbg32_unused_lcinterface;
+		Dbg64_unused_lcinterface;
 		Dbg32_unused_sec;
 		Dbg64_unused_sec;
 		Dbg32_unused_unref;

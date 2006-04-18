@@ -50,6 +50,7 @@
 #include	<conv.h>
 #include	"_rtld.h"
 #include	"_audit.h"
+#include	"_elf.h"
 #include	"msg.h"
 
 static int ld_flags_env(const char *, Word *, Word *, uint_t, int);
@@ -137,7 +138,7 @@ rtld_db_postinit(Lm_list *lml)
 void
 rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
 {
-	void	(*fptr)();
+	void	(*fptr)(Lm_list *);
 
 	switch (event) {
 	case RD_PREINIT:
@@ -594,7 +595,7 @@ call_array(Addr *array, uint_t arraysz, Rt_map *lmp, Word shtype)
 	 * Call the .*array[] entries
 	 */
 	for (ndx = start; ndx != stop; ndx += incr) {
-		void (*	fptr)() = (void(*)())array[ndx];
+		void (*fptr)(void) = (void(*)())array[ndx];
 
 		DBG_CALL(Dbg_util_call_array(lmp, (void *)fptr, ndx, shtype));
 
@@ -624,21 +625,6 @@ call_init(Rt_map ** tobj, int flag)
 	if (rtld_flags & RT_FL_INITFIRST) {
 		(void) list_append(&pending, tobj);
 		return;
-	}
-
-	/*
-	 * If a 'thread initialization' is pending - call it now before any
-	 * .init code is fired.  Also clear the thrinit() to mark it as done.
-	 * Note, this is called for each link-map list, which is what libc
-	 * expects.
-	 */
-	if (thrinit) {
-		void	(*_thrinit)() = thrinit;
-
-		thrinit = 0;
-		leave((Lm_list *)0);
-		_thrinit();
-		(void) enter();
 	}
 
 	/*
@@ -763,7 +749,7 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		 */
 		if ((rtld_flags & RT_FL_CONCUR) ||
 		    (FLAGS(lmp) & FLG_RT_INITDONE)) {
-			void	(*fptr)() = FINI(lmp);
+			void	(*fptr)(void) = FINI(lmp);
 
 			if (FINIARRAY(lmp) || fptr) {
 				/*
@@ -880,6 +866,11 @@ atexit_fini()
 	 * Traverse any alternative link-map lists.
 	 */
 	for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
+		/*
+		 * Ignore the base-link-map list, which has already been
+		 * processed, and the runtime linkers link-map list, which is
+		 * typically processed last.
+		 */
 		if (lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM))
 			continue;
 
@@ -920,9 +911,10 @@ atexit_fini()
  * and from any internal dl*() requests.
  */
 void
-load_completion(Rt_map * nlmp, Rt_map * clmp)
+load_completion(Rt_map *nlmp, Rt_map *clmp)
 {
 	Rt_map	**tobj = 0;
+	Lm_list	*nlml, *clml;
 
 	/*
 	 * Establish any .init processing.  Note, in a world of lazy loading,
@@ -932,26 +924,58 @@ load_completion(Rt_map * nlmp, Rt_map * clmp)
 	 * any tsorting starts from the nlmp (new link-maps) pointer and not
 	 * necessarily from the link-map that may have satisfied the request.
 	 *
-	 * Note, if the caller is an auditor, and the destination isn't, then
-	 * don't run any .inits.  This scenario is typical of an auditor trying
-	 * to inspect another link-map for symbols.  Allow this inspection
-	 * without running any code on the inspected link-map, as running this
-	 * code may reenter the auditor, who has not yet finished their own
+	 * Note, the primary link-map has an initialization phase where dynamic
+	 * .init firing is suppressed.  This provides for a simple and clean
+	 * handshake with the primary link-maps libc, which is important for
+	 * establishing uberdata.  In addition, auditors often obtain handles
+	 * to primary link-map objects as the objects are loaded, so as to
+	 * inspect the link-map for symbols.  This inspection is allowed without
+	 * running any code on the primary link-map, as running this code may
+	 * reenter the auditor, who may not yet have finished its own
 	 * initialization.
 	 */
-	if (nlmp && ((clmp == 0) ||
-	    ((LIST(clmp)->lm_flags & LML_FLG_NOAUDIT) == 0) ||
-	    (LIST(clmp) == LIST(nlmp)))) {
+	if (nlmp)
+		nlml = LIST(nlmp);
+	if (clmp)
+		clml = LIST(clmp);
+
+	if (nlmp && nlml->lm_init &&
+	    ((nlml != &lml_main) || (rtld_flags2 & RT_FL2_PLMSETUP))) {
 		if ((tobj = tsort(nlmp, LIST(nlmp)->lm_init,
 		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
 			tobj = 0;
 	}
 
 	/*
+	 * Make sure any alternative link-map retrieves any external interfaces
+	 * and initializes threads.
+	 */
+	if (nlmp && (nlml != &lml_main)) {
+		(void) rt_get_extern(nlml, nlmp);
+		rt_thr_init(nlml);
+	}
+
+	/*
+	 * Traverse the list of new link-maps and register any dynamic TLS.
+	 * This storage is established for any objects not on the primary
+	 * link-map, and for any objects added to the primary link-map after
+	 * static TLS has been registered.
+	 */
+	if (nlmp && nlml->lm_tls &&
+	    ((nlml != &lml_main) || (rtld_flags2 & RT_FL2_PLMSETUP))) {
+		Rt_map	*lmp;
+
+		for (lmp = nlmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+			if (PTTLS(lmp) && PTTLS(lmp)->p_memsz)
+				tls_modaddrem(lmp, TM_FLG_MODADD);
+		}
+		nlml->lm_tls = 0;
+	}
+
+	/*
 	 * Indicate the link-map list is consistent.
 	 */
-	if (clmp &&
-	    ((LIST(clmp)->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_ACTIVITY))
+	if (clmp && ((clml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_ACTIVITY))
 		audit_activity(clmp, LA_ACT_CONSISTENT);
 
 	/*
@@ -1255,7 +1279,6 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * Indicate each new link-map has been moved to the previous link-map
 	 * control list.
 	 */
-
 	for (lmp = nlmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
 		CNTL(lmp) = plmco;
 
@@ -1446,9 +1469,9 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
     Word *lmtflags, uint_t env_flags, int aout)
 {
 	u_longlong_t	variable = 0;
-	unsigned short	select = 0;
-	const char **str;
-	Word val = 0;
+	ushort_t	select = 0;
+	const char	**str;
+	Word		val = 0;
 
 	/*
 	 * Determine whether we're dealing with a replaceable or permanent
@@ -2160,7 +2183,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
     int aout)
 {
 	const char	*s2;
-	static	size_t	loc = 0;
+	static		size_t	loc = 0;
 
 	if (*s1++ != 'L')
 		return;
@@ -2175,14 +2198,14 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 		if (strncmp(s2, MSG_ORIG(MSG_LC_ALL), MSG_LC_ALL_SIZE) == 0) {
 			s2 += MSG_LC_ALL_SIZE;
 			if ((*s2 != '\0') && (loc < LOC_ALL)) {
-				locale = s2;
+				glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
 				loc = LOC_ALL;
 			}
 		} else if (strncmp(s2, MSG_ORIG(MSG_LC_MESSAGES),
 		    MSG_LC_MESSAGES_SIZE) == 0) {
 			s2 += MSG_LC_MESSAGES_SIZE;
 			if ((*s2 != '\0') && (loc < LOC_MESG)) {
-				locale = s2;
+				glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
 				loc = LOC_MESG;
 			}
 		}
@@ -2192,7 +2215,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 	s2 = s1;
 	if ((*s2++ == 'A') && (*s2++ == 'N') && (*s2++ == 'G') &&
 	    (*s2++ == '=') && (*s2 != '\0') && (loc < LOC_LANG)) {
-		locale = s2;
+		glcs[CI_LCMESSAGES].lc_un.lc_ptr = (char *)s2;
 		loc = LOC_LANG;
 		return;
 	}
@@ -2242,6 +2265,8 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
 int
 readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 {
+	char	*locale;
+
 	if (envp == (const char **)0)
 		return (0);
 
@@ -2277,12 +2302,12 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 	 * Duplicate the string so that new locale setting can generically
 	 * cleanup any previous locales.
 	 */
-	if (locale) {
+	if ((locale = glcs[CI_LCMESSAGES].lc_un.lc_ptr) != 0) {
 		if (((*locale == 'C') && (*(locale + 1) == '\0')) ||
 		    (strcmp(locale, MSG_ORIG(MSG_TKN_POSIX)) == 0))
-			locale = 0;
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = 0;
 		else
-			locale = strdup(locale);
+			glcs[CI_LCMESSAGES].lc_un.lc_ptr = strdup(locale);
 	}
 	return (0);
 }
@@ -2377,16 +2402,15 @@ dowrite(Prfbuf * prf)
 #define	FLG_UT_DOTSEEN	0x0008	/* dot appeared in format spec */
 
 /*
- * This macro is for use from within doprf only.  it's to be used
- * for checking the output buffer size and placing characters into
- * the buffer.
+ * This macro is for use from within doprf only.  It is to be used for checking
+ * the output buffer size and placing characters into the buffer.
  */
 #define	PUTC(c) \
 	{ \
-		register char tmpc; \
+		char tmpc; \
 		\
 		tmpc = (c); \
-		if ((bufsiz) && ((bp + 1) >= bufend)) { \
+		if (bufsiz && (bp >= bufend)) { \
 			prf->pr_cur = bp; \
 			if (dowrite(prf) == 0) \
 				return (0); \
@@ -2594,6 +2618,7 @@ again:
 			}
 		}
 	}
+
 	PUTC('\0');
 	prf->pr_cur = bp;
 	return (1);
