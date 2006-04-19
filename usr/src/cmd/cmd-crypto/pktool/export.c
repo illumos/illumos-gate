@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1090,13 +1089,17 @@ cvt_cert2x509(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, X509 **c)
 	}
 
 	/* Serial number (optional) */
-	cryptodebug("calling c2i_ASN1_INTEGER for serial number");
-	if ((ssl_serial = c2i_ASN1_INTEGER(NULL, &serial, serial_len)) ==
-	    NULL) {
+	cryptodebug("calling OPENSSL_malloc() for serial number");
+	if ((ssl_serial = OPENSSL_malloc(sizeof (ASN1_INTEGER))) == NULL) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Unable to convert certificate serial number."));
-		return (CKR_GENERAL_ERROR);
+		return (CKR_HOST_MEMORY);
 	}
+	ssl_serial->length = serial_len;
+	ssl_serial->type = (serial[0] & 0x80) ? V_ASN1_NEG_INTEGER :
+	    V_ASN1_INTEGER;
+	ssl_serial->data = serial;
+	ssl_serial->flags = 0;
 	cryptodebug("calling X509_set_serialNumber");
 	if (!X509_set_serialNumber(cert, ssl_serial))
 		cryptodebug("error not caught");
