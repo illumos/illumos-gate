@@ -96,7 +96,6 @@ static int conskbd_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static void	conskbduwsrv(queue_t *);
 static void	conskbdlwserv(queue_t *);
 static void	conskbdlrput(queue_t *, mblk_t *);
-static void	conskbdioctl(queue_t *, mblk_t *);
 static int	conskbdclose(queue_t *, int, cred_t *);
 static int	conskbdopen(queue_t *, dev_t *, int, int, cred_t *);
 
@@ -183,7 +182,7 @@ static 	struct cb_ops cb_conskbd_ops = {
 	nochpoll,		/* cb_chpoll */
 	ddi_prop_op,		/* cb_prop_op */
 	&conskbd_str_info,	/* cb_stream */
-	D_MP | D_MTOUTPERIM	/* cb_flag */
+	D_MP | D_MTOUTPERIM | D_MTOCEXCL	/* cb_flag */
 };
 
 
@@ -209,7 +208,7 @@ static struct dev_ops conskbd_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Console kbd Multiplexer driver 'conskbd' %I%",
+	"conskbd multiplexer driver %I%",
 	&conskbd_ops,	/* driver ops */
 };
 
@@ -253,7 +252,11 @@ uint_t	conskbd_errlevel = PRINT_L2;
 #endif
 
 /*
- * Module global data are protected by the per-module inner perimeter
+ * Module global data are protected by outer perimeter. Modifying
+ * these global data is executed in outer perimeter exclusively.
+ * Except in conskbdopen() and conskbdclose(), which are entered
+ * exclusively (Refer to D_MTOCEXCL flag), all changes for the
+ * global variables are protected by qwriter().
  */
 static	queue_t	*conskbd_regqueue; /* regular keyboard queue above us */
 static	queue_t	*conskbd_consqueue; /* console queue above us */
@@ -280,7 +283,9 @@ static struct {
  */
 static int conskbd_kstat_update(kstat_t *, int);
 
+static void conskbd_ioctl(queue_t *, mblk_t *);
 static void conskbd_ioc_plink(queue_t *, mblk_t *);
+static void conskbd_ioc_punlink(queue_t *, mblk_t *);
 static void conskbd_legacy_kbd_ioctl(queue_t *, mblk_t *);
 static void conskbd_virtual_kbd_ioctl(queue_t *, mblk_t *);
 static mblk_t *conskbd_alloc_firm_event(int, int);
@@ -288,7 +293,8 @@ static mblk_t *conskbd_alloc_firm_event(int, int);
 static conskbd_pending_msg_t *conskbd_mux_find_msg(mblk_t *);
 static void conskbd_mux_enqueue_msg(conskbd_pending_msg_t *);
 static void conskbd_mux_dequeue_msg(conskbd_pending_msg_t *);
-static void conskbd_link_lower_queue(conskbd_lower_queue_t *);
+static void conskbd_link_lowque_virt(queue_t *, mblk_t *);
+static void conskbd_link_lowque_legacy(queue_t *, mblk_t *);
 
 static void conskbd_handle_downstream_msg(queue_t *, mblk_t *);
 static void conskbd_kioctype_complete(conskbd_lower_queue_t *, mblk_t *);
@@ -324,13 +330,12 @@ static struct kbtrans_callbacks conskbd_callbacks = {
  * Single private "global" lock for the few rare conditions
  * we want single-threaded.
  */
-static	kmutex_t	conskbd_lq_lock;
 static	kmutex_t	conskbd_msgq_lock;
 static	conskbd_pending_msg_t	*conskbd_msg_queue;
 
 /*
  * The software state structure of virtual keyboard.
- * Currently, only one virtual keyboard is support.
+ * Currently, only one virtual keyboard is supported.
  */
 static conskbd_state_t	conskbd = { 0 };
 
@@ -363,7 +368,6 @@ _init(void)
 
 	conskbd_keyindex = kbtrans_usbkb_maptab_init();
 
-	mutex_init(&conskbd_lq_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&conskbd_msgq_lock, NULL, MUTEX_DRIVER, NULL);
 
 	return (error);
@@ -390,7 +394,6 @@ _fini(void)
 	error = mod_remove(&modlinkage);
 	if (error != 0)
 		return (error);
-	mutex_destroy(&conskbd_lq_lock);
 	mutex_destroy(&conskbd_msgq_lock);
 	kbtrans_usbkb_maptab_fini(&conskbd_keyindex);
 
@@ -549,6 +552,12 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	}
 
 	/*
+	 * Check if already initialized
+	 */
+	if (conskbd_consqueue != NULL)
+		return (0);
+
+	/*
 	 * Opening the device to be linked under the console.
 	 */
 	conskbd_consqueue = q;
@@ -577,7 +586,7 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 
 	return (0);
 
-}	/* conskbd_open() */
+}	/* conskbdopen() */
 
 
 /*ARGSUSED*/
@@ -585,6 +594,9 @@ static int
 conskbdclose(queue_t *q, int flag, cred_t *crp)
 {
 	if (q == conskbd_regqueue) {
+
+		conskbd_pending_msg_t	*pmsg, *prev, *next;
+		mblk_t		*mp;
 
 		/* switch the input stream back to conskbd_consqueue */
 		conskbd.conskbd_directio = B_FALSE;
@@ -594,6 +606,34 @@ conskbdclose(queue_t *q, int flag, cred_t *crp)
 		    conskbd_consqueue);
 		qprocsoff(q);
 		conskbd_regqueue = NULL;
+
+		/*
+		 * If there are any pending ioctls which conskbd hasn't
+		 * responded to yet, remove them from conskbd_msg_queue.
+		 * Otherwise, we might send the response to a nonexistent
+		 * closed queue. Refer to: conskbd_mux_upstream_msg().
+		 */
+		for (prev = NULL, pmsg = conskbd_msg_queue; pmsg != NULL;
+		    pmsg = next) {
+			next = pmsg->kpm_next;
+			if (pmsg->kpm_upper_queue == q) {
+				if (prev == NULL)
+					conskbd_msg_queue = next;
+				else
+					prev->kpm_next = next;
+
+				while (pmsg->kpm_resp_list != NULL) {
+					mp = pmsg->kpm_resp_list;
+					pmsg->kpm_resp_list = mp->b_next;
+					mp->b_next = mp->b_prev = NULL;
+					freemsg(mp);
+				}
+				mutex_destroy(&pmsg->kpm_lock);
+				kmem_free(pmsg, sizeof (*pmsg));
+			} else {
+				prev = pmsg;
+			}
+		}
 	} else if (q == conskbd_consqueue) {
 		/*
 		 * Well, this is probably a mistake, but we will permit you
@@ -605,7 +645,7 @@ conskbdclose(queue_t *q, int flag, cred_t *crp)
 
 	return (0);
 
-}	/* conskbd_close() */
+}	/* conskbdclose() */
 
 /*
  * Service procedure for upper write queue.
@@ -677,7 +717,7 @@ conskbduwsrv(queue_t *q)
 		switch (mp->b_datap->db_type) {
 
 		case M_IOCTL:
-			conskbdioctl(q, mp);
+			conskbd_ioctl(q, mp);
 			break;
 
 		case M_FLUSH:
@@ -728,13 +768,9 @@ conskbduwsrv(queue_t *q)
 }	/* conskbduwsrv() */
 
 static void
-conskbdioctl(queue_t *q, mblk_t *mp)
+conskbd_ioctl(queue_t *q, mblk_t *mp)
 {
-	conskbd_lower_queue_t		*prev;
-	conskbd_lower_queue_t		*lqs;
 	struct	iocblk			*iocp;
-	struct	linkblk			*linkp;
-	int	index;
 	int	error = 0;
 
 	iocp = (struct iocblk *)mp->b_rptr;
@@ -752,52 +788,12 @@ conskbdioctl(queue_t *q, mblk_t *mp)
 			miocnak(q, mp, 0, EAGAIN);
 			break;
 		}
-
-		mutex_enter(&conskbd_lq_lock);
-		conskbd_ioc_plink(q, mp);
-		mutex_exit(&conskbd_lq_lock);
+		qwriter(q, mp, conskbd_ioc_plink, PERIM_OUTER);
 		break;
 
 	case I_UNLINK:
 	case I_PUNLINK:
-		mutex_enter(&conskbd_lq_lock);
-		linkp = (struct linkblk *)mp->b_cont->b_rptr;
-		prev = conskbd.conskbd_lqueue_list;
-		for (lqs = prev; lqs; lqs = lqs->lqs_next) {
-			if (lqs->lqs_queue == linkp->l_qbot) {
-				if (prev == lqs)
-					conskbd.conskbd_lqueue_list =
-					    lqs->lqs_next;
-				else
-					prev->lqs_next = lqs->lqs_next;
-
-				lqs->lqs_queue->q_ptr =  NULL;
-				conskbd.conskbd_lqueue_nums --;
-				if (conskbd.conskbd_lqueue_nums == 0) {
-					kbd_layout_bak = conskbd.conskbd_layout;
-					conskbd.conskbd_layout = -1;
-				}
-
-				mutex_exit(&conskbd_lq_lock);
-
-				for (index = 0; index < KBTRANS_KEYNUMS_MAX;
-				    index ++) {
-					if (lqs->lqs_key_state[index] ==
-					    KEY_PRESSED)
-						kbtrans_streams_key(
-						    conskbd.conskbd_kbtrans,
-						    index,
-						    KEY_RELEASED);
-				}
-
-				kmem_free(lqs, sizeof (*lqs));
-				miocack(q, mp, 0, 0);
-				return;
-			}
-			prev = lqs;
-		}
-		mutex_exit(&conskbd_lq_lock);
-		miocnak(q, mp, 0, EINVAL);
+		qwriter(q, mp, conskbd_ioc_punlink, PERIM_OUTER);
 		break;
 
 	case KIOCSKABORTEN:
@@ -827,7 +823,7 @@ conskbdioctl(queue_t *q, mblk_t *mp)
 		}
 	}
 
-}	/* conskbdioctl() */
+}	/* conskbd_ioctl() */
 
 
 static void
@@ -933,7 +929,6 @@ conskbd_virtual_kbd_ioctl(queue_t *q, mblk_t *mp)
 			miocack(q, mp, sizeof (int), 0);
 			return;
 		}
-
 		conskbd_handle_downstream_msg(q, mp);
 		break;
 
@@ -1324,21 +1319,14 @@ conskbd_ioc_plink(queue_t *q, mblk_t *mp)
 {
 	mblk_t		*req;
 	queue_t		*lowque;
-	struct iocblk		*iocp;
 	struct linkblk		*linkp;
 	conskbd_lower_queue_t	*lqs;
-
-	ASSERT(mutex_owned(&conskbd_lq_lock));
 
 	lqs = kmem_zalloc(sizeof (*lqs), KM_SLEEP);
 	ASSERT(lqs->lqs_state == LQS_UNINITIALIZED);
 
-	iocp = (struct iocblk *)mp->b_rptr;
 	linkp = (struct linkblk *)mp->b_cont->b_rptr;
 	lowque = linkp->l_qbot;
-
-	lowque->q_ptr = (void *)lqs;
-	OTHERQ(lowque)->q_ptr = (void *)lqs;
 
 	lqs->lqs_queue = lowque;
 	lqs->lqs_pending_plink = mp;
@@ -1347,7 +1335,6 @@ conskbd_ioc_plink(queue_t *q, mblk_t *mp)
 	req = mkiocb(CONSSETKBDTYPE);
 	if (req == NULL) {
 		miocnak(q, mp, 0, ENOMEM);
-		lowque->q_ptr = NULL;
 		kmem_free(lqs, sizeof (*lqs));
 		return;
 	}
@@ -1356,14 +1343,12 @@ conskbd_ioc_plink(queue_t *q, mblk_t *mp)
 	if (req->b_cont == NULL) {
 		freemsg(req);
 		miocnak(q, mp, 0, ENOMEM);
-		lowque->q_ptr = NULL;
 		kmem_free(lqs, sizeof (*lqs));
 		return;
 	}
 
-	iocp->ioc_count = 0;
-	iocp->ioc_rval = 0;
-
+	lowque->q_ptr = lqs;
+	OTHERQ(lowque)->q_ptr = lqs;
 	*(int *)req->b_cont->b_wptr = KB_USB;
 	req->b_cont->b_wptr += sizeof (int);
 
@@ -1374,11 +1359,56 @@ conskbd_ioc_plink(queue_t *q, mblk_t *mp)
 		miocnak(lqs->lqs_pending_queue,
 		    lqs->lqs_pending_plink, 0, ENOMEM);
 		lowque->q_ptr = NULL;
+		OTHERQ(lowque)->q_ptr = NULL;
 		kmem_free(lqs, sizeof (*lqs));
 	}
 
 }	/* conskbd_ioc_plink() */
 
+
+static void
+conskbd_ioc_punlink(queue_t *q, mblk_t *mp)
+{
+	int			index;
+	struct linkblk		*linkp;
+	conskbd_lower_queue_t	*lqs;
+	conskbd_lower_queue_t	*prev;
+
+	linkp = (struct linkblk *)mp->b_cont->b_rptr;
+	prev = conskbd.conskbd_lqueue_list;
+	for (lqs = prev; lqs; lqs = lqs->lqs_next) {
+		if (lqs->lqs_queue == linkp->l_qbot) {
+			if (prev == lqs)
+				conskbd.conskbd_lqueue_list =
+				    lqs->lqs_next;
+			else
+				prev->lqs_next = lqs->lqs_next;
+
+			lqs->lqs_queue->q_ptr =  NULL;
+			OTHERQ(lqs->lqs_queue)->q_ptr = NULL;
+			conskbd.conskbd_lqueue_nums --;
+			if (conskbd.conskbd_lqueue_nums == 0) {
+				kbd_layout_bak = conskbd.conskbd_layout;
+				conskbd.conskbd_layout = -1;
+			}
+
+			for (index = 0; index < KBTRANS_KEYNUMS_MAX; index ++) {
+				if (lqs->lqs_key_state[index] == KEY_PRESSED)
+					kbtrans_streams_key(
+					    conskbd.conskbd_kbtrans,
+					    index,
+					    KEY_RELEASED);
+			}
+
+			kmem_free(lqs, sizeof (*lqs));
+			miocack(q, mp, 0, 0);
+			return;
+		}
+		prev = lqs;
+	}
+	miocnak(q, mp, 0, EINVAL);
+
+}	/* conskbd_ioc_punlink() */
 
 /*
  * Every physical keyboard has a corresponding STREAMS queue. We call this
@@ -1437,9 +1467,9 @@ static void
 conskbd_kioctype_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 {
 	struct iocblk	*iocp;
-	mblk_t		*msg;
 	mblk_t		*req;
 	queue_t		*lowerque;
+	int		err = ENOMEM;
 
 	ASSERT(lqs->lqs_pending_plink);
 	ASSERT(lqs->lqs_state == LQS_KIOCTYPE_ACK_PENDING);
@@ -1450,23 +1480,13 @@ conskbd_kioctype_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	case M_IOCACK:
 		req = mkiocb(KIOCTRANS);
 		if (req == NULL) {
-			miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-			    0, ENOMEM);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
-			freemsg(mp);
-			return;
+			goto err_exit;
 		}
 
 		req->b_cont = allocb(sizeof (int), BPRI_MED);
 		if (req->b_cont == NULL) {
-			miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-			    0, ENOMEM);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
 			freemsg(req);
-			freemsg(mp);
-			return;
+			goto err_exit;
 		}
 
 		/* Set the translate mode to TR_UNTRANS_EVENT */
@@ -1478,12 +1498,10 @@ conskbd_kioctype_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 
 		if (putq(lowerque, req) != 1) {
 			freemsg(req);
-			miocnak(lqs->lqs_pending_queue,
-			    lqs->lqs_pending_plink, 0, ENOMEM);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
+			goto err_exit;
 		}
-		break;
+		freemsg(mp);
+		return;
 
 	case M_IOCNAK:
 		/*
@@ -1500,38 +1518,22 @@ conskbd_kioctype_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 		 */
 		if (conskbd.conskbd_lqueue_nums > 0) {
 			iocp = (struct iocblk *)mp->b_rptr;
-			miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-			    0, iocp->ioc_error);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
-			break;
+			err = iocp->ioc_error;
+			goto err_exit;
 		}
 
 		/*
-		 * Bypass the virutal keyboard for old hardware
+		 * link this keyboard under conskbd.
 		 */
-		conskbd.conskbd_bypassed = B_TRUE;
-
-		msg = lqs->lqs_pending_plink;
-		msg->b_datap->db_type = M_IOCACK;
-		iocp = (struct iocblk *)msg->b_rptr;
-		iocp->ioc_error = 0;
-
-		/*
-		 * link this keyboard under conskbd
-		 */
-		mutex_enter(&conskbd_lq_lock);
-		lqs->lqs_next = conskbd.conskbd_lqueue_list;
-		conskbd.conskbd_lqueue_list = lqs;
-		conskbd.conskbd_lqueue_nums++;
-		mutex_exit(&conskbd_lq_lock);
-
-		lqs->lqs_state = LQS_INITIALIZED_LEGACY;
-
-		qreply(lqs->lqs_pending_queue, lqs->lqs_pending_plink);
-		break;
+		qwriter(lowerque, mp, conskbd_link_lowque_legacy, PERIM_OUTER);
+		return;
 	}
 
+err_exit:
+	miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink, 0, err);
+	lowerque->q_ptr = NULL;
+	OTHERQ(lowerque)->q_ptr = NULL;
+	kmem_free(lqs, sizeof (*lqs));
 	freemsg(mp);
 
 }	/* conskbd_kioctype_complete() */
@@ -1542,6 +1544,7 @@ conskbd_kioctrans_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	struct iocblk 	*iocp;
 	mblk_t		*req;
 	queue_t		*lowerque;
+	int		err = ENOMEM;
 
 	ASSERT(lqs->lqs_pending_plink != NULL);
 	ASSERT(lqs->lqs_state == LQS_KIOCTRANS_ACK_PENDING);
@@ -1552,44 +1555,35 @@ conskbd_kioctrans_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	case M_IOCACK:
 		req = mkiocb(KIOCLAYOUT);
 		if (req == NULL) {
-			miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-			    0, ENOMEM);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
-			freemsg(mp);
-			return;
+			goto err_exit;
 		}
 
 		req->b_cont = allocb(sizeof (int), BPRI_MED);
 		if (req->b_cont == NULL) {
-			miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-			    0, ENOMEM);
-			kmem_free(lqs, sizeof (*lqs));
 			freemsg(req);
-			freemsg(mp);
-			return;
+			goto err_exit;
 		}
 
 		/* waiting for response to KIOCLAYOUT */
 		lqs->lqs_state = LQS_KIOCLAYOUT_ACK_PENDING;
 		if (putq(lqs->lqs_queue, req) != 1) {
 			freemsg(req);
-			miocnak(lqs->lqs_pending_queue,
-			    lqs->lqs_pending_plink, 0, ENOMEM);
-			lowerque->q_ptr = NULL;
-			kmem_free(lqs, sizeof (*lqs));
+			goto err_exit;
 		}
-		break;
+		freemsg(mp);
+		return;
 
 	case M_IOCNAK:
 		iocp = (struct iocblk *)mp->b_rptr;
-		miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink,
-		    0, iocp->ioc_error);
-		lowerque->q_ptr = NULL;
-		kmem_free(lqs, sizeof (*lqs));
-		break;
+		err = iocp->ioc_error;
+		goto err_exit;
 	}
 
+err_exit:
+	miocnak(lqs->lqs_pending_queue, lqs->lqs_pending_plink, 0, err);
+	lowerque->q_ptr = NULL;
+	OTHERQ(lowerque)->q_ptr = NULL;
+	kmem_free(lqs, sizeof (*lqs));
 	freemsg(mp);
 
 }	/* conskbd_kioctrans_complete() */
@@ -1667,8 +1661,6 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 		break;
 	}
 
-	freemsg(mp);
-
 	fail = B_TRUE;
 
 	if (conskbd.conskbd_led_state == -1)
@@ -1705,7 +1697,10 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 		 * current keyboard under conskbd. Thus, even if fails
 		 * to set/get LED, this keyboard could be available.
 		 */
-		conskbd_link_lower_queue(lqs);
+		qwriter(lqs->lqs_queue,
+		    mp, conskbd_link_lowque_virt, PERIM_OUTER);
+	} else {
+		freemsg(mp);
 	}
 
 }	/* conskbd_kioclayout_complete() */
@@ -1741,8 +1736,7 @@ conskbd_kiocsled_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	 * error, so we will plumb the lower queue into conskbd whether
 	 * setting/getting LED succeeds or fails.
 	 */
-	freemsg(mp);
-	conskbd_link_lower_queue(lqs);
+	qwriter(lqs->lqs_queue, mp, conskbd_link_lowque_virt, PERIM_OUTER);
 
 }	/* conskbd_kiocsled_complete() */
 
@@ -1761,10 +1755,12 @@ conskbd_mux_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
 
 	if (!msg) {
 		/*
-		 * Here, we just discard the responses to KIOCSLED request.
-		 * Please refer to conskbd_streams_setled().
+		 * Here we discard the response if:
+		 *
+		 *   1. It's an KIOCSLED request; see conskbd_streams_setled().
+		 *   2. The application has already closed the upper stream;
+		 *		see conskbdclose()
 		 */
-		ASSERT(((struct iocblk *)mp->b_rptr)->ioc_cmd == KIOCSLED);
 		freemsg(mp);
 		return;
 	}
@@ -1917,38 +1913,61 @@ conskbd_mux_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
 
 }	/* conskbd_mux_upstream_msg() */
 
+static void
+conskbd_link_lowque_legacy(queue_t *lowque, mblk_t *mp)
+{
+	conskbd_lower_queue_t *lqs;
+
+	freemsg(mp);
+
+	/*
+	 * Bypass the virutal keyboard for old hardware,
+	 * Now, only current legacy keyboard can be linked
+	 * under conskbd
+	 */
+	conskbd.conskbd_bypassed = B_TRUE;
+
+	/*
+	 * Link the lower queue under conskbd
+	 */
+	lqs = (conskbd_lower_queue_t *)lowque->q_ptr;
+	lqs->lqs_state = LQS_INITIALIZED_LEGACY;
+	lqs->lqs_next = conskbd.conskbd_lqueue_list;
+	conskbd.conskbd_lqueue_list = lqs;
+	conskbd.conskbd_lqueue_nums++;
+
+	mioc2ack(lqs->lqs_pending_plink, NULL, 0, 0);
+	qreply(lqs->lqs_pending_queue, lqs->lqs_pending_plink);
+
+}	/* conskbd_link_lowque_legacy() */
 
 static void
-conskbd_link_lower_queue(conskbd_lower_queue_t *lqs)
+conskbd_link_lowque_virt(queue_t *lowque, mblk_t *mp)
 {
-	struct iocblk 	*iocp;
-	mblk_t		*msg;
 	int		index;
+	conskbd_lower_queue_t *lqs;
 
+	freemsg(mp);
+
+	lqs = (conskbd_lower_queue_t *)lowque->q_ptr;
+
+	ASSERT(lqs->lqs_queue == lowque);
 	ASSERT(lqs->lqs_pending_plink != NULL);
-
-	msg = lqs->lqs_pending_plink;
-	msg->b_datap->db_type = M_IOCACK;
-	iocp = (struct iocblk *)msg->b_rptr;
-	iocp->ioc_error = 0;
 
 	/*
 	 * Now, link the lower queue under conskbd
 	 */
-	mutex_enter(&conskbd_lq_lock);
-	conskbd.conskbd_lqueue_nums++;
-	lqs->lqs_next = conskbd.conskbd_lqueue_list;
-	conskbd.conskbd_lqueue_list = lqs;
 	for (index = 0; index < KBTRANS_KEYNUMS_MAX; index ++) {
 		lqs->lqs_key_state[index] = KEY_RELEASED;
 	}
+	lqs->lqs_next = conskbd.conskbd_lqueue_list;
 	lqs->lqs_state = LQS_INITIALIZED;
-	mutex_exit(&conskbd_lq_lock);
+	conskbd.conskbd_lqueue_nums++;
+	conskbd.conskbd_lqueue_list = lqs;
+	mioc2ack(lqs->lqs_pending_plink, NULL, 0, 0);
 	qreply(lqs->lqs_pending_queue, lqs->lqs_pending_plink);
 
-}	/* conskbd_kiocsled_complete() */
-
-
+}	/* conskbd_link_lowque_virt() */
 
 /*ARGSUSED*/
 static void
