@@ -129,33 +129,6 @@ hv_cpu_yield(void)
 
 /*ARGSUSED*/
 uint64_t
-hv_service_recv(uint64_t s_id, uint64_t buf_pa, uint64_t size,
-    uint64_t *recv_bytes)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_send(uint64_t s_id, uint64_t buf_pa, uint64_t size,
-    uint64_t *send_bytes)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_getstatus(uint64_t s_id, uint64_t *vreg)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_setstatus(uint64_t s_id, uint64_t bits)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_clrstatus(uint64_t s_id, uint64_t bits)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
 hv_cpu_state(uint64_t cpuid, uint64_t *cpu_state)
 { return (0); }
 
@@ -453,80 +426,6 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	retl
 	nop
 	SET_SIZE(hv_cpu_yield)
-
-	/*
-	 * hv_service_recv(uint64_t s_id, uint64_t buf_pa,
-	 *     uint64_t size, uint64_t *recv_bytes);
-	 */
-	ENTRY(hv_service_recv)
-	save	%sp, -SA(MINFRAME), %sp
-	mov	%i0, %o0
-	mov	%i1, %o1
-	mov	%i2, %o2
-	mov	%i3, %o3
-	mov	SVC_RECV, %o5
-	ta	FAST_TRAP
-	brnz	%o0, 1f
-	mov	%o0, %i0
-	stx	%o1, [%i3]
-1:
-	ret
-	restore
-	SET_SIZE(hv_service_recv)
-
-	/*
-	 * hv_service_send(uint64_t s_id, uint64_t buf_pa,
-	 *     uint64_t size, uint64_t *recv_bytes);
-	 */
-	ENTRY(hv_service_send)
-	save	%sp, -SA(MINFRAME), %sp
-	mov	%i0, %o0
-	mov	%i1, %o1
-	mov	%i2, %o2
-	mov	%i3, %o3
-	mov	SVC_SEND, %o5
-	ta	FAST_TRAP
-	brnz	%o0, 1f
-	mov	%o0, %i0
-	stx	%o1, [%i3]
-1:
-	ret
-	restore	
-	SET_SIZE(hv_service_send)
-	
-	/*
-	 * hv_service_getstatus(uint64_t s_id, uint64_t *vreg);
-	 */
-	ENTRY(hv_service_getstatus)
-	mov	%o1, %o4			! save datap
-	mov	SVC_GETSTATUS, %o5
-	ta	FAST_TRAP
-	brz,a	%o0, 1f
-	stx	%o1, [%o4]
-1:
-	retl
-	nop
-	SET_SIZE(hv_service_getstatus)
-	
-	/*
-	 * hv_service_setstatus(uint64_t s_id, uint64_t bits);
-	 */
-	ENTRY(hv_service_setstatus)
-	mov	SVC_SETSTATUS, %o5
-	ta	FAST_TRAP
-	retl
-	nop
-	SET_SIZE(hv_service_setstatus)
-
-	/*
-	 * hv_service_clrstatus(uint64_t s_id, uint64_t bits);
-	 */
-	ENTRY(hv_service_clrstatus)
-	mov	SVC_CLRSTATUS, %o5
-	ta	FAST_TRAP
-	retl
-	nop
-	SET_SIZE(hv_service_clrstatus)
 
 	/*
 	 * int hv_cpu_state(uint64_t cpuid, uint64_t *cpu_state);

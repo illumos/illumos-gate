@@ -104,12 +104,6 @@ extern "C" {
 #define	CONS_READ		0x60
 #define	CONS_WRITE		0x61
 
-#define	SVC_SEND		0x80
-#define	SVC_RECV		0x81
-#define	SVC_GETSTATUS		0x82
-#define	SVC_SETSTATUS		0x83
-#define	SVC_CLRSTATUS		0x84
-
 #define	TTRACE_BUF_CONF		0x90
 #define	TTRACE_BUF_INFO		0x91
 #define	TTRACE_ENABLE		0x92

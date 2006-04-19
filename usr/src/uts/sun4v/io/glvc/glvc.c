@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +44,7 @@
 #include <sys/uadmin.h>
 #include <sys/machsystm.h>
 #include <sys/hypervisor_api.h>
+#include <sys/hsvc.h>
 #include <sys/glvc.h>
 
 /*
@@ -137,7 +137,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. This is a driver */
-	"Sun4v virtual channel driver",	/* Name of the module */
+	"Sun4v virtual channel driver 2.0",	/* Name of the module */
 	&glvc_ops			/* pointer to the dev_ops structure */
 };
 
@@ -168,6 +168,18 @@ typedef struct glvc_soft_state {
 	uint64_t mb_recv_buf_pa;
 	uint64_t mb_send_buf_pa;
 } glvc_soft_state_t;
+
+/*
+ * Hypervisor VSC api versioning information for glvc driver.
+ */
+static uint64_t	glvc_vsc_min_ver; /* Negotiated VSC API minor version */
+static uint_t glvc_vsc_users = 0; /* VSC API users */
+static kmutex_t glvc_vsc_users_mutex;	/* Mutex to protect user count */
+
+static hsvc_info_t glvc_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_VSC, GLVC_VSC_MAJOR_VER,
+	GLVC_VSC_MINOR_VER, "glvc"
+};
 
 /*
  * Module Variables
@@ -203,6 +215,11 @@ _init(void)
 	    sizeof (glvc_soft_state_t), 1)) != 0)
 		return (error);
 
+	/*
+	 * Initialize the mutex for global data structure
+	 */
+	mutex_init(&glvc_vsc_users_mutex, NULL, MUTEX_DRIVER, NULL);
+
 	error = mod_install(&modlinkage);
 
 	return (error);
@@ -225,6 +242,8 @@ _fini(void)
 	if (error)
 		return (error);
 
+	mutex_destroy(&glvc_vsc_users_mutex);
+
 	ddi_soft_state_fini(&glvc_ssp);
 	return (0);
 }
@@ -241,9 +260,38 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		instance = ddi_get_instance(dip);
 
-		if (ddi_soft_state_zalloc(glvc_ssp, instance)
-		    != DDI_SUCCESS)
+		/*
+		 * Negotiate the API version for VSC hypervisor services.
+		 */
+		mutex_enter(&glvc_vsc_users_mutex);
+		if (glvc_vsc_users == 0 &&
+		    (err = hsvc_register(&glvc_hsvc, &glvc_vsc_min_ver))
+		    != 0) {
+			cmn_err(CE_WARN, "%s: cannot negotiate hypervisor "
+			    "services group: 0x%lx major: 0x%lx minor: 0x%lx "
+			    "errno: %d\n", glvc_hsvc.hsvc_modname,
+			    glvc_hsvc.hsvc_group, glvc_hsvc.hsvc_major,
+			    glvc_hsvc.hsvc_minor, err);
+
+			mutex_exit(&glvc_vsc_users_mutex);
 			return (DDI_FAILURE);
+		} else {
+			glvc_vsc_users++;
+			mutex_exit(&glvc_vsc_users_mutex);
+		}
+
+		DPRINTF(("Glvc instance %d negotiated VSC API version, "
+		    " major 0x%lx minor 0x%lx\n",
+		    instance, glvc_hsvc.hsvc_major, glvc_vsc_min_ver));
+
+		if (ddi_soft_state_zalloc(glvc_ssp, instance)
+		    != DDI_SUCCESS) {
+			mutex_enter(&glvc_vsc_users_mutex);
+			if (--glvc_vsc_users == 0)
+				(void) hsvc_unregister(&glvc_hsvc);
+			mutex_exit(&glvc_vsc_users_mutex);
+			return (DDI_FAILURE);
+		}
 
 		softsp = ddi_get_soft_state(glvc_ssp, instance);
 
@@ -330,7 +378,7 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_report_dev(dip);
 
 		DPRINTF(("glvc instance %d, s_id %lu,"
-		    "mtu %lu attached", instance, softsp->s_id,
+		    "mtu %lu attached\n", instance, softsp->s_id,
 		    softsp->mtu));
 
 		return (DDI_SUCCESS);
@@ -349,6 +397,10 @@ bad1:
 	mutex_destroy(&(softsp->statusreg_mutex));
 
 bad:
+	mutex_enter(&glvc_vsc_users_mutex);
+	if (--glvc_vsc_users == 0)
+		(void) hsvc_unregister(&glvc_hsvc);
+	mutex_exit(&glvc_vsc_users_mutex);
 	cmn_err(CE_WARN, "glvc: attach failed for instance %d\n", instance);
 	ddi_soft_state_free(glvc_ssp, instance);
 	return (DDI_FAILURE);
@@ -390,6 +442,11 @@ glvc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		ddi_soft_state_free(glvc_ssp, instance);
 
+		mutex_enter(&glvc_vsc_users_mutex);
+		if (--glvc_vsc_users == 0)
+			(void) hsvc_unregister(&glvc_hsvc);
+		mutex_exit(&glvc_vsc_users_mutex);
+
 		return (DDI_SUCCESS);
 	case DDI_SUSPEND:
 		return (DDI_SUCCESS);
@@ -424,7 +481,7 @@ glvc_add_intr_handlers(dev_info_t *dip)
 		polling_interval = (uint64_t)ddi_getprop(DDI_DEV_T_ANY,
 		    softsp->dip, DDI_PROP_DONTPASS, "intrmode_poll",
 		    GLVC_TIMEOUT_POLL);
-		DPRINTF(("glvc instance %d polling_interval = %lu",
+		DPRINTF(("glvc instance %d polling_interval = %lu\n",
 		    instance, polling_interval));
 		softsp->polling_interval = drv_usectohz(polling_interval);
 	} else {
@@ -435,7 +492,7 @@ glvc_add_intr_handlers(dev_info_t *dip)
 		    (uint64_t)ddi_getprop(DDI_DEV_T_ANY,
 		    softsp->dip, DDI_PROP_DONTPASS, "pollmode_poll",
 		    GLVC_POLLMODE_POLL);
-		DPRINTF(("glvc instance %d polling_interval = %lu",
+		DPRINTF(("glvc instance %d polling_interval = %lu\n",
 		    instance, polling_interval));
 		softsp->polling_interval =
 		    drv_usectohz(polling_interval);
@@ -447,7 +504,7 @@ glvc_add_intr_handlers(dev_info_t *dip)
 		    GLVC_REG_RECV_ENA|GLVC_REG_SEND_ENA);
 		if (err != H_EOK) {
 			cmn_err(CE_NOTE, "glvc instance %d"
-			    " cannot enable receive interrupt",
+			    " cannot enable receive interrupt\n",
 			    instance);
 			return (DDI_FAILURE);
 		}

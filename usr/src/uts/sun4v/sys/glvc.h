@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,28 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Service channel related Hypervisor function numbers.
+ */
+#define	SVC_SEND		0x80
+#define	SVC_RECV		0x81
+#define	SVC_GETSTATUS		0x82
+#define	SVC_SETSTATUS		0x83
+#define	SVC_CLRSTATUS		0x84
+
+#ifndef _ASM
+
+/*
+ * VSC API versioning.
+ *
+ * Current glvc driver supports VSC API version 1.0.
+ */
+#define	GLVC_VSC_MAJOR_VER_1	0x1ull
+#define	GLVC_VSC_MAJOR_VER	GLVC_VSC_MAJOR_VER_1
+
+#define	GLVC_VSC_MINOR_VER_0	0x0ull
+#define	GLVC_VSC_MINOR_VER	GLVC_VSC_MINOR_VER_0
 
 /* for ioctl */
 #define	GLVC_XPORT_IOCTL_DATA_PEEK		1
@@ -61,6 +82,8 @@ typedef struct glvc_xport_opt_op {
 	int32_t		opt_sel;	/* option selector (ex: MTU) */
 	uint32_t	opt_val;	/* option value to use */
 } glvc_xport_opt_op_t;
+
+#endif /* _ASM */
 
 #ifdef __cplusplus
 }

@@ -109,7 +109,7 @@ MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 #
 QCN_OBJS	= qcn.o
 VNEX_OBJS	= vnex.o
-GLVC_OBJS	= glvc.o
+GLVC_OBJS	= glvc.o glvc_hcall.o
 MDESC_OBJS	= mdesc.o
 
 #
