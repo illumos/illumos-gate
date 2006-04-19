@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.3	*/
 
@@ -98,11 +96,10 @@ _elf_outsync(int fd, char *p, size_t sz, unsigned int flag)
 		_elf_seterr(EIO_SYNC, err);
 		return (0);
 	}
-	if (lseek(fd, 0L, SEEK_SET) == 0) {
-		if (write(fd, p, sz) == sz) {
-			(void) free(p);
-			return (sz);
-		}
+	if ((lseek(fd, 0L, SEEK_SET) == 0) &&
+	    (write(fd, p, sz) == sz) && (fsync(fd) == 0)) {
+		(void) free(p);
+		return (sz);
 	}
 	_elf_seterr(EIO_WRITE, errno);
 	return (0);

@@ -1099,3 +1099,4 @@ Bugid   Risk Synopsis
 6390410 64-bit LD_PROFILE can fail: relocation error when binding profile plt
 6382945 AMD64-GCC: dbx: internal error: dwarf reference attribute out of bounds
 6262333 init section of .so dlopened from audit interface not being called
+6409613 elf_outsync() should fsync()
