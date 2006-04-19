@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -2282,6 +2281,9 @@ nfs_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 		 * is happening, then RDIRTY will get set again.  The
 		 * RDIRTY bit must get cleared before the flush so that
 		 * we don't lose this information.
+		 *
+		 * If there are no full file async write operations
+		 * pending and RDIRTY bit is set, clear it.
 		 */
 		if (off == (u_offset_t)0 &&
 		    !(flags & B_ASYNC) &&
@@ -2289,6 +2291,13 @@ nfs_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 			mutex_enter(&rp->r_statelock);
 			rdirty = (rp->r_flags & RDIRTY);
 			rp->r_flags &= ~RDIRTY;
+			mutex_exit(&rp->r_statelock);
+		} else if (flags & B_ASYNC && off == (u_offset_t)0) {
+			mutex_enter(&rp->r_statelock);
+			if (rp->r_flags & RDIRTY && rp->r_awcount == 0) {
+				rdirty = (rp->r_flags & RDIRTY);
+				rp->r_flags &= ~RDIRTY;
+			}
 			mutex_exit(&rp->r_statelock);
 		} else
 			rdirty = 0;
