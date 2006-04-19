@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +56,7 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
+	struct regs *rp = lwptoregs(lwp);
 
 	/*
 	 * We unconditionally assign to every field through the end
@@ -96,7 +96,14 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 		ucp->uc_flags &= ~UC_FPU;
 
 	sigktou(&mask, &ucp->uc_sigmask);
-	lwptoregs(lwp)->r_ps &= ~PS_T; 		/* disable single step XXX */
+	/*
+	 * If the trace flag is set, arrange for single-stepping and
+	 * turn off the trace flag.
+	 */
+	if (rp->r_ps & PS_T) {
+		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
+		rp->r_ps &= ~PS_T;
+	}
 }
 
 /*
@@ -118,6 +125,14 @@ restorecontext(ucontext_t *ucp)
 	}
 
 	if (ucp->uc_flags & UC_CPU) {
+		/*
+		 * If the trace flag is set, mark the lwp to take a
+		 * single-step trap on return to user level (below).
+		 * The x86 lcall interface and sysenter has already done this,
+		 * and turned off the flag, but amd64 syscall interface has not.
+		 */
+		if (lwptoregs(lwp)->r_ps & PS_T)
+			lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 		setgregs(lwp, ucp->uc_mcontext.gregs);
 		lwp->lwp_eosys = JUSTRETURN;
 		t->t_post_sys = 1;
@@ -221,6 +236,7 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 {
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
+	struct regs *rp = lwptoregs(lwp);
 
 	bzero(&ucp->uc_mcontext.fpregs, sizeof (ucontext32_t) -
 	    offsetof(ucontext32_t, uc_mcontext.fpregs));
@@ -254,7 +270,14 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 		ucp->uc_flags &= ~UC_FPU;
 
 	sigktou(&mask, &ucp->uc_sigmask);
-	lwptoregs(lwp)->r_ps &= ~PS_T;
+	/*
+	 * If the trace flag is set, arrange for single-stepping and
+	 * turn off the trace flag.
+	 */
+	if (rp->r_ps & PS_T) {
+		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
+		rp->r_ps &= ~PS_T;
+	}
 }
 
 int

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -467,7 +466,16 @@ post_syscall(long rval1, long rval2)
 	 */
 	if (code == 0)
 		goto sig_check;
-
+	/*
+	 * If the trace flag is set, mark the lwp to take a single-step trap
+	 * on return to user level (below). The x86 lcall interface and
+	 * sysenter has already done this, and turned off the flag, but
+	 * amd64 syscall interface has not.
+	 */
+	if (rp->r_ps & PS_T) {
+		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
+		rp->r_ps &= ~PS_T;
+	}
 #ifdef C2_AUDIT
 	if (audit_active) {	/* put out audit record for this syscall */
 		rval_t	rval;
