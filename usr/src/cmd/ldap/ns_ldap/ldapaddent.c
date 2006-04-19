@@ -3321,7 +3321,7 @@ genent_bootparams(char *line, int (*cback)())
 
 	data.param = NULL;
 
-	do {
+	while (t = strtok(NULL, " \t"))  {
 
 		/*
 		 * don't clobber comment in canonical entry
@@ -3340,7 +3340,7 @@ genent_bootparams(char *line, int (*cback)())
 		}
 		data.param[ctr-1] = parameter;
 
-	} while (t = strtok(NULL, " \t"));
+	}
 
 
 	/* End the list of all the aliases by NULL */
