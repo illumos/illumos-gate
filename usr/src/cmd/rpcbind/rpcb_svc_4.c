@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,13 +299,13 @@ rpcbproc_getversaddr_4(regp, rqstp, transp)
  */
 /* ARGSUSED */
 rpcb_entry_list_ptr *
-rpcbproc_getaddrlist_4(regp, rqstp, transp)
-	rpcb *regp;
-	struct svc_req *rqstp;	/* Not used here */
-	SVCXPRT *transp;
+rpcbproc_getaddrlist_4(
+	rpcb *regp,
+	struct svc_req *rqstp,	/* Not used here */
+	SVCXPRT *transp)
 {
 	static rpcb_entry_list_ptr rlist;
-	register rpcblist_ptr rbl;
+	rpcblist_ptr rbl, next, prev;
 	rpcb_entry_list_ptr rp, tail;
 	ulong_t prog, vers;
 	rpcb_entry *a;
@@ -348,7 +347,9 @@ rpcbproc_getaddrlist_4(regp, rqstp, transp)
 	fprintf(stderr, "r_addr: %s r_netid: %s nc_protofmly: %s\n",
 		regp->r_addr, transp->xp_netid, reg_nconf->nc_protofmly);
 #endif
-	for (rbl = list_rbl; rbl != NULL; rbl = rbl->rpcb_next) {
+	prev = NULL;
+	for (rbl = list_rbl; rbl != NULL; rbl = next) {
+	    next = rbl->rpcb_next;
 	    if ((rbl->rpcb_map.r_prog == prog) &&
 		(rbl->rpcb_map.r_vers == vers)) {
 		nconf = rpcbind_get_conf(rbl->rpcb_map.r_netid);
@@ -356,6 +357,7 @@ rpcbproc_getaddrlist_4(regp, rqstp, transp)
 			goto fail;
 		if (strcmp(nconf->nc_protofmly, reg_nconf->nc_protofmly)
 				!= 0) {
+			prev = rbl;
 			continue;	/* not same proto family */
 		}
 #ifdef RPCBIND_DEBUG
@@ -366,13 +368,25 @@ rpcbproc_getaddrlist_4(regp, rqstp, transp)
 #ifdef RPCBIND_DEBUG
 		fprintf(stderr, " FAILED\n");
 #endif
+			prev = rbl;
 			continue;
 		} else if (!maddr[0]) {
 #ifdef RPCBIND_DEBUG
 	fprintf(stderr, " SUCCEEDED, but port died -  maddr: nullstring\n");
 #endif
-			/* The server died. Unset this combination */
-			delete_prog(regp->r_prog);
+			/*
+			 * The server died, remove this rpcb_map element from
+			 * the list and free it.
+			 */
+#ifdef PORTMAP
+			(void) del_pmaplist(&rbl->rpcb_map);
+#endif
+			(void) delete_rbl(rbl);
+
+			if (prev == NULL)
+				list_rbl = next;
+			else
+				prev->rpcb_next = next;
 			continue;
 		}
 #ifdef RPCBIND_DEBUG
@@ -401,6 +415,7 @@ rpcbproc_getaddrlist_4(regp, rqstp, transp)
 		}
 		rp = NULL;
 	    }
+	    prev = rbl;
 	}
 #ifdef RPCBIND_DEBUG
 	for (rp = rlist; rp; rp = rp->rpcb_entry_next) {

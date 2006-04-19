@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +72,7 @@ struct db_list {
 };
 
 static struct db_list *db_fs_list = NULL;
-static	char	err_str[] = "DB I/O error has occured";
+static	char	err_str[] = "DB I/O error has occurred";
 struct link_keys {
 	fh_secondary_key	lnkey;
 	int			lnsize;
@@ -526,29 +525,23 @@ fetch_record(struct db_list *dbp, void *keyaddr, int keysize, void *dataaddr,
 
 	data = dbm_fetch(dbp->db, key);
 	if (data.dptr == NULL) {
-		/* primary record not in database */
-		*errorp = dbm_error(dbp->db);
-		dbm_clearerr(dbp->db);
-
-		if (*errorp) {
-			if (errno)
-				err = strerror(errno);
-			else {
-				err = err_str;
-				errno = EIO;
-			}
-		} else { /* should not happen but sometimes does */
-			err = err_str;
-			errno = -1;
+		/* see if there is a database error */
+		if (dbm_error(dbp->db)) {
+			/* clear and report the database error */
+			dbm_clearerr(dbp->db);
+			*errorp = EIO;
+			err = strerror(*errorp);
+			syslog(LOG_ERR, gettext(errfmt), err);
+		} else {
+			/* primary record not in database */
+			*errorp = ENOENT;
 		}
-		*errorp = errno;
-
 		if (debug > 3) {
+			err = strerror(*errorp);
 			debug_print_key(stderr, str, "fetch_record:"
 				"dbm_fetch:\n", key.dptr, key.dsize);
 			(void) fprintf(stderr, errfmt, err);
-		} else
-			syslog(LOG_ERR, gettext(errfmt), err);
+		}
 		return (NULL);
 	}
 

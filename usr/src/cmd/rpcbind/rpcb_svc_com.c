@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -92,8 +91,8 @@ static void	find_versions();
 static struct netbuf	*netbufdup();
 static rpcblist_ptr find_service();
 static int	add_pmaplist(RPCB *);
-static int	del_pmaplist(RPCB *);
-static void	delete_rbl(rpcblist_ptr);
+int	del_pmaplist(RPCB *);
+void	delete_rbl(rpcblist_ptr);
 
 static char *nullstring = "";
 static int rpcb_rmtcalls;
@@ -273,9 +272,8 @@ map_unset(regp, owner)
 	return (1);
 }
 
-static void
-delete_rbl(rbl)
-	rpcblist_ptr rbl;
+void
+delete_rbl(rpcblist_ptr rbl)
 {
 	free(rbl->rpcb_map.r_addr);
 	free(rbl->rpcb_map.r_netid);
@@ -1197,9 +1195,22 @@ forward_register(caller_xid, caller_addr, forward_fd, uaddr,
 
 	min_time = FINFO[0].time;
 	time_now = time((time_t *)0);
-	/* initialization */
-	if (lastxid == 0)
+	/*
+	 * initialization: once this has happened, lastxid will
+	 * - always be a multiple of NFORWARD (which has to be a power of 2),
+	 * - never be 0 again,
+	 * - never be (ulong_t)(-NFORWARD)
+	 * when entering or returning from this function.
+	 */
+	if (lastxid == 0) {
 		lastxid = time_now * NFORWARD;
+		/*
+		 * avoid lastxid wraparound to 0,
+		 *  and generating a forward_xid of -1
+		 */
+		if (lastxid >= (ulong_t)(-NFORWARD))
+			lastxid = NFORWARD;
+	}
 
 	/*
 	 * Check if it is an duplicate entry. Then,
@@ -1252,6 +1263,10 @@ forward_register(caller_xid, caller_addr, forward_fd, uaddr,
 	 */
 	FINFO[j].uaddr = uaddr;
 	lastxid = lastxid + NFORWARD;
+	/* avoid lastxid wraparound to 0, and generating a forward_xid of -1 */
+	if (lastxid >= (ulong_t)(-NFORWARD))
+		lastxid = NFORWARD;
+
 	FINFO[j].forward_xid = lastxid + j;	/* encode slot */
 	return (FINFO[j].forward_xid);		/* forward on this xid */
 }
@@ -1831,9 +1846,8 @@ add_pmaplist(arg)
 /*
  * Delete this from the pmap list only if it is UDP or TCP.
  */
-static int
-del_pmaplist(arg)
-	RPCB *arg;
+int
+del_pmaplist(RPCB *arg)
 {
 	register pmaplist *pml;
 	pmaplist *prevpml, *fnd;
