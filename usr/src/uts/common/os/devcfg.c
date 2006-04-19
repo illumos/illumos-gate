@@ -6208,16 +6208,16 @@ mt_config_thread(void *arg)
 		rdip = NULL;
 	}
 
-	if (--hdl->mtc_thr_count == 0)
-		cv_broadcast(&hdl->mtc_cv);
-	mutex_exit(&hdl->mtc_lock);
-
 	if (rdip) {
 		ASSERT(rv != NDI_SUCCESS);
 		ndi_rele_devi(rdip);
 	}
 
 	ndi_rele_devi(dip);
+
+	if (--hdl->mtc_thr_count == 0)
+		cv_broadcast(&hdl->mtc_cv);
+	mutex_exit(&hdl->mtc_lock);
 	kmem_free(mcd, sizeof (*mcd));
 }
 
