@@ -38,7 +38,8 @@
 #include <sys/session.h>
 #include <sys/thread.h>
 #include <sys/dnlc.h>
-#include <sys/cred_impl.h>
+#include <sys/cred.h>
+#include <sys/priv.h>
 #include <sys/list.h>
 #include <sys/sdt.h>
 #include <sys/policy.h>

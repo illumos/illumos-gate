@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -841,7 +840,7 @@ nfs4_secinfo_path(mntinfo4_t *mi, cred_t *cr, int isrecov)
 {
 
 	int error = 0;
-	int pathlen;
+	int ncomp;
 	servinfo4_t *svp = mi->mi_curr_serv;
 
 	/*
@@ -849,14 +848,16 @@ nfs4_secinfo_path(mntinfo4_t *mi, cred_t *cr, int isrecov)
 	 */
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_READER, 0);
 	ASSERT(svp->sv_path != NULL);
-	pathlen = strlen(svp->sv_path);
+
+	/* returns 0 for root, no matter how many leading /'s */
+	ncomp = comp_total(svp->sv_path);
 
 	/*
 	 * If mounting server rootdir, use available secinfo list
 	 * on the client. No SECINFO call here since SECINFO op
 	 * expects a component name.
 	 */
-	if (pathlen == 1 && svp->sv_path[0] == '/') {
+	if (ncomp == 0) {
 		if (svp->sv_secinfo == NULL) {
 			nfs_rw_exit(&svp->sv_lock);
 			secinfo_update(svp, secinfo_support);
