@@ -46,6 +46,7 @@ d none usr 755 root sys
 d none usr/platform 755 root sys
 d none usr/platform/sun4u 755 root sys
 d none usr/platform/sun4u-us3 755 root sys
+d none usr/platform/sun4u-opl 755 root sys
 #
 # other platform directories
 #
@@ -172,6 +173,7 @@ s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libprtdiag_psr.so.1=../..
 #
 d none usr/platform/sun4u/lib 755 root bin
 d none usr/platform/sun4u-us3/lib 755 root bin
+d none usr/platform/sun4u-opl/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
 d none usr/platform/SUNW,Ultra-2/lib 755 root bin
 d none usr/platform/SUNW,Ultra-250/lib 755 root bin

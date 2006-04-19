@@ -26,9 +26,7 @@
 #
 # Platform specific Makefile for libc_psr.
 #
-PLATFORM	= SUNW,SPARC-Enterprise
-ALT_PLAT	= sun4u-opl
-
+PLATFORM	= sun4u-opl
 COMPAT_PLAT	= sun4u-us3
 CLASS		= 32
 
@@ -36,7 +34,7 @@ OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(ALT_PLAT)/$(MACH)
+MAPDIR=		../../spec/$(PLATFORM)/$(MACH)
 MAPFILE=	$(MAPDIR)/mapfile-$(MACH)
 MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR)
 MAPOPTS=	$(MAPFILES:%=-M %)

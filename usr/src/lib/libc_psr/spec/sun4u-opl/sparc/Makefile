@@ -31,8 +31,7 @@
 LIBRARY	=	libc_psr.a
 VERS	=	.1
 
-PLATFORM=	SUNW,SPARC-Enterprise
-ALT_PLAT=	sun4u-opl
+PLATFORM=	sun4u-opl
 CLASS	=	32
 
 OBJECTS	=	c_psr-$(MACH).o
@@ -40,7 +39,7 @@ OBJECTS	=	c_psr-$(MACH).o
 SPECVERS =	-$(MACH)
 
 include	$(SRC)/lib/Makefile.lib
-include $(SRC)/lib/libc_psr/spec/$(ALT_PLAT)/Makefile.links
+include $(SRC)/lib/libc_psr/spec/$(PLATFORM)/Makefile.links
 
 # Uncomment the following if the linker complains
 #sparc_C_PICFLAGS  = -K PIC
@@ -48,4 +47,4 @@ include $(SRC)/lib/libc_psr/spec/$(ALT_PLAT)/Makefile.links
 include	$(SRC)/lib/Makefile.spec
 include	$(SRC)/lib/Makefile.spec.psm
 
-$(DISABLE_APPTRACE)install: $(ROOTABILIB)
+install:

@@ -50,11 +50,6 @@ ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
 
 #
-# Used when building links in /platform/$(PLATFORM)/lib
-#
-LINKED_PLATFORMS	= SUNW,SPARC-Enterprise
-
-#
 # install rule
 #
 $(ROOT_PSM_LIB_DIR)/%: % $(ROOT_PSM_LIB_DIR)

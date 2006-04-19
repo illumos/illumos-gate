@@ -283,7 +283,8 @@ sparcv9_ROOT.BIN64= \
 	/platform/sun4v/lib/$(MACH64) \
 	/usr/platform/sun4v/sbin \
 	/usr/platform/sun4v/lib \
-	/usr/platform/sun4u-us3/lib
+	/usr/platform/sun4u-us3/lib \
+	/usr/platform/sun4u-opl/lib
 
 amd64_ROOT.BIN64=
 

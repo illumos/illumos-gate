@@ -27,10 +27,10 @@
 # lib/libc_psr/sun4u-opl/Makefile
 #
 
-include ../../Makefile.lib
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/Makefile.psm
 
-PLATFORM=	SUNW,SPARC-Enterprise
-ALT_PLAT=	sun4u-opl
+PLATFORM=	sun4u-opl
 
 SUBDIRS=	$(MACH)
 SUBDIRS64=	$(MACH64)
@@ -40,10 +40,34 @@ install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 
-.KEEP_STATE:
+MODULE		= libc_psr.so.1
+LIBC_PSR_DIRS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib)
+LIBC_PSR_LINKS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MODULE))
+INS.slink6	= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+LIBC_PSR64_DIRS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64))
+LIBC_PSR64_LINKS = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64)/$(MODULE))
+INS.slink7	= $(RM) -r $@; $(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
 
-all install clean clobber : lib32 \
-				$(BUILD64) lib64
+#
+# Used when building links in /platform/$(PLATFORM)/lib
+#
+LINKED_PLATFORMS	= SUNW,SPARC-Enterprise
+
+all install: lib32 $(BUILD64) lib64 $(LIBC_PSR_LINKS) $(LIBC_PSR64_LINKS)
+
+clean clobber: lib32 $(BUILD64) lib64
+
+$(LIBC_PSR_DIRS):
+	-$(INS.dir.root.bin)
+
+$(LIBC_PSR_LINKS): $(LIBC_PSR_DIRS)
+	-$(INS.slink6)
+
+$(LIBC_PSR64_DIRS):
+	-$(INS.dir.root.bin)
+
+$(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
+	-$(INS.slink7)
 
 lint:
 	@ $(ECHO) "Nothing to lint here: skipping"
@@ -56,6 +80,6 @@ $(SUBDIRS) $(SUBDIRS64): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 spec: FRC
-	@cd ../spec/$(ALT_PLAT); pwd; $(MAKE) $(TARGET)
+	@cd ../spec/$(PLATFORM); pwd; $(MAKE) $(TARGET)
 
 FRC:
