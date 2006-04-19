@@ -44,10 +44,6 @@ ROOTMODULE	= $(ROOT_OPL_MISC_DIR)/$(MODULE)
 
 DRMACH_OFFSETS  = $(UTSBASE)/sun4u/opl/ml/drmach_offsets.in
 DRMACH_OFFSETS_H        = $(OBJS_DIR)/drmach_offsets.h
-DRMACH_OFFSETS_C        = $(OBJS_DIR)/drmach_offsets.c
-DRMACH_OFFSETS_S        = $(OBJS_DIR)/drmach_offsets.s
-DRMACH_OFFSETS_TMP      = $(OBJS_DIR)/drmach_offsets.tmp
-DRMACH_OFFSETS_OUT      = $(OBJS_DIR)/drmach_offsets.out
 
 #
 #	Include common rules.
@@ -98,17 +94,9 @@ AS_INC_PATH     += -I$(OBJS_DIR)
 
 $(DRMACH_DEPS:%=$(OBJS_DIR)/%):    $(DRMACH_OFFSETS_H)
 
-$(DRMACH_OFFSETS_H): $(GENCONST) $(DRMACH_OFFSETS_OUT)
-	@cp $(DRMACH_OFFSETS_OUT) $(DRMACH_OFFSETS_H)
-	$(GENCONST) >> $(DRMACH_OFFSETS_H)
-
-$(DRMACH_OFFSETS_OUT): $(DRMACH_OFFSETS)
-	@grep "^#" $(DRMACH_OFFSETS) > $(DRMACH_OFFSETS_C)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -g -S -o $(DRMACH_OFFSETS_S) $(DRMACH_OFFSETS_C)
-	@grep -v "^#" $(DRMACH_OFFSETS) > $(DRMACH_OFFSETS_TMP)
-	$(STABS) -t genassym -m $(MODEL) $(DRMACH_OFFSETS_TMP) \
-	< $(DRMACH_OFFSETS_S) > $(DRMACH_OFFSETS_OUT)
-	@rm $(DRMACH_OFFSETS_C) $(DRMACH_OFFSETS_S) $(DRMACH_OFFSETS_TMP)
+$(DRMACH_OFFSETS_H): $(GENCONST) $(DRMACH_OFFSETS)
+	$(OFFSETS_CREATE) <$(DRMACH_OFFSETS) >$@
+	$(GENCONST) >> $@
 
 #
 #	Include common targets.
