@@ -5314,6 +5314,10 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 	un->un_solaris_offset = 0;
 	un->un_solaris_size = cap;
 	un->un_f_geometry_is_valid = TRUE;
+
+	/* clear the vtoc label */
+	bzero(&un->un_vtoc, sizeof (struct dk_vtoc));
+
 	kmem_free(buf, EFI_MIN_ARRAY_SIZE);
 	return (0);
 
