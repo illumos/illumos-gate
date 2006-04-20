@@ -1356,13 +1356,13 @@ Java_org_opensolaris_os_dtrace_LocalConsumer__1lookupKernelFunction(
 	}
 
 	rc = dtrace_addr2str(dtp, addr, &dummy, 1);
-	s = malloc(rc);
+	s = malloc(rc + 1);
 	if (!s) {
 		dtj_throw_out_of_memory(jenv,
 		    "Failed to allocate kernel function name");
 		return (NULL);
 	}
-	(void) dtrace_addr2str(dtp, addr, s, rc);
+	(void) dtrace_addr2str(dtp, addr, s, rc + 1);
 
 	jfunc = (*jenv)->NewStringUTF(jenv, s);
 	free(s);
@@ -1406,13 +1406,13 @@ Java_org_opensolaris_os_dtrace_LocalConsumer__1lookupUserFunction(JNIEnv *jenv,
 	}
 
 	rc = dtrace_uaddr2str(dtp, pid, addr, &dummy, 1);
-	s = malloc(rc);
+	s = malloc(rc + 1);
 	if (!s) {
 		dtj_throw_out_of_memory(jenv,
 		    "Failed to allocate user function name");
 		return (NULL);
 	}
-	(void) dtrace_uaddr2str(dtp, pid, addr, s, rc);
+	(void) dtrace_uaddr2str(dtp, pid, addr, s, rc + 1);
 
 	jfunc = (*jenv)->NewStringUTF(jenv, s);
 	free(s);
