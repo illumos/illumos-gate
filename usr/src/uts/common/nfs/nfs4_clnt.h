@@ -1209,7 +1209,8 @@ typedef struct nfs4_server {
 #define	N4S_CLIENTID_PEND	0x2	/* server doesn't have clientid */
 #define	N4S_CB_PINGED		0x4	/* server has sent us a CB_NULL */
 #define	N4S_CB_WAITER		0x8	/* is/has wait{ing/ed} for cb_null */
-#define	N4S_BADOWNER_DEBUG	0x10	/* bad owner err msg per client */
+#define	N4S_INSERTED		0x10	/* list has reference for server */
+#define	N4S_BADOWNER_DEBUG	0x20	/* bad owner err msg per client */
 
 #define	N4S_CB_PAUSE_TIME	10000	/* Amount of time to pause (10ms) */
 

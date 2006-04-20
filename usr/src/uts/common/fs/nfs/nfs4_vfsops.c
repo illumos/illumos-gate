@@ -2422,7 +2422,7 @@ nfs4setclientid(mntinfo4_t *mi, cred_t *cr, bool_t recovery, nfs4_error_t *n4ep)
 	struct servinfo4 *svp = mi->mi_curr_serv;
 	nfs4_recov_state_t recov_state;
 	int num_retries = 0;
-	bool_t retry = FALSE;
+	bool_t retry;
 	cred_t *lcr = NULL;
 	int retry_inuse = 1; /* only retry once on NFS4ERR_CLID_INUSE */
 	time_t lease_time = 0;
@@ -2432,6 +2432,7 @@ nfs4setclientid(mntinfo4_t *mi, cred_t *cr, bool_t recovery, nfs4_error_t *n4ep)
 	ASSERT(n4ep != NULL);
 
 recov_retry:
+	retry = FALSE;
 	nfs4_error_zinit(n4ep);
 	if (!recovery)
 		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
@@ -2596,9 +2597,17 @@ recov_retry:
 				num_retries = 0;
 		}
 	} else {
-		/* Since everything succeeded give the list a reference count */
+		/*
+		 * Since everything succeeded give the list a reference count if
+		 * it hasn't been given one by add_new_nfs4_server() or if this
+		 * is not a recovery situation in which case it is already on
+		 * the list.
+		 */
 		mutex_enter(&np->s_lock);
-		np->s_refcnt++;
+		if ((np->s_flags & N4S_INSERTED) == 0) {
+			np->s_refcnt++;
+			np->s_flags |= N4S_INSERTED;
+		}
 		mutex_exit(&np->s_lock);
 	}
 
@@ -3187,6 +3196,7 @@ add_new_nfs4_server(struct servinfo4 *svp, cred_t *cr)
 	mutex_enter(&sp->s_lock);
 	insque(sp, &nfs4_server_lst);
 	sp->s_refcnt++;			/* list gets a reference */
+	sp->s_flags |= N4S_INSERTED;
 	sp->clientid = 0;
 	return (sp);
 }
