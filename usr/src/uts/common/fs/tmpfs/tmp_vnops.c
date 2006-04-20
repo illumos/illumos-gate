@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -261,14 +260,32 @@ wrtmp(
 		if (!pagecreate)
 			rw_exit(&tp->tn_contents);
 
-		/* Get offset within the segmap mapping */
-		segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
-		base = segmap_getmapflt(segkmap, vp, (offset &  MAXBMASK),
-		    PAGESIZE, !pagecreate, S_WRITE);
-
 		newpage = 0;
+		if (vpm_enable) {
+			/*
+			 * XXX Why do we need to hold the contents lock?
+			 * The kpm mappings will not cause a fault.
+			 *
+			 * Copy data. If new pages are created, part of
+			 * the page that is not written will be initizliazed
+			 * with zeros.
+			 */
+			error = vpm_data_copy(vp, offset, bytes, uio,
+				!pagecreate, &newpage, 1, S_WRITE);
 
-		if (pagecreate) {
+			if (pagecreate) {
+				rw_exit(&tp->tn_contents);
+			}
+		} else {
+			/* Get offset within the segmap mapping */
+			segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
+			base = segmap_getmapflt(segkmap, vp,
+						(offset &  MAXBMASK),
+			    PAGESIZE, !pagecreate, S_WRITE);
+		}
+
+
+		if (!vpm_enable && pagecreate) {
 			rw_downgrade(&tp->tn_contents);
 
 			/*
@@ -287,10 +304,12 @@ wrtmp(
 				    (size_t)pageoffset);
 		}
 
-		error = uiomove(base + segmap_offset + pageoffset,
+		if (!vpm_enable) {
+			error = uiomove(base + segmap_offset + pageoffset,
 			(long)bytes, UIO_WRITE, uio);
+		}
 
-		if (pagecreate &&
+		if (!vpm_enable && pagecreate &&
 		    uio->uio_offset < P2ROUNDUP(offset + bytes, PAGESIZE)) {
 			long	zoffset; /* zero from offset into page */
 			/*
@@ -310,16 +329,17 @@ wrtmp(
 			 */
 			if ((zoffset = pageoffset + nmoved) < PAGESIZE)
 				(void) kzero(base + segmap_offset + zoffset,
-				    (size_t)PAGESIZE - zoffset);
+					(size_t)PAGESIZE - zoffset);
 		}
 
 		/*
 		 * Unlock the pages which have been allocated by
 		 * page_create_va() in segmap_pagecreate()
 		 */
-		if (newpage)
+		if (!vpm_enable && newpage) {
 			segmap_pageunlock(segkmap, base + segmap_offset,
 			    (size_t)PAGESIZE, S_WRITE);
+		}
 
 		if (error) {
 			/*
@@ -327,9 +347,19 @@ wrtmp(
 			 * be sure to invalidate any pages that may have
 			 * been allocated.
 			 */
-			(void) segmap_release(segkmap, base, SM_INVAL);
+			if (vpm_enable) {
+				(void) vpm_sync_pages(vp, offset,
+						PAGESIZE, SM_INVAL);
+			} else {
+				(void) segmap_release(segkmap, base, SM_INVAL);
+			}
 		} else {
-			error = segmap_release(segkmap, base, 0);
+			if (vpm_enable) {
+				error = vpm_sync_pages(vp, offset,
+						PAGESIZE, 0);
+			} else {
+				error = segmap_release(segkmap, base, 0);
+			}
 		}
 
 		/*
@@ -468,17 +498,36 @@ rdtmp(
 		 */
 		rw_exit(&tp->tn_contents);
 
-		segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
-		base = segmap_getmapflt(segkmap, vp, offset & MAXBMASK,
-		    bytes, 1, S_READ);
+		if (vpm_enable) {
+			/*
+			 * Copy data.
+			 */
+			error = vpm_data_copy(vp, offset, bytes, uio,
+				1, NULL, 0, S_READ);
+		} else {
+			segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
+			base = segmap_getmapflt(segkmap, vp, offset & MAXBMASK,
+			    bytes, 1, S_READ);
 
-		error = uiomove(base + segmap_offset + pageoffset,
-		    (long)bytes, UIO_READ, uio);
+			error = uiomove(base + segmap_offset + pageoffset,
+			    (long)bytes, UIO_READ, uio);
+		}
 
-		if (error)
-			(void) segmap_release(segkmap, base, 0);
-		else
-			error = segmap_release(segkmap, base, 0);
+		if (error) {
+			if (vpm_enable) {
+				(void) vpm_sync_pages(vp, offset,
+						PAGESIZE, 0);
+			} else {
+				(void) segmap_release(segkmap, base, 0);
+			}
+		} else {
+			if (vpm_enable) {
+				error = vpm_sync_pages(vp, offset,
+						PAGESIZE, 0);
+			} else {
+				error = segmap_release(segkmap, base, 0);
+			}
+		}
 
 		/*
 		 * Re-acquire contents lock.

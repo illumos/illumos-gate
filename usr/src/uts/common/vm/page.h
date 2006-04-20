@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -468,7 +467,7 @@ typedef struct page {
 	struct vnode	*p_vnode;	/* vnode that this page is named by */
 	selock_t	p_selock;	/* shared/exclusive lock on the page */
 #if defined(_LP64)
-	int		p_selockpad;	/* pad for growing selock */
+	uint_t		p_vpmref;	/* vpm ref - index of the vpmap_t */
 #endif
 	struct page	*p_hash;	/* hash by [vnode, offset] */
 	struct page	*p_vpnext;	/* next page in vnode list */
@@ -506,7 +505,11 @@ typedef struct page {
 	/* index of entry in p_map when p_embed is set */
 	uint_t		p_mlentry;
 #endif
+#if defined(_LP64)
+	kmutex_t	p_ilock;	/* protects p_vpmref */
+#else
 	uint64_t	p_msresv_2;	/* page allocation debugging */
+#endif
 } page_t;
 
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -880,10 +879,16 @@ spec_read(
 		if (diff < n)
 			n = (size_t)diff;
 
-		base = segmap_getmapflt(segkmap, blkvp,
-			(u_offset_t)(off + on), n, 1, S_READ);
+		if (vpm_enable) {
+			error = vpm_data_copy(blkvp, (u_offset_t)(off + on),
+				n, uiop, 1, NULL, 0, S_READ);
+		} else {
+			base = segmap_getmapflt(segkmap, blkvp,
+				(u_offset_t)(off + on), n, 1, S_READ);
 
-		if ((error = uiomove(base + on, n, UIO_READ, uiop)) == 0) {
+			error = uiomove(base + on, n, UIO_READ, uiop);
+		}
+		if (!error) {
 			int flags = 0;
 			/*
 			 * If we read a whole block, we won't need this
@@ -891,9 +896,17 @@ spec_read(
 			 */
 			if (n + on == MAXBSIZE)
 				flags = SM_DONTNEED | SM_FREE;
-			error = segmap_release(segkmap, base, flags);
+			if (vpm_enable) {
+				error = vpm_sync_pages(blkvp, off, n, flags);
+			} else {
+				error = segmap_release(segkmap, base, flags);
+			}
 		} else {
-			(void) segmap_release(segkmap, base, 0);
+			if (vpm_enable) {
+				(void) vpm_sync_pages(blkvp, off, n, 0);
+			} else {
+				(void) segmap_release(segkmap, base, 0);
+			}
 			if (bdevsize == UNKNOWN_SIZE) {
 				error = 0;
 				break;
@@ -984,22 +997,27 @@ spec_write(
 		if (n == MAXBSIZE || (on == 0 && (off + n) == bdevsize))
 			pagecreate = 1;
 
-		base = segmap_getmapflt(segkmap, blkvp,
-		    (u_offset_t)(off + on), n, !pagecreate, S_WRITE);
-
-		/*
-		 * segmap_pagecreate() returns 1 if it calls
-		 * page_create_va() to allocate any pages.
-		 */
 		newpage = 0;
+		if (vpm_enable) {
+			error = vpm_data_copy(blkvp, (u_offset_t)(off + on),
+				n, uiop, !pagecreate, NULL, 0, S_WRITE);
+		} else {
+			base = segmap_getmapflt(segkmap, blkvp,
+			    (u_offset_t)(off + on), n, !pagecreate, S_WRITE);
 
-		if (pagecreate)
-			newpage = segmap_pagecreate(segkmap, base + on,
-				n, 0);
+			/*
+			 * segmap_pagecreate() returns 1 if it calls
+			 * page_create_va() to allocate any pages.
+			 */
 
-		error = uiomove(base + on, n, UIO_WRITE, uiop);
+			if (pagecreate)
+				newpage = segmap_pagecreate(segkmap, base + on,
+					n, 0);
 
-		if (pagecreate &&
+			error = uiomove(base + on, n, UIO_WRITE, uiop);
+		}
+
+		if (!vpm_enable && pagecreate &&
 		    uiop->uio_loffset <
 		    P2ROUNDUP_TYPED(off + on + n, PAGESIZE, offset_t)) {
 			/*
@@ -1029,7 +1047,7 @@ spec_write(
 		 * Unlock the pages which have been allocated by
 		 * page_create_va() in segmap_pagecreate().
 		 */
-		if (newpage)
+		if (!vpm_enable && newpage)
 			segmap_pageunlock(segkmap, base + on,
 				(size_t)n, S_WRITE);
 
@@ -1053,9 +1071,18 @@ spec_write(
 				flags = SM_WRITE | SM_ASYNC | SM_DONTNEED;
 			}
 			smark(sp, SUPD|SCHG);
-			error = segmap_release(segkmap, base, flags);
-		} else
-			(void) segmap_release(segkmap, base, SM_INVAL);
+			if (vpm_enable) {
+				error = vpm_sync_pages(blkvp, off, n, flags);
+			} else {
+				error = segmap_release(segkmap, base, flags);
+			}
+		} else {
+			if (vpm_enable) {
+				(void) vpm_sync_pages(blkvp, off, n, SM_INVAL);
+			} else {
+				(void) segmap_release(segkmap, base, SM_INVAL);
+			}
+		}
 
 	} while (error == 0 && uiop->uio_resid > 0 && n != 0);
 

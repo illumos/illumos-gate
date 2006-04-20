@@ -135,6 +135,7 @@ GENUNIX_OBJS +=	\
 		flock.o		\
 		fm.o		\
 		fork.o		\
+		vpm.o		\
 		fsat.o		\
 		fs_subr.o	\
 		fsflush.o	\

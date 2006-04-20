@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989 AT&T.
@@ -472,9 +471,17 @@ nfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 		if (diff < n)
 			n = (size_t)diff;
 
-		base = segmap_getmapflt(segkmap, vp, off + on, n, 1, S_READ);
-
-		error = uiomove(base + on, n, UIO_READ, uiop);
+		if (vpm_enable) {
+			/*
+			 * Copy data.
+			 */
+			error = vpm_data_copy(vp, off + on, n, uiop,
+						1, NULL, 0, S_READ);
+		} else {
+			base = segmap_getmapflt(segkmap, vp, off + on, n,
+								1, S_READ);
+			error = uiomove(base + on, n, UIO_READ, uiop);
+		}
 
 		if (!error) {
 			/*
@@ -488,9 +495,18 @@ nfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			else
 				flags = 0;
 			mutex_exit(&rp->r_statelock);
-			error = segmap_release(segkmap, base, flags);
-		} else
-			(void) segmap_release(segkmap, base, 0);
+			if (vpm_enable) {
+				error = vpm_sync_pages(vp, off, n, flags);
+			} else {
+				error = segmap_release(segkmap, base, flags);
+			}
+		} else {
+			if (vpm_enable) {
+				(void) vpm_sync_pages(vp, off, n, 0);
+			} else {
+				(void) segmap_release(segkmap, base, 0);
+			}
+		}
 	} while (!error && uiop->uio_resid > 0);
 
 	return (error);
@@ -651,25 +667,35 @@ nfs_fwrite:
 			cv_wait(&rp->r_cv, &rp->r_statelock);
 		mutex_exit(&rp->r_statelock);
 
-		if (segmap_kpm) {
-			int pon = uiop->uio_loffset & PAGEOFFSET;
-			size_t pn = MIN(PAGESIZE - pon, uiop->uio_resid);
-			int pagecreate;
+		if (vpm_enable) {
+			/*
+			 * It will use kpm mappings, so no need to
+			 * pass an address.
+			 */
+			error = writerp(rp, NULL, n, uiop, 0);
+		} else  {
+			if (segmap_kpm) {
+				int pon = uiop->uio_loffset & PAGEOFFSET;
+				size_t pn = MIN(PAGESIZE - pon,
+							uiop->uio_resid);
+				int pagecreate;
 
-			mutex_enter(&rp->r_statelock);
-			pagecreate = (pon == 0) && (pn == PAGESIZE ||
-				uiop->uio_loffset + pn >= rp->r_size);
-			mutex_exit(&rp->r_statelock);
+				mutex_enter(&rp->r_statelock);
+				pagecreate = (pon == 0) && (pn == PAGESIZE ||
+					uiop->uio_loffset + pn >= rp->r_size);
+				mutex_exit(&rp->r_statelock);
 
-			base = segmap_getmapflt(segkmap, vp, off + on,
+				base = segmap_getmapflt(segkmap, vp, off + on,
 						pn, !pagecreate, S_WRITE);
 
-			error = writerp(rp, base + pon, n, uiop, pagecreate);
+				error = writerp(rp, base + pon, n, uiop,
+								pagecreate);
 
-		} else {
-			base = segmap_getmapflt(segkmap, vp, off + on,
-						n, 0, S_READ);
-			error = writerp(rp, base + on, n, uiop, 0);
+			} else {
+				base = segmap_getmapflt(segkmap, vp, off + on,
+							n, 0, S_READ);
+				error = writerp(rp, base + on, n, uiop, 0);
+			}
 		}
 
 		if (!error) {
@@ -691,9 +717,17 @@ nfs_fwrite:
 				flags &= ~SM_ASYNC;
 				flags |= SM_WRITE;
 			}
-			error = segmap_release(segkmap, base, flags);
+			if (vpm_enable) {
+				error = vpm_sync_pages(vp, off, n, flags);
+			} else {
+				error = segmap_release(segkmap, base, flags);
+			}
 		} else {
-			(void) segmap_release(segkmap, base, 0);
+			if (vpm_enable) {
+				(void) vpm_sync_pages(vp, off, n, 0);
+			} else {
+				(void) segmap_release(segkmap, base, 0);
+			}
 			/*
 			 * In the event that we got an access error while
 			 * faulting in a page for a write-only file just

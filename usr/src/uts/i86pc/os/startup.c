@@ -1528,7 +1528,7 @@ startup_vm(void)
 		 * between kernelbase and the beginning of segkpm.
 		 */
 		kpm_vbase = final_kernelheap + KERNEL_REDZONE_SIZE;
-		kpm_size = mmu_ptob(physmax);
+		kpm_size = mmu_ptob(physmax + 1);
 		PRM_DEBUG(kpm_vbase);
 		PRM_DEBUG(kpm_size);
 		final_kernelheap =
@@ -1763,6 +1763,7 @@ startup_vm(void)
 	if (kpm_desired) {
 		kpm_init();
 		kpm_enable = 1;
+		vpm_enable = 1;
 	}
 
 	/*

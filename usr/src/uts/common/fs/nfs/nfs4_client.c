@@ -2185,10 +2185,13 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 	u_offset_t offset;
 	int error;
 	int sm_error;
+	vnode_t *vp = RTOV(rp);
 
 	ASSERT(tcount <= MAXBSIZE && tcount <= uio->uio_resid);
-	ASSERT(((uintptr_t)base & MAXBOFFSET) + tcount <= MAXBSIZE);
 	ASSERT(nfs_rw_lock_held(&rp->r_rwlock, RW_WRITER));
+	if (!vpm_enable) {
+		ASSERT(((uintptr_t)base & MAXBOFFSET) + tcount <= MAXBSIZE);
+	}
 
 	/*
 	 * Move bytes in at most PAGESIZE chunks. We must avoid
@@ -2206,8 +2209,7 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		 * n is the number of bytes required to satisfy the request
 		 *   or the number of bytes to fill out the page.
 		 */
-		n = (int)MIN((PAGESIZE - ((uintptr_t)base & PAGEOFFSET)),
-		    tcount);
+		n = (int)MIN((PAGESIZE - (offset & PAGEOFFSET)), tcount);
 
 		/*
 		 * Check to see if we can skip reading in the page
@@ -2226,12 +2228,12 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		 * created and mapped at base.
 		 */
 		pagecreate = pgcreated ||
-			(((uintptr_t)base & PAGEOFFSET) == 0 &&
+			((offset & PAGEOFFSET) == 0 &&
 			(n == PAGESIZE || ((offset + n) >= rp->r_size)));
 
 		mutex_exit(&rp->r_statelock);
 
-		if (pagecreate) {
+		if (!vpm_enable && pagecreate) {
 			/*
 			 * The last argument tells segmap_pagecreate() to
 			 * always lock the page, as opposed to sometimes
@@ -2267,7 +2269,17 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		rp->r_modaddr = (offset & MAXBMASK);
 		mutex_exit(&rp->r_statelock);
 
-		error = uiomove(base, n, UIO_WRITE, uio);
+		if (vpm_enable) {
+			/*
+			 * Copy data. If new pages are created, part of
+			 * the page that is not written will be initizliazed
+			 * with zeros.
+			 */
+			error = vpm_data_copy(vp, offset, n, uio,
+				!pagecreate, NULL, 0, S_WRITE);
+		} else {
+			error = uiomove(base, n, UIO_WRITE, uio);
+		}
 
 		/*
 		 * r_size is the maximum number of
@@ -2284,7 +2296,11 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 
 		/* n = # of bytes written */
 		n = (int)(uio->uio_loffset - offset);
-		base += n;
+
+		if (!vpm_enable) {
+			base += n;
+		}
+
 		tcount -= n;
 		/*
 		 * If we created pages w/o initializing them completely,
@@ -2292,7 +2308,7 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 		 * This happens on a most EOF write cases and if
 		 * we had some sort of error during the uiomove.
 		 */
-		if (pagecreate) {
+		if (!vpm_enable && pagecreate) {
 			if ((uio->uio_loffset & PAGEOFFSET) || n == 0)
 				(void) kzero(base, PAGESIZE - n);
 
@@ -2310,8 +2326,8 @@ writerp4(rnode4_t *rp, caddr_t base, int tcount, struct uio *uio, int pgcreated)
 				 * segmap_pagecreate().
 				 */
 				sm_error = segmap_fault(kas.a_hat, segkmap,
-						saved_base, saved_n,
-						F_SOFTUNLOCK, S_WRITE);
+					saved_base, saved_n,
+					F_SOFTUNLOCK, S_WRITE);
 				if (error == 0)
 					error = sm_error;
 			}

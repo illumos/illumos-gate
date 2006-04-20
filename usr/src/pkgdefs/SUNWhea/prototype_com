@@ -1230,6 +1230,7 @@ f none usr/include/vm/seg_spt.h 644 root bin
 f none usr/include/vm/seg_vn.h 644 root bin
 f none usr/include/vm/seg_kpm.h 644 root bin
 f none usr/include/vm/vpage.h 644 root bin
+f none usr/include/vm/vpm.h 644 root bin
 f none usr/include/volmgt.h 644 root bin
 f none usr/include/wait.h 644 root bin
 f none usr/include/wchar.h 644 root bin

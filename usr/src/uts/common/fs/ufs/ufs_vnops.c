@@ -999,21 +999,32 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 			rw_exit(&ufsvfsp->vfs_dqrwlock);
 		}
 
-		base = segmap_getmapflt(segkmap, vp, (off + mapon),
+		newpage = 0;
+		premove_resid = uio->uio_resid;
+		if (vpm_enable) {
+			/*
+			 * Copy data. If new pages are created, part of
+			 * the page that is not written will be initizliazed
+			 * with zeros.
+			 */
+			error = vpm_data_copy(vp, (off + mapon), (uint_t)n,
+				uio, !pagecreate, &newpage, 0, S_WRITE);
+		} else {
+
+			base = segmap_getmapflt(segkmap, vp, (off + mapon),
 					(uint_t)n, !pagecreate, S_WRITE);
 
-		/*
-		 * segmap_pagecreate() returns 1 if it calls
-		 * page_create_va() to allocate any pages.
-		 */
-		newpage = 0;
+			/*
+			 * segmap_pagecreate() returns 1 if it calls
+			 * page_create_va() to allocate any pages.
+			 */
 
-		if (pagecreate)
-			newpage = segmap_pagecreate(segkmap, base,
-			    (size_t)n, 0);
+			if (pagecreate)
+				newpage = segmap_pagecreate(segkmap, base,
+				    (size_t)n, 0);
 
-		premove_resid = uio->uio_resid;
-		error = uiomove(base + mapon, (long)n, UIO_WRITE, uio);
+			error = uiomove(base + mapon, (long)n, UIO_WRITE, uio);
+		}
 
 		/*
 		 * If "newpage" is set, then a new page was created and it
@@ -1028,7 +1039,7 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 		 * If uiomove fails because of an error, the old valid data
 		 * is kept instead of filling the rest of the page with zero's.
 		 */
-		if (newpage &&
+		if (!vpm_enable && newpage &&
 		    uio->uio_loffset < roundup(off + mapon + n, PAGESIZE)) {
 			/*
 			 * We created pages w/o initializing them completely,
@@ -1049,7 +1060,7 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 		 * Unlock the pages allocated by page_create_va()
 		 * in segmap_pagecreate()
 		 */
-		if (newpage)
+		if (!vpm_enable && newpage)
 			segmap_pageunlock(segkmap, base, (size_t)n, S_WRITE);
 
 		/*
@@ -1130,7 +1141,15 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 				 */
 				flags = SM_INVAL;
 			}
-			(void) segmap_release(segkmap, base, flags);
+
+			if (vpm_enable) {
+				/*
+				 *  Flush pages.
+				 */
+				(void) vpm_sync_pages(vp, off, n, flags);
+			} else {
+				(void) segmap_release(segkmap, base, flags);
+			}
 		} else {
 			flags = 0;
 			/*
@@ -1163,7 +1182,14 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 				 */
 				flags = SM_WRITE | SM_ASYNC | SM_DONTNEED;
 			}
-			error = segmap_release(segkmap, base, flags);
+			if (vpm_enable) {
+				/*
+				 * Flush pages.
+				 */
+				(void) vpm_sync_pages(vp, off, n, flags);
+			} else {
+				(void) segmap_release(segkmap, base, flags);
+			}
 			/*
 			 * If the operation failed and is synchronous,
 			 * then we need to unwind what uiomove() last
@@ -1429,10 +1455,18 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 		 */
 		if (rwtype == RW_READER)
 			rw_exit(&ip->i_contents);
-		base = segmap_getmapflt(segkmap, vp, (off + mapon),
-					(uint_t)n, 1, S_READ);
 
-		error = uiomove(base + mapon, (long)n, UIO_READ, uio);
+		if (vpm_enable) {
+			/*
+			 * Copy data.
+			 */
+			error = vpm_data_copy(vp, (off + mapon), (uint_t)n,
+				uio, 1, NULL, 0, S_READ);
+		} else {
+			base = segmap_getmapflt(segkmap, vp, (off + mapon),
+					(uint_t)n, 1, S_READ);
+			error = uiomove(base + mapon, (long)n, UIO_READ, uio);
+		}
 
 		flags = 0;
 		if (!error) {
@@ -1460,9 +1494,18 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 				flags &= ~SM_ASYNC;
 				flags |= SM_WRITE;
 			}
-			error = segmap_release(segkmap, base, flags);
-		} else
-			(void) segmap_release(segkmap, base, flags);
+			if (vpm_enable) {
+				error = vpm_sync_pages(vp, off, n, flags);
+			} else {
+				error = segmap_release(segkmap, base, flags);
+			}
+		} else {
+			if (vpm_enable) {
+				(void) vpm_sync_pages(vp, off, n, flags);
+			} else {
+				(void) segmap_release(segkmap, base, flags);
+			}
+		}
 
 		if (rwtype == RW_READER)
 			rw_enter(&ip->i_contents, rwtype);

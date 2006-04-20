@@ -3124,6 +3124,7 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 	return (hm);
 }
 
+extern int	vpm_enable;
 /*
  * Unload all translations to a page. If the page is a subpage of a large
  * page, the large page mappings are also removed.
@@ -3142,6 +3143,14 @@ hati_pageunload(struct page *pp, uint_t pg_szcd, uint_t forceflag)
 	uint_t		entry;
 	level_t		level;
 
+#if defined(__amd64)
+	/*
+	 * clear the vpm ref.
+	 */
+	if (vpm_enable) {
+		pp->p_vpmref = 0;
+	}
+#endif
 	/*
 	 * The loop with next_size handles pages with multiple pagesize mappings
 	 */
@@ -3488,6 +3497,11 @@ hat_page_getshare(page_t *pp)
 {
 	uint_t cnt;
 	cnt = hment_mapcnt(pp);
+#if defined(__amd64)
+	if (vpm_enable && pp->p_vpmref) {
+		cnt += 1;
+	}
+#endif
 	return (cnt);
 }
 
