@@ -18,29 +18,50 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/extendedFILE/Makefile.com
 
-PROG= strchg strconf
+LIBRARY = extendedFILE.a
+VERS = .1
 
-include ../../Makefile.cmd
+OBJECTS = extendedFILE.o
 
-OWNER= root
-GROUP= root
+# include library definitions
+include ../../Makefile.lib
+
+MAPFILE = $(MAPDIR)/mapfile
+CLOBBERFILES +=	$(MAPFILE)
+
+SRCS = $(OBJECTS:%.o=../common/%.c)
+
+LIBS = $(DYNLIB)
+LDLIBS += -lc
+CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -D_REENTRANT -I../common
+DYNFLAGS += -M$(MAPFILE) $(ZINTERPOSE)
+
+CPPFLAGS += -I../../common/inc
 
 .KEEP_STATE:
 
-all: $(PROG)
-
-install: all $(ROOTPROG)
-
-clean:
+all: $(LIBS)
 
 lint:
-	$(LINT.c) strchg.c $(LDLIBS)
-	$(LINT.c) strconf.c $(LDLIBS)
+	$(LINT.c) $(SRCS) $(LDLIBS)
 
+$(DYNLIB): $(MAPFILE)
+
+$(MAPFILE):
+	@cd $(MAPDIR); $(MAKE) mapfile
+
+# include library targets
 include ../../Makefile.targ
+
+pics/%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)

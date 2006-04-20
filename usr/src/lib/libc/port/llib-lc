@@ -145,6 +145,7 @@
 #include <spawn.h>
 #include <inttypes.h>
 #include <getopt.h>
+#include <stdio_ext.h>
 #if defined(__i386)
 #include <sys/sysi86.h>
 #endif
@@ -1708,16 +1709,6 @@ int *___errno()
 extern int getloadavg(double [], int);
 
 extern long pcsample(uintptr_t [], long);
-
-extern size_t __fbufsize(FILE *stream);
-extern int __freading(FILE *stream);
-extern int __fwriting(FILE *stream);
-extern int __freadable(FILE *stream);
-extern int __fwritable(FILE *stream);
-extern int __flbf(FILE *stream);
-extern void __fpurge(FILE *stream);
-extern size_t __fpending(FILE *stream);
-extern void _flushlbf(void);
 
 int fstat(int, struct stat *);
 int stat(const char *_RESTRICT_KYWD, struct stat *_RESTRICT_KYWD);

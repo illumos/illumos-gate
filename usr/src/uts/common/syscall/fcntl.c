@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +88,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	struct shr_locowner shr_own;
 	offset_t maxoffset;
 	model_t datamodel;
+	int fdres;
 
 #if defined(_ILP32) && !defined(lint) && defined(_SYSCALL32)
 	ASSERT(sizeof (struct flock) == sizeof (struct flock32));
@@ -122,6 +122,11 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	case F_GETXFL:
 		if ((error = f_getfl(fdes, &flag)) == 0)
 			retval = flag + FOPEN;
+		goto out;
+
+	case F_BADFD:
+		if ((error = f_badfd(fdes, &fdres, (int)arg)) == 0)
+			retval = fdres;
 		goto out;
 	}
 
@@ -172,13 +177,25 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			 * (which we have to do anyway), then releasef(fdes),
 			 * then closeandsetf().  Incrementing f_count ensures
 			 * that fp won't disappear after we call releasef().
+			 * When closeandsetf() fails, we try avoid calling
+			 * closef() because of all the side effects.
 			 */
 			mutex_enter(&fp->f_tlock);
 			fp->f_count++;
 			mutex_exit(&fp->f_tlock);
 			releasef(fdes);
-			(void) closeandsetf(iarg, fp);
-			retval = iarg;
+			if ((error = closeandsetf(iarg, fp)) == 0) {
+				retval = iarg;
+			} else {
+				mutex_enter(&fp->f_tlock);
+				if (fp->f_count > 1) {
+					fp->f_count--;
+					mutex_exit(&fp->f_tlock);
+				} else {
+					mutex_exit(&fp->f_tlock);
+					(void) closef(fp);
+				}
+			}
 			goto out;
 		}
 		goto done;

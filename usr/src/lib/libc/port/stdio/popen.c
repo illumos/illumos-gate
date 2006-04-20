@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #pragma weak pclose = _pclose
@@ -54,10 +54,6 @@
 #define	tst(a, b) (*mode == 'r'? (b) : (a))
 #define	RDR	0
 #define	WTR	1
-
-#ifndef	_LP64
-#define	MAX_FD (1 << (NBBY * (unsigned)sizeof (_lastbuf->_file))) /* now 256 */
-#endif	/*	_LP64	*/
 
 static int _insert_nolock(pid_t, int);
 
@@ -96,16 +92,6 @@ popen(const char *cmd, const char *mode)
 	if (pipe(p) < 0)
 		return (NULL);
 
-#ifndef	_LP64
-	/* check that the fd's are in range for a struct FILE */
-	if ((p[WTR] >= MAX_FD) || (p[RDR] >= MAX_FD)) {
-		(void) close(p[WTR]);
-		(void) close(p[RDR]);
-		errno = EMFILE;
-		return (NULL);
-	}
-#endif	/* _LP64 */
-
 	shpath = __xpg4? xpg4_path : sun_path;
 	if (access(shpath, X_OK))	/* XPG4 Requirement: */
 		shpath = "";		/* force child to fail immediately */
@@ -115,12 +101,19 @@ popen(const char *cmd, const char *mode)
 	/* myside and yourside reverse roles in child */
 	stdio = tst(0, 1);
 
+	/* This will fail more quickly if we run out of fds */
+	if ((iop = fdopen(myside, mode)) == NULL) {
+		(void) close(yourside);
+		(void) close(myside);
+		return (NULL);
+	}
+
 	lmutex_lock(&popen_lock);
 
 	/* in the child, close all pipes from other popen's */
 	if ((error = posix_spawn_file_actions_init(&fact)) != 0) {
 		lmutex_unlock(&popen_lock);
-		(void) close(myside);
+		(void) fclose(iop);
 		(void) close(yourside);
 		errno = error;
 		return (NULL);
@@ -140,7 +133,7 @@ popen(const char *cmd, const char *mode)
 	if (error) {
 		lmutex_unlock(&popen_lock);
 		(void) posix_spawn_file_actions_destroy(&fact);
-		(void) close(myside);
+		(void) fclose(iop);
 		(void) close(yourside);
 		errno = error;
 		return (NULL);
@@ -156,17 +149,12 @@ popen(const char *cmd, const char *mode)
 	(void) close(yourside);
 	if ((errno = error) != 0 || _insert_nolock(pid, myside) == -1) {
 		lmutex_unlock(&popen_lock);
-		(void) close(myside);
+		(void) fclose(iop);
 		return (NULL);
 	}
 
 	lmutex_unlock(&popen_lock);
 
-	if ((iop = fdopen(myside, mode)) == NULL) {
-		(void) _delete(myside);
-		(void) close(myside);
-		return (NULL);
-	}
 	_SET_ORIENTATION_BYTE(iop);
 
 	return (iop);

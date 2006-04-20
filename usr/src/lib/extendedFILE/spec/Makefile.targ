@@ -18,29 +18,18 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/libplot/plot/spec/Makefile.targ
 
-PROG= strchg strconf
+LIBRARY	=	extendedFILE.a
+VERS	=	.1
 
-include ../../Makefile.cmd
+OBJECTS	=	extendedFILE.o
 
-OWNER= root
-GROUP= root
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-install: all $(ROOTPROG)
-
-clean:
-
-lint:
-	$(LINT.c) strchg.c $(LDLIBS)
-	$(LINT.c) strconf.c $(LDLIBS)
-
-include ../../Makefile.targ
+TRANSCPP =
+SPECCPP =

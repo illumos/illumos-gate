@@ -67,6 +67,7 @@ f none usr/lib/dns/cylink.so.1 755 root bin
 f none usr/lib/dns/dnssafe.so.1 755 root bin
 # EXPORT DELETE END
 f none usr/lib/dns/irs.so.1 755 root bin
+f none usr/lib/extendedFILE.so.1 755 root bin
 f none usr/lib/lib.b 444 root bin
 s none usr/lib/libadm.so=../../lib/libadm.so.1
 s none usr/lib/libadm.so.1=../../lib/libadm.so.1
@@ -152,8 +153,8 @@ s none usr/lib/libldap.so=libldap.so.5
 f none usr/lib/libldap.so.5 755 root bin
 f none usr/lib/libldap.so.4 755 root bin
 s none usr/lib/liblddbg.so.4=../../lib/liblddbg.so.4
-s none usr/lib/liblgrp.so=./liblgrp.so.1 
-f none usr/lib/liblgrp.so.1 755 root bin 
+s none usr/lib/liblgrp.so=./liblgrp.so.1
+f none usr/lib/liblgrp.so.1 755 root bin
 s none usr/lib/liblm.so=./liblm.so.1
 f none usr/lib/liblm.so.1 755 root bin
 f none usr/lib/libmail.so.1 755 root bin

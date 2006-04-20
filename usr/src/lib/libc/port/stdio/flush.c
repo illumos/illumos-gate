@@ -33,6 +33,7 @@
 #include "synonyms.h"
 #include "mtlib.h"
 #include "file64.h"
+#include "../gen/_libc_gettext.h"
 
 #define	_iob	__iob
 
@@ -48,6 +49,7 @@
 #include <sys/stat.h>
 #include <stddef.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #undef end
 
@@ -63,6 +65,8 @@
 #define	FPDECL(fp)		FILE *fp
 #define	FIRSTFP(lp, fp)		fp = lp->iobp
 #define	NEXTFP(fp)		fp++
+#define	FPLOCK(fp)		&fp->_lock
+#define	FPSTATE(fp)		&fp->_state
 
 #define	xFILE			FILE
 
@@ -72,6 +76,10 @@
 #define	FIRSTFP(lp, fp)		x##fp = lp->iobp; \
 				fp = x##fp ? &x##fp->_iob : &_iob[0]
 #define	NEXTFP(fp)		(x##fp ? fp = &(++x##fp)->_iob : ++fp)
+#define	FPLOCK(fp)		x##fp ? \
+				    &x##fp->xlock : &_xftab[IOPIND(fp)]._lock
+#define	FPSTATE(fp)		x##fp ? \
+				    &x##fp->xstate : &_xftab[IOPIND(fp)]._state
 
 /* The extended 32-bit file structure for use in link buffers */
 typedef struct xFILE {
@@ -135,18 +143,10 @@ static struct _link_ *lastlink = NULL;
 static int fcloses;
 static int nchunks;
 
-static rwlock_t _first_link_lock = DEFAULTRWLOCK;
+static mutex_t _first_link_lock = DEFAULTMUTEX;
 
-static int _fflush_u_iops(void);
+static int _fflush_l_iops(void);
 static FILE *getiop(FILE *, rmutex_t *, mbstate_t *);
-
-#define	GETIOP(fp, lk, mb)	{FILE *ret; \
-	if ((ret = getiop((fp), __libc_threaded? (lk): NULL, (mb))) != NULL) { \
-		if (__libc_threaded) \
-			(void) __rw_unlock(&_first_link_lock); \
-		return (ret); \
-	}; \
-	}
 
 /*
  * All functions that understand the linked list of iob's follow.
@@ -164,7 +164,7 @@ __cleanup(void)		/* called at process end to flush ouput streams */
 void
 stdio_locks()
 {
-	(void) __rw_wrlock(&_first_link_lock);
+	(void) __mutex_lock(&_first_link_lock);
 	/*
 	 * XXX: We should acquire all of the iob locks here.
 	 */
@@ -176,7 +176,7 @@ stdio_unlocks()
 	/*
 	 * XXX: We should release all of the iob locks here.
 	 */
-	(void) __rw_unlock(&_first_link_lock);
+	(void) __mutex_unlock(&_first_link_lock);
 }
 
 void
@@ -185,22 +185,43 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	FPDECL(fp);
 	int i;
 	struct _link_ *lp;
+	/* Allow compiler to optimize the loop */
+	int threaded = __libc_threaded;
 
-	if (__libc_threaded)
-		(void) __rw_rdlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 	do {
 		FIRSTFP(lp, fp);
 		for (i = lp->niob; --i >= 0; NEXTFP(fp)) {
-			if ((fp->_flag & (_IOLBF | _IOWRT)) ==
-			    (_IOLBF | _IOWRT))
-				(void) _fflush_u(fp);
+			/*
+			 * The additional _IONBF check guards againsts
+			 * allocated but uninitialized iops (see _findiop).
+			 * We also automatically skip non allocated iop's.
+			 * Don't block on locks.
+			 */
+			if ((fp->_flag & (_IOLBF | _IOWRT | _IONBF)) ==
+			    (_IOLBF | _IOWRT)) {
+				if (threaded) {
+					rmutex_t *lk = FPLOCK(fp);
+					if (rmutex_trylock(lk) != 0)
+						continue;
+					/* Recheck after locking */
+					if ((fp->_flag & (_IOLBF | _IOWRT)) ==
+					    (_IOLBF | _IOWRT)) {
+						(void) _fflush_u(fp);
+					}
+					(void) rmutex_unlock(lk);
+				} else {
+					(void) _fflush_u(fp);
+				}
+			}
 		}
 	} while ((lp = lp->next) != NULL);
 
-	if (__libc_threaded)
-		(void) __rw_unlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_unlock(&_first_link_lock);
 }
 
 /* allocate an unused stream; NULL if cannot */
@@ -232,9 +253,10 @@ _findiop(void)
 	struct _link_ *hdr;
 	FPDECL(fp);
 	int i;
+	int threaded = __libc_threaded;
 
-	if (__libc_threaded)
-		(void) __rw_wrlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_lock(&_first_link_lock);
 
 	if (lastlink == NULL) {
 rescan:
@@ -258,13 +280,18 @@ rescan:
 		FIRSTFP(lp, fp);
 
 		for (i = lp->niob; --i >= 0; NEXTFP(fp)) {
-#ifdef	_LP64
-			GETIOP(fp, &fp->_lock, &fp->_state);
-#else
-			GETIOP(fp,
-			    xfp ? &xfp->xlock : &_xftab[IOPIND(fp)]._lock,
-			    xfp ? &xfp->xstate : &_xftab[IOPIND(fp)]._state);
-#endif	/*	_LP64	*/
+			FILE *ret;
+			if (threaded) {
+				ret = getiop(fp, FPLOCK(fp), FPSTATE(fp));
+				if (ret != NULL) {
+				    (void) __mutex_unlock(&_first_link_lock);
+				    return (ret);
+				}
+			} else {
+				ret = getiop(fp, NULL, FPSTATE(fp));
+				if (ret != NULL)
+					return (ret);
+			}
 		}
 	} while ((lastlink = lp = lp->next) != NULL);
 
@@ -288,8 +315,8 @@ rescan:
 	 * Need to allocate another and put it in the linked list.
 	 */
 	if ((pkgp = malloc(sizeof (Pkg))) == NULL) {
-		if (__libc_threaded)
-			(void) __rw_unlock(&_first_link_lock);
+		if (threaded)
+			(void) __mutex_unlock(&_first_link_lock);
 		return (NULL);
 	}
 
@@ -355,8 +382,8 @@ rescan:
 	fp->_ptr = 0;
 	fp->_base = 0;
 	fp->_flag = 0377; /* claim the fp by setting low 8 bits */
-	if (__libc_threaded)
-		(void) __rw_unlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_unlock(&_first_link_lock);
 
 	return (fp);
 }
@@ -369,7 +396,7 @@ isseekable(FILE *iop)
 
 	save_errno = errno;
 
-	if (fstat64(iop->_file, &fstatbuf) != 0) {
+	if (fstat64(GET_FD(iop), &fstatbuf) != 0) {
 		/*
 		 * when we don't know what it is we'll
 		 * do the old behaviour and flush
@@ -452,8 +479,8 @@ _setbufend(FILE *iop, Uchar *end)	/* set the end pointer for this iop */
 	 * old _bufend macro.  This is *so* broken, fileno()
 	 * is not the proper index.
 	 */
-	if (iop->_file < _NFILE)
-		_bufendtab[iop->_file] = end;
+	if (iop->_magic < _NFILE)
+		_bufendtab[iop->_magic] = end;
 
 }
 
@@ -523,8 +550,9 @@ _xflsbuf(FILE *iop)
 		_bufsync(iop, bufend);
 
 	if (n > 0) {
+		int fd = GET_FD(iop);
 		while ((num_wrote =
-			write(iop->_file, base, (size_t)n)) != n) {
+			write(fd, base, (size_t)n)) != n) {
 			if (num_wrote <= 0) {
 				iop->_flag |= _IOERR;
 				return (EOF);
@@ -548,56 +576,86 @@ fflush(FILE *iop)
 		res = _fflush_u(iop);
 		FUNLOCKFILE(lk);
 	} else {
-		res = _fflush_u_iops();		/* flush all iops */
+		res = _fflush_l_iops();		/* flush all iops */
 	}
 	return (res);
 }
 
 static int
-_fflush_u_iops(void)		/* flush all buffers */
+_fflush_l_iops(void)		/* flush all buffers */
 {
 	FPDECL(iop);
 
 	int i;
 	struct _link_ *lp;
 	int res = 0;
+	rmutex_t *lk;
+	/* Allow the compiler to optimize the load out of the loop */
+	int threaded = __libc_threaded;
 
-	if (__libc_threaded)
-		(void) __rw_rdlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 
 	do {
 		/*
-		 * Don't grab the locks for these file pointers
-		 * since they are supposed to be flushed anyway
-		 * It could also be the case in which the 2nd
-		 * portion (base and lock) are not initialized
+		 * We need to grab the file locks or file corruption
+		 * will happen.  But we first check the flags field
+		 * knowing that when it is 0, it isn't allocated and
+		 * cannot be allocated while we're holding the
+		 * _first_link_lock.  And when _IONBF is set (also the
+		 * case when _flag is 0377, or alloc in progress), we
+		 * also ignore it.
+		 *
+		 * Ignore locked streams; it will appear as if
+		 * concurrent updates happened after fflush(NULL).  Note
+		 * that we even attempt to lock if the locking is set to
+		 * "by caller".  We don't want to penalize callers of
+		 * __fsetlocking() by not flushing their files.  Note: if
+		 * __fsetlocking() callers don't employ any locking, they
+		 * may still face corruption in fflush(NULL); but that's
+		 * no change from earlier releases.
 		 */
 		FIRSTFP(lp, iop);
 		for (i = lp->niob; --i >= 0; NEXTFP(iop)) {
-		    if (!(iop->_flag & _IONBF)) {
-			/*
-			 * don't need to worry about the _IORW case
-			 * since the iop will also marked with _IOREAD
-			 * or _IOWRT whichever we are really doing
-			 */
-			if (iop->_flag & _IOWRT) {    /* flush write buffers */
-			    res |= _fflush_u(iop);
-			} else if (iop->_flag & _IOREAD) {
-				/*
-				 * flush seekable read buffers
-				 * don't flush non-seekable read buffers
-				 */
-			    if (GET_SEEKABLE(iop)) {
-				res |= _fflush_u(iop);
-			    }
+			unsigned int flag = iop->_flag;
+
+			/* flag 0, flag 0377, or _IONBF set */
+			if (flag == 0 || (flag & _IONBF) != 0)
+				continue;
+
+			if (threaded) {
+				lk = FPLOCK(iop);
+				if (rmutex_trylock(lk) != 0)
+					continue;
 			}
-		    }
+
+			if (!(iop->_flag & _IONBF)) {
+				/*
+				 * don't need to worry about the _IORW case
+				 * since the iop will also marked with _IOREAD
+				 * or _IOWRT whichever we are really doing
+				 */
+				if (iop->_flag & _IOWRT) {
+					/* Flush write buffers */
+					res |= _fflush_u(iop);
+				} else if (iop->_flag & _IOREAD) {
+					/*
+					 * flush seekable read buffers
+					 * don't flush non-seekable read buffers
+					 */
+					if (GET_SEEKABLE(iop)) {
+						res |= _fflush_u(iop);
+					}
+				}
+			}
+			if (threaded)
+				(void) rmutex_unlock(lk);
 		}
 	} while ((lp = lp->next) != NULL);
-	if (__libc_threaded)
-		(void) __rw_unlock(&_first_link_lock);
+	if (threaded)
+		(void) __mutex_unlock(&_first_link_lock);
 	return (res);
 }
 
@@ -609,7 +667,7 @@ _fflush_u(FILE *iop)
 
 	/* this portion is always assumed locked */
 	if (!(iop->_flag & _IOWRT)) {
-		(void) lseek64(iop->_file, -iop->_cnt, SEEK_CUR);
+		(void) lseek64(GET_FD(iop), -iop->_cnt, SEEK_CUR);
 		iop->_cnt = 0;
 		/* needed for ungetc & multibyte pushbacks */
 		iop->_ptr = iop->_base;
@@ -647,7 +705,7 @@ fclose(FILE *iop)
 	/* Is not unbuffered and opened for read and/or write ? */
 	if (!(iop->_flag & _IONBF) && (iop->_flag & (_IOWRT | _IOREAD | _IORW)))
 		res = _fflush_u(iop);
-	if (close(iop->_file) < 0)
+	if (close(GET_FD(iop)) < 0)
 		res = EOF;
 	if (iop->_flag & _IOMYBUF) {
 		(void) free((char *)iop->_base - PUSHBACK);
@@ -659,10 +717,10 @@ fclose(FILE *iop)
 	FUNLOCKFILE(lk);
 
 	if (__libc_threaded)
-		(void) __rw_wrlock(&_first_link_lock);
+		(void) __mutex_lock(&_first_link_lock);
 	fcloses++;
 	if (__libc_threaded)
-		(void) __rw_unlock(&_first_link_lock);
+		(void) __mutex_unlock(&_first_link_lock);
 
 	return (res);
 }
@@ -679,7 +737,7 @@ close_fd(FILE *iop)
 	/* Is not unbuffered and opened for read and/or write ? */
 	if (!(iop->_flag & _IONBF) && (iop->_flag & (_IOWRT | _IOREAD | _IORW)))
 		res = _fflush_u(iop);
-	if (close(iop->_file) < 0)
+	if (close(GET_FD(iop)) < 0)
 		res = EOF;
 	if (iop->_flag & _IOMYBUF) {
 		(void) free((char *)iop->_base - PUSHBACK);
@@ -735,5 +793,110 @@ _getmbstate(FILE *iop)
 		return (&dat->_state);
 
 	return (NULL);
+}
+
+/*
+ * More 32-bit only functions.
+ * They lookup/set large fd's for extended FILE support.
+ */
+
+/*
+ * The negative value indicates that Extended fd FILE's has not
+ * been enabled by the user.
+ */
+static int bad_fd = -1;
+
+int
+_file_get(FILE *iop)
+{
+	int altfd;
+
+	/*
+	 * Failure indicates a FILE * not allocated through stdio;
+	 * it means the flag values are probably bogus and that if
+	 * a file descriptor is set, it's in _magic.
+	 * Inline getxfdat() for performance reasons.
+	 */
+	if (STDIOP(iop))
+		altfd = _xftab[IOPIND(iop)]._altfd;
+	else if (VALIDXFILE(FILEx(iop)))
+		altfd = FILEx(iop)->_xdat._altfd;
+	else
+		return (iop->_magic);
+	/*
+	 * if this is not an internal extended FILE then check
+	 * if _file is being changed from underneath us.
+	 * It should not be because if
+	 * it is then then we lose our ability to guard against
+	 * silent data corruption.
+	 */
+	if (!iop->__xf_nocheck && bad_fd > -1 && iop->_magic != bad_fd) {
+		/* LINTED: variable format specifier */
+		(void) fprintf(stderr, _libc_gettext(
+		    "Application violated extended FILE safety mechanism.\n"
+		    "Please read the man page for extendedFILE.\nAborting\n"));
+		abort();
+	}
+	return (altfd);
+}
+
+int
+_file_set(FILE *iop, int fd, const char *type)
+{
+	struct xFILEdata *dat;
+	int Fflag;
+
+	/* Already known to contain at least one byte */
+	while (*++type != '\0')
+		;
+
+	Fflag = type[-1] == 'F';
+	if (!Fflag && bad_fd < 0) {
+		errno = EMFILE;
+		return (-1);
+	}
+
+	dat = getxfdat(iop);
+	iop->__extendedfd = 1;
+	iop->__xf_nocheck = Fflag;
+	dat->_altfd = fd;
+	iop->_magic = (unsigned char)bad_fd;
+	return (0);
+}
+
+/*
+ * Activates extended fd's in FILE's
+ */
+
+static const int tries[] = {196, 120, 60, 3};
+#define	NTRIES	(sizeof (tries)/sizeof (int))
+
+int
+enable_extended_FILE_stdio(int fd, int action)
+{
+	int i;
+
+	if (action < 0)
+		action = SIGABRT;	/* default signal */
+
+	if (fd < 0) {
+		/*
+		 * search for an available fd and make it the badfd
+		 */
+		for (i = 0; i < NTRIES; i++) {
+			fd = fcntl(tries[i], F_BADFD, action);
+			if (fd >= 0)
+				break;
+		}
+		if (fd < 0)	/* failed to find an available fd */
+			return (-1);
+	} else {
+		/* caller requests that fd be the chosen badfd */
+		int nfd = fcntl(fd, F_BADFD, action);
+		if (nfd < 0 || nfd != fd)
+			return (-1);
+	}
+	bad_fd = fd;
+	return (0);
 }
 #endif

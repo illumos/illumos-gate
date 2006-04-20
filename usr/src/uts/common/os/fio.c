@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,14 @@
  *
  * CDDL HEADER END
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	All Rights Reserved */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	All Rights Reserved */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -577,6 +577,10 @@ getf(int fd)
 	UF_ENTER(ufp, fip, fd);
 	if ((fp = ufp->uf_file) == NULL) {
 		UF_EXIT(ufp);
+
+		if (fd == fip->fi_badfd && fip->fi_action > 0)
+			tsignal(curthread, fip->fi_action);
+
 		return (NULL);
 	}
 	ufp->uf_refcnt++;
@@ -599,7 +603,9 @@ getf(int fd)
  * Close whatever file currently occupies the file descriptor slot
  * and install the new file, usually NULL, in the file descriptor slot.
  * The close must complete before we release the file descriptor slot.
- * We return the error number from closef().
+ * If newfp != NULL we only return an error if we can't allocate the
+ * slot so the caller knows that it needs to free the filep;
+ * in the other cases we return the error number from closef().
  */
 int
 closeandsetf(int fd, file_t *newfp)
@@ -626,6 +632,12 @@ closeandsetf(int fd, file_t *newfp)
 		 * new non-NULL file pointer.
 		 */
 		mutex_enter(&fip->fi_lock);
+		if (fd == fip->fi_badfd) {
+			mutex_exit(&fip->fi_lock);
+			if (fip->fi_action > 0)
+				tsignal(curthread, fip->fi_action);
+			return (EBADF);
+		}
 		UF_ENTER(ufp, fip, fd);
 		while (ufp->uf_busy && ufp->uf_file == NULL) {
 			mutex_exit(&fip->fi_lock);
@@ -755,7 +767,8 @@ closeandsetf(int fd, file_t *newfp)
 
 	setf(fd, newfp);
 
-	return (error);
+	/* Only return closef() error when closing is all we do */
+	return (newfp == NULL ? error : 0);
 }
 
 /*
@@ -950,6 +963,11 @@ ufalloc_file(int start, file_t *fp)
 	for (;;) {
 		mutex_enter(&fip->fi_lock);
 		fd = fd_find(fip, start);
+		if (fd >= 0 && fd == fip->fi_badfd) {
+			start = fd + 1;
+			mutex_exit(&fip->fi_lock);
+			continue;
+		}
 		if ((uint_t)fd < filelimit)
 			break;
 		if (fd >= filelimit) {
@@ -1255,6 +1273,66 @@ f_setfd(int fd, char flags)
 	(void) f_setfd_error(fd, flags);
 }
 
+#define	BADFD_MIN	3
+#define	BADFD_MAX	255
+
+/*
+ * Attempt to allocate a file descriptor which is bad and which
+ * is "poison" to the application.  It cannot be closed (except
+ * on exec), allocated for a different use, etc.
+ */
+int
+f_badfd(int start, int *fdp, int action)
+{
+	int fdr;
+	int badfd;
+	uf_info_t *fip = P_FINFO(curproc);
+
+#ifdef _LP64
+	/* No restrictions on 64 bit _file */
+	if (get_udatamodel() != DATAMODEL_ILP32)
+		return (EINVAL);
+#endif
+
+	if (start > BADFD_MAX || start < BADFD_MIN)
+		return (EINVAL);
+
+	if (action >= NSIG || action < 0)
+		return (EINVAL);
+
+	mutex_enter(&fip->fi_lock);
+	badfd = fip->fi_badfd;
+	mutex_exit(&fip->fi_lock);
+
+	if (badfd != -1)
+		return (EAGAIN);
+
+	fdr = ufalloc(start);
+
+	if (fdr > BADFD_MAX) {
+		setf(fdr, NULL);
+		return (EMFILE);
+	}
+	if (fdr < 0)
+		return (EMFILE);
+
+	mutex_enter(&fip->fi_lock);
+	if (fip->fi_badfd != -1) {
+		/* Lost race */
+		mutex_exit(&fip->fi_lock);
+		setf(fdr, NULL);
+		return (EAGAIN);
+	}
+	fip->fi_action = action;
+	fip->fi_badfd = fdr;
+	mutex_exit(&fip->fi_lock);
+	setf(fdr, NULL);
+
+	*fdp = fdr;
+
+	return (0);
+}
+
 /*
  * Allocate a file descriptor and assign it to the vnode "*vpp",
  * performing the usual open protocol upon it and returning the
@@ -1360,6 +1438,10 @@ close_exec(uf_info_t *fip)
 			(void) closef(fp);
 		}
 	}
+
+	/* Reset bad fd */
+	fip->fi_badfd = -1;
+	fip->fi_action = -1;
 }
 
 /*

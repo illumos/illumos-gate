@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include "synonyms.h"
@@ -48,6 +48,7 @@ setvbuf(FILE *iop, char *abuf, int type, size_t size)
 	Uchar *temp;
 	int	sflag = iop->_flag & _IOMYBUF;
 	rmutex_t *lk;
+	int fd = GET_FD(iop);
 
 	FLOCKFILE(lk, iop);
 	iop->_flag &= ~(_IOMYBUF | _IONBF | _IOLBF);
@@ -56,14 +57,14 @@ setvbuf(FILE *iop, char *abuf, int type, size_t size)
 	case _IONBF:
 		iop->_flag |= _IONBF;	 /* file is unbuffered */
 #ifndef _STDIO_ALLOCATE
-		if (iop->_file < 2) {
+		if (fd < 2) {
 			/* use special buffer for std{in,out} */
-			buf = (iop->_file == 0) ? _sibuf : _sobuf;
+			buf = (fd == 0) ? _sibuf : _sobuf;
 			size = BUFSIZ;
 		} else /* needed for ifdef */
 #endif
-		if (iop->_file < _NFILE) {
-			buf = _smbuf[iop->_file];
+		if (fd < _NFILE) {
+			buf = _smbuf[fd];
 			size = _SMBFSZ - PUSHBACK;
 		} else
 			if ((buf = malloc(_SMBFSZ * sizeof (Uchar))) != NULL) {

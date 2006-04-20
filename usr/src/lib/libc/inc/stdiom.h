@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -168,6 +167,36 @@ extern int	_doscan(FILE *, const char *, va_list);
 #ifdef	_LP64
 extern void	close_pid(void);
 #endif	/*	_LP64	*/
+
+/*
+ * Internal routines from flush.c
+ */
+extern int _file_get(FILE *);
+extern int _file_set(FILE *, int, const char *);
+
+/*
+ * Macros to aid the extended fd FILE work.
+ * This helps isolate the changes to only the 32-bit code
+ * since 64-bit Solaris is not affected by this.
+ */
+#ifdef  _LP64
+#define	GET_FD(iop)		((iop)->_file)
+#define	SET_FILE(iop, fd)	((iop)->_file = (fd))
+#else
+#define	GET_FD(iop)		\
+		(((iop)->__extendedfd) ? _file_get(iop) : (iop)->_magic)
+#define	SET_FILE(iop, fd)	(iop)->_magic = (fd); (iop)->__extendedfd = 0
+#endif
+
+/*
+ * Maximum size of the file descriptor stored in the FILE structure.
+ */
+
+#ifdef _LP64
+#define	_FILE_FD_MAX	INT_MAX
+#else
+#define	_FILE_FD_MAX	255
+#endif
 
 /*
  * Internal routines from fileno.c

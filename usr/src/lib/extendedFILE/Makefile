@@ -18,29 +18,31 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/extendedFILE/Makefile
 
-PROG= strchg strconf
+include	../Makefile.lib
 
-include ../../Makefile.cmd
+SUBDIRS=	spec .WAIT $(MACH)
 
-OWNER= root
-GROUP= root
+LIBRARY=	extendedFILE.a
+
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all: $(PROG)
+all install clean clobber lint: $(SUBDIRS)
 
-install: all $(ROOTPROG)
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-clean:
-
-lint:
-	$(LINT.c) strchg.c $(LDLIBS)
-	$(LINT.c) strconf.c $(LDLIBS)
-
-include ../../Makefile.targ
+FRC:

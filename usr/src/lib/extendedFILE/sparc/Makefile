@@ -18,29 +18,17 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/extendedFILE/sparc/Makefile
 
-PROG= strchg strconf
-
-include ../../Makefile.cmd
-
-OWNER= root
-GROUP= root
+MAPDIR=	../spec/sparc
+include ../Makefile.com
 
 .KEEP_STATE:
 
-all: $(PROG)
-
-install: all $(ROOTPROG)
-
-clean:
-
-lint:
-	$(LINT.c) strchg.c $(LDLIBS)
-	$(LINT.c) strconf.c $(LDLIBS)
-
-include ../../Makefile.targ
+install: all $(ROOTLIBS)

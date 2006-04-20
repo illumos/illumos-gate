@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -25,11 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Unix routine to do an "fopen" on file descriptor
@@ -62,28 +60,14 @@ fdopen(int fd, const char *type) /* associate file desc. with stream */
 	char plus;
 	unsigned char flag;
 
-
 	/* Sets EBADF for bad fds */
 	if (fcntl(fd, F_GETFD) == -1)
 		return (NULL);
 
-#ifdef	_LP64
 	if ((iop = _findiop()) == 0) {
 		errno = ENOMEM;
 		return (NULL);
 	}
-	iop->_file = fd;
-#else
-	if (fd > UCHAR_MAX) {
-		errno = EMFILE;
-		return (NULL);
-	}
-	if ((iop = _findiop()) == 0) {
-		errno = ENOMEM;
-		return (NULL);
-	}
-	iop->_file = (unsigned char)fd;
-#endif	/*	_LP64	*/
 
 	switch (type[0]) {
 	default:
@@ -105,6 +89,18 @@ fdopen(int fd, const char *type) /* associate file desc. with stream */
 	if (plus == '+')
 		flag = _IORW;
 	iop->_flag = flag;
+
+#ifdef	_LP64
+	iop->_file = fd;
+#else
+	if (fd <= _FILE_FD_MAX) {
+		SET_FILE(iop, fd);
+	} else if (_file_set(iop, fd, type) != 0) {
+		/* errno set by _file_set () */
+		iop->_flag = 0;		/* release iop */
+		return (NULL);
+	}
+#endif	/*	_LP64	*/
 
 	return (iop);
 }

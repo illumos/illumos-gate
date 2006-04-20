@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1983 Regents of the University of California.
@@ -42,4 +42,4 @@ clean:
 	$(RM) $(ACULIB) $(OBJS) core errs
 
 lint:
-	$(LINT.c) $(OBJS:%.o=%.c)
+	$(LINT.c) $(OBJS:%.o=%.c) $(LDLIBS)

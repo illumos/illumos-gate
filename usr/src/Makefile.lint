@@ -286,6 +286,7 @@ COMMON_SUBDIRS = \
 	lib/abi \
 	lib/auditd_plugins \
 	lib/crypt_modules \
+	lib/extendedFILE \
 	lib/libadt_jni \
 	lib/libaio \
 	lib/libavl \

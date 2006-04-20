@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +65,8 @@
 FILE *
 _endopen(const char *name, const char *type, FILE *iop, int largefile)
 {
-	int oflag, fd;
+	int oflag, fd, fflag;
 	char plus;
-	rmutex_t *lk;
 
 	if (iop == NULL)
 		return (NULL);
@@ -78,19 +76,24 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 		return (NULL);
 	case 'r':
 		oflag = O_RDONLY;
+		fflag = _IOREAD;
 		break;
 	case 'w':
 		oflag = O_WRONLY | O_TRUNC | O_CREAT;
+		fflag = _IOWRT;
 		break;
 	case 'a':
 		oflag = O_WRONLY | O_APPEND | O_CREAT;
+		fflag = _IOWRT;
 		break;
 	}
 	/* UNIX ignores 'b' and treats text and binary the same */
 	if ((plus = type[1]) == 'b')
 		plus = type[2];
-	if (plus == '+')
+	if (plus == '+') {
 		oflag = (oflag & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
+		fflag = _IORW;
+	}
 
 	/* select small or large file open based on flag */
 	if (largefile) {
@@ -101,36 +104,21 @@ _endopen(const char *name, const char *type, FILE *iop, int largefile)
 	if (fd < 0)
 		return (NULL);
 
+	/* As long as we make sure _flag stays != 0, we don't need to lock */
 #ifdef	_LP64
 	iop->_file = fd;
+	iop->_flag = (iop->_flag & ~0377) | fflag;
 #else
-	if (fd > UCHAR_MAX) {
+	if (fd <= _FILE_FD_MAX) {
+		SET_FILE(iop, fd);
+	} else if (_file_set(iop, fd, type) != 0) {
+		/* errno set in _file_set() */
 		(void) close(fd);
-		errno = EMFILE;
 		return (NULL);
 	}
-	iop->_file = (unsigned char)fd; /* assume fits in unsigned char */
+	iop->_flag = fflag;
 #endif	/*	_LP64	*/
 
-	FLOCKFILE(lk, iop);		/* this lock may be unnecessary */
-
-#ifdef	_LP64
-	iop->_flag &= ~0377;	/* clear lower 8-bits */
-	if (plus == '+')
-		iop->_flag |= _IORW;
-	else if (type[0] == 'r')
-		iop->_flag |= _IOREAD;
-	else
-		iop->_flag |= _IOWRT;
-#else
-	if (plus == '+')
-		iop->_flag = _IORW;
-	else if (type[0] == 'r')
-		iop->_flag = _IOREAD;
-	else
-		iop->_flag = _IOWRT;
-#endif	/*	_LP64	*/
-	FUNLOCKFILE(lk);
 	if (oflag == (O_WRONLY | O_APPEND | O_CREAT)) {	/* type == "a" */
 		if (lseek64(fd, (off64_t)0, SEEK_END) < (off64_t)0) {
 			(void) close(fd);

@@ -177,6 +177,7 @@ SUBDIRS += \
 	libpctx		.WAIT	\
 	libcpc		\
 	watchmalloc	\
+	extendedFILE	\
 	madv		\
 	mpss		\
 	libdisasm	\

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #pragma weak _flsbuf = __flsbuf
@@ -71,7 +71,7 @@ _flsbuf(int ch, FILE *iop)	/* flush (write) buffer, save ch, */
 		case _IONBF | _IOWRT:	/* okay to do no-buffered case */
 			iop->_cnt = 0;
 			uch = (unsigned char)ch;
-			if (write(iop->_file, (char *)&uch, 1) != 1)
+			if (write(GET_FD(iop), (char *)&uch, 1) != 1)
 				iop->_flag |= _IOERR;
 			goto out;
 		}
