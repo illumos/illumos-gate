@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,7 +225,6 @@ typedef struct {
  */
 static void	pepb_uninitchild(dev_info_t *);
 static int 	pepb_initchild(dev_info_t *child);
-static int 	pepb_create_pci_prop(dev_info_t *);
 static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
 static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
@@ -365,9 +363,11 @@ next_step:
 		 * so log the message and ignore the failure.
 		 */
 		if (pepb->inband_hpc == INBAND_HPC_PCIE &&
-		    pciehpc_init(devi, NULL) != DDI_SUCCESS)
-		    cmn_err(CE_NOTE, "Failed to initialize inband hotplug "
+		    pciehpc_init(devi, NULL) != DDI_SUCCESS) {
+		    pepb->inband_hpc = INBAND_HPC_NONE;
+		    cmn_err(CE_CONT, "!Failed to initialize inband hotplug "
 			"controller");
+		}
 	}
 
 	ddi_report_dev(devi);
@@ -464,7 +464,7 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	}
 
 	*(int *)result = 0;
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
 	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg", (caddr_t)&drv_regp,
 	    &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -540,7 +540,6 @@ pepb_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
 	char name[MAXNAMELEN];
-	int ret;
 
 	if (pepb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -585,9 +584,6 @@ pepb_initchild(dev_info_t *child)
 		return (DDI_NOT_WELL_FORMED);
 	}
 
-	if ((ret = pepb_create_pci_prop(child)) != DDI_SUCCESS)
-		return (ret);
-
 	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "interrupts",
 	    -1) != -1) {
 		pdptr = kmem_zalloc((sizeof (struct ddi_parent_private_data) +
@@ -628,50 +624,6 @@ pepb_uninitchild(dev_info_t *dip)
 
 	ddi_prop_remove_all(dip);
 }
-
-static int
-pepb_create_pci_prop(dev_info_t *child)
-{
-	pci_regspec_t *pci_rp;
-	int	length;
-	int	value;
-
-	/* get child "reg" property */
-	value = ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_CANSLEEP,
-	    "reg", (caddr_t)&pci_rp, &length);
-	if (value != DDI_SUCCESS)
-		return (value);
-
-	(void) ndi_prop_update_byte_array(DDI_DEV_T_NONE, child, "reg",
-	    (uchar_t *)pci_rp, length);
-
-	/*
-	 * free the memory allocated by ddi_getlongprop ().
-	 */
-	kmem_free(pci_rp, length);
-
-	/* assign the basic PCI Properties */
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-	    "vendor-id", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child, "vendor-id",
-		    value);
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-	    "device-id", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child, "device-id",
-		    value);
-
-	value = ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
-	    "interrupts", -1);
-	if (value != -1)
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, child, "interrupts",
-		    value);
-	return (DDI_SUCCESS);
-}
-
 
 /*
  * pepb_save_config_regs
