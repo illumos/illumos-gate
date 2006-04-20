@@ -76,7 +76,7 @@ typedef struct zil_trailer {
 	zio_block_tail_t zit_bt; /* block trailer */
 } zil_trailer_t;
 
-#define	ZIL_MIN_BLKSZ	4096
+#define	ZIL_MIN_BLKSZ	4096ULL
 #define	ZIL_MAX_BLKSZ	SPA_MAXBLOCKSIZE
 #define	ZIL_BLK_DATA_SZ(lwb)	((lwb)->lwb_sz - sizeof (zil_trailer_t))
 

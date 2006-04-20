@@ -652,7 +652,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	 */
 	zil_blksz = MAX(zilog->zl_cur_used, zilog->zl_prev_used);
 	zil_blksz = MAX(zil_blksz, zilog->zl_itx_list_sz + sizeof (*ztp));
-	zil_blksz = P2ROUNDUP(zil_blksz, ZIL_MIN_BLKSZ);
+	zil_blksz = P2ROUNDUP_TYPED(zil_blksz, ZIL_MIN_BLKSZ, uint64_t);
 	if (zil_blksz > ZIL_MAX_BLKSZ)
 		zil_blksz = ZIL_MAX_BLKSZ;
 
@@ -742,8 +742,8 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 			txg_wait_synced(zilog->zl_dmu_pool, txg);
 		if (itx->itx_wr_state != WR_COPIED) {
 			if (itx->itx_wr_state == WR_NEED_COPY) {
-				dlen = P2ROUNDUP(lr->lr_length,
-				    sizeof (uint64_t));
+				dlen = P2ROUNDUP_TYPED(lr->lr_length,
+				    sizeof (uint64_t), uint64_t);
 				ASSERT(dlen);
 				dbuf = kmem_alloc(dlen, KM_NOSLEEP);
 				/* on memory shortage use dmu_sync */
@@ -824,7 +824,7 @@ zil_itx_create(int txtype, size_t lrsize)
 {
 	itx_t *itx;
 
-	lrsize = P2ROUNDUP(lrsize, sizeof (uint64_t));
+	lrsize = P2ROUNDUP_TYPED(lrsize, sizeof (uint64_t), size_t);
 
 	itx = kmem_alloc(offsetof(itx_t, itx_lr) + lrsize, KM_SLEEP);
 	itx->itx_lr.lrc_txtype = txtype;
