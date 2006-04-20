@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,8 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/psrinfo/Makefile
 #
@@ -32,7 +31,6 @@ PROG=	psrinfo
 
 include	../Makefile.cmd
 
-LDLIBS += -lkstat
 OWNER = root
 GROUP = sys
 
@@ -40,10 +38,22 @@ GROUP = sys
 
 all: $(PROG)
 
-install: all $(ROOTUSRSBINPROG)
+install: all .WAIT $(ROOTUSRSBINPROG)
+
+_msg: $(PROG).po
 
 clean:
 
-lint: lint_PROG
+%: %.pl
+	$(SED) -e "s@TEXT_DOMAIN@\"$(TEXT_DOMAIN)\"@" $< > $@
 
-include	../Makefile.targ
+
+$(ROOTUSRSBINBINPROG): $(PROG)
+	$(INS.file)
+
+$(PROG).po: $(PROG).pl
+	$(XGETTEXT) -d $(PROG) $(PROG).pl 
+
+lint:
+
+include ../Makefile.targ
