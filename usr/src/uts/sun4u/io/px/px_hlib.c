@@ -3017,7 +3017,85 @@ oberon_hp_pwron(caddr_t csr_base)
 	/* wait to check power state */
 	delay(drv_usectohz(25000));
 
+	if (CSR_BR(csr_base, TLU_SLOT_STATUS, PWFD)) {
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: power fault\n");
+		goto fail1;
+	}
+
+	/* power is good */
+	CSR_BS(csr_base, TLU_SLOT_CONTROL, PWFDEN);
+
+	/* Turn on slot clock */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, CLKEN);
+
+	/* Release PCI-E Reset */
+	delay(drv_usectohz(100000));
+	CSR_BS(csr_base, HOTPLUG_CONTROL, N_PERST);
+
+	/*
+	 * Open events' mask
+	 * This should be done from pciehpc already
+	 */
+
+	/*
+	 * Initialize Leaf
+	 * SPLS = 00b, SPLV = 11001b, i.e. 25W
+	 */
+	reg = CSR_XR(csr_base, TLU_SLOT_CAPABILITIES);
+	reg &= ~(TLU_SLOT_CAPABILITIES_SPLS_MASK <<
+	    TLU_SLOT_CAPABILITIES_SPLS);
+	reg &= ~(TLU_SLOT_CAPABILITIES_SPLV_MASK <<
+	    TLU_SLOT_CAPABILITIES_SPLS);
+	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLS);
+	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
+
+	/* Enable PCIE port */
+	CSR_BS(csr_base, DLU_PORT_CONTROL, CK_EN);
+	CSR_BC(csr_base, FLP_PORT_CONTROL, PORT_DIS);
+
+	/* wait for the LUP_P/LUP_S */
+	delay(drv_usectohz(10000));
+	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
+	if (!(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_P)) &&
+	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S))) {
+		DBG(DBG_HP, NULL, "oberon_hp_pwron fails to enable "
+		    "PCI-E port\n");
+		goto fail2;
+	}
+
+	/* Turn on Power LED */
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
+	reg = pcie_slotctl_pwr_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_ON);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	/* Notify to SCF */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
 	return (DDI_SUCCESS);
+
+fail2:
+	/* Link up is failed */
+	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
+	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
+	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
+	delay(drv_usectohz(150));
+
+	CSR_BC(csr_base, HOTPLUG_CONTROL, CLKEN);
+	delay(drv_usectohz(100));
+
+fail1:
+	CSR_BC(csr_base, TLU_SLOT_CONTROL, PWFDEN);
+
+	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+
+	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
+	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
+	reg = pcie_slotctl_pwr_indicator_set(reg,
+	    PCIE_SLOTCTL_INDICATOR_STATE_OFF);
+	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
+
+	CSR_BC(csr_base, TLU_SLOT_STATUS, PWFD);
 
 fail:
 	return (DDI_FAILURE);
@@ -3098,86 +3176,6 @@ oberon_hp_pwroff(caddr_t csr_base)
 	return (DDI_SUCCESS);
 }
 
-static uint_t oberon_hp_pwrledon(caddr_t csr_base)
-{
-	volatile uint64_t reg;
-
-	DBG(DBG_HP, NULL, "oberon_hp_pwrledon the slot\n");
-
-	CSR_BS(csr_base, TLU_SLOT_CONTROL, PWFDEN);
-
-	/* Turn on slot clock */
-	CSR_BS(csr_base, HOTPLUG_CONTROL, CLKEN);
-
-	/* Release PCI-E Reset */
-	delay(drv_usectohz(100000));
-	CSR_BS(csr_base, HOTPLUG_CONTROL, N_PERST);
-
-	/*
-	 * Open events' mask
-	 * This should be done from pciehpc already
-	 */
-
-	/*
-	 * Initialize Leaf
-	 * SPLS = 00b, SPLV = 11001b, i.e. 25W
-	 */
-	reg = CSR_XR(csr_base, TLU_SLOT_CAPABILITIES);
-	reg &= ~(TLU_SLOT_CAPABILITIES_SPLS_MASK <<
-	    TLU_SLOT_CAPABILITIES_SPLS);
-	reg &= ~(TLU_SLOT_CAPABILITIES_SPLV_MASK <<
-	    TLU_SLOT_CAPABILITIES_SPLS);
-	reg |= (0x19 << TLU_SLOT_CAPABILITIES_SPLS);
-	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
-
-	/* Enable PCIE port */
-	CSR_BS(csr_base, DLU_PORT_CONTROL, CK_EN);
-	CSR_BC(csr_base, FLP_PORT_CONTROL, PORT_DIS);
-
-	/* wait for the LUP_P/LUP_S */
-	delay(drv_usectohz(10000));
-	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
-	if (!(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_P)) &&
-	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S))) {
-		DBG(DBG_HP, NULL, "oberon_hp_pwrledon fails to enable "
-		    "PCI-E port\n");
-		goto fail;
-	}
-
-	/* Turn on Power LED */
-	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
-	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
-	reg = pcie_slotctl_pwr_indicator_set(reg,
-	    PCIE_SLOTCTL_INDICATOR_STATE_ON);
-	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
-
-	/* Notify to SCF */
-	CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
-	return (DDI_SUCCESS);
-
-fail:
-	/* Link up is failed */
-	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
-	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
-	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
-	delay(drv_usectohz(150));
-
-	CSR_BC(csr_base, HOTPLUG_CONTROL, CLKEN);
-	delay(drv_usectohz(100));
-
-	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
-
-	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
-	reg &= ~PCIE_SLOTCTL_PWR_INDICATOR_MASK;
-	reg = pcie_slotctl_pwr_indicator_set(reg,
-	    PCIE_SLOTCTL_INDICATOR_STATE_OFF);
-	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
-
-	CSR_BC(csr_base, TLU_SLOT_CONTROL, PWFDEN);
-
-	return (DDI_FAILURE);
-}
-
 static uint_t
 oberon_hpreg_get(void *cookie, off_t off)
 {
@@ -3199,6 +3197,12 @@ oberon_hpreg_get(void *cookie, off_t off)
 	case PCIE_SLOTSTS:
 		val = CSR_XR(csr_base, TLU_SLOT_STATUS);
 		break;
+	case PCIE_LINKCAP:
+		val = CSR_XR(csr_base, TLU_LINK_CAPABILITIES);
+		break;
+	case PCIE_LINKSTS:
+		val = CSR_XR(csr_base, TLU_LINK_STATUS);
+		break;
 	default:
 		DBG(DBG_HP, NULL, "oberon_hpreg_get(): "
 		    "unsupported offset 0x%lx\n", off);
@@ -3212,8 +3216,7 @@ static uint_t
 oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 {
 	caddr_t csr_base = *(caddr_t *)cookie;
-	volatile uint64_t pwr_state_on, pwr_fault, reg;
-	uint16_t pwr_led_state, pwr_led_ctrl;
+	volatile uint64_t pwr_state_on, pwr_fault;
 	uint_t pwr_off, ret = DDI_SUCCESS;
 
 	DBG(DBG_HP, NULL, "oberon_hpreg_put 0x%lx: cur %x, new %x\n",
@@ -3225,10 +3228,6 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 		 * Depending on the current state, insertion or removal
 		 * will go through their respective sequences.
 		 */
-		reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
-		pwr_led_state = pcie_slotctl_pwr_indicator_get(reg);
-		pwr_led_ctrl = pcie_slotctl_pwr_indicator_get(val);
-
 		pwr_state_on = CSR_BR(csr_base, HOTPLUG_CONTROL, PWREN);
 		pwr_off = val & PCIE_SLOTCTL_PWR_CONTROL;
 
@@ -3242,11 +3241,7 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 				CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
 			else
 				ret = oberon_hp_pwroff(csr_base);
-		} else if (pwr_state_on &&
-		    (pwr_led_state == PCIE_SLOTCTL_INDICATOR_STATE_BLINK) &&
-		    (pwr_led_ctrl == PCIE_SLOTCTL_INDICATOR_STATE_ON))
-			ret = oberon_hp_pwrledon(csr_base);
-		else
+		} else
 			CSR_XS(csr_base, TLU_SLOT_CONTROL, val);
 		break;
 	case PCIE_SLOTSTS:

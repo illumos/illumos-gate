@@ -1393,8 +1393,27 @@ pcishpc_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 		case HPC_CTRL_SET_LED_STATE:
 			hpc_led_info = (hpc_led_info_t *)arg;
-			(void) pcishpc_setled(pcishpc_p, hpc_led_info->led,
-				hpc_led_info->state);
+			switch (hpc_led_info->led) {
+				case HPC_ATTN_LED:
+					(void) pcishpc_setled(pcishpc_p,
+					    hpc_led_info->led,
+					    hpc_led_info->state);
+					break;
+				case HPC_POWER_LED:
+					pcishpc_debug("pcishpc_pci_control() "
+					    "Error: SET_LED - power LED");
+					ret = HPC_ERR_NOTSUPPORTED;
+					break;
+				case HPC_FAULT_LED:
+				case HPC_ACTIVE_LED:
+					break;
+				default:
+					pcishpc_debug("pcishpc_pci_control() "
+					    "Error: SET_LED - Unknown LED %x",
+					    hpc_led_info->led);
+					ret = HPC_ERR_NOTSUPPORTED;
+					break;
+				}
 			break;
 
 		case HPC_CTRL_DEV_UNCONFIG_FAILURE:
