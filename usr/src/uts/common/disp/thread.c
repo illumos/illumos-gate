@@ -1545,12 +1545,18 @@ intr_active(struct cpu *cp, int level)
 int
 servicing_interrupt()
 {
-	/*
-	 * Note: single-OR used on purpose to return non-zero if T_INTR_THREAD
-	 * flag set or CPU_ON_INTR(CPU) is non-zero (indicating high-level
-	 * interrupt).
-	 */
-	return ((curthread->t_flag & T_INTR_THREAD) | CPU_ON_INTR(CPU));
+	int onintr = 0;
+
+	/* Are we an interrupt thread */
+	if (curthread->t_flag & T_INTR_THREAD)
+		return (1);
+	/* Are we servicing a high level interrupt? */
+	if (CPU_ON_INTR(CPU)) {
+		kpreempt_disable();
+		onintr = CPU_ON_INTR(CPU);
+		kpreempt_enable();
+	}
+	return (onintr);
 }
 
 
