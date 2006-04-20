@@ -3214,6 +3214,7 @@ sadb_age_bytes(queue_t *pfkey_q, ipsa_t *assoc, uint64_t bytes,
 			 * this off on another non-interrupt thread.
 			 */
 			assoc->ipsa_state = IPSA_STATE_DYING;
+			assoc->ipsa_bytes = newtotal;
 			if (sendmsg)
 				sadb_expire_assoc(pfkey_q, assoc);
 		} /* Else someone beat me to it! */
