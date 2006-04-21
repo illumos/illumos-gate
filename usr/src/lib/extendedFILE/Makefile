@@ -28,7 +28,7 @@
 
 include	../Makefile.lib
 
-SUBDIRS=	spec .WAIT $(MACH)
+SUBDIRS=	$(MACH)
 
 LIBRARY=	extendedFILE.a
 

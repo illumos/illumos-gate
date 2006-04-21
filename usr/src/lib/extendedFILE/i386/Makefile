@@ -26,7 +26,6 @@
 #
 # lib/extendedFILE/i386/Makefile
 
-MAPDIR=	../spec/i386
 include ../Makefile.com
 
 .KEEP_STATE:

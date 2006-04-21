@@ -34,8 +34,7 @@ OBJECTS = extendedFILE.o
 # include library definitions
 include ../../Makefile.lib
 
-MAPFILE = $(MAPDIR)/mapfile
-CLOBBERFILES +=	$(MAPFILE)
+MAPFILE = ../common/mapfile-vers
 
 SRCS = $(OBJECTS:%.o=../common/%.c)
 
@@ -54,10 +53,7 @@ all: $(LIBS)
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
-$(DYNLIB): $(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
+$(DYNLIB):
 
 # include library targets
 include ../../Makefile.targ

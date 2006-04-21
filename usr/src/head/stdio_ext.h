@@ -76,7 +76,7 @@ extern int __fsetlocking(FILE *stream, int type);
  * Extended FILE enabling function.
  */
 #if defined(_LP64) && !defined(__lint)
-#define	enable_extended_FILE_stdio(fd, act)		(255)
+#define	enable_extended_FILE_stdio(fd, act)		(0)
 #else
 extern int enable_extended_FILE_stdio(int, int);
 #endif
