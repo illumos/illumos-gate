@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,7 +465,7 @@ cmd_cpuset(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint_t rflag = 0, lflag = 0;
 	int words;
-	ulong_t *set;
+	ulong_t *setp, set = 0;
 
 	if (mdb_getopts(argc, argv,
 	    'l', MDB_OPT_SETBITS, TRUE, &lflag,
@@ -480,10 +479,11 @@ cmd_cpuset(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 
 	if ((words = BT_BITOUL(ncpu)) == 1) {
-		set = &addr;
+		setp = &set;
+		mdb_vread(setp, sizeof (ulong_t), addr);
 	} else {
-		set = mdb_alloc(words * sizeof (ulong_t), UM_SLEEP | UM_GC);
-		mdb_vread(set, words * sizeof (ulong_t), addr);
+		setp = mdb_alloc(words * sizeof (ulong_t), UM_SLEEP | UM_GC);
+		mdb_vread(setp, words * sizeof (ulong_t), addr);
 	}
 
 	if (lflag) {
@@ -492,18 +492,18 @@ cmd_cpuset(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		for (i = 0; i < words; i++)
 			for (j = 0, m = 1; j < BT_NBIPUL; j++, m <<= 1)
-				if (set[i] & m)
+				if (setp[i] & m)
 					mdb_printf("%r\n", i * BT_NBIPUL + j);
 	} else if (rflag) {
 		int i;
 		int sep = 0;
 
 		for (i = 0; i < words; i++) {
-			mdb_printf(sep ? " %?0lx" : "%?0lx", set[i]);
+			mdb_printf(sep ? " %?0lx" : "%?0lx", setp[i]);
 			sep = 1;
 		}
 	} else {
-		print_cpuset_range(set, words, 0);
+		print_cpuset_range(setp, words, 0);
 	}
 
 	return (DCMD_OK);
@@ -1330,7 +1330,7 @@ xc_mbox(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (int)((addr - sym.st_value) / mbox_size), addr,
 	    state ? state : "XC_???");
 
-	print_cpuset_range(&mbox->xc_cpuset, BT_BITOUL(ncpu), 5);
+	print_cpuset_range((ulong_t *)&mbox->xc_cpuset, BT_BITOUL(ncpu), 5);
 
 	mdb_printf(" ] %-16a %-16a %a\n",
 	    mbox->xc_arg1, mbox->xc_arg2, mbox->xc_func);

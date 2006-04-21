@@ -423,13 +423,6 @@ mach_htraptrace_configure(int cpuid)
 
 /*ARGSUSED*/
 void
-mach_htraptrace_init(void)
-{
-	/* allocate hypervisor traptrace buffer, not applicable to sun4u */
-}
-
-/*ARGSUSED*/
-void
 mach_htraptrace_cleanup(int cpuid)
 {
 	/* cleanup hypervisor traptrace buffer, not applicable to sun4u */

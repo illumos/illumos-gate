@@ -2118,7 +2118,6 @@ startup_end(void)
 	mach_descrip_init();
 	cpu_intrq_setup(CPU);
 	cpu_intrq_register(CPU);
-	mach_htraptrace_init();
 	mach_htraptrace_setup(CPU->cpu_id);
 	mach_htraptrace_configure(CPU->cpu_id);
 	mach_dump_buffer_init();

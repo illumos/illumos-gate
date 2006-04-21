@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -420,12 +419,22 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 	int i = 0;
 
 
+	/*
+	 * The import request should be at least
+	 * contig_mem_slab_size because that is the
+	 * slab arena's quantum. The size can be
+	 * further restricted since contiguous
+	 * allocations larger than contig_mem_slab_size
+	 * are not supported here.
+	 */
+	ASSERT(size == contig_mem_slab_size);
+
 	if ((addr = vmem_xalloc(vmp, size, size, 0, 0,
 	    NULL, NULL, vmflag)) == NULL) {
 		return (NULL);
 	}
 
-	/* If we ever don't want slab-sized pages, this will panic */
+	/* The address should be slab-size aligned. */
 	ASSERT(((uintptr_t)addr & (contig_mem_slab_size - 1)) == 0);
 
 	if (page_resv(npages, vmflag & VM_KMFLAGS) == 0) {
@@ -527,6 +536,8 @@ contig_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t size, int vmflag)
 void *
 contig_mem_alloc_align(size_t size, size_t align)
 {
+	ASSERT(align <= contig_mem_slab_size);
+
 	if ((align & (align - 1)) != 0)
 		return (NULL);
 

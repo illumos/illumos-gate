@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +43,6 @@ int mach_htraptrace_enable = 1;
 int mach_htraptrace_enable = 0;
 #endif
 int htrap_tr0_inuse = 0;
-caddr_t httrace_buf;	/* hv traptrace buffer for all cpus except 0 */
 extern char htrap_tr0[];	/* prealloc buf for boot cpu */
 
 caddr_t	mmu_fault_status_area;
@@ -317,9 +315,16 @@ mach_htraptrace_setup(int cpuid)
 	    !htrap_tr0_inuse)) {
 		ctlp = &trap_trace_ctl[cpuid];
 		ctlp->d.hvaddr_base = (cpuid == bootcpuid) ? htrap_tr0 :
-		    httrace_buf + (cpuid * HTRAP_TSIZE);
-		ctlp->d.hlimit = HTRAP_TSIZE;
-		ctlp->d.hpaddr_base = va_to_pa(ctlp->d.hvaddr_base);
+		    contig_mem_alloc_align(HTRAP_TSIZE, HTRAP_TSIZE);
+		if (ctlp->d.hvaddr_base == NULL) {
+			ctlp->d.hlimit = 0;
+			ctlp->d.hpaddr_base = NULL;
+			cmn_err(CE_WARN, "!cpu%d: failed to allocate HV "
+			    "traptrace buffer", cpuid);
+		} else {
+			ctlp->d.hlimit = HTRAP_TSIZE;
+			ctlp->d.hpaddr_base = va_to_pa(ctlp->d.hvaddr_base);
+		}
 	}
 }
 
@@ -337,7 +342,9 @@ mach_htraptrace_configure(int cpuid)
 
 	ctlp = &trap_trace_ctl[cpuid];
 	if (mach_htraptrace_enable) {
-		if ((ctlp->d.hvaddr_base != htrap_tr0) || (!htrap_tr0_inuse)) {
+		if ((ctlp->d.hvaddr_base != NULL) &&
+		    ((ctlp->d.hvaddr_base != htrap_tr0) ||
+		    (!htrap_tr0_inuse))) {
 			ret = hv_ttrace_buf_info(&prev_buf, &prev_bufsize);
 			if ((ret == H_EOK) && (prev_bufsize != 0)) {
 				cmn_err(CE_CONT,
@@ -347,8 +354,8 @@ mach_htraptrace_configure(int cpuid)
 			}
 
 			ret = hv_ttrace_buf_conf(ctlp->d.hpaddr_base,
-			    HTRAP_TSIZE / (sizeof (struct htrap_trace_record)),
-			    &size);
+			    ctlp->d.hlimit /
+			    (sizeof (struct htrap_trace_record)), &size);
 			if (ret == H_EOK) {
 				ret = hv_ttrace_enable(\
 				    (uint64_t)TRAP_TENABLE_ALL, &prev_enable);
@@ -398,40 +405,22 @@ mach_htraptrace_configure(int cpuid)
 }
 
 /*
- * This function allocates hypervisor traptrace buffer
- */
-void
-mach_htraptrace_init(void)
-{
-	if (mach_htraptrace_enable && (max_ncpus > 1))
-		httrace_buf = contig_mem_alloc_align((HTRAP_TSIZE *
-		    max_ncpus), HTRAP_TSIZE);
-	else
-		httrace_buf = NULL;
-}
-
-/*
  * This function cleans up the hypervisor traptrace buffer
  */
 void
 mach_htraptrace_cleanup(int cpuid)
 {
-	int i;
-	TRAP_TRACE_CTL  *ctlp;
-	caddr_t newbuf;
-
 	if (mach_htraptrace_enable) {
+		TRAP_TRACE_CTL *ctlp;
+		caddr_t httrace_buf_va;
+
+		ASSERT(cpuid < max_ncpus);
 		ctlp = &trap_trace_ctl[cpuid];
-		newbuf = ctlp->d.hvaddr_base;
-		i = (newbuf - httrace_buf) / HTRAP_TSIZE;
-		if (((newbuf - httrace_buf) % HTRAP_TSIZE == 0) &&
-		    ((i >= 0) && (i < max_ncpus))) {
-			bzero(newbuf, HTRAP_TSIZE);
-		} else if (newbuf == htrap_tr0) {
-			bzero(htrap_tr0, (HTRAP_TSIZE));
-		} else {
-			cmn_err(CE_WARN, "failed to free trap trace buffer "
-			    "from cpu%d", cpuid);
+		httrace_buf_va = ctlp->d.hvaddr_base;
+		if (httrace_buf_va == htrap_tr0) {
+			bzero(httrace_buf_va, HTRAP_TSIZE);
+		} else if (httrace_buf_va != NULL) {
+			contig_mem_free(httrace_buf_va, HTRAP_TSIZE);
 		}
 		ctlp->d.hvaddr_base = NULL;
 		ctlp->d.hlimit = 0;
