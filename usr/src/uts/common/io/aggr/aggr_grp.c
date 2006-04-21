@@ -228,6 +228,11 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	port->lp_state = AGGR_PORT_STATE_ATTACHED;
 
 	/*
+	 * Set port's receive callback
+	 */
+	port->lp_mrh = mac_rx_add(port->lp_mh, aggr_recv_cb, (void *)port);
+
+	/*
 	 * If LACP is OFF, the port can be used to send data as soon
 	 * as its link is up and verified to be compatible with the
 	 * aggregation.
@@ -255,6 +260,8 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 	/* update state */
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return (B_FALSE);
+
+	mac_rx_remove(port->lp_mh, port->lp_mrh);
 	port->lp_state = AGGR_PORT_STATE_STANDBY;
 
 	aggr_grp_multicst_port(port, B_FALSE);
@@ -605,7 +612,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	grp->lg_refs = 1;
-	grp->lg_closing = B_FALSE;
+	grp->lg_closing = 0;
 	grp->lg_key = key;
 
 	grp->lg_ifspeed = 0;
@@ -708,6 +715,8 @@ bail:
 	if (grp != NULL) {
 		aggr_port_t *cport;
 
+		atomic_add_32(&grp->lg_closing, 1);
+
 		port = grp->lg_ports;
 		while (port != NULL) {
 			cport = port->lp_next;
@@ -771,8 +780,9 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t *do_notify)
 	}
 	*pport = port->lp_next;
 
+	atomic_add_32(&port->lp_closing, 1);
+
 	rw_enter(&port->lp_lock, RW_WRITER);
-	port->lp_closing = B_TRUE;
 
 	/*
 	 * If the MAC address of the port being removed was assigned
@@ -918,9 +928,11 @@ aggr_grp_delete(uint32_t key)
 		rw_exit(&aggr_grp_lock);
 		return (ENOENT);
 	}
+
+	atomic_add_32(&grp->lg_closing, 1);
+
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
-	grp->lg_closing = B_TRUE;
 
 	/*
 	 * Unregister from the MAC service module. Since this can

@@ -440,7 +440,9 @@ dld_wsrv(queue_t *wq)
 		ASSERT(dsp->ds_tx_cnt == 0);
 		ASSERT(dsp->ds_tx_msgcnt == 0);
 		mutex_exit(&dsp->ds_tx_list_lock);
-		goto done;
+		rw_exit(&dsp->ds_lock);
+		DLD_EXIT(dsp);
+		return;
 	}
 	dsp->ds_tx_list_head = dsp->ds_tx_list_tail = NULL;
 	dsp->ds_tx_cnt = dsp->ds_tx_msgcnt = 0;
@@ -466,6 +468,7 @@ dld_wsrv(queue_t *wq)
 	if ((mp = dls_tx(dsp->ds_dc, mp)) != NULL)
 		dld_tx_enqueue(dsp, mp, B_TRUE);
 
+done:
 	/*
 	 * Grab the list lock again and check if the transmit queue is
 	 * really empty; if so, lift up flow-control and backenable any
@@ -479,7 +482,7 @@ dld_wsrv(queue_t *wq)
 		dsp->ds_tx_qbusy = B_FALSE;
 	}
 	mutex_exit(&dsp->ds_tx_list_lock);
-done:
+
 	rw_exit(&dsp->ds_lock);
 	DLD_EXIT(dsp);
 }
@@ -1491,8 +1494,8 @@ dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, boolean_t head_insert)
 	/* Calculate total size and count of the packet(s) */
 	for (tail = mp, cnt = msgdsize(mp), msgcnt = 1;
 	    tail->b_next != NULL; tail = tail->b_next) {
-		ASSERT(DB_TYPE(tail) == M_DATA);
-		cnt += msgdsize(tail);
+		ASSERT(DB_TYPE(tail->b_next) == M_DATA);
+		cnt += msgdsize(tail->b_next);
 		msgcnt++;
 	}
 
@@ -1608,12 +1611,12 @@ ioc_raw(dld_str_t *dsp, mblk_t *mp)
 		 * Set the receive callback.
 		 */
 		dls_rx_set(dsp->ds_dc, dld_str_rx_raw, (void *)dsp);
-
-		/*
-		 * Note that raw mode is enabled.
-		 */
-		dsp->ds_mode = DLD_RAW;
 	}
+
+	/*
+	 * Note that raw mode is enabled.
+	 */
+	dsp->ds_mode = DLD_RAW;
 
 	rw_exit(&dsp->ds_lock);
 	miocack(q, mp, 0, 0);

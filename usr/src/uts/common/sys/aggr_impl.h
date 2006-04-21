@@ -62,13 +62,13 @@ typedef struct aggr_port_s {
 			lp_tx_enabled : 1,
 			lp_collector_enabled : 1,
 			lp_promisc_on : 1,
-			lp_closing : 1,
 			/*
 			 * Indicates whether it is in the process of setting
 			 * MAC address to the aggregation group MAC
 			 */
 			lp_set_grpmac : 1,
-			lp_pad_bits : 26;
+			lp_pad_bits : 27;
+	uint32_t	lp_closing;
 	uint_t		lp_port;
 	mac_handle_t	lp_mh;
 	const mac_info_t *lp_mip;
@@ -111,8 +111,8 @@ typedef struct aggr_grp_s {
 			lg_addr_fixed : 1,	/* fixed MAC address? */
 			lg_started : 1,		/* group started? */
 			lg_promisc : 1,		/* in promiscuous mode? */
-			lg_closing : 1,
-			lg_pad_bits : 12;
+			lg_pad_bits : 13;
+	uint32_t	lg_closing;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_t		lg_mac;

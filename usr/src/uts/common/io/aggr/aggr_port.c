@@ -128,7 +128,7 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	port->lp_mip = mac_info(mh);
 	port->lp_port = portnum;
 	(void) strlcpy(port->lp_devname, name, sizeof (port->lp_devname));
-	port->lp_closing = B_FALSE;
+	port->lp_closing = 0;
 	port->lp_set_grpmac = B_FALSE;
 
 	/* get the port's original MAC address */
@@ -136,9 +136,6 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 
 	/* add the port's receive callback */
 	port->lp_mnh = mac_notify_add(mh, aggr_port_notify_cb, (void *)port);
-
-	/* set port's receive callback */
-	port->lp_mrh = mac_rx_add(mh, aggr_recv_cb, (void *)port);
 
 	/* set port's transmit information */
 	port->lp_txinfo = mac_tx_get(port->lp_mh);
@@ -178,7 +175,6 @@ void
 aggr_port_delete(aggr_port_t *port)
 {
 	mac_resource_set(port->lp_mh, NULL, NULL);
-	mac_rx_remove(port->lp_mh, port->lp_mrh);
 	mac_notify_remove(port->lp_mh, port->lp_mnh);
 	mac_active_clear(port->lp_mh);
 
@@ -323,6 +319,13 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 	aggr_port_t *port = arg;
 	aggr_grp_t *grp = port->lp_grp;
 
+	/*
+	 * Do nothing if the aggregation or the port is in the deletion
+	 * process. Note that this is necessary to avoid deadlock.
+	 */
+	if ((grp->lg_closing) || (port->lp_closing))
+		return;
+
 	AGGR_PORT_REFHOLD(port);
 
 	switch (type) {
@@ -330,7 +333,7 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 		mac_tx_update(&grp->lg_mac);
 		break;
 	case MAC_NOTE_LINK:
-		if (aggr_port_notify_link(grp, port) && !grp->lg_closing)
+		if (aggr_port_notify_link(grp, port))
 			mac_link_update(&grp->lg_mac, grp->lg_link_state);
 		break;
 	case MAC_NOTE_UNICST:

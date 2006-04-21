@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,8 @@ static kmem_cache_t	*i_mac_impl_cachep;
 static mod_hash_t	*i_mac_impl_hash;
 krwlock_t		i_mac_impl_lock;
 uint_t			i_mac_impl_count;
+
+static void i_mac_notify_task(void *);
 
 /*
  * Private functions.
@@ -104,6 +105,8 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 	rw_init(&mip->mi_txloop_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_resource_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&mip->mi_activelink_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&mip->mi_notify_ref_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&mip->mi_notify_cv, NULL, CV_DRIVER, NULL);
 	return (0);
 }
 
@@ -131,6 +134,8 @@ i_mac_destructor(void *buf, void *arg)
 	rw_destroy(&mip->mi_txloop_lock);
 	rw_destroy(&mip->mi_resource_lock);
 	mutex_destroy(&mip->mi_activelink_lock);
+	mutex_destroy(&mip->mi_notify_ref_lock);
+	cv_destroy(&mip->mi_notify_cv);
 }
 
 static int
@@ -163,6 +168,11 @@ i_mac_create(mac_t *mp)
 	 */
 	mip->mi_mp = mp;
 	mp->m_impl = (void *)mip;
+
+	/*
+	 * The mac is not ready for open yet.
+	 */
+	mip->mi_disabled = B_TRUE;
 
 	/*
 	 * Insert the hash table entry.
@@ -250,7 +260,7 @@ i_mac_destroy(mac_t *mp)
 	mp->m_impl = NULL;
 	mip->mi_mp = NULL;
 	mip->mi_link = LINK_STATE_UNKNOWN;
-	mip->mi_destroying = B_FALSE;
+	mip->mi_disabled = B_FALSE;
 
 	/*
 	 * Free the structure back to the cache.
@@ -263,14 +273,63 @@ i_mac_destroy(mac_t *mp)
 static void
 i_mac_notify(mac_impl_t *mip, mac_notify_type_t type)
 {
+	mac_notify_task_arg_t	*mnta;
+
+	rw_enter(&i_mac_impl_lock, RW_READER);
+	if (mip->mi_disabled)
+		goto exit;
+
+	if ((mnta = kmem_alloc(sizeof (*mnta), KM_NOSLEEP)) == NULL) {
+		cmn_err(CE_WARN, "i_mac_notify(%s, 0x%x): memory "
+		    "allocation failed", mip->mi_name, type);
+		goto exit;
+	}
+
+	mnta->mnt_mip = mip;
+	mnta->mnt_type = type;
+
+	mutex_enter(&mip->mi_notify_ref_lock);
+	mip->mi_notify_ref++;
+	mutex_exit(&mip->mi_notify_ref_lock);
+
+	rw_exit(&i_mac_impl_lock);
+
+	if (taskq_dispatch(system_taskq, i_mac_notify_task, mnta,
+	    TQ_NOSLEEP) == NULL) {
+		cmn_err(CE_WARN, "i_mac_notify(%s, 0x%x): taskq dispatch "
+		    "failed", mip->mi_name, type);
+
+		mutex_enter(&mip->mi_notify_ref_lock);
+		if (--mip->mi_notify_ref == 0)
+			cv_signal(&mip->mi_notify_cv);
+		mutex_exit(&mip->mi_notify_ref_lock);
+
+		kmem_free(mnta, sizeof (*mnta));
+	}
+	return;
+
+exit:
+	rw_exit(&i_mac_impl_lock);
+}
+
+static void
+i_mac_notify_task(void *notify_arg)
+{
+	mac_notify_task_arg_t	*mnta = (mac_notify_task_arg_t *)notify_arg;
+	mac_impl_t		*mip;
+	mac_notify_type_t	type;
 	mac_notify_fn_t		*mnfp;
 	mac_notify_t		notify;
 	void			*arg;
 
+	mip = mnta->mnt_mip;
+	type = mnta->mnt_type;
+	kmem_free(mnta, sizeof (*mnta));
+
 	/*
 	 * Walk the list of notifications.
 	 */
-	rw_enter(&(mip->mi_notify_lock), RW_READER);
+	rw_enter(&mip->mi_notify_lock, RW_READER);
 	for (mnfp = mip->mi_mnfp; mnfp != NULL; mnfp = mnfp->mnf_nextp) {
 		notify = mnfp->mnf_fn;
 		arg = mnfp->mnf_arg;
@@ -278,7 +337,12 @@ i_mac_notify(mac_impl_t *mip, mac_notify_type_t type)
 		ASSERT(notify != NULL);
 		notify(arg, type);
 	}
-	rw_exit(&(mip->mi_notify_lock));
+	rw_exit(&mip->mi_notify_lock);
+
+	mutex_enter(&mip->mi_notify_ref_lock);
+	if (--mip->mi_notify_ref == 0)
+		cv_signal(&mip->mi_notify_cv);
+	mutex_exit(&mip->mi_notify_ref_lock);
 }
 
 /*
@@ -375,7 +439,7 @@ again:
 		goto failed;
 	}
 
-	if (mip->mi_destroying) {
+	if (mip->mi_disabled) {
 		rw_exit(&i_mac_impl_lock);
 		goto again;
 	}
@@ -853,10 +917,10 @@ mac_notify_add(mac_handle_t mh, mac_notify_t notify, void *arg)
 	/*
 	 * Add it to the head of the 'notify' callback list.
 	 */
-	rw_enter(&(mip->mi_notify_lock), RW_WRITER);
+	rw_enter(&mip->mi_notify_lock, RW_WRITER);
 	mnfp->mnf_nextp = mip->mi_mnfp;
 	mip->mi_mnfp = mnfp;
-	rw_exit(&(mip->mi_notify_lock));
+	rw_exit(&mip->mi_notify_lock);
 
 	return ((mac_notify_handle_t)mnfp);
 }
@@ -872,7 +936,7 @@ mac_notify_remove(mac_handle_t mh, mac_notify_handle_t mnh)
 	/*
 	 * Search the 'notify' callback list for the function closure.
 	 */
-	rw_enter(&(mip->mi_notify_lock), RW_WRITER);
+	rw_enter(&mip->mi_notify_lock, RW_WRITER);
 	for (pp = &(mip->mi_mnfp); (p = *pp) != NULL;
 	    pp = &(p->mnf_nextp)) {
 		if (p == mnfp)
@@ -884,7 +948,7 @@ mac_notify_remove(mac_handle_t mh, mac_notify_handle_t mnh)
 	 * Remove it from the list.
 	 */
 	*pp = p->mnf_nextp;
-	rw_exit(&(mip->mi_notify_lock));
+	rw_exit(&mip->mi_notify_lock);
 
 	/*
 	 * Free it.
@@ -1069,6 +1133,13 @@ mac_register(mac_t *mp)
 	dnp->dn_flags |= DN_GLDV3_DRIVER;
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
+	/*
+	 * Mark the MAC to be ready for open.
+	 */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	((mac_impl_t *)mp->m_impl)->mi_disabled = B_FALSE;
+	rw_exit(&i_mac_impl_lock);
+
 	cmn_err(CE_NOTE, "!%s%d/%d registered", drvname, instance, mp->m_port);
 	return (0);
 
@@ -1094,7 +1165,7 @@ mac_unregister(mac_t *mp)
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
-	 * If not, set mi_destroying to prevent any new VLAN's from being
+	 * If not, set mi_disabled to prevent any new VLAN's from being
 	 * created before we can perform the i_mac_destroy() below.
 	 */
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
@@ -1102,8 +1173,16 @@ mac_unregister(mac_t *mp)
 		rw_exit(&i_mac_impl_lock);
 		return (EBUSY);
 	}
-	mip->mi_destroying = B_TRUE;
+	mip->mi_disabled = B_TRUE;
 	rw_exit(&i_mac_impl_lock);
+
+	/*
+	 * Wait for all taskqs which process the mac notifications to finish.
+	 */
+	mutex_enter(&mip->mi_notify_ref_lock);
+	while (mip->mi_notify_ref != 0)
+		cv_wait(&mip->mi_notify_cv, &mip->mi_notify_ref_lock);
+	mutex_exit(&mip->mi_notify_ref_lock);
 
 	if (strcmp(drvname, "aggr") == 0)
 		(void) snprintf(name, MAXNAMELEN, "aggr%u", mp->m_port);
@@ -1112,7 +1191,7 @@ mac_unregister(mac_t *mp)
 
 	if ((err = dls_destroy(name)) != 0) {
 		rw_enter(&i_mac_impl_lock, RW_WRITER);
-		mip->mi_destroying = B_FALSE;
+		mip->mi_disabled = B_FALSE;
 		rw_exit(&i_mac_impl_lock);
 		return (err);
 	}
@@ -1419,7 +1498,7 @@ i_mac_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	i_mac_info_state_t	*statep = arg;
 	mac_impl_t		*mip = (mac_impl_t *)val;
 
-	if (mip->mi_destroying)
+	if (mip->mi_disabled)
 		return (MH_WALK_CONTINUE);
 
 	if (strcmp(statep->mi_name,

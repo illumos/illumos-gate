@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +78,7 @@ struct mac_impl_s {
 	char			mi_name[MAXNAMELEN];
 
 	uint32_t		mi_ref;
-	boolean_t		mi_destroying;
+	boolean_t		mi_disabled;
 
 	krwlock_t		mi_state_lock;
 	uint_t			mi_active;
@@ -95,6 +94,10 @@ struct mac_impl_s {
 
 	krwlock_t		mi_notify_lock;
 	mac_notify_fn_t		*mi_mnfp;
+
+	kmutex_t		mi_notify_ref_lock;
+	uint32_t		mi_notify_ref;
+	kcondvar_t		mi_notify_cv;
 
 	krwlock_t		mi_rx_lock;
 	mac_rx_fn_t		*mi_mrfp;
@@ -117,6 +120,11 @@ struct mac_impl_s {
 	mac_txinfo_t		mi_txinfo;
 	mac_txinfo_t		mi_txloopinfo;
 };
+
+typedef struct mac_notify_task_arg {
+	mac_impl_t		*mnt_mip;
+	mac_notify_type_t	mnt_type;
+} mac_notify_task_arg_t;
 
 extern void	mac_init(void);
 extern int	mac_fini(void);
