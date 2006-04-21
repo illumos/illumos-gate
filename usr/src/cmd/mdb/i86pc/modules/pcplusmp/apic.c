@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +60,25 @@ static char *businfo_array[] = {
 
 static struct av_head	avec_tbl[APIC_MAX_VECTOR+1];
 
+
+/*
+ * Option usage
+ */
+#define	INTR_DISPLAY_DRVR_INST	0x1	/* -d option */
+#define	INTR_DISPLAY_INTRSTAT	0x2	/* -i option */
+
+int	option_flags;
+
+
+void
+interrupt_help(void)
+{
+	mdb_printf("Prints the interrupt usage on the system.\n"
+	    "By default, only interrupt service routine names are printed.\n\n"
+	    "Switches:\n"
+	    "  -d   instead of ISR, print <driver_name><instance#>\n"
+	    "  -i   show like intrstat, cpu# ISR/<driver_name><instance#>\n");
+}
 
 /*
  * get_interrupt_type:
@@ -144,51 +162,52 @@ interrupt_display_info(apic_irq_t irqp, int i)
 		(void) mdb_snprintf(ipl, 3, "%d", irqp.airq_ipl);
 	}
 
+	share_cnt = irqp.airq_share;
+
 	/* Print each interrupt entry */
-	mdb_printf("%3d  0x%x   %-3s %-5s %-6s%-4s %2d   %-9s ", i,
-	    irqp.airq_vector, ipl, (bus_type ? businfo_array[bus_type] : " "),
-	    intr_type, cpu_assigned, irqp.airq_share, ioapic_iline);
+	if (option_flags & INTR_DISPLAY_INTRSTAT)
+		mdb_printf("cpu%s\t", cpu_assigned);
+	else
+		mdb_printf("%3d  0x%x   %-3s %-5s %-6s%-4s %2d   %-9s ",
+		    i, irqp.airq_vector, ipl,
+		    (bus_type ? businfo_array[bus_type] : " "),
+		    intr_type, cpu_assigned, share_cnt, ioapic_iline);
 
 	/* If valid dip found; print driver name */
-	dip_addr = (uintptr_t)irqp.airq_dip;
-	if (dip_addr && mdb_devinfo2driver(dip_addr, driver_name,
-	    sizeof (driver_name)) == 0) {
-
-		(void) mdb_vread(&dev_info, sizeof (dev_info), dip_addr);
-		mdb_printf("%s#%d", driver_name, dev_info.devi_instance);
-
-		share_cnt = irqp.airq_share - 1;
+	if (irqp.airq_dip) {
 		(void) mdb_vread(&avhp, sizeof (struct autovec),
 		    (uintptr_t)avec_tbl[i].avh_link);
 
+		/*
+		 * Loop thru all the shared IRQs
+		 */
 		while (irqp.airq_mps_intr_index != FREE_INDEX &&
 		    share_cnt-- > 0) {
-			dip_addr = (uintptr_t)avhp.av_dip;
-			if (dip_addr && !DDI_CF2(&dev_info) &&
-			    mdb_devinfo2driver(dip_addr, driver_name,
-			    sizeof (driver_name)) == 0) {
-				(void) mdb_vread(&dev_info, sizeof (dev_info),
-				    dip_addr);
-				mdb_printf(", %s#%d", driver_name,
-				    dev_info.devi_instance);
+			if (option_flags & INTR_DISPLAY_DRVR_INST) {
+				dip_addr = (uintptr_t)avhp.av_dip;
+				if (dip_addr && mdb_devinfo2driver(dip_addr,
+				    driver_name, sizeof (driver_name)) == 0) {
+					(void) mdb_vread(&dev_info,
+					    sizeof (dev_info), dip_addr);
+					mdb_printf("%s#%d", driver_name,
+					    dev_info.devi_instance);
+				}
 			} else
-				mdb_printf(", %a", avhp.av_vector);
+				mdb_printf("%a", avhp.av_vector);
 			if (mdb_vread(&avhp, sizeof (struct autovec),
-			    (uintptr_t)avhp.av_link) == -1)
-				continue;
+			    (uintptr_t)avhp.av_link) != -1)
+				mdb_printf(", ");
 		}
-		mdb_printf("\n");
 
 	} else {
 		if (irqp.airq_mps_intr_index == RESERVE_INDEX &&
 		    !irqp.airq_share)
-			mdb_printf("poke_cpu\n");
+			mdb_printf("poke_cpu");
 		else if (mdb_vread(&avhp, sizeof (struct autovec),
-		    (uintptr_t)avec_tbl[i].avh_link) == -1)
-			mdb_printf("\n");
-		else
-			mdb_printf("%a\n", avhp.av_vector);
+		    (uintptr_t)avec_tbl[i].avh_link) != -1)
+			mdb_printf("%a", avhp.av_vector);
 	}
+	mdb_printf("\n");
 }
 
 
@@ -204,6 +223,13 @@ interrupt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int		i;
 	apic_irq_t	*irq_tbl[APIC_MAX_VECTOR+1], irqp;
 
+	option_flags = 0;
+	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, INTR_DISPLAY_DRVR_INST, &option_flags,
+	    'i', MDB_OPT_SETBITS, INTR_DISPLAY_INTRSTAT, &option_flags,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
 	if (mdb_readvar(&irq_tbl, "apic_irq_table") == -1) {
 		mdb_warn("failed to read apic_irq_table");
 		return (DCMD_ERR);
@@ -215,8 +241,13 @@ interrupt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	/* Print the header first */
-	mdb_printf("%<u>IRQ  Vector IPL Bus   Type  CPU Share APIC/INT# "
-	    "Driver Name(s)/ISR(s) %</u>\n");
+	if (option_flags & INTR_DISPLAY_INTRSTAT)
+		mdb_printf("%<u>CPU\t ");
+	else
+		mdb_printf(
+		    "%<u>IRQ  Vector IPL Bus   Type  CPU Share APIC/INT# ");
+	mdb_printf("%s %</u>\n", option_flags & INTR_DISPLAY_DRVR_INST ?
+	    "Driver Name(s)" : "ISR(s)");
 
 	/* Walk all the entries */
 	for (i = 0; i < APIC_MAX_VECTOR + 1; i++) {
@@ -239,7 +270,8 @@ interrupt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * named _mdb_init to return a pointer to our module information.
  */
 static const mdb_dcmd_t dcmds[] = {
-	{ "interrupts", NULL, "print interrupts", interrupt_dump, NULL},
+	{ "interrupts", "?[-di]", "print interrupts", interrupt_dump,
+	    interrupt_help},
 	{ NULL }
 };
 

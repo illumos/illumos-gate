@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,24 @@
 
 static struct av_head	avec_tbl[256];
 static uint16_t		shared_tbl[MAX_ISA_IRQ + 1];
+
+/*
+ * Option usage
+ */
+#define	INTR_DISPLAY_DRVR_INST	0x1	/* -d option */
+#define	INTR_DISPLAY_INTRSTAT	0x2	/* -i option */
+
+int	option_flags;
+
+void
+interrupt_help(void)
+{
+	mdb_printf("Prints the interrupt usage on the system.\n"
+	    "By default, only interrupt service routine names are printed.\n\n"
+	    "Switches:\n"
+	    "  -d   instead of ISR, print <driver_name><instance#>\n"
+	    "  -i   show like intrstat, cpu# ISR/<driver_name><instance#>\n");
+}
 
 static char *
 interrupt_print_bus(uintptr_t dip_addr)
@@ -72,10 +89,15 @@ interrupt_print_isr(struct autovec avhp)
 	uintptr_t	dip_addr = (uintptr_t)avhp.av_dip;
 	struct dev_info	dev_info;
 
-	if (dip_addr && mdb_devinfo2driver(dip_addr, driver_name,
-	    sizeof (driver_name)) == 0) {
-		(void) mdb_vread(&dev_info, sizeof (dev_info), dip_addr);
-		mdb_printf("%s#%d", driver_name, dev_info.devi_instance);
+	if (option_flags & INTR_DISPLAY_DRVR_INST) {
+		if (dip_addr && mdb_devinfo2driver(dip_addr, driver_name,
+		    sizeof (driver_name)) == 0) {
+			(void) mdb_vread(&dev_info, sizeof (dev_info),
+			    dip_addr);
+			mdb_printf("%s#%d", driver_name,
+			    dev_info.devi_instance);
+		} else
+			mdb_printf("%a", avhp.av_vector);
 	} else
 		mdb_printf("%a", avhp.av_vector);
 }
@@ -92,6 +114,13 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 	int		i, share_cnt;
 	boolean_t	found = B_FALSE;
 	struct autovec	avhp;
+
+	option_flags = 0;
+	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, INTR_DISPLAY_DRVR_INST, &option_flags,
+	    'i', MDB_OPT_SETBITS, INTR_DISPLAY_INTRSTAT, &option_flags,
+	    NULL) != argc)
+		return (DCMD_USAGE);
 
 	if (mdb_readvar(&avec_tbl, "autovect") == -1) {
 		mdb_warn("failed to read autovect");
@@ -125,8 +154,12 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	/* Print the header first */
-	mdb_printf("%<u>IRQ  Vector IPL(lo/hi) Bus Share "
-	    "Driver Name(s)/ISR(s)%</u>\n");
+	if (option_flags & INTR_DISPLAY_INTRSTAT)
+		mdb_printf("%<u>CPU\t ");
+	else
+		mdb_printf("%<u>IRQ  Vector IPL(lo/hi) Bus Share ");
+	mdb_printf("%s %</u>\n", option_flags & INTR_DISPLAY_DRVR_INST ?
+	    "Driver Name(s)" : "ISR(s)");
 
 	/* Walk all the entries */
 	for (i = 0; i < MAX_ISA_IRQ + 1; i++) {
@@ -137,11 +170,14 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 
 		/* Print each interrupt entry */
 		share_cnt = shared_tbl[i];
-		mdb_printf("%3d   0x%2x   %4d/%-2d   %-4s %3d  ",
-		    i, i + PIC_VECTBASE,
-		    avec_tbl[i].avh_lo_pri, avec_tbl[i].avh_hi_pri,
-		    avhp.av_dip ? interrupt_print_bus((uintptr_t)avhp.av_dip) :
-		    " - ", share_cnt);
+		if (option_flags & INTR_DISPLAY_INTRSTAT)
+			mdb_printf("cpu0\t");
+		else
+			mdb_printf("%3d   0x%2x   %4d/%-2d   %-4s %3d  ",
+			    i, i + PIC_VECTBASE, avec_tbl[i].avh_lo_pri,
+			    avec_tbl[i].avh_hi_pri, avhp.av_dip ?
+			    interrupt_print_bus((uintptr_t)avhp.av_dip) : " - ",
+			    share_cnt);
 
 		if (share_cnt)
 			interrupt_print_isr(avhp);
@@ -164,7 +200,8 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
  * MDB module linkage information:
  */
 static const mdb_dcmd_t dcmds[] = {
-	{ "interrupts", NULL, "print interrupts", uppc_interrupt_dump, NULL},
+	{ "interrupts", "?[-di]", "print interrupts", uppc_interrupt_dump,
+	    interrupt_help},
 	{ NULL }
 };
 
