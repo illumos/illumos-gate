@@ -1264,11 +1264,11 @@ prefetch_page_r(void *pp)
 
 #elif defined(OLYMPUS_C)
 	!
-	!	Prefetch strides for Olympus-C
+	! Prefetch strides for Olympus-C
 	!
 
-#define STRIDE1	512
-#define STRIDE2	640
+#define STRIDE1	0x440
+#define STRIDE2	0x640
 	
 	ENTRY(prefetch_page_w)
         prefetch        [%o0+STRIDE1], #n_writes
@@ -1310,7 +1310,8 @@ prefetch_smap_w(void *smp)
 
 #elif defined(OLYMPUS_C)
 	!
-	! (TBD) Use length of one for now.
+	! Use length of one for now.
+	!
 #define	PREFETCH_Q_LEN	1
 
 #else 	/* OLYMPUS_C */
