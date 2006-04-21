@@ -322,6 +322,14 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	for (i = 0; i < pages; i++)
 		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flags, i));
 
+	/*
+	 * If HV VPCI version is 1.1 and higher, pass the BDF, phantom
+	 * function, and relax ordering information. Otherwise, justp pass
+	 * read or write attribute information.
+	 */
+	if (px_vpci_min_ver == PX_VPCI_MINOR_VER_0)
+		attr = attr & (PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE);
+
 	while ((ttes_mapped = pfn_p - pfns) < pages) {
 		uintptr_t	ra = va_to_pa(pfn_p);
 		pages_t		ttes2map;
