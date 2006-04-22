@@ -296,8 +296,6 @@ plat_store_mem_sids(plat_dimm_sid_board_data_t *data)
 
 	mutex_enter(&domain_dimm_sids[bd].pdsb_lock);
 
-	ASSERT(domain_dimm_sids[bd].pdsb_state != PDSB_STATE_STORED);
-
 	if (data->pdsbd_errno) {
 		domain_dimm_sids[bd].pdsb_state = PDSB_STATE_FAILED_TO_STORE;
 		mutex_exit(&domain_dimm_sids[bd].pdsb_lock);
