@@ -1770,7 +1770,7 @@ secpolicy_contract_event_choice(const cred_t *cr)
 int
 secpolicy_gart_access(const cred_t *cr)
 {
-	return (PRIV_POLICY(cr, PRIV_GART_ACCESS, B_FALSE, EPERM, NULL));
+	return (PRIV_POLICY(cr, PRIV_GRAPHICS_ACCESS, B_FALSE, EPERM, NULL));
 }
 
 /*
@@ -1782,10 +1782,13 @@ secpolicy_gart_access(const cred_t *cr)
 int
 secpolicy_gart_map(const cred_t *cr)
 {
-	if (PRIV_POLICY(cr, PRIV_GART_ACCESS, B_FALSE, EPERM, NULL)) {
-		return (PRIV_POLICY(cr, PRIV_GART_MAP, B_FALSE, EPERM, NULL));
+	if (PRIV_POLICY_ONLY(cr, PRIV_GRAPHICS_ACCESS, B_FALSE)) {
+		return (PRIV_POLICY(cr, PRIV_GRAPHICS_ACCESS, B_FALSE, EPERM,
+		    NULL));
+	} else {
+		return (PRIV_POLICY(cr, PRIV_GRAPHICS_MAP, B_FALSE, EPERM,
+		    NULL));
 	}
-	return (0);
 }
 
 /*

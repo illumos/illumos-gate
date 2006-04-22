@@ -149,19 +149,17 @@ privilege PRIV_FILE_UPGRADE_SL
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
-privilege PRIV_GART_ACCESS
+privilege PRIV_GRAPHICS_ACCESS
 
-	Allows a process to make ioctls to agpgart device except
-	that AGPIOC_INFO ioctl needs no privilege. Typically only
-	xserver process needs to have this privilege. And a process
-	with this privilege is also allowed to map aperture ranges
-	through agpgart driver.
+	Allows a process to make privileged ioctls to graphics devices.
+	Typically only xserver process needs to have this privilege.
+	A process with this privilege is also allowed to perform
+	privileged graphics device mappings.
 
-privilege PRIV_GART_MAP
+privilege PRIV_GRAPHICS_MAP
 	
-	Allows a process to map aperture ranges through  agpgart
-	driver. This privilege won't allow the process to do agpgart
-	ioctls other than AGPIOC_INFO.
+	Allows a process to perform privileged mappings through a
+	graphics device.
 
 privilege PRIV_IPC_DAC_READ
 
