@@ -100,6 +100,7 @@ typedef struct zvol_state {
 	uint32_t	zv_total_opens;	/* total open count */
 	zilog_t		*zv_zilog;	/* ZIL handle */
 	uint64_t	zv_txg_assign;	/* txg to assign during ZIL replay */
+	krwlock_t	zv_dslock;	/* dmu_sync() rwlock */
 } zvol_state_t;
 
 static void
@@ -413,6 +414,8 @@ zvol_create_minor(zfs_cmd_t *zc)
 	zv->zv_mode = ds_mode;
 	zv->zv_zilog = zil_open(os, NULL);
 
+	rw_init(&zv->zv_dslock, NULL, RW_DEFAULT, NULL);
+
 	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector, NULL);
 
 	zvol_size_changed(zv, dev);
@@ -647,8 +650,29 @@ zvol_close(dev_t dev, int flag, int otyp, cred_t *cr)
 }
 
 /*
- * zvol_log_write() handles synchronous page writes using
- * TX_WRITE ZIL transactions.
+ * Create and return an immediate write ZIL transaction.
+ */
+itx_t *
+zvol_immediate_itx(offset_t off, ssize_t len, char *addr)
+{
+	itx_t *itx;
+	lr_write_t *lr;
+
+	itx = zil_itx_create(TX_WRITE, sizeof (*lr) + len);
+	lr = (lr_write_t *)&itx->itx_lr;
+	lr->lr_foid = ZVOL_OBJ;
+	lr->lr_offset = off;
+	lr->lr_length = len;
+	lr->lr_blkoff = 0;
+	BP_ZERO(&lr->lr_blkptr);
+	bcopy(addr, (char *)itx + offsetof(itx_t, itx_lr) +
+	    sizeof (*lr), len);
+	itx->itx_wr_state = WR_COPIED;
+	return (itx);
+}
+
+/*
+ * zvol_log_write() handles synchronous writes using TX_WRITE ZIL transactions.
  *
  * We store data in the log buffers if it's small enough.
  * Otherwise we flush the data out via dmu_sync().
@@ -659,41 +683,64 @@ int
 zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t len,
     char *addr)
 {
+	dmu_object_info_t doi;
+	ssize_t nbytes;
 	itx_t *itx;
 	lr_write_t *lr;
-	objset_t *os = zv->zv_objset;
-	int dlen;
+	objset_t *os;
+	uint64_t txg;
 	int error;
+	uint32_t blocksize;
 
-	dlen = (len <= zvol_immediate_write_sz ? len : 0);
-	itx = zil_itx_create(TX_WRITE, sizeof (*lr) + dlen);
-	lr = (lr_write_t *)&itx->itx_lr;
-	lr->lr_foid = ZVOL_OBJ;
-	lr->lr_offset = off;
-	lr->lr_length = len;
-	lr->lr_blkoff = 0;
-	BP_ZERO(&lr->lr_blkptr);
+	/* handle common case */
+	if (len <= zvol_immediate_write_sz) {
+		itx = zvol_immediate_itx(off, len, addr);
+		(void) zil_itx_assign(zv->zv_zilog, itx, tx);
+		return (0);
+	}
+
+	txg = dmu_tx_get_txg(tx);
+	os = zv->zv_objset;
 
 	/*
-	 * Get the data as we know we'll be writing it immediately
+	 * We need to dmu_sync() each block in the range.
+	 * For this we need the blocksize.
 	 */
-	if (dlen) { /* immediate write */
-		bcopy(addr, (char *)itx + offsetof(itx_t, itx_lr) +
-		    sizeof (*lr), len);
-	} else {
-		txg_suspend(dmu_objset_pool(os));
-		error = dmu_sync(os, ZVOL_OBJ, off, &lr->lr_blkoff,
-		    &lr->lr_blkptr, dmu_tx_get_txg(tx));
-		txg_resume(dmu_objset_pool(os));
-		if (error) {
-			kmem_free(itx, offsetof(itx_t, itx_lr));
-			return (error);
+	error = dmu_object_info(os, ZVOL_OBJ, &doi);
+	if (error)
+		return (error);
+	blocksize = doi.doi_data_block_size;
+
+	/*
+	 * We need to immediate write or dmu_sync() each block in the range.
+	 */
+	while (len) {
+		nbytes = MIN(len, blocksize - P2PHASE(off, blocksize));
+		if (nbytes <= zvol_immediate_write_sz) {
+			itx = zvol_immediate_itx(off, nbytes, addr);
+		} else {
+			itx = zil_itx_create(TX_WRITE, sizeof (*lr));
+			lr = (lr_write_t *)&itx->itx_lr;
+			lr->lr_foid = ZVOL_OBJ;
+			lr->lr_offset = off;
+			lr->lr_length = nbytes;
+			lr->lr_blkoff = 0;
+			BP_ZERO(&lr->lr_blkptr);
+
+			txg_suspend(dmu_objset_pool(os));
+			error = dmu_sync(os, ZVOL_OBJ, off, &lr->lr_blkoff,
+			    &lr->lr_blkptr, txg);
+			txg_resume(dmu_objset_pool(os));
+			if (error) {
+				kmem_free(itx, offsetof(itx_t, itx_lr));
+				return (error);
+			}
+			itx->itx_wr_state = WR_COPIED;
 		}
+		(void) zil_itx_assign(zv->zv_zilog, itx, tx);
+		len -= nbytes;
+		off += nbytes;
 	}
-	itx->itx_wr_state = WR_COPIED;
-
-	(void) zil_itx_assign(zv->zv_zilog, itx, tx);
-
 	return (0);
 }
 
@@ -707,6 +754,8 @@ zvol_strategy(buf_t *bp)
 	objset_t *os;
 	int error = 0;
 	int sync;
+	int reading;
+	int txg_sync_needed = B_FALSE;
 
 	if (zv == NULL) {
 		bioerror(bp, ENXIO);
@@ -737,6 +786,17 @@ zvol_strategy(buf_t *bp)
 	addr = bp->b_un.b_addr;
 	resid = bp->b_bcount;
 
+	/*
+	 * There must be no buffer changes when doing a dmu_sync() because
+	 * we can't change the data whilst calculating the checksum.
+	 * A better approach than a per zvol rwlock would be to lock ranges.
+	 */
+	reading = bp->b_flags & B_READ;
+	if (reading || resid <= zvol_immediate_write_sz)
+		rw_enter(&zv->zv_dslock, RW_READER);
+	else
+		rw_enter(&zv->zv_dslock, RW_WRITER);
+
 	while (resid != 0 && off < volsize) {
 
 		size = MIN(resid, 1UL << 20);	/* cap at 1MB per tx */
@@ -744,9 +804,8 @@ zvol_strategy(buf_t *bp)
 		if (size > volsize - off)	/* don't write past the end */
 			size = volsize - off;
 
-		if (bp->b_flags & B_READ) {
-			error = dmu_read(os, ZVOL_OBJ,
-			    off, size, addr);
+		if (reading) {
+			error = dmu_read(os, ZVOL_OBJ, off, size, addr);
 		} else {
 			dmu_tx_t *tx = dmu_tx_create(os);
 			dmu_tx_hold_write(tx, ZVOL_OBJ, off, size);
@@ -757,12 +816,9 @@ zvol_strategy(buf_t *bp)
 				dmu_write(os, ZVOL_OBJ, off, size, addr, tx);
 				if (sync) {
 					/* use the ZIL to commit this write */
-					error = zvol_log_write(zv, tx, off,
-					    size, addr);
-					if (error) {
-						txg_wait_synced(
-						    dmu_objset_pool(os), 0);
-						sync = B_FALSE;
+					if (zvol_log_write(zv, tx, off, size,
+					    addr) != 0) {
+						txg_sync_needed = B_TRUE;
 					}
 				}
 				dmu_tx_commit(tx);
@@ -774,14 +830,19 @@ zvol_strategy(buf_t *bp)
 		addr += size;
 		resid -= size;
 	}
+	rw_exit(&zv->zv_dslock);
 
 	if ((bp->b_resid = resid) == bp->b_bcount)
 		bioerror(bp, off > volsize ? EINVAL : error);
 
 	biodone(bp);
 
-	if (sync)
-		zil_commit(zv->zv_zilog, UINT64_MAX, FDSYNC);
+	if (sync) {
+		if (txg_sync_needed)
+			txg_wait_synced(dmu_objset_pool(os), 0);
+		else
+			zil_commit(zv->zv_zilog, UINT64_MAX, FDSYNC);
+	}
 
 	return (0);
 }
