@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -323,7 +322,6 @@ pbm_afsr_report(dev_info_t *dip, uint64_t fme_ena, pbm_errstate_t *pbm_err_p)
 	int ret = 0;
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 	pci_common_t *cmn_p = pci_p->pci_common_p;
-	pci_target_err_t tgt_err;
 
 	ASSERT(MUTEX_HELD(&cmn_p->pci_fm_mutex));
 
@@ -338,26 +336,18 @@ pbm_afsr_report(dev_info_t *dip, uint64_t fme_ena, pbm_errstate_t *pbm_err_p)
 	/*
 	 * Lookup and fault errant handle
 	 */
-	if (((ret = pci_handle_lookup(dip, ACC_HANDLE, fme_ena,
-				(void *)&pbm_err_p->pbm_pci.pci_pa))
-			== DDI_FM_FATAL) || (ret == DDI_FM_UNKNOWN)) {
+	if (((ret = ndi_fmc_error(dip, NULL, ACC_HANDLE, fme_ena,
+	    (void *)&pbm_err_p->pbm_pci.pci_pa)) == DDI_FM_FATAL) ||
+	    (ret == DDI_FM_UNKNOWN))
 		fatal++;
-	}
 
 	/*
 	 * queue target ereport if appropriate
 	 */
-	if (pbm_err_p->pbm_terr_class) {
-		tgt_err.tgt_err_ena = fme_ena;
-		tgt_err.tgt_err_class = pbm_err_p->pbm_terr_class;
-		if (pbm_err_p->pbm_log == FM_LOG_PCI)
-			tgt_err.tgt_bridge_type = "pci";
-		else
-			tgt_err.tgt_bridge_type = pbm_err_p->pbm_bridge_type;
-		tgt_err.tgt_err_addr = pbm_err_p->pbm_pci.pci_pa;
-		errorq_dispatch(pci_target_queue, (void *)&tgt_err,
-		    sizeof (pci_target_err_t), ERRORQ_ASYNC);
-	}
+	if (pbm_err_p->pbm_terr_class)
+		pci_target_enqueue(fme_ena, pbm_err_p->pbm_terr_class,
+		    (pbm_err_p->pbm_log == FM_LOG_PCI) ? "pci" :
+		    pbm_err_p->pbm_bridge_type, pbm_err_p->pbm_pci.pci_pa);
 
 	/*
 	 * We are currently not dealing with the multiple error

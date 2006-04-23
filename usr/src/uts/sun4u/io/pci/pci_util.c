@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -721,7 +720,6 @@ pci_cfg_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_errstate_t *pci_err_p,
 	int fatal = 0;
 	int nonfatal = 0;
 	int i;
-	pci_target_err_t tgt_err;
 
 	ASSERT(dip);
 
@@ -776,17 +774,11 @@ pci_cfg_report(dev_info_t *dip, ddi_fm_error_t *derr, pci_errstate_t *pci_err_p,
 				 * pci_lookup_handle() to determine if sync
 				 * or async
 				 */
-				tgt_err.tgt_err_ena = derr->fme_ena;
-				tgt_err.tgt_err_class =
-				    pci_err_tbl[i].terr_class;
-				tgt_err.tgt_bridge_type = PCI_ERROR_SUBCLASS;
-				tgt_err.tgt_err_addr =
-				    (uint64_t)derr->fme_bus_specific;
 				nonfatal++;
-				errorq_dispatch(pci_target_queue,
-				    (void *)&tgt_err,
-				    sizeof (pci_target_err_t),
-				    ERRORQ_ASYNC);
+				pci_target_enqueue(derr->fme_ena,
+				    pci_err_tbl[i].terr_class,
+				    PCI_ERROR_SUBCLASS,
+				    (uint64_t)derr->fme_bus_specific);
 				break;
 			default:
 				/*

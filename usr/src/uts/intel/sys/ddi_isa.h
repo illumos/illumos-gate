@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,6 +333,37 @@ i_ddi_acc_fault_check(ddi_acc_impl_t *hdlp);
 
 void
 i_ddi_acc_fault_notify(ddi_acc_impl_t *hdlp);
+
+/* DDI Fault Services functions */
+void i_ddi_caut_get(size_t size, void *addr, void *val);
+
+uint8_t i_ddi_caut_get8(ddi_acc_impl_t *hdlp, uint8_t *addr);
+uint16_t i_ddi_caut_get16(ddi_acc_impl_t *hdlp, uint16_t *addr);
+uint32_t i_ddi_caut_get32(ddi_acc_impl_t *hdlp, uint32_t *addr);
+uint64_t i_ddi_caut_get64(ddi_acc_impl_t *hdlp, uint64_t *addr);
+
+void i_ddi_caut_put8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value);
+void i_ddi_caut_put16(ddi_acc_impl_t *hdlp, uint16_t *addr, uint16_t value);
+void i_ddi_caut_put32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value);
+void i_ddi_caut_put64(ddi_acc_impl_t *hdlp, uint64_t *addr, uint64_t value);
+
+void i_ddi_caut_rep_get8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+    uint8_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_get16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
+
+void i_ddi_caut_rep_put8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+    uint8_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_put16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_put32(ddi_acc_impl_t *hdl, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
+void i_ddi_caut_rep_put64(ddi_acc_impl_t *hdl, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
 
 #endif	/* __STDC__ */
 

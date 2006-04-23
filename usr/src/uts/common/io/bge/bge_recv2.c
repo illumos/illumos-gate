@@ -193,6 +193,11 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	 * Sync the data and copy it to the STREAMS buffer.
 	 */
 	DMA_SYNC(srbdp->pbuf, DDI_DMA_SYNC_FORKERNEL);
+	if (bge_check_dma_handle(bgep, srbdp->pbuf.dma_hdl) != DDI_FM_OK) {
+		bgep->bge_dma_error = B_TRUE;
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
+		return (NULL);
+	}
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
 		/*
@@ -252,9 +257,8 @@ error:
 	 * (rather than merely packet data) appears corrupted.
 	 * The factotum will attempt to reset-and-recover.
 	 */
-	mutex_enter(bgep->genlock);
 	bgep->bge_chip_state = BGE_CHIP_ERROR;
-	mutex_exit(bgep->genlock);
+	bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
 	return (NULL);
 }
 
@@ -288,6 +292,19 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 	 * before accepting the packets they describe
 	 */
 	DMA_SYNC(rrp->desc, DDI_DMA_SYNC_FORKERNEL);
+	if (*rrp->prod_index_p >= rrp->desc.nslots) {
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
+		return (NULL);
+	}
+	if (bge_check_dma_handle(bgep, rrp->desc.dma_hdl) != DDI_FM_OK) {
+		rrp->rx_next = *rrp->prod_index_p;
+		bge_mbx_put(bgep, rrp->chip_mbx_reg, rrp->rx_next);
+		bgep->bge_dma_error = B_TRUE;
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
+		return (NULL);
+	}
+
 	hw_rbd_p = DMA_VPTR(rrp->desc);
 	head = NULL;
 	tail = &head;
@@ -302,6 +319,8 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 	}
 
 	bge_mbx_put(bgep, rrp->chip_mbx_reg, rrp->rx_next);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		bgep->bge_chip_state = BGE_CHIP_ERROR;
 	return (head);
 }
 

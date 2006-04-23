@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -87,6 +86,7 @@ struct event {
 	struct lut *payloadprops;	/* nvpairs for problem payload */
 	int count;			/* for reports, number seen */
 	int cached_state;
+	int keep_in_tree;
 	unsigned long long cached_delay;
 	struct bubble {
 		struct bubble *next;
@@ -135,6 +135,7 @@ struct iterinfo {
 
 struct lut *itree_create(struct config *croot);
 void itree_free(struct lut *itp);
+void itree_prune(struct lut *itp);
 struct event *itree_lookup(struct lut *itp,
     const char *ename, const struct ipath *ipp);
 

@@ -95,10 +95,12 @@ static void vmatch(struct info *infop, struct node *np,
     struct node *lnp, struct node *anp, struct wildcardinfo **wcproot);
 static void hmatch(struct info *infop, struct node *np, struct node *nextnp);
 static void itree_pbubble(int flags, struct bubble *bp);
+static void itree_pruner(void *left, void *right, void *arg);
 static void itree_destructor(void *left, void *right, void *arg);
 static int itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
     struct node *toev, struct lut *ex);
 static void itree_free_arrowlists(struct bubble *bubp, int arrows_too);
+static void itree_prune_arrowlists(struct bubble *bubp);
 static void arrow_add_within(struct arrow *ap, struct node *xpr);
 static struct arrow *itree_add_arrow(struct bubble *frombubblep,
     struct bubble *tobubblep, struct node *apnode, struct node *fromevent,
@@ -1427,6 +1429,12 @@ itree_free(struct lut *lutp)
 	lut_free(lutp, itree_destructor, NULL);
 }
 
+void
+itree_prune(struct lut *lutp)
+{
+	lut_walk(lutp, itree_pruner, NULL);
+}
+
 int
 itree_nameinstancecmp(struct node *np1, struct node *np2)
 {
@@ -1608,10 +1616,12 @@ itree_destructor(void *left, void *right, void *arg)
 	struct bubble *nextbub, *bub;
 
 	/* Free the properties */
-	lut_free(ep->props, instances_destructor, NULL);
+	if (ep->props)
+		lut_free(ep->props, instances_destructor, NULL);
 
 	/* Free the payload properties */
-	lut_free(ep->payloadprops, payloadprops_destructor, NULL);
+	if (ep->payloadprops)
+		lut_free(ep->payloadprops, payloadprops_destructor, NULL);
 
 	/* Free my bubbles */
 	for (bub = ep->bubbles; bub != NULL; ) {
@@ -1634,6 +1644,38 @@ itree_destructor(void *left, void *right, void *arg)
 		nvlist_free(ep->nvp);
 	bzero(ep, sizeof (*ep));
 	FREE(ep);
+}
+
+/*ARGSUSED*/
+static void
+itree_pruner(void *left, void *right, void *arg)
+{
+	struct event *ep = (struct event *)right;
+	struct bubble *nextbub, *bub;
+
+	if (ep->keep_in_tree)
+		return;
+
+	/* Free the properties */
+	lut_free(ep->props, instances_destructor, NULL);
+
+	/* Free the payload properties */
+	lut_free(ep->payloadprops, payloadprops_destructor, NULL);
+
+	/* Free my bubbles */
+	for (bub = ep->bubbles; bub != NULL; ) {
+		nextbub = bub->next;
+		itree_prune_arrowlists(bub);
+		itree_free_bubble(bub);
+		bub = nextbub;
+	}
+
+	if (ep->nvp != NULL)
+		nvlist_free(ep->nvp);
+	ep->props = NULL;
+	ep->payloadprops = NULL;
+	ep->bubbles = NULL;
+	ep->nvp = NULL;
 }
 
 static void
@@ -1818,8 +1860,11 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 	/* handle constraints on the to event in the prop statement */
 	epnames[0] = toev->u.event.epname;
 	epnames[1] = fromev->u.event.epname;
-	if (eval_potential(toev->u.event.eexprlist, ex, epnames, &newc) == 0)
+	if (eval_potential(toev->u.event.eexprlist, ex, epnames, &newc) == 0) {
+		if (newc != NULL)
+			tree_free(newc);
 		return (0);		/* constraint disallows arrow */
+	}
 
 	/* if we came up with any deferred constraints, add them to arrow */
 	if (newc != NULL)
@@ -1904,6 +1949,52 @@ itree_free_arrowlists(struct bubble *bubp, int arrows_too)
 	}
 }
 
+static void
+itree_delete_arrow(struct bubble *bubp, struct arrow *arrow)
+{
+	struct arrowlist *al, *oal;
+
+	al = bubp->arrows;
+	if (al->arrowp == arrow) {
+		bubp->arrows = al->next;
+		bzero(al, sizeof (*al));
+		FREE(al);
+		return;
+	}
+	while (al != NULL) {
+		oal = al;
+		al = al->next;
+		ASSERT(al != NULL);
+		if (al->arrowp == arrow) {
+			oal->next = al->next;
+			bzero(al, sizeof (*al));
+			FREE(al);
+			return;
+		}
+	}
+}
+
+static void
+itree_prune_arrowlists(struct bubble *bubp)
+{
+	struct arrowlist *al, *nal;
+
+	al = bubp->arrows;
+	while (al != NULL) {
+		nal = al->next;
+		if (bubp->t == B_FROM)
+			itree_delete_arrow(al->arrowp->head, al->arrowp);
+		else
+			itree_delete_arrow(al->arrowp->tail, al->arrowp);
+		itree_free_constraints(al->arrowp);
+		bzero(al->arrowp, sizeof (struct arrow));
+		FREE(al->arrowp);
+		bzero(al, sizeof (*al));
+		FREE(al);
+		al = nal;
+	}
+}
+
 struct arrowlist *
 itree_next_arrow(struct bubble *bubble, struct arrowlist *last)
 {
@@ -1962,6 +2053,8 @@ itree_free_constraints(struct arrow *ap)
 		ASSERT(cl->cnode != NULL);
 		if (!iexpr_cached(cl->cnode))
 			tree_free(cl->cnode);
+		else
+			iexpr_free(cl->cnode);
 		bzero(cl, sizeof (*cl));
 		FREE(cl);
 		cl = ncl;

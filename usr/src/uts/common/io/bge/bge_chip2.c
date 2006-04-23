@@ -1062,7 +1062,7 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 	 * accesses internally, even with polling OFF.
 	 */
 	regval1 = regval2 = bge_reg_get32(bgep, MI_COMMS_REG);
-	for (timeout = 1000; ; ) {
+	for (timeout = 100; ; ) {
 		if ((regval2 & MI_COMMS_START) == 0) {
 			bge_reg_put32(bgep, MI_COMMS_REG, cmd);
 			break;
@@ -1073,14 +1073,13 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 		regval2 = bge_reg_get32(bgep, MI_COMMS_REG);
 	}
 
-	if (timeout != 1000)
-		BGE_REPORT((bgep, "bge_mii_access: cmd 0x%x -- "
-			"MI_COMMS_START set for %d us; 0x%x->0x%x",
-			cmd, 10*(1000-timeout), regval1, regval2));
-
-	ASSERT(timeout != 0);
 	if (timeout == 0)
 		return ((uint16_t)~0u);
+
+	if (timeout != 100)
+		BGE_REPORT((bgep, "bge_mii_access: cmd 0x%x -- "
+			"MI_COMMS_START set for %d us; 0x%x->0x%x",
+			cmd, 10*(100-timeout), regval1, regval2));
 
 	regval1 = bge_reg_get32(bgep, MI_COMMS_REG);
 	for (timeout = 1000; ; ) {
@@ -1099,7 +1098,6 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 	if (regval2 & MI_COMMS_READ_FAILED)
 		return ((uint16_t)~0u);
 
-	ASSERT(timeout != 0);
 	if (timeout == 0)
 		return ((uint16_t)~0u);
 
@@ -1133,11 +1131,9 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 		regval2 = regval1;
 	}
 
-	ASSERT((regval2 & MI_COMMS_START) == 0);
 	if (regval2 & MI_COMMS_START)
 		return ((uint16_t)~0u);
 
-	ASSERT((regval2 & MI_COMMS_READ_FAILED) == 0);
 	if (regval2 & MI_COMMS_READ_FAILED)
 		return ((uint16_t)~0u);
 
@@ -1277,7 +1273,6 @@ bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 		drv_usecwait(1);
 	}
 
-	ASSERT((regval & SEEPROM_ACCESS_START) == 0);
 	if (regval & SEEPROM_ACCESS_COMPLETE) {
 		/*
 		 * All OK; read the SEEPROM data register, then write back
@@ -1438,8 +1433,6 @@ static void bge_nvmem_relinquish(bge_t *bgep);
 static void
 bge_nvmem_relinquish(bge_t *bgep)
 {
-	uint32_t regval;
-
 	ASSERT(mutex_owned(bgep->genlock));
 
 	switch (bgep->chipid.nvtype) {
@@ -1464,15 +1457,13 @@ bge_nvmem_relinquish(bge_t *bgep)
 	/*
 	 * Our own request should be present (whether or not granted) ...
 	 */
-	regval = bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
-	ASSERT((regval & NVM_READ_REQ) != 0);
+	(void) bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
 
 	/*
 	 * ... this will make it go away.
 	 */
 	bge_reg_put32(bgep, NVM_SW_ARBITRATION_REG, NVM_RESET_REQ);
-	regval = bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
-	ASSERT((regval & NVM_READ_REQ) == 0);
+	(void) bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
 }
 
 /*
@@ -1547,12 +1538,10 @@ bge_nvmem_acquire(bge_t *bgep)
 	 * caller to retry later (hence the choice of return code EAGAIN).
 	 */
 	regval = bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
-	ASSERT((regval & NVM_READ_REQ) == 0);
 	bge_reg_put32(bgep, NVM_SW_ARBITRATION_REG, NVM_SET_REQ);
 
 	for (tries = 0; tries < 50; ++tries) {
 		regval = bge_reg_get32(bgep, NVM_SW_ARBITRATION_REG);
-		ASSERT((regval & NVM_READ_REQ) != 0);
 		if (regval & NVM_WON_REQ1)
 			break;
 		drv_usecwait(1);
@@ -1878,10 +1867,10 @@ bge_init_recv_rule(bge_t *bgep)
  * to refer to this chip, the correct settings for various registers, and
  * of course whether the device and/or subsystem are supported!
  */
-void bge_chip_id_init(bge_t *bgep);
+int bge_chip_id_init(bge_t *bgep);
 #pragma	no_inline(bge_chip_id_init)
 
-void
+int
 bge_chip_id_init(bge_t *bgep)
 {
 	char buf[MAXPATHLEN];		/* any risk of stack overflow?	*/
@@ -2201,6 +2190,9 @@ bge_chip_id_init(bge_t *bgep)
 #endif
 	else
 		cidp->flags |= CHIP_FLAG_SUPPORTED;
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		return (EIO);
+	return (0);
 }
 
 void
@@ -2254,6 +2246,7 @@ bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
 		drv_usecwait(100);
 	}
 
+	bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
 	return (B_FALSE);
 }
 
@@ -2370,7 +2363,7 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 	default:
 		bge_reg_put32(bgep, regno, regval);
 		return (bge_chip_poll_engine(bgep, regno,
-			STATE_MACHINE_RESET_BIT, 0));
+		    STATE_MACHINE_RESET_BIT, 0));
 	}
 }
 
@@ -2414,7 +2407,7 @@ bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 		regval &= ~morebits;
 		bge_reg_put32(bgep, regno, regval);
 		return (bge_chip_poll_engine(bgep, regno,
-			STATE_MACHINE_ENABLE_BIT, 0));
+		    STATE_MACHINE_ENABLE_BIT, 0));
 	}
 }
 
@@ -2458,7 +2451,7 @@ bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 		regval |= morebits;
 		bge_reg_put32(bgep, regno, regval);
 		return (bge_chip_poll_engine(bgep, regno,
-			STATE_MACHINE_ENABLE_BIT, STATE_MACHINE_ENABLE_BIT));
+		    STATE_MACHINE_ENABLE_BIT, STATE_MACHINE_ENABLE_BIT));
 	}
 }
 
@@ -2537,13 +2530,13 @@ bge_sync_mac_modes(bge_t *bgep)
  * the current loopback mode ...
  */
 #ifdef BGE_IPMI_ASF
-void bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
+int bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
 #else
-void bge_chip_sync(bge_t *bgep);
+int bge_chip_sync(bge_t *bgep);
 #endif
 #pragma	no_inline(bge_chip_sync)
 
-void
+int
 #ifdef BGE_IPMI_ASF
 bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive)
 #else
@@ -2555,6 +2548,7 @@ bge_chip_sync(bge_t *bgep)
 	uint64_t macaddr;
 	uint32_t fill;
 	int i;
+	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_sync($%p)",
 		(void *)bgep));
@@ -2585,19 +2579,24 @@ bge_chip_sync(bge_t *bgep)
 	 */
 	if (bge_stop_start_on_sync) {
 #ifdef BGE_IPMI_ASF
-		if (bgep->asf_enabled) {
-			(void) bge_chip_disable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, 0);
+		if (!bgep->asf_enabled) {
+			if (!bge_chip_disable_engine(bgep,
+			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG))
+				retval = DDI_FAILURE;
 		} else {
-			(void) bge_chip_disable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG);
+			if (!bge_chip_disable_engine(bgep,
+			    RECEIVE_MAC_MODE_REG, 0))
+				retval = DDI_FAILURE;
 		}
 #else
-		(void) bge_chip_disable_engine(bgep, RECEIVE_MAC_MODE_REG,
-		    RECEIVE_MODE_KEEP_VLAN_TAG);
+		if (!bge_chip_disable_engine(bgep, RECEIVE_MAC_MODE_REG,
+		    RECEIVE_MODE_KEEP_VLAN_TAG))
+			retval = DDI_FAILURE;
 #endif
-		(void) bge_chip_disable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
-		(void) bge_chip_reset_engine(bgep, RECEIVE_MAC_MODE_REG);
+		if (!bge_chip_disable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0))
+			retval = DDI_FAILURE;
+		if (!bge_chip_reset_engine(bgep, RECEIVE_MAC_MODE_REG))
+			retval = DDI_FAILURE;
 	}
 
 	/*
@@ -2645,20 +2644,25 @@ bge_chip_sync(bge_t *bgep)
 	 * Restart RX/TX MAC engines if required ...
 	 */
 	if (bgep->bge_chip_state == BGE_CHIP_RUNNING) {
-		(void) bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
+		if (!bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0))
+			retval = DDI_FAILURE;
 #ifdef BGE_IPMI_ASF
-		if (bgep->asf_enabled) {
-			(void) bge_chip_enable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, 0);
+		if (!bgep->asf_enabled) {
+			if (!bge_chip_enable_engine(bgep,
+			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG))
+				retval = DDI_FAILURE;
 		} else {
-			(void) bge_chip_enable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG);
+			if (!bge_chip_enable_engine(bgep,
+			    RECEIVE_MAC_MODE_REG, 0))
+				retval = DDI_FAILURE;
 		}
 #else
-		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
-		    RECEIVE_MODE_KEEP_VLAN_TAG);
+		if (!bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
+		    RECEIVE_MODE_KEEP_VLAN_TAG))
+			retval = DDI_FAILURE;
 #endif
 	}
+	return (retval);
 }
 
 /*
@@ -2733,6 +2737,9 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 					    regno, 0);
 	}
 
+	if (!ok && !fault)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
+
 	/*
 	 * Finally, disable (all) MAC events & clear the MAC status
 	 */
@@ -2740,13 +2747,38 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	bge_reg_put32(bgep, ETHERNET_MAC_STATUS_REG, ~0);
 
 	/*
-	 * Do we need to check whether everything completed OK?
-	 * Probably not ... it always works anyway.
+	 * if we're stopping the chip because of a detected fault then do
+	 * appropriate actions
 	 */
-
-	if (fault)
-		bgep->bge_chip_state = BGE_CHIP_FAULT;
-	else
+	if (fault) {
+		if (bgep->bge_chip_state != BGE_CHIP_FAULT) {
+			bgep->bge_chip_state = BGE_CHIP_FAULT;
+			ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+			if (bgep->bge_dma_error) {
+				/*
+				 * need to free buffers in case the fault was
+				 * due to a memory error in a buffer - got to
+				 * do a fair bit of tidying first
+				 */
+				if (bgep->progress & PROGRESS_KSTATS) {
+					bge_fini_kstats(bgep);
+					bgep->progress &= ~PROGRESS_KSTATS;
+				}
+				if (bgep->progress & PROGRESS_INTR) {
+					bge_intr_disable(bgep);
+					rw_enter(bgep->errlock, RW_WRITER);
+					bge_fini_rings(bgep);
+					rw_exit(bgep->errlock);
+					bgep->progress &= ~PROGRESS_INTR;
+				}
+				if (bgep->progress & PROGRESS_BUFS) {
+					bge_free_bufs(bgep);
+					bgep->progress &= ~PROGRESS_BUFS;
+				}
+				bgep->bge_dma_error = B_FALSE;
+			}
+		}
+	} else
 		bgep->bge_chip_state = BGE_CHIP_STOPPED;
 }
 
@@ -2829,13 +2861,13 @@ bge_poll_firmware(bge_t *bgep)
 }
 
 #ifdef BGE_IPMI_ASF
-void bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
+int bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
 #else
-void bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
+int bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
 #endif
 #pragma	no_inline(bge_chip_reset)
 
-void
+int
 #ifdef BGE_IPMI_ASF
 bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode)
 #else
@@ -2851,6 +2883,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 #ifdef BGE_IPMI_ASF
 	uint32_t mailbox;
 #endif
+	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_reset($%p, %d)",
 		(void *)bgep, enable_dma));
@@ -2865,9 +2898,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 */
 	switch (bgep->bge_chip_state) {
 	default:
-		ASSERT(!"can't get here");
 		_NOTE(NOTREACHED)
-		return;
+		return (DDI_FAILURE);
 
 	case BGE_CHIP_INITIAL:
 	case BGE_CHIP_STOPPED:
@@ -2900,7 +2932,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * Step 4-5: reset Core clock & wait for completion
 	 * Steps 6-8: are done by bge_chip_cfg_init()
 	 */
-	(void) bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0);
+	if (!bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0))
+		retval = DDI_FAILURE;
 
 	mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
 	    MHCR_ENABLE_TAGGED_STATUS_MODE |
@@ -2915,7 +2948,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if (bgep->asf_enabled)
 		bgep->asf_wordswapped = B_FALSE;
 #endif
-	(void) bge_chip_reset_engine(bgep, MISC_CONFIG_REG);
+	if (!bge_chip_reset_engine(bgep, MISC_CONFIG_REG))
+		retval = DDI_FAILURE;
 	bge_chip_cfg_init(bgep, &chipid, enable_dma);
 
 	/*
@@ -2930,7 +2964,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * Step 9: enable MAC memory arbiter,bit30 and bit31 of 5714/5715 should
 	 * not be changed.
 	 */
-	(void) bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0);
+	if (!bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0))
+		retval = DDI_FAILURE;
 
 	/*
 	 * Steps 10-11: configure PIO endianness options and
@@ -3031,13 +3066,14 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	/*
 	 * The SEND INDEX registers should be reset to zero by the
 	 * global chip reset; if they're not, there'll be trouble
-	 * later on -- usually in the form of an ASSERTion failure
-	 * in bge_send.c.  So let's catch it early ...
+	 * later on.
 	 */
 	sx0 = bge_reg_get32(bgep, NIC_DIAG_SEND_INDEX_REG(0));
-	if (sx0 != 0)
-		bge_problem(bgep, "send index %d: device didn't RESET!", sx0);
-	ASSERT(sx0 == 0);
+	if (sx0 != 0) {
+		BGE_REPORT((bgep, "SEND INDEX - device didn't RESET"));
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
+		return (DDI_FAILURE);
+	}
 
 	/* Enable MSI code */
 	if (bgep->intr_type == DDI_INTR_TYPE_MSI)
@@ -3086,16 +3122,17 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 */
 	bgep->chip_resets += 1;
 	bgep->bge_chip_state = BGE_CHIP_RESET;
+	return (retval);
 }
 
 /*
  * bge_chip_start() -- start the chip transmitting and/or receiving,
  * including enabling interrupts
  */
-void bge_chip_start(bge_t *bgep, boolean_t reset_phys);
+int bge_chip_start(bge_t *bgep, boolean_t reset_phys);
 #pragma	no_inline(bge_chip_start)
 
-void
+int
 bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 {
 	uint32_t coalmode;
@@ -3103,13 +3140,13 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	uint32_t mtu;
 	uint32_t maxring;
 	uint64_t ring;
+	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_start($%p)",
 		(void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 	ASSERT(bgep->bge_chip_state == BGE_CHIP_RESET);
-	ASSERT(bge_reg_get32(bgep, NIC_DIAG_SEND_INDEX_REG(0)) == 0);
 
 	/*
 	 * Taken from Broadcom document 570X-PG102-R, pp 102-116.
@@ -3208,9 +3245,11 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Steps 34-36: enable buffer manager & internal h/w queues
 	 */
-	(void) bge_chip_enable_engine(bgep, BUFFER_MANAGER_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
-	(void) bge_chip_enable_engine(bgep, FTQ_RESET_REG, 0);
+	if (!bge_chip_enable_engine(bgep, BUFFER_MANAGER_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, FTQ_RESET_REG, 0))
+		retval = DDI_FAILURE;
 
 	/*
 	 * Steps 37-39: initialise Receive Buffer (Producer) RCBs
@@ -3276,10 +3315,11 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 96: set up multicast filters
 	 */
 #ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_FALSE);
+	if (bge_chip_sync(bgep, B_FALSE) == DDI_FAILURE)
 #else
-	bge_chip_sync(bgep);
+	if (bge_chip_sync(bgep) == DDI_FAILURE)
 #endif
+		retval = DDI_FAILURE;
 
 	/*
 	 * Step 49: configure the MTU
@@ -3323,7 +3363,8 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Steps 57-58: stop (?) the Host Coalescing Engine
 	 */
-	(void) bge_chip_disable_engine(bgep, HOST_COALESCE_MODE_REG, ~0);
+	if (!bge_chip_disable_engine(bgep, HOST_COALESCE_MODE_REG, ~0))
+		retval = DDI_FAILURE;
 
 	/*
 	 * Steps 59-62: initialise Host Coalescing parameters
@@ -3378,14 +3419,18 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 		coalmode = COALESCE_64_BYTE_STATUS;
 	else
 		coalmode = 0;
-	(void) bge_chip_enable_engine(bgep, HOST_COALESCE_MODE_REG, coalmode);
-	(void) bge_chip_enable_engine(bgep, RCV_BD_COMPLETION_MODE_REG,
-	    STATE_MACHINE_ATTN_ENABLE_BIT);
-	(void) bge_chip_enable_engine(bgep, RCV_LIST_PLACEMENT_MODE_REG, 0);
+	if (!bge_chip_enable_engine(bgep, HOST_COALESCE_MODE_REG, coalmode))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, RCV_BD_COMPLETION_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, RCV_LIST_PLACEMENT_MODE_REG, 0))
+		retval = DDI_FAILURE;
 
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
-		(void) bge_chip_enable_engine(bgep, RCV_LIST_SELECTOR_MODE_REG,
-		    STATE_MACHINE_ATTN_ENABLE_BIT);
+		if (!bge_chip_enable_engine(bgep, RCV_LIST_SELECTOR_MODE_REG,
+		    STATE_MACHINE_ATTN_ENABLE_BIT))
+			retval = DDI_FAILURE;
 
 	/*
 	 * Step 72: Enable MAC DMA engines
@@ -3423,44 +3468,60 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Beware exhaust fumes?
 	 */
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
-		(void) bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0);
-	(void) bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
-		(bge_dma_wrprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS);
-	(void) bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
-		(bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS);
-	(void) bge_chip_enable_engine(bgep, RCV_DATA_COMPLETION_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
+		if (!bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0))
+			retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
+	    (bge_dma_wrprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
+	    (bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, RCV_DATA_COMPLETION_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
-		(void) bge_chip_enable_engine(bgep,
-		    MBUF_CLUSTER_FREE_MODE_REG, 0);
-	(void) bge_chip_enable_engine(bgep, SEND_DATA_COMPLETION_MODE_REG, 0);
-	(void) bge_chip_enable_engine(bgep, SEND_BD_COMPLETION_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
-	(void) bge_chip_enable_engine(bgep, RCV_BD_INITIATOR_MODE_REG,
-		RCV_BD_DISABLED_RING_ATTN);
-	(void) bge_chip_enable_engine(bgep, RCV_DATA_BD_INITIATOR_MODE_REG,
-		RCV_DATA_BD_ILL_RING_ATTN);
-	(void) bge_chip_enable_engine(bgep, SEND_DATA_INITIATOR_MODE_REG, 0);
-	(void) bge_chip_enable_engine(bgep, SEND_BD_INITIATOR_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
-	(void) bge_chip_enable_engine(bgep, SEND_BD_SELECTOR_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
+		if (!bge_chip_enable_engine(bgep,
+		    MBUF_CLUSTER_FREE_MODE_REG, 0))
+			retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, SEND_DATA_COMPLETION_MODE_REG, 0))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, SEND_BD_COMPLETION_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, RCV_BD_INITIATOR_MODE_REG,
+	    RCV_BD_DISABLED_RING_ATTN))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, RCV_DATA_BD_INITIATOR_MODE_REG,
+	    RCV_DATA_BD_ILL_RING_ATTN))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, SEND_DATA_INITIATOR_MODE_REG, 0))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, SEND_BD_INITIATOR_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
+	if (!bge_chip_enable_engine(bgep, SEND_BD_SELECTOR_MODE_REG,
+	    STATE_MACHINE_ATTN_ENABLE_BIT))
+		retval = DDI_FAILURE;
 
 	/*
 	 * Step 88: download firmware -- doesn't apply
 	 * Steps 89-90: enable Transmit & Receive MAC Engines
 	 */
-	(void) bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
+	if (!bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0))
+		retval = DDI_FAILURE;
 #ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG, 0);
+	if (!bgep->asf_enabled) {
+		if (!bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
+		    RECEIVE_MODE_KEEP_VLAN_TAG))
+			retval = DDI_FAILURE;
 	} else {
-		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
-		    RECEIVE_MODE_KEEP_VLAN_TAG);
+		if (!bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG, 0))
+			retval = DDI_FAILURE;
 	}
 #else
-	(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
-	    RECEIVE_MODE_KEEP_VLAN_TAG);
+	if (!bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
+	    RECEIVE_MODE_KEEP_VLAN_TAG))
+		retval = DDI_FAILURE;
 #endif
 
 	/*
@@ -3499,7 +3560,8 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * restart autoneg (if required)
 	 */
 	if (reset_phys)
-		bge_phys_update(bgep);
+		if (bge_phys_update(bgep) == DDI_FAILURE)
+			retval = DDI_FAILURE;
 
 	/*
 	 * Extra step (DSG): hand over all the Receive Buffers to the chip
@@ -3553,6 +3615,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * All done!
 	 */
 	bgep->bge_chip_state = BGE_CHIP_RUNNING;
+	return (retval);
 }
 
 
@@ -3569,14 +3632,14 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
  * the <flags> word of the status block, returning the value of the
  * <tag> and the <flags> before the bits were cleared.
  */
-static uint64_t bge_status_sync(bge_t *bgep, uint64_t bits);
+static int bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags);
 #pragma	inline(bge_status_sync)
 
-static uint64_t
-bge_status_sync(bge_t *bgep, uint64_t bits)
+static int
+bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 {
 	bge_status_t *bsp;
-	uint64_t flags;
+	int retval;
 
 	BGE_TRACE(("bge_status_sync($%p, 0x%llx)",
 		(void *)bgep, bits));
@@ -3584,13 +3647,17 @@ bge_status_sync(bge_t *bgep, uint64_t bits)
 	ASSERT(bgep->bge_guard == BGE_GUARD);
 
 	DMA_SYNC(bgep->status_block, DDI_DMA_SYNC_FORKERNEL);
+	retval = bge_check_dma_handle(bgep, bgep->status_block.dma_hdl);
+	if (retval != DDI_FM_OK)
+		return (retval);
+
 	bsp = DMA_VPTR(bgep->status_block);
-	flags = bge_atomic_clr64(&bsp->flags_n_tag, bits);
+	*flags = bge_atomic_clr64(&bsp->flags_n_tag, bits);
 
 	BGE_DEBUG(("bge_status_sync($%p, 0x%llx) returning 0x%llx",
-		(void *)bgep, bits, flags));
+		(void *)bgep, bits, *flags));
 
-	return (flags);
+	return (retval);
 }
 
 static void bge_wake_factotum(bge_t *bgep);
@@ -3621,6 +3688,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	uint64_t flags;
 	uint32_t mlcr = 0;
 	uint_t result;
+	int retval;
 
 	BGE_TRACE(("bge_intr($%p) ($%p)", arg1, arg2));
 
@@ -3652,9 +3720,13 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		 */
 		result = DDI_INTR_CLAIMED;
 
-		if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
+		if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
 			bge_cfg_set32(bgep, PCI_CONF_BGE_MHCR,
 				MHCR_MASK_PCI_INT_OUTPUT);
+			if (bge_check_acc_handle(bgep, bgep->cfg_handle) !=
+			    DDI_FM_OK)
+				goto chip_stop;
+		}
 
 		/*
 		 * Sync the status block and grab the flags-n-tag from it.
@@ -3665,24 +3737,48 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		 */
 		bgep->missed_dmas += 1;
 		bsp = DMA_VPTR(bgep->status_block);
-		flags = bge_status_sync(bgep, STATUS_FLAG_UPDATED);
+		for (;;) {
+			if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
+				/*
+				 * bge_chip_stop() may have freed dma area etc
+				 * while we were in this interrupt handler -
+				 * better not call bge_status_sync()
+				 */
+				(void) bge_check_acc_handle(bgep,
+				    bgep->io_handle);
+				mutex_exit(bgep->genlock);
+				return (DDI_INTR_CLAIMED);
+			}
+			retval = bge_status_sync(bgep, STATUS_FLAG_UPDATED,
+			    &flags);
+			if (retval != DDI_FM_OK) {
+				bgep->bge_dma_error = B_TRUE;
+				goto chip_stop;
+			}
 
-		while (flags & STATUS_FLAG_UPDATED) {
+			if (!(flags & STATUS_FLAG_UPDATED))
+				break;
+
 			/*
 			 * Tell the chip that we're processing the interrupt
 			 */
 			bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
 				INTERRUPT_MBOX_DISABLE(flags));
+			if (bge_check_acc_handle(bgep, bgep->io_handle) !=
+			    DDI_FM_OK)
+				goto chip_stop;
 
 			/*
 			 * Drop the mutex while we:
 			 * 	Receive any newly-arrived packets
 			 *	Recycle any newly-finished send buffers
 			 */
+			bgep->bge_intr_running = B_TRUE;
 			mutex_exit(bgep->genlock);
 			bge_receive(bgep, bsp);
 			bge_recycle(bgep, bsp);
 			mutex_enter(bgep->genlock);
+			bgep->bge_intr_running = B_FALSE;
 
 			/*
 			 * Tell the chip we've finished processing, and
@@ -3698,7 +3794,6 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 			bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
 				INTERRUPT_MBOX_ENABLE(flags));
 			bgep->missed_dmas = 0;
-			flags = bge_status_sync(bgep, STATUS_FLAG_UPDATED);
 		}
 
 		/*
@@ -3736,25 +3831,9 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 				 * over to see whether anything can be done
 				 * about it ...
 				 */
-#ifdef BGE_IPMI_ASF
-				if (bgep->asf_enabled &&
-					(bgep->asf_status == ASF_STAT_RUN)) {
-					/*
-					 * We must stop ASF heart beat before
-					 * bge_chip_stop(), otherwise some
-					 * computers (ex. IBM HS20 blade
-					 * server) may crash.
-					 */
-					bge_asf_update_status(bgep);
-					bge_asf_stop_timer(bgep);
-					bgep->asf_status = ASF_STAT_STOP;
-
-					bge_asf_pre_reset_operations(bgep,
-						BGE_INIT_RESET);
-				}
-#endif
-				bge_chip_stop(bgep, B_TRUE);
-				result = DDI_INTR_UNCLAIMED;
+				bge_fm_ereport(bgep,
+				    DDI_FM_DEVICE_BADINT_LIMIT);
+				goto chip_stop;
 			}
 		}
 
@@ -3762,12 +3841,41 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		 * Reenable assertion of #INTA, unless there's a DMA fault
 		 */
 		if (result == DDI_INTR_CLAIMED) {
-			if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
+			if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
 				bge_cfg_clr32(bgep, PCI_CONF_BGE_MHCR,
 					MHCR_MASK_PCI_INT_OUTPUT);
+				if (bge_check_acc_handle(bgep,
+				    bgep->cfg_handle) != DDI_FM_OK)
+					goto chip_stop;
+			}
 		}
 	}
 
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		goto chip_stop;
+
+	mutex_exit(bgep->genlock);
+	return (result);
+
+chip_stop:
+#ifdef BGE_IPMI_ASF
+	if (bgep->asf_enabled && bgep->asf_status == ASF_STAT_RUN) {
+		/*
+		 * We must stop ASF heart beat before
+		 * bge_chip_stop(), otherwise some
+		 * computers (ex. IBM HS20 blade
+		 * server) may crash.
+		 */
+		bge_asf_update_status(bgep);
+		bge_asf_stop_timer(bgep);
+		bgep->asf_status = ASF_STAT_STOP;
+
+		bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+	}
+#endif
+	bge_chip_stop(bgep, B_TRUE);
+	(void) bge_check_acc_handle(bgep, bgep->io_handle);
 	mutex_exit(bgep->genlock);
 	return (result);
 }
@@ -3877,11 +3985,11 @@ bge_factotum_link_handler(bge_t *bgep)
 	(*logfn)(bgep, "link %s%s", bgep->link_mode_msg, msg);
 }
 
-static boolean_t bge_factotum_link_check(bge_t *bgep);
+static boolean_t bge_factotum_link_check(bge_t *bgep, int *dma_state);
 #pragma	no_inline(bge_factotum_link_check)
 
 static boolean_t
-bge_factotum_link_check(bge_t *bgep)
+bge_factotum_link_check(bge_t *bgep, int *dma_state)
 {
 	boolean_t check;
 	uint64_t flags;
@@ -3899,8 +4007,10 @@ bge_factotum_link_check(bge_t *bgep)
 	/*
 	 * Get & clear the ERROR and LINK_CHANGED bits from the status block
 	 */
-	flags = STATUS_FLAG_ERROR | STATUS_FLAG_LINK_CHANGED;
-	flags = bge_status_sync(bgep, flags);
+	*dma_state = bge_status_sync(bgep, STATUS_FLAG_ERROR |
+	    STATUS_FLAG_LINK_CHANGED, &flags);
+	if (*dma_state != DDI_FM_OK)
+		return (B_FALSE);
 
 	/*
 	 * Clear any errors flagged in the status block ...
@@ -3983,6 +4093,7 @@ bge_factotum_stall_check(bge_t *bgep)
 		return (B_FALSE);
 
 	BGE_REPORT((bgep, "Tx stall detected, watchdog code 0x%x", dogval));
+	bge_fm_ereport(bgep, DDI_FM_DEVICE_STALL);
 	return (B_TRUE);
 }
 
@@ -4003,6 +4114,7 @@ bge_chip_factotum(caddr_t arg)
 	uint_t result;
 	boolean_t error;
 	boolean_t linkchg;
+	int dma_state;
 
 	bgep = (bge_t *)arg;
 
@@ -4026,8 +4138,16 @@ bge_chip_factotum(caddr_t arg)
 		break;
 
 	case BGE_CHIP_RUNNING:
-		linkchg = bge_factotum_link_check(bgep);
+		linkchg = bge_factotum_link_check(bgep, &dma_state);
 		error = bge_factotum_stall_check(bgep);
+		if (dma_state != DDI_FM_OK) {
+			bgep->bge_dma_error = B_TRUE;
+			error = B_TRUE;
+		}
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+			error = B_TRUE;
+		if (error)
+			bgep->bge_chip_state = BGE_CHIP_ERROR;
 		break;
 
 	case BGE_CHIP_ERROR:
@@ -4039,32 +4159,72 @@ bge_chip_factotum(caddr_t arg)
 		 * Fault detected, time to reset ...
 		 */
 		if (bge_autorecover) {
+			if (!(bgep->progress & PROGRESS_BUFS)) {
+				/*
+				 * if we can't allocate the ring buffers,
+				 * try later
+				 */
+				if (bge_alloc_bufs(bgep) != DDI_SUCCESS) {
+					mutex_exit(bgep->genlock);
+					return (result);
+				}
+				bgep->progress |= PROGRESS_BUFS;
+			}
+			if (!(bgep->progress & PROGRESS_INTR)) {
+				bge_init_rings(bgep);
+				bge_intr_enable(bgep);
+				bgep->progress |= PROGRESS_INTR;
+			}
+			if (!(bgep->progress & PROGRESS_KSTATS)) {
+				bge_init_kstats(bgep,
+				    ddi_get_instance(bgep->devinfo));
+				bgep->progress |= PROGRESS_KSTATS;
+			}
+
 			BGE_REPORT((bgep, "automatic recovery activated"));
-			bge_restart(bgep, B_FALSE);
+
+			if (bge_restart(bgep, B_FALSE) != DDI_SUCCESS) {
+				bgep->bge_chip_state = BGE_CHIP_ERROR;
+				error = B_TRUE;
+			}
+			if (bge_check_acc_handle(bgep, bgep->cfg_handle) !=
+			    DDI_FM_OK) {
+				bgep->bge_chip_state = BGE_CHIP_ERROR;
+				error = B_TRUE;
+			}
+			if (bge_check_acc_handle(bgep, bgep->io_handle) !=
+			    DDI_FM_OK) {
+				bgep->bge_chip_state = BGE_CHIP_ERROR;
+				error = B_TRUE;
+			}
+			if (error == B_FALSE) {
 #ifdef BGE_IPMI_ASF
-			/*
-			 * Start our ASF heartbeat counter as soon as possible.
-			 */
-			if (bgep->asf_enabled) {
-				if (bgep->asf_status != ASF_STAT_RUN) {
+				if (bgep->asf_enabled &&
+				    bgep->asf_status != ASF_STAT_RUN) {
 					bgep->asf_timeout_id = timeout(
-						bge_asf_heartbeat,
-						(void *)bgep,
-						drv_usectohz(
-						BGE_ASF_HEARTBEAT_INTERVAL));
+					    bge_asf_heartbeat, (void *)bgep,
+					    drv_usectohz(
+					    BGE_ASF_HEARTBEAT_INTERVAL));
 					bgep->asf_status = ASF_STAT_RUN;
 				}
-			}
 #endif
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_RESTORED);
+			}
 		}
 		break;
 	}
 
+
 	/*
 	 * If an error is detected, stop the chip now, marking it as
 	 * faulty, so that it will be reset next time through ...
+	 *
+	 * Note that if intr_running is set, then bge_intr() has dropped
+	 * genlock to call bge_receive/bge_recycle. Can't stop the chip at
+	 * this point so have to wait until the next time the factotum runs.
 	 */
-	if (error) {
+	if (error && !bgep->bge_intr_running) {
 #ifdef BGE_IPMI_ASF
 		if (bgep->asf_enabled && (bgep->asf_status == ASF_STAT_RUN)) {
 			/*
@@ -4077,9 +4237,11 @@ bge_chip_factotum(caddr_t arg)
 			bgep->asf_status = ASF_STAT_STOP;
 
 			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
+			(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
 		}
 #endif
 		bge_chip_stop(bgep, B_TRUE);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
 	}
 	mutex_exit(bgep->genlock);
 
@@ -4116,6 +4278,9 @@ bge_chip_cyclic(void *arg)
 
 	case BGE_CHIP_RUNNING:
 		bge_reg_set32(bgep, HOST_COALESCE_MODE_REG, COALESCE_NOW);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
 		break;
 
 	case BGE_CHIP_FAULT:
@@ -4757,7 +4922,7 @@ bge_diag_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 		/*
 		 * Reset and reinitialise the 570x hardware
 		 */
-		bge_restart(bgep, cmd == BGE_HARD_RESET);
+		(void) bge_restart(bgep, cmd == BGE_HARD_RESET);
 		return (IOC_ACK);
 	}
 
@@ -4954,8 +5119,12 @@ bge_chip_blank(void *arg, time_t ticks, uint_t count)
 {
 	bge_t *bgep = arg;
 
+	mutex_enter(bgep->genlock);
 	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG, ticks);
 	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG, count);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
+	mutex_exit(bgep->genlock);
 }
 
 #ifdef BGE_IPMI_ASF
@@ -5006,9 +5175,17 @@ bge_asf_update_status(bge_t *bgep)
  * of the required value.
  */
 void
-bge_asf_heartbeat(void *bgep)
+bge_asf_heartbeat(void *arg)
 {
+	bge_t *bgep = (bge_t *)arg;
+
+	mutex_enter(bgep->genlock);
 	bge_asf_update_status((bge_t *)bgep);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+	mutex_exit(bgep->genlock);
 	((bge_t *)bgep)->asf_timeout_id = timeout(bge_asf_heartbeat, bgep,
 		drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
 }

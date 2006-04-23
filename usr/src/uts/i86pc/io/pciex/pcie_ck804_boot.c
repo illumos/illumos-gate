@@ -40,15 +40,16 @@
 /*
  * PCI Configuration (ck804, PCIe) related library functions
  */
-static boolean_t look_for_any_pciex_device(uchar_t);
+static boolean_t	look_for_any_pciex_device(uchar_t);
 
 /* Globals */
 extern int pci_boot_debug;
 
 boolean_t
-check_if_device_is_pciex(uchar_t bus, uchar_t dev, uchar_t func,
-    ushort_t *slot_number, ushort_t *is_pci_bridge)
+check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
+    uchar_t func, ushort_t *slot_number, ushort_t *is_pci_bridge)
 {
+	boolean_t found_pciex = B_FALSE;
 	ushort_t cap;
 	ushort_t capsp;
 	ushort_t cap_count = PCI_CAP_MAX_PTR;
@@ -65,6 +66,10 @@ check_if_device_is_pciex(uchar_t bus, uchar_t dev, uchar_t func,
 	while (cap_count-- && capsp >= PCI_CAP_PTR_OFF) {
 		capsp &= PCI_CAP_PTR_MASK;
 		cap = (*pci_getb_func)(bus, dev, func, capsp);
+
+		if (cap == PCI_CAP_ID_PCIX && cdip)
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pcix-capid-pointer", capsp);
 
 		if (cap == PCI_CAP_ID_PCI_E) {
 #ifdef	DEBUG
@@ -94,13 +99,35 @@ check_if_device_is_pciex(uchar_t bus, uchar_t dev, uchar_t func,
 				    capsp + PCIE_SLOTCAP);
 				*slot_number =
 				    PCIE_SLOTCAP_PHY_SLOT_NUM(slot_cap);
+
+				if (cdip)
+					(void) ndi_prop_update_int(
+					    DDI_DEV_T_NONE, cdip,
+					    "pcie-slotcap-reg", slot_cap);
 			}
-			return (B_TRUE);
+
+			/*
+			 * Can only do I/O based config space access at
+			 * this early stage. Meaning, one cannot access
+			 * extended config space i.e. > 256 bytes.
+			 * So, AER cap_id property will be created much later.
+			 */
+			if (cdip) {
+				(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+				    "pcie-capid-reg",
+				    (*pci_getw_func)(bus, dev, func,
+					capsp + PCIE_PCIECAP));
+				(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+				    "pcie-capid-pointer", capsp);
+			}
+
+			found_pciex = B_TRUE;
 		}
 		capsp = (*pci_getb_func)(bus, dev, func,
 		    capsp + PCI_CAP_NEXT_PTR);
 	}
-	return (B_FALSE);
+
+	return (found_pciex);
 }
 
 
@@ -145,7 +172,7 @@ look_for_any_pciex_device(uchar_t bus)
 			if ((func == 0) && (header & PCI_HEADER_MULTI))
 				nfunc = 8;
 
-			if (check_if_device_is_pciex(bus, dev, func,
+			if (check_if_device_is_pciex(NULL, bus, dev, func,
 			    &slot_num, &is_pci_bridge) == B_TRUE)
 				return (B_TRUE);
 		} /* end of func */

@@ -430,6 +430,9 @@ bge_driverinfo_update(kstat_t *ksp, int flag)
 		return (EACCES);
 
 	bgep = ksp->ks_private;
+	if (bgep->bge_chip_state == BGE_CHIP_FAULT)
+		return (EIO);
+
 	knp = ksp->ks_data;
 
 	(knp++)->value.ui64 = bgep->rx_buff[0].cookie.dmac_laddress;
@@ -452,9 +455,19 @@ bge_driverinfo_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = pci_config_get32(handle, PCI_CONF_BGE_MHCR);
 	(knp++)->value.ui64 = pci_config_get32(handle, PCI_CONF_BGE_PDRWCR);
 	(knp++)->value.ui64 = pci_config_get32(handle, PCI_CONF_BGE_PCISTATE);
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 
 	(knp++)->value.ui64 = bge_reg_get32(bgep, BUFFER_MANAGER_STATUS_REG);
 	(knp++)->value.ui64 = bge_reg_get32(bgep, RCV_INITIATOR_STATUS_REG);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
 
 	return (0);
@@ -528,6 +541,9 @@ bge_mii_update(kstat_t *ksp, int flag)
 		return (EACCES);
 
 	bgep = ksp->ks_private;
+	if (bgep->bge_chip_state == BGE_CHIP_FAULT)
+		return (EIO);
+
 	knp = ksp->ks_data;
 
 	/*
@@ -543,6 +559,11 @@ bge_mii_update(kstat_t *ksp, int flag)
 	xcvr_id = bge_mii_get16(bgep, MII_PHYIDH);
 	xcvr_id <<= 16;
 	xcvr_id |= bge_mii_get16(bgep, MII_PHYIDL);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
 
 	switch (bgep->param_link_speed) {
@@ -695,6 +716,9 @@ bge_phydata_update(kstat_t *ksp, int flag)
 		return (EACCES);
 
 	bgep = ksp->ks_private;
+	if (bgep->bge_chip_state == BGE_CHIP_FAULT)
+		return (EIO);
+
 	knp = ksp->ks_data;
 
 	/*
@@ -721,6 +745,12 @@ bge_phydata_update(kstat_t *ksp, int flag)
 		default:
 			knp->value.ui64 = bge_mii_get16(bgep, ksip->index);
 			break;
+		}
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_DEGRADED);
+			mutex_exit(bgep->genlock);
+			return (EIO);
 		}
 		mutex_exit(bgep->genlock);
 	}
@@ -866,6 +896,12 @@ bge_m_stat(void *arg, enum mac_stat stat)
 	bge_statistics_t *bstp;
 	uint64_t val;
 
+	mutex_enter(bgep->genlock);
+	if (bgep->bge_chip_state == BGE_CHIP_FAULT) {
+		mutex_exit(bgep->genlock);
+		return (0);
+	}
+
 	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
 		bstp = DMA_VPTR(bgep->statistics);
 	else {
@@ -924,7 +960,11 @@ bge_m_stat(void *arg, enum mac_stat stat)
 			bge_reg_get32(bgep, STAT_ETHER_JABBERS_REG);
 		bgep->stat_val.etherStatsUndersizePkts +=
 			bge_reg_get32(bgep, STAT_ETHER_UNDERSIZE_REG);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
 		}
+	}
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -1113,11 +1153,13 @@ bge_m_stat(void *arg, enum mac_stat stat)
 		break;
 
 	case MAC_STAT_XCVR_ID:
-		mutex_enter(bgep->genlock);
 		val = bge_mii_get16(bgep, MII_PHYIDH);
 		val <<= 16;
 		val |= bge_mii_get16(bgep, MII_PHYIDL);
-		mutex_exit(bgep->genlock);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+		}
 		break;
 
 	case MAC_STAT_XCVR_INUSE:
@@ -1261,5 +1303,6 @@ bge_m_stat(void *arg, enum mac_stat stat)
 #endif
 	}
 
+	mutex_exit(bgep->genlock);
 	return (val);
 }

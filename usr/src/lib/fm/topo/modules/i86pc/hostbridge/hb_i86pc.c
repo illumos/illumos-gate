@@ -28,6 +28,7 @@
 
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
+#include <strings.h>
 #include "pcibus.h"
 #include "hostbridge.h"
 #include "did.h"
@@ -70,7 +71,7 @@ pci_hostbridges_find(tnode_t *ptn)
 {
 	di_node_t devtree;
 	di_node_t pnode;
-	char *eplain;
+	di_node_t cnode;
 	int hbcnt = 0;
 
 	/* Scan for buses, top-level devinfo nodes with the right driver */
@@ -81,29 +82,40 @@ pci_hostbridges_find(tnode_t *ptn)
 		return (0);
 	}
 
-	/*
-	 * By default we do not enumerate generic PCI on x86
-	 */
-	eplain = getenv("TOPOENUMPLAINPCI");
-	if (eplain != NULL) {
-		pnode = di_drv_first_node(PCI, devtree);
-		while (pnode != DI_NODE_NIL) {
-			if (hb_process(ptn, hbcnt++, pnode) < 0) {
-				di_fini(devtree);
-				topo_node_range_destroy(ptn, HOSTBRIDGE);
-				return (topo_mod_seterrno(HbHdl,
-				    EMOD_PARTIAL_ENUM));
-			}
-			pnode = di_drv_next_node(pnode);
+	pnode = di_drv_first_node(PCI, devtree);
+	while (pnode != DI_NODE_NIL) {
+		if (hb_process(ptn, hbcnt++, pnode) < 0) {
+			di_fini(devtree);
+			topo_node_range_destroy(ptn, HOSTBRIDGE);
+			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
 		}
+		pnode = di_drv_next_node(pnode);
 	}
 
 	pnode = di_drv_first_node(NPE, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (rc_process(ptn, hbcnt++, pnode) < 0) {
-			di_fini(devtree);
-			topo_node_range_destroy(ptn, HOSTBRIDGE);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+		for (cnode = di_child_node(pnode); cnode != DI_NODE_NIL;
+		    cnode = di_sibling_node(cnode)) {
+			if (di_driver_name(cnode) == NULL)
+				continue;
+			if (strcmp(di_driver_name(cnode), PCI_PCI) == 0) {
+				if (hb_process(ptn, hbcnt++, cnode) < 0) {
+					di_fini(devtree);
+					topo_node_range_destroy(ptn,
+					    HOSTBRIDGE);
+					return (topo_mod_seterrno(HbHdl,
+					    EMOD_PARTIAL_ENUM));
+				}
+			}
+			if (strcmp(di_driver_name(cnode), PCIE_PCI) == 0) {
+				if (rc_process(ptn, hbcnt++, cnode) < 0) {
+					di_fini(devtree);
+					topo_node_range_destroy(ptn,
+					    HOSTBRIDGE);
+					return (topo_mod_seterrno(HbHdl,
+					    EMOD_PARTIAL_ENUM));
+				}
+			}
 		}
 		pnode = di_drv_next_node(pnode);
 	}

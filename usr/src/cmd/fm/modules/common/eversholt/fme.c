@@ -960,7 +960,7 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 }
 
 static int mark_arrows(struct fme *fmep, struct event *ep, int mark,
-    unsigned long long at_latest_by, unsigned long long *pdelay);
+    unsigned long long at_latest_by, unsigned long long *pdelay, int keep);
 
 /* ARGSUSED */
 static void
@@ -970,6 +970,7 @@ clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
 	struct arrowlist *ap;
 
 	ep->cached_state = 0;
+	ep->keep_in_tree = 0;
 	for (bp = itree_next_bubble(ep, NULL); bp;
 	    bp = itree_next_bubble(ep, bp)) {
 		if (bp->t != B_FROM)
@@ -2334,7 +2335,7 @@ fme_timer_fired(struct fme *fmep, id_t tid)
 	} else {
 		fmep->hesitated = 1;
 	}
-	fme_eval(fmep, NULL);
+	fme_eval(fmep, fmep->e0r);
 }
 
 /*
@@ -2540,6 +2541,7 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 			fmd_case_close(fmep->hdl, fmep->fmcase);
 		}
 	}
+	itree_prune(fmep->eventtree);
 }
 
 static void indent(void);
@@ -2625,7 +2627,7 @@ triggered(struct fme *fmep, struct event *ep, int mark)
 
 static int
 mark_arrows(struct fme *fmep, struct event *ep, int mark,
-    unsigned long long at_latest_by, unsigned long long *pdelay)
+    unsigned long long at_latest_by, unsigned long long *pdelay, int keep)
 {
 	struct bubble *bp;
 	struct arrowlist *ap;
@@ -2648,9 +2650,13 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 			 */
 			if (mark == 0) {
 				ap->arrowp->mark &= ~EFFECTS_COUNTER;
+				if (keep && (ep2->cached_state &
+				    (WAIT_EFFECT|CREDIBLE_EFFECT|PARENT_WAIT)))
+					ep2->keep_in_tree = 1;
 				ep2->cached_state &=
 				    ~(WAIT_EFFECT|CREDIBLE_EFFECT|PARENT_WAIT);
-				(void) mark_arrows(fmep, ep2, mark, 0, NULL);
+				(void) mark_arrows(fmep, ep2, mark, 0, NULL,
+				    keep);
 				continue;
 			}
 			if (ep2->cached_state & REQMNTS_DISPROVED) {
@@ -2687,7 +2693,7 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 				continue;
 			}
 			platform_set_payloadnvp(ep2->nvp);
-			if (checkconstraints(fmep, ap->arrowp) != 1) {
+			if (checkconstraints(fmep, ap->arrowp) == 0) {
 				platform_set_payloadnvp(NULL);
 				indent();
 				out(O_ALTFP|O_VERB|O_NONL,
@@ -2721,7 +2727,8 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 				out(O_ALTFP|O_VERB, NULL);
 				indent_push("  E");
 				if (mark_arrows(fmep, ep2, PARENT_WAIT,
-				    at_latest_by, &my_delay) == WAIT_EFFECT) {
+				    at_latest_by, &my_delay, 0) ==
+				    WAIT_EFFECT) {
 					retval = WAIT_EFFECT;
 					if (overall_delay > my_delay)
 						overall_delay = my_delay;
@@ -2746,7 +2753,7 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 				out(O_ALTFP|O_VERB, NULL);
 				indent_push("  E");
 				if (mark_arrows(fmep, ep2, mark, at_latest_by,
-				    &my_delay) == WAIT_EFFECT) {
+				    &my_delay, 0) == WAIT_EFFECT) {
 					retval = WAIT_EFFECT;
 					if (overall_delay > my_delay)
 						overall_delay = my_delay;
@@ -2777,7 +2784,7 @@ effects_test(struct fme *fmep, struct event *fault_event,
 	out(O_ALTFP|O_VERB, NULL);
 
 	(void) mark_arrows(fmep, fault_event, CREDIBLE_EFFECT, at_latest_by,
-	    &my_delay);
+	    &my_delay, 0);
 	for (error_event = fmep->observations;
 	    error_event; error_event = error_event->observations) {
 		indent();
@@ -2799,7 +2806,12 @@ effects_test(struct fme *fmep, struct event *fault_event,
 			out(O_ALTFP|O_VERB, " triggered");
 		}
 	}
-	(void) mark_arrows(fmep, fault_event, 0, 0, NULL);
+	if (return_value == FME_DISPROVED) {
+		(void) mark_arrows(fmep, fault_event, 0, 0, NULL, 0);
+	} else {
+		fault_event->keep_in_tree = 1;
+		(void) mark_arrows(fmep, fault_event, 0, 0, NULL, 1);
+	}
 
 	indent();
 	out(O_ALTFP|O_VERB|O_NONL, "<-EFFECTS %s ",
@@ -3081,7 +3093,7 @@ causes_test(struct fme *fmep, struct event *ep,
 			 * from traversing this arrow
 			 */
 			platform_set_payloadnvp(ep->nvp);
-			if (checkconstraints(fmep, ap->arrowp) != 1)
+			if (checkconstraints(fmep, ap->arrowp) == 0)
 				do_not_follow = 1;
 			platform_set_payloadnvp(NULL);
 			if (do_not_follow) {

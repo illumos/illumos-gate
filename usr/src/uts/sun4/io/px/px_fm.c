@@ -93,6 +93,12 @@ px_fm_attach(px_t *px_p)
 		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
+	 * Initialize pci_target_queue for FMA handling of
+	 * pci errors.
+	 */
+	pci_targetq_init();
+
+	/*
 	 * check parents' capability
 	 */
 	ddi_fm_init(px_p->px_dip, &px_p->px_fm_cap, &px_p->px_fm_ibc);
@@ -191,80 +197,13 @@ px_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip)
 }
 
 /*
- * Function called after a dma fault occurred to find out whether the
- * fault address is associated with a driver that is able to handle faults
- * and recover from faults. The driver has to set DDI_DMA_FLAGERR and
- * cache dma handles in order to make this checking effective to help
- * recovery from dma faults.
- */
-/* ARGSUSED */
-static int
-px_dma_check(dev_info_t *dip, const void *handle, const void *comp_addr,
-    const void *not_used)
-{
-	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
-	pfn_t fault_pfn = mmu_btop(*(uint64_t *)comp_addr);
-	pfn_t comp_pfn;
-	int page;
-
-	/*
-	 * Assertion failure if DDI_FM_DMACHK_CAPABLE capability has not
-	 * been effectively initialized during attach.
-	 */
-	ASSERT(mp);
-
-	for (page = 0; page < mp->dmai_ndvmapages; page++) {
-		comp_pfn = PX_GET_MP_PFN(mp, page);
-		if (fault_pfn == comp_pfn)
-			return (DDI_FM_NONFATAL);
-	}
-
-	return (DDI_FM_UNKNOWN);
-}
-
-/*
- * Function used to check if a given access handle owns the failing address.
- * Called by ndi_fmc_error, when we detect a PIO error.
- */
-/* ARGSUSED */
-static int
-px_acc_check(dev_info_t *dip, const void *handle, const void *comp_addr,
-    const void *not_used)
-{
-	pfn_t pfn, fault_pfn;
-	ddi_acc_hdl_t *hp = impl_acc_hdl_get((ddi_acc_handle_t)handle);
-
-	/*
-	 * Assertion failure if DDI_FM_ACCCHK_CAPABLE capability has not
-	 * been effectively initialized during attach.
-	 */
-	ASSERT(hp);
-
-	pfn = hp->ah_pfn;
-	fault_pfn = mmu_btop(*(uint64_t *)comp_addr);
-	if (fault_pfn >= pfn && fault_pfn < (pfn + hp->ah_pnum))
-		return (DDI_FM_NONFATAL);
-
-	return (DDI_FM_UNKNOWN);
-}
-
-/*
  * Function used by PCI error handlers to check if captured address is stored
  * in the DMA or ACC handle caches.
  */
 int
 px_handle_lookup(dev_info_t *dip, int type, uint64_t fme_ena, void *afar)
 {
-	uint32_t cap = ((px_t *)DIP_TO_STATE(dip))->px_fm_cap;
-	int	ret = DDI_FM_FATAL;
-
-	int (*f)() = type == DMA_HANDLE ?
-	    (DDI_FM_DMA_ERR_CAP(cap) ? px_dma_check : NULL) :
-	    (DDI_FM_ACC_ERR_CAP(cap) ? px_acc_check : NULL);
-
-	if (f)
-		ret = ndi_fmc_error(dip, NULL, type, f, fme_ena, afar);
-
+	int ret = ndi_fmc_error(dip, NULL, type, fme_ena, afar);
 	return (ret == DDI_FM_UNKNOWN ? DDI_FM_FATAL : ret);
 }
 
@@ -749,7 +688,6 @@ px_fabric_check(px_t *px_p, msgcode_t msg_code,
 	if (px_fabric_die &&
 	    (ret & (PX_FATAL_GOS | PX_FATAL_SW)))
 			ret = DDI_FM_FATAL;
-
 	return (ret);
 }
 

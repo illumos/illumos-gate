@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,18 +54,6 @@ extern "C" {
 #define	DB_PIF_PRIMARY_TO_HOST		0x40
 
 /*
- * The following definition could have been inherited from sys/pci/pci_var.h
- * but that runs into including many other dependent files which are
- * host-pci nexus specific. So declaring our own bus_range structure makes
- * it lot easier and simpler. This is ok as bus-range format is in the
- * pci bindings.
- */
-typedef struct bus_range {
-	uint32_t lo;
-	uint32_t hi;
-} db_pci_bus_range_t;
-
-/*
  * the  following definition is used to save the state of all PCI children
  * under us.
  */
@@ -89,7 +76,7 @@ typedef struct db_ctrl {
 	caddr_t		conf_io;	/* pointer to Conf indirect map */
 
 	/* our bus range information */
-	db_pci_bus_range_t	range;
+	pci_bus_range_t	range;
 
 	/* any device tuning parameters here. */
 	uint16_t	p_command;

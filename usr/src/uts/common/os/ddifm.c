@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -158,19 +157,54 @@ static struct i_ddi_fmkstat ddifm_kstat_template = {
 void
 ddi_fm_service_impact(dev_info_t *dip, int svc_impact)
 {
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
 	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (!DEVI_IS_DEVICE_OFFLINE(dip)) {
 		switch (svc_impact) {
 		case DDI_SERVICE_LOST:
 			DEVI_SET_DEVICE_DOWN(dip);
+			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+			    DDI_FM_SERVICE_IMPACT, DDI_FM_SERVICE_LOST);
+			ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
+			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    NULL);
 			break;
 		case DDI_SERVICE_DEGRADED:
 			DEVI_SET_DEVICE_DEGRADED(dip);
+			if (DEVI_IS_DEVICE_DEGRADED(dip)) {
+				(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+				    DDI_FM_SERVICE_IMPACT,
+				    DDI_FM_SERVICE_DEGRADED);
+				ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
+				    FM_VERSION, DATA_TYPE_UINT8,
+				    FM_EREPORT_VERS0, NULL);
+			} else if (DEVI_IS_DEVICE_DOWN(dip)) {
+				(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+				    DDI_FM_SERVICE_IMPACT,
+				    DDI_FM_SERVICE_LOST);
+				ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
+				    FM_VERSION, DATA_TYPE_UINT8,
+				    FM_EREPORT_VERS0, NULL);
+			}
 			break;
 		case DDI_SERVICE_RESTORED:
 			DEVI_SET_DEVICE_UP(dip);
+			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+			    DDI_FM_SERVICE_IMPACT, DDI_FM_SERVICE_RESTORED);
+			ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
+			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    NULL);
 			break;
 		case DDI_SERVICE_UNAFFECTED:
+			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+			    DDI_FM_SERVICE_IMPACT, DDI_FM_SERVICE_UNAFFECTED);
+			ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
+			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+			    NULL);
+			break;
 		default:
 			break;
 		}
@@ -210,7 +244,7 @@ erpt_post_sleep(dev_info_t *dip, const char *error_class, uint64_t ena,
 		(void) ddi_pathname(dip, device_path);
 	}
 
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	if (ddi_prop_lookup_string(DDI_DEV_T_NONE, dip,
 		DDI_PROP_DONTPASS, DEVID_PROP_NAME, &devid) == DDI_SUCCESS) {
 		fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
 		    device_path, devid);
@@ -391,10 +425,8 @@ ddi_fm_ereport_post(dev_info_t *dip, const char *error_class, uint64_t ena,
 	va_list ap;
 	struct i_ddi_fmhdl *fmhdl = DEVI(dip)->devi_fmhdl;
 
-	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip))) {
-		i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL, sflag);
+	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip)))
 		return;
-	}
 
 	ASSERT(fmhdl);
 
@@ -651,12 +683,11 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibcp)
 	/*
 	 * Initialize support for ereport generation
 	 */
-	if (DDI_FM_EREPORT_CAP(*fmcap) &&
-	    DDI_FM_EREPORT_CAP(ddi_system_fmcap)) {
+	if (DDI_FM_EREPORT_CAP(*fmcap) && DDI_FM_EREPORT_CAP(pcap)) {
 		fmhdl->fh_errorq = ereport_errorq;
-		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		if (ddi_getprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 		    "fm-ereport-capable", 0) == 0)
-			(void) ddi_prop_create(DDI_DEV_T_ANY, dip,
+			(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
 			    DDI_PROP_CANSLEEP, "fm-ereport-capable", NULL, 0);
 
 		newcap |= DDI_FM_EREPORT_CAPABLE;
@@ -667,9 +698,9 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibcp)
 	 */
 
 	if (DDI_FM_ERRCB_CAP(*fmcap) && DDI_FM_ERRCB_CAP(pcap)) {
-		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		if (ddi_getprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 		    "fm-errcb-capable", 0) == 0)
-			(void) ddi_prop_create(DDI_DEV_T_ANY, dip,
+			(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
 			    DDI_PROP_CANSLEEP, "fm-errcb-capable", NULL, 0);
 
 		newcap |= DDI_FM_ERRCB_CAPABLE;
@@ -683,9 +714,9 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibcp)
 		i_ndi_fmc_create(&fmhdl->fh_dma_cache, 2, ibc);
 
 		/* Set-up dma chk capability prop */
-		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		if (ddi_getprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 		    "fm-dmachk-capable", 0) == 0)
-			(void) ddi_prop_create(DDI_DEV_T_ANY, dip,
+			(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
 			    DDI_PROP_CANSLEEP, "fm-dmachk-capable", NULL, 0);
 
 		newcap |= DDI_FM_DMACHK_CAPABLE;
@@ -694,9 +725,9 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibcp)
 	if (DDI_FM_ACC_ERR_CAP(*fmcap) && DDI_FM_ACC_ERR_CAP(pcap)) {
 		i_ndi_fmc_create(&fmhdl->fh_acc_cache, 2, ibc);
 		/* Set-up dma chk capability prop */
-		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		if (ddi_getprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 		    "fm-accchk-capable", 0) == 0)
-			(void) ddi_prop_create(DDI_DEV_T_ANY, dip,
+			(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
 			    DDI_PROP_CANSLEEP, "fm-accchk-capable", NULL, 0);
 
 		newcap |= DDI_FM_ACCCHK_CAPABLE;
@@ -726,20 +757,17 @@ ddi_fm_fini(dev_info_t *dip)
 {
 	struct i_ddi_fmhdl *fmhdl = DEVI(dip)->devi_fmhdl;
 
+	ASSERT(fmhdl);
+
 	if (!(DEVI_IS_DETACHING(dip) || DEVI_IS_ATTACHING(dip))) {
 		i_ddi_drv_ereport_post(dip, DVR_ECONTEXT, NULL, DDI_NOSLEEP);
 		return;
 	}
 
-	if (DDI_FM_DEFAULT_CAP(fmhdl->fh_cap))
-		return;
-
-	ASSERT(fmhdl);
-
 	kstat_delete(fmhdl->fh_ksp);
 
 	if (DDI_FM_EREPORT_CAP(fmhdl->fh_cap)) {
-		(void) ddi_prop_remove(DDI_DEV_T_ANY, dip,
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
 		    "fm-ereport-capable");
 	}
 
@@ -750,12 +778,12 @@ ddi_fm_fini(dev_info_t *dip)
 		    DDI_FM_ACC_ERR_CAP(fmhdl->fh_cap)) {
 			if (fmhdl->fh_dma_cache != NULL) {
 				i_ndi_fmc_destroy(fmhdl->fh_dma_cache);
-				(void) ddi_prop_remove(DDI_DEV_T_ANY, dip,
+				(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
 				    "fm-dmachk-capable");
 			}
 			if (fmhdl->fh_acc_cache != NULL) {
 				i_ndi_fmc_destroy(fmhdl->fh_acc_cache);
-				(void) ddi_prop_remove(DDI_DEV_T_ANY, dip,
+				(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
 				    "fm-accachk-capable");
 			}
 		}
@@ -791,16 +819,20 @@ ddi_fm_capable(dev_info_t *dip)
 void
 ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)
 {
-	ndi_err_t *errp = ((ddi_acc_impl_t *)handle)->ahi_err;
+	ndi_err_t *errp;
+
+	if (handle == NULL)
+		return;
 
 	if (version != DDI_FME_VER0) {
 		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
 
 		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
-		cmn_err(CE_PANIC, "ddi_fm_dma_err_get: "
+		cmn_err(CE_PANIC, "ddi_fm_acc_err_get: "
 		    "Invalid driver version\n");
 	}
 
+	errp = ((ddi_acc_impl_t *)handle)->ahi_err;
 	de->fme_status = errp->err_status;
 	de->fme_ena = errp->err_ena;
 	de->fme_flag = errp->err_expected;
@@ -810,7 +842,10 @@ ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)
 void
 ddi_fm_dma_err_get(ddi_dma_handle_t handle, ddi_fm_error_t *de, int version)
 {
-	ndi_err_t *errp = &((ddi_dma_impl_t *)handle)->dmai_error;
+	ndi_err_t *errp;
+
+	if (handle == NULL)
+		return;
 
 	if (version != DDI_FME_VER0) {
 		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
@@ -819,10 +854,56 @@ ddi_fm_dma_err_get(ddi_dma_handle_t handle, ddi_fm_error_t *de, int version)
 		    "Invalid driver version\n");
 	}
 
+	errp = &((ddi_dma_impl_t *)handle)->dmai_error;
+
 	de->fme_status = errp->err_status;
 	de->fme_ena = errp->err_ena;
 	de->fme_flag = errp->err_expected;
 	de->fme_dma_handle = handle;
+}
+
+void
+ddi_fm_acc_err_clear(ddi_acc_handle_t handle, int version)
+{
+	ndi_err_t *errp;
+
+	if (handle == NULL)
+		return;
+
+	if (version != DDI_FME_VER0) {
+		ddi_acc_hdl_t *hp = impl_acc_hdl_get(handle);
+
+		i_ddi_drv_ereport_post(hp->ah_dip, DVR_EVER, NULL, DDI_NOSLEEP);
+		cmn_err(CE_PANIC, "ddi_fm_acc_err_clear: "
+		    "Invalid driver version\n");
+	}
+
+	errp = ((ddi_acc_impl_t *)handle)->ahi_err;
+	errp->err_status = DDI_FM_OK;
+	errp->err_ena = 0;
+	errp->err_expected = DDI_FM_ERR_UNEXPECTED;
+}
+
+void
+ddi_fm_dma_err_clear(ddi_dma_handle_t handle, int version)
+{
+	ndi_err_t *errp;
+
+	if (handle == NULL)
+		return;
+
+	if (version != DDI_FME_VER0) {
+		i_ddi_drv_ereport_post(((ddi_dma_impl_t *)handle)->dmai_rdip,
+		    DVR_EVER, NULL, DDI_NOSLEEP);
+		cmn_err(CE_PANIC, "ddi_fm_dma_err_clear: "
+		    "Invalid driver version\n");
+	}
+
+	errp = &((ddi_dma_impl_t *)handle)->dmai_error;
+
+	errp->err_status = DDI_FM_OK;
+	errp->err_ena = 0;
+	errp->err_expected = DDI_FM_ERR_UNEXPECTED;
 }
 
 void
@@ -850,4 +931,20 @@ i_ddi_fm_dma_err_set(ddi_dma_handle_t handle, uint64_t ena, int status,
 	hdlp->dmai_error.err_status = status;
 	hdlp->dmai_error.err_expected = flag;
 	atomic_add_64(&fmhdl->fh_kstat.fek_dma_err.value.ui64, 1);
+}
+
+ddi_fmcompare_t
+i_ddi_fm_acc_err_cf_get(ddi_acc_handle_t handle)
+{
+	ddi_acc_impl_t *i_hdlp = (ddi_acc_impl_t *)handle;
+
+	return (i_hdlp->ahi_err->err_cf);
+}
+
+ddi_fmcompare_t
+i_ddi_fm_dma_err_cf_get(ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hdlp = (ddi_dma_impl_t *)handle;
+
+	return (hdlp->dmai_error.err_cf);
 }

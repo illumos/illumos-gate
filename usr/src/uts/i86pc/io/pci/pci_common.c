@@ -830,6 +830,391 @@ pci_common_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
 }
 
 
+int
+pci_common_ctlops_poke(peekpoke_ctlops_t *in_args)
+{
+	size_t size = in_args->size;
+	uintptr_t dev_addr = in_args->dev_addr;
+	uintptr_t host_addr = in_args->host_addr;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+	ddi_acc_hdl_t *hdlp = (ddi_acc_hdl_t *)in_args->handle;
+	size_t repcount = in_args->repcount;
+	uint_t flags = in_args->flags;
+	int err = DDI_SUCCESS;
+
+	/*
+	 * if no handle then this is a poke. We have to return failure here
+	 * as we have no way of knowing whether this is a MEM or IO space access
+	 */
+	if (in_args->handle == NULL)
+		return (DDI_FAILURE);
+
+	/*
+	 * rest of this function is actually for cautious puts
+	 */
+	for (; repcount; repcount--) {
+		if (hp->ahi_acc_attr == DDI_ACCATTR_CONFIG_SPACE) {
+			switch (size) {
+			case sizeof (uint8_t):
+				pci_config_wr8(hp, (uint8_t *)dev_addr,
+				    *(uint8_t *)host_addr);
+				break;
+			case sizeof (uint16_t):
+				pci_config_wr16(hp, (uint16_t *)dev_addr,
+				    *(uint16_t *)host_addr);
+				break;
+			case sizeof (uint32_t):
+				pci_config_wr32(hp, (uint32_t *)dev_addr,
+				    *(uint32_t *)host_addr);
+				break;
+			case sizeof (uint64_t):
+				pci_config_wr64(hp, (uint64_t *)dev_addr,
+				    *(uint64_t *)host_addr);
+				break;
+			default:
+				err = DDI_FAILURE;
+				break;
+			}
+		} else if (hp->ahi_acc_attr & DDI_ACCATTR_IO_SPACE) {
+			if (hdlp->ah_acc.devacc_attr_endian_flags ==
+			    DDI_STRUCTURE_BE_ACC) {
+				switch (size) {
+				case sizeof (uint8_t):
+					i_ddi_io_put8(hp,
+					    (uint8_t *)dev_addr,
+					    *(uint8_t *)host_addr);
+					break;
+				case sizeof (uint16_t):
+					i_ddi_io_swap_put16(hp,
+					    (uint16_t *)dev_addr,
+					    *(uint16_t *)host_addr);
+					break;
+				case sizeof (uint32_t):
+					i_ddi_io_swap_put32(hp,
+					    (uint32_t *)dev_addr,
+					    *(uint32_t *)host_addr);
+					break;
+				/*
+				 * note the 64-bit case is a dummy
+				 * function - so no need to swap
+				 */
+				case sizeof (uint64_t):
+					i_ddi_io_put64(hp,
+					    (uint64_t *)dev_addr,
+					    *(uint64_t *)host_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			} else {
+				switch (size) {
+				case sizeof (uint8_t):
+					i_ddi_io_put8(hp,
+					    (uint8_t *)dev_addr,
+					    *(uint8_t *)host_addr);
+					break;
+				case sizeof (uint16_t):
+					i_ddi_io_put16(hp,
+					    (uint16_t *)dev_addr,
+					    *(uint16_t *)host_addr);
+					break;
+				case sizeof (uint32_t):
+					i_ddi_io_put32(hp,
+					    (uint32_t *)dev_addr,
+					    *(uint32_t *)host_addr);
+					break;
+				case sizeof (uint64_t):
+					i_ddi_io_put64(hp,
+					    (uint64_t *)dev_addr,
+					    *(uint64_t *)host_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			}
+		} else {
+			if (hdlp->ah_acc.devacc_attr_endian_flags ==
+			    DDI_STRUCTURE_BE_ACC) {
+				switch (size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)dev_addr =
+					    *(uint8_t *)host_addr;
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)dev_addr =
+					    ddi_swap16(*(uint16_t *)host_addr);
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)dev_addr =
+					    ddi_swap32(*(uint32_t *)host_addr);
+					break;
+				case sizeof (uint64_t):
+					*(uint64_t *)dev_addr =
+					    ddi_swap64(*(uint64_t *)host_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			} else {
+				switch (size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)dev_addr =
+					    *(uint8_t *)host_addr;
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)dev_addr =
+					    *(uint16_t *)host_addr;
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)dev_addr =
+					    *(uint32_t *)host_addr;
+					break;
+				case sizeof (uint64_t):
+					*(uint64_t *)dev_addr =
+					    *(uint64_t *)host_addr;
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			}
+		}
+		host_addr += size;
+		if (flags == DDI_DEV_AUTOINCR)
+			dev_addr += size;
+	}
+	return (err);
+}
+
+
+int
+pci_fm_acc_setup(ddi_acc_hdl_t *hp, off_t offset, off_t len)
+{
+	ddi_acc_impl_t	*ap = (ddi_acc_impl_t *)hp->ah_platform_private;
+
+	/* endian-ness check */
+	if (hp->ah_acc.devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
+		return (DDI_FAILURE);
+
+	/*
+	 * range check
+	 */
+	if ((offset >= PCI_CONF_HDR_SIZE) ||
+	    (len > PCI_CONF_HDR_SIZE) ||
+	    (offset + len > PCI_CONF_HDR_SIZE))
+		return (DDI_FAILURE);
+
+	ap->ahi_acc_attr |= DDI_ACCATTR_CONFIG_SPACE;
+	/*
+	 * always use cautious mechanism for config space gets
+	 */
+	ap->ahi_get8 = i_ddi_caut_get8;
+	ap->ahi_get16 = i_ddi_caut_get16;
+	ap->ahi_get32 = i_ddi_caut_get32;
+	ap->ahi_get64 = i_ddi_caut_get64;
+	ap->ahi_rep_get8 = i_ddi_caut_rep_get8;
+	ap->ahi_rep_get16 = i_ddi_caut_rep_get16;
+	ap->ahi_rep_get32 = i_ddi_caut_rep_get32;
+	ap->ahi_rep_get64 = i_ddi_caut_rep_get64;
+	if (hp->ah_acc.devacc_attr_access == DDI_CAUTIOUS_ACC) {
+		ap->ahi_put8 = i_ddi_caut_put8;
+		ap->ahi_put16 = i_ddi_caut_put16;
+		ap->ahi_put32 = i_ddi_caut_put32;
+		ap->ahi_put64 = i_ddi_caut_put64;
+		ap->ahi_rep_put8 = i_ddi_caut_rep_put8;
+		ap->ahi_rep_put16 = i_ddi_caut_rep_put16;
+		ap->ahi_rep_put32 = i_ddi_caut_rep_put32;
+		ap->ahi_rep_put64 = i_ddi_caut_rep_put64;
+	} else {
+		ap->ahi_put8 = pci_config_wr8;
+		ap->ahi_put16 = pci_config_wr16;
+		ap->ahi_put32 = pci_config_wr32;
+		ap->ahi_put64 = pci_config_wr64;
+		ap->ahi_rep_put8 = pci_config_rep_wr8;
+		ap->ahi_rep_put16 = pci_config_rep_wr16;
+		ap->ahi_rep_put32 = pci_config_rep_wr32;
+		ap->ahi_rep_put64 = pci_config_rep_wr64;
+	}
+
+	/* Initialize to default check/notify functions */
+	ap->ahi_fault_check = i_ddi_acc_fault_check;
+	ap->ahi_fault_notify = i_ddi_acc_fault_notify;
+	ap->ahi_fault = 0;
+	impl_acc_err_init(hp);
+	return (DDI_SUCCESS);
+}
+
+
+int
+pci_common_ctlops_peek(peekpoke_ctlops_t *in_args)
+{
+	size_t size = in_args->size;
+	uintptr_t dev_addr = in_args->dev_addr;
+	uintptr_t host_addr = in_args->host_addr;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+	ddi_acc_hdl_t *hdlp = (ddi_acc_hdl_t *)in_args->handle;
+	size_t repcount = in_args->repcount;
+	uint_t flags = in_args->flags;
+	int err = DDI_SUCCESS;
+
+	/*
+	 * if no handle then this is a peek. We have to return failure here
+	 * as we have no way of knowing whether this is a MEM or IO space access
+	 */
+	if (in_args->handle == NULL)
+		return (DDI_FAILURE);
+
+	for (; repcount; repcount--) {
+		if (hp->ahi_acc_attr == DDI_ACCATTR_CONFIG_SPACE) {
+			switch (size) {
+			case sizeof (uint8_t):
+				*(uint8_t *)host_addr = pci_config_rd8(hp,
+				    (uint8_t *)dev_addr);
+				break;
+			case sizeof (uint16_t):
+				*(uint16_t *)host_addr = pci_config_rd16(hp,
+				    (uint16_t *)dev_addr);
+				break;
+			case sizeof (uint32_t):
+				*(uint32_t *)host_addr = pci_config_rd32(hp,
+				    (uint32_t *)dev_addr);
+				break;
+			case sizeof (uint64_t):
+				*(uint64_t *)host_addr = pci_config_rd64(hp,
+				    (uint64_t *)dev_addr);
+				break;
+			default:
+				err = DDI_FAILURE;
+				break;
+			}
+		} else if (hp->ahi_acc_attr & DDI_ACCATTR_IO_SPACE) {
+			if (hdlp->ah_acc.devacc_attr_endian_flags ==
+			    DDI_STRUCTURE_BE_ACC) {
+				switch (size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)host_addr =
+					    i_ddi_io_get8(hp,
+					    (uint8_t *)dev_addr);
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)host_addr =
+					    i_ddi_io_swap_get16(hp,
+					    (uint16_t *)dev_addr);
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)host_addr =
+					    i_ddi_io_swap_get32(hp,
+					    (uint32_t *)dev_addr);
+					break;
+				/*
+				 * note the 64-bit case is a dummy
+				 * function - so no need to swap
+				 */
+				case sizeof (uint64_t):
+					*(uint64_t *)host_addr =
+					    i_ddi_io_get64(hp,
+					    (uint64_t *)dev_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			} else {
+				switch (size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)host_addr =
+					    i_ddi_io_get8(hp,
+					    (uint8_t *)dev_addr);
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)host_addr =
+					    i_ddi_io_get16(hp,
+					    (uint16_t *)dev_addr);
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)host_addr =
+					    i_ddi_io_get32(hp,
+					    (uint32_t *)dev_addr);
+					break;
+				case sizeof (uint64_t):
+					*(uint64_t *)host_addr =
+					    i_ddi_io_get64(hp,
+					    (uint64_t *)dev_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			}
+		} else {
+			if (hdlp->ah_acc.devacc_attr_endian_flags ==
+			    DDI_STRUCTURE_BE_ACC) {
+				switch (in_args->size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)host_addr =
+					    *(uint8_t *)dev_addr;
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)host_addr =
+					    ddi_swap16(*(uint16_t *)dev_addr);
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)host_addr =
+					    ddi_swap32(*(uint32_t *)dev_addr);
+					break;
+				case sizeof (uint64_t):
+					*(uint64_t *)host_addr =
+					    ddi_swap64(*(uint64_t *)dev_addr);
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			} else {
+				switch (in_args->size) {
+				case sizeof (uint8_t):
+					*(uint8_t *)host_addr =
+					    *(uint8_t *)dev_addr;
+					break;
+				case sizeof (uint16_t):
+					*(uint16_t *)host_addr =
+					    *(uint16_t *)dev_addr;
+					break;
+				case sizeof (uint32_t):
+					*(uint32_t *)host_addr =
+					    *(uint32_t *)dev_addr;
+					break;
+				case sizeof (uint64_t):
+					*(uint64_t *)host_addr =
+					    *(uint64_t *)dev_addr;
+					break;
+				default:
+					err = DDI_FAILURE;
+					break;
+				}
+			}
+		}
+		host_addr += size;
+		if (flags == DDI_DEV_AUTOINCR)
+			dev_addr += size;
+	}
+	return (err);
+}
+
+/*ARGSUSED*/
+int
+pci_common_peekpoke(dev_info_t *dip, dev_info_t *rdip,
+	ddi_ctl_enum_t ctlop, void *arg, void *result)
+{
+	if (ctlop == DDI_CTLOPS_PEEK)
+		return (pci_common_ctlops_peek((peekpoke_ctlops_t *)arg));
+	else
+		return (pci_common_ctlops_poke((peekpoke_ctlops_t *)arg));
+}
+
 /*
  * These are the get and put functions to be shared with drivers. The
  * mutex locking is done inside the functions referenced, rather than

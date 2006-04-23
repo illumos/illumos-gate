@@ -3609,10 +3609,7 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 	struct pcihp_slotinfo *slotinfop;
 	hpc_slot_state_t rstate;
 	ddi_acc_hdl_t *hp;
-	struct bus_range {
-		uint32_t lo;
-		uint32_t hi;
-	} pci_bus_range;
+	pci_bus_range_t pci_bus_range;
 
 	slotinfop = &pcihp_p->slotinfo[pci_dev];
 
@@ -3645,7 +3642,7 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 	 * If there is no dip then we need to see if an
 	 * adapter has just been hot plugged.
 	 */
-	len = sizeof (struct bus_range);
+	len = sizeof (pci_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, pdip,
 	    0, "bus-range",
 	    (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {

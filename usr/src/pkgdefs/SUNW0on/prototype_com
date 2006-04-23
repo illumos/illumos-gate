@@ -54,6 +54,7 @@ f none usr/lib/locale/C/LC_MESSAGES/PCI.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/ZFS.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SCA500.po            644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SCA1000.po           644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/PCIEX.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ADMIN.po    644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_NETRPC.po   644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_OSCMD.po    644 root sys

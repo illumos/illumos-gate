@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -443,6 +442,84 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 	mutex_exit(&fcp->fc_lock);
 }
 
+int
+ndi_fmc_entry_error(dev_info_t *dip, int flag, ddi_fm_error_t *derr,
+    const void *bus_err_state)
+{
+	int status, fatal = 0, nonfatal = 0;
+	ndi_fmc_t *fcp = NULL;
+	ndi_fmcentry_t *fep;
+	struct i_ddi_fmhdl *fmhdl;
+
+	ASSERT(flag == DMA_HANDLE || flag == ACC_HANDLE);
+
+	fmhdl = DEVI(dip)->devi_fmhdl;
+	ASSERT(fmhdl);
+	status = DDI_FM_UNKNOWN;
+
+	if (flag == DMA_HANDLE && DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap)) {
+		fcp = fmhdl->fh_dma_cache;
+		ASSERT(fcp);
+	} else if (flag == ACC_HANDLE && DDI_FM_ACC_ERR_CAP(fmhdl->fh_cap)) {
+		fcp = fmhdl->fh_acc_cache;
+		ASSERT(fcp);
+	}
+
+	if (fcp != NULL) {
+
+		/*
+		 * Check active resource entries
+		 */
+		mutex_enter(&fcp->fc_lock);
+		for (fep = fcp->fc_active->fce_next; fep != NULL;
+		    fep = fep->fce_next) {
+			ddi_fmcompare_t compare_func;
+
+			/*
+			 * Compare captured error state with handle
+			 * resources.  During the comparison and
+			 * subsequent error handling, we block
+			 * attempts to free the cache entry.
+			 */
+			compare_func = (flag == ACC_HANDLE) ?
+			    i_ddi_fm_acc_err_cf_get((ddi_acc_handle_t)
+				fep->fce_resource) :
+			    i_ddi_fm_dma_err_cf_get((ddi_dma_handle_t)
+				fep->fce_resource);
+
+			status = compare_func(dip, fep->fce_resource,
+			    bus_err_state, fep->fce_bus_specific);
+			if (status == DDI_FM_UNKNOWN || status == DDI_FM_OK)
+				continue;
+
+			if (status == DDI_FM_FATAL)
+				++fatal;
+			else if (status == DDI_FM_NONFATAL)
+				++nonfatal;
+
+			/* Set the error for this resource handle */
+			if (flag == ACC_HANDLE) {
+				ddi_acc_handle_t ap = fep->fce_resource;
+
+				i_ddi_fm_acc_err_set(ap, derr->fme_ena, status,
+				    DDI_FM_ERR_UNEXPECTED);
+				ddi_fm_acc_err_get(ap, derr, DDI_FME_VERSION);
+				derr->fme_acc_handle = ap;
+			} else {
+				ddi_dma_handle_t dp = fep->fce_resource;
+
+				i_ddi_fm_dma_err_set(dp, derr->fme_ena, status,
+				    DDI_FM_ERR_UNEXPECTED);
+				ddi_fm_dma_err_get(dp, derr, DDI_FME_VERSION);
+				derr->fme_dma_handle = dp;
+			}
+			break;
+		}
+		mutex_exit(&fcp->fc_lock);
+	}
+	return (fatal ? DDI_FM_FATAL : nonfatal ? DDI_FM_NONFATAL :
+	    DDI_FM_UNKNOWN);
+}
 
 /*
  * Check error state against the handle resource stored in the specified
@@ -466,13 +543,11 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
  *
  */
 int
-ndi_fmc_error(dev_info_t *dip, dev_info_t *tdip, int flag,
-    ndi_fmcompare_t compare_func, uint64_t ena, const void *bus_err_state)
+ndi_fmc_error(dev_info_t *dip, dev_info_t *tdip, int flag, uint64_t ena,
+    const void *bus_err_state)
 {
 	int status, fatal = 0, nonfatal = 0;
-	ndi_fmc_t *fcp;
 	ddi_fm_error_t derr;
-	ndi_fmcentry_t *fep;
 	struct i_ddi_fmhdl *fmhdl;
 	struct i_ddi_fmtgt *tgt;
 
@@ -481,88 +556,42 @@ ndi_fmc_error(dev_info_t *dip, dev_info_t *tdip, int flag,
 	i_ddi_fm_handler_enter(dip);
 	fmhdl = DEVI(dip)->devi_fmhdl;
 	ASSERT(fmhdl);
+
+	bzero(&derr, sizeof (ddi_fm_error_t));
+	derr.fme_version = DDI_FME_VERSION;
+	derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
+	derr.fme_ena = ena;
+
 	for (tgt = fmhdl->fh_tgts; tgt != NULL; tgt = tgt->ft_next) {
 
 		if (tdip != NULL && tdip != tgt->ft_dip)
 			continue;
 
-		fmhdl = DEVI(tgt->ft_dip)->devi_fmhdl;
-		fcp = NULL;
-		bzero(&derr, sizeof (ddi_fm_error_t));
-		derr.fme_version = DDI_FME_VERSION;
-		derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
-		status = DDI_FM_UNKNOWN;
+		/*
+		 * Attempt to find the entry in this childs handle cache
+		 */
+		status = ndi_fmc_entry_error(tgt->ft_dip, flag, &derr,
+		    bus_err_state);
 
-		if (flag == DMA_HANDLE && DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap)) {
-			fcp = fmhdl->fh_dma_cache;
-			ASSERT(fcp);
-		} else if (flag == ACC_HANDLE &&
-		    DDI_FM_ACC_ERR_CAP(fmhdl->fh_cap)) {
-			fcp = fmhdl->fh_acc_cache;
-			ASSERT(fcp);
-		}
+		if (status == DDI_FM_FATAL)
+			++fatal;
+		else if (status == DDI_FM_NONFATAL)
+			++nonfatal;
+		else
+			continue;
 
-		if (fcp != NULL) {
+		/*
+		 * Call our child to process this error.
+		 */
+		status = tgt->ft_errhdl->eh_func(tgt->ft_dip, &derr,
+		    tgt->ft_errhdl->eh_impl);
 
-			/*
-			 * Check active resource entries
-			 */
-			mutex_enter(&fcp->fc_lock);
-			for (fep = fcp->fc_active->fce_next; fep != NULL;
-			    fep = fep->fce_next) {
-
-				/*
-				 * Compare captured error state with handle
-				 * resources.  During the comparison and
-				 * subsequent error handling, we block
-				 * attempts to free the cache entry.
-				 */
-				status = compare_func(dip, fep->fce_resource,
-				    bus_err_state, fep->fce_bus_specific);
-				if (status == DDI_FM_UNKNOWN ||
-				    status == DDI_FM_OK)
-					continue;
-
-				if (status == DDI_FM_FATAL)
-					++fatal;
-				else if (status == DDI_FM_NONFATAL)
-					++nonfatal;
-
-				/* Set the error for this resource handle */
-				if (flag == ACC_HANDLE) {
-					ddi_acc_handle_t ap = fep->fce_resource;
-
-					i_ddi_fm_acc_err_set(ap, ena, status,
-					    DDI_FM_ERR_UNEXPECTED);
-					ddi_fm_acc_err_get(ap, &derr,
-					    DDI_FME_VERSION);
-					derr.fme_acc_handle = ap;
-				} else {
-					ddi_dma_handle_t dp = fep->fce_resource;
-
-					i_ddi_fm_dma_err_set(dp, ena, status,
-					    DDI_FM_ERR_UNEXPECTED);
-					ddi_fm_dma_err_get(dp, &derr,
-					    DDI_FME_VERSION);
-					derr.fme_dma_handle = dp;
-				}
-
-				/*
-				 * Call our child to process this error.
-				 */
-				derr.fme_bus_specific = (void *)bus_err_state;
-				status = tgt->ft_errhdl->eh_func(tgt->ft_dip,
-				    &derr, tgt->ft_errhdl->eh_impl);
-
-				if (status == DDI_FM_FATAL)
-					++fatal;
-				else if (status == DDI_FM_NONFATAL)
-					++nonfatal;
-			}
-			mutex_exit(&fcp->fc_lock);
-		}
-
+		if (status == DDI_FM_FATAL)
+			++fatal;
+		else if (status == DDI_FM_NONFATAL)
+			++nonfatal;
 	}
+
 	i_ddi_fm_handler_exit(dip);
 
 	if (fatal)

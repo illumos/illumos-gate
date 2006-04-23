@@ -165,11 +165,14 @@ pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out)
 	int err;
 
 	/*
-	 * If it's not a device, just inherit any label from our parent
+	 * If it's not a device or a PCI-express bus (which could potentially
+	 * represent a slot, and therefore we might need to capture its slot
+	 * name information), just inherit any label from our parent
 	 */
 	*out = NULL;
 	nm = topo_node_name(node);
-	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0) {
+	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0 &&
+	    strcmp(nm, PCIEX_BUS) != 0) {
 		if (topo_node_label_set(node, NULL, &err) < 0)
 			if (err != ETOPO_PROP_NOENT)
 				return (topo_mod_seterrno(PciHdl, err));

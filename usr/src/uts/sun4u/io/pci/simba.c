@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -374,7 +373,6 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	int instance;
 	simba_devstate_t *simba;
-	ddi_fm_error_t derr;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -450,15 +448,6 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		    (simba->fm_cap & DDI_FM_EREPORT_CAPABLE));
 
 		pci_ereport_setup(devi);
-
-		/*
-		 * clear any outstanding error bits
-		 */
-		bzero(&derr, sizeof (ddi_fm_error_t));
-		derr.fme_version = DDI_FME_VERSION;
-		derr.fme_flag = DDI_FM_ERR_EXPECTED;
-		pci_ereport_post(devi, &derr, NULL);
-		pci_bdg_ereport_post(devi, &derr, NULL);
 
 		ddi_fm_handler_register(devi, simba_err_callback, simba);
 
@@ -538,17 +527,13 @@ simba_err_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	simba_err.afar = pci_config_get64(simba->config_handle, 0xf0);
 	derr->fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 
-	pci_ereport_post(dip, derr, &simba_err.pci_cfg_stat);
-	pci_bdg_ereport_post(dip, derr, &simba_err.pci_cfg_sec_stat);
-	ret = pci_bdg_check_status(dip, derr, simba_err.pci_cfg_stat,
-	    simba_err.pci_cfg_sec_stat);
+	pci_ereport_post(dip, derr, NULL);
+	ret = derr->fme_status;
 
 	DEBUG6(D_FAULT, "%s-%d: cleaning up fault bits %x %x %x.%8x\n",
-			ddi_driver_name(simba->dip),
-			ddi_get_instance(simba->dip), simba_err.pci_cfg_stat,
-			simba_err.pci_cfg_sec_stat,
-			(uint_t)(simba_err.afsr >> 32),
-			(uint_t)simba_err.afsr);
+	    ddi_driver_name(simba->dip), ddi_get_instance(simba->dip),
+	    simba_err.pci_cfg_stat, simba_err.pci_cfg_sec_stat,
+	    (uint_t)(simba_err.afsr >> 32), (uint_t)simba_err.afsr);
 	pci_config_put64(simba->config_handle, 0xe8, simba_err.afsr);
 
 	return (ret);

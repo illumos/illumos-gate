@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,9 +140,8 @@ void *per_pci_state;		/* per-pbm soft state pointer */
 void *per_pci_common_state;	/* per-psycho soft state pointer */
 kmutex_t pci_global_mutex;	/* attach/detach common struct lock */
 errorq_t *pci_ecc_queue = NULL;	/* per-system ecc handling queue */
-errorq_t *pci_target_queue = NULL;	/* per-system target handling queue */
+extern errorq_t *pci_target_queue;
 struct cb_ops *pcihp_ops = NULL;	/* hotplug module cb ops */
-
 
 extern void pci_child_cfg_save(dev_info_t *dip);
 extern void pci_child_cfg_restore(dev_info_t *dip);
@@ -757,8 +755,10 @@ mapped:
 	    cookiep->dmac_size);
 	dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
 		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
+		mp->dmai_error.err_cf = impl_dma_check;
+	}
 
 	mp->dmai_flags |= DMAI_FLAGS_MAPPED;
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);

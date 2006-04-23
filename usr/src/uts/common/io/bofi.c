@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,10 @@
 #include <sys/cpuvar.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
+#include <sys/sysevent/eventdefs.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/debug.h>
@@ -180,6 +183,12 @@ static int	bofi_dma_win(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
 static int	bofi_intr_ops(dev_info_t *dip, dev_info_t *rdip,
 		    ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp,
 		    void *result);
+static int	bofi_fm_ereport_callback(sysevent_t *ev, void *cookie);
+
+evchan_t *bofi_error_chan;
+
+#define	FM_SIMULATED_DMA "simulated.dma"
+#define	FM_SIMULATED_PIO "simulated.pio"
 
 #if defined(__sparc)
 static void	bofi_dvma_kaddr_load(ddi_dma_handle_t, caddr_t, uint_t,
@@ -725,6 +734,10 @@ bofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			mutex_destroy(&bofi_low_mutex);
 			return (DDI_FAILURE);
 		}
+		if (sysevent_evc_bind(FM_ERROR_CHAN, &bofi_error_chan, 0) == 0)
+			(void) sysevent_evc_subscribe(bofi_error_chan, "bofi",
+			    EC_FM, bofi_fm_ereport_callback, NULL, 0);
+
 		/*
 		 * save dip for getinfo
 		 */
@@ -767,6 +780,8 @@ bofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 */
 	if (reset_bus_ops(nexus_name, &save_bus_ops) == 0)
 		return (DDI_FAILURE);
+
+	sysevent_evc_unbind(bofi_error_chan);
 
 	mutex_destroy(&clone_tab_mutex);
 	mutex_destroy(&bofi_mutex);
@@ -1724,6 +1739,7 @@ bofi_errdef_alloc(struct bofi_errdef *errdefp, char *namep,
 	ep->errdef = *errdefp;
 	ep->name = namep;
 	ep->errdef.errdef_handle = (uint64_t)(uintptr_t)ep;
+	ep->errstate.severity = DDI_SERVICE_RESTORED;
 	ep->errstate.errdef_handle = (uint64_t)(uintptr_t)ep;
 	cv_init(&ep->cv, NULL, CV_DRIVER, NULL);
 	/*
@@ -2164,8 +2180,10 @@ retry:
 	 */
 	if (rval == 0 && !(ep->state & BOFI_NEW_MESSAGE)) {
 		ep->state |= BOFI_MESSAGE_WAIT;
-		if (cv_wait_sig(&ep->cv, &bofi_low_mutex) == 0)
-			rval = EINTR;
+		if (cv_wait_sig(&ep->cv, &bofi_low_mutex) == 0) {
+			if (!(ep->state & BOFI_NEW_MESSAGE))
+				rval = EINTR;
+		}
 		goto retry;
 	}
 	ep->state &= ~BOFI_NEW_MESSAGE;
@@ -2277,6 +2295,8 @@ do_dma_corrupt(struct bofi_shadow *hp, struct bofi_errent *ep,
 	caddr_t logaddr;
 	uint64_t *addr;
 	uint64_t *endaddr;
+	ddi_dma_impl_t *hdlp;
+	ndi_err_t *errp;
 
 	ASSERT(MUTEX_HELD(&bofi_mutex));
 	if ((ep->errdef.access_count ||
@@ -2325,6 +2345,19 @@ do_dma_corrupt(struct bofi_shadow *hp, struct bofi_errent *ep,
 		    ep->errdef.offset + ep->errdef.len)) & ~LLSZMASK);
 		len = endaddr - addr;
 		operand = ep->errdef.operand;
+		hdlp = (ddi_dma_impl_t *)(hp->hdl.dma_handle);
+		errp = &hdlp->dmai_error;
+		if (ep->errdef.acc_chk & 2) {
+			uint64_t ena;
+			char buf[FM_MAX_CLASS];
+
+			errp->err_status = DDI_FM_NONFATAL;
+			(void) snprintf(buf, FM_MAX_CLASS, FM_SIMULATED_DMA);
+			ena = fm_ena_generate(0, FM_ENA_FMT1);
+			ddi_fm_ereport_post(hp->dip, buf, ena,
+			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8,
+			    FM_EREPORT_VERS0, NULL);
+		}
 		switch (ep->errdef.optype) {
 		case BOFI_EQUAL :
 			for (i = 0; i < len; i++)
@@ -2377,6 +2410,8 @@ do_pior_corrupt(struct bofi_shadow *hp, caddr_t addr,
 	intptr_t base;
 	int done_get = 0;
 	uint64_t get_val, gv;
+	ddi_acc_impl_t *hdlp;
+	ndi_err_t *errp;
 
 	ASSERT(MUTEX_HELD(&bofi_mutex));
 	/*
@@ -2431,6 +2466,21 @@ do_pior_corrupt(struct bofi_shadow *hp, caddr_t addr,
 					    addr - hp->addr,
 					    accsize, repcount, &gv);
 				}
+				hdlp = (ddi_acc_impl_t *)(hp->hdl.acc_handle);
+				errp = hdlp->ahi_err;
+				if (ep->errdef.acc_chk & 1) {
+					uint64_t ena;
+					char buf[FM_MAX_CLASS];
+
+					errp->err_status = DDI_FM_NONFATAL;
+					(void) snprintf(buf, FM_MAX_CLASS,
+					    FM_SIMULATED_PIO);
+					ena = fm_ena_generate(0, FM_ENA_FMT1);
+					ddi_fm_ereport_post(hp->dip, buf, ena,
+					    DDI_NOSLEEP, FM_VERSION,
+					    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+					    NULL);
+				}
 				switch (ep->errdef.optype) {
 				case BOFI_EQUAL :
 					get_val = operand;
@@ -2476,6 +2526,8 @@ do_piow_corrupt(struct bofi_shadow *hp, caddr_t addr, uint64_t *valuep,
 	uintptr_t minlen;
 	intptr_t base;
 	uint64_t v = *valuep;
+	ddi_acc_impl_t *hdlp;
+	ndi_err_t *errp;
 
 	ASSERT(MUTEX_HELD(&bofi_mutex));
 	/*
@@ -2513,6 +2565,21 @@ do_piow_corrupt(struct bofi_shadow *hp, caddr_t addr, uint64_t *valuep,
 				 */
 				if (ep->errstate.fail_time == 0)
 					ep->errstate.fail_time = bofi_gettime();
+				hdlp = (ddi_acc_impl_t *)(hp->hdl.acc_handle);
+				errp = hdlp->ahi_err;
+				if (ep->errdef.acc_chk & 1) {
+					uint64_t ena;
+					char buf[FM_MAX_CLASS];
+
+					errp->err_status = DDI_FM_NONFATAL;
+					(void) snprintf(buf, FM_MAX_CLASS,
+					    FM_SIMULATED_PIO);
+					ena = fm_ena_generate(0, FM_ENA_FMT1);
+					ddi_fm_ereport_post(hp->dip, buf, ena,
+					    DDI_NOSLEEP, FM_VERSION,
+					    DATA_TYPE_UINT8, FM_EREPORT_VERS0,
+					    NULL);
+				}
 				switch (ep->errdef.optype) {
 				case BOFI_EQUAL :
 					*valuep = ep->errdef.operand;
@@ -4622,6 +4689,79 @@ bofi_post_event(dev_info_t *dip, dev_info_t *rdip,
 	}
 	mutex_exit(&bofi_mutex);
 	return (save_bus_ops.bus_post_event(dip, rdip, eventhdl, impl_data));
+}
+
+/*ARGSUSED*/
+static int
+bofi_fm_ereport_callback(sysevent_t *ev, void *cookie)
+{
+	char *class = "";
+	char *path = "";
+	char *ptr;
+	nvlist_t *nvlist;
+	nvlist_t *detector;
+	ddi_fault_impact_t impact;
+	struct bofi_errent *ep;
+	struct bofi_shadow *hp;
+	struct bofi_link   *lp;
+	char service_class[FM_MAX_CLASS];
+	char hppath[MAXPATHLEN];
+	int service_ereport = 0;
+
+	(void) sysevent_get_attr_list(ev, &nvlist);
+	(void) nvlist_lookup_string(nvlist, FM_CLASS, &class);
+	if (nvlist_lookup_nvlist(nvlist, FM_EREPORT_DETECTOR, &detector) == 0)
+		(void) nvlist_lookup_string(detector, FM_FMRI_DEV_PATH, &path);
+
+	(void) snprintf(service_class, FM_MAX_CLASS, "%s.%s.%s.",
+	    FM_EREPORT_CLASS, DDI_IO_CLASS, DDI_FM_SERVICE_IMPACT);
+	if (strncmp(class, service_class, strlen(service_class) - 1) == 0)
+		service_ereport = 1;
+
+	mutex_enter(&bofi_mutex);
+	/*
+	 * find shadow handles with appropriate dev_infos
+	 * and set error reported on all associated errdef structures
+	 */
+	for (hp = shadow_list.next; hp != &shadow_list; hp = hp->next) {
+		(void) ddi_pathname(hp->dip, hppath);
+		if (strcmp(path, hppath) != 0)
+			continue;
+		for (lp = hp->link; lp != NULL; lp = lp->link) {
+			ep = lp->errentp;
+			ep->errstate.errmsg_count++;
+			if (!(ep->state & BOFI_DEV_ACTIVE))
+				continue;
+			if (ep->errstate.msg_time != NULL)
+				continue;
+			if (service_ereport) {
+				ptr = class + strlen(service_class);
+				if (strcmp(ptr, DDI_FM_SERVICE_LOST) == 0)
+					impact = DDI_SERVICE_LOST;
+				else if (strcmp(ptr,
+				    DDI_FM_SERVICE_DEGRADED) == 0)
+					impact = DDI_SERVICE_DEGRADED;
+				else if (strcmp(ptr,
+				    DDI_FM_SERVICE_RESTORED) == 0)
+					impact = DDI_SERVICE_RESTORED;
+				else
+					impact = DDI_SERVICE_UNAFFECTED;
+				if (ep->errstate.severity > impact)
+					ep->errstate.severity = impact;
+			} else if (ep->errstate.buffer[0] == '\0') {
+				(void) strncpy(ep->errstate.buffer, class,
+				    ERRMSGSIZE);
+			}
+			if (ep->errstate.buffer[0] != '\0' &&
+			    ep->errstate.severity < DDI_SERVICE_RESTORED) {
+				ep->errstate.msg_time = bofi_gettime();
+				ddi_trigger_softintr(ep->softintr_id);
+			}
+		}
+	}
+	nvlist_free(nvlist);
+	mutex_exit(&bofi_mutex);
+	return (0);
 }
 
 /*

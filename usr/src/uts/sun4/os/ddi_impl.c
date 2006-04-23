@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1269,6 +1268,62 @@ impl_acc_hdl_free(ddi_acc_handle_t handle)
 	}
 }
 
+#define	PCI_GET_MP_PFN(mp, page_no)	((mp)->dmai_ndvmapages == 1 ? \
+	(pfn_t)(mp)->dmai_iopte:(((pfn_t *)(mp)->dmai_iopte)[page_no]))
+
+/*
+ * Function called after a dma fault occurred to find out whether the
+ * fault address is associated with a driver that is able to handle faults
+ * and recover from faults.
+ */
+/* ARGSUSED */
+int
+impl_dma_check(dev_info_t *dip, const void *handle, const void *addr,
+    const void *not_used)
+{
+	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
+	pfn_t fault_pfn = mmu_btop(*(uint64_t *)addr);
+	pfn_t comp_pfn;
+
+	/*
+	 * The driver has to set DDI_DMA_FLAGERR to recover from dma faults.
+	 */
+	int page;
+
+	ASSERT(mp);
+	for (page = 0; page < mp->dmai_ndvmapages; page++) {
+		comp_pfn = PCI_GET_MP_PFN(mp, page);
+		if (fault_pfn == comp_pfn)
+			return (DDI_FM_NONFATAL);
+	}
+	return (DDI_FM_UNKNOWN);
+}
+
+/*
+ * Function used to check if a given access handle owns the failing address.
+ * Called by ndi_fmc_error, when we detect a PIO error.
+ */
+/* ARGSUSED */
+static int
+impl_acc_check(dev_info_t *dip, const void *handle, const void *addr,
+    const void *not_used)
+{
+	pfn_t pfn, fault_pfn;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get((ddi_acc_handle_t)handle);
+
+	ASSERT(hp);
+
+	if (addr != NULL) {
+		pfn = hp->ah_pfn;
+		fault_pfn = mmu_btop(*(uint64_t *)addr);
+		if (fault_pfn >= pfn && fault_pfn < (pfn + hp->ah_pnum))
+			return (DDI_FM_NONFATAL);
+	}
+	return (DDI_FM_UNKNOWN);
+}
+
 void
 impl_acc_err_init(ddi_acc_hdl_t *handlep)
 {
@@ -1300,6 +1355,7 @@ impl_acc_err_init(ddi_acc_hdl_t *handlep)
 				    (uintptr_t)&i_ddi_prot_trampoline;
 			errp->err_status = DDI_FM_OK;
 			errp->err_expected = DDI_FM_ERR_UNEXPECTED;
+			errp->err_cf = impl_acc_check;
 		}
 	}
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -62,6 +61,7 @@
 #include <sys/sdt.h>
 #include <sys/rootnex.h>
 #include <vm/hat_i86.h>
+#include <sys/ddifm.h>
 
 /*
  * enable/disable extra checking of function parameters. Useful for debugging
@@ -191,6 +191,8 @@ static int rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     off_t *offp, size_t *lenp, caddr_t *objp, uint_t cache_flags);
 static int rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip,
     ddi_ctl_enum_t ctlop, void *arg, void *result);
+static int rootnex_fm_init(dev_info_t *dip, dev_info_t *tdip, int tcap,
+    ddi_iblock_cookie_t *ibc);
 static int rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip,
     ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result);
 
@@ -219,7 +221,7 @@ static struct bus_ops rootnex_bus_ops = {
 	0,			/* bus_intr_ctl */
 	0,			/* bus_config */
 	0,			/* bus_unconfig */
-	NULL,			/* bus_fm_init */
+	rootnex_fm_init,	/* bus_fm_init */
 	NULL,			/* bus_fm_fini */
 	NULL,			/* bus_fm_access_enter */
 	NULL,			/* bus_fm_access_exit */
@@ -288,8 +290,6 @@ static int rootnex_dma_init();
 static void rootnex_add_props(dev_info_t *);
 static int rootnex_ctl_reportdev(dev_info_t *dip);
 static struct intrspec *rootnex_get_ispec(dev_info_t *rdip, int inum);
-static int rootnex_ctlops_poke(peekpoke_ctlops_t *in_args);
-static int rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result);
 static int rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
 static int rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
 static int rootnex_map_handle(ddi_map_req_t *mp);
@@ -323,9 +323,8 @@ static int rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp,
 static int rootnex_valid_sync_parms(ddi_dma_impl_t *hp, rootnex_window_t *win,
     off_t offset, size_t size, uint_t cache_flags);
 static int rootnex_verify_buffer(rootnex_dma_t *dma);
-static int rootnex_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr,
-    const void *no_used);
-
+static int rootnex_dma_check(dev_info_t *dip, const void *handle,
+    const void *comp_addr, const void *not_used);
 
 /*
  * _init()
@@ -394,24 +393,19 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rootnex_state->r_reserved_msg_printed = B_FALSE;
 	rootnex_cnt = &rootnex_state->r_counters[0];
 
-	mutex_init(&rootnex_state->r_peekpoke_mutex, NULL, MUTEX_SPIN,
-	    (void *)ipltospl(15));
-
 	/*
 	 * Set minimum fm capability level for i86pc platforms and then
 	 * initialize error handling. Since we're the rootnex, we don't
 	 * care what's returned in the fmcap field.
 	 */
-	ddi_system_fmcap = DDI_FM_ERRCB_CAPABLE;
+	ddi_system_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 	fmcap = ddi_system_fmcap;
 	ddi_fm_init(dip, &fmcap, &rootnex_state->r_err_ibc);
-	if (fmcap & DDI_FM_ERRCB_CAPABLE)
-		ddi_fm_handler_register(dip, rootnex_fm_callback, NULL);
 
 	/* initialize DMA related state */
 	e = rootnex_dma_init();
 	if (e != DDI_SUCCESS) {
-		mutex_destroy(&rootnex_state->r_peekpoke_mutex);
 		kmem_free(rootnex_state, sizeof (rootnex_state_t));
 		return (DDI_FAILURE);
 	}
@@ -564,12 +558,6 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		*(ulong_t *)result = btopr(*(ulong_t *)arg);
 		return (DDI_SUCCESS);
 
-	case DDI_CTLOPS_POKE:
-		return (rootnex_ctlops_poke((peekpoke_ctlops_t *)arg));
-
-	case DDI_CTLOPS_PEEK:
-		return (rootnex_ctlops_peek((peekpoke_ctlops_t *)arg, result));
-
 	case DDI_CTLOPS_INITCHILD:
 		return (impl_ddi_sunbus_initchild(arg));
 
@@ -709,114 +697,6 @@ rootnex_ctl_reportdev(dev_info_t *dev)
 	kmem_free(buf, REPORTDEV_BUFSIZE);
 	return (DDI_SUCCESS);
 }
-
-
-/*
- * rootnex_ctlops_poke()
- *
- */
-static int
-rootnex_ctlops_poke(peekpoke_ctlops_t *in_args)
-{
-	int err = DDI_SUCCESS;
-	on_trap_data_t otd;
-
-	/* Cautious access not supported. */
-	if (in_args->handle != NULL)
-		return (DDI_FAILURE);
-
-	mutex_enter(&rootnex_state->r_peekpoke_mutex);
-
-	/* Set up protected environment. */
-	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		switch (in_args->size) {
-		case sizeof (uint8_t):
-			*(uint8_t *)in_args->dev_addr = *(uint8_t *)
-			    in_args->host_addr;
-			break;
-
-		case sizeof (uint16_t):
-			*(uint16_t *)in_args->dev_addr =
-			    *(uint16_t *)in_args->host_addr;
-			break;
-
-		case sizeof (uint32_t):
-			*(uint32_t *)in_args->dev_addr =
-			    *(uint32_t *)in_args->host_addr;
-			break;
-
-		case sizeof (uint64_t):
-			*(uint64_t *)in_args->dev_addr =
-			    *(uint64_t *)in_args->host_addr;
-			break;
-
-		default:
-			err = DDI_FAILURE;
-			break;
-		}
-	} else
-		err = DDI_FAILURE;
-
-	/* Take down protected environment. */
-	no_trap();
-	mutex_exit(&rootnex_state->r_peekpoke_mutex);
-
-	return (err);
-}
-
-
-/*
- * rootnex_ctlops_peek()
- *
- */
-static int
-rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result)
-{
-	int err = DDI_SUCCESS;
-	on_trap_data_t otd;
-
-	/* Cautious access not supported. */
-	if (in_args->handle != NULL)
-		return (DDI_FAILURE);
-
-	mutex_enter(&rootnex_state->r_peekpoke_mutex);
-
-	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		switch (in_args->size) {
-		case sizeof (uint8_t):
-			*(uint8_t *)in_args->host_addr =
-			    *(uint8_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint16_t):
-			*(uint16_t *)in_args->host_addr =
-			    *(uint16_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint32_t):
-			*(uint32_t *)in_args->host_addr =
-			    *(uint32_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint64_t):
-			*(uint64_t *)in_args->host_addr =
-			    *(uint64_t *)in_args->dev_addr;
-			break;
-
-		default:
-			err = DDI_FAILURE;
-			break;
-		}
-		result = (void *)in_args->host_addr;
-	} else
-		err = DDI_FAILURE;
-
-	no_trap();
-	mutex_exit(&rootnex_state->r_peekpoke_mutex);
-
-	return (err);
-}
-
 
 
 /*
@@ -1107,6 +987,11 @@ to I/O space is not supported.\n");
 			    (rp->regspec_bustype > 1 && rp->regspec_addr == 0) ?
 				((caddr_t)(uintptr_t)rp->regspec_bustype) :
 				((caddr_t)(uintptr_t)rp->regspec_addr);
+
+			hp->ah_pfn = mmu_btop((ulong_t)rp->regspec_addr &
+			    (~MMU_PAGEOFFSET));
+			hp->ah_pnum = mmu_btopr(rp->regspec_size +
+			    (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET);
 		}
 
 #ifdef	DDI_MAP_DEBUG
@@ -1182,6 +1067,13 @@ physical %x ",
 		hat_devload(kas.a_hat, cvaddr, mmu_ptob(npages), mmu_btop(base),
 		    mp->map_prot | hat_acc_flags, HAT_LOAD_LOCK);
 		*vaddrp = (caddr_t)cvaddr + pgoffset;
+
+		/* save away pfn and npages for FMA */
+		hp = mp->map_handlep;
+		if (hp) {
+			hp->ah_pfn = mmu_btop(base);
+			hp->ah_pnum = npages;
+		}
 	}
 
 #ifdef	DDI_MAP_DEBUG
@@ -1904,6 +1796,15 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	}
 
 	/*
+	 * If the driver supports FMA, insert the handle in the FMA DMA handle
+	 * cache.
+	 */
+	if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
+		hp->dmai_error.err_cf = rootnex_dma_check;
+		(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
+	}
+
+	/*
 	 * if we don't need the copybuf and we don't need to do a partial,  we
 	 * hit the fast path. All the high performance devices should be trying
 	 * to hit this path. To hit this path, a device should be able to reach
@@ -2012,6 +1913,17 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	/*
+	 * If the driver supports FMA, remove the handle in the FMA DMA handle
+	 * cache.
+	 */
+	if (hp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
+		if ((DEVI(rdip)->devi_fmhdl != NULL) &&
+		    (DDI_FM_DMA_ERR_CAP(DEVI(rdip)->devi_fmhdl->fh_cap))) {
+			(void) ndi_fmc_remove(rdip, DMA_HANDLE, hp);
+		}
+	}
+
+	/*
 	 * cleanup and copy buffer or window state. if we didn't use the copy
 	 * buffer or windows, there won't be much to do :-)
 	 */
@@ -2050,16 +1962,13 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 static int
 rootnex_verify_buffer(rootnex_dma_t *dma)
 {
-	peekpoke_ctlops_t peek;
 	page_t **pplist;
 	caddr_t vaddr;
 	uint_t pcnt;
 	uint_t poff;
 	page_t *pp;
-	uint8_t b;
+	char b;
 	int i;
-	int e;
-
 
 	/* Figure out how many pages this buffer occupies */
 	if (dma->dp_dma.dmao_type == DMA_OTYP_PAGES) {
@@ -2102,16 +2011,11 @@ rootnex_verify_buffer(rootnex_dma_t *dma)
 		/* For a virtual address, try to peek at each page */
 		} else {
 			if (dma->dp_sglinfo.si_asp == &kas) {
-				bzero(&peek, sizeof (peekpoke_ctlops_t));
-				peek.host_addr = (uintptr_t)&b;
-				peek.size = sizeof (uint8_t);
-				peek.dev_addr = (uintptr_t)vaddr;
 				for (i = 0; i < pcnt; i++) {
-					e = rootnex_ctlops_peek(&peek, &b);
-					if (e != DDI_SUCCESS) {
+					if (ddi_peek8(NULL, vaddr, &b) ==
+					    DDI_FAILURE)
 						return (DDI_FAILURE);
-					}
-					peek.dev_addr += MMU_PAGESIZE;
+					vaddr += MMU_PAGESIZE;
 				}
 			}
 		}
@@ -2164,6 +2068,7 @@ rootnex_clean_dmahdl(ddi_dma_impl_t *hp)
 	hp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
 	hp->dmai_error.err_ontrap = NULL;
 	hp->dmai_error.err_fep = NULL;
+	hp->dmai_error.err_cf = NULL;
 }
 
 
@@ -4425,9 +4330,126 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 #endif /* defined(__amd64) */
 }
 
-/*ARGSUSED*/
+
+/*
+ * *********
+ *  FMA Code
+ * *********
+ */
+
+/*
+ * rootnex_fm_init()
+ *    FMA init busop
+ */
+/* ARGSUSED */
 static int
-rootnex_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
+rootnex_fm_init(dev_info_t *dip, dev_info_t *tdip, int tcap,
+    ddi_iblock_cookie_t *ibc)
 {
-	return (rootnex_fm_ma_ta_panic_flag ? DDI_FM_FATAL : DDI_FM_NONFATAL);
+	*ibc = rootnex_state->r_err_ibc;
+
+	return (ddi_system_fmcap);
+}
+
+/*
+ * rootnex_dma_check()
+ *    Function called after a dma fault occurred to find out whether the
+ *    fault address is associated with a driver that is able to handle faults
+ *    and recover from faults.
+ */
+/* ARGSUSED */
+static int
+rootnex_dma_check(dev_info_t *dip, const void *handle, const void *addr,
+    const void *not_used)
+{
+	rootnex_window_t *window;
+	uint64_t start_addr;
+	uint64_t fault_addr;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	uint64_t end_addr;
+	size_t csize;
+	int i;
+	int j;
+
+
+	/* The driver has to set DDI_DMA_FLAGERR to recover from dma faults */
+	hp = (ddi_dma_impl_t *)handle;
+	ASSERT(hp);
+
+	dma = (rootnex_dma_t *)hp->dmai_private;
+
+	/* Get the address that we need to search for */
+	fault_addr = *(uint64_t *)addr;
+
+	/*
+	 * if we don't have any windows, we can just walk through all the
+	 * cookies.
+	 */
+	if (dma->dp_window == NULL) {
+		/* for each cookie */
+		for (i = 0; i < dma->dp_sglinfo.si_sgl_size; i++) {
+			/*
+			 * if the faulted address is within the physical address
+			 * range of the cookie, return DDI_FM_NONFATAL.
+			 */
+			if ((fault_addr >= dma->dp_cookies[i].dmac_laddress) &&
+			    (fault_addr <= (dma->dp_cookies[i].dmac_laddress +
+			    dma->dp_cookies[i].dmac_size))) {
+				return (DDI_FM_NONFATAL);
+			}
+		}
+
+		/* fault_addr not within this DMA handle */
+		return (DDI_FM_UNKNOWN);
+	}
+
+	/* we have mutiple windows, walk through each window */
+	for (i = 0; i < hp->dmai_nwin; i++) {
+		window = &dma->dp_window[i];
+
+		/* Go through all the cookies in the window */
+		for (j = 0; j < window->wd_cookie_cnt; j++) {
+
+			start_addr = window->wd_first_cookie[j].dmac_laddress;
+			csize = window->wd_first_cookie[j].dmac_size;
+
+			/*
+			 * if we are trimming the first cookie in the window,
+			 * and this is the first cookie, adjust the start
+			 * address and size of the cookie to account for the
+			 * trim.
+			 */
+			if (window->wd_trim.tr_trim_first && (j == 0)) {
+				start_addr = window->wd_trim.tr_first_paddr;
+				csize = window->wd_trim.tr_first_size;
+			}
+
+			/*
+			 * if we are trimming the last cookie in the window,
+			 * and this is the last cookie, adjust the start
+			 * address and size of the cookie to account for the
+			 * trim.
+			 */
+			if (window->wd_trim.tr_trim_last &&
+			    (j == (window->wd_cookie_cnt - 1))) {
+				start_addr = window->wd_trim.tr_last_paddr;
+				csize = window->wd_trim.tr_last_size;
+			}
+
+			end_addr = start_addr + csize;
+
+			/*
+			 * if the faulted address is within the physical address
+			 * range of the cookie, return DDI_FM_NONFATAL.
+			 */
+			if ((fault_addr >= start_addr) &&
+			    (fault_addr <= end_addr)) {
+				return (DDI_FM_NONFATAL);
+			}
+		}
+	}
+
+	/* fault_addr not within this DMA handle */
+	return (DDI_FM_UNKNOWN);
 }

@@ -757,7 +757,7 @@ static int
 mc_fm_handle(dev_info_t *dip, ddi_fm_error_t *fmerr, const void *arg)
 {
 	pci_ereport_post(dip, fmerr, NULL);
-	return (DDI_FM_NONFATAL);
+	return (fmerr->fme_status);
 }
 
 static void

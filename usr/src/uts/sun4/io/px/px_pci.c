@@ -302,18 +302,6 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_get_soft_state(pxb_state, instance);
 		(void) pcie_pwr_resume(devi);
 
-		mutex_enter(&DEVI(devi)->devi_lock);
-		DEVI_SET_ATTACHING(devi);
-		mutex_exit(&DEVI(devi)->devi_lock);
-
-		if (pxb_fm_init(pxb) != DDI_SUCCESS)
-			cmn_err(CE_WARN, "px_pci: dip0x%p failed pxb_fm_init "
-			    "at resume\n", (void *) devi);
-
-		mutex_enter(&DEVI(devi)->devi_lock);
-		DEVI_CLR_ATTACHING(devi);
-		mutex_exit(&DEVI(devi)->devi_lock);
-
 		return (DDI_SUCCESS);
 
 	case DDI_ATTACH:
@@ -522,16 +510,6 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		pxb = (pxb_devstate_t *)
 			ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
-
-		mutex_enter(&DEVI(devi)->devi_lock);
-		DEVI_SET_DETACHING(devi);
-		mutex_exit(&DEVI(devi)->devi_lock);
-
-		pxb_fm_fini(pxb);
-
-		mutex_enter(&DEVI(devi)->devi_lock);
-		DEVI_CLR_DETACHING(devi);
-		mutex_exit(&DEVI(devi)->devi_lock);
 
 		error = pcie_pwr_suspend(devi);
 
@@ -1693,11 +1671,10 @@ pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p)
 static int
 pxb_fm_init(pxb_devstate_t *pxb_p)
 {
-	ddi_fm_error_t	derr;
 	dev_info_t	*dip = pxb_p->pxb_dip;
 
 	pxb_p->pxb_fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE;
+		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
 	 * Request our capability level and get our parents capability
@@ -1706,15 +1683,6 @@ pxb_fm_init(pxb_devstate_t *pxb_p)
 	ddi_fm_init(dip, &pxb_p->pxb_fm_cap, &pxb_p->pxb_fm_ibc);
 
 	pci_ereport_setup(dip);
-
-	/*
-	 * clear any outstanding error bits
-	 */
-	bzero(&derr, sizeof (ddi_fm_error_t));
-	derr.fme_version = DDI_FME_VERSION;
-	derr.fme_flag = DDI_FM_ERR_EXPECTED;
-	pci_ereport_post(dip, &derr, NULL);
-	pci_bdg_ereport_post(dip, &derr, NULL);
 
 	/*
 	 * Register error callback with our parent.
@@ -1763,16 +1731,8 @@ static int
 pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data)
 {
-	uint16_t pci_cfg_stat, pci_cfg_sec_stat;
-	int ret;
-	ddi_acc_handle_t hdl = *(ddi_acc_handle_t *)impl_data;
-
-	pci_ereport_post(dip, derr, &pci_cfg_stat);
-	pci_bdg_ereport_post(dip, derr, &pci_cfg_sec_stat);
-	ret = pci_bdg_check_status(dip, derr, pci_cfg_stat, pci_cfg_sec_stat);
-	/* do this till Fabric FMA is in place. */
-	pcie_clear_errors(dip, hdl);
-	return (ret);
+	pci_ereport_post(dip, derr, NULL);
+	return (derr->fme_status);
 }
 
 /*

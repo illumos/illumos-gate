@@ -106,30 +106,6 @@ static int pcicfg_slot_iosize = 64 * PCICFG_IOGRAN; /* 64K per slot */
 static int pcicfg_sec_reset_delay = 3000000;
 static int pcicfg_do_legacy_props = 1;	/* create legacy compatible prop */
 
-/*
- * The following typedef is used to represent a
- * 1275 "bus-range" property of a PCI Bus node.
- * DAF - should be in generic include file...
- */
-
-typedef struct pcicfg_bus_range {
-	uint32_t lo;
-	uint32_t hi;
-} pcicfg_bus_range_t;
-
-typedef struct pcicfg_range {
-
-	uint32_t child_hi;
-	uint32_t child_mid;
-	uint32_t child_lo;
-	uint32_t parent_hi;
-	uint32_t parent_mid;
-	uint32_t parent_lo;
-	uint32_t size_hi;
-	uint32_t size_lo;
-
-} pcicfg_range_t;
-
 typedef struct hole hole_t;
 
 struct hole {
@@ -289,7 +265,7 @@ static void pcicfg_config_teardown(ddi_acc_handle_t *);
 static void pcicfg_get_mem(pcicfg_phdl_t *, uint32_t, uint64_t *);
 static void pcicfg_get_pf_mem(pcicfg_phdl_t *, uint32_t, uint64_t *);
 static void pcicfg_get_io(pcicfg_phdl_t *, uint32_t, uint32_t *);
-static int pcicfg_update_ranges_prop(dev_info_t *, pcicfg_range_t *);
+static int pcicfg_update_ranges_prop(dev_info_t *, ppb_ranges_t *);
 static int pcicfg_configure_ntbridge(dev_info_t *, uint_t, uint_t);
 static uint_t pcicfg_ntbridge_child(dev_info_t *);
 static int pcicfg_indirect_map(dev_info_t *dip);
@@ -604,7 +580,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	int func;
 	dev_info_t *new_device;
 	dev_info_t *attach_point;
-	pcicfg_bus_range_t pci_bus_range;
+	pci_bus_range_t pci_bus_range;
 	int rv;
 	int circ;
 	uint_t highest_bus;
@@ -613,7 +589,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	 * Start probing at the device specified in "device" on the
 	 * "bus" specified.
 	 */
-	len = sizeof (pcicfg_bus_range_t);
+	len = sizeof (pci_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, devi, 0, "bus-range",
 	    (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
@@ -1062,10 +1038,10 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 static int
 pcicfg_ntbridge_configure_done(dev_info_t *dip)
 {
-	pcicfg_range_t range[PCICFG_RANGE_LEN];
+	ppb_ranges_t range[PCICFG_RANGE_LEN];
 	pcicfg_phdl_t		*entry;
 	uint_t			len;
-	pcicfg_bus_range_t	bus_range;
+	pci_bus_range_t		bus_range;
 	int			new_bus_range[2];
 
 	DEBUG1("Configuring children for %p\n", dip);
@@ -1074,21 +1050,21 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	ASSERT(entry);
 
 	bzero((caddr_t)range,
-		sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
-	range[1].child_hi = range[1].parent_hi |=
+		sizeof (ppb_ranges_t) * PCICFG_RANGE_LEN);
+	range[1].child_high = range[1].parent_high |=
 		(PCI_REG_REL_M | PCI_ADDR_MEM32);
-	range[1].child_lo = range[1].parent_lo = (uint32_t)entry->memory_base;
+	range[1].child_low = range[1].parent_low = (uint32_t)entry->memory_base;
 
-	range[0].child_hi = range[0].parent_hi |=
+	range[0].child_high = range[0].parent_high |=
 		(PCI_REG_REL_M | PCI_ADDR_IO);
-	range[0].child_lo = range[0].parent_lo = (uint32_t)entry->io_base;
+	range[0].child_low = range[0].parent_low = (uint32_t)entry->io_base;
 
-	range[2].child_hi = range[2].parent_hi |=
+	range[2].child_high = range[2].parent_high |=
 		(PCI_REG_REL_M | PCI_ADDR_MEM32 | PCI_REG_PF_M);
-	range[2].child_lo = range[2].parent_lo =
+	range[2].child_low = range[2].parent_low =
 		(uint32_t)entry->pf_memory_base;
 
-	len = sizeof (pcicfg_bus_range_t);
+	len = sizeof (pci_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"bus-range", (caddr_t)&bus_range, (int *)&len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
@@ -1128,7 +1104,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	}
 #endif
 
-	range[0].size_lo = entry->io_len;
+	range[0].size_low = entry->io_len;
 	if (pcicfg_update_ranges_prop(dip, &range[0])) {
 		DEBUG0("Failed to update ranges (i/o)\n");
 		entry->error = PCICFG_FAILURE;
@@ -1144,7 +1120,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	}
 #endif
 
-	range[1].size_lo = entry->memory_len;
+	range[1].size_low = entry->memory_len;
 	if (pcicfg_update_ranges_prop(dip, &range[1])) {
 		DEBUG0("Failed to update ranges (memory)\n");
 		entry->error = PCICFG_FAILURE;
@@ -1160,7 +1136,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	}
 #endif
 
-	range[2].size_lo = entry->pf_memory_len;
+	range[2].size_low = entry->pf_memory_len;
 	if (pcicfg_update_ranges_prop(dip, &range[2])) {
 		DEBUG0("Failed to update ranges (PF memory)\n");
 		entry->error = PCICFG_FAILURE;
@@ -1207,9 +1183,9 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	int 		len, bus;
 	uint16_t	vid;
 	ddi_acc_handle_t	config_handle;
-	pcicfg_bus_range_t pci_bus_range;
+	pci_bus_range_t pci_bus_range;
 
-	len = sizeof (pcicfg_bus_range_t);
+	len = sizeof (pci_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, new_device, DDI_PROP_DONTPASS,
 		"bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
@@ -1657,7 +1633,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	uint32_t io_answer;
 	int count;
 	uint8_t header_type;
-	pcicfg_range_t range[PCICFG_RANGE_LEN];
+	ppb_ranges_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
 	uint64_t mem_residual;
 	uint64_t pf_mem_residual;
@@ -1688,21 +1664,21 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		bzero((caddr_t)range,
-			sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
+			sizeof (ppb_ranges_t) * PCICFG_RANGE_LEN);
 
 		(void) pcicfg_setup_bridge(entry, handle);
 
-		range[0].child_hi = range[0].parent_hi |=
+		range[0].child_high = range[0].parent_high |=
 			(PCI_REG_REL_M | PCI_ADDR_IO);
-		range[0].child_lo = range[0].parent_lo =
+		range[0].child_low = range[0].parent_low =
 			entry->io_last;
-		range[1].child_hi = range[1].parent_hi |=
+		range[1].child_high = range[1].parent_high |=
 			(PCI_REG_REL_M | PCI_ADDR_MEM32);
-		range[1].child_lo = range[1].parent_lo =
+		range[1].child_low = range[1].parent_low =
 			entry->memory_last;
-		range[2].child_hi = range[2].parent_hi |=
+		range[2].child_high = range[2].parent_high |=
 			(PCI_REG_REL_M | PCI_ADDR_MEM32 | PCI_REG_PF_M);
-		range[2].child_lo = range[2].parent_lo =
+		range[2].child_low = range[2].parent_low =
 			entry->pf_memory_last;
 
 		ndi_devi_enter(dip, &count);
@@ -1754,7 +1730,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		}
 
 		if (entry->io_len > 0) {
-			range[0].size_lo = entry->io_last - entry->io_base;
+			range[0].size_low = entry->io_last - entry->io_base;
 			if (pcicfg_update_ranges_prop(dip, &range[0])) {
 				DEBUG0("Failed to update ranges (i/o)\n");
 				entry->error = PCICFG_FAILURE;
@@ -1762,7 +1738,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			}
 		}
 		if (entry->memory_len > 0) {
-			range[1].size_lo =
+			range[1].size_low =
 				entry->memory_last - entry->memory_base;
 			if (pcicfg_update_ranges_prop(dip, &range[1])) {
 				DEBUG0("Failed to update ranges (memory)\n");
@@ -1771,7 +1747,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			}
 		}
 		if (entry->pf_memory_len > 0) {
-			range[2].size_lo =
+			range[2].size_low =
 				entry->pf_memory_last - entry->pf_memory_base;
 			if (pcicfg_update_ranges_prop(dip, &range[2])) {
 				DEBUG0("Failed to update ranges (PF memory)\n");
@@ -2377,7 +2353,7 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 static int
 pcicfg_free_bridge_resources(dev_info_t *dip)
 {
-	pcicfg_range_t		*ranges;
+	ppb_ranges_t		*ranges;
 	uint_t			*bus;
 	int			k;
 	int			length;
@@ -2403,20 +2379,20 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 		length = 0;
 	}
 
-	for (i = 0; i < length / sizeof (pcicfg_range_t); i++) {
+	for (i = 0; i < length / sizeof (ppb_ranges_t); i++) {
 		char *mem_type;
 
-		if (ranges[i].size_lo != 0 ||
-			ranges[i].size_hi != 0) {
-			switch (ranges[i].parent_hi & PCI_REG_ADDR_M) {
+		if (ranges[i].size_low != 0 ||
+			ranges[i].size_high != 0) {
+			switch (ranges[i].parent_high & PCI_REG_ADDR_M) {
 				case PCI_ADDR_IO:
 					DEBUG2("Free I/O    "
 					"base/length = [0x%x]/[0x%x]\n",
-						ranges[i].child_lo,
-						ranges[i].size_lo);
+						ranges[i].child_low,
+						ranges[i].size_low);
 					if (ndi_ra_free(ddi_get_parent(dip),
-						(uint64_t)ranges[i].child_lo,
-						(uint64_t)ranges[i].size_lo,
+						(uint64_t)ranges[i].child_low,
+						(uint64_t)ranges[i].size_low,
 						NDI_RA_TYPE_IO, NDI_RA_PASS)
 						!= NDI_SUCCESS) {
 						DEBUG0("Trouble freeing "
@@ -2427,29 +2403,30 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 				break;
 				case PCI_ADDR_MEM32:
 				case PCI_ADDR_MEM64:
-				    if (ranges[i].parent_hi & PCI_REG_PF_M) {
+				    if (ranges[i].parent_high & PCI_REG_PF_M) {
 					DEBUG3("Free PF Memory base/length"
 					" = [0x%x.0x%x]/[0x%x]\n",
 					ranges[i].child_mid,
-					ranges[i].child_lo,
-					ranges[i].size_lo)
+					ranges[i].child_low,
+					ranges[i].size_low)
 					mem_type = NDI_RA_TYPE_PCI_PREFETCH_MEM;
 				    } else {
 					DEBUG3("Free Memory base/length"
 					" = [0x%x.0x%x]/[0x%x]\n",
 					ranges[i].child_mid,
-					ranges[i].child_lo,
-					ranges[i].size_lo)
+					ranges[i].child_low,
+					ranges[i].size_low)
 					mem_type = NDI_RA_TYPE_MEM;
 				    }
 				    if (ndi_ra_free(ddi_get_parent(dip),
-						PCICFG_LADDR(ranges[i].child_lo,
+						PCICFG_LADDR(
+						ranges[i].child_low,
 						ranges[i].child_mid),
-						(uint64_t)ranges[i].size_lo,
+						(uint64_t)ranges[i].size_low,
 						mem_type,
 						NDI_RA_PASS) != NDI_SUCCESS) {
 						DEBUG0("Trouble freeing "
-						"PCI memory space\n");
+						    "PCI memory space\n");
 						kmem_free(ranges, length);
 						return (PCICFG_FAILURE);
 				    }
@@ -2750,10 +2727,10 @@ pcicfg_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 }
 
 static int
-pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
+pcicfg_update_ranges_prop(dev_info_t *dip, ppb_ranges_t *addition)
 {
 	int		rlen;
-	pcicfg_range_t	*ranges;
+	ppb_ranges_t	*ranges;
 	caddr_t		newreg;
 	uint_t		status;
 
@@ -2771,7 +2748,7 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 			DEBUG0("no ranges property - creating one\n");
 			if (ndi_prop_update_int_array(DDI_DEV_T_NONE,
 				dip, "ranges", (int *)addition,
-				sizeof (pcicfg_range_t)/sizeof (int))
+				sizeof (ppb_ranges_t)/sizeof (int))
 				!= DDI_SUCCESS) {
 				DEBUG0("Did'nt create ranges property\n");
 				return (PCICFG_FAILURE);
@@ -2783,22 +2760,22 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 	 * Allocate memory for the existing ranges plus one and then
 	 * build it.
 	 */
-	newreg = kmem_zalloc(rlen+sizeof (pcicfg_range_t), KM_SLEEP);
+	newreg = kmem_zalloc(rlen+sizeof (ppb_ranges_t), KM_SLEEP);
 
 	bcopy(ranges, newreg, rlen);
-	bcopy(addition, newreg + rlen, sizeof (pcicfg_range_t));
+	bcopy(addition, newreg + rlen, sizeof (ppb_ranges_t));
 
 	/*
 	 * Write out the new "ranges" property
 	 */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
 		dip, "ranges", (int *)newreg,
-		(rlen + sizeof (pcicfg_range_t))/sizeof (int));
+		(rlen + sizeof (ppb_ranges_t))/sizeof (int));
 
 	DEBUG1("Updating ranges property for %d entries",
-			rlen / sizeof (pcicfg_range_t) + 1);
+			rlen / sizeof (ppb_ranges_t) + 1);
 
-	kmem_free((caddr_t)newreg, rlen+sizeof (pcicfg_range_t));
+	kmem_free((caddr_t)newreg, rlen+sizeof (ppb_ranges_t));
 
 	kmem_free((caddr_t)ranges, rlen);
 
@@ -3042,20 +3019,32 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 			return (ret);
 		}
 	}
+	if ((cap_id_loc = pcicfg_get_cap(config_handle, PCI_CAP_ID_PCIX)) > 0) {
+		/* create the pcix-capid-pointer property */
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pcix-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
+			return (ret);
+	}
 	if (pcie_dev && (cap_id_loc = pcicfg_get_cap(config_handle,
 					PCI_CAP_ID_PCI_E)) > 0) {
+		/* create the pcie-capid-pointer property */
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pcie-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
+			return (ret);
 		val = pci_config_get16(config_handle, cap_id_loc +
 				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
 		if (val) {
-			wordval = (pci_config_get32(config_handle, cap_id_loc +
-					PCIE_SLOTCAP) >>
-					PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
-					PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
-			/* create the property only if slotnum set correctly? */
+			wordval = pci_config_get32(config_handle, cap_id_loc +
+					PCIE_SLOTCAP);
+			/* create the slotcap-reg property */
 			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE,
-					dip, "physical-slot#", wordval))
-						!= DDI_SUCCESS) {
+			    dip, "pcie-slotcap-reg", wordval)) != DDI_SUCCESS)
+				return (ret);
+			/* create the property only if slotnum set correctly? */
+			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    "physical-slot#", PCIE_SLOTCAP_PHY_SLOT_NUM(
+			    wordval))) != DDI_SUCCESS) {
 				return (ret);
 			}
 		}
@@ -3637,7 +3626,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	uint64_t mem_size, io_size, pf_mem_size;
 	uint64_t mem_end, pf_mem_end, io_end;
 	uint64_t round_answer, round_len;
-	pcicfg_range_t range[PCICFG_RANGE_LEN];
+	ppb_ranges_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
 	pcicfg_phdl_t phdl;
 	int count;
@@ -4273,27 +4262,28 @@ pf_setup_end:
 	DEBUG2("                         - PF Mem address %lx PF Mem Size %x\n",
 	    pf_mem_base, pf_mem_size);
 
-	bzero((caddr_t)range, sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
+	bzero((caddr_t)range, sizeof (ppb_ranges_t) * PCICFG_RANGE_LEN);
 
-	range[0].child_hi = range[0].parent_hi |= (PCI_REG_REL_M | PCI_ADDR_IO);
-	range[0].child_lo = range[0].parent_lo = io_base;
-	range[1].child_hi = range[1].parent_hi |=
+	range[0].child_high = range[0].parent_high |= (PCI_REG_REL_M |
+	    PCI_ADDR_IO);
+	range[0].child_low = range[0].parent_low = io_base;
+	range[1].child_high = range[1].parent_high |=
 	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
-	range[1].child_lo = range[1].parent_lo = mem_base;
-	range[2].child_hi = range[2].parent_hi |=
+	range[1].child_low = range[1].parent_low = mem_base;
+	range[2].child_high = range[2].parent_high |=
 	    (PCI_REG_REL_M | PCI_ADDR_MEM64 | PCI_REG_PF_M);
-	range[2].child_lo = range[2].parent_lo = pf_mem_base;
+	range[2].child_low = range[2].parent_low = pf_mem_base;
 
 	if (io_size > 0) {
-		range[0].size_lo = io_size;
+		range[0].size_low = io_size;
 		(void) pcicfg_update_ranges_prop(new_child, &range[0]);
 	}
 	if (mem_size > 0) {
-		range[1].size_lo = mem_size;
+		range[1].size_low = mem_size;
 		(void) pcicfg_update_ranges_prop(new_child, &range[1]);
 	}
 	if (pf_mem_size > 0) {
-		range[2].size_lo = pf_mem_size;
+		range[2].size_low = pf_mem_size;
 		(void) pcicfg_update_ranges_prop(new_child, &range[2]);
 	}
 

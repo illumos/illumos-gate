@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,10 @@ extern "C" {
 /* State structure. */
 typedef struct pci_state {
 	dev_info_t *pci_dip;
+	int pci_fmcap;
+	ddi_iblock_cookie_t pci_fm_ibc;
+	kmutex_t pci_peek_poke_mutex;
+	kmutex_t pci_err_mutex;
 } pci_state_t;
 
 /* AMD's northbridges vendor-id and device-ids */
@@ -121,6 +124,9 @@ void	pci_common_set_parent_private_data(dev_info_t *);
  */
 int	pci_common_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp);
 int	pci_common_name_child(dev_info_t *child, char *name, int namelen);
+int	pci_common_peekpoke(dev_info_t *dip, dev_info_t *rdip,
+	ddi_ctl_enum_t ctlop, void *arg, void *result);
+int	pci_fm_acc_setup(ddi_acc_hdl_t *hp, off_t offset, off_t len);
 
 #ifdef	__cplusplus
 }

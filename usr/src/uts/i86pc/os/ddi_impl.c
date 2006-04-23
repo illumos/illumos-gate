@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -56,6 +55,7 @@
 #include <sys/archsystm.h>
 #include <vm/seg_kmem.h>
 #include <sys/ontrap.h>
+#include <sys/fm/protocol.h>
 #include <sys/ramdisk.h>
 #include <sys/sunndi.h>
 #include <sys/vmem.h>
@@ -2092,6 +2092,182 @@ peekpoke_mem(ddi_ctl_enum_t cmd, peekpoke_ctlops_t *in_args)
 	return (cmd == DDI_CTLOPS_PEEK ? peek_mem(in_args) : poke_mem(in_args));
 }
 
+/*
+ * we've just done a cautious put/get. Check if it was successful by
+ * calling pci_ereport_post() on all puts and for any gets that return -1
+ */
+static int
+pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop)
+{
+	int	rval = DDI_SUCCESS;
+	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
+	ddi_fm_error_t de;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+	ddi_acc_hdl_t *hdlp = (ddi_acc_hdl_t *)in_args->handle;
+	int check_err = 0;
+	int repcount = in_args->repcount;
+
+	if (ctlop == DDI_CTLOPS_PEEK &&
+	    hdlp->ah_acc.devacc_attr_access != DDI_CAUTIOUS_ACC) {
+		for (; repcount; repcount--) {
+			switch (in_args->size) {
+			case sizeof (uint8_t):
+				if (*(uint8_t *)in_args->host_addr == 0xff)
+					check_err = 1;
+				break;
+			case sizeof (uint16_t):
+				if (*(uint16_t *)in_args->host_addr == 0xffff)
+					check_err = 1;
+				break;
+			case sizeof (uint32_t):
+				if (*(uint32_t *)in_args->host_addr ==
+				    0xffffffff)
+					check_err = 1;
+				break;
+			case sizeof (uint64_t):
+				if (*(uint64_t *)in_args->host_addr ==
+				    0xffffffffffffffff)
+					check_err = 1;
+				break;
+			}
+		}
+		if (check_err == 0)
+			return (DDI_SUCCESS);
+	}
+	/*
+	 * for a cautious put or get or a non-cautious get that returned -1 call
+	 * io framework to see if there really was an error
+	 */
+	bzero(&de, sizeof (ddi_fm_error_t));
+	de.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
+	de.fme_bus_specific = (void *)in_args->dev_addr;
+	if (hdlp->ah_acc.devacc_attr_access == DDI_CAUTIOUS_ACC) {
+		de.fme_flag = DDI_FM_ERR_EXPECTED;
+		de.fme_acc_handle = in_args->handle;
+	} else if (hdlp->ah_acc.devacc_attr_access == DDI_DEFAULT_ACC) {
+		/*
+		 * We only get here with DDI_DEFAULT_ACC for config space gets.
+		 * Non-hardened drivers may be probing the hardware and
+		 * expecting -1 returned. So need to treat errors on
+		 * DDI_DEFAULT_ACC as DDI_FM_ERR_EXPECTED.
+		 */
+		de.fme_flag = DDI_FM_ERR_EXPECTED;
+		de.fme_acc_handle = in_args->handle;
+	} else {
+		/*
+		 * Hardened driver doing protected accesses shouldn't
+		 * get errors unless there's a hardware problem. Treat
+		 * as nonfatal if there's an error, but set UNEXPECTED
+		 * so we raise ereports on any errors and potentially
+		 * fault the device
+		 */
+		de.fme_flag = DDI_FM_ERR_UNEXPECTED;
+	}
+	pci_ereport_post(dip, &de, NULL);
+	if (hdlp->ah_acc.devacc_attr_access != DDI_DEFAULT_ACC &&
+	    de.fme_status != DDI_FM_OK) {
+		ndi_err_t *errp = (ndi_err_t *)hp->ahi_err;
+		rval = DDI_FAILURE;
+		errp->err_ena = de.fme_ena;
+		errp->err_expected = de.fme_flag;
+		errp->err_status = DDI_FM_NONFATAL;
+	}
+	return (rval);
+}
+
+/*
+ * pci_peekpoke_check_nofma() is for when an error occurs on a register access
+ * during pci_ereport_post(). We can't call pci_ereport_post() again or we'd
+ * recurse, so assume all puts are OK and gets have failed if they return -1
+ */
+static int
+pci_peekpoke_check_nofma(void *arg, ddi_ctl_enum_t ctlop)
+{
+	int rval = DDI_SUCCESS;
+	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+	ddi_acc_hdl_t *hdlp = (ddi_acc_hdl_t *)in_args->handle;
+	int repcount = in_args->repcount;
+
+	if (ctlop == DDI_CTLOPS_POKE)
+		return (rval);
+
+	for (; repcount; repcount--) {
+		switch (in_args->size) {
+		case sizeof (uint8_t):
+			if (*(uint8_t *)in_args->host_addr == 0xff)
+				rval = DDI_FAILURE;
+			break;
+		case sizeof (uint16_t):
+			if (*(uint16_t *)in_args->host_addr == 0xffff)
+				rval = DDI_FAILURE;
+			break;
+		case sizeof (uint32_t):
+			if (*(uint32_t *)in_args->host_addr == 0xffffffff)
+				rval = DDI_FAILURE;
+			break;
+		case sizeof (uint64_t):
+			if (*(uint64_t *)in_args->host_addr ==
+			    0xffffffffffffffff)
+				rval = DDI_FAILURE;
+			break;
+		}
+	}
+	if (hdlp->ah_acc.devacc_attr_access != DDI_DEFAULT_ACC &&
+	    rval == DDI_FAILURE) {
+		ndi_err_t *errp = (ndi_err_t *)hp->ahi_err;
+		errp->err_ena = fm_ena_generate(0, FM_ENA_FMT1);
+		errp->err_expected = DDI_FM_ERR_UNEXPECTED;
+		errp->err_status = DDI_FM_NONFATAL;
+	}
+	return (rval);
+}
+
+int
+pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
+	ddi_ctl_enum_t ctlop, void *arg, void *result,
+	int (*handler)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
+	void *), kmutex_t *err_mutexp, kmutex_t *peek_poke_mutexp)
+{
+	int rval;
+	peekpoke_ctlops_t *in_args = (peekpoke_ctlops_t *)arg;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
+
+	if (hp->ahi_acc_attr & DDI_ACCATTR_CONFIG_SPACE) {
+	    if (!mutex_tryenter(err_mutexp)) {
+			/*
+			 * As this may be a recursive call from within
+			 * pci_ereport_post() we can't wait for the mutexes.
+			 * Fortunately we know someone is already calling
+			 * pci_ereport_post() which will handle the error bits
+			 * for us, and as this is a config space access we can
+			 * just do the access and check return value for -1
+			 * using pci_peekpoke_check_nofma().
+			 */
+			rval = handler(dip, rdip, ctlop, arg, result);
+			if (rval == DDI_SUCCESS)
+				rval = pci_peekpoke_check_nofma(arg, ctlop);
+			return (rval);
+		}
+		/*
+		 * This can't be a recursive call. Drop the err_mutex and get
+		 * both mutexes in the right order. If an error hasn't already
+		 * been detected by the ontrap code, use pci_peekpoke_check_fma
+		 * which will call pci_ereport_post() to check error status.
+		 */
+		mutex_exit(err_mutexp);
+	}
+	mutex_enter(peek_poke_mutexp);
+	rval = handler(dip, rdip, ctlop, arg, result);
+	if (rval == DDI_SUCCESS) {
+		mutex_enter(err_mutexp);
+		rval = pci_peekpoke_check_fma(dip, arg, ctlop);
+		mutex_exit(err_mutexp);
+	}
+	mutex_exit(peek_poke_mutexp);
+	return (rval);
+}
+
 void
 impl_setup_ddi(void)
 {
@@ -2234,4 +2410,162 @@ impl_bus_reprobe(void)
 		(*probe->probe)(1);
 		probe = probe->next;
 	}
+}
+
+
+/*
+ * The following functions ready a cautious request to go up to the nexus
+ * driver.  It is up to the nexus driver to decide how to process the request.
+ * It may choose to call i_ddi_do_caut_get/put in this file, or do it
+ * differently.
+ */
+
+static void
+i_ddi_caut_getput_ctlops(ddi_acc_impl_t *hp, uint64_t host_addr,
+    uint64_t dev_addr, size_t size, size_t repcount, uint_t flags,
+    ddi_ctl_enum_t cmd)
+{
+	peekpoke_ctlops_t	cautacc_ctlops_arg;
+
+	cautacc_ctlops_arg.size = size;
+	cautacc_ctlops_arg.dev_addr = dev_addr;
+	cautacc_ctlops_arg.host_addr = host_addr;
+	cautacc_ctlops_arg.handle = (ddi_acc_handle_t)hp;
+	cautacc_ctlops_arg.repcount = repcount;
+	cautacc_ctlops_arg.flags = flags;
+
+	(void) ddi_ctlops(hp->ahi_common.ah_dip, hp->ahi_common.ah_dip, cmd,
+	    &cautacc_ctlops_arg, NULL);
+}
+
+uint8_t
+i_ddi_caut_get8(ddi_acc_impl_t *hp, uint8_t *addr)
+{
+	uint8_t value;
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint8_t), 1, 0, DDI_CTLOPS_PEEK);
+
+	return (value);
+}
+
+uint16_t
+i_ddi_caut_get16(ddi_acc_impl_t *hp, uint16_t *addr)
+{
+	uint16_t value;
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint16_t), 1, 0, DDI_CTLOPS_PEEK);
+
+	return (value);
+}
+
+uint32_t
+i_ddi_caut_get32(ddi_acc_impl_t *hp, uint32_t *addr)
+{
+	uint32_t value;
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint32_t), 1, 0, DDI_CTLOPS_PEEK);
+
+	return (value);
+}
+
+uint64_t
+i_ddi_caut_get64(ddi_acc_impl_t *hp, uint64_t *addr)
+{
+	uint64_t value;
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint64_t), 1, 0, DDI_CTLOPS_PEEK);
+
+	return (value);
+}
+
+void
+i_ddi_caut_put8(ddi_acc_impl_t *hp, uint8_t *addr, uint8_t value)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint8_t), 1, 0, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_put16(ddi_acc_impl_t *hp, uint16_t *addr, uint16_t value)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint16_t), 1, 0, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_put32(ddi_acc_impl_t *hp, uint32_t *addr, uint32_t value)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint32_t), 1, 0, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_put64(ddi_acc_impl_t *hp, uint64_t *addr, uint64_t value)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)&value, (uintptr_t)addr,
+	    sizeof (uint64_t), 1, 0, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_rep_get8(ddi_acc_impl_t *hp, uint8_t *host_addr, uint8_t *dev_addr,
+	size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint8_t), repcount, flags, DDI_CTLOPS_PEEK);
+}
+
+void
+i_ddi_caut_rep_get16(ddi_acc_impl_t *hp, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint16_t), repcount, flags, DDI_CTLOPS_PEEK);
+}
+
+void
+i_ddi_caut_rep_get32(ddi_acc_impl_t *hp, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint32_t), repcount, flags, DDI_CTLOPS_PEEK);
+}
+
+void
+i_ddi_caut_rep_get64(ddi_acc_impl_t *hp, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint64_t), repcount, flags, DDI_CTLOPS_PEEK);
+}
+
+void
+i_ddi_caut_rep_put8(ddi_acc_impl_t *hp, uint8_t *host_addr, uint8_t *dev_addr,
+	size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint8_t), repcount, flags, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_rep_put16(ddi_acc_impl_t *hp, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint16_t), repcount, flags, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_rep_put32(ddi_acc_impl_t *hp, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint32_t), repcount, flags, DDI_CTLOPS_POKE);
+}
+
+void
+i_ddi_caut_rep_put64(ddi_acc_impl_t *hp, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
+{
+	i_ddi_caut_getput_ctlops(hp, (uintptr_t)host_addr, (uintptr_t)dev_addr,
+	    sizeof (uint64_t), repcount, flags, DDI_CTLOPS_POKE);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4840,7 +4840,8 @@ dca_fma_init(dca_t *dca)
 		/*
 		 * Initialize pci ereport capabilities if ereport capable
 		 */
-		if (DDI_FM_EREPORT_CAP(dca->fm_capabilities))
+		if (DDI_FM_EREPORT_CAP(dca->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(dca->fm_capabilities))
 			pci_ereport_setup(dca->dca_dip);
 
 		/*
@@ -4872,7 +4873,8 @@ dca_fma_fini(dca_t *dca)
 		/*
 		 * Release any resources allocated by pci_ereport_setup()
 		 */
-		if (DDI_FM_EREPORT_CAP(dca->fm_capabilities)) {
+		if (DDI_FM_EREPORT_CAP(dca->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(dca->fm_capabilities)) {
 			pci_ereport_teardown(dca->dca_dip);
 		}
 
@@ -4895,42 +4897,19 @@ dca_fma_fini(dca_t *dca)
 /*
  * The IO fault service error handling callback function
  */
+/*ARGSUSED*/
 static int
 dca_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
 {
-	int		rv;
 	dca_t		*dca = (dca_t *)impl_data;
-	uint16_t	pci_status;
-	ddi_fm_error_t	dca_err;
 
-	rv = err->fme_status = DDI_FM_OK;
-	if (err->fme_flag == DDI_FM_ERR_EXPECTED) {
-		/*
-		 * dca never perfrom DDI_ACC_CAUTIOUS protected operations
-		 * but if it did. we would handle it here
-		 */
-		return (rv);
-	}
-
-	/*
-	 * See if there is a pci error as well
-	 * The updated pci_ereport_post function requires a reinitialized
-	 * ddi_fm_error_t structure with a zero ena field.
-	 */
-	bzero(&dca_err, sizeof (ddi_fm_error_t));
-	dca_err.fme_version = DDI_FME_VERSION;
-	dca_err.fme_flag = DDI_FM_ERR_UNEXPECTED;
-	pci_ereport_post(dip, &dca_err, &pci_status);
-	if (pci_status != 0) {
+	pci_ereport_post(dip, err, NULL);
+	if (err->fme_status == DDI_FM_FATAL) {
 		dca_failure(dca, DDI_DATAPATH_FAULT,
 		    DCA_FM_ECLASS_NONE, dca_ena(0), CRYPTO_DEVICE_ERROR,
 		    "fault PCI in FMA callback.");
-
-		rv = err->fme_status = DDI_FM_FATAL;
-		return (rv);
 	}
-
-	return (rv);
+	return (err->fme_status);
 }
 
 
@@ -4940,17 +4919,13 @@ dca_check_acc_handle(dca_t *dca, ddi_acc_handle_t handle,
 {
 	ddi_fm_error_t	de;
 	int		version = 0;
-	uint16_t	pci_status;
 
-	if (DDI_FM_EREPORT_CAP(dca->fm_capabilities)) {
-		ddi_fm_acc_err_get(handle, &de, version);
-		if (de.fme_status != DDI_FM_OK) {
-			pci_ereport_post(dca->dca_dip, &de, &pci_status);
-			dca_failure(dca, DDI_DATAPATH_FAULT,
-			    eclass_index, fm_ena_increment(de.fme_ena),
-			    CRYPTO_DEVICE_ERROR, "");
-			return (DDI_FAILURE);
-		}
+	ddi_fm_acc_err_get(handle, &de, version);
+	if (de.fme_status != DDI_FM_OK) {
+		dca_failure(dca, DDI_DATAPATH_FAULT,
+		    eclass_index, fm_ena_increment(de.fme_ena),
+		    CRYPTO_DEVICE_ERROR, "");
+		return (DDI_FAILURE);
 	}
 
 	return (DDI_SUCCESS);
@@ -4962,19 +4937,14 @@ dca_check_dma_handle(dca_t *dca, ddi_dma_handle_t handle,
 {
 	ddi_fm_error_t	de;
 	int		version = 0;
-	uint16_t	pci_status;
 
-	if (DDI_FM_EREPORT_CAP(dca->fm_capabilities)) {
-		ddi_fm_dma_err_get(handle, &de, version);
-		if (de.fme_status != DDI_FM_OK) {
-			pci_ereport_post(dca->dca_dip, &de, &pci_status);
-			dca_failure(dca, DDI_DATAPATH_FAULT,
-			    eclass_index, fm_ena_increment(de.fme_ena),
-			    CRYPTO_DEVICE_ERROR, "");
-			return (DDI_FAILURE);
-		}
+	ddi_fm_dma_err_get(handle, &de, version);
+	if (de.fme_status != DDI_FM_OK) {
+		dca_failure(dca, DDI_DATAPATH_FAULT,
+		    eclass_index, fm_ena_increment(de.fme_ena),
+		    CRYPTO_DEVICE_ERROR, "");
+		return (DDI_FAILURE);
 	}
-
 	return (DDI_SUCCESS);
 }
 

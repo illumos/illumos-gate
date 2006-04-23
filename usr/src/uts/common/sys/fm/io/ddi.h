@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,22 @@ extern "C" {
 
 /* IO-specific FMA ereport class defintions */
 #define	DDI_IO_CLASS			"io"
+
+/* leaf driver detected ereport definitions */
+#define	DDI_FM_DEVICE			"device"
+#define	DDI_FM_DEVICE_INVAL_STATE	"inval_state"
+#define	DDI_FM_DEVICE_NO_RESPONSE	"no_response"
+#define	DDI_FM_DEVICE_STALL		"stall"
+#define	DDI_FM_DEVICE_BADINT_LIMIT	"badint_limit"
+#define	DDI_FM_DEVICE_INTERN_CORR	"intern_corr"
+#define	DDI_FM_DEVICE_INTERN_UNCORR	"intern_uncorr"
+
+/* service impact ereport definitions */
+#define	DDI_FM_SERVICE_IMPACT		"service"
+#define	DDI_FM_SERVICE_LOST		"lost"
+#define	DDI_FM_SERVICE_DEGRADED		"degraded"
+#define	DDI_FM_SERVICE_RESTORED		"restored"
+#define	DDI_FM_SERVICE_UNAFFECTED	"unaffected"
 
 /* Driver defect ereport specifications */
 #define	DVR_ERPT		"ddi."

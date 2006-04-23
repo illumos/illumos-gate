@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,13 +96,16 @@ struct i_ddi_fmhdl {
 
 typedef struct pci_fm_err {
 	char *err_class;
-	uint16_t reg_bit;
+	uint32_t reg_bit;
 	char *terr_class;
+	int flags;
 } pci_fm_err_t;
 
 extern pci_fm_err_t pci_err_tbl[];
 
 #ifdef _KERNEL
+typedef int (*ddi_fmcompare_t)(dev_info_t *, const void *, const void *,
+    const void *);
 
 /* driver defect error reporting */
 void i_ddi_drv_ereport_post(dev_info_t *, const char *, nvlist_t *, int);
@@ -115,6 +117,8 @@ extern void i_ddi_fm_handler_exit(dev_info_t *);
 /* access and dma handle protection support */
 extern void i_ddi_fm_acc_err_set(ddi_acc_handle_t, uint64_t, int, int);
 extern void i_ddi_fm_dma_err_set(ddi_dma_handle_t, uint64_t, int, int);
+extern ddi_fmcompare_t i_ddi_fm_acc_err_cf_get(ddi_acc_handle_t);
+extern ddi_fmcompare_t i_ddi_fm_dma_err_cf_get(ddi_dma_handle_t);
 
 /* fm busop support */
 extern void i_ndi_busop_access_enter(dev_info_t *, ddi_acc_handle_t);

@@ -44,6 +44,11 @@
           path='%r/usr/platform/i86pc/lib/fm/topo/plugins' />
       </range>
 
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1'
+          path='%r/usr/platform/i86pc/lib/fm/topo/plugins' />
+      </range>
+
     </dependents>
   </range>
 

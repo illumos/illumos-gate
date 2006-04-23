@@ -3753,3 +3753,19 @@ msgid "SUN4U-8007-9E.impact"
 msgstr "The system will not be functioning at the same performance level with the STRAND removal.\n"
 msgid "SUN4U-8007-9E.action"
 msgstr "Schedule a repair procedure to replace the affected STRAND.  Use fmdump -v -u\n to identify the smallest CPU/Strand ID of the affected CORE on this\nSTRAND.\n"
+#
+# code: SUN4U-8007-AX
+# keys: fault.io.pci.device-invreq fault.io.tomatillo
+#
+msgid "SUN4U-8007-AX.type"
+msgstr "Fault"
+msgid "SUN4U-8007-AX.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-AX.description"
+msgstr "Either the transmitting device sent an invalid request or the receiving device failed to respond.\n  Refer to %s for more information."
+msgid "SUN4U-8007-AX.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4U-8007-AX.impact"
+msgstr "Loss of services provided by the device instances associated with this fault\n"
+msgid "SUN4U-8007-AX.action"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u  to identify the devices or contact Sun for support.\n"

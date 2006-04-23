@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +72,7 @@ ushort_t	pcie_device_ctrl_default = \
 		    PCIE_DEVCTL_CE_REPORTING_EN | \
 		    PCIE_DEVCTL_NFE_REPORTING_EN | \
 		    PCIE_DEVCTL_FE_REPORTING_EN | \
+		    PCIE_DEVCTL_UR_REPORTING_EN | \
 		    PCIE_DEVCTL_RO_EN;
 
 /* PCI-Express AER Root Control Register */
@@ -92,9 +92,25 @@ ushort_t	pcie_root_error_cmd_default = \
  * Can be defined to mask off certain types of AER errors
  * By default all are set to 0; as no errors are masked
  */
-uint32_t	pcie_aer_uce_mask = 0;		/* Uncorrectable errors mask */
-uint32_t	pcie_aer_ce_mask = 0;		/* Correctable errors mask */
-uint32_t	pcie_aer_suce_mask = 0;		/* Secondary UNCOR error mask */
+uint32_t	pcie_aer_uce_mask = 0;
+uint32_t	pcie_aer_ce_mask = PCIE_AER_CE_AD_NFE;
+uint32_t	pcie_aer_suce_mask = 0;
+
+/*
+ * PCI-Express related severity (AER only)
+ * Used to set the severity levels of errors detected by devices on the PCI
+ * Express fabric, which in turn results in either a fatal or nonfatal error
+ * message to the root complex.  A set bit (1) indictates a fatal error, an
+ * unset one is nonfatal.  For more information refer to the PCI Express Base
+ * Specification and the PCI Express to PCI/PCI-X Bridge Specification.
+ * default values are set below:
+ */
+uint32_t	pcie_aer_uce_severity = PCIE_AER_UCE_MTLP | PCIE_AER_UCE_RO | \
+    PCIE_AER_UCE_FCP | PCIE_AER_UCE_SD | PCIE_AER_UCE_DLP | \
+    PCIE_AER_UCE_TRAINING;
+uint32_t	pcie_aer_suce_severity = PCIE_AER_SUCE_SERR_ASSERT | \
+    PCIE_AER_SUCE_UC_ADDR_ERR | PCIE_AER_SUCE_UC_ATTR_ERR | \
+    PCIE_AER_SUCE_USC_MSG_DATA_ERR;
 
 /*
  * By default, error handling is enabled
@@ -117,7 +133,7 @@ uint32_t	pcie_aer_suce_mask = 0;		/* Secondary UNCOR error mask */
  */
 uint32_t	pcie_error_disable_flag = 0;
 uint32_t	pcie_serr_disable_flag = 1;
-uint32_t	pcie_aer_disable_flag = 1;
+uint32_t	pcie_aer_disable_flag = 0;
 
 /*
  * Function prototypes
@@ -125,7 +141,7 @@ uint32_t	pcie_aer_disable_flag = 1;
 static void	pcie_error_clear_errors(ddi_acc_handle_t, uint16_t,
 		    uint16_t, uint16_t);
 static uint16_t pcie_error_find_cap_reg(ddi_acc_handle_t, uint8_t);
-static uint16_t	pcie_error_find_ext_cap_reg(ddi_acc_handle_t, uint16_t);
+static uint16_t	pcie_error_find_ext_aer_capid(ddi_acc_handle_t);
 static void	pcie_ck804_error_init(dev_info_t *, ddi_acc_handle_t,
 		    uint16_t, uint16_t);
 static void	pcie_ck804_error_fini(ddi_acc_handle_t, uint16_t, uint16_t);
@@ -145,6 +161,7 @@ pcie_error_init(dev_info_t *cdip)
 	uint16_t		device_ctl;
 	uint16_t		dev_type = 0;
 	uint32_t		aer_reg;
+	uint32_t		uce_mask = pcie_aer_uce_mask;
 
 	/*
 	 * flag to turn this off
@@ -199,8 +216,10 @@ pcie_error_init(dev_info_t *cdip)
 	/* Look for PCIe capability */
 	cap_ptr = pcie_error_find_cap_reg(cfg_hdl, PCI_CAP_ID_PCI_E);
 	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {	/* PCIe found */
-		aer_ptr = pcie_error_find_ext_cap_reg(cfg_hdl,
-		    PCIE_EXT_CAP_ID_AER);
+		aer_ptr = pcie_error_find_ext_aer_capid(cfg_hdl);
+		if (aer_ptr != PCI_CAP_NEXT_PTR_NULL)
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pcie-aer-pointer", aer_ptr);
 		dev_type = pci_config_get16(cfg_hdl, cap_ptr +
 		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	}
@@ -250,18 +269,31 @@ pcie_error_init(dev_info_t *cdip)
 	if (pcie_aer_disable_flag)
 		goto cleanup;
 
+	/* Disable PTLP/ECRC (or mask these two) for Switches */
+	if (dev_type == PCIE_PCIECAP_DEV_TYPE_UP ||
+	    dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN)
+		uce_mask |= (PCIE_AER_UCE_PTLP | PCIE_AER_UCE_ECRC);
+
+	/* Set Uncorrectable error severity */
+	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_UCE_SERV);
+	pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_UCE_SERV,
+	    pcie_aer_uce_severity);
+	PCIE_ERROR_DBG("%s: AER UCE severity=0x%x->0x%x\n",
+	    ddi_driver_name(cdip), aer_reg, pci_config_get32(cfg_hdl,
+	    aer_ptr + PCIE_AER_UCE_SERV));
+
 	/* Enable Uncorrectable errors */
 	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_UCE_MASK);
 	pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_UCE_MASK,
-	    aer_reg | pcie_aer_uce_mask);
-	PCIE_ERROR_DBG("%s: AER UCE=0x%x->0x%x\n", ddi_driver_name(cdip),
+	    aer_reg | uce_mask);
+	PCIE_ERROR_DBG("%s: AER UCE mask=0x%x->0x%x\n", ddi_driver_name(cdip),
 	    aer_reg, pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_UCE_MASK));
 
 	/* Enable Correctable errors */
 	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_CE_MASK);
 	pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_CE_MASK,
 	    aer_reg | pcie_aer_ce_mask);
-	PCIE_ERROR_DBG("%s: AER CE=0x%x->0x%x\n", ddi_driver_name(cdip),
+	PCIE_ERROR_DBG("%s: AER CE mask=0x%x->0x%x\n", ddi_driver_name(cdip),
 	    aer_reg, pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_CE_MASK));
 
 	/*
@@ -270,13 +302,21 @@ pcie_error_init(dev_info_t *cdip)
 	if (!(dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI))
 		goto cleanup;
 
+	/* Set Secondary Uncorrectable error severity */
+	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_SERV);
+	pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_SERV,
+	    pcie_aer_suce_severity);
+	PCIE_ERROR_DBG("%s: AER SUCE severity=0x%x->0x%x\n",
+	    ddi_driver_name(cdip), aer_reg,
+	    pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_SERV));
+
 	/*
 	 * Enable secondary bus errors
 	 */
 	aer_reg = pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK);
 	pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK,
 	    aer_reg | pcie_aer_suce_mask);
-	PCIE_ERROR_DBG("%s: AER SUCE=0x%x->0x%x\n",
+	PCIE_ERROR_DBG("%s: AER SUCE mask=0x%x->0x%x\n",
 	    ddi_driver_name(cdip), aer_reg,
 	    pci_config_get32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK));
 
@@ -317,6 +357,14 @@ pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 		PCIE_ERROR_DBG("%s: PCIe AER Root Error Command "
 		    "Register=0x%x->0x%x\n", ddi_driver_name(child), rc_ctl,
 		    pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD));
+
+		/* Also enable ECRC checking */
+		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_CTL);
+		if (rc_ctl & PCIE_AER_CTL_ECRC_GEN_CAP)
+			rc_ctl |= PCIE_AER_CTL_ECRC_GEN_ENA;
+		if (rc_ctl & PCIE_AER_CTL_ECRC_CHECK_CAP)
+			rc_ctl |= PCIE_AER_CTL_ECRC_CHECK_ENA;
+		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_CTL, rc_ctl);
 	}
 }
 
@@ -377,7 +425,8 @@ pcie_error_fini(dev_info_t *cdip)
 	/* Disable PCI-Express Baseline Error Handling */
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL, 0x0);
 
-	aer_ptr = pcie_error_find_ext_cap_reg(cfg_hdl, PCIE_EXT_CAP_ID_AER);
+	aer_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
+	    "pcie-aer-pointer", PCIE_EXT_CAP_NEXT_PTR_NULL);
 
 	/*
 	 * Only disable these set of errors for CK8-04/IO-4 devices
@@ -433,6 +482,14 @@ pcie_ck804_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
 		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
 		rc_ctl &= ~pcie_root_error_cmd_default;
 		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD, rc_ctl);
+
+		/* Disable ECRC checking */
+		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_CTL);
+		if (rc_ctl & PCIE_AER_CTL_ECRC_GEN_CAP)
+			rc_ctl &= ~PCIE_AER_CTL_ECRC_GEN_ENA;
+		if (rc_ctl & PCIE_AER_CTL_ECRC_CHECK_CAP)
+			rc_ctl &= ~PCIE_AER_CTL_ECRC_CHECK_ENA;
+		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_CTL, rc_ctl);
 	}
 }
 
@@ -509,7 +566,7 @@ pcie_error_find_cap_reg(ddi_acc_handle_t cfg_hdl, uint8_t cap_id)
  * for the pci-express capability id pointer.
  */
 static uint16_t
-pcie_error_find_ext_cap_reg(ddi_acc_handle_t cfg_hdl, uint16_t cap_id)
+pcie_error_find_ext_aer_capid(ddi_acc_handle_t cfg_hdl)
 {
 	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
 	uint16_t	offset = P2ALIGN(PCIE_EXT_CAP, 4);
@@ -520,7 +577,7 @@ pcie_error_find_ext_cap_reg(ddi_acc_handle_t cfg_hdl, uint16_t cap_id)
 	hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK;
 
 	while ((hdr_next_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) &&
-	    (hdr_cap_id != cap_id)) {
+	    (hdr_cap_id != PCIE_EXT_CAP_ID_AER)) {
 		offset = P2ALIGN(hdr_next_ptr, 4);
 		hdr = pci_config_get32(cfg_hdl, offset);
 		hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
@@ -529,7 +586,7 @@ pcie_error_find_ext_cap_reg(ddi_acc_handle_t cfg_hdl, uint16_t cap_id)
 		    PCIE_EXT_CAP_ID_MASK;
 	}
 
-	if (hdr_cap_id == cap_id)
+	if (hdr_cap_id == PCIE_EXT_CAP_ID_AER)
 		return (P2ALIGN(offset, 4));
 
 	return (PCIE_EXT_CAP_NEXT_PTR_NULL);

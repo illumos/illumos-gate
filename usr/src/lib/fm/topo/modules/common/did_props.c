@@ -54,6 +54,8 @@ static int DRIVERprop_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int EXCAP_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
+static int BDF_set(tnode_t *, did_t *,
+    const char *, const char *, const char *);
 static int label_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int maybe_di_chars_copy(tnode_t *, did_t *,
@@ -83,6 +85,8 @@ txprop_t Fn_common_props[] = {
 	    TOPO_STABILITY_PRIVATE, DRIVERprop_set },
 	{ NULL, TOPO_PGROUP_PCI, TOPO_PROP_EXCAP,
 	    TOPO_STABILITY_PRIVATE, EXCAP_set },
+	{ DI_CLASSPROP, TOPO_PGROUP_PCI, TOPO_PROP_CLASS,
+	    TOPO_STABILITY_PRIVATE, maybe_di_uint_to_str },
 	{ DI_VENDIDPROP, TOPO_PGROUP_PCI, TOPO_PROP_VENDID,
 	    TOPO_STABILITY_PRIVATE, maybe_di_uint_to_str },
 	{ NULL, TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL,
@@ -124,6 +128,8 @@ txprop_t RC_common_props[] = {
 	    TOPO_STABILITY_PRIVATE, DRIVERprop_set },
 	{ NULL, TOPO_PGROUP_PCI, TOPO_PROP_EXCAP,
 	    TOPO_STABILITY_PRIVATE, EXCAP_set },
+	{ NULL, TOPO_PGROUP_PCI, TOPO_PROP_BDF,
+	    TOPO_STABILITY_PRIVATE, BDF_set },
 	{ NULL, TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL,
 	    TOPO_STABILITY_PRIVATE, label_set },
 	{ NULL, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU,
@@ -676,6 +682,25 @@ maybe_di_uint_to_str(tnode_t *tn, did_t *pd,
 		return (0);
 
 	return (uint_to_strprop(did_mod(pd), v, tn, tpgrp, tpnm));
+}
+
+/*ARGSUSED*/
+static int
+BDF_set(tnode_t *tn, did_t *pd,
+    const char *dpnm, const char *tpgrp, const char *tpnm)
+{
+	int bdf;
+	char str[23]; /* '0x' + sizeof (UINT64_MAX) + '\0' */
+	int e;
+
+	if ((bdf = did_bdf(pd)) <= 0)
+		return (0);
+
+	(void) snprintf(str, 23, "0x%x", bdf);
+	if (topo_prop_set_string(tn,
+	    tpgrp, tpnm, TOPO_PROP_SET_ONCE, str, &e) < 0)
+		return (topo_mod_seterrno(did_mod(pd), e));
+	return (0);
 }
 
 int

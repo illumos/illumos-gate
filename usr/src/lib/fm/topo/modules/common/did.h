@@ -52,6 +52,7 @@ extern int did_rc(did_t *);
 extern int did_physslot(did_t *);
 extern int did_inherit(tnode_t *, tnode_t *);
 extern int did_excap(did_t *);
+extern int did_bdf(did_t *);
 
 extern did_t *did_create(did_hash_t *, di_node_t, int, int, int, int);
 extern did_t *did_find(did_hash_t *, di_node_t);

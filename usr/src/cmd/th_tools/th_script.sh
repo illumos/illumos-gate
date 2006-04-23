@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 2000-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -179,9 +178,13 @@ run_subtest()
 		if [ "${status[2]}" -gt 0 ]; then
 			res="test not triggered"
 		elif [ "${status[1]}" -eq 0 ]; then
-			res="success (corruption undetected)"
+			res="success (error undetected)"
 		elif [ "${status[1]}" -gt 0 ]; then
-			res="success (corruption reported)"
+			if [ "${status[6]}" -eq 16 ]; then
+				res="failure (no service impact reported)"
+			else
+				res="success (error reported)"
+			fi
 		else
 			res=
 		fi
@@ -200,7 +203,13 @@ run_subtest()
 		echo "\tFail Time :\t${status[0]}\tMsg Time  :\t${status[1]}"
 		echo "\tAcc count :\t${status[2]}\tFail count:\t${status[3]}"
 		echo "\tAccess Chk:\t${status[4]}\tEmsg count:\t${status[5]}"
-		echo "\tSeverity  :\t${status[6]}"
+		if [ "${status[6]}" -eq 0 ]; then
+			echo "\tSeverity:\tSERVICE UNAFFECTED"
+		elif [ "${status[6]}" -eq -16 ]; then
+			echo "\tSeverity:\tSERVICE DEGRADED"
+		elif [ "${status[6]}" -eq -32 ]; then
+			echo "\tSeverity:\tSERVICE LOST"
+		fi
 		((edefid += 1))
 	done
 

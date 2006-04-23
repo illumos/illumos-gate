@@ -52,6 +52,7 @@ static struct stats *Niexpr;
 static struct iexpr {
 	struct node *np;
 	struct iexpr *next;	/* next entry in hash bucket */
+	int count;
 } *Cache[IEXPRSZ];
 
 /*
@@ -238,6 +239,7 @@ iexpr(struct node *np)
 		if (iexpr_cmp(cp->np, np) == 0) {
 			/* found it */
 			tree_free(np);
+			cp->count++;
 			return (cp->np);
 		}
 
@@ -245,11 +247,38 @@ iexpr(struct node *np)
 	cp = MALLOC(sizeof (*cp));
 	cp->np = np;
 	cp->next = bucketp;
+	cp->count = 1;
 	Cache[idx] = cp;
 
 	stats_counter_bump(Niexpr);
 
 	return (np);
+}
+
+void
+iexpr_free(struct node *np)
+{
+	unsigned idx = iexpr_hash(np) % IEXPRSZ;
+	struct iexpr *cp;
+	struct iexpr *prevcp = NULL;
+
+	/* search cache */
+	for (cp = Cache[idx]; cp != NULL; cp = cp->next) {
+		if (iexpr_cmp(cp->np, np) == 0) {
+			/* found it */
+			cp->count--;
+			if (cp->count == 0) {
+				tree_free(cp->np);
+				if (prevcp == NULL)
+					Cache[idx] = cp->next;
+				else
+					prevcp->next = cp->next;
+				FREE(cp);
+			}
+			return;
+		}
+		prevcp = cp;
+	}
 }
 
 /*

@@ -129,7 +129,7 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 	if (*slotnum == -1 && (excap & PCIE_PCIECAP_SLOT_IMPL) != 0) {
 		uint_t slotcap;
 		int e;
-		e = di_uintprop_get(src, SAVED_PCIEX_SLOTCAP_REG, &slotcap);
+		e = di_uintprop_get(src, "pcie-slotcap-reg", &slotcap);
 		if (e == 0)
 			*slotnum = slotcap >> PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT;
 	}
@@ -248,6 +248,8 @@ did_create(did_hash_t *dhash, di_node_t src,
 		np->dp_bus = ibus;
 	np->dp_dev = PCI_REG_DEV_G(reg);
 	np->dp_fn = PCI_REG_FUNC_G(reg);
+	np->dp_bdf = (PCI_REG_BUS_G(reg) << 8) | (PCI_REG_DEV_G(reg) << 3) |
+	    PCI_REG_FUNC_G(reg);
 	/*
 	 * There *may* be a class code we can capture.  If there wasn't
 	 * one, capture that fact by setting the class value to -1.
@@ -263,7 +265,7 @@ did_create(did_hash_t *dhash, di_node_t src,
 	 * If there wasn't one, the capabilities will be the out-of-bounds
 	 * value of zero.
 	 */
-	(void) di_uintprop_get(src, SAVED_PCIEX_CAP_REG, &np->dp_excap);
+	(void) di_uintprop_get(src, "pcie-capid-reg", &np->dp_excap);
 	/*
 	 * There *may* be a physical slot number property we can capture.
 	 */
@@ -429,6 +431,13 @@ did_excap(did_t *dp)
 {
 	assert(dp != NULL);
 	return ((int)dp->dp_excap);
+}
+
+int
+did_bdf(did_t *dp)
+{
+	assert(dp != NULL);
+	return ((int)dp->dp_bdf);
 }
 
 const char *

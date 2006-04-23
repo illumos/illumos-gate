@@ -457,6 +457,10 @@ bge_phy_reset_and_check(bge_t *bgep)
 	extctrl = bge_mii_get16(bgep, 0x10);
 	bge_mii_put16(bgep, 0x10, extctrl & ~0x3000);
 
+	if (!reset_success)
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
+	else if (phy_locked)
+		bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
 	return (reset_success && !phy_locked);
 }
 
@@ -472,7 +476,7 @@ bge_phy_tweak_gmii(bge_t *bgep)
  * End of Broadcom-derived workaround code				*
  */
 
-static void
+static int
 bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 {
 	uint16_t phy_status;
@@ -503,10 +507,14 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 		 * Just a plain reset; the "check" code breaks these chips
 		 */
 		reset_ok = bge_phy_reset(bgep);
+		if (!reset_ok)
+			bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
 		break;
 	}
-	if (!reset_ok)
-		bge_problem(bgep, "PHY failed to reset correctly");
+	if (!reset_ok) {
+		BGE_REPORT((bgep, "PHY failed to reset correctly"));
+		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Step 5: disable WOL (not required after RESET)
@@ -546,6 +554,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	 */
 	if (powerdown)
 		bge_phy_powerdown(bgep);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -561,7 +570,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
  *
  * NOTE: <genlock> must already be held by the caller
  */
-static void
+static int
 bge_update_copper(bge_t *bgep)
 {
 	boolean_t adv_autoneg;
@@ -740,7 +749,8 @@ bge_update_copper(bge_t *bgep)
 	 * changes can be attributed to our reprogramming the PHY
 	 */
 	bgep->phys_write_time = gethrtime();
-	(*bgep->physops->phys_restart)(bgep, B_FALSE);
+	if ((*bgep->physops->phys_restart)(bgep, B_FALSE) == DDI_FAILURE)
+		return (DDI_FAILURE);
 	bge_mii_put16(bgep, MII_AN_ADVERT, anar);
 	bge_mii_put16(bgep, MII_CONTROL, control);
 	bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
@@ -778,6 +788,7 @@ bge_update_copper(bge_t *bgep)
 		break;
 	}
 #endif	/* BGE_COPPER_WIRESPEED */
+	return (DDI_SUCCESS);
 }
 
 static boolean_t
@@ -937,7 +948,7 @@ static const phys_ops_t copper_ops = {
  * Reinitialise the SerDes interface.  Note that it normally powers
  * up in the disabled state, so we need to explicitly activate it.
  */
-static void
+static int
 bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 {
 	uint32_t macmode;
@@ -965,7 +976,7 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 	bge_reg_set32(bgep, SERDES_CONTROL_REG, SERDES_CONTROL_COMMA_DETECT);
 	bge_reg_set32(bgep, SERDES_CONTROL_REG, SERDES_CONTROL_TX_DISABLE);
 	if (powerdown)
-		return;
+		return (DDI_SUCCESS);
 
 	/*
 	 * Otherwise, pause, (re-)enable the SerDes output, and send
@@ -981,6 +992,7 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 	bge_reg_clr32(bgep, ETHERNET_MAC_MODE_REG, ETHERNET_MODE_SEND_CFGS);
 	bgep->serdes_lpadv = AUTONEG_CODE_FAULT_ANEG_ERR;
 	bgep->serdes_status = ~0U;
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -998,7 +1010,7 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
  *
  * NOTE: <genlock> must already be held by the caller
  */
-static void
+static int
 bge_update_serdes(bge_t *bgep)
 {
 	boolean_t adv_autoneg;
@@ -1112,11 +1124,12 @@ bge_update_serdes(bge_t *bgep)
 	 */
 	bgep->serdes_advert = advert;
 	bgep->phys_write_time = gethrtime();
-	bge_restart_serdes(bgep, B_FALSE);
+	(void) bge_restart_serdes(bgep, B_FALSE);
 	bge_reg_set32(bgep, SERDES_CONTROL_REG, serdes);
 
 	BGE_DEBUG(("bge_update_serdes: serdes |= 0x%x, advert 0x%x",
 		serdes, advert));
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -1359,7 +1372,7 @@ static const phys_ops_t serdes_ops = {
  * Here we have to determine which media we're using (copper or serdes).
  * Once that's done, we can initialise the physical layer appropriately.
  */
-void
+int
 bge_phys_init(bge_t *bgep)
 {
 	BGE_TRACE(("bge_phys_init($%p)", (void *)bgep));
@@ -1383,8 +1396,16 @@ bge_phys_init(bge_t *bgep)
 		bgep->physops = &serdes_ops;
 	}
 
-	(*bgep->physops->phys_restart)(bgep, B_FALSE);
+	if ((*bgep->physops->phys_restart)(bgep, B_FALSE) != DDI_SUCCESS) {
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
+	return (0);
 }
 
 /*
@@ -1396,7 +1417,10 @@ bge_phys_reset(bge_t *bgep)
 	BGE_TRACE(("bge_phys_reset($%p)", (void *)bgep));
 
 	mutex_enter(bgep->genlock);
-	(*bgep->physops->phys_restart)(bgep, B_FALSE);
+	if ((*bgep->physops->phys_restart)(bgep, B_FALSE) != DDI_SUCCESS)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
 	mutex_exit(bgep->genlock);
 }
 
@@ -1406,13 +1430,13 @@ bge_phys_reset(bge_t *bgep)
  * Another RESET should get it back to working, but it may take a few
  * seconds it may take a few moments to return to normal operation ...
  */
-void
+int
 bge_phys_idle(bge_t *bgep)
 {
 	BGE_TRACE(("bge_phys_idle($%p)", (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
-	(*bgep->physops->phys_restart)(bgep, B_TRUE);
+	return ((*bgep->physops->phys_restart)(bgep, B_TRUE));
 }
 
 /*
@@ -1427,13 +1451,13 @@ bge_phys_idle(bge_t *bgep)
  *
  * NOTE: <genlock> must already be held by the caller
  */
-void
+int
 bge_phys_update(bge_t *bgep)
 {
 	BGE_TRACE(("bge_phys_update($%p)", (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
-	(*bgep->physops->phys_update)(bgep);
+	return ((*bgep->physops->phys_update)(bgep));
 }
 
 #undef	BGE_DBG

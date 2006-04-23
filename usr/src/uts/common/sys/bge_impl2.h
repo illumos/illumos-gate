@@ -67,6 +67,11 @@ extern "C" {
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
+#include <sys/ddifm.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/io/ddi.h>
+
 #include <sys/mac.h>
 
 #ifdef __amd64
@@ -600,8 +605,8 @@ typedef struct {
  *	check for link status change
  */
 typedef struct {
-	void			(*phys_restart)(struct bge *, boolean_t);
-	void			(*phys_update)(struct bge *);
+	int			(*phys_restart)(struct bge *, boolean_t);
+	int			(*phys_update)(struct bge *);
 	boolean_t		(*phys_check)(struct bge *, boolean_t);
 } phys_ops_t;
 
@@ -754,6 +759,8 @@ typedef struct bge {
 	const phys_ops_t	*physops;
 	char			ifname[8];	/* "bge0" ... "bge999"	*/
 
+	int			fm_capabilities;	/* FMA capabilities */
+
 	/*
 	 * These structures describe the blocks of memory allocated during
 	 * attach().  They remain unchanged thereafter, although the memory
@@ -896,6 +903,8 @@ typedef struct bge {
 	 * Miscellaneous operating variables (not synchronised)
 	 */
 	uint32_t		watchdog;	/* watches for Tx stall	*/
+	boolean_t		bge_intr_running;
+	boolean_t		bge_dma_error;
 	boolean_t		resched_needed;
 	boolean_t		resched_running;
 	uint32_t		factotum_flag;	/* softint pending	*/
@@ -936,6 +945,7 @@ typedef struct bge {
  */
 #define	PROGRESS_CFG		0x0001	/* config space mapped		*/
 #define	PROGRESS_REGS		0x0002	/* registers mapped		*/
+#define	PROGRESS_BUFS		0x0004	/* ring buffers allocated	*/
 #define	PROGRESS_RESCHED	0x0010	/* resched softint registered	*/
 #define	PROGRESS_FACTOTUM	0x0020	/* factotum softint registered	*/
 #define	PROGRESS_HWINT		0x0040	/* h/w interrupt registered	*/
@@ -1157,8 +1167,8 @@ void bge_reg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
 void bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
 void bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t value);
 void bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma);
-void bge_chip_id_init(bge_t *bgep);
-void bge_chip_start(bge_t *bgep, boolean_t reset_phy);
+int bge_chip_id_init(bge_t *bgep);
+int bge_chip_start(bge_t *bgep, boolean_t reset_phy);
 void bge_chip_stop(bge_t *bgep, boolean_t fault);
 #ifdef BGE_IPMI_ASF
 void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
@@ -1171,11 +1181,11 @@ void bge_asf_get_config(bge_t *bgep);
 void bge_asf_pre_reset_operations(bge_t *bgep, uint32_t mode);
 void bge_asf_post_reset_old_mode(bge_t *bgep, uint32_t mode);
 void bge_asf_post_reset_new_mode(bge_t *bgep, uint32_t mode);
-void bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
-void bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
+int bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
+int bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
 #else
-void bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
-void bge_chip_sync(bge_t *bgep);
+int bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
+int bge_chip_sync(bge_t *bgep);
 #endif
 void bge_chip_blank(void *arg, time_t ticks, uint_t count);
 uint_t bge_chip_factotum(caddr_t arg);
@@ -1206,17 +1216,26 @@ void bge_problem(bge_t *bgep, const char *fmt, ...);
 void bge_notice(bge_t *bgep, const char *fmt, ...);
 void bge_log(bge_t *bgep, const char *fmt, ...);
 void bge_error(bge_t *bgep, const char *fmt, ...);
+void bge_fm_ereport(bge_t *bgep, char *detail);
 extern kmutex_t bge_log_mutex[1];
 extern uint32_t bge_debug;
 
 /* bge_main.c */
-void bge_restart(bge_t *bgep, boolean_t reset_phy);
+int bge_restart(bge_t *bgep, boolean_t reset_phy);
+int bge_check_acc_handle(bge_t *bgep, ddi_acc_handle_t handle);
+int bge_check_dma_handle(bge_t *bgep, ddi_dma_handle_t handle);
+void bge_init_rings(bge_t *bgep);
+void bge_fini_rings(bge_t *bgep);
+int bge_alloc_bufs(bge_t *bgep);
+void bge_free_bufs(bge_t *bgep);
+void bge_intr_enable(bge_t *bgep);
+void bge_intr_disable(bge_t *bgep);
 
 /* bge_phys.c */
-void bge_phys_init(bge_t *bgep);
+int bge_phys_init(bge_t *bgep);
 void bge_phys_reset(bge_t *bgep);
-void bge_phys_idle(bge_t *bgep);
-void bge_phys_update(bge_t *bgep);
+int bge_phys_idle(bge_t *bgep);
+int bge_phys_update(bge_t *bgep);
 boolean_t bge_phys_check(bge_t *bgep);
 
 /* bge_ndd.c */

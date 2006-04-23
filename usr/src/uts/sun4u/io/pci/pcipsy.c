@@ -1674,7 +1674,7 @@ pci_pbm_classify(pbm_errstate_t *pbm_err_p)
 	}
 	if (e & PSYCHO_PCI_AFSR_E_RTRY) {
 		pbm_err_p->pbm_err_class = pbm_err_p->pbm_pri ?
-			PCI_PBM_RETRY : PCI_SEC_PBM_RETRY;
+		    PCI_PBM_RETRY : PCI_SEC_PBM_RETRY;
 		pbm_err_p->pbm_log = FM_LOG_PBM;
 		nerr++;
 	}
@@ -1711,7 +1711,6 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 	int fatal = 0;
 	int nonfatal = 0;
 	int unknown = 0;
-	int rserr = 0;
 	uint32_t prierr, secerr;
 	pbm_errstate_t pbm_err;
 	char buf[FM_MAX_CLASS];
@@ -1821,7 +1820,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			    pbm_err.pbm_pci.pci_cfg_comm, PCI_PA,
 			    DATA_TYPE_UINT64, (uint64_t)0, NULL);
 		}
-		rserr++;
+		unknown++;
 	}
 
 	/* Streaming Byte Hole Error */
@@ -1846,7 +1845,7 @@ done:
 	/*
 	 * rserr not claimed as nonfatal by a child is treated as fatal
 	 */
-	if (rserr && ret != DDI_FM_NONFATAL)
+	if (unknown && !nonfatal && !fatal)
 		fatal++;
 
 	/* Cleanup and reset error bits */

@@ -143,6 +143,20 @@ bge_error(bge_t *bgep, const char *fmt, ...)
 	mutex_exit(bge_log_mutex);
 }
 
+void
+bge_fm_ereport(bge_t *bgep, char *detail)
+{
+	uint64_t ena;
+	char buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+	ena = fm_ena_generate(0, FM_ENA_FMT1);
+	if (DDI_FM_EREPORT_CAP(bgep->fm_capabilities)) {
+		ddi_fm_ereport_post(bgep->devinfo, buf, ena, DDI_NOSLEEP,
+		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+	}
+}
+
 #if	BGE_DEBUGGING
 
 static void

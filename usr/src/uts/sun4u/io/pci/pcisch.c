@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -472,6 +471,7 @@ map_pci_registers(pci_t *pci_p, dev_info_t *dip)
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+
 	/*
 	 * Register set 0 is PCI CSR Base
 	 */
@@ -1635,10 +1635,10 @@ jbus_check_va_log(cb_t *cb_p, uint64_t fme_ena,
 		 * logged DMA address
 		 */
 		if (cb_err_p->cb_pbm[i].pbm_va_log) {
-			ret = pci_handle_lookup(cb_p->cb_pci_cmn_p->pci_p[i]->
-					pci_dip, DMA_HANDLE, fme_ena,
-					(void *)&cb_err_p->cb_pbm[i].
-					pbm_va_log);
+			void *addr = (void *)&cb_err_p->cb_pbm[i].pbm_va_log;
+			ret = ndi_fmc_error(cb_p->cb_pci_cmn_p->pci_p[i]->
+					pci_dip, NULL, DMA_HANDLE, fme_ena,
+					(void *)addr);
 			if (ret == DDI_FM_NONFATAL)
 				break;
 		}
@@ -1885,7 +1885,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 			ret = DDI_FM_UNKNOWN;
 			if (cmn_p->pci_p[j] == NULL)
 				continue;
-			ret = pci_handle_lookup(cmn_p->pci_p[j]->pci_dip,
+			ret = ndi_fmc_error(cmn_p->pci_p[j]->pci_dip, NULL,
 					flag, ecc_err_p->ecc_ena,
 					(void *)&ecc_err_p->ecc_err_addr);
 			if (ret == DDI_FM_NONFATAL) {
@@ -2203,16 +2203,17 @@ iommu_err_handler(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err_p)
 			 * Fault the address in iommu_tfar
 			 * register to inform target driver of error
 			 */
-			ret = pci_handle_lookup(pci_p->pci_dip, DMA_HANDLE,
+			ret = ndi_fmc_error(pci_p->pci_dip, NULL, DMA_HANDLE,
 				ena, (void *)&pbm_err_p->pbm_iommu.iommu_tfar);
 
-			if (ret == DDI_FM_NONFATAL)
+			if (ret != DDI_FM_NONFATAL)
 				if (ta_signalled)
 					nonfatal++;
 				else
 					fatal++;
 			else
-				fatal++;
+				nonfatal++;
+
 			iommu_ereport_post(dip, ena, pbm_err_p);
 			break;
 		case TOMATILLO_IOMMU_TIMEOUT_ERR:
@@ -2309,13 +2310,11 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 	int fatal = 0;
 	int nonfatal = 0;
 	int unknown = 0;
-	int rserr = 0;
 	uint32_t prierr, secerr;
 	pbm_errstate_t pbm_err;
 	char buf[FM_MAX_CLASS];
 	pci_t *pci_p = (pci_t *)impl_data;
 	pbm_t *pbm_p = pci_p->pci_pbm_p;
-	pci_target_err_t tgt_err;
 	int i, ret = 0;
 
 	ASSERT(MUTEX_HELD(&pci_p->pci_common_p->pci_fm_mutex));
@@ -2422,18 +2421,11 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			else
 				nonfatal++;
 			if (caller == PCI_TRAP_CALL &&
-			    pci_pbm_err_tbl[i].pbm_terr_class) {
-				tgt_err.tgt_err_ena = derr->fme_ena;
-				tgt_err.tgt_err_class =
-				    pci_pbm_err_tbl[i].pbm_terr_class;
-				tgt_err.tgt_bridge_type =
-				    pbm_err.pbm_bridge_type;
-				tgt_err.tgt_err_addr =
-				    (uint64_t)derr->fme_bus_specific;
-				errorq_dispatch(pci_target_queue,
-				    (void *)&tgt_err, sizeof (pci_target_err_t),
-				    ERRORQ_ASYNC);
-			}
+			    pci_pbm_err_tbl[i].pbm_terr_class)
+				pci_target_enqueue(derr->fme_ena,
+				    pci_pbm_err_tbl[i].pbm_terr_class,
+				    pbm_err.pbm_bridge_type,
+				    (uint64_t)derr->fme_bus_specific);
 		}
 	}
 
@@ -2469,7 +2461,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			    DATA_TYPE_UINT16, pbm_err.pbm_pci.pci_cfg_comm,
 			    PCI_PA, DATA_TYPE_UINT64, (uint64_t)0, NULL);
 		}
-		rserr++;
+		unknown++;
 	}
 
 	/*
@@ -2506,10 +2498,10 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 		 */
 		ret = DDI_FM_FATAL;
 		if (caller != PCI_TRAP_CALL) {
-			if (pbm_err.pbm_va_log)
-				ret = pci_handle_lookup(dip, DMA_HANDLE,
-						derr->fme_ena,
-						(void *)&pbm_err.pbm_va_log);
+			if (pbm_err.pbm_va_log) {
+				ret = ndi_fmc_error(dip, NULL, DMA_HANDLE,
+				    derr->fme_ena, (void *)&pbm_err.pbm_va_log);
+			}
 			if (ret == DDI_FM_NONFATAL)
 				nonfatal++;
 			else
@@ -2541,7 +2533,7 @@ done:
 	/*
 	 * RSERR not claimed as nonfatal by a child is considered fatal
 	 */
-	if (rserr && ret != DDI_FM_NONFATAL)
+	if (unknown && !fatal && !nonfatal)
 		fatal++;
 
 	/* Cleanup and reset error bits */
@@ -2911,11 +2903,14 @@ pcix_ereport_post(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err)
 {
 	char buf[FM_MAX_CLASS];
 
+	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
+		    pbm_err->pbm_bridge_type, pbm_err->pbm_err_class);
+
 	ena = ena ? ena : fm_ena_generate(0, FM_ENA_FMT1);
 
 	DEBUG1(DBG_ERR_INTR, dip, "pcix_ereport_post: ereport_post: %s", buf);
 
-	ddi_fm_ereport_post(dip, pbm_err->pbm_err_class, ena, DDI_NOSLEEP,
+	ddi_fm_ereport_post(dip, buf, ena, DDI_NOSLEEP,
 	    FM_VERSION, DATA_TYPE_UINT8, 0,
 	    PCI_CONFIG_STATUS, DATA_TYPE_UINT16, pbm_err->pbm_pci.pci_cfg_stat,
 	    PCI_CONFIG_COMMAND, DATA_TYPE_UINT16, pbm_err->pbm_pci.pci_cfg_comm,

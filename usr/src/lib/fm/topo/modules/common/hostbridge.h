@@ -49,6 +49,8 @@ extern "C" {
 #define	SCHIZO "pcisch"
 #define	PSYCHO "pcipsy"
 #define	NPE "npe"
+#define	PCIE_PCI "pcie_pci"
+#define	PCI_PCI "pci_pci"
 #define	PCI "pci"
 #define	PX "px"
 

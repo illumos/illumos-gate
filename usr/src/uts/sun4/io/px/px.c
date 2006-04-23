@@ -62,6 +62,8 @@ static void px_cb_detach(px_t *);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
 
+extern errorq_t *pci_target_queue;
+
 /*
  * function prototypes for hotplug routines:
  */
@@ -170,6 +172,13 @@ _fini(void)
 	e = mod_remove(&modlinkage);
 	if (e != DDI_SUCCESS)
 		return (e);
+	/*
+	 * Destroy pci_target_queue, and set it to NULL.
+	 */
+	if (pci_target_queue)
+		errorq_destroy(pci_target_queue);
+
+	pci_target_queue = NULL;
 
 	/* Free px soft state */
 	ddi_soft_state_fini(&px_state_p);
@@ -941,8 +950,10 @@ mapped:
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
 	/* insert dma handle into FMA cache */
-	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
 		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
+		mp->dmai_error.err_cf = impl_dma_check;
+	}
 
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
 map_err:

@@ -586,9 +586,6 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	subcl = (classcode >> 8) & 0xff;
 	pciide = is_pciide(basecl, subcl, revid, vendorid, deviceid,
 	    subvenid, subdevid);
-	if (check_if_device_is_pciex(bus, dev, func, &slot_num,
-	    &is_pci_bridge) == B_TRUE)
-		pciex = 1;
 
 	if (pciide)
 		(void) snprintf(nodename, sizeof (nodename), "pci-ide");
@@ -608,6 +605,10 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	ndi_devi_alloc_sleep(pci_bus_res[bus].dip, nodename,
 	    DEVI_SID_NODEID, &dip);
+
+	if (check_if_device_is_pciex(dip, bus, dev, func, &slot_num,
+	    &is_pci_bridge) == B_TRUE)
+		pciex = 1;
 
 	/* add properties */
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip, "device-id", deviceid);
@@ -1407,30 +1408,18 @@ add_bus_slot_names_prop(int bus)
 	}
 }
 
-/* this should be in some header file, shared with pcicfg */
-struct pcicfg_range {
-	uint32_t child_hi;
-	uint32_t child_mid;
-	uint32_t child_lo;
-	uint32_t parent_hi;
-	uint32_t parent_mid;
-	uint32_t parent_lo;
-	uint32_t size_hi;
-	uint32_t size_lo;
-};
-
 static int
-memlist_to_range(struct pcicfg_range *rp, struct memlist *entry, int type)
+memlist_to_range(ppb_ranges_t *rp, struct memlist *entry, int type)
 {
 	if (entry == NULL)
 		return (0);
 
 	/* assume 32-bit addresses */
-	rp->child_hi = rp->parent_hi = type;
+	rp->child_high = rp->parent_high = type;
 	rp->child_mid = rp->parent_mid = 0;
-	rp->child_lo = rp->parent_lo = (uint32_t)entry->address;
-	rp->size_hi = 0;
-	rp->size_lo = (uint32_t)entry->size;
+	rp->child_low = rp->parent_low = (uint32_t)entry->address;
+	rp->size_high = 0;
+	rp->size_low = (uint32_t)entry->size;
 	return (1);
 }
 
@@ -1438,7 +1427,7 @@ static void
 add_ppb_ranges_prop(int bus)
 {
 	int i = 0;
-	struct pcicfg_range *rp;
+	ppb_ranges_t *rp;
 
 	rp = kmem_alloc(3 * sizeof (*rp), KM_SLEEP);
 
@@ -1452,7 +1441,7 @@ add_ppb_ranges_prop(int bus)
 	if (i != 0)
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
 		    pci_bus_res[bus].dip, "ranges", (int *)rp,
-		    i * sizeof (struct pcicfg_range) / sizeof (int));
+		    i * sizeof (ppb_ranges_t) / sizeof (int));
 	kmem_free(rp, 3 * sizeof (*rp));
 }
 

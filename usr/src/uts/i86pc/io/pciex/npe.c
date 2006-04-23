@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,6 +37,10 @@
 #include <sys/sysmacros.h>
 #include <sys/ddi_intr.h>
 #include <sys/sunndi.h>
+#include <sys/sunddi.h>
+#include <sys/ddifm.h>
+#include <sys/ndifm.h>
+#include <sys/fm/util.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <io/pci/pci_common.h>
 #include <io/pci/pci_tools_ext.h>
@@ -48,11 +51,14 @@
  */
 static int	npe_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 		    off_t, off_t, caddr_t *);
-static int	npe_map_legacy_pci(off_t, off_t, caddr_t *, ddi_acc_hdl_t *);
 static int	npe_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 		    void *, void *);
 static int	npe_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
 		    ddi_intr_handle_impl_t *, void *);
+static int	npe_fm_init(dev_info_t *, dev_info_t *, int,
+		    ddi_iblock_cookie_t *);
+
+static int	npe_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
 
 struct bus_ops npe_bus_ops = {
 	BUSO_REV,
@@ -78,7 +84,7 @@ struct bus_ops npe_bus_ops = {
 	0,		/* (*bus_intr_ctl)(); */
 	0,		/* (*bus_config)(); */
 	0,		/* (*bus_unconfig)(); */
-	NULL,		/* (*bus_fm_init)(); */
+	npe_fm_init,	/* (*bus_fm_init)(); */
 	NULL,		/* (*bus_fm_fini)(); */
 	NULL,		/* (*bus_fm_access_enter)(); */
 	NULL,		/* (*bus_fm_access_exit)(); */
@@ -145,7 +151,6 @@ struct dev_ops npe_ops = {
  */
 static int npe_removechild(dev_info_t *child);
 static int npe_initchild(dev_info_t *child);
-static int npe_check_if_device_is_pci(dev_info_t *);
 
 /*
  * External support routine
@@ -211,7 +216,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-
 /*ARGSUSED*/
 static int
 npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
@@ -254,6 +258,12 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ddi_soft_state_free(npe_statep, instance);
 		return (DDI_FAILURE);
 	}
+	pcip->pci_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	ddi_fm_init(devi, &pcip->pci_fmcap, &pcip->pci_fm_ibc);
+
+	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
+		ddi_fm_handler_register(devi, npe_fm_callback, NULL);
 
 	npe_query_acpi_mcfg(devi);
 	ddi_report_dev(devi);
@@ -267,6 +277,9 @@ static int
 npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(devi);
+	pci_state_t *pcip;
+
+	pcip = ddi_get_soft_state(npe_statep, ddi_get_instance(devi));
 
 	/* Uninitialize pcitool support. */
 	pcitool_uninit(devi);
@@ -275,6 +288,11 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	 * Uninitialize hotplug support on this bus.
 	 */
 	(void) pcihp_uninit(devi);
+
+	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
+		ddi_fm_handler_unregister(devi);
+
+	ddi_fm_fini(devi);
 	ddi_soft_state_free(npe_statep, instance);
 	return (DDI_SUCCESS);
 }
@@ -287,14 +305,14 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	int 		rnumber;
 	int		length;
 	int		space;
-	dev_info_t	*parent;
+	ddi_acc_impl_t	*ap;
 	ddi_acc_hdl_t	*hp;
 	ddi_map_req_t	mr;
 	pci_regspec_t	pci_reg;
 	pci_regspec_t	*pci_rp;
 	struct regspec	reg;
 	pci_acc_cfblk_t	*cfp;
-
+	int		retval;
 
 	mr = *mp; /* Get private copy of request */
 	mp = &mr;
@@ -359,46 +377,40 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 * check for unmap and unlock of address space
 	 */
 	if ((mp->map_op == DDI_MO_UNMAP) || (mp->map_op == DDI_MO_UNLOCK)) {
-		/*
-		 * Adjust offset and length
-		 * A non-zero length means override the one in the regspec.
-		 */
-		pci_rp->pci_phys_low += (uint_t)offset;
-		if (len != 0)
-			pci_rp->pci_size_low = len;
-
 		switch (space) {
 		case PCI_ADDR_IO:
 			reg.regspec_bustype = 1;
 			break;
 
 		case PCI_ADDR_CONFIG:
-			/* Check for AMD's northbridges */
-			if (is_amd_northbridge(rdip) == 0)
-				return (DDI_SUCCESS);
-
 			/*
+			 * Check for AMD's northbridges
+			 *	AND
+			 * for any PCI device.
 			 *
-			 * Next two checks are workarounds to fix
+			 * This is a workaround fix for
 			 * AMD-8132's inability to handle MMCFG
-			 * accesses on Galaxy's PE servers.
+			 * accesses on Galaxy's PE servers
+			 *	AND
+			 * to disable MMCFG for any PCI device.
 			 *
-			 * Solution: Check if device_type is "pci"
-			 * and for any such device do I/O based config space
-			 * access.
-			 *
-			 * Leaf devices under AMD-8132 may not
-			 * have a device_type of "pci". This was observed
-			 * during testing. Hence, if first check fails
-			 * then check if the parent has "device_type"
-			 * of "pci" and allow I/O based config space access
+			 * If a device is *not* found to have PCIe
+			 * capability, then assume it is a PCI device.
 			 */
-			if (npe_check_if_device_is_pci(rdip))
-				return (DDI_SUCCESS);
 
-			parent = ddi_get_parent(rdip);
-			if (parent && npe_check_if_device_is_pci(parent))
+			if (is_amd_northbridge(rdip) == 0 ||
+			    (ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+			    DDI_PROP_DONTPASS, "pcie-capid-pointer",
+			    PCI_CAP_NEXT_PTR_NULL) == PCI_CAP_NEXT_PTR_NULL)) {
+				if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
+				    mp->map_handlep->ah_acc.devacc_attr_access
+				    != DDI_DEFAULT_ACC) {
+					ndi_fmc_remove(rdip, ACC_HANDLE,
+					    (void *)mp->map_handlep);
+				}
 				return (DDI_SUCCESS);
+			}
+
 
 			/* FALLTHROUGH */
 		case PCI_ADDR_MEM64:
@@ -416,11 +428,27 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		default:
 			return (DDI_FAILURE);
 		}
+
+		/*
+		 * Adjust offset and length
+		 * A non-zero length means override the one in the regspec.
+		 */
+		pci_rp->pci_phys_low += (uint_t)offset;
+		if (len != 0)
+			pci_rp->pci_size_low = len;
+
 		reg.regspec_addr = pci_rp->pci_phys_low;
 		reg.regspec_size = pci_rp->pci_size_low;
 
 		mp->map_obj.rp = &reg;
-		return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
+		retval = ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp);
+		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
+		    mp->map_handlep->ah_acc.devacc_attr_access !=
+		    DDI_DEFAULT_ACC) {
+			ndi_fmc_remove(rdip, ACC_HANDLE,
+			    (void *)mp->map_handlep);
+		}
+		return (retval);
 
 	}
 
@@ -431,6 +459,11 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	}
 
 
+	/*
+	 * Note that pci_fm_acc_setup() is called to serve two purposes
+	 * i) enable legacy PCI I/O style config space access
+	 * ii) register with FMA
+	 */
 	if (space == PCI_ADDR_CONFIG) {
 		/* Can't map config space without a handle */
 		hp = (ddi_acc_hdl_t *)mp->map_handlep;
@@ -443,16 +476,30 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		cfp->c_devnum = PCI_REG_DEV_G(pci_rp->pci_phys_hi);
 		cfp->c_funcnum = PCI_REG_FUNC_G(pci_rp->pci_phys_hi);
 
-		/* Check for AMD's northbridges */
-		if (is_amd_northbridge(rdip) == 0)
-			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+		*vaddrp = (caddr_t)offset;
 
-		if (npe_check_if_device_is_pci(rdip))
-			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+		/*
+		 * Check for AMD's northbridges, pci devices and
+		 * devices underneath a pci bridge.  This is to setup
+		 * I/O based config space access.
+		 */
+		if (is_amd_northbridge(rdip) == 0 ||
+		    (ddi_prop_get_int(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+		    "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL) ==
+		    PCI_CAP_NEXT_PTR_NULL)) {
+			int ret;
 
-		parent = ddi_get_parent(rdip);
-		if (parent && npe_check_if_device_is_pci(parent))
-			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+			if ((ret = pci_fm_acc_setup(hp, offset, len)) ==
+			    DDI_SUCCESS) {
+				if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
+				    mp->map_handlep->ah_acc.devacc_attr_access
+				    != DDI_DEFAULT_ACC) {
+					ndi_fmc_insert(rdip, ACC_HANDLE,
+					    (void *)mp->map_handlep, NULL);
+				}
+			}
+			return (ret);
+		}
 
 		pci_rp->pci_phys_low = ddi_prop_get_int64(DDI_DEV_T_ANY,
 		    rdip, 0, "ecfga-base-address", 0);
@@ -510,63 +557,35 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	reg.regspec_size = pci_rp->pci_size_low;
 
 	mp->map_obj.rp = &reg;
-	return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
+	retval = ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp);
+	if (retval == DDI_SUCCESS) {
+		/*
+		 * For config space gets force use of cautious access routines.
+		 * These will handle default and protected mode accesses too.
+		 */
+		if (space == PCI_ADDR_CONFIG) {
+			ap = (ddi_acc_impl_t *)mp->map_handlep;
+			ap->ahi_acc_attr &= ~DDI_ACCATTR_DIRECT;
+			ap->ahi_acc_attr |= DDI_ACCATTR_CONFIG_SPACE;
+			ap->ahi_get8 = i_ddi_caut_get8;
+			ap->ahi_get16 = i_ddi_caut_get16;
+			ap->ahi_get32 = i_ddi_caut_get32;
+			ap->ahi_get64 = i_ddi_caut_get64;
+			ap->ahi_rep_get8 = i_ddi_caut_rep_get8;
+			ap->ahi_rep_get16 = i_ddi_caut_rep_get16;
+			ap->ahi_rep_get32 = i_ddi_caut_rep_get32;
+			ap->ahi_rep_get64 = i_ddi_caut_rep_get64;
+		}
+		if (DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
+		    mp->map_handlep->ah_acc.devacc_attr_access !=
+		    DDI_DEFAULT_ACC) {
+			ndi_fmc_insert(rdip, ACC_HANDLE,
+			    (void *)mp->map_handlep, NULL);
+		}
+	}
+	return (retval);
 }
 
-
-static int
-npe_map_legacy_pci(off_t offset, off_t len, caddr_t *vaddrp, ddi_acc_hdl_t *hp)
-{
-	ddi_acc_impl_t	*ap;
-
-	/*
-	 * check for config space
-	 * On x86, CONFIG is not mapped via MMU and there is
-	 * no endian-ness issues. Set the attr field in the handle to
-	 * indicate that the common routines to call the nexus driver.
-	 */
-
-	ap = (ddi_acc_impl_t *)hp->ah_platform_private;
-
-	/* endian-ness check */
-	if (hp->ah_acc.devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
-		return (DDI_FAILURE);
-
-	/*
-	 * range check
-	 */
-	if ((offset >= PCI_CONF_HDR_SIZE) ||
-	    (len > PCI_CONF_HDR_SIZE) ||
-	    (offset + len > PCI_CONF_HDR_SIZE))
-		return (DDI_FAILURE);
-	*vaddrp = (caddr_t)offset;
-
-	ap->ahi_acc_attr |= DDI_ACCATTR_CONFIG_SPACE;
-	ap->ahi_put8 = pci_config_wr8;
-	ap->ahi_get8 = pci_config_rd8;
-	ap->ahi_put64 = pci_config_wr64;
-	ap->ahi_get64 = pci_config_rd64;
-	ap->ahi_rep_put8 = pci_config_rep_wr8;
-	ap->ahi_rep_get8 = pci_config_rep_rd8;
-	ap->ahi_rep_put64 = pci_config_rep_wr64;
-	ap->ahi_rep_get64 = pci_config_rep_rd64;
-	ap->ahi_get16 = pci_config_rd16;
-	ap->ahi_get32 = pci_config_rd32;
-	ap->ahi_put16 = pci_config_wr16;
-	ap->ahi_put32 = pci_config_wr32;
-	ap->ahi_rep_get16 = pci_config_rep_rd16;
-	ap->ahi_rep_get32 = pci_config_rep_rd32;
-	ap->ahi_rep_put16 = pci_config_rep_wr16;
-	ap->ahi_rep_put32 = pci_config_rep_wr32;
-
-	/* Initialize to default check/notify functions */
-	ap->ahi_fault_check = i_ddi_acc_fault_check;
-	ap->ahi_fault_notify = i_ddi_acc_fault_notify;
-	ap->ahi_fault = 0;
-	impl_acc_err_init(hp);
-
-	return (DDI_SUCCESS);
-}
 
 
 /*ARGSUSED*/
@@ -637,6 +656,10 @@ npe_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 		break;
 	}
+
+	case DDI_CTLOPS_PEEK:
+	case DDI_CTLOPS_POKE:
+		return (pci_common_peekpoke(dip, rdip, ctlop, arg, result));
 
 	default:
 		break;
@@ -814,18 +837,23 @@ npe_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	return (pcihp_info(dip, cmd, arg, result));
 }
 
+/*ARGSUSED*/
 static int
-npe_check_if_device_is_pci(dev_info_t *child)
+npe_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
+    ddi_iblock_cookie_t *ibc)
 {
-	int		ret = 0;
-	char		*dev_type = NULL;
+	pci_state_t  *pcip = ddi_get_soft_state(npe_statep,
+	    ddi_get_instance(dip));
 
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-	    "device_type", &dev_type) == DDI_SUCCESS) {
-		if (strcmp(dev_type, "pci") == 0)
-			ret = 1;
-		ddi_prop_free(dev_type);
-	}
+	ASSERT(ibc != NULL);
+	*ibc = pcip->pci_fm_ibc;
 
-	return (ret);
+	return (pcip->pci_fmcap);
+}
+
+/*ARGSUSED*/
+static int
+npe_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
+{
+	return (ndi_fm_handler_dispatch(dip, NULL, derr));
 }

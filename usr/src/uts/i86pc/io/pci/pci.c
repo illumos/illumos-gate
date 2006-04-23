@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,9 @@
 #include <sys/pci_impl.h>
 #include <sys/sysmacros.h>
 #include <sys/sunndi.h>
+#include <sys/ddifm.h>
+#include <sys/ndifm.h>
+#include <sys/fm/protocol.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <io/pci/pci_common.h>
 #include <io/pci/pci_tools_ext.h>
@@ -52,6 +54,9 @@ static int	pci_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 		    void *, void *);
 static int	pci_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
 		    ddi_intr_handle_impl_t *, void *);
+static int	pci_fm_init(dev_info_t *, dev_info_t *, int,
+		    ddi_iblock_cookie_t *);
+static int	pci_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
 
 struct bus_ops pci_bus_ops = {
 	BUSO_REV,
@@ -77,7 +82,7 @@ struct bus_ops pci_bus_ops = {
 	0,		/* (*bus_intr_ctl)(); */
 	0,		/* (*bus_config)(); */
 	0,		/* (*bus_unconfig)(); */
-	NULL,		/* (*bus_fm_init)(); */
+	pci_fm_init,	/* (*bus_fm_init)(); */
 	NULL,		/* (*bus_fm_fini)(); */
 	NULL,		/* (*bus_fm_access_enter)(); */
 	NULL,		/* (*bus_fm_access_exit)(); */
@@ -248,6 +253,18 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad_pcitool_init;
 	}
 
+	pcip->pci_fmcap = DDI_FM_ERRCB_CAPABLE |
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	ddi_fm_init(devi, &pcip->pci_fmcap, &pcip->pci_fm_ibc);
+	mutex_init(&pcip->pci_err_mutex, NULL, MUTEX_DRIVER,
+	    (void *)pcip->pci_fm_ibc);
+	mutex_init(&pcip->pci_peek_poke_mutex, NULL, MUTEX_DRIVER,
+	    (void *)pcip->pci_fm_ibc);
+	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE) {
+		pci_ereport_setup(devi);
+		ddi_fm_handler_register(devi, pci_fm_callback, NULL);
+	}
+
 	ddi_report_dev(devi);
 
 	return (DDI_SUCCESS);
@@ -265,6 +282,16 @@ static int
 pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(devi);
+	pci_state_t *pcip;
+
+	pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(devi));
+	if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE) {
+		ddi_fm_handler_unregister(devi);
+		pci_ereport_teardown(devi);
+	}
+	mutex_destroy(&pcip->pci_peek_poke_mutex);
+	mutex_destroy(&pcip->pci_err_mutex);
+	ddi_fm_fini(devi);
 
 	/* Uninitialize pcitool support. */
 	pcitool_uninit(devi);
@@ -284,7 +311,6 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	struct regspec reg;
 	ddi_map_req_t mr;
 	ddi_acc_hdl_t *hp;
-	ddi_acc_impl_t *ap;
 	pci_regspec_t pci_reg;
 	pci_regspec_t *pci_rp;
 	int 	rnumber;
@@ -408,48 +434,10 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	 * indicate that the common routines to call the nexus driver.
 	 */
 	if (space == PCI_ADDR_CONFIG) {
-		hp = (ddi_acc_hdl_t *)mp->map_handlep;
-
 		/* Can't map config space without a handle */
+		hp = (ddi_acc_hdl_t *)mp->map_handlep;
 		if (hp == NULL)
 			return (DDI_FAILURE);
-
-		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
-
-		/* endian-ness check */
-		if (hp->ah_acc.devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
-			return (DDI_FAILURE);
-
-		/*
-		 * range check
-		 */
-		if ((offset >= 256) || (len > 256) || (offset + len > 256))
-			return (DDI_FAILURE);
-		*vaddrp = (caddr_t)offset;
-
-		ap->ahi_acc_attr |= DDI_ACCATTR_CONFIG_SPACE;
-		ap->ahi_put8 = pci_config_wr8;
-		ap->ahi_get8 = pci_config_rd8;
-		ap->ahi_put64 = pci_config_wr64;
-		ap->ahi_get64 = pci_config_rd64;
-		ap->ahi_rep_put8 = pci_config_rep_wr8;
-		ap->ahi_rep_get8 = pci_config_rep_rd8;
-		ap->ahi_rep_put64 = pci_config_rep_wr64;
-		ap->ahi_rep_get64 = pci_config_rep_rd64;
-		ap->ahi_get16 = pci_config_rd16;
-		ap->ahi_get32 = pci_config_rd32;
-		ap->ahi_put16 = pci_config_wr16;
-		ap->ahi_put32 = pci_config_wr32;
-		ap->ahi_rep_get16 = pci_config_rep_rd16;
-		ap->ahi_rep_get32 = pci_config_rep_rd32;
-		ap->ahi_rep_put16 = pci_config_rep_wr16;
-		ap->ahi_rep_put32 = pci_config_rep_wr32;
-
-		/* Initialize to default check/notify functions */
-		ap->ahi_fault_check = i_ddi_acc_fault_check;
-		ap->ahi_fault_notify = i_ddi_acc_fault_notify;
-		ap->ahi_fault = 0;
-		impl_acc_err_init(hp);
 
 		/* record the device address for future reference */
 		cfp = (pci_acc_cfblk_t *)&hp->ah_bus_private;
@@ -457,7 +445,8 @@ pci_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		cfp->c_devnum = PCI_REG_DEV_G(pci_rp->pci_phys_hi);
 		cfp->c_funcnum = PCI_REG_FUNC_G(pci_rp->pci_phys_hi);
 
-		return (DDI_SUCCESS);
+		*vaddrp = (caddr_t)offset;
+		return (pci_fm_acc_setup(hp, offset, len));
 	}
 
 	/*
@@ -520,6 +509,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	uint_t	reglen;
 	int	rn;
 	int	totreg;
+	pci_state_t *pcip;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -580,6 +570,13 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		}
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 	}
+
+	case DDI_CTLOPS_PEEK:
+	case DDI_CTLOPS_POKE:
+		pcip = ddi_get_soft_state(pci_statep, ddi_get_instance(dip));
+		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
+		    pci_common_peekpoke, &pcip->pci_err_mutex,
+		    &pcip->pci_peek_poke_mutex));
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
@@ -761,4 +758,31 @@ static int
 pci_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
+}
+
+/*ARGSUSED*/
+static int
+pci_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
+    ddi_iblock_cookie_t *ibc)
+{
+	pci_state_t  *pcip = ddi_get_soft_state(pci_statep,
+	    ddi_get_instance(dip));
+
+	ASSERT(ibc != NULL);
+	*ibc = pcip->pci_fm_ibc;
+
+	return (pcip->pci_fmcap);
+}
+
+/*ARGSUSED*/
+static int
+pci_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
+{
+	pci_state_t  *pcip = ddi_get_soft_state(pci_statep,
+	    ddi_get_instance(dip));
+
+	mutex_enter(&pcip->pci_err_mutex);
+	pci_ereport_post(dip, derr, NULL);
+	mutex_exit(&pcip->pci_err_mutex);
+	return (derr->fme_status);
 }

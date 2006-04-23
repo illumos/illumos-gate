@@ -110,6 +110,7 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
 	mp->dmai_error.err_ontrap = NULL;
 	mp->dmai_error.err_fep = NULL;
+	mp->dmai_error.err_cf = NULL;
 
 	if (px_child_prefetch(mp->dmai_rdip))
 		mp->dmai_flags |= (PX_DMAI_FLAGS_MAP_BUFZONE |

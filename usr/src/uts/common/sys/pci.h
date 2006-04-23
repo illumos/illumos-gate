@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -641,11 +640,102 @@ extern "C" {
  * PCI-X capability related definitions
  */
 #define	PCI_PCIX_COMMAND	0x2	/* Command register offset */
+#define	PCI_PCIX_STATUS		0x4	/* Status register offset */
+#define	PCI_PCIX_ECC_STATUS	0x8	/* ECC Status register offset */
+#define	PCI_PCIX_ECC_FST_AD	0xC	/* ECC First address register offset */
+#define	PCI_PCIX_ECC_SEC_AD	0x10	/* ECC Second address register offset */
+#define	PCI_PCIX_ECC_ATTR	0x14	/* ECC Attribute register offset */
 
+/*
+ * PCI-X bridge capability related definitions
+ */
+#define	PCI_PCIX_SEC_STATUS	0x2	/* Secondary status register offset */
+#define	PCI_PCIX_BDG_STATUS	0x4	/* Bridge Status register offset */
+#define	PCI_PCIX_UP_SPL_CTL	0x8	/* Upstream split ctrl reg offset */
+#define	PCI_PCIX_DOWN_SPL_CTL	0xC	/* Downstream split ctrl reg offset */
+#define	PCI_PCIX_BDG_ECC_STATUS	0x10	/* ECC Status register offset */
+#define	PCI_PCIX_BDG_ECC_FST_AD	0x14	/* ECC First address register offset */
+#define	PCI_PCIX_BDG_ECC_SEC_AD	0x18	/* ECC Second address register offset */
+#define	PCI_PCIX_BDG_ECC_ATTR	0x1C	/* ECC Attribute register offset */
+
+/*
+ * PCIX capabilities values
+ */
 #define	PCI_PCIX_VER_MASK	0x3000	/* Bits 12 and 13 */
 #define	PCI_PCIX_VER_0		0x0000	/* PCIX cap list item version 0 */
 #define	PCI_PCIX_VER_1		0x1000	/* PCIX cap list item version 1 */
 #define	PCI_PCIX_VER_2		0x2000	/* PCIX cap list item version 2 */
+
+#define	PCI_PCIX_SPL_DSCD	0x40000 /* Split Completion Discarded */
+#define	PCI_PCIX_UNEX_SPL	0x80000	/* Unexpected Split Completion */
+#define	PCI_PCIX_RX_SPL_MSG	0x20000000 /* Recieved Spl Comp Error Message */
+
+#define	PCI_PCIX_ECC_SEL	0x1	/* Secondary ECC register select */
+#define	PCI_PCIX_ECC_EP		0x2	/* Error Present on other side */
+#define	PCI_PCIX_ECC_S_CE	0x4	/* Addl Correctable ECC Error */
+#define	PCI_PCIX_ECC_S_UE	0x8	/* Addl Uncorrectable ECC Error */
+#define	PCI_PCIX_ECC_PHASE	0x70	/* ECC Error Phase */
+#define	PCI_PCIX_ECC_CORR	0x80	/* ECC Error Corrected */
+#define	PCI_PCIX_ECC_SYN	0xff00	/* ECC Error Syndrome */
+#define	PCI_PCIX_ECC_FST_CMD	0xf0000	 /* ECC Error First Command */
+#define	PCI_PCIX_ECC_SEC_CMD	0xf00000 /* ECC Error Second Command */
+#define	PCI_PCIX_ECC_UP_ATTR	0xf000000 /* ECC Error Upper Attributes */
+
+/*
+ * PCIX ECC Phase Values
+ */
+#define	PCI_PCIX_ECC_PHASE_NOERR	0x0
+#define	PCI_PCIX_ECC_PHASE_FADDR	0x1
+#define	PCI_PCIX_ECC_PHASE_SADDR	0x2
+#define	PCI_PCIX_ECC_PHASE_ATTR		0x3
+#define	PCI_PCIX_ECC_PHASE_DATA32	0x4
+#define	PCI_PCIX_ECC_PHASE_DATA64	0x5
+
+/*
+ * PCI-X Command Encoding
+ */
+#define	PCI_PCIX_CMD_INTR		0x0
+#define	PCI_PCIX_CMD_SPEC		0x1
+#define	PCI_PCIX_CMD_IORD		0x2
+#define	PCI_PCIX_CMD_IOWR		0x3
+#define	PCI_PCIX_CMD_DEVID		0x5
+#define	PCI_PCIX_CMD_MEMRD_DW		0x6
+#define	PCI_PCIX_CMD_MEMWR		0x7
+#define	PCI_PCIX_CMD_MEMRD_BL		0x8
+#define	PCI_PCIX_CMD_MEMWR_BL		0x9
+#define	PCI_PCIX_CMD_CFRD		0xA
+#define	PCI_PCIX_CMD_CFWR		0xB
+#define	PCI_PCIX_CMD_SPL		0xC
+#define	PCI_PCIX_CMD_DADR		0xD
+#define	PCI_PCIX_CMD_MEMRDBL		0xE
+#define	PCI_PCIX_CMD_MEMWRBL		0xF
+
+#if defined(_BIT_FIELDS_LTOH)
+typedef struct pcix_attr {
+	uint32_t	lbc	:8,
+			rid	:16,
+			tag	:5,
+			ro	:1,
+			ns	:1,
+			r	:1;
+} pcix_attr_t;
+#elif defined(_BIT_FIELDS_HTOL)
+typedef struct pcix_attr {
+	uint32_t	r	:1,
+			ns	:1,
+			ro	:1,
+			tag	:5,
+			rid	:16,
+			lbc	:8;
+} pcix_attr_t;
+#else
+#error "bit field not defined"
+#endif
+
+#define	PCI_PCIX_BSS_SPL_DSCD	0x4	/* Secondary split comp discarded */
+#define	PCI_PCIX_BSS_UNEX_SPL	0x8	/* Secondary unexpected split comp */
+#define	PCI_PCIX_BSS_SPL_OR	0x10	/* Secondary split comp overrun */
+#define	PCI_PCIX_BSS_SPL_DLY	0x20	/* Secondary split comp delayed */
 
 /*
  * PCI Message Signalled Interrupts (MSI) capability entry offsets for 32-bit
@@ -723,6 +813,43 @@ extern "C" {
 #define	PCI_CLK_33MHZ	(33 * 1000 * 1000)	/* 33MHz clock speed */
 #define	PCI_CLK_66MHZ	(66 * 1000 * 1000)	/* 66MHz clock speed */
 #define	PCI_CLK_133MHZ	(133 * 1000 * 1000)	/* 133MHz clock speed */
+
+/*
+ * pci bus range definition
+ */
+typedef struct pci_bus_range {
+	uint32_t lo;
+	uint32_t hi;
+} pci_bus_range_t;
+
+/*
+ * The following typedef is used to represent an entry in the "ranges"
+ * property of a pci hostbridge device node.
+ */
+typedef struct pci_ranges {
+	uint32_t child_high;
+	uint32_t child_mid;
+	uint32_t child_low;
+	uint32_t parent_high;
+	uint32_t parent_low;
+	uint32_t size_high;
+	uint32_t size_low;
+} pci_ranges_t;
+
+/*
+ * The following typedef is used to represent an entry in the "ranges"
+ * property of a pci-pci bridge device node.
+ */
+typedef struct {
+	uint32_t child_high;
+	uint32_t child_mid;
+	uint32_t child_low;
+	uint32_t parent_high;
+	uint32_t parent_mid;
+	uint32_t parent_low;
+	uint32_t size_high;
+	uint32_t size_low;
+} ppb_ranges_t;
 
 /*
  * This structure represents one entry of the 1275 "reg" property and

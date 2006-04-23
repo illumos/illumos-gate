@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,850 +30,1239 @@
 #define PCI_DEV_FIT 1000
 #define PCI_BUS_FIT 500
 
+/*
+ * SERD parameters.
+ *
+ * Nonfatal dpe errors have to be recovered by the hardened driver which may
+ * cause intermittant performance/responsiveness problems, so we have tighter
+ * serd parameters for these. These are most likely errors in buffers/caches
+ * within devices and bridges, so use similar rates to cpu data cache parity
+ * errors.
+ * 
+ * We will be more conservative about nonfatal internal errors reported
+ * by the driver.
+ */
+#define NONFATAL_COUNT 6
+#define NONFATAL_TIME 2h
+#define NONFATAL_DPE_U_COUNT 3
+#define NONFATAL_DPE_U_TIME 168h
+#define NONFATAL_DPE_D_COUNT 3
+#define NONFATAL_DPE_D_TIME 168h
+
+#define	IS_LEAF \
+	(confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60400" && \
+	confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") != "60401")
+
+#define	IS_BDG \
+	(confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") == "60400" || \
+	confprop(asru(pcibus/pcidev/pcifn), "CLASS-CODE") == "60401")
+
+#define	FD_IS_LEAF \
+	(confprop(asru(pcibus/pcidev[fromdev]/pcifn), "CLASS-CODE") != \
+	"60400" && \
+	confprop(asru(pcibus/pcidev[fromdev]/pcifn), "CLASS-CODE") != "60401")
+
+/*
+ * note general rule for errors is that for upstream propagations
+ * @pcibus/pcidev/pcifn is the sending device while  for downstream
+ * propagations it is the receiving device.
+ */
+
 asru pcibus/pcidev/pcifn;
 fru pcibus/pcidev;
 
-/*
- * Faulty PCI device
- */
-event fault.io.pci.device@pcibus/pcidev/pcifn,
+event fault.io.pci.device-interr@pcibus/pcidev/pcifn,
         FITrate=PCI_DEV_FIT, FRU=pcibus/pcidev, ASRU=pcibus/pcidev/pcifn;
 
-event error.io.pci.tx-ma@pcibus/pcidev/pcifn;
-event error.io.pci.rx-ma@pcibus/pcidev/pcifn;
-event error.io.pci.tx-serr@pcibus/pcidev/pcifn;
-event error.io.pci.serr@pcibus;
-event error.io.pci.rx-ta@pcibus/pcidev/pcifn;
-event error.io.pci.tx-dpe@pcibus/pcidev/pcifn;
-event error.io.pci.tx-wdpe@pcibus/pcidev/pcifn;
-event error.io.pci.rec-ma@pcibus/pcidev/pcifn;
-event error.io.pci.rec-ta@pcibus/pcidev/pcifn;
-event error.io.pci.rec-mdpe@pcibus/pcidev/pcifn;
-event error.io.pci.tx-pma@pcibus/pcidev/pcifn;
-event error.io.pci.tx-dma@pcibus/pcidev/pcifn;
-event error.io.pci.tx-rdpe@pcibus/pcidev/pcifn;
-event error.io.pci.tx-pwdpe@pcibus/pcidev/pcifn;
-event error.io.pci.tx-dwdpe@pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.sta@pcibus/pcidev/pcifn;
-event error.io.pci.rx-pma@pcibus/pcidev/pcifn;
-event error.io.pci.rx-dma@pcibus/pcidev/pcifn;
-event error.io.pci.sec-tx-ta@pcibus/pcidev/pcifn;
-event error.io.pci.sec-rx-pta@pcibus/pcidev/pcifn;
-event error.io.pci.sec-rx-dta@pcibus/pcidev/pcifn;
-event error.io.pci.rx-pta@pcibus/pcidev/pcifn;
-event error.io.pci.tx-pta@pcibus/pcidev/pcifn;
-event error.io.pci.rx-dta@pcibus/pcidev/pcifn;
-event error.io.pci.bdg-rx-dpe@pcibus/pcidev/pcifn;
-event error.io.pci.sec-rx-dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-pwdpe@pcibus/pcidev/pcifn;
-event error.io.pci.bdg-dwdpe@pcibus/pcidev/pcifn;
-event error.io.pci.rx-rdpe@pcibus/pcidev/pcifn;
-event error.io.pci.rx-wdpe@pcibus/pcidev/pcifn;
-event error.io.pci.sec-rx-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.sec-target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.sec-target-ma@pcibus/pcidev/pcifn;
-event error.io.pci.sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-ape@pcibus/pcidev/pcifn;
-event error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pcix.tx-oor@pcibus/pcidev/pcifn;
-event error.io.pcix.rx-discard@pcibus/pcidev/pcifn;
-event error.io.pcix.rx-unex-sc@pcibus/pcidev/pcifn;
+event fault.io.pci.device-invreq@pcibus/pcidev/pcifn,
+        FITrate=PCI_DEV_FIT, FRU=pcibus/pcidev, ASRU=pcibus/pcidev/pcifn;
 
-event ereport.io.pci.dto@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-ma@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-ma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.ma@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.ma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sserr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sec-ma@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sserr@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.rta@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-rta@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sta@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.dpe@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.mdpe@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sec-sta@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sec-rta@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.target-rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.sta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pcix.oor@pcibus/pcidev/pcifn;
-event ereport.io.pcix.discard@pcibus/pcidev/pcifn;
-event ereport.io.pcix.unex-sc@pcibus/pcidev/pcifn;
+event fault.io.pci.device-noresp@pcibus/pcidev/pcifn,
+        FITrate=PCI_DEV_FIT, FRU=pcibus/pcidev, ASRU=pcibus/pcidev/pcifn;
 
 /*
- * A faulty PCI device may cause:
- *
- *  - tx-ma:	the device to not respond to a valid request.
- *  - rx-ma:	the device to issue an errant address.
- *  - tx-serr:	the device to signal an serr.
- *  - rx-ta:	the device to receive a target abort from an unhappy target.
- *  - tx-dpe:	the device to trasmit data data and/or parity.
- *  - tx-ape:	address/parity to get corrupted during transmission -
- *		only the serr is a must - sserr/dpe will show up if 
- *		target driver is hardened. In addition the target could target
- *		abort or master abort.
- *
- * A fault PCI-X device may cause:
- *
- *  - tx-oor:	the device sends a byte count larger than the completers
- *           	address range.
- *  - tx-discard a DMA split completion received a master abort or a
- *		target abort which caused the device to discard the
- *		split completion
- *  - rx-unex-sc the device recieved a split completion with a tag
- * 		which does not match any outstanding transaction.
- *
- * NOTE: The rules below are for pci-pci bridge support
- *
- *  - tx-pma:	the device not to respond to a posted request across a bridge.
- *  - tx-dma:	the device not to respond to a delayed request across a bridge.
- *  - rx-pta:	the device to receive a target abort from a posted transaction
- *		across a bridge.
- *  - rx-dta:	the device to receive a target abort from a delayed transaction
- *		across a bridge.
- *  - tx-ape-bdg:	address/parity to get corrupted during transmission.
- *		Must see serr/serr/dpe. In addition the pci-pci bridge
- * 		could target abort or master abort or let the request through
- *		to the secondary bus causing an ape there.
- *  - tx-rdpe:	the device to transfer bad data and/or bad parity during a read
- *		request to a bridge.
- *  - tx-pwdpe:	the device to transfer bad data and/or bad parity during a
- *		posted write request to a bridge.
- *  - tx-dwdpe: the device to transfer bad data and/or bad parity during a
- *		delayed write request to a bridge.
- *
- * NOTE: The rules below are specifically for the pci-pci bridge, in which it
- * sends incorrect data/parity when receiving correct data/parity.
- *
- *  - bdg-tx-ape:	address/parity to get corrupted during transmission
- *			on the primary side bus. Must see sserr/dpe/rec_serr.
- *			In addition the hostbridge could target abort
- *			or master abort and if this was a delayed access
- *			we could get target abort propagated to secondary bus.
- *  - bdg-tx-dwdpe:	the bridge sends bad data/parity during a delayed write
- *			request to the primary side bus.
- *  - bdg-tx-pwdpe:	the bridge sends bad data/parity during a posted write
- *			request to the primary side bus.
- *  - bdg-tx-rdpe:	the bridge sends bad data/parity during a read request
- *			to the primary side bus.
- *  - bdg-tx-sec-ape:	address/parity to get corrupted during transmission
- *			on the secondary side bus. Only the sec-rserr/sserr/
- *			serr *must* happen. In addition any hardened leaf
- *			driver on the secondary bus that detects the ape will
- *			report sserr/dpe. Also the target device can target
- *			abort or master abort.
- *  - bdg-tx-sec-rdpe:	the bridge sends bad data/parity during a read request
- *			to the secondary side bus.
- *  - bdg-tx-sec-pwdpe: the bridge sends bad data/parity during a posted write
- *			request to the secondary side bus.
- *  - bdg-tx-sec-dwdpe: the bridge sends bad data/parity during a delayed write
- *			request to the secondary side bus.
- *
- *  - dto:	the device could exceed the timeout alloted for a delayed
- *		transaction, causing the bridge to signal a discard timeout.
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty hostbridge may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-d:	the device not to respond to an upstream request
+ *  - nr-drw-d:	the device not to respond to an upstream request
+ *  - ta-pw-d:	the device to send a target abort to an upstream request
+ *  - ta-drw-d:	the device to send a target abort to an upstream request
+ *  - serr-u:	the device to report itself in error
+ *  - badreq-pw-d:a bad downstream request - not parity error (may cause target
+ * 		to target abort or master abort)
+ *  - badreq-drw-d:a bad downstream request - not parity error (may cause
+ * 		target to target abort or master abort)
+ *  - ape-d:	address/parity to get corrupted during downstream transmission
+ *  - scpe-d:	split completion to get corrupted during downstream transmission
+ *  - dpe-d:	the device to transfer bad data and/or bad parity downstream
+ *  - retry-to-d:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
  */
-prop fault.io.pci.device@pcibus/pcidev/pcifn (0)->
-    error.io.pci.tx-ma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-ma@pcibus/pcidev/pcifn,
-    error.io.pci.tx-serr@pcibus/pcidev/pcifn,
-    error.io.pci.rx-ta@pcibus/pcidev/pcifn,
-    error.io.pci.tx-ape@pcibus/pcidev/pcifn,
-    error.io.pci.tx-dpe@pcibus/pcidev/pcifn,
-    error.io.pcix.rx-discard@pcibus/pcidev/pcifn,
-    error.io.pcix.tx-oor@pcibus/pcidev/pcifn,
-    error.io.pcix.rx-unex-sc@pcibus/pcidev/pcifn,
-    ereport.io.pci.dto@pcibus/pcidev<>/pcifn<>;
+#define	PCI_TO_HB pcibus/pcidev<todev>/pcifn<> {fromdev != 32 && todev == 32}
+#define	PCI_FROM_HB pcibus/pcidev<todev>/pcifn<> {fromdev == 32 && todev != 32}
 
-prop fault.io.pci.device@pcibus/pcidev/pcifn (0)->
-    error.io.pci.tx-pma@pcibus/pcidev/pcifn,
-    error.io.pci.tx-dma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-pta@pcibus/pcidev/pcifn,
-    error.io.pci.rx-dta@pcibus/pcidev/pcifn,
-    error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn,
-    error.io.pci.tx-rdpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-pwdpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-dwdpe@pcibus/pcidev/pcifn;
+event error.io.pci.retry-to-d@pcibus/pcidev/pcifn;
+event error.io.pci.nr-pw-d@pcibus/pcidev/pcifn;
+event error.io.pci.nr-drw-d@pcibus/pcidev/pcifn;
+event error.io.pci.ta-pw-d@pcibus/pcidev/pcifn;
+event error.io.pci.ta-drw-d@pcibus/pcidev/pcifn;
+event error.io.pci.badreq-pw-d@pcibus/pcidev/pcifn;
+event error.io.pci.badreq-drw-d@pcibus/pcidev/pcifn;
+event error.io.pci.f-dpe-d@pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
+event error.io.pci.nonfatal-dpe-d@pcibus/pcidev/pcifn;
+event error.io.pci.ape-d@pcibus/pcidev/pcifn;
+event error.io.pci.ape-u@pcibus/pcidev/pcifn;
+event error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn;
+event error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn;
+event error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn;
+event error.io.pci.ta-u@pcibus/pcidev/pcifn;
+event error.io.pci.ma-u@pcibus/pcidev/pcifn;
+event error.io.pci.perr-dw-u@pcibus/pcidev/pcifn;
+event error.io.pci.perr-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.perr-dr-u@pcibus/pcidev/pcifn;
+event error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn;
+event error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.device-serr@pcibus/pcidev/pcifn;
+event error.io.pci.device-ta@pcibus/pcidev/pcifn;
+event error.io.pci.device-par@pcibus/pcidev/pcifn;
+event error.io.pci.serr-u@pcibus/pcidev/pcifn;
+event error.io.pcix.scpe-d@pcibus/pcidev/pcifn;
+event error.io.pcix.scpe-u@pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn;
 
-prop fault.io.pci.device@pcibus/pcidev/pcifn (0)->
-    error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event ereport.io.pci.ma@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.rta@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.mdpe@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sta@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sserr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.dpe@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.target-rta@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.target-ma@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.discard@pcibus/pcidev/pcifn{within(5s)};
 
-prop error.io.pci.tx-ma@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn;
+prop fault.io.pci.device-noresp@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nr-pw-d@PCI_FROM_HB,
+    error.io.pci.nr-drw-d@PCI_FROM_HB,
+    error.io.pci.retry-to-d@PCI_FROM_HB;
 
-prop error.io.pci.tx-ma@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rec-ma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.badreq-pw-d@PCI_FROM_HB,
+    error.io.pci.badreq-drw-d@PCI_FROM_HB;
 
-prop error.io.pci.rx-ma@pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn;
+prop fault.io.pci.device-interr@pcibus/pcidev/pcifn (0)->
+    error.io.pci.device-par@pcibus/pcidev/pcifn,
+    error.io.pci.device-ta@pcibus/pcidev/pcifn,
+    error.io.pci.device-serr@pcibus/pcidev/pcifn;
 
-prop error.io.pci.rx-ma@pcibus/pcidev[fromdev]/pcifn (1)->
-    ereport.io.pci.target-ma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    error.io.pci.sec-target-ma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.device-par@pcibus/pcidev[fromdev]/pcifn (1)->
+    error.io.pci.f-dpe-d@PCI_FROM_HB,
+    error.io.pci.nf-dpe-d@PCI_FROM_HB,
+    error.io.pcix.scpe-d@PCI_FROM_HB,
+    error.io.pci.ape-d@PCI_FROM_HB;
 
-prop error.io.pci.sec-target-ma@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+prop error.io.pci.device-ta@pcibus/pcidev[fromdev]/pcifn (1)->
+    error.io.pci.ta-pw-d@PCI_FROM_HB,
+    error.io.pci.ta-drw-d@PCI_FROM_HB;
 
-prop error.io.pci.rec-ma@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.ma@pcibus/pcidev/pcifn;
+prop error.io.pci.device-ta@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.sta@pcibus/pcidev<todev>/pcifn {
+	todev == fromdev && fromdev == 32 };
 
-prop error.io.pci.rec-ta@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.rta@pcibus/pcidev/pcifn;
-
-prop error.io.pci.rec-mdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-serr@pcibus/pcidev/pcifn (1)->
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.tx-serr@pcibus/pcidev/pcifn (0)->
+prop error.io.pci.device-serr@pcibus/pcidev/pcifn (2)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn,
     ereport.io.pci.sserr@pcibus/pcidev/pcifn;
 
-prop error.io.pci.rx-ta@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rec-ta@pcibus/pcidev[fromdev]/pcifn,
-    error.io.pci.sta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.f-dpe-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn,
+    error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn,
+    error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn;
 
-prop error.io.pci.sta@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sta@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn;
+prop error.io.pci.nonfatal-dpe-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn,
+    error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn,
+    error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-dpe@pcibus/pcidev/pcifn (1)->
-    error.io.pci.tx-rdpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-wdpe@pcibus/pcidev/pcifn;
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * ereport generation rules for hostbridge
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+prop error.io.pci.dpdata-pw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.dpe@PCI_TO_HB;
 
-prop error.io.pci.tx-rdpe@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rx-rdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.dpdata-dw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.dpe@PCI_TO_HB;
 
-prop error.io.pci.rx-rdpe@pcibus/pcidev/pcifn (2)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+prop error.io.pci.dpdata-dr-u@pcibus/pcidev[fromdev]/pcifn (2)->
+    ereport.io.pci.mdpe@PCI_TO_HB,
+    ereport.io.pci.dpe@PCI_TO_HB;
 
-prop error.io.pci.tx-rdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pci.dpe@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
 
-prop error.io.pci.tx-wdpe@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rx-wdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
 
-prop error.io.pci.tx-wdpe@pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn;
+prop error.io.pci.ma-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.ma@PCI_TO_HB;
 
-prop error.io.pci.rx-wdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
+prop error.io.pci.ta-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.rta@PCI_TO_HB;
 
-prop error.io.pci.tx-ape@pcibus/pcidev/pcifn (1)->
-    error.io.pci.serr@pcibus;
+prop error.io.pci.perr-dw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.mdpe@PCI_TO_HB;
 
-prop error.io.pci.tx-ape@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.dpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.perr-pw-u@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pci.mdpe@PCI_TO_HB;
 
-prop error.io.pci.tx-ape@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.target-rta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.sta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.badreq-drw-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
 
-prop error.io.pci.tx-ape@pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ta@pcibus/pcidev/pcifn;
+prop error.io.pci.badreq-pw-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sta@PCI_TO_HB;
 
-prop error.io.pci.tx-ape@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.target-ma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pcix.scpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn,
+    error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-ape@pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn;
+prop error.io.pcix.scpe-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.dpe@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB,
+    ereport.io.pci.sta@PCI_TO_HB;
+
+prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pcix.discard@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
+
+prop error.io.pcix.spl-comp-ta-u@pcibus/pcidev[fromdev]/pcifn (3)->
+    ereport.io.pcix.discard@PCI_TO_HB,
+    error.io.pci.serr-u@PCI_TO_HB,
+    ereport.io.pci.sserr@PCI_TO_HB;
+
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty PCI leaf device or pci-pci bridge may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-u:		the device not to respond to a valid downstream request
+ *  - nr-drw-u:		the device not to respond to a valid downstream request
+ *  - ta-pw-u:		the device responds with a ta to a valid downstream
+ *			request
+ *  - ta-drw-u:		the device responds with a ta to a valid downstream
+ *			request
+ *  - serr-u:		the device to report itself in error
+ *  - badreq-pw-u:	a bad upstream request (may cause target to target
+ *			abort or master abort)
+ *  - badreq-drw-u:	a bad upstream request (may cause target to target
+ *			abort or master abort)
+ *  - ape-u:		the transfer of bad address/parity upstream.
+ *  - scpe-u:		the transfer of bad split completion upstream.
+ *  - dpe-u:		the device to deliver bad data/parity upstream.
+ *  - retry-to-u:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
+ *
+ * A faulty PCI-X leaf device or bridge may also cause:
+ *
+ *  - tx-oor:		the device sends a byte count larger than the completers
+ *			address range.
+ *  - rx-unex-sc:	the device recieved a split completion with a tag
+ * 			which does not match any outstanding transaction.
+ */
+
+#define	PCI_NOT_HB pcibus/pcidev[fromdev]/pcifn {fromdev != 32}
+
+event error.io.pci.retry-to-u@pcibus/pcidev/pcifn;
+event error.io.pci.nr-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.nr-drw-u@pcibus/pcidev/pcifn;
+event error.io.pci.ta-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.ta-drw-u@pcibus/pcidev/pcifn;
+event error.io.pci.f-dpe-u@pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+event error.io.pci.nonfatal-dpe-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-f-dpdata-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-nf-dpdata-pw-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-f-dpdata-dw-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-nf-dpdata-dw-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-f-dpdata-dr-u@pcibus/pcidev/pcifn;
+event error.io.pci.flt-nf-dpdata-dr-u@pcibus/pcidev/pcifn;
+event error.io.pci.perr-d@pcibus/pcidev/pcifn;
+event error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn;
+event error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.target-rta-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.target-ma-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.tx-oor@pcibus/pcidev/pcifn;
+event error.io.pcix.rx-unex-sc@pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn;
+event error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn;
+event error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn;
+event error.io.device.nf-device@pcibus/pcidev/pcifn;
+event error.io.device.f-device@pcibus/pcidev/pcifn;
+event error.io.pciex.flt-badreq-u@pcibus/pcidev/pcifn;
+
+event ereport.io.pcix.oor@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.unex-sc@pcibus/pcidev/pcifn{within(5s)};
+
+prop fault.io.pci.device-noresp@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.nr-pw-u@PCI_NOT_HB,
+    error.io.pci.nr-drw-u@PCI_NOT_HB,
+    error.io.pci.retry-to-u@PCI_NOT_HB;
+
+prop fault.io.pci.device-interr@pcibus/pcidev[fromdev]/pcifn (0)->
+    error.io.pci.ta-pw-u@PCI_NOT_HB,
+    error.io.pci.ta-drw-u@PCI_NOT_HB,
+    error.io.pci.serr-u@PCI_NOT_HB,
+    error.io.pci.ape-u@PCI_NOT_HB,
+    error.io.pci.f-dpe-u@PCI_NOT_HB,
+    error.io.pci.nf-dpe-u@PCI_NOT_HB,
+    error.io.device.f-device@PCI_NOT_HB,
+    error.io.device.nf-device@PCI_NOT_HB,
+    error.io.pcix.scpe-u@PCI_NOT_HB,
+    error.io.pcix.tx-oor@PCI_NOT_HB,
+    error.io.pcix.rx-unex-sc@PCI_NOT_HB;
+
+prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn {FD_IS_LEAF} (0)->
+    error.io.pciex.flt-badreq-u@PCI_NOT_HB,
+    error.io.pci.badreq-drw-u@PCI_NOT_HB,
+    error.io.pci.badreq-pw-u@PCI_NOT_HB;
 
 prop error.io.pcix.tx-oor@pcibus/pcidev/pcifn (1)->
     ereport.io.pcix.oor@pcibus/pcidev/pcifn;
 
-prop error.io.pcix.rx-discard@pcibus/pcidev/pcifn (1)->
-    ereport.io.pcix.discard@pcibus/pcidev/pcifn;
+prop error.io.pcix.rx-unex-sc@pcibus/pcidev[fromdev]/pcifn (1)->
+    ereport.io.pcix.unex-sc@pcibus/pcidev<todev>/pcifn<> {fromdev != todev};
 
-prop error.io.pcix.rx-unex-sc@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pcix.unex-sc@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.f-dpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.flt-f-dpdata-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.flt-f-dpdata-dw-u@pcibus/pcidev/pcifn,
+    error.io.pci.flt-f-dpdata-dr-u@pcibus/pcidev/pcifn;
 
-/*
- * the rules below are for hostbridge faults above a pci-pci bridge
- */
+prop error.io.pci.flt-f-dpdata-pw-u@pcibus/pcidev/pcifn (2)->
+    error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-pma@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn;
+prop error.io.pci.flt-f-dpdata-pw-u@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-pma@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rx-pma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.flt-f-dpdata-dw-u@pcibus/pcidev/pcifn (3)->
+    error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn,
+    error.io.pci.perr-d@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.rx-pma@pcibus/pcidev/pcifn (3)->
-    error.io.pci.serr@pcibus,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn,
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn;
+prop error.io.pci.flt-f-dpdata-dr-u@pcibus/pcidev/pcifn (2)->
+    error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-dma@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn;
+prop error.io.pci.flt-f-dpdata-dr-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-dma@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.rx-dma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.nonfatal-dpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.flt-nf-dpdata-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.flt-nf-dpdata-dw-u@pcibus/pcidev/pcifn,
+    error.io.pci.flt-nf-dpdata-dr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.rx-dma@pcibus/pcidev/pcifn (2)->
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn<>,
-    error.io.pci.sec-tx-ta@pcibus/pcidev/pcifn;
+prop error.io.pci.flt-nf-dpdata-pw-u@pcibus/pcidev/pcifn (2)->
+    error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.sec-tx-ta@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn;
+prop error.io.pci.flt-nf-dpdata-pw-u@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.sec-tx-ta@pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+prop error.io.pci.flt-nf-dpdata-dw-u@pcibus/pcidev/pcifn (3)->
+    error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn,
+    error.io.pci.perr-d@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.rx-pta@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.tx-pta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.flt-nf-dpdata-dr-u@pcibus/pcidev/pcifn (2)->
+    error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-pta@pcibus/pcidev/pcifn (3)->
-    error.io.pci.serr@pcibus,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.sec-rx-pta@pcibus/pcidev/pcifn;
-
-prop error.io.pci.sec-rx-pta@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn;
-
-prop error.io.pci.sec-rx-pta@pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.rx-dta@pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-ta@pcibus/pcidev/pcifn;
-
-prop error.io.pci.rx-dta@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.sec-rx-dta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.sec-rx-dta@pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.sta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.sec-rx-dta@pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.sec-rx-dta@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.tx-rdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-rdpe@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.bdg-rx-dpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-rx-dpe@pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn,
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn<>,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-rx-dpe@pcibus/pcidev/pcifn (0)->
-    error.io.pci.sec-rx-mdpe@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.sec-rx-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-pwdpe@pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-pwdpe@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.bdg-pwdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-pwdpe@pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn<>,
-    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-pwdpe@pcibus/pcidev/pcifn (1)->
-    error.io.pci.sec-target-mdpe@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.sec-target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.sec-target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-dwdpe@pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-dwdpe@pcibus/pcidev[fromdev]/pcifn (1)->
-    error.io.pci.bdg-dwdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-dwdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-dwdpe@pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
- 
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn (1)->
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev[fromdev]/pcifn (2)->
-    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.dpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.target-rta@pcibus/pcidev<todev>/pcifn<>/pcibus/pcidev/pcifn
-    {fromdev != todev},
-    ereport.io.pci.sta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ta@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.target-ma@pcibus/pcidev<todev>/pcifn<>/pcibus/pcidev/pcifn
-    {fromdev != todev};
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-ape-bdg@pcibus/pcidev[fromdev]/pcifn (0)->
-    error.io.pci.bdg-tx-sec-ape@pcibus/pcidev<todev>/pcifn<>/pcibus/pcidev/pcifn
-    {fromdev != todev};
+prop error.io.pci.flt-nf-dpdata-dr-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn;
 
 /*
- * The rules below are specifically for the pci-pci bridge, in which it
- * sends incorrect data/parity when receiving correct data/parity.
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty pci-pci bridge may also cause
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - nr-pw-d:		the device not to respond to a valid upstream request
+ *  - nr-drw-d:		the device not to respond to a valid upstream request
+ *  - ta-pw-d:		the device responds with a ta to a valid upstream
+ *			request
+ *  - ta-drw-d:		the device responds with a ta to a valid upstream
+ *			request
+ *  - ape-d:	address/parity to get corrupted during downstream transmission.
+ *  - scpe-d:	split completion gets corrupted during downstream transmission.
+ *  - dpe-d:	data/parity to get corrupted during downstream transmission.
+ *  - retry-to-d:	the device to exceed the set timeout for a delayed
+ *			transaction retry.
  */
 
-prop error.io.pci.bdg-tx-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ape-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.f-dpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.retry-to-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.nr-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.nr-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.scpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
 
-prop error.io.pci.bdg-tx-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn<>;
+prop fault.io.pci.device-noresp@pcibus/pcidev/pcifn (0)->
+    error.io.pci.nr-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.nr-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.retry-to-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
 
-prop error.io.pci.bdg-tx-dwdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rx-wdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop fault.io.pci.device-interr@pcibus/pcidev/pcifn (0)->
+    error.io.pci.ta-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.ta-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.ape-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pcix.scpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.f-dpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.nf-dpe-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
 
-prop error.io.pci.bdg-tx-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.bdg-tx-pwdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rx-wdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-tx-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-tx-rdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rx-rdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-tx-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus,
-    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.sec-rx-dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-mdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.sec-rx-dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.dpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.target-rta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.target-ma@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ma@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.bdg-tx-sec-ape@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.rec-ta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+/*
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * A faulty PCI bus may cause:
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ *  - ape-d:	address/parity to get corrupted during downstream transmission.
+ *  - scpe-d:	split completion gets corrupted during downstream transmission.
+ *  - dpe-d:	data/parity to get corrupted during downstream transmission.
+ *  - ape-u:	address/parity to get corrupted during upstream transmission.
+ *  - dpe-u:	data/parity to get corrupted during read upstream transmission.
+ *  - scpe-u:	split completion to get corrupted during upstream transmission.
+ */
 
 fru pcibus;
 asru pcibus;
 
-event fault.io.pci.bus@pcibus,
+event fault.io.pci.bus-linkerr@pcibus,
         FITrate=PCI_BUS_FIT, FRU=pcibus, ASRU=pcibus;
 
-/* A faulty PCI bus may cause:
- *
- *  - tx-dpe:	data/parity to get corrupted during transmission.
- *  - tx-ape:	address/parity to get corrupted during transmission.
- *
- * NOTE: The rules below are valid for pci-pci bridge transactions.
- *
- *  - tx-ape-bdg:	address/parity to get corrupted during transmission.
- *  - tx-pwdpe:	data/parity to get corrupted during posted write transmission
- *		to a pci-pci bridge.
- *  - tx-dwdpe:	data/parity to get corrupted during delayed write transmission
- *		to a pci-pci bridge.
- *  - tx-rdpe:	data/parity to get corrupted during read transmission
- *		to a pci-pci bridge.
- *  - bdg-tx-ape:	address/parity to get corrupted during transmission
- *			from a pci-pci bridge.
- *  - bdg-tx-pwdpe:	data/parity to get corrupted during posted write
- *			transmission from a pci-pci bridge.
- *  - bdg-tx-dwdpe:	data/parity to get corrupted during delayed write
- *			transmission from a pci-pci bridge.
- *  - bdg-tx-rdpe:	data/parity to get corrupted during read transmission
- *			from a pci-pci bridge.
- */
-
-prop fault.io.pci.bus@pcibus (0)->
-    error.io.pci.tx-dpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-ape@pcibus/pcidev/pcifn,
-    error.io.pcix.tx-oor@pcibus/pcidev/pcifn,
-    error.io.pcix.rx-unex-sc@pcibus/pcidev/pcifn;
-
-prop fault.io.pci.bus@pcibus (0)->
-    error.io.pci.tx-ape-bdg@pcibus/pcidev/pcifn,
-    error.io.pci.tx-pwdpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-rdpe@pcibus/pcidev/pcifn,
-    error.io.pci.tx-dwdpe@pcibus/pcidev/pcifn;
-
-prop fault.io.pci.bus@pcibus (0)->
-    error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+prop fault.io.pci.bus-linkerr@pcibus (0)->
+    error.io.pci.ape-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.f-dpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.nf-dpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.ape-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.f-dpe-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pci.nf-dpe-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.scpe-d@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.scpe-u@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.tx-oor@pcibus/pcidev<todev>/pcifn { todev != 32},
+    error.io.pcix.rx-unex-sc@pcibus/pcidev<todev>/pcifn { todev != 32};
 
 /*
- * A defective PCI device driver may cause:
- *
- *  - tx-ma:	a device to not respond because it was power managed and the
- *		driver attempted to access it.
- *  - rx-ma:	a device to address a non-existent device.
- *  - rx-ta:	a device to request a transaction from a target that is invalid
- *		causing a target abort to be received.
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * recursive rules for pci-pci bridges
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
 
-event defect.io.pci.driver@pcibus/pcidev/pcifn;
+event error.io.pci.serr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.perr-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.perr-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.perr-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn;
+event error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.leaf-ape-d@pcibus/pcidev/pcifn;
+event error.io.pci.ape-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-ape-u@pcibus/pcidev/pcifn;
+event error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn;
+event error.io.pci.badreq-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.badreq-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-d@pcibus/pcidev/pcifn;
+event error.io.pci.ta-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.target-rta-d@pcibus/pcidev/pcifn;
+event error.io.pci.target-ma-d@pcibus/pcidev/pcifn;
+event error.io.pci.ta-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.nr-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ta-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.retry-to-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.scpe-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
 
-prop defect.io.pci.driver@pcibus/pcidev/pcifn (0)->
-    error.io.pci.tx-ma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-ma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-ta@pcibus/pcidev/pcifn,
-    error.io.pcix.tx-oor@pcibus/pcidev/pcifn;
-
-/* PCI-PCI devices */
-asru pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-fru pcibus/pcidev/pcifn/pcibus/pcidev;
-
-event fault.io.pci.device@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    FITrate=PCI_DEV_FIT, FRU=pcibus/pcidev/pcifn/pcibus/pcidev,
-    ASRU=pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-event error.io.pci.tx-sec-pma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-dma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.rx-sec-pta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.rx-sec-dta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-serr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pci.sec-dpe@pcibus/pcidev/pcifn;
-
-event ereport.io.pci.target-rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sec-ma@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.pci.sec-sta@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sec-rta@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.dto@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-spl-dis@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.spl-dis@pcibus/pcidev/pcifn{within(5s)};
 
 /*
- * A faulty PCI device off of a pci-pci bridge may cause:
- *
- *  - tx-sec-pma:	the device not to respond to a valid request during a
- *			posted transaction.
- *  - tx-sec-dma:	the device not to respond to a valid request during a
- *			delayed transaction.
- *  - rx-sec-pta:	the device to receive a target abort during a posted
- *			transaction.
- *  - rx-sec-dta:	the device to receive a target abort during a delayed
- *			transaction.
- *  - tx-sec-serr:	the device to signal a system error.
- *  - tx-sec-ape:	the transfer of bad address/parity. We must see sec_dpe/
- *			sserr/rec_serr. The initiator will only see the PERR# -
- *			so may raise mdpe. Another device on the secondary bus
- *			could detect and report the ape. The bridge could target
- *			abort or master abort or pass the request up to the 
- *			primary bus.
- *  - tx-sec-pwdpe:	the device to deliver bad data/parity during a posted
- *			write.
- *  - tx-sec-dwdpe:	the device to deliver bad data/parity during a delayed
- *			write.
- *  - tx-sec-rdpe:	the device to deliver bad data/parity during a read.
- *  - dto:		the device to exceed the set timeout for a delayed
- *			transaction.
- *  - rx-pma:		the device to send a bad address to the primary side
- *			bus during a posted transaction.
- *  - rx-dma:		the device to send a bad address to the primary side bus
- *			during a delayed transaction.
+ * SERR# can propagate upstream and may be seen by other devices on the bus
  */
-prop fault.io.pci.device@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.tx-sec-pma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-dma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-sec-pta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-sec-dta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-serr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-pma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-dma@pcibus/pcidev/pcifn,
+prop error.io.pci.serr-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<> {todev!=fromdev};
 
-    ereport.io.pci.dto@pcibus/pcidev/pcifn;
+prop error.io.pci.serr-u@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.sserr@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-sec-pma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.tx-sec-dma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn,
-    ereport.io.pci.sta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.tx-sec-dma@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rec-ta@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.rx-sec-pta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    error.io.pci.rx-ta@pcibus/pcidev/pcifn<>,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.rx-sec-dta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.rx-sec-dta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn,
-    error.io.pci.rx-ta@pcibus/pcidev/pcifn<>;
-
-prop error.io.pci.tx-sec-serr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+prop error.io.pci.serr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
     ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
-    error.io.pci.rec-mdpe@pcibus/pcidev/pcifn<>,
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-pwdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.sec-dpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.sec-dpe@pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+/*
+ * PERR# can propagate upstream for delayed writes. For posted writes
+ * it turns into an SERR#.
+ */
+prop error.io.pci.perr-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
     ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.perr-dw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.perr-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+/*
+ * PERR# can propagate downstream (only for downstream dw parity error)
+ */
+prop error.io.pci.perr-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.perr-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.perr-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.perr-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+/*
+ * downstream target ereports are for any descendant device
+ *
+ * A hostbridge driver may generate "target-" ereports when knowledge of the
+ * physical address associated with a fault allows the target device to be
+ * determined. This is not a requirement of the Diagnosis Engine, but can be
+ * valuable when available.
+ */
+prop error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.target-rta-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.target-rta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.target-rta-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-rta-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.target-ma-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.target-ma@pcibus/pcidev/pcifn;
+
+prop error.io.pci.target-ma-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-ma-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+/*
+ * target aborts propagate upstream
+ */
+prop error.io.pci.ta-u@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)->
+    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn,
+    error.io.pci.ta-u@pcibus/pcidev/pcifn;
+
+/*
+ * bad data (ie invalid but not an ape or dpe) can propagate downstream,
+ * and at some point may result in a target or master abort
+ */
+prop error.io.pci.badreq-pw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.badreq-pw-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>,
+    error.io.pci.nr-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-pw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-pw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    error.io.pci.nr-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-pw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-drw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.badreq-drw-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>,
+    error.io.pci.nr-drw-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-drw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-drw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    error.io.pci.nr-drw-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-drw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)-> 
+    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-u@pcibus/pcidev/pcifn { IS_LEAF } (0)-> 
+    ereport.io.pci.sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-u@pcibus/pcidev/pcifn { IS_BDG } (1)-> 
+    ereport.io.pci.sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (2)-> 
+    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.ma-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.target-rta-d@pcibus/pcidev/pcifn,
+    error.io.pci.target-ma-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    error.io.pci.ma-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-drw-u@pcibus/pcidev/pcifn (1)-> 
+    error.io.pci.ta-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-drw-u@pcibus/pcidev/pcifn (1)-> 
+    error.io.pci.target-rta-d@pcibus/pcidev/pcifn;
+
+/*
+ * bad data (ie invalid but not an ape or dpe) can propagate upstream,
+ * and at some point may result in a target or master abort
+ */
+prop error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.nr-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
+    error.io.pci.ta-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn (0)->
+    error.io.pci.nr-pw-d@pcibus/pcidev/pcifn,
+    error.io.pci.ta-pw-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-pw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.ma@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-pw-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.ma@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.rta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-pw-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.rta@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+/*
+ * for delayed writes we treat upstream badreq specially as rta always
+ * propagates back downstream to the leaf
+ */
+prop error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.rta@pcibus/pcidev/pcifn,
+    ereport.io.pci.ma@pcibus/pcidev/pcifn; 
+
+prop error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.ma@pcibus/pcidev/pcifn,
+    ereport.io.pci.rta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.ma@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.ma@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-d@pcibus/pcidev/pcifn { IS_BDG } (0)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nr-drw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.ta-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>,
+    error.io.pci.nr-drw-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.ta-drw-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-drw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.ta-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.rta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn,
+    ereport.io.pci.rta@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ta-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.ta-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+/*
+ * Request with address parity error must be detected by parent device
+ * and can optionally result in a target or master abort.
+ * It may also be detected by sibling devices on a bus
+ */
+prop error.io.pci.ape-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+    ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-u@pcibus/pcidev/pcifn (0)->
+    error.io.pci.nr-drw-d@pcibus/pcidev/pcifn,
+    error.io.pci.ta-drw-d@pcibus/pcidev/pcifn,
+    error.io.pci.nr-pw-d@pcibus/pcidev/pcifn,
+    error.io.pci.ta-pw-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-u@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-u@pcibus/pcidev[fromdev]/pcifn (0)->
+    ereport.io.pci.dpe@pcibus/pcidev<todev>/pcifn<> {fromdev != todev},
+    ereport.io.pci.sserr@pcibus/pcidev<todev>/pcifn<> {fromdev != todev};
+
+prop error.io.pci.ape-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-ape-u@pcibus/pcidev/pcifn;
+
+/*
+ * If the bridge sees an upstream split completion error (pci-x only) it could
+ * result in a number of things
+ * - for various faults in the split completion (eg address parity error)
+ *   we will respond with a target abort (which the child device will treat
+ *   as a split completion ta)
+ * - for other faults we can't tell who send the split completion and so
+ *   just drop the request (which the child device sees as a split
+ *   completion ma)
+ */
+prop error.io.pcix.scpe-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.scpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn,
+    error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.sserr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.spl-dis@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ma-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pcix.spl-dis@pcibus/pcidev/pcifn,
+    ereport.io.pci.ma@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.sserr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.spl-dis@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ta-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pcix.spl-dis@pcibus/pcidev/pcifn,
+    ereport.io.pci.rta@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.scpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn;
+
+/*
+ * request with address parity error must be detected by child device
+ * and can optionally result in a target or master abort.
+ */
+prop error.io.pci.ape-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    error.io.pci.leaf-ape-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.leaf-ape-d@pcibus/pcidev/pcifn { IS_LEAF } (2)->
+    ereport.io.pci.sserr@pcibus/pcidev/pcifn,
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.ape-d@pcibus/pcidev/pcifn (0)->
+    error.io.pci.ta-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.ta-drw-u@pcibus/pcidev/pcifn,
+    error.io.pci.nr-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.nr-drw-u@pcibus/pcidev/pcifn;
+
+/*
+ * If the device sees a downstream split completion error (pci-x only) it could
+ * result in a number of things
+ * - for various faults in the split completion (eg address parity error)
+ *   we will respond with a target abort (which the parent bridge will treat
+ *   as a split completion ta)
+ * - for other faults we can't tell who send the split completion and so
+ *   just drop the request (which the parent bridge sees as a split
+ *   completion ma)
+ */
+prop error.io.pcix.scpe-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.sta@pcibus/pcidev/pcifn,
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sserr@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.scpe-d@pcibus/pcidev/pcifn (1)->
+    error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn,
+    error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ma-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+    ereport.io.pcix.sec-spl-dis@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-ma@pcibus/pcidev/pcifn;
+
+prop error.io.pcix.spl-comp-ta-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+    ereport.io.pcix.sec-spl-dis@pcibus/pcidev/pcifn,
+    error.io.pci.serr-u@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-rta@pcibus/pcidev/pcifn;
+
+/*
+ * request with data parity error can propagate upstream
+ *
+ * for PCI/X (but not PCI) the split write can optionally be forwarded across
+ * the bridge, maintaining bad parity/ecc
+ *
+ * if there is a dpe on a retry on a delayed write, we don't send another
+ * retry, and eventually the dto timer will expire
+ */
+prop error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-pw-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
     ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-sec-rdpe@pcibus/pcidev[fromdev]/pcifn/pcibus/pcidev/pcifn (1)->
-    error.io.pci.rx-rdpe@pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
+prop error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn;
 
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
+prop error.io.pci.dpdata-dw-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    error.io.pci.retry-to-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (3)->
     ereport.io.pci.sec-dpe@pcibus/pcidev/pcifn,
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn<>,
-    error.io.pci.serr@pcibus;
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.mdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    ereport.io.pci.target-mdpe@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev[fromdev]/pcifn (0)->
-    ereport.io.pci.dpe@pcibus/pcidev/pcifn/pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev},
-    ereport.io.pci.sserr@pcibus/pcidev/pcifn/pcibus/pcidev<todev>/pcifn<>
-    {fromdev != todev};
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-rserr@pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-sta@pcibus/pcidev/pcifn,
-    ereport.io.pci.target-rta@pcibus/pcidev/pcifn,
-    ereport.io.pci.rta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.target-ma@pcibus/pcidev/pcifn,
-    ereport.io.pci.ma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.bdg-tx-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-
-asru pcibus/pcidev;
-fru pcibus/pcidev/pcifn/pcibus;
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dr-u@pcibus/pcidev/pcifn;
 
 /*
- * A faulty secondary side PCI bus may cause:
+ * Request with data parity error can propagate downstream. A hardened
+ * leaf driver should handle the error, but may or may not be able to
+ * avoid service impact. We handle to two cases separately. If there is
+ * service impact we will fail immediately, if not we will feed into a SERD
+ * engine.
  *
- *  - tx-sec-ape:	the transfer of bad address/parity when the secondary
- *			bus is the originator.
- *  - tx-sec-pwdpe:	the transfer of bad data/parity during a posted write.
- *  - tx-sec-dwdpe:	the transfer of bad data/parity during a delayed write.
- *  - tx-sec-rdpe:	the transfer of bad data/parity during a read.
- *  - bdg-tx-sec-ape:	the transfer of bad address/parity when the secondary
- *			bus is the destination.
- *  - bdg-tx-sec-rdpe:	the transfer from the bridge of bad data/parity during a
- *			read.
- *  - bdg-tx-sec-pwdpe:	the transfer from the bridge of bad data/parity during a
- *			posted write.
- *  - bdg-tx-sec-dwdpe:	the transfer from the bridge of bad data/parity during a
- *			delayed write.
+ * for PCI/X (but not PCI) the split write can optionally be forwarded across
+ * the bridge, maintaining bad parity/ecc
+ *
+ * if there is a dpe on a retry on a delayed write, we don't send another
+ * retry, and eventually the dto timer will expire
  */
-event fault.io.pci.bus@pcibus/pcidev/pcifn/pcibus,
-    FITrate=PCI_BUS_FIT, FRU=pcibus/pcidev/pcifn/pcibus,
-    ASRU=pcibus/pcidev;
+prop error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn (2)->
+    error.io.pci.perr-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn;
 
+prop error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
 
-prop fault.io.pci.bus@pcibus/pcidev/pcifn/pcibus (0)->
-    error.io.pci.tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-ape@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-rdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-pwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.bdg-tx-sec-dwdpe@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+prop error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-pw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn (2)->
+    error.io.pci.perr-pw-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-pw-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.dpdata-pw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn (3)->
+    error.io.pci.perr-dw-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn,
+    error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dw-d@pcibus/pcidev/pcifn { IS_BDG } (0)->
+    error.io.pci.retry-to-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn (3)->
+    error.io.pci.perr-dw-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn,
+    error.io.pci.target-mdpe-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dw-d@pcibus/pcidev/pcifn { IS_BDG } (0)->
+    error.io.pci.retry-to-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.sec-mdpe@pcibus/pcidev/pcifn,
+    error.io.pci.dpdata-dw-fwd-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn (2)->
+    error.io.pci.perr-dr-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.f-dpdata-dr-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+
+prop error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn (2)->
+    error.io.pci.perr-dr-u@pcibus/pcidev/pcifn,
+    error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn { IS_BDG } (2)->
+    ereport.io.pci.dpe@pcibus/pcidev/pcifn,
+    ereport.io.pci.mdpe@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn (1)->
+    error.io.pci.nf-dpdata-dr-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
 
 /*
- * A defective device driver of a device that is off of a pci-pci bridge may
- * cause:
- *
- *  - tx-sec-pma:	the device to not respond to a posted transaction.
- *  - tx-sec-dma:	the device to not respond to a delayed transaction.
- *  - rx-sec-pta:	the device to receive a target abort during a posted
- *			transaction.
- *  - rx-sec-dta:	the device to receive a target abort during a delayed
- *			transaction.
- *  - rx-pma:		the device to send a bad address to the primary side bus
- *			during a posted transaction.
- *  - rx-dma:		the device to send a bad address to the primary side bus
- *			during a delayed transaction.
+ * delayed read/write retry timeout can cause dto at a bridge
+ */
+prop error.io.pci.retry-to-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    error.io.pci.retry-to-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.retry-to-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.dto@pcibus/pcidev/pcifn;
+
+prop error.io.pci.retry-to-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.retry-to-d@pcibus/pcidev/pcifn (0)->
+    error.io.pci.retry-to-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+
+prop error.io.pci.retry-to-d@pcibus/pcidev/pcifn { IS_BDG } (1)->
+    ereport.io.pci.dto@pcibus/pcidev/pcifn;
+
+prop error.io.pci.retry-to-d@pcibus/pcidev/pcifn { IS_BDG } (0)->
+    error.io.pci.serr-u@pcibus/pcidev/pcifn;
+
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * source- propagations.
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+event error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.source-ape-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.service.restored@pcibus/pcidev/pcifn;
+
+event ereport.io.service.lost@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.service.degraded@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.service.unaffected@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.service.restored@pcibus/pcidev/pcifn{within(30s)};
+
+prop error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.service.lost@pcibus/pcidev/pcifn,
+    ereport.io.service.degraded@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.service.lost@pcibus/pcidev/pcifn,
+    ereport.io.service.degraded@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.service.lost@pcibus/pcidev/pcifn,
+    ereport.io.service.degraded@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pci.source-ape-u@pcibus/pcidev/pcifn (1)->
+    error.io.pci.source-ape-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+prop error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn (1)->
+    error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
+    
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * Handling of leaf driver detected internal errors. Use serd engine if
+ * no service impact - otherwise fail immediately
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+event ereport.io.device.inval_state@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.no_response@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.stall@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.badint_limit@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.nf-device@pcibus/pcidev/pcifn;
+
+prop error.io.service.restored@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.lost@pcibus/pcidev/pcifn,
+    ereport.io.service.degraded@pcibus/pcidev/pcifn;
+
+prop error.io.service.restored@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.restored@pcibus/pcidev/pcifn;
+
+prop error.io.device.f-device@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.device.inval_state@pcibus/pcidev/pcifn,
+    ereport.io.device.no_response@pcibus/pcidev/pcifn,
+    ereport.io.device.stall@pcibus/pcidev/pcifn,
+    ereport.io.device.badint_limit@pcibus/pcidev/pcifn;
+
+prop error.io.device.f-device@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.lost@pcibus/pcidev/pcifn,
+    ereport.io.service.degraded@pcibus/pcidev/pcifn;
+
+engine serd.io.device.nonfatal@pcibus/pcidev/pcifn,
+    N=NONFATAL_COUNT, T=NONFATAL_TIME, method=persistent,
+    trip=ereport.io.device.nf-device@pcibus/pcidev/pcifn;
+
+event upset.io.device.nonfatal@pcibus/pcidev/pcifn,
+    engine=serd.io.device.nonfatal@pcibus/pcidev/pcifn;
+
+prop error.io.device.nf-device@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.device.nf-device@pcibus/pcidev/pcifn;
+
+prop error.io.device.nf-device@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    ereport.io.device.inval_state@pcibus/pcidev/pcifn,
+    ereport.io.device.no_response@pcibus/pcidev/pcifn,
+    ereport.io.device.stall@pcibus/pcidev/pcifn,
+    ereport.io.device.badint_limit@pcibus/pcidev/pcifn,
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop upset.io.device.nonfatal@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.device.inval_state@pcibus/pcidev/pcifn,
+    ereport.io.device.no_response@pcibus/pcidev/pcifn,
+    ereport.io.device.stall@pcibus/pcidev/pcifn,
+    ereport.io.device.badint_limit@pcibus/pcidev/pcifn;
+
+prop upset.io.device.nonfatal@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * Handling of pci express nonfatal errors (dpe). Use serd engine if
+ * no service impact - otherwise fail immediately
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ */
+event ereport.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
+event ereport.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+
+engine serd.io.pci.nf-dpe-u@pcibus/pcidev/pcifn,
+    N=NONFATAL_DPE_U_COUNT, T=NONFATAL_DPE_U_TIME, method=persistent,
+    trip=ereport.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+
+event upset.io.pci.nf-dpe-u@pcibus/pcidev/pcifn,
+    engine=serd.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpe-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpe-u@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    error.io.pci.nonfatal-dpe-u@pcibus/pcidev/pcifn,
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop upset.io.pci.nf-dpe-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    error.io.pci.nonfatal-dpe-u@pcibus/pcidev/pcifn;
+
+prop upset.io.pci.nf-dpe-u@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+engine serd.io.pci.nf-dpe-d@pcibus/pcidev/pcifn,
+    N=NONFATAL_DPE_D_COUNT, T=NONFATAL_DPE_D_TIME, method=persistent,
+    trip=ereport.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
+
+event upset.io.pci.nf-dpe-d@pcibus/pcidev/pcifn,
+    engine=serd.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpe-d@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
+
+prop error.io.pci.nf-dpe-d@pcibus/pcidev/pcifn { IS_LEAF } (0)->
+    error.io.pci.nonfatal-dpe-d@pcibus/pcidev/pcifn,
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+prop upset.io.pci.nf-dpe-d@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    error.io.pci.nonfatal-dpe-d@pcibus/pcidev/pcifn;
+
+prop upset.io.pci.nf-dpe-d@pcibus/pcidev/pcifn { IS_LEAF } (1)->
+    ereport.io.service.unaffected@pcibus/pcidev/pcifn,
+    error.io.service.restored@pcibus/pcidev/pcifn;
+
+/*
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * stub unused ereports
+ * - ignore rx-spl as we can't tell what message it was (and we should have
+ *   diagnosed the problem anyway from standard pci ereports)
+ * - ignore sec-spl-or/sec-spl-dly as these aren't really faults (tuning info)
+ * - ignore unex-spl/sec-unex-spl
+ * - ignore ecc.ue ereports (we get everything we need from dpe/mdpe)
+ * - ignore ecc.ce ereports for now (could do serd on these)
+ * - ignore nr ereport
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
 
-event defect.io.pci.driver@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event ereport.io.pci.nr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.unex-spl@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.rx-spl@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-unex-spl@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-spl-or@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-spl-dly@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ce-addr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ce-attr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ce-data@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ue-addr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ue-attr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.ecc.ue-data@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.s-ce@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.s-ue@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-addr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-attr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-data@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-addr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-attr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-data@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-s-ce@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pcix.sec-s-ue@pcibus/pcidev/pcifn{within(5s)};
 
-prop defect.io.pci.driver@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn (0)->
-    error.io.pci.tx-sec-pma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.tx-sec-dma@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-sec-pta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-sec-dta@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn,
-    error.io.pci.rx-pma@pcibus/pcidev/pcifn,
-    error.io.pci.rx-dma@pcibus/pcidev/pcifn;
+event upset.io.pcix.discard@pcibus/pcidev/pcifn;
+
+prop upset.io.pcix.discard@pcibus/pcidev/pcifn (1)->
+    ereport.io.pci.nr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.rx-spl@pcibus/pcidev/pcifn,
+    ereport.io.pcix.unex-spl@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-unex-spl@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-spl-or@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-spl-dly@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ce-addr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ce-attr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ce-data@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ue-addr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ue-attr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.ecc.ue-data@pcibus/pcidev/pcifn,
+    ereport.io.pcix.s-ce@pcibus/pcidev/pcifn,
+    ereport.io.pcix.s-ue@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ce-addr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ce-attr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ce-data@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ue-addr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ue-attr@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-ecc.ue-data@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-s-ce@pcibus/pcidev/pcifn,
+    ereport.io.pcix.sec-s-ue@pcibus/pcidev/pcifn;

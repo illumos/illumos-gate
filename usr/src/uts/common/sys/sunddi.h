@@ -1874,12 +1874,18 @@ pci_ereport_teardown(dev_info_t *dip);
 void
 pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *status);
 
-void
-pci_bdg_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *status);
-
+#if defined(__i386) || defined(__amd64)
 int
-pci_bdg_check_status(dev_info_t *dip, ddi_fm_error_t *derr,
-    uint16_t pci_cfg_stat, uint16_t pci_cfg_sec_stat);
+pci_peekpoke_check(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *,
+	int (*handler)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
+	void *), kmutex_t *, kmutex_t *);
+#endif
+
+void
+pci_target_enqueue(uint64_t, char *, char *, uint64_t);
+
+void
+pci_targetq_init(void);
 
 /*
  * the prototype for the C Language Type Model inquiry.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -165,6 +164,8 @@ extern void impl_acc_hdl_init(ddi_acc_hdl_t *hp);
 
 /* access error handling support */
 extern void impl_acc_err_init(ddi_acc_hdl_t *);
+extern int impl_dma_check(dev_info_t *, const void *, const void *,
+    const void *);
 extern int i_ddi_ontrap(ddi_acc_handle_t);
 extern void i_ddi_notrap(ddi_acc_handle_t);
 extern int i_ddi_prot_trampoline();

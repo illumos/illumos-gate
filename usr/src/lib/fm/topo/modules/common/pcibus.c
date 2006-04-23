@@ -464,8 +464,8 @@ pci_enum(topo_mod_t *ignored, tnode_t *troot, const char *name,
 
 	if (strcmp(name, PCI_BUS) != 0 && strcmp(name, PCIEX_BUS) != 0) {
 		topo_mod_dprintf(PciHdl,
-		    "Currently only know how to enumerate %s or %s.\n",
-		    PCI_BUS, PCIEX_BUS);
+		    "Currently only know how to enumerate %s or %s not %s.\n",
+		    PCI_BUS, PCIEX_BUS, name);
 		return (0);
 	}
 	pname = topo_node_name(troot);

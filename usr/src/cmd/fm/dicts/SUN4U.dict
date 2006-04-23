@@ -261,3 +261,4 @@ fault.io.oberon=230
 fault.cpu.SPARC64-VI.chip=231
 fault.cpu.SPARC64-VI.core=232
 fault.cpu.SPARC64-VI.strand=233
+fault.io.pci.device-invreq fault.io.tomatillo=234

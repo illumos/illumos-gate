@@ -39,6 +39,9 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
+#include <sys/ddifm.h>
+#include <sys/ndifm.h>
+#include <sys/fm/protocol.h>
 #include <sys/hotplug/pci/pcihp.h>
 #if defined(__i386) || defined(__amd64)
 #include <sys/pci_intr_lib.h>
@@ -73,6 +76,11 @@ static int ppb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
 static int ppb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
+static int	ppb_fm_init(dev_info_t *, dev_info_t *, int,
+		    ddi_iblock_cookie_t *);
+
+static int	ppb_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
+
 #if defined(__i386) || defined(__amd64)
 static int ppb_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
 	ddi_intr_handle_impl_t *, void *);
@@ -112,7 +120,7 @@ struct bus_ops ppb_bus_ops = {
 	0,		/* (*bus_intr_ctl)();		*/
 	0,		/* (*bus_config)(); 		*/
 	0,		/* (*bus_unconfig)(); 		*/
-	NULL,		/* (*bus_fm_init)(); 		*/
+	ppb_fm_init,	/* (*bus_fm_init)(); 		*/
 	NULL,		/* (*bus_fm_fini)(); 		*/
 	NULL,		/* (*bus_fm_access_enter)(); 	*/
 	NULL,		/* (*bus_fm_access_exit)(); 	*/
@@ -198,6 +206,10 @@ static void *ppb_state;
 typedef struct {
 
 	dev_info_t *dip;
+	int ppb_fmcap;
+	ddi_iblock_cookie_t ppb_fm_ibc;
+	kmutex_t ppb_peek_poke_mutex;
+	kmutex_t ppb_err_mutex;
 
 #if defined(__sparc)
 	/*
@@ -323,7 +335,37 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		ppb = ddi_get_soft_state(ppb_state, instance);
 		ppb->dip = devi;
+
+		/*
+		 * don't enable ereports if immediate child of npe
+		 */
+		if (strcmp(ddi_driver_name(ddi_get_parent(devi)), "npe") == 0)
+			ppb->ppb_fmcap = DDI_FM_ERRCB_CAPABLE |
+			    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+		else
+			ppb->ppb_fmcap = DDI_FM_EREPORT_CAPABLE |
+			    DDI_FM_ERRCB_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+			    DDI_FM_DMACHK_CAPABLE;
+
+		ddi_fm_init(devi, &ppb->ppb_fmcap, &ppb->ppb_fm_ibc);
+		mutex_init(&ppb->ppb_err_mutex, NULL, MUTEX_DRIVER,
+		    (void *)ppb->ppb_fm_ibc);
+		mutex_init(&ppb->ppb_peek_poke_mutex, NULL, MUTEX_DRIVER,
+		    (void *)ppb->ppb_fm_ibc);
+
+		if (ppb->ppb_fmcap & (DDI_FM_ERRCB_CAPABLE |
+		    DDI_FM_EREPORT_CAPABLE))
+			pci_ereport_setup(devi);
+		if (ppb->ppb_fmcap & DDI_FM_ERRCB_CAPABLE)
+		    ddi_fm_handler_register(devi, ppb_fm_callback, NULL);
+
 		if (pci_config_setup(devi, &config_handle) != DDI_SUCCESS) {
+			if (ppb->ppb_fmcap & DDI_FM_ERRCB_CAPABLE)
+				ddi_fm_handler_unregister(devi);
+			if (ppb->ppb_fmcap & (DDI_FM_ERRCB_CAPABLE |
+			    DDI_FM_EREPORT_CAPABLE))
+				pci_ereport_teardown(devi);
+			ddi_fm_fini(devi);
 			ddi_soft_state_free(ppb_state, instance);
 			return (DDI_FAILURE);
 		}
@@ -371,6 +413,17 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, devi, "device_type");
+
+		ppb = ddi_get_soft_state(ppb_state, ddi_get_instance(devi));
+		if (ppb->ppb_fmcap & DDI_FM_ERRCB_CAPABLE)
+			ddi_fm_handler_unregister(devi);
+		if (ppb->ppb_fmcap & (DDI_FM_ERRCB_CAPABLE |
+		    DDI_FM_EREPORT_CAPABLE))
+			pci_ereport_teardown(devi);
+		mutex_destroy(&ppb->ppb_peek_poke_mutex);
+		mutex_destroy(&ppb->ppb_err_mutex);
+		ddi_fm_fini(devi);
+
 		/*
 		 * And finally free the per-pci soft state.
 		 */
@@ -414,6 +467,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int	reglen;
 	int	rn;
 	int	totreg;
+	ppb_devstate_t *ppb;
 
 	switch (ctlop) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -440,6 +494,15 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		if (rdip == (dev_info_t *)0)
 			return (DDI_FAILURE);
 		break;
+
+	case DDI_CTLOPS_PEEK:
+	case DDI_CTLOPS_POKE:
+		ppb = ddi_get_soft_state(ppb_state, ddi_get_instance(dip));
+		if (strcmp(ddi_driver_name(ddi_get_parent(dip)), "npe") != 0)
+			return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+		return (pci_peekpoke_check(dip, rdip, ctlop, arg, result,
+		    ddi_ctlops, &ppb->ppb_err_mutex,
+		    &ppb->ppb_peek_poke_mutex));
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
@@ -984,4 +1047,31 @@ static int
 ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
+}
+
+/*ARGSUSED*/
+static int
+ppb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
+    ddi_iblock_cookie_t *ibc)
+{
+	ppb_devstate_t  *ppb = ddi_get_soft_state(ppb_state,
+	    ddi_get_instance(dip));
+
+	ASSERT(ibc != NULL);
+	*ibc = ppb->ppb_fm_ibc;
+
+	return (ppb->ppb_fmcap);
+}
+
+/*ARGSUSED*/
+static int
+ppb_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
+{
+	ppb_devstate_t  *ppb = ddi_get_soft_state(ppb_state,
+	    ddi_get_instance(dip));
+
+	mutex_enter(&ppb->ppb_err_mutex);
+	pci_ereport_post(dip, derr, NULL);
+	mutex_exit(&ppb->ppb_err_mutex);
+	return (derr->fme_status);
 }

@@ -113,8 +113,6 @@ bge_recycle_ring(bge_t *bgep, send_ring_t *srp)
 	 *	we're not about to free more places than were claimed!
 	 */
 	ASSERT(srp->tx_free > 0);
-	ASSERT(srp->tx_free < srp->desc.nslots);
-	ASSERT(srp->tx_free + n <= srp->desc.nslots);
 
 	srp->tc_next = slot;
 	bge_atomic_renounce(&srp->tx_free, n);
@@ -412,7 +410,6 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	 *	there must be at least one place NOT free (ours!)
 	 */
 	ASSERT(srp->tx_free > 0);
-	ASSERT(srp->tx_free < srp->desc.nslots);
 
 	if ((status = bge_send_copy(bgep, mp, srp, tci)) == SEND_FAIL) {
 		/*
@@ -437,6 +434,8 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	if (--srp->tx_flow == 0) {
 		DMA_SYNC(srp->desc, DDI_DMA_SYNC_FORDEV);
 		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+			bgep->bge_chip_state = BGE_CHIP_ERROR;
 	}
 	mutex_exit(srp->tx_lock);
 

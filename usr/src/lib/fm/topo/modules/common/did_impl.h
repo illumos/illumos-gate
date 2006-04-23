@@ -80,6 +80,7 @@ typedef struct did {
 	int dp_bus;		/* PCI bus number */
 	int dp_dev;		/* PCI device number on the above bus */
 	int dp_fn;		/* PCI function number of the above device */
+	int dp_bdf;		/* PCI "real" bdf */
 	/*
 	 * There may be some slot name info on devinfo node for a bus or
 	 * hostbridge.  We'll copy or reference it for child nodes of that

@@ -395,8 +395,9 @@ extern "C" {
 /*
  * AER Uncorrectable Error Status/Mask/Severity Register
  */
-#define	PCIE_AER_UCE_TRAINING		0x0	/* Training Error Status */
+#define	PCIE_AER_UCE_TRAINING		0x1	/* Training Error Status */
 #define	PCIE_AER_UCE_DLP		0x10	/* Data Link Protocol Error */
+#define	PCIE_AER_UCE_SD			0x20	/* Link Surprise down */
 #define	PCIE_AER_UCE_PTLP		0x1000	/* Poisoned TLP Status */
 #define	PCIE_AER_UCE_FCP		0x2000	/* Flow Control Protocol Sts */
 #define	PCIE_AER_UCE_TO			0x4000	/* Completion Timeout Status */
@@ -405,11 +406,14 @@ extern "C" {
 #define	PCIE_AER_UCE_RO			0x20000	/* Receiver Overflow Status */
 #define	PCIE_AER_UCE_MTLP		0x40000	/* Malformed TLP Status */
 #define	PCIE_AER_UCE_ECRC		0x80000	/* ECRC Error Status */
-#define	PCIE_AER_UCE_UR		0x100000	/* Unsupported Req */
+#define	PCIE_AER_UCE_UR			0x100000 /* Unsupported Req */
 #define	PCIE_AER_UCE_BITS		(PCIE_AER_UCE_TRAINING | \
-    PCIE_AER_UCE_DLP | PCIE_AER_UCE_PTLP | PCIE_AER_UCE_FCP | \
-    PCIE_AER_UCE_TO | PCIE_AER_UCE_CA | PCIE_AER_UCE_UC | PCIE_AER_UCE_RO | \
-    PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC | PCIE_AER_UCE_UR)
+    PCIE_AER_UCE_DLP | PCIE_AER_UCE_SD | PCIE_AER_UCE_PTLP | \
+    PCIE_AER_UCE_FCP | PCIE_AER_UCE_TO | PCIE_AER_UCE_CA | \
+    PCIE_AER_UCE_UC | PCIE_AER_UCE_RO | PCIE_AER_UCE_MTLP | \
+    PCIE_AER_UCE_ECRC | PCIE_AER_UCE_UR)
+#define	PCIE_AER_UCE_LOG_BITS		(PCIE_AER_UCE_PTLP | PCIE_AER_UCE_CA | \
+    PCIE_AER_UCE_UC | PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC | PCIE_AER_UCE_UR)
 
 /*
  * AER Correctable Error Status/Mask Register
@@ -419,6 +423,7 @@ extern "C" {
 #define	PCIE_AER_CE_BAD_DLLP		0x80	/* Bad DLLP Status */
 #define	PCIE_AER_CE_REPLAY_ROLLOVER	0x100	/* REPLAY_NUM Rollover Status */
 #define	PCIE_AER_CE_REPLAY_TO		0x1000	/* Replay Timer Timeout Sts */
+#define	PCIE_AER_CE_AD_NFE		0x2000	/* Advisory Non-Fatal Status */
 #define	PCIE_AER_CE_BITS		(PCIE_AER_CE_RECEIVER_ERR | \
     PCIE_AER_CE_BAD_TLP | PCIE_AER_CE_BAD_DLLP | PCIE_AER_CE_REPLAY_ROLLOVER | \
     PCIE_AER_CE_REPLAY_TO)
@@ -477,6 +482,13 @@ extern "C" {
 #define	PCIE_AER_SUCE_PERR_ASSERT	0x800	/* PERR Assertion Detected */
 #define	PCIE_AER_SUCE_SERR_ASSERT	0x1000	/* SERR Assertion Detected */
 #define	PCIE_AER_SUCE_INTERNAL_ERR	0x2000	/* Internal Bridge Err Detect */
+
+#define	PCIE_AER_SUCE_HDR_CMD_LWR_MASK	0xF	/* Lower Command Mask */
+#define	PCIE_AER_SUCE_HDR_CMD_LWR_SHIFT	4	/* Lower Command Shift */
+#define	PCIE_AER_SUCE_HDR_CMD_UP_MASK	0xF	/* Upper Command Mask */
+#define	PCIE_AER_SUCE_HDR_CMD_UP_SHIFT	8	/* Upper Command Shift */
+#define	PCIE_AER_SUCE_HDR_ADDR_SHIFT	32	/* Upper Command Shift */
+
 #define	PCIE_AER_SUCE_BITS		(PCIE_AER_SUCE_TA_ON_SC | \
     PCIE_AER_SUCE_MA_ON_SC | PCIE_AER_SUCE_RCVD_TA | PCIE_AER_SUCE_RCVD_MA | \
     PCIE_AER_SUCE_USC_ERR | PCIE_AER_SUCE_USC_MSG_DATA_ERR | \
@@ -484,6 +496,11 @@ extern "C" {
     PCIE_AER_SUCE_UC_ADDR_ERR |	PCIE_AER_SUCE_TIMER_EXPIRED | \
     PCIE_AER_SUCE_PERR_ASSERT |	PCIE_AER_SUCE_SERR_ASSERT | \
     PCIE_AER_SUCE_INTERNAL_ERR)
+#define	PCIE_AER_SUCE_LOG_BITS		(PCIE_AER_SUCE_TA_ON_SC | \
+    PCIE_AER_SUCE_MA_ON_SC | PCIE_AER_SUCE_RCVD_TA | PCIE_AER_SUCE_RCVD_MA | \
+    PCIE_AER_SUCE_USC_ERR | PCIE_AER_SUCE_USC_MSG_DATA_ERR | \
+    PCIE_AER_SUCE_UC_DATA_ERR | PCIE_AER_SUCE_UC_ATTR_ERR | \
+    PCIE_AER_SUCE_UC_ADDR_ERR |	PCIE_AER_SUCE_PERR_ASSERT)
 
 /*
  * AER Secondary Capability & Control
@@ -507,17 +524,17 @@ extern "C" {
 /*
  * PCI-E Common TLP Header Fields
  */
-#define	PCIE_TLP_FMT_3DW 	0x00
+#define	PCIE_TLP_FMT_3DW	0x00
 #define	PCIE_TLP_FMT_4DW	0x20
 #define	PCIE_TLP_FMT_3DW_DATA	0x40
 #define	PCIE_TLP_FMT_4DW_DATA	0x60
 
 #define	PCIE_TLP_TYPE_MEM	0x0
 #define	PCIE_TLP_TYPE_MEMLK	0x1
-#define	PCIE_TLP_TYPE_IO 	0x2
+#define	PCIE_TLP_TYPE_IO	0x2
 #define	PCIE_TLP_TYPE_CFG0	0x4
 #define	PCIE_TLP_TYPE_CFG1	0x5
-#define	PCIE_TLP_TYPE_MSG 	0x10
+#define	PCIE_TLP_TYPE_MSG	0x10
 #define	PCIE_TLP_TYPE_CPL	0xA
 #define	PCIE_TLP_TYPE_CPLLK	0xB
 #define	PCIE_TLP_TYPE_MSI	0x18
@@ -528,14 +545,14 @@ extern "C" {
 #define	PCIE_TLP_MRDLK4		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MEMLK)
 #define	PCIE_TLP_MRDWR3		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_MEM)
 #define	PCIE_TLP_MRDWR4		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MEM)
-#define	PCIE_TLP_IORD 		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_IO)
-#define	PCIE_TLP_IOWR 		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_IO)
+#define	PCIE_TLP_IORD		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_IO)
+#define	PCIE_TLP_IOWR		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_IO)
 #define	PCIE_TLP_CFGRD0		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CFG0)
 #define	PCIE_TLP_CFGWR0		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CFG0)
 #define	PCIE_TLP_CFGRD1		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CFG1)
 #define	PCIE_TLP_CFGWR1		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CFG1)
-#define	PCIE_TLP_MSG 		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MSG)
-#define	PCIE_TLP_MSGD 		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MSG)
+#define	PCIE_TLP_MSG		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MSG)
+#define	PCIE_TLP_MSGD		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MSG)
 #define	PCIE_TLP_CPL		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CPL)
 #define	PCIE_TLP_CPLD		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CPL)
 #define	PCIE_TLP_CPLLK		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CPLLK)
@@ -552,31 +569,156 @@ typedef uint16_t pcie_req_id_t;
 #define	PCIE_REQ_ID_FUNC_SHIFT	0
 #define	PCIE_REQ_ID_FUNC_MASK	0x0007
 
+#if defined(_BIT_FIELDS_LTOH)
+/*
+ * PCI Express little-endian common TLP header format
+ */
+typedef struct pcie_tlp_hdr {
+	uint32_t	len	:10,
+			rsvd3   :2,
+			attr    :2,
+			ep	:1,
+			td	:1,
+			rsvd2   :4,
+			tc	:3,
+			rsvd1   :1,
+			type    :5,
+			fmt	:2,
+			rsvd0   :1;
+} pcie_tlp_hdr_t;
+
+typedef struct pcie_mem64 {
+	uint32_t	fbe	:4,
+			lbe	:4,
+			tag	:8,
+			rid	:16;
+	uint32_t	addr1;
+	uint32_t	rsvd0   :2,
+			addr0   :30;
+} pcie_mem64_t;
+
+typedef struct pcie_memio32 {
+	uint32_t	fbe	:4,
+			lbe	:4,
+			tag	:8,
+			rid	:16;
+	uint32_t	rsvd0   :2,
+			addr0   :30;
+} pcie_memio32_t;
+
+typedef struct pcie_cfg {
+	uint32_t	fbe	:4,
+			lbe	:4,
+			tag	:8,
+			rid	:16;
+	uint32_t	rsvd1   :2,
+			reg	:6,
+			extreg  :4,
+			rsvd0   :4,
+			func    :3,
+			dev	:5,
+			bus	:8;
+} pcie_cfg_t;
+
+typedef struct pcie_cpl {
+	uint32_t	bc	:12,
+			bcm	:1,
+			status  :3,
+			cid	:16;
+	uint32_t	laddr   :7,
+			rsvd0   :1,
+			tag	:8,
+			rid	:16;
+} pcie_cpl_t;
+
 /*
  * PCI-Express Message Request Header
  */
 typedef struct pcie_msg {
-	uint32_t	rsvd1	:16,	/* DW0 */
+	uint32_t	msg_code:8,	/* DW1 */
+			tag	:8,
+			rid	:16;
+	uint32_t	unused[2];	/* DW 2 & 3 */
+} pcie_msg_t;
+
+#elif defined(_BIT_FIELDS_HTOL)
+/*
+ * PCI Express big-endian common TLP header format
+ */
+typedef struct pcie_tlp_hdr {
+	uint32_t	rsvd0	:1,
+			fmt	:2,
+			type	:5,
+			rsvd1	:1,
+			tc	:3,
+			rsvd2	:4,
 			td	:1,
 			ep	:1,
 			attr	:2,
-			rsvd2	:2,
+			rsvd3	:2,
 			len	:10;
+} pcie_tlp_hdr_t;
+
+typedef struct pcie_mem64 {
+	uint32_t	rid	:16,
+			tag	:8,
+			lbe	:4,
+			fbe	:4;
+	uint32_t	addr1;
+	uint32_t	addr0	:30,
+			rsvd0	:2;
+} pcie_mem64_t;
+
+typedef struct pcie_memio32 {
+	uint32_t	rid	:16,
+			tag	:8,
+			lbe	:4,
+			fbe	:4;
+	uint32_t	addr0	:30,
+			rsvd0	:2;
+} pcie_memio32_t;
+
+typedef struct pcie_cfg {
+	uint32_t	rid	:16,
+			tag	:8,
+			lbe	:4,
+			fbe	:4;
+	uint32_t	bus	:8,
+			dev	:5,
+			func	:3,
+			rsvd0	:4,
+			extreg	:4,
+			reg	:6,
+			rsvd1	:2;
+} pcie_cfg_t;
+
+typedef struct pcie_cpl {
+	uint32_t	cid	:16,
+			status	:3,
+			bcm	:1,
+			bc	:12;
+	uint32_t	rid	:16,
+			tag	:8,
+			rsvd0	:1,
+			laddr	:7;
+} pcie_cpl_t;
+
+/*
+ * PCI-Express Message Request Header
+ */
+typedef struct pcie_msg {
 	uint32_t	rid	:16,	/* DW1 */
 			tag	:8,
 			msg_code:8;
 	uint32_t	unused[2];	/* DW 2 & 3 */
 } pcie_msg_t;
+#else
+#error "bit field not defined"
+#endif
 
 #define	PCIE_MSG_CODE_ERR_COR		0x30
 #define	PCIE_MSG_CODE_ERR_NONFATAL	0x31
 #define	PCIE_MSG_CODE_ERR_FATAL		0x33
-
-/*
- * Exported PCI-express property names
- */
-#define	SAVED_PCIEX_CAP_REG	"pciex-cap-reg"
-#define	SAVED_PCIEX_SLOTCAP_REG	"pciex-slotcap-reg"
 
 #ifdef	__cplusplus
 }

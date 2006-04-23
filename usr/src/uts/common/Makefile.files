@@ -204,6 +204,7 @@ GENUNIX_OBJS +=	\
 		serializer.o	\
 		pci_intr_lib.o	\
 		pci_cap.o	\
+		pcifm.o		\
 		pgrp.o		\
 		pgrpsys.o	\
 		pid.o		\

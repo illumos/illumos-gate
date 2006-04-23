@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +47,6 @@ extern "C" {
 #define	PCI_SIDEA		0
 #define	PCI_SIDEB		1
 #define	ECC_MAX_ERRS		6
-#define	TARGET_MAX_ERRS		6
 
 /*
  * Since pci_pbm_err_handler() is called by various interrupt/trap/callback
@@ -68,7 +66,6 @@ extern "C" {
 #define	PCIX_PFAR		"pcix-pfar"
 
 extern errorq_t *pci_ecc_queue;		/* per-system ecc handling queue */
-extern errorq_t *pci_target_queue;	/* per-system target handling queue */
 
 /*
  * region where schizo pio ecc error was detected
@@ -91,16 +88,6 @@ typedef struct pbm_fm_err {
 	int pbm_flag;
 	char *pbm_terr_class;
 } pbm_fm_err_t;
-
-typedef struct pci_target_err {
-	uint64_t tgt_err_addr;
-	uint64_t tgt_err_ena;
-	uint64_t tgt_pci_addr;
-	uint32_t tgt_pci_space;
-	dev_info_t *tgt_dip;
-	char *tgt_err_class;
-	char *tgt_bridge_type;
-} pci_target_err_t;
 
 typedef struct ecc_format {
 	ecc_region_t ecc_region;
@@ -219,8 +206,6 @@ extern void pci_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle);
 extern void pbm_ereport_post(dev_info_t *dip, uint64_t ena,
 		pbm_errstate_t *pbm_err);
 extern void pci_fm_acc_setup(ddi_map_req_t *mp, dev_info_t *rdip);
-extern int pci_handle_lookup(dev_info_t *dip, int type, uint64_t fme_ena,
-		void *afar);
 extern void pci_fmri_create(dev_info_t *dip, pci_common_t *cmn_p);
 extern void pci_fm_create(pci_t *pci_p);
 extern void pci_fm_destroy(pci_t *pci_p);

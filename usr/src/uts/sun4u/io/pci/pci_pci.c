@@ -74,21 +74,6 @@ typedef struct	slot_table {
 } slot_table_t;
 
 /*
- * The following typedef is used to represent an entry in the "ranges"
- * property of a device node.
- */
-typedef struct {
-	uint32_t child_high;
-	uint32_t child_mid;
-	uint32_t child_low;
-	uint32_t parent_high;
-	uint32_t parent_mid;
-	uint32_t parent_low;
-	uint32_t size_high;
-	uint32_t size_low;
-} ppb_ranges_t;
-
-/*
  * The variable controls the default setting of the command register
  * for pci devices.  See ppb_initchild() for details.
  */
@@ -1643,8 +1628,6 @@ static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 static void
 ppb_fm_init(ppb_devstate_t *ppb_p)
 {
-	ddi_fm_error_t derr;
-
 	ppb_p->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
@@ -1657,15 +1640,6 @@ ppb_fm_init(ppb_devstate_t *ppb_p)
 	    (ppb_p->fm_cap & DDI_FM_ERRCB_CAPABLE));
 
 	pci_ereport_setup(ppb_p->dip);
-
-	/*
-	 * clear any outstanding error bits
-	 */
-	bzero(&derr, sizeof (ddi_fm_error_t));
-	derr.fme_version = DDI_FME_VERSION;
-	derr.fme_flag = DDI_FM_ERR_EXPECTED;
-	pci_ereport_post(ppb_p->dip, &derr, NULL);
-	pci_bdg_ereport_post(ppb_p->dip, &derr, NULL);
 
 	/*
 	 * Register error callback with our parent.
@@ -1708,13 +1682,9 @@ ppb_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 static int
 ppb_err_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 {
-	uint16_t pci_cfg_stat, pci_cfg_sec_stat;
-
 	ASSERT(impl_data == NULL);
-	pci_ereport_post(dip, derr, &pci_cfg_stat);
-	pci_bdg_ereport_post(dip, derr, &pci_cfg_sec_stat);
-	return (pci_bdg_check_status(dip, derr, pci_cfg_stat,
-	    pci_cfg_sec_stat));
+	pci_ereport_post(dip, derr, NULL);
+	return (derr->fme_status);
 }
 
 static void

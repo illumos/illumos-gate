@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,18 +57,17 @@ typedef struct i_ndi_err {
 	int err_expected;			/* was this error expected? */
 	void *err_ontrap;			/* ontrap protection, if any */
 	struct i_ddi_fmc_entry *err_fep;	/* FM cache link */
+	int (*err_cf)();			/* compare function */
 } ndi_err_t;
-
-
-typedef int (ndi_fmcompare_t)(dev_info_t *, const void *, const void *,
-    const void *);
 
 #ifdef	_KERNEL
 
 extern void ndi_fmc_insert(dev_info_t *, int, void *, void *);
 extern void ndi_fmc_remove(dev_info_t *, int, const void *);
-extern int ndi_fmc_error(dev_info_t *, dev_info_t *, int, ndi_fmcompare_t,
-    uint64_t, const void *);
+extern int ndi_fmc_error(dev_info_t *, dev_info_t *, int, uint64_t,
+    const void *);
+extern int ndi_fmc_entry_error(dev_info_t *, int, ddi_fm_error_t *,
+    const void *);
 
 extern int ndi_fm_handler_dispatch(dev_info_t *, dev_info_t *,
     const ddi_fm_error_t *);

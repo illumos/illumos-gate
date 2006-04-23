@@ -48,6 +48,7 @@ static char subdev_propname[] = "subsystem-id";
 static char subven_propname[] = "subsystem-vendor-id";
 static char rxrings_propname[] = "bge-rx-rings";
 static char txrings_propname[] = "bge-tx-rings";
+static char fm_cap[] = "fm-capable";
 static char default_mtu[] = "default-mtu";
 
 static int bge_add_intrs(bge_t *, int);
@@ -68,7 +69,7 @@ static ddi_dma_attr_t dma_attr = {
 	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_seg		*/
 	1,				/* dma_attr_sgllen 	*/
 	0x00000001,			/* dma_attr_granular 	*/
-	0				/* dma_attr_flags 	*/
+	DDI_DMA_FLAGERR			/* dma_attr_flags */
 };
 
 /*
@@ -77,7 +78,8 @@ static ddi_dma_attr_t dma_attr = {
 static ddi_device_acc_attr_t bge_reg_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 /*
@@ -86,7 +88,8 @@ static ddi_device_acc_attr_t bge_reg_accattr = {
 static ddi_device_acc_attr_t bge_desc_accattr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,
-	DDI_STRICTORDER_ACC
+	DDI_STRICTORDER_ACC,
+	DDI_FLAGERR_ACC
 };
 
 /*
@@ -244,7 +247,7 @@ bge_reinit_rings(bge_t *bgep)
 /*
  *	bge_reset() -- reset h/w & rings to initial state
  */
-static void
+static int
 #ifdef BGE_IPMI_ASF
 bge_reset(bge_t *bgep, uint_t asf_mode)
 #else
@@ -252,6 +255,7 @@ bge_reset(bge_t *bgep)
 #endif
 {
 	uint64_t	ring;
+	int retval;
 
 	BGE_TRACE(("bge_reset($%p)", (void *)bgep));
 
@@ -270,9 +274,9 @@ bge_reset(bge_t *bgep)
 		mutex_enter(bgep->send[ring].tc_lock);
 
 #ifdef BGE_IPMI_ASF
-	bge_chip_reset(bgep, B_TRUE, asf_mode);
+	retval = bge_chip_reset(bgep, B_TRUE, asf_mode);
 #else
-	bge_chip_reset(bgep, B_TRUE);
+	retval = bge_chip_reset(bgep, B_TRUE);
 #endif
 	bge_reinit_rings(bgep);
 
@@ -288,6 +292,7 @@ bge_reset(bge_t *bgep)
 		mutex_exit(bgep->recv[ring].rx_lock);
 
 	BGE_DEBUG(("bge_reset($%p) done", (void *)bgep));
+	return (retval);
 }
 
 /*
@@ -316,9 +321,11 @@ bge_stop(bge_t *bgep)
 /*
  *	bge_start() -- start transmitting/receiving
  */
-static void
+static int
 bge_start(bge_t *bgep, boolean_t reset_phys)
 {
+	int retval;
+
 	BGE_TRACE(("bge_start($%p, %d)", (void *)bgep, reset_phys));
 
 	ASSERT(mutex_owned(bgep->genlock));
@@ -326,34 +333,41 @@ bge_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Start chip processing, including enabling interrupts
 	 */
-	bge_chip_start(bgep, reset_phys);
+	retval = bge_chip_start(bgep, reset_phys);
 
 	BGE_DEBUG(("bge_start($%p, %d) done", (void *)bgep, reset_phys));
+	return (retval);
 }
 
 /*
  * bge_restart - restart transmitting/receiving after error or suspend
  */
-void
+int
 bge_restart(bge_t *bgep, boolean_t reset_phys)
 {
+	int retval = DDI_SUCCESS;
 	ASSERT(mutex_owned(bgep->genlock));
 
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
-		bge_reset(bgep, ASF_MODE_POST_INIT);
+		if (bge_reset(bgep, ASF_MODE_POST_INIT) != DDI_SUCCESS)
+			retval = DDI_FAILURE;
 	} else
-		bge_reset(bgep, ASF_MODE_NONE);
+		if (bge_reset(bgep, ASF_MODE_NONE) != DDI_SUCCESS)
+			retval = DDI_FAILURE;
 #else
-	bge_reset(bgep);
+	if (bge_reset(bgep) != DDI_SUCCESS)
+		retval = DDI_FAILURE;
 #endif
 	if (bgep->bge_mac_state == BGE_MAC_STARTED) {
-		bge_start(bgep, reset_phys);
+		if (bge_start(bgep, reset_phys) != DDI_SUCCESS)
+			retval = DDI_FAILURE;
 		bgep->watchdog = 0;
 		ddi_trigger_softintr(bgep->resched_id);
 	}
 
 	BGE_DEBUG(("bge_restart($%p, %d) done", (void *)bgep, reset_phys));
+	return (retval);
 }
 
 
@@ -378,10 +392,18 @@ bge_m_stop(void *arg)
 	 * Just stop processing, then record new GLD state
 	 */
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		mutex_exit(bgep->genlock);
+		return;
+	}
+
 	bgep->link_up_msg = bgep->link_down_msg = " (stopped)";
 	bge_stop(bgep);
 	bgep->bge_mac_state = BGE_MAC_STOPPED;
 	BGE_DEBUG(("bge_m_stop($%p) done", arg));
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
 	mutex_exit(bgep->genlock);
 }
 
@@ -399,6 +421,12 @@ bge_m_start(void *arg)
 	 * Start processing and record new GLD state
 	 */
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
 		if ((bgep->asf_status == ASF_STAT_RUN) &&
@@ -411,15 +439,37 @@ bge_m_start(void *arg)
 			return (0);
 		}
 	}
-	bge_reset(bgep, ASF_MODE_INIT);
+	if (bge_reset(bgep, ASF_MODE_INIT) != DDI_SUCCESS) {
 #else
-	bge_reset(bgep);
+	if (bge_reset(bgep) != DDI_SUCCESS) {
 #endif
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	bgep->link_up_msg = bgep->link_down_msg = " (initialized)";
-	bge_start(bgep, B_TRUE);
+	if (bge_start(bgep, B_TRUE) != DDI_SUCCESS) {
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	bgep->bge_mac_state = BGE_MAC_STARTED;
 	BGE_DEBUG(("bge_m_start($%p) done", arg));
 
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
 		if (bgep->asf_status != ASF_STAT_RUN) {
@@ -452,9 +502,25 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 	 * Sync the chip's idea of the address too ...
 	 */
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	ethaddr_copy(macaddr, bgep->curr_addr.addr);
 #ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_FALSE);
+	if (bge_chip_sync(bgep, B_FALSE) == DDI_FAILURE) {
+#else
+	if (bge_chip_sync(bgep) == DDI_FAILURE) {
+#endif
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+#ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
 		/*
 		 * The above bge_chip_sync() function wrote the ethernet MAC
@@ -473,9 +539,17 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 
 			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
 		}
-		bge_chip_stop(bgep, B_TRUE);
+		bge_chip_stop(bgep, B_FALSE);
 
-		bge_restart(bgep, B_FALSE);
+		if (bge_restart(bgep, B_FALSE) == DDI_FAILURE) {
+			(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+			(void) bge_check_acc_handle(bgep, bgep->io_handle);
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_DEGRADED);
+			mutex_exit(bgep->genlock);
+			return (EIO);
+		}
+
 		/*
 		 * Start our ASF heartbeat counter as soon as possible.
 		 */
@@ -487,10 +561,18 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 			bgep->asf_status = ASF_STAT_RUN;
 		}
 	}
-#else
-	bge_chip_sync(bgep);
 #endif
 	BGE_DEBUG(("bge_m_unicst_set($%p) done", arg));
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
 
 	return (0);
@@ -547,26 +629,60 @@ bge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	 * must also update the chip's hardware map registers.
 	 */
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	if (add) {
 		if ((*refp)++ == 0) {
 			bgep->mcast_hash[word] |= bit;
 #ifdef BGE_IPMI_ASF
-			bge_chip_sync(bgep, B_TRUE);
+			if (bge_chip_sync(bgep, B_TRUE) == DDI_FAILURE) {
 #else
-			bge_chip_sync(bgep);
+			if (bge_chip_sync(bgep) == DDI_FAILURE) {
 #endif
+				(void) bge_check_acc_handle(bgep,
+				    bgep->cfg_handle);
+				(void) bge_check_acc_handle(bgep,
+				    bgep->io_handle);
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_DEGRADED);
+				mutex_exit(bgep->genlock);
+				return (EIO);
+			}
 		}
 	} else {
 		if (--(*refp) == 0) {
 			bgep->mcast_hash[word] &= ~bit;
 #ifdef BGE_IPMI_ASF
-			bge_chip_sync(bgep, B_TRUE);
+			if (bge_chip_sync(bgep, B_TRUE) == DDI_FAILURE) {
 #else
-			bge_chip_sync(bgep);
+			if (bge_chip_sync(bgep) == DDI_FAILURE) {
 #endif
+				(void) bge_check_acc_handle(bgep,
+				    bgep->cfg_handle);
+				(void) bge_check_acc_handle(bgep,
+				    bgep->io_handle);
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_DEGRADED);
+				mutex_exit(bgep->genlock);
+				return (EIO);
+			}
 		}
 	}
 	BGE_DEBUG(("bge_m_multicst($%p) done", arg));
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
 
 	return (0);
@@ -589,13 +705,35 @@ bge_m_promisc(void *arg, boolean_t on)
 	 * Store MAC layer specified mode and pass to chip layer to update h/w
 	 */
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	bgep->promisc = on;
 #ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_TRUE);
+	if (bge_chip_sync(bgep, B_TRUE) == DDI_FAILURE) {
 #else
-	bge_chip_sync(bgep);
+	if (bge_chip_sync(bgep) == DDI_FAILURE) {
 #endif
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	BGE_DEBUG(("bge_m_promisc_set($%p) done", arg));
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (EIO);
+	}
 	mutex_exit(bgep->genlock);
 	return (0);
 }
@@ -781,6 +919,12 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	}
 
 	mutex_enter(bgep->genlock);
+	if (!(bgep->progress & PROGRESS_INTR)) {
+		/* can happen during autorecovery */
+		mutex_exit(bgep->genlock);
+		miocnak(wq, mp, 0, EIO);
+		return;
+	}
 
 	switch (cmd) {
 	default:
@@ -824,17 +968,33 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	switch (status) {
 	case IOC_RESTART_REPLY:
 	case IOC_RESTART_ACK:
-		bge_phys_update(bgep);
+		if (bge_phys_update(bgep) != DDI_SUCCESS) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_DEGRADED);
+			status = IOC_INVAL;
+		}
 #ifdef BGE_IPMI_ASF
-		bge_chip_sync(bgep, B_FALSE);
+		if (bge_chip_sync(bgep, B_FALSE) == DDI_FAILURE) {
 #else
-		bge_chip_sync(bgep);
+		if (bge_chip_sync(bgep) == DDI_FAILURE) {
 #endif
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_DEGRADED);
+			status = IOC_INVAL;
+		}
 		if (bgep->intr_type == DDI_INTR_TYPE_MSI)
 			bge_chip_msi_trig(bgep);
 		break;
 	}
 
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		status = IOC_INVAL;
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		status = IOC_INVAL;
+	}
 	mutex_exit(bgep->genlock);
 
 	/*
@@ -1196,23 +1356,13 @@ bge_fini_send_ring(bge_t *bgep, uint64_t ring)
 
 /*
  * Initialise all transmit, receive, and buffer rings.
- * (also a few top-level mutexen that can't be done until
- * the h/w interrupt handler has been registered 'cos we
- * need the cookie).
  */
-static void
+void
 bge_init_rings(bge_t *bgep)
 {
 	uint64_t ring;
 
 	BGE_TRACE(("bge_init_rings($%p)", (void *)bgep));
-
-	mutex_init(bgep->genlock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(bgep->intr_pri));
-	mutex_init(bgep->softintrlock, NULL, MUTEX_DRIVER,
-		DDI_INTR_PRI(bgep->intr_pri));
-	rw_init(bgep->errlock, NULL, RW_DRIVER,
-	    DDI_INTR_PRI(bgep->intr_pri));
 
 	/*
 	 * Perform one-off initialisation of each ring ...
@@ -1228,7 +1378,7 @@ bge_init_rings(bge_t *bgep)
 /*
  * Undo the work of bge_init_rings() above before the memory is freed
  */
-static void
+void
 bge_fini_rings(bge_t *bgep)
 {
 	uint64_t ring;
@@ -1241,10 +1391,6 @@ bge_fini_rings(bge_t *bgep)
 		bge_fini_recv_ring(bgep, ring);
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		bge_fini_send_ring(bgep, ring);
-
-	rw_destroy(bgep->errlock);
-	mutex_destroy(bgep->softintrlock);
-	mutex_destroy(bgep->genlock);
 }
 
 /*
@@ -1323,7 +1469,7 @@ bge_free_dma_mem(dma_area_t *dma_p)
  * This function allocates all the transmit and receive buffers
  * and descriptors, in four chunks (or one, if MONOLITHIC).
  */
-static int
+int
 bge_alloc_bufs(bge_t *bgep)
 {
 	dma_area_t area;
@@ -1502,7 +1648,7 @@ bge_alloc_bufs(bge_t *bgep)
  * This routine frees the transmit and receive buffers and descriptors.
  * Make sure the chip is stopped before calling it!
  */
-static void
+void
 bge_free_bufs(bge_t *bgep)
 {
 	int split;
@@ -1638,6 +1784,106 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 		cidp->vendor_addr.set ? "" : "not "));
 }
 
+
+/*ARGSUSED*/
+int
+bge_check_acc_handle(bge_t *bgep, ddi_acc_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ddi_fm_acc_err_get(handle, &de, DDI_FME_VERSION);
+	ddi_fm_acc_err_clear(handle, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+/*ARGSUSED*/
+int
+bge_check_dma_handle(bge_t *bgep, ddi_dma_handle_t handle)
+{
+	ddi_fm_error_t de;
+
+	ASSERT(bgep->progress & PROGRESS_BUFS);
+	ddi_fm_dma_err_get(handle, &de, DDI_FME_VERSION);
+	return (de.fme_status);
+}
+
+/*
+ * The IO fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+bge_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+	/*
+	 * as the driver can always deal with an error in any dma or
+	 * access handle, we can just return the fme_status value.
+	 */
+	pci_ereport_post(dip, err, NULL);
+	return (err->fme_status);
+}
+
+static void
+bge_fm_init(bge_t *bgep)
+{
+	ddi_iblock_cookie_t iblk;
+
+	/* Only register with IO Fault Services if we have some capability */
+	if (bgep->fm_capabilities) {
+		bge_reg_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+		bge_desc_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+		dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+
+		/* Register capabilities with IO Fault Services */
+		ddi_fm_init(bgep->devinfo, &bgep->fm_capabilities, &iblk);
+
+		/*
+		 * Initialize pci ereport capabilities if ereport capable
+		 */
+		if (DDI_FM_EREPORT_CAP(bgep->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(bgep->fm_capabilities))
+			pci_ereport_setup(bgep->devinfo);
+
+		/*
+		 * Register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(bgep->fm_capabilities))
+			ddi_fm_handler_register(bgep->devinfo,
+			bge_fm_error_cb, (void*) bgep);
+	} else {
+		/*
+		 * These fields have to be cleared of FMA if there are no
+		 * FMA capabilities at runtime.
+		 */
+		bge_reg_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+		bge_desc_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+		dma_attr.dma_attr_flags = 0;
+	}
+}
+
+static void
+bge_fm_fini(bge_t *bgep)
+{
+	/* Only unregister FMA capabilities if we registered some */
+	if (bgep->fm_capabilities) {
+
+		/*
+		 * Release any resources allocated by pci_ereport_setup()
+		 */
+		if (DDI_FM_EREPORT_CAP(bgep->fm_capabilities) ||
+		    DDI_FM_ERRCB_CAP(bgep->fm_capabilities))
+			pci_ereport_teardown(bgep->devinfo);
+
+		/*
+		 * Un-register error callback if error callback capable
+		 */
+		if (DDI_FM_ERRCB_CAP(bgep->fm_capabilities))
+			ddi_fm_handler_unregister(bgep->devinfo);
+
+		/* Unregister from IO Fault Services */
+		ddi_fm_fini(bgep->devinfo);
+	}
+}
+
 static void
 #ifdef BGE_IPMI_ASF
 bge_unattach(bge_t *bgep, uint_t asf_mode)
@@ -1673,7 +1919,13 @@ bge_unattach(bge_t *bgep)
 	if (bgep->progress & PROGRESS_HWINT) {
 		mutex_enter(bgep->genlock);
 #ifdef BGE_IPMI_ASF
-		bge_chip_reset(bgep, B_FALSE, asf_mode);
+		if (bge_chip_reset(bgep, B_FALSE, asf_mode) != DDI_SUCCESS)
+#else
+		if (bge_chip_reset(bgep, B_FALSE) != DDI_SUCCESS)
+#endif
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+#ifdef BGE_IPMI_ASF
 		if (bgep->asf_enabled) {
 			/*
 			 * This register has been overlaid. We restore its
@@ -1682,26 +1934,37 @@ bge_unattach(bge_t *bgep)
 			bge_nic_put32(bgep, BGE_NIC_DATA_SIG_ADDR,
 			    BGE_NIC_DATA_SIG);
 		}
-#else
-		bge_chip_reset(bgep, B_FALSE);
 #endif
+		if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
 		mutex_exit(bgep->genlock);
 	}
-
 	if (bgep->progress & PROGRESS_INTR) {
-		bge_rem_intrs(bgep);
+		bge_intr_disable(bgep);
 		bge_fini_rings(bgep);
 	}
-
+	if (bgep->progress & PROGRESS_HWINT) {
+		bge_rem_intrs(bgep);
+		rw_destroy(bgep->errlock);
+		mutex_destroy(bgep->softintrlock);
+		mutex_destroy(bgep->genlock);
+	}
 	if (bgep->progress & PROGRESS_FACTOTUM)
 		ddi_remove_softintr(bgep->factotum_id);
 	if (bgep->progress & PROGRESS_RESCHED)
 		ddi_remove_softintr(bgep->resched_id);
-	bge_free_bufs(bgep);
+	if (bgep->progress & PROGRESS_BUFS)
+		bge_free_bufs(bgep);
 	if (bgep->progress & PROGRESS_REGS)
 		ddi_regs_map_free(&bgep->io_handle);
 	if (bgep->progress & PROGRESS_CFG)
 		pci_config_teardown(&bgep->cfg_handle);
+
+	bge_fm_fini(bgep);
 
 	ddi_remove_minor_node(bgep->devinfo, NULL);
 	macp = bgep->macp;
@@ -1740,7 +2003,14 @@ bge_resume(dev_info_t *devinfo)
 	 * Refuse to resume if the chip has changed its identity!
 	 */
 	cidp = &bgep->chipid;
+	mutex_enter(bgep->genlock);
 	bge_chip_cfg_init(bgep, &chipid, B_FALSE);
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
+	mutex_exit(bgep->genlock);
 	if (chipid.vendor != cidp->vendor)
 		return (DDI_FAILURE);
 	if (chipid.device != cidp->device)
@@ -1754,7 +2024,23 @@ bge_resume(dev_info_t *devinfo)
 	 * All OK, reinitialise h/w & kick off GLD scheduling
 	 */
 	mutex_enter(bgep->genlock);
-	bge_restart(bgep, B_TRUE);
+	if (bge_restart(bgep, B_TRUE) != DDI_SUCCESS) {
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
 	mutex_exit(bgep->genlock);
 	return (DDI_SUCCESS);
 }
@@ -1779,7 +2065,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int err;
 	mac_info_t *mip;
 	int intr_types;
-	int i;
 #ifdef BGE_IPMI_ASF
 	uint32_t mhcrValue;
 #endif
@@ -1823,6 +2108,16 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		BGE_DRIVER_NAME, instance);
 
 	/*
+	 * Initialize for fma support
+	 */
+	bgep->fm_capabilities = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+	    DDI_PROP_DONTPASS, fm_cap,
+	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
+	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
+	BGE_DEBUG(("bgep->fm_capabilities = %d", bgep->fm_capabilities));
+	bge_fm_init(bgep);
+
+	/*
 	 * Look up the IOMMU's page size for DVMA mappings (must be
 	 * a power of 2) and convert to a mask.  This can be used to
 	 * determine whether a message buffer crosses a page boundary.
@@ -1862,6 +2157,10 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	cidp = &bgep->chipid;
 	bzero(cidp, sizeof (*cidp));
 	bge_chip_cfg_init(bgep, cidp, B_FALSE);
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		goto attach_fail;
+	}
 
 #ifdef BGE_IPMI_ASF
 	if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
@@ -1914,12 +2213,16 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Characterise the device, so we know its requirements.
 	 * Then allocate the appropriate TX and RX descriptors & buffers.
 	 */
-	bge_chip_id_init(bgep);
+	if (bge_chip_id_init(bgep) == EIO) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		goto attach_fail;
+	}
 	err = bge_alloc_bufs(bgep);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "DMA buffer allocation failed");
 		goto attach_fail;
 	}
+	bgep->progress |= PROGRESS_BUFS;
 
 	/*
 	 * Add the softint handlers:
@@ -1976,11 +2279,11 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			bge_log(bgep, "Using MSI interrupt type\n");
 
 			bgep->intr_type = DDI_INTR_TYPE_MSI;
-			bgep->progress |= PROGRESS_INTR;
+			bgep->progress |= PROGRESS_HWINT;
 		}
 	}
 
-	if (!(bgep->progress & PROGRESS_INTR) &&
+	if (!(bgep->progress & PROGRESS_HWINT) &&
 	    (intr_types & DDI_INTR_TYPE_FIXED)) {
 		if (bge_add_intrs(bgep, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS) {
 			bge_error(bgep, "FIXED interrupt "
@@ -1991,34 +2294,35 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		bge_log(bgep, "Using FIXED interrupt type\n");
 
 		bgep->intr_type = DDI_INTR_TYPE_FIXED;
-		bgep->progress |= PROGRESS_INTR;
+		bgep->progress |= PROGRESS_HWINT;
 	}
 
-	if (!(bgep->progress & PROGRESS_INTR)) {
+	if (!(bgep->progress & PROGRESS_HWINT)) {
 		bge_error(bgep, "No interrupts registered\n");
 		goto attach_fail;
 	}
 
 	/*
 	 * Note that interrupts are not enabled yet as
-	 * mutex locks are not initialized.
-	 * Initialize rings and mutex locks.
+	 * mutex locks are not initialized. Initialize mutex locks.
+	 */
+	mutex_init(bgep->genlock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(bgep->intr_pri));
+	mutex_init(bgep->softintrlock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(bgep->intr_pri));
+	rw_init(bgep->errlock, NULL, RW_DRIVER,
+	    DDI_INTR_PRI(bgep->intr_pri));
+
+	/*
+	 * Initialize rings.
 	 */
 	bge_init_rings(bgep);
-	bgep->progress |= PROGRESS_HWINT;
 
 	/*
 	 * Now that mutex locks are initialized, enable interrupts.
 	 */
-	if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-		/* Call ddi_intr_block_enable() for MSI interrupts */
-		(void) ddi_intr_block_enable(bgep->htable, bgep->intr_cnt);
-	} else {
-		/* Call ddi_intr_enable for MSI or FIXED interrupts */
-		for (i = 0; i < bgep->intr_cnt; i++) {
-			(void) ddi_intr_enable(bgep->htable[i]);
-		}
-	}
+	bge_intr_enable(bgep);
+	bgep->progress |= PROGRESS_INTR;
 
 	/*
 	 * Initialise link state variables
@@ -2035,19 +2339,38 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * filtering, promiscuity, loopback mode.
 	 */
 #ifdef BGE_IPMI_ASF
-	bge_reset(bgep, ASF_MODE_SHUTDOWN);
+	if (bge_reset(bgep, ASF_MODE_SHUTDOWN) != DDI_SUCCESS) {
 #else
-	bge_reset(bgep);
+	if (bge_reset(bgep) != DDI_SUCCESS) {
 #endif
+		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		goto attach_fail;
+	}
 
 	bzero(bgep->mcast_hash, sizeof (bgep->mcast_hash));
 	bzero(bgep->mcast_refs, sizeof (bgep->mcast_refs));
 	bgep->promisc = B_FALSE;
 	bgep->param_loop_mode = BGE_LOOP_NONE;
+	if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		goto attach_fail;
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		mutex_exit(bgep->genlock);
+		goto attach_fail;
+	}
 
 	mutex_exit(bgep->genlock);
 
-	bge_phys_init(bgep);
+	if (bge_phys_init(bgep) == EIO) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+		goto attach_fail;
+	}
 	bgep->progress |= PROGRESS_PHY;
 
 	/*
@@ -2163,7 +2486,17 @@ bge_suspend(bge_t *bgep)
 	 */
 #endif
 	bge_stop(bgep);
-	bge_phys_idle(bgep);
+	if (bge_phys_idle(bgep) != DDI_SUCCESS) {
+		(void) bge_check_acc_handle(bgep, bgep->io_handle);
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
+	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
+		mutex_exit(bgep->genlock);
+		return (DDI_FAILURE);
+	}
 	mutex_exit(bgep->genlock);
 
 	return (DDI_SUCCESS);
@@ -2214,6 +2547,13 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		}
 
 		asf_mode = ASF_MODE_POST_SHUTDOWN;
+
+		if (bge_check_acc_handle(bgep, bgep->cfg_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
 	}
 	mutex_exit(bgep->genlock);
 #endif
@@ -2424,7 +2764,38 @@ bge_rem_intrs(bge_t *bgep)
 
 	bge_log(bgep, "bge_rem_intrs\n");
 
-	/* Disable all interrupts */
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < bgep->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(bgep->htable[i]);
+		(void) ddi_intr_free(bgep->htable[i]);
+	}
+
+	kmem_free(bgep->htable, bgep->intr_cnt * sizeof (ddi_intr_handle_t));
+}
+
+
+void
+bge_intr_enable(bge_t *bgep)
+{
+	int i;
+
+	if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_enable() for MSI interrupts */
+		(void) ddi_intr_block_enable(bgep->htable, bgep->intr_cnt);
+	} else {
+		/* Call ddi_intr_enable for MSI or FIXED interrupts */
+		for (i = 0; i < bgep->intr_cnt; i++) {
+			(void) ddi_intr_enable(bgep->htable[i]);
+		}
+	}
+}
+
+
+void
+bge_intr_disable(bge_t *bgep)
+{
+	int i;
+
 	if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		/* Call ddi_intr_block_disable() */
 		(void) ddi_intr_block_disable(bgep->htable, bgep->intr_cnt);
@@ -2433,12 +2804,4 @@ bge_rem_intrs(bge_t *bgep)
 			(void) ddi_intr_disable(bgep->htable[i]);
 		}
 	}
-
-	/* Call ddi_intr_remove_handler() */
-	for (i = 0; i < bgep->intr_cnt; i++) {
-		(void) ddi_intr_remove_handler(bgep->htable[i]);
-		(void) ddi_intr_free(bgep->htable[i]);
-	}
-
-	kmem_free(bgep->htable, bgep->intr_cnt * sizeof (ddi_intr_handle_t));
 }

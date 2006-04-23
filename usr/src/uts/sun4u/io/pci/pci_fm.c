@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,79 +64,6 @@
  * PBM errors.
  *
  */
-
-/*
- * Function called after a dma fault occurred to find out whether the
- * fault address is associated with a driver that is able to handle faults
- * and recover from faults.
- */
-/* ARGSUSED */
-static int
-pci_dma_check(dev_info_t *dip, const void *handle, const void *comp_addr,
-    const void *not_used)
-{
-	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
-	pfn_t fault_pfn = mmu_btop(*(uint64_t *)comp_addr);
-	pfn_t comp_pfn;
-	int page;
-
-	/*
-	 * The driver has to set DDI_DMA_FLAGERR to recover from dma faults.
-	 */
-	ASSERT(mp);
-
-	for (page = 0; page < mp->dmai_ndvmapages; page++) {
-		comp_pfn = PCI_GET_MP_PFN(mp, page);
-		if (fault_pfn == comp_pfn)
-			return (DDI_FM_NONFATAL);
-	}
-
-	return (DDI_FM_UNKNOWN);
-}
-
-/*
- * Function used to check if a given access handle owns the failing address.
- * Called by ndi_fmc_error, when we detect a PIO error.
- */
-/* ARGSUSED */
-static int
-pci_acc_check(dev_info_t *dip, const void *handle, const void *comp_addr,
-    const void *not_used)
-{
-	pfn_t pfn, fault_pfn;
-	ddi_acc_hdl_t *hp;
-
-	hp = impl_acc_hdl_get((ddi_acc_handle_t)handle);
-
-	ASSERT(hp);
-
-	pfn = hp->ah_pfn;
-	fault_pfn = mmu_btop(*(uint64_t *)comp_addr);
-	if (fault_pfn >= pfn && fault_pfn < (pfn + hp->ah_pnum))
-		return (DDI_FM_NONFATAL);
-
-	return (DDI_FM_UNKNOWN);
-}
-
-/*
- * Function used by PCI error handlers to check if captured address is stored
- * in the DMA or ACC handle caches.
- */
-int
-pci_handle_lookup(dev_info_t *dip, int type, uint64_t fme_ena, void *afar)
-{
-	int status = DDI_FM_UNKNOWN;
-	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
-
-	if (type == DMA_HANDLE && DDI_FM_DMA_ERR_CAP(pci_p->pci_fm_cap))
-		status = ndi_fmc_error(dip, NULL, type, pci_dma_check,
-		    fme_ena, afar);
-	else if (DDI_FM_ACC_ERR_CAP(pci_p->pci_fm_cap))
-		status = ndi_fmc_error(dip, NULL, type, pci_acc_check,
-		    fme_ena, afar);
-
-	return (status);
-}
 
 /*
  * Function used to setup access functions depending on level of desired
@@ -213,7 +139,7 @@ pci_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 
 	ASSERT(ibc != NULL);
-	*ibc = pci_p->pci_pbm_p->pbm_iblock_cookie;
+	*ibc = pci_p->pci_fm_ibc;
 
 	return (pci_p->pci_fm_cap);
 }
@@ -319,231 +245,6 @@ pci_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
 		return (DDI_FM_OK);
 }
 
-/*
- * private version of walk_devs() that can be used during panic. No
- * sleeping or locking required.
- */
-static int
-pci_tgt_walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg)
-{
-	while (dip) {
-		switch ((*f)(dip, arg)) {
-		case DDI_WALK_TERMINATE:
-			return (DDI_WALK_TERMINATE);
-		case DDI_WALK_CONTINUE:
-			if (pci_tgt_walk_devs(ddi_get_child(dip), f,
-			    arg) == DDI_WALK_TERMINATE)
-				return (DDI_WALK_TERMINATE);
-			break;
-		case DDI_WALK_PRUNECHILD:
-			break;
-		}
-		dip = ddi_get_next_sibling(dip);
-	}
-	return (DDI_WALK_CONTINUE);
-}
-
-static int
-pci_check_regs(dev_info_t *dip, void *arg)
-{
-	int reglen;
-	int rn;
-	int totreg;
-	pci_regspec_t *drv_regp;
-	pci_target_err_t *tgt_err = (pci_target_err_t *)arg;
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "assigned-addresses", (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
-		return (DDI_WALK_CONTINUE);
-
-	totreg = reglen / sizeof (pci_regspec_t);
-	for (rn = 0; rn < totreg; rn++) {
-		if (tgt_err->tgt_pci_space ==
-		    PCI_REG_ADDR_G(drv_regp[rn].pci_phys_hi) &&
-		    (tgt_err->tgt_pci_addr >=
-		    (uint64_t)drv_regp[rn].pci_phys_low +
-		    ((uint64_t)drv_regp[rn].pci_phys_mid << 32)) &&
-		    (tgt_err->tgt_pci_addr <
-		    (uint64_t)drv_regp[rn].pci_phys_low +
-		    ((uint64_t)drv_regp[rn].pci_phys_mid << 32) +
-		    (uint64_t)drv_regp[rn].pci_size_low +
-		    ((uint64_t)drv_regp[rn].pci_size_hi << 32))) {
-			tgt_err->tgt_dip = dip;
-			kmem_free(drv_regp, reglen);
-			return (DDI_WALK_TERMINATE);
-		}
-	}
-	kmem_free(drv_regp, reglen);
-	return (DDI_WALK_CONTINUE);
-}
-
-static int
-pci_check_ranges(dev_info_t *dip, void *arg)
-{
-	uint64_t range_parent_begin;
-	uint64_t range_parent_size;
-	uint64_t range_parent_end;
-	uint32_t space_type;
-	uint32_t bus_num;
-	uint32_t range_offset;
-	pci_ranges_t *pci_ranges, *rangep;
-	pci_bus_range_t *pci_bus_rangep;
-	int pci_ranges_length;
-	int nrange;
-	pci_target_err_t *tgt_err = (pci_target_err_t *)arg;
-	int i, size;
-
-	if (strcmp(ddi_node_name(dip), "pci") != 0)
-		return (DDI_WALK_CONTINUE);
-
-	/*
-	 * Get the ranges property.
-	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "ranges",
-		(caddr_t)&pci_ranges, &pci_ranges_length) != DDI_SUCCESS) {
-		return (DDI_WALK_CONTINUE);
-	}
-	nrange = pci_ranges_length / sizeof (pci_ranges_t);
-	rangep = pci_ranges;
-	pci_fix_ranges(pci_ranges, nrange);
-
-	for (i = 0; i < nrange; i++, rangep++) {
-		range_parent_begin = ((uint64_t)rangep->parent_high << 32) +
-		    rangep->parent_low;
-		range_parent_size = ((uint64_t)rangep->size_high << 32) +
-		    rangep->size_low;
-		range_parent_end = range_parent_begin + range_parent_size - 1;
-
-		if ((tgt_err->tgt_err_addr < range_parent_begin) ||
-		    (tgt_err->tgt_err_addr > range_parent_end)) {
-			/* Not in range */
-			continue;
-		}
-		space_type = PCI_REG_ADDR_G(rangep->child_high);
-		if (space_type == PCI_REG_ADDR_G(PCI_ADDR_CONFIG)) {
-			/* Config space address - check bus range */
-			range_offset = tgt_err->tgt_err_addr -
-			    range_parent_begin;
-			bus_num = PCI_REG_BUS_G(range_offset);
-			if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_DONTPASS, "bus-range",
-			    (caddr_t)&pci_bus_rangep, &size) != DDI_SUCCESS) {
-				continue;
-			}
-			if ((bus_num < pci_bus_rangep->lo) ||
-			    (bus_num > pci_bus_rangep->hi)) {
-				/*
-				 * Bus number not appropriate for this
-				 * pci nexus.
-				 */
-				kmem_free(pci_bus_rangep, size);
-				continue;
-			}
-			kmem_free(pci_bus_rangep, size);
-		}
-
-		/* We have a match if we get here - compute pci address */
-		tgt_err->tgt_pci_addr = tgt_err->tgt_err_addr -
-		    range_parent_begin;
-		tgt_err->tgt_pci_addr += (((uint64_t)rangep->child_mid << 32) +
-		    rangep->child_low);
-		tgt_err->tgt_pci_space = space_type;
-		if (panicstr)
-			pci_tgt_walk_devs(dip, pci_check_regs, (void *)tgt_err);
-		else
-			ddi_walk_devs(dip, pci_check_regs, (void *)tgt_err);
-		if (tgt_err->tgt_dip != NULL) {
-			kmem_free(pci_ranges, pci_ranges_length);
-			return (DDI_WALK_TERMINATE);
-		}
-	}
-	kmem_free(pci_ranges, pci_ranges_length);
-	return (DDI_WALK_PRUNECHILD);
-}
-
-/*
- * need special version of ddi_fm_ereport_post() as the leaf driver may
- * not be hardened.
- */
-void
-pci_tgt_ereport_post(dev_info_t *dip, const char *error_class, uint64_t ena,
-    uint8_t version, ...)
-{
-	char *name;
-	char device_path[MAXPATHLEN];
-	char ddi_error_class[FM_MAX_CLASS];
-	nvlist_t *ereport, *detector;
-	nv_alloc_t *nva;
-	errorq_elem_t *eqep;
-	va_list ap;
-
-	if (panicstr) {
-		eqep = errorq_reserve(ereport_errorq);
-		if (eqep == NULL)
-			return;
-		ereport = errorq_elem_nvl(ereport_errorq, eqep);
-		nva = errorq_elem_nva(ereport_errorq, eqep);
-		detector = fm_nvlist_create(nva);
-	} else {
-		ereport = fm_nvlist_create(NULL);
-		detector = fm_nvlist_create(NULL);
-	}
-
-	(void) ddi_pathname(dip, device_path);
-	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL,
-	    device_path, NULL);
-	(void) snprintf(ddi_error_class, FM_MAX_CLASS, "%s.%s",
-	    DDI_IO_CLASS, error_class);
-	fm_ereport_set(ereport, version, ddi_error_class, ena, detector, NULL);
-
-	va_start(ap, version);
-	name = va_arg(ap, char *);
-	(void) i_fm_payload_set(ereport, name, ap);
-	va_end(ap);
-
-	if (panicstr) {
-		errorq_commit(ereport_errorq, eqep, ERRORQ_SYNC);
-	} else {
-		(void) fm_ereport_post(ereport, EVCH_TRYHARD);
-		fm_nvlist_destroy(ereport, FM_NVA_FREE);
-		fm_nvlist_destroy(detector, FM_NVA_FREE);
-	}
-}
-
-/*
- * Function used to drain pci_target_queue, either during panic or after softint
- * is generated, to generate target device ereports based on captured physical
- * addresss
- */
-static void
-pci_target_drain(void *private_p, pci_target_err_t *tgt_err)
-{
-	char buf[FM_MAX_CLASS];
-
-	/*
-	 * The following assumes that all pci_pci bridge devices
-	 * are configured as transparant. Find the top-level pci
-	 * nexus which has tgt_err_addr in one of its ranges, converting this
-	 * to a pci address in the process. Then starting at this node do
-	 * another tree walk to find a device with the pci address we've
-	 * found within range of one of it's assigned-addresses properties.
-	 */
-	tgt_err->tgt_dip = NULL;
-	if (panicstr)
-		pci_tgt_walk_devs(ddi_root_node(), pci_check_ranges,
-		    (void *)tgt_err);
-	else
-		ddi_walk_devs(ddi_root_node(), pci_check_ranges,
-		    (void *)tgt_err);
-	if (tgt_err->tgt_dip == NULL)
-		return;
-
-	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s", tgt_err->tgt_bridge_type,
-	    tgt_err->tgt_err_class);
-	pci_tgt_ereport_post(tgt_err->tgt_dip, buf, tgt_err->tgt_err_ena, 0,
-	    PCI_PA, DATA_TYPE_UINT64, tgt_err->tgt_err_addr, NULL);
-}
-
 void
 pci_fm_create(pci_t *pci_p)
 {
@@ -558,7 +259,7 @@ pci_fm_create(pci_t *pci_p)
 	if (pci_ecc_queue == NULL) {
 		pci_ecc_queue = errorq_create("pci_ecc_queue",
 				(errorq_func_t)ecc_err_drain,
-				(void *)NULL,
+				(void *)pci_p->pci_ecc_p,
 				ECC_MAX_ERRS, sizeof (ecc_errstate_t),
 				PIL_2, ERRORQ_VITAL);
 		if (pci_ecc_queue == NULL)
@@ -566,20 +267,9 @@ pci_fm_create(pci_t *pci_p)
 	}
 
 	/*
-	 * PCI target errorq, to schedule async handling of generation of
-	 * target device ereports based on captured physical address.
-	 * The errorq is created here but destroyed when _fini is called
-	 * for the pci module.
+	 * Initialize pci_target_queue for FMA handling of pci errors.
 	 */
-	if (pci_target_queue == NULL) {
-		pci_target_queue = errorq_create("pci_target_queue",
-				(errorq_func_t)pci_target_drain,
-				(void *)NULL,
-				TARGET_MAX_ERRS, sizeof (pci_target_err_t),
-				PIL_2, ERRORQ_VITAL);
-		if (pci_target_queue == NULL)
-			panic("failed to create required system error queue");
-	}
+	pci_targetq_init();
 
 	/*
 	 * Initialize FMA support
