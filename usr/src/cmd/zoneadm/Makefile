@@ -38,19 +38,32 @@ $(ROOTMANIFEST)         := FILEMODE= 444
 $(ROOTMANIFESTDIR)/%: %
 	$(INS.file)
 
+OBJS= zoneadm.o sw_cmp.o zfs.o
+SRCS = $(OBJS:.o=.c)
+POFILE=zoneadm_all.po
+POFILES= $(OBJS:%.o=%.po)
+
 LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs
 
 .KEEP_STATE:
 
 all: $(PROG)
 
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
 install: all $(ROOTUSRSBINPROG) $(ROOTMANIFEST) $(ROOTMETHOD)
 
 check:	$(PROG).c $(CHKMANIFEST)
-	$(CSTYLE) -pP $(PROG).c
+	$(CSTYLE) -pP $(SRCS:%=%)
+
+$(POFILE): $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
 clean:
 
-lint:	lint_PROG
+lint:	lint_SRCS
 
 include ../Makefile.targ

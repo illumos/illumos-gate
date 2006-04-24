@@ -55,7 +55,6 @@
 #include <libintl.h>
 #include <libzonecfg.h>
 #include <bsm/adt.h>
-#include <sys/utsname.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -64,7 +63,7 @@
 #include <sys/sockio.h>
 #include <sys/mntent.h>
 #include <limits.h>
-#include <libzfs.h>
+#include <dirent.h>
 
 #include <fcntl.h>
 #include <door.h>
@@ -74,6 +73,8 @@
 
 #include <pool.h>
 #include <sys/pool.h>
+
+#include "zoneadm.h"
 
 #define	MAXARGS	8
 
@@ -89,35 +90,9 @@ typedef struct zone_entry {
 static zone_entry_t *zents;
 static size_t nzents;
 
-#if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
-#define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
-#endif
-
-#define	Z_ERR	1
-#define	Z_USAGE	2
-
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE \
 	(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
-
-#define	CMD_HELP	0
-#define	CMD_BOOT	1
-#define	CMD_HALT	2
-#define	CMD_READY	3
-#define	CMD_REBOOT	4
-#define	CMD_LIST	5
-#define	CMD_VERIFY	6
-#define	CMD_INSTALL	7
-#define	CMD_UNINSTALL	8
-#define	CMD_MOUNT	9
-#define	CMD_UNMOUNT	10
-#define	CMD_CLONE	11
-#define	CMD_MOVE	12
-#define	CMD_DETACH	13
-#define	CMD_ATTACH	14
-
-#define	CMD_MIN		CMD_HELP
-#define	CMD_MAX		CMD_ATTACH
 
 struct cmd {
 	uint_t	cmd_num;				/* command number */
@@ -134,9 +109,9 @@ struct cmd {
 #define	SHELP_REBOOT	"reboot"
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
-#define	SHELP_INSTALL	"install"
+#define	SHELP_INSTALL	"install [-x nodataset]"
 #define	SHELP_UNINSTALL	"uninstall [-F]"
-#define	SHELP_CLONE	"clone [-m method] zonename"
+#define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] zonename"
 #define	SHELP_MOVE	"move zonepath"
 #define	SHELP_DETACH	"detach"
 #define	SHELP_ATTACH	"attach [-F]"
@@ -185,13 +160,13 @@ static struct cmd cmdtab[] = {
 
 /* set early in main(), never modified thereafter, used all over the place */
 static char *execname;
-static char *target_zone;
 static char *locale;
+char *target_zone;
 
 /* used in do_subproc() and signal handler */
 static volatile boolean_t child_killed;
 
-static char *
+char *
 cmd_to_str(int cmd_num)
 {
 	assert(cmd_num >= CMD_MIN && cmd_num <= CMD_MAX);
@@ -240,12 +215,21 @@ long_help(int cmd_num)
 		    "can safely be instantiated\n\ton the machine: "
 		    "physical network interfaces exist, etc."));
 	case CMD_INSTALL:
-		return (gettext("Install the configuration on to the system."));
+		return (gettext("Install the configuration on to the system.  "
+		    "The -x nodataset option\n\tcan be used to prevent the "
+		    "creation of a new ZFS file system for the\n\tzone "
+		    "(assuming the zonepath is within a ZFS file system)."));
 	case CMD_UNINSTALL:
 		return (gettext("Uninstall the configuration from the system.  "
 		    "The -F flag can be used\n\tto force the action."));
 	case CMD_CLONE:
-		return (gettext("Clone the installation of another zone."));
+		return (gettext("Clone the installation of another zone.  "
+		    "The -m option can be used to\n\tspecify 'copy' which "
+		    "forces a copy of the source zone.  The -s option\n\t"
+		    "can be used to specify the name of a ZFS snapshot "
+		    "that was taken from\n\ta previous clone command.  The "
+		    "snapshot will be used as the source\n\tinstead of "
+		    "creating a new ZFS snapshot."));
 	case CMD_MOVE:
 		return (gettext("Move the zone to a new zonepath."));
 	case CMD_DETACH:
@@ -310,7 +294,7 @@ sub_usage(char *short_usage, int cmd_num)
  * to call libc'c strerror() or that from libzonecfg.
  */
 
-static void
+void
 zperror(const char *str, boolean_t zonecfg_error)
 {
 	(void) fprintf(stderr, "%s: %s: %s\n", execname, str,
@@ -326,7 +310,7 @@ zperror(const char *str, boolean_t zonecfg_error)
  * like zperror() above.
  */
 
-static void
+void
 zperror2(const char *zone, const char *str)
 {
 	(void) fprintf(stderr, "%s: %s: %s: %s\n", execname, zone, str,
@@ -334,7 +318,7 @@ zperror2(const char *zone, const char *str)
 }
 
 /* PRINTFLIKE1 */
-static void
+void
 zerror(const char *fmt, ...)
 {
 	va_list alist;
@@ -847,7 +831,7 @@ validate_zonepath(char *path, int cmd_num)
 	if ((strcmp(stbuf.st_fstype, MNTTYPE_TMPFS) == 0) ||
 	    (strcmp(stbuf.st_fstype, MNTTYPE_XMEMFS) == 0)) {
 		(void) printf(gettext("WARNING: %s is on a temporary "
-		    "file-system.\n"), rpath);
+		    "file system.\n"), rpath);
 	}
 	if (crosscheck_zonepaths(rpath) != Z_OK)
 		return (Z_ERR);
@@ -913,8 +897,8 @@ validate_zonepath(char *path, int cmd_num)
 		 * Zonepath and NFS are literals that should not be translated.
 		 */
 		(void) fprintf(stderr, gettext("Zonepath %s is on an NFS "
-		    "mounted file-system.\n"
-		    "\tA local file-system must be used.\n"), rpath);
+		    "mounted file system.\n"
+		    "\tA local file system must be used.\n"), rpath);
 		return (Z_ERR);
 	}
 	if (vfsbuf.f_flag & ST_NOSUID) {
@@ -924,7 +908,7 @@ validate_zonepath(char *path, int cmd_num)
 		 * translated.
 		 */
 		(void) fprintf(stderr, gettext("Zonepath %s is on a nosuid "
-		    "file-system.\n"), rpath);
+		    "file system.\n"), rpath);
 		return (Z_ERR);
 	}
 
@@ -1973,8 +1957,8 @@ verify_ipd(zone_dochandle_t handle)
 			 * not be translated.
 			 */
 			(void) fprintf(stderr, gettext("cannot verify "
-			    "inherit-pkg-dir %s: NFS mounted file-system.\n"
-			    "\tA local file-system must be used.\n"),
+			    "inherit-pkg-dir %s: NFS mounted file system.\n"
+			    "\tA local file system must be used.\n"),
 			    fstab.zone_fs_dir);
 			return_code = Z_ERR;
 		}
@@ -1984,57 +1968,8 @@ verify_ipd(zone_dochandle_t handle)
 	return (return_code);
 }
 
-/* ARGSUSED */
-static void
-zfs_fs_err_handler(const char *fmt, va_list ap)
-{
-	/*
-	 * Do nothing - do not print the libzfs error messages.
-	 */
-}
-
 /*
- * Verify that the ZFS dataset exists, and its mountpoint
- * property is set to "legacy".
- */
-static int
-verify_fs_zfs(struct zone_fstab *fstab)
-{
-	zfs_handle_t *zhp;
-	char propbuf[ZFS_MAXPROPLEN];
-
-	zfs_set_error_handler(zfs_fs_err_handler);
-
-	if ((zhp = zfs_open(fstab->zone_fs_special, ZFS_TYPE_ANY)) == NULL) {
-		(void) fprintf(stderr, gettext("could not verify fs %s: "
-		    "could not access zfs dataset '%s'\n"),
-		    fstab->zone_fs_dir, fstab->zone_fs_special);
-		return (Z_ERR);
-	}
-
-	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
-		(void) fprintf(stderr, gettext("cannot verify fs %s: "
-		    "'%s' is not a filesystem\n"),
-		    fstab->zone_fs_dir, fstab->zone_fs_special);
-		zfs_close(zhp);
-		return (Z_ERR);
-	}
-
-	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf, sizeof (propbuf),
-	    NULL, NULL, 0, 0) != 0 || strcmp(propbuf, "legacy") != 0) {
-		(void) fprintf(stderr, gettext("could not verify fs %s: "
-		    "zfs '%s' mountpoint is not \"legacy\"\n"),
-		    fstab->zone_fs_dir, fstab->zone_fs_special);
-		zfs_close(zhp);
-		return (Z_ERR);
-	}
-
-	zfs_close(zhp);
-	return (Z_OK);
-}
-
-/*
- * Verify that the special device/filesystem exists and is valid.
+ * Verify that the special device/file system exists and is valid.
  */
 static int
 verify_fs_special(struct zone_fstab *fstab)
@@ -2058,8 +1993,8 @@ verify_fs_special(struct zone_fstab *fstab)
 		 * not be translated.
 		 */
 		(void) fprintf(stderr, gettext("cannot verify "
-		    "fs %s: NFS mounted file-system.\n"
-		    "\tA local file-system must be used.\n"),
+		    "fs %s: NFS mounted file system.\n"
+		    "\tA local file system must be used.\n"),
 		    fstab->zone_fs_special);
 		return (Z_ERR);
 	}
@@ -2078,14 +2013,14 @@ verify_filesystems(zone_dochandle_t handle)
 	/*
 	 * No need to verify inherit-pkg-dir fs types, as their type is
 	 * implicitly lofs, which is known.  Therefore, the types are only
-	 * verified for regular filesystems below.
+	 * verified for regular file systems below.
 	 *
 	 * Since the actual mount point is not known until the dependent mounts
 	 * are performed, we don't attempt any path validation here: that will
 	 * happen later when zoneadmd actually does the mounts.
 	 */
 	if (zonecfg_setfsent(handle) != Z_OK) {
-		(void) fprintf(stderr, gettext("could not verify file-systems: "
+		(void) fprintf(stderr, gettext("could not verify file systems: "
 		    "unable to enumerate mounts\n"));
 		return (Z_ERR);
 	}
@@ -2137,7 +2072,7 @@ verify_filesystems(zone_dochandle_t handle)
 		if (fstab.zone_fs_raw[0] == '\0' && stat(cmdbuf, &st) == 0) {
 			(void) fprintf(stderr, gettext("could not verify fs "
 			    "%s: must specify 'raw' device for %s "
-			    "file-systems\n"),
+			    "file systems\n"),
 			    fstab.zone_fs_dir, fstab.zone_fs_type);
 			return_code = Z_ERR;
 			goto next_fs;
@@ -2173,129 +2108,6 @@ next_fs:
 		zonecfg_free_fs_option_list(fstab.zone_fs_options);
 	}
 	(void) zonecfg_endfsent(handle);
-
-	return (return_code);
-}
-
-const char *current_dataset;
-
-/*
- * Custom error handler for errors incurred as part of the checks below.  We
- * want to trim off the leading 'cannot open ...' to create a better error
- * message.  The only other way this can fail is if we fail to set the 'zoned'
- * property.  In this case we just pass the error on verbatim.
- */
-static void
-zfs_error_handler(const char *fmt, va_list ap)
-{
-	char buf[1024];
-
-	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
-
-	if (strncmp(gettext("cannot open "), buf,
-	    strlen(gettext("cannot open "))) == 0)
-		/*
-		 * TRANSLATION_NOTE
-		 * zfs and dataset are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("could not verify zfs "
-		    "dataset %s%s\n"), current_dataset, strchr(buf, ':'));
-	else
-		(void) fprintf(stderr, gettext("could not verify zfs dataset "
-		    "%s: %s\n"), current_dataset, buf);
-}
-
-/* ARGSUSED */
-static int
-check_zvol(zfs_handle_t *zhp, void *unused)
-{
-	int ret;
-
-	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-		/*
-		 * TRANSLATION_NOTE
-		 * zfs and dataset are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("cannot verify zfs dataset %s: "
-		    "volumes cannot be specified as a zone dataset resource\n"),
-		    zfs_get_name(zhp));
-		ret = -1;
-	} else {
-		ret = zfs_iter_children(zhp, check_zvol, NULL);
-	}
-
-	zfs_close(zhp);
-
-	return (ret);
-}
-
-/*
- * Validate that the given dataset exists on the system, and that neither it nor
- * its children are zvols.
- *
- * Note that we don't do anything with the 'zoned' property here.  All
- * management is done in zoneadmd when the zone is actually rebooted.  This
- * allows us to automatically set the zoned property even when a zone is
- * rebooted by the administrator.
- */
-static int
-verify_datasets(zone_dochandle_t handle)
-{
-	int return_code = Z_OK;
-	struct zone_dstab dstab;
-	zfs_handle_t *zhp;
-	char propbuf[ZFS_MAXPROPLEN];
-	char source[ZFS_MAXNAMELEN];
-	zfs_source_t srctype;
-
-	if (zonecfg_setdsent(handle) != Z_OK) {
-		/*
-		 * TRANSLATION_NOTE
-		 * zfs and dataset are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("could not verify zfs datasets: "
-		    "unable to enumerate datasets\n"));
-		return (Z_ERR);
-	}
-
-	zfs_set_error_handler(zfs_error_handler);
-
-	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
-
-		current_dataset = dstab.zone_dataset_name;
-
-		if ((zhp = zfs_open(dstab.zone_dataset_name,
-		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME)) == NULL) {
-			return_code = Z_ERR;
-			continue;
-		}
-
-		if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf,
-		    sizeof (propbuf), &srctype, source,
-		    sizeof (source), 0) == 0 &&
-		    (srctype == ZFS_SRC_INHERITED)) {
-			(void) fprintf(stderr, gettext("could not verify zfs "
-			    "dataset %s: mountpoint cannot be inherited\n"),
-			    dstab.zone_dataset_name);
-			return_code = Z_ERR;
-			zfs_close(zhp);
-			continue;
-		}
-
-		if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-			(void) fprintf(stderr, gettext("cannot verify zfs "
-			    "dataset %s: volumes cannot be specified as a "
-			    "zone dataset resource\n"),
-			    dstab.zone_dataset_name);
-			return_code = Z_ERR;
-		}
-
-		if (zfs_iter_children(zhp, check_zvol, NULL) != 0)
-			return_code = Z_ERR;
-
-		zfs_close(zhp);
-	}
-	(void) zonecfg_enddsent(handle);
 
 	return (return_code);
 }
@@ -2511,6 +2323,7 @@ install_func(int argc, char *argv[])
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	int status;
+	boolean_t nodataset = B_FALSE;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot install zone in alternate root"));
@@ -2518,11 +2331,18 @@ install_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?")) != EOF) {
+	if ((arg = getopt(argc, argv, "?x:")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_INSTALL, CMD_INSTALL);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'x':
+			if (strcmp(optarg, "nodataset") != 0) {
+				sub_usage(SHELP_INSTALL, CMD_INSTALL);
+				return (Z_USAGE);
+			}
+			nodataset = B_TRUE;
+			break;
 		default:
 			sub_usage(SHELP_INSTALL, CMD_INSTALL);
 			return (Z_USAGE);
@@ -2565,6 +2385,10 @@ install_func(int argc, char *argv[])
 		zperror2(target_zone, gettext("could not get zone path"));
 		goto done;
 	}
+
+	if (!nodataset)
+		create_zfs_zonepath(zonepath);
+
 	if (chmod(zonepath, DEFAULT_DIR_MODE) != 0) {
 		zperror(zonepath, B_FALSE);
 		err = Z_ERR;
@@ -2755,7 +2579,7 @@ opt_match(char *opt, char *options)
 	return (B_FALSE);
 }
 
-#define	RW_LOFS	"WARNING: read-write lofs file-system on '%s' is configured " \
+#define	RW_LOFS	"WARNING: read-write lofs file system on '%s' is configured " \
 	"in both zones.\n"
 
 static void
@@ -2799,11 +2623,11 @@ print_fs_warnings(struct zone_fstab *s_fstab, struct zone_fstab *t_fstab)
 
 	/*
 	 * TRANSLATION_NOTE
-	 * The first variable is the file-system type and the second is
-	 * the file-system special device.  For example,
-	 * WARNING: ufs file-system on '/dev/dsk/c0t0d0s0' ...
+	 * The first variable is the file system type and the second is
+	 * the file system special device.  For example,
+	 * WARNING: ufs file system on '/dev/dsk/c0t0d0s0' ...
 	 */
-	(void) fprintf(stderr, gettext("WARNING: %s file-system on '%s' "
+	(void) fprintf(stderr, gettext("WARNING: %s file system on '%s' "
 	    "is configured in both zones.\n"), t_fstab->zone_fs_type,
 	    t_fstab->zone_fs_special);
 }
@@ -2819,7 +2643,7 @@ warn_fs_match(zone_dochandle_t s_handle, char *source_zone,
 	if ((err = zonecfg_setfsent(t_handle)) != Z_OK) {
 		errno = err;
 		zperror2(target_zone,
-		    gettext("could not enumerate file-systems"));
+		    gettext("could not enumerate file systems"));
 		return;
 	}
 
@@ -2827,7 +2651,7 @@ warn_fs_match(zone_dochandle_t s_handle, char *source_zone,
 		if ((err = zonecfg_setfsent(s_handle)) != Z_OK) {
 			errno = err;
 			zperror2(source_zone,
-			    gettext("could not enumerate file-systems"));
+			    gettext("could not enumerate file systems"));
 			(void) zonecfg_endfsent(t_handle);
 			return;
 		}
@@ -3007,8 +2831,15 @@ copy_zone(char *src, char *dst)
 		out_null = B_TRUE;
 	}
 
+	/*
+	 * Use find to get the list of files to copy.  We need to skip
+	 * files of type "socket" since cpio can't handle those but that
+	 * should be ok since the app will recreate the socket when it runs.
+	 * We also need to filter out anything under the .zfs subdir.  Since
+	 * find is running depth-first, we need the extra egrep to filter .zfs.
+	 */
 	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "cd %s && /usr/bin/find . -depth -print | "
+	    "cd %s && /usr/bin/find . -type s -prune -o -depth -print | "
 	    "/usr/bin/egrep -v '^\\./\\.zfs$|^\\./\\.zfs/' | "
 	    "/usr/bin/cpio -pdmuP@ %s > %s 2>&1",
 	    src, dst, outfile);
@@ -3093,10 +2924,40 @@ unconfigure_zone(char *zonepath)
 }
 
 /* ARGSUSED */
-int
+static int
 zfm_print(const char *p, void *r) {
 	zerror("  %s\n", p);
 	return (0);
+}
+
+int
+clone_copy(char *source_zonepath, char *zonepath)
+{
+	int err;
+
+	/* Don't clone the zone if anything is still mounted there */
+	if (zonecfg_find_mounts(source_zonepath, NULL, NULL)) {
+		zerror(gettext("These file systems are mounted on "
+		    "subdirectories of %s.\n"), source_zonepath);
+		(void) zonecfg_find_mounts(source_zonepath, zfm_print, NULL);
+		return (Z_ERR);
+	}
+
+	/*
+	 * Attempt to create a ZFS fs for the zonepath.  As usual, we don't
+	 * care if this works or not since we always have the default behavior
+	 * of a simple directory for the zonepath.
+	 */
+	create_zfs_zonepath(zonepath);
+
+	(void) printf(gettext("Copying %s..."), source_zonepath);
+	(void) fflush(stdout);
+
+	err = copy_zone(source_zonepath, zonepath);
+
+	(void) printf("\n");
+
+	return (err);
 }
 
 static int
@@ -3109,7 +2970,8 @@ clone_func(int argc, char *argv[])
 	char source_zonepath[MAXPATHLEN];
 	zone_state_t state;
 	zone_entry_t *zent;
-	char *method = "copy";
+	char *method = NULL;
+	char *snapshot = NULL;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot clone zone in alternate root"));
@@ -3117,7 +2979,7 @@ clone_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?m:")) != EOF) {
+	if ((arg = getopt(argc, argv, "?m:s:")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_CLONE, CMD_CLONE);
@@ -3125,12 +2987,16 @@ clone_func(int argc, char *argv[])
 		case 'm':
 			method = optarg;
 			break;
+		case 's':
+			snapshot = optarg;
+			break;
 		default:
 			sub_usage(SHELP_CLONE, CMD_CLONE);
 			return (Z_USAGE);
 		}
 	}
-	if (argc != (optind + 1) || strcmp(method, "copy") != 0) {
+	if (argc != (optind + 1) ||
+	    (method != NULL && strcmp(method, "copy") != 0)) {
 		sub_usage(SHELP_CLONE, CMD_CLONE);
 		return (Z_USAGE);
 	}
@@ -3143,7 +3009,6 @@ clone_func(int argc, char *argv[])
 	/*
 	 * We also need to do some extra validation on the source zone.
 	 */
-
 	if (strcmp(source_zone, GLOBAL_ZONENAME) == 0) {
 		zerror(gettext("%s operation is invalid for the global zone."),
 		    cmd_to_str(CMD_CLONE));
@@ -3213,15 +3078,6 @@ clone_func(int argc, char *argv[])
 		goto done;
 	}
 
-	/* Don't clone the zone if anything is still mounted there */
-	if (zonecfg_find_mounts(source_zonepath, NULL, NULL)) {
-		zerror(gettext("These file-systems are mounted on "
-		    "subdirectories of %s.\n"), source_zonepath);
-		(void) zonecfg_find_mounts(source_zonepath, zfm_print, NULL);
-		err = Z_ERR;
-		goto done;
-	}
-
 	if ((err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE))
 	    != Z_OK) {
 		errno = err;
@@ -3229,15 +3085,24 @@ clone_func(int argc, char *argv[])
 		goto done;
 	}
 
-	(void) printf(gettext("Cloning zonepath %s..."), source_zonepath);
-	(void) fflush(stdout);
+	if (snapshot != NULL) {
+		err = clone_snapshot_zfs(snapshot, zonepath);
+	} else {
+		/*
+		 * We always copy the clone unless the source is ZFS and a
+		 * ZFS clone worked.  We fallback to copying if the ZFS clone
+		 * fails for some reason.
+		 */
+		err = Z_ERR;
+		if (method == NULL && is_zonepath_zfs(source_zonepath))
+			err = clone_zfs(source_zone, source_zonepath, zonepath);
 
-	err = copy_zone(source_zonepath, zonepath);
-	(void) printf("\n");
-	if (err != Z_OK)
-		goto done;
+		if (err != Z_OK)
+			err = clone_copy(source_zonepath, zonepath);
+	}
 
-	err = unconfigure_zone(zonepath);
+	if (err == Z_OK)
+		err = unconfigure_zone(zonepath);
 
 done:
 	release_lock_file(lockfd);
@@ -3247,49 +3112,120 @@ done:
 #define	RMCOMMAND	"/usr/bin/rm -rf"
 
 /*
- * Used when moving a zonepath (via copying) to clean up the old path or
- * the new path if there was an error.
+ * Used when removing a zonepath after uninstalling or cleaning up after
+ * the move subcommand.  This handles a zonepath that has non-standard
+ * contents so that we will only cleanup the stuff we know about and leave
+ * any user data alone.
  *
- * This function handles the case of a zonepath being a zfs filesystem.
- * If it is a zfs filesystem, we cannot just remove the whole zonepath
- * since we can't remove the filesystem itself.  Instead, we have to remove
- * the contents of the filesystem, but not the .zfs directory.
+ * If the "all" parameter is true then we should remove the whole zonepath
+ * even if it has non-standard files/directories in it.  This can be used when
+ * we need to cleanup after moving the zonepath across file systems.
+ *
+ * We "exec" the RMCOMMAND so that the returned status is that of RMCOMMAND
+ * and not the shell.
  */
 static int
-remove_zonepath(char *zonepath)
+cleanup_zonepath(char *zonepath, boolean_t all)
 {
-	int status;
-	boolean_t is_zfs = B_FALSE;
-	struct stat buf;
-	char cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 128];
+	int		status;
+	int		i;
+	boolean_t	non_std = B_FALSE;
+	struct dirent	*dp;
+	DIR		*dirp;
+	char		*std_entries[] = {"dev", "lu", "root", NULL};
+			/* (MAXPATHLEN * 3) is for the 3 std_entries dirs */
+	char		cmdbuf[sizeof (RMCOMMAND) + (MAXPATHLEN * 3) + 64];
 
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/.zfs", zonepath);
-
-	if (stat(cmdbuf, &buf) == 0 && S_ISDIR(buf.st_mode))
-		is_zfs = B_TRUE;
-
-	if (is_zfs) {
-		/*
-		 * This doesn't handle the (unlikely) case that there are
-		 * directories or files in the top-level zonepath with white
-		 * space in the names.
-		 */
-		(void) snprintf(cmdbuf, sizeof (cmdbuf),
-		    "cd %s && /usr/bin/ls -A | /usr/bin/egrep -v '^\\.zfs$' | "
-		    "/usr/bin/xargs " RMCOMMAND, zonepath);
-	} else {
-		/*
-		 * "exec" the command so that the returned status is
-		 * that of rm and not the shell.
-		 */
-		(void) snprintf(cmdbuf, sizeof (cmdbuf),
-		    "exec " RMCOMMAND " %s", zonepath);
+	/*
+	 * We shouldn't need these checks but lets be paranoid since we
+	 * could blow away the whole system here if we got the wrong zonepath.
+	 */
+	if (*zonepath == NULL || strcmp(zonepath, "/") == 0) {
+		(void) fprintf(stderr, "invalid zonepath '%s'\n", zonepath);
+		return (Z_INVAL);
 	}
 
+	/*
+	 * If the dirpath is already gone (maybe it was manually removed) then
+	 * we just return Z_OK so that the cleanup is successful.
+	 */
+	if ((dirp = opendir(zonepath)) == NULL)
+		return (Z_OK);
+
+	/*
+	 * Look through the zonepath directory to see if there are any
+	 * non-standard files/dirs.  Also skip .zfs since that might be
+	 * there but we'll handle ZFS file systems as a special case.
+	 */
+	while ((dp = readdir(dirp)) != NULL) {
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0 ||
+		    strcmp(dp->d_name, ".zfs") == 0)
+			continue;
+
+		for (i = 0; std_entries[i] != NULL; i++)
+			if (strcmp(dp->d_name, std_entries[i]) == 0)
+				break;
+
+		if (std_entries[i] == NULL)
+			non_std = B_TRUE;
+	}
+	(void) closedir(dirp);
+
+	if (!all && non_std) {
+		/*
+		 * There are extra, non-standard directories/files in the
+		 * zonepath so we don't want to remove the zonepath.  We
+		 * just want to remove the standard directories and leave
+		 * the user data alone.
+		 */
+		(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND);
+
+		for (i = 0; std_entries[i] != NULL; i++) {
+			char tmpbuf[MAXPATHLEN];
+
+			if (snprintf(tmpbuf, sizeof (tmpbuf), " %s/%s",
+			    zonepath, std_entries[i]) >= sizeof (tmpbuf) ||
+			    strlcat(cmdbuf, tmpbuf, sizeof (cmdbuf)) >=
+			    sizeof (cmdbuf)) {
+				(void) fprintf(stderr,
+				    gettext("path is too long\n"));
+				return (Z_INVAL);
+			}
+		}
+
+		status = do_subproc(cmdbuf);
+
+		(void) fprintf(stderr, gettext("WARNING: Unable to completely "
+		    "remove %s\nbecause it contains additional user data.  "
+		    "Only the standard directory\nentries have been "
+		    "removed.\n"),
+		    zonepath);
+
+		return (subproc_status(RMCOMMAND, status));
+	}
+
+	/*
+	 * There is nothing unexpected in the zonepath, try to get rid of the
+	 * whole zonepath directory.
+	 *
+	 * If the zonepath is its own zfs file system, try to destroy the
+	 * file system.  If that fails for some reason (e.g. it has clones)
+	 * then we'll just remove the contents of the zonepath.
+	 */
+	if (is_zonepath_zfs(zonepath)) {
+		if (destroy_zfs(zonepath) == Z_OK)
+			return (Z_OK);
+		(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND
+		    " %s/*", zonepath);
+		status = do_subproc(cmdbuf);
+		return (subproc_status(RMCOMMAND, status));
+	}
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
+	    zonepath);
 	status = do_subproc(cmdbuf);
-
-	return (subproc_status("rm", status));
-
+	return (subproc_status(RMCOMMAND, status));
 }
 
 static int
@@ -3301,6 +3237,10 @@ move_func(int argc, char *argv[])
 	char zonepath[MAXPATHLEN];
 	zone_dochandle_t handle;
 	boolean_t fast;
+	boolean_t is_zfs = B_FALSE;
+	struct dirent *dp;
+	DIR *dirp;
+	boolean_t empty = B_TRUE;
 	boolean_t revert;
 	struct stat zonepath_buf;
 	struct stat new_zonepath_buf;
@@ -3334,7 +3274,7 @@ move_func(int argc, char *argv[])
 	/*
 	 * Check out the new zonepath.  This has the side effect of creating
 	 * a directory for the new zonepath.  We depend on this later when we
-	 * stat to see if we are doing a cross file-system move or not.
+	 * stat to see if we are doing a cross file system move or not.
 	 */
 	if (validate_zonepath(new_zonepath, CMD_MOVE) != Z_OK)
 		return (Z_ERR);
@@ -3356,17 +3296,40 @@ move_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
+	/*
+	 * Check if the destination directory is empty.
+	 */
+	if ((dirp = opendir(new_zonepath)) == NULL) {
+		zperror(gettext("could not open new zone path"), B_FALSE);
+		return (Z_ERR);
+	}
+	while ((dp = readdir(dirp)) != (struct dirent *)0) {
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0)
+			continue;
+		empty = B_FALSE;
+		break;
+	}
+	(void) closedir(dirp);
+
+	/* Error if there is anything in the destination directory. */
+	if (!empty) {
+		(void) fprintf(stderr, gettext("could not move zone to %s: "
+		    "directory not empty\n"), new_zonepath);
+		return (Z_ERR);
+	}
+
 	/* Don't move the zone if anything is still mounted there */
 	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
-		zerror(gettext("These file-systems are mounted on "
+		zerror(gettext("These file systems are mounted on "
 		    "subdirectories of %s.\n"), zonepath);
 		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
 		return (Z_ERR);
 	}
 
 	/*
-	 * Check if we are moving in the same filesystem and can do a fast
-	 * move or if we are crossing filesystems and have to copy the data.
+	 * Check if we are moving in the same file system and can do a fast
+	 * move or if we are crossing file systems and have to copy the data.
 	 */
 	fast = (zonepath_buf.st_dev == new_zonepath_buf.st_dev);
 
@@ -3390,15 +3353,19 @@ move_func(int argc, char *argv[])
 	}
 
 	/*
-	 * We're making some file-system changes now so we have to clean up
-	 * the file-system before we are done.  This will either clean up the
+	 * We're making some file system changes now so we have to clean up
+	 * the file system before we are done.  This will either clean up the
 	 * new zonepath if the zonecfg update failed or it will clean up the
 	 * old zonepath if everything is ok.
 	 */
 	revert = B_TRUE;
 
-	if (fast) {
-		/* same filesystem, use rename for a quick move */
+	if (is_zonepath_zfs(zonepath) &&
+	    move_zfs(zonepath, new_zonepath) != Z_ERR) {
+		is_zfs = B_TRUE;
+
+	} else if (fast) {
+		/* same file system, use rename for a quick move */
 
 		/*
 		 * Remove the new_zonepath directory that got created above
@@ -3425,8 +3392,15 @@ move_func(int argc, char *argv[])
 		}
 
 	} else {
+		/*
+		 * Attempt to create a ZFS fs for the new zonepath.  As usual,
+		 * we don't care if this works or not since we always have the
+		 * default behavior of a simple directory for the zonepath.
+		 */
+		create_zfs_zonepath(new_zonepath);
+
 		(void) printf(gettext(
-		    "Moving across file-systems; copying zonepath %s..."),
+		    "Moving across file systems; copying zonepath %s..."),
 		    zonepath);
 		(void) fflush(stdout);
 
@@ -3456,13 +3430,23 @@ done:
 	release_lock_file(lockfd);
 
 	/*
-	 * Clean up the file-system based on how things went.  We either
+	 * Clean up the file system based on how things went.  We either
 	 * clean up the new zonepath if the operation failed for some reason
 	 * or we clean up the old zonepath if everything is ok.
 	 */
 	if (revert) {
 		/* The zonecfg update failed, cleanup the new zonepath. */
-		if (fast) {
+		if (is_zfs) {
+			if (move_zfs(new_zonepath, zonepath) == Z_ERR) {
+				(void) fprintf(stderr, gettext("could not "
+				    "restore zonepath, the zfs mountpoint is "
+				    "set as:\n%s\n"), new_zonepath);
+				/*
+				 * err is already != Z_OK since we're reverting
+				 */
+			}
+
+		} else if (fast) {
 			if (rename(new_zonepath, zonepath) != 0) {
 				zperror(gettext("could not restore zonepath"),
 				    B_FALSE);
@@ -3474,7 +3458,7 @@ done:
 			(void) printf(gettext("Cleaning up zonepath %s..."),
 			    new_zonepath);
 			(void) fflush(stdout);
-			err = remove_zonepath(new_zonepath);
+			err = cleanup_zonepath(new_zonepath, B_TRUE);
 			(void) printf("\n");
 
 			if (err != Z_OK) {
@@ -3493,11 +3477,11 @@ done:
 
 	} else {
 		/* The move was successful, cleanup the old zonepath. */
-		if (!fast) {
+		if (!is_zfs && !fast) {
 			(void) printf(
 			    gettext("Cleaning up zonepath %s..."), zonepath);
 			(void) fflush(stdout);
-			err = remove_zonepath(zonepath);
+			err = cleanup_zonepath(zonepath, B_TRUE);
 			(void) printf("\n");
 
 			if (err != Z_OK) {
@@ -3549,7 +3533,7 @@ detach_func(int argc, char *argv[])
 
 	/* Don't detach the zone if anything is still mounted there */
 	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
-		zerror(gettext("These file-systems are mounted on "
+		zerror(gettext("These file systems are mounted on "
 		    "subdirectories of %s.\n"), zonepath);
 		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
 		return (Z_ERR);
@@ -3598,263 +3582,6 @@ done:
 	release_lock_file(lockfd);
 
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
-}
-
-/*
- * Find the specified package in the sw inventory on the handle and check
- * if the version matches what is passed in.
- * Return 0 if the packages match
- *        1 if the package is found but we have a version mismatch
- *        -1 if the package is not found
- */
-static int
-pkg_cmp(zone_dochandle_t handle, char *pkg_name, char *pkg_vers,
-    char *return_vers, int vers_size)
-{
-	int res = -1;
-	struct zone_pkgtab pkgtab;
-
-	if (zonecfg_setpkgent(handle) != Z_OK) {
-		(void) fprintf(stderr,
-		    gettext("unable to enumerate packages\n"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getpkgent(handle, &pkgtab) == Z_OK) {
-		if (strcmp(pkg_name, pkgtab.zone_pkg_name) != 0)
-			continue;
-
-		if (strcmp(pkg_vers, pkgtab.zone_pkg_version) == 0) {
-			res = 0;
-			break;
-		}
-
-		(void) strlcpy(return_vers, pkgtab.zone_pkg_version, vers_size);
-		res = 1;
-		break;
-	}
-
-	(void) zonecfg_endpkgent(handle);
-	return (res);
-}
-
-/*
- * Used in software comparisons to check the packages between the two zone
- * handles.  The packages have to match or we print a message telling the
- * user what is out of sync.  The src_cmp flag tells us if the first handle
- * is the source machine global zone or not.  This is used to enable the
- * right messages to be printed and also to enable extra version checking
- * that is not needed for the opposite comparison.
- */
-static int
-pkg_check(char *header, zone_dochandle_t handle1, zone_dochandle_t handle2,
-    boolean_t src_cmp)
-{
-	int			err;
-	int			res = Z_OK;
-	boolean_t		do_header = B_TRUE;
-	char			other_vers[ZONE_PKG_VERSMAX];
-	struct zone_pkgtab	pkgtab;
-
-	if (zonecfg_setpkgent(handle1) != Z_OK) {
-		(void) fprintf(stderr,
-		    gettext("unable to enumerate packages\n"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getpkgent(handle1, &pkgtab) == Z_OK) {
-		if ((err = pkg_cmp(handle2, pkgtab.zone_pkg_name,
-		    pkgtab.zone_pkg_version, other_vers, sizeof (other_vers)))
-		    != 0) {
-			if (do_header && (err < 0 || src_cmp)) {
-				/* LINTED E_SEC_PRINTF_VAR_FMT */
-				(void) fprintf(stderr, header);
-				do_header = B_FALSE;
-			}
-			if (err < 0) {
-				(void) fprintf(stderr,
-				    (src_cmp == B_TRUE) ?
-				    gettext("\t%s: not installed\n\t\t(%s)\n") :
-				    gettext("\t%s (%s)\n"),
-				    pkgtab.zone_pkg_name,
-				    pkgtab.zone_pkg_version);
-				res = Z_ERR;
-			} else if (src_cmp) {
-				(void) fprintf(stderr, gettext(
-				    "\t%s: version mismatch\n\t\t(%s)"
-				    "\n\t\t(%s)\n"),
-				    pkgtab.zone_pkg_name,
-				    pkgtab.zone_pkg_version, other_vers);
-				res = Z_ERR;
-			}
-		}
-	}
-
-	(void) zonecfg_endpkgent(handle1);
-
-	return (res);
-}
-
-/*
- * Find the specified patch in the sw inventory on the handle and check
- * if the version matches what is passed in.
- * Return 0 if the patches match
- *        1 if the patches is found but we have a version mismatch
- *        -1 if the patches is not found
- */
-static int
-patch_cmp(zone_dochandle_t handle, char *patch_id, char *patch_vers,
-    char *return_vers, int vers_size)
-{
-	int			res = -1;
-	struct zone_patchtab	patchtab;
-
-	if (zonecfg_setpatchent(handle) != Z_OK) {
-		(void) fprintf(stderr,
-		    gettext("unable to enumerate patches\n"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getpatchent(handle, &patchtab) == Z_OK) {
-		char *p;
-
-		if ((p = strchr(patchtab.zone_patch_id, '-')) != NULL)
-			*p++ = '\0';
-		else
-			p = "";
-
-		if (strcmp(patch_id, patchtab.zone_patch_id) != 0)
-			continue;
-
-		if (strcmp(patch_vers, p) == 0) {
-			res = 0;
-			break;
-		}
-
-		(void) strlcpy(return_vers, p, vers_size);
-		/*
-		 * Keep checking.  This handles the case where multiple
-		 * versions of the same patch is installed.
-		 */
-		res = 1;
-	}
-
-	(void) zonecfg_endpatchent(handle);
-	return (res);
-}
-
-/*
- * Used in software comparisons to check the patches between the two zone
- * handles.  The patches have to match or we print a message telling the
- * user what is out of sync.  The src_cmp flag tells us if the first handle
- * is the source machine global zone or not.  This is used to enable the
- * right messages to be printed and also to enable extra version checking
- * that is not needed for the opposite comparison.
- */
-static int
-patch_check(char *header, zone_dochandle_t handle1, zone_dochandle_t handle2,
-    boolean_t src_cmp)
-{
-	int			err;
-	int			res = Z_OK;
-	boolean_t		do_header = B_TRUE;
-	char			other_vers[MAXNAMELEN];
-	struct zone_patchtab	patchtab;
-
-	if (zonecfg_setpatchent(handle1) != Z_OK) {
-		(void) fprintf(stderr,
-		    gettext("unable to enumerate patches\n"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getpatchent(handle1, &patchtab) == Z_OK) {
-		char *patch_vers;
-
-		if ((patch_vers = strchr(patchtab.zone_patch_id, '-')) != NULL)
-			*patch_vers++ = '\0';
-		else
-			patch_vers = "";
-
-		if ((err = patch_cmp(handle2, patchtab.zone_patch_id,
-		    patch_vers, other_vers, sizeof (other_vers))) != 0) {
-			if (do_header && (err < 0 || src_cmp)) {
-				/* LINTED E_SEC_PRINTF_VAR_FMT */
-				(void) fprintf(stderr, header);
-				do_header = B_FALSE;
-			}
-			if (err < 0) {
-				(void) fprintf(stderr,
-				    (src_cmp == B_TRUE) ?
-				    gettext("\t%s: not installed\n") :
-				    gettext("\t%s\n"),
-				    patchtab.zone_patch_id);
-				res = Z_ERR;
-			} else if (src_cmp) {
-				(void) fprintf(stderr,
-				    gettext("\t%s: version mismatch\n\t\t(%s) "
-				    "(%s)\n"), patchtab.zone_patch_id,
-				    patch_vers, other_vers);
-				res = Z_ERR;
-			}
-		}
-	}
-
-	(void) zonecfg_endpatchent(handle1);
-
-	return (res);
-}
-
-/*
- * Compare the software on the local global zone and source system global
- * zone.  Used when we are trying to attach a zone during migration.
- * l_handle is for the local system and s_handle is for the source system.
- * These have a snapshot of the appropriate packages and patches in the global
- * zone for the two machines.
- * The functions called here will print any messages that are needed to
- * inform the user about package or patch problems.
- */
-static int
-sw_cmp(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
-{
-	char		*hdr;
-	int		res = Z_OK;
-
-	/*
-	 * Check the source host for pkgs (and versions) that are not on the
-	 * local host.
-	 */
-	hdr = gettext("These packages installed on the source system are "
-	    "inconsistent with this system:\n");
-	if (pkg_check(hdr, s_handle, l_handle, B_TRUE) != Z_OK)
-		res = Z_ERR;
-
-	/*
-	 * Now check the local host for pkgs that were not on the source host.
-	 * We already handled version mismatches in the loop above.
-	 */
-	hdr = gettext("These packages installed on this system were "
-	    "not installed on the source system:\n");
-	if (pkg_check(hdr, l_handle, s_handle, B_FALSE) != Z_OK)
-		res = Z_ERR;
-
-	/*
-	 * Check the source host for patches that are not on the local host.
-	 */
-	hdr = gettext("These patches installed on the source system are "
-	    "inconsistent with this system:\n");
-	if (patch_check(hdr, s_handle, l_handle, B_TRUE) != Z_OK)
-		res = Z_ERR;
-
-	/*
-	 * Check the local host for patches that were not on the source host.
-	 * We already handled version mismatches in the loop above.
-	 */
-	hdr = gettext("These patches installed on this system were "
-	    "not installed on the source system:\n");
-	if (patch_check(hdr, l_handle, s_handle, B_FALSE) != Z_OK)
-		res = Z_ERR;
-
-	return (res);
 }
 
 /*
@@ -4030,7 +3757,7 @@ attach_func(int argc, char *argv[])
 	}
 
 	/* sw_cmp prints error msgs as necessary */
-	if ((err = sw_cmp(handle, athandle)) != Z_OK)
+	if ((err = sw_cmp(handle, athandle, SW_CMP_NONE)) != Z_OK)
 		goto done;
 
 	if ((err = dev_fix(athandle)) != Z_OK)
@@ -4082,14 +3809,11 @@ ask_yesno(boolean_t default_answer, const char *question)
 static int
 uninstall_func(int argc, char *argv[])
 {
-	/* 6: "exec " and " " */
-	char cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 6];
 	char line[ZONENAME_MAX + 128];	/* Enough for "Are you sure ..." */
-	char rootpath[MAXPATHLEN], devpath[MAXPATHLEN];
+	char rootpath[MAXPATHLEN], zonepath[MAXPATHLEN];
 	boolean_t force = B_FALSE;
 	int lockfd, answer;
 	int err, arg;
-	int status;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot uninstall zone in alternate root"));
@@ -4132,13 +3856,12 @@ uninstall_func(int argc, char *argv[])
 		}
 	}
 
-	if ((err = zone_get_zonepath(target_zone, devpath,
-	    sizeof (devpath))) != Z_OK) {
+	if ((err = zone_get_zonepath(target_zone, zonepath,
+	    sizeof (zonepath))) != Z_OK) {
 		errno = err;
 		zperror2(target_zone, gettext("could not get zone path"));
 		return (Z_ERR);
 	}
-	(void) strlcat(devpath, "/dev", sizeof (devpath));
 	if ((err = zone_get_rootpath(target_zone, rootpath,
 	    sizeof (rootpath))) != Z_OK) {
 		errno = err;
@@ -4167,7 +3890,7 @@ uninstall_func(int argc, char *argv[])
 	/* Don't uninstall the zone if anything is mounted there */
 	err = zonecfg_find_mounts(rootpath, NULL, NULL);
 	if (err) {
-		zerror(gettext("These file-systems are mounted on "
+		zerror(gettext("These file systems are mounted on "
 		    "subdirectories of %s.\n"), rootpath);
 		(void) zonecfg_find_mounts(rootpath, zfm_print, NULL);
 		return (Z_ERR);
@@ -4180,20 +3903,12 @@ uninstall_func(int argc, char *argv[])
 		goto bad;
 	}
 
-	/*
-	 * "exec" the command so that the returned status is that of
-	 * RMCOMMAND and not the shell.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
-	    devpath);
-	status = do_subproc(cmdbuf);
-	if ((err = subproc_status(RMCOMMAND, status)) != Z_OK)
+	if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("cleaning up zonepath failed"));
 		goto bad;
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
-	    rootpath);
-	status = do_subproc(cmdbuf);
-	if ((err = subproc_status(RMCOMMAND, status)) != Z_OK)
-		goto bad;
+	}
+
 	err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
 	if (err != Z_OK) {
 		errno = err;
