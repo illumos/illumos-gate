@@ -661,9 +661,9 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 		prop[PT_SOCK_TYPE_INDEX].ip_error = IVE_INVALID;
 
 	/* Get the bind address */
-	if (!cfg->istlx && ((prop[PT_BIND_ADDR_INDEX].ip_error == IVE_UNSET) ||
-	    ((cfg->bind_addr =
-	    strdup(prop[PT_BIND_ADDR_INDEX].ip_value.iv_string)) == NULL)))
+	if (!cfg->istlx && prop[PT_BIND_ADDR_INDEX].ip_error != IVE_UNSET &&
+	    (cfg->bind_addr =
+	    strdup(prop[PT_BIND_ADDR_INDEX].ip_value.iv_string)) == NULL)
 		prop[PT_BIND_ADDR_INDEX].ip_error = IVE_INVALID;
 
 	/*
