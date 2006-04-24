@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1671,6 +1671,83 @@ const struct st_drivetype st_drivetypes[] =
     0,                        /* .load_timeout                                */
     0,                        /* .unload_timeout                              */
     MINUTES(240)              /* .erase_timeout                               */
+  },
+
+  /*
+   * Certance Ultrium LTO 3
+   * [1] This drive supports 3 densites at this time.
+   *     ST_MODE_SEL_COMP controls compression.
+   * [2] max_rretries and max_wretries are not used but kept for
+   *     backward compatibility.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Certance Ultrium 3",     /* .name            Display ("pretty") name     */
+    17,                       /* .length          Length of next item...      */
+    "CERTANCEULTRIUM 3",      /* .vid             handles SCSI or FC          */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*    00001           Supports variable length  */
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
+                              /*    -----                                     */
+                              /*    18619                                     */
+    -1,                       /* .max_rretries    [Note 2]                    */
+    -1,                       /* .max_wretries    [Note 2]                    */
+    {0x40, 0x42, 0x44, 0x44}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes                 */
+    0,                        /* .non_motion_timeout                          */
+    MINUTES(60),              /* .io_timeout                                  */
+    MINUTES(35),              /* .rewind_timeout                              */
+    MINUTES(60),              /* .space_timeout                               */
+    MINUTES(35),              /* .load_timeout                                */
+    MINUTES(35),              /* .unload_timeout                              */
+    MINUTES(180)              /* .erase_timeout                               */
+  },
+
+  /*
+   * Certance Ultrium LTO 2
+   * [1] This drive supports two densites at this time.
+   *     0x40 for Ultrium 1 and 0x42 for Ultrium 2.
+   *     ST_MODE_SEL_COMP controls compression.
+   * [2] max_rretries and max_wretries are not used but kept for
+   *     backward compatibility.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "Certance Ultrium 2", /* .name            Display ("pretty") name     */
+    17,                       /* .length          Length of next item...      */
+    "CERTANCEULTRIUM 2",      /* .vid             handles SCSI or FC          */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*    00001           Supports variable length  */
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */ 
+    ST_MODE_SEL_COMP,         /*    10000           Mode select compression   */
+                              /*    -----                                     */
+                              /*    18619                                     */
+    -1,                       /* .max_rretries    [Note 2]                    */
+    -1,                       /* .max_wretries    [Note 2]                    */
+    {0x40, 0x40, 0x42, 0x42}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes                 */
+    0,                        /* .non_motion_timeout                          */
+    MINUTES(60),              /* .io_timeout                                  */
+    MINUTES(35),              /* .rewind_timeout                              */
+    MINUTES(60),              /* .space_timeout                               */
+    MINUTES(35),              /* .load_timeout                                */
+    MINUTES(35),              /* .unload_timeout                              */
+    MINUTES(180)              /* .erase_timeout                               */
   },
 
   /*

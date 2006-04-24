@@ -7577,12 +7577,13 @@ st_modeselect(struct scsi_tape *un)
 			    "found media 0x%X using density 0x%X\n",
 			    un->un_mspl->media_type,
 			    un->un_dp->densities[best]);
+			un->un_mspl->density = un->un_dp->densities[best];
+		} else {
+			/* Otherwise set density based on minor node opened */
+			un->un_mspl->density =
+			    un->un_dp->densities[un->un_curdens];
 		}
-
-		un->un_mspl->density = un->un_dp->densities[best];
-
 	} else {
-		/* Otherwise set density based on minor node opened */
 		un->un_mspl->density = un->un_dp->densities[un->un_curdens];
 	}
 
