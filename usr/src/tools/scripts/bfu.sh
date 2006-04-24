@@ -72,18 +72,21 @@ export ARCHIVE=${ARCHIVEPATH}
 #	include all files in any of its directories, as well as any files in
 #	/etc/inet/ itself.
 #
+#	These lists should really be generated automatically from the
+#	pkgmap(4) metadata.
+#
+
+#
 # First list: files to be saved in global and non-global zones.
 #
 all_zones_files="
 	etc/.login
 	etc/acct/holidays
 	etc/acctadm.conf
-	etc/aggregation.conf
 	etc/auto_*
 	etc/cron.d/at.deny
 	etc/cron.d/cron.deny
 	etc/crypto/pkcs11.conf
-	etc/datalink.conf
 	etc/default/*
 	etc/dfs/dfstab
 	etc/dumpdates
@@ -111,6 +114,7 @@ all_zones_files="
 	etc/mail/helpfile
 	etc/mail/local-host-names
 	etc/mail/trusted-users
+	etc/named.conf
 	etc/net/*/services
 	etc/netconfig
 	etc/nfs/nfslog.conf
@@ -125,7 +129,6 @@ all_zones_files="
 	etc/project
 	etc/publickey
 	etc/remote
-	etc/named.conf
 	etc/resolv.conf
 	etc/rmmount.conf
 	etc/rpc
@@ -168,8 +171,10 @@ global_zone_only_files="
 	boot/solaris/bootenv.rc
 	boot/solaris/devicedb/master
 	boot/solaris/filelist.ramdisk
+	etc/aggregation.conf
 	etc/bootrc
 	etc/crypto/kcf.conf
+	etc/datalink.conf
 	etc/devlink.tab
 	etc/driver_aliases
 	etc/driver_classes
@@ -187,7 +192,10 @@ global_zone_only_files="
 	etc/minor_perm
 	etc/name_to_major
 	etc/name_to_sysnum
-	etc/nca/*
+	etc/nca/nca.if
+	etc/nca/ncakmod.conf
+	etc/nca/ncalogd.conf
+	etc/nca/ncaport.conf
 	etc/openwin/server/etc/OWconfig
 	etc/path_to_inst
 	etc/power.conf
@@ -242,7 +250,6 @@ superfluous_local_zone_files="
 	etc/default/power
 	etc/flash/postdeployment/svm.cleanup
 	etc/flash/predeployment/svm.save
-	etc/fm
 	etc/inet/datemsk.ndpd
 	etc/inet/ike
 	etc/inet/ipqosconf.1.sample
@@ -255,18 +262,15 @@ superfluous_local_zone_files="
 	etc/inet/mipagent.conf.ha-sample
 	etc/inet/secret
 	etc/inet/sock2path
-	etc/init.d/audit
 	etc/init.d/devlinks
 	etc/init.d/dodatadm.udaplt
 	etc/init.d/drvconfig
-	etc/init.d/flashprom
 	etc/init.d/llc2
 	etc/init.d/mipagent
 	etc/init.d/ncakmod
 	etc/init.d/ncalogd
 	etc/init.d/pcmcia
 	etc/init.d/pppd
-	etc/init.d/sckm
 	etc/init.d/wrsmcfg
 	etc/ipf
 	etc/llc2
@@ -275,32 +279,22 @@ superfluous_local_zone_files="
 	etc/openwin
 	etc/ppp
 	etc/rc0.d/K06mipagent
-	etc/rc0.d/K33audit
 	etc/rc0.d/K34ncalogd
-	etc/rc0.d/K42sckm
 	etc/rc0.d/K50pppd
 	etc/rc0.d/K52llc2
 	etc/rc1.d/K06mipagent
-	etc/rc1.d/K33audit
 	etc/rc1.d/K34ncalogd
-	etc/rc1.d/K40sf880dr
-	etc/rc1.d/K42sckm
 	etc/rc1.d/K50pppd
 	etc/rc1.d/K52llc2
 	etc/rc2.d/K06mipagent
 	etc/rc2.d/S40llc2
 	etc/rc2.d/S42ncakmod
 	etc/rc2.d/S47pppd
-	etc/rc2.d/S70sckm
-	etc/rc2.d/S75flashprom
 	etc/rc2.d/S81dodatadm.udaplt
 	etc/rc2.d/S94ncalogd
-	etc/rc2.d/S98efcode
-	etc/rc2.d/S99audit
 	etc/rc3.d/S80mipagent
 	etc/rcS.d/K06mipagent
 	etc/rcS.d/K34ncalogd
-	etc/rcS.d/K42sckm
 	etc/rcS.d/K44wrsmcfg
 	etc/rcS.d/K50pppd
 	etc/rcS.d/K52llc2
@@ -313,19 +307,75 @@ superfluous_local_zone_files="
 	etc/wrsm
 	etc/zones
 	kernel
+	lib/libmeta.so
+	lib/libmeta.so.1
+	lib/svc/method/ipfilter
+	lib/svc/method/pfil
+	lib/svc/method/sf880dr
+	lib/svc/method/svc-cvcd
+	lib/svc/method/svc-dcs
+	lib/svc/method/svc-dscp
+	lib/svc/method/svc-dumpadm
 	lib/svc/method/svc-intrd
+	lib/svc/method/svc-mdmonitor
+	lib/svc/method/svc-metainit
 	lib/svc/method/svc-poold
 	lib/svc/method/svc-pools
+	lib/svc/method/svc-power
 	lib/svc/method/svc-scheduler
+	lib/svc/method/svc-sckmd
+	lib/svc/method/svc-syseventd
+	lib/svc/method/svc-zones
+	platform/*/kernel
+	platform/SUNW,Sun-Fire-15000/lib/cvcd
+	platform/SUNW,Ultra-Enterprise-10000/lib/cvcd
+	platform/i86pc/biosint
+	platform/i86pc/multiboot
+	platform/sun4u/cprboot
+	platform/sun4u/lib/libwrsmconf.so
+	platform/sun4u/lib/libwrsmconf.so.1
+	platform/sun4u/lib/sparcv9/libwrsmconf.so
+	platform/sun4u/lib/sparcv9/libwrsmconf.so.1
+	platform/sun4u/sbin
+	platform/sun4u/ufsboot
+	platform/sun4u/wanboot
+	platform/sun4v/lib/libc_psr
+	platform/sun4v/lib/sparcv9/libc_psr
+	platform/sun4v/ufsboot
+	platform/sun4v/wanboot
+	sbin/dladm
+	sbin/metadb
+	sbin/metadevadm
+	sbin/metainit
+	sbin/metarecover
+	sbin/metastat
+	usr/include/netinet/ip_compat.h
+	usr/include/netinet/ip_fil.h
+	usr/include/netinet/ip_nat.h
+	usr/include/netinet/ip_proxy.h
+	usr/include/netinet/ip_state.h
+	usr/include/netinet/ipl.h
+	usr/include/sys/dcam
+	usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so
+	usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options
+	usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so
+	usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
+	usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln
+	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
-	var/fm
 	var/log/pool
-	var/svc/manifest/network/aggregation.xml
-	var/svc/manifest/network/datalink-init.xml
-	var/svc/manifest/network/datalink.xml
 	var/svc/manifest/network/ipfilter.xml
 	var/svc/manifest/network/pfil.xml
-	var/svc/manifest/platform
+	var/svc/manifest/network/rpc/mdcomm.xml
+	var/svc/manifest/network/rpc/meta.xml
+	var/svc/manifest/network/rpc/metamed.xml
+	var/svc/manifest/network/rpc/metamh.xml
+	var/svc/manifest/platform/i86pc/eeprom.xml
+	var/svc/manifest/platform/sun4u/dcs.xml
+	var/svc/manifest/platform/sun4u/dscp.xml
+	var/svc/manifest/platform/sun4u/efdaemon.xml
+	var/svc/manifest/platform/sun4u/sckmd.xml
+	var/svc/manifest/platform/sun4u/sf880drd.xml
 	var/svc/manifest/system/cvc.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/fmd.xml
@@ -342,14 +392,15 @@ superfluous_local_zone_files="
 "
 
 #
-# files to be preserved, ie unconditionally restored to "child" versions
+# Fourth list: files to be preserved, ie unconditionally restored to
+# "child" versions
 #
 preserve_files="
 	kernel/misc/amd64/sysinit
-	kernel/misc/sysinit
-	kernel/misc/usbs49_fw
 	kernel/misc/amd64/usbs49_fw
 	kernel/misc/sparcv9/usbs49_fw
+	kernel/misc/sysinit
+	kernel/misc/usbs49_fw
 	var/adm/aculog
 	var/adm/spellhist
 	var/adm/utmpx
@@ -835,6 +886,7 @@ smf_obsolete_rc_files="
 	etc/init.d/rootusr
 	etc/init.d/rpc
 	etc/init.d/savecore
+	etc/init.d/sckm
 	etc/init.d/sf880dr
 	etc/init.d/slpd
 	etc/init.d/sshd
@@ -874,6 +926,7 @@ smf_obsolete_rc_files="
 	etc/rc0.d/K41ldap.client
 	etc/rc0.d/K41nfs.client
 	etc/rc0.d/K41rpc
+	etc/rc0.d/K42sckm
 	etc/rc0.d/K43inet
 	etc/rc0.d/K68picld
 	etc/rc0.d/K83devfsadm
@@ -903,6 +956,7 @@ smf_obsolete_rc_files="
 	etc/rc1.d/K41autofs
 	etc/rc1.d/K41ldap.client
 	etc/rc1.d/K41rpc
+	etc/rc1.d/K42sckm
 	etc/rc1.d/K43inet
 	etc/rc1.d/K99libc.mount
 	etc/rc1.d/S01MOUNTFSYS
@@ -920,6 +974,7 @@ smf_obsolete_rc_files="
 	etc/rc2.d/S65ipfboot
 	etc/rc2.d/S69domainname
 	etc/rc2.d/S69inet
+	etc/rc2.d/S70sckm
 	etc/rc2.d/S71ldap.client
 	etc/rc2.d/S71rpc
 	etc/rc2.d/S71sysid.sys
@@ -973,6 +1028,7 @@ smf_obsolete_rc_files="
 	etc/rcS.d/K41autofs
 	etc/rcS.d/K41ldap.client
 	etc/rcS.d/K41rpc
+	etc/rcS.d/K42sckm
 	etc/rcS.d/K43inet
 	etc/rcS.d/K99libc.mount
 	etc/rcS.d/S10cvc
@@ -2074,7 +2130,6 @@ print "\nCreating bfu execution environment ..."
 # kernel/library/command incompatibilities during a live upgrade.
 #
 bfucmd="
-	/usr/sbin/add_drv
 	/usr/bin/awk
 	/usr/bin/cat
 	/usr/bin/chgrp
@@ -2107,23 +2162,16 @@ bfucmd="
 	/usr/bin/ksh
 	/usr/bin/line
 	/usr/bin/ln
-	/usr/sbin/lofiadm
 	/usr/bin/ls
 	/usr/bin/mkdir
-	/usr/sbin/mkfile
-	/usr/sbin/mkfs
-	/usr/sbin/mknod
 	/usr/bin/mktemp
 	/usr/bin/more
-	/usr/sbin/mount
 	/usr/bin/mv
 	/usr/bin/nawk
 	/usr/bin/pgrep
-	/usr/sbin/newfs
 	/usr/bin/pkginfo
 	/usr/bin/pkill
 	/usr/bin/printf
-	/usr/sbin/prtconf
 	/usr/bin/prun
 	/usr/bin/ps
 	/usr/bin/pstop
@@ -2145,8 +2193,6 @@ bfucmd="
 	/usr/bin/true
 	/usr/bin/truss
 	/usr/bin/tty
-	/usr/sbin/uadmin
-	/usr/sbin/umount
 	/usr/bin/uname
 	/usr/bin/uniq
 	/usr/bin/uptime
@@ -2155,16 +2201,25 @@ bfucmd="
 	/usr/bin/wc
 	/usr/bin/xargs
 	/usr/bin/zcat
+	/usr/sbin/add_drv
 	/usr/sbin/chroot
 	/usr/sbin/halt
 	/usr/sbin/lockfs
+	/usr/sbin/lofiadm
+	/usr/sbin/mkfile
+	/usr/sbin/mkfs
 	/usr/sbin/mknod
+	/usr/sbin/mount
+	/usr/sbin/newfs
 	/usr/sbin/pkgrm
+	/usr/sbin/prtconf
 	/usr/sbin/reboot
 	/usr/sbin/sync
 	/usr/sbin/tar
 	/usr/sbin/uadmin
+	/usr/sbin/umount
 	/usr/sbin/wall
+	/usr/sbin/zonecfg
 	${FASTFS-$GATE/public/bin/$bfu_isa/fastfs}
 	${GZIPBIN-$GATE/public/bin/$bfu_isa/gzip}
 "
@@ -4337,11 +4392,20 @@ exit 0
 EOF
 }
 
+dir_is_inherited() {
+	dir=$1
+	set -- `zonecfg -z $zone info inherit-pkg-dir dir=/$dir`
+	[ "$3" = "/$dir" ] && return 0 || return 1
+}
+
 mondo_loop() {
 	typeset pkgroot
 	typeset pkg
 	root=$1
 	zone=$2
+	if [ $zone != global ]; then
+		usrroot=$root
+	fi
 
 	# If the archives being installed contain i86pc.boot, 
 	# check to see if it contains strap.com, one of the
@@ -4542,11 +4606,11 @@ mondo_loop() {
 	#
 	# Remove old ZFS binaries (back when it was three modules)
 	#
-	find $root/kernel/drv -name zpool | xargs rm -f
+	find $root/kernel/drv -name zpool 2> /dev/null | xargs rm -f
 	rm -f $root/kernel/drv/zpool.conf
 	rm -f $root/kernel/drv/zpool.cache
 
-	find $root/kernel/drv -name zvol | xargs rm -f
+	find $root/kernel/drv -name zvol 2> /dev/null | xargs rm -f
 	rm -f $root/kernel/drv/zvol.conf
 
 	#
@@ -5978,7 +6042,15 @@ mondo_loop() {
 				extract_boot_archives boot $rootarchs
 			fi
 		else
-			extract_archives root generic
+			dir_is_inherited usr ||
+			    extract_archives usr generic $usrarchs
+			dir_is_inherited lib ||
+			    extract_archives lib generic
+			dir_is_inherited sbin ||
+			    extract_archives sbin generic
+			dir_is_inherited platform &&
+			    extract_archives root generic ||
+			    extract_archives root generic $rootarchs
 		fi
 	fi
 
@@ -6074,11 +6146,8 @@ mondo_loop() {
 			done
 		fi
 	fi
-	if [ $zone != global ]; then
-		rm -rf $global_zone_only_files $superfluous_local_zone_files
-	fi
-	cd bfu.child
 
+	cd bfu.child
 	for file in `filelist $zone`
 	do
 		# parent: freshly-BFUed version
@@ -6288,6 +6357,10 @@ mondo_loop() {
 	smf_apply_conf
 
 	update_policy_conf
+
+	if [ $zone != global ]; then
+		rm -rf $global_zone_only_files $superfluous_local_zone_files
+	fi
 
 	print "bfu'ed from $cpiodir on `date +%Y-%m-%d`" >>etc/motd
 	tail +`nawk '/bfu.ed from/ { x=NR }; END { print x+1 }' \
