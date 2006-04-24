@@ -47,6 +47,7 @@ i preinstall
 i postinstall
 i space
 i i.initd
+i i.preserve
 #
 d none etc 0755 root sys
 d none etc/init.d 0755 root sys
