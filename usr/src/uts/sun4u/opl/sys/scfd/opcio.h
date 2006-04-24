@@ -79,7 +79,6 @@ extern "C" {
 #define	SCFIOCREMCSFILE		(SCFIOC|108|0x80040000)
 
 #define	SCFIOCSETPHPINFO	(SCFIOC|1|0xe0000000)
-#define	SCFIOCPCIRESETREQ	(SCFIOC|2|0xe0000000)
 
 /* SCFIOCOPECALL */
 #define	SUB_OPECALL_DISP	0x10	/* OP call disp */
@@ -311,13 +310,6 @@ typedef struct scfsetphpinfo {
 	unsigned char	buf[65536];
 	unsigned int	size;
 } scfsetphpinfo_t;
-
-/* SCFIOCPCIRESETREQ */
-typedef struct scfpciresetreq {
-	unsigned char	sbuf[65536];
-	unsigned char	rbuf[16];
-	unsigned int	size;
-} scfpciresetreq_t;
 
 #ifdef	__cplusplus
 }

@@ -60,6 +60,8 @@ int	scf_dscp_end_wait_time	= SCF_TIMER_VALUE_DSCP_END;
 int	scf_dscp_txbusy_time	= SCF_TIMER_VALUE_DSCP_BUSY;
 	/* DSCP interface callback timer */
 int	scf_dscp_callback_time	= SCF_TIMER_VALUE_DSCP_CALLBACK;
+	/* DSCP INIT_REQ retry timer */
+int	scf_dscp_init_time	= SCF_TIMER_VALUE_DSCP_INIT;
 
 /*
  * Function list
@@ -86,6 +88,7 @@ extern void	scf_dscp_end_tout(void);
 extern void	scf_dscp_busy_tout(void);
 extern void	scf_dscp_callback_tout(void);
 extern void	scf_report_send_wait_tout(void);
+extern void	scf_dscp_init_tout(void);
 
 /*
  * scf_timer_init()
@@ -144,6 +147,10 @@ scf_timer_init(void)
 	scf_timer[SCF_TIMERCD_RCI_BUSY].value = scf_rci_busy_rtime;
 	scf_timer[SCF_TIMERCD_RCI_BUSY].tbl[0].code = SCF_TIMERCD_RCI_BUSY;
 	scf_timer[SCF_TIMERCD_RCI_BUSY].tbl[1].code = SCF_TIMERCD_RCI_BUSY;
+
+	scf_timer[SCF_TIMERCD_DSCP_INIT].value = scf_dscp_init_time;
+	scf_timer[SCF_TIMERCD_DSCP_INIT].tbl[0].code = SCF_TIMERCD_DSCP_INIT;
+	scf_timer[SCF_TIMERCD_DSCP_INIT].tbl[1].code = SCF_TIMERCD_DSCP_INIT;
 
 	SCFDBGMSG(SCF_DBGFLAG_TIMER, SCF_FUNC_NAME ": end");
 }
@@ -435,6 +442,11 @@ scf_tout(void *arg)
 		case SCF_TIMERCD_RCI_BUSY:
 			/* SCF command RCI_BUSY timeout */
 			scf_report_send_wait_tout();
+			break;
+
+		case SCF_TIMERCD_DSCP_INIT:
+			/* DSCP INIT_REQ retry timeout */
+			scf_dscp_init_tout();
 			break;
 
 		default:

@@ -43,8 +43,9 @@ typedef enum {
 	SCF_TIMERCD_DSCP_END,	/* DSCP interface TxEND watch timer */
 	SCF_TIMERCD_DSCP_BUSY,	/* DSCP interface busy watch timer */
 	SCF_TIMERCD_DSCP_CALLBACK, /* DSCP interface callback timer */
-	SCF_TIMERCD_BUF_FUL,	/* SCF command BUF_FUL retray timer */
-	SCF_TIMERCD_RCI_BUSY,	/* SCF command RCI_BUSY retray timer */
+	SCF_TIMERCD_BUF_FUL,	/* SCF command BUF_FUL retry timer */
+	SCF_TIMERCD_RCI_BUSY,	/* SCF command RCI_BUSY retry timer */
+	SCF_TIMERCD_DSCP_INIT,	/* DSCP INIT_REQ retry timer */
 	SCF_TIMERCD_MAX		/* Max timer code */
 } scf_tm_code_t;
 
@@ -94,6 +95,8 @@ typedef struct scf_timer {
 #define	SCF_TIMER_VALUE_DSCP_BUSY	2000
 	/* DSCP interface callback timer value (20ms) */
 #define	SCF_TIMER_VALUE_DSCP_CALLBACK	20
+	/* DSCP INIT_REQ retry timer value (5ms) */
+#define	SCF_TIMER_VALUE_DSCP_INIT	5000
 
 /*
  * Timer value convert macro

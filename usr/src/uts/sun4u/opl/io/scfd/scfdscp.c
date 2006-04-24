@@ -63,6 +63,7 @@ void	scf_dscp_end_tout(void);
 void	scf_dscp_busy_tout(void);
 void	scf_dscp_callback_tout(void);
 void	scf_dscp_callback(void);
+void	scf_dscp_init_tout(void);
 
 /*
  * Interrupt function : from scf_dscp_intr()
@@ -1514,6 +1515,7 @@ scf_dscp_fini(void)
 	scf_timer_stop(SCF_TIMERCD_DSCP_END);
 	scf_timer_stop(SCF_TIMERCD_DSCP_CALLBACK);
 	scf_timer_stop(SCF_TIMERCD_DSCP_BUSY);
+	scf_timer_stop(SCF_TIMERCD_DSCP_INIT);
 
 	/* All DSC buffer release */
 	scf_dscp_dscbuff_free_all();
@@ -1761,6 +1763,7 @@ scf_dscp_stop(uint32_t factor)
 	scf_timer_stop(SCF_TIMERCD_DSCP_ACK);
 	scf_timer_stop(SCF_TIMERCD_DSCP_END);
 	scf_timer_stop(SCF_TIMERCD_DSCP_BUSY);
+	scf_timer_stop(SCF_TIMERCD_DSCP_INIT);
 
 	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": end");
 }
@@ -1804,48 +1807,6 @@ scf_dscp_intr(scf_state_t *statep)
 	SCF_DBG_TEST_INTR_DSCP_DSR(statep);
 
 	SCFDBGMSG1(SCF_DBGFLAG_REG, "DSR = 0x%02x", statep->reg_dsr);
-
-	if ((statep->reg_dsr & DSR_RxREQ) != 0) {	/* RxREQ interrupt */
-		SCFDBGMSG(SCF_DBGFLAG_DSCP, "RxREQ interrupt");
-
-		interrupt = FLAG_ON;
-		/* Get RxDCR register */
-		statep->reg_rxdcr_c_flag =
-			SCF_DDI_GET16(statep, statep->scf_regs_handle,
-			&statep->scf_regs->RxDCR_C_FLAG);
-		SC_DBG_DRV_TRACE(TC_R_RxDCR_C_FLAG, __LINE__,
-			&statep->reg_rxdcr_c_flag,
-			sizeof (statep->reg_rxdcr_c_flag));
-
-		statep->reg_rxdcr_c_offset =
-			SCF_DDI_GET16(statep, statep->scf_regs_handle,
-			&statep->scf_regs->RxDCR_OFFSET);
-		SC_DBG_DRV_TRACE(TC_R_RxDCR_OFFSET, __LINE__,
-			&statep->reg_rxdcr_c_offset,
-			sizeof (statep->reg_rxdcr_c_offset));
-
-		statep->reg_rxdcr_c_length =
-			SCF_DDI_GET32(statep, statep->scf_regs_handle,
-			&statep->scf_regs->RxDCR_LENGTH);
-		SC_DBG_DRV_TRACE(TC_R_RxDCR_LENGTH, __LINE__,
-			&statep->reg_rxdcr_c_length,
-			sizeof (statep->reg_rxdcr_c_length));
-
-		/* SRAM trace */
-		SCF_SRAM_TRACE(statep, DTC_DSCP_RXREQ);
-
-		SCF_DBG_TEST_INTR_DSCP_RXTX(statep, statep->reg_dsr);
-
-		SC_DBG_DRV_TRACE(TC_RxREQ, __LINE__,
-			&statep->reg_rxdcr_c_flag, 8);
-
-		SCFDBGMSG3(SCF_DBGFLAG_REG, "RxDCR = 0x%04x 0x%04x 0x%08x",
-			statep->reg_rxdcr_c_flag, statep->reg_rxdcr_c_offset,
-			statep->reg_rxdcr_c_length);
-
-		/* Call RxRERQ interrupt processing */
-		scf_dscp_rxreq_recv(statep);
-	}
 
 	if ((statep->reg_dsr & DSR_TxACK) != 0) {	/* TxACK interrupt */
 		SCFDBGMSG(SCF_DBGFLAG_DSCP, "TxACK interrupt");
@@ -1894,6 +1855,48 @@ scf_dscp_intr(scf_state_t *statep)
 
 		/* Call TxEND interrupt processing */
 		scf_dscp_txend_recv(statep);
+	}
+
+	if ((statep->reg_dsr & DSR_RxREQ) != 0) {	/* RxREQ interrupt */
+		SCFDBGMSG(SCF_DBGFLAG_DSCP, "RxREQ interrupt");
+
+		interrupt = FLAG_ON;
+		/* Get RxDCR register */
+		statep->reg_rxdcr_c_flag =
+			SCF_DDI_GET16(statep, statep->scf_regs_handle,
+			&statep->scf_regs->RxDCR_C_FLAG);
+		SC_DBG_DRV_TRACE(TC_R_RxDCR_C_FLAG, __LINE__,
+			&statep->reg_rxdcr_c_flag,
+			sizeof (statep->reg_rxdcr_c_flag));
+
+		statep->reg_rxdcr_c_offset =
+			SCF_DDI_GET16(statep, statep->scf_regs_handle,
+			&statep->scf_regs->RxDCR_OFFSET);
+		SC_DBG_DRV_TRACE(TC_R_RxDCR_OFFSET, __LINE__,
+			&statep->reg_rxdcr_c_offset,
+			sizeof (statep->reg_rxdcr_c_offset));
+
+		statep->reg_rxdcr_c_length =
+			SCF_DDI_GET32(statep, statep->scf_regs_handle,
+			&statep->scf_regs->RxDCR_LENGTH);
+		SC_DBG_DRV_TRACE(TC_R_RxDCR_LENGTH, __LINE__,
+			&statep->reg_rxdcr_c_length,
+			sizeof (statep->reg_rxdcr_c_length));
+
+		/* SRAM trace */
+		SCF_SRAM_TRACE(statep, DTC_DSCP_RXREQ);
+
+		SCF_DBG_TEST_INTR_DSCP_RXTX(statep, statep->reg_dsr);
+
+		SC_DBG_DRV_TRACE(TC_RxREQ, __LINE__,
+			&statep->reg_rxdcr_c_flag, 8);
+
+		SCFDBGMSG3(SCF_DBGFLAG_REG, "RxDCR = 0x%04x 0x%04x 0x%08x",
+			statep->reg_rxdcr_c_flag, statep->reg_rxdcr_c_offset,
+			statep->reg_rxdcr_c_length);
+
+		/* Call RxRERQ interrupt processing */
+		scf_dscp_rxreq_recv(statep);
 	}
 
 	if (interrupt == FLAG_OFF) {
@@ -2173,6 +2176,54 @@ scf_dscp_callback_tout(void)
 
 	/* Callback timer start */
 	scf_timer_start(SCF_TIMERCD_DSCP_CALLBACK);
+
+	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": end");
+}
+
+
+/*
+ * scf_dscp_init_tout()
+ *
+ * Description: INIT_REQ retray timeout performs TxREQ transmission again.
+ *
+ */
+void
+scf_dscp_init_tout(void)
+{
+#undef	SCF_FUNC_NAME
+#define	SCF_FUNC_NAME		"scf_dscp_init_tout() "
+	scf_dscp_dsc_t		*dsc_p;		/* TxDSC address */
+
+	ASSERT(MUTEX_HELD(&scf_comtbl.all_mutex));
+
+	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": start");
+
+	/* Check pending send TxDSC or local control TxDSC */
+	if ((scf_dscp_comtbl.tx_dsc_count == 0) &&
+		(scf_dscp_comtbl.tx_local_use_flag == FLAG_OFF)) {
+		goto END_dscp_init_tout;
+	}
+
+	/* Check local control data flag */
+	if (scf_dscp_comtbl.tx_local_use_flag == FLAG_OFF) {
+		/* Get TxDSC address */
+		dsc_p = &scf_dscp_comtbl.tx_dscp[scf_dscp_comtbl.tx_get];
+	} else {
+		/* Get local data TxDSC address */
+		dsc_p = &scf_dscp_comtbl.tx_dscp[scf_dscp_comtbl.tx_local];
+	}
+
+	/* Check TxDSC status */
+	if (dsc_p->status == SCF_TX_ST_TXREQ_SEND_WAIT) {
+		/* TxDSC status (SB2) */
+		/* Call send matrix */
+		scf_dscp_send_matrix();
+	}
+
+/*
+ * END_dscp_init_tout
+ */
+END_dscp_init_tout:
 
 	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": end");
 }
@@ -2463,6 +2514,24 @@ scf_dscp_txend_recv(scf_state_t *statep)
 			/* memo counter up */
 			scf_dscp_comtbl.tx_busy_memo_cnt++;
 
+			/* TxREQ code check */
+			if (dsc_p->dinfo.bdcr.code == DSC_CNTL_INIT_REQ) {
+				/* Check main status */
+				if (mainp->status ==
+					SCF_ST_EST_TXEND_RECV_WAIT) {
+					/* TxREQ busy timer start */
+					scf_timer_start(SCF_TIMERCD_DSCP_INIT);
+
+					/* Change TxDSC status (SB2) */
+					SCF_SET_DSC_STATUS(dsc_p,
+						SCF_TX_ST_TXREQ_SEND_WAIT);
+
+					/* TxDSC not release */
+					norel_txdsc = FLAG_ON;
+				}
+				break;
+			}
+
 			/* Check re-try counter */
 			if ((scf_dscp_comtbl.tx_busy_retry_cnt <
 				scf_dscp_comtbl.tx_busy_maxretry_cnt) &&
@@ -2543,6 +2612,24 @@ scf_dscp_txend_recv(scf_state_t *statep)
 
 			/* memo counter up */
 			scf_dscp_comtbl.tx_nak_memo_cnt++;
+
+			/* TxREQ code check */
+			if (dsc_p->dinfo.bdcr.code == DSC_CNTL_INIT_REQ) {
+				/* Check main status */
+				if (mainp->status ==
+					SCF_ST_EST_TXEND_RECV_WAIT) {
+					/* TxREQ busy timer start */
+					scf_timer_start(SCF_TIMERCD_DSCP_INIT);
+
+					/* Change TxDSC status (SB2) */
+					SCF_SET_DSC_STATUS(dsc_p,
+						SCF_TX_ST_TXREQ_SEND_WAIT);
+
+					/* TxDSC not release */
+					norel_txdsc = FLAG_ON;
+				}
+				break;
+			}
 
 			/* Check re-try counter */
 			if ((scf_dscp_comtbl.tx_nak_retry_cnt <
@@ -2888,7 +2975,8 @@ scf_dscp_rxreq_recv(scf_state_t *statep)
 		if ((mainp != NULL) &&
 			(((dsc_p->dinfo.base.offset >= offset_low) &&
 			(dsc_p->dinfo.base.offset < offset_hight)) ||
-			(dsc_p->dinfo.base.offset == DSC_OFFSET_NOTHING))) {
+			((dsc_p->dinfo.base.offset == DSC_OFFSET_NOTHING) &&
+			(dsc_p->dinfo.bdcr.code != DSC_CNTL_DATA_REQ)))) {
 			/* RxREQ notice to main matrix */
 			scf_dscp_rxreq_notice(mainp);
 		} else {
@@ -3486,6 +3574,11 @@ scf_dscp_send_matrix(void)
 		/* Get timer status */
 		timer_ret = scf_timer_check(SCF_TIMERCD_DSCP_BUSY);
 		/* Check TxREQ busy timer exec */
+		if (timer_ret == SCF_TIMER_EXEC) {
+			break;
+		}
+		timer_ret = scf_timer_check(SCF_TIMERCD_DSCP_INIT);
+		/* Check INIT_REQ retry timer exec */
 		if (timer_ret == SCF_TIMER_EXEC) {
 			break;
 		}

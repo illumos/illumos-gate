@@ -293,7 +293,6 @@ typedef	struct scf_drvtrc_ent {
 #define		SUB_OPTION_DISP		0x04	/* Option disp */
 #define		SUB_PCI_HP_CONFIG	0x52	/* PCI configuration set */
 #define		SUB_PCI_DISP		0x54	/* PCI configuration disp */
-#define		SUB_PHP_RESET		0x61	/* PHP Reset */
 #define		SUB_DISK_LED_DISP	0x70	/* DISK LED disp */
 #define		SUB_DISK_LED_ON		0x73	/* DISK LED on */
 #define		SUB_DISK_LED_BLINK	0x75	/* DISK LED blink */

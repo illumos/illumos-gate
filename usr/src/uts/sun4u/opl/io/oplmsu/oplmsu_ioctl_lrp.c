@@ -494,6 +494,14 @@ oplmsu_lrmsg_error(queue_t *lrq, mblk_t *mp)
 	lpath = (lpath_t *)lrq->q_ptr;
 	upath = oplmsu_search_upath_info(lpath->path_no);
 
+	if (upath == NULL) {
+		mutex_exit(&oplmsu_uinst->l_lock);
+		mutex_exit(&oplmsu_uinst->u_lock);
+		rw_exit(&oplmsu_uinst->lock);
+		freemsg(mp);
+		return (SUCCESS);
+	}
+
 	if ((lpath->status == MSU_LINK_NU) ||
 	    (lpath->status == MSU_SETID_NU) ||
 	    (upath->traditional_status == MSU_WSTR_ACK) ||
@@ -625,6 +633,14 @@ oplmsu_lrdata_xoffxon(queue_t *lrq, mblk_t *mp)
 
 	lpath = (lpath_t *)lrq->q_ptr;
 	upath = oplmsu_search_upath_info(lpath->path_no);
+
+	if (upath == NULL) {
+		mutex_exit(&oplmsu_uinst->l_lock);
+		mutex_exit(&oplmsu_uinst->u_lock);
+		rw_exit(&oplmsu_uinst->lock);
+		freemsg(mp);
+		return (SUCCESS);
+	}
 
 	if ((stp_upath != NULL) && (stp_upath != upath)) {
 		if ((stp_upath->status != MSU_PSTAT_ACTIVE) ||

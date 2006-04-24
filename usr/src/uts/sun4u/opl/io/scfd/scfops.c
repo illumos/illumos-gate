@@ -78,7 +78,6 @@ int	scf_ioc_remcscmd(intptr_t arg, int mode, int *rval_p, int u_mode);
 int	scf_ioc_remcsfile(intptr_t arg, int mode, int *rval_p, int u_mode);
 int	scf_ioc_sparecmd(intptr_t arg, int mode, int *rval_p, int u_mode);
 int	scf_ioc_setphpinfo(intptr_t arg, int mode, int *rval_p, int u_mode);
-int	scf_ioc_pciresetreq(intptr_t arg, int mode, int *rval_p, int u_mode);
 int	scf_push_reportsense(unsigned int rci_addr, unsigned char *sense,
 	time_t timestamp);
 int	scf_pop_reportsense(scfreport_t *rsense);
@@ -382,10 +381,6 @@ scf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		 */
 		case SCFIOCSETPHPINFO:
 			ret = scf_ioc_setphpinfo(arg, mode, rval_p, u_mode);
-			break;
-
-		case SCFIOCPCIRESETREQ:
-			ret = scf_ioc_pciresetreq(arg, mode, rval_p, u_mode);
 			break;
 
 		default:
@@ -913,6 +908,7 @@ scf_ioc_optiondisp(intptr_t arg, int mode, int *rval_p, int u_mode)
 	mutex_exit(&scf_comtbl.all_mutex);
 
 	if (ret == 0) {
+
 		if (ddi_copyout((void *)&scfoption, (void *)arg,
 			sizeof (scfoption_t), mode) != 0) {
 			SC_DBG_DRV_TRACE(TC_IOCTL|TC_ERR, __LINE__,
@@ -3061,78 +3057,6 @@ scf_ioc_setphpinfo(intptr_t arg, int mode, int *rval_p, int u_mode)
 	if (scfsetphpinfo_p) {
 		kmem_free((void *)scfsetphpinfo_p,
 			(size_t)(sizeof (scfsetphpinfo_t)));
-	}
-
-	SCFDBGMSG1(SCF_DBGFLAG_IOCTL, SCF_FUNC_NAME ": end return = %d", ret);
-	return (ret);
-}
-
-
-/*
- * scf_ioc_pciresetreq()
- *
- * Description: SCFIOCPCIRESETREQ ioctl command processing.
- *
- */
-/* ARGSUSED */
-int
-scf_ioc_pciresetreq(intptr_t arg, int mode, int *rval_p, int u_mode)
-{
-#undef	SCF_FUNC_NAME
-#define	SCF_FUNC_NAME		"scf_ioc_pciresetreq() "
-	int			ret = 0;
-	struct scf_cmd		scf_cmd;
-	scfpciresetreq_t	*scfpciresetreq_p = NULL;
-
-	SCFDBGMSG(SCF_DBGFLAG_IOCTL, SCF_FUNC_NAME ": start");
-
-	scfpciresetreq_p = kmem_zalloc((size_t)(sizeof (scfpciresetreq_t)),
-		KM_SLEEP);
-
-	if (ddi_copyin((void *)arg, (void *)scfpciresetreq_p,
-		sizeof (scfpciresetreq_t), mode) != 0) {
-		SC_DBG_DRV_TRACE(TC_IOCTL|TC_ERR, __LINE__, "ioctl   ", 8);
-		ret = EFAULT;
-		goto END_pciresetreq;
-	}
-
-	if (scfpciresetreq_p->size > SCF_L_CNT_MAX) {
-		SC_DBG_DRV_TRACE(TC_IOCTL|TC_ERR, __LINE__, "ioctl   ", 8);
-		ret = EINVAL;
-		goto END_pciresetreq;
-	}
-
-	scf_cmd.cmd = CMD_DOMAIN_INFO;
-	scf_cmd.subcmd = SUB_PHP_RESET;
-	scf_cmd.sbuf = &scfpciresetreq_p->sbuf[0];
-	scf_cmd.scount = scfpciresetreq_p->size;
-	scf_cmd.rbuf = &scfpciresetreq_p->rbuf[0];
-	scf_cmd.rcount = SCF_S_CNT_15;
-	scf_cmd.flag = SCF_USE_L_BUF;
-
-	mutex_enter(&scf_comtbl.all_mutex);
-
-	ret = scf_send_cmd_check_bufful(&scf_cmd);
-
-	mutex_exit(&scf_comtbl.all_mutex);
-
-	if (ret == 0) {
-		if (ddi_copyout((void *)scfpciresetreq_p, (void *)arg,
-			sizeof (scfpciresetreq_t), mode) != 0) {
-			SC_DBG_DRV_TRACE(TC_IOCTL|TC_ERR, __LINE__,
-				"ioctl   ", 8);
-			ret = EFAULT;
-		}
-	}
-
-/*
- * END_pciresetreq
- */
-	END_pciresetreq:
-
-	if (scfpciresetreq_p) {
-		kmem_free((void *)scfpciresetreq_p,
-			(size_t)(sizeof (scfpciresetreq_t)));
 	}
 
 	SCFDBGMSG1(SCF_DBGFLAG_IOCTL, SCF_FUNC_NAME ": end return = %d", ret);

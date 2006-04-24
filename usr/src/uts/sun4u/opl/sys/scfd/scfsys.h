@@ -48,7 +48,7 @@ extern "C" {
 #define	FLAG_ON			(1)
 #define	FLAG_OFF		(0)
 
-#define	SCF_DRIVER_VERSION	"SCF driver 1.5"
+#define	SCF_DRIVER_VERSION	"SCF driver 1.6"
 #define	SCF_DRIVER_NAME		"scfd"
 #define	SCF_DEVICE_NAME		"scfc"
 
@@ -138,8 +138,6 @@ extern int	scf_ioc_remcsfile(intptr_t arg, int mode, int *rval_p,
 extern int	scf_ioc_sparecmd(intptr_t arg, int mode, int *rval_p,
 			int u_mode);
 extern int	scf_ioc_setphpinfo(intptr_t arg, int mode, int *rval_p,
-			int u_mode);
-extern int	scf_ioc_pciresetreq(intptr_t arg, int mode, int *rval_p,
 			int u_mode);
 extern int	scf_push_reportsense(unsigned int rci_addr,
 			unsigned char *sense, time_t timestamp);
