@@ -111,8 +111,14 @@
 				DSCP Service
 			</loctext>
 		</common_name>
+		<description>
+			<loctext xml:lang='C'>
+				This service starts DSCP on
+				SPARC Enterprise Servers.
+			</loctext>
+		</description>
 		<documentation>
-			<manpage title='??' section='1M'
+			<manpage title='prtdscp' section='1M'
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>

@@ -71,14 +71,15 @@ main(int argc, char **argv)
 	if ((options & OPT_SP) != 0) {
 		trace(gettext("Looking up SP address...\n"));
 		if (get_address(DSCP_ADDR_REMOTE, saddr) < 0) {
-			trace(gettext("Lookup failed.  Aborting.\n"));
+			err(gettext("SP Address lookup failed. Aborting.\n"));
 			exit(-1);
 		}
 	}
 	if ((options & OPT_DOMAIN) != 0) {
 		trace(gettext("Looking up domain address...\n"));
 		if (get_address(DSCP_ADDR_LOCAL, daddr) < 0) {
-			trace(gettext("Lookup failed.  Aborting.\n"));
+			err(gettext("Domain Address lookup failed. "
+			    "Aborting.\n"));
 			exit(-1);
 		}
 	}
@@ -199,14 +200,14 @@ get_address(int which, char *addr)
 
 	error = dscpAddr(0, which, &saddr, &len);
 	if (error != DSCP_OK) {
-		err(gettext("dscpAddr() failed: %s"), dscp_strerror(error));
+		trace(gettext("dscpAddr() failed: %s"), dscp_strerror(error));
 		return (-1);
 	}
 
 	/* LINTED pointer cast may result in improper alignment */
 	sin = (struct sockaddr_in *)&saddr;
 	if (inet_ntop(AF_INET, &(sin->sin_addr), addr, sizeof (*sin)) == NULL) {
-		err(gettext("address string conversion failed."));
+		trace(gettext("address string conversion failed."));
 		return (-1);
 	}
 
