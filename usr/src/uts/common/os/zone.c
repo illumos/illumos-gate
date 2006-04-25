@@ -4600,6 +4600,7 @@ zone_find_by_any_path(const char *path, boolean_t treat_abs)
 	    zone = list_next(&zone_active, zone)) {
 		char	*c;
 		size_t	pathlen;
+		char *rootpath_start;
 
 		if (zone == global_zone)	/* skip global zone */
 			continue;
@@ -4610,9 +4611,9 @@ zone_find_by_any_path(const char *path, boolean_t treat_abs)
 			c--;
 		} while (*c != '/');
 
-		pathlen = c - zone->zone_rootpath + 1;
-		if (strncmp(path, zone->zone_rootpath + path_offset,
-		    pathlen - path_offset) == 0)
+		pathlen = c - zone->zone_rootpath + 1 - path_offset;
+		rootpath_start = (zone->zone_rootpath + path_offset);
+		if (strncmp(path, rootpath_start, pathlen) == 0)
 			break;
 	}
 	if (zone == NULL)
