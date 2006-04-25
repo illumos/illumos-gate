@@ -85,6 +85,7 @@ typedef struct fasttrap_provider {
 	kmutex_t ftp_mtx;			/* provider lock */
 	uint64_t ftp_rcount;			/* enabled probes ref count */
 	uint64_t ftp_ccount;			/* consumers creating probes */
+	uint64_t ftp_mcount;			/* meta provider count */
 	fasttrap_proc_t *ftp_proc;		/* shared proc for all provs */
 	struct fasttrap_provider *ftp_next;	/* next prov in hash chain */
 } fasttrap_provider_t;

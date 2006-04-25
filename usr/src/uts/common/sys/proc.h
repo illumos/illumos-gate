@@ -446,6 +446,7 @@ extern struct pid pid0;		/* p0's pid */
 #define	SSYS	   0x00000001	/* system (resident) process */
 #define	SEXITING   0x00000002	/* process is exiting */
 #define	SITBUSY	   0x00000004	/* setitimer(ITIMER_REAL) in progress */
+#define	SFORKING   0x00000008	/* tells called functions that we're forking */
 #define	SWATCHOK   0x00000010	/* proc in acceptable state for watchpoints */
 #define	SKILLED    0x00000100	/* SIGKILL has been posted to the process */
 #define	SSCONT	   0x00000200	/* SIGCONT has been posted to the process */

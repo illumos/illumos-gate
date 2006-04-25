@@ -5537,11 +5537,15 @@ dtrace_cred2priv(cred_t *cr, uint32_t *privp, uid_t *uidp, zoneid_t *zoneidp)
 {
 	uint32_t priv;
 
-	*uidp = crgetuid(cr);
-	*zoneidp = crgetzoneid(cr);
-	if (PRIV_POLICY_ONLY(cr, PRIV_ALL, B_FALSE)) {
+	if (cr == NULL || PRIV_POLICY_ONLY(cr, PRIV_ALL, B_FALSE)) {
+		/*
+		 * For DTRACE_PRIV_ALL, the uid and zoneid don't matter.
+		 */
 		priv = DTRACE_PRIV_ALL;
 	} else {
+		*uidp = crgetuid(cr);
+		*zoneidp = crgetzoneid(cr);
+
 		priv = 0;
 		if (PRIV_POLICY_ONLY(cr, PRIV_DTRACE_KERNEL, B_FALSE))
 			priv |= DTRACE_PRIV_KERNEL | DTRACE_PRIV_USER;
@@ -6636,7 +6640,8 @@ dtrace_probe_enable(const dtrace_probedesc_t *desc, dtrace_enabling_t *enab)
 	}
 
 	dtrace_probekey(desc, &pkey);
-	dtrace_cred2priv(CRED(), &priv, &uid, &zoneid);
+	dtrace_cred2priv(enab->dten_vstate->dtvs_state->dts_cred.dcr_cred,
+	    &priv, &uid, &zoneid);
 
 	return (dtrace_match(&pkey, priv, uid, zoneid, dtrace_ecb_create_enable,
 	    enab));
@@ -6707,7 +6712,7 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 	 * See dtrace_helper_provider_validate().
 	 */
 	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 &&
-	    provider->dofpv_prenoffs != 0) {
+	    provider->dofpv_prenoffs != DOF_SECT_NONE) {
 		enoff_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 		    provider->dofpv_prenoffs * dof->dofh_secsize);
 		enoff = (uint32_t *)(uintptr_t)(daddr + enoff_sec->dofs_offset);
@@ -12581,8 +12586,9 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 	enoff_sec = NULL;
 
 	if (dof->dofh_ident[DOF_ID_VERSION] != DOF_VERSION_1 &&
-	    provider->dofpv_prenoffs != 0 && (enoff_sec = dtrace_dof_sect(dof,
-	    DOF_SECT_PRENOFFS, provider->dofpv_prenoffs)) == NULL)
+	    provider->dofpv_prenoffs != DOF_SECT_NONE &&
+	    (enoff_sec = dtrace_dof_sect(dof, DOF_SECT_PRENOFFS,
+	    provider->dofpv_prenoffs)) == NULL)
 		return (-1);
 
 	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
@@ -12647,11 +12653,10 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 		}
 
 		/*
-		 * The offset count must not wrap the index and there must be
-		 * at least one offset. The offsets must also not overflow the
-		 * section's data.
+		 * The offset count must not wrap the index, and the offsets
+		 * must also not overflow the section's data.
 		 */
-		if (probe->dofpr_offidx + probe->dofpr_noffs <=
+		if (probe->dofpr_offidx + probe->dofpr_noffs <
 		    probe->dofpr_offidx ||
 		    (probe->dofpr_offidx + probe->dofpr_noffs) *
 		    off_sec->dofs_entsize > off_sec->dofs_size) {
@@ -12664,8 +12669,7 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 			 * If there's no is-enabled offset section, make sure
 			 * there aren't any is-enabled offsets. Otherwise
 			 * perform the same checks as for probe offsets
-			 * (immediately above), except that having zero
-			 * is-enabled offsets is permitted.
+			 * (immediately above).
 			 */
 			if (enoff_sec == NULL) {
 				if (probe->dofpr_enoffidx != 0 ||
@@ -12682,6 +12686,15 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 				    "offset");
 				return (-1);
 			}
+
+			if (probe->dofpr_noffs + probe->dofpr_nenoffs == 0) {
+				dtrace_dof_error(dof, "zero probe and "
+				    "is-enabled offsets");
+				return (-1);
+			}
+		} else if (probe->dofpr_noffs == 0) {
+			dtrace_dof_error(dof, "zero probe offsets");
+			return (-1);
 		}
 
 		if (probe->dofpr_argidx + probe->dofpr_xargc <

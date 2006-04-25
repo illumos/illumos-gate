@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -232,6 +231,7 @@ cfork(int isvfork, int isfork1)
 		 */
 		mutex_enter(&p->p_lock);
 		sprlock_proc(p);
+		p->p_flag |= SFORKING;
 		mutex_exit(&p->p_lock);
 
 		error = as_dup(p->p_as, &cp->p_as);
@@ -258,6 +258,7 @@ cfork(int isvfork, int isfork1)
 			task_rele(tk);
 
 			mutex_enter(&p->p_lock);
+			p->p_flag &= ~SFORKING;
 			pool_barrier_exit();
 			continuelwps(p);
 			sprunlock(p);
@@ -272,17 +273,26 @@ cfork(int isvfork, int isfork1)
 		if (p->p_segacct)
 			shmfork(p, cp);
 
+		/*
+		 * Remove all DTrace tracepoints from the child process. We
+		 * need to do this _before_ duplicating USDT providers since
+		 * any associated probes may be immediately enabled.
+		 */
+		if (p->p_dtrace_count > 0)
+			dtrace_fasttrap_fork(p, cp);
+
+		/*
+		 * Duplicate any helper actions and providers. The SFORKING
+		 * we set above informs the code to enable USDT probes that
+		 * sprlock() may fail because the child is being forked.
+		 */
 		if (p->p_dtrace_helpers != NULL) {
 			ASSERT(dtrace_helpers_fork != NULL);
 			(*dtrace_helpers_fork)(p, cp);
 		}
 
-		/*
-		 * Remove all DTrace tracepoints from the child process.
-		 */
 		mutex_enter(&p->p_lock);
-		if (p->p_dtrace_count > 0)
-			dtrace_fasttrap_fork(p, cp);
+		p->p_flag &= ~SFORKING;
 		sprunlock(p);
 	}
 

@@ -440,7 +440,12 @@ dof_add_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 
 		dofpr.dofpr_func = dof_add_string(ddo, pip->pi_fname);
 
-		assert(pip->pi_noffs > 0);
+		/*
+		 * There should be one probe offset or is-enabled probe offset
+		 * or else this probe instance won't have been created. The
+		 * kernel will reject DOF which has a probe with no offsets.
+		 */
+		assert(pip->pi_noffs + pip->pi_nenoffs > 0);
 
 		dofpr.dofpr_offidx =
 		    dt_buf_len(&ddo->ddo_offs) / sizeof (uint32_t);
@@ -487,6 +492,7 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 	dof_relohdr_t dofr;
 	dof_secidx_t *dofs;
 	ulong_t xr, nxr;
+	size_t sz;
 	id_t i;
 
 	if (pvp->pv_flags & DT_PROVIDER_IMPL)
@@ -529,15 +535,17 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 
 	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_args, sizeof (uint8_t));
 
-	assert(dt_buf_len(&ddo->ddo_offs) > 0);
-
 	dofpv.dofpv_proffs = dof_add_lsect(ddo, NULL, DOF_SECT_PROFFS,
 	    sizeof (uint_t), 0, sizeof (uint_t), dt_buf_len(&ddo->ddo_offs));
 
 	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_offs, sizeof (uint_t));
 
-	dofpv.dofpv_prenoffs = dof_add_lsect(ddo, NULL, DOF_SECT_PRENOFFS,
-	    sizeof (uint_t), 0, sizeof (uint_t), dt_buf_len(&ddo->ddo_enoffs));
+	if ((sz = dt_buf_len(&ddo->ddo_enoffs)) != 0) {
+		dofpv.dofpv_prenoffs = dof_add_lsect(ddo, NULL,
+		    DOF_SECT_PRENOFFS, sizeof (uint_t), 0, sizeof (uint_t), sz);
+	} else {
+		dofpv.dofpv_prenoffs = DOF_SECT_NONE;
+	}
 
 	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_enoffs, sizeof (uint_t));
 

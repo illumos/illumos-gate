@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1193,7 +1193,7 @@ size_t elf_datasz_max = 1 * 1024 * 1024;
  */
 static int
 process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
-    Shdr *v, int nshdrs, rlim64_t rlimit, Off *doffsetp, int *nshdrsp)
+    Shdr *v, int nv, rlim64_t rlimit, Off *doffsetp, int *nshdrsp)
 {
 	vnode_t *lastvp = NULL;
 	struct seg *seg;
@@ -1284,7 +1284,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 					    shdr->sh_link * ehdr.e_shentsize);
 				}
 
-				if (v != NULL && i < nshdrs - 1) {
+				if (v != NULL && i < nv - 1) {
 					if (shdr->sh_size > datasz &&
 					    shdr->sh_size <= elf_datasz_max) {
 						if (data != NULL)
@@ -1352,7 +1352,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 				if (strtab->sh_type != SHT_STRTAB)
 					continue;
 
-				if (v != NULL && i < nshdrs - 2) {
+				if (v != NULL && i < nv - 2) {
 					sz = MAX(symtab->sh_size,
 					    strtab->sh_size);
 					if (sz > datasz &&
@@ -1436,7 +1436,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 		goto done;
 	}
 
-	if (i != nshdrs - 1) {
+	if (i != nv - 1) {
 		cmn_err(CE_WARN, "elfcore: core dump failed for "
 		    "process %d; address space is changing", p->p_pid);
 		error = EIO;
