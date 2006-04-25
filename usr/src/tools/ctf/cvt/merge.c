@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -453,8 +452,7 @@ map_td_tree_post(tdesc_t *ctdp, tdesc_t **ctdpp, void *private)
 	ed.ed_node = ctdp;
 	ed.ed_selfuniquify = 0;
 
-	debug(3, "map_td_tree_post on %d %s\n", ctdp->t_id,
-	    ctdp->t_name == NULL ? "(anon)" : ctdp->t_name);
+	debug(3, "map_td_tree_post on %d %s\n", ctdp->t_id, tdesc_name(ctdp));
 
 	if (hash_find_iter(mcd->md_parent->td_layouthash, ctdp,
 	    equiv_cb, &ed) < 0) {
@@ -479,7 +477,7 @@ map_td_tree_post(tdesc_t *ctdp, tdesc_t **ctdpp, void *private)
 		 * means that the "name" hash function is broken.
 		 */
 		terminate("Second pass for %d (%s) == %d\n", ctdp->t_id,
-		    (ctdp->t_name ? ctdp->t_name : "(anon)"), ed.ed_tgt->t_id);
+		    tdesc_name(ctdp), ed.ed_tgt->t_id);
 	} else {
 		int id = mcd->md_tgt->td_nextid++;
 
@@ -521,8 +519,7 @@ map_td_tree_self_post(tdesc_t *ctdp, tdesc_t **ctdpp, void *private)
 		 * function is broken.
 		 */
 		terminate("Self-unique second pass for %d (%s) == %d\n",
-		    ctdp->t_id, (ctdp->t_name ? ctdp->t_name : "(anon)"),
-		    ed.ed_tgt->t_id);
+		    ctdp->t_id, tdesc_name(ctdp), ed.ed_tgt->t_id);
 	} else {
 		int id = mcd->md_tgt->td_nextid++;
 
@@ -878,8 +875,7 @@ fwd_redir(tdesc_t *fwd, tdesc_t **fwdp, void *private)
 	if (!alist_find(map, (void *)fwd, (void **)&defn))
 		return (0);
 
-	debug(3, "Redirecting an edge to %s\n",
-	    (defn->t_name ? defn->t_name : "(anon)"));
+	debug(3, "Redirecting an edge to %s\n", tdesc_name(defn));
 
 	*fwdp = defn;
 
@@ -922,11 +918,10 @@ redir_mstr_fwd_cb(void *name, void *value, void *arg)
 	if (!hash_find(rmd->rmd_tgt->td_idhash, (void *)&template,
 	    (void *)&defn)) {
 		terminate("Couldn't unforward %d (%s)\n", defnid,
-		    (defn->t_name ? defn->t_name : "(anon)"));
+		    tdesc_name(defn));
 	}
 
-	debug(3, "Forward map: resolved %d to %s\n",
-	    defnid, (defn->t_name ? defn->t_name : "(anon)"));
+	debug(3, "Forward map: resolved %d to %s\n", defnid, tdesc_name(defn));
 
 	alist_add(rmd->rmd_map, (void *)fwd, (void *)defn);
 
@@ -993,8 +988,7 @@ add_tdesc(tdesc_t *oldtdp, int newid, merge_cb_data_t *mcd)
 	    (void *)&template, NULL) == 0);
 
 	debug(3, "trying to conjure %d %s (%d) as %d\n",
-	    oldtdp->t_type, (oldtdp->t_name ? oldtdp->t_name : "(anon)"),
-	    oldtdp->t_id, newid);
+	    oldtdp->t_type, tdesc_name(oldtdp), oldtdp->t_id, newid);
 
 	if ((newtdp = tdesc_ops[oldtdp->t_type].conjure(oldtdp, newid,
 	    mcd)) == NULL)
@@ -1032,8 +1026,7 @@ add_tdtbr_cb(void *data, void *arg)
 	tdesc_t **tdpp = data;
 	merge_cb_data_t *mcd = arg;
 
-	debug(3, "Remapping %s (%d)\n",
-	    ((*tdpp)->t_name ? (*tdpp)->t_name : "(anon)"), (*tdpp)->t_id);
+	debug(3, "Remapping %s (%d)\n", tdesc_name(*tdpp), (*tdpp)->t_id);
 
 	if (!remap_node(tdpp, *tdpp, -1, NULL, mcd))
 		return (0);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -420,8 +419,7 @@ write_type(tdesc_t *tp, ctf_buf_t *b)
 		warning("Can't write unknown type %d\n", tp->t_type);
 	}
 
-	debug(3, "Wrote type %d %s\n", tp->t_id,
-	    (tp->t_name ? tp->t_name : "(anon)"));
+	debug(3, "Wrote type %d %s\n", tp->t_id, tdesc_name(tp));
 
 	return (1);
 }
@@ -458,9 +456,10 @@ compress_start(resbuf_t *rb)
 		parseterminate("zlib start failed: %s", zError(rc));
 }
 
-static void
-compress_buffer(caddr_t buf, size_t n, resbuf_t *rb)
+static ssize_t
+compress_buffer(const void *buf, size_t n, void *data)
 {
+	resbuf_t *rb = (resbuf_t *)data;
 	int rc;
 
 	rb->rb_zstr.next_out = (Bytef *)rb->rb_ptr;
@@ -476,6 +475,8 @@ compress_buffer(caddr_t buf, size_t n, resbuf_t *rb)
 			parseterminate("zlib deflate failed: %s", zError(rc));
 	}
 	rb->rb_ptr = (caddr_t)rb->rb_zstr.next_out;
+
+	return (n);
 }
 
 static void
@@ -524,11 +525,13 @@ pad_buffer(ctf_buf_t *buf, int align)
 	}
 }
 
-static void
-bcopy_data(void *buf, size_t n, caddr_t *posp)
+static ssize_t
+bcopy_data(const void *buf, size_t n, void *data)
 {
+	caddr_t *posp = (caddr_t *)data;
 	bcopy(buf, *posp, n);
 	*posp += n;
+	return (n);
 }
 
 static caddr_t
@@ -541,11 +544,10 @@ write_buffer(ctf_header_t *h, ctf_buf_t *buf, size_t *resszp)
 	    + buf->ctb_strtab.str_size);
 
 	bufpos = outbuf;
-	bcopy_data(h, sizeof (ctf_header_t), &bufpos);
-	bcopy_data(buf->ctb_base, buf->ctb_ptr - buf->ctb_base,
+	(void) bcopy_data(h, sizeof (ctf_header_t), &bufpos);
+	(void) bcopy_data(buf->ctb_base, buf->ctb_ptr - buf->ctb_base,
 	    &bufpos);
-	if (strtab_write(&buf->ctb_strtab, (ssize_t (*)())bcopy_data,
-	    &bufpos) < 0)
+	if (strtab_write(&buf->ctb_strtab, bcopy_data, &bufpos) < 0)
 		terminate("strtab_write failed\n");
 	*resszp = bufpos - outbuf;
 	return (outbuf);
@@ -567,10 +569,10 @@ write_compressed_buffer(ctf_header_t *h, ctf_buf_t *buf, size_t *resszp)
 	resbuf.rb_ptr = resbuf.rb_base + sizeof (ctf_header_t);
 
 	compress_start(&resbuf);
-	compress_buffer(buf->ctb_base, buf->ctb_ptr - buf->ctb_base, &resbuf);
+	(void) compress_buffer(buf->ctb_base, buf->ctb_ptr - buf->ctb_base,
+	    &resbuf);
 	compress_flush(&resbuf, Z_FULL_FLUSH);
-	if (strtab_write(&buf->ctb_strtab, (ssize_t (*)())compress_buffer,
-	    &resbuf) < 0)
+	if (strtab_write(&buf->ctb_strtab, compress_buffer, &resbuf) < 0)
 		terminate("strtab_write failed\n");
 	compress_end(&resbuf);
 
@@ -1133,7 +1135,7 @@ resurrect_types(ctf_header_t *h, tdata_t *td, tdesc_t **tdarr, int tdsize,
 
 		debug(3, "Resurrected %d %stype %s (%d)\n", tdp->t_type,
 		    (CTF_INFO_ISROOT(ctt->ctt_info) ? "root " : ""),
-		    (tdp->t_name ? tdp->t_name : "(anon)"), tdp->t_id);
+		    tdesc_name(tdp), tdp->t_id);
 	}
 
 	debug(3, "Resurrected %d types (%d were roots)\n", tcnt, iicnt);

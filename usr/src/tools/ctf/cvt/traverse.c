@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +94,7 @@ static int
 tdtrav_su(tdesc_t *this, tdtrav_data_t *tdtd)
 {
 	mlist_t *ml;
-	int rc;
+	int rc = 0;
 
 	for (ml = this->t_members; ml; ml = ml->ml_next) {
 		if ((rc = tdtraverse(ml->ml_type, &ml->ml_type, tdtd)) < 0)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -372,8 +371,7 @@ parse_sou(char *cp, iidesc_t *idp)
 				tdp->t_tdesc = rtdp;
 				addhash(tdp, tid); /* for *(x,y) types */
 				parse_debug(3, NULL, "    %s defined as %s(%d)",
-				    idp->ii_name, (rtdp->t_name != NULL) ?
-				    rtdp->t_name : "anon", tid);
+				    idp->ii_name, tdesc_name(rtdp), tid);
 			} else if (rtdp->t_name == NULL) {
 				rtdp->t_name = xstrdup(idp->ii_name);
 				addhash(rtdp, tid);
@@ -561,11 +559,9 @@ tagadd(char *w, int h, tdesc_t *tdp)
 		addhash(tdp, h);
 	else if (otdp != tdp) {
 		warning("duplicate entry\n");
-		warning("  old: %s %d (%d,%d)\n",
-		    otdp->t_name ? otdp->t_name : "(anon)",
+		warning("  old: %s %d (%d,%d)\n", tdesc_name(otdp),
 		    otdp->t_type, TYPEFILE(otdp->t_id), TYPENUM(otdp->t_id));
-		warning("  new: %s %d (%d,%d)\n",
-		    tdp->t_name ? tdp->t_name : "(anon)",
+		warning("  new: %s %d (%d,%d)\n", tdesc_name(tdp),
 		    tdp->t_type, TYPEFILE(tdp->t_id), TYPENUM(tdp->t_id));
 		return (-1);
 	}
@@ -912,8 +908,7 @@ soudef(char *cp, stabtype_t type, tdesc_t **rtdp)
 		cp += 3;
 	}
 
-	parse_debug(3, cp, "soudef: %s size=%d",
-	    (*rtdp)->t_name ? (*rtdp)->t_name : "(anonsou)",
+	parse_debug(3, cp, "soudef: %s size=%d", tdesc_name(*rtdp),
 	    (*rtdp)->t_size);
 
 	prev = &((*rtdp)->t_members);
@@ -954,8 +949,7 @@ soudef(char *cp, stabtype_t type, tdesc_t **rtdp)
 			}
 		} else {
 			parse_debug(3, NULL, "      refers to %s (%d, %s)",
-			    w ? w : "anon", h,
-			    tdp->t_name ? tdp->t_name : "anon");
+			    w ? w : "anon", h, tdesc_name(tdp));
 		}
 
 		cp = offsize(cp, mlp);
@@ -964,7 +958,7 @@ soudef(char *cp, stabtype_t type, tdesc_t **rtdp)
 		if (itdp->t_type == INTRINSIC) {
 			if (mlp->ml_size != itdp->t_intr->intr_nbits) {
 				parse_debug(4, cp, "making %d bit intrinsic "
-				    "from %s", mlp->ml_size, itdp->t_name);
+				    "from %s", mlp->ml_size, tdesc_name(itdp));
 				mlp->ml_type = bitintrinsic(itdp, mlp->ml_size);
 			} else
 				mlp->ml_type = tdp;
@@ -1037,8 +1031,7 @@ enumdef(char *cp, tdesc_t **rtdp)
 		cp = name(cp, &w);
 		elp->el_name = w;
 		cp = number(cp, &elp->el_number);
-		parse_debug(3, NULL, "enum %s: %s=%d",
-		    (*rtdp)->t_name ? (*rtdp)->t_name : "(anon enum)",
+		parse_debug(3, NULL, "enum %s: %s=%d", tdesc_name(*rtdp),
 		    elp->el_name, elp->el_number);
 		prev = &elp->el_next;
 		if (*cp++ != ',')
@@ -1171,11 +1164,11 @@ resolve_typed_bitfields_cb(mlist_t *ml, void *private)
 		case INTRINSIC:
 			if (ml->ml_size != tdp->t_intr->intr_nbits) {
 				debug(3, "making %d bit intrinsic from %s",
-				    ml->ml_size, tdp->t_name);
+				    ml->ml_size, tdesc_name(tdp));
 				ml->ml_type = bitintrinsic(tdp, ml->ml_size);
 			} else {
 				debug(3, "using existing %d bit %s intrinsic",
-				    ml->ml_size, tdp->t_name);
+				    ml->ml_size, tdesc_name(tdp));
 				ml->ml_type = tdp;
 			}
 			return (1);

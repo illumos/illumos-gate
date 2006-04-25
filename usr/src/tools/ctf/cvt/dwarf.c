@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -754,7 +753,7 @@ die_array_resolve(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 
 	if ((sz = tdesc_size(tdp->t_ardef->ad_contents)) == 0) {
 		debug(3, "unable to resolve array %s (%d) contents %d\n",
-		    (tdp->t_name == NULL ? "(anon)" : tdp->t_name), tdp->t_id,
+		    tdesc_name(tdp), tdp->t_id,
 		    tdp->t_ardef->ad_contents->t_id);
 
 		dw->dw_nunres++;
@@ -779,8 +778,7 @@ die_array_failed(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 		return (1);
 
 	fprintf(stderr, "Array %d: failed to size contents type %s (%d)\n",
-	    tdp->t_id, (cont->t_name == NULL ? "(anon)" : cont->t_name),
-	    cont->t_id);
+	    tdp->t_id, tdesc_name(cont), cont->t_id);
 
 	return (1);
 }
@@ -883,12 +881,12 @@ die_enum_resolve(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 	 * so don't even try.
 	 */
 	if (full == NULL) {
-		terminate("tdp %u: enum %s has no members\n",
-		    tdp->t_id, (tdp->t_name == NULL ? "(anon)" : tdp->t_name));
+		terminate("tdp %u: enum %s has no members\n", tdp->t_id,
+		    tdesc_name(tdp));
 	}
 
 	debug(3, "tdp %u: enum %s redirected to %u\n", tdp->t_id,
-	    (tdp->t_name == NULL ? "(anon)" : tdp->t_name), full->t_id);
+	    tdesc_name(tdp), full->t_id);
 
 	tdp->t_flags |= TDESC_F_RESOLVED;
 
@@ -901,7 +899,7 @@ die_fwd_map(void *arg1, void *arg2)
 	tdesc_t *fwd = arg1, *sou = arg2;
 
 	debug(3, "tdp %u: mapped forward %s to sou %u\n", fwd->t_id,
-	    fwd->t_name, sou->t_id);
+	    tdesc_name(fwd), sou->t_id);
 	fwd->t_tdesc = sou;
 
 	return (0);
@@ -925,7 +923,7 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 
 	debug(3, "die %llu: creating %s %s\n", off,
 	    (tdp->t_type == FORWARD ? "forward decl" : typename),
-	    (tdp->t_name == NULL ? "(anon)" : tdp->t_name));
+	    tdesc_name(tdp));
 
 	if (tdp->t_type == FORWARD) {
 		hash_add(dw->dw_fwdhash, tdp);
@@ -1013,13 +1011,12 @@ die_sou_create(dwarf_t *dw, Dwarf_Die str, Dwarf_Off off, tdesc_t *tdp,
 	 * change the name.
 	 */
 	if (tdp->t_members == NULL) {
-		char *old = (tdp->t_name == NULL ? "" : tdp->t_name);
+		const char *old = tdesc_name(tdp);
 		size_t newsz = 7 + strlen(old) + 1;
 		char *new = xmalloc(newsz);
 		(void) snprintf(new, newsz, "orphan %s", old);
 
-		debug(3, "die %llu: worked around %s %s\n", off, typename,
-		    (tdp->t_name == NULL ? "<anon>" : tdp->t_name));
+		debug(3, "die %llu: worked around %s %s\n", off, typename, old);
 
 		if (tdp->t_name != NULL)
 			free(tdp->t_name);
@@ -1060,7 +1057,7 @@ die_sou_resolve(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 	if (tdp->t_flags & TDESC_F_RESOLVED)
 		return (1);
 
-	debug(3, "resolving sou %s\n", tdp->t_name);
+	debug(3, "resolving sou %s\n", tdesc_name(tdp));
 
 	for (ml = tdp->t_members; ml != NULL; ml = ml->ml_next) {
 		if (ml->ml_size == 0) {
@@ -1110,8 +1107,7 @@ die_sou_failed(tdesc_t *tdp, tdesc_t **tdpp, void *private)
 		if (ml->ml_size == 0) {
 			fprintf(stderr, "%s %d: failed to size member %s of "
 			    "type %s (%d)\n", typename, tdp->t_id, ml->ml_name,
-			    (ml->ml_type->t_name == NULL ? "(anon)" :
-			    ml->ml_type->t_name), ml->ml_type->t_id);
+			    tdesc_name(ml->ml_type), ml->ml_type->t_id);
 		}
 	}
 
@@ -1393,7 +1389,7 @@ die_base_create(dwarf_t *dw, Dwarf_Die base, Dwarf_Off off, tdesc_t *tdp)
 	if ((intr = die_base_name_parse(tdp->t_name, &new)) != NULL) {
 		/* Found it.  We'll use the parsed version */
 		debug(3, "die %llu: name \"%s\" remapped to \"%s\"\n", off,
-		    tdp->t_name, new);
+		    tdesc_name(tdp), new);
 
 		free(tdp->t_name);
 		tdp->t_name = new;
@@ -1403,7 +1399,7 @@ die_base_create(dwarf_t *dw, Dwarf_Die base, Dwarf_Off off, tdesc_t *tdp)
 		 * based on the DWARF data.
 		 */
 		debug(3, "die %llu: using dwarf data for base \"%s\"\n", off,
-		    tdp->t_name);
+		    tdesc_name(tdp));
 
 		intr = die_base_from_dwarf(dw, base, off, sz);
 	}
@@ -1601,7 +1597,8 @@ die_fwd_resolve(tdesc_t *fwd, tdesc_t **fwdp, void *private)
 		return (1);
 
 	if (fwd->t_tdesc != NULL) {
-		debug(3, "tdp %u: unforwarded %s\n", fwd->t_id, fwd->t_name);
+		debug(3, "tdp %u: unforwarded %s\n", fwd->t_id,
+		    tdesc_name(fwd));
 		*fwdp = fwd->t_tdesc;
 	}
 

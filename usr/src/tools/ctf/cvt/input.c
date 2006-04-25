@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +39,7 @@
 
 #include "ctftools.h"
 #include "memory.h"
+#include "symbol.h"
 
 typedef int read_cb_f(tdata_t *, char *, void *);
 
@@ -386,6 +386,7 @@ GElf_Sym *
 symit_next(symit_data_t *si, int type)
 {
 	GElf_Sym sym;
+	int check_sym = (type == STT_OBJECT || type == STT_FUNC);
 
 	for (; si->si_next < si->si_nument; si->si_next++) {
 		gelf_getsym(si->si_symd, si->si_next, &si->si_cursym);
@@ -397,6 +398,9 @@ symit_next(symit_data_t *si, int type)
 
 		if (GELF_ST_TYPE(sym.st_info) != type ||
 		    sym.st_shndx == SHN_UNDEF)
+			continue;
+
+		if (check_sym && ignore_symbol(&sym, si->si_curname))
 			continue;
 
 		si->si_next++;

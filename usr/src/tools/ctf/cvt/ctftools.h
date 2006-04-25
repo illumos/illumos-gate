@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -412,6 +411,7 @@ const char *dw_tag2str(uint_t);
 tdata_t *tdata_new(void);
 void tdata_free(tdata_t *);
 void tdata_build_hashes(tdata_t *td);
+const char *tdesc_name(tdesc_t *);
 int tdesc_idhash(int, void *);
 int tdesc_idcmp(void *, void *);
 int tdesc_namehash(int, void *);
