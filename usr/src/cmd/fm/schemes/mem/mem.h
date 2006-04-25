@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -103,8 +102,8 @@ extern "C" {
  *     that there is no relationship.
  */
 
-/* 8+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8 */
-#define	MEM_SERID_MAXLEN	16
+/* 18+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8 */
+#define	MEM_SERID_MAXLEN	20
 
 typedef struct mem_dimm_map {
 	struct mem_dimm_map *dm_next;	/* The next DIMM map */
