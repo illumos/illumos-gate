@@ -164,7 +164,7 @@ __cleanup(void)		/* called at process end to flush ouput streams */
 void
 stdio_locks()
 {
-	(void) __mutex_lock(&_first_link_lock);
+	(void) _private_mutex_lock(&_first_link_lock);
 	/*
 	 * XXX: We should acquire all of the iob locks here.
 	 */
@@ -176,7 +176,7 @@ stdio_unlocks()
 	/*
 	 * XXX: We should release all of the iob locks here.
 	 */
-	(void) __mutex_unlock(&_first_link_lock);
+	(void) _private_mutex_unlock(&_first_link_lock);
 }
 
 void
@@ -189,7 +189,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) __mutex_lock(&_first_link_lock);
+		(void) _private_mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 	do {
@@ -221,7 +221,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	} while ((lp = lp->next) != NULL);
 
 	if (threaded)
-		(void) __mutex_unlock(&_first_link_lock);
+		(void) _private_mutex_unlock(&_first_link_lock);
 }
 
 /* allocate an unused stream; NULL if cannot */
@@ -256,7 +256,7 @@ _findiop(void)
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) __mutex_lock(&_first_link_lock);
+		(void) _private_mutex_lock(&_first_link_lock);
 
 	if (lastlink == NULL) {
 rescan:
@@ -284,8 +284,9 @@ rescan:
 			if (threaded) {
 				ret = getiop(fp, FPLOCK(fp), FPSTATE(fp));
 				if (ret != NULL) {
-				    (void) __mutex_unlock(&_first_link_lock);
-				    return (ret);
+					(void) _private_mutex_unlock(
+					    &_first_link_lock);
+					return (ret);
 				}
 			} else {
 				ret = getiop(fp, NULL, FPSTATE(fp));
@@ -316,7 +317,7 @@ rescan:
 	 */
 	if ((pkgp = malloc(sizeof (Pkg))) == NULL) {
 		if (threaded)
-			(void) __mutex_unlock(&_first_link_lock);
+			(void) _private_mutex_unlock(&_first_link_lock);
 		return (NULL);
 	}
 
@@ -383,7 +384,7 @@ rescan:
 	fp->_base = 0;
 	fp->_flag = 0377; /* claim the fp by setting low 8 bits */
 	if (threaded)
-		(void) __mutex_unlock(&_first_link_lock);
+		(void) _private_mutex_unlock(&_first_link_lock);
 
 	return (fp);
 }
@@ -594,7 +595,7 @@ _fflush_l_iops(void)		/* flush all buffers */
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) __mutex_lock(&_first_link_lock);
+		(void) _private_mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 
@@ -655,7 +656,7 @@ _fflush_l_iops(void)		/* flush all buffers */
 		}
 	} while ((lp = lp->next) != NULL);
 	if (threaded)
-		(void) __mutex_unlock(&_first_link_lock);
+		(void) _private_mutex_unlock(&_first_link_lock);
 	return (res);
 }
 
@@ -717,10 +718,10 @@ fclose(FILE *iop)
 	FUNLOCKFILE(lk);
 
 	if (__libc_threaded)
-		(void) __mutex_lock(&_first_link_lock);
+		(void) _private_mutex_lock(&_first_link_lock);
 	fcloses++;
 	if (__libc_threaded)
-		(void) __mutex_unlock(&_first_link_lock);
+		(void) _private_mutex_unlock(&_first_link_lock);
 
 	return (res);
 }
