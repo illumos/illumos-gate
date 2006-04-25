@@ -1045,7 +1045,6 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	objset_t	*os = zfsvfs->z_os;
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
-	rl_t		*rl;
 	int		error;
 	uint64_t	zoid;
 
@@ -1144,51 +1143,24 @@ top:
 		if (mode && (error = zfs_zaccess_rwx(zp, mode, cr))) {
 			goto out;
 		}
-		/*
-		 * Truncate regular files if requested.
-		 */
-
-		/*
-		 * Need to update dzp->z_seq?
-		 */
 
 		mutex_enter(&dzp->z_lock);
 		dzp->z_seq++;
 		mutex_exit(&dzp->z_lock);
 
-		if ((ZTOV(zp)->v_type == VREG) && (zp->z_phys->zp_size != 0) &&
+		/*
+		 * Truncate regular files if requested.
+		 */
+		if ((ZTOV(zp)->v_type == VREG) &&
+		    (zp->z_phys->zp_size != 0) &&
 		    (vap->va_mask & AT_SIZE) && (vap->va_size == 0)) {
-			/*
-			 * Truncate the file.
-			 */
-			tx = dmu_tx_create(os);
-			dmu_tx_hold_bonus(tx, zoid);
-			dmu_tx_hold_free(tx, zoid, 0, DMU_OBJECT_END);
-			/* Lock the whole range of the file */
-			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-			error = dmu_tx_assign(tx, zfsvfs->z_assign);
-			if (error) {
-				dmu_tx_abort(tx);
-				zfs_range_unlock(zp, rl);
-				if (dl)
-					zfs_dirent_unlock(dl);
-				VN_RELE(ZTOV(zp));
-				if (error == ERESTART &&
-				    zfsvfs->z_assign == TXG_NOWAIT) {
-					txg_wait_open(dmu_objset_pool(os), 0);
-					goto top;
-				}
-				ZFS_EXIT(zfsvfs);
-				return (error);
+			error = zfs_freesp(zp, 0, 0, mode, TRUE);
+			if (error == ERESTART &&
+			    zfsvfs->z_assign == TXG_NOWAIT) {
+				zfs_dirent_unlock(dl);
+				txg_wait_open(dmu_objset_pool(os), 0);
+				goto top;
 			}
-			error = zfs_freesp(zp, 0, 0, mode, tx, cr);
-			if (error == 0) {
-				zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-				seq = zfs_log_truncate(zilog, tx,
-				    TX_TRUNCATE, zp, 0, 0);
-			}
-			zfs_range_unlock(zp, rl);
-			dmu_tx_commit(tx);
 		}
 	}
 out:
@@ -1937,12 +1909,10 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zilog_t		*zilog = zfsvfs->z_log;
 	uint64_t	seq = 0;
 	dmu_tx_t	*tx;
-	rl_t		*rl;
-	uint_t		mask = vap->va_mask;
-	uint_t		mask_applied = 0;
 	vattr_t		oldva;
+	uint_t		mask = vap->va_mask;
+	uint_t		saved_mask;
 	int		trim_mask = FALSE;
-	int		saved_mask;
 	uint64_t	new_mode;
 	znode_t		*attrzp;
 	int		need_policy = FALSE;
@@ -1963,7 +1933,6 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	ZFS_ENTER(zfsvfs);
 
 top:
-	rl = NULL;
 	attrzp = NULL;
 
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
@@ -1977,6 +1946,21 @@ top:
 
 	if (mask & AT_SIZE) {
 		err = zfs_zaccess(zp, ACE_WRITE_DATA, cr);
+		if (err) {
+			ZFS_EXIT(zfsvfs);
+			return (err);
+		}
+		/*
+		 * XXX - Note, we are not providing any open
+		 * mode flags here (like FNDELAY), so we may
+		 * block if there are locks present... this
+		 * should be addressed in openat().
+		 */
+		do {
+			if (err == ERESTART)
+				txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			err = zfs_freesp(zp, vap->va_size, 0, 0, FALSE);
+		} while (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT);
 		if (err) {
 			ZFS_EXIT(zfsvfs);
 			return (err);
@@ -2085,27 +2069,10 @@ top:
 			    0, ZFS_ACL_SIZE(MAX_ACL_SIZE));
 	}
 
-	if (mask & AT_SIZE) {
-		uint64_t off = vap->va_size;
-		/*
-		 * Range lock the entire file, to ensure the truncate
-		 * is serialised.
-		 */
-		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-		ASSERT(rl != NULL);
-		if (off < zp->z_phys->zp_size)
-			dmu_tx_hold_free(tx, zp->z_id, off, DMU_OBJECT_END);
-		else if (zp->z_blksz < zfsvfs->z_max_blksz && off > zp->z_blksz)
-			/* we will rewrite this block if we grow */
-			dmu_tx_hold_write(tx, zp->z_id, 0, zp->z_phys->zp_size);
-	}
-
 	if ((mask & (AT_UID | AT_GID)) && zp->z_phys->zp_xattr != 0) {
 		err = zfs_zget(zp->z_zfsvfs, zp->z_phys->zp_xattr, &attrzp);
 		if (err) {
 			dmu_tx_abort(tx);
-			if (rl != NULL)
-				zfs_range_unlock(zp, rl);
 			ZFS_EXIT(zfsvfs);
 			return (err);
 		}
@@ -2117,8 +2084,6 @@ top:
 		if (attrzp)
 			VN_RELE(ZTOV(attrzp));
 		dmu_tx_abort(tx);
-		if (rl != NULL)
-			zfs_range_unlock(zp, rl);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			goto top;
@@ -2136,22 +2101,6 @@ top:
 	 * Note: you cannot set ctime directly, although it will be
 	 * updated as a side-effect of calling this function.
 	 */
-	if (mask & AT_SIZE) {
-		/*
-		 * XXX - Note, we are not providing any open
-		 * mode flags here (like FNDELAY), so we may
-		 * block if there are locks present... this
-		 * should be addressed in openat().
-		 */
-		err = zfs_freesp(zp, vap->va_size, 0, 0, tx, cr);
-		if (err) {
-			mutex_enter(&zp->z_lock);
-			goto out;
-		}
-		mask_applied |= AT_SIZE;
-	}
-
-	mask_applied = mask;	/* no errors after this point */
 
 	mutex_enter(&zp->z_lock);
 
@@ -2185,24 +2134,18 @@ top:
 	if (mask & AT_MTIME)
 		ZFS_TIME_ENCODE(&vap->va_mtime, pzp->zp_mtime);
 
-	if (mask_applied & AT_SIZE)
+	if (mask & AT_SIZE)
 		zfs_time_stamper_locked(zp, CONTENT_MODIFIED, tx);
-	else if (mask_applied != 0)
+	else if (mask != 0)
 		zfs_time_stamper_locked(zp, STATE_CHANGED, tx);
 
-out:
-
-	if (mask_applied != 0)
-		seq = zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap,
-		    mask_applied);
+	if (mask != 0)
+		seq = zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap, mask);
 
 	mutex_exit(&zp->z_lock);
 
 	if (attrzp)
 		VN_RELE(ZTOV(attrzp));
-
-	if (rl != NULL)
-		zfs_range_unlock(zp, rl);
 
 	dmu_tx_commit(tx);
 
@@ -3437,12 +3380,8 @@ static int
 zfs_space(vnode_t *vp, int cmd, flock64_t *bfp, int flag,
     offset_t offset, cred_t *cr, caller_context_t *ct)
 {
-	dmu_tx_t	*tx;
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
-	zilog_t		*zilog = zfsvfs->z_log;
-	rl_t		*rl;
-	uint64_t	seq = 0;
 	uint64_t	off, len;
 	int		error;
 
@@ -3466,63 +3405,12 @@ top:
 
 	off = bfp->l_start;
 	len = bfp->l_len; /* 0 means from off to end of file */
-	tx = dmu_tx_create(zfsvfs->z_os);
-	dmu_tx_hold_bonus(tx, zp->z_id);
-	/*
-	 * If we will change zp_size (in zfs_freesp) then lock the whole file,
-	 * otherwise just lock the range being freed.
-	 */
-	if (len == 0 || off + len > zp->z_phys->zp_size) {
-		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-	} else {
-		rl = zfs_range_lock(zp, off, len, RL_WRITER);
-		/* recheck, in case zp_size changed */
-		if (off + len > zp->z_phys->zp_size) {
-			/* lost race: file size changed, lock whole file */
-			zfs_range_unlock(zp, rl);
-			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-		}
-	}
 
-	if (off + len > zp->z_blksz && zp->z_blksz < zfsvfs->z_max_blksz &&
-	    off >= zp->z_phys->zp_size) {
-		/*
-		 * We are increasing the length of the file,
-		 * and this may mean a block size increase.
-		 */
-		dmu_tx_hold_write(tx, zp->z_id, 0,
-		    MIN(off + len, zfsvfs->z_max_blksz));
-	} else if (off < zp->z_phys->zp_size) {
-		/*
-		 * If len == 0, we are truncating the file.
-		 */
-		dmu_tx_hold_free(tx, zp->z_id, off, len ? len : DMU_OBJECT_END);
-	}
-
-	error = dmu_tx_assign(tx, zfsvfs->z_assign);
-	if (error) {
-		dmu_tx_abort(tx);
-		zfs_range_unlock(zp, rl);
-		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
+	do {
+		if (error == ERESTART)
 			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
-			goto top;
-		}
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
-
-	error = zfs_freesp(zp, off, len, flag, tx, cr);
-
-	if (error == 0) {
-		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		seq = zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
-	}
-
-	zfs_range_unlock(zp, rl);
-
-	dmu_tx_commit(tx);
-
-	zil_commit(zilog, seq, 0);
+		error = zfs_freesp(zp, off, len, flag, TRUE);
+	} while (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);

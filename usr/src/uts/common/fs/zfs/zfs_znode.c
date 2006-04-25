@@ -902,30 +902,51 @@ zfs_no_putpage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
  * Free space in a file.
  *
  *	IN:	zp	- znode of file to free data in.
- *		from	- start of section to free.
+ *		off	- start of section to free.
  *		len	- length of section to free (0 => to EOF).
  *		flag	- current file open mode flags.
- *		tx	- open transaction.
  *
  * 	RETURN:	0 if success
  *		error code if failure
  */
 int
-zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
-	cred_t *cr)
+zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 {
 	vnode_t *vp = ZTOV(zp);
-	uint64_t size = zp->z_phys->zp_size;
-	uint64_t end = from + len;
+	dmu_tx_t *tx;
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	zilog_t *zilog = zfsvfs->z_log;
+	rl_t *rl;
+	uint64_t seq = 0;
+	uint64_t end = off + len;
+	uint64_t size, new_blksz;
 	int error;
 
 	if (ZTOV(zp)->v_type == VFIFO)
 		return (0);
 
 	/*
+	 * If we will change zp_size then lock the whole file,
+	 * otherwise just lock the range being freed.
+	 */
+	if (len == 0 || off + len > zp->z_phys->zp_size) {
+		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+	} else {
+		rl = zfs_range_lock(zp, off, len, RL_WRITER);
+		/* recheck, in case zp_size changed */
+		if (off + len > zp->z_phys->zp_size) {
+			/* lost race: file size changed, lock whole file */
+			zfs_range_unlock(zp, rl);
+			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+		}
+	}
+
+	/*
 	 * Nothing to do if file already at desired length.
 	 */
-	if (len == 0 && size == from) {
+	size = zp->z_phys->zp_size;
+	if (len == 0 && size == off) {
+		zfs_range_unlock(zp, rl);
 		return (0);
 	}
 
@@ -933,19 +954,26 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 	 * Check for any locks in the region to be freed.
 	 */
 	if (MANDLOCK(vp, (mode_t)zp->z_phys->zp_mode)) {
-		uint64_t	start;
+		uint64_t start = off;
+		uint64_t extent = len;
 
-		if (size > from)
-			start = from;
-		else
+		if (off > size) {
 			start = size;
-		if (error = chklock(vp, FWRITE, start, 0, flag, NULL))
+			extent += off - size;
+		} else if (len == 0) {
+			extent = size - off;
+		}
+		if (error = chklock(vp, FWRITE, start, extent, flag, NULL)) {
+			zfs_range_unlock(zp, rl);
 			return (error);
+		}
 	}
 
-	if (end > zp->z_blksz && (!ISP2(zp->z_blksz) ||
-	    zp->z_blksz < zp->z_zfsvfs->z_max_blksz)) {
-		uint64_t new_blksz;
+	tx = dmu_tx_create(zfsvfs->z_os);
+	dmu_tx_hold_bonus(tx, zp->z_id);
+	new_blksz = 0;
+	if (end > size &&
+	    (!ISP2(zp->z_blksz) || zp->z_blksz < zfsvfs->z_max_blksz)) {
 		/*
 		 * We are growing the file past the current block size.
 		 */
@@ -955,42 +983,74 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 		} else {
 			new_blksz = MIN(end, zp->z_zfsvfs->z_max_blksz);
 		}
-		zfs_grow_blocksize(zp, new_blksz, tx);
+		dmu_tx_hold_write(tx, zp->z_id, 0, MIN(end, new_blksz));
+	} else if (off < size) {
+		/*
+		 * If len == 0, we are truncating the file.
+		 */
+		dmu_tx_hold_free(tx, zp->z_id, off, len ? len : DMU_OBJECT_END);
 	}
+
+	error = dmu_tx_assign(tx, zfsvfs->z_assign);
+	if (error) {
+		dmu_tx_abort(tx);
+		zfs_range_unlock(zp, rl);
+		return (error);
+	}
+
+	if (new_blksz)
+		zfs_grow_blocksize(zp, new_blksz, tx);
+
 	if (end > size || len == 0)
 		zp->z_phys->zp_size = end;
-	if (from > size)
-		return (0);
+
+	if (off < size) {
+		objset_t *os = zfsvfs->z_os;
+
+		if (len == 0)
+			len = -1;
+		else if (end > size)
+			len = size - off;
+		VERIFY(0 == dmu_free_range(os, zp->z_id, off, len, tx));
+	}
+
+	if (log) {
+		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
+		seq = zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
+	}
+
+	zfs_range_unlock(zp, rl);
+
+	dmu_tx_commit(tx);
+
+	if (log)
+		zil_commit(zilog, seq, 0);
 
 	/*
-	 * Clear any mapped pages in the truncated region.
+	 * Clear any mapped pages in the truncated region.  This has to
+	 * happen outside of the transaction to avoid the possibility of
+	 * a deadlock with someone trying to push a page that we are
+	 * about to invalidate.
 	 */
 	rw_enter(&zp->z_map_lock, RW_WRITER);
-	if (vn_has_cached_data(vp)) {
+	if (off < size && vn_has_cached_data(vp)) {
 		page_t *pp;
-		uint64_t start = from & PAGEMASK;
-		int off = from & PAGEOFFSET;
+		uint64_t start = off & PAGEMASK;
+		int poff = off & PAGEOFFSET;
 
-		if (off != 0 && (pp = page_lookup(vp, start, SE_SHARED))) {
+		if (poff != 0 && (pp = page_lookup(vp, start, SE_SHARED))) {
 			/*
 			 * We need to zero a partial page.
 			 */
-			pagezero(pp, off, PAGESIZE - off);
+			pagezero(pp, poff, PAGESIZE - poff);
 			start += PAGESIZE;
 			page_unlock(pp);
 		}
 		error = pvn_vplist_dirty(vp, start, zfs_no_putpage,
-		    B_INVAL | B_TRUNC, cr);
+		    B_INVAL | B_TRUNC, NULL);
 		ASSERT(error == 0);
 	}
 	rw_exit(&zp->z_map_lock);
-
-	if (len == 0)
-		len = -1;
-	else if (end > size)
-		len = size - from;
-	VERIFY(0 == dmu_free_range(zp->z_zfsvfs->z_os,
-	    zp->z_id, from, len, tx));
 
 	return (0);
 }

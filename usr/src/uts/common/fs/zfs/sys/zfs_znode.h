@@ -242,8 +242,7 @@ extern void	zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx);
 extern void	zfs_time_stamper(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_time_stamper_locked(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_grow_blocksize(znode_t *, uint64_t, dmu_tx_t *);
-extern int	zfs_freesp(znode_t *, uint64_t, uint64_t, int, dmu_tx_t *,
-    cred_t *cr);
+extern int	zfs_freesp(znode_t *, uint64_t, uint64_t, int, boolean_t);
 extern void	zfs_znode_init(void);
 extern void	zfs_znode_fini(void);
 extern int	zfs_zget(zfsvfs_t *, uint64_t, znode_t **);

@@ -250,7 +250,8 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
 		 * If we are a snapshot mounted under .zfs, return
 		 * the vp for the snapshot directory.
 		 */
-		if (zfsvfs->z_parent != zfsvfs) {
+		if (dzp->z_phys->zp_parent == dzp->z_id &&
+		    zfsvfs->z_parent != zfsvfs) {
 			error = zfsctl_root_lookup(zfsvfs->z_parent->z_ctldir,
 			    "snapshot", vpp, NULL, 0, NULL, kcred);
 			return (error);
