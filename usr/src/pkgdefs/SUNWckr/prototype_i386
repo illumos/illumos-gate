@@ -119,6 +119,8 @@ f none kernel/drv/sysmsg 755 root sys
 f none kernel/drv/tcp 755 root sys
 f none kernel/drv/tcp6 755 root sys
 f none kernel/drv/tl 755 root sys
+f none kernel/drv/tzmon 755 root sys
+f none kernel/drv/tzmon.conf 644 root sys
 f none kernel/drv/udp 755 root sys
 f none kernel/drv/udp6 755 root sys
 f none kernel/drv/vgatext 755 root sys
@@ -286,6 +288,7 @@ f none kernel/drv/amd64/sysmsg 755 root sys
 f none kernel/drv/amd64/tcp 755 root sys
 f none kernel/drv/amd64/tcp6 755 root sys
 f none kernel/drv/amd64/tl 755 root sys
+f none kernel/drv/amd64/tzmon 755 root sys
 f none kernel/drv/amd64/udp 755 root sys
 f none kernel/drv/amd64/udp6 755 root sys
 f none kernel/drv/amd64/vgatext 755 root sys

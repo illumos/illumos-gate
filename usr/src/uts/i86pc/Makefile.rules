@@ -93,6 +93,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/tzmon/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -243,6 +247,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/tzmon/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))

@@ -264,6 +264,7 @@ DRV_KMODS	+= amd64_gart
 DRV_KMODS	+= cpc
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= power
+DRV_KMODS	+= tzmon
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audiovia823x
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audioens

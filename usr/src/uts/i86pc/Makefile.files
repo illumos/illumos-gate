@@ -128,6 +128,7 @@ AGPGART_OBJS	+=	agpgart.o \
 			agp_kstat.o
 AGPTARGET_OBJS	+=	agptarget.o
 AMD64GART_OBJS	+=	amd64_gart.o
+TZMON_OBJS	+= tzmon.o
 
 GHD_OBJS +=	ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
 		ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
