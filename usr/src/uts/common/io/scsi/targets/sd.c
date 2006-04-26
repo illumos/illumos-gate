@@ -28,10 +28,6 @@
 /*
  * SCSI disk target driver.
  */
-
-
-
-
 #include <sys/scsi/scsi.h>
 #include <sys/dkbad.h>
 #include <sys/dklabel.h>
@@ -13802,7 +13798,8 @@ sd_shadow_buf_alloc(struct buf *bp, size_t datalen, uint_t bflags,
 	new_bp = getrbuf(KM_SLEEP);
 	new_bp->b_un.b_addr = kmem_zalloc(datalen, KM_SLEEP);
 	new_bp->b_bcount = datalen;
-	new_bp->b_flags	= bp->b_flags | bflags;
+	new_bp->b_flags = bflags |
+	    (bp->b_flags & ~(B_PAGEIO | B_PHYS | B_REMAPPED | B_SHADOW));
 #else
 	new_bp = scsi_alloc_consistent_buf(SD_ADDRESS(un), NULL,
 	    datalen, bflags, SLEEP_FUNC, NULL);

@@ -700,6 +700,7 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data",
 	geom_cache
 	mhioc_inkeys
 	mhioc_inresvs
+	mode_caching
 	mode_header
 	mode_speed
 	scsi_cdb
