@@ -146,5 +146,14 @@ MACHINE_DEFS	+= -D_OPL
 MACHINE_DEFS    += -DOLYMPUS_SHARED_FTLB
 MACHINE_DEFS	+= -D_CMP_NO_ERROR_STEERING -D_HW_MEMSCRUB_SUPPORT
 MACHINE_DEFS	+= -DDO_CORELEVEL_LOADBAL
+#
+# OLYMPUS C cross-call erratas.
+#  - revision A can only deliver one xcall at a time.
+#  - revision B can dispatch xcalls to 32 (IDSR_BN_SETS) CPUs at a time,
+#    but it can not send more xcalls until all the pending xcalls are
+#    dispatched. In other words, all previous 32 xcall slots must be
+#    in non-busy state before further xcalls can be issued.
+MACHINE_DEFS += -DOLYMPUS_C_REV_A_ERRATA_XCALL
+MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL
 
 .KEEP_STATE:

@@ -89,7 +89,3 @@ WORKAROUND_DEFS += -DJALAPENO_ERRATA_85
 #   Will not be fixed.
 WORKAROUND_DEFS += -DCHEETAHPLUS_ERRATUM_34
 
-# OLYMPUS C cross-call errata. The first revision of the CPU can
-# deliver only one cross call at time.
-# Will be fixed in the succeeded revision of the cpu.
-WORKAROUND_DEFS	+= -DOLYMPUS_ERRATA_XCALL

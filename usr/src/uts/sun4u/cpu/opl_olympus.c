@@ -278,7 +278,7 @@ send_mondo_set(cpuset_t set)
 	int index = 0;
 	int ncpuids = 0;
 #endif
-#ifdef	OLYMPUS_ERRATA_XCALL
+#ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 	int bn_sets = IDSR_BN_SETS;
 	uint64_t ver;
 
@@ -288,7 +288,7 @@ send_mondo_set(cpuset_t set)
 	ASSERT(!CPUSET_ISNULL(set));
 	starttick = lasttick = gettick();
 
-#ifdef	OLYMPUS_ERRATA_XCALL
+#ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 	ver = ultra_getver();
 	if (((ULTRA_VER_IMPL(ver)) == OLYMPUS_C_IMPL) &&
 		((OLYMPUS_REV_MASK(ver)) == OLYMPUS_C_A))
@@ -317,7 +317,7 @@ send_mondo_set(cpuset_t set)
 			 * CPUs, set "index" to the highest numbered CPU in
 			 * the set so we can ship to other CPUs a bit later on.
 			 */
-#ifdef	OLYMPUS_ERRATA_XCALL
+#ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 			if (shipped < bn_sets) {
 #else
 			if (shipped < IDSR_BN_SETS) {
@@ -362,7 +362,7 @@ send_mondo_set(cpuset_t set)
 			cmn_err(CE_CONT, "send mondo timeout "
 				"[%d NACK %d BUSY]\nIDSR 0x%"
 				"" PRIx64 "  cpuids:", nack, busy, idsr);
-#ifdef	OLYMPUS_ERRATA_XCALL
+#ifdef	OLYMPUS_C_REV_A_ERRATA_XCALL
 			for (i = 0; i < bn_sets; i++) {
 #else
 			for (i = 0; i < IDSR_BN_SETS; i++) {
@@ -378,6 +378,18 @@ send_mondo_set(cpuset_t set)
 		}
 		curnack = idsr & nackmask;
 		curbusy = idsr & busymask;
+
+#ifdef OLYMPUS_C_REV_B_ERRATA_XCALL
+		/*
+		 * Only proceed to send more xcalls if all the
+		 * cpus in the previous IDSR_BN_SETS were completed.
+		 */
+		if (curbusy) {
+			busy++;
+			continue;
+		}
+#endif /* OLYMPUS_C_REV_B_ERRATA_XCALL */
+
 #if (NCPU > IDSR_BN_SETS)
 		if (shipped < ncpuids) {
 			uint64_t cpus_left;
@@ -421,11 +433,12 @@ send_mondo_set(cpuset_t set)
 			}
 		}
 #endif
+#ifndef	OLYMPUS_C_REV_B_ERRATA_XCALL
 		if (curbusy) {
 			busy++;
 			continue;
 		}
-
+#endif	/* OLYMPUS_C_REV_B_ERRATA_XCALL */
 #ifdef SEND_MONDO_STATS
 		{
 			int n = gettick() - starttick;
