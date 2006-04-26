@@ -440,6 +440,7 @@ intr_thread_get_time(struct cpu *cpu)
 	ret = time - mcpu->intrstat[pil][1];
 	mcpu->intrstat[pil][0] = time;
 	mcpu->intrstat[pil][1] = time;
+	cpu->cpu_intracct[cpu->cpu_mstate] += delta;
 
 	return (ret);
 }

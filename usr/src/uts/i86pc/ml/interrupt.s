@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1648,6 +1647,7 @@ _intr_get_time_no_start_time:
 
 	cli				/* make this easy -- block intrs */
 	pushl	%esi			/* and free up some registers */
+	pushl	%ebx
 
 	LOADCPU(%esi)
 	movl	CPU_THREAD(%esi), %ecx
@@ -1663,7 +1663,9 @@ _tsc_patch17:
 	TSC_SUB_FROM(%ecx, T_INTR_START)	/* get elapsed time */
 	TSC_ADD_TO(%ecx, T_INTR_START)		/* T_INTR_START = rdtsc */
 
-	movzbl	T_PIL(%ecx), %ecx		/* %ecx = pil */
+	INTRACCTBASE(%esi, %ebx)			/* %ebx = CPU + cpu_mstate*8 */
+	TSC_ADD_TO(%ebx, CPU_INTRACCT);		/* intracct[ms] += elapsed */
+	movzbl	T_PIL(%ecx), %ecx			/* %ecx = pil */
 	PILBASE_INTRSTAT(%esi, %ecx)		/* %ecx = CPU + pil*16 */
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)		/* intrstat[0] += elapsed */
 	TSC_LOAD(%ecx, CPU_INTRSTAT)		/* get new intrstat[0] */
@@ -1672,6 +1674,7 @@ _tsc_patch17:
 	
 	/* %edx/%eax contain difference between old and new intrstat[1] */
 
+	popl	%ebx
 	popl	%esi
 	sti
 	ret
