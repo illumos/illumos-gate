@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -115,6 +114,9 @@
 #define	ABS_TIME	0
 #define	REL_TIME	1
 
+mutex_t mq_list_lock = DEFAULTMUTEX;
+mqdes_t *mq_list = NULL;
+
 static int
 mq_is_valid(mqdes_t *mqdp)
 {
@@ -145,9 +147,10 @@ mq_init(mqhdr_t *mqhp, size_t msgsize, ssize_t maxmsg)
 	 * ftruncate() on the message queue file assures that the
 	 * pages will be zfod.
 	 */
-	(void) sem_init(&mqhp->mq_exclusive, 1, 1);
+	(void) mutex_init(&mqhp->mq_exclusive, USYNC_PROCESS, NULL);
 	(void) sem_init(&mqhp->mq_rblocked, 1, 0);
 	(void) sem_init(&mqhp->mq_notempty, 1, 0);
+	(void) sem_init(&mqhp->mq_spawner, 1, 0);
 	(void) sem_init(&mqhp->mq_notfull, 1, (uint_t)maxmsg);
 
 	mqhp->mq_maxsz = msgsize;
@@ -155,14 +158,15 @@ mq_init(mqhdr_t *mqhp, size_t msgsize, ssize_t maxmsg)
 
 	/*
 	 * As of this writing (1997), there are 32 message queue priorities.
-	 * If this is to change, then the size of the mq_mask will also
-	 * have to change.  If NDEBUG isn't defined, assert that
+	 * If this is to change, then the size of the mq_mask will
+	 * also have to change.  If DEBUG is defined, assert that
 	 * _MQ_PRIO_MAX hasn't changed.
 	 */
 	mqhp->mq_maxprio = _MQ_PRIO_MAX;
+#if defined(DEBUG)
+	/* LINTED always true */
 	MQ_ASSERT(sizeof (mqhp->mq_mask) * 8 >= _MQ_PRIO_MAX);
-
-	mqhp->mq_magic = MQ_MAGIC;
+#endif
 
 	/*
 	 * Since the message queue can be mapped into different
@@ -195,7 +199,7 @@ mq_getmsg(mqhdr_t *mqhp, char *msgp, uint_t *msg_prio)
 	uint64_t *headpp;
 	uint64_t *tailpp;
 
-	MQ_ASSERT_SEMVAL_LEQ(&mqhp->mq_exclusive, 0);
+	MQ_ASSERT(MUTEX_HELD(&mqhp->mq_exclusive));
 
 	/*
 	 * Get the head and tail pointers for the queue of maximum
@@ -250,7 +254,7 @@ mq_putmsg(mqhdr_t *mqhp, const char *msgp, ssize_t len, uint_t prio)
 	uint64_t *headpp;
 	uint64_t *tailpp;
 
-	MQ_ASSERT_SEMVAL_LEQ(&mqhp->mq_exclusive, 0);
+	MQ_ASSERT(MUTEX_HELD(&mqhp->mq_exclusive));
 
 	/*
 	 * Grab a free message block, and link it in.  We shouldn't
@@ -452,8 +456,17 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdp->mqd_mq = mqhp;
 	mqdp->mqd_mqdn = mqdnp;
 	mqdp->mqd_magic = MQ_MAGIC;
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0)
+	mqdp->mqd_tcd = NULL;
+	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0) {
+		(void) mutex_lock(&mq_list_lock);
+		mqdp->mqd_next = mq_list;
+		mqdp->mqd_prev = NULL;
+		if (mq_list)
+			mq_list->mqd_prev = mqdp;
+		mq_list = mqdp;
+		(void) mutex_unlock(&mq_list_lock);
 		return ((mqd_t)mqdp);
+	}
 
 	locked = 0;	/* fall into the error case */
 out:
@@ -482,7 +495,7 @@ _mq_close(mqd_t mqdes)
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
 	struct mq_dn *mqdnp;
-	int canstate;
+	thread_communication_data_t *tcdp;
 
 	if (!mq_is_valid(mqdp)) {
 		errno = EBADF;
@@ -492,24 +505,32 @@ _mq_close(mqd_t mqdes)
 	mqhp = mqdp->mqd_mq;
 	mqdnp = mqdp->mqd_mqdn;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
-	while (sem_wait(&mqhp->mq_exclusive) == -1 && errno == EINTR)
-		continue;
-	(void) pthread_setcancelstate(canstate, NULL);
-
+	(void) mutex_lock(&mqhp->mq_exclusive);
 	if (mqhp->mq_des == (uintptr_t)mqdp &&
 	    mqhp->mq_sigid.sn_pid == getpid()) {
-		/* Notification is set for this descriptor, remove it */
+		/* notification is set for this descriptor, remove it */
 		(void) __signotify(SN_CANCEL, NULL, &mqhp->mq_sigid);
-		mqhp->mq_sigid.sn_pid = 0;
+		mqhp->mq_ntype = 0;
 		mqhp->mq_des = 0;
 	}
-	(void) sem_post(&mqhp->mq_exclusive);
-
-	/* Invalidate the descriptor before freeing it */
+	if ((tcdp = mqdp->mqd_tcd) != NULL) {
+		mqdp->mqd_tcd = NULL;
+		del_sigev_mq(tcdp);
+	}
+	/* invalidate the descriptor before freeing it */
 	mqdp->mqd_magic = 0;
-	free(mqdp);
+	(void) mutex_unlock(&mqhp->mq_exclusive);
 
+	(void) mutex_lock(&mq_list_lock);
+	if (mqdp->mqd_next)
+		mqdp->mqd_next->mqd_prev = mqdp->mqd_prev;
+	if (mqdp->mqd_prev)
+		mqdp->mqd_prev->mqd_next = mqdp->mqd_next;
+	if (mq_list == mqdp)
+		mq_list = mqdp->mqd_next;
+	(void) mutex_unlock(&mq_list_lock);
+
+	free(mqdp);
 	(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
 	return (munmap((caddr_t)mqhp, (size_t)mqhp->mq_totsize));
 }
@@ -547,7 +568,6 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
 	int err;
-	int canstate;
 	int notify = 0;
 
 	/*
@@ -573,7 +593,7 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 		return (-1);
 	}
 
-	if ((mqdp->mqd_mqdn->mqdn_flags & O_NONBLOCK) != 0)
+	if (mqdp->mqd_mqdn->mqdn_flags & O_NONBLOCK)
 		err = sem_trywait(&mqhp->mq_notfull);
 	else {
 		/*
@@ -598,17 +618,7 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	 * By the time we're here, we know that we've got the capacity
 	 * to add to the queue...now acquire the exclusive lock.
 	 */
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
-	err = sem_wait(&mqhp->mq_exclusive);
-	(void) pthread_setcancelstate(canstate, NULL);
-	if (err == -1) {
-		/*
-		 * We must have been interrupted by a signal.
-		 * Post on mq_notfull so someone else can take our slot.
-		 */
-		(void) sem_post(&mqhp->mq_notfull);
-		return (-1);
-	}
+	(void) mutex_lock(&mqhp->mq_exclusive);
 
 	/*
 	 * Now determine if we want to kick the notification.  POSIX
@@ -616,18 +626,19 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	 * we must kick it when the queue makes an empty to non-empty
 	 * transition, and there are no blocked receivers.  Note that
 	 * this mechanism does _not_ guarantee that the kicked process
-	 * will be able to receive a message without blocking;  another
-	 * receiver could intervene in the meantime.  Thus,
-	 * the notification mechanism is inherently racy;  all we can
-	 * do is hope to minimize the window as much as possible.  In
-	 * general, we want to avoid kicking the notification when
-	 * there are clearly receivers blocked.  We'll determine if we
-	 * want to kick the notification before the mq_putmsg(), but the
-	 * actual signotify() won't be done until the message is on
-	 * the queue.
+	 * will be able to receive a message without blocking;
+	 * another receiver could intervene in the meantime.  Thus,
+	 * the notification mechanism is inherently racy; all we can
+	 * do is hope to minimize the window as much as possible.
+	 * In general, we want to avoid kicking the notification when
+	 * there are clearly receivers blocked.  We'll determine if
+	 * we want to kick the notification before the mq_putmsg(),
+	 * but the actual signotify() won't be done until the message
+	 * is on the queue.
 	 */
 	if (mqhp->mq_sigid.sn_pid != 0) {
 		int nmessages, nblocked;
+
 		(void) sem_getvalue(&mqhp->mq_notempty, &nmessages);
 		(void) sem_getvalue(&mqhp->mq_rblocked, &nblocked);
 
@@ -636,22 +647,20 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	}
 
 	mq_putmsg(mqhp, msg_ptr, (ssize_t)msg_len, msg_prio);
-
-	/*
-	 * The ordering here is important.  We want to make sure that
-	 * one has to have mq_exclusive before being able to kick
-	 * mq_notempty.
-	 */
 	(void) sem_post(&mqhp->mq_notempty);
 
 	if (notify) {
+		/* notify and also delete the registration */
 		(void) __signotify(SN_SEND, NULL, &mqhp->mq_sigid);
-		mqhp->mq_sigid.sn_pid = 0;
+		if (mqhp->mq_ntype == SIGEV_THREAD ||
+		    mqhp->mq_ntype == SIGEV_PORT)
+			(void) sem_post(&mqhp->mq_spawner);
+		mqhp->mq_ntype = 0;
 		mqhp->mq_des = 0;
 	}
 
-	(void) sem_post(&mqhp->mq_exclusive);
 	MQ_ASSERT_SEMVAL_LEQ(&mqhp->mq_notempty, ((int)mqhp->mq_maxmsg));
+	(void) mutex_unlock(&mqhp->mq_exclusive);
 
 	return (0);
 }
@@ -697,7 +706,6 @@ __mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
 	ssize_t	msg_size;
-	int canstate;
 	int err;
 
 	/*
@@ -760,23 +768,11 @@ __mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 		}
 	}
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
-	err = sem_wait(&mqhp->mq_exclusive);
-	(void) pthread_setcancelstate(canstate, NULL);
-	if (err == -1) {
-		/*
-		 * We must have been interrupted by a signal.
-		 * Post on mq_notfull so someone else can take our message.
-		 */
-		(void) sem_post(&mqhp->mq_notempty);
-		return (-1);
-	}
-
+	(void) mutex_lock(&mqhp->mq_exclusive);
 	msg_size = mq_getmsg(mqhp, msg_ptr, msg_prio);
-
 	(void) sem_post(&mqhp->mq_notfull);
-	(void) sem_post(&mqhp->mq_exclusive);
 	MQ_ASSERT_SEMVAL_LEQ(&mqhp->mq_notfull, ((int)mqhp->mq_maxmsg));
+	(void) mutex_unlock(&mqhp->mq_exclusive);
 
 	return (msg_size);
 }
@@ -804,13 +800,51 @@ _mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 		rel_timeout, REL_TIME));
 }
 
+/*
+ * Only used below, in _mq_notify().
+ * We already have a spawner thread.
+ * Verify that the attributes match; cancel it if necessary.
+ */
+static int
+cancel_if_necessary(thread_communication_data_t *tcdp,
+	const struct sigevent *sigevp)
+{
+	int do_cancel = !_pthread_attr_equal(tcdp->tcd_attrp,
+			    sigevp->sigev_notify_attributes);
+
+	if (do_cancel) {
+		/*
+		 * Attributes don't match, cancel the spawner thread.
+		 */
+		(void) pthread_cancel(tcdp->tcd_server_id);
+	} else {
+		/*
+		 * Reuse the existing spawner thread with possibly
+		 * changed notification function and value.
+		 */
+		tcdp->tcd_notif.sigev_notify = SIGEV_THREAD;
+		tcdp->tcd_notif.sigev_signo = 0;
+		tcdp->tcd_notif.sigev_value = sigevp->sigev_value;
+		tcdp->tcd_notif.sigev_notify_function =
+			sigevp->sigev_notify_function;
+	}
+
+	return (do_cancel);
+}
+
 int
-_mq_notify(mqd_t mqdes, const struct sigevent *notification)
+_mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
-	int canstate;
+	thread_communication_data_t *tcdp;
 	siginfo_t mq_siginfo;
+	struct sigevent sigevent;
+	struct stat64 statb;
+	port_notify_t *pn;
+	void *userval;
+	int ntype;
+	int port;
 
 	if (!mq_is_valid(mqdp)) {
 		errno = EBADF;
@@ -819,68 +853,115 @@ _mq_notify(mqd_t mqdes, const struct sigevent *notification)
 
 	mqhp = mqdp->mqd_mq;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
-	while (sem_wait(&mqhp->mq_exclusive) == -1 && errno == EINTR)
-		continue;
-	(void) pthread_setcancelstate(canstate, NULL);
+	(void) mutex_lock(&mqhp->mq_exclusive);
 
-	if (notification == NULL) {
+	if (sigevp == NULL) {		/* remove notification */
 		if (mqhp->mq_des == (uintptr_t)mqdp &&
 		    mqhp->mq_sigid.sn_pid == getpid()) {
-			/*
-			 * Remove signotify_id if queue is registered with
-			 * this process
-			 */
+			/* notification is set for this descriptor, remove it */
 			(void) __signotify(SN_CANCEL, NULL, &mqhp->mq_sigid);
-			mqhp->mq_sigid.sn_pid = 0;
+			if ((tcdp = mqdp->mqd_tcd) != NULL) {
+				(void) mutex_lock(&tcdp->tcd_lock);
+				if (tcdp->tcd_msg_enabled) {
+					/* cancel the spawner thread */
+					tcdp = mqdp->mqd_tcd;
+					mqdp->mqd_tcd = NULL;
+					(void) pthread_cancel(
+					    tcdp->tcd_server_id);
+				}
+				(void) mutex_unlock(&tcdp->tcd_lock);
+			}
+			mqhp->mq_ntype = 0;
 			mqhp->mq_des = 0;
 		} else {
-			/*
-			 * if registered with another process or mqdes
-			 */
+			/* notification is not set for this descriptor */
 			errno = EBUSY;
 			goto bad;
 		}
-	} else {
-		/*
-		 * Register notification with this process.
-		 */
-
-		switch (notification->sigev_notify) {
+	} else {		/* register notification with this process */
+		switch (ntype = sigevp->sigev_notify) {
+		case SIGEV_THREAD:
+			userval = sigevp->sigev_value.sival_ptr;
+			port = -1;
+			break;
+		case SIGEV_PORT:
+			pn = sigevp->sigev_value.sival_ptr;
+			userval = pn->portnfy_user;
+			port = pn->portnfy_port;
+			if (fstat64(port, &statb) != 0 ||
+			    !S_ISPORT(statb.st_mode)) {
+				errno = EBADF;
+				goto bad;
+			}
+			(void) memset(&sigevent, 0, sizeof (sigevent));
+			sigevent.sigev_notify = SIGEV_PORT;
+			sigevp = &sigevent;
+			break;
+		}
+		switch (ntype) {
 		case SIGEV_NONE:
 			mq_siginfo.si_signo = 0;
 			mq_siginfo.si_code = SI_MESGQ;
 			break;
 		case SIGEV_SIGNAL:
-			mq_siginfo.si_signo = notification->sigev_signo;
-			mq_siginfo.si_value = notification->sigev_value;
+			mq_siginfo.si_signo = sigevp->sigev_signo;
+			mq_siginfo.si_value = sigevp->sigev_value;
 			mq_siginfo.si_code = SI_MESGQ;
 			break;
 		case SIGEV_THREAD:
-			errno = ENOSYS;
-			goto bad;
+			if ((tcdp = mqdp->mqd_tcd) != NULL &&
+			    cancel_if_necessary(tcdp, sigevp))
+				mqdp->mqd_tcd = NULL;
+			/* FALLTHROUGH */
+		case SIGEV_PORT:
+			if ((tcdp = mqdp->mqd_tcd) == NULL) {
+				/* we must create a spawner thread */
+				tcdp = setup_sigev_handler(sigevp, MQ);
+				if (tcdp == NULL) {
+					errno = EBADF;
+					goto bad;
+				}
+				tcdp->tcd_msg_enabled = 0;
+				tcdp->tcd_msg_closing = 0;
+				tcdp->tcd_msg_avail = &mqhp->mq_spawner;
+				if (launch_spawner(tcdp) != 0) {
+					free_sigev_handler(tcdp);
+					goto bad;
+				}
+				mqdp->mqd_tcd = tcdp;
+			}
+			mq_siginfo.si_signo = 0;
+			mq_siginfo.si_code = SI_MESGQ;
+			break;
 		default:
 			errno = EINVAL;
 			goto bad;
 		}
 
-		/*
-		 * Either notification is not present, or if
-		 * notification is already present, but the process
-		 * which registered notification does not exist then
-		 * kernel can register notification for current process.
-		 */
-
+		/* register notification */
 		if (__signotify(SN_PROC, &mq_siginfo, &mqhp->mq_sigid) < 0)
 			goto bad;
+		mqhp->mq_ntype = ntype;
 		mqhp->mq_des = (uintptr_t)mqdp;
+		switch (ntype) {
+		case SIGEV_THREAD:
+		case SIGEV_PORT:
+			tcdp->tcd_port = port;
+			tcdp->tcd_msg_object = mqdp;
+			tcdp->tcd_msg_userval = userval;
+			(void) mutex_lock(&tcdp->tcd_lock);
+			tcdp->tcd_msg_enabled = ntype;
+			(void) mutex_unlock(&tcdp->tcd_lock);
+			(void) cond_broadcast(&tcdp->tcd_cv);
+			break;
+		}
 	}
 
-	(void) sem_post(&mqhp->mq_exclusive);
+	(void) mutex_unlock(&mqhp->mq_exclusive);
 	return (0);
 
 bad:
-	(void) sem_post(&mqhp->mq_exclusive);
+	(void) mutex_unlock(&mqhp->mq_exclusive);
 	return (-1);
 }
 

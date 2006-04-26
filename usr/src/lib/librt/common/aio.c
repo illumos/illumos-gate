@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,16 +31,95 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#pragma weak close = __posix_aio_close
+
+#include "c_synonyms.h"
 #include <aio.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <stdlib.h>
 #include "pos4.h"
-
-#pragma weak close = __posix_aio_close
-#pragma weak fork = __posix_aio_fork
+#include "sigev_thread.h"
 
 extern int _libaio_close(int fd);
-extern pid_t _libaio_fork(void);
+
+/*
+ * There is but one spawner for all aio operations.
+ */
+thread_communication_data_t *sigev_aio_tcd = NULL;
+
+mutex_t sigev_aio_lock = DEFAULTMUTEX;
+cond_t sigev_aio_cv = DEFAULTCV;
+int sigev_aio_busy = 0;
+
+static int
+__sigev_thread_init(struct sigevent *sigevp)
+{
+	thread_communication_data_t *tcdp;
+	int port;
+	int rc = 0;
+
+	(void) mutex_lock(&sigev_aio_lock);
+	while (sigev_aio_busy)
+		(void) cond_wait(&sigev_aio_cv, &sigev_aio_lock);
+	if ((tcdp = sigev_aio_tcd) != NULL)
+		port = tcdp->tcd_port;
+	else {
+		sigev_aio_busy = 1;
+		(void) mutex_unlock(&sigev_aio_lock);
+
+		tcdp = setup_sigev_handler(sigevp, AIO);
+		if (tcdp == NULL) {
+			port = -1;
+			rc = -1;
+		} else if (launch_spawner(tcdp) != 0) {
+			free_sigev_handler(tcdp);
+			tcdp = NULL;
+			port = -1;
+			rc = -1;
+		} else {
+			port = tcdp->tcd_port;
+		}
+
+		(void) mutex_lock(&sigev_aio_lock);
+		sigev_aio_tcd = tcdp;
+		sigev_aio_busy = 0;
+		(void) cond_broadcast(&sigev_aio_cv);
+	}
+	(void) mutex_unlock(&sigev_aio_lock);
+	sigevp->sigev_signo = port;
+	return (rc);
+}
+
+static int
+__posix_sigev_thread(aiocb_t *aiocbp)
+{
+	struct sigevent *sigevp;
+
+	if (aiocbp != NULL) {
+		sigevp = &aiocbp->aio_sigevent;
+		if (sigevp->sigev_notify == SIGEV_THREAD &&
+		    sigevp->sigev_notify_function != NULL)
+			return (__sigev_thread_init(sigevp));
+	}
+	return (0);
+}
+
+#if !defined(_LP64)
+static int
+__posix_sigev_thread64(aiocb64_t *aiocbp)
+{
+	struct sigevent *sigevp;
+
+	if (aiocbp != NULL) {
+		sigevp = &aiocbp->aio_sigevent;
+		if (sigevp->sigev_notify == SIGEV_THREAD &&
+		    sigevp->sigev_notify_function != NULL)
+			return (__sigev_thread_init(sigevp));
+	}
+	return (0);
+}
+#endif
 
 int
 __posix_aio_close(int fd)
@@ -48,22 +127,16 @@ __posix_aio_close(int fd)
 	return (_libaio_close(fd));
 }
 
-pid_t
-__posix_aio_fork(void)
-{
-	return (_libaio_fork());
-}
-
 int
-aio_cancel(int fildes, struct aiocb *aiocbp)
+aio_cancel(int fildes, aiocb_t *aiocbp)
 {
 	return (__aio_cancel(fildes, aiocbp));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_cancel64(int fildes, struct aiocb64 *aiocbp)
+aio_cancel64(int fildes, aiocb64_t *aiocbp)
 {
 	return (__aio_cancel64(fildes, aiocbp));
 }
@@ -71,15 +144,15 @@ aio_cancel64(int fildes, struct aiocb64 *aiocbp)
 #endif
 
 int
-aio_error(const struct aiocb *aiocbp)
+aio_error(const aiocb_t *aiocbp)
 {
 	return (__aio_error(aiocbp));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_error64(const struct aiocb64 *aiocbp)
+aio_error64(const aiocb64_t *aiocbp)
 {
 	return (__aio_error64(aiocbp));
 }
@@ -87,47 +160,64 @@ aio_error64(const struct aiocb64 *aiocbp)
 #endif
 
 int
-aio_fsync(int op, struct aiocb *aiocbp)
+aio_fsync(int op, aiocb_t *aiocbp)
 {
-	return (__aio_fsync(op, aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread(aiocbp)) == 0)
+		rc = __aio_fsync(op, aiocbp);
+	return (rc);
+
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_fsync64(int op, struct aiocb64 *aiocbp)
+aio_fsync64(int op, aiocb64_t *aiocbp)
 {
-	return (__aio_fsync64(op, aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread64(aiocbp)) == 0)
+		rc = __aio_fsync64(op, aiocbp);
+	return (rc);
 }
 
 #endif
 
 int
-aio_read(struct aiocb *aiocbp)
+aio_read(aiocb_t *aiocbp)
 {
-	return (__aio_read(aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread(aiocbp)) == 0)
+		rc = __aio_read(aiocbp);
+	return (rc);
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_read64(struct aiocb64 *aiocbp)
+aio_read64(aiocb64_t *aiocbp)
 {
-	return (__aio_read64(aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread64(aiocbp)) == 0)
+		rc = __aio_read64(aiocbp);
+	return (rc);
 }
 
 #endif
 
 ssize_t
-aio_return(struct aiocb *aiocbp)
+aio_return(aiocb_t *aiocbp)
 {
 	return (__aio_return(aiocbp));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 ssize_t
-aio_return64(struct aiocb64 *aiocbp)
+aio_return64(aiocb64_t *aiocbp)
 {
 	return (__aio_return64(aiocbp));
 }
@@ -135,17 +225,17 @@ aio_return64(struct aiocb64 *aiocbp)
 #endif
 
 int
-aio_suspend(const struct aiocb * const list[], int nent,
-    const struct timespec *timeout)
+aio_suspend(const aiocb_t * const list[], int nent,
+    const timespec_t *timeout)
 {
 	return (__aio_suspend((void **)list, nent, timeout, 0));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_suspend64(const struct aiocb64 * const list[], int nent,
-    const struct timespec *timeout)
+aio_suspend64(const aiocb64_t * const list[], int nent,
+    const timespec_t *timeout)
 {
 	return (__aio_suspend((void **)list, nent, timeout, 1));
 }
@@ -153,37 +243,75 @@ aio_suspend64(const struct aiocb64 * const list[], int nent,
 #endif
 
 int
-aio_write(struct aiocb *aiocbp)
+aio_write(aiocb_t *aiocbp)
 {
-	return (__aio_write(aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread(aiocbp)) == 0)
+		rc = __aio_write(aiocbp);
+	return (rc);
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-aio_write64(struct aiocb64 *aiocbp)
+aio_write64(aiocb64_t *aiocbp)
 {
-	return (__aio_write64(aiocbp));
+	int rc;
+
+	if ((rc = __posix_sigev_thread64(aiocbp)) == 0)
+		rc = __aio_write64(aiocbp);
+	return (rc);
 }
 
 #endif
 
 int
 lio_listio(int mode,
-	struct aiocb *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
-	int nent, struct sigevent *_RESTRICT_KYWD sig)
+	aiocb_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
+	int nent, struct sigevent *_RESTRICT_KYWD sigevp)
 {
-	return (__lio_listio(mode, list, nent, sig));
+	int i;
+	aiocb_t *aiocbp;
+
+	for (i = 0; i < nent; i++) {
+		if ((aiocbp = list[i]) != NULL &&
+		    aiocbp->aio_sigevent.sigev_notify == SIGEV_THREAD &&
+		    __posix_sigev_thread(aiocbp) != 0)
+			return (-1);
+	}
+	if (sigevp != NULL &&
+	    sigevp->sigev_notify == SIGEV_THREAD &&
+	    sigevp->sigev_notify_function != NULL &&
+	    __sigev_thread_init(sigevp) != 0)
+		return (-1);
+
+	return (__lio_listio(mode, list, nent, sigevp));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
 lio_listio64(int mode,
-	struct aiocb64 *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
-	int nent, struct sigevent *_RESTRICT_KYWD sig)
+	aiocb64_t *_RESTRICT_KYWD const *_RESTRICT_KYWD list,
+	int nent, struct sigevent *_RESTRICT_KYWD sigevp)
 {
-	return (__lio_listio64(mode, list, nent, sig));
+	int i;
+	aiocb64_t *aiocbp;
+
+	for (i = 0; i < nent; i++) {
+		if ((aiocbp = list[i]) != NULL &&
+		    aiocbp->aio_sigevent.sigev_notify == SIGEV_THREAD &&
+		    __posix_sigev_thread64(aiocbp) != 0)
+			return (-1);
+	}
+	if (sigevp != NULL &&
+	    sigevp->sigev_notify == SIGEV_THREAD &&
+	    sigevp->sigev_notify_function != NULL &&
+	    __sigev_thread_init(sigevp) != 0)
+		return (-1);
+
+	return (__lio_listio64(mode, list, nent, sigevp));
 }
 
 #endif
@@ -191,18 +319,18 @@ lio_listio64(int mode,
 
 int
 aio_waitn(aiocb_t *list[], uint_t nent, uint_t *nwait,
-	const struct timespec *timeout)
+	const timespec_t *timeout)
 {
-	return (__aio_waitn((void **)list, nent, nwait, timeout, 0));
+	return (__aio_waitn((void **)list, nent, nwait, timeout));
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
 aio_waitn64(aiocb64_t *list[], uint_t nent, uint_t *nwait,
-	const struct timespec *timeout)
+	const timespec_t *timeout)
 {
-	return (__aio_waitn((void **)list, nent, nwait, timeout, 1));
+	return (__aio_waitn((void **)list, nent, nwait, timeout));
 }
 
 #endif

@@ -1,3 +1,4 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -17,12 +18,12 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc/spec/private.spec
 
 function	_QgetRD # used by Sun's old Fortran 77 runtime libraries
 #Declaration	/* Unknown. */
@@ -1743,12 +1744,27 @@ weak		pthread_atfork
 version		SUNWprivate_1.1
 end
 
+function	_pthread_attr_clone
+#Declaration	/* Unknown. */
+version		SUNWprivate_1.1
+end
+
+function	_pthread_attr_equal
+#Declaration	/* Unknown. */
+version		SUNWprivate_1.1
+end
+
 function	_pthread_attr_destroy
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
 
 function	_pthread_attr_getdetachstate
+#Declaration	/* Unknown. */
+version		SUNWprivate_1.1
+end
+
+function	_pthread_attr_getdaemonstate_np
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -1794,6 +1810,11 @@ version		SUNWprivate_1.1
 end
 
 function	_pthread_attr_setdetachstate
+#Declaration	/* Unknown. */
+version		SUNWprivate_1.1
+end
+
+function	_pthread_attr_setdaemonstate_np
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end

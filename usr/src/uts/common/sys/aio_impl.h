@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@ extern "C" {
  * a list head is used for notification. a group of requests that
  * should only notify a process when they are done will have a
  * list head. notification is sent when the group of requests are
- * done. individual requests do not send out any notification.
+ * done.
  */
 typedef struct aio_lio {
 	int 		lio_nent;		/* number of requests in list */
@@ -65,6 +65,8 @@ typedef struct aio_lio {
 	struct aio_lio	*lio_next;		/* free list pointer */
 	kcondvar_t	lio_notify;		/* list notification */
 	sigqueue_t	*lio_sigqp;		/* sigqueue_t pointer */
+	int		lio_port;		/* port number notification */
+	port_kevent_t	*lio_portkev;		/* port event structure */
 } aio_lio_t;
 
 /*
@@ -158,13 +160,6 @@ typedef struct aio {
 #define	AIO_PAGELOCKDONE	0x200		/* aio called as_pagelock() */
 #define	AIO_CLOSE_PORT		0x400		/* port is being closed */
 
-#ifdef DEBUG
-#define	AIO_REQ_PEND	0x1000			/* req in pending queue */
-#define	AIO_REQ_CLEAN	0x2000			/* req in cleanup queue */
-#define	AIO_REQ_PORTQ	0x4000			/* req in port done queue */
-#define	AIO_REQ_FREE	0x8000			/* req in free queue */
-#endif
-
 /* flag argument of aio_cleanup() */
 
 #define	AIO_CLEANUP_POLL	0		/* check kaio poll queue */
@@ -183,8 +178,9 @@ extern void aio_req_free(aio_t *, aio_req_t *);
 extern void aio_cleanupq_concat(aio_t *, aio_req_t *, int);
 extern void aio_copyout_result(aio_req_t *);
 extern void aio_copyout_result_port(struct iovec *, struct buf *, void *);
-extern void aio_enq_port_pending(aio_t *, aio_req_t *);
 extern void aio_req_remove_portq(aio_t *, aio_req_t *);
+extern void aio_enq(aio_req_t **, aio_req_t *, int);
+extern void aio_deq(aio_req_t **, aio_req_t *);
 /* Clustering: PXFS module uses this interface */
 extern void aio_done(struct buf *);
 

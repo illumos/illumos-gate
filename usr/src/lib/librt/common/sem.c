@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -62,8 +61,9 @@ typedef	struct	semaddr {
 	ino64_t		sad_inode;	/* inode # of the mmapped file */
 } semaddr_t;
 
-static	semaddr_t	*semheadp = NULL;
-static	mutex_t		semlock = DEFAULTMUTEX;
+static long semvaluemax = 0;
+static semaddr_t *semheadp = NULL;
+mutex_t semlock = DEFAULTMUTEX;
 
 sem_t *
 _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
@@ -87,14 +87,17 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 
 	/* modify oflag to have RDWR and filter CREATE mode only */
 	oflag = (oflag & (O_CREAT|O_EXCL)) | (O_RDWR);
-	if ((oflag & O_CREAT) != 0) {
+	if (oflag & O_CREAT) {
+		if (semvaluemax == 0 &&
+		    (semvaluemax = _sysconf(_SC_SEM_VALUE_MAX)) <= 0)
+			semvaluemax = -1;
 		va_start(ap, oflag);
 		crmode = va_arg(ap, mode_t);
 		value = va_arg(ap, uint_t);
 		va_end(ap);
 		/* check value < the max for a named semaphore */
-		if ((_lsemvaluemax == -1L) ||
-		    ((unsigned long)value > (unsigned long)_lsemvaluemax)) {
+		if (semvaluemax < 0 ||
+		    (ulong_t)value > (ulong_t)semvaluemax) {
 			errno = EINVAL;
 			goto out;
 		}
@@ -168,7 +171,7 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 	(void) strcpy(next->sad_name, path);
 
 	/* initialize it by jumping through the jump table */
-	if ((cr_flag & DFILE_CREATE) != 0) {
+	if (cr_flag & DFILE_CREATE) {
 		if ((error = sema_init((sema_t *)sem, value, USYNC_PROCESS, 0))
 		    != 0) {
 			errno = error;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,13 +60,9 @@ void aio_cleanup_exit(void);
 static void aio_sigev_send(proc_t *, sigqueue_t *);
 static void aio_hash_delete(aio_t *, aio_req_t *);
 static void aio_lio_free(aio_t *, aio_lio_t *);
-static void aio_enq(aio_req_t **, aio_req_t *, int);
 static void aio_cleanup_cleanupq(aio_t *, aio_req_t *, int);
 static int aio_cleanup_notifyq(aio_t *, aio_req_t *, int);
 static void aio_cleanup_pollq(aio_t *, aio_req_t *, int);
-static void aio_enq_doneq(aio_t *aiop, aio_req_t *reqp);
-static void aio_enq_portq(aio_t *, aio_req_t *, int);
-static void aio_enq_port_cleanupq(aio_t *, aio_req_t *);
 static void aio_cleanup_portq(aio_t *, aio_req_t *, int);
 
 /*
@@ -200,15 +196,18 @@ aio_done(struct buf *bp)
 	proc_t *p;
 	struct as *as;
 	aio_req_t *reqp;
-	aio_lio_t *head;
+	aio_lio_t *head = NULL;
 	aio_t *aiop;
-	sigqueue_t *sigev;
+	sigqueue_t *sigev = NULL;
 	sigqueue_t *lio_sigev = NULL;
+	port_kevent_t *pkevp = NULL;
+	port_kevent_t *lio_pkevp = NULL;
 	int fd;
 	int cleanupqflag;
 	int pollqflag;
 	int portevpend;
 	void (*func)();
+	int use_port = 0;
 
 	p = bp->b_proc;
 	reqp = (aio_req_t *)bp->b_forw;
@@ -234,11 +233,13 @@ aio_done(struct buf *bp)
 	aiop = p->p_aio;
 	ASSERT(aiop != NULL);
 
-	if (reqp->aio_req_portkev) {
-		mutex_enter(&aiop->aio_portq_mutex);
-		mutex_enter(&aiop->aio_mutex);
-		aiop->aio_pending--;
-		reqp->aio_req_flags &= ~AIO_PENDING;
+	mutex_enter(&aiop->aio_portq_mutex);
+	mutex_enter(&aiop->aio_mutex);
+	ASSERT(aiop->aio_pending > 0);
+	ASSERT(reqp->aio_req_flags & AIO_PENDING);
+	aiop->aio_pending--;
+	reqp->aio_req_flags &= ~AIO_PENDING;
+	if ((pkevp = reqp->aio_req_portkev) != NULL) {
 		/* Event port notification is desired for this transaction */
 		if (reqp->aio_req_flags & AIO_CLOSE_PORT) {
 			/*
@@ -246,10 +247,11 @@ aio_done(struct buf *bp)
 			 * pending asynchronous I/O transactions to complete.
 			 */
 			portevpend = --aiop->aio_portpendcnt;
-			aio_enq_portq(aiop, reqp, 1);
+			aio_deq(&aiop->aio_portpending, reqp);
+			aio_enq(&aiop->aio_portq, reqp, 0);
 			mutex_exit(&aiop->aio_mutex);
 			mutex_exit(&aiop->aio_portq_mutex);
-			(void) port_send_event(reqp->aio_req_portkev);
+			port_send_event(pkevp);
 			if (portevpend == 0)
 				cv_broadcast(&aiop->aio_portcv);
 			return;
@@ -262,7 +264,8 @@ aio_done(struct buf *bp)
 			 */
 			as = p->p_as;
 			mutex_enter(&as->a_contents);
-			aio_enq_port_cleanupq(aiop, reqp);
+			aio_deq(&aiop->aio_portpending, reqp);
+			aio_enq(&aiop->aio_portcleanupq, reqp, 0);
 			cv_signal(&aiop->aio_cleanupcv);
 			mutex_exit(&as->a_contents);
 			mutex_exit(&aiop->aio_mutex);
@@ -270,112 +273,102 @@ aio_done(struct buf *bp)
 			return;
 		}
 
-		aio_enq_portq(aiop, reqp, 1);
-		mutex_exit(&aiop->aio_mutex);
-		mutex_exit(&aiop->aio_portq_mutex);
-		(void) port_send_event(reqp->aio_req_portkev);
-		return;
-	}
+		aio_deq(&aiop->aio_portpending, reqp);
+		aio_enq(&aiop->aio_portq, reqp, 0);
 
-	mutex_enter(&aiop->aio_mutex);
-	ASSERT(aiop->aio_pending > 0);
-	ASSERT(reqp->aio_req_flags & AIO_PENDING);
-	aiop->aio_pending--;
-	reqp->aio_req_flags &= ~AIO_PENDING;
+		use_port = 1;
+	} else {
+		/*
+		 * when the AIO_CLEANUP flag is enabled for this
+		 * process, or when the AIO_POLL bit is set for
+		 * this request, special handling is required.
+		 * otherwise the request is put onto the doneq.
+		 */
+		cleanupqflag = (aiop->aio_flags & AIO_CLEANUP);
+		pollqflag = (reqp->aio_req_flags & AIO_POLL);
+		if (cleanupqflag | pollqflag) {
 
-	reqp->aio_req_next = NULL;
-	/*
-	 * when the AIO_CLEANUP flag is enabled for this
-	 * process, or when the AIO_POLL bit is set for
-	 * this request, special handling is required.
-	 * otherwise the request is put onto the doneq.
-	 */
-	cleanupqflag = (aiop->aio_flags & AIO_CLEANUP);
-	pollqflag = (reqp->aio_req_flags & AIO_POLL);
-	if (cleanupqflag | pollqflag) {
+			if (cleanupqflag) {
+				as = p->p_as;
+				mutex_enter(&as->a_contents);
+			}
 
-		if (cleanupqflag) {
-			as = p->p_as;
-			mutex_enter(&as->a_contents);
+			/*
+			 * requests with their AIO_POLL bit set are put
+			 * on the pollq, requests with sigevent structures
+			 * or with listio heads are put on the notifyq, and
+			 * the remaining requests don't require any special
+			 * cleanup handling, so they're put onto the default
+			 * cleanupq.
+			 */
+			if (pollqflag)
+				aio_enq(&aiop->aio_pollq, reqp, AIO_POLLQ);
+			else if (reqp->aio_req_sigqp || reqp->aio_req_lio)
+				aio_enq(&aiop->aio_notifyq, reqp, AIO_NOTIFYQ);
+			else
+				aio_enq(&aiop->aio_cleanupq, reqp,
+				    AIO_CLEANUPQ);
+
+			if (cleanupqflag) {
+				cv_signal(&aiop->aio_cleanupcv);
+				mutex_exit(&as->a_contents);
+				mutex_exit(&aiop->aio_mutex);
+				mutex_exit(&aiop->aio_portq_mutex);
+			} else {
+				ASSERT(pollqflag);
+				/* block aio_cleanup_exit until we're done */
+				aiop->aio_flags |= AIO_DONE_ACTIVE;
+				mutex_exit(&aiop->aio_mutex);
+				mutex_exit(&aiop->aio_portq_mutex);
+				/*
+				 * let the cleanup processing happen from an AST
+				 * set an AST on all threads in this process
+				 */
+				mutex_enter(&p->p_lock);
+				set_proc_ast(p);
+				mutex_exit(&p->p_lock);
+				mutex_enter(&aiop->aio_mutex);
+				/* wakeup anybody waiting in aiowait() */
+				cv_broadcast(&aiop->aio_waitcv);
+
+				/* wakeup aio_cleanup_exit if needed */
+				if (aiop->aio_flags & AIO_CLEANUP)
+					cv_signal(&aiop->aio_cleanupcv);
+				aiop->aio_flags &= ~AIO_DONE_ACTIVE;
+				mutex_exit(&aiop->aio_mutex);
+			}
+			return;
 		}
 
 		/*
-		 * requests with their AIO_POLL bit set are put
-		 * on the pollq, requests with sigevent structures
-		 * or with listio heads are put on the notifyq, and
-		 * the remaining requests don't require any special
-		 * cleanup handling, so they're put onto the default
-		 * cleanupq.
+		 * save req's sigevent pointer, and check its
+		 * value after releasing aio_mutex lock.
 		 */
-		if (pollqflag)
-			aio_enq(&aiop->aio_pollq, reqp, AIO_POLLQ);
-		else if (reqp->aio_req_sigqp || reqp->aio_req_lio)
-			aio_enq(&aiop->aio_notifyq, reqp, AIO_NOTIFYQ);
-		else
-			aio_enq(&aiop->aio_cleanupq, reqp, AIO_CLEANUPQ);
+		sigev = reqp->aio_req_sigqp;
+		reqp->aio_req_sigqp = NULL;
 
-		if (cleanupqflag) {
-			cv_signal(&aiop->aio_cleanupcv);
-			mutex_exit(&as->a_contents);
-			mutex_exit(&aiop->aio_mutex);
-		} else {
-			ASSERT(pollqflag);
-			/* block aio_cleanup_exit until we're done */
-			aiop->aio_flags |= AIO_DONE_ACTIVE;
-			mutex_exit(&aiop->aio_mutex);
-			/*
-			 * let the cleanup processing happen from an
-			 * AST. set an AST on all threads in this process
-			 */
-			mutex_enter(&p->p_lock);
-			set_proc_ast(p);
-			mutex_exit(&p->p_lock);
-			mutex_enter(&aiop->aio_mutex);
-			/* wakeup anybody waiting in aiowait() */
-			cv_broadcast(&aiop->aio_waitcv);
-
-			/* wakeup aio_cleanup_exit if needed */
-			if (aiop->aio_flags & AIO_CLEANUP)
-				cv_signal(&aiop->aio_cleanupcv);
-			aiop->aio_flags &= ~AIO_DONE_ACTIVE;
-			mutex_exit(&aiop->aio_mutex);
-		}
-		return;
-	}
-
-	/* put request on done queue. */
-	aio_enq_doneq(aiop, reqp);
+		/* put request on done queue. */
+		aio_enq(&aiop->aio_doneq, reqp, AIO_DONEQ);
+	} /* portkevent */
 
 	/*
-	 * save req's sigevent pointer, and check its
-	 * value after releasing aio_mutex lock.
-	 */
-	sigev = reqp->aio_req_sigqp;
-	reqp->aio_req_sigqp = NULL;
-
-	/*
-	 * when list IO notification is enabled, a signal
-	 * is sent only when all entries in the list are
-	 * done.
+	 * when list IO notification is enabled, a notification or
+	 * signal is sent only when all entries in the list are done.
 	 */
 	if ((head = reqp->aio_req_lio) != NULL) {
 		ASSERT(head->lio_refcnt > 0);
 		if (--head->lio_refcnt == 0) {
-			cv_signal(&head->lio_notify);
 			/*
 			 * save lio's sigevent pointer, and check
-			 * its value after releasing aio_mutex
-			 * lock.
+			 * its value after releasing aio_mutex lock.
 			 */
 			lio_sigev = head->lio_sigqp;
 			head->lio_sigqp = NULL;
+			cv_signal(&head->lio_notify);
+			if (head->lio_port >= 0 &&
+			    (lio_pkevp = head->lio_portkev) != NULL)
+				head->lio_port = -1;
 		}
-		mutex_exit(&aiop->aio_mutex);
-		if (sigev)
-			aio_sigev_send(p, sigev);
-		if (lio_sigev)
-			aio_sigev_send(p, lio_sigev);
-		return;
 	}
 
 	/*
@@ -395,17 +388,24 @@ aio_done(struct buf *bp)
 	}
 
 	mutex_exit(&aiop->aio_mutex);
+	mutex_exit(&aiop->aio_portq_mutex);
+
 	if (sigev)
 		aio_sigev_send(p, sigev);
-	else {
+	else if (!use_port && head == NULL) {
 		/*
-		 * send a SIGIO signal when the process
-		 * has a handler enabled.
+		 * Send a SIGIO signal when the process has a handler enabled.
 		 */
-		if ((func = p->p_user.u_signal[SIGIO - 1]) !=
-		    SIG_DFL && (func != SIG_IGN))
+		if ((func = PTOU(p)->u_signal[SIGIO - 1]) != SIG_DFL &&
+		    func != SIG_IGN)
 			psignal(p, SIGIO);
 	}
+	if (pkevp)
+		port_send_event(pkevp);
+	if (lio_sigev)
+		aio_sigev_send(p, lio_sigev);
+	if (lio_pkevp)
+		port_send_event(lio_pkevp);
 }
 
 /*
@@ -479,13 +479,10 @@ aphysio_unlock(aio_req_t *reqp)
 }
 
 /*
- * deletes a requests id from the hash table of outstanding
- * io.
+ * deletes a requests id from the hash table of outstanding io.
  */
 static void
-aio_hash_delete(
-	aio_t *aiop,
-	struct aio_req_t *reqp)
+aio_hash_delete(aio_t *aiop, struct aio_req_t *reqp)
 {
 	long index;
 	aio_result_t *resultp = reqp->aio_req_resultp;
@@ -537,9 +534,12 @@ aio_req_free(aio_t *aiop, aio_req_t *reqp)
 			aio_lio_free(aiop, liop);
 		reqp->aio_req_lio = NULL;
 	}
-	if (reqp->aio_req_sigqp != NULL)
+	if (reqp->aio_req_sigqp != NULL) {
 		kmem_free(reqp->aio_req_sigqp, sizeof (sigqueue_t));
+		reqp->aio_req_sigqp = NULL;
+	}
 	reqp->aio_req_next = aiop->aio_free;
+	reqp->aio_req_prev = NULL;
 	aiop->aio_free = reqp;
 	aiop->aio_outstanding--;
 	if (aiop->aio_outstanding == 0)
@@ -556,6 +556,7 @@ aio_req_free_port(aio_t *aiop, aio_req_t *reqp)
 	ASSERT(MUTEX_HELD(&aiop->aio_mutex));
 
 	reqp->aio_req_next = aiop->aio_free;
+	reqp->aio_req_prev = NULL;
 	aiop->aio_free = reqp;
 	aiop->aio_outstanding--;
 	aio_hash_delete(aiop, reqp);
@@ -563,158 +564,76 @@ aio_req_free_port(aio_t *aiop, aio_req_t *reqp)
 
 
 /*
- * Put a completed request onto its appropiate done queue.
+ * Verify the integrity of a queue.
  */
-/*ARGSUSED*/
+#if defined(DEBUG)
 static void
+aio_verify_queue(aio_req_t *head,
+	aio_req_t *entry_present, aio_req_t *entry_missing)
+{
+	aio_req_t *reqp;
+	int found = 0;
+	int present = 0;
+
+	if ((reqp = head) != NULL) {
+		do {
+			ASSERT(reqp->aio_req_prev->aio_req_next == reqp);
+			ASSERT(reqp->aio_req_next->aio_req_prev == reqp);
+			if (entry_present == reqp)
+				found++;
+			if (entry_missing == reqp)
+				present++;
+		} while ((reqp = reqp->aio_req_next) != head);
+	}
+	ASSERT(entry_present == NULL || found == 1);
+	ASSERT(entry_missing == NULL || present == 0);
+}
+#else
+#define	aio_verify_queue(x, y, z)
+#endif
+
+/*
+ * Put a request onto the tail of a queue.
+ */
+void
 aio_enq(aio_req_t **qhead, aio_req_t *reqp, int qflg_new)
 {
-	if (*qhead == NULL) {
-		*qhead = reqp;
+	aio_req_t *head;
+	aio_req_t *prev;
+
+	aio_verify_queue(*qhead, NULL, reqp);
+
+	if ((head = *qhead) == NULL) {
 		reqp->aio_req_next = reqp;
 		reqp->aio_req_prev = reqp;
+		*qhead = reqp;
 	} else {
-		reqp->aio_req_next = *qhead;
-		reqp->aio_req_prev = (*qhead)->aio_req_prev;
-		reqp->aio_req_prev->aio_req_next = reqp;
-		(*qhead)->aio_req_prev = reqp;
+		reqp->aio_req_next = head;
+		reqp->aio_req_prev = prev = head->aio_req_prev;
+		prev->aio_req_next = reqp;
+		head->aio_req_prev = reqp;
 	}
-
 	reqp->aio_req_flags |= qflg_new;
 }
 
 /*
- * Put a completed request onto its appropiate done queue.
- */
-static void
-aio_enq_doneq(aio_t *aiop, aio_req_t *reqp)
-{
-
-	if (aiop->aio_doneq == NULL) {
-		aiop->aio_doneq = reqp;
-		reqp->aio_req_next = reqp;
-		reqp->aio_req_prev = reqp;
-	} else {
-		reqp->aio_req_next = aiop->aio_doneq;
-		reqp->aio_req_prev = aiop->aio_doneq->aio_req_prev;
-		reqp->aio_req_prev->aio_req_next = reqp;
-		aiop->aio_doneq->aio_req_prev = reqp;
-	}
-
-	reqp->aio_req_flags |= AIO_DONEQ;
-}
-
-#ifdef DEBUG
-/* ARGSUSED */
-void
-aio_check_flag(aio_req_t *reqp, int check, int val, int flag)
-{
-	int	lval;
-	if (reqp == NULL)
-		return;
-	lval = reqp->aio_req_flags & check;
-	ASSERT(lval == val);
-}
-
-void
-aio_checkset_flag(aio_req_t *reqp, int checkdel, int set)
-{
-	aio_check_flag(reqp, checkdel, checkdel, 0);
-	reqp->aio_req_flags &= ~checkdel;
-	reqp->aio_req_flags |= set;
-
-	aio_check_flag(reqp->aio_req_next, set, set, 1);
-	aio_check_flag(reqp->aio_req_prev, set, set, 2);
-}
-#endif	/* DEBUG */
-
-/*
- * Put a pending request onto the pending port queue.
+ * Remove a request from its queue.
  */
 void
-aio_enq_port_pending(aio_t *aiop, aio_req_t *reqp)
+aio_deq(aio_req_t **qhead, aio_req_t *reqp)
 {
-	ASSERT(MUTEX_HELD(&aiop->aio_mutex));
+	aio_verify_queue(*qhead, reqp, NULL);
 
-	if (aiop->aio_portpending != NULL) {
-		reqp->aio_req_next = aiop->aio_portpending;
-		aiop->aio_portpending->aio_req_prev = reqp;
+	if (reqp->aio_req_next == reqp) {
+		*qhead = NULL;
 	} else {
-		reqp->aio_req_next = NULL;
-	}
-	reqp->aio_req_prev = NULL;
-	aiop->aio_portpending = reqp;
-#ifdef DEBUG
-	reqp->aio_req_flags |= AIO_REQ_PEND;
-#endif
-}
-
-/*
- * Put a completed request onto the port queue.
- */
-static void
-aio_enq_portq(aio_t *aiop, aio_req_t *reqp, int pending)
-{
-
-	ASSERT(MUTEX_HELD(&aiop->aio_portq_mutex));
-	if (pending) {
-#ifdef DEBUG
-		aio_checkset_flag(reqp, AIO_REQ_PEND, AIO_REQ_PEND);
-#endif
-		/* first take request out of the pending queue ... */
-		if (reqp->aio_req_prev == NULL)
-			/* first request */
-			aiop->aio_portpending = reqp->aio_req_next;
-		else
-			reqp->aio_req_prev->aio_req_next = reqp->aio_req_next;
-		if (reqp->aio_req_next != NULL)
-			reqp->aio_req_next->aio_req_prev = reqp->aio_req_prev;
-	}
-
-	/* ... and insert request into done queue */
-	if (aiop->aio_portq != NULL) {
-		reqp->aio_req_next = aiop->aio_portq;
-		aiop->aio_portq->aio_req_prev = reqp;
-	} else {
-		reqp->aio_req_next = NULL;
-	}
-	reqp->aio_req_prev = NULL;
-	aiop->aio_portq = reqp;
-#ifdef DEBUG
-	if (pending)
-		aio_checkset_flag(reqp, AIO_REQ_PEND, AIO_REQ_PORTQ);
-	else
-		aio_checkset_flag(reqp, AIO_REQ_CLEAN, AIO_REQ_PORTQ);
-#endif
-}
-
-/*
- * Put a completed request onto the port cleanup queue.
- */
-static void
-aio_enq_port_cleanupq(aio_t *aiop, aio_req_t *reqp)
-{
-
-#ifdef DEBUG
-	aio_checkset_flag(reqp, AIO_REQ_PEND, AIO_REQ_PEND);
-#endif
-	/* first take request out of the pending queue ... */
-	if (reqp->aio_req_prev == NULL)
-		/* first request */
-		aiop->aio_portpending = reqp->aio_req_next;
-	else
 		reqp->aio_req_prev->aio_req_next = reqp->aio_req_next;
-
-	if (reqp->aio_req_next != NULL)
 		reqp->aio_req_next->aio_req_prev = reqp->aio_req_prev;
-
-	/* ... and insert request into the cleanup queue */
-	reqp->aio_req_next = aiop->aio_portcleanupq;
-	aiop->aio_portcleanupq = reqp;
-#ifdef DEBUG
+		if (*qhead == reqp)
+			*qhead = reqp->aio_req_next;
+	}
+	reqp->aio_req_next = NULL;
 	reqp->aio_req_prev = NULL;
-	aio_checkset_flag(reqp, AIO_REQ_PEND, AIO_REQ_CLEAN);
-#endif
 }
 
 /*
@@ -727,8 +646,6 @@ void
 aio_cleanupq_concat(aio_t *aiop, aio_req_t *q2, int qflg)
 {
 	aio_req_t *cleanupqhead, *q2tail;
-
-#ifdef DEBUG
 	aio_req_t *reqp = q2;
 
 	do {
@@ -736,7 +653,6 @@ aio_cleanupq_concat(aio_t *aiop, aio_req_t *q2, int qflg)
 		reqp->aio_req_flags &= ~qflg;
 		reqp->aio_req_flags |= AIO_CLEANUPQ;
 	} while ((reqp = reqp->aio_req_next) != q2);
-#endif
 
 	cleanupqhead = aiop->aio_cleanupq;
 	if (cleanupqhead == NULL)
@@ -849,7 +765,7 @@ aio_cleanup(int flag)
 	 * determine if a SIGIO signal should be delievered.
 	 */
 	if (!signalled &&
-	    (func = curproc->p_user.u_signal[SIGIO - 1]) != SIG_DFL &&
+	    (func = PTOU(curproc)->u_signal[SIGIO - 1]) != SIG_DFL &&
 	    func != SIG_IGN)
 		psignal(curproc, SIGIO);
 }
@@ -864,7 +780,7 @@ aio_cleanup_portq(aio_t *aiop, aio_req_t *cleanupq, int exitflag)
 	aio_req_t	*reqp;
 	aio_req_t	*next;
 	aio_req_t	*headp;
-	aio_req_t	*tailp;
+	aio_lio_t	*liop;
 
 	/* first check the portq */
 	if (exitflag || ((aiop->aio_flags & AIO_CLEANUP_PORT) == 0)) {
@@ -873,33 +789,42 @@ aio_cleanup_portq(aio_t *aiop, aio_req_t *cleanupq, int exitflag)
 			aiop->aio_flags |= AIO_CLEANUP_PORT;
 		mutex_exit(&aiop->aio_mutex);
 
+		/*
+		 * It is not allowed to hold locks during aphysio_unlock().
+		 * The aio_done() interrupt function will try to acquire
+		 * aio_mutex and aio_portq_mutex.  Therefore we disconnect
+		 * the portq list from the aiop for the duration of the
+		 * aphysio_unlock() loop below.
+		 */
 		mutex_enter(&aiop->aio_portq_mutex);
 		headp = aiop->aio_portq;
 		aiop->aio_portq = NULL;
 		mutex_exit(&aiop->aio_portq_mutex);
-
-		for (reqp = headp; reqp != NULL; reqp = next) {
-			tailp = reqp;
-			next = reqp->aio_req_next;
-			/*
-			 * It is not allowed to hold locks during
-			 * aphysio_unlock(). The aio_done() interrupt function
-			 * will try to acquire aio_mutex and aio_portq_mutex.
-			 */
-			aphysio_unlock(reqp);
-			if (exitflag) {
-				mutex_enter(&aiop->aio_mutex);
-				aio_req_free(aiop, reqp);
-				mutex_exit(&aiop->aio_mutex);
-			}
+		if ((reqp = headp) != NULL) {
+			do {
+				next = reqp->aio_req_next;
+				aphysio_unlock(reqp);
+				if (exitflag) {
+					mutex_enter(&aiop->aio_mutex);
+					aio_req_free(aiop, reqp);
+					mutex_exit(&aiop->aio_mutex);
+				}
+			} while ((reqp = next) != headp);
 		}
 
 		if (headp != NULL && exitflag == 0) {
-			/* move unlocked requests back to the done queue */
+			/* move unlocked requests back to the port queue */
+			aio_req_t *newq;
+
 			mutex_enter(&aiop->aio_portq_mutex);
-			if (aiop->aio_portq != NULL) {
-				tailp->aio_req_next = aiop->aio_portq;
-				aiop->aio_portq->aio_req_prev = tailp;
+			if ((newq = aiop->aio_portq) != NULL) {
+				aio_req_t *headprev = headp->aio_req_prev;
+				aio_req_t *newqprev = newq->aio_req_prev;
+
+				headp->aio_req_prev = newqprev;
+				newq->aio_req_prev = headprev;
+				headprev->aio_req_next = newq;
+				newqprev->aio_req_next = headp;
 			}
 			aiop->aio_portq = headp;
 			cv_broadcast(&aiop->aio_portcv);
@@ -908,26 +833,38 @@ aio_cleanup_portq(aio_t *aiop, aio_req_t *cleanupq, int exitflag)
 	}
 
 	/* now check the port cleanup queue */
-	for (reqp = cleanupq; reqp != NULL; reqp = next) {
-#ifdef DEBUG
-		aio_checkset_flag(reqp, AIO_REQ_CLEAN, AIO_REQ_CLEAN);
-#endif
+	if ((reqp = cleanupq) == NULL)
+		return;
+	do {
 		next = reqp->aio_req_next;
 		aphysio_unlock(reqp);
 		if (exitflag) {
-#ifdef DEBUG
-			aio_checkset_flag(reqp, AIO_REQ_CLEAN, AIO_REQ_FREE);
-#endif
 			mutex_enter(&aiop->aio_mutex);
 			aio_req_free(aiop, reqp);
 			mutex_exit(&aiop->aio_mutex);
 		} else {
 			mutex_enter(&aiop->aio_portq_mutex);
-			aio_enq_portq(aiop, reqp, 0);
+			aio_enq(&aiop->aio_portq, reqp, 0);
 			mutex_exit(&aiop->aio_portq_mutex);
-			(void) port_send_event(reqp->aio_req_portkev);
+			port_send_event(reqp->aio_req_portkev);
+			if ((liop = reqp->aio_req_lio) != NULL) {
+				int send_event = 0;
+
+				mutex_enter(&aiop->aio_mutex);
+				ASSERT(liop->lio_refcnt > 0);
+				if (--liop->lio_refcnt == 0) {
+					if (liop->lio_port >= 0 &&
+					    liop->lio_portkev) {
+						liop->lio_port = -1;
+						send_event = 1;
+					}
+				}
+				mutex_exit(&aiop->aio_mutex);
+				if (send_event)
+					port_send_event(liop->lio_portkev);
+			}
 		}
-	}
+	} while ((reqp = next) != cleanupq);
 }
 
 /*
@@ -937,6 +874,7 @@ static void
 aio_cleanup_cleanupq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 {
 	aio_req_t *reqp, *next;
+
 	ASSERT(MUTEX_HELD(&aiop->aio_cleanupq_mutex));
 
 	/*
@@ -946,29 +884,20 @@ aio_cleanup_cleanupq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 	 * The aio_cleanupq_mutex protects the queue for the duration of the
 	 * loop from aio_req_done() and aio_req_find().
 	 */
-
-	qhead->aio_req_prev->aio_req_next = NULL;
-	for (reqp = qhead; reqp != NULL; reqp = next) {
+	if ((reqp = qhead) == NULL)
+		return;
+	do {
 		ASSERT(reqp->aio_req_flags & AIO_CLEANUPQ);
+		ASSERT(reqp->aio_req_portkev == NULL);
 		next = reqp->aio_req_next;
 		aphysio_unlock(reqp);
 		mutex_enter(&aiop->aio_mutex);
-		if (exitflg) {
-			/*
-			 * reqp can't be referenced after its freed
-			 */
+		if (exitflg)
 			aio_req_free(aiop, reqp);
-		} else {
-			if (reqp->aio_req_portkev &&
-			    ((reqp->aio_req_flags & AIO_DONEQ) == 0)) {
-				aio_enq_doneq(aiop, reqp);
-				(void) port_send_event(reqp->aio_req_portkev);
-			} else {
-				aio_enq_doneq(aiop, reqp);
-			}
-		}
+		else
+			aio_enq(&aiop->aio_doneq, reqp, AIO_DONEQ);
 		mutex_exit(&aiop->aio_mutex);
-	}
+	} while ((reqp = next) != qhead);
 }
 
 /*
@@ -982,41 +911,43 @@ aio_cleanup_notifyq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 	sigqueue_t *sigev, *lio_sigev = NULL;
 	int signalled = 0;
 
-	qhead->aio_req_prev->aio_req_next = NULL;
-	for (reqp = qhead; reqp != NULL; reqp = next) {
+	if ((reqp = qhead) == NULL)
+		return (0);
+	do {
 		ASSERT(reqp->aio_req_flags & AIO_NOTIFYQ);
 		next = reqp->aio_req_next;
 		aphysio_unlock(reqp);
 		if (exitflg) {
-			/* reqp cann't be referenced after its freed */
 			mutex_enter(&aiop->aio_mutex);
 			aio_req_free(aiop, reqp);
 			mutex_exit(&aiop->aio_mutex);
-			continue;
-		}
-		mutex_enter(&aiop->aio_mutex);
-		aio_enq_doneq(aiop, reqp);
-		sigev = reqp->aio_req_sigqp;
-		reqp->aio_req_sigqp = NULL;
-		/* check if list IO completion notification is required */
-		if ((liohead = reqp->aio_req_lio) != NULL) {
-			ASSERT(liohead->lio_refcnt > 0);
-			if (--liohead->lio_refcnt == 0) {
-				cv_signal(&liohead->lio_notify);
-				lio_sigev = liohead->lio_sigqp;
-				liohead->lio_sigqp = NULL;
+		} else {
+			mutex_enter(&aiop->aio_mutex);
+			aio_enq(&aiop->aio_doneq, reqp, AIO_DONEQ);
+			sigev = reqp->aio_req_sigqp;
+			reqp->aio_req_sigqp = NULL;
+			if ((liohead = reqp->aio_req_lio) != NULL) {
+				ASSERT(liohead->lio_refcnt > 0);
+				if (--liohead->lio_refcnt == 0) {
+					cv_signal(&liohead->lio_notify);
+					lio_sigev = liohead->lio_sigqp;
+					liohead->lio_sigqp = NULL;
+				}
+			}
+			mutex_exit(&aiop->aio_mutex);
+			if (sigev) {
+				signalled++;
+				aio_sigev_send(reqp->aio_req_buf.b_proc,
+				    sigev);
+			}
+			if (lio_sigev) {
+				signalled++;
+				aio_sigev_send(reqp->aio_req_buf.b_proc,
+				    lio_sigev);
 			}
 		}
-		mutex_exit(&aiop->aio_mutex);
-		if (sigev) {
-			signalled++;
-			aio_sigev_send(reqp->aio_req_buf.b_proc, sigev);
-		}
-		if (lio_sigev) {
-			signalled++;
-			aio_sigev_send(reqp->aio_req_buf.b_proc, lio_sigev);
-		}
-	}
+	} while ((reqp = next) != qhead);
+
 	return (signalled);
 }
 
@@ -1032,25 +963,23 @@ aio_cleanup_pollq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 	 * As no other threads should be accessing the queue at this point,
 	 * it isn't necessary to hold aio_mutex while we traverse its elements.
 	 */
-
-	qhead->aio_req_prev->aio_req_next = NULL;
-	for (reqp = qhead; reqp != NULL; reqp = next) {
+	if ((reqp = qhead) == NULL)
+		return;
+	do {
 		ASSERT(reqp->aio_req_flags & AIO_POLLQ);
 		next = reqp->aio_req_next;
 		aphysio_unlock(reqp);
 		if (exitflg) {
-			/* reqp cann't be referenced after its freed */
 			mutex_enter(&aiop->aio_mutex);
 			aio_req_free(aiop, reqp);
 			mutex_exit(&aiop->aio_mutex);
-			continue;
+		} else {
+			aio_copyout_result(reqp);
+			mutex_enter(&aiop->aio_mutex);
+			aio_enq(&aiop->aio_doneq, reqp, AIO_DONEQ);
+			mutex_exit(&aiop->aio_mutex);
 		}
-		/* copy out request's result_t. */
-		aio_copyout_result(reqp);
-		mutex_enter(&aiop->aio_mutex);
-		aio_enq_doneq(aiop, reqp);
-		mutex_exit(&aiop->aio_mutex);
-	}
+	} while ((reqp = next) != qhead);
 }
 
 /*
@@ -1090,12 +1019,13 @@ aio_cleanup_exit(void)
 	 * free up the done queue's resources.
 	 */
 	if ((head = aiop->aio_doneq) != NULL) {
-		head->aio_req_prev->aio_req_next = NULL;
-		for (reqp = head; reqp != NULL; reqp = next) {
+		aiop->aio_doneq = NULL;
+		reqp = head;
+		do {
 			next = reqp->aio_req_next;
 			aphysio_unlock(reqp);
 			kmem_free(reqp, sizeof (struct aio_req_t));
-		}
+		} while ((reqp = next) != head);
 	}
 	/*
 	 * release aio request freelist.
@@ -1221,14 +1151,7 @@ aio_req_remove_portq(aio_t *aiop, aio_req_t *reqp)
 		 */
 		cv_wait(&aiop->aio_portcv, &aiop->aio_portq_mutex);
 	}
-	if (reqp == aiop->aio_portq) {
-		/* first request in the queue */
-		aiop->aio_portq = reqp->aio_req_next;
-	} else {
-		reqp->aio_req_prev->aio_req_next = reqp->aio_req_next;
-		if (reqp->aio_req_next)
-			reqp->aio_req_next->aio_req_prev = reqp->aio_req_prev;
-	}
+	aio_deq(&aiop->aio_portq, reqp);
 }
 
 /* ARGSUSED */
@@ -1267,12 +1190,16 @@ aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 	 */
 	mutex_enter(&aiop->aio_portq_mutex);
 	mutex_enter(&aiop->aio_mutex);
-	reqp = aiop->aio_portpending;
-	for (counter = 0; reqp != NULL; reqp = reqp->aio_req_next) {
-		if (reqp->aio_req_portkev && (reqp->aio_req_port == port)) {
-			reqp->aio_req_flags |= AIO_CLOSE_PORT;
-			counter++;
-		}
+	counter = 0;
+	if ((headp = aiop->aio_portpending) != NULL) {
+		reqp = headp;
+		do {
+			if (reqp->aio_req_portkev &&
+			    reqp->aio_req_port == port) {
+				reqp->aio_req_flags |= AIO_CLOSE_PORT;
+				counter++;
+			}
+		} while ((reqp = reqp->aio_req_next) != headp);
 	}
 	if (counter == 0) {
 		/* no AIOs pending */
@@ -1289,19 +1216,19 @@ aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 	 * all pending AIOs are completed.
 	 * check port doneq
 	 */
-
-	reqp = aiop->aio_portq;
 	headp = NULL;
-	for (; reqp != NULL; reqp = next) {
-		next = reqp->aio_req_next;
-		if (reqp->aio_req_port == port) {
-			/* discard event */
-			aio_req_remove_portq(aiop, reqp);
-			port_free_event(reqp->aio_req_portkev);
-			/* put request in temporary queue */
-			reqp->aio_req_next = headp;
-			headp = reqp;
-		}
+	if ((reqp = aiop->aio_portq) != NULL) {
+		do {
+			next = reqp->aio_req_next;
+			if (reqp->aio_req_port == port) {
+				/* dequeue request and discard event */
+				aio_req_remove_portq(aiop, reqp);
+				port_free_event(reqp->aio_req_portkev);
+				/* put request in temporary queue */
+				reqp->aio_req_next = headp;
+				headp = reqp;
+			}
+		} while ((reqp = next) != aiop->aio_portq);
 	}
 	mutex_exit(&aiop->aio_portq_mutex);
 

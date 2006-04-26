@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,30 +18,83 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libaio.h"
-#include <dlfcn.h>
 
-mutex_t __sigio_pendinglock = DEFAULTMUTEX;	/* protects __sigio_pending */
-int __sigio_pending = 0;		/* count of pending SIGIO signals */
-int _sigio_enabled = 0;			/* set if SIGIO has a signal handler */
-static struct sigaction sigioact;
-sigset_t __sigiomask;
-struct sigaction  sigcanact;
+void
+sig_mutex_lock(mutex_t *mp)
+{
+	_sigoff();
+	(void) mutex_lock(mp);
+}
 
-typedef int (*sig_act_t)(int, const struct sigaction *, struct sigaction *);
-static sig_act_t next_sigaction;
+void
+sig_mutex_unlock(mutex_t *mp)
+{
+	(void) mutex_unlock(mp);
+	_sigon();
+}
 
 int
-_aio_create_worker(aio_req_t *rp, int mode)
+sig_mutex_trylock(mutex_t *mp)
 {
-	struct aio_worker *aiowp, **workers, **nextworker;
+	int error;
+
+	_sigoff();
+	if ((error = mutex_trylock(mp)) != 0)
+		_sigon();
+	return (error);
+}
+
+/*
+ * sig_cond_wait() is a cancellation point.
+ */
+int
+sig_cond_wait(cond_t *cv, mutex_t *mp)
+{
+	int error;
+
+	pthread_testcancel();
+	error = cond_wait(cv, mp);
+	if (error == EINTR && _sigdeferred() != 0) {
+		sig_mutex_unlock(mp);
+		/* take the deferred signal here */
+		sig_mutex_lock(mp);
+	}
+	pthread_testcancel();
+	return (error);
+}
+
+/*
+ * sig_cond_reltimedwait() is a cancellation point.
+ */
+int
+sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
+{
+	int error;
+
+	pthread_testcancel();
+	error = cond_reltimedwait(cv, mp, ts);
+	if (error == EINTR && _sigdeferred() != 0) {
+		sig_mutex_unlock(mp);
+		/* take the deferred signal here */
+		sig_mutex_lock(mp);
+	}
+	pthread_testcancel();
+	return (error);
+}
+
+int
+_aio_create_worker(aio_req_t *reqp, int mode)
+{
+	aio_worker_t *aiowp, **workers, **nextworker;
 	int *aio_workerscnt;
 	void *(*func)(void *);
 	sigset_t oset;
@@ -52,51 +104,57 @@ _aio_create_worker(aio_req_t *rp, int mode)
 	 * Put the new worker thread in the right queue.
 	 */
 	switch (mode) {
-	case AIOWRITE:
-		workers = &__workers_wr;
-		nextworker = &__nextworker_wr;
-		aio_workerscnt = &__wr_workerscnt;
-		func = _aio_do_request;
-		break;
 	case AIOREAD:
-		workers = &__workers_rd;
-		nextworker = &__nextworker_rd;
-		aio_workerscnt = &__rd_workerscnt;
+	case AIOWRITE:
+	case AIOAREAD:
+	case AIOAWRITE:
+#if !defined(_LP64)
+	case AIOAREAD64:
+	case AIOAWRITE64:
+#endif
+		workers = &__workers_rw;
+		nextworker = &__nextworker_rw;
+		aio_workerscnt = &__rw_workerscnt;
 		func = _aio_do_request;
 		break;
-	case AIOSIGEV:
-		workers = &__workers_si;
-		nextworker = &__nextworker_si;
-		func = _aio_send_sigev;
-		aio_workerscnt = &__si_workerscnt;
+	case AIONOTIFY:
+		workers = &__workers_no;
+		nextworker = &__nextworker_no;
+		func = _aio_do_notify;
+		aio_workerscnt = &__no_workerscnt;
+		break;
+	default:
+		_aiopanic("_aio_create_worker: invalid mode");
+		break;
 	}
 
-	if ((aiowp = _aio_alloc_worker()) == NULL)
+	if ((aiowp = _aio_worker_alloc()) == NULL)
 		return (-1);
 
-	if (rp) {
-		rp->req_state = AIO_REQ_QUEUED;
-		rp->req_worker = aiowp;
-		aiowp->work_head1 = rp;
-		aiowp->work_tail1 = rp;
-		aiowp->work_next1 = rp;
-		aiowp->work_cnt1 = 1;
+	if (reqp) {
+		reqp->req_state = AIO_REQ_QUEUED;
+		reqp->req_worker = aiowp;
+		aiowp->work_head1 = reqp;
+		aiowp->work_tail1 = reqp;
+		aiowp->work_next1 = reqp;
+		aiowp->work_count1 = 1;
+		aiowp->work_minload1 = 1;
 	}
 
-	(void) _sigprocmask(SIG_SETMASK, &_worker_set, &oset);
-	error = thr_create(NULL, __aiostksz, func, aiowp,
-		THR_BOUND | THR_DAEMON | THR_SUSPENDED, &aiowp->work_tid);
-	(void) _sigprocmask(SIG_SETMASK, &oset, NULL);
+	(void) pthread_sigmask(SIG_SETMASK, &_full_set, &oset);
+	error = thr_create(NULL, AIOSTKSIZE, func, aiowp,
+		THR_DAEMON | THR_SUSPENDED, &aiowp->work_tid);
+	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
 	if (error) {
-		if (rp) {
-			rp->req_state = AIO_REQ_FREE;
-			rp->req_worker = NULL;
+		if (reqp) {
+			reqp->req_state = 0;
+			reqp->req_worker = NULL;
 		}
-		_aio_free_worker(aiowp);
+		_aio_worker_free(aiowp);
 		return (-1);
 	}
 
-	(void) mutex_lock(&__aio_mutex);
+	sig_mutex_lock(&__aio_mutex);
 	(*aio_workerscnt)++;
 	if (*workers == NULL) {
 		aiowp->work_forw = aiowp;
@@ -110,136 +168,54 @@ _aio_create_worker(aio_req_t *rp, int mode)
 		(*workers)->work_backw = aiowp;
 	}
 	_aio_worker_cnt++;
-	(void) mutex_unlock(&__aio_mutex);
+	sig_mutex_unlock(&__aio_mutex);
 
 	(void) thr_continue(aiowp->work_tid);
 
 	return (0);
 }
 
-void
-_aio_cancel_on(struct aio_worker *aiowp)
-{
-	aiowp->work_cancel_flg = 1;
-}
-
-void
-_aio_cancel_off(struct aio_worker *aiowp)
-{
-	aiowp->work_cancel_flg = 0;
-}
+/*
+ * This is the application's AIOSIGCANCEL sigaction setting.
+ */
+static struct sigaction sigcanact;
 
 /*
- * resend a SIGIO signal that was sent while the
- * __aio_mutex was locked.
- *
- * This function is called from _aio_unlock() when previously SIGIO was
- * detected and deferred (signal caught).
- * There could be several threads calling _aio_lock() - _aio_unlock() and
- * therefore __aiosendsig() must make sure that "kill" is being called
- * only one time here.
- *
+ * This is our AIOSIGCANCEL handler.
+ * If the signal is not meant for us, call the application's handler.
  */
-void
-__aiosendsig(void)
-{
-	sigset_t	oset;
-	int		send_sigio;
-
-	(void) _sigprocmask(SIG_BLOCK, &__sigiomask, &oset);
-
-	(void) mutex_lock(&__sigio_pendinglock);
-	send_sigio = __sigio_pending;
-	__sigio_pending = 0;
-	(void) mutex_unlock(&__sigio_pendinglock);
-
-	(void) _sigprocmask(SIG_SETMASK, &oset, NULL);
-
-	if (__pid == (pid_t)-1)
-		__pid = getpid();
-	if (send_sigio)
-		(void) kill(__pid, SIGIO);
-}
-
-/*
- * this is the low-level handler for SIGIO. the application
- * handler will not be called if the signal is being blocked.
- */
-static void
-aiosigiohndlr(int sig, siginfo_t *sip, void *uap)
-{
-	struct sigaction tact;
-	int blocked;
-
-	/*
-	 * SIGIO signal is being blocked if either _sigio_masked
-	 * or sigio_maskedcnt is set or if both these variables
-	 * are clear and the _aio_mutex is locked. the last
-	 * condition can only happen when _aio_mutex is being
-	 * unlocked. this is a very small window where the mask
-	 * is clear and the lock is about to be unlocked, however,
-	 * it`s still set and so the signal should be defered.
-	 * mutex_trylock() will be used now to check the ownership
-	 * of the lock (instead of MUTEX_HELD). This is necessary because
-	 * there is a window where the owner of the lock is deleted
-	 * and the thread could become preempted. In that case MUTEX_HELD()
-	 * will not detect the -still- ownership of the lock.
-	 */
-	if ((blocked = (__sigio_masked | __sigio_maskedcnt)) == 0) {
-		if (mutex_trylock(&__aio_mutex) == 0)
-			(void) mutex_unlock(&__aio_mutex);
-		else
-			blocked = 1;
-	}
-
-	if (blocked) {
-		/*
-		 * aio_lock() is supposed to be non re-entrant with
-		 * respect to SIGIO signals. if a SIGIO signal
-		 * interrupts a region of code locked by _aio_mutex
-		 * the SIGIO signal should be deferred until this
-		 * mutex is unlocked. a flag is set, sigio_pending,
-		 * to indicate that a SIGIO signal is pending and
-		 * should be resent to the process via a kill().
-		 * The libaio handler must be reinstalled here, otherwise
-		 * the disposition gets the default status and the
-		 * next SIGIO signal would terminate the process.
-		 */
-		(void) mutex_lock(&__sigio_pendinglock);
-		__sigio_pending = 1;
-		(void) mutex_unlock(&__sigio_pendinglock);
-		tact = sigioact;
-		tact.sa_sigaction = aiosigiohndlr;
-		(void) sigaddset(&tact.sa_mask, SIGIO);
-		(void) (*next_sigaction)(SIGIO, &tact, NULL);
-	} else {
-		/*
-		 * call the real handler.
-		 */
-		(sigioact.sa_sigaction)(sig, sip, uap);
-	}
-}
-
 void
 aiosigcancelhndlr(int sig, siginfo_t *sip, void *uap)
 {
-	struct aio_worker *aiowp;
-	struct sigaction act;
+	aio_worker_t *aiowp;
+	void (*func)(int, siginfo_t *, void *);
 
-	if (sip != NULL && sip->si_code == SI_LWP) {
-		if (thr_getspecific(_aio_key, (void **)&aiowp) != 0)
-			_aiopanic("aiosigcancelhndlr, thr_getspecific()\n");
-		ASSERT(aiowp != NULL);
-		if (aiowp->work_cancel_flg)
-			siglongjmp(aiowp->work_jmp_buf, 1);
-	} else if (sigcanact.sa_handler == SIG_DFL) {
-		act.sa_handler = SIG_DFL;
-		(void) (*next_sigaction)(SIGAIOCANCEL, &act, NULL);
-		(void) kill(getpid(), sig);
-	} else if (sigcanact.sa_handler != SIG_IGN) {
-		(sigcanact.sa_sigaction)(sig, sip, uap);
+	if (sip != NULL && sip->si_code == SI_LWP &&
+	    (aiowp = pthread_getspecific(_aio_key)) != NULL) {
+		/*
+		 * Only aio worker threads get here (with aiowp != NULL).
+		 */
+		siglongjmp(aiowp->work_jmp_buf, 1);
+	} else if (sigcanact.sa_handler != SIG_IGN &&
+	    sigcanact.sa_handler != SIG_DFL) {
+		/*
+		 * Call the application signal handler.
+		 */
+		func = sigcanact.sa_sigaction;
+		if (sigcanact.sa_flags & SA_RESETHAND)
+			sigcanact.sa_handler = SIG_DFL;
+		if (!(sigcanact.sa_flags & SA_SIGINFO))
+			sip = NULL;
+		(void) func(sig, sip, uap);
 	}
+	/*
+	 * SIGLWP is ignored by default.
+	 */
 }
+
+/* consolidation private interface in libc */
+extern int _libc_sigaction(int sig, const struct sigaction *act,
+	struct sigaction *oact);
 
 #pragma	weak sigaction = _sigaction
 int
@@ -248,54 +224,73 @@ _sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 	struct sigaction tact;
 	struct sigaction oldact;
 
-	if (next_sigaction == NULL)
-		next_sigaction = (sig_act_t)dlsym(RTLD_NEXT, "_sigaction");
+	/*
+	 * We detect SIGIO just to set the _sigio_enabled flag.
+	 */
+	if (sig == SIGIO && nact != NULL)
+		_sigio_enabled =
+		    (nact->sa_handler != SIG_DFL &&
+		    nact->sa_handler != SIG_IGN);
 
 	/*
-	 * Only interpose on SIGIO when it is given a disposition other
-	 * than SIG_IGN, or SIG_DFL.  Because SIGAIOCANCEL is SIGPROF,
-	 * this signal always should be interposed on, so that SIGPROF
-	 * can also be used by the application for profiling.
+	 * We interpose on SIGAIOCANCEL (aka SIGLWP).  Although SIGLWP
+	 * is a 'reserved' signal that no application should be using, we
+	 * honor the application's handler (see aiosigcancelhndlr(), above).
 	 */
-	if (sig == SIGIO || sig == SIGAIOCANCEL) {
-		if (oact) {
-			if (sig == SIGIO)
-				*oact = sigioact;
-			else
-				*oact = sigcanact;
-		}
-		if (nact == NULL)
-			return (0);
-
-		tact = *nact;
-		if (sig == SIGIO) {
-			oldact = sigioact;
-			sigioact = tact;
+	if (sig == SIGAIOCANCEL) {
+		oldact = sigcanact;
+		if (nact != NULL) {
+			sigcanact = tact = *nact;
 			if (tact.sa_handler == SIG_DFL ||
 			    tact.sa_handler == SIG_IGN) {
-				_sigio_enabled = 0;
+				tact.sa_flags = SA_SIGINFO;
+				(void) sigemptyset(&tact.sa_mask);
 			} else {
-				_sigio_enabled = 1;
-				tact.sa_sigaction = aiosigiohndlr;
+				tact.sa_flags |= SA_SIGINFO;
+				tact.sa_flags &= ~(SA_NODEFER | SA_RESETHAND);
 			}
-			tact.sa_flags &= ~SA_NODEFER;
-			if ((*next_sigaction)(sig, &tact, NULL) == -1) {
-				sigioact = oldact;
-				return (-1);
-			}
-		} else {
-			oldact = sigcanact;
-			sigcanact = tact;
 			tact.sa_sigaction = aiosigcancelhndlr;
-			tact.sa_flags &= ~SA_NODEFER;
-			tact.sa_flags |= SA_SIGINFO;
-			if ((*next_sigaction)(sig, &tact, NULL) == -1) {
+			if (_libc_sigaction(sig, &tact, NULL) == -1) {
 				sigcanact = oldact;
 				return (-1);
 			}
 		}
+		if (oact)
+			*oact = oldact;
 		return (0);
 	}
 
-	return ((*next_sigaction)(sig, nact, oact));
+	/*
+	 * Everything else, just call the real sigaction().
+	 */
+	return (_libc_sigaction(sig, nact, oact));
+}
+
+void
+init_signals(void)
+{
+	struct sigaction act;
+
+	/*
+	 * See if the application has set up a handler for SIGIO.
+	 */
+	(void) _libc_sigaction(SIGIO, NULL, &act);
+	_sigio_enabled =
+	    (act.sa_handler != SIG_DFL && act.sa_handler != SIG_IGN);
+
+	/*
+	 * Arrange to catch SIGAIOCANCEL (SIGLWP).
+	 * If the application has already set up a handler, preserve it.
+	 */
+	(void) _libc_sigaction(SIGAIOCANCEL, NULL, &sigcanact);
+	act = sigcanact;
+	if (act.sa_handler == SIG_DFL || act.sa_handler == SIG_IGN) {
+		act.sa_flags = SA_SIGINFO;
+		(void) sigemptyset(&act.sa_mask);
+	} else {
+		act.sa_flags |= SA_SIGINFO;
+		act.sa_flags &= ~(SA_NODEFER | SA_RESETHAND);
+	}
+	act.sa_sigaction = aiosigcancelhndlr;
+	(void) _libc_sigaction(SIGAIOCANCEL, &act, NULL);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,11 +78,11 @@ port_discard_events(port_queue_t *portq)
 	pid_t		pid = curproc->p_pid;
 
 	/*
-	 * Both mutexes are required to avoid interaction with other threads
-	 * in port_get(n).
+	 * The call to port_block() is required to avoid interaction
+	 * with other threads in port_get(n).
 	 */
 	mutex_enter(&portq->portq_mutex);
-	mutex_enter(&portq->portq_block_mutex);
+	port_block(portq);
 	port_push_eventq(portq);	/* empty temporary queue */
 	kevp = list_head(&portq->portq_list);
 	while (kevp) {
@@ -93,7 +93,7 @@ port_discard_events(port_queue_t *portq)
 		}
 		kevp = list_next(&portq->portq_list, kevp);
 	}
-	mutex_exit(&portq->portq_block_mutex);
+	port_unblock(portq);
 	mutex_exit(&portq->portq_mutex);
 }
 

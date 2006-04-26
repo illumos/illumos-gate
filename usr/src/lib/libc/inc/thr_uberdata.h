@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +55,10 @@
 #include <thread_db.h>
 #include "libc_int.h"
 #include "tdb_agent.h"
+
+/* belongs in <pthread.h> */
+#define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
+#define	PTHREAD_CREATE_NONDAEMON_NP	0
 
 /*
  * This is an implementation-specific include file for threading support.
@@ -493,7 +496,7 @@ typedef struct ulwp {
 					/* or pthread_detach() was called */
 	char		ul_writer;	/* sleeping in rw_wrlock() */
 	char		ul_stopping;	/* set by curthread: stopping self */
-	char		ul_pad4;
+	char		ul_cancel_prologue;	/* for _cancel_prologue() */
 	short		ul_preempt;	/* no_preempt()/preempt() */
 	short		ul_savpreempt;	/* pre-existing preempt value */
 	char		ul_sigsuspend;	/* thread is in sigsuspend/pollsys */
@@ -584,8 +587,6 @@ typedef struct ulwp {
  * of thr_join().  The trailing members are unneeded for this purpose.
  */
 #define	REPLACEMENT_SIZE	((size_t)&((ulwp_t *)NULL)->ul_sigmask)
-
-extern	size_t	_lpagesize;
 
 /*
  * Definitions for static initialization of signal sets,
@@ -865,7 +866,7 @@ typedef struct ulwp32 {
 					/* or pthread_detach() was called */
 	char		ul_writer;	/* sleeping in rw_wrlock() */
 	char		ul_stopping;	/* set by curthread: stopping self */
-	char		ul_pad4;
+	char		ul_cancel_prologue;	/* for _cancel_prologue() */
 	short		ul_preempt;	/* no_preempt()/preempt() */
 	short		ul_savpreempt;	/* pre-existing preempt value */
 	char		ul_sigsuspend;	/* thread is in sigsuspend/pollsys */
@@ -1015,6 +1016,7 @@ typedef	struct	_thrattr {
 	size_t	stksize;
 	void	*stkaddr;
 	int	detachstate;
+	int	daemonstate;
 	int	scope;
 	int	prio;
 	int	policy;
@@ -1208,6 +1210,7 @@ extern	ssize_t	_read(int, void *, size_t);
 extern	ssize_t	_write(int, const void *, size_t);
 extern	void	*_memcpy(void *, const void *, size_t);
 extern	void	*_memset(void *, int, size_t);
+extern	int	_memcmp(const void *, const void *, size_t);
 extern	void	*_private_memcpy(void *, const void *, size_t);
 extern	void	*_private_memset(void *, int, size_t);
 extern	int	_private_sigfillset(sigset_t *);
@@ -1312,6 +1315,7 @@ extern	void	_thr_terminate(void *);
 extern	void	_thr_exit(void *);
 extern	void	_thrp_exit(void);
 
+extern	const thrattr_t *def_thrattr(void);
 extern	int	_thread_setschedparam_main(pthread_t, int,
 			const struct sched_param *, int);
 extern	int	_validate_rt_prio(int, int);

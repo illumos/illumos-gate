@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -251,7 +251,7 @@ shell.o: sqlite.h
 NES_MAPFILE=	$(SRC)/cmd/mapfile_noexstk $(NX_MAP)
 
 sqlite:	shell.o $(RELOC)
-	$(LINK.c) -o sqlite shell.o $(NES_MAPFILE:%=-M%) $(RELOC) -lrt
+	$(LINK.c) -o sqlite shell.o $(NES_MAPFILE:%=-M%) $(RELOC)
 	$(CTFMERGE) -t -L VERSION -o $@ shell.o $(RELOC)
 	$(POST_PROCESS)
 

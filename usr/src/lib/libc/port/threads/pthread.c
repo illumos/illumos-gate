@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,15 +46,6 @@ typedef struct  __once {
 #define	once_flag	oflag.pad32_flag[1]
 
 /*
- * Default attribute object for pthread_create() with NULL attr pointer.
- * Note that the 'guardsize' field is initialized on the first call
- * to pthread_create() with a NULL attr pointer.
- */
-static thrattr_t _defattr =
-	{0, NULL, PTHREAD_CREATE_JOINABLE, PTHREAD_SCOPE_PROCESS,
-	0, SCHED_OTHER, PTHREAD_EXPLICIT_SCHED, 0};
-
-/*
  * pthread_create: creates a thread in the current process.
  * calls common _thrp_create() after copying the attributes.
  */
@@ -65,8 +56,8 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 {
 	ulwp_t		*self = curthread;
 	uberdata_t	*udp = self->ul_uberdata;
+	const thrattr_t	*ap = attr? attr->__pthread_attrp : def_thrattr();
 	long		flag;
-	thrattr_t	*ap;
 	pthread_t	tid;
 	int		policy;
 	pri_t		priority;
@@ -75,16 +66,8 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	int		mappedpri;
 	int		rt = 0;
 
-	if (attr == NULL) {
-		ap = &_defattr;
-		if (ap->guardsize == 0) {
-			if (_lpagesize == 0)
-				_lpagesize = _sysconf(_SC_PAGESIZE);
-			ap->guardsize = _lpagesize;
-		}
-	} else if ((ap = attr->__pthread_attrp) == NULL) {
+	if (ap == NULL)
 		return (EINVAL);
-	}
 
 	if (ap->inherit == PTHREAD_INHERIT_SCHED) {
 		policy = self->ul_policy;
@@ -115,7 +98,7 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 		}
 	}
 
-	flag = ap->scope | ap->detachstate | THR_SUSPENDED;
+	flag = ap->scope | ap->detachstate | ap->daemonstate | THR_SUSPENDED;
 	error = _thrp_create(ap->stkaddr, ap->stksize, start_routine, arg,
 		flag, &tid, priority, policy, ap->guardsize);
 	if (error == 0) {

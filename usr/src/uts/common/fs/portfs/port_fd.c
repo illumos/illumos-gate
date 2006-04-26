@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -362,7 +363,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		/*
 		 * port_send_event will release the portkev_lock mutex.
 		 */
-		(void) port_send_event(pkevp);
+		port_send_event(pkevp);
 	} else {
 		mutex_exit(&pkevp->portkev_lock);
 	}

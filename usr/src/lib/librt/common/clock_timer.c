@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,68 +38,127 @@
 #pragma	weak clock_nanosleep = _clock_nanosleep
 #pragma	weak nanosleep = _nanosleep
 
+#include "c_synonyms.h"
 #include <time.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #include "pos4.h"
+#include "sigev_thread.h"
+
+/*
+ * Array of pointers to tcd's, indexed by timer id.
+ * No more than 'timer_max' timers can be created by any process.
+ */
+int timer_max = 0;
+thread_communication_data_t **timer_tcd;
+static pthread_once_t timer_once = PTHREAD_ONCE_INIT;
+
+static void
+timer_init(void)
+{
+	timer_max = (int)_sysconf(_SC_TIMER_MAX);
+	timer_tcd = malloc(timer_max * sizeof (*timer_tcd));
+	(void) memset(timer_tcd, 0, timer_max * sizeof (*timer_tcd));
+}
 
 int
-_clock_getres(clockid_t clock_id, struct timespec *res)
+_clock_getres(clockid_t clock_id, timespec_t *res)
 {
 	return (__clock_getres(clock_id, res));
 }
 
 int
-_clock_gettime(clockid_t clock_id, struct timespec *tp)
+_clock_gettime(clockid_t clock_id, timespec_t *tp)
 {
 	return (__clock_gettime(clock_id, tp));
 }
 
 int
-_clock_settime(clockid_t clock_id, const struct timespec *tp)
+_clock_settime(clockid_t clock_id, const timespec_t *tp)
 {
 	return (__clock_settime(clock_id, tp));
 }
 
 int
-_timer_create(clockid_t clock_id, struct sigevent *evp, timer_t *timerid)
+_timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
 {
-	return (__timer_create(clock_id, evp, timerid));
+	struct sigevent sigevent;
+	port_notify_t port_notify;
+	thread_communication_data_t *tcdp;
+	int sigev_thread = 0;
+	int rc;
+
+	(void) pthread_once(&timer_once, timer_init);
+
+	if (sigevp != NULL &&
+	    sigevp->sigev_notify == SIGEV_THREAD &&
+	    sigevp->sigev_notify_function != NULL) {
+		sigev_thread = 1;
+		tcdp = setup_sigev_handler(sigevp, TIMER);
+		if (tcdp == NULL)
+			return (-1);
+		/* copy the sigevent structure so we can modify it */
+		sigevent = *sigevp;
+		sigevp = &sigevent;
+		port_notify.portnfy_port = tcdp->tcd_port;
+		port_notify.portnfy_user = NULL;
+		sigevp->sigev_value.sival_ptr = &port_notify;
+	}
+
+	rc = __timer_create(clock_id, sigevp, timerid);
+	if (rc == 0 && sigev_thread) {
+		if ((rc = launch_spawner(tcdp)) != 0)
+			__timer_delete(*timerid);
+		else
+			timer_tcd[*timerid] = tcdp;
+	}
+	if (rc != 0 && sigev_thread)
+		free_sigev_handler(tcdp);
+
+	return (rc);
 }
 
 int
 _timer_delete(timer_t timerid)
 {
-	return (__timer_delete(timerid));
+	int rc;
+
+	if ((rc = del_sigev_timer(timerid)) == 0)
+		return (__timer_delete(timerid));
+	else
+		return (rc);
 }
 
 int
 _timer_getoverrun(timer_t timerid)
 {
-	return (__timer_getoverrun(timerid));
+	return (__timer_getoverrun(timerid) + sigev_timer_getoverrun(timerid));
 }
 
 int
-_timer_gettime(timer_t timerid, struct itimerspec *value)
+_timer_gettime(timer_t timerid, itimerspec_t *value)
 {
 	return (__timer_gettime(timerid, value));
 }
 
 int
-_timer_settime(timer_t timerid, int flags, const struct itimerspec *value,
-    struct itimerspec *ovalue)
+_timer_settime(timer_t timerid, int flags, const itimerspec_t *value,
+	itimerspec_t *ovalue)
 {
 	return (__timer_settime(timerid, flags, value, ovalue));
 }
 
 int
 _clock_nanosleep(clockid_t clock_id, int flags,
-	const struct timespec *rqtp, struct timespec *rmtp)
+	const timespec_t *rqtp, timespec_t *rmtp)
 {
 	return (__clock_nanosleep(clock_id, flags, rqtp, rmtp));
 }
 
 int
-_nanosleep(const struct timespec *rqtp, struct timespec *rmtp)
+_nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 {
 	return (__nanosleep(rqtp, rmtp));
 }

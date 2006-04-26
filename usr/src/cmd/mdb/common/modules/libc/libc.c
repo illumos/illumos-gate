@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -500,13 +500,13 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulwp.ul_dead,
 		ulwp.ul_unwind);
 
-	HD("detached   writer     stopping   pad4       preempt    savpreempt");
+	HD("detached   writer     stopping   can'prolog preempt    savpreempt");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
 		OFFSET(ul_detached),
 		ulwp.ul_detached,
 		ulwp.ul_writer,
 		ulwp.ul_stopping,
-		ulwp.ul_pad4,
+		ulwp.ul_cancel_prologue,
 		ulwp.ul_preempt,
 		ulwp.ul_savpreempt);
 

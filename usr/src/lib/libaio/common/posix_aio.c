@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,28 +41,15 @@
  */
 
 #include "libaio.h"
+#include <atomic.h>
 #include <sys/file.h>
+#include <sys/port.h>
 
 extern int __fdsync(int, int);
-extern aio_req_t *_aio_hash_find(aio_result_t *);
 
-/* __aio_suspend stuff */
+cond_t	_aio_waitn_cv = DEFAULTCV;	/* wait for end of aio_waitn */
 
-extern	int	_aio_kernel_suspend;
-extern	int	_aio_suscv_cnt;
-
-/* __aio_waitn stuff */
-
-static	mutex_t	__aio_waitn_mutex = DEFAULTMUTEX; /* 1 aio_waitn per process */
-static	cond_t	_aio_waitn_cv = DEFAULTCV;	/* wait for end of aio_waitn */
-extern	int	_aio_flags;
-extern	cond_t	_aio_iowait_cv;
-extern	int	_aio_doneq_cnt;
-extern	int	_aio_outstand_cnt;
-extern	int	_aio_waitncnt;
-
-static int _aio_check_timeout(const struct timespec *, struct timespec *,
-	int *);
+static int _aio_check_timeout(const timespec_t *, timespec_t *, int *);
 
 /* defines for timedwait in __aio_waitn()  and __aio_suspend() */
 #define	AIO_TIMEOUT_INDEF	-1
@@ -71,58 +58,77 @@ static int _aio_check_timeout(const struct timespec *, struct timespec *,
 #define	AIO_TIMEOUT_UNDEF	2
 
 /*
- * List I/O list head stuff
+ * List I/O stuff
  */
-static aio_lio_t *_lio_head_freelist = NULL;
-static int _aio_lio_alloc(aio_lio_t **);
-static void _aio_lio_free(aio_lio_t *);
 static void _lio_list_decr(aio_lio_t *);
+static long aio_list_max = 0;
 
 int
-__aio_read(aiocb_t *cb)
+__aio_read(aiocb_t *aiocbp)
 {
-	aio_lio_t	*head = NULL;
-
-	if ((cb == NULL) || cb->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
 		errno = EINVAL;
 		return (-1);
 	}
-
-	cb->aio_lio_opcode = LIO_READ;
-	return (_aio_rw(cb, head, &__nextworker_rd, AIOAREAD,
-	    (AIO_KAIO | AIO_NO_DUPS), NULL));
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
+		return (-1);
+	}
+	aiocbp->aio_lio_opcode = LIO_READ;
+	return (_aio_rw(aiocbp, NULL, &__nextworker_rw, AIOAREAD,
+	    (AIO_KAIO | AIO_NO_DUPS)));
 }
 
 int
-__aio_write(aiocb_t *cb)
+__aio_write(aiocb_t *aiocbp)
 {
-	aio_lio_t	*head = NULL;
-
-	if ((cb == NULL) || cb->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
 		errno = EINVAL;
 		return (-1);
 	}
-
-	cb->aio_lio_opcode = LIO_WRITE;
-	return (_aio_rw(cb, head, &__nextworker_wr, AIOAWRITE,
-	    (AIO_KAIO | AIO_NO_DUPS), NULL));
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
+		return (-1);
+	}
+	aiocbp->aio_lio_opcode = LIO_WRITE;
+	return (_aio_rw(aiocbp, NULL, &__nextworker_rw, AIOAWRITE,
+	    (AIO_KAIO | AIO_NO_DUPS)));
 }
 
+/*
+ * __lio_listio() cancellation handler.
+ */
+/* ARGSUSED */
+static void
+_lio_listio_cleanup(aio_lio_t *head)
+{
+	int freeit = 0;
+
+	ASSERT(MUTEX_HELD(&head->lio_mutex));
+	if (head->lio_refcnt == 0) {
+		ASSERT(head->lio_nent == 0);
+		freeit = 1;
+	}
+	head->lio_waiting = 0;
+	sig_mutex_unlock(&head->lio_mutex);
+	if (freeit)
+		_aio_lio_free(head);
+}
 
 int
-__lio_listio(int mode, aiocb_t * const list[],
-    int nent, struct sigevent *sig)
+__lio_listio(int mode, aiocb_t *const list[],
+	int nent, struct sigevent *sigev)
 {
-	int 		i, err;
 	int 		aio_ufs = 0;
 	int 		oerrno = 0;
 	aio_lio_t	*head = NULL;
+	aiocb_t		*aiocbp;
 	int		state = 0;
-	static long	aio_list_max = 0;
-	aio_worker_t 	**nextworker;
 	int 		EIOflg = 0;
 	int 		rw;
 	int		do_kaio = 0;
+	int 		error;
+	int 		i;
 
 	if (!_kaio_ok)
 		_kaio_init();
@@ -130,7 +136,7 @@ __lio_listio(int mode, aiocb_t * const list[],
 	if (aio_list_max == 0)
 		aio_list_max = sysconf(_SC_AIO_LISTIO_MAX);
 
-	if (nent < 0 || (long)nent > aio_list_max) {
+	if (nent <= 0 || nent > aio_list_max) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -148,107 +154,115 @@ __lio_listio(int mode, aiocb_t * const list[],
 	}
 
 	for (i = 0; i < nent; i++) {
-		if (list[i]) {
-			if (list[i]->aio_lio_opcode != LIO_NOP) {
-				list[i]->aio_state = state;
-				if (KAIO_SUPPORTED(list[i]->aio_fildes))
-					do_kaio++;
-				else
-					list[i]->aio_resultp.aio_errno =
-					    ENOTSUP;
-			} else
-				list[i]->aio_state = NOCHECK;
+		if ((aiocbp = list[i]) == NULL)
+			continue;
+		if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+			errno = EBUSY;
+			return (-1);
+		}
+		if (aiocbp->aio_lio_opcode == LIO_NOP)
+			aiocbp->aio_state = NOCHECK;
+		else {
+			aiocbp->aio_state = state;
+			if (KAIO_SUPPORTED(aiocbp->aio_fildes))
+				do_kaio++;
+			else
+				aiocbp->aio_resultp.aio_errno = ENOTSUP;
 		}
 	}
 
 	if (do_kaio) {
-		if ((err = (int)_kaio(AIOLIO, mode, list, nent, sig)) == 0)
+		error = (int)_kaio(AIOLIO, mode, list, nent, sigev);
+		if (error == 0)
 			return (0);
 		oerrno = errno;
 	} else {
 		oerrno = errno = ENOTSUP;
-		err = -1;
+		error = -1;
 	}
-	if ((err == -1) && (errno == ENOTSUP)) {
-		err = errno = 0;
+
+	if (error == -1 && errno == ENOTSUP) {
+		error = errno = 0;
 		/*
-		 * If LIO_WAIT, or signal required, allocate a list head.
+		 * If LIO_WAIT, or notification required, allocate a list head.
 		 */
-		if ((mode == LIO_WAIT) || ((sig) &&
-		    (sig->sigev_notify == SIGEV_SIGNAL)))
-			(void) _aio_lio_alloc(&head);
+		if (mode == LIO_WAIT ||
+		    (sigev != NULL &&
+		    (sigev->sigev_notify == SIGEV_SIGNAL ||
+		    sigev->sigev_notify == SIGEV_THREAD ||
+		    sigev->sigev_notify == SIGEV_PORT)))
+			head = _aio_lio_alloc();
 		if (head) {
-			(void) mutex_lock(&head->lio_mutex);
-			head->lio_mode = (char)mode;
-			if ((mode == LIO_NOWAIT) && (sig) &&
-			    (sig->sigev_notify != SIGEV_NONE) &&
-			    (sig->sigev_signo > 0)) {
-				head->lio_signo = sig->sigev_signo;
-				head->lio_sigval.sival_ptr =
-				    sig->sigev_value.sival_ptr;
-			} else
-				head->lio_signo = 0;
+			sig_mutex_lock(&head->lio_mutex);
+			head->lio_mode = mode;
+			head->lio_largefile = 0;
+			if (mode == LIO_NOWAIT && sigev != NULL) {
+				if (sigev->sigev_notify == SIGEV_THREAD) {
+					head->lio_port = sigev->sigev_signo;
+					head->lio_event = AIOLIO;
+					head->lio_sigevent = sigev;
+					head->lio_sigval.sival_ptr =
+					    sigev->sigev_value.sival_ptr;
+				} else if (sigev->sigev_notify == SIGEV_PORT) {
+					port_notify_t *pn =
+					    sigev->sigev_value.sival_ptr;
+					head->lio_port = pn->portnfy_port;
+					head->lio_event = AIOLIO;
+					head->lio_sigevent = sigev;
+					head->lio_sigval.sival_ptr =
+					    pn->portnfy_user;
+				} else {	/* SIGEV_SIGNAL */
+					head->lio_signo = sigev->sigev_signo;
+					head->lio_sigval.sival_ptr =
+					    sigev->sigev_value.sival_ptr;
+				}
+			}
 			head->lio_nent = head->lio_refcnt = nent;
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
 		}
 		/*
 		 * find UFS requests, errno == ENOTSUP/EBADFD,
 		 */
 		for (i = 0; i < nent; i++) {
-			if (list[i] &&
-			    ((list[i]->aio_resultp.aio_errno == ENOTSUP) ||
-			    (list[i]->aio_resultp.aio_errno == EBADFD))) {
-				if (list[i]->aio_lio_opcode == LIO_NOP) {
-					if (head)
-						_lio_list_decr(head);
-					continue;
-				}
-				if (list[i]->aio_resultp.aio_errno == EBADFD)
-					SET_KAIO_NOT_SUPPORTED(
-					    list[i]->aio_fildes);
-				if (list[i]->aio_reqprio < 0) {
-					list[i]->aio_resultp.aio_errno =
-					    EINVAL;
-					list[i]->aio_resultp.aio_return = -1;
-					EIOflg = 1;
-					if (head)
-						_lio_list_decr(head);
-					continue;
-				}
-				/*
-				 * submit an AIO request with flags AIO_NO_KAIO
-				 * to avoid the kaio() syscall in _aio_rw()
-				 */
-				switch (list[i]->aio_lio_opcode) {
-					case LIO_READ:
-						rw = AIOAREAD;
-						nextworker = &__nextworker_rd;
-						break;
-					case LIO_WRITE:
-						rw = AIOAWRITE;
-						nextworker = &__nextworker_wr;
-						break;
-				}
-				if (sig && sig->sigev_notify == SIGEV_PORT)
-					err = _aio_rw(list[i], head, nextworker,
-					    rw, (AIO_NO_KAIO | AIO_NO_DUPS),
-					    sig);
-				else
-					err = _aio_rw(list[i], head, nextworker,
-					    rw, (AIO_NO_KAIO | AIO_NO_DUPS),
-					    NULL);
-				if (err != 0) {
-					if (head)
-						_lio_list_decr(head);
-					list[i]->aio_resultp.aio_errno = err;
-					EIOflg = 1;
-				} else
-					aio_ufs++;
-
-			} else {
+			if ((aiocbp = list[i]) == NULL ||
+			    aiocbp->aio_lio_opcode == LIO_NOP ||
+			    (aiocbp->aio_resultp.aio_errno != ENOTSUP &&
+			    aiocbp->aio_resultp.aio_errno != EBADFD)) {
 				if (head)
 					_lio_list_decr(head);
 				continue;
+			}
+			if (aiocbp->aio_resultp.aio_errno == EBADFD)
+				SET_KAIO_NOT_SUPPORTED(aiocbp->aio_fildes);
+			if (aiocbp->aio_reqprio < 0) {
+				aiocbp->aio_resultp.aio_errno = EINVAL;
+				aiocbp->aio_resultp.aio_return = -1;
+				EIOflg = 1;
+				if (head)
+					_lio_list_decr(head);
+				continue;
+			}
+			/*
+			 * submit an AIO request with flags AIO_NO_KAIO
+			 * to avoid the kaio() syscall in _aio_rw()
+			 */
+			switch (aiocbp->aio_lio_opcode) {
+			case LIO_READ:
+				rw = AIOAREAD;
+				break;
+			case LIO_WRITE:
+				rw = AIOAWRITE;
+				break;
+			}
+			error = _aio_rw(aiocbp, head, &__nextworker_rw, rw,
+			    (AIO_NO_KAIO | AIO_NO_DUPS));
+			if (error == 0)
+				aio_ufs++;
+			else {
+				if (head)
+					_lio_list_decr(head);
+				aiocbp->aio_resultp.aio_errno = error;
+				EIOflg = 1;
 			}
 		}
 	}
@@ -256,28 +270,35 @@ __lio_listio(int mode, aiocb_t * const list[],
 		errno = EIO;
 		return (-1);
 	}
-	if ((mode == LIO_WAIT) && (oerrno == ENOTSUP)) {
+	if (mode == LIO_WAIT && oerrno == ENOTSUP) {
 		/*
 		 * call kaio(AIOLIOWAIT) to get all outstanding
 		 * kernel AIO requests
 		 */
-		if ((nent - aio_ufs) > 0) {
-			(void) _kaio(AIOLIOWAIT, mode, list, nent, sig);
-		}
-		if (head && head->lio_nent > 0) {
-			(void) mutex_lock(&head->lio_mutex);
+		if ((nent - aio_ufs) > 0)
+			(void) _kaio(AIOLIOWAIT, mode, list, nent, sigev);
+		if (head != NULL && head->lio_nent > 0) {
+			sig_mutex_lock(&head->lio_mutex);
 			while (head->lio_refcnt > 0) {
-				errno = cond_wait(&head->lio_cond_cv,
+				int err;
+				head->lio_waiting = 1;
+				pthread_cleanup_push(_lio_listio_cleanup, head);
+				err = sig_cond_wait(&head->lio_cond_cv,
 				    &head->lio_mutex);
-				if (errno) {
-					(void) mutex_unlock(&head->lio_mutex);
+				pthread_cleanup_pop(0);
+				head->lio_waiting = 0;
+				if (err && head->lio_nent > 0) {
+					sig_mutex_unlock(&head->lio_mutex);
+					errno = err;
 					return (-1);
 				}
 			}
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
+			ASSERT(head->lio_nent == 0 && head->lio_refcnt == 0);
+			_aio_lio_free(head);
 			for (i = 0; i < nent; i++) {
-				if (list[i] &&
-				    list[i]->aio_resultp.aio_errno) {
+				if ((aiocbp = list[i]) != NULL &&
+				    aiocbp->aio_resultp.aio_errno) {
 					errno = EIO;
 					return (-1);
 				}
@@ -285,20 +306,32 @@ __lio_listio(int mode, aiocb_t * const list[],
 		}
 		return (0);
 	}
-	return (err);
+	return (error);
 }
 
 static void
 _lio_list_decr(aio_lio_t *head)
 {
-	(void) mutex_lock(&head->lio_mutex);
+	sig_mutex_lock(&head->lio_mutex);
 	head->lio_nent--;
 	head->lio_refcnt--;
-	(void) mutex_unlock(&head->lio_mutex);
+	sig_mutex_unlock(&head->lio_mutex);
 }
 
-extern void _cancelon(void);
-extern void _canceloff(void);
+extern void _cancel_prologue(void);
+extern void _cancel_epilogue(void);
+
+/*
+ * __aio_suspend() cancellation handler.
+ */
+/* ARGSUSED */
+static void
+_aio_suspend_cleanup(int *counter)
+{
+	ASSERT(MUTEX_HELD(&__aio_mutex));
+	(*counter)--;		/* _aio_kernel_suspend or _aio_suscv_cnt */
+	sig_mutex_unlock(&__aio_mutex);
+}
 
 int
 __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
@@ -306,15 +339,24 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 	int		cv_err;	/* error code from cond_xxx() */
 	int		kerr;	/* error code from _kaio(AIOSUSPEND) */
 	int		i;
-	struct timespec	twait;	/* copy of timo for internal calculations */
-	struct timespec	*wait = NULL;
+	timespec_t	twait;	/* copy of timo for internal calculations */
+	timespec_t	*wait = NULL;
 	int		timedwait;
 	int		req_outstanding;
 	aiocb_t		**listp;
+	aiocb_t		*aiocbp;
+#if !defined(_LP64)
 	aiocb64_t	**listp64;
+	aiocb64_t	*aiocbp64;
+#endif
 	hrtime_t	hrtstart;
 	hrtime_t	hrtend;
 	hrtime_t	hrtres;
+
+#if defined(_LP64)
+	if (largefile)
+		_aiopanic("__aio_suspend: largefile set when _LP64 defined");
+#endif
 
 	if (nent <= 0) {
 		errno = EINVAL;
@@ -340,30 +382,33 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		timedwait = AIO_TIMEOUT_INDEF;
 	}
 
+#if !defined(_LP64)
 	if (largefile) {
-		/* _LARGEFILE64_SOURCE && !_LP64 */
 		listp64 = (aiocb64_t **)list;
 		for (i = 0; i < nent; i++) {
-			if (listp64[i] && listp64[i]->aio_state == CHECK)
-				listp64[i]->aio_state = CHECKED;
+			if ((aiocbp64 = listp64[i]) != NULL &&
+			    aiocbp64->aio_state == CHECK)
+				aiocbp64->aio_state = CHECKED;
 		}
-	} else {
+	} else
+#endif	/* !_LP64 */
+	{
 		listp = (aiocb_t **)list;
 		for (i = 0; i < nent; i++) {
-			if (listp[i] && listp[i]->aio_state == CHECK)
-				listp[i]->aio_state = CHECKED;
+			if ((aiocbp = listp[i]) != NULL &&
+			    aiocbp->aio_state == CHECK)
+				aiocbp->aio_state = CHECKED;
 		}
 	}
+
+	sig_mutex_lock(&__aio_mutex);
 
 	/*
 	 * The next "if -case" is required to accelerate the
 	 * access to completed RAW-IO requests.
 	 */
-
 	if ((_aio_doneq_cnt + _aio_outstand_cnt) == 0) {
 		/* Only kernel requests pending */
-
-		_cancelon();
 
 		/*
 		 * _aio_kernel_suspend is used to detect completed non RAW-IO
@@ -371,9 +416,7 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		 * As long as this thread resides in the kernel (_kaio) further
 		 * asynchronous non RAW-IO requests could be submitted.
 		 */
-		_aio_lock();
 		_aio_kernel_suspend++;
-		_aio_unlock();
 
 		/*
 		 * Always do the kaio() call without using the KAIO_SUPPORTED()
@@ -388,27 +431,33 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		 *	non RAW-IOs completed inbetween.
 		 */
 
-		if (largefile)
-			kerr = (int)_kaio(AIOSUSPEND64, list, nent, timo, -1);
-		else
-			kerr = (int)_kaio(AIOSUSPEND, list, nent, timo, -1);
+		pthread_cleanup_push(_aio_suspend_cleanup,
+		    &_aio_kernel_suspend);
+		pthread_cleanup_push(sig_mutex_lock, &__aio_mutex);
+		sig_mutex_unlock(&__aio_mutex);
+		_cancel_prologue();
+		kerr = (int)_kaio(largefile? AIOSUSPEND64 : AIOSUSPEND,
+		    list, nent, timo, -1);
+		_cancel_epilogue();
+		pthread_cleanup_pop(1);	/* sig_mutex_lock(&__aio_mutex) */
+		pthread_cleanup_pop(0);
 
-		_aio_lock();
 		_aio_kernel_suspend--;
-		_aio_unlock();
 
-		_canceloff();
-		if (!kerr)
+		if (!kerr) {
+			sig_mutex_unlock(&__aio_mutex);
 			return (0);
+		}
 	} else {
 		kerr = 1;	/* simulation: _kaio detected AIONOTIFY */
 	}
 
-	/* Return kernel error code, if no other IOs are outstanding */
-
-	_aio_lock();
+	/*
+	 * Return kernel error code if no other IOs are outstanding.
+	 */
 	req_outstanding = _aio_doneq_cnt + _aio_outstand_cnt;
-	_aio_unlock();
+
+	sig_mutex_unlock(&__aio_mutex);
 
 	if (req_outstanding == 0) {
 		/* no IOs outstanding in the thread pool */
@@ -418,8 +467,9 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		return (-1);
 	}
 
-	/* IOs using the thread pool are outstanding */
-
+	/*
+	 * IOs using the thread pool are outstanding.
+	 */
 	if (timedwait == AIO_TIMEOUT_WAIT) {
 		/* time monitoring */
 		hrtend = hrtstart + (hrtime_t)timo->tv_sec * (hrtime_t)NANOSEC +
@@ -430,48 +480,39 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		twait.tv_sec = hrtres / (hrtime_t)NANOSEC;
 		twait.tv_nsec = hrtres % (hrtime_t)NANOSEC;
 		wait = &twait;
-	} else {
-		if (timedwait == AIO_TIMEOUT_POLL) {
-			twait = *timo;	/* content of timo = 0 : polling */
-			wait = &twait;
-		}
+	} else if (timedwait == AIO_TIMEOUT_POLL) {
+		twait = *timo;	/* content of timo = 0 : polling */
+		wait = &twait;
 	}
 
 	for (;;) {
-		int	aio_errno;
-		int	aio_inprogress;
+		int	error;
+		int	inprogress;
 
 		/* first scan file system requests */
-		aio_inprogress = 0;
-		if (largefile) {
-			for (i = 0; i < nent; i++) {
-				if (listp64[i] == NULL)
+		inprogress = 0;
+		for (i = 0; i < nent; i++) {
+#if !defined(_LP64)
+			if (largefile) {
+				if ((aiocbp64 = listp64[i]) == NULL)
 					continue;
-				aio_errno = listp64[i]->aio_resultp.aio_errno;
-				if (aio_errno == EINPROGRESS) {
-					aio_inprogress = 1;
-				} else {
-					if (aio_errno != ECANCELED) {
-						errno = 0;
-						return (0);
-					}
-				}
+				error = aiocbp64->aio_resultp.aio_errno;
+			} else
+#endif
+			{
+				if ((aiocbp = listp[i]) == NULL)
+					continue;
+				error = aiocbp->aio_resultp.aio_errno;
 			}
-		} else {
-			for (i = 0; i < nent; i++) {
-				if (listp[i] == NULL)
-					continue;
-				aio_errno = listp[i]->aio_resultp.aio_errno;
-				if (aio_errno == EINPROGRESS) {
-					aio_inprogress = 1;
-				} else {
-					if (aio_errno != ECANCELED) {
-						errno = 0;
-						return (0);
-					}
-				}
+			if (error == EINPROGRESS)
+				inprogress = 1;
+			else if (error != ECANCELED) {
+				errno = 0;
+				return (0);
 			}
 		}
+
+		sig_mutex_lock(&__aio_mutex);
 
 		/*
 		 * If there aren't outstanding I/Os in the thread pool then
@@ -480,8 +521,8 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 		 * If the kernel was notified to return, then we have to check
 		 * possible pending RAW-IOs.
 		 */
-		if (_aio_outstand_cnt == 0 && aio_inprogress == 0 &&
-		    kerr != 1) {
+		if (_aio_outstand_cnt == 0 && inprogress == 0 && kerr != 1) {
+			sig_mutex_unlock(&__aio_mutex);
 			errno = EAGAIN;
 			break;
 		}
@@ -501,35 +542,36 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 				hrtres = hrtend - gethrtime();
 				if (hrtres <= 0) {
 					/* timer expired */
+					sig_mutex_unlock(&__aio_mutex);
 					errno = EAGAIN;
 					break;
 				}
 				wait->tv_sec = hrtres / (hrtime_t)NANOSEC;
 				wait->tv_nsec = hrtres % (hrtime_t)NANOSEC;
 			}
-			_aio_lock();
 			_aio_kernel_suspend++;
-			_aio_unlock();
 
-			_cancelon();
-			if (largefile)
-				kerr = (int)_kaio(AIOSUSPEND64, list, nent,
-				    wait, -1);
-			else
-				kerr = (int)_kaio(AIOSUSPEND, list, nent,
-				    wait, -1);
-			_canceloff();
+			pthread_cleanup_push(_aio_suspend_cleanup,
+			    &_aio_kernel_suspend);
+			pthread_cleanup_push(sig_mutex_lock, &__aio_mutex);
+			sig_mutex_unlock(&__aio_mutex);
+			_cancel_prologue();
+			kerr = (int)_kaio(largefile? AIOSUSPEND64 : AIOSUSPEND,
+			    list, nent, wait, -1);
+			_cancel_epilogue();
+			pthread_cleanup_pop(1);
+			pthread_cleanup_pop(0);
 
-			_aio_lock();
 			_aio_kernel_suspend--;
-			_aio_unlock();
 
 			if (!kerr) {
+				sig_mutex_unlock(&__aio_mutex);
 				return (0);
 			}
 		}
 
 		if (timedwait == AIO_TIMEOUT_POLL) {
+			sig_mutex_unlock(&__aio_mutex);
 			errno = EAGAIN;
 			break;
 		}
@@ -539,6 +581,7 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 			hrtres = hrtend - gethrtime();
 			if (hrtres <= 0) {
 				/* timer expired */
+				sig_mutex_unlock(&__aio_mutex);
 				errno = EAGAIN;
 				break;
 			}
@@ -546,27 +589,25 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 			wait->tv_nsec = hrtres % (hrtime_t)NANOSEC;
 		}
 
-		_aio_lock();
 		if (_aio_outstand_cnt == 0) {
-			_aio_unlock();
+			sig_mutex_unlock(&__aio_mutex);
 			continue;
 		}
 
 		_aio_suscv_cnt++;	/* ID for _aiodone (wake up) */
 
+		pthread_cleanup_push(_aio_suspend_cleanup, &_aio_suscv_cnt);
 		if (timedwait == AIO_TIMEOUT_WAIT) {
-			cv_err = cond_reltimedwait(&_aio_iowait_cv,
+			cv_err = sig_cond_reltimedwait(&_aio_iowait_cv,
 			    &__aio_mutex, wait);
-
 			if (cv_err == ETIME)
 				cv_err = EAGAIN;
 		} else {
 			/* wait indefinitely */
-			cv_err = cond_wait(&_aio_iowait_cv, &__aio_mutex);
+			cv_err = sig_cond_wait(&_aio_iowait_cv, &__aio_mutex);
 		}
-
-		_aio_suscv_cnt--;
-		_aio_unlock();
+		/* this decrements _aio_suscv_cnt and drops __aio_mutex */
+		pthread_cleanup_pop(1);
 
 		if (cv_err) {
 			errno = cv_err;
@@ -577,166 +618,125 @@ __aio_suspend(void **list, int nent, const timespec_t *timo, int largefile)
 }
 
 int
-__aio_error(aiocb_t *cb)
+__aio_error(aiocb_t *aiocbp)
 {
-	aio_req_t *reqp;
-	int aio_errno = cb->aio_resultp.aio_errno;
+	aio_result_t *resultp = &aiocbp->aio_resultp;
+	int error;
 
-	if (aio_errno == EINPROGRESS) {
-		if (cb->aio_state == CHECK) {
+	if ((error = resultp->aio_errno) == EINPROGRESS) {
+		if (aiocbp->aio_state == CHECK) {
 			/*
-			 * Always do the kaio() call without using
-			 * the KAIO_SUPPORTED()
-			 * checks because it is not mandatory to
-			 * have a valid fd
-			 * set in the aiocb, only the resultp must be set.
+			 * Always do the kaio() call without using the
+			 * KAIO_SUPPORTED() checks because it is not
+			 * mandatory to have a valid fd set in the
+			 * aiocb, only the resultp must be set.
 			 */
-			if (((int)_kaio(AIOERROR, cb)) == EINVAL) {
+			if ((int)_kaio(AIOERROR, aiocbp) == EINVAL) {
 				errno = EINVAL;
 				return (-1);
 			}
-		} else if (cb->aio_state == CHECKED)
-			cb->aio_state =  CHECK;
-	} else if (cb->aio_state == USERAIO) {
-		_aio_lock();
-		if (reqp = _aio_hash_find(&cb->aio_resultp)) {
-			cb->aio_state = NOCHECK;
-			_lio_remove(reqp->lio_head);
-			(void) _aio_hash_del(reqp->req_resultp);
-			(void) _aio_req_remove(reqp);
-			_aio_req_free(reqp);
+			error = resultp->aio_errno;
+		} else if (aiocbp->aio_state == CHECKED) {
+			aiocbp->aio_state =  CHECK;
 		}
-		_aio_unlock();
 	}
-	return (aio_errno);
+	return (error);
 }
 
 ssize_t
-__aio_return(aiocb_t *cb)
+__aio_return(aiocb_t *aiocbp)
 {
-	ssize_t ret;
+	aio_result_t *resultp = &aiocbp->aio_resultp;
 	aio_req_t *reqp;
+	int error;
+	ssize_t retval;
 
 	/*
-	 * graceful detection of an invalid cb is not possible. a
-	 * SIGSEGV will be generated if it is invalid.
+	 * The _aiodone() function stores resultp->aio_return before
+	 * storing resultp->aio_errno (with an membar_producer() in
+	 * between).  We use membar_consumer() below to ensure proper
+	 * memory ordering between _aiodone() and ourself.
 	 */
-	if (cb == NULL) {
-		errno = EINVAL;
-		exit(-1);
-	}
+	error = resultp->aio_errno;
+	membar_consumer();
+	retval = resultp->aio_return;
 
 	/*
-	 * we use this condition to indicate that
-	 * aio_return has been called before
+	 * we use this condition to indicate either that
+	 * aio_return() has been called before or should
+	 * not have been called yet.
 	 */
-	if (cb->aio_resultp.aio_return == -1 &&
-	    cb->aio_resultp.aio_errno == EINVAL) {
-		errno = EINVAL;
+	if ((retval == -1 && error == EINVAL) || error == EINPROGRESS) {
+		errno = error;
 		return (-1);
 	}
 
 	/*
-	 * Before we return mark the result as being returned so that later
+	 * Before we return, mark the result as being returned so that later
 	 * calls to aio_return() will return the fact that the result has
-	 * already been returned
+	 * already been returned.
 	 */
-	ret = cb->aio_resultp.aio_return;
-	cb->aio_resultp.aio_return = -1;
-	cb->aio_resultp.aio_errno = EINVAL;
-	if (cb->aio_state == USERAIO) {
-		_aio_lock();
-		if (reqp = _aio_hash_find(&cb->aio_resultp)) {
-			cb->aio_state = NOCHECK;
-			_lio_remove(reqp->lio_head);
-			(void) _aio_hash_del(reqp->req_resultp);
-			(void) _aio_req_remove(reqp);
-			_aio_req_free(reqp);
-		}
-		_aio_unlock();
+	sig_mutex_lock(&__aio_mutex);
+	/* retest, in case more than one thread actually got in here */
+	if (resultp->aio_return == -1 && resultp->aio_errno == EINVAL) {
+		sig_mutex_unlock(&__aio_mutex);
+		errno = EINVAL;
+		return (-1);
 	}
-	return (ret);
+	resultp->aio_return = -1;
+	resultp->aio_errno = EINVAL;
+	if ((reqp = _aio_hash_del(resultp)) == NULL)
+		sig_mutex_unlock(&__aio_mutex);
+	else {
+		aiocbp->aio_state = NOCHECK;
+		ASSERT(reqp->req_head == NULL);
+		(void) _aio_req_remove(reqp);
+		sig_mutex_unlock(&__aio_mutex);
+		_aio_req_free(reqp);
+	}
 
+	if (retval == -1)
+		errno = error;
+	return (retval);
 }
 
 void
-_lio_remove(aio_lio_t *head)
+_lio_remove(aio_req_t *reqp)
 {
+	aio_lio_t *head;
 	int refcnt;
 
-	if (head) {
-		(void) mutex_lock(&head->lio_mutex);
+	if ((head = reqp->req_head) != NULL) {
+		sig_mutex_lock(&head->lio_mutex);
+		ASSERT(head->lio_refcnt == head->lio_nent);
 		refcnt = --head->lio_nent;
-		(void) mutex_unlock(&head->lio_mutex);
-		if (!refcnt)
+		head->lio_refcnt--;
+		sig_mutex_unlock(&head->lio_mutex);
+		if (refcnt == 0)
 			_aio_lio_free(head);
+		reqp->req_head = NULL;
 	}
-}
-
-void
-_aio_remove(aio_req_t *reqp)
-{
-	_lio_remove(reqp->lio_head);
-	_aio_lock();
-	(void) _aio_hash_del(reqp->req_resultp);
-	(void) _aio_req_remove(reqp);
-	_aio_req_free(reqp);
-	_aio_unlock();
-}
-
-int
-_aio_lio_alloc(aio_lio_t **head)
-{
-	aio_lio_t	*lio_head;
-
-	(void) mutex_lock(&__lio_mutex);
-	if (_lio_head_freelist == NULL) {
-		lio_head = (aio_lio_t *)malloc(sizeof (aio_lio_t));
-	} else {
-		lio_head = _lio_head_freelist;
-		_lio_head_freelist = lio_head->lio_next;
-	}
-	if (lio_head == NULL) {
-		(void) mutex_unlock(&__lio_mutex);
-		return (-1);
-	}
-	(void) memset(lio_head, 0, sizeof (aio_lio_t));
-	(void) cond_init(&lio_head->lio_cond_cv, USYNC_THREAD, NULL);
-	(void) mutex_init(&lio_head->lio_mutex, USYNC_THREAD, NULL);
-	*head = lio_head;
-	(void) mutex_unlock(&__lio_mutex);
-	return (0);
-}
-
-void
-_aio_lio_free(aio_lio_t *head)
-{
-	(void) mutex_lock(&__lio_mutex);
-	head->lio_next = _lio_head_freelist;
-	_lio_head_freelist = head;
-	(void) mutex_unlock(&__lio_mutex);
 }
 
 /*
  * This function returns the number of asynchronous I/O requests submitted.
  */
-
 static int
-__aio_fsync_bar(aiocb_t *cb, aio_lio_t *head, aio_worker_t *aiowp,
+__aio_fsync_bar(aiocb_t *aiocbp, aio_lio_t *head, aio_worker_t *aiowp,
     int workerscnt)
 {
 	int i;
-	int err;
+	int error;
 	aio_worker_t *next = aiowp;
 
 	for (i = 0; i < workerscnt; i++) {
-		err = _aio_rw(cb, head, &next, AIOFSYNC, AIO_NO_KAIO, NULL);
-		if (err != 0) {
-			(void) mutex_lock(&head->lio_mutex);
+		error = _aio_rw(aiocbp, head, &next, AIOFSYNC, AIO_NO_KAIO);
+		if (error != 0) {
+			sig_mutex_lock(&head->lio_mutex);
 			head->lio_mode = LIO_DESTROY;	/* ignore fsync */
 			head->lio_nent -= workerscnt - i;
 			head->lio_refcnt -= workerscnt - i;
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
 			errno = EAGAIN;
 			return (i);
 		}
@@ -748,39 +748,47 @@ __aio_fsync_bar(aiocb_t *cb, aio_lio_t *head, aio_worker_t *aiowp,
 /*
  * This function is called from aio_fsync(3RT).
  */
-
 int
-__aio_fsync(int op, aiocb_t *cb)
+__aio_fsync(int op, aiocb_t *aiocbp)
 {
-	struct stat buf;
 	aio_lio_t *head;
-	int	retval;
+	struct stat statb;
+	int fret;
 
-	if (cb == NULL) {
+	if (aiocbp == NULL)
 		return (0);
-	}
 
-	if ((op != O_DSYNC) && (op != O_SYNC)) {
+	if (aiocbp->aio_reqprio < 0 || (op != O_DSYNC && op != O_SYNC)) {
 		errno = EINVAL;
 		return (-1);
 	}
-
-	if (fstat(cb->aio_fildes, &buf) < 0)
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
+		return (-1);
+	}
+	if (fstat(aiocbp->aio_fildes, &statb) < 0)
 		return (-1);
 
 	/*
-	 * The first asynchronous I/O request in the current process
-	 * will create a bunch of workers.
-	 * If the sum of workers (read + write) is zero then the
-	 * number of pending asynchronous I/O requests is zero.
-	 * In such a case only execute the standard fsync(3C) or
-	 * fdatasync(3RT) as appropriate (see flag of __fdsync()).
+	 * Kernel aio_fsync() is not supported.
+	 * We force user-level aio_fsync() just
+	 * for the notification side-effect.
 	 */
-	if ((__wr_workerscnt + __rd_workerscnt) == 0) {
+	if (!__uaio_ok && __uaio_init() == -1)
+		return (-1);
+
+	/*
+	 * The first asynchronous I/O request in the current process will
+	 * create a bunch of workers (via __uaio_init()).  If the number
+	 * of workers is zero then the number of pending asynchronous I/O
+	 * requests is zero.  In such a case only execute the standard
+	 * fsync(3C) or fdatasync(3RT) as appropriate.
+	 */
+	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)
-			return (__fdsync(cb->aio_fildes, FDSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC));
 		else
-			return (__fdsync(cb->aio_fildes, FSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FSYNC));
 	}
 
 	/*
@@ -788,29 +796,30 @@ __aio_fsync(int op, aiocb_t *cb)
 	 * 	O_DSYNC - fdatasync()
 	 * 	O_SYNC - fsync()
 	 */
-	cb->aio_offset = op;
-	cb->aio_lio_opcode = AIOFSYNC;
+	aiocbp->aio_offset = op;
+	aiocbp->aio_lio_opcode = AIOFSYNC;
 
 	/*
-	 * create a list of fsync requests. the worker
-	 * that gets the last request will do the fsync
-	 * request.
+	 * Create a list of fsync requests.  The worker that
+	 * gets the last request will do the fsync request.
 	 */
-	(void) _aio_lio_alloc(&head);
+	head = _aio_lio_alloc();
 	if (head == NULL) {
 		errno = EAGAIN;
 		return (-1);
 	}
 	head->lio_mode = LIO_FSYNC;
-	head->lio_signo = 0;
-	head->lio_nent = head->lio_refcnt = __wr_workerscnt + __rd_workerscnt;
-	/* insert an fsync request on every read workers' queue. */
-	retval = __aio_fsync_bar(cb, head, __workers_rd, __rd_workerscnt);
-	if (retval != __rd_workerscnt) {
+	head->lio_nent = head->lio_refcnt = __rw_workerscnt;
+	head->lio_largefile = 0;
+
+	/*
+	 * Insert an fsync request on every worker's queue.
+	 */
+	fret = __aio_fsync_bar(aiocbp, head, __workers_rw, __rw_workerscnt);
+	if (fret != __rw_workerscnt) {
 		/*
-		 * Less fsync requests than workers means that
-		 * it was not possible to submit fsync requests to all
-		 * workers.
+		 * Fewer fsync requests than workers means that it was
+		 * not possible to submit fsync requests to all workers.
 		 * Actions:
 		 * a) number of fsync requests submitted is 0:
 		 *    => free allocated memory (aio_lio_t).
@@ -818,22 +827,17 @@ __aio_fsync(int op, aiocb_t *cb)
 		 *    => the last worker executing the fsync request
 		 *	 will free the aio_lio_t struct.
 		 */
-		if (retval == 0)
+		if (fret == 0)
 			_aio_lio_free(head);
 		return (-1);
 	}
-
-	/* insert an fsync request on every write workers' queue. */
-	retval = __aio_fsync_bar(cb, head, __workers_wr, __wr_workerscnt);
-	if (retval != __wr_workerscnt)
-		return (-1);
 	return (0);
 }
 
 int
-__aio_cancel(int fd, aiocb_t *cb)
+__aio_cancel(int fd, aiocb_t *aiocbp)
 {
-	aio_req_t *rp;
+	aio_req_t *reqp;
 	aio_worker_t *aiowp;
 	int done = 0;
 	int canceled = 0;
@@ -842,38 +846,55 @@ __aio_cancel(int fd, aiocb_t *cb)
 	if (fstat(fd, &buf) < 0)
 		return (-1);
 
-	if (cb != NULL) {
-		if (cb->aio_state == USERAIO) {
-			_aio_lock();
-			rp = _aio_hash_find(&cb->aio_resultp);
-			if (rp == NULL) {
-				_aio_unlock();
-				return (AIO_ALLDONE);
-			} else {
-				aiowp = rp->req_worker;
-				(void) mutex_lock(&aiowp->work_qlock1);
-				(void) _aio_cancel_req(aiowp, rp, &canceled,
-				    &done);
-				(void) mutex_unlock(&aiowp->work_qlock1);
-				_aio_unlock();
-				if (done)
-					return (AIO_ALLDONE);
-				else if (canceled)
-					return (AIO_CANCELED);
-				else
-					return (AIO_NOTCANCELED);
-			}
+	if (aiocbp != NULL) {
+		if (fd != aiocbp->aio_fildes) {
+			errno = EINVAL;
+			return (-1);
 		}
-
-		if (cb->aio_state == USERAIO_DONE)
+		if (aiocbp->aio_state == USERAIO) {
+			sig_mutex_lock(&__aio_mutex);
+			reqp = _aio_hash_find(&aiocbp->aio_resultp);
+			if (reqp == NULL) {
+				sig_mutex_unlock(&__aio_mutex);
+				return (AIO_ALLDONE);
+			}
+			aiowp = reqp->req_worker;
+			sig_mutex_lock(&aiowp->work_qlock1);
+			(void) _aio_cancel_req(aiowp, reqp, &canceled, &done);
+			sig_mutex_unlock(&aiowp->work_qlock1);
+			sig_mutex_unlock(&__aio_mutex);
+			if (done)
+				return (AIO_ALLDONE);
+			if (canceled)
+				return (AIO_CANCELED);
+			return (AIO_NOTCANCELED);
+		}
+		if (aiocbp->aio_state == USERAIO_DONE)
 			return (AIO_ALLDONE);
-
-		return ((int)_kaio(AIOCANCEL, fd, cb));
+		return ((int)_kaio(AIOCANCEL, fd, aiocbp));
 	}
 
 	return (aiocancel_all(fd));
 }
 
+/*
+ * __aio_waitn() cancellation handler.
+ */
+/* ARGSUSED */
+static void
+_aio_waitn_cleanup(void *arg)
+{
+	ASSERT(MUTEX_HELD(&__aio_mutex));
+
+	/* check for pending aio_waitn() calls */
+	_aio_flags &= ~(AIO_LIB_WAITN | AIO_WAIT_INPROGRESS | AIO_IO_WAITING);
+	if (_aio_flags & AIO_LIB_WAITN_PENDING) {
+		_aio_flags &= ~AIO_LIB_WAITN_PENDING;
+		(void) cond_signal(&_aio_waitn_cv);
+	}
+
+	sig_mutex_unlock(&__aio_mutex);
+}
 
 /*
  * aio_waitn can be used to reap the results of several I/O operations that
@@ -886,34 +907,23 @@ __aio_cancel(int fd, aiocb_t *cb)
  * return if the timeout expires. Additionally, aio_waitn returns 0 if
  * successful or -1 if an error occurred.
  */
-
-/*ARGSUSED*/
 int
-__aio_waitn(void **list, uint_t nent, uint_t *nwait,
-    const struct timespec *utimo, int largefile)
+__aio_waitn(void **list, uint_t nent, uint_t *nwait, const timespec_t *utimo)
 {
-	int err = 0;
+	int error = 0;
 	uint_t dnwait = 0;	/* amount of requests in the waitn-done list */
 	uint_t kwaitcnt;	/* expected "done" requests from kernel */
 	uint_t knentcnt;	/* max. expected "done" requests from kernel */
 	int uerrno = 0;
 	int kerrno = 0;		/* save errno from _kaio() call */
 	int timedwait = AIO_TIMEOUT_UNDEF;
-	aio_req_t *aiorp;
-#if	defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
-	aiocb64_t *aiop64;
-#endif
-	struct timespec end;
-	struct timespec twait;	/* copy of utimo for internal calculations */
-	struct timespec *wait = NULL;
+	aio_req_t *reqp;
+	timespec_t end;
+	timespec_t twait;	/* copy of utimo for internal calculations */
+	timespec_t *wait = NULL;
 
 	if (nent == 0 || *nwait == 0 || *nwait > nent) {
 		errno = EINVAL;
-		return (-1);
-	}
-
-	if (nwait == NULL) {
-		errno = EFAULT;
 		return (-1);
 	}
 
@@ -923,37 +933,36 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 	 * call finishes.
 	 */
 
-	(void) mutex_lock(&__aio_waitn_mutex);
+	sig_mutex_lock(&__aio_mutex);
 
 	while (_aio_flags & AIO_LIB_WAITN) {
-
 		if (utimo && utimo->tv_sec == 0 && utimo->tv_nsec == 0) {
-			(void) mutex_unlock(&__aio_waitn_mutex);
+			sig_mutex_unlock(&__aio_mutex);
 			*nwait = 0;
 			return (0);
 		}
-
 		_aio_flags |= AIO_LIB_WAITN_PENDING;
-		err = cond_wait(&_aio_waitn_cv, &__aio_waitn_mutex);
-		if (err != 0) {
-			(void) mutex_unlock(&__aio_waitn_mutex);
+		pthread_cleanup_push(sig_mutex_unlock, &__aio_mutex);
+		error = sig_cond_wait(&_aio_waitn_cv, &__aio_mutex);
+		pthread_cleanup_pop(0);
+		if (error != 0) {
+			sig_mutex_unlock(&__aio_mutex);
 			*nwait = 0;
-			errno = err;
+			errno = error;
 			return (-1);
 		}
 	}
 
+	pthread_cleanup_push(_aio_waitn_cleanup, NULL);
+
 	_aio_flags |= AIO_LIB_WAITN;
 
-	(void) mutex_unlock(&__aio_waitn_mutex);
-
 	if (*nwait >= AIO_WAITN_MAXIOCBS) {
-		err = _aio_check_timeout(utimo, &end, &timedwait);
-		if (err) {
-			*nwait = 0;
-			return (-1);
+		if (_aio_check_timeout(utimo, &end, &timedwait) != 0) {
+			error = -1;
+			dnwait = 0;
+			goto out;
 		}
-
 		if (timedwait != AIO_TIMEOUT_INDEF) {
 			twait = *utimo;
 			wait = &twait;
@@ -961,38 +970,33 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 	}
 
 	/*
-	 * _aio_lock() is not required at this time, but the
-	 * condition is that "_aio_doneq_cnt" has to be updated
-	 * before "_aio_outstand_cnt". Otherwise we could hit
-	 * a zero value in both counters during the transition
-	 * time (see _aiodone).
-	 *
 	 * If both counters are still set to zero, then only
 	 * kernel requests are currently outstanding (raw-I/Os).
 	 */
-
 	if ((_aio_doneq_cnt + _aio_outstand_cnt) == 0) {
-
 		for (;;) {
 			kwaitcnt = *nwait - dnwait;
 			knentcnt = nent - dnwait;
 			if (knentcnt > AIO_WAITN_MAXIOCBS)
 				knentcnt = AIO_WAITN_MAXIOCBS;
-
 			kwaitcnt = (kwaitcnt > knentcnt) ? knentcnt : kwaitcnt;
 
-			err = (int)_kaio(AIOWAITN, &list[dnwait], knentcnt,
+			pthread_cleanup_push(sig_mutex_lock, &__aio_mutex);
+			sig_mutex_unlock(&__aio_mutex);
+			_cancel_prologue();
+			error = (int)_kaio(AIOWAITN, &list[dnwait], knentcnt,
 			    &kwaitcnt, wait);
+			_cancel_epilogue();
+			pthread_cleanup_pop(1);
 
-			if (err == 0) {
+			if (error == 0) {
 				dnwait += kwaitcnt;
 				if (dnwait >= *nwait ||
 				    *nwait < AIO_WAITN_MAXIOCBS)
 					break;
-
 				if (timedwait == AIO_TIMEOUT_WAIT) {
-					err = _aio_get_timedelta(&end, wait);
-					if (err ==  -1) {
+					error = _aio_get_timedelta(&end, wait);
+					if (error ==  -1) {
 						/* timer expired */
 						errno = ETIME;
 						break;
@@ -1000,45 +1004,30 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 				}
 				continue;
 			}
-
 			if (errno == EAGAIN) {
 				if (dnwait > 0)
-					err = 0;
+					error = 0;
 				break;
 			}
-
 			if (errno == ETIME || errno == EINTR) {
 				dnwait += kwaitcnt;
 				break;
 			}
-
 			/* fatal error */
 			break;
 		}
 
-		*nwait = dnwait;
-
-		/* check for pending aio_waitn() calls */
-		(void) mutex_lock(&__aio_waitn_mutex);
-		_aio_flags &= ~AIO_LIB_WAITN;
-		if (_aio_flags & AIO_LIB_WAITN_PENDING) {
-			_aio_flags &= ~AIO_LIB_WAITN_PENDING;
-			(void) cond_signal(&_aio_waitn_cv);
-		}
-		(void) mutex_unlock(&__aio_waitn_mutex);
-
-		return (err);
+		goto out;
 	}
 
 	/* File system I/Os outstanding ... */
 
 	if (timedwait == AIO_TIMEOUT_UNDEF) {
-		err = _aio_check_timeout(utimo, &end, &timedwait);
-		if (err) {
-			*nwait = 0;
-			return (-1);
+		if (_aio_check_timeout(utimo, &end, &timedwait) != 0) {
+			error = -1;
+			dnwait = 0;
+			goto out;
 		}
-
 		if (timedwait != AIO_TIMEOUT_INDEF) {
 			twait = *utimo;
 			wait = &twait;
@@ -1054,34 +1043,29 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 		 * greater than the calculated sum (sum_reqs) then
 		 * use _kaio to check pending RAW-IO requests.
 		 */
-
-		(void) mutex_lock(&__aio_mutex);
 		sum_reqs = _aio_doneq_cnt + dnwait + _aio_outstand_cnt;
 		kwaitcnt = (*nwait > sum_reqs) ? *nwait - sum_reqs : 0;
-		(void) mutex_unlock(&__aio_mutex);
 
 		if (kwaitcnt != 0) {
-
 			/* possibly some kernel I/Os outstanding */
-
 			knentcnt = nent - dnwait;
 			if (knentcnt > AIO_WAITN_MAXIOCBS)
 				knentcnt = AIO_WAITN_MAXIOCBS;
-
 			kwaitcnt = (kwaitcnt > knentcnt) ? knentcnt : kwaitcnt;
 
-			(void) mutex_lock(&__aio_waitn_mutex);
 			_aio_flags |= AIO_WAIT_INPROGRESS;
-			(void) mutex_unlock(&__aio_waitn_mutex);
 
-			err = (int)_kaio(AIOWAITN, &list[dnwait], knentcnt,
+			pthread_cleanup_push(sig_mutex_lock, &__aio_mutex);
+			sig_mutex_unlock(&__aio_mutex);
+			_cancel_prologue();
+			error = (int)_kaio(AIOWAITN, &list[dnwait], knentcnt,
 			    &kwaitcnt, wait);
+			_cancel_epilogue();
+			pthread_cleanup_pop(1);
 
-			(void) mutex_lock(&__aio_waitn_mutex);
 			_aio_flags &= ~AIO_WAIT_INPROGRESS;
-			(void) mutex_unlock(&__aio_waitn_mutex);
 
-			if (err == 0) {
+			if (error == 0) {
 				dnwait += kwaitcnt;
 			} else {
 				switch (errno) {
@@ -1089,11 +1073,9 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 				case EAGAIN:
 					/* don't wait for kernel I/Os */
 					kerrno = 0; /* ignore _kaio() errno */
-					(void) mutex_lock(&__aio_mutex);
 					*nwait = _aio_doneq_cnt +
 					    _aio_outstand_cnt + dnwait;
-					(void) mutex_unlock(&__aio_mutex);
-					err = 0;
+					error = 0;
 					break;
 				case EINTR:
 				case ETIME:
@@ -1101,125 +1083,135 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
 					dnwait += kwaitcnt;
 					timedwait = AIO_TIMEOUT_POLL;
 					kerrno = errno;	/* save _kaio() errno */
-					err = 0;
+					error = 0;
 					break;
 				default:
 					kerrno = errno;	/* save _kaio() errno */
 					break;
 				}
 			}
-
-			if (err)
+			if (error)
 				break;		/* fatal kernel error */
 		}
 
 		/* check completed FS requests in the "done" queue */
 
-		(void) mutex_lock(&__aio_mutex);
-		while (_aio_doneq_cnt && (dnwait < nent)) {
+		while (_aio_doneq_cnt && dnwait < nent) {
 			/* get done requests */
-			if ((aiorp = _aio_req_remove(NULL)) != NULL) {
-				(void) _aio_hash_del(aiorp->req_resultp);
-				list[dnwait++] = aiorp->req_iocb;
-#if	defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
-				if (largefile) {
-					aiop64 = (void *)aiorp->req_iocb;
-					aiop64->aio_state = USERAIO_DONE;
-				} else
-#endif
-					aiorp->req_iocb->aio_state =
-					    USERAIO_DONE;
-				_aio_req_free(aiorp);
+			if ((reqp = _aio_req_remove(NULL)) != NULL) {
+				(void) _aio_hash_del(reqp->req_resultp);
+				list[dnwait++] = reqp->req_aiocbp;
+				_aio_req_mark_done(reqp);
+				_lio_remove(reqp);
+				_aio_req_free(reqp);
 			}
 		}
 
 		if (dnwait >= *nwait) {
 			/* min. requested amount of completed I/Os satisfied */
-			(void) mutex_unlock(&__aio_mutex);
 			break;
 		}
-
-		if (timedwait == AIO_TIMEOUT_WAIT) {
-			if ((err = _aio_get_timedelta(&end, wait)) == -1) {
-				/* timer expired */
-				(void) mutex_unlock(&__aio_mutex);
-				uerrno = ETIME;
-				break;
-			}
+		if (timedwait == AIO_TIMEOUT_WAIT &&
+		    (error = _aio_get_timedelta(&end, wait)) == -1) {
+			/* timer expired */
+			uerrno = ETIME;
+			break;
 		}
 
 		/*
 		 * If some I/Os are outstanding and we have to wait for them,
-		 * then sleep here.
-		 * _aiodone() will wakeup this thread as soon as the
-		 * required amount of completed I/Os is done.
+		 * then sleep here.  _aiodone() will call _aio_waitn_wakeup()
+		 * to wakeup this thread as soon as the required amount of
+		 * completed I/Os is done.
 		 */
-
 		if (_aio_outstand_cnt > 0 && timedwait != AIO_TIMEOUT_POLL) {
-
 			/*
-			 * _aiodone() will wake up this thread as soon as
-			 * - _aio_waitncnt -requests are completed or
+			 * _aio_waitn_wakeup() will wake up this thread when:
+			 * - _aio_waitncnt requests are completed or
 			 * - _aio_outstand_cnt becomes zero.
 			 * cond_reltimedwait() could also return with
-			 * timeout error (ETIME).
+			 * a timeout error (ETIME).
 			 */
-
 			if (*nwait < _aio_outstand_cnt)
 				_aio_waitncnt = *nwait;
 			else
 				_aio_waitncnt = _aio_outstand_cnt;
 
-			(void) mutex_lock(&__aio_waitn_mutex);
 			_aio_flags |= AIO_IO_WAITING;
-			(void) mutex_unlock(&__aio_waitn_mutex);
 
 			if (wait)
-				uerrno = cond_reltimedwait(&_aio_iowait_cv,
+				uerrno = sig_cond_reltimedwait(&_aio_iowait_cv,
 				    &__aio_mutex, wait);
 			else
-				uerrno = cond_wait(&_aio_iowait_cv,
+				uerrno = sig_cond_wait(&_aio_iowait_cv,
 				    &__aio_mutex);
 
-			(void) mutex_lock(&__aio_waitn_mutex);
 			_aio_flags &= ~AIO_IO_WAITING;
-			(void) mutex_unlock(&__aio_waitn_mutex);
 
 			if (uerrno == ETIME) {
 				timedwait = AIO_TIMEOUT_POLL;
-				(void) mutex_unlock(&__aio_mutex);
 				continue;
 			}
-
 			if (uerrno != 0)
 				timedwait = AIO_TIMEOUT_POLL;
 		}
 
-		(void) mutex_unlock(&__aio_mutex);
 		if (timedwait == AIO_TIMEOUT_POLL) {
 			/* polling or timer expired */
 			break;
 		}
 	}
 
-	/* check for pending aio_waitn() calls */
-	(void) mutex_lock(&__aio_waitn_mutex);
-	_aio_flags &= ~AIO_LIB_WAITN;
-	if (_aio_flags & AIO_LIB_WAITN_PENDING) {
-		_aio_flags &= ~AIO_LIB_WAITN_PENDING;
-		(void) cond_signal(&_aio_waitn_cv);
-	}
-	(void) mutex_unlock(&__aio_waitn_mutex);
-
-	*nwait = dnwait;
-
 	errno = uerrno == 0 ? kerrno : uerrno;
 	if (errno)
-		err = -1;
+		error = -1;
 	else
-		err = 0;
+		error = 0;
 
-	return (err);
+out:
+	*nwait = dnwait;
+
+	pthread_cleanup_pop(1);		/* drops __aio_mutex */
+
+	return (error);
+}
+
+void
+_aio_waitn_wakeup(void)
+{
+	/*
+	 * __aio_waitn() sets AIO_IO_WAITING to notify _aiodone() that
+	 * it is waiting for completed I/Os. The number of required
+	 * completed I/Os is stored into "_aio_waitncnt".
+	 * aio_waitn() is woken up when
+	 * - there are no further outstanding I/Os
+	 *   (_aio_outstand_cnt == 0) or
+	 * - the expected number of I/Os has completed.
+	 * Only one __aio_waitn() function waits for completed I/Os at
+	 * a time.
+	 *
+	 * __aio_suspend() increments "_aio_suscv_cnt" to notify
+	 * _aiodone() that at least one __aio_suspend() call is
+	 * waiting for completed I/Os.
+	 * There could be more than one __aio_suspend() function
+	 * waiting for completed I/Os. Because every function should
+	 * be waiting for different I/Os, _aiodone() has to wake up all
+	 * __aio_suspend() functions each time.
+	 * Every __aio_suspend() function will compare the recently
+	 * completed I/O with its own list.
+	 */
+	ASSERT(MUTEX_HELD(&__aio_mutex));
+	if (_aio_flags & AIO_IO_WAITING) {
+		if (_aio_waitncnt > 0)
+			_aio_waitncnt--;
+		if (_aio_outstand_cnt == 0 || _aio_waitncnt == 0 ||
+		    _aio_suscv_cnt > 0)
+			(void) cond_broadcast(&_aio_iowait_cv);
+	} else {
+		/* Wake up waiting aio_suspend calls */
+		if (_aio_suscv_cnt > 0)
+			(void) cond_broadcast(&_aio_iowait_cv);
+	}
 }
 
 /*
@@ -1228,35 +1220,21 @@ __aio_waitn(void **list, uint_t nent, uint_t *nwait,
  * AIO_TIMEOUT_WAIT 	: timeout
  * AIO_TIMEOUT_INDEF	: wait indefinitely
  */
-int
-_aio_check_timeout(const struct timespec *utimo, struct timespec *end,
-	int *timedwait)
+static int
+_aio_check_timeout(const timespec_t *utimo, timespec_t *end, int *timedwait)
 {
 	struct	timeval	curtime;
 
 	if (utimo) {
-		if ((utimo->tv_sec < 0) || (utimo->tv_nsec < 0) ||
-		    (utimo->tv_nsec >= NANOSEC)) {
-			/*
-			 * invalid timer values => return EINVAL
-			 * check for pending aio_waitn() calls
-			 */
-			(void) mutex_lock(&__aio_waitn_mutex);
-			_aio_flags &= ~AIO_LIB_WAITN;
-			if (_aio_flags & AIO_LIB_WAITN_PENDING) {
-				_aio_flags &= ~AIO_LIB_WAITN_PENDING;
-				(void) cond_signal(&_aio_waitn_cv);
-			}
-			(void) mutex_unlock(&__aio_waitn_mutex);
+		if (utimo->tv_sec < 0 || utimo->tv_nsec < 0 ||
+		    utimo->tv_nsec >= NANOSEC) {
 			errno = EINVAL;
 			return (-1);
 		}
-
-		if ((utimo->tv_sec > 0) || (utimo->tv_nsec > 0)) {
+		if (utimo->tv_sec > 0 || utimo->tv_nsec > 0) {
 			(void) gettimeofday(&curtime, NULL);
 			end->tv_sec = utimo->tv_sec + curtime.tv_sec;
-			end->tv_nsec = utimo->tv_nsec +
-			    1000 * curtime.tv_usec;
+			end->tv_nsec = utimo->tv_nsec + 1000 * curtime.tv_usec;
 			if (end->tv_nsec >= NANOSEC) {
 				end->tv_nsec -= NANOSEC;
 				end->tv_sec += 1;
@@ -1272,51 +1250,54 @@ _aio_check_timeout(const struct timespec *utimo, struct timespec *end,
 	return (0);
 }
 
-#if	defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
-__aio_read64(aiocb64_t *cb)
+__aio_read64(aiocb64_t *aiocbp)
 {
-	aio_lio_t	*head = NULL;
-
-	if (cb == NULL || cb->aio_offset < 0 || cb->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
 		errno = EINVAL;
 		return (-1);
 	}
-
-	cb->aio_lio_opcode = LIO_READ;
-	return (_aio_rw64(cb, head, &__nextworker_rd, AIOAREAD64,
-	    (AIO_KAIO | AIO_NO_DUPS), NULL));
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
+		return (-1);
+	}
+	aiocbp->aio_lio_opcode = LIO_READ;
+	return (_aio_rw64(aiocbp, NULL, &__nextworker_rw, AIOAREAD64,
+	    (AIO_KAIO | AIO_NO_DUPS)));
 }
 
 int
-__aio_write64(aiocb64_t *cb)
+__aio_write64(aiocb64_t *aiocbp)
 {
-	aio_lio_t	*head = NULL;
-
-	if (cb == NULL || cb->aio_offset < 0 || cb->aio_reqprio < 0) {
+	if (aiocbp == NULL || aiocbp->aio_reqprio < 0) {
 		errno = EINVAL;
 		return (-1);
 	}
-	cb->aio_lio_opcode = LIO_WRITE;
-	return (_aio_rw64(cb, head, &__nextworker_wr, AIOAWRITE64,
-	    (AIO_KAIO | AIO_NO_DUPS), NULL));
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
+		return (-1);
+	}
+	aiocbp->aio_lio_opcode = LIO_WRITE;
+	return (_aio_rw64(aiocbp, NULL, &__nextworker_rw, AIOAWRITE64,
+	    (AIO_KAIO | AIO_NO_DUPS)));
 }
 
 int
-__lio_listio64(int mode, aiocb64_t * const list[],
-    int nent, struct sigevent *sig)
+__lio_listio64(int mode, aiocb64_t *const list[],
+	int nent, struct sigevent *sigev)
 {
-	int 		i, err;
 	int 		aio_ufs = 0;
 	int 		oerrno = 0;
 	aio_lio_t	*head = NULL;
+	aiocb64_t	*aiocbp;
 	int		state = 0;
-	static long	aio_list_max = 0;
-	aio_worker_t 	**nextworker;
 	int 		EIOflg = 0;
 	int 		rw;
 	int		do_kaio = 0;
+	int 		error;
+	int 		i;
 
 	if (!_kaio_ok)
 		_kaio_init();
@@ -1324,7 +1305,7 @@ __lio_listio64(int mode, aiocb64_t * const list[],
 	if (aio_list_max == 0)
 		aio_list_max = sysconf(_SC_AIO_LISTIO_MAX);
 
-	if (nent < 0 || nent > aio_list_max) {
+	if (nent <= 0 || nent > aio_list_max) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -1342,107 +1323,115 @@ __lio_listio64(int mode, aiocb64_t * const list[],
 	}
 
 	for (i = 0; i < nent; i++) {
-		if (list[i]) {
-			if (list[i]->aio_lio_opcode != LIO_NOP) {
-				list[i]->aio_state = state;
-				if (KAIO_SUPPORTED(list[i]->aio_fildes))
-					do_kaio++;
-				else
-					list[i]->aio_resultp.aio_errno =
-					    ENOTSUP;
-			} else
-				list[i]->aio_state = NOCHECK;
+		if ((aiocbp = list[i]) == NULL)
+			continue;
+		if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+			errno = EBUSY;
+			return (-1);
+		}
+		if (aiocbp->aio_lio_opcode == LIO_NOP)
+			aiocbp->aio_state = NOCHECK;
+		else {
+			aiocbp->aio_state = state;
+			if (KAIO_SUPPORTED(aiocbp->aio_fildes))
+				do_kaio++;
+			else
+				aiocbp->aio_resultp.aio_errno = ENOTSUP;
 		}
 	}
 
 	if (do_kaio) {
-		if ((err = (int)_kaio(AIOLIO64, mode, list, nent, sig)) == 0)
+		error = (int)_kaio(AIOLIO64, mode, list, nent, sigev);
+		if (error == 0)
 			return (0);
 		oerrno = errno;
 	} else {
 		oerrno = errno = ENOTSUP;
-		err = -1;
+		error = -1;
 	}
-	if ((err == -1) && (errno == ENOTSUP)) {
-		err = errno = 0;
+
+	if (error == -1 && errno == ENOTSUP) {
+		error = errno = 0;
 		/*
-		 * If LIO_WAIT, or signal required, allocate a list head.
+		 * If LIO_WAIT, or notification required, allocate a list head.
 		 */
-		if ((mode == LIO_WAIT) ||
-		    ((sig) && (sig->sigev_notify == SIGEV_SIGNAL)))
-			(void) _aio_lio_alloc(&head);
+		if (mode == LIO_WAIT ||
+		    (sigev != NULL &&
+		    (sigev->sigev_notify == SIGEV_SIGNAL ||
+		    sigev->sigev_notify == SIGEV_THREAD ||
+		    sigev->sigev_notify == SIGEV_PORT)))
+			head = _aio_lio_alloc();
 		if (head) {
-			(void) mutex_lock(&head->lio_mutex);
+			sig_mutex_lock(&head->lio_mutex);
 			head->lio_mode = mode;
-			if ((mode == LIO_NOWAIT) && (sig) &&
-			    (sig->sigev_notify != SIGEV_NONE) &&
-			    (sig->sigev_signo > 0)) {
-				head->lio_signo = sig->sigev_signo;
-				head->lio_sigval.sival_ptr =
-				    sig->sigev_value.sival_ptr;
-			} else
-				head->lio_signo = 0;
+			head->lio_largefile = 1;
+			if (mode == LIO_NOWAIT && sigev != NULL) {
+				if (sigev->sigev_notify == SIGEV_THREAD) {
+					head->lio_port = sigev->sigev_signo;
+					head->lio_event = AIOLIO64;
+					head->lio_sigevent = sigev;
+					head->lio_sigval.sival_ptr =
+					    sigev->sigev_value.sival_ptr;
+				} else if (sigev->sigev_notify == SIGEV_PORT) {
+					port_notify_t *pn =
+					    sigev->sigev_value.sival_ptr;
+					head->lio_port = pn->portnfy_port;
+					head->lio_event = AIOLIO64;
+					head->lio_sigevent = sigev;
+					head->lio_sigval.sival_ptr =
+					    pn->portnfy_user;
+				} else {	/* SIGEV_SIGNAL */
+					head->lio_signo = sigev->sigev_signo;
+					head->lio_sigval.sival_ptr =
+					    sigev->sigev_value.sival_ptr;
+				}
+			}
 			head->lio_nent = head->lio_refcnt = nent;
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
 		}
 		/*
 		 * find UFS requests, errno == ENOTSUP/EBADFD,
 		 */
 		for (i = 0; i < nent; i++) {
-			if (list[i] &&
-			    ((list[i]->aio_resultp.aio_errno == ENOTSUP) ||
-			    (list[i]->aio_resultp.aio_errno == EBADFD))) {
-				if (list[i]->aio_lio_opcode == LIO_NOP) {
-					if (head)
-						_lio_list_decr(head);
-					continue;
-				}
-				if (list[i]->aio_resultp.aio_errno == EBADFD)
-					SET_KAIO_NOT_SUPPORTED(
-					    list[i]->aio_fildes);
-				if (list[i]->aio_reqprio < 0) {
-					list[i]->aio_resultp.aio_errno =
-					    EINVAL;
-					list[i]->aio_resultp.aio_return = -1;
-					EIOflg = 1;
-					if (head)
-						_lio_list_decr(head);
-					continue;
-				}
-				/*
-				 * submit an AIO request with flags AIO_NO_KAIO
-				 * to avoid the kaio() syscall in _aio_rw()
-				 */
-				switch (list[i]->aio_lio_opcode) {
-					case LIO_READ:
-						rw = AIOAREAD64;
-						nextworker = &__nextworker_rd;
-						break;
-					case LIO_WRITE:
-						rw = AIOAWRITE64;
-						nextworker = &__nextworker_wr;
-						break;
-				}
-				if (sig && (sig->sigev_notify == SIGEV_PORT))
-					err = _aio_rw64(list[i], head,
-					    nextworker, rw,
-					    (AIO_NO_KAIO | AIO_NO_DUPS), sig);
-				else
-					err = _aio_rw64(list[i], head,
-					    nextworker, rw,
-					    (AIO_NO_KAIO | AIO_NO_DUPS), NULL);
-				if (err != 0) {
-					if (head)
-						_lio_list_decr(head);
-					list[i]->aio_resultp.aio_errno = err;
-					EIOflg = 1;
-				} else
-					aio_ufs++;
-
-			} else {
+			if ((aiocbp = list[i]) == NULL ||
+			    aiocbp->aio_lio_opcode == LIO_NOP ||
+			    (aiocbp->aio_resultp.aio_errno != ENOTSUP &&
+			    aiocbp->aio_resultp.aio_errno != EBADFD)) {
 				if (head)
 					_lio_list_decr(head);
 				continue;
+			}
+			if (aiocbp->aio_resultp.aio_errno == EBADFD)
+				SET_KAIO_NOT_SUPPORTED(aiocbp->aio_fildes);
+			if (aiocbp->aio_reqprio < 0) {
+				aiocbp->aio_resultp.aio_errno = EINVAL;
+				aiocbp->aio_resultp.aio_return = -1;
+				EIOflg = 1;
+				if (head)
+					_lio_list_decr(head);
+				continue;
+			}
+			/*
+			 * submit an AIO request with flags AIO_NO_KAIO
+			 * to avoid the kaio() syscall in _aio_rw()
+			 */
+			switch (aiocbp->aio_lio_opcode) {
+			case LIO_READ:
+				rw = AIOAREAD64;
+				break;
+			case LIO_WRITE:
+				rw = AIOAWRITE64;
+				break;
+			}
+			error = _aio_rw64(aiocbp, head, &__nextworker_rw, rw,
+			    (AIO_NO_KAIO | AIO_NO_DUPS));
+			if (error == 0)
+				aio_ufs++;
+			else {
+				if (head)
+					_lio_list_decr(head);
+				aiocbp->aio_resultp.aio_errno = error;
+				EIOflg = 1;
 			}
 		}
 	}
@@ -1450,28 +1439,35 @@ __lio_listio64(int mode, aiocb64_t * const list[],
 		errno = EIO;
 		return (-1);
 	}
-	if ((mode == LIO_WAIT) && (oerrno == ENOTSUP)) {
+	if (mode == LIO_WAIT && oerrno == ENOTSUP) {
 		/*
 		 * call kaio(AIOLIOWAIT) to get all outstanding
 		 * kernel AIO requests
 		 */
-		if ((nent - aio_ufs) > 0) {
-			_kaio(AIOLIOWAIT, mode, list, nent, sig);
-		}
-		if (head && head->lio_nent > 0) {
-			(void) mutex_lock(&head->lio_mutex);
+		if ((nent - aio_ufs) > 0)
+			(void) _kaio(AIOLIOWAIT, mode, list, nent, sigev);
+		if (head != NULL && head->lio_nent > 0) {
+			sig_mutex_lock(&head->lio_mutex);
 			while (head->lio_refcnt > 0) {
-				errno = cond_wait(&head->lio_cond_cv,
+				int err;
+				head->lio_waiting = 1;
+				pthread_cleanup_push(_lio_listio_cleanup, head);
+				err = sig_cond_wait(&head->lio_cond_cv,
 				    &head->lio_mutex);
-				if (errno) {
-					(void) mutex_unlock(&head->lio_mutex);
+				pthread_cleanup_pop(0);
+				head->lio_waiting = 0;
+				if (err && head->lio_nent > 0) {
+					sig_mutex_unlock(&head->lio_mutex);
+					errno = err;
 					return (-1);
 				}
 			}
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
+			ASSERT(head->lio_nent == 0 && head->lio_refcnt == 0);
+			_aio_lio_free(head);
 			for (i = 0; i < nent; i++) {
-				if (list[i] &&
-				    list[i]->aio_resultp.aio_errno) {
+				if ((aiocbp = list[i]) != NULL &&
+				    aiocbp->aio_resultp.aio_errno) {
 					errno = EIO;
 					return (-1);
 				}
@@ -1479,109 +1475,108 @@ __lio_listio64(int mode, aiocb64_t * const list[],
 		}
 		return (0);
 	}
-	return (err);
+	return (error);
 }
 
 int
-__aio_error64(aiocb64_t *cb)
+__aio_error64(aiocb64_t *aiocbp)
 {
-	aio_req_t *reqp;
-	int aio_errno = cb->aio_resultp.aio_errno;
+	aio_result_t *resultp = &aiocbp->aio_resultp;
+	int error;
 
-	if (aio_errno == EINPROGRESS) {
-		if (cb->aio_state == CHECK) {
+	if ((error = resultp->aio_errno) == EINPROGRESS) {
+		if (aiocbp->aio_state == CHECK) {
 			/*
-			 * Always do the kaio() call without using
-			 * the KAIO_SUPPORTED()
-			 * checks because it is not mandatory to
-			 * have a valid fd
-			 * set in the aiocb, only the resultp must be set.
+			 * Always do the kaio() call without using the
+			 * KAIO_SUPPORTED() checks because it is not
+			 * mandatory to have a valid fd set in the
+			 * aiocb, only the resultp must be set.
 			 */
-			if ((_kaio(AIOERROR64, cb)) == EINVAL) {
+			if ((int)_kaio(AIOERROR64, aiocbp) == EINVAL) {
 				errno = EINVAL;
 				return (-1);
 			}
-		} else if (cb->aio_state == CHECKED)
-			cb->aio_state =  CHECK;
-		return (aio_errno);
-	}
-
-	if (cb->aio_state == USERAIO) {
-		_aio_lock();
-		if (reqp = _aio_hash_find(&cb->aio_resultp)) {
-			cb->aio_state = NOCHECK;
-			_lio_remove(reqp->lio_head);
-			(void) _aio_hash_del(reqp->req_resultp);
-			(void) _aio_req_remove(reqp);
-			_aio_req_free(reqp);
+			error = resultp->aio_errno;
+		} else if (aiocbp->aio_state == CHECKED) {
+			aiocbp->aio_state =  CHECK;
 		}
-		_aio_unlock();
 	}
-	return (aio_errno);
+	return (error);
 }
 
 ssize_t
-__aio_return64(aiocb64_t *cb)
+__aio_return64(aiocb64_t *aiocbp)
 {
+	aio_result_t *resultp = &aiocbp->aio_resultp;
 	aio_req_t *reqp;
-	int ret;
+	int error;
+	ssize_t retval;
 
 	/*
-	 * graceful detection of an invalid cb is not possible. a
-	 * SIGSEGV will be generated if it is invalid.
+	 * The _aiodone() function stores resultp->aio_return before
+	 * storing resultp->aio_errno (with an membar_producer() in
+	 * between).  We use membar_consumer() below to ensure proper
+	 * memory ordering between _aiodone() and ourself.
 	 */
-	if (cb == NULL) {
-		errno = EINVAL;
-		exit(-1);
-	}
+	error = resultp->aio_errno;
+	membar_consumer();
+	retval = resultp->aio_return;
+
 	/*
-	 * we use this condition to indicate that
-	 * aio_return has been called before
+	 * we use this condition to indicate either that
+	 * aio_return() has been called before or should
+	 * not have been called yet.
 	 */
-	if (cb->aio_resultp.aio_return == -1 &&
-	    cb->aio_resultp.aio_errno == EINVAL) {
-		errno = EINVAL;
+	if ((retval == -1 && error == EINVAL) || error == EINPROGRESS) {
+		errno = error;
 		return (-1);
 	}
 
 	/*
-	 * Before we return mark the result as being returned so that later
+	 * Before we return, mark the result as being returned so that later
 	 * calls to aio_return() will return the fact that the result has
-	 * already been returned
+	 * already been returned.
 	 */
-	ret = cb->aio_resultp.aio_return;
-	cb->aio_resultp.aio_return = -1;
-	cb->aio_resultp.aio_errno = EINVAL;
-	if (cb->aio_state == USERAIO) {
-		_aio_lock();
-		if (reqp = _aio_hash_find(&cb->aio_resultp)) {
-			cb->aio_state = NOCHECK;
-			_lio_remove(reqp->lio_head);
-			(void) _aio_hash_del(reqp->req_resultp);
-			(void) _aio_req_remove(reqp);
-			_aio_req_free(reqp);
-		}
-		_aio_unlock();
+	sig_mutex_lock(&__aio_mutex);
+	/* retest, in case more than one thread actually got in here */
+	if (resultp->aio_return == -1 && resultp->aio_errno == EINVAL) {
+		sig_mutex_unlock(&__aio_mutex);
+		errno = EINVAL;
+		return (-1);
 	}
-	return (ret);
+	resultp->aio_return = -1;
+	resultp->aio_errno = EINVAL;
+	if ((reqp = _aio_hash_del(resultp)) == NULL)
+		sig_mutex_unlock(&__aio_mutex);
+	else {
+		aiocbp->aio_state = NOCHECK;
+		ASSERT(reqp->req_head == NULL);
+		(void) _aio_req_remove(reqp);
+		sig_mutex_unlock(&__aio_mutex);
+		_aio_req_free(reqp);
+	}
+
+	if (retval == -1)
+		errno = error;
+	return (retval);
 }
 
 static int
-__aio_fsync_bar64(aiocb64_t *cb, aio_lio_t *head, aio_worker_t *aiowp,
+__aio_fsync_bar64(aiocb64_t *aiocbp, aio_lio_t *head, aio_worker_t *aiowp,
     int workerscnt)
 {
 	int i;
-	int err;
+	int error;
 	aio_worker_t *next = aiowp;
 
 	for (i = 0; i < workerscnt; i++) {
-		err = _aio_rw64(cb, head, &next, AIOFSYNC, AIO_NO_KAIO, NULL);
-		if (err != 0) {
-			(void) mutex_lock(&head->lio_mutex);
+		error = _aio_rw64(aiocbp, head, &next, AIOFSYNC, AIO_NO_KAIO);
+		if (error != 0) {
+			sig_mutex_lock(&head->lio_mutex);
 			head->lio_mode = LIO_DESTROY;	/* ignore fsync */
 			head->lio_nent -= workerscnt - i;
 			head->lio_refcnt -= workerscnt - i;
-			(void) mutex_unlock(&head->lio_mutex);
+			sig_mutex_unlock(&head->lio_mutex);
 			errno = EAGAIN;
 			return (i);
 		}
@@ -1591,42 +1586,46 @@ __aio_fsync_bar64(aiocb64_t *cb, aio_lio_t *head, aio_worker_t *aiowp,
 }
 
 int
-__aio_fsync64(int op, aiocb64_t *cb)
+__aio_fsync64(int op, aiocb64_t *aiocbp)
 {
-	struct stat buf;
 	aio_lio_t *head;
-	int retval;
+	struct stat statb;
+	int fret;
 
-	if (cb == NULL) {
+	if (aiocbp == NULL)
 		return (0);
-	}
 
-	if ((op != O_DSYNC) && (op != O_SYNC)) {
+	if (aiocbp->aio_reqprio < 0 || (op != O_DSYNC && op != O_SYNC)) {
 		errno = EINVAL;
 		return (-1);
 	}
-
-	if (fstat(cb->aio_fildes, &buf) < 0)
-		return (-1);
-
-	if ((buf.st_mode & S_IWRITE) == 0) {
-		errno = EBADF;
+	if (_aio_hash_find(&aiocbp->aio_resultp) != NULL) {
+		errno = EBUSY;
 		return (-1);
 	}
+	if (fstat(aiocbp->aio_fildes, &statb) < 0)
+		return (-1);
 
 	/*
-	 * The first asynchronous I/O request in the current process
-	 * will create a bunch of workers.
-	 * If the sum of workers (read + write) is zero then the
-	 * number of pending asynchronous I/O requests is zero.
-	 * In such a case only execute the standard fsync(3C) or
-	 * fdatasync(3RT) as appropriate (see flag of __fdsync()).
+	 * Kernel aio_fsync() is not supported.
+	 * We force user-level aio_fsync() just
+	 * for the notification side-effect.
 	 */
-	if ((__wr_workerscnt + __rd_workerscnt) == 0) {
+	if (!__uaio_ok && __uaio_init() == -1)
+		return (-1);
+
+	/*
+	 * The first asynchronous I/O request in the current process will
+	 * create a bunch of workers (via __uaio_init()).  If the number
+	 * of workers is zero then the number of pending asynchronous I/O
+	 * requests is zero.  In such a case only execute the standard
+	 * fsync(3C) or fdatasync(3RT) as appropriate.
+	 */
+	if (__rw_workerscnt == 0) {
 		if (op == O_DSYNC)
-			return (__fdsync(cb->aio_fildes, FDSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FDSYNC));
 		else
-			return (__fdsync(cb->aio_fildes, FSYNC));
+			return (__fdsync(aiocbp->aio_fildes, FSYNC));
 	}
 
 	/*
@@ -1634,30 +1633,30 @@ __aio_fsync64(int op, aiocb64_t *cb)
 	 * 	O_DSYNC - fdatasync()
 	 * 	O_SYNC - fsync()
 	 */
-	cb->aio_offset = op;
-	cb->aio_lio_opcode = AIOFSYNC;
+	aiocbp->aio_offset = op;
+	aiocbp->aio_lio_opcode = AIOFSYNC;
 
 	/*
-	 * create a list of fsync requests. the worker
-	 * that gets the last request will do the fsync
-	 * request.
+	 * Create a list of fsync requests.  The worker that
+	 * gets the last request will do the fsync request.
 	 */
-	(void) _aio_lio_alloc(&head);
+	head = _aio_lio_alloc();
 	if (head == NULL) {
 		errno = EAGAIN;
 		return (-1);
 	}
-
 	head->lio_mode = LIO_FSYNC;
-	head->lio_signo = 0;
-	head->lio_nent = head->lio_refcnt = __wr_workerscnt + __rd_workerscnt;
-	/* insert an fsync request on every read workers' queue. */
-	retval = __aio_fsync_bar64(cb, head, __workers_rd, __rd_workerscnt);
-	if (retval != __rd_workerscnt) {
+	head->lio_nent = head->lio_refcnt = __rw_workerscnt;
+	head->lio_largefile = 1;
+
+	/*
+	 * Insert an fsync request on every worker's queue.
+	 */
+	fret = __aio_fsync_bar64(aiocbp, head, __workers_rw, __rw_workerscnt);
+	if (fret != __rw_workerscnt) {
 		/*
-		 * Less fsync requests than workers means that
-		 * it was not possible to submit fsync requests to all
-		 * workers.
+		 * Fewer fsync requests than workers means that it was
+		 * not possible to submit fsync requests to all workers.
 		 * Actions:
 		 * a) number of fsync requests submitted is 0:
 		 *    => free allocated memory (aio_lio_t).
@@ -1665,56 +1664,54 @@ __aio_fsync64(int op, aiocb64_t *cb)
 		 *    => the last worker executing the fsync request
 		 *	 will free the aio_lio_t struct.
 		 */
-		if (retval == 0)
+		if (fret == 0)
 			_aio_lio_free(head);
 		return (-1);
 	}
-
-	/* insert an fsync request on every write workers' queue. */
-	retval = __aio_fsync_bar64(cb, head, __workers_wr, __wr_workerscnt);
-	if (retval != __wr_workerscnt)
-		return (-1);
 	return (0);
 }
 
 int
-__aio_cancel64(int fd, aiocb64_t *cb)
+__aio_cancel64(int fd, aiocb64_t *aiocbp)
 {
-	aio_req_t	*rp;
+	aio_req_t *reqp;
 	aio_worker_t *aiowp;
 	int done = 0;
 	int canceled = 0;
-	struct stat	buf;
+	struct stat buf;
 
 	if (fstat(fd, &buf) < 0)
 		return (-1);
 
-	if (cb != NULL) {
-		if (cb->aio_state == USERAIO) {
-			_aio_lock();
-			rp = _aio_hash_find(&cb->aio_resultp);
-			if (rp == NULL) {
-				_aio_unlock();
-				return (AIO_ALLDONE);
-			} else {
-				aiowp = rp->req_worker;
-				(void) mutex_lock(&aiowp->work_qlock1);
-				(void) _aio_cancel_req(aiowp, rp, &canceled,
-				    &done);
-				(void) mutex_unlock(&aiowp->work_qlock1);
-				_aio_unlock();
-				if (done)
-					return (AIO_ALLDONE);
-				else if (canceled)
-					return (AIO_CANCELED);
-				else
-					return (AIO_NOTCANCELED);
-			}
+	if (aiocbp != NULL) {
+		if (fd != aiocbp->aio_fildes) {
+			errno = EINVAL;
+			return (-1);
 		}
-		return ((int)_kaio(AIOCANCEL, fd, cb));
+		if (aiocbp->aio_state == USERAIO) {
+			sig_mutex_lock(&__aio_mutex);
+			reqp = _aio_hash_find(&aiocbp->aio_resultp);
+			if (reqp == NULL) {
+				sig_mutex_unlock(&__aio_mutex);
+				return (AIO_ALLDONE);
+			}
+			aiowp = reqp->req_worker;
+			sig_mutex_lock(&aiowp->work_qlock1);
+			(void) _aio_cancel_req(aiowp, reqp, &canceled, &done);
+			sig_mutex_unlock(&aiowp->work_qlock1);
+			sig_mutex_unlock(&__aio_mutex);
+			if (done)
+				return (AIO_ALLDONE);
+			if (canceled)
+				return (AIO_CANCELED);
+			return (AIO_NOTCANCELED);
+		}
+		if (aiocbp->aio_state == USERAIO_DONE)
+			return (AIO_ALLDONE);
+		return ((int)_kaio(AIOCANCEL, fd, aiocbp));
 	}
 
 	return (aiocancel_all(fd));
 }
 
-#endif /* (_LARGEFILE64_SOURCE) && !defined(_LP64) */
+#endif /* !defined(_LP64) */

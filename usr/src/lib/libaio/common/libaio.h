@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 extern "C" {
 #endif
 
+#include "c_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -41,6 +42,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <thread.h>
+#include <pthread.h>
 #include <asynch.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -48,90 +50,109 @@ extern "C" {
 #include <aio.h>
 #include <limits.h>
 #include <ucontext.h>
+#include <sys/mman.h>
 
-#ifndef _REENTRANT
-#define	_REENTRANT
-#endif
-
-#ifdef DEBUG
+#if defined(DEBUG)
 extern int assfail(char *, char *, int);
 #define	ASSERT(EX) ((void)((EX) || assfail(#EX, __FILE__, __LINE__)))
 #else
 #define	ASSERT(EX)
 #endif
 
-#define	SIGAIOCANCEL	SIGPROF		/* special aio cancelation signal */
+#if !defined(_LP64)
+#define	AIOSTKSIZE	(64 * 1024)
+#else
+#define	AIOSTKSIZE	(128 * 1024)
+#endif
+
+#define	SIGAIOCANCEL		SIGLWP	/* special aio cancelation signal */
+
 #define	AIO_WAITN_MAXIOCBS	32768	/* max. iocbs per system call */
 
-typedef struct aio_args {
+/*
+ * Declare structure types.  The structures themselves are defined below.
+ */
+typedef struct aio_args		aio_args_t;
+typedef struct aio_lio		aio_lio_t;
+typedef struct notif_param	notif_param_t;
+typedef struct aio_req		aio_req_t;
+typedef struct aio_worker	aio_worker_t;
+typedef struct aio_hash		aio_hash_t;
+
+struct aio_args {
 	int 		fd;
 	caddr_t		buf;
 	size_t		bufsz;
 	offset_t	offset;
-} aio_args_t;
+};
 
 /*
  * list head for UFS list I/O
  */
-typedef struct aio_lio {
-	char		lio_mode;	/* LIO_WAIT/LIO_NOWAIT */
-	int		lio_nent;	/* Number of list I/O's		*/
-	int		lio_refcnt;	/* outstanding I/O's 		*/
+struct aio_lio {
+	mutex_t		lio_mutex;	/* list mutex */
 	cond_t		lio_cond_cv;	/* list notification for I/O done */
-	mutex_t		lio_mutex;	/* list mutex 			*/
-	struct aio_lio	*lio_next;	/* pointer to next on freelist  */
-	int		lio_signo;	/* Signal for LIO_NOWAIT */
-	union sigval	lio_sigval;	/* Signal parameter */
+	aio_lio_t	*lio_next;	/* pointer to next on freelist */
+	char		lio_mode;	/* LIO_WAIT/LIO_NOWAIT */
 	char		lio_canned;	/* lio was canceled */
-} aio_lio_t;
+	char		lio_largefile;	/* largefile operation */
+	char		lio_waiting;	/* waiting in __lio_listio() */
+	int		lio_nent;	/* Number of list I/O's */
+	int		lio_refcnt;	/* outstanding I/O's */
+	int		lio_event;	/* Event number for notification */
+	int		lio_port;	/* Port number for notification */
+	int		lio_signo;	/* Signal number for notification */
+	union sigval	lio_sigval;	/* Signal parameter */
+	uintptr_t	lio_object;	/* for SIGEV_THREAD or SIGEV_PORT */
+	struct sigevent	*lio_sigevent;	/* Notification function and attr. */
+};
 
 /*
- * size of aio_req should be power of 2. this helps to improve the
- * effectiveness of the hashing function.
+ * Notification parameters
  */
-typedef struct aio_req {
+struct notif_param {
+	int		np_signo;	/* SIGEV_SIGNAL */
+	int		np_port;	/* SIGEV_THREAD or SIGEV_PORT */
+	void		*np_user;
+	int		np_event;
+	uintptr_t	np_object;
+	int		np_lio_signo;	/* listio: SIGEV_SIGNAL */
+	int		np_lio_port;	/* listio: SIGEV_THREAD or SIGEV_PORT */
+	void		*np_lio_user;
+	int		np_lio_event;
+	uintptr_t	np_lio_object;
+};
+
+struct aio_req {
 	/*
 	 * fields protected by _aio_mutex lock.
 	 */
-	struct aio_req *req_link;	/* hash chain link */
+	aio_req_t *req_link;		/* hash/freelist chain link */
 	/*
 	 * when req is on the doneq, then req_next is protected by
 	 * the _aio_mutex lock. when the req is on a work q, then
 	 * req_next is protected by a worker's work_qlock1 lock.
 	 */
-	struct aio_req *req_next;	/* request/done queue link */
-	struct aio_req *req_prev;	/* double linked list */
-	/*
-	 * condition variable that waits for a request to be
-	 * canceled.
-	 */
-	mutex_t		req_lock;	/* protects the following 2 fields */
-	cond_t		req_cancv;	/* cancel req condition variable */
-	char		req_canned;	/* set when canceled */
+	aio_req_t *req_next;		/* request/done queue link */
+	aio_req_t *req_prev;		/* double linked list */
 	/*
 	 * fields protected by a worker's work_qlock1 lock.
 	 */
-	int		req_state;	/* AIO_REQ_QUEUED, ... */
+	char		req_state;	/* AIO_REQ_QUEUED, ... */
 	/*
 	 * fields require no locking.
 	 */
-	int		req_type;	/* AIO_POSIX_REQ ? */
-	struct aio_worker *req_worker;	/* associate req. with worker */
+	char		req_type;	/* AIO_POSIX_REQ or not */
+	char		req_largefile;	/* largefile operation */
+	char		req_op;		/* AIOREAD, etc. */
+	aio_worker_t	*req_worker;	/* associate request with worker */
 	aio_result_t	*req_resultp;	/* address of result buffer */
-	int		req_op;		/* read or write */
 	aio_args_t	req_args;	/* arglist */
-	aio_lio_t	*lio_head;	/* list head for LIO */
-	int		req_retval;	/* resultp's retval */
-	int		req_errno;	/* resultp's errno */
-	char		req_canwait;	/* waiting for req to be canceled */
-	struct	sigevent aio_sigevent;
-	int		lio_signo;	/* Signal for LIO_NOWAIT */
-	union sigval lio_sigval;	/* Signal parameter */
-	aiocb_t		*req_iocb;	/* ptr to aiocb */
-} aio_req_t;
-
-/* special request type for handling sigevent notification */
-#define	AIOSIGEV	AIOFSYNC+1
+	aio_lio_t	*req_head;	/* list head for LIO */
+	struct sigevent	req_sigevent;
+	void		*req_aiocbp;	/* ptr to aiocb or aiocb64 */
+	notif_param_t	req_notify;	/* notification parameters */
+};
 
 /* special lio type that destroys itself when lio refcnt becomes zero */
 #define	LIO_FSYNC	LIO_WAIT+1
@@ -140,15 +161,14 @@ typedef struct aio_req {
 /* lio flags */
 #define	LIO_FSYNC_CANCELED	0x1
 
-/* values for aios_state */
+/* values for aio_state */
 
 #define	AIO_REQ_QUEUED		1
 #define	AIO_REQ_INPROGRESS	2
 #define	AIO_REQ_CANCELED	3
 #define	AIO_REQ_DONE 		4
 #define	AIO_REQ_FREE		5
-#define	AIO_LIO_DONE		6
-#define	AIO_REQ_DONEQ 		7
+#define	AIO_REQ_DONEQ 		6
 
 /* use KAIO in _aio_rw() */
 #define	AIO_NO_KAIO		0x0
@@ -197,140 +217,177 @@ typedef struct aio_req {
  *
  * uint32_t	_kaio_supported[MAX_KAIO_FDARRAY_SIZE];
  *
- * Array is MAX_KAIO_ARRAY_SIZE of 32-bit elements, for 4kb.
- * If more than (MAX_KAIO_FDARRAY_SIZE * KAIO_FDARRAY_ELEM_SIZE )
+ * Array is MAX_KAIO_ARRAY_SIZE of 32-bit elements, for 8kb.
+ * If more than (MAX_KAIO_FDARRAY_SIZE * KAIO_FDARRAY_ELEM_SIZE)
  * files are open, this can be expanded.
  */
 
-#define	MAX_KAIO_FDARRAY_SIZE		1024
+#define	MAX_KAIO_FDARRAY_SIZE		2048
 #define	KAIO_FDARRAY_ELEM_SIZE		WORD_BIT	/* uint32_t */
 
 #define	MAX_KAIO_FDS	(MAX_KAIO_FDARRAY_SIZE * KAIO_FDARRAY_ELEM_SIZE)
 
-#define	VALID_FD(fdes)		(((fdes) >= 0) && ((fdes) < MAX_KAIO_FDS))
+#define	VALID_FD(fdes)		((fdes) >= 0 && (fdes) < MAX_KAIO_FDS)
 
 #define	KAIO_SUPPORTED(fdes)						\
-	((!VALID_FD(fdes)) || 						\
+	(!VALID_FD(fdes) || 						\
 		((_kaio_supported[(fdes) / KAIO_FDARRAY_ELEM_SIZE] &	\
 		(uint32_t)(1 << ((fdes) % KAIO_FDARRAY_ELEM_SIZE))) == 0))
 
 #define	SET_KAIO_NOT_SUPPORTED(fdes)					\
-	if (VALID_FD((fdes)))						\
+	if (VALID_FD(fdes))						\
 		_kaio_supported[(fdes) / KAIO_FDARRAY_ELEM_SIZE] |=	\
 		(uint32_t)(1 << ((fdes) % KAIO_FDARRAY_ELEM_SIZE))
 
 #define	CLEAR_KAIO_SUPPORTED(fdes)					\
-	if (VALID_FD((fdes)))						\
+	if (VALID_FD(fdes))						\
 		_kaio_supported[(fdes) / KAIO_FDARRAY_ELEM_SIZE] &=	\
 		~(uint32_t)(1 << ((fdes) % KAIO_FDARRAY_ELEM_SIZE))
 
-typedef struct aio_worker {
-	/*
-	 * fields protected by _aio_mutex lock
-	 */
-	struct aio_worker *work_forw;	/* forward link in list of workers */
-	struct aio_worker *work_backw;	/* backwards link in list of workers */
-	/*
-	 * fields require no locking.
-	 */
-	thread_t work_tid;		/* worker's thread-id */
+struct aio_worker {
+	aio_worker_t *work_forw;	/* forward link in list of workers */
+	aio_worker_t *work_backw;	/* backwards link in list of workers */
 	mutex_t work_qlock1;		/* lock for work queue 1 */
-	struct aio_req *work_head1;	/* head of work request queue 1 */
-	struct aio_req *work_tail1;	/* tail of work request queue 1 */
-	struct aio_req *work_next1;	/* work queue one's next pointer */
-	struct aio_req *work_prev1;	/* last request done from queue 1 */
-	int work_cnt1;			/* length of work queue one */
+	cond_t work_idle_cv;		/* place to sleep when idle */
+	aio_req_t *work_head1;		/* head of work request queue 1 */
+	aio_req_t *work_tail1;		/* tail of work request queue 1 */
+	aio_req_t *work_next1;		/* work queue one's next pointer */
+	aio_req_t *work_prev1;		/* last request done from queue 1 */
+	aio_req_t *work_req;		/* active work request */
+	thread_t work_tid;		/* worker's thread-id */
+	int work_count1;		/* length of work queue one */
 	int work_done1;			/* number of requests done */
 	int work_minload1;		/* min length of queue */
-	struct aio_req *work_req;	/* active work request */
 	int work_idleflg;		/* when set, worker is idle */
-	cond_t work_idle_cv;		/* place to sleep when idle */
-	mutex_t work_lock;		/* protects work flags */
 	sigjmp_buf work_jmp_buf;	/* cancellation point */
-	char work_cancel_flg;		/* flag set when at cancellation pt */
-} aio_worker_t;
+};
 
+struct aio_hash {			/* resultp hash table */
+	mutex_t		hash_lock;
+	aio_req_t	*hash_ptr;
+#if !defined(_LP64)
+	void		*hash_pad;	/* ensure sizeof (aio_hash_t) == 32 */
+#endif
+};
+
+extern aio_hash_t *_aio_hash;
+
+#define	HASHSZ			2048	/* power of 2 */
+#define	AIOHASH(resultp)	((((uintptr_t)(resultp) >> 17) ^ \
+				((uintptr_t)(resultp) >> 2)) & (HASHSZ - 1))
+#define	POSIX_AIO(x)		((x)->req_type == AIO_POSIX_REQ)
+
+/*
+ * _sigoff(), _sigon(), and _sigdeferred() are consolidation-private
+ * interfaces in libc that defer signals, enable signals, and return
+ * the deferred signal number (if any), respectively.
+ * Calls to _sigoff() and _sigon() can nest but must be balanced,
+ * so nested calls to these functions work properly.
+ */
+extern void _sigoff(void);
+extern void _sigon(void);
+extern int _sigdeferred(void);
+
+/*
+ * The following five functions are the same as the corresponding
+ * libc functions without the 'sig_' prefix, except that all signals
+ * are deferred while the lock is held.  Their use in the library
+ * makes the aio interfaces async-signal safe.
+ */
+extern void sig_mutex_lock(mutex_t *);
+extern void sig_mutex_unlock(mutex_t *);
+extern int sig_mutex_trylock(mutex_t *);
+extern int sig_cond_wait(cond_t *, mutex_t *);
+extern int sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+
+extern int __uaio_init(void);
 extern void _kaio_init(void);
 extern intptr_t _kaio(int, ...);
 extern int _aiorw(int, caddr_t, int, offset_t, int, aio_result_t *, int);
-extern int _aio_rw(aiocb_t *, aio_lio_t *, aio_worker_t **, int, int,
-	struct sigevent *);
-extern int __aio_fsync(int, aiocb_t *);
-#if	defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
-extern int _aio_rw64(aiocb64_t *, aio_lio_t *, aio_worker_t **, int, int,
-	struct sigevent *);
-extern int __aio_fsync64(int, aiocb64_t *);
+extern int _aio_rw(aiocb_t *, aio_lio_t *, aio_worker_t **, int, int);
+#if !defined(_LP64)
+extern int _aio_rw64(aiocb64_t *, aio_lio_t *, aio_worker_t **, int, int);
 #endif
-extern int aiocancel_all(int);
 extern int _aio_create_worker(aio_req_t *, int);
-extern void *_aio_send_sigev(void *);
 
-extern void _aio_cancel_on(aio_worker_t *);
-extern void _aio_cancel_off(aio_worker_t *);
 extern int _aio_cancel_req(aio_worker_t *, aio_req_t *, int *, int *);
+extern int aiocancel_all(int);
+extern void init_signals(void);
 
-extern void _aio_forkinit(void);
 extern void _aiopanic(char *);
-extern void _aio_lock(void);
-extern void _aio_unlock(void);
-extern void _aio_req_free(aio_req_t *);
+extern aio_req_t *_aio_hash_find(aio_result_t *);
 extern aio_req_t *_aio_hash_del(aio_result_t *);
-extern int _fill_aiocache(int);
+extern void _aio_req_mark_done(aio_req_t *);
+extern void _aio_waitn_wakeup(void);
 
-extern aio_worker_t *_aio_alloc_worker(void);
-extern void _aio_free_worker(void *);
+extern aio_worker_t *_aio_worker_alloc(void);
+extern void _aio_worker_free(void *);
+extern aio_req_t *_aio_req_alloc(void);
+extern void _aio_req_free(aio_req_t *);
+extern aio_lio_t *_aio_lio_alloc(void);
+extern void _aio_lio_free(aio_lio_t *);
 
-extern void _aio_idle(struct aio_worker *);
-extern void __aiosendsig(void);
+extern void _aio_idle(aio_worker_t *);
 extern void *_aio_do_request(void *);
-extern void _aio_remove(aio_req_t *);
-extern void _lio_remove(aio_lio_t *);
+extern void *_aio_do_notify(void *);
+extern void _lio_remove(aio_req_t *);
 extern aio_req_t *_aio_req_remove(aio_req_t *);
-extern int _aio_get_timedelta(struct timespec *, struct timespec *);
+extern int _aio_get_timedelta(timespec_t *, timespec_t *);
 
 extern int _close(int);
 extern int __sigqueue(pid_t pid, int signo,
 	/* const union sigval */ void *value, int si_code);
-extern pid_t _fork(void);
 extern int _sigaction(int sig, const struct sigaction *act,
 	struct sigaction *oact);
 extern int _sigemptyset(sigset_t *set);
 extern int _sigaddset(sigset_t *set, int signo);
-extern int _sigismember(sigset_t *set, int signo);
-extern int _sigprocmask(int how, const sigset_t *set, sigset_t *oset);
-extern void aiosigcancelhndlr(int, siginfo_t *, void *);
+extern int _sigismember(const sigset_t *set, int signo);
 
-extern aio_worker_t *__nextworker_rd;	/* worker chosen for next rd request */
-extern aio_worker_t *__workers_rd;	/* list of all rd workers */
-extern int __rd_workerscnt;		/* number of rd workers */
-extern aio_worker_t *__nextworker_wr;	/* worker chosen for next wr request */
-extern aio_worker_t *__workers_wr;	/* list of all wr workers */
-extern int __wr_workerscnt;		/* number of wr workers */
-extern aio_worker_t *__nextworker_si;	/* worker chosen for next si request */
-extern aio_worker_t *__workers_si;	/* list of all si workers */
-extern int __si_workerscnt;		/* number of si workers */
-extern int __aiostksz;			/* stack size for workers */
-extern mutex_t __aio_mutex;		/* global aio lock that's SIGIO-safe */
-extern mutex_t __lio_mutex;		/* global lio lock */
+extern aio_result_t *_aio_req_done(void);
+extern void _aio_set_result(aio_req_t *, ssize_t, int);
+
+extern aio_worker_t *_kaiowp;		/* points to kaio cleanup thread */
+extern aio_worker_t *__workers_rw;	/* list of all rw workers */
+extern aio_worker_t *__nextworker_rw;	/* worker chosen for next rw request */
+extern int __rw_workerscnt;		/* number of rw workers */
+extern aio_worker_t *__workers_no;	/* list of all notification workers */
+extern aio_worker_t *__nextworker_no;	/* worker chosen, next notification */
+extern int __no_workerscnt;		/* number of notification workers */
+extern mutex_t __aio_initlock;		/* makes aio initialization atomic */
+extern mutex_t __aio_mutex;		/* global aio lock */
+extern cond_t _aio_iowait_cv;		/* wait for userland I/Os */
+extern cond_t _aio_waitn_cv;		/* wait for end of aio_waitn */
 extern int _max_workers;		/* max number of workers permitted */
 extern int _min_workers;		/* min number of workers */
 extern sigset_t _worker_set;		/* worker's signal mask */
+extern sigset_t _full_set;		/* all signals (sigfillset()) */
 extern int _aio_worker_cnt;		/* number of AIO workers */
 extern int _sigio_enabled;		/* when set, send SIGIO signal */
-extern int __sigio_pending;		/* count of pending SIGIO signals */
-extern int __sigio_masked;		/* when set, SIGIO is masked */
-extern int __sigio_maskedcnt;		/* count number times bit mask is set */
 extern pid_t __pid;			/* process's PID */
+extern int __uaio_ok;			/* indicates if aio is initialized */
 extern int _kaio_ok;			/* indicates if kaio is initialized */
-extern thread_key_t _aio_key;		/* for thread-specific data */
-extern struct sigaction sigcanact;	/* action for SIGAIOCANCEL */
-extern int _pagesize;
+extern pthread_key_t _aio_key;		/* for thread-specific data */
+
+extern aio_req_t *_aio_done_tail;	/* list of done requests */
+extern aio_req_t *_aio_done_head;
+extern aio_req_t *_aio_doneq;
+extern int _aio_freelist_cnt;
+extern int _aio_allocated_cnt;
+extern int _aio_donecnt;
+extern int _aio_doneq_cnt;
+extern int _aio_waitncnt;		/* # of requests for aio_waitn */
+extern int _aio_outstand_cnt;		/* # of outstanding requests */
+extern int _kaio_outstand_cnt;		/* # of outstanding kaio requests */
+extern int _aio_req_done_cnt;		/* req. done but not in "done queue" */
+extern int _aio_kernel_suspend;		/* active kernel kaio calls */
+extern int _aio_suscv_cnt;		/* aio_suspend calls waiting on cv's */
+extern int _aiowait_flag;		/* when set, aiowait() is inprogress */
+extern int _aio_flags;			/* see libaio.h defines for */
 
 /*
  * Array for determining whether or not a file supports kaio
- *
  */
-extern uint32_t _kaio_supported[];
+extern uint32_t *_kaio_supported;
 
 #ifdef	__cplusplus
 }

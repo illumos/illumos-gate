@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -640,9 +640,10 @@ portfs(int opcode, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	{
 		/*
 		 * library events, blocking
-		 * Only events of type PORT_SOURCE_AIO are currently allowed.
+		 * Only events of type PORT_SOURCE_AIO or PORT_SOURCE_MQ
+		 * are currently allowed.
 		 */
-		if ((int)a1 != PORT_SOURCE_AIO) {
+		if ((int)a1 != PORT_SOURCE_AIO && (int)a1 != PORT_SOURCE_MQ) {
 			error = EINVAL;
 			break;
 		}
@@ -875,11 +876,7 @@ port_send(port_t *pp, int source, int events, void *user)
 	pev->portkev_arg = NULL;
 	pev->portkev_flags = 0;
 
-	error = port_send_event(pev);
-	if (error) {
-		port_free_event_local(pev, 0);
-		return (error);
-	}
+	port_send_event(pev);
 	return (0);
 }
 
@@ -933,11 +930,7 @@ port_dispatch_event(port_t *pp, int opcode, int source, int events,
 		pev->portkev_callback = NULL;
 	}
 
-	error = port_send_event(pev);
-	if (error) {
-		port_free_event_local(pev, 0);
-		return (error);
-	}
+	port_send_event(pev);
 	return (0);
 }
 
@@ -1011,7 +1004,7 @@ port_sendn(int ports[], int errors[], uint_t nent, int events, void *user,
 		pev->portkev_arg = NULL;
 		pev->portkev_flags = 0;
 
-		(void) port_send_event(pev);
+		port_send_event(pev);
 		releasef(port);
 	}
 	if (errorcnt) {
@@ -1164,12 +1157,12 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 	mutex_enter(&portq->portq_mutex);
 	if (max == 0) {
 		/*
-		 * Return number of objects with events
-		 * The portq_block_mutex is required to synchronize this
+		 * Return number of objects with events.
+		 * The port_block() call is required to synchronize this
 		 * thread with another possible thread, which could be
 		 * retrieving events from the port queue.
 		 */
-		mutex_enter(&portq->portq_block_mutex);
+		port_block(portq);
 		/*
 		 * Check if a second thread is currently retrieving events
 		 * and it is using the temporary event queue.
@@ -1179,7 +1172,7 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 			port_push_eventq(portq);
 		}
 		*nget = portq->portq_nent;
-		mutex_exit(&portq->portq_block_mutex);
+		port_unblock(portq);
 		mutex_exit(&portq->portq_mutex);
 		return (0);
 	}
@@ -1320,8 +1313,6 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 	}
 
 portnowait:
-	nmax = max < portq->portq_nent ? max : portq->portq_nent;
-
 	/*
 	 * Move port event queue to a temporary event queue .
 	 * New incoming events will be continue be posted to the event queue
@@ -1339,7 +1330,9 @@ portnowait:
 	 * returns it will check the conditions to awake other waiting threads.
 	 */
 	portq->portq_getn++;	/* number of threads retrieving events */
-	mutex_enter(&portq->portq_block_mutex); /* block other threads here */
+	port_block(portq);	/* block other threads here */
+	nmax = max < portq->portq_nent ? max : portq->portq_nent;
+
 	if (portq->portq_tnent) {
 		/*
 		 * Move remaining events from previous thread back to the
@@ -1443,7 +1436,6 @@ portnowait:
 	 *  Remember number of remaining events in the temporary event queue.
 	 */
 	portq->portq_tnent = tnent - nevents;
-	mutex_exit(&portq->portq_block_mutex);
 
 	/*
 	 * Work to do before return :
@@ -1456,6 +1448,7 @@ portnowait:
 	 */
 
 	mutex_enter(&portq->portq_mutex);
+	port_unblock(portq);
 	if (portq->portq_tnent) {
 		/*
 		 * move remaining events in the temporary event queue back
@@ -1703,12 +1696,10 @@ port_check_return_cond(port_queue_t *portq)
  * - the next event after the event pointed by 'last'
  * The caller of this function is responsible for the integrity of the queue
  * in use:
- * - port_getn() is using a temporary queue protected with
- *   portq->portq_block_mutex
- * - port_close_events() is working on the global event queue and protects the
- *   queue with portq->portq_mutex.
+ * - port_getn() is using a temporary queue protected with port_block().
+ * - port_close_events() is working on the global event queue and protects
+ *   the queue with portq->portq_mutex.
  */
-
 port_kevent_t *
 port_get_kevent(list_t *list, port_kevent_t *last)
 {
@@ -1825,6 +1816,7 @@ port_dequeue_thread(port_queue_t *portq, portget_t *pgetp)
 	if (pgetp->portget_next == pgetp) {
 		/* last (single) waiting thread */
 		portq->portq_thread = NULL;
+		portq->portq_nget = 0;
 	} else {
 		pgetp->portget_prev->portget_next = pgetp->portget_next;
 		pgetp->portget_next->portget_prev = pgetp->portget_prev;

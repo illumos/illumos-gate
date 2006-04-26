@@ -57,8 +57,6 @@ int __libc_threaded = 0;	/* zero until first thr_create() */
 static	int	thr_concurrency = 1;
 static	int	pthread_concurrency;
 
-size_t	_lpagesize;
-
 #define	HASHTBLSZ	1024	/* must be a power of two */
 #define	TIDHASH(tid, udp)	(tid & (udp)->hash_mask)
 
@@ -338,6 +336,8 @@ trim_stack_cache(int cache_limit)
 ulwp_t *
 find_stack(size_t stksize, size_t guardsize)
 {
+	static size_t pagesize = 0;
+
 	uberdata_t *udp = curthread->ul_uberdata;
 	size_t mapsize;
 	ulwp_t *prev;
@@ -355,17 +355,18 @@ find_stack(size_t stksize, size_t guardsize)
 			lprot = (PROT_READ|PROT_WRITE|PROT_EXEC);
 		stackprot = (int)lprot;
 	}
-	if (_lpagesize == 0)
-		_lpagesize = _sysconf(_SC_PAGESIZE);
+	if (pagesize == 0)	/* do this once */
+		pagesize = _sysconf(_SC_PAGESIZE);
+
 	/*
 	 * One megabyte stacks by default, but subtract off
 	 * two pages for the system-created red zones.
 	 * Round up a non-zero stack size to a pagesize multiple.
 	 */
 	if (stksize == 0)
-		stksize = DEFAULTSTACK - 2 * _lpagesize;
+		stksize = DEFAULTSTACK - 2 * pagesize;
 	else
-		stksize = ((stksize + _lpagesize - 1) & -_lpagesize);
+		stksize = ((stksize + pagesize - 1) & -pagesize);
 
 	/*
 	 * Round up the mapping size to a multiple of pagesize.
@@ -373,8 +374,7 @@ find_stack(size_t stksize, size_t guardsize)
 	 * so we deduct that from the value of guardsize.
 	 */
 	if (guardsize != 0)
-		guardsize = ((guardsize + _lpagesize - 1) & -_lpagesize) -
-			_lpagesize;
+		guardsize = ((guardsize + pagesize - 1) & -pagesize) - pagesize;
 	mapsize = stksize + guardsize;
 
 	lmutex_lock(&udp->link_lock);
@@ -2202,6 +2202,11 @@ _ti_bind_clear(int bindflag)
  * it does in the old libthread (see the comments in cond_wait_queue()).
  * Also, signals are deferred at thread startup until TLS constructors
  * have all been called, at which time _thr_setup() calls sigon().
+ *
+ * _sigoff() and _sigon() are external consolidation-private interfaces
+ * to sigoff() and sigon(), respectively, in libc.  _sigdeferred() is
+ * a consolidation-private interface that returns the deferred signal
+ * number, if any.  These are used in libnsl, librt, and libaio.
  * Also, _sigoff() and _sigon() are called from dbx's run-time checking
  * (librtc.so) to defer signals during its critical sections (not to be
  * confused with libc critical sections [see exit_critical() above]).
@@ -2216,6 +2221,12 @@ void
 _sigon(void)
 {
 	sigon(curthread);
+}
+
+int
+_sigdeferred(void)
+{
+	return (curthread->ul_cursig);
 }
 
 void

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,29 @@
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sched.h>
+
+/*
+ * Default attribute object for pthread_create() with NULL attr pointer.
+ * Note that the 'guardsize' field is initialized on the first call.
+ */
+const thrattr_t *
+def_thrattr(void)
+{
+	static thrattr_t thrattr = {
+		0,				/* stksize */
+		NULL,				/* stkaddr */
+		PTHREAD_CREATE_JOINABLE,	/* detachstate */
+		PTHREAD_CREATE_NONDAEMON_NP,	/* daemonstate */
+		PTHREAD_SCOPE_PROCESS,		/* scope */
+		0,				/* prio */
+		SCHED_OTHER,			/* policy */
+		PTHREAD_EXPLICIT_SCHED,		/* inherit */
+		0				/* guardsize */
+	};
+	if (thrattr.guardsize == 0)
+		thrattr.guardsize = _sysconf(_SC_PAGESIZE);
+	return (&thrattr);
+}
 
 /*
  * pthread_attr_init: allocates the attribute object and initializes it
@@ -41,16 +64,7 @@ _pthread_attr_init(pthread_attr_t *attr)
 	thrattr_t *ap;
 
 	if ((ap = lmalloc(sizeof (thrattr_t))) != NULL) {
-		if (_lpagesize == 0)
-			_lpagesize = _sysconf(_SC_PAGESIZE);
-		ap->stksize = 0;
-		ap->stkaddr = NULL;
-		ap->prio = 0;
-		ap->policy = SCHED_OTHER;
-		ap->inherit = PTHREAD_EXPLICIT_SCHED;
-		ap->detachstate = PTHREAD_CREATE_JOINABLE;
-		ap->scope = PTHREAD_SCOPE_PROCESS;
-		ap->guardsize = _lpagesize;
+		*ap = *def_thrattr();
 		attr->__pthread_attrp = ap;
 		return (0);
 	}
@@ -70,6 +84,42 @@ _pthread_attr_destroy(pthread_attr_t *attr)
 	lfree(attr->__pthread_attrp, sizeof (thrattr_t));
 	attr->__pthread_attrp = NULL;
 	return (0);
+}
+
+/*
+ * _pthread_attr_clone: make a copy of a pthread_attr_t.
+ * This is a consolidation-private interface, for librt.
+ */
+int
+_pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
+{
+	thrattr_t *ap;
+	const thrattr_t *old_ap =
+		old_attr? old_attr->__pthread_attrp : def_thrattr();
+
+	if (old_ap == NULL)
+		return (EINVAL);
+	if ((ap = lmalloc(sizeof (thrattr_t))) == NULL)
+		return (ENOMEM);
+	*ap = *old_ap;
+	attr->__pthread_attrp = ap;
+	return (0);
+}
+
+/*
+ * _pthread_attr_equal: compare two pthread_attr_t's, return 1 if equal.
+ * A NULL pthread_attr_t pointer implies default attributes.
+ * This is a consolidation-private interface, for librt.
+ */
+int
+_pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
+{
+	const thrattr_t *ap1 = attr1? attr1->__pthread_attrp : def_thrattr();
+	const thrattr_t *ap2 = attr2? attr2->__pthread_attrp : def_thrattr();
+
+	if (ap1 == NULL || ap2 == NULL)
+		return (0);
+	return (ap1 == ap2 || _memcmp(ap1, ap2, sizeof (thrattr_t)) == 0);
 }
 
 /*
@@ -143,9 +193,8 @@ _pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 }
 
 /*
- * pthread_attr_setdetachstate: sets the detach state to JOINABLE or
- * DETACHED.
- * This is equivalent to setting THR_DETACHED flag in thr_create().
+ * pthread_attr_setdetachstate: sets the detach state to DETACHED or JOINABLE.
+ * PTHREAD_CREATE_DETACHED is equivalent to thr_create(THR_DETACHED).
  */
 #pragma weak pthread_attr_setdetachstate = _pthread_attr_setdetachstate
 int
@@ -174,6 +223,42 @@ _pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
 	if (attr != NULL && (ap = attr->__pthread_attrp) != NULL &&
 	    detachstate != NULL) {
 		*detachstate = ap->detachstate;
+		return (0);
+	}
+	return (EINVAL);
+}
+
+/*
+ * pthread_attr_setdaemonstate_np: sets the daemon state to DAEMON or NONDAEMON.
+ * PTHREAD_CREATE_DAEMON is equivalent to thr_create(THR_DAEMON).
+ * For now, this is a consolidation-private interface for librt.
+ */
+int
+_pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
+{
+	thrattr_t *ap;
+
+	if (attr != NULL && (ap = attr->__pthread_attrp) != NULL &&
+	    (daemonstate == PTHREAD_CREATE_DAEMON_NP ||
+	    daemonstate == PTHREAD_CREATE_NONDAEMON_NP)) {
+		ap->daemonstate = daemonstate;
+		return (0);
+	}
+	return (EINVAL);
+}
+
+/*
+ * pthread_attr_getdaemonstate_np: gets the daemon state.
+ * For now, this is a consolidation-private interface for librt.
+ */
+int
+_pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)
+{
+	thrattr_t *ap;
+
+	if (attr != NULL && (ap = attr->__pthread_attrp) != NULL &&
+	    daemonstate != NULL) {
+		*daemonstate = ap->daemonstate;
 		return (0);
 	}
 	return (EINVAL);

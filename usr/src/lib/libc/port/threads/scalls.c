@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -373,6 +372,38 @@ _forkall(void)
 		self->ul_sigsuspend = 0;				\
 		restore_signals(self);					\
 	}								\
+}
+
+/*
+ * Externally-callable cancellation prologue and epilogue
+ * functions, for cancellation points outside of libc.
+ */
+void
+_cancel_prologue(void)
+{
+	ulwp_t *self = curthread;
+
+	self->ul_cancel_prologue = (self->ul_vfork | self->ul_nocancel);
+	if (self->ul_cancel_prologue == 0) {
+		self->ul_save_async = self->ul_cancel_async;
+		if (!self->ul_cancel_disabled) {
+			self->ul_cancel_async = 1;
+			if (self->ul_cancel_pending)
+				_pthread_exit(PTHREAD_CANCELED);
+		}
+		self->ul_sp = stkptr();
+	}
+}
+
+void
+_cancel_epilogue(void)
+{
+	ulwp_t *self = curthread;
+
+	if (self->ul_cancel_prologue == 0) {
+		self->ul_sp = 0;
+		self->ul_cancel_async = self->ul_save_async;
+	}
 }
 
 /*

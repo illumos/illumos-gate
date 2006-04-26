@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ typedef struct aiocb {
 	size_t 		aio_nbytes;		/* length of transfer */
 	off_t 		aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */
-	struct sigevent	aio_sigevent;		/* signal number and offset */
+	struct sigevent	aio_sigevent;		/* notification type */
 	int 		aio_lio_opcode;		/* listio operation */
 	aio_result_t	aio_resultp;		/* results */
 	int 		aio_state;		/* state flag for List I/O */
@@ -67,7 +67,7 @@ typedef struct aiocb64 {
 	size_t 		aio_nbytes;		/* length of transfer */
 	off64_t		aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */
-	struct sigevent	aio_sigevent;		/* signal number and offset */
+	struct sigevent	aio_sigevent;		/* notification type */
 	int 		aio_lio_opcode;		/* listio operation */
 	aio_result_t	aio_resultp;		/* results */
 	int 		aio_state;		/* state flag for List I/O */
@@ -85,7 +85,7 @@ typedef struct aiocb64_32 {
 	uint32_t 	aio_nbytes;		/* length of transfer */
 	off64_t 	aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */
-	struct sigevent32 aio_sigevent;		/* signal number and offset */
+	struct sigevent32 aio_sigevent;		/* notification type */
 	int 		aio_lio_opcode;		/* listio operation */
 	aio_result32_t	aio_resultp;		/* results */
 	int 		aio_state;		/* state flag for List I/O */
@@ -106,7 +106,7 @@ typedef struct aiocb32 {
 	uint32_t	aio_nbytes;		/* length of transfer */
 	uint32_t	aio_offset;		/* file offset */
 	int		aio_reqprio;		/* request priority offset */
-	struct sigevent32 aio_sigevent;		/* signal number and offset */
+	struct sigevent32 aio_sigevent;		/* notification type */
 	int 		aio_lio_opcode;		/* listio operation */
 	aio_result32_t	aio_resultp;		/* results */
 	int 		aio_state;		/* state flag for List I/O */

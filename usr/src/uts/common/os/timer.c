@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -435,7 +435,7 @@ timer_fire(itimer_t *it)
 	} else {
 		if (it->it_flags & IT_PORT) {
 			it->it_pending = 1;
-			(void) port_send_event((port_kevent_t *)it->it_portev);
+			port_send_event((port_kevent_t *)it->it_portev);
 			mutex_exit(&it->it_mutex);
 		} else if (it->it_flags & IT_SIGNAL) {
 			it->it_pending = 1;
@@ -476,7 +476,8 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 			if (copyin(evp, &ev, sizeof (struct oldsigevent)))
 				return (set_errno(EFAULT));
 
-			if (ev.sigev_notify == SIGEV_PORT) {
+			if (ev.sigev_notify == SIGEV_PORT ||
+			    ev.sigev_notify == SIGEV_THREAD) {
 				if (copyin(ev.sigev_value.sival_ptr, &tim_pnevp,
 				    sizeof (port_notify_t)))
 					return (set_errno(EFAULT));
@@ -495,7 +496,8 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 			 * sigvals in a 64-bit kernel.
 			 */
 			ev.sigev_value.sival_int = ev32.sigev_value.sival_int;
-			if (ev.sigev_notify == SIGEV_PORT) {
+			if (ev.sigev_notify == SIGEV_PORT ||
+			    ev.sigev_notify == SIGEV_THREAD) {
 				if (copyin((void *)(uintptr_t)
 				    ev32.sigev_value.sival_ptr,
 				    (void *)&tim_pnevp32,
@@ -511,11 +513,11 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 		switch (ev.sigev_notify) {
 		case SIGEV_NONE:
 			break;
-
 		case SIGEV_SIGNAL:
 			if (ev.sigev_signo < 1 || ev.sigev_signo >= NSIG)
 				return (set_errno(EINVAL));
 			break;
+		case SIGEV_THREAD:
 		case SIGEV_PORT:
 			break;
 		default:
@@ -580,7 +582,10 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	 * to call into (yet another) backend.
 	 */
 	sigq->sq_info.si_signo = ev.sigev_signo;
-	sigq->sq_info.si_value = ev.sigev_value;
+	if (evp == NULL)
+		sigq->sq_info.si_value.sival_int = i;
+	else
+		sigq->sq_info.si_value = ev.sigev_value;
 	sigq->sq_info.si_code = SI_TIMER;
 	sigq->sq_info.si_pid = p->p_pid;
 	sigq->sq_info.si_ctid = PRCTID(p);
@@ -595,7 +600,8 @@ timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
 	itp[i] = it;
 
 
-	if (ev.sigev_notify == SIGEV_PORT) {
+	if (ev.sigev_notify == SIGEV_THREAD ||
+	    ev.sigev_notify == SIGEV_PORT) {
 		int port;
 
 		/*

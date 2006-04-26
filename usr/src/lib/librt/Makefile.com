@@ -40,13 +40,15 @@ OBJECTS=	\
 	sched.o		\
 	sem.o		\
 	shm.o		\
-	sigrt.o
+	sigev_thread.o	\
+	sigrt.o		\
+	thread_pool.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS += 	-laio -lmd -lc
+LDLIBS += 	-laio -lc
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR=		../common
@@ -56,8 +58,14 @@ SPECMAPFILE=	$(MAPDIR)/mapfile
 ROOTLINTDIR64=	$(ROOTLIBDIR64)
 ROOTLINKS64=    $(ROOTLIBDIR64)/$(LIBLINKS)
 
+# Setting LIBRT_DEBUG = -DDEBUG (make LIBRT_DEBUG=-DDEBUG ...)
+# enables ASSERT() checking in the library.
+# This is automatically enabled for DEBUG builds, not for non-debug builds.
+LIBRT_DEBUG =
+$(NOT_RELEASE_BUILD)LIBRT_DEBUG = -DDEBUG
+
 CFLAGS	+=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I../../common/inc
+CPPFLAGS +=	$(LIBRT_DEBUG) -D_REENTRANT -I../../common/inc
 
 #
 # If and when somebody gets around to messaging this, CLOBBERFILE should not

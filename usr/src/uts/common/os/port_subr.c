@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -55,6 +55,34 @@ uint_t		port_max_list = PORT_MAX_LIST;
 port_control_t	port_control;	/* Event port framework main structure */
 
 /*
+ * Block other threads from using a port.
+ * We enter holding portq->portq_mutex but
+ * we may drop and reacquire this lock.
+ * Callers must deal with this fact.
+ */
+void
+port_block(port_queue_t *portq)
+{
+	ASSERT(MUTEX_HELD(&portq->portq_mutex));
+
+	while (portq->portq_flags & PORTQ_BLOCKED)
+		cv_wait(&portq->portq_block_cv, &portq->portq_mutex);
+	portq->portq_flags |= PORTQ_BLOCKED;
+}
+
+/*
+ * Undo port_block(portq).
+ */
+void
+port_unblock(port_queue_t *portq)
+{
+	ASSERT(MUTEX_HELD(&portq->portq_mutex));
+
+	portq->portq_flags &= ~PORTQ_BLOCKED;
+	cv_signal(&portq->portq_block_cv);
+}
+
+/*
  * The port_send_event() function is used by all event sources to submit
  * trigerred events to a port. All the data  required for the event management
  * is already stored in the port_kevent_t structure.
@@ -66,7 +94,7 @@ port_control_t	port_control;	/* Event port framework main structure */
  *
  * This function is often called from interrupt level.
  */
-int
+void
 port_send_event(port_kevent_t *pkevp)
 {
 	port_queue_t	*portq;
@@ -80,7 +108,7 @@ port_send_event(port_kevent_t *pkevp)
 			mutex_exit(&pkevp->portkev_lock);
 		}
 		mutex_exit(&portq->portq_mutex);
-		return (0);
+		return;
 	}
 
 	/* put event in the port queue */
@@ -88,8 +116,8 @@ port_send_event(port_kevent_t *pkevp)
 	portq->portq_nent++;
 
 	/*
-	 * Remove PORTQ_WAIT_EVENTS flags to indicate that new events are
-	 * available.
+	 * Remove the PORTQ_WAIT_EVENTS flag to indicate
+	 * that new events are available.
 	 */
 	portq->portq_flags &= ~PORTQ_WAIT_EVENTS;
 	pkevp->portkev_flags |= PORT_KEV_DONEQ;		/* event enqueued */
@@ -122,7 +150,6 @@ port_send_event(port_kevent_t *pkevp)
 	} else {
 		mutex_exit(&portq->portq_mutex);
 	}
-	return (0);
 }
 
 /*
@@ -161,6 +188,7 @@ port_alloc_event(int port, int flags, int source, port_kevent_t **pkevpp)
 {
 	port_t		*pp;
 	file_t		*fp;
+	port_kevent_t	*pkevp;
 
 	if ((fp = getf(port)) == NULL)
 		return (EBADF);
@@ -170,29 +198,34 @@ port_alloc_event(int port, int flags, int source, port_kevent_t **pkevpp)
 		return (EBADFD);
 	}
 
-	pp = VTOEP(fp->f_vnode);
+	pkevp = kmem_cache_alloc(port_control.pc_cache, KM_NOSLEEP);
+	if (pkevp == NULL) {
+		releasef(port);
+		return (ENOMEM);
+	}
 
 	/*
 	 * port_max_events is controlled by the resource control
 	 * process.port-max-events
 	 */
+	pp = VTOEP(fp->f_vnode);
+	mutex_enter(&pp->port_queue.portq_mutex);
 	if (pp->port_curr >= pp->port_max_events) {
+		mutex_exit(&pp->port_queue.portq_mutex);
+		kmem_cache_free(port_control.pc_cache, pkevp);
 		releasef(port);
 		return (EAGAIN);
 	}
+	pp->port_curr++;
+	mutex_exit(&pp->port_queue.portq_mutex);
 
-	*pkevpp = kmem_cache_alloc(port_control.pc_cache, KM_NOSLEEP);
-	if (*pkevpp == NULL) {
-		releasef(port);
-		return (ENOMEM);
-	}
-	atomic_add_32(&pp->port_curr, 1);
-	mutex_init(&(*pkevpp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
-	(*pkevpp)->portkev_source = source;
-	(*pkevpp)->portkev_flags = flags;
-	(*pkevpp)->portkev_pid = curproc->p_pid;
-	(*pkevpp)->portkev_port = pp;
-	(*pkevpp)->portkev_callback = NULL;
+	bzero(pkevp, sizeof (port_kevent_t));
+	mutex_init(&pkevp->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
+	pkevp->portkev_source = source;
+	pkevp->portkev_flags = flags;
+	pkevp->portkev_pid = curproc->p_pid;
+	pkevp->portkev_port = pp;
+	*pkevpp = pkevp;
 	releasef(port);
 	return (0);
 }
@@ -224,19 +257,28 @@ int
 port_alloc_event_local(port_t *pp, int source, int flags,
     port_kevent_t **pkevpp)
 {
-	if (pp->port_curr >= pp->port_max_events)
-		return (EAGAIN);
+	port_kevent_t	*pkevp;
 
-	*pkevpp = kmem_cache_alloc(port_control.pc_cache, KM_NOSLEEP);
-	if (*pkevpp == NULL)
+	pkevp = kmem_cache_alloc(port_control.pc_cache, KM_NOSLEEP);
+	if (pkevp == NULL)
 		return (ENOMEM);
 
-	atomic_add_32(&pp->port_curr, 1);
-	mutex_init(&(*pkevpp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
-	(*pkevpp)->portkev_flags = flags;
-	(*pkevpp)->portkev_port = pp;
-	(*pkevpp)->portkev_source = source;
-	(*pkevpp)->portkev_pid = curproc->p_pid;
+	mutex_enter(&pp->port_queue.portq_mutex);
+	if (pp->port_curr >= pp->port_max_events) {
+		mutex_exit(&pp->port_queue.portq_mutex);
+		kmem_cache_free(port_control.pc_cache, pkevp);
+		return (EAGAIN);
+	}
+	pp->port_curr++;
+	mutex_exit(&pp->port_queue.portq_mutex);
+
+	bzero(pkevp, sizeof (port_kevent_t));
+	mutex_init(&pkevp->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
+	pkevp->portkev_flags = flags;
+	pkevp->portkev_port = pp;
+	pkevp->portkev_source = source;
+	pkevp->portkev_pid = curproc->p_pid;
+	*pkevpp = pkevp;
 	return (0);
 }
 
@@ -249,31 +291,30 @@ port_alloc_event_local(port_t *pp, int source, int flags,
  */
 int
 port_alloc_event_block(port_t *pp, int source, int flags,
-    port_kevent_t **pkevp)
+    port_kevent_t **pkevpp)
 {
-	int		rval;
+	port_kevent_t *pkevp =
+	    kmem_cache_alloc(port_control.pc_cache, KM_SLEEP);
 
-	if (pp->port_curr >= pp->port_max_events) {
-		mutex_enter(&pp->port_mutex);
-		pp->port_flags |= PORT_EVENTS;
-		while (pp->port_curr >= pp->port_max_events) {
-			rval = cv_wait_sig(&pp->port_cv, &pp->port_mutex);
-			if (rval == 0) {
-				/* signal detected */
-				mutex_exit(&pp->port_mutex);
-				return (EINTR);
-			}
+	mutex_enter(&pp->port_queue.portq_mutex);
+	while (pp->port_curr >= pp->port_max_events) {
+		if (!cv_wait_sig(&pp->port_cv, &pp->port_queue.portq_mutex)) {
+			/* signal detected */
+			mutex_exit(&pp->port_queue.portq_mutex);
+			kmem_cache_free(port_control.pc_cache, pkevp);
+			return (EINTR);
 		}
-		mutex_exit(&pp->port_mutex);
 	}
+	pp->port_curr++;
+	mutex_exit(&pp->port_queue.portq_mutex);
 
-	*pkevp = kmem_cache_alloc(port_control.pc_cache, KM_SLEEP);
-	atomic_add_32(&pp->port_curr, 1);
-	mutex_init(&(*pkevp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
-	(*pkevp)->portkev_flags = flags;
-	(*pkevp)->portkev_port = pp;
-	(*pkevp)->portkev_source = source;
-	(*pkevp)->portkev_pid = curproc->p_pid;
+	bzero(pkevp, sizeof (port_kevent_t));
+	mutex_init(&pkevp->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
+	pkevp->portkev_flags = flags;
+	pkevp->portkev_port = pp;
+	pkevp->portkev_source = source;
+	pkevp->portkev_pid = curproc->p_pid;
+	*pkevpp = pkevp;
 	return (0);
 }
 
@@ -303,7 +344,7 @@ port_remove_done_event(port_kevent_t *pkevp)
 	portq = &pkevp->portkev_port->port_queue;
 	mutex_enter(&portq->portq_mutex);
 	/* wait for port_get() or port_getn() */
-	mutex_enter(&portq->portq_block_mutex);
+	port_block(portq);
 	if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
 		/* event still in port queue */
 		if (portq->portq_getn) {
@@ -317,7 +358,7 @@ port_remove_done_event(port_kevent_t *pkevp)
 		/* now remove event from the port queue */
 		port_remove_event_doneq(pkevp, portq);
 	}
-	mutex_exit(&portq->portq_block_mutex);
+	port_unblock(portq);
 	mutex_exit(&portq->portq_mutex);
 }
 
@@ -343,22 +384,23 @@ port_free_event(port_kevent_t *pkevp)
 
 	portq = &pp->port_queue;
 	mutex_enter(&portq->portq_mutex);
-	mutex_enter(&portq->portq_block_mutex);
+	port_block(portq);
 	if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
 		pkevp->portkev_flags |= PORT_KEV_FREE;
 		pkevp->portkev_callback = NULL;
-		mutex_exit(&portq->portq_block_mutex);
+		port_unblock(portq);
 		mutex_exit(&portq->portq_mutex);
 		return;
 	}
-	mutex_exit(&portq->portq_block_mutex);
+	port_unblock(portq);
 
 	if (pkevp->portkev_flags & PORT_KEV_CACHED) {
 		mutex_exit(&portq->portq_mutex);
 		return;
 	}
 
-	atomic_add_32(&pp->port_curr, -1);
+	if (--pp->port_curr < pp->port_max_events)
+		cv_signal(&pp->port_cv);
 	if (portq->portq_flags & PORTQ_CLOSE) {
 		/*
 		 * Another thread is closing the event port.
@@ -382,33 +424,28 @@ port_free_event(port_kevent_t *pkevp)
 void
 port_free_event_local(port_kevent_t *pkevp, int counter)
 {
-	port_t	*pp = pkevp->portkev_port;
+	port_t *pp = pkevp->portkev_port;
+	port_queue_t *portq = &pp->port_queue;
+	int wakeup;
 
-	ASSERT(pp != NULL);
-	if (counter == 0)
-		atomic_add_32(&pp->port_curr, -1);
 	pkevp->portkev_callback = NULL;
 	pkevp->portkev_flags = 0;
 	pkevp->portkev_port = NULL;
 	mutex_destroy(&pkevp->portkev_lock);
 	kmem_cache_free(port_control.pc_cache, pkevp);
 
-	/* Check if blocking calls are waiting for event slots */
-	if (pp->port_flags & PORT_EVENTS) {
-		mutex_enter(&pp->port_mutex);
-		pp->port_flags &= ~PORT_EVENTS;
-		cv_signal(&pp->port_cv);
-		mutex_exit(&pp->port_mutex);
+	mutex_enter(&portq->portq_mutex);
+	if (counter == 0) {
+		if (--pp->port_curr < pp->port_max_events)
+			cv_signal(&pp->port_cv);
 	}
+	wakeup = (portq->portq_flags & PORTQ_POLLOUT);
+	portq->portq_flags &= ~PORTQ_POLLOUT;
+	mutex_exit(&portq->portq_mutex);
 
 	/* Submit a POLLOUT event if requested */
-	if (pp->port_queue.portq_flags & PORTQ_POLLOUT) {
-		port_queue_t	*portq = &pp->port_queue;
-		mutex_enter(&portq->portq_mutex);
-		portq->portq_flags &= ~PORTQ_POLLOUT;
-		mutex_exit(&portq->portq_mutex);
+	if (wakeup)
 		pollwakeup(&pp->port_pollhd, POLLOUT);
-	}
 }
 
 /*
@@ -527,7 +564,7 @@ port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 	pkevp =  pdp->pd_portev;
 	portq = &pp->port_queue;
 	mutex_enter(&portq->portq_mutex);
-	mutex_enter(&portq->portq_block_mutex);
+	port_block(portq);
 	if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
 		if (portq->portq_getn && portq->portq_tnent) {
 			/*
@@ -539,7 +576,7 @@ port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 		/* cleanup merged port queue */
 		port_remove_event_doneq(pkevp, portq);
 	}
-	mutex_exit(&portq->portq_block_mutex);
+	port_unblock(portq);
 	mutex_exit(&portq->portq_mutex);
 	if (pkevp->portkev_callback) {
 		(void) (*pkevp->portkev_callback)(pkevp->portkev_arg,

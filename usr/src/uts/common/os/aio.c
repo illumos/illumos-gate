@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ static int kaio(ulong_t *, rval_t *);
  * implementation specific functions (private)
  */
 #ifdef _LP64
-static int alio(int, int, aiocb_t **, int, struct sigevent *);
+static int alio(int, aiocb_t **, int, struct sigevent *);
 #endif
 static int aionotify(void);
 static int aioinit(void);
@@ -88,7 +88,7 @@ static aio_req_t *aio_req_remove(aio_req_t *);
 static int aio_req_find(aio_result_t *, aio_req_t **);
 static int aio_hash_insert(struct aio_req_t *, aio_t *);
 static int aio_req_setup(aio_req_t **, aio_t *, aiocb_t *,
-    aio_result_t *, int, vnode_t *);
+    aio_result_t *, vnode_t *);
 static int aio_cleanup_thread(aio_t *);
 static aio_lio_t *aio_list_get(aio_result_t *);
 static void lio_set_uerror(void *, int);
@@ -107,8 +107,8 @@ static int arw(int, int, char *, int, offset_t, aio_result_t *, int);
 static int aiorw(int, void *, int, int);
 
 static int alioLF(int, void *, int, void *);
-static int aio_req_setupLF(aio_req_t **, aio_t *,
-    aiocb64_32_t *, aio_result_t *, int, vnode_t *);
+static int aio_req_setupLF(aio_req_t **, aio_t *, aiocb64_32_t *,
+    aio_result_t *, vnode_t *);
 static int alio32(int, void *, int, void *);
 static int driver_aio_write(vnode_t *vp, struct aio_req *aio, cred_t *cred_p);
 static int driver_aio_read(vnode_t *vp, struct aio_req *aio, cred_t *cred_p);
@@ -256,7 +256,7 @@ kaioc(
 		error = aiostart();
 		break;
 	case AIOLIO:
-		error = alio((int)a0, (int)a1, (aiocb_t **)a2, (int)a3,
+		error = alio((int)a1, (aiocb_t **)a2, (int)a3,
 		    (struct sigevent *)a4);
 		break;
 	case AIOLIOWAIT:
@@ -1159,7 +1159,8 @@ aiostart(void)
  */
 
 static int
-aio_req_assoc_port_rw(port_notify_t *pntfy, aiocb_t *cbp, aio_req_t *reqp)
+aio_req_assoc_port_rw(port_notify_t *pntfy, aiocb_t *cbp,
+	aio_req_t *reqp, int event)
 {
 	port_kevent_t	*pkevp = NULL;
 	int		error;
@@ -1174,108 +1175,12 @@ aio_req_assoc_port_rw(port_notify_t *pntfy, aiocb_t *cbp, aio_req_t *reqp)
 	} else {
 		port_init_event(pkevp, (uintptr_t)cbp, pntfy->portnfy_user,
 		    aio_port_callback, reqp);
+		pkevp->portkev_events = event;
 		reqp->aio_req_portkev = pkevp;
 		reqp->aio_req_port = pntfy->portnfy_port;
 	}
 	return (error);
 }
-
-/*
- * Associate an aiocb with a port.
- * This function is used by lio_listio() to associate a transaction with a port.
- * Allocate an event port structure (port_alloc_event()) and store the
- * delivered user pointer (portnfy_user) in the portkev_user field of the
- * The aio_req_portkev pointer in the aio_req_t structure was added to identify
- * the port association.
- * The event port notification can be requested attaching the port_notify_t
- * structure to the sigevent argument of lio_listio() or attaching the
- * port_notify_t structure to the sigevent structure which is embedded in the
- * aiocb.
- * The attachement to the global sigevent structure is valid for all aiocbs
- * in the list.
- */
-
-static int
-aio_req_assoc_port(struct sigevent *sigev, void	*user, aiocb_t *cbp,
-    aio_req_t *reqp, port_kevent_t *pkevtp)
-{
-	port_kevent_t	*pkevp = NULL;
-	port_notify_t	pntfy;
-	int		error;
-
-	if (sigev->sigev_notify == SIGEV_PORT) {
-		/* aiocb has an own port notification embedded */
-		if (copyin((void *)sigev->sigev_value.sival_ptr, &pntfy,
-		    sizeof (port_notify_t)))
-			return (EFAULT);
-
-		error = port_alloc_event(pntfy.portnfy_port, PORT_ALLOC_DEFAULT,
-		    PORT_SOURCE_AIO, &pkevp);
-		if (error) {
-			if ((error == ENOMEM) || (error == EAGAIN))
-				return (EAGAIN);
-			else
-				return (EINVAL);
-		}
-		/* use this values instead of the global values in port */
-
-		port_init_event(pkevp, (uintptr_t)cbp, pntfy.portnfy_user,
-		    aio_port_callback, reqp);
-		reqp->aio_req_port = pntfy.portnfy_port;
-	} else {
-		/* use global port notification */
-		error = port_dup_event(pkevtp, &pkevp, PORT_ALLOC_DEFAULT);
-		if (error)
-			return (EAGAIN);
-		port_init_event(pkevp, (uintptr_t)cbp, user, aio_port_callback,
-		    reqp);
-	}
-	reqp->aio_req_portkev = pkevp;
-	return (0);
-}
-
-/*
- * Same comments as in aio_req_assoc_port(), see above.
- */
-
-static int
-aio_req_assoc_port32(struct sigevent32 *sigev, void *user, aiocb_t *cbp,
-    aio_req_t *reqp, port_kevent_t *pkevtp)
-{
-	port_kevent_t	*pkevp = NULL;
-	port_notify32_t	pntfy;
-	int		error;
-
-	if (sigev->sigev_notify == SIGEV_PORT) {
-		if (copyin((void *)(uintptr_t)sigev->sigev_value.sival_int,
-		    &pntfy, sizeof (port_notify32_t)))
-			return (EFAULT);
-
-		error = port_alloc_event(pntfy.portnfy_port,
-		    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO, &pkevp);
-		if (error) {
-			if ((error == ENOMEM) || (error == EAGAIN))
-				return (EAGAIN);
-			else
-				return (EINVAL);
-		}
-		/* use this values instead of the global values in port */
-
-		port_init_event(pkevp, (uintptr_t)cbp,
-		    (void *)(uintptr_t)pntfy.portnfy_user,
-		    aio_port_callback, reqp);
-		reqp->aio_req_port = pntfy.portnfy_port;
-	} else {
-		error = port_dup_event(pkevtp, &pkevp, PORT_ALLOC_DEFAULT);
-		if (error)
-			return (EAGAIN);
-		port_init_event(pkevp, (uintptr_t)cbp, user, aio_port_callback,
-		    reqp);
-	}
-	reqp->aio_req_portkev = pkevp;
-	return (0);
-}
-
 
 #ifdef _LP64
 
@@ -1292,15 +1197,12 @@ aio_req_assoc_port32(struct sigevent32 *sigev, void *user, aiocb_t *cbp,
  * locking strategy. Processing a list could adversely impact
  * the driver's interrupt latency.
  */
-/*ARGSUSED*/
 static int
 alio(
-	int	opcode,
-	int	mode_arg,
-	aiocb_t	**aiocb_arg,
-	int	nent,
-	struct	sigevent *sigev)
-
+	int		mode_arg,
+	aiocb_t		**aiocb_arg,
+	int		nent,
+	struct sigevent	*sigev)
 {
 	file_t		*fp;
 	file_t		*prev_fp = NULL;
@@ -1310,9 +1212,10 @@ alio(
 	aio_req_t	*reqp;
 	aio_t		*aiop;
 	caddr_t		cbplist;
-	aiocb_t		*cbp, **ucbp;
 	aiocb_t		cb;
 	aiocb_t		*aiocb = &cb;
+	aiocb_t		*cbp;
+	aiocb_t		**ucbp;
 	struct sigevent sigevk;
 	sigqueue_t	*sqp;
 	int		(*aio_func)();
@@ -1323,9 +1226,12 @@ alio(
 	size_t		ssize;
 	int		deadhead = 0;
 	int		aio_notsupported = 0;
-	int		aio_use_port = 0;
+	int		lio_head_port;
+	int		aio_port;
+	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
 	port_notify_t	pnotify;
+	int		event;
 
 	aiop = curproc->p_aio;
 	if (aiop == NULL || nent <= 0 || nent > _AIO_LISTIO_MAX)
@@ -1335,16 +1241,35 @@ alio(
 	cbplist = kmem_alloc(ssize, KM_SLEEP);
 	ucbp = (aiocb_t **)cbplist;
 
-	if (copyin(aiocb_arg, cbplist, sizeof (aiocb_t *) * nent)) {
+	if (copyin(aiocb_arg, cbplist, ssize) ||
+	    (sigev && copyin(sigev, &sigevk, sizeof (struct sigevent)))) {
 		kmem_free(cbplist, ssize);
 		return (EFAULT);
 	}
 
-	if (sigev) {
-		if (copyin(sigev, &sigevk, sizeof (struct sigevent))) {
+	/* Event Ports  */
+	if (sigev &&
+	    (sigevk.sigev_notify == SIGEV_THREAD ||
+	    sigevk.sigev_notify == SIGEV_PORT)) {
+		if (sigevk.sigev_notify == SIGEV_THREAD) {
+			pnotify.portnfy_port = sigevk.sigev_signo;
+			pnotify.portnfy_user = sigevk.sigev_value.sival_ptr;
+		} else if (copyin(sigevk.sigev_value.sival_ptr,
+		    &pnotify, sizeof (pnotify))) {
 			kmem_free(cbplist, ssize);
 			return (EFAULT);
 		}
+		error = port_alloc_event(pnotify.portnfy_port,
+		    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO, &pkevtp);
+		if (error) {
+			if (error == ENOMEM || error == EAGAIN)
+				error = EAGAIN;
+			else
+				error = EINVAL;
+			kmem_free(cbplist, ssize);
+			return (error);
+		}
+		lio_head_port = pnotify.portnfy_port;
 	}
 
 	/*
@@ -1353,28 +1278,7 @@ alio(
 	 */
 	head = NULL;
 
-	/* Event Ports  */
-
-	if (sigev && sigevk.sigev_notify == SIGEV_PORT) {
-		/* Use port for completion notification */
-		if (copyin(sigevk.sigev_value.sival_ptr, &pnotify,
-		    sizeof (port_notify_t))) {
-			kmem_free(cbplist, ssize);
-			return (EFAULT);
-		}
-		/* use event ports for the list of aiocbs */
-		aio_use_port = 1;
-		error = port_alloc_event(pnotify.portnfy_port,
-		    PORT_ALLOC_PRIVATE, PORT_SOURCE_AIO, &pkevtp);
-		if (error) {
-			if ((error == ENOMEM) || (error == EAGAIN))
-				error = EAGAIN;
-			else
-				error = EINVAL;
-			kmem_free(cbplist, ssize);
-			return (error);
-		}
-	} else if ((mode_arg == LIO_WAIT) || sigev) {
+	if (mode_arg == LIO_WAIT || sigev) {
 		mutex_enter(&aiop->aio_mutex);
 		error = aio_lio_alloc(&head);
 		mutex_exit(&aiop->aio_mutex);
@@ -1383,8 +1287,10 @@ alio(
 		deadhead = 1;
 		head->lio_nent = nent;
 		head->lio_refcnt = nent;
-		if (sigev && (sigevk.sigev_notify == SIGEV_SIGNAL) &&
-		    (sigevk.sigev_signo > 0 && sigevk.sigev_signo < NSIG)) {
+		head->lio_port = -1;
+		head->lio_portkev = NULL;
+		if (sigev && sigevk.sigev_notify == SIGEV_SIGNAL &&
+		    sigevk.sigev_signo > 0 && sigevk.sigev_signo < NSIG) {
 			sqp = kmem_zalloc(sizeof (sigqueue_t), KM_NOSLEEP);
 			if (sqp == NULL) {
 				error = EAGAIN;
@@ -1403,13 +1309,25 @@ alio(
 		} else {
 			head->lio_sigqp = NULL;
 		}
+		if (pkevtp) {
+			/*
+			 * Prepare data to send when list of aiocb's
+			 * has completed.
+			 */
+			port_init_event(pkevtp, (uintptr_t)sigev,
+			    (void *)(uintptr_t)pnotify.portnfy_user,
+			    NULL, head);
+			pkevtp->portkev_events = AIOLIO;
+			head->lio_portkev = pkevtp;
+			head->lio_port = pnotify.portnfy_port;
+		}
 	}
 
 	for (i = 0; i < nent; i++, ucbp++) {
 
 		cbp = *ucbp;
 		/* skip entry if it can't be copied. */
-		if (cbp == NULL || copyin(cbp, aiocb, sizeof (aiocb_t))) {
+		if (cbp == NULL || copyin(cbp, aiocb, sizeof (*aiocb))) {
 			if (head) {
 				mutex_enter(&aiop->aio_mutex);
 				head->lio_nent--;
@@ -1420,7 +1338,6 @@ alio(
 		}
 
 		/* skip if opcode for aiocb is LIO_NOP */
-
 		mode = aiocb->aio_lio_opcode;
 		if (mode == LIO_NOP) {
 			cbp = NULL;
@@ -1446,12 +1363,9 @@ alio(
 			continue;
 		}
 
-		vp = fp->f_vnode;
-
 		/*
 		 * check the permission of the partition
 		 */
-		mode = aiocb->aio_lio_opcode;
 		if ((fp->f_flag & mode) == 0) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, EBADF);
@@ -1466,11 +1380,12 @@ alio(
 		}
 
 		/*
-		 * common case where requests are to the same fd for the
-		 * same r/w operation.
+		 * common case where requests are to the same fd
+		 * for the same r/w operation.
 		 * for UFS, need to set EBADFD
 		 */
-		if ((fp != prev_fp) || (mode != prev_mode)) {
+		vp = fp->f_vnode;
+		if (fp != prev_fp || mode != prev_mode) {
 			aio_func = check_vp(vp, mode);
 			if (aio_func == NULL) {
 				prev_fp = NULL;
@@ -1490,8 +1405,9 @@ alio(
 			}
 		}
 
-		if (error = aio_req_setup(&reqp, aiop, aiocb,
-		    &cbp->aio_resultp, aio_use_port, vp)) {
+		error = aio_req_setup(&reqp, aiop, aiocb,
+		    &cbp->aio_resultp, vp);
+		if (error) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, error);
 			if (head) {
@@ -1516,15 +1432,47 @@ alio(
 
 		reqp->aio_req_iocb.iocb = (caddr_t)cbp;
 
-		if (aio_use_port) {
-			reqp->aio_req_port = pnotify.portnfy_port;
-			error = aio_req_assoc_port(&aiocb->aio_sigevent,
-			    pnotify.portnfy_user, cbp, reqp, pkevtp);
+		event = (mode == LIO_READ)? AIOAREAD : AIOAWRITE;
+		aio_port = (aiocb->aio_sigevent.sigev_notify == SIGEV_PORT);
+		aio_thread = (aiocb->aio_sigevent.sigev_notify == SIGEV_THREAD);
+		if (aio_port | aio_thread) {
+			port_kevent_t *lpkevp;
+			/*
+			 * Prepare data to send with each aiocb completed.
+			 */
+			if (aio_port) {
+				void *paddr =
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+				if (copyin(paddr, &pnotify, sizeof (pnotify)))
+					error = EFAULT;
+			} else {	/* aio_thread */
+				pnotify.portnfy_port =
+				    aiocb->aio_sigevent.sigev_signo;
+				pnotify.portnfy_user =
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+			}
+			if (error)
+				/* EMPTY */;
+			else if (pkevtp != NULL &&
+			    pnotify.portnfy_port == lio_head_port)
+				error = port_dup_event(pkevtp, &lpkevp,
+				    PORT_ALLOC_DEFAULT);
+			else
+				error = port_alloc_event(pnotify.portnfy_port,
+				    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO,
+				    &lpkevp);
+			if (error == 0) {
+				port_init_event(lpkevp, (uintptr_t)cbp,
+				    (void *)(uintptr_t)pnotify.portnfy_user,
+				    aio_port_callback, reqp);
+				lpkevp->portkev_events = event;
+				reqp->aio_req_portkev = lpkevp;
+				reqp->aio_req_port = pnotify.portnfy_port;
+			}
 		}
 
 		/*
 		 * send the request to driver.
-		 * Clustering: If PXFS vnode, call PXFS function.
 		 */
 		if (error == 0) {
 			if (aiocb->aio_nbytes == 0) {
@@ -1535,6 +1483,7 @@ alio(
 			error = (*aio_func)(vp, (aio_req_t *)&reqp->aio_req,
 			    CRED());
 		}
+
 		/*
 		 * the fd's ref count is not decremented until the IO has
 		 * completed unless there was an error.
@@ -1557,9 +1506,6 @@ alio(
 			clear_active_fd(aiocb->aio_fildes);
 		}
 	}
-
-	if (pkevtp)
-		port_free_event(pkevtp);
 
 	if (aio_notsupported) {
 		error = ENOTSUP;
@@ -1588,6 +1534,8 @@ done:
 	if (deadhead) {
 		if (head->lio_sigqp)
 			kmem_free(head->lio_sigqp, sizeof (sigqueue_t));
+		if (head->lio_portkev)
+			port_free_event(head->lio_portkev);
 		kmem_free(head, sizeof (aio_lio_t));
 	}
 	return (error);
@@ -1788,7 +1736,7 @@ alio_cleanup(aio_t *aiop, aiocb_t **cbp, int nent, int run_mode)
 	int i;
 	aio_req_t *reqp;
 	aio_result_t *resultp;
-	aiocb64_32_t	*aiocb_64;
+	aiocb64_32_t *aiocb_64;
 
 	for (i = 0; i < nent; i++) {
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
@@ -1796,15 +1744,15 @@ alio_cleanup(aio_t *aiop, aiocb_t **cbp, int nent, int run_mode)
 				continue;
 			if (run_mode == AIO_LARGEFILE) {
 				aiocb_64 = (aiocb64_32_t *)cbp[i];
-				resultp = (aio_result_t *)&aiocb_64->
-				    aio_resultp;
+				resultp = (aio_result_t *)
+				    &aiocb_64->aio_resultp;
 			} else
 				resultp = &cbp[i]->aio_resultp;
 		}
 #ifdef	_SYSCALL32_IMPL
 		else {
-			aiocb32_t	*aiocb_32;
-			caddr32_t	*cbp32;
+			aiocb32_t *aiocb_32;
+			caddr32_t *cbp32;
 
 			cbp32 = (caddr32_t *)cbp;
 			if (cbp32[i] == NULL)
@@ -1840,8 +1788,7 @@ alio_cleanup(aio_t *aiop, aiocb_t **cbp, int nent, int run_mode)
 }
 
 /*
- * write out the results for an aio request that is
- * done.
+ * Write out the results for an aio request that is done.
  */
 static int
 aioerror(void *cb, int run_mode)
@@ -2040,14 +1987,14 @@ arw(
 	aiocb.aio_nbytes = bufsize;
 	aiocb.aio_offset = offset;
 	aiocb.aio_sigevent.sigev_notify = 0;
-	error = aio_req_setup(&reqp, aiop, &aiocb, resultp, 0, vp);
+	error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp);
 #else
 	aiocb64.aio_fildes = fdes;
 	aiocb64.aio_buf = (caddr32_t)bufp;
 	aiocb64.aio_nbytes = bufsize;
 	aiocb64.aio_offset = offset;
 	aiocb64.aio_sigevent.sigev_notify = 0;
-	error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, 0, vp);
+	error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp);
 #endif
 	if (error) {
 		releasef(fdes);
@@ -2068,7 +2015,6 @@ arw(
 	}
 	/*
 	 * send the request to driver.
-	 * Clustering: If PXFS vnode, call PXFS function.
 	 */
 	error = (*aio_func)(vp, (aio_req_t *)&reqp->aio_req, CRED());
 	/*
@@ -2091,26 +2037,9 @@ arw(
 }
 
 /*
- * Take request out of the port pending queue ...
- */
-
-void
-aio_deq_port_pending(aio_t *aiop, aio_req_t *reqp)
-{
-	ASSERT(MUTEX_HELD(&aiop->aio_mutex));
-	if (reqp->aio_req_prev == NULL)
-		/* first request */
-		aiop->aio_portpending = reqp->aio_req_next;
-	else
-		reqp->aio_req_prev->aio_req_next = reqp->aio_req_next;
-	if (reqp->aio_req_next != NULL)
-		reqp->aio_req_next->aio_req_prev = reqp->aio_req_prev;
-}
-
-/*
  * posix version of asynchronous read and write
  */
-static	int
+static int
 aiorw(
 	int		opcode,
 	void		*aiocb_arg,
@@ -2162,9 +2091,8 @@ aiorw(
 			bufsize = aiocb64.aio_nbytes;
 			resultp = (aio_result_t *)&(((aiocb64_32_t *)aiocb_arg)
 			    ->aio_resultp);
-			if ((fp = getf(fd = aiocb64.aio_fildes)) == NULL) {
+			if ((fp = getf(fd = aiocb64.aio_fildes)) == NULL)
 				return (EBADF);
-			}
 			sigev = (struct sigevent *)&aiocb64.aio_sigevent;
 		}
 
@@ -2174,6 +2102,11 @@ aiorw(
 				releasef(fd);
 				return (EFAULT);
 			}
+			aio_use_port = 1;
+		} else if (sigev->sigev_notify == SIGEV_THREAD) {
+			pntfy.portnfy_port = aiocb.aio_sigevent.sigev_signo;
+			pntfy.portnfy_user =
+			    aiocb.aio_sigevent.sigev_value.sival_ptr;
 			aio_use_port = 1;
 		}
 	}
@@ -2216,8 +2149,13 @@ aiorw(
 				return (EFAULT);
 			}
 			pntfy.portnfy_port = pntfy32.portnfy_port;
-			pntfy.portnfy_user =
-			    (void *)(uintptr_t)pntfy32.portnfy_user;
+			pntfy.portnfy_user = (void *)(uintptr_t)
+			    pntfy32.portnfy_user;
+			aio_use_port = 1;
+		} else if (sigev32->sigev_notify == SIGEV_THREAD) {
+			pntfy.portnfy_port = sigev32->sigev_signo;
+			pntfy.portnfy_user = (void *)(uintptr_t)
+			    sigev32->sigev_value.sival_ptr;
 			aio_use_port = 1;
 		}
 	}
@@ -2238,12 +2176,10 @@ aiorw(
 		releasef(fd);
 		return (EBADFD);
 	}
-	if ((model == DATAMODEL_NATIVE) && (run_mode == AIO_LARGEFILE))
-		error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp,
-		    aio_use_port, vp);
+	if (run_mode == AIO_LARGEFILE)
+		error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp);
 	else
-		error = aio_req_setup(&reqp, aiop, &aiocb, resultp,
-		    aio_use_port, vp);
+		error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp);
 
 	if (error) {
 		releasef(fd);
@@ -2263,12 +2199,15 @@ aiorw(
 		reqp->aio_req_iocb.iocb32 = (caddr32_t)(uintptr_t)aiocb_arg;
 #endif
 
-	if (aio_use_port)
-		error = aio_req_assoc_port_rw(&pntfy, aiocb_arg, reqp);
+	if (aio_use_port) {
+		int event = (run_mode == AIO_LARGEFILE)?
+		    ((mode == FREAD)? AIOAREAD64 : AIOAWRITE64) :
+		    ((mode == FREAD)? AIOAREAD : AIOAWRITE);
+		error = aio_req_assoc_port_rw(&pntfy, aiocb_arg, reqp, event);
+	}
 
 	/*
 	 * send the request to driver.
-	 * Clustering: If PXFS vnode, call PXFS function.
 	 */
 	if (error == 0) {
 		if (bufsize == 0) {
@@ -2287,7 +2226,7 @@ aiorw(
 	if (error) {
 		releasef(fd);
 		mutex_enter(&aiop->aio_mutex);
-		aio_deq_port_pending(aiop, reqp);
+		aio_deq(&aiop->aio_portpending, reqp);
 		aio_req_free(aiop, reqp);
 		aiop->aio_pending--;
 		if (aiop->aio_flags & AIO_REQ_BLOCK)
@@ -2312,7 +2251,7 @@ lio_set_error(aio_req_t *reqp)
 		return;
 
 	mutex_enter(&aiop->aio_mutex);
-	aio_deq_port_pending(aiop, reqp);
+	aio_deq(&aiop->aio_portpending, reqp);
 	aiop->aio_pending--;
 	/* request failed, AIO_PHYSIODONE set to aviod physio cleanup. */
 	reqp->aio_req_flags |= AIO_PHYSIODONE;
@@ -2403,11 +2342,10 @@ static aio_req_t *
 aio_req_remove(aio_req_t *reqp)
 {
 	aio_t *aiop = curproc->p_aio;
-	aio_req_t *head;
 
 	ASSERT(MUTEX_HELD(&aiop->aio_mutex));
 
-	if (reqp) {
+	if (reqp != NULL) {
 		ASSERT(reqp->aio_req_flags & AIO_DONEQ);
 		if (reqp->aio_req_next == reqp) {
 			/* only one request on queue */
@@ -2431,24 +2369,25 @@ aio_req_remove(aio_req_t *reqp)
 				aiop->aio_cleanupq = reqp->aio_req_next;
 		}
 		reqp->aio_req_flags &= ~AIO_DONEQ;
-		return (reqp);
-	}
-
-	if (aiop->aio_doneq) {
-		head = aiop->aio_doneq;
-		ASSERT(head->aio_req_flags & AIO_DONEQ);
-		if (head == head->aio_req_next) {
+		reqp->aio_req_next = NULL;
+		reqp->aio_req_prev = NULL;
+	} else if ((reqp = aiop->aio_doneq) != NULL) {
+		ASSERT(reqp->aio_req_flags & AIO_DONEQ);
+		if (reqp == reqp->aio_req_next) {
 			/* only one request on queue */
 			aiop->aio_doneq = NULL;
 		} else {
-			head->aio_req_prev->aio_req_next = head->aio_req_next;
-			head->aio_req_next->aio_req_prev = head->aio_req_prev;
-			aiop->aio_doneq = head->aio_req_next;
+			reqp->aio_req_prev->aio_req_next = reqp->aio_req_next;
+			reqp->aio_req_next->aio_req_prev = reqp->aio_req_prev;
+			aiop->aio_doneq = reqp->aio_req_next;
 		}
-		head->aio_req_flags &= ~AIO_DONEQ;
-		return (head);
+		reqp->aio_req_flags &= ~AIO_DONEQ;
+		reqp->aio_req_next = NULL;
+		reqp->aio_req_prev = NULL;
 	}
-	return (NULL);
+	if (aiop->aio_doneq == NULL && (aiop->aio_flags & AIO_WAITN))
+		cv_broadcast(&aiop->aio_waitcv);
+	return (reqp);
 }
 
 static int
@@ -2457,19 +2396,17 @@ aio_req_setup(
 	aio_t 		*aiop,
 	aiocb_t 	*arg,
 	aio_result_t 	*resultp,
-	int		port,
 	vnode_t		*vp)
 {
+	sigqueue_t	*sqp = NULL;
 	aio_req_t 	*reqp;
-	sigqueue_t	*sqp;
 	struct uio 	*uio;
-
 	struct sigevent *sigev;
 	int		error;
 
 	sigev = &arg->aio_sigevent;
-	if ((sigev->sigev_notify == SIGEV_SIGNAL) &&
-	    (sigev->sigev_signo > 0 && sigev->sigev_signo < NSIG)) {
+	if (sigev->sigev_notify == SIGEV_SIGNAL &&
+	    sigev->sigev_signo > 0 && sigev->sigev_signo < NSIG) {
 		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_NOSLEEP);
 		if (sqp == NULL)
 			return (EAGAIN);
@@ -2482,8 +2419,7 @@ aio_req_setup(
 		sqp->sq_info.si_uid = crgetuid(curproc->p_cred);
 		sqp->sq_info.si_signo = sigev->sigev_signo;
 		sqp->sq_info.si_value = sigev->sigev_value;
-	} else
-		sqp = NULL;
+	}
 
 	mutex_enter(&aiop->aio_mutex);
 
@@ -2506,8 +2442,9 @@ aio_req_setup(
 	aiop->aio_pending++;
 	aiop->aio_outstanding++;
 	reqp->aio_req_flags = AIO_PENDING;
-	if (port)
-		aio_enq_port_pending(aiop, reqp);
+	if (sigev->sigev_notify == SIGEV_THREAD ||
+	    sigev->sigev_notify == SIGEV_PORT)
+		aio_enq(&aiop->aio_portpending, reqp, 0);
 	mutex_exit(&aiop->aio_mutex);
 	/*
 	 * initialize aio request.
@@ -2515,6 +2452,7 @@ aio_req_setup(
 	reqp->aio_req_fd = arg->aio_fildes;
 	reqp->aio_req_sigqp = sqp;
 	reqp->aio_req_iocb.iocb = NULL;
+	reqp->aio_req_lio = NULL;
 	reqp->aio_req_buf.b_file = vp;
 	uio = reqp->aio_req.aio_uio;
 	uio->uio_iovcnt = 1;
@@ -2557,14 +2495,8 @@ aio_req_alloc(aio_req_t **nreqp, aio_result_t *resultp)
 	ASSERT(MUTEX_HELD(&aiop->aio_mutex));
 
 	if ((reqp = aiop->aio_free) != NULL) {
-		reqp->aio_req_flags = 0;
 		aiop->aio_free = reqp->aio_req_next;
-		/*
-		 * Clustering:This field has to be specifically
-		 * set to null so that the right thing can be
-		 * done in aphysio()
-		 */
-		reqp->aio_req_buf.b_iodone = NULL;
+		bzero(reqp, sizeof (*reqp));
 	} else {
 		/*
 		 * Check whether memory is getting tight.
@@ -2574,15 +2506,13 @@ aio_req_alloc(aio_req_t **nreqp, aio_result_t *resultp)
 		 */
 		if (freemem < desfree)
 			return (EAGAIN);
-
 		reqp = kmem_zalloc(sizeof (struct aio_req_t), KM_NOSLEEP);
 		if (reqp == NULL)
 			return (EAGAIN);
-		reqp->aio_req.aio_uio = &(reqp->aio_req_uio);
-		reqp->aio_req.aio_uio->uio_iov = &(reqp->aio_req_iov);
-		reqp->aio_req.aio_private = reqp;
 	}
-
+	reqp->aio_req.aio_uio = &reqp->aio_req_uio;
+	reqp->aio_req.aio_uio->uio_iov = &reqp->aio_req_iov;
+	reqp->aio_req.aio_private = reqp;
 	reqp->aio_req_buf.b_offset = -1;
 	reqp->aio_req_resultp = resultp;
 	if (aio_hash_insert(reqp, aiop)) {
@@ -2669,7 +2599,7 @@ aio_cleanup_thread(aio_t *aiop)
 			}
 
 			if ((rqclnup || AS_ISUNMAPWAIT(as)) &&
-					aiop->aio_doneq) {
+			    aiop->aio_doneq) {
 				aio_req_t *doneqhead = aiop->aio_doneq;
 				mutex_exit(&as->a_contents);
 				aiop->aio_doneq = NULL;
@@ -2979,10 +2909,10 @@ alioLF(
 	aio_req_t	*reqp;
 	aio_t		*aiop;
 	caddr_t		cbplist;
-	aiocb64_32_t	*cbp;
-	caddr32_t	*ucbp;
 	aiocb64_32_t	cb64;
 	aiocb64_32_t	*aiocb = &cb64;
+	aiocb64_32_t	*cbp;
+	caddr32_t	*ucbp;
 #ifdef _LP64
 	aiocb_t		aiocb_n;
 #endif
@@ -2990,14 +2920,18 @@ alioLF(
 	sigqueue_t	*sqp;
 	int		(*aio_func)();
 	int		mode;
-	int		error = 0, aio_errors = 0;
+	int		error = 0;
+	int		aio_errors = 0;
 	int		i;
 	size_t		ssize;
 	int		deadhead = 0;
 	int		aio_notsupported = 0;
-	int		aio_use_port = 0;
+	int		lio_head_port;
+	int		aio_port;
+	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
 	port_notify32_t	pnotify;
+	int		event;
 
 	aiop = curproc->p_aio;
 	if (aiop == NULL || nent <= 0 || nent > _AIO_LISTIO_MAX)
@@ -3009,16 +2943,36 @@ alioLF(
 	cbplist = kmem_alloc(ssize, KM_SLEEP);
 	ucbp = (caddr32_t *)cbplist;
 
-	if (copyin(aiocb_arg, cbplist, ssize)) {
+	if (copyin(aiocb_arg, cbplist, ssize) ||
+	    (sigev && copyin(sigev, &sigevk, sizeof (sigevk)))) {
 		kmem_free(cbplist, ssize);
 		return (EFAULT);
 	}
 
-	if (sigev) {
-		if (copyin(sigev, &sigevk, sizeof (sigevk))) {
+	/* Event Ports  */
+	if (sigev &&
+	    (sigevk.sigev_notify == SIGEV_THREAD ||
+	    sigevk.sigev_notify == SIGEV_PORT)) {
+		if (sigevk.sigev_notify == SIGEV_THREAD) {
+			pnotify.portnfy_port = sigevk.sigev_signo;
+			pnotify.portnfy_user = sigevk.sigev_value.sival_ptr;
+		} else if (copyin(
+		    (void *)(uintptr_t)sigevk.sigev_value.sival_ptr,
+		    &pnotify, sizeof (pnotify))) {
 			kmem_free(cbplist, ssize);
 			return (EFAULT);
 		}
+		error = port_alloc_event(pnotify.portnfy_port,
+		    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO, &pkevtp);
+		if (error) {
+			if (error == ENOMEM || error == EAGAIN)
+				error = EAGAIN;
+			else
+				error = EINVAL;
+			kmem_free(cbplist, ssize);
+			return (error);
+		}
+		lio_head_port = pnotify.portnfy_port;
 	}
 
 	/*
@@ -3027,26 +2981,7 @@ alioLF(
 	 */
 	head = NULL;
 
-	/* Event Ports  */
-
-	if (sigev && sigevk.sigev_notify == SIGEV_PORT) {
-		/* Use PORT for completion notification */
-		if (copyin((void *)(uintptr_t)sigevk.sigev_value.sival_ptr,
-		    &pnotify, sizeof (port_notify32_t))) {
-			kmem_free(cbplist, ssize);
-			return (EFAULT);
-		}
-		/* use event ports for the list of aiocbs */
-		aio_use_port = 1;
-		error = port_alloc_event(pnotify.portnfy_port,
-		    PORT_ALLOC_PRIVATE, PORT_SOURCE_AIO, &pkevtp);
-		if (error) {
-			if (error == ENOMEM)
-				error = EAGAIN;
-			kmem_free(cbplist, ssize);
-			return (error);
-		}
-	} else if ((mode_arg == LIO_WAIT) || sigev) {
+	if (mode_arg == LIO_WAIT || sigev) {
 		mutex_enter(&aiop->aio_mutex);
 		error = aio_lio_alloc(&head);
 		mutex_exit(&aiop->aio_mutex);
@@ -3055,8 +2990,10 @@ alioLF(
 		deadhead = 1;
 		head->lio_nent = nent;
 		head->lio_refcnt = nent;
-		if (sigev && (sigevk.sigev_notify == SIGEV_SIGNAL) &&
-		    (sigevk.sigev_signo > 0 && sigevk.sigev_signo < NSIG)) {
+		head->lio_port = -1;
+		head->lio_portkev = NULL;
+		if (sigev && sigevk.sigev_notify == SIGEV_SIGNAL &&
+		    sigevk.sigev_signo > 0 && sigevk.sigev_signo < NSIG) {
 			sqp = kmem_zalloc(sizeof (sigqueue_t), KM_NOSLEEP);
 			if (sqp == NULL) {
 				error = EAGAIN;
@@ -3076,13 +3013,25 @@ alioLF(
 		} else {
 			head->lio_sigqp = NULL;
 		}
+		if (pkevtp) {
+			/*
+			 * Prepare data to send when list of aiocb's
+			 * has completed.
+			 */
+			port_init_event(pkevtp, (uintptr_t)sigev,
+			    (void *)(uintptr_t)pnotify.portnfy_user,
+			    NULL, head);
+			pkevtp->portkev_events = AIOLIO64;
+			head->lio_portkev = pkevtp;
+			head->lio_port = pnotify.portnfy_port;
+		}
 	}
 
 	for (i = 0; i < nent; i++, ucbp++) {
 
 		cbp = (aiocb64_32_t *)(uintptr_t)*ucbp;
 		/* skip entry if it can't be copied. */
-		if (cbp == NULL || copyin(cbp, aiocb, sizeof (aiocb64_32_t))) {
+		if (cbp == NULL || copyin(cbp, aiocb, sizeof (*aiocb))) {
 			if (head) {
 				mutex_enter(&aiop->aio_mutex);
 				head->lio_nent--;
@@ -3093,7 +3042,6 @@ alioLF(
 		}
 
 		/* skip if opcode for aiocb is LIO_NOP */
-
 		mode = aiocb->aio_lio_opcode;
 		if (mode == LIO_NOP) {
 			cbp = NULL;
@@ -3119,12 +3067,9 @@ alioLF(
 			continue;
 		}
 
-		vp = fp->f_vnode;
-
 		/*
 		 * check the permission of the partition
 		 */
-		mode = aiocb->aio_lio_opcode;
 		if ((fp->f_flag & mode) == 0) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, EBADF);
@@ -3143,7 +3088,8 @@ alioLF(
 		 * for the same r/w operation
 		 * for UFS, need to set EBADFD
 		 */
-		if ((fp != prev_fp) || (mode != prev_mode)) {
+		vp = fp->f_vnode;
+		if (fp != prev_fp || mode != prev_mode) {
 			aio_func = check_vp(vp, mode);
 			if (aio_func == NULL) {
 				prev_fp = NULL;
@@ -3162,16 +3108,18 @@ alioLF(
 				prev_mode = mode;
 			}
 		}
+
 #ifdef	_LP64
 		aiocb_LFton(aiocb, &aiocb_n);
 		error = aio_req_setup(&reqp, aiop, &aiocb_n,
-		    (aio_result_t *)&cbp->aio_resultp, aio_use_port, vp);
+		    (aio_result_t *)&cbp->aio_resultp, vp);
 #else
 		error = aio_req_setupLF(&reqp, aiop, aiocb,
-		    (aio_result_t *)&cbp->aio_resultp, aio_use_port, vp);
+		    (aio_result_t *)&cbp->aio_resultp, vp);
 #endif  /* _LP64 */
 		if (error) {
 			releasef(aiocb->aio_fildes);
+			lio_set_uerror(&cbp->aio_resultp, error);
 			if (head) {
 				mutex_enter(&aiop->aio_mutex);
 				head->lio_nent--;
@@ -3194,16 +3142,47 @@ alioLF(
 
 		reqp->aio_req_iocb.iocb32 = *ucbp;
 
-		if (aio_use_port) {
-			reqp->aio_req_port = pnotify.portnfy_port;
-			error = aio_req_assoc_port32(&aiocb->aio_sigevent,
-			    (void *)(uintptr_t)pnotify.portnfy_user,
-			    (aiocb_t *)(uintptr_t)*ucbp, reqp, pkevtp);
+		event = (mode == LIO_READ)? AIOAREAD64 : AIOAWRITE64;
+		aio_port = (aiocb->aio_sigevent.sigev_notify == SIGEV_PORT);
+		aio_thread = (aiocb->aio_sigevent.sigev_notify == SIGEV_THREAD);
+		if (aio_port | aio_thread) {
+			port_kevent_t *lpkevp;
+			/*
+			 * Prepare data to send with each aiocb completed.
+			 */
+			if (aio_port) {
+				void *paddr = (void *)(uintptr_t)
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+				if (copyin(paddr, &pnotify, sizeof (pnotify)))
+					error = EFAULT;
+			} else {	/* aio_thread */
+				pnotify.portnfy_port =
+				    aiocb->aio_sigevent.sigev_signo;
+				pnotify.portnfy_user =
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+			}
+			if (error)
+				/* EMPTY */;
+			else if (pkevtp != NULL &&
+			    pnotify.portnfy_port == lio_head_port)
+				error = port_dup_event(pkevtp, &lpkevp,
+				    PORT_ALLOC_DEFAULT);
+			else
+				error = port_alloc_event(pnotify.portnfy_port,
+				    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO,
+				    &lpkevp);
+			if (error == 0) {
+				port_init_event(lpkevp, (uintptr_t)*ucbp,
+				    (void *)(uintptr_t)pnotify.portnfy_user,
+				    aio_port_callback, reqp);
+				lpkevp->portkev_events = event;
+				reqp->aio_req_portkev = lpkevp;
+				reqp->aio_req_port = pnotify.portnfy_port;
+			}
 		}
 
 		/*
 		 * send the request to driver.
-		 * Clustering: If PXFS vnode, call PXFS function.
 		 */
 		if (error == 0) {
 			if (aiocb->aio_nbytes == 0) {
@@ -3238,9 +3217,6 @@ alioLF(
 		}
 	}
 
-	if (pkevtp)
-		port_free_event(pkevtp);
-
 	if (aio_notsupported) {
 		error = ENOTSUP;
 	} else if (aio_errors) {
@@ -3268,6 +3244,8 @@ done:
 	if (deadhead) {
 		if (head->lio_sigqp)
 			kmem_free(head->lio_sigqp, sizeof (sigqueue_t));
+		if (head->lio_portkev)
+			port_free_event(head->lio_portkev);
 		kmem_free(head, sizeof (aio_lio_t));
 	}
 	return (error);
@@ -3304,7 +3282,7 @@ aiocb_LFton(aiocb64_32_t *src, aiocb_t *dest)
 
 /*
  * This function is used only for largefile calls made by
- * 32 bit applications on 32 bit kernel.
+ * 32 bit applications.
  */
 static int
 aio_req_setupLF(
@@ -3312,19 +3290,17 @@ aio_req_setupLF(
 	aio_t		*aiop,
 	aiocb64_32_t	*arg,
 	aio_result_t	*resultp,
-	int		port,
 	vnode_t		*vp)
 {
+	sigqueue_t	*sqp = NULL;
 	aio_req_t	*reqp;
-	sigqueue_t	*sqp;
-	struct	uio	*uio;
-
-	struct	sigevent *sigev;
+	struct uio	*uio;
+	struct sigevent32 *sigev;
 	int 		error;
 
-	sigev = (struct	sigevent *)&arg->aio_sigevent;
-	if ((sigev->sigev_notify == SIGEV_SIGNAL) &&
-	    (sigev->sigev_signo > 0 && sigev->sigev_signo < NSIG)) {
+	sigev = &arg->aio_sigevent;
+	if (sigev->sigev_notify == SIGEV_SIGNAL &&
+	    sigev->sigev_signo > 0 && sigev->sigev_signo < NSIG) {
 		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_NOSLEEP);
 		if (sqp == NULL)
 			return (EAGAIN);
@@ -3336,9 +3312,8 @@ aio_req_setupLF(
 		sqp->sq_info.si_zoneid = getzoneid();
 		sqp->sq_info.si_uid = crgetuid(curproc->p_cred);
 		sqp->sq_info.si_signo = sigev->sigev_signo;
-		sqp->sq_info.si_value = sigev->sigev_value;
-	} else
-		sqp = NULL;
+		sqp->sq_info.si_value.sival_int = sigev->sigev_value.sival_int;
+	}
 
 	mutex_enter(&aiop->aio_mutex);
 
@@ -3361,8 +3336,9 @@ aio_req_setupLF(
 	aiop->aio_pending++;
 	aiop->aio_outstanding++;
 	reqp->aio_req_flags = AIO_PENDING;
-	if (port)
-		aio_enq_port_pending(aiop, reqp);
+	if (sigev->sigev_notify == SIGEV_THREAD ||
+	    sigev->sigev_notify == SIGEV_PORT)
+		aio_enq(&aiop->aio_portpending, reqp, 0);
 	mutex_exit(&aiop->aio_mutex);
 	/*
 	 * initialize aio request.
@@ -3370,6 +3346,7 @@ aio_req_setupLF(
 	reqp->aio_req_fd = arg->aio_fildes;
 	reqp->aio_req_sigqp = sqp;
 	reqp->aio_req_iocb.iocb = NULL;
+	reqp->aio_req_lio = NULL;
 	reqp->aio_req_buf.b_file = vp;
 	uio = reqp->aio_req.aio_uio;
 	uio->uio_iovcnt = 1;
@@ -3389,7 +3366,7 @@ alio32(
 	int		mode_arg,
 	void		*aiocb_arg,
 	int		nent,
-	void		*sigev_arg)
+	void		*sigev)
 {
 	file_t		*fp;
 	file_t		*prev_fp = NULL;
@@ -3398,34 +3375,39 @@ alio32(
 	aio_lio_t	*head;
 	aio_req_t	*reqp;
 	aio_t		*aiop;
+	caddr_t		cbplist;
 	aiocb_t		cb;
 	aiocb_t		*aiocb = &cb;
-	caddr_t		cbplist;
 #ifdef	_LP64
 	aiocb32_t	*cbp;
 	caddr32_t	*ucbp;
 	aiocb32_t	cb32;
 	aiocb32_t	*aiocb32 = &cb32;
-	struct sigevent32	sigev;
+	struct sigevent32	sigevk;
 #else
 	aiocb_t		*cbp, **ucbp;
-	struct sigevent	sigev;
+	struct sigevent	sigevk;
 #endif
 	sigqueue_t	*sqp;
 	int		(*aio_func)();
 	int		mode;
-	int		error = 0, aio_errors = 0;
+	int		error = 0;
+	int		aio_errors = 0;
 	int		i;
 	size_t		ssize;
 	int		deadhead = 0;
 	int		aio_notsupported = 0;
-	int		aio_use_port = 0;
+	int		lio_head_port;
+	int		aio_port;
+	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
 #ifdef	_LP64
 	port_notify32_t	pnotify;
 #else
 	port_notify_t	pnotify;
 #endif
+	int		event;
+
 	aiop = curproc->p_aio;
 	if (aiop == NULL || nent <= 0 || nent > _AIO_LISTIO_MAX)
 		return (EINVAL);
@@ -3438,16 +3420,36 @@ alio32(
 	cbplist = kmem_alloc(ssize, KM_SLEEP);
 	ucbp = (void *)cbplist;
 
-	if (copyin(aiocb_arg, cbplist, ssize)) {
+	if (copyin(aiocb_arg, cbplist, ssize) ||
+	    (sigev && copyin(sigev, &sigevk, sizeof (struct sigevent32)))) {
 		kmem_free(cbplist, ssize);
 		return (EFAULT);
 	}
 
-	if (sigev_arg) {
-		if (copyin(sigev_arg, &sigev, sizeof (struct sigevent32))) {
+	/* Event Ports  */
+	if (sigev &&
+	    (sigevk.sigev_notify == SIGEV_THREAD ||
+	    sigevk.sigev_notify == SIGEV_PORT)) {
+		if (sigevk.sigev_notify == SIGEV_THREAD) {
+			pnotify.portnfy_port = sigevk.sigev_signo;
+			pnotify.portnfy_user = sigevk.sigev_value.sival_ptr;
+		} else if (copyin(
+		    (void *)(uintptr_t)sigevk.sigev_value.sival_ptr,
+		    &pnotify, sizeof (pnotify))) {
 			kmem_free(cbplist, ssize);
 			return (EFAULT);
 		}
+		error = port_alloc_event(pnotify.portnfy_port,
+		    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO, &pkevtp);
+		if (error) {
+			if (error == ENOMEM || error == EAGAIN)
+				error = EAGAIN;
+			else
+				error = EINVAL;
+			kmem_free(cbplist, ssize);
+			return (error);
+		}
+		lio_head_port = pnotify.portnfy_port;
 	}
 
 	/*
@@ -3456,28 +3458,7 @@ alio32(
 	 */
 	head = NULL;
 
-	/* Event Ports  */
-
-	if (sigev_arg && sigev.sigev_notify == SIGEV_PORT) {
-		/* Use PORT for completion notification */
-		if (copyin((void *)(uintptr_t)sigev.sigev_value.sival_ptr,
-		    &pnotify, sizeof (port_notify32_t))) {
-			kmem_free(cbplist, ssize);
-			return (EFAULT);
-		}
-		/* use event ports for the list of aiocbs */
-		aio_use_port = 1;
-		error = port_alloc_event(pnotify.portnfy_port,
-		    PORT_ALLOC_PRIVATE, PORT_SOURCE_AIO, &pkevtp);
-		if (error) {
-			if ((error == ENOMEM) || (error == EAGAIN))
-				error = EAGAIN;
-			else
-				error = EINVAL;
-			kmem_free(cbplist, ssize);
-			return (error);
-		}
-	} else if ((mode_arg == LIO_WAIT) || sigev_arg) {
+	if (mode_arg == LIO_WAIT || sigev) {
 		mutex_enter(&aiop->aio_mutex);
 		error = aio_lio_alloc(&head);
 		mutex_exit(&aiop->aio_mutex);
@@ -3486,8 +3467,10 @@ alio32(
 		deadhead = 1;
 		head->lio_nent = nent;
 		head->lio_refcnt = nent;
-		if (sigev_arg && (sigev.sigev_notify == SIGEV_SIGNAL) &&
-		    (sigev.sigev_signo > 0 && sigev.sigev_signo < NSIG)) {
+		head->lio_port = -1;
+		head->lio_portkev = NULL;
+		if (sigev && sigevk.sigev_notify == SIGEV_SIGNAL &&
+		    sigevk.sigev_signo > 0 && sigevk.sigev_signo < NSIG) {
 			sqp = kmem_zalloc(sizeof (sigqueue_t), KM_NOSLEEP);
 			if (sqp == NULL) {
 				error = EAGAIN;
@@ -3500,12 +3483,24 @@ alio32(
 			sqp->sq_info.si_ctid = PRCTID(curproc);
 			sqp->sq_info.si_zoneid = getzoneid();
 			sqp->sq_info.si_uid = crgetuid(curproc->p_cred);
-			sqp->sq_info.si_signo = sigev.sigev_signo;
+			sqp->sq_info.si_signo = sigevk.sigev_signo;
 			sqp->sq_info.si_value.sival_int =
-			    sigev.sigev_value.sival_int;
+			    sigevk.sigev_value.sival_int;
 			head->lio_sigqp = sqp;
 		} else {
 			head->lio_sigqp = NULL;
+		}
+		if (pkevtp) {
+			/*
+			 * Prepare data to send when list of aiocb's has
+			 * completed.
+			 */
+			port_init_event(pkevtp, (uintptr_t)sigev,
+			    (void *)(uintptr_t)pnotify.portnfy_user,
+			    NULL, head);
+			pkevtp->portkev_events = AIOLIO;
+			head->lio_portkev = pkevtp;
+			head->lio_port = pnotify.portnfy_port;
 		}
 	}
 
@@ -3514,11 +3509,12 @@ alio32(
 		/* skip entry if it can't be copied. */
 #ifdef	_LP64
 		cbp = (aiocb32_t *)(uintptr_t)*ucbp;
-		if (cbp == NULL || copyin(cbp, aiocb32, sizeof (aiocb32_t))) {
+		if (cbp == NULL || copyin(cbp, aiocb32, sizeof (*aiocb32)))
 #else
 		cbp = (aiocb_t *)*ucbp;
-		if (cbp == NULL || copyin(cbp, aiocb, sizeof (aiocb_t))) {
+		if (cbp == NULL || copyin(cbp, aiocb, sizeof (*aiocb)))
 #endif
+		{
 			if (head) {
 				mutex_enter(&aiop->aio_mutex);
 				head->lio_nent--;
@@ -3535,7 +3531,6 @@ alio32(
 #endif /* _LP64 */
 
 		/* skip if opcode for aiocb is LIO_NOP */
-
 		mode = aiocb->aio_lio_opcode;
 		if (mode == LIO_NOP) {
 			cbp = NULL;
@@ -3561,12 +3556,9 @@ alio32(
 			continue;
 		}
 
-		vp = fp->f_vnode;
-
 		/*
 		 * check the permission of the partition
 		 */
-		mode = aiocb->aio_lio_opcode;
 		if ((fp->f_flag & mode) == 0) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, EBADF);
@@ -3585,13 +3577,13 @@ alio32(
 		 * for the same r/w operation
 		 * for UFS, need to set EBADFD
 		 */
-		if ((fp != prev_fp) || (mode != prev_mode)) {
+		vp = fp->f_vnode;
+		if (fp != prev_fp || mode != prev_mode) {
 			aio_func = check_vp(vp, mode);
 			if (aio_func == NULL) {
 				prev_fp = NULL;
 				releasef(aiocb->aio_fildes);
-				lio_set_uerror(&cbp->aio_resultp,
-				    EBADFD);
+				lio_set_uerror(&cbp->aio_resultp, EBADFD);
 				aio_notsupported++;
 				if (head) {
 					mutex_enter(&aiop->aio_mutex);
@@ -3605,8 +3597,10 @@ alio32(
 				prev_mode = mode;
 			}
 		}
-		if (error = aio_req_setup(&reqp, aiop, aiocb,
-		    (aio_result_t *)&cbp->aio_resultp, aio_use_port, vp)) {
+
+		error = aio_req_setup(&reqp, aiop, aiocb,
+		    (aio_result_t *)&cbp->aio_resultp, vp);
+		if (error) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, error);
 			if (head) {
@@ -3629,26 +3623,63 @@ alio32(
 		(void) suword32(&cbp->aio_resultp.aio_errno,
 		    EINPROGRESS);
 
-		reqp->aio_req_iocb.iocb32 = ((caddr32_t *)cbplist)[i];
+		reqp->aio_req_iocb.iocb32 = (caddr32_t)(uintptr_t)cbp;
 
-		if (aio_use_port) {
-			reqp->aio_req_port = pnotify.portnfy_port;
+		event = (mode == LIO_READ)? AIOAREAD : AIOAWRITE;
+		aio_port = (aiocb->aio_sigevent.sigev_notify == SIGEV_PORT);
+		aio_thread = (aiocb->aio_sigevent.sigev_notify == SIGEV_THREAD);
+		if (aio_port | aio_thread) {
+			port_kevent_t *lpkevp;
+			/*
+			 * Prepare data to send with each aiocb completed.
+			 */
 #ifdef _LP64
-			error = aio_req_assoc_port32(&aiocb32->aio_sigevent,
-			    (void *)(uintptr_t)pnotify.portnfy_user,
-			    (aiocb_t *)(uintptr_t)(((caddr32_t *)cbplist)[i]),
-			    reqp, pkevtp);
+			if (aio_port) {
+				void *paddr = (void  *)(uintptr_t)
+				    aiocb32->aio_sigevent.sigev_value.sival_ptr;
+				if (copyin(paddr, &pnotify, sizeof (pnotify)))
+					error = EFAULT;
+			} else {	/* aio_thread */
+				pnotify.portnfy_port =
+				    aiocb32->aio_sigevent.sigev_signo;
+				pnotify.portnfy_user =
+				    aiocb32->aio_sigevent.sigev_value.sival_ptr;
+			}
 #else
-			error = aio_req_assoc_port(&aiocb->aio_sigevent,
-			    pnotify.portnfy_user,
-			    (aiocb_t *)(((caddr32_t *)cbplist)[i]),
-			    reqp, pkevtp);
+			if (aio_port) {
+				void *paddr =
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+				if (copyin(paddr, &pnotify, sizeof (pnotify)))
+					error = EFAULT;
+			} else {	/* aio_thread */
+				pnotify.portnfy_port =
+				    aiocb->aio_sigevent.sigev_signo;
+				pnotify.portnfy_user =
+				    aiocb->aio_sigevent.sigev_value.sival_ptr;
+			}
 #endif
+			if (error)
+				/* EMPTY */;
+			else if (pkevtp != NULL &&
+			    pnotify.portnfy_port == lio_head_port)
+				error = port_dup_event(pkevtp, &lpkevp,
+				    PORT_ALLOC_DEFAULT);
+			else
+				error = port_alloc_event(pnotify.portnfy_port,
+				    PORT_ALLOC_DEFAULT, PORT_SOURCE_AIO,
+				    &lpkevp);
+			if (error == 0) {
+				port_init_event(lpkevp, (uintptr_t)cbp,
+				    (void *)(uintptr_t)pnotify.portnfy_user,
+				    aio_port_callback, reqp);
+				lpkevp->portkev_events = event;
+				reqp->aio_req_portkev = lpkevp;
+				reqp->aio_req_port = pnotify.portnfy_port;
+			}
 		}
 
 		/*
 		 * send the request to driver.
-		 * Clustering: If PXFS vnode, call PXFS function.
 		 */
 		if (error == 0) {
 			if (aiocb->aio_nbytes == 0) {
@@ -3683,9 +3714,6 @@ alio32(
 		}
 	}
 
-	if (pkevtp)
-		port_free_event(pkevtp);
-
 	if (aio_notsupported) {
 		error = ENOTSUP;
 	} else if (aio_errors) {
@@ -3713,6 +3741,8 @@ done:
 	if (deadhead) {
 		if (head->lio_sigqp)
 			kmem_free(head->lio_sigqp, sizeof (sigqueue_t));
+		if (head->lio_portkev)
+			port_free_event(head->lio_portkev);
 		kmem_free(head, sizeof (aio_lio_t));
 	}
 	return (error);

@@ -39,6 +39,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <dlfcn.h>
 #include <md5.h>
 #include "pos4.h"
 #include "pos4obj.h"
@@ -88,6 +89,56 @@ __close_nc(int fildes)
 	return (val);
 }
 
+/*
+ * This is to avoid loading libmd.so.1 unless we absolutely have to.
+ */
+typedef void (*md5_calc_t)(unsigned char *, unsigned char *, unsigned int);
+static void *md5_handle = NULL;
+static md5_calc_t real_md5_calc = NULL;
+mutex_t md5_lock = DEFAULTMUTEX;
+
+static void
+load_md5_calc(void)
+{
+	/*
+	 * _sigoff() and _sigon() are consolidation-private interfaces
+	 * in libc that defer and then reenable signals.
+	 */
+	extern void _sigoff(void);
+	extern void _sigon(void);
+
+	_sigoff();
+	(void) mutex_lock(&md5_lock);
+	if (real_md5_calc == NULL) {
+		md5_handle = dlopen("libmd.so.1", RTLD_LAZY);
+		if (md5_handle == NULL)
+			real_md5_calc = (md5_calc_t)(-1);
+		else {
+			real_md5_calc =
+			    (md5_calc_t)dlsym(md5_handle, "md5_calc");
+			if (real_md5_calc == NULL) {
+				(void) dlclose(md5_handle);
+				md5_handle = NULL;
+				real_md5_calc = (md5_calc_t)(-1);
+			}
+		}
+	}
+	(void) mutex_unlock(&md5_lock);
+	_sigon();
+}
+
+/*
+ * If librt.so.1 is dlclose()d, take libmd.so.1 down with us.
+ */
+#pragma fini(unload_md5_calc)
+static void
+unload_md5_calc(void)
+{
+	if (md5_handle != NULL)
+		(void) dlclose(md5_handle);
+	md5_handle = NULL;
+	real_md5_calc = NULL;
+}
 
 static char *
 __pos4obj_name(const char *path, const char *type)
@@ -152,7 +203,18 @@ __pos4obj_name(const char *path, const char *type)
 		return (dfile);
 	}
 
-	md5_calc(md5_digest, (unsigned char *)path + 1, strlen(path + 1));
+	/*
+	 * If we can successfully load it, call md5_calc().
+	 * Otherwise, (this "can't happen") return NULL.
+	 */
+	if (real_md5_calc == NULL)
+		load_md5_calc();
+	if (real_md5_calc == (md5_calc_t)(-1)) {
+		free(dfile);
+		return (NULL);
+	}
+
+	real_md5_calc(md5_digest, (unsigned char *)path + 1, strlen(path + 1));
 	__pos4obj_md5toa(hashbuf, md5_digest);
 	(void) strcat(dfile, ".");
 	(void) strcat(dfile, (const char *)hashbuf);

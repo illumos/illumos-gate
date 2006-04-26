@@ -2378,6 +2378,11 @@ version		sparc=SYSVABI_1.3 i386=SYSVABI_1.3 sparcv9=SUNW_0.7 \
 binding		nodirect
 end
 
+function	_libc_sigaction
+weak		sigaction
+version		SUNWprivate_1.1
+end
+
 function	sigaltstack
 include		<signal.h>
 declaration	int sigaltstack(const stack_t *_RESTRICT_KYWD ss, \

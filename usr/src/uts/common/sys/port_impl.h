@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,8 +93,8 @@ typedef struct port_alert {
  */
 typedef struct port_queue {
 	kmutex_t 	portq_mutex;
-	kmutex_t 	portq_block_mutex;
 	kcondvar_t	portq_closecv;
+	kcondvar_t	portq_block_cv;
 	int		portq_flags;
 	uint_t		portq_nent;	/* number of events in the queue */
 	uint_t		portq_nget;	/* events required for waiting thread */
@@ -116,6 +116,7 @@ typedef struct port_queue {
 #define	PORTQ_WAIT_EVENTS  0x04 /* waiting for new events */
 #define	PORTQ_POLLIN	   0x08 /* events available in the event queue */
 #define	PORTQ_POLLOUT	   0x10 /* space available for new events */
+#define	PORTQ_BLOCKED	   0x20 /* port is blocked by port_getn() */
 
 #define	VTOEP(v)  ((struct port *)(v->v_data))
 #define	EPTOV(ep) ((struct vnode *)(ep)->port_vnode)
@@ -223,6 +224,8 @@ int	port_alloc_event_block(port_t *, int, int, struct port_kevent **);
 void	port_push_eventq(port_queue_t *);
 void	port_remove_done_event(struct port_kevent *);
 struct	port_kevent *port_get_kevent(list_t *, struct port_kevent *);
+void	port_block(port_queue_t *);
+void	port_unblock(port_queue_t *);
 
 /* PORT_SOURCE_FD cache management */
 void port_pcache_remove_fd(port_fdcache_t *, portfd_t *);

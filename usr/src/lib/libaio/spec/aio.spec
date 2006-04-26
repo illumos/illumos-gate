@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,6 +17,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -91,10 +91,8 @@ binding		nodirect
 end
 
 function	fork
-declaration	pid_t fork(void)
 version		SUNW_0.7
-exception	$return == -1
-binding		nodirect
+filter		libc.so.1
 end
 
 function	sigaction extends libc/spec/sys.spec sigaction
@@ -200,9 +198,5 @@ version		sparc=SUNWprivate_1.1 i386=SUNWprivate_1.1
 end
 
 function	_libaio_close
-version		SUNWprivate_1.1
-end
-
-function	_libaio_fork
 version		SUNWprivate_1.1
 end
