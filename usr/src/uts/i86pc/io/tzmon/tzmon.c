@@ -410,7 +410,7 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 
 	if (enum_flag & TZMON_ENUM_TRIP_POINTS) {
 		for (level = 0; level < TZ_NUM_LEVELS; level++) {
-			snprintf(abuf, 5, "_AC%d", level);
+			(void) snprintf(abuf, 5, "_AC%d", level);
 			tzmon_eval_int(obj, abuf, &tzp->ac[level]);
 
 		}
@@ -426,7 +426,7 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 				tzp->al[level].Length = 0;
 				tzp->al[level].Pointer = NULL;
 			} else {
-				snprintf(abuf, 5, "_AL%d", level);
+				(void) snprintf(abuf, 5, "_AL%d", level);
 				tzp->al[level].Length = ACPI_ALLOCATE_BUFFER;
 				tzp->al[level].Pointer = NULL;
 				if (AcpiEvaluateObject(obj, abuf, NULL,
@@ -442,7 +442,7 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 
 		tzp->psl.Length = ACPI_ALLOCATE_BUFFER;
 		tzp->psl.Pointer = NULL;
-		AcpiEvaluateObject(obj, "_PSL", NULL, &tzp->psl);
+		(void) AcpiEvaluateObject(obj, "_PSL", NULL, &tzp->psl);
 	}
 
 	tzmon_eval_int(obj, "_TC1", &tzp->tc1);
@@ -467,8 +467,8 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 				cmn_err(CE_WARN, "tzmon: could not create"
 				    " monitor thread - monitor by notify only");
 			} else {
-				ddi_taskq_dispatch(tzp->taskq, tzmon_monitor,
-				    tzp, DDI_SLEEP);
+				(void) ddi_taskq_dispatch(tzp->taskq,
+				    tzmon_monitor, tzp, DDI_SLEEP);
 			}
 		}
 	}
