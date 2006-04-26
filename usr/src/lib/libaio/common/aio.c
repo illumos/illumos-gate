@@ -351,7 +351,7 @@ _aiorw(int fd, caddr_t buf, int bufsz, offset_t offset, int whence,
 		    (umode | AIO_POLL_BIT) : umode),
 		    fd, buf, bufsz, loffset, resultp);
 		if (kerr == 0) {
-			sig_mutex_lock(&__aio_mutex);
+			sig_mutex_unlock(&__aio_mutex);
 			return (0);
 		}
 		_kaio_outstand_cnt--;
