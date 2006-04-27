@@ -83,6 +83,85 @@ extern int pci_slot_names_prop(int, char *, int);
 /* set non-zero to force PCI peer-bus renumbering */
 int pci_bus_always_renumber = 0;
 
+/* get the subordinate bus # for a root/peer bus */
+static int
+pci_root_subbus(int bus, uchar_t *subbus)
+{
+	ACPI_HANDLE	hdl;
+	ACPI_BUFFER	rb;
+	ACPI_RESOURCE	*rp;
+	int	rv;
+
+	if (pci_bus_res[bus].dip == NULL) {
+		/* non-used bus # */
+		return (AE_ERROR);
+	}
+	if (acpica_find_pciobj(pci_bus_res[bus].dip, &hdl) != AE_OK) {
+		cmn_err(CE_WARN, "!No ACPI obj for bus%d, ACPI OFF?\n", bus);
+		return (AE_ERROR);
+	}
+
+	rb.Length = ACPI_ALLOCATE_BUFFER;
+	if (AcpiGetCurrentResources(hdl, &rb) != AE_OK) {
+		cmn_err(CE_WARN, "!_CRS failed on pci%d\n", bus);
+		return (AE_ERROR);
+	}
+
+	rv = AE_ERROR;
+
+	for (rp = rb.Pointer; rp->Type != ACPI_RESOURCE_TYPE_END_TAG;
+	    rp = ACPI_NEXT_RESOURCE(rp)) {
+
+		switch (rp->Type) {
+		    case ACPI_RESOURCE_TYPE_ADDRESS16:
+			    if (rp->Data.Address.ResourceType
+				    != ACPI_BUS_NUMBER_RANGE)
+				    continue;
+			    *subbus = (uchar_t)rp->Data.Address16.Maximum;
+			    dcmn_err(CE_NOTE, "Address16,subbus=%d\n", *subbus);
+			    break;
+		    case ACPI_RESOURCE_TYPE_ADDRESS32:
+			    if (rp->Data.Address.ResourceType
+				    != ACPI_BUS_NUMBER_RANGE)
+				    continue;
+			    *subbus = (uchar_t)rp->Data.Address32.Maximum;
+			    dcmn_err(CE_NOTE, "Address32,subbus=%d\n", *subbus);
+			    break;
+		    case ACPI_RESOURCE_TYPE_ADDRESS64:
+			    if (rp->Data.Address.ResourceType
+				!= ACPI_BUS_NUMBER_RANGE)
+				    continue;
+			    *subbus = (uchar_t)rp->Data.Address64.Maximum;
+			    dcmn_err(CE_NOTE, "Address64,subbus=%d\n", *subbus);
+			    break;
+		    case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
+			    if (rp->Data.Address.ResourceType
+				    != ACPI_BUS_NUMBER_RANGE)
+				    continue;
+			    *subbus = (uchar_t)rp->Data.ExtAddress64.Maximum;
+			    dcmn_err(CE_NOTE, "ExtAdr64,subbus=%d\n", *subbus);
+			    break;
+		    default:
+			    dcmn_err(CE_NOTE, "rp->Type=%d\n", rp->Type);
+			    continue;
+		}
+
+		/* found the bus-range resource */
+		dcmn_err(CE_NOTE, "pci%d, subbus=%d\n", bus, *subbus);
+		rv = AE_OK;
+
+		/* This breaks out of the resource scanning loop */
+		break;
+	}
+
+	AcpiOsFree(rb.Pointer);
+	if (rv != AE_OK)
+		cmn_err(CE_NOTE, "!No bus-range resource for pci%d\n", bus);
+
+	return (rv);
+
+}
+
 /*
  * Enumerate all PCI devices
  */
@@ -126,11 +205,6 @@ pci_setup_tree()
 		add_bus_slot_names_prop(i);
 	}
 
-	/* add bus-range property for root/peer bus nodes */
-	for (i = 0; i <= pci_bios_nbus; i++) {
-		if (pci_bus_res[i].par_bus == (uchar_t)-1)
-			add_bus_range_prop(i);
-	}
 }
 
 /*
@@ -276,6 +350,16 @@ pci_reprogram(void)
 	 * Excise phantom roots if possible
 	 */
 	pci_renumber_root_busses();
+
+	/* add bus-range property for root/peer bus nodes */
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		if (pci_bus_res[i].par_bus == (uchar_t)-1) {
+			uchar_t subbus;
+			if (pci_root_subbus(i, &subbus) == AE_OK)
+			    pci_bus_res[i].sub_bus = subbus;
+			add_bus_range_prop(i);
+		}
+	}
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "pci-reprog", &onoff) == DDI_SUCCESS) {
