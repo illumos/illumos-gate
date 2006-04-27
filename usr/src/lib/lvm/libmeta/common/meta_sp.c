@@ -2368,17 +2368,6 @@ meta_sp_print(
  * RETURNS:	daddr_t	- -1 if error, otherwise the start block
  * PURPOSE:	Encapsulate the determination of the start block of the
  *		device upon which the sp is built or being built.
- *		This is done to hide the ugliness of the algorithm.  In
- *		the case where a sp is being built upon a stripe of > 1
- *		TB that is made up of a set of disks in which the first
- *		has a VTOC label the result returned from the call to
- *		metagetstart is incorrect.  The reason being that a > 1
- *		TB metadevice will manufacture an EFI label in which the
- *		start address is zero.  This is irrespective of the underlying
- *		devices.  The long term fix for this is to fix
- *		meta_efi_to_mdvtoc and meta_efi_to mdgeom so that they return
- *		values that are indicative of the first underlying device in
- *		metadevice.
  */
 static diskaddr_t
 meta_sp_get_start(
@@ -2389,18 +2378,8 @@ meta_sp_get_start(
 {
 	daddr_t		start_block;
 
-	if ((start_block = metagetstart(sp, np, ep)) != MD_DISKADDR_ERROR) {
+	if ((start_block = metagetstart(sp, np, ep)) != MD_DISKADDR_ERROR)
 		start_block += MD_SP_START;
-		/*
-		 * In the case that the device upon which the sp is being
-		 * created is a metadevice then ensure that in the case that
-		 * the first underlying device has a vtoc label that it is
-		 * not overwritten with a watermark by setting the start block
-		 * to point just past the vtoc label
-		 */
-		if (start_block < VTOC_SIZE && metaismeta(np))
-			start_block = VTOC_SIZE;
-	}
 
 	return (start_block);
 }

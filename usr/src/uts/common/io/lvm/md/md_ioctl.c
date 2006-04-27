@@ -3624,7 +3624,11 @@ md_get_efi(md_unit_t *un, char *buf)
 	 */
 
 	UUID_LE_CONVERT(efi_part->efi_gpe_PartitionTypeGUID, md_efi_reserved);
-	efi_part->efi_gpe_StartingLBA = 0;
+	if (un->c.un_flag & MD_LABELED)
+		efi_part->efi_gpe_StartingLBA = LE_64(1ULL);
+	else
+		efi_part->efi_gpe_StartingLBA = 0;
+
 	efi_part->efi_gpe_EndingLBA = LE_64(un->c.un_total_blocks - 1);
 
 	if (un->c.un_vtoc_id) {

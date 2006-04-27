@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +137,19 @@ meta_efi_to_mdvtoc(struct dk_gpt *gpt, mdvtoc_t *mdvp)
 		mdvp->parts[i].size = gpt->efi_parts[i].p_size;
 		mdvp->parts[i].tag = gpt->efi_parts[i].p_tag;
 		mdvp->parts[i].flag = gpt->efi_parts[i].p_flag;
+		/*
+		 * It is possible to present an efi label but be using vtoc
+		 * disks to create a > 1 TB metadevice.  In case the first
+		 * disk in the underlying metadevice is a vtoc disk and starts
+		 * at the beginning of the disk it is necessary to convey this
+		 * information to the user.
+		 */
+		if (mdvp->parts[i].size > 0 &&
+		    mdvp->parts[i].start != 0 && mdvp->nparts == 1) {
+			mdvp->parts[i].label = btodb(DK_LABEL_SIZE);
+			mdvp->parts[i].start = 0;
+		}
+
 		/*
 		 * Due to the lack of a label for the entire partition table,
 		 * we use p_name of the reserved partition
