@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2427,15 +2426,17 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 			break;
 		/*
 		 * We are on either the condvar sleep queue or the
-		 * mutex sleep queue.  If we are on the mutex sleep
-		 * queue, continue sleeping.  If we are on the condvar
-		 * sleep queue, break out of the sleep if we were
-		 * interrupted or we timed out (EINTR or ETIME).
+		 * mutex sleep queue.  Break out of the sleep if we
+		 * were interrupted or we timed out (EINTR or ETIME).
 		 * Else this is a spurious wakeup; continue the loop.
 		 */
-		if (self->ul_sleepq == mqp)		/* mutex queue */
-			tsp = NULL;
-		else if (self->ul_sleepq == qp) {	/* condvar queue */
+		if (self->ul_sleepq == mqp) {		/* mutex queue */
+			if (error) {
+				mp->mutex_waiters = dequeue_self(mqp, mp);
+				break;
+			}
+			tsp = NULL;	/* no more timeout */
+		} else if (self->ul_sleepq == qp) {	/* condvar queue */
 			if (error) {
 				cvp->cond_waiters_user = dequeue_self(qp, cvp);
 				break;
