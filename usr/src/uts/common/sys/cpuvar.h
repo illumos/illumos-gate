@@ -204,6 +204,8 @@ typedef struct cpu {
 	int32_t		cpu_intr_weight;
 	void		*cpu_vm_data;
 
+	struct cpu_physid *cpu_physid;	/* physical associations */
+
 #if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 	/*
 	 * XXX - needs to be fixed. Structure size should not change.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -119,6 +118,14 @@ typedef struct chip {
 	struct chip	*chip_balance;		/* chip to balance against */
 	uint32_t	chip_nrunning;		/* # of running threads */
 } chip_t;
+
+/*
+ * IDs associating a CPU with various physical hardware
+ */
+typedef struct cpu_physid {
+	chipid_t		cpu_chipid;	/* CPU's physical processor */
+	id_t			cpu_coreid;	/* CPU's physical core */
+} cpu_physid_t;
 
 /*
  * Change the number of running threads on the chip

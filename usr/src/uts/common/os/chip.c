@@ -78,6 +78,7 @@
  */
 
 chip_t			cpu0_chip;	/* chip structure for first CPU */
+cpu_physid_t		cpu0_physid;	/* boot CPU's physical id structure */
 
 /*
  * chip_bootstrap is used on platforms where it is possible to enter the
@@ -224,15 +225,26 @@ chip_cpu_init(cpu_t *cp)
 
 	ASSERT((chip_list == NULL) || (MUTEX_HELD(&cpu_lock)));
 
+	if (chip_list == NULL)
+		cp->cpu_physid = &cpu0_physid;
+	else
+		cp->cpu_physid = kmem_zalloc(sizeof (cpu_physid_t), KM_SLEEP);
+
 	/*
-	 * Call into the platform to fetch this cpu's chipid
+	 * Call into the platform to fetch this cpu's chip and core ids.
+	 * The ids are cached in the CPU's physical id structure.
+	 *
 	 * On sun4v platforms, the chip infrastructure is currently being
 	 * leveraged to implement core level load balancing.
 	 */
 #ifdef	DO_CORELEVEL_LOADBAL
 	cid = chip_plat_get_coreid(cp);
+	cp->cpu_physid->cpu_coreid = cid;
+	cp->cpu_physid->cpu_chipid = chip_plat_get_chipid(cp);
 #else
 	cid = chip_plat_get_chipid(cp);
+	cp->cpu_physid->cpu_chipid = cid;
+	cp->cpu_physid->cpu_coreid = chip_plat_get_coreid(cp);
 #endif /* DO_CORELEVEL_LOADBAL */
 
 	chp = chip_find(cid);
@@ -345,10 +357,23 @@ chip_cpu_fini(cpu_t *cp)
 	chp = cp->cpu_chip;
 	cp->cpu_chip = NULL;
 
+	/*
+	 * Clear out and free the CPU's physical id structure
+	 */
+	cp->cpu_physid->cpu_chipid = -1;
+	cp->cpu_physid->cpu_coreid = -1;
+
+	if (cp->cpu_physid != &cpu0_physid) {
+		ASSERT(cp->cpu_physid != NULL);
+		kmem_free(cp->cpu_physid, sizeof (cpu_physid_t));
+	}
+	cp->cpu_physid = NULL;
+
+	/*
+	 * Delete the chip if its last CPU is being deleted
+	 */
 	if (--chp->chip_ref == 0) {
-		/*
-		 * make sure the chip is really empty
-		 */
+
 		ASSERT(chp->chip_ncpu == 0);
 		ASSERT(chp->chip_cpus == NULL);
 		ASSERT(chp->chip_nrunning == 0);

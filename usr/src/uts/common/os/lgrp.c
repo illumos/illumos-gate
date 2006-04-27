@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1632,7 +1631,7 @@ lgrp_phys_to_lgrp(u_longlong_t physaddr)
 static lgrp_t *
 lgrp_cpu_to_lgrp(cpu_t *cpu)
 {
-	return (cpu->cpu_chip->chip_lgrp);
+	return (cpu->cpu_lpl->lpl_lgrp);
 }
 
 /*
@@ -2063,7 +2062,7 @@ lpl_init(lpl_t *lpl, lpl_t *lpl_leaf, lgrp_t *lgrp)
 void
 lpl_clear(lpl_t *lpl)
 {
-	lgrpid_t	lid;
+	lgrp_id_t	lid;
 
 	/* save lid for debugging purposes */
 	lid = lpl->lpl_lgrpid;
@@ -2451,7 +2450,7 @@ lpl_leaf_insert(lpl_t *lpl_leaf, cpupart_t *cpupart)
 	lgrp_t		*lgrp_cur;
 	lpl_t		*lpl_cur;
 	lpl_t		*lpl_parent;
-	lgrpid_t	parent_id;
+	lgrp_id_t	parent_id;
 	klgrpset_t	rset_intersect; /* resources in cpupart and lgrp */
 
 	for (i = 0; i <= lgrp_alloc_max; i++) {
@@ -3095,7 +3094,6 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 	}
 
 	ASSERT(klgrpset_ismember(lgrpset, lgrpid_start));
-	bestlpl = &cpupart->cp_lgrploads[lgrpid_start];
 
 	do {
 		pgcnt_t	npgs;
@@ -3136,7 +3134,8 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 			 * has threads on this lgrp, so this is a preferred
 			 * lgroup for the thread.
 			 */
-			if (lpl_pick(lpl, bestlpl)) {
+			if (bestlpl == NULL ||
+			    lpl_pick(lpl, bestlpl)) {
 				bestload = lpl->lpl_loadavg;
 				bestlpl = lpl;
 			}
@@ -3147,7 +3146,8 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 			 * difference is big enough to justify splitting up
 			 * the process' threads.
 			 */
-			if (lpl_pick(lpl, bestrlpl)) {
+			if (bestrlpl == NULL ||
+			    lpl_pick(lpl, bestrlpl)) {
 				bestrload = lpl->lpl_loadavg;
 				bestrlpl = lpl;
 			}
@@ -3166,14 +3166,25 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 
 	/*
 	 * If all the lgroups over which the thread's process is spread are
-	 * heavily loaded, we'll consider placing the thread on one of the
-	 * other leaf lgroups in the thread's partition.
+	 * heavily loaded, or otherwise undesirable, we'll consider placing
+	 * the thread on one of the other leaf lgroups in the thread's
+	 * partition.
 	 */
-	if ((bestload > LGRP_EXPAND_PROC_THRESH(bestlpl->lpl_ncpu)) &&
+	if ((bestlpl == NULL) ||
+	    ((bestload > LGRP_EXPAND_PROC_THRESH(bestlpl->lpl_ncpu)) &&
 	    (bestrload < bestload) &&	/* paranoid about wraparound */
 	    (bestrload + LGRP_EXPAND_PROC_DIFF(bestrlpl->lpl_ncpu) <
-	    bestload)) {
+	    bestload))) {
 		bestlpl = bestrlpl;
+	}
+
+	if (bestlpl == NULL) {
+		/*
+		 * No lgroup looked particularly good, but we still
+		 * have to pick something. Go with the randomly selected
+		 * legal lgroup we started with above.
+		 */
+		bestlpl = &cpupart->cp_lgrploads[lgrpid_start];
 	}
 
 	cpupart->cp_lgrp_hint = bestlpl->lpl_lgrpid;
@@ -3184,17 +3195,14 @@ lgrp_choose(kthread_t *t, cpupart_t *cpupart)
 }
 
 /*
- * Return 1 if lpl1 is a better candidate than lpl2 for lgrp homing.
+ * Decide if lpl1 is a better candidate than lpl2 for lgrp homing.
+ * Returns non-zero if lpl1 is a better candidate, and 0 otherwise.
  */
 static int
 lpl_pick(lpl_t *lpl1, lpl_t *lpl2)
 {
 	lgrp_load_t	l1, l2;
 	lgrp_load_t	tolerance = LGRP_LOADAVG_TOLERANCE(lpl1->lpl_ncpu);
-
-
-	if (lpl2 == NULL)
-		return (1);
 
 	l1 = lpl1->lpl_loadavg;
 	l2 = lpl2->lpl_loadavg;
