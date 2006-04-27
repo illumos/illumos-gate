@@ -38,11 +38,38 @@ static k5_mutex_t rc_typelist_lock = K5_MUTEX_PARTIAL_INITIALIZER;
 
 int krb5int_rc_finish_init(void)
 {
+    int retval;
+
+    retval = k5_mutex_finish_init(&grcache.lock);
+    if (retval)
+	return (retval);
+
     return k5_mutex_finish_init(&rc_typelist_lock);
 }
 void krb5int_rc_terminate(void)
 {
     struct krb5_rc_typelist *t, *t_next;
+    struct mem_data *tgr = (struct mem_data *)grcache.data;
+    struct authlist *q, *qt;
+    int i;
+
+    k5_mutex_destroy(&grcache.lock);
+
+    if (tgr != NULL) {
+    	if (tgr->name)
+		free(tgr->name);
+    	for (i = 0; i < tgr->hsize; i++)
+		for (q = tgr->h[i]; q; q = qt) {
+			qt = q->nh;
+			free(q->rep.server);
+			free(q->rep.client);
+			free(q);
+		}
+    	if (tgr->h)
+		free(tgr->h);
+    	free(tgr);
+    }
+
     k5_mutex_destroy(&rc_typelist_lock);
     for (t = typehead; t != &krb5_rc_typelist_dfl; t = t_next) {
 	t_next = t->next;

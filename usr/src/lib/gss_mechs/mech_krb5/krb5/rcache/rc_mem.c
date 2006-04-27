@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,10 +13,18 @@
  */
 
 /*
+ * Solaris Kerberos:
  * An implementation for the memory only (mem) replay cache type.
  */
 #include "rc_common.h"
 #include "rc_mem.h"
+
+/*
+ * We want the replay cache to hang around for the entire life span of the
+ * process, regardless if the auth_context or acceptor_cred handles are
+ * destroyed.
+ */
+struct global_rcache grcache = {K5_MUTEX_PARTIAL_INITIALIZER, NULL};
 
 /*
  * of course, list is backwards
@@ -104,8 +112,15 @@ krb5_rc_mem_get_span(
     err = k5_mutex_lock(&id->lock);
     if (err)
 	return err;
+
+    if (err = k5_mutex_lock(&grcache.lock)) {
+	k5_mutex_unlock(&id->lock);
+	return (err);
+    }
     t = (struct mem_data *) id->data;
     *lifespan = t->lifespan;
+    k5_mutex_unlock(&grcache.lock);
+
     k5_mutex_unlock(&id->lock);
     return 0;
 }
@@ -129,47 +144,28 @@ krb5_rc_mem_init(krb5_context context, krb5_rcache id, krb5_deltat lifespan)
     retval = k5_mutex_lock(&id->lock);
     if (retval)
 	return retval;
+    retval = k5_mutex_lock(&grcache.lock);
+    if (retval) {
+	k5_mutex_unlock(&id->lock);
+	return (retval);
+    }
+
     retval = krb5_rc_mem_init_locked(context, id, lifespan);
+
+    k5_mutex_unlock(&grcache.lock);
     k5_mutex_unlock(&id->lock);
     return retval;
 }
 
-
-krb5_error_code KRB5_CALLCONV
-krb5_rc_mem_close_no_free(krb5_context context, krb5_rcache id)
-{
-	struct mem_data *t = (struct mem_data *)id->data;
-	struct authlist *q, *qt;
-	int i;
-
-	if (t->name)
-		free(t->name);
-	for (i = 0; i < t->hsize; i++)
-		for (q = t->h[i]; q; q = qt) {
-			qt = q->nh;
-			free(q->rep.server);
-			free(q->rep.client);
-			free(q);
-		}
-	if (t->h)
-		free(t->h);
-	free(t);
-	id->data = NULL;
-	return (0);
-}
-
+/*
+ * We want the replay cache to be persistent since we can't
+ * read from a file to retrieve the rcache, so we must not free
+ * here.  Just return success.
+ */
 krb5_error_code KRB5_CALLCONV
 krb5_rc_mem_close(krb5_context context, krb5_rcache id)
 {
-    krb5_error_code retval;
-    retval = k5_mutex_lock(&id->lock);
-    if (retval)
-	return retval;
-    krb5_rc_mem_close_no_free(context, id);
-    k5_mutex_unlock(&id->lock);
-    k5_mutex_destroy(&id->lock);
-    free(id);
-    return 0;
+	return (0);
 }
 
 krb5_error_code KRB5_CALLCONV
@@ -185,10 +181,26 @@ krb5_rc_mem_resolve(krb5_context context, krb5_rcache id, char *name)
 	struct mem_data *t = 0;
 	krb5_error_code retval;
 
+	retval = k5_mutex_lock(&grcache.lock);
+	if (retval)
+		return (retval);
+
+	/*
+	 * If the global rcache has already been initialized through a prior
+	 * call to this function then just set the rcache to point to it for
+	 * any subsequent operations.
+	 */
+	if (grcache.data != NULL) {
+		id->data = (krb5_pointer)grcache.data;
+		k5_mutex_unlock(&grcache.lock);
+		return (0);
+	}
 	/* allocate id? no */
-	if (!(t = (struct mem_data *)malloc(sizeof (struct mem_data))))
+	if (!(t = (struct mem_data *)malloc(sizeof (struct mem_data)))) {
+		k5_mutex_unlock(&grcache.lock);
 		return (KRB5_RC_MALLOC);
-	id->data = (krb5_pointer)t;
+	}
+	grcache.data = id->data = (krb5_pointer)t;
 	memset(t, 0, sizeof (struct mem_data));
 	if (name) {
 		t->name = malloc(strlen(name)+1);
@@ -206,6 +218,7 @@ krb5_rc_mem_resolve(krb5_context context, krb5_rcache id, char *name)
 		goto cleanup;
 	}
 	memset(t->h, 0, t->hsize*sizeof (struct authlist *));
+	k5_mutex_unlock(&grcache.lock);
 	return (0);
 
 cleanup:
@@ -215,11 +228,17 @@ cleanup:
 		if (t->h)
 			krb5_xfree(t->h);
 		krb5_xfree(t);
+		grcache.data = NULL; 
 		id->data = NULL;
 	}
+	k5_mutex_unlock(&grcache.lock);
 	return (retval);
 }
 
+/*
+ * Recovery (retrieval) of the replay cache occurred during
+ * krb5_rc_resolve().  So we just return error here.
+ */
 krb5_error_code KRB5_CALLCONV
 krb5_rc_mem_recover(krb5_context context, krb5_rcache id)
 {
@@ -251,21 +270,30 @@ krb5_rc_mem_store(krb5_context context, krb5_rcache id, krb5_donot_replay *rep)
 	ret = k5_mutex_lock(&id->lock);
 	if (ret)
 		return (ret);
+	ret = k5_mutex_lock(&grcache.lock);
+	if (ret) {
+		k5_mutex_unlock(&id->lock);
+		return (ret);
+	}
 
 	switch (rc_store(context, id, rep)) {
 		case CMP_MALLOC:
+			k5_mutex_unlock(&grcache.lock);
 			k5_mutex_unlock(&id->lock);
 			return (KRB5_RC_MALLOC);
 		case CMP_REPLAY:
+			k5_mutex_unlock(&grcache.lock);
 			k5_mutex_unlock(&id->lock);
 			return (KRB5KRB_AP_ERR_REPEAT);
 		case CMP_EXPIRED:
+			k5_mutex_unlock(&grcache.lock);
 			k5_mutex_unlock(&id->lock);
 			return (KRB5KRB_AP_ERR_SKEW);
 		case CMP_HOHUM:
 			break;
 	}
 
+	k5_mutex_unlock(&grcache.lock);
 	k5_mutex_unlock(&id->lock);
 	return (0);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,6 +22,7 @@ extern "C" {
  */
 
 /*
+ * Solaris Kerberos:
  * Declarations for the memory replay cache implementation.
  */
 
@@ -31,6 +32,13 @@ struct mem_data {
 	int hsize;
 	struct authlist **h;
 };
+
+struct global_rcache {
+	k5_mutex_t lock;
+	struct mem_data *data;
+};
+
+extern struct global_rcache grcache;
 
 extern krb5_rc_ops krb5_rc_mem_ops;
 
@@ -54,8 +62,6 @@ char *KRB5_CALLCONV krb5_rc_mem_get_name
 	(krb5_context, krb5_rcache);
 krb5_error_code KRB5_CALLCONV krb5_rc_mem_resolve
 	(krb5_context, krb5_rcache, char *);
-krb5_error_code krb5_rc_mem_close_no_free
-	(krb5_context, krb5_rcache);
 void krb5_rc_free_entry
 	(krb5_context, krb5_donot_replay **);
 

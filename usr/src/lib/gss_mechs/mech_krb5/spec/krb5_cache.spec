@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -213,13 +213,6 @@ end
 function	krb5_rc_mem_close
 include		<krb5.h>, <k5-int.h>, <rc_mem.h>
 declaration	krb5_error_code krb5_rc_mem_close \
-			(krb5_context context, krb5_rcache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_rc_mem_close_no_free
-include		<krb5.h>, <k5-int.h>, <rc_mem.h>
-declaration	krb5_error_code krb5_rc_mem_close_no_free \
 			(krb5_context context, krb5_rcache id)
 version		SUNWprivate_1.1
 end
