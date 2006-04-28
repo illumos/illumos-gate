@@ -35,6 +35,20 @@ unset CDPATH
 
 PATH=/usr/bin:/usr/ccs/bin
 
+# yield an exit status and no other output
+# /dev/null redirection guards against noise in the event that neither $1
+# nor $2 exist
+isnewer() {
+	[ "$1" -nt "$2" ] && return 0
+	[ "$1" -ot "$2" ] && return 1
+	left=$(/bin/ls -E "$1" 2>/dev/null | awk '{print $7}')
+	left=${left##*.}
+	right=$(/bin/ls -E "$2" 2>/dev/null | awk '{print $7}')
+	right=${right##*.}
+	[ -z "$left" -o -z "$right" -o "$left" -gt "$right" ] && return 0
+	return 1
+}
+
 if [ $# -ne 1 ]; then
 	echo "Usage: $0 workspace" 1>&2
 	exit 1
@@ -55,14 +69,15 @@ if [ ! -f "${CODEMGR_WS}"/Codemgr_wsdata/nametable ]; then
 fi
 
 cd ${CODEMGR_WS} &&
+tail +2 Codemgr_wsdata/nametable | 
 while read file etc; do
     	file="./$file"
 	sfile="${file%/*}/SCCS/s.${file##*/}"
-	if [ "$sfile" -nt "$file" ]; then
+	if isnewer "$sfile" "$file"; then
 	    	ls -E "$sfile"
 		ls -E "$file" 
 		echo "reget $file:"
 		# -G needed so file doesn't land in working dir.
 		sccs get -G "$file" "$file"
 	fi
-done < Codemgr_wsdata/nametable
+done
