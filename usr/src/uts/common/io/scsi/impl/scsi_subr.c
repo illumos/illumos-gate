@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,7 +301,7 @@ get_pktiopb(struct scsi_address *ap, caddr_t *datap, int cdblen, int statuslen,
 		(func == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC,
 		NULL);
 	if (!pkt) {
-		i_ddi_mem_free(local.b_un.b_addr, 0);
+		i_ddi_mem_free(local.b_un.b_addr, NULL);
 		if (func != NULL_FUNC) {
 			ddi_set_callback(func, NULL, &scsi_callback_id);
 		}
@@ -323,7 +323,7 @@ free_pktiopb(struct scsi_pkt *pkt, caddr_t datap, int datalen)
 
 	(*tran->tran_destroy_pkt)(ap, pkt);
 	if (datap && datalen) {
-		i_ddi_mem_free(datap, 0);
+		i_ddi_mem_free(datap, NULL);
 	}
 	if (scsi_callback_id != 0) {
 		ddi_run_callback(&scsi_callback_id);

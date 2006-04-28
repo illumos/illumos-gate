@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -140,47 +141,12 @@ gfxp_va2pa(struct as *as, caddr_t addr, uint64_t *pa)
 }
 
 /*
- * The KVA returned from ddi_dma_mem_alloc() always has WB/cached PTEs.
- * This causes severe coherency problems when the pages are exported to
- * user space with uncached/UC/WC PTEs.  Fix the cache attributes for
- * each page, until ddi_dma_mem_alloc() returns KVAs with the correct
- * cache attributes.
+ * NOP now
  */
+/* ARGSUSED */
 void
 gfxp_fix_mem_cache_attrs(caddr_t kva_start, size_t length, int cache_attr)
 {
-	struct hat *hat = kas.a_hat;
-	uint_t hat_attr;
-	uint_t hat_flags;
-	pfn_t pfnum;
-	caddr_t kva;
-	caddr_t kva_max;
-
-	if (hat_getattr(hat, kva_start, &hat_attr) == -1)
-		return;
-
-	if (cache_attr == GFXP_MEMORY_UNCACHED) {
-		hat_attr &= ~HAT_ORDER_MASK;
-		hat_attr |= HAT_STRICTORDER | HAT_PLAT_NOCACHE;
-	} else if (cache_attr == GFXP_MEMORY_WRITECOMBINED) {
-		hat_attr &= ~HAT_ORDER_MASK;
-		hat_attr |= HAT_MERGING_OK | HAT_PLAT_NOCACHE;
-	} else
-		return;
-
-	hat_attr |= HAT_NOSYNC;
-
-	hat_flags = HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST;
-
-	kva = (caddr_t)((uintptr_t)kva_start & (uintptr_t)PAGEMASK);
-	kva_max = (caddr_t)((uintptr_t)(kva_start + length + PAGEOFFSET) &
-		(uintptr_t)PAGEMASK);
-
-	for (; kva < kva_max; kva += PAGESIZE) {
-		pfnum = hat_getpfnum(hat, kva);
-		hat_unload(hat, kva, PAGESIZE, HAT_UNLOAD_UNLOCK);
-		hat_devload(hat, kva, PAGESIZE, pfnum, hat_attr, hat_flags);
-	}
 }
 
 int
@@ -189,26 +155,28 @@ gfxp_ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
     caddr_t arg, caddr_t *kaddrp, size_t *real_length,
     ddi_acc_handle_t *handlep)
 {
-	int cache_attr;
+	uint_t l_flags = flags & ~IOMEM_DATA_MASK; /* clear cache attrs */
+	int e;
 
-	if (ddi_dma_mem_alloc(handle, length, accattrp, flags, waitfp, arg,
-	    kaddrp, real_length, handlep) == DDI_FAILURE) {
-		return (DDI_FAILURE);
+	/*
+	 * Set an appropriate attribute from devacc_attr_dataorder
+	 * to keep compatibility. The cache attributes are igonred
+	 * if specified.
+	 */
+	if (accattrp != NULL) {
+		if (accattrp->devacc_attr_dataorder == DDI_STRICTORDER_ACC) {
+			l_flags |= IOMEM_DATA_UNCACHED;
+		} else if (accattrp->devacc_attr_dataorder ==
+		    DDI_MERGING_OK_ACC) {
+			l_flags |= IOMEM_DATA_UC_WR_COMBINE;
+		} else {
+			l_flags |= IOMEM_DATA_CACHED;
+		}
 	}
 
-	if (accattrp == NULL)
-		return (DDI_SUCCESS);
-
-	if (accattrp->devacc_attr_dataorder == DDI_STRICTORDER_ACC)
-		cache_attr = GFXP_MEMORY_UNCACHED;
-	else if (accattrp->devacc_attr_dataorder == DDI_MERGING_OK_ACC)
-		cache_attr = GFXP_MEMORY_WRITECOMBINED;
-	else
-		return (DDI_SUCCESS);
-
-	gfxp_fix_mem_cache_attrs(*kaddrp, *real_length, cache_attr);
-
-	return (DDI_SUCCESS);
+	e = ddi_dma_mem_alloc(handle, length, accattrp, l_flags, waitfp,
+	    arg, kaddrp, real_length, handlep);
+	return (e);
 }
 
 int

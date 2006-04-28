@@ -2902,7 +2902,7 @@ rootnex_teardown_copybuf(rootnex_dma_t *dma)
 
 	/* if we allocated a copy buffer, free it */
 	if (dma->dp_cbaddr != NULL) {
-		i_ddi_mem_free(dma->dp_cbaddr, 0);
+		i_ddi_mem_free(dma->dp_cbaddr, NULL);
 	}
 }
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,7 +170,7 @@ gda_free(opaque_t objp, struct cmpkt *pktp, struct buf *bp)
 
 	if (bp) {
 		if (bp->b_un.b_addr)
-			i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
+			i_ddi_mem_free((caddr_t)bp->b_un.b_addr, NULL);
 		freerbuf(bp);
 	}
 }

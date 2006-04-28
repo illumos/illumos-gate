@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@
 #include <sys/conf.h>
 #include <sys/debug.h>
 #include <sys/ddidevmap.h>
+#include <sys/ddi_implfuncs.h>
 #include <sys/lgrp.h>
 
 #include <vm/page.h>
@@ -74,6 +75,7 @@
 #include <sys/sunddi.h>
 #include <sys/esunddi.h>
 #include <sys/fs/snode.h>
+
 
 #if DEBUG
 int segdev_debug;
@@ -3597,7 +3599,6 @@ devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 
 #ifdef lint
 	dip = dip;
-	accattrp = accattrp;
 #endif
 
 	TRACE_4(TR_FAC_DEVMAP, TR_DEVMAP_UMEM_SETUP,
@@ -3611,6 +3612,11 @@ devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 
 	/* For UMEM_TRASH, this restriction is not needed */
 	if ((off + len) > cp->size)
+		return (DDI_FAILURE);
+
+	/* check if the cache and endian attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
+	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
 		return (DDI_FAILURE);
 
 	/*
@@ -3634,6 +3640,10 @@ devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 		dhp->dh_cookie = cookie;
 		dhp->dh_roff = ptob(btop(off));
 		dhp->dh_cvaddr = cp->cvaddr + dhp->dh_roff;
+		/* set HAT cache attributes */
+		i_ddi_cacheattr_to_hatacc(flags, &dhp->dh_hat_attr);
+		/* set HAT endianess attributes */
+		i_ddi_devacc_to_hatacc(accattrp, &dhp->dh_hat_attr);
 	}
 
 	/*
@@ -3710,6 +3720,11 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	if (flags != 0)
 		return (DDI_FAILURE);
 
+	/* check if the cache and endian attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
+	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
+		return (DDI_FAILURE);
+
 	if ((dhp->dh_prot & dhp->dh_orig_maxprot & maxprot) != dhp->dh_prot)
 		return (DDI_FAILURE);
 
@@ -3729,6 +3744,10 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	dhp->dh_cookie = cookie;
 	dhp->dh_roff = ptob(btop(off));
 	dhp->dh_cvaddr = cp->cvaddr + dhp->dh_roff;
+	/* set HAT cache attributes */
+	i_ddi_cacheattr_to_hatacc(flags, &dhp->dh_hat_attr);
+	/* set HAT endianess attributes */
+	i_ddi_devacc_to_hatacc(accattrp, &dhp->dh_hat_attr);
 
 	/* clear the large page size flag */
 	dhp->dh_flags &= ~DEVMAP_FLAG_LARGE;

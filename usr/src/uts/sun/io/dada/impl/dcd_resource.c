@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ dcd_free_consistent_buf(struct buf *bp)
 		return;
 
 	if (bp->b_un.b_addr)
-		i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
+		i_ddi_mem_free((caddr_t)bp->b_un.b_addr, NULL);
 	freerbuf(bp);
 	if (dcd_callback_id != 0L) {
 		ddi_run_callback(&dcd_callback_id);

@@ -1150,7 +1150,7 @@ ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limp, uint_t len, caddr_t *iopbp)
 void
 ddi_iopb_free(caddr_t iopb)
 {
-	i_ddi_mem_free(iopb, 0);
+	i_ddi_mem_free(iopb, NULL);
 }
 
 int
@@ -1171,7 +1171,7 @@ ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
 void
 ddi_mem_free(caddr_t kaddr)
 {
-	i_ddi_mem_free(kaddr, 1);
+	i_ddi_mem_free(kaddr, NULL);
 }
 
 /*
@@ -6623,7 +6623,7 @@ static uintptr_t dma_mem_list_id = 0;
 
 int
 ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
-	ddi_device_acc_attr_t *accattrp, uint_t xfermodes,
+	ddi_device_acc_attr_t *accattrp, uint_t flags,
 	int (*waitfp)(caddr_t), caddr_t arg, caddr_t *kaddrp,
 	size_t *real_length, ddi_acc_handle_t *handlep)
 {
@@ -6631,7 +6631,7 @@ ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	dev_info_t *dip = hp->dmai_rdip;
 	ddi_acc_hdl_t *ap;
 	ddi_dma_attr_t *attrp = &hp->dmai_attr;
-	uint_t sleepflag;
+	uint_t sleepflag, xfermodes;
 	int (*fp)(caddr_t);
 	int rval;
 
@@ -6645,6 +6645,21 @@ ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	if (*handlep == NULL)
 		return (DDI_FAILURE);
 
+	/* check if the cache and endian attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
+	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
+		return (DDI_FAILURE);
+
+	/*
+	 * Transfer the meaningful bits to xfermodes.
+	 * Double-check if the 3rd party driver correctly sets the bits.
+	 * If not, set DDI_DMA_STREAMING to keep compatibility.
+	 */
+	xfermodes = flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING);
+	if (xfermodes == 0) {
+		xfermodes = DDI_DMA_STREAMING;
+	}
+
 	/*
 	 * initialize the common elements of data access handle
 	 */
@@ -6653,17 +6668,17 @@ ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	ap->ah_dip = dip;
 	ap->ah_offset = 0;
 	ap->ah_len = 0;
-	ap->ah_xfermodes = xfermodes;
+	ap->ah_xfermodes = flags;
 	ap->ah_acc = *accattrp;
 
 	sleepflag = ((waitfp == DDI_DMA_SLEEP) ? 1 : 0);
 	if (xfermodes == DDI_DMA_CONSISTENT) {
-		rval = i_ddi_mem_alloc(dip, attrp, length, sleepflag, 0,
-			    accattrp, kaddrp, NULL, ap);
+		rval = i_ddi_mem_alloc(dip, attrp, length, sleepflag,
+		    flags, accattrp, kaddrp, NULL, ap);
 		*real_length = length;
 	} else {
-		rval = i_ddi_mem_alloc(dip, attrp, length, sleepflag, 1,
-			    accattrp, kaddrp, real_length, ap);
+		rval = i_ddi_mem_alloc(dip, attrp, length, sleepflag,
+		    flags, accattrp, kaddrp, real_length, ap);
 	}
 	if (rval == DDI_SUCCESS) {
 		ap->ah_len = (off_t)(*real_length);
@@ -6687,11 +6702,7 @@ ddi_dma_mem_free(ddi_acc_handle_t *handlep)
 	ap = impl_acc_hdl_get(*handlep);
 	ASSERT(ap);
 
-	if (ap->ah_xfermodes == DDI_DMA_CONSISTENT) {
-		i_ddi_mem_free((caddr_t)ap->ah_addr, 0);
-	} else {
-		i_ddi_mem_free((caddr_t)ap->ah_addr, 1);
-	}
+	i_ddi_mem_free((caddr_t)ap->ah_addr, ap);
 
 	/*
 	 * free the handle

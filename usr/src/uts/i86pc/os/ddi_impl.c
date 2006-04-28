@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -61,6 +62,8 @@
 #include <sys/vmem.h>
 #include <sys/pci_impl.h>
 #include <sys/mach_intr.h>
+#include <vm/hat_i86.h>
+#include <sys/x86_archext.h>
 
 /*
  * DDI Boot Configuration
@@ -89,6 +92,8 @@ static void impl_bus_reprobe(void);
 
 static int poke_mem(peekpoke_ctlops_t *in_args);
 static int peek_mem(peekpoke_ctlops_t *in_args);
+
+static int kmem_override_cache_attrs(caddr_t, size_t, uint_t);
 
 #define	CTGENTRIES	15
 
@@ -1102,6 +1107,40 @@ kmem_io_index_next(int curindex)
 	return (-1);
 }
 
+/*
+ * allow kmem to be mapped in with different PTE cache attribute settings.
+ * Used by i_ddi_mem_alloc()
+ */
+int
+kmem_override_cache_attrs(caddr_t kva, size_t size, uint_t order)
+{
+	uint_t hat_flags;
+	caddr_t kva_end;
+	uint_t hat_attr;
+	pfn_t pfn;
+
+	if (hat_getattr(kas.a_hat, kva, &hat_attr) == -1) {
+		return (-1);
+	}
+
+	hat_attr &= ~HAT_ORDER_MASK;
+	hat_attr |= order | HAT_NOSYNC;
+	hat_flags = HAT_LOAD_LOCK;
+
+	kva_end = (caddr_t)(((uintptr_t)kva + size + PAGEOFFSET) &
+	    (uintptr_t)PAGEMASK);
+	kva = (caddr_t)((uintptr_t)kva & (uintptr_t)PAGEMASK);
+
+	while (kva < kva_end) {
+		pfn = hat_getpfnum(kas.a_hat, kva);
+		hat_unload(kas.a_hat, kva, PAGESIZE, HAT_UNLOAD_UNLOCK);
+		hat_devload(kas.a_hat, kva, PAGESIZE, pfn, hat_attr, hat_flags);
+		kva += MMU_PAGESIZE;
+	}
+
+	return (0);
+}
+
 void
 ka_init(void)
 {
@@ -1417,6 +1456,112 @@ kfreea(void *addr)
 }
 
 /*
+ * Check if the endianess attribute is supported on the platform.
+ * This function must be called before i_ddi_devacc_to_hatacc().
+ */
+boolean_t
+i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp)
+{
+	/*
+	 * Big endianess is not supported on X86.
+	 */
+	if (devaccp != NULL &&
+	    devaccp->devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/* set HAT endianess attributes from ddi_device_acc_attr */
+void
+i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp)
+{
+#if defined(lint)
+	*hataccp = *hataccp;
+#endif
+	static char *fname = "i_ddi_devacc_to_hatacc";
+	/*
+	 * This case must not occur because the endianess is examined
+	 * before this function is called.
+	 */
+	if (devaccp != NULL &&
+	    devaccp->devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC) {
+		cmn_err(CE_WARN,
+		    "%s: devacc_attr_endian_flags=0x%x is ignored.",
+		    fname, devaccp->devacc_attr_endian_flags);
+	}
+}
+
+/*
+ * Check if the specified cache attribute is supported on the platform.
+ * This function must be called before i_ddi_cacheattr_to_hatacc().
+ */
+boolean_t
+i_ddi_check_cache_attr(uint_t flags)
+{
+	/*
+	 * The cache attributes are mutually exclusive. Any combination of
+	 * the attributes leads to a failure.
+	 */
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
+	if ((cache_attr != 0) && ((cache_attr & (cache_attr - 1)) != 0))
+		return (B_FALSE);
+
+	/* All cache attributes are supported on X86/X64 */
+	if (cache_attr & (IOMEM_DATA_UNCACHED | IOMEM_DATA_CACHED |
+	    IOMEM_DATA_UC_WR_COMBINE))
+		return (B_TRUE);
+
+	/* undefined attributes */
+	return (B_FALSE);
+}
+
+/* set HAT cache attributes from the cache attributes */
+void
+i_ddi_cacheattr_to_hatacc(uint_t flags, uint_t *hataccp)
+{
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
+	static char *fname = "i_ddi_cacheattr_to_hatacc";
+
+	/*
+	 * If write-combining is not supported, then it falls back
+	 * to uncacheable.
+	 */
+	if (cache_attr == IOMEM_DATA_UC_WR_COMBINE && !(x86_feature & X86_PAT))
+		cache_attr = IOMEM_DATA_UNCACHED;
+
+	/*
+	 * set HAT attrs according to the cache attrs.
+	 */
+	switch (cache_attr) {
+	case IOMEM_DATA_UNCACHED:
+		*hataccp &= ~HAT_ORDER_MASK;
+		*hataccp |= (HAT_STRICTORDER | HAT_PLAT_NOCACHE);
+		break;
+	case IOMEM_DATA_UC_WR_COMBINE:
+		*hataccp &= ~HAT_ORDER_MASK;
+		*hataccp |= (HAT_MERGING_OK | HAT_PLAT_NOCACHE);
+		break;
+	case IOMEM_DATA_CACHED:
+		*hataccp &= ~HAT_ORDER_MASK;
+		*hataccp |= HAT_UNORDERED_OK;
+		break;
+	/*
+	 * This case must not occur because the cache attribute is scrutinized
+	 * before this function is called.
+	 */
+	default:
+		/*
+		 * set cacheable to hat attrs.
+		 */
+		*hataccp &= ~HAT_ORDER_MASK;
+		*hataccp |= HAT_UNORDERED_OK;
+		cmn_err(CE_WARN, "%s: cache_attr=0x%x is ignored.",
+		    fname, cache_attr);
+	}
+}
+
+/*
  * This should actually be called i_ddi_dma_mem_alloc. There should
  * also be an i_ddi_pio_mem_alloc. i_ddi_dma_mem_alloc should call
  * through the device tree with the DDI_CTLOPS_DMA_ALIGN ctl ops to
@@ -1428,7 +1573,7 @@ kfreea(void *addr)
 /*ARGSUSED*/
 int
 i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
-	size_t length, int cansleep, int streaming,
+	size_t length, int cansleep, int flags,
 	ddi_device_acc_attr_t *accattrp, caddr_t *kaddrp,
 	size_t *real_length, ddi_acc_hdl_t *ap)
 {
@@ -1438,6 +1583,8 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	int physcontig = 0;
 	pgcnt_t npages;
 	pgcnt_t minctg;
+	uint_t order;
+	int e;
 
 	/*
 	 * Check legality of arguments
@@ -1445,6 +1592,7 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	if (length == 0 || kaddrp == NULL || attr == NULL) {
 		return (DDI_FAILURE);
 	}
+
 	if (attr->dma_attr_minxfer == 0 || attr->dma_attr_align == 0 ||
 		(attr->dma_attr_align & (attr->dma_attr_align - 1)) ||
 		(attr->dma_attr_minxfer & (attr->dma_attr_minxfer - 1))) {
@@ -1461,6 +1609,17 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 
 	ASSERT((iomin & (iomin - 1)) == 0);
 
+	/*
+	 * if we allocate memory with IOMEM_DATA_UNCACHED or
+	 * IOMEM_DATA_UC_WR_COMBINE, make sure we allocate a page aligned
+	 * memory that ends on a page boundry.
+	 * Don't want to have to different cache mappings to the same
+	 * physical page.
+	 */
+	if (OVERRIDE_CACHE_ATTR(flags)) {
+		iomin = (iomin + MMU_PAGEOFFSET) & MMU_PAGEMASK;
+		length = (length + MMU_PAGEOFFSET) & (size_t)MMU_PAGEMASK;
+	}
 
 	/*
 	 * Determine if we need to satisfy the request for physically
@@ -1494,6 +1653,20 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	if ((*kaddrp = a) == NULL)
 		return (DDI_FAILURE);
 
+	/*
+	 * if we to modify the cache attributes, go back and muck with the
+	 * mappings.
+	 */
+	if (OVERRIDE_CACHE_ATTR(flags)) {
+		order = 0;
+		i_ddi_cacheattr_to_hatacc(flags, &order);
+		e = kmem_override_cache_attrs(a, length, order);
+		if (e != 0) {
+			kfreea(a);
+			return (DDI_FAILURE);
+		}
+	}
+
 	if (real_length) {
 		*real_length = length;
 	}
@@ -1505,6 +1678,7 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 		iap->ahi_acc_attr |= DDI_ACCATTR_CPU_VADDR;
 		impl_acc_hdl_init(ap);
 	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -1554,8 +1728,26 @@ i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
 
 /* ARGSUSED */
 void
-i_ddi_mem_free(caddr_t kaddr, int stream)
+i_ddi_mem_free(caddr_t kaddr, ddi_acc_hdl_t *ap)
 {
+	if (ap != NULL) {
+		/*
+		 * if we modified the cache attributes on alloc, go back and
+		 * fix them since this memory could be returned to the
+		 * general pool.
+		 */
+		if (OVERRIDE_CACHE_ATTR(ap->ah_xfermodes)) {
+			uint_t order = 0;
+			int e;
+			i_ddi_cacheattr_to_hatacc(IOMEM_DATA_CACHED, &order);
+			e = kmem_override_cache_attrs(kaddr, ap->ah_len, order);
+			if (e != 0) {
+				cmn_err(CE_WARN, "i_ddi_mem_free() failed to "
+				    "override cache attrs, memory leaked\n");
+				return;
+			}
+		}
+	}
 	kfreea(kaddr);
 }
 

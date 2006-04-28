@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,9 +77,8 @@ gfxp_umem_cookie_destroy(ddi_umem_cookie_t cookie)
 }
 
 /*
- * called by driver devmap routine to pass kernel virtual address  mapping
- * info to the framework.    used only for kernel memory
- * allocated from ddi_dma_mem_alloc().
+ * called by driver devmap routine to pass kernel virtual address mapping
+ * info to the framework.
  */
 /*ARGSUSED*/
 int
@@ -88,120 +87,26 @@ gfxp_devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
     offset_t off, size_t len, uint_t maxprot, uint_t flags,
     ddi_device_acc_attr_t *accattrp)
 {
-	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
-	struct ddi_umem_cookie *cp = (struct ddi_umem_cookie *)cookie;
-
-#ifdef lint
-	dip = dip;
-#endif
-
-	if (cookie == NULL)
-		return (DDI_FAILURE);
-
-	/* For UMEM_TRASH, this restriction is not needed */
-	if ((off + len) > cp->size)
-		return (DDI_FAILURE);
+	uint_t l_flags = flags & ~IOMEM_DATA_MASK; /* clear cache attrs */
+	int e;
 
 	/*
-	 * First to check if this function has been called for this dhp.
+	 * Set an appropriate attribute from devacc_attr_dataorder
+	 * to keep compatibility. The cache attributes are igonred
+	 * if specified.
 	 */
-	if (dhp->dh_flags & DEVMAP_SETUP_DONE)
-		return (DDI_FAILURE);
-
-	if ((dhp->dh_prot & dhp->dh_orig_maxprot & maxprot) != dhp->dh_prot)
-		return (DDI_FAILURE);
-
-	if (flags & DEVMAP_MAPPING_INVALID) {
-		/*
-		 * If DEVMAP_MAPPING_INVALID is specified, we have to grant
-		 * remap permission.
-		 */
-		if (!(flags & DEVMAP_ALLOW_REMAP)) {
-			return (DDI_FAILURE);
-		}
-	} else {
-		dhp->dh_cookie = cookie;
-		dhp->dh_roff = ptob(btop(off));
-		dhp->dh_cvaddr = cp->cvaddr + dhp->dh_roff;
-	}
-
 	if (accattrp != NULL) {
-		switch (accattrp->devacc_attr_dataorder) {
-		case DDI_STRICTORDER_ACC:
-			dhp->dh_hat_attr &= ~HAT_ORDER_MASK;
-			dhp->dh_hat_attr |= (HAT_STRICTORDER|HAT_PLAT_NOCACHE);
-			break;
-		case DDI_UNORDERED_OK_ACC:
-			dhp->dh_hat_attr &= ~HAT_ORDER_MASK;
-			dhp->dh_hat_attr |= HAT_UNORDERED_OK;
-			break;
-		case DDI_MERGING_OK_ACC:
-			dhp->dh_hat_attr &= ~HAT_ORDER_MASK;
-			dhp->dh_hat_attr |= (HAT_MERGING_OK|HAT_PLAT_NOCACHE);
-			break;
-		case DDI_LOADCACHING_OK_ACC:
-			dhp->dh_hat_attr &= ~HAT_ORDER_MASK;
-			dhp->dh_hat_attr |= HAT_LOADCACHING_OK;
-			break;
-		case DDI_STORECACHING_OK_ACC:
-			dhp->dh_hat_attr &= ~HAT_ORDER_MASK;
-			dhp->dh_hat_attr |= HAT_STORECACHING_OK;
-			break;
-		default:
-			return (DDI_FAILURE);
+		if (accattrp->devacc_attr_dataorder == DDI_STRICTORDER_ACC) {
+			l_flags |= IOMEM_DATA_UNCACHED;
+		} else if (accattrp->devacc_attr_dataorder ==
+		    DDI_MERGING_OK_ACC) {
+			l_flags |= IOMEM_DATA_UC_WR_COMBINE;
+		} else {
+			l_flags |= IOMEM_DATA_CACHED;
 		}
 	}
 
-#ifdef __sparc
-	if (accattrp != NULL) {
-		if (accattrp->devacc_attr_endian_flags ==
-			DDI_STRUCTURE_LE_ACC) {
-			dhp->dh_hat_attr &= ~HAT_ENDIAN_MASK;
-			dhp->dh_hat_attr |= HAT_STRUCTURE_LE;
-		}
-	}
-#endif
-
-	/*
-	 * The default is _not_ to pass HAT_LOAD_NOCONSIST to hat_devload();
-	 * we pass HAT_LOAD_NOCONSIST _only_ in cases where hat tries to
-	 * create consistent mappings but our intention was to create
-	 * non-consistent mappings.
-	 *
-	 * DEVMEM: hat figures it out it's DEVMEM and creates non-consistent
-	 * mappings.
-	 *
-	 * kernel exported memory: hat figures it out it's memory and always
-	 * creates consistent mappings.
-	 *
-	 * /dev/mem: non-consistent mappings. See comments in common/io/mem.c
-	 *
-	 * /dev/kmem: consistent mappings are created unless they are
-	 * MAP_FIXED. We _explicitly_ tell hat to create non-consistent
-	 * mappings by passing HAT_LOAD_NOCONSIST in case of MAP_FIXED
-	 * mappings of /dev/kmem. See common/io/mem.c
-	 */
-
-	/* Only some of the flags bits are settable by the driver */
-	dhp->dh_flags |= (flags & DEVMAP_SETUP_FLAGS);
-
-	dhp->dh_len = ptob(btopr(len));
-	dhp->dh_maxprot = maxprot & dhp->dh_orig_maxprot;
-	ASSERT((dhp->dh_prot & dhp->dh_orig_maxprot & maxprot) == dhp->dh_prot);
-
-	if (callbackops != NULL) {
-		bcopy(callbackops, &dhp->dh_callbackops,
-			sizeof (struct devmap_callback_ctl));
-	}
-	/*
-	 * Initialize dh_lock if we want to do remap.
-	 */
-	if (dhp->dh_flags & DEVMAP_ALLOW_REMAP) {
-		mutex_init(&dhp->dh_lock, NULL, MUTEX_DEFAULT, NULL);
-		dhp->dh_flags |= DEVMAP_LOCK_INITED;
-	}
-
-	dhp->dh_flags |= DEVMAP_SETUP_DONE;
-
-	return (DDI_SUCCESS);
+	e = devmap_umem_setup(dhc, dip, callbackops, cookie, off, len, maxprot,
+	    l_flags, accattrp);
+	return (e);
 }

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -989,6 +990,91 @@ i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *hdlp)
  * SECTION: DDI Memory/DMA
  */
 
+/*
+ * Check if the endianess attribute is supported on the platform.
+ * This function must be called before i_ddi_devacc_to_hatacc().
+ */
+boolean_t
+i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp)
+{
+#if defined(lint)
+	*devaccp = *devaccp;
+#endif
+	/*
+	 * All kinds of endianess is supported on SPARC.
+	 */
+	return (B_TRUE);
+}
+
+/* set HAT endianess attributes from ddi_device_acc_attr */
+void
+i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp)
+{
+	if (devaccp != NULL) {
+		if (devaccp->devacc_attr_endian_flags == DDI_STRUCTURE_LE_ACC) {
+			*hataccp &= ~HAT_ENDIAN_MASK;
+			*hataccp |= HAT_STRUCTURE_LE;
+		}
+	}
+}
+
+/*
+ * Check if the specified cache attribute is supported on the platform.
+ * This function must be called before i_ddi_cacheattr_to_hatacc().
+ */
+boolean_t
+i_ddi_check_cache_attr(uint_t flags)
+{
+	/*
+	 * The cache attributes are mutually exclusive. Any combination of
+	 * the attributes leads to a failure.
+	 */
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
+	if ((cache_attr != 0) && ((cache_attr & (cache_attr - 1)) != 0))
+		return (B_FALSE);
+
+	/*
+	 * On the sparc architecture, only IOMEM_DATA_CACHED is meaningful,
+	 * but others lead to a failure.
+	 */
+	if (cache_attr & IOMEM_DATA_CACHED)
+		return (B_TRUE);
+	else
+		return (B_FALSE);
+}
+
+/* set HAT cache attributes from the cache attributes */
+void
+i_ddi_cacheattr_to_hatacc(uint_t flags, uint_t *hataccp)
+{
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
+	static char *fname = "i_ddi_cacheattr_to_hatacc";
+#if defined(lint)
+	*hataccp = *hataccp;
+#endif
+	/*
+	 * set HAT attrs according to the cache attrs.
+	 */
+	switch (cache_attr) {
+	/*
+	 * The cache coherency is always maintained on SPARC, and
+	 * nothing is required.
+	 */
+	case IOMEM_DATA_CACHED:
+		break;
+	/*
+	 * Both IOMEM_DATA_UC_WRITE_COMBINED and IOMEM_DATA_UNCACHED are
+	 * not supported on SPARC -- this case must not occur because the
+	 * cache attribute is scrutinized before this function is called.
+	 */
+	case IOMEM_DATA_UNCACHED:
+	case IOMEM_DATA_UC_WR_COMBINE:
+	default:
+		cmn_err(CE_WARN, "%s: cache_attr=0x%x is ignored.",
+		    fname, cache_attr);
+	}
+}
+
 static vmem_t *little_endian_arena;
 static vmem_t *big_endian_arena;
 
@@ -1076,12 +1162,12 @@ kfreea(void *addr)
 
 int
 i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
-    size_t length, int cansleep, int streaming,
+    size_t length, int cansleep, int flags,
     ddi_device_acc_attr_t *accattrp,
     caddr_t *kaddrp, size_t *real_length, ddi_acc_hdl_t *handlep)
 {
 	caddr_t a;
-	int iomin, align;
+	int iomin, align, streaming;
 	uint_t endian_flags = DDI_NEVERSWAP_ACC;
 
 #if defined(lint)
@@ -1094,11 +1180,17 @@ i_ddi_mem_alloc(dev_info_t *dip, ddi_dma_attr_t *attr,
 	if (length == 0 || kaddrp == NULL || attr == NULL) {
 		return (DDI_FAILURE);
 	}
+
 	if (attr->dma_attr_minxfer == 0 || attr->dma_attr_align == 0 ||
 	    (attr->dma_attr_align & (attr->dma_attr_align - 1)) ||
 	    (attr->dma_attr_minxfer & (attr->dma_attr_minxfer - 1))) {
 		return (DDI_FAILURE);
 	}
+
+	/*
+	 * check if a streaming sequential xfer is requested.
+	 */
+	streaming = (flags & DDI_DMA_STREAMING) ? 1 : 0;
 
 	/*
 	 * Drivers for 64-bit capable SBus devices will encode
@@ -1189,7 +1281,7 @@ i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
 
 /* ARGSUSED */
 void
-i_ddi_mem_free(caddr_t kaddr, int stream)
+i_ddi_mem_free(caddr_t kaddr, ddi_acc_hdl_t *ap)
 {
 	kfreea(kaddr);
 }

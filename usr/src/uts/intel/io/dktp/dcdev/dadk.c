@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -964,7 +964,7 @@ dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp)
 		if (iobp->b_bp && (iobp->b_flag & IOB_BPALLOC)) {
 			bp = iobp->b_bp;
 			if (bp->b_un.b_addr && (iobp->b_flag & IOB_BPBUFALLOC))
-				i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
+				i_ddi_mem_free((caddr_t)bp->b_un.b_addr, NULL);
 			freerbuf(bp);
 		}
 		kmem_free(iobp, sizeof (*iobp));

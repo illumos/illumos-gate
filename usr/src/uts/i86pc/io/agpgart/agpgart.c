@@ -3276,7 +3276,8 @@ agpgart_devmap(dev_t dev, devmap_cookie_t cookie, offset_t offset, size_t len,
 		status = devmap_pmem_setup(cookie, softstate->asoft_dip,
 		    &agp_devmap_cb,
 		    PMEMP(mementry->kte_memhdl)->pmem_cookie, local_offset,
-		    len, PROT_ALL, DEVMAP_DEFAULTS, &mem_dev_acc_attr);
+		    len, PROT_ALL, (DEVMAP_DEFAULTS|IOMEM_DATA_UC_WR_COMBINE),
+		    &mem_dev_acc_attr);
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN,

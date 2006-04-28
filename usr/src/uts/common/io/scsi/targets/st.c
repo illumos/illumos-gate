@@ -843,7 +843,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 				kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 			}
 			if (un->un_mspl) {
-				i_ddi_mem_free((caddr_t)un->un_mspl, 0);
+				i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
 			}
 			scsi_destroy_pkt(un->un_rqs);
 			scsi_free_consistent_buf(un->un_rqs_bp);
@@ -1102,7 +1102,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 		}
 		if (un->un_mspl) {
-			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
+			i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
 		}
 		if (un->un_rqs) {
 			scsi_destroy_pkt(un->un_rqs);
@@ -1401,7 +1401,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	if (!un->un_sbufp || !un->un_mspl) {
 		if (un->un_mspl) {
-			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
+			i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
 		}
 		ST_DEBUG6(devp->sd_dev, st_label, SCSI_DEBUG,
 		    "probe partial failure: no space\n");
@@ -1481,7 +1481,7 @@ error:
 	ddi_remove_minor_node(devp->sd_dev, NULL);
 	if (un) {
 		if (un->un_mspl) {
-			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
+			i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
 		}
 		if (un->un_sbufp) {
 			freerbuf(un->un_sbufp);

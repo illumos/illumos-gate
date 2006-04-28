@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -82,13 +83,25 @@ i_ddi_mem_alloc_lim(dev_info_t *dip, ddi_dma_lim_t *limits,
 	uint_t *real_length, ddi_acc_hdl_t *handlep);
 
 void
-i_ddi_mem_free(caddr_t kaddr, int streaming);
+i_ddi_mem_free(caddr_t kaddr, ddi_acc_hdl_t *ap);
 
 int
 i_ddi_devi_get_ppa(dev_info_t *dip);
 
 void
 i_ddi_devi_set_ppa(dev_info_t *dip, int ppa);
+
+boolean_t
+i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp);
+
+void
+i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp);
+
+void
+i_ddi_cacheattr_to_hatacc(uint_t flags, uint_t *hataccp);
+
+boolean_t
+i_ddi_check_cache_attr(uint_t flags);
 
 /*
  * Access and DMA handle fault set/clear routines

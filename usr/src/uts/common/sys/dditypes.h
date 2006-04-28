@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -273,7 +273,7 @@ typedef struct ddi_acc_hdl {
 	uint_t	ah_hat_flags;		/* hat flags used to map object */
 	pfn_t	ah_pfn;			/* physical page frame number */
 	uint_t	ah_pnum;		/* number of contiguous pages */
-	ulong_t	ah_xfermodes;		/* data transfer modes */
+	ulong_t	ah_xfermodes;		/* data transfer modes, etc */
 	ddi_device_acc_attr_t ah_acc;	/* device access attributes */
 } ddi_acc_hdl_t;
 

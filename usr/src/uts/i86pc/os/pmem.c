@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +142,7 @@ devmap_pmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct devmap_pmem_cookie *pcp = (struct devmap_pmem_cookie *)cookie;
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
 
 	if (pcp == NULL || (off + len) > ptob(pcp->dp_npages))
 		return (DDI_FAILURE);
@@ -156,6 +156,15 @@ devmap_pmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 	if ((dhp->dh_prot & dhp->dh_orig_maxprot & maxprot) != dhp->dh_prot)
 		return (DDI_FAILURE);
 
+	/*
+	 * Check if the cache attributes are supported. Need to pay
+	 * attention that only uncachable or write-combining is
+	 * permitted for pmem.
+	 */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
+	    (cache_attr & (IOMEM_DATA_UNCACHED|IOMEM_DATA_UC_WR_COMBINE)) == 0)
+		return (DDI_FAILURE);
+
 	if (flags & DEVMAP_MAPPING_INVALID) {
 		/*
 		 * If DEVMAP_MAPPING_INVALID is specified, we have to grant
@@ -167,16 +176,10 @@ devmap_pmem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 		dhp->dh_pcookie = (devmap_pmem_cookie_t)pcp;
 		/* dh_roff is the offset inside the dh_pcookie. */
 		dhp->dh_roff = ptob(btop(off));
+		/* Set the cache attributes correctly */
+		i_ddi_cacheattr_to_hatacc(cache_attr, &dhp->dh_hat_attr);
 	}
 
-	/*
-	 * Only "No Cache" and "Write Combining" are supported. If any other
-	 * cache type is specified, override with "No Cache".
-	 */
-	if (accattrp->devacc_attr_dataorder == DDI_MERGING_OK_ACC)
-		dhp->dh_hat_attr = HAT_PLAT_NOCACHE | HAT_MERGING_OK;
-	else
-		dhp->dh_hat_attr = HAT_PLAT_NOCACHE | HAT_STRICTORDER;
 	dhp->dh_cookie = DEVMAP_PMEM_COOKIE;
 	dhp->dh_flags |= (flags & DEVMAP_SETUP_FLAGS);
 	dhp->dh_len = ptob(btopr(len));
@@ -214,6 +217,7 @@ devmap_pmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 {
 	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
 	struct devmap_pmem_cookie *pcp = (struct devmap_pmem_cookie *)cookie;
+	uint_t cache_attr = IOMEM_CACHE_ATTR(flags);
 
 	/*
 	 * Reture failure if setup has not been done or no remap permission
@@ -233,6 +237,15 @@ devmap_pmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	if (pcp == NULL || (off + len) > ptob(pcp->dp_npages))
 		return (DDI_FAILURE);
 
+	/*
+	 * Check if the cache attributes are supported. Need to pay
+	 * attention that only uncachable or write-combining is
+	 * permitted for pmem.
+	 */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
+	    (cache_attr & (IOMEM_DATA_UNCACHED|IOMEM_DATA_UC_WR_COMBINE)) == 0)
+		return (DDI_FAILURE);
+
 	HOLD_DHP_LOCK(dhp);
 	/*
 	 * Unload the old mapping of pages reloated with this dhp, so next
@@ -243,14 +256,9 @@ devmap_pmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	hat_unload(dhp->dh_seg->s_as->a_hat, dhp->dh_uvaddr,
 	    dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
 
-	/*
-	 * Only "No Cache" and "Write Combining" are supported, if other cache
-	 * type is specified, override with "No Cache".
-	 */
-	if (accattrp->devacc_attr_dataorder == DDI_MERGING_OK_ACC)
-		dhp->dh_hat_attr = HAT_MERGING_OK;
-	else
-		dhp->dh_hat_attr = HAT_STRICTORDER;
+	/* Set the cache attributes correctly */
+	i_ddi_cacheattr_to_hatacc(cache_attr, &dhp->dh_hat_attr);
+
 	dhp->dh_pcookie = cookie;
 	dhp->dh_roff = ptob(btop(off));
 	dhp->dh_len = ptob(btopr(len));

@@ -724,6 +724,48 @@ enum ddi_dma_ctlops {
 	DDI_DMA_E_GETATTR	/* get DMA engine attributes		*/
 };
 
+/*
+ * Cache attribute flags:
+ *
+ * IOMEM_DATA_CACHED
+ *   The CPU can cache the data it fetches and push it to memory at a later
+ *   time. This is the default attribute and used if no cache attributes is
+ *   specified.
+ *
+ * IOMEM_DATA_UC_WR_COMBINE
+ *   The CPU never caches the data but writes may occur out of order or be
+ *   combined. It implies re-ordering.
+ *
+ * IOMEM_DATA_UNCACHED
+ *   The CPU never caches the data and has uncacheable access to memory.
+ *   It also implies strict ordering.
+ *
+ * The cache attributes are mutually exclusive, and any combination of the
+ * values leads to a failure. On the sparc architecture, only IOMEM_DATA_CACHED
+ * is meaningful, but others lead to a failure.
+ */
+#define	IOMEM_DATA_CACHED		0x10000 /* data is cached */
+#define	IOMEM_DATA_UC_WR_COMBINE	0x20000 /* data is not cached, but */
+						/* writes might be combined */
+#define	IOMEM_DATA_UNCACHED		0x40000 /* data is not cached. */
+#define	IOMEM_DATA_MASK			0xF0000	/* cache attrs mask */
+
+/*
+ * Check if either uncacheable or write-combining specified. (those flags are
+ * mutually exclusive) This macro is used to override hat attributes if either
+ * one is set.
+ */
+#define	OVERRIDE_CACHE_ATTR(attr)	\
+	(attr & (IOMEM_DATA_UNCACHED | IOMEM_DATA_UC_WR_COMBINE))
+
+/*
+ * Get the cache attribute from flags. If there is no attributes,
+ * return IOMEM_DATA_CACHED (default attribute).
+ */
+#define	IOMEM_CACHE_ATTR(flags)	\
+	((flags & IOMEM_DATA_MASK) ? (flags & IOMEM_DATA_MASK) : \
+	    IOMEM_DATA_CACHED)
+
 #ifdef	__cplusplus
 }
 #endif
