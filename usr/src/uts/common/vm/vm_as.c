@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +76,7 @@ static struct kmem_cache *as_cache;
 
 static void as_setwatchprot(struct as *, caddr_t, size_t, uint_t);
 static void as_clearwatchprot(struct as *, caddr_t, size_t);
+int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 
 /*
@@ -1598,6 +1598,14 @@ again:
 int
 as_map(struct as *as, caddr_t addr, size_t size, int (*crfp)(), void *argsp)
 {
+	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+	return (as_map_locked(as, addr, size, crfp, argsp));
+}
+
+int
+as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
+		void *argsp)
+{
 	struct seg *seg = NULL;
 	caddr_t raddr;			/* rounded down addr */
 	size_t rsize;			/* rounded up size */
@@ -1607,8 +1615,6 @@ as_map(struct as *as, caddr_t addr, size_t size, int (*crfp)(), void *argsp)
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
 		(size_t)raddr;
-
-	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
 
 	/*
 	 * check for wrap around

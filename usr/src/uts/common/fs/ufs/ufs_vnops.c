@@ -162,6 +162,8 @@ static	daddr32_t *save_dblks(struct inode *, struct ufsvfs *, daddr32_t *,
 static	int ufs_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
 static	int ufs_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
 
+extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
+
 /*
  * For lockfs: ulockfs begin/end is now inlined in the ufs_xxx functions.
  *
@@ -2078,6 +2080,7 @@ ufs_setattr(
 	timestruc_t now;
 	vattr_t oldva;
 	int retry = 1;
+	int indeadlock;
 
 	TRACE_2(TR_FAC_UFS, TR_UFS_SETATTR_START,
 		"ufs_setattr_start:vp %p flags %x", vp, flags);
@@ -2116,7 +2119,17 @@ again:
 	 * This follows the protocol for read()/write().
 	 */
 	if (vp->v_type != VDIR) {
-		rw_enter(&ip->i_rwlock, RW_WRITER);
+		/*
+		 * ufs_tryirwlock uses rw_tryenter and checks for SLOCK to
+		 * avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+		 * possible, retries the operation.
+		 */
+		ufs_tryirwlock(&ip->i_rwlock, RW_WRITER, retry_file);
+		if (indeadlock) {
+			if (ulp)
+				ufs_lockfs_end(ulp);
+			goto again;
+		}
 		dorwlock = 1;
 	}
 
@@ -2152,7 +2165,10 @@ again:
 	 * ufs_link/create/remove/rename/mkdir/rmdir/symlink.
 	 */
 	if (vp->v_type == VDIR) {
-		rw_enter(&ip->i_rwlock, RW_WRITER);
+		ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_SETATTR,
+					retry_dir);
+		if (indeadlock)
+			goto again;
 		dorwlock = 1;
 	}
 
@@ -2812,6 +2828,7 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 			ufs_idle_some(ufs_lookup_idle_count);
 		}
 
+retry_lookup:
 	ufsvfsp = ip->i_ufsvfs;
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_LOOKUP_MASK);
 	if (error)
@@ -2843,6 +2860,9 @@ fastpath:
 		ufs_lockfs_end(ulp);
 	}
 
+	if (error == EAGAIN)
+		goto retry_lookup;
+
 out:
 	TRACE_3(TR_FAC_UFS, TR_UFS_LOOKUP_END,
 		"ufs_lookup_end:dvp %p name %s error %d", vpp, nm, error);
@@ -2866,6 +2886,7 @@ ufs_create(struct vnode *dvp, char *name, struct vattr *vap, enum vcexcl excl,
 	int noentry;
 	int defer_dip_seq_update = 0;	/* need to defer update of dip->i_seq */
 	int retry = 1;
+	int indeadlock;
 
 	TRACE_1(TR_FAC_UFS, TR_UFS_CREATE_START,
 		"ufs_create_start:dvp %p", dvp);
@@ -2902,7 +2923,16 @@ again:
 	} else {
 		xip = NULL;
 		noentry = 0;
-		rw_enter(&ip->i_rwlock, RW_WRITER);
+		/*
+		 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
+		 * to avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+		 * possible, retries the operation.
+		 */
+		ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_CREATE,
+					retry_dir);
+		if (indeadlock)
+			goto again;
+
 		xvp = dnlc_lookup(dvp, name);
 		if (xvp == DNLC_NO_VNODE) {
 			noentry = 1;
@@ -2924,6 +2954,14 @@ again:
 			error = ufs_direnter_cm(ip, name, DE_CREATE,
 				vap, &xip, cr,
 				(noentry | (retry ? IQUIET : 0)));
+			if (error == EAGAIN) {
+				if (ulp) {
+					TRANS_END_CSYNC(ufsvfsp, error, issync,
+						TOP_CREATE, trans_size);
+					ufs_lockfs_end(ulp);
+				}
+				goto again;
+			}
 			rw_exit(&ip->i_rwlock);
 		}
 		ip = xip;
@@ -3010,7 +3048,13 @@ again:
 				else {
 					rw_exit(&ip->i_contents);
 					rw_exit(&ufsvfsp->vfs_dqrwlock);
-					rw_enter(&ip->i_rwlock, RW_WRITER);
+					ufs_tryirwlock_trans(&ip->i_rwlock,
+							RW_WRITER, TOP_CREATE,
+							retry_file);
+					if (indeadlock) {
+						VN_RELE(ITOV(ip));
+						goto again;
+					}
 					rw_enter(&ufsvfsp->vfs_dqrwlock,
 							RW_READER);
 					rw_enter(&ip->i_contents, RW_WRITER);
@@ -3080,7 +3124,13 @@ unlock:
 	}
 
 	if (!error && truncflag) {
-		rw_enter(&ip->i_rwlock, RW_WRITER);
+		ufs_tryirwlock(&ip->i_rwlock, RW_WRITER, retry_trunc);
+		if (indeadlock) {
+			if (ulp)
+				ufs_lockfs_end(ulp);
+			VN_RELE(ITOV(ip));
+			goto again;
+		}
 		(void) TRANS_ITRUNC(ip, (u_offset_t)0, 0, cr);
 		rw_exit(&ip->i_rwlock);
 	}
@@ -3113,6 +3163,7 @@ ufs_remove(struct vnode *vp, char *nm, struct cred *cr)
 	struct ufsvfs *ufsvfsp	= ip->i_ufsvfs;
 	struct ulockfs *ulp;
 	vnode_t *rmvp = NULL;	/* Vnode corresponding to name being removed */
+	int indeadlock;
 	int error;
 	int issync;
 	int trans_size;
@@ -3130,6 +3181,7 @@ ufs_remove(struct vnode *vp, char *nm, struct cred *cr)
 	if (ufsvfsp->vfs_delete.uq_ne > ufs_idle_max)
 		ufs_delete_drain(vp->v_vfsp, 1, 1);
 
+retry_remove:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_REMOVE_MASK);
 	if (error)
 		goto out;
@@ -3138,7 +3190,14 @@ ufs_remove(struct vnode *vp, char *nm, struct cred *cr)
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_REMOVE,
 		    trans_size = (int)TOP_REMOVE_SIZE(VTOI(vp)));
 
-	rw_enter(&ip->i_rwlock, RW_WRITER);
+	/*
+	 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
+	 * to avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+	 * possible, retries the operation.
+	 */
+	ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_REMOVE, retry);
+	if (indeadlock)
+		goto retry_remove;
 	error = ufs_dirremove(ip, nm, (struct inode *)0, (struct vnode *)0,
 	    DR_REMOVE, cr, &rmvp);
 	rw_exit(&ip->i_rwlock);
@@ -3179,10 +3238,12 @@ ufs_link(struct vnode *tdvp, struct vnode *svp, char *tnm, struct cred *cr)
 	int issync;
 	int trans_size;
 	int isdev;
+	int indeadlock;
 
 	TRACE_1(TR_FAC_UFS, TR_UFS_LINK_START,
 		"ufs_link_start:tdvp %p", tdvp);
 
+retry_link:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_LINK_MASK);
 	if (error)
 		goto out;
@@ -3218,7 +3279,15 @@ ufs_link(struct vnode *tdvp, struct vnode *svp, char *tnm, struct cred *cr)
 		error = EPERM;
 		goto unlock;
 	}
-	rw_enter(&tdp->i_rwlock, RW_WRITER);
+
+	/*
+	 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
+	 * to avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+	 * possible, retries the operation.
+	 */
+	ufs_tryirwlock_trans(&tdp->i_rwlock, RW_WRITER, TOP_LINK, retry);
+	if (indeadlock)
+		goto retry_link;
 	error = ufs_direnter_lr(tdp, tnm, DE_LINK, (struct inode *)0,
 	    sip, cr, NULL);
 	rw_exit(&tdp->i_rwlock);
@@ -3274,6 +3343,9 @@ ufs_rename(
 	int error;
 	int issync;
 	int trans_size;
+	krwlock_t *first_lock;
+	krwlock_t *second_lock;
+	krwlock_t *reverse_lock;
 
 	TRACE_1(TR_FAC_UFS, TR_UFS_RENAME_START,
 		"ufs_rename_start:sdvp %p", sdvp);
@@ -3282,6 +3354,7 @@ ufs_rename(
 	sdp = VTOI(sdvp);
 	slot.fbp = NULL;
 	ufsvfsp = sdp->i_ufsvfs;
+retry_rename:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);
 	if (error)
 		goto out;
@@ -3309,6 +3382,15 @@ ufs_rename(
 	 */
 	gethrestime(&now);
 	if (error = ufs_dirlook(sdp, snm, &sip, cr, 0)) {
+		if (error == EAGAIN) {
+			if (ulp) {
+				TRANS_END_CSYNC(ufsvfsp, error, issync,
+					TOP_RENAME, trans_size);
+				ufs_lockfs_end(ulp);
+			}
+			goto retry_rename;
+		}
+
 		goto unlock;
 	}
 
@@ -3326,27 +3408,75 @@ ufs_rename(
 	 * in the path of each other, it can lead to a deadlock. This
 	 * can be avoided by getting the locks as RW_READER here and then
 	 * upgrading to RW_WRITER after completing the ufs_dircheckpath.
+	 *
+	 * We hold the target directory's i_rwlock after calling
+	 * ufs_lockfs_begin but in many other operations (like ufs_readdir)
+	 * VOP_RWLOCK is explicitly called by the filesystem independent code
+	 * before calling the file system operation. In these cases the order
+	 * is reversed (i.e i_rwlock is taken first and then ufs_lockfs_begin
+	 * is called). This is fine as long as ufs_lockfs_begin acts as a VOP
+	 * counter but with ufs_quiesce setting the SLOCK bit this becomes a
+	 * synchronizing object which might lead to a deadlock. So we use
+	 * rw_tryenter instead of rw_enter. If we fail to get this lock and
+	 * find that SLOCK bit is set, we call ufs_lockfs_end and restart the
+	 * operation.
 	 */
 retry:
-	rw_enter(&tdp->i_rwlock, RW_READER);
-	if (tdp != sdp) {
+	first_lock = &tdp->i_rwlock;
+	second_lock = &sdp->i_rwlock;
+retry_firstlock:
+	if (!rw_tryenter(first_lock, RW_READER)) {
 		/*
-		 * We're locking 2 peer level locks, so must use tryenter
-		 * on the 2nd to avoid deadlocks that would occur
-		 * if we renamed a->b and b->a concurrently.
+		 * We didn't get the lock. Check if the SLOCK is set in the
+		 * ufsvfs. If yes, we might be in a deadlock. Safer to give up
+		 * and wait for SLOCK to be cleared.
 		 */
-		if (!rw_tryenter(&sdp->i_rwlock, RW_READER)) {
+
+		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
+			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME,
+					trans_size);
+			ufs_lockfs_end(ulp);
+			goto retry_rename;
+
+		} else {
 			/*
-			 * Reverse the lock grabs in case we have heavy
-			 * contention on the 2nd lock.
+			 * SLOCK isn't set so this is a genuine synchronization
+			 * case. Let's try again after giving them a breather.
 			 */
-			rw_exit(&tdp->i_rwlock);
-			rw_enter(&sdp->i_rwlock, RW_READER);
-			if (!rw_tryenter(&tdp->i_rwlock, RW_READER)) {
-				ufs_rename_retry_cnt++;
-				rw_exit(&sdp->i_rwlock);
-				goto retry;
-			}
+			delay(RETRY_LOCK_DELAY);
+			goto  retry_firstlock;
+		}
+	}
+	/*
+	 * Need to check if the tdp and sdp are same !!!
+	 */
+	if ((tdp != sdp) && (!rw_tryenter(second_lock, RW_READER))) {
+		/*
+		 * We didn't get the lock. Check if the SLOCK is set in the
+		 * ufsvfs. If yes, we might be in a deadlock. Safer to give up
+		 * and wait for SLOCK to be cleared.
+		 */
+
+		rw_exit(first_lock);
+		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
+			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME,
+					trans_size);
+			ufs_lockfs_end(ulp);
+			goto retry_rename;
+
+		} else {
+			/*
+			 * So we couldn't get the second level peer lock *and*
+			 * the SLOCK bit isn't set. Too bad we can be
+			 * contentding with someone wanting these locks otherway
+			 * round. Reverse the locks in case there is a heavy
+			 * contention for the second level lock.
+			 */
+			reverse_lock = first_lock;
+			first_lock = second_lock;
+			second_lock = reverse_lock;
+			ufs_rename_retry_cnt++;
+			goto  retry_firstlock;
 		}
 	}
 
@@ -3588,6 +3718,7 @@ ufs_mkdir(struct vnode *dvp, char *dirname, struct vattr *vap,
 	int error;
 	int issync;
 	int trans_size;
+	int indeadlock;
 	int retry = 1;
 
 	ASSERT((vap->va_mask & (AT_TYPE|AT_MODE)) == (AT_TYPE|AT_MODE));
@@ -3611,10 +3742,25 @@ again:
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_MKDIR,
 		    trans_size = (int)TOP_MKDIR_SIZE(ip));
 
-	rw_enter(&ip->i_rwlock, RW_WRITER);
+	/*
+	 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
+	 * to avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+	 * possible, retries the operation.
+	 */
+	ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_MKDIR, retry);
+	if (indeadlock)
+		goto again;
 
 	error = ufs_direnter_cm(ip, dirname, DE_MKDIR, vap, &xip, cr,
 		(retry ? IQUIET : 0));
+	if (error == EAGAIN) {
+		if (ulp) {
+			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_MKDIR,
+					trans_size);
+			ufs_lockfs_end(ulp);
+		}
+		goto again;
+	}
 
 	rw_exit(&ip->i_rwlock);
 	if (error == 0) {
@@ -3652,6 +3798,8 @@ ufs_rmdir(struct vnode *vp, char *nm, struct vnode *cdir, struct cred *cr)
 	vnode_t *rmvp = NULL;	/* Vnode of removed directory */
 	int error;
 	int issync;
+	int trans_size;
+	int indeadlock;
 
 	TRACE_1(TR_FAC_UFS, TR_UFS_RMDIR_START,
 		"ufs_rmdir_start:vp %p", vp);
@@ -3666,21 +3814,30 @@ ufs_rmdir(struct vnode *vp, char *nm, struct vnode *cdir, struct cred *cr)
 	if (ufsvfsp->vfs_delete.uq_ne > ufs_idle_max)
 		ufs_delete_drain(vp->v_vfsp, 1, 1);
 
+retry_rmdir:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RMDIR_MASK);
 	if (error)
 		goto out;
 
 	if (ulp)
-		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_RMDIR, TOP_RMDIR_SIZE);
+		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_RMDIR,
+					trans_size = TOP_RMDIR_SIZE);
 
-	rw_enter(&ip->i_rwlock, RW_WRITER);
+	/*
+	 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
+	 * to avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+	 * possible, retries the operation.
+	 */
+	ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_RMDIR, retry);
+	if (indeadlock)
+		goto retry_rmdir;
 	error = ufs_dirremove(ip, nm, (struct inode *)0, cdir, DR_RMDIR, cr,
 									&rmvp);
 	rw_exit(&ip->i_rwlock);
 
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RMDIR,
-				TOP_RMDIR_SIZE);
+				trans_size);
 		ufs_lockfs_end(ulp);
 	}
 
@@ -5404,6 +5561,7 @@ ufs_map(struct vnode *vp,
 	TRACE_1(TR_FAC_UFS, TR_UFS_MAP_START,
 		"ufs_map_start:vp %p", vp);
 
+retry_map:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_MAP_MASK);
 	if (error)
 		goto out;
@@ -5457,7 +5615,28 @@ ufs_map(struct vnode *vp,
 	vn_a.szc = 0;
 	vn_a.lgrp_mem_policy_flags = 0;
 
-	error = as_map(as, *addrp, len, segvn_create, &vn_a);
+retry_lock:
+	if (!AS_LOCK_TRYENTER(ias, &as->a_lock, RW_WRITER)) {
+		/*
+		 * We didn't get the lock. Check if the SLOCK is set in the
+		 * ufsvfs. If yes, we might be in a deadlock. Safer to give up
+		 * and wait for SLOCK to be cleared.
+		 */
+
+		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
+			as_rangeunlock(as);
+			ufs_lockfs_end(ulp);
+			goto retry_map;
+		} else {
+			/*
+			 * SLOCK isn't set so this is a genuine synchronization
+			 * case. Let's try again after giving them a breather.
+			 */
+			delay(RETRY_LOCK_DELAY);
+			goto  retry_lock;
+		}
+	}
+	error = as_map_locked(as, *addrp, len, segvn_create, &vn_a);
 	as_rangeunlock(as);
 
 unlock:

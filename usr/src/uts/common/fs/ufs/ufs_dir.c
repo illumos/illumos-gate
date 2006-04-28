@@ -169,6 +169,7 @@ ufs_dirlook(
 	struct direct *ep;		/* the current directory entry */
 	struct vnode *vp;
 	struct vnode *dvp;		/* directory vnode ptr */
+	struct ulockfs *ulp;
 	dcanchor_t *dcap;
 	off_t endsearch;		/* offset to end directory search */
 	off_t offset;
@@ -181,12 +182,15 @@ ufs_dirlook(
 	int doingchk;
 	int i;
 	int caching;
+	int indeadlock;
 	ino_t ep_ino;			/* entry i number */
 	ino_t chkino;
 	ushort_t ep_reclen;		/* direct local d_reclen */
 
 	ASSERT(*namep != '\0'); /* All callers ensure *namep is non null */
 
+	if (dp->i_ufsvfs)
+		ulp = &dp->i_ufsvfs->vfs_ulockfs;
 	/*
 	 * Check accessibility of directory.
 	 */
@@ -217,8 +221,14 @@ ufs_dirlook(
 	/*
 	 * Grab the reader lock on the directory data before checking
 	 * the dnlc to avoid a race with ufs_dirremove() & friends.
+	 *
+	 * ufs_tryirwlock uses rw_tryenter and checks for SLOCK to
+	 * avoid i_rwlock, ufs_lockfs_begin deadlock. If deadlock
+	 * possible, retries the operation.
 	 */
-	rw_enter(&dp->i_rwlock, RW_READER);
+	ufs_tryirwlock((&dp->i_rwlock), RW_READER, retry_dircache);
+	if (indeadlock)
+		return (EAGAIN);
 
 	switch (dnlc_dir_lookup(dcap, namep, &handle)) {
 	case DFOUND:
@@ -243,7 +253,12 @@ ufs_dirlook(
 			/*
 			 * must recheck as we dropped dp->i_rwlock
 			 */
-			rw_enter(&dp->i_rwlock, RW_READER);
+			ufs_tryirwlock(&dp->i_rwlock, RW_READER, retry_parent);
+			if (indeadlock) {
+				if (!err)
+					VN_RELE(ITOV(*ipp));
+				return (EAGAIN);
+			}
 			if (!err && (dnlc_dir_lookup(dcap, namep, &handle2)
 			    == DFOUND) && (handle == handle2)) {
 				dnlc_update(dvp, namep, ITOV(*ipp));
@@ -495,7 +510,13 @@ searchloop:
 				err = ufs_iget_alloced(dp->i_vfs, ep_ino, ipp,
 				    cr);
 				rw_exit(&dp->i_ufsvfs->vfs_dqrwlock);
-				rw_enter(&dp->i_rwlock, RW_READER);
+				ufs_tryirwlock(&dp->i_rwlock, RW_READER,
+						retry_disk);
+				if (indeadlock) {
+					if (!err)
+						VN_RELE(ITOV(*ipp));
+					return (EAGAIN);
+				}
 				if (err)
 					goto bad;
 				/*
@@ -626,6 +647,8 @@ ufs_direnter_cm(
 	int do_rele_nip = 0;	/* release nip */
 	int noentry = flags & ~IQUIET;
 	int quiet = flags & IQUIET;	/* Suppress out of inodes message */
+	int indeadlock;
+	struct ulockfs *ulp;
 
 	ASSERT(RW_WRITE_HELD(&tdp->i_rwlock));
 
@@ -650,12 +673,29 @@ ufs_direnter_cm(
 		/*
 		 * ufs_dirlook will acquire the i_rwlock
 		 */
+		if (tdp->i_ufsvfs)
+			ulp = &tdp->i_ufsvfs->vfs_ulockfs;
 		rw_exit(&tdp->i_rwlock);
 		if (err = ufs_dirlook(tdp, namep, ipp, cr, 0)) {
-			rw_enter(&tdp->i_rwlock, RW_WRITER);
+			if (err == EAGAIN)
+				return (err);
+
+			/*
+			 * ufs_tryirwlock uses rw_tryenter and checks for
+			 * SLOCK to avoid i_rwlock, ufs_lockfs_begin deadlock.
+			 * If deadlock possible, retries the operation.
+			 */
+			ufs_tryirwlock(&tdp->i_rwlock, RW_WRITER, retry_err);
+			if (indeadlock)
+				return (EAGAIN);
+
 			return (err);
 		}
-		rw_enter(&tdp->i_rwlock, RW_WRITER);
+		ufs_tryirwlock(&tdp->i_rwlock, RW_WRITER, retry);
+		if (indeadlock) {
+			VN_RELE(ITOV(*ipp));
+			return (EAGAIN);
+		}
 		return (EEXIST);
 	}
 

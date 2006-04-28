@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -739,6 +738,61 @@ struct	ocg {
 
 #define	getfs(vfsp) \
 	((struct fs *)((struct ufsvfs *)vfsp->vfs_data)->vfs_bufp->b_un.b_addr)
+
+#define	RETRY_LOCK_DELAY 1
+
+/*
+ * Macros to test and acquire i_rwlock:
+ * some vnops hold the target directory's i_rwlock after calling
+ * ufs_lockfs_begin but in many other operations (like ufs_readdir)
+ * VOP_RWLOCK is explicitly called by the filesystem independent code before
+ * calling the file system operation. In these cases the order is reversed
+ * (i.e i_rwlock is taken first and then ufs_lockfs_begin is called). This
+ * is fine as long as ufs_lockfs_begin acts as a VOP counter but with
+ * ufs_quiesce setting the SLOCK bit this becomes a synchronizing
+ * object which might lead to a deadlock. So we use rw_tryenter instead of
+ * rw_enter. If we fail to get this lock and find that SLOCK bit is set, we
+ * call ufs_lockfs_end and restart the operation.
+ */
+
+#define	ufs_tryirwlock(lock, mode, label) \
+{\
+	indeadlock = 0;\
+label:\
+	if (!rw_tryenter(lock, mode))\
+	{\
+		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {\
+			indeadlock = 1;\
+		} else {\
+			delay(RETRY_LOCK_DELAY);\
+			goto  label;\
+		}\
+	}\
+}
+
+/*
+ * The macro ufs_tryirwlock_trans is used in functions which call
+ * TRANS_BEGIN_CSYNC and ufs_lockfs_begin, hence the need to call
+ * TRANS_END_CSYNC and ufs_lockfs_end.
+ */
+
+#define	ufs_tryirwlock_trans(lock, mode, transmode, label) \
+{\
+	indeadlock = 0;\
+label:\
+	if (!rw_tryenter(lock, mode))\
+	{\
+		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {\
+			TRANS_END_CSYNC(ufsvfsp, error, issync,\
+				transmode, trans_size);\
+			ufs_lockfs_end(ulp);\
+			indeadlock = 1;\
+		} else {\
+			delay(RETRY_LOCK_DELAY);\
+			goto  label;\
+		}\
+	}\
+}
 
 #ifdef	__cplusplus
 }
