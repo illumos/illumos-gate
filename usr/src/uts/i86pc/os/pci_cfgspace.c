@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,8 +79,10 @@ kmutex_t pcicfg_chipset_mutex;
 void
 pci_cfgspace_init(void)
 {
-	mutex_init(&pcicfg_mutex, NULL, MUTEX_DEFAULT, 0);
-	mutex_init(&pcicfg_chipset_mutex, NULL, MUTEX_DEFAULT, 0);
+	mutex_init(&pcicfg_mutex, NULL, MUTEX_SPIN,
+	    (ddi_iblock_cookie_t)ipltospl(15));
+	mutex_init(&pcicfg_chipset_mutex, NULL, MUTEX_SPIN,
+	    (ddi_iblock_cookie_t)ipltospl(15));
 	if (!pci_check()) {
 		mutex_destroy(&pcicfg_mutex);
 		mutex_destroy(&pcicfg_chipset_mutex);

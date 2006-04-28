@@ -2299,6 +2299,10 @@ pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop)
 	int check_err = 0;
 	int repcount = in_args->repcount;
 
+	if (ctlop == DDI_CTLOPS_POKE &&
+	    hdlp->ah_acc.devacc_attr_access != DDI_CAUTIOUS_ACC)
+		return (DDI_SUCCESS);
+
 	if (ctlop == DDI_CTLOPS_PEEK &&
 	    hdlp->ah_acc.devacc_attr_access != DDI_CAUTIOUS_ACC) {
 		for (; repcount; repcount--) {
@@ -2332,7 +2336,6 @@ pci_peekpoke_check_fma(dev_info_t *dip, void *arg, ddi_ctl_enum_t ctlop)
 	 */
 	bzero(&de, sizeof (ddi_fm_error_t));
 	de.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
-	de.fme_bus_specific = (void *)in_args->dev_addr;
 	if (hdlp->ah_acc.devacc_attr_access == DDI_CAUTIOUS_ACC) {
 		de.fme_flag = DDI_FM_ERR_EXPECTED;
 		de.fme_acc_handle = in_args->handle;
@@ -2426,7 +2429,7 @@ pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
 
 	if (hp->ahi_acc_attr & DDI_ACCATTR_CONFIG_SPACE) {
-	    if (!mutex_tryenter(err_mutexp)) {
+		if (!mutex_tryenter(err_mutexp)) {
 			/*
 			 * As this may be a recursive call from within
 			 * pci_ereport_post() we can't wait for the mutexes.

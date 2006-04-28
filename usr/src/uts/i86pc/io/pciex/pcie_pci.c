@@ -471,10 +471,6 @@ pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	/* uninitialize inband PCI-E HPC if present */
 	if (pepb->inband_hpc == INBAND_HPC_PCIE)
 		(void) pciehpc_uninit(devi);
-	/*
-	 * And finally free the per-pci soft state.
-	 */
-	ddi_soft_state_free(pepb_state, ddi_get_instance(devi));
 
 	/*
 	 * Uninitialize hotplug support on this bus.
@@ -489,6 +485,12 @@ pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	mutex_destroy(&pepb->pepb_err_mutex);
 	mutex_destroy(&pepb->pepb_peek_poke_mutex);
 	ddi_fm_fini(devi);
+
+	/*
+	 * And finally free the per-pci soft state.
+	 */
+	ddi_soft_state_free(pepb_state, ddi_get_instance(devi));
+
 	return (DDI_SUCCESS);
 }
 
