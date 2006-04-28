@@ -2846,14 +2846,19 @@ tsb_user:
 	cmp	%g7, TTE4M
 	bge,pn	%icc, tsb_user4m
 	  nop
-#else
+#else /* sun4v */
 	cmp	%g7, TTESZ_VALID | TTE4M
 	be,pn	%icc, tsb_user4m
 	  srlx	%g3, TTE_SZ2_SHFT, %g7
 	andcc	%g7, TTE_SZ2_BITS, %g7		! check 32/256MB
+#ifdef ITLB_32M_256M_SUPPORT
+	bnz,pn	%icc, tsb_user4m
+	  nop
+#else /* ITLB_32M_256M_SUPPORT */
 	bnz,a,pn %icc, tsb_user_pn_synth
-	  cmp	%g5, FAST_IMMU_MISS_TT
-#endif
+	 cmp	%g5, FAST_IMMU_MISS_TT
+#endif /* ITLB_32M_256M_SUPPORT */
+#endif /* sun4v */
 
 tsb_user8k:
 	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = first TSB ptr
@@ -2913,7 +2918,7 @@ tsb_user4m:
         ! trapstat wants TTE in %g5
         retry
 
-#ifndef sun4v
+#if !defined(sun4v) && !defined(ITLB_32M_256M_SUPPORT)
 	/*
 	 * Panther ITLB synthesis.
 	 * The Panther 32M and 256M ITLB code simulates these two large page
@@ -2966,7 +2971,7 @@ tsb_user_itlb_synth:
 	SET_TTE4M_PN(%g5, %g7)			/* add TTE4M pagesize to TTE */
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)
         retry
-#endif
+#endif /* sun4v && ITLB_32M_256M_SUPPORT */
 
 tsb_kernel:
 #ifdef sun4v
