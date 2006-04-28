@@ -1476,10 +1476,10 @@ i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp)
 void
 i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp)
 {
+	static char *fname = "i_ddi_devacc_to_hatacc";
 #if defined(lint)
 	*hataccp = *hataccp;
 #endif
-	static char *fname = "i_ddi_devacc_to_hatacc";
 	/*
 	 * This case must not occur because the endianess is examined
 	 * before this function is called.
