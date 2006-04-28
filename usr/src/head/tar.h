@@ -34,6 +34,8 @@
 extern "C" {
 #endif
 
+#include <sys/feature_tests.h>
+
 #define	TMAGIC		"ustar"
 #define	TMAGLEN		6
 #define	TVERSION	"00"
@@ -70,6 +72,7 @@ extern "C" {
 #define	TOWRITE		00002
 #define	TOEXEC		00001
 
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 /*
  *      Types used in ancillary files
  */
@@ -89,6 +92,8 @@ extern "C" {
 #define	COMP_TYPE	'C'	/* path components, use for MLD */
 #define	ATTR_FLAG_TYPE	'F'	/* file attribute flag bytes data type */
 #define	LK_COMP_TYPE	'K'	/* link data path component */
+#endif
+
 #ifdef	__cplusplus
 }
 #endif
