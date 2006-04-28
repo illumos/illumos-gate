@@ -25,15 +25,12 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise
+CLASS = arch
+ARCH = SUNW,SPARC-Enterprise
 
-i386_SUBDIRS = i86pc
+MODULE = ioboard
+MODULESRCS = opl_ioboard.c opl_hostbridge.c
 
-SUBDIRS = $($(MACH)_SUBDIRS)
+include ../../Makefile.plugin
 
-include ../../Makefile.subdirs
+LDLIBS += -ldevinfo

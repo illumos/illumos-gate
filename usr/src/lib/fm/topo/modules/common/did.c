@@ -118,6 +118,8 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
     int *slotnum, char **slotnm)
 {
 	char *slotbuf;
+	int sz;
+	uchar_t *buf;
 
 	*slotnum = -1;
 	(void) di_uintprop_get(src, DI_PHYSPROP, (uint_t *)slotnum);
@@ -137,12 +139,20 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 		return (0);
 
 	/*
-	 * Make generic description string "SLOT <num>", allow up 10
-	 * digits for number
+	 * For PCI-Express, there is only one downstream device, so check for
+	 * a slot-names property, and if it exists, ignore the slotmask value
+	 * and use the string as the label.
 	 */
-	slotbuf = alloca(16);
-	(void) snprintf(slotbuf, 16, "SLOT %d", *slotnum);
-
+	if (di_bytes_get(src, DI_SLOTPROP, &sz, &buf) == 0 && sz > 4) {
+		slotbuf = (char *)&buf[4];
+	} else {
+		/*
+		 * Make generic description string "SLOT <num>", allow up to
+		 * 10 digits for number
+		 */
+		slotbuf = alloca(16);
+		(void) snprintf(slotbuf, 16, "SLOT %d", *slotnum);
+	}
 	if ((*slotnm = topo_mod_strdup(mp, slotbuf)) == NULL)
 		return (-1);
 
@@ -506,19 +516,15 @@ pciex_cap_get(did_hash_t *dhash, di_node_t dn)
 }
 
 int
-did_inherit(tnode_t *parent, tnode_t *child)
+did_inherit(did_t *pdp, did_t *dp)
 {
-	did_t *pdp, *dp;
-
 	/*
 	 * If the child already has a label, we're done.
 	 */
-	dp = topo_node_private(child);
 	assert(dp != NULL);
 	if (did_numlabels(dp) > 0)
 		return (0);
 
-	pdp = topo_node_private(parent);
 	assert(pdp != NULL);
 
 	/*

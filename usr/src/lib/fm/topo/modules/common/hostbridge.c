@@ -232,12 +232,6 @@ static void
 hb_release(topo_mod_t *mp, tnode_t *node)
 {
 	topo_method_unregister_all(mp, node);
-
-	/*
-	 * node private data (did_t) for this node is destroyed in
-	 * did_hash_destroy()
-	 */
-
 }
 
 static tnode_t *
@@ -311,7 +305,7 @@ pcihostbridge_declare(tnode_t *parent, di_node_t din, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, din)) == NULL)
 		return (NULL);
-	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, i, pd)) == NULL)
+	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, i, din)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, HB_common_props, HB_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -335,7 +329,7 @@ pciexhostbridge_declare(tnode_t *parent, di_node_t din, topo_instance_t hi)
 
 	if ((pd = did_find(Didhash, din)) == NULL)
 		return (NULL);
-	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, hi, pd)) == NULL)
+	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, hi, din)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, ExHB_common_props, ExHB_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -360,7 +354,7 @@ pciexrc_declare(tnode_t *parent, di_node_t din, topo_instance_t ri)
 	if ((pd = did_find(Didhash, din)) == NULL)
 		return (NULL);
 	did_markrc(pd);
-	if ((ntn = hb_tnode_create(parent, PCIEX_ROOT, ri, pd)) == NULL)
+	if ((ntn = hb_tnode_create(parent, PCIEX_ROOT, ri, din)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, RC_common_props, RC_propcnt) < 0) {
 		topo_node_unbind(ntn);

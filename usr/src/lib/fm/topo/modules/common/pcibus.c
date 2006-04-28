@@ -156,13 +156,10 @@ pci_tnode_create(tnode_t *parent,
 static int
 hostbridge_asdevice(tnode_t *bus)
 {
-	did_t *pd;
 	di_node_t di;
 	tnode_t *dev32;
 
-	pd = topo_node_private(bus);
-	assert(pd != NULL);
-	di = did_dinode(pd);
+	di = topo_node_private(bus);
 	assert(di != DI_NODE_NIL);
 
 	if ((dev32 = pcidev_declare(bus, di, 32)) == NULL)
@@ -180,7 +177,7 @@ pciexfn_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCIEX_FUNCTION, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCIEX_FUNCTION, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Fn_common_props, Fn_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -208,7 +205,7 @@ pciexdev_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCIEX_DEVICE, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCIEX_DEVICE, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -233,7 +230,7 @@ pciexbus_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCIEX_BUS, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCIEX_BUS, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Bus_common_props, Bus_propcnt) < 0) {
 		topo_node_range_destroy(ntn, PCI_DEVICE);
@@ -259,7 +256,7 @@ pcifn_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCI_FUNCTION, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCI_FUNCTION, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Fn_common_props, Fn_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -278,19 +275,25 @@ pcifn_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 tnode_t *
 pcidev_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 {
+	di_node_t pdn;
 	did_t *pd;
 	tnode_t *ntn;
+	did_t *ppd;
 
+	if ((pdn = topo_node_private(parent)) == DI_NODE_NIL)
+		return (NULL);
+	if ((ppd = did_find(Didhash, pdn)) == NULL)
+		return (NULL);
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCI_DEVICE, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCI_DEVICE, i, dn)) == NULL)
 		return (NULL);
 	/*
 	 * If our devinfo node is lacking certain information of its
 	 * own, we may need/want to inherit the information available
 	 * from our parent node's private data.
 	 */
-	did_inherit(parent, ntn);
+	did_inherit(ppd, pd);
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
 		topo_node_unbind(ntn);
 		return (NULL);
@@ -315,7 +318,7 @@ pcibus_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, dn)) == NULL)
 		return (NULL);
-	if ((ntn = pci_tnode_create(parent, PCI_BUS, i, pd)) == NULL)
+	if ((ntn = pci_tnode_create(parent, PCI_BUS, i, dn)) == NULL)
 		return (NULL);
 	/*
 	 * If our devinfo node is lacking certain information of its
@@ -454,15 +457,24 @@ pci_children_instantiate(tnode_t *parent, di_node_t pn,
 
 /*ARGSUSED*/
 static int
-pci_enum(topo_mod_t *ignored, tnode_t *troot, const char *name,
+pci_enum(topo_mod_t *mp, tnode_t *troot, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused)
 {
 	did_t *hbdid, *didp;
 	char *pname;
+	di_node_t parent_dinode;
+	int rc;
+	int retval;
 
 	topo_mod_dprintf(PciHdl, "Enumerating pci!\n");
 
-	if (strcmp(name, PCI_BUS) != 0 && strcmp(name, PCIEX_BUS) != 0) {
+	if (strcmp(name, PCI_BUS) == 0) {
+		/* PCI Bus, so no root complex */
+		rc = NO_RC;
+	} else if (strcmp(name, PCIEX_BUS) == 0) {
+		/* PCI-Express; root complex is hostbridge's instance */
+		rc = topo_node_instance(troot);
+	} else {
 		topo_mod_dprintf(PciHdl,
 		    "Currently only know how to enumerate %s or %s not %s.\n",
 		    PCI_BUS, PCIEX_BUS, name);
@@ -478,14 +490,16 @@ pci_enum(topo_mod_t *ignored, tnode_t *troot, const char *name,
 		    HOSTBRIDGE, PCIEX_ROOT);
 		return (0);
 	}
-	if ((hbdid = topo_node_private(troot)) == NULL) {
+	if ((parent_dinode = topo_node_private(troot)) == DI_NODE_NIL) {
 		topo_mod_dprintf(PciHdl,
 		    "Parent %s node missing private data.\n"
 		    "Unable to proceed with %s enumeration.\n",
 		    pname, name);
 		return (0);
 	}
-	Didhash = did_hash(hbdid);
+	Didhash = did_hash_init(mp);
+	hbdid = did_create(Didhash, parent_dinode, 0, 0, rc, TRUST_BDF);
+
 	/*
 	 * If we're looking for a specific bus-instance, find the right
 	 * did_t in the chain, otherwise, there should be only one did_t.
@@ -504,15 +518,18 @@ pci_enum(topo_mod_t *ignored, tnode_t *troot, const char *name,
 			topo_mod_dprintf(PciHdl,
 			    "Parent %s node missing private data related\n"
 			    "to %s instance %d.\n", pname, name, min);
+			did_hash_fini(Didhash);
 			return (0);
 		}
 	} else {
 		assert(did_link_get(hbdid) == NULL);
 		didp = hbdid;
 	}
-	return (pci_children_instantiate(troot, did_dinode(didp),
+	retval = pci_children_instantiate(troot, did_dinode(didp),
 	    did_board(didp), did_bridge(didp), did_rc(didp),
-	    (min == max) ? min : TRUST_BDF, 0));
+	    (min == max) ? min : TRUST_BDF, 0);
+	did_hash_fini(Didhash);
+	return (retval);
 }
 
 /*ARGSUSED*/

@@ -49,6 +49,7 @@ static const char *Hc_canon[] = {
 	"dimm",
 	"hostbridge",
 	"interconnect",
+	"chassis",
 	"ioboard",
 	"memory-controller",
 	"motherboard",

@@ -117,6 +117,10 @@ d none usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/event-transport.so 555 root bin
 f none usr/platform/SUNW,SPARC-Enterprise/lib/fm/fmd/plugins/event-transport.conf 644 root bin
+d none usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo 755 root bin
+f none usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/plugins 755 root bin
+f none usr/platform/SUNW,SPARC-Enterprise/lib/fm/topo/plugins/ioboard.so 555 root bin
 d none usr/platform/SUNW,Sun-Fire 755 root sys
 d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire/lib/fm 755 root bin

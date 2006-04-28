@@ -1,0 +1,298 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * SUNW,OPL-Enterprise platform ioboard topology enumerator
+ */
+#include <string.h>
+#include <strings.h>
+#include <libdevinfo.h>
+#include <fm/topo_mod.h>
+#include <sys/fm/protocol.h>
+#include "opl_topo.h"
+
+#define	IOB_ENUMR_VERS	1
+#define	FRUNAME		"iou"
+#define	LABEL		FRUNAME "#%d"
+#define	IOBDFRU		"hc:///component=" LABEL
+
+static int opl_iob_enum(topo_mod_t *hdl, tnode_t *parent, const char *name,
+    topo_instance_t imin, topo_instance_t imax, void *notused);
+
+const topo_modinfo_t IobInfo = {
+	IOBOARD,
+	IOB_ENUMR_VERS,
+	opl_iob_enum,
+	NULL};
+
+di_prom_handle_t opl_promtree = DI_PROM_HANDLE_NIL;
+di_node_t opl_devtree;
+
+void
+_topo_init(topo_mod_t *modhdl)
+{
+	/*
+	 * Turn on module debugging output
+	 */
+	if (getenv("TOPOIOBDBG") != NULL)
+		topo_mod_setdebug(modhdl, TOPO_DBG_ALL);
+	topo_mod_dprintf(modhdl, "initializing ioboard enumerator\n");
+
+	topo_mod_register(modhdl, &IobInfo, NULL);
+}
+
+void
+_topo_fini(topo_mod_t *modhdl)
+{
+	topo_mod_unregister(modhdl);
+}
+
+/*
+ * Checks to see if there's a physical board number property on this
+ * device node.
+ */
+static int
+opl_get_physical_board(di_node_t n)
+{
+	di_prom_prop_t pp = DI_PROM_PROP_NIL;
+	uchar_t *buf;
+	int val;
+
+	for (pp = di_prom_prop_next(opl_promtree, n, pp);
+	    pp != DI_PROM_PROP_NIL;
+	    pp = di_prom_prop_next(opl_promtree, n, pp)) {
+		if (strcmp(di_prom_prop_name(pp), OPL_PHYSICAL_BD) == 0) {
+			if (di_prom_prop_data(pp, &buf) < sizeof (val))
+				continue;
+			bcopy(buf, &val, sizeof (val));
+			return (val);
+		}
+	}
+	return (-1);
+}
+
+/*
+ * Creates a map of logical boards to physical location.
+ */
+static void
+opl_map_boards(int lsb_to_psb[OPL_IOB_MAX])
+{
+	di_node_t n;
+	int i;
+
+	/* Initialize all entries to no mapping */
+	for (i = 0; i < OPL_IOB_MAX; i++) {
+		lsb_to_psb[i] = i;
+	}
+	/*
+	 * Get LSB-to-PSB (logical-to-physical board) mapping by finding the
+	 * memory controller driver per LSB. The MC driver will have a
+	 * physical-board# property.
+	 */
+	for (n = di_drv_first_node(OPL_MC_DRV, opl_devtree);
+	    n != DI_NODE_NIL;
+	    n = di_drv_next_node(n)) {
+		char *ba = di_bus_addr(n);
+		int a = OPL_MC_STR2BA(ba);
+		int lsb = OPL_MC_LSB(a);
+		int psb;
+
+		psb = opl_get_physical_board(n);
+		if (psb < 0 || psb >= OPL_IOB_MAX) {
+			/* psb mapping is out of range, skip */
+			continue;
+		}
+		lsb_to_psb[lsb] = psb;
+	}
+}
+
+/*
+ * Create the ioboard node. Add fru and label properties, and create room
+ * for child hostbridge nodes.
+ */
+static tnode_t *
+opl_iob_node_create(topo_mod_t *mp, tnode_t *parent, int inst)
+{
+	int err;
+	tnode_t *ion;
+	nvlist_t *fmri;
+	nvlist_t *args = NULL;
+	nvlist_t *pfmri = NULL;
+	topo_hdl_t *thp = topo_mod_handle(mp);
+	char label[8];
+	char fmri_str[32];
+
+	if (parent == NULL || inst < 0) {
+		return (NULL);
+	}
+
+	/* Get parent FMRI */
+	(void) topo_node_resource(parent, &pfmri, &err);
+	if (pfmri != NULL) {
+		if (topo_mod_nvalloc(mp, &args, NV_UNIQUE_NAME) != 0 ||
+		    nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri)
+		    != 0) {
+			nvlist_free(pfmri);
+			nvlist_free(args);
+			(void) topo_mod_seterrno(mp, EMOD_FMRI_NVL);
+			return (NULL);
+		}
+		nvlist_free(pfmri);
+	}
+	/* Create ioboard FMRI */
+	if ((fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, IOBOARD, inst,
+	    args, &err)) == NULL) {
+		topo_mod_dprintf(mp, "create of tnode for ioboard failed: %s",
+		    topo_strerror(topo_mod_errno(mp)));
+		(void) topo_mod_seterrno(mp, err);
+		nvlist_free(args);
+		return (NULL);
+	}
+	nvlist_free(args);
+	/* Create node for this ioboard */
+	ion = topo_node_bind(mp, parent, IOBOARD, inst, fmri, NULL);
+	if (ion == NULL) {
+		nvlist_free(fmri);
+		topo_mod_dprintf(mp, "unable to bind ioboard: %s",
+		    topo_strerror(topo_mod_errno(mp)));
+		return (NULL); /* mod_errno already set */
+	}
+	nvlist_free(fmri);
+	/* Create and add FRU fmri for this ioboard */
+	snprintf(fmri_str, sizeof (fmri_str), IOBDFRU, inst);
+	if (topo_fmri_str2nvl(thp, fmri_str, &fmri, &err) == 0) {
+		(void) topo_node_fru_set(ion, fmri, 0, &err);
+		nvlist_free(fmri);
+	}
+	/* Add label for this ioboard */
+	snprintf(label, sizeof (label), LABEL, inst);
+	(void) topo_node_label_set(ion, label, &err);
+
+	/* Create range of hostbridges on this ioboard */
+	if (topo_node_range_create(mp, ion, HOSTBRIDGE, 0, OPL_HB_MAX) != 0) {
+		topo_mod_dprintf(mp, "topo_node_range_create failed",
+		    topo_strerror(topo_mod_errno(mp)));
+		return (NULL);
+	}
+
+	return (ion);
+}
+
+/*ARGSUSED*/
+static int
+opl_iob_enum(topo_mod_t *mp, tnode_t *parent, const char *name,
+    topo_instance_t imin, topo_instance_t imax, void *notused)
+{
+	di_node_t pnode;
+	tnode_t *ion;
+	topo_instance_t inst;
+	int lsb_to_psb[OPL_IOB_MAX];
+	ioboard_contents_t ioboard_list[OPL_IOB_MAX];
+	int retval = 0;
+
+	/* Validate the name is correct */
+	if (strcmp(name, "ioboard") != 0) {
+		return (-1);
+	}
+	/* Initialize devinfo once for the module */
+	if ((opl_promtree = di_prom_init()) == DI_PROM_HANDLE_NIL) {
+		(void) topo_mod_seterrno(mp, errno);
+		topo_mod_dprintf(mp,
+		    "Ioboard enumerator: di_prom_handle_init failed.\n");
+		return (-1);
+	}
+	/* Make sure we don't exceed OPL_IOB_MAX */
+	if (imax >= OPL_IOB_MAX) {
+		imax = OPL_IOB_MAX;
+	}
+
+	bzero(ioboard_list, sizeof (ioboard_list));
+
+	opl_devtree = di_init("/", DINFOCPYALL);
+	if (opl_devtree == DI_NODE_NIL) {
+		(void) topo_mod_seterrno(mp, errno);
+		topo_mod_dprintf(mp, "devinfo init failed.");
+		return (-1);
+	}
+
+	/*
+	 * Create a mapping from logical board numbers (which are part of
+	 * the device node bus address) to physical board numbers, so we
+	 * can create meaningful fru labels.
+	 */
+	opl_map_boards(lsb_to_psb);
+
+	/*
+	 * Figure out which boards are installed by finding hostbridges
+	 * with matching bus addresses.
+	 */
+	for (pnode = di_drv_first_node(OPL_PX_DRV, opl_devtree);
+	    pnode != DI_NODE_NIL;
+	    pnode = di_drv_next_node(pnode)) {
+		int psb = -1;
+		char *ba = di_bus_addr(pnode);
+		int a = OPL_PX_STR2BA(ba);
+		int lsb = OPL_PX_LSB(a);
+		int hb = OPL_PX_HB(a);
+		int rc = OPL_PX_RC(a);
+		/* Map logical system board to physical system board */
+		if (lsb >= 0 && lsb <= OPL_IOB_MAX) {
+			psb = lsb_to_psb[lsb];
+		}
+		/* If valid psb, note that this board exists */
+		if (psb >= 0 && psb < OPL_IOB_MAX) {
+			ioboard_list[psb].count++;
+			ioboard_list[psb].rcs[hb][rc] = pnode;
+		}
+	}
+
+	/*
+	 * Now enumerate each existing board  Exit loop if retval is
+	 * ever set to non-zero.
+	 */
+	for (inst = imin; inst <= imax && retval == 0; inst++) {
+		/* If this board doesn't contain any hostbridges, skip it */
+		if (ioboard_list[inst].count == 0) {
+			continue;
+		}
+		/* Create node for this ioboard */
+		ion = opl_iob_node_create(mp, parent, inst);
+		if (ion == NULL) {
+			topo_mod_dprintf(mp,
+			    "enumeration of ioboard failed: %s",
+			    topo_strerror(topo_mod_errno(mp)));
+			retval = -1;
+			break;
+		}
+		/* Enumerate hostbridges on this ioboard, sets errno */
+		retval = opl_hb_enum(mp, &ioboard_list[inst], ion, inst);
+	}
+	di_fini(opl_devtree);
+	di_prom_fini(opl_promtree);
+	return (retval);
+}
