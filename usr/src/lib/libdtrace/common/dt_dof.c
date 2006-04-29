@@ -457,7 +457,7 @@ dof_add_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 		    dt_buf_len(&ddo->ddo_enoffs) / sizeof (uint32_t);
 		dofpr.dofpr_nenoffs = pip->pi_nenoffs;
 		dt_buf_write(dtp, &ddo->ddo_enoffs, pip->pi_enoffs,
-		    pip->pi_noffs * sizeof (uint32_t), sizeof (uint32_t));
+		    pip->pi_nenoffs * sizeof (uint32_t), sizeof (uint32_t));
 
 		/*
 		 * If pi_rname isn't set, the relocation will be against the
