@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.51";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.52";
 
 /*
  * Property names
@@ -49,7 +49,7 @@ static char subven_propname[] = "subsystem-vendor-id";
 static char rxrings_propname[] = "bge-rx-rings";
 static char txrings_propname[] = "bge-tx-rings";
 static char fm_cap[] = "fm-capable";
-static char default_mtu[] = "default-mtu";
+static char default_mtu[] = "default_mtu";
 
 static int bge_add_intrs(bge_t *, int);
 static void bge_rem_intrs(bge_t *);
@@ -1487,7 +1487,7 @@ bge_alloc_bufs(bge_t *bgep)
 	BGE_TRACE(("bge_alloc_bufs($%p)",
 		(void *)bgep));
 
-	rxbuffsize = BGE_STD_SLOTS_USED*BGE_STD_BUFF_SIZE;
+	rxbuffsize = BGE_STD_SLOTS_USED*bgep->chipid.std_buf_size;
 	rxbuffsize += bgep->chipid.jumbo_slots*bgep->chipid.recv_jumbo_size;
 	rxbuffsize += BGE_MINI_SLOTS_USED*BGE_MINI_BUFF_SIZE;
 
@@ -1590,7 +1590,7 @@ bge_alloc_bufs(bge_t *bgep)
 		area = bgep->rx_buff[split];
 		bge_slice_chunk(&bgep->buff[BGE_STD_BUFF_RING].buf[split],
 			&area, BGE_STD_SLOTS_USED/BGE_SPLIT,
-			BGE_STD_BUFF_SIZE);
+			bgep->chipid.std_buf_size);
 		bge_slice_chunk(&bgep->buff[BGE_JUMBO_BUFF_RING].buf[split],
 			&area, bgep->chipid.jumbo_slots/BGE_SPLIT,
 			bgep->chipid.recv_jumbo_size);

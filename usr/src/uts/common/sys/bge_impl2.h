@@ -580,6 +580,7 @@ typedef struct {
 	uint16_t		ethmax_size;
 	uint16_t		snd_buff_size;
 	uint16_t		recv_jumbo_size;
+	uint16_t		std_buf_size;
 	uint32_t		mbuf_hi_water;
 	uint32_t		mbuf_lo_water_rmac;
 	uint32_t		mbuf_lo_water_rdma;

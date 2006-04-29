@@ -579,17 +579,9 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	/*
 	 * Make sure these indirect-access registers are sane
 	 * rather than random after power-up or reset
-	 *
-	 * For BCM5714C A3 silicon to avoid resource deadlocking
 	 */
-	if ((cidp->device == DEVICE_ID_5714C) &&
-		(cidp->revision == REVISION_ID_5714_A3)) {
-		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0x4900);
-		pci_config_put32(handle, PCI_CONF_BGE_RIADR, 1);
-	} else {
-		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
-		pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
-	}
+	pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
+	pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
 }
 
 #ifdef __amd64
@@ -1910,6 +1902,9 @@ bge_chip_id_init(bge_t *bgep)
 	cidp->bge_dma_rwctrl = bge_dma_rwctrl;
 	cidp->pci_type = BGE_PCI_X;
 	cidp->statistic_type = BGE_STAT_BLK;
+	cidp->mbuf_lo_water_rdma = bge_mbuf_lo_water_rdma;
+	cidp->mbuf_lo_water_rmac = bge_mbuf_lo_water_rmac;
+	cidp->mbuf_hi_water = bge_mbuf_hi_water;
 
 	if (cidp->rx_rings == 0 || cidp->rx_rings > BGE_RECV_RINGS_MAX)
 		cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
@@ -1969,11 +1964,14 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5705MA3:
 	case DEVICE_ID_5705F:
 		cidp->chip_label = 5705;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
@@ -1990,11 +1988,14 @@ bge_chip_id_init(bge_t *bgep)
 		 * Apart from the label, we treat this as a 5705(?)
 		 */
 		cidp->chip_label = 5782;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
@@ -2005,11 +2006,14 @@ bge_chip_id_init(bge_t *bgep)
 		 * Apart from the label, we treat this as a 5705(?)
 		 */
 		cidp->chip_label = 5788;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
@@ -2021,42 +2025,51 @@ bge_chip_id_init(bge_t *bgep)
 		/* FALLTHRU */
 	case DEVICE_ID_5714S:
 		cidp->chip_label = 5714;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
-		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
 	case DEVICE_ID_5715C:
 		cidp->chip_label = 5715;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5715;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
-		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		if (cidp->revision >= REVISION_ID_5715_A2)
+			cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
 	case DEVICE_ID_5721:
 		cidp->chip_label = 5721;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2066,12 +2079,15 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5751:
 	case DEVICE_ID_5751M:
 		cidp->chip_label = 5751;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
-		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2083,26 +2099,40 @@ bge_chip_id_init(bge_t *bgep)
 	/*
 	 * Setup the default jumbo parameter.
 	 */
-	cidp->mbuf_lo_water_rdma = bge_mbuf_lo_water_rdma;
-	cidp->mbuf_lo_water_rmac = bge_mbuf_lo_water_rmac;
-	cidp->mbuf_hi_water = bge_mbuf_hi_water;
 	cidp->ethmax_size = ETHERMAX;
 	cidp->snd_buff_size = BGE_SEND_BUFF_SIZE_DEFAULT;
+	cidp->std_buf_size = BGE_STD_BUFF_SIZE;
 
 	/*
 	 * If jumbo is enabled and this kind of chipset supports jumbo feature,
 	 * setup below jumbo specific parameters.
+	 *
+	 * For BCM5714/5715, there is only one standard receive ring. So the
+	 * std buffer size should be set to BGE_JUMBO_BUFF_SIZE when jumbo
+	 * feature is enabled.
 	 */
 	if (bge_jumbo_enable &&
 	    !(cidp->flags & CHIP_FLAG_NO_JUMBO) &&
 	    (cidp->default_mtu > BGE_DEFAULT_MTU) &&
 	    (cidp->default_mtu <= BGE_MAXIMUM_MTU)) {
-		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_JUMBO;
-		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_JUMBO;
-		cidp->mbuf_hi_water = MBUF_HIWAT_JUMBO;
+	    if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+			cidp->mbuf_lo_water_rdma =
+			    RDMA_MBUF_LOWAT_5714_JUMBO;
+			cidp->mbuf_lo_water_rmac =
+			    MAC_RX_MBUF_LOWAT_5714_JUMBO;
+			cidp->mbuf_hi_water = MBUF_HIWAT_5714_JUMBO;
+			cidp->jumbo_slots = 0;
+			cidp->std_buf_size = BGE_JUMBO_BUFF_SIZE;
+	    } else {
+			cidp->mbuf_lo_water_rdma =
+			    RDMA_MBUF_LOWAT_JUMBO;
+			cidp->mbuf_lo_water_rmac =
+			    MAC_RX_MBUF_LOWAT_JUMBO;
+			cidp->mbuf_hi_water = MBUF_HIWAT_JUMBO;
+			cidp->jumbo_slots = BGE_JUMBO_SLOTS_USED;
+		}
 		cidp->recv_jumbo_size = BGE_JUMBO_BUFF_SIZE;
 		cidp->snd_buff_size = BGE_SEND_BUFF_SIZE_JUMBO;
-		cidp->jumbo_slots = BGE_JUMBO_SLOTS_USED;
 		cidp->ethmax_size = cidp->default_mtu +
 		    sizeof (struct ether_header);
 	}
@@ -2798,8 +2828,6 @@ bge_poll_firmware(bge_t *bgep)
 	uint32_t i;
 
 	/*
-	 * Step 18: put the T3_MAGIC_NUMBER into the GENCOMM port
-	 *
 	 * Step 19: poll for firmware completion (GENCOMM port set
 	 * to the ones complement of T3_MAGIC_NUMBER).
 	 *
@@ -2822,17 +2850,6 @@ bge_poll_firmware(bge_t *bgep)
 	 * GENCOMM word as "the upper half of a 64-bit quantity" makes
 	 * it work correctly on both big- and little-endian hosts.
 	 */
-#ifdef BGE_IPMI_ASF
-	if (!bgep->asf_enabled) {
-#endif
-		magic = (uint64_t)T3_MAGIC_NUMBER << 32;
-		bge_nic_put64(bgep, NIC_MEM_GENCOMM, magic);
-		BGE_DEBUG(("bge_poll_firmware: put T3 magic 0x%llx in GENCOMM"
-			" 0x%lx", magic, NIC_MEM_GENCOMM));
-#ifdef BGE_IPMI_ASF
-	}
-#endif
-
 	for (i = 0; i < 1000; ++i) {
 		drv_usecwait(1000);
 		gen = bge_nic_get64(bgep, NIC_MEM_GENCOMM) >> 32;
@@ -2876,6 +2893,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 {
 	chip_id_t chipid;
 	uint64_t mac;
+	uint64_t magic;
 	uint32_t modeflags;
 	uint32_t mhcr;
 	uint32_t sx0;
@@ -2931,6 +2949,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * and Misc Host Control Register as specified in step-13
 	 * Step 4-5: reset Core clock & wait for completion
 	 * Steps 6-8: are done by bge_chip_cfg_init()
+	 * put the T3_MAGIC_NUMBER into the GENCOMM port before reset
 	 */
 	if (!bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0))
 		retval = DDI_FAILURE;
@@ -2948,6 +2967,15 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if (bgep->asf_enabled)
 		bgep->asf_wordswapped = B_FALSE;
 #endif
+#ifdef BGE_IPMI_ASF
+	if (!bgep->asf_enabled) {
+#endif
+		magic = (uint64_t)T3_MAGIC_NUMBER << 32;
+		bge_nic_put64(bgep, NIC_MEM_GENCOMM, magic);
+#ifdef BGE_IPMI_ASF
+	}
+#endif
+
 	if (!bge_chip_reset_engine(bgep, MISC_CONFIG_REG))
 		retval = DDI_FAILURE;
 	bge_chip_cfg_init(bgep, &chipid, enable_dma);
@@ -3721,7 +3749,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		result = DDI_INTR_CLAIMED;
 
 		if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
-			bge_cfg_set32(bgep, PCI_CONF_BGE_MHCR,
+			bge_reg_set32(bgep, PCI_CONF_BGE_MHCR,
 				MHCR_MASK_PCI_INT_OUTPUT);
 			if (bge_check_acc_handle(bgep, bgep->cfg_handle) !=
 			    DDI_FM_OK)
@@ -3842,7 +3870,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 		 */
 		if (result == DDI_INTR_CLAIMED) {
 			if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
-				bge_cfg_clr32(bgep, PCI_CONF_BGE_MHCR,
+				bge_reg_clr32(bgep, PCI_CONF_BGE_MHCR,
 					MHCR_MASK_PCI_INT_OUTPUT);
 				if (bge_check_acc_handle(bgep,
 				    bgep->cfg_handle) != DDI_FM_OK)
