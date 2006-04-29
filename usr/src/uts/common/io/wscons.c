@@ -1299,51 +1299,9 @@ wclrput(queue_t *q, mblk_t *mp)
 }
 
 /*
- * Auxiliary routines, for allowing the workstation console to be redirected.
- */
-
-/*
- * Given a minor device number for a wscons instance, return a held vnode for
- * it.
- *
- * We currently support only one instance, for the "workstation console".
- */
-int
-wcvnget(minor_t unit, vnode_t **vpp)
-{
-	if (unit != 0 || rwsconsvp == NULL)
-		return (ENXIO);
-
-	/*
-	 * rwsconsvp is already held, so we don't have to do it here.
-	 */
-	*vpp = rwsconsvp;
-	return (0);
-}
-
-/*
- * Release the vnode that wcvnget returned.
- */
-/* ARGSUSED */
-void
-wcvnrele(minor_t unit, vnode_t *vp)
-{
-	/*
-	 * Nothing to do, since we only support the workstation console
-	 * instance that's held throughout the system's lifetime.
-	 */
-}
-
-/*
- * The declaration and initialization of the wscons_srvnops has been
- * moved to space.c to allow "wc" to become a loadable module.
- */
-
-/*
  * These are for systems without OBP, and for devices that cannot be
  * shared between Solaris and the OBP.
  */
-
 static void
 wc_polled_putchar(cons_polledio_arg_t arg, unsigned char c)
 {

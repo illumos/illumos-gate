@@ -894,13 +894,6 @@ stubs_base:
 	END_MODULE(sad);
 #endif
 
-#ifndef WC_MODULE
-	MODULE(wc,drv);
-	STUB(wc, wcvnget, 0);
-	STUB(wc, wcvnrele, 0);
-	END_MODULE(wc);
-#endif
-
 #ifndef IWSCN_MODULE
 	MODULE(iwscn,drv);
 	STUB(iwscn, srpop, 0);

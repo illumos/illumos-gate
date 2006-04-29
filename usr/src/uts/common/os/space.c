@@ -244,20 +244,9 @@ int	consmode = CONS_FW;
 int	cons_tem_disable;
 
 /*
- * Moved here from wscons.c
- * Package the redirection-related routines into an ops vector of the form
- * that the redirecting driver expects.
- */
-srvnops_t wscons_srvnops = {
-	wcvnget,
-	wcvnrele
-};
-
-/*
  * consconfig() in autoconf.c sets this; it's the vnode of the distinguished
  * keyboard/frame buffer combination, aka the workstation console.
  */
-
 vnode_t *rwsconsvp;
 dev_t	rwsconsdev;
 
@@ -267,11 +256,6 @@ dev_t	rwsconsdev;
  * (e.g. keyswitches with a secure position) exists.
  */
 int abort_enable = KIOCABORTENABLE;
-
-/* from iwscons.c */
-
-kthread_id_t	iwscn_thread;	/* thread that is allowed to push redirm */
-wcm_data_t	*iwscn_wcm_data; /* allocated data for redirm */
 
 /* from cpc.c */
 uint_t kcpc_key;	/* TSD key for CPU performance counter context */

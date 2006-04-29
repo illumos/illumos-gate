@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,21 +33,17 @@
  * redirection driver.  Its purpose in life is to detect when the stream that
  * it's pushed on is closed, thereupon calling back into the redirection
  * driver so that the driver can cancel redirection to the stream.
+ * It passes all messages on unchanged, in both directions.
  */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
-#include <sys/kmem.h>
-
 #include <sys/stream.h>
 #include <sys/stropts.h>
-
 #include <sys/debug.h>
-
 #include <sys/strredir.h>
-#include <sys/thread.h>
-
+#include <sys/strsubr.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -61,8 +57,8 @@ static int	wcmclose(queue_t *, int, cred_t *);
 static int	wcmput(queue_t *, mblk_t *);
 
 static struct module_info	wcminfo = {
-	_STRREDIR_MODID,
-	"redirmod",
+	STRREDIR_MODID,
+	STRREDIR_MOD,
 	0,
 	INFPSZ,
 	5120,
@@ -70,23 +66,23 @@ static struct module_info	wcminfo = {
 };
 
 static struct qinit	wcmrinit = {
-	wcmput,		/* put */
-	NULL,		/* service */
-	wcmopen,	/* open */
-	wcmclose,	/* close */
-	NULL,		/* qadmin */
+	(int (*)())putnext,	/* put */
+	NULL,			/* service */
+	wcmopen,		/* open */
+	wcmclose,		/* close */
+	NULL,			/* qadmin */
 	&wcminfo,
-	NULL		/* mstat */
+	NULL			/* mstat */
 };
 
 static struct qinit	wcmwinit = {
-	wcmput,		/* put */
-	NULL,		/* service */
-	wcmopen,	/* open */
-	wcmclose,	/* close */
-	NULL,		/* qadmin */
+	(int (*)())putnext,	/* put */
+	NULL,			/* service */
+	wcmopen,		/* open */
+	wcmclose,		/* close */
+	NULL,			/* qadmin */
 	&wcminfo,
-	NULL		/* mstat */
+	NULL			/* mstat */
 };
 
 static struct streamtab	redirminfo = {
@@ -99,7 +95,7 @@ static struct streamtab	redirminfo = {
 static struct fmodsw fsw = {
 	"redirmod",
 	&redirminfo,
-	D_NEW | D_MP
+	D_MP
 };
 
 static struct modlstrmod modlstrmod = {
@@ -134,27 +130,8 @@ _info(struct modinfo *modinfop)
 static int
 wcmopen(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 {
-	extern kthread_t	*iwscn_thread;
-	extern wcm_data_t	*iwscn_wcm_data;
-
 	if (sflag != MODOPEN)
 		return (EINVAL);
-
-	/*
-	 * There's nothing to do if we're already open.
-	 */
-	if (q->q_ptr == NULL) {
-		/*
-		 * Attach the per open instance state structure.
-		 * Its fields were * initialized elsewhere (from the
-		 * SRIOCSREDIR case of of the redirection driver's ioctl
-		 * routine).
-		 * To prevent other threads from getting this, check thread_id.
-		 */
-		if (curthread != iwscn_thread)
-			return (EINVAL);
-		q->q_ptr = WR(q)->q_ptr = iwscn_wcm_data;
-	}
 	qprocson(q);
 	return (0);
 }
@@ -163,23 +140,7 @@ wcmopen(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 static int
 wcmclose(queue_t *q, int flag, cred_t *cred)
 {
-	wcm_data_t	*mdp = (wcm_data_t *)q->q_ptr;
-
 	qprocsoff(q);
-	srpop(mdp, flag, cred);
-	WR(q)->q_ptr = q->q_ptr = NULL;
-	kmem_free(mdp, sizeof (*mdp));
-
-	return (0);
-}
-
-/*
- * This module's only purpose in life is to intercept closes on the stream
- * it's pushed on.  It passes all messages on unchanged, in both directions.
- */
-static int
-wcmput(queue_t *q, mblk_t *mp)
-{
-	putnext(q, mp);
+	srpop(q->q_stream->sd_vnode);
 	return (0);
 }

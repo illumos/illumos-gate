@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -592,20 +591,6 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 	mutex_exit(&stp->sd_lock);
 
 	/*
-	 * Since we call pollwakeup in close() now, the poll list should
-	 * be empty in most cases. The only exception is the layered devices
-	 * (e.g. the console drivers with redirection modules pushed on top
-	 * of it).
-	 */
-	if (stp->sd_pollist.ph_list != NULL) {
-		pollwakeup(&stp->sd_pollist, POLLERR);
-		pollhead_clean(&stp->sd_pollist);
-	}
-	ASSERT(stp->sd_pollist.ph_list == NULL);
-	ASSERT(stp->sd_sidp == NULL);
-	ASSERT(stp->sd_pgidp == NULL);
-
-	/*
 	 * If the registered process or process group did not have an
 	 * open instance of this stream then strclean would not be
 	 * called. Thus at the time of closing all remaining siglist entries
@@ -696,6 +681,22 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 
 		qdetach(_RD(rmq), 1, flag, crp, B_FALSE);
 	}
+
+	/*
+	 * Since we call pollwakeup in close() now, the poll list should
+	 * be empty in most cases. The only exception is the layered devices
+	 * (e.g. the console drivers with redirection modules pushed on top
+	 * of it).  We have to do this after calling qdetach() because
+	 * the redirection module won't have torn down the console
+	 * redirection until after qdetach() has been invoked.
+	 */
+	if (stp->sd_pollist.ph_list != NULL) {
+		pollwakeup(&stp->sd_pollist, POLLERR);
+		pollhead_clean(&stp->sd_pollist);
+	}
+	ASSERT(stp->sd_pollist.ph_list == NULL);
+	ASSERT(stp->sd_sidp == NULL);
+	ASSERT(stp->sd_pgidp == NULL);
 
 	/* Prevent qenable from re-enabling the stream head queue */
 	disable_svc(_RD(qp));
