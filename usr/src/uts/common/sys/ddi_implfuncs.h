@@ -91,9 +91,6 @@ i_ddi_devi_get_ppa(dev_info_t *dip);
 void
 i_ddi_devi_set_ppa(dev_info_t *dip, int ppa);
 
-boolean_t
-i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp);
-
 void
 i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp);
 

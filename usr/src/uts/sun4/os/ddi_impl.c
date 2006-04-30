@@ -990,22 +990,6 @@ i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *hdlp)
  * SECTION: DDI Memory/DMA
  */
 
-/*
- * Check if the endianess attribute is supported on the platform.
- * This function must be called before i_ddi_devacc_to_hatacc().
- */
-boolean_t
-i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp)
-{
-#if defined(lint)
-	*devaccp = *devaccp;
-#endif
-	/*
-	 * All kinds of endianess is supported on SPARC.
-	 */
-	return (B_TRUE);
-}
-
 /* set HAT endianess attributes from ddi_device_acc_attr */
 void
 i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp)

@@ -3614,9 +3614,8 @@ devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 	if ((off + len) > cp->size)
 		return (DDI_FAILURE);
 
-	/* check if the cache and endian attributes are supported */
-	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
-	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
+	/* check if the cache attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE)
 		return (DDI_FAILURE);
 
 	/*
@@ -3720,9 +3719,8 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	if (flags != 0)
 		return (DDI_FAILURE);
 
-	/* check if the cache and endian attributes are supported */
-	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
-	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
+	/* check if the cache attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE)
 		return (DDI_FAILURE);
 
 	if ((dhp->dh_prot & dhp->dh_orig_maxprot & maxprot) != dhp->dh_prot)

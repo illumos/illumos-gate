@@ -6645,9 +6645,8 @@ ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
 	if (*handlep == NULL)
 		return (DDI_FAILURE);
 
-	/* check if the cache and endian attributes are supported */
-	if (i_ddi_check_cache_attr(flags) == B_FALSE ||
-	    i_ddi_check_endian_attr(accattrp) == B_FALSE)
+	/* check if the cache attributes are supported */
+	if (i_ddi_check_cache_attr(flags) == B_FALSE)
 		return (DDI_FAILURE);
 
 	/*

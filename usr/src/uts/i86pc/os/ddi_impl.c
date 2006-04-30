@@ -1455,41 +1455,10 @@ kfreea(void *addr)
 	}
 }
 
-/*
- * Check if the endianess attribute is supported on the platform.
- * This function must be called before i_ddi_devacc_to_hatacc().
- */
-boolean_t
-i_ddi_check_endian_attr(ddi_device_acc_attr_t *devaccp)
-{
-	/*
-	 * Big endianess is not supported on X86.
-	 */
-	if (devaccp != NULL &&
-	    devaccp->devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
-		return (B_FALSE);
-
-	return (B_TRUE);
-}
-
-/* set HAT endianess attributes from ddi_device_acc_attr */
+/*ARGSUSED*/
 void
 i_ddi_devacc_to_hatacc(ddi_device_acc_attr_t *devaccp, uint_t *hataccp)
 {
-	static char *fname = "i_ddi_devacc_to_hatacc";
-#if defined(lint)
-	*hataccp = *hataccp;
-#endif
-	/*
-	 * This case must not occur because the endianess is examined
-	 * before this function is called.
-	 */
-	if (devaccp != NULL &&
-	    devaccp->devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC) {
-		cmn_err(CE_WARN,
-		    "%s: devacc_attr_endian_flags=0x%x is ignored.",
-		    fname, devaccp->devacc_attr_endian_flags);
-	}
 }
 
 /*
