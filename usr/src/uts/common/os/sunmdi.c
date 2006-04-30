@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -248,8 +247,14 @@ static void		i_mdi_client_lock(mdi_client_t *, mdi_pathinfo_t *);
 static void		i_mdi_client_unlock(mdi_client_t *);
 static int		i_mdi_client_free(mdi_vhci_t *, mdi_client_t *);
 static mdi_client_t	*i_devi_get_client(dev_info_t *);
-static int		i_mdi_pi_enable_disable(dev_info_t *, dev_info_t *, int,
-			int);
+/*
+ * NOTE: this will be removed once the NWS files are changed to use the new
+ * mdi_{enable,disable}_path interfaces
+ */
+static int		i_mdi_pi_enable_disable(dev_info_t *, dev_info_t *,
+				int, int);
+static mdi_pathinfo_t 	*i_mdi_enable_disable_path(mdi_pathinfo_t *pip,
+				mdi_vhci_t *vh, int flags, int op);
 /*
  * Failover related function prototypes
  */
@@ -1912,8 +1917,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			 * Since we are checking for state == ONLINE and the
 			 * same veriable is used for DISABLE/ENABLE information.
 			 */
-			if (MDI_PI(pip)->pi_state  ==
-				MDI_PATHINFO_STATE_ONLINE &&
+			if ((MDI_PI(pip)->pi_state  ==
+				MDI_PATHINFO_STATE_ONLINE) &&
 				preferred == MDI_PI(pip)->pi_preferred) {
 				/*
 				 * Return the path in hold state. Caller should
@@ -2038,6 +2043,22 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 					    MDI_PATHINFO_STATE_ONLINE ||
 					    (MDI_PI(pip)->pi_state ==
 					    MDI_PATHINFO_STATE_STANDBY)) &&
+						MDI_PI(pip)->pi_preferred ==
+						preferred) ? 1 : 0);
+				} else if (flags ==
+					(MDI_SELECT_STANDBY_PATH |
+					MDI_SELECT_ONLINE_PATH |
+					MDI_SELECT_USER_DISABLE_PATH)) {
+					cond = (((MDI_PI(pip)->pi_state ==
+					    MDI_PATHINFO_STATE_ONLINE ||
+					    (MDI_PI(pip)->pi_state ==
+					    MDI_PATHINFO_STATE_STANDBY) ||
+						(MDI_PI(pip)->pi_state ==
+					    (MDI_PATHINFO_STATE_ONLINE|
+					    MDI_PATHINFO_STATE_USER_DISABLE)) ||
+						(MDI_PI(pip)->pi_state ==
+					    (MDI_PATHINFO_STATE_STANDBY |
+					    MDI_PATHINFO_STATE_USER_DISABLE)))&&
 						MDI_PI(pip)->pi_preferred ==
 						preferred) ? 1 : 0);
 				} else {
@@ -5230,10 +5251,61 @@ mdi_pi_kstat_iosupdate(mdi_pathinfo_t *pip, struct buf *bp)
 }
 
 /*
+ * Enable the path(specific client/target/initiator)
+ * Enabling a path means that MPxIO may select the enabled path for routing
+ * future I/O requests, subject to other path state constraints.
+ */
+int
+mdi_pi_enable_path(mdi_pathinfo_t *pip, int flags)
+{
+	mdi_phci_t	*ph;
+
+	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
+	if (ph == NULL) {
+		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
+			" failed. pip: %p ph = NULL\n", pip));
+		return (MDI_FAILURE);
+	}
+
+	(void) i_mdi_enable_disable_path(pip, ph->ph_vhci, flags,
+		MDI_ENABLE_OP);
+	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
+		" Returning success pip = %p. ph = %p\n", pip, ph));
+	return (MDI_SUCCESS);
+
+}
+
+/*
+ * Disable the path (specific client/target/initiator)
+ * Disabling a path means that MPxIO will not select the disabled path for
+ * routing any new I/O requests.
+ */
+int
+mdi_pi_disable_path(mdi_pathinfo_t *pip, int flags)
+{
+	mdi_phci_t	*ph;
+
+	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
+	if (ph == NULL) {
+		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
+			" failed. pip: %p ph = NULL\n", pip));
+		return (MDI_FAILURE);
+	}
+
+	(void) i_mdi_enable_disable_path(pip,
+			ph->ph_vhci, flags, MDI_DISABLE_OP);
+	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
+		"Returning success pip = %p. ph = %p", pip, ph));
+	return (MDI_SUCCESS);
+}
+
+/*
  * disable the path to a particular pHCI (pHCI specified in the phci_path
  * argument) for a particular client (specified in the client_path argument).
  * Disabling a path means that MPxIO will not select the disabled path for
  * routing any new I/O requests.
+ * NOTE: this will be removed once the NWS files are changed to use the new
+ * mdi_{enable,disable}_path interfaces
  */
 int
 mdi_pi_disable(dev_info_t *cdip, dev_info_t *pdip, int flags)
@@ -5246,6 +5318,8 @@ mdi_pi_disable(dev_info_t *cdip, dev_info_t *pdip, int flags)
  * argument) for a particular client (specified in the client_path argument).
  * Enabling a path means that MPxIO may select the enabled path for routing
  * future I/O requests, subject to other path state constraints.
+ * NOTE: this will be removed once the NWS files are changed to use the new
+ * mdi_{enable,disable}_path interfaces
  */
 
 int
@@ -5254,9 +5328,81 @@ mdi_pi_enable(dev_info_t *cdip, dev_info_t *pdip, int flags)
 	return (i_mdi_pi_enable_disable(cdip, pdip, flags, MDI_ENABLE_OP));
 }
 
+/*
+ * Common routine for doing enable/disable.
+ */
+static mdi_pathinfo_t *
+i_mdi_enable_disable_path(mdi_pathinfo_t *pip, mdi_vhci_t *vh, int flags,
+		int op)
+{
+	int		sync_flag = 0;
+	int		rv;
+	mdi_pathinfo_t 	*next;
+	int		(*f)() = NULL;
+
+	f = vh->vh_ops->vo_pi_state_change;
+
+	sync_flag = (flags << 8) & 0xf00;
+
+	/*
+	 * Do a callback into the mdi consumer to let it
+	 * know that path is about to get enabled/disabled.
+	 */
+	if (f != NULL) {
+		rv = (*f)(vh->vh_dip, pip, 0,
+			MDI_PI_EXT_STATE(pip),
+			MDI_EXT_STATE_CHANGE | sync_flag |
+			op | MDI_BEFORE_STATE_CHANGE);
+		if (rv != MDI_SUCCESS) {
+			MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
+			"!vo_pi_state_change: failed rv = %x", rv));
+		}
+	}
+	MDI_PI_LOCK(pip);
+	next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+
+	switch (flags) {
+		case USER_DISABLE:
+			if (op == MDI_DISABLE_OP)
+				MDI_PI_SET_USER_DISABLE(pip);
+			else
+				MDI_PI_SET_USER_ENABLE(pip);
+			break;
+		case DRIVER_DISABLE:
+			if (op == MDI_DISABLE_OP)
+				MDI_PI_SET_DRV_DISABLE(pip);
+			else
+				MDI_PI_SET_DRV_ENABLE(pip);
+			break;
+		case DRIVER_DISABLE_TRANSIENT:
+			if (op == MDI_DISABLE_OP && rv == MDI_SUCCESS)
+				MDI_PI_SET_DRV_DISABLE_TRANS(pip);
+			else
+				MDI_PI_SET_DRV_ENABLE_TRANS(pip);
+			break;
+	}
+	MDI_PI_UNLOCK(pip);
+	/*
+	 * Do a callback into the mdi consumer to let it
+	 * know that path is now enabled/disabled.
+	 */
+	if (f != NULL) {
+		rv = (*f)(vh->vh_dip, pip, 0,
+			MDI_PI_EXT_STATE(pip),
+			MDI_EXT_STATE_CHANGE | sync_flag |
+			op | MDI_AFTER_STATE_CHANGE);
+		if (rv != MDI_SUCCESS) {
+			MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
+			"!vo_pi_state_change: failed rv = %x", rv));
+		}
+	}
+	return (next);
+}
 
 /*
  * Common routine for doing enable/disable.
+ * NOTE: this will be removed once the NWS files are changed to use the new
+ * mdi_{enable,disable}_path has been putback
  */
 int
 i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
@@ -5267,9 +5413,6 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 	mdi_client_t	*ct;
 	mdi_pathinfo_t	*next, *pip;
 	int		found_it;
-	int		(*f)() = NULL;
-	int		rv;
-	int		sync_flag = 0;
 
 	ph = i_devi_get_phci(pdip);
 	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
@@ -5286,10 +5429,7 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		return (MDI_FAILURE);
 	}
 
-	sync_flag = (flags << 8) & 0xf00;
-
 	vh = ph->ph_vhci;
-	f = vh->vh_ops->vo_pi_state_change;
 
 	if (cdip == NULL) {
 		/*
@@ -5330,60 +5470,7 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		 */
 		pip = ph->ph_path_head;
 		while (pip != NULL) {
-			/*
-			 * Do a callback into the mdi consumer to let it
-			 * know that path is about to be enabled/disabled.
-			 */
-			if (f != NULL) {
-				rv = (*f)(vh->vh_dip, pip, 0,
-					MDI_PI_EXT_STATE(pip),
-					MDI_EXT_STATE_CHANGE | sync_flag |
-					op | MDI_BEFORE_STATE_CHANGE);
-				if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-				"!vo_pi_state_change: failed rv = %x", rv));
-				}
-			}
-
-			MDI_PI_LOCK(pip);
-			next =
-				(mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
-			switch (flags) {
-			case USER_DISABLE:
-				if (op == MDI_DISABLE_OP)
-					MDI_PI_SET_USER_DISABLE(pip);
-				else
-					MDI_PI_SET_USER_ENABLE(pip);
-				break;
-			case DRIVER_DISABLE:
-				if (op == MDI_DISABLE_OP)
-					MDI_PI_SET_DRV_DISABLE(pip);
-				else
-					MDI_PI_SET_DRV_ENABLE(pip);
-				break;
-			case DRIVER_DISABLE_TRANSIENT:
-				if (op == MDI_DISABLE_OP && rv == MDI_SUCCESS)
-					MDI_PI_SET_DRV_DISABLE_TRANS(pip);
-				else
-					MDI_PI_SET_DRV_ENABLE_TRANS(pip);
-				break;
-			}
-			MDI_PI_UNLOCK(pip);
-			/*
-			 * Do a callback into the mdi consumer to let it
-			 * know that path is now enabled/disabled.
-			 */
-			if (f != NULL) {
-				rv = (*f)(vh->vh_dip, pip, 0,
-					MDI_PI_EXT_STATE(pip),
-					MDI_EXT_STATE_CHANGE | sync_flag |
-					op | MDI_AFTER_STATE_CHANGE);
-				if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-				"!vo_pi_state_change: failed rv = %x", rv));
-				}
-			}
-			pip = next;
+			pip = i_mdi_enable_disable_path(pip, vh, flags, op);
 		}
 		MDI_PHCI_UNLOCK(ph);
 	} else {
@@ -5414,6 +5501,7 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 			pip = next;
 		}
 
+
 		MDI_CLIENT_UNLOCK(ct);
 		if (found_it == 0) {
 			MDI_DEBUG(1, (CE_NOTE, NULL,
@@ -5421,60 +5509,13 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 			" failed. Could not find corresponding pip\n"));
 			return (MDI_FAILURE);
 		}
-		/*
-		 * Do a callback into the mdi consumer to let it
-		 * know that path is about to get enabled/disabled.
-		 */
-		if (f != NULL) {
-			rv = (*f)(vh->vh_dip, pip, 0,
-				MDI_PI_EXT_STATE(pip),
-				MDI_EXT_STATE_CHANGE | sync_flag |
-				op | MDI_BEFORE_STATE_CHANGE);
-			if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-				"!vo_pi_state_change: failed rv = %x", rv));
-			}
-		}
-		MDI_PI_LOCK(pip);
-		switch (flags) {
-			case USER_DISABLE:
-				if (op == MDI_DISABLE_OP)
-					MDI_PI_SET_USER_DISABLE(pip);
-				else
-					MDI_PI_SET_USER_ENABLE(pip);
-				break;
-			case DRIVER_DISABLE:
-				if (op == MDI_DISABLE_OP)
-					MDI_PI_SET_DRV_DISABLE(pip);
-				else
-					MDI_PI_SET_DRV_ENABLE(pip);
-				break;
-			case DRIVER_DISABLE_TRANSIENT:
-				if (op == MDI_DISABLE_OP && rv == MDI_SUCCESS)
-					MDI_PI_SET_DRV_DISABLE_TRANS(pip);
-				else
-					MDI_PI_SET_DRV_ENABLE_TRANS(pip);
-				break;
-		}
-		MDI_PI_UNLOCK(pip);
-		/*
-		 * Do a callback into the mdi consumer to let it
-		 * know that path is now enabled/disabled.
-		 */
-		if (f != NULL) {
-			rv = (*f)(vh->vh_dip, pip, 0,
-				MDI_PI_EXT_STATE(pip),
-				MDI_EXT_STATE_CHANGE | sync_flag |
-				op | MDI_AFTER_STATE_CHANGE);
-			if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-				"!vo_pi_state_change: failed rv = %x", rv));
-			}
-		}
+
+		(void) i_mdi_enable_disable_path(pip, vh, flags, op);
 	}
 
 	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-		" Returning success pdip = %p cdip = %p\n", op, pdip, cdip));
+		" Returning success op: %x pdip = %p cdip = %p\n", op,
+			pdip, cdip));
 	return (MDI_SUCCESS);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,6 +388,12 @@ typedef struct scsi_vhci_lun {
  * from VHCI_HOLD_LUN as this pertains to IOs only.
  */
 #define	VLUN_QUIESCED_FLG		0x08
+
+/*
+ * This flag is set to tell vhci_update_pathstates to call back
+ * into vhci_mpapi_update_tpg_acc_state.
+ */
+#define	VLUN_UPDATE_TPG			0x10
 
 /*
  * Various reset recovery depth.
