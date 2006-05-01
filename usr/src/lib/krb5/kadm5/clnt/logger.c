@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -578,7 +578,7 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		     */
 		    if (cp[4] == ':' || cp[4] == '=') {
 			log_control.log_entries[i].lfu_fopen_mode = 
-				(cp[4] == ':') ? "a+" : "w";
+				(cp[4] == ':') ? "a+F" : "wF";
 			f = fopen(&cp[5],
 				log_control.log_entries[i].lfu_fopen_mode);
 			if (f) {
@@ -773,7 +773,7 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		 */
 		else if (!strcasecmp(cp, "STDERR")) {
 		    if (log_control.log_entries[i].lfu_filep =
-			fdopen(fileno(stderr), "a+")) {
+			fdopen(fileno(stderr), "a+F")) {
 			log_control.log_entries[i].log_type = K_LOG_STDERR;
 			log_control.log_entries[i].lfu_fname =
 			    "standard error";
@@ -784,7 +784,7 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		 */
 		else if (!strcasecmp(cp, "CONSOLE")) {
 		    if (log_control.log_entries[i].ldu_filep =
-			CONSOLE_OPEN("a+")) {
+			CONSOLE_OPEN("a+F")) {
 			log_control.log_entries[i].log_type = K_LOG_CONSOLE;
 			log_control.log_entries[i].ldu_devname = "console";
 		    }
@@ -798,7 +798,7 @@ krb5_klog_init(kcontext, ename, whoami, do_com_err)
 		     */
 		    if (cp[6] == '=') {
 			if (log_control.log_entries[i].ldu_filep =
-			    DEVICE_OPEN(&cp[7], "w")) {
+			    DEVICE_OPEN(&cp[7], "wF")) {
 			    log_control.log_entries[i].log_type = K_LOG_DEVICE;
 			    log_control.log_entries[i].ldu_devname = &cp[7];
 			}

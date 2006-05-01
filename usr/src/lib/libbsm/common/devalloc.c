@@ -97,7 +97,7 @@ da_check_logindevperm(char *devname)
 		(void) close(fd);
 		return (0);
 	}
-	if ((fp = fdopen(fd, "r")) == NULL) {
+	if ((fp = fdopen(fd, "rF")) == NULL) {
 		free(fbuf);
 		(void) close(fd);
 		return (0);
@@ -179,7 +179,6 @@ _da_read_file(char *fname, char **fbuf, time_t *ftime, rwlock_t *flock,
 	int		fd = -1;
 	int		fsize = 0;
 	time_t		newtime;
-	FILE		*fp = NULL;
 	struct stat	f_stat;
 
 	if (flag & DA_FORCE)
@@ -204,11 +203,10 @@ _da_read_file(char *fname, char **fbuf, time_t *ftime, rwlock_t *flock,
 		 */
 		if (rw_wrlock(flock) != 0)
 			return (-1);
-		if ((fp = fopen(fname, "r")) == NULL) {
+		if ((fd = open(fname, O_RDONLY)) == -1) {
 			(void) rw_unlock(flock);
 			return (-1);
 		}
-		fd = fileno(fp);
 		if (*fbuf != NULL) {
 			free(*fbuf);
 			*fbuf = NULL;
@@ -913,10 +911,10 @@ da_open_devdb(char *rootdir, FILE **dafp, FILE **dmfp, int flag)
 
 	if (flag & DA_RDWR) {
 		oflag = DA_RDWR;
-		fmode = "r+";
+		fmode = "r+F";
 	} else if (flag & DA_RDONLY) {
 		oflag = DA_RDONLY;
-		fmode = "r";
+		fmode = "rF";
 	}
 
 	if ((lockfd = _da_lock_devdb(rootdir)) == -1)

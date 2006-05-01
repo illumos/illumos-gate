@@ -307,8 +307,6 @@ clnt_create_service_timed(const char *host, const char *service,
 	char *nettype = &nettype_array[0];
 	char *hostname, *serv;
 	bool_t try_others;
-	extern int __rpc_minfd;
-
 
 	/*
 	 * handle const of netclass
@@ -399,8 +397,7 @@ clnt_create_service_timed(const char *host, const char *service,
 			continue;
 		}
 
-		if (fd < __rpc_minfd)
-			fd = __rpc_raise_fd(fd);
+		RPC_RAISEFD(fd);
 
 		__rpc_set_mac_options(fd, nconf, prog);
 
@@ -609,7 +606,6 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 	bool_t madefd;			/* whether fd opened here */
 	t_scalar_t servtype;
 	int retval;
-	extern int __rpc_minfd;
 
 	if (fd == RPC_ANYFD) {
 		if (nconf == NULL) {
@@ -620,8 +616,7 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 		fd = t_open(nconf->nc_device, O_RDWR, NULL);
 		if (fd == -1)
 			goto err;
-		if (fd < __rpc_minfd)
-			fd = __rpc_raise_fd(fd);
+		RPC_RAISEFD(fd);
 		madefd = TRUE;
 		__rpc_set_mac_options(fd, nconf, prog);
 		if (t_bind(fd, NULL, NULL) == -1)
@@ -761,17 +756,12 @@ err1:	if (madefd)
  *  a descriptor to a higher value.  If we fail to do it, we continue
  *  to use the old one (and hope for the best).
  */
-int __rpc_minfd = 3;
-
 int
 __rpc_raise_fd(int fd)
 {
 	int nfd;
 
-	if (fd >= __rpc_minfd)
-		return (fd);
-
-	if ((nfd = fcntl(fd, F_DUPFD, __rpc_minfd)) == -1)
+	if ((nfd = fcntl(fd, F_DUPFD, RPC_MINFD)) == -1)
 		return (fd);
 
 	if (t_sync(nfd) == -1) {

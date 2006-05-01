@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -304,7 +304,7 @@ static int _parse_la(const char *prefix, const char *in, char *out)
 	    length = strlen(line);
 	    *(line + (length - strlen(SO_SUFFIX))) = '\0';
 	    strcat(line, LA_SUFFIX);
-	    file = fopen(line, "r");
+	    file = fopen(line, "rF");
 	    if(file) {
 		/* We'll get it on the .la open */
 		fclose(file);
@@ -319,7 +319,7 @@ static int _parse_la(const char *prefix, const char *in, char *out)
     strcpy(line, prefix);
     strcat(line, in);
 
-    file = fopen(line, "r");
+    file = fopen(line, "rF");
     if(!file) {
 	_sasl_log(NULL, SASL_LOG_WARN,
 		  "unable to open LA file: %s", line);

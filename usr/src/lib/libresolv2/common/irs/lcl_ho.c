@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,9 +87,6 @@ static const char rcsid[] = "$Id: lcl_ho.c,v 1.26 2001/05/29 05:49:04 marka Exp 
 #include <isc/memcluster.h>
 
 #include "port_after.h"
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-#include "../../../libnsl/include/nsl_stdio_prv.h"
-#endif
 
 #include "irs_p.h"
 #include "dns_p.h"
@@ -114,11 +111,7 @@ static const char rcsid[] = "$Id: lcl_ho.c,v 1.26 2001/05/29 05:49:04 marka Exp 
 #endif
 
 struct pvt {
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	__NSL_FILE *	fp;
-#else
 	FILE *		fp;
-#endif
 	struct hostent	host;
 	char *		h_addr_ptrs[MAXADDRS + 1];
 	char *		host_aliases[MAXALIASES];
@@ -205,11 +198,7 @@ ho_close(struct irs_ho *this) {
 
 	ho_minimize(this);
 	if (pvt->fp)
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-		(void) __nsl_fclose(pvt->fp);
-#else
 		(void) fclose(pvt->fp);
-#endif
 	if (pvt->res && pvt->free_res)
 		(*pvt->free_res)(pvt->res);
 	memput(pvt, sizeof *pvt);
@@ -358,21 +347,13 @@ ho_next(struct irs_ho *this) {
 	bufsiz = sizeof pvt->hostbuf;
 	offset = 0;
  again:
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	if (!(p = __nsl_fgets(bufp + offset, bufsiz - offset, pvt->fp))) {
-#else
 	if (!(p = fgets(bufp + offset, bufsiz - offset, pvt->fp))) {
-#endif
 		RES_SET_H_ERRNO(pvt->res, HOST_NOT_FOUND);
 		if (dbuf)
 			free(dbuf);
 		return (NULL);
 	}
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	if (!strchr(p, '\n') && !__nsl_feof(pvt->fp)) {
-#else
 	if (!strchr(p, '\n') && !feof(pvt->fp)) {
-#endif
 #define GROWBUF 1024
 		/* allocate space for longer line */
 		if (dbuf == NULL) {
@@ -387,19 +368,11 @@ ho_next(struct irs_ho *this) {
 			offset = strlen(dbuf);
 		} else {
 			/* allocation failed; skip this long line */
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-			while ((c = __nsl_getc(pvt->fp)) != EOF)
-#else
 			while ((c = getc(pvt->fp)) != EOF)
-#endif
 				if (c == '\n')
 					break;
 			if (c != EOF)
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-				__nsl_ungetc(c, pvt->fp);
-#else
 				ungetc(c, pvt->fp);
-#endif
 		}
 		goto again;
 	}
@@ -462,32 +435,21 @@ static void
 ho_rewind(struct irs_ho *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
 
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	if (pvt->fp) {
-		if (__nsl_fseek(pvt->fp, 0L, SEEK_SET) == 0)
-			return;
-		(void)__nsl_fclose(pvt->fp);
-	}
-	if (!(pvt->fp = __nsl_fopen(_PATH_HOSTS, "r")))
-		return;
-	if (fcntl(__nsl_fileno(pvt->fp), F_SETFD, 1) < 0) {
-		(void)__nsl_fclose(pvt->fp);
-		pvt->fp = NULL;
-	}
-#else
 	if (pvt->fp) {
 		if (fseek(pvt->fp, 0L, SEEK_SET) == 0)
 			return;
 		(void)fclose(pvt->fp);
 	}
+#ifdef SUNW_AVOIDSTDIO_FDLIMIT
+	if (!(pvt->fp = fopen(_PATH_HOSTS, "rF")))
+#else
 	if (!(pvt->fp = fopen(_PATH_HOSTS, "r")))
+#endif
 		return;
 	if (fcntl(fileno(pvt->fp), F_SETFD, 1) < 0) {
 		(void)fclose(pvt->fp);
 		pvt->fp = NULL;
 	}
-#endif
-
 }
 
 static void
@@ -495,11 +457,7 @@ ho_minimize(struct irs_ho *this) {
 	struct pvt *pvt = (struct pvt *)this->private;
 
 	if (pvt->fp != NULL) {
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-		(void)__nsl_fclose(pvt->fp);
-#else
 		(void)fclose(pvt->fp);
-#endif
 		pvt->fp = NULL;
 	}
 	if (pvt->res)

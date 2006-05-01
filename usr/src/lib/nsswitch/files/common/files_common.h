@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,8 +37,6 @@
 #include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>
-
-#include "../../../libnsl/include/nsl_stdio_prv.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -80,7 +77,7 @@ struct files_backend {
 	files_backend_op_t	*ops;
 	int			n_ops;
 	const char		*filename;
-	__NSL_FILE		*f;
+	FILE			*f;
 	int			minbuf;
 	char			*buf;
 	files_hash_t		*hashinfo;
@@ -103,7 +100,7 @@ extern nss_backend_t	*_nss_files_constr(files_backend_op_t	*ops,
 					const char		*filename,
 					int			min_bufsize,
 					files_hash_t		*fhp);
-extern nss_status_t	_nss_files_destr (files_backend_ptr_t, void *dummy);
+extern nss_status_t	_nss_files_destr(files_backend_ptr_t, void *dummy);
 extern nss_status_t	_nss_files_setent(files_backend_ptr_t, void *dummy);
 extern nss_status_t	_nss_files_endent(files_backend_ptr_t, void *dummy);
 extern nss_status_t	_nss_files_getent_rigid(files_backend_ptr_t, void *);
@@ -123,10 +120,10 @@ extern nss_status_t 	_nss_files_XY_hash(files_backend_ptr_t	be,
 					files_hash_t		*fhp,
 					int			hashop,
 					files_XY_check_func	check);
-int _nss_files_read_line(__NSL_FILE *f, char *buffer, int	buflen);
+int _nss_files_read_line(FILE *f, char *buffer, int	buflen);
 #else
 extern nss_backend_t	*_nss_files_constr();
-extern nss_status_t	_nss_files_destr ();
+extern nss_status_t	_nss_files_destr();
 extern nss_status_t	_nss_files_setent();
 extern nss_status_t	_nss_files_endent();
 extern nss_status_t	_nss_files_getent_rigid();

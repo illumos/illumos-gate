@@ -90,6 +90,11 @@ extern void rpc_fd_unlock(const void *handle, int fd);
  * way to avoid the warnings.
  */
 
+#define	RPC_MINFD	3
+
+#define	RPC_RAISEFD(fd)		if (fd < RPC_MINFD) \
+					fd = __rpc_raise_fd(fd)
+
 extern int	__getpublickey_cached(char *, char *, int *);
 extern void	__getpublickey_flush(const char *);
 extern int	__can_use_af(sa_family_t);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,11 @@ log_open_stream(log_channel chan) {
 		chan->flags |= LOG_CHANNEL_BROKEN;
 		return (NULL);
 	}
+#ifdef SUNW_AVOIDSTDIO_FDLIMIT
+	stream = fdopen(fd, "aF");
+#else
 	stream = fdopen(fd, "a");
+#endif
 	if (stream == NULL) {
 		syslog(LOG_ERR, "log_open_stream: fdopen() failed");
 		chan->flags |= LOG_CHANNEL_BROKEN;

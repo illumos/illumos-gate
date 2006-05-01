@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -72,7 +76,7 @@ krb5_get_admhst(char *h, char *r, int n)
 	    return ret;
 	r = realm;
     }
-    if ((cnffile = fopen(DEFAULT_CONFIG_FILENAME, "r")) == NULL) {
+    if ((cnffile = fopen(DEFAULT_CONFIG_FILENAME, "rF")) == NULL) {
             return(0);
     }
     if (fgets(linebuf, BUFSIZ, cnffile) == NULL) {

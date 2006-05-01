@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ initshells(void)
 	if (strings != NULL)
 		(void) free(strings);
 	strings = NULL;
-	if ((fp = fopen(SHELLS, "r")) == (FILE *)0)
+	if ((fp = fopen(SHELLS, "rF")) == (FILE *)0)
 		return ((char **)okshells);
 	/*
 	 * The +1 in the malloc() below is needed to handle the final

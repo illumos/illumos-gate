@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +100,7 @@ ncad_init(void)
 	real_socket = (sfunc1_t *)dlsym(RTLD_NEXT, "socket");
 	real_bind = (sfunc2_t *)dlsym(RTLD_NEXT, "bind");
 
-	if ((fp = fopen(filename, "r")) == NULL) {
+	if ((fp = fopen(filename, "rF")) == NULL) {
 		(void) fprintf(stderr, "Failed to open file %s for reading in "
 				" ncad_addr.so. Error = %s\n",
 				filename,

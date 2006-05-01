@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -144,7 +144,7 @@ ldaplog(int level, char *fmt, ...)
 	 * send the message into a regular log file
 	 */
 	if (!logfd) {
-		logfd = fopen(logfile, "a");
+		logfd = fopen(logfile, "aF");
 	} /* end if */
 	/*
 	 * finally write the message into the log file

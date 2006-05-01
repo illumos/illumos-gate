@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -308,7 +308,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 		if (krb5_move_ccache(context, principal, pwd))
 			return (FALSE);
 		return (TRUE);
-	    }  
+	    }
 	}
 
     }
@@ -316,7 +316,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 	return(FALSE);			/* no hope of matching */
 
     /* open ~/.k5login */
-    if ((fp = fopen(pbuf, "r")) == NULL) {
+    if ((fp = fopen(pbuf, "rF")) == NULL) {
 	free(princname);
 	return(FALSE);
     }
@@ -359,7 +359,7 @@ krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 }
 
 OM_uint32
-krb5_gss_userok(void *ctxt,	
+krb5_gss_userok(void *ctxt,
 		OM_uint32 *minor,
 		const gss_name_t pname,
 		const char *user,
@@ -370,12 +370,12 @@ krb5_gss_userok(void *ctxt,
 
 	if (minor == NULL || user_ok == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	
+
 	*user_ok = 0;
 
 	if (! kg_validate_name(pname)) {
-                 *minor = (OM_uint32) G_VALIDATE_FAILED; 
-                 return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME); 
+                 *minor = (OM_uint32) G_VALIDATE_FAILED;
+                 return (GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
 	}
 
 	if (krb5_kuserok(ctxt, (krb5_principal) pname, user)) {

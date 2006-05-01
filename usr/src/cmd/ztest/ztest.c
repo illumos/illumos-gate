@@ -96,6 +96,7 @@
 #include <sys/dsl_prop.h>
 #include <sys/refcount.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -3307,6 +3308,7 @@ main(int argc, char **argv)
 		if (pid == 0) {	/* child */
 			struct rlimit rl = { 1024, 1024 };
 			(void) setrlimit(RLIMIT_NOFILE, &rl);
+			(void) enable_extended_FILE_stdio(-1, -1);
 			ztest_run(zopt_pool);
 			exit(0);
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1061,11 +1061,11 @@ typedef krb5_int16  krb5_kt_vno;
 #define xfread(a, b, c, d) fread((char *)a, b, (unsigned) c, d)
 
 #ifdef ANSI_STDIO
-static char *const fopen_mode_rbplus= "rb+";
-static char *const fopen_mode_rb = "rb";
+static char *const fopen_mode_rbplus= "rb+F";
+static char *const fopen_mode_rb = "rbF";
 #else
-static char *const fopen_mode_rbplus= "r+";
-static char *const fopen_mode_rb = "r";
+static char *const fopen_mode_rbplus= "r+F";
+static char *const fopen_mode_rb = "rF";
 #endif
 
 static krb5_error_code

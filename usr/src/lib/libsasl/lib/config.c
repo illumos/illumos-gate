@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -102,7 +102,7 @@ int sasl_config_init(const char *filename)
     nconfiglist=0;
 #endif /* _SUN_SDK_ */
 
-    infile = fopen(filename, "r");
+    infile = fopen(filename, "rF");
     if (!infile) {
       return SASL_CONTINUE;
     }

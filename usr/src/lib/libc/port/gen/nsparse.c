@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,26 +19,27 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "synonyms.h"
+#include "file64.h"
 #include "mtlib.h"
 #include "libc.h"
 #include <synch.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
 #include <dlfcn.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include "stdiom.h"
 
 #define	__NSS_PRIVATE_INTERFACE
 #include "nsswitch_priv.h"
@@ -489,37 +489,63 @@ syslog_warning(const char *dbase)
 	    dbase, __NSW_CONFIG_FILE);
 }
 
+/*
+ * Since we cannot call malloc() or lock any of the ordinary mutexes
+ * while we hold an lmutex_lock(), we open the file outside the lock
+ * and disable locking on the file; the latter is fine because we're
+ * reading the fp only from a single thread.
+ */
+static FILE *
+open_conf(void)
+{
+	FILE *fp = fopen(__NSW_CONFIG_FILE, "rF");
+
+	if (fp != NULL) {
+		if (_findbuf(fp) == NULL) {
+			(void) fclose(fp);
+			return (NULL);
+		}
+		SET_IONOLOCK(fp);
+	}
+	return (fp);
+}
+
 struct __nsw_switchconfig_v1 *
 __nsw_getconfig_v1(const char *dbase, enum __nsw_parse_err *errp)
 {
 	struct __nsw_switchconfig_v1 *cfp, *retp = NULL;
 	int syslog_error = 0;
-	__NSL_FILE *fp;
+	FILE *fp = NULL;
 	char *linep;
 	char lineq[BUFSIZ];
 
-	/*
-	 * ==== I don't feel entirely comfortable disabling signals for the
-	 *	duration of this, but maybe we have to.  Or maybe we should
-	 *	use mutex_trylock to detect recursion?  (Not clear what's
-	 *	the right thing to do when it happens, though).
-	 */
 	lmutex_lock(&serialize_config_v1);
-
+top:
 	if (cfp = scrounge_cache_v1(dbase)) {
 		*errp = __NSW_CONF_PARSE_SUCCESS;
 		lmutex_unlock(&serialize_config_v1);
+		if (fp != NULL)
+			(void) fclose(fp);
 		return (cfp);
 	}
 
-	if ((fp = __nsl_c_fopen(__NSW_CONFIG_FILE, "r")) == NULL) {
-		*errp = __NSW_CONF_PARSE_NOFILE;
+	if (fp == NULL) {
+		struct cons_cell_v1 *cp = concell_list_v1;
+
 		lmutex_unlock(&serialize_config_v1);
-		return (NULL);
+		/* open_conf() must be called w/o locks held */
+		if ((fp = open_conf()) == NULL) {
+			*errp = __NSW_CONF_PARSE_NOFILE;
+			return (NULL);
+		}
+		lmutex_lock(&serialize_config_v1);
+		/* Cache changed? */
+		if (cp != concell_list_v1)
+			goto top;
 	}
 
 	*errp = __NSW_CONF_PARSE_NOPOLICY;
-	while (linep = __nsl_c_fgets(lineq, BUFSIZ, fp)) {
+	while (linep = fgets(lineq, BUFSIZ, fp)) {
 		enum __nsw_parse_err	line_err;
 		char			*tokenp, *comment;
 
@@ -572,11 +598,11 @@ __nsw_getconfig_v1(const char *dbase, enum __nsw_parse_err *errp)
 			 */
 		}
 	}
-	(void) __nsl_c_fclose(fp);
 	lmutex_unlock(&serialize_config_v1);
 	/*
-	 * We have to drop the lock before calling syslog().
+	 * We have to drop the lock before calling fclose()/syslog().
 	 */
+	(void) fclose(fp);
 	if (syslog_error)
 		syslog_warning(dbase);
 	return (retp);
@@ -587,32 +613,36 @@ __nsw_getconfig(const char *dbase, enum __nsw_parse_err *errp)
 {
 	struct __nsw_switchconfig *cfp, *retp = NULL;
 	int syslog_error = 0;
-	__NSL_FILE *fp;
+	FILE *fp = NULL;
 	char *linep;
 	char lineq[BUFSIZ];
 
-	/*
-	 * ==== I don't feel entirely comfortable disabling signals for the
-	 *	duration of this, but maybe we have to.  Or maybe we should
-	 *	use mutex_trylock to detect recursion?  (Not clear what's
-	 *	the right thing to do when it happens, though).
-	 */
 	lmutex_lock(&serialize_config);
-
+top:
 	if (cfp = scrounge_cache(dbase)) {
 		*errp = __NSW_CONF_PARSE_SUCCESS;
 		lmutex_unlock(&serialize_config);
+		if (fp != NULL)
+			(void) fclose(fp);
 		return (cfp);
 	}
 
-	if ((fp = __nsl_c_fopen(__NSW_CONFIG_FILE, "r")) == NULL) {
-		*errp = __NSW_CONF_PARSE_NOFILE;
+	if (fp == NULL) {
+		struct cons_cell *cp = concell_list;
+		/* open_conf() must be called w/o locks held */
 		lmutex_unlock(&serialize_config);
-		return (NULL);
+		if ((fp = open_conf()) == NULL) {
+			*errp = __NSW_CONF_PARSE_NOFILE;
+			return (NULL);
+		}
+		lmutex_lock(&serialize_config);
+		/* Cache changed? */
+		if (cp != concell_list)
+			goto top;
 	}
 
 	*errp = __NSW_CONF_PARSE_NOPOLICY;
-	while (linep = __nsl_c_fgets(lineq, BUFSIZ, fp)) {
+	while (linep = fgets(lineq, BUFSIZ, fp)) {
 		enum __nsw_parse_err	line_err;
 		char			*tokenp, *comment;
 
@@ -665,11 +695,11 @@ __nsw_getconfig(const char *dbase, enum __nsw_parse_err *errp)
 			 */
 		}
 	}
-	(void) __nsl_c_fclose(fp);
 	lmutex_unlock(&serialize_config);
 	/*
-	 * We have to drop the lock before calling syslog().
+	 * We have to drop the lock before calling fclose()/syslog().
 	 */
+	(void) fclose(fp);
 	if (syslog_error)
 		syslog_warning(dbase);
 	return (retp);
@@ -917,139 +947,4 @@ alldigits(char *s)
 		if (!isdigit(*s))
 			return (0);
 	return (1);
-}
-
-
-/*
- * To avoid the 256 open file descriptor limitation in stdio,
- * we are using a  private limited implementation of stdio calls.
- * The private implementation is closely based on the implementation
- * in the standard C library.
- * To simplify, certain assumptions are made:
- * - a file may be opened only in read mode.
- * - Only sequential reads allowed
- * - file descriptors should not be shared between threads
- */
-
-static int
-_raise_fd(int fd)
-{
-	int nfd;
-	static const int min_fd = 256;
-
-	if (fd >= min_fd)
-		return (fd);
-
-	if ((nfd = fcntl(fd, F_DUPFD, min_fd)) == -1) {
-		/*
-		 * If the shell limits [See limit(1)] the
-		 * descriptors to 256, fcntl will fail
-		 * and errno will be set to EINVAL. Since
-		 * the intention is to ignore fcntl failures
-		 * and continue working with 'fd', we should
-		 * reset errno to _prevent_ apps relying on errno
-		 * to treat this as an error.
-		 */
-		errno = 0;
-		return (fd);
-	}
-
-	(void) close(fd);
-
-	return (nfd);
-}
-
-__NSL_FILE *
-__nsl_c_fopen(const char *filename, const char *mode)
-{
-	int		fd;
-	__NSL_FILE	*stream;
-	void		*buf;
-
-	if (mode == NULL || filename == NULL) {
-		return (NULL);
-	}
-
-	if (strcmp(mode, "r") != 0) {
-		return (NULL);
-	}
-
-	fd = open(filename, O_RDONLY | O_LARGEFILE, 0666);
-	if (fd < 0)
-		return (NULL);
-
-	stream = libc_malloc(sizeof (__NSL_FILE));
-	buf = lmalloc(__NSL_FILE_BUF_SIZE);
-	if (stream != NULL && buf != NULL) {
-		stream->_nsl_base = buf;
-		stream->_nsl_file = _raise_fd(fd);
-		stream->_nsl_cnt = 0;
-		stream->_nsl_ptr = stream->_nsl_base;
-	} else {
-		(void) close(fd);
-		if (buf)
-			lfree(buf, __NSL_FILE_BUF_SIZE);
-		if (stream)
-			libc_free(stream);
-		stream = NULL;
-	}
-
-	return (stream);
-}
-
-int
-__nsl_c_fclose(__NSL_FILE *stream)
-{
-	int res = 0;
-
-	if (stream == NULL)
-		return (EOF);
-
-	if (close(stream->_nsl_file) < 0)
-		res = EOF;
-
-	lfree(stream->_nsl_base, __NSL_FILE_BUF_SIZE);
-	libc_free(stream);
-
-	return (res);
-}
-
-char *
-__nsl_c_fgets(char *buf, int size, __NSL_FILE *stream)
-{
-	char *ptr = buf;
-	char *p;
-	int n;
-	int res;
-
-	size--;		/* room for '\0' */
-	while (size > 0) {
-		if (stream->_nsl_cnt == 0) {
-			stream->_nsl_ptr = stream->_nsl_base;
-
-			if ((res = read(stream->_nsl_file, stream->_nsl_base,
-				__NSL_FILE_BUF_SIZE)) > 0) {
-				stream->_nsl_cnt = res;
-			} else {
-				stream->_nsl_cnt = 0;
-				break;
-			}
-		}
-		n = (int)(size < stream->_nsl_cnt ? size : stream->_nsl_cnt);
-		if ((p = memccpy(ptr, (char *)stream->_nsl_ptr, '\n',
-		    (size_t)n)) != NULL)
-			n = (int)(p - ptr);
-		ptr += n;
-		stream->_nsl_cnt -= n;
-		stream->_nsl_ptr += n;
-		if (p != NULL)
-			break; /* newline found */
-		size -= n;
-	}
-
-	if (ptr == buf)	/* never read anything */
-		return (NULL);
-
-	*ptr = '\0';
-	return (buf);
 }

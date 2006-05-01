@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1035,7 +1034,6 @@ bool_t
 rpc_control(int op, void *info)
 {
 	int		tmp;
-	extern int	__rpc_minfd;
 
 	switch (op) {
 	case RPC_SVC_MTMODE_SET:
@@ -1075,15 +1073,6 @@ rpc_control(int op, void *info)
 			return (TRUE);
 		}
 		return (FALSE);
-	case __RPC_CLNT_MINFD_SET:
-		tmp = *((int *)info);
-		if (tmp < 0)
-			return (FALSE);
-		__rpc_minfd = tmp;
-		return (TRUE);
-	case __RPC_CLNT_MINFD_GET:
-		*((int *)info) = __rpc_minfd;
-		return (TRUE);
 	case RPC_SVC_CONNMAXREC_SET:
 		tmp = __rpc_legal_connmaxrec(*(int *)info);
 		if (tmp >= 0) {

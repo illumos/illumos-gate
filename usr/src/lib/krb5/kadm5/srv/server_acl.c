@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -514,7 +514,7 @@ acl_load_acl_file()
 
     DPRINT(DEBUG_CALLS, acl_debug_level, ("* acl_load_acl_file()\n"));
     /* Open the ACL file for read */
-    if (afp = fopen(acl_acl_file, "r")) {
+    if (afp = fopen(acl_acl_file, "rF")) {
 	alineno = 1;
 	aentpp = &acl_list_head;
 

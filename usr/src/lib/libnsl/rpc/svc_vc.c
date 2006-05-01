@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -788,34 +787,6 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 				"can't open connection", errorstr);
 		(void) t_snddis(srcfd, tcp);
 		return;
-	}
-	if (destfd < 256) {
-		int nfd;
-
-		nfd = fcntl(destfd, F_DUPFD, 256);
-		if (nfd != -1) {
-			if (t_close(destfd) == -1) {
-				char errorstr[100];
-
-				__tli_sys_strerror(errorstr, sizeof (errorstr),
-						t_errno, errno);
-				(void) syslog(LOG_ERR,
-		"could not t_close() old fd %d; mem & fd leak error: %s",
-						destfd, errorstr);
-			}
-			destfd = nfd;
-			if (t_sync(destfd) == -1) {
-				char errorstr[100];
-
-				__tli_sys_strerror(errorstr, sizeof (errorstr),
-						t_errno, errno);
-				(void) syslog(LOG_ERR,
-				    "could not t_sync() duped fd %d: %s",
-						destfd, errorstr);
-				(void) t_snddis(srcfd, tcp);
-				return;
-			}
-		}
 	}
 	if (RPC_FD_NOTIN_FDSET(destfd)) {
 		(void) syslog(LOG_ERR, errstring, do_accept_str,

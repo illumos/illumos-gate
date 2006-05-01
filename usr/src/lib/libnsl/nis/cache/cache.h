@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +37,6 @@ extern "C" {
 #include <stdlib.h>
 #include "../gen/nis_local.h"
 #include "../gen/nis_clnt.h"
-#include "nsl_stdio_prv.h"
 
 #define	CLIENT_FILE	"/var/nis/client_info"
 
@@ -82,9 +80,9 @@ class HostList {
 	int checkHost(char *value, char *interface, int *rank);
 	int matchHost(char *name, char *uaddr, int *rank);
 	int serves(directory_obj *dobj);
-	int dumpList(__NSL_FILE *fp);
+	int dumpList(FILE *fp);
 	void addOption(int value);
-	void dumpOption(__NSL_FILE *fp);
+	void dumpOption(FILE *fp);
 	void deleteBackupList();
 	void deleteList();
 	void backupList();
@@ -164,7 +162,7 @@ class NisCache {
 	uint32_t expireTime(uint32_t ttl);
 	int nextGeneration();
 	void rerankServers();
-	void writePreference(__NSL_FILE *fp);
+	void writePreference(FILE *fp);
 	void mergePreference(char *value);
 	void mergeOption(char *value);
 	void resetPreference();

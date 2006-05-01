@@ -173,7 +173,7 @@ tsol_mkmntlist(void)
 	struct mntlist *mntst = NULL;
 	struct mnttab mnt;
 
-	if ((mounted = fopen(MNTTAB, "r")) == NULL) {
+	if ((mounted = fopen(MNTTAB, "rF")) == NULL) {
 		perror(MNTTAB);
 		return (NULL);
 	}

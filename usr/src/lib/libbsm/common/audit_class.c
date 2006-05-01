@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,7 +126,7 @@ getauclassent_r(au_class_entry)
 	/* open audit class file if it isn't already */
 	_mutex_lock(&mutex_classfile);
 	if (!au_class_file) {
-		if (!(au_class_file = fopen(au_class_fname, "r"))) {
+		if (!(au_class_file = fopen(au_class_fname, "rF"))) {
 			_mutex_unlock(&mutex_classfile);
 			return ((au_class_ent_t *)0);
 		}
@@ -250,7 +249,7 @@ xcacheauclass(result, class_name, class_no, flags)
 	if (called_once == 0) {
 
 		/* Count number of lines in the class file */
-		if ((fp = fopen(au_class_fname, "r")) == NULL) {
+		if ((fp = fopen(au_class_fname, "rF")) == NULL) {
 			_mutex_unlock(&mutex_classcache);
 			return (-1);
 		}

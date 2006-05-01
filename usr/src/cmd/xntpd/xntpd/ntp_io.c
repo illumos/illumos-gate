@@ -1,5 +1,5 @@
 /*
- * Copyright 1996, 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,6 +16,7 @@
 
 #ifdef SYS_SOLARIS
 # define	FD_SETSIZE	65536
+#include <stdio_ext.h>
 #endif
 
 #include <stdio.h>
@@ -235,6 +236,9 @@ max_fdlimit()
     msyslog(LOG_ERR, "setrlimit(RLIMIT_NOFILE): %m");
     return;
   }
+#ifdef SYS_SOLARIS
+ enable_extended_FILE_stdio(-1, -1);
+#endif
 }
 #endif
 

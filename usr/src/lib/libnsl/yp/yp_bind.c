@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -53,7 +52,6 @@
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/tiuser.h>
-#include "nsl_stdio_prv.h"
 
 #define	BFSIZE	(YPMAXDOMAIN + 32)	/* size of binding file */
 int	 __ypipbufsize = 8192;		/* size used for clnt_tli_create */
@@ -1113,7 +1111,7 @@ get_cached_transport(struct netconfig *nconf, int vers, char *uaddress,
 static ypbind_resp *
 get_cached_domain(char *domain)
 {
-	__NSL_FILE *fp;
+	FILE *fp;
 	int st;
 	char filename[300];
 	static ypbind_resp res;
@@ -1121,24 +1119,24 @@ get_cached_domain(char *domain)
 
 	(void) snprintf(filename, sizeof (filename),
 					"%s/%s/cache_binding", BINDING, domain);
-	fp = __nsl_fopen(filename, "r");
+	fp = fopen(filename, "rF");
 	if (fp == 0)
 		return (0);
 
 	/* if first byte is not locked, then ypbind must not be running */
-	st = lockf(__nsl_fileno(fp), F_TEST, 1);
+	st = lockf(fileno(fp), F_TEST, 1);
 	if (st != -1 || (errno != EAGAIN && errno != EACCES)) {
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (0);
 	}
 
-	__nsl_xdrstdio_create(&xdrs, fp, XDR_DECODE);
+	xdrstdio_create(&xdrs, fp, XDR_DECODE);
 
 	(void) memset((char *)&res, 0, sizeof (res));
 	st = xdr_ypbind_resp(&xdrs, &res);
 
 	xdr_destroy(&xdrs);
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 
 	if (st)
 		return (&res);

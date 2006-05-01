@@ -149,9 +149,9 @@ krb5_db_fetch_mkey(context, mname, etype, fromkeyboard, twice, keyfile,
 	defkeyfile[sizeof(defkeyfile) - 1] = '\0';
 	
 #ifdef ANSI_STDIO
-	if (!(kf = fopen((keyfile) ? keyfile : defkeyfile, "rb")))
+	if (!(kf = fopen((keyfile) ? keyfile : defkeyfile, "rbF")))
 #else
-	if (!(kf = fopen((keyfile) ? keyfile : defkeyfile, "r")))
+	if (!(kf = fopen((keyfile) ? keyfile : defkeyfile, "rF")))
 #endif
 	    return KRB5_KDB_CANTREAD_STORED;
 	if (fread((krb5_pointer) &enctype, 2, 1, kf) != 1) {

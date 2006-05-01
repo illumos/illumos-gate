@@ -211,19 +211,17 @@ NisMgrCache::checkUp()
 uint32_t
 NisMgrCache::writeDotFile()
 {
-	__NSL_FILE *fp;
+	FILE *fp;
 	char tempName[MAXPATHLEN+1];
-	char buf[64];
 
 	(void) sprintf(tempName, "%s.tmp", DOT_FILE);
-	fp = __nsl_fopen(tempName, "w");
+	fp = fopen(tempName, "wF");
 	if (fp == NULL)
 		return (0);
 
-	(void) snprintf(buf, sizeof (buf), "%u\n", config_time);
-	(void) __nsl_fputstring(buf, fp);
+	(void) fprintf(fp, "%u\n", config_time);
 	writePreference(fp);
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 	if (rename(tempName, DOT_FILE) == -1) {
 		(void) unlink(tempName);
 		syslog(LOG_ERR, "cannot rename %s file", DOT_FILE);
@@ -345,7 +343,7 @@ NisMgrCache::loadLocalFile()
 	/* For IPv4, we want the loopback net, not the loopback address */
 	in4addr_loopback.s_addr = IN_LOOPBACKNET << IN_CLASSA_NSHIFT;
 
-	fp = fopen(CLIENT_FILE, "r");
+	fp = fopen(CLIENT_FILE, "rF");
 	if (fp == NULL)
 		return (0);
 

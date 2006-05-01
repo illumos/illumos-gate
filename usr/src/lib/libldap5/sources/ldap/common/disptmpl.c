@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,7 @@ ldap_init_templates( char *file, struct ldap_disptmpl **tmpllistp )
 
     *tmpllistp = NULLDISPTMPL;
 
-    if (( fp = fopen( file, "r" )) == NULL ) {
+    if (( fp = fopen( file, "rF" )) == NULL ) {
 	return( LDAP_TMPL_ERR_FILE );
     }
 

@@ -44,6 +44,7 @@
 
 #include <dlfcn.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -153,6 +154,8 @@ main(int argc, char *argv[])
 			rl.rlim_cur = MAX_FILEDESC_LIMIT;
 		setrlimit(RLIMIT_NOFILE, &rl);
 	}
+	(void) enable_extended_FILE_stdio(-1, -1);
+
 	openlog("rpcbind", LOG_CONS, LOG_DAEMON);
 
 	/*

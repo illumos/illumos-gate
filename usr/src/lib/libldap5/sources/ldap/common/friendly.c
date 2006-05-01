@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -55,7 +59,7 @@ ldap_friendly_name( char *filename, char *name, FriendlyMap *map )
     }
 
 	if ( *map == NULL ) {
-		if ( (fp = fopen( filename, "r" )) == NULL )
+		if ( (fp = fopen( filename, "rF" )) == NULL )
 			return( name );
 
 		entries = 0;

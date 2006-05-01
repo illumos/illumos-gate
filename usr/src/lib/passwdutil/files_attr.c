@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +155,7 @@ private_getpwnam_r(const char *name, struct passwd *result, char *buffer,
 	FILE *fp;
 	int found;
 
-	if ((fp = fopen(PASSWD, "r")) == NULL)
+	if ((fp = fopen(PASSWD, "rF")) == NULL)
 		return (NULL);
 
 	found = 0;
@@ -193,7 +192,7 @@ private_getspnam_r(const char *name, struct spwd *result, char *buffer,
 	FILE *fp;
 	int found;
 
-	fp = fopen(SHADOW, "r");
+	fp = fopen(SHADOW, "rF");
 	if (fp == NULL)
 		return (NULL);
 
@@ -530,7 +529,7 @@ files_getattr(char *name, attrlist *items, pwu_repository_t *rep)
 			debug("files_getattr: Get password history for %s ",
 			    name);
 
-			if ((history = fopen(HISTORY, "r")) == NULL) {
+			if ((history = fopen(HISTORY, "rF")) == NULL) {
 				debug("files_getattr: %s not found", HISTORY);
 				res = PWU_OPEN_FAILED;
 				goto getattr_exit;
@@ -927,12 +926,12 @@ files_update_shadow(char *name, struct spwd *spwd)
 	}
 	(void) fchown(tempfd, (uid_t)0, stbuf.st_gid);
 
-	if ((dst = fdopen(tempfd, "w")) == NULL) {
+	if ((dst = fdopen(tempfd, "wF")) == NULL) {
 		err = PWU_OPEN_FAILED;
 		goto shadow_exit;
 	}
 
-	if ((src = fopen(SHADOW, "r")) == NULL) {
+	if ((src = fopen(SHADOW, "rF")) == NULL) {
 		err = PWU_OPEN_FAILED;
 		(void) fclose(dst);
 		(void) unlink(SHADTEMP);
@@ -1021,11 +1020,11 @@ files_update_passwd(char *name, struct passwd *pwd)
 		err = PWU_OPEN_FAILED;
 		goto passwd_exit;
 	}
-	if ((dst = fdopen(tempfd, "w")) == NULL) {
+	if ((dst = fdopen(tempfd, "wF")) == NULL) {
 		err = PWU_OPEN_FAILED;
 		goto passwd_exit;
 	}
-	if ((src = fopen(PASSWD, "r")) == NULL) {
+	if ((src = fopen(PASSWD, "rF")) == NULL) {
 		err = PWU_OPEN_FAILED;
 		(void) fclose(dst);
 		(void) unlink(PASSTEMP);
@@ -1163,12 +1162,12 @@ files_update_history(char *name, struct spwd *spwd)
 	(void) fchown(tmpfd, (uid_t)0, (gid_t)0);
 
 	/* get ready to copy */
-	if (((src = fopen(HISTORY, "r")) == NULL) &&
+	if (((src = fopen(HISTORY, "rF")) == NULL) &&
 	    (errno != ENOENT)) {
 		(void) unlink(HISTEMP);
 		return (PWU_OPEN_FAILED);
 	}
-	if ((dst = fdopen(tmpfd, "w")) == NULL) {
+	if ((dst = fdopen(tmpfd, "wF")) == NULL) {
 		(void) fclose(src);
 		(void) unlink(HISTEMP);
 		return (PWU_OPEN_FAILED);

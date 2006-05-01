@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -884,7 +884,7 @@ static int parse_mechlist_file(const char *mechlistfile)
     char *t, *ptr;
     int r = 0;
 
-    f = fopen(mechlistfile, "r");
+    f = fopen(mechlistfile, "rF");
     if (!f) return SASL_FAIL;
 
     r = SASL_OK;

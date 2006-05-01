@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,23 +93,6 @@ extern "C" {
 #define	__NSW_STR_FOREVER	"forever"
 
 #ifdef __NSS_PRIVATE_INTERFACE
-#define	__NSL_FILE_BUF_SIZE	1024
-
-/* To avoid the 256 file descriptor limitation in stdio, we use our own */
-/* private version of stdio functions. A modified FILE structure is used */
-/* in our private stdio functions. We support only read mode access in */
-/* this private stdio implementation. */
-
-typedef struct {
-	unsigned char	*_nsl_base;	/* __NSL_FILE_BUF_SIZE */
-	int		_nsl_file;	/* an integer datatype to hold */
-					/* the file pointer */
-
-	int		_nsl_cnt;	/* number of bytes available to read */
-					/* in the buffer */
-
-	unsigned char	*_nsl_ptr; /* location of next byte in buffer to read */
-} __NSL_FILE;
 
 struct __nsw_lookup_v1 {
 	char *service_name;
@@ -141,10 +123,6 @@ struct __nsw_switchconfig_v1 *__nsw_getconfig_v1
 	(const char *, enum __nsw_parse_err *);
 int __nsw_freeconfig_v1(struct __nsw_switchconfig_v1 *);
 action_t __nsw_extended_action_v1(struct __nsw_lookup_v1 *, int);
-
-extern __NSL_FILE	*__nsl_c_fopen(const char *filename, const char *mode);
-extern int 		__nsl_c_fclose(__NSL_FILE *stream);
-extern char		*__nsl_c_fgets(char *s, int n, __NSL_FILE *stream);
 
 #endif /* __NSS_PRIVATE_INTERFACE */
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,9 +94,6 @@ static const char rcsid[] = "$Id: res_query.c,v 8.24 2003/01/31 15:25:58 vixie E
 #include <stdlib.h>
 #include <string.h>
 #include "port_after.h"
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-#include "../../../libnsl/include/nsl_stdio_prv.h"
-#endif
 
 /* Options.  Leave them on. */
 #define DEBUG
@@ -407,30 +404,20 @@ const char *
 res_hostalias(const res_state statp, const char *name, char *dst, size_t siz) {
 	char *file, *cp1, *cp2;
 	char buf[BUFSIZ];
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	__NSL_FILE *fp;
-#else
 	FILE *fp;
-#endif
 
 	if (statp->options & RES_NOALIASES)
 		return (NULL);
 	file = getenv("HOSTALIASES");
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	if (file == NULL || (fp = __nsl_fopen(file, "r")) == NULL)
+#ifdef SUNW_AVOIDSTDIO_FDLIMIT
+	 if (file == NULL || (fp = fopen(file, "rF")) == NULL)
 #else
 	 if (file == NULL || (fp = fopen(file, "r")) == NULL)
 #endif
 		return (NULL);
-#ifndef	SUNW_AVOIDSTDIO_FDLIMIT
 	setbuf(fp, NULL);
-#endif
 	buf[sizeof(buf) - 1] = '\0';
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	while (__nsl_fgets(buf, sizeof(buf), fp)) {
-#else
 	while (fgets(buf, sizeof(buf), fp)) {
-#endif
 		for (cp1 = buf; *cp1 && !isspace((unsigned char)*cp1); ++cp1)
 			;
 		if (!*cp1)
@@ -447,18 +434,10 @@ res_hostalias(const res_state statp, const char *name, char *dst, size_t siz) {
 			*cp2 = '\0';
 			strncpy(dst, cp1, siz - 1);
 			dst[siz - 1] = '\0';
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-			__nsl_fclose(fp);
-#else
 			fclose(fp);
-#endif
 			return (dst);
 		}
 	}
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	__nsl_fclose(fp);
-#else
 	fclose(fp);
-#endif
 	return (NULL);
 }

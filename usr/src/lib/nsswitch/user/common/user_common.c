@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "user" backends.
@@ -34,15 +33,14 @@
  *   but this here is just yer standard fgets() thang.
  */
 
+#include "user_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
-#include "user_common.h"
 #include <sys/stat.h>
-#include "../../../libnsl/include/nsl_stdio_prv.h"
 #include <string.h>
 
 nss_status_t
@@ -55,11 +53,11 @@ _nss_user_setent(be, dummy)
 			/* Backend isn't initialized properly? */
 			return (NSS_UNAVAIL);
 		}
-		if ((be->f = __nsl_fopen(be->filename, "r")) == 0) {
+		if ((be->f = fopen(be->filename, "rF")) == 0) {
 			return (NSS_UNAVAIL);
 		}
 	} else {
-		__nsl_rewind(be->f);
+		rewind(be->f);
 	}
 	return (NSS_SUCCESS);
 }
@@ -70,7 +68,7 @@ _nss_user_endent(be, dummy)
 	void			*dummy;
 {
 	if (be->f != 0) {
-		__nsl_fclose(be->f);
+		fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -93,7 +91,7 @@ _nss_user_endent(be, dummy)
  */
 int
 _nss_user_read_line(f, buffer, buflen)
-	__NSL_FILE		*f;
+	FILE			*f;
 	char			*buffer;
 	int			buflen;
 {
@@ -103,7 +101,7 @@ _nss_user_read_line(f, buffer, buflen)
 	while (1) {
 		linelen = 0;
 		while (linelen < buflen - 1) {	/* "- 1" saves room for \n\0 */
-			switch (c = __nsl_getc_unlocked(f)) {
+			switch (c = getc_unlocked(f)) {
 			case EOF:
 				if (linelen == 0 ||
 				    buffer[linelen - 1] == '\\') {
@@ -130,7 +128,7 @@ _nss_user_read_line(f, buffer, buflen)
 		/* Buffer overflow -- eat rest of line and loop again */
 		/* ===> Should syslog() */
 		do {
-			c = __nsl_getc_unlocked(f);
+			c = getc_unlocked(f);
 			if (c == EOF) {
 				return (-1);
 			}
@@ -276,7 +274,7 @@ _nss_user_constr(ops, n_ops, filename, min_bufsize)
 {
 	user_backend_ptr_t	be;
 
-	if ((be = (user_backend_ptr_t) malloc(sizeof (*be))) == 0) {
+	if ((be = (user_backend_ptr_t)malloc(sizeof (*be))) == 0) {
 		return (0);
 	}
 	be->ops		= ops;
@@ -289,5 +287,5 @@ _nss_user_constr(ops, n_ops, filename, min_bufsize)
 	be->f		= 0;
 	be->buf		= 0;
 
-	return ((nss_backend_t *) be);
+	return ((nss_backend_t *)be);
 }

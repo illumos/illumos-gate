@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -38,7 +37,6 @@
 #include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>
-#include "../../../libnsl/include/nsl_stdio_prv.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -53,7 +51,7 @@ struct user_backend {
 	user_backend_op_t	*ops;
 	int			n_ops;
 	const char		*filename;
-	__NSL_FILE		*f;
+	FILE			*f;
 	int			minbuf;
 	char			*buf;
 };
@@ -74,7 +72,7 @@ extern nss_backend_t	*_nss_user_constr(user_backend_op_t	*ops,
 					int			n_ops,
 					const char		*filename,
 					int			min_bufsize);
-extern nss_status_t	_nss_user_destr (user_backend_ptr_t, void *dummy);
+extern nss_status_t	_nss_user_destr(user_backend_ptr_t, void *dummy);
 extern nss_status_t	_nss_user_setent(user_backend_ptr_t, void *dummy);
 extern nss_status_t	_nss_user_endent(user_backend_ptr_t, void *dummy);
 extern nss_status_t 	_nss_user_do_all(user_backend_ptr_t,
@@ -86,12 +84,12 @@ extern nss_status_t 	_nss_user_XY_all(user_backend_ptr_t	be,
 					int 			netdb,
 					const char		*filter,
 					user_XY_check_func	check);
-extern int		_nss_user_read_line(__NSL_FILE		*f,
+extern int		_nss_user_read_line(FILE		*f,
 					char			*buffer,
 					int			buflen);
 #else
 extern nss_backend_t	*_nss_user_constr();
-extern nss_status_t	_nss_user_destr ();
+extern nss_status_t	_nss_user_destr();
 extern nss_status_t	_nss_user_setent();
 extern nss_status_t	_nss_user_endent();
 extern nss_status_t	_nss_user_do_all();

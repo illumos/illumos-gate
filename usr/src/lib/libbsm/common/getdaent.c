@@ -238,7 +238,7 @@ setdaent(void)
 	if (_da == NULL)
 		return;
 	if (daf == NULL)
-		daf = fopen(DEVALLOC_FILE, "r");
+		daf = fopen(DEVALLOC_FILE, "rF");
 	else
 		rewind(daf);
 }

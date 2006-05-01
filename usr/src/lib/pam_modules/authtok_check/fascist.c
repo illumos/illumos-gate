@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -441,7 +441,7 @@ DictCheck(char *password, char *path)
 	PWDICT *pwp;
 	int r;
 
-	if ((pwp = PWOpen(path, "r")) == NULL)
+	if ((pwp = PWOpen(path, "rF")) == NULL)
 		return (DATABASE_OPEN_FAIL);
 
 	r = FascistLook(pwp, password);

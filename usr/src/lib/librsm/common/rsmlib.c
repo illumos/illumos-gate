@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -185,7 +184,7 @@ _rsm_librsm_init()
 #ifdef DEBUG
 	mutex_init(&rsmlog_lock, USYNC_THREAD, NULL);
 	sprintf(logname, "%s.%d", TRACELOG, getpid());
-	rsmlog_fd = fopen(logname, "w+");
+	rsmlog_fd = fopen(logname, "w+F");
 	if (rsmlog_fd == NULL) {
 		fprintf(stderr, "Log file open failed\n");
 		return (errno);
@@ -3076,7 +3075,7 @@ _rsm_get_segmentid_range(const char *appid, rsm_memseg_id_t *baseid,
 	if (appid == NULL || baseid == NULL || length == NULL)
 		return (RSMERR_BAD_ADDR);
 
-	if ((fp = fopen(RSMSEGIDFILE, "r")) == NULL) {
+	if ((fp = fopen(RSMSEGIDFILE, "rF")) == NULL) {
 		DBPRINTF((RSM_LIBRARY, RSM_DEBUG_VERBOSE,
 		    "cannot open <%s>\n", RSMSEGIDFILE));
 		return (RSMERR_BAD_CONF);

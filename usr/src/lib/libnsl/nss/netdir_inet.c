@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -86,7 +85,6 @@
 #include <syslog.h>
 #include <nsswitch.h>
 #include "nss.h"
-#include "nsl_stdio_prv.h"
 
 #define	MAXIFS 32
 #define	UDPDEV	"/dev/udp"
@@ -3056,18 +3054,18 @@ static boolean_t
 _read_nsw_file(void)
 {
 	char	defval[LINESIZE];
-	__NSL_FILE *defl;
+	FILE	*defl;
 	boolean_t	nosort = B_FALSE;
 
 
 	do {
-		defl = __nsl_fopen(__NSW_DEFAULT_FILE, "r");
+		defl = fopen(__NSW_DEFAULT_FILE, "rF");
 	} while ((defl == NULL) && (errno == EINTR));
 
 	if (defl == NULL)
 		return (B_FALSE);
 
-	while (__nsl_fgets(defval, sizeof (defval), defl) != NULL) {
+	while (fgets(defval, sizeof (defval), defl) != NULL) {
 		if ((strncmp(DONT_SORT, defval, sizeof (DONT_SORT) - 1) == 0) ||
 		    (strncmp(DONT_SORT2, defval,
 			sizeof (DONT_SORT2) - 1) == 0)) {
@@ -3075,6 +3073,6 @@ _read_nsw_file(void)
 			break;
 		}
 	}
-	(void) __nsl_fclose(defl);
+	(void) fclose(defl);
 	return (nosort);
 }

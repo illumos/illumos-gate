@@ -737,13 +737,13 @@ pool_set_status(int state)
 			if (state) {
 				char *cmd = "/usr/sbin/svcadm enable -s " \
 				    SMF_SVC_INSTANCE;
-				if ((p = popen(cmd, "w")) == NULL ||
+				if ((p = popen(cmd, "wF")) == NULL ||
 				    pclose(p) != 0)
 					return (PO_FAIL);
 			} else {
 				char *cmd = "/usr/sbin/svcadm disable -s " \
 				    SMF_SVC_INSTANCE;
-				if ((p = popen(cmd, "w")) == NULL ||
+				if ((p = popen(cmd, "wF")) == NULL ||
 				    pclose(p) != 0)
 					return (PO_FAIL);
 			}

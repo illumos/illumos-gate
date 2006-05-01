@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -281,6 +282,7 @@ main(argc, argv)
 			}
 			closefrom(3);
 		}
+		(void) enable_extended_FILE_stdio(-1, -1);
 	} else {
 		syslog(LOG_ERR,
 			"unable to increase threads - continue with default");

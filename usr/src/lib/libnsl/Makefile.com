@@ -32,7 +32,7 @@ VERS=	.1
 # objects are listed by source directory
 
 # common utility code used in more than one directory
-COMMON=		common.o daemon_utils.o nsl_stdio_prv.o
+COMMON=		common.o daemon_utils.o
 
 DES=		des_crypt.o des_soft.o
 
@@ -70,7 +70,7 @@ authsys_prot.o	can_use_af.o \
 clnt_bcast.o	clnt_dg.o	clnt_door.o	clnt_generic.o	clnt_perror.o \
 clnt_raw.o	clnt_simple.o	clnt_vc.o	fdsync.o	getdname.o \
 inet_ntoa.o	key_call.o	key_prot.o	mt_misc.o \
-netname.o	netnamer.o	openchild.o	pmap_clnt.o	pmap_prot.o \
+netname.o	netnamer.o	pmap_clnt.o	pmap_prot.o \
 rpc_callmsg.o	rpc_comdata.o	rpc_comdata1.o	rpc_generic.o	rpc_prot.o \
 rpc_sel2poll.o \
 rpc_soc.o	rpc_td.o	rpcb_clnt.o	rpcb_prot.o \
@@ -79,7 +79,7 @@ svc_auth.o	svc_auth_loopb.o	svc_auth_sys.o	svc_dg.o \
 svc_door.o	svc_generic.o	svc_raw.o	svc_run.o	svc_simple.o \
 svc_vc.o	svcauth_des.o	svid_funcs.o	ti_opts.o	xdr.o \
 xdr_array.o	xdr_float.o	xdr_mem.o	xdr_rec.o	xdr_refer.o \
-xdr_sizeof.o	xdr_stdio.o	xdr_stdio_prv.o
+xdr_sizeof.o	xdr_stdio.o
 
 SAF= checkver.o  doconfig.o
 

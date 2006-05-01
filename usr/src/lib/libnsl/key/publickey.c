@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +73,6 @@
 #include <thread.h>
 #include "../nis/gen/nis_clnt.h"
 #include <nss_dbdefs.h>
-#include "nsl_stdio_prv.h"
 
 static const char *PKTABLE = "cred.org_dir";
 static const char *PKMAP = "publickey.byname";
@@ -229,18 +227,18 @@ getkeys_files(int *errp, char *netname, char *pkey, char *skey, char *passwd)
 	char buf[WORKBUFSIZE];
 	int	r = 0;
 	char *res;
-	__NSL_FILE *fd;
+	FILE *fd;
 	char *p;
 	char *lasts;
 
-	fd = __nsl_fopen(PKFILE, "r");
-	if (fd == (__NSL_FILE *)0) {
+	fd = fopen(PKFILE, "rF");
+	if (fd == NULL) {
 		*errp = __NSW_UNAVAIL;
 		return (0);
 	}
 
 	/* Search through the file linearly :-( */
-	while ((res = __nsl_fgets(buf, WORKBUFSIZE, fd)) != NULL) {
+	while ((res = fgets(buf, WORKBUFSIZE, fd)) != NULL) {
 
 		if ((res[0] == '#') || (res[0] == '\n'))
 			continue;
@@ -285,14 +283,14 @@ getkeys_files(int *errp, char *netname, char *pkey, char *skey, char *passwd)
 				p++;
 				if (skey && extract_secret(p, skey, passwd))
 					r |= 2;
-				(void) __nsl_fclose(fd);
+				(void) fclose(fd);
 				*errp = __NSW_SUCCESS;
 				return (r);
 			}
 		}
 	}
 
-	(void) __nsl_fclose(fd);
+	(void) fclose(fd);
 	*errp = __NSW_NOTFOUND;
 	return (0);
 }

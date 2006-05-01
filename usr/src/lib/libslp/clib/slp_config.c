@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -101,9 +100,9 @@ void slp_readConfig() {
 	/* check env for alternate config file */
 	fp = NULL;
 	if (cfile = getenv("SLP_CONF_FILE"))
-		fp = fopen(cfile, "r");
+		fp = fopen(cfile, "rF");
 	if (!fp)
-		if (!(fp = fopen(SLP_DEFAULT_CONFIG_FILE, "r"))) {
+		if (!(fp = fopen(SLP_DEFAULT_CONFIG_FILE, "rF"))) {
 			slp_err(LOG_INFO, 0, "readConfig",
 				"cannot open config file");
 			return;

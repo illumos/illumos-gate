@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,7 +126,8 @@ _ruserpass(const char *host, char **aname, char **apass)
 
 		*aname = malloc(MAXANAME + 1);
 		(void) cuserid(myname);
-		(void) printf(_dgettext(TEXT_DOMAIN, "Name (%s:%s): "), host, myname);
+		(void) printf(_dgettext(TEXT_DOMAIN, "Name (%s:%s): "),
+		    host, myname);
 		(void) fflush(stdout);
 		if (read(2, *aname, MAXANAME) <= 0)
 			exit(1);
@@ -139,7 +139,7 @@ _ruserpass(const char *host, char **aname, char **apass)
 				*index(*aname, '\n') = 0;
 	}
 	if (*aname && *apass == 0) {
-		(void) printf(_dgettext(TEXT_DOMAIN, "Password (%s:%s): "), 
+		(void) printf(_dgettext(TEXT_DOMAIN, "Password (%s:%s): "),
 			host, *aname);
 		(void) fflush(stdout);
 		*apass = getpass("");
@@ -162,7 +162,7 @@ rnetrc(const char *host, char **aname, char **apass)
 	if (hdir == NULL)
 		hdir = ".";
 	(void) sprintf(buf, "%s/.netrc", hdir);
-	d->cfile = fopen(buf, "r");
+	d->cfile = fopen(buf, "rF");
 	if (d->cfile == NULL) {
 		if (errno != ENOENT)
 			perror(buf);
@@ -196,11 +196,11 @@ next:
 			if (fstat64(fileno(d->cfile), &stb) >= 0 &&
 				    (stb.st_mode & 077) != 0) {
 				(void) fprintf(stderr,
-				     _dgettext(TEXT_DOMAIN, 
-				     "Error - .netrc file not correct mode.\n"));
+				    _dgettext(TEXT_DOMAIN,
+				    "Error - .netrc file not correct mode.\n"));
 				(void) fprintf(stderr,
-				     _dgettext(TEXT_DOMAIN, 
-				     "Remove password or correct mode.\n"));
+				    _dgettext(TEXT_DOMAIN,
+				    "Remove password or correct mode.\n"));
 				exit(1);
 			}
 			if (token() && *apass == 0) {
@@ -215,9 +215,8 @@ next:
 			(void) token();
 			break;
 		default:
-			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN, "Unknown .netrc option %s\n"), 
-			    d->tokval);
+			(void) fprintf(stderr, _dgettext(TEXT_DOMAIN,
+			    "Unknown .netrc option %s\n"), d->tokval);
 			break;
 		}
 		goto done;

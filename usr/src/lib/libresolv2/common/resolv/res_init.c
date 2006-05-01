@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,9 +99,6 @@ static const char rcsid[] = "$Id: res_init.c,v 8.32 2003/04/03 06:31:10 marka Ex
 #include <netdb.h>
 
 #include "port_after.h"
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-#include "../../../libnsl/include/nsl_stdio_prv.h"
-#endif
 
 /* ensure that sockaddr_in6 and IN6ADDR_ANY_INIT are declared / defined */
 #include <resolv.h>
@@ -176,11 +173,7 @@ res_ninit(res_state statp) {
 /* This function has to be reachable by res_data.c but not publically. */
 int
 __res_vinit(res_state statp, int preinit) {
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	register __NSL_FILE *fp;
-#else
 	register FILE *fp;
-#endif
 	register char *cp, **pp;
 	register int n;
 	char buf[BUFSIZ];
@@ -396,15 +389,13 @@ __res_vinit(res_state statp, int preinit) {
 
 	nserv = 0;
 
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	if ((fp = __nsl_fopen(_PATH_RESCONF, "r")) != NULL) {
-	    /* read the config file */
-	    while (__nsl_fgets(buf, sizeof(buf), fp) != NULL) {
+#ifdef SUNW_AVOIDSTDIO_FDLIMIT
+	if ((fp = fopen(_PATH_RESCONF, "rF")) != NULL) {
 #else
 	if ((fp = fopen(_PATH_RESCONF, "r")) != NULL) {
+#endif
 	    /* read the config file */
 	    while (fgets(buf, sizeof(buf), fp) != NULL) {
-#endif
 		/* skip comments */
 		if (*buf == ';' || *buf == '#')
 			continue;
@@ -550,12 +541,7 @@ __res_vinit(res_state statp, int preinit) {
 #ifdef RESOLVSORT
 	    statp->nsort = nsort;
 #endif
-
-#ifdef	SUNW_AVOIDSTDIO_FDLIMIT
-	    (void) __nsl_fclose(fp);
-#else
 		(void) fclose(fp);
-#endif
 	}
 /*
  * Last chance to get a nameserver.  This should not normally

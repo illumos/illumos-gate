@@ -1824,7 +1824,7 @@ sysevent_open_channel(const char *channel)
 	 * Check that /var/run is mounted as tmpfs before allowing a channel
 	 * to be opened.
 	 */
-	if ((fp = fopen(MNTTAB, "r")) == NULL) {
+	if ((fp = fopen(MNTTAB, "rF")) == NULL) {
 		errno = EACCES;
 		return (NULL);
 	}

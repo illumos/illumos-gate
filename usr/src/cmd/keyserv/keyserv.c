@@ -47,6 +47,7 @@
  */
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -185,6 +186,7 @@ main(int argc, char *argv[])
 			limit = FD_SETSIZE;
 		rl.rlim_cur = limit;
 		(void) setrlimit(RLIMIT_NOFILE, &rl);
+		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
 	__key_encryptsession_pk_LOCAL = &__key_encrypt_pk_2_svc;

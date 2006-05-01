@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * scr_dump.c
- * 
+ *
  * XCurses Library
  *
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
@@ -61,7 +60,7 @@ const char *f;
 
 	code = ERR;
 
-	if ((fp = fopen(f, "wb")) != (FILE *) 0) {
+	if ((fp = fopen(f, "wF")) != (FILE *) 0) {
 		code = putwin(curscr, fp);
 		(void) fclose(fp);
 	}
@@ -78,7 +77,7 @@ const char *f;
 	FILE *fp;
 	WINDOW *new;
 
-	if ((fp = fopen(f, "rb")) == (FILE *) 0)
+	if ((fp = fopen(f, "rF")) == (FILE *) 0)
 		return ERR;
 
 	new = getwin(fp);
@@ -150,8 +149,8 @@ const char *f;
 }
 
 /*
- * Get the screen image that really reflects what is on the screen, 
- * though the applicatiion may not want it.  A subsequent doupdate() 
+ * Get the screen image that really reflects what is on the screen,
+ * though the applicatiion may not want it.  A subsequent doupdate()
  * will compared and make changes against this image.
  */
 int
@@ -165,11 +164,11 @@ const char *f;
 	__m_trace("scr_init(%p=\"%s\")", f);
 #endif
 
-	if ((non_rev_rmcup && exit_ca_mode != (char *) 0) 
-	|| stat(f, &dump) != 0 || stat(ctermid((char *) 0), &tty) != 0 
-	|| dump.st_mtime < tty.st_mtime) 
+	if ((non_rev_rmcup && exit_ca_mode != (char *) 0)
+	|| stat(f, &dump) != 0 || stat(ctermid((char *) 0), &tty) != 0
+	|| dump.st_mtime < tty.st_mtime)
 		code = ERR;
-	else 
+	else
 		code = scr_replace(__m_screen->_curscr, f);
 
 	return __m_return_code("scr_init", code);
@@ -177,7 +176,7 @@ const char *f;
 
 /*
  * Get the screen image that is really on the screen and that the
- * application wants on the screen.  
+ * application wants on the screen.
  */
 int
 scr_set(f)

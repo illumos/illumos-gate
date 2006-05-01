@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -65,7 +69,7 @@ ldap_init_searchprefs( char *file, struct ldap_searchobj **solistp )
     long	rlen, len;
     int		rc, eof;
 
-    if (( fp = fopen( file, "r" )) == NULL ) {
+    if (( fp = fopen( file, "rF" )) == NULL ) {
 	return( LDAP_SEARCHPREF_ERR_FILE );
     }
 

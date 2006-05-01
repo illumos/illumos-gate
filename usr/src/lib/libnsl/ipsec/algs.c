@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -550,8 +549,8 @@ bail:
 void
 _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 {
-	FILE *f = NULL;
-	int fd, rc, trash_num;
+	FILE *f;
+	int rc, trash_num;
 	ipsec_proto_t *new_protos = NULL, *trash;
 	time_t filetime;
 	struct stat statbuf;
@@ -572,24 +571,21 @@ _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 		(void) rw_wrlock(&proto_rw);
 	}
 
-	fd = open(INET_IPSECALGSFILE, O_RDONLY);
-	if (fd != -1) {
-		f = fdopen(fd, "r");
-		if (f == NULL) {
-			(void) close(fd);
-		} else {
-			rc = fstat(fd, &statbuf);
-			if (rc != -1) {
-				/*
-				 * Update if the file is newer than our
-				 * last cached copy.
-				 */
-				filetime = statbuf.st_mtime;
-				if (alg_context != NULL ||
-				    filetime > proto_last_update)
-					new_protos = build_list(f, &rc);
-			}
+	f = fopen(INET_IPSECALGSFILE, "rF");
+	if (f != NULL) {
+		rc = fstat(fileno(f), &statbuf);
+		if (rc != -1) {
+			/*
+			 * Update if the file is newer than our
+			 * last cached copy.
+			 */
+			filetime = statbuf.st_mtime;
+			if (alg_context != NULL ||
+			    filetime > proto_last_update)
+				new_protos = build_list(f, &rc);
 		}
+		/* Since f is read-only, can avoid all of the failures... */
+		(void) fclose(f);
 	}
 
 	if (alg_context == NULL) {
@@ -622,9 +618,6 @@ _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 		*alg_nums = rc;
 	}
 
-	/* Since f is read-only, can avoid all of the failures... */
-	if (f != NULL)
-		(void) fclose(f);
 }
 
 /*

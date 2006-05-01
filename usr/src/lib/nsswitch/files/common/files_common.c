@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "files" backends.
@@ -54,11 +53,11 @@ _nss_files_setent(be, dummy)
 			/* Backend isn't initialized properly? */
 			return (NSS_UNAVAIL);
 		}
-		if ((be->f = __nsl_fopen(be->filename, "r")) == 0) {
+		if ((be->f = fopen(be->filename, "rF")) == 0) {
 			return (NSS_UNAVAIL);
 		}
 	} else {
-		__nsl_rewind(be->f);
+		rewind(be->f);
 	}
 	return (NSS_SUCCESS);
 }
@@ -70,7 +69,7 @@ _nss_files_endent(be, dummy)
 	void			*dummy;
 {
 	if (be->f != 0) {
-		__nsl_fclose(be->f);
+		fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -93,7 +92,7 @@ _nss_files_endent(be, dummy)
  */
 int
 _nss_files_read_line(f, buffer, buflen)
-	__NSL_FILE		*f;
+	FILE			*f;
 	char			*buffer;
 	int			buflen;
 {
@@ -104,7 +103,7 @@ _nss_files_read_line(f, buffer, buflen)
 	while (1) {
 		linelen = 0;
 		while (linelen < buflen - 1) {	/* "- 1" saves room for \n\0 */
-			switch (c = __nsl_getc_unlocked(f)) {
+			switch (c = getc_unlocked(f)) {
 			case EOF:
 				if (linelen == 0 ||
 				    buffer[linelen - 1] == '\\') {
@@ -131,7 +130,7 @@ _nss_files_read_line(f, buffer, buflen)
 		/* Buffer overflow -- eat rest of line and loop again */
 		/* ===> Should syslog() */
 		do {
-			c = __nsl_getc_unlocked(f);
+			c = getc_unlocked(f);
 			if (c == EOF) {
 				return (-1);
 			}

@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -78,9 +82,9 @@ krb5_db_store_mkey(context, keyfile, mname, key)
     oumask = umask(077);
 #endif
 #ifdef ANSI_STDIO
-    if (!(kf = fopen(keyfile, "wb")))
+    if (!(kf = fopen(keyfile, "wbF")))
 #else
-    if (!(kf = fopen(keyfile, "w")))
+    if (!(kf = fopen(keyfile, "wF")))
 #endif
     {
 #if HAVE_UMASK

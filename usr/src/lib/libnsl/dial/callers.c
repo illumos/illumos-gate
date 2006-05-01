@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -103,7 +102,7 @@ exphone(char *in, char *out)
 	*s1 = NULLCHAR;
 
 	tpre[0] = NULLCHAR;
-	fn = fopen(DIALCODES, "r");
+	fn = fopen(DIALCODES, "rF");
 	if (fn != NULL) {
 		while (fgets(buf, BUFSIZ, fn)) {
 			if (sscanf(buf, "%60s%60s", p, tpre) < 1)

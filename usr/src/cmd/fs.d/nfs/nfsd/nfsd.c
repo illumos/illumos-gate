@@ -57,6 +57,7 @@
 #include <nfs/nfs_acl.h>
 #include <nfs/nfssys.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <netconfig.h>
@@ -154,6 +155,8 @@ main(int ac, char *av[])
 			" sufficient privileges\n", av[0]);
 		exit(1);
 	}
+
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	/*
 	 * Read in the values from config file first before we check

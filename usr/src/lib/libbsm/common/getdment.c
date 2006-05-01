@@ -93,7 +93,7 @@ setdmapent(void)
 	if (_dmap == NULL)
 		return;
 	if (dmapf == NULL)
-		dmapf = fopen(DEVMAPS_FILE, "r");
+		dmapf = fopen(DEVMAPS_FILE, "rF");
 	else
 		rewind(dmapf);
 }
@@ -401,7 +401,7 @@ dmap_dlexpand(devmap_t *dmp)
 		(void) strcpy(tmplist, dmp->dmap_devlist + 1);
 		if ((cp = strchr(tmplist, '`')) != NULL)
 			*cp = '\0';
-		if ((expansion = popen(tmplist, "r")) == NULL)
+		if ((expansion = popen(tmplist, "rF")) == NULL)
 			return (NULL);
 		count = fread(tmplist, 1, sizeof (tmplist) - 1, expansion);
 		(void) pclose(expansion);

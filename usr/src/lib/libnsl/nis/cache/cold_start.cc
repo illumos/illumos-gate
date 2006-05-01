@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +57,6 @@
 #include  <unistd.h>
 #include  <fcntl.h>
 #include "cache.h"
-#include "nsl_stdio_prv.h"
 #include "nis_cache.h"
 
 extern "C" void prime_pkey_cache(directory_obj *);
@@ -80,21 +78,21 @@ static
 bool_t
 readColdStartFile(char *fileName, directory_obj *dobj, int prime)
 {
-	__NSL_FILE 	*fp;
+	FILE 		*fp;
 	XDR 		xdrs;
 	struct timeval 	now;
 	bool_t 		ret_val = TRUE;
 
 	(void) memset((void*)dobj, 0, sizeof (directory_obj));
-	if (!(fp = __nsl_fopen(fileName, "r"))) {
+	if (!(fp = fopen(fileName, "rF"))) {
 		return (FALSE);
 	}
 
-	__nsl_xdrstdio_create(&xdrs, fp, XDR_DECODE);
+	xdrstdio_create(&xdrs, fp, XDR_DECODE);
 	if (!xdr_directory_obj(&xdrs, dobj)) {
 		ret_val = FALSE;
 	}
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 
 	// change the absolute time in the stored directory object
 	// back into a ttl that is the field in the directory object.
@@ -139,7 +137,7 @@ loadColdStartFile(char *fileName, directory_obj *dobj)
 bool_t
 __nis_writeColdStartFile(char *fileName, directory_obj *dobj)
 {
-	__NSL_FILE 	*fp;
+	FILE 		*fp;
 	int 		fd;
 	XDR 		xdrs;
 	struct timeval 	now;
@@ -161,7 +159,7 @@ __nis_writeColdStartFile(char *fileName, directory_obj *dobj)
 		return (FALSE);
 	}
 	// get a stream for xdr
-	if (!(fp = __nsl_fdopen(fd, "w"))) {
+	if (!(fp = fdopen(fd, "wF"))) {
 		syslog(LOG_ERR,
 		    "NIS+: writeColdStartFile: fdopen() failed for '%s': %m",
 		    tempName);
@@ -176,7 +174,7 @@ __nis_writeColdStartFile(char *fileName, directory_obj *dobj)
 	"NIS+: writeColdStartFile: could not chmod cold_start file: %m");
 		goto err;
 	}
-	__nsl_xdrstdio_create(&xdrs, fp, XDR_ENCODE);
+	xdrstdio_create(&xdrs, fp, XDR_ENCODE);
 
 	// change time to live in the directory object into absolute time.
 	// this has to be reconverted back into a ttl when the directory
@@ -189,7 +187,7 @@ __nis_writeColdStartFile(char *fileName, directory_obj *dobj)
 		goto err;
 	}
 
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 	(void) close(fd);
 
 	// rename the temporary file to the actual cold start file file
@@ -203,7 +201,7 @@ __nis_writeColdStartFile(char *fileName, directory_obj *dobj)
 	return (TRUE);
 
 err:
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 	(void) close(fd);
 	(void) unlink(tempName);
 	return (FALSE);

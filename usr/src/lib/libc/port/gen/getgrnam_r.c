@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +46,6 @@
 #include <synch.h>
 #include <sys/param.h>
 #include <sys/mman.h>
-
-#define	__NSS_PRIVATE_INTERFACE
-#include "nsswitch_priv.h"
-#undef	__NSS_PRIVATE_INTERFACE
 
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
 int str2group(const char *, int, void *,
@@ -467,7 +462,7 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 {
 	struct nss_groupsbymem	arg;
 	char defval[BUFSIZ];
-	__NSL_FILE *defl;
+	FILE *defl;
 
 	arg.username	= username;
 	arg.gid_array	= gid_array;
@@ -496,15 +491,15 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 	 * link ourselfs against libcmd, so instead we just do it by hand
 	 */
 
-	if ((defl = __nsl_c_fopen(__NSW_DEFAULT_FILE, "r")) != NULL) {
-		while (__nsl_c_fgets(defval, sizeof (defval), defl) != NULL) {
+	if ((defl = fopen(__NSW_DEFAULT_FILE, "rF")) != NULL) {
+		while (fgets(defval, sizeof (defval), defl) != NULL) {
 			if (strncmp(USE_NETID_STR, defval,
 			    sizeof (USE_NETID_STR) - 1) == 0) {
 				arg.force_slow_way = 0;
 				break;
 			}
 		}
-		(void) __nsl_c_fclose(defl);
+		(void) fclose(defl);
 	}
 
 	(void) nss_search(&db_root, _nss_initf_group,

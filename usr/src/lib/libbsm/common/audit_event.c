@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,7 +25,7 @@ static char	sccsid[] = "%Z%%M% %I% %E% SMI";
 #endif
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +131,7 @@ getauevent_r(au_event_entry)
 	/* open audit event file if it isn't already */
 	_mutex_lock(&mutex_eventfile);
 	if (!au_event_file)
-		if (!(au_event_file = fopen(au_event_fname, "r"))) {
+		if (!(au_event_file = fopen(au_event_fname, "rF"))) {
 			_mutex_unlock(&mutex_eventfile);
 			return ((au_event_ent_t *)0);
 		}
@@ -328,7 +327,7 @@ cacheauevent(result, event_number)
 	if (called_once == 0) {
 
 		/* Count number of lines in the events file */
-		if ((fp = fopen(au_event_fname, "r")) == NULL) {
+		if ((fp = fopen(au_event_fname, "rF")) == NULL) {
 			_mutex_unlock(&mutex_eventcache);
 			return (-1);
 		}

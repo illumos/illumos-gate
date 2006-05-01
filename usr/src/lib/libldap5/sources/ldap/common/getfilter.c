@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ ldap_init_getfilter( char *fname )
     int 		eof;
     LDAPFiltDesc	*lfdp;
 
-    if (( fp = fopen( fname, "r" )) == NULL ) {
+    if (( fp = fopen( fname, "rF" )) == NULL ) {
 	return( NULL );
     }
 

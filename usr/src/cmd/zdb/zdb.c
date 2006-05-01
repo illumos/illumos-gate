@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/zfs_context.h>
@@ -2051,6 +2052,7 @@ main(int argc, char **argv)
 	vdev_knob_t *vk;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	dprintf_setup(&argc, argv);
 

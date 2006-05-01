@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ __bt_dinit()
 	first = 0;
 
 #ifndef TRACE_TO_STDERR
-	if ((tracefp = fopen("/tmp/__bt_debug", "w")) != NULL)
+	if ((tracefp = fopen("/tmp/__bt_debug", "wF")) != NULL)
 		return;
 #endif
 	tracefp = stderr;

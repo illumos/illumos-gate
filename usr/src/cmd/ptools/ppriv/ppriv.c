@@ -28,6 +28,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -129,6 +130,7 @@ main(int argc, char **argv)
 	if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
 		rlim.rlim_cur = rlim.rlim_max;
 		(void) setrlimit(RLIMIT_NOFILE, &rlim);
+		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
 	if (exec) {

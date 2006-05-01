@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -55,7 +59,7 @@ int main(argc, argv)
     p = strrchr(p, '.');
     if (p == (char *)NULL || strcmp(p, ".ct"))
 	strcat(path, ".ct");
-    yyin = fopen(path, "r");
+    yyin = fopen(path, "rF");
     if (!yyin) {
 	perror(path);
 	exit(1);
@@ -68,7 +72,7 @@ int main(argc, argv)
     strcat(c_file, ".c");
     *p = '.';
 
-    output_file = fopen(c_file, "w+");
+    output_file = fopen(c_file, "w+F");
     if (!output_file) {
 	perror(c_file);
 	exit(1);

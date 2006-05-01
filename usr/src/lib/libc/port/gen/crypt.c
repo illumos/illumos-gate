@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -374,7 +373,7 @@ getcryptpolicy(void)
 	char	line[BUFSIZ];
 	struct crypt_policy_s *policy;
 
-	if ((pconf = fopen(POLICY_CONF_FILE, "r")) == NULL) {
+	if ((pconf = fopen(POLICY_CONF_FILE, "rF")) == NULL) {
 		return (NULL);
 	}
 
@@ -539,7 +538,7 @@ getalgbyname(const char *algname, boolean_t *found)
 		goto cleanup;
 	}
 
-	if ((fconf = fdopen(configfd, "r")) == NULL) {
+	if ((fconf = fdopen(configfd, "rF")) == NULL) {
 		syslog(LOG_ALERT, "crypt: fdopen(%d) failed: %s",
 			configfd, strerror(errno));
 		goto cleanup;

@@ -91,7 +91,7 @@ setdadefent(void)
 	if (_df == NULL)
 		return;
 	if (dadeff == NULL)
-		dadeff = fopen(DADEFS_FILE, "r");
+		dadeff = fopen(DADEFS_FILE, "rF");
 	else
 		rewind(dadeff);
 }

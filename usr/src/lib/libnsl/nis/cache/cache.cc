@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,6 @@
 #include <syslog.h>
 #include "cache.h"
 #include "cold_start.h"
-#include "nsl_stdio_prv.h"
 #include "nis_cache.h"
 
 int __nis_debuglevel = 0;
@@ -1024,7 +1022,7 @@ NisCache::resetPreference()
 
 
 void
-NisCache::writePreference(__NSL_FILE *fp)
+NisCache::writePreference(FILE *fp)
 {
 	(void) prefer.dumpList(fp);
 	prefer.dumpOption(fp);
@@ -1331,13 +1329,13 @@ NisCache::okay()
 uint32_t
 NisCache::loadDotFile()
 {
-	__NSL_FILE *fp;
+	FILE *fp;
 	char *p, buf[2048];
 	size_t l;
 	uint32_t exptime;
 	struct timeval now;
 
-	fp = __nsl_fopen(DOT_FILE, "r");
+	fp = fopen(DOT_FILE, "rF");
 	if (fp == NULL)
 		return (0);
 
@@ -1345,22 +1343,22 @@ NisCache::loadDotFile()
 	 * read TTL: TTL must be the first line in this file
 	 * unless the file is empty.
 	 */
-	if ((p = __nsl_fgets(buf, sizeof (buf), fp)) == NULL) {
+	if ((p = fgets(buf, sizeof (buf), fp)) == NULL) {
 		/* empty file */
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (0);
 	}
 	if (!isdigit(*p)) {
 		/* invalid TTL */
 		syslog(LOG_ERR, "invalid TTL in %s", DOT_FILE);
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (0);
 	}
 	exptime = (uint32_t)atol(p);
 	(void) gettimeofday(&now, NULL);
 	if (exptime < now.tv_sec) {
 		/* TTL expired */
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (0);
 	}
 
@@ -1368,9 +1366,9 @@ NisCache::loadDotFile()
 	 * read preferred server list
 	 * This line can be empty
 	 */
-	if ((p = __nsl_fgets(buf, sizeof (buf), fp)) == NULL) {
+	if ((p = fgets(buf, sizeof (buf), fp)) == NULL) {
 		/* file without any preferred info */
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (exptime);
 	}
 	l = strlen(p) - 1;
@@ -1382,9 +1380,9 @@ NisCache::loadDotFile()
 	 * read options: valid options are "all" and
 	 * "pref_only".  Default is "all".
 	 */
-	if ((p = __nsl_fgets(buf, sizeof (buf), fp)) == NULL) {
+	if ((p = fgets(buf, sizeof (buf), fp)) == NULL) {
 		/* file without any preferred info */
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		mergeOption(PREF_ALL);
 		return (exptime);
 	}
@@ -1397,7 +1395,7 @@ NisCache::loadDotFile()
 		mergeOption(PREF_ALL);
 
 	/* ignore the rest of the file */
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 	return (exptime);
 }
 
@@ -1741,24 +1739,20 @@ HostList::serves(directory_obj *dobj)
 
 
 int
-HostList::dumpList(__NSL_FILE *fp)
+HostList::dumpList(FILE *fp)
 {
 	HostEnt *scan;
-	int	n = 0;
-	char	buf[64];
+	int     n = 0;
 
 	for (scan = entries; scan; scan = scan->next) {
 		if (n++)
-			(void) __nsl_fputc(',', fp);
-		(void) __nsl_fputstring(scan->name, fp);
-		if (scan->interface && *scan->interface) {
-			(void) __nsl_fputc('/', fp);
-			(void) __nsl_fputstring(scan->interface, fp);
-		}
-		(void) snprintf(buf, sizeof (buf), "(%d)", scan->rank);
-		(void) __nsl_fputstring(buf, fp);
+			(void) fprintf(fp, ",");
+		(void) fprintf(fp, "%s", scan->name);
+		if (scan->interface && *scan->interface)
+			(void) fprintf(fp, "/%s", scan->interface);
+		(void) fprintf(fp, "(%d)", scan->rank);
 	}
-	(void) __nsl_fputc('\n', fp);
+	(void) fprintf(fp, "\n");
 	return (n);
 }
 
@@ -1771,16 +1765,14 @@ HostList::addOption(int value)
 
 
 void
-HostList::dumpOption(__NSL_FILE *fp)
+HostList::dumpOption(FILE *fp)
 {
 	switch (pref_option) {
 		case PREF_ALL_VAL:
-			(void) __nsl_fputstring(PREF_ALL, fp);
-			(void) __nsl_fputc('\n', fp);
+			(void) fprintf(fp, "%s\n", PREF_ALL);
 			break;
 		case PREF_ONLY_VAL:
-			(void) __nsl_fputstring(PREF_ONLY, fp);
-			(void) __nsl_fputc('\n', fp);
+			(void) fprintf(fp, "%s\n", PREF_ONLY);
 			break;
 	}
 }

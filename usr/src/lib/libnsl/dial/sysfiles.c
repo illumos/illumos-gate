@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -163,7 +162,7 @@ scansys(const char *service)
 	char *tok, buf[BUFSIZ];
 
 	Systems[0] = Devices[0] = Dialers[0] = NULL;
-	if ((f = fopen(SYSFILES, "r")) != 0) {
+	if ((f = fopen(SYSFILES, "rF")) != 0) {
 		while (getline(f, buf) > 0) {
 			/* got a (logical) line from Sysfiles */
 			/* strtok's of this buf continue in tokenize() */
@@ -213,7 +212,7 @@ scancfg(char *service, char *device)
 	connecttime = CONNECTTIME;
 	expecttime = EXPECTTIME;
 
-	if ((f = fopen(DEVCONFIG, "r")) != 0) {
+	if ((f = fopen(DEVCONFIG, "rF")) != 0) {
 		while (getline(f, buf) > 0) {
 			/* got a (logical) line from Devconfig */
 			/* strtok's of this buf continue in tokenize() */
@@ -494,7 +493,7 @@ nextsystems(void)
 		nsystems = 0;
 	}
 	for (; Systems[nsystems] != NULL; nsystems++)
-		if ((fsystems = fopen(Systems[nsystems], "r")) != NULL)
+		if ((fsystems = fopen(Systems[nsystems], "rF")) != NULL)
 			return (TRUE);
 	return (FALSE);
 }
@@ -534,7 +533,7 @@ nextdevices(void)
 		ndevices = 0;
 	}
 	for (; Devices[ndevices] != NULL; ndevices++)
-		if ((fdevices = fopen(Devices[ndevices], "r")) != NULL)
+		if ((fdevices = fopen(Devices[ndevices], "rF")) != NULL)
 			return (TRUE);
 	return (FALSE);
 }
@@ -577,7 +576,7 @@ nextdialers(void)
 	}
 
 	for (; Dialers[ndialers] != NULL; ndialers++)
-		if ((fdialers = fopen(Dialers[ndialers], "r")) != NULL)
+		if ((fdialers = fopen(Dialers[ndialers], "rF")) != NULL)
 			return (TRUE);
 	return (FALSE);
 }
@@ -707,7 +706,7 @@ setconfig(void)
 	char *tok;
 	extern char _ProtoCfg[];
 
-	if ((f = fopen(CONFIG, "r")) != 0) {
+	if ((f = fopen(CONFIG, "rF")) != 0) {
 	while (getline(f, buf) > 0) {
 		/* got a (logical) line from Config file */
 		tok = strtok(buf, " \t");

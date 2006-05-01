@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +120,7 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 	} else {
 		file = NSCONFIGFILE;
 	}
-	fp = fopen(file, "r");
+	fp = fopen(file, "rF");
 	if (fp == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
 			gettext("Unable to open filename '%s' "
@@ -414,7 +413,7 @@ __ns_ldap_DumpLdif(char *filename)
 	if (filename == NULL) {
 		fp = stdout;
 	} else {
-		fp = fopen(filename, "w");
+		fp = fopen(filename, "wF");
 		if (fp == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
 				gettext("Unable to open filename %s for ldif "
@@ -526,7 +525,7 @@ __ns_ldap_DumpConfigFiles(char **files)
 		if (fi == 1)
 			docred++;
 		rc = stat(filename, &buf);
-		fp = fopen(filename, "w");
+		fp = fopen(filename, "wF");
 		if (fp == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
 				gettext("Unable to open filename %s"

@@ -39,6 +39,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <ftw.h>
 #include <signal.h>
@@ -535,6 +536,8 @@ main(int argc, char *argv[])
 	if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
 		syslog(LOG_ERR, "statd: unable to set RLIMIT_NOFILE to %d\n",
 			MAX_FDS);
+
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	if (!debug) {
 		ppid = fork();

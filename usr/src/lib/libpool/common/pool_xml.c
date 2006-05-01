@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2026,9 +2025,9 @@ pool_xml_open_file(pool_conf_t *conf)
 	}
 
 	if ((prov->pc_oflags & PO_RDWR) != 0)
-		prov->pxc_file = fopen(conf->pc_location, "r+");
+		prov->pxc_file = fopen(conf->pc_location, "r+F");
 	else /* Assume opening PO_RDONLY */
-		prov->pxc_file = fopen(conf->pc_location, "r");
+		prov->pxc_file = fopen(conf->pc_location, "rF");
 
 	if (prov->pxc_file == NULL) {
 		pool_seterror(POE_SYSTEM);

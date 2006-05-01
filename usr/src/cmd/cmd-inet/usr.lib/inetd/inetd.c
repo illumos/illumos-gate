@@ -88,6 +88,7 @@
 
 #include <netdb.h>
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
@@ -3789,6 +3790,8 @@ main(int argc, char *argv[])
 	}
 
 	msg_init();	/* setup logging */
+
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	/* inetd invocation syntax is inetd [alt_conf_file] method_name */
 

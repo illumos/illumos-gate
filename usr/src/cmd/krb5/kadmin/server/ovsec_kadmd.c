@@ -33,6 +33,7 @@
  */
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <signal.h>
 #include <syslog.h>
 #include <sys/types.h>
@@ -465,7 +466,8 @@ main(int argc, char *argv[])
 
 	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
 		rl.rlim_cur = rl.rlim_max = MAX(rl.rlim_max, FD_SETSIZE);
-		setrlimit(RLIMIT_NOFILE, &rl);
+		(void) setrlimit(RLIMIT_NOFILE, &rl);
+		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
 	if (!nofork && (ret = daemon(0, 0))) {

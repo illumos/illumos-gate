@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +46,6 @@
 #include <libintl.h>
 #include <syslog.h>
 #include "netcspace.h"
-#include "nsl_stdio_prv.h"
 
 #define	FAILURE  (unsigned)(-1)
 
@@ -57,7 +55,7 @@
 
 static int blank(char *);
 static int comment(char *);
-static struct netconfig *fgetnetconfig(__NSL_FILE *, char *);
+static struct netconfig *fgetnetconfig(FILE *, char *);
 static void netconfig_free(struct netconfig *);
 static unsigned int getflag(char *);
 static char **getlookups(char *);
@@ -268,33 +266,33 @@ static struct netconfig **
 getnetlist(void)
 {
 	char line[BUFSIZ];	/* holds each line of NETCONFIG */
-	__NSL_FILE *fp;		/* file stream for NETCONFIG */
+	FILE *fp;		/* file stream for NETCONFIG */
 	struct netconfig **listpp; /* the beginning of the netconfig list */
 	struct netconfig **tpp;	/* used to traverse the netconfig list */
 	int count;		/* the number of entries in file */
 
-	if ((fp = __nsl_fopen(NETCONFIG, "r")) == NULL) {
+	if ((fp = fopen(NETCONFIG, "rF")) == NULL) {
 		nc_error = NC_OPENFAIL;
 		return (NULL);
 	}
 
 	count = 0;
-	while (__nsl_fgets(line, BUFSIZ, fp)) {
+	while (fgets(line, BUFSIZ, fp)) {
 		if (!(blank(line) || comment(line))) {
 			++count;
 		}
 	}
-	__nsl_rewind(fp);
+	rewind(fp);
 
 	if (count == 0) {
 		nc_error = NC_NOTFOUND;
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (NULL);
 	}
 	if ((listpp = malloc((count + 1) *
 	    sizeof (struct netconfig *))) == NULL) {
 		nc_error = NC_NOMEM;
-		(void) __nsl_fclose(fp);
+		(void) fclose(fp);
 		return (NULL);
 	}
 
@@ -309,7 +307,7 @@ getnetlist(void)
 	linenum = 0;
 	for (tpp = listpp; *tpp = fgetnetconfig(fp, NULL); tpp++)
 		;
-	(void) __nsl_fclose(fp);
+	(void) fclose(fp);
 
 	if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
 		netlist_free(&listpp);
@@ -323,7 +321,7 @@ getnetlist(void)
  */
 
 static struct netconfig *
-fgetnetconfig(__NSL_FILE *fp, char *netid)
+fgetnetconfig(FILE *fp, char *netid)
 {
 	char linep[BUFSIZ];	/* pointer to a line in the file */
 	struct netconfig *netconfigp; /* holds the new netconfig structure */
@@ -332,7 +330,7 @@ fgetnetconfig(__NSL_FILE *fp, char *netid)
 	char *entnetid;		/* netid for the current entry */
 
 	/* skip past blank lines and comments. */
-	while (retvalp = __nsl_fgets(linep, BUFSIZ, fp)) {
+	while (retvalp = fgets(linep, BUFSIZ, fp)) {
 		linenum++;
 		if (!(blank(linep) || comment(linep))) {
 			break;

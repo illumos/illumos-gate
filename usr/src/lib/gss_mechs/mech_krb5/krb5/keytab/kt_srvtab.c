@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -122,7 +126,7 @@ krb5_ktsrvtab_resolve(krb5_context context, const char *name, krb5_keytab *id)
     FILE *fp;
 
     /* Make sure we can open the srvtab file for reading. */
-    fp = fopen(name, "r");
+    fp = fopen(name, "rF");
     if (!fp)
 	return(errno);
     fclose(fp);
@@ -387,9 +391,9 @@ const struct _krb5_kt_ops krb5_kts_ops = {
 #include <stdio.h>
 
 #ifdef ANSI_STDIO
-#define		READ_MODE	"rb"
+#define		READ_MODE	"rbF"
 #else
-#define		READ_MODE	"r"
+#define		READ_MODE	"rF"
 #endif
 
 /* The maximum sizes for V4 aname, realm, sname, and instance +1 */

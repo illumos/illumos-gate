@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +45,6 @@
 #include <dlfcn.h>
 #include <rpcsvc/nis_dhext.h>
 
-#include "nsl_stdio_prv.h"
 
 /*
  * NIS+ security file
@@ -178,12 +176,12 @@ list_copy(void *(*cp_ent)(), void **mpp)
 
 static char *
 nextline(fd, line)
-	__NSL_FILE *fd;
+	FILE *fd;
 	char *line;
 {
 	char *cp;
 
-	if (__nsl_fgets(line, NIS_SEC_CF_MAX_LINELEN, fd) == NULL)
+	if (fgets(line, NIS_SEC_CF_MAX_LINELEN, fd) == NULL)
 		return (NULL);
 	cp = index(line, '\n');
 	if (cp)
@@ -352,7 +350,7 @@ parse_line(char *linep, int minflds, int maxflds, int bufsiz)
  */
 
 static mechanism_t *
-get_secfile_ent(__NSL_FILE *fptr)
+get_secfile_ent(FILE *fptr)
 {
 	mechanism_t	*m;
 	char		*cp;
@@ -559,7 +557,7 @@ __nis_get_mechanisms(bool_t qop_secserv)
 	int		ent_cnt_no_dups = 0;	 /* valid cf count, no dups */
 	static uint_t	last = 0;
 	struct stat	sbuf;
-	__NSL_FILE 	*fptr;
+	FILE 		*fptr;
 
 	if (stat(NIS_SEC_CF_PATHNAME, &sbuf) != 0)
 		return (NULL);
@@ -576,7 +574,7 @@ __nis_get_mechanisms(bool_t qop_secserv)
 		}
 		mechs = mechs_no_dups = NULL;
 
-		if (!(fptr = __nsl_fopen(NIS_SEC_CF_PATHNAME, "r"))) {
+		if (!(fptr = fopen(NIS_SEC_CF_PATHNAME, "rF"))) {
 			(void) mutex_unlock(&nis_sec_cf_lock);
 			return (NULL);
 		}
@@ -597,7 +595,7 @@ __nis_get_mechanisms(bool_t qop_secserv)
 			    list_append_ent((void *)mp, (void **)tmechs,
 			    ent_cnt, (void (*)())sf_free_mech_ent);
 			if (tmechs == NULL) {
-				(void) __nsl_fclose(fptr);
+				(void) fclose(fptr);
 				(void) mutex_unlock(&nis_sec_cf_lock);
 				return (NULL);
 			}
@@ -610,12 +608,12 @@ __nis_get_mechanisms(bool_t qop_secserv)
 			    list_append_ent((void *)mp, (void **)tmechs_no_dups,
 			    ent_cnt_no_dups, (void (*)())sf_free_mech_ent);
 			if (tmechs_no_dups == NULL) {
-				(void) __nsl_fclose(fptr);
+				(void) fclose(fptr);
 				(void) mutex_unlock(&nis_sec_cf_lock);
 				return (NULL);
 			}
 		}
-		(void) __nsl_fclose(fptr);
+		(void) fclose(fptr);
 
 		/* set master lists to point to new built ones */
 		mechs = tmechs;
@@ -920,7 +918,7 @@ __nis_keyalg2authtype(
  * The caller should free the storage of a successful return.
  */
 static mfent_t *
-get_mechfile_ent(__NSL_FILE *fptr)
+get_mechfile_ent(FILE *fptr)
 {
 	mfent_t		*m;
 	char		*cp;
@@ -1007,7 +1005,7 @@ mf_get_mechs()
 	uint_t		ent_cnt = 0;		/* valid cf file entry count */
 	static uint_t	last = 0;		/* file last modified date */
 	struct stat	sbuf;
-	__NSL_FILE	*fptr;
+	FILE 		*fptr;
 
 	if (stat(mech_file, &sbuf) != 0)
 		return (NULL);
@@ -1022,7 +1020,7 @@ mf_get_mechs()
 			mechs = NULL;
 		}
 
-		if (!(fptr = __nsl_fopen(mech_file, "r"))) {
+		if (!(fptr = fopen(mech_file, "rF"))) {
 			(void) mutex_unlock(&mech_file_lock);
 			return (NULL);
 		}
@@ -1032,12 +1030,12 @@ mf_get_mechs()
 			tmechs = (mfent_t **)list_append_ent((void *)mp,
 			    (void **)tmechs, ent_cnt, (void (*)()) mf_free_ent);
 			if (tmechs == NULL) {
-				(void) __nsl_fclose(fptr);
+				(void) fclose(fptr);
 				(void) mutex_unlock(&mech_file_lock);
 				return (NULL);
 			}
 		}
-		(void) __nsl_fclose(fptr);
+		(void) fclose(fptr);
 
 		mechs = tmechs;  /* set master list to pt to newly built one */
 	}

@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * prof_file.c ---- routines that manipulate an individual profile file.
@@ -115,7 +119,7 @@ static int rw_access(const_profile_filespec_t filespec)
 	 */
 	FILE	*f;
 
-	f = fopen(filespec, "r+");
+	f = fopen(filespec, "r+F");
 	if (f) {
 		fclose(f);
 		return 1;
@@ -139,7 +143,7 @@ static int r_access(const_profile_filespec_t filespec)
 	 */
 	FILE	*f;
 
-	f = fopen(filespec, "r");
+	f = fopen(filespec, "rF");
 	if (f) {
 		fclose(f);
 		return 1;
@@ -357,7 +361,7 @@ errcode_t profile_update_file_data(prf_data_t data)
 	}
 #endif
 	errno = 0;
-	f = fopen(data->filespec, "r");
+	f = fopen(data->filespec, "rF");
 	if (f == NULL) {
 		retval = errno;
 		k5_mutex_unlock(&data->lock);
@@ -415,7 +419,7 @@ static errcode_t write_data_to_file(prf_data_t data, const char *outfile,
 
 	errno = 0;
 
-	f = fopen(new_file, "w");
+	f = fopen(new_file, "wF");
 	if (!f) {
 		retval = errno;
 		if (retval == 0)

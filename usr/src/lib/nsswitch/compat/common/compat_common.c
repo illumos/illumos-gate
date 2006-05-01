@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common code and structures used by name-service-switch "compat" backends.
@@ -38,7 +37,6 @@
 #include <bsm/libbsm.h>
 #include <user_attr.h>
 #include "compat_common.h"
-#include "../../../libnsl/include/nsl_stdio_prv.h"
 
 /*
  * This should be in a header.
@@ -116,7 +114,7 @@ struct compat_backend {
 	compat_backend_op_t	*ops;
 	int			n_ops;
 	const char		*filename;
-	__NSL_FILE		*f;
+	FILE			*f;
 	int			minbuf;
 	char			*buf;
 	int			linelen;	/* <== Explain use, lifetime */
@@ -359,11 +357,11 @@ _nss_compat_setent(be, dummy)
 			/* Backend isn't initialized properly? */
 			return (NSS_UNAVAIL);
 		}
-		if ((be->f = __nsl_fopen(be->filename, "r")) == 0) {
+		if ((be->f = fopen(be->filename, "rF")) == 0) {
 			return (NSS_UNAVAIL);
 		}
 	} else {
-		__nsl_rewind(be->f);
+		rewind(be->f);
 	}
 	strset_free(&be->minuses);
 	/* ===> ??? nss_endent(be->db_rootp, be->db_initf, &be->db_context); */
@@ -385,7 +383,7 @@ _nss_compat_endent(be, dummy)
 	void			*dummy;
 {
 	if (be->f != 0) {
-		__nsl_fclose(be->f);
+		fclose(be->f);
 		be->f = 0;
 	}
 	if (be->buf != 0) {
@@ -425,7 +423,7 @@ _nss_compat_destr(be, dummy)
 
 static int
 read_line(f, buffer, buflen)
-	__NSL_FILE		*f;
+	FILE			*f;
 	char			*buffer;
 	int			buflen;
 {
@@ -433,7 +431,7 @@ read_line(f, buffer, buflen)
 	while (1) {
 		int	linelen;
 
-		if (__nsl_fgets(buffer, buflen, f) == 0) {
+		if (fgets(buffer, buflen, f) == 0) {
 			/* End of file */
 			return (-1);
 		}
@@ -450,13 +448,13 @@ read_line(f, buffer, buflen)
 			buffer[--linelen] = '\0';
 			return (linelen);
 		}
-		if (__nsl_feof(f)) {
+		if (feof(f)) {
 			/* Line is last line in file, and has no newline */
 			return (linelen);
 		}
 		/* Line too long for buffer;  toss it and loop for next line */
 		/* ===== should syslog() in cases where previous code did */
-		while (__nsl_fgets(buffer, buflen, f) != 0 &&
+		while (fgets(buffer, buflen, f) != 0 &&
 		    buffer[strlen(buffer) - 1] != '\n') {
 			;
 		}
