@@ -30,7 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/pci.h>
-#include <fm/libtopo.h>
+#include <fm/topo_mod.h>
 #include <libdevinfo.h>
 #include <libnvpair.h>
 

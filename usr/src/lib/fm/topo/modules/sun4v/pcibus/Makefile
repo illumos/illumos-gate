@@ -29,7 +29,14 @@
 MODULE = pcibus
 ARCH = sun4v
 CLASS = arch
-PCISRCS = pcibus.c pcibus_labels.c did.c did_hash.c did_props.c util.c
+PCISRCS = did.c			\
+	  did_hash.c		\
+	  did_props.c		\
+	  pcibus.c		\
+	  pcibus_labels.c	\
+	  pcifn_enum.c		\
+	  util.c
+
 MODULESRCS = $(PCISRCS) pci_sun4v.c
 
 include ../../Makefile.plugin

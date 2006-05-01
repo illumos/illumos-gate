@@ -305,7 +305,7 @@ pcihostbridge_declare(tnode_t *parent, di_node_t din, topo_instance_t i)
 
 	if ((pd = did_find(Didhash, din)) == NULL)
 		return (NULL);
-	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, i, din)) == NULL)
+	if ((ntn = hb_tnode_create(parent, HOSTBRIDGE, i, pd)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, HB_common_props, HB_propcnt) < 0) {
 		topo_node_unbind(ntn);

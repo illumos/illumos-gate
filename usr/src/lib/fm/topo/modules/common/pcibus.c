@@ -54,6 +54,7 @@ extern int Dev_propcnt;
 extern int Fn_propcnt;
 
 extern int platform_pci_label(tnode_t *, nvlist_t *, nvlist_t **);
+extern int pcifn_enum(topo_mod_t *, tnode_t *);
 
 di_prom_handle_t Promtree = DI_PROM_HANDLE_NIL;
 topo_mod_t *PciHdl;
@@ -355,6 +356,24 @@ pcibus_declare(tnode_t *parent, di_node_t dn, topo_instance_t i)
 }
 
 static int
+pci_bridge_declare(tnode_t *fn, di_node_t din, int board,
+    int bridge, int rc, int depth)
+{
+	int err, excap, extyp;
+
+	excap = pciex_cap_get(Didhash, din);
+	extyp = excap & PCIE_PCIECAP_DEV_TYPE_MASK;
+	if (excap <= 0 ||
+	    extyp != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
+		err = pci_children_instantiate(fn,
+		    din, board, bridge, rc, TRUST_BDF, depth + 1);
+	else
+		err = pci_children_instantiate(fn,
+		    din, board, bridge, rc - TO_PCI, TRUST_BDF, depth + 1);
+	return (err);
+}
+
+static int
 declare_dev_and_fn(tnode_t *bus, tnode_t **dev, di_node_t din,
     int board, int bridge, int rc, int devno, int fnno, int depth)
 {
@@ -378,23 +397,14 @@ declare_dev_and_fn(tnode_t *bus, tnode_t **dev, di_node_t din,
 		return (-1);
 	if (pci_classcode_get(Didhash, din, &class, &subclass) < 0)
 		return (-1);
-	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI) {
-		int excap, extyp;
-
-		excap = pciex_cap_get(Didhash, din);
-		extyp = excap & PCIE_PCIECAP_DEV_TYPE_MASK;
-		if (excap <= 0 ||
-		    extyp != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
-			err = pci_children_instantiate(fn,
-			    din, board, bridge, rc, TRUST_BDF, depth + 1);
-		else
-			err = pci_children_instantiate(fn,
-			    din, board, bridge, rc - TO_PCI,
-			    TRUST_BDF, depth + 1);
-		if (err < 0)
-			return (-1);
-	}
-	return (0);
+	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI)
+		err = pci_bridge_declare(fn, din, board, bridge, rc, depth);
+	else
+		err = pcifn_enum(PciHdl, fn);
+	if (err < 0)
+		return (-1);
+	else
+		return (0);
 }
 
 int
@@ -455,55 +465,59 @@ pci_children_instantiate(tnode_t *parent, di_node_t pn,
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-pci_enum(topo_mod_t *mp, tnode_t *troot, const char *name,
-    topo_instance_t min, topo_instance_t max, void *notused)
+pciexbus_enum(tnode_t *ptn,
+    char *pnm, topo_instance_t min, topo_instance_t max)
 {
-	did_t *hbdid, *didp;
-	char *pname;
-	di_node_t parent_dinode;
+	di_node_t pdn;
 	int rc;
 	int retval;
 
-	topo_mod_dprintf(PciHdl, "Enumerating pci!\n");
+	/*
+	 * PCI-Express; root complex shares the hostbridge's instance
+	 * number.  Parent node's private data is a simple di_node_t
+	 * and we have to construct our own did hash and did_t.
+	 */
+	rc = topo_node_instance(ptn);
 
-	if (strcmp(name, PCI_BUS) == 0) {
-		/* PCI Bus, so no root complex */
-		rc = NO_RC;
-	} else if (strcmp(name, PCIEX_BUS) == 0) {
-		/* PCI-Express; root complex is hostbridge's instance */
-		rc = topo_node_instance(troot);
-	} else {
-		topo_mod_dprintf(PciHdl,
-		    "Currently only know how to enumerate %s or %s not %s.\n",
-		    PCI_BUS, PCIEX_BUS, name);
-		return (0);
-	}
-	pname = topo_node_name(troot);
-	if (strcmp(pname, HOSTBRIDGE) != 0 && strcmp(pname, PCIEX_ROOT) != 0) {
-		topo_mod_dprintf(PciHdl,
-		    "Currently can only enumerate a %s or %s directly\n",
-		    PCI_BUS, PCIEX_BUS);
-		topo_mod_dprintf(PciHdl,
-		    "descended from a %s or %s node.\n",
-		    HOSTBRIDGE, PCIEX_ROOT);
-		return (0);
-	}
-	if ((parent_dinode = topo_node_private(troot)) == DI_NODE_NIL) {
+	if ((pdn = topo_node_private(ptn)) == DI_NODE_NIL) {
 		topo_mod_dprintf(PciHdl,
 		    "Parent %s node missing private data.\n"
 		    "Unable to proceed with %s enumeration.\n",
-		    pname, name);
+		    pnm, PCIEX_BUS);
 		return (0);
 	}
-	Didhash = did_hash_init(mp);
-	hbdid = did_create(Didhash, parent_dinode, 0, 0, rc, TRUST_BDF);
+	if ((Didhash = did_hash_init(PciHdl)) == NULL ||
+	    (did_create(Didhash, pdn, 0, 0, rc, TRUST_BDF) == NULL))
+		return (-1);	/* errno already set */
+	retval = pci_children_instantiate(ptn,
+	    pdn, 0, 0, rc, (min == max) ? min : TRUST_BDF, 0);
+	did_hash_fini(Didhash);
+	return (retval);
+}
+
+static int
+pcibus_enum(tnode_t *ptn, char *pnm, topo_instance_t min, topo_instance_t max)
+{
+	did_t *hbdid, *didp;
+	int retval;
+
+	/*
+	 * PCI Bus; Parent node's private data is a did_t.  We'll
+	 * use the did hash established by the parent.
+	 */
+	if ((hbdid = topo_node_private(ptn)) == NULL) {
+		topo_mod_dprintf(PciHdl,
+		    "Parent %s node missing private data.\n"
+		    "Unable to proceed with %s enumeration.\n",
+		    pnm, PCIEX_BUS);
+		return (0);
+	}
+	Didhash = did_hash(hbdid);
 
 	/*
 	 * If we're looking for a specific bus-instance, find the right
 	 * did_t in the chain, otherwise, there should be only one did_t.
-	 * Cache the did_t of interest in *this* enumerator's cache.
 	 */
 	if (min == max) {
 		int b;
@@ -517,18 +531,50 @@ pci_enum(topo_mod_t *mp, tnode_t *troot, const char *name,
 		if (didp == NULL) {
 			topo_mod_dprintf(PciHdl,
 			    "Parent %s node missing private data related\n"
-			    "to %s instance %d.\n", pname, name, min);
-			did_hash_fini(Didhash);
+			    "to %s instance %d.\n", pnm, PCI_BUS, min);
 			return (0);
 		}
 	} else {
 		assert(did_link_get(hbdid) == NULL);
 		didp = hbdid;
 	}
-	retval = pci_children_instantiate(troot, did_dinode(didp),
+	retval = pci_children_instantiate(ptn, did_dinode(didp),
 	    did_board(didp), did_bridge(didp), did_rc(didp),
 	    (min == max) ? min : TRUST_BDF, 0);
-	did_hash_fini(Didhash);
+	return (retval);
+}
+
+/*ARGSUSED*/
+static int
+pci_enum(topo_mod_t *mp, tnode_t *ptn, const char *name,
+    topo_instance_t min, topo_instance_t max, void *notused)
+{
+	char *pnm;
+	int retval;
+
+	topo_mod_dprintf(PciHdl, "Enumerating pci!\n");
+
+	pnm = topo_node_name(ptn);
+	if (strcmp(pnm, HOSTBRIDGE) != 0 && strcmp(pnm, PCIEX_ROOT) != 0) {
+		topo_mod_dprintf(PciHdl,
+		    "Currently can only enumerate a %s or %s directly\n",
+		    PCI_BUS, PCIEX_BUS);
+		topo_mod_dprintf(PciHdl,
+		    "descended from a %s or %s node.\n",
+		    HOSTBRIDGE, PCIEX_ROOT);
+		return (0);
+	}
+
+	if (strcmp(name, PCI_BUS) == 0) {
+		retval = pcibus_enum(ptn, pnm, min, max);
+	} else if (strcmp(name, PCIEX_BUS) == 0) {
+		retval = pciexbus_enum(ptn, pnm, min, max);
+	} else {
+		topo_mod_dprintf(PciHdl,
+		    "Currently only know how to enumerate %s or %s not %s.\n",
+		    PCI_BUS, PCIEX_BUS, name);
+		return (0);
+	}
 	return (retval);
 }
 

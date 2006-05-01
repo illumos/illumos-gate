@@ -29,8 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <topo_parse.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -47,6 +45,7 @@ static const char *Hc_canon[] = {
 	"chip-select",
 	"cpu",
 	"dimm",
+	"disk",
 	"hostbridge",
 	"interconnect",
 	"chassis",
@@ -60,6 +59,7 @@ static const char *Hc_canon[] = {
 	"pciexfn",
 	"pciexrc",
 	"pcifn",
+	"sata-port",
 	"systemboard"
 };
 

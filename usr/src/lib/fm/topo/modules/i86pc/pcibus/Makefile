@@ -29,7 +29,14 @@
 MODULE = pcibus
 ARCH = i86pc
 CLASS = arch
-PCISRCS = pcibus.c did.c did_hash.c did_props.c util.c pcibus_labels.c
+PCISRCS = did.c			\
+	  did_hash.c		\
+	  did_props.c		\
+	  pcibus.c		\
+	  pcibus_labels.c	\
+	  pcifn_enum.c		\
+	  util.c
+
 MODULESRCS = $(PCISRCS) pci_i86pc.c
 
 include ../../Makefile.plugin

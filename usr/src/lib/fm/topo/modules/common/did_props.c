@@ -376,7 +376,8 @@ ASRU_set(tnode_t *tn, did_t *pd,
 	mp = did_mod(pd);
 	hp = topo_mod_handle(mp);
 	nm = topo_node_name(tn);
-	if (strcmp(nm, PCI_FUNCTION) == 0 || strcmp(nm, PCIEX_FUNCTION) == 0) {
+	if (strcmp(nm, PCI_FUNCTION) == 0 || strcmp(nm, PCIEX_FUNCTION) == 0 ||
+	    strcmp(nm, PCIEX_ROOT) == 0) {
 		if ((dnpath = di_devfs_path(did_dinode(pd))) != NULL) {
 			/*
 			 * Dup the path, dev_path_fix() may replace it and
