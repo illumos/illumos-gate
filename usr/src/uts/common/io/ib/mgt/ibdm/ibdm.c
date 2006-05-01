@@ -6090,6 +6090,16 @@ static void
 ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 {
 	ibdm_ioc_info_t *ioc_list;
+	int	in_gidlist = 0;
+
+	/*
+	 * Check if gidinfo has been inserted into the
+	 * ibdm_dp_gidlist_head list. gl_next or gl_prev
+	 * != NULL, if gidinfo is the list.
+	 */
+	if (gidinfo->gl_prev != NULL ||
+	    gidinfo->gl_next != NULL)
+		in_gidlist = 1;
 
 	ioc_list = ibdm_update_ioc_gidlist(gidinfo, 0);
 
@@ -6104,16 +6114,19 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		(void) ibdm_free_iou_info(gidinfo);
 		mutex_exit(&gidinfo->gl_mutex);
 	}
-	if (gidinfo->gl_prev != NULL)
-		gidinfo->gl_prev->gl_next = gidinfo->gl_next;
-	if (gidinfo->gl_next != NULL)
-		gidinfo->gl_next->gl_prev = gidinfo->gl_prev;
 
-	if (gidinfo == ibdm.ibdm_dp_gidlist_head)
-		ibdm.ibdm_dp_gidlist_head = gidinfo->gl_next;
-	if (gidinfo == ibdm.ibdm_dp_gidlist_tail)
-		ibdm.ibdm_dp_gidlist_tail = gidinfo->gl_prev;
-	ibdm.ibdm_ngids--;
+	if (in_gidlist) {
+		if (gidinfo->gl_prev != NULL)
+			gidinfo->gl_prev->gl_next = gidinfo->gl_next;
+		if (gidinfo->gl_next != NULL)
+			gidinfo->gl_next->gl_prev = gidinfo->gl_prev;
+
+		if (gidinfo == ibdm.ibdm_dp_gidlist_head)
+			ibdm.ibdm_dp_gidlist_head = gidinfo->gl_next;
+		if (gidinfo == ibdm.ibdm_dp_gidlist_tail)
+			ibdm.ibdm_dp_gidlist_tail = gidinfo->gl_prev;
+		ibdm.ibdm_ngids--;
+	}
 	mutex_exit(&ibdm.ibdm_mutex);
 
 	mutex_destroy(&gidinfo->gl_mutex);
