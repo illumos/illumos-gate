@@ -873,6 +873,10 @@ forkexec(zlog_t *zlogp, const char *path, char *const argv[])
 		return (-1);
 	} else if (child_pid == 0) {
 		closefrom(0);
+		/* redirect stdin, stdout & stderr to /dev/null */
+		(void) open("/dev/null", O_RDONLY);	/* stdin */
+		(void) open("/dev/null", O_WRONLY);	/* stdout */
+		(void) open("/dev/null", O_WRONLY);	/* stderr */
 		(void) execv(path, argv);
 		/*
 		 * Since we are in the child, there is no point calling zerror()

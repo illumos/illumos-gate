@@ -90,6 +90,14 @@ typedef struct zone_entry {
 static zone_entry_t *zents;
 static size_t nzents;
 
+#define	LOOPBACK_IF	"lo0"
+#define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
+
+struct net_if {
+	char	*name;
+	int	af;
+};
+
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE \
 	(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
@@ -2150,6 +2158,217 @@ verify_limitpriv(zone_dochandle_t handle)
 	return (err);
 }
 
+static void
+free_local_netifs(int if_cnt, struct net_if **if_list)
+{
+	int		i;
+
+	for (i = 0; i < if_cnt; i++) {
+		free(if_list[i]->name);
+		free(if_list[i]);
+	}
+	free(if_list);
+}
+
+/*
+ * Get a list of the network interfaces, along with their address families,
+ * that are plumbed in the global zone.  See if_tcp(7p) for a description
+ * of the ioctls used here.
+ */
+static int
+get_local_netifs(int *if_cnt, struct net_if ***if_list)
+{
+	int		s;
+	int		i;
+	int		res = Z_OK;
+	int		space_needed;
+	int		cnt = 0;
+	struct		lifnum if_num;
+	struct		lifconf if_conf;
+	struct		lifreq *if_reqp;
+	char		*if_buf;
+	struct net_if	**local_ifs = NULL;
+
+	*if_cnt = 0;
+	*if_list = NULL;
+
+	if ((s = socket(SOCKET_AF(AF_INET), SOCK_DGRAM, 0)) < 0)
+		return (Z_ERR);
+
+	/*
+	 * Come back here in the unlikely event that the number of interfaces
+	 * increases between the time we get the count and the time we do the
+	 * SIOCGLIFCONF ioctl.
+	 */
+retry:
+	/* Get the number of interfaces. */
+	if_num.lifn_family = AF_UNSPEC;
+	if_num.lifn_flags = LIFC_NOXMIT;
+	if (ioctl(s, SIOCGLIFNUM, &if_num) < 0) {
+		(void) close(s);
+		return (Z_ERR);
+	}
+
+	/* Get the interface configuration list. */
+	space_needed = if_num.lifn_count * sizeof (struct lifreq);
+	if ((if_buf = malloc(space_needed)) == NULL) {
+		(void) close(s);
+		return (Z_ERR);
+	}
+	if_conf.lifc_family = AF_UNSPEC;
+	if_conf.lifc_flags = LIFC_NOXMIT;
+	if_conf.lifc_len = space_needed;
+	if_conf.lifc_buf = if_buf;
+	if (ioctl(s, SIOCGLIFCONF, &if_conf) < 0) {
+		free(if_buf);
+		/*
+		 * SIOCGLIFCONF returns EINVAL if the buffer we passed in is
+		 * too small.  In this case go back and get the new if cnt.
+		 */
+		if (errno == EINVAL)
+			goto retry;
+
+		(void) close(s);
+		return (Z_ERR);
+	}
+	(void) close(s);
+
+	/* Get the name and address family for each interface. */
+	if_reqp = if_conf.lifc_req;
+	for (i = 0; i < (if_conf.lifc_len / sizeof (struct lifreq)); i++) {
+		struct net_if	**p;
+		struct lifreq	req;
+
+		if (strcmp(LOOPBACK_IF, if_reqp->lifr_name) == 0) {
+			if_reqp++;
+			continue;
+		}
+
+		if ((s = socket(SOCKET_AF(if_reqp->lifr_addr.ss_family),
+		    SOCK_DGRAM, 0)) == -1) {
+			res = Z_ERR;
+			break;
+		}
+
+		(void) strncpy(req.lifr_name, if_reqp->lifr_name,
+		    sizeof (req.lifr_name));
+		if (ioctl(s, SIOCGLIFADDR, &req) < 0) {
+			(void) close(s);
+			if_reqp++;
+			continue;
+		}
+
+		if ((p = (struct net_if **)realloc(local_ifs,
+		    sizeof (struct net_if *) * (cnt + 1))) == NULL) {
+			res = Z_ERR;
+			break;
+		}
+		local_ifs = p;
+
+		if ((local_ifs[cnt] = malloc(sizeof (struct net_if))) == NULL) {
+			res = Z_ERR;
+			break;
+		}
+
+		if ((local_ifs[cnt]->name = strdup(if_reqp->lifr_name))
+		    == NULL) {
+			free(local_ifs[cnt]);
+			res = Z_ERR;
+			break;
+		}
+		local_ifs[cnt]->af = req.lifr_addr.ss_family;
+		cnt++;
+
+		(void) close(s);
+		if_reqp++;
+	}
+
+	free(if_buf);
+
+	if (res != Z_OK) {
+		free_local_netifs(cnt, local_ifs);
+	} else {
+		*if_cnt = cnt;
+		*if_list = local_ifs;
+	}
+
+	return (res);
+}
+
+static char *
+af2str(int af)
+{
+	switch (af) {
+	case AF_INET:
+		return ("IPv4");
+	case AF_INET6:
+		return ("IPv6");
+	default:
+		return ("Unknown");
+	}
+}
+
+/*
+ * Cross check the network interface name and address family with the
+ * interfaces that are set up in the global zone so that we can print the
+ * appropriate error message.
+ */
+static void
+print_net_err(char *phys, char *addr, int af, char *msg)
+{
+	int		i;
+	int		local_if_cnt = 0;
+	struct net_if	**local_ifs = NULL;
+	boolean_t	found_if = B_FALSE;
+	boolean_t	found_af = B_FALSE;
+
+	if (get_local_netifs(&local_if_cnt, &local_ifs) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("could not verify %s %s=%s %s=%s\n\t%s\n"),
+		    "net", "address", addr, "physical", phys, msg);
+		return;
+	}
+
+	for (i = 0; i < local_if_cnt; i++) {
+		if (strcmp(phys, local_ifs[i]->name) == 0) {
+			found_if = B_TRUE;
+			if (af == local_ifs[i]->af) {
+				found_af = B_TRUE;
+				break;
+			}
+		}
+	}
+
+	free_local_netifs(local_if_cnt, local_ifs);
+
+	if (!found_if) {
+		(void) fprintf(stderr,
+		    gettext("could not verify %s %s=%s\n\t"
+		    "network interface %s is not plumbed in the global zone\n"),
+		    "net", "physical", phys, phys);
+		return;
+	}
+
+	/*
+	 * Print this error if we were unable to find the address family
+	 * for this interface.  If the af variable is not initialized to
+	 * to something meaningful by the caller (not AF_UNSPEC) then we
+	 * also skip this message since it wouldn't be informative.
+	 */
+	if (!found_af && af != AF_UNSPEC) {
+		(void) fprintf(stderr,
+		    gettext("could not verify %s %s=%s %s=%s\n\tthe %s address "
+		    "family is not configured on this interface in the\n\t"
+		    "global zone\n"),
+		    "net", "address", addr, "physical", phys, af2str(af));
+		return;
+	}
+
+	(void) fprintf(stderr,
+	    gettext("could not verify %s %s=%s %s=%s\n\t%s\n"),
+	    "net", "address", addr, "physical", phys, msg);
+}
+
 static int
 verify_details(int cmd_num)
 {
@@ -2217,7 +2436,7 @@ verify_details(int cmd_num)
 	}
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
 		struct lifreq lifr;
-		sa_family_t af;
+		sa_family_t af = AF_UNSPEC;
 		int so, res;
 
 		/* skip any loopback interfaces */
@@ -2225,10 +2444,9 @@ verify_details(int cmd_num)
 			continue;
 		if ((res = zonecfg_valid_net_address(nwiftab.zone_nwif_address,
 		    &lifr)) != Z_OK) {
-			(void) fprintf(stderr, gettext("could not verify %s "
-			    "%s=%s %s=%s: %s\n"), "net", "address",
-			    nwiftab.zone_nwif_address, "physical",
-			    nwiftab.zone_nwif_physical, zonecfg_strerror(res));
+			print_net_err(nwiftab.zone_nwif_physical,
+			    nwiftab.zone_nwif_address, af,
+			    zonecfg_strerror(res));
 			return_code = Z_ERR;
 			continue;
 		}
@@ -2245,11 +2463,9 @@ verify_details(int cmd_num)
 			return_code = Z_ERR;
 			continue;
 		}
-		if (ioctl(so, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
-			(void) fprintf(stderr,
-			    gettext("could not verify %s %s=%s %s=%s: %s\n"),
-			    "net", "address", nwiftab.zone_nwif_address,
-			    "physical", nwiftab.zone_nwif_physical,
+		if (ioctl(so, SIOCGLIFFLAGS, &lifr) < 0) {
+			print_net_err(nwiftab.zone_nwif_physical,
+			    nwiftab.zone_nwif_address, af,
 			    strerror(errno));
 			return_code = Z_ERR;
 		}
