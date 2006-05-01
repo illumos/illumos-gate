@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -530,6 +529,8 @@ extern boolean_t metaslot_enabled;
 extern CK_SLOT_ID metaslot_keystore_slotid;
 extern boolean_t metaslot_auto_key_migrate;
 extern struct CK_FUNCTION_LIST metaslot_functionList;
+extern int meta_urandom_seed_fd;
+extern pthread_mutex_t initmutex;
 
 extern ses_to_be_freed_list_t ses_delay_freed;
 extern object_to_be_freed_list_t obj_delay_freed;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,6 +277,9 @@ rnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	int error;
 	uint8_t buf[WRITEBUFSIZE];
 	size_t bytes;
+	minor_t devno;
+
+	devno = getminor(dev);
 
 	while (uiop->uio_resid > 0) {
 		bytes = min(sizeof (buf), uiop->uio_resid);
@@ -287,9 +289,19 @@ rnd_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		if ((error = uiomove(buf, bytes, UIO_WRITE, uiop)) != 0)
 			return (error);
 
-		/* Add bytes to the pool but don't change the entropy level */
-		if ((error = random_add_entropy(buf, bytes, 0)) != 0)
-			return (error);
+		switch (devno) {
+		case DEVRANDOM:
+			if ((error = random_add_entropy(buf, bytes, 0)) != 0)
+				return (error);
+			break;
+		case DEVURANDOM:
+			if ((error = random_add_pseudo_entropy(buf, bytes,
+			    0)) != 0)
+				return (error);
+			break;
+		default:
+			return (ENXIO);
+		}
 	}
 
 	return (0);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,15 +185,13 @@ kcf_rngprov_check(void)
  * its random number generator.
  */
 static void
-rngprov_seed(uint8_t *buf, int len)
+rngprov_seed(uint8_t *buf, int len, uint_t entropy_est, uint32_t flags)
 {
 	kcf_provider_desc_t *pd = NULL;
-	kcf_req_params_t params;
 
 	if (kcf_get_sw_prov(rngmech_type, &pd, B_FALSE) == CRYPTO_SUCCESS) {
-		KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_SEED,
-		    pd->pd_sid, buf, len);
-		(void) kcf_submit_request(pd, NULL, NULL, &params, B_FALSE);
+		(void) KCF_PROV_SEED_RANDOM(pd, pd->pd_sid, buf, len,
+		    entropy_est, flags, NULL);
 		KCF_PROV_REFRELE(pd);
 	}
 }
@@ -249,7 +247,7 @@ rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t from_user_api,
 		}
 
 		KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_GENERATE,
-		    pd->pd_sid, ptr, need);
+		    pd->pd_sid, ptr, need, 0, 0);
 		rv = kcf_submit_request(pd, NULL, NULL, &params, B_FALSE);
 		ASSERT(rv != CRYPTO_QUEUED);
 
@@ -346,7 +344,7 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len, boolean_t from_user_api)
 			req.cr_callback_arg = rndbuf;
 			KCF_WRAP_RANDOM_OPS_PARAMS(&params,
 			    KCF_OP_RANDOM_GENERATE,
-			    pd->pd_sid, rndbuf, MINEXTRACTBYTES);
+			    pd->pd_sid, rndbuf, MINEXTRACTBYTES, 0, 0);
 			break;
 
 		case CRYPTO_SW_PROVIDER:
@@ -357,7 +355,7 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len, boolean_t from_user_api)
 			 */
 			KCF_WRAP_RANDOM_OPS_PARAMS(&params,
 			    KCF_OP_RANDOM_GENERATE,
-			    pd->pd_sid, ptr, len);
+			    pd->pd_sid, ptr, len, 0, 0);
 			break;
 		}
 
@@ -999,14 +997,28 @@ rndc_getbytes(uint8_t *ptr, size_t len)
  * Mix the supplied bytes into the entropy pool of a kCF
  * RNG provider.
  */
-/* ARGSUSED */
 int
-random_add_entropy(uint8_t *ptr, size_t len, uint16_t entropy_est)
+random_add_pseudo_entropy(uint8_t *ptr, size_t len, uint_t entropy_est)
 {
 	if (len < 1)
 		return (-1);
 
-	rngprov_seed(ptr, len);
+	rngprov_seed(ptr, len, entropy_est, 0);
+
+	return (0);
+}
+
+/*
+ * Mix the supplied bytes into the entropy pool of a kCF
+ * RNG provider. Mix immediately.
+ */
+int
+random_add_entropy(uint8_t *ptr, size_t len, uint_t entropy_est)
+{
+	if (len < 1)
+		return (-1);
+
+	rngprov_seed(ptr, len, entropy_est, CRYPTO_SEED_NOW);
 
 	return (0);
 }

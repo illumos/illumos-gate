@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,6 @@
 #include "softRandom.h"
 #include "softSession.h"
 
-
 CK_RV
 C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 {
@@ -43,7 +41,6 @@ C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 	CK_RV	rv;
 	soft_session_t	*session_p;
 	boolean_t	lock_held = B_FALSE;
-	int		fd;
 	long		nwrite;
 
 	if (!softtoken_initialized)
@@ -60,24 +57,33 @@ C_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed, CK_ULONG ulSeedLen)
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	while ((fd = open(DEV_URANDOM, O_WRONLY)) < 0) {
-		if (errno != EINTR)
-			break;
+	if (soft_urandom_seed_fd < 0) {
+		(void) pthread_mutex_lock(&soft_giant_mutex);
+			/* Check again holding the mutex */
+			if (soft_urandom_seed_fd < 0) {
+				while ((soft_urandom_seed_fd = open(DEV_URANDOM,
+				    O_WRONLY)) < 0) {
+					if (errno != EINTR)
+						break;
+				}
+				if (soft_urandom_seed_fd < 0) {
+					(void) pthread_mutex_unlock(
+					    &soft_giant_mutex);
+					if (errno == EACCES)
+						return (
+						CKR_RANDOM_SEED_NOT_SUPPORTED);
+					return (CKR_DEVICE_ERROR);
+				}
+				(void) fcntl(soft_urandom_seed_fd, F_SETFD,
+				    FD_CLOEXEC);
+			}
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
 	}
-	if (fd == -1) {
-		if (errno == EACCES)
-			return (CKR_RANDOM_SEED_NOT_SUPPORTED);
-		return (CKR_DEVICE_ERROR);
-	}
-	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 
-	nwrite = looping_write(fd, pSeed, ulSeedLen);
+	nwrite = looping_write(soft_urandom_seed_fd, pSeed, ulSeedLen);
 	if (nwrite <= 0) {
-		(void) close(fd);
 		return (CKR_DEVICE_ERROR);
 	}
-
-	(void) close(fd);
 
 	return (CKR_OK);
 

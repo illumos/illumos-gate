@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -777,7 +776,7 @@ static crypto_dual_cipher_mac_ops_t dprov_cipher_mac_ops = {
 };
 
 static int dprov_seed_random(crypto_provider_handle_t, crypto_session_id_t,
-    uchar_t *, size_t, crypto_req_handle_t);
+    uchar_t *, size_t, uint_t, uint32_t, crypto_req_handle_t);
 static int dprov_generate_random(crypto_provider_handle_t, crypto_session_id_t,
     uchar_t *, size_t, crypto_req_handle_t);
 
@@ -1272,6 +1271,8 @@ typedef struct dprov_random_req {
 	uchar_t *rr_buf;
 	size_t rr_len;
 	crypto_session_id_t rr_session_id;
+	uint_t rr_entropy_est;
+	uint32_t rr_flags;
 } dprov_random_req_t;
 
 /* for DPROV_REQ_SESSION requests */
@@ -1396,7 +1397,8 @@ static int dprov_cipher_mac_submit_req(dprov_req_type_t, dprov_state_t *,
     crypto_mechanism_t *, crypto_key_t *, crypto_mechanism_t *, crypto_key_t *,
     crypto_dual_data_t *, crypto_data_t *, crypto_data_t *, int);
 static int dprov_random_submit_req(dprov_req_type_t, dprov_state_t *,
-    crypto_req_handle_t, uchar_t *, size_t, crypto_session_id_t);
+    crypto_req_handle_t, uchar_t *, size_t, crypto_session_id_t, uint_t,
+    uint32_t);
 static int dprov_session_submit_req(dprov_req_type_t, dprov_state_t *,
     crypto_req_handle_t, crypto_session_id_t *, crypto_session_id_t,
     crypto_user_type_t, char *, size_t);
@@ -3384,7 +3386,8 @@ dprov_mac_verify_decrypt_atomic(crypto_provider_handle_t provider,
 
 static int
 dprov_seed_random(crypto_provider_handle_t provider,  crypto_session_id_t sid,
-    uchar_t *buf, size_t len, crypto_req_handle_t req)
+    uchar_t *buf, size_t len, uint_t entropy_est, uint32_t flags,
+    crypto_req_handle_t req)
 {
 	int error = CRYPTO_FAILED;
 	dprov_state_t *softc = (dprov_state_t *)provider;
@@ -3396,7 +3399,7 @@ dprov_seed_random(crypto_provider_handle_t provider,  crypto_session_id_t sid,
 	    instance));
 
 	error = dprov_random_submit_req(DPROV_REQ_RANDOM_SEED, softc,
-	    req, buf, len, sid);
+	    req, buf, len, sid, entropy_est, flags);
 
 	DPROV_DEBUG(D_RANDOM, ("(%d) dprov_seed_random: done err = 0x0%x\n",
 	    instance, error));
@@ -3418,7 +3421,7 @@ dprov_generate_random(crypto_provider_handle_t provider,
 	    instance));
 
 	error = dprov_random_submit_req(DPROV_REQ_RANDOM_GENERATE, softc,
-	    req, buf, len, sid);
+	    req, buf, len, sid, 0, 0);
 
 	DPROV_DEBUG(D_RANDOM, ("(%d) dprov_generate_random: done "
 	    "err = 0x0%x\n", instance, error));
@@ -4548,7 +4551,7 @@ dprov_cipher_submit_req(dprov_req_type_t req_type,
 static int
 dprov_random_submit_req(dprov_req_type_t req_type,
     dprov_state_t *softc, crypto_req_handle_t req, uchar_t *buf, size_t len,
-    crypto_session_id_t sid)
+    crypto_session_id_t sid, uint_t entropy_est, uint32_t flags)
 {
 	dprov_req_t *taskq_req;
 
@@ -4559,6 +4562,8 @@ dprov_random_submit_req(dprov_req_type_t req_type,
 	taskq_req->dr_random_req.rr_buf = buf;
 	taskq_req->dr_random_req.rr_len = len;
 	taskq_req->dr_random_req.rr_session_id = sid;
+	taskq_req->dr_random_req.rr_entropy_est = entropy_est;
+	taskq_req->dr_random_req.rr_flags = flags;
 
 	return (dprov_taskq_dispatch(softc, taskq_req,
 	    (task_func_t *)dprov_random_task, KM_NOSLEEP));

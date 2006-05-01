@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -954,10 +953,10 @@ extern rctl_hndl_t rc_project_crypto_mem;
  * Wrappers for crypto_random_number_ops(9S) entry points.
  */
 
-#define	KCF_PROV_SEED_RANDOM(pd, session, buf, len, req) ( \
+#define	KCF_PROV_SEED_RANDOM(pd, session, buf, len, est, flags, req) ( \
 	(KCF_PROV_RANDOM_OPS(pd) && KCF_PROV_RANDOM_OPS(pd)->seed_random) ? \
 	KCF_PROV_RANDOM_OPS(pd)->seed_random((pd)->pd_prov_handle, \
-	    session, buf, len, req) : CRYPTO_NOT_SUPPORTED)
+	    session, buf, len, est, flags, req) : CRYPTO_NOT_SUPPORTED)
 
 #define	KCF_PROV_GENERATE_RANDOM(pd, session, buf, len, req) ( \
 	(KCF_PROV_RANDOM_OPS(pd) && \
@@ -1249,6 +1248,7 @@ extern void kcf_rnd_init();
 extern boolean_t kcf_rngprov_check(void);
 extern int kcf_rnd_get_pseudo_bytes(uint8_t *, size_t);
 extern int kcf_rnd_get_bytes(uint8_t *, size_t, boolean_t, boolean_t);
+extern int random_add_pseudo_entropy(uint8_t *, size_t, uint_t);
 extern void kcf_rnd_chpoll(int, short *, struct pollhead **);
 extern void kcf_rnd_schedule_timeout(boolean_t);
 

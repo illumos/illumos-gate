@@ -1270,7 +1270,8 @@ common_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 		switch (optype) {
 		case KCF_OP_RANDOM_SEED:
 			err = KCF_PROV_SEED_RANDOM(pd, rops->rn_sid,
-			    rops->rn_buf, rops->rn_buflen, rhndl);
+			    rops->rn_buf, rops->rn_buflen, rops->rn_entropy_est,
+			    rops->rn_flags, rhndl);
 			break;
 
 		case KCF_OP_RANDOM_GENERATE:

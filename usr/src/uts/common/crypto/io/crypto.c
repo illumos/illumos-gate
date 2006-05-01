@@ -4086,7 +4086,8 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_SEED,
-	    sp->sd_provider_session->ps_session, seed_buffer, seed_len);
+	    sp->sd_provider_session->ps_session, seed_buffer, seed_len, 0,
+	    CRYPTO_SEED_NOW);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 
@@ -4176,7 +4177,7 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_GENERATE,
-	    sp->sd_provider_session->ps_session, buffer, len);
+	    sp->sd_provider_session->ps_session, buffer, len, 0, 0);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 

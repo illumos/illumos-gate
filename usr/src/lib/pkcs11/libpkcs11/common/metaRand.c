@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +61,6 @@ meta_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed,
 {
 	CK_RV rv;
 	meta_session_t *session;
-	int fd;
 	ssize_t n;
 
 	if (pSeed == NULL || ulSeedLen == 0)
@@ -74,24 +72,32 @@ meta_SeedRandom(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSeed,
 		return (rv);
 	REFRELEASE(session);
 
-	while ((fd = open(RANDOM_DEVICE, O_WRONLY)) < 0) {
-		if (errno != EINTR)
-			break;
-	}
-	if (fd == -1) {
-		if (errno == EACCES)
-			return (CKR_RANDOM_SEED_NOT_SUPPORTED);
-		else
-			return (CKR_DEVICE_ERROR);
+	if (meta_urandom_seed_fd < 0) {
+		(void) pthread_mutex_lock(&initmutex);
+			/* Check again holding the mutex */
+			if (meta_urandom_seed_fd < 0) {
+				while ((meta_urandom_seed_fd = open(
+				    RANDOM_DEVICE, O_WRONLY)) < 0) {
+					if (errno != EINTR)
+						break;
+				}
+				if (meta_urandom_seed_fd < 0) {
+					(void) pthread_mutex_unlock(&initmutex);
+					if (errno == EACCES)
+						return (
+						CKR_RANDOM_SEED_NOT_SUPPORTED);
+					return (CKR_DEVICE_ERROR);
+				}
+				(void) fcntl(meta_urandom_seed_fd, F_SETFD,
+				    FD_CLOEXEC);
+			}
+		(void) pthread_mutex_unlock(&initmutex);
 	}
 
-	n = looping_write(fd, pSeed, ulSeedLen);
+	n = looping_write(meta_urandom_seed_fd, pSeed, ulSeedLen);
 	if (n <= 0) {
-		(void) close(fd);
 		return (CKR_DEVICE_ERROR);
 	}
-
-	(void) close(fd);
 
 	return (CKR_OK);
 }

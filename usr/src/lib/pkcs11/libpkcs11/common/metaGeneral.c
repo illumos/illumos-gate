@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +109,9 @@ struct CK_FUNCTION_LIST metaslot_functionList = {
 	meta_WaitForSlotEvent
 };
 
-static pthread_mutex_t initmutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t initmutex = PTHREAD_MUTEX_INITIALIZER;
+
+int meta_urandom_seed_fd = -1;
 
 ses_to_be_freed_list_t ses_delay_freed;
 object_to_be_freed_list_t obj_delay_freed;
@@ -163,7 +164,6 @@ meta_Initialize(CK_VOID_PTR pInitArgs)
 
 	meta_slotManager_find_object_token();
 
-
 	/* Initialize the object_to_be_freed list */
 	(void) pthread_mutex_init(&obj_delay_freed.obj_to_be_free_mutex, NULL);
 	obj_delay_freed.count = 0;
@@ -199,6 +199,11 @@ meta_Finalize(CK_VOID_PTR pReserved)
 		return (CKR_ARGUMENTS_BAD);
 
 	(void) pthread_mutex_lock(&initmutex);
+
+	if (meta_urandom_seed_fd > 0) {
+		(void) close(meta_urandom_seed_fd);
+		meta_urandom_seed_fd = -1;
+	}
 
 	meta_objectManager_finalize();
 

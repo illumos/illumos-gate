@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,6 +145,8 @@ typedef struct kcf_random_number_ops_params {
 	crypto_session_id_t	rn_sid;
 	uchar_t			*rn_buf;
 	size_t			rn_buflen;
+	uint_t			rn_entropy_est;
+	uint32_t		rn_flags;
 } kcf_random_number_ops_params_t;
 
 /*
@@ -476,7 +477,8 @@ typedef struct kcf_req_params {
 	cmops->md_decr_templ = _decr_templ;				\
 }
 
-#define	KCF_WRAP_RANDOM_OPS_PARAMS(req, ftype, _sid, _buf, _buflen) {	\
+#define	KCF_WRAP_RANDOM_OPS_PARAMS(req, ftype, _sid, _buf, _buflen,	\
+	_est, _flags) {							\
 	kcf_random_number_ops_params_t *rops =				\
 		&(req)->rp_u.random_number_params;			\
 									\
@@ -485,6 +487,8 @@ typedef struct kcf_req_params {
 	rops->rn_sid = _sid;						\
 	rops->rn_buf = _buf;						\
 	rops->rn_buflen = _buflen;					\
+	rops->rn_entropy_est = _est;					\
+	rops->rn_flags = _flags;					\
 }
 
 #define	KCF_WRAP_SESSION_OPS_PARAMS(req, ftype, _sid_ptr, _sid,		\

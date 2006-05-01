@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,10 +385,15 @@ typedef struct crypto_dual_cipher_mac_ops {
  */
 typedef struct crypto_random_number_ops {
 	int (*seed_random)(crypto_provider_handle_t, crypto_session_id_t,
-	    uchar_t *, size_t, crypto_req_handle_t);
+	    uchar_t *, size_t, uint_t, uint32_t, crypto_req_handle_t);
 	int (*generate_random)(crypto_provider_handle_t, crypto_session_id_t,
 	    uchar_t *, size_t, crypto_req_handle_t);
 } crypto_random_number_ops_t;
+
+/*
+ * Flag values for seed_random.
+ */
+#define	CRYPTO_SEED_NOW		0x00000001
 
 /*
  * The crypto_session_ops structure contains pointers to session

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,12 +82,17 @@ typedef struct physmem_entsrc_s {
 } physmem_entsrc_t;
 
 static uint32_t srndpool[RNDPOOLSIZE/4];	/* Pool of random bits */
+static uint32_t buffer[RNDPOOLSIZE/4];	/* entropy mixed in later */
+static int buffer_bytes;		/* bytes written to buffer */
 static uint32_t entropy_bits;		/* pool's current amount of entropy */
 static kmutex_t srndpool_lock;		/* protects r/w accesses to the pool, */
 					/* and the global variables */
+static kmutex_t buffer_lock;		/* protects r/w accesses to buffer */
 static kcondvar_t srndpool_read_cv;	/* serializes poll/read syscalls */
 static int pindex;			/* Global index for adding/extracting */
 					/* from the pool */
+static int bstart, bindex;		/* Global vars for adding/extracting */
+					/* from the buffer */
 static uint8_t leftover[HASHSIZE];	/* leftover output */
 static int leftover_bytes;		/* leftover length */
 
@@ -111,6 +115,7 @@ static void swrand_init();
 static void swrand_schedule_timeout(void);
 static int swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t);
 static void swrand_add_entropy(uint8_t *ptr, size_t len, uint16_t entropy_est);
+static void swrand_add_entropy_later(uint8_t *ptr, size_t len);
 
 /* Dynamic Reconfiguration related declarations */
 kphysm_setup_vector_t rnd_dr_callback_vec = {
@@ -146,7 +151,7 @@ static crypto_control_ops_t swrand_control_ops = {
 };
 
 static int swrand_seed_random(crypto_provider_handle_t, crypto_session_id_t,
-    uchar_t *, size_t, crypto_req_handle_t);
+    uchar_t *, size_t, uint_t, uint32_t, crypto_req_handle_t);
 static int swrand_generate_random(crypto_provider_handle_t,
     crypto_session_id_t, uchar_t *, size_t, crypto_req_handle_t);
 
@@ -201,11 +206,15 @@ _init(void)
 	}
 
 	mutex_init(&srndpool_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&buffer_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&srndpool_read_cv, NULL, CV_DEFAULT, NULL);
 	entropy_bits = 0;
 	pindex = 0;
+	bindex = 0;
+	bstart = 0;
 	snum_waiters = 0;
 	leftover_bytes = 0;
+	buffer_bytes = 0;
 
 	/*
 	 * Initialize the pool using
@@ -224,6 +233,7 @@ _init(void)
 
 	if (physmem_ent_init(&entsrc) != 0) {
 		mutex_destroy(&srndpool_lock);
+		mutex_destroy(&buffer_lock);
 		cv_destroy(&srndpool_read_cv);
 		(void) crypto_unregister_provider(swrand_prov_handle);
 		return (ENOMEM);
@@ -231,6 +241,7 @@ _init(void)
 
 	if ((ret = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&srndpool_lock);
+		mutex_destroy(&buffer_lock);
 		cv_destroy(&srndpool_read_cv);
 		physmem_ent_fini(&entsrc);
 		(void) crypto_unregister_provider(swrand_prov_handle);
@@ -267,10 +278,14 @@ swrand_provider_status(crypto_provider_handle_t provider, uint_t *status)
 /* ARGSUSED */
 static int
 swrand_seed_random(crypto_provider_handle_t provider, crypto_session_id_t sid,
-    uchar_t *buf, size_t len, crypto_req_handle_t req)
+    uchar_t *buf, size_t len, uint_t entropy_est, uint32_t flags,
+    crypto_req_handle_t req)
 {
 	/* The entropy estimate is always 0 in this path */
-	swrand_add_entropy(buf, len, 0);
+	if (flags & CRYPTO_SEED_NOW)
+		swrand_add_entropy(buf, len, 0);
+	else
+		swrand_add_entropy_later(buf, len);
 	return (CRYPTO_SUCCESS);
 }
 
@@ -386,6 +401,15 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 	return (0);
 }
 
+#define	SWRAND_ADD_BYTES(ptr, len, i, pool)		\
+	ASSERT((ptr) != NULL && (len) > 0);		\
+	BUMP_SWRAND_STATS(ss_bytesIn, (len));		\
+	while ((len)--) {				\
+		(pool)[(i)++] ^= *(ptr);		\
+		(ptr)++;				\
+		(i) &= (RNDPOOLSIZE - 1);		\
+	}
+
 /* Write some more user-provided entropy to the pool */
 static void
 swrand_add_bytes(uint8_t *ptr, size_t len)
@@ -393,15 +417,24 @@ swrand_add_bytes(uint8_t *ptr, size_t len)
 	uint8_t *pool = (uint8_t *)srndpool;
 
 	ASSERT(MUTEX_HELD(&srndpool_lock));
-	ASSERT(ptr != NULL && len > 0);
-
-	BUMP_SWRAND_STATS(ss_bytesIn, len);
-	while (len--) {
-		pool[pindex++] ^= *ptr;
-		ptr++;
-		pindex &= (RNDPOOLSIZE - 1);
-	}
+	SWRAND_ADD_BYTES(ptr, len, pindex, pool);
 }
+
+/*
+ * Add bytes to buffer. Adding the buffer to the random pool
+ * is deferred until the random pool is mixed.
+ */
+static void
+swrand_add_bytes_later(uint8_t *ptr, size_t len)
+{
+	uint8_t *pool = (uint8_t *)buffer;
+
+	ASSERT(MUTEX_HELD(&buffer_lock));
+	SWRAND_ADD_BYTES(ptr, len, bindex, pool);
+	buffer_bytes += len;
+}
+
+#undef SWRAND_ADD_BYTES
 
 /* Mix the pool */
 static void
@@ -411,8 +444,31 @@ swrand_mix_pool(uint16_t entropy_est)
 	HASH_CTX hashctx;
 	uint8_t digest[HASHSIZE];
 	uint8_t *pool = (uint8_t *)srndpool;
+	uint8_t *bp = (uint8_t *)buffer;
 
 	ASSERT(MUTEX_HELD(&srndpool_lock));
+
+	/* add deferred bytes */
+	mutex_enter(&buffer_lock);
+	if (buffer_bytes > 0) {
+		if (buffer_bytes >= RNDPOOLSIZE) {
+			for (i = 0; i < RNDPOOLSIZE/4; i++) {
+				srndpool[i] ^= buffer[i];
+				buffer[i] = 0;
+			}
+			bstart = bindex = 0;
+		} else {
+			for (i = 0; i < buffer_bytes; i++) {
+				pool[pindex++] ^= bp[bstart];
+				bp[bstart++] = 0;
+				pindex &= (RNDPOOLSIZE - 1);
+				bstart &= (RNDPOOLSIZE - 1);
+			}
+			ASSERT(bstart == bindex);
+		}
+		buffer_bytes = 0;
+	}
+	mutex_exit(&buffer_lock);
 
 	start = 0;
 	for (i = 0; i < RNDPOOLSIZE/HASHSIZE + 1; i++) {
@@ -446,6 +502,14 @@ swrand_mix_pool(uint16_t entropy_est)
 
 	swrand_stats.ss_entEst = entropy_bits;
 	BUMP_SWRAND_STATS(ss_entIn, entropy_est);
+}
+
+static void
+swrand_add_entropy_later(uint8_t *ptr, size_t len)
+{
+	mutex_enter(&buffer_lock);
+	swrand_add_bytes_later(ptr, len);
+	mutex_exit(&buffer_lock);
 }
 
 static void
