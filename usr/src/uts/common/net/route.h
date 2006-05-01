@@ -236,13 +236,15 @@ typedef struct rtm_ext_s {
 /*
  * Trusted Solaris route security attributes extension.
  */
+typedef struct rtsa_s {
+	uint32_t	rtsa_mask;	/* see RTSA_* below */
+	uint32_t	rtsa_doi;	/* domain of interpretation */
+	brange_t	rtsa_slrange;	/* sensitivity label range */
+} rtsa_t;
+
 typedef struct tsol_rtsecattr_s {
 	uint32_t	rtsa_cnt;	/* number of attributes */
-	struct rtsa_s {
-		uint32_t rtsa_mask;	/* see RTSA_* below */
-		uint32_t rtsa_doi;	/* domain of interpretation */
-		brange_t rtsa_slrange;	/* sensitivity label range */
-	} rtsa_attr[1];
+	rtsa_t		rtsa_attr[1];
 } tsol_rtsecattr_t;
 
 #define	TSOL_RTSECATTR_SIZE(n) \
