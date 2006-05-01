@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/main.c -- main routines for logadm
@@ -57,6 +56,7 @@ static void dologname(struct fn *fnp, struct opts *clopts);
 static boolean_t rotatelog(struct fn *fnp, struct opts *opts);
 static void rotateto(struct fn *fnp, struct opts *opts, int n,
     struct fn *recentlog, boolean_t isgz);
+static void do_delayed_gzip(const char *lhs, void *rhs, void *arg);
 static void expirefiles(struct fn *fnp, struct opts *opts);
 static void dorm(struct opts *opts, const char *msg, struct fn *fnp);
 static void docmd(struct opts *opts, const char *msg, const char *cmd,
@@ -87,6 +87,9 @@ static struct lut *Aftercmds;
 
 /* list of conffile entry names that are considered "done" */
 static struct lut *Donenames;
+
+/* A list of names of files to be gzipped */
+static struct lut *Gzipnames = NULL;
 
 /* table that drives argument parsing */
 static struct optinfo Opttable[] = {
@@ -384,6 +387,11 @@ main(int argc, char *argv[])
 	/* execute any after commands */
 	lut_walk(Aftercmds, doaftercmd, clopts);
 
+	/* execute any gzip commands */
+	lut_walk(Gzipnames, do_delayed_gzip, clopts);
+	lut_free(Gzipnames, free);
+	Gzipnames = NULL;
+
 	/* write out any conffile changes */
 	conf_close(clopts);
 
@@ -434,6 +442,24 @@ doaftercmd(const char *lhs, void *rhs, void *arg)
 
 	docmd(opts, "-a cmd", Sh, "-c", lhs, NULL);
 }
+
+/* perform delayed gzip */
+
+static void
+do_delayed_gzip(const char *lhs, void *rhs, void *arg)
+{
+	struct opts *opts = (struct opts *)arg;
+
+	if (rhs == NULL) {
+		if (Debug) {
+			(void) fprintf(stderr, "do_delayed_gzip: not gzipping "
+				"expired file <%s>\n", lhs);
+		}
+		return;
+	}
+	docmd(opts, "compress old log (-z flag)", Gzip, "-f", lhs, NULL);
+}
+
 
 /* main logname processing */
 static void
@@ -837,8 +863,13 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 			(void) fprintf(stderr, "rotateto z count %d\n", count);
 
 		if (count <= n) {
-			docmd(opts, "compress old log (-z flag)", Gzip,
-			    "-f", fn_s(newfile), NULL);
+
+			/*
+			 * Don't gzip the old log file yet -
+			 * it takes too long. Just remember that we
+			 * need to gzip.
+			 */
+			Gzipnames = lut_add(Gzipnames, fn_s(newfile), "1");
 			fn_puts(newfile, ".gz");
 		}
 	}
@@ -955,6 +986,7 @@ dorm(struct opts *opts, const char *msg, struct fn *fnp)
 		fn_free(cmd);
 	} else
 		docmd(opts, msg, Rm, "-f", fn_s(fnp), NULL);
+	Gzipnames = lut_add(Gzipnames, fn_s(fnp), NULL);
 }
 
 /* execute a command, producing -n and -v output as necessary */
