@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,25 +293,25 @@ sbdp_check_devices(dev_info_t *dip, int *refcount, sbd_error_t *sep)
 	(void) e_ddi_branch_referenced(dip, sbdp_check_dip, &sbr);
 }
 
+/*
+ * Starting from the root node suspend all devices in the device tree.
+ * Assumes that all devices have already been marked busy.
+ */
 static int
-sbdp_suspend_devices(dev_info_t *dip, sbdp_sr_handle_t *srh)
+sbdp_suspend_devices_(dev_info_t *dip, sbdp_sr_handle_t *srh)
 {
-	int circ;
 	major_t	major;
 	char	*dname;
 
 	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
 		char	d_name[40], d_alias[40], *d_info;
 
-		ndi_devi_enter(dip, &circ);
-		if (sbdp_suspend_devices(ddi_get_child(dip), srh)) {
-			ndi_devi_exit(dip, circ);
+		if (sbdp_suspend_devices_(ddi_get_child(dip), srh)) {
 			return (ENXIO);
 		}
-		ndi_devi_exit(dip, circ);
 
 		if (!sbdp_is_real_device(dip))
-				continue;
+			continue;
 
 		major = (major_t)-1;
 		if ((dname = DEVI(dip)->devi_binding_name) != NULL)
@@ -353,6 +353,42 @@ sbdp_suspend_devices(dev_info_t *dip, sbdp_sr_handle_t *srh)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+sbdp_suspend_devices_enter(dev_info_t *dip, void *arg)
+{
+	struct dev_info *devi = DEVI(dip);
+	ndi_devi_enter(dip, &devi->devi_circular);
+	return (DDI_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+static int
+sbdp_suspend_devices_exit(dev_info_t *dip, void *arg)
+{
+	struct dev_info *devi = DEVI(dip);
+	ndi_devi_exit(dip, devi->devi_circular);
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Before suspending devices first mark all device nodes busy. This
+ * avoids a deadlock situation when another thread holds a device busy
+ * and accesses an already suspended device.
+ */
+static int
+sbdp_suspend_devices(dev_info_t *dip, sbdp_sr_handle_t *srh)
+{
+	int	rv;
+
+	/* assumes dip is ddi_root_node so no ndi_devi_enter required */
+	ASSERT(dip == ddi_root_node());
+	ddi_walk_devs(dip, sbdp_suspend_devices_enter, NULL);
+	rv = sbdp_suspend_devices_(dip, srh);
+	ddi_walk_devs(dip, sbdp_suspend_devices_exit, NULL);
+	return (rv);
 }
 
 static void
@@ -703,8 +739,6 @@ sbdp_resume(sbdp_sr_handle_t *srh)
 		break;
 	}
 
-	i_ndi_allow_device_tree_changes(srh->sh_ndi);
-
 	/*
 	 * update the signature block
 	 */
@@ -733,8 +767,6 @@ sbdp_suspend(sbdp_sr_handle_t *srh)
 	 */
 	CPU_SIGNATURE(OS_SIG, SIGST_QUIESCE_INPROGRESS, SIGSUBST_NULL,
 	    CPU->cpu_id);
-
-	i_ndi_block_device_tree_changes(&srh->sh_ndi);
 
 	/*
 	 * first, stop all user threads
