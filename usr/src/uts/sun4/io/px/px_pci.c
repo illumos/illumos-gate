@@ -63,10 +63,13 @@
  *
  * By default MSI is enabled on all supported platforms.
  */
-boolean_t pxb_enable_msi = B_TRUE; /* MSI enabled by default, otherwise INTX */
+static boolean_t pxb_enable_msi = B_TRUE; /* MSI enabled if TRUE, else INTX */
 
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
+static int pxb_ddi_dma_allochdl_limited(dev_info_t *dip, dev_info_t *rdip,
+	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
+	ddi_dma_handle_t *handlep);
 static int pxb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
 static int pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip,
@@ -87,7 +90,7 @@ static int ppb_pcie_device_type(pxb_devstate_t *pxb_p);
 static void pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p);
 #endif
 
-struct bus_ops pxb_bus_ops = {
+static struct bus_ops pxb_bus_ops = {
 	BUSO_REV,
 	pxb_bus_map,
 	0,
@@ -95,7 +98,11 @@ struct bus_ops pxb_bus_ops = {
 	0,
 	i_ddi_map_fault,
 	ddi_dma_map,
+#if defined(PXB_ADDR_LIMIT_HI) || defined(PXB_ADDR_LIMIT_LO)
+	pxb_ddi_dma_allochdl_limited,
+#else
 	ddi_dma_allochdl,
+#endif
 	ddi_dma_freehdl,
 	ddi_dma_bindhdl,
 	ddi_dma_unbindhdl,
@@ -167,7 +174,7 @@ static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static void pxb_init_hotplug(pxb_devstate_t *pxb);
 
-struct dev_ops pxb_ops = {
+static struct dev_ops pxb_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
 	pxb_info,		/* info */
@@ -205,7 +212,7 @@ void *pxb_state;
 /*
  * SW workaround for PLX HW bug Flag
  */
-int pxb_tlp_count = 64;
+static int pxb_tlp_count = 64;
 
 /*
  * forward function declarations:
@@ -2024,3 +2031,39 @@ pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
 	}
 	return (ret);
 }
+
+#if defined(PXB_ADDR_LIMIT_HI) || defined(PXB_ADDR_LIMIT_LO)
+
+/*
+ * Some PCI-X to PCI-E bridges do not support full 64-bit addressing on the
+ * PCI-X side of the bridge.  We build a special version of this driver for
+ * those bridges, which uses PXB_ADDR_LIMIT_LO and/or PXB_ADDR_LIMIT_HI
+ * to define the range of values which the chip can handle.  The code below
+ * then clamps the DMA address range supplied by the driver, preventing the
+ * PCI-E nexus driver from allocating any memory the bridge can't deal
+ * with.
+ */
+
+static int
+pxb_ddi_dma_allochdl_limited(dev_info_t *dip, dev_info_t *rdip,
+	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
+	ddi_dma_handle_t *handlep)
+{
+	/*
+	 * If the leaf device's limits are outside than what the bridge can
+	 * handle, we need to clip the values passed up the chain.
+	 */
+#ifdef PXB_ADDR_LIMIT_LO
+	if (attr_p->dma_attr_addr_lo < PXB_ADDR_LIMIT_LO)
+		attr_p->dma_attr_addr_lo = PXB_ADDR_LIMIT_LO;
+#endif
+
+#ifdef PXB_ADDR_LIMIT_HI
+	if (attr_p->dma_attr_addr_hi > PXB_ADDR_LIMIT_HI)
+		attr_p->dma_attr_addr_hi = PXB_ADDR_LIMIT_HI;
+#endif
+
+	return (ddi_dma_allochdl(dip, rdip, attr_p, waitfp, arg, handlep));
+}
+
+#endif

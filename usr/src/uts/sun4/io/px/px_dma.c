@@ -315,14 +315,17 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 
 	DBG(DBG_DMA_ALLOCH, px_p->px_dip, "hi=%x.%08x, lo=%x.%08x\n",
 		HI32(hi), LO32(hi), HI32(lo), LO32(lo));
-	if (hi <= lo) { /* peer transfers cannot have alignment & nocross */
-		dev_info_t *rdip = mp->dmai_rdip;
-		cmn_err(CE_WARN, "%s%d peer only dev %p", NAMEINST(rdip), mp);
-		if ((nocross < UINT32_MAX) || (align > 1)) {
-			cmn_err(CE_WARN, "%s%d peer only device bad attr",
-				NAMEINST(rdip));
+	if (hi <= lo) {
+		/*
+		 * If this is an IOMMU bypass access, the caller can't use
+		 * the required addresses, so fail it.  Otherwise, it's
+		 * peer-to-peer; ensure that the caller has no alignment or
+		 * segment size restrictions.
+		 */
+		if ((mp->dmai_flags & PX_DMAI_FLAGS_BYPASSREQ) ||
+		    (nocross < UINT32_MAX) || (align > 1))
 			return (DDI_DMA_BADATTR);
-		}
+
 		mp->dmai_flags |= PX_DMAI_FLAGS_PEER_ONLY;
 	} else /* set practical counter_max value */
 		count_max = MIN(count_max, hi - lo);

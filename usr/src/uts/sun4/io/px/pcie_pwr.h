@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +147,29 @@ typedef struct pcie_pm {
 /*
  * Interface with other parts of the driver(s) code
  */
+
+/*
+ * We link pcie_pwr.o into several drivers (px, px_pci, and pxb_bcm), which
+ * causes the symbols below to be duplicated.  This isn't an issue in
+ * practice, since they aren't used from outside the module that they're
+ * part of.  However, lint does not know this, and when it does global
+ * crosschecks for the kernel, it complains.  To prevent this, we rename the
+ * symbols to driver-specific names when we're doing a lint run.
+ */
+
+#if defined(lint) && defined(PX_MOD_NAME)
+#define	pwr_common_setup	PX_MOD_NAME##_pwr_common_setup
+#define	pwr_common_teardown	PX_MOD_NAME##_pwr_common_teardown
+#define	pcie_bus_power		PX_MOD_NAME##_pcie_bus_power
+#define	pcie_power		PX_MOD_NAME##_pcie_power
+#define	pcie_pm_add_child	PX_MOD_NAME##_pcie_pm_add_child
+#define	pcie_pm_remove_child	PX_MOD_NAME##_pcie_pm_remove_child
+#define	pcie_pwr_suspend	PX_MOD_NAME##_pcie_pwr_suspend
+#define	pcie_pwr_resume		PX_MOD_NAME##_pcie_pwr_resume
+#define	pcie_pm_hold		PX_MOD_NAME##_pcie_pm_hold
+#define	pcie_pm_release		PX_MOD_NAME##_pcie_pm_release
+#endif
+
 extern int pwr_common_setup(dev_info_t *dip);
 extern void pwr_common_teardown(dev_info_t *dip);
 extern int pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,

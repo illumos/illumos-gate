@@ -105,6 +105,7 @@ f none kernel/drv/sparcv9/pseudo 755 root sys
 f none kernel/drv/sparcv9/ptc 755 root sys
 f none kernel/drv/sparcv9/ptsl 755 root sys
 f none kernel/drv/sparcv9/px_pci 755 root sys
+f none kernel/drv/sparcv9/pxb_bcm 755 root sys
 f none kernel/drv/sparcv9/ramdisk 755 root sys
 f none kernel/drv/sparcv9/random 755 root sys
 f none kernel/drv/sparcv9/rts 755 root sys

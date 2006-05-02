@@ -187,6 +187,11 @@ extern void *pxb_state;
 	((pxb->pxb_vendor_id == PXB_VENDOR_BCM) && \
 	(pxb->pxb_device_id == PXB_DEVICE_BCM5714))
 
+/* Workaround for address space limitation in Broadcom 5708, 5714, 5715 */
+#ifdef BROADCOM_ADDR_LIMIT
+#define	PXB_ADDR_LIMIT_HI		0xFFFFFFFFFFULL
+#endif
+
 #define	PXB_DEVICE_PLX_BAD_MSI_REV	0xAA	/* last known bad rev for MSI */
 
 #define	PXB_VENDOR_SUN			0x108E
