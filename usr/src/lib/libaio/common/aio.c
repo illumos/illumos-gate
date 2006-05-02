@@ -45,7 +45,7 @@ extern void _aio_lio_free(aio_lio_t *);
 extern int __fdsync(int, int);
 extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
-static int _aio_fsync_del(aio_req_t *);
+static int _aio_fsync_del(aio_worker_t *, aio_req_t *);
 static void _aiodone(aio_req_t *, ssize_t, int);
 static void _aio_cancel_work(aio_worker_t *, int, int *, int *);
 static void _aio_finish_request(aio_worker_t *, ssize_t, int);
@@ -730,8 +730,9 @@ _aio_cancel_req(aio_worker_t *aiowp, aio_req_t *reqp, int *canceled, int *done)
 		(*done)++;
 		return (0);
 	}
-	if (reqp->req_op == AIOFSYNC) {
+	if (reqp->req_op == AIOFSYNC && reqp != aiowp->work_req) {
 		ASSERT(POSIX_AIO(reqp));
+		/* Cancel the queued aio_fsync() request */
 		if (!reqp->req_head->lio_canned) {
 			reqp->req_head->lio_canned = 1;
 			_aio_outstand_cnt--;
@@ -952,10 +953,8 @@ top:
 			break;
 #endif	/* !defined(_LP64) */
 		case AIOFSYNC:
-			if (_aio_fsync_del(reqp)) {
-				aiowp->work_req = NULL;
+			if (_aio_fsync_del(aiowp, reqp))
 				goto top;
-			}
 			ASSERT(reqp->req_head == NULL);
 			/*
 			 * All writes for this fsync request are now
@@ -1289,16 +1288,20 @@ _aiodone(aio_req_t *reqp, ssize_t retval, int error)
  * otherwise return a non-zero value.
  */
 static int
-_aio_fsync_del(aio_req_t *reqp)
+_aio_fsync_del(aio_worker_t *aiowp, aio_req_t *reqp)
 {
 	aio_lio_t *head = reqp->req_head;
 	int rval = 0;
 
+	ASSERT(reqp == aiowp->work_req);
+	sig_mutex_lock(&aiowp->work_qlock1);
 	sig_mutex_lock(&head->lio_mutex);
 	if (head->lio_refcnt > 1) {
 		head->lio_refcnt--;
 		head->lio_nent--;
+		aiowp->work_req = NULL;
 		sig_mutex_unlock(&head->lio_mutex);
+		sig_mutex_unlock(&aiowp->work_qlock1);
 		sig_mutex_lock(&__aio_mutex);
 		_aio_outstand_cnt--;
 		_aio_waitn_wakeup();
@@ -1306,18 +1309,21 @@ _aio_fsync_del(aio_req_t *reqp)
 		_aio_req_free(reqp);
 		return (1);
 	}
-	sig_mutex_unlock(&head->lio_mutex);
 	ASSERT(head->lio_nent == 1 && head->lio_refcnt == 1);
 	reqp->req_head = NULL;
 	if (head->lio_canned)
 		reqp->req_state = AIO_REQ_CANCELED;
 	if (head->lio_mode == LIO_DESTROY) {
-		_aio_req_free(reqp);
+		aiowp->work_req = NULL;
 		rval = 1;
 	}
+	sig_mutex_unlock(&head->lio_mutex);
+	sig_mutex_unlock(&aiowp->work_qlock1);
 	head->lio_refcnt--;
 	head->lio_nent--;
 	_aio_lio_free(head);
+	if (rval != 0)
+		_aio_req_free(reqp);
 	return (rval);
 }
 
