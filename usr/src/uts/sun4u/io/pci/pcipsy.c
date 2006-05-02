@@ -664,18 +664,31 @@ out:	if (buf1)
 
 
 /*ARGSUSED*/
+static void
+cb_thermal_timeout(void *arg)
+{
+	do_shutdown();
+
+	/*
+	 * In case do_shutdown() fails to halt the system.
+	 */
+	(void) timeout((void(*)(void *))power_down, NULL,
+	    thermal_powerdown_delay * hz);
+}
+
+/*
+ * High-level handler for psycho's CBNINTR_THERMAL interrupt.
+ *
+ * Use timeout(9f) to implement the core functionality so that the
+ * timeout(9f) function can sleep, if needed.
+ */
+/*ARGSUSED*/
 uint_t
 cb_thermal_intr(caddr_t a)
 {
 	cmn_err(CE_WARN, "pci: Thermal warning detected!\n");
 	if (pci_thermal_intr_fatal) {
-		do_shutdown();
-
-		/*
-		 * In case do_shutdown() fails to halt the system.
-		 */
-		(void) timeout((void(*)(void *))power_down, NULL,
-		    thermal_powerdown_delay * hz);
+		(void) timeout(cb_thermal_timeout, NULL, 0);
 	}
 	return (DDI_INTR_CLAIMED);
 }
