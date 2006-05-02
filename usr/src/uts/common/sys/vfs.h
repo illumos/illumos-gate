@@ -42,6 +42,7 @@
 #include <sys/vnode.h>
 #include <sys/statvfs.h>
 #include <sys/refstr.h>
+#include <sys/avl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -199,6 +200,19 @@ extern kmutex_t		vskstat_tree_lock;
 struct zone;		/* from zone.h */
 struct fem_head;	/* from fem.h */
 
+/*
+ * Private vfs data, NOT to be used by a file system implementation.
+ */
+typedef struct vfs_impl {
+	struct fem_head	*vi_femhead;		/* fs monitoring */
+	/*
+	 * Support for statistics on the vnode operations
+	 */
+	vsk_anchor_t	*vi_vskap;		/* anchor for vopstats' kstat */
+	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
+	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
+} vfs_impl_t;
+
 typedef struct vfs {
 	struct vfs	*vfs_next;		/* next VFS in VFS list */
 	struct vfs	*vfs_prev;		/* prev VFS in VFS list */
@@ -222,7 +236,7 @@ typedef struct vfs {
 	refstr_t	*vfs_resource;		/* mounted resource name */
 	refstr_t	*vfs_mntpt;		/* mount point name */
 	time_t		vfs_mtime;		/* time we were mounted */
-	struct fem_head	*vfs_femhead;		/* fs monitoring */
+	vfs_impl_t 	*vfs_implp;		/* impl specific data */
 	/*
 	 * Zones support.  Note that the zone that "owns" the mount isn't
 	 * necessarily the same as the zone in which the zone is visible.
@@ -232,13 +246,12 @@ typedef struct vfs {
 	struct zone	*vfs_zone;		/* zone that owns the mount */
 	struct vfs	*vfs_zone_next;		/* next VFS visible in zone */
 	struct vfs	*vfs_zone_prev;		/* prev VFS visible in zone */
-	/*
-	 * Support for statistics on the vnode operations
-	 */
-	vsk_anchor_t	*vfs_vskap;		/* anchor for vopstats' kstat */
-	vopstats_t	*vfs_fstypevsp;		/* ptr to per-fstype vopstats */
-	vopstats_t	vfs_vopstats;		/* per-mount vnode op stats */
 } vfs_t;
+
+#define	vfs_femhead	vfs_implp->vi_femhead
+#define	vfs_vskap	vfs_implp->vi_vskap
+#define	vfs_fstypevsp	vfs_implp->vi_fstypevsp
+#define	vfs_vopstats	vfs_implp->vi_vopstats
 
 /*
  * VFS flags.
@@ -417,6 +430,8 @@ vfsops_t *vfs_getops(vfs_t *vfsp);
 int	vfs_matchops(vfs_t *, vfsops_t *);
 int	vfs_can_sync(vfs_t *vfsp);
 void	vfs_init(vfs_t *vfsp, vfsops_t *, void *);
+void	vfsimpl_setup(vfs_t *vfsp);
+void	vfsimpl_teardown(vfs_t *vfsp);
 void	vn_exists(vnode_t *);
 void	vn_idle(vnode_t *);
 void	vn_reclaim(vnode_t *);
@@ -533,25 +548,11 @@ extern const mntopts_t vfs_mntopts;	/* globally recognized options */
 	vfs_rele(vfsp); \
 }
 
-#define	VFS_INIT(vfsp, op, data)	vfs_init((vfsp), (op), (data))
-
-#define	_VFS_INIT(vfsp, op, data)	{ \
-	(vfsp)->vfs_count = 0; \
-	(vfsp)->vfs_next = vfsp; \
-	(vfsp)->vfs_prev = vfsp; \
-	(vfsp)->vfs_zone_next = vfsp; \
-	(vfsp)->vfs_zone_prev = vfsp; \
-	vfs_setops((vfsp), (op)); \
-	(vfsp)->vfs_flag = 0; \
-	(vfsp)->vfs_data = (data); \
-	(vfsp)->vfs_resource = NULL; \
-	(vfsp)->vfs_mntpt = NULL; \
-	(vfsp)->vfs_mntopts.mo_count = 0; \
-	(vfsp)->vfs_mntopts.mo_list = NULL; \
-	(vfsp)->vfs_femhead = NULL; \
-	(vfsp)->vfs_zone = NULL; \
-	sema_init(&(vfsp)->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL); \
+#define	VFS_INIT(vfsp, op, data) { \
+	vfs_init((vfsp), (op), (data)); \
+	vfsimpl_setup((vfsp)); \
 }
+
 
 #define	VFS_INSTALLED(vfsswp)	(((vfsswp)->vsw_flag & VSW_INSTALLED) != 0)
 #define	ALLOCATED_VFSSW(vswp)		((vswp)->vsw_name[0] != '\0')

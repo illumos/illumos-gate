@@ -51,7 +51,6 @@
 #include <vm/seg_enum.h>
 #include <sys/kstat.h>
 #include <sys/kmem.h>
-#include <sys/avl.h>
 #ifdef	_KERNEL
 #include <sys/buf.h>
 #endif	/* _KERNEL */

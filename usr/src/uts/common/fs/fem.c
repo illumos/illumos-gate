@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1633,6 +1632,8 @@ fshead_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	void		*arg0;
 	int		errc;
 
+	ASSERT(vfsp->vfs_implp);
+
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_mount;
 		fem_unlock(vfsp->vfs_femhead);
@@ -1658,6 +1659,8 @@ fshead_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	int		(*func)();
 	void		*arg0;
 	int		errc;
+
+	ASSERT(vfsp->vfs_implp);
 
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_unmount;
@@ -1685,6 +1688,8 @@ fshead_root(vfs_t *vfsp, vnode_t **vpp)
 	void		*arg0;
 	int		errc;
 
+	ASSERT(vfsp->vfs_implp);
+
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_root;
 		fem_unlock(vfsp->vfs_femhead);
@@ -1709,6 +1714,8 @@ fshead_statvfs(vfs_t *vfsp, statvfs64_t *sp)
 	int		(*func)();
 	void		*arg0;
 	int		errc;
+
+	ASSERT(vfsp->vfs_implp);
 
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_statvfs;
@@ -1736,6 +1743,8 @@ fshead_sync(vfs_t *vfsp, short flag, cred_t *cr)
 	void		*arg0;
 	int		errc;
 
+	ASSERT(vfsp->vfs_implp);
+
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_sync;
 		fem_unlock(vfsp->vfs_femhead);
@@ -1760,6 +1769,8 @@ fshead_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	int		(*func)();
 	void		*arg0;
 	int		errc;
+
+	ASSERT(vfsp->vfs_implp);
 
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_vget;
@@ -1786,6 +1797,8 @@ fshead_mountroot(vfs_t *vfsp, enum whymountroot reason)
 	void		*arg0;
 	int		errc;
 
+	ASSERT(vfsp->vfs_implp);
+
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_mountroot;
 		fem_unlock(vfsp->vfs_femhead);
@@ -1811,6 +1824,8 @@ fshead_freevfs(vfs_t *vfsp)
 	void		(*func)();
 	void		*arg0;
 
+	ASSERT(vfsp->vfs_implp);
+
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (void (*)()) vfsp->vfs_op->vfs_freevfs;
 		fem_unlock(vfsp->vfs_femhead);
@@ -1835,6 +1850,8 @@ fshead_vnstate(vfs_t *vfsp, vnode_t *vp, vntrans_t nstate)
 	int		(*func)();
 	void		*arg0;
 	int		errc;
+
+	ASSERT(vfsp->vfs_implp);
 
 	if ((femsp = fem_lock(vfsp->vfs_femhead)) == NULL) {
 		func = (int (*)()) vfsp->vfs_op->vfs_vnstate;
@@ -3275,6 +3292,9 @@ fsem_is_installed(struct vfs *v, fsem_t *mon, void *arg)
 {
 	struct fem_list	*fl;
 
+	if (v->vfs_implp == NULL)
+		return (0);
+
 	fl = fem_get(v->vfs_femhead);
 	if (fl != NULL) {
 		int	e;
@@ -3296,6 +3316,10 @@ fsem_install(
 {
 	int	error;
 	struct fem_node	nnode;
+
+	/* If this vfs hasn't been properly initialized, fail the install */
+	if (vfsp->vfs_implp == NULL)
+		return (EINVAL);
 
 	nnode.fn_available = arg;
 	nnode.fn_op.fsem = mon;
@@ -3322,6 +3346,10 @@ int
 fsem_uninstall(struct vfs *v, fsem_t *mon, void *arg)
 {
 	int	e;
+
+	if (v->vfs_implp == NULL)
+		return (EINVAL);
+
 	e = fem_remove_node(v->vfs_femhead, (void **)&v->vfs_op,
 			(void *)mon, arg);
 	return (e);
@@ -3334,6 +3362,7 @@ fsem_setvfsops(vfs_t *v, vfsops_t *newops)
 
 	ASSERT(v != NULL);
 	ASSERT(newops != NULL);
+	ASSERT(v->vfs_implp);
 
 	do {
 		r = v->vfs_op;
@@ -3356,6 +3385,7 @@ fsem_getvfsops(vfs_t *v)
 	vfsops_t	*r;
 
 	ASSERT(v != NULL);
+	ASSERT(v->vfs_implp);
 
 	r = v->vfs_op;
 	membar_consumer();

@@ -434,7 +434,7 @@ vfs_setops(vfs_t *vfsp, vfsops_t *vfsops)
 
 	op = vfsp->vfs_op;
 	membar_consumer();
-	if (vfsp->vfs_femhead == NULL &&
+	if ((vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) &&
 	    casptr(&vfsp->vfs_op, op, vfsops) == op) {
 		return;
 	}
@@ -451,7 +451,8 @@ vfs_getops(vfs_t *vfsp)
 
 	op = vfsp->vfs_op;
 	membar_consumer();
-	if (vfsp->vfs_femhead == NULL && op == vfsp->vfs_op) {
+	if ((vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) &&
+	    op == vfsp->vfs_op) {
 		return (op);
 	} else {
 		return (fsem_getvfsops(vfsp));
@@ -496,16 +497,53 @@ vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 	vfsp->vfs_mntpt = NULL;
 	vfsp->vfs_mntopts.mo_count = 0;
 	vfsp->vfs_mntopts.mo_list = NULL;
-	vfsp->vfs_femhead = NULL;
+	vfsp->vfs_implp = NULL;
 	vfsp->vfs_zone = NULL;
 	/*
-	 * Note: Don't initialize vfs_vskap, vfs_fstypevsp since it
-	 * could be a problem for unbundled file systems.
+	 * Note: Don't initialize any member of the vfs_impl_t structure
+	 * here as it could be a problem for unbundled file systems.
 	 */
 	vfs_setops((vfsp), (op));
 	sema_init(&vfsp->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL);
 }
 
+/*
+ * Allocate and initialize the vfs implementation private data
+ * structure, vfs_impl_t.
+ */
+void
+vfsimpl_setup(vfs_t *vfsp)
+{
+	vfsp->vfs_implp = kmem_alloc(sizeof (vfs_impl_t), KM_SLEEP);
+	/* Note that this are #define'd in vfs.h */
+	vfsp->vfs_femhead = NULL;
+	vfsp->vfs_vskap = NULL;
+	vfsp->vfs_fstypevsp = NULL;
+}
+
+/*
+ * Release the vfs_impl_t structure, if it exists. Some unbundled
+ * filesystems may not use the newer version of vfs and thus
+ * would not contain this implementation private data structure.
+ */
+void
+vfsimpl_teardown(vfs_t *vfsp)
+{
+	vfs_impl_t	*vip = vfsp->vfs_implp;
+
+	if (vip == NULL)
+		return;
+
+	if (vip->vi_femhead) {
+		ASSERT(vip->vi_femhead->femh_list == NULL);
+		mutex_destroy(&vip->vi_femhead->femh_lock);
+		kmem_free(vip->vi_femhead, sizeof (*(vip->vi_femhead)));
+		vip->vi_femhead = NULL;
+	}
+
+	kmem_free(vfsp->vfs_implp, sizeof (vfs_impl_t));
+	vfsp->vfs_implp = NULL;
+}
 
 /*
  * VFS system calls: mount, umount, syssync, statfs, fstatfs, statvfs,
@@ -1218,6 +1256,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			vfsp->vfs_flag = ovflags;
 			if (splice)
 				vn_vfsunlock(vp);
+			if (vfsp->vfs_implp)
+				vfsimpl_teardown(vfsp);
 			kmem_free(vfsp, sizeof (struct vfs));
 			goto errout;
 		}
@@ -1334,6 +1374,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		} else {
 			vfs_unlock(vfsp);
 			vfs_freemnttab(vfsp);
+			if (vfsp->vfs_implp)
+				vfsimpl_teardown(vfsp);
 			kmem_free(vfsp, sizeof (struct vfs));
 		}
 	} else {
@@ -3806,6 +3848,8 @@ vfs_rele(vfs_t *vfsp)
 		if (vfsp->vfs_zone)
 			zone_rele(vfsp->vfs_zone);
 		vfs_freemnttab(vfsp);
+		if (vfsp->vfs_implp)
+			vfsimpl_teardown(vfsp);
 		sema_destroy(&vfsp->vfs_reflock);
 		kmem_free(vfsp, sizeof (*vfsp));
 	}

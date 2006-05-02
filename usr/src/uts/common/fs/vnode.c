@@ -116,7 +116,8 @@ int vopstats_enabled = 1;
 
 #define	VOPSTATS_UPDATE(vp, counter) {					\
 	vfs_t *vfsp = (vp)->v_vfsp;					\
-	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
+	if (vfsp && vfsp->vfs_implp &&					\
+	    (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) {	\
 		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
 		uint64_t *stataddr = &(vsp->n##counter.value.ui64);	\
 		extern void __dtrace_probe___fsinfo_##counter(vnode_t *, \
@@ -131,7 +132,8 @@ int vopstats_enabled = 1;
 
 #define	VOPSTATS_UPDATE_IO(vp, counter, bytecounter, bytesval) {	\
 	vfs_t *vfsp = (vp)->v_vfsp;					\
-	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
+	if (vfsp && vfsp->vfs_implp &&					\
+	    (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) {	\
 		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
 		uint64_t *stataddr = &(vsp->n##counter.value.ui64);	\
 		extern void __dtrace_probe___fsinfo_##counter(vnode_t *, \
@@ -566,8 +568,8 @@ get_vskstat_anchor(vfs_t *vfsp)
 	kstat_t		*ksp;			/* Ptr to new kstat */
 	avl_index_t	where;			/* Location in the AVL tree */
 
-	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
-	    !vopstats_enabled)
+	if (vfsp == NULL || vfsp->vfs_implp == NULL ||
+	    (vfsp->vfs_flag & VFS_STATS) == 0 || !vopstats_enabled)
 		return (NULL);
 
 	/* Need to get the fsid to build a kstat name */
@@ -615,8 +617,8 @@ teardown_vopstats(vfs_t *vfsp)
 	vsk_anchor_t	*vskap;
 	avl_index_t	where;
 
-	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
-	    !vopstats_enabled)
+	if (vfsp == NULL || vfsp->vfs_implp == NULL ||
+	    (vfsp->vfs_flag & VFS_STATS) == 0 || !vopstats_enabled)
 		return;
 
 	/* This is a safe check since VFS_STATS must be set (see above) */
@@ -2129,7 +2131,8 @@ vn_reclaim(vnode_t *vp)
 {
 	vfs_t   *vfsp = vp->v_vfsp;
 
-	if (vfsp == NULL || vfsp->vfs_femhead == NULL) {
+	if (vfsp == NULL ||
+	    vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) {
 		return;
 	}
 	(void) VFS_VNSTATE(vfsp, vp, VNTRANS_RECLAIMED);
@@ -2140,7 +2143,8 @@ vn_idle(vnode_t *vp)
 {
 	vfs_t   *vfsp = vp->v_vfsp;
 
-	if (vfsp == NULL || vfsp->vfs_femhead == NULL) {
+	if (vfsp == NULL ||
+	    vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) {
 		return;
 	}
 	(void) VFS_VNSTATE(vfsp, vp, VNTRANS_IDLED);
@@ -2150,7 +2154,8 @@ vn_exists(vnode_t *vp)
 {
 	vfs_t   *vfsp = vp->v_vfsp;
 
-	if (vfsp == NULL || vfsp->vfs_femhead == NULL) {
+	if (vfsp == NULL ||
+	    vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) {
 		return;
 	}
 	(void) VFS_VNSTATE(vfsp, vp, VNTRANS_EXISTS);
@@ -2161,7 +2166,8 @@ vn_invalid(vnode_t *vp)
 {
 	vfs_t   *vfsp = vp->v_vfsp;
 
-	if (vfsp == NULL || vfsp->vfs_femhead == NULL) {
+	if (vfsp == NULL ||
+	    vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) {
 		return;
 	}
 	(void) VFS_VNSTATE(vfsp, vp, VNTRANS_DESTROYED);
