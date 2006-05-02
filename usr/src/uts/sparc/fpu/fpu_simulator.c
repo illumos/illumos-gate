@@ -229,15 +229,12 @@ _fp_fpu_simulator(
 			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
 			_fp_mul(pfpsd, &us1, &us2, &ust);
 			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				if (ust.fpclass == fp_quiet ||
-					ust.fpclass == fp_signaling) {
-				    _fp_pack(pfpsd, &ust, nrd, fma_inst->sz);
-				} else {
-				    _fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
-				    _fp_add(pfpsd, &ust, &us3, &ud);
-				    ud.sign ^= 1;
-				    _fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
-				}
+				_fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				if (ust.fpclass != fp_quiet &&
+				    ust.fpclass != fp_signaling)
+					ust.sign ^= 1;
+				_fp_sub(pfpsd, &ust, &us3, &ud);
+				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmadds,
 				fpu_sim_fnmaddd, fpu_sim_invalid);
@@ -247,15 +244,12 @@ _fp_fpu_simulator(
 			_fp_unpack(pfpsd, &us2, nrs2, fma_inst->sz);
 			_fp_mul(pfpsd, &us1, &us2, &ust);
 			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				if (ust.fpclass == fp_quiet ||
-					ust.fpclass == fp_signaling) {
-				    _fp_pack(pfpsd, &ust, nrd, fma_inst->sz);
-				} else {
-				    _fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
-				    _fp_sub(pfpsd, &ust, &us3, &ud);
-				    ud.sign ^= 1;
-				    _fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
-				}
+				_fp_unpack(pfpsd, &us3, nrs3, fma_inst->sz);
+				if (ust.fpclass != fp_quiet &&
+				    ust.fpclass != fp_signaling)
+					ust.sign ^= 1;
+				_fp_add(pfpsd, &ust, &us3, &ud);
+				_fp_pack(pfpsd, &ud, nrd, fma_inst->sz);
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmsubs,
 				fpu_sim_fnmsubd, fpu_sim_invalid);
