@@ -631,6 +631,9 @@ kadmin_cpw(argc, argv)
     int n_ks_tuple = 0, keepold = 0, randkey = 0;
     krb5_key_salt_tuple *ks_tuple = NULL;
     krb5_principal princ;
+    int local_kadmin = 0;
+
+    local_kadmin = (strcmp(whoami, KADMIN_LOCAL_NAME) == 0);
     
     if (argc < 2) {
 	 goto usage;
@@ -710,7 +713,7 @@ kadmin_cpw(argc, argv)
 	free(canon);
 	return;
     } else if (randkey) {
-	if (keepold || ks_tuple != NULL) {
+	if (keepold || ks_tuple != NULL || local_kadmin) {
 	    retval = kadm5_randkey_principal_3(handle, princ, keepold,
 					       n_ks_tuple, ks_tuple,
 					       NULL, NULL);
