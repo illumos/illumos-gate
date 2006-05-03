@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -997,7 +996,7 @@ static void
 tftpd_sendfile(struct formats *pf, int oacklen)
 {
 	struct tftphdr *dp;
-	volatile int block = 1;
+	volatile ushort_t block = 1;
 	int size, n, serrno;
 
 	if (oacklen != 0) {
@@ -1172,7 +1171,8 @@ tftpd_recvfile(struct formats *pf, int oacklen)
 {
 	struct tftphdr *dp;
 	struct tftphdr *ap;    /* ack buffer */
-	int block = 0, n, size, acklen, serrno;
+	ushort_t block = 0;
+	int n, size, acklen, serrno;
 
 	dp = w_init();
 	ap = &ackbuf.tb_hdr;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +115,8 @@ tftp_sendfile(int fd, char *name, char *mode)
 {
 	struct tftphdr *ap;	/* data and ack packets */
 	struct tftphdr *dp;
-	int block = 0, size, n;
+	int count = 0, size, n;
+	ushort_t block = 0;
 	off_t amount = 0;
 	struct sockaddr_in6 from;
 	socklen_t fromlen;
@@ -137,7 +137,7 @@ tftp_sendfile(int fd, char *name, char *mode)
 
 	do {
 		(void) signal(SIGALRM, timer);
-		if (block == 0) {
+		if (count == 0) {
 			if ((size = makerequest(WRQ, name, dp, mode)) == -1) {
 				(void) fprintf(stderr,
 				    "tftp: Error: Write request packet too "
@@ -166,7 +166,7 @@ tftp_sendfile(int fd, char *name, char *mode)
 			goto abort;
 		}
 		/* Can't read-ahead first block as OACK may change blocksize */
-		if (block != 0)
+		if (count != 0)
 			read_ahead(file, convert);
 		(void) alarm(rexmtval);
 		for (; ; ) {
@@ -198,7 +198,7 @@ tftp_sendfile(int fd, char *name, char *mode)
 				(void) fputc('\n', stderr);
 				goto abort;
 			}
-			if ((block == 0) && (ap->th_opcode == OACK)) {
+			if ((count == 0) && (ap->th_opcode == OACK)) {
 				errcode = process_oack(&ackbuf, n);
 				if (errcode >= 0) {
 					nak(errcode);
@@ -221,10 +221,11 @@ tftp_sendfile(int fd, char *name, char *mode)
 			}
 		}
 		cancel_alarm();
-		if (block > 0)
+		if (count > 0)
 			amount += size;
 		block++;
-	} while (size == blocksize || block == 1);
+		count++;
+	} while (size == blocksize || count == 1);
 abort:
 	cancel_alarm();
 	(void) fclose(file);
@@ -241,7 +242,8 @@ tftp_recvfile(int fd, char *name, char *mode)
 {
 	struct tftphdr *ap;
 	struct tftphdr *dp;
-	int block = 1, n, size;
+	ushort_t block = 1;
+	int n, size;
 	unsigned long amount = 0;
 	struct sockaddr_in6 from;
 	socklen_t fromlen;
