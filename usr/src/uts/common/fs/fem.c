@@ -367,10 +367,10 @@ fem_addref(struct fem_list *sp)
 	atomic_add_32(&sp->feml_refc, 1);
 }
 
-static void
+static uint32_t
 fem_delref(struct fem_list *sp)
 {
-	(void) atomic_add_32_nv(&sp->feml_refc, -1);
+	return (atomic_add_32_nv(&sp->feml_refc, -1));
 }
 
 static struct fem_list *
@@ -392,10 +392,8 @@ fem_release(struct fem_list *sp)
 {
 	int	i;
 
-	if (sp->feml_refc != 0) {
-		fem_delref(sp);
-	}
-	if (sp->feml_refc == 0) {
+	ASSERT(sp->feml_refc != 0);
+	if (fem_delref(sp) == 0) {
 		/*
 		 * Before freeing the list, we need to release the
 		 * caller-provided data.
@@ -2891,7 +2889,7 @@ fem_push_node(
 						fem_dup_list(olist, list);
 						/* orphan this list */
 						hd->femh_list = list;
-						fem_delref(olist);
+						(void) fem_delref(olist);
 						retry = 0;
 					}
 				} else {
@@ -3078,7 +3076,7 @@ fem_remove_node(struct fem_head *fh, void **baseops, void *opset, void *datap)
 				} else {
 					fh->femh_list = nsp;
 				}
-				fem_delref(sp);
+				(void) fem_delref(sp);
 			} else {
 				/* List changed while locked, try again... */
 				fem_release(nsp);
