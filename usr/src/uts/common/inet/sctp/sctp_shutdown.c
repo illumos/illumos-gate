@@ -294,6 +294,8 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 		bcopy(inmp->b_rptr, mp1->b_rptr, MBLKL(inmp));
 		freeb(inmp);
 		inmp = mp1;
+	} else {
+		ASSERT(DB_CKSUMFLAGS(inmp) == 0);
 	}
 
 	/*

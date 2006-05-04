@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -309,7 +309,7 @@ sosctp_find_cmsg(const uchar_t *control, socklen_t clen, int type)
 int
 sosctp_waitconnected(struct sonode *so, int fmode)
 {
-	int error;
+	int error = 0;
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ||
@@ -328,8 +328,7 @@ sosctp_waitconnected(struct sonode *so, int fmode)
 			 * nonblocking techniques for detecting when
 			 * the connection has been established.
 			 */
-			error = EINTR;
-			break;
+			return (EINTR);
 		}
 		dprint(3, ("awoken on %p\n", so));
 	}
@@ -338,10 +337,18 @@ sosctp_waitconnected(struct sonode *so, int fmode)
 		error = sogeterr(so);
 		ASSERT(error != 0);
 		dprint(3, ("sosctp_waitconnected: error %d\n", error));
-	} else if (so->so_state & SS_ISCONNECTED) {
-		error = 0;
+		return (error);
 	}
-	return (error);
+	if (!(so->so_state & SS_ISCONNECTED)) {
+		/*
+		 * Another thread could have consumed so_error
+		 * e.g. by calling read. - take from sowaitconnected()
+		 */
+		error = ECONNREFUSED;
+		dprint(3, ("sosctp_waitconnected: error %d\n", error));
+		return (error);
+	}
+	return (0);
 }
 
 /*
@@ -352,7 +359,7 @@ static int
 sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 {
 	struct sonode *so = &ssa->ssa_sonode->ss_so;
-	int error;
+	int error = 0;
 
 	ASSERT((ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ||
 	    ssa->ssa_error != 0);
@@ -370,8 +377,7 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 			 * nonblocking techniques for detecting when
 			 * the connection has been established.
 			 */
-			error = EINTR;
-			break;
+			return (EINTR);
 		}
 		dprint(3, ("awoken on %p\n", so));
 	}
@@ -379,10 +385,19 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 		error = ssa->ssa_error;
 		ssa->ssa_error = 0;
 		dprint(3, ("sosctp_assoc_waitconnected: error %d\n", error));
-	} else if (ssa->ssa_state & SS_ISCONNECTED) {
-		error = 0;
+		return (error);
 	}
-	return (error);
+
+	if (!(ssa->ssa_state & SS_ISCONNECTED)) {
+		/*
+		 * Another thread could have consumed so_error
+		 * e.g. by calling read. - take from sowaitconnected()
+		 */
+		error = ECONNREFUSED;
+		dprint(3, ("sosctp_waitconnected: error %d\n", error));
+		return (error);
+	}
+	return (0);
 }
 
 /*

@@ -775,8 +775,9 @@ typedef struct sctp_s {
 		sctp_linklocal : 1,	/* is linklocal assoc. */
 		sctp_mac_exempt : 1,	/* SO_MAC_EXEMPT */
 		sctp_rexmitting : 1,	/* SCTP is retransmitting */
+		sctp_zero_win_probe : 1,	/* doing zero win probe */
 
-		sctp_dummy : 4;
+		sctp_dummy : 3;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -820,6 +821,7 @@ typedef struct sctp_s {
 #define	sctp_linklocal sctp_bits.sctp_linklocal
 #define	sctp_mac_exempt sctp_bits.sctp_mac_exempt
 #define	sctp_rexmitting sctp_bits.sctp_rexmitting
+#define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -1092,6 +1094,8 @@ extern void	sctp_redo_faddr_srcs(sctp_t *);
 extern void	sctp_regift_xmitlist(sctp_t *);
 extern void	sctp_return_heartbeat(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
 extern void	sctp_rexmit(sctp_t *, sctp_faddr_t *);
+extern mblk_t	*sctp_rexmit_packet(sctp_t *, mblk_t **, mblk_t **,
+		    sctp_faddr_t *, uint_t *);
 extern void	sctp_rexmit_timer(sctp_t *, sctp_faddr_t *);
 extern sctp_faddr_t *sctp_rotate_faddr(sctp_t *, sctp_faddr_t *);
 
@@ -1109,6 +1113,7 @@ extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);
 extern void	sctp_set_faddr_current(sctp_t *, sctp_faddr_t *);
 extern int	sctp_set_hdraddrs(sctp_t *);
+extern void	sctp_set_saddr(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sets_init(void);
 extern void	sctp_sets_fini(void);
 extern void	sctp_shutdown_event(sctp_t *);

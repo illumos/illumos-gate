@@ -3994,8 +3994,6 @@ reset_conn_ipif(ipif)
 	ipif_t	*ipif;
 {
 	ipcl_walk(conn_delete_ipif, (caddr_t)ipif);
-	/* flush the SCTP ire cache for this ipif */
-	sctp_ire_cache_flush(ipif);
 }
 
 /*

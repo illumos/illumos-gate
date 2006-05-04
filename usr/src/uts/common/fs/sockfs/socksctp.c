@@ -1657,12 +1657,14 @@ static int
 sosctp_getsockopt(struct sonode *so, int level, int option_name,
     void *optval, socklen_t *optlenp, int flags)
 {
-	int error = 0;
-	void *option = NULL;
-	socklen_t maxlen = *optlenp, len, optlen;
-	uint32_t value;
-	uint8_t buffer[4];
-	void *optbuf = &buffer;
+	int		error = 0;
+	void		*option = NULL;
+	socklen_t	maxlen = *optlenp;
+	socklen_t	len;
+	socklen_t	optlen;
+	uint32_t	value;
+	uint8_t		buffer[4];
+	void		*optbuf = &buffer;
 
 	mutex_enter(&so->so_lock);
 
@@ -1771,9 +1773,12 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 	}
 	optlen = maxlen;
 	mutex_exit(&so->so_lock);
+	/*
+	 * If the resulting optlen is greater than the provided maxlen, then
+	 * we sliently trucate.
+	 */
 	error = sctp_get_opt(so->so_priv, level, option_name, optbuf, &optlen);
 	mutex_enter(&so->so_lock);
-	ASSERT(optlen <= maxlen);
 	if (error != 0) {
 		if (option == NULL) {
 			/* We have no fallback value */

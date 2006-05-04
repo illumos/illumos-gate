@@ -54,13 +54,14 @@
 
 #include "sctp_impl.h"
 #include "sctp_addr.h"
+#include "sctp_asconf.h"
 
 static struct kmem_cache *sctp_kmem_faddr_cache;
 static void sctp_init_faddr(sctp_t *, sctp_faddr_t *, in6_addr_t *, mblk_t *);
 
 /* Set the source address.  Refer to comments in sctp_get_ire(). */
-static void
-set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
+void
+sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	boolean_t v6 = !fp->isv4;
 
@@ -141,7 +142,7 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		 * address should be marked not reachable so that
 		 * it won't be used to send data.
 		 */
-		set_saddr(sctp, fp);
+		sctp_set_saddr(sctp, fp);
 		if (fp->state == SCTP_FADDRS_UNREACH)
 			return;
 		goto check_current;
@@ -176,7 +177,7 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		 * explicitly bind() to an address.  But that address is
 		 * not the preferred source address to send to the peer.
 		 */
-		set_saddr(sctp, fp);
+		sctp_set_saddr(sctp, fp);
 		if (fp->state == SCTP_FADDRS_UNREACH) {
 			IRE_REFRELE(ire);
 			return;
@@ -1761,17 +1762,53 @@ cleanup:
 	return (retval);
 }
 
+/*
+ * Reset any state related to transmitted chunks.
+ */
 void
 sctp_congest_reset(sctp_t *sctp)
 {
-	sctp_faddr_t *fp;
+	sctp_faddr_t	*fp;
+	mblk_t		*mp;
 
-	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		fp->ssthresh = sctp_initial_mtu;
 		fp->cwnd = fp->sfa_pmss * sctp_slow_start_initial;
 		fp->suna = 0;
 		fp->pba = 0;
 	}
+	/*
+	 * Clean up the transmit list as well since we have reset accounting
+	 * on all the fps. Send event upstream, if required.
+	 */
+	while ((mp = sctp->sctp_xmit_head) != NULL) {
+		sctp->sctp_xmit_head = mp->b_next;
+		mp->b_next = NULL;
+		if (sctp->sctp_xmit_head != NULL)
+			sctp->sctp_xmit_head->b_prev = NULL;
+		sctp_sendfail_event(sctp, mp, 0, B_TRUE);
+	}
+	sctp->sctp_xmit_head = NULL;
+	sctp->sctp_xmit_tail = NULL;
+	sctp->sctp_xmit_unacked = NULL;
+
+	sctp->sctp_unacked = 0;
+	/*
+	 * Any control message as well. We will clean-up this list as well.
+	 * This contains any pending ASCONF request that we have queued/sent.
+	 * If we do get an ACK we will just drop it. However, given that
+	 * we are restarting chances are we aren't going to get any.
+	 */
+	if (sctp->sctp_cxmit_list != NULL)
+		sctp_asconf_free_cxmit(sctp, NULL);
+	sctp->sctp_cxmit_list = NULL;
+	sctp->sctp_cchunk_pend = 0;
+
+	sctp->sctp_rexmitting = B_FALSE;
+	sctp->sctp_rxt_nxttsn = 0;
+	sctp->sctp_rxt_maxtsn = 0;
+
+	sctp->sctp_zero_win_probe = B_FALSE;
 }
 
 static void

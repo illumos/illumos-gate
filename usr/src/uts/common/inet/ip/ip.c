@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -12532,13 +12533,7 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 		goto ipoptions;
 	} else {
 		/* Check the IP header checksum.  */
-		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
-			/*
-			 * Since there is no SCTP h/w cksum support yet, just
-			 * clear the flag.
-			 */
-			DB_CKSUMFLAGS(mp) = 0;
-		} else {
+		if (!IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 #define	uph	((uint16_t *)ipha)
 			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
 			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
@@ -12555,6 +12550,11 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 				goto error;
 			}
 		}
+		/*
+		 * Since there is no SCTP h/w cksum support yet, just
+		 * clear the flag.
+		 */
+		DB_CKSUMFLAGS(mp) = 0;
 	}
 
 	/*

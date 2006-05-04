@@ -117,7 +117,14 @@ sctp_hash_destroy()
 	}
 }
 
-/* Walk the SCTP global list and refrele the ire for this ipif */
+/*
+ * Walk the SCTP global list and refrele the ire for this ipif
+ * This is called when an address goes down, so that we release any reference
+ * to the ire associated with this address. Additionally, for any SCTP if
+ * this was the only/last address in its source list, we don't kill the
+ * assoc., if there is no address added subsequently, or if this does not
+ * come up, then the assoc. will die a natural death (i.e. timeout).
+ */
 void
 sctp_ire_cache_flush(ipif_t *ipif)
 {
@@ -146,8 +153,7 @@ sctp_ire_cache_flush(ipif_t *ipif)
 		connp = sctp->sctp_connp;
 		mutex_enter(&connp->conn_lock);
 		ire = connp->conn_ire_cache;
-		if (ire != NULL &&
-		    (ipif == NULL || ire->ire_ipif == ipif)) {
+		if (ire != NULL && ire->ire_ipif == ipif) {
 			connp->conn_ire_cache = NULL;
 			mutex_exit(&connp->conn_lock);
 			IRE_REFRELE_NOTR(ire);
@@ -155,13 +161,29 @@ sctp_ire_cache_flush(ipif_t *ipif)
 			mutex_exit(&connp->conn_lock);
 		}
 		/* check for ires cached in faddr */
-		for (fp = sctp->sctp_faddrs; fp != NULL;
-		    fp = fp->next) {
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+			/*
+			 * If this ipif is being used as the source address
+			 * we need to update it as well, else we will end
+			 * up using the dead source address.
+			 */
 			ire = fp->ire;
-			if (ire != NULL && (ipif == NULL ||
-			    ire->ire_ipif == ipif)) {
+			if (ire != NULL && ire->ire_ipif == ipif) {
 				fp->ire = NULL;
 				IRE_REFRELE_NOTR(ire);
+			}
+			/*
+			 * This may result in setting the fp as unreachable,
+			 * i.e. if all the source addresses are down. In
+			 * that case the assoc. would timeout.
+			 */
+			if (IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
+			    &fp->saddr)) {
+				sctp_set_saddr(sctp, fp);
+				if (fp == sctp->sctp_current &&
+				    fp->state != SCTP_FADDRS_UNREACH) {
+					sctp_set_faddr_current(sctp, fp);
+				}
 			}
 		}
 		WAKE_SCTP(sctp);

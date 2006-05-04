@@ -1707,19 +1707,57 @@ window_probe:
 	 * Retransmit fired for a destination which didn't have
 	 * any unacked data pending.
 	 */
-	if (!sctp->sctp_unacked && sctp->sctp_unsent) {
+	if (sctp->sctp_unacked == 0 && sctp->sctp_unsent != 0) {
 		/*
 		 * Send a window probe. Inflate frwnd to allow
 		 * sending one segment.
 		 */
-		if (sctp->sctp_frwnd < (oldfp->sfa_pmss - sizeof (*sdc))) {
+		if (sctp->sctp_frwnd < (oldfp->sfa_pmss - sizeof (*sdc)))
 			sctp->sctp_frwnd = oldfp->sfa_pmss - sizeof (*sdc);
-		}
-		BUMP_MIB(&sctp_mib, sctpOutWinProbe);
+		/* next TSN to send */
+		sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
 		sctp_output(sctp);
+		/* Last sent TSN */
+		sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
+		ASSERT(sctp->sctp_rxt_maxtsn >= sctp->sctp_rxt_nxttsn);
+		sctp->sctp_zero_win_probe = B_TRUE;
+		BUMP_MIB(&sctp_mib, sctpOutWinProbe);
 	}
 	return;
 out:
+	/*
+	 * If were are probing for zero window, don't adjust retransmission
+	 * variables, but the timer is still backed off.
+	 */
+	if (sctp->sctp_zero_win_probe) {
+		mblk_t	*pkt;
+		uint_t	pkt_len;
+
+		/*
+		 * Get the Zero Win Probe for retrasmission, sctp_rxt_nxttsn
+		 * and sctp_rxt_maxtsn will specify the ZWP packet.
+		 */
+		fp = oldfp;
+		if (oldfp->state != SCTP_FADDRS_ALIVE)
+			fp = sctp_rotate_faddr(sctp, oldfp);
+		pkt = sctp_rexmit_packet(sctp, &meta, &mp, fp, &pkt_len);
+		if (pkt != NULL) {
+			ASSERT(pkt_len <= fp->sfa_pmss);
+			sctp_set_iplen(sctp, pkt);
+			sctp_add_sendq(sctp, pkt);
+		} else {
+			SCTP_KSTAT(sctp_ss_rexmit_failed);
+		}
+		oldfp->strikes++;
+		sctp->sctp_strikes++;
+		SCTP_CALC_RXT(oldfp, sctp->sctp_rto_max);
+		if (oldfp != fp && oldfp->suna != 0)
+			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		BUMP_MIB(&sctp_mib, sctpOutWinProbe);
+		return;
+	}
+
 	/*
 	 * Enter slowstart for this destination
 	 */
@@ -2003,9 +2041,12 @@ sctp_wput(queue_t *q, mblk_t *mp)
  * This function is called by sctp_ss_rexmit() to create a packet
  * to be retransmitted to the given fp.  The given meta and mp
  * parameters are respectively the sctp_msg_hdr_t and the mblk of the
- * first chunk to be retransmitted.
+ * first chunk to be retransmitted. This is also called when we want
+ * to retransmit a zero window probe from sctp_rexmit() or when we
+ * want to retransmit the zero window probe after the window has
+ * opened from sctp_got_sack().
  */
-static mblk_t *
+mblk_t *
 sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
     uint_t *packet_len)
 {
@@ -2044,7 +2085,11 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 		return (NULL);
 	}
 	SCTP_CHUNK_SENT(sctp, *mp, sdc, fp, chunklen, *meta);
-	sctp->sctp_rxt_nxttsn = ntohl(sdc->sdh_tsn);
+	/*
+	 * Don't update the TSN if we are doing a Zero Win Probe.
+	 */
+	if (!sctp->sctp_zero_win_probe)
+		sctp->sctp_rxt_nxttsn = ntohl(sdc->sdh_tsn);
 	*mp = (*mp)->b_next;
 
 try_bundle:
@@ -2109,7 +2154,11 @@ try_bundle:
 
 		SCTP_CHUNK_CLEAR_FLAGS(nmp);
 		SCTP_CHUNK_SENT(sctp, *mp, sdc, fp, chunklen, *meta);
-		sctp->sctp_rxt_nxttsn = ntohl(sdc->sdh_tsn);
+		/*
+		 * Don't update the TSN if we are doing a Zero Win Probe.
+		 */
+		if (!sctp->sctp_zero_win_probe)
+			sctp->sctp_rxt_nxttsn = ntohl(sdc->sdh_tsn);
 
 		seglen = new_len;
 		*mp = (*mp)->b_next;
@@ -2141,6 +2190,8 @@ sctp_ss_rexmit(sctp_t *sctp)
 	sctp_data_hdr_t	*sdc;
 	int		burst;
 
+	ASSERT(!sctp->sctp_zero_win_probe);
+
 	/*
 	 * If the last cum ack is smaller than what we have just
 	 * retransmitted, simply return.
@@ -2149,7 +2200,6 @@ sctp_ss_rexmit(sctp_t *sctp)
 		sctp->sctp_rxt_nxttsn = sctp->sctp_lastack_rxd + 1;
 	else
 		return;
-
 	ASSERT(SEQ_LEQ(sctp->sctp_rxt_nxttsn, sctp->sctp_rxt_maxtsn));
 
 	/*

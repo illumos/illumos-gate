@@ -1192,13 +1192,14 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 #define	SCTP_ACK_IT(sctp, tsn)						\
 	if (tsn == sctp->sctp_ftsn) {					\
 		dprint(2, ("data_chunk: acking next %x\n", tsn));	\
-		(sctp->sctp_ftsn)++;					\
+		(sctp)->sctp_ftsn++;					\
+		if ((sctp)->sctp_sack_gaps > 0)				\
+			(sctp)->sctp_force_sack = 1;			\
 	} else if (SEQ_GT(tsn, sctp->sctp_ftsn)) {			\
 		/* Got a gap; record it */				\
 		dprint(2, ("data_chunk: acking gap %x\n", tsn));	\
-		sctp_ack_add(&sctp->sctp_sack_info,			\
-				tsn,					\
-				&sctp->sctp_sack_gaps);			\
+		sctp_ack_add(&sctp->sctp_sack_info, tsn,		\
+		    &sctp->sctp_sack_gaps);				\
 		sctp->sctp_force_sack = 1;				\
 	}
 
@@ -2493,7 +2494,53 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		else
 			mp = NULL;
 		BUMP_MIB(&sctp_mib, sctpInDupAck);
+		/*
+		 * If we were doing a zero win probe and the win
+		 * has now opened to at least MSS, re-transmit the
+		 * zero win probe via sctp_rexmit_packet().
+		 */
+		if (mp != NULL && sctp->sctp_zero_win_probe &&
+		    ntohl(sc->ssc_a_rwnd) >= sctp->sctp_current->sfa_pmss) {
+			mblk_t	*pkt;
+			uint_t	pkt_len;
+			mblk_t	*mp1 = mp;
+			mblk_t	*meta = sctp->sctp_xmit_head;
+
+			/*
+			 * Reset the RTO since we have been backing-off
+			 * to send the ZWP.
+			 */
+			fp = sctp->sctp_current;
+			fp->rto = fp->srtt + 4 * fp->rttvar;
+			/* Resend the ZWP */
+			pkt = sctp_rexmit_packet(sctp, &meta, &mp1, fp,
+			    &pkt_len);
+			if (pkt == NULL) {
+				SCTP_KSTAT(sctp_ss_rexmit_failed);
+				return (0);
+			}
+			ASSERT(pkt_len <= fp->sfa_pmss);
+			sctp->sctp_zero_win_probe = B_FALSE;
+			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
+			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
+			sctp_set_iplen(sctp, pkt);
+			sctp_add_sendq(sctp, pkt);
+		}
 	} else {
+		if (sctp->sctp_zero_win_probe) {
+			/*
+			 * Reset the RTO since we have been backing-off
+			 * to send the ZWP.
+			 */
+			fp = sctp->sctp_current;
+			fp->rto = fp->srtt + 4 * fp->rttvar;
+			sctp->sctp_zero_win_probe = B_FALSE;
+			/* This is probably not required */
+			if (!sctp->sctp_rexmitting) {
+				sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
+				sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
+			}
+		}
 		acked = sctp_cumack(sctp, cumtsn, &mp);
 		sctp->sctp_xmit_unacked = mp;
 		if (acked > 0) {
@@ -2786,7 +2833,7 @@ ret:
 		fp->acked = 0;
 		goto check_ss_rxmit;
 	}
-	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		if (cumack_forward && fp->acked && !fast_recovery &&
 		    (fp->acked + fp->suna > fp->cwnd - fp->sfa_pmss)) {
 			if (fp->cwnd < fp->ssthresh) {
@@ -4005,10 +4052,12 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			break;
 
 		default:
-			BUMP_LOCAL(sctp->sctp_ibchunks);
-			cmn_err(CE_WARN, "XXXdefault in dispatch state %d",
-			    sctp->sctp_state);
-			break;
+			/*
+			 * The only remaining states are SCTPS_IDLE and
+			 * SCTPS_BOUND, and we should not be getting here
+			 * for these.
+			 */
+			ASSERT(0);
 		} /* switch (sctp->sctp_state) */
 
 		ch = sctp_next_chunk(ch, &mlen);

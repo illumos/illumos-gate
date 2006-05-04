@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,16 +360,18 @@ static int
 socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
     struct cred *cr, int32_t *rvalp)
 {
-	struct sonode *so;
-	struct sctp_sonode *ss;
-	int32_t value;
-	int error, intval;
-	pid_t pid;
-	struct sctp_soassoc *ssa;
-	void *conn;
-	void *buf;
+	struct sonode		*so;
+	struct sctp_sonode	*ss;
+	int32_t			value;
+	int			error;
+	int			intval;
+	pid_t			pid;
+	struct sctp_soassoc	*ssa;
+	void			*conn;
+	void			*buf;
 	STRUCT_DECL(sctpopt, opt);
-	uint32_t optlen, buflen;
+	uint32_t		optlen;
+	int			buflen;
 
 	so = VTOSO(vp);
 	ss = SOTOSSO(so);
@@ -483,6 +485,9 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 
 		/* Copyin the option buffer and then call sctp_get_opt(). */
 		buflen = optlen;
+		/* Let's allocate a buffer enough to hold an int */
+		if (buflen < sizeof (uint32_t))
+			buflen = sizeof (uint32_t);
 		buf = kmem_alloc(buflen, KM_SLEEP);
 		if (so_copyin(STRUCT_FGETP(opt, sopt_val), buf, optlen,
 		    (mode & (int)FKIOCTL))) {
@@ -502,7 +507,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 			SSA_REFRELE(ss, ssa);
 			mutex_exit(&so->so_lock);
 		}
-
+		optlen = MIN(buflen, optlen);
 		/* No error, copyout the result with the correct buf len. */
 		if (error == 0) {
 			STRUCT_FSET(opt, sopt_len, optlen);
