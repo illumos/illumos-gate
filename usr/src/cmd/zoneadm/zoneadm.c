@@ -70,6 +70,7 @@
 #include <macros.h>
 #include <libgen.h>
 #include <fnmatch.h>
+#include <sys/modctl.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -2473,6 +2474,17 @@ verify_details(int cmd_num)
 	}
 	(void) zonecfg_endnwifent(handle);
 no_net:
+
+	/* verify that lofs has not been excluded from the kernel */
+	if (modctl(MODLOAD, 1, "fs/lofs", NULL) != 0) {
+		if (errno == ENXIO)
+			(void) fprintf(stderr, gettext("could not verify "
+			    "lofs(7FS): possibly excluded in /etc/system\n"));
+		else
+			(void) fprintf(stderr, gettext("could not verify "
+			    "lofs(7FS): %s\n"), strerror(errno));
+		return_code = Z_ERR;
+	}
 
 	if (verify_filesystems(handle) != Z_OK)
 		return_code = Z_ERR;
