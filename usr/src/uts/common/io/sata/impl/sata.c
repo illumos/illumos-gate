@@ -63,7 +63,7 @@ int	sata_debug_flags = 0;
 #define	SATA_ENABLE_QUEUING		1
 #define	SATA_ENABLE_NCQ			2
 #define	SATA_ENABLE_PROCESS_EVENTS	4
-static 	int sata_func_enable = SATA_ENABLE_PROCESS_EVENTS;
+int sata_func_enable = SATA_ENABLE_PROCESS_EVENTS | SATA_ENABLE_QUEUING;
 
 #ifdef SATA_DEBUG
 #define	SATA_LOG_D(args)	sata_log args
@@ -1106,6 +1106,8 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		/* Sanity check */
 		if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+			    cport_mutex);
 			/* No physical port deactivation supported. */
 			break;
 		}
@@ -2714,6 +2716,7 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
  * SCMD_WRITE_G4
  * SCMD_WRITE_G5
  * SCMD_SEEK		(noop)
+ * SCMD_SDIAG
  *
  * All other commands are rejected as unsupported.
  *
@@ -2859,7 +2862,6 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	case SCMD_SEEK:
 		rval = sata_txlt_nodata_cmd_immediate(spx);
 		break;
-
 
 		/* Other cases will be filed later */
 		/* postponed until phase 2 of the development */
@@ -4879,34 +4881,49 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 	 * to appropriate command if possible
 	 */
 	if (sata_func_enable & SATA_ENABLE_QUEUING) {
-		if (sdinfo->satadrv_queue_depth > 1 &&
-		    SATA_QDEPTH(spx->txlt_sata_hba_inst) > 1) {
-			/* Queuing supported by controller and device */
-			if ((sata_func_enable & SATA_ENABLE_NCQ) &&
-			    (sdinfo->satadrv_features_support &
-			    SATA_DEV_F_NCQ) &&
-			    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
-			    SATA_CTLF_NCQ)) {
-				/* NCQ supported - use FPDMA READ */
+		boolean_t using_queuing;
+
+		/* Queuing supported by controller and device? */
+		if ((sata_func_enable & SATA_ENABLE_NCQ) &&
+		    (sdinfo->satadrv_features_support &
+		    SATA_DEV_F_NCQ) &&
+		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
+		    SATA_CTLF_NCQ)) {
+			using_queuing = B_TRUE;
+
+			/* NCQ supported - use FPDMA READ */
+			scmd->satacmd_cmd_reg =
+			    SATAC_READ_FPDMA_QUEUED;
+			scmd->satacmd_features_reg_ext =
+			    scmd->satacmd_sec_count_msb;
+			scmd->satacmd_sec_count_msb = 0;
+			scmd->satacmd_rle_sata_cmd = NULL;
+		} else if ((sdinfo->satadrv_features_support &
+		    SATA_DEV_F_TCQ) &&
+		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
+		    SATA_CTLF_QCMD)) {
+			using_queuing = B_TRUE;
+
+			/* Legacy queueing */
+			if (sdinfo->satadrv_features_support &
+			    SATA_DEV_F_LBA48) {
 				scmd->satacmd_cmd_reg =
-				    SATAC_READ_FPDMA_QUEUED;
+				    SATAC_READ_DMA_QUEUED_EXT;
 				scmd->satacmd_features_reg_ext =
 				    scmd->satacmd_sec_count_msb;
 				scmd->satacmd_sec_count_msb = 0;
 			} else {
-				/* Legacy queueing */
-				if (sdinfo->satadrv_features_support &
-				    SATA_DEV_F_LBA48) {
-					scmd->satacmd_cmd_reg =
-					    SATAC_READ_DMA_QUEUED_EXT;
-					scmd->satacmd_features_reg_ext =
-					    scmd->satacmd_sec_count_msb;
-					scmd->satacmd_sec_count_msb = 0;
-				} else {
-					scmd->satacmd_cmd_reg =
-					    SATAC_READ_DMA_QUEUED;
-				}
+				scmd->satacmd_cmd_reg =
+				    SATAC_READ_DMA_QUEUED;
 			}
+		} else	/* Queuing not supported */
+			using_queuing = B_FALSE;
+
+		/*
+		 * If queuing, the sector count goes in the features register
+		 * and the secount count will contain the tag.
+		 */
+		if (using_queuing) {
 			scmd->satacmd_features_reg =
 			    scmd->satacmd_sec_count_lsb;
 			scmd->satacmd_sec_count_lsb = 0;
@@ -5080,35 +5097,45 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 	 * to appropriate command if possible
 	 */
 	if (sata_func_enable & SATA_ENABLE_QUEUING) {
-		if (sdinfo->satadrv_queue_depth > 1 &&
-		    SATA_QDEPTH(spx->txlt_sata_hba_inst) > 1) {
-			/* Queuing supported by controller and device */
-			if ((sata_func_enable & SATA_ENABLE_NCQ) &&
-			    (sdinfo->satadrv_features_support &
-			    SATA_DEV_F_NCQ) &&
-			    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
-			    SATA_CTLF_NCQ)) {
-				/* NCQ supported - use FPDMA WRITE */
+		boolean_t using_queuing;
+
+		/* Queuing supported by controller and device? */
+		if ((sata_func_enable & SATA_ENABLE_NCQ) &&
+		    (sdinfo->satadrv_features_support &
+		    SATA_DEV_F_NCQ) &&
+		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
+		    SATA_CTLF_NCQ)) {
+			using_queuing = B_TRUE;
+
+			/* NCQ supported - use FPDMA WRITE */
+			scmd->satacmd_cmd_reg =
+			    SATAC_WRITE_FPDMA_QUEUED;
+			scmd->satacmd_features_reg_ext =
+			    scmd->satacmd_sec_count_msb;
+			scmd->satacmd_sec_count_msb = 0;
+			scmd->satacmd_rle_sata_cmd = NULL;
+		} else if ((sdinfo->satadrv_features_support &
+		    SATA_DEV_F_TCQ) &&
+		    (SATA_FEATURES(spx->txlt_sata_hba_inst) &
+		    SATA_CTLF_QCMD)) {
+			using_queuing = B_TRUE;
+
+			/* Legacy queueing */
+			if (sdinfo->satadrv_features_support &
+			    SATA_DEV_F_LBA48) {
 				scmd->satacmd_cmd_reg =
-				    SATAC_WRITE_FPDMA_QUEUED;
+				    SATAC_WRITE_DMA_QUEUED_EXT;
 				scmd->satacmd_features_reg_ext =
 				    scmd->satacmd_sec_count_msb;
 				scmd->satacmd_sec_count_msb = 0;
-				scmd->satacmd_rle_sata_cmd = NULL;
 			} else {
-				/* Legacy queueing */
-				if (sdinfo->satadrv_features_support &
-				    SATA_DEV_F_LBA48) {
-					scmd->satacmd_cmd_reg =
-					    SATAC_WRITE_DMA_QUEUED_EXT;
-					scmd->satacmd_features_reg_ext =
-					    scmd->satacmd_sec_count_msb;
-					scmd->satacmd_sec_count_msb = 0;
-				} else {
-					scmd->satacmd_cmd_reg =
-					    SATAC_WRITE_DMA_QUEUED;
-				}
+				scmd->satacmd_cmd_reg =
+				    SATAC_WRITE_DMA_QUEUED;
 			}
+		} else	/* Queuing not supported */
+			using_queuing = B_FALSE;
+
+		if (using_queuing) {
 			scmd->satacmd_features_reg =
 			    scmd->satacmd_sec_count_lsb;
 			scmd->satacmd_sec_count_lsb = 0;
@@ -5319,7 +5346,6 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 	}
 	return (TRAN_ACCEPT);
 }
-
 
 /*
  * Send pkt to SATA HBA driver
@@ -6414,10 +6440,13 @@ sata_build_lsense_page_10(
 		rval = sata_ext_smart_selftest_read_log(sata_hba_inst, sdinfo,
 		    ext_selftest_log, 0);
 		if (rval == 0) {
-			int index;
+			int index, start_index;
 			struct smart_ext_selftest_log_entry *entry;
+			static const struct smart_ext_selftest_log_entry empty =
+			    {0};
 			uint16_t block_num;
 			int count;
+			boolean_t only_one_block = B_FALSE;
 
 			index = ext_selftest_log->
 			    smart_ext_selftest_log_index[0];
@@ -6427,6 +6456,7 @@ sata_build_lsense_page_10(
 				goto out;
 
 			--index;	/* Correct for 0 origin */
+			start_index = index;	/* remember where we started */
 			block_num = index / ENTRIES_PER_EXT_SELFTEST_LOG_BLK;
 			if (block_num != 0) {
 				rval = sata_ext_smart_selftest_read_log(
@@ -6449,9 +6479,28 @@ sata_build_lsense_page_10(
 				uint8_t add_sense_code;
 				uint8_t add_sense_code_qual;
 
+				/* If this is an unused entry, we are done */
+				if (bcmp(entry, &empty, sizeof (empty)) == 0) {
+					/* Broken firmware on some disks */
+					if (index + 1 ==
+					    ENTRIES_PER_EXT_SELFTEST_LOG_BLK) {
+						--entry;
+						--index;
+						if (bcmp(entry, &empty,
+						    sizeof (empty)) == 0)
+							goto out;
+					} else
+						goto out;
+				}
+
+				if (only_one_block &&
+				    start_index == index)
+					goto out;
+
 				lpp->param_code[0] = 0;
 				lpp->param_code[1] = count;
-				lpp->param_ctrl_flags = 0;
+				lpp->param_ctrl_flags =
+				    LOG_CTRL_LP | LOG_CTRL_LBIN;
 				lpp->param_len =
 				    SCSI_LOG_SENSE_SELFTEST_PARAM_LEN;
 
@@ -6521,20 +6570,38 @@ sata_build_lsense_page_10(
 				    smart_ext_selftest_log_timestamp[1];
 				lpp->param_values[3] = entry->
 				    smart_ext_selftest_log_timestamp[0];
-				lpp->param_values[4] = 0;
-				lpp->param_values[5] = 0;
-				lpp->param_values[6] = entry->
-				    smart_ext_selftest_log_failing_lba[5];
-				lpp->param_values[7] = entry->
-				    smart_ext_selftest_log_failing_lba[4];
-				lpp->param_values[8] = entry->
-				    smart_ext_selftest_log_failing_lba[3];
-				lpp->param_values[9] = entry->
-				    smart_ext_selftest_log_failing_lba[2];
-				lpp->param_values[10] = entry->
-				    smart_ext_selftest_log_failing_lba[1];
-				lpp->param_values[11] = entry->
-				    smart_ext_selftest_log_failing_lba[0];
+				if (status != 0) {
+					lpp->param_values[4] = 0;
+					lpp->param_values[5] = 0;
+					lpp->param_values[6] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [5];
+					lpp->param_values[7] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [4];
+					lpp->param_values[8] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [3];
+					lpp->param_values[9] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [2];
+					lpp->param_values[10] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [1];
+					lpp->param_values[11] = entry->
+					    smart_ext_selftest_log_failing_lba
+					    [0];
+				} else {	/* No bad block address */
+					lpp->param_values[4] = 0xff;
+					lpp->param_values[5] = 0xff;
+					lpp->param_values[6] = 0xff;
+					lpp->param_values[7] = 0xff;
+					lpp->param_values[8] = 0xff;
+					lpp->param_values[9] = 0xff;
+					lpp->param_values[10] = 0xff;
+					lpp->param_values[11] = 0xff;
+				}
+
 				lpp->param_values[12] = sense_key;
 				lpp->param_values[13] = add_sense_code;
 				lpp->param_values[14] = add_sense_code_qual;
@@ -6565,14 +6632,16 @@ sata_build_lsense_page_10(
 						    [1] == 0))
 							goto out;
 						block_num =
-						    logdir.read_log_ext_nblks[0]
+						    logdir.read_log_ext_nblks
 						    [EXT_SMART_SELFTEST_LOG_PAGE
-						    - 1];
+						    - 1][0];
 						block_num |= logdir.
-						    read_log_ext_nblks[1]
+						    read_log_ext_nblks
 						    [EXT_SMART_SELFTEST_LOG_PAGE
-						    - 1] << 8;
+						    - 1][1] << 8;
 						--block_num;
+						only_one_block =
+						    (block_num == 0);
 					}
 					rval = sata_ext_smart_selftest_read_log(
 					    sata_hba_inst, sdinfo,
@@ -6605,6 +6674,8 @@ out:
 			int index;
 			int count;
 			struct smart_selftest_log_entry *entry;
+			static const struct smart_selftest_log_entry empty =
+			    { 0 };
 
 			index = selftest_log->smart_selftest_log_index;
 			if (index == 0)
@@ -6621,9 +6692,13 @@ out:
 				uint8_t add_sense_code;
 				uint8_t add_sense_code_qual;
 
+				if (bcmp(entry, &empty, sizeof (empty)) == 0)
+					goto done;
+
 				lpp->param_code[0] = 0;
 				lpp->param_code[1] = count;
-				lpp->param_ctrl_flags = 0;
+				lpp->param_ctrl_flags =
+				    LOG_CTRL_LP | LOG_CTRL_LBIN;
 				lpp->param_len =
 				    SCSI_LOG_SENSE_SELFTEST_PARAM_LEN;
 
@@ -6692,18 +6767,29 @@ out:
 				    smart_selftest_log_timestamp[1];
 				lpp->param_values[3] = entry->
 				    smart_selftest_log_timestamp[0];
-				lpp->param_values[4] = 0;
-				lpp->param_values[5] = 0;
-				lpp->param_values[6] = 0;
-				lpp->param_values[7] = 0;
-				lpp->param_values[8] = entry->
-				    smart_selftest_log_failing_lba[3];
-				lpp->param_values[9] = entry->
-				    smart_selftest_log_failing_lba[2];
-				lpp->param_values[10] = entry->
-				    smart_selftest_log_failing_lba[1];
-				lpp->param_values[11] = entry->
-				    smart_selftest_log_failing_lba[0];
+				if (status != 0) {
+					lpp->param_values[4] = 0;
+					lpp->param_values[5] = 0;
+					lpp->param_values[6] = 0;
+					lpp->param_values[7] = 0;
+					lpp->param_values[8] = entry->
+					    smart_selftest_log_failing_lba[3];
+					lpp->param_values[9] = entry->
+					    smart_selftest_log_failing_lba[2];
+					lpp->param_values[10] = entry->
+					    smart_selftest_log_failing_lba[1];
+					lpp->param_values[11] = entry->
+					    smart_selftest_log_failing_lba[0];
+				} else {	/* No block address */
+					lpp->param_values[4] = 0xff;
+					lpp->param_values[5] = 0xff;
+					lpp->param_values[6] = 0xff;
+					lpp->param_values[7] = 0xff;
+					lpp->param_values[8] = 0xff;
+					lpp->param_values[9] = 0xff;
+					lpp->param_values[10] = 0xff;
+					lpp->param_values[11] = 0xff;
+				}
 				lpp->param_values[12] = sense_key;
 				lpp->param_values[13] = add_sense_code;
 				lpp->param_values[14] = add_sense_code_qual;
@@ -6765,7 +6851,7 @@ sata_build_lsense_page_2f(
 		break;
 	case 0:
 	case -1:	/* failed to get data */
-		lpp->param_values[0] = 0;
+		lpp->param_values[0] = 0;	/* No failure predicted */
 		lpp->param_values[1] = 0;
 		break;
 #if defined(SATA_DEBUG)
@@ -6797,7 +6883,8 @@ sata_build_lsense_page_2f(
 		kmem_free(smart_data, 512);
 	}
 
-	lpp->param_values[2] = temp;
+	lpp->param_values[2] = temp;	/* most recent temperature */
+	lpp->param_values[3] = 0;	/* required vendor specific byte */
 
 	lpp->param_len = SCSI_INFO_EXCEPTIONS_PARAM_LEN;
 
@@ -8225,7 +8312,7 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 	if (sdinfo->satadrv_features_support & SATA_DEV_F_NCQ)
 		(void) strlcat(msg_buf, ", Native Command Queueing",
 		    MAXPATHLEN);
-	else if (sdinfo->satadrv_id.ai_cmdset83 & SATA_RW_DMA_QUEUED_CMD)
+	if (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ)
 		(void) strlcat(msg_buf, ", Queuing", MAXPATHLEN);
 	if ((sdinfo->satadrv_id.ai_cmdset82 & SATA_SMART_SUPPORTED) &&
 	    (sdinfo->satadrv_id.ai_features85 & SATA_SMART_ENABLED))
@@ -8923,8 +9010,11 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 
 		sdinfo->satadrv_queue_depth = sdinfo->satadrv_id.ai_qdepth;
 		if (sdinfo->satadrv_id.ai_cmdset83 & SATA_RW_DMA_QUEUED_CMD)
-			if (sdinfo->satadrv_queue_depth == 0)
-				sdinfo->satadrv_queue_depth = 1;
+			++sdinfo->satadrv_queue_depth;
+
+		if ((sdinfo->satadrv_id.ai_cmdset83 & SATA_RW_DMA_QUEUED_CMD) &&
+		    (sdinfo->satadrv_id.ai_features86 & SATA_RW_DMA_QUEUED_CMD))
+			sdinfo->satadrv_features_support |= SATA_DEV_F_TCQ;
 
 		rval = 0;
 	}
@@ -10959,16 +11049,23 @@ sata_fetch_smart_return_status(sata_hba_inst_t *sata_hba_inst,
 	scmd->satacmd_features_reg = SATA_SMART_RETURN_STATUS;
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_SMART;
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
+
 
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		/*
 		 * Whoops, no SMART RETURN STATUS
 		 */
 		rval = -1;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		if (scmd->satacmd_error_reg & SATA_ERROR_ABORT) {
 			rval = -1;
 			goto fail;
@@ -11065,17 +11162,23 @@ sata_fetch_smart_data(
 	scmd->satacmd_features_reg = SATA_SMART_READ_DATA;
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_SMART;
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
 
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		/*
 		 * Whoops, no SMART DATA available
 		 */
 		rval = -1;
 		goto fail;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
 		if (rval != DDI_SUCCESS) {
@@ -11169,16 +11272,25 @@ sata_ext_smart_selftest_read_log(
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_READ_LOG_EXT;
 
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
+
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
+
 		/*
 		 * Whoops, no SMART selftest log info available
 		 */
 		rval = -1;
 		goto fail;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
+
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
 		if (rval != DDI_SUCCESS) {
@@ -11270,17 +11382,23 @@ sata_smart_selftest_log(
 	scmd->satacmd_features_reg = SATA_SMART_READ_LOG;
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_SMART;
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
 
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		/*
 		 * Whoops, no SMART DATA available
 		 */
 		rval = -1;
 		goto fail;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
 		if (rval != DDI_SUCCESS) {
@@ -11369,16 +11487,25 @@ sata_smart_read_log(
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_SMART;
 
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
+
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
+
 		/*
 		 * Whoops, no SMART DATA available
 		 */
 		rval = -1;
 		goto fail;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
+
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
 		if (rval != DDI_SUCCESS) {
@@ -11467,16 +11594,23 @@ sata_read_log_ext_directory(
 	scmd->satacmd_device_reg = 0;		/* Always device 0 */
 	scmd->satacmd_cmd_reg = SATAC_READ_LOG_EXT;
 
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sdinfo->satadrv_addr.cport)));
+
 	/* Send pkt to SATA HBA driver */
 	if ((*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt) !=
 	    SATA_TRAN_ACCEPTED ||
 	    spkt->satapkt_reason != SATA_PKT_COMPLETED) {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		/*
 		 * Whoops, no SMART selftest log info available
 		 */
 		rval = -1;
 		goto fail;
 	} else {
+		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
+		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
 			DDI_DMA_SYNC_FORKERNEL);
 		if (rval != DDI_SUCCESS) {

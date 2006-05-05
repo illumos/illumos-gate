@@ -320,6 +320,7 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_DEV_F_NCQ			0x08
 #define	SATA_DEV_F_SATA1		0x10
 #define	SATA_DEV_F_SATA2		0x20
+#define	SATA_DEV_F_TCQ			0x40	/* Non NCQ tagged queuing */
 
 /*
  * Drive settings flags (satdrv_settings)

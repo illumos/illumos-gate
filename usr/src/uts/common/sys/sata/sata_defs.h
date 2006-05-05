@@ -130,6 +130,7 @@ extern "C" {
 
 /* Generic ATA definitions */
 
+#define	SATA_TAG_QUEUING_SHIFT 3
 /*
  * Identify Device data
  * Although bot ATA and ATAPI devices' Identify Data has the same lenght,
@@ -420,7 +421,7 @@ typedef struct sata_id {
 #define	SCSI_PREDICTED_FAILURE	0x5d
 #define	SCSI_GENERAL_HD_FAILURE	0x10
 
-#define	SCSI_INFO_EXCEPTIONS_PARAM_LEN	3
+#define	SCSI_INFO_EXCEPTIONS_PARAM_LEN	4
 
 #define	READ_LOG_EXT_LOG_DIRECTORY	0
 #define	SMART_SELFTEST_LOG_PAGE		6
@@ -487,7 +488,7 @@ struct smart_ext_selftest_log {
 
 struct read_log_ext_directory {
 	uint8_t	read_log_ext_vers[2];	/* general purpose log version */
-	uint8_t read_log_ext_nblks[2][255]; /* # of blks @ log addr index+1 */
+	uint8_t read_log_ext_nblks[255][2]; /* # of blks @ log addr index+1 */
 };
 
 /*
