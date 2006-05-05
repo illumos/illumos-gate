@@ -420,3 +420,9 @@ declaration	void krb5_set_key_length(krb5_keyblock *,\
 version		SUNWprivate_1.1
 end
 
+function	krb5_set_principal_realm
+include		<k5-int.h>
+declaration	krb5_set_principal_realm(krb5_context context, \
+	                 krb5_principal principal, const char *realm)
+version		SUNWprivate_1.1
+end

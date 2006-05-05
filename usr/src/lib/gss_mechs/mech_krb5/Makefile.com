@@ -115,7 +115,7 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	recvauth.o  send_tgs.o  sendauth.o  srv_rcache.o  str_conv.o \
 	tgtname.o  valid_times.o  walk_rtree.o appdefault.o deltat.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
-	vfy_increds.o vic_opt.o krb5_libinit.o chpw.o \
+	vfy_increds.o vic_opt.o set_realm.o krb5_libinit.o chpw.o \
 	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o
 
 K5_KRB_UTS= copy_athctr.o copy_auth.o copy_cksum.o copy_key.o \
