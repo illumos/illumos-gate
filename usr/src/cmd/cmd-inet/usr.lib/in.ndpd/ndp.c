@@ -65,6 +65,9 @@ static void	verify_prefix_opt(struct phyint *pi, uchar_t *opt,
 static void	verify_mtu_opt(struct phyint *pi, uchar_t *opt,
 		    char *frombuf);
 
+static void	update_ra_flag(struct phyint *pi,
+		    const struct sockaddr_in6 *from, int isrouter);
+
 static uint_t	ra_flags;	/* Global to detect when to trigger DHCP */
 
 /*
@@ -321,6 +324,7 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 	uint16_t router_lifetime;
 	uint_t reachable, retrans;
 	boolean_t reachable_time_changed = _B_FALSE;
+	boolean_t slla_opt_present	 = _B_FALSE;
 
 	if (no_loopback && loopback)
 		return;
@@ -432,6 +436,7 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 			if (!loopback) {
 				incoming_lla_opt(pi, (uchar_t *)opt,
 				    from, NDF_ISROUTER_ON);
+				slla_opt_present = _B_TRUE;
 			}
 			break;
 		default:
@@ -440,6 +445,8 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 		opt = (struct nd_opt_hdr *)((char *)opt + optlen);
 		len -= optlen;
 	}
+	if (!slla_opt_present)
+		update_ra_flag(pi, from, NDF_ISROUTER_ON);
 	/* Stop sending solicitations */
 	check_to_solicit(pi, SOLICIT_DONE);
 }
@@ -1351,4 +1358,63 @@ verify_opt_len(struct nd_opt_hdr *opt, int optlen,
 		    8 * opt->nd_opt_len);
 	}
 	return (_B_TRUE);
+}
+
+/*
+ * Update IsRouter Flag for Host turning into a router or vice-versa.
+ */
+static void
+update_ra_flag(struct phyint *pi, const struct sockaddr_in6 *from, int isrouter)
+{
+	struct lifreq lifr;
+	char abuf[INET6_ADDRSTRLEN];
+	struct sockaddr_in6 *sin6;
+
+	/* check if valid flag is being set */
+	if ((isrouter != NDF_ISROUTER_ON) &&
+	    (isrouter != NDF_ISROUTER_OFF)) {
+		logmsg(LOG_ERR, "update_ra_flag: Invalid IsRouter "
+		    "flag %d\n", isrouter);
+		return;
+	}
+
+	sin6 = (struct sockaddr_in6 *)&lifr.lifr_nd.lnr_addr;
+	bzero(sin6, sizeof (*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = from->sin6_addr;
+
+	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
+
+	if (ioctl(pi->pi_sock, SIOCLIFGETND, (char *)&lifr) < 0) {
+		logperror_pi(pi, "update_ra_flag: SIOCLIFGETND");
+	} else {
+		/*
+		 * The lif_nd_req structure has three state values to be used
+		 * when changing/updating nces :
+		 * lnr_state_create, lnr_state_same_lla, and lnr_state_diff_lla.
+		 *
+		 * In this case, we're updating an nce, without changing lla;
+		 * so we set lnr_state_same_lla to ND_UNCHANGED, indicating that
+		 * nce's state should not be affected by our flag change.
+		 *
+		 * The kernel implementation also expects the lnr_state_create
+		 * field be always set, before processing ioctl request for NCE
+		 * update.
+		 * We use the state as STALE, while addressing the possibility
+		 * of NCE deletion when ioctl with SIOCLIFGETND argument
+		 * in earlier step is returned - further in such case we don't
+		 * want to re-create the entry in the reachable state.
+		 */
+		lifr.lifr_nd.lnr_state_create = ND_STALE;
+		lifr.lifr_nd.lnr_state_same_lla = ND_UNCHANGED;
+		lifr.lifr_nd.lnr_flags = isrouter;
+		if ((ioctl(pi->pi_sock, SIOCLIFSETND, (char *)&lifr)) < 0) {
+			logperror_pi(pi, "update_ra_flag: SIOCLIFSETND");
+		} else {
+			(void) inet_ntop(AF_INET6, (void *)&from->sin6_addr,
+			    abuf, sizeof (abuf));
+			logmsg(LOG_INFO, "update_ra_flag: IsRouter flag "
+			    "updated for %s\n", abuf);
+		}
+	}
 }
