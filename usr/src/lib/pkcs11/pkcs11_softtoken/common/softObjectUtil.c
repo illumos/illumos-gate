@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,6 +269,10 @@ soft_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
 
 	/* Write the new token object to the keystore */
 	if (IS_TOKEN_OBJECT(new_objp)) {
+		if (!soft_keystore_status(KEYSTORE_INITIALIZED)) {
+			rv = CKR_DEVICE_REMOVED;
+			goto fail_cleanup2;
+		}
 		new_objp->version = 1;
 		rv = soft_put_object_to_keystore(new_objp);
 		if (rv != CKR_OK) {
@@ -634,7 +637,8 @@ search_for_objects(CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulCount,
 	 * into the token, all public and private objects in the keystore
 	 * are searched.
 	 */
-	if (((token_flag_val) || (!token_specified)) && (soft_token_present)) {
+	if (((token_flag_val) || (!token_specified)) &&
+	    soft_keystore_status(KEYSTORE_INITIALIZED)) {
 		/* acquire token session lock */
 		(void) pthread_mutex_lock(&soft_slot.slot_mutex);
 		rv = refresh_token_objects();
@@ -922,8 +926,7 @@ soft_delete_all_in_core_token_objects(token_obj_type_t type)
 }
 
 /*
- * Mark all the token objects in the global list
- * to be valid.
+ * Mark all the token objects in the global list to be valid.
  */
 void
 soft_validate_token_objects(boolean_t validate)
@@ -932,6 +935,7 @@ soft_validate_token_objects(boolean_t validate)
 	soft_object_t *objp;
 
 	(void) pthread_mutex_lock(&soft_slot.slot_mutex);
+
 	objp = soft_slot.token_object_list;
 
 	while (objp) {

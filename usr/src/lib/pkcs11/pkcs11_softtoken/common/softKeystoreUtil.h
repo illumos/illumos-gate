@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,13 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+
+/* Keystore State values */
+#define	KEYSTORE_UNINITIALIZED	0
+#define	KEYSTORE_PRESENT	1
+#define	KEYSTORE_VERSION_OK	2
+#define	KEYSTORE_INITIALIZED	3
+#define	KEYSTORE_UNAVAILABLE	4
 
 typedef enum {
 	ALL_TOKENOBJS = 0,
@@ -68,7 +74,6 @@ typedef struct ks_obj {
 	struct ks_obj *next;
 } ks_obj_t;
 
-
 /*
  * Prototype for functions in softKeystore.c
  */
@@ -94,6 +99,7 @@ int soft_keystore_del_obj(ks_obj_handle_t *ks_handle, boolean_t lock_held);
 int soft_keystore_get_pin_salt(char **salt);
 CK_RV soft_keystore_pin_initialized(boolean_t *initialized, char **hashed_pin,
     boolean_t lock_held);
+boolean_t soft_keystore_status(int desired_state);
 
 #ifdef __cplusplus
 }

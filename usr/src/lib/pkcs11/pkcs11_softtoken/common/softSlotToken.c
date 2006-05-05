@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -287,7 +286,7 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 	    64);
 	(void) strncpy((char *)pInfo->manufacturerID, SOFT_MANUFACTURER_ID, 32);
 	pInfo->flags = 0;
-	if (soft_token_present) {
+	if (soft_keystore_status(KEYSTORE_PRESENT)) {
 		pInfo->flags |= CKF_TOKEN_PRESENT;
 	}
 	pInfo->hardwareVersion.major = HARDWARE_VERSION_MAJOR;
@@ -318,7 +317,7 @@ C_GetTokenInfo(CK_SLOT_ID slotID, CK_TOKEN_INFO_PTR pInfo)
 	if (pInfo == NULL)
 		return (CKR_ARGUMENTS_BAD);
 
-	if (!soft_token_present)
+	if (!soft_keystore_status(KEYSTORE_VERSION_OK))
 		return (CKR_DEVICE_REMOVED);
 
 	/* Provide information about a token in the provided buffer */
@@ -493,7 +492,7 @@ C_SetPIN(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (!soft_token_present) {
+	if (!soft_keystore_status(KEYSTORE_VERSION_OK)) {
 		SES_REFRELE(session_p, lock_held);
 		return (CKR_DEVICE_REMOVED);
 	}

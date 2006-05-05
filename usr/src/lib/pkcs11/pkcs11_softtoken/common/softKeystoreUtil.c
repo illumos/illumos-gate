@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -46,6 +45,7 @@
 #include <cryptoutil.h>
 #include "softGlobal.h"
 #include "softObject.h"
+#include "softSession.h"
 #include "softKeystore.h"
 #include "softKeystoreUtil.h"
 
@@ -69,7 +69,7 @@
  * below.  If either order of the fields or their data type changed,
  * you must make sure the ALL the pre-define values are still valid
  *
- * 1) PKCS#11 release number.  It's 2.11 in this release (uchar_t[32])
+ * 1) PKCS#11 release number.  It's 2.20 in this release (uchar_t[32])
  * 2) keystore version number: used for synchronizing when different
  *    processes access the keystore at the same time.  It is incremented
  *    when there is a change to the keystore. (uint_32)
@@ -158,6 +158,7 @@ static soft_object_t	*hmac_key = NULL;
 static char		keystore_path[MAXPATHLEN];
 static boolean_t	keystore_path_initialized = B_FALSE;
 static int		desc_fd = 0;
+
 
 static char *
 get_user_home_sunw_path(char *home_path)
@@ -619,7 +620,6 @@ open_and_lock_keystore_desc(mode_t mode, boolean_t do_create_keystore,
 			break;
 	}
 	if (fd < 0) {
-		soft_token_present = B_FALSE;
 		if ((errno == ENOENT) && (do_create_keystore)) {
 			if (create_keystore() < 0) {
 				goto done;
@@ -639,8 +639,6 @@ open_and_lock_keystore_desc(mode_t mode, boolean_t do_create_keystore,
 	} else {
 		(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 	}
-
-	soft_token_present = B_TRUE;
 
 	if (lock_held) {
 		/* already hold the lock */
@@ -1079,7 +1077,6 @@ soft_keystore_unlock_object(int fd)
 int
 soft_keystore_get_version(uint_t *version, boolean_t lock_held)
 {
-
 	int fd, ret_val = 0;
 	uint_t buf;
 
@@ -2956,4 +2953,152 @@ cleanup:
 
 	(void) close(fd);
 	return (ret_val);
+}
+
+/*
+ * This checks if the keystore file exists
+ */
+
+static int
+soft_keystore_exists()
+{
+	int ret;
+	struct stat fn_stat;
+	char *fname, ks_desc_file[MAXPATHLEN];
+
+	fname = get_desc_file_path(ks_desc_file);
+	ret = stat(fname, &fn_stat);
+	if (ret == 0)
+		return (0);
+	return (errno);
+}
+
+/*
+ *	FUNCTION: soft_keystore_init
+ *
+ *	ARGUMENTS:
+ *		desired_state:  The keystore state the caller would like
+ *				it to be.
+ *
+ *	RETURN VALUE:
+ *		Returns the state the function is in.  If it succeeded, it
+ *		will be the same as the desired, if not it will be
+ *		KEYSTORE_UNAVAILABLE.
+ *
+ *	DESCRIPTION:
+ *		This function will only load as much keystore data as is
+ *		requested at that time. This is for performace by delaying the
+ *		reading of token objects until they are needed or never at
+ *		all if they are not used.
+ *
+ *		It is only called by soft_keystore_status() when the
+ *		"desired_state" is not the the current load state of keystore.
+ *
+ */
+int
+soft_keystore_init(int desired_state)
+{
+	int ret;
+
+	(void) pthread_mutex_lock(&soft_slot.keystore_mutex);
+
+	/*
+	 * If more than one session tries to initialize the keystore, the
+	 * second and other following sessions that were waiting for the lock
+	 * will quickly exit if their requirements are satisfied.
+	 */
+	if (desired_state <= soft_slot.keystore_load_status) {
+		(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
+		return (soft_slot.keystore_load_status);
+	}
+
+	/*
+	 * With 'keystore_load_status' giving the current state of the
+	 * process, this switch will bring it up to the desired state if
+	 * possible.
+	 */
+
+	switch (soft_slot.keystore_load_status) {
+	case KEYSTORE_UNINITIALIZED:
+		ret = soft_keystore_exists();
+		if (ret == 0)
+			soft_slot.keystore_load_status = KEYSTORE_PRESENT;
+		else if (ret == ENOENT)
+			if (create_keystore() == 0)
+				soft_slot.keystore_load_status =
+				    KEYSTORE_PRESENT;
+			else {
+				soft_slot.keystore_load_status =
+				    KEYSTORE_UNAVAILABLE;
+				cryptoerror(LOG_ERR,
+				    "pkcs11_softtoken: "
+				    "Cannot create keystore.");
+				break;
+			}
+
+		if (desired_state <= KEYSTORE_PRESENT)
+			break;
+
+	/* FALLTHRU */
+	case KEYSTORE_PRESENT:
+		if (soft_keystore_get_version(&soft_slot.ks_version, B_FALSE)
+		    != 0) {
+			soft_slot.keystore_load_status = KEYSTORE_UNAVAILABLE;
+			cryptoerror(LOG_ERR,
+			    "pkcs11_softtoken: Keystore version failure.");
+			break;
+		}
+
+		soft_slot.keystore_load_status = KEYSTORE_VERSION_OK;
+		if (desired_state <= KEYSTORE_VERSION_OK)
+			break;
+
+	/* FALLTHRU */
+	case KEYSTORE_VERSION_OK:
+		/* Load all the public token objects from keystore */
+		if (soft_get_token_objects_from_keystore(PUB_TOKENOBJS)
+		    != CKR_OK) {
+			(void) soft_destroy_token_session();
+			soft_slot.keystore_load_status = KEYSTORE_UNAVAILABLE;
+			cryptoerror(LOG_ERR,
+			    "pkcs11_softtoken: Cannot initialize keystore.");
+			break;
+		}
+
+		soft_slot.keystore_load_status = KEYSTORE_INITIALIZED;
+	};
+
+	(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
+	return (soft_slot.keystore_load_status);
+}
+
+/*
+ *	FUNCTION: soft_keystore_status
+ *
+ *	ARGUMENTS:
+ *		desired_state:  The keystore state the caller would like
+ *				it to be.
+ *
+ *	RETURN VALUE:
+ *		B_TRUE if keystore is ready and at the desired state.
+ *		B_FALSE if keystore had an error and is not available.
+ *
+ *	DESCRIPTION:
+ *		The calling function wants to make sure the keystore load
+ *		status to in a state it requires.  If it is not at that
+ *		state it will call the load function.
+ *		If keystore is at the desired state or has just been
+ *		loaded to that state, it will return TRUE.  If there has been
+ *		load failure, it will return FALSE.
+ *
+ */
+boolean_t
+soft_keystore_status(int desired_state)
+{
+
+	if (soft_slot.keystore_load_status == KEYSTORE_UNAVAILABLE)
+		return (B_FALSE);
+
+	return ((desired_state <= soft_slot.keystore_load_status) ||
+	    (soft_keystore_init(desired_state) == desired_state));
 }

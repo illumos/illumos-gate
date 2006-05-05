@@ -147,7 +147,7 @@ SRCS =	\
 	$(BIGNUM_PSR_SRCS)
 
 LIBS    =       $(DYNLIB)
-LDLIBS  +=      -lc -lmd
+LDLIBS  +=      -lc -lmd -lcryptoutil
 
 MAPDIR  = ../spec/$(TRANSMACH)
 SPECMAPFILE = $(MAPDIR)/mapfile

@@ -224,6 +224,7 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	soft_slot.authenticated = 0;
 	soft_slot.userpin_change_needed = 0;
 	soft_slot.token_object_list = NULL;
+	soft_slot.keystore_load_status = KEYSTORE_UNINITIALIZED;
 
 	if ((rv = soft_init_token_session()) != CKR_OK) {
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
@@ -237,27 +238,10 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 		return (CKR_CANT_LOCK);
 	}
 
-	/* Get keystore version because it might not be 1 at this time */
-	if (soft_keystore_get_version(&soft_slot.ks_version, B_FALSE) !=
-	    0) {
-		soft_token_present = B_FALSE;
-	}
-
-	if (soft_token_present) {
-		/* Load all the public token objects from keystore */
-		if ((rv = soft_get_token_objects_from_keystore(
-		    PUB_TOKENOBJS)) != CKR_OK) {
-			(void) pthread_mutex_destroy(&soft_slot.slot_mutex);
-			(void) soft_destroy_token_session();
-			(void) pthread_mutex_unlock(&soft_giant_mutex);
-			return (rv);
-		} else {
-			/*
-			 * Invalidate public token objects until the
-			 * C_OpenSession is called.
-			 */
-			soft_validate_token_objects(B_FALSE);
-		}
+	/* Initialize the keystore lock */
+	if (pthread_mutex_init(&soft_slot.keystore_mutex, NULL) != 0) {
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
+		return (CKR_CANT_LOCK);
 	}
 
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
@@ -361,6 +345,7 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 	 */
 	soft_delete_all_in_core_token_objects(ALL_TOKEN);
 	(void) pthread_mutex_destroy(&soft_slot.slot_mutex);
+	(void) pthread_mutex_destroy(&soft_slot.keystore_mutex);
 	(void) soft_destroy_token_session();
 
 	/*
@@ -372,6 +357,8 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 		free(delay_free_obj);
 		delay_free_obj = tmpo;
 	}
+
+	soft_slot.keystore_load_status = KEYSTORE_UNINITIALIZED;
 	(void) pthread_mutex_destroy(&obj_delay_freed.obj_to_be_free_mutex);
 
 	delay_free_ses = ses_delay_freed.first;
