@@ -25,34 +25,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stddef.h>
-#include <sys/mdb_modapi.h>
-#include <mdb/mdb_ks.h>
-#include <sys/modctl.h>
-#include <sys/avintr.h>
-#include <sys/psm_common.h>
-#include <sys/pic.h>
+#include "intr_common.h"
 
-static struct av_head	avec_tbl[256];
+static struct av_head	avec_tbl[APIC_MAX_VECTOR+1];
 static uint16_t		shared_tbl[MAX_ISA_IRQ + 1];
-
-/*
- * Option usage
- */
-#define	INTR_DISPLAY_DRVR_INST	0x1	/* -d option */
-#define	INTR_DISPLAY_INTRSTAT	0x2	/* -i option */
-
-int	option_flags;
-
-void
-interrupt_help(void)
-{
-	mdb_printf("Prints the interrupt usage on the system.\n"
-	    "By default, only interrupt service routine names are printed.\n\n"
-	    "Switches:\n"
-	    "  -d   instead of ISR, print <driver_name><instance#>\n"
-	    "  -i   show like intrstat, cpu# ISR/<driver_name><instance#>\n");
-}
 
 static char *
 interrupt_print_bus(uintptr_t dip_addr)
@@ -82,26 +58,6 @@ interrupt_print_bus(uintptr_t dip_addr)
 }
 
 
-static void
-interrupt_print_isr(struct autovec avhp)
-{
-	char		driver_name[MODMAXNAMELEN + 1];
-	uintptr_t	dip_addr = (uintptr_t)avhp.av_dip;
-	struct dev_info	dev_info;
-
-	if (option_flags & INTR_DISPLAY_DRVR_INST) {
-		if (dip_addr && mdb_devinfo2driver(dip_addr, driver_name,
-		    sizeof (driver_name)) == 0) {
-			(void) mdb_vread(&dev_info, sizeof (dev_info),
-			    dip_addr);
-			mdb_printf("%s#%d", driver_name,
-			    dev_info.devi_instance);
-		} else
-			mdb_printf("%a", avhp.av_vector);
-	} else
-		mdb_printf("%a", avhp.av_vector);
-}
-
 /*
  * uppc_interrupt_dump:
  *	Dump uppc(7d) interrupt information.
@@ -111,7 +67,7 @@ int
 uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	int		i, share_cnt;
+	int		i, j;
 	boolean_t	found = B_FALSE;
 	struct autovec	avhp;
 
@@ -133,11 +89,10 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	/*
-	 * All x86 systems load uppc(7d) by default.
-	 * Now, this becomes interesting on APIC based systems.
-	 * 'interrupts' dcmd is supported by both the .so modules
-	 * So, uppc(7d) needs to be unloaded somehow on APIC based systems
-	 * Here a check for shared_tbl[i] and returning NULL takes care of that
+	 * By default, on all x86 systems ::interrupts from uppc(7d) gets
+	 * loaded first. For APIC systems the ::interrupts from pcplusmp(7d)
+	 * ought to be executed. Confusion stems as both modules export the
+	 * same dcmd.
 	 */
 	for (i = 0; i < MAX_ISA_IRQ + 1; i++)
 		if (shared_tbl[i]) {
@@ -169,24 +124,28 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 			continue;
 
 		/* Print each interrupt entry */
-		share_cnt = shared_tbl[i];
 		if (option_flags & INTR_DISPLAY_INTRSTAT)
 			mdb_printf("cpu0\t");
 		else
-			mdb_printf("%3d   0x%2x   %4d/%-2d   %-4s %3d  ",
+			mdb_printf("%-3d   0x%2x   %4d/%-2d   %-4s %-3d  ",
 			    i, i + PIC_VECTBASE, avec_tbl[i].avh_lo_pri,
 			    avec_tbl[i].avh_hi_pri, avhp.av_dip ?
 			    interrupt_print_bus((uintptr_t)avhp.av_dip) : " - ",
-			    share_cnt);
+			    shared_tbl[i]);
 
-		if (share_cnt)
-			interrupt_print_isr(avhp);
+		if (shared_tbl[i])
+			interrupt_print_isr((uintptr_t)avhp.av_vector,
+			    (uintptr_t)avhp.av_intarg1, (uintptr_t)avhp.av_dip);
 
-		while (share_cnt-- > 0) {
+		for (j = 1; j < shared_tbl[i]; j++) {
 			if (mdb_vread(&avhp, sizeof (struct autovec),
 			    (uintptr_t)avhp.av_link) != -1)  {
 				mdb_printf(", ");
-				interrupt_print_isr(avhp);
+				interrupt_print_isr((uintptr_t)avhp.av_vector,
+				    (uintptr_t)avhp.av_intarg1,
+				    (uintptr_t)avhp.av_dip);
+			} else {
+				break;
 			}
 		}
 		mdb_printf("\n");
@@ -210,5 +169,11 @@ static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, NULL };
 const mdb_modinfo_t *
 _mdb_init(void)
 {
+	GElf_Sym	sym;
+
+	if (mdb_lookup_by_name("gld_intr", &sym) != -1)
+		if (GELF_ST_TYPE(sym.st_info) == STT_FUNC)
+			gld_intr_addr = (uintptr_t)sym.st_value;
+
 	return (&modinfo);
 }
