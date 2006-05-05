@@ -1175,6 +1175,7 @@ arc_reclaim_needed(void)
 	if (availrmem < swapfs_minfree + swapfs_reserve + extra)
 		return (1);
 
+#if defined(__i386)
 	/*
 	 * If we're on an i386 platform, it's possible that we'll exhaust the
 	 * kernel heap space before we ever run out of available physical
@@ -1186,7 +1187,6 @@ arc_reclaim_needed(void)
 	 * heap is allocated.  (Or, in the caclulation, if less than 1/4th is
 	 * free)
 	 */
-#if defined(__i386)
 	if (btop(vmem_size(heap_arena, VMEM_FREE)) <
 	    (btop(vmem_size(heap_arena, VMEM_FREE | VMEM_ALLOC)) >> 2))
 		return (1);
@@ -1212,6 +1212,13 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 	 * up too much memory.
 	 */
 	dnlc_reduce_cache((void *)(uintptr_t)arc_reduce_dnlc_percent);
+
+#if defined(__i386)
+	/*
+	 * Reclaim unused memory from all kmem caches.
+	 */
+	kmem_reap();
+#endif
 #endif
 
 	/*

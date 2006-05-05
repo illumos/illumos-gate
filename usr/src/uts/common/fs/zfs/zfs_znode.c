@@ -1006,12 +1006,13 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 
 	if (off < size) {
 		objset_t *os = zfsvfs->z_os;
+		uint64_t rlen = len;
 
 		if (len == 0)
-			len = -1;
+			rlen = -1;
 		else if (end > size)
-			len = size - off;
-		VERIFY(0 == dmu_free_range(os, zp->z_id, off, len, tx));
+			rlen = size - off;
+		VERIFY(0 == dmu_free_range(os, zp->z_id, off, rlen, tx));
 	}
 
 	if (log) {
