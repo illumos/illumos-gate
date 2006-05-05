@@ -50,6 +50,9 @@ i depend
 #
 d none usr 755 root sys
 d none usr/platform 755 root sys
+d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
+d none usr/platform/SUNW,SPARC-Enterprise/sbin 755 root bin
+s none usr/platform/SUNW,SPARC-Enterprise/sbin/fruadm=../../sun4u/sbin/fruadm
 d none usr/platform/SUNW,Sun-Blade-1000 755 root sys
 d none usr/platform/SUNW,Sun-Blade-1000/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-1000/lib/picl 755 root sys

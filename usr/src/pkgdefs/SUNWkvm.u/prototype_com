@@ -100,7 +100,6 @@ s none usr/platform/SUNW,Sun-Blade-2500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,A70/sbin=../sun4u/sbin
 d none usr/platform/SUNW,SPARC-Enterprise/sbin 755 root bin
 s none usr/platform/SUNW,SPARC-Enterprise/sbin/eeprom=../../sun4u/sbin/eeprom
-s none usr/platform/SUNW,SPARC-Enterprise/sbin/fruadm=../../sun4u/sbin/fruadm
 s none usr/platform/SUNW,SPARC-Enterprise/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,SPARC-Enterprise/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Sun-Fire-V445/sbin 755 root bin
