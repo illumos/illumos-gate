@@ -879,7 +879,12 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf)
 		 * blocksize after we get the lock in case it's changed!
 		 */
 		for (;;) {
-			boff = off & ~(zp->z_blksz - 1);
+			if (ISP2(zp->z_blksz)) {
+				boff = P2ALIGN_TYPED(off, zp->z_blksz,
+				    uint64_t);
+			} else {
+				boff = 0;
+			}
 			dlen = zp->z_blksz;
 			rl = zfs_range_lock(zp, boff, dlen, RL_READER);
 			if (zp->z_blksz == dlen)
