@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +111,8 @@ daemonize_init(void)
 	    PRIV_FILE_DAC_EXECUTE, PRIV_FILE_DAC_READ, PRIV_FILE_DAC_SEARCH,
 	    PRIV_FILE_DAC_WRITE, PRIV_FILE_OWNER, PRIV_PROC_OWNER,
 	    PRIV_PROC_PRIOCNTL, PRIV_SYS_ADMIN, PRIV_SYS_CONFIG,
-	    PRIV_SYS_DEVICES, PRIV_SYS_RES_CONFIG, NULL) != 0)
+	    PRIV_SYS_DEVICES, PRIV_SYS_RES_CONFIG, PRIV_NET_PRIVADDR,
+	    PRIV_SYS_NET_CONFIG, NULL) != 0)
 		fmd_error(EFMD_EXIT, "additional privileges required to run\n");
 
 	/*
