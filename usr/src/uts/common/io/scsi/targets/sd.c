@@ -22437,18 +22437,11 @@ sd_dkio_set_geometry(dev_t dev, caddr_t arg, int flag)
 	}
 
 	/*
-	 * Make sure the geometry is valid before setting the geometry.
+	 * Make sure there is no reservation conflict on the lun.
 	 */
-	if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
-		return (rval);
+	if (sd_send_scsi_TEST_UNIT_READY(un, 0) == EACCES) {
+		return (EACCES);
 	}
-	mutex_enter(SD_MUTEX(un));
-
-	if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
-		mutex_exit(SD_MUTEX(un));
-		return (rval);
-	}
-	mutex_exit(SD_MUTEX(un));
 
 #if defined(__i386) || defined(__amd64)
 	if (un->un_solaris_size == 0) {
@@ -22641,18 +22634,11 @@ sd_dkio_set_partition(dev_t dev, caddr_t arg, int flag)
 	mutex_exit(SD_MUTEX(un));
 
 	/*
-	 * Make sure the geometry is valid before setting the partitions.
+	 * Make sure there is no reservation conflict on the lun.
 	 */
-	if ((rval = sd_send_scsi_TEST_UNIT_READY(un, 0)) != 0) {
-		return (rval);
+	if (sd_send_scsi_TEST_UNIT_READY(un, 0) == EACCES) {
+		return (EACCES);
 	}
-	mutex_enter(SD_MUTEX(un));
-
-	if ((rval = sd_validate_geometry(un, SD_PATH_DIRECT)) != 0) {
-		mutex_exit(SD_MUTEX(un));
-		return (rval);
-	}
-	mutex_exit(SD_MUTEX(un));
 
 #if defined(__i386) || defined(__amd64)
 	if (un->un_solaris_size == 0) {
