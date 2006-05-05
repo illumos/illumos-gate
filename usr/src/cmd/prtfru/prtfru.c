@@ -372,8 +372,11 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 				((strcmp(def->name, "Lowest") == 0) ||
 				(strcmp(def->name, "Highest") == 0) ||
 				(strcmp(def->name, "Latest") == 0)))
-				value -= TEMPERATURE_OFFSET;
-			output((def->dispType == FDISP_Octal) ?
+				output((def->dispType == FDISP_Octal) ?
+				"%llo" : "%lld (%lld degrees C)",
+				value, (value - TEMPERATURE_OFFSET));
+			else
+				output((def->dispType == FDISP_Octal) ?
 				"%llo" : "%lld", value);
 			return;
 		case FDISP_Time:
