@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
+#include <openssl/pkcs12.h>
 #include "kssladm.h"
 
 static void
@@ -49,7 +50,7 @@ pem_password_callback(char *buf, int size, int rwflag, void *userdata)
 
 
 static STACK_OF(X509_INFO) *
-PEM_get_x509_info_stack(const char *filename, char *passphrase)
+PEM_get_x509_info_stack(const char *filename, char *password_file)
 {
 	FILE *fp;
 	STACK_OF(X509_INFO) *x509_info_stack;
@@ -66,7 +67,7 @@ PEM_get_x509_info_stack(const char *filename, char *passphrase)
 	OpenSSL_add_all_algorithms();
 
 	x509_info_stack = PEM_X509_INFO_read(
-	    fp, NULL, pem_password_callback, passphrase);
+	    fp, NULL, pem_password_callback, password_file);
 	(void) fclose(fp);
 
 	if (x509_info_stack == NULL) {
@@ -76,12 +77,11 @@ PEM_get_x509_info_stack(const char *filename, char *passphrase)
 	return (x509_info_stack);
 }
 
-
-RSA *
-PEM_get_rsa_key(const char *filename, char *passphrase)
+static EVP_PKEY *
+PEM_get_key(const char *filename, const char *password_file)
 {
 	FILE *fp;
-	RSA *rsa_key;
+	EVP_PKEY *pkey = NULL;
 
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
@@ -89,19 +89,19 @@ PEM_get_rsa_key(const char *filename, char *passphrase)
 		return (NULL);
 	}
 	if (verbose)
-		(void) printf("In PEM_get_rsa_key: %s opened\n", filename);
+		(void) printf("In PEM_get_key: %s opened\n", filename);
 
 	OpenSSL_add_all_algorithms();
 
-	rsa_key = PEM_read_RSAPrivateKey(
-	    fp, NULL, pem_password_callback, passphrase);
+	pkey = PEM_read_PrivateKey(fp, NULL, pem_password_callback,
+	    (char *)password_file);
 	(void) fclose(fp);
 
-	if (rsa_key == NULL) {
+	if (pkey == NULL) {
 		print_crypto_error();
 	}
 
-	return (rsa_key);
+	return (pkey);
 }
 
 uchar_t *
@@ -154,33 +154,121 @@ X509_to_bytes(X509 *cert, int *cert_size)
 	return (cert_buf);
 }
 
-
-/* Returns DER encoded cert */
-uchar_t *
-PEM_get_cert(const char *filename, char *passphrase, int *cert_size)
+static uchar_t **
+init_cert_vars(int **rlens)
 {
-	STACK_OF(X509_INFO) *x509_info_stack;
-	uchar_t *cert_buf;
-	X509_INFO *info;
+	int i;
+	uchar_t **cert_bufs;
+	int *lcert_lens;
 
-	x509_info_stack = PEM_get_x509_info_stack(filename, passphrase);
+	cert_bufs = (uchar_t **)malloc(MAX_CHAIN_LENGTH * sizeof (uchar_t **));
+	if (cert_bufs == NULL)
+		return (NULL);
+	for (i = 0; i < MAX_CHAIN_LENGTH; i++)
+		cert_bufs[i] = NULL;
+
+	lcert_lens = malloc(MAX_CHAIN_LENGTH * sizeof (int));
+	if (lcert_lens == NULL) {
+		free(cert_bufs);
+		return (NULL);
+	}
+	for (i = 0; i < MAX_CHAIN_LENGTH; i++)
+		lcert_lens[i] = 0;
+
+	*rlens = lcert_lens;
+	return (cert_bufs);
+}
+
+static void
+print_subject(X509 *x)
+{
+	char buf[256];
+
+	(void) X509_NAME_oneline(X509_get_subject_name(x),
+	    buf, sizeof (buf));
+	(void) fprintf(stdout, "/* subject: %s */ \n", buf);
+}
+
+/*
+ * Returns DER encoded certs in an array of pointers
+ * and their sizes in cert_sizes. If the rsa argument is
+ * not NULL, we return the RSA key in it. The caller needs
+ * to free the structures when done.
+ */
+uchar_t **
+PEM_get_rsa_key_certs(const char *filename, char *password_file,
+    RSA **rsa, int **cert_sizes, int *n)
+{
+	int i, cert_size, ncerts;
+	int *cert_lens;
+	uchar_t **cert_bufs;
+	EVP_PKEY *pkey = NULL;
+	X509_INFO *info;
+	X509_INFO *cert_infos[MAX_CHAIN_LENGTH];
+	STACK_OF(X509_INFO) *x509_info_stack;
+
+	x509_info_stack = PEM_get_x509_info_stack(filename, password_file);
 	if (x509_info_stack == NULL) {
 		return (NULL);
 	}
 
+	ncerts = 0;
 	/* LINTED */
-	info = sk_X509_INFO_pop(x509_info_stack);
-	if (info == NULL || info->x509 == NULL) {
+	while ((info = sk_X509_INFO_pop(x509_info_stack)) != NULL &&
+	    ncerts < MAX_CHAIN_LENGTH) {
+		cert_infos[ncerts] = info;
+		ncerts++;
+		if (verbose)
+			print_subject(info->x509);
+	}
+
+	if (ncerts == 0) {
 		(void) fprintf(stderr, "No cert found\n");
 		return (NULL);
 	}
 
-	cert_buf = X509_to_bytes(info->x509, cert_size);
-	X509_INFO_free(info);
-	return (cert_buf);
+	if (rsa != NULL) {
+		X509 *x;
+
+		pkey = PEM_get_key(filename, password_file);
+		if (pkey == NULL)
+			return (NULL);
+
+		x = cert_infos[ncerts - 1]->x509;
+		if (!X509_check_private_key(x, pkey)) {
+			(void) fprintf(stderr, "Error: Server certificate "
+			    "and server private key do not match.\n");
+			EVP_PKEY_free(pkey);
+			return (NULL);
+		}
+
+		*rsa = EVP_PKEY_get1_RSA(pkey);
+	}
+
+	if ((cert_bufs = init_cert_vars(&cert_lens)) == NULL) {
+		if (pkey != NULL)
+			EVP_PKEY_free(pkey);
+		return (NULL);
+	}
+
+	/*
+	 * cert_infos[] is constructed from a stack of certificates structure
+	 * and hence the order is high level CA certificate first. SSL protocol
+	 * needs the certificates in the order of low level CA certificate
+	 * first. So, we walk cert_infos[] in reverse order below.
+	 */
+	for (i = 0; i < ncerts; i++) {
+		info =  cert_infos[ncerts - 1 - i];
+		cert_bufs[i] = X509_to_bytes(info->x509, &cert_size);
+		cert_lens[i] = cert_size;
+		X509_INFO_free(info);
+	}
+
+	*cert_sizes = cert_lens;
+	*n = ncerts;
+	return (cert_bufs);
 }
 
-#include <openssl/pkcs12.h>
 static PKCS12 *
 PKCS12_load(const char *filename)
 {
@@ -189,7 +277,7 @@ PKCS12_load(const char *filename)
 
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
-		perror("Unnable to open file for reading");
+		perror("Unable to open file for reading");
 		return (NULL);
 	}
 
@@ -207,59 +295,112 @@ PKCS12_load(const char *filename)
 	return (p12);
 }
 
-int
-PKCS12_get_rsa_key_cert(const char *filename, const char *password_file,
-	RSA **rsa, uchar_t **cert, int *cert_size)
+/*
+ * Returns DER encoded certs in an array of pointers and their
+ * sizes in cert_sizes. The RSA key is returned in the rsa argument.
+ * The caller needs to free the structures when done.
+ */
+uchar_t **
+PKCS12_get_rsa_key_certs(const char *filename, const char *password_file,
+    RSA **rsa, int **cert_sizes, int *n)
 {
-	int rv = -1;
-	EVP_PKEY *pkey = NULL;
-	X509 *x509 = NULL;
+	int i, ncerts, cert_size;
+	int *cert_lens;
 	char *password = NULL;
 	char password_buf[1024];
-	PKCS12 *p12;
+	uchar_t **cert_bufs = NULL;
+	uchar_t *cert_buf;
+	PKCS12 *p12 = NULL;
+	EVP_PKEY *pkey = NULL;
+	X509 *x509 = NULL;
+	X509 *certs[MAX_CHAIN_LENGTH];
+	STACK_OF(X509) *ca = NULL;
 
 	p12 = PKCS12_load(filename);
 	if (p12 == NULL) {
-		goto out0;
+		return (NULL);
 	}
 
 	if (! PKCS12_verify_mac(p12, NULL, 0)) {
 		if (get_passphrase(
 		    password_file, password_buf, sizeof (password_buf)) <= 0) {
-			perror("Unnable to read passphrase");
-			goto out0;
+			perror("Unable to read passphrase");
+			goto done;
 		}
 
 		password = password_buf;
 	}
 
-	(void) PKCS12_parse(p12, password, &pkey, &x509, NULL);
+	if (PKCS12_parse(p12, password, &pkey, &x509, &ca) <= 0) {
+		(void) fprintf(stderr, "Unable to parse PKCS12 file.\n");
+		goto done;
+	}
 
-	PKCS12_free(p12);
 	if (pkey == NULL) {
 		(void) fprintf(stderr, "No key returned\n");
-		goto out0;
+		goto done;
 	}
 	if (x509 == NULL) {
 		(void) fprintf(stderr, "No cert returned\n");
-		goto out1;
+		goto done;
 	}
+
+	if (!X509_check_private_key(x509, pkey)) {
+		(void) fprintf(stderr, "Error: Server certificate and server "
+		    "private key do not match.\n");
+		goto done;
+	}
+
+	cert_buf = X509_to_bytes(x509, &cert_size);
+	if (cert_buf == NULL)
+		goto done;
+	X509_free(x509);
 
 	*rsa = EVP_PKEY_get1_RSA(pkey);
 	if (*rsa == NULL) {
-		goto out2;
+		goto done;
 	}
 
-	*cert = X509_to_bytes(x509, cert_size);
-
-	if (*cert != NULL) {
-		rv = 0;
+	if ((cert_bufs = init_cert_vars(&cert_lens)) == NULL) {
+		RSA_free(*rsa);
+		goto done;
 	}
 
-out2:
-	X509_free(x509);
-out1:
-	EVP_PKEY_free(pkey);
-out0:
-	return (rv);
+	ncerts = 0;
+	cert_bufs[0] = cert_buf;
+	cert_lens[0] = cert_size;
+	ncerts++;
+
+	/* LINTED */
+	while ((ca != NULL) && ((x509 = sk_X509_pop(ca)) != NULL) &&
+	    ncerts < MAX_CHAIN_LENGTH) {
+		certs[ncerts] = x509;
+		ncerts++;
+		if (verbose)
+			print_subject(x509);
+	}
+
+	/*
+	 * certs[1..ncerts-1] is constructed from a stack of certificates
+	 * structure and hence the order is high level CA certificate first.
+	 * SSL protocol needs the certificates in the order of low level CA
+	 * certificate first. So, we walk certs[] in reverse order below.
+	 */
+	for (i = 1; i < ncerts; i++) {
+		x509 =  certs[ncerts - i];
+		cert_bufs[i] = X509_to_bytes(x509, &cert_size);
+		cert_lens[i] = cert_size;
+		X509_free(x509);
+	}
+
+	*cert_sizes = cert_lens;
+	*n = ncerts;
+
+done:
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+	if (p12 != NULL)
+		PKCS12_free(p12);
+
+	return (cert_bufs);
 }

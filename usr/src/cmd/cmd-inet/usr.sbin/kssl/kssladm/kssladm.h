@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,8 @@ extern "C" {
 #define	FAILURE		1
 #define	ERROR_USAGE	2
 
+#define	MAX_CHAIN_LENGTH	12
+
 extern boolean_t verbose;
 
 extern int do_create(int argc, char *argv[]);
@@ -52,11 +54,10 @@ extern void usage_create(boolean_t do_print);
 extern void usage_delete(boolean_t do_print);
 
 extern uchar_t *get_modulus(uchar_t *ber_buf, int buflen, int *modlen);
-extern RSA *PEM_get_rsa_key(const char *filename, char *passphrase);
-extern uchar_t *PEM_get_cert(const char *filename, char *passphrase,
-    int *cert_size);
-extern int PKCS12_get_rsa_key_cert(const char *filename, const char *password,
-    RSA **rsa, uchar_t **cert, int *cert_size);
+extern uchar_t **PEM_get_rsa_key_certs(const char *filename,
+    char *password_file, RSA **rsa, int **cert_sizes, int *ncerts);
+extern uchar_t **PKCS12_get_rsa_key_certs(const char *filename,
+    const char *password_file, RSA **rsa, int **cert_sizes, int *ncerts);
 extern int get_passphrase(const char *password_file, char *buf, int buf_size);
 extern int kssl_send_command(char *buf, int cmd);
 extern int parse_and_set_addr(char *arg1, char *arg2, struct sockaddr_in *addr);

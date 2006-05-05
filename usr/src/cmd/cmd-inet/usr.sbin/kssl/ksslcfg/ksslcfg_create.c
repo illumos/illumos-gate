@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,15 +42,16 @@ usage_create(boolean_t do_print)
 		(void) fprintf(stderr, gettext("Usage:\n"));
 	(void) fprintf(stderr, "ksslcfg create"
 		" -f pkcs11 [-d softtoken_directory] -T <token_label>"
-		" -C <certificate_subject> -x <proxy_port>"
+		" -C <certificate_label> -x <proxy_port>"
+		" [-h <ca_certchain_file>]"
 		" [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, "ksslcfg create"
-		" -f pkcs12 -i <certificate_file> -x <proxy_port>"
+		" -f pkcs12 -i <cert_and_key_pk12file> -x <proxy_port>"
 		" [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, "ksslcfg create"
-		" -f pem -i <certificate_file> -x <proxy_port>"
+		" -f pem -i <cert_and_key_pemfile> -x <proxy_port>"
 		" [options] [<server_address>] <server_port>\n");
 
 	(void) fprintf(stderr, gettext("options are:\n"));
@@ -474,7 +475,7 @@ do_create(int argc, char *argv[])
 	 * of the arguments. This is the reason we ignore optarg
 	 * for some of the cases below.
 	 */
-	while ((c = getopt(argc, argv, "vT:d:f:i:p:c:C:t:u:x:z:")) != -1) {
+	while ((c = getopt(argc, argv, "vT:d:f:h:i:p:c:C:t:u:x:z:")) != -1) {
 		switch (c) {
 		case 'd':
 			break;
@@ -485,6 +486,8 @@ do_create(int argc, char *argv[])
 			break;
 		case 'f':
 			format = optarg;
+			break;
+		case 'h':
 			break;
 		case 'i':
 			filename = optarg;

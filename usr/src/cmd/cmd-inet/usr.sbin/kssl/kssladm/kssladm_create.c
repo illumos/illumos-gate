@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <sys/sysmacros.h>
 #include <netdb.h> /* hostent */
 #include <netinet/in.h>
 #include <openssl/rsa.h>
@@ -49,14 +50,15 @@ usage_create(boolean_t do_print)
 	(void) fprintf(stderr, "kssladm create"
 		" -f pkcs11 [-d softtoken_directory] -T <token_label>"
 		" -C <certificate_label> -x <proxy_port>"
+		" [-h <ca_certchain_file>]"
 		" [options] [<server_address>] [<server_port>]\n");
 
 	(void) fprintf(stderr, "kssladm create"
-		" -f pkcs12 -i <certificate_file> -x <proxy_port>"
+		" -f pkcs12 -i <cert_and_key_pk12file> -x <proxy_port>"
 		" [options] [<server_address>] [<server_port>]\n");
 
 	(void) fprintf(stderr, "kssladm create"
-		" -f pem -i <certificate_file> -x <proxy_port>"
+		" -f pem -i <cert_and_key_pemfile> -x <proxy_port>"
 		" [options] [<server_address>] [<server_port>]\n");
 
 	(void) fprintf(stderr, "options are:\n"
@@ -107,13 +109,14 @@ get_cert_val(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE cert_obj, int *len)
  * Everything is allocated in one single contiguous buffer.
  * The layout is the following:
  * . the kssl_params_t structure
- * . the array of sizes of the certificates, (value of sc_sizes_offset)
  * . the array of key attribute structs, (value of ck_attrs)
- * . the certificates values (values of sc_certs[i])
  * . the key attributes values (values of ck_attrs[i].ck_value);
+ * . the array of sizes of the certificates, (referred to as sc_sizes[])
+ * . the certificates values (referred to as sc_certs[])
  *
  * The address of the certs and key attributes values are offsets
- * from the beginning of the big buffer.
+ * from the beginning of the big buffer. sc_sizes_offset points
+ * to sc_sizes[0] and sc_certs_offset points to sc_certs[0].
  */
 static kssl_params_t *
 pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
@@ -152,7 +155,7 @@ pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
 	/* Get the sizes */
 	bufsize = sizeof (kssl_params_t);
 	cert_size = (uint32_t)cert_attrs[0].ulValueLen;
-	bufsize += cert_size + sizeof (uint32_t);
+	bufsize += cert_size + MAX_CHAIN_LENGTH * sizeof (uint32_t);
 
 	/* and the required key attributes */
 	rv = C_GetAttributeValue(sess, privkey_obj, privkey_attrs,
@@ -194,6 +197,9 @@ pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
 		attr_cnt++;
 	}
 
+	/* Add 4-byte cushion as sc_sizes[0] needs 32-bit aligment */
+	bufsize += sizeof (uint32_t);
+
 	/* Now the big memory allocation */
 	if ((buf = calloc(bufsize, 1)) == NULL) {
 		(void) fprintf(stderr,
@@ -207,29 +213,12 @@ pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
 
 	buf = (char *)(kssl_params + 1);
 
-	kssl_params->kssl_certs.sc_count = 1;
-	bcopy(&cert_size, buf, sizeof (uint32_t));
-	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
-	buf += sizeof (uint32_t);
-
 	/* the keys attributes structs array */
 	key = &kssl_params->kssl_privkey;
 	key->ks_format = CRYPTO_KEY_ATTR_LIST;
 	key->ks_count = attr_cnt;
 	key->ks_attrs_offset = buf - (char *)kssl_params;
 	buf += attr_cnt * sizeof (kssl_object_attribute_t);
-
-	/* now the certs values */
-	cert_attrs[0].pValue = buf;
-	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
-	buf += cert_attrs[0].ulValueLen;
-
-	rv = C_GetAttributeValue(sess, cert_obj, cert_attrs, 1);
-	if (rv != CKR_OK) {
-		(void) fprintf(stderr, "Cannot get cert value."
-		    " error = %s\n", pkcs11_strerror(rv));
-		return (NULL);
-	}
 
 	/* then the attributes values */
 	for (i = 0; i < attr_cnt; i++) {
@@ -245,6 +234,7 @@ pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
 
 		buf += privkey_attrs[i].ulValueLen;
 	}
+
 	/* then the key attributes values */
 	rv = C_GetAttributeValue(sess, privkey_obj, privkey_attrs, attr_cnt);
 	if (rv != CKR_OK) {
@@ -257,13 +247,31 @@ pkcs11_to_kssl(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE privkey_obj,
 	bcopy(kssl_attrs, ((char *)kssl_params) + key->ks_attrs_offset,
 	    attr_cnt * sizeof (kssl_object_attribute_t));
 
+	buf = (char *)P2ROUNDUP((uintptr_t)buf, sizeof (uint32_t));
+	kssl_params->kssl_certs.sc_count = 1;
+	bcopy(&cert_size, buf, sizeof (uint32_t));
+	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
+	buf += MAX_CHAIN_LENGTH * sizeof (uint32_t);
+
+	/* now the certs values */
+	cert_attrs[0].pValue = buf;
+	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
+	buf += cert_attrs[0].ulValueLen;
+
+	rv = C_GetAttributeValue(sess, cert_obj, cert_attrs, 1);
+	if (rv != CKR_OK) {
+		(void) fprintf(stderr, "Cannot get cert value."
+		    " error = %s\n", pkcs11_strerror(rv));
+		return (NULL);
+	}
+
 	*paramsize = bufsize;
 	return (kssl_params);
 }
 
 #define	max_num_cert 32
 
-kssl_params_t *
+static kssl_params_t *
 load_from_pkcs11(const char *token_label, const char *password_file,
 	const char *certname, int *bufsize)
 {
@@ -384,7 +392,7 @@ load_from_pkcs11(const char *token_label, const char *password_file,
 	rv = C_FindObjectsInit(sess, cert_tmpl, cert_tmpl_count);
 	if (rv != CKR_OK) {
 		(void) fprintf(stderr,
-		    "Cannot intialize cert search."
+		    "Cannot initialize cert search."
 		    " error = %s\n", pkcs11_strerror(rv));
 		return (NULL);
 	}
@@ -562,11 +570,15 @@ load_from_pkcs11(const char *token_label, const char *password_file,
 	}
 }
 
-
+/*
+ * See the comments for pkcs11_to_kssl() for the layout of the
+ * returned buffer.
+ */
 static kssl_params_t *
-openssl_to_kssl(RSA *rsa, uchar_t *cert_buf, int cert_size, int *paramsize)
+openssl_to_kssl(RSA *rsa, int ncerts, uchar_t *cert_bufs[], int *cert_sizes,
+    int *paramsize)
 {
-	int i;
+	int i, tcsize;
 	kssl_params_t *kssl_params;
 	kssl_key_t *key;
 	char *buf;
@@ -585,8 +597,12 @@ openssl_to_kssl(RSA *rsa, uchar_t *cert_buf, int cert_size, int *paramsize)
 	BIGNUM *priv_key_bignums[MAX_ATTR_CNT];
 	int attr_cnt;
 
+	tcsize = 0;
+	for (i = 0; i < ncerts; i++)
+		tcsize += cert_sizes[i];
+
 	bufsize = sizeof (kssl_params_t);
-	bufsize += cert_size + sizeof (uint32_t);
+	bufsize += (tcsize + MAX_CHAIN_LENGTH * sizeof (uint32_t));
 
 	/* and the key attributes */
 	priv_key_bignums[0] = rsa->n;		/* MODULUS */
@@ -616,6 +632,9 @@ openssl_to_kssl(RSA *rsa, uchar_t *cert_buf, int cert_size, int *paramsize)
 		attr_cnt++;
 	}
 
+	/* Add 4-byte cushion as sc_sizes[0] needs 32-bit aligment */
+	bufsize += sizeof (uint32_t);
+
 	/* Now the big memory allocation */
 	if ((buf = calloc(bufsize, 1)) == NULL) {
 		(void) fprintf(stderr,
@@ -629,22 +648,12 @@ openssl_to_kssl(RSA *rsa, uchar_t *cert_buf, int cert_size, int *paramsize)
 
 	buf = (char *)(kssl_params + 1);
 
-	kssl_params->kssl_certs.sc_count = 1;
-	bcopy(&cert_size, buf, sizeof (uint32_t));
-	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
-	buf += sizeof (uint32_t);
-
 	/* the keys attributes structs array */
 	key = &kssl_params->kssl_privkey;
 	key->ks_format = CRYPTO_KEY_ATTR_LIST;
 	key->ks_count = attr_cnt;
 	key->ks_attrs_offset = buf - (char *)kssl_params;
 	buf += attr_cnt * sizeof (kssl_object_attribute_t);
-
-	/* now the certs values */
-	bcopy(cert_buf, buf, cert_size);
-	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
-	buf += cert_size;
 
 	attr_cnt = 0;
 	/* then the key attributes values */
@@ -661,68 +670,143 @@ openssl_to_kssl(RSA *rsa, uchar_t *cert_buf, int cert_size, int *paramsize)
 	bcopy(kssl_attrs, ((char *)kssl_params) + key->ks_attrs_offset,
 	    attr_cnt * sizeof (kssl_object_attribute_t));
 
+	buf = (char *)P2ROUNDUP((uintptr_t)buf, sizeof (uint32_t));
+	kssl_params->kssl_certs.sc_count = ncerts;
+	bcopy(cert_sizes, buf, ncerts * sizeof (uint32_t));
+	kssl_params->kssl_certs.sc_sizes_offset = buf - (char *)kssl_params;
+	buf += MAX_CHAIN_LENGTH * sizeof (uint32_t);
+
+	kssl_params->kssl_certs.sc_certs_offset = buf - (char *)kssl_params;
+	/* now the certs values */
+	for (i = 0; i < ncerts; i++) {
+		bcopy(cert_bufs[i], buf, cert_sizes[i]);
+		buf += cert_sizes[i];
+	}
+
 	*paramsize = bufsize;
 	return (kssl_params);
 }
 
-kssl_params_t *
+static kssl_params_t *
+add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file,
+    const char *password_file)
+{
+	int i, ncerts, newlen;
+	int *cert_sizes;
+	uint32_t certlen = 0;
+	char *buf;
+	uchar_t **cert_bufs;
+	kssl_params_t *kssl_params;
+
+	ncerts = 0;
+	cert_bufs = PEM_get_rsa_key_certs(cacert_chain_file,
+	    (char *)password_file, NULL, &cert_sizes, &ncerts);
+	if (cert_bufs == NULL || ncerts == 0) {
+		free(old_params);
+		return (NULL);
+	}
+
+	if (verbose) {
+		(void) printf("%d certificates read successfully\n", ncerts);
+	}
+
+	newlen = old_params->kssl_params_size;
+	for (i = 0; i < ncerts; i++)
+		newlen += cert_sizes[i];
+
+	/*
+	 * Get a bigger structure and update the
+	 * fields to account for the additional certs.
+	 */
+	kssl_params = realloc(old_params, newlen);
+
+	kssl_params->kssl_params_size = newlen;
+	kssl_params->kssl_certs.sc_count += ncerts;
+
+	/* Put the cert_sizes starting from sc_sizes[1] */
+	buf = (char *)kssl_params;
+	buf += kssl_params->kssl_certs.sc_sizes_offset;
+	bcopy(buf, &certlen, sizeof (uint32_t));
+	buf += sizeof (uint32_t);
+	bcopy(cert_sizes, buf, ncerts * sizeof (uint32_t));
+
+	/* Put the cert_bufs starting from sc_certs[1] */
+	buf = (char *)kssl_params;
+	buf += kssl_params->kssl_certs.sc_certs_offset;
+	buf += certlen;
+
+	/* now the certs values */
+	for (i = 0; i < ncerts; i++) {
+		bcopy(cert_bufs[i], buf, cert_sizes[i]);
+		buf += cert_sizes[i];
+	}
+
+	for (i = 0; i < ncerts; i++)
+		free(cert_bufs[i]);
+	free(cert_bufs);
+	free(cert_sizes);
+
+	return (kssl_params);
+}
+
+static kssl_params_t *
 load_from_pem(const char *filename, const char *password_file, int *paramsize)
 {
-	uchar_t *cert_buf;
-	int cert_size;
+	uchar_t **cert_bufs;
+	int *cert_sizes, ncerts, i;
 	RSA *rsa;
 	kssl_params_t *kssl_params;
 
-	rsa = PEM_get_rsa_key(filename, (char *)password_file);
-	if (rsa == NULL) {
-		(void) fprintf(stderr, "cannot read the private key\n");
+	ncerts = 0;
+	cert_bufs = PEM_get_rsa_key_certs(filename, (char *)password_file,
+	    &rsa, &cert_sizes, &ncerts);
+	if (rsa == NULL || cert_bufs == NULL || ncerts == 0) {
 		return (NULL);
 	}
 
 	if (verbose)
-		(void) printf("private key read successfully\n");
+		(void) printf("%d certificates read successfully\n", ncerts);
 
-	cert_buf = PEM_get_cert(filename, (char *)password_file, &cert_size);
-	if (cert_buf == NULL) {
-		RSA_free(rsa);
-		return (NULL);
-	}
+	kssl_params = openssl_to_kssl(rsa, ncerts, cert_bufs,
+	    cert_sizes, paramsize);
 
-	if (verbose)
-		(void) printf("certificate read successfully size=%d\n",
-		    cert_size);
-
-	kssl_params = openssl_to_kssl(rsa, cert_buf, cert_size, paramsize);
-
-	free(cert_buf);
+	for (i = 0; i < ncerts; i++)
+		free(cert_bufs[i]);
+	free(cert_bufs);
+	free(cert_sizes);
 	RSA_free(rsa);
 	return (kssl_params);
 }
 
-kssl_params_t *
+static kssl_params_t *
 load_from_pkcs12(const char *filename, const char *password_file,
     int *paramsize)
 {
-	uchar_t *cert_buf;
-	int cert_size;
 	RSA *rsa;
 	kssl_params_t *kssl_params;
+	uchar_t **cert_bufs;
+	int *cert_sizes, ncerts, i;
 
-	if (PKCS12_get_rsa_key_cert(filename, password_file, &rsa, &cert_buf,
-	    &cert_size) < 0) {
+	ncerts = 0;
+	cert_bufs = PKCS12_get_rsa_key_certs(filename, password_file, &rsa,
+	    &cert_sizes, &ncerts);
+	if (cert_bufs == NULL || ncerts == 0) {
 		(void) fprintf(stderr,
 		    "Unable to read cert and/or key from %s\n", filename);
 		return (NULL);
 	}
 
 	if (verbose)
-		(void) printf(
-		    "key/certificate read successfully cert_size=%d\n",
-		    cert_size);
+		(void) printf("%d certificates read successfully\n", ncerts);
 
-	kssl_params = openssl_to_kssl(rsa, cert_buf, cert_size, paramsize);
+	kssl_params = openssl_to_kssl(rsa, ncerts, cert_bufs,
+	    cert_sizes, paramsize);
 
-	free(cert_buf);
+	for (i = 0; i < ncerts; i++)
+		free(cert_bufs[i]);
+	free(cert_bufs);
+	free(cert_sizes);
+
 	RSA_free(rsa);
 	return (kssl_params);
 }
@@ -782,7 +866,7 @@ struct csuite {
 	{"rsa_des_cbc_sha", SSL_RSA_WITH_DES_CBC_SHA, B_FALSE},
 };
 
-int
+static int
 check_suites(char *suites, uint16_t *sarray)
 {
 	int i;
@@ -827,7 +911,8 @@ do_create(int argc, char *argv[])
 	const char *softtoken_dir = NULL;
 	const char *token_label = NULL;
 	const char *password_file = NULL;
-	const char *filename = NULL;
+	const char *cert_key_file = NULL;
+	const char *cacert_chain_file = NULL;
 	const char *certname = NULL;
 	char *suites = NULL;
 	uint32_t timeout = DEFAULT_SID_TIMEOUT;
@@ -844,7 +929,7 @@ do_create(int argc, char *argv[])
 	argc -= 1;
 	argv += 1;
 
-	while ((c = getopt(argc, argv, "vT:d:f:i:p:c:C:t:x:z:")) != -1) {
+	while ((c = getopt(argc, argv, "vT:d:f:h:i:p:c:C:t:x:z:")) != -1) {
 		switch (c) {
 		case 'd':
 			softtoken_dir = optarg;
@@ -858,8 +943,11 @@ do_create(int argc, char *argv[])
 		case 'f':
 			format = optarg;
 			break;
+		case 'h':
+			cacert_chain_file = optarg;
+			break;
 		case 'i':
-			filename = optarg;
+			cert_key_file = optarg;
 			break;
 		case 'T':
 			token_label = optarg;
@@ -926,17 +1014,17 @@ do_create(int argc, char *argv[])
 		kssl_params = load_from_pkcs11(
 		    token_label, password_file, certname, &bufsize);
 	} else if (strcmp(format, "pkcs12") == 0) {
-		if (filename == NULL) {
+		if (cert_key_file == NULL) {
 			goto err;
 		}
 		kssl_params = load_from_pkcs12(
-		    filename, password_file, &bufsize);
+		    cert_key_file, password_file, &bufsize);
 	} else if (strcmp(format, "pem") == 0) {
-		if (filename == NULL) {
+		if (cert_key_file == NULL) {
 			goto err;
 		}
 		kssl_params = load_from_pem(
-		    filename, password_file, &bufsize);
+		    cert_key_file, password_file, &bufsize);
 	} else {
 		(void) fprintf(stderr, "Unsupported cert format: %s\n", format);
 		goto err;
@@ -954,6 +1042,14 @@ do_create(int argc, char *argv[])
 	kssl_params->kssl_session_cache_timeout = timeout;
 	kssl_params->kssl_proxy_port = proxy_port;
 	kssl_params->kssl_session_cache_size = scache_size;
+
+	if (cacert_chain_file != NULL) {
+		kssl_params = add_cacerts(kssl_params, cacert_chain_file,
+		    password_file);
+		if (kssl_params == NULL) {
+			return (FAILURE);
+		}
+	}
 
 	if (kssl_send_command((char *)kssl_params, KSSL_ADD_ENTRY) < 0) {
 		(void) fprintf(stderr, "Error loading cert and key");
