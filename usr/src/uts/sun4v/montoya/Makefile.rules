@@ -18,31 +18,36 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libprtdiag_psr/sparc/Makefile
 
-PRTDIAG_PLATFORMS=	desktop tazmo javelin sunfire starfire serengeti \
-			montecarlo littleneck starcat daktari cherrystone \
-			lw8 snowbird ontario schumacher opl montoya
+#
+#	This Makefile defines the build rules for the directory
+#	uts/sun4v/montoya.
+#
+#	The following two-level ordering must be maintained in this file.
+#	  Lines are sorted first in order of decreasing specificity based on
+#	  the first directory component.  That is, sun4v rules come before
+#	  sparc rules come before common rules.
+#
+#	  Lines whose initial directory components are equal are sorted
+#	  alphabetically by the remaining components.
 
-all :=		TARGET= all
-lint :=		TARGET= lint
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-_msg :=		TARGET= _msg
+#
+#	Section 1a: C object build rules
+#
 
-.KEEP_STATE:
+$(OBJS_DIR)/%.o:	$(UTSBASE)/sun4v/montoya/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
-all lint clean clobber install _msg : $(PRTDIAG_PLATFORMS)
+#
+#	Section 1b: Lint `object' build rules
+#
 
-$(PRTDIAG_PLATFORMS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+$(LINTS_DIR)/%.ln:	$(UTSBASE)/sun4v/montoya/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 

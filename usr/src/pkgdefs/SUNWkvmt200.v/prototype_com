@@ -46,28 +46,36 @@ i copyright
 d none usr 755 root sys
 d none usr/platform 755 root sys
 d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
+d none usr/platform/SUNW,Netra-CP3060 755 root sys
 #
 # create links to sun4v platform
 #
 s none usr/platform/SUNW,Sun-Fire-T200/sbin=../sun4v/sbin
 #
 #
-# create lib directory for Sun-Fire-T200
+# create lib directory 
 #
 d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
 #
 # add binary and libraries for prtdiag
 #
 f none usr/platform/SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 644 root bin
+
 #
 # create libpcp library
 #
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=./libpcp.so.1
+s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so=../../SUNW,Sun-Fire-T200/lib/libpcp.so
 f none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1 755 root bin
+s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../SUNW,Sun-Fire-T200/lib/libpcp.so.1
+
 #
 # platform-dependent boot object
 #
 s none usr/platform/SUNW,Sun-Fire-T200/lib/fs=../../sun4v/lib/fs
+s none usr/platform/SUNW,Netra-CP3060/lib/fs=../../sun4v/lib/fs
 #
 # add erie link
 #

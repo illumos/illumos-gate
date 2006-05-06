@@ -44,10 +44,16 @@ i i.preserve
 #
 d none platform 755 root sys
 d none platform/SUNW,Sun-Fire-T200 755 root sys
+d none platform/SUNW,Netra-CP3060 755 root sys
 d none platform/SUNW,Sun-Fire-T200/kernel 755 root sys
+d none platform/SUNW,Netra-CP3060/kernel 755 root sys
 d none platform/SUNW,Sun-Fire-T200/kernel/misc 755 root sys
+d none platform/SUNW,Netra-CP3060/kernel/misc 755 root sys
 d none platform/SUNW,Sun-Fire-T200/kernel/misc/sparcv9 755 root sys
+d none platform/SUNW,Netra-CP3060/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,Sun-Fire-T200/kernel/misc/sparcv9/platmod 755 root sys
+f none platform/SUNW,Netra-CP3060/kernel/misc/sparcv9/platmod 755 root sys
 s none platform/SUNW,Sun-Fire-T200/lib=../sun4v/lib
 s none platform/SUNW,Sun-Fire-T1000=sun4v
 s none platform/SUNW,Netra-T2000=SUNW,Sun-Fire-T200
+s none platform/SUNW,Netra-CP3060/lib=../sun4v/lib

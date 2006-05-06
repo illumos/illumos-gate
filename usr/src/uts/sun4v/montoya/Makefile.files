@@ -18,31 +18,23 @@
 #
 # CDDL HEADER END
 #
-#
+# uts/sun4v/montoya/Makefile.files
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libprtdiag_psr/sparc/Makefile
 
-PRTDIAG_PLATFORMS=	desktop tazmo javelin sunfire starfire serengeti \
-			montecarlo littleneck starcat daktari cherrystone \
-			lw8 snowbird ontario schumacher opl montoya
+#
+#	Global definitions for sun4v implementation specific modules.
+#
 
-all :=		TARGET= all
-lint :=		TARGET= lint
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-_msg :=		TARGET= _msg
+#
+# Define objects.
+#
+MONTOYA_PLATMOD_OBJS	= montoya.o
 
-.KEEP_STATE:
-
-all lint clean clobber install _msg : $(PRTDIAG_PLATFORMS)
-
-$(PRTDIAG_PLATFORMS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
+#
+#	include montoya header files
+#
+INC_PATH	+= -I$(UTSBASE)/sun4v

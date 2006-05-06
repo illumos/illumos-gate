@@ -41,6 +41,7 @@ socal SUNW,socal
 glm "pci1000,1"
 uata "pci1095,646"
 uata "pci10b9,5229"
+uata "pci10b9,5288"
 uata "pci1095,649"
 uata "pci1095,680"
 dad "ide-disk"
