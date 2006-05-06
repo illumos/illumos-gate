@@ -35,7 +35,6 @@
 #include <sys/cladm.h>
 #include <devid.h>
 #include <sys/lvm/md_convert.h>
-#include <sdssc.h>
 
 /*
  * Exported Entry Points
@@ -642,15 +641,14 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 	int			i;
 	md_set_desc		*sd;
 	int			use_devid = 1;
-	ddi_devid_t		devidp;
+	ddi_devid_t		devidp, new_devidp;
 	char			*minor_name = NULL;
 	size_t			sz;
 	char			*devid_str = NULL;
-	sdssc_version_t		version;
+	int			need_to_free_devidp = 0;
 
 	if ((sd = metaget_setdesc(sp, ep)) == NULL)
 		return (-1);
-
 	(void) memset(&c, 0, sizeof (c));
 
 	c.c_setno = sp->setno;
@@ -732,14 +730,7 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			}
 		}
 
-		/*
-		 * If the device does not have a devid or is a multinode
-		 * diskset or we are in a SunCluster 3.x enviroment then
-		 * do not use devids.
-		 */
-		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd) ||
-		    ((sdssc_version(&version) == SDSSC_OKAY) &&
-		    (version.major >= 3))) {
+		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd)) {
 			use_devid = 0;
 		}
 
@@ -754,18 +745,50 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			(void) snprintf(devid_str, len, "%s/%s", dnp->devid,
 			    minor_name);
 			(void) devid_str_decode(devid_str, &devidp, NULL);
+			need_to_free_devidp = 1;
 
+			/* If need to fix LB then setup old_devid info */
+			if (p->dd_flags & MD_DR_FIX_LB_NM_DID) {
+				sz = devid_sizeof(devidp);
+				c.c_locator.l_old_devid_sz = sz;
+				c.c_locator.l_old_devid = (uintptr_t)malloc(sz);
+				(void) memcpy((void *)(uintptr_t)
+				    c.c_locator.l_old_devid,
+				    devidp, sz);
+
+				new_devidp = replicated_list_lookup(
+				    devid_sizeof((ddi_devid_t)devidp),
+				    (void *)(uintptr_t)devidp);
+				devid_free(devidp);
+				need_to_free_devidp = 0;
+				devidp = new_devidp;
+
+			}
 			sz = devid_sizeof(devidp);
 			c.c_locator.l_devid = (uintptr_t)malloc(sz);
 			c.c_locator.l_devid_sz = sz;
-			(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
+			(void) memcpy((void *)(uintptr_t)
+			    c.c_locator.l_devid,
 			    devidp, sz);
+			if (need_to_free_devidp) {
+				devid_free(devidp);
+				need_to_free_devidp = 0;
+			}
 			if (minor_name == NULL) {
 				/* ERROR fix up */
 				Free(devid_str);
+				Free((void *)(uintptr_t)c.c_locator.l_devid);
+				if (c.c_locator.l_old_devid_sz) {
+					Free((void *)
+					    (uintptr_t)c.c_locator.l_old_devid);
+					c.c_locator.l_old_devid_sz = 0;
+					c.c_locator.l_old_devid =
+						(uintptr_t)NULL;
+				}
 				return (-1);
 			}
-			(void) strcpy(c.c_locator.l_minor_name, minor_name);
+			(void) strcpy(c.c_locator.l_minor_name,
+			    minor_name);
 			c.c_locator.l_devid_flags = MDDB_DEVID_VALID |
 			    MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
 		} else {
@@ -785,6 +808,15 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			if (metaioctl(MD_DB_USEDEV, &c, &c.c_mde, NULL) != 0) {
 				if (use_devid) {
 					Free(devid_str);
+					Free((void *)
+					    (uintptr_t)c.c_locator.l_devid);
+					if (c.c_locator.l_old_devid_sz) {
+						Free((void *)(uintptr_t)
+						    c.c_locator.l_old_devid);
+						c.c_locator.l_old_devid_sz = 0;
+						c.c_locator.l_old_devid =
+						    (uintptr_t)NULL;
+					}
 				}
 				Free(minor_name);
 				return (mdstealerror(ep, &c.c_mde));
@@ -792,6 +824,13 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 		}
 		if (use_devid) {
 			Free(devid_str);
+			Free((void *)(uintptr_t)c.c_locator.l_devid);
+			if (c.c_locator.l_old_devid_sz) {
+				Free((void *)
+				    (uintptr_t)c.c_locator.l_old_devid);
+				c.c_locator.l_old_devid_sz = 0;
+				c.c_locator.l_old_devid = (uintptr_t)NULL;
+			}
 		}
 		Free(minor_name);
 	}

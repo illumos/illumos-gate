@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,7 @@
 #include "meta_set_prv.h"
 #include <sys/lvm/md_crc.h>
 
+extern	char	*blkname(char *);
 
 static int
 upd_dr_dbinfo(
@@ -480,6 +480,8 @@ cleanup:
 	return (-1);
 }
 
+extern int *replicated_disk_list_built;
+extern int replicated_disk_list_built_pass1;
 /*
  * Exported Entry Points
  */
@@ -497,6 +499,7 @@ meta_set_take(
 	md_drive_desc		*d = NULL;
 	char			*owner = NULL;
 	int			rval = 0;
+	int			pathname_return = 0;
 	int			i;
 	int			has_set;
 	int			matches = 0;
@@ -511,6 +514,9 @@ meta_set_take(
 	int			ret = 0;
 	char			*newname = NULL;
 	mdkey_t			side_names_key;
+	int			unrslv_replicated = 0;
+	mddrivenamelist_t	*dnlp = NULL;
+	int			retake_flag = 0;
 
 	if ((flags & TAKE_USETAG) || (flags & TAKE_USEIT)) {
 		if (flags & TAKE_USETAG) {
@@ -598,6 +604,180 @@ meta_set_take(
 	side += SKEW;
 
 	/*
+	 * If this set had been previously imported as a partial replicated
+	 * diskset, then must attempt to updated any unresolved drive
+	 * records in diskset with new devid information.  Must set
+	 * flags in drivedesc list before loading up set so that the
+	 * md driver will fix up names and devids correctly in the
+	 * locator block.
+	 */
+	if (sd->sd_flags & MD_SR_UNRSLV_REPLICATED) {
+		md_im_names_t		cnames = { 0, NULL};
+		ddi_devid_t		old_devid, new_devid;
+		char			*search_path = "/dev";
+		devid_nmlist_t		*nmlist;
+		int			indx;
+		mddrivenamelist_t	**dnlpp = &dnlp;
+
+		if (meta_list_disks(ep, &cnames) != 0) {
+			rval = -1;
+			goto out;
+		}
+
+		for (indx = 0; indx < cnames.min_count; ++indx) {
+			mddrivename_t   *dnp;
+			mdsetname_t	*sp =  metasetname(MD_LOCAL_NAME, ep);
+			int		fd = -1;
+			ddi_devid_t	devid1;
+			char		*cdevidp;
+			int		len;
+			char		*fp;
+
+			/*
+			 * We may have name collision here so we need to get
+			 * the dnp using the devid and not the name.
+			 */
+			len = strlen(cnames.min_names[indx]) + strlen("s0");
+			if ((fp = (char *)Malloc(len+1)) == NULL) {
+				(void) mdsyserror(ep, ENOMEM, NULL);
+				rval = -1;
+				goto out;
+			}
+			(void) snprintf(fp, len + 1, "%ss0",
+			    cnames.min_names[indx]);
+			if ((fd = open(fp, O_RDONLY|O_NDELAY)) < 0) {
+				(void) mdsyserror(ep, EIO, fp);
+				rval = -1;
+				goto out;
+			}
+			Free(fp);
+			/* if no device id, what error?) */
+			if (devid_get(fd, &devid1) != 0) {
+				(void) mdsyserror(ep, EIO, fp);
+				rval = -1;
+				goto out;
+			}
+			if (close(fd) < 0) {
+				(void) mdsyserror(ep, EIO, fp);
+				rval = -1;
+				goto out;
+			}
+			cdevidp = devid_str_encode(devid1, NULL);
+			if (cdevidp == NULL) {
+				(void) mdsyserror(ep, EIO, fp);
+				rval = -1;
+				goto out;
+			}
+			devid_free(devid1);
+			dnp = metadrivenamebydevid(&sp, cdevidp,
+			    cnames.min_names[indx], ep);
+			devid_str_free(cdevidp);
+			if (dnp == NULL) {
+				/*
+				 * Assuming we're interested in knowing about
+				 * whatever error occurred, but not in stopping.
+				 */
+				mde_perror(ep, cnames.min_names[indx]);
+				mdclrerror(ep);
+				continue;
+			}
+
+			dnlpp = meta_drivenamelist_append_wrapper(dnlpp, dnp);
+		}
+		/* Reget sd and dd since freed by meta_prune_cnames. */
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			rval = -1;
+			goto out;
+		}
+
+		if (sd->sd_flags & MD_SR_MB_DEVID)
+			dd = metaget_drivedesc(sp,
+				MD_BASICNAME_OK | PRINT_FAST, ep);
+		else
+			dd = metaget_drivedesc(sp,
+				MD_BASICNAME_OK, ep);
+		/* If ep has error, then there was a failure, set rval */
+		if (!mdisok(ep)) {
+			rval = -1;
+			goto out;
+		}
+
+		/* Builds global replicated disk list */
+		replicated_disk_list_built = &replicated_disk_list_built_pass1;
+
+		/* If success, then clear error structure */
+		if (build_replicated_disks_list(ep, dnlp) == 1)
+			mdclrerror(ep);
+		/* If ep has error, then there was a failure, set rval */
+		if (! mdisok(ep)) {
+			rval = -1;
+			goto out;
+		}
+
+		for (d = dd; d != NULL; d = d->dd_next) {
+			if (d->dd_flags & MD_DR_UNRSLV_REPLICATED) {
+				/* Get old devid from drive record */
+				(void) devid_str_decode(d->dd_dnp->devid,
+				    &old_devid, NULL);
+
+				/*
+				 * If the devid stored in the drive record
+				 * (old_devid) matches a devid known by
+				 * the system, then this disk has already
+				 * been partially resolved.  This situation
+				 * could occur if a panic happened during a
+				 * previous take of this diskset.
+				 * Set flag to later handle fixing the master
+				 * block on disk and turning off the unresolved
+				 * replicated flag.
+				 */
+				if (meta_deviceid_to_nmlist(search_path,
+				    (ddi_devid_t)old_devid,
+				    DEVID_MINOR_NAME_ALL,
+				    &nmlist) == 0) {
+					d->dd_flags |= MD_DR_FIX_MB_DID;
+					retake_flag = 1;
+					continue;
+				}
+
+				/*
+				 * If the devid stored in the drive record
+				 * is on the list of replicated disks found
+				 * during a system scan then set both flags
+				 * so that the locator block, namespaces
+				 * (diskset and local set), master block
+				 * and unresolved replicated flag are updated.
+				 */
+				new_devid = replicated_list_lookup(
+				    devid_sizeof((ddi_devid_t)old_devid),
+				    old_devid);
+				devid_free(old_devid);
+
+				/*
+				 * If devid stored in the drive record is
+				 * not found then set flag to mark
+				 * that set is still unresolved and
+				 * continue to next drive record.
+				 */
+				if (new_devid == NULL) {
+					unrslv_replicated = 1;
+					continue;
+				}
+
+				/*
+				 * Set flags to fix up the master block,
+				 * locator block of the diskset, diskset
+				 * namespace and the local set namespace.
+				 */
+				d->dd_flags |= (MD_DR_FIX_MB_DID |
+						MD_DR_FIX_LB_NM_DID);
+				retake_flag = 1;
+			}
+		}
+
+	}
+
+	/*
 	 * Check the local devid namespace to see if the disks
 	 * have been moved. Use the local set first of all as this contains
 	 * entries for the disks in the set.
@@ -627,6 +807,7 @@ meta_set_take(
 			 * we are interested in.
 			 */
 			if (newname != NULL) {
+				char	*save_devid;
 				/*
 				 * Need to save the side names key as this
 				 * points to the namespace entry that will
@@ -635,16 +816,28 @@ meta_set_take(
 				 * set the namespace key.
 				 */
 				side_names_key = d->dd_dnp->side_names_key;
+
+				/*
+				 * There is the possibility that there
+				 * will be multiple disks with the same
+				 * name but different devids in the
+				 * drivelist. Because of this, we need
+				 * to look for a new dnp based on devid
+				 * and not name.
+				 */
+				save_devid = Strdup(d->dd_dnp->devid);
 				metafreedrivename(d->dd_dnp);
-				d->dd_dnp = metadrivename(&sp,
-				    metadiskname(newname), ep);
+				d->dd_dnp = metadrivenamebydevid(&sp,
+				    save_devid, newname, ep);
+				Free(save_devid);
 				Free(newname);
 				/*
 				 * null newname so we are reset for next time
 				 * through
 				 */
 				newname = NULL;
-				ret = meta_make_sidenmlist(sp, d->dd_dnp, ep);
+				ret = meta_make_sidenmlist(sp,
+					    d->dd_dnp, 0, NULL, ep);
 				d->dd_dnp->side_names_key = side_names_key;
 				if (ret == -1) {
 					rval = -1;
@@ -663,7 +856,8 @@ meta_set_take(
 	RB_TEST(2, "take", ep)
 
 	if (!MD_ATSET_DESC(sd)) {
-		if (tk_own_bydd(sp, dd, mhiargsp, FALSE, ep))
+		if (tk_own_bydd(sp, dd, mhiargsp,
+		    flags & MD_IM_PARTIAL_DISKSET, ep))
 			goto rollback;
 	}
 
@@ -743,13 +937,38 @@ meta_set_take(
 			(void) mddserror(ep, MDE_DS_SETCLEANUP, sp->setno,
 			    sp->setname, NULL, mynode());
 			rval = -1;
-			goto out;
 		}
 		goto rollback;
 	}
 
-	rval = pathname_reload(&sp, sp->setno, ep);
-	if ((rval == METADEVADM_ERR) || (rval == METADEVADM_DSKNAME_ERR)) {
+	/*
+	 * If an unresolved replicated diskset, fix up diskset
+	 * and local namespaces, master block and drive record
+	 * with the new devid.  If all drives in diskset are
+	 * now resolved, then clear set unresolved replicated flag.
+	 * If an error is encountered, don't fail the take, but
+	 * don't proceed any further in resolving the replicated disks.
+	 */
+	if (sd->sd_flags & MD_SR_UNRSLV_REPLICATED) {
+		/* Fix up diskset and local namespaces with new devids */
+		meta_unrslv_replicated_nm(sp, dd, dnlp, ep);
+		if (mdisok(ep)) {
+			/* Fix up master block with new devids  */
+			meta_unrslv_replicated_mb(sp, dd, dnlp, ep);
+		}
+
+		/* If all drives are resolved, set OK flag in set record. */
+		if (mdisok(ep) && (unrslv_replicated == 0)) {
+			/* Ignore failure since no bad effect. */
+			(void) clnt_upd_sr_flags(mynode(), sp, MD_SR_OK, ep);
+		}
+		mdclrerror(ep);
+
+	}
+
+	pathname_return = pathname_reload(&sp, sp->setno, ep);
+	if ((pathname_return == METADEVADM_ERR) ||
+	    (pathname_return == METADEVADM_DSKNAME_ERR)) {
 		goto rollback;
 	}
 
@@ -846,6 +1065,23 @@ meta_set_take(
 	}
 
 	RB_TEST(7, "take", ep)
+
+	/*
+	 * In order to resolve the namespace major driver names and
+	 * to have the subdrivers attempt to re-associate devts from
+	 * the newly resolved replicated device ids, return a '2'.
+	 * This instructs metaset to release the diskset and re-take.
+	 *
+	 * Return a 2 if
+	 * 	- no error was detected on the take
+	 *	- a replicated unresolved devid was resolved during take
+	 *	- take isn't being called during an import
+	 *	- this isn't already a re-take situation
+	 */
+	if ((rval == 0) && (retake_flag == 1) &&
+	    ((flags & (TAKE_RETAKE | TAKE_IMP)) == 0)) {
+		rval = 2;
+	}
 
 	return (rval);
 

@@ -926,6 +926,97 @@ meta_is_drive_in_thisset(
 	return (0);
 }
 
+/*
+ * Check to see if devid is in use in any diskset.
+ * This is used in the case when a partial diskset is being imported
+ * to make sure that the unvailable drive isn't already in use in an
+ * already imported partial diskset.  Can't check on the cname since the
+ * unavailable disk's cname is from the previous system and may collide
+ * with a cname on this system.
+ * Return values:
+ *	1: devid has been found in a diskset
+ *	0: devid not found in any diskset
+ */
+int
+meta_is_devid_in_anyset(
+	void		*devid,
+	mdsetname_t	**spp,
+	md_error_t 	*ep
+)
+{
+	set_t		setno;
+	mdsetname_t	*this_sp;
+	int		is_it;
+	set_t		max_sets;
+
+	if ((max_sets = get_max_sets(ep)) == 0)
+		return (-1);
+
+	assert(spp != NULL);
+	*spp = NULL;
+
+	for (setno = 1; setno < max_sets; setno++) {
+		if ((this_sp = metasetnosetname(setno, ep)) == NULL) {
+			if (mdismddberror(ep, MDE_DB_NODB)) {
+				mdclrerror(ep);
+				return (0);
+			}
+			if (mdiserror(ep, MDE_NO_SET)) {
+				mdclrerror(ep);
+				continue;
+			}
+			return (-1);
+		}
+
+		if ((is_it = meta_is_devid_in_thisset(this_sp,
+		    devid, ep)) == -1) {
+			if (mdiserror(ep, MDE_NO_SET)) {
+				mdclrerror(ep);
+				continue;
+			}
+			return (-1);
+		}
+		if (is_it) {
+			*spp = this_sp;
+			return (0);
+		}
+	}
+	return (0);
+}
+
+int
+meta_is_devid_in_thisset(
+	mdsetname_t	*sp,
+	void		*devid,
+	md_error_t	*ep
+)
+{
+	md_drive_desc	*dd, *p;
+	ddi_devid_t	dd_devid;
+
+	dd = metaget_drivedesc(sp, MD_BASICNAME_OK, ep);
+	if (dd == NULL) {
+		if (! mdisok(ep))
+			return (-1);
+		return (0);
+	}
+
+	for (p = dd; p != NULL; p = p->dd_next) {
+		if (p->dd_dnp->devid == NULL)
+			continue;
+		(void) devid_str_decode(p->dd_dnp->devid,
+		    &dd_devid, NULL);
+		if (dd_devid == NULL)
+			continue;
+		if (devid_compare(devid, dd_devid) == 0) {
+			devid_free(dd_devid);
+			return (1);
+		}
+		devid_free(dd_devid);
+	}
+	return (0);
+}
+
 int
 meta_set_balance(
 	mdsetname_t		*sp,
@@ -1769,55 +1860,6 @@ metadrivename_withdrkey(
 		return (NULL);
 	}
 
-	/* get namespace info */
-	if (MD_MNSET_DESC(sd)) {
-		if ((nm = meta_getnmbykey(MD_LOCAL_SET, sideno,
-		    key, ep)) == NULL)
-			return (NULL);
-	} else {
-		if ((nm = meta_getnmbykey(MD_LOCAL_SET, sideno+SKEW,
-		    key, ep)) == NULL)
-			return (NULL);
-	}
-
-	/* get device name */
-	if (flags & PRINT_FAST) {
-		if ((np = metaname_fast(&sp, nm, LOGICAL_DEVICE, ep)) == NULL) {
-			Free(nm);
-			return (NULL);
-		}
-	} else {
-		if ((np = metaname(&sp, nm, LOGICAL_DEVICE, ep)) == NULL) {
-			Free(nm);
-			return (NULL);
-		}
-	}
-	Free(nm);
-
-	/* make sure it's OK */
-	if ((! (flags & MD_BASICNAME_OK)) && (metachkcomp(np, ep) != 0))
-		return (NULL);
-
-	/* get drivename */
-	dnp = np->drivenamep;
-	dnp->side_names_key = key;
-
-	/*
-	 * Skip the following devid check if dnp is did device
-	 * The device id is disabled for did device due to the
-	 * lack of minor name support in the did driver. The following
-	 * devid code path can set and propagate the error and
-	 * eventually prevent did disks from being added to the
-	 * diskset under SunCluster systems
-	 */
-	if (strncmp(dnp->rname, "/dev/did/", strlen("/dev/did/")) == 0) {
-		goto out;
-	}
-
-	/* Also, Skip the check if MN diskset, no devid's */
-	if (MD_MNSET_DESC(sd)) {
-		goto out;
-	}
 
 	/*
 	 * Get the devid associated with the key.
@@ -1829,9 +1871,68 @@ metadrivename_withdrkey(
 	 */
 	if ((devidp = meta_getdidbykey(MD_LOCAL_SET, sideno+SKEW, key, ep))
 	    != NULL) {
-		dnp->devid = devid_str_encode(devidp, NULL);
+		/*
+		 * Look for the correct dnp using the devid for comparison.
+		 */
+		dnp = meta_getdnp_bydevid(sp, sideno, devidp, key, ep);
 		free(devidp);
+		dnp->side_names_key = key;
 	} else {
+		/*
+		 * We didn't get a devid. We'll try for a dnp using the
+		 * name. If we have a MN diskset or if the dnp is a did
+		 * device, we're done because then we don't have devids.
+		 * Otherwise we'll try to set the devid
+		 * and get the dnp via devid again.
+		 * We also need to clear the ep structure. When the
+		 * above call to meta_getdidbykey returned a null, it
+		 * also put an error code into ep. In this case, the null
+		 * return is actually OK and any errors can be ignored. The
+		 * reason it is OK is because this could be a MN set or
+		 * we could  be running without devids (ex cluster).
+		 */
+		mdclrerror(ep);
+
+		if ((nm = meta_getnmbykey(MD_LOCAL_SET, sideno, key,
+		    ep)) == NULL)
+			return (NULL);
+		/* get device name */
+		if (flags & PRINT_FAST) {
+			if ((np = metaname_fast(&sp, nm,
+			    LOGICAL_DEVICE, ep)) == NULL) {
+				Free(nm);
+				return (NULL);
+			}
+		} else {
+			if ((np = metaname(&sp, nm, LOGICAL_DEVICE,
+			    ep)) == NULL) {
+				Free(nm);
+				return (NULL);
+			}
+		}
+		Free(nm);
+		/* make sure it's OK */
+		if ((! (flags & MD_BASICNAME_OK)) && (metachkcomp(np,
+		    ep) != 0))
+			return (NULL);
+
+		/* get drivename */
+		dnp = np->drivenamep;
+		dnp->side_names_key = key;
+		/*
+		 * Skip the devid set/check for the following cases:
+		 * 1) If MN diskset, there are no devid's
+		 * 2) if dnp is did device
+		 * The device id is disabled for did device due to the
+		 * lack of minor name support in the did driver. The following
+		 * devid code path can set and propagate the error and
+		 * eventually prevent did disks from being added to the
+		 * diskset under SunCluster systems
+		 */
+		if ((strncmp(dnp->rname, "/dev/did/", strlen("/dev/did/"))
+		    == 0) || (MD_MNSET_DESC(sd)))
+			goto out;
+
 		/*
 		 * It is okay if replica is not in devid mode
 		 */
@@ -1841,20 +1942,30 @@ metadrivename_withdrkey(
 		}
 
 		/*
+		 * We're not MN or did devices but
 		 * devid is missing so this means that we have
 		 * just upgraded from a configuration where
 		 * devid's were not used so try to add in
-		 * the devid and requery.
+		 * the devid and requery. If the devid still isn't there,
+		 * that's OK. dnp->devid will be null as it is in any
+		 * configuration with no devids.
 		 */
 		if (meta_setdid(MD_LOCAL_SET, sideno + SKEW, key,
 		    ep) < 0)
 			return (NULL);
 		if ((devidp = (ddi_devid_t)meta_getdidbykey(MD_LOCAL_SET,
-		    sideno+SKEW, key, ep)) == NULL)
-			return (NULL);
-		dnp->devid = devid_str_encode(devidp, NULL);
-		devid_free(devidp);
+		    sideno+SKEW, key, ep)) != NULL) {
+			/*
+			 * Found a devid so look for the dnp using the
+			 * devid as the search mechanism.
+			 */
+			dnp = meta_getdnp_bydevid(sp, sideno, devidp, key, ep);
+			free(devidp);
+			dnp->side_names_key = key;
+		}
 	}
+
+
 
 out:
 	if (flags & MD_BYPASS_DAEMON)

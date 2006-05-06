@@ -1510,6 +1510,7 @@ parse_takeset(int argc, char **argv)
 	sdssc_boolean_e	cluster_take = SDSSC_False;
 	sdssc_version_t	vers;
 	rval_e		rval;
+	int		set_take_rval;
 
 	/* reset and parse args */
 	optind = 1;
@@ -1646,7 +1647,30 @@ parse_takeset(int argc, char **argv)
 		md_exit(sp, 10);	/* special errcode */
 	}
 
-	if (meta_set_take(sp, &mhiargs, flags, usetag, &status)) {
+	/*
+	 * If a 2 is returned from meta_set_take, this take was able to resolve
+	 * an unresolved replicated disk (i.e. a disk is now available that
+	 * had been missing during the import of the replicated diskset).
+	 * Need to release the diskset and re-take in order to have
+	 * the subdrivers re-snarf using the newly resolved (or newly mapped)
+	 * devids.  This also allows the namespace to be updated with the
+	 * correct major names in the case where the disk being replicated
+	 * was handled by a different driver than the replicated disk.
+	 */
+	set_take_rval = meta_set_take(sp, &mhiargs, flags, usetag, &status);
+	if (set_take_rval == 2) {
+		if (meta_set_release(sp, &status)) {
+			mde_perror(&status,
+			    "Need to release and take set to resolve names.");
+			md_exit(sp, 1);
+		}
+		metaflushdrivenames();
+		metaflushsetname(sp);
+		set_take_rval = meta_set_take(sp, &mhiargs,
+		    (flags | TAKE_RETAKE), usetag, &status);
+	}
+
+	if (set_take_rval == -1) {
 		mde_perror(&status, "");
 		if (mdismddberror(&status, MDE_DB_TAGDATA))
 			md_exit(sp, 2);

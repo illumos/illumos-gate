@@ -132,11 +132,13 @@ add_sideno_sidenm(
 		 */
 		if (MD_MNSET_DESC(sd)) {
 			if (add_name(local_sp, sideno, local_key,
-			    sn->dname, sn->mnum, sn->cname, ep) == -1)
+			    sn->dname, sn->mnum, sn->cname, NULL, NULL,
+			    ep) == -1)
 				return (-1);
 		} else {
 			if (add_name(local_sp, sideno+SKEW, local_key,
-			    sn->dname, sn->mnum, sn->cname, ep) == -1)
+			    sn->dname, sn->mnum, sn->cname, NULL, NULL,
+			    ep) == -1)
 				return (-1);
 		}
 	} else
@@ -597,7 +599,8 @@ add_sidenamelist(
 			 */
 			if (nodeid == sn->sideno) {
 				if ((err = add_name(local_sp, sn->sideno, key,
-				    sn->dname, sn->mnum, sn->cname, ep)) == -1)
+				    sn->dname, sn->mnum, sn->cname,
+				    NULL, NULL, ep)) == -1)
 					return (-1);
 				key = (mdkey_t)err;
 				break;
@@ -620,7 +623,8 @@ add_sidenamelist(
 			if (sn->sideno != thisside)
 				continue;
 			if ((err = add_name(local_sp, sn->sideno+SKEW, key,
-			    sn->dname, sn->mnum, sn->cname, ep)) == -1)
+			    sn->dname, sn->mnum, sn->cname, NULL,
+			    NULL, ep)) == -1)
 				return (-1);
 			key = (mdkey_t)err;
 			break;
@@ -635,7 +639,8 @@ add_sidenamelist(
 			if (sn->sideno == thisside)
 				continue;
 			if ((err = add_name(local_sp, sn->sideno+SKEW, key,
-				sn->dname, sn->mnum, sn->cname, ep)) == -1)
+			    sn->dname, sn->mnum, sn->cname, NULL, NULL,
+			    ep)) == -1)
 				return (-1);
 			key = (mdkey_t)err;
 		}
@@ -647,7 +652,8 @@ add_sidenamelist(
 			sn = dn->side_names;
 			if (sn) {
 				if ((err = add_name(local_sp, sn->sideno, key,
-				    sn->dname, sn->mnum, sn->cname, ep)) == -1)
+				    sn->dname, sn->mnum, sn->cname,
+				    NULL, NULL, ep)) == -1)
 						return (-1);
 				key = (mdkey_t)err;
 			}
@@ -656,6 +662,139 @@ add_sidenamelist(
 
 	dn->side_names_key = key;
 	return (0);
+}
+
+/*
+ * imp_adddrvs
+ *    This is a version of adddrvs that is specific to the
+ *    metaimport command. Due to the unavailability of some disks,
+ *    information needs to be obtained about the disk from the devid so
+ *    it can eventually be passed down to add_sidenamelist.
+ *    Go ahead and set drive state to MD_DR_OK here so that no
+ *    later RPC is needed to set OK where UNRLSV_REPLICATED could
+ *    be cleared.  Set record is still set to MD_SR_ADD which will force
+ *    a cleanup of the set in case of panic.
+ */
+void
+imp_adddrvs(
+	char		*setname,
+	md_drive_desc	*dd,
+	md_timeval32_t	timestamp,
+	ulong_t		genid,
+	md_error_t	*ep
+)
+{
+	mddb_userreq_t	req;
+	md_drive_record	*dr, *tdr;
+	md_set_record	*sr;
+	md_drive_desc	*p;
+	mddrivename_t	*dn;
+	mdname_t	*np;
+	md_dev64_t	dev;
+	md_error_t	xep = mdnullerror;
+	char		*minorname = NULL;
+	ddi_devid_t	devidp = NULL;
+	mdsidenames_t	*sn;
+	mdsetname_t	*local_sp;
+
+
+	if ((local_sp = metasetname(MD_LOCAL_NAME, ep)) == NULL) {
+		return;
+	}
+
+	if ((sr = getsetbyname(setname, ep)) == NULL)
+		return;
+
+	for (p = dd; p != NULL; p = p->dd_next) {
+		uint_t	rep_slice;
+		int	ret = 0;
+
+		dn = p->dd_dnp;
+
+		/*
+		 * We need the minorname and devid string decoded from the
+		 * devid to add the sidename for this drive to the
+		 * local set.
+		 */
+		ret = devid_str_decode(dn->devid, &devidp, &minorname);
+		if (ret != 0) {
+			/* failed to decode the devid */
+			goto out;
+		}
+
+		sn = dn->side_names;
+		if (sn == NULL) {
+			dn->side_names_key = MD_KEYWILD;
+			continue;
+		}
+
+		if ((dn->side_names_key = add_name(local_sp, SKEW, MD_KEYWILD,
+		    sn->dname, sn->mnum, sn->cname, minorname, devidp,
+		    ep)) == -1) {
+			devid_free(devidp);
+			devid_str_free(minorname);
+			goto out;
+		}
+
+		devid_free(devidp);
+		devid_str_free(minorname);
+
+		/* Create the drive record */
+		(void) memset(&req, 0, sizeof (req));
+		METAD_SETUP_DR(MD_DB_CREATE, 0);
+		req.ur_size = sizeof (*dr);
+		if (metaioctl(MD_DB_USERREQ, &req, &req.ur_mde, NULL) != 0) {
+			(void) mdstealerror(ep, &req.ur_mde);
+			goto out;
+		}
+
+		/* Fill in the drive record values */
+		dr = Zalloc(sizeof (*dr));
+		dr->dr_selfid = req.ur_recid;
+		dr->dr_dbcnt = p->dd_dbcnt;
+		dr->dr_dbsize = p->dd_dbsize;
+		dr->dr_key = dn->side_names_key;
+
+		dr->dr_ctime = timestamp;
+		dr->dr_genid = genid;
+		dr->dr_revision = MD_DRIVE_RECORD_REVISION;
+		dr->dr_flags = MD_DR_OK;
+		if (p->dd_flags & MD_DR_UNRSLV_REPLICATED) {
+			dr->dr_flags |= MD_DR_UNRSLV_REPLICATED;
+			sr->sr_flags |= MD_SR_UNRSLV_REPLICATED;
+		}
+
+		/* Link the drive records and fill in in-core data */
+		dr_cache_add(sr, dr);
+
+		dev = NODEV64;
+		if ((meta_replicaslice(dn, &rep_slice, &xep) == 0) &&
+		    ((np = metaslicename(dn, rep_slice, &xep)) != NULL))
+			dev = np->dev;
+		else
+			mdclrerror(&xep);
+
+		SE_NOTIFY(EC_SVM_CONFIG, ESC_SVM_REMOVE, SVM_TAG_DRIVE,
+		    MD_LOCAL_SET, dev);
+		SE_NOTIFY(EC_SVM_CONFIG, ESC_SVM_ADD, SVM_TAG_DRIVE,
+		    sr->sr_setno, dev);
+	}
+
+	/* Commit all the records atomically */
+	commitset(sr, TRUE, ep);
+	free_sr(sr);
+	return;
+
+out:
+	/* If failures, remove drive records. */
+	dr = tdr = sr->sr_drivechain;
+	while (dr != NULL) {
+		tdr = dr->dr_next;
+		if (del_name(local_sp, 0, dr->dr_key, &xep))
+			mdclrerror(&xep);
+		sr_del_drv(sr, dr->dr_selfid);
+		dr = tdr;
+	}
 }
 
 static void
@@ -834,6 +973,51 @@ mdrpc_adddrvs_2_svc(
 	    default:
 		return (FALSE);
 	}
+}
+
+/*
+ * add 1 or more drive records to a set when importing.
+ */
+bool_t
+mdrpc_imp_adddrvs_2_svc(
+	mdrpc_drives_2_args	*args,
+	mdrpc_generic_res	*res,
+	struct svc_req		*rqstp		/* RPC stuff */
+)
+{
+	mdrpc_drives_2_args_r1	*v2_args;
+	md_error_t		*ep = &res->status;
+	int			err;
+	int			op_mode = W_OK;
+
+	switch (args->rev) {
+	    case MD_METAD_ARGS_REV_1:
+		v2_args = &args->mdrpc_drives_2_args_u.rev1;
+		if (v2_args == NULL) {
+			return (FALSE);
+		}
+		break;
+	    default:
+		return (FALSE);
+	}
+
+	/* setup, check permissions */
+	(void) memset(res, 0, sizeof (*res));
+	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
+		return (FALSE);
+	else if (err != 0)
+		return (TRUE);
+
+	if (check_set_lock(op_mode, v2_args->cl_sk, ep))
+		return (TRUE);
+
+	/* doit */
+	imp_adddrvs(v2_args->sp->setname, v2_args->drivedescs,
+	    v2_args->timestamp, v2_args->genid, ep);
+
+	err = svc_fini(ep);
+
+	return (TRUE);
 }
 
 static void

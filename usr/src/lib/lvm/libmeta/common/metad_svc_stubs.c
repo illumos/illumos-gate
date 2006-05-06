@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +64,7 @@
 #pragma weak mdrpc_setnameok_2_svc =		_mdrpc_setnameok_2_svc
 #pragma weak mdrpc_ownset_2_svc =		_mdrpc_ownset_2_svc
 #pragma weak mdrpc_adddrvs_2_svc =		_mdrpc_adddrvs_2_svc
+#pragma weak mdrpc_imp_set_drvs_2_svc =		_mdrpc_imp_set_drvs_2_svc
 #pragma weak mdrpc_deldrvs_2_svc =		_mdrpc_deldrvs_2_svc
 #pragma weak mdrpc_upd_dr_dbinfo_2_svc =	_mdrpc_upd_dr_dbinfo_2_svc
 #pragma weak mdrpc_devinfo_2_svc =		_mdrpc_devinfo_2_svc
@@ -97,6 +97,7 @@
 #pragma weak mdrpc_resnarf_set_2_svc =		_mdrpc_resnarf_set_2_svc
 #pragma weak mdrpc_mn_mirror_resync_all_2_svc = \
 					_mdrpc_mn_mirror_resync_all_2_svc
+#pragma weak mdrpc_imp_adddrvs_2_svc =		_mdrpc_imp_adddrvs_2_svc
 
 /*ARGSUSED*/
 bool_t
@@ -486,6 +487,17 @@ _mdrpc_adddrvs_2_svc(
 
 /*ARGSUSED*/
 bool_t
+_mdrpc_imp_set_drvs_2_svc(
+	mdrpc_drives_2_args *a,
+	mdrpc_generic_res *b,
+	struct svc_req *c)
+{
+	assert(0);
+	return (TRUE);
+}
+
+/*ARGSUSED*/
+bool_t
 _mdrpc_deldrvs_2_svc(
 	mdrpc_drives_2_args *a,
 	mdrpc_generic_res *b,
@@ -817,6 +829,17 @@ _mdrpc_mn_susp_res_io_2_svc(
 bool_t
 _mdrpc_mn_mirror_resync_all_2_svc(
 	mdrpc_setno_2_args *a,
+	mdrpc_generic_res *b,
+	struct svc_req *c)
+{
+	assert(0);
+	return (TRUE);
+}
+
+/*ARGSUSED*/
+bool_t
+_mdrpc_imp_adddrvs_2_svc(
+	mdrpc_drives_2_args *a,
 	mdrpc_generic_res *b,
 	struct svc_req *c)
 {

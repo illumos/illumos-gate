@@ -392,6 +392,10 @@ meta_getnmentbydev(
 	return (Strdup(device_name));
 }
 
+/*
+ * The arguments, minorname and devid, are only used with the partial
+ * import code and should be NULL otherwise.
+ */
 int
 add_name(
 	mdsetname_t	*sp,
@@ -400,6 +404,8 @@ add_name(
 	char		*dname,
 	minor_t		mnum,
 	char		*bname,
+	char		*minorname,	/* only used with a partial import */
+	ddi_devid_t	devid,		/* only used with a partial import */
 	md_error_t	*ep
 )
 {
@@ -413,7 +419,13 @@ add_name(
 	(void) strncpy(nm.drvnm, dname, sizeof (nm.drvnm));
 	nm.devname_len = strlen(bname) + 1;
 	nm.devname = (uintptr_t)bname;
-
+	if (devid && minorname) {
+		nm.minorname_len = strlen(minorname) + 1;
+		nm.minorname = (uintptr_t)minorname;
+		nm.devid_size = devid_sizeof(devid);
+		nm.devid = (uintptr_t)devid;
+		nm.imp_flag = MDDB_C_IMPORT;
+	}
 	if (metaioctl(MD_IOCSET_NM, &nm, &nm.mde, bname) < 0)
 		return (mdstealerror(ep, &nm.mde));
 
@@ -579,7 +591,8 @@ add_key_name(
 	}
 
 	if ((err = add_name(sp, thisside, key, devlist[thisside].dname,
-	    devlist[thisside].mnum, devlist[thisside].bname, ep)) == -1) {
+	    devlist[thisside].mnum, devlist[thisside].bname, NULL,
+	    NULL, ep)) == -1) {
 		empty_devicelist();
 		return (-1);
 	}
@@ -602,7 +615,8 @@ add_key_name(
 
 		if (devlist[sideno].dname != NULL) {
 			err = add_name(sp, sideno, key, devlist[sideno].dname,
-			    devlist[sideno].mnum, devlist[sideno].bname, ep);
+			    devlist[sideno].mnum, devlist[sideno].bname,
+			    NULL, NULL, ep);
 			if (err == -1) {
 				empty_devicelist();
 				return (-1);
@@ -758,7 +772,7 @@ add_self_name(
 
 	if (metaislocalset(sp)) {
 	    if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
-		minor, devname, ep)) == MD_KEYBAD) {
+		minor, devname, NULL, NULL, ep)) == MD_KEYBAD) {
 			Free(devname);
 			return (-1);
 	    }
@@ -767,7 +781,7 @@ add_self_name(
 		 * Add myside first and use the returned key to add other sides
 		 */
 		if ((key = add_name(sp, myside, MD_KEYWILD, drvname,
-		    minor, devname, ep)) == MD_KEYBAD) {
+		    minor, devname, NULL, NULL, ep)) == MD_KEYBAD) {
 			Free(devname);
 			return (-1);
 		}
@@ -786,7 +800,7 @@ add_self_name(
 			if (mnside->nd_nodeid == myside)
 				continue;
 			if (add_name(sp, mnside->nd_nodeid, key, drvname,
-			    minor, devname, ep) == -1) {
+			    minor, devname, NULL, NULL, ep) == -1) {
 				Free(devname);
 				return (-1);
 			}
@@ -798,7 +812,7 @@ add_self_name(
 			if (side == myside)
 				continue;
 			if (add_name(sp, side, key, drvname, minor, devname,
-			    ep) == -1) {
+			    NULL, NULL, ep) == -1) {
 				Free(devname);
 				return (-1);
 			}

@@ -770,6 +770,7 @@ extern void	md_remove_minor_node(minor_t);
 
 /* Externals from md_names.c */
 extern mdkey_t	md_setdevname(set_t, side_t, mdkey_t, char *, minor_t, char *,
+		    int imp_flag, ddi_devid_t devid, char *minorname,
 			set_t, md_error_t *);
 extern int	md_getdevname(set_t, side_t, mdkey_t, md_dev64_t, char *,
 		    size_t);
@@ -815,7 +816,7 @@ extern md_dev64_t md_makedevice(major_t, minor_t);
 extern major_t	md_getmajor(md_dev64_t);
 extern minor_t	md_getminor(md_dev64_t);
 extern void	md_timeval(md_timeval32_t *);
-extern int	md_imp_snarf_set(set_t *, int);
+extern int	md_imp_snarf_set(mddb_config_t *);
 
 /* externals from md_mddb.c */
 extern int	mddb_reread_rr(set_t, mddb_recid_t);

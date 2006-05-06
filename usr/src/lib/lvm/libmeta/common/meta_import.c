@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,8 @@ typedef struct did_list {
 	dev_t		dev;
 	uint_t		did_index;
 	char		*minor_name;
+	char		*driver_name;
+	int		available;
 	struct did_list	*next;
 } did_list_t;
 
@@ -76,7 +77,11 @@ static replicated_disk_t *replicated_disk_list[MAX_DEVID_LEN + 1] = {NULL};
  * The list of replicated disks is built just once and this flag is set
  * once it's done
  */
-static int replicated_disk_list_built = 0;
+int replicated_disk_list_built_pass1 = 0;
+int replicated_disk_list_built_pass2 = 0;
+int *replicated_disk_list_built;
+
+static void free_did_list(did_list_t *did_listp);
 
 /*
  * Map logical blk to physical
@@ -120,17 +125,15 @@ static md_im_drive_info_t *
 drive_append(
 	md_im_drive_info_t	**midpp,
 	mddrivename_t		*dnp,
-	void			*devid,
-	void			*rdevid,
-	void			*devname,
-	int			devid_sz,
-	char			*minor_name,
+	did_list_t		*nonrep_did_listp,
+	minor_t			mnum,
 	md_timeval32_t		timestamp,
 	md_im_replica_info_t	*mirp
 )
 {
 	md_im_drive_info_t	*midp;
 	int			o_devid_sz;
+	int			devid_sz;
 
 	for (; (*midpp != NULL); midpp = &((*midpp)->mid_next))
 		;
@@ -140,37 +143,47 @@ drive_append(
 	midp->mid_dnp = dnp;
 
 	/*
-	 * If rdevid is not NULL then we know we are dealing with
+	 * If rdid is not NULL then we know we are dealing with
 	 * replicated diskset case. 'devid_sz' will always be the
-	 * size of a valid devid which can be 'devid' or 'rdevid'
+	 * size of a valid devid which can be 'did' or 'rdid'
 	 */
-	midp->mid_devid = (void *)Malloc(devid_sz);
 
-	if (rdevid) {
-		(void) memcpy(midp->mid_devid, rdevid, devid_sz);
+	if (nonrep_did_listp->rdid) {
+		devid_sz = devid_sizeof(nonrep_did_listp->rdid);
+		midp->mid_devid = (void *)Malloc(devid_sz);
+		(void) memcpy(midp->mid_devid, nonrep_did_listp->rdid,
+		    devid_sz);
 		/*
 		 * Also need to store the 'other' devid
 		 */
-		o_devid_sz = devid_sizeof((ddi_devid_t)devid);
+		o_devid_sz = devid_sizeof((ddi_devid_t)(nonrep_did_listp->did));
 		midp->mid_o_devid = (void *)Malloc(o_devid_sz);
-		(void) memcpy(midp->mid_o_devid, devid, o_devid_sz);
+		(void) memcpy(midp->mid_o_devid, nonrep_did_listp->did,
+		    o_devid_sz);
 		midp->mid_o_devid_sz = o_devid_sz;
 	} else {
+		devid_sz = devid_sizeof(nonrep_did_listp->did);
+		midp->mid_devid = (void *)Malloc(devid_sz);
 		/*
 		 * In the case of regular diskset, midp->mid_o_devid
 		 * will be a NULL pointer
 		 */
-		(void) memcpy(midp->mid_devid, devid, devid_sz);
+		(void) memcpy(midp->mid_devid, nonrep_did_listp->did, devid_sz);
 	}
-
-	if (devname)
-		midp->mid_devname = Strdup(devname);
 
 	midp->mid_devid_sz = devid_sz;
 	midp->mid_setcreatetimestamp = timestamp;
-	(void) strlcpy(midp->mid_minor_name, minor_name, MDDB_MINOR_NAME_MAX);
+	midp->mid_available = nonrep_did_listp->available;
+	if (nonrep_did_listp->minor_name) {
+		(void) strlcpy(midp->mid_minor_name,
+		    nonrep_did_listp->minor_name, MDDB_MINOR_NAME_MAX);
+	}
+	midp->mid_mnum = mnum;
+	if (nonrep_did_listp->driver_name)
+		midp->mid_driver_name = Strdup(nonrep_did_listp->driver_name);
 	midp->mid_replicas = mirp;
-
+	if (nonrep_did_listp->devname)
+		midp->mid_devname = Strdup(nonrep_did_listp->devname);
 	return (midp);
 }
 
@@ -187,17 +200,14 @@ static md_im_drive_info_t **
 drive_append_wrapper(
 	md_im_drive_info_t	**tailpp,
 	mddrivename_t		*dnp,
-	void 			*devid,
-	void			*rdevid,
-	void			*devname,
-	int			devid_sz,
-	char			*minor_name,
+	did_list_t		*nonrep_did_listp,
+	minor_t			mnum,
 	md_timeval32_t		timestamp,
 	md_im_replica_info_t	*mirp
 )
 {
-	(void) drive_append(tailpp, dnp, devid, rdevid, devname, devid_sz,
-	    minor_name, timestamp, mirp);
+	(void) drive_append(tailpp, dnp, nonrep_did_listp, mnum, timestamp,
+	    mirp);
 
 	if ((*tailpp)->mid_next == NULL)
 		return (tailpp);
@@ -302,7 +312,7 @@ map_replica_disk(
  * for the disk.
  * If you store the returned devid you must create a local copy.
  */
-static void *
+void *
 replicated_list_lookup(
 	uint_t	devid_len,
 	void	*old_devid
@@ -374,16 +384,13 @@ get_replica_disks(
 	did_list_t		*did_listp,
 	mddb_mb_t		*mb,
 	mddb_lb_t		*lbp,
-	md_error_t		*ep,
-	int			replicated
+	md_error_t		*ep
 )
 {
 	mddrivename_t		*dnp;
 	int			indx, on_list;
 	mdsetname_t		*sp = metasetname(MD_LOCAL_NAME, ep);
 	int			flags;
-	int			devid_sz;
-	char			*minor_name;
 	did_list_t		*replica_disk;
 	daddr32_t		offset;
 	daddr32_t		length;
@@ -391,63 +398,68 @@ get_replica_disks(
 	md_im_replica_info_t	**mirpp = NULL;
 	md_im_drive_info_t	**midpp = &misp->mis_drives;
 	md_im_drive_info_t	*midp;
-	void			*did;
 
 	for (indx = 0; indx < lbp->lb_loccnt; indx++) {
 
 		on_list = 0;
-		if (lbp->lb_locators[indx].l_flags & MDDB_F_ACTIVE) {
+		if ((lbp->lb_locators[indx].l_flags == 0) ||
+		    (lbp->lb_locators[indx].l_flags & MDDB_F_DELETED))
+			continue;
 
-			/*
-			 * search the device id list for a
-			 * specific ctds based on the locator
-			 * block device id array index.
-			 */
-			replica_disk = map_replica_disk(did_listp, indx);
+		/*
+		 * search the device id list for a
+		 * specific ctds based on the locator
+		 * block device id array index.
+		 */
+		replica_disk = map_replica_disk(did_listp, indx);
 
-			assert(replica_disk != NULL);
+		assert(replica_disk != NULL);
 
 
-			/*
-			 * metadrivename() can fail for a slice name
-			 * if there is not an existing mddrivename_t.
-			 * So we use metadiskname() to strip the slice
-			 * number.
-			 */
-			dnp = metadrivename(&sp,
-			    metadiskname(replica_disk->devname), ep);
+		/*
+		 * metadrivename() can fail for a slice name
+		 * if there is not an existing mddrivename_t.
+		 * So we use metadiskname() to strip the slice
+		 * number.
+		 */
+		dnp = metadrivename(&sp, metadiskname(replica_disk->devname),
+		    ep);
 
-			for (midp = misp->mis_drives; midp != NULL;
-				midp = midp->mid_next) {
-				if (dnp == midp->mid_dnp) {
+		for (midp = misp->mis_drives; midp != NULL;
+			midp = midp->mid_next) {
+			if (dnp == midp->mid_dnp) {
+				/*
+				 * You could get a dnp match, but if 1 disk
+				 * is unavailable and the other isn't, they
+				 * will have the same dnp due
+				 * to the name being the same, but in fact
+				 * are different disks.
+				 */
+				if (midp->mid_available ==
+				    replica_disk->available) {
 					on_list = 1;
 					mirpp = &midp->mid_replicas;
 					break;
 				}
 			}
+		}
+
+		/*
+		 * New on the list so add it
+		 */
+		if (!on_list) {
+			mddb_mb_t	*mbp;
+			uint_t		sliceno;
+			mdname_t	*rsp;
+			int		fd = -1;
+
+			mbp = Malloc(DEV_BSIZE);
 
 			/*
-			 * Get the correct devid_sz
+			 * If the disk isn't available, we don't
+			 * want to try to read from it.
 			 */
-			if (replicated)
-				did = replica_disk->rdid;
-			else
-				did = replica_disk->did;
-
-			devid_sz = devid_sizeof((ddi_devid_t)did);
-			minor_name = replica_disk->minor_name;
-
-			/*
-			 * New on the list so add it
-			 */
-			if (!on_list) {
-				mddb_mb_t	*mbp;
-				uint_t		sliceno;
-				mdname_t	*rsp;
-				int		fd = -1;
-
-				mbp = Malloc(DEV_BSIZE);
-
+			if (replica_disk->available == MD_IM_DISK_AVAILABLE) {
 				/* determine the replica slice */
 				if (meta_replicaslice(dnp, &sliceno,
 				    ep) != 0) {
@@ -488,54 +500,57 @@ get_replica_disks(
 				}
 
 				(void) close(fd);
-				midpp = drive_append_wrapper(midpp, dnp,
-				    replica_disk->did, replica_disk->rdid,
-				    replica_disk->devname,
-				    devid_sz, minor_name, mbp->mb_setcreatetime,
-				    NULL);
-				mirpp = &((*midpp)->mid_replicas);
-				Free(mbp);
 			}
+			midpp = drive_append_wrapper(midpp, dnp,
+			    replica_disk,
+			    meta_getminor(replica_disk->dev),
+			    mbp->mb_setcreatetime, NULL);
+			mirpp = &((*midpp)->mid_replicas);
+			Free(mbp);
+		}
 
-			/*
-			 * For either of these assertions to fail, it implies
-			 * a NULL return from metadrivename() above.  Since
-			 * the args came from a presumed valid locator block,
-			 * that's Bad.
-			 */
-			assert(midpp != NULL);
-			assert(mirpp != NULL);
+		/*
+		 * For either of these assertions to fail, it implies
+		 * a NULL return from metadrivename() above.  Since
+		 * the args came from a presumed valid locator block,
+		 * that's Bad.
+		 */
+		assert(midpp != NULL);
+		assert(mirpp != NULL);
 
-			/*
-			 * Extract the parameters describing this replica.
-			 *
-			 * The magic "1" in the length calculation accounts
-			 * for the length of the master block, in addition to
-			 * the block count it describes.  (The master block
-			 * will always take up one block on the disk, and
-			 * there will always only be one master block per
-			 * replica, even though much of the code is structured
-			 * to handle noncontiguous replicas.)
-			 */
-			flags = lbp->lb_locators[indx].l_flags;
-			offset = lbp->lb_locators[indx].l_blkno;
-			length = mb->mb_blkcnt + 1;
-			timestamp = mb->mb_setcreatetime;
+		/*
+		 * Extract the parameters describing this replica.
+		 *
+		 * The magic "1" in the length calculation accounts
+		 * for the length of the master block, in addition to
+		 * the block count it describes.  (The master block
+		 * will always take up one block on the disk, and
+		 * there will always only be one master block per
+		 * replica, even though much of the code is structured
+		 * to handle noncontiguous replicas.)
+		 */
+		flags = lbp->lb_locators[indx].l_flags;
+		offset = lbp->lb_locators[indx].l_blkno;
+		length = mb->mb_blkcnt + 1;
+		timestamp = mb->mb_setcreatetime;
 
-			mirpp = replica_append_wrapper(mirpp, flags,
-				offset, length, timestamp);
+		mirpp = replica_append_wrapper(mirpp, flags,
+			offset, length, timestamp);
 
-			/*
-			 * If we're here it means -
-			 *
-			 * a) we had an active copy of the replica, and
-			 * b) we've added the disk to the list of
-			 *    disks as well.
-			 *
-			 * We need to bump up the number of active
-			 * replica count for each such replica so that it
-			 * can be used later for replica quorum check.
-			 */
+		/*
+		 * If we're here it means -
+		 *
+		 * we've added the disk to the list of
+		 *    disks.
+		 */
+
+		/*
+		 * We need to bump up the number of active
+		 * replica count for each such replica that is
+		 * active so that it can be used later for replica
+		 * quorum check.
+		 */
+		if (flags & MDDB_F_ACTIVE) {
 			misp->mis_active_replicas++;
 		}
 	}
@@ -621,6 +636,8 @@ static void
 get_disks_from_didnamespace(
 	md_im_set_desc_t	*misp,
 	pnm_rec_t		**pnm,
+	mddb_rb_t		*nm,
+	mddb_rb_t		*shrnm,
 	mddb_rb_t		*did_nm,
 	mddb_rb_t		*did_shrnm,
 	uint_t 			imp_flags,
@@ -635,14 +652,24 @@ get_disks_from_didnamespace(
 	mdsetname_t		*sp = metasetname(MD_LOCAL_NAME, ep);
 	mddb_rb_t		*rbp_did = did_nm;
 	mddb_rb_t		*rbp_did_shr = did_shrnm;
+	mddb_rb_t		*rbp_nm = nm;
+	mddb_rb_t		*rbp_shr_nm = shrnm;
 	int			on_list = 0;
-	int			devid_sz;
 	struct devid_min_rec	*did_rec;
 	struct devid_shr_rec	*did_shr_rec;
+	struct nm_rec		*namesp_rec;
+	struct nm_shr_rec	*namesp_shr_rec;
 	struct did_shr_name	*did;
 	struct did_min_name	*min;
 	void			*r_did;	/* NULL if not a replicated diskset */
 	void			*valid_did;
+	int			avail = 0;
+	struct nm_name		*nmp;
+	struct nm_shared_name	*snmp;
+	mdkey_t			drv_key, key, dev_key;
+	minor_t			mnum = 0;
+	did_list_t		*nonrep_did_listp;
+	size_t			used_size, offset;
 
 	/*
 	 * We got a pointer to an mddb record, which we expect to contain a
@@ -653,6 +680,10 @@ get_disks_from_didnamespace(
 	/* LINTED */
 	did_shr_rec = (struct devid_shr_rec *)
 	    ((caddr_t)(&rbp_did_shr->rb_data));
+	/* LINTED */
+	namesp_rec = (struct nm_rec *)((caddr_t)(&rbp_nm->rb_data));
+	/* LINTED */
+	namesp_shr_rec = (struct nm_shr_rec *)((caddr_t)(&rbp_shr_nm->rb_data));
 
 	/*
 	 * Skip the nm_rec_hdr and iterate on the array of struct minor_name
@@ -664,9 +695,10 @@ get_disks_from_didnamespace(
 
 		on_list = 0;
 		r_did = NULL;
+		nonrep_did_listp = Zalloc(sizeof (struct did_list));
 
 		/*
-		 * For a give DID_NM key, locate the corresponding device
+		 * For a given DID_NM key, locate the corresponding device
 		 * id from DID_NM_SHR
 		 */
 		for (did = &did_shr_rec->device_id[0]; did->did_key != 0;
@@ -691,7 +723,7 @@ get_disks_from_didnamespace(
 		 * If replicated diskset
 		 */
 		if (replicated) {
-			size_t		new_devid_len;
+			size_t		new_devid_len, old_devid_len;
 			char		*temp;
 			/*
 			 * In this case, did->did_devid will
@@ -699,56 +731,206 @@ get_disks_from_didnamespace(
 			 */
 			temp = replicated_list_lookup(did->did_size,
 			    did->did_devid);
-			new_devid_len = devid_sizeof((ddi_devid_t)temp);
-			r_did = Zalloc(new_devid_len);
-			(void) memcpy(r_did, temp, new_devid_len);
+			if (temp == NULL) {
+				/* we have a partial replicated set, fake it */
+				new_devid_len = did->did_size;
+				r_did = Zalloc(new_devid_len);
+				(void) memcpy(r_did, did->did_devid,
+				    new_devid_len);
+			} else {
+				new_devid_len = devid_sizeof((ddi_devid_t)temp);
+				r_did = Zalloc(new_devid_len);
+				(void) memcpy(r_did, temp, new_devid_len);
+			}
 			valid_did = r_did;
+			nonrep_did_listp->rdid = Zalloc(new_devid_len);
+			(void) memcpy(nonrep_did_listp->rdid, r_did,
+			    new_devid_len);
+			old_devid_len =
+			    devid_sizeof((ddi_devid_t)did->did_devid);
+			nonrep_did_listp->did = Zalloc(old_devid_len);
+			(void) memcpy((void *)nonrep_did_listp->did,
+			    (void *)did->did_devid, old_devid_len);
 		} else {
+			size_t		new_devid_len;
+
 			valid_did = did->did_devid;
+			new_devid_len =
+			    devid_sizeof((ddi_devid_t)did->did_devid);
+			nonrep_did_listp->did = Zalloc(new_devid_len);
+			(void) memcpy((void *)nonrep_did_listp->did,
+			    (void *)did->did_devid, new_devid_len);
 		}
 
-		/* Get the ctds mapping for that device id */
+		/*
+		 * Get a ctds mapping for that device id.
+		 * Since disk is being imported into this system,
+		 * just use the first ctds in list.
+		 */
 		if (meta_deviceid_to_nmlist(search_path,
 		    (ddi_devid_t)valid_did,
 		    &min->min_name[0], &nmlist) == 0) {
-
-			assert(nmlist->devname != NULL);
-			dnp = metadrivename(&sp,
-			    metadiskname(nmlist->devname), ep);
 			/*
-			 * Add drive to pnm_rec_t list of physical devices for
-			 * metastat output.
+			 * We know the disk is available. Use the
+			 * device information in nmlist.
 			 */
-			if (imp_flags & META_IMP_VERBOSE) {
-				append_pnm_rec(pnm, min->min_key,
-				    nmlist->devname);
+			assert(nmlist[0].devname != NULL);
+			nonrep_did_listp->devname = Strdup(nmlist[0].devname);
+			nonrep_did_listp->available = MD_IM_DISK_AVAILABLE;
+			avail = 0;
+			mnum = meta_getminor(nmlist[0].dev);
+			devid_free_nmlist(nmlist);
+		} else {
+			/*
+			 * The disk is not available. That means we need to
+			 * use the (old) device information stored in the
+			 * namespace.
+			 */
+			/* search in nm space for a match */
+			offset = sizeof (struct nm_rec) -
+			    sizeof (struct nm_name);
+			used_size =  namesp_rec->r_rec_hdr.r_used_size - offset;
+			for (nmp = &namesp_rec->r_name[0]; nmp->n_key != 0;
+			    /* LINTED */
+			    nmp = (struct nm_name *)((char *)nmp +
+			    NAMSIZ(nmp))) {
+				if (nmp->n_key == min->min_key)
+					break;
+			    used_size -=  NAMSIZ(nmp);
+			    if ((int)used_size <= 0) {
+				md_exit(NULL, 1);
+			    }
 			}
 
-			assert(dnp != NULL);
-			/* Is it already on the list? */
-			for (midp = misp->mis_drives; midp != NULL;
-			    midp = midp->mid_next) {
-				if (midp->mid_dnp == dnp) {
+			if (nmp->n_key == 0) {
+				assert(nmp->n_key != 0);
+				md_exit(NULL, 1);
+			}
+			dev_key = nmp->n_dir_key;
+			snmp = &namesp_shr_rec->sr_name[0];
+			key = snmp->sn_key;
+			/*
+			 * Use the namespace n_dir_key to look in the
+			 * shared namespace. When we find the matching
+			 * key, that is the devname and minor number we
+			 * want.
+			 */
+			offset = sizeof (struct nm_shr_rec) -
+			    sizeof (struct nm_shared_name);
+			used_size = namesp_shr_rec->sr_rec_hdr.r_used_size -
+			    offset;
+			while (key != 0) {
+				if (dev_key == key) {
+					/*
+					 * This complicated looking series
+					 * of code creates a devname of the
+					 * form  <sn_name>/<n_name> which
+					 * will look like /dev/dsk/c1t4d0s0.
+					 */
+					nonrep_did_listp->devname =
+					    Zalloc(strlen(nmp->n_name) +
+					    strlen(snmp->sn_name) + 2);
+					(void) strlcpy(
+					    nonrep_did_listp->devname,
+					    snmp->sn_name,
+					    strlen(snmp->sn_name));
+					(void) strlcat(
+					    nonrep_did_listp->devname, "/",
+					    strlen(nmp->n_name) +
+					    strlen(snmp->sn_name) + 2);
+					(void) strlcat(
+					    nonrep_did_listp->devname,
+					    nmp->n_name,
+					    strlen(nmp->n_name) +
+					    strlen(snmp->sn_name) + 2);
+					mnum = nmp->n_minor;
+					break;
+				}
+				/* LINTED */
+				snmp = (struct nm_shared_name *)((char *)snmp +
+				    SHR_NAMSIZ(snmp));
+				key = snmp->sn_key;
+				used_size -= SHR_NAMSIZ(snmp);
+				if ((int)used_size <= 0) {
+					md_exit(NULL, 1);
+				}
+			}
+			if (key == 0) {
+				nonrep_did_listp->devname = NULL;
+				mnum = 0;
+			}
+
+			nonrep_did_listp->available = MD_IM_DISK_NOT_AVAILABLE;
+			nonrep_did_listp->minor_name = Strdup(min->min_name);
+			avail = 1;
+			drv_key = nmp->n_drv_key;
+			snmp = &namesp_shr_rec->sr_name[0];
+			key = snmp->sn_key;
+			/*
+			 * Use the namespace n_drv_key to look in the
+			 * shared namespace. When we find the matching
+			 * key, that is the driver name for the disk.
+			 */
+			offset = sizeof (struct nm_shr_rec) -
+			    sizeof (struct nm_shared_name);
+			used_size = namesp_shr_rec->sr_rec_hdr.r_used_size -
+			    offset;
+			while (key != 0) {
+				if (drv_key == key) {
+					nonrep_did_listp->driver_name =
+					    Strdup(snmp->sn_name);
+					break;
+				}
+				/* LINTED */
+				snmp = (struct nm_shared_name *)((char *)snmp +
+				    SHR_NAMSIZ(snmp));
+				key = snmp->sn_key;
+				used_size -= SHR_NAMSIZ(snmp);
+				if ((int)used_size <= 0) {
+					md_exit(NULL, 1);
+				}
+			}
+			if (key == 0)
+				nonrep_did_listp->driver_name = NULL;
+		}
+		dnp = metadrivename(&sp,
+		    metadiskname(nonrep_did_listp->devname), ep);
+		/*
+		 * Add drive to pnm_rec_t list of physical devices for
+		 * metastat output.
+		 */
+		if (imp_flags & META_IMP_VERBOSE) {
+			append_pnm_rec(pnm, min->min_key,
+			    nonrep_did_listp->devname);
+		}
+
+		assert(dnp != NULL);
+		/* Is it already on the list? */
+		for (midp = misp->mis_drives; midp != NULL;
+		    midp = midp->mid_next) {
+			if (midp->mid_dnp == dnp) {
+				if (midp->mid_available ==
+				    nonrep_did_listp->available) {
 					on_list = 1;
 					break;
 				}
 			}
+		}
 
-			devid_sz = devid_sizeof(
-			    (ddi_devid_t)valid_did);
+		if (!on_list) {
+			mddb_mb_t	*mbp;
+			uint_t		sliceno;
+			mdname_t	*rsp;
+			int		fd = -1;
 
-			if (!on_list) {
-				mddb_mb_t	*mbp;
-				uint_t		sliceno;
-				mdname_t	*rsp;
-				int		fd = -1;
+			mbp = Malloc(DEV_BSIZE);
 
-				mbp = Malloc(DEV_BSIZE);
-
+			if (!avail) {
 				/* determine the replica slice */
 				if (meta_replicaslice(dnp, &sliceno,
 				    ep) != 0) {
 					Free(mbp);
+					free_did_list(nonrep_did_listp);
 					continue;
 				}
 
@@ -759,18 +941,21 @@ get_disks_from_didnamespace(
 				if (dnp->vtoc.parts[sliceno].size
 				    == 0) {
 					Free(mbp);
+					free_did_list(nonrep_did_listp);
 					continue;
 				}
 
 				if ((rsp = metaslicename(dnp, sliceno,
 				    ep)) == NULL) {
 					Free(mbp);
+					free_did_list(nonrep_did_listp);
 					continue;
 				}
 
 				if ((fd = open(rsp->rname,
 				    O_RDONLY| O_NDELAY)) < 0) {
 					Free(mbp);
+					free_did_list(nonrep_did_listp);
 					continue;
 				}
 
@@ -781,26 +966,26 @@ get_disks_from_didnamespace(
 				    DEV_BSIZE) <= 0) {
 					mdclrerror(ep);
 					Free(mbp);
-						(void) close(fd);
-						continue;
+					free_did_list(nonrep_did_listp);
+					(void) close(fd);
+					continue;
 				}
 
 				(void) close(fd);
-				/*
-				 * If it is replicated diskset,
-				 * r_did will be non-NULL and
-				 * devid_sz will be its size.
-				 * Passing the devname as NULL because field
-				 * is not currently used for a non-replica disk.
-				 */
-				midpp = drive_append_wrapper(midpp,
-				    dnp, &did->did_devid, r_did, NULL,
-				    devid_sz, &min->min_name[0],
-				    mbp->mb_setcreatetime, NULL);
-				Free(mbp);
 			}
-		devid_free_nmlist(nmlist);
+			/*
+			 * If it is replicated diskset,
+			 * r_did will be non-NULL.
+			 * Passing the devname as NULL because field
+			 * is not currently used for a non-replica disk.
+			 */
+			midpp = drive_append_wrapper(midpp,
+			    dnp, nonrep_did_listp,
+			    mnum, mbp->mb_setcreatetime, NULL);
+			Free(mbp);
+			free_did_list(nonrep_did_listp);
 		}
+	free_did_list(nonrep_did_listp);
 	}
 }
 
@@ -821,17 +1006,19 @@ set_append(
 	mddb_mb_t		*mb,
 	mddb_lb_t		*lbp,
 	mddb_rb_t		*nm,
+	mddb_rb_t		*shrnm,
 	pnm_rec_t		**pnm,
 	mddb_rb_t		*did_nm,
 	mddb_rb_t		*did_shrnm,
 	uint_t 			imp_flags,
-	int			replicated,
 	md_error_t		*ep
 )
 {
 
 	md_im_set_desc_t	*misp;
 	set_t			setno = mb->mb_setno;
+	int			partial = imp_flags & MD_IM_PARTIAL_DISKSET;
+	int			replicated = imp_flags & MD_IM_SET_REPLICATED;
 
 	/* run to end of list */
 	for (; (*mispp != NULL); mispp = &((*mispp)->mis_next))
@@ -844,12 +1031,13 @@ set_append(
 		misp->mis_flags = MD_IM_SET_REPLICATED;
 
 	misp->mis_oldsetno = setno;
+	misp->mis_partial = partial;
 
 	/* Get the disks with and without replicas */
-	get_replica_disks(misp, did_listp, mb, lbp, ep, replicated);
+	get_replica_disks(misp, did_listp, mb, lbp, ep);
 
 	if (nm != NULL && did_nm != NULL && did_shrnm != NULL) {
-		get_disks_from_didnamespace(misp, pnm, did_nm,
+		get_disks_from_didnamespace(misp, pnm, nm, shrnm, did_nm,
 		    did_shrnm, imp_flags, replicated, ep);
 	}
 
@@ -1404,8 +1592,8 @@ read_nm_rec(
  * ids; the caller of this routine is responsible for free'ing up the memory.
  *
  * Returns:
- * 	1	if it's a replicated disk
- * 	0 	if it's not a replicated disk
+ * 	MD_IM_SET_REPLICATED	if it's a replicated disk
+ * 	0 			if it's not a replicated disk
  */
 static int
 is_replicated(
@@ -1426,7 +1614,7 @@ is_replicated(
 		return (retval);
 
 	if (devid_compare((ddi_devid_t)mbp->mb_devid, current_devid) != 0)
-		retval = 1;
+		retval = MD_IM_SET_REPLICATED;
 
 	if (retval && need_devid) {
 		new_devid_len = devid_sizeof(current_devid);
@@ -1474,7 +1662,7 @@ free_replicated_disks_list()
  * 	1	on success
  * 	0 	on failure
  */
-static int
+int
 build_replicated_disks_list(
 	md_error_t *ep,
 	mddrivenamelist_t *dnlp
@@ -1522,7 +1710,7 @@ build_replicated_disks_list(
 		}
 		(void) close(fd);
 	}
-	replicated_disk_list_built = 1;
+	*replicated_disk_list_built = 1;
 
 	Free(mbp);
 	return (1);
@@ -1553,6 +1741,102 @@ free_did_list(
 			Free(temp->devname);
 		if (temp->minor_name)
 			Free(temp->minor_name);
+		if (temp->driver_name)
+			Free(temp->driver_name);
+		Free(temp);
+	}
+}
+
+/*
+ * meta_free_im_replica_info
+ *
+ * Frees the md_im_replica_info list
+ */
+static void
+meta_free_im_replica_info(
+	md_im_replica_info_t	*mirp
+)
+{
+	md_im_replica_info_t	*r, *temp;
+
+	r = mirp;
+
+	while (r != NULL) {
+		temp = r;
+		r = r->mir_next;
+
+		Free(temp);
+	}
+}
+
+/*
+ * meta_free_im_drive_info
+ *
+ * Frees the md_im_drive_info list
+ */
+static void
+meta_free_im_drive_info(
+	md_im_drive_info_t	*midp
+)
+{
+	md_im_drive_info_t	*d, *temp;
+
+	d = midp;
+
+	while (d != NULL) {
+		temp = d;
+		d = d->mid_next;
+
+		if (temp->mid_available & MD_IM_DISK_NOT_AVAILABLE)
+			/*
+			 * dnp is not on the drivenamelist and is a temp
+			 * dnp for metaimport if the disk is unavailable.
+			 * We need to specifically free it because of this.
+			 * If the disk is available, standard drivelist freeing
+			 * will kick in so we don't need to do it.
+			 */
+			metafreedrivename(temp->mid_dnp);
+		if (temp->mid_devid)
+			Free(temp->mid_devid);
+		if (temp->mid_o_devid)
+			Free(temp->mid_o_devid);
+		if (temp->mid_driver_name)
+			Free(temp->mid_driver_name);
+		if (temp->mid_devname)
+			Free(temp->mid_devname);
+		if (temp->mid_replicas) {
+			meta_free_im_replica_info(temp->mid_replicas);
+			temp->mid_replicas = NULL;
+		}
+		if (temp->overlap) {
+			meta_free_im_drive_info(temp->overlap);
+			temp->overlap = NULL;
+		}
+		Free(temp);
+	}
+}
+
+/*
+ * meta_free_im_set_desc
+ *
+ * Frees the md_im_set_desc_t list
+ */
+void
+meta_free_im_set_desc(
+	md_im_set_desc_t	*misp
+)
+{
+	md_im_set_desc_t	*s, *temp;
+
+	s = misp;
+
+	while (s != NULL) {
+		temp = s;
+		s = s->mis_next;
+		if (temp->mis_drives) {
+			meta_free_im_drive_info(temp->mis_drives);
+			temp->mis_drives = NULL;
+		}
 		Free(temp);
 	}
 }
@@ -1577,7 +1861,9 @@ build_did_list(
 	md_error_t	*ep,
 	int		fd,
 	mddb_mb_t	*mb,
+	mddb_lb_t	*lbp,
 	mddb_did_blk_t	*lbdidp,
+	mddb_ln_t	*lnp,
 	did_list_t	**did_listp,
 	int		replicated
 )
@@ -1593,8 +1879,11 @@ build_did_list(
 	mddb_did_info_t	*did_info = NULL;
 	void		*did = NULL;
 	size_t		new_devid_len;
+	int		partial = 0;
+	int		partial_replicated = 0;
 
 	for (cnt = 0; cnt < MDDB_NLB; cnt++) {
+		partial_replicated = 0;
 		did_info = &lbdidp->blk_info[cnt];
 
 		if (!(did_info->info_flags & MDDB_DID_EXISTS))
@@ -1604,7 +1893,7 @@ build_did_list(
 		new->did = Zalloc(did_info->info_length);
 
 		/*
-		 * If we can re-use the buffer already has been
+		 * If we can re-use the buffer that has already been
 		 * read in then just use it.  Otherwise free
 		 * the previous one and alloc a new one
 		 */
@@ -1646,10 +1935,19 @@ build_did_list(
 		if (replicated) {
 		    temp = replicated_list_lookup(did_info->info_length,
 			new->did);
-		    new_devid_len = devid_sizeof((ddi_devid_t)temp);
-		    new->rdid = Zalloc(new_devid_len);
-		    (void) memcpy(new->rdid, temp, new_devid_len);
-		    did = new->rdid;
+		    if (temp == NULL) {
+			/* we have a partial replicated set, fake it */
+			new_devid_len = devid_sizeof((ddi_devid_t)new->did);
+			new->rdid = Zalloc(new_devid_len);
+			(void) memcpy(new->rdid, new->did, new_devid_len);
+			did = new->rdid;
+			partial_replicated = 1;
+		    } else {
+			new_devid_len = devid_sizeof((ddi_devid_t)temp);
+			new->rdid = Zalloc(new_devid_len);
+			(void) memcpy(new->rdid, temp, new_devid_len);
+			did = new->rdid;
+		    }
 		} else {
 		    did = new->did;
 		}
@@ -1658,20 +1956,42 @@ build_did_list(
 			return (-1);
 		}
 
-		if ((rval = meta_deviceid_to_nmlist(search_path,
-		    (ddi_devid_t)did, minor_name, &nm)) != 0) {
-			*did_listp = head;
-			free_did_list(*did_listp);
-			*did_listp = NULL;
-			(void) mddserror(ep, MDE_DS_PARTIALSET, MD_SET_BAD,
-			    mynode(), NULL, NULL);
-			return (ENOTSUP);
+		if (partial_replicated || meta_deviceid_to_nmlist(search_path,
+		    (ddi_devid_t)did, minor_name, &nm) != 0) {
+			int	len = 0;
+
+			/*
+			 * Partial diskset case. We'll need to get the
+			 * device information from the metadb instead
+			 * of the output (nm) of meta_deviceid_to_nmlist.
+			 */
+			len = strlen(lnp->ln_prefixes[0].pre_data) +
+			    strlen(lnp->ln_suffixes[0][cnt].suf_data) + 2;
+			new->devname = Zalloc(len);
+			(void) strlcpy(new->devname,
+			    lnp->ln_prefixes[0].pre_data,
+			    strlen(lnp->ln_prefixes[0].pre_data) + 1);
+			(void) strlcat(new->devname, "/", len);
+			(void) strlcat(new->devname,
+			    lnp->ln_suffixes[0][cnt].suf_data, len);
+			new->minor_name = Strdup(minor_name);
+			new->next = head;
+			new->available = MD_IM_DISK_NOT_AVAILABLE;
+			new->driver_name = Strdup(lbp->lb_drvnm[0].dn_data);
+			new->dev = lbp->lb_locators[cnt].l_dev;
+			head = new;
+			partial = ENOTSUP;
+			continue;
 		}
 
+		/*
+		 * Disk is there. Grab device information from nm structure.
+		 */
 		assert(nm->devname != NULL);
 		new->devname = Strdup(nm->devname);
 		new->dev = nm->dev;
 		new->minor_name = Strdup(minor_name);
+		new->available = MD_IM_DISK_AVAILABLE;
 
 		devid_free_nmlist(nm);
 
@@ -1683,6 +2003,8 @@ build_did_list(
 	if (bp)
 		Free(bp);
 	*did_listp = head;
+	if (partial)
+		return (partial);
 	return (1);
 }
 /*
@@ -1698,7 +2020,6 @@ build_did_list(
  */
 static int
 check_nm_disks(
-	md_error_t		*ep,
 	struct devid_min_rec	*did_nmp,
 	struct devid_shr_rec	*did_shrnmp
 )
@@ -1751,8 +2072,7 @@ check_nm_disks(
 		 */
 		if ((meta_deviceid_to_nmlist(search_path,
 		    did, minor_name, &nm)) != 0) {
-			(void) mddserror(ep, MDE_DS_PARTIALSET, MD_SET_BAD,
-			    mynode(), NULL, NULL);
+			/* Partial diskset detected */
 			return (ENOTSUP);
 		}
 		devid_free_nmlist(nm);
@@ -1828,6 +2148,86 @@ report_metadb_info(
 	(void) printf("\n");
 }
 
+/*
+ * meta_replica_quorum will determine if the disks in the set to be
+ * imported have enough valid replicas to have quorum.
+ *
+ * RETURN:
+ *	-1	Set doesn't have quorum
+ *	0	Set does have quorum
+ */
+int
+meta_replica_quorum(
+	md_im_set_desc_t *misp
+)
+{
+	md_im_drive_info_t	*midp;
+	md_im_replica_info_t    *midr;
+	int			replica_count = 0;
+
+	for (midp = misp->mis_drives; midp != NULL;
+		midp = midp->mid_next) {
+
+		if (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE)
+			continue;
+
+		/*
+		 * The drive is okay. Now count its replicas
+		 */
+		for (midr = midp->mid_replicas; midr != NULL;
+			midr = midr->mir_next) {
+			replica_count++;
+		}
+	}
+
+	if (misp->mis_active_replicas & 1) {
+		/* odd number of replicas */
+		if (replica_count < (misp->mis_active_replicas + 1)/2)
+			return (-1);
+	} else {
+		/* even number of replicas */
+		if (replica_count <= ((misp->mis_active_replicas + 1)/2))
+			return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
+ * Choose the best drive to use for the metaimport command.
+ */
+md_im_drive_info_t *
+pick_good_disk(md_im_set_desc_t *misp)
+{
+	md_timeval32_t		*setcrtime; /* set creation time */
+	md_im_drive_info_t	*good_disk = NULL;
+	md_im_drive_info_t	*midp = NULL;
+	md_im_replica_info_t	*mirp;
+
+	setcrtime = &(misp->mis_drives->mid_replicas->mir_timestamp);
+	for (midp = misp->mis_drives; (midp != NULL) && (good_disk == NULL);
+	    midp = midp->mid_next) {
+		/* drive must be available */
+		if (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE) {
+			continue;
+		}
+		for (mirp = midp->mid_replicas; mirp != NULL;
+		    mirp = mirp->mir_next) {
+			/* replica must be active to be a good one */
+			if (mirp->mir_flags & MDDB_F_ACTIVE) {
+				if ((setcrtime->tv_sec ==
+				    midp-> mid_setcreatetimestamp.tv_sec) &&
+				    (setcrtime->tv_usec ==
+				    midp->mid_setcreatetimestamp.tv_usec)) {
+					good_disk = midp;
+					break;
+				}
+			}
+		}
+	}
+	return (good_disk);
+}
 
 /*
  * report_set_info()
@@ -1848,22 +2248,21 @@ report_set_info(
 	int			fd,
 	uint_t			imp_flags,
 	int			set_count,
+	int			overlap,
+	md_im_drive_info_t	*overlap_disks,
 	md_error_t		*ep
 )
 {
 	int 			rval = 0;
 	md_im_drive_info_t	*d;
-	md_im_replica_info_t	*r;
 	md_im_drive_info_t	*good_disk = NULL;
 	int			i;
 	int			in = META_INDENT;
 	char			indent[MAXPATHLEN];
-	int			dlen = 0;
-	md_timeval32_t		firstdisktime;
 	md_timeval32_t		lastaccess; /* stores last modified timestamp */
-	int			set_contains_time_conflict = 0;
-	int			disk_time_conflict = 0;
-
+	int			has_overlap = 0;
+	int			no_quorum = 0;
+	int			partial = 0;
 
 	/* Calculates the correct indentation. */
 	indent[0] = 0;
@@ -1881,98 +2280,112 @@ report_set_info(
 		}
 	}
 
+	partial = misp->mis_partial;
+	good_disk = pick_good_disk(misp);
+	if (good_disk == NULL) {
+		return (rval);
+	}
+
 	/*
 	 * Make the distinction between a regular diskset and
-	 * a replicated diskset.
+	 * a replicated diskset.  Also make the distinction
+	 * between a partial vs. full diskset.
 	 */
-	if (misp->mis_flags & MD_IM_SET_REPLICATED) {
-		if (imp_flags & META_IMP_REPORT) {
-			(void) printf("%i)  %s:\n", set_count, gettext(
-			    "Found replicated diskset containing disks"));
+	if (partial == MD_IM_PARTIAL_DISKSET) {
+		if (misp->mis_flags & MD_IM_SET_REPLICATED) {
+			if (imp_flags & META_IMP_REPORT) {
+				(void) printf("%i)  %s:\n", set_count, gettext(
+				    "Found partial replicated diskset "
+				    "containing disks"));
+			} else {
+				(void) printf("\n%s:\n", gettext(
+				    "Importing partial replicated diskset "
+				    "containing disks"));
+			}
 		} else {
-			(void) printf("\n%s:\n", gettext(
-			    "Importing replicated diskset containing disks"));
+			if (imp_flags & META_IMP_REPORT) {
+				(void) printf("%i)  %s:\n", set_count, gettext(
+				    "Found partial regular diskset containing "
+				    "disks"));
+			} else {
+				(void) printf("\n%s:\n", gettext(
+				    "Importing partial regular diskset "
+				    "containing disks"));
+			}
 		}
 	} else {
-		if (imp_flags & META_IMP_REPORT) {
-			(void) printf("%i)  %s:\n", set_count, gettext(
-			    "Found regular diskset containing disks"));
+		if (misp->mis_flags & MD_IM_SET_REPLICATED) {
+			if (imp_flags & META_IMP_REPORT) {
+				(void) printf("%i)  %s:\n", set_count, gettext(
+				    "Found replicated diskset containing "
+				    "disks"));
+			} else {
+				(void) printf("\n%s:\n", gettext(
+				    "Importing replicated diskset containing "
+				    "disks"));
+			}
 		} else {
-			(void) printf("\n%s:\n", gettext(
-			    "Importing regular diskset containing disks"));
+			if (imp_flags & META_IMP_REPORT) {
+				(void) printf("%i)  %s:\n", set_count, gettext(
+				    "Found regular diskset containing disks"));
+			} else {
+				(void) printf("\n%s:\n", gettext(
+				    "Importing regular diskset containing "
+				    "disks"));
+			}
 		}
 	}
 
-
 	/*
-	 * Save the set creation time for the first disk in the
-	 * diskset.
+	 * Check each drive in the set. If it's unavailable or
+	 * an overlap tell the user.
 	 */
 	for (d = misp->mis_drives; d != NULL; d = d->mid_next) {
-		dlen = max(dlen, strlen(d->mid_dnp->cname));
-		if (good_disk == NULL) {
-			for (r = d->mid_replicas; r != NULL; r = r->mir_next) {
-				if (r->mir_flags & MDDB_F_ACTIVE) {
-					good_disk = d;
-					firstdisktime =
-					    d->mid_setcreatetimestamp;
+		(void) fprintf(stdout, "  %s", d->mid_dnp->cname);
+		if (d->mid_available == MD_IM_DISK_NOT_AVAILABLE) {
+			(void) fprintf(stdout, " (UNAVAIL)");
+		}
+		if (overlap) {
+			md_im_drive_info_t	**chain;
+			/*
+			 * There is the potential for an overlap, see if
+			 * this disk is one of the overlapped disks.
+			 */
+			for (chain = &overlap_disks; *chain != NULL;
+			    chain = &(*chain)->overlap) {
+				if (strcmp(d->mid_dnp->cname,
+				    (*chain)->mid_dnp->cname) == 0) {
+					(void) fprintf(stdout, " (CONFLICT)");
+					has_overlap = 1;
 					break;
 				}
 			}
-		} else {
-			break;
 		}
+		(void) fprintf(stdout, "\n");
 	}
 
-
 	/*
-	 * Compares the set creation time from the first disk in the
-	 * diskset to the diskset creation time on all other
-	 * disks in the diskset.
-	 * If they are different then the disk probably belongs to a
-	 * different diskset so we will print out a warning.
-	 *
-	 * Looping through all drives in the diskset to print
-	 * out information about the drive.
+	 * This note explains the (UNAVAIL) that appears next to the
+	 * disks in the diskset that are not available.
 	 */
-	for (d = misp->mis_drives; d != NULL; disk_time_conflict = 0,
-	    d = d->mid_next) {
-		/*
-		 * Verify that the disk's seconds and micro-seconds fields
-		 * match the fields for the good_disk.
-		 */
-		if ((firstdisktime.tv_sec !=
-		    d->mid_setcreatetimestamp.tv_sec) ||
-		    (firstdisktime.tv_usec !=
-		    d->mid_setcreatetimestamp.tv_usec)) {
-			disk_time_conflict = 1;
-			set_contains_time_conflict = 1;
-		}
-
-		/* Printing disk names. */
-		if (disk_time_conflict == 1) {
-			/* print '*' next to conflicting disk */
-			(void) printf("%s%-*.*s *\n", indent,
-			    dlen, dlen, d->mid_dnp->cname);
-		} else {
-			(void) printf("%s%-*.*s\n", indent,
-			    dlen, dlen, d->mid_dnp->cname);
-		}
-	}
-	(void) printf("\n");
-
-	/*
-	 * This note explains the "*" that appears next to the
-	 * disks with metadbs' whose lb_inittime timestamp does not
-	 * match the rest of the diskset.
-	 */
-	if (set_contains_time_conflict) {
+	if (partial) {
 		(void) printf("%s%s\n%s%s\n\n", indent,
-		    gettext("* WARNING: This disk has been reused in "
-		    "another diskset."), indent, gettext("Import may corrupt "
+		    gettext("(UNAVAIL) WARNING: This disk is unavailable on"
+		    " this system."), indent, gettext("Import may corrupt "
 		    "data in the diskset."));
 	}
 
+	/*
+	 * This note explains the (CONFLICT) that appears next to the
+	 * disks whose lb_inittime timestamp does not
+	 * match the rest of the diskset.
+	 */
+	if (has_overlap) {
+		(void) printf("%s%s\n%s%s\n\n", indent,
+		    gettext("(CONFLICT) WARNING: This disk has been reused in "
+		    "another diskset or system configuration."), indent,
+		    gettext("Import may corrupt data in the diskset."));
+	}
 
 	/*
 	 * If the verbose flag was given on the command line,
@@ -2039,6 +2452,10 @@ report_set_info(
 		    gettext("For more information about this diskset"),
 		    indent, myname, good_disk->mid_dnp->cname);
 		}
+
+		if (meta_replica_quorum(misp) != 0)
+			no_quorum = 1;
+
 		/*
 		 * TRANSLATION_NOTE
 		 *
@@ -2047,9 +2464,15 @@ report_set_info(
 		 * (untranslatable) that the user may use to import
 		 * the specified diskset.
 		 */
-		(void) printf("%s%s:\n%s  %s -s <newsetname> %s\n", indent,
-		    gettext("To import this diskset"), indent, myname,
-		    good_disk->mid_dnp->cname);
+		if (partial || has_overlap || no_quorum) {
+			(void) printf("%s%s:\n%s  %s -f -s <newsetname> %s\n",
+			    indent, gettext("To import this diskset"), indent,
+			    myname, good_disk->mid_dnp->cname);
+		} else {
+			(void) printf("%s%s:\n%s  %s -s <newsetname> %s\n",
+			    indent, gettext("To import this diskset"), indent,
+			    myname, good_disk->mid_dnp->cname);
+		}
 	}
 	(void) printf("\n\n");
 
@@ -2063,12 +2486,12 @@ report_set_info(
  * Scans a given drive for set specific information. If the given drive
  * has a shared metadb, scans the shared metadb for information pertaining
  * to the set.
+ * If imp_flags has META_IMP_PASS1 set don't report.
  *
  * Returns:
  * 	<0 	for failure
  *	0	success but no replicas were found
  *	1	success and a replica was found
- *	ENOTSUP for partial disksets detected
  */
 int
 meta_get_and_report_set_info(
@@ -2077,6 +2500,8 @@ meta_get_and_report_set_info(
 	int			local_mb_ok,
 	uint_t			imp_flags,
 	int			*set_count,
+	int			overlap,
+	md_im_drive_info_t	*overlap_disks,
 	md_error_t 		*ep
 )
 {
@@ -2100,13 +2525,15 @@ meta_get_and_report_set_info(
 	mddrivenamelist_t	*dnlp;
 	mddrivename_t 		*dnp;
 	md_im_names_t		cnames = { 0, NULL};
-	char			*nm = NULL;
+	char			*nm = NULL, *shrnm = NULL;
 	char			*did_nm = NULL, *did_shrnm = NULL;
 	struct nm_rec		*nmp;
+	struct nm_shr_rec	*snmp;
 	struct devid_shr_rec	*did_shrnmp;
 	struct devid_min_rec	*did_nmp;
 	int			extended_namespace = 0;
 	int			replicated = 0;
+	int			partial = 0;
 	pnm_rec_t		*pnm = NULL; /* list of physical devs in set */
 	md_im_set_desc_t	*misp;
 
@@ -2198,7 +2625,18 @@ meta_get_and_report_set_info(
 	 * the locator block are invalid and we need to build a list of
 	 * replicated disks.
 	 */
-	if (replicated && !replicated_disk_list_built) {
+	if (imp_flags & META_IMP_PASS1) {
+		/*
+		 * We need to do this for both passes but
+		 * replicated_disk_list_built is global so we need some way
+		 * to determine which pass we're on. Set it to the appropriate
+		 * pass's flag.
+		 */
+		replicated_disk_list_built = &replicated_disk_list_built_pass1;
+	} else {
+		replicated_disk_list_built = &replicated_disk_list_built_pass2;
+	}
+	if (replicated && !(*replicated_disk_list_built)) {
 		/*
 		 * if there's a replicated diskset involved, we need to
 		 * scan the system one more time and build a list of all
@@ -2214,11 +2652,6 @@ meta_get_and_report_set_info(
 			goto out;
 	}
 
-	rval = build_did_list(ep, fd, mbp, lbdidp, &did_listp, replicated);
-
-	if ((rval <= 0) || (rval == ENOTSUP))
-		goto out;
-
 	/*
 	 * Until here, we've gotten away with fixed sizes for the
 	 * master block and locator block.  The locator names,
@@ -2229,6 +2662,20 @@ meta_get_and_report_set_info(
 	lnp = Zalloc(lnsize);
 
 	if ((rval = read_locator_names(ep, fd, mbp, lbp, lnp, lnsize)) <= 0)
+		goto out;
+
+	rval = build_did_list(ep, fd, mbp, lbp, lbdidp, lnp, &did_listp,
+	    replicated);
+
+	/*
+	 * An rval of ENOTSUP means we have a partial diskset. We'll want
+	 * to set the partial variable so we can pass this information
+	 * set_append_wrapper later for placing on the misp list.
+	 */
+	if (rval == ENOTSUP)
+		partial = MD_IM_PARTIAL_DISKSET;
+
+	if (rval < 0)
 		goto out;
 
 	/*
@@ -2255,6 +2702,20 @@ meta_get_and_report_set_info(
 	/*LINTED*/
 	nmp = (struct nm_rec *)(nm + sizeof (mddb_rb_t));
 	if (nmp->r_rec_hdr.r_next_recid != (mddb_recid_t)0) {
+		extended_namespace = 1;
+		rval = 0;
+		goto out;
+	}
+
+	if ((rval = read_nm_rec(ep, fd, mbp, lbp, &shrnm, MDDB_SHR_NM,
+	    rsp->cname)) < 0)
+		goto out;
+	else if (rval == 0)
+		goto append;
+
+	/*LINTED*/
+	snmp = (struct nm_shr_rec *)(shrnm + sizeof (mddb_rb_t));
+	if (snmp->sr_rec_hdr.r_next_recid != (mddb_recid_t)0) {
 		extended_namespace = 1;
 		rval = 0;
 		goto out;
@@ -2295,23 +2756,36 @@ meta_get_and_report_set_info(
 	 * are actually available. If they aren't we'll return with
 	 * an ENOTSUP error which indicates a partial diskset.
 	 */
-	rval = check_nm_disks(ep, did_nmp, did_shrnmp);
-	if ((rval < 0) || (rval == ENOTSUP))
+	rval = check_nm_disks(did_nmp, did_shrnmp);
+
+	/*
+	 * An rval of ENOTSUP means we have a partial diskset. We'll want
+	 * to set the partial variable so we can pass this information
+	 * to set_append_wrapper later for placing on the misp list.
+	 */
+	if (rval == ENOTSUP)
+		partial = MD_IM_PARTIAL_DISKSET;
+
+	if (rval < 0)
 		goto out;
 
 append:
 	/* Finally, we've got what we need to process this replica. */
 	misp = set_append(mispp, did_listp, mbp, lbp,
 	    /*LINTED*/
-	    (mddb_rb_t *)nm, &pnm, (mddb_rb_t *)did_nm, (mddb_rb_t *)did_shrnm,
-	    imp_flags, replicated, ep);
+	    (mddb_rb_t *)nm, (mddb_rb_t *)shrnm, &pnm, (mddb_rb_t *)did_nm,
+	    /*LINTED*/
+	    (mddb_rb_t *)did_shrnm, (imp_flags | partial | replicated), ep);
 
-	*set_count += 1;
-	rval = report_set_info(misp, mbp, lbp,
-		/*LINTED*/
-		(mddb_rb_t *)nm, &pnm, rsp, fd, imp_flags, *set_count, ep);
-	if (rval < 0)
-		goto out;
+	if (!(imp_flags & META_IMP_PASS1)) {
+		*set_count += 1;
+		rval = report_set_info(misp, mbp, lbp,
+		    /*LINTED*/
+		    (mddb_rb_t *)nm, &pnm, rsp, fd, imp_flags, *set_count,
+		    overlap, overlap_disks, ep);
+		if (rval < 0)
+			goto out;
+	}
 
 	/* Return the fact that we found at least one set */
 	rval = 1;
@@ -2376,48 +2850,563 @@ meta_getminor_name(
 	return (ret_minor_name);
 }
 
-static int
-meta_replica_quorum(
-	md_im_set_desc_t *misp,
-	md_error_t *ep
+/*
+ * meta_update_mb_did
+ *
+ * Update or create the master block with the new set number.
+ * If a non-null devid pointer is given, the devid in the
+ * master block will also be changed.
+ *
+ * This routine is called during the import of a diskset
+ * (meta_imp_update_mb) and during the take of a diskset that has
+ * some unresolved replicated drives (meta_unrslv_replicated_mb).
+ *
+ * Returns : nothing (void)
+ */
+static void
+meta_update_mb_did(
+	mdsetname_t	*sp,
+	mddrivename_t	*dnp,			/* raw name of drive with mb */
+	void		*new_devid,		/* devid to be stored in mb */
+	int		new_devid_len,
+	void		*old_devid,		/* old devid stored in mb */
+	int		replica_present,	/* does replica follow mb? */
+	int		offset,
+	md_error_t	*ep
 )
+{
+	int			fd;
+	struct mddb_mb		*mbp;
+	uint_t			sliceno;
+	mdname_t		*rsp;
+
+	/* determine the replica slice */
+	if (meta_replicaslice(dnp, &sliceno, ep) != 0) {
+		return;
+	}
+
+	/*
+	 * if the replica slice size is zero,
+	 * don't bother opening
+	 */
+	if (dnp->vtoc.parts[sliceno].size == 0) {
+		return;
+	}
+
+	if ((rsp = metaslicename(dnp, sliceno, ep)) == NULL) {
+		return;
+	}
+
+	if ((fd = open(rsp->rname, O_RDWR | O_NDELAY)) < 0) {
+		return;
+	}
+
+	if (lseek(fd, (off_t)dbtob(offset), SEEK_SET) < 0)
+		return;
+
+	mbp = Zalloc(DEV_BSIZE);
+	if (read(fd, mbp, DEV_BSIZE) != DEV_BSIZE) {
+		Free(mbp);
+		return;
+	}
+
+	/* If no replica on disk, check for dummy mb */
+	if (replica_present == NULL) {
+		/*
+		 * Check to see if there is a dummy there. If not
+		 * create one. This would happen if the set was
+		 * created before the master block dummy code was
+		 * implemented.
+		 */
+		if ((mbp->mb_magic != MDDB_MAGIC_DU) ||
+		    (mbp->mb_revision != MDDB_REV_MB)) {
+			meta_mkdummymaster(sp, fd, offset);
+			Free(mbp);
+			return;
+		}
+	}
+
+	mbp->mb_setno = sp->setno;
+	if (meta_gettimeofday(&mbp->mb_timestamp) == -1) {
+		Free(mbp);
+		return;
+	}
+
+	/*
+	 * If a old_devid is non-NULL then we're are dealing with a
+	 * replicated diskset and the devid needs to be updated.
+	 */
+	if (old_devid) {
+		if (mbp->mb_devid_magic == MDDB_MAGIC_DE) {
+			if (mbp->mb_devid_len)
+				(void) memset(mbp->mb_devid, 0,
+				    mbp->mb_devid_len);
+			(void) memcpy(mbp->mb_devid,
+			    (char *)new_devid, new_devid_len);
+			mbp->mb_devid_len = new_devid_len;
+		}
+	}
+
+	crcgen((uchar_t *)mbp, (uint_t *)&mbp->mb_checksum,
+	    (uint_t)DEV_BSIZE, (crc_skip_t *)NULL);
+
+	/*
+	 * Now write out the changes to disk.
+	 * If an error occurs, just continue on.
+	 * Next take of set will register this drive as
+	 * an unresolved replicated drive and will attempt
+	 * to fix the master block again.
+	 */
+	if (lseek(fd, (off_t)dbtob(offset), SEEK_SET) < 0) {
+		Free(mbp);
+		return;
+	}
+	if (write(fd, mbp, DEV_BSIZE) != DEV_BSIZE) {
+		Free(mbp);
+		return;
+	}
+
+	Free(mbp);
+	(void) close(fd);
+}
+
+
+/*
+ * meta_imp_update_mb
+ *
+ * Update the master block information during an import.
+ * Takes an import set descriptor.
+ *
+ * Returns : nothing (void)
+ */
+void
+meta_imp_update_mb(mdsetname_t *sp, md_im_set_desc_t *misp, md_error_t *ep)
 {
 	md_im_drive_info_t	*midp;
 	mddrivename_t		*dnp;
-	md_im_replica_info_t    *midr;
-	mdname_t		*np;
-	struct stat		st_buf;
-	uint_t			rep_slice;
-	int			replica_count = 0;
+	int			offset = 16; /* default mb offset is 16 */
 
-	for (midp = misp->mis_drives; midp != NULL;
-		midp = midp->mid_next) {
+	for (midp = misp->mis_drives; midp != NULL; midp = midp->mid_next) {
+		/*
+		 * If disk isn't available we can't update, so go to next
+		 */
+		if (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE) {
+			continue;
+		}
 
 		dnp = midp->mid_dnp;
 
-		if ((meta_replicaslice(dnp, &rep_slice, ep) != 0) ||
-			((np = metaslicename(dnp, rep_slice, ep))
+		if (midp->mid_replicas) {
+			md_im_replica_info_t	*mirp;
+
+			/*
+			 * If we have replicas on this disk we need to make
+			 * sure that we update the master block on every
+			 * replica on the disk.
+			 */
+			for (mirp = midp->mid_replicas; mirp != NULL;
+			    mirp = mirp->mir_next) {
+				offset = mirp->mir_offset;
+				meta_update_mb_did(sp, dnp, midp->mid_devid,
+				    midp->mid_devid_sz, midp->mid_o_devid,
+				    1, offset, ep);
+			}
+		} else {
+			/* No replicas, just update the one dummy mb */
+			meta_update_mb_did(sp, dnp, midp->mid_devid,
+			    midp->mid_devid_sz, midp->mid_o_devid,
+			    0, offset, ep);
+		}
+		if (!mdisok(ep))
+			return;
+	}
+}
+
+/*
+ * meta_unrslv_replicated_common
+ *
+ * Given a drive_desc and a drivenamelist pointer,
+ * return the devidp associated with the drive_desc,
+ * the replicated (new) devidp associated with the drive_desc
+ * and the specific mddrivename in the drivenamelist that
+ * matches the replicated (new) devidp.
+ *
+ * Typically the drivenamelist pointer would be setup by
+ * the meta_prune_cnames function.
+ *
+ * Calling function must free devidp using devid_free.
+ *
+ * Returns 0 - success, found new_devidp and dnp_new.
+ * Returns 1 - failure, didn't find new devid info
+ */
+static int
+meta_unrslv_replicated_common(
+	int			myside,
+	md_drive_desc		*dd,	/* drive list for diskset */
+	mddrivenamelist_t	*dnlp,	/* list of drives on current system */
+	ddi_devid_t		*devidp,	/* old devid */
+	ddi_devid_t		*new_devidp,	/* replicated (new) devid */
+	mddrivename_t		**dnp_new,	/* replicated drive name */
+	md_error_t		*ep
+)
+{
+	mddrivename_t		*dnp;	/* drive name of old drive */
+	mdsidenames_t		*sn = NULL;
+	uint_t			rep_slice;
+	mdname_t		*np;
+	char			*minor_name = NULL;
+	char			*devid_str = NULL;
+	size_t			len;
+	int			devid_sz;
+	mddrivenamelist_t	*dp;
+	ddi_devid_t		old_devid; /* devid of old drive */
+	ddi_devid_t		new_devid; /* devid of new replicated drive */
+	ddi_devid_t		dnp_new_devid; /* devid derived from drive */
+						/* name of replicated drive */
+
+	dnp = dd->dd_dnp;
+
+	/* Get old devid from drive record */
+	(void) devid_str_decode(dd->dd_dnp->devid,
+	    &old_devid, NULL);
+
+	/* Look up replicated (new) devid */
+	new_devid = replicated_list_lookup(
+	    devid_sizeof(old_devid), old_devid);
+
+	devid_free(old_devid);
+
+	if (new_devid == NULL)
+		return (1);
+
+	/*
+	 * Using new_devid, find a drivename entry with a matching devid.
+	 * Use the passed in dnlp since it has the new (replicated) disknames
+	 * in it.
+	 */
+	for (dp = dnlp; dp != NULL; dp = dp->next) {
+		(void) devid_str_decode(dp->drivenamep->devid,
+		    &dnp_new_devid, NULL);
+
+		if (dnp_new_devid == NULL)
+			continue;
+
+		if (devid_compare(new_devid, dnp_new_devid) == 0) {
+			devid_free(dnp_new_devid);
+			break;
+		}
+		devid_free(dnp_new_devid);
+	}
+
+	/* If can't find new name for drive - nothing to update */
+	if (dp == NULL)
+		return (1);
+
+	/*
+	 * Setup returned value to be the drivename structure associated
+	 * with new (replicated) drive.
+	 */
+	*dnp_new = dp->drivenamep;
+
+	/*
+	 * Need to return the new devid including the minor name.
+	 * Find the minor_name here using the sidename or by
+	 * looking in the namespace.
+	 */
+	for (sn = dnp->side_names; sn != NULL; sn = sn->next) {
+		if (sn->sideno == myside)
+			break;
+	}
+
+	/*
+	 * The disk has no side name information
+	 */
+	if (sn == NULL) {
+		if ((meta_replicaslice(*dnp_new, &rep_slice, ep) != 0) ||
+		    ((np = metaslicename(*dnp_new, rep_slice, ep))
 			== NULL)) {
+			mdclrerror(ep);
+			return (1);
+		}
+
+		if (np->dev == NODEV64)
+			return (1);
+
+		/*
+		 * minor_name will be NULL if dnp->devid == NULL
+		 * - see metagetvtoc()
+		 */
+		if (np->minor_name == NULL)
+			return (1);
+		else
+			minor_name = Strdup(np->minor_name);
+
+	} else {
+		minor_name = meta_getdidminorbykey(
+			    MD_LOCAL_SET, sn->sideno + SKEW,
+			    dnp->side_names_key, ep);
+		if (!mdisok(ep))
+			return (1);
+	}
+	/*
+	 * Now, use the old devid with minor name to lookup
+	 * the replicated (new) devid that will also contain
+	 * a minor name.
+	 */
+	len = strlen(dnp->devid) + strlen(minor_name) + 2;
+	devid_str = (char *)Malloc(len);
+	(void) snprintf(devid_str, len, "%s/%s", dnp->devid,
+	    minor_name);
+	(void) devid_str_decode(devid_str, devidp, NULL);
+	Free(devid_str);
+	devid_sz = devid_sizeof((ddi_devid_t)*devidp);
+	*new_devidp = replicated_list_lookup(devid_sz, *devidp);
+	return (0);
+}
+
+/*
+ * meta_unrslv_replicated_mb
+ *
+ * Update the master block information during a take.
+ * Takes an md_drive_desc descriptor.
+ *
+ * Returns : nothing (void)
+ */
+void
+meta_unrslv_replicated_mb(
+	mdsetname_t		*sp,
+	md_drive_desc		*dd,	/* drive list for diskset */
+	mddrivenamelist_t	*dnlp,	/* list of drives on current system */
+	md_error_t		*ep
+)
+{
+	md_drive_desc		*d = NULL, *d_save;
+	mddrivename_t		*dnp;	   /* dnp of old drive */
+	mddrivename_t		*dnp_new;  /* dnp of new (replicated) drive */
+	mddrivename_t		*dnp_save; /* saved copy needed to restore */
+	ddi_devid_t		devidp, new_devidp;
+	int			myside;
+
+	if ((myside = getmyside(sp, ep)) == MD_SIDEWILD)
+		return;
+
+	for (d = dd; d != NULL; d = d->dd_next) {
+		dnp = d->dd_dnp;
+		if (dnp == NULL)
+			continue;
+
+		/* If don't need to update master block - skip it. */
+		if (!(d->dd_flags & MD_DR_FIX_MB_DID))
+			continue;
+
+		/*
+		 * Get old and replicated (new) devids associated with this
+		 * drive.  Also, get the new (replicated) drivename structure.
+		 */
+		if (meta_unrslv_replicated_common(myside, d, dnlp, &devidp,
+		    &new_devidp, &dnp_new, ep) != 0) {
 			mdclrerror(ep);
 			continue;
 		}
 
-		if (stat(np->bname, &st_buf) != 0)
+		if (new_devidp) {
+			int	offset = 16; /* default mb offset is 16 */
+			int	dbcnt;
+
+			if (d->dd_dbcnt) {
+				/*
+				 * Update each master block on the disk
+				 */
+				for (dbcnt = d->dd_dbcnt; dbcnt != 0; dbcnt--) {
+					meta_update_mb_did(sp, dnp_new,
+					    new_devidp,
+					    devid_sizeof(new_devidp), devidp,
+					    1, offset, ep);
+					offset += d->dd_dbsize;
+				}
+			} else {
+				/* update the one dummy mb */
+				meta_update_mb_did(sp, dnp_new, new_devidp,
+				    devid_sizeof(new_devidp), devidp,
+				    0, offset, ep);
+			}
+			if (!mdisok(ep)) {
+				devid_free(devidp);
+				return;
+			}
+
+			/* Set drive record flags to ok */
+			/* Just update this one drive record. */
+			d_save = d->dd_next;
+			dnp_save = d->dd_dnp;
+			d->dd_next = NULL;
+			d->dd_dnp = dnp_new;
+			/* Ignore failure since no bad effect. */
+			(void) clnt_upd_dr_flags(mynode(), sp, d,
+			    MD_DR_OK, ep);
+			d->dd_next = d_save;
+			d->dd_dnp = dnp_save;
+		}
+		devid_free(devidp);
+	}
+}
+
+/*
+ * meta_update_nm_rr_did
+ *
+ * Change a devid stored in the diskset namespace and in the local set
+ * namespace with the new devid.
+ *
+ * This routine is called during the import of a diskset
+ * (meta_imp_update_nn) and during the take of a diskset that has
+ * some unresolved replicated drives (meta_unrslv_replicated_nm).
+ *
+ * Returns : nothing (void)
+ */
+static void
+meta_update_nm_rr_did(
+	mdsetname_t	*sp,
+	void		*old_devid,		/* old devid being replaced */
+	int		old_devid_sz,
+	void		*new_devid,		/* devid to be stored in nm */
+	int		new_devid_sz,
+	int		import_flag,		/* called during import? */
+	md_error_t	*ep
+)
+{
+	struct mddb_config	c;
+
+	(void) memset(&c, 0, sizeof (c));
+	c.c_setno = sp->setno;
+
+	/* During import to NOT update the local namespace. */
+	if (import_flag)
+		c.c_flags = MDDB_C_IMPORT;
+
+	c.c_locator.l_devid = (uintptr_t)Malloc(new_devid_sz);
+	(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
+	    new_devid, new_devid_sz);
+	c.c_locator.l_devid_sz = new_devid_sz;
+	c.c_locator.l_devid_flags =
+	    MDDB_DEVID_VALID | MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
+	c.c_locator.l_old_devid = (uint64_t)(uintptr_t)Malloc(old_devid_sz);
+	(void) memcpy((void *)(uintptr_t)c.c_locator.l_old_devid,
+	    old_devid, old_devid_sz);
+	c.c_locator.l_old_devid_sz = old_devid_sz;
+	if (metaioctl(MD_IOCUPDATE_NM_RR_DID, &c, &c.c_mde, NULL) != 0) {
+		(void) mdstealerror(ep, &c.c_mde);
+	}
+	Free((void *)(uintptr_t)c.c_locator.l_devid);
+	Free((void *)(uintptr_t)c.c_locator.l_old_devid);
+}
+
+/*
+ * meta_imp_update_nm
+ *
+ * Change a devid stored in the diskset namespace with the new devid.
+ * This routine is called during the import of a remotely replicated diskset.
+ *
+ * Returns : nothing (void)
+ */
+void
+meta_imp_update_nm(mdsetname_t *sp, md_im_set_desc_t *misp, md_error_t *ep)
+{
+	md_im_drive_info_t	*midp;
+
+	for (midp = misp->mis_drives; midp != NULL; midp = midp->mid_next) {
+		/*
+		 * If disk isn't available we can't update, so go to next
+		 */
+		if (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE) {
+			continue;
+		}
+
+		meta_update_nm_rr_did(sp, midp->mid_o_devid,
+		    midp->mid_o_devid_sz, midp->mid_devid,
+		    midp->mid_devid_sz, 1, ep);
+		if (!mdisok(ep))
+			return;
+	}
+}
+
+/*
+ * meta_unrslv_replicated_nm
+ *
+ * Change a devid stored in the diskset namespace and in the local set
+ * namespace with the new devid.
+ *
+ * This routine is called during the take of a diskset that has
+ * some unresolved replicated drives.
+ *
+ * Returns : nothing (void)
+ */
+void
+meta_unrslv_replicated_nm(
+	mdsetname_t		*sp,
+	md_drive_desc		*dd,	/* drive list for diskset */
+	mddrivenamelist_t	*dnlp,	/* list of drives on current system */
+	md_error_t		*ep
+)
+{
+	md_drive_desc		*d = NULL;
+	mddrivename_t		*dnp;	/* drive name of old drive */
+	mddrivename_t		*dnp_new; /* drive name of new (repl) drive */
+	ddi_devid_t		devidp, new_devidp;
+	ddi_devid_t		old_devid;
+	char			*devid_old_save;
+	mdsetname_t		*local_sp = NULL;
+	int			myside;
+
+	if ((myside = getmyside(sp, ep)) == MD_SIDEWILD)
+		return;
+
+	for (d = dd; d != NULL; d = d->dd_next) {
+		dnp = d->dd_dnp;
+		if (dnp == NULL)
 			continue;
 
+		/* If don't need to update namespace - skip it. */
+		if (!(d->dd_flags & MD_DR_FIX_LB_NM_DID))
+			continue;
+
+		/* Get old devid from drive record */
+		(void) devid_str_decode(d->dd_dnp->devid,
+		    &old_devid, NULL);
+
 		/*
-		 * The drive is okay now count its replicas
+		 * Get old and replicated (new) devids associated with this
+		 * drive.  Also, get the new (replicated) drivename structure.
 		 */
-		for (midr = midp->mid_replicas; midr != NULL;
-			midr = midr->mir_next) {
-			replica_count++;
+		if (meta_unrslv_replicated_common(myside, d, dnlp, &devidp,
+		    &new_devidp, &dnp_new, ep) != 0) {
+			mdclrerror(ep);
+			continue;
 		}
+
+		if (new_devidp) {
+			meta_update_nm_rr_did(sp, devidp,
+			    devid_sizeof(devidp), new_devidp,
+			    devid_sizeof(new_devidp), 0, ep);
+			if (!mdisok(ep)) {
+				devid_free(devidp);
+				return;
+			}
+		}
+		devid_free(devidp);
+
+		/*
+		 * Using the new devid, fix up the name.
+		 * If meta_upd_ctdnames fails, the next take will re-resolve
+		 * the name from the new devid.
+		 */
+		local_sp = metasetname(MD_LOCAL_NAME, ep);
+		devid_old_save = dnp->devid;
+		dnp->devid = dnp_new->devid;
+		(void) meta_upd_ctdnames(&local_sp, 0, (myside + SKEW),
+			dnp, NULL, ep);
+		mdclrerror(ep);
+		dnp->devid = devid_old_save;
 	}
-
-	if (replica_count < (misp->mis_active_replicas + 1)/2)
-		return (-1);
-
-	return (0);
 }
 
 static set_t
@@ -2472,9 +3461,17 @@ meta_imp_set(
 	struct mddb_config	c;
 	mdname_t		*np;
 	md_im_replica_info_t	*mirp;
-	char			setnum_link[MAXPATHLEN];
-	char			setname_link[MAXPATHLEN];
+	set_t			setno;
+	mdcinfo_t		*cinfo;
+	mdsetname_t		*sp;
+	mddrivenamelist_t	*dnlp = NULL;
+	mddrivenamelist_t	**dnlpp = &dnlp;
 	char			*minor_name = NULL;
+	int			stale_flag = 0;
+	md_set_desc		*sd;
+	int			partial_replicated_flag = 0;
+	md_error_t		xep = mdnullerror;
+	md_setkey_t		*cl_sk;
 
 	(void) memset(&c, 0, sizeof (c));
 	(void) strlcpy(c.c_setname, setname, sizeof (c.c_setname));
@@ -2493,45 +3490,99 @@ meta_imp_set(
 	/*
 	 * Find the next available set number
 	 */
-	if ((c.c_setno = meta_imp_setno(ep)) == MD_SET_BAD) {
+	if ((setno = meta_imp_setno(ep)) == MD_SET_BAD) {
 		return (mddserror(ep, MDE_DS_SETNOTIMP, MD_SET_BAD,
 		    mynode(), NULL, c.c_setname));
 	}
 
+	c.c_setno = setno;
 	if (meta_gettimeofday(&tp) == -1) {
 		return (mdsyserror(ep, errno, NULL));
 	}
 	c.c_timestamp = tp;
 
 	/* Check to see if replica quorum requirement is fulfilled */
-	if (!force && meta_replica_quorum(misp, ep) == -1)
-		return (mddserror(ep, MDE_DS_INSUFQUORUM, MD_SET_BAD,
-		    mynode(), NULL, c.c_setname));
+	if (meta_replica_quorum(misp) == -1) {
+		if (!force) {
+			return (mddserror(ep, MDE_DS_INSUFQUORUM, MD_SET_BAD,
+			    mynode(), NULL, c.c_setname));
+		} else {
+			stale_flag = MD_IMP_STALE_SET;
+			/*
+			 * If we have a stale diskset, the kernel will
+			 * delete the replicas on the unavailable disks.
+			 * To be consistent, we'll zero out the mirp on those
+			 * disks here.
+			 */
+			for (midp = misp->mis_drives; midp != NULL;
+			    midp = midp->mid_next) {
+				if (midp->mid_available ==
+				    MD_IM_DISK_NOT_AVAILABLE) {
+					midp->mid_replicas = NULL;
+				}
+			}
+		}
+	}
 
 	for (midp = misp->mis_drives; midp != NULL;
 		midp = midp->mid_next) {
-		mdcinfo_t	*cinfo;
+
+		if ((misp->mis_flags & MD_IM_SET_REPLICATED) &&
+		    (partial_replicated_flag == 0) &&
+		    (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE))
+			partial_replicated_flag = MD_SR_UNRSLV_REPLICATED;
 
 		/*
-		 * We pass down the list of the drives in the
-		 * set down to the kernel irrespective of
-		 * whether the drives have a replica or not.
-		 *
-		 * The kernel detects which of the drives don't
-		 * have a replica and accordingly does the
-		 * right thing.
+		 * We pass the list of the drives in the
+		 * set with replicas on them down to the kernel.
 		 */
 		dnp = midp->mid_dnp;
-		if ((meta_replicaslice(dnp, &rep_slice, ep) != 0) ||
-		    ((np = metaslicename(dnp, rep_slice, ep))
-		    == NULL)) {
-			mdclrerror(ep);
+		mirp = midp->mid_replicas;
+		if (!mirp) {
+			/*
+			 * No replicas on this disk, go to next disk.
+			 */
 			continue;
 		}
 
-		(void) strcpy(c.c_locator.l_devname, np->bname);
-		c.c_locator.l_dev = meta_cmpldev(np->dev);
-		c.c_locator.l_mnum = meta_getminor(np->dev);
+		if (midp->mid_available == MD_IM_DISK_NOT_AVAILABLE) {
+			/*
+			 * The disk isn't there. We'll need to get the
+			 * disk information from the midp list instead
+			 * of going and looking for it. This means it
+			 * will be information relative to the old
+			 * system.
+			 */
+			minor_name = Strdup(midp->mid_minor_name);
+			(void) strncpy(c.c_locator.l_driver,
+			    midp->mid_driver_name,
+			    sizeof (c.c_locator.l_driver));
+			(void) strcpy(c.c_locator.l_devname, midp->mid_devname);
+			c.c_locator.l_mnum = midp->mid_mnum;
+
+		} else {
+			if ((meta_replicaslice(dnp, &rep_slice, ep) != 0) ||
+			    ((np = metaslicename(dnp, rep_slice, ep))
+			    == NULL)) {
+				mdclrerror(ep);
+				continue;
+			}
+			(void) strcpy(c.c_locator.l_devname, np->bname);
+			c.c_locator.l_dev = meta_cmpldev(np->dev);
+			c.c_locator.l_mnum = meta_getminor(np->dev);
+			minor_name = meta_getminor_name(np->bname, ep);
+			if ((cinfo = metagetcinfo(np, ep)) == NULL) {
+				mdclrerror(ep);
+				continue;
+			}
+
+			if (cinfo->dname) {
+				(void) strncpy(c.c_locator.l_driver,
+				    cinfo->dname,
+				    sizeof (c.c_locator.l_driver));
+			}
+		}
+
 		c.c_locator.l_devid = (uintptr_t)Malloc(midp->mid_devid_sz);
 		(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
 		    midp->mid_devid, midp->mid_devid_sz);
@@ -2546,31 +3597,14 @@ meta_imp_set(
 			    midp->mid_o_devid, midp->mid_o_devid_sz);
 			c.c_locator.l_old_devid_sz = midp->mid_o_devid_sz;
 		}
-		minor_name = meta_getminor_name(np->bname, ep);
-		(void) strncpy(c.c_locator.l_minor_name, minor_name,
-		    sizeof (c.c_locator.l_minor_name));
-
-		if ((cinfo = metagetcinfo(np, ep)) == NULL) {
-			mdclrerror(ep);
-			continue;
+		if (minor_name) {
+			(void) strncpy(c.c_locator.l_minor_name, minor_name,
+			    sizeof (c.c_locator.l_minor_name));
 		}
-		(void) strncpy(c.c_locator.l_driver, cinfo->dname,
-		    sizeof (c.c_locator.l_driver));
-
-		mirp = midp->mid_replicas;
 
 		do {
-			if (mirp) {
-				c.c_locator.l_flags = 0;
-				c.c_locator.l_blkno = mirp->mir_offset;
-				mirp = mirp->mir_next;
-			} else {
-				/*
-				 * Default offset for dummy is 16
-				 */
-				c.c_locator.l_blkno = 16;
-			}
-
+			c.c_locator.l_flags = 0;
+			c.c_locator.l_blkno = mirp->mir_offset;
 			if (metaioctl(MD_DB_USEDEV, &c, &c.c_mde, NULL) != 0) {
 				Free((void *)(uintptr_t)c.c_locator.l_devid);
 				if (c.c_locator.l_old_devid)
@@ -2578,6 +3612,7 @@ meta_imp_set(
 					    c.c_locator.l_old_devid);
 				return (mdstealerror(ep, &c.c_mde));
 			}
+			mirp = mirp->mir_next;
 		} while (mirp != NULL);
 	}
 
@@ -2595,39 +3630,143 @@ meta_imp_set(
 	}
 
 	/*
-	 * Now kernel should have all the information
+	 * Now the kernel should have all the information
 	 * regarding the import diskset replica.
-	 * Tell kernel to load them up and import the set
+	 * Tell the kernel to load them up and import the set
 	 */
-	if (metaioctl(MD_IOCIMP_LOAD, &c.c_setno, &c.c_mde, NULL) != 0) {
+	(void) memset(&c, 0, sizeof (c));
+	c.c_flags = stale_flag;
+	c.c_setno = setno;
+	if (metaioctl(MD_IOCIMP_LOAD, &c, &c.c_mde, NULL) != 0) {
 		Free((void *)(uintptr_t)c.c_locator.l_devid);
 		if (c.c_locator.l_old_devid)
 			Free((void *)(uintptr_t)c.c_locator.l_old_devid);
 		return (mdstealerror(ep, &c.c_mde));
 	}
 
-	(void) meta_smf_enable(META_SMF_DISKSET, NULL);
-
-	/* The set has now been imported, create the appropriate symlink */
-	(void) snprintf(setname_link, MAXPATHLEN, "/dev/md/%s", setname);
-	(void) snprintf(setnum_link, MAXPATHLEN, "shared/%d", c.c_setno);
-
 	/*
-	 * Since we already verified that the setname was OK, make sure to
-	 * cleanup before proceeding.
+	 * Create a set name for the set.
 	 */
-	if (unlink(setname_link) == -1) {
-		if (errno != ENOENT)
-			(void) mdsyserror(ep, errno, setname_link);
+	sp = Zalloc(sizeof (*sp));
+	sp->setname = Strdup(setname);
+	sp->lockfd = MD_NO_LOCK;
+	sp->setno = setno;
+	sd = Zalloc(sizeof (*sd));
+	(void) strcpy(sd->sd_nodes[0], mynode());
+	sd->sd_ctime = tp;
+	sd->sd_genid = 0;
+
+
+	if (misp->mis_flags & MD_IM_SET_REPLICATED) {
+		/* Update the diskset namespace */
+		meta_imp_update_nm(sp, misp, ep);
+
+		/* Release the diskset - even if update_nm failed */
+		(void) memset(&c, 0, sizeof (c));
+		c.c_setno = setno;
+		/* Don't need device id information from this ioctl */
+		c.c_locator.l_devid = (uint64_t)0;
+		c.c_locator.l_devid_flags = 0;
+		if (metaioctl(MD_RELEASE_SET, &c, &c.c_mde, NULL) != 0) {
+			if (mdisok(ep))
+				(void) mdstealerror(ep, &c.c_mde);
+			Free(sd);
+			Free(sp);
+			return (-1);
+		}
+
+		/* If update_nm failed, then fail the import. */
+		if (!mdisok(ep)) {
+			Free(sd);
+			Free(sp);
+			return (-1);
+		}
 	}
 
-	if (symlink(setnum_link, setname_link) == -1)
-		(void) mdsyserror(ep, errno, setname_link);
+	/*
+	 * We'll need to update information in the master block due
+	 * to the set number changing and if the case of a replicated
+	 * diskset, the device id changing. May also need to create a
+	 * dummy master block if it's not there.
+	 */
+	meta_imp_update_mb(sp, misp, ep);
+	if (!mdisok(ep)) {
+		Free(sd);
+		Free(sp);
+		return (-1);
+	}
 
-	/* resnarf the set that has just been imported */
-	if (clnt_resnarf_set(mynode(), c.c_setno, ep) != 0)
-		md_eprintf("%s\n", dgettext(TEXT_DOMAIN, "Please stop and "
-		    "restart rpc.metad"));
+	/*
+	 * Create set record for diskset, but record is left in
+	 * MD_SR_ADD state until after drives are added to set.
+	 */
+	if (clnt_lock_set(mynode(), sp, ep)) {
+		Free(sd);
+		Free(sp);
+		return (-1);
+	}
+
+	if (clnt_createset(mynode(), sp, sd->sd_nodes,
+	    sd->sd_ctime, sd->sd_genid, ep)) {
+		cl_sk = cl_get_setkey(sp->setno, sp->setname);
+		(void) clnt_unlock_set(mynode(), cl_sk, &xep);
+		Free(sd);
+		Free(sp);
+		return (-1);
+	}
+
+	Free(sd);
+
+	/*
+	 * Create drive records for the disks in the set.
+	 */
+	for (midp = misp->mis_drives; midp != NULL; midp = midp->mid_next) {
+		dnp = midp->mid_dnp;
+		if (midp->mid_available & MD_IM_DISK_NOT_AVAILABLE) {
+			/*
+			 * If the disk isn't available, the dnp->devid is
+			 * no good. It is either blank for the case where
+			 * there is no disk with that devname, or it
+			 * contains the devid for the real disk in the system
+			 * with that name. The problem is, if the disk is
+			 * unavailable, then the devid should be the devid
+			 * of the missing disk. So we're faking a dnp for
+			 * the import. This is needed for creating drive
+			 * records.
+			 */
+			dnp = Zalloc(sizeof (mddrivename_t));
+			dnp->side_names_key = midp->mid_dnp->side_names_key;
+			dnp->type = midp->mid_dnp->type;
+			dnp->cname = Strdup(midp->mid_dnp->cname);
+			dnp->rname = Strdup(midp->mid_dnp->rname);
+			dnp->devid = devid_str_encode(midp->mid_devid,
+			    NULL);
+			midp->mid_dnp = dnp;
+		}
+		dnlpp = meta_drivenamelist_append_wrapper(dnlpp, dnp);
+	}
+
+	if (meta_imp_set_adddrives(sp, dnlp, misp, ep)) {
+		Free(sp);
+		return (mddserror(ep, MDE_DS_SETNOTIMP, MD_SET_BAD,
+		    mynode(), NULL, c.c_setname));
+	}
+
+	/* If drives were added without error, set set_record to OK */
+	if (clnt_upd_sr_flags(mynode(), sp,
+	    (partial_replicated_flag | MD_SR_OK | MD_SR_MB_DEVID), ep)) {
+		Free(sp);
+		return (mddserror(ep, MDE_DS_SETNOTIMP, MD_SET_BAD,
+		    mynode(), NULL, c.c_setname));
+	}
+
+	Free(sp);
+
+	cl_sk = cl_get_setkey(sp->setno, sp->setname);
+	if (clnt_unlock_set(mynode(), cl_sk, ep)) {
+		return (-1);
+	}
+	cl_set_setkey(NULL);
 
 	Free((void *)(uintptr_t)c.c_locator.l_devid);
 	if (c.c_locator.l_old_devid)

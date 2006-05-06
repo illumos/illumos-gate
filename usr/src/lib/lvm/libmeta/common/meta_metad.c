@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,6 +507,94 @@ clnt_add_drv_sidenms(
 
 	return (0);
 }
+
+/*
+ * Adding drives via metaimport to disksets. Some of the drives may
+ * not be available so we need more information than the basic clnt_adddrvs
+ * offers us.
+ */
+int
+clnt_imp_adddrvs(
+	char			*hostname,
+	mdsetname_t		*sp,
+	md_drive_desc		*dd,
+	md_timeval32_t		timestamp,
+	ulong_t			genid,
+	md_error_t		*ep
+)
+{
+	CLIENT			*clntp;
+	mdrpc_drives_2_args	v2_args;
+	mdrpc_drives_2_args_r1	*v21_args;
+	mdrpc_generic_res	res;
+	int			rval;
+	int			version;
+
+	/* initialize */
+	mdclrerror(ep);
+	(void) memset(&v2_args, 0, sizeof (v2_args));
+	(void) memset(&res, 0, sizeof (res));
+
+	/* build args */
+	v2_args.rev = MD_METAD_ARGS_REV_1;
+	v21_args = &v2_args.mdrpc_drives_2_args_u.rev1;
+	v21_args->sp = sp;
+	v21_args->cl_sk = cl_get_setkey(sp->setno, sp->setname);
+	v21_args->drivedescs = dd;
+	v21_args->timestamp = timestamp;
+	v21_args->genid = genid;
+
+	/* do it */
+	if (md_in_daemon && strcmp(mynode(), hostname) == 0) {
+		int	bool;
+
+		/*
+		 * If the server is local, we call the v1 procedure
+		 */
+		bool = mdrpc_imp_adddrvs_2(&v2_args, &res, NULL);
+		assert(bool == TRUE);
+		(void) mdstealerror(ep, &res.status);
+	} else {
+		if ((clntp = metarpcopen(hostname, CL_LONG_TMO, ep)) == NULL)
+			return (-1);
+
+		/*
+		 * Check the client handle for the version
+		 * and invoke the appropriate version of the
+		 * remote procedure
+		 */
+		CLNT_CONTROL(clntp, CLGET_VERS, (char *)&version);
+
+		/*
+		 * If the client is version 1, return error
+		 * otherwise, make the remote procedure call.
+		 */
+		if (version == METAD_VERSION) { /* version 1 */
+			(void) mddserror(ep, MDE_DS_RPCVERSMISMATCH,
+			    sp->setno, hostname, NULL, NULL);
+			metarpcclose(clntp);
+			return (-1);
+		} else {
+			rval = mdrpc_imp_adddrvs_2(&v2_args, &res, clntp);
+			if (rval != RPC_SUCCESS)
+				(void) mdrpcerror(ep, clntp, hostname,
+				    dgettext(TEXT_DOMAIN,
+				    "metad imp add drives"));
+			else
+				(void) mdstealerror(ep, &res.status);
+		}
+
+		metarpcclose(clntp);
+	}
+
+	xdr_free(xdr_mdrpc_generic_res, (char *)&res);
+
+	if (! mdisok(ep))
+		return (-1);
+
+	return (0);
+}
+
 
 /*
  * Add drives to disksets.

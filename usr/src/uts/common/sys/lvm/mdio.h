@@ -140,6 +140,11 @@ extern "C" {
 	"logging; they\n#pass data directly to the underlying device.\n"
 
 /*
+ * for importing of disksets (IMP_LOAD)
+ */
+#define	MD_IMP_STALE_SET	1
+
+/*
  * miscname stuff
  */
 
@@ -304,6 +309,7 @@ typedef struct mdnm_params {
 	ushort_t	minorname_len;	/* length of minor name */
 	uint64_t	minorname;	/* address of minor name */
 	uint_t		ref_count;	/* returned n_count */
+	int		imp_flag;	/* used by metaimport */
 } mdnm_params_t;
 
 typedef struct mdhspnm_params {
@@ -749,6 +755,8 @@ typedef struct md_regen_param {
 #define	MD_DB_LBINITTIME	(MDIOC|104) /* get the lb_inittime */
 #define	MD_IOCGET_HSP_NM	(MDIOC|105) /* get hsp entry from namespace */
 #define	MD_IOCREM_DEV		(MDIOC|106) /* remove device node for unit */
+#define	MD_IOCUPDATE_NM_RR_DID	(MDIOC|107) /* update remotely repl did in NM */
+
 
 #define	MDIOC_MISC	(MDIOC|128)	/* misc module base */
 /* Used in DEBUG_TEST code */

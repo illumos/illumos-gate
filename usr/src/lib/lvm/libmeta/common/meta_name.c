@@ -1070,7 +1070,7 @@ metafreedrivename(
 /*
  * flush the drive name cache
  */
-static void
+void
 metaflushdrivenames()
 {
 	mddrivenamelist_t	*p, *n;
@@ -2621,7 +2621,289 @@ metaname_fast(
 {
 	return (metaname_common(spp, uname, 1, uname_type, ep));
 }
+/*
+ * Get the dnp using the device id.
+ *
+ * We have the potential to have more than 1 dnp with the same disk name but
+ * have different device ids. This would happen in the case of a partial
+ * diskset. The unavailable disk name is relative to the prior host and could
+ * possibly be the same as a disk on this system. The only way to tell which
+ * dnp belongs with this disk is by searching by device id. We have the
+ * potential to have the case where 1) the disk who's device id we pass in is
+ * in the system. In this case the name and the device id are both valid for
+ * the disk. 2) The disk whose device id we've been passed is not in the
+ * system and no disk with the same name has a dnp on the list. And 3) The
+ * disk whose device id we've been passed is not on the system but there is
+ * a disk with the same name (different devid) that is on the system. Here's
+ * what we return for each of those cases:
+ * 1) If disk is in system:
+ * 	disk is found on drivelistp or we create a new drivename and it's
+ * 	fully populated as expected.
+ * 2) If disk not in system, no collision
+ *	Disk with the same devid is not found on drivelistp, we create a new
+ *	drivename structure and the dnp->devid is filled in not from getparts
+ *	but from the devidp passed in. No other disk in the system has the
+ *	same "name" or devid.
+ *	This situation would be caused by the import of a partial diskset.
+ * 3) If disk not in system, collision
+ *	Disk with the same devid is not found on the drivelistp, we create a
+ *	new drivename struct but getparts will use the information from the
+ *	name which is actually in reference to another disk of the same name
+ *	in the system. getparts will fill in the dnp->devid with the value
+ *	from the other disk and	we overwrite this with the value of this disk.
+ *	To get into this situation one of the disks is actually unavailable
+ *	as in the case of a partial import.
+ */
+mddrivename_t *
+meta_getdnp_bydevid(
+	mdsetname_t	*sp,
+	side_t		sideno,
+	ddi_devid_t	devidp,
+	mdkey_t		key,
+	md_error_t	*ep
+)
+{
+	ddi_devid_t		dnp_devidp;
+	char			*nm;
+	mddrivenamelist_t	**tail;
+	mddrivename_t		*dnp;
+	uint_t			slice;
+	mdname_t		*np;
+	char			*rname = NULL;
+	char			*dname = NULL;
+	uint_t			nparts, partno;
+	int			ret;
+	md_set_desc		*sd = NULL;
+	meta_device_type_t	uname_type = LOGICAL_DEVICE;
 
+	/* look in the cache first */
+	for (tail = &drivelistp; (*tail != NULL); tail = &(*tail)->next) {
+		dnp = (*tail)->drivenamep;
+		if (dnp->type != MDT_COMP)
+			continue;
+		ret = devid_str_decode(dnp->devid, &dnp_devidp, NULL);
+		if (ret != 0) {
+			/* unable to decode the devid */
+			return (NULL);
+		}
+		/* compare with the devid passed in. */
+		if (devid_compare(devidp, dnp_devidp) == 0) {
+			/* match! We have the same disk */
+			devid_free(dnp_devidp);
+			return (dnp);
+		}
+		devid_free(dnp_devidp);
+	}
+
+	/* drive not in the cache */
+
+	if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+		return (NULL);
+	}
+	/* get namespace info */
+	if (MD_MNSET_DESC(sd)) {
+		if ((nm = meta_getnmbykey(MD_LOCAL_SET, sideno,
+		    key, ep)) == NULL)
+			return (NULL);
+	} else {
+		if ((nm = meta_getnmbykey(MD_LOCAL_SET,
+		    sideno+SKEW, key, ep)) == NULL)
+			return (NULL);
+	}
+
+	/* get raw name (rname) of the slice and drive name (dname) */
+	if ((rname = getrawnames(&sp, nm, &dname, &uname_type, ep)) == NULL) {
+		return (NULL);
+	}
+
+	/* allocate new list element and drive */
+	*tail = Zalloc(sizeof (**tail));
+	dnp = (*tail)->drivenamep = Zalloc(sizeof (*dnp));
+	metainitdrivename(dnp);
+
+	/* get parts info */
+	/*
+	 * Note that if the disk is unavailable this name will point to
+	 * either a nonexistent disk and thus the part info and devid will
+	 * be empty or the name will point to the wrong disk and this
+	 * information will be invalid. Because of this, we overwrite the
+	 * dnp->devid with the correct one after getparts returns.
+	 */
+	if (getparts(dnp, rname, dname, uname_type, &nparts, &partno, ep) != 0)
+		goto out;
+
+	dnp->devid = devid_str_encode(devidp, NULL);
+
+	/*
+	 * libmeta needs at least V_NUMPAR partitions.
+	 * If we have an EFI partition with less than V_NUMPAR slices,
+	 * we nevertheless reserve space for V_NUMPAR
+	 */
+	if (nparts < V_NUMPAR) {
+		nparts = V_NUMPAR;
+	}
+
+	/* allocate and link in parts */
+	dnp->parts.parts_len = nparts;
+	dnp->parts.parts_val = Zalloc((sizeof (*dnp->parts.parts_val)) *
+	    dnp->parts.parts_len);
+
+	for (slice = 0; (slice < nparts); ++slice) {
+		np = &dnp->parts.parts_val[slice];
+		metainitname(np);
+		np->drivenamep = dnp;
+	}
+
+	/* setup name_t (or slice) wanted */
+	if ((np = setup_slice(sp, uname_type, dnp, nm, rname,
+	    dname, partno, ep)) == NULL)
+		goto out;
+
+	/* canonical disk name */
+	if ((dnp->cname = metadiskname(np->cname)) == NULL)
+		dnp->cname = Strdup(np->cname);
+	if ((dnp->rname = metadiskname(np->rname)) == NULL)
+		dnp->rname = Strdup(np->rname);
+
+	if (dname != NULL)
+		Free(dname);
+	Free(rname);
+	return (dnp);
+
+out:
+	if (dname != NULL)
+		Free(dname);
+
+	if (rname != NULL)
+		Free(rname);
+
+	metafreedrivename(dnp);
+	Free(dnp);
+	Free(*tail);
+	*tail = NULL;
+	return (NULL);
+}
+
+/*
+ * Search the drivename list by devid instead of name. If you don't find
+ * an entry with the same device id, create one for the uname passed in.
+ */
+mddrivename_t *
+metadrivenamebydevid(
+	mdsetname_t		**spp,
+	char			*devid,
+	char			*uname,
+	md_error_t		*ep
+)
+{
+	ddi_devid_t		dnp_devidp, in_devidp;
+	mdname_t		*np;
+	mddrivenamelist_t	**tail;
+	char			*rname = NULL;
+	mddrivename_t		*dnp;
+	char			*dname;
+	int			ret;
+	uint_t			nparts, partno;
+	uint_t			slice;
+	meta_device_type_t	uname_type = LOGICAL_DEVICE;
+
+	/* look in the cache first */
+	for (tail = &drivelistp; (*tail != NULL); tail = &(*tail)->next) {
+		dnp = (*tail)->drivenamep;
+		if (dnp->type != MDT_COMP)
+			continue;
+
+		/* decode the dnp devid */
+		ret = devid_str_decode(dnp->devid, &dnp_devidp, NULL);
+		if (ret != 0) {
+			/* unable to decode the devid */
+			return (NULL);
+		}
+		/* decode the passed in devid */
+		ret = devid_str_decode(devid, &in_devidp, NULL);
+		if (ret != 0) {
+			/* unable to decode the devid */
+			devid_free(dnp_devidp);
+			return (NULL);
+		}
+		/* compare with the devids */
+		if (devid_compare(in_devidp, dnp_devidp) == 0) {
+			/* match! We have the same disk */
+			devid_free(dnp_devidp);
+			devid_free(in_devidp);
+			return (dnp);
+		}
+	}
+	devid_free(dnp_devidp);
+	devid_free(in_devidp);
+
+	/* not in the cache */
+
+	/* get raw name (rname) of the slice and drive (dname) we have */
+	if ((rname = getrawnames(spp, uname, &dname, &uname_type,
+	    ep)) == NULL) {
+		return (NULL);
+	}
+
+	/* allocate new list element and drive */
+	*tail = Zalloc(sizeof (**tail));
+	dnp = (*tail)->drivenamep = Zalloc(sizeof (*dnp));
+
+	metainitdrivename(dnp);
+
+	/* get parts info */
+	if (getparts(dnp, rname, dname, uname_type, &nparts, &partno, ep) != 0)
+		goto out;
+
+	/*
+	 * libmeta needs at least V_NUMPAR partitions.
+	 * If we have an EFI partition with less than V_NUMPAR slices,
+	 * we nevertheless reserve space for V_NUMPAR
+	 */
+	if (nparts < V_NUMPAR) {
+		nparts = V_NUMPAR;
+	}
+
+	/* allocate and link in parts */
+	dnp->parts.parts_len = nparts;
+	dnp->parts.parts_val = Zalloc((sizeof (*dnp->parts.parts_val)) *
+	    dnp->parts.parts_len);
+	for (slice = 0; (slice < nparts); ++slice) {
+		np = &dnp->parts.parts_val[slice];
+		metainitname(np);
+		np->drivenamep = dnp;
+	}
+
+	/* setup name_t (or slice) wanted */
+	if ((np = setup_slice(*spp, uname_type, dnp, uname, rname,
+	    dname, partno, ep)) == NULL)
+		goto out;
+
+	/* canonical disk name */
+	if ((dnp->cname = metadiskname(np->cname)) == NULL)
+		dnp->cname = Strdup(np->cname);
+	if ((dnp->rname = metadiskname(np->rname)) == NULL)
+		dnp->rname = Strdup(np->rname);
+
+	/* cleanup, return success */
+	if (dname != NULL)
+		Free(dname);
+	Free(rname);
+	return (dnp);
+
+	/* cleanup, return error */
+out:
+	if (dname != NULL)
+		Free(dname);
+	if (rname != NULL)
+		Free(rname);
+
+	metafreedrivename(dnp);
+	Free(dnp);
+	Free(*tail);
+	*tail = NULL;
+	return (NULL);
+}
 /*
  * set up names for a drive
  */

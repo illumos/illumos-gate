@@ -926,7 +926,7 @@ add_hsp_name_mn_sides(
 		if (nd->nd_nodeid == curside)
 			continue;
 		if (add_name(sp, nd->nd_nodeid, key, MD_HOTSPARES,
-			minor(NODEV), hsp_name, ep) == -1) {
+			minor(NODEV), hsp_name, NULL, NULL, ep) == -1) {
 			return (-1);
 		}
 	}
@@ -964,7 +964,7 @@ add_hsp_name_trad_sides(
 			continue;
 		if (sd->sd_nodes[i][0] != '\0') {
 			if (add_name(sp, i, key, MD_HOTSPARES, minor(NODEV),
-				hsp_name, ep) == -1) {
+				hsp_name, NULL, NULL, ep) == -1) {
 				return (-1);
 			}
 		}
@@ -1014,7 +1014,7 @@ add_hsp_name(
 
 	/* First add the record for the side of the current node. */
 	key = add_name(sp, thisside, MD_KEYWILD, MD_HOTSPARES, minor(NODEV),
-		hsp_name, ep);
+		hsp_name, NULL, NULL, ep);
 	if (key == -1) {
 		goto cleanup;
 	}

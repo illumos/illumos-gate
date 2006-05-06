@@ -1,5 +1,5 @@
 %/*
-% * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % *
 % * CDDL HEADER START
@@ -964,6 +964,9 @@ program METAD {
 
 		mdrpc_generic_res
 		mdrpc_mn_sp_update_abr(mdrpc_setno_2_args) = 43;
+
+		mdrpc_generic_res
+		mdrpc_imp_adddrvs(mdrpc_drives_2_args) = 44;
 
 	} = 2;
 } = 100229;

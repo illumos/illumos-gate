@@ -881,6 +881,7 @@ extern int			mddb_validate_lb(set_t setno, int *rmaxsz);
 extern int			mddb_getinvlb_devid(set_t setno, int count,
 				    int size, char **ctdptr);
 extern int			md_update_minor(set_t, side_t, mdkey_t);
+extern int			md_update_nm_rr_did_ioctl(mddb_config_t *cp);
 extern int			md_update_top_device_minor(set_t, side_t,
 				    md_dev64_t);
 #ifdef DEBUG

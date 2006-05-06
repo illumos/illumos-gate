@@ -404,6 +404,8 @@ typedef struct md_mn_msg_tbl_entry {
 #define	TAKE_FORCE	0x0001
 #define	TAKE_USETAG	0x0002
 #define	TAKE_USEIT	0x0004
+#define	TAKE_IMP	0x0008
+#define	TAKE_RETAKE	0x0010
 
 /*
  * ignore gettext for lint so we check printf args
@@ -595,6 +597,62 @@ typedef struct md_evlist {
 
 /* end of meta event definitions ("meta_notify.h") */
 
+typedef struct md_im_names {
+	int	min_count;
+	char	**min_names;
+} md_im_names_t;
+
+/* Values for replica info status */
+#define	MD_IM_REPLICA_SCANNED	(0x01)
+#define	MD_IM_REPLICA_VALID	(0x02)
+
+typedef struct md_im_replica_info {
+	struct md_im_replica_info	*mir_next;
+	int				mir_status;
+	int				mir_flags;
+	daddr32_t			mir_offset;
+	daddr32_t			mir_length;
+	md_timeval32_t			mir_timestamp;
+} md_im_replica_info_t;
+
+typedef struct md_im_drive_info {
+	struct md_im_drive_info		*mid_next; /* next drive in this set */
+	mddrivename_t			*mid_dnp;
+	void 				*mid_devid;
+	void				*mid_o_devid;
+	int				mid_devid_sz;
+	int				mid_o_devid_sz;
+	char				mid_minor_name[MDDB_MINOR_NAME_MAX];
+	minor_t				mid_mnum;
+	int				mid_available;
+	md_timeval32_t			mid_setcreatetimestamp;
+	char				*mid_driver_name;
+	char				*mid_devname;
+	md_im_replica_info_t		*mid_replicas;
+	int				overlapped_disk;
+	struct md_im_drive_info		*overlap; /* chain of overlap disks */
+} md_im_drive_info_t;
+
+/* Values for mid_available */
+#define	MD_IM_DISK_AVAILABLE		0x00
+#define	MD_IM_DISK_NOT_AVAILABLE	0x01
+
+/* Values for set descriptor flags */
+#define	MD_IM_SET_INVALID	0x10
+#define	MD_IM_SET_REPLICATED	0x20
+
+/* Values for mis_partial */
+#define	MD_IM_COMPLETE_DISKSET	0x04
+#define	MD_IM_PARTIAL_DISKSET	0x08
+
+typedef struct md_im_set_desc {
+	struct md_im_set_desc		*mis_next;
+	int				mis_flags;
+	int				mis_oldsetno;
+	md_im_drive_info_t		*mis_drives;
+	int				mis_active_replicas;
+	int				mis_partial;
+} md_im_set_desc_t;
 
 /* meta_admin.c */
 extern	int		open_admin(md_error_t *ep);
@@ -1120,12 +1178,15 @@ extern	mdsetname_t	*metasetnosetname(set_t setno, md_error_t *ep);
 extern	mdsetname_t	*metafakesetname(set_t setno, char *sname);
 extern	md_set_desc	*metaget_setdesc(mdsetname_t *sp, md_error_t *ep);
 extern	void		metaflushsetname(mdsetname_t *sp);
+extern	void		metaflushdrivenames(void);
 extern	int		metaislocalset(mdsetname_t *sp);
 extern	int		metaissameset(mdsetname_t *sp1, mdsetname_t *sp2);
 extern	void		metaflushsidenames(mddrivename_t *dnp);
 extern	char		*metadiskname(char *name);
 extern	mddrivename_t	*metadrivename(mdsetname_t **spp, char *uname,
 			    md_error_t *ep);
+extern	mddrivename_t	*metadrivenamebydevid(mdsetname_t **spp, char *devid,
+			    char *uname, md_error_t *ep);
 extern	mdname_t	*metaslicename(mddrivename_t *dnp, uint_t sliceno,
 			    md_error_t *ep);
 extern	void		metafreedrivename(mddrivename_t *dnp);
@@ -1181,6 +1242,9 @@ extern	int		meta_get_hotspare_names(mdsetname_t *sp,
 			    mdnamelist_t **nlpp, int options, md_error_t *ep);
 extern	void		meta_create_non_dup_list(mdname_t *mdnp,
 			    mddevid_t **ldevidpp);
+extern	mddrivename_t	*meta_getdnp_bydevid(mdsetname_t *sp, side_t sideno,
+			    ddi_devid_t devidp, mdkey_t key, md_error_t *ep);
+
 
 /* meta_nameinfo.c */
 extern	mdsetname_t	*metagetset(mdname_t *np, int bypass_daemon,
@@ -1233,7 +1297,7 @@ extern	int		meta_setdid(set_t setno, side_t sideno, mdkey_t key,
 			    md_error_t *ep);
 extern	int		add_name(mdsetname_t *sp, side_t sideno, mdkey_t key,
 			    char *dname, minor_t mnum, char *bname,
-			    md_error_t *ep);
+			    char *minorname, ddi_devid_t devid, md_error_t *ep);
 extern	int		del_name(mdsetname_t *sp, side_t sideno, mdkey_t key,
 			    md_error_t *ep);
 extern	int		add_key_name(mdsetname_t *sp, mdname_t *np,
@@ -1391,6 +1455,10 @@ extern	int		meta_is_drive_in_anyset(mddrivename_t *dnp,
 extern	int		meta_is_drive_in_thisset(mdsetname_t *sp,
 			    mddrivename_t *dnp, int bypass_daemon,
 			    md_error_t *ep);
+extern	int		meta_is_devid_in_anyset(void *devid,
+			    mdsetname_t **spp, md_error_t *ep);
+extern	int		meta_is_devid_in_thisset(mdsetname_t *sp,
+			    void *devid, md_error_t *ep);
 extern	int		meta_set_balance(mdsetname_t *sp, md_error_t *ep);
 extern	int		meta_set_destroy(mdsetname_t *sp, int lock_set,
 			    md_error_t *ep);
@@ -1428,7 +1496,8 @@ extern	int		meta_devid_use(md_error_t *ep);
 
 /* meta_set_drv.c */
 extern	int		meta_make_sidenmlist(mdsetname_t *,
-			    mddrivename_t *, md_error_t *);
+			    mddrivename_t *, int imp_flag,
+			    md_im_drive_info_t *midp, md_error_t *);
 extern	int		meta_set_adddrives(mdsetname_t *sp,
 			    mddrivenamelist_t *dnlp, daddr_t dbsize,
 			    int force_label, md_error_t *ep);
@@ -1763,49 +1832,18 @@ extern	int		read_database_block(md_error_t *, int, mddb_mb_t *, int,
 			    void *, int);
 extern	daddr_t		getphysblk(mddb_block_t, mddb_mb_t *);
 
-typedef struct md_im_names {
-	int	min_count;
-	char	**min_names;
-} md_im_names_t;
+extern	md_im_drive_info_t	*pick_good_disk(md_im_set_desc_t *misp);
 
-/* Values for replica info status */
-#define	MD_IM_REPLICA_SCANNED	(0x01)
-#define	MD_IM_REPLICA_VALID	(0x02)
-
-typedef struct md_im_replica_info {
-	struct md_im_replica_info	*mir_next;
-	int				mir_status;
-	int				mir_flags;
-	daddr32_t			mir_offset;
-	daddr32_t			mir_length;
-	md_timeval32_t			mir_timestamp;
-} md_im_replica_info_t;
-
-typedef struct md_im_drive_info {
-	struct md_im_drive_info		*mid_next; /* next drive in this set */
-	mddrivename_t			*mid_dnp;
-	void 				*mid_devid;
-	void				*mid_o_devid;
-	int				mid_devid_sz;
-	int				mid_o_devid_sz;
-	char				mid_minor_name[MDDB_MINOR_NAME_MAX];
-	md_timeval32_t			mid_setcreatetimestamp;
-	char				*mid_devname;
-	md_im_replica_info_t		*mid_replicas;
-	struct md_im_drive_info		*overlap; /* chain of overlap disks */
-} md_im_drive_info_t;
-
-/* Values for set descriptor flags */
-#define	MD_IM_SET_INVALID	0x01
-#define	MD_IM_SET_REPLICATED	0x02
-
-typedef struct md_im_set_desc {
-	struct md_im_set_desc		*mis_next;
-	int				mis_flags;
-	int				mis_oldsetno;
-	md_im_drive_info_t		*mis_drives;
-	int				mis_active_replicas;
-} md_im_set_desc_t;
+extern	void		meta_unrslv_replicated_mb(mdsetname_t *sp,
+			    md_drive_desc *dd, mddrivenamelist_t *dnlp,
+			    md_error_t *ep);
+extern	void		meta_unrslv_replicated_nm(mdsetname_t *sp,
+			    md_drive_desc *dd, mddrivenamelist_t *dnlp,
+			    md_error_t *ep);
+extern  void *		replicated_list_lookup(uint_t devid_len,
+			    void *old_devid);
+extern  int		build_replicated_disks_list(md_error_t *ep,
+			    mddrivenamelist_t *dnlp);
 
 /*
  * pnm_rec is used to store the mapping from keys in the NM namespace
@@ -1831,18 +1869,29 @@ typedef struct pnm_rec {
 /* Flags for metaimport reporting */
 #define	META_IMP_REPORT		0x0001
 #define	META_IMP_VERBOSE	0x0002
+#define	META_IMP_PASS1		0x1000
 
 extern	int			meta_list_disks(md_error_t *, md_im_names_t *);
 extern	mddrivenamelist_t	*meta_prune_cnames(md_error_t *,
 				    md_im_names_t *, int);
 extern	int			meta_get_and_report_set_info(
 				    mddrivenamelist_t *, md_im_set_desc_t **,
-				    int, uint_t, int *, md_error_t *);
+				    int, uint_t, int *, int,
+				    md_im_drive_info_t *, md_error_t *);
 extern	void			free_pnm_rec_list(pnm_rec_t **);
 extern	int			meta_imp_set(md_im_set_desc_t *,
 				    char *, int, bool_t, md_error_t *);
 extern	int			meta_imp_drvused(mdsetname_t *sp,
 				    mddrivename_t *dnp, md_error_t *ep);
+extern	int			meta_replica_quorum(md_im_set_desc_t *misp);
+extern	int			meta_imp_set_adddrives(mdsetname_t *sp,
+				    mddrivenamelist_t *dnlp,
+				    md_im_set_desc_t *misp, md_error_t *ep);
+extern	void			meta_free_im_set_desc(md_im_set_desc_t *misp);
+extern	int			clnt_imp_adddrvs(char *hostname,
+				    mdsetname_t *sp, md_drive_desc *dd,
+				    md_timeval32_t timestamp,
+				    ulong_t genid, md_error_t *ep);
 
 /* Flags for direction in copy_msg_1 */
 #define	MD_MN_COPY_TO_ONDISK 0x0001
@@ -1865,9 +1914,6 @@ extern	int		meta_read_nodelist(int *nodecnt,
 extern	int		meta_write_nodelist(int nodecnt, char **nids,
 			    md_error_t *ep);
 extern	void		meta_free_nodelist(mndiskset_membershiplist_t *nl);
-
-/* Values for set descriptor flags */
-#define	MD_IM_SET_INVALID	0x01
 
 /* meta_mn_subr.c */
 /* defines for flags argument for meta_mn_send_command() */

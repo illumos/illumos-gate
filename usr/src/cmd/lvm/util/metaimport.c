@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +38,7 @@
 #include <sys/lvm/md_names.h>
 #include <sdssc.h>
 
-static md_im_drive_info_t	*overlap_disks = NULL;
+static md_im_drive_info_t	*overlap_disks;
 
 static void
 usage(mdsetname_t *sp, char *string)
@@ -79,51 +78,123 @@ print_version(mdsetname_t *sp)
 static int
 set_disk_overlap(md_im_set_desc_t *misp)
 {
-
-	md_im_set_desc_t *next, *isp = misp;
-	md_im_drive_info_t *set_dr, *next_set_dr, **chain;
-	int	is_overlap = 0;
-
+	md_im_set_desc_t	*next, *isp = misp;
+	md_im_drive_info_t	*set_dr, *next_set_dr, **chain;
+	int			is_overlap = 0;
+	md_im_drive_info_t	*good_disk = NULL;
+	md_im_drive_info_t	*d;
+	md_timeval32_t		gooddisktime;
+	int			disk_not_available = 0;
+	/*
+	 * There are 2 ways we could get an "overlap" disk.
+	 * One is if the ctd's are the same. The other is if
+	 * the setcreatetimestamp on the disk doesn't agree with the
+	 * "good" disk in the set. However, if we have a disk that is
+	 * unavailable and the other instance of the ctd is available we
+	 * really don't have a conflict. It's just that the unavailable ctd
+	 * is it's "old" location and the available instance is a current
+	 * location.
+	 */
 	for (; isp != NULL; isp = isp->mis_next) {
 	    for (next = isp->mis_next; next != NULL; next = next->mis_next) {
-
 		for (set_dr = isp->mis_drives; set_dr != NULL;
-			set_dr = set_dr->mid_next) {
-
-			for (next_set_dr = next->mis_drives;
-			    next_set_dr != NULL;
-			    next_set_dr = next_set_dr->mid_next) {
-			    if (strcmp(set_dr->mid_dnp->cname,
-				next_set_dr->mid_dnp->cname) == 0) {
+		    set_dr = set_dr->mid_next) {
+		    if (set_dr->mid_available == MD_IM_DISK_NOT_AVAILABLE)
+			disk_not_available = 1;
+		    else
+			disk_not_available = 0;
+		    for (next_set_dr = next->mis_drives; next_set_dr != NULL;
+			next_set_dr = next_set_dr->mid_next) {
+			if (disk_not_available &&
+			    (next_set_dr->mid_available
+			    == MD_IM_DISK_AVAILABLE))
+				continue;
+			else if (!disk_not_available &&
+			    (next_set_dr->mid_available ==
+			    MD_IM_DISK_NOT_AVAILABLE))
+				continue;
+			if (strcmp(set_dr->mid_dnp->cname,
+			    next_set_dr->mid_dnp->cname) == 0) {
 				/*
-				 * Chain it, skip if already there
+				 * Chain it, skip if
+				 * already there
 				 */
 				if (overlap_disks == NULL) {
 					set_dr->overlap = NULL;
+					set_dr->overlapped_disk = 1;
+					next_set_dr->overlapped_disk = 1;
 					overlap_disks = set_dr;
 				} else {
 				    for (chain = &overlap_disks;
 					*chain != NULL;
 					chain = &(*chain)->overlap) {
 					if (strcmp(set_dr->mid_dnp->cname,
-					    (*chain)->mid_dnp->cname)
-					    == 0)
+					    (*chain)->mid_dnp->cname) == 0)
 						break;
 				    }
 
 				    if (*chain == NULL) {
 					*chain = set_dr;
 					set_dr->overlap = NULL;
+					set_dr->overlapped_disk = 1;
+					next_set_dr->overlapped_disk = 1;
 				    }
 				}
 				if (!is_overlap)
 					is_overlap = 1;
-			    }
 			}
+		    }
 		}
 	    }
 	}
 
+	for (isp = misp; isp != NULL; isp = isp->mis_next) {
+		good_disk = pick_good_disk(isp);
+		if (good_disk == NULL) {
+			/* didn't find a good disk */
+			continue;
+		}
+		gooddisktime = good_disk->mid_setcreatetimestamp;
+		for (d = isp->mis_drives; d != NULL; d = d->mid_next) {
+			if (d->mid_available == MD_IM_DISK_NOT_AVAILABLE)
+				continue;
+			/*
+			 * If the disk doesn't have the same set creation
+			 * time as the designated "good disk" we have a
+			 * time conflict/overlap situation. Mark the disk
+			 * as such.
+			 */
+			if ((gooddisktime.tv_usec !=
+			    d->mid_setcreatetimestamp.tv_usec) ||
+			    (gooddisktime.tv_sec !=
+			    d->mid_setcreatetimestamp.tv_sec)) {
+				d->overlapped_disk = 1;
+				if (overlap_disks == NULL) {
+					d->overlap = NULL;
+					d->overlapped_disk = 1;
+					overlap_disks = d;
+				} else {
+					for (chain = &overlap_disks;
+					    *chain != NULL;
+					    chain = &(*chain)->overlap) {
+						if (strcmp(d->mid_dnp->cname,
+						    (*chain)->mid_dnp->cname)
+						    == 0) {
+							break;
+						}
+					}
+
+					if (*chain == NULL) {
+						*chain = d;
+						d->overlap = NULL;
+						d->overlapped_disk = 1;
+					}
+				}
+				if (!is_overlap)
+					is_overlap = 1;
+			}
+		}
+	}
 	return (is_overlap);
 }
 
@@ -155,6 +226,19 @@ report_overlap_recommendation()
 		uint_t		sliceno;
 		int		fd = -1;
 
+		/*
+		 * If the disk isn't available (i.e. powered off or dead)
+		 * we can't read the master block timestamp and thus
+		 * cannot make a recommendation as to which set it belongs to.
+		 */
+		if (d->mid_available != MD_IM_DISK_AVAILABLE) {
+			(void) fprintf(stdout, "  %s ", d->mid_dnp->cname);
+			(void) fprintf(stdout,
+			    gettext(" - no recommendation can "
+			    "be made because disk is unavailable\n"));
+			continue;
+		}
+
 		if (meta_replicaslice(d->mid_dnp, &sliceno, ep) != 0)
 			continue;
 
@@ -173,13 +257,174 @@ report_overlap_recommendation()
 		(void) close(fd);
 		fprintf(stdout, "  %s ", d->mid_dnp->cname);
 		    (void) fprintf(stdout, "%s: %s\n",
-		    gettext(" - recommend importing with set "
+		    gettext(" - must import with set "
 		    "created at "), meta_print_time((md_timeval32_t *)
 		    (&(mbp->mb_setcreatetime))));
 	}
 	Free(mbp);
 }
 
+/*
+ * is_first_disk is called to determine if the disk passed to it is
+ * eligible to be used as the "first disk time" in the set. It checks to
+ * see if the disk is available, on the skip list or not (thus already in
+ * an importable set) or being used by the system already.
+ * RETURN:
+ *	1	The time can be used as the first disk time
+ *	0	The time should not be used.
+ */
+static int
+is_first_disk(
+md_im_drive_info_t	*d,
+mddrivenamelist_t	**skiph)
+{
+	mddrivenamelist_t	*slp;
+	md_error_t		status = mdnullerror;
+	md_error_t		*ep = &status;
+	mdsetname_t		*sp = metasetname(MD_LOCAL_NAME, ep);
+
+	/*
+	 * If a disk is not available there is no
+	 * set creation timestamp available.
+	 */
+	if (d->mid_available == MD_IM_DISK_AVAILABLE) {
+		/*
+		 * We also need to make sure this disk isn't already on
+		 * the skip list.
+		 */
+		for (slp = *skiph; slp != NULL; slp = slp->next) {
+			if (d->mid_dnp == slp->drivenamep)
+				return (0);
+		}
+		/*
+		 * And we need to make sure the drive isn't
+		 * currently being used for something else
+		 * like a mounted file system or a current
+		 * metadevice or in a set.
+		 */
+		if (meta_imp_drvused(sp, d->mid_dnp, ep)) {
+			return (0);
+		}
+	} else {
+		return (0);
+	}
+	return (1);
+}
+
+/*
+ * Input a list of disks (dnlp), find the sets that are importable, create
+ * a list of these sets (mispp), and a list of the disks within each of these
+ * sets (midp). These lists (mispp and midp) will be used by metaimport.
+ */
+static int process_disks(
+	mddrivenamelist_t	*dnlp,
+	mddrivenamelist_t	**skipt,
+	md_im_set_desc_t	**mispp,
+	int			flags,
+	int			*set_count,
+	int			overlap,
+	md_error_t		*ep
+)
+{
+	mddrivenamelist_t	*dp;
+	int			rscount = 0;
+	int			hasreplica;
+	md_im_set_desc_t	*p;
+	md_im_drive_info_t	*d;
+	mddrivenamelist_t	**skiph = skipt;
+
+	/* Scan qualified disks */
+	for (dp = dnlp; dp != NULL; dp = dp->next) {
+		mddrivenamelist_t *slp;
+
+		/* is the current drive on the skip list? */
+		for (slp = *skiph; slp != NULL; slp = slp->next) {
+		    if (dp->drivenamep == slp->drivenamep)
+			    break;
+		}
+		/* drive on the skip list ? */
+		if (slp != NULL)
+			continue;
+
+		/*
+		 * In addition to updating the misp list, either verbose or
+		 * standard output will be generated.
+		 *
+		 */
+		hasreplica = meta_get_and_report_set_info(dp, mispp, 0,
+		    flags, set_count, overlap, overlap_disks, ep);
+
+		if (hasreplica < 0) {
+			mde_perror(ep, "");
+			mdclrerror(ep);
+		} else {
+
+			rscount += hasreplica;
+
+			/* Eliminate duplicate reporting */
+			if (hasreplica > 0) {
+				md_timeval32_t	firstdisktime;
+
+				/*
+				 * Go to the tail for the current set
+				 */
+				for (p = *mispp; p->mis_next != NULL;
+				    p = p->mis_next);
+
+				/*
+				 * Now look for the set creation timestamp.
+				 * If a disk is not available there is no
+				 * set creation timestamp available so look
+				 * for the first available disk to grab this
+				 * information from. We also need to make
+				 * sure this disk isn't already on the skip
+				 * list. If so go to the next available drive.
+				 * And we need to make sure the drive isn't
+				 * currently being used for something else
+				 * like a mounted file system or a current
+				 * metadevice or in a set.
+				 */
+				for (d = p->mis_drives; d != NULL;
+				    d = d->mid_next) {
+					if (is_first_disk(d, skiph)) {
+						firstdisktime =
+						    d->mid_setcreatetimestamp;
+						break;
+					}
+				}
+				for (d = p->mis_drives; d != NULL;
+				    d = d->mid_next) {
+					/*
+					 * if the mb_setcreatetime for a disk
+					 * is not the same as the first disk
+					 * in the set, don't put it on the
+					 * skip list. This disk probably
+					 * doesn't really belong in this set
+					 * and we'll want to look at it again
+					 * to figure out where it does belong.
+					 * If the disk isn't available, there's
+					 * really no point in looking at it
+					 * again so put it on the skip list.
+					 */
+					if (d->mid_available ==
+					    MD_IM_DISK_AVAILABLE) {
+						if ((d->mid_setcreatetimestamp.
+						    tv_sec != firstdisktime.
+						    tv_sec) ||
+						    (d->mid_setcreatetimestamp.
+						    tv_usec !=
+						    firstdisktime.tv_usec))
+							continue;
+					}
+					skipt =
+					    meta_drivenamelist_append_wrapper(
+						skipt, d->mid_dnp);
+				}
+			}
+		}
+	}
+	return (rscount);
+}
 
 int
 main(int argc, char *argv[])
@@ -197,18 +442,18 @@ main(int argc, char *argv[])
 	mddrivenamelist_t	*dnlp = NULL;
 	mddrivenamelist_t	*dp;
 	mddrivenamelist_t	*skiph = NULL;
-	mddrivenamelist_t	**skipt = &skiph;
 	int			rscount = 0;
-	int			hasreplica;
+	md_im_set_desc_t	*pass1_misp = NULL;
 	md_im_set_desc_t	*misp = NULL;
+	md_im_set_desc_t	**pass1_mispp = &pass1_misp;
 	md_im_set_desc_t	**mispp = &misp;
 	mhd_mhiargs_t		mhiargs = defmhiargs;
 	int			have_multiple_sets = 0;
 	int			force = 0;
 	int			overlap = 0;
-	int			partial = 0;
 	uint_t			imp_flags = 0;
 	int			set_count = 0;
+	int			no_quorum = 0;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -374,7 +619,8 @@ main(int argc, char *argv[])
 		char			*dlist;
 		int			sizecnt = 0;
 
-		sizecnt += strlen(ip->drive);
+		/* add 1 for null terminator */
+		sizecnt += strlen(ip->drive) + 1;
 		for (dp = dnlp->next; dp != NULL; dp = dp->next) {
 			sizecnt += 2; /* for the ", " */
 			sizecnt += strlen(dp->drivenamep->cname);
@@ -383,15 +629,14 @@ main(int argc, char *argv[])
 		dlist = Malloc(sizecnt);
 
 		strlcpy(dlist, ip->drive, sizecnt);
-		Free(ip->drive);
 
-		dlist += strlen(ip->drive);
+		Free(ip->drive);
 		for (dp = dnlp->next; dp != NULL; dp = dp->next) {
 			strlcat(dlist, ", ", sizecnt);
 			strlcat(dlist, dp->drivenamep->cname, sizecnt);
 		}
 
-		ip->drive = Strdup(dlist);
+		ip->drive = dlist;
 	}
 
 	/* Don't continue if we're already hosed */
@@ -406,96 +651,26 @@ main(int argc, char *argv[])
 		md_exit(sp, 0);
 	}
 
-	/* Scan qualified disks */
-	for (dp = dnlp; dp != NULL; dp = dp->next) {
-		mddrivenamelist_t *slp;
+	/*
+	 * META_IMP_PASS1 means gather the info, but don't report.
+	 */
+	(void) process_disks(dnlp, &skiph, pass1_mispp,
+	    imp_flags | META_IMP_PASS1, &set_count, overlap, ep);
 
-		/* is the current drive on the skip list? */
-		for (slp = skiph; slp != NULL; slp = slp->next) {
-		    if (dp->drivenamep == slp->drivenamep)
-			    goto skipdisk;
-		}
+	overlap_disks = NULL;
+	overlap = set_disk_overlap(pass1_misp);
+	skiph = NULL;
 
-		/*
-		 * In addition to updating the misp list, either verbose or
-		 * standard output will be generated.
-		 *
-		 */
-		hasreplica = meta_get_and_report_set_info(dp, mispp, 0,
-		    imp_flags, &set_count, ep);
-
-		/*
-		 * If current disk is part of a partial diskset,
-		 * meta_get_set_info returns an ENOTSUP for this disk.
-		 * Import of partial disksets isn't supported yet,
-		 * so do NOT put this disk onto any list being set up
-		 * by metaimport. The partial diskset error message will
-		 * only be printed once when the first partial diskset is
-		 * detected. If the user is actually trying to import the
-		 * partial diskset, print the error and exit; otherwise,
-		 * print the error and continue.
-		 */
-		if (hasreplica == ENOTSUP) {
-			if (report_only) {
-			    if (!partial) {
-				mde_perror(ep, "");
-				partial = 1;
-			    }
-			    mdclrerror(ep);
-			    goto skipdisk;
-			} else {
-			    mde_perror(ep, "");
-			    md_exit(sp, 1);
-			}
-		}
-
-		if (hasreplica < 0) {
-			mde_perror(ep, "");
-			mdclrerror(ep);
-		} else {
-			md_im_set_desc_t	*p;
-			md_im_drive_info_t	*d;
-
-			rscount += hasreplica;
-
-			/* Eliminate duplicate reporting */
-			if (hasreplica > 0) {
-				md_timeval32_t	firstdisktime;
-
-				/*
-				 * Go to the tail for the current set
-				 */
-				for (p = misp; p->mis_next != NULL;
-				    p = p->mis_next);
-				firstdisktime =
-				    p->mis_drives->mid_setcreatetimestamp;
-				for (d = p->mis_drives;
-				    d != NULL;
-				    d = d->mid_next) {
-					/*
-					 * if the mb_setcreatetime for a disk
-					 * is not the same as the first disk
-					 * in the set, don't put it on the
-					 * skip list. This disk probably
-					 * doesn't really belong in this set
-					 * and we'll want to look at it again
-					 * to figure out where it does belong.
-					 */
-					if ((d->mid_setcreatetimestamp.tv_sec !=
-					    firstdisktime.tv_sec) ||
-					    (d->mid_setcreatetimestamp.tv_usec
-					    != firstdisktime.tv_usec))
-						continue;
-					skipt =
-					    meta_drivenamelist_append_wrapper(
-						skipt, d->mid_dnp);
-				}
-			}
-		}
-
-skipdisk:
-		;
-	}
+	/*
+	 * This time call without META_IMP_PASS1 set and we gather
+	 * and report the information.
+	 * We need to do this twice because of the overlap detection.
+	 * The first pass generates a list of disks to detect overlap on.
+	 * We then do a second pass using that overlap list to generate
+	 * the report.
+	 */
+	rscount = process_disks(dnlp, &skiph, mispp, imp_flags, &set_count,
+	    overlap, ep);
 
 	/*
 	 * Now have entire list of disks associated with diskset including
@@ -508,15 +683,52 @@ skipdisk:
 		md_im_drive_info_t	*d;
 		mddrivename_t		*dnp;
 
+		if (sp == NULL) {
+			/* Get sp for local set */
+			if ((sp = metasetname(MD_LOCAL_NAME, ep)) == NULL) {
+				mde_perror(ep, "");
+				meta_free_im_set_desc(misp);
+				md_exit(sp, 1);
+			}
+		}
+
 		for (p = misp; p != NULL; p = p->mis_next) {
 			for (d = p->mis_drives; d != NULL; d = d->mid_next) {
 				dnp = d->mid_dnp;
-				if (meta_imp_drvused(sp, dnp, ep)) {
-					(void) mddserror(ep,
-						MDE_DS_DRIVEINUSE, 0, NULL,
-						dnp->cname, NULL);
-					mde_perror(ep, "");
-					md_exit(sp, 0);
+				if (d->mid_available == MD_IM_DISK_AVAILABLE) {
+					if (meta_imp_drvused(sp, dnp, ep)) {
+						(void) mddserror(ep,
+						    MDE_DS_DRIVEINUSE, 0, NULL,
+						    dnp->cname, NULL);
+						mde_perror(ep, "");
+						meta_free_im_set_desc(misp);
+						md_exit(sp, 1);
+					}
+				} else {
+					/*
+					 * If drive is unavailable, then check
+					 * that this drive hasn't already been
+					 * imported as part of another partial
+					 * diskset.  Check by devid instead of
+					 * cname since the unavailable drive
+					 * would have the cname from its
+					 * previous system and this may collide
+					 * with a valid cname on this system.
+					 * Fail if devid is found in another
+					 * set or if the routine fails.
+					 */
+					mdsetname_t	*tmp_sp = NULL;
+
+					if ((meta_is_devid_in_anyset(
+					    d->mid_devid, &tmp_sp, ep) == -1) ||
+					    (tmp_sp != NULL)) {
+						(void) mddserror(ep,
+						    MDE_DS_DRIVEINUSE, 0, NULL,
+						    dnp->cname, NULL);
+						mde_perror(ep, "");
+						meta_free_im_set_desc(misp);
+						md_exit(sp, 1);
+					}
 				}
 			}
 		}
@@ -531,9 +743,11 @@ skipdisk:
 		 * If we've found partial disksets but no complete disksets,
 		 * we don't want this to print.
 		 */
-		if (!partial) {
+		if (!misp) {
 			md_eprintf("%s\n", gettext("no unconfigured sets "
 			    "detected"));
+			meta_free_im_set_desc(misp);
+			md_exit(sp, 1);
 		}
 		md_exit(sp, 0);
 	}
@@ -566,17 +780,15 @@ skipdisk:
 			    gettext("Number of disksets eligible for import"),
 			    set_count);
 		}
+	}
+	if (overlap) {
+		report_overlap_recommendation();
+	}
 
-		overlap = set_disk_overlap(misp);
-		if (overlap) {
-			report_overlap_recommendation();
-		}
-
-		if (!report_only) {
-			md_eprintf("%s\n\n", gettext("multiple unconfigured "
-			    "sets detected.\nRerun the command with the "
-			    "suggested options for the desired set."));
-		}
+	if (have_multiple_sets && !report_only) {
+		md_eprintf("%s\n\n", gettext("multiple unconfigured "
+		    "sets detected.\nRerun the command with the "
+		    "suggested options for the desired set."));
 	}
 
 
@@ -586,8 +798,29 @@ skipdisk:
 	 */
 
 	if (report_only) {
+		meta_free_im_set_desc(misp);
 		md_exit(sp, 0);
 	} else if (have_multiple_sets) {
+		meta_free_im_set_desc(misp);
+		md_exit(sp, 1);
+	} else if (overlap) {
+		md_im_drive_info_t	*d;
+		/*
+		 * The only way we can get here is if we're doing an import
+		 * request on a set that contains at least one disk with
+		 * a time conflict. We are prohibiting the importation of
+		 * this type of set until the offending disk(s) are turned
+		 * off to prevent data corruption.
+		 */
+		printf(gettext("To import this set, "));
+		for (d = pass1_misp->mis_drives;
+		    d != NULL;
+		    d = d->mid_next) {
+			if (d->overlapped_disk)
+				printf("%s ", d->mid_dnp->cname);
+		}
+		printf(gettext("must be removed from the system\n"));
+		meta_free_im_set_desc(misp);
 		md_exit(sp, 1);
 	}
 
@@ -595,32 +828,50 @@ skipdisk:
 		usage(sp, gettext("You must specify a new set name."));
 	}
 
+	/*
+	 * The user must specify the -f (force) flag if the following
+	 * conditions exist:
+	 *		- partial diskset
+	 *		- stale diskset
+	 */
+	if (meta_replica_quorum(misp) != 0)
+		no_quorum = 1;
+	if (misp->mis_partial || no_quorum) {
+		if (!force)
+			usage(sp, gettext("You must specify the force flag"));
+	}
 	(void) meta_imp_set(misp, setname_new, force, dry_run, ep);
-
 	if (dry_run) {
+		meta_free_im_set_desc(misp);
 		md_exit(sp, 0);
 	}
 
 	if (!mdisok(ep)) {
+		meta_free_im_set_desc(misp);
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}
 
 	if ((sp = metasetname(setname_new, ep)) == NULL) {
+		meta_free_im_set_desc(misp);
 		mde_perror(ep, "");
 		md_exit(sp, 1);
 	}
 
 	if (meta_lock_nowait(sp, ep) != 0) {
+		meta_free_im_set_desc(misp);
 		mde_perror(ep, "");
 		md_exit(sp, 10);	/* special errcode */
 	}
 
-	if (meta_set_take(sp, &mhiargs, 0, 0, &status)) {
+	if (meta_set_take(sp, &mhiargs, (misp->mis_partial | TAKE_IMP),
+	    0, &status)) {
+		meta_free_im_set_desc(misp);
 		mde_perror(&status, "");
 		md_exit(sp, 1);
 	}
 
+	meta_free_im_set_desc(misp);
 	md_exit(sp, 0);
 	/*NOTREACHED*/
 	return (0);

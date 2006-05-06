@@ -1964,13 +1964,6 @@ ds_to_str(
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "multiple namespace records detected"));
 		break;
-	case MDE_DS_PARTIALSET:
-		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
-		    "partial diskset detected\n"
-		    "Please refer to the Solaris Volume Manager documentation,"
-		    "\nTroubleshooting section, at http://docs.sun.com or from"
-		    "\nyour local copy"));
-		break;
 	case MDE_DS_COMMDCTL_SUSPEND_NYD:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "rpc.mdcommd on host %s is not yet drained during "

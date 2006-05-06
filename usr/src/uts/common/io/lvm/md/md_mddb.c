@@ -113,7 +113,7 @@ extern md_ops_t		*md_opslist;
 extern md_krwlock_t	nm_lock;
 
 static int 		update_locatorblock(mddb_set_t *s, md_dev64_t dev,
-				ddi_devid_t didptr);
+				ddi_devid_t didptr, ddi_devid_t old_didptr);
 
 /*
  * Defines for crc calculation for records
@@ -1027,8 +1027,16 @@ mddb_devid_add(
 		((char *)devid_ptr)[i] = ((char *)devid)[i];
 
 	/* Update mddb_did_info area for new device id */
-	did_info->info_flags = MDDB_DID_EXISTS | MDDB_DID_VALID |
-				MDDB_DID_UPDATED;
+	did_info->info_flags = MDDB_DID_EXISTS | MDDB_DID_VALID;
+
+	/*
+	 * Only set UPDATED flag for non-replicated import cases.
+	 * This allows the side locator driver name index to get
+	 * updated in load_old_replicas.
+	 */
+	if (!(md_get_setstatus(s->s_setno) & MD_SET_REPLICATED_IMPORT))
+		did_info->info_flags |= MDDB_DID_UPDATED;
+
 	did_info->info_firstblk = blk;
 	did_info->info_blkcnt = blkcnt;
 	did_info->info_offset = offset;
@@ -1806,8 +1814,10 @@ getmasters(
 	if (crcchk(mb, &mb->mb_checksum, MDDB_BSIZE, NULL)) {
 		error = MDDB_F_EFMT | MDDB_F_EMASTER;
 	}
-	if (!(md_get_setstatus(s->s_setno) & MD_SET_IMPORT) &&
-		(mb->mb_setno != s->s_setno)) {
+
+	if (!(md_get_setstatus(s->s_setno) &
+	    (MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT)) &&
+	    (mb->mb_setno != s->s_setno)) {
 		error = MDDB_F_EFMT | MDDB_F_EMASTER;
 	}
 	if (mb->mb_blkno != blkno) {
@@ -1826,8 +1836,9 @@ getmasters(
 	 * Don't care about devid in local set since it is not used
 	 * and this should not be part of set importing
 	 */
-	if ((s->s_setno != MD_LOCAL_SET) && !(md_get_setstatus(s->s_setno) &
-		MD_SET_IMPORT)) {
+	if ((s->s_setno != MD_LOCAL_SET) &&
+	    !(md_get_setstatus(s->s_setno) &
+	    (MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT))) {
 		/*
 		 * Now check the destroy flag. We also need to handle
 		 * the case where the destroy flag is reset after the
@@ -2331,7 +2342,8 @@ getuserdata(
 	 * record, we must convert it because it was incore as a 64 bit
 	 * structure but its on disk layout has only 32 bit for block sizes
 	 */
-	if (!(md_get_setstatus(setno) & MD_SET_IMPORT) &&
+	if (!(md_get_setstatus(setno) &
+	    (MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT)) &&
 	    (type >= MDDB_FIRST_MODID) &&
 	    ((rbp->rb_revision == MDDB_REV_RB) ||
 		(rbp->rb_revision == MDDB_REV_RBFN))) {
@@ -2878,9 +2890,21 @@ match_mddb(mddb_ri_t *rip, ddi_devid_t devid, char *minor, md_dev64_t dev,
 	}
 
 	if (rip->ri_devid && devid && minor) {
-		if (ddi_devid_compare(rip->ri_devid, devid) != 0 ||
-		    strcmp(rip->ri_minor_name, minor) != 0)
-			return (0);
+		/*
+		 * If old devid exists, then this is a replicated diskset
+		 * and both old and new devids must be checked.
+		 */
+		if (rip->ri_old_devid) {
+			if (((ddi_devid_compare(rip->ri_devid, devid) != 0) &&
+			    (ddi_devid_compare(rip->ri_old_devid,
+			    devid) != 0)) ||
+			    (strcmp(rip->ri_minor_name, minor) != 0))
+				return (0);
+		} else {
+			if (ddi_devid_compare(rip->ri_devid, devid) != 0 ||
+			    strcmp(rip->ri_minor_name, minor) != 0)
+				return (0);
+		}
 	} else {
 		if (rip->ri_dev != dev)
 			return (0);
@@ -4225,7 +4249,7 @@ selectlocator(
 			if (r->ri_lbp == (mddb_lb_t *)NULL)
 				continue;
 
-			if (cmpidentifier(s, &r->ri_lbp->lb_ident))
+			if (!cmpidentifier(s, &r->ri_lbp->lb_ident))
 				continue;
 
 			if (r->ri_dtp != (mddb_dt_t *)NULL) {
@@ -4852,7 +4876,8 @@ get_mbs_n_lbs(
 		 * We don't do this check if we're in the middle of
 		 * importing a set.
 		 */
-		if (!(md_get_setstatus(s->s_setno) & MD_SET_IMPORT) &&
+		if (!(md_get_setstatus(s->s_setno) &
+		    (MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT)) &&
 		    (lbp->lb_setno != s->s_setno))
 			continue;
 
@@ -5111,26 +5136,26 @@ get_mbs_n_lbs(
 				if (!(did_info->info_flags & MDDB_DID_EXISTS))
 					continue;
 
-				if (rip->ri_old_devid == NULL)
-					continue;
-
 				if (did_icp->did_ic_devid[li] == NULL)
 					continue;
 
 				for (trip = s->s_rip; trip != NULL;
 				    trip = trip->ri_next) {
+					if (trip->ri_old_devid == NULL)
+						continue;
 					if (ddi_devid_compare(
 					    trip->ri_old_devid,
 					    did_icp->did_ic_devid[li]) != 0) {
 						continue;
 					}
 
-					/* update l_dev */
+					/* update l_dev and side mnum */
 					lp->l_dev = md_cmpldev(trip->ri_dev);
+					lbp->lb_sidelocators[0][li].l_mnum =
+					    md_getminor(trip->ri_dev);
 				}
 			}
 		}
-
 
 		/*
 		 * If there is a valid devid, verify that this locator
@@ -5162,8 +5187,9 @@ get_mbs_n_lbs(
 				if (!(did_info->info_flags & MDDB_DID_EXISTS))
 					continue;
 
-				if ((md_get_setstatus(setno) &
-				    MD_SET_REPLICATED_IMPORT)) {
+				if (((md_get_setstatus(setno) &
+				    MD_SET_REPLICATED_IMPORT)) &&
+				    (rip->ri_old_devid != (ddi_devid_t)NULL)) {
 					if (ddi_devid_compare(rip->ri_old_devid,
 					    did_icp->did_ic_devid[li]) != 0)
 					    continue;
@@ -5471,6 +5497,7 @@ load_old_replicas(
 	char		*minor_name;
 	int		write_lb = 0;
 	int		rval;
+	int		stale_rtn = 0;
 
 	/* The only error path out of get_mbs_n_lbs() is MDDB_E_TAGDATA */
 	if (retval = get_mbs_n_lbs(s, &write_lb))
@@ -5819,11 +5846,16 @@ load_old_replicas(
 
 	/* This will return non-zero if STALE or TOOFEW */
 	/* This will write out chosen replica image to all replicas */
-	if (selectreplicas(s, MDDB_SCANALL))
-		goto errout;
+	stale_rtn = selectreplicas(s, MDDB_SCANALL);
 
 	if ((md_get_setstatus(setno) & MD_SET_REPLICATED_IMPORT)) {
 		ddi_devid_t	devidptr;
+
+		/*
+		 * ignore the return value from selectreplicas because we
+		 * may have a STALE or TOOFEW set in the case of a partial
+		 * replicated diskset. We will fix that up later.
+		 */
 
 		lbp = s->s_lbp;
 		for (li = 0; li < lbp->lb_loccnt; li++) {
@@ -5842,13 +5874,17 @@ load_old_replicas(
 					}
 					if (update_locatorblock(s,
 					    md_expldev(lp->l_dev),
-					    rip->ri_devid)) {
+					    rip->ri_devid, rip->ri_old_devid)) {
 						goto errout;
 					}
 				}
 			}
 		}
+	} else {
+		if (stale_rtn)
+			goto errout;
 	}
+
 	/*
 	 * If the replica is in device id style - validate the device id's,
 	 * if present, in the locator block devid area.
@@ -7146,7 +7182,8 @@ mddb_unload_set(
 				MD_SET_OWNERSHIP | MD_SET_BADTAG |
 				MD_SET_CLRTAG | MD_SET_MNSET |
 				MD_SET_DIDCLUP | MD_SET_MNPARSE_BLK |
-				MD_SET_MN_MIR_STATE_RC);
+				MD_SET_MN_MIR_STATE_RC | MD_SET_IMPORT |
+				MD_SET_REPLICATED_IMPORT);
 
 	mutex_exit(SETMUTEX(setno));
 }
@@ -7674,6 +7711,22 @@ out:
  *		the devt to see if it matches the given devt. If so, and
  *		there is an associated device id which is not the same
  *		as the passed in devid, delete old devid and add a new one.
+ *
+ *		During import of replicated disksets, old_didptr contains
+ *		the original disk's device id.  Use this device id in
+ *		addition to the devt to determine if an entry is a match
+ *		and should be updated with the new device id of the
+ *		replicated disk.  Specifically, this is the case being handled:
+ *
+ *		Original_disk	Replicated_disk	Disk_Available_During_Import
+ *		c1t1d0		c1t3d0		no - so old name c1t1d0 shown
+ *		c1t2d0		c1t1d0		yes - name is c1t1d0
+ *		c1t3d0		c1t2d0		yes - name is c1t2d0
+ *
+ *		Can't just match on devt since devt for the first and third
+ *		disks will be the same, but the original disk's device id
+ *		is known and can be used to distinguish which disk's
+ *		replicated device id should be updated.
  *	RETURN
  *		MDDB_E_NODEVID
  *		MDDB_E_NOLOCBLK
@@ -7681,7 +7734,12 @@ out:
  *		0	Success
  */
 static int
-update_locatorblock(mddb_set_t *s, md_dev64_t dev, ddi_devid_t didptr)
+update_locatorblock(
+	mddb_set_t	*s,
+	md_dev64_t	dev,
+	ddi_devid_t	didptr,
+	ddi_devid_t	old_didptr
+)
 {
 	mddb_lb_t	*lbp = NULL;
 	mddb_locator_t	*lp;
@@ -7690,6 +7748,11 @@ update_locatorblock(mddb_set_t *s, md_dev64_t dev, ddi_devid_t didptr)
 	ddi_devid_t	devid_ptr;
 	int		retval = 0;
 	char		*minor_name;
+	int		repl_import_flag;
+
+	/* Set replicated flag if this is a replicated import */
+	repl_import_flag = md_get_setstatus(s->s_setno) &
+	    MD_SET_REPLICATED_IMPORT;
 
 	lbp = s->s_lbp;
 	/* find replicas that haven't been deleted */
@@ -7713,20 +7776,32 @@ update_locatorblock(mddb_set_t *s, md_dev64_t dev, ddi_devid_t didptr)
 			if (devid_ptr == NULL) {
 				return (MDDB_E_NODEVID);
 			}
+
+			/*
+			 * During a replicated import the old_didptr
+			 * must match the current devid before the
+			 * devid can be updated.
+			 */
+			if (repl_import_flag) {
+				if (ddi_devid_compare(devid_ptr,
+				    old_didptr) != 0)
+					continue;
+			}
+
 			if (ddi_devid_compare(devid_ptr, didptr) != 0) {
 				/*
 				 * devid's not equal so
 				 * delete and add
 				 */
 				if (ddi_lyr_get_minor_name(
-					md_dev64_to_dev(dev),
-					S_IFBLK, &minor_name) == DDI_SUCCESS) {
+				    md_dev64_to_dev(dev),
+				    S_IFBLK, &minor_name) == DDI_SUCCESS) {
 					(void) mddb_devid_delete(s, li);
 					(void) mddb_devid_add(s, li, didptr,
-								minor_name);
+					    minor_name);
 					kmem_free(minor_name,
-						    strlen(minor_name)+1);
-						break;
+					    strlen(minor_name)+1);
+					break;
 				} else {
 					retval = 1;
 					goto err_out;
@@ -7867,7 +7942,7 @@ setdid(
 		}
 	}
 
-	if (update_locatorblock(s, cp->c_devt, devidp)) {
+	if (update_locatorblock(s, cp->c_devt, devidp, NULL)) {
 		err = -1;
 		goto out;
 	}
@@ -8547,8 +8622,7 @@ mddb_configure(
 		if (cp->c_locator.l_old_devid) {
 			md_set_setstatus(setno, MD_SET_REPLICATED_IMPORT);
 		}
-		if ((err = ridev(&s->s_rip, &cp->c_locator, NULL, flag)) != 0)
-			err = mddbstatus2error(ep, err, NODEV32, setno);
+		err = ridev(&s->s_rip, &cp->c_locator, NULL, flag);
 		mddb_setexit(s);
 		break;
 
@@ -10063,6 +10137,16 @@ take_set(mddb_config_t *cp, int mode)
 		if (md_snarf_db_set(setno, ep) != 0)
 			goto out;
 		snarf_ok = 1;
+	}
+
+	/*
+	 * Clear replicated import flag since this is
+	 * used during the take of a diskset with
+	 * previously unresolved replicated disks.
+	 */
+	if (md_get_setstatus(setno) &
+	    MD_SET_REPLICATED_IMPORT) {
+		md_clr_setstatus(setno, MD_SET_REPLICATED_IMPORT);
 	}
 
 	if (! err && mdisok(ep)) {
@@ -12232,6 +12316,9 @@ update_mb(
 	int	err = 0;
 
 	for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
+		if (rip->ri_flags & MDDB_F_EMASTER)
+			/* disk is powered off or not there */
+			continue;
 
 		if (md_get_setstatus(s->s_setno) &
 			MD_SET_REPLICATED_IMPORT) {
@@ -12282,7 +12369,10 @@ update_setname(
 
 	rw_enter(&nm_lock.lock, RW_WRITER);
 	if ((nh = get_first_record(setno, 0, NM_SHARED)) == NULL) {
-		err = MD_KEYBAD;
+		/*
+		 * No namespace is okay
+		 */
+		err = 0;
 		goto out;
 	}
 
@@ -12304,13 +12394,13 @@ update_setname(
 
 	if (remove_shared_entry(nh, o_key, NULL, 0L | NM_IMP_SHARED |
 	    NM_NOCOMMIT)) {
-		err = MD_KEYBAD;
+		err = MDDB_E_NORECORD;
 		goto out;
 	}
 	if ((new_shn = (struct nm_shared_name *)alloc_entry(
 	    nh, md_set[setno].s_nmid, len, NM_SHARED |
 	    NM_NOCOMMIT, &recid)) == NULL) {
-		err = MD_KEYBAD;
+		err = MDDB_E_NORECORD;
 		goto out;
 	}
 
@@ -12332,17 +12422,26 @@ out:
 	return (err);
 }
 
+/*
+ * Returns 0 on success.
+ * Returns -1 on failure with ep filled in.
+ */
 static int
 md_imp_db(
-	set_t	setno
+	set_t		setno,
+	int		stale_flag,
+	md_error_t	*ep
 )
 {
 	mddb_set_t	*s;
 	int		err = 0;
 	mddb_dt_t	*dtp;
+	mddb_lb_t	*lbp;
+	int		i;
+	int		loccnt;
 
 	if ((s = mddb_setenter(setno, MDDB_MUSTEXIST, &err)) == NULL) {
-		return (err);
+		return (mddbstatus2error(ep, err, NODEV32, setno));
 	}
 
 	/* Update dt */
@@ -12351,6 +12450,7 @@ md_imp_db(
 	}
 
 	if ((err = dt_write(s)) != 0) {
+		err = mdsyserror(ep, err);
 		mddb_setexit(s);
 		return (err);
 	}
@@ -12362,14 +12462,36 @@ md_imp_db(
 	 */
 
 	/* Update lb */
-	if ((err = writelocall(s)) != 0) {
-		mddb_setexit(s);
-		return (err);
+	if (stale_flag & MD_IMP_STALE_SET) {
+		lbp = s->s_lbp;
+		loccnt = lbp->lb_loccnt;
+		for (i = 0; i < loccnt; i++) {
+			mddb_locator_t	*lp = &lbp->lb_locators[i];
+			md_dev64_t	ndev = md_expldev(lp->l_dev);
+			ddi_devid_t	devid_ptr;
+
+			devid_ptr = s->s_did_icp->did_ic_devid[i];
+			if (devid_ptr == NULL) {
+				/*
+				 * Already deleted, go to next one.
+				 */
+				continue;
+			}
+			if (mddb_devid_validate((ddi_devid_t)devid_ptr, &ndev,
+			    NULL)) {
+				/* disk unavailable, mark deleted */
+				lp->l_flags = MDDB_F_DELETED;
+				/* then remove the device id from the list */
+				free_mbipp(&s->s_mbiarray[i]);
+				s->s_mbiarray[i] = 0;
+				(void) mddb_devid_delete(s, i);
+			}
+		}
+		md_clr_setstatus(setno, MD_SET_STALE);
 	}
 
-
-	/* Update mb */
-	if ((err = update_mb(s)) != 0) {
+	if ((err = writelocall(s)) != 0) {
+		err = mdmddberror(ep, MDDB_E_NOTNOW, NODEV32, setno);
 		mddb_setexit(s);
 		return (err);
 	}
@@ -12377,11 +12499,13 @@ md_imp_db(
 	mddb_setexit(s);
 
 	/* Update db records */
-	if ((err = update_db_rec(s)) != 0)
-		return (err);
+	if ((err = update_db_rec(s)) != 0) {
+		return (mddbstatus2error(ep, err, NODEV32, setno));
+	}
 
 	/* Update setname embedded in the namespace */
-	err = update_setname(setno);
+	if ((err = update_setname(setno)) != 0)
+		return (mddbstatus2error(ep, err, NODEV32, setno));
 
 	return (err);
 }
@@ -12436,136 +12560,20 @@ md_setup_recids(
 	*ids = &recids[0];
 }
 
-static int
-md_imp_create_set(
-	set_t	setno
+/*
+ * The purpose of this function is to replace the old_devid with the
+ * new_devid in the given namespace.   This is used for importing
+ * remotely replicated drives.
+ */
+int
+md_update_namespace_rr_did(
+	mddb_config_t	*cp
 )
 {
-	mddb_set_t	*s;
-	int		drc = 0, err = 0;
-	size_t		sr_size = sizeof (md_set_record);
-	md_set_record	*sr;
-	mddb_recid_t	sr_recid, dr_recid, *ids = NULL;
-	mddb_ri_t	*rip, *trip;
-	md_drive_record	*dr;
-	size_t		dr_size = sizeof (md_drive_record);
-	mdkey_t		dr_key;
-	md_error_t	error = MDNULLERROR;
-
-
-	if ((s = mddb_setenter(setno, MDDB_MUSTEXIST, &err)) == NULL)
-		return (err);
-
-	/* Create and fill in set record */
-	if ((sr_recid = mddb_createrec(sr_size, MDDB_USER, MDDB_UR_SR,
-	    MD_CRO_32BIT, MD_LOCAL_SET)) < 0) {
-		mddb_setexit(s);
-		return (MDDB_E_INVALID);
-	}
-
-	sr = (md_set_record *)mddb_getrecaddr(sr_recid);
-	sr->sr_selfid = sr_recid;
-	sr->sr_setno = s->s_setno;
-	(void) strcpy(sr->sr_setname, s->s_setname);
-	uniqtime32(&sr->sr_ctime);
-	sr->sr_genid = 0;
-	sr->sr_revision = MD_SET_RECORD_REVISION;
-	sr->sr_flags |= MD_SR_OK;
-	sr->sr_mhiargs = defmhiargs;
-	(void) strcpy(sr->sr_nodes[0], utsname.nodename);
-
-	/* Create and fillin drive records */
-	for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
-		/*
-		 * Add entry and create the record
-		 */
-		if ((dr_key = md_setdevname(MD_LOCAL_SET, 1, MD_KEYWILD,
-		    rip->ri_driver, md_getminor(rip->ri_dev),
-		    rip->ri_devname, setno, &error)) == 0)
-			continue;
-
-		if (dr_key < 0) {
-			mddb_setexit(s);
-			return (MD_KEYBAD);
-		}
-
-		if ((dr_recid = mddb_createrec(dr_size, MDDB_USER,
-		    MDDB_UR_DR, MD_CRO_32BIT, MD_LOCAL_SET)) < 0) {
-			mddb_setexit(s);
-			return (MDDB_E_INVALID);
-		}
-
-		dr = (md_drive_record *)mddb_getrecaddr(dr_recid);
-		dr->dr_selfid = dr_recid;
-
-		/*
-		 * We need to check to see if the drive on
-		 * the rip has a replica. If it doesn't have
-		 * a replica, then we need to set the dr_dbcnt
-		 * and dr_dbsize to 0 to reflect that.
-		 */
-		if (rip->ri_mbip == NULL) {
-			dr->dr_dbcnt = 0;
-			dr->dr_dbsize = 0;
-		} else {
-			dr->dr_dbcnt = 1;
-
-			for (trip = s->s_rip; trip != NULL;
-			    trip = trip->ri_next) {
-
-				if (trip == rip)
-					continue;
-
-				if ((trip->ri_dev == rip->ri_dev) &&
-				    (strcmp(trip->ri_devname, rip->ri_devname)
-				    == 0))
-					dr->dr_dbcnt++;
-			}
-
-			dr->dr_dbsize = rip->ri_mbip->mbi_mddb_mb.mb_blkcnt + 1;
-		}
-		dr->dr_key = dr_key;
-		uniqtime32(&dr->dr_ctime);
-		dr->dr_genid = 1;
-		dr->dr_revision = MD_DRIVE_RECORD_REVISION;
-		dr->dr_flags = MD_SR_OK;
-		drc++;
-
-		/* Add on the linked list */
-		(void) md_dr_add(sr, dr);
-	}
-
-	/*
-	 * Alloc and setup recids which include set record
-	 */
-	(void) md_setup_recids(sr, &ids, drc + 2);
-
-	/*
-	 * Commit all the records
-	 */
-	err = mddb_commitrecs(ids);
-
-	if (ids)
-		kmem_free(ids, sizeof (mddb_recid_t) * (drc + 2));
-	mddb_setexit(s);
-	return (err);
-}
-
-/*
- * namespace is loaded before this is called.
- * The purpose of this function is to update the device ids in the entire
- * namespace using the data in the ri structure. Compare the devid found in
- * the namespace with ri_old_devid and if they are the same, update with the
- * devid in ri_devid.
- */
-static int
-md_imp_update_namespace_did(mddb_set_t *s)
-{
-	set_t			setno = s->s_lbp->lb_setno;
+	set_t			setno = cp->c_setno;
 	struct nm_next_hdr	*nh;
 	mdkey_t			key = MD_KEYWILD;
 	side_t			side = MD_SIDEWILD;
-	mddb_ri_t		*rip = NULL;
 	mddb_recid_t		recids[3];
 	struct did_min_name	*n;
 	struct nm_next_hdr	*did_shr_nh;
@@ -12578,6 +12586,13 @@ md_imp_update_namespace_did(mddb_set_t *s)
 	struct did_shr_name	*shn;
 	size_t			offset;
 	struct nm_next_hdr	*this_did_shr_nh;
+	void			*old_devid, *new_devid;
+
+	if (!(md_get_setstatus(setno) & MD_SET_NM_LOADED))
+		return (EIO);
+
+	old_devid = (void *)(uintptr_t)cp->c_locator.l_old_devid;
+	new_devid = (void *)(uintptr_t)cp->c_locator.l_devid;
 
 	/*
 	 * It is okay if we dont have any configuration
@@ -12591,7 +12606,7 @@ md_imp_update_namespace_did(mddb_set_t *s)
 		/* check out every entry in the namespace */
 		if ((n = (struct did_min_name *)lookup_entry(nh, setno,
 		    side, key, NODEV64, NM_DEVID)) == NULL) {
-			break;
+			continue;
 		} else {
 			did_shr_nh = get_first_record(setno, 0, NM_DEVID |
 			    NM_SHARED);
@@ -12608,39 +12623,37 @@ md_imp_update_namespace_did(mddb_set_t *s)
 			rw_enter(&nm_lock.lock, RW_WRITER);
 			devid = (ddi_devid_t)shr_n->did_devid;
 			/* find this devid in the incore replica  */
-			for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
-				if (ddi_devid_compare(devid, rip->ri_old_devid)
-				    == 0) {
-					/*
-					 * found the corresponding entry
-					 * update with new devid
-					 */
-					/* first remove old devid info */
-					ent_did_key = shr_n ->did_key;
-					ent_did_count = shr_n->did_count;
-					ent_did_data = shr_n->did_data;
-					ent_size = DID_SHR_NAMSIZ(shr_n);
-					size = ((struct nm_rec_hdr *)
-					    this_did_shr_nh->nmn_record)->
-					    r_used_size - offset - ent_size;
-					if (size == 0) {
-						(void) bzero(shr_n, ent_size);
-					} else {
-						(void) ovbcopy((caddr_t)shr_n +
-						    ent_size, shr_n, size);
-						(void) bzero((caddr_t)shr_n +
-						    size, ent_size);
-					}
-					((struct nm_rec_hdr *)this_did_shr_nh->
-					    nmn_record)->r_used_size -=
-					    ent_size;
-					/* add in new devid info */
-					if ((shn = (struct did_shr_name *)
-					    alloc_entry(did_shr_nh,
-					    md_set[setno].s_did_nmid,
-					    ddi_devid_sizeof(rip->ri_devid),
-					    NM_DEVID | NM_SHARED | NM_NOCOMMIT,
-					    &recids[0])) == NULL) {
+			if (ddi_devid_compare(devid, old_devid) == 0) {
+				/*
+				 * found the corresponding entry
+				 * update with new devid
+				 */
+				/* first remove old devid info */
+				ent_did_key = shr_n ->did_key;
+				ent_did_count = shr_n->did_count;
+				ent_did_data = shr_n->did_data;
+				ent_size = DID_SHR_NAMSIZ(shr_n);
+				size = ((struct nm_rec_hdr *)
+				    this_did_shr_nh->nmn_record)->
+				    r_used_size - offset - ent_size;
+				if (size == 0) {
+					(void) bzero(shr_n, ent_size);
+				} else {
+					(void) ovbcopy((caddr_t)shr_n +
+					    ent_size, shr_n, size);
+					(void) bzero((caddr_t)shr_n +
+					    size, ent_size);
+				}
+				((struct nm_rec_hdr *)this_did_shr_nh->
+				    nmn_record)->r_used_size -=
+				    ent_size;
+				/* add in new devid info */
+				if ((shn = (struct did_shr_name *)
+				    alloc_entry(did_shr_nh,
+				    md_set[setno].s_did_nmid,
+				    cp->c_locator.l_devid_sz,
+				    NM_DEVID | NM_SHARED | NM_NOCOMMIT,
+				    &recids[0])) == NULL) {
 						rw_exit(&nm_lock.lock);
 						return (ENOMEM);
 					}
@@ -12649,34 +12662,74 @@ md_imp_update_namespace_did(mddb_set_t *s)
 					ent_did_data |= NM_DEVID_VALID;
 					shn->did_data = ent_did_data;
 					shn->did_size = ddi_devid_sizeof(
-					    rip->ri_devid);
-					bcopy((void *)rip->ri_devid, (void *)
+					    new_devid);
+					bcopy((void *)new_devid, (void *)
 					    shn->did_devid, shn->did_size);
 					recids[1] = md_set[setno].s_nmid;
 					recids[2] = 0;
 					mddb_commitrecs_wrapper(recids);
-				}
 			}
 			rw_exit(&nm_lock.lock);
 		}
 	}
+
 	return (0);
+}
+
+/*
+ * namespace is loaded before this is called.
+ * This function is a wrapper for md_update_namespace_rr_did.
+ *
+ * md_update_namespace_rr_did may be called twice if attempting to
+ * resolve a replicated device id during the take of a diskset - once
+ * for the diskset namespace and a second time for the local namespace.
+ * The local namespace would need to be updated when a drive has been
+ * found during a take of the diskset that hadn't been resolved during
+ * the import (aka partial replicated import).
+ *
+ * If being called during the import of the diskset (IMPORT flag set)
+ * md_update_namespace_rr_did will only be called once with the disket
+ * namespace.
+ */
+int
+md_update_nm_rr_did_ioctl(
+	mddb_config_t	*cp
+)
+{
+	int	rval = 0;
+
+	/* If update of diskset namespace fails, stop and return failure */
+	if ((rval = md_update_namespace_rr_did(cp)) != 0)
+		return (rval);
+
+	if (cp->c_flags & MDDB_C_IMPORT)
+		return (0);
+
+	/* If update of local namespace fails, return failure */
+	cp->c_setno = MD_LOCAL_SET;
+	rval = md_update_namespace_rr_did(cp);
+	return (rval);
 }
 
 /*ARGSUSED*/
 int
 md_imp_snarf_set(
-	set_t	*setnum,
-	int	mode
+	mddb_config_t	*cp
 )
 {
-	set_t		setno = *setnum; /* import setno */
+	set_t		setno;
+	int		stale_flag;
 	mddb_set_t	*s;
 	int		i, err = 0;
 	md_ops_t	*ops;
+	md_error_t	*ep = &cp->c_mde;
 
+	setno = cp->c_setno;
+	stale_flag = cp->c_flags;
+
+	mdclrerror(ep);
 	if (setno >= md_nsets) {
-		return (EINVAL);
+		return (mdsyserror(ep, EINVAL));
 	}
 
 	md_haltsnarf_enter(setno);
@@ -12688,6 +12741,7 @@ md_imp_snarf_set(
 	md_set_setstatus(setno, MD_SET_IMPORT);
 
 	if ((s = mddb_setenter(setno, MDDB_MUSTEXIST, &err)) == NULL) {
+		err = mddbstatus2error(ep, err, NODEV32, setno);
 		goto out;
 	}
 
@@ -12708,12 +12762,12 @@ md_imp_snarf_set(
 	 * and ask each module to fixup unit records
 	 */
 	if (!md_load_namespace(setno, NULL, NM_DEVID)) {
-		err = ENOENT;
+		err = mdsyserror(ep, ENOENT);
 		goto cleanup;
 	}
 	if (!md_load_namespace(setno, NULL, 0L)) {
 		(void) md_unload_namespace(setno, NM_DEVID);
-		err = ENOENT;
+		err = mdsyserror(ep, ENOENT);
 		goto cleanup;
 	}
 
@@ -12732,22 +12786,17 @@ md_imp_snarf_set(
 	 *	(4) directory block
 	 * calls appropriate writes to push changes out
 	 */
-	if ((err = md_imp_db(setno)) != 0)
+	if ((err = md_imp_db(setno, stale_flag, ep)) != 0) {
 		goto cleanup;
+	}
 
 	/*
-	 * Create set in MD_LOCAL_SET
+	 * Don't unload namespace if importing a replicated diskset.
+	 * Namespace will be unloaded with an explicit RELEASE_SET ioctl.
 	 */
-	if ((err = md_imp_create_set(setno)) != 0)
-		goto cleanup;
-
-	/*
-	 * update the namespace device ids if necessary (ie. block copy disk)
-	 */
-	if ((md_get_setstatus(s->s_setno) & MD_SET_REPLICATED_IMPORT)) {
-		if ((err = md_imp_update_namespace_did(s)) != 0) {
-			goto cleanup;
-		}
+	if (md_get_setstatus(s->s_setno) & MD_SET_REPLICATED_IMPORT) {
+		md_haltsnarf_exit(setno);
+		return (err);
 	}
 
 cleanup:

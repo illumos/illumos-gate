@@ -1471,7 +1471,7 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		 */
 		for (i = 0; i < nm.ref_count; i++) {
 			if (add_name(sp, d->msg_sideno, nm.key, dname, mnum,
-			    cname, &ep) == -1) {
+			    cname, NULL, NULL, &ep) == -1) {
 				(void) mdstealerror(&(resp->mmr_ep), &ep);
 				Free(cname);
 				Free(dname);

@@ -1726,14 +1726,17 @@ zero_data_ptrs(struct nm_next_hdr *nh, set_t setno)
  */
 mdkey_t
 md_setdevname(
-	set_t	setno,		/* specify which namespace to put in */
-	side_t	side,		/* (key 1) side # */
-	mdkey_t	key,		/* (key 2) KEYWILD - alloc key, else use key */
-	char	*drvnm,		/* store this driver name with devicename */
-	minor_t	mnum,		/* store this minor number as well */
-	char	*devname,	/* device name to be stored */
-	set_t	imp_setno,	/* used exclusively by import */
-	md_error_t *ep		/* place to return error info */
+	set_t		setno,	/* specify which namespace to put in */
+	side_t		side,	/* (key 1) side # */
+	mdkey_t		key,	/* (key 2) KEYWILD - alloc key, else use key */
+	char		*drvnm,	/* store this driver name with devicename */
+	minor_t		mnum,	/* store this minor number as well */
+	char		*devname,	/* device name to be stored */
+	int		imp_flag,	/* used exclusively by import */
+	ddi_devid_t	imp_devid,	/* used exclusively by import */
+	char		*imp_mname,	/* used exclusively by import */
+	set_t		imp_setno,	/* used exclusively by import */
+	md_error_t	*ep		/* place to return error info */
 )
 {
 	struct nm_next_hdr	*nh, *did_nh = NULL;
@@ -1819,18 +1822,26 @@ md_setdevname(
 	 * of the side information is taken here because it is dealt
 	 * with later on.
 	 */
-	devt = makedevice(ddi_name_to_major(drvnm), mnum);
-	if ((ddi_lyr_get_devid(devt, &devid) == DDI_SUCCESS) &&
-	    (ddi_lyr_get_minor_name(devt, S_IFBLK, &mname) ==
-	    DDI_SUCCESS) &&
-	    (((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags &
-	    MDDB_DEVID_STYLE))
-		/*
-		 * Reference the device id namespace
-		 */
+	if (!imp_flag) {
+		devt = makedevice(ddi_name_to_major(drvnm), mnum);
+		if ((ddi_lyr_get_devid(devt, &devid) == DDI_SUCCESS) &&
+		    (ddi_lyr_get_minor_name(devt, S_IFBLK, &mname) ==
+		    DDI_SUCCESS) &&
+		    (((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags &
+		    MDDB_DEVID_STYLE))
+			/*
+			 * Reference the device id namespace
+			 */
+			shared = NM_DEVID | NM_NOTSHARED;
+		else
+			shared = NM_NOTSHARED;
+	} else {
+		/* Importing diskset has devids so store in namespace */
+		devid = kmem_alloc(ddi_devid_sizeof(imp_devid), KM_SLEEP);
+		bcopy(imp_devid, devid, ddi_devid_sizeof(imp_devid));
+		mname = md_strdup(imp_mname);
 		shared = NM_DEVID | NM_NOTSHARED;
-	else
-		shared = NM_NOTSHARED;
+	}
 
 	/*
 	 * Always lookup the primary name space
@@ -1873,6 +1884,41 @@ md_setdevname(
 	 */
 	lookup_res = lookup_deventry(nh, setno, side, key, drvnm, mnum, dname,
 		fname, &n);
+
+	/* If we are importing the set */
+	if (imp_flag && (lookup_res == LOOKUP_DEV_FOUND)) {
+		ushort_t	did_sz;
+		ddi_devid_t	did;
+
+		/*
+		 * We need to check for the case where there is a disk
+		 * already in the namespace with a different ID from
+		 * the one we want to add, but the same name. This is
+		 * possible in the case of an unavailable disk.
+		 */
+		rw_exit(&nm_lock.lock);
+		if (md_getdevid(setno, side, n->n_key, NULL, &did_sz) != 0)
+			did_sz = 0;
+		rw_enter(&nm_lock.lock, RW_WRITER);
+		if (did_sz > 0) {
+			did = kmem_zalloc(did_sz, KM_SLEEP);
+			rw_exit(&nm_lock.lock);
+			(void) md_getdevid(setno, side, n->n_key, did, &did_sz);
+			rw_enter(&nm_lock.lock, RW_WRITER);
+			if (ddi_devid_compare(did, devid) == 0) {
+				kmem_free(did, did_sz);
+				retval = 0;
+				goto out;
+			}
+			kmem_free(did, did_sz);
+		}
+		/*
+		 * This is not the same disk so we haven't really found it.
+		 * Thus, we need to say it's "NOMATCH" and create a new
+		 * entry.
+		 */
+		lookup_res = LOOKUP_DEV_NOMATCH;
+	}
 	switch (lookup_res) {
 	case LOOKUP_DEV_FOUND:
 		/* If we are importing the set */
@@ -2079,8 +2125,9 @@ add_devid:
 		}
 	}
 out:
-	if (devid)
+	if (devid) {
 		ddi_devid_free(devid);
+	}
 	if (dname)
 		freestr(dname);
 	if (mname)

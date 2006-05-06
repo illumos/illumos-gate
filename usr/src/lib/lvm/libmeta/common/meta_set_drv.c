@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,39 +127,63 @@ metaget_drivedesc_fromdrivelist(
 
 int
 meta_make_sidenmlist(
-	mdsetname_t	*sp,
-	mddrivename_t	*dnp,
-	md_error_t	*ep
+	mdsetname_t		*sp,
+	mddrivename_t		*dnp,
+	int			import_flag, /* flags partial import */
+	md_im_drive_info_t	*midp,	/* import drive information */
+	md_error_t		*ep
 )
 {
-	mdsidenames_t	*sn, **sn_next;
-	mdname_t	*np;
-	int		done;
-	side_t		sideno = MD_SIDEWILD;
-	uint_t		rep_slice;
+	mdsidenames_t		*sn, **sn_next;
+	mdname_t		*np;
+	int			done;
+	side_t			sideno = MD_SIDEWILD;
+	uint_t			rep_slice;
+	char			*bname;
 
-	if (meta_replicaslice(dnp, &rep_slice, ep) != 0)
-		return (-1);
+	if (!import_flag) {
+		/*
+		 * Normal (aka NOT partial import) code path.
+		 */
+		if (meta_replicaslice(dnp, &rep_slice, ep) != 0) {
+			return (-1);
+		}
 
-	dnp->side_names_key = MD_KEYWILD;
+		dnp->side_names_key = MD_KEYWILD;
 
-	if ((np = metaslicename(dnp, rep_slice, ep)) == NULL)
-		return (-1);
-
+		if ((np = metaslicename(dnp, rep_slice, ep)) == NULL)
+			return (-1);
+		bname = Strdup(np->bname);
+	} else {
+		/*
+		 * When doing a partial import, we'll get the needed
+		 * information from somewhere other than the system.
+		 */
+		dnp->side_names_key = MD_KEYWILD;
+		bname = Strdup(midp->mid_devname);
+	}
 	metaflushsidenames(dnp);
 	sn_next = &dnp->side_names;
 	/*CONSTCOND*/
 	while (1) {
 		sn = Zalloc(sizeof (*sn));
 
-		if ((done = meta_getnextside_devinfo(sp, np->bname,
-		    &sideno, &sn->cname, &sn->dname, &sn->mnum, ep)) == -1) {
-			Free(sn);
-			return (-1);
+		if ((done = meta_getnextside_devinfo(sp, bname, &sideno,
+		    &sn->cname, &sn->dname, &sn->mnum, ep)) == -1) {
+			if (import_flag) {
+				mdclrerror(ep);
+				sn->dname = Strdup(midp->mid_driver_name);
+				sn->mnum = midp->mid_mnum;
+			} else {
+				Free(sn);
+				Free(bname);
+				return (-1);
+			}
 		}
 
 		if (done == 0) {
 			Free(sn);
+			Free(bname);
 			return (0);
 		}
 
@@ -312,18 +335,17 @@ meta_set_adddrives(
 	 */
 	for (p = dnlp; p != NULL; p = p->next) {
 		if (meta_repartition_drive(sp,
-		    p->drivenamep,
-		    force_label == TRUE ? MD_REPART_FORCE : 0,
+		    p->drivenamep, force_label == TRUE ? MD_REPART_FORCE : 0,
 		    NULL, /* Don't return the VTOC. */
 		    ep) != 0) {
 			rval = -1;
 			goto out;
 		}
-
 		/*
 		 * Create the names for the drives we are adding per side.
 		 */
-		if (meta_make_sidenmlist(sp, p->drivenamep, ep) == -1) {
+		if (meta_make_sidenmlist(sp, p->drivenamep, 0, NULL,
+		    ep) == -1) {
 			rval = -1;
 			goto out;
 		}
@@ -364,7 +386,6 @@ meta_set_adddrives(
 			(void) close(fd);
 		}
 	}
-
 	/*
 	 * Get the set timeout information.
 	 */
@@ -933,6 +954,192 @@ rollback:
 		if (!(MD_MNSET_DESC(sd))) {
 			md_rb_sig_handling_off(md_got_sig(), md_which_sig());
 		}
+	}
+
+	return (rval);
+}
+
+/*
+ * Add drives routine used during import of a diskset.
+ */
+int
+meta_imp_set_adddrives(
+	mdsetname_t		*sp,
+	mddrivenamelist_t	*dnlp,
+	md_im_set_desc_t	*misp,
+	md_error_t		*ep
+)
+{
+	md_set_desc		*sd;
+	mddrivenamelist_t	*p;
+	md_drive_desc		*dd = NULL, *ddp;
+	int			flush_set_onerr = 0;
+	md_timeval32_t		now;
+	ulong_t			genid;
+	mhd_mhiargs_t		mhiargs;
+	md_im_replica_info_t	*mirp;
+	md_im_drive_info_t	*midp;
+	int			rval = 0;
+	sigset_t		oldsigs;
+	ulong_t			max_genid = 0;
+	int			rb_level = 0;
+	md_error_t		xep = mdnullerror;
+
+	if ((sd = metaget_setdesc(sp, ep)) == NULL)
+		return (-1);
+
+	for (p = dnlp; p != NULL; p = p->next) {
+		int		imp_flag = 0;
+
+		/*
+		 * If we have a partial diskset, meta_make_sidenmlist will
+		 * need information from midp to complete making the
+		 * side name structure.
+		 */
+		if (misp->mis_partial) {
+			imp_flag = MDDB_C_IMPORT;
+			for (midp = misp->mis_drives; midp != NULL;
+			    midp = midp->mid_next) {
+				if (midp->mid_dnp == p->drivenamep)
+					break;
+			}
+			if (midp == NULL) {
+				(void) mddserror(ep, MDE_DS_SETNOTIMP,
+				    MD_SET_BAD, mynode(), NULL, sp->setname);
+				rval = -1;
+				goto out;
+			}
+		}
+		/*
+		 * Create the names for the drives we are adding per side.
+		 */
+		if (meta_make_sidenmlist(sp, p->drivenamep, imp_flag,
+		    midp, ep) == -1) {
+			rval = -1;
+			goto out;
+		}
+	}
+
+	/*
+	 * Get the list of drives descriptors that we are adding.
+	 */
+	dd = metaget_drivedesc_fromdrivelist(sp, dnlp, MD_DR_ADD, ep);
+
+	if (! mdisok(ep)) {
+		rval = -1;
+		goto out;
+	}
+
+	/*
+	 * Get the set timeout information.
+	 */
+	(void) memset(&mhiargs, '\0', sizeof (mhiargs));
+	if (clnt_gtimeout(mynode(), sp, &mhiargs, ep) == -1) {
+		rval = -1;
+		goto out;
+	}
+
+	/*
+	 * Get timestamp and generation id for new records
+	 */
+	now = sd->sd_ctime;
+	genid = sd->sd_genid;
+
+	/* At this point, in case of error, set should be flushed. */
+	flush_set_onerr = 1;
+
+	rb_level = 1;   /* level 1 */
+
+	for (midp = misp->mis_drives; midp != NULL; midp = midp->mid_next) {
+		for (ddp = dd; ddp != NULL; ddp = ddp->dd_next) {
+			if (ddp->dd_dnp == midp->mid_dnp) {
+				/* same disk */
+				ddp->dd_dnp->devid =
+				    devid_str_encode(midp->mid_devid,
+				    midp->mid_minor_name);
+
+				ddp->dd_dbcnt = 0;
+				mirp = midp->mid_replicas;
+				if (mirp) {
+					ddp->dd_dbsize = mirp->mir_length;
+					for (; mirp != NULL;
+					    mirp = mirp->mir_next) {
+						ddp->dd_dbcnt++;
+					}
+				}
+				if ((midp->mid_available &
+				    MD_IM_DISK_NOT_AVAILABLE) &&
+				    (misp->mis_flags & MD_IM_SET_REPLICATED)) {
+					ddp->dd_flags = MD_DR_UNRSLV_REPLICATED;
+				}
+			}
+		}
+	}
+
+	/*
+	 * Add the drive records for the drives that we are adding to
+	 * each host in the set.  Marks the drive records as MD_DR_ADD.
+	 * May also mark a drive record as MD_DR_UNRSLV_REPLICATED if
+	 * this flag was set in the dd_flags for that drive.
+	 */
+	if (clnt_imp_adddrvs(mynode(), sp, dd, now, genid, ep) == -1)
+		goto rollback;
+
+	rb_level = 2;   /* level 2 */
+
+	/*
+	 * Take ownership of the added drives.
+	 */
+	if (tk_own_bydd(sp, dd, &mhiargs, TRUE, ep))
+		goto rollback;
+
+out:
+	metafreedrivedesc(&dd);
+
+	if (flush_set_onerr) {
+		metaflushsetname(sp);
+	}
+
+	return (rval);
+
+rollback:
+	/* Make sure we are blocking all signals */
+	if (procsigs(TRUE, &oldsigs, &xep) < 0)
+		mdclrerror(&xep);
+
+	rval = -1;
+
+	max_genid = sd->sd_genid;
+
+	/* level 2 */
+	if (rb_level > 1) {
+		if (!MD_ATSET_DESC(sd)) {
+			if (rel_own_bydd(sp, dd, TRUE, &xep)) {
+				mdclrerror(&xep);
+			}
+		}
+	}
+
+	/* level 1 */
+	if (rb_level > 0) {
+		if (clnt_deldrvs(mynode(), sp, dd, &xep) == -1) {
+			mdclrerror(&xep);
+		}
+		max_genid += 2;
+		resync_genid(sp, sd, max_genid, 0, NULL);
+	}
+
+	/* level 0 */
+
+	/* release signals back to what they were on entry */
+	if (procsigs(FALSE, &oldsigs, &xep) < 0)
+		mdclrerror(&xep);
+
+	metafreedrivedesc(&dd);
+
+	if (flush_set_onerr) {
+		metaflushsetname(sp);
+		md_rb_sig_handling_off(md_got_sig(), md_which_sig());
 	}
 
 	return (rval);

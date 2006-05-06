@@ -143,9 +143,11 @@ get_lb_inittime_ioctl(
 static int
 setnm_ioctl(mdnm_params_t *nm, int mode)
 {
-	char 	*name;
+	char 	*name, *minorname = NULL;
 	side_t	side;
 	int	err = 0;
+	void	*devid = NULL;
+	int	devid_sz;
 
 	/*
 	 * Don't allow addition of new names to namespace during upgrade.
@@ -178,6 +180,36 @@ setnm_ioctl(mdnm_params_t *nm, int mode)
 		goto out;
 	}
 
+	if (nm->imp_flag) {
+		if ((nm->devid == NULL) || (nm->minorname == NULL)) {
+			err = EINVAL;
+			goto out;
+		}
+		if (nm->devid) {
+			devid_sz = nm->devid_size;
+			devid = kmem_zalloc(devid_sz, KM_SLEEP);
+			err = ddi_copyin((caddr_t)(uintptr_t)nm->devid,
+			    devid, devid_sz, mode);
+			if (err) {
+				err = EFAULT;
+				goto out;
+			}
+		}
+		if (nm->minorname) {
+			if (nm->minorname_len > MAXPATHLEN) {
+				err = EINVAL;
+				goto out;
+			}
+			minorname = kmem_zalloc(nm->minorname_len, KM_SLEEP);
+			err = ddi_copyin((caddr_t)(uintptr_t)nm->minorname,
+			    minorname, (size_t)nm->minorname_len, mode);
+			if (err) {
+				err = EFAULT;
+				goto out;
+			}
+		}
+	}
+
 	if (nm->side == -1)
 		side = mddb_getsidenum(nm->setno);
 	else
@@ -190,7 +222,8 @@ setnm_ioctl(mdnm_params_t *nm, int mode)
 	}
 
 	nm->key = md_setdevname(nm->setno, side, nm->key, nm->drvnm,
-	    nm->mnum, name, 0, &nm->mde);
+	    nm->mnum, name, nm->imp_flag, (ddi_devid_t)devid, minorname,
+	    0, &nm->mde);
 	/*
 	 * If we got an error from md_setdevname & md_setdevname did not
 	 * set the error code, we'll default to MDE_DB_NOSPACE.
@@ -202,6 +235,11 @@ setnm_ioctl(mdnm_params_t *nm, int mode)
 
 out:
 	kmem_free(name, MAXPATHLEN);
+	if (devid) {
+		kmem_free(devid, devid_sz);
+	}
+	if (minorname)
+		kmem_free(minorname, nm->minorname_len);
 	return (err);
 }
 
@@ -226,6 +264,7 @@ getnm_ioctl(
 
 	if ((md_get_setstatus(nm->setno) & MD_SET_SNARFED) == 0)
 		return (ENODEV);
+
 
 	name = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
@@ -3295,15 +3334,16 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		if (! (mode & FWRITE))
 			return (EACCES);
 
-		sz = sizeof (set_t);
-		d = kmem_alloc(sz, KM_SLEEP);
+		mddb_config_case = 1;
 
-		if (ddi_copyin(data, d, sz, mode) != 0) {
-			err = EFAULT;
-			break;
+		err = mddb_config_from_user(&d, data, mode, &c_devid_addr,
+		    &c_old_devid_addr);
+
+		if (err) {
+			return (err);
 		}
 
-		err = md_imp_snarf_set((set_t *)d, mode);
+		err = md_imp_snarf_set((mddb_config_t *)d);
 		break;
 
 	}
@@ -3322,6 +3362,22 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			return (err);
 
 		err = get_lb_inittime_ioctl((mddb_config_t *)d);
+		break;
+	}
+	case MD_IOCUPDATE_NM_RR_DID:
+	{
+		if (! (mode & FWRITE))
+			return (EACCES);
+
+		mddb_config_case = 1;
+
+		err = mddb_config_from_user(&d, data, mode, &c_devid_addr,
+		    &c_old_devid_addr);
+
+		if (err)
+			return (err);
+
+		err = md_update_nm_rr_did_ioctl((mddb_config_t *)d);
 		break;
 	}
 	default:

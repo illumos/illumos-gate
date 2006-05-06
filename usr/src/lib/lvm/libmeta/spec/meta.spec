@@ -937,6 +937,10 @@ function	meta_free_drive_info_list
 version		SUNWprivate_1.1
 end
 
+function	meta_free_im_set_desc
+version		SUNWprivate_1.1
+end
+
 function	meta_get_drive_names
 version		SUNWprivate_1.1
 end
@@ -978,6 +982,10 @@ version		SUNWprivate_1.1
 end
 
 function	meta_rel_own
+version		SUNWprivate_1.1
+end
+
+function	meta_replica_quorum
 version		SUNWprivate_1.1
 end
 
@@ -1254,6 +1262,10 @@ version		SUNWprivate_1.1
 end
 
 function	metaflushsidenames
+version		SUNWprivate_1.1
+end
+
+function	metaflushdrivenames
 version		SUNWprivate_1.1
 end
 
@@ -1769,6 +1781,14 @@ function	meta_is_drive_in_thisset
 version		SUNWprivate_1.1
 end
 
+function	meta_is_devid_in_anyset
+version		SUNWprivate_1.1
+end
+
+function	meta_is_devid_in_thisset
+version		SUNWprivate_1.1
+end
+
 function	meta_set_balance
 version		SUNWprivate_1.1
 end
@@ -1814,10 +1834,6 @@ version		SUNWprivate_1.1
 end
 
 function	strinlst
-version		SUNWprivate_1.1
-end
-
-function	meta_make_sidenmlist
 version		SUNWprivate_1.1
 end
 
@@ -3685,6 +3701,14 @@ function	xdr_mdrpc_nodeid_2_args
 version		SUNWprivate_1.1
 end
 
+function	clnt_imp_adddrvs
+version		SUNWprivate_1.1
+end
+
+function	mdrpc_imp_adddrvs_2
+version		SUNWprivate_1.1
+end
+
 function	meta_is_member
 version		SUNWprivate_1.1
 end
@@ -3734,6 +3758,10 @@ version		SUNWprivate_1.1
 end
 
 function	read_master_block
+version		SUNWprivate_1.1
+end
+
+function	pick_good_disk
 version		SUNWprivate_1.1
 end
 
