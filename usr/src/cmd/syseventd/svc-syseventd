@@ -32,18 +32,6 @@ case "$1" in
 	if /usr/lib/sysevent/syseventd >/dev/msglog 2>&1; then :; else
 		exit
 	fi
-
-	# Establish the default framebuffer name.
-
-	fbdev=`/usr/sbin/prtconf -F 2>/dev/null`
-
-	if [ $? -eq 0 ]; then
-		set -- /devices$fbdev*
-		if [ -c $1 ]; then
-			rm -f /dev/fb
-			ln -s $1 /dev/fb
-		fi
-	fi
 	;;
 
 #

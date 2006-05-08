@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -569,16 +568,19 @@ dump()
 	(void) printf("%-*s %c %-12s %s", NMAX, user, w, device, time_buf);
 
 	if (!terse) {
-		(void) strcpy(path, "/dev/");
-		(void) strncpy(path + 5, utmpp->ut_line,
-		    sizeof (utmpp->ut_line));
-		path[5 + sizeof (utmpp->ut_line)] = '\0';
-
 		/*
 		 *	Stat device for idle time
 		 *	(Don't complain if you can't)
 		 */
-		if ((rc = stat(path, stbufp)) != -1) {
+		rc = -1;
+		if (utmpp->ut_type == USER_PROCESS) {
+			(void) strcpy(path, "/dev/");
+			(void) strncpy(path + 5, utmpp->ut_line,
+			    sizeof (utmpp->ut_line));
+			path[5 + sizeof (utmpp->ut_line)] = '\0';
+			rc = stat(path, stbufp);
+		}
+		if (rc != -1) {
 			idle = timnow - stbufp->st_mtime;
 			hr = idle/3600;
 			min = (unsigned)(idle/60)%60;

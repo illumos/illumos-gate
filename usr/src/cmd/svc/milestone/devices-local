@@ -66,9 +66,18 @@ fbdev=`/usr/sbin/prtconf -F 2>/dev/null`
 if [ $? -eq 0 ]; then
 	set -- /devices$fbdev*
 	if [ -c $1 ]; then
-		rm -f /dev/fb
-		ln -s $1 /dev/fb
-	fi
+		if [ -h /dev/fb ]; then
+			fblink=`ls -l /dev/fb | /usr/bin/awk '{ print $11 }'`
+
+			if [ "$1" != "$fblink" ]; then
+				rm -f /dev/fb
+				ln -s $1 /dev/fb
+			fi
+		else
+			rm -f /dev/fb
+			ln -s $1 /dev/fb
+		fi
+        fi
 fi
 
 # Create any zvol devices
