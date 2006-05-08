@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -514,6 +513,17 @@ do_add_aggr(int argc, char *argv[])
 	}
 
 	if (laadm_add(key, nport, port, t_arg, altroot, &diag) < 0) {
+		/*
+		 * checking ENOTSUP is a temporary workaround
+		 * and should be removed once 6399681 is fixed.
+		 */
+		if (errno == ENOTSUP) {
+			(void) fprintf(stderr,
+			    gettext("%s: add operation failed: %s\n"),
+			    progname,
+			    gettext("device capabilities don't match"));
+			exit(ENOTSUP);
+		}
 		PRINT_ERR_DIAG("%s: add operation failed: %s", diag,
 		    laadm_diag);
 		exit(1);
