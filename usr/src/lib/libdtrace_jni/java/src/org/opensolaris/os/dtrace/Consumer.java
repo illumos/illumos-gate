@@ -418,9 +418,49 @@ public interface Consumer {
      * @throws IllegalStateException if called before {@link #go()} or
      * if {@code stop()} was already called
      * @see #go()
+     * @see #abort()
      * @see #close()
      */
     public void stop();
+
+    /**
+     * Aborts the background thread started by {@link #go()}.  {@code
+     * abort()} is effectively the same as {@link #stop()} except that
+     * it does not block (i.e. it does not wait until the background
+     * thread actually stops).  {@link #isRunning()} is likely {@code
+     * true} immediately after a call to {@code abort()}, since an
+     * aborted consumer stops at a time specified as later.
+     * Specifically, a call to {@code abort()} stops tracing just before
+     * the next {@link ConsumerListener#intervalBegan(ConsumerEvent e)
+     * intervalBegan()} event and stops consuming probe data by the
+     * subsequent {@link ConsumerListener#intervalEnded(ConsumerEvent e)
+     * intervalEnded()} event.  When the aborted consumer actually
+     * stops, listeners are notified in the {@link
+     * ConsumerListener#consumerStopped(ConsumerEvent e)
+     * consumerStopped()} method, where it is convenient to {@link
+     * #close()} the stopped consumer after requesting the final
+     * aggregate.
+     * <p>
+     * The {@code abort()} and {@code stop()} methods have slightly
+     * different behavior when called <i>just after</i> {@code go()} but
+     * <i>before</i> the consumer actually starts running:  It is
+     * possible to {@code stop()} a consumer before it starts running
+     * (resulting in a {@code consumerStopped()} event without a
+     * matching {@code consumerStarted()} event), whereas an aborted
+     * consumer will not stop until after it starts running, when it
+     * completes a single interval (that interval does not include
+     * sleeping to wait for traced probe data).  Calling {@code abort()}
+     * before {@code go()} is legal and has the same effect as calling
+     * it after {@code go()} and before the consumer starts running.
+     * The last behavior follows from the design: You do not know the
+     * state of a consumer after calling {@code abort()}, nor is it
+     * necessary to know the state of a consumer before calling {@code
+     * abort()}.  That may be preferable, for example, when you want to
+     * abort a consumer opened and started in another thread.
+     *
+     * @see #stop()
+     */
+    public void abort();
 
     /**
      * Closes an open consumer and releases the system resources it was

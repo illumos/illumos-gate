@@ -90,16 +90,17 @@ public interface ConsumerListener extends EventListener {
     /**
      * Called once when the source {@link Consumer} is stopped,
      * indicating that this listener should expect no further events.
-     * Called only if there was a prior call to {@link
-     * #consumerStarted(ConsumerEvent e) consumerStarted()}, that is,
-     * only if the consumer was successfully started by a call to {@link
-     * Consumer#go()}.  Guaranteed to be called whether the consumer was
-     * stopped by request (via {@link Consumer#stop()}), terminated
-     * normally as a result of the DTrace {@code exit()} action or the
-     * completion of all target processes, or terminated abnormally
-     * because of an exception.  It is necessary to call {@link
-     * Consumer#close()} to release any system resources still held by
-     * the stopped consumer.
+     * Guaranteed to be called whether the consumer was stopped by
+     * request (by calling {@link Consumer#stop()} or {@link
+     * Consumer#abort()}), terminated normally as a result of the DTrace
+     * {@code exit()} action (see <a
+     * href=http://docs.sun.com/app/docs/doc/817-6223/6mlkidlhm?a=view>
+     * <tt>exit()</tt></a> in the <b>Special Actions</b> section of the
+     * <b>Actions and Subroutines</b> chapter of the <i>Solaris Dynamic
+     * Tracing Guide</i>) or after the completion of all target
+     * processes, or terminated abnormally because of an exception.  It
+     * is necessary to call {@link Consumer#close()} to release any
+     * system resources still held by the stopped consumer.
      *
      * @see #consumerStarted(ConsumerEvent e)
      */

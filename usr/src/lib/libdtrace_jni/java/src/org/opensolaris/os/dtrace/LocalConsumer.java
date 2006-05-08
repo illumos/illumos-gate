@@ -746,6 +746,13 @@ public class LocalConsumer implements Consumer {
 	t.start();
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @throws IllegalThreadStateException if attempting to {@code
+     * stop()} a running consumer while holding the lock on that
+     * consumer
+     */
     public void
     stop()
     {
@@ -791,7 +798,7 @@ public class LocalConsumer implements Consumer {
 			throw new IllegalStateException(
 				"consumer already stopped");
 		    }
-		    logger.info("consumer already stopped");
+		    logger.fine("consumer already stopped");
 		    break;
 		case CLOSED:
 		    throw new IllegalStateException("consumer closed");
@@ -804,6 +811,12 @@ public class LocalConsumer implements Consumer {
 	}
 
 	if (running) {
+	    if (Thread.holdsLock(this)) {
+		throw new IllegalThreadStateException("The current " +
+			"thread cannot stop this LocalConsumer while " +
+			"holding the lock on this LocalConsumer");
+	    }
+
 	    //
 	    // Calls no libdtrace methods, so no synchronization is
 	    // needed.  Sets a native flag that causes the consumer
@@ -833,26 +846,49 @@ public class LocalConsumer implements Consumer {
 	}
     }
 
-    public synchronized void
+    public void
+    abort()
+    {
+	_interrupt();
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * @throws IllegalThreadStateException if attempting to {@code
+     * close()} a running consumer while holding the lock on that
+     * consumer
+     */
+    public void
     close()
     {
-	if ((state == State.INIT) || (state == State.CLOSED)) {
-	    state = State.CLOSED;
-	    return;
+	synchronized (this) {
+	    if ((state == State.INIT) || (state == State.CLOSED)) {
+		state = State.CLOSED;
+		return;
+	    }
 	}
 
-	if ((state == State.STARTED) || (state == State.GO)) {
+	try {
 	    stop();
+	} catch (IllegalStateException e) {
+	    // ignore (we don't have synchronized state access because
+	    // it is illegal to call stop() while holding the lock on
+	    // this consumer)
 	}
 
-	synchronized (LocalConsumer.class) {
-	    _close();
-	}
-	_destroy();
-	state = State.CLOSED;
+	synchronized (this) {
+	    if (state != State.CLOSED) {
+		synchronized (LocalConsumer.class) {
+		    _close();
+		}
+		_destroy();
+		state = State.CLOSED;
 
-	if (logger.isLoggable(Level.INFO)) {
-	    logger.info("consumer table count: " + _openCount());
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.info("consumer table count: " + _openCount());
+		}
+	    }
 	}
     }
 
