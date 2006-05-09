@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,7 @@ CPPFLAGS=	-I$(LOCAL) -I$(GENERAL) -I$(GLOBAL) \
 			$(CPPFLAGS.master) -D_LARGEFILE64_SOURCE=1
 LIBDUMP=	../lib/libdump.a
 LINTLIBDUMP=	../lib/llib-ldump.ln
-LDLIBS +=	$(BSTATIC) -L../lib -ldump $(BDYNAMIC) -lsocket -lnsl
+LDLIBS +=	$(BSTATIC) -L../lib -ldump $(BDYNAMIC) -lsocket -lnsl -lsec
 
 UFSROOTLINK=	$(UFSROOTUSRSBIN)/$(PROG)
 LINKVALUE=	../lib/fs/$(FSTYPE)/$(PROG)

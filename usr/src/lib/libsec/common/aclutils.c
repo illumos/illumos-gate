@@ -1749,6 +1749,25 @@ acl_data(acl_t *aclp)
 }
 
 /*
+ * Take an acl array and build an acl_t.
+ */
+acl_t *
+acl_to_aclp(enum acl_type type, void *acl, int count)
+{
+	acl_t *aclp;
+
+
+	aclp = acl_alloc(type);
+	if (aclp == NULL)
+		return (aclp);
+
+	aclp->acl_aclp = acl;
+	aclp->acl_cnt = count;
+
+	return (aclp);
+}
+
+/*
  * Remove an ACL from a file and create a trivial ACL based
  * off of the mode argument.  After acl has been set owner/group
  * are updated to match owner,group arguments

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -107,6 +106,7 @@ extern int acl_parse(const char *, acl_t **);
 extern int yyparse(void);
 extern void yyreset(void);
 extern acl_t *acl_alloc(enum acl_type);
+extern acl_t *acl_to_aclp(enum acl_type, void *, int);
 
 #ifdef	__cplusplus
 }

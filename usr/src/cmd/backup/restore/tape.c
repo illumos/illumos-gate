@@ -8,7 +8,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <priv_utils.h>
+#include <aclutils.h>
 
 #define	MAXINO	65535		/* KLUDGE */
 
@@ -1285,6 +1286,7 @@ fsd_acl(name, aclp, size)
 	static aclent_t *aclent = NULL;
 	ufs_acl_t *diskacl;
 	static int n = 0;
+	acl_t *set_aclp;
 	uint_t i;
 	int saverr, j;
 
@@ -1319,7 +1321,13 @@ fsd_acl(name, aclp, size)
 		++j;
 	}
 
-	if (acl(name, SETACL, n, aclent) == -1) {
+	set_aclp = acl_to_aclp(ACLENT_T, aclent, n);
+	if (set_aclp == NULL) {
+		(void) fprintf(stderr, gettext("Cannot build acl_t\n"));
+		done(1);
+	}
+
+	if (acl_set(name, set_aclp) == -1) {
 		static int once = 0;
 
 		/*
@@ -1348,6 +1356,7 @@ fsd_acl(name, aclp, size)
 			    name, strerror(saverr));
 		}
 	}
+	acl_free(set_aclp);
 }
 
 static struct fsdtypes {
