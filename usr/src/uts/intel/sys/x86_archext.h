@@ -153,7 +153,7 @@ extern "C" {
 	"\20cmov\17mca\16pge\15mtrr\14syscall\12apic\11cx8"	\
 	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
 
-#define	CPUID_AMD_ECX_CMP_LEGACY 0x00000010	/* AMD: multi-core chip */
+#define	CPUID_AMD_ECX_CMP_LEGACY 0x00000002	/* AMD: multi-core chip */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
