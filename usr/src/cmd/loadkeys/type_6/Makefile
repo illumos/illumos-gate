@@ -28,12 +28,13 @@
 # cmd/loadkeys/type_6/Makefile
 
 KEYTABLES = \
-        us belgium denmark finnish france germany italy japan korea \
-        netherlands norway portugal reset spain sweden \
+        us belgium czech denmark finnish france canadian_french \
+ 	germany greece hungary italy japan korea \
+        netherlands norway portugal poland reset spain sweden \
         swiss_french swiss_german taiwan uk \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
-        maltauk albania turkeyq turkeyf 
+        maltauk albania turkeyq turkeyf latvia lithuania macedonia russia 
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -47,12 +48,13 @@ ROOTKEYTABLESCON= $(KEYTABLESCONFIG:%=$(ROOTKEYDIR)/%)
 # there is an install target for each ROOT layout link
 #
 LAYOUTS= \
-        layout_00 layout_02 layout_06 layout_07 layout_08 layout_09 layout_0e \
-        layout_0f layout_10 layout_12 layout_13 layout_16 layout_19 \
-        layout_1a layout_1b layout_1c layout_1e layout_20 layout_21 \
-        layout_100 layout_18 layout_101 layout_102 layout_103 layout_104 \
-        layout_105 layout_106 layout_107 layout_108 layout_10f layout_1f \
-	layout_23
+        layout_00 layout_02 layout_04 layout_06 layout_07 layout_08 \
+	layout_09 layout_0e layout_0f layout_10 layout_12 layout_13 \
+	layout_16 layout_17 layout_19 layout_0a layout_0c layout_109 \
+	layout_10a layout_10b layout_1a layout_1b layout_1c layout_1e \
+	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
+	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
+	layout_10f layout_1f layout_23 layout_15
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -86,6 +88,12 @@ $(ROOTKEYDIR)/layout_00: $(ROOTKEYDIR)/us
 $(ROOTKEYDIR)/layout_02: $(ROOTKEYDIR)/belgium
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/belgium $@
 
+$(ROOTKEYDIR)/layout_04: $(ROOTKEYDIR)/canadian_french
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/canadian_french $@
+
+$(ROOTKEYDIR)/layout_05: $(ROOTKEYDIR)/czech
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/czech $@
+
 $(ROOTKEYDIR)/layout_06: $(ROOTKEYDIR)/denmark
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/denmark $@
 
@@ -97,6 +105,12 @@ $(ROOTKEYDIR)/layout_08: $(ROOTKEYDIR)/france
 
 $(ROOTKEYDIR)/layout_09: $(ROOTKEYDIR)/germany
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/germany $@
+
+$(ROOTKEYDIR)/layout_0a: $(ROOTKEYDIR)/greece
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/greece $@
+
+$(ROOTKEYDIR)/layout_0c: $(ROOTKEYDIR)/hungary
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/hungary $@
 
 $(ROOTKEYDIR)/layout_0e: $(ROOTKEYDIR)/italy
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/italy $@
@@ -115,6 +129,12 @@ $(ROOTKEYDIR)/layout_13: $(ROOTKEYDIR)/norway
 
 $(ROOTKEYDIR)/layout_16: $(ROOTKEYDIR)/portugal
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/portugal $@
+
+$(ROOTKEYDIR)/layout_15: $(ROOTKEYDIR)/poland
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/poland $@
+
+$(ROOTKEYDIR)/layout_17: $(ROOTKEYDIR)/russia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/russia $@
 
 $(ROOTKEYDIR)/layout_19: $(ROOTKEYDIR)/spain
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/spain $@
@@ -166,6 +186,15 @@ $(ROOTKEYDIR)/layout_107: $(ROOTKEYDIR)/maltauk
 
 $(ROOTKEYDIR)/layout_108: $(ROOTKEYDIR)/albania
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/albania  $@
+
+$(ROOTKEYDIR)/layout_109: $(ROOTKEYDIR)/lithuania
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/lithuania $@
+
+$(ROOTKEYDIR)/layout_10a: $(ROOTKEYDIR)/latvia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/latvia $@
+
+$(ROOTKEYDIR)/layout_10b: $(ROOTKEYDIR)/macedonia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/macedonia $@
 
 $(ROOTKEYDIR)/layout_10f: $(ROOTKEYDIR)/japan
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan $@
