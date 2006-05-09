@@ -428,11 +428,11 @@ void tdata_label_newmax(tdata_t *, int);
 
 /* util.c */
 int streq(char *, char *);
-int findelfsecidx(Elf *, char *);
+int findelfsecidx(Elf *, const char *, const char *);
 char *mktmpname(const char *, const char *);
 void terminate(char *, ...);
+void aborterr(char *, ...);
 void set_terminate_cleanup(void (*)());
-void vaterminate(char *, va_list);
 void elfterminate(const char *, const char *, ...);
 void warning(char *, ...);
 void vadebug(int, char *, va_list);

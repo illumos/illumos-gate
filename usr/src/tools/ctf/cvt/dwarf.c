@@ -1778,7 +1778,7 @@ elf_ptrsz(Elf *elf)
 
 	if (gelf_getehdr(elf, &ehdr) == NULL) {
 		terminate("failed to read ELF header: %s\n",
-		    elf_errmsg(elf_errno()));
+		    elf_errmsg(-1));
 	}
 
 	if (ehdr.e_ident[EI_CLASS] == ELFCLASS32)

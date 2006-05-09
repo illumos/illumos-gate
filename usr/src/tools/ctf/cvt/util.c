@@ -61,24 +61,29 @@ streq(char *s1, char *s2)
 }
 
 int
-findelfsecidx(Elf *elf, char *tofind)
+findelfsecidx(Elf *elf, const char *file, const char *tofind)
 {
 	Elf_Scn *scn = NULL;
 	GElf_Ehdr ehdr;
 	GElf_Shdr shdr;
 
-	if (gelf_getehdr(elf, &ehdr) == NULL) {
-		terminate("gelf_getehdr: %s\n", elf_errmsg(elf_errno()));
-	}
+	if (gelf_getehdr(elf, &ehdr) == NULL)
+		elfterminate(file, "Couldn't read ehdr");
 
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
 		char *name;
 
-		if (gelf_getshdr(scn, &shdr) == NULL ||
-		    (name = elf_strptr(elf, ehdr.e_shstrndx,
+		if (gelf_getshdr(scn, &shdr) == NULL) {
+			elfterminate(file,
+			    "Couldn't read header for section %d",
+			    elf_ndxscn(scn));
+		}
+
+		if ((name = elf_strptr(elf, ehdr.e_shstrndx,
 		    (size_t)shdr.sh_name)) == NULL) {
-			terminate("gelf_getehdr: %s\n",
-			    elf_errmsg(elf_errno()));
+			elfterminate(file,
+			    "Couldn't get name for section %d",
+			    elf_ndxscn(scn));
 		}
 
 		if (strcmp(name, tofind) == 0)
@@ -102,12 +107,6 @@ whine(char *type, char *format, va_list ap)
 }
 
 void
-vaterminate(char *format, va_list ap)
-{
-	whine("ERROR", format, ap);
-}
-
-void
 set_terminate_cleanup(void (*cleanup)())
 {
 	terminate_cleanup = cleanup;
@@ -117,18 +116,31 @@ set_terminate_cleanup(void (*cleanup)())
 void
 terminate(char *format, ...)
 {
-	if (format) {
-		va_list ap;
+	va_list ap;
 
-		va_start(ap, format);
-		whine("ERROR", format, ap);
-		va_end(ap);
-	}
+	va_start(ap, format);
+	whine("ERROR", format, ap);
+	va_end(ap);
 
 	if (terminate_cleanup)
 		terminate_cleanup();
 
+	if (getenv("CTF_ABORT_ON_TERMINATE") != NULL)
+		abort();
 	exit(1);
+}
+
+/*PRINTFLIKE1*/
+void
+aborterr(char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	whine("ERROR", format, ap);
+	va_end(ap);
+
+	abort();
 }
 
 /*PRINTFLIKE1*/
@@ -193,7 +205,7 @@ elfterminate(const char *file, const char *fmt, ...)
 	vsnprintf(msgbuf, sizeof (msgbuf), fmt, ap);
 	va_end(ap);
 
-	terminate("%s: %s: %s\n", file, msgbuf, elf_errmsg(elf_errno()));
+	terminate("%s: %s: %s\n", file, msgbuf, elf_errmsg(-1));
 }
 
 const char *

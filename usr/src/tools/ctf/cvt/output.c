@@ -344,7 +344,8 @@ sort_iidescs(Elf *elf, const char *file, tdata_t *td, int fuzzymatch,
 	match.iim_fuzzy = fuzzymatch;
 	match.iim_file = NULL;
 
-	if ((stidx = findelfsecidx(elf, dynsym ? ".dynsym" : ".symtab")) < 0)
+	if ((stidx = findelfsecidx(elf, file,
+	    dynsym ? ".dynsym" : ".symtab")) < 0)
 		terminate("%s: Can't open symbol table\n", file);
 	scn = elf_getscn(elf, stidx);
 	data = elf_getdata(scn, NULL);
@@ -626,7 +627,7 @@ write_file(Elf *src, const char *srcname, Elf *dst, const char *dstname,
 	}
 
 	if (symtab_idx == -1) {
-		terminate("Cannot find %s section\n",
+		terminate("%s: Cannot find %s section\n", srcname,
 		    dynsym ? "SHT_DYNSYM" : "SHT_SYMTAB");
 	}
 

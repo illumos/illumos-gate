@@ -174,7 +174,7 @@ fnarg_free(iidesc_t *ii)
  * assembled under an iidesc list.
  */
 int
-stabs_read(tdata_t *td, Elf *elf, const char *filename)
+stabs_read(tdata_t *td, Elf *elf, const char *file)
 {
 	Elf_Scn *scn;
 	Elf_Data *data;
@@ -190,18 +190,18 @@ stabs_read(tdata_t *td, Elf *elf, const char *filename)
 	int nstabs, rc, i;
 	int scope = 0;
 
-	if (!((stabidx = findelfsecidx(elf, ".stab.excl")) >= 0 &&
-	    (stabstridx = findelfsecidx(elf, ".stab.exclstr")) >= 0) &&
-	    !((stabidx = findelfsecidx(elf, ".stab")) >= 0 &&
-	    (stabstridx = findelfsecidx(elf, ".stabstr")) >= 0)) {
+	if (!((stabidx = findelfsecidx(elf, file, ".stab.excl")) >= 0 &&
+	    (stabstridx = findelfsecidx(elf, file, ".stab.exclstr")) >= 0) &&
+	    !((stabidx = findelfsecidx(elf, file, ".stab")) >= 0 &&
+	    (stabstridx = findelfsecidx(elf, file, ".stabstr")) >= 0)) {
 		errno = ENOENT;
 		return (-1);
 	}
 
 	file_stack = stack_new(free);
 
-	stack_push(file_stack, (void *)filename);
-	curhdr = filename;
+	stack_push(file_stack, (void *)file);
+	curhdr = file;
 
 	debug(3, "Found stabs in %d, strings in %d\n", stabidx, stabstridx);
 
@@ -249,8 +249,8 @@ stabs_read(tdata_t *td, Elf *elf, const char *filename)
 
 		if ((str = elf_strptr(elf, stabstridx,
 		    (size_t)stab->n_strx)) == NULL) {
-			terminate("Can't find string at %u for stab %d\n",
-			    stab->n_strx, i);
+			terminate("%s: Can't find string at %u for stab %d\n",
+			    file, stab->n_strx, i);
 		}
 
 		if (stab->n_type == N_BINCL) {
@@ -265,8 +265,8 @@ stabs_read(tdata_t *td, Elf *elf, const char *filename)
 			continue;
 		} else if (stab->n_type == N_OPT) {
 			if (strcmp(str, "gcc2_compiled.") == 0) {
-				terminate("GCC-generated stabs are "
-				    "unsupported.  Use DWARF instead.\n");
+				terminate("%s: GCC-generated stabs are "
+				    "unsupported. Use DWARF instead.\n", file);
 			}
 			continue;
 		}
@@ -312,9 +312,12 @@ stabs_read(tdata_t *td, Elf *elf, const char *filename)
 		ofstr = fstr;
 
 		iidescp = NULL;
-		if ((rc = parse_stab(stab, fstr, &iidescp)) < 0)
-			terminate("Couldn't parse stab \"%s\" (file %s)\n",
-			    str, curhdr);
+
+		if ((rc = parse_stab(stab, fstr, &iidescp)) < 0) {
+			terminate("%s: Couldn't parse stab \"%s\" "
+			    "(source file %s)\n", file, str, curhdr);
+		}
+
 		if (rc == 0)
 			goto parse_loop_end;
 
@@ -356,7 +359,8 @@ stabs_read(tdata_t *td, Elf *elf, const char *filename)
 			iidesc_free(iidescp, NULL);
 			break;
 		default:
-			terminate("Unknown iidesc type %d\n", iidescp->ii_type);
+			aborterr("invalid ii_type %d for stab type %d",
+			    iidescp->ii_type, stab->n_type);
 		}
 
 parse_loop_end:

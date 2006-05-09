@@ -547,8 +547,7 @@ write_buffer(ctf_header_t *h, ctf_buf_t *buf, size_t *resszp)
 	(void) bcopy_data(h, sizeof (ctf_header_t), &bufpos);
 	(void) bcopy_data(buf->ctb_base, buf->ctb_ptr - buf->ctb_base,
 	    &bufpos);
-	if (strtab_write(&buf->ctb_strtab, bcopy_data, &bufpos) < 0)
-		terminate("strtab_write failed\n");
+	(void) strtab_write(&buf->ctb_strtab, bcopy_data, &bufpos);
 	*resszp = bufpos - outbuf;
 	return (outbuf);
 }
@@ -572,8 +571,7 @@ write_compressed_buffer(ctf_header_t *h, ctf_buf_t *buf, size_t *resszp)
 	(void) compress_buffer(buf->ctb_base, buf->ctb_ptr - buf->ctb_base,
 	    &resbuf);
 	compress_flush(&resbuf, Z_FULL_FLUSH);
-	if (strtab_write(&buf->ctb_strtab, compress_buffer, &resbuf) < 0)
-		terminate("strtab_write failed\n");
+	(void) strtab_write(&buf->ctb_strtab, compress_buffer, &resbuf);
 	compress_end(&resbuf);
 
 	*resszp = (resbuf.rb_ptr - resbuf.rb_base);

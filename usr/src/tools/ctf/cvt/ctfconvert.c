@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +98,7 @@ file_read(tdata_t *td, const char *filename, int ignore_non_c)
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
 		close(fd);
 		terminate("failed to read %s: %s\n", filename,
-		    elf_errmsg(elf_errno()));
+		    elf_errmsg(-1));
 	}
 
 	source_types = built_source_types(elf, filename);
@@ -122,8 +121,10 @@ file_read(tdata_t *td, const char *filename, int ignore_non_c)
 		 * None of the readers found compatible type data.
 		 */
 
-		if (findelfsecidx(elf, ".debug") >= 0)
-			terminate("DWARF version 1 is not supported\n");
+		if (findelfsecidx(elf, filename, ".debug") >= 0) {
+			terminate("%s: DWARF version 1 is not supported\n",
+			    filename);
+		}
 
 		if (!(source_types & SOURCE_C) && ignore_non_c) {
 			debug(1, "Ignoring file %s not built from C sources\n",

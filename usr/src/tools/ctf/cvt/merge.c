@@ -476,7 +476,7 @@ map_td_tree_post(tdesc_t *ctdp, tdesc_t **ctdpp, void *private)
 		 * exhaustive search through the entire graph.  This usually
 		 * means that the "name" hash function is broken.
 		 */
-		terminate("Second pass for %d (%s) == %d\n", ctdp->t_id,
+		aborterr("Second pass for %d (%s) == %d\n", ctdp->t_id,
 		    tdesc_name(ctdp), ed.ed_tgt->t_id);
 	} else {
 		int id = mcd->md_tgt->td_nextid++;
@@ -518,7 +518,7 @@ map_td_tree_self_post(tdesc_t *ctdp, tdesc_t **ctdpp, void *private)
 		 * through the entire hash.  This usually means that the hash
 		 * function is broken.
 		 */
-		terminate("Self-unique second pass for %d (%s) == %d\n",
+		aborterr("Self-unique second pass for %d (%s) == %d\n",
 		    ctdp->t_id, tdesc_name(ctdp), ed.ed_tgt->t_id);
 	} else {
 		int id = mcd->md_tgt->td_nextid++;
@@ -696,7 +696,7 @@ remap_node(tdesc_t **tgtp, tdesc_t *oldtgt, int selftid, tdesc_t *newself,
 	}
 
 	if ((template.t_id = get_mapping(mcd->md_ta, oldid)) == 0)
-		terminate("failed to get mapping for tid %d\n", oldid);
+		aborterr("failed to get mapping for tid %d\n", oldid);
 
 	if (!hash_find(mcd->md_parent->td_idhash, (void *)&template,
 	    (void *)&tgt) && (!(mcd->md_flags & MCD_F_REFMERGE) ||
@@ -917,7 +917,7 @@ redir_mstr_fwd_cb(void *name, void *value, void *arg)
 
 	if (!hash_find(rmd->rmd_tgt->td_idhash, (void *)&template,
 	    (void *)&defn)) {
-		terminate("Couldn't unforward %d (%s)\n", defnid,
+		aborterr("Couldn't unforward %d (%s)\n", defnid,
 		    tdesc_name(defn));
 	}
 
@@ -1062,7 +1062,7 @@ merge_types(hash_t *src, merge_cb_data_t *mcd)
 	debug(3, "add_tdtbr_cb added %d items\n", tdrc);
 
 	if (list_count(*mcd->md_tdtbr) != 0)
-		terminate("Couldn't remap all nodes\n");
+		aborterr("Couldn't remap all nodes\n");
 
 	/*
 	 * We now have an alist of master forwards and the ids of the new master

@@ -92,7 +92,7 @@ read_file(Elf *elf, char *file, char *label, read_cb_f *func, void *arg,
 	int ctfscnidx;
 	tdata_t *td;
 
-	if ((ctfscnidx = findelfsecidx(elf, ".SUNW_ctf")) < 0) {
+	if ((ctfscnidx = findelfsecidx(elf, file, ".SUNW_ctf")) < 0) {
 		if (require_ctf &&
 		    (built_source_types(elf, file) & SOURCE_C)) {
 			terminate("Input file %s was partially built from "
@@ -294,7 +294,7 @@ count_files(char **files, int n)
 
 		if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
 			warning("Can't open input file %s: %s\n", file,
-			    elf_errmsg(elf_errno()));
+			    elf_errmsg(-1));
 			err++;
 			(void) close(fd);
 			continue;
@@ -345,7 +345,7 @@ symit_new(Elf *elf, const char *file)
 	Elf_Scn *scn;
 	int symtabidx;
 
-	if ((symtabidx = findelfsecidx(elf, ".symtab")) < 0)
+	if ((symtabidx = findelfsecidx(elf, file, ".symtab")) < 0)
 		return (NULL);
 
 	si = xcalloc(sizeof (symit_data_t));
