@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 /* Portions Copyright 2005 Cyril Plisko */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1535,6 +1534,7 @@ find_lib(
 	char name[NUM_LIB_NAMES][MAXPATHLEN];
 	struct stat lib_stat;
 	void *dlhandle = NULL;
+	static char plat_name[SYSINFO_LENGTH];
 	static char machine_name[SYSINFO_LENGTH];
 	static char arch_name[SYSINFO_LENGTH];
 	int i = 0;
@@ -1548,10 +1548,13 @@ find_lib(
 	 * Initialize machine name and arch name
 	 */
 	if (strncmp("", machine_name, MAXPATHLEN) == 0) {
-		if (sysinfo(SI_MACHINE, machine_name, SYSINFO_LENGTH) == -1) {
+		if (sysinfo(SI_PLATFORM, plat_name, SYSINFO_LENGTH) == -1) {
 			return (CFGA_ERROR);
 		}
 		if (sysinfo(SI_ARCHITECTURE, arch_name, SYSINFO_LENGTH) == -1) {
+			return (CFGA_ERROR);
+		}
+		if (sysinfo(SI_MACHINE, machine_name, SYSINFO_LENGTH) == -1) {
 			return (CFGA_ERROR);
 		}
 	}
@@ -1579,6 +1582,21 @@ find_lib(
 		/* Attachment points may not have a class (i.e. are generic) */
 		if (name[i][0] == '\0') {
 			continue;
+		}
+
+		/*
+		 * Try path based upon platform name
+		 */
+		(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
+		    LIB_PATH_BASE1, plat_name, LIB_PATH_MIDDLE,
+		    name[i], LIB_PATH_TAIL);
+
+		if (stat(lib, &lib_stat) == 0) {
+			/* file exists, is it a lib */
+			dlhandle = dlopen(lib, RTLD_LAZY);
+			if (dlhandle != NULL) {
+				goto found;
+			}
 		}
 
 		/*

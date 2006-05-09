@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,6 +366,7 @@ dev_change_state(
 /*ARGSUSED*/
 scfga_ret_t
 dev_remove(
+	const char *func,
 	scfga_cmd_t cmd,
 	apid_t *apidp,
 	prompt_t *prp,
@@ -476,6 +477,7 @@ dev_remove(
 /*ARGSUSED*/
 scfga_ret_t
 dev_insert(
+	const char *func,
 	scfga_cmd_t cmd,
 	apid_t *apidp,
 	prompt_t *prp,
@@ -529,6 +531,7 @@ dev_insert(
 /*ARGSUSED*/
 scfga_ret_t
 dev_replace(
+	const char *func,
 	scfga_cmd_t cmd,
 	apid_t *apidp,
 	prompt_t *prp,
@@ -613,9 +616,34 @@ dev_replace(
 	return (ret == SCFGA_OK ? ret2 : ret);
 }
 
+#pragma weak plat_dev_led
+/*ARGSUSED*/
+scfga_ret_t
+dev_led(
+	const char *func,
+	scfga_cmd_t cmd,
+	apid_t *apidp,
+	prompt_t *prp,
+	cfga_flags_t flags,
+	char **errstring)
+{
+
+	/*
+	 * The implementation of the led command is platform-specific, so
+	 * the default behavior is to say that the functionality is not
+	 * available for this device.
+	 */
+	if (plat_dev_led) {
+		return (plat_dev_led(func, cmd, apidp, prp, flags, errstring));
+	}
+	cfga_err(errstring, 0, ERR_UNAVAILABLE, 0);
+	return (SCFGA_ERR);
+}
+
 /*ARGSUSED*/
 scfga_ret_t
 reset_common(
+	const char *func,
 	scfga_cmd_t cmd,
 	apid_t *apidp,
 	prompt_t *prp,
@@ -1377,7 +1405,9 @@ critical_ctrlr(const char *hba_phys)
 	/*FALLTHRU*/
 out:
 	S_FREE(bufp);
-	if (fp != NULL) fclose(fp);
+	if (fp != NULL) {
+		(void) fclose(fp);
+	}
 	return (rv);
 }
 

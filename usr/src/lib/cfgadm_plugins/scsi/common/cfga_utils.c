@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
+#include <libgen.h>
+#include <limits.h>
 
 /*
  * This file contains helper routines for the SCSI plugin
@@ -129,6 +131,8 @@ msgcvt_t str_tbl[] = {
 /* Commands */
 {CMD_INSERT_DEV,	0, 0,	"insert_device"},
 {CMD_REMOVE_DEV,	0, 0,	"remove_device"},
+{CMD_LED_DEV,		0, 0,	"led"},
+{CMD_LOCATOR_DEV,	0, 0,	"locator"},
 {CMD_REPLACE_DEV,	0, 0,	"replace_device"},
 {CMD_RESET_DEV,		0, 0,	"reset_device"},
 {CMD_RESET_BUS,		0, 0,	"reset_bus"},
@@ -139,6 +143,9 @@ msgcvt_t str_tbl[] = {
 {MSG_HELP_USAGE,	0, 0,	"\t-x insert_device ap_id [ap_id... ]\n"
 				"\t-x remove_device ap_id [ap_id... ]\n"
 				"\t-x replace_device ap_id [ap_id... ]\n"
+				"\t-x locator[=on|off] ap_id [ap_id... ]\n"
+				"\t-x led[=LED,mode=on|off|blink] "
+				    "ap_id [ap_id... ]\n"
 				"\t-x reset_device ap_id [ap_id... ]\n"
 				"\t-x reset_bus ap_id [ap_id... ]\n"
 				"\t-x reset_all ap_id [ap_id... ]\n"},
@@ -167,8 +174,35 @@ msgcvt_t str_tbl[] = {
 /* Misc. */
 {WARN_DISCONNECT,	0, 1,
 	"WARNING: Disconnecting critical partitions may cause system hang."
-	"\nContinue"}
+	"\nContinue"},
+
+/* LED messages */
+{MSG_LED_HDR,		0, 1,	"Disk                    Led"},
+{MSG_MISSING_LED_NAME,	0, 1,	"Missing LED name"},
+{MSG_MISSING_LED_MODE,	0, 1,	"Missing LED mode"}
 };
+
+char *
+led_strs[] = {
+	"fault",
+	"power",
+	"attn",
+	"active",
+	"locator",
+	NULL
+};
+
+char *
+led_mode_strs[] = {
+	"off",
+	"on",
+	"blink",
+	"faulted",
+	"unknown",
+	NULL
+};
+
+
 
 
 #define	N_STRS	(sizeof (str_tbl) / sizeof (str_tbl[0]))
@@ -226,6 +260,8 @@ static hw_cmd_t hw_cmds[] = {
 	{ CMD_INSERT_DEV,	SCFGA_INSERT_DEV,	dev_insert	},
 	{ CMD_REMOVE_DEV,	SCFGA_REMOVE_DEV,	dev_remove	},
 	{ CMD_REPLACE_DEV,	SCFGA_REPLACE_DEV,	dev_replace	},
+	{ CMD_LED_DEV,		SCFGA_LED_DEV,		dev_led		},
+	{ CMD_LOCATOR_DEV,	SCFGA_LOCATOR_DEV,	dev_led		},
 	{ CMD_RESET_DEV,	SCFGA_RESET_DEV,	reset_common	},
 	{ CMD_RESET_BUS,	SCFGA_RESET_BUS,	reset_common	},
 	{ CMD_RESET_ALL,	SCFGA_RESET_ALL,	reset_common	},
@@ -466,10 +502,19 @@ invoke_cmd(
 	char **errstring)
 {
 	int i;
+	int len;
+
+
+	/*
+	 * Determine if the func has an equal sign; only compare up to
+	 * the equals
+	 */
+	for (len = 0; func[len] != 0 && func[len] != '='; len++);
 
 	for (i = 0; i < N_HW_CMDS; i++) {
-		if (strcmp(func, GET_MSG_STR(hw_cmds[i].str_id)) == 0) {
-			return (hw_cmds[i].fcn(hw_cmds[i].cmd, apidtp,
+		const char *s = GET_MSG_STR(hw_cmds[i].str_id);
+		if (strncmp(func, s, len) == 0 && s[len] == 0) {
+			return (hw_cmds[i].fcn(func, hw_cmds[i].cmd, apidtp,
 			    prp, flags, errstring));
 		}
 	}
@@ -554,6 +599,29 @@ cfga_msg(struct cfga_msg *msgp, ...)
 	(void) (*msgp->message_routine)(msgp->appdata_ptr, p);
 
 	S_FREE(p);
+}
+
+
+/*
+ * This routine prints the value of an led for a disk.
+ */
+void
+cfga_led_msg(struct cfga_msg *msgp, apid_t *apidp, led_strid_t led,
+    led_modeid_t mode)
+{
+	char led_msg[MAX_INPUT];	/* 512 bytes */
+
+	if ((msgp == NULL) || (msgp->message_routine == NULL)) {
+		return;
+	}
+	if ((apidp == NULL) || (apidp->dyncomp == NULL)) {
+		return;
+	}
+	snprintf(led_msg, sizeof (led_msg), "%-23s\t%s=%s\n",
+			basename(apidp->dyncomp),
+			dgettext(TEXT_DOMAIN, led_strs[led]),
+			dgettext(TEXT_DOMAIN, led_mode_strs[mode]));
+	(void) (*msgp->message_routine)(msgp->appdata_ptr, led_msg);
 }
 
 /*
@@ -857,7 +925,7 @@ physpath_to_devlink(
 	(void) di_devlink_walk(hdl, NULL, minor_path, DI_PRIMARY_LINK,
 	    (void *)&larg, get_link);
 
-	di_devlink_fini(&hdl);
+	(void) di_devlink_fini(&hdl);
 
 	if (*logpp == NULL)
 		return (SCFGA_LIB_ERR);

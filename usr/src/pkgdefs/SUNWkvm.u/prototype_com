@@ -246,6 +246,15 @@ s none usr/platform/sun4u/lib/cfgadm/ac.so=./ac.so.1
 f none usr/platform/sun4u/lib/cfgadm/sbd.so.1 755 root bin
 s none usr/platform/sun4u/lib/cfgadm/sbd.so=./sbd.so.1
 #
+# SPARC-Enterprise platform specific scsi plugin.
+#
+d none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm 755 root sys
+d none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/sparcv9 755 root sys
+f none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/scsi.so.1 755 root bin
+s none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/scsi.so=./scsi.so.1
+f none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/sparcv9/scsi.so.1 755 root bin
+s none usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/sparcv9/scsi.so=./scsi.so.1
+#
 # platform-dependent boot objects for sun4u and links for each sun4u platform
 #
 d none usr/platform/sun4u/lib/fs 755 root bin

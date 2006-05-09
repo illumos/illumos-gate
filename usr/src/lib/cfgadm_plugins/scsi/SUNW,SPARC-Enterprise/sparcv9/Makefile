@@ -18,37 +18,23 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/scsi/scsi.xcl
+# lib/cfgadm_plugins/scsi/SUNW,SPARC-Enterprise/sparcv9/Makefile
 #
-msgid  "insert_device"
-msgid  "remove_device"
-msgid  "led"
-msgid  "locator"
-msgid  "replace_device"
-msgid  "\t-x insert_device ap_id [ap_id... ]\n"
-       "\t-x remove_device ap_id [ap_id... ]\n"
-       "\t-x replace_device ap_id [ap_id... ]\n"
-       "\t-x locator[=on|off] ap_id [ap_id... ]\n"
-       "\t-x led[=LED,mode=on|off|blink] "
-       "ap_id [ap_id... ]\n"
-       "\t-x reset_device ap_id [ap_id... ]\n"
-       "\t-x reset_bus ap_id [ap_id... ]\n"
-       "\t-x reset_all ap_id [ap_id... ]\n"
-msgid  "%s/"
-msgid  "."
-msgid  ".."
-msgid  "%s"
-msgid  ": "
-msgid  "\n"
-msgid  "%s%s"
-msgid  " "
-msgid  "  "
-msgid  "-"
-msgid  "%%-%ds  %%-%ds"
-msgid  "%-23s\t%s=%s\n"
+
+MAPDIR=	../../spec/sparcv9
+include ../Makefile.com
+include ../../../../Makefile.lib.64
+CFLAGS64 += -I../../common -I$(SRC)/uts/sun4u/opl
+
+LINTFLAGS64 += -I../../common -I$(SRC)/uts/sun4u/opl
+
+.KEEP_STATE:
+
+install: all $(ROOTLIBS64) $(ROOTLINKS64) 

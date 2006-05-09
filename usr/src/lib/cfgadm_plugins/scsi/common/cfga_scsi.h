@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,6 +127,8 @@ typedef enum {
 	SCFGA_DEV_CONFIGURE,
 	SCFGA_DEV_UNCONFIGURE,
 	SCFGA_DEV_REMOVE,
+	SCFGA_LED_DEV,
+	SCFGA_LOCATOR_DEV,
 	SCFGA_RESET_DEV,
 	SCFGA_RESET_BUS,
 	SCFGA_RESET_ALL,
@@ -244,6 +246,8 @@ ERRARG_RCM_REMOVE,
 CMD_INSERT_DEV,
 CMD_REMOVE_DEV,
 CMD_REPLACE_DEV,
+CMD_LED_DEV,
+CMD_LOCATOR_DEV,
 CMD_RESET_DEV,
 CMD_RESET_BUS,
 CMD_RESET_ALL,
@@ -265,14 +269,36 @@ CONF_UNQUIESCE,
 CONF_NO_QUIESCE,
 
 /* Misc. */
-WARN_DISCONNECT
+WARN_DISCONNECT,
+
+/* HDD led/locator messages */
+MSG_LED_HDR,
+MSG_MISSING_LED_NAME,
+MSG_MISSING_LED_MODE
 } msgid_t;
+
+typedef enum {
+	LED_STR_FAULT,
+	LED_STR_POWER,
+	LED_STR_ATTN,
+	LED_STR_ACTIVE,
+	LED_STR_LOCATOR
+} led_strid_t;
+
+typedef enum {
+	LED_MODE_OFF,
+	LED_MODE_ON,
+	LED_MODE_BLINK,
+	LED_MODE_FAULTED,
+	LED_MODE_UNK
+} led_modeid_t;
+
 
 typedef struct {
 	msgid_t str_id;
 	scfga_cmd_t cmd;
-	scfga_ret_t (*fcn)(scfga_cmd_t, apid_t *, prompt_t *, cfga_flags_t,
-	    char **);
+	scfga_ret_t (*fcn)(const char *, scfga_cmd_t, apid_t *, prompt_t *,
+	    cfga_flags_t, char **);
 } hw_cmd_t;
 
 typedef struct {
@@ -331,14 +357,18 @@ scfga_ret_t bus_change_state(cfga_cmd_t state_change_cmd,
     char **errstring);
 scfga_ret_t dev_change_state(cfga_cmd_t state_change_cmd,
     apid_t *apidp, cfga_flags_t flags, char **errstring);
-scfga_ret_t dev_insert(scfga_cmd_t cmd, apid_t *apidp, prompt_t *argsp,
-    cfga_flags_t flags, char **errstring);
-scfga_ret_t dev_replace(scfga_cmd_t cmd, apid_t *apidp, prompt_t *argsp,
-    cfga_flags_t flags, char **errstring);
-scfga_ret_t dev_remove(scfga_cmd_t cmd, apid_t *apidp, prompt_t *argsp,
-    cfga_flags_t flags, char **errstring);
-scfga_ret_t reset_common(scfga_cmd_t cmd, apid_t *apidp, prompt_t *argsp,
-    cfga_flags_t flags, char **errstring);
+scfga_ret_t dev_insert(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
+scfga_ret_t dev_replace(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
+scfga_ret_t dev_remove(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
+scfga_ret_t reset_common(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
+scfga_ret_t dev_led(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
+scfga_ret_t plat_dev_led(const char *func, scfga_cmd_t cmd, apid_t *apidp,
+    prompt_t *argsp, cfga_flags_t flags, char **errstring);
 
 
 /* List related routines */
@@ -386,6 +416,8 @@ scfga_ret_t invoke_cmd(const char *func, apid_t *apidt, prompt_t *prp,
 
 void cfga_err(char **errstring, int use_errno, ...);
 void cfga_msg(struct cfga_msg *msgp, ...);
+void cfga_led_msg(struct cfga_msg *msgp, apid_t *apidp, led_strid_t,
+    led_modeid_t);
 char *cfga_str(int append_newline, ...);
 int msg_idx(msgid_t msgid);
 scfga_ret_t walk_tree(const char *physpath, void *arg, uint_t init_flags,

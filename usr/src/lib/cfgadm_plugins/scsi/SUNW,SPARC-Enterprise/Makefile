@@ -18,21 +18,22 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/scsi/Makefile
+# lib/cfgadm_plugins/scsi/SUNW,SPARC-Enterprise/Makefile
+#
 
-include		../../Makefile.lib
+include		../../../Makefile.lib
 
-sparc_SUBDIRS=	SUNW,SPARC-Enterprise
-SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64) $($(MACH)_SUBDIRS)
+SUBDIRS= sparc sparcv9
 
-all :=		TARGET= all
+MSGSUBDIRS= $(SUBDIRS)
+
+all := 		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
@@ -41,8 +42,7 @@ lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 package :=	TARGET= package
 
-TEXT_DOMAIN=	SUNW_OST_OSLIB
-XGETFLAGS=	-a -x scsi.xcl
+XGETFLAGS=	-a -x ../scsi.xcl
 POFILE=		scsi.po
 POFILES=	generic.po
 
@@ -54,9 +54,6 @@ CP=	cp
 
 all clean clobber delete install lint package: $(SUBDIRS)
 
-$(MACH) $(MACH64) spec $($(MACH)_SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
 _msg:	$(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)
@@ -67,8 +64,14 @@ $(POFILE):	$(POFILES)
 
 $(POFILES):
 	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) `$(GREP) -l gettext */*.[ch]`
+	$(XGETTEXT) $(XGETFLAGS) `$(GREP) -l gettext */*.[ch] ../*/*.[ch]`
 	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
 	$(RM) messages.po
+
+
+install: all $(SUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
