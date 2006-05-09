@@ -247,13 +247,13 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 				    FM_EREPORT_PAYLOAD_ZFS_ZIO_OFFSET,
 				    DATA_TYPE_UINT64, stateoroffset,
 				    FM_EREPORT_PAYLOAD_ZFS_ZIO_SIZE,
-				    DATA_TYPE_UINT64, size);
+				    DATA_TYPE_UINT64, size, NULL);
 			else
 				fm_payload_set(ereport,
 				    FM_EREPORT_PAYLOAD_ZFS_ZIO_OFFSET,
 				    DATA_TYPE_UINT64, zio->io_offset,
 				    FM_EREPORT_PAYLOAD_ZFS_ZIO_SIZE,
-				    DATA_TYPE_UINT64, zio->io_size);
+				    DATA_TYPE_UINT64, zio->io_size, NULL);
 		}
 
 		/*
@@ -272,7 +272,7 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 			    zio->io_logical->io_bookmark.zb_level,
 			    FM_EREPORT_PAYLOAD_ZFS_ZIO_BLKID,
 			    DATA_TYPE_UINT64,
-			    zio->io_logical->io_bookmark.zb_blkid);
+			    zio->io_logical->io_bookmark.zb_blkid, NULL);
 	} else if (vd != NULL) {
 		/*
 		 * If we have a vdev but no zio, this is a device fault, and the
