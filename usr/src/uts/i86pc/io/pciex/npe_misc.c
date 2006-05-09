@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +43,7 @@
  */
 void	npe_query_acpi_mcfg(dev_info_t *dip);
 void	npe_ck804_fix_aer_ptr(dev_info_t *child);
+int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 
 /*
  * Default ecfga base address
@@ -128,4 +128,24 @@ npe_ck804_fix_aer_ptr(dev_info_t *child)
 		    cya1 | NVIDIA_CK804_VEND_CYA1_ERPT_VAL);
 
 	pci_config_teardown(&config_handle);
+}
+
+
+/*
+ * If the bridge is empty, disable it
+ */
+int
+npe_disable_empty_bridges_workaround(dev_info_t *child)
+{
+	/*
+	 * Do not bind drivers to empty bridges.
+	 * Fail above, if the bridge is found to be hotplug capable
+	 */
+	if (ddi_driver_major(child) == ddi_name_to_major("pcie_pci") &&
+	    ddi_get_child(child) == NULL &&
+	    ddi_prop_get_int(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
+	    "pci-hotplug-type", INBAND_HPC_NONE) == INBAND_HPC_NONE)
+		return (1);
+
+	return (0);
 }

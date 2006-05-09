@@ -157,6 +157,7 @@ static int npe_initchild(dev_info_t *child);
  */
 extern void	npe_query_acpi_mcfg(dev_info_t *dip);
 extern void	npe_ck804_fix_aer_ptr(dev_info_t *child);
+extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 
 /*
  * Module linkage information for the kernel.
@@ -685,6 +686,13 @@ static int
 npe_initchild(dev_info_t *child)
 {
 	char	name[80];
+
+	/*
+	 * Do not bind drivers to empty bridges.
+	 * Fail above, if the bridge is found to be hotplug capable
+	 */
+	if (npe_disable_empty_bridges_workaround(child) == 1)
+		return (DDI_FAILURE);
 
 	if (pci_common_name_child(child, name, 80) != DDI_SUCCESS)
 		return (DDI_FAILURE);

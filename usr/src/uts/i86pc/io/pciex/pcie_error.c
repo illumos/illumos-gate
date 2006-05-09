@@ -140,6 +140,8 @@ uint32_t	pcie_aer_disable_flag = 0;
  */
 static void	pcie_error_clear_errors(ddi_acc_handle_t, uint16_t,
 		    uint16_t, uint16_t);
+static void	pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *,
+		    boolean_t *);
 static uint16_t pcie_error_find_cap_reg(ddi_acc_handle_t, uint8_t);
 static uint16_t	pcie_error_find_ext_aer_capid(ddi_acc_handle_t);
 static void	pcie_ck804_error_init(dev_info_t *, ddi_acc_handle_t,
@@ -162,6 +164,8 @@ pcie_error_init(dev_info_t *cdip)
 	uint16_t		dev_type = 0;
 	uint32_t		aer_reg;
 	uint32_t		uce_mask = pcie_aer_uce_mask;
+	boolean_t		empty_io_range = B_FALSE;
+	boolean_t		empty_mem_range = B_FALSE;
 
 	/*
 	 * flag to turn this off
@@ -186,6 +190,20 @@ pcie_error_init(dev_info_t *cdip)
 		/* shouldn't happen; just in case */
 		if (command_reg & PCI_COMM_SERR_ENABLE)
 			command_reg &= ~PCI_COMM_SERR_ENABLE;
+	}
+	/* Check io and mem ranges for empty bridges */
+	pcie_check_io_mem_range(cfg_hdl, &empty_io_range, &empty_mem_range);
+	if ((empty_io_range == B_TRUE) &&
+	    (pcie_command_default & PCI_COMM_IO)) {
+		pcie_command_default &= ~PCI_COMM_IO;
+		PCIE_ERROR_DBG("%s: No I/O range found\n",
+		    ddi_driver_name(cdip));
+	}
+	if ((empty_mem_range == B_TRUE) &&
+	    (pcie_command_default & PCI_COMM_MAE)) {
+		pcie_command_default &= ~PCI_COMM_MAE;
+		PCIE_ERROR_DBG("%s: No Mem range found\n",
+		    ddi_driver_name(cdip));
 	}
 	command_reg |= pcie_command_default;
 	pci_config_put16(cfg_hdl, PCI_CONF_COMM, command_reg);
@@ -325,6 +343,32 @@ cleanup:
 	return (DDI_SUCCESS);
 }
 
+
+static void
+pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
+    boolean_t *empty_mem_range)
+{
+	uint8_t	class, subclass;
+	uint_t	val;
+
+	class = pci_config_get8(cfg_hdl, PCI_CONF_BASCLASS);
+	subclass = pci_config_get8(cfg_hdl, PCI_CONF_SUBCLASS);
+
+	if ((class == PCI_CLASS_BRIDGE) && (subclass == PCI_BRIDGE_PCI)) {
+		val = (((uint_t)pci_config_get8(cfg_hdl, PCI_BCNF_IO_BASE_LOW) &
+		    0xf0) << 8);
+		/*
+		 * Assuming that a zero based io_range[0] implies an
+		 * invalid I/O range.  Likewise for mem_range[0].
+		 */
+		if (val == 0)
+			*empty_io_range = B_TRUE;
+		val = (((uint_t)pci_config_get16(cfg_hdl, PCI_BCNF_MEM_BASE) &
+		    0xfff0) << 16);
+		if (val == 0)
+			*empty_mem_range = B_TRUE;
+	}
+}
 
 static void
 pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,

@@ -168,13 +168,6 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-typedef enum {
-	INBAND_HPC_NONE,
-	INBAND_HPC_PCIE,
-	INBAND_HPC_SHPC
-} pepb_inband_hpc_t;
-
-static pepb_inband_hpc_t	pepb_probe_inband_hpc(dev_info_t *);
 
 /*
  * soft state pointer and structure template:
@@ -204,7 +197,7 @@ typedef struct {
 	/*
 	 * hot plug support
 	 */
-	pepb_inband_hpc_t	inband_hpc;	/* inband HPC type */
+	int			inband_hpc;	/* inband HPC type */
 
 	/*
 	 * interrupt support
@@ -375,7 +368,8 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    "device_type", device_type);
 
 	/* probe for inband HPC */
-	pepb->inband_hpc = pepb_probe_inband_hpc(devi);
+	pepb->inband_hpc = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
+	    DDI_PROP_DONTPASS, "pci-hotplug-type", INBAND_HPC_NONE);
 
 	/*
 	 * Initialize interrupt handlers.
@@ -823,74 +817,6 @@ pepb_restore_config_regs(pepb_devstate_t *pepb_p)
 
 		pci_config_teardown(&config_handle);
 	}
-}
-
-/*
- * Probe for the inband PCI(E) hot plug controller. Returns the type
- * of HPC found. This function works only for the standard PCI(E) bridge
- * that has inband hot plug controller.
- *
- * NOTE: This won't work for Host-PCI(E) bridges.
- */
-static pepb_inband_hpc_t
-pepb_probe_inband_hpc(dev_info_t *dip)
-{
-	uint8_t cap_ptr;
-	uint8_t cap_id;
-	uint16_t status;
-	ddi_acc_handle_t cfg_handle;
-
-	if (pci_config_setup(dip, &cfg_handle) != DDI_SUCCESS)
-		return (INBAND_HPC_NONE);
-
-	/* Read the PCI configuration status register. */
-	status = pci_config_get16(cfg_handle, PCI_CONF_STAT);
-
-	/* check for capabilities list */
-	if (!(status & PCI_STAT_CAP)) {
-		/* no capabilities list */
-		pci_config_teardown(&cfg_handle);
-		return (INBAND_HPC_NONE);
-	}
-
-	/* Get a pointer to the PCI capabilities list. */
-	cap_ptr = pci_config_get8(cfg_handle, PCI_BCNF_CAP_PTR);
-	cap_ptr &= 0xFC; /* mask off reserved bits */
-
-	/*
-	 * Walk thru the capabilities list looking for PCI Express capability
-	 * structure.
-	 */
-	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		cap_id = pci_config_get8(cfg_handle, cap_ptr);
-
-		if (cap_id == PCI_CAP_ID_PCI_E) {
-			uint32_t slot_cap;
-
-			/* Read the PCI Express Slot Capabilities Register */
-			slot_cap = pci_config_get32(cfg_handle,
-			    cap_ptr + PCIE_SLOTCAP);
-
-			/* Does it have PCI Express HotPlug capability? */
-			if (slot_cap & PCIE_SLOTCAP_HP_CAPABLE) {
-				pci_config_teardown(&cfg_handle);
-				return (INBAND_HPC_PCIE);
-			}
-		}
-
-		if (cap_id == PCI_CAP_ID_PCI_HOTPLUG) {
-			pci_config_teardown(&cfg_handle);
-			return (INBAND_HPC_SHPC); /* inband SHPC present */
-		}
-
-		/* Get the pointer to the next capability */
-		cap_ptr = pci_config_get8(cfg_handle, cap_ptr + 1);
-		cap_ptr &= 0xFC;
-	}
-
-	pci_config_teardown(&cfg_handle);
-
-	return (INBAND_HPC_NONE);
 }
 
 static int

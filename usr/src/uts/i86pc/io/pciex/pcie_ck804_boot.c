@@ -91,7 +91,7 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 
 			/*
 			 * Check for "Slot  Implemented" bit
-			 * PCIE_PCIECAP_SLOT_IMPL implies that
+			 * PCIE_PCIECAP_SLOT_IMPL implies that.
 			 */
 			if (status & PCIE_PCIECAP_SLOT_IMPL) {
 				/* offset 14h is Slot Cap Register */
@@ -104,6 +104,15 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 					(void) ndi_prop_update_int(
 					    DDI_DEV_T_NONE, cdip,
 					    "pcie-slotcap-reg", slot_cap);
+
+				/* Is PCI Express HotPlug capability set? */
+				if (cdip &&
+				    (slot_cap & PCIE_SLOTCAP_HP_CAPABLE)) {
+					(void) ndi_prop_update_int(
+					    DDI_DEV_T_NONE, cdip,
+					    "pci-hotplug-type",
+					    INBAND_HPC_PCIE);
+				}
 			}
 
 			/*
@@ -123,6 +132,12 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 
 			found_pciex = B_TRUE;
 		}
+
+		if (cdip && (cap == PCI_CAP_ID_PCI_HOTPLUG)) {
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pci-hotplug-type", INBAND_HPC_SHPC);
+		}
+
 		capsp = (*pci_getb_func)(bus, dev, func,
 		    capsp + PCI_CAP_NEXT_PTR);
 	}
