@@ -51,6 +51,9 @@
 #include <sys/fm/util.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/cpu/AMD.h>
+#include <sys/acpi/acpi.h>
+#include <sys/acpi/acpi_pci.h>
+#include <sys/acpica.h>
 
 #include "ao.h"
 #include "ao_mca_disp.h"
@@ -107,11 +110,10 @@ static const ao_error_disp_t ao_disp_unknown = {
 static const struct ao_smi_disable {
 	const char *asd_sys_vendor;	/* SMB_TYPE_SYSTEM vendor prefix */
 	const char *asd_bios_vendor;	/* SMB_TYPE_BIOS vendor prefix */
-	uint32_t asd_port;		/* output port for SMI disable */
 	uint32_t asd_code;		/* output code for SMI disable */
 } ao_smi_disable[] = {
-	{ "Sun Microsystems", "American Megatrends", 0x502F, 0x59 },
-	{ NULL, NULL, 0, 0 }
+	{ "Sun Microsystems", "American Megatrends", 0x59 },
+	{ NULL, NULL, 0 }
 };
 
 static int
@@ -760,12 +762,38 @@ ao_mca_init(void *data)
 	setcr4(getcr4() | CR4_MCE); /* enable #mc exceptions */
 }
 
+/*
+ * Note that although this cpu module is loaded before the PSMs are
+ * loaded (and hence before acpica is loaded), this function is
+ * called from post_startup(), after PSMs are initialized and acpica
+ * is loaded.
+ */
+static int
+ao_acpi_find_smicmd(int *asd_port)
+{
+	FADT_DESCRIPTOR *fadt = NULL;
+
+	/*
+	 * AcpiGetFirmwareTable works even if ACPI is disabled, so a failure
+	 * here means we weren't able to retreive a pointer to the FADT.
+	 */
+	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+		return (-1);
+
+	ASSERT(fadt != NULL);
+
+	*asd_port = fadt->SmiCmd;
+	return (0);
+}
+
 /*ARGSUSED*/
 void
 ao_mca_post_init(void *data)
 {
 	const struct ao_smi_disable *asd;
 	id_t id;
+	int rv = -1, asd_port;
 
 	smbios_system_t sy;
 	smbios_bios_t sb;
@@ -789,10 +817,26 @@ ao_mca_post_init(void *data)
 			    strlen(asd->asd_bios_vendor)) != 0)
 				continue;
 
-			cmn_err(CE_CONT, "?SMI polling disabled in favor of "
-			    "Solaris Fault Management for AMD Processors");
+			/*
+			 * Look for the SMI_CMD port in the ACPI FADT,
+			 * if the port is 0, this platform doesn't support
+			 * SMM, so there is no SMI error polling to disable.
+			 */
+			if ((rv = ao_acpi_find_smicmd(&asd_port)) == 0 &&
+			    asd_port != 0) {
+				cmn_err(CE_CONT, "?SMI polling disabled in "
+				    "favor of Solaris Fault Management for "
+				    "AMD Processors\n");
 
-			outl(asd->asd_port, asd->asd_code);
+				outl(asd_port, asd->asd_code);
+
+			} else if (rv < 0) {
+				cmn_err(CE_CONT, "?Solaris Fault Management "
+				    "for AMD Processors could not disable SMI "
+				    "polling because an error occurred while "
+				    "trying to determine the SMI command port "
+				    "from the ACPI FADT table\n");
+			}
 			break;
 		}
 	}
