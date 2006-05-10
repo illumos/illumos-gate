@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2037,6 +2036,25 @@ scsa1394_cmd_fill_cdb_rbc(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 	cmd->sc_xfer_bytes = len * blk_size;
 
 	/* finalize new CDB */
+	switch (pkt->pkt_cdbp[0]) {
+	case SCMD_READ:
+	case SCMD_WRITE:
+		/*
+		 * We rewrite READ/WRITE G0 commands as READ/WRITE G1.
+		 * Build new cdb from scatch.
+		 * The lba and length fields is updated below.
+		 */
+		bzero(cmd->sc_cdb, cmd->sc_cdb_actual_len);
+		break;
+	default:
+		/*
+		 * Copy the non lba/len fields.
+		 * The lba and length fields is updated below.
+		 */
+		bcopy(pkt->pkt_cdbp, cmd->sc_cdb, cmd->sc_cdb_actual_len);
+		break;
+	}
+
 	cmd->sc_cdb[0] = (uchar_t)opcode;
 	scsa1394_cmd_fill_cdb_lba(cmd, lba);
 	switch (opcode) {
