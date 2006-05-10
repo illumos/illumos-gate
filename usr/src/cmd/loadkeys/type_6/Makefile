@@ -54,7 +54,7 @@ LAYOUTS= \
 	layout_10a layout_10b layout_1a layout_1b layout_1c layout_1e \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
-	layout_10f layout_1f layout_23 layout_15
+	layout_10f layout_1f layout_23 layout_15 layout_05
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
