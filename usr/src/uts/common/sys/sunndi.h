@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,26 +280,27 @@ ndi_devi_unconfig_driver(dev_info_t *dip, int flags, major_t major);
  *			  first taking it Offline.
  */
 
-#define	NDI_DEVI_REMOVE		0x00001 /* remove after unconfig */
-#define	NDI_ONLINE_ATTACH	0x00002 /* online/attach after config */
-#define	NDI_MDI_FALLBACK	0x00004 /* Leadville to fallback to phci */
-#define	NDI_CONFIG		0x00008 /* recursively config descendants */
-#define	NDI_UNCONFIG		0x00010 /* unconfig to uninitialized state */
-#define	NDI_DEVI_BIND		0x00020 /* transition to DS_BOUND state */
-#define	NDI_DEVI_PERSIST	0x00040 /* do not config offlined nodes */
-#define	NDI_PROMNAME		0x00080 /* name comes from prom */
-#define	NDI_DEVFS_CLEAN		0x01000 /* clean up dv_nodes only, no detach */
-#define	NDI_AUTODETACH		0x02000 /* moduninstall daemon */
-#define	NDI_NO_EVENT		0x04000 /* don't devfs add/remove events */
-#define	NDI_DEVI_DEBUG		0x08000 /* turn on observability */
-#define	NDI_CONFIG_REPROBE	0x10000 /* force a reprobe (deferred attach) */
-#define	NDI_DEVI_ONLINE		0x20000 /* force offlined device to online */
-#define	NDI_DEVI_OFFLINE	0x40000 /* set detached device to offline */
-#define	NDI_POST_EVENT		0x80000 /* Post NDI events before remove */
-#define	NDI_BRANCH_EVENT_OP	0x1000000 /* branch op needing a branch event */
-#define	NDI_NO_EVENT_STATE_CHNG	0x2000000 /* don't change the event state */
-#define	NDI_DRV_CONF_REPROBE	0x4000000 /* reprobe conf-enum'd nodes only */
-#define	NDI_DETACH_DRIVER	0x8000000 /* performing driver_detach */
+#define	NDI_DEVI_REMOVE		0x00000001 /* remove after unconfig */
+#define	NDI_ONLINE_ATTACH	0x00000002 /* online/attach after config */
+#define	NDI_MDI_FALLBACK	0x00000004 /* Leadville to fallback to phci */
+#define	NDI_CONFIG		0x00000008 /* recursively config descendants */
+#define	NDI_UNCONFIG		0x00000010 /* unconfig to uninitialized state */
+#define	NDI_DEVI_BIND		0x00000020 /* transition to DS_BOUND state */
+#define	NDI_DEVI_PERSIST	0x00000040 /* do not config offlined nodes */
+#define	NDI_PROMNAME		0x00000080 /* name comes from prom */
+#define	NDI_DEVFS_CLEAN		0x00001000 /* clean dv_nodes only, no detach */
+#define	NDI_AUTODETACH		0x00002000 /* moduninstall daemon */
+#define	NDI_NO_EVENT		0x00004000 /* don't devfs add/remove events */
+#define	NDI_DEVI_DEBUG		0x00008000 /* turn on observability */
+#define	NDI_CONFIG_REPROBE	0x00010000 /* force reprobe (deferred attach) */
+#define	NDI_DEVI_ONLINE		0x00020000 /* force offlined device to online */
+#define	NDI_DEVI_OFFLINE	0x00040000 /* set detached device to offline */
+#define	NDI_POST_EVENT		0x00080000 /* Post NDI events before remove */
+#define	NDI_BRANCH_EVENT_OP	0x01000000 /* branch op needs branch event */
+#define	NDI_NO_EVENT_STATE_CHNG	0x02000000 /* don't change the event state */
+#define	NDI_DRV_CONF_REPROBE	0x04000000 /* reprobe conf-enum'd nodes only */
+#define	NDI_DETACH_DRIVER	0x08000000 /* performing driver_detach */
+#define	NDI_MTC_OFF		0x10000000 /* disable multi-threading */
 
 /* ndi interface flag values */
 #define	NDI_SLEEP		0x000000

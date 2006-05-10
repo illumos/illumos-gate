@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +39,6 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/sunmdi.h>
-#include <sys/mdi_impldefs.h>
 #include <sys/disp.h>
 
 /* cb_ops entry points */
@@ -484,18 +482,18 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
 {
 	_NOTE(ARGUNUSED(flags))
-	char *cname, *paddr, *guid, *devnm;
-	mdi_pathinfo_t *pip;
-	int len;
+	char		*cname, *paddr, *guid, *devnm;
+	mdi_pathinfo_t	*pip;
+	int		len, circ, rval;
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
 		break;
 	case BUS_CONFIG_DRIVER:	/* no direct children to configure */
 	case BUS_CONFIG_ALL:
-		return (DDI_SUCCESS);
+		return (NDI_SUCCESS);
 	default:
-		return (DDI_FAILURE);
+		return (NDI_FAILURE);
 	}
 
 	/* only implement BUS_CONFIG_ONE */
@@ -507,75 +505,102 @@ tphci_bus_config(dev_info_t *parent, uint_t flags,
 		cmn_err(CE_NOTE, "tphci_bus_config -- invalid device %s",
 		    (char *)arg);
 		kmem_free(devnm, len);
-		return (DDI_FAILURE);
+		return (NDI_FAILURE);
 	}
 
-	if (mdi_pi_alloc(parent, cname, guid, paddr, 0, &pip)
-	    != MDI_SUCCESS) {
-		cmn_err(CE_NOTE, "tphci_bus_config -- mdi_pi_alloc failed");
-		kmem_free(devnm, len);
-		return (DDI_FAILURE);
-	}
+	mdi_devi_enter(parent, &circ);
+	rval = mdi_pi_alloc(parent, cname, guid, paddr, 0, &pip);
 	kmem_free(devnm, len);
+	if (rval != MDI_SUCCESS) {
+		cmn_err(CE_NOTE, "tphci_bus_config -- mdi_pi_alloc failed");
+		mdi_devi_exit(parent, circ);
+		return (NDI_FAILURE);
+	}
 
-	if (mdi_pi_online(pip, 0) != MDI_SUCCESS) {
+	/*
+	 * Hold the path and exit the pHCI while calling mdi_pi_online
+	 * to avoid deadlock with power management of pHCI.
+	 */
+	mdi_hold_path(pip);
+	mdi_devi_exit_phci(parent, circ);
+	rval = mdi_pi_online(pip, 0);
+	mdi_devi_enter_phci(parent, &circ);
+	mdi_rele_path(pip);
+
+	if (rval != MDI_SUCCESS) {
 		cmn_err(CE_NOTE, "tphci_bus_config -- mdi_pi_online failed");
 		(void) mdi_pi_free(pip, 0);
-		return (DDI_FAILURE);
+		mdi_devi_exit(parent, circ);
+		return (NDI_FAILURE);
 	}
 
 	if (childp) {
-		*childp = MDI_PI(pip)->pi_client->ct_dip;
+		*childp = mdi_pi_get_client(pip);
 		ndi_hold_devi(*childp);
 	}
-	return (DDI_SUCCESS);
+	mdi_devi_exit(parent, circ);
+
+	return (NDI_SUCCESS);
 }
 
 static int
 tphci_bus_unconfig(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg)
 {
-	int rval, circ;
-	mdi_pathinfo_t *pip;
-	mdi_phci_t *ph;
-	char *devnm, *cname, *caddr;
+	int		rval = MDI_SUCCESS;
+	int		circ;
+	mdi_pathinfo_t	*pip, *next;
+	char		*devnm, *cname, *caddr;
 
 	switch (op) {
 	case BUS_UNCONFIG_ONE:
 		devnm = (char *)arg;
 		i_ddi_parse_name(devnm, &cname, &caddr, NULL);
 		if (strcmp(cname, "tclient") != 0)
-			return (DDI_SUCCESS);	/* no such device */
+			return (NDI_SUCCESS);	/* no such device */
+
+		mdi_devi_enter(parent, &circ);
 		pip = mdi_pi_find(parent, NULL, caddr);
-		if (pip == NULL)
-			return (DDI_SUCCESS);
-		rval = mdi_pi_offline(pip, NDI_DEVI_REMOVE);
+		if (pip) {
+			mdi_hold_path(pip);
+			mdi_devi_exit_phci(parent, circ);
+			rval = mdi_pi_offline(pip, NDI_DEVI_REMOVE);
+			mdi_devi_enter_phci(parent, &circ);
+			mdi_rele_path(pip);
+
+			if (rval == MDI_SUCCESS)
+				(void) mdi_pi_free(pip, 0);
+		}
+		mdi_devi_exit(parent, circ);
 		return (rval == MDI_SUCCESS ? NDI_SUCCESS : NDI_FAILURE);
 
 	case BUS_UNCONFIG_ALL:
 		if (flags & NDI_AUTODETACH)
-			return (DDI_FAILURE);
+			return (NDI_FAILURE);
 
-		ph = DEVI(parent)->devi_mdi_xhci;
-		ASSERT(ph != NULL);
+		mdi_devi_enter(parent, &circ);
+		next = mdi_get_next_client_path(parent, NULL);
+		while ((pip = next) != NULL) {
+			next = mdi_get_next_client_path(parent, pip);
 
-		rval = MDI_SUCCESS;
-		ndi_devi_enter(parent, &circ);
-		pip = (mdi_pathinfo_t *)ph->ph_path_head;
-		while (pip) {
+			mdi_hold_path(pip);
+			mdi_devi_exit_phci(parent, circ);
 			rval = mdi_pi_offline(pip, NDI_DEVI_REMOVE);
-			if (rval != MDI_SUCCESS) {
+			mdi_devi_enter_phci(parent, &circ);
+			mdi_rele_path(pip);
+
+			if (rval != MDI_SUCCESS)
 				break;
-			}
-			pip = (mdi_pathinfo_t *)ph->ph_path_head;
+			(void) mdi_pi_free(pip, 0);
 		}
-		ndi_devi_exit(parent, circ);
+		mdi_devi_exit(parent, circ);
 		return (rval == MDI_SUCCESS ? NDI_SUCCESS : NDI_FAILURE);
 
 	case BUS_UNCONFIG_DRIVER:	/* nothing to do */
-		return (DDI_SUCCESS);
+		return (NDI_SUCCESS);
+
 	default:
-		return (DDI_FAILURE);
+		return (NDI_FAILURE);
 	}
 	/*NOTREACHED*/
 }

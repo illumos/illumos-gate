@@ -30,8 +30,10 @@
  *
  * Default locking order:
  *
- * _NOTE(LOCK_ORDER(mdi_mutex, mdi_phci::ph_mutex))
- * _NOTE(LOCK_ORDER(mdi_mutex, mdi_client::ct_mutex))
+ * _NOTE(LOCK_ORDER(mdi_mutex, mdi_vhci:vh_phci_mutex);
+ * _NOTE(LOCK_ORDER(mdi_mutex, mdi_vhci:vh_client_mutex);
+ * _NOTE(LOCK_ORDER(mdi_vhci:vh_phci_mutex, mdi_phci::ph_mutex);
+ * _NOTE(LOCK_ORDER(mdi_vhci:vh_client_mutex, mdi_client::ct_mutex);
  * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_pathinfo::pi_mutex))
  * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_client::ct_mutex))
  * _NOTE(LOCK_ORDER(mdi_client::ct_mutex mdi_pathinfo::pi_mutex))
@@ -70,6 +72,7 @@
 #ifdef	DEBUG
 #include <sys/debug.h>
 int	mdi_debug = 1;
+int	mdi_debug_logonly = 0;
 #define	MDI_DEBUG(level, stmnt) \
 	    if (mdi_debug >= (level)) i_mdi_log stmnt
 static void i_mdi_log(int, dev_info_t *, const char *fmt, ...);
@@ -82,7 +85,7 @@ extern int	modrootloaded;
 
 /*
  * Global mutex:
- * Protects vHCI list and structure members, pHCI and Client lists.
+ * Protects vHCI list and structure members.
  */
 kmutex_t	mdi_mutex;
 
@@ -201,7 +204,6 @@ static int 		i_mdi_lba_lb(mdi_client_t *ct,
 static void		i_mdi_pm_hold_client(mdi_client_t *, int);
 static void		i_mdi_pm_rele_client(mdi_client_t *, int);
 static void		i_mdi_pm_reset_client(mdi_client_t *);
-static void		i_mdi_pm_hold_all_phci(mdi_client_t *);
 static int		i_mdi_power_all_phci(mdi_client_t *);
 static void		i_mdi_log_sysevent(dev_info_t *, char *, char *);
 
@@ -216,8 +218,6 @@ static mdi_vhci_t	*i_mdi_vhci_class2vhci(char *);
 static mdi_vhci_t	*i_devi_get_vhci(dev_info_t *);
 static mdi_phci_t	*i_devi_get_phci(dev_info_t *);
 static void		i_mdi_phci_lock(mdi_phci_t *, mdi_pathinfo_t *);
-static void		i_mdi_phci_get_client_lock(mdi_phci_t *,
-			    mdi_client_t *);
 static void		i_mdi_phci_unlock(mdi_phci_t *);
 static mdi_pathinfo_t	*i_mdi_pi_alloc(mdi_phci_t *, char *, mdi_client_t *);
 static void		i_mdi_phci_add_path(mdi_phci_t *, mdi_pathinfo_t *);
@@ -326,7 +326,7 @@ i_mdi_init()
  *		MDI_COMPONENT_PHCI
  *		MDI_COMPONENT_CLIENT
  * XXX This doesn't work under multi-level MPxIO and should be
- *	removed when clients migrate mdi_is_*() interfaces.
+ *	removed when clients migrate mdi_component_is_*() interfaces.
  */
 int
 mdi_get_component_type(dev_info_t *dip)
@@ -349,7 +349,6 @@ mdi_get_component_type(dev_info_t *dip)
  *		MDI_SUCCESS
  *		MDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
@@ -358,6 +357,7 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
 	mdi_vhci_t		*vh = NULL;
 
 	ASSERT(vops->vo_revision == MDI_VHCI_OPS_REV);
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(vdip)));
 
 	i_mdi_init();
 
@@ -409,6 +409,9 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
 			ddi_prop_free(load_balance);
 		}
 
+		mutex_init(&vh->vh_phci_mutex, NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(&vh->vh_client_mutex, NULL, MUTEX_DEFAULT, NULL);
+
 		/*
 		 * Store the vHCI ops vectors
 		 */
@@ -449,12 +452,13 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
  *		MDI_SUCCESS
  *		MDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_vhci_unregister(dev_info_t *vdip, int flags)
 {
 	mdi_vhci_t	*found, *vh, *prev = NULL;
+
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(vdip)));
 
 	/*
 	 * Check for invalid VHCI
@@ -462,11 +466,10 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	if ((vh = i_devi_get_vhci(vdip)) == NULL)
 		return (MDI_FAILURE);
 
-	mutex_enter(&mdi_mutex);
-
 	/*
 	 * Scan the list of registered vHCIs for a match
 	 */
+	mutex_enter(&mdi_mutex);
 	for (found = mdi_vhci_head; found != NULL; found = found->vh_next) {
 		if (found == vh)
 			break;
@@ -483,7 +486,15 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	 * should have been unregistered, before a vHCI can be
 	 * unregistered.
 	 */
-	if (vh->vh_phci_count || vh->vh_client_count || vh->vh_refcnt) {
+	MDI_VHCI_PHCI_LOCK(vh);
+	if (vh->vh_refcnt || vh->vh_phci_count || vh->vh_client_count) {
+		MDI_VHCI_PHCI_UNLOCK(vh);
+		mutex_exit(&mdi_mutex);
+		return (MDI_FAILURE);
+	}
+	MDI_VHCI_PHCI_UNLOCK(vh);
+
+	if (destroy_vhci_cache(vh) != MDI_SUCCESS) {
 		mutex_exit(&mdi_mutex);
 		return (MDI_FAILURE);
 	}
@@ -499,22 +510,8 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	if (vh == mdi_vhci_tail) {
 		mdi_vhci_tail = prev;
 	}
-
 	mdi_vhci_count--;
 	mutex_exit(&mdi_mutex);
-
-	if (destroy_vhci_cache(vh) != MDI_SUCCESS) {
-		/* add vhci to the global list */
-		mutex_enter(&mdi_mutex);
-		if (mdi_vhci_head == NULL)
-			mdi_vhci_head = vh;
-		else
-			mdi_vhci_tail->vh_next = vh;
-		mdi_vhci_tail = vh;
-		mdi_vhci_count++;
-		mutex_exit(&mdi_mutex);
-		return (MDI_FAILURE);
-	}
 
 	vh->vh_ops = NULL;
 	DEVI(vdip)->devi_mdi_component &= ~MDI_COMPONENT_VHCI;
@@ -522,6 +519,8 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	kmem_free(vh->vh_class, strlen(vh->vh_class)+1);
 	kmem_free(vh->vh_client_table,
 	    mdi_client_table_size * sizeof (struct client_hash));
+	mutex_destroy(&vh->vh_phci_mutex);
+	mutex_destroy(&vh->vh_client_mutex);
 
 	kmem_free(vh, sizeof (mdi_vhci_t));
 	return (MDI_SUCCESS);
@@ -579,7 +578,6 @@ i_devi_get_vhci(dev_info_t *vdip)
  *		MDI_SUCCESS
  *		MDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_phci_register(char *class, dev_info_t *pdip, int flags)
@@ -588,6 +586,16 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	mdi_vhci_t		*vh;
 	char			*data;
 	char			*pathname;
+
+	/*
+	 * Some subsystems, like fcp, perform pHCI registration from a
+	 * different thread than the one doing the pHCI attach(9E) - the
+	 * driver attach code is waiting for this other thread to complete.
+	 * This means we can only ASSERT DEVI_BUSY_CHANGING of parent
+	 * (indicating that some thread has done an ndi_devi_enter of parent)
+	 * not DEVI_BUSY_OWNED (which would indicate that we did the enter).
+	 */
+	ASSERT(DEVI_BUSY_CHANGING(ddi_get_parent(pdip)));
 
 	pathname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	(void) ddi_pathname(pdip, pathname);
@@ -630,15 +638,16 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	ph->ph_unstable = 0;
 	ph->ph_vprivate = 0;
 	cv_init(&ph->ph_unstable_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&ph->ph_powerchange_cv, NULL, CV_DRIVER, NULL);
 
+	MDI_PHCI_LOCK(ph);
 	MDI_PHCI_SET_POWER_UP(ph);
+	MDI_PHCI_UNLOCK(ph);
 	DEVI(pdip)->devi_mdi_component |= MDI_COMPONENT_PHCI;
 	DEVI(pdip)->devi_mdi_xhci = (caddr_t)ph;
 
 	vhcache_phci_add(vh->vh_config, ph);
 
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_PHCI_LOCK(vh);
 	if (vh->vh_phci_head == NULL) {
 		vh->vh_phci_head = ph;
 	}
@@ -647,7 +656,8 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	}
 	vh->vh_phci_tail = ph;
 	vh->vh_phci_count++;
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_PHCI_UNLOCK(vh);
+
 	i_mdi_log_sysevent(pdip, class, ESC_DDI_INITIATOR_REGISTER);
 	return (MDI_SUCCESS);
 }
@@ -662,7 +672,6 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
  *		MDI_SUCCESS
  *		MDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_phci_unregister(dev_info_t *pdip, int flags)
@@ -671,6 +680,8 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 	mdi_phci_t		*ph;
 	mdi_phci_t		*tmp;
 	mdi_phci_t		*prev = NULL;
+
+	ASSERT(DEVI_BUSY_CHANGING(ddi_get_parent(pdip)));
 
 	ph = i_devi_get_phci(pdip);
 	if (ph == NULL) {
@@ -687,7 +698,7 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 		return (MDI_FAILURE);
 	}
 
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_PHCI_LOCK(vh);
 	tmp = vh->vh_phci_head;
 	while (tmp) {
 		if (tmp == ph) {
@@ -708,14 +719,12 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 	}
 
 	vh->vh_phci_count--;
-
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_PHCI_UNLOCK(vh);
 
 	i_mdi_log_sysevent(pdip, ph->ph_vhci->vh_class,
 	    ESC_DDI_INITIATOR_UNREGISTER);
 	vhcache_phci_remove(vh->vh_config, ph);
 	cv_destroy(&ph->ph_unstable_cv);
-	cv_destroy(&ph->ph_powerchange_cv);
 	mutex_destroy(&ph->ph_mutex);
 	kmem_free(ph, sizeof (mdi_phci_t));
 	DEVI(pdip)->devi_mdi_component &= ~MDI_COMPONENT_PHCI;
@@ -738,11 +747,163 @@ i_devi_get_phci(dev_info_t *pdip)
 }
 
 /*
+ * Single thread mdi entry into devinfo node for modifying its children.
+ * If necessary we perform an ndi_devi_enter of the vHCI before doing
+ * an ndi_devi_enter of 'dip'.  We maintain circular in two parts: one
+ * for the vHCI and one for the pHCI.
+ */
+void
+mdi_devi_enter(dev_info_t *phci_dip, int *circular)
+{
+	dev_info_t	*vdip;
+	int		vcircular, pcircular;
+
+	/* Verify calling context */
+	ASSERT(MDI_PHCI(phci_dip));
+	vdip = mdi_devi_get_vdip(phci_dip);
+	ASSERT(vdip);			/* A pHCI always has a vHCI */
+
+	/*
+	 * If pHCI is detaching then the framework has already entered the
+	 * vHCI on a threads that went down the code path leading to
+	 * detach_node().  This framework enter of the vHCI during pHCI
+	 * detach is done to avoid deadlock with vHCI power management
+	 * operations which enter the vHCI and the enter down the path
+	 * to the pHCI. If pHCI is detaching then we piggyback this calls
+	 * enter of the vHCI on frameworks vHCI enter that has already
+	 * occurred - this is OK because we know that the framework thread
+	 * doing detach is waiting for our completion.
+	 *
+	 * We should DEVI_IS_DETACHING under an enter of the parent to avoid
+	 * race with detach - but we can't do that because the framework has
+	 * already entered the parent, so we have some complexity instead.
+	 */
+	for (;;) {
+		if (ndi_devi_tryenter(vdip, &vcircular)) {
+			ASSERT(vcircular != -1);
+			if (DEVI_IS_DETACHING(phci_dip)) {
+				ndi_devi_exit(vdip, vcircular);
+				vcircular = -1;
+			}
+			break;
+		} else if (DEVI_IS_DETACHING(phci_dip)) {
+			vcircular = -1;
+			break;
+		} else {
+			delay(1);
+		}
+	}
+
+	ndi_devi_enter(phci_dip, &pcircular);
+	*circular = (vcircular << 16) | (pcircular & 0xFFFF);
+}
+
+/*
+ * Release mdi_devi_enter or successful mdi_devi_tryenter.
+ */
+void
+mdi_devi_exit(dev_info_t *phci_dip, int circular)
+{
+	dev_info_t	*vdip;
+	int		vcircular, pcircular;
+
+	/* Verify calling context */
+	ASSERT(MDI_PHCI(phci_dip));
+	vdip = mdi_devi_get_vdip(phci_dip);
+	ASSERT(vdip);			/* A pHCI always has a vHCI */
+
+	/* extract two circular recursion values from single int */
+	pcircular = (short)(circular & 0xFFFF);
+	vcircular = (short)((circular >> 16) & 0xFFFF);
+
+	ndi_devi_exit(phci_dip, pcircular);
+	if (vcircular != -1)
+		ndi_devi_exit(vdip, vcircular);
+}
+
+/*
+ * The functions mdi_devi_exit_phci() and mdi_devi_enter_phci() are used
+ * around a pHCI drivers calls to mdi_pi_online/offline, after holding
+ * the pathinfo node via mdi_hold_path/mdi_rele_path, to avoid deadlock
+ * with vHCI power management code during path online/offline.  Each
+ * mdi_devi_exit_phci must have a matching mdi_devi_enter_phci, and both must
+ * occur within the scope of an active mdi_devi_enter that establishes the
+ * circular value.
+ */
+void
+mdi_devi_exit_phci(dev_info_t *phci_dip, int circular)
+{
+	int		pcircular;
+
+	/* Verify calling context */
+	ASSERT(MDI_PHCI(phci_dip));
+
+	pcircular = (short)(circular & 0xFFFF);
+	ndi_devi_exit(phci_dip, pcircular);
+}
+
+void
+mdi_devi_enter_phci(dev_info_t *phci_dip, int *circular)
+{
+	int		pcircular;
+
+	/* Verify calling context */
+	ASSERT(MDI_PHCI(phci_dip));
+
+	ndi_devi_enter(phci_dip, &pcircular);
+
+	/* verify matching mdi_devi_exit_phci/mdi_devi_enter_phci use */
+	ASSERT(pcircular == ((short)(*circular & 0xFFFF)));
+}
+
+/*
+ * mdi_devi_get_vdip():
+ *		given a pHCI dip return vHCI dip
+ */
+dev_info_t *
+mdi_devi_get_vdip(dev_info_t *pdip)
+{
+	mdi_phci_t	*ph;
+
+	ph = i_devi_get_phci(pdip);
+	if (ph && ph->ph_vhci)
+		return (ph->ph_vhci->vh_dip);
+	return (NULL);
+}
+
+/*
+ * mdi_devi_pdip_entered():
+ *		Return 1 if we are vHCI and have done an ndi_devi_enter
+ *		of a pHCI
+ */
+int
+mdi_devi_pdip_entered(dev_info_t *vdip)
+{
+	mdi_vhci_t	*vh;
+	mdi_phci_t	*ph;
+
+	vh = i_devi_get_vhci(vdip);
+	if (vh == NULL)
+		return (0);
+
+	MDI_VHCI_PHCI_LOCK(vh);
+	ph = vh->vh_phci_head;
+	while (ph) {
+		if (ph->ph_dip && DEVI_BUSY_OWNED(ph->ph_dip)) {
+			MDI_VHCI_PHCI_UNLOCK(vh);
+			return (1);
+		}
+		ph = ph->ph_next;
+	}
+	MDI_VHCI_PHCI_UNLOCK(vh);
+	return (0);
+}
+
+/*
  * mdi_phci_path2devinfo():
  * 		Utility function to search for a valid phci device given
  *		the devfs pathname.
  */
-
 dev_info_t *
 mdi_phci_path2devinfo(dev_info_t *vdip, caddr_t pathname)
 {
@@ -762,7 +923,7 @@ mdi_phci_path2devinfo(dev_info_t *vdip, caddr_t pathname)
 	}
 
 	temp_pathname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_PHCI_LOCK(vh);
 	ph = vh->vh_phci_head;
 	while (ph != NULL) {
 		pdip = ph->ph_dip;
@@ -777,7 +938,7 @@ mdi_phci_path2devinfo(dev_info_t *vdip, caddr_t pathname)
 	if (ph == NULL) {
 		pdip = NULL;
 	}
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_PHCI_UNLOCK(vh);
 	kmem_free(temp_pathname, MAXPATHLEN);
 	return (pdip);
 }
@@ -834,37 +995,6 @@ i_mdi_phci_lock(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 }
 
 /*
- * i_mdi_phci_get_client_lock():
- *		Lock a pHCI device
- * Return Values:
- *		None
- * Note:
- *		The default locking order is:
- *		_NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_client::ct_mutex))
- *		But there are number of situations where locks need to be
- *		grabbed in reverse order.  This routine implements try and lock
- *		mechanism depending on the requested parameter option.
- */
-static void
-i_mdi_phci_get_client_lock(mdi_phci_t *ph, mdi_client_t *ct)
-{
-	if (ct) {
-		/* Reverse locking is requested. */
-		while (MDI_PHCI_TRYLOCK(ph) == 0) {
-			/*
-			 * tryenter failed. Try to grab again
-			 * after a small delay
-			 */
-			MDI_CLIENT_UNLOCK(ct);
-			delay(1);
-			MDI_CLIENT_LOCK(ct);
-		}
-	} else {
-		MDI_PHCI_LOCK(ph);
-	}
-}
-
-/*
  * i_mdi_phci_unlock():
  *		Unlock the pHCI component
  */
@@ -888,7 +1018,7 @@ i_mdi_devinfo_create(mdi_vhci_t *vh, char *name, char *guid,
 {
 	dev_info_t *cdip = NULL;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
 
 	/* Verify for duplicate entry */
 	cdip = i_mdi_devinfo_find(vh, name, guid);
@@ -936,7 +1066,6 @@ fail:
  * Return Values:
  *		Handle to a dev_info node or NULL
  */
-
 static dev_info_t *
 i_mdi_devinfo_find(mdi_vhci_t *vh, caddr_t name, char *guid)
 {
@@ -979,12 +1108,13 @@ static int
 i_mdi_devinfo_remove(dev_info_t *vdip, dev_info_t *cdip, int flags)
 {
 	int	rv = MDI_SUCCESS;
+
 	if (i_mdi_is_child_present(vdip, cdip) == MDI_SUCCESS ||
 	    (flags & MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED)) {
 		rv = ndi_devi_offline(cdip, NDI_DEVI_REMOVE);
 		if (rv != NDI_SUCCESS) {
 			MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_devinfo_remove:"
-			    " failed. cdip = %p\n", cdip));
+			    " failed. cdip = %p\n", (void *)cdip));
 		}
 		/*
 		 * Convert to MDI error code
@@ -1012,6 +1142,7 @@ static mdi_client_t *
 i_devi_get_client(dev_info_t *cdip)
 {
 	mdi_client_t	*ct = NULL;
+
 	if (MDI_CLIENT(cdip)) {
 		ct = (mdi_client_t *)DEVI(cdip)->devi_mdi_client;
 	}
@@ -1022,7 +1153,6 @@ i_devi_get_client(dev_info_t *cdip)
  * i_mdi_is_child_present():
  *		Search for the presence of client device dev_info node
  */
-
 static int
 i_mdi_is_child_present(dev_info_t *vdip, dev_info_t *cdip)
 {
@@ -1056,7 +1186,6 @@ i_mdi_is_child_present(dev_info_t *vdip, dev_info_t *cdip)
  *		grabbed in reverse order.  This routine implements try and lock
  *		mechanism depending on the requested parameter option.
  */
-
 static void
 i_mdi_client_lock(mdi_client_t *ct, mdi_pathinfo_t *pip)
 {
@@ -1084,7 +1213,6 @@ i_mdi_client_lock(mdi_client_t *ct, mdi_pathinfo_t *pip)
  * i_mdi_client_unlock():
  *		Unlock a client component
  */
-
 static void
 i_mdi_client_unlock(mdi_client_t *ct)
 {
@@ -1094,7 +1222,7 @@ i_mdi_client_unlock(mdi_client_t *ct)
 /*
  * i_mdi_client_alloc():
  * 		Allocate and initialize a client structure.  Caller should
- *		hold the global mdi_mutex.
+ *		hold the vhci client lock.
  * Return Values:
  *		Handle to a client component
  */
@@ -1104,7 +1232,7 @@ i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid)
 {
 	mdi_client_t	*ct;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
 
 	/*
 	 * Allocate and initialize a component structure.
@@ -1123,9 +1251,11 @@ i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid)
 	ct->ct_vprivate = NULL;
 	ct->ct_flags = 0;
 	ct->ct_state = MDI_CLIENT_STATE_FAILED;
+	MDI_CLIENT_LOCK(ct);
 	MDI_CLIENT_SET_OFFLINE(ct);
 	MDI_CLIENT_SET_DETACH(ct);
 	MDI_CLIENT_SET_POWER_UP(ct);
+	MDI_CLIENT_UNLOCK(ct);
 	ct->ct_failover_flags = 0;
 	ct->ct_failover_status = 0;
 	cv_init(&ct->ct_failover_cv, NULL, CV_DRIVER, NULL);
@@ -1150,16 +1280,16 @@ i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid)
 /*
  * i_mdi_client_enlist_table():
  *		Attach the client device to the client hash table. Caller
- *		should hold the mdi_mutex
+ *		should hold the vhci client lock.
  */
-
 static void
 i_mdi_client_enlist_table(mdi_vhci_t *vh, mdi_client_t *ct)
 {
 	int 			index;
 	struct client_hash	*head;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
+
 	index = i_mdi_get_hash_key(ct->ct_guid);
 	head = &vh->vh_client_table[index];
 	ct->ct_hnext = (mdi_client_t *)head->ct_hash_head;
@@ -1171,9 +1301,8 @@ i_mdi_client_enlist_table(mdi_vhci_t *vh, mdi_client_t *ct)
 /*
  * i_mdi_client_delist_table():
  *		Attach the client device to the client hash table.
- *		Caller should hold the mdi_mutex
+ *		Caller should hold the vhci client lock.
  */
-
 static void
 i_mdi_client_delist_table(mdi_vhci_t *vh, mdi_client_t *ct)
 {
@@ -1183,7 +1312,8 @@ i_mdi_client_delist_table(mdi_vhci_t *vh, mdi_client_t *ct)
 	mdi_client_t		*next;
 	mdi_client_t		*last;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
+
 	guid = ct->ct_guid;
 	index = i_mdi_get_hash_key(guid);
 	head = &vh->vh_client_table[index];
@@ -1223,7 +1353,8 @@ i_mdi_client_free(mdi_vhci_t *vh, mdi_client_t *ct)
 	dev_info_t	*cdip;
 	dev_info_t	*vdip;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
+
 	vdip = vh->vh_dip;
 	cdip = ct->ct_dip;
 
@@ -1254,9 +1385,9 @@ i_mdi_client_free(mdi_vhci_t *vh, mdi_client_t *ct)
 	kmem_free(ct, sizeof (*ct));
 
 	if (cdip != NULL) {
-		mutex_exit(&mdi_mutex);
+		MDI_VHCI_CLIENT_UNLOCK(vh);
 		(void) i_mdi_devinfo_remove(vdip, cdip, flags);
-		mutex_enter(&mdi_mutex);
+		MDI_VHCI_CLIENT_LOCK(vh);
 	}
 	return (rv);
 }
@@ -1264,7 +1395,7 @@ i_mdi_client_free(mdi_vhci_t *vh, mdi_client_t *ct)
 /*
  * i_mdi_client_find():
  * 		Find the client structure corresponding to a given guid
- *		Caller should hold the mdi_mutex
+ *		Caller should hold the vhci client lock.
  */
 static mdi_client_t *
 i_mdi_client_find(mdi_vhci_t *vh, char *cname, char *guid)
@@ -1273,7 +1404,8 @@ i_mdi_client_find(mdi_vhci_t *vh, char *cname, char *guid)
 	struct client_hash	*head;
 	mdi_client_t		*ct;
 
-	ASSERT(MUTEX_HELD(&mdi_mutex));
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(vh));
+
 	index = i_mdi_get_hash_key(guid);
 	head = &vh->vh_client_table[index];
 
@@ -1287,8 +1419,6 @@ i_mdi_client_find(mdi_vhci_t *vh, char *cname, char *guid)
 	}
 	return (ct);
 }
-
-
 
 /*
  * i_mdi_client_update_state():
@@ -1308,7 +1438,8 @@ static void
 i_mdi_client_update_state(mdi_client_t *ct)
 {
 	int state;
-	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	state = i_mdi_client_compute_state(ct, NULL);
 	MDI_CLIENT_SET_STATE(ct, state);
 }
@@ -1330,7 +1461,7 @@ i_mdi_client_compute_state(mdi_client_t *ct, mdi_phci_t *ph)
 	int		standby_count = 0;
 	mdi_pathinfo_t	*pip, *next;
 
-	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	pip = ct->ct_path_head;
 	while (pip != NULL) {
 		MDI_PI_LOCK(pip);
@@ -1340,6 +1471,7 @@ i_mdi_client_compute_state(mdi_client_t *ct, mdi_phci_t *ph)
 			pip = next;
 			continue;
 		}
+
 		if ((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK)
 				== MDI_PATHINFO_STATE_ONLINE)
 			online_count++;
@@ -1354,7 +1486,7 @@ i_mdi_client_compute_state(mdi_client_t *ct, mdi_phci_t *ph)
 		if (standby_count == 0) {
 			state = MDI_CLIENT_STATE_FAILED;
 			MDI_DEBUG(2, (CE_NOTE, NULL, "!client state: failed"
-			    " ct = %p\n", ct));
+			    " ct = %p\n", (void *)ct));
 		} else if (standby_count == 1) {
 			state = MDI_CLIENT_STATE_DEGRADED;
 		} else {
@@ -1425,7 +1557,6 @@ mdi_client_path2devinfo(dev_info_t *vdip, char *pathname)
 	kmem_free(temp_pathname, MAXPATHLEN);
 	return (cdip);
 }
-
 
 /*
  * mdi_client_get_path_count():
@@ -1653,7 +1784,7 @@ i_mdi_failover(void *arg)
 	mdi_client_t	*ct = (mdi_client_t *)arg;
 	mdi_vhci_t	*vh = ct->ct_vhci;
 
-	ASSERT(!MUTEX_HELD(&ct->ct_mutex));
+	ASSERT(!MDI_CLIENT_LOCKED(ct));
 
 	if (vh->vh_ops->vo_failover != NULL) {
 		/*
@@ -1750,12 +1881,12 @@ i_mdi_lba_lb(mdi_client_t *ct, mdi_pathinfo_t **ret_pip, struct buf *bp)
 		}
 		if (pip == NULL) {
 			MDI_DEBUG(4, (CE_NOTE, NULL,
-			    "!lba %p, no pip !!\n",
-				bp->b_blkno));
+			    "!lba %llx, no pip !!\n",
+				bp->b_lblkno));
 		} else {
 			MDI_DEBUG(4, (CE_NOTE, NULL,
-			    "!lba %p, no pip for path_index, "
-			    "pip %p\n", pip));
+			    "!lba %llx, no pip for path_index, "
+			    "pip %p\n", bp->b_lblkno, (void *)pip));
 		}
 	}
 	return (MDI_FAILURE);
@@ -1798,8 +1929,9 @@ i_mdi_lba_lb(mdi_client_t *ct, mdi_pathinfo_t **ret_pip, struct buf *bp)
  *		when the STANDBY path comes up first), during failover
  *		(to activate a STANDBY path as ONLINE).
  *
- *		The selected path in returned in a held state (ref_cnt).
- *		Caller should release the hold by calling mdi_rele_path().
+ *		The selected path is returned in a a mdi_hold_path() state
+ *		(pi_ref_cnt). Caller should release the hold by calling
+ *		mdi_rele_path().
  *
  * Return Values:
  *		MDI_SUCCESS	- Completed successfully
@@ -1851,7 +1983,7 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			 * Fail this request.
 			 */
 			MDI_DEBUG(2, (CE_NOTE, cdip, "!mdi_select_path: "
-			    "client state offline ct = %p\n", ct));
+			    "client state offline ct = %p\n", (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_FAILURE);
 		}
@@ -1862,7 +1994,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			 * caller that this device is busy.
 			 */
 			MDI_DEBUG(2, (CE_NOTE, cdip, "!mdi_select_path: "
-			    "client failover in progress ct = %p\n", ct));
+			    "client failover in progress ct = %p\n",
+			    (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_BUSY);
 		}
@@ -1873,7 +2006,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		 * (standby) and let the probe/attach process to continue.
 		 */
 		if (MDI_CLIENT_IS_DETACHED(ct) || !i_ddi_devi_attached(cdip)) {
-			MDI_DEBUG(4, (CE_NOTE, cdip, "!Devi is onlining\n"));
+			MDI_DEBUG(4, (CE_NOTE, cdip, "!Devi is onlining "
+			    "ct = %p\n", (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_DEVI_ONLINING);
 		}
@@ -2243,31 +2377,6 @@ mdi_get_next_client_path(dev_info_t *ph_dip, mdi_pathinfo_t *pip)
 }
 
 /*
- * mdi_get_nextpath():
- *		mdi_pathinfo node walker function.  Get the next node from the
- *		client or pHCI device list.
- *
- * XXX This is wrapper function for compatibility purposes only.
- *
- *	It doesn't work under Multi-level MPxIO, where a dip
- *	is both client and phci (which link should next_path follow?).
- *	Once Leadville is modified to call mdi_get_next_phci/client_path,
- *	this interface should be removed.
- */
-void
-mdi_get_next_path(dev_info_t *dip, mdi_pathinfo_t *pip,
-    mdi_pathinfo_t **ret_pip)
-{
-	if (MDI_CLIENT(dip)) {
-		*ret_pip = mdi_get_next_phci_path(dip, pip);
-	} else if (MDI_PHCI(dip)) {
-		*ret_pip = mdi_get_next_client_path(dip, pip);
-	} else {
-		*ret_pip = NULL;
-	}
-}
-
-/*
  * mdi_hold_path():
  *		Hold the mdi_pathinfo node against unwanted unexpected free.
  * Return Values:
@@ -2304,7 +2413,6 @@ mdi_rele_path(mdi_pathinfo_t *pip)
 		MDI_PI_UNLOCK(pip);
 	}
 }
-
 
 /*
  * mdi_pi_lock():
@@ -2357,6 +2465,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 	mdi_client_t		*ct;
 	mdi_pathinfo_t		*pip = NULL;
 
+	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: %s %s",
+	    caddr ? caddr : "NULL", paddr ? paddr : "NULL"));
 	if ((pdip == NULL) || (paddr == NULL)) {
 		return (NULL);
 	}
@@ -2365,7 +2475,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		/*
 		 * Invalid pHCI device, Nothing more to do.
 		 */
-		MDI_DEBUG(2, (CE_WARN, NULL,
+		MDI_DEBUG(2, (CE_WARN, pdip,
 		    "!mdi_pi_find: invalid phci"));
 		return (NULL);
 	}
@@ -2375,20 +2485,26 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		/*
 		 * Invalid vHCI device, Nothing more to do.
 		 */
-		MDI_DEBUG(2, (CE_WARN, NULL,
-		    "!mdi_pi_find: invalid phci"));
+		MDI_DEBUG(2, (CE_WARN, pdip,
+		    "!mdi_pi_find: invalid vhci"));
 		return (NULL);
 	}
 
 	/*
-	 * Look for client device identified by caddr (guid)
+	 * Look for pathinfo node identified by paddr.
 	 */
 	if (caddr == NULL) {
 		/*
 		 * Find a mdi_pathinfo node under pHCI list for a matching
 		 * unit address.
 		 */
-		mutex_enter(&ph->ph_mutex);
+		MDI_PHCI_LOCK(ph);
+		if (MDI_PHCI_IS_OFFLINE(ph)) {
+			MDI_DEBUG(2, (CE_WARN, pdip,
+			    "!mdi_pi_find: offline phci %p", (void *)ph));
+			MDI_PHCI_UNLOCK(ph);
+			return (NULL);
+		}
 		pip = (mdi_pathinfo_t *)ph->ph_path_head;
 
 		while (pip != NULL) {
@@ -2397,7 +2513,9 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 			}
 			pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
 		}
-		mutex_exit(&ph->ph_mutex);
+		MDI_PHCI_UNLOCK(ph);
+		MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: found %p",
+		    (void *)pip));
 		return (pip);
 	}
 
@@ -2412,7 +2530,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 	/*
 	 * Find the client device corresponding to 'caddr'
 	 */
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_CLIENT_LOCK(vh);
 
 	/*
 	 * XXX - Passing NULL to the following function works as long as the
@@ -2424,8 +2542,10 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		 * Client not found, Obviously mdi_pathinfo node has not been
 		 * created yet.
 		 */
-		mutex_exit(&mdi_mutex);
-		return (pip);
+		MDI_VHCI_CLIENT_UNLOCK(vh);
+		MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: client not "
+		    "found for caddr %s", caddr ? caddr : "NULL"));
+		return (NULL);
 	}
 
 	/*
@@ -2438,7 +2558,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 	 * Release the global mutex as it is no more needed. Note: We always
 	 * respect the locking order while acquiring.
 	 */
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_CLIENT_UNLOCK(vh);
 
 	pip = (mdi_pathinfo_t *)ct->ct_path_head;
 	while (pip != NULL) {
@@ -2452,6 +2572,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
 	}
 	MDI_CLIENT_UNLOCK(ct);
+	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: found:: %p", (void *)pip));
 	return (pip);
 }
 
@@ -2488,6 +2609,10 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	int		rv = MDI_NOMEM;
 	int		path_allocated = 0;
 
+	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_alloc_compatible: %s %s %s",
+	    cname ? cname : "NULL", caddr ? caddr : "NULL",
+	    paddr ? paddr : "NULL"));
+
 	if (pdip == NULL || cname == NULL || caddr == NULL || paddr == NULL ||
 	    ret_pip == NULL) {
 		/* Nothing more to do */
@@ -2495,12 +2620,21 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	}
 
 	*ret_pip = NULL;
+
+	/* No allocations on detaching pHCI */
+	if (DEVI_IS_DETACHING(pdip)) {
+		/* Invalid pHCI device, return failure */
+		MDI_DEBUG(1, (CE_WARN, pdip,
+		    "!mdi_pi_alloc: detaching pHCI=%p", (void *)pdip));
+		return (MDI_FAILURE);
+	}
+
 	ph = i_devi_get_phci(pdip);
 	ASSERT(ph != NULL);
 	if (ph == NULL) {
 		/* Invalid pHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_alloc: invalid pHCI=%p", pdip));
+		MDI_DEBUG(1, (CE_WARN, pdip,
+		    "!mdi_pi_alloc: invalid pHCI=%p", (void *)pdip));
 		return (MDI_FAILURE);
 	}
 
@@ -2508,8 +2642,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	vh = ph->ph_vhci;
 	if (vh == NULL) {
 		/* Invalid vHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_alloc: invalid pHCI=%p", pdip));
+		MDI_DEBUG(1, (CE_WARN, pdip,
+		    "!mdi_pi_alloc: invalid vHCI=%p", (void *)pdip));
 		MDI_PHCI_UNLOCK(ph);
 		return (MDI_FAILURE);
 	}
@@ -2519,8 +2653,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 		 * Do not allow new node creation when pHCI is in
 		 * offline/suspended states
 		 */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "mdi_pi_alloc: pHCI=%p is not ready", ph));
+		MDI_DEBUG(1, (CE_WARN, pdip,
+		    "mdi_pi_alloc: pHCI=%p is not ready", (void *)ph));
 		MDI_PHCI_UNLOCK(ph);
 		return (MDI_BUSY);
 	}
@@ -2528,7 +2662,7 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	MDI_PHCI_UNLOCK(ph);
 
 	/* look for a matching client, create one if not found */
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_CLIENT_LOCK(vh);
 	ct = i_mdi_client_find(vh, cname, caddr);
 	if (ct == NULL) {
 		ct = i_mdi_client_alloc(vh, cname, caddr);
@@ -2551,6 +2685,7 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	DEVI(cdip)->devi_mdi_component |= MDI_COMPONENT_CLIENT;
 	DEVI(cdip)->devi_mdi_client = (caddr_t)ct;
 
+	MDI_CLIENT_LOCK(ct);
 	pip = (mdi_pathinfo_t *)ct->ct_path_head;
 	while (pip != NULL) {
 		/*
@@ -2562,6 +2697,7 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 		}
 		pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
 	}
+	MDI_CLIENT_UNLOCK(ct);
 
 	if (pip == NULL) {
 		/*
@@ -2578,7 +2714,7 @@ fail:
 	/*
 	 * Release the global mutex.
 	 */
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_CLIENT_UNLOCK(vh);
 
 	/*
 	 * Mark the pHCI as stable
@@ -2587,6 +2723,9 @@ fail:
 	MDI_PHCI_STABLE(ph);
 	MDI_PHCI_UNLOCK(ph);
 	*ret_pip = pip;
+
+	MDI_DEBUG(2, (CE_NOTE, pdip,
+	    "!mdi_pi_alloc_compatible: alloc %p", (void *)pip));
 
 	if (path_allocated)
 		vhcache_pi_add(vh->vh_config, MDI_PI(pip));
@@ -2609,7 +2748,6 @@ mdi_pi_alloc(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
  * Return Values:
  *		mdi_pathinfo
  */
-
 /*ARGSUSED*/
 static mdi_pathinfo_t *
 i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
@@ -2619,6 +2757,8 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	int		ph_circular;
 	int		se_flag;
 	int		kmem_flag;
+
+	ASSERT(MDI_VHCI_CLIENT_LOCKED(ph->ph_vhci));
 
 	pip = kmem_zalloc(sizeof (struct mdi_pathinfo), KM_SLEEP);
 	mutex_init(&MDI_PI(pip)->pi_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -2654,6 +2794,11 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 
 	/*
 	 * Lock both dev_info nodes against changes in parallel.
+	 *
+	 * The ndi_devi_enter(Client), is atypical since the client is a leaf.
+	 * This atypical operation is done to synchronize pathinfo nodes
+	 * during devinfo snapshot (see di_register_pip) by 'pretending' that
+	 * the pathinfo nodes are children of the Client.
 	 */
 	ndi_devi_enter(ct->ct_dip, &ct_circular);
 	ndi_devi_enter(ph->ph_dip, &ph_circular);
@@ -2679,12 +2824,12 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
  * Notes:
  *		Caller should per-pHCI mutex
  */
-
 static void
 i_mdi_phci_add_path(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 {
 	ASSERT(DEVI_BUSY_OWNED(ph->ph_dip));
 
+	MDI_PHCI_LOCK(ph);
 	if (ph->ph_path_head == NULL) {
 		ph->ph_path_head = pip;
 	} else {
@@ -2692,18 +2837,19 @@ i_mdi_phci_add_path(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 	}
 	ph->ph_path_tail = pip;
 	ph->ph_path_count++;
+	MDI_PHCI_UNLOCK(ph);
 }
 
 /*
  * i_mdi_client_add_path():
  *		Add mdi_pathinfo node to client list
  */
-
 static void
 i_mdi_client_add_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 {
 	ASSERT(DEVI_BUSY_OWNED(ct->ct_dip));
 
+	MDI_CLIENT_LOCK(ct);
 	if (ct->ct_path_head == NULL) {
 		ct->ct_path_head = pip;
 	} else {
@@ -2711,6 +2857,7 @@ i_mdi_client_add_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 	}
 	ct->ct_path_tail = pip;
 	ct->ct_path_count++;
+	MDI_CLIENT_UNLOCK(ct);
 }
 
 /*
@@ -2722,7 +2869,6 @@ i_mdi_client_add_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
  *		MDI_FAILURE
  *		MDI_BUSY
  */
-
 /*ARGSUSED*/
 int
 mdi_pi_free(mdi_pathinfo_t *pip, int flags)
@@ -2742,7 +2888,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		 * Invalid pHCI device, return failure
 		 */
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid pHCI"));
+		    "!mdi_pi_free: invalid pHCI pip=%p", (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -2752,7 +2898,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 	if (vh == NULL) {
 		/* Invalid pHCI device, return failure */
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid vHCI"));
+		    "!mdi_pi_free: invalid vHCI pip=%p", (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -2764,7 +2910,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		 * Invalid Client device, return failure
 		 */
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid client"));
+		    "!mdi_pi_free: invalid client pip=%p", (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -2779,8 +2925,8 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Node is busy
 		 */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: pathinfo node is busy pip=%p", pip));
+		MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
+		    "!mdi_pi_free: pathinfo node is busy pip=%p", (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_BUSY);
 	}
@@ -2789,9 +2935,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Give a chance for pending I/Os to complete.
 		 */
-		MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip, "!mdi_pi_free: "
+		MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!mdi_pi_free: "
 		    "%d cmds still pending on path: %p\n",
-		    MDI_PI(pip)->pi_ref_cnt, pip));
+		    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
 		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
 		    &MDI_PI(pip)->pi_mutex,
 		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
@@ -2799,14 +2945,14 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
 			 */
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip,
+			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip,
 			    "!mdi_pi_free: "
 			    "Timeout reached on path %p without the cond\n",
-			    pip));
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip,
+			    (void *)pip));
+			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip,
 			    "!mdi_pi_free: "
 			    "%d cmds still pending on path: %p\n",
-			    MDI_PI(pip)->pi_ref_cnt, pip));
+			    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
 			MDI_PI_UNLOCK(pip);
 			return (MDI_BUSY);
 		}
@@ -2820,7 +2966,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 
 	MDI_CLIENT_LOCK(ct);
 
-	/* Prevent further failovers till mdi_mutex is held */
+	/* Prevent further failovers till MDI_VHCI_CLIENT_LOCK is held */
 	MDI_CLIENT_SET_PATH_FREE_IN_PROGRESS(ct);
 
 	/*
@@ -2830,7 +2976,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		cv_wait(&ct->ct_failover_cv, &ct->ct_mutex);
 
 	MDI_CLIENT_UNLOCK(ct);
-	mutex_enter(&mdi_mutex);
+	MDI_VHCI_CLIENT_LOCK(vh);
 	MDI_CLIENT_LOCK(ct);
 	MDI_CLIENT_CLEAR_PATH_FREE_IN_PROGRESS(ct);
 
@@ -2857,12 +3003,12 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 			 */
 			MDI_CLIENT_UNLOCK(ct);
 			(void) i_mdi_client_free(ct->ct_vhci, ct);
-			mutex_exit(&mdi_mutex);
+			MDI_VHCI_CLIENT_UNLOCK(vh);
 			return (rv);
 		}
 	}
 	MDI_CLIENT_UNLOCK(ct);
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_CLIENT_UNLOCK(vh);
 
 	if (rv == MDI_FAILURE)
 		vhcache_pi_add(vh->vh_config, MDI_PI(pip));
@@ -2882,11 +3028,14 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 	int	se_flag;
 	int	kmem_flag;
 
+	ASSERT(MDI_CLIENT_LOCKED(ct));
+
 	/*
 	 * remove any per-path kstats
 	 */
 	i_mdi_pi_kstat_destroy(pip);
 
+	/* See comments in i_mdi_pi_alloc() */
 	ndi_devi_enter(ct->ct_dip, &ct_circular);
 	ndi_devi_enter(ph->ph_dip, &ph_circular);
 
@@ -2925,7 +3074,6 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
  * Notes:
  *		Caller should hold per-pHCI mutex
  */
-
 static void
 i_mdi_phci_remove_path(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 {
@@ -2934,6 +3082,7 @@ i_mdi_phci_remove_path(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 
 	ASSERT(DEVI_BUSY_OWNED(ph->ph_dip));
 
+	MDI_PHCI_LOCK(ph);
 	path = ph->ph_path_head;
 	while (path != NULL) {
 		if (path == pip) {
@@ -2961,13 +3110,13 @@ i_mdi_phci_remove_path(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 	 */
 	MDI_PI(pip)->pi_phci_link = NULL;
 	MDI_PI(pip)->pi_phci = NULL;
+	MDI_PHCI_UNLOCK(ph);
 }
 
 /*
  * i_mdi_client_remove_path():
  * 		Remove a mdi_pathinfo node from client path list.
  */
-
 static void
 i_mdi_client_remove_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 {
@@ -2976,6 +3125,7 @@ i_mdi_client_remove_path(mdi_client_t *ct, mdi_pathinfo_t *pip)
 
 	ASSERT(DEVI_BUSY_OWNED(ct->ct_dip));
 
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	path = ct->ct_path_head;
 	while (path != NULL) {
 		if (path == pip) {
@@ -3034,7 +3184,7 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 */
 		MDI_PI_UNLOCK(pip);
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid phci"));
+		    "!mdi_pi_state_change: invalid phci pip=%p", (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3046,7 +3196,7 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 */
 		MDI_PI_UNLOCK(pip);
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid vhci"));
+		    "!mdi_pi_state_change: invalid vhci pip=%p", (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3058,7 +3208,8 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 */
 		MDI_PI_UNLOCK(pip);
 		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid client"));
+		    "!mdi_pi_state_change: invalid client pip=%p",
+		    (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3073,9 +3224,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		if (f != NULL) {
 			rv = (*f)(vh->vh_dip, pip, 0);
 			if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(1, (CE_WARN, vh->vh_dip,
+				MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
 				    "!vo_pi_init: failed vHCI=0x%p, pip=0x%p",
-				    vh, pip));
+				    (void *)vh, (void *)pip));
 				return (MDI_FAILURE);
 			}
 		}
@@ -3089,8 +3240,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 	 */
 	i_mdi_phci_lock(ph, pip);
 	if (MDI_PHCI_IS_READY(ph) == 0) {
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: pHCI not ready, pHCI=%p", ph));
+		MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
+		    "!mdi_pi_state_change: pHCI not ready, pHCI=%p",
+		    (void *)ph));
 		MDI_PI_UNLOCK(pip);
 		i_mdi_phci_unlock(ph);
 		return (MDI_BUSY);
@@ -3187,18 +3339,18 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 	i_mdi_client_unlock(ct);
 
 	f = vh->vh_ops->vo_pi_state_change;
-	if (f != NULL) {
+	if (f != NULL)
 		rv = (*f)(vh->vh_dip, pip, state, 0, flag);
-		if (rv == MDI_NOT_SUPPORTED) {
-			MDI_CLIENT_SET_DEV_NOT_SUPPORTED(ct);
-		}
-		if (rv != MDI_SUCCESS) {
-			MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-			    "!vo_pi_state_change: failed rv = %x", rv));
-		}
-	}
+
 	MDI_CLIENT_LOCK(ct);
 	MDI_PI_LOCK(pip);
+	if (rv == MDI_NOT_SUPPORTED) {
+		MDI_CLIENT_SET_DEV_NOT_SUPPORTED(ct);
+	}
+	if (rv != MDI_SUCCESS) {
+		MDI_DEBUG(2, (CE_WARN, ct->ct_dip,
+		    "!vo_pi_state_change: failed rv = %x", rv));
+	}
 	if (MDI_PI_IS_TRANSIENT(pip)) {
 		if (rv == MDI_SUCCESS) {
 			MDI_PI_CLEAR_TRANSIENT(pip);
@@ -3235,14 +3387,14 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 				    ((state == MDI_PATHINFO_STATE_ONLINE) ||
 				    (state == MDI_PATHINFO_STATE_STANDBY))) {
 
-					i_mdi_client_unlock(ct);
 					/*
 					 * Must do ndi_devi_online() through
 					 * hotplug thread for deferred
 					 * attach mechanism to work
 					 */
+					MDI_CLIENT_UNLOCK(ct);
 					rv = ndi_devi_online(cdip, 0);
-					i_mdi_client_lock(ct, NULL);
+					MDI_CLIENT_LOCK(ct);
 					if ((rv != NDI_SUCCESS) &&
 					    (MDI_CLIENT_STATE(ct) ==
 					    MDI_CLIENT_STATE_DEGRADED)) {
@@ -3274,9 +3426,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 				if (((flag & NDI_DEVI_REMOVE) == 0) &&
 				    cdip && (i_ddi_node_state(cdip) >=
 				    DS_INITIALIZED)) {
-					i_mdi_client_unlock(ct);
+					MDI_CLIENT_UNLOCK(ct);
 					rv = ndi_devi_offline(cdip, 0);
-					i_mdi_client_lock(ct, NULL);
+					MDI_CLIENT_LOCK(ct);
 
 					if (rv != NDI_SUCCESS) {
 						/*
@@ -3348,7 +3500,7 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_pm_held == 0) {
 		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "mdi_pi_online "
-		    "i_mdi_pm_hold_pip\n"));
+		    "i_mdi_pm_hold_pip %p\n", (void *)pip));
 		i_mdi_pm_hold_pip(pip);
 		client_held = 1;
 	}
@@ -3361,7 +3513,7 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 		}
 
 		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "mdi_pi_online "
-		    "i_mdi_pm_hold_client\n"));
+		    "i_mdi_pm_hold_client %p\n", (void *)ct));
 		i_mdi_pm_hold_client(ct, 1);
 		MDI_CLIENT_UNLOCK(ct);
 	}
@@ -3473,9 +3625,9 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Give a chance for pending I/Os to complete.
 		 */
-		MDI_DEBUG(1, (CE_NOTE, vdip, "!i_mdi_pi_offline: "
+		MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
 		    "%d cmds still pending on path: %p\n",
-		    MDI_PI(pip)->pi_ref_cnt, pip));
+		    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
 		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
 		    &MDI_PI(pip)->pi_mutex,
 		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
@@ -3483,12 +3635,12 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
 			 */
-			MDI_DEBUG(1, (CE_NOTE, vdip, "!i_mdi_pi_offline: "
+			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
 			    "Timeout reached on path %p without the cond\n",
-			    pip));
-			MDI_DEBUG(1, (CE_NOTE, vdip, "!i_mdi_pi_offline: "
+			    (void *)pip));
+			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
 			    "%d cmds still pending on path: %p\n",
-			    MDI_PI(pip)->pi_ref_cnt, pip));
+			    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
 		}
 	}
 	vh = ct->ct_vhci;
@@ -3504,8 +3656,9 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		MDI_PI_UNLOCK(pip);
 		if ((rv = (*f)(vdip, pip, MDI_PATHINFO_STATE_OFFLINE, 0,
 		    flags)) != MDI_SUCCESS) {
-			MDI_DEBUG(1, (CE_WARN, vdip, "!vo_path_offline failed "
-			    "vdip 0x%x, pip 0x%x", vdip, pip));
+			MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
+			    "!vo_path_offline failed "
+			    "vdip %p, pip %p", (void *)vdip, (void *)pip));
 		}
 		MDI_PI_LOCK(pip);
 	}
@@ -3574,7 +3727,7 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 	 * Change in the mdi_pathinfo node state will impact the client state
 	 */
 	MDI_DEBUG(2, (CE_NOTE, NULL, "!i_mdi_pi_offline ct = %p pip = %p",
-	    ct, pip));
+	    (void *)ct, (void *)pip));
 	return (rv);
 }
 
@@ -3757,7 +3910,6 @@ mdi_pi_set_preferred(mdi_pathinfo_t *pip, int preferred)
 	}
 }
 
-
 /*
  * mdi_pi_set_state():
  *		Set the mdi_pathinfo node state
@@ -3777,7 +3929,6 @@ mdi_pi_set_state(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state)
 /*
  * Property functions:
  */
-
 int
 i_map_nvlist_error_to_mdi(int val)
 {
@@ -3807,14 +3958,13 @@ i_map_nvlist_error_to_mdi(int val)
  *		and release by calling mdi_pi_unlock() at the end of walk to
  *		get a consistent value.
  */
-
 nvpair_t *
 mdi_pi_get_next_prop(mdi_pathinfo_t *pip, nvpair_t *prev)
 {
 	if ((pip == NULL) || (MDI_PI(pip)->pi_prop == NULL)) {
 		return (NULL);
 	}
-	ASSERT(MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(MDI_PI_LOCKED(pip));
 	return (nvlist_next_nvpair(MDI_PI(pip)->pi_prop, prev));
 }
 
@@ -3822,14 +3972,13 @@ mdi_pi_get_next_prop(mdi_pathinfo_t *pip, nvpair_t *prev)
  * mdi_prop_remove():
  * 		Remove the named property from the named list.
  */
-
 int
 mdi_prop_remove(mdi_pathinfo_t *pip, char *name)
 {
 	if (pip == NULL) {
 		return (DDI_PROP_NOT_FOUND);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -3861,7 +4010,6 @@ mdi_prop_remove(mdi_pathinfo_t *pip, char *name)
  * 		Caller should hold the mdi_pathinfo_t lock to get a consistent
  *		buffer size.
  */
-
 int
 mdi_prop_size(mdi_pathinfo_t *pip, size_t *buflenp)
 {
@@ -3872,7 +4020,7 @@ mdi_prop_size(mdi_pathinfo_t *pip, size_t *buflenp)
 	if ((pip == NULL) || (MDI_PI(pip)->pi_prop == NULL)) {
 		return (DDI_PROP_NOT_FOUND);
 	}
-	ASSERT(MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(MDI_PI_LOCKED(pip));
 	rv = nvlist_size(MDI_PI(pip)->pi_prop,
 	    &bufsize, NV_ENCODE_NATIVE);
 	*buflenp = bufsize;
@@ -3884,7 +4032,6 @@ mdi_prop_size(mdi_pathinfo_t *pip, size_t *buflenp)
  * 		pack the property list.  The caller should hold the
  *		mdi_pathinfo_t node to get a consistent data
  */
-
 int
 mdi_prop_pack(mdi_pathinfo_t *pip, char **bufp, uint_t buflen)
 {
@@ -3895,7 +4042,7 @@ mdi_prop_pack(mdi_pathinfo_t *pip, char **bufp, uint_t buflen)
 		return (DDI_PROP_NOT_FOUND);
 	}
 
-	ASSERT(MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(MDI_PI_LOCKED(pip));
 
 	bufsize = buflen;
 	rv = nvlist_pack(MDI_PI(pip)->pi_prop, bufp, (size_t *)&bufsize,
@@ -3916,7 +4063,7 @@ mdi_prop_update_byte(mdi_pathinfo_t *pip, char *name, uchar_t data)
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -3940,7 +4087,7 @@ mdi_prop_update_byte_array(mdi_pathinfo_t *pip, char *name, uchar_t *data,
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -3963,7 +4110,7 @@ mdi_prop_update_int(mdi_pathinfo_t *pip, char *name, int data)
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -3986,7 +4133,7 @@ mdi_prop_update_int64(mdi_pathinfo_t *pip, char *name, int64_t data)
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -4010,7 +4157,7 @@ mdi_prop_update_int_array(mdi_pathinfo_t *pip, char *name, int *data,
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -4034,7 +4181,7 @@ mdi_prop_update_string(mdi_pathinfo_t *pip, char *name, char *data)
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -4058,7 +4205,7 @@ mdi_prop_update_string_array(mdi_pathinfo_t *pip, char *name, char **data,
 	if (pip == NULL) {
 		return (DDI_PROP_INVAL_ARG);
 	}
-	ASSERT(!MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(!MDI_PI_LOCKED(pip));
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_prop == NULL) {
 		MDI_PI_UNLOCK(pip);
@@ -4188,7 +4335,6 @@ mdi_prop_lookup_string(mdi_pathinfo_t *pip, char *name, char **data)
  *		returned is the actual property and valid as long as
  *		mdi_pathinfo_t node is alive.
  */
-
 int
 mdi_prop_lookup_string_array(mdi_pathinfo_t *pip, char *name, char ***data,
     uint_t *nelements)
@@ -4210,7 +4356,6 @@ mdi_prop_lookup_string_array(mdi_pathinfo_t *pip, char *name, char ***data,
  *		copy of it.  So the data returned is valid as long as
  *		mdi_pathinfo_t node is valid.
  */
-
 /*ARGSUSED*/
 int
 mdi_prop_free(void *data)
@@ -4228,7 +4373,7 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
 	dev_info_t	*dip = ct->ct_dip;
 	char		lb_buf[64];
 
-	ASSERT(MUTEX_HELD(&ct->ct_mutex));
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	if ((dip == NULL) || (ddi_get_instance(dip) == -1) ||
 	    (MDI_CLIENT_IS_REPORT_DEV_NEEDED(ct) == 0)) {
 		return;
@@ -4291,28 +4436,23 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
  *		Utility function for error message management
  *
  */
-
-/*VARARGS3*/
+/*PRINTFLIKE3*/
 static void
 i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 {
-	char		buf[MAXNAMELEN];
 	char		name[MAXNAMELEN];
+	char		buf[MAXNAMELEN];
+	char		*bp;
 	va_list		ap;
 	int		log_only = 0;
 	int		boot_only = 0;
 	int		console_only = 0;
 
 	if (dip) {
-		if (level == CE_PANIC || level == CE_WARN || level == CE_NOTE) {
-			(void) snprintf(name, MAXNAMELEN, "%s%d:\n",
-			    ddi_node_name(dip), ddi_get_instance(dip));
-		} else {
-			(void) snprintf(name, MAXNAMELEN, "%s%d:",
-			    ddi_node_name(dip), ddi_get_instance(dip));
-		}
+		(void) snprintf(name, MAXNAMELEN, "%s%d: ",
+		    ddi_node_name(dip), ddi_get_instance(dip));
 	} else {
-		name[0] = '\0';
+		name[0] = 0;
 	}
 
 	va_start(ap, fmt);
@@ -4321,14 +4461,25 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 
 	switch (buf[0]) {
 	case '!':
+		bp = &buf[1];
 		log_only = 1;
 		break;
 	case '?':
+		bp = &buf[1];
 		boot_only = 1;
 		break;
 	case '^':
+		bp = &buf[1];
 		console_only = 1;
 		break;
+	default:
+		bp = buf;
+		break;
+	}
+	if (mdi_debug_logonly) {
+		log_only = 1;
+		boot_only = 0;
+		console_only = 0;
 	}
 
 	switch (level) {
@@ -4339,17 +4490,17 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 	case CE_WARN:
 	case CE_PANIC:
 		if (boot_only) {
-			cmn_err(level, "?%s\t%s", name, &buf[1]);
+			cmn_err(level, "?mdi: %s%s", name, bp);
 		} else if (console_only) {
-			cmn_err(level, "^%s\t%s", name, &buf[1]);
+			cmn_err(level, "^mdi: %s%s", name, bp);
 		} else if (log_only) {
-			cmn_err(level, "!%s\t%s", name, &buf[1]);
+			cmn_err(level, "!mdi: %s%s", name, bp);
 		} else {
-			cmn_err(level, "%s\t%s", name, buf);
+			cmn_err(level, "mdi: %s%s", name, bp);
 		}
 		break;
 	default:
-		cmn_err(level, "%s\t%s", name, buf);
+		cmn_err(level, "mdi: %s%s", name, bp);
 		break;
 	}
 }
@@ -4376,7 +4527,7 @@ i_mdi_client_online(dev_info_t *ct_dip)
 		(void) i_mdi_power_all_phci(ct);
 
 	MDI_DEBUG(4, (CE_NOTE, ct_dip, "i_mdi_client_online "
-	    "i_mdi_pm_hold_client\n"));
+	    "i_mdi_pm_hold_client %p\n", (void *)ct));
 	i_mdi_pm_hold_client(ct, 1);
 
 	MDI_CLIENT_UNLOCK(ct);
@@ -4403,7 +4554,6 @@ i_mdi_phci_online(dev_info_t *ph_dip)
  *		NDI_SUCCESS
  *		MDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_devi_online(dev_info_t *dip, uint_t flags)
@@ -4427,7 +4577,6 @@ mdi_devi_online(dev_info_t *dip, uint_t flags)
  *		NDI_SUCCESS
  *		NDI_FAILURE
  */
-
 /*ARGSUSED*/
 int
 mdi_devi_offline(dev_info_t *dip, uint_t flags)
@@ -4442,6 +4591,7 @@ mdi_devi_offline(dev_info_t *dip, uint_t flags)
 
 	if (MDI_PHCI(dip)) {
 		rv = i_mdi_phci_offline(dip, flags);
+
 		if ((rv != NDI_SUCCESS) && MDI_CLIENT(dip)) {
 			/* set client back online */
 			i_mdi_client_online(dip);
@@ -4471,10 +4621,9 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	 * corresponding client devices, for which this pHCI provides
 	 * critical services.
 	 */
-	MDI_DEBUG(2, (CE_NOTE, dip, "!mdi_phci_offline called %p\n",
-	    dip));
-
 	ph = i_devi_get_phci(dip);
+	MDI_DEBUG(2, (CE_NOTE, dip, "!mdi_phci_offline called %p %p\n",
+	    (void *)dip, (void *)ph));
 	if (ph == NULL) {
 		return (rv);
 	}
@@ -4482,7 +4631,8 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	MDI_PHCI_LOCK(ph);
 
 	if (MDI_PHCI_IS_OFFLINE(ph)) {
-		MDI_DEBUG(1, (CE_WARN, dip, "!pHCI %p already offlined", ph));
+		MDI_DEBUG(1, (CE_WARN, dip, "!pHCI %p already offlined",
+		    (void *)ph));
 		MDI_PHCI_UNLOCK(ph);
 		return (NDI_SUCCESS);
 	}
@@ -4503,6 +4653,7 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	while (pip != NULL) {
 		MDI_PI_LOCK(pip);
 		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+
 		/*
 		 * The mdi_pathinfo state is OK. Check the client state.
 		 * If failover in progress fail the pHCI from offlining
@@ -4520,7 +4671,7 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 			    "This device can not be removed at "
 			    "this moment. Please try again later."));
 			MDI_PI_UNLOCK(pip);
-			MDI_CLIENT_UNLOCK(ct);
+			i_mdi_client_unlock(ct);
 			MDI_PHCI_UNLOCK(ph);
 			return (NDI_BUSY);
 		}
@@ -4662,9 +4813,9 @@ i_mdi_client_offline(dev_info_t *dip, uint_t flags)
 	 * not in failing over state and update client state
 	 * accordingly
 	 */
-	MDI_DEBUG(2, (CE_NOTE, dip, "!i_mdi_client_offline called %p\n",
-	    dip));
 	ct = i_devi_get_client(dip);
+	MDI_DEBUG(2, (CE_NOTE, dip, "!i_mdi_client_offline called %p %p\n",
+	    (void *)dip, (void *)ct));
 	if (ct != NULL) {
 		MDI_CLIENT_LOCK(ct);
 		if (ct->ct_unstable) {
@@ -4710,7 +4861,6 @@ i_mdi_client_offline(dev_info_t *dip, uint_t flags)
  * mdi_pre_attach():
  *		Pre attach() notification handler
  */
-
 /*ARGSUSED*/
 int
 mdi_pre_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
@@ -4727,7 +4877,6 @@ mdi_pre_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
  * mdi_post_attach():
  *		Post attach() notification handler
  */
-
 /*ARGSUSED*/
 void
 mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
@@ -4744,7 +4893,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 		switch (cmd) {
 		case DDI_ATTACH:
 			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!pHCI post_attach: called %p\n", ph));
+			    "!pHCI post_attach: called %p\n", (void *)ph));
 			if (error == DDI_SUCCESS) {
 				MDI_PHCI_SET_ATTACH(ph);
 			} else {
@@ -4757,7 +4906,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 
 		case DDI_RESUME:
 			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!pHCI post_resume: called %p\n", ph));
+			    "!pHCI post_resume: called %p\n", (void *)ph));
 			if (error == DDI_SUCCESS) {
 				MDI_PHCI_SET_RESUME(ph);
 			} else {
@@ -4779,7 +4928,7 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 		switch (cmd) {
 		case DDI_ATTACH:
 			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!Client post_attach: called %p\n", ct));
+			    "!Client post_attach: called %p\n", (void *)ct));
 			if (error != DDI_SUCCESS) {
 				MDI_DEBUG(1, (CE_NOTE, dip,
 				    "!Client post_attach: failed error=%d\n",
@@ -4799,15 +4948,17 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 			for (pip = ct->ct_path_head; pip != NULL;
 			    pip = (mdi_pathinfo_t *)
 			    MDI_PI(pip)->pi_client_link) {
-				(void) i_mdi_pi_kstat_create(pip);
-				i_mdi_report_path_state(ct, pip);
+				if (!MDI_PI_IS_OFFLINE(pip)) {
+					(void) i_mdi_pi_kstat_create(pip);
+					i_mdi_report_path_state(ct, pip);
+				}
 			}
 			MDI_CLIENT_SET_ATTACH(ct);
 			break;
 
 		case DDI_RESUME:
 			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!Client post_attach: called %p\n", ct));
+			    "!Client post_attach: called %p\n", (void *)ct));
 			if (error == DDI_SUCCESS) {
 				MDI_CLIENT_SET_RESUME(ct);
 			} else {
@@ -4826,7 +4977,6 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
  * mdi_pre_detach():
  *		Pre detach notification handler
  */
-
 /*ARGSUSED*/
 int
 mdi_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
@@ -4864,7 +5014,7 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI pre_detach: called %p\n", ph));
+		    "!pHCI pre_detach: called %p\n", (void *)ph));
 		if (!MDI_PHCI_IS_OFFLINE(ph)) {
 			/*
 			 * mdi_pathinfo nodes are still attached to
@@ -4873,7 +5023,7 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			MDI_DEBUG(2, (CE_WARN, dip,
 			    "!pHCI pre_detach: "
 			    "mdi_pathinfo nodes are still attached "
-			    "%p\n", ph));
+			    "%p\n", (void *)ph));
 			rv = DDI_FAILURE;
 			break;
 		}
@@ -4889,7 +5039,7 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI pre_suspend: called %p\n", ph));
+		    "!pHCI pre_suspend: called %p\n", (void *)ph));
 		/*
 		 * Suspend all the client devices accessible through this pHCI
 		 */
@@ -4981,13 +5131,13 @@ i_mdi_client_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client pre_detach: called %p\n", ct));
+		    "!Client pre_detach: called %p\n", (void *)ct));
 		MDI_CLIENT_SET_DETACH(ct);
 		break;
 
 	case DDI_SUSPEND:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client pre_suspend: called %p\n", ct));
+		    "!Client pre_suspend: called %p\n", (void *)ct));
 		MDI_CLIENT_SET_SUSPEND(ct);
 		break;
 
@@ -5003,7 +5153,6 @@ i_mdi_client_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  * mdi_post_detach():
  *		Post detach notification handler
  */
-
 /*ARGSUSED*/
 void
 mdi_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
@@ -5042,14 +5191,14 @@ i_mdi_phci_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	switch (cmd) {
 	case DDI_DETACH:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI post_detach: called %p\n", ph));
+		    "!pHCI post_detach: called %p\n", (void *)ph));
 		if (error != DDI_SUCCESS)
 			MDI_PHCI_SET_ATTACH(ph);
 		break;
 
 	case DDI_SUSPEND:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI post_suspend: called %p\n", ph));
+		    "!pHCI post_suspend: called %p\n", (void *)ph));
 		if (error != DDI_SUCCESS)
 			MDI_PHCI_SET_RESUME(ph);
 		break;
@@ -5075,7 +5224,7 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	switch (cmd) {
 	case DDI_DETACH:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client post_detach: called %p\n", ct));
+		    "!Client post_detach: called %p\n", (void *)ct));
 		if (DEVI_IS_ATTACHING(ct->ct_dip)) {
 			MDI_DEBUG(4, (CE_NOTE, dip, "i_mdi_client_post_detach "
 			    "i_mdi_pm_rele_client\n"));
@@ -5091,7 +5240,7 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 
 	case DDI_SUSPEND:
 		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client post_suspend: called %p\n", ct));
+		    "!Client post_suspend: called %p\n", (void *)ct));
 		if (error != DDI_SUCCESS)
 			MDI_CLIENT_SET_RESUME(ct);
 		break;
@@ -5119,14 +5268,14 @@ i_mdi_pi_kstat_create(mdi_pathinfo_t *pip)
 
 	ASSERT(client != NULL && ppath != NULL);
 
-	ASSERT(mutex_owned(&(MDI_PI(pip)->pi_client->ct_mutex)));
+	ASSERT(MDI_CLIENT_LOCKED(MDI_PI(pip)->pi_client));
 
 	if (MDI_PI(pip)->pi_kstats != NULL)
 		return (MDI_SUCCESS);
 
 	for (cpip = MDI_PI(pip)->pi_client->ct_path_head; cpip != NULL;
 	    cpip = (mdi_pathinfo_t *)(MDI_PI(cpip)->pi_client_link)) {
-		if (cpip == pip)
+		if ((cpip == pip) || MDI_PI_IS_OFFLINE(pip))
 			continue;
 		/*
 		 * We have found a different path with same parent
@@ -5263,14 +5412,15 @@ mdi_pi_enable_path(mdi_pathinfo_t *pip, int flags)
 	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
 	if (ph == NULL) {
 		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
-			" failed. pip: %p ph = NULL\n", pip));
+			" failed. pip: %p ph = NULL\n", (void *)pip));
 		return (MDI_FAILURE);
 	}
 
 	(void) i_mdi_enable_disable_path(pip, ph->ph_vhci, flags,
 		MDI_ENABLE_OP);
 	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
-		" Returning success pip = %p. ph = %p\n", pip, ph));
+		" Returning success pip = %p. ph = %p\n",
+		(void *)pip, (void *)ph));
 	return (MDI_SUCCESS);
 
 }
@@ -5288,14 +5438,15 @@ mdi_pi_disable_path(mdi_pathinfo_t *pip, int flags)
 	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
 	if (ph == NULL) {
 		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
-			" failed. pip: %p ph = NULL\n", pip));
+			" failed. pip: %p ph = NULL\n", (void *)pip));
 		return (MDI_FAILURE);
 	}
 
 	(void) i_mdi_enable_disable_path(pip,
 			ph->ph_vhci, flags, MDI_DISABLE_OP);
 	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
-		"Returning success pip = %p. ph = %p", pip, ph));
+		"Returning success pip = %p. ph = %p",
+		(void *)pip, (void *)ph));
 	return (MDI_SUCCESS);
 }
 
@@ -5363,22 +5514,25 @@ i_mdi_enable_disable_path(mdi_pathinfo_t *pip, mdi_vhci_t *vh, int flags,
 
 	switch (flags) {
 		case USER_DISABLE:
-			if (op == MDI_DISABLE_OP)
+			if (op == MDI_DISABLE_OP) {
 				MDI_PI_SET_USER_DISABLE(pip);
-			else
+			} else {
 				MDI_PI_SET_USER_ENABLE(pip);
+			}
 			break;
 		case DRIVER_DISABLE:
-			if (op == MDI_DISABLE_OP)
+			if (op == MDI_DISABLE_OP) {
 				MDI_PI_SET_DRV_DISABLE(pip);
-			else
+			} else {
 				MDI_PI_SET_DRV_ENABLE(pip);
+			}
 			break;
 		case DRIVER_DISABLE_TRANSIENT:
-			if (op == MDI_DISABLE_OP && rv == MDI_SUCCESS)
+			if (op == MDI_DISABLE_OP && rv == MDI_SUCCESS) {
 				MDI_PI_SET_DRV_DISABLE_TRANS(pip);
-			else
+			} else {
 				MDI_PI_SET_DRV_ENABLE_TRANS(pip);
+			}
 			break;
 	}
 	MDI_PI_UNLOCK(pip);
@@ -5415,17 +5569,18 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 	int		found_it;
 
 	ph = i_devi_get_phci(pdip);
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-		" Operation = %d pdip = %p cdip = %p\n", op, pdip, cdip));
+	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
+		"Op = %d pdip = %p cdip = %p\n", op, (void *)pdip,
+		(void *)cdip));
 	if (ph == NULL) {
 		MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-			" failed. ph = NULL operation = %d\n", op));
+			"Op %d failed. ph = NULL\n", op));
 		return (MDI_FAILURE);
 	}
 
 	if ((op != MDI_ENABLE_OP) && (op != MDI_DISABLE_OP)) {
-		MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-			" Invalid operation = %d\n", op));
+		MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
+			"Op Invalid operation = %d\n", op));
 		return (MDI_FAILURE);
 	}
 
@@ -5435,27 +5590,30 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		/*
 		 * Need to mark the Phci as enabled/disabled.
 		 */
-		MDI_DEBUG(3, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-		"Operation %d for the phci\n", op));
+		MDI_DEBUG(3, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
+		"Op %d for the phci\n", op));
 		MDI_PHCI_LOCK(ph);
 		switch (flags) {
 			case USER_DISABLE:
-				if (op == MDI_DISABLE_OP)
+				if (op == MDI_DISABLE_OP) {
 					MDI_PHCI_SET_USER_DISABLE(ph);
-				else
+				} else {
 					MDI_PHCI_SET_USER_ENABLE(ph);
+				}
 				break;
 			case DRIVER_DISABLE:
-				if (op == MDI_DISABLE_OP)
+				if (op == MDI_DISABLE_OP) {
 					MDI_PHCI_SET_DRV_DISABLE(ph);
-				else
+				} else {
 					MDI_PHCI_SET_DRV_ENABLE(ph);
+				}
 				break;
 			case DRIVER_DISABLE_TRANSIENT:
-				if (op == MDI_DISABLE_OP)
+				if (op == MDI_DISABLE_OP) {
 					MDI_PHCI_SET_DRV_DISABLE_TRANSIENT(ph);
-				else
+				} else {
 					MDI_PHCI_SET_DRV_ENABLE_TRANSIENT(ph);
+				}
 				break;
 			default:
 				MDI_PHCI_UNLOCK(ph);
@@ -5513,56 +5671,9 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		(void) i_mdi_enable_disable_path(pip, vh, flags, op);
 	}
 
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-		" Returning success op: %x pdip = %p cdip = %p\n", op,
-			pdip, cdip));
-	return (MDI_SUCCESS);
-}
-
-/*ARGSUSED3*/
-int
-mdi_devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
-    int flags, clock_t timeout)
-{
-	mdi_pathinfo_t *pip;
-	dev_info_t *dip;
-	clock_t interval = drv_usectohz(100000);	/* 0.1 sec */
-	char *paddr;
-
-	MDI_DEBUG(2, (CE_NOTE, NULL, "configure device %s", devnm));
-
-	if (!MDI_PHCI(pdip))
-		return (MDI_FAILURE);
-
-	paddr = strchr(devnm, '@');
-	if (paddr == NULL)
-		return (MDI_FAILURE);
-
-	paddr++;	/* skip '@' */
-	pip = mdi_pi_find(pdip, NULL, paddr);
-	while (pip == NULL && timeout > 0) {
-		if (interval > timeout)
-			interval = timeout;
-		if (flags & NDI_DEVI_DEBUG) {
-			cmn_err(CE_CONT, "%s%d: %s timeout %ld %ld\n",
-			    ddi_driver_name(pdip), ddi_get_instance(pdip),
-			    paddr, interval, timeout);
-		}
-		delay(interval);
-		timeout -= interval;
-		interval += interval;
-		pip = mdi_pi_find(pdip, NULL, paddr);
-	}
-
-	if (pip == NULL)
-		return (MDI_FAILURE);
-	dip = mdi_pi_get_client(pip);
-	if (ndi_devi_online(dip, flags) != NDI_SUCCESS)
-		return (MDI_FAILURE);
-	*cdipp = dip;
-
-	/* TODO: holding should happen inside search functions */
-	ndi_hold_devi(dip);
+	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
+		"Op %d Returning success pdip = %p cdip = %p\n",
+		op, (void *)pdip, (void *)cdip));
 	return (MDI_SUCCESS);
 }
 
@@ -5575,15 +5686,15 @@ i_mdi_pm_hold_pip(mdi_pathinfo_t *pip)
 	dev_info_t	*ph_dip;
 
 	ASSERT(pip != NULL);
-	ASSERT(MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(MDI_PI_LOCKED(pip));
 
 	if (MDI_PI(pip)->pi_pm_held) {
 		return;
 	}
 
 	ph_dip = mdi_pi_get_phci(pip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_hold_pip for %s%d\n",
-	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip)));
+	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_hold_pip for %s%d %p\n",
+	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
 	if (ph_dip == NULL) {
 		return;
 	}
@@ -5591,7 +5702,9 @@ i_mdi_pm_hold_pip(mdi_pathinfo_t *pip)
 	MDI_PI_UNLOCK(pip);
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt was %d\n",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
+
 	pm_hold_power(ph_dip);
+
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt is %d\n",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
 	MDI_PI_LOCK(pip);
@@ -5608,7 +5721,7 @@ i_mdi_pm_rele_pip(mdi_pathinfo_t *pip)
 	dev_info_t	*ph_dip = NULL;
 
 	ASSERT(pip != NULL);
-	ASSERT(MUTEX_HELD(&MDI_PI(pip)->pi_mutex));
+	ASSERT(MDI_PI_LOCKED(pip));
 
 	if (MDI_PI(pip)->pi_pm_held == 0) {
 		return;
@@ -5618,8 +5731,8 @@ i_mdi_pm_rele_pip(mdi_pathinfo_t *pip)
 	ASSERT(ph_dip != NULL);
 
 	MDI_PI_UNLOCK(pip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_rele_pip for %s%d\n",
-	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip)));
+	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_rele_pip for %s%d %p\n",
+	    ddi_get_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
 
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt was %d\n",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
@@ -5634,11 +5747,12 @@ i_mdi_pm_rele_pip(mdi_pathinfo_t *pip)
 static void
 i_mdi_pm_hold_client(mdi_client_t *ct, int incr)
 {
-	ASSERT(ct);
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 
 	ct->ct_power_cnt += incr;
-	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_hold_client "
-	    "ct_power_cnt = %d incr = %d\n", ct->ct_power_cnt, incr));
+	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_hold_client %p "
+	    "ct_power_cnt = %d incr = %d\n", (void *)ct,
+	    ct->ct_power_cnt, incr));
 	ASSERT(ct->ct_power_cnt >= 0);
 }
 
@@ -5647,7 +5761,7 @@ i_mdi_rele_all_phci(mdi_client_t *ct)
 {
 	mdi_pathinfo_t  *pip;
 
-	ASSERT(mutex_owned(&ct->ct_mutex));
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	pip = (mdi_pathinfo_t *)ct->ct_path_head;
 	while (pip != NULL) {
 		mdi_hold_path(pip);
@@ -5662,12 +5776,13 @@ i_mdi_rele_all_phci(mdi_client_t *ct)
 static void
 i_mdi_pm_rele_client(mdi_client_t *ct, int decr)
 {
-	ASSERT(ct);
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 
 	if (i_ddi_devi_attached(ct->ct_dip)) {
 		ct->ct_power_cnt -= decr;
-		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_rele_client "
-		    "ct_power_cnt = %d decr = %d\n", ct->ct_power_cnt, decr));
+		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_rele_client %p "
+		    "ct_power_cnt = %d decr = %d\n",
+		    (void *)ct, ct->ct_power_cnt, decr));
 	}
 
 	ASSERT(ct->ct_power_cnt >= 0);
@@ -5680,30 +5795,14 @@ i_mdi_pm_rele_client(mdi_client_t *ct, int decr)
 static void
 i_mdi_pm_reset_client(mdi_client_t *ct)
 {
-	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_reset_client "
-	    "ct_power_cnt = %d\n", ct->ct_power_cnt));
+	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_reset_client %p "
+	    "ct_power_cnt = %d\n", (void *)ct, ct->ct_power_cnt));
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	ct->ct_power_cnt = 0;
 	i_mdi_rele_all_phci(ct);
 	ct->ct_powercnt_config = 0;
 	ct->ct_powercnt_unconfig = 0;
 	ct->ct_powercnt_reset = 1;
-}
-
-static void
-i_mdi_pm_hold_all_phci(mdi_client_t *ct)
-{
-	mdi_pathinfo_t  *pip;
-	ASSERT(mutex_owned(&ct->ct_mutex));
-
-	pip = (mdi_pathinfo_t *)ct->ct_path_head;
-	while (pip != NULL) {
-		mdi_hold_path(pip);
-		MDI_PI_LOCK(pip);
-		i_mdi_pm_hold_pip(pip);
-		MDI_PI_UNLOCK(pip);
-		mdi_rele_path(pip);
-		pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
-	}
 }
 
 static int
@@ -5720,15 +5819,16 @@ i_mdi_power_one_phci(mdi_pathinfo_t *pip)
 
 	/* bring all components of phci to full power */
 	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
-	    "pm_powerup for %s%d\n", ddi_get_name(ph_dip),
-	    ddi_get_instance(ph_dip)));
+	    "pm_powerup for %s%d %p\n", ddi_get_name(ph_dip),
+	    ddi_get_instance(ph_dip), (void *)pip));
 
 	ret = pm_powerup(ph_dip);
 
 	if (ret == DDI_FAILURE) {
 		MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
-		    "pm_powerup FAILED for %s%d\n",
-		    ddi_get_name(ph_dip), ddi_get_instance(ph_dip)));
+		    "pm_powerup FAILED for %s%d %p\n",
+		    ddi_get_name(ph_dip), ddi_get_instance(ph_dip),
+		    (void *)pip));
 
 		MDI_PI_LOCK(pip);
 		i_mdi_pm_rele_pip(pip);
@@ -5745,16 +5845,19 @@ i_mdi_power_all_phci(mdi_client_t *ct)
 	mdi_pathinfo_t  *pip;
 	int		succeeded = 0;
 
+	ASSERT(MDI_CLIENT_LOCKED(ct));
 	pip = (mdi_pathinfo_t *)ct->ct_path_head;
 	while (pip != NULL) {
-		mdi_hold_path(pip);
-		MDI_CLIENT_UNLOCK(ct);
-		if (i_mdi_power_one_phci(pip) == MDI_SUCCESS)
-			succeeded = 1;
+		if (MDI_PI_IS_ONLINE(pip) || MDI_PI_IS_STANDBY(pip)) {
+			mdi_hold_path(pip);
+			MDI_CLIENT_UNLOCK(ct);
+			if (i_mdi_power_one_phci(pip) == MDI_SUCCESS)
+				succeeded = 1;
 
-		ASSERT(ct == MDI_PI(pip)->pi_client);
-		MDI_CLIENT_LOCK(ct);
-		mdi_rele_path(pip);
+			ASSERT(ct == MDI_PI(pip)->pi_client);
+			MDI_CLIENT_LOCK(ct);
+			mdi_rele_path(pip);
+		}
 		pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
 	}
 
@@ -5960,22 +6063,23 @@ i_mdi_pm_pre_config_one(dev_info_t *child)
 }
 
 static int
-i_mdi_pm_pre_config(dev_info_t *parent, dev_info_t *child)
+i_mdi_pm_pre_config(dev_info_t *vdip, dev_info_t *child)
 {
 	int			ret = MDI_SUCCESS;
 	dev_info_t		*cdip;
 	int			circ;
 
-	ASSERT(MDI_VHCI(parent));
+	ASSERT(MDI_VHCI(vdip));
 
 	/* ndi_devi_config_one */
 	if (child) {
+		ASSERT(DEVI_BUSY_OWNED(vdip));
 		return (i_mdi_pm_pre_config_one(child));
 	}
 
 	/* devi_config_common */
-	ndi_devi_enter(parent, &circ);
-	cdip = ddi_get_child(parent);
+	ndi_devi_enter(vdip, &circ);
+	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
@@ -5984,7 +6088,7 @@ i_mdi_pm_pre_config(dev_info_t *parent, dev_info_t *child)
 			break;
 		cdip = next;
 	}
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(vdip, circ);
 	return (ret);
 }
 
@@ -6040,31 +6144,32 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 }
 
 static int
-i_mdi_pm_pre_unconfig(dev_info_t *parent, dev_info_t *child, int *held,
+i_mdi_pm_pre_unconfig(dev_info_t *vdip, dev_info_t *child, int *held,
     int flags)
 {
 	int			ret = MDI_SUCCESS;
 	dev_info_t		*cdip;
 	int			circ;
 
-	ASSERT(MDI_VHCI(parent));
+	ASSERT(MDI_VHCI(vdip));
 	*held = 0;
 
 	/* ndi_devi_unconfig_one */
 	if (child) {
+		ASSERT(DEVI_BUSY_OWNED(vdip));
 		return (i_mdi_pm_pre_unconfig_one(child, held, flags));
 	}
 
 	/* devi_unconfig_common */
-	ndi_devi_enter(parent, &circ);
-	cdip = ddi_get_child(parent);
+	ndi_devi_enter(vdip, &circ);
+	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
 		ret = i_mdi_pm_pre_unconfig_one(cdip, held, flags);
 		cdip = next;
 	}
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(vdip, circ);
 
 	if (*held)
 		ret = MDI_SUCCESS;
@@ -6130,28 +6235,30 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 }
 
 static void
-i_mdi_pm_post_config(dev_info_t *parent, dev_info_t *child)
+i_mdi_pm_post_config(dev_info_t *vdip, dev_info_t *child)
 {
 	int		circ;
 	dev_info_t	*cdip;
-	ASSERT(MDI_VHCI(parent));
+
+	ASSERT(MDI_VHCI(vdip));
 
 	/* ndi_devi_config_one */
 	if (child) {
+		ASSERT(DEVI_BUSY_OWNED(vdip));
 		i_mdi_pm_post_config_one(child);
 		return;
 	}
 
 	/* devi_config_common */
-	ndi_devi_enter(parent, &circ);
-	cdip = ddi_get_child(parent);
+	ndi_devi_enter(vdip, &circ);
+	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
 		i_mdi_pm_post_config_one(cdip);
 		cdip = next;
 	}
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(vdip, circ);
 }
 
 static void
@@ -6205,33 +6312,34 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 }
 
 static void
-i_mdi_pm_post_unconfig(dev_info_t *parent, dev_info_t *child, int held)
+i_mdi_pm_post_unconfig(dev_info_t *vdip, dev_info_t *child, int held)
 {
 	int			circ;
 	dev_info_t		*cdip;
 
-	ASSERT(MDI_VHCI(parent));
+	ASSERT(MDI_VHCI(vdip));
 
 	if (!held) {
-		MDI_DEBUG(4, (CE_NOTE, parent,
+		MDI_DEBUG(4, (CE_NOTE, vdip,
 		    "i_mdi_pm_post_unconfig held = %d\n", held));
 		return;
 	}
 
 	if (child) {
+		ASSERT(DEVI_BUSY_OWNED(vdip));
 		i_mdi_pm_post_unconfig_one(child);
 		return;
 	}
 
-	ndi_devi_enter(parent, &circ);
-	cdip = ddi_get_child(parent);
+	ndi_devi_enter(vdip, &circ);
+	cdip = ddi_get_child(vdip);
 	while (cdip) {
 		dev_info_t *next = ddi_get_next_sibling(cdip);
 
 		i_mdi_pm_post_unconfig_one(cdip);
 		cdip = next;
 	}
-	ndi_devi_exit(parent, circ);
+	ndi_devi_exit(vdip, circ);
 }
 
 int
@@ -6251,29 +6359,29 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 	if (devnm != NULL) {
 		ndi_devi_enter(vdip, &circ);
 		client_dip = ndi_devi_findchild(vdip, devnm);
-		ndi_devi_exit(vdip, circ);
 	}
 
-	MDI_DEBUG(4, (CE_NOTE, vdip, "mdi_power op = %d\n", op));
+	MDI_DEBUG(4, (CE_NOTE, vdip, "mdi_power op = %d %s %p\n",
+	    op, devnm ? devnm : "NULL", (void *)client_dip));
 
 	switch (op) {
 	case MDI_PM_PRE_CONFIG:
 		ret = i_mdi_pm_pre_config(vdip, client_dip);
-
 		break;
+
 	case MDI_PM_PRE_UNCONFIG:
 		ret = i_mdi_pm_pre_unconfig(vdip, client_dip, (int *)args,
 		    flags);
-
 		break;
+
 	case MDI_PM_POST_CONFIG:
 		i_mdi_pm_post_config(vdip, client_dip);
-
 		break;
+
 	case MDI_PM_POST_UNCONFIG:
 		i_mdi_pm_post_unconfig(vdip, client_dip, *(int *)args);
-
 		break;
+
 	case MDI_PM_HOLD_POWER:
 	case MDI_PM_RELE_POWER:
 		ASSERT(args);
@@ -6305,9 +6413,13 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 
 		MDI_CLIENT_UNLOCK(ct);
 		break;
+
 	default:
 		break;
 	}
+
+	if (devnm)
+		ndi_devi_exit(vdip, circ);
 
 	return (ret);
 }
@@ -8276,19 +8388,17 @@ mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
 	char *cp;
 
 	/*
-	 * While bus configuring phcis, the phci driver interactions with MDI
-	 * cause child nodes to be enumerated under the vhci node for which
-	 * they need to ndi_devi_enter the vhci node.
-	 *
-	 * Unfortunately, to avoid the deadlock, we ourself can not wait for
-	 * for the bus config operations on phcis to finish while holding the
-	 * ndi_devi_enter lock. To avoid this deadlock, skip bus configs on
-	 * phcis and call the default framework provided bus config function
-	 * if we are called with ndi_devi_enter lock held.
+	 * To bus config vhcis we relay operation, possibly using another
+	 * thread, to phcis. The phci driver then interacts with MDI to cause
+	 * vhci child nodes to be enumerated under the vhci node.  Adding a
+	 * vhci child requires an ndi_devi_enter of the vhci. Since another
+	 * thread may be adding the child, to avoid deadlock we can't wait
+	 * for the relayed operations to complete if we have already entered
+	 * the vhci node.
 	 */
 	if (DEVI_BUSY_OWNED(vdip)) {
-		MDI_DEBUG(2, (CE_NOTE, vdip,
-		    "!MDI: vhci bus config: vhci dip is busy owned\n"));
+		MDI_DEBUG(2, (CE_NOTE, vdip, "!MDI: vhci bus config: "
+		    "vhci dip is busy owned %p\n", (void *)vdip));
 		goto default_bus_config;
 	}
 
@@ -8479,31 +8589,24 @@ void
 mdi_vhci_walk_clients(dev_info_t *vdip,
     int (*f)(dev_info_t *, void *), void *arg)
 {
+	mdi_vhci_t	*vh = i_devi_get_vhci(vdip);
 	dev_info_t	*cdip;
 	mdi_client_t	*ct;
 
-	mutex_enter(&mdi_mutex);
-
+	MDI_VHCI_CLIENT_LOCK(vh);
 	cdip = ddi_get_child(vdip);
-
 	while (cdip) {
 		ct = i_devi_get_client(cdip);
 		MDI_CLIENT_LOCK(ct);
 
-		switch ((*f)(cdip, arg)) {
-		case DDI_WALK_CONTINUE:
+		if (((*f)(cdip, arg)) == DDI_WALK_CONTINUE)
 			cdip = ddi_get_next_sibling(cdip);
-			MDI_CLIENT_UNLOCK(ct);
-			break;
+		else
+			cdip = NULL;
 
-		default:
-			MDI_CLIENT_UNLOCK(ct);
-			mutex_exit(&mdi_mutex);
-			return;
-		}
+		MDI_CLIENT_UNLOCK(ct);
 	}
-
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_CLIENT_UNLOCK(vh);
 }
 
 /*
@@ -8514,31 +8617,23 @@ void
 mdi_vhci_walk_phcis(dev_info_t *vdip,
     int (*f)(dev_info_t *, void *), void *arg)
 {
-	mdi_vhci_t	*vh = NULL;
-	mdi_phci_t	*ph = NULL;
+	mdi_vhci_t	*vh = i_devi_get_vhci(vdip);
+	mdi_phci_t	*ph, *next;
 
-	mutex_enter(&mdi_mutex);
-
-	vh = i_devi_get_vhci(vdip);
+	MDI_VHCI_PHCI_LOCK(vh);
 	ph = vh->vh_phci_head;
-
 	while (ph) {
 		MDI_PHCI_LOCK(ph);
 
-		switch ((*f)(ph->ph_dip, arg)) {
-		case DDI_WALK_CONTINUE:
-			MDI_PHCI_UNLOCK(ph);
-			ph = ph->ph_next;
-			break;
+		if (((*f)(ph->ph_dip, arg)) == DDI_WALK_CONTINUE)
+			next = ph->ph_next;
+		else
+			next = NULL;
 
-		default:
-			MDI_PHCI_UNLOCK(ph);
-			mutex_exit(&mdi_mutex);
-			return;
-		}
+		MDI_PHCI_UNLOCK(ph);
+		ph = next;
 	}
-
-	mutex_exit(&mdi_mutex);
+	MDI_VHCI_PHCI_UNLOCK(vh);
 }
 
 

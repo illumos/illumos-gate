@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1606,25 +1605,37 @@ ppm_dev_init(ppm_dev_t *ppmd)
 		ppmd->domp->pwr_cnt++;
 
 	dip = ppmd->dip;
-	dcomps = DEVI(dip)->devi_pm_components;
-	pm_comp = &dcomps[ppmd->cmpt].pmc_comp;
-
-	ppmd->lowest = pm_comp->pmc_lvals[0];
-	ASSERT(ppmd->lowest >= 0);
-	maxi = pm_comp->pmc_numlevels - 1;
-	ppmd->highest = pm_comp->pmc_lvals[maxi];
 
 	/*
-	 * If 66mhz PCI device on pci 66mhz bus supports D2 state
-	 * (config reg PMC bit 10 set), ppm could turn off its bus
-	 * clock once it is at D3hot.
+	 * ppm exists to handle power-manageable devices which require
+	 * special handling on the current platform.  However, a
+	 * driver for such a device may choose not to support power
+	 * management on a particular load/attach.  In this case we
+	 * we create a structure to represent a single-component device
+	 * for which "level" = PM_LEVEL_UNKNOWN and "lowest" = 0
+	 * are effectively constant.
 	 */
-	if (ppmd->domp->dflags & PPMD_PCI66MHZ) {
-		for (i = 0; i < maxi; i++)
-			if (pm_comp->pmc_lvals[i] == PM_LEVEL_D2) {
-				ppmd->flags |= PPMDEV_PCI66_D2;
-				break;
-			}
+	if (PM_GET_PM_INFO(dip)) {
+		dcomps = DEVI(dip)->devi_pm_components;
+		pm_comp = &dcomps[ppmd->cmpt].pmc_comp;
+
+		ppmd->lowest = pm_comp->pmc_lvals[0];
+		ASSERT(ppmd->lowest >= 0);
+		maxi = pm_comp->pmc_numlevels - 1;
+		ppmd->highest = pm_comp->pmc_lvals[maxi];
+
+		/*
+		 * If 66mhz PCI device on pci 66mhz bus supports D2 state
+		 * (config reg PMC bit 10 set), ppm could turn off its bus
+		 * clock once it is at D3hot.
+		 */
+		if (ppmd->domp->dflags & PPMD_PCI66MHZ) {
+			for (i = 0; i < maxi; i++)
+				if (pm_comp->pmc_lvals[i] == PM_LEVEL_D2) {
+					ppmd->flags |= PPMDEV_PCI66_D2;
+					break;
+				}
+		}
 	}
 
 	/*

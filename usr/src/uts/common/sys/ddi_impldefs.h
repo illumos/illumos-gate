@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +139,7 @@ struct dev_info  {
 	struct dev_info *devi_pm_ppm;		/* ppm attached to this one */
 	void		*devi_pm_ppm_private;	/* for use by ppm driver */
 	int		devi_pm_dev_thresh;	/* "device" threshold */
-	uint_t		devi_pm_kidsupcnt;	/* # of kids powered up */
+	int		devi_pm_kidsupcnt;	/* # of kids powered up */
 	struct pm_scan	*devi_pm_scan;		/* pm scan info */
 	uint_t		devi_pm_noinvolpm;	/* # of descendents no-invol */
 	uint_t		devi_pm_volpmd;		/* # of voluntarily pm'ed */
@@ -497,6 +496,7 @@ void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
 #define	DEVI_BRANCH_HELD	0x00000008 /* branch rooted at this dip held */
 #define	DEVI_NO_BIND		0x00000010 /* prevent driver binding */
 #define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
+#define	DEVI_PHCI_SIGNALS_VHCI	0x00000040 /* pHCI ndi_devi_exit signals vHCI */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
 #define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\
