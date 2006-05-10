@@ -8279,6 +8279,20 @@ sd_unit_attach(dev_info_t *devi)
 					goto spinup_failed;
 #endif
 				}
+
+				/*
+				 * Here it's not necessary to check the case:
+				 * the capacity of the device is bigger than
+				 * what the max hba cdb can support. Because
+				 * sd_send_scsi_READ_CAPACITY will retrieve
+				 * the capacity by sending USCSI command, which
+				 * is constrained by the max hba cdb. Actually,
+				 * sd_send_scsi_READ_CAPACITY will return
+				 * EINVAL when using bigger cdb than required
+				 * cdb length. Will handle this case in
+				 * "case EINVAL".
+				 */
+
 				/*
 				 * The following relies on
 				 * sd_send_scsi_READ_CAPACITY never
@@ -8293,6 +8307,18 @@ sd_unit_attach(dev_info_t *devi)
 
 				break;
 			}
+			case EINVAL:
+				/*
+				 * In the case where the max-cdb-length property
+				 * is smaller than the required CDB length for
+				 * a SCSI device, a target driver can fail to
+				 * attach to that device.
+				 */
+				scsi_log(SD_DEVINFO(un),
+				    sd_label, CE_WARN,
+				    "disk capacity is too large "
+				    "for current cdb length");
+				goto spinup_failed;
 			case EACCES:
 				/*
 				 * Should never get here if the spin-up
@@ -11698,6 +11724,10 @@ sd_send_scsi_cmd(dev_t dev, struct uscsi_cmd *incmd,
 		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
 		    "invalid uscsi_cdblen, returning EINVAL\n");
 		return (EINVAL);
+	} else if (incmd->uscsi_cdblen > un->un_max_hba_cdb) {
+		SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_cmd: "
+		    "unsupported uscsi_cdblen, returning EINVAL\n");
+		return (EINVAL);
 	}
 
 	/*
@@ -13001,6 +13031,8 @@ sd_core_iostart(int index, struct sd_lun *un, struct buf *bp)
 static void
 sd_init_cdb_limits(struct sd_lun *un)
 {
+	int hba_cdb_limit;
+
 	/*
 	 * Use CDB_GROUP1 commands for most devices except for
 	 * parallel SCSI fixed drives in which case we get better
@@ -13015,16 +13047,36 @@ sd_init_cdb_limits(struct sd_lun *un)
 #endif
 
 	/*
+	 * Try to read the max-cdb-length supported by HBA.
+	 */
+	un->un_max_hba_cdb = scsi_ifgetcap(SD_ADDRESS(un), "max-cdb-length", 1);
+	if (0 >= un->un_max_hba_cdb) {
+		un->un_max_hba_cdb = CDB_GROUP4;
+		hba_cdb_limit = SD_CDB_GROUP4;
+	} else if (0 < un->un_max_hba_cdb &&
+	    un->un_max_hba_cdb < CDB_GROUP1) {
+		hba_cdb_limit = SD_CDB_GROUP0;
+	} else if (CDB_GROUP1 <= un->un_max_hba_cdb &&
+	    un->un_max_hba_cdb < CDB_GROUP5) {
+		hba_cdb_limit = SD_CDB_GROUP1;
+	} else if (CDB_GROUP5 <= un->un_max_hba_cdb &&
+	    un->un_max_hba_cdb < CDB_GROUP4) {
+		hba_cdb_limit = SD_CDB_GROUP5;
+	} else {
+		hba_cdb_limit = SD_CDB_GROUP4;
+	}
+
+	/*
 	 * Use CDB_GROUP5 commands for removable devices.  Use CDB_GROUP4
 	 * commands for fixed disks unless we are building for a 32 bit
 	 * kernel.
 	 */
 #ifdef _LP64
 	un->un_maxcdb = (un->un_f_has_removable_media) ? SD_CDB_GROUP5 :
-	    SD_CDB_GROUP4;
+	    min(hba_cdb_limit, SD_CDB_GROUP4);
 #else
 	un->un_maxcdb = (un->un_f_has_removable_media) ? SD_CDB_GROUP5 :
-	    SD_CDB_GROUP1;
+	    min(hba_cdb_limit, SD_CDB_GROUP1);
 #endif
 
 	/*

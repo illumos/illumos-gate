@@ -301,6 +301,7 @@ struct sd_lun {
 
 	int	un_mincdb;		/* Smallest CDB to use */
 	int	un_maxcdb;		/* Largest CDB to use */
+	int	un_max_hba_cdb;		/* Largest CDB supported by HBA */
 	int	un_status_len;
 	int	un_pkt_flags;
 
