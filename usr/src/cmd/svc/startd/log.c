@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +31,8 @@
  * Logging destinations
  *   svc.startd(1M) supports three logging destinations:  the system log, a
  *   daemon-specific log (in the /var/svc/log hierarchy by default), and to the
- *   standard output.  Any or all of these destinations may be used to
+ *   standard output (redirected to the /var/svc/log/svc.startd.log file by
+ *   default).  Any or all of these destinations may be used to
  *   communicate a specific message; the audiences for each destination differ.
  *
  *   Generic messages associated with svc.startd(1M) are made by the
@@ -197,16 +197,14 @@ vlog_prefix(int severity, const char *prefix, const char *format, va_list args)
 		return;
 #endif
 
-	if (st->st_log_flags & STARTD_LOG_FILE && logfile)
+	if (st->st_log_flags & STARTD_LOG_FILE && logfile) {
 		(void) fputs(buf, logfile);
+		(void) fflush(logfile);
+	}
 	if (st->st_log_flags & STARTD_LOG_TERMINAL)
 		(void) fputs(buf, stdout);
-
-	if (st->st_log_timezone_known)
+	if (st->st_log_flags & STARTD_LOG_SYSLOG && st->st_log_timezone_known)
 		vsyslog(severity, format, args);
-
-	if (st->st_log_flags & STARTD_LOG_FILE && logfile)
-		(void) fflush(logfile);
 }
 
 /*PRINTFLIKE2*/
@@ -452,20 +450,29 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 		severity = LOG_INFO;
 	} else {
 		switch (outcome) {
+		case MAINT_REQUESTED:
+			action = gettext("transitioned to maintenance by "
+			    "request (see 'svcs -xv' for details)");
+			break;
 		case START_FAILED_REPEATEDLY:
-			action = gettext("failed repeatedly");
+			action = gettext("failed repeatedly: transitioned to "
+			    "maintenance (see 'svcs -xv' for details)");
 			break;
 		case START_FAILED_CONFIGURATION:
-			action = gettext("misconfigured");
+			action = gettext("misconfigured: transitioned to "
+			    "maintenance (see 'svcs -xv' for details)");
 			break;
 		case START_FAILED_FATAL:
-			action = gettext("failed fatally");
+			action = gettext("failed fatally: transitioned to "
+			    "maintenance (see 'svcs -xv' for details)");
 			break;
 		case START_FAILED_TIMEOUT_FATAL:
-			action = gettext("timed out, fault threshold reached");
+			action = gettext("timed out: transitioned to "
+			    "maintenance (see 'svcs -xv' for details)");
 			break;
 		case START_FAILED_OTHER:
-			action = gettext("failed");
+			action = gettext("failed: transitioned to "
+			    "maintenance (see 'svcs -xv' for details)");
 			break;
 		case START_REQUESTED:
 			assert(outcome != START_REQUESTED);
@@ -474,9 +481,8 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 			action = gettext("outcome unknown?");
 		}
 
-		message = uu_msprintf("[ %s %s %s ]\n",
-		    inst->ri_i.i_fmri + strlen("svc:/"), action,
-		    gettext("(see 'svcs -x' for details)"));
+		message = uu_msprintf("[ %s %s ]\n",
+		    inst->ri_i.i_fmri + strlen("svc:/"), action);
 
 		severity = LOG_ERR;
 	}
@@ -487,7 +493,14 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 		    "Could not log boot message for %s: %s.\n",
 		    inst->ri_i.i_fmri, uu_strerror(uu_error()));
 	} else {
-		if (!st->st_log_login_reached) {
+		/*
+		 * All significant errors should to go to syslog to
+		 * communicate appropriate information even for systems
+		 * without a console connected during boot.  Send the
+		 * message to stderr only if the severity is lower than
+		 * (indicated by >) LOG_ERR.
+		 */
+		if (!st->st_log_login_reached && severity > LOG_ERR) {
 			/*LINTED*/
 			if (fprintf(stderr, message) < 0)
 				log_error(LOG_NOTICE, "Could not log for %s: "

@@ -320,7 +320,7 @@ startd_thread_create(void *(*func)(void *), void *ptr)
 
 
 static int
-read_startd_config(int log_args)
+read_startd_config(void)
 {
 	scf_handle_t *hndl;
 	scf_instance_t *inst;
@@ -530,17 +530,14 @@ timestamp:
 		if (scf_value_get_astring(val, vbuf, max_scf_value_size) < 0)
 			bad_error("scf_value_get_astring", scf_error());
 
-		if (!log_args && strcmp("logging", buf) == 0) {
+		if (strcmp("logging", buf) == 0) {
 			if (strcmp("verbose", vbuf) == 0) {
 				st->st_boot_flags = STARTD_BOOT_VERBOSE;
-				st->st_log_flags = STARTD_LOG_VERBOSE;
 				st->st_log_level_min = LOG_INFO;
 			} else if (strcmp("debug", vbuf) == 0) {
 				st->st_boot_flags = STARTD_BOOT_VERBOSE;
-				st->st_log_flags = STARTD_LOG_DEBUG;
 				st->st_log_level_min = LOG_DEBUG;
 			} else if (strcmp("quiet", vbuf) == 0) {
-				st->st_log_flags = STARTD_LOG_QUIET;
 				st->st_log_level_min = LOG_NOTICE;
 			} else {
 				uu_warn("unknown options/logging "
@@ -597,16 +594,17 @@ noscfout:
 	    cp = strtok_r(NULL, ",", &lasts)) {
 		if (strcmp(cp, "debug") == 0) {
 			st->st_boot_flags = STARTD_BOOT_VERBOSE;
-			st->st_log_flags = STARTD_LOG_DEBUG;
 			st->st_log_level_min = LOG_DEBUG;
+
+			/* -m debug should send messages to console */
+			st->st_log_flags =
+			    st->st_log_flags | STARTD_LOG_TERMINAL;
 		} else if (strcmp(cp, "verbose") == 0) {
 			st->st_boot_flags = STARTD_BOOT_VERBOSE;
-			st->st_log_flags = STARTD_LOG_VERBOSE;
 			st->st_log_level_min = LOG_INFO;
 		} else if (strcmp(cp, "seed") == 0) {
 			uu_warn("SMF option \"%s\" unimplemented.\n", cp);
 		} else if (strcmp(cp, "quiet") == 0) {
-			st->st_log_flags = STARTD_LOG_QUIET;
 			st->st_log_level_min = LOG_NOTICE;
 		} else if (strncmp(cp, "milestone=",
 		    sizeof ("milestone=") - 1) == 0) {
@@ -713,7 +711,7 @@ set_boot_env()
 }
 
 static void
-startup(int log_args)
+startup(void)
 {
 	ctid_t configd_ctid;
 	int err;
@@ -759,7 +757,7 @@ startup(int log_args)
 	utmpx_init();
 	wait_init();
 
-	if (read_startd_config(log_args))
+	if (read_startd_config())
 		log_framework(LOG_INFO, "svc.configd unable to provide startd "
 		    "optional settings\n");
 
@@ -831,7 +829,6 @@ main(int argc, char *argv[])
 {
 	int opt;
 	int daemonize = 1;
-	int log_args = 0;
 	struct sigaction act;
 	sigset_t nullset;
 	struct stat sb;
@@ -858,24 +855,13 @@ main(int argc, char *argv[])
 	max_scf_value_size++;
 	max_scf_fmri_size++;
 
-	st->st_log_flags = STARTD_LOG_FILE;
-	st->st_log_level_min = LOG_INFO;
+	st->st_log_flags = STARTD_LOG_FILE | STARTD_LOG_SYSLOG;
+	st->st_log_level_min = LOG_NOTICE;
 
-	while ((opt = getopt(argc, argv, "dnqrs")) != EOF) {
+	while ((opt = getopt(argc, argv, "nrs")) != EOF) {
 		switch (opt) {
-		case 'd':
-			st->st_log_flags =
-			    STARTD_LOG_FILE | STARTD_LOG_TERMINAL;
-			st->st_log_level_min = LOG_DEBUG;
-			log_args = 1;
-			break;
 		case 'n':
 			daemonize = 0;
-			break;
-		case 'q':
-			st->st_log_flags = 0;
-			st->st_log_level_min = LOG_NOTICE;
-			log_args = 1;
 			break;
 		case 'r':			/* reconfiguration boot */
 			opt_reconfig = 1;
@@ -912,7 +898,7 @@ main(int argc, char *argv[])
 	(void) sigaction(SIGINT, &act, NULL);
 	(void) sigaction(SIGTERM, &act, NULL);
 
-	startup(log_args);
+	startup();
 
 	(void) sigemptyset(&nullset);
 	while (!finished) {

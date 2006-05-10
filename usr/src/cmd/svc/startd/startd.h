@@ -324,11 +324,11 @@ typedef struct graph_edge {
 	graph_vertex_t	*ge_parent;
 } graph_edge_t;
 
-
 /*
- * Start method outcomes
+ * Restarter transition outcomes
  */
 typedef enum {
+	MAINT_REQUESTED,
 	START_REQUESTED,
 	START_FAILED_REPEATEDLY,
 	START_FAILED_CONFIGURATION,
@@ -476,15 +476,8 @@ typedef struct wait_info {
 #define	STARTD_LOG_TERMINAL	0x2
 #define	STARTD_LOG_SYSLOG	0x4
 
-#define	STARTD_BOOT		0x1
-#define	STARTD_DEBUG		0x2
-
 #define	STARTD_BOOT_QUIET	0x1
 #define	STARTD_BOOT_VERBOSE	0x2
-
-#define	STARTD_LOG_QUIET	0x1
-#define	STARTD_LOG_VERBOSE	0x2
-#define	STARTD_LOG_DEBUG	0x3
 
 typedef struct startd_state {
 	/* Logging configuration */
@@ -586,6 +579,16 @@ void *graph_event_thread(void *);
 void *repository_event_thread(void *);
 int dgraph_add_instance(const char *, scf_instance_t *, boolean_t);
 void graph_engine_start(void);
+void graph_enable_by_vertex(graph_vertex_t *, int, int);
+int refresh_vertex(graph_vertex_t *, scf_instance_t *);
+void vertex_send_event(graph_vertex_t *, restarter_event_type_t);
+void graph_start_if_satisfied(graph_vertex_t *);
+void vertex_subgraph_dependencies_shutdown(scf_handle_t *h,
+    graph_vertex_t *v, int was_running);
+void graph_transition_sulogin(restarter_instance_state_t,
+    restarter_instance_state_t);
+void graph_transition_propagate(graph_vertex_t *, restarter_event_type_t,
+    restarter_error_t);
 
 /* libscf.c - common */
 char *inst_fmri_to_svc_fmri(const char *);
@@ -711,6 +714,10 @@ pthread_t startd_thread_create(void *(*)(void *), void *);
 void special_null_transition(void);
 void special_online_hooks_get(const char *, instance_hook_t *,
     instance_hook_t *, instance_hook_t *);
+
+/* transition.c */
+int gt_transition(scf_handle_t *, graph_vertex_t *, restarter_error_t,
+    restarter_instance_state_t, restarter_instance_state_t);
 
 /* utmpx.c */
 void utmpx_init(void);

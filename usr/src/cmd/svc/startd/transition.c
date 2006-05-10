@@ -1,0 +1,340 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * transition.c - Graph State Machine
+ *
+ * The graph state machine is implemented here, with a typical approach
+ * of a function per state.  Separating the implementation allows more
+ * clarity into the actions taken on notification of state change, as well
+ * as a place for future expansion including hooks for configurable actions.
+ * All functions are called with dgraph_lock held.
+ *
+ * The start action for this state machine is not explicit.  The states
+ * (ONLINE and DEGRADED) which needs to know when they're entering the state
+ * due to a daemon restart implement this understanding by checking for
+ * transition from uninitialized.  In the future, this would likely be better
+ * as an explicit start action instead of relying on an overloaded transition.
+ *
+ * All gt_enter functions use the same set of return codes.
+ *    0              success
+ *    ECONNABORTED   repository connection aborted
+ */
+
+#include "startd.h"
+
+static int
+gt_running(restarter_instance_state_t state)
+{
+	if (state == RESTARTER_STATE_ONLINE ||
+	    state == RESTARTER_STATE_DEGRADED)
+		return (1);
+
+	return (0);
+}
+
+static int
+gt_enter_uninit(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	int err;
+	scf_instance_t *inst;
+
+	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
+
+	/* Initialize instance by refreshing it. */
+
+	err = libscf_fmri_get_instance(h, v->gv_name, &inst);
+	switch (err) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		return (ECONNABORTED);
+
+	case ENOENT:
+		return (0);
+
+	case EINVAL:
+	case ENOTSUP:
+	default:
+		bad_error("libscf_fmri_get_instance", err);
+	}
+
+	err = refresh_vertex(v, inst);
+	if (err == 0)
+		graph_enable_by_vertex(v, v->gv_flags & GV_ENABLED, 0);
+
+	scf_instance_destroy(inst);
+
+	/* If the service was running, propagate a stop event. */
+	if (gt_running(old_state)) {
+		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+	}
+
+	graph_transition_sulogin(RESTARTER_STATE_UNINIT, old_state);
+	return (0);
+}
+
+static int
+gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
+
+	if (gt_running(old_state)) {
+		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+	} else if (v->gv_state == RESTARTER_STATE_MAINT) {
+		log_framework(LOG_DEBUG, "Propagating maintenance of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_START, rerr);
+	}
+
+	graph_transition_sulogin(RESTARTER_STATE_MAINT, old_state);
+	return (0);
+}
+
+static int
+gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
+
+	/*
+	 * If the instance should be enabled, see if we can start it.
+	 * Otherwise send a disable command.
+	 */
+	if (v->gv_flags & GV_ENABLED) {
+		graph_start_if_satisfied(v);
+	} else {
+		if (gt_running(old_state) && v->gv_post_disable_f)
+			v->gv_post_disable_f();
+		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
+	}
+
+	if (gt_running(old_state)) {
+		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+	}
+
+	graph_transition_sulogin(RESTARTER_STATE_OFFLINE, old_state);
+	return (0);
+}
+
+static int
+gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	vertex_subgraph_dependencies_shutdown(h, v, gt_running(old_state));
+
+	/*
+	 * If the instance should be disabled, no problem.  Otherwise,
+	 * send an enable command, which should result in the instance
+	 * moving to OFFLINE.
+	 */
+	if (v->gv_flags & GV_ENABLED) {
+		vertex_send_event(v, RESTARTER_EVENT_TYPE_ENABLE);
+	} else if (gt_running(old_state) && v->gv_post_disable_f) {
+		v->gv_post_disable_f();
+	}
+
+	/*
+	 * If the service was running, propagate this as a stop.
+	 * Otherwise, we treat other transitions as a start propagate,
+	 * since they can satisfy optional_all dependencies.
+	 */
+	if (gt_running(old_state)) {
+		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+
+	} else if (v->gv_state == RESTARTER_STATE_DISABLED) {
+		log_framework(LOG_DEBUG, "Propagating disable of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_START, rerr);
+	}
+
+	graph_transition_sulogin(RESTARTER_STATE_DISABLED, old_state);
+	return (0);
+}
+
+static int
+gt_internal_online_or_degraded(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	int r;
+
+	/*
+	 * If the instance has just come up, update the start
+	 * snapshot.
+	 */
+	if (gt_running(old_state) == 0) {
+		/*
+		 * Don't fire if we're just recovering state
+		 * after a restart.
+		 */
+		if (old_state != RESTARTER_STATE_UNINIT &&
+		    v->gv_post_online_f)
+			v->gv_post_online_f();
+
+		r = libscf_snapshots_poststart(h, v->gv_name, B_TRUE);
+		switch (r) {
+		case 0:
+		case ENOENT:
+			/*
+			 * If ENOENT, the instance must have been
+			 * deleted.  Pretend we were successful since
+			 * we should get a delete event later.
+			 */
+			break;
+
+		case ECONNABORTED:
+			return (ECONNABORTED);
+
+		case EACCES:
+		case ENOTSUP:
+		default:
+			bad_error("libscf_snapshots_poststart", r);
+		}
+	}
+	if (!(v->gv_flags & GV_ENABLED))
+		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
+
+	if (gt_running(old_state) == 0) {
+		log_framework(LOG_DEBUG, "Propagating start of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v,
+		    RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON, rerr);
+	} else if (rerr == RERR_REFRESH) {
+		/* For refresh we'll get a message sans state change */
+
+		log_framework(LOG_DEBUG, "Propagating refresh of %s.\n",
+		    v->gv_name);
+
+		graph_transition_propagate(v, RESTARTER_EVENT_TYPE_STOP, rerr);
+	}
+
+	return (0);
+}
+
+static int
+gt_enter_online(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	int r;
+
+	r = gt_internal_online_or_degraded(h, v, old_state, rerr);
+	if (r != 0)
+		return (r);
+
+	graph_transition_sulogin(RESTARTER_STATE_ONLINE, old_state);
+	return (0);
+}
+
+static int
+gt_enter_degraded(scf_handle_t *h, graph_vertex_t *v,
+    restarter_instance_state_t old_state, restarter_error_t rerr)
+{
+	int r;
+
+	r = gt_internal_online_or_degraded(h, v, old_state, rerr);
+	if (r != 0)
+		return (r);
+
+	graph_transition_sulogin(RESTARTER_STATE_DEGRADED, old_state);
+	return (0);
+}
+
+/*
+ * gt_transition() implements the state transition for the graph
+ * state machine.  It can return:
+ *    0              success
+ *    ECONNABORTED   repository connection aborted
+ */
+int
+gt_transition(scf_handle_t *h, graph_vertex_t *v, restarter_error_t rerr,
+    restarter_instance_state_t old_state, restarter_instance_state_t new_state)
+{
+	int err = 0;
+
+	/*
+	 * If there's a common set of work to be done on exit from the
+	 * old_state, include it as a separate set of functions here.  For
+	 * now there's no such work, so there are no gt_exit functions.
+	 */
+
+	/*
+	 * Now call the appropriate gt_enter function for the new state.
+	 */
+	switch (new_state) {
+	case RESTARTER_STATE_UNINIT:
+		err = gt_enter_uninit(h, v, old_state, rerr);
+		break;
+
+	case RESTARTER_STATE_DISABLED:
+		err = gt_enter_disabled(h, v, old_state, rerr);
+		break;
+
+	case RESTARTER_STATE_OFFLINE:
+		err = gt_enter_offline(h, v, old_state, rerr);
+		break;
+
+	case RESTARTER_STATE_ONLINE:
+		err = gt_enter_online(h, v, old_state, rerr);
+		break;
+
+	case RESTARTER_STATE_DEGRADED:
+		err = gt_enter_degraded(h, v, old_state, rerr);
+		break;
+
+	case RESTARTER_STATE_MAINT:
+		err = gt_enter_maint(h, v, old_state, rerr);
+		break;
+
+	default:
+		/* Shouldn't have been passed an invalid state. */
+#ifndef NDEBUG
+		uu_warn("%s:%d: Uncaught case %d.\n", __FILE__, __LINE__,
+		    new_state);
+#endif
+		abort();
+	}
+
+	return (err);
+}

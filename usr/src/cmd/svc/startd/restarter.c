@@ -1450,6 +1450,8 @@ maintain_instance(scf_handle_t *h, restarter_inst_t *rip, int immediate,
 	(void) restarter_instance_update_states(h, rip, rip->ri_i.i_state,
 	    RESTARTER_STATE_MAINT, RERR_NONE, (char *)aux);
 
+	log_transition(rip, MAINT_REQUESTED);
+
 	info = startd_zalloc(sizeof (*info));
 	info->sf_id = rip->ri_id;
 	info->sf_method_type = METHOD_STOP;

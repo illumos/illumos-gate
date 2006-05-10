@@ -173,7 +173,8 @@ static u_longlong_t dep_insert_ns = 0;
 
 
 static const char * const emsg_invalid_restarter =
-	"Restarter FMRI for %s is invalid.  Transitioning to maintenance.\n";
+	"Transitioning %s to maintenance, restarter FMRI %s is invalid "
+	"(see 'svcs -xv' for details).\n";
 static const char * const console_login_fmri = CONSOLE_LOGIN_FMRI;
 static const char * const single_user_fmri = SCF_MILESTONE_SINGLE_USER;
 static const char * const multi_user_fmri = SCF_MILESTONE_MULTI_USER;
@@ -214,7 +215,6 @@ static graph_vertex_t *manifest_import_p = NULL;
 static char target_milestone_as_runlevel(void);
 static void graph_runlevel_changed(char rl, int online);
 static int dgraph_set_milestone(const char *, scf_handle_t *, boolean_t);
-static void vertex_send_event(graph_vertex_t *v, restarter_event_type_t e);
 static boolean_t should_be_in_subgraph(graph_vertex_t *v);
 
 /*
@@ -1570,8 +1570,8 @@ dependency_satisfied(graph_vertex_t *v, boolean_t satbility)
 	}
 }
 
-static void
-start_if_satisfied(graph_vertex_t *v)
+void
+graph_start_if_satisfied(graph_vertex_t *v)
 {
 	if (v->gv_state == RESTARTER_STATE_OFFLINE &&
 	    instance_satisfied(v, B_FALSE) == 1) {
@@ -1615,7 +1615,7 @@ static int
 satbility_cb(graph_vertex_t *v, void *arg)
 {
 	if (v->gv_type == GVT_INST)
-		start_if_satisfied(v);
+		graph_start_if_satisfied(v);
 
 	return (UU_WALK_NEXT);
 }
@@ -1634,7 +1634,7 @@ propagate_start(graph_vertex_t *v, void *arg)
 {
 	switch (v->gv_type) {
 	case GVT_INST:
-		start_if_satisfied(v);
+		graph_start_if_satisfied(v);
 		break;
 
 	case GVT_GROUP:
@@ -1724,7 +1724,7 @@ propagate_stop(graph_vertex_t *v, void *arg)
  *   of the enabled property.  Thus, send the ADMIN_DISABLE rather than
  *   a plain DISABLE restarter event.
  */
-static void
+void
 graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 {
 	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
@@ -2446,9 +2446,9 @@ handle_cycle(const char *fmri, int *path)
 
 	path_to_str(path, (char **)&cp, &sz);
 
-	log_error(LOG_ERR, "Putting service %s into maintenance "
-	    "because it completes a dependency cycle:\n%s", fmri ? fmri : "?",
-	    cp);
+	log_error(LOG_ERR, "Transitioning %s to maintenance "
+	    "because it completes a dependency cycle (see svcs -xv for "
+	    "details):\n%s", fmri ? fmri : "?", cp);
 
 	startd_free((void *)cp, sz);
 }
@@ -2709,7 +2709,7 @@ get_inst:
  * into maintenance.  Update GV_INSUBGRAPH flags as necessary.  Returns 0 or
  * ECONNABORTED.
  */
-static int
+int
 refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 {
 	int err;
@@ -2816,15 +2816,7 @@ refresh_vertex(graph_vertex_t *v, scf_instance_t *inst)
 		}
 	}
 
-	if (v->gv_state == RESTARTER_STATE_OFFLINE) {
-		if (instance_satisfied(v, B_FALSE) == 1) {
-			if (v->gv_start_f == NULL)
-				vertex_send_event(v,
-				    RESTARTER_EVENT_TYPE_START);
-			else
-				v->gv_start_f(v);
-		}
-	}
+	graph_start_if_satisfied(v);
 
 	ret = 0;
 
@@ -3063,7 +3055,7 @@ init_state:
 		assert(err == EINVAL || err == ELOOP);
 
 		if (err == EINVAL) {
-			log_framework(LOG_WARNING, emsg_invalid_restarter,
+			log_framework(LOG_ERR, emsg_invalid_restarter,
 			    v->gv_name);
 			reason = "invalid_restarter";
 		} else {
@@ -3880,7 +3872,7 @@ has_running_nonsubgraph_dependents(graph_vertex_t *v)
 /*
  * For the dependency, disable the instance which makes up the dependency if
  * it is not in the subgraph and running.  If the dependency instance is in
- * the subgraph or it is not running, continue by disabling all of it's
+ * the subgraph or it is not running, continue by disabling all of its
  * non-subgraph dependencies.
  */
 static void
@@ -3983,8 +3975,7 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
     restarter_instance_state_t state, restarter_error_t serr)
 {
 	graph_vertex_t *v;
-	int err = 0, r;
-	int was_running, up_or_down;
+	int err = 0;
 	restarter_instance_state_t old_state;
 
 	MUTEX_LOCK(&dgraph_lock);
@@ -4013,9 +4004,25 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 	    instance_state_str[v->gv_state], instance_state_str[state]);
 
 	old_state = v->gv_state;
-	was_running = inst_running(v);
-
 	v->gv_state = state;
+
+	err = gt_transition(h, v, serr, old_state, state);
+
+	MUTEX_UNLOCK(&dgraph_lock);
+	return (err);
+}
+
+/*
+ * If this is a service shutdown and we're in the middle of a subgraph
+ * shutdown, we need to check if either we're the last service to go
+ * and should kickoff system shutdown, or if we should disable other
+ * services.
+ */
+void
+vertex_subgraph_dependencies_shutdown(scf_handle_t *h, graph_vertex_t *v,
+    int was_running)
+{
+	int up_or_down;
 
 	up_or_down = was_running ^ inst_running(v);
 
@@ -4035,170 +4042,20 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 			    disable_nonsubgraph_dependencies, (void *)h);
 		}
 	}
+}
 
-	switch (state) {
-	case RESTARTER_STATE_UNINIT: {
-		scf_instance_t *inst;
-
-		/* Initialize instance by refreshing it. */
-
-		err = libscf_fmri_get_instance(h, v->gv_name, &inst);
-		switch (err) {
-		case 0:
-			break;
-
-		case ECONNABORTED:
-			MUTEX_UNLOCK(&dgraph_lock);
-			return (ECONNABORTED);
-
-		case ENOENT:
-			MUTEX_UNLOCK(&dgraph_lock);
-			return (0);
-
-		case EINVAL:
-		case ENOTSUP:
-		default:
-			bad_error("libscf_fmri_get_instance", err);
-		}
-
-		err = refresh_vertex(v, inst);
-		if (err == 0)
-			graph_enable_by_vertex(v, v->gv_flags & GV_ENABLED, 0);
-
-		scf_instance_destroy(inst);
-		break;
-	}
-
-	case RESTARTER_STATE_DISABLED:
-		/*
-		 * If the instance should be disabled, no problem.  Otherwise,
-		 * send an enable command, which should result in the instance
-		 * moving to OFFLINE.
-		 */
-		if (v->gv_flags & GV_ENABLED) {
-			vertex_send_event(v, RESTARTER_EVENT_TYPE_ENABLE);
-		} else if (was_running && v->gv_post_disable_f) {
-			v->gv_post_disable_f();
-		}
-		break;
-
-	case RESTARTER_STATE_OFFLINE:
-		/*
-		 * If the instance should be enabled, see if we can start it.
-		 * Otherwise send a disable command.
-		 */
-		if (v->gv_flags & GV_ENABLED) {
-			if (instance_satisfied(v, B_FALSE) == 1) {
-				if (v->gv_start_f == NULL) {
-					vertex_send_event(v,
-					    RESTARTER_EVENT_TYPE_START);
-				} else {
-					v->gv_start_f(v);
-				}
-			} else {
-				log_framework(LOG_DEBUG,
-				    "Dependencies of %s not satisfied, "
-				    "not starting.\n", v->gv_name);
-			}
-		} else {
-			if (was_running && v->gv_post_disable_f)
-				v->gv_post_disable_f();
-			vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
-		}
-		break;
-
-	case RESTARTER_STATE_ONLINE:
-	case RESTARTER_STATE_DEGRADED:
-		/*
-		 * If the instance has just come up, update the start
-		 * snapshot.
-		 */
-		if (!was_running) {
-			/*
-			 * Don't fire if we're just recovering state
-			 * after a restart.
-			 */
-			if (old_state != RESTARTER_STATE_UNINIT &&
-			    v->gv_post_online_f)
-				v->gv_post_online_f();
-
-			r = libscf_snapshots_poststart(h, v->gv_name, B_TRUE);
-			switch (r) {
-			case 0:
-			case ENOENT:
-				/*
-				 * If ENOENT, the instance must have been
-				 * deleted.  Pretend we were successful since
-				 * we should get a delete event later.
-				 */
-				break;
-
-			case ECONNABORTED:
-				MUTEX_UNLOCK(&dgraph_lock);
-				return (ECONNABORTED);
-
-			case EACCES:
-			case ENOTSUP:
-			default:
-				bad_error("libscf_snapshots_poststart", r);
-			}
-		}
-		if (!(v->gv_flags & GV_ENABLED))
-			vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
-		break;
-
-	case RESTARTER_STATE_MAINT:
-		/* No action. */
-		break;
-
-	default:
-		/* Should have been caught above. */
-#ifndef NDEBUG
-		uu_warn("%s:%d: Uncaught case %d.\n", __FILE__, __LINE__,
-		    state);
-#endif
-		abort();
-	}
-
-	/*
-	 * If the service came up or went down, propagate the event.  We must
-	 * treat offline -> disabled as a start since it can satisfy
-	 * optional_all dependencies.  And we must treat !running -> maintenance
-	 * as a start because maintenance satisfies optional and exclusion
-	 * dependencies.
-	 */
-	if (inst_running(v)) {
-		if (!was_running) {
-			log_framework(LOG_DEBUG, "Propagating start of %s.\n",
-			    v->gv_name);
-
-			graph_walk_dependents(v, propagate_start, NULL);
-		} else if (serr == RERR_REFRESH) {
-			/* For refresh we'll get a message sans state change */
-
-			log_framework(LOG_DEBUG, "Propagating refresh of %s.\n",
-			    v->gv_name);
-
-			graph_walk_dependents(v, propagate_stop, (void *)serr);
-		}
-	} else if (was_running) {
-		log_framework(LOG_DEBUG, "Propagating stop of %s.\n",
-			    v->gv_name);
-
-		graph_walk_dependents(v, propagate_stop, (void *)serr);
-	} else if (v->gv_state == RESTARTER_STATE_DISABLED) {
-		log_framework(LOG_DEBUG, "Propagating disable of %s.\n",
-		    v->gv_name);
-
-		graph_walk_dependents(v, propagate_start, NULL);
-		propagate_satbility(v);
-	} else if (v->gv_state == RESTARTER_STATE_MAINT) {
-		log_framework(LOG_DEBUG, "Propagating maintenance of %s.\n",
-		    v->gv_name);
-
-		graph_walk_dependents(v, propagate_start, NULL);
-		propagate_satbility(v);
-	}
+/*
+ * Decide whether to start up an sulogin thread after a service is
+ * finished changing state.  Only need to do the full can_come_up()
+ * evaluation if an instance is changing state, we're not halfway through
+ * loading the thread, and we aren't shutting down or going to the single
+ * user milestone.
+ */
+void
+graph_transition_sulogin(restarter_instance_state_t state,
+    restarter_instance_state_t old_state)
+{
+	assert(PTHREAD_MUTEX_HELD(&dgraph_lock));
 
 	if (state != old_state && st->st_load_complete &&
 	    !go_single_user_mode && !go_to_level1 &&
@@ -4208,10 +4065,37 @@ dgraph_set_instance_state(scf_handle_t *h, const char *inst_name,
 			sulogin_thread_running = B_TRUE;
 		}
 	}
+}
 
-	MUTEX_UNLOCK(&dgraph_lock);
+/*
+ * Propagate a start, stop or maintenance event.  Use the
+ * RESTARTER_EVENT_TYPE_START, RESTARTER_EVENT_TYPE_STOP, and
+ * RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON respectively to represent those
+ * events.
+ *
+ * For maintenance, we need to propagate_satbility() as well to
+ * take care of walking further down the graph than just the direct
+ * dependents.
+ */
+void
+graph_transition_propagate(graph_vertex_t *v, restarter_event_type_t propagate,
+    restarter_error_t rerr)
+{
+	if (propagate == RESTARTER_EVENT_TYPE_STOP) {
+		graph_walk_dependents(v, propagate_stop, (void *)rerr);
+	} else if (propagate == RESTARTER_EVENT_TYPE_START ||
+	    propagate == RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON) {
+		graph_walk_dependents(v, propagate_start, NULL);
 
-	return (err);
+		if (propagate == RESTARTER_EVENT_TYPE_ADMIN_MAINT_ON)
+			propagate_satbility(v);
+	} else {
+#ifndef NDEBUG
+		uu_warn("%s:%d: Unexpected propagate value %d.\n",  __FILE__,
+		    __LINE__, propagate);
+#endif
+		abort();
+	}
 }
 
 /*
