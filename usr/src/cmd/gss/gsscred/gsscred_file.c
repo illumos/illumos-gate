@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,18 +39,25 @@
  */
 
 #define	MAX_ENTRY_LEN 1024
+
 static const char credFile[] = "/etc/gss/gsscred_db";
 static const char credFileTmp[] = "/etc/gss/gsscred_db.tmp";
 static const int expNameTokIdLen = 2;
 static const int mechOidLenLen = 2;
-static const int mechOidTagLen = 1;
+static const int krb5OidTagLen = 1;
+static const int krb5OidLenLen = 1;
+static const int nameLen = 4;
+static const int krb5OidLen = 9;
+
+/*
+ * Multiply by two given that the token has already gone through hex string
+ * expansion.
+ */
+#define	NAME_OFFSET (expNameTokIdLen + mechOidLenLen + krb5OidTagLen + \
+	krb5OidLenLen + krb5OidLen + nameLen) * 2
 
 static int matchEntry(const char *entry, const gss_buffer_t name,
 		const char *uid, uid_t *uidOut);
-
-/* From g_glue.c */
-extern int
-get_der_length(unsigned char **, unsigned int, unsigned int *);
 
 /*
  * file_addGssCredEntry
@@ -252,16 +258,24 @@ int file_deleteGssCredEntry(const gss_buffer_t name, const char *uid,
 static int matchEntry(const char *entry, const gss_buffer_t name,
 		const char *uid, uid_t *uidOut)
 {
-	char fullEntry[MAX_ENTRY_LEN+1], *item;
-	unsigned char *buf;
+	char fullEntry[MAX_ENTRY_LEN+1], *item, *item_buf, *name_buf;
 	char dilims[] = "\t \n";
-	int length;
-	unsigned int dummy;
-	OM_uint32 minor, result;
-	gss_buffer_desc mechOidDesc = GSS_C_EMPTY_BUFFER;
-	gss_name_t intName;
-	gss_buffer_desc expName;
-	char *krb5_oid = "\052\206\110\206\367\022\001\002\002";
+	/*
+	 * item_len is the length of the token in the gsscred_db.
+	 * name_len is the length of the token passed to this function.
+	 */
+	int item_len, name_len;
+	/*
+	 * This is the hex encoding of the beginning of all exported name
+	 * tokens for the Kerberos V mechanism.  We need this to detect old,
+	 * incorrectly exported name tokens; see below.
+	 */
+	char *krb5_ntok_prefix = "0401000B06092A864886F712010202";
+	/*
+	 * This is the hex encoded GSS_C_NT_USER_NAME OID, needed for the same
+	 * reason as krb5_ntok_prefix.
+	 */
+	char *gss_u_name = "2A864886F71201020101";
 
 	if (entry == NULL || isspace(*entry))
 		return (0);
@@ -272,77 +286,68 @@ static int matchEntry(const char *entry, const gss_buffer_t name,
 	if ((item = strtok(fullEntry, dilims)) == NULL)
 		return (0);
 
-	/* do wee need to search the name */
+	/* do we need to search the name */
 	if (name != NULL) {
+
+		item_len = strlen(item);
+		name_len = name->length;
+		name_buf = name->value;
+
 		/* we can match the prefix of the string */
-		if (strlen(item) < name->length)
+		if (item_len < name_len)
 			return (0);
 
-		if (memcmp(item, name->value, name->length) != 0) {
-
-			buf = (unsigned char *)name->value;
-			buf += expNameTokIdLen;
-
-			/* skip oid length - get to der */
-			buf += 2;
-
-			/* skip oid tag */
-			buf++;
-
-			/* get oid length */
-			length = get_der_length(&buf,
-				(name->length - expNameTokIdLen
-				- mechOidLenLen - mechOidTagLen), &dummy);
-
-			if (length == -1)
-				return (0);
-
-			mechOidDesc.length = length;
+		if (strncmp(item, name->value, name_len) != 0) {
 
 			/*
-			 * check whether exported name length is within the
-			 * boundary.
+			 * The following section is needed in order to detect
+			 * two existing errant formats in the gsscred db.
+			 *
+			 * 1. Exported names that have a trailing null byte
+			 * ("00" in two hex characters) with the name length
+			 * incremented to account for the extra null byte.
+			 *
+			 * 2. Exported names that have the name type length
+			 * and name type OID prepended to the exported name.
+			 *
 			 */
-			if (name->length <
-				(expNameTokIdLen + mechOidLenLen + length
-					+ dummy + mechOidTagLen))
+			if (strncmp(name->value, krb5_ntok_prefix,
+			    strlen(krb5_ntok_prefix)) != 0)
 				return (0);
 
-			mechOidDesc.value = buf;
+			if (strncmp(item, krb5_ntok_prefix,
+			    strlen(krb5_ntok_prefix)) != 0)
+				return (0);
 
-			buf += dummy + mechOidDesc.length;
+			if ((item_buf = strstr(item, gss_u_name)) == NULL)
+				return (0);
+
+			item_buf += strlen(gss_u_name);
+
+			name_buf += NAME_OFFSET;
+
+			if ((strlen(item_buf) != strlen(name_buf)) &&
+			    (strncmp(item_buf + (strlen(item_buf) - 2), "00", 2)
+			    != 0))
+				return (0);
 
 			/*
-			 * If the mechoid is that of Kerberos and if the
-			 * "display" part of the exported file name starts and
-			 * ends with a zero-valued byte, then we are dealing
-			 * with old styled gsscred entries. We will then match
-			 * them in the following manner:
-			 *	- gss_import_name() the name from the file
-			 *	- gss_export_name() the result
-			 *	- mem_cmp() the result with the name we are
-			 *		trying to match.
+			 * Here we compare the end of name_len, given
+			 * that item_len could have two extra "00"
+			 * representing the null byte.
 			 */
-			if (mechOidDesc.length == 9 &&
-				(memcmp(buf, krb5_oid,
-						mechOidDesc.length) == 0) &&
-				(*buf == '\0' && buf[length] == '\0')) {
-				if (gss_import_name(&minor, name,
-						GSS_C_NT_EXPORT_NAME,
-						&intName) != GSS_S_COMPLETE)
-					return (0);
-				result = gss_export_name(&minor, intName,
-								&expName);
-				(void) gss_release_name(&minor, &intName);
-				if (result != GSS_S_COMPLETE)
-					return (0);
-				result = memcmp(item, expName.value,
-							expName.length);
-				(void) gss_release_buffer(&minor, &expName);
-				if (result != 0)
-					return (0);
-			}
-		}
+			if (strncmp(item_buf, name_buf, name_len - NAME_OFFSET)
+			    != 0)
+				return (0);
+		} else
+			/*
+			 * We only strncmp() so we could check for old,
+			 * broken exported name tokens for the krb5 mech.
+			 * For any other exported name tokens we want exact
+			 * matches only.
+			 */
+			if (item_len != name_len)
+				return (0);
 
 		/* do we need to check the uid - if not then we found it */
 		if (uid == NULL) {
