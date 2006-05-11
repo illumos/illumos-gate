@@ -623,6 +623,7 @@ MSGSUBDIRS=		\
 	sort		\
 	split		\
 	ssh		\
+	stat		\
 	strings		\
 	su		\
 	sum		\

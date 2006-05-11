@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <time.h>
+#include <langinfo.h>
 #include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/vnode.h>
@@ -46,6 +47,7 @@
 #include <poll.h>
 #include <ctype.h>
 #include <libintl.h>
+#include <locale.h>
 
 /*
  * For now, parsable output is turned off.  Once we gather feedback and
@@ -826,16 +828,23 @@ void
 print_time(int type)
 {
 	time_t	t;
+	static char *fmt = NULL;	/* Time format */
+
+	/* We only need to retrieve this once per invocation */
+	if (fmt == NULL) {
+		fmt = nl_langinfo(_DATE_FMT);
+	}
 
 	if (time(&t) != -1) {
 		if (type == UDATE) {
 			(void) printf("%ld\n", t);
 		} else if (type == DDATE) {
-			char	*dstr;
+			char	dstr[64];
+			int	len;
 
-			dstr = ctime(&t);
-			if (dstr) {
-				(void) printf("%s", dstr);
+			len = strftime(dstr, sizeof (dstr), fmt, localtime(&t));
+			if (len > 0) {
+				(void) printf("%s\n", dstr);
 			}
 		}
 	}
@@ -882,6 +891,12 @@ main(int argc, char *argv[])
 	void (*dfunc)(char *, vopstats_t *, vopstats_t *, int) = dflt_display;
 
 	extern int	optind;
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
 
 	cmdname = argv[0];
 	while ((c = getopt(argc, argv, OPTIONS)) != EOF) {
