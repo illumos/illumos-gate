@@ -110,7 +110,7 @@ static const ao_error_disp_t ao_disp_unknown = {
 static const struct ao_smi_disable {
 	const char *asd_sys_vendor;	/* SMB_TYPE_SYSTEM vendor prefix */
 	const char *asd_bios_vendor;	/* SMB_TYPE_BIOS vendor prefix */
-	uint32_t asd_code;		/* output code for SMI disable */
+	uint8_t asd_code;		/* output code for SMI disable */
 } ao_smi_disable[] = {
 	{ "Sun Microsystems", "American Megatrends", 0x59 },
 	{ NULL, NULL, 0 }
@@ -828,7 +828,7 @@ ao_mca_post_init(void *data)
 				    "favor of Solaris Fault Management for "
 				    "AMD Processors\n");
 
-				outl(asd_port, asd->asd_code);
+				outb(asd_port, asd->asd_code);
 
 			} else if (rv < 0) {
 				cmn_err(CE_CONT, "?Solaris Fault Management "
