@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,6 +117,7 @@ static void repos(int nchar);
 static void trouble();
 static int edit(struct diff *diff, int dup, int j);
 static void edscript(int n);
+static void usage();
 
 int
 main(int argc, char **argv)
@@ -125,9 +125,9 @@ main(int argc, char **argv)
 	int i, m, n;
 	eflag  = 0;
 	oflag  = 0;
-	if (*argv[1] == '-') {
+	if ((argc > 1) && (*argv[1] == '-')) {
 		switch (argv[1][1]) {
-		default:
+		case 'e':
 			eflag = 3;
 			break;
 		case '3':
@@ -143,15 +143,15 @@ main(int argc, char **argv)
 		case 'X':
 			oflag = eflag = 1;
 			break;
+		default:
+			usage();
+			break;
 		}
 		argv++;
 		argc--;
 	}
-	if (argc < 6) {
-		(void) fprintf(stderr, "diff3: arg count\n");
-		exit(1);
-	}
-
+	if (argc < 6)
+		usage();
 	if (oflag) {
 		(void) snprintf(f1mark, sizeof (f1mark), "<<<<<<< %s",
 						argc >= 7 ? argv[6] : argv[3]);
@@ -555,4 +555,12 @@ edscript(int n)
 			(void) printf("%da\n%s\n.\n", de[n].old.from-1, f1mark);
 		}
 	}
+}
+
+static void
+usage()
+{
+	(void) fprintf(stderr,
+	    "\tusage: diff3prog [-ex3EX] d13 d23 f1 f2 f3 [m1 m2]\n");
+	exit(1);
 }
