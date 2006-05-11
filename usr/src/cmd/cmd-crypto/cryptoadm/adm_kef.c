@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -921,7 +920,7 @@ uninstall_kef(char *provname)
 	if (check_active_for_soft(provname, &is_active) == FAILURE) {
 		return (FAILURE);
 	} else if ((is_active == B_TRUE) &&
-	    (unload_kef_soft(provname) == FAILURE)) {
+	    (unload_kef_soft(provname, B_TRUE) == FAILURE)) {
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to uninstall %s.\n"), provname);
 		return (FAILURE);
@@ -1131,7 +1130,7 @@ refresh(void)
 			}
 
 			if (!found) {
-				rc = unload_kef_soft(psoftname);
+				rc = unload_kef_soft(psoftname, B_FALSE);
 				if (rc == FAILURE) {
 					cryptoerror(LOG_ERR, gettext(
 					    "WARNING - the provider %s is "
@@ -1262,11 +1261,13 @@ refresh(void)
 /*
  * Unload the kernel software provider. Before calling this function, the
  * caller should check if the provider is in the config file and if it
- * is kernel.  This routine makes 3 ioctl calls to remove it from kernel
- * completely.
+ * is kernel. This routine makes 3 ioctl calls to remove it from kernel
+ * completely. The argument do_check set to B_FALSE means that the
+ * caller knows the provider is not the config file and hence the check
+ * is skipped.
  */
 int
-unload_kef_soft(char *provname)
+unload_kef_soft(char *provname, boolean_t do_check)
 {
 	crypto_unload_soft_module_t 	*punload_soft = NULL;
 	crypto_load_soft_config_t	*pload_soft_conf = NULL;
@@ -1279,7 +1280,15 @@ unload_kef_soft(char *provname)
 		return (FAILURE);
 	}
 
-	if ((pent = getent_kef(provname)) == NULL) {
+	if (!do_check) {
+		/* Construct an entry using the provname */
+		pent = calloc(1, sizeof (entry_t));
+		if (pent == NULL) {
+			cryptoerror(LOG_STDERR, gettext("out of memory."));
+			return (FAILURE);
+		}
+		(void) strlcpy(pent->name, provname, MAXNAMELEN);
+	} else if ((pent = getent_kef(provname)) == NULL) {
 		cryptoerror(LOG_STDERR, gettext("%s does not exist."),
 		    provname);
 		return (FAILURE);
