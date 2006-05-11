@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -96,6 +96,7 @@ $(ROOTSFWMANDIRS): $(ROOTSFWMAN)
 $(ROOTSFWMAN): $(ROOTSFW)/share
 	$(INS.dir)
 $(ROOTSFW)/man: $(ROOTSFW)
+	$(RM) $@
 	$(SYMLINK) share/man $@ $(CHOWNLINK) $(CHGRPLINK)
 $(ROOTSFWMAN)/man1m/% $(ROOTSFWMAN)/man3/% $(ROOTSFWMAN)/man4/%: sunman/%
 	$(INS.file)
