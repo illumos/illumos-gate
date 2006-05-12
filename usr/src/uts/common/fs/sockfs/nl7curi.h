@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,8 @@ extern "C" {
 #include <sys/stropts.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+
+#undef	PROMIF_DEBUG
 
 /*
  * Some usefull chararcter macros:
@@ -92,6 +94,8 @@ typedef struct ref_s {
 	}								\
 }
 
+#define	REF_COUNT(container) (container)->ref.cnt
+
 #define	REF_ASSERT(container, count)					\
 	ASSERT((container)->ref.cnt == (count));
 
@@ -122,18 +126,24 @@ typedef struct uri_desc_s {
 	struct uri_desc_s *hash;	/* Hash *next */
 	uint64_t	hit;		/* Hit counter */
 	clock_t		expire;		/* URI lbolt expires on (-1 = NEVER) */
+#ifdef notyet
+	void		*sslctx;	/* SSL context */
+#endif
 	boolean_t	nocache;	/* URI no cache */
+	boolean_t	conditional;	/* Conditional response */
+	uint32_t	hvalue;		/* Hashed value */
 
 	mblk_t		*reqmp;		/* Request mblk_t */
 	str_t		path;		/* Path name of response  */
 	str_t		auth;		/* Authority for response */
 	ssize_t		resplen;	/* Response length */
+	ssize_t		respclen;	/* Response chunk length */
 	char		*eoh;		/* End of header pointer */
 	void		*scheme;	/* Scheme private state */
 
 	ref_t		ref;		/* Reference stuff */
 
-	size_t		count;		/* rd_t chain byte cound */
+	size_t		count;		/* rd_t chain byte count */
 	uri_rd_t	*tail;		/* Last response descriptor */
 	uri_rd_t	response;	/* First response descriptor */
 
@@ -142,8 +152,13 @@ typedef struct uri_desc_s {
 	kmutex_t	proclock;	/* Lock for proc and waiting */
 } uri_desc_t;
 
+/* Hash the (char)c to the hash accumulator (uint32_t)hv */
+#define	CHASH(hv, c) (hv) = ((hv) << 5) + (hv) + c; (hv) &= 0x7FFFFFFF
+
 #define	URI_TEMP (uri_desc_t *)-1	/* Temp (nocache) uri_t.hash pointer */
-#define	URI_TEMP_PARSE_SZ 512		/* Enough bytes to parse for headers */
+
+#define	URI_LEN_NOVALUE -1		/* Length (int) counter no value yet */
+#define	URI_LEN_CONSUMED -2		/* Length (int) counter consumed */
 
 typedef struct uri_segmap_s {
 	ref_t		ref;		/* Reference, one per uri_desb_t */
@@ -159,15 +174,23 @@ typedef struct uri_desb_s {
 } uri_desb_t;
 
 /*
- * Function prototypes:
+ * Add (and create if need be) a new uri_rd_t to a uri.
+ *
+ * Note, macro can block, must be called from a blockable context.
  */
-
-boolean_t nl7c_http_request(char **, char *, uri_desc_t *, struct sonode *);
-boolean_t nl7c_http_response(char **, char *, uri_desc_t *, struct sonode *);
-boolean_t nl7c_http_cmp(void *, void *);
-mblk_t *nl7c_http_persist(struct sonode *);
-void nl7c_http_free(void *arg);
-void nl7c_http_init(void);
+#define	URI_RD_ADD(uri, rdp, size, offset) {				\
+	if ((uri)->tail == NULL) {					\
+		(rdp) = &(uri)->response;				\
+	} else {							\
+		(rdp) = kmem_cache_alloc(nl7c_uri_rd_kmc, KM_SLEEP);	\
+		(uri)->tail->next = (rdp);				\
+	}								\
+	(rdp)->sz = size;						\
+	(rdp)->off = offset;						\
+	(rdp)->next = NULL;						\
+	(uri)->tail = rdp;						\
+	(uri)->count += size;						\
+}
 
 #ifdef	__cplusplus
 }

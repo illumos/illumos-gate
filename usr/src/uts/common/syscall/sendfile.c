@@ -72,8 +72,8 @@
 
 extern int sosendfile64(file_t *, file_t *, const struct ksendfilevec64 *,
 		ssize32_t *);
-extern void nl7c_sendfilev(struct sonode *, u_offset_t, struct sendfilevec *,
-		int);
+extern int nl7c_sendfilev(struct sonode *, u_offset_t *, struct sendfilevec *,
+		int, ssize_t *);
 
 /*
  * kstrwritemp() has very similar semantics as that of strwrite().
@@ -1260,19 +1260,16 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 		 * pagesize is useless.
 		 *
 		 * Note, if socket has NL7C enabled then call NL7C's
-		 * senfilev() function to give NL7C a chance to copy
-		 * the vec for caching, then continue processing as
-		 * normal.
+		 * senfilev() function to consume the sfv[].
 		 */
 		if (is_sock) {
 			switch (so->so_family) {
 			case AF_INET:
 			case AF_INET6:
-				if (so->so_nl7c_flags != 0) {
-					nl7c_sendfilev(so, fileoff,
-					    sfv, copy_cnt);
-				}
-				if (total_size <= (4 * maxblk))
+				if (so->so_nl7c_flags != 0)
+					error = nl7c_sendfilev(so, &fileoff,
+					    sfv, copy_cnt, &count);
+				else if (total_size <= (4 * maxblk))
 					error = sendvec_small_chunk(fp,
 					    &fileoff, sfv, copy_cnt,
 					    total_size, maxblk, &count);

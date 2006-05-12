@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,8 @@ extern "C" {
 #define	NL7C_SOPERSIST	0x00000002 /* NL7C socket is persistent */
 #define	NL7C_WAITWRITE	0x00000004 /* NL7C waiting first write */
 #define	NL7C_AF_NCA	0x00000008 /* NL7C enabled socket via AF_NCA */
+#define	NL7C_POLLIN	0x00000010 /* poll() POLLIN prior to read */
+#define	NL7C_CLOSE	0x00000020 /* NL7C close needed */
 
 #define	NL7C_SCHEMEPRIV	0xFFFF0000 /* NL7C scheme private state */
 
@@ -58,18 +59,17 @@ extern "C" {
  */
 
 extern boolean_t	nl7c_enabled;
-
 extern clock_t		nl7c_uri_ttl;
 
 /*
  * Function prototypes ...
  */
 
-boolean_t nl7c_process(struct sonode *, boolean_t, int);
-void nl7c_data(struct sonode *, uio_t *);
-extern void nl7c_urifree(struct sonode *);
-void nl7c_close(struct sonode *);
-boolean_t nl7c_parse(struct sonode *, boolean_t, boolean_t *, int);
+boolean_t	nl7c_process(struct sonode *, boolean_t);
+int		nl7c_data(struct sonode *, uio_t *);
+void		nl7c_urifree(struct sonode *);
+void		nl7c_close(struct sonode *);
+boolean_t	nl7c_parse(struct sonode *, boolean_t, boolean_t *);
 
 #ifdef	__cplusplus
 }

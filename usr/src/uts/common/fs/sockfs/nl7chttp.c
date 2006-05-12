@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,12 +27,35 @@
 
 #include <sys/sysmacros.h>
 #include <sys/strsubr.h>
-#include <sys/promif.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
 
 #include <inet/nca/ncadoorhdr.h>
 #include <inet/nca/ncalogd.h>
+
+
+volatile uint64_t	nl7c_http_response_chunked = 0;
+volatile uint64_t	nl7c_http_response_chunkparse = 0;
+
+volatile uint64_t	nl7c_http_response_pass1 = 0;
+volatile uint64_t	nl7c_http_response_pass2 = 0;
+volatile uint64_t	nl7c_http_response_304 = 0;
+volatile uint64_t	nl7c_http_response_307 = 0;
+volatile uint64_t	nl7c_http_response_400 = 0;
+
+volatile uint64_t	nl7c_http_cond_304 = 0;
+volatile uint64_t	nl7c_http_cond_412 = 0;
+
+/*
+ * Some externs:
+ */
+
+extern uint64_t		nl7c_uri_bytes;
+extern kmem_cache_t	*nl7c_uri_kmc;
+extern kmem_cache_t	*nl7c_uri_rd_kmc;
+extern void		nl7c_uri_inactive(uri_desc_t *);
+extern uint32_t		nca_major_version;
+extern uint32_t		nca_minor_version;
 
 /*
  * HTTP connection persistent headers, mblk_t's, and state values stored in
@@ -50,25 +72,22 @@ mblk_t	*http_conn_ka;
 #define	HTTP_CONN_KA	0x00020000
 
 /*
- * HTTP scheme private state:
+ * Hex ascii Digit to Integer accumulate, if (char)c is a valid ascii
+ * hex digit then the contents of (int32_t)n will be left shifted and
+ * the new digit added in, else n will be set to -1.
  */
 
-typedef struct http_s {
-	boolean_t	parsed;		/* Response parsed */
-	uint32_t	major, minor;	/* HTTP/major.minor */
-	uint32_t	headlen;	/* HTTP header length */
-	clock_t		date;		/* Response Date: */
-	clock_t		expire;		/* Response Expire: */
-	time_t		lastmod;	/* Response Last-Modified: */
-	str_t		accept;		/* Request Accept: */
-	str_t		acceptchar;	/* Request Accept-Charset: */
-	str_t		acceptenco;	/* Request Accept-Encoding: */
-	str_t		acceptlang;	/* Request Accept-Language: */
-	str_t		etag;		/* Request/Response ETag: */
-	str_t		uagent;		/* Request User-Agent: */
-} http_t;
-
-static kmem_cache_t *http_kmc;
+#define	hd2i(c, n) {							\
+	(n) *= 16;							\
+	if (isdigit(c))							\
+		(n) += (c) - '0';					\
+	else if ((c) >= 'a' && (c) <= 'f')				\
+		(n) += (c) - 'W';					\
+	else if ((c) >= 'A' && (c) <= 'F')				\
+		(n) += (c) - '7';					\
+	else								\
+		(n) = -1;						\
+}
 
 /*
  * HTTP parser action values:
@@ -86,7 +105,8 @@ typedef enum act_e {
 	ETAG		= 0x0100,
 	RESPONSE	= 0x0200,
 	URIABS		= 0x0400,
-	URIREL		= 0x0800
+	URIREL		= 0x0800,
+	HEX		= 0x1000
 } act_t;
 
 #define	UNDEF		PASS
@@ -122,16 +142,43 @@ typedef struct ttree_s {
 #define	INIT(s, t) {s, S##s, t}
 
 #include "nl7ctokgen.h"
-
 static ttree_t *req_tree;
 static ttree_t *res_tree;
 
 /*
- * HTTP date routines:
+ * HTTP scheme private state:
+ */
+
+typedef struct http_s {
+	boolean_t	parsed;		/* Response parsed */
+	uint32_t	major, minor;	/* HTTP/major.minor */
+	uint32_t	headlen;	/* HTTP header length */
+	clock_t		date;		/* Response Date: */
+	clock_t		expire;		/* Response Expire: */
+	clock_t		moddate;	/* Request *Modified-Since date */
+	act_t		modtokid;	/* Request *Modified-Since tokid */
+	time_t		lastmod;	/* Response Last-Modified: */
+	str_t		accept;		/* Request Accept: */
+	str_t		acceptchar;	/* Request Accept-Charset: */
+	str_t		acceptenco;	/* Request Accept-Encoding: */
+	str_t		acceptlang;	/* Request Accept-Language: */
+	str_t		etag;		/* Request/Response ETag: */
+	str_t		uagent;		/* Request User-Agent: */
+} http_t;
+
+static kmem_cache_t *http_kmc;
+
+/*
+ * HTTP date routines, dow[] for day of the week, Dow[] for day of the
+ * week for the Unix epoch (i.e. day 0 is a Thu), months[] for the months
+ * of the year, and dom[] for day number of the year for the first day
+ * of each month (non leap year).
  */
 
 static char *dow[] = {"sunday", "monday", "tuesday", "wednesday", "thursday",
 	"friday", "saturday", 0};
+
+static char *Dow[] = {"Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed", 0};
 
 static char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
 	"Aug", "Sep", "Oct", "Nov", "Dec", 0};
@@ -537,6 +584,116 @@ http_date2time_t(char *cp, char *ep)
 }
 
 /*
+ * http_today(char *) - returns in the given char* pointer the current
+ * date in ascii with a format of (char [29]):
+ *
+ *	Sun, 07 Dec 1998 14:49:37 GMT	; RFC 822, updated by RFC 1123
+ */
+
+static void
+http_today(char *cp)
+{
+	ssize_t	i;
+	char	*fp;
+
+	ssize_t	leap;
+	ssize_t	year;
+	ssize_t	month;
+	ssize_t	dow;
+	ssize_t	day;
+	ssize_t	hour;
+	ssize_t	min;
+	ssize_t	sec;
+
+	/* Secs since Thu, 01 Jan 1970 00:00:00 GMT */
+	time_t	now = gethrestime_sec();
+
+	sec = now % 60;
+	now /= 60;
+	min = now % 60;
+	now /= 60;
+	hour = now % 24;
+	now /= 24;
+	dow = now % 7;
+
+	year = 1970;
+	for (;;) {
+		if (year % 4 == 0 && year % 100 != 0 || year % 400 == 0)
+			day = 366;
+		else
+			day = 365;
+		if (now < day)
+			break;
+		now -= day;
+		year++;
+	}
+
+	now++;
+	if (year % 4 == 0 && year % 100 != 0 || year % 400 == 0)
+		leap = 1;
+	else
+		leap = 0;
+	month = 11;
+	for (i = 11; i; i--) {
+		if (i < 2)
+			leap = 0;
+		if (now > dom[i] + leap)
+			break;
+		month--;
+	}
+	day = now - dom[i] - leap;
+
+	fp = Dow[dow];
+	*cp++ = *fp++;
+	*cp++ = *fp++;
+	*cp++ = *fp++;
+	*cp++ = ',';
+	*cp++ = ' ';
+
+	i = day / 10;
+	*cp++ = '0' + i;
+	*cp++ = '0' + (day - i * 10);
+	*cp++ = ' ';
+
+	fp = months[month];
+	*cp++ = *fp++;
+	*cp++ = *fp++;
+	*cp++ = *fp++;
+	*cp++ = ' ';
+
+	i = year / 1000;
+	*cp++ = '0' + i;
+	year -= i * 1000;
+	i = year / 100;
+	*cp++ = '0' + i;
+	year -= i * 100;
+	i = year / 10;
+	*cp++ = '0' + i;
+	year -= i * 10;
+	*cp++ = '0' + year;
+	*cp++ = ' ';
+
+	i = hour / 10;
+	*cp++ = '0' + i;
+	*cp++ = '0' + (hour - i * 10);
+	*cp++ = ':';
+
+	i = min / 10;
+	*cp++ = '0' + i;
+	*cp++ = '0' + (min - i * 10);
+	*cp++ = ':';
+
+	i = sec / 10;
+	*cp++ = '0' + i;
+	*cp++ = '0' + (sec - i * 10);
+	*cp++ = ' ';
+
+	*cp++ = 'G';
+	*cp++ = 'M';
+	*cp = 'T';
+}
+
+/*
  * Given the ttree_t pointer "*t", parse the char buffer pointed to
  * by "**cpp" of multiline text data up to the pointer "**epp", the
  * pointer "*hash" points to the current text hash.
@@ -558,18 +715,22 @@ http_date2time_t(char *cp, char *ep)
  */
 
 static token_t *
-ttree_line_parse(ttree_t *t, char **cpp, char **epp, char **hpp, unsigned *hash)
+ttree_line_parse(ttree_t *t, char **cpp, char **epp, char **hpp, uint32_t *hash)
 {
 	char	ca, cb;			/* current line <=> parse node */
 
 	char	*cp = *cpp;
 	char	*ep = *epp;
-	unsigned hv = *hash;		/* hash value */
 
 	char	*tp = t->tok->text;	/* current parse text */
 	char	*sp = cp;		/* saved *cp */
 
 	int	parse;			/* parse state */
+
+	uint32_t hv;			/* hash value */
+
+	if (hash != NULL)
+		hv = *hash;
 
 	/* Special case, check for EOH (i.e. empty line) */
 	if (cp < ep) {
@@ -599,25 +760,27 @@ ttree_line_parse(ttree_t *t, char **cpp, char **epp, char **hpp, unsigned *hash)
 		if (cb != 0) {
 			/* Get next current line char */
 			ca = *cp++;
+			/* Case insensitive */
+			cb = tolower(cb);
+			ca = tolower(ca);
+			if (ca == cb) {
+				/*
+				 * Char match, next char.
+				 *
+				 * Note, parse text can contain EOL chars.
+				 */
+				tp++;
+				continue;
+			}
 			if (ca == '\r' || ca == '\n') {
 				/* EOL, always go less than */
 				t = t->lt;
+			} else if (ca < cb) {
+				/* Go less than */
+				t = t->lt;
 			} else {
-				/* Case insensitive */
-				cb = tolower(cb);
-				ca = tolower(ca);
-				if (ca == cb) {
-					/* Char match, next char */
-					tp++;
-					continue;
-				}
-				if (ca < cb) {
-					/* Go less than */
-					t = t->lt;
-				} else {
-					/* Go greater than */
-					t = t->gt;
-				}
+				/* Go greater than */
+				t = t->gt;
 			}
 			while (t != NULL && t->tok == NULL) {
 				/* Null node, so descend to < node */
@@ -663,9 +826,9 @@ ttree_line_parse(ttree_t *t, char **cpp, char **epp, char **hpp, unsigned *hash)
 				parse = 0;
 			} else if (parse == 2) {
 				break;
-			} else if (t != NULL && t->tok->act & HASH) {
-				hv = hv * 33 + ca;
-				hv &= 0xFFFFFF;
+			} else if (t != NULL && (t->tok->act & HASH) &&
+			    hash != NULL) {
+				CHASH(hv, ca);
 			}
 			cp++;
 		}
@@ -679,7 +842,7 @@ ttree_line_parse(ttree_t *t, char **cpp, char **epp, char **hpp, unsigned *hash)
 		 * pointer for next call (i.e. begin of next line), and last
 		 * return pointer to the matching token_t.
 		 */
-		if (t != NULL && t->tok->act & HASH)
+		if (t != NULL && (t->tok->act & HASH) && hash != NULL)
 			*hash = hv;
 		*cpp = cp;
 		return (t != NULL ? t->tok : NULL);
@@ -792,6 +955,211 @@ nl7c_http_cmp(void *arg1, void *arg2)
 }
 
 /*
+ * In-line HTTP responses:
+ */
+
+static char http_resp_304[] =
+	"HTTP/#.# 304 Not Modified\r\n"
+	"Date: #############################\r\n"
+	"Server: NCA/#.# (Solaris)\r\n";
+
+static char http_resp_412[] =
+	"HTTP/#.# 412 Precondition Failed\r\n"
+	"Date: #############################\r\n"
+	"Server: NCA/#.# (Solaris)\r\n";
+
+static uri_desc_t *
+http_mkresponse(uri_desc_t *req, uri_desc_t *res, char *proto, int sz)
+{
+	http_t		*qhttp = req->scheme;
+	http_t		*shttp = res->scheme;
+	uri_desc_t	*uri = kmem_cache_alloc(nl7c_uri_kmc, KM_SLEEP);
+	char		*alloc;
+	char		*cp;
+	char		*ep = &proto[sz];
+	uri_rd_t	*rdp;
+	int		cnt;
+
+	char		hdr_etag[] = "ETag: ";
+
+	/* Any optional header(s) */
+	if (shttp->etag.cp != NULL) {
+		/* Response has an ETag:, count it */
+		sz += sizeof (hdr_etag) - 1 +
+		    (shttp->etag.ep - shttp->etag.cp) + 2;
+	}
+	sz += 2;
+	alloc = kmem_alloc(sz, KM_SLEEP);
+
+	/* Minimum temp uri initialization as needed by uri_response() */
+	REF_INIT(uri, 1, nl7c_uri_inactive, nl7c_uri_kmc);
+	uri->hash = URI_TEMP;
+	uri->tail = NULL;
+	uri->scheme = NULL;
+	uri->reqmp = NULL;
+	uri->count = 0;
+	cv_init(&uri->waiting, NULL, CV_DEFAULT, NULL);
+	mutex_init(&uri->proclock, NULL, MUTEX_DEFAULT, NULL);
+
+	URI_RD_ADD(uri, rdp, sz, -1);
+	rdp->data.kmem = alloc;
+	atomic_add_64(&nl7c_uri_bytes, sz);
+
+	cp = alloc;
+	if (qhttp->major == 1) {
+		/*
+		 * Full response format.
+		 *
+		 * Copy to first sub char '#'.
+		 */
+		while (proto < ep) {
+			if (*proto == '#')
+				break;
+			*cp++ = *proto++;
+		}
+
+		/* Process the HTTP version substitutions */
+		if (*proto != '#') goto bad;
+		*cp++ = '0' + qhttp->major;
+		proto++;
+		while (proto < ep) {
+			if (*proto == '#')
+				break;
+			*cp++ = *proto++;
+		}
+		if (*proto != '#') goto bad;
+		*cp++ = '0' + qhttp->minor;
+		proto++;
+
+		/* Copy to the next sub char '#' */
+		while (proto < ep) {
+			if (*proto == '#')
+				break;
+			*cp++ = *proto++;
+		}
+
+		/* Process the "Date: " substitution */
+		if (*proto != '#') goto bad;
+		http_today(cp);
+
+		/* Skip to the next nonsub char '#' */
+		while (proto < ep) {
+			if (*proto != '#')
+				break;
+			cp++;
+			proto++;
+		}
+
+		/* Copy to the next sub char '#' */
+		while (proto < ep) {
+			if (*proto == '#')
+				break;
+			*cp++ = *proto++;
+		}
+
+		/* Process the NCA version substitutions */
+		if (*proto != '#') goto bad;
+		*cp++ = '0' + nca_major_version;
+		proto++;
+		while (proto < ep) {
+			if (*proto == '#')
+				break;
+			*cp++ = *proto++;
+		}
+		if (*proto != '#') goto bad;
+		*cp++ = '0' + nca_minor_version;
+		proto++;
+
+		/* Copy remainder of HTTP header */
+		while (proto < ep) {
+			*cp++ = *proto++;
+		}
+	} else {
+		goto bad;
+	}
+	/* Any optional header(s) */
+	if (shttp->etag.cp != NULL) {
+		/* Response has an ETag:, add it */
+		cnt = sizeof (hdr_etag) - 1;
+		bcopy(hdr_etag, cp, cnt);
+		cp += cnt;
+		cnt = (shttp->etag.ep - shttp->etag.cp);
+		bcopy(shttp->etag.cp, cp, cnt);
+		cp += cnt;
+		*cp++ = '\r';
+		*cp++ = '\n';
+	}
+	/* Last, add empty line */
+	uri->eoh = cp;
+	*cp++ = '\r';
+	*cp = '\n';
+
+	return (uri);
+
+bad:
+	/*
+	 * Free any resources allocated here, note that while we could
+	 * use the uri_inactive() to free the uri by doing a REF_RELE()
+	 * we instead free it here as the URI may be in less then a fully
+	 * initialized state.
+	 */
+	kmem_free(alloc, sz);
+	kmem_cache_free(nl7c_uri_kmc, uri);
+	return (NULL);
+}
+
+uri_desc_t *
+nl7c_http_cond(uri_desc_t *req, uri_desc_t *res)
+{
+	http_t	*qhttp = req->scheme;
+	time_t	qdate = qhttp->moddate;
+	http_t	*shttp = res->scheme;
+	time_t	sdate = shttp->lastmod == -1 ? shttp->date : shttp->lastmod;
+	uri_desc_t *uri;
+
+	if (qhttp->modtokid == Qhdr_If_Modified_Since &&
+	    sdate != -1 && qdate != -1 && sdate <= qdate) {
+		/*
+		 * Request is If-Modified-Since: and both response
+		 * and request dates are valid and response is the
+		 * same age as request so return a 304 response uri
+		 * instead of the cached response.
+		 */
+		nl7c_http_cond_304++;
+		uri = http_mkresponse(req, res, http_resp_304,
+		    sizeof (http_resp_304) - 1);
+		if (uri != NULL) {
+			/* New response uri */
+			REF_RELE(res);
+			return (uri);
+		}
+		return (res);
+	} else if (qhttp->modtokid == Qhdr_If_Unmodified_Since &&
+	    sdate != -1 && qdate != -1 && sdate >= qdate) {
+		/*
+		 * Request is If-Unmodified-Since: and both response
+		 * and request dates are valid and response is not the
+		 * same age as the request so return a 412 response
+		 * uri instead of the cached response.
+		 */
+		nl7c_http_cond_412++;
+		uri = http_mkresponse(req, res, http_resp_412,
+		    sizeof (http_resp_412) - 1);
+		if (uri != NULL) {
+			/* New response uri */
+			REF_RELE(res);
+			return (uri);
+		}
+		return (res);
+	}
+	/*
+	 * No conditional response meet or unknown type or no
+	 * valid dates so just return the original uri response.
+	 */
+	return (res);
+}
+
+/*
  * Return the appropriate HTTP connection persist header
  * based on the request HTTP persistent header state.
  */
@@ -822,8 +1190,7 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	http_t	*http = kmem_cache_alloc(http_kmc, KM_SLEEP);
 	char	*cp = *cpp;
 	char	*hp;
-	char	*sep;
-	unsigned hash = 0;
+	char	*scp, *sep;
 	char	*HTTP = "HTTP/";
 	token_t	*match;
 	boolean_t persist = B_FALSE;
@@ -831,7 +1198,7 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	ASSERT(cp <= ep);
 
 	if (cp == ep) {
-		goto pass;
+		goto bad;
 	}
 	/*
 	 * Initialize any uri_desc_t and/or http_t members.
@@ -839,9 +1206,11 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	uri->scheme = (void *)http;
 	uri->auth.cp = NULL;
 	uri->auth.ep = NULL;
-	uri->resplen = -1;
+	uri->resplen = URI_LEN_NOVALUE;
+	uri->respclen = URI_LEN_NOVALUE;
 	uri->eoh = NULL;
 	uri->nocache = B_FALSE;
+	uri->conditional = B_FALSE;
 	http->parsed = B_FALSE;
 	http->accept.cp = NULL;
 	http->acceptchar.cp = NULL;
@@ -851,6 +1220,7 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	http->uagent.cp = NULL;
 	http->date = -1;
 	http->expire = -1;
+	http->lastmod = -1;
 	if (*cp == '\r') {
 		/*
 		 * Special case for a Request-Line without an HTTP version,
@@ -865,7 +1235,7 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	 */
 	if (*cp++ != ' ')
 		/* Unkown or bad Request-Line format, just punt */
-		goto pass;
+		goto bad;
 	/*
 	 * The URI parser has parsed through the URI and the <SP>
 	 * delimiter, parse the HTTP/N.N version
@@ -877,21 +1247,21 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	if (*HTTP != 0) {
 		if (cp == ep)
 			goto more;
-		goto pass;
+		goto bad;
 	}
 	if (cp == ep)
 		goto more;
 	if (*cp < '0' || *cp > '9')
-		goto pass;
+		goto bad;
 	http->major = *cp++ - '0';
 	if (cp == ep)
 		goto more;
 	if (*cp++ != '.')
-		goto pass;
+		goto bad;
 	if (cp == ep)
 		goto more;
 	if (*cp < '0' || *cp > '9')
-		goto pass;
+		goto bad;
 	http->minor = *cp++ - '0';
 	if (cp == ep)
 		goto more;
@@ -899,11 +1269,11 @@ nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 got_version:
 
 	if (*cp++ != '\r')
-		goto pass;
+		goto bad;
 	if (cp == ep)
 		goto more;
 	if (*cp++ != '\n')
-		goto pass;
+		goto bad;
 	/*
 	 * Initialize persistent state based on HTTP version.
 	 */
@@ -920,7 +1290,7 @@ got_version:
 		persist = B_FALSE;
 	} else {
 		/* >= 2.0 not supported (yet) */
-		goto pass;
+		goto bad;
 	}
 	/*
 	 * Parse HTTP headers through the EOH
@@ -928,7 +1298,8 @@ got_version:
 	 */
 	for (sep = ep; cp < ep; ep = sep) {
 		/* Get the next line */
-		match = ttree_line_parse(req_tree, &cp, &ep, &hp, &hash);
+		scp = cp;
+		match = ttree_line_parse(req_tree, &cp, &ep, &hp, &uri->hvalue);
 		if (match != NULL) {
 			if (match->act & QUALIFIER) {
 				/*
@@ -946,7 +1317,7 @@ got_version:
 					while (hp < ep) {
 						c = *hp++;
 						if (! isdigit(c))
-							goto pass;
+							goto bad;
 						n *= 10;
 						n += c - '0';
 					}
@@ -1001,9 +1372,10 @@ got_version:
 					break;
 
 				case Qhdr_If_Modified_Since:
-					break;
-
 				case Qhdr_If_Unmodified_Since:
+					http->moddate = secs;
+					http->modtokid = match->tokid;
+					uri->conditional = B_TRUE;
 					break;
 
 				case Qhdr_Keep_Alive:
@@ -1019,6 +1391,24 @@ got_version:
 					break;
 
 				};
+			}
+			if (match->act & FILTER) {
+				/*
+				 * Filter header, do a copyover the header
+				 * text, guarenteed to be at least 1 byte.
+				 */
+				char	*cop = scp;
+				int	n = (ep - cop) - 1;
+				char	filter[] = "NL7C-Filtered";
+
+				n = MIN(n, sizeof (filter) - 1);
+				if (n > 0)
+					bcopy(filter, cop, n);
+				cop += n;
+				ASSERT(cop < ep);
+				*cop++ = ':';
+				while (cop < ep)
+					*cop++ = ' ';
 			}
 			if (match->act & NOCACHE) {
 				uri->nocache = B_TRUE;
@@ -1044,6 +1434,7 @@ done:
 		so->so_nl7c_flags &= ~NL7C_SOPERSIST;
 
 	if (http->major == 1) {
+		so->so_nl7c_flags &= ~NL7C_SCHEMEPRIV;
 		if (http->minor >= 1) {
 			if (! persist)
 				so->so_nl7c_flags |= HTTP_CONN_CL;
@@ -1062,6 +1453,10 @@ done:
 
 pass:
 	*cpp = NULL;
+	return (B_TRUE);
+
+bad:
+	*cpp = NULL;
 more:
 	return (B_FALSE);
 }
@@ -1073,7 +1468,6 @@ nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	char	*cp = *cpp;
 	char	*hp;
 	char	*scp, *sep;
-	unsigned hash = 0;
 	char	*HTTP = "HTTP/";
 	int	status = 0;
 	token_t	*match;
@@ -1085,8 +1479,15 @@ nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 
 	ASSERT(http != NULL);
 
-	if (http->parsed)
+	if (http->parsed) {
+		if (uri->respclen != URI_LEN_NOVALUE) {
+			/* Chunked response */
+			sep = ep;
+			goto chunked;
+		}
+		/* Already parsed, nothing todo */
 		return (B_TRUE);
+	}
 
 	/*
 	 * Parse the HTTP/N.N version. Note, there's currently no use
@@ -1100,13 +1501,13 @@ nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	if (*HTTP != 0) {
 		if (cp == ep)
 			goto more;
-		goto pass;
+		goto bad;
 	}
 	if (cp == ep)
 		goto more;
 
 	if (*cp < '0' || *cp > '9')
-		goto pass;
+		goto bad;
 #ifdef	NOT_YET
 	major = *cp++ - '0';
 #else
@@ -1116,11 +1517,11 @@ nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 	if (cp == ep)
 		goto more;
 	if (*cp++ != '.')
-		goto pass;
+		goto bad;
 	if (cp == ep)
 		goto more;
 	if (*cp < '0' || *cp > '9')
-		goto pass;
+		goto bad;
 #ifdef	NOT_YET
 	minor = *cp++ - '0';
 #else
@@ -1133,10 +1534,10 @@ nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 got_version:
 
 	/*
-	 * Get the response code, if not 200 then pass on this response.
+	 * Get the response code.
 	 */
 	if (*cp++ != ' ')
-		goto pass;
+		goto bad;
 	if (cp == ep)
 		goto more;
 
@@ -1144,14 +1545,44 @@ got_version:
 		if (*cp == ' ')
 			break;
 		if (*cp < '0' || *cp > '9')
-			goto pass;
+			goto bad;
 		if (status)
 			status *= 10;
 		status += *cp++ - '0';
 	} while (cp < ep);
 
-	if (status != 200)
+	switch (status) {
+	case 200:
+		/*
+		 * The only response status we continue to process.
+		 */
+		break;
+	case 304:
+		nl7c_http_response_304++;
+		nocache = B_TRUE;
+		uri->resplen = 0;
 		goto pass;
+	case 307:
+		nl7c_http_response_307++;
+		nocache = B_TRUE;
+		uri->resplen = 0;
+		goto pass;
+	case 400:
+		nl7c_http_response_400++;
+		/*
+		 * Special case some response status codes, just mark
+		 * as nocache and no response length and pass on the
+		 * request/connection.
+		 */
+		nocache = B_TRUE;
+		uri->resplen = 0;
+		goto pass;
+	default:
+		/*
+		 * All other response codes result in a parse failure.
+		 */
+		goto bad;
+	}
 
 	/*
 	 * Initialize persistent state based on request HTTP version.
@@ -1169,7 +1600,7 @@ got_version:
 		persist = B_FALSE;
 	} else {
 		/* >= 2.0 not supported (yet) */
-		goto pass;
+		goto bad;
 	}
 
 	/*
@@ -1179,7 +1610,7 @@ got_version:
 	for (sep = ep; cp < ep; ep = sep) {
 		/* Get the next line */
 		scp = cp;
-		match = ttree_line_parse(res_tree, &cp, &ep, &hp, &hash);
+		match = ttree_line_parse(res_tree, &cp, &ep, &hp, NULL);
 		if (match != NULL) {
 			if (match->act & QUALIFIER) {
 				/*
@@ -1196,10 +1627,16 @@ got_version:
 				if (match->act & NUMERIC) {
 					while (hp < ep) {
 						c = *hp++;
-						if (! isdigit(c))
-							goto pass;
-						n *= 10;
-						n += c - '0';
+						if (match->act & HEX) {
+							hd2i(c, n);
+							if (n == -1)
+								goto bad;
+						} else {
+							if (! isdigit(c))
+								goto bad;
+							n *= 10;
+							n += c - '0';
+						}
 					}
 				} else if (match->act & DATE) {
 					secs = http_date2time_t(hp, ep);
@@ -1225,8 +1662,15 @@ got_version:
 					persist = B_TRUE;
 					break;
 
+				case Shdr_Chunked:
+					uri->respclen = 0;
+					uri->resplen = 0;
+					nl7c_http_response_chunked++;
+					break;
+
 				case Shdr_Content_Length:
-					uri->resplen = n;
+					if (uri->respclen == URI_LEN_NOVALUE)
+						uri->resplen = n;
 					break;
 
 				case Shdr_Date:
@@ -1250,8 +1694,12 @@ got_version:
 					http->lastmod = secs;
 					break;
 
-				case Shdr_Set_Cookies:
+				case Shdr_Set_Cookie:
 					nocache = B_TRUE;
+					break;
+
+				case Shdr_Server:
+					break;
 
 				default:
 					nocache = B_TRUE;
@@ -1290,17 +1738,17 @@ got_version:
 	goto more;
 
 done:
+	/* Parse completed */
 	http->parsed = B_TRUE;
-
-	if (nocache) {
-		uri->nocache = B_TRUE;
-		goto pass;
-	}
-	if (uri->resplen == -1)
-		goto pass;
-
-	/* Save the HTTP header length and add to URI response length */
+	/* Save the HTTP header length */
 	http->headlen = (cp - *cpp);
+	if (uri->respclen == URI_LEN_NOVALUE) {
+		if (uri->resplen == URI_LEN_NOVALUE) {
+			nl7c_http_response_pass1++;
+			goto pass;
+		}
+	}
+	/* Add header length to URI response length */
 	uri->resplen += http->headlen;
 
 	/* Set socket persist state */
@@ -1309,9 +1757,42 @@ done:
 	else
 		so->so_nl7c_flags &= ~NL7C_SOPERSIST;
 
+	if (http->major == 1) {
+		so->so_nl7c_flags &= ~NL7C_SCHEMEPRIV;
+		if (http->minor >= 1) {
+			if (! persist)
+				so->so_nl7c_flags |= HTTP_CONN_CL;
+		} else {
+			if (persist)
+				so->so_nl7c_flags |= HTTP_CONN_KA;
+			else
+				so->so_nl7c_flags |= HTTP_CONN_CL;
+		}
+	}
+
+	if (nocache) {
+		/*
+		 * Response not to be cached, only post response
+		 * processing code common to both non and cached
+		 * cases above here and code for the cached case
+		 * below.
+		 *
+		 * Note, chunked transfer processing is the last
+		 * to be done.
+		 */
+		uri->nocache = B_TRUE;
+		if (uri->respclen != URI_LEN_NOVALUE) {
+			/* Chunked response */
+			goto chunked;
+		}
+		/* Nothing more todo */
+		goto parsed;
+	}
+
 	if (http->expire != -1 && http->date != -1) {
 		if (http->expire <= http->date) {
-			/* No cache */
+			/* ??? just pass */
+			nl7c_http_response_pass2++;
 			goto pass;
 		}
 		/* Have a valid expire and date so calc an lbolt expire */
@@ -1321,12 +1802,102 @@ done:
 		uri->expire = lbolt + SEC_TO_TICK(nl7c_uri_ttl);
 	}
 
+chunked:
+	/*
+	 * Chunk transfer parser and processing, a very simple parser
+	 * is implemented here for the common case were one, or more,
+	 * complete chunk(s) are passed in (i.e. length header + body).
+	 *
+	 * All other cases are passed.
+	 */
+	scp = cp;
+	while (uri->respclen != URI_LEN_NOVALUE && cp < sep) {
+		if (uri->respclen == URI_LEN_CONSUMED) {
+			/* Skip trailing "\r\n" */
+			if (cp == sep)
+				goto more;
+			if (*cp++ != '\r')
+				goto bad;
+			if (cp == sep)
+				goto more;
+			if (*cp++ != '\n')
+				goto bad;
+			uri->respclen = 0;
+		}
+		if (uri->respclen == 0) {
+			/* Parse a chunklen "[0-9A-Fa-f]+" */
+			char	c;
+			int	n = 0;
+
+			if (cp == sep)
+				goto more;
+			nl7c_http_response_chunkparse++;
+			while (cp < sep && (c = *cp++) != '\r') {
+				hd2i(c, n);
+				if (n == -1)
+					goto bad;
+			}
+			if (cp == sep)
+				goto more;
+			if (*cp++ != '\n')
+				goto bad;
+			uri->respclen = n;
+			if (n == 0) {
+				/* Last chunk, skip trailing "\r\n" */
+				if (cp == sep)
+					goto more;
+				if (*cp++ != '\r')
+					goto bad;
+				if (cp == sep)
+					goto more;
+				if (*cp++ != '\n')
+					goto bad;
+				uri->respclen = URI_LEN_NOVALUE;
+				break;
+			}
+		}
+		if (uri->respclen > 0) {
+			/* Consume some bytes for the current chunk */
+			uint32_t sz = (sep - cp);
+
+			if (sz > uri->respclen)
+				sz = uri->respclen;
+			uri->respclen -= sz;
+			cp += sz;
+			if (uri->respclen == 0) {
+				/* End of chunk, skip trailing "\r\n" */
+				if (cp == sep) {
+					uri->respclen = URI_LEN_CONSUMED;
+					goto more;
+				}
+				if (*cp++ != '\r')
+					goto bad;
+				if (cp == sep)
+					goto more;
+				if (*cp++ != '\n')
+					goto bad;
+				if (cp == sep)
+					goto more;
+			}
+		}
+	}
+	uri->resplen += (cp - scp);
+
+parsed:
 	*cpp = cp;
 	return (B_TRUE);
 
 pass:
 	*cpp = NULL;
+	return (B_TRUE);
+
+bad:
+	*cpp = NULL;
+	return (B_FALSE);
+
 more:
+	uri->resplen += (cp - scp);
+	*cpp = cp;
 	return (B_FALSE);
 }
 

@@ -87,6 +87,7 @@
 #include <sys/autoconf.h>
 
 #include <fs/sockfs/nl7c.h>
+#include <fs/sockfs/nl7curi.h>
 
 #include <inet/udp_impl.h>
 #include <inet/tcp_impl.h>
@@ -490,11 +491,11 @@ socktpi_write(
 
 	if (so_mode & SM_BYTESTREAM) {
 		/* Send M_DATA messages */
-		if (so->so_nl7c_flags & NL7C_ENABLED) {
-			/* Give NL7C some data */
-			nl7c_data(so, uiop);
+		if ((so->so_nl7c_flags & NL7C_ENABLED) &&
+		    (error = nl7c_data(so, uiop)) >= 0) {
+			/* NL7C consumed the data */
+			return (error);
 		}
-
 		if ((so_state & SS_DIRECT) &&
 		    canputnext(vp->v_stream->sd_wrq)) {
 			return (sostream_direct(so, uiop, NULL, cr));
@@ -1258,6 +1259,10 @@ socktpi_poll(
 
 	if (so->so_nl7c_rcv_mp != NULL) {
 		*reventsp |= (POLLIN|POLLRDNORM) & events;
+	}
+	if ((so->so_nl7c_flags & NL7C_ENABLED) &&
+	    ((POLLIN|POLLRDNORM) & *reventsp)) {
+		so->so_nl7c_flags |= NL7C_POLLIN;
 	}
 
 	return (0);

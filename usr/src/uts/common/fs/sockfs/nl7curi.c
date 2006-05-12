@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,18 +32,33 @@
 #include <vm/seg_map.h>
 #include <vm/seg_kpm.h>
 #include <sys/condvar_impl.h>
-#include <sys/promif.h>
 #include <sys/sendfile.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
+
+#include <inet/common.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
+#include <inet/tcp.h>
+#include <inet/led.h>
+#include <inet/mi.h>
+
+#include <inet/nca/ncadoorhdr.h>
+#include <inet/nca/ncalogd.h>
+#include <inet/nca/ncandd.h>
+
+#include <sys/promif.h>
 
 /*
  * Some externs:
  */
 
-extern boolean_t nl7c_logd_enabled;
-extern void	nl7c_logd_log(uri_desc_t *, uri_desc_t *, time_t, ipaddr_t);
-boolean_t	nl7c_close_addr(struct sonode *);
+extern boolean_t	nl7c_logd_enabled;
+extern void		nl7c_logd_log(uri_desc_t *, uri_desc_t *,
+			    time_t, ipaddr_t);
+extern boolean_t	nl7c_close_addr(struct sonode *);
+extern struct sonode	*nl7c_addr2portso(void *);
+extern uri_desc_t	*nl7c_http_cond(uri_desc_t *, uri_desc_t *);
 
 /*
  * Various global tuneables:
@@ -58,6 +72,25 @@ uint64_t	nl7c_file_prefetch = 1; /* File cache prefetch pages */
 
 uint64_t	nl7c_uri_max = 0;	/* Maximum bytes (0 == infinite) */
 uint64_t	nl7c_uri_bytes = 0;	/* Bytes of kmem used by URIs */
+
+/*
+ * Locals:
+ */
+
+static int	uri_rd_response(struct sonode *, uri_desc_t *,
+		    uri_rd_t *, boolean_t);
+static int	uri_response(struct sonode *, uri_desc_t *);
+
+/*
+ * HTTP scheme functions called from nl7chttp.c:
+ */
+
+boolean_t nl7c_http_request(char **, char *, uri_desc_t *, struct sonode *);
+boolean_t nl7c_http_response(char **, char *, uri_desc_t *, struct sonode *);
+boolean_t nl7c_http_cmp(void *, void *);
+mblk_t *nl7c_http_persist(struct sonode *);
+void nl7c_http_free(void *arg);
+void nl7c_http_init(void);
 
 /*
  * Counters that need to move to kstat and/or be removed:
@@ -76,7 +109,7 @@ volatile uint64_t nl7c_uri_reclaim_cnt = 0;
 volatile uint64_t nl7c_uri_pass_urifail = 0;
 volatile uint64_t nl7c_uri_pass_dupbfail = 0;
 volatile uint64_t nl7c_uri_more_get = 0;
-volatile uint64_t nl7c_uri_pass_getnot = 0;
+volatile uint64_t nl7c_uri_pass_method = 0;
 volatile uint64_t nl7c_uri_pass_option = 0;
 volatile uint64_t nl7c_uri_more_eol = 0;
 volatile uint64_t nl7c_uri_more_http = 0;
@@ -84,19 +117,22 @@ volatile uint64_t nl7c_uri_pass_http = 0;
 volatile uint64_t nl7c_uri_pass_addfail = 0;
 volatile uint64_t nl7c_uri_pass_temp = 0;
 volatile uint64_t nl7c_uri_expire = 0;
+volatile uint64_t nl7c_uri_purge = 0;
 volatile uint64_t nl7c_uri_NULL1 = 0;
 volatile uint64_t nl7c_uri_NULL2 = 0;
 volatile uint64_t nl7c_uri_close = 0;
 volatile uint64_t nl7c_uri_temp_close = 0;
 volatile uint64_t nl7c_uri_free = 0;
 volatile uint64_t nl7c_uri_temp_free = 0;
+volatile uint64_t nl7c_uri_temp_mk = 0;
+volatile uint64_t nl7c_uri_rd_EAGAIN = 0;
 
 /*
  * Various kmem_cache_t's:
  */
 
-static kmem_cache_t *uri_kmc;
-static kmem_cache_t *uri_rd_kmc;
+kmem_cache_t *nl7c_uri_kmc;
+kmem_cache_t *nl7c_uri_rd_kmc;
 static kmem_cache_t *uri_desb_kmc;
 static kmem_cache_t *uri_segmap_kmc;
 
@@ -180,13 +216,8 @@ static const int P2Ps[] = {
  *    URI_HASH(unsigned hix, char *cp, char *ep) - hash the char(s) from
  *    *cp to *ep to the unsigned hix, cp nor ep are modified.
  *
- *    URI_HASH_STR(unsigned hix, str_t *sp) - hash the str_t *sp.
- *
- *    URI_HASH_IX(unsigned hix, int hsz) - convert the hash value hix to
- *    a hash index 0 - hsz.
- *
- *    URI_HASH_DESC(uri_desc_t *uri, int which, unsigned hix) - hash the
- *    uri_desc_t *uri's str_t path member,
+ *    URI_HASH_IX(unsigned hix, int which) - convert the hash value hix to
+ *    a hash index 0 - (uri_hash_sz[which] - 1).
  *
  *    URI_HASH_MIGRATE(from, hp, to) - migrate the uri_hash_t *hp list
  *    uri_desc_t members from hash from to hash to.
@@ -230,24 +261,12 @@ static const int P2Ps[] = {
 		if ((_c = *_s) == '%') {				\
 			H2A(_s, (ep), _c);				\
 		}							\
-		(hv) = ((hv) << 5) + (hv) + _c;				\
-		(hv) &= 0x7FFFFFFF;					\
+		CHASH(hv, _c);						\
 		_s++;							\
 	}								\
 }
 
-#define	URI_HASH_STR(hix, sp) URI_HASH(hix, (sp)->cp, (sp)->ep)
-
-#define	URI_HASH_IX(hix, hsz) (hix) = (hix) % (hsz)
-
-#define	URI_HASH_DESC(uri, which, hix) {				\
-	(hix) = 0;							\
-	URI_HASH_STR((hix), &(uri)->path);				\
-	if ((uri)->auth.cp != NULL) {					\
-		URI_HASH_STR((hix), &(uri)->auth);			\
-	}								\
-	URI_HASH_IX((hix), uri_hash_sz[(which)]);			\
-}
+#define	URI_HASH_IX(hix, which) (hix) = (hix) % (uri_hash_sz[(which)])
 
 #define	URI_HASH_MIGRATE(from, hp, to) {				\
 	uri_desc_t	*_nuri;						\
@@ -259,7 +278,8 @@ static const int P2Ps[] = {
 		(hp)->list = _nuri->hash;				\
 		atomic_add_32(&uri_hash_cnt[(from)], -1);		\
 		atomic_add_32(&uri_hash_cnt[(to)], 1);			\
-		URI_HASH_DESC(_nuri, (to), _nhix);			\
+		_nhix = _nuri->hvalue;					\
+		URI_HASH_IX(_nhix, to);					\
 		_nhp = &uri_hash_ab[(to)][_nhix];			\
 		mutex_enter(&_nhp->lock);				\
 		_nuri->hash = _nhp->list;				\
@@ -288,20 +308,6 @@ static const int P2Ps[] = {
 	}								\
 }
 
-#define	URI_RD_ADD(uri, rdp, size, offset) {				\
-	if ((uri)->tail == NULL) {					\
-		(rdp) = &(uri)->response;				\
-	} else {							\
-		(rdp) = kmem_cache_alloc(uri_rd_kmc, KM_SLEEP);		\
-		(uri)->tail->next = (rdp);				\
-	}								\
-	(rdp)->sz = size;						\
-	(rdp)->off = offset;						\
-	(rdp)->next = NULL;						\
-	(uri)->tail = rdp;						\
-	(uri)->count += size;						\
-}
-
 void
 nl7c_uri_init(void)
 {
@@ -315,11 +321,11 @@ nl7c_uri_init(void)
 	    KM_SLEEP);
 	uri_hash_lru[cur] = uri_hash_ab[cur];
 
-	uri_kmc = kmem_cache_create("NL7C_uri_kmc", sizeof (uri_desc_t), 0,
-	    NULL, NULL, uri_kmc_reclaim, NULL, NULL, 0);
+	nl7c_uri_kmc = kmem_cache_create("NL7C_uri_kmc", sizeof (uri_desc_t),
+	    0, NULL, NULL, uri_kmc_reclaim, NULL, NULL, 0);
 
-	uri_rd_kmc = kmem_cache_create("NL7C_uri_rd_kmc", sizeof (uri_rd_t), 0,
-	    NULL, NULL, NULL, NULL, NULL, 0);
+	nl7c_uri_rd_kmc = kmem_cache_create("NL7C_uri_rd_kmc",
+	    sizeof (uri_rd_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	uri_desb_kmc = kmem_cache_create("NL7C_uri_desb_kmc",
 	    sizeof (uri_desb_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
@@ -330,14 +336,112 @@ nl7c_uri_init(void)
 	nl7c_http_init();
 }
 
+#define	CV_SZ	16
+
+void
+nl7c_mi_report_hash(mblk_t *mp)
+{
+	uri_hash_t	*hp, *pend;
+	uri_desc_t	*uri;
+	uint32_t	cur;
+	uint32_t	new;
+	int		n, nz, tot;
+	uint32_t	cv[CV_SZ + 1];
+
+	rw_enter(&uri_hash_access, RW_READER);
+	cur = uri_hash_which;
+	new = cur ? 0 : 1;
+next:
+	for (n = 0; n <= CV_SZ; n++)
+		cv[n] = 0;
+	nz = 0;
+	tot = 0;
+	hp = &uri_hash_ab[cur][0];
+	pend = &uri_hash_ab[cur][uri_hash_sz[cur]];
+	while (hp < pend) {
+		n = 0;
+		for (uri = hp->list; uri != NULL; uri = uri->hash) {
+			n++;
+		}
+		tot += n;
+		if (n > 0)
+			nz++;
+		if (n > CV_SZ)
+			n = CV_SZ;
+		cv[n]++;
+		hp++;
+	}
+
+	(void) mi_mpprintf(mp, "\nHash=%s, Buckets=%d, "
+	    "Avrg=%d\nCount by bucket:", cur != new ? "CUR" : "NEW",
+	    uri_hash_sz[cur], nz != 0 ? ((tot * 10 + 5) / nz) / 10 : 0);
+	(void) mi_mpprintf(mp, "Free=%d", cv[0]);
+	for (n = 1; n < CV_SZ; n++) {
+		int	pn = 0;
+		char	pv[5];
+		char	*pp = pv;
+
+		for (pn = n; pn < 1000; pn *= 10)
+			*pp++ = ' ';
+		*pp = 0;
+		(void) mi_mpprintf(mp, "%s%d=%d", pv, n, cv[n]);
+	}
+	(void) mi_mpprintf(mp, "Long=%d", cv[CV_SZ]);
+
+	if (cur != new && uri_hash_ab[new] != NULL) {
+		cur = new;
+		goto next;
+	}
+	rw_exit(&uri_hash_access);
+}
+
+void
+nl7c_mi_report_uri(mblk_t *mp)
+{
+	uri_hash_t	*hp;
+	uri_desc_t	*uri;
+	uint32_t	cur;
+	uint32_t	new;
+	int		ix;
+	int		ret;
+	char		sc;
+
+	rw_enter(&uri_hash_access, RW_READER);
+	cur = uri_hash_which;
+	new = cur ? 0 : 1;
+next:
+	for (ix = 0; ix < uri_hash_sz[cur]; ix++) {
+		hp = &uri_hash_ab[cur][ix];
+		mutex_enter(&hp->lock);
+		uri = hp->list;
+		while (uri != NULL) {
+			sc = *(uri->path.ep);
+			*(uri->path.ep) = 0;
+			ret = mi_mpprintf(mp, "%s: %d %d %d",
+			    uri->path.cp, (int)uri->resplen,
+			    (int)uri->respclen, (int)uri->count);
+			*(uri->path.ep) = sc;
+			if (ret == -1) break;
+			uri = uri->hash;
+		}
+		mutex_exit(&hp->lock);
+		if (ret == -1) break;
+	}
+	if (ret != -1 && cur != new && uri_hash_ab[new] != NULL) {
+		cur = new;
+		goto next;
+	}
+	rw_exit(&uri_hash_access);
+}
+
 /*
  * The uri_desc_t ref_t inactive function called on the last REF_RELE(),
  * free all resources contained in the uri_desc_t. Note, the uri_desc_t
  * will be freed by REF_RELE() on return.
  */
 
-static void
-uri_inactive(uri_desc_t *uri)
+void
+nl7c_uri_inactive(uri_desc_t *uri)
 {
 	int64_t	 bytes = 0;
 
@@ -354,7 +458,7 @@ uri_inactive(uri_desc_t *uri)
 			}
 			rdp = rdp->next;
 			if (free != NULL) {
-				kmem_cache_free(uri_rd_kmc, free);
+				kmem_cache_free(nl7c_uri_rd_kmc, free);
 			}
 			free = rdp;
 		}
@@ -418,7 +522,6 @@ uri_kmc_reclaim(void *arg)
 static void
 uri_delete(uri_desc_t *del)
 {
-	uint32_t	hash = 0;
 	uint32_t	hix;
 	uri_hash_t	*hp;
 	uri_desc_t	*uri;
@@ -426,18 +529,14 @@ uri_delete(uri_desc_t *del)
 	uint32_t	cur;
 	uint32_t	new;
 
-	URI_HASH_STR(hash, &(del->path));
-	if (del->auth.cp != NULL) {
-		/* Calculate hash for request authority */
-		URI_HASH(hash, del->auth.cp, del->auth.ep);
-	}
+	ASSERT(del->hash != URI_TEMP);
 	rw_enter(&uri_hash_access, RW_WRITER);
 	cur = uri_hash_which;
 	new = cur ? 0 : 1;
 next:
 	puri = NULL;
-	hix = hash;
-	URI_HASH_IX(hix, uri_hash_sz[cur]);
+	hix = del->hvalue;
+	URI_HASH_IX(hix, cur);
 	hp = &uri_hash_ab[cur][hix];
 	for (uri = hp->list; uri != NULL; uri = uri->hash) {
 		if (uri != del) {
@@ -486,7 +585,8 @@ uri_add(uri_desc_t *uri, krw_t rwlock, boolean_t nonblocking)
 	 */
 	REF_HOLD(uri);
 again:
-	URI_HASH_DESC(uri, cur, hix);
+	hix = uri->hvalue;
+	URI_HASH_IX(hix, cur);
 	if (uri_hash_ab[new] == NULL &&
 	    uri_hash_cnt[cur] < uri_hash_overflow[cur]) {
 		/*
@@ -602,7 +702,8 @@ again:
 	/*
 	 * Add URI to new hash.
 	 */
-	URI_HASH_DESC(uri, new, hix);
+	hix = uri->hvalue;
+	URI_HASH_IX(hix, new);
 	hp = &uri_hash_ab[new][hix];
 	mutex_enter(&hp->lock);
 	uri->hash = hp->list;
@@ -632,14 +733,14 @@ again:
 
 /*
  * Lookup a uri_desc_t in the URI hash, if found free the request uri_desc_t
- * and return the found uri_desc_t with a REF_HOLD() placed on it. Else, use
- * the request URI to create a new hash entry.
+ * and return the found uri_desc_t with a REF_HOLD() placed on it. Else, if
+ * add B_TRUE use the request URI to create a new hash entry. Else if add
+ * B_FALSE ...
  */
 
 static uri_desc_t *
 uri_lookup(uri_desc_t *ruri, boolean_t add, boolean_t nonblocking)
 {
-	uint32_t	hash = 0;
 	uint32_t	hix;
 	uri_hash_t	*hp;
 	uri_desc_t	*uri;
@@ -649,20 +750,14 @@ uri_lookup(uri_desc_t *ruri, boolean_t add, boolean_t nonblocking)
 	char		*rcp = ruri->path.cp;
 	char		*rep = ruri->path.ep;
 
-	/* Calculate hash for request path */
-	URI_HASH(hash, rcp, rep);
-	if (ruri->auth.cp != NULL) {
-		/* Calculate hash for request authority */
-		URI_HASH(hash, ruri->auth.cp, ruri->auth.ep);
-	}
 again:
 	rw_enter(&uri_hash_access, RW_READER);
 	cur = uri_hash_which;
 	new = cur ? 0 : 1;
 nexthash:
 	puri = NULL;
-	hix = hash;
-	URI_HASH_IX(hix, uri_hash_sz[cur]);
+	hix = ruri->hvalue;
+	URI_HASH_IX(hix, cur);
 	hp = &uri_hash_ab[cur][hix];
 	mutex_enter(&hp->lock);
 	for (uri = hp->list; uri != NULL; uri = uri->hash) {
@@ -722,27 +817,10 @@ nexthash:
 			/* URI doesn't have auth and request URI does */
 			goto nexturi;
 		}
-		if (uri->scheme != NULL) {
-			if (ruri->scheme == NULL) {
-				/*
-				 * URI has scheme private qualifiers,
-				 * request URI doesn't.
-				 */
-				goto nexturi;
-			}
-			if (! nl7c_http_cmp(uri->scheme, ruri->scheme)) {
-				/* No match */
-				goto nexturi;
-			}
-		} else if (ruri->scheme != NULL) {
-			/*
-			 * URI doesn't have scheme private qualifiers,
-			 * request URI does.
-			 */
-			goto nexturi;
-		}
 		/*
-		 * Have a match, check for expire or request no cache.
+		 * Have a path/auth match so before any other processing
+		 * of requested URI, check for expire or request no cache
+		 * purge.
 		 */
 		if (uri->expire >= 0 && uri->expire <= lbolt || ruri->nocache) {
 			/*
@@ -750,6 +828,9 @@ nexthash:
 			 * the cached version, unlink the URI from the hash
 			 * chain, release all locks, release the hash ref
 			 * on the URI, and last look it up again.
+			 *
+			 * Note, this will cause all variants of the named
+			 * URI to be purged.
 			 */
 			if (puri != NULL) {
 				puri->hash = uri->hash;
@@ -759,15 +840,33 @@ nexthash:
 			mutex_exit(&hp->lock);
 			atomic_add_32(&uri_hash_cnt[cur], -1);
 			rw_exit(&uri_hash_access);
-			nl7c_uri_expire++;
+			if (ruri->nocache)
+				nl7c_uri_purge++;
+			else
+				nl7c_uri_expire++;
 			REF_RELE(uri);
 			goto again;
 		}
+		if (uri->scheme != NULL) {
+			/*
+			 * URI has scheme private qualifier(s), if request
+			 * URI doesn't or if no match skip this URI.
+			 */
+			if (ruri->scheme == NULL ||
+			    ! nl7c_http_cmp(uri->scheme, ruri->scheme))
+				goto nexturi;
+		} else if (ruri->scheme != NULL) {
+			/*
+			 * URI doesn't have scheme private qualifiers but
+			 * request URI does, no match, skip this URI.
+			 */
+			goto nexturi;
+		}
 		/*
-		 * Ready URI for return, put a reference hold on the URI,
-		 * if this URI is currently being processed (i.e. filled)
-		 * then wait for the processing to be completed first, free
-		 * up the request URI and return the matched URI.
+		 * Have a match, ready URI for return, first put a reference
+		 * hold on the URI, if this URI is currently being processed
+		 * then have to wait for the processing to be completed and
+		 * redo the lookup, else return it.
 		 */
 		REF_HOLD(uri);
 		mutex_enter(&uri->proclock);
@@ -795,16 +894,13 @@ nexthash:
 				 */
 				mutex_exit(&uri->proclock);
 				REF_RELE(uri);
-				REF_RELE(ruri);
 				return (NULL);
 			}
-		} else {
-			mutex_exit(&uri->proclock);
 		}
+		mutex_exit(&uri->proclock);
 		uri->hit++;
 		mutex_exit(&hp->lock);
 		rw_exit(&uri_hash_access);
-		REF_RELE(ruri);
 		return (uri);
 	nexturi:
 		puri = uri;
@@ -820,12 +916,8 @@ nexthash:
 	}
 add:
 	if (! add) {
-		/*
-		 * Lookup only so free the
-		 * request URI and return.
-		 */
+		/* Lookup only so return failure */
 		rw_exit(&uri_hash_access);
-		REF_RELE(ruri);
 		return (NULL);
 	}
 	/*
@@ -835,6 +927,7 @@ add:
 	ruri->hit = 0;
 	ruri->expire = -1;
 	ruri->response.sz = 0;
+	ruri->proc = (struct sonode *)~NULL;
 	cv_init(&ruri->waiting, NULL, CV_DEFAULT, NULL);
 	mutex_init(&ruri->proclock, NULL, MUTEX_DEFAULT, NULL);
 	uri_add(ruri, RW_READER, nonblocking);
@@ -947,25 +1040,86 @@ nl7c_urifree(struct sonode *so)
 }
 
 /*
- * Called to copy some application response data.
+ * ...
+ *
+ *	< 0	need more data
+ *
+ *	  0	parse complete
+ *
+ *	> 0	parse error
  */
 
-volatile uint64_t nl7c_data_pfail = 0;
-volatile uint64_t nl7c_data_ntemp = 0;
-volatile uint64_t nl7c_data_ncntl = 0;
+volatile uint64_t nl7c_resp_pfail = 0;
+volatile uint64_t nl7c_resp_ntemp = 0;
+volatile uint64_t nl7c_resp_pass = 0;
 
-void
-nl7c_data(struct sonode *so, uio_t *uiop)
+static int
+nl7c_resp_parse(struct sonode *so, uri_desc_t *uri, char *data, int sz)
+{
+	if (! nl7c_http_response(&data, &data[sz], uri, so)) {
+		if (data == NULL) {
+			/* Parse fail */
+			goto pfail;
+		}
+		/* More data */
+		data = NULL;
+	} else if (data == NULL) {
+		goto pass;
+	}
+	if (uri->hash != URI_TEMP && uri->nocache) {
+		/*
+		 * After response parse now no cache,
+		 * delete it from cache, wakeup any
+		 * waiters on this URI, make URI_TEMP.
+		 */
+		uri_delete(uri);
+		mutex_enter(&uri->proclock);
+		if (CV_HAS_WAITERS(&uri->waiting)) {
+			cv_broadcast(&uri->waiting);
+		}
+		mutex_exit(&uri->proclock);
+		uri->hash = URI_TEMP;
+		nl7c_uri_temp_mk++;
+	}
+	if (data == NULL) {
+		/* More data needed */
+		return (-1);
+	}
+	/* Success */
+	return (0);
+
+pfail:
+	nl7c_resp_pfail++;
+	return (EINVAL);
+
+pass:
+	nl7c_resp_pass++;
+	return (ENOTSUP);
+}
+
+/*
+ * Called to sink application response data, the processing of the data
+ * is the same for a cached or temp URI (i.e. a URI for which we aren't
+ * going to cache the URI but want to parse it for detecting response
+ * data end such that for a persistent connection we can parse the next
+ * request).
+ *
+ * On return 0 is returned for sink success, > 0 on error, and < 0 on
+ * no so URI (note, data not sinked).
+ */
+
+int
+nl7c_data(struct sonode *so, uio_t *uio)
 {
 	uri_desc_t	*uri = (uri_desc_t *)so->so_nl7c_uri;
-	iovec_t		*iovp = uiop->uio_iov;
-	int		resid = uiop->uio_resid;
-	int		sz, len, cnt;
-	char		*alloc;
-	char		*data;
+	iovec_t		*iov;
+	int		cnt;
+	int		sz = uio->uio_resid;
+	char		*data, *alloc;
 	char		*bp;
 	uri_rd_t	*rdp;
-	int		error = 0;
+	boolean_t	first;
+	int		error, perror;
 
 	nl7c_uri_data++;
 
@@ -973,72 +1127,79 @@ nl7c_data(struct sonode *so, uio_t *uiop)
 		/* Socket & NL7C out of sync, disable NL7C */
 		so->so_nl7c_flags = 0;
 		nl7c_uri_NULL1++;
-		return;
+		return (-1);
 	}
 
-	if (so->so_nl7c_flags & NL7C_WAITWRITE)
+	if (so->so_nl7c_flags & NL7C_WAITWRITE) {
 		so->so_nl7c_flags &= ~NL7C_WAITWRITE;
+		first = B_TRUE;
+	} else {
+		first = B_FALSE;
+	}
 
-	if (uri->hash == URI_TEMP) {
-		if (uri->resplen == -1)
-			sz = MIN(resid, URI_TEMP_PARSE_SZ);
-		else
-			sz = 0;
-	} else {
-		sz = resid;
-	}
-	if (sz > 0) {
-		alloc = kmem_alloc(sz, KM_SLEEP);
-	} else {
-		alloc = NULL;
-	}
-	if (uri->hash == URI_TEMP) {
-		uri->count += resid;
-		data = alloc;
-	} else {
-		URI_RD_ADD(uri, rdp, sz, -1);
-		if (rdp == NULL)
-			goto fail;
-		rdp->data.kmem = alloc;
-		data = alloc;
-		alloc = NULL;
-	}
-	bp = data;
-	for (len = sz; len > 0; len -= cnt) {
-		cnt = MIN(len, iovp->iov_len);
-		error = xcopyin(iovp->iov_base, bp, cnt);
-		if (error) {
-			goto fail;
-		}
-		bp += cnt;
-		iovp++;
-	}
-	bp = data;
-	if (uri->resplen == -1 &&
-	    ! nl7c_http_response(&bp, &bp[sz], uri, so) &&
-	    (bp == NULL || uri->hash != URI_TEMP || uri->resplen == -1)) {
-		/*
-		 * Parse not complete and parse failed or not TEMP
-		 * partial parse or TEMP partial parse and no resplen.
-		 */
-		if (bp == NULL)
-			nl7c_data_pfail++;
-		else if (uri->hash != URI_TEMP)
-			nl7c_data_ntemp++;
-		else if (uri->resplen == -1)
-			nl7c_data_ncntl++;
+	alloc = kmem_alloc(sz, KM_SLEEP);
+	URI_RD_ADD(uri, rdp, sz, -1);
+	if (rdp == NULL) {
+		error = ENOMEM;
 		goto fail;
 	}
-	if (uri->resplen != -1 && uri->count >= uri->resplen) {
-		/* Got the response data, close the uri */
+
+	if (uri->hash != URI_TEMP && uri->count > nca_max_cache_size) {
+		uri_delete(uri);
+		uri->hash = URI_TEMP;
+	}
+	data = alloc;
+	alloc = NULL;
+	rdp->data.kmem = data;
+	atomic_add_64(&nl7c_uri_bytes, sz);
+
+	bp = data;
+	while (uio->uio_resid > 0) {
+		iov = uio->uio_iov;
+		if ((cnt = iov->iov_len) == 0) {
+			goto next;
+		}
+		cnt = MIN(cnt, uio->uio_resid);
+		error = xcopyin(iov->iov_base, bp, cnt);
+		if (error)
+			goto fail;
+
+		iov->iov_base += cnt;
+		iov->iov_len -= cnt;
+		uio->uio_resid -= cnt;
+		uio->uio_loffset += cnt;
+		bp += cnt;
+	next:
+		uio->uio_iov++;
+		uio->uio_iovcnt--;
+	}
+
+	/* Successfull sink of data, response parse the data */
+	perror = nl7c_resp_parse(so, uri, data, sz);
+
+	/* Send the data out the connection */
+	error = uri_rd_response(so, uri, rdp, first);
+	if (error)
+		goto fail;
+
+	/* Success */
+	if (perror == 0 &&
+	    ((uri->respclen == URI_LEN_NOVALUE &&
+	    uri->resplen == URI_LEN_NOVALUE) ||
+	    uri->count >= uri->resplen)) {
+		/*
+		 * No more data needed and no pending response
+		 * data or current data count >= response length
+		 * so close the URI processing for this so.
+		 */
 		nl7c_close(so);
+		if (! (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+			/* Not a persistent connection */
+			so->so_nl7c_flags = 0;
+		}
 	}
-	if (alloc != NULL) {
-		kmem_free(alloc, sz);
-	} else {
-		atomic_add_64(&nl7c_uri_bytes, sz);
-	}
-	return;
+
+	return (0);
 
 fail:
 	if (alloc != NULL) {
@@ -1046,6 +1207,8 @@ fail:
 	}
 	so->so_nl7c_flags = 0;
 	nl7c_urifree(so);
+
+	return (error);
 }
 
 /*
@@ -1060,11 +1223,11 @@ fail:
  */
 
 static char *
-nl7c_readfile(file_t *fp, u_offset_t *off, int *len, int *max_rem)
+nl7c_readfile(file_t *fp, u_offset_t *off, int *len, int max, int *ret)
 {
 	vnode_t	*vp = fp->f_vnode;
 	int	flg = 0;
-	size_t	size = MIN(*len, *max_rem);
+	size_t	size = MIN(*len, max);
 	char	*data;
 	int	error;
 	uio_t	uio;
@@ -1074,6 +1237,7 @@ nl7c_readfile(file_t *fp, u_offset_t *off, int *len, int *max_rem)
 
 	if (*off > MAXOFFSET_T) {
 		VOP_RWUNLOCK(vp, flg, NULL);
+		*ret = EFBIG;
 		return (NULL);
 	}
 
@@ -1094,40 +1258,39 @@ nl7c_readfile(file_t *fp, u_offset_t *off, int *len, int *max_rem)
 
 	error = VOP_READ(vp, &uio, fp->f_flag, fp->f_cred, NULL);
 	VOP_RWUNLOCK(vp, flg, NULL);
+	*ret = error;
 	if (error) {
 		kmem_free(data, size);
 		return (NULL);
 	}
-	*max_rem = *len - size;
 	*len = size;
 	*off += size;
 	return (data);
 }
 
 /*
- * Called to copy application response sendfilev.
- *
- * Note, the value of kmem_bytes is a segmap max sized value greater
- * than or equal to TCP's tcp_slow_start_initial, there are several
- * issues with this scheme least of which is assuming that TCP is the
- * only IP transport we care about or that we hardcode the TCP value
- * but until ...
+ * Called to sink application response sendfilev, as with nl7c_data() above
+ * all the data will be processed by NL7C unless there's an error.
  */
 
-void
-nl7c_sendfilev(struct sonode *so, u_offset_t off, sendfilevec_t *sfvp, int sfvc)
+int
+nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
+	int sfvc, ssize_t *xfer)
 {
 	uri_desc_t	*uri = (uri_desc_t *)so->so_nl7c_uri;
 	file_t		*fp = NULL;
 	vnode_t		*vp = NULL;
 	char		*data = NULL;
+	u_offset_t	off;
 	int		len;
-	int		count;
+	int		cnt;
 	int		total_count = 0;
-	char		*bp;
+	char		*alloc;
 	uri_rd_t	*rdp;
-	int		max_rem;
+	int		max;
+	int		perror;
 	int		error = 0;
+	boolean_t	first = B_TRUE;
 
 	nl7c_uri_sendfilev++;
 
@@ -1135,7 +1298,7 @@ nl7c_sendfilev(struct sonode *so, u_offset_t off, sendfilevec_t *sfvp, int sfvc)
 		/* Socket & NL7C out of sync, disable NL7C */
 		so->so_nl7c_flags = 0;
 		nl7c_uri_NULL2++;
-		return;
+		return (0);
 	}
 
 	if (so->so_nl7c_flags & NL7C_WAITWRITE)
@@ -1145,12 +1308,13 @@ nl7c_sendfilev(struct sonode *so, u_offset_t off, sendfilevec_t *sfvp, int sfvc)
 		/*
 		 * off - the current sfv read file offset or user address.
 		 *
-		 * len - the current sfv kmem_alloc()ed buffer length, note
-		 *	 may be less than the actual sfv size.
+		 * len - the current sfv length in bytes.
 		 *
-		 * count - the actual current sfv size in bytes.
+		 * cnt - number of bytes kmem_alloc()ed.
 		 *
-		 * data - the kmem_alloc()ed buffer of size "len".
+		 * alloc - the kmem_alloc()ed buffer of size "cnt".
+		 *
+		 * data - copy of "alloc" used for post alloc references.
 		 *
 		 * fp - the current sfv file_t pointer.
 		 *
@@ -1162,145 +1326,121 @@ nl7c_sendfilev(struct sonode *so, u_offset_t off, sendfilevec_t *sfvp, int sfvc)
 		 */
 		off = sfvp->sfv_off;
 		len = sfvp->sfv_len;
-		count = len;
-		if (uri->hash == URI_TEMP) {
-			if (uri->resplen == -1)
-				len = MIN(len, URI_TEMP_PARSE_SZ);
-			else
-				len = 0;
-		}
-		if (len == 0) {
+		cnt = len;
+		if (sfvp->sfv_fd == SFV_FD_SELF) {
 			/*
-			 * TEMP uri with no data to sink, just count bytes.
+			 * User memory, copyin() all the bytes.
 			 */
-			uri->count += count;
-		} else if (sfvp->sfv_fd == SFV_FD_SELF) {
-			/*
-			 * Process user memory, copyin().
-			 */
-			data = kmem_alloc(len, KM_SLEEP);
-
-			error = xcopyin((caddr_t)(uintptr_t)off, data, len);
+			alloc = kmem_alloc(cnt, KM_SLEEP);
+			error = xcopyin((caddr_t)(uintptr_t)off, alloc, cnt);
 			if (error)
 				goto fail;
-
-			bp = data;
-			if (uri->resplen == -1 &&
-			    ! nl7c_http_response(&bp, &bp[len], uri, so) &&
-			    (bp == NULL || uri->hash != URI_TEMP ||
-			    (uri->hash == URI_TEMP && uri->resplen == -1))) {
-				/*
-				 * Parse not complete and parse failed or
-				 * not TEMP partial parse or TEMP partial
-				 * parse and no resplen.
-				 */
-				goto fail;
-			}
-
-			if (uri->hash == URI_TEMP) {
-				uri->count += len;
-				kmem_free(data, len);
-				data = NULL;
-			} else {
-				URI_RD_ADD(uri, rdp, len, -1);
-				if (rdp == NULL)
-					goto fail;
-				rdp->data.kmem = data;
-				data = NULL;
-				total_count += len;
-			}
 		} else {
 			/*
-			 * File descriptor, prefetch some bytes,
-			 * save vnode_t if any bytes left.
+			 * File descriptor, prefetch some bytes.
 			 */
-			if ((fp = getf(sfvp->sfv_fd)) == NULL)
+			if ((fp = getf(sfvp->sfv_fd)) == NULL) {
+				error = EBADF;
 				goto fail;
-
-			if ((fp->f_flag & FREAD) == 0)
+			}
+			if ((fp->f_flag & FREAD) == 0) {
+				error = EACCES;
 				goto fail;
-
+			}
 			vp = fp->f_vnode;
-			if (vp->v_type != VREG)
+			if (vp->v_type != VREG) {
+				error = EINVAL;
 				goto fail;
+			}
 			VN_HOLD(vp);
 
 			/* Read max_rem bytes from file for prefetch */
 			if (nl7c_use_kmem) {
-				max_rem = len;
+				max = cnt;
 			} else {
-				max_rem = MAXBSIZE * nl7c_file_prefetch;
+				max = MAXBSIZE * nl7c_file_prefetch;
 			}
-			data = nl7c_readfile(fp, &off, &len, &max_rem);
-			if (data == NULL)
+			alloc = nl7c_readfile(fp, &off, &cnt, max, &error);
+			if (alloc == NULL)
 				goto fail;
 
 			releasef(sfvp->sfv_fd);
 			fp = NULL;
-
-			bp = data;
-			if (uri->resplen == -1 &&
-			    ! nl7c_http_response(&bp, &bp[len], uri, so) &&
-			    (bp == NULL || uri->hash != URI_TEMP ||
-			    uri->resplen == -1)) {
-				/*
-				 * Parse not complete and parse failed or
-				 * not TEMP partial parse or TEMP partial
-				 * parse and no resplen.
-				 */
-				goto fail;
-			}
-
-			if (uri->hash == URI_TEMP) {
-				/*
-				 * Temp uri, account for all sfv bytes and
-				 * free up any resources allocated above.
-				 */
-				uri->count += count;
-				kmem_free(data, len);
-				data = NULL;
-				VN_RELE(vp);
-				vp = NULL;
-			} else {
-				/*
-				 * Setup an uri_rd_t for the prefetch and
-				 * if any sfv data remains setup an another
-				 * uri_rd_t to map it, last free up any
-				 * resources allocated above.
-				 */
-				URI_RD_ADD(uri, rdp, len, -1);
-				if (rdp == NULL)
-					goto fail;
-				rdp->data.kmem = data;
-				data = NULL;
-				if (max_rem > 0) {
-					/* More file data so add it */
-					URI_RD_ADD(uri, rdp, max_rem, off);
-					if (rdp == NULL)
-						goto fail;
-					rdp->data.vnode = vp;
-				} else {
-					/* All file data fit in the prefetch */
-					VN_RELE(vp);
-				}
-				vp = NULL;
-				/* Only account for the kmem_alloc()ed bytes */
-				total_count += len;
-			}
 		}
+		URI_RD_ADD(uri, rdp, cnt, -1);
+		if (rdp == NULL) {
+			error = ENOMEM;
+			goto fail;
+		}
+		data = alloc;
+		alloc = NULL;
+		rdp->data.kmem = data;
+		total_count += cnt;
+		if (uri->hash != URI_TEMP && total_count > nca_max_cache_size) {
+			uri_delete(uri);
+			uri->hash = URI_TEMP;
+		}
+
+		/* Response parse */
+		perror = nl7c_resp_parse(so, uri, data, len);
+
+		/* Send kmem data out the connection */
+		error = uri_rd_response(so, uri, rdp, first);
+
+		if (error)
+			goto fail;
+
+		if (sfvp->sfv_fd != SFV_FD_SELF) {
+			/*
+			 * File descriptor, if any bytes left save vnode_t.
+			 */
+			if (len > cnt) {
+				/* More file data so add it */
+				URI_RD_ADD(uri, rdp, len - cnt, off);
+				if (rdp == NULL) {
+					error = ENOMEM;
+					goto fail;
+				}
+				rdp->data.vnode = vp;
+
+				/* Send vnode data out the connection */
+				error = uri_rd_response(so, uri, rdp, first);
+			} else {
+				/* All file data fit in the prefetch */
+				VN_RELE(vp);
+			}
+			*fileoff += len;
+			vp = NULL;
+		}
+		*xfer += len;
 		sfvp++;
+
+		if (first)
+			first = B_FALSE;
 	}
 	if (total_count > 0) {
 		atomic_add_64(&nl7c_uri_bytes, total_count);
 	}
-	if (uri->resplen != -1 && uri->count >= uri->resplen) {
-		/* Got the response data, close the uri */
+	if (perror == 0 &&
+	    ((uri->respclen == URI_LEN_NOVALUE &&
+	    uri->resplen == URI_LEN_NOVALUE) ||
+	    uri->count >= uri->resplen)) {
+		/*
+		 * No more data needed and no pending response
+		 * data or current data count >= response length
+		 * so close the URI processing for this so.
+		 */
 		nl7c_close(so);
+		if (! (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+			/* Not a persistent connection */
+			so->so_nl7c_flags = 0;
+		}
 	}
-	return;
+
+	return (0);
 
 fail:
-	if (data != NULL)
+	if (alloc != NULL)
 		kmem_free(data, len);
 
 	if (vp != NULL)
@@ -1312,8 +1452,11 @@ fail:
 	if (total_count > 0) {
 		atomic_add_64(&nl7c_uri_bytes, total_count);
 	}
+
 	so->so_nl7c_flags = 0;
 	nl7c_urifree(so);
+
+	return (error);
 }
 
 /*
@@ -1376,9 +1519,9 @@ uri_segmap_inactive(uri_segmap_t *smp)
 
 /*
  * The call-back for desballoc()ed mblk_t's, if a segmap mapped mblk_t
- * release the reference, one per deballoc() of a segmap page, release
- * the reference of the URI containing the uri_rd_t, last free kmem
- * free the uri_desb_t.
+ * release the reference, one per desballoc() of a segmap page, if a rd_t
+ * mapped mblk_t release the reference, one per desballoc() of a uri_desc_t,
+ * last kmem free the uri_desb_t.
  */
 
 static void
@@ -1445,7 +1588,7 @@ uri_desb_chop(
 	int		lbytes = bytes ? *bytes : lsz;
 	uri_desb_t	*desb;
 	mblk_t		*mp = NULL;
-	mblk_t		*nmp, *tmp, *pmp = NULL;
+	mblk_t		*nmp, *pmp = NULL;
 	int		msz;
 
 	if (lbytes == 0 && lsz == 0)
@@ -1458,6 +1601,11 @@ uri_desb_chop(
 			msz = (eoh - ldata);
 			pmp = persist;
 			persist = NULL;
+			if (msz == 0) {
+				nmp = pmp;
+				pmp = NULL;
+				goto zero;
+			}
 		}
 		desb = kmem_cache_alloc(uri_desb_kmc, KM_SLEEP);
 		REF_HOLD(temp->uri);
@@ -1473,34 +1621,35 @@ uri_desb_chop(
 			}
 			REF_RELE(temp->uri);
 			if (mp != NULL) {
+				mp->b_next = NULL;
 				freemsg(mp);
+			}
+			if (persist != NULL) {
+				freeb(persist);
 			}
 			return (NULL);
 		}
 		nmp->b_wptr += msz;
+	zero:
 		if (mp != NULL) {
-			/*LINTED*/
-			ASSERT(tmp->b_cont == NULL);
-			/*LINTED*/
-			tmp->b_cont = nmp;
+			mp->b_next->b_cont = nmp;
 		} else {
 			mp = nmp;
 		}
-		tmp = nmp;
+		if (pmp != NULL) {
+			nmp->b_cont = pmp;
+			nmp = pmp;
+			pmp = NULL;
+		}
+		mp->b_next = nmp;
 		ldata += msz;
 		lsz -= msz;
 		lbytes -= msz;
-		if (pmp) {
-			tmp->b_cont = pmp;
-			tmp = pmp;
-			pmp = NULL;
-		}
 	}
 	*data = ldata;
 	*sz = lsz;
 	if (bytes)
 		*bytes = lbytes;
-	mp->b_next = tmp;
 	return (mp);
 }
 
@@ -1537,40 +1686,60 @@ kstrwritempnoqwait(struct vnode *vp, mblk_t *mp)
 }
 
 /*
- * Send the URI response uri_desc_t *uri out the socket_t *so.
+ * Send the URI uri_desc_t *uri response uri_rd_t *rdp out the socket_t *so.
  */
 
-static void
-uri_response(struct sonode *so, uri_desc_t *uri, int max_mblk)
+static int
+uri_rd_response(struct sonode *so,
+    uri_desc_t *uri,
+    uri_rd_t *rdp,
+    boolean_t first)
 {
-	uri_rd_t	*rdp = &uri->response;
 	vnode_t		*vp = SOTOV(so);
+	int		max_mblk = (int)((tcp_t *)so->so_priv)->tcp_mss;
 	int		wsz;
 	mblk_t		*mp, *wmp, *persist;
 	int		write_bytes;
-	uri_rd_t	rd = {0};
+	uri_rd_t	rd;
 	uri_desb_t	desb;
 	uri_segmap_t	*segmap = NULL;
 	char		*segmap_data;
 	size_t		segmap_sz;
-	boolean_t	first = B_TRUE;
+	int		error;
+	int		fflg = ((so->so_state & SS_NDELAY) ? FNDELAY : 0) |
+			    ((so->so_state & SS_NONBLOCK) ? FNONBLOCK : 0);
 
-	/* For first kstrwrite() enough data to get things going */
-	write_bytes = P2ROUNDUP((max_mblk * 4), MAXBSIZE * nl7c_file_prefetch);
 
 	/* Initialize template uri_desb_t */
 	desb.frtn.free_func = uri_desb_free;
 	desb.frtn.free_arg = NULL;
 	desb.uri = uri;
 
+	/* Get a local copy of the rd_t */
+	bcopy(rdp, &rd, sizeof (rd));
 	do {
+		if (first) {
+			/*
+			 * For first kstrwrite() enough data to get
+			 * things going, note non blocking version of
+			 * kstrwrite() will be used below.
+			 */
+			write_bytes = P2ROUNDUP((max_mblk * 4),
+			    MAXBSIZE * nl7c_file_prefetch);
+		} else {
+			if ((write_bytes = so->so_sndbuf) == 0)
+				write_bytes = vp->v_stream->sd_qn_maxpsz;
+			ASSERT(write_bytes > 0);
+			write_bytes = P2ROUNDUP(write_bytes, MAXBSIZE);
+		}
+		/*
+		 * Chop up to a write_bytes worth of data.
+		 */
 		wmp = NULL;
 		wsz = write_bytes;
 		do {
-			if (rd.sz == 0) {
-				bcopy(rdp, &rd, sizeof (rd));
-				rdp = rdp->next;
-			}
+			if (rd.sz == 0)
+				break;
 			if (rd.off == -1) {
 				if (uri->eoh >= rd.data.kmem &&
 				    uri->eoh < &rd.data.kmem[rd.sz]) {
@@ -1581,22 +1750,28 @@ uri_response(struct sonode *so, uri_desc_t *uri, int max_mblk)
 				desb.segmap = NULL;
 				mp = uri_desb_chop(&rd.data.kmem, &rd.sz,
 				    &wsz, &desb, max_mblk, uri->eoh, persist);
-				if (mp == NULL)
+				if (mp == NULL) {
+					error = ENOMEM;
 					goto invalidate;
+				}
 			} else {
 				if (segmap == NULL) {
 					segmap = uri_segmap_map(&rd,
 					    write_bytes);
-					if (segmap == NULL)
+					if (segmap == NULL) {
+						error = ENOMEM;
 						goto invalidate;
+					}
 					desb.segmap = segmap;
 					segmap_data = segmap->base;
 					segmap_sz = segmap->len;
 				}
 				mp = uri_desb_chop(&segmap_data, &segmap_sz,
 				    &wsz, &desb, max_mblk, NULL, NULL);
-				if (mp == NULL)
+				if (mp == NULL) {
+					error = ENOMEM;
 					goto invalidate;
+				}
 				if (segmap_sz == 0) {
 					rd.sz -= segmap->len;
 					rd.off += segmap->len;
@@ -1611,12 +1786,12 @@ uri_response(struct sonode *so, uri_desc_t *uri, int max_mblk)
 				wmp->b_next = mp->b_next;
 				mp->b_next = NULL;
 			}
-		} while (wsz > 0 && (rd.sz > 0 || rdp != NULL));
+		} while (wsz > 0 && rd.sz > 0);
 
 		wmp->b_next = NULL;
 		if (first) {
 			/* First kstrwrite(), use noqwait */
-			if (kstrwritempnoqwait(vp, wmp) != 0)
+			if ((error = kstrwritempnoqwait(vp, wmp)) != 0)
 				goto invalidate;
 			/*
 			 * For the rest of the kstrwrite()s use SO_SNDBUF
@@ -1624,17 +1799,20 @@ uri_response(struct sonode *so, uri_desc_t *uri, int max_mblk)
 			 * may (will) block one or more times.
 			 */
 			first = B_FALSE;
-			if ((write_bytes = so->so_sndbuf) == 0)
-				write_bytes = vp->v_stream->sd_qn_maxpsz;
-			ASSERT(write_bytes > 0);
-			write_bytes = P2ROUNDUP(write_bytes, MAXBSIZE);
 		} else {
-			if (kstrwritemp(vp, wmp, 0) != 0)
-				goto invalidate;
+			if ((error = kstrwritemp(vp, wmp, fflg)) != 0) {
+				if (error == EAGAIN) {
+					nl7c_uri_rd_EAGAIN++;
+					if ((error =
+					    kstrwritempnoqwait(vp, wmp)) != 0)
+						goto invalidate;
+				} else
+					goto invalidate;
+			}
 		}
-	} while (rd.sz > 0 || rdp != NULL);
+	} while (rd.sz > 0);
 
-	return;
+	return (0);
 
 invalidate:
 	if (segmap) {
@@ -1642,7 +1820,34 @@ invalidate:
 	}
 	if (wmp)
 		freemsg(wmp);
+
+	return (error);
+}
+
+/*
+ * Send the URI uri_desc_t *uri response out the socket_t *so.
+ */
+
+static int
+uri_response(struct sonode *so, uri_desc_t *uri)
+{
+	uri_rd_t	*rdp = &uri->response;
+	boolean_t	first = B_TRUE;
+	int		error;
+
+	while (rdp != NULL) {
+		error = uri_rd_response(so, uri, rdp, first);
+		if (error != 0) {
+			goto invalidate;
+		}
+		first = B_FALSE;
+		rdp = rdp->next;
+	}
+	return (0);
+
+invalidate:
 	uri_delete(uri);
+	return (error);
 }
 
 /*
@@ -1723,36 +1928,41 @@ static char pchars[] = {
  */
 
 boolean_t
-nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
-	int max_mblk)
+nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 {
 	char	*cp = (char *)so->so_nl7c_rcv_mp->b_rptr;
 	char	*ep = (char *)so->so_nl7c_rcv_mp->b_wptr;
 	char	*get = "GET ";
+	char	*post = "POST ";
 	char	c;
 	char	*uris;
-	uri_desc_t *uri;
+	uri_desc_t *uri = NULL;
 	uri_desc_t *ruri = NULL;
+	mblk_t	*reqmp;
+	uint32_t hv = 0;
 
+	if ((reqmp = dupb(so->so_nl7c_rcv_mp)) == NULL) {
+		nl7c_uri_pass_dupbfail++;
+		goto pass;
+	}
 	/*
 	 * Allocate and initialize minimumal state for the request
 	 * uri_desc_t, in the cache hit case this uri_desc_t will
 	 * be freed.
 	 */
-	uri = kmem_cache_alloc(uri_kmc, KM_SLEEP);
-	REF_INIT(uri, 1, uri_inactive, uri_kmc);
+	uri = kmem_cache_alloc(nl7c_uri_kmc, KM_SLEEP);
+	REF_INIT(uri, 1, nl7c_uri_inactive, nl7c_uri_kmc);
 	uri->hash = NULL;
 	uri->tail = NULL;
 	uri->scheme = NULL;
 	uri->count = 0;
-	if ((uri->reqmp = dupb(so->so_nl7c_rcv_mp)) == NULL) {
-		nl7c_uri_pass_dupbfail++;
-		goto pass;
-	}
+	uri->reqmp = reqmp;
+
 	/*
 	 * Set request time to current time.
 	 */
 	so->so_nl7c_rtime = gethrestime_sec();
+
 	/*
 	 * Parse the Request-Line for the URI.
 	 *
@@ -1767,12 +1977,22 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 		cp++;
 	}
 	if (*get != 0) {
-		if (cp == ep) {
-			nl7c_uri_more_get++;
-			goto more;
+		/* Note a "GET", check for "POST" */
+		while (cp < ep && *post == *cp) {
+			post++;
+			cp++;
 		}
-		nl7c_uri_pass_getnot++;
-		goto pass;
+		if (*post != 0) {
+			if (cp == ep) {
+				nl7c_uri_more_get++;
+				goto more;
+			}
+			/* Not a "GET" or a "POST", just pass */
+			nl7c_uri_pass_method++;
+			goto pass;
+		}
+		/* "POST", don't cache but still may want to parse */
+		uri->hash = URI_TEMP;
 	}
 	/*
 	 * Skip over URI path char(s) and save start and past end pointers.
@@ -1783,6 +2003,7 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 			/* Don't cache but still may want to parse */
 			uri->hash = URI_TEMP;
 		}
+		CHASH(hv, c);
 		cp++;
 	}
 	if (c != '\r' && cp == ep) {
@@ -1795,11 +2016,12 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 	 */
 	uri->path.cp = uris;
 	uri->path.ep = cp;
-	if (! nl7c_http_request(&cp, ep, uri, so)) {
+	uri->hvalue = hv;
+	if (! nl7c_http_request(&cp, ep, uri, so) || cp == NULL) {
 		/*
-		 * Parse not successful, the pointer to the parse pointer
-		 * "cp" is overloaded such that ! NULL for more data and
-		 * NULL for pass on request.
+		 * Parse not successful or pass on request, the pointer
+		 * to the parse pointer "cp" is overloaded such that ! NULL
+		 * for more data and NULL for bad parse of request or pass.
 		 */
 		if (cp != NULL) {
 			nl7c_uri_more_http++;
@@ -1808,6 +2030,14 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 		nl7c_uri_pass_http++;
 		goto pass;
 	}
+	if (uri->nocache) {
+		uri->hash = URI_TEMP;
+		(void) uri_lookup(uri, B_FALSE, nonblocking);
+	} else if (uri->hash == URI_TEMP) {
+		uri->nocache = B_TRUE;
+		(void) uri_lookup(uri, B_FALSE, nonblocking);
+	}
+
 	if (uri->hash == URI_TEMP) {
 		if (so->so_nl7c_flags & NL7C_SOPERSIST) {
 			/* Temporary URI so skip hash processing */
@@ -1820,16 +2050,10 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 		goto pass;
 	}
 	/*
-	 * If logging enabled save the request uri pointer and place
-	 * an additional reference on it for logging use after lookup().
+	 * Check the URI hash for a cached response, save the request
+	 * uri in case we need it below.
 	 */
-	if (nl7c_logd_enabled) {
-		ruri = uri;
-		REF_HOLD(ruri);
-	}
-	/*
-	 * Check the URI hash for a cached response.
-	 */
+	ruri = uri;
 	if ((uri = uri_lookup(uri, B_TRUE, nonblocking)) == NULL) {
 		/*
 		 * Failed to lookup due to nonblocking wait required,
@@ -1843,16 +2067,24 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 	if (uri->response.sz > 0) {
 		/*
 		 * We have the response cached, update recv mblk rptr
-		 * to reflect the data consumed above, send the response
-		 * out the socket, release reference on uri from the
-		 * call to lookup_add(), set the *ret value to B_TRUE
-		 * for socket close and return B_FALSE to indcate no
-		 * more data needed.
+		 * to reflect the data consumed in parse.
 		 */
 		mblk_t	*mp = so->so_nl7c_rcv_mp;
 
-		/* If a saved ruri set above then log request */
-		if (ruri != NULL) {
+		if (cp == (char *)mp->b_wptr) {
+			so->so_nl7c_rcv_mp = mp->b_cont;
+			mp->b_cont = NULL;
+			freeb(mp);
+		} else {
+			mp->b_rptr = (unsigned char *)cp;
+		}
+		nl7c_uri_hit++;
+		/* If conditional request check for substitute response */
+		if (ruri->conditional) {
+			uri = nl7c_http_cond(ruri, uri);
+		}
+		/* If logging enabled log request */
+		if (nl7c_logd_enabled) {
 			ipaddr_t faddr;
 
 			if (so->so_family == AF_INET) {
@@ -1862,32 +2094,35 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret,
 			} else {
 				faddr = 0;
 			}
+			/* XXX need to pass response type, e.g. 200, 304 */
 			nl7c_logd_log(ruri, uri, so->so_nl7c_rtime, faddr);
-			REF_RELE(ruri);
 		}
-		nl7c_uri_hit++;
-		if (cp == (char *)mp->b_wptr) {
-			so->so_nl7c_rcv_mp = mp->b_cont;
-			mp->b_cont = NULL;
-			freeb(mp);
-		} else {
-			mp->b_rptr = (unsigned char *)cp;
-		}
-		uri_response(so, uri, max_mblk);
+		/*
+		 * Release reference on request URI, send the response out
+		 * the socket, release reference on response uri, set the
+		 * *ret value to B_TRUE to indicate request was consumed
+		 * then return B_FALSE to indcate no more data needed.
+		 */
+		REF_RELE(ruri);
+		(void) uri_response(so, uri);
 		REF_RELE(uri);
 		*ret = B_TRUE;
 		return (B_FALSE);
 	}
-	if (ruri != NULL) {
-		REF_RELE(ruri);
-	}
 	/*
-	 * Don't have a response cached or may want to cache the
-	 * response from the webserver so store the uri pointer in
-	 * the so subsequent write-side calls ...
+	 * Miss the cache, the request URI is in the cache waiting for
+	 * application write-side data to fill it.
 	 */
 	nl7c_uri_miss++;
 temp:
+	/*
+	 * A miss or temp URI for which response data is needed, link
+	 * uri to so and so to uri, set WAITWRITE in the so such that
+	 * read-side processing is suspended (so the next read() gets
+	 * the request data) until a write() is processed by NL7C.
+	 *
+	 * Note, so->so_nl7c_uri now owns the REF_INIT() ref.
+	 */
 	uri->proc = so;
 	so->so_nl7c_uri = uri;
 	so->so_nl7c_flags |= NL7C_WAITWRITE;

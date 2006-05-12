@@ -1,15 +1,14 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -34,9 +33,11 @@ Shdr_Date, "Date: ", PASS | QUALIFIER | DATE
 Shdr_Expires, "Expires: ", PASS | QUALIFIER | DATE
 Shdr_Keep_Alive, "Keep-Alive: ", FILTER | QUALIFIER
 Shdr_Last_Modified, "Last-Modified: ", PASS | QUALIFIER | QUALIFIER | DATE
-Shdr_Set_Cookies, "Set-Cookies: ", PASS | NOCACHE
+Shdr_Set_Cookie, "Set-Cookie: ", PASS | NOCACHE
 Shdr_Cache_Control_No_Cache, "Cache-Control: no-cache", PASS | NOCACHE
 Shdr_Cache_Control_No_Store, "Cache-Control: no-store", PASS | NOCACHE
 Shdr_Cache_Control_Max_Age, "Cache-Control: max-age", PASS | NUMERIC
 Shdr_ETagW, "ETag: W/", PASS | NOCACHE
 Shdr_ETag, "ETag: ", PASS | QUALIFIER
+Shdr_Chunked, "Transfer-Encoding: chunked", PASS | QUALIFIER
+Shdr_Server, "Server: ", PASS | QUALIFIER

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +48,6 @@
  * NCA socket API, "AF_NCA", and "ndd /dev/nca" for backwards compatability.
  */
 
-#include <sys/promif.h>
 #include <sys/systm.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
@@ -62,6 +60,9 @@
 
 #include <inet/nca/ncadoorhdr.h>
 #include <inet/nca/ncalogd.h>
+#include <inet/nca/ncandd.h>
+
+#include <sys/promif.h>
 
 /*
  * NL7C, NCA, NL7C logger enabled:
@@ -102,19 +103,33 @@ typedef struct nl7c_addr_s {
 		void		*align;	/* foce alignment */
 	}		addr;		/* address */
 
-	queue_t		*listenerq;	/* listen()er's Q (NULL if none ) */
+	struct sonode	*listener;	/* listen()er's sonode */
 	boolean_t	temp;		/* temporary addr via add_addr() ? */
 } nl7c_addr_t;
 
 nl7c_addr_t	*nl7caddrs = NULL;
 
-void
-nl7c_listener_addr(void *arg, queue_t *q)
-{
-	nl7c_addr_t	*p = (nl7c_addr_t *)arg;
+/*
+ * Called for an NL7C_ENABLED listen()er socket for the nl7c_addr_t
+ * previously returned by nl7c_lookup_addr().
+ */
 
-	if (p->listenerq == NULL)
-		p->listenerq = q;
+void
+nl7c_listener_addr(void *arg, struct sonode *so)
+{
+	nl7c_addr_t		*p = (nl7c_addr_t *)arg;
+
+	if (p->listener == NULL)
+		p->listener = so;
+	so->so_nl7c_addr = arg;
+}
+
+struct sonode *
+nl7c_addr2portso(void *arg)
+{
+	nl7c_addr_t		*p = (nl7c_addr_t *)arg;
+
+	return (p->listener);
 }
 
 void *
@@ -156,7 +171,6 @@ nl7c_add_addr(void *addr, t_uscalar_t addrlen)
 		return (NULL);
 	}
 again:
-	old = nl7caddrs;
 	p = nl7caddrs;
 	while (p) {
 		if (new == NULL && p->port == 0)
@@ -172,8 +186,6 @@ again:
 	}
 	if (new == NULL) {
 		new = kmem_zalloc(sizeof (*new), KM_SLEEP);
-		if (new == NULL)
-			return (NULL);
 		alloced = B_TRUE;
 	} else
 		alloced = B_FALSE;
@@ -184,6 +196,7 @@ again:
 	new->temp = B_TRUE;
 
 	if (alloced) {
+		old = nl7caddrs;
 		new->next = old;
 		if (atomic_cas_ptr(&nl7caddrs, old, new) != old) {
 			kmem_free(new, sizeof (*new));
@@ -198,13 +211,12 @@ boolean_t
 nl7c_close_addr(struct sonode *so)
 {
 	nl7c_addr_t	*p = nl7caddrs;
-	queue_t		*q = strvp2wq(SOTOV(so));
 
 	while (p) {
-		if (p->listenerq == q) {
+		if (p->listener == so) {
 			if (p->temp)
 				p->port = (uint16_t)-1;
-			p->listenerq = NULL;
+			p->listener = NULL;
 			return (B_TRUE);
 		}
 		p = p->next;
@@ -225,13 +237,13 @@ nl7c_mi_report_addr(mblk_t *mp)
 	ipaddr_t	ip;
 	uint16_t	port;
 	nl7c_addr_t	*p = nl7caddrs;
+	struct sonode	*so;
 	char		addr[32];
 
 	(void) mi_mpprintf(mp, "Door  Up-Call-Queue IPaddr:TCPport Listenning");
-
 	while (p) {
-		if (p->listenerq != NULL) {
-			/* Only report listen()ed on addr(s) */
+		if (p->port != (uint16_t)-1) {
+			/* Don't report freed slots */
 			ip = ntohl(p->addr.v4);
 			port = ntohs(p->port);
 
@@ -246,9 +258,10 @@ nl7c_mi_report_addr(mblk_t *mp)
 				(void) mi_sprintf(addr, "%d.%d.%d.%d",
 					a1, a2, a3, a4);
 			}
-			(void) mi_sprintf(addr, "%s:%d", addr, port);
-			(void) mi_mpprintf(mp, "%p  %p  %s  %d", (void *)NULL,
-				(void *)p->listenerq, addr, 1);
+			so = p->listener;
+			(void) mi_mpprintf(mp, "%p  %s:%d  %d",
+			    so ? (void *)strvp2wq(SOTOV(so)) : NULL,
+			    addr, port, p->listener ? 1 : 0);
 		}
 		p = p->next;
 	}
@@ -320,14 +333,18 @@ inet_atob(char *s, nl7c_addr_t *p)
 		p->family = AF_INET6;
 	} else {
 		p->family = AF_INET;
+		p->addr.v4 = ntohl(p->addr.v4);
 	}
 	return (0);
 }
 
 /*
  * Open and read each line from "/etc/nca/ncaport.conf", the syntax of a
- * ncaport.conf file line is: ncaport=IPaddr/Port, all other lines will
- * be ignored, where:
+ * ncaport.conf file line is:
+ *
+ *	ncaport=IPaddr/Port[/Proxy]
+ *
+ * Where:
  *
  * ncaport - the only token recognized.
  *
@@ -337,6 +354,8 @@ inet_atob(char *s, nl7c_addr_t *p)
  *       / - IPaddr/Port seperator.
  *
  *    Port - a TCP decimal port number.
+ *
+ * Note, all other lines will be ignored.
  */
 
 static void
@@ -469,7 +488,7 @@ ncaportconf_read(void)
 			} else if (c == '#' || isspace(c)) {
 				/* End of port number, convert */
 				*stringp = NULL;
-				addrp->port = atou(string);
+				addrp->port = ntohs(atou(string));
 
 				/* End of parse, add entry */
 				nl7c_addr_add(addrp);
@@ -480,7 +499,12 @@ ncaportconf_read(void)
 				parse = EOL;
 				break;
 			}
-			/*FALLTHROUGH*/
+			if (c == '\n') {
+				/* Found EOL, start on next line */
+				parse = START;
+			}
+			break;
+
 		case EOL:
 			if (c == '\n') {
 				/* Found EOL, start on next line */
@@ -844,11 +868,13 @@ nl7clogd_startup(void)
 void
 nl7c_startup()
 {
+	/*
+	 * Open, read, and parse the NCA logd configuration file,
+	 * then initialize URI processing and NCA compat.
+	 */
 	ncalogdconf_read();
 	nl7c_uri_init();
 	nl7c_nca_init();
-
-	nl7c_enabled = B_TRUE;
 }
 
 void
@@ -900,109 +926,127 @@ volatile uint64_t nl7c_proc_again = 0;
 volatile uint64_t nl7c_proc_next = 0;
 volatile uint64_t nl7c_proc_rcv = 0;
 volatile uint64_t nl7c_proc_noLRI = 0;
+volatile uint64_t nl7c_proc_nodata = 0;
+volatile uint64_t nl7c_proc_parse = 0;
 
 boolean_t
-nl7c_process(struct sonode *so, boolean_t nonblocking, int max_mblk)
+nl7c_process(struct sonode *so, boolean_t nonblocking)
 {
 	vnode_t	*vp = SOTOV(so);
-	mblk_t	*mp = so->so_nl7c_rcv_mp;
-	mblk_t	*tmp;
+	mblk_t	*rmp = so->so_nl7c_rcv_mp;
 	clock_t	timout;
+	rval_t	rval;
 	uchar_t pri;
 	int 	pflag;
-	mblk_t	*rmp;
-	rval_t	rval;
 	int	error;
-	boolean_t ret;
 	boolean_t more;
+	boolean_t ret = B_FALSE;
+	boolean_t first = B_TRUE;
+	boolean_t pollin = (so->so_nl7c_flags & NL7C_POLLIN);
 
 	nl7c_proc_cnt++;
 
+	/* Caller has so_lock enter()ed */
 	error = so_lock_read_intr(so, nonblocking ? FNDELAY|FNONBLOCK : 0);
 	if (error) {
 		/* Couldn't read lock, pass on this socket */
 		so->so_nl7c_flags = 0;
-		ret = B_FALSE;
 		nl7c_proc_noLRI++;
-		goto out;
+		return (B_FALSE);
 	}
+	/* Exit so_lock for now, will be reenter()ed prior to return */
 	mutex_exit(&so->so_lock);
 
-	if (mp != NULL) {
-		/*
-		 * Some data from a previous process() call,
-		 * move to rmp so we skip the first kstrgetmsg().
-		 */
-		rmp = mp;
-		mp = NULL;
-	} else
-		rmp = NULL;
+	if (pollin)
+		so->so_nl7c_flags &= ~NL7C_POLLIN;
 
 	/* Initialize some kstrgetmsg() constants */
-	pflag = MSG_ANY;
+	pflag = MSG_ANY | MSG_DELAYERROR;
 	pri = 0;
-	if (nonblocking)
+	if (nonblocking) {
+		/* Non blocking so don't block */
 		timout = 0;
-	else
-		timout = -1;
+	} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+		/* 2nd or more time(s) here so use keep-alive value */
+		timout = nca_http_keep_alive_timeout;
+	} else {
+		/* 1st time here so use connection value */
+		timout = nca_http_timeout;
+	}
 
+	rval.r_vals = 0;
 	do {
+		/*
+		 * First time through, if no data left over from a previous
+		 * kstrgetmsg() then try to get some, else just process it.
+		 *
+		 * Thereafter, rmp = NULL after the successfull kstrgetmsg()
+		 * so try to get some new data and append to list (i.e. until
+		 * enough fragments are collected for a successfull parse).
+		 */
 		if (rmp == NULL) {
-			rval.r_vals = 0;
-			error = kstrgetmsg(vp, &rmp, NULL, &pri, &pflag,
-					timout, &rval);
 
+			error = kstrgetmsg(vp, &rmp, NULL, &pri, &pflag,
+			    timout, &rval);
 			if (error) {
 				if (error == ETIME) {
 					/* Timeout */
-					error = 0;
 					nl7c_proc_ETIME++;
-				} else {
+				} else if (error != EWOULDBLOCK) {
 					/* Error of some sort */
 					nl7c_proc_error++;
+					rval.r_v.r_v2 = error;
+					so->so_nl7c_flags = 0;
+					break;
 				}
-				ret = B_FALSE;
+				error = 0;
+			}
+			if (rmp != NULL) {
+				mblk_t	*mp = so->so_nl7c_rcv_mp;
+
+
+				if (mp == NULL) {
+					/* Just new data, common case */
+					so->so_nl7c_rcv_mp = rmp;
+				} else {
+					/* Add new data to tail */
+					while (mp->b_cont != NULL)
+						mp = mp->b_cont;
+					mp->b_cont = rmp;
+				}
+			}
+			if (so->so_nl7c_rcv_mp == NULL) {
+				/* No data */
+				nl7c_proc_nodata++;
+				if (timout > 0 || (first && pollin)) {
+					/* Expected data so EOF */
+					ret = B_TRUE;
+				} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+					/* Persistent so just checking */
+					ret = B_FALSE;
+				}
 				break;
 			}
-
-			if (rmp == NULL) {
-				/* No more data */
-				ret = B_FALSE;
-				break;
-			}
+			rmp = NULL;
 		}
-		if (mp == NULL) {
-			/* First msg, common case */
-			mp = rmp;
-			so->so_nl7c_rcv_mp = mp;
-		} else {
-			/*
-			 * Add msg to tail.
-			 *
-			 * Note, mp == NULL first pass through the loop
-			 * and tmp is set below.
-			 */
-			/*LINTED*/
-			tmp->b_cont = rmp;
-		}
-
-		/* New tail */
-		tmp = rmp;
-		rmp = NULL;
-		while (tmp->b_cont != NULL)
-			tmp = tmp->b_cont;
-
+		first = B_FALSE;
 	again:
-		more = nl7c_parse(so, nonblocking, &ret, max_mblk);
+		nl7c_proc_parse++;
 
-		if (more == B_FALSE && ret == B_TRUE &&
-		    (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+		more = nl7c_parse(so, nonblocking, &ret);
+
+		if (ret == B_TRUE && (so->so_nl7c_flags & NL7C_SOPERSIST)) {
 			/*
-			 * Parse complete, socket is persistent so
-			 * process the next request (if any).
+			 * Parse complete, cache hit, response on its way,
+			 * socket is persistent so try to process the next
+			 * request.
 			 */
+			if (nonblocking) {
+				ret = B_FALSE;
+				break;
+			}
 			if (so->so_nl7c_rcv_mp) {
-				/* More recv-side data, pipelined ? */
+				/* More recv-side data, pipelined */
 				nl7c_proc_again++;
 				goto again;
 			}
@@ -1010,38 +1054,20 @@ nl7c_process(struct sonode *so, boolean_t nonblocking, int max_mblk)
 			if (nonblocking)
 				timout = 0;
 			else
-				timout = 15000; /* 15 seconds */
-			mp = NULL;
+				timout = nca_http_keep_alive_timeout;
+
 			more = B_TRUE;
-			ret = B_FALSE;
 		}
 
 	} while (more);
 
-	if (error) {
-		/*
-		 * An error of some sort occured above, save the error
-		 * value for passing the socket onto the accept()er.
-		 *
-		 * Update the saved rval_t with the error value and
-		 * clear the NL7C so_state so the socket accept() can
-		 * complete, return B_FALSE.
-		 */
-		so->so_nl7c_rcv_rval = (int64_t)error;
-		so->so_nl7c_flags = 0;
-		ret = B_FALSE;
-	} else if (so->so_nl7c_rcv_mp) {
-		/*
-		 * Recieve side data leftover so save the last rval_t
-		 * from above for subsequent read() processing and if
-		 * POLLIN is indicated (i.e. a read-side poll() may be
-		 * pending) do a pollwakeup().
-		 */
+	if (so->so_nl7c_rcv_mp) {
 		nl7c_proc_rcv++;
-		so->so_nl7c_rcv_rval = rval.r_vals;
 	}
+	so->so_nl7c_rcv_rval = rval.r_vals;
+	/* Renter so_lock, caller called with it enter()ed */
 	mutex_enter(&so->so_lock);
 	so_unlock_read(so);
-out:
+
 	return (ret);
 }

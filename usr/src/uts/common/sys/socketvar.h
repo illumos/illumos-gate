@@ -319,12 +319,15 @@ struct sonode {
 	 * so_nl7c_uri		the URI currently being processed.
 	 *
 	 * so_nl7c_rtime	URI request gethrestime_sec().
+	 *
+	 * so_nl7c_addr		pointer returned by nl7c_addr_lookup().
 	 */
 	uint64_t	so_nl7c_flags;
 	mblk_t		*so_nl7c_rcv_mp;
 	int64_t		so_nl7c_rcv_rval;
 	void		*so_nl7c_uri;
 	time_t		so_nl7c_rtime;
+	void		*so_nl7c_addr;
 
 	/* For sockets acting as an in-kernel SSL proxy */
 	kssl_endpt_type_t	so_kssl_type;	/* is proxy/is proxied/none */

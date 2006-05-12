@@ -75,8 +75,10 @@
 #include <inet/tcp.h>
 #include <inet/udp_impl.h>
 
-#include <fs/sockfs/nl7c.h>
 #include <sys/zone.h>
+
+#include <fs/sockfs/nl7c.h>
+#include <fs/sockfs/nl7curi.h>
 
 #include <inet/kssl/ksslapi.h>
 
@@ -174,7 +176,7 @@ extern	void sigunintr(k_sigset_t *);
 
 extern	void *nl7c_lookup_addr(void *, t_uscalar_t);
 extern	void *nl7c_add_addr(void *, t_uscalar_t);
-extern	void nl7c_listener_addr(void *, queue_t *);
+extern	void nl7c_listener_addr(void *, struct sonode *);
 
 /* Sockets acting as an in-kernel SSL proxy */
 extern mblk_t	*strsock_kssl_input(vnode_t *, mblk_t *, strwakeup_t *,
@@ -757,10 +759,10 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	 * NL7C supports the TCP transport only so check AF_INET and AF_INET6
 	 * family sockets only. If match mark as such.
 	 */
-	if ((nl7c_enabled && addr != NULL &&
+	if (nl7c_enabled && ((addr != NULL &&
 	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
 	    (nl7c = nl7c_lookup_addr(addr, addrlen))) ||
-	    so->so_nl7c_flags == NL7C_AF_NCA) {
+	    so->so_nl7c_flags == NL7C_AF_NCA)) {
 		/*
 		 * NL7C is not supported in non-global zones,
 		 * we enforce this restriction here.
@@ -768,6 +770,13 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		if (so->so_zoneid == GLOBAL_ZONEID) {
 			/* An NL7C socket, mark it */
 			so->so_nl7c_flags |= NL7C_ENABLED;
+			if (nl7c == NULL) {
+				/*
+				 * Was an AF_NCA bind() so add it to the
+				 * addr list for reporting purposes.
+				 */
+				nl7c = nl7c_add_addr(addr, addrlen);
+			}
 		} else
 			nl7c = NULL;
 	}
@@ -795,8 +804,11 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	 * Intercept the bind_req message here to check if this <address/port>
 	 * was configured as an SSL proxy server, or if another endpoint was
 	 * already configured to act as a proxy for us.
+	 *
+	 * Note, only if NL7C not enabled for this socket.
 	 */
-	if ((so->so_family == AF_INET || so->so_family == AF_INET6) &&
+	if (nl7c == NULL &&
+	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
 	    so->so_type == SOCK_STREAM) {
 
 		if (so->so_kssl_ent != NULL) {
@@ -1079,16 +1091,9 @@ skip_transport:
 		}
 	}
 
-	if (nl7c == NULL && (so->so_nl7c_flags & NL7C_AF_NCA) &&
-	    (so->so_nl7c_flags & NL7C_ENABLED)) {
-		/*
-		 * Was an AF_NCA bind() so add it to the addr list for
-		 * reporting purposes.
-		 */
-		nl7c = nl7c_add_addr(addr, addrlen);
-	}
 	if (nl7c != NULL) {
-		nl7c_listener_addr(nl7c, strvp2wq(SOTOV(so)));
+		/* Register listen()er sonode pointer with NL7C */
+		nl7c_listener_addr(nl7c, so);
 	}
 
 	freemsg(mp);
@@ -1217,6 +1222,7 @@ sotpi_unbind(struct sonode *so, int flags)
 		so->so_laddr_len = 0;
 	}
 	so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN|SS_LADDR_VALID);
+
 done:
 
 	/* If the caller held the lock don't release it here */
@@ -1725,17 +1731,22 @@ again:
 
 		if (so->so_nl7c_flags & NL7C_ENABLED) {
 			/*
-			 * An NL7C marked listen()er so the new socket
-			 * inherits the listen()er's NL7C state.
+			 * A NL7C marked listen()er so the new socket
+			 * inherits the listen()er's NL7C state, except
+			 * for NL7C_POLLIN.
 			 *
-			 * When calling NL7C to process the new socket
-			 * pass the nonblocking i/o state of the listen
-			 * socket as this is the context we are in.
+			 * Only call NL7C to process the new socket if
+			 * the listen socket allows blocking i/o.
 			 */
-			nso->so_nl7c_flags = so->so_nl7c_flags;
-			if (nl7c_process(nso,
-			    (nso->so_state & (SS_NONBLOCK|SS_NDELAY)),
-			    (int)((tcp_t *)nso->so_priv)->tcp_mss)) {
+			nso->so_nl7c_flags = so->so_nl7c_flags & (~NL7C_POLLIN);
+			if (so->so_state & (SS_NONBLOCK|SS_NDELAY)) {
+				/*
+				 * Nonblocking accept() just make it
+				 * persist to defer processing to the
+				 * read-side syscall (e.g. read).
+				 */
+				nso->so_nl7c_flags |= NL7C_SOPERSIST;
+			} else if (nl7c_process(nso, B_FALSE)) {
 				/*
 				 * NL7C has completed processing on the
 				 * socket, close the socket and back to
@@ -2793,13 +2804,13 @@ nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
 			n = MIN(MBLKL(nmp), uiop->uio_resid);
 			if (n > 0)
 				error = uiomove(nmp->b_rptr, n, UIO_READ, uiop);
-			if (error)
-				break;
 			nmp->b_rptr += n;
 			if (nmp->b_rptr == nmp->b_wptr) {
 				pmp = nmp;
 				nmp = nmp->b_cont;
 			}
+			if (error)
+				break;
 		} else {
 			/*
 			 * We only handle data, save for caller to handle.
@@ -2811,7 +2822,7 @@ nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
 			if (*rmp == NULL) {
 				*rmp = nmp;
 			} else {
-				tmp->b_next = nmp;
+				tmp->b_cont = nmp;
 			}
 			nmp = nmp->b_cont;
 			tmp = nmp;
@@ -2823,7 +2834,13 @@ nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
 		freemsg(so->so_nl7c_rcv_mp);
 	}
 	if ((so->so_nl7c_rcv_mp = nmp) == NULL) {
-		/* Last mblk_t so return the saved rval from kstrgetmsg() */
+		/* Last mblk_t so return the saved kstrgetmsg() rval/error */
+		if (error == 0) {
+			rval_t	*p = (rval_t *)&so->so_nl7c_rcv_rval;
+
+			error = p->r_v.r_v2;
+			p->r_v.r_v2 = 0;
+		}
 		rp->r_vals = so->so_nl7c_rcv_rval;
 		so->so_nl7c_rcv_rval = 0;
 	} else {
@@ -2908,30 +2925,55 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	dprintso(so, 1, ("sotpi_recvmsg: namelen %d controllen %d\n",
 		namelen, controllen));
 
+	mutex_enter(&so->so_lock);
 	/*
 	 * If an NL7C enabled socket and not waiting for write data.
 	 */
-	mutex_enter(&so->so_lock);
-	if ((so->so_nl7c_flags & (NL7C_ENABLED|NL7C_WAITWRITE)) ==
+	if ((so->so_nl7c_flags & (NL7C_ENABLED | NL7C_WAITWRITE)) ==
 	    NL7C_ENABLED) {
 		if (so->so_nl7c_uri) {
-			/*
-			 * Close uri processing for a previous request.
-			 */
+			/* Close uri processing for a previous request */
 			nl7c_close(so);
 		}
-		if (nl7c_process(so,
-		    (so->so_state & (SS_NONBLOCK|SS_NDELAY)),
-		    (int)((tcp_t *)so->so_priv)->tcp_mss)) {
+		if ((so_state & SS_CANTRCVMORE) && so->so_nl7c_rcv_mp == NULL) {
+			/* Nothing to process, EOF */
+			mutex_exit(&so->so_lock);
+			return (0);
+		} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+			/* Persistent NL7C socket, try to process request */
+			boolean_t ret;
+
+			ret = nl7c_process(so,
+			    (so->so_state & (SS_NONBLOCK|SS_NDELAY)));
+			rval.r_vals = so->so_nl7c_rcv_rval;
+			error = rval.r_v.r_v2;
+			if (error) {
+				/* Error of some sort, return it */
+				mutex_exit(&so->so_lock);
+				return (error);
+			}
+			if (so->so_nl7c_flags &&
+			    ! (so->so_nl7c_flags & NL7C_WAITWRITE)) {
+				/*
+				 * Still an NL7C socket and no data
+				 * to pass up to the caller.
+				 */
+				mutex_exit(&so->so_lock);
+				if (ret) {
+					/* EOF */
+					return (0);
+				} else {
+					/* Need more data */
+					return (EAGAIN);
+				}
+			}
+		} else {
 			/*
-			 * NL7C has completed processing on the socket,
-			 * clear the enabled bit as no further NL7C
-			 * processing will be needed.
+			 * Not persistent so no further NL7C processing.
 			 */
 			so->so_nl7c_flags = 0;
 		}
 	}
-
 	/*
 	 * Only one reader is allowed at any given time. This is needed
 	 * for T_EXDATA handling and, in the future, MSG_WAITALL.
@@ -2979,15 +3021,12 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	opflag = pflag;
 	first = 1;
 
-	/*
-	 * If so saved NL7C rcv mblk_t(s) uiomove them first
-	 * else get'm from the streamhead.
-	 */
 retry:
 	saved_resid = uiop->uio_resid;
 	pri = 0;
 	mp = NULL;
 	if (so->so_nl7c_rcv_mp != NULL) {
+		/* Already kstrgetmsg()ed saved mblk(s) from NL7C */
 		error = nl7c_sorecv(so, &mp, uiop, &rval);
 	} else {
 		error = kstrgetmsg(SOTOV(so), &mp, uiop, &pri, &pflag,

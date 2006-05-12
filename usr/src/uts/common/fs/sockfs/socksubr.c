@@ -516,8 +516,11 @@ sockfree(struct sonode *so)
 	so->so_nl7c_rcv_rval = 0;
 	if (so->so_nl7c_uri != NULL) {
 		nl7c_urifree(so);
+		/* urifree() cleared nl7c_uri */
 	}
-	so->so_nl7c_flags = 0;
+	if (so->so_nl7c_flags) {
+		so->so_nl7c_flags = 0;
+	}
 
 	ASSERT(so->so_ux_bound_vp == NULL);
 	if ((mp = so->so_unbind_mp) != NULL) {
