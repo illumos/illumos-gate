@@ -619,12 +619,27 @@ sig_check:
 		astoff(t);
 		t->t_sig_check = 0;
 
-		mutex_enter(&p->p_lock);
+		/*
+		 * The following check is legal for the following reasons:
+		 *	1) The thread we are checking, is ourselves, so there is
+		 *	   no way the proc can go away.
+		 *	2) The only time we need to be protected by the
+		 *	   lock is if the binding is changed.
+		 *
+		 *	Note we will still take the lock and check the binding
+		 *	if the condition was true without the lock held.  This
+		 *	prevents lock contention among threads owned by the
+		 * 	same proc.
+		 */
+
 		if (curthread->t_proc_flag & TP_CHANGEBIND) {
-			timer_lwpbind();
-			curthread->t_proc_flag &= ~TP_CHANGEBIND;
+			mutex_enter(&p->p_lock);
+			if (curthread->t_proc_flag & TP_CHANGEBIND) {
+				timer_lwpbind();
+				curthread->t_proc_flag &= ~TP_CHANGEBIND;
+			}
+			mutex_exit(&p->p_lock);
 		}
-		mutex_exit(&p->p_lock);
 
 		/*
 		 * for kaio requests on the special kaio poll queue,
