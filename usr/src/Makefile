@@ -140,8 +140,12 @@ sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 	libheaders ucbheaders cmdheaders commonheaders
 
 #
-# top-level setup target (headers/tools)
-setup: sgs
+# top-level setup target to setup the development environment
+# this includes headers and tools.  for open-only builds (i.e.:
+# source trees w/o usr/closed), this also depends on the closedbins
+# target (above) in order to properly seed the proto area
+#
+setup: closedbins sgs
 	@cd tools; pwd; $(MAKE) install
 
 # /var/mail/:saved is a special case because of the colon in the name.
