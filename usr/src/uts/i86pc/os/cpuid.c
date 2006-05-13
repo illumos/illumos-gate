@@ -194,6 +194,28 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_XMAXEAX_MAX		0x80000100
 
 /*
+ * A couple of shorthand macros to identify "later" P6-family chips
+ * like the Pentium M and Core.  First, the "older" P6-based stuff
+ * (loosely defined as "pre-Pentium-4"):
+ * P6, PII, Mobile PII, PII Xeon, PIII, Mobile PIII, PIII Xeon
+ */
+
+#define	IS_LEGACY_P6(cpi) (			\
+	cpi->cpi_family == 6 && 		\
+		(cpi->cpi_model == 1 ||		\
+		cpi->cpi_model == 3 ||		\
+		cpi->cpi_model == 5 ||		\
+		cpi->cpi_model == 6 ||		\
+		cpi->cpi_model == 7 ||		\
+		cpi->cpi_model == 8 ||		\
+		cpi->cpi_model == 0xA ||	\
+		cpi->cpi_model == 0xB)		\
+)
+
+/* A "new F6" is everything with family 6 that's not the above */
+#define	IS_NEW_F6(cpi) ((cpi->cpi_family == 6) && !IS_LEGACY_P6(cpi))
+
+/*
  *  Some undocumented ways of patching the results of the cpuid
  *  instruction to permit running Solaris 10 on future cpus that
  *  we don't currently support.  Could be set to non-zero values
@@ -286,10 +308,11 @@ cpuid_pass1(cpu_t *cpu)
 	cpi->cpi_model = CPI_MODEL(cpi);
 	cpi->cpi_family = CPI_FAMILY(cpi);
 
-	if (cpi->cpi_family == 0xf) {
+	if (cpi->cpi_family == 0xf)
 		cpi->cpi_family += CPI_FAMILY_XTD(cpi);
+
+	if (cpi->cpi_model == 0xf)
 		cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
-	}
 
 	cpi->cpi_step = CPI_STEP(cpi);
 	cpi->cpi_brandid = CPI_BRANDID(cpi);
@@ -309,7 +332,7 @@ cpuid_pass1(cpu_t *cpu)
 	case X86_VENDOR_Intel:
 		if (cpi->cpi_family == 5)
 			x86_type = X86_TYPE_P5;
-		else if (cpi->cpi_family == 6) {
+		else if (IS_LEGACY_P6(cpi)) {
 			x86_type = X86_TYPE_P6;
 			pentiumpro_bug4046376 = 1;
 			pentiumpro_bug4064495 = 1;
@@ -318,7 +341,7 @@ cpuid_pass1(cpu_t *cpu)
 			 */
 			if (cpi->cpi_model < 3 && cpi->cpi_step < 3)
 				cp->cp_edx &= ~CPUID_INTC_EDX_SEP;
-		} else if (cpi->cpi_family == 0xf) {
+		} else if (IS_NEW_F6(cpi) || cpi->cpi_family == 0xf) {
 			x86_type = X86_TYPE_P4;
 			/*
 			 * We don't currently depend on any of the %ecx
@@ -536,7 +559,7 @@ cpuid_pass1(cpu_t *cpu)
 	xcpuid = 0;
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
-		if (cpi->cpi_family >= 0xf)
+		if (IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf)
 			xcpuid++;
 		break;
 	case X86_VENDOR_AMD:
@@ -1067,8 +1090,8 @@ intel_cpubrand(const struct cpuid_info *cpi)
 		break;
 	}
 
-	if (cpi->cpi_family <= 0xf && cpi->cpi_model <= 0xf &&
-	    cpi->cpi_brandid != 0) {
+	/* BrandID is present if the field is nonzero */
+	if (cpi->cpi_brandid != 0) {
 		static const struct {
 			uint_t bt_bid;
 			const char *bt_str;
@@ -1085,7 +1108,14 @@ intel_cpubrand(const struct cpuid_info *cpi)
 			{ 0xb,	"Intel(r) Xeon(tm)" },
 			{ 0xc,	"Intel(r) Xeon(tm) MP" },
 			{ 0xe,	"Mobile Intel(r) Pentium(r) 4" },
-			{ 0xf,	"Mobile Intel(r) Celeron(r)" }
+			{ 0xf,	"Mobile Intel(r) Celeron(r)" },
+			{ 0x11, "Mobile Genuine Intel(r)" },
+			{ 0x12, "Intel(r) Celeron(r) M" },
+			{ 0x13, "Mobile Intel(r) Celeron(r)" },
+			{ 0x14, "Intel(r) Celeron(r)" },
+			{ 0x15, "Mobile Genuine Intel(r)" },
+			{ 0x16,	"Intel(r) Pentium(r) M" },
+			{ 0x17, "Mobile Intel(r) Celeron(r)" }
 		};
 		uint_t btblmax = sizeof (brand_tbl) / sizeof (brand_tbl[0]);
 		uint_t sgn;
@@ -2615,11 +2645,13 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	/* chunks, and apic-id */
 
 	switch (cpi->cpi_vendor) {
-	case X86_VENDOR_Intel:
-	case X86_VENDOR_AMD:
 		/*
 		 * first available on Pentium IV and Opteron (K8)
 		 */
+	case X86_VENDOR_Intel:
+		create = IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf;
+		break;
+	case X86_VENDOR_AMD:
 		create = cpi->cpi_family >= 0xf;
 		break;
 	default:
@@ -2649,7 +2681,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
-		create = cpi->cpi_family >= 0xf;
+		create = IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf;
 		break;
 	default:
 		create = 0;
@@ -2662,24 +2694,23 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	/* ext-cpuid-features */
 
 	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
 	case X86_VENDOR_Cyrix:
 	case X86_VENDOR_TM:
 	case X86_VENDOR_Centaur:
-		/*
-		 * The extended cpuid features are not relevant on
-		 * Intel but are available from the AMD K5 model 1
-		 * and most Cyrix GXm and later.
-		 */
 		create = cpi->cpi_xmaxeax >= 0x80000001;
 		break;
 	default:
 		create = 0;
 		break;
 	}
-	if (create)
+	if (create) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			"ext-cpuid-features", CPI_FEATURES_XTD_EDX(cpi));
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
+			"ext-cpuid-features-ecx", CPI_FEATURES_XTD_ECX(cpi));
+	}
 
 	/*
 	 * Brand String first appeared in Intel Pentium IV, AMD K5
