@@ -50,6 +50,22 @@
 #define	TZMON_ENUM_DEV_LISTS	2
 #define	TZMON_ENUM_ALL		(TZMON_ENUM_TRIP_POINTS	| TZMON_ENUM_DEV_LISTS)
 
+/*
+ * TZ_TASKQ_NAME_LEN is precisely the length of the string "AcpiThermalMonitor"
+ * plus a two-digit instance number plus a NULL.  If the taskq name is changed
+ * (particularly if it is lengthened), then this value needs to change.
+ */
+#define	TZ_TASKQ_NAME_LEN	21
+
+/*
+ * Kelvin to Celsius conversion
+ * The formula for converting degrees Kelvin to degrees Celsius is
+ * C = K - 273.15 (we round to 273.2).  The unit for thermal zone
+ * temperatures is tenths of a degree Kelvin.  Use tenth of a degree
+ * to convert, then make a whole number out of it.
+ */
+#define	K_TO_C(temp)		(((temp) - 2732) / 10)
+
 
 /* cb_ops or dev_ops forward declarations */
 static	int	tzmon_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
@@ -228,8 +244,16 @@ tzmon_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 static int
 tzmon_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+	thermal_zone_t *tzp = zone_list;
+
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
+
+	/* free allocated thermal zone name(s) */
+	while (tzp != NULL) {
+		AcpiOsFree(tzp->zone_name);
+		tzp = tzp->next;
+	}
 
 	/* discard zone list assets */
 	tzmon_free_zone_list();
@@ -371,7 +395,9 @@ static void
 tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 {
 	ACPI_STATUS status;
+	ACPI_BUFFER zone_name;
 	int	level;
+	int	instance;
 	char	abuf[5];
 
 	/*
@@ -384,6 +410,13 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 		mutex_enter(&zone_list_lock);
 		tzp->next = zone_list;
 		zone_list = tzp;
+
+		/*
+		 * It is exceedingly unlikely that instance will exceed 99.
+		 * However, if it does, this will cause problems when
+		 * creating the taskq for this thermal zone.
+		 */
+		instance = zone_count;
 		zone_count++;
 		mutex_exit(&zone_list_lock);
 		mutex_enter(&tzp->lock);
@@ -395,6 +428,15 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 		 * the current temperature.
 		 */
 		tzp->current_level = 0;
+
+		/* Get the zone name in case we need to display it later */
+		zone_name.Length = ACPI_ALLOCATE_BUFFER;
+		zone_name.Pointer = NULL;
+
+		status = AcpiGetName(obj, ACPI_FULL_PATHNAME, &zone_name);
+		ASSERT(status == AE_OK);
+
+		tzp->zone_name = zone_name.Pointer;
 
 		status = AcpiInstallNotifyHandler(obj, ACPI_DEVICE_NOTIFY,
 		    tzmon_notify_zone, (void *)tzp);
@@ -460,8 +502,12 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 
 		/* start monitor thread if needed */
 		if (tzp->taskq == NULL) {
+			char taskq_name[TZ_TASKQ_NAME_LEN];
+
+			(void) snprintf(taskq_name, TZ_TASKQ_NAME_LEN,
+			    "AcpiThermalMonitor%02d", instance);
 			tzp->taskq = ddi_taskq_create(tzmon_dip,
-			    "AcpiThermalMonitor", 1, TASKQ_DEFAULTPRI, 0);
+			    taskq_name, 1, TASKQ_DEFAULTPRI, 0);
 			if (tzp->taskq == NULL) {
 				tzp->polling_period = 0;
 				cmn_err(CE_WARN, "tzmon: could not create"
@@ -626,16 +672,20 @@ tzmon_eval_zone(thermal_zone_t *tzp)
 
 	/* _HOT handling */
 	if (tzp->hot > 0 && tmp >= tzp->hot) {
-		cmn_err(CE_WARN, "tzmon: temp %d is above _HOT (%d)\n",
-		    tmp, tzp->hot);
+		cmn_err(CE_WARN,
+		    "tzmon: Thermal zone (%s) is too hot (%d C); "
+			"initiating shutdown\n",
+		    (char *)tzp->zone_name, K_TO_C(tmp));
 
 		tzmon_do_shutdown();
 	}
 
 	/* _CRT handling */
 	if (tzp->crt > 0 && tmp >= tzp->crt) {
-		cmn_err(CE_WARN, "tzmon: temp %d is above _CRT (%d)\n",
-		    tmp, tzp->crt);
+		cmn_err(CE_WARN,
+		    "tzmon: Thermal zone (%s) is critically hot (%d C); "
+			"initiating rapid shutdown\n",
+		    (char *)tzp->zone_name, K_TO_C(tmp));
 
 		/* shut down (fairly) immediately */
 		mdboot(A_REBOOT, AD_HALT, NULL, B_FALSE);

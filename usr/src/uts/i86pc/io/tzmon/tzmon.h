@@ -43,6 +43,7 @@ typedef struct thermal_zone {
 	kmutex_t		lock;
 	ACPI_HANDLE		obj;
 	ddi_taskq_t		*taskq;
+	void			*zone_name;
 
 	int			ac[TZ_NUM_LEVELS];
 	ACPI_BUFFER		al[TZ_NUM_LEVELS];
