@@ -75,7 +75,7 @@ ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		if (osym->st_value == nsym->st_value) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_INCOMPREG3),
-			    conv_sym_SPARC_value(osym->st_value),
+			    conv_sym_SPARC_value(osym->st_value, 0),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -93,7 +93,7 @@ ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		    (strcmp(oname, nname) != 0)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_INCOMPREG1),
-			    conv_sym_SPARC_value(osym->st_value),
+			    conv_sym_SPARC_value(osym->st_value, 0),
 			    sdp->sd_file->ifl_name, demangle(oname),
 			    ifl->ifl_name, demangle(nname));
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -107,7 +107,7 @@ ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 		    (nsym->st_shndx == SHN_ABS)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_MULTINIREG),
-			    conv_sym_SPARC_value(osym->st_value),
+			    conv_sym_SPARC_value(osym->st_value, 0),
 			    demangle(nname), sdp->sd_file->ifl_name,
 			    ifl->ifl_name);
 			ofl->ofl_flags |= FLG_OF_FATAL;
@@ -117,8 +117,8 @@ ld_reg_check(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
 	} else if (strcmp(oname, nname) == 0) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYM_INCOMPREG2),
 		    demangle(sdp->sd_name), sdp->sd_file->ifl_name,
-		    conv_sym_SPARC_value(osym->st_value), ifl->ifl_name,
-		    conv_sym_SPARC_value(nsym->st_value));
+		    conv_sym_SPARC_value(osym->st_value, 0), ifl->ifl_name,
+		    conv_sym_SPARC_value(nsym->st_value, 0));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (1);
 	}
@@ -140,10 +140,10 @@ ld_mach_sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_NONE,
 			    MSG_INTL(MSG_SYM_FILETYPES),
 			    sdp->sd_file->ifl_name, conv_sym_info_type(
-			    sdp->sd_file->ifl_ehdr->e_machine, otype),
+			    sdp->sd_file->ifl_ehdr->e_machine, otype, 0),
 			    ifl->ifl_name,
 			    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
-			    ntype));
+			    ntype, 0));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}
@@ -203,7 +203,7 @@ ld_is_regsym(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_BADSCRATCH),
 			    ifl->ifl_name, symsecname, symndx,
-			    conv_sym_SPARC_value(sym->st_value));
+			    conv_sym_SPARC_value(sym->st_value, 0));
 			return ((const char *)S_ERROR);
 		}
 

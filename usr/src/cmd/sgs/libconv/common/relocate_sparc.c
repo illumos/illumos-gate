@@ -87,11 +87,12 @@ static const Msg rels[R_SPARC_NUM] = {
 #endif
 
 const char *
-conv_reloc_SPARC_type(Word type)
+conv_reloc_SPARC_type(Word type, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
 	if (type >= R_SPARC_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+		return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			type, fmt_flags));
 	return (MSG_ORIG(rels[type]));
 }

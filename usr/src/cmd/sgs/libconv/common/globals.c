@@ -31,18 +31,32 @@
 #include	"_conv.h"
 #include	"globals_msg.h"
 
+
+/*
+ * Given an integer value, generate an ASCII representation of it.
+ *
+ * entry:
+ *	string - Buffer into which the resulting string is generated.
+ *	size - Size of string buffer (i.e. sizeof(string))
+ *	value - Value to be formatted.
+ *	fmt_flags - CONV_FMT_* values, used to specify formatting details.
+ *
+ * exit:
+ *	The formatted string, or as much as will fit, is placed into
+ *	string. String is returned.
+ */
 const char *
-conv_invalid_val(char *string, size_t size, Xword value, int flags)
+conv_invalid_val(char *string, size_t size, Xword value, int fmt_flags)
 {
 	const char	*fmt;
 
-	if (flags & CONV_INV_DECIMAL) {
-		if (flags & CONV_INV_SPACE)
+	if (fmt_flags & CONV_FMT_DECIMAL) {
+		if (fmt_flags & CONV_FMT_SPACE)
 			fmt = MSG_ORIG(MSG_GBL_FMT_DECS);
 		else
 			fmt = MSG_ORIG(MSG_GBL_FMT_DEC);
 	} else {
-		if (flags & CONV_INV_SPACE)
+		if (fmt_flags & CONV_FMT_SPACE)
 			fmt = MSG_ORIG(MSG_GBL_FMT_HEXS);
 		else
 			fmt = MSG_ORIG(MSG_GBL_FMT_HEX);
@@ -51,9 +65,31 @@ conv_invalid_val(char *string, size_t size, Xword value, int flags)
 	return ((const char *)string);
 }
 
+
+
 /*
- * Provide a focal point for expanding values (typically bit-fields) into
+ * Provide a focal point for expanding bit-fields values into
  * their corresponding strings.
+ *
+ * entry:
+ *	string - Buffer into which the resulting string is generated.
+ *	size - Size of string buffer (i.e. sizeof(string))
+ *	vdp - Array of value descriptors, giving the possible bit
+ *		values, and their corresponding strings. Note that the
+ *		final element must contain only NULL values. This
+ *		terminates the list.
+ *	oflags - Bits for which output strings are desired.
+ *	rflags - Bits for which a numeric value should be printed
+ *		if vdp does not provide a corresponding string. This
+ *		must be a proper subset of oflags.
+ *	separator - If non-NULL, a separator string to be inserted
+ *		between each string value copied into the output.
+ *	element - TRUE if first element output should be preceeded
+ *		by a separator, and FALSE otherwise.
+ *
+ * exit:
+ *	string contains the formatted result. True (1) is returned if there
+ *	was no error, and False (0) if the buffer was too small.
  */
 int
 conv_expn_field(char *string, size_t size, const Val_desc *vdp,
@@ -105,7 +141,7 @@ conv_expn_field(char *string, size_t size, const Val_desc *vdp,
 		size_t  rem = size - off;
 
 		(void) conv_invalid_val(&string[off], rem, rflags,
-		    CONV_INV_SPACE);
+		    CONV_FMT_SPACE);
 	}
 
 	return (1);

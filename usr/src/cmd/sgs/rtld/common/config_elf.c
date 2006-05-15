@@ -182,6 +182,7 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 int
 elf_config(Rt_map *lmp, int aout)
 {
+	Rtc_id		*id;
 	Rtc_head	*head;
 	int		fd, features = 0;
 	struct stat	status;
@@ -251,10 +252,27 @@ elf_config(Rt_map *lmp, int aout)
 		(void) close(fd);
 		return (DBG_CONF_PRCFAIL);
 	}
+	(void) close(fd);
+
+	/*
+	 * If we have an Rtc_id block at the beginning, then validate it
+	 * and advance the address to the Rtc_head. If not, then trust
+	 * that the file is compatible with us and move ahead (there is
+	 * some error checking for Rtc_head below as well).
+	 */
+	id = (Rtc_id *) addr;
+	if (RTC_ID_TEST(id)) {
+		addr += sizeof (*id);
+		status.st_size -= sizeof (*id);
+		if (status.st_size < sizeof (Rtc_head))
+			return (DBG_CONF_CORRUPT);
+		if ((id->id_class != M_CLASS) || (id->id_data != M_DATA) ||
+		    (id->id_machine != M_MACH))
+			return (DBG_CONF_ABIMISMATCH);
+	}
 
 	config->c_bgn = addr;
 	config->c_end = addr + status.st_size;
-	(void) close(fd);
 
 	head = (Rtc_head *)addr;
 

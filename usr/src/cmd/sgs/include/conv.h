@@ -79,10 +79,22 @@ extern "C" {
 #endif
 
 /*
- * Flags for conv_invalid_val().
+ * Flags that alter standard formatting for conversion routines.
  */
-#define	CONV_INV_DECIMAL	0x1	/* print as decimal (default is hex) */
-#define	CONV_INV_SPACE		0x2	/* append a space */
+#define	CONV_FMT_DECIMAL	0x1	/* conv_invalid_val() should print */
+					/*    integer print as decimal */
+					/*    (default is hex) */
+#define	CONV_FMT_SPACE		0x2	/* conv_invalid_val() should append */
+					/*    a space after the number.  */
+#define	CONV_FMT_ALTDUMP	0x4	/* Output strings using the versions */
+					/*    used by the dump program. */
+#define	CONV_FMT_ALTFILE	0x8	/* Output strings in the form used */
+					/*    by the file(1) command */
+
+/*
+ * Mask of CONV_FMT bits that reflect a desire to use alternate strings.
+ */
+#define	CONV_FMTALTMASK (CONV_FMT_ALTDUMP|CONV_FMT_ALTFILE)
 
 /*
  * The expansion of bit-field data items is driven from a value descriptor and
@@ -201,33 +213,33 @@ extern	const char	*conv_cap_val_sf1(Xword, Half);
 extern	const char	*conv_dyn_flag1(Xword);
 extern	const char	*conv_dyn_flag(Xword);
 extern	const char	*conv_dyn_posflag1(Xword);
-extern	const char	*conv_dyn_tag(Xword, Half);
+extern	const char	*conv_dyn_tag(Xword, Half, int);
 extern	const char	*conv_dyn_feature1(Xword);
-extern	const char	*conv_ehdr_class(uchar_t);
-extern	const char	*conv_ehdr_data(uchar_t);
+extern	const char	*conv_ehdr_class(uchar_t, int);
+extern	const char	*conv_ehdr_data(uchar_t, int);
 extern	const char	*conv_ehdr_flags(Half, Word);
-extern	const char	*conv_ehdr_mach(Half);
-extern	const char	*conv_ehdr_type(Half);
-extern	const char	*conv_ehdr_vers(Word);
+extern	const char	*conv_ehdr_mach(Half, int);
+extern	const char	*conv_ehdr_type(Half, int);
+extern	const char	*conv_ehdr_vers(Word, int);
 extern	int		conv_expn_field(char *, size_t, const Val_desc *,
 			    Xword, Xword, const char *, int);
 extern	const char	*conv_invalid_val(char *, size_t, Xword, int);
 extern	const char	*conv_phdr_flags(Word);
 extern	const char	*conv_phdr_type(Half, Word);
 extern	const char	*conv_reject_desc(Rej_desc *);
-extern	const char	*conv_reloc_type(Half, Word);
-extern	const char	*conv_reloc_386_type(Word);
-extern	const char	*conv_reloc_amd64_type(Word);
-extern	const char	*conv_reloc_SPARC_type(Word);
+extern	const char	*conv_reloc_type(Half, Word, int);
+extern	const char	*conv_reloc_386_type(Word, int);
+extern	const char	*conv_reloc_amd64_type(Word, int);
+extern	const char	*conv_reloc_SPARC_type(Word, int);
 extern	const char	*conv_sec_flags(Xword);
 extern	const char	*conv_sec_info(Word, Xword);
-extern	const char	*conv_sec_type(Half, Word);
-extern	const char	*conv_sym_info_bind(uchar_t);
-extern	const char	*conv_sym_info_type(Half, uchar_t);
+extern	const char	*conv_sec_type(Half, Word, int);
+extern	const char	*conv_sym_info_bind(uchar_t, int);
+extern	const char	*conv_sym_info_type(Half, uchar_t, int);
 extern	const char	*conv_sym_shndx(Half);
 extern	const char	*conv_sym_other(uchar_t);
 extern	const char	*conv_sym_value(Half, uchar_t, Addr);
-extern	const char	*conv_sym_SPARC_value(Addr);
+extern	const char	*conv_sym_SPARC_value(Addr, int);
 
 #ifdef	__cplusplus
 }

@@ -1399,7 +1399,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_TITLE), addr);
-	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH);
+	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH, 0);
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_LINE1), addr, dynstr, dyn.d_un.d_ptr);
 
 	mdb_set_dot(addr + sizeof (Dyn));
@@ -1437,17 +1437,18 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (byte[EI_MAG2] ? byte[EI_MAG2] : '0'),
 	    (byte[EI_MAG3] ? byte[EI_MAG3] : '0'));
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE2),
-	    conv_ehdr_class(ehdr.e_ident[EI_CLASS]),
-	    conv_ehdr_data(ehdr.e_ident[EI_DATA]));
+	    conv_ehdr_class(ehdr.e_ident[EI_CLASS], 0),
+	    conv_ehdr_data(ehdr.e_ident[EI_DATA], 0));
 
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE3),
-	    conv_ehdr_mach(ehdr.e_machine), conv_ehdr_vers(ehdr.e_version));
-	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4), conv_ehdr_type(ehdr.e_type));
+	    conv_ehdr_mach(ehdr.e_machine, 0),
+	    conv_ehdr_vers(ehdr.e_version, 0));
+	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4), conv_ehdr_type(ehdr.e_type, 0));
 
 	/*
-	 * Line up the flags differently depending on wether we
-	 * received a numeric (e.g. "0x200") or text represent-
-	 * ation (e.g. "[ EF_SPARC_SUN_US1 ]").
+	 * Line up the flags differently depending on whether we
+	 * received a numeric (e.g. "0x200") or text representation
+	 * (e.g. "[ EF_SPARC_SUN_US1 ]").
 	 */
 	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags);
 	if (flgs[0] == '[')

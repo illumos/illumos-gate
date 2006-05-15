@@ -36,7 +36,7 @@ Elf_shdr(Lm_list *lml, Half mach, Shdr * shdr)
 	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
 	    conv_sec_flags(shdr->sh_flags));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
-	    conv_sec_type(mach, shdr->sh_type));
+	    conv_sec_type(mach, shdr->sh_type, 0));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr->sh_offset),
 	    EC_XWORD(shdr->sh_entsize));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr->sh_link),

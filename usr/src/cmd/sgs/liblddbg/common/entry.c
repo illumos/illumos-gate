@@ -47,7 +47,7 @@ Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 	    MSG_INTL(MSG_STR_NULL)), conv_sec_flags(enp->ec_attrbits));
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX),
-	    EC_WORD(enp->ec_ndx), conv_sec_type(mach, enp->ec_type));
+	    EC_WORD(enp->ec_ndx), conv_sec_type(mach, enp->ec_type, 0));
 
 	if (enp->ec_files.head) {
 		dbg_print(lml, MSG_ORIG(MSG_ECR_FILES));

@@ -32,8 +32,8 @@
 #include	<stdio.h>
 #include	<sys/machelf.h>
 #include	<elfcap.h>
-#include	"_conv.h"
 #include	"cap_msg.h"
+#include	"_conv.h"
 
 static int
 conv_cap_1(Xword val, char *str, size_t len, Half mach,

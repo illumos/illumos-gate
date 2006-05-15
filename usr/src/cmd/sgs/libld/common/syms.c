@@ -1842,7 +1842,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_NONGLOB), demangle(name),
-			    ifl->ifl_name, conv_sym_info_bind(bind));
+			    ifl->ifl_name, conv_sym_info_bind(bind, 0));
 			continue;
 		}
 

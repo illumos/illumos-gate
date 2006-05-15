@@ -67,6 +67,7 @@ extern "C" {
 #define	DBG_CONF_VERSION	2
 #define	DBG_CONF_PRCFAIL	3
 #define	DBG_CONF_CORRUPT	4
+#define	DBG_CONF_ABIMISMATCH	5
 
 #define	DBG_ORDER_INFO_RANGE	1	/* sh_link out of range */
 #define	DBG_ORDER_INFO_ORDER	2	/* sh_info also ordered */

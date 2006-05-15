@@ -54,7 +54,7 @@ LDLIBS +=	-lmapmalloc $(DLLIB) -lc
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(SRC)/common/sgsrtcid
 DYNFLAGS +=	$(VERSREF) $(CONVLIBDIR) -lconv \
 		$(MAPOPTS) $(USE_PROTO)
 

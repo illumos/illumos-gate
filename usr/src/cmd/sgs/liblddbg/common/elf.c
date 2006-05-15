@@ -45,11 +45,13 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	    (byte[EI_MAG2] ? byte[EI_MAG2] : '0'),
 	    (byte[EI_MAG3] ? byte[EI_MAG3] : '0'));
 	dbg_print(lml, MSG_ORIG(MSG_ELF_CLASS),
-	    conv_ehdr_class(ehdr->e_ident[EI_CLASS]),
-	    conv_ehdr_data(ehdr->e_ident[EI_DATA]));
+	    conv_ehdr_class(ehdr->e_ident[EI_CLASS], 0),
+	    conv_ehdr_data(ehdr->e_ident[EI_DATA], 0));
 	dbg_print(lml, MSG_ORIG(MSG_ELF_MACHINE),
-	    conv_ehdr_mach(ehdr->e_machine), conv_ehdr_vers(ehdr->e_version));
-	dbg_print(lml, MSG_ORIG(MSG_ELF_TYPE), conv_ehdr_type(ehdr->e_type));
+	    conv_ehdr_mach(ehdr->e_machine, 0),
+	    conv_ehdr_vers(ehdr->e_version, 0));
+	dbg_print(lml, MSG_ORIG(MSG_ELF_TYPE),
+	    conv_ehdr_type(ehdr->e_type, 0));
 
 	/*
 	 * Line up the flags differently depending on whether we received a
@@ -101,7 +103,7 @@ Elf_ehdr(Lm_list *lml, Ehdr *ehdr, Shdr *shdr0)
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_ADDR), EC_ADDR(shdr0->sh_addr),
 	    conv_sec_flags(shdr0->sh_flags));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
-	    conv_sec_type(ehdr->e_machine, shdr0->sh_type));
+	    conv_sec_type(ehdr->e_machine, shdr0->sh_type, 0));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_OFFSET), EC_OFF(shdr0->sh_offset),
 	    EC_XWORD(shdr0->sh_entsize));
 	dbg_print(lml, MSG_ORIG(MSG_SHD0_LINK), EC_WORD(shdr0->sh_link),

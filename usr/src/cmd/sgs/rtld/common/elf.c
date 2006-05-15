@@ -2534,7 +2534,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 		fixed = 0;
 	else {
 		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
-		    conv_ehdr_type(etype));
+		    conv_ehdr_type(etype, 0));
 		return (0);
 	}
 

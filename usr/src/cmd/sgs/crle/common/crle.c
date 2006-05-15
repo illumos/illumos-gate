@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +34,7 @@
 #include	<dlfcn.h>
 #include	<errno.h>
 #include	"_crle.h"
+#include	"conv.h"
 #include	"msg.h"
 
 
@@ -110,7 +110,7 @@ typedef struct {
 } Objdir;
 
 int
-main(int argc, char ** argv)
+main(int argc, char **argv, char **envp)
 {
 	Crle_desc	crle = { 0 };
 	int		c, error = 0;
@@ -118,6 +118,7 @@ main(int argc, char ** argv)
 	List		objdirs = { 0, 0 };
 	Objdir		_lobjdir = { 0, 0 }, * lobjdir = &_lobjdir;
 	struct stat	ostatus, nstatus;
+	int 		c_class;
 
 	if (list_append(&objdirs, lobjdir) == 0)
 		return (1);
@@ -132,10 +133,10 @@ main(int argc, char ** argv)
 	 * Initialization configuration information.
 	 */
 	crle.c_name = argv[0];
+	crle.c_flags |= CRLE_ADDID;
 	crle.c_strbkts = 503;
 	crle.c_inobkts = 251;
-	crle.c_class = ELFCLASS32;
-	crle.c_machine = M_MACH;
+	c_class = M_CLASS;
 
 	/*
 	 * First argument pass.
@@ -150,12 +151,8 @@ main(int argc, char ** argv)
 				    MSG_ORIG(MSG_ARG_6), optarg);
 				error = 1;
 			}
-			crle.c_class = ELFCLASS64;
-#if	defined(sparc)
-			crle.c_machine = EM_SPARCV9;
-#elif	defined(i386)
-			crle.c_machine = EM_IA_64;
-#endif
+
+			c_class = ELFCLASS64;
 			break;
 
 		case 'A':			/* create optional */
@@ -273,11 +270,11 @@ main(int argc, char ** argv)
 	 */
 	if (crle.c_confil == 0) {
 		crle.c_flags |= CRLE_CONFDEF;
-
-		if (crle.c_class == ELFCLASS32)
+		if (c_class == ELFCLASS32) {
 			crle.c_confil = (char *)MSG_ORIG(MSG_PTH_CONFIG);
-		else
+		} else {
 			crle.c_confil = (char *)MSG_ORIG(MSG_PTH_CONFIG_64);
+		}
 	}
 
 	/*
@@ -311,11 +308,48 @@ main(int argc, char ** argv)
 	 */
 	if ((crle.c_flags & CRLE_UPDATE) ||
 	    ((crle.c_flags & CRLE_CREAT) == 0)) {
-		if (inspectconfig(&crle))
+		switch (inspectconfig(&crle)) {
+		case INSCFG_RET_OK:
+			if ((crle.c_flags & CRLE_UPDATE) == 0)
+				return (0);
+			break;
+		case INSCFG_RET_FAIL:
 			return (1);
-		if ((crle.c_flags & CRLE_UPDATE) == 0)
-			return (0);
+			break;
+		case INSCFG_RET_NEED64:
+			c_class = ELFCLASS64;
+			break;
+		}
 	}
+
+	/*
+	 * Ensure that the right version (32 or 64-bit) of this program
+	 * is running. The 32 and 64-bit compilers may align fields within
+	 * structures differently. Using the right version of crle for
+	 * the config file ensures that all linker components will see
+	 * the same layout, without the need for special code.
+	 */
+#ifdef _ELF64
+	if (c_class == ELFCLASS32) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
+			crle.c_name, crle.c_confil);
+		return (1);
+	}
+#else
+	if (c_class == ELFCLASS64) {
+		conv_check_native(argv, envp);
+
+		/*
+		 * conv_check_native() should not return, as we expect
+		 * the 64-bit version to have executed on top of us.
+		 * If it does, it means there is no 64-bit support
+		 * available on this system.
+		 */
+		(void) fprintf(stderr, MSG_INTL(MSG_ISA32_NO64SUP),
+			crle.c_name);
+		return (1);
+	}
+#endif
 
 	if (crle.c_flags & CRLE_VERBOSE)
 		(void) printf(MSG_INTL(MSG_DIA_CONFILE), crle.c_confil);

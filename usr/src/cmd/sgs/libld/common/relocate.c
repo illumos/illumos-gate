@@ -72,7 +72,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 	if ((ifl->ifl_flags & FLG_IF_DISPDONE) &&
 	    (ofl->ofl_flags & FLG_OF_VERBOSE))
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_DISPREL2),
-		    conv_reloc_type(ifl->ifl_ehdr->e_machine, M_R_COPY),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, M_R_COPY, 0),
 		    ifl->ifl_name, demangle(sdp->sd_name));
 
 	if ((ifl->ifl_flags & FLG_IF_DISPPEND) == 0)
@@ -130,7 +130,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 				eprintf(ofl->ofl_lml,
 				    ERR_WARNING, MSG_INTL(MSG_REL_DISPREL1),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-				    (uint_t)ELF_R_TYPE(reloc->r_info)),
+				    (uint_t)ELF_R_TYPE(reloc->r_info), 0),
 				    ifl->ifl_name, str,
 				    MSG_INTL(MSG_STR_UNKNOWN),
 				    EC_XWORD(reloc->r_offset),
@@ -159,8 +159,8 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_REL_DISPREL1),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-			    (uint_t)ELF_R_TYPE(reloc->r_info)), ifl->ifl_name,
-			    demangle(rsdp->sd_name), str,
+			    (uint_t)ELF_R_TYPE(reloc->r_info), 0),
+			    ifl->ifl_name, demangle(rsdp->sd_name), str,
 			    EC_XWORD(reloc->r_offset), str);
 		}
 	}
@@ -308,7 +308,7 @@ ld_disp_errmsg(const char *msg, Rel_desc *rsp, Ofl_desc *ofl)
 		str = MSG_INTL(MSG_STR_UNKNOWN);
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, msg,
-	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype),
+	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype, 0),
 	    ifl->ifl_name, rsp->rel_sname, str, EC_OFF(rsp->rel_roffset));
 }
 
@@ -714,7 +714,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 	if (ELF_ST_TYPE(sym->st_info) != STT_OBJECT) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPSYM),
 		    conv_sym_info_type(sdp->sd_file->ifl_ehdr->e_machine,
-		    ELF_ST_TYPE(sym->st_info)),
+		    ELF_ST_TYPE(sym->st_info), 0),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), sdp->sd_file->ifl_name);
 		return (ld_add_outrel(NULL, rsp, ofl));
@@ -871,7 +871,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			MSG_INTL(MSG_REL_COPY),
 			conv_reloc_type(_sdp->sd_file->ifl_ehdr->e_machine,
-			M_R_COPY), _sdp->sd_file->ifl_name, _sdp->sd_name);
+			M_R_COPY, 0), _sdp->sd_file->ifl_name, _sdp->sd_name);
 		DBG_CALL(Dbg_syms_reloc(ofl, sdp));
 	}
 	return (ld_add_actrel(NULL, rsp, ofl));
@@ -888,7 +888,7 @@ reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
 	Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_UNEXPREL),
-	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype),
+	    conv_reloc_type(ifl->ifl_ehdr->e_machine, rsp->rel_rtype, 0),
 	    ifl->ifl_name, demangle(rsp->rel_sname));
 
 	/*
@@ -948,7 +948,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			    MSG_INTL(MSG_REL_PICREDLOC),
 			    demangle(rsp->rel_sname), ifl->ifl_name,
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-			    rsp->rel_rtype));
+			    rsp->rel_rtype, 0));
 			return (S_ERROR);
 		}
 
@@ -1099,7 +1099,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		Ifl_desc	*ifl = reld->rel_isdesc->is_file;
 
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTBASED),
-		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
 		    ifl->ifl_name, demangle(sdp->sd_name));
 		return (S_ERROR);
 	}
@@ -1117,8 +1117,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_BADTLS),
-			    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype),
-			    ifl->ifl_name, demangle(sdp->sd_name));
+			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
+			    rtype, 0), ifl->ifl_name, demangle(sdp->sd_name));
 			return (S_ERROR);
 		}
 	}
@@ -1231,7 +1231,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) && IS_NOTSUP(rtype)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOTSUP),
-		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
 		    ifl->ifl_name, isp->is_name);
 		return (S_ERROR);
 	}
@@ -1242,7 +1242,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 */
 	if (sdp == NULL) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYMBOL),
-		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype),
+		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype, 0),
 		    isp->is_name, ifl->ifl_name, EC_XWORD(reloc->r_offset));
 		return (S_ERROR);
 	}
@@ -1294,7 +1294,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	if ((sdp->sd_flags & FLG_SY_INVALID) || (rsndx == 0) ||
 	    (rsndx >= ifl->ifl_symscnt)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
-		    M_REL_CONTYPSTR(rtype), ifl->ifl_name, isp->is_name,
+		    M_REL_CONTYPSTR(rtype, 0), ifl->ifl_name, isp->is_name,
 		    demangle(reld->rel_sname),
 		    EC_XWORD(reloc->r_offset), EC_WORD(rsndx));
 		return (S_ERROR);

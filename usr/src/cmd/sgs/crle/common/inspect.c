@@ -715,8 +715,8 @@ inspect_file(Crle_desc * crle, const char *path, const char *file, Half flags,
 	if ((elf_kind(elf) != ELF_K_ELF) ||
 	    (gelf_getehdr(elf, &ehdr) == NULL) ||
 	    (!((ehdr.e_type == ET_EXEC) || (ehdr.e_type == ET_DYN))) ||
-	    (!((ehdr.e_ident[EI_CLASS] == crle->c_class) ||
-	    (ehdr.e_machine == crle->c_machine)))) {
+	    (!((ehdr.e_ident[EI_CLASS] == M_CLASS) ||
+	    (ehdr.e_machine == M_MACH)))) {
 		if (error)
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_TYPE),
 			    crle->c_name, path);

@@ -478,7 +478,7 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 {
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
 	    ifl->ifl_name, name, conv_sec_type(ifl->ifl_ehdr->e_machine,
-	    shdr->sh_type));
+	    shdr->sh_type, 0));
 	return (1);
 }
 
@@ -1174,7 +1174,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (shdr->sh_type != M_REL_SHT_TYPE) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, isc->is_name,
-		    conv_sec_type(ifl->ifl_ehdr->e_machine, shdr->sh_type));
+		    conv_sec_type(ifl->ifl_ehdr->e_machine, shdr->sh_type, 0));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1530,7 +1530,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
 				    name,
 				    conv_sec_type(ifl->ifl_ehdr->e_machine,
-				    shdr->sh_type));
+				    shdr->sh_type, 0));
 
 			/*
 			 * Handle sections greater than SHT_LOSUNW.

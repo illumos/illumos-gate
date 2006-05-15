@@ -48,5 +48,5 @@ Elf_dyn_entry(Lm_list *lml, Dyn *dyn, int ndx, const char *name, Half mach)
 
 	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_FMT_INDEX), ndx);
 	dbg_print(lml, MSG_INTL(MSG_DYN_ENTRY), index,
-	    conv_dyn_tag(dyn->d_tag, mach), EC_XWORD(dyn->d_un.d_val), name);
+	    conv_dyn_tag(dyn->d_tag, mach, 0), EC_XWORD(dyn->d_un.d_val), name);
 }

@@ -1353,7 +1353,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *name, const char *file,
 				if (badrel) {
 					(void) fprintf(stderr,
 					    MSG_INTL(MSG_ERR_BADREL1), file,
-					    conv_reloc_type(mach, reltype));
+					    conv_reloc_type(mach, reltype, 0));
 				}
 			}
 

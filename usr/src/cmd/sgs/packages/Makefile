@@ -137,7 +137,6 @@ package_dep_:	FRC
 		@ cd $(SRC)/uts/common/sys; pwd; $(MAKE) \
 			$(ROOT)/usr/include/sys/elf.h \
 			$(ROOT)/usr/include/sys/elf_386.h \
-			$(ROOT)/usr/include/sys/elf_M32.h \
 			$(ROOT)/usr/include/sys/elf_SPARC.h \
 			$(ROOT)/usr/include/sys/elf_notes.h \
 			$(ROOT)/usr/include/sys/elf_amd64.h \

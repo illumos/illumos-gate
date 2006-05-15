@@ -82,7 +82,9 @@ ONLDREADME=	../../packages/common/SUNWonld-README
 
 PICS=		$(OBJECTS:%=pics/%)
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(ELFCAP) $(VAR_LIBCONV_CPPFLAGS)
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(ELFCAP) \
+		-I$(SRC)/common/sgsrtcid $(VAR_LIBCONV_CPPFLAGS)
+
 ARFLAGS=	cr
 
 AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)

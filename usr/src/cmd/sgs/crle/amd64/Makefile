@@ -26,32 +26,18 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG=		dump
+include		../Makefile.com
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+.KEEP_STATE:
 
-COMOBJS=	dump.o		fcns.o
+CPPFLAGS +=	-D_ELF64
+LLDFLAGS =	$(LLDFLAGS64)
+CONVLIBDIR =	$(CONVLIBDIR64)
+ELFLIBDIR =	$(ELFLIBDIR64)
+LDDBGLIBDIR =	$(LDDBGLIBDIR64)
+LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
-SRCS=		$(COMOBJS:%.o=../common/%.c)
+ROOTPROG =	$(ROOTPROG64)
 
-OBJS =		$(COMOBJS)
-.PARALLEL:	$(OBJS)
-
-
-ROOTCCSBIN64=		$(ROOTCCSBIN)/$(MACH64)
-ROOTCCSBINPROG64=	$(PROG:%=$(ROOTCCSBIN64)/%)
-
-CPPFLAGS +=	-D__EXTENSIONS__
-LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'
-LLDFLAGS64 =	'$(LDPASS)-R$$ORIGIN/../../../lib/$(MACH64)'
-LDFLAGS +=	$(LLDFLAGS)
-
-DEMLIB=		-L../../sgsdemangler/$(MACH)
-DEMLIB64=	-L../../sgsdemangler/$(MACH64)
-LDLIBS +=	$(DEMLIB) -ldemangle $(CONVLIBDIR) $(CONV_LIB) \
-		$(ELFLIBDIR) -lelf
-
-LINTSRCS =	$(SRCS)
-
-CLEANFILES +=	$(LINTOUT)
+include		../Makefile.targ
+include		../../Makefile.sub.64

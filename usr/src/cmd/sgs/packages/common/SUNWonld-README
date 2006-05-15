@@ -1100,3 +1100,4 @@ Bugid   Risk Synopsis
 6382945 AMD64-GCC: dbx: internal error: dwarf reference attribute out of bounds
 6262333 init section of .so dlopened from audit interface not being called
 6409613 elf_outsync() should fsync()
+6174390 crle configuration files are inconsistent across platforms

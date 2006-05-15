@@ -30,8 +30,8 @@
  */
 #include	<stdio.h>
 #include	<sys/elf_amd64.h>
-#include	"_conv.h"
 #include	"relocate_amd64_msg.h"
+#include	"_conv.h"
 
 /*
  * AMD64 specific relocations.
@@ -60,11 +60,12 @@ static const Msg rels[R_AMD64_NUM] = {
 #endif
 
 const char *
-conv_reloc_amd64_type(Word type)
+conv_reloc_amd64_type(Word type, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
 	if (type >= R_AMD64_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+		return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			type, fmt_flags));
 	return (MSG_ORIG(rels[type]));
 }

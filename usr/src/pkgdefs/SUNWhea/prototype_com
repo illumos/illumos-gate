@@ -620,7 +620,6 @@ f none usr/include/sys/ecppvar.h 644 root bin
 f none usr/include/sys/efi_partition.h 644 root bin
 f none usr/include/sys/elf.h 644 root bin
 f none usr/include/sys/elf_386.h 644 root bin
-f none usr/include/sys/elf_M32.h 644 root bin
 f none usr/include/sys/elf_SPARC.h 644 root bin
 f none usr/include/sys/elf_amd64.h 644 root bin
 f none usr/include/sys/elf_notes.h 644 root bin

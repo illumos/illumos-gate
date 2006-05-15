@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +35,6 @@
 #include	"_crle.h"
 #include	"msg.h"
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	MAXNBKTS 10007
 
@@ -63,6 +61,7 @@ genconfig(Crle_desc * crle)
 	size_t		diroff = 0, fileoff = 0, envoff = 0;
 	size_t		fltroff = 0, flteoff = 0;
 	Addr		addr;
+	Rtc_id		*id;
 	Rtc_head	*head;
 	Word		*hashtbl, * hashbkt, * hashchn, hashbkts = 0;
 	char		*strtbl, *_strtbl;
@@ -160,6 +159,10 @@ genconfig(Crle_desc * crle)
 		size += S_ROUND(crle->c_strsize, sizeof (Word));
 	}
 
+	/* Account for addition of Rtc_id block at the start */
+	if (crle->c_flags & CRLE_ADDID)
+		size += sizeof (Rtc_id);
+
 	/*
 	 * Truncate our temporary file now that we know its size and map it.
 	 */
@@ -186,40 +189,61 @@ genconfig(Crle_desc * crle)
 	crle->c_tempsize = size;
 
 	/*
-	 * Establish the real address of each of the structures within the file.
+	 * Rtc_id goes at the top, followed by the Rtc_head. We base
+	 * all offset calculations relative to Rtc_head, not from
+	 * the top of the file. This eases backwards compatability to
+	 * older versons that lacked the Rtc_id at the top.
 	 */
+	if (crle->c_flags & CRLE_ADDID) {
+		/* The contents of the Rtc_id are all known at compile time */
+		static const Rtc_id id_template = {
+			RTC_ID_MAG0, RTC_ID_MAG1, RTC_ID_MAG2, RTC_ID_MAG3,
+			M_CLASS, M_DATA, M_MACH,
+			{ 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+
+		id = (Rtc_id *) addr;
+		*id = id_template;	/* Fill in the Rtc_id data */
+		addr += sizeof (Rtc_id);
+	} else {
+		id = NULL;
+	}
+	crle->c_tempheadaddr = addr;
 	head = (Rtc_head *)addr;
 
+	/*
+	 * Establish the real address of each of the structures within the file.
+	 */
 	head->ch_hash = hashoff;
 	/* LINTED */
-	hashtbl = (Word *)((char *)head->ch_hash + addr);
+	hashtbl = (Word *)(CAST_PTRINT(char *, head->ch_hash) + addr);
 
 	head->ch_obj = objoff;
 	/* LINTED */
-	objtbl = (Rtc_obj *)((char *)head->ch_obj + addr);
-	objtbl = (Rtc_obj *)S_ROUND((int)(objtbl + 1), sizeof (Lword));
+	objtbl = (Rtc_obj *)(CAST_PTRINT(char *, head->ch_obj) + addr);
+	objtbl = (Rtc_obj *)S_ROUND((uintptr_t)(objtbl + 1), sizeof (Lword));
 
 	head->ch_file = fileoff;
 	/* LINTED */
-	filetbl = (Rtc_file *)((char *)head->ch_file + addr);
+	filetbl = (Rtc_file *)(CAST_PTRINT(char *, head->ch_file) + addr);
 
 	head->ch_dir = diroff;
 	/* LINTED */
-	dirtbl = (Rtc_dir *)((char *)head->ch_dir + addr);
+	dirtbl = (Rtc_dir *)(CAST_PTRINT(char *, head->ch_dir) + addr);
 
 	head->ch_env = envoff;
 	/* LINTED */
-	envtbl = (Rtc_env *)((char *)head->ch_env + addr);
+	envtbl = (Rtc_env *)(CAST_PTRINT(char *, head->ch_env) + addr);
 
 	head->ch_fltr = fltroff;
 	/* LINTED */
-	fltrtbl = (Rtc_fltr *)((char *)head->ch_fltr + addr);
+	fltrtbl = (Rtc_fltr *)(CAST_PTRINT(char *, head->ch_fltr) + addr);
 	head->ch_flte = flteoff;
 	/* LINTED */
-	fltetbl = _fltetbl = (Rtc_flte *)((char *)head->ch_flte + addr);
+	fltetbl = _fltetbl =
+		(Rtc_flte *)(CAST_PTRINT(char *, head->ch_flte) + addr);
 
 	head->ch_str = stroff;
-	strtbl = _strtbl = (char *)((char *)head->ch_str + addr);
+	strtbl = _strtbl = (char *)(CAST_PTRINT(char *, head->ch_str) + addr);
 
 	/*
 	 * Fill in additional basic header information.
@@ -232,8 +256,9 @@ genconfig(Crle_desc * crle)
 		head->ch_cnflags |= RTC_HDR_IGNORE;
 		head->ch_dlflags = crle->c_dlflags;
 	}
-	if (crle->c_class == ELFCLASS64)
-		head->ch_cnflags |= RTC_HDR_64;
+#ifdef _ELF64
+	head->ch_cnflags |= RTC_HDR_64;
+#endif
 
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 	head->ch_cnflags |= RTC_HDR_UPM;
@@ -300,9 +325,9 @@ genconfig(Crle_desc * crle)
 				 */
 				_dirtbl = &dirtbl[ent->e_id - 1];
 				_dirtbl->cd_file =
-				    (Word)((char *)filetbl - addr);
+				    CAST_PTRINT(Word, ((char *)filetbl- addr));
 				_dirtbl->cd_obj =
-				    (Word)((char *)objtbl - addr);
+				    CAST_PTRINT(Word, ((char *)objtbl - addr));
 
 				/* LINTED */
 				filetbl = (Rtc_file *)((char *)filetbl +
@@ -319,8 +344,9 @@ genconfig(Crle_desc * crle)
 				 * Increment Rt_obj pointer (make sure pointer
 				 * falls on an 8-byte boundary).
 				 */
-				objtbl = (Rtc_obj *)S_ROUND((int)(objtbl + 1),
-				    sizeof (Lword));
+				objtbl = (Rtc_obj *)
+					S_ROUND((uintptr_t)(objtbl + 1),
+						sizeof (Lword));
 			}
 		}
 
@@ -373,11 +399,12 @@ genconfig(Crle_desc * crle)
 				_dirtbl = &dirtbl[ent->e_id - 1];
 				/* LINTED */
 				_filetbl = (Rtc_file *)
-				    ((char *)_dirtbl->cd_file + addr);
+				    (CAST_PTRINT(char *, _dirtbl->cd_file)
+					+ addr);
 
 				_id = --ent->e_dir->e_cnt;
 				_filetbl[_id].cf_obj =
-				    (Word)((char *)objtbl - addr);
+				    CAST_PTRINT(Word, ((char *)objtbl - addr));
 
 				/*
 				 * If object has an alternative, record it in
@@ -416,7 +443,8 @@ genconfig(Crle_desc * crle)
 				 * Increment Rt_obj pointer (make sure pointer
 				 * falls on an 8-byte boundary).
 				 */
-				objtbl = (Rtc_obj *)S_ROUND((int)(objtbl + 1),
+				objtbl = (Rtc_obj *)
+				    S_ROUND((uintptr_t)(objtbl + 1),
 				    sizeof (Lword));
 			}
 		}
@@ -452,8 +480,8 @@ genconfig(Crle_desc * crle)
 				/*
 				 * Assign the file name from its full name.
 				 */
-				objtbl->co_name = (Addr)((char *)
-				    ent->e_path->e_cobj->co_name + ent->e_off);
+				objtbl->co_name = (Addr)(CAST_PTRINT(char *,
+				    ent->e_path->e_cobj->co_name) + ent->e_off);
 
 				/*
 				 * Add this file to its associated directory.
@@ -461,11 +489,12 @@ genconfig(Crle_desc * crle)
 				_dirtbl = &dirtbl[ent->e_id - 1];
 				/* LINTED */
 				_filetbl = (Rtc_file *)
-				    ((char *)_dirtbl->cd_file + addr);
+				    (CAST_PTRINT(char *, _dirtbl->cd_file) +
+				    addr);
 
 				_id = --ent->e_dir->e_cnt;
 				_filetbl[_id].cf_obj =
-				    (Word)((char *)objtbl - addr);
+				    CAST_PTRINT(Word, ((char *)objtbl - addr));
 
 				/*
 				 * Add this object to the hash table.
@@ -478,7 +507,8 @@ genconfig(Crle_desc * crle)
 				 * Increment Rt_obj pointer (make sure pointer
 				 * falls on an 8-byte boundary).
 				 */
-				objtbl = (Rtc_obj *)S_ROUND((int)(objtbl + 1),
+				objtbl = (Rtc_obj *)
+				    S_ROUND((uintptr_t)(objtbl + 1),
 				    sizeof (Lword));
 			}
 		}
@@ -560,7 +590,8 @@ genconfig(Crle_desc * crle)
 			fltrtbl->fr_string = _strtbl - strtbl;
 			(void) strcpy(_strtbl, flt->f_str);
 			_strtbl += flt->f_strsz;
-			fltrtbl->fr_filtee = ((Word)_fltetbl - (Word)fltetbl);
+			fltrtbl->fr_filtee = (Word)
+			    ((uintptr_t)_fltetbl - (uintptr_t)fltetbl);
 
 			for (LIST_TRAVERSE(&(flt->f_filtee), lnp2, flte)) {
 				/*
@@ -581,7 +612,7 @@ genconfig(Crle_desc * crle)
 	 * Flush everything out.
 	 */
 	(void) close(crle->c_tempfd);
-	if (msync((void *)addr, size, MS_ASYNC) == -1) {
+	if (msync((void *)crle->c_tempaddr, crle->c_tempsize, MS_ASYNC) == -1) {
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_TRUNC),
 		    crle->c_name, crle->c_tempname, strerror(err));
@@ -599,7 +630,7 @@ genconfig(Crle_desc * crle)
 int
 updateconfig(Crle_desc * crle)
 {
-	Rtc_head *	head = (Rtc_head *)crle->c_tempaddr;
+	Rtc_head *head = (Rtc_head *)crle->c_tempheadaddr;
 
 	if (crle->c_flags & CRLE_DUMP) {
 		head->ch_cnflags &= ~RTC_HDR_IGNORE;

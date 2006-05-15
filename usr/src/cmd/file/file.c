@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -27,13 +26,16 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_LARGEFILE64_SOURCE
+
+/* Get definitions for the relocation types supported. */
+#define	ELF_TARGET_ALL
 
 #include <ctype.h>
 #include <unistd.h>
@@ -53,14 +55,13 @@
 #include <sys/mkdev.h>
 #include <sys/stat.h>
 #include <sys/elf.h>
-#include <sys/elf_M32.h>
-#include <sys/elf_SPARC.h>
 #include <procfs.h>
 #include <sys/core.h>
 #include <sys/dumphdr.h>
 #include <netinet/in.h>
 #include <gelf.h>
 #include <elfcap.h>
+#include <sgsrtcid.h>
 #include "file.h"
 
 typedef Elf64_Nhdr	GElf_Nhdr;
@@ -188,6 +189,7 @@ static void usage(void);
 static void default_magic(void);
 static void add_to_mlist(char *, int);
 static void fd_cleanup(void);
+static int is_rtld_config(void);
 
 #ifdef XPG4
 	/* SUSv3 requires a single <space> after the colon */
@@ -608,6 +610,7 @@ def_position_tests(void)
 		(void) putchar('\n');
 		return (1);
 
+
 	/* LINTED: pointer cast may result in improper alignment */
 	} else if (*(int *)fbuf == CORE_MAGIC) {
 		/* LINTED: pointer cast may result in improper alignment */
@@ -620,6 +623,12 @@ def_position_tests(void)
 		(void) putchar('\n');
 		return (1);
 	}
+
+	/*
+	 * Runtime linker (ld.so.1) configuration file.
+	 */
+	if (is_rtld_config())
+		return (1);
 
 	/*
 	 * ZIP files, JAR files, and Java executables
@@ -1069,10 +1078,6 @@ static void
 print_elf_flags(int machine, unsigned int flags)
 {
 	switch (machine) {
-	case EM_M32:
-		if (flags & EF_M32_MAU)
-			(void) printf("%s", gettext(", MAU Required"));
-		break;
 	case EM_SPARCV9:
 		if (flags & EF_SPARC_EXT_MASK) {
 			if (flags & EF_SPARC_SUN_US3) {
@@ -1309,6 +1314,30 @@ is_stripped(Elf *elf)
 	} else {
 		(void) printf(gettext(", stripped"));
 	}
+}
+
+/*
+ * is_rtld_config - If file is a runtime linker config file, prints
+ * the description and returns True (1). Otherwise, silently returns
+ * False (0).
+ */
+int
+is_rtld_config(void)
+{
+	Rtc_id *id;
+
+	if ((fbsz >= sizeof (*id)) && RTC_ID_TEST(fbuf)) {
+		(void) printf(gettext("Runtime Linking Configuration"));
+		/* LINTED: pointer cast may result in improper alignment */
+		id = (Rtc_id *) fbuf;
+		print_elf_class(id->id_class);
+		print_elf_datatype(id->id_data);
+		print_elf_machine(id->id_machine);
+		(void) printf("\n");
+		return (1);
+	}
+
+	return (0);
 }
 
 /*

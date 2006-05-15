@@ -93,6 +93,21 @@ extern const char link_ver_string[];	/* Linker version id  */
 #define	SGSOFFSETOF(s, m)	((size_t)(&(((s *)0)->m)))
 
 /*
+ * When casting between integer and pointer types, gcc will complain
+ * if the integer type used is not large enough to hold the pointer
+ * value without loss. Although a dubious practice in general, this
+ * is sometimes done by design. In those cases, the general solution
+ * is to introduce an intermediate cast to widen the integer value. The
+ * CAST_PTRINT macro does this, and its use documents the fact that
+ * the programmer is doing that sort of cast.
+ */
+#ifdef __GNUC__
+#define	CAST_PTRINT(cast, value) ((cast)(uintptr_t)value)
+#else
+#define	CAST_PTRINT(cast, value) ((cast)value)
+#endif
+
+/*
  * General typedefs.
  */
 typedef enum {

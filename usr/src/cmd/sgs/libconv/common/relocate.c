@@ -35,19 +35,23 @@
  * Generic front-end that determines machine specific relocations.
  */
 const char *
-conv_reloc_type(Half mach, Word type)
+conv_reloc_type(Half mach, Word type, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
-	if (mach == EM_386)
-		return (conv_reloc_386_type(type));
+	switch (mach) {
+	case EM_386:
+		return (conv_reloc_386_type(type, fmt_flags));
 
-	if ((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
-	    (mach == EM_SPARCV9))
-		return (conv_reloc_SPARC_type(type));
+	case EM_SPARC:
+	case EM_SPARC32PLUS:
+	case EM_SPARCV9:
+		return (conv_reloc_SPARC_type(type, fmt_flags));
 
-	if (mach == EM_AMD64)
-		return (conv_reloc_amd64_type(type));
+	case EM_AMD64:
+		return (conv_reloc_amd64_type(type, fmt_flags));
+	}
 
-	return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+	/* If didn't match a machine type, use integer value */
+	return (conv_invalid_val(string, CONV_INV_STRSIZE, type, fmt_flags));
 }

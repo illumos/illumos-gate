@@ -34,32 +34,44 @@
 #include	"elf_msg.h"
 #include	<sys/elf_SPARC.h>
 
+
+
+/* Instantiate a local copy of conv_map2str() from _conv.h */
+DEFINE_conv_map2str
+
+
+
 const char *
-conv_ehdr_class(uchar_t class)
+conv_ehdr_class(uchar_t class, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	classes[] = {
-		MSG_ELFCLASSNONE,	MSG_ELFCLASS32,		MSG_ELFCLASS64
+		MSG_ELFCLASSNONE, MSG_ELFCLASS32, MSG_ELFCLASS64
+	};
+	static const Msg	classes_alt[] = {
+		MSG_ELFCLASSNONE_ALT, MSG_ELFCLASS32_ALT, MSG_ELFCLASS64_ALT
 	};
 
-	if (class >= ELFCLASSNUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, class, 0));
-	else
-		return (MSG_ORIG(classes[class]));
+	return (conv_map2str(string, sizeof (string), class, fmt_flags,
+		ARRAY_NELTS(classes), classes, classes_alt, classes_alt));
 }
 
 const char *
-conv_ehdr_data(uchar_t data)
+conv_ehdr_data(uchar_t data, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	datas[] = {
-		MSG_ELFDATANONE,	MSG_ELFDATA2LSB, 	MSG_ELFDATA2MSB
+		MSG_ELFDATANONE, MSG_ELFDATA2LSB, MSG_ELFDATA2MSB
+	};
+	static const Msg	datas_dump[] = {
+		MSG_ELFDATANONE_ALT, MSG_ELFDATA2LSB_ALT1, MSG_ELFDATA2MSB_ALT1
+	};
+	static const Msg	datas_file[] = {
+		MSG_ELFDATANONE_ALT, MSG_ELFDATA2LSB_ALT2, MSG_ELFDATA2MSB_ALT2
 	};
 
-	if (data >= ELFDATANUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, data, 0));
-	else
-		return (MSG_ORIG(datas[data]));
+	return (conv_map2str(string, sizeof (string), data, fmt_flags,
+		ARRAY_NELTS(datas), datas, datas_dump, datas_file));
 }
 
 static const Msg machines[EM_NUM] = {
@@ -96,50 +108,91 @@ static const Msg machines[EM_NUM] = {
 	MSG_EM_MN10200,		MSG_EM_PJ,		MSG_EM_OPENRISC,
 	MSG_EM_ARC_A5,		MSG_EM_XTENSA
 };
+static const Msg machines_alt[EM_NUM] = {
+	MSG_EM_NONE_ALT,	MSG_EM_M32_ALT,		MSG_EM_SPARC_ALT,
+	MSG_EM_386_ALT,		MSG_EM_68K_ALT,		MSG_EM_88K_ALT,
+	MSG_EM_486_ALT,		MSG_EM_860_ALT,		MSG_EM_MIPS_ALT,
+	MSG_EM_UNKNOWN9,	MSG_EM_MIPS_RS3_LE_ALT,	MSG_EM_RS6000_ALT,
+	MSG_EM_UNKNOWN12,	MSG_EM_UNKNOWN13,	MSG_EM_UNKNOWN14,
+	MSG_EM_PA_RISC_ALT,	MSG_EM_nCUBE_ALT,	MSG_EM_VPP500_ALT,
+	MSG_EM_SPARC32PLUS_ALT,	MSG_EM_UNKNOWN19,	MSG_EM_PPC_ALT,
+	MSG_EM_PPC64_ALT,	MSG_EM_UNKNOWN22,	MSG_EM_UNKNOWN23,
+	MSG_EM_UNKNOWN24,	MSG_EM_UNKNOWN25,	MSG_EM_UNKNOWN26,
+	MSG_EM_UNKNOWN27,	MSG_EM_UNKNOWN28,	MSG_EM_UNKNOWN29,
+	MSG_EM_UNKNOWN30,	MSG_EM_UNKNOWN31,	MSG_EM_UNKNOWN32,
+	MSG_EM_UNKNOWN33,	MSG_EM_UNKNOWN34,	MSG_EM_UNKNOWN35,
+	MSG_EM_Y800,		MSG_EM_FR20,		MSG_EM_RH32,
+	MSG_EM_RCE,		MSG_EM_ARM_ALT,		MSG_EM_ALPHA_ALT,
+	MSG_EM_SH,		MSG_EM_SPARCV9_ALT,	MSG_EM_TRICORE,
+	MSG_EM_ARC,		MSG_EM_H8_300,		MSG_EM_H8_300H,
+	MSG_EM_H8S,		MSG_EM_H8_500,		MSG_EM_IA_64_ALT,
+	MSG_EM_MIPS_X,		MSG_EM_COLDFIRE,	MSG_EM_68HC12,
+	MSG_EM_MMA,		MSG_EM_PCP,		MSG_EM_NCPU,
+	MSG_EM_NDR1,		MSG_EM_STARCORE,	MSG_EM_ME16,
+	MSG_EM_ST100,		MSG_EM_TINYJ,		MSG_EM_AMD64_ALT,
+	MSG_EM_UNKNOWN63,	MSG_EM_UNKNOWN64,	MSG_EM_UNKNOWN65,
+	MSG_EM_FX66,		MSG_EM_ST9PLUS,		MSG_EM_ST7,
+	MSG_EM_68HC16,		MSG_EM_68HC11,		MSG_EM_68HC08,
+	MSG_EM_68HC05,		MSG_EM_SVX,		MSG_EM_ST19,
+	MSG_EM_VAX_ALT,		MSG_EM_CRIS,		MSG_EM_JAVELIN,
+	MSG_EM_FIREPATH,	MSG_EM_ZSP,		MSG_EM_MMIX,
+	MSG_EM_HUANY,		MSG_EM_PRISM,		MSG_EM_AVR,
+	MSG_EM_FR30,		MSG_EM_D10V,		MSG_EM_D30V,
+	MSG_EM_V850,		MSG_EM_M32R,		MSG_EM_MN10300,
+	MSG_EM_MN10200,		MSG_EM_PJ,		MSG_EM_OPENRISC,
+	MSG_EM_ARC_A5,		MSG_EM_XTENSA
+};
 #if	(EM_NUM != (EM_XTENSA + 1))
 #error	"EM_NUM has grown"
 #endif
 
 const char *
-conv_ehdr_mach(Half machine)
+conv_ehdr_mach(Half machine, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
-	if (machine >= (EM_NUM))
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, machine, 0));
-	else
-		return (MSG_ORIG(machines[machine]));
+	return (conv_map2str(string, sizeof (string), machine, fmt_flags,
+		ARRAY_NELTS(machines), machines, machines_alt, machines_alt));
 }
 
+
 const char *
-conv_ehdr_type(Half etype)
+conv_ehdr_type(Half etype, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	etypes[] = {
 		MSG_ET_NONE,		MSG_ET_REL,		MSG_ET_EXEC,
 		MSG_ET_DYN,		MSG_ET_CORE
 	};
+	static const Msg	etypes_alt[] = {
+		MSG_ET_NONE_ALT,	MSG_ET_REL_ALT,		MSG_ET_EXEC_ALT,
+		MSG_ET_DYN_ALT,		MSG_ET_CORE_ALT
+	};
 
-	if (etype == ET_SUNWPSEUDO)
-		return (MSG_ORIG(MSG_ET_SUNWPSEUDO));
-	else if (etype >= ET_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, etype, 0));
-	else
-		return (MSG_ORIG(etypes[etype]));
+	if (etype == ET_SUNWPSEUDO) {
+		return ((fmt_flags & CONV_FMTALTMASK)
+			? MSG_ORIG(MSG_ET_SUNWPSEUDO_ALT)
+			: MSG_ORIG(MSG_ET_SUNWPSEUDO));
+	}
+
+	return (conv_map2str(string, sizeof (string), etype, fmt_flags,
+		ARRAY_NELTS(etypes), etypes, etypes_alt, etypes_alt));
+
 }
 
 const char *
-conv_ehdr_vers(Word version)
+conv_ehdr_vers(Word version, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	versions[] = {
 		MSG_EV_NONE,		MSG_EV_CURRENT
 	};
+	static const Msg	versions_alt[] = {
+		MSG_EV_NONE_ALT,	MSG_EV_CURRENT_ALT
+	};
 
-	if (version >= EV_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, version, 0));
-	else
-		return (MSG_ORIG(versions[version]));
+	return (conv_map2str(string, sizeof (string), version, fmt_flags,
+		ARRAY_NELTS(versions), versions, versions_alt, versions_alt));
 }
 
 #define	EFLAGSZ	MSG_GBL_OSQBRKT_SIZE + \
@@ -195,7 +248,7 @@ conv_ehdr_flags(Half mach, Word flags)
 
 		return (string);
 	}
-	return (conv_invalid_val(string, EFLAGSZ, flags, CONV_INV_DECIMAL));
+	return (conv_invalid_val(string, EFLAGSZ, flags, CONV_FMT_DECIMAL));
 }
 
 /*
@@ -212,16 +265,16 @@ conv_reject_desc(Rej_desc * rej)
 
 	if (type == SGS_REJ_MACH)
 		/* LINTED */
-		return (conv_ehdr_mach((Half)info));
+		return (conv_ehdr_mach((Half)info, 0));
 	else if (type == SGS_REJ_CLASS)
 		/* LINTED */
-		return (conv_ehdr_class((uchar_t)info));
+		return (conv_ehdr_class((uchar_t)info, 0));
 	else if (type == SGS_REJ_DATA)
 		/* LINTED */
-		return (conv_ehdr_data((uchar_t)info));
+		return (conv_ehdr_data((uchar_t)info, 0));
 	else if (type == SGS_REJ_TYPE)
 		/* LINTED */
-		return (conv_ehdr_type((Half)info));
+		return (conv_ehdr_type((Half)info, 0));
 	else if ((type == SGS_REJ_BADFLAG) || (type == SGS_REJ_MISFLAG) ||
 	    (type == SGS_REJ_HAL) || (type == SGS_REJ_US3))
 		/*
@@ -237,5 +290,5 @@ conv_reject_desc(Rej_desc * rej)
 			return (MSG_ORIG(MSG_STR_EMPTY));
 	} else
 		return (conv_invalid_val(string, CONV_INV_STRSIZE, info,
-		    CONV_INV_DECIMAL));
+		    CONV_FMT_DECIMAL));
 }

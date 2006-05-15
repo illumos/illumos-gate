@@ -497,18 +497,27 @@ void
 Dbg_file_config_dis(Lm_list *lml, const char *config, int features)
 {
 	const char	*str;
-	int		error = features & ~CONF_FEATMSK;
 
-	if (error == DBG_CONF_IGNORE)
+	switch (features & ~CONF_FEATMSK) {
+	case DBG_CONF_IGNORE:
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_1);
-	else if (error == DBG_CONF_VERSION)
+		break;
+	case DBG_CONF_VERSION:
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_2);
-	else if (error == DBG_CONF_PRCFAIL)
+		break;
+	case DBG_CONF_PRCFAIL:
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_3);
-	else if (error == DBG_CONF_CORRUPT)
+		break;
+	case DBG_CONF_CORRUPT:
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_4);
-	else
+		break;
+	case DBG_CONF_ABIMISMATCH:
+		str = MSG_INTL(MSG_FIL_CONFIG_ERR_5);
+		break;
+	default:
 		str = conv_config_feat(features);
+		break;
+	}
 
 	Dbg_util_nl(lml, DBG_NL_FRC);
 	dbg_print(lml, MSG_INTL(MSG_FIL_CONFIG_ERR), config, str);
@@ -620,7 +629,7 @@ Dbg_file_generic(Lm_list *lml, Ifl_desc *ifl)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_BASIC), ifl->ifl_name,
-		conv_ehdr_type(ifl->ifl_ehdr->e_type));
+		conv_ehdr_type(ifl->ifl_ehdr->e_type, 0));
 }
 
 static const Msg

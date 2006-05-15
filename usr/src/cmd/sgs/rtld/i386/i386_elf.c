@@ -225,7 +225,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	 */
 	if (!lmp || ((reloff % sizeof (Rel)) != 0)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
-		    conv_reloc_386_type(R_386_JMP_SLOT),
+		    conv_reloc_386_type(R_386_JMP_SLOT, 0),
 		    EC_NATPTR(lmp), EC_XWORD(reloff), EC_NATPTR(from));
 		rtldexit(lml, 1);
 	}
@@ -1086,5 +1086,5 @@ elf_plt_write(uintptr_t addr, uintptr_t vaddr, void *rptr, uintptr_t symval,
 const char *
 _conv_reloc_type(uint_t rel)
 {
-	return (conv_reloc_386_type(rel));
+	return (conv_reloc_386_type(rel, 0));
 }

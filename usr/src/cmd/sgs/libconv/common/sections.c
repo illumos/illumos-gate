@@ -35,6 +35,13 @@
 #include	<_conv.h>
 #include	<sections_msg.h>
 
+
+
+/* Instantiate a local copy of conv_map2str() from _conv.h */
+DEFINE_conv_map2str
+
+
+
 static const Msg secs[SHT_NUM] = {
 	MSG_SHT_NULL,		MSG_SHT_PROGBITS,	MSG_SHT_SYMTAB,
 	MSG_SHT_STRTAB,		MSG_SHT_RELA,		MSG_SHT_HASH,
@@ -44,40 +51,73 @@ static const Msg secs[SHT_NUM] = {
 	MSG_SHT_FINI_ARRAY,	MSG_SHT_PREINIT_ARRAY,	MSG_SHT_GROUP,
 	MSG_SHT_SYMTAB_SHNDX
 };
+static const Msg secs_alt[SHT_NUM] = {
+	MSG_SHT_NULL_ALT,	MSG_SHT_PROGBITS_ALT,	MSG_SHT_SYMTAB_ALT,
+	MSG_SHT_STRTAB_ALT,	MSG_SHT_RELA_ALT,	MSG_SHT_HASH_ALT,
+	MSG_SHT_DYNAMIC_ALT,	MSG_SHT_NOTE_ALT,	MSG_SHT_NOBITS_ALT,
+	MSG_SHT_REL_ALT,	MSG_SHT_SHLIB_ALT,	MSG_SHT_DYNSYM_ALT,
+	MSG_SHT_UNKNOWN12,	MSG_SHT_UNKNOWN13,	MSG_SHT_INIT_ARRAY_ALT,
+	MSG_SHT_FINI_ARRAY_ALT,	MSG_SHT_PREINIT_ARRAY_ALT, MSG_SHT_GROUP_ALT,
+	MSG_SHT_SYMTAB_SHNDX_ALT
+};
 #if	(SHT_NUM != (SHT_SYMTAB_SHNDX + 1))
 #error	"SHT_NUM has grown"
 #endif
 
 static const Msg usecs[SHT_HISUNW - SHT_LOSUNW + 1] = {
-	MSG_SHT_SUNW_dof,	MSG_SHT_SUNW_cap,	MSG_SHT_SUNW_SIGNATURE,
-	MSG_SHT_SUNW_ANNOTATE,	MSG_SHT_SUNW_DEBUGSTR,	MSG_SHT_SUNW_DEBUG,
-	MSG_SHT_SUNW_move,	MSG_SHT_SUNW_COMDAT,	MSG_SHT_SUNW_syminfo,
-	MSG_SHT_SUNW_verdef,	MSG_SHT_SUNW_verneed,	MSG_SHT_SUNW_versym
+	MSG_SHT_SUNW_dof,		MSG_SHT_SUNW_cap,
+	MSG_SHT_SUNW_SIGNATURE,		MSG_SHT_SUNW_ANNOTATE,
+	MSG_SHT_SUNW_DEBUGSTR,		MSG_SHT_SUNW_DEBUG,
+	MSG_SHT_SUNW_move,		MSG_SHT_SUNW_COMDAT,
+	MSG_SHT_SUNW_syminfo,		MSG_SHT_SUNW_verdef,
+	MSG_SHT_SUNW_verneed,		MSG_SHT_SUNW_versym
+};
+static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
+	MSG_SHT_SUNW_dof_ALT,		MSG_SHT_SUNW_cap_ALT,
+	MSG_SHT_SUNW_SIGNATURE_ALT,	MSG_SHT_SUNW_ANNOTATE_ALT,
+	MSG_SHT_SUNW_DEBUGSTR_ALT,	MSG_SHT_SUNW_DEBUG_ALT,
+	MSG_SHT_SUNW_move_ALT,		MSG_SHT_SUNW_COMDAT_ALT,
+	MSG_SHT_SUNW_syminfo_ALT,	MSG_SHT_SUNW_verdef_ALT,
+	MSG_SHT_SUNW_verneed_ALT,	MSG_SHT_SUNW_versym_ALT
 };
 #if	(SHT_LOSUNW != SHT_SUNW_dof)
 #error	"SHT_LOSUNW has moved"
 #endif
 
+
 const char *
-conv_sec_type(Half mach, Word sec)
+conv_sec_type(Half mach, Word sec, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
-	if (sec < SHT_NUM)
-		return (MSG_ORIG(secs[sec]));
-	else if ((sec >= SHT_LOSUNW) && (sec <= SHT_HISUNW))
-		return (MSG_ORIG(usecs[sec - SHT_LOSUNW]));
-	else if ((sec >= SHT_LOPROC) && (sec <= SHT_HIPROC)) {
-		if ((sec == SHT_SPARC_GOTDATA) && ((mach == EM_SPARC) ||
-		    (mach == EM_SPARC32PLUS) || (mach == EM_SPARCV9)))
-			return (MSG_ORIG(MSG_SHT_SPARC_GOTDATA));
-		else if ((sec == SHT_AMD64_UNWIND) && (mach == EM_AMD64))
-			return (MSG_ORIG(MSG_SHT_AMD64_UNWIND));
-		else
-			return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			    sec, 0));
-	} else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, sec, 0));
+	if (sec < SHT_NUM) {
+		return (conv_map2str(string, sizeof (string), sec, fmt_flags,
+			ARRAY_NELTS(secs), secs, secs_alt, NULL));
+	} else if ((sec >= SHT_LOSUNW) && (sec <= SHT_HISUNW)) {
+		return (conv_map2str(string, sizeof (string), sec - SHT_LOSUNW,
+			fmt_flags, ARRAY_NELTS(usecs), usecs, usecs_alt, NULL));
+	} else if ((sec >= SHT_LOPROC) && (sec <= SHT_HIPROC)) {
+		switch (mach) {
+		case EM_SPARC:
+		case EM_SPARC32PLUS:
+		case EM_SPARCV9:
+			if (sec == SHT_SPARC_GOTDATA) {
+				return (fmt_flags & CONV_FMT_ALTDUMP)
+					? MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT)
+					: MSG_ORIG(MSG_SHT_SPARC_GOTDATA);
+			}
+			break;
+		case EM_AMD64:
+			if (sec == SHT_AMD64_UNWIND) {
+				return (fmt_flags & CONV_FMT_ALTDUMP)
+					? MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT)
+					: MSG_ORIG(MSG_SHT_AMD64_UNWIND);
+			}
+		}
+	}
+
+	/* If we get here, it's an unknown type */
+	return (conv_invalid_val(string, CONV_INV_STRSIZE, sec, fmt_flags));
 }
 
 #define	FLAGSZ	MSG_GBL_OSQBRKT_SIZE + \

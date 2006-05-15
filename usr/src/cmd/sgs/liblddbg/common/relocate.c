@@ -213,7 +213,7 @@ Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Word rtype,
 		secname = MSG_ORIG(MSG_STR_EMPTY);
 
 	Elf_reloc_entry_2(lml, caller, MSG_ORIG(MSG_STR_EMPTY), type,
-	    conv_reloc_type(mach, rtype), off, value, secname, symname,
+	    conv_reloc_type(mach, rtype, 0), off, value, secname, symname,
 	    MSG_ORIG(MSG_STR_EMPTY));
 }
 
@@ -240,7 +240,8 @@ Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 
 	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED),
 	    rsp->rel_isdesc->is_basename, rsp->rel_isdesc->is_file->ifl_name,
-	    conv_reloc_type(mach, rsp->rel_rtype), EC_OFF(rsp->rel_roffset));
+	    conv_reloc_type(mach, rsp->rel_rtype, 0),
+	    EC_OFF(rsp->rel_roffset));
 }
 
 void
@@ -251,8 +252,8 @@ Dbg_reloc_transition(Lm_list *lml, Half mach, Word oldrtype, Word newrtype,
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_REL_TRANS), EC_OFF(off),
-	    conv_reloc_type(mach, oldrtype) + M_R_STR_LEN,
-	    conv_reloc_type(mach, newrtype) + M_R_STR_LEN, sym);
+	    conv_reloc_type(mach, oldrtype, 0) + M_R_STR_LEN,
+	    conv_reloc_type(mach, newrtype, 0) + M_R_STR_LEN, sym);
 }
 
 void
@@ -317,7 +318,7 @@ Dbg_reloc_ors_entry(Lm_list *lml, int caller, Word type, Half mach,
 		symname = MSG_ORIG(MSG_STR_EMPTY);
 
 	Elf_reloc_entry_2(lml, caller, MSG_INTL(MSG_STR_OUT), type,
-	    conv_reloc_type(mach, orsp->rel_rtype), orsp->rel_roffset,
+	    conv_reloc_type(mach, orsp->rel_rtype, 0), orsp->rel_roffset,
 	    orsp->rel_raddend, secname, symname, MSG_ORIG(MSG_STR_EMPTY));
 }
 
@@ -341,7 +342,7 @@ Dbg_reloc_ars_entry(Lm_list *lml, int caller, Word type, Half mach,
 		secname = arsp->rel_osdesc->os_name;
 
 	Elf_reloc_entry_2(lml, caller, MSG_INTL(MSG_STR_ACT), type,
-	    conv_reloc_type(mach, arsp->rel_rtype), arsp->rel_roffset,
+	    conv_reloc_type(mach, arsp->rel_rtype, 0), arsp->rel_roffset,
 	    arsp->rel_raddend, secname, arsp->rel_sym->sd_name,
 	    MSG_ORIG(MSG_STR_EMPTY));
 }
@@ -555,13 +556,13 @@ Elf_reloc_entry_1(Lm_list *lml, int caller, const char *prestr, Half mach,
 	if (type == SHT_RELA) {
 		Rela	*rela = (Rela *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info));
+		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info), 0);
 		off = rela->r_offset;
 		add = rela->r_addend;
 	} else {
 		Rel	*rel = (Rel *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info));
+		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info), 0);
 		off = rel->r_offset;
 		add = 0;
 	}

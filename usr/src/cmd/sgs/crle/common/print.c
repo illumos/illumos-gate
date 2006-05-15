@@ -138,36 +138,36 @@ fablib(Crle_desc * crle, int flag)
 
 	switch (flag) {
 	case CRLE_EDLIB:
-		if (crle->c_class == ELFCLASS64) {
+#if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-			path = MSG_ORIG(MSG_PTH_NEWDLP_64);
+		path = MSG_ORIG(MSG_PTH_NEWDLP_64);
 #else
-			path = MSG_ORIG(MSG_PTH_OLDDLP_64);
+		path = MSG_ORIG(MSG_PTH_OLDDLP_64);
 #endif
-		} else {
+#else
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-			path = MSG_ORIG(MSG_PTH_NEWDLP);
+		path = MSG_ORIG(MSG_PTH_NEWDLP);
 #else
-			path = MSG_ORIG(MSG_PTH_OLDDLP);
+		path = MSG_ORIG(MSG_PTH_OLDDLP);
 #endif
-		}
+#endif
 		list = &crle->c_edlibpath;
 		break;
 
 	case CRLE_ESLIB:
-		if (crle->c_class == ELFCLASS64) {
+#if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-			path = MSG_ORIG(MSG_PTH_NEWTD_64);
+		path = MSG_ORIG(MSG_PTH_NEWTD_64);
 #else
-			path = MSG_ORIG(MSG_PTH_OLDTD_64);
+		path = MSG_ORIG(MSG_PTH_OLDTD_64);
 #endif
-		} else {
+#else
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-			path = MSG_ORIG(MSG_PTH_NEWTD);
+		path = MSG_ORIG(MSG_PTH_NEWTD);
 #else
-			path = MSG_ORIG(MSG_PTH_OLDTD);
+		path = MSG_ORIG(MSG_PTH_OLDTD);
 #endif
-		}
+#endif
 		list = &crle->c_eslibpath;
 		break;
 
@@ -207,10 +207,11 @@ getflags(Half flags)
  * Dump a configuration files information.  This routine is very close to the
  * scanconfig() in libcrle.
  */
-static int
+static INSCFG_RET
 scanconfig(Crle_desc * crle, Addr addr)
 {
-	Rtc_head	*head = (Rtc_head *)addr;
+	Rtc_id		*id;
+	Rtc_head	*head;
 	Rtc_dir		*dirtbl;
 	Rtc_file	*filetbl;
 	Rtc_obj		*objtbl, * obj;
@@ -221,9 +222,94 @@ scanconfig(Crle_desc * crle, Addr addr)
 	char		_cmd[PATH_MAX], * cmd;
 	char		_objdir[PATH_MAX], * objdir = 0;
 
+
+	/*
+	 * If there is an Rtc_id present, the Rtc_head follows it.
+	 * Otherwise, it is at the top.
+	 */
+	if (RTC_ID_TEST(addr)) {
+		id = (Rtc_id *) addr;
+		addr += sizeof (*id);	/* Rtc_head follows */
+	} else {
+		id = NULL;
+		/*
+		 * When updating an existing config file that is lacking
+		 * the Rtc_id block, don't put one into the resulting file.
+		 */
+		crle->c_flags &= ~CRLE_ADDID;
+	}
+	head = (Rtc_head *) addr;
+
+
+	/*
+	 * The rest of the configuration file can only be examined by
+	 * a program of the same ELFCLASS, byte order, and hardware
+	 * architecture as the one that created it.
+	 */
+#ifdef _ELF64
+	/* 64-bit program with an existing 32-bit file? Abort. */
+	if (!(head->ch_cnflags & RTC_HDR_64)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
+			crle->c_name, crle->c_confil);
+		return (INSCFG_RET_FAIL);
+	}
+#else
+	/* 32-bit program with an existing 64-bit file? Restart. */
+	if (head->ch_cnflags & RTC_HDR_64)
+		return (INSCFG_RET_NEED64);
+#endif
+	/*
+	 * Now that the ELFCLASS has been settled, ensure that the
+	 * byte order and hardware match. Unlike ELFCLASS, where restarting
+	 * the other version is an option, we cannot work around a mismatch
+	 * of these attributes.
+	 */
+	if (id) {		/* Rtc_id is present */
+		/*
+		 * Was the file produced by compatible hardware?
+		 * ELFCLASS doesn't matter here, because we can
+		 * adjust for that, but byte order and machine type do.
+		 */
+		if ((id->id_data != M_DATA) || (id->id_machine != M_MACH)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ARG_WRONGARCH),
+			    crle->c_name, crle->c_confil,
+			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE),
+			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE),
+			    conv_ehdr_data(M_DATA, CONV_FMT_ALTFILE),
+			    conv_ehdr_mach(M_MACH, CONV_FMT_ALTFILE));
+			return (INSCFG_RET_FAIL);
+		}
+	}
+
+
 	/* LINTED */
-	objtbl = (Rtc_obj *)((char *)head->ch_obj + addr);
-	strtbl = (const char *)((char *)head->ch_str + addr);
+	objtbl = (Rtc_obj *)(CAST_PTRINT(char *, head->ch_obj) + addr);
+	strtbl = (const char *)(CAST_PTRINT(char *, head->ch_str) + addr);
+
+	/*
+	 * If the configuration file has a version higher than we
+	 * recognise, we face two issues:
+	 *	(1) Updates are not possible because we have no
+	 *		way to recognise or propagate the new features.
+	 *		This has to be a fatal error.
+	 *	(2) Printing has the risk that we may have been
+	 *		handed something other than a real config file, as
+	 *		well as the fact that we can't display the information
+	 *		for the new features. So, we print a warning, but
+	 *		continue on to do the best we can with it.
+	 */
+	if (head->ch_version > RTC_VER_CURRENT) {
+		if (crle->c_flags & CRLE_UPDATE) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ARG_UPDATEVER),
+				crle->c_name, crle->c_confil,
+				head->ch_version, RTC_VER_CURRENT);
+			return (INSCFG_RET_FAIL);
+		} else {
+			(void) fprintf(stderr, MSG_INTL(MSG_ARG_PRINTVER),
+				crle->c_name, crle->c_confil,
+				head->ch_version, RTC_VER_CURRENT);
+		}
+	}
 
 	/*
 	 * If this is a version 1 configuration file we can't generate accurate
@@ -234,29 +320,16 @@ scanconfig(Crle_desc * crle, Addr addr)
 		    crle->c_confil, head->ch_version);
 	}
 
-	/*
-	 * If we're updating an existing configuration file make sure we're
-	 * dealing with the same class of file.
-	 */
-	if (crle->c_flags & CRLE_UPDATE) {
-		if (head->ch_cnflags & RTC_HDR_64)
-			crle->c_class = ELFCLASS64;
-		else if (crle->c_class == ELFCLASS64) {
-		    (void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
-			crle->c_name, crle->c_confil);
-			return (1);
-		}
-	} else {
-		if (head->ch_cnflags & RTC_HDR_64) {
-			/*
-			 * Construct the original command line argument.
-			 */
-			cmd = strcpy(alloca(MSG_CMD_64_SIZE + 1),
-			    MSG_ORIG(MSG_CMD_64));
-			if (list_append(&cmdline, cmd) == 0)
-				return (1);
-		}
+
+	if (!(crle->c_flags & CRLE_UPDATE) && (head->ch_cnflags & RTC_HDR_64)) {
+		/*
+		 * Construct the original command line argument.
+		 */
+		cmd = strcpy(alloca(MSG_CMD_64_SIZE + 1), MSG_ORIG(MSG_CMD_64));
+		if (list_append(&cmdline, cmd) == 0)
+			return (INSCFG_RET_FAIL);
 	}
+
 
 	/*
 	 * Start analyzing the configuration files header information.
@@ -273,13 +346,22 @@ scanconfig(Crle_desc * crle, Addr addr)
 		    crle->c_confil, fmt);
 
 		/*
+		 * If the file has an id block, show the information
+		 */
+		if (id)
+		    printf(MSG_INTL(MSG_DMP_PLATFORM),
+			conv_ehdr_class(id->id_class, CONV_FMT_ALTFILE),
+			conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE),
+			conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE));
+
+		/*
 		 * Construct the original command line argument.
 		 */
 		(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_CONF),
 		    crle->c_confil);
 		cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 		if (list_append(&cmdline, cmd) == 0)
-			return (1);
+			return (INSCFG_RET_FAIL);
 
 		/*
 		 * Construct any -f usage.
@@ -290,7 +372,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    conv_dl_flag(head->ch_dlflags, 1));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	} else {
 		/*
@@ -326,7 +408,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			if (inspect(crle, (strtbl + obj->co_name),
 			    (RTC_OBJ_DUMP | RTC_OBJ_ALTER |
 			    RTC_OBJ_GROUP | RTC_OBJ_CMDLINE)) != 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		} else {
 			(void) printf(MSG_INTL(MSG_DMP_APP),
 			    (strtbl + obj->co_alter), (strtbl + obj->co_name));
@@ -338,13 +420,13 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    MSG_ORIG(MSG_CMD_OUTPUT), crle->c_objdir);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 
 			(void) snprintf(_cmd, PATH_MAX,
 			    MSG_ORIG(MSG_CMD_DUMPGRP), (strtbl + obj->co_name));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	}
 
@@ -374,7 +456,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			}
 #endif
 			if (addlib(crle, &crle->c_edlibpath, str) != 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		} else {
 			(void) printf(MSG_INTL(MSG_DMP_DLIBPTH),
 			    MSG_ORIG(MSG_STR_ELF), str);
@@ -383,7 +465,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    MSG_ORIG(MSG_CMD_EDLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	} else {
 		if (crle->c_flags & CRLE_UPDATE) {
@@ -396,25 +478,25 @@ scanconfig(Crle_desc * crle, Addr addr)
 				 * that the users get added to them.
 				 */
 				if (fablib(crle, CRLE_EDLIB) != 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		} else {
 			/*
 			 * Indicate any system default.
 			 */
-			if (crle->c_class == ELFCLASS64) {
+#if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-				(void) printf(MSG_INTL(MSG_DEF_NEWDLP_64));
+			(void) printf(MSG_INTL(MSG_DEF_NEWDLP_64));
 #else
-				(void) printf(MSG_INTL(MSG_DEF_OLDDLP_64));
+			(void) printf(MSG_INTL(MSG_DEF_OLDDLP_64));
 #endif
-			} else {
+#else
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-				(void) printf(MSG_INTL(MSG_DEF_NEWDLP));
+			(void) printf(MSG_INTL(MSG_DEF_NEWDLP));
 #else
-				(void) printf(MSG_INTL(MSG_DEF_OLDDLP));
+			(void) printf(MSG_INTL(MSG_DEF_OLDDLP));
 #endif
-			}
+#endif
 		}
 	}
 
@@ -441,7 +523,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			}
 #endif
 			if (addlib(crle, &crle->c_eslibpath, str) != 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		} else {
 			(void) printf(MSG_INTL(MSG_DMP_TLIBPTH),
 			    MSG_ORIG(MSG_STR_ELF), str);
@@ -450,7 +532,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    MSG_ORIG(MSG_CMD_ESLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	} else {
 		if (crle->c_flags & CRLE_UPDATE) {
@@ -463,25 +545,25 @@ scanconfig(Crle_desc * crle, Addr addr)
 				 * that the users get added to them.
 				 */
 				if (fablib(crle, CRLE_ESLIB) != 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		} else {
 			/*
 			 * Indicate any system default.
 			 */
-			if (crle->c_class == ELFCLASS64) {
+#if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-				(void) printf(MSG_INTL(MSG_DEF_NEWTD_64));
+			(void) printf(MSG_INTL(MSG_DEF_NEWTD_64));
 #else
-				(void) printf(MSG_INTL(MSG_DEF_OLDTD_64));
+			(void) printf(MSG_INTL(MSG_DEF_OLDTD_64));
 #endif
-			} else {
+#else
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-				(void) printf(MSG_INTL(MSG_DEF_NEWTD));
+			(void) printf(MSG_INTL(MSG_DEF_NEWTD));
 #else
-				(void) printf(MSG_INTL(MSG_DEF_OLDTD));
+			(void) printf(MSG_INTL(MSG_DEF_OLDTD));
 #endif
-			}
+#endif
 		}
 	}
 
@@ -493,7 +575,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 		if (crle->c_flags & CRLE_UPDATE) {
 			crle->c_flags |= CRLE_AOUT;
 			if (addlib(crle, &crle->c_adlibpath, str) != 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		} else {
 			(void) printf(MSG_INTL(MSG_DMP_DLIBPTH),
 			    MSG_ORIG(MSG_STR_AOUT), str);
@@ -502,7 +584,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    MSG_ORIG(MSG_CMD_ADLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	} else {
 		if (crle->c_flags & CRLE_UPDATE) {
@@ -515,7 +597,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				 * that the users get added to them.
 				 */
 				if (fablib(crle, CRLE_ADLIB) != 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		} else if (crle->c_flags & CRLE_AOUT) {
 			/*
@@ -533,7 +615,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 		if (crle->c_flags & CRLE_UPDATE) {
 			crle->c_flags |= CRLE_AOUT;
 			if (addlib(crle, &crle->c_aslibpath, str) != 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		} else {
 			(void) printf(MSG_INTL(MSG_DMP_TLIBPTH),
 			    MSG_ORIG(MSG_STR_AOUT), str);
@@ -542,7 +624,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			    MSG_ORIG(MSG_CMD_ASLIB), str);
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
-				return (1);
+				return (INSCFG_RET_FAIL);
 		}
 	} else {
 		if (crle->c_flags & CRLE_UPDATE) {
@@ -555,7 +637,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				 * that the users get added to them.
 				 */
 				if (fablib(crle, CRLE_ASLIB) != 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		} else if (crle->c_flags & CRLE_AOUT) {
 			/*
@@ -583,7 +665,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			if (crle->c_flags & CRLE_UPDATE) {
 				if (addenv(crle, str,
 				    (envtbl->env_flags | RTC_ENV_CONFIG)) == 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			} else {
 				const char	*pfmt, *sfmt;
 
@@ -598,7 +680,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				(void) snprintf(_cmd, PATH_MAX, sfmt, str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 				if (list_append(&cmdline, cmd) == 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		}
 	}
@@ -612,9 +694,11 @@ scanconfig(Crle_desc * crle, Addr addr)
 			Rtc_flte *	fltetbl;
 
 			/* LINTED */
-			fltrtbl = (Rtc_fltr *)((char *)head->ch_fltr + addr);
+			fltrtbl = (Rtc_fltr *)
+				(CAST_PTRINT(char *, head->ch_fltr) + addr);
 			/* LINTED */
-			fltetbl = (Rtc_flte *)((char *)head->ch_flte + addr);
+			fltetbl = (Rtc_flte *)
+				(CAST_PTRINT(char *, head->ch_flte) + addr);
 
 			(void) printf(MSG_INTL(MSG_FLT_TITLE));
 
@@ -657,7 +741,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 	if (head->ch_hash == 0) {
 		if ((crle->c_flags & CRLE_UPDATE) == 0)
 			printcmd(crle, head, &cmdline);
-		return (0);
+		return (INSCFG_RET_OK);
 	}
 
 	/*
@@ -683,7 +767,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 			if (crle->c_flags & CRLE_UPDATE) {
 				if (inspect(crle, str,
 				    getflags(dobj->co_flags)) != 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 				if ((dobj->co_flags &
 				    (RTC_OBJ_NOEXIST | RTC_OBJ_ALTER)) ==
 				    RTC_OBJ_NOEXIST)
@@ -694,7 +778,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				    getformat(dobj->co_flags), str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 				if (list_append(&cmdline, cmd) == 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 		}
 
@@ -776,7 +860,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				if (crle->c_flags & CRLE_UPDATE) {
 					if (inspect(crle, str,
 					    getflags(flags)) != 0)
-						return (1);
+						return (INSCFG_RET_FAIL);
 					continue;
 				}
 
@@ -787,7 +871,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 					cmd = strcpy(alloca(strlen(_cmd) + 1),
 					    _cmd);
 					if (list_append(&cmdline, cmd) == 0)
-						return (1);
+						return (INSCFG_RET_FAIL);
 				}
 
 				/* LINTED */
@@ -795,7 +879,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 				    getformat(flags), str);
 				cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 				if (list_append(&cmdline, cmd) == 0)
-					return (1);
+					return (INSCFG_RET_FAIL);
 			}
 
 			if (crle->c_flags & CRLE_UPDATE)
@@ -838,13 +922,13 @@ scanconfig(Crle_desc * crle, Addr addr)
 		printcmd(crle, head, &cmdline);
 
 	if ((crle->c_flags & CRLE_VERBOSE) == 0)
-		return (0);
+		return (INSCFG_RET_OK);
 
 	/*
 	 * If we've in verbose mode scan the hash list.
 	 */
 	/* LINTED */
-	hash = (Word *)((char *)head->ch_hash + addr);
+	hash = (Word *)(CAST_PTRINT(char *, head->ch_hash) + addr);
 	bkts = hash[0];
 	chain = &hash[2 + bkts];
 	hash += 2;
@@ -882,14 +966,15 @@ scanconfig(Crle_desc * crle, Addr addr)
 	}
 	(void) printf(MSG_ORIG(MSG_STR_NL));
 
-	return (0);
+	return (INSCFG_RET_OK);
 }
 
 
-int
+INSCFG_RET
 inspectconfig(Crle_desc * crle)
 {
-	int		error, fd;
+	INSCFG_RET	error;
+	int		fd;
 	Addr		addr;
 	struct stat	status;
 	const char	*caller = crle->c_name, *file = crle->c_confil;
@@ -939,23 +1024,23 @@ inspectconfig(Crle_desc * crle)
 					fmt1 = MSG_INTL(MSG_DEF_AOUTDLP);
 					fmt2 = MSG_INTL(MSG_DEF_AOUTTD);
 				} else {
-					if (crle->c_class == ELFCLASS64) {
+#if M_CLASS == ELFCLASS64
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-					    fmt1 = MSG_INTL(MSG_DEF_NEWDLP_64);
-					    fmt2 = MSG_INTL(MSG_DEF_NEWTD_64);
+					fmt1 = MSG_INTL(MSG_DEF_NEWDLP_64);
+					fmt2 = MSG_INTL(MSG_DEF_NEWTD_64);
 #else
-					    fmt1 = MSG_INTL(MSG_DEF_OLDDLP_64);
-					    fmt2 = MSG_INTL(MSG_DEF_OLDTD_64);
+					fmt1 = MSG_INTL(MSG_DEF_OLDDLP_64);
+					fmt2 = MSG_INTL(MSG_DEF_OLDTD_64);
 #endif
-					} else {
+#else
 #ifndef	SGS_PRE_UNIFIED_PROCESS
-					    fmt1 = MSG_INTL(MSG_DEF_NEWDLP);
-					    fmt2 = MSG_INTL(MSG_DEF_NEWTD);
+					fmt1 = MSG_INTL(MSG_DEF_NEWDLP);
+					fmt2 = MSG_INTL(MSG_DEF_NEWTD);
 #else
-					    fmt1 = MSG_INTL(MSG_DEF_OLDDLP);
-					    fmt2 = MSG_INTL(MSG_DEF_OLDTD);
+					fmt1 = MSG_INTL(MSG_DEF_OLDDLP);
+					fmt2 = MSG_INTL(MSG_DEF_OLDTD);
 #endif
-					}
+#endif
 				}
 				(void) printf(fmt1);
 				(void) printf(fmt2);

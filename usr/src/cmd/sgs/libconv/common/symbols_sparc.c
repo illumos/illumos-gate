@@ -42,12 +42,14 @@ static const Msg registers[] = { 0,
 };
 
 const char *
-conv_sym_SPARC_value(Addr val)
+conv_sym_SPARC_value(Addr val, int fmt_flags)
 {
 	static char	string[CONV_INV_STRSIZE];
 
-	if ((val < STO_SPARC_REGISTER_G1) || (val > STO_SPARC_REGISTER_G7))
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, val, 0));
-	else
+	if ((val < STO_SPARC_REGISTER_G1) || (val > STO_SPARC_REGISTER_G7)) {
+		return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			val, fmt_flags));
+	} else {
 		return (MSG_ORIG(registers[val]));
+	}
 }

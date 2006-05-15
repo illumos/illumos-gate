@@ -73,8 +73,12 @@ FILEMODE =	755
 
 CPPFEATUREMACROS= $(VAR_RTLD_CPPFEATUREMACROS)
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/common/krtld \
-		    -I$(SRCBASE)/uts/$(PLAT)/krtld $(CPPFEATUREMACROS)
+CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc \
+		-I$(SRCBASE)/uts/common/krtld \
+		-I$(SRCBASE)/uts/$(PLAT)/krtld \
+		-I$(SRC)/common/sgsrtcid \
+		 $(CPPFEATUREMACROS)
+
 ASFLAGS=	-P -D_ASM $(CPPFLAGS)
 LDLIB =		-L ../../libld/$(MACH)
 RTLDLIB =	-L ../../librtld/$(MACH)

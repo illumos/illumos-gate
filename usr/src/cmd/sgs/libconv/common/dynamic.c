@@ -182,7 +182,7 @@ conv_dyn_feature1(Xword flags)
 }
 
 const char *
-conv_dyn_tag(Xword tag, Half mach)
+conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	tags[DT_MAXPOSTAGS] = {
@@ -204,12 +204,32 @@ conv_dyn_tag(Xword tag, Half mach)
 		MSG_DYN_FLAGS,		MSG_DYN_NULL,
 		MSG_DYN_PREINIT_ARRAY,	MSG_DYN_PREINIT_ARRAYSZ
 	};
+	static const Msg	tags_alt[DT_MAXPOSTAGS] = {
+		MSG_DYN_NULL,		MSG_DYN_NEEDED,
+		MSG_DYN_PLTRELSZ_ALT,	MSG_DYN_PLTGOT,
+		MSG_DYN_HASH,		MSG_DYN_STRTAB,
+		MSG_DYN_SYMTAB,		MSG_DYN_RELA,
+		MSG_DYN_RELASZ,		MSG_DYN_RELAENT,
+		MSG_DYN_STRSZ,		MSG_DYN_SYMENT,
+		MSG_DYN_INIT,		MSG_DYN_FINI,
+		MSG_DYN_SONAME,		MSG_DYN_RPATH,
+		MSG_DYN_SYMBOLIC_ALT,	MSG_DYN_REL,
+		MSG_DYN_RELSZ,		MSG_DYN_RELENT,
+		MSG_DYN_PLTREL,		MSG_DYN_DEBUG,
+		MSG_DYN_TEXTREL,	MSG_DYN_JMPREL,
+		MSG_DYN_BIND_NOW,	MSG_DYN_INIT_ARRAY,
+		MSG_DYN_FINI_ARRAY,	MSG_DYN_INIT_ARRAYSZ,
+		MSG_DYN_FINI_ARRAYSZ,	MSG_DYN_RUNPATH,
+		MSG_DYN_FLAGS,		MSG_DYN_NULL,
+		MSG_DYN_PREINIT_ARRAY,	MSG_DYN_PREINIT_ARRAYSZ
+	};
 
 	if (tag < DT_MAXPOSTAGS) {
 		/*
 		 * Generic dynamic tags.
 		 */
-		return (MSG_ORIG(tags[tag]));
+		return ((fmt_flags & CONV_FMTALTMASK)
+			? MSG_ORIG(tags_alt[tag]) : MSG_ORIG(tags[tag]));
 	} else {
 		/*
 		 * SUNW: DT_LOOS -> DT_HIOS range.
@@ -296,7 +316,7 @@ conv_dyn_tag(Xword tag, Half mach)
 			return (MSG_ORIG(MSG_DYN_REGISTER));
 		else
 			return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			    tag, 0));
+			    tag, fmt_flags));
 	}
 }
 

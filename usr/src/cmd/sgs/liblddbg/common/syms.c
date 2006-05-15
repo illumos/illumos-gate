@@ -196,7 +196,7 @@ Dbg_syms_process(Lm_list *lml, Ifl_desc *ifl)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SYM_PROCESS), ifl->ifl_name,
-	    conv_ehdr_type(ifl->ifl_ehdr->e_type));
+	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0));
 }
 
 void
@@ -509,9 +509,9 @@ Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
 
 		dbg_print(lml, msg, prestr,
 		    conv_sym_value(mach, type, sym->st_value), sym->st_size,
-		    conv_sym_info_type(mach, type), conv_sym_info_bind(bind),
-		    conv_sym_other(sym->st_other), verndx,
-		    sec ? sec : conv_sym_shndx(sym->st_shndx),
+		    conv_sym_info_type(mach, type, 0),
+		    conv_sym_info_bind(bind, 0), conv_sym_other(sym->st_other),
+		    verndx, sec ? sec : conv_sym_shndx(sym->st_shndx),
 		    Elf_demangle_name(poststr));
 	}
 }

@@ -29,16 +29,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/* Get definitions for the relocation types supported. */
+#define	ELF_TARGET_ALL
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <unistd.h>
 #include <libelf.h>
 #include <link.h>
-#include <sys/elf_M32.h>
-#include <sys/elf_386.h>
-#include <sys/elf_SPARC.h>
-#include <sys/elf_amd64.h>
+#include <sys/elf.h>
 #include <sys/machelf.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -50,6 +50,13 @@
 
 
 #define	OPTSTR	"agcd:fhn:oprstvCLT:V?"		/* option string for getopt() */
+
+/*
+ * DUMP_CONVFMT defines the libconv formatting options we want to use:
+ *	- Unknown items to be printed as integers using decimal formatting
+ *	- The "Dump Style" versions of strings.
+ */
+#define	DUMP_CONVFMT (CONV_FMT_DECIMAL|CONV_FMT_ALTDUMP)
 
 const char *UNKNOWN = "<unknown>";
 
@@ -365,9 +372,12 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 					(void) printf(tmpstr, sym_name);
 				} else
 					(void) printf("%-22s", sym_name);
-			} else
+			} else {
 				(void) printf("%-22d", symid);
-			print_reloc_type(p_ehdr->e_machine, type);
+			}
+			(void) printf("%-20s",
+				conv_reloc_type(p_ehdr->e_machine,
+				type, DUMP_CONVFMT));
 		}
 		(void) printf("%lld\n", EC_SXWORD(rela.r_addend));
 		ndx++;
@@ -455,10 +465,12 @@ print_rel(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 		} else {
 			if (strlen(sym_name))
 				(void) printf("%-20s", sym_name);
-			else
+			else {
 				(void) printf("%-20d", sym.st_name);
-
-			print_reloc_type(p_ehdr->e_machine, type);
+			}
+			(void) printf("%-20s",
+				conv_reloc_type(p_ehdr->e_machine,
+				type, DUMP_CONVFMT));
 		}
 		(void) printf("\n");
 		ndx++;
@@ -573,35 +585,12 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 			 *  The strings "REG_G1" through "REG_G7" are intended
 			 *  to be consistent with output from elfdump(1).
 			 */
-			switch (sym.st_value) {
-			case STO_SPARC_REGISTER_G1:
-				(void) printf("%-*s", 12 + adj, "REG_G1");
-				break;
-			case STO_SPARC_REGISTER_G2:
-				(void) printf("%-*s", 12 + adj, "REG_G2");
-				break;
-			case STO_SPARC_REGISTER_G3:
-				(void) printf("%-*s", 12 + adj, "REG_G3");
-				break;
-			case STO_SPARC_REGISTER_G4:
-				(void) printf("%-*s", 12 + adj, "REG_G4");
-				break;
-			case STO_SPARC_REGISTER_G5:
-				(void) printf("%-*s", 12 + adj, "REG_G5");
-				break;
-			case STO_SPARC_REGISTER_G6:
-				(void) printf("%-*s", 12 + adj, "REG_G6");
-				break;
-			case STO_SPARC_REGISTER_G7:
-				(void) printf("%-*s", 12 + adj, "REG_G7");
-				break;
-			default:
-				(void) printf("0x%-*llx", 10 + adj,
-				    EC_ADDR(sym.st_value));
-			}
-		} else
+			(void) printf("%-*s", 12 + adj,
+			    conv_sym_SPARC_value(sym.st_value, DUMP_CONVFMT));
+		} else {
 			(void) printf("0x%-*llx", 10 + adj,
 			    EC_ADDR(sym.st_value));
+		}
 
 		(void) printf("%-*lld", 9 + adj, EC_XWORD(sym.st_size));
 
@@ -609,66 +598,17 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 			(void) printf("%d\t\t%d\t%d\t%#x\t",
 			    type, bind, (int)sym.st_other, (int)shndx);
 		} else {
-			switch (type) {
-			case STT_NOTYPE:
-				(void) printf("%s\t", "NOTY");
-				break;
-			case STT_OBJECT:
-				(void) printf("%s\t", "OBJT");
-				break;
-			case STT_FUNC:
-				(void) printf("%s\t", "FUNC");
-				break;
-			case STT_SECTION:
-				(void) printf("%s\t", "SECT");
-				break;
-			case STT_FILE:
-				(void) printf("%s\t", "FILE");
-				break;
-			case STT_SPARC_REGISTER:
-				(void) printf("%s\t", "REGI");
-				break;
-			case STT_COMMON:
-				(void) printf("%s\t", "COMM");
-				break;
-			case STT_TLS:
-				(void) printf("%s\t", "TLS ");
-				break;
-			default:
-				(void) printf("%d\t", type);
-			}
-			switch (bind) {
-			case STB_LOCAL:
-				(void) printf("LOCL");
-				break;
-			case STB_GLOBAL:
-				(void) printf("GLOB");
-				break;
-			case STB_WEAK:
-				(void) printf("WEAK");
-				break;
-			default:
-				(void) printf("%d", bind);
-			}
+			GElf_Ehdr p_ehdr;
+			(void) gelf_getehdr(elf_file, &p_ehdr);
+			(void) printf("%s\t",
+				conv_sym_info_type(p_ehdr.e_machine, type,
+				DUMP_CONVFMT));
+			(void) printf("%s",
+				conv_sym_info_bind(bind, DUMP_CONVFMT));
 			(void) printf("\t  %d\t", EC_WORD(sym.st_other));
 
 			if (specsec) {
-				switch (shndx) {
-				case SHN_UNDEF:
-					(void) printf("UNDEF");
-					break;
-				case SHN_ABS:
-					(void) printf("ABS");
-					break;
-				case SHN_COMMON:
-					(void) printf("COMMON");
-					break;
-				case SHN_XINDEX:
-					(void) printf("XINDEX");
-					break;
-				default:
-					(void) printf("%d", EC_WORD(shndx));
-				}
+				(void) printf("%s", conv_sym_shndx(shndx));
 			} else
 				(void) printf("%d", EC_WORD(shndx));
 			(void) printf("\t");
@@ -708,6 +648,7 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 	SCNTAB *p;
 	int num;
 	int field;
+	GElf_Ehdr p_ehdr;
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
 		field = 21;
@@ -715,6 +656,7 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 		field = 13;
 
 	p = s;
+	(void) gelf_getehdr(elf_file, &p_ehdr);
 
 	for (num = 0; num < num_scns; num++, p++) {
 		(void) printf("[%d]\t", index++);
@@ -723,89 +665,8 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 			EC_WORD(p->p_shdr.sh_type),
 			EC_XWORD(p->p_shdr.sh_flags));
 		} else {
-			switch (p->p_shdr.sh_type) {
-			case SHT_NULL:
-				(void) printf("NULL");
-				break;
-			case SHT_PROGBITS:
-				(void) printf("PBIT");
-				break;
-			case SHT_SYMTAB:
-				(void) printf("SYMT");
-				break;
-			case SHT_STRTAB:
-				(void) printf("STRT");
-				break;
-			case SHT_RELA:
-				(void) printf("RELA");
-				break;
-			case SHT_HASH:
-				(void) printf("HASH");
-				break;
-			case SHT_DYNAMIC:
-				(void) printf("DYNM");
-				break;
-			case SHT_NOTE:
-				(void) printf("NOTE");
-				break;
-			case SHT_NOBITS:
-				(void) printf("NOBI");
-				break;
-			case SHT_REL:
-				(void) printf("REL ");
-				break;
-			case SHT_DYNSYM:
-				(void) printf("DYNS");
-				break;
-			case ((GElf_Word) SHT_LOUSER):
-				(void) printf("LUSR");
-				break;
-			case ((GElf_Word) SHT_HIUSER):
-				(void) printf("HUSR");
-				break;
-			case SHT_SHLIB:
-				(void) printf("SHLB");
-				break;
-			case SHT_SUNW_SIGNATURE:
-				(void) printf("SIGN");
-				break;
-			case SHT_SUNW_ANNOTATE:
-				(void) printf("ANOT");
-				break;
-			case SHT_SUNW_DEBUGSTR:
-				(void) printf("DBGS");
-				break;
-			case SHT_SUNW_DEBUG:
-				(void) printf("DBG ");
-				break;
-			case SHT_SUNW_move:
-				(void) printf("MOVE");
-				break;
-			case SHT_SUNW_verdef:
-				(void) printf("VERD");
-				break;
-			case SHT_SUNW_verneed:
-				(void) printf("VERN");
-				break;
-			case SHT_SUNW_versym:
-				(void) printf("VERS");
-				break;
-			case SHT_SUNW_syminfo:
-				(void) printf("SYMI");
-				break;
-			case SHT_SUNW_COMDAT:
-				(void) printf("COMD");
-				break;
-			case SHT_AMD64_UNWIND:
-				(void) printf("UNWD");
-				break;
-			case SHT_SPARC_GOTDATA:
-				(void) printf("GOTD");
-				break;
-			default:
-				(void) printf("%u", EC_WORD(p->p_shdr.sh_type));
-				break;
-			}
+			(void) printf(conv_sec_type(p_ehdr.e_machine,
+				p->p_shdr.sh_type, DUMP_CONVFMT));
 			(void) printf("    ");
 
 			if (p->p_shdr.sh_flags & SHF_WRITE)
@@ -1211,52 +1072,7 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
  *	bitdesc - Pointer to NULL terminated array of PDYNITEM_BITDESC
  *		structs describing the allowed bit values.
  */
-#define	Fmttag		"%-15.15s "
-#define	Fmtptr		"%#llx"
-
-void
-pdynitem_addr(const char *name, GElf_Dyn *p_dyn)
-{
-	(void) printf(Fmttag, name);
-	(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
-}
-
-void
-pdynitem_val(const char *name, GElf_Dyn *p_dyn)
-{
-	(void) printf(Fmttag, name);
-	(void) printf(Fmtptr, EC_XWORD(p_dyn->d_un.d_val));
-}
-
-void
-pdynitem_depval(const char *name, GElf_Dyn *p_dyn)
-{
-	(void) printf(Fmttag, name);
-	(void) printf(Fmtptr "  (deprecated value)",
-			EC_XWORD(p_dyn->d_un.d_val));
-}
-
-void
-pdynitem_ign(const char *name)
-{
-	(void) printf(Fmttag "(ignored)", name);
-}
-
-void
-pdynitem_str(const char *name, GElf_Dyn *p_dyn, Elf *elf_file, GElf_Word link)
-{
-	char *str;
-
-	(void) printf(Fmttag, name);
-	if (v_flag) {	/* Look up the string */
-		str = (char *)elf_strptr(elf_file, link, p_dyn->d_un.d_ptr);
-		if (!(str && *str))
-			str = (char *)UNKNOWN;
-		(void) printf("%s", str);
-	} else {	/* Show the address */
-		(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
-	}
-}
+#define	pdyn_Fmtptr		"%#llx"
 
 /*
  * Arrays of this type are used for the values argument to
@@ -1270,11 +1086,10 @@ typedef struct {
 } PDYNITEM_BITDESC;
 
 void
-pdynitem_bitmask(const char *name, GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
+pdynitem_bitmask(GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
 {
 	char buf[512];
 
-	(void) printf(Fmttag, name);
 	if (v_flag) {
 		buf[0] = '\0';
 		for (; bitdesc->bit; bitdesc++) {
@@ -1289,12 +1104,10 @@ pdynitem_bitmask(const char *name, GElf_Dyn *p_dyn, PDYNITEM_BITDESC *bitdesc)
 	}
 
 	/* We don't have a string, or one is not requested. Show address */
-	(void) printf(Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
+	(void) printf(pdyn_Fmtptr, EC_ADDR(p_dyn->d_un.d_ptr));
 
 }
 
-#undef Fmttag
-#undef Fmtptr
 
 /*
  * Print dynamic linking information.  Input is an ELF
@@ -1371,6 +1184,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 	int		lib_scns = num_scns;
 	SCNTAB		*l_scns = p_scns;
 	int		header_num = 0;
+	char 		*str;
 
 	if (!p_flag)
 		(void) printf("\n  **** DYNAMIC SECTION INFORMATION ****\n");
@@ -1400,7 +1214,9 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 
 		(void) gelf_getdyn(dyn_data, ii++, &p_dyn);
 		while (p_dyn.d_tag != DT_NULL) {
-			(void) printf("[%d]\t", index++);
+			(void) printf("[%d]\t%-15.15s ", index++,
+				conv_dyn_tag(p_dyn.d_tag, p_ehdr.e_machine,
+				DUMP_CONVFMT));
 
 			/*
 			 * It would be nice to use a table driven loop
@@ -1409,228 +1225,119 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			 */
 			switch (p_dyn.d_tag) {
 			/*
-			 * Start of generic flags.
+			 * Items with an address value
 			 */
-			case (DT_NEEDED):
-				pdynitem_str("NEEDED", &p_dyn, elf_file, link);
-				break;
-			case (DT_PLTRELSZ):
-				pdynitem_val("PLTSZ", &p_dyn);
-				break;
-			case (DT_PLTGOT):
-				pdynitem_addr("PLTGOT", &p_dyn);
-				break;
-			case (DT_HASH):
-				pdynitem_addr("HASH", &p_dyn);
-				break;
-			case (DT_STRTAB):
-				pdynitem_addr("STRTAB", &p_dyn);
-				break;
-			case (DT_SYMTAB):
-				pdynitem_addr("SYMTAB", &p_dyn);
-				break;
-			case (DT_RELA):
-				pdynitem_addr("RELA", &p_dyn);
-				break;
-			case (DT_RELASZ):
-				pdynitem_val("RELASZ", &p_dyn);
-				break;
-			case (DT_RELAENT):
-				pdynitem_val("RELAENT", &p_dyn);
-				break;
-			case (DT_STRSZ):
-				pdynitem_val("STRSZ", &p_dyn);
-				break;
-			case (DT_SYMENT):
-				pdynitem_val("SYMENT", &p_dyn);
-				break;
-			case (DT_INIT):
-				pdynitem_addr("INIT", &p_dyn);
-				break;
-			case (DT_FINI):
-				pdynitem_addr("FINI", &p_dyn);
-				break;
-			case (DT_SONAME):
-				pdynitem_str("SONAME", &p_dyn, elf_file, link);
-				break;
-			case (DT_RPATH):
-				pdynitem_str("RPATH", &p_dyn, elf_file, link);
-				break;
-			case (DT_SYMBOLIC):
-				pdynitem_ign("SYMB");
-				break;
-			case (DT_REL):
-				pdynitem_addr("REL", &p_dyn);
-				break;
-			case (DT_RELSZ):
-				pdynitem_val("RELSZ", &p_dyn);
-				break;
-			case (DT_RELENT):
-				pdynitem_val("RELENT", &p_dyn);
-				break;
-			case (DT_PLTREL):
-				pdynitem_val("PLTREL", &p_dyn);
-				break;
-			case (DT_DEBUG):
-				pdynitem_addr("DEBUG", &p_dyn);
-				break;
-			case (DT_TEXTREL):
-				pdynitem_addr("TEXTREL", &p_dyn);
-				break;
-			case (DT_JMPREL):
-				pdynitem_addr("JMPREL", &p_dyn);
-				break;
-			case (DT_BIND_NOW):
-				pdynitem_val("BIND_NOW", &p_dyn);
-				break;
-			case (DT_INIT_ARRAY):
-				pdynitem_addr("INIT_ARRAY", &p_dyn);
-				break;
-			case (DT_FINI_ARRAY):
-				pdynitem_addr("FINI_ARRAY", &p_dyn);
-				break;
-			case (DT_INIT_ARRAYSZ):
-				pdynitem_addr("INIT_ARRAYSZ", &p_dyn);
-				break;
-			case (DT_FINI_ARRAYSZ):
-				pdynitem_addr("FINI_ARRAYSZ", &p_dyn);
-				break;
-			case (DT_RUNPATH):
-				pdynitem_str("RUNPATH", &p_dyn,
-					elf_file, link);
-				break;
-			case (DT_FLAGS):
-				pdynitem_bitmask("FLAGS", &p_dyn,
-					dyn_dt_flags);
-				break;
-
-			case (DT_PREINIT_ARRAY):
-				pdynitem_addr("PRINIT_ARRAY", &p_dyn);
-				break;
-			case (DT_PREINIT_ARRAYSZ):
-				pdynitem_addr("PRINIT_ARRAYSZ", &p_dyn);
-				break;
-			/*
-			 * DT_LOOS - DT_HIOS range.
-			 */
-			case (DT_SUNW_AUXILIARY):
-				pdynitem_str("SUNW_AUXILIARY", &p_dyn,
-					elf_file, link);
-				break;
-			case (DT_SUNW_RTLDINF):
-				pdynitem_addr("SUNW_RTLDINF", &p_dyn);
-				break;
-			case (DT_SUNW_FILTER):
-				pdynitem_str("SUNW_FILTER", &p_dyn,
-					elf_file, link);
-				break;
-			case (DT_SUNW_CAP):
-				pdynitem_addr("SUNW_CAP", &p_dyn);
+			case DT_PLTGOT:
+			case DT_HASH:
+			case DT_STRTAB:
+			case DT_RELA:
+			case DT_SYMTAB:
+			case DT_INIT:
+			case DT_FINI:
+			case DT_REL:
+			case DT_DEBUG:
+			case DT_TEXTREL:
+			case DT_JMPREL:
+			case DT_INIT_ARRAY:
+			case DT_FINI_ARRAY:
+			case DT_INIT_ARRAYSZ:
+			case DT_FINI_ARRAYSZ:
+			case DT_PREINIT_ARRAY:
+			case DT_PREINIT_ARRAYSZ:
+			case DT_SUNW_RTLDINF:
+			case DT_SUNW_CAP:
+			case DT_PLTPAD:
+			case DT_MOVETAB:
+			case DT_SYMINFO:
+			case DT_RELACOUNT:
+			case DT_RELCOUNT:
+			case DT_VERSYM:
+			case DT_VERDEF:
+			case DT_VERDEFNUM:
+			case DT_VERNEED:
+				(void) printf(pdyn_Fmtptr,
+					EC_ADDR(p_dyn.d_un.d_ptr));
 				break;
 
 			/*
-			 * SUNW: DT_VALRNGLO - DT_VALRNGHI range.
+			 * Items with a string value
 			 */
-			case (DT_CHECKSUM):
-				pdynitem_val("CHECKSUM", &p_dyn);
-				break;
-			case (DT_PLTPADSZ):
-				pdynitem_val("PLTPADSZ", &p_dyn);
-				break;
-			case (DT_MOVEENT):
-				pdynitem_val("MOVEENT", &p_dyn);
-				break;
-			case (DT_MOVESZ):
-				pdynitem_val("MOVESZ", &p_dyn);
-				break;
-			case (DT_FEATURE_1):
-				pdynitem_bitmask("FEATURE_1", &p_dyn,
-					dyn_dt_feature_1);
-				break;
-			case (DT_POSFLAG_1):
-				pdynitem_bitmask("POSFLAG_1", &p_dyn,
-					dyn_dt_posflag_1);
-				break;
-			case (DT_SYMINSZ):
-				pdynitem_val("SYMINSZ", &p_dyn);
-				break;
-			case (DT_SYMINENT):
-				pdynitem_val("SYMINENT", &p_dyn);
+			case DT_NEEDED:
+			case DT_SONAME:
+			case DT_RPATH:
+			case DT_RUNPATH:
+			case DT_SUNW_AUXILIARY:
+			case DT_SUNW_FILTER:
+			case DT_CONFIG:
+			case DT_DEPAUDIT:
+			case DT_AUDIT:
+			case DT_AUXILIARY:
+			case DT_USED:
+			case DT_FILTER:
+				if (v_flag) {	/* Look up the string */
+					str = (char *)elf_strptr(elf_file, link,
+						p_dyn.d_un.d_ptr);
+					if (!(str && *str))
+						str = (char *)UNKNOWN;
+					(void) printf("%s", str);
+				} else {	/* Show the address */
+					(void) printf(pdyn_Fmtptr,
+						EC_ADDR(p_dyn.d_un.d_ptr));
+				}
 				break;
 
 			/*
-			 * SUNW: DT_ADDRRNGLO - DT_ADDRRNGHI range.
+			 * Items with a literal value
 			 */
-			case (DT_CONFIG):
-				pdynitem_str("CONFIG", &p_dyn, elf_file, link);
-				break;
-			case (DT_DEPAUDIT):
-				pdynitem_str("DEPAUDIT", &p_dyn,
-					elf_file, link);
-				break;
-			case (DT_AUDIT):
-				pdynitem_str("AUDIT", &p_dyn, elf_file, link);
-				break;
-			case (DT_PLTPAD):
-				pdynitem_addr("PLTPAD", &p_dyn);
-				break;
-			case (DT_MOVETAB):
-				pdynitem_addr("MOVETAB", &p_dyn);
-				break;
-			case (DT_SYMINFO):
-				pdynitem_addr("SYMINFO", &p_dyn);
+			case DT_PLTRELSZ:
+			case DT_RELASZ:
+			case DT_RELAENT:
+			case DT_STRSZ:
+			case DT_SYMENT:
+			case DT_RELSZ:
+			case DT_RELENT:
+			case DT_PLTREL:
+			case DT_BIND_NOW:
+			case DT_CHECKSUM:
+			case DT_PLTPADSZ:
+			case DT_MOVEENT:
+			case DT_MOVESZ:
+			case DT_SYMINSZ:
+			case DT_SYMINENT:
+			case DT_VERNEEDNUM:
+			case DT_SPARC_REGISTER:
+				(void) printf(pdyn_Fmtptr,
+					EC_XWORD(p_dyn.d_un.d_val));
 				break;
 
 			/*
-			 * SUNW: generic range.
+			 * Items that are bitmasks
 			 */
-			case (DT_RELACOUNT):
-				pdynitem_addr("RELACOUNT", &p_dyn);
+			case DT_FLAGS:
+				pdynitem_bitmask(&p_dyn, dyn_dt_flags);
 				break;
-			case (DT_RELCOUNT):
-				pdynitem_addr("RELCOUNT", &p_dyn);
+			case DT_FEATURE_1:
+				pdynitem_bitmask(&p_dyn, dyn_dt_feature_1);
 				break;
-			case (DT_FLAGS_1):
-				pdynitem_bitmask("FLAGS_1", &p_dyn,
-					dyn_dt_flags_1);
+			case DT_POSFLAG_1:
+				pdynitem_bitmask(&p_dyn, dyn_dt_posflag_1);
 				break;
-			case (DT_VERSYM):
-				pdynitem_addr("VERSYM", &p_dyn);
-				break;
-			case (DT_VERDEF):
-				pdynitem_addr("VERDEF", &p_dyn);
-				break;
-			case (DT_VERDEFNUM):
-				pdynitem_addr("VERDEFNUM", &p_dyn);
-				break;
-			case (DT_VERNEED):
-				pdynitem_addr("VERNEED", &p_dyn);
-				break;
-			case (DT_VERNEEDNUM):
-				pdynitem_val("VERNEEDNUM", &p_dyn);
-				break;
-			case (DT_AUXILIARY):
-				pdynitem_str("AUXILIARY", &p_dyn,
-					elf_file, link);
-				break;
-			case (DT_USED):
-				pdynitem_str("USED", &p_dyn, elf_file, link);
-				break;
-			case (DT_FILTER):
-				pdynitem_str("FILTER", &p_dyn, elf_file, link);
+			case DT_FLAGS_1:
+				pdynitem_bitmask(&p_dyn, dyn_dt_flags_1);
 				break;
 
 			/*
-			 * SUNW: machine specific range.
+			 * Depreciated items with a literal value
 			 */
-			case (DT_SPARC_REGISTER):
-				pdynitem_val("REGISTER", &p_dyn);
+			case DT_DEPRECATED_SPARC_REGISTER:
+				(void) printf(pdyn_Fmtptr
+					"  (deprecated value)",
+					EC_XWORD(p_dyn.d_un.d_val));
 				break;
-			case (DT_DEPRECATED_SPARC_REGISTER):
-				pdynitem_depval("REGISTER", &p_dyn);
-				break;
-			default:
-				(void) printf("%lld", EC_XWORD(p_dyn.d_tag));
+
+			/* Ignored items */
+			case DT_SYMBOLIC:
+				(void) printf("(ignored)");
 				break;
 			}
 			(void) printf("\n");
@@ -1667,7 +1374,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 static GElf_Ehdr *
 dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 {
-	int class, data;
+	int class;
 	int field;
 
 	if (gelf_getehdr(elf_file, elf_head_p) == NULL) {
@@ -1704,126 +1411,16 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 			(int)elf_head_p->e_machine,
 			elf_head_p->e_version);
 	} else {
-		data = elf_head_p->e_ident[5];
-
-		switch (class) {
-		case ELFCLASSNONE:
-			(void) printf("%-*s", field, "None");
-			break;
-		case ELFCLASS32:
-			(void) printf("%-*s", field, "32-bit");
-			break;
-		case ELFCLASS64:
-			(void) printf("%-*s", field, "64-bit");
-			break;
-		default:
-			(void) printf("%-*d", field, class);
-			break;
-		}
-		switch (data) {
-		case ELFDATANONE:
-			(void) printf("%-11s", "None   ");
-			break;
-		case ELFDATA2LSB:
-			(void) printf("%-11s", "2LSB   ");
-			break;
-		case ELFDATA2MSB:
-			(void) printf("%-11s", "2MSB   ");
-			break;
-		default:
-			(void) printf("%-11d", data);
-			break;
-		}
-
-		switch (elf_head_p->e_type) {
-		case ET_NONE:
-			(void) printf("%-*s", field, "None");
-			break;
-		case ET_REL:
-			(void) printf("%-*s", field, "Reloc");
-			break;
-		case ET_EXEC:
-			(void) printf("%-*s", field, "Exec");
-			break;
-		case ET_DYN:
-			(void) printf("%-*s", field, "Dyn");
-			break;
-		case ET_CORE:
-			(void) printf("%-*s", field, "Core");
-			break;
-		default:
-			(void) printf("%-*d", field,
-				EC_WORD(elf_head_p->e_type));
-			break;
-		}
-		switch (elf_head_p->e_machine) {
-		case EM_NONE:
-			(void) printf("%-12s", "No mach");
-			break;
-		case EM_M32:
-			(void) printf("%-12s", "WE32100");
-			break;
-		case EM_SPARC:
-			(void) printf("%-12s", "SPARC");
-			break;
-		case EM_SPARCV9:
-			(void) printf("%-12s", "SPARCV9");
-			break;
-		case EM_386:
-			(void) printf("%-12s", "80386");
-			break;
-		case EM_68K:
-			(void) printf("%-12s", "68000");
-			break;
-		case EM_88K:
-			(void) printf("%-12s", "88000");
-			break;
-		case EM_486:
-			(void) printf("%-12s", "80486");
-			break;
-		case EM_860:
-			(void) printf("%-12s", "i860");
-			break;
-		case EM_MIPS:
-			(void) printf("%-12s", "RS3000_BE");
-			break;
-		case EM_MIPS_RS3_LE:
-			(void) printf("%-12s", "RS3000_LE");
-			break;
-		case EM_RS6000:
-			(void) printf("%-12s", "RS6000");
-			break;
-		case EM_PA_RISC:
-			(void) printf("%-12s", "PA_RISC");
-			break;
-		case EM_nCUBE:
-			(void) printf("%-12s", "nCUBE");
-			break;
-		case EM_VPP500:
-			(void) printf("%-12s", "VPP500");
-			break;
-		case EM_SPARC32PLUS:
-			(void) printf("%-12s", "SPARC32PLUS");
-			break;
-		case EM_PPC:
-			(void) printf("%-12s", "PowerPC");
-			break;
-		case EM_IA_64:
-			(void) printf("%-12s", "IA64");
-			break;
-		default:
-			(void) printf("%-12d", EC_WORD(elf_head_p->e_machine));
-		}
-		switch (elf_head_p->e_version) {
-		case EV_NONE:
-			(void) printf("Invalid\n");
-			break;
-		case EV_CURRENT:
-			(void) printf("Current\n");
-			break;
-		default:
-			(void) printf("%d\n", elf_head_p->e_version);
-		}
+		(void) printf("%-*s", field,
+			conv_ehdr_class(class, DUMP_CONVFMT));
+		(void) printf("%-11s",
+			conv_ehdr_data(elf_head_p->e_ident[5], DUMP_CONVFMT));
+		(void) printf("%-*s", field,
+			conv_ehdr_type(elf_head_p->e_type, DUMP_CONVFMT));
+		(void) printf("%-12s",
+			conv_ehdr_mach(elf_head_p->e_machine, DUMP_CONVFMT));
+		(void) printf("%s\n",
+			conv_ehdr_vers(elf_head_p->e_version, DUMP_CONVFMT));
 	}
 	(void) printf("%-#*llx%-#11llx%-#*llx%-#12x%#x\n",
 		field, EC_ADDR(elf_head_p->e_entry),

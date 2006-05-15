@@ -44,7 +44,7 @@ MAPFILES =	../common/mapfile-vers
 MAPOPTS =	$(MAPFILES:%=-M%)
 
 CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
-		-I$(SRCBASE)/uts/common/krtld
+		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid
 DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 

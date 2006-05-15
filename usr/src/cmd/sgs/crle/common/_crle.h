@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,13 +132,12 @@ typedef	struct crle_desc {
 	int		c_tempfd;	/*	mmapped address and size */
 	Addr		c_tempaddr;
 	size_t		c_tempsize;
+	Addr		c_tempheadaddr;	/* Ptr to Rtc_head within c_tempaddr */
 	char		*c_confil;	/* configuration file */
 	char		*c_objdir;	/* current object directory for */
 					/*	dldump(3dl) */
 	char		*c_audit;	/* audit library name */
 	uint_t		c_flags;	/* state flags for crle processing */
-	ushort_t	c_machine;	/* object machine type and class to */
-	ushort_t	c_class;	/* 	operate on */
 	int		c_dlflags;	/* current dldump(3dl) flags */
 	int		c_strbkts;	/* internal hash table initialization */
 	int		c_inobkts;	/*	parameters */
@@ -164,6 +162,7 @@ typedef	struct crle_desc {
 #define	CRLE_CREAT	0x0001		/* config file creation required */
 #define	CRLE_ALTER	0x0002		/* alternative entries required */
 #define	CRLE_DUMP	0x0004		/* alternative create by dldump(3dl) */
+#define	CRLE_ADDID	0x0008		/* Add Rtc_id to head of new files */
 #define	CRLE_VERBOSE	0x0010		/* verbose mode */
 #define	CRLE_AOUT	0x0020		/* AOUT flag in effect */
 #define	CRLE_EXISTS	0x0040		/* config file already exists */
@@ -180,6 +179,15 @@ typedef	struct crle_desc {
 #define	CRLE_ASLIB	0x8000		/* default AOUT secure path supplied */
 
 /*
+ * Return type code returned by inspectconfig()
+ */
+typedef enum {
+	INSCFG_RET_OK = 0,		/* Config file is OK */
+	INSCFG_RET_FAIL = 1,		/* Config file has a fatal problem */
+	INSCFG_RET_NEED64 = 2,		/* 64-bit config seen by 32-bit crle */
+} INSCFG_RET;
+
+/*
  * Local functions.
  */
 extern int		addlib(Crle_desc *, char **, const char *);
@@ -192,7 +200,7 @@ extern Hash_ent *	get_hash(Hash_tbl *, Addr, Half, int);
 extern int		inspect(Crle_desc *, const char *, Half);
 extern Listnode *	list_append(List *, const void *);
 extern Hash_tbl *	make_hash(int, Hash_type, ulong_t);
-extern int		inspectconfig(Crle_desc *);
+extern INSCFG_RET	inspectconfig(Crle_desc *);
 extern int		updateconfig(Crle_desc *);
 
 #ifdef	__cplusplus

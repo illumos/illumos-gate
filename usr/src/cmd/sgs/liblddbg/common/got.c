@@ -121,10 +121,12 @@ Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
 	if (reloc) {
 		if (type == SHT_RELA) {
 			rela = (Rela *)reloc;
-			str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info));
+			str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info),
+				0);
 		} else {
 			rel = (Rel *)reloc;
-			str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info));
+			str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info),
+				0);
 		}
 
 		if (name)

@@ -70,6 +70,7 @@ CPPFLAGS +=	-I. -I../common -I../../common -I../../../include \
 		-I../../../include/$(MACH) \
 		-I$(SRC)/lib/libc/inc \
 		-I$(SRC)/uts/common/krtld \
+		-I$(SRC)/common/sgsrtcid \
 		-I$(SRC)/uts/$(ARCH)/sys
 
 DYNFLAGS +=	$(VERSREF) -M $(MAPFILE)

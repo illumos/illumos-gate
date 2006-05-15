@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -69,11 +68,21 @@
 @ MSG_ARG_UPDATE	"%s: %s: version [%lu] of configuration file provides \
 			 limited update (-u) and command-line regeneration \
 			 capabilities: best effort in effect\n"
+@ MSG_ARG_UPDATEVER	"%s: %s: file version [%lu] newer than crle version \
+			[%lu]. Unable to update\n"
+@ MSG_ARG_PRINTVER	"%s: %s: file version [%lu] newer than crle version \
+			[%lu]. Displayed information may be incomplete\n"
 @ MSG_ARG_CLASS		"%s: %s: 32-bit file update is incompatible with -64 \
 			 option\n"
+@ MSG_ARG_WRONGARCH	"%s: %s: %s %s file update is incompatible with \
+			%s %s version of crle\n"
 
 @ MSG_WARN_ENV		"%s: warning: %.*s: environment variable \
 			 multiply-defined, first definition taken\n"
+
+# ISA errors
+@ MSG_ISA32_NO64SUP	"%s: This system lacks support for 64-bit \
+			configuration files\n"
 
 # System error messages
 
@@ -163,6 +172,7 @@
 # Dump strings
 
 @ MSG_DMP_HEAD		"\nConfiguration file [version %lu]: %s  %s\n"
+@ MSG_DMP_PLATFORM	"  Platform:\t%s %s %s\n"
 @ MSG_DMP_APP		"  Specific application: %s  (original: %s)\n" 
 @ MSG_DMP_DLIBPTH	"  Default Library Path (%s):\t%s\n"
 @ MSG_DMP_TLIBPTH	"  Trusted Directories (%s):\t%s\n"

@@ -103,8 +103,9 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	    demangle(sdp->sd_name));
 	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 	    sdp->sd_file->ifl_name,
-	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype), ifl->ifl_name,
-	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype));
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
+	    ifl->ifl_name,
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype, 0));
 }
 
 /*ARGSUSED4*/
@@ -391,9 +392,9 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
 		    ifl->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype, 0));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return;
 	}
@@ -412,9 +413,9 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
 		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype));
+		    ntype, 0));
 		warn++;
 	} else if ((otype == STT_OBJECT) && (osym->st_size != nsym->st_size)) {
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN)) {
@@ -510,9 +511,9 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		}
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
 		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype));
+		    ntype, 0));
 		return;
 	} else if (ofile != nfile) {
 
@@ -550,9 +551,9 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype),
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
 		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype));
+		    ntype, 0));
 		warn++;
 	} else if (osym->st_size != nsym->st_size) {
 		/*

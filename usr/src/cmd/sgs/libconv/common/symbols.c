@@ -61,7 +61,7 @@ conv_sym_other(uchar_t other)
 }
 
 const char *
-conv_sym_info_type(Half mach, uchar_t type)
+conv_sym_info_type(Half mach, uchar_t type, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	types[] = {
@@ -70,17 +70,19 @@ conv_sym_info_type(Half mach, uchar_t type)
 		MSG_STT_TLS
 	};
 
-	if (type < STT_NUM)
+	if (type < STT_NUM) {
 		return (MSG_ORIG(types[type]));
-	else if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
-	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))
+	} else if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
+	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER)) {
 		return (MSG_ORIG(MSG_STT_REGISTER));
-	else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+	} else {
+		return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			type, fmt_flags));
+	}
 }
 
 const char *
-conv_sym_info_bind(uchar_t bind)
+conv_sym_info_bind(uchar_t bind, int fmt_flags)
 {
 	static char		string[CONV_INV_STRSIZE];
 	static const Msg	binds[] = {
@@ -88,7 +90,8 @@ conv_sym_info_bind(uchar_t bind)
 	};
 
 	if (bind >= STB_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, bind, 0));
+		return (conv_invalid_val(string, CONV_INV_STRSIZE,
+			bind, fmt_flags));
 	else
 		return (MSG_ORIG(binds[bind]));
 }
@@ -117,7 +120,7 @@ conv_sym_shndx(Half shndx)
 		return (MSG_ORIG(MSG_SHN_XINDEX));
 	default:
 		return (conv_invalid_val(string, CONV_INV_STRSIZE, shndx,
-		    CONV_INV_DECIMAL));
+		    CONV_FMT_DECIMAL));
 	}
 }
 
@@ -128,7 +131,7 @@ conv_sym_value(Half mach, uchar_t type, Addr value)
 
 	if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))
-		return (conv_sym_SPARC_value(value));
+		return (conv_sym_SPARC_value(value, 0));
 
 	(void) sprintf(string, MSG_ORIG(MSG_SYM_FMT_VAL), EC_ADDR(value));
 	return (string);

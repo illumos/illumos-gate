@@ -911,7 +911,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_amd64_type(arsp->rel_rtype),
+				    conv_reloc_amd64_type(arsp->rel_rtype, 0),
 				    ifl_name, demangle(arsp->rel_sname),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
@@ -942,7 +942,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, class,
 				    MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_amd64_type(arsp->rel_rtype),
+				    conv_reloc_amd64_type(arsp->rel_rtype, 0),
 				    ifl_name, arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -
@@ -1199,7 +1199,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 			return (0);
 		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
 		    MSG_INTL(MSG_REL_EXTERNSYM),
-		    conv_reloc_amd64_type(rsp->rel_rtype),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
 		return (1);
@@ -1238,7 +1238,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	if ((ofl->ofl_flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
 	    (FLG_OF_STATIC | FLG_OF_EXEC)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
-		    conv_reloc_amd64_type(rsp->rel_rtype),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname));
 		return (S_ERROR);
@@ -1252,10 +1252,10 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
 
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
-		    conv_reloc_amd64_type(rsp->rel_rtype),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 		    ifl->ifl_name, demangle(rsp->rel_sname),
 		    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
-		    ELF_ST_TYPE(sdp->sd_sym->st_info)));
+		    ELF_ST_TYPE(sdp->sd_sym->st_info), 0));
 		return (S_ERROR);
 	}
 
@@ -1283,7 +1283,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			if (IS_TLS_LD(rtype) || IS_TLS_LE(rtype)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_REL_TLSBND),
-				    conv_reloc_amd64_type(rsp->rel_rtype),
+				    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 				    rsp->rel_isdesc->is_file->ifl_name,
 				    demangle(rsp->rel_sname),
 				    sdp->sd_file->ifl_name);
@@ -1335,7 +1335,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 */
 	if (IS_TLS_IE(rtype) || IS_TLS_LE(rtype)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSIE),
-		    conv_reloc_amd64_type(rsp->rel_rtype),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname));
 		return (S_ERROR);
@@ -1346,7 +1346,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 */
 	if (!local && IS_TLS_LD(rtype)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
-		    conv_reloc_amd64_type(rsp->rel_rtype),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname),
 		    sdp->sd_file->ifl_name);

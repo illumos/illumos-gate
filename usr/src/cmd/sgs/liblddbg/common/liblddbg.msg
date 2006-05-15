@@ -429,6 +429,8 @@
 @ MSG_FIL_CONFIG_ERR_2	"invalid version"
 @ MSG_FIL_CONFIG_ERR_3	"unable to process file"
 @ MSG_FIL_CONFIG_ERR_4	"corrupt or truncated file"
+@ MSG_FIL_CONFIG_ERR_5	"incompatible ELF class, byte order, or machine \
+			architecture"
 
 @ MSG_CNTL_TITLE	"control list processing complete: moving lmco 0x%llx \
 			 to lmco 0x%llx"
