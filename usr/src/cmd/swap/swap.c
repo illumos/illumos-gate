@@ -342,7 +342,7 @@ doswap(int flag)
 				number_to_scaled_string(numbuf, allocated,
 				factor, scale));
 		(void) printf(gettext("%s reserved = "),
-				number_to_scaled_string(numbuf, allocated,
+				number_to_scaled_string(numbuf, reserved,
 				factor, scale));
 		(void) printf(gettext("%s used, "),
 				number_to_scaled_string(numbuf,
@@ -528,7 +528,7 @@ number_to_scaled_string(
 	/*
 	 * Now we have number as a count of scale units.
 	 * Stop scaling when we reached exa bytes, then something is
-	 * probably wrong with our number.probably wrong with our number.
+	 * probably wrong with our number.
 	 */
 	while ((number >= scale) && (*uom != 'E')) {
 		uom++;	/* Next unit of measurement */
