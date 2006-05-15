@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -233,6 +233,8 @@ extern uint_t	sgenv_debug;
 #define	SGENV_DEBUG_THREAD	0x10
 #define	SGENV_DEBUG_ALL		0xFF
 
+#define	DCMN_ERR_S(v, s)	static fn_t (v) = (s)
+
 #define	DCMN_ERR	cmn_err
 #define	DCMN_ERR_EVENT	if (sgenv_debug & SGENV_DEBUG_EVENT)	DCMN_ERR
 #define	DCMN_ERR_CACHE	if (sgenv_debug & SGENV_DEBUG_CACHE)	DCMN_ERR
@@ -260,10 +262,13 @@ extern uint_t	sgenv_debug;
 		if (sgenv_debug & SGENV_DEBUG_POLL)	SGENV_PRINT_ENV_INFO(x)
 
 #else
-#define	DCMN_ERR
-#define	DCMN_ERR_EVENT
-#define	DCMN_ERR_CACHE
-#define	DCMN_ERR_THREAD
+#define	DCMN_ERR_S(v, s)	fn_t (v) = ""
+
+#define	_DCMN_ERR		cmn_err
+#define	DCMN_ERR		if (0) _DCMN_ERR
+#define	DCMN_ERR_EVENT		if (0) _DCMN_ERR
+#define	DCMN_ERR_CACHE		if (0) _DCMN_ERR
+#define	DCMN_ERR_THREAD		if (0) _DCMN_ERR
 #define	SGENV_PRINT_MBOX_MSG
 #define	SGENV_PRINT_ENV_INFO
 #define	SGENV_PRINT_POLL_INFO

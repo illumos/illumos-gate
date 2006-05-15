@@ -884,7 +884,7 @@ sgenv_remove_intr_handlers(void)
 static int
 sgenv_create_cache_update_threads(void)
 {
-	static fn_t	f = "sgenv_create_cache_update_threads()";
+	DCMN_ERR_S(f, "sgenv_create_cache_update_threads()");
 
 	DCMN_ERR_THREAD(CE_NOTE, "Entering %s", f);
 
@@ -911,7 +911,7 @@ sgenv_create_cache_update_threads(void)
 static int
 sgenv_remove_cache_update_threads(void)
 {
-	static fn_t	f = "sgenv_remove_cache_update_threads()";
+	DCMN_ERR_S(f, "sgenv_remove_cache_update_threads()");
 
 	DCMN_ERR_THREAD(CE_NOTE, "%s: Waiting for cache update threads", f);
 
@@ -1018,7 +1018,7 @@ sgenv_init_env_cache(void)
 static void
 sgenv_update_env_cache(void)
 {
-	static fn_t	f = "sgenv_update_env_cache()";
+	DCMN_ERR_S(f, "sgenv_update_env_cache()");
 
 	mutex_enter(&env_flag_lock);
 
@@ -1095,7 +1095,7 @@ sgenv_update_env_cache(void)
 static int
 sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 {
-	static fn_t	f = "sgenv_env_info_kstat_update()";
+	DCMN_ERR_S(f, "sgenv_env_info_kstat_update()");
 
 	int		err = 0;
 	int		key_posn;
@@ -1185,7 +1185,7 @@ sgenv_env_info_kstat_update(kstat_t *ksp, int rw)
 static int
 sgenv_env_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 {
-	static fn_t	f = "sgenv_env_info_kstat_snapshot()";
+	DCMN_ERR_S(f, "sgenv_env_info_kstat_snapshot()");
 
 	switch (rw) {
 	case KSTAT_WRITE:
@@ -1251,7 +1251,7 @@ sgenv_init_board_cache(void)
 static void
 sgenv_update_board_cache(void)
 {
-	static fn_t	f = "sgenv_update_board_cache()";
+	DCMN_ERR_S(f, "sgenv_update_board_cache()");
 
 	mutex_enter(&board_flag_lock);
 
@@ -1377,7 +1377,7 @@ sgenv_board_info_kstat_update(kstat_t *ksp, int rw)
 static int
 sgenv_board_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 {
-	static fn_t	f = "sgenv_board_info_kstat_snapshot()";
+	DCMN_ERR_S(f, "sgenv_board_info_kstat_snapshot()");
 
 	sg_board_info_t	*bdp;
 	int		i, num_bds = 0;
@@ -1459,7 +1459,7 @@ sgenv_board_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 static int
 sgenv_get_env_info_data(void)
 {
-	static fn_t	f = "sgenv_get_env_info_data()";
+	DCMN_ERR_S(f, "sgenv_get_env_info_data()");
 
 	envresp_key_t	new_keys[SGENV_MAX_HPU_KEYS] = {0};
 	envresp_key_t	old_key;
@@ -2288,7 +2288,7 @@ sgenv_update_env_kstat_size(kstat_t *ksp)
 static uint_t
 sgenv_check_sensor_thresholds(void)
 {
-	static fn_t	f = "sgenv_poll_env()";
+	DCMN_ERR_S(f, "sgenv_poll_env()");
 
 	int	key;	/* loop through keys */
 	int	i;	/* loops through each sensor for each <key> */
@@ -2577,7 +2577,7 @@ sgenv_tagid_to_string(sensor_id_t id, char *str)
 static uint_t
 sgenv_keyswitch_handler(char *arg)
 {
-	static fn_t		f = "sgenv_keyswitch_handler()";
+	DCMN_ERR_S(f, "sgenv_keyswitch_handler()");
 
 	sysevent_t		*ev = NULL;
 	sysevent_id_t		eid;
@@ -2672,7 +2672,7 @@ sgenv_keyswitch_handler(char *arg)
 static uint_t
 sgenv_env_data_handler(char *arg)
 {
-	static fn_t	f = "sgenv_env_data_handler()";
+	DCMN_ERR_S(f, "sgenv_env_data_handler()");
 
 	sg_event_env_changed_t	*payload = NULL;
 	sbbc_msg_t		*msg = NULL;
@@ -2720,7 +2720,7 @@ sgenv_env_data_handler(char *arg)
 static uint_t
 sgenv_fan_status_handler(char *arg)
 {
-	static fn_t	f = "sgenv_fan_status_handler()";
+	DCMN_ERR_S(f, "sgenv_fan_status_handler()");
 
 	sysevent_t		*ev = NULL;
 	sysevent_id_t		eid;
@@ -2919,7 +2919,7 @@ sgenv_fan_status_handler(char *arg)
 static int
 sgenv_process_threshold_event(env_sensor_t sensor)
 {
-	static fn_t		f = "sgenv_process_threshold_event()";
+	DCMN_ERR_S(f, "sgenv_process_threshold_event()");
 
 	sysevent_t		*ev = NULL;
 	sysevent_id_t		eid;
@@ -3135,7 +3135,7 @@ sgenv_process_threshold_event(env_sensor_t sensor)
 static uint_t
 sgenv_dr_event_handler(char *arg)
 {
-	static fn_t	f = "sgenv_dr_event_handler()";
+	DCMN_ERR_S(f, "sgenv_dr_event_handler()");
 
 	sg_system_fru_descriptor_t	*payload = NULL;
 	sbbc_msg_t			*msg = NULL;
@@ -3206,7 +3206,7 @@ sgenv_dr_event_handler(char *arg)
 static void
 sgenv_indicate_cache_update_needed(int cache_type)
 {
-	static fn_t	f = "sgenv_indicate_cache_update_needed()";
+	DCMN_ERR_S(f, "sgenv_indicate_cache_update_needed()");
 
 	/*
 	 * If the cache is already being updated, we set a flag to
