@@ -49,8 +49,10 @@ package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		-I$(SRC)/common/sgsrtcid -I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -D__EXTENSIONS__
+LLDFLAGS =	'-R$$ORIGIN/../lib'
+LLDFLAGS64 =	'-R$$ORIGIN/../../lib/$(MACH64)'
 LDFLAGS +=	$(VERSREF) $(USE_PROTO) -M$(MAPFILE) \
-			'-R$$ORIGIN/../lib' $(ZNOLAZYLOAD)
+			$(LLDFLAGS) $(ZNOLAZYLOAD)
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) $(DLLIB)
 LINTFLAGS +=	-mx
 

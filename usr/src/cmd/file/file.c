@@ -1328,7 +1328,6 @@ is_rtld_config(void)
 
 	if ((fbsz >= sizeof (*id)) && RTC_ID_TEST(fbuf)) {
 		(void) printf(gettext("Runtime Linking Configuration"));
-		/* LINTED: pointer cast may result in improper alignment */
 		id = (Rtc_id *) fbuf;
 		print_elf_class(id->id_class);
 		print_elf_datatype(id->id_data);
