@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -335,10 +334,6 @@ static struct blacklist {
 
 	{MS_ADDONICS_CARD_READER_VID, MS_ADDONICS_CARD_READER_PID,
 	    0, SCSA2USB_ATTRS_REDUCED_CMD},
-
-	/* Newman 1.1 Flash Disk */
-	{MS_NEWMAN_FLASH_VID, MS_NEWMAN_FLASH_PID, 0,
-	    SCSA2USB_ATTRS_MODE_SENSE},
 
 	/* Acomdata 80GB USB/1394 Hard Disk */
 	{MS_ACOMDATA_VID, MS_ACOMDATA_PID1, 0,
@@ -2947,7 +2942,8 @@ scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		transport = SCSA2USB_REJECT;
 	}
 
-	if (transport == SCSA2USB_TRANSPORT) {
+	switch (transport) {
+	case SCSA2USB_TRANSPORT:
 		if (SCSA2USB_IS_BULK_ONLY(scsa2usbp)) {
 			rval = scsa2usb_bulk_only_transport(scsa2usbp, cmd);
 		} else if (SCSA2USB_IS_CB(scsa2usbp) ||
@@ -2956,10 +2952,14 @@ scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		} else {
 			rval = TRAN_FATAL_ERROR;
 		}
-	} else {
+		break;
+	case SCSA2USB_JUST_ACCEPT:
+		SCSA2USB_SET_PKT_DO_COMP_STATE(scsa2usbp);
+		rval = TRAN_ACCEPT;
+		break;
+	default:
 		rval = TRAN_FATAL_ERROR;
 	}
-
 
 	return (rval);
 }
@@ -3208,9 +3208,22 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 		break;
 
 	/*
-	 * do not convert SCMD_MODE_SENSE/SELECT to G1 cmds because
-	 * the mode header is different as well
+	 * Do not convert SCMD_MODE_SENSE/SELECT to G1 cmds because
+	 * the mode header is different as well. USB devices don't
+	 * support 0x03 & 0x04 mode pages, which are already obsoleted
+	 * by SPC-2 specification.
 	 */
+	case SCMD_MODE_SENSE:
+	case SCMD_MODE_SELECT:
+		if ((pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE3_CODE) ||
+		    (pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE4_CODE)) {
+			if (cmd->cmd_bp) {
+				cmd->cmd_pkt->pkt_resid = cmd->cmd_bp->b_bcount;
+			}
+			scsa2usb_force_invalid_request(scsa2usbp, cmd);
+			return (SCSA2USB_JUST_ACCEPT);
+		}
+		break;
 
 	case SCMD_DOORLOCK:
 	case SCMD_START_STOP:

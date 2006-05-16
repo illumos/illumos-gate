@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -95,9 +94,6 @@ extern "C" {
 #define	MS_ADDONICS_CARD_READER_VID 0x7cc /* addonics */
 #define	MS_ADDONICS_CARD_READER_PID 0x320
 
-#define	MS_NEWMAN_FLASH_VID	0x1043	/* Newman flash device */
-#define	MS_NEWMAN_FLASH_PID	0x8006
-
 #define	MS_ACOMDATA_VID		0xc0b	/* VendorId of DMI (Acomdata) */
 #define	MS_ACOMDATA_PID1	0x5fab	/* PID for 80GB USB/1394 disk */
 
@@ -151,6 +147,15 @@ extern "C" {
 
 /* max inquiry length */
 #define	SCSA2USB_MAX_INQ_LEN (offsetof(struct scsi_inquiry, inq_serial))
+
+/* page code of scsi mode page */
+#ifndef SD_MODE_SENSE_PAGE3_CODE
+#define	SD_MODE_SENSE_PAGE3_CODE	0x03
+#endif
+
+#ifndef SD_MODE_SENSE_PAGE4_CODE
+#define	SD_MODE_SENSE_PAGE4_CODE	0x04
+#endif
 
 /*
  * PM support

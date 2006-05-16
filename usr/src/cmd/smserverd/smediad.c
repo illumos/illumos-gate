@@ -988,7 +988,9 @@ scsi_media_status(int32_t fd)
 	(void) memset((void *) &ucmd, 0, sizeof (ucmd));
 	(void) memset((void *) &cdb, 0, sizeof (union scsi_cdb));
 	cdb.scc_cmd = SCMD_MODE_SENSE;
+	cdb.cdb_opaque[2] = MODEPAGE_ALLPAGES;
 	FORMG0COUNT(&cdb, sizeof (modeh));
+
 	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
 	ucmd.uscsi_bufaddr = (caddr_t)&modeh;
@@ -998,11 +1000,18 @@ scsi_media_status(int32_t fd)
 	ucmd.uscsi_rqbuf = rq_data;
 	ret_val = do_uscsi_cmd(fd, &ucmd, USCSI_READ|USCSI_RQENABLE);
 	if (ret_val || ucmd.uscsi_status) {
-		debug(5, "Modesense failed: %d - %d errno = %d\n",
+		debug(5, "Modesense for 0x3f pages failed: %d-%d errno=%d\n",
 			ret_val, ucmd.uscsi_status, errno);
-		return (-1);
+		cdb.cdb_opaque[2] = 0;
+		ucmd.uscsi_rqlen = RQ_LEN;
+		FORMG0COUNT(&cdb, sizeof (modeh));
+		ret_val = do_uscsi_cmd(fd, &ucmd, USCSI_READ|USCSI_RQENABLE);
+		if (ret_val || ucmd.uscsi_status) {
+			debug(5, "Modesense failed: %d - %d errno = %d\n",
+				ret_val, ucmd.uscsi_status, errno);
+			return (-1);
+		}
 	}
-
 
 	if (modeh.device_specific & W_E_MASK) {
 		cur_status = SM_WRITE_PROTECT_NOPASSWD;

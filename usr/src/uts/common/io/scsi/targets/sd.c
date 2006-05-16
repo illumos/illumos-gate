@@ -10746,17 +10746,6 @@ sd_ready_and_valid(struct sd_lun *un)
 		}
 	}
 
-#ifdef DOESNTWORK /* on eliteII, see 1118607 */
-	/*
-	 * check to see if this disk is write protected, if it is and we have
-	 * not set read-only, then fail
-	 */
-	if ((flag & FWRITE) && (sr_check_wp(dev))) {
-		New_state(un, SD_STATE_CLOSED);
-		goto done;
-	}
-#endif
-
 	/*
 	 * If this device supports DOOR_LOCK command, try and send
 	 * this command to PREVENT MEDIA REMOVAL, but don't get upset
@@ -20411,6 +20400,7 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
+	int			headlen;
 
 	ASSERT(un != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
@@ -20430,12 +20420,15 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 		cdb.scc_cmd = SCMD_MODE_SENSE;
 		cdb.cdb_opaque[2] = page_code;
 		FORMG0COUNT(&cdb, buflen);
+		headlen = MODE_HEADER_LENGTH;
 	} else {
 		cdb.scc_cmd = SCMD_MODE_SENSE_G1;
 		cdb.cdb_opaque[2] = page_code;
 		FORMG1COUNT(&cdb, buflen);
+		headlen = MODE_HEADER_LENGTH_GRP2;
 	}
 
+	ASSERT(headlen <= buflen);
 	SD_FILL_SCSI1_LUN_CDB(un, &cdb);
 
 	ucmd_buf.uscsi_cdb	= (char *)&cdb;
@@ -20452,6 +20445,15 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 
 	switch (status) {
 	case 0:
+		/*
+		 * sr_check_wp() uses 0x3f page code and check the header of
+		 * mode page to determine if target device is write-protected.
+		 * But some USB devices return 0 bytes for 0x3f page code. For
+		 * this case, make sure that mode page header is returned at
+		 * least.
+		 */
+		if (buflen - ucmd_buf.uscsi_resid <  headlen)
+			status = EIO;
 		break;	/* Success! */
 	case EIO:
 		switch (ucmd_buf.uscsi_status) {
@@ -27287,7 +27289,7 @@ sr_change_speed(dev_t dev, int cmd, intptr_t data, int flag)
 
 	if ((rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP0, sense,
 	    BUFLEN_MODE_CDROM_SPEED, CDROM_MODE_SPEED,
-	    SD_PATH_STANDARD)) != 0) {
+		SD_PATH_STANDARD)) != 0) {
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "sr_change_speed: Mode Sense Failed\n");
 		kmem_free(sense, BUFLEN_MODE_CDROM_SPEED);
@@ -29049,11 +29051,12 @@ sr_ejected(struct sd_lun *un)
 /*
  *    Function: sr_check_wp()
  *
- * Description: This routine checks the write protection of a removable media
- *		disk via the write protect bit of the Mode Page Header device
- *		specific field.  This routine has been implemented to use the
- *		error recovery mode page for all device types.
- *		Note: In the future use a sd_send_scsi_MODE_SENSE() routine
+ * Description: This routine checks the write protection of a removable
+ *      media disk and hotpluggable devices via the write protect bit of
+ *      the Mode Page Header device specific field. Some devices choke
+ *      on unsupported mode page. In order to workaround this issue,
+ *      this routine has been implemented to use 0x3f mode page(request
+ *      for all pages) for all device types.
  *
  *   Arguments: dev		- the device 'dev_t'
  *
@@ -29070,8 +29073,7 @@ sr_check_wp(dev_t dev)
 	uchar_t		device_specific;
 	uchar_t		*sense;
 	int		hdrlen;
-	int		rval;
-	int		retry_flag = FALSE;
+	int		rval = FALSE;
 
 	/*
 	 * Note: The return codes for this routine should be reworked to
@@ -29082,61 +29084,40 @@ sr_check_wp(dev_t dev)
 	}
 
 	if (un->un_f_cfg_is_atapi == TRUE) {
-		retry_flag = TRUE;
-	}
-
-retry:
-	if (un->un_f_cfg_is_atapi == TRUE) {
 		/*
 		 * The mode page contents are not required; set the allocation
 		 * length for the mode page header only
 		 */
 		hdrlen = MODE_HEADER_LENGTH_GRP2;
 		sense = kmem_zalloc(hdrlen, KM_SLEEP);
-		rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP1, sense, hdrlen,
-		    MODEPAGE_ERR_RECOV, SD_PATH_STANDARD);
+		if (sd_send_scsi_MODE_SENSE(un, CDB_GROUP1, sense, hdrlen,
+		    MODEPAGE_ALLPAGES, SD_PATH_STANDARD) != 0)
+			goto err_exit;
 		device_specific =
 		    ((struct mode_header_grp2 *)sense)->device_specific;
 	} else {
 		hdrlen = MODE_HEADER_LENGTH;
 		sense = kmem_zalloc(hdrlen, KM_SLEEP);
-		rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP0, sense, hdrlen,
-		    MODEPAGE_ERR_RECOV, SD_PATH_STANDARD);
+		if (sd_send_scsi_MODE_SENSE(un, CDB_GROUP0, sense, hdrlen,
+		    MODEPAGE_ALLPAGES, SD_PATH_STANDARD) != 0)
+			goto err_exit;
 		device_specific =
 		    ((struct mode_header *)sense)->device_specific;
 	}
 
-	if (rval != 0) {
-		if ((un->un_f_cfg_is_atapi == TRUE) && (retry_flag)) {
-			/*
-			 * For an Atapi Zip drive, observed the drive
-			 * reporting check condition for the first attempt.
-			 * Sense data indicating power on or bus device/reset.
-			 * Hence in case of failure need to try at least once
-			 * for Atapi devices.
-			 */
-			retry_flag = FALSE;
-			kmem_free(sense, hdrlen);
-			goto retry;
-		} else {
-			/*
-			 * Write protect mode sense failed; not all disks
-			 * understand this query. Return FALSE assuming that
-			 * these devices are not writable.
-			 */
-			rval = FALSE;
-		}
-	} else {
-		if (device_specific & WRITE_PROTECT) {
-			rval = TRUE;
-		} else {
-			rval = FALSE;
-		}
+	/*
+	 * Write protect mode sense failed; not all disks
+	 * understand this query. Return FALSE assuming that
+	 * these devices are not writable.
+	 */
+	if (device_specific & WRITE_PROTECT) {
+		rval = TRUE;
 	}
+
+err_exit:
 	kmem_free(sense, hdrlen);
 	return (rval);
 }
-
 
 /*
  *    Function: sr_volume_ctrl()
