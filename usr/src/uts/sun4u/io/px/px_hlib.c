@@ -2989,6 +2989,8 @@ static uint_t
 oberon_hp_pwron(caddr_t csr_base)
 {
 	volatile uint64_t reg;
+	boolean_t link_retrain, link_up;
+	int i;
 
 	DBG(DBG_HP, NULL, "oberon_hp_pwron the slot\n");
 
@@ -3002,8 +3004,7 @@ oberon_hp_pwron(caddr_t csr_base)
 	/* Check Slot status */
 	reg = CSR_XR(csr_base, TLU_SLOT_STATUS);
 	if (!(reg & (1ull << TLU_SLOT_STATUS_PSD)) ||
-	    (reg & (1ull << TLU_SLOT_STATUS_MRLS)) ||
-	    (reg & (1ull << TLU_SLOT_STATUS_PWFD))) {
+	    (reg & (1ull << TLU_SLOT_STATUS_MRLS))) {
 		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: slot status %lx\n",
 		    reg);
 		goto fail;
@@ -3014,15 +3015,24 @@ oberon_hp_pwron(caddr_t csr_base)
 	/* Turn on slot power */
 	CSR_BS(csr_base, HOTPLUG_CONTROL, PWREN);
 
+	/* power fault detection */
+	delay(drv_usectohz(25000));
+	CSR_BS(csr_base, TLU_SLOT_STATUS, PWFD);
+	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+
 	/* wait to check power state */
 	delay(drv_usectohz(25000));
 
-	if (CSR_BR(csr_base, TLU_SLOT_STATUS, PWFD)) {
+	if (!CSR_BR(csr_base, TLU_SLOT_STATUS, PWFD)) {
 		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: power fault\n");
 		goto fail1;
 	}
 
 	/* power is good */
+	CSR_BS(csr_base, HOTPLUG_CONTROL, PWREN);
+
+	delay(drv_usectohz(25000));
+	CSR_BS(csr_base, TLU_SLOT_STATUS, PWFD);
 	CSR_BS(csr_base, TLU_SLOT_CONTROL, PWFDEN);
 
 	/* Turn on slot clock */
@@ -3050,18 +3060,43 @@ oberon_hp_pwron(caddr_t csr_base)
 	CSR_XS(csr_base, TLU_SLOT_CAPABILITIES, reg);
 
 	/* Enable PCIE port */
-	CSR_BS(csr_base, DLU_PORT_CONTROL, CK_EN);
+	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
 	CSR_BC(csr_base, FLP_PORT_CONTROL, PORT_DIS);
 
-	/* wait for the LUP_P/LUP_S */
-	delay(drv_usectohz(10000));
-	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
-	if (!(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_P)) &&
-	    !(reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LUP_S))) {
+	/* wait for the link up */
+	link_up = B_FALSE;
+	link_retrain = B_TRUE;
+	for (i = 0; (i < 2) && (link_up == B_FALSE); i++) {
+		delay(drv_usectohz(100000));
+		reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
+
+		if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
+			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_MASK) ==
+			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_FC_INIT_DONE) &&
+		    (reg & (1ull << DLU_LINK_LAYER_STATUS_DLUP_STS)) &&
+		    ((reg & DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_MASK) ==
+			DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_DL_ACTIVE)) {
+			DBG(DBG_HP, NULL, "oberon_hp_pwron : link is up\n");
+			link_up = B_TRUE;
+		} else if (link_retrain == B_TRUE) {
+			DBG(DBG_HP, NULL, "oberon_hp_pwron: retrain link\n");
+			/* retrain the link */
+			CSR_BS(csr_base, FLP_PORT_LINK_CONTROL, RETRAIN);
+			link_retrain = B_FALSE;
+		}
+	}
+
+	if (link_up == B_FALSE) {
 		DBG(DBG_HP, NULL, "oberon_hp_pwron fails to enable "
 		    "PCI-E port\n");
 		goto fail2;
 	}
+
+	/* link is up */
+	CSR_BS(csr_base, FLP_PORT_ACTIVE_STATUS, TRAIN_ERROR);
+	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_P);
+	CSR_BS(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR, TE_S);
+	CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
 
 	/* Turn on Power LED */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
@@ -3071,13 +3106,16 @@ oberon_hp_pwron(caddr_t csr_base)
 	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
 
 	/* Notify to SCF */
-	CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
+	if (CSR_BR(csr_base, HOTPLUG_CONTROL, SLOTPON))
+		CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
+	else
+		CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
+
 	return (DDI_SUCCESS);
 
 fail2:
 	/* Link up is failed */
 	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
-	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
 	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
 	delay(drv_usectohz(150));
 
@@ -3112,37 +3150,32 @@ oberon_hp_pwroff(caddr_t csr_base)
 
 	/* Clear Slot Event */
 	CSR_BS(csr_base, TLU_SLOT_STATUS, PSDC);
+	CSR_BS(csr_base, TLU_SLOT_STATUS, PWFD);
 
 	/* DRN_TR_DIS on */
 	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
+	delay(drv_usectohz(10000));
 
 	/* Disable port */
 	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
 
-	/* check time or link status */
-	delay(drv_usectohz(10000));
-
-	/* DRN_TR_DIS off/ CK_EN off */
-	reg = CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR);
-	if ((reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LDN_P)) ||
-	    (reg & (1ull << TLU_OTHER_EVENT_STATUS_CLEAR_LDN_S))) {
-		CSR_BC(csr_base, TLU_CONTROL, DRN_TR_DIS);
-	}
-	CSR_BC(csr_base, DLU_PORT_CONTROL, CK_EN);
-
 	/* PCIE reset */
+	delay(drv_usectohz(10000));
 	CSR_BC(csr_base, HOTPLUG_CONTROL, N_PERST);
 
 	/* PCIE clock stop */
+	delay(drv_usectohz(150));
 	CSR_BC(csr_base, HOTPLUG_CONTROL, CLKEN);
 
 	/* Turn off slot power */
+	delay(drv_usectohz(100));
 	CSR_BC(csr_base, TLU_SLOT_CONTROL, PWFDEN);
 	CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
-	CSR_BC(csr_base, TLU_SLOT_STATUS, PWFD);
+	delay(drv_usectohz(25000));
+	CSR_BS(csr_base, TLU_SLOT_STATUS, PWFD);
 
 	/* write 0 to bit 7 of ILU Error Log Enable Register */
-	CSR_BS(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3);
+	CSR_BC(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3);
 
 	/* Power LED off */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
@@ -3159,12 +3192,10 @@ oberon_hp_pwroff(caddr_t csr_base)
 	CSR_XS(csr_base, TLU_SLOT_CONTROL, reg);
 
 	/* Notify to SCF */
-	CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
-
-	/*
-	 * Check Leaf Reset
-	 * XXX - We don't need to wait for this any more.
-	 */
+	if (CSR_BR(csr_base, HOTPLUG_CONTROL, SLOTPON))
+		CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
+	else
+		CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
 
 	/* Indicator LED off */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
@@ -3237,8 +3268,11 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 			pwr_fault = CSR_XR(csr_base, TLU_SLOT_STATUS) &
 			    (1ull << TLU_SLOT_STATUS_PWFD);
 
-			if (pwr_fault)
+			if (pwr_fault) {
+				DBG(DBG_HP, NULL, "oberon_hpreg_put: power "
+				    "off because of power fault\n");
 				CSR_BC(csr_base, HOTPLUG_CONTROL, PWREN);
+			}
 			else
 				ret = oberon_hp_pwroff(csr_base);
 		} else

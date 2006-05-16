@@ -5420,20 +5420,11 @@ pcicfg_alloc_new_resources(dev_info_t *dip)
 				    assigned[j].pci_phys_hi) !=
 				    PCI_REG_ADDR_G(reg[i].pci_phys_hi)) {
 
-					cmn_err(CE_WARN, "Fcode changing"
+					DEBUG2("Fcode changing"
 					    " SS bits of - 0x%x -"
 					    " on %s\n", reg[i].pci_phys_hi,
 					    DEVI(dip)->devi_name);
 
-					/*
-					 * Dont forget to free mem from
-					 * ddi_getlongprop
-					 */
-					if (acount != 0)
-						kmem_free((caddr_t)assigned,
-						    assigned_len);
-					kmem_free((caddr_t)reg, reg_len);
-					return (PCICFG_FAILURE);
 				}
 
 
@@ -5608,6 +5599,12 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 
 			phys_spec.pci_phys_low = PCICFG_LOADDR(answer);
 			phys_spec.pci_phys_mid = PCICFG_HIADDR(answer);
+			/*
+			 * currently support 32b address space
+			 * assignments only.
+			 */
+			phys_spec.pci_phys_hi ^= PCI_ADDR_MEM64 ^
+							PCI_ADDR_MEM32;
 
 			break;
 

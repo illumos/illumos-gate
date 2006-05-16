@@ -207,18 +207,23 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	uint16_t		cap_ptr, aer_ptr, dev_type, device_sts;
 	int			rval = DDI_FAILURE;
 
+	/* 1. clear the Legacy PCI Errors */
+	device_sts = pci_config_get16(config_handle, PCI_CONF_STAT);
+	pci_config_put16(config_handle, PCI_CONF_STAT, device_sts);
+
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-		!= DDI_FAILURE) {
-		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
-			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
-		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
-	}
+			== DDI_FAILURE)
+		return;
+
+	rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+		(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+	dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	/*
 	 * Clear any pending errors
 	 */
-	/* 1. clear the Advanced PCIe Errors */
+	/* 2. clear the Advanced PCIe Errors */
 	if (rval != DDI_FAILURE) {
 		PCI_XCAP_PUT32(config_handle, NULL, aer_ptr, PCIE_AER_CE_STS,
 			-1);
@@ -231,15 +236,11 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 		}
 	}
 
-	/* 2. clear the PCIe Errors */
+	/* 3. clear the PCIe Errors */
 	if ((device_sts = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
 		PCIE_DEVSTS)) != PCI_CAP_EINVAL16)
 		PCI_CAP_PUT16(config_handle, PCI_CAP_ID_PCI_E, cap_ptr,
 			PCIE_DEVSTS, device_sts);
-
-	/* 3. clear the Legacy PCI Errors */
-	device_sts = pci_config_get16(config_handle, PCI_CONF_STAT);
-	pci_config_put16(config_handle, PCI_CONF_STAT, device_sts);
 
 	if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
 		device_sts = pci_config_get16(config_handle,
@@ -256,18 +257,19 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	uint32_t		aer_reg;
 	int			rval = DDI_FAILURE;
 
-	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-		!= DDI_FAILURE) {
-		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
-			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
-		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
-	}
-
 	/*
 	 * Clear any pending errors
 	 */
 	pcie_clear_errors(dip, config_handle);
+
+	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+			== DDI_FAILURE)
+		return;
+
+	rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+		(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+	dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	/*
 	 * Enable PCI-Express Baseline Error Handling
@@ -336,12 +338,13 @@ pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	int			rval = DDI_FAILURE;
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-		!= DDI_FAILURE) {
-		rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
-			(PCIE_EXT_CAP_ID_AER), &aer_ptr);
-		dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
-	}
+			== DDI_FAILURE)
+		return;
+
+	rval = PCI_CAP_LOCATE(config_handle, PCI_CAP_XCFG_SPC
+		(PCIE_EXT_CAP_ID_AER), &aer_ptr);
+	dev_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	/*
 	 * Disable PCI-Express Baseline Error Handling

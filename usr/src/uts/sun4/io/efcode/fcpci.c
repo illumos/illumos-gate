@@ -1319,13 +1319,10 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 				if (PCI_REG_ADDR_G(assigned[i].pci_phys_hi) !=
 				    PCI_REG_ADDR_G(phys_spec.pci_phys_hi)) {
 
-					cmn_err(CE_WARN, "Fcode changing ss "
-					    "bits in reg %x -- %x",
+					FC_DEBUG2(2, CE_WARN, "Fcode changing "
+					    "ss bits in reg %x -- %x",
 					    assigned[i].pci_phys_hi,
 					    phys_spec.pci_phys_hi);
-
-					kmem_free(assigned, assigned_len);
-					return (1);
 				}
 
 				/*
@@ -1460,6 +1457,12 @@ pci_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 
 			phys_spec.pci_phys_low = LOADDR(answer);
 			phys_spec.pci_phys_mid = HIADDR(answer);
+			/*
+			 * currently support 32b address space
+			 * assignments only.
+			 */
+			phys_spec.pci_phys_hi ^= PCI_ADDR_MEM64 ^
+							PCI_ADDR_MEM32;
 
 			break;
 
@@ -1878,12 +1881,12 @@ fcpci_indirect_map(dev_info_t *dip)
 {
 	int rc = DDI_FAILURE;
 
-	if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip), DDI_PROP_DONTPASS,
+	if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
 			PCICFG_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 		rc = DDI_SUCCESS;
 	else
 		if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				DDI_PROP_DONTPASS, PCICFG_BUS_CONF_MAP_PROP,
+				0, PCICFG_BUS_CONF_MAP_PROP,
 				DDI_FAILURE) != DDI_FAILURE)
 			rc = DDI_SUCCESS;
 

@@ -29,6 +29,6 @@ OBJECTS	= pci.o
 LIBRARY	= lfc_upa_pci.a
 
 SYMLINKS = lfc_pci_pci.so lfc_gptwo_pci.so lfc_pciex_pciex.so \
-		lfc_pciex_pci.so lfc_pci_pciex.so
+		lfc_pciex_pci.so lfc_pci_pciex.so lfc_jupiter_pciex.so
 
 include ../../Makefile.efcode
