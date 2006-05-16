@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,10 @@
 #define	id(s)	#ident s
 #endif
 id("%Z%%M% %I%     %E% SMI")
+
+#ifndef DISKBP3
+#define DISKBP3 /frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+#endif
 
 name:DISKBP3/HDD2/disk
 TABLE Devices
