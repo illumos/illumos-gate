@@ -370,14 +370,28 @@ do_get_intrp_name(fcode_env_t *env)
 static void
 do_master_interrupt(fcode_env_t *env)
 {
-	int	portid;
-	token_t	xt;
+	private_data_t	*pdp = DEVICE_PRIVATE(env);
+	char		*service = "master-interrupt";
+	int		portid;
+	token_t		xt;
+	int		error;
+	fc_cell_t	status;
 
-	CHECK_DEPTH(env, 2, "jupiter:master-interrput");
+	CHECK_DEPTH(env, 2, "jupiter:master-interrupt");
 	portid	= POP(DS);
 	xt	= POP(DS);
 
+	/*
+	 * Install the master interrupt handler for this port id.
+	 */
+	error = fc_run_priv(pdp->common, service, 2, 1,
+	    fc_uint32_t2cell(portid), fc_uint32_t2cell(xt), &status);
+
+	if (error || !status)
+		throw_from_fclib(env, 1, "jupiter:%s: failed\n", service);
+
 	PUSH(DS, FALSE);
+
 	debug_msg(DEBUG_REG_ACCESS,
 	    "jupiter:master-interrupt ( %x %x ) -> %x\n",
 	    portid, xt, (int)FALSE);

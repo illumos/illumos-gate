@@ -79,9 +79,12 @@ static int	opl_map_phys(dev_info_t *, struct regspec *,  caddr_t *,
 				ddi_device_acc_attr_t *, ddi_acc_handle_t *);
 static void	opl_unmap_phys(ddi_acc_handle_t *);
 static int	opl_get_hwd_va(dev_info_t *, fco_handle_t, fc_ci_t *);
+static int	opl_master_interrupt(dev_info_t *, fco_handle_t, fc_ci_t *);
 
 extern int	prom_get_fcode_size(char *);
 extern int	prom_get_fcode(char *, char *);
+
+static int	master_interrupt_init(uint32_t, uint32_t);
 
 #define	PROBE_STR_SIZE	64
 #define	UNIT_ADDR_SIZE	64
@@ -105,6 +108,7 @@ opl_fc_ops_t	opl_fc_ops[] = {
 	{	FC_GET_FCODE_SIZE,	opl_get_fcode_size},
 	{	FC_GET_FCODE,		opl_get_fcode},
 	{	"get-hwd-va",		opl_get_hwd_va},
+	{	"master-interrupt",	opl_master_interrupt},
 	{	NULL,			NULL}
 
 };
@@ -120,6 +124,8 @@ extern int	efcode_size;
 
 int		hwddump_flags = HWDDUMP_SBP | HWDDUMP_CHUNKS;
 #endif
+
+static int	master_interrupt_inited = 0;
 
 int
 _init()
@@ -1984,6 +1990,302 @@ opl_get_hwd_va(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 			    portid);
 			status = 0;
 		}
+	}
+
+	cp->nresults = fc_int2cell(1);
+	fc_result(cp, 0) = status;
+
+	return (fc_success_op(ap, rp, cp));
+}
+
+/*
+ * After Solaris boots, a user can enter OBP using L1A, etc. While in OBP,
+ * interrupts may be received from PCI devices. These interrupts
+ * cannot be handled meaningfully since the system is in OBP. These
+ * interrupts need to be cleared on the CPU side so that the CPU may
+ * continue with whatever it is doing. Devices that have raised the
+ * interrupts are expected to reraise the interrupts after sometime
+ * as they have not been handled. At that time, Solaris will have a
+ * chance to properly service the interrupts.
+ *
+ * The location of the interrupt registers depends on what is present
+ * at a port. OPL currently supports the Oberon and the CMU channel.
+ * The following handler handles both kinds of ports and computes
+ * interrupt register addresses from the specifications and Jupiter Bus
+ * device bindings.
+ *
+ * Fcode drivers install their interrupt handler via a "master-interrupt"
+ * service. For boot time devices, this takes place within OBP. In the case
+ * of DR, OPL uses IKP. The Fcode drivers that run within the efcode framework
+ * attempt to install their handler via the "master-interrupt" service.
+ * However, we cannot meaningfully install the Fcode driver's handler.
+ * Instead, we install our own handler in OBP which does the same thing.
+ *
+ * Note that the only handling done for interrupts here is to clear it
+ * on the CPU side. If any device in the future requires more special
+ * handling, we would have to put in some kind of framework for adding
+ * device-specific handlers. This is *highly* unlikely, but possible.
+ *
+ * Finally, OBP provides a hook called "unix-interrupt-handler" to install
+ * a Solaris-defined master-interrupt handler for a port. The default
+ * definition for this method does nothing. Solaris may override this
+ * with its own definition. This is the way the following handler gets
+ * control from OBP when interrupts happen at a port after L1A, etc.
+ */
+
+static char define_master_interrupt_handler[] =
+
+/*
+ * This method translates an Oberon port id to the base (physical) address
+ * of the interrupt clear registers for that port id.
+ */
+
+": pcich-mid>clear-int-pa   ( mid -- pa ) "
+"   dup 1 >> 7 and          ( mid ch# ) "
+"   over 4 >> h# 1f and     ( mid ch# lsb# ) "
+"   1 d# 46 <<              ( mid ch# lsb# pa ) "
+"   swap d# 40 << or        ( mid ch# pa ) "
+"   swap d# 37 << or        ( mid pa ) "
+"   swap 1 and if h# 70.0000 else h# 60.0000 then "
+"   or h# 1400 or           ( pa ) "
+"; "
+
+/*
+ * This method translates a CMU channel port id to the base (physical) address
+ * of the interrupt clear registers for that port id. There are two classes of
+ * interrupts that need to be handled for a CMU channel:
+ *	- obio interrupts
+ *	- pci interrupts
+ * So, there are two addresses that need to be computed.
+ */
+
+": cmuch-mid>clear-int-pa   ( mid -- obio-pa pci-pa ) "
+"   dup 1 >> 7 and          ( mid ch# ) "
+"   over 4 >> h# 1f and     ( mid ch# lsb# ) "
+"   1 d# 46 <<              ( mid ch# lsb# pa ) "
+"   swap d# 40 << or        ( mid ch# pa ) "
+"   swap d# 37 << or        ( mid pa ) "
+"   nip dup h# 1800 +       ( pa obio-pa ) "
+"   swap h# 1400 +          ( obio-pa pci-pa ) "
+"; "
+
+/*
+ * This method checks if a given I/O port ID is valid or not.
+ * For a given LSB,
+ *	Oberon ports range from 0 - 3
+ *	CMU ch ports range from 4 - 4
+ *
+ * Also, the Oberon supports leaves 0 and 1.
+ * The CMU ch supports only one leaf, leaf 0.
+ */
+
+": valid-io-mid? ( mid -- flag ) "
+"   dup 1 >> 7 and                     ( mid ch# ) "
+"   dup 4 > if 2drop false exit then   ( mid ch# ) "
+"   4 = swap 1 and 1 = and not "
+"; "
+
+/*
+ * This method checks if a given port id is a CMU ch.
+ */
+
+": cmuch? ( mid -- flag ) 1 >> 7 and 4 = ; "
+
+/*
+ * Given the base address of the array of interrupt clear registers for
+ * a port id, this method iterates over the given interrupt number bitmap
+ * and resets the interrupt on the CPU side for every interrupt number
+ * in the bitmap. Note that physical addresses are used to perform the
+ * writes, not virtual addresses. This allows the handler to work without
+ * any involvement from Solaris.
+ */
+
+": clear-ints ( pa bitmap count -- ) "
+"   0 do                            ( pa bitmap ) "
+"      dup 0= if 2drop unloop exit then "
+"      tuck                         ( bitmap pa bitmap ) "
+"      1 and if                     ( bitmap pa ) "
+"	 dup i 8 * + 0 swap         ( bitmap pa 0 pa' ) "
+"	 h# 15 spacex!              ( bitmap pa ) "
+"      then                         ( bitmap pa ) "
+"      swap 1 >>                    ( pa bitmap ) "
+"   loop "
+"; "
+
+/*
+ * This method replaces the master-interrupt handler in OBP. Once
+ * this method is plumbed into OBP, OBP transfers control to this
+ * handler while returning to Solaris from OBP after L1A. This method's
+ * task is to simply reset received interrupts on the CPU side.
+ * When the devices reassert the interrupts later, Solaris will
+ * be able to see them and handle them.
+ *
+ * For each port ID that has interrupts, this method is called
+ * once by OBP. The input arguments are:
+ *	mid	portid
+ *	bitmap	bitmap of interrupts that have happened
+ *
+ * This method returns true, if it is able to handle the interrupts.
+ * OBP does nothing further.
+ *
+ * This method returns false, if it encountered a problem. Currently,
+ * the only problem could be an invalid port id. OBP needs to do
+ * its own processing in that case. If this method returns false,
+ * it preserves the mid and bitmap arguments for OBP.
+ */
+
+": unix-resend-mondos ( mid bitmap -- [ mid bitmap false ] | true ) "
+
+/*
+ * Uncomment the following line if you want to display the input arguments.
+ * This is meant for debugging.
+ * "   .\" Bitmap=\" dup u. .\" MID=\" over u. cr "
+ */
+
+/*
+ * If the port id is not valid (according to the Oberon and CMU ch
+ * specifications, then return false to OBP to continue further
+ * processing.
+ */
+
+"   over valid-io-mid? not if       ( mid bitmap ) "
+"      false exit "
+"   then "
+
+/*
+ * If the port is a CMU ch, then the 64-bit bitmap represents
+ * 2 32-bit bitmaps:
+ *	- obio interrupt bitmap (20 bits)
+ *	- pci interrupt bitmap (32 bits)
+ *
+ * - Split the bitmap into two
+ * - Compute the base addresses of the interrupt clear registers
+ *   for both pci interrupts and obio interrupts
+ * - Clear obio interrupts
+ * - Clear pci interrupts
+ */
+
+"   over cmuch? if                  ( mid bitmap ) "
+"      xlsplit                      ( mid pci-bit obio-bit ) "
+"      rot cmuch-mid>clear-int-pa   ( pci-bit obio-bit obio-pa pci-pa ) "
+"      >r                           ( pci-bit obio-bit obio-pa ) ( r: pci-pa ) "
+"      swap d# 20 clear-ints        ( pci-bit ) ( r: pci-pa ) "
+"      r> swap d# 32 clear-ints     (  ) ( r: ) "
+
+/*
+ * If the port is an Oberon, then the 64-bit bitmap is used fully.
+ *
+ * - Compute the base address of the interrupt clear registers
+ * - Clear interrupts
+ */
+
+"   else                            ( mid bitmap ) "
+"      swap pcich-mid>clear-int-pa  ( bitmap pa ) "
+"      swap d# 64 clear-ints        (  ) "
+"   then "
+
+/*
+ * Always return true from here.
+ */
+
+"   true                            ( true ) "
+"; "
+;
+
+static char	install_master_interrupt_handler[] =
+	"' unix-resend-mondos to unix-interrupt-handler";
+static char	handler[] = "unix-interrupt-handler";
+static char	handler_defined[] = "p\" %s\" find nip swap l! ";
+
+/*ARGSUSED*/
+static int
+master_interrupt_init(uint32_t portid, uint32_t xt)
+{
+	uint_t	defined;
+	char	buf[sizeof (handler) + sizeof (handler_defined)];
+
+	if (master_interrupt_inited)
+		return (1);
+
+	/*
+	 * Check if the defer word "unix-interrupt-handler" is defined.
+	 * This must be defined for OPL systems. So, this is only a
+	 * sanity check.
+	 */
+	(void) sprintf(buf, handler_defined, handler);
+	prom_interpret(buf, (uintptr_t)&defined, 0, 0, 0, 0);
+	if (!defined) {
+		cmn_err(CE_WARN, "master_interrupt_init: "
+		    "%s is not defined\n", handler);
+		return (0);
+	}
+
+	/*
+	 * Install the generic master-interrupt handler. Note that
+	 * this is only done one time on the first DR operation.
+	 * This is because, for OPL, one, single generic handler
+	 * handles all ports (Oberon and CMU channel) and all
+	 * interrupt sources within each port.
+	 *
+	 * The current support is only for the Oberon and CMU-channel.
+	 * If any others need to be supported, the handler has to be
+	 * modified accordingly.
+	 */
+
+	/*
+	 * Define the OPL master interrupt handler
+	 */
+	prom_interpret(define_master_interrupt_handler, 0, 0, 0, 0, 0);
+
+	/*
+	 * Take over the master interrupt handler from OBP.
+	 */
+	prom_interpret(install_master_interrupt_handler, 0, 0, 0, 0, 0);
+
+	master_interrupt_inited = 1;
+
+	/*
+	 * prom_interpret() does not return a status. So, we assume
+	 * that the calls succeeded. In reality, the calls may fail
+	 * if there is a syntax error, etc in the strings.
+	 */
+
+	return (1);
+}
+
+/*
+ * Install the master-interrupt handler for a device.
+ */
+static int
+opl_master_interrupt(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
+{
+	uint32_t	portid, xt;
+	int		board, channel, leaf;
+	int		status;
+
+	/* Check the argument */
+	if (fc_cell2int(cp->nargs) != 2)
+		return (fc_syntax_error(cp, "nargs must be 2"));
+
+	if (fc_cell2int(cp->nresults) < 1)
+		return (fc_syntax_error(cp, "nresults must be >= 1"));
+
+	/* Get the parameters */
+	portid = fc_cell2uint32_t(fc_arg(cp, 0));
+	xt = fc_cell2uint32_t(fc_arg(cp, 1));
+
+	board = OPL_IO_PORTID_TO_LSB(portid);
+	channel = OPL_PORTID_TO_CHANNEL(portid);
+	leaf = OPL_PORTID_TO_LEAF(portid);
+
+	if ((board >= HWD_SBS_PER_DOMAIN) || !OPL_VALID_CHANNEL(channel) ||
+	    (OPL_OBERON_CHANNEL(channel) && !OPL_VALID_LEAF(leaf)) ||
+	    ((channel == OPL_CMU_CHANNEL) && (leaf != 0))) {
+		FC_DEBUG1(1, CE_CONT, "opl_master_interrupt: invalid port %x\n",
+		    portid);
+		status = 0;
+	} else {
+		status = master_interrupt_init(portid, xt);
 	}
 
 	cp->nresults = fc_int2cell(1);
