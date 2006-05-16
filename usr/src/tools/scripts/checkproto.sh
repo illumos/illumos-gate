@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,12 +71,18 @@ PROTO=${WS}/proto/root_${MACH}
 
 rm -f $PLIST
 
-PKGDEFS_FLG="-d ${SRC}/pkgdefs"
-[ -d ${SRC}/../closed ] && \
-	PKGDEFS_FLG="$PKGDEFS_FLG -d ${SRC}/../closed/pkgdefs"
-EXCEPTION=${PKGDEFS}/etc/exception_list_${MACH}
+pkglocns="${SRC}/pkgdefs"
+[ -d ${SRC}/../closed/pkgdefs ] && pkglocns="$pkglocns ${SRC}/../closed/pkgdefs"
+
+exceptions=""
+pkgdefs=""
+for p in $pkglocns; do
+	efile="$p/etc/exception_list_${MACH}"
+	[ -f $efile ] && exceptions="$exceptions -e $efile"
+	pkgdefs="$pkgdefs -d $p"
+done
 
 protolist ${PROTO} > $PLIST
-protocmp ${GUFLAG} -e ${EXCEPTION} ${PKGDEFS_FLG} ${PLIST}
+protocmp ${GUFLAG} $exceptions $pkgdefs ${PLIST}
 
 rm -f $PLIST
