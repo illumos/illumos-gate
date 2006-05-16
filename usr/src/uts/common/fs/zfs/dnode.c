@@ -442,6 +442,7 @@ dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
 		rw_exit(&dn->dn_struct_rwlock);
 		if (refcount_add(&db->db_holds, FTAG) == 1)
 			dnode_add_ref(dn, db);
+		VERIFY(0 == dbuf_read(db, NULL, DB_RF_MUST_SUCCEED));
 		mutex_enter(&db->db_mtx);
 		ASSERT3U(db->db.db_size, ==, dn->dn_bonuslen);
 		ASSERT(db->db.db_data != NULL);

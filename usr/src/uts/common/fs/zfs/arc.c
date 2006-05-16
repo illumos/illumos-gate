@@ -2246,7 +2246,8 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		 */
 		ASSERT(bp->blk_cksum.zc_word[0] == 0 ||
 		    ab->b_cksum0 == bp->blk_cksum.zc_word[0]);
-		arc_change_state(arc.anon, ab, hash_lock);
+		if (ab->b_state != arc.anon)
+			arc_change_state(arc.anon, ab, hash_lock);
 		if (refcount_is_zero(&ab->b_refcnt)) {
 			mutex_exit(hash_lock);
 			arc_hdr_destroy(ab);
