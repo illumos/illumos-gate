@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +116,10 @@ extern "C" {
  * registers complete.  It is selected so it won't miss in the tlb.
  */
 #define	FLUSH_ADDR	(KERNELBASE + 2 * MMU_PAGESIZE4M)
+
+#define	MAX_NCTXS_BITS			16	/* sun4v max. contexts bits */
+#define	MIN_NCTXS_BITS			2
+#define	MAX_NCTXS	(1ull << MAX_NCTXS_BITS)
 
 #ifdef	__cplusplus
 }

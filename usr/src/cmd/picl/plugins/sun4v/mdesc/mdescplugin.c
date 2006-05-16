@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,8 @@ void mdescplugin_fini(void);
 extern int add_cpu_prop(picl_nodehdl_t node, void *args);
 extern int disk_discovery(void);
 extern md_t *mdesc_devinit(void);
+extern void mdesc_devfini(md_t *mdp);
+extern int update_devices(char *dev, int op);
 
 picld_plugin_reg_t mdescplugin_reg = {
 	PICLD_PLUGIN_VERSION_1,
@@ -88,6 +90,65 @@ find_disk(picl_nodehdl_t node, void *args)
 	}
 
 	return (PICL_WALK_CONTINUE);
+}
+
+/*
+ * DR event handler
+ * respond to the picl events:
+ *      PICLEVENT_DR_AP_STATE_CHANGE
+ */
+static void
+dr_handler(const char *ename, const void *earg, size_t size, void *cookie)
+{
+	nvlist_t	*nvlp = NULL;
+	char		*dtype;
+	char		*ap_id;
+	char		*hint;
+
+
+	if (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) != 0) {
+		return;
+	}
+
+	if (nvlist_unpack((char *)earg, size, &nvlp, NULL)) {
+		return;
+	}
+
+	if (nvlist_lookup_string(nvlp, PICLEVENTARG_DATA_TYPE, &dtype)) {
+		nvlist_free(nvlp);
+		return;
+	}
+
+	if (strcmp(dtype, PICLEVENTARG_PICLEVENT_DATA) != 0) {
+		nvlist_free(nvlp);
+		return;
+	}
+
+	if (nvlist_lookup_string(nvlp, PICLEVENTARG_AP_ID, &ap_id)) {
+		nvlist_free(nvlp);
+		return;
+	}
+
+	if (nvlist_lookup_string(nvlp, PICLEVENTARG_HINT, &hint)) {
+		nvlist_free(nvlp);
+		return;
+	}
+
+	mdp = mdesc_devinit();
+	if (mdp == NULL) {
+		nvlist_free(nvlp);
+		return;
+	}
+
+	rootnode = md_root_node(mdp);
+
+	if (strcmp(hint, DR_HINT_INSERT) == 0)
+		(void) update_devices(ap_id, DEV_ADD);
+	else if (strcmp(hint, DR_HINT_REMOVE) == 0)
+		(void) update_devices(ap_id, DEV_REMOVE);
+
+	mdesc_devfini(mdp);
+	nvlist_free(nvlp);
 }
 
 /*
@@ -170,8 +231,10 @@ mdescplugin_init(void)
 	    dsc_handler, NULL);
 	(void) ptree_register_handler(PICLEVENT_SYSEVENT_DEVICE_REMOVED,
 	    dsc_handler, NULL);
+	(void) ptree_register_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    dr_handler, NULL);
 
-	(void) md_fini(mdp);
+	mdesc_devfini(mdp);
 }
 
 void
@@ -182,6 +245,8 @@ mdescplugin_fini(void)
 	    dsc_handler, NULL);
 	(void) ptree_unregister_handler(PICLEVENT_SYSEVENT_DEVICE_REMOVED,
 	    dsc_handler, NULL);
+	(void) ptree_unregister_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    dr_handler, NULL);
 }
 
 void

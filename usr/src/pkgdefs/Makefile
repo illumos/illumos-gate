@@ -69,6 +69,8 @@ sparc_SUBDIRS= \
 	SUNWkvm.u  \
 	SUNWkvm.v  \
 	SUNWkvmt200.v \
+	SUNWldomr.v  \
+	SUNWldomu.v  \
 	SUNWluxd.u \
 	SUNWluxl \
 	SUNWonmtst.u \

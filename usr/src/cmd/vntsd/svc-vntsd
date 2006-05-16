@@ -1,0 +1,64 @@
+#!/sbin/sh
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Start script for vntsd
+#
+# For modifying parameters passed to vntsd, do not edit
+# this script. Instead use svccfg(1m) to modify the SMF
+# repository. For example:
+#
+# svccfg
+# svc:> select ldoms/vntsd
+# svc:/ldoms/vntsd> setprop vntsd/vcc_device = "virtual-console-concentrator@1"
+# svc:/ldoms/vntsd> setprop vntsd/listen_addr = "192.168.1.1"
+# svc:/ldoms/vntsd> exit
+
+. /lib/svc/share/smf_include.sh
+
+vcc_device=`svcprop -p vntsd/vcc_device $SMF_FMRI 2>/dev/null`
+if [ -z "$vcc_device" ]; then
+	vcc_device="virtual-console-concentrator@0"
+fi
+args="-i $vcc_device"
+
+listen_addr=`svcprop -p vntsd/listen_addr $SMF_FMRI 2>/dev/null`
+if [ -n "$listen_addr" ]; then
+	args="$args -p $listen_addr"
+fi
+
+timeout=`svcprop -p vntsd/timeout_minutes $SMF_FMRI 2>/dev/null`
+if [ -n "$timeout" ]; then
+	args="$args -t $timeout"
+fi
+
+if [ -x /usr/lib/ldoms/vntsd ]; then
+    /usr/lib/ldoms/vntsd $args || exit $SMF_EXIT_ERR_CONFIG
+else
+    echo "WARNING: /usr/lib/ldoms/vntsd is missing or not executable" >& 2
+    exit $SMF_EXIT_ERR_CONFIG
+fi
+
+exit $SMF_EXIT_OK

@@ -151,11 +151,7 @@
 	.align	32
 #define	NOTP4	NOTP; NOTP; NOTP; NOTP
 
-/*
- * RED is for traps that use the red mode handler.
- * We should never see these either.
- */
-#define	RED	NOT
+
 /*
  * BAD is used for trap vectors we don't have a kernel
  * handler for.
@@ -824,6 +820,25 @@ tt_pil/**/level:			;\
 	.align	32
 
 /*
+ * We take over the rtba after we set our trap table and
+ * fault status area. The watchdog reset trap is now handled by the OS.
+ */
+#define WATCHDOG_RESET			\
+	mov	PTL1_BAD_WATCHDOG, %g1	;\
+	ba,a,pt	%xcc, .watchdog_trap	;\
+	.align	32
+
+/*
+ * RED is for traps that use the red mode handler.
+ * We should never see these either.
+ */
+#define RED			\
+	mov	PTL1_BAD_RED, %g1	;\
+	ba,a,pt	%xcc, .watchdog_trap	;\
+	.align	32
+
+	
+/*
  * MMU Trap Handlers.
  */
 
@@ -1124,7 +1139,7 @@ trap_table0:
 	/* hardware traps */
 	NOT;				/* 000	reserved */
 	RED;				/* 001	power on reset */
-	RED;				/* 002	watchdog reset */
+	WATCHDOG_RESET;			/* 002	watchdog reset */
 	RED;				/* 003	externally initiated reset */
 	RED;				/* 004	software initiated reset */
 	RED;				/* 005	red mode exception */
@@ -2682,6 +2697,20 @@ trace_dataprot:
 
 #endif /* TRAPTRACE */
 
+/*
+ * Handle watchdog reset trap. Enable the MMU using the MMU_ENABLE
+ * HV service, which requires the return target to be specified as a VA
+ * since we are enabling the MMU. We set the target to ptl1_panic.
+ */
+
+	.type	.watchdog_trap, #function
+.watchdog_trap:
+	mov	1, %o0
+	setx	ptl1_panic, %g2, %o1
+	mov	MMU_ENABLE, %o5
+	ta	FAST_TRAP
+	done
+	SET_SIZE(.watchdog_trap)
 /*
  * synthesize for trap(): SFAR in %g2, SFSR in %g3
  */

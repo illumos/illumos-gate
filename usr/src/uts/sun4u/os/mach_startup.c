@@ -402,6 +402,13 @@ cpu_intrq_setup(struct cpu *cp)
 
 /*ARGSUSED*/
 void
+cpu_intrq_cleanup(struct cpu *cp)
+{
+	/* Interrupt mondo queues not applicable to sun4u */
+}
+
+/*ARGSUSED*/
+void
 cpu_intrq_register(struct cpu *cp)
 {
 	/* Interrupt/error queues not applicable to sun4u */
@@ -429,15 +436,41 @@ mach_htraptrace_cleanup(int cpuid)
 }
 
 void
+mach_descrip_startup_init(void)
+{
+	/*
+	 * Only for sun4v.
+	 * Initialize Machine description framework during startup.
+	 */
+}
+void
+mach_descrip_startup_fini(void)
+{
+	/*
+	 * Only for sun4v.
+	 * Clean up Machine Description framework during startup.
+	 */
+}
+
+void
 mach_descrip_init(void)
 {
-	/* Obtain Machine description - only for sun4v */
+	/*
+	 * Only for sun4v.
+	 * Initialize Machine description framework.
+	 */
 }
 
 void
 hsvc_setup(void)
 {
 	/* Setup hypervisor services, not applicable to sun4u */
+}
+
+void
+load_mach_drivers(void)
+{
+	/* Currently no machine class (sun4u) specific drivers to load */
 }
 
 /*

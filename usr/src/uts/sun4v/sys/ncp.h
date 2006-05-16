@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +29,12 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <sys/kmem.h>
+#include <sys/mdesc.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/spi.h>
 #include <sys/ncs.h>
 
 #ifdef	__cplusplus
@@ -45,11 +49,6 @@ extern "C" {
 #define	FALSE		0
 #define	TRUE		1
 
-/*
- * XXX
- * NCP_MAX_NMAUS should come from OBP/HV
- * NCP_MAX_CPUS_PER_MAU should come from OBP/HV
- */
 #define	NCP_MAX_NMAUS		8
 #define	NCP_MAX_CPUS_PER_MAU	4
 #define	NCP_CPUID2MAUID(c)	((c) / NCP_MAX_CPUS_PER_MAU)
@@ -96,8 +95,6 @@ typedef struct ncp_minor ncp_minor_t;
 typedef struct ncp_listnode ncp_listnode_t;
 typedef struct ncp_request ncp_request_t;
 typedef struct ncp_stat ncp_stat_t;
-typedef struct ncp_mau_queue ncp_mau_queue_t;
-typedef struct ncp_desc ncp_desc_t;
 
 
 
@@ -246,44 +243,14 @@ struct ncp_stat {
 	kstat_named_t		ns_status;
 	kstat_named_t		ns_algs[DS_MAX];
 	struct {
+		kstat_named_t	ns_mauid;
+		kstat_named_t	ns_mauhandle;
+		kstat_named_t	ns_maustate;
 		kstat_named_t	ns_submit;
 		kstat_named_t	ns_qfull;
+		kstat_named_t	ns_qbusy;
 		kstat_named_t	ns_qupdate_failure;
 	}			ns_mau[NCP_MAX_NMAUS];
-};
-
-
-struct ncp {
-	kmutex_t			n_lock;
-	kmem_cache_t			*n_ds_cache;
-	kmem_cache_t			*n_mactl_cache;
-	kmem_cache_t			*n_mabuf_cache;
-	dev_info_t			*n_dip;
-	minor_t				n_minor;
-	int				n_nmaus;
-	int				n_max_nmaus;
-	int				*n_mauids;
-	ncp_mau_queue_t			*n_mau_q;
-	int				n_mau_q_size;
-
-	ddi_taskq_t			*n_taskq;
-
-	unsigned			n_flags;	/* dev state flags */
-
-	kstat_t				*n_ksp;
-	kstat_t				*n_intrstats;
-	u_longlong_t			n_stats[DS_MAX];
-	u_longlong_t			n_qfull[NCP_MAX_NMAUS];
-	u_longlong_t			n_qupdate_failure[NCP_MAX_NMAUS];
-
-	ulong_t				n_pagesize;
-	crypto_kcf_provider_handle_t	n_prov;
-
-	kmutex_t			n_freereqslock;
-	ncp_listnode_t			n_freereqs;   /* available requests */
-
-	kmutex_t			n_ctx_list_lock;
-	ncp_listnode_t			n_ctx_list;
 };
 
 /*
@@ -294,10 +261,25 @@ struct ncp {
 
 /*
  * IMPORTANT:
- *	(NCP_MAQUEUE_NENTRIES * sizeof (ncs_hvdesc_t)) <= PAGESIZE
+ *	NCP_MAQUEUE_NENTRIES *must* be a power-of-2.
+ *	requirement: sizeof (ncs_hvdesc_t) == 64
  */
-#define	NCP_MAQUEUE_NENTRIES	64
+#define	NCP_MAQUEUE_NENTRIES	(1 << 9)	/* 512 */
 #define	NCP_MAQUEUE_WRAPMASK	(NCP_MAQUEUE_NENTRIES - 1)
+#define	NCP_MAQUEUE_SIZE	(NCP_MAQUEUE_NENTRIES * sizeof (ncs_hvdesc_t))
+#define	NCP_MAQUEUE_ALIGN	(NCP_MAQUEUE_SIZE - 1)
+#define	NCP_MAQUEUE_SLOTS_AVAIL(q)	\
+		(((q)->nmq_head > (q)->nmq_tail) ? \
+			((q)->nmq_head > (q)->nmq_tail - 1) : \
+			(NCP_MAQUEUE_NENTRIES - \
+			((q)->nmq_tail - (q)->nmq_head) - 1))
+
+#define	NCP_QINDEX_TO_QOFFSET(i)	((i) * sizeof (ncs_hvdesc_t))
+#define	NCP_QOFFSET_TO_QINDEX(o)	((o) / sizeof (ncs_hvdesc_t))
+#define	NCP_QINDEX_INCR(i)		(((i) + 1) & NCP_MAQUEUE_WRAPMASK)
+#define	NCP_QINDEX_IS_VALID(i)		(((i) >= 0) && \
+						((i) < NCP_MAQUEUE_NENTRIES))
+#define	NCP_QTIMEOUT_SECONDS		15
 
 typedef struct ncp_ma {
 	kmutex_t	nma_lock;
@@ -305,24 +287,141 @@ typedef struct ncp_ma {
 	int		nma_ref;	/* # of descriptor references */
 } ncp_ma_t;
 
+typedef struct ncp_desc ncp_desc_t;
 struct ncp_desc {
 	ncs_hvdesc_t	nd_hv;
 	ncp_desc_t	*nd_link;	/* to string related descriptors */
 	ncp_ma_t	*nd_ma;		/* referenced MA buffer */
 };
 
+typedef struct ncp_descjob {
+	int			dj_id;
+	kcondvar_t		dj_cv;
+	ncp_desc_t		*dj_jobp;
+	struct ncp_descjob	*dj_prev;
+	struct ncp_descjob	*dj_next;
+} ncp_descjob_t;
+
 /*
  * nmq_head, nmq_tail = indexes into nmq_desc[].
  */
-struct ncp_mau_queue {
-	int		nmq_id;
+typedef struct {
+	uint64_t	nmq_mauhandle;
+	uint64_t	nmq_devino;
+	int		nmq_inum;
+	int		nmq_mauid;
+	int		nmq_init;
+	int		nmq_busy_wait;
+	kcondvar_t	nmq_busy_cv;
 	kmutex_t	nmq_lock;
 	int		nmq_head;
 	int		nmq_tail;
 	uint_t		nmq_wrapmask;
+	ncp_descjob_t	**nmq_jobs;
+	size_t		nmq_jobs_size;
 	ncs_hvdesc_t	*nmq_desc;	/* descriptor array */
-	int		nmq_desc_size;
-	uint64_t	nmq_njobs;
+	char		*nmq_mem;
+	size_t		nmq_memsize;
+	ncp_descjob_t	*nmq_joblist;
+	int		nmq_joblistcnt;
+	struct {
+		uint64_t	qks_njobs;
+		uint64_t	qks_qfull;
+		uint64_t	qks_qbusy;
+		uint64_t	qks_qfail;
+	} nmq_ks;
+} ncp_mau_queue_t;
+
+#define	MAU_STATE_ERROR		(-1)
+#define	MAU_STATE_OFFLINE	0
+#define	MAU_STATE_ONLINE	1
+
+typedef struct {
+	int		mm_mauid;
+	int		mm_cpulistsz;
+	int		*mm_cpulist;
+	int		mm_ncpus;
+	int		mm_nextcpuidx;
+	/*
+	 * Only protects mm_nextcpuidx field.
+	 */
+	kmutex_t	mm_lock;
+	/*
+	 * xxx - maybe need RW lock for mm_state?
+	 */
+	int		mm_state;	/* MAU_STATE_... */
+
+	ncp_mau_queue_t	mm_queue;
+} mau_entry_t;
+
+typedef struct {
+	int		mc_cpuid;
+	int		mc_mauid;
+	/*
+	 * xxx - maybe need RW lock for mm_state?
+	 * Mirrors mm_state in mau_entry_t.  Duplicated
+	 * for speed so we don't have search mau_entry
+	 * table.  Field rarely updated.
+	 */
+	int		mc_state;	/* MAU_STATE_... */
+} cpu_entry_t;
+
+typedef struct {
+	/*
+	 * MAU stuff
+	 */
+	int		m_maulistsz;
+	mau_entry_t	*m_maulist;
+	int		m_nmaus;
+	int		m_nextmauidx;
+	/*
+	 * Only protects m_nextmauidx field.
+	 */
+	kmutex_t	m_lock;
+
+	/*
+	 * CPU stuff
+	 */
+	int		m_cpulistsz;
+	cpu_entry_t	*m_cpulist;
+	int		m_ncpus;
+} ncp_mau2cpu_map_t;
+
+struct ncp {
+	uint_t				n_hvapi_minor_version;
+	kmutex_t			n_lock;
+	kmem_cache_t			*n_ds_cache;
+	kmem_cache_t			*n_mactl_cache;
+	kmem_cache_t			*n_mabuf_cache;
+	dev_info_t			*n_dip;
+	minor_t				n_minor;
+
+	ddi_taskq_t			*n_taskq;
+
+	unsigned			n_flags;	/* dev state flags */
+
+	kstat_t				*n_ksp;
+	kstat_t				*n_intrstats;
+	u_longlong_t			n_stats[DS_MAX];
+
+	ddi_intr_handle_t		*n_htable;
+	int				n_intr_mid[NCP_MAX_NMAUS];
+	int				n_intr_type;
+	int				n_intr_cnt;
+	size_t				n_intr_size;
+	uint_t				n_intr_pri;
+
+	ulong_t				n_pagesize;
+	crypto_kcf_provider_handle_t	n_prov;
+
+	kmutex_t			n_freereqslock;
+	ncp_listnode_t			n_freereqs;   /* available requests */
+
+	kmutex_t			n_ctx_list_lock;
+	ncp_listnode_t			n_ctx_list;
+
+	md_t				*n_mdp;
+	ncp_mau2cpu_map_t		n_maumap;
 };
 
 #endif	/* _KERNEL */
@@ -343,14 +442,18 @@ struct ncp_mau_queue {
 #define	DMA_LDST	0x00000004
 #define	DNCS_QTAIL	0x00000008
 #define	DATTACH		0x00000010
-#define	DMOD		0x00000040  /* _init/_fini/_info/attach/detach */
-#define	DENTRY		0x00000080  /* crypto routine entry/exit points */
+#define	DMD		0x00000020
+#define	DHV		0x00000040
+#define	DINTR		0x00000080
+#define	DMOD		0x00000100  /* _init/_fini/_info/attach/detach */
+#define	DENTRY		0x00000200  /* crypto routine entry/exit points */
 #define	DALL		0xFFFFFFFF
 
 #define	DBG0	ncp_dprintf
 #define	DBG1	ncp_dprintf
 #define	DBG2	ncp_dprintf
 #define	DBG3	ncp_dprintf
+#define	DBG4	ncp_dprintf
 #define	DBGCALL(flag, func)	{ if (ncp_dflagset(flag)) (void) func; }
 
 void	ncp_dprintf(ncp_t *, int, const char *, ...);
@@ -363,6 +466,7 @@ int	ncp_dflagset(int);
 #define	DBG1(vca, lvl, fmt, arg1)
 #define	DBG2(vca, lvl, fmt, arg1, arg2)
 #define	DBG3(vca, lvl, fmt, arg1, arg2, arg3)
+#define	DBG4(vca, lvl, fmt, arg1, arg2, arg3, arg4)
 #define	DBGCALL(flag, func)
 
 #endif	/* !defined(DEBUG) */
@@ -402,6 +506,16 @@ void	ncp_dsactxfree(void *);
 int	ncp_dsaatomic(crypto_provider_handle_t, crypto_session_id_t,
 			crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
 			crypto_data_t *, int, crypto_req_handle_t, int);
+
+/*
+ * ncp_md.
+ */
+int	ncp_init_mau2cpu_map(ncp_t *);
+void	ncp_deinit_mau2cpu_map(ncp_t *);
+int	ncp_map_cpu_to_mau(ncp_t *, int);
+int	ncp_map_mau_to_cpu(ncp_t *, int);
+int	ncp_map_nextmau(ncp_t *);
+mau_entry_t	*ncp_map_findmau(ncp_t *, int);
 
 /*
  * ncp_kstat.c

@@ -33,12 +33,24 @@ extern "C" {
 #endif
 
 /*
- * NCS HV API versioni definitions.
+ * NCS HV API version definitions.
  */
 #define	NCS_MAJOR_VER		1
-#define	NCS_MINOR_VER		0
+#define	NCS_MINOR_VER		1
 
+/*
+ * NCS HV API v1.0
+ */
 #define	HV_NCS_REQUEST		0x110
+/*
+ * NCS HV API v1.1
+ */
+#define	HV_NCS_QCONF			0x111
+#define	HV_NCS_QINFO			0x112
+#define	HV_NCS_GETHEAD			0x113
+#define	HV_NCS_GETTAIL			0x114
+#define	HV_NCS_SETTAIL			0x115
+#define	HV_NCS_QHANDLE_TO_DEVINO	0x116
 
 #ifndef _ASM
 /* Forward typedefs */
@@ -62,7 +74,7 @@ union ma_ctl {
 		uint64_t	length:6;
 	} bits;
 };
-#endif	/* !_ASM */
+#endif /* _ASM */
 
 /* Values for ma_ctl operation field */
 #define	MA_OP_LOAD		0x0
@@ -114,7 +126,7 @@ union ma_ma {
 #endif	/* !_ASM */
 
 /*
- * NCS API definitions
+ * NCS HV API v1.0 definitions (PSARC/2005/125)
  */
 
 /*
@@ -164,8 +176,8 @@ typedef struct ma_regs {
 } ma_regs_t;
 
 #define	ND_TYPE_UNASSIGNED	0
-#define	ND_TYPE_MA		1
-#define	ND_TYPE_SPU		2
+#define	ND_TYPE_MA		1	/* v1.0 only */
+#define	ND_TYPE_SPU		2	/* v1.0 only */
 
 #define	ND_STATE_FREE		0
 #define	ND_STATE_PENDING	1
@@ -190,7 +202,50 @@ typedef struct ncs_hvdesc {
 
 extern uint64_t hv_ncs_request(int, uint64_t, size_t);
 
-#endif	/* !_ASM */
+#endif	/* _ASM */
+
+/*
+ * NCS HV API v1.1 definitions (FWARC/2006/174)
+ *
+ * Some of the structures above (v1.0) are inherited for v1.1
+ */
+/*
+ * In v1.1, the nhd_type field has the following values
+ * when non-zero (unassigned).  The nhd_type field indicates
+ * whether the descriptor is the beginning of a crypto job,
+ * the continuation, or the end/last descriptor in a job.
+ * A job may be comprised of multiple descriptors.
+ */
+#define	ND_TYPE_START		0x01
+#define	ND_TYPE_CONT		0x02
+#define	ND_TYPE_END		0x80
+
+/*
+ * Types of queues supported by NCS
+ */
+#define	NCS_QTYPE_MAU		0x1
+#define	NCS_QTYPE_CWQ		0x2
+
+/*
+ * This structure is accessed with offsets in ml/hcall.s.
+ * Any changes to this structure will require updates to
+ * the hv_ncs_qinfo entrypoint in ml/hcall.s.
+ */
+#ifndef _ASM
+typedef struct ncs_qinfo {
+	uint64_t	qi_qtype;
+	uint64_t	qi_baseaddr;
+	uint64_t	qi_qsize;
+} ncs_qinfo_t;
+
+extern uint64_t	hv_ncs_qconf(uint64_t, uint64_t, uint64_t, uint64_t *);
+extern uint64_t	hv_ncs_qinfo(uint64_t, ncs_qinfo_t *);
+extern uint64_t	hv_ncs_gethead(uint64_t, uint64_t *);
+extern uint64_t	hv_ncs_gettail(uint64_t, uint64_t *);
+extern uint64_t	hv_ncs_settail(uint64_t, uint64_t);
+extern uint64_t	hv_ncs_qhandle_to_devino(uint64_t, uint64_t *);
+extern uint64_t	hv_ncs_intr_clrstate(uint64_t);
+#endif /* _ASM */
 
 #ifdef	__cplusplus
 }

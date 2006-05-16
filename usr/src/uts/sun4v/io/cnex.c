@@ -1,0 +1,1133 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Logical domain channel devices are devices implemented entirely
+ * in software; cnex is the nexus for channel-devices. They use
+ * the HV channel interfaces via the LDC transport module to send
+ * and receive data and to register callbacks.
+ */
+
+#include <sys/types.h>
+#include <sys/cmn_err.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/ddi_impldefs.h>
+#include <sys/devops.h>
+#include <sys/instance.h>
+#include <sys/modctl.h>
+#include <sys/open.h>
+#include <sys/stat.h>
+#include <sys/sunddi.h>
+#include <sys/sunndi.h>
+#include <sys/systm.h>
+#include <sys/mkdev.h>
+#include <sys/machsystm.h>
+#include <sys/intr.h>
+#include <sys/ddi_intr_impl.h>
+#include <sys/ivintr.h>
+#include <sys/hypervisor_api.h>
+#include <sys/ldc.h>
+#include <sys/cnex.h>
+#include <sys/mach_descrip.h>
+
+/*
+ * Internal functions/information
+ */
+static struct cnex_pil_map cnex_class_to_pil[] = {
+	{LDC_DEV_GENERIC,	PIL_3},
+	{LDC_DEV_BLK,		PIL_4},
+	{LDC_DEV_BLK_SVC,	PIL_3},
+	{LDC_DEV_NT,		PIL_6},
+	{LDC_DEV_NT_SVC,	PIL_4},
+	{LDC_DEV_SERIAL,	PIL_6}
+};
+#define	CNEX_MAX_DEVS (sizeof (cnex_class_to_pil) / \
+				sizeof (cnex_class_to_pil[0]))
+
+#define	SUN4V_REG_SPEC2CFG_HDL(x)	((x >> 32) & ~(0xfull << 28))
+
+static hrtime_t cnex_pending_tmout = 2ull * NANOSEC; /* 2 secs in nsecs */
+static void *cnex_state;
+
+static void cnex_intr_redist(void *arg);
+static uint_t cnex_intr_wrapper(caddr_t arg);
+
+/*
+ * Debug info
+ */
+#ifdef DEBUG
+
+/*
+ * Print debug messages
+ *
+ * set cnexdbg to 0xf for enabling all msgs
+ * 0x8 - Errors
+ * 0x4 - Warnings
+ * 0x2 - All debug messages
+ * 0x1 - Minimal debug messages
+ */
+
+int cnexdbg = 0x8;
+
+static void
+cnexdebug(const char *fmt, ...)
+{
+	char buf[512];
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void) vsprintf(buf, fmt, ap);
+	va_end(ap);
+
+	cmn_err(CE_CONT, "%s\n", buf);
+}
+
+#define	D1		\
+if (cnexdbg & 0x01)	\
+	cnexdebug
+
+#define	D2		\
+if (cnexdbg & 0x02)	\
+	cnexdebug
+
+#define	DWARN		\
+if (cnexdbg & 0x04)	\
+	cnexdebug
+
+#define	DERR		\
+if (cnexdbg & 0x08)	\
+	cnexdebug
+
+#else
+
+#define	D1
+#define	D2
+#define	DWARN
+#define	DERR
+
+#endif
+
+/*
+ * Config information
+ */
+static int cnex_attach(dev_info_t *, ddi_attach_cmd_t);
+static int cnex_detach(dev_info_t *, ddi_detach_cmd_t);
+static int cnex_open(dev_t *, int, int, cred_t *);
+static int cnex_close(dev_t, int, int, cred_t *);
+static int cnex_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+static int cnex_ctl(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *,
+    void *);
+
+static struct bus_ops cnex_bus_ops = {
+	BUSO_REV,
+	nullbusmap,		/* bus_map */
+	NULL,			/* bus_get_intrspec */
+	NULL,			/* bus_add_intrspec */
+	NULL,			/* bus_remove_intrspec */
+	i_ddi_map_fault,	/* bus_map_fault */
+	ddi_no_dma_map,		/* bus_dma_map */
+	ddi_no_dma_allochdl,	/* bus_dma_allochdl */
+	NULL,			/* bus_dma_freehdl */
+	NULL,			/* bus_dma_bindhdl */
+	NULL,			/* bus_dma_unbindhdl */
+	NULL,			/* bus_dma_flush */
+	NULL,			/* bus_dma_win */
+	NULL,			/* bus_dma_ctl */
+	cnex_ctl,		/* bus_ctl */
+	ddi_bus_prop_op,	/* bus_prop_op */
+	0,			/* bus_get_eventcookie */
+	0,			/* bus_add_eventcall */
+	0,			/* bus_remove_eventcall	*/
+	0,			/* bus_post_event */
+	NULL,			/* bus_intr_ctl */
+	NULL,			/* bus_config */
+	NULL,			/* bus_unconfig */
+	NULL,			/* bus_fm_init */
+	NULL,			/* bus_fm_fini */
+	NULL,			/* bus_fm_access_enter */
+	NULL,			/* bus_fm_access_exit */
+	NULL,			/* bus_power */
+	NULL			/* bus_intr_op */
+};
+
+static struct cb_ops cnex_cb_ops = {
+	cnex_open,			/* open */
+	cnex_close,			/* close */
+	nodev,				/* strategy */
+	nodev,				/* print */
+	nodev,				/* dump */
+	nodev,				/* read */
+	nodev,				/* write */
+	cnex_ioctl,			/* ioctl */
+	nodev,				/* devmap */
+	nodev,				/* mmap */
+	nodev,				/* segmap */
+	nochpoll,			/* poll */
+	ddi_prop_op,			/* cb_prop_op */
+	0,				/* streamtab  */
+	D_MP | D_NEW | D_HOTPLUG	/* Driver compatibility flag */
+};
+
+static struct dev_ops cnex_ops = {
+	DEVO_REV,		/* devo_rev, */
+	0,			/* refcnt  */
+	ddi_getinfo_1to1,	/* info */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
+	cnex_attach,		/* attach */
+	cnex_detach,		/* detach */
+	nodev,			/* reset */
+	&cnex_cb_ops,		/* driver operations */
+	&cnex_bus_ops,		/* bus operations */
+	nulldev			/* power */
+};
+
+/*
+ * Module linkage information for the kernel.
+ */
+static struct modldrv modldrv = {
+	&mod_driverops,
+	"sun4v channel-devices nexus driver v%I%",
+	&cnex_ops,
+};
+
+static struct modlinkage modlinkage = {
+	MODREV_1, (void *)&modldrv, NULL
+};
+
+int
+_init(void)
+{
+	int err;
+
+	if ((err = ddi_soft_state_init(&cnex_state,
+		sizeof (cnex_soft_state_t), 0)) != 0) {
+		return (err);
+	}
+	if ((err = mod_install(&modlinkage)) != 0) {
+		ddi_soft_state_fini(&cnex_state);
+		return (err);
+	}
+	return (0);
+}
+
+int
+_fini(void)
+{
+	int err;
+
+	if ((err = mod_remove(&modlinkage)) != 0)
+		return (err);
+	ddi_soft_state_fini(&cnex_state);
+	return (0);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&modlinkage, modinfop));
+}
+
+/*
+ * Callback function invoked by the interrupt redistribution
+ * framework. This will redirect interrupts at CPUs that are
+ * currently available in the system.
+ */
+static void
+cnex_intr_redist(void *arg)
+{
+	cnex_ldc_t		*cldcp;
+	cnex_soft_state_t	*cnex_ssp = arg;
+	int			intr_state;
+	hrtime_t 		start;
+	uint64_t		cpuid;
+	int 			rv;
+
+	ASSERT(cnex_ssp != NULL);
+	mutex_enter(&cnex_ssp->clist_lock);
+
+	cldcp = cnex_ssp->clist;
+	while (cldcp != NULL) {
+
+		mutex_enter(&cldcp->lock);
+
+		if (cldcp->tx.hdlr) {
+			/*
+			 * Don't do anything for disabled interrupts.
+			 */
+			rv = hvldc_intr_getvalid(cnex_ssp->cfghdl,
+			    cldcp->tx.ino, &intr_state);
+			if (rv) {
+				DWARN("cnex_intr_redist: tx ino=0x%llx, "
+				    "can't get valid\n", cldcp->tx.ino);
+				mutex_exit(&cldcp->lock);
+				mutex_exit(&cnex_ssp->clist_lock);
+				return;
+			}
+			if (intr_state == HV_INTR_NOTVALID) {
+				cldcp = cldcp->next;
+				continue;
+			}
+
+			cpuid = intr_dist_cpuid();
+
+			/* disable interrupts */
+			rv = hvldc_intr_setvalid(cnex_ssp->cfghdl,
+			    cldcp->tx.ino, HV_INTR_NOTVALID);
+			if (rv) {
+				DWARN("cnex_intr_redist: tx ino=0x%llx, "
+				    "can't set valid\n", cldcp->tx.ino);
+				mutex_exit(&cldcp->lock);
+				mutex_exit(&cnex_ssp->clist_lock);
+				return;
+			}
+
+			/*
+			 * Make a best effort to wait for pending interrupts
+			 * to finish. There is not much we can do if we timeout.
+			 */
+			start = gethrtime();
+
+			do {
+				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
+				    cldcp->tx.ino, &intr_state);
+				if (rv) {
+					DWARN("cnex_intr_redist: tx ino=0x%llx,"
+					    "can't get state\n", cldcp->tx.ino);
+					mutex_exit(&cldcp->lock);
+					mutex_exit(&cnex_ssp->clist_lock);
+					return;
+				}
+
+				if ((gethrtime() - start) > cnex_pending_tmout)
+					break;
+
+			} while (!panicstr &&
+			    intr_state == HV_INTR_DELIVERED_STATE);
+
+			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
+			    cldcp->tx.ino, cpuid);
+			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
+			    cldcp->tx.ino, HV_INTR_VALID);
+		}
+
+		if (cldcp->rx.hdlr) {
+			/*
+			 * Don't do anything for disabled interrupts.
+			 */
+			rv = hvldc_intr_getvalid(cnex_ssp->cfghdl,
+			    cldcp->rx.ino, &intr_state);
+			if (rv) {
+				DWARN("cnex_intr_redist: rx ino=0x%llx, "
+				    "can't get valid\n", cldcp->rx.ino);
+				mutex_exit(&cldcp->lock);
+				mutex_exit(&cnex_ssp->clist_lock);
+				return;
+			}
+			if (intr_state == HV_INTR_NOTVALID) {
+				cldcp = cldcp->next;
+				continue;
+			}
+
+			cpuid = intr_dist_cpuid();
+
+			/* disable interrupts */
+			rv = hvldc_intr_setvalid(cnex_ssp->cfghdl,
+			    cldcp->rx.ino, HV_INTR_NOTVALID);
+			if (rv) {
+				DWARN("cnex_intr_redist: rx ino=0x%llx, "
+				    "can't set valid\n", cldcp->rx.ino);
+				mutex_exit(&cldcp->lock);
+				mutex_exit(&cnex_ssp->clist_lock);
+				return;
+			}
+
+			/*
+			 * Make a best effort to wait for pending interrupts
+			 * to finish. There is not much we can do if we timeout.
+			 */
+			start = gethrtime();
+
+			do {
+				rv = hvldc_intr_getstate(cnex_ssp->cfghdl,
+				    cldcp->rx.ino, &intr_state);
+				if (rv) {
+					DWARN("cnex_intr_redist: rx ino=0x%llx,"
+					    "can't set state\n", cldcp->rx.ino);
+					mutex_exit(&cldcp->lock);
+					mutex_exit(&cnex_ssp->clist_lock);
+					return;
+				}
+
+				if ((gethrtime() - start) > cnex_pending_tmout)
+					break;
+
+			} while (!panicstr &&
+			    intr_state == HV_INTR_DELIVERED_STATE);
+
+			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
+			    cldcp->rx.ino, cpuid);
+			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
+			    cldcp->rx.ino, HV_INTR_VALID);
+		}
+
+		mutex_exit(&cldcp->lock);
+
+		/* next channel */
+		cldcp = cldcp->next;
+	}
+
+	mutex_exit(&cnex_ssp->clist_lock);
+}
+
+/*
+ * Exported interface to register a LDC endpoint with
+ * the channel nexus
+ */
+static int
+cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
+{
+	int		idx;
+	cnex_ldc_t	*cldcp;
+	int		listsz, num_nodes, num_channels;
+	md_t		*mdp = NULL;
+	mde_cookie_t	rootnode, *listp = NULL;
+	uint64_t	tmp_id, rxino, txino;
+	cnex_soft_state_t *cnex_ssp;
+	int		status, instance;
+
+	/* Get device instance and structure */
+	instance = ddi_get_instance(dip);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* Check to see if channel is already registered */
+	mutex_enter(&cnex_ssp->clist_lock);
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id) {
+			DWARN("cnex_reg_chan: channel 0x%llx exists\n", id);
+			mutex_exit(&cnex_ssp->clist_lock);
+			return (EINVAL);
+		}
+		cldcp = cldcp->next;
+	}
+
+	/* Get the Tx/Rx inos from the MD */
+	if ((mdp = md_get_handle()) == NULL) {
+		DWARN("cnex_reg_chan: cannot init MD\n");
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (ENXIO);
+	}
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = (mde_cookie_t *)kmem_zalloc(listsz, KM_SLEEP);
+
+	rootnode = md_root_node(mdp);
+
+	/* search for all channel_endpoint nodes */
+	num_channels = md_scan_dag(mdp, rootnode,
+	    md_find_name(mdp, "channel-endpoint"),
+	    md_find_name(mdp, "fwd"), listp);
+	if (num_channels <= 0) {
+		DWARN("cnex_reg_chan: invalid channel id\n");
+		kmem_free(listp, listsz);
+		(void) md_fini_handle(mdp);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (EINVAL);
+	}
+
+	for (idx = 0; idx < num_channels; idx++) {
+
+		/* Get the channel ID */
+		status = md_get_prop_val(mdp, listp[idx], "id", &tmp_id);
+		if (status) {
+			DWARN("cnex_reg_chan: cannot read LDC ID\n");
+			kmem_free(listp, listsz);
+			(void) md_fini_handle(mdp);
+			mutex_exit(&cnex_ssp->clist_lock);
+			return (ENXIO);
+		}
+		if (tmp_id != id)
+			continue;
+
+		/* Get the Tx and Rx ino */
+		status = md_get_prop_val(mdp, listp[idx], "tx-ino", &txino);
+		if (status) {
+			DWARN("cnex_reg_chan: cannot read Tx ino\n");
+			kmem_free(listp, listsz);
+			(void) md_fini_handle(mdp);
+			mutex_exit(&cnex_ssp->clist_lock);
+			return (ENXIO);
+		}
+		status = md_get_prop_val(mdp, listp[idx], "rx-ino", &rxino);
+		if (status) {
+			DWARN("cnex_reg_chan: cannot read Rx ino\n");
+			kmem_free(listp, listsz);
+			(void) md_fini_handle(mdp);
+			mutex_exit(&cnex_ssp->clist_lock);
+			return (ENXIO);
+		}
+	}
+	kmem_free(listp, listsz);
+	(void) md_fini_handle(mdp);
+
+	/* Allocate a new channel structure */
+	cldcp = kmem_zalloc(sizeof (*cldcp), KM_SLEEP);
+
+	/* Initialize the channel */
+	mutex_init(&cldcp->lock, NULL, MUTEX_DRIVER, NULL);
+
+	cldcp->id = id;
+	cldcp->tx.ino = txino;
+	cldcp->rx.ino = rxino;
+	cldcp->devclass = devclass;
+
+	/* add channel to nexus channel list */
+	cldcp->next = cnex_ssp->clist;
+	cnex_ssp->clist = cldcp;
+
+	mutex_exit(&cnex_ssp->clist_lock);
+
+	return (0);
+}
+
+/*
+ * Add Tx/Rx interrupt handler for the channel
+ */
+static int
+cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
+    uint_t (*hdlr)(), caddr_t arg1, caddr_t arg2)
+{
+	int		rv, idx, pil;
+	cnex_ldc_t	*cldcp;
+	cnex_intr_t	*iinfo;
+	uint64_t	cpuid;
+	cnex_soft_state_t *cnex_ssp;
+	int		instance;
+
+	/* Get device instance and structure */
+	instance = ddi_get_instance(dip);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* get channel info */
+	mutex_enter(&cnex_ssp->clist_lock);
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id)
+			break;
+		cldcp = cldcp->next;
+	}
+	if (cldcp == NULL) {
+		DWARN("cnex_add_intr: channel 0x%llx does not exist\n", id);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (EINVAL);
+	}
+	mutex_exit(&cnex_ssp->clist_lock);
+
+	/* get channel lock */
+	mutex_enter(&cldcp->lock);
+
+	/* get interrupt type */
+	if (itype == CNEX_TX_INTR) {
+		iinfo = &(cldcp->tx);
+	} else if (itype == CNEX_RX_INTR) {
+		iinfo = &(cldcp->rx);
+	} else {
+		DWARN("cnex_add_intr: invalid interrupt type\n", id);
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	/* check if a handler is already added */
+	if (iinfo->hdlr != 0) {
+		DWARN("cnex_add_intr: interrupt handler exists\n");
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	/* save interrupt handler info */
+	iinfo->hdlr = hdlr;
+	iinfo->arg1 = arg1;
+	iinfo->arg2 = arg2;
+
+	iinfo->ssp = cnex_ssp;
+
+	/*
+	 * FIXME - generate the interrupt cookie
+	 * using the interrupt registry
+	 */
+	iinfo->icookie = cnex_ssp->cfghdl | iinfo->ino;
+
+	D1("cnex_add_intr: add hdlr, cfghdl=0x%llx, ino=0x%llx, "
+	    "cookie=0x%llx\n", cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
+
+	/* Pick a PIL on the basis of the channel's devclass */
+	for (idx = 0, pil = PIL_3; idx < CNEX_MAX_DEVS; idx++) {
+		if (cldcp->devclass == cnex_class_to_pil[idx].devclass) {
+			pil = cnex_class_to_pil[idx].pil;
+			break;
+		}
+	}
+
+	/* add interrupt to solaris ivec table */
+	VERIFY(add_ivintr(iinfo->icookie, pil, cnex_intr_wrapper,
+		(caddr_t)iinfo, NULL) == 0);
+
+	/* set the cookie in the HV */
+	rv = hvldc_intr_setcookie(cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
+
+	/* pick next CPU in the domain for this channel */
+	cpuid = intr_dist_cpuid();
+
+	/* set the target CPU and then enable interrupts */
+	rv = hvldc_intr_settarget(cnex_ssp->cfghdl, iinfo->ino, cpuid);
+	if (rv) {
+		DWARN("cnex_add_intr: ino=0x%llx, cannot set target cpu\n",
+		    iinfo->ino);
+		goto hv_error;
+	}
+	rv = hvldc_intr_setstate(cnex_ssp->cfghdl, iinfo->ino,
+	    HV_INTR_IDLE_STATE);
+	if (rv) {
+		DWARN("cnex_add_intr: ino=0x%llx, cannot set state\n",
+		    iinfo->ino);
+		goto hv_error;
+	}
+	rv = hvldc_intr_setvalid(cnex_ssp->cfghdl, iinfo->ino, HV_INTR_VALID);
+	if (rv) {
+		DWARN("cnex_add_intr: ino=0x%llx, cannot set valid\n",
+		    iinfo->ino);
+		goto hv_error;
+	}
+
+	mutex_exit(&cldcp->lock);
+	return (0);
+
+hv_error:
+	(void) rem_ivintr(iinfo->icookie, NULL);
+	mutex_exit(&cldcp->lock);
+	return (ENXIO);
+}
+
+
+/*
+ * Exported interface to unregister a LDC endpoint with
+ * the channel nexus
+ */
+static int
+cnex_unreg_chan(dev_info_t *dip, uint64_t id)
+{
+	cnex_ldc_t	*cldcp, *prev_cldcp;
+	cnex_soft_state_t *cnex_ssp;
+	int		instance;
+
+	/* Get device instance and structure */
+	instance = ddi_get_instance(dip);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* find and remove channel from list */
+	mutex_enter(&cnex_ssp->clist_lock);
+	prev_cldcp = NULL;
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id)
+			break;
+		prev_cldcp = cldcp;
+		cldcp = cldcp->next;
+	}
+
+	if (cldcp == 0) {
+		DWARN("cnex_unreg_chan: invalid channel %d\n", id);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (EINVAL);
+	}
+
+	if (cldcp->tx.hdlr || cldcp->rx.hdlr) {
+		DWARN("cnex_unreg_chan: handlers still exist\n");
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (ENXIO);
+	}
+
+	if (prev_cldcp)
+		prev_cldcp->next = cldcp->next;
+	else
+		cnex_ssp->clist = cldcp->next;
+
+	mutex_exit(&cnex_ssp->clist_lock);
+
+	/* destroy mutex */
+	mutex_destroy(&cldcp->lock);
+
+	/* free channel */
+	kmem_free(cldcp, sizeof (*cldcp));
+
+	return (0);
+}
+
+/*
+ * Remove Tx/Rx interrupt handler for the channel
+ */
+static int
+cnex_rem_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
+{
+	int			rv;
+	cnex_ldc_t		*cldcp;
+	cnex_intr_t		*iinfo;
+	cnex_soft_state_t	*cnex_ssp;
+	hrtime_t 		start;
+	int			instance, istate;
+
+	/* Get device instance and structure */
+	instance = ddi_get_instance(dip);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* get channel info */
+	mutex_enter(&cnex_ssp->clist_lock);
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id)
+			break;
+		cldcp = cldcp->next;
+	}
+	if (cldcp == NULL) {
+		DWARN("cnex_rem_intr: channel 0x%llx does not exist\n", id);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (EINVAL);
+	}
+	mutex_exit(&cnex_ssp->clist_lock);
+
+	/* get rid of the channel intr handler */
+	mutex_enter(&cldcp->lock);
+
+	/* get interrupt type */
+	if (itype == CNEX_TX_INTR) {
+		iinfo = &(cldcp->tx);
+	} else if (itype == CNEX_RX_INTR) {
+		iinfo = &(cldcp->rx);
+	} else {
+		DWARN("cnex_rem_intr: invalid interrupt type\n");
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	D1("cnex_rem_intr: interrupt ino=0x%x\n", iinfo->ino);
+
+	/* check if a handler is already added */
+	if (iinfo->hdlr == 0) {
+		DWARN("cnex_rem_intr: interrupt handler does not exist\n");
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	D1("cnex_rem_intr: set intr to invalid ino=0x%x\n", iinfo->ino);
+	rv = hvldc_intr_setvalid(cnex_ssp->cfghdl,
+	    iinfo->ino, HV_INTR_NOTVALID);
+	if (rv) {
+		DWARN("cnex_rem_intr: cannot set valid ino=%x\n", iinfo->ino);
+		mutex_exit(&cldcp->lock);
+		return (ENXIO);
+	}
+
+	/*
+	 * Make a best effort to wait for pending interrupts
+	 * to finish. There is not much we can do if we timeout.
+	 */
+	start = gethrtime();
+	do {
+		rv = hvldc_intr_getstate(cnex_ssp->cfghdl, iinfo->ino, &istate);
+		if (rv) {
+			DWARN("cnex_rem_intr: ino=0x%llx, cannot get state\n",
+			    iinfo->ino);
+		}
+
+		if (rv || ((gethrtime() - start) > cnex_pending_tmout))
+			break;
+
+	} while (!panicstr && istate == HV_INTR_DELIVERED_STATE);
+
+	/* if interrupts are still pending print warning */
+	if (istate != HV_INTR_IDLE_STATE) {
+		DWARN("cnex_rem_intr: cannot remove intr busy ino=%x\n",
+		    iinfo->ino);
+		/* clear interrupt state */
+		(void) hvldc_intr_setstate(cnex_ssp->cfghdl, iinfo->ino,
+		    HV_INTR_IDLE_STATE);
+	}
+
+	/* remove interrupt */
+	rem_ivintr(iinfo->icookie, NULL);
+
+	/* clear interrupt info */
+	bzero(iinfo, sizeof (*iinfo));
+
+	mutex_exit(&cldcp->lock);
+
+	return (0);
+}
+
+
+/*
+ * Clear pending Tx/Rx interrupt
+ */
+static int
+cnex_clr_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
+{
+	int			rv;
+	cnex_ldc_t		*cldcp;
+	cnex_intr_t		*iinfo;
+	cnex_soft_state_t	*cnex_ssp;
+	int			instance;
+
+	/* Get device instance and structure */
+	instance = ddi_get_instance(dip);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* get channel info */
+	mutex_enter(&cnex_ssp->clist_lock);
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id)
+			break;
+		cldcp = cldcp->next;
+	}
+	if (cldcp == NULL) {
+		DWARN("cnex_clr_intr: channel 0x%llx does not exist\n", id);
+		mutex_exit(&cnex_ssp->clist_lock);
+		return (EINVAL);
+	}
+	mutex_exit(&cnex_ssp->clist_lock);
+
+	mutex_enter(&cldcp->lock);
+
+	/* get interrupt type */
+	if (itype == CNEX_TX_INTR) {
+		iinfo = &(cldcp->tx);
+	} else if (itype == CNEX_RX_INTR) {
+		iinfo = &(cldcp->rx);
+	} else {
+		DWARN("cnex_rem_intr: invalid interrupt type\n");
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	D1("cnex_rem_intr: interrupt ino=0x%x\n", iinfo->ino);
+
+	/* check if a handler is already added */
+	if (iinfo->hdlr == 0) {
+		DWARN("cnex_clr_intr: interrupt handler does not exist\n");
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
+
+	rv = hvldc_intr_setstate(cnex_ssp->cfghdl, iinfo->ino,
+	    HV_INTR_IDLE_STATE);
+	if (rv) {
+		DWARN("cnex_intr_wrapper: cannot clear interrupt state\n");
+	}
+
+	mutex_exit(&cldcp->lock);
+
+	return (0);
+}
+
+/*
+ * Channel nexus interrupt handler wrapper
+ */
+static uint_t
+cnex_intr_wrapper(caddr_t arg)
+{
+	int 			res;
+	uint_t 			(*handler)();
+	caddr_t 		handler_arg1;
+	caddr_t 		handler_arg2;
+	cnex_intr_t 		*iinfo = (cnex_intr_t *)arg;
+
+	ASSERT(iinfo != NULL);
+
+	handler = iinfo->hdlr;
+	handler_arg1 = iinfo->arg1;
+	handler_arg2 = iinfo->arg2;
+
+	D1("cnex_intr_wrapper: ino=0x%llx invoke client handler\n", iinfo->ino);
+	res = (*handler)(handler_arg1, handler_arg2);
+
+	return (res);
+}
+
+/*ARGSUSED*/
+static int
+cnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
+{
+	int 		rv, instance, reglen;
+	cnex_regspec_t	*reg_p;
+	ldc_cnex_t	cinfo;
+	cnex_soft_state_t *cnex_ssp;
+
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Get the instance specific soft state structure.
+	 * Save the devi for this instance in the soft_state data.
+	 */
+	instance = ddi_get_instance(devi);
+	if (ddi_soft_state_zalloc(cnex_state, instance) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	cnex_ssp->devi = devi;
+	cnex_ssp->clist = NULL;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+		"reg", (caddr_t)&reg_p, &reglen) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	/* get the sun4v config handle for this device */
+	cnex_ssp->cfghdl = SUN4V_REG_SPEC2CFG_HDL(reg_p->physaddr);
+	kmem_free(reg_p, reglen);
+
+	D1("cnex_attach: cfghdl=0x%llx\n", cnex_ssp->cfghdl);
+
+	/* init channel list mutex */
+	mutex_init(&cnex_ssp->clist_lock, NULL, MUTEX_DRIVER, NULL);
+
+	/* Register with LDC module */
+	cinfo.dip = devi;
+	cinfo.reg_chan = cnex_reg_chan;
+	cinfo.unreg_chan = cnex_unreg_chan;
+	cinfo.add_intr = cnex_add_intr;
+	cinfo.rem_intr = cnex_rem_intr;
+	cinfo.clr_intr = cnex_clr_intr;
+
+	/*
+	 * LDC register will fail if an nexus instance had already
+	 * registered with the LDC framework
+	 */
+	rv = ldc_register(&cinfo);
+	if (rv) {
+		DWARN("cnex_attach: unable to register with LDC\n");
+		ddi_soft_state_free(cnex_state, instance);
+		mutex_destroy(&cnex_ssp->clist_lock);
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_create_minor_node(devi, "devctl", S_IFCHR, instance,
+	    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
+		ddi_remove_minor_node(devi, NULL);
+		ddi_soft_state_free(cnex_state, instance);
+		mutex_destroy(&cnex_ssp->clist_lock);
+		return (DDI_FAILURE);
+	}
+
+	/* Add interrupt redistribution callback. */
+	intr_dist_add(cnex_intr_redist, cnex_ssp);
+
+	ddi_report_dev(devi);
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+cnex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
+{
+	int 		instance;
+	ldc_cnex_t	cinfo;
+	cnex_soft_state_t *cnex_ssp;
+
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
+	}
+
+	instance = ddi_get_instance(devi);
+	cnex_ssp = ddi_get_soft_state(cnex_state, instance);
+
+	/* check if there are any channels still registered */
+	if (cnex_ssp->clist) {
+		cmn_err(CE_WARN, "?cnex_dettach: channels registered %d\n",
+		    ddi_get_instance(devi));
+		return (DDI_FAILURE);
+	}
+
+	/* Unregister with LDC module */
+	cinfo.dip = devi;
+	(void) ldc_unregister(&cinfo);
+
+	/* Remove interrupt redistribution callback. */
+	intr_dist_rem(cnex_intr_redist, cnex_ssp);
+
+	/* destroy mutex */
+	mutex_destroy(&cnex_ssp->clist_lock);
+
+	/* free soft state structure */
+	ddi_soft_state_free(cnex_state, instance);
+
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+cnex_open(dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+	int instance;
+
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	instance = getminor(*devp);
+	if (ddi_get_soft_state(cnex_state, instance) == NULL)
+		return (ENXIO);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+cnex_close(dev_t dev, int flags, int otyp, cred_t *credp)
+{
+	int instance;
+
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	instance = getminor(dev);
+	if (ddi_get_soft_state(cnex_state, instance) == NULL)
+		return (ENXIO);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+cnex_ioctl(dev_t dev,
+    int cmd, intptr_t arg, int mode, cred_t *cred_p, int *rval_p)
+{
+	int instance;
+	cnex_soft_state_t *cnex_ssp;
+
+	instance = getminor(dev);
+	if ((cnex_ssp = ddi_get_soft_state(cnex_state, instance)) == NULL)
+		return (ENXIO);
+	ASSERT(cnex_ssp->devi);
+	return (ndi_devctl_ioctl(cnex_ssp->devi, cmd, arg, mode, 0));
+}
+
+static int
+cnex_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
+    void *arg, void *result)
+{
+	char		name[MAXNAMELEN];
+	uint32_t	reglen;
+	int		*cnex_regspec;
+
+	switch (ctlop) {
+	case DDI_CTLOPS_REPORTDEV:
+		if (rdip == NULL)
+			return (DDI_FAILURE);
+		cmn_err(CE_CONT, "?channel-device: %s%d\n",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip));
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_INITCHILD:
+	{
+		dev_info_t *child = (dev_info_t *)arg;
+
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, child,
+			DDI_PROP_DONTPASS, "reg",
+			&cnex_regspec, &reglen) != DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+
+		(void) snprintf(name, sizeof (name), "%x", *cnex_regspec);
+		ddi_set_name_addr(child, name);
+		ddi_set_parent_data(child, NULL);
+		ddi_prop_free(cnex_regspec);
+		return (DDI_SUCCESS);
+	}
+
+	case DDI_CTLOPS_UNINITCHILD:
+	{
+		dev_info_t *child = (dev_info_t *)arg;
+
+		NDI_CONFIG_DEBUG((CE_NOTE,
+		    "DDI_CTLOPS_UNINITCHILD(%s, instance=%d)",
+		    ddi_driver_name(child), DEVI(child)->devi_instance));
+
+		ddi_set_name_addr(child, NULL);
+
+		return (DDI_SUCCESS);
+	}
+
+	case DDI_CTLOPS_DMAPMAPC:
+	case DDI_CTLOPS_REPORTINT:
+	case DDI_CTLOPS_REGSIZE:
+	case DDI_CTLOPS_NREGS:
+	case DDI_CTLOPS_SIDDEV:
+	case DDI_CTLOPS_SLAVEONLY:
+	case DDI_CTLOPS_AFFINITY:
+	case DDI_CTLOPS_POKE:
+	case DDI_CTLOPS_PEEK:
+		/*
+		 * These ops correspond to functions that "shouldn't" be called
+		 * by a channel-device driver.  So we whine when we're called.
+		 */
+		cmn_err(CE_WARN, "%s%d: invalid op (%d) from %s%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip), ctlop,
+		    ddi_driver_name(rdip), ddi_get_instance(rdip));
+		return (DDI_FAILURE);
+
+	case DDI_CTLOPS_ATTACH:
+	case DDI_CTLOPS_BTOP:
+	case DDI_CTLOPS_BTOPR:
+	case DDI_CTLOPS_DETACH:
+	case DDI_CTLOPS_DVMAPAGESIZE:
+	case DDI_CTLOPS_IOMIN:
+	case DDI_CTLOPS_POWER:
+	case DDI_CTLOPS_PTOB:
+	default:
+		/*
+		 * Everything else (e.g. PTOB/BTOP/BTOPR requests) we pass up
+		 */
+		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
+	}
+}
+
+/* -------------------------------------------------------------------------- */

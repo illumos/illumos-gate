@@ -642,6 +642,7 @@ usr/include/librestart.h		i386
 usr/include/librestart_priv.h		i386
 usr/include/libcontract_priv.h		i386
 var/svc/manifest/platform/sun4u		i386
+var/svc/manifest/platform/sun4v		i386
 var/svc/profile/platform_SUNW,SPARC-Enterprise.xml	i386
 var/svc/profile/platform_SUNW,Sun-Fire.xml	i386
 var/svc/profile/platform_SUNW,Sun-Fire-880.xml	i386

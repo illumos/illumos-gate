@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +131,34 @@ kaif_install_generic(caddr_t tgt, caddr_t arg)
 	bcopy((caddr_t)kaif_hdlr_generic, tgt, 32);
 }
 
-#ifndef sun4v
+#ifdef	sun4v
+
+/*ARGSUSED*/
+static void
+kaif_install_goto_tt64(caddr_t tgt, caddr_t arg)
+{
+	/* LINTED - pointer alignment */
+	uint32_t *hdlr = (uint32_t *)tgt;
+	uint32_t disp = (T_FAST_INSTR_MMU_MISS - T_INSTR_MMU_MISS) * 0x20;
+
+	*hdlr++ = 0x10480000 | (disp >> 2);	/* ba,pt (to tt64) */
+	*hdlr++ = 0x01000000;			/* nop */
+}
+
+/*ARGSUSED*/
+static void
+kaif_install_goto_tt68(caddr_t tgt, caddr_t arg)
+{
+	/* LINTED - pointer alignment */
+	uint32_t *hdlr = (uint32_t *)tgt;
+	uint32_t disp = (T_FAST_DATA_MMU_MISS - T_DATA_MMU_MISS) * 0x20;
+
+	*hdlr++ = 0x10480000 | (disp >> 2);	/* ba,pt (to tt68) */
+	*hdlr++ = 0x01000000;			/* nop */
+}
+
+#endif	/* sun4v */
+
 static void
 kaif_install_dmmumiss(caddr_t tgt, caddr_t vatotte)
 {
@@ -159,25 +186,31 @@ kaif_install_immumiss(caddr_t tgt, caddr_t vatotte)
 	*patch++ |= (uintptr_t)vatotte >> 10;
 	*patch |= ((uintptr_t)vatotte) & 0x3ff;
 }
-#endif /* sun4v */
 
 static struct kaif_trap_handlers {
 	uint_t th_tt;
 	void (*th_install)(caddr_t, caddr_t);
 } kaif_trap_handlers[] = {
 	{ T_INSTR_EXCEPTION,			kaif_install_generic },
+#ifdef sun4v
+	{ T_INSTR_MMU_MISS,			kaif_install_goto_tt64 },
+#endif
 	{ T_IDIV0,				kaif_install_generic },
 	{ T_DATA_EXCEPTION,			kaif_install_generic },
+#ifdef sun4v
+	{ T_DATA_MMU_MISS,			kaif_install_goto_tt68 },
+#endif
 	{ T_DATA_ERROR,				kaif_install_generic },
 	{ T_ALIGNMENT,				kaif_install_generic },
-#ifdef sun4v
-#else /* sun4v */
 	{ T_FAST_INSTR_MMU_MISS,		kaif_install_immumiss },
 	{ T_FAST_DATA_MMU_MISS,			kaif_install_dmmumiss },
 	{ T_FAST_DATA_MMU_PROT,			kaif_install_generic },
+#ifdef sun4v
+	{ T_INSTR_MMU_MISS + T_TL1,		kaif_install_goto_tt64 },
+	{ T_DATA_MMU_MISS + T_TL1,		kaif_install_goto_tt68 },
+#endif
 	{ T_FAST_INSTR_MMU_MISS + T_TL1,	kaif_install_immumiss },
 	{ T_FAST_DATA_MMU_MISS + T_TL1,		kaif_install_dmmumiss },
-#endif /* sun4v */
 	{ 0 }
 };
 
@@ -189,34 +222,27 @@ kaif_trap_init(void)
 	int i;
 
 	/*
+	 * sun4u:
 	 * We rely upon OBP for the handling of a great many traps.  As such,
 	 * we begin by populating our table with pointers to OBP's handlers.
 	 * We then copy in our own handlers where appropriate.  At some point,
 	 * when we provide the bulk of the handlers, this process will be
 	 * reversed.
+	 *
+	 * sun4v:
+	 * The sun4v kernel dismisses OBP at boot. Both fast and slow TLB
+	 * misses are handled by KMDB. Breakpoint traps go directly KMDB.
+	 * All other trap entries are redirected to their respective
+	 * trap implemenation within the Solaris trap table.
 	 */
 	for (i = 0; i < kaif_tba_native_sz; i += 0x20) {
 		/* LINTED - pointer alignment */
 		uint32_t *hdlr = (uint32_t *)(kaif_tba_native + i);
 #ifdef	sun4v
-		uint32_t tt = i/0x20;
-
-		/*
-		 * We use obp's tl0 handlers. Sine kmdb installs itsdebug
-		 * hook in obp, if obp cannot handle any traps, such as
-		 * user enter an invalid address in kmdb, obp will call
-		 * kmdb's callback and the control goes back to kmdb.
-		 * For tl>0 traps, kernel's trap handlers are good at
-		 * handling these on sun4v.
-		 */
-		if (tt >= T_TL1)
-			brtgt = (uintptr_t)(kaif_tba_kernel + i);
-		else
-			brtgt = (uintptr_t)(kaif_tba_obp + i);
-#else /* !sun4v */
+		brtgt = (uintptr_t)(kaif_tba_kernel + i);
+#else
 		brtgt = (uintptr_t)(kaif_tba_obp + i);
-#endif /* sun4v */
-
+#endif
 		*hdlr++ = 0x03000000 | (brtgt >> 10);	/* sethi brtgt, %g1 */
 		*hdlr++ = 0x81c06000 | (brtgt & 0x3ff);	/* jmp %g1 + brtgt */
 		*hdlr++ = 0x01000000;			/* nop */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,8 @@
 #include <sys/cpu_module.h>
 #include <sys/dtrace.h>
 #include <sys/cpu_sgnblk_defs.h>
+#include <sys/mdesc.h>
+#include <sys/mach_descrip.h>
 
 /*
  * Useful for disabling MP bring-up for an MP capable kernel
@@ -87,25 +89,67 @@ init_cpu_info(struct cpu *cp)
 	}
 }
 
-/* ARGSUSED */
 /*
- * Routine used to cleanup a CPU that has been powered off.  This will
+ * Routine used to cleanup a CPU that has been powered off. This will
  * destroy all per-cpu information related to this cpu.
  */
 int
 mp_cpu_unconfigure(int cpuid)
 {
-	return (0);
+	int retval;
+	extern void empty_cpu(int);
+	extern int cleanup_cpu_common(int);
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	retval = cleanup_cpu_common(cpuid);
+
+	empty_cpu(cpuid);
+
+	return (retval);
 }
 
-/* ARGSUSED */
+struct mp_find_cpu_arg {
+	int cpuid;		/* set by mp_cpu_configure() */
+	dev_info_t *dip;	/* set by mp_find_cpu() */
+};
+
 int
 mp_find_cpu(dev_info_t *dip, void *arg)
 {
-	return (0);
+	struct mp_find_cpu_arg *target = (struct mp_find_cpu_arg *)arg;
+	char	*type;
+	int	rv = DDI_WALK_CONTINUE;
+	int	cpuid;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "device_type", &type))
+		return (DDI_WALK_CONTINUE);
+
+	if (strcmp(type, "cpu") != 0)
+		goto out;
+
+	cpuid = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "reg", -1);
+
+	if (cpuid == -1) {
+		cmn_err(CE_PANIC, "reg prop not found in cpu node");
+	}
+
+	cpuid = PROM_CFGHDL_TO_CPUID(cpuid);
+
+	if (cpuid != target->cpuid)
+		goto out;
+
+	/* Found it */
+	rv = DDI_WALK_TERMINATE;
+	target->dip = dip;
+
+out:
+	ddi_prop_free(type);
+	return (rv);
 }
 
-/* ARGSUSED */
 /*
  * Routine used to setup a newly inserted CPU in preparation for starting
  * it running code.
@@ -113,5 +157,68 @@ mp_find_cpu(dev_info_t *dip, void *arg)
 int
 mp_cpu_configure(int cpuid)
 {
+	extern void fill_cpu(md_t *, mde_cookie_t);
+	extern void setup_cpu_common(int);
+	extern void setup_exec_unit_mappings(md_t *);
+	md_t *mdp;
+	mde_cookie_t rootnode, cpunode = MDE_INVAL_ELEM_COOKIE;
+	int listsz, i;
+	mde_cookie_t *listp = NULL;
+	int	num_nodes;
+	uint64_t cpuid_prop;
+
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if ((mdp = md_get_handle()) == NULL)
+		return (ENODEV);
+
+	rootnode = md_root_node(mdp);
+
+	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
+
+	num_nodes = md_node_count(mdp);
+
+	ASSERT(num_nodes > 0);
+
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = kmem_zalloc(listsz, KM_SLEEP);
+
+	num_nodes = md_scan_dag(mdp, rootnode, md_find_name(mdp, "cpu"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	if (num_nodes < 0)
+		return (ENODEV);
+
+	for (i = 0; i < num_nodes; i++) {
+		if (md_get_prop_val(mdp, listp[i], "id", &cpuid_prop))
+			break;
+		if (cpuid_prop == (uint64_t)cpuid) {
+			cpunode = listp[i];
+			break;
+		}
+	}
+
+	if (cpunode == MDE_INVAL_ELEM_COOKIE)
+		return (ENODEV);
+
+	kmem_free(listp, listsz);
+
+	/*
+	 * Note: uses cpu_lock to protect cpunodes and ncpunodes
+	 * which will be modified inside of fill_cpu and
+	 * setup_exec_unit_mappings.
+	 */
+	fill_cpu(mdp, cpunode);
+
+	/*
+	 * Remap all the cpunodes' execunit mappings.
+	 */
+	setup_exec_unit_mappings(mdp);
+
+	(void) md_fini_handle(mdp);
+
+	setup_cpu_common(cpuid);
+
 	return (0);
 }

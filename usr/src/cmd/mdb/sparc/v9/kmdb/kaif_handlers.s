@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,20 @@
 #include <sys/machtrap.h>
 #include <sys/privregs.h>
 #include <sys/mmu.h>
+#include <vm/mach_sfmmu.h>
+
+#if defined(sun4v) && !defined(lint)
+#include <sys/machparam.h>
+#endif
+
+#if defined(sun4v) && defined(KMDB_TRAPCOUNT)
+/*
+ * The sun4v implemenations of the fast miss handlers are larger than those
+ * of their sun4u kin. This is unfortunate because there is not enough space
+ * remaining in the respective trap table entries for this debug feature.
+ */
+#error "KMDB_TRAPCOUNT not supported on sun4v"
+#endif
 
 /*
  * This file contains the trap handlers that will be copied to kmdb's trap
@@ -50,12 +64,7 @@
 
 #if defined(lint)
 #include <kmdb/kaif.h>
-#endif /* lint */
 
-#if defined(lint)
-
-#ifdef sun4v
-#else /* sun4v */
 void
 kaif_hdlr_dmiss(void)
 {
@@ -65,51 +74,149 @@ void
 kaif_itlb_handler(void)
 {
 }
-#endif /* sun4v */
-#else	/* lint */
+
+#else /* lint */
 
 #ifdef sun4v
+
+#define	GET_MMU_D_ADDR_CTX(daddr, ctx)			\
+	MMU_FAULT_STATUS_AREA(ctx);			\
+	ldx	[ctx + MMFSA_D_ADDR], daddr;		\
+	ldx	[ctx + MMFSA_D_CTX], ctx
+
+#define	GET_MMU_I_ADDR_CTX(iaddr, ctx)			\
+	MMU_FAULT_STATUS_AREA(ctx);			\
+	ldx	[ctx + MMFSA_I_ADDR], iaddr;		\
+	ldx	[ctx + MMFSA_I_CTX], ctx
+
+/*
+ * KAIF_ITLB_STUFF
+ * derived from ITLB_STUFF in uts/sun4v/vm/mach_sfmmu.h
+ *
+ * Load ITLB entry
+ *
+ * In:
+ *   tte = reg containing tte
+ *   ouch = branch target label used if hcall fails (sun4v only)
+ *   scr1, scr2, scr3, scr4 = scratch registers (must not be %o0-%o3)
+ */
+#define	KAIF_ITLB_STUFF(tte, ouch, scr1, scr2, scr3, scr4)	\
+	mov	%o0, scr1;				\
+	mov	%o1, scr2;				\
+	mov	%o2, scr3;				\
+	mov	%o3, scr4;				\
+	MMU_FAULT_STATUS_AREA(%o2);			\
+	ldx	[%o2 + MMFSA_I_ADDR], %o0;		\
+	ldx	[%o2 + MMFSA_I_CTX], %o1;		\
+	srlx	%o0, PAGESHIFT, %o0;			\
+	sllx	%o0, PAGESHIFT, %o0;			\
+	mov	tte, %o2;				\
+	mov	MAP_ITLB, %o3;				\
+	ta	MMU_MAP_ADDR;				\
+	/* BEGIN CSTYLED */				\
+	brnz,a,pn %o0, ouch;				\
+	  nop;						\
+	/* END CSTYLED */				\
+	mov	scr1, %o0;				\
+	mov	scr2, %o1;				\
+	mov	scr3, %o2;				\
+	mov	scr4, %o3
+
+/*
+ * KAIF_DTLB_STUFF
+ * derived from DTLB_STUFF in uts/sun4v/vm/mach_sfmmu.h
+ *
+ * Load DTLB entry
+ *
+ * In:
+ *   tte = reg containing tte
+ *   ouch = branch target label used if hcall fails (sun4v only)
+ *   scr1, scr2, scr3, scr4 = scratch registers (must not be %o0-%o3)
+ */
+#define	KAIF_DTLB_STUFF(tte, ouch, scr1, scr2, scr3, scr4)	\
+	mov	%o0, scr1;				\
+	mov	%o1, scr2;				\
+	mov	%o2, scr3;				\
+	mov	%o3, scr4;				\
+	MMU_FAULT_STATUS_AREA(%o2);			\
+	ldx	[%o2 + MMFSA_D_ADDR], %o0;		\
+	ldx	[%o2 + MMFSA_D_CTX], %o1;		\
+	srlx	%o0, PAGESHIFT, %o0;			\
+	sllx	%o0, PAGESHIFT, %o0;			\
+	mov	tte, %o2;				\
+	mov	MAP_DTLB, %o3;				\
+	ta	MMU_MAP_ADDR;				\
+	/* BEGIN CSTYLED */				\
+	brnz,a,pn %o0, ouch;				\
+	  nop;						\
+	/* END CSTYLED */				\
+	mov	scr1, %o0;				\
+	mov	scr2, %o1;				\
+	mov	scr3, %o2;				\
+	mov	scr4, %o3
+
 #else /* sun4v */
 
-	.global	kaif_hdlr_dmiss_patch
-	.global	kaif_hdlr_imiss_patch
+#define	GET_MMU_D_ADDR_CTX(daddr, ctx)			\
+	mov	MMU_TAG_ACCESS, ctx;			\
+	ldxa	[ctx]ASI_DMMU, daddr;			\
+	sllx	daddr, TAGACC_CTX_LSHIFT, ctx;		\
+	srlx	ctx, TAGACC_CTX_LSHIFT, ctx
 
-	/*
-	 * This routine must be exactly 32 instructions long.
-	 */
+#define	GET_MMU_I_ADDR_CTX(iaddr, ctx)			\
+	rdpr	%tpc, iaddr;				\
+	ldxa	[%g0]ASI_IMMU, ctx;			\
+	srlx	ctx, TTARGET_CTX_SHIFT, ctx
+
+#define	KAIF_DTLB_STUFF(tte, ouch, scr1, scr2, scr3, scr4)	\
+	DTLB_STUFF(tte, scr1, scr2, scr3, scr4)
+
+#define	KAIF_ITLB_STUFF(tte, ouch, scr1, scr2, scr3, scr4)	\
+	ITLB_STUFF(tte, scr1, scr2, scr3, scr4)
+
+#endif /* sun4v */
+	
+/*
+ * KAIF_CALL_KDI_VATOTTE
+ *
+ * Use kdi_vatotte to look up the tte.  We don't bother stripping the
+ * context, as it won't change the tte we get.
+ *
+ * The two instruction at patch_lbl are modified during runtime
+ * by kaif to point to kdi_vatotte
+ *
+ * Clobbers all globals.
+ * Returns tte in %g1 if successful, otherwise 0 in %g1
+ * Leaves address of next instruction following this macro in scr1
+ */
+#define	KAIF_CALL_KDI_VATOTTE(addr, ctx, patch_lbl, scr0, scr1)	\
+	.global	patch_lbl;					\
+patch_lbl:							\
+	sethi	%hi(0), scr0;					\
+	or	scr0, %lo(0), scr0;				\
+	jmpl	scr0, scr1;					\
+	add	scr1, 8, scr1
+
+
 	ENTRY_NP(kaif_hdlr_dmiss)
-	mov	MMU_TAG_ACCESS, %g1
-	ldxa	[%g1]ASI_DMMU, %g1		/* %g1 = addr|ctx */
-	sllx	%g1, TAGACC_CTX_LSHIFT, %g2	/* strip addr */
-	srlx	%g2, TAGACC_CTX_LSHIFT, %g2	/* %g2 = ctx */
+	GET_MMU_D_ADDR_CTX(%g1, %g2)
 
-	/*
-	 * Use kdi_vatotte to look up the tte.  We don't bother stripping the
-	 * context, as it won't change the tte we get.
-	 */
-kaif_hdlr_dmiss_patch:
-	sethi	%hi(0), %g3	/* set by kaif to kdi_vatotte */
-	or	%g3, %lo(0), %g3
-	jmpl	%g3, %g7	/* uses all regs, ret to %g7, tte or 0 in %g1 */
-	add	%g7, 8, %g7	/* adjust return */
-
-	brz	%g1, 1f
+	KAIF_CALL_KDI_VATOTTE(%g1, %g2, kaif_hdlr_dmiss_patch, %g3, %g7)
+0:	brz	%g1, 1f
 	nop
 
 	/* 
 	 * kdi_vatotte gave us a TTE to use.  Load it up and head back 
 	 * into the world, but first bump a counter.
 	 */
-#ifdef	KMDB_TRAPCOUNT
-	ldx	[%g7 + 0x40], %g2	/* Trap counter.  See top comment */
+
+#ifdef	KMDB_TRAPCOUNT			/* Trap counter.  See top comment */
+	ldx	[%g7 + .count-0b], %g2
 	add	%g2, 1, %g2
-	stx	%g2, [%g7 + 0x40]
-#else
-	nop
-	nop
-	nop
+	stx	%g2, [%g7 + .count-0b]
 #endif
-	stxa	%g1, [%g0]ASI_DTLB_IN
+
+	KAIF_DTLB_STUFF(%g1, 1f, %g2, %g3, %g4, %g5)
 	retry
 
 1:	/* 
@@ -126,63 +233,47 @@ kaif_hdlr_dmiss_patch:
 	 * find the TTE for the debugger without missing.
 	 */
 
-#ifdef	KMDB_TRAPCOUNT
-	mov	MMU_TAG_ACCESS, %g1	/* Trap address "counter". */
-	ldxa	[%g1]ASI_DMMU, %g1
-	stx	%g1, [%g7 + 0x48]
-#else
-	nop
-	nop
-	nop
+#ifdef	KMDB_TRAPCOUNT			/* Trap address "counter". */
+	GET_MMU_D_ADDR(%g2, %g3)
+	stx	%g2, [%g7 + .daddr-0b]
+	stx	%g1, [%g7 + .ecode-0b]
 #endif
 
-	mov	PTSTATE_KERN_COMMON | PSTATE_AG, %g3
-	wrpr	%g3, %pstate
-	sethi	%hi(kaif_dtrap), %g4
-	jmp	%g4 + %lo(kaif_dtrap)
+	sethi	%hi(kaif_dtrap), %g1
+	jmp	%g1 + %lo(kaif_dtrap)
 	nop
-	unimp	0
-	unimp	0	/* counter goes here (base + 0x60) */
-	unimp	0
-	unimp	0	/* miss address goes here (base + 0x68) */
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
+	/* NOTREACHED */
+
+#ifdef KMDB_TRAPCOUNT
+	.align 8
+.count:	.xword 0			/* counter goes here */
+.daddr:	.xword 0			/* miss address goes here */
+.ecode:	.xword 0			/* sun4v: g1 contains err code */
+#endif
+
+	.align 32*4			/* force length to 32 instr. */
 	SET_SIZE(kaif_hdlr_dmiss)
 
-	/*
-	 * This routine must be exactly 32 instructions long.
-	 */
+
+
 	ENTRY_NP(kaif_hdlr_imiss)
-	rdpr	%tpc, %g1
-	ldxa	[%g0]ASI_IMMU, %g2
-	srlx	%g2, TTARGET_CTX_SHIFT, %g2
+	GET_MMU_I_ADDR_CTX(%g1, %g2)
 
-kaif_hdlr_imiss_patch:
-	sethi	%hi(0), %g3	/* set by kaif to kdi_vatotte */
-	or	%g3, %lo(0), %g3
-	jmpl	%g3, %g7	/* uses all regs, ret to %g7, tte or 0 in %g1 */
-	add	%g7, 8, %g7	/* adjust return */
-
-	brz	%g1, 1f
+	KAIF_CALL_KDI_VATOTTE(%g1, %g2, kaif_hdlr_imiss_patch, %g3, %g7)
+0:	brz	%g1, 1f
 	nop
 
 	/* 
 	 * kdi_vatotte gave us a TTE to use.  Load it up and head back 
 	 * into the world, but first bump a counter.
 	 */
-#ifdef	KMDB_TRAPCOUNT
-	ldx	[%g7 + 0x3c], %g2	/* Trap counter.  See top comment */
+#ifdef	KMDB_TRAPCOUNT			/* Trap counter.  See top comment */
+	ldx	[%g7 + .count-0b], %g2
 	add	%g2, 1, %g2
-	stx	%g2, [%g7 + 0x3c]
-#else
-	nop
-	nop
-	nop
+	stx	%g2, [%g7 + .count-0b]
 #endif
-	stxa	%g1, [%g0]ASI_ITLB_IN
+
+	KAIF_ITLB_STUFF(%g1, 1f, %g2, %g3, %g4, %g5)
 	retry
 
 1:	/* 
@@ -197,42 +288,41 @@ kaif_hdlr_imiss_patch:
 	 * We will only reach this point at TL=1, as kdi_vatotte will always
 	 * find the TTE for the debugger without missing.
 	 */
-	rdpr	%pstate, %g1
-	or	%g0, PTSTATE_KERN_COMMON | PSTATE_AG, %g2
-	set	kaif_dtrap, %g3
-	jmp	%g3
-	wrpr	%g2, %pstate
-	unimp	0
-	unimp	0
-	unimp	0	/* counter goes here */
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
-	unimp	0
+
+	sethi	%hi(kaif_dtrap), %g1
+	jmp	%g1 + %lo(kaif_dtrap)
+	nop
+	/* NOTREACHED */
+
+#ifdef KMDB_TRAPCOUNT
+	.align	8
+.count:	.xword	0
+#endif
+
+	.align	32*4			/* force length to 32 instr. */
 	SET_SIZE(kaif_hdlr_imiss)
-#endif /* sun4v */
+
+
 
 	ENTRY_NP(kaif_hdlr_generic)
-#ifdef	KMDB_TRAPCOUNT
-	rd	%pc, %g3		/* Trap counter.  See top comment */
-	ld	[%g3 + 0x1c], %g4
+#ifdef	KMDB_TRAPCOUNT			/* Trap counter.  See top comment */
+0:	rd	%pc, %g3
+	ldx	[%g3 + .count-0b], %g4
 	add	%g4, 1, %g4
-	st	%g4, [%g3 + 0x1c]
-#else
-	nop
-	nop
-	nop
-	nop
+	stx	%g4, [%g3 + .count-0b]
 #endif
-	sethi	%hi(kaif_dtrap), %g3
-	jmp	%g3 + %lo(kaif_dtrap)
-	rdpr	%pstate, %g1
-	unimp	0	/* counter goes here */
+
+	sethi	%hi(kaif_dtrap), %g1
+	jmp	%g1 + %lo(kaif_dtrap)
+	nop
+	/* NOTREACHED */
+
+#ifdef	KMDB_TRAPCOUNT
+	.align	8
+.count:	.xword	0			/* counter goes here */
+#endif
+
+	.align	32*4			/* force length to 32 instr. */
 	SET_SIZE(kaif_hdlr_generic)
 
-#endif
+#endif /* lint */

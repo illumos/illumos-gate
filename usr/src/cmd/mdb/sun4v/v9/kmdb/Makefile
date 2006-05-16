@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -57,6 +58,9 @@ KMDB_FPTEST = \
 # Uncomment the following line to enable trap accounting.  A DTLB translation
 # will be added for the trap table, and each handler installed by KMDB will use
 # its padding to keep a trap count.  See kaif_handlers.s.
+#
+# NOTE: not currently supported by the sun4v fast miss handlers. See
+# ../../../sparc/v9/kmdb/kaif_handlers.s to verify before use.
 #
 #TRAPCOUNT = -DKMDB_TRAPCOUNT
 
@@ -146,6 +150,9 @@ kmdb_context_off.h: ../../../sparc/kmdb/kmdb_context_off.in
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
+%.o: ../../../../../uts/sun4v/ml/%.s
+	$(COMPILE.s) -o $@ $<
+
 #
 # Lint
 #
@@ -188,6 +195,9 @@ kmdb_context_off.h: ../../../sparc/kmdb/kmdb_context_off.in
 
 %.ln: $(SRC)/common/net/util/%.c
 	$(LINT.c) -c $<
+
+%.ln: ../../../../../uts/sun4v/ml/%.s
+	$(LINT.s) -c $<
 
 #
 # Installation targets

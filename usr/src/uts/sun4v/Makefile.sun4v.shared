@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile contains the common definitions for the sun4v unix
 #	and all sun4v implementation architecture dependent modules.
@@ -309,19 +309,26 @@ MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
 #
 #	Machine Specific Driver Modules (/kernel/drv):
 #
-DRV_KMODS	+= vnex
-DRV_KMODS	+= qcn
-DRV_KMODS	+= dma
+DRV_KMODS	+= bge
+DRV_KMODS	+= cnex
 DRV_KMODS	+= cpc
-DRV_KMODS	+= rootnex
-DRV_KMODS	+= trapstat
-DRV_KMODS	+= px
+DRV_KMODS	+= dma
+DRV_KMODS	+= ebus
 DRV_KMODS	+= fpc
 DRV_KMODS	+= glvc
-DRV_KMODS	+= bge
 DRV_KMODS	+= mdesc
-DRV_KMODS	+= ebus
-DRV_KMODS	+= su
+DRV_KMODS	+= px
+DRV_KMODS	+= qcn
+DRV_KMODS	+= rootnex
+DRV_KMODS       += su
+DRV_KMODS	+= trapstat
+DRV_KMODS	+= vcc 
+DRV_KMODS	+= vdc
+DRV_KMODS	+= vds
+DRV_KMODS	+= vldc
+DRV_KMODS	+= vnet
+DRV_KMODS	+= vnex
+DRV_KMODS	+= vsw
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ncp
@@ -354,8 +361,16 @@ SYS_KMODS	+=
 #
 #	'User' Modules (/kernel/misc):
 #
-MISC_KMODS	+= obpsym bootdev vis platmod
-
+MISC_KMODS	+= bootdev 
+MISC_KMODS	+= dr_cpu 
+MISC_KMODS	+= ds
+MISC_KMODS	+= fault_iso
+MISC_KMODS	+= ldc 
+MISC_KMODS	+= obpsym 
+MISC_KMODS	+= platmod 
+MISC_KMODS	+= platsvc 
+MISC_KMODS	+= vis 
+ 
 #	md5 optimized for Niagara
 #
 MISC_KMODS	+= md5

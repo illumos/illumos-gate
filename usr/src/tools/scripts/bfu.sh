@@ -325,6 +325,7 @@ superfluous_local_zone_files="
 	lib/svc/method/svc-scheduler
 	lib/svc/method/svc-sckmd
 	lib/svc/method/svc-syseventd
+	lib/svc/method/svc-vntsd
 	lib/svc/method/svc-zones
 	platform/*/kernel
 	platform/SUNW,Sun-Fire-15000/lib/cvcd
@@ -357,6 +358,7 @@ superfluous_local_zone_files="
 	usr/include/netinet/ipl.h
 	usr/include/sys/dcam
 	usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so
+	usr/lib/ldoms
 	usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options
 	usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so
 	usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
@@ -376,6 +378,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/platform/sun4u/efdaemon.xml
 	var/svc/manifest/platform/sun4u/sckmd.xml
 	var/svc/manifest/platform/sun4u/sf880drd.xml
+	var/svc/manifest/platform/sun4v/vntsd.xml
 	var/svc/manifest/system/cvc.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/fmd.xml

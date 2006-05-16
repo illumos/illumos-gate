@@ -49,6 +49,8 @@ extern "C" {
 #define	MMU_MAP_ADDR		0x83
 #define	MMU_UNMAP_ADDR		0x84
 
+#define	CORE_TRAP		0xff
+
 /*
  * Error returns in %o0.
  * (Additional result is returned in %o1.)
@@ -71,6 +73,8 @@ extern "C" {
 #define	H_ENOMAP		14	/* Mapping is not valid, */
 					/* no translation exists */
 #define	H_EBUSY			17	/* Resource busy */
+#define	H_ETOOMANY		15	/* Hard resource limit exceeded */
+#define	H_ECHANNEL		16	/* Illegal LDC channel */
 
 #define	H_BREAK			-1	/* Console Break */
 #define	H_HUP			-2	/* Console Break */
@@ -85,9 +89,15 @@ extern "C" {
  */
 #define	HV_MACH_EXIT		0x00
 #define	HV_MACH_DESC		0x01
+#define	HV_MACH_SIR		0x02
+
+#define	HV_CPU_START		0x10
+#define	HV_CPU_STOP		0x11
 #define	HV_CPU_YIELD		0x12
-#define	CPU_QCONF		0x14
+#define	HV_CPU_QCONF		0x14
 #define	HV_CPU_STATE		0x17
+#define	HV_CPU_SET_RTBA		0x18
+
 #define	MMU_TSB_CTX0		0x20
 #define	MMU_TSB_CTXNON0		0x21
 #define	MMU_DEMAP_PAGE		0x22
@@ -95,20 +105,24 @@ extern "C" {
 #define	MMU_DEMAP_ALL		0x24
 #define	MAP_PERM_ADDR		0x25
 #define	MMU_SET_INFOPTR		0x26
+#define	MMU_ENABLE		0x27
 #define	UNMAP_PERM_ADDR		0x28
+
 #define	HV_MEM_SCRUB		0x31
 #define	HV_MEM_SYNC		0x32
+
 #define	HV_INTR_SEND		0x42
+
 #define	TOD_GET			0x50
 #define	TOD_SET			0x51
-#define	CONS_READ		0x60
-#define	CONS_WRITE		0x61
+
+#define	CONS_GETCHAR		0x60
+#define	CONS_PUTCHAR		0x61
 
 #define	TTRACE_BUF_CONF		0x90
 #define	TTRACE_BUF_INFO		0x91
 #define	TTRACE_ENABLE		0x92
 #define	TTRACE_FREEZE		0x93
-
 #define	DUMP_BUF_UPDATE		0x94
 
 #define	HVIO_INTR_DEVINO2SYSINO	0xa0
@@ -119,12 +133,46 @@ extern "C" {
 #define	HVIO_INTR_GETTARGET	0xa5
 #define	HVIO_INTR_SETTARGET	0xa6
 
+#define	VINTR_GET_COOKIE	0xa7
+#define	VINTR_SET_COOKIE	0xa8
+#define	VINTR_GET_VALID		0xa9
+#define	VINTR_SET_VALID		0xaa
+#define	VINTR_GET_STATE		0xab
+#define	VINTR_SET_STATE		0xac
+#define	VINTR_GET_TARGET	0xad
+#define	VINTR_SET_TARGET	0xae
+
+#define	LDC_TX_QCONF		0xe0
+#define	LDC_TX_QINFO		0xe1
+#define	LDC_TX_GET_STATE	0xe2
+#define	LDC_TX_SET_QTAIL	0xe3
+#define	LDC_RX_QCONF		0xe4
+#define	LDC_RX_QINFO		0xe5
+#define	LDC_RX_GET_STATE	0xe6
+#define	LDC_RX_SET_QHEAD	0xe7
+
+#define	LDC_SET_MAP_TABLE	0xea
+#define	LDC_GET_MAP_TABLE	0xeb
+#define	LDC_COPY		0xec
+#define	LDC_MAPIN		0xed
+#define	LDC_UNMAP		0xee
+#define	LDC_REVOKE		0xef
+
 #ifdef SET_MMU_STATS
 #define	MMU_STAT_AREA		0xfc
 #endif /* SET_MMU_STATS */
 
 #define	HV_RA2PA		0x200
 #define	HV_HPRIV		0x201
+
+/*
+ * Function numbers for CORE_TRAP.
+ */
+#define	API_SET_VERSION		0x00
+#define	API_PUT_CHAR		0x01
+#define	API_EXIT		0x02
+#define	API_GET_VERSION		0x03
+
 
 /*
  * Bits for MMU functions flags argument:
@@ -188,14 +236,14 @@ struct mmu_stat {
 };
 #endif /* SET_MMU_STATS */
 
-#endif /* _ASM */
+#endif /* ! _ASM */
 
 /*
  * CPU States
  */
 #define	CPU_STATE_INVALID	0x0
-#define	CPU_STATE_IDLE		0x1	/* cpu not started */
-#define	CPU_STATE_GUEST		0x2	/* cpu running guest code */
+#define	CPU_STATE_STOPPED	0x1	/* cpu not started */
+#define	CPU_STATE_RUNNING	0x2	/* cpu running guest code */
 #define	CPU_STATE_ERROR		0x3	/* cpu is in the error state */
 #define	CPU_STATE_LAST_PUBLIC	CPU_STATE_ERROR	/* last valid state */
 
@@ -256,19 +304,34 @@ struct mmu_stat {
 #define	HVIO_DMA_SYNC_DIR_TO_DEV	0x01
 #define	HVIO_DMA_SYNC_DIR_FROM_DEV	0x02
 
+/*
+ * LDC Channel States
+ */
+#define	LDC_CHANNEL_DOWN	0x0
+#define	LDC_CHANNEL_UP		0x1
+#define	LDC_CHANNEL_RESET	0x2
+
 #ifndef _ASM
 
 extern uint64_t hv_mmu_map_perm_addr(void *, int, uint64_t, int);
 extern uint64_t	hv_mmu_unmap_perm_addr(void *, int, int);
+extern uint64_t hv_mach_exit(uint64_t exit_code);
+extern uint64_t hv_mach_sir(void);
+
+extern uint64_t hv_cpu_start(uint64_t cpuid, uint64_t pc, uint64_t rtba,
+    uint64_t arg);
+extern uint64_t hv_cpu_stop(uint64_t cpuid);
+extern uint64_t hv_cpu_set_rtba(uint64_t *rtba);
+
 extern uint64_t	hv_set_ctx0(uint64_t, uint64_t);
 extern uint64_t	hv_set_ctxnon0(uint64_t, uint64_t);
+extern uint64_t hv_mmu_fault_area_conf(void *raddr);
 #ifdef SET_MMU_STATS
 extern uint64_t hv_mmu_set_stat_area(uint64_t, uint64_t);
 #endif /* SET_MMU_STATS */
 
 extern uint64_t hv_cpu_qconf(int queue, uint64_t paddr, int size);
-extern uint64_t hv_cpu_yield();
-
+extern uint64_t hv_cpu_yield(void);
 extern uint64_t hv_cpu_state(uint64_t cpuid, uint64_t *cpu_state);
 extern uint64_t hv_mem_scrub(uint64_t real_addr, uint64_t length,
     uint64_t *scrubbed_len);
@@ -282,7 +345,6 @@ extern uint64_t hv_service_send(uint64_t s_id, uint64_t buf_pa,
 extern uint64_t hv_service_getstatus(uint64_t s_id, uint64_t *vreg);
 extern uint64_t hv_service_setstatus(uint64_t s_id, uint64_t bits);
 extern uint64_t hv_service_clrstatus(uint64_t s_id, uint64_t bits);
-
 extern uint64_t hv_mach_desc(uint64_t buffer_ra, uint64_t *buffer_sizep);
 
 extern uint64_t hv_ttrace_buf_info(uint64_t *, uint64_t *);
@@ -300,16 +362,64 @@ extern uint64_t hv_tod_set(uint64_t);
 extern uint64_t hvio_intr_devino_to_sysino(uint64_t dev_hdl, uint32_t devino,
     uint64_t *sysino);
 extern uint64_t hvio_intr_getvalid(uint64_t sysino,
-    int *intr_valid_state);
+	int *intr_valid_state);
 extern uint64_t hvio_intr_setvalid(uint64_t sysino,
-    int intr_valid_state);
+	int intr_valid_state);
 extern uint64_t hvio_intr_getstate(uint64_t sysino,
-    int *intr_state);
+	int *intr_state);
 extern uint64_t hvio_intr_setstate(uint64_t sysino, int intr_state);
 extern uint64_t hvio_intr_gettarget(uint64_t sysino, uint32_t *cpuid);
 extern uint64_t hvio_intr_settarget(uint64_t sysino, uint32_t cpuid);
 
-#endif
+extern uint64_t hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base,
+    uint64_t nentries);
+extern uint64_t hv_ldc_tx_qinfo(uint64_t channel, uint64_t *ra_base,
+    uint64_t *nentries);
+extern uint64_t hv_ldc_tx_get_state(uint64_t channel, uint64_t *headp,
+    uint64_t *tailp, uint64_t *state);
+extern uint64_t hv_ldc_tx_set_qtail(uint64_t channel, uint64_t tail);
+extern uint64_t hv_ldc_rx_qconf(uint64_t channel, uint64_t ra_base,
+    uint64_t nentries);
+extern uint64_t hv_ldc_rx_qinfo(uint64_t channel, uint64_t *ra_base,
+    uint64_t *nentries);
+extern uint64_t hv_ldc_rx_get_state(uint64_t channel, uint64_t *headp,
+    uint64_t *tailp, uint64_t *state);
+extern uint64_t hv_ldc_rx_set_qhead(uint64_t channel, uint64_t head);
+
+extern uint64_t hv_ldc_set_map_table(uint64_t channel, uint64_t tbl_ra,
+    uint64_t tbl_entries);
+extern uint64_t hv_ldc_get_map_table(uint64_t channel, uint64_t *tbl_ra,
+    uint64_t *tbl_entries);
+extern uint64_t hv_ldc_copy(uint64_t channel, uint64_t request,
+    uint64_t cookie, uint64_t raddr, uint64_t length, uint64_t *lengthp);
+extern uint64_t hv_ldc_mapin(uint64_t channel, uint64_t cookie,
+    uint64_t *raddr, uint64_t *perm);
+extern uint64_t hv_ldc_unmap(uint64_t raddr);
+extern uint64_t hv_ldc_revoke(uint64_t raddr);
+extern uint64_t hv_api_get_version(uint64_t api_group, uint64_t *majorp,
+    uint64_t *minorp);
+extern uint64_t hv_api_set_version(uint64_t api_group, uint64_t major,
+    uint64_t minor, uint64_t *supported_minor);
+
+extern uint64_t hvldc_intr_getcookie(uint64_t dev_hdl, uint32_t devino,
+    uint64_t *cookie);
+extern uint64_t hvldc_intr_setcookie(uint64_t dev_hdl, uint32_t devino,
+    uint64_t cookie);
+extern uint64_t hvldc_intr_getvalid(uint64_t dev_hdl, uint32_t devino,
+    int *intr_valid_state);
+extern uint64_t hvldc_intr_setvalid(uint64_t dev_hdl, uint32_t devino,
+    int intr_valid_state);
+extern uint64_t hvldc_intr_getstate(uint64_t dev_hdl, uint32_t devino,
+    int *intr_state);
+extern uint64_t hvldc_intr_setstate(uint64_t dev_hdl, uint32_t devino,
+    int intr_state);
+extern uint64_t hvldc_intr_gettarget(uint64_t dev_hdl, uint32_t devino,
+    uint32_t *cpuid);
+extern uint64_t hvldc_intr_settarget(uint64_t dev_hdl, uint32_t devino,
+    uint32_t cpuid);
+
+#endif /* ! _ASM */
+
 
 #ifdef __cplusplus
 }

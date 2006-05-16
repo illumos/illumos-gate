@@ -58,12 +58,8 @@
 #include <sys/trapstat.h>
 #include <sys/hsvc.h>
 
-#define	S_VAC_SIZE	MMU_PAGESIZE /* XXXQ? */
-
-/*
- * Maximum number of contexts
- */
-#define	MAX_NCTXS	(1 << 13)
+#define	NI_MMU_PAGESIZE_MASK	((1 << TTE8K) | (1 << TTE64K) | (1 << TTE4M) \
+				    | (1 << TTE256M))
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 static niagara_mmustat_t *cpu_tstat_va;		/* VA of mmustat buffer */
@@ -82,12 +78,16 @@ static hsvc_info_t niagara_hsvc = {
 void
 cpu_setup(void)
 {
-	extern int at_flags;
-	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int mmu_exported_pagesize_mask;
-	extern int get_cpu_pagesizes(void);
 	extern int cpc_has_overflow_intr;
 	int status;
+	char *ni_isa_set[] = {
+	    "sparcv9+vis",
+	    "sparcv9+vis2",
+	    "sparcv8plus+vis",
+	    "sparcv8plus+vis2",
+	    NULL
+	};
 
 	/*
 	 * Negotiate the API version for Niagara specific hypervisor
@@ -102,49 +102,29 @@ cpu_setup(void)
 		niagara_hsvc_available = B_FALSE;
 	}
 
+	/*
+	 * The setup common to all CPU modules is done in cpu_setup_common
+	 * routine.
+	 */
+	cpu_setup_common(ni_isa_set);
+
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
-	at_flags = EF_SPARC_SUN_US3 | EF_SPARC_32PLUS | EF_SPARC_SUN_US1;
 
-	/*
-	 * Use the maximum number of contexts available for Spitfire unless
-	 * it has been tuned for debugging.
-	 * We are checking against 0 here since this value can be patched
-	 * while booting.  It can not be patched via /etc/system since it
-	 * will be patched too late and thus cause the system to panic.
-	 */
-	if (nctxs == 0)
-		nctxs = MAX_NCTXS;
-
-	if (use_page_coloring) {
-		do_pg_coloring = 1;
-		if (use_virtual_coloring)
-			do_virtual_coloring = 1;
+	if (broken_md_flag) {
+		/*
+		 * Turn on the missing bits supported by Niagara CPU in
+		 * MMU pagesize mask returned by MD.
+		 */
+		mmu_exported_pagesize_mask |= NI_MMU_PAGESIZE_MASK;
+	} else {
+		if ((mmu_exported_pagesize_mask &
+		    DEFAULT_SUN4V_MMU_PAGESIZE_MASK) !=
+		    DEFAULT_SUN4V_MMU_PAGESIZE_MASK)
+			cmn_err(CE_PANIC, "machine description"
+			    " does not have required sun4v page sizes"
+			    " 8K, 64K and 4M: MD mask is 0x%x",
+			    mmu_exported_pagesize_mask);
 	}
-	/*
-	 * Initalize supported page sizes information before the PD.
-	 * If no information is available, then initialize the
-	 * mmu_exported_pagesize_mask to a reasonable value for that processor.
-	 */
-	mmu_exported_pagesize_mask = get_cpu_pagesizes();
-	if (mmu_exported_pagesize_mask <= 0) {
-		mmu_exported_pagesize_mask = (1 << TTE8K) | (1 << TTE64K) |
-		    (1 << TTE4M) | (1 << TTE256M);
-	}
-
-	/*
-	 * Tune pp_slots to use up to 1/8th of the tlb entries.
-	 */
-	pp_slots = MIN(8, MAXPP_SLOTS);
-
-	/*
-	 * Block stores invalidate all pages of the d$ so pagecopy
-	 * et. al. do not need virtual translations with virtual
-	 * coloring taken into consideration.
-	 */
-	pp_consistent_coloring = 0;
-	isa_list =
-	    "sparcv9 sparcv8plus sparcv8 sparcv8-fsmuld sparcv7 "
-	    "sparc sparcv9+vis sparcv9+vis2 sparcv8plus+vis sparcv8plus+vis2";
 
 	cpu_hwcap_flags |= AV_SPARC_ASI_BLK_INIT;
 
@@ -155,84 +135,34 @@ cpu_setup(void)
 	 * and must never be mapped. In addition, software must not use
 	 * pages within 4GB of the VA hole as instruction pages to
 	 * avoid problems with prefetching into the VA hole.
-	 *
-	 * VA hole information should be obtained from the machine
-	 * description.
 	 */
-	hole_start = (caddr_t)(0x800000000000ul - (1ul << 32));
-	hole_end = (caddr_t)(0xffff800000000000ul + (1ul << 32));
+	hole_start = (caddr_t)((1ull << (va_bits - 1)) - (1ull << 32));
+	hole_end = (caddr_t)((0ull - (1ull << (va_bits - 1))) + (1ull << 32));
 
-	/*
-	 * The kpm mapping window.
-	 * kpm_size:
-	 *	The size of a single kpm range.
-	 *	The overall size will be: kpm_size * vac_colors.
-	 * kpm_vbase:
-	 *	The virtual start address of the kpm range within the kernel
-	 *	virtual address space. kpm_vbase has to be kpm_size aligned.
-	 */
-	kpm_size = (size_t)(2ull * 1024 * 1024 * 1024 * 1024); /* 2TB */
-	kpm_size_shift = 41;
-	kpm_vbase = (caddr_t)0xfffffa0000000000ull; /* 16EB - 6TB */
-
-	/*
-	 * The traptrace code uses either %tick or %stick for
-	 * timestamping.  We have %stick so we can use it.
-	 */
-	traptrace_use_stick = 1;
-
-	/*
-	 * sun4v provides demap_all
-	 */
-	if (!disable_delay_tlb_flush)
-		delay_tlb_flush = 1;
 	/*
 	 * Niagara has a performance counter overflow interrupt
 	 */
 	cpc_has_overflow_intr = 1;
 }
 
-#define	MB	 * 1024 * 1024
+#define	MB(n)	((n) * 1024 * 1024)
 /*
  * Set the magic constants of the implementation.
  */
 void
 cpu_fiximp(struct cpu_node *cpunode)
 {
-	extern int vac_size, vac_shift;
-	extern uint_t vac_mask;
-	int i, a;
-
 	/*
-	 * The assumption here is that fillsysinfo will eventually
-	 * have code to fill this info in from the PD.
-	 * We hard code this for niagara now.
-	 * Once the PD access library is done this code
-	 * might need to be changed to get the info from the PD
+	 * The Cache node is optional in MD. Therefore in case "Cache"
+	 * node does not exists in MD, set the default L2 cache associativity,
+	 * size, linesize.
 	 */
 	if (cpunode->ecache_size == 0)
-		cpunode->ecache_size = 3 MB;
+		cpunode->ecache_size = MB(3);
 	if (cpunode->ecache_linesize == 0)
 		cpunode->ecache_linesize = 64;
 	if (cpunode->ecache_associativity == 0)
 		cpunode->ecache_associativity = 12;
-
-	cpunode->ecache_setsize =
-	    cpunode->ecache_size / cpunode->ecache_associativity;
-
-	if (ecache_setsize == 0)
-		ecache_setsize = cpunode->ecache_setsize;
-	if (ecache_alignsize == 0)
-		ecache_alignsize = cpunode->ecache_linesize;
-
-	vac_size = S_VAC_SIZE;
-	vac_mask = MMU_PAGEMASK & (vac_size - 1);
-	i = 0; a = vac_size;
-	while (a >>= 1)
-		++i;
-	vac_shift = i;
-	shm_alignment = vac_size;
-	vac = 0;
 }
 
 static int niagara_cpucnt;
@@ -243,13 +173,13 @@ cpu_init_private(struct cpu *cp)
 	extern int niagara_kstat_init(void);
 
 	/*
-	 * This code change assumes that the virtual cpu ids are identical
-	 * to the physical cpu ids which is true for ontario but not for
-	 * niagara in general.
-	 * This is a temporary fix which will later be modified to obtain
-	 * the execution unit sharing information from MD table.
+	 * The cpu_ipipe field is initialized based on the execution
+	 * unit sharing information from the MD. It defaults to the
+	 * virtual CPU id in the absence of such information.
 	 */
-	cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id / 4);
+	cp->cpu_m.cpu_ipipe = cpunodes[cp->cpu_id].exec_unit_mapping;
+	if (cp->cpu_m.cpu_ipipe == NO_EU_MAPPING_FOUND)
+		cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	if (niagara_cpucnt++ == 0 && niagara_hsvc_available == B_TRUE) {

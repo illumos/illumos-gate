@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,8 +303,11 @@ kdi_trap_vatotte(void)
 	ldx	[%g2], %g2		/* VA %g1, sfmmup %g2 */
 
 	mov	1, %g3			/* VA %g1, sfmmup %g2, idx %g3 */
-1:	mov	HBLK_RANGE_SHIFT, %g4
-	mulx	%g3, 3, %g4
+	mov	HBLK_RANGE_SHIFT, %g4
+	ba	3f
+	nop
+
+1:	mulx	%g3, 3, %g4		/* 3: see TTE_BSZS_SHIFT */
 	add	%g4, MMU_PAGESHIFT, %g4
 
 3:	KDI_HME_HASH_FUNCTION		/* %g1, %g2, %g4 => hash in %g4 */
@@ -321,11 +324,9 @@ kdi_trap_vatotte(void)
 4:	ba,a	6f
 
 5:	add	%g3, 1, %g3
-#ifdef sun4v
-	cmp	%g3, MAX_HASHCNT	        
-#else                
-	cmp	%g3, DEFAULT_MAX_HASHCNT	/* no 32/256M kernel pages */
-#endif	
+	set	mmu_hashcnt, %g4
+	lduw	[%g4], %g4
+	cmp	%g3, %g4
 	ble	1b
 	nop
 

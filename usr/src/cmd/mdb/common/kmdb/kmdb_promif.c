@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,6 +28,9 @@
 #include <sys/types.h>
 #include <sys/termios.h>
 #include <sys/promif.h>
+#ifdef sun4v
+#include <sys/promif_impl.h>
+#endif
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
@@ -754,7 +756,14 @@ kmdb_prom_assfail(const char *assertion, const char *file, int line)
 void
 kmdb_prom_init_begin(char *pgmname, kmdb_auxv_t *kav)
 {
+#ifdef sun4v
+	if (kav->kav_domaining)
+		kmdb_prom_init_promif(pgmname, kav);
+	else
+		prom_init(pgmname, kav->kav_romp);
+#else
 	prom_init(pgmname, kav->kav_romp);
+#endif
 
 	/* Initialize the interrupt ring buffer */
 	kmdb_prom_readbuf_head = kmdb_prom_readbuf_tail;
@@ -763,6 +772,18 @@ kmdb_prom_init_begin(char *pgmname, kmdb_auxv_t *kav)
 	kmdb_sysp = kav->kav_romp;
 #endif
 }
+
+#ifdef sun4v
+void
+kmdb_prom_init_promif(char *pgmname, kmdb_auxv_t *kav)
+{
+	ASSERT(kav->kav_domaining);
+	cif_init(pgmname, kav->kav_promif_root,
+	    kav->kav_promif_in, kav->kav_promif_out,
+	    kav->kav_promif_pin, kav->kav_promif_pout,
+	    kav->kav_promif_chosennode, kav->kav_promif_optionsnode);
+}
+#endif
 
 /*
  * Conclude the initialization of the debugger/PROM interface.  Memory

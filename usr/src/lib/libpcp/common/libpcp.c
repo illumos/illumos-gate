@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/glvc.h>
+#include <sys/vldc.h>
+#include <sys/ldc.h>
 #include <netinet/in.h>
 
 #include "libpcp.h"
@@ -80,6 +81,11 @@ static int check_magic_byte_presence(int byte_cnt, uint8_t *byte_val,
 					int *ispresent);
 static uint16_t checksum(uint16_t *addr, int32_t count);
 static int pcp_cleanup(int channel_fd);
+
+static int vldc_read(int fd, uint8_t *bufp, int size);
+static int vldc_write(int fd, uint8_t *bufp, int size);
+static int pcp_update_read_area(int byte_cnt);
+static int pcp_vldc_frame_error_handle(void);
 
 /*
  * local channel (glvc) file descriptor set by pcp_send_recv()
@@ -156,6 +162,19 @@ static struct sigaction glvc_act;
 /* To restore old SIGALRM signal handler */
 static struct sigaction old_act;
 
+/*
+ * Variables to support vldc based streaming transport
+ */
+typedef enum {
+	GLVC_NON_STREAM,
+	VLDC_STREAMING
+} xport_t;
+
+static int xport_type = GLVC_NON_STREAM;
+#define	CHANNEL_DEV	"channel-devices"
+
+#define	VLDC_MTU_SIZE	(2048)
+
 static void
 glvc_timeout_handler(void)
 {
@@ -178,6 +197,7 @@ pcp_init(char *channel_name)
 
 	if (channel_name == NULL)
 		return (PCPL_INVALID_ARGS);
+
 	/*
 	 * Open virtual channel name.
 	 */
@@ -186,12 +206,33 @@ pcp_init(char *channel_name)
 	}
 
 	/*
-	 * Get the Channel MTU size
+	 * Check if the channel-name points to a vldc node
+	 * or a glvc node
 	 */
+	if (strstr(channel_name, CHANNEL_DEV) != NULL) {
+		vldc_opt_op_t op;
 
-	if (pcp_get_prop(channel_fd, GLVC_XPORT_OPT_MTU_SZ, &mtu_size) != 0) {
-		(void) close(channel_fd);
-		return (PCPL_GLVC_ERROR);
+		xport_type  = VLDC_STREAMING;
+		mtu_size = VLDC_MTU_SIZE;
+
+		op.op_sel = VLDC_OP_SET;
+		op.opt_sel = VLDC_OPT_MODE;
+		op.opt_val = LDC_MODE_STREAM;
+		if (ioctl(channel_fd, VLDC_IOCTL_OPT_OP, &op) != 0) {
+			(void) close(channel_fd);
+			return (PCPL_GLVC_ERROR);
+		}
+	} else {
+		xport_type  = GLVC_NON_STREAM;
+		/*
+		 * Get the Channel MTU size
+		 */
+
+		if (pcp_get_prop(channel_fd, GLVC_XPORT_OPT_MTU_SZ,
+				&mtu_size) != 0) {
+			(void) close(channel_fd);
+			return (PCPL_GLVC_ERROR);
+		}
 	}
 
 	/*
@@ -233,7 +274,8 @@ pcp_close(int channel_fd)
 {
 
 	if (channel_fd >= 0) {
-		(void) pcp_cleanup(channel_fd);
+		if (xport_type  == GLVC_NON_STREAM)
+			(void) pcp_cleanup(channel_fd);
 		(void) close(channel_fd);
 	} else {
 		return (-1);
@@ -631,7 +673,6 @@ pcp_peek(uint8_t *buf, int bytes_cnt)
 	(void) memcpy(buf, peek_area, m);
 
 	return (m);
-
 }
 
 /*
@@ -648,13 +689,19 @@ pcp_write(uint8_t *buf, int byte_cnt)
 		return (PCPL_INVALID_ARGS);
 	}
 
-	(void) alarm(glvc_timeout);
+	if (xport_type == GLVC_NON_STREAM) {
+		(void) alarm(glvc_timeout);
 
-	if ((ret = write(chnl_fd, buf, byte_cnt)) < 0) {
+		if ((ret = write(chnl_fd, buf, byte_cnt)) < 0) {
+			(void) alarm(0);
+			return (ret);
+		}
 		(void) alarm(0);
-		return (ret);
+	} else {
+		if ((ret = vldc_write(chnl_fd, buf, byte_cnt)) <= 0) {
+			return (ret);
+		}
 	}
-	(void) alarm(0);
 
 	return (ret);
 }
@@ -718,17 +765,28 @@ pcp_read(uint8_t *buf, int byte_cnt)
 	 * do a peek to see how much data is available and read complete data.
 	 */
 
-	if ((m = pcp_peek(read_tail, mtu_size)) < 0) {
-		return (m);
-	}
+	if (xport_type == GLVC_NON_STREAM) {
+		if ((m = pcp_peek(read_tail, mtu_size)) < 0) {
+			return (m);
+		}
 
-	(void) alarm(glvc_timeout);
-	if ((ret = read(chnl_fd, read_tail, m)) < 0) {
+		(void) alarm(glvc_timeout);
+		if ((ret = read(chnl_fd, read_tail, m)) < 0) {
+			(void) alarm(0);
+			return (ret);
+		}
+
 		(void) alarm(0);
-		return (ret);
+	} else {
+		/*
+		 * Read the extra number of bytes
+		 */
+		m = byte_cnt - (read_tail - read_head);
+		if ((ret = vldc_read(chnl_fd,
+				read_tail, m)) <= 0) {
+			return (ret);
+		}
 	}
-
-	(void) alarm(0);
 	read_tail += ret;
 
 	/*
@@ -738,6 +796,69 @@ pcp_read(uint8_t *buf, int byte_cnt)
 	(void) memcpy(buf, read_head, n);
 
 	read_head += n;
+
+	return (n);
+}
+
+/*
+ * Issue read from the driver until byet_cnt number
+ * of bytes are present in read buffer. Do not
+ * move the read head.
+ */
+static int
+pcp_update_read_area(int byte_cnt)
+{
+	int			ret;
+	int			n, i;
+
+	if (byte_cnt < 0 || byte_cnt > mtu_size) {
+		return (PCPL_INVALID_ARGS);
+	}
+
+	/*
+	 * initialization of local read buffer
+	 * from which the stream read requests are serviced.
+	 */
+	if (read_area == NULL) {
+		read_area = (uint8_t *)umem_zalloc(READ_AREA_SIZE,
+							UMEM_DEFAULT);
+		if (read_area == NULL) {
+			return (PCPL_MALLOC_FAIL);
+		}
+		read_head = read_area;
+		read_tail = read_area;
+	}
+
+	/*
+	 * if we already have sufficient data in the buffer,
+	 * just return
+	 */
+	if (byte_cnt <= (read_tail - read_head)) {
+		return (byte_cnt);
+	}
+
+	/*
+	 * if the request is not satisfied from the buffered data, then move the
+	 * remaining data to front of the buffer and read new data.
+	 */
+	for (i = 0; i < (read_tail - read_head); ++i) {
+		read_area[i] = read_head[i];
+	}
+	read_head = read_area;
+	read_tail = read_head + i;
+
+	n = byte_cnt - (read_tail - read_head);
+
+	if ((ret = vldc_read(chnl_fd,
+			read_tail, n)) <= 0) {
+		return (ret);
+	}
+	read_tail += ret;
+
+	/*
+	 * Return the number of bytes we could read
+	 */
+	n = MIN(byte_cnt, (read_tail - read_head));
 
 	return (n);
 }
@@ -798,7 +919,6 @@ pcp_peek_read(uint8_t *buf, int byte_cnt)
 	if ((m = pcp_peek(peek_read_tail, mtu_size)) < 0) {
 		return (m);
 	}
-
 	peek_read_tail += m;
 
 	/*
@@ -874,7 +994,12 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
 	 * (magic seq) or if an error happens while reading data from
 	 * channel.
 	 */
-	if ((ret = pcp_frame_error_handle()) != 0)
+	if (xport_type  == GLVC_NON_STREAM)
+		ret = pcp_frame_error_handle();
+	else
+		ret = pcp_vldc_frame_error_handle();
+
+	if (ret != 0)
 		return (PCPL_FRAME_ERROR);
 
 	/* read magic number first */
@@ -1059,6 +1184,55 @@ pcp_frame_error_handle(void)
 }
 
 /*
+ * This function handles channel framing errors. It waits until proper
+ * frame with starting sequence as magic numder (0xAFBCAFA0)
+ * is arrived. It removes unexpected data (before the magic number sequence)
+ * on the channel. It returns when proper magic number sequence is seen
+ * or when any failure happens while reading/peeking the channel.
+ */
+static int
+pcp_vldc_frame_error_handle(void)
+{
+	uint8_t		magic_num_buf[4];
+	uint32_t	net_magic_num; /* magic byte in network byte order */
+	uint32_t	host_magic_num = PCP_MAGIC_NUM;
+	int		found_magic = 0;
+
+	net_magic_num =  htonl(host_magic_num);
+	(void) memcpy(magic_num_buf, (uint8_t *)&net_magic_num, 4);
+
+	/*
+	 * For vldc, we need to read whatever data is available and
+	 * advance the read pointer one byte at a time until we get
+	 * the magic word. When this function is invoked, we do not
+	 * have any byte in the read buffer.
+	 */
+
+	/*
+	 * Keep reading until we find the matching magic number
+	 */
+	while (!found_magic) {
+		while ((read_tail - read_head) < sizeof (host_magic_num)) {
+			if (pcp_update_read_area(sizeof (host_magic_num)) < 0)
+				return (-1);
+		}
+
+		/*
+		 * We should have at least 4 bytes in read buffer. Check
+		 * if the magic number can be matched
+		 */
+		if (memcmp(read_head, magic_num_buf,
+				sizeof (host_magic_num))) {
+			read_head += 1;
+		} else {
+			found_magic = 1;
+		}
+	}
+
+	return (0);
+}
+
+/*
  * checks whether certain byte sequence is present in the data stream.
  */
 static int
@@ -1187,4 +1361,82 @@ pcp_cleanup(int channel_fd)
 
 	umem_free(buf, mtu_size);
 	return (ret);
+}
+
+static int
+vldc_write(int fd, uint8_t *bufp, int size)
+{
+	int res;
+	int left = size;
+	pollfd_t pollfd;
+
+	pollfd.events = POLLOUT;
+	pollfd.revents = 0;
+	pollfd.fd = fd;
+
+	/*
+	 * Poll for the vldc channel to be ready
+	 */
+	if (poll(&pollfd, 1, glvc_timeout * MILLISEC) <= 0) {
+		return (-1);
+	}
+
+	do {
+		if ((res = write(fd, bufp, left)) <= 0) {
+			if (errno != EWOULDBLOCK) {
+				return (res);
+			}
+		} else {
+			bufp += res;
+			left -= res;
+		}
+	} while (left > 0);
+
+	/*
+	 * Return number of bytes actually written
+	 */
+	return (size - left);
+}
+
+/*
+ * Keep reading until we get the specified number of bytes
+ */
+static int
+vldc_read(int fd, uint8_t *bufp, int size)
+{
+	int res;
+	int left = size;
+
+	struct pollfd fds[1];
+
+	fds[0].events = POLLIN | POLLPRI;
+	fds[0].revents = 0;
+	fds[0].fd = fd;
+
+	if (poll(fds, 1, glvc_timeout * MILLISEC) <= 0) {
+		return (-1);
+	}
+
+	while (left > 0) {
+		res = read(fd, bufp, left);
+			/* return on error or short read */
+		if ((res == 0) || ((res < 0) &&
+			(errno == EAGAIN))) {
+				/* poll until the read is unblocked */
+				if ((poll(fds, 1, glvc_timeout * MILLISEC)) < 0)
+					return (-1);
+
+				continue;
+		} else
+		if (res < 0) {
+			/* unrecoverable error */
+
+			return (-1);
+		} else {
+			bufp += res;
+			left -= res;
+		}
+	}
+
+	return (size - left);
 }

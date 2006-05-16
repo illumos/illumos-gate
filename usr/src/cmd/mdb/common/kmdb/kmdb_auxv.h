@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +52,9 @@
 #include <gelf.h>
 #include <sys/machelf.h>
 #include <sys/kdi.h>
+#ifdef sun4v
+#include <sys/obpdefs.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,6 +106,16 @@ typedef struct kmdb_auxv {
 #ifdef __sparc
 	void (*kav_ktrap_install)(int, void (*)(void)); /* Add to krnl trptbl */
 	void (*kav_ktrap_restore)(void);	/* Restore krnl trap hdlrs */
+#ifdef sun4v
+	uint_t		kav_domaining;		/* Domaining status */
+	caddr_t		kav_promif_root;	/* PROM shadow tree root */
+	ihandle_t	kav_promif_in;		/* PROM input dev instance */
+	ihandle_t	kav_promif_out;		/* PROM output dev instance */
+	phandle_t	kav_promif_pin;		/* PROM input dev package */
+	phandle_t	kav_promif_pout;	/* PROM output dev package */
+	pnode_t		kav_promif_chosennode;	/* PROM "/chosen" node */
+	pnode_t		kav_promif_optionsnode;	/* PROM "/options" node */
+#endif
 #endif
 
 } kmdb_auxv_t;

@@ -34,6 +34,7 @@
 #	object lists
 #
 CORE_OBJS +=	bootops.o
+CORE_OBJS +=	prom_alloc.o
 CORE_OBJS +=	cmp.o
 CORE_OBJS +=	cpc_hwreg.o
 CORE_OBJS +=	cpc_subr.o
@@ -44,11 +45,13 @@ CORE_OBJS +=	hardclk.o
 CORE_OBJS +=	hat_sfmmu.o
 CORE_OBJS +=	hat_kdi.o
 CORE_OBJS +=	hsvc.o
+CORE_OBJS +=	lpad.o
 CORE_OBJS +=	mach_cpu_states.o
 CORE_OBJS +=	mach_ddi_impl.o
-CORE_OBJS +=    mach_descrip.o
+CORE_OBJS +=	mach_descrip.o
 CORE_OBJS +=	mach_mp_startup.o
 CORE_OBJS +=	mach_mp_states.o
+CORE_OBJS +=	mach_proc_init.o
 CORE_OBJS +=	mach_sfmmu.o
 CORE_OBJS +=	mach_startup.o
 CORE_OBJS +=	mach_subr_asm.o
@@ -59,13 +62,30 @@ CORE_OBJS +=	mem_cage.o
 CORE_OBJS +=	mem_config.o
 CORE_OBJS +=	memlist_new.o
 CORE_OBJS +=	ppage.o
+CORE_OBJS +=	promif_asr.o
+CORE_OBJS +=	promif_cpu.o
+CORE_OBJS +=	promif_emul.o
+CORE_OBJS +=	promif_mon.o
+CORE_OBJS +=	promif_io.o
+CORE_OBJS +=	promif_interp.o
+CORE_OBJS +=	promif_key.o
+CORE_OBJS +=	promif_power_off.o
+CORE_OBJS +=	promif_prop.o
+CORE_OBJS +=	promif_node.o
+CORE_OBJS +=	promif_reboot.o
+CORE_OBJS +=	promif_stree.o
+CORE_OBJS +=	promif_test.o
+CORE_OBJS +=	promif_version.o
 CORE_OBJS +=	sfmmu_kdi.o
 CORE_OBJS +=	swtch.o
 CORE_OBJS +=	xhat_sfmmu.o
 
+CORE_OBJS +=	mdesc_diff.o
 CORE_OBJS +=	mdesc_findname.o
 CORE_OBJS +=	mdesc_findnodeprop.o
 CORE_OBJS +=	mdesc_fini.o
+CORE_OBJS +=	mdesc_getbinsize.o
+CORE_OBJS +=	mdesc_getgen.o
 CORE_OBJS +=	mdesc_getpropdata.o
 CORE_OBJS +=	mdesc_getpropstr.o
 CORE_OBJS +=	mdesc_getpropval.o
@@ -109,14 +129,26 @@ MEMTEST_OBJS	+= memtest.o memtest_asm.o \
 #
 QCN_OBJS	= qcn.o
 VNEX_OBJS	= vnex.o
+CNEX_OBJS	= cnex.o
 GLVC_OBJS	= glvc.o glvc_hcall.o
 MDESC_OBJS	= mdesc.o
+LDC_OBJS	= ldc.o
+VLDC_OBJS	= vldc.o
+VCC_OBJS	= vcc.o
+VNET_OBJS	= vnet.o vnet_gen.o
+VSW_OBJS	= vsw.o
+VDC_OBJS	= vdc.o
+VDS_OBJS	= vds.o
 
 #
 #			Misc modules
 #
-OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
 BOOTDEV_OBJS	+= bootdev.o
+DR_CPU_OBJS	+= dr_cpu.o dr_util.o
+DS_OBJS		= ds.o
+FAULT_ISO_OBJS	= fault_iso.o
+OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
+PLATSVC_OBJS	= platsvc.o mdeg.o
 
 #
 #			Performance Counter BackEnd (PCBE) Modules
@@ -163,4 +195,3 @@ ASSYM_DEPS	+= mach_sfmmu_asm.o sfmmu_asm.o
 #
 
 ARCFOUR_OBJS	+= arcfour.o arcfour_crypt.o
-

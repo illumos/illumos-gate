@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,16 +43,19 @@
 #define	SIZE	8192
 
 static void mdesc_free(void *bufp, size_t size);
+uint8_t *md_bufp;
 
 md_t *
 mdesc_devinit(void)
 {
 	int fh;
-	uint8_t *bufp = NULL;
 	int res;
 	int size;
 	int offset;
 	md_t *mdp;
+
+	if (md_bufp != NULL)
+		return (NULL);
 
 	fh = open(MDESC_PATH, O_RDONLY, 0);
 	if (fh < 0) {
@@ -62,8 +65,8 @@ mdesc_devinit(void)
 	size = SIZE;	/* initial size */
 	offset = 0;
 
-	bufp = malloc(size);
-	if (NULL == bufp) {
+	md_bufp = malloc(size);
+	if (NULL == md_bufp) {
 		return (NULL);
 	}
 
@@ -76,18 +79,18 @@ mdesc_devinit(void)
 
 		while (len < SIZE) {
 			size += SIZE;
-			bufp = realloc(bufp, size);
-			if (NULL == bufp)
+			md_bufp = realloc(md_bufp, size);
+			if (NULL == md_bufp)
 				return (NULL);
 			len = size - offset;
 		}
 
 		do {
-			res = read(fh, bufp+offset, len);
+			res = read(fh, md_bufp + offset, len);
 		} while ((res < 0) && (errno == EAGAIN));
 
 		if (res < 0) {
-			free(bufp);
+			free(md_bufp);
 			return (NULL);
 		}
 
@@ -96,13 +99,13 @@ mdesc_devinit(void)
 
 	(void) close(fh);
 
-	bufp = realloc(bufp, offset);
-	if (NULL == bufp)
+	md_bufp = realloc(md_bufp, offset);
+	if (NULL == md_bufp)
 		return (NULL);
 
-	mdp = md_init_intern((uint64_t *)bufp, malloc, mdesc_free);
+	mdp = md_init_intern((uint64_t *)md_bufp, malloc, mdesc_free);
 	if (NULL == mdp) {
-		free(bufp);
+		free(md_bufp);
 		return (NULL);
 	}
 
@@ -113,5 +116,17 @@ mdesc_devinit(void)
 void
 mdesc_free(void *bufp, size_t size)
 {
-	free(bufp);
+	if (bufp)
+		free(bufp);
+}
+
+void
+mdesc_devfini(md_t *mdp)
+{
+	if (mdp)
+		(void) md_fini(mdp);
+
+	if (md_bufp)
+		free(md_bufp);
+	md_bufp = NULL;
 }

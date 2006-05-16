@@ -1712,8 +1712,25 @@ trapstat_cpu_setup(cpu_setup_t what, processorid_t cpu)
 		break;
 
 	case CPU_UNCONFIG:
-		if (tcpu->tcpu_flags & TSTAT_CPU_ENABLED)
+		if (tcpu->tcpu_flags & TSTAT_CPU_ENABLED) {
 			tcpu->tcpu_flags &= ~TSTAT_CPU_ENABLED;
+#ifdef	sun4v
+			/*
+			 * A power-off, causes the cpu mondo queues to be
+			 * unconfigured on sun4v. Since we can't teardown
+			 * trapstat's mappings on the cpu that is going away,
+			 * we simply mark it as not allocated. This will
+			 * prevent a teardown on a cpu with the same cpu id
+			 * that might have been added while trapstat is running.
+			 */
+			if (tcpu->tcpu_flags & TSTAT_CPU_ALLOCATED) {
+				tcpu->tcpu_pfn = NULL;
+				tcpu->tcpu_instr = NULL;
+				tcpu->tcpu_data = NULL;
+				tcpu->tcpu_flags &= ~TSTAT_CPU_ALLOCATED;
+			}
+#endif
+		}
 		break;
 
 	default:

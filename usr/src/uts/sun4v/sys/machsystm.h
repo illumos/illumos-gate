@@ -337,6 +337,7 @@ extern void idle_stop_xcall(void);
 extern void set_idle_cpu(int);
 extern void unset_idle_cpu(int);
 extern void mp_cpu_quiesce(struct cpu *);
+extern int stopcpu_bycpuid(int);
 
 /*
  * Panic at TL > 0
@@ -396,6 +397,12 @@ extern uchar_t	kpm_size_shift;
 extern caddr_t	kpm_vbase;
 
 #define	INVALID_VADDR(a)	(((a) >= hole_start && (a) < hole_end))
+#define	VA_ADDRESS_SPACE_BITS		64
+#define	RA_ADDRESS_SPACE_BITS		56
+#define	MAX_REAL_ADDRESS		(1ull << RA_ADDRESS_SPACE_BITS)
+#define	DEFAULT_VA_ADDRESS_SPACE_BITS	48	/* def. Niagara (broken MD) */
+#define	PAGESIZE_MASK_BITS		16
+#define	MAX_PAGESIZE_MASK		((1<<PAGESIZE_MASK_BITS) - 1)
 
 extern void adjust_hw_copy_limits(int);
 
@@ -465,6 +472,25 @@ void	sticksync_master(void);
 
 #define	HV_TOD_RETRY_THRESH	100
 #define	HV_TOD_WAIT_USEC	5
+
+/*
+ * Interrupt Queues and Error Queues
+ */
+
+#define	INTR_CPU_Q	0x3c
+#define	INTR_DEV_Q	0x3d
+#define	CPU_RQ		0x3e
+#define	CPU_NRQ		0x3f
+#define	DEFAULT_CPU_Q_ENTRIES	0x100
+#define	DEFAULT_DEV_Q_ENTRIES	0x100
+#define	INTR_REPORT_SIZE	64
+
+#ifndef	_ASM
+extern uint64_t cpu_q_entries;
+extern uint64_t dev_q_entries;
+extern uint64_t cpu_rq_entries;
+extern uint64_t cpu_nrq_entries;
+#endif /* _ASM */
 
 #endif /* _KERNEL */
 

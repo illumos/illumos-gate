@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -653,12 +654,15 @@ hsvc_init(void)
  * uses hypervisor services belonging to the HSVC_GROUP_CORE API
  * group only for itself.
  *
- * Note that the HSVC_GROUP_DIAG is negotiated on behalf of
- * any driver/module using DIAG services.
+ * Rest of the API groups are currently negotiated on behalf
+ * of the pcitool, glvc support.  In future, when these drivers
+ * are modified to do the negotiation themselves, corresponding
+ * entry should be removed from the table below.
  */
 static hsvc_info_t  hsvcinfo_unix[] = {
 	{HSVC_REV_1, NULL,	HSVC_GROUP_SUN4V,	1,	0, NULL},
-	{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	0, NULL},
+	{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	1, NULL},
+	{HSVC_REV_1, NULL,	HSVC_GROUP_VSC,		1,	0, NULL},
 	{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL}
 };
 

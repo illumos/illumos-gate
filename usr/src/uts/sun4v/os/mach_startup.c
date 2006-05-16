@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -36,6 +37,8 @@
 #include <sys/disp.h>
 #include <sys/hypervisor_api.h>
 #include <sys/traptrace.h>
+#include <sys/modctl.h>
+#include <sys/ldoms.h>
 
 #ifdef TRAPTRACE
 int mach_htraptrace_enable = 1;
@@ -61,7 +64,7 @@ setup_trap_table(void)
 	mmfsa_va =
 	    mmu_fault_status_area + (MMFSA_SIZE * CPU->cpu_id);
 
-	intr_init(CPU);			/* init interrupt request free list */
+	intr_init(CPU);		/* init interrupt request free list */
 	setwstate(WSTATE_KERN);
 	set_mmfsa_scratchpad(mmfsa_va);
 	prom_set_mmfsa_traptable(&trap_table, va_to_pa(mmfsa_va));
@@ -426,4 +429,55 @@ mach_htraptrace_cleanup(int cpuid)
 		ctlp->d.hlimit = 0;
 		ctlp->d.hpaddr_base = NULL;
 	}
+}
+
+/*
+ * Load any required machine class (sun4v) specific drivers.
+ */
+void
+load_mach_drivers(void)
+{
+	/*
+	 * We don't want to load these LDOMs-specific
+	 * modules if domaining has been disabled.  Also,
+	 * we must be able to run on non-LDOMs firmware.
+	 */
+	if (!domaining_enabled)
+		return;
+
+	/*
+	 * Load the core domain services module
+	 */
+	if (modload("misc", "ds") == -1)
+		cmn_err(CE_NOTE, "!'ds' module failed to load");
+
+	/*
+	 * Load the rest of the domain services
+	 */
+	if (modload("misc", "fault_iso") == -1)
+		cmn_err(CE_NOTE, "!'fault_iso' module failed to load");
+
+	if (modload("misc", "platsvc") == -1)
+		cmn_err(CE_NOTE, "!'platsvc' module failed to load");
+
+	if (modload("misc", "dr_cpu") == -1)
+		cmn_err(CE_NOTE, "!'dr_cpu' module failed to load");
+
+	/*
+	 * Attempt to attach any virtual device servers. These
+	 * drivers must be loaded at start of day so that they
+	 * can respond to any updates to the machine description.
+	 *
+	 * Since it is quite likely that a domain will not support
+	 * one or more of these servers, failures are ignored.
+	 */
+
+	/* virtual disk server */
+	(void) i_ddi_attach_hw_nodes("vds");
+
+	/* virtual network switch */
+	(void) i_ddi_attach_hw_nodes("vsw");
+
+	/* virtual console concentrator */
+	(void) i_ddi_attach_hw_nodes("vcc");
 }

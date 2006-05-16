@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -281,22 +280,26 @@ extern "C" {
  * names defined in sun4u/os/mach_cpu_states.c which should be kept up to
  * date if new #defines are added.
  */
-#define	PTL1_BAD_DEBUG		0
-#define	PTL1_BAD_WTRAP		1
-#define	PTL1_BAD_KMISS		2
-#define	PTL1_BAD_KPROT_FAULT	3
-#define	PTL1_BAD_ISM		4
-#define	PTL1_BAD_MMUTRAP	5
-#define	PTL1_BAD_TRAP		6
-#define	PTL1_BAD_FPTRAP		7
-#define	PTL1_BAD_INTR_REQ	8
-#define	PTL1_BAD_TRACE_PTR	9
-#define	PTL1_BAD_STACK		10
-#define	PTL1_BAD_DTRACE_FLAGS	11
-#define	PTL1_BAD_CTX_STEAL	12
-#define	PTL1_BAD_ECC		13
-#define	PTL1_BAD_HCALL		14
-#define	PTL1_BAD_GL		15
+#define	PTL1_BAD_DEBUG				0
+#define	PTL1_BAD_WTRAP				1
+#define	PTL1_BAD_KMISS				2
+#define	PTL1_BAD_KPROT_FAULT			3
+#define	PTL1_BAD_ISM				4
+#define	PTL1_BAD_MMUTRAP			5
+#define	PTL1_BAD_TRAP				6
+#define	PTL1_BAD_FPTRAP				7
+#define	PTL1_BAD_INTR_REQ			8
+#define	PTL1_BAD_TRACE_PTR			9
+#define	PTL1_BAD_STACK				10
+#define	PTL1_BAD_DTRACE_FLAGS			11
+#define	PTL1_BAD_CTX_STEAL			12
+#define	PTL1_BAD_ECC				13
+#define	PTL1_BAD_HCALL				14
+#define	PTL1_BAD_GL				15
+#define	PTL1_BAD_WATCHDOG			16
+#define	PTL1_BAD_RED				17
+#define	PTL1_BAD_HCALL_UNMAP_PERM_EINVAL	18
+#define	PTL1_BAD_HCALL_UNMAP_PERM_ENOMAP	19
 
 /*
  * Defines the max trap level allowed

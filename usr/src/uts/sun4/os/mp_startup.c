@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -45,6 +46,7 @@
 #include <sys/cpu_sgnblk_defs.h>
 
 extern void cpu_intrq_setup(struct cpu *);
+extern void cpu_intrq_cleanup(struct cpu *);
 extern void cpu_intrq_register(struct cpu *);
 
 struct cpu	*cpus;	/* pointer to other cpus; dynamically allocate */
@@ -467,6 +469,11 @@ cleanup_cpu_common(int cpuid)
 	 * Clean up the interrupt pool.
 	 */
 	cleanup_intr_pool(cp);
+
+	/*
+	 * Clean any machine specific interrupt states.
+	 */
+	cpu_intrq_cleanup(cp);
 
 	/*
 	 * At this point, the only threads bound to this CPU should be

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,140 +53,77 @@
 #include <sys/panic.h>
 #include <sys/dtrace.h>
 #include <vm/seg_spt.h>
+#include <sys/simulate.h>
+#include <sys/fault.h>
 
-#define	S_VAC_SIZE	MMU_PAGESIZE /* XXXQ? */
-
-/*
- * Maximum number of contexts
- */
-#define	MAX_NCTXS	(1 << 13)
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 
 void
 cpu_setup(void)
 {
-	extern int at_flags;
-	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int mmu_exported_pagesize_mask;
-	extern int get_cpu_pagesizes(void);
+	char *generic_isa_set[] = {
+	    "sparcv9+vis",
+	    "sparcv8plus+vis",
+	    NULL
+	};
+
+	/*
+	 * The setup common to all CPU modules is done in cpu_setup_common
+	 * routine.
+	 */
+	cpu_setup_common(generic_isa_set);
 
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
 
-	at_flags = EF_SPARC_32PLUS | EF_SPARC_SUN_US1; /* XXXQ */
-
-	/*
-	 * Use the maximum number of contexts available for Spitfire unless
-	 * it has been tuned for debugging.
-	 * We are checking against 0 here since this value can be patched
-	 * while booting.  It can not be patched via /etc/system since it
-	 * will be patched too late and thus cause the system to panic.
-	 */
-	if (nctxs == 0)
-		nctxs = MAX_NCTXS;
-
-	if (use_page_coloring) {
-		do_pg_coloring = 1;
-		if (use_virtual_coloring)
-			do_virtual_coloring = 1;
-	}
-	/*
-	 * Initalize supported page sizes information before the PD.
-	 * If no information is available, then initialize the
-	 * mmu_exported_pagesize_mask to a reasonable value for that processor.
-	 */
-	mmu_exported_pagesize_mask = get_cpu_pagesizes();
-	if (mmu_exported_pagesize_mask <= 0) {
-		mmu_exported_pagesize_mask = (1 << TTE8K) | (1 << TTE64K) |
-		    (1 << TTE4M);
+	if (broken_md_flag) {
+		/*
+		 * Turn on the missing bits supported by sun4v architecture in
+		 * MMU pagesize mask returned by MD.
+		 */
+		mmu_exported_pagesize_mask |= DEFAULT_SUN4V_MMU_PAGESIZE_MASK;
+	} else {
+		/*
+		 * According to sun4v architecture each processor must
+		 * support 8K, 64K and 4M page sizes. If any of the page
+		 * size is missing from page size mask, then panic.
+		 */
+		if ((mmu_exported_pagesize_mask &
+		    DEFAULT_SUN4V_MMU_PAGESIZE_MASK) !=
+		    DEFAULT_SUN4V_MMU_PAGESIZE_MASK)
+			cmn_err(CE_PANIC, "machine description"
+			    " does not have required sun4v page sizes"
+			    " 8K, 64K and 4M: MD mask is 0x%x",
+			    mmu_exported_pagesize_mask);
 	}
 
 	/*
-	 * Tune pp_slots to use up to 1/8th of the tlb entries.
+	 * If processor supports the subset of full 64-bit virtual
+	 * address space, then set VA hole accordingly.
 	 */
-	pp_slots = MIN(8, MAXPP_SLOTS);
-
-	/*
-	 * Block stores invalidate all pages of the d$ so pagecopy
-	 * et. al. do not need virtual translations with virtual
-	 * coloring taken into consideration.
-	 */
-	pp_consistent_coloring = 0;
-	isa_list =
-	    "sparcv9+vis sparcv9 "
-	    "sparcv8plus+vis sparcv8plus "
-	    "sparcv8 sparcv8-fsmuld sparcv7 sparc";
-
-	/*
-	 * On Spitfire, there's a hole in the address space
-	 * that we must never map (the hardware only support 44-bits of
-	 * virtual address).  Later CPUs are expected to have wider
-	 * supported address ranges.
-	 *
-	 * See address map on p23 of the UltraSPARC 1 user's manual.
-	 */
-/* XXXQ get from machine description */
-	hole_start = (caddr_t)0x80000000000ull;
-	hole_end = (caddr_t)0xfffff80000000000ull;
-
-	/*
-	 * The kpm mapping window.
-	 * kpm_size:
-	 *	The size of a single kpm range.
-	 *	The overall size will be: kpm_size * vac_colors.
-	 * kpm_vbase:
-	 *	The virtual start address of the kpm range within the kernel
-	 *	virtual address space. kpm_vbase has to be kpm_size aligned.
-	 */
-	kpm_size = (size_t)(2ull * 1024 * 1024 * 1024 * 1024); /* 2TB */
-	kpm_size_shift = 41;
-	kpm_vbase = (caddr_t)0xfffffa0000000000ull; /* 16EB - 6TB */
-
-	/*
-	 * The traptrace code uses either %tick or %stick for
-	 * timestamping.  We have %stick so we can use it.
-	 */
-	traptrace_use_stick = 1;
-
-	/*
-	 * sun4v provides demap_all
-	 */
-	if (!disable_delay_tlb_flush)
-		delay_tlb_flush = 1;
+	if (va_bits < VA_ADDRESS_SPACE_BITS) {
+		hole_start = (caddr_t)(1ull << (va_bits - 1));
+		hole_end = (caddr_t)(0ull - (1ull << (va_bits - 1)));
+	} else {
+		hole_start = hole_end = 0;
+	}
 }
 
-/*
- * Set the magic constants of the implementation.
- */
 void
 cpu_fiximp(struct cpu_node *cpunode)
 {
-	extern int vac_size, vac_shift;
-	extern uint_t vac_mask;
-	int i, a;
-
 	/*
-	 * The assumption here is that fillsysinfo will eventually
-	 * have code to fill this info in from the PD.
-	 * We hard code this for now.
-	 * Once the PD access library is done this code
-	 * might need to be changed to get the info from the PD
+	 * The Cache node is optional in MD. Therefore in case "Cache"
+	 * does not exists in MD, set the default L2 cache associativity,
+	 * size, linesize for generic CPU module.
 	 */
-	/*
-	 * Page Coloring defaults for sun4v
-	 */
-	ecache_setsize = 0x100000;
-	ecache_alignsize = 64;
-	cpunode->ecache_setsize =  0x100000;
-
-	vac_size = S_VAC_SIZE;
-	vac_mask = MMU_PAGEMASK & (vac_size - 1);
-	i = 0; a = vac_size;
-	while (a >>= 1)
-		++i;
-	vac_shift = i;
-	shm_alignment = vac_size;
-	vac = 0;
+	if (cpunode->ecache_size == 0)
+		cpunode->ecache_size = 0x100000;
+	if (cpunode->ecache_linesize == 0)
+		cpunode->ecache_linesize = 64;
+	if (cpunode->ecache_associativity == 0)
+		cpunode->ecache_associativity = 1;
 }
 
 void
@@ -220,7 +156,9 @@ cpu_init_private(struct cpu *cp)
 	 * unit sharing information from the Machine Description table.
 	 * It defaults to the CPU id in the absence of such information.
 	 */
-	cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id);
+	cp->cpu_m.cpu_ipipe = cpunodes[cp->cpu_id].exec_unit_mapping;
+	if (cp->cpu_m.cpu_ipipe == NO_EU_MAPPING_FOUND)
+		cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id);
 }
 
 void
@@ -243,6 +181,96 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 	    tsbaddr++) {
 		tsbaddr->tte_tag.tag_inthi = TSBTAG_INVALID;
 	}
+}
+
+/*
+ * Sun4v kernel must emulate code a generic sun4v processor may not support
+ * i.e. VIS1 and VIS2.
+ */
+#define	IS_FLOAT(i) (((i) & 0x1000000) != 0)
+#define	IS_IBIT_SET(x)	(x & 0x2000)
+#define	IS_VIS1(op, op3)(op == 2 && op3 == 0x36)
+#define	IS_PARTIAL_OR_SHORT_FLOAT_LD_ST(op, op3, asi)		\
+		(op == 3 && (op3 == IOP_V8_LDDFA ||		\
+		op3 == IOP_V8_STDFA) &&	asi > ASI_SNFL)
+int
+vis1_partial_support(struct regs *rp, k_siginfo_t *siginfo, uint_t *fault)
+{
+	char *badaddr;
+	int instr;
+	uint_t	optype, op3, asi;
+	uint_t	rd, ignor;
+
+	if (!USERMODE(rp->r_tstate))
+		return (-1);
+
+	instr = fetch_user_instr((caddr_t)rp->r_pc);
+
+	rd = (instr >> 25) & 0x1f;
+	optype = (instr >> 30) & 0x3;
+	op3 = (instr >> 19) & 0x3f;
+	ignor = (instr >> 5) & 0xff;
+	if (IS_IBIT_SET(instr)) {
+		asi = (uint32_t)((rp->r_tstate >> TSTATE_ASI_SHIFT) &
+		    TSTATE_ASI_MASK);
+	} else {
+		asi = ignor;
+	}
+
+	if (!IS_VIS1(optype, op3) &&
+	    !IS_PARTIAL_OR_SHORT_FLOAT_LD_ST(optype, op3, asi)) {
+		return (-1);
+	}
+	switch (simulate_unimp(rp, &badaddr)) {
+	case SIMU_RETRY:
+		break;	/* regs are already set up */
+		/*NOTREACHED*/
+
+	case SIMU_SUCCESS:
+		/*
+		 * skip the successfully
+		 * simulated instruction
+		 */
+		rp->r_pc = rp->r_npc;
+		rp->r_npc += 4;
+		break;
+		/*NOTREACHED*/
+
+	case SIMU_FAULT:
+		siginfo->si_signo = SIGSEGV;
+		siginfo->si_code = SEGV_MAPERR;
+		siginfo->si_addr = badaddr;
+		*fault = FLTBOUNDS;
+		break;
+
+	case SIMU_DZERO:
+		siginfo->si_signo = SIGFPE;
+		siginfo->si_code = FPE_INTDIV;
+		siginfo->si_addr = (caddr_t)rp->r_pc;
+		*fault = FLTIZDIV;
+		break;
+
+	case SIMU_UNALIGN:
+		siginfo->si_signo = SIGBUS;
+		siginfo->si_code = BUS_ADRALN;
+		siginfo->si_addr = badaddr;
+		*fault = FLTACCESS;
+		break;
+
+	case SIMU_ILLEGAL:
+	default:
+		siginfo->si_signo = SIGILL;
+		op3 = (instr >> 19) & 0x3F;
+		if ((IS_FLOAT(instr) && (op3 == IOP_V8_STQFA) ||
+		    (op3 == IOP_V8_STDFA)))
+			siginfo->si_code = ILL_ILLADR;
+		else
+			siginfo->si_code = ILL_ILLOPC;
+		siginfo->si_addr = (caddr_t)rp->r_pc;
+		*fault = FLTILL;
+		break;
+	}
+	return (0);
 }
 
 /*

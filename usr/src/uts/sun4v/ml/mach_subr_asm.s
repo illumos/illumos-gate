@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +72,80 @@ get_mmfsa_scratchpad()
 	nop
 	SET_SIZE(get_mmfsa_scratchpad)
 #endif	/* lint */
+
+
+
+#if defined(lint)
+/* ARGSUSED */
+void
+cpu_intrq_unregister_powerdown(uint64_t doneflag_va)
+{}
+
+#else	/* lint */
+
+/*
+ * Called from a x-trap at tl1 must use %g1 as arg
+ * and save/restore %o0-%o5 after hypervisor calls
+ */
+
+	ENTRY(cpu_intrq_unregister_powerdown)
+
+	CPU_ADDR(%g2, %g3)
+	add %g2, CPU_MCPU, %g2 
+	/*
+	 * Save %o regs
+	 */
+	mov %o0, %g3
+	mov %o1, %g4
+	mov %o2, %g5
+	mov %o5, %g6
+
+	ldx [%g2 + MCPU_CPU_Q_BASE], %o1
+	mov INTR_CPU_Q, %o0
+	call hv_cpu_qconf
+	mov %g0, %o2
+
+	ldx [%g2 + MCPU_DEV_Q_BASE], %o1
+	mov INTR_DEV_Q, %o0
+	call hv_cpu_qconf
+	mov %g0, %o2
+
+	ldx [%g2 + MCPU_RQ_BASE], %o1
+	mov CPU_RQ, %o0
+	call hv_cpu_qconf
+	mov %g0, %o2
+
+	ldx [%g2 + MCPU_NRQ_BASE], %o1
+	mov CPU_NRQ, %o0
+	call hv_cpu_qconf
+	mov %g0, %o2
+
+	/*
+	 * set done flag to 0
+	 */
+	stub %g0, [%g1]
+
+	/*
+	 * Restore %o regs
+	 */
+	mov %g3, %o0
+	mov %g4, %o1
+	mov %g5, %o2
+	mov %g6, %o5
+
+	/*
+	 * This CPU is on its way out. Spin here
+	 * until the DR unconfigure code stops it.
+	 * Returning would put it back in the OS
+	 * where it might grab resources like locks,
+	 * causing some nastiness to occur.
+	 */
+0:
+	ba,a	0b
+
+	SET_SIZE(cpu_intrq_unregister_powerdown)
+#endif	/* lint */
+
 
 #if defined(lint)
 /* ARGSUSED */

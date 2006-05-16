@@ -71,6 +71,7 @@
  */
 extern void map_wellknown_devices(void);
 extern void hsvc_setup(void);
+extern void mach_descrip_startup_init(void);
 
 int	dcache_size;
 int	dcache_linesize;
@@ -242,6 +243,13 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	ctlp->d.limit = TRAP_TSIZE;		/* XXX dynamic someday */
 	ctlp->d.paddr_base = va_to_pa(trap_tr0);
 #endif /* TRAPTRACE */
+
+	/*
+	 * Initialize the Machine Description kernel framework
+	 */
+
+	mach_descrip_startup_init();
+
 	/*
 	 * initialize HV trap trace buffer for the boot cpu
 	 */

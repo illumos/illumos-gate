@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +51,16 @@ extern "C" {
 #define	KMDB_ACT_F_BOOT		0x1		/* activated during boot */
 
 extern int kmdb_init(const char *, kmdb_auxv_t *);
+
+/*
+ * This function should only be defined for sun4v. However the mdb build
+ * uses a custom tool (hdr2map) to generate mapfile from header files but
+ * this tool does not take care of preprocessor directives and functions
+ * are included into the mapfile whatever the architecture is and even
+ * if there is an #ifdef sun4v. So we always declare this function but it
+ * has a fake definition for all architecture but sun4v.
+ */
+extern void kmdb_init_promif(char *, kmdb_auxv_t *);
 
 extern void kmdb_activate(kdi_debugvec_t **, uint_t);
 extern void kmdb_deactivate(void);

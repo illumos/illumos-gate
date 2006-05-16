@@ -207,6 +207,7 @@ struct cpu_node {
 	int	ecache_associativity;
 	int	ecache_setsize;
 	uint64_t	device_id;
+	id_t	exec_unit_mapping;
 };
 
 extern struct cpu_node cpunodes[];

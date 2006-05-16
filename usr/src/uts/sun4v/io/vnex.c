@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -96,7 +95,8 @@ static struct vnex_pil_map vnex_name_to_pil[] = {
 	{"loop", 	PIL_3},
 	{"sunmc", 	PIL_3},
 	{"sunvts", 	PIL_3},
-	{"explorer", 	PIL_3}
+	{"explorer", 	PIL_3},
+	{"ncp", 	PIL_8}
 };
 
 #define	VNEX_MAX_DEVS	(sizeof (vnex_name_to_pil) /	\
@@ -421,6 +421,20 @@ vnex_disable_intr(dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+int
+vnex_ino_to_inum(dev_info_t *dip, uint32_t ino)
+{
+	vnex_id_t		*vid_p;
+	ddi_intr_handle_impl_t	*hdlp;
+
+	if ((vid_p = vnex_locate_id(dip, ino)) == NULL)
+		return (-1);
+	else if ((hdlp = vid_p->vid_ddi_hdlp) == NULL)
+		return (-1);
+	else
+		return (hdlp->ih_inum);
 }
 
 static int

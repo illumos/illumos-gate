@@ -456,6 +456,7 @@ sparc_SUBDIRS=		\
 	sckmd		\
 	sf880drd	\
 	stmsboot	\
+	vntsd		\
 	wrsmconf	\
 	wrsmstat
 
@@ -692,6 +693,7 @@ sparc_MSGSUBDIRS=	\
 	prtdscp		\
 	prtfru		\
 	stmsboot	\
+	vntsd		\
 	wrsmconf	\
 	wrsmstat
 
@@ -765,6 +767,7 @@ MANIFEST_TOPDIRS=			\
 	syseventd			\
 	syslogd				\
 	utmpd				\
+	vntsd				\
 	ypcmd				\
 	zoneadmd
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,6 +152,18 @@ extern void bzero(void *addr, size_t count);
 
 int	cpu_trapstat_conf(int cmd);
 void	cpu_trapstat_data(void *buf, uint_t pgszs);
+
+#define	NO_EU_MAPPING_FOUND		0xffffffff
+/*
+ * Default MMU pagesize mask for sun4v architecture.
+ */
+#define	DEFAULT_SUN4V_MMU_PAGESIZE_MASK	((1 << TTE8K) | (1 << TTE64K) \
+					    | (1 << TTE4M))
+
+void	cpu_setup_common(char **);
+
+boolean_t	broken_md_flag;
+int	va_bits;
 
 #endif /* _KERNEL */
 

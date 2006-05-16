@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,11 @@
 #include <sys/cpuvar.h>
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
+#ifdef sun4v
+#include <sys/ldoms.h>
+#include <sys/promif_impl.h>
+#include <kmdb/kmdb_kctl.h>
+#endif
 
 #include <kmdb/kctl/kctl.h>
 
@@ -229,7 +233,47 @@ kctl_auxv_init_isadep(kmdb_auxv_t *kav, void *romp)
 
 	kav->kav_ktrap_install = kctl_ktrap_install;
 	kav->kav_ktrap_restore = kctl_ktrap_restore;
+#ifdef sun4v
+	if (kctl.kctl_boot_loaded) {
+		/*
+		 * When booting kmdb, kmdb starts before domaining is
+		 * enabled and before the cif handler is changed to the
+		 * kernel cif handler. So we start kmdb with using the
+		 * OBP and we will change this when the cif handler is
+		 * installed.
+		 */
+		kav->kav_domaining = 0;
+	} else {
+		kctl_auxv_set_promif(kav);
+	}
+#endif
 }
+
+#ifdef sun4v
+
+void
+kctl_auxv_set_promif(kmdb_auxv_t *kav)
+{
+	kav->kav_domaining = domaining_enabled;
+	kav->kav_promif_root = promif_stree_getroot();
+	kav->kav_promif_in = prom_stdin_ihandle();
+	kav->kav_promif_out = prom_stdout_ihandle();
+	kav->kav_promif_pin = prom_stdin_node();
+	kav->kav_promif_pout = prom_stdout_node();
+	kav->kav_promif_chosennode = prom_chosennode();
+	kav->kav_promif_optionsnode = prom_finddevice("/options");
+}
+
+void
+kctl_switch_promif(void)
+{
+	kmdb_auxv_t kav;
+
+	kctl_auxv_set_promif(&kav);
+	kmdb_init_promif(NULL, &kav);
+}
+
+#endif
 
 /*ARGSUSED*/
 void

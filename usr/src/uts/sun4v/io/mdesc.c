@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,22 +54,28 @@
  * Operational state flags
  */
 
-#define	MDESC_DIDMINOR	0x2		/* Created minors */
-#define	MDESC_DIDMUTEX	0x8		/* Created mutex */
-#define	MDESC_DIDCV	0x10		/* Created cv */
-#define	MDESC_BUSY	0x20		/* Device is busy */
+#define	MDESC_GOT_HANDLE	0x10		/* Got mdesc handle */
+#define	MDESC_BUSY		0x20		/* Device is busy */
 
-static void *mdesc_state_head;
+static void		*mdesc_state_head;
+static vmem_t		*mdesc_minor;
+static uint16_t 	mdesc_max_opens = 256;
+static uint16_t		mdesc_opens = 0;
+static int		mdesc_attached = 0;
+static dev_info_t	*mdesc_devi;
+static kmutex_t		mdesc_lock;
 
 struct mdesc_state {
 	int		instance;
-	dev_info_t	*devi;
+	dev_t		dev;
 	kmutex_t	lock;
 	kcondvar_t	cv;
 	size_t		mdesc_len;
-	uint8_t		*mdesc;
+	md_t		*mdesc;
 	int		flags;
 };
+
+typedef struct mdesc_state mdesc_state_t;
 
 static int mdesc_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int mdesc_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -129,19 +134,13 @@ static struct modlinkage modlinkage = {
 };
 
 
-
-
-
-
-
-
 int
 _init(void)
 {
 	int retval;
 
 	if ((retval = ddi_soft_state_init(&mdesc_state_head,
-	    sizeof (struct mdesc_state), 1)) != 0)
+	    sizeof (struct mdesc_state), mdesc_max_opens)) != 0)
 		return (retval);
 	if ((retval = mod_install(&modlinkage)) != 0) {
 		ddi_soft_state_fini(&mdesc_state_head);
@@ -189,9 +188,10 @@ mdesc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		if ((mdsp = ddi_get_soft_state(mdesc_state_head,
-		    getminor((dev_t)arg))) != NULL) {
-			*resultp = mdsp->devi;
+		mdsp = ddi_get_soft_state(mdesc_state_head,
+		    getminor((dev_t)arg));
+		if (mdsp != NULL) {
+			*resultp = mdesc_devi;
 			retval = DDI_SUCCESS;
 		} else
 			*resultp = NULL;
@@ -212,47 +212,23 @@ static int
 mdesc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(dip);
-	struct mdesc_state *mdsp;
 
 	switch (cmd) {
 	case DDI_ATTACH:
-		if (ddi_soft_state_zalloc(mdesc_state_head, instance) !=
-		    DDI_SUCCESS) {
-			cmn_err(CE_WARN, "%s@%d: Unable to allocate state",
-			    MDESC_NAME, instance);
-			return (DDI_FAILURE);
-		}
-		if ((mdsp = ddi_get_soft_state(mdesc_state_head, instance)) ==
-		    NULL) {
-			cmn_err(CE_WARN, "%s@%d: Unable to obtain state",
-			    MDESC_NAME, instance);
-			ddi_soft_state_free(dip, instance);
-			return (DDI_FAILURE);
-		}
+
 		if (ddi_create_minor_node(dip, MDESC_NAME, S_IFCHR, instance,
 		    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s@%d: Unable to create minor node",
 			    MDESC_NAME, instance);
-			(void) mdesc_detach(dip, DDI_DETACH);
 			return (DDI_FAILURE);
 		}
-		mdsp->flags |= MDESC_DIDMINOR;
-
-		mdsp->instance = instance;
-		mdsp->devi = dip;
-
-		mutex_init(&mdsp->lock, NULL, MUTEX_DRIVER, NULL);
-		mdsp->flags |= MDESC_DIDMUTEX;
-
-		cv_init(&mdsp->cv, NULL, CV_DRIVER, NULL);
-		mdsp->flags |= MDESC_DIDCV;
-
-			/* point the driver at the kernel's copy of the data */
-		mdsp->mdesc = (uint8_t *)machine_descrip.va;
-		mdsp->mdesc_len = (machine_descrip.va != NULL) ?
-		    machine_descrip.size : 0;
-
 		ddi_report_dev(dip);
+		mdesc_devi = dip;
+		mdesc_minor = vmem_create("mdesc_minor", (void *) 1,
+		    mdesc_max_opens, 1, NULL, NULL, NULL, 0,
+		    VM_SLEEP | VMC_IDENTIFIER);
+		mutex_init(&mdesc_lock, NULL, MUTEX_DRIVER, NULL);
+		mdesc_attached = 1;
 		return (DDI_SUCCESS);
 	case DDI_RESUME:
 		return (DDI_SUCCESS);
@@ -261,27 +237,16 @@ mdesc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 }
 
-
-
+/*ARGSUSED*/
 static int
 mdesc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int instance = ddi_get_instance(dip);
-	struct mdesc_state *mdsp;
-
 	switch (cmd) {
 	case DDI_DETACH:
-		mdsp = ddi_get_soft_state(mdesc_state_head, instance);
-		if (mdsp != NULL) {
-			ASSERT(!(mdsp->flags & MDESC_BUSY));
-			if (mdsp->flags & MDESC_DIDCV)
-				cv_destroy(&mdsp->cv);
-			if (mdsp->flags & MDESC_DIDMUTEX)
-				mutex_destroy(&mdsp->lock);
-			if (mdsp->flags & MDESC_DIDMINOR)
-				ddi_remove_minor_node(dip, NULL);
-		}
-		ddi_soft_state_free(mdesc_state_head, instance);
+		mutex_destroy(&mdesc_lock);
+		vmem_destroy(mdesc_minor);
+		ddi_remove_minor_node(mdesc_devi, NULL);
+		mdesc_attached = 0;
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
@@ -292,28 +257,107 @@ mdesc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 }
 
+static void
+mdesc_destroy_state(mdesc_state_t *mdsp)
+{
+	minor_t minor = getminor(mdsp->dev);
+
+	if (mdsp->flags & MDESC_GOT_HANDLE)
+		(void) md_fini_handle(mdsp->mdesc);
+
+	cv_destroy(&mdsp->cv);
+	mutex_destroy(&mdsp->lock);
+	ddi_soft_state_free(mdesc_state_head, minor);
+	vmem_free(mdesc_minor, (void *)(uintptr_t)minor, 1);
+}
+
+static mdesc_state_t *
+mdesc_create_state(dev_t *devp)
+{
+	major_t	major;
+	minor_t	minor;
+	mdesc_state_t *mdsp;
+
+	minor = (minor_t)(uintptr_t)vmem_alloc(mdesc_minor, 1,
+	    VM_BESTFIT | VM_SLEEP);
+
+	if (ddi_soft_state_zalloc(mdesc_state_head, minor) !=
+	    DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s@%d: Unable to allocate state",
+		    MDESC_NAME, minor);
+		vmem_free(mdesc_minor, (void *)(uintptr_t)minor, 1);
+		return (NULL);
+	}
+
+	mdsp = ddi_get_soft_state(mdesc_state_head, minor);
+
+	if (devp != NULL) {
+		major = getemajor(*devp);
+	} else {
+		major = ddi_driver_major(mdesc_devi);
+	}
+
+	mdsp->dev = makedevice(major, minor);
+
+	if (devp != NULL)
+		*devp = mdsp->dev;
+
+	mdsp->instance = minor;
+
+	mutex_init(&mdsp->lock, NULL, MUTEX_DRIVER, NULL);
+
+	cv_init(&mdsp->cv, NULL, CV_DRIVER, NULL);
+
+	mdsp->mdesc = md_get_handle();
+
+	if (mdsp->mdesc == NULL) {
+		mdesc_destroy_state(mdsp);
+		return (NULL);
+	}
+	mdsp->flags |= MDESC_GOT_HANDLE;
+
+	mdsp->mdesc_len = md_get_bin_size(mdsp->mdesc);
+
+	if (mdsp->mdesc_len == 0) {
+		mdesc_destroy_state(mdsp);
+		mdsp = NULL;
+	}
+
+	return (mdsp);
+}
 
 
 /*ARGSUSED*/
 static int
 mdesc_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
-	int instance = getminor(*devp);
 	struct mdesc_state *mdsp;
-
-	if ((mdsp = ddi_get_soft_state(mdesc_state_head, instance)) == NULL)
-		return (ENXIO);
-
-	ASSERT(mdsp->instance == instance);
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
+	if (!mdesc_attached)
+		return (ENXIO);
+
+	mutex_enter(&mdesc_lock);
+
+	if (mdesc_opens >= mdesc_max_opens) {
+		mutex_exit(&mdesc_lock);
+		return (ENXIO);
+	}
+
+	mdsp = mdesc_create_state(devp);
+
+	if (mdsp == NULL) {
+		mutex_exit(&mdesc_lock);
+		return (ENXIO);
+	}
+
+	mdesc_opens++;
+
+	mutex_exit(&mdesc_lock);
 
 	return (0);
 }
-
-
-
 
 /*ARGSUSED*/
 static int
@@ -322,13 +366,25 @@ mdesc_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	struct mdesc_state *mdsp;
 	int instance = getminor(dev);
 
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	mutex_enter(&mdesc_lock);
+	if (mdesc_opens == 0) {
+		mutex_exit(&mdesc_lock);
+		return (0);
+	}
+	mutex_exit(&mdesc_lock);
+
 	if ((mdsp = ddi_get_soft_state(mdesc_state_head, instance)) == NULL)
 		return (ENXIO);
 
 	ASSERT(mdsp->instance == instance);
 
-	if (otyp != OTYP_CHR)
-		return (EINVAL);
+	mdesc_destroy_state(mdsp);
+	mutex_enter(&mdesc_lock);
+	mdesc_opens--;
+	mutex_exit(&mdesc_lock);
 
 	return (0);
 }
@@ -363,6 +419,7 @@ mdesc_rw(dev_t dev, struct uio *uiop, enum uio_rw rw)
 	int instance = getminor(dev);
 	size_t len;
 	int retval;
+	caddr_t buf;
 
 	len = uiop->uio_resid;
 
@@ -400,7 +457,11 @@ mdesc_rw(dev_t dev, struct uio *uiop, enum uio_rw rw)
 	mdsp->flags |= MDESC_BUSY;
 	mutex_exit(&mdsp->lock);
 
-	retval = uiomove((void *)(mdsp->mdesc + uiop->uio_offset),
+	buf = md_get_md_raw(mdsp->mdesc);
+	if (buf == NULL)
+		return (ENXIO);
+
+	retval = uiomove((void *)(buf + uiop->uio_offset),
 		len, rw, uiop);
 
 	mutex_enter(&mdsp->lock);

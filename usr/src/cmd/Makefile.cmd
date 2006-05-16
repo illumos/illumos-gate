@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -209,6 +208,7 @@ ROOTSVCNETWORKSSL=		$(ROOTSVCNETWORK)/ssl
 ROOTSVCPLATFORM=		$(ROOTVARSVCMANIFEST)/platform
 ROOTSVCPLATFORMI86PC=		$(ROOTSVCPLATFORM)/i86pc
 ROOTSVCPLATFORMSUN4U=		$(ROOTSVCPLATFORM)/sun4u
+ROOTSVCPLATFORMSUN4V=		$(ROOTSVCPLATFORM)/sun4v
 ROOTSVCAPPLICATION=		$(ROOTVARSVCMANIFEST)/application
 ROOTSVCAPPLICATIONMANAGEMENT=	$(ROOTSVCAPPLICATION)/management
 ROOTSVCAPPLICATIONSECURITY=	$(ROOTSVCAPPLICATION)/security
@@ -386,6 +386,9 @@ $(ROOTSVCPLATFORMI86PC)/%: %
 	$(INS.file)
 
 $(ROOTSVCPLATFORMSUN4U)/%: %
+	$(INS.file)
+
+$(ROOTSVCPLATFORMSUN4V)/%: %
 	$(INS.file)
 
 $(ROOTMAN1)/%: %.sunman

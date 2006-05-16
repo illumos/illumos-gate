@@ -159,6 +159,7 @@ ROOT.SYS= \
 	/var/svc/manifest/platform \
 	/var/svc/manifest/platform/i86pc \
 	/var/svc/manifest/platform/sun4u \
+	/var/svc/manifest/platform/sun4v \
 	/var/svc/manifest/site \
 	/var/svc/profile
 
@@ -170,7 +171,13 @@ XROOT.BIN= \
 	/usr/lib/inet/wanboot
 # EXPORT DELETE END
 
+i386_ROOT.BIN=
+
+sparc_ROOT.BIN= \
+	/usr/lib/ldoms
+
 ROOT.BIN= \
+	$($(MACH)_ROOT.BIN) \
 	/etc/saf \
 	/etc/sma \
 	/etc/sma/snmp \

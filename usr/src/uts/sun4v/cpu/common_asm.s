@@ -1050,8 +1050,16 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	ta	FAST_TRAP
 	brz,pt	%o0, 1f
 	nop
-	ba	ptl1_panic
+
 	mov	PTL1_BAD_HCALL, %g1
+
+	cmp	%o0, H_ENOMAP
+	move	%xcc, PTL1_BAD_HCALL_UNMAP_PERM_ENOMAP, %g1
+	
+	cmp	%o0, H_EINVAL 
+	move	%xcc, PTL1_BAD_HCALL_UNMAP_PERM_EINVAL, %g1
+
+	ba,a	ptl1_panic
 1:
 	mov	%g6, %o5
 	mov	%g5, %o2

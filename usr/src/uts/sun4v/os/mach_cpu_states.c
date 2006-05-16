@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,6 +48,8 @@
 #include <sys/dtrace.h>
 #include <sys/xc_impl.h>
 #include <sys/callb.h>
+#include <sys/mdesc.h>
+#include <sys/mach_descrip.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -438,6 +439,12 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"CPU ECC error loop",		/* PTL1_BAD_ECC */
 		"unexpected error from hypervisor call", /* PTL1_BAD_HCALL */
 		"unexpected global level(%gl)", /* PTL1_BAD_GL */
+		"Watchdog Reset", 		/* PTL1_BAD_WATCHDOG */
+		"unexpected RED mode trap", 	/* PTL1_BAD_RED */
+		"return value EINVAL from hcall: "\
+		    "UNMAP_PERM_ADDR",	/* PTL1_BAD_HCALL_UNMAP_PERM_EINVAL */
+		"return value ENOMAP from hcall: "\
+		    "UNMAP_PERM_ADDR", /* PTL1_BAD_HCALL_UNMAP_PERM_ENOMAP */
 	};
 
 	uint_t reason = pstate->ptl1_regs.ptl1_gregs[0].ptl1_g1;
@@ -559,7 +566,45 @@ getintprop(pnode_t node, char *name, int deflt)
 void
 cpu_init_tick_freq(void)
 {
-	sys_tick_freq = cpunodes[CPU->cpu_id].clock_freq;
+	md_t *mdp;
+	mde_cookie_t rootnode;
+	int		listsz;
+	mde_cookie_t	*listp = NULL;
+	int	num_nodes;
+	uint64_t stick_prop;
+
+	if (broken_md_flag) {
+		sys_tick_freq = cpunodes[CPU->cpu_id].clock_freq;
+		return;
+	}
+
+	if ((mdp = md_get_handle()) == NULL)
+		panic("stick_frequency property not found in MD");
+
+	rootnode = md_root_node(mdp);
+	ASSERT(rootnode != MDE_INVAL_ELEM_COOKIE);
+
+	num_nodes = md_node_count(mdp);
+
+	ASSERT(num_nodes > 0);
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = (mde_cookie_t *)prom_alloc((caddr_t)0, listsz, 0);
+
+	if (listp == NULL)
+		panic("cannot allocate list for MD properties");
+
+	num_nodes = md_scan_dag(mdp, rootnode, md_find_name(mdp, "platform"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	ASSERT(num_nodes == 1);
+
+	if (md_get_prop_val(mdp, *listp, "stick-frequency", &stick_prop) != 0)
+		panic("stick_frequency property not found in MD");
+
+	sys_tick_freq = stick_prop;
+
+	prom_free((caddr_t)listp, listsz);
+	(void) md_fini_handle(mdp);
 }
 
 int shipit(int n, uint64_t cpu_list_ra);

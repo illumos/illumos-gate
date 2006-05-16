@@ -71,15 +71,20 @@ extern void cpu_intrq_register(struct cpu *);
 extern void contig_mem_init(void);
 extern void mach_dump_buffer_init(void);
 extern void mach_descrip_init(void);
+extern void mach_descrip_startup_fini(void);
 extern void mach_memscrub(void);
 extern void mach_fpras(void);
 extern void mach_cpu_halt_idle(void);
 extern void mach_hw_copy_limit(void);
+extern void load_mach_drivers(void);
 extern void load_tod_module(void);
 #pragma weak load_tod_module
 
 extern int ndata_alloc_mmfsa(struct memlist *ndata);
 #pragma weak ndata_alloc_mmfsa
+
+extern void cif_init(void);
+#pragma weak cif_init
 
 extern void parse_idprom(void);
 extern void add_vx_handler(char *, int, void (*)(cell_t *));
@@ -1748,6 +1753,13 @@ startup_bop_gone(void)
 	extern int bop_io_quiesced;
 
 	/*
+	 * Destroy the MD initialized at startup
+	 * The startup initializes the MD framework
+	 * using prom and BOP alloc free it now.
+	 */
+	mach_descrip_startup_fini();
+
+	/*
 	 * Call back into boot and release boots resources.
 	 */
 	BOP_QUIESCE_IO(bootops);
@@ -2198,6 +2210,10 @@ post_startup(void)
 	 */
 	(void) modload("fs", "procfs");
 
+	/* load machine class specific drivers */
+	load_mach_drivers();
+
+	/* load platform specific drivers */
 	if (&load_platform_drivers)
 		load_platform_drivers();
 
@@ -2214,6 +2230,9 @@ post_startup(void)
 #ifdef	PTL1_PANIC_DEBUG
 	init_ptl1_thread();
 #endif	/* PTL1_PANIC_DEBUG */
+
+	if (&cif_init)
+		cif_init();
 }
 
 #ifdef	PTL1_PANIC_DEBUG

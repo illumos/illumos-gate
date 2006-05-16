@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -35,6 +36,30 @@
 #include <sys/hypervisor_api.h>
 
 #if defined(lint) || defined(__lint)
+
+/*ARGSUSED*/
+uint64_t
+hv_mach_exit(uint64_t exit_code)
+{ return (0); }
+
+uint64_t
+hv_mach_sir(void)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_cpu_start(uint64_t cpuid, uint64_t pc, uint64_t rtba, uint64_t arg)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_cpu_stop(uint64_t cpuid)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_cpu_set_rtba(uint64_t *rtba)
+{ return (0); }
 
 /*ARGSUSED*/
 int64_t
@@ -59,6 +84,11 @@ hv_tod_set(uint64_t seconds)
 /*ARGSUSED*/
 uint64_t
 hv_mmu_map_perm_addr(void *vaddr, int ctx, uint64_t tte, int flags)
+{ return (0); }
+
+/*ARGSUSED */
+uint64_t
+hv_mmu_fault_area_conf(void *raddr)
 { return (0); }
 
 /*ARGSUSED*/
@@ -171,7 +201,7 @@ hv_ttrace_freeze(uint64_t freeze, uint64_t *prev_freeze)
 uint64_t
 hv_mach_desc(uint64_t buffer_ra, uint64_t *buffer_sizep)
 { return (0); }
-	
+
 /*ARGSUSED*/	
 uint64_t
 hv_ra2pa(uint64_t ra)
@@ -182,31 +212,190 @@ uint64_t
 hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 { return (0); }
 
+/*ARGSUSED*/	
+uint64_t
+hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base, uint64_t nentries)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_tx_qinfo(uint64_t channel, uint64_t *ra_base, uint64_t *nentries)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_tx_get_state(uint64_t channel, 
+	uint64_t *headp, uint64_t *tailp, uint64_t *state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_tx_set_qtail(uint64_t channel, uint64_t tail)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_ldc_rx_qconf(uint64_t channel, uint64_t ra_base, uint64_t nentries)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_rx_qinfo(uint64_t channel, uint64_t *ra_base, uint64_t *nentries)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_rx_get_state(uint64_t channel, 
+	uint64_t *headp, uint64_t *tailp, uint64_t *state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_rx_set_qhead(uint64_t channel, uint64_t head)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_send_msg(uint64_t channel, uint64_t msg_ra)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_set_map_table(uint64_t channel, uint64_t tbl_ra, uint64_t tbl_entries)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_ldc_copy(uint64_t channel, uint64_t request, uint64_t cookie,
+	uint64_t raddr, uint64_t length, uint64_t *lengthp)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_getcookie(uint64_t dev_hdl, uint32_t devino, uint64_t *cookie)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_setcookie(uint64_t dev_hdl, uint32_t devino, uint64_t cookie)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_getvalid(uint64_t dev_hdl, uint32_t devino, int *intr_valid_state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_setvalid(uint64_t dev_hdl, uint32_t devino, int intr_valid_state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_getstate(uint64_t dev_hdl, uint32_t devino, int *intr_state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_setstate(uint64_t dev_hdl, uint32_t devino, int intr_state)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_gettarget(uint64_t dev_hdl, uint32_t devino, uint32_t *cpuid)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hvldc_intr_settarget(uint64_t dev_hdl, uint32_t devino, uint32_t cpuid)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_api_get_version(uint64_t api_group, uint64_t *majorp, uint64_t *minorp)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_api_set_version(uint64_t api_group, uint64_t major, uint64_t minor,
+    uint64_t *supported_minor)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
-	 * %o0 - character
+	 * int hv_mach_exit(uint64_t exit_code)
+	 */
+	ENTRY(hv_mach_exit)
+	mov	HV_MACH_EXIT, %o5
+	ta	FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_mach_exit)
+
+	/*
+	 * uint64_t hv_mach_sir(void)
+	 */
+	ENTRY(hv_mach_sir)
+	mov	HV_MACH_SIR, %o5
+	ta	FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_mach_sir)
+
+	/*
+	 * hv_cpu_start(uint64_t cpuid, uint64_t pc, ui64_t rtba,
+	 *     uint64_t arg)
+	 */
+	ENTRY(hv_cpu_start)
+	mov	HV_CPU_START, %o5
+	ta	FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_cpu_start)
+
+	/*
+	 * hv_cpu_stop(uint64_t cpuid)
+	 */
+	ENTRY(hv_cpu_stop)
+	mov	HV_CPU_STOP, %o5
+	ta	FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_cpu_stop)
+
+	/*
+	 * hv_cpu_set_rtba(uint64_t *rtba)
+	 */
+	ENTRY(hv_cpu_set_rtba)
+	mov	%o0, %o2
+	ldx	[%o2], %o0
+	mov	HV_CPU_SET_RTBA, %o5
+	ta	FAST_TRAP
+	stx	%o1, [%o2]
+	retl
+	  nop
+	SET_SIZE(hv_cpu_set_rtba)
+
+	/*
+	 * int64_t hv_cnputchar(uint8_t ch)
 	 */
 	ENTRY(hv_cnputchar)
-	mov	CONS_WRITE, %o5
+	mov	CONS_PUTCHAR, %o5
 	ta	FAST_TRAP
-	tst	%o0
 	retl
-	movnz	%xcc, -1, %o0
+	  nop
 	SET_SIZE(hv_cnputchar)
 
 	/*
-	 * %o0 pointer to character buffer
-	 * return values:
-	 * 0 success
-	 * hv_errno failure
+	 * int64_t hv_cngetchar(uint8_t *ch)
 	 */
 	ENTRY(hv_cngetchar)
 	mov	%o0, %o2
-	mov	CONS_READ, %o5
+	mov	CONS_GETCHAR, %o5
 	ta	FAST_TRAP
 	brnz,a	%o0, 1f		! failure, just return error
-	mov	1, %o0
+	  nop
 
 	cmp	%o1, H_BREAK
 	be	1f
@@ -220,7 +409,7 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	mov	0, %o0
 1:
 	retl
-	nop
+	  nop
 	SET_SIZE(hv_cngetchar)
 
 	ENTRY(hv_tod_get)
@@ -251,6 +440,19 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	retl
 	nop
 	SET_SIZE(hv_mmu_map_perm_addr)
+
+	/*
+	 * hv_mmu_fault_area_conf(void *raddr)
+	 */
+	ENTRY(hv_mmu_fault_area_conf)
+	mov	%o0, %o2
+	ldx	[%o2], %o0
+	mov	MMU_SET_INFOPTR, %o5
+	ta	FAST_TRAP
+	stx	%o1, [%o2]
+	retl
+	  nop
+	SET_SIZE(hv_mmu_fault_area_conf)
 
 	/*
 	 * Unmap permanent address
@@ -308,7 +510,7 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	 * arg2 Size (%o2)
 	 */
 	ENTRY(hv_cpu_qconf)
-	mov	CPU_QCONF, %o5
+	mov	HV_CPU_QCONF, %o5
 	ta	FAST_TRAP
 	retl
 	nop
@@ -537,7 +739,7 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	 * arg0 enable/ freeze (%o0)
 	 * ret0 status (%o0)
 	 * ret1 previous freeze state (%o1)
-	*/
+	 */
 	ENTRY(hv_ttrace_freeze)
 	mov	%o1, %o2
 	mov	TTRACE_FREEZE, %o5
@@ -596,5 +798,321 @@ hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	retl
 	nop
 	SET_SIZE(hv_hpriv)
+
+	/*
+         * hv_ldc_tx_qconf(uint64_t channel, uint64_t ra_base, 
+	 *	uint64_t nentries);
+	 */
+	ENTRY(hv_ldc_tx_qconf)
+	mov     LDC_TX_QCONF, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_ldc_tx_qconf)
+
+
+	/*
+         * hv_ldc_tx_qinfo(uint64_t channel, uint64_t *ra_base, 
+	 *	uint64_t *nentries);
+	 */
+	ENTRY(hv_ldc_tx_qinfo)
+	mov	%o1, %g1
+	mov	%o2, %g2
+	mov     LDC_TX_QINFO, %o5
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	retl
+	  stx   %o2, [%g2]
+	SET_SIZE(hv_ldc_tx_qinfo)
+
+
+	/*
+	 * hv_ldc_tx_get_state(uint64_t channel, 
+	 *	uint64_t *headp, uint64_t *tailp, uint64_t *state);
+	 */
+	ENTRY(hv_ldc_tx_get_state)
+	mov     LDC_TX_GET_STATE, %o5
+	mov     %o1, %g1
+	mov     %o2, %g2
+	mov     %o3, %g3
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	stx     %o2, [%g2]
+	retl
+	  stx   %o3, [%g3]
+	SET_SIZE(hv_ldc_tx_get_state)
+
+
+	/*
+	 * hv_ldc_tx_set_qtail(uint64_t channel, uint64_t tail)
+	 */
+	ENTRY(hv_ldc_tx_set_qtail)
+	mov     LDC_TX_SET_QTAIL, %o5
+	ta      FAST_TRAP
+	retl
+	SET_SIZE(hv_ldc_tx_set_qtail)
+
+	
+	/*
+         * hv_ldc_rx_qconf(uint64_t channel, uint64_t ra_base, 
+	 *	uint64_t nentries);
+	 */
+	ENTRY(hv_ldc_rx_qconf)
+	mov     LDC_RX_QCONF, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_ldc_rx_qconf)
+
+
+	/*
+         * hv_ldc_rx_qinfo(uint64_t channel, uint64_t *ra_base, 
+	 *	uint64_t *nentries);
+	 */
+	ENTRY(hv_ldc_rx_qinfo)
+	mov	%o1, %g1
+	mov	%o2, %g2
+	mov     LDC_RX_QINFO, %o5
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	retl
+	  stx   %o2, [%g2]
+	SET_SIZE(hv_ldc_rx_qinfo)
+
+
+	/*
+	 * hv_ldc_rx_get_state(uint64_t channel, 
+	 *	uint64_t *headp, uint64_t *tailp, uint64_t *state);
+	 */
+	ENTRY(hv_ldc_rx_get_state)
+	mov     LDC_RX_GET_STATE, %o5
+	mov     %o1, %g1
+	mov     %o2, %g2
+	mov     %o3, %g3
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	stx     %o2, [%g2]
+	retl
+	  stx   %o3, [%g3]
+	SET_SIZE(hv_ldc_rx_get_state)
+
+
+	/*
+	 * hv_ldc_rx_set_qhead(uint64_t channel, uint64_t head)
+	 */
+	ENTRY(hv_ldc_rx_set_qhead)
+	mov     LDC_RX_SET_QHEAD, %o5
+	ta      FAST_TRAP
+	retl
+	SET_SIZE(hv_ldc_rx_set_qhead)
+
+	/*
+	 * hv_ldc_set_map_table(uint64_t channel, uint64_t tbl_ra, 
+	 *		uint64_t tbl_entries)
+	 */
+	ENTRY(hv_ldc_set_map_table)
+	mov     LDC_SET_MAP_TABLE, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_ldc_set_map_table)
+
+
+	/*
+	 * hv_ldc_get_map_table(uint64_t channel, uint64_t *tbl_ra, 
+	 *		uint64_t *tbl_entries)
+	 */
+	ENTRY(hv_ldc_get_map_table)
+	mov	%o1, %g1
+	mov	%o2, %g2
+	mov     LDC_GET_MAP_TABLE, %o5
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	retl
+	  stx     %o2, [%g2]	  
+	SET_SIZE(hv_ldc_get_map_table)
+
+
+	/*
+	 * hv_ldc_copy(uint64_t channel, uint64_t request, uint64_t cookie,
+	 *		uint64_t raddr, uint64_t length, uint64_t *lengthp);
+	 */
+	ENTRY(hv_ldc_copy)
+	mov     %o5, %g1
+	mov     LDC_COPY, %o5
+	ta      FAST_TRAP
+	retl
+	  stx   %o1, [%g1]
+	SET_SIZE(hv_ldc_copy)
+
+
+	/*
+	 * hv_ldc_mapin(uint64_t channel, uint64_t cookie, uint64_t *raddr, 
+	 *		uint64_t *perm)
+	 */
+	ENTRY(hv_ldc_mapin)
+	mov	%o2, %g1
+	mov	%o3, %g2
+	mov     LDC_MAPIN, %o5
+	ta      FAST_TRAP
+	stx     %o1, [%g1]
+	retl
+	  stx     %o2, [%g2]	  
+	SET_SIZE(hv_ldc_mapin)
+
+
+	/*
+	 * hv_ldc_unmap(uint64_t raddr)
+	 */
+	ENTRY(hv_ldc_unmap)
+	mov     LDC_UNMAP, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_ldc_unmap)
+
+
+	/*
+	 * hv_ldc_revoke(uint64_t raddr)
+	 */
+	ENTRY(hv_ldc_revoke)
+	mov     LDC_REVOKE, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hv_ldc_revoke)
+
+
+	/*
+	 * hvldc_intr_getcookie(uint64_t dev_hdl, uint32_t devino,
+	 *			uint64_t *cookie);
+	 */
+	ENTRY(hvldc_intr_getcookie)
+	mov	%o2, %g1
+	mov     VINTR_GET_COOKIE, %o5
+	ta      FAST_TRAP
+	retl
+	  stx   %o1, [%g1]
+	SET_SIZE(hvldc_intr_getcookie)
+
+	/*
+	 * hvldc_intr_setcookie(uint64_t dev_hdl, uint32_t devino,
+	 *			uint64_t cookie);
+	 */
+	ENTRY(hvldc_intr_setcookie)
+	mov     VINTR_SET_COOKIE, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hvldc_intr_setcookie)
+
+	
+	/*
+	 * hvldc_intr_getvalid(uint64_t dev_hdl, uint32_t devino,
+	 *			int *intr_valid_state);
+	 */
+	ENTRY(hvldc_intr_getvalid)
+	mov	%o2, %g1
+	mov     VINTR_GET_VALID, %o5
+	ta      FAST_TRAP
+	retl
+	  stuw   %o1, [%g1]
+	SET_SIZE(hvldc_intr_getvalid)
+
+	/*
+	 * hvldc_intr_setvalid(uint64_t dev_hdl, uint32_t devino,
+	 *			int intr_valid_state);
+	 */
+	ENTRY(hvldc_intr_setvalid)
+	mov     VINTR_SET_VALID, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hvldc_intr_setvalid)
+
+	/*
+	 * hvldc_intr_getstate(uint64_t dev_hdl, uint32_t devino,
+	 *			int *intr_state);
+	 */
+	ENTRY(hvldc_intr_getstate)
+	mov	%o2, %g1
+	mov     VINTR_GET_STATE, %o5
+	ta      FAST_TRAP
+	retl
+	  stuw   %o1, [%g1]
+	SET_SIZE(hvldc_intr_getstate)
+
+	/*
+	 * hvldc_intr_setstate(uint64_t dev_hdl, uint32_t devino,
+	 *			int intr_state);
+	 */
+	ENTRY(hvldc_intr_setstate)
+	mov     VINTR_SET_STATE, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hvldc_intr_setstate)
+
+	/*
+	 * hvldc_intr_gettarget(uint64_t dev_hdl, uint32_t devino,
+	 *			uint32_t *cpuid);
+	 */
+	ENTRY(hvldc_intr_gettarget)
+	mov	%o2, %g1
+	mov     VINTR_GET_TARGET, %o5
+	ta      FAST_TRAP
+	retl
+	  stuw   %o1, [%g1]
+	SET_SIZE(hvldc_intr_gettarget)
+
+	/*
+	 * hvldc_intr_settarget(uint64_t dev_hdl, uint32_t devino,
+	 *			uint32_t cpuid);
+	 */
+	ENTRY(hvldc_intr_settarget)
+	mov     VINTR_SET_TARGET, %o5
+	ta      FAST_TRAP
+	retl
+	  nop
+	SET_SIZE(hvldc_intr_settarget)
+
+	/*
+	 * hv_api_get_version(uint64_t api_group, uint64_t *majorp,
+	 *			uint64_t *minorp)
+	 *
+	 * API_GET_VERSION
+	 * arg0 API group
+	 * ret0 status
+	 * ret1 major number
+	 * ret2 minor number
+	 */
+	ENTRY(hv_api_get_version)
+	mov	%o1, %o3
+	mov	%o2, %o4
+	mov	API_GET_VERSION, %o5
+	ta	CORE_TRAP
+	stx	%o1, [%o3]
+	retl
+	  stx	%o2, [%o4]
+	SET_SIZE(hv_api_get_version)
+
+	/*
+	 * hv_api_set_version(uint64_t api_group, uint64_t major,
+	 *			uint64_t minor, uint64_t *supported_minor)
+	 *
+	 * API_SET_VERSION
+	 * arg0 API group
+	 * arg1 major number
+	 * arg2 requested minor number
+	 * ret0 status
+	 * ret1 actual minor number
+	 */
+	ENTRY(hv_api_set_version)
+	mov	%o3, %o4
+	mov	API_SET_VERSION, %o5
+	ta	CORE_TRAP
+	retl
+	  stx	%o1, [%o4]
+	SET_SIZE(hv_api_set_version)
 
 #endif	/* lint || __lint */

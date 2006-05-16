@@ -2,9 +2,8 @@
 \ CDDL HEADER START
 \
 \ The contents of this file are subject to the terms of the
-\ Common Development and Distribution License, Version 1.0 only
-\ (the "License").  You may not use this file except in compliance
-\ with the License.
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
 \
 \ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 \ or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
 \
 \ CDDL HEADER END
 \
-\ Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ offsets.in: input file to produce assym.h using the stabs program
@@ -79,6 +78,7 @@
 
 #include <vm/hat_sfmmu.h>
 #include <sys/traptrace.h>
+#include <sys/lpad.h>
 
 machcpu
 	intrstat	MCPU_INTRSTAT
@@ -280,3 +280,16 @@ ptl1_gregs
 	ptl1_g6
 	ptl1_g7
 
+lpad_data
+	magic		LPAD_MAGIC
+	inuse		LPAD_INUSE
+	mmfsa_ra	LPAD_MMFSA_RA
+	pc		LPAD_PC
+	arg		LPAD_ARG
+	nmap		LPAD_NMAP
+	map		LPAD_MAP
+
+lpad_map	LPAD_MAP_SIZE
+	flags		LPAD_MAP_FLAGS
+	va		LPAD_MAP_VA
+	tte		LPAD_MAP_TTE
