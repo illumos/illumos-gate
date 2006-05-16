@@ -56,6 +56,8 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/fs/ufs_quota.h>
+#include <priv_utils.h>
+#include <locale.h>
 
 int	vflag;
 int	nolocalquota;
@@ -69,6 +71,10 @@ extern char	*optarg;
 #define	kb(x)	((x) / (1024 / DEV_BSIZE))
 #else
 #define	kb(x)	((x) * (DEV_BSIZE / 1024))
+#endif
+
+#if	!defined(TEXT_DOMAIN)   /* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"  /* Use this only if it weren't */
 #endif
 
 static int getnfsquota(char *, char *, uid_t, struct dqblk *);
@@ -85,6 +91,25 @@ main(int argc, char *argv[])
 	int	opt;
 	int	i;
 	int	status = 0;
+
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
+	/*
+	 * PRIV_FILE_DAC_READ is needed to read the QFNAME file
+	 * Clear all other privleges from the limit set, and add
+	 * the required privilege to the bracketed set.
+	 */
+
+	if (__init_suid_priv(PU_CLEARLIMITSET, PRIV_FILE_DAC_READ,
+				NULL) == -1) {
+		(void) fprintf(stderr,
+				gettext("Insufficient privileges, "
+				"quota must be set-uid root or have "
+				"file_dac_read privileges\n"));
+
+		exit(1);
+	}
 
 	while ((opt = getopt(argc, argv, "vV")) != EOF) {
 		switch (opt) {
@@ -128,6 +153,7 @@ main(int argc, char *argv[])
 		} else
 			status |= showname(argv[i]);
 	}
+	__priv_relinquish();
 	return (status);
 }
 
@@ -461,7 +487,10 @@ getdiskquota(struct mnttab *mntp, uid_t uid, struct dqblk *dqp)
 		mntp->mnt_mountp, QFNAME);
 	if (stat64(qfilename, &statb) < 0 || statb.st_dev != fsdev)
 		return (0);
-	if ((fd = open64(qfilename, O_RDONLY)) < 0)
+	(void) __priv_bracket(PRIV_ON);
+	fd = open64(qfilename, O_RDONLY);
+	(void) __priv_bracket(PRIV_OFF);
+	if (fd < 0)
 		return (0);
 	(void) llseek(fd, (offset_t)dqoff(uid), L_SET);
 	switch (read(fd, dqp, sizeof (struct dqblk))) {
@@ -518,7 +547,10 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 				sizeof (qfile))) {
 				continue;
 			}
-			if ((fd = open64(qfile, O_RDONLY)) != -1)
+			(void) __priv_bracket(PRIV_ON);
+			fd = open64(qfile, O_RDONLY);
+			(void) __priv_bracket(PRIV_OFF);
+			if (fd != -1)
 				break;
 		}
 		fclose(fstab);
@@ -538,7 +570,10 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 			errno = ENOENT;
 			return (-1);
 		}
-		if ((fd = open64(qfile, O_RDONLY)) < 0)
+		(void) __priv_bracket(PRIV_ON);
+		fd = open64(qfile, O_RDONLY);
+		(void) __priv_bracket(PRIV_OFF);
+		if (fd < 0)
 			return (-1);
 	}	/* else */
 	quota.op = cmd;
