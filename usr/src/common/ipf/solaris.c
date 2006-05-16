@@ -734,9 +734,18 @@ frdest_t *fdp;
 	 * If this is a duplicate mblk then we want ip to point at that
 	 * data, not the original, if and only if it is already pointing at
 	 * the current mblk data.
+	 *
+	 * Otherwise, if it's not a duplicate, and we're not already pointing
+	 * at the current mblk data, then we want to ensure that the data
+	 * points at ip.
 	 */
-	if (ip == (ip_t *)qf->qf_m->b_rptr && qf->qf_m != mb)
+
+	if ((ip == (ip_t *)qf->qf_m->b_rptr) && (qf->qf_m != mb)) {
 		ip = (ip_t *)mb->b_rptr;
+	} else if ((qf->qf_m == mb) && (ip != (ip_t *)qf->qf_m->b_rptr)) { 
+		qf->qf_m->b_rptr = (uchar_t *)ip;
+		qf->qf_off = 0;
+	}
 
 	/*
 	 * If there is another M_PROTO, we don't want it
