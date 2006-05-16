@@ -58,6 +58,7 @@ typedef struct vdev_knob {
 #define	VDEV_FAULT_COUNT	2
 
 extern int vdev_open(vdev_t *);
+extern int vdev_validate(vdev_t *);
 extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg);
 extern void vdev_init(vdev_t *, uint64_t txg);

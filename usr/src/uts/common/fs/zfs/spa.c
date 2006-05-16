@@ -313,6 +313,25 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 
 	/*
+	 * Validate the labels for all leaf vdevs.  We need to grab the config
+	 * lock because all label I/O is done with the ZIO_FLAG_CONFIG_HELD
+	 * flag.
+	 */
+	spa_config_enter(spa, RW_READER, FTAG);
+	error = vdev_validate(rvd);
+	spa_config_exit(spa, FTAG);
+
+	if (error != 0) {
+		error = EBADF;
+		goto out;
+	}
+
+	if (rvd->vdev_state <= VDEV_STATE_CANT_OPEN) {
+		error = ENXIO;
+		goto out;
+	}
+
+	/*
 	 * Find the best uberblock.
 	 */
 	bzero(ub, sizeof (uberblock_t));
@@ -444,16 +463,9 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 
 	/*
-	 * Load the vdev state for all top level vdevs.  We need to grab the
-	 * config lock because all label I/O is done with the
-	 * ZIO_FLAG_CONFIG_HELD flag.
+	 * Load the vdev state for all toplevel vdevs.
 	 */
-	spa_config_enter(spa, RW_READER, FTAG);
-	error = vdev_load(rvd);
-	spa_config_exit(spa, FTAG);
-
-	if (error)
-		goto out;
+	vdev_load(rvd);
 
 	/*
 	 * Propagate the leaf DTLs we just loaded all the way up the tree.
@@ -569,11 +581,11 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 
 		if (error == EBADF) {
 			/*
-			 * If vdev_load() returns EBADF, it indicates that one
-			 * of the vdevs indicates that the pool has been
-			 * exported or destroyed.  If this is the case, the
-			 * config cache is out of sync and we should remove the
-			 * pool from the namespace.
+			 * If vdev_validate() returns failure (indicated by
+			 * EBADF), it indicates that one of the vdevs indicates
+			 * that the pool has been exported or destroyed.  If
+			 * this is the case, the config cache is out of sync and
+			 * we should remove the pool from the namespace.
 			 */
 			spa_unload(spa);
 			spa_deactivate(spa);

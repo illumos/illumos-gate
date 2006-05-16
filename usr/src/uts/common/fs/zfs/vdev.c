@@ -801,13 +801,6 @@ vdev_open(vdev_t *vd)
 	}
 
 	/*
-	 * If we were able to open a vdev that was marked permanently
-	 * unavailable, clear that state now.
-	 */
-	if (vd->vdev_not_present)
-		vd->vdev_not_present = 0;
-
-	/*
 	 * This allows the ZFS DE to close cases appropriately.  If a device
 	 * goes away and later returns, we want to close the associated case.
 	 * But it's not enough to simply post this only when a device goes from
@@ -818,6 +811,79 @@ vdev_open(vdev_t *vd)
 	 * issue.
 	 */
 	zfs_post_ok(vd->vdev_spa, vd);
+
+	return (0);
+}
+
+/*
+ * Called once the vdevs are all opened, this routine validates the label
+ * contents.  This needs to be done before vdev_load() so that we don't
+ * inadvertently do repair I/Os to the wrong device, and so that vdev_reopen()
+ * won't succeed if the device has been changed underneath.
+ *
+ * This function will only return failure if one of the vdevs indicates that it
+ * has since been destroyed or exported.  This is only possible if
+ * /etc/zfs/zpool.cache was readonly at the time.  Otherwise, the vdev state
+ * will be updated but the function will return 0.
+ */
+int
+vdev_validate(vdev_t *vd)
+{
+	spa_t *spa = vd->vdev_spa;
+	int c;
+	nvlist_t *label;
+	uint64_t guid;
+	uint64_t state;
+
+	for (c = 0; c < vd->vdev_children; c++)
+		if (vdev_validate(vd->vdev_child[c]) != 0)
+			return (-1);
+
+	if (vd->vdev_ops->vdev_op_leaf) {
+
+		if ((label = vdev_label_read_config(vd)) == NULL) {
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_BAD_LABEL);
+			return (0);
+		}
+
+		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
+		    &guid) != 0 || guid != spa_guid(spa)) {
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			nvlist_free(label);
+			return (0);
+		}
+
+		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID,
+		    &guid) != 0 || guid != vd->vdev_guid) {
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			nvlist_free(label);
+			return (0);
+		}
+
+		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
+		    &state) != 0) {
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			nvlist_free(label);
+			return (0);
+		}
+
+		nvlist_free(label);
+
+		if (spa->spa_load_state == SPA_LOAD_OPEN &&
+		    state != POOL_STATE_ACTIVE)
+			return (-1);
+	}
+
+	/*
+	 * If we were able to open and validate a vdev that was previously
+	 * marked permanently unavailable, clear that state now.
+	 */
+	if (vd->vdev_not_present)
+		vd->vdev_not_present = 0;
 
 	return (0);
 }
@@ -835,6 +901,13 @@ vdev_close(vdev_t *vd)
 		vdev_queue_fini(vd);
 		vd->vdev_cache_active = B_FALSE;
 	}
+
+	/*
+	 * We record the previous state before we close it, so  that if we are
+	 * doing a reopen(), we don't generate FMA ereports if we notice that
+	 * it's still faulted.
+	 */
+	vd->vdev_prevstate = vd->vdev_state;
 
 	if (vd->vdev_offline)
 		vd->vdev_state = VDEV_STATE_OFFLINE;
@@ -1101,125 +1174,32 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	dmu_tx_commit(tx);
 }
 
-int
+void
 vdev_load(vdev_t *vd)
 {
-	spa_t *spa = vd->vdev_spa;
-	int c, error;
-	nvlist_t *label;
-	uint64_t guid, state;
-
-	dprintf("loading %s\n", vdev_description(vd));
+	int c;
 
 	/*
 	 * Recursively load all children.
 	 */
 	for (c = 0; c < vd->vdev_children; c++)
-		if ((error = vdev_load(vd->vdev_child[c])) != 0)
-			return (error);
-
-	/*
-	 * If this is a leaf vdev, make sure its agrees with its disk labels.
-	 */
-	if (vd->vdev_ops->vdev_op_leaf) {
-
-		if (vdev_is_dead(vd))
-			return (0);
-
-		/*
-		 * XXX state transitions don't propagate to parent here.
-		 * Also, merely setting the state isn't sufficient because
-		 * it's not persistent; a vdev_reopen() would make us
-		 * forget all about it.
-		 */
-		if ((label = vdev_label_read_config(vd)) == NULL) {
-			dprintf("can't load label config\n");
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			return (0);
-		}
-
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
-		    &guid) != 0 || guid != spa_guid(spa)) {
-			dprintf("bad or missing pool GUID (%llu)\n", guid);
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			nvlist_free(label);
-			return (0);
-		}
-
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID, &guid) ||
-		    guid != vd->vdev_guid) {
-			dprintf("bad or missing vdev guid (%llu != %llu)\n",
-			    guid, vd->vdev_guid);
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			nvlist_free(label);
-			return (0);
-		}
-
-		/*
-		 * If we find a vdev with a matching pool guid and vdev guid,
-		 * but the pool state is not active, it indicates that the user
-		 * exported or destroyed the pool without affecting the config
-		 * cache (if / was mounted readonly, for example).  In this
-		 * case, immediately return EBADF so the caller can remove it
-		 * from the config.
-		 */
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
-		    &state)) {
-			dprintf("missing pool state\n");
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			nvlist_free(label);
-			return (0);
-		}
-
-		if (state != POOL_STATE_ACTIVE &&
-		    (spa->spa_load_state == SPA_LOAD_OPEN ||
-		    (state != POOL_STATE_EXPORTED &&
-		    state != POOL_STATE_DESTROYED))) {
-			dprintf("pool state not active (%llu)\n", state);
-			nvlist_free(label);
-			return (EBADF);
-		}
-
-		nvlist_free(label);
-	}
+		vdev_load(vd->vdev_child[c]);
 
 	/*
 	 * If this is a top-level vdev, initialize its metaslabs.
 	 */
-	if (vd == vd->vdev_top) {
-
-		if (vd->vdev_ashift == 0 || vd->vdev_asize == 0) {
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			return (0);
-		}
-
-		if ((error = vdev_metaslab_init(vd, 0)) != 0) {
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			return (0);
-		}
-	}
+	if (vd == vd->vdev_top &&
+	    (vd->vdev_ashift == 0 || vd->vdev_asize == 0 ||
+	    vdev_metaslab_init(vd, 0) != 0))
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
 
 	/*
 	 * If this is a leaf vdev, load its DTL.
 	 */
-	if (vd->vdev_ops->vdev_op_leaf) {
-		error = vdev_dtl_load(vd);
-		if (error) {
-			dprintf("can't load DTL for %s, error %d\n",
-			    vdev_description(vd), error);
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			return (0);
-		}
-	}
-
-	return (0);
+	if (vd->vdev_ops->vdev_op_leaf && vdev_dtl_load(vd) != 0)
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
 }
 
 void
@@ -1770,14 +1750,14 @@ vdev_propagate_state(vdev_t *vd)
 void
 vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 {
-	uint64_t prev_state;
+	uint64_t save_state;
 
 	if (state == vd->vdev_state) {
 		vd->vdev_stat.vs_aux = aux;
 		return;
 	}
 
-	prev_state = vd->vdev_state;
+	save_state = vd->vdev_state;
 
 	vd->vdev_state = state;
 	vd->vdev_stat.vs_aux = aux;
@@ -1789,7 +1769,18 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		 * begin with.  Failure to open such a device is not considered
 		 * an error.
 		 */
-		if (!vd->vdev_not_present &&
+		if (vd->vdev_spa->spa_load_state == SPA_LOAD_IMPORT &&
+		    vd->vdev_ops->vdev_op_leaf)
+			vd->vdev_not_present = 1;
+
+		/*
+		 * Post the appropriate ereport.  If the 'prevstate' field is
+		 * set to something other than VDEV_STATE_UNKNOWN, it indicates
+		 * that this is part of a vdev_reopen().  In this case, we don't
+		 * want to post the ereport if the device was already in the
+		 * CANT_OPEN state beforehand.
+		 */
+		if (vd->vdev_prevstate != state && !vd->vdev_not_present &&
 		    vd != vd->vdev_spa->spa_root_vdev) {
 			const char *class;
 
@@ -1817,12 +1808,8 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 			}
 
 			zfs_ereport_post(class, vd->vdev_spa,
-			    vd, NULL, prev_state, 0);
+			    vd, NULL, save_state, 0);
 		}
-
-		if (vd->vdev_spa->spa_load_state == SPA_LOAD_IMPORT &&
-		    vd->vdev_ops->vdev_op_leaf)
-			vd->vdev_not_present = 1;
 	}
 
 	if (isopen)
