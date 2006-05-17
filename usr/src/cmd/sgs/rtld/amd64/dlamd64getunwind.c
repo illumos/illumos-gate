@@ -41,18 +41,18 @@
 #include <stdio.h>
 
 static Dl_amd64_unwindinfo *
-getunwind_core(Rt_map *clmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
+getunwind_core(Rt_map *lmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
 	/*
 	 * Validate the version information.
 	 */
 	if (unwindinfo == NULL) {
-		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
+		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
 		return (0);
 	}
 	if ((unwindinfo->dlui_version < DLUI_VERS_1) ||
 	    (unwindinfo->dlui_version > DLUI_VERS_CURRENT)) {
-		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_UNW_BADVERS),
+		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_UNW_BADVERS),
 		    DLUI_VERS_CURRENT, unwindinfo->dlui_version);
 		return (0);
 	}
@@ -67,16 +67,16 @@ getunwind_core(Rt_map *clmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 	unwindinfo->dlui_segstart = 0;
 	unwindinfo->dlui_segend = 0;
 
-	if (clmp) {
+	if (lmp) {
 		Mmap	*immap;
 
-		unwindinfo->dlui_objname = PATHNAME(clmp);
+		unwindinfo->dlui_objname = PATHNAME(lmp);
 
 		/*
 		 * Scan through the mmaps of this object to get the specific
 		 * segment found.
 		 */
-		for (immap = MMAPS(clmp); immap->m_vaddr; immap++) {
+		for (immap = MMAPS(lmp); immap->m_vaddr; immap++) {
 			if (((caddr_t)pc >= immap->m_vaddr) &&
 			    ((caddr_t)pc < (immap->m_vaddr + immap->m_msize))) {
 				break;
@@ -85,19 +85,19 @@ getunwind_core(Rt_map *clmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 		unwindinfo->dlui_segstart = immap->m_vaddr;
 		unwindinfo->dlui_segend = immap->m_vaddr + immap->m_msize;
 
-		if (PTUNWIND(clmp) && (immap->m_vaddr)) {
+		if (PTUNWIND(lmp) && (immap->m_vaddr)) {
 			uintptr_t   base;
 
-			if (FLAGS(clmp) & FLG_RT_FIXED)
+			if (FLAGS(lmp) & FLG_RT_FIXED)
 				base = 0;
 			else
-				base = ADDR(clmp);
+				base = ADDR(lmp);
 
 			unwindinfo->dlui_unwindstart =
-			    (void *)(PTUNWIND(clmp)->p_vaddr + base);
+			    (void *)(PTUNWIND(lmp)->p_vaddr + base);
 			unwindinfo->dlui_unwindend =
-			    (void *)(PTUNWIND(clmp)->p_vaddr +
-			    PTUNWIND(clmp)->p_memsz + base);
+			    (void *)(PTUNWIND(lmp)->p_vaddr +
+			    PTUNWIND(lmp)->p_memsz + base);
 
 		} else if (immap->m_vaddr)
 			unwindinfo->dlui_flags |= DLUI_FLG_NOUNWIND;
@@ -118,14 +118,20 @@ getunwind_core(Rt_map *clmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 Dl_amd64_unwindinfo *
 _dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
-	Rt_map	*clmp;
+	Rt_map	*lmp;
 	int	entry = enter();
 
-	clmp = _caller(caller(), CL_NONE);
+	/*
+	 * Identify the link-map associated with the exception "pc".  Note,
+	 * this is not the actual caller of _dlamd64getunwind(), which is
+	 * probably one of the libC libraries.  However, the caller and
+	 * exception object are both on the same link-map list.
+	 */
+	lmp = _caller(pc, CL_NONE);
 
-	unwindinfo = getunwind_core(clmp, pc, unwindinfo);
+	unwindinfo = getunwind_core(lmp, pc, unwindinfo);
 
 	if (entry)
-		leave(LIST(clmp));
+		leave(LIST(lmp));
 	return (unwindinfo);
 }

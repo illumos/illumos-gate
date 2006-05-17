@@ -1101,3 +1101,4 @@ Bugid   Risk Synopsis
 6262333 init section of .so dlopened from audit interface not being called
 6409613 elf_outsync() should fsync()
 6174390 crle configuration files are inconsistent across platforms
+6426048 C++ exceptions broken in Nevada for amd64
