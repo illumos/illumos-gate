@@ -2023,7 +2023,7 @@ e_pm_hold_rele_power(dev_info_t *dip, int cnt)
 	PMD_FUNC(pmf, "hold_rele_power")
 	int circ;
 
-	if ((dip == NULL) || PM_ISBC(dip))
+	if ((dip == NULL) || (PM_GET_PM_INFO(dip) == NULL) || PM_ISBC(dip))
 		return;
 
 	PM_LOCK_POWER(dip, &circ);

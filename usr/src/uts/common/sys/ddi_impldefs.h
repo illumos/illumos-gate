@@ -139,7 +139,7 @@ struct dev_info  {
 	struct dev_info *devi_pm_ppm;		/* ppm attached to this one */
 	void		*devi_pm_ppm_private;	/* for use by ppm driver */
 	int		devi_pm_dev_thresh;	/* "device" threshold */
-	int		devi_pm_kidsupcnt;	/* # of kids powered up */
+	uint_t		devi_pm_kidsupcnt;	/* # of kids powered up */
 	struct pm_scan	*devi_pm_scan;		/* pm scan info */
 	uint_t		devi_pm_noinvolpm;	/* # of descendents no-invol */
 	uint_t		devi_pm_volpmd;		/* # of voluntarily pm'ed */
