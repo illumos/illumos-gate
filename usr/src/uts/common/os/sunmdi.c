@@ -270,8 +270,6 @@ static void		i_mdi_report_path_state(mdi_client_t *,
 
 static void		setup_vhci_cache(mdi_vhci_t *);
 static int		destroy_vhci_cache(mdi_vhci_t *);
-static void		setup_phci_driver_list(mdi_vhci_t *);
-static void		free_phci_driver_list(mdi_vhci_config_t *);
 static int		stop_vhcache_async_threads(mdi_vhci_config_t *);
 static boolean_t	stop_vhcache_flush_thread(void *, int);
 static void		free_string_array(char **, int);
@@ -6566,18 +6564,6 @@ static char *vhci_class_list[] = { MDI_HCI_CLASS_SCSI, MDI_HCI_CLASS_IB };
 #define	N_VHCI_CLASSES	(sizeof (vhci_class_list) / sizeof (char *))
 
 /*
- * Built-in list of phci drivers for every vhci class.
- * All phci drivers expect iscsi have root device support.
- */
-static mdi_phci_driver_info_t scsi_phci_driver_list[] = {
-	{ "fp", 1 },
-	{ "iscsi", 0 },
-	{ "ibsrp", 1 }
-	};
-
-static mdi_phci_driver_info_t ib_phci_driver_list[] = { "tavor", 1 };
-
-/*
  * During boot time, the on-disk vhci cache for every vhci class is read
  * in the form of an nvlist and stored here.
  */
@@ -6646,8 +6632,6 @@ setup_vhci_cache(mdi_vhci_t *vh)
 	    mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
 
-	setup_phci_driver_list(vh);
-
 	/*
 	 * The on-disk vhci cache is read during booting prior to the
 	 * lights-out period by mdi_read_devices_files().
@@ -6705,9 +6689,6 @@ destroy_vhci_cache(mdi_vhci_t *vh)
 	kmem_free(vhc->vhc_vhcache_filename,
 	    strlen(vhc->vhc_vhcache_filename) + 1);
 
-	if (vhc->vhc_phci_driver_list)
-		free_phci_driver_list(vhc);
-
 	mod_hash_destroy_strhash(vhcache->vhcache_client_hash);
 
 	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
@@ -6731,86 +6712,6 @@ destroy_vhci_cache(mdi_vhci_t *vh)
 	cv_destroy(&vhc->vhc_cv);
 	kmem_free(vhc, sizeof (mdi_vhci_config_t));
 	return (MDI_SUCCESS);
-}
-
-/*
- * Setup the list of phci drivers associated with the specified vhci class.
- * MDI uses this information to rebuild bus config cache if in case the
- * cache is not available or corrupted.
- */
-static void
-setup_phci_driver_list(mdi_vhci_t *vh)
-{
-	mdi_vhci_config_t *vhc = vh->vh_config;
-	mdi_phci_driver_info_t *driver_list;
-	char **driver_list1;
-	uint_t ndrivers, ndrivers1;
-	int i, j;
-
-	if (strcmp(vh->vh_class, MDI_HCI_CLASS_SCSI) == 0) {
-		driver_list = scsi_phci_driver_list;
-		ndrivers = sizeof (scsi_phci_driver_list) /
-		    sizeof (mdi_phci_driver_info_t);
-	} else if (strcmp(vh->vh_class, MDI_HCI_CLASS_IB) == 0) {
-		driver_list = ib_phci_driver_list;
-		ndrivers = sizeof (ib_phci_driver_list) /
-		    sizeof (mdi_phci_driver_info_t);
-	} else {
-		driver_list = NULL;
-		ndrivers = 0;
-	}
-
-	/*
-	 * The driver.conf file of a vhci driver can specify additional
-	 * phci drivers using a project private "phci-drivers" property.
-	 */
-	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, vh->vh_dip,
-	    DDI_PROP_DONTPASS, "phci-drivers", &driver_list1,
-	    &ndrivers1) != DDI_PROP_SUCCESS)
-		ndrivers1 = 0;
-
-	vhc->vhc_nphci_drivers = ndrivers + ndrivers1;
-	if (vhc->vhc_nphci_drivers == 0)
-		return;
-
-	vhc->vhc_phci_driver_list = kmem_alloc(
-	    sizeof (mdi_phci_driver_info_t) * vhc->vhc_nphci_drivers, KM_SLEEP);
-
-	for (i = 0; i < ndrivers; i++) {
-		vhc->vhc_phci_driver_list[i].phdriver_name =
-		    i_ddi_strdup(driver_list[i].phdriver_name, KM_SLEEP);
-		vhc->vhc_phci_driver_list[i].phdriver_root_support =
-		    driver_list[i].phdriver_root_support;
-	}
-
-	for (j = 0; j < ndrivers1; j++, i++) {
-		vhc->vhc_phci_driver_list[i].phdriver_name =
-		    i_ddi_strdup(driver_list1[j], KM_SLEEP);
-		vhc->vhc_phci_driver_list[i].phdriver_root_support = 1;
-	}
-
-	if (ndrivers1)
-		ddi_prop_free(driver_list1);
-}
-
-/*
- * Free the memory allocated for the phci driver list
- */
-static void
-free_phci_driver_list(mdi_vhci_config_t *vhc)
-{
-	int i;
-
-	if (vhc->vhc_phci_driver_list == NULL)
-		return;
-
-	for (i = 0; i < vhc->vhc_nphci_drivers; i++) {
-		kmem_free(vhc->vhc_phci_driver_list[i].phdriver_name,
-		    strlen(vhc->vhc_phci_driver_list[i].phdriver_name) + 1);
-	}
-
-	kmem_free(vhc->vhc_phci_driver_list,
-	    sizeof (mdi_phci_driver_info_t) * vhc->vhc_nphci_drivers);
 }
 
 /*
@@ -8220,29 +8121,163 @@ single_threaded_vhconfig_exit(mdi_vhci_config_t *vhc)
 	mutex_exit(&vhc->vhc_lock);
 }
 
+typedef struct mdi_phci_driver_info {
+	char	*phdriver_name;	/* name of the phci driver */
+
+	/* set to non zero if the phci driver supports root device */
+	int	phdriver_root_support;
+} mdi_phci_driver_info_t;
+
 /*
- * Attach the phci driver instances associated with the vhci:
+ * vhci class and root support capability of a phci driver can be
+ * specified using ddi-vhci-class and ddi-no-root-support properties in the
+ * phci driver.conf file. The built-in tables below contain this information
+ * for those phci drivers whose driver.conf files don't yet contain this info.
+ *
+ * All phci drivers expect iscsi have root device support.
+ */
+static mdi_phci_driver_info_t scsi_phci_driver_list[] = {
+	{ "fp", 1 },
+	{ "iscsi", 0 },
+	{ "ibsrp", 1 }
+	};
+
+static mdi_phci_driver_info_t ib_phci_driver_list[] = { "tavor", 1 };
+
+static void *
+mdi_realloc(void *old_ptr, size_t old_size, size_t new_size)
+{
+	void *new_ptr;
+
+	new_ptr = kmem_zalloc(new_size, KM_SLEEP);
+	if (old_ptr) {
+		bcopy(old_ptr, new_ptr, old_size);
+		kmem_free(old_ptr, old_size);
+	}
+	return (new_ptr);
+}
+
+static void
+add_to_phci_list(char ***driver_list, int **root_support_list,
+    int *cur_elements, int *max_elements, char *driver_name, int root_support)
+{
+	ASSERT(*cur_elements <= *max_elements);
+	if (*cur_elements == *max_elements) {
+		*max_elements += 10;
+		*driver_list = mdi_realloc(*driver_list,
+		    sizeof (char *) * (*cur_elements),
+		    sizeof (char *) * (*max_elements));
+		*root_support_list = mdi_realloc(*root_support_list,
+		    sizeof (int) * (*cur_elements),
+		    sizeof (int) * (*max_elements));
+	}
+	(*driver_list)[*cur_elements] = i_ddi_strdup(driver_name, KM_SLEEP);
+	(*root_support_list)[*cur_elements] = root_support;
+	(*cur_elements)++;
+}
+
+static void
+get_phci_driver_list(char *vhci_class, char ***driver_list,
+    int **root_support_list, int *cur_elements, int *max_elements)
+{
+	mdi_phci_driver_info_t	*st_driver_list, *p;
+	int		st_ndrivers, root_support, i, j, driver_conf_count;
+	major_t		m;
+	struct devnames	*dnp;
+	ddi_prop_t	*propp;
+
+	*driver_list = NULL;
+	*root_support_list = NULL;
+	*cur_elements = 0;
+	*max_elements = 0;
+
+	/* add the phci drivers derived from the phci driver.conf files */
+	for (m = 0; m < devcnt; m++) {
+		dnp = &devnamesp[m];
+
+		if (dnp->dn_flags & DN_PHCI_DRIVER) {
+			LOCK_DEV_OPS(&dnp->dn_lock);
+			if (dnp->dn_global_prop_ptr != NULL &&
+			    (propp = i_ddi_prop_search(DDI_DEV_T_ANY,
+			    DDI_VHCI_CLASS, DDI_PROP_TYPE_STRING,
+			    &dnp->dn_global_prop_ptr->prop_list)) != NULL &&
+			    strcmp(propp->prop_val, vhci_class) == 0) {
+
+				root_support = (i_ddi_prop_search(DDI_DEV_T_ANY,
+				    DDI_NO_ROOT_SUPPORT, DDI_PROP_TYPE_INT,
+				    &dnp->dn_global_prop_ptr->prop_list)
+				    == NULL) ? 1 : 0;
+
+				add_to_phci_list(driver_list, root_support_list,
+				    cur_elements, max_elements, dnp->dn_name,
+				    root_support);
+
+				UNLOCK_DEV_OPS(&dnp->dn_lock);
+			} else
+				UNLOCK_DEV_OPS(&dnp->dn_lock);
+		}
+	}
+
+	driver_conf_count = *cur_elements;
+
+	/* add the phci drivers specified in the built-in tables */
+	if (strcmp(vhci_class, MDI_HCI_CLASS_SCSI) == 0) {
+		st_driver_list = scsi_phci_driver_list;
+		st_ndrivers = sizeof (scsi_phci_driver_list) /
+		    sizeof (mdi_phci_driver_info_t);
+	} else if (strcmp(vhci_class, MDI_HCI_CLASS_IB) == 0) {
+		st_driver_list = ib_phci_driver_list;
+		st_ndrivers = sizeof (ib_phci_driver_list) /
+		    sizeof (mdi_phci_driver_info_t);
+	} else {
+		st_driver_list = NULL;
+		st_ndrivers = 0;
+	}
+
+	for (i = 0, p = st_driver_list; i < st_ndrivers; i++, p++) {
+		/* add this phci driver if not already added before */
+		for (j = 0; j < driver_conf_count; j++) {
+			if (strcmp((*driver_list)[j], p->phdriver_name) == 0)
+				break;
+		}
+		if (j == driver_conf_count) {
+			add_to_phci_list(driver_list, root_support_list,
+			    cur_elements, max_elements, p->phdriver_name,
+			    p->phdriver_root_support);
+		}
+	}
+}
+
+/*
+ * Attach the phci driver instances associated with the specified vhci class.
  * If root is mounted attach all phci driver instances.
  * If root is not mounted, attach the instances of only those phci
  * drivers that have the root support.
  */
 static void
-attach_phci_drivers(mdi_vhci_config_t *vhc)
+attach_phci_drivers(char *vhci_class)
 {
-	int  i;
-	major_t m;
+	char	**driver_list, **p;
+	int	*root_support_list;
+	int	cur_elements, max_elements, i;
+	major_t	m;
 
-	for (i = 0; i < vhc->vhc_nphci_drivers; i++) {
-		if (modrootloaded == 0 &&
-		    vhc->vhc_phci_driver_list[i].phdriver_root_support == 0)
-			continue;
+	get_phci_driver_list(vhci_class, &driver_list, &root_support_list,
+	    &cur_elements, &max_elements);
 
-		m = ddi_name_to_major(
-		    vhc->vhc_phci_driver_list[i].phdriver_name);
-		if (m != (major_t)-1) {
-			if (ddi_hold_installed_driver(m) != NULL)
+	for (i = 0; i < cur_elements; i++) {
+		if (modrootloaded || root_support_list[i]) {
+			m = ddi_name_to_major(driver_list[i]);
+			if (m != (major_t)-1 && ddi_hold_installed_driver(m))
 				ddi_rele_driver(m);
 		}
+	}
+
+	if (driver_list) {
+		for (i = 0, p = driver_list; i < cur_elements; i++, p++)
+			kmem_free(*p, strlen(*p) + 1);
+		kmem_free(driver_list, sizeof (char *) * max_elements);
+		kmem_free(root_support_list, sizeof (int) * max_elements);
 	}
 }
 
@@ -8258,8 +8293,9 @@ attach_phci_drivers(mdi_vhci_config_t *vhc)
  * in the cache reflect only those phci drivers that have root support.
  */
 static int
-build_vhci_cache(mdi_vhci_config_t *vhc)
+build_vhci_cache(mdi_vhci_t *vh)
 {
+	mdi_vhci_config_t *vhc = vh->vh_config;
 	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
 
 	single_threaded_vhconfig_enter(vhc);
@@ -8272,7 +8308,7 @@ build_vhci_cache(mdi_vhci_config_t *vhc)
 	}
 	rw_exit(&vhcache->vhcache_lock);
 
-	attach_phci_drivers(vhc);
+	attach_phci_drivers(vh->vh_class);
 	bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE | NDI_NO_EVENT,
 	    BUS_CONFIG_ALL, (major_t)-1);
 
@@ -8328,15 +8364,16 @@ out:
  * driver instances. During this process all paths will be discovered.
  */
 static int
-vhcache_discover_paths(mdi_vhci_config_t *vhc)
+vhcache_discover_paths(mdi_vhci_t *vh)
 {
+	mdi_vhci_config_t *vhc = vh->vh_config;
 	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
 	int rv = 0;
 
 	single_threaded_vhconfig_enter(vhc);
 
 	if (vhcache_do_discovery(vhc)) {
-		attach_phci_drivers(vhc);
+		attach_phci_drivers(vh->vh_class);
 		bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE |
 		    NDI_NO_EVENT, BUS_CONFIG_ALL, (major_t)-1);
 
@@ -8405,7 +8442,7 @@ mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
 	rw_enter(&vhcache->vhcache_lock, RW_READER);
 	if (!(vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE)) {
 		rw_exit(&vhcache->vhcache_lock);
-		rv = build_vhci_cache(vhc);
+		rv = build_vhci_cache(vh);
 		rw_enter(&vhcache->vhcache_lock, RW_READER);
 	}
 
@@ -8458,7 +8495,7 @@ default_bus_config:
 		return (MDI_SUCCESS);
 	} else if (op == BUS_CONFIG_ONE && rv == 0 && params_valid) {
 		/* discover all paths and try configuring again */
-		if (vhcache_discover_paths(vhc) &&
+		if (vhcache_discover_paths(vh) &&
 		    ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
 		    NDI_SUCCESS)
 			return (MDI_SUCCESS);

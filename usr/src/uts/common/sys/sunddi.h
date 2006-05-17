@@ -310,6 +310,8 @@ typedef enum {
  */
 #define	DDI_FORCEATTACH		"ddi-forceattach"
 #define	DDI_NO_AUTODETACH	"ddi-no-autodetach"
+#define	DDI_VHCI_CLASS		"ddi-vhci-class"
+#define	DDI_NO_ROOT_SUPPORT	"ddi-no-root-support"
 
 /*
  * Values that the function supplied to the dev_info

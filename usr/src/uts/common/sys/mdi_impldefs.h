@@ -1008,19 +1008,10 @@ typedef struct mdi_vhci_cache {
 /* vhcache_flags */
 #define	MDI_VHCI_CACHE_SETUP_DONE	0x0001	/* cache setup completed */
 
-typedef struct mdi_phci_driver_info {
-	char			*phdriver_name;	/* name of the phci driver */
-
-	/* set to non zero if the phci driver supports root device */
-	int			phdriver_root_support;
-} mdi_phci_driver_info_t;
-
 /* vhci bus config structure - one for vhci instance */
 typedef struct mdi_vhci_config {
 	char			*vhc_vhcache_filename;	/* on-disk file name */
 	mdi_vhci_cache_t	vhc_vhcache;		/* vhci cache */
-	mdi_phci_driver_info_t	*vhc_phci_driver_list;	/* ph drv info array */
-	int			vhc_nphci_drivers;	/* # of phci drivers */
 	kmutex_t		vhc_lock;		/* vhci config lock */
 	kcondvar_t		vhc_cv;
 	int			vhc_flags;		/* see below */
