@@ -1069,8 +1069,8 @@ zone_init(void)
 	 */
 	rc_zone_cpu_shares = rctl_register("zone.cpu-shares",
 	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |
-	    RCTL_GLOBAL_NOBASIC |
-	    RCTL_GLOBAL_COUNT, FSS_MAXSHARES, FSS_MAXSHARES,
+	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER,
+	    FSS_MAXSHARES, FSS_MAXSHARES,
 	    &zone_cpu_shares_ops);
 
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,

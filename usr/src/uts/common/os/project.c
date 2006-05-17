@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -733,7 +732,8 @@ project_init(void)
 	rc_project_cpu_shares = rctl_register("project.cpu-shares",
 	    RCENTITY_PROJECT, RCTL_GLOBAL_SIGNAL_NEVER |
 	    RCTL_GLOBAL_DENY_NEVER | RCTL_GLOBAL_NOBASIC |
-	    RCTL_GLOBAL_COUNT, FSS_MAXSHARES, FSS_MAXSHARES,
+	    RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER,
+	    FSS_MAXSHARES, FSS_MAXSHARES,
 	    &project_cpu_shares_ops);
 	rctl_add_default_limit("project.cpu-shares", 1, RCPRIV_PRIVILEGED,
 	    RCTL_LOCAL_NOACTION);
