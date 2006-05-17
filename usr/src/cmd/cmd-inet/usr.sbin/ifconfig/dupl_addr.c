@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
 /*
  * Perform IPv6 duplicate address detection for a given interface
  * and IPv6 address.
@@ -56,8 +54,8 @@ static int	send_dad_probe(int s, char *phyname,
 		    struct sockaddr_in6 *solicited_mc);
 static int	recv_dad(int s, char *phyname, struct sockaddr_in6 *testaddr,
 		    int ifindex);
-static boolean_t verify_opt_len(struct nd_opt_hdr *opt, int optlen,
-		    struct sockaddr_in6 *from);
+static boolean_t verify_opts(struct nd_opt_hdr *opt, int optlen,
+		    struct sockaddr_in6 *from, boolean_t reject_dad_slla);
 static void	dad_failed(char *phyname, struct sockaddr_in6 *testaddr,
 		    int code);
 static void	print_na(char *str, char *phyname,
@@ -314,8 +312,8 @@ run_dad(int s, char *phyname, struct sockaddr_in6 *testaddr,
 		while (1) {
 			(void) gettimeofday(&curtime, NULL);
 			time_left = RetransTimer -
-				(curtime.tv_sec - starttime.tv_sec) * 1000 -
-				(curtime.tv_usec - starttime.tv_usec) / 1000;
+			    (curtime.tv_sec - starttime.tv_sec) * 1000 -
+			    (curtime.tv_usec - starttime.tv_usec) / 1000;
 
 			if (debug) {
 				(void) printf("run_dad: time_left %d ms\n",
@@ -561,14 +559,22 @@ recv_dad(int s, char *phyname, struct sockaddr_in6 *testaddr, int ifindex)
 		}
 
 		if (len > sizeof (struct nd_neighbor_solicit)) {
-			if (!verify_opt_len((struct nd_opt_hdr *)&ns[1],
-			    len - sizeof (struct nd_neighbor_solicit), &from))
+			/*
+			 * For DAD type neighbor solicitation message,
+			 * we need to further verify if SLLA option is present
+			 * in received options,
+			 * so we pass TRUE to reject_dad_slla argument.
+			 */
+			if (!verify_opts((struct nd_opt_hdr *)&ns[1],
+			    len - sizeof (struct nd_neighbor_solicit),
+			    &from, _B_TRUE))
 				return (0);
 		}
 
 		if (debug)
 			print_ns("Received valid NS", phyname, ns, len, &from);
-		if (!IN6_IS_ADDR_UNSPECIFIED(&from.sin6_addr)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&from.sin6_addr) ||
+		    !IN6_IS_ADDR_MC_SOLICITEDNODE(&dst)) {
 			/* Sender is doing address resolution */
 			return (0);
 		}
@@ -653,8 +659,14 @@ recv_dad(int s, char *phyname, struct sockaddr_in6 *testaddr, int ifindex)
 		}
 
 		if (len > sizeof (struct nd_neighbor_advert)) {
-			if (!verify_opt_len((struct nd_opt_hdr *)&na[1],
-			    len - sizeof (struct nd_neighbor_advert), &from))
+			/*
+			 * Since this is a Neighbor advertisement
+			 * we unset the reject_dad_slla flag, thus
+			 * there is no need to verify the SLLA options.
+			 */
+			if (!verify_opts((struct nd_opt_hdr *)&na[1],
+			    len - sizeof (struct nd_neighbor_advert),
+			    &from, _B_FALSE))
 				return (0);
 		}
 
@@ -679,9 +691,12 @@ recv_dad(int s, char *phyname, struct sockaddr_in6 *testaddr, int ifindex)
 /*
  * Verify that all options have a non-zero length and that
  * the options fit within the total length of the packet (optlen).
+ * If reject_dad_slla is set, then we also verify that no SLLA option is
+ * present as mandated by section 7.1.1 of RFC 2461.
  */
 static boolean_t
-verify_opt_len(struct nd_opt_hdr *opt, int optlen, struct sockaddr_in6 *from)
+verify_opts(struct nd_opt_hdr *opt, int optlen, struct sockaddr_in6 *from,
+    boolean_t reject_dad_slla)
 {
 	while (optlen > 0) {
 		if (opt->nd_opt_len == 0) {
@@ -713,6 +728,10 @@ verify_opt_len(struct nd_opt_hdr *opt, int optlen, struct sockaddr_in6 *from)
 				    opt->nd_opt_type, opt->nd_opt_len,
 				    abuf);
 			}
+			return (_B_FALSE);
+		}
+		if (reject_dad_slla &&
+		    opt->nd_opt_type == ND_OPT_SOURCE_LINKADDR) {
 			return (_B_FALSE);
 		}
 		opt = (struct nd_opt_hdr *)((char *)opt +

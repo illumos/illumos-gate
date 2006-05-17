@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -601,6 +601,26 @@ struct sockaddr_in6 {
 #define	IN6_IS_ADDR_MC_GLOBAL(addr) \
 	(((addr)->_S6_un._S6_u32[0] & 0x00000fff) == 0x00000eff)
 #endif /* _BIG_ENDIAN */
+
+/*
+ * The IN6_IS_ADDR_MC_SOLICITEDNODE macro is not defined in any standard or
+ * RFC, and shouldn't be used by portable applications.  It is used to see
+ * if an address is a solicited-node multicast address, which is prefixed
+ * with ff02:0:0:0:0:1:ff00::/104.
+ */
+#ifdef _BIG_ENDIAN
+#define	IN6_IS_ADDR_MC_SOLICITEDNODE(addr)			\
+	(((addr)->_S6_un._S6_u32[0] == 0xff020000) &&		\
+	((addr)->_S6_un._S6_u32[1] == 0x00000000) &&		\
+	((addr)->_S6_un._S6_u32[2] == 0x00000001) &&		\
+	(((addr)->_S6_un._S6_u32[3] & 0xff000000) == 0xff000000))
+#else
+#define	IN6_IS_ADDR_MC_SOLICITEDNODE(addr)			\
+	(((addr)->_S6_un._S6_u32[0] == 0x000002ff) &&		\
+	((addr)->_S6_un._S6_u32[1] == 0x00000000) &&		\
+	((addr)->_S6_un._S6_u32[2] == 0x01000000) &&		\
+	(((addr)->_S6_un._S6_u32[3] & 0x000000ff) == 0x000000ff))
+#endif
 
 /*
  * Macros to a) test for 6to4 IPv6 address, and b) to test if two

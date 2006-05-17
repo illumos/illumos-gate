@@ -100,20 +100,6 @@ static	int	ndp_g_walker = 0;	/* # of active thread */
 /* ndp_g_walker_cleanup will be true, when deletion have to be defered */
 static	boolean_t	ndp_g_walker_cleanup = B_FALSE;
 
-#ifdef _BIG_ENDIAN
-#define	IN6_IS_ADDR_MC_SOLICITEDNODE(addr) \
-	((((addr)->s6_addr32[0] & 0xff020000) == 0xff020000) && \
-	((addr)->s6_addr32[1] == 0x0) && \
-	((addr)->s6_addr32[2] == 0x00000001) && \
-	((addr)->s6_addr32[3] & 0xff000000) == 0xff000000)
-#else	/* _BIG_ENDIAN */
-#define	IN6_IS_ADDR_MC_SOLICITEDNODE(addr) \
-	((((addr)->s6_addr32[0] & 0x000002ff) == 0x000002ff) && \
-	((addr)->s6_addr32[1] == 0x0) && \
-	((addr)->s6_addr32[2] == 0x01000000) && \
-	((addr)->s6_addr32[3] & 0x000000ff) == 0x000000ff)
-#endif
-
 #define	NCE_HASH_PTR(addr) \
 	(&(nce_hash_tbl[NCE_ADDR_HASH_V6(addr, NCE_TABLE_SIZE)]))
 
