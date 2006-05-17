@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,11 +78,11 @@
 
 extern int errno;
 static mutex_t	_door_lock = DEFAULTMUTEX;
+static	int 		doorfd = -1;
 
 int
 __ns_ldap_trydoorcall(ldap_data_t **dptr, int *ndata, int *adata)
 {
-	static	int 		doorfd = -1;
 	static	door_info_t 	real_door;
 	door_info_t 		my_door;
 	door_arg_t		param;
@@ -184,6 +183,17 @@ try_again:
 	}
 
 	return ((*dptr)->ldap_ret.ldap_return_code);
+}
+
+#pragma fini(_doorfd_close)
+static void
+_doorfd_close()
+{
+	(void) mutex_lock(&_door_lock);
+	if (doorfd != -1) {
+		(void) close(doorfd);
+	}
+	(void) mutex_unlock(&_door_lock);
 }
 
 /*
