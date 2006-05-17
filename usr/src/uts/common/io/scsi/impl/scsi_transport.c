@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,6 +71,18 @@ scsi_flag_nointr_comp(struct scsi_pkt *pkt)
 	mutex_exit(&scsi_flag_nointr_mutex);
 }
 
+static void
+scsi_consistent_comp(struct scsi_pkt *pkt)
+{
+	struct scsi_pkt_cache_wrapper *pcw =
+		(struct scsi_pkt_cache_wrapper *)pkt;
+
+	pkt->pkt_comp = pcw->pcw_orig_comp;
+	scsi_sync_pkt(pkt);
+	if (pkt->pkt_comp)
+		(*pkt->pkt_comp)(pkt);
+}
+
 /*
  * A packet can have FLAG_NOINTR set because of target driver or
  * scsi_poll(). If FLAG_NOINTR is set and we are in user context,
@@ -82,7 +93,6 @@ scsi_flag_nointr_comp(struct scsi_pkt *pkt)
  * the CPU will be stuck in high priority.
  */
 
-
 int
 scsi_transport(struct scsi_pkt *pkt)
 {
@@ -90,6 +100,18 @@ scsi_transport(struct scsi_pkt *pkt)
 	extern int do_polled_io;
 	int rval = TRAN_ACCEPT;
 
+	/* determine if we need to sync the data on the HBA's behalf */
+	if ((pkt->pkt_dma_flags & DDI_DMA_CONSISTENT) &&
+	    ((P_TO_TRAN(pkt)->tran_setup_pkt) != NULL)) {
+		struct scsi_pkt_cache_wrapper *pcw =
+			(struct scsi_pkt_cache_wrapper *)pkt;
+
+		_NOTE(SCHEME_PROTECTS_DATA("unique per pkt", \
+			scsi_pkt_cache_wrapper::pcw_orig_comp));  
+
+		pcw->pcw_orig_comp = pkt->pkt_comp;
+		pkt->pkt_comp = scsi_consistent_comp;
+	}
 	/*
 	 * Check if we are required to do polled I/O. We can
 	 * get scsi_pkts that don't have the FLAG_NOINTR bit

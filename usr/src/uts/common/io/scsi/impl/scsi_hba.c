@@ -42,6 +42,11 @@ extern struct scsi_pkt *scsi_init_cache_pkt(struct scsi_address *,
 		    int (*)(caddr_t), caddr_t);
 extern void scsi_free_cache_pkt(struct scsi_address *,
 		    struct scsi_pkt *);
+extern void scsi_cache_dmafree(struct scsi_address *,
+		    struct scsi_pkt *);
+extern void scsi_sync_cache_pkt(struct scsi_address *,
+		    struct scsi_pkt *);
+
 /*
  * Round up all allocations so that we can guarantee
  * long-long alignment.  This is the same alignment
@@ -227,6 +232,7 @@ scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 	/*
 	 * allocate a chunk of memory for the following:
 	 * scsi_pkt
+	 * pcw_* fields
 	 * pkt_ha_private
 	 * pkt_cdbp, if needed
 	 * (pkt_private always null)
@@ -241,6 +247,19 @@ scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 	ptr = buf;
 	ptr += sizeof (struct scsi_pkt_cache_wrapper);
 	pkt->pkt_ha_private = (opaque_t)ptr;
+	/*
+	 * keep track of the granularity at the time this handle was
+	 * allocated
+	 */
+	((struct scsi_pkt_cache_wrapper *)buf)->pcw_granular =
+		tran->tran_dma_attr.dma_attr_granular;
+	if (ddi_dma_alloc_handle(tran->tran_hba_dip,
+	    &tran->tran_dma_attr,
+	    kmflag == KM_SLEEP ? SLEEP_FUNC: NULL_FUNC, NULL,
+	    &pkt->pkt_handle) != DDI_SUCCESS) {
+
+		return (-1);
+	}
 	ptr += tran->tran_hba_len;
 	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) {
 		pkt->pkt_cdbp = (opaque_t)ptr;
@@ -260,10 +279,11 @@ scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
 void
 scsi_hba_pkt_destructor(void *buf, void *arg)
 {
-	struct scsi_pkt		*pkt;
+	struct scsi_pkt_cache_wrapper *pktw = buf;
+	struct scsi_pkt *pkt	= &(pktw->pcw_pkt);
 	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
 
-	pkt = &((struct scsi_pkt_cache_wrapper *)buf)->pcw_pkt;
+	ASSERT((pktw->pcw_flags & PCW_BOUND) == 0);
 	if (tran->tran_pkt_destructor)
 		(*tran->tran_pkt_destructor)(pkt, arg);
 
@@ -280,6 +300,13 @@ scsi_hba_pkt_destructor(void *buf, void *arg)
 	    (pkt->pkt_cdbp == (opaque_t)((char *)pkt +
 	    tran->tran_hba_len +
 	    sizeof (struct scsi_pkt_cache_wrapper))));
+	ASSERT(pkt->pkt_handle);
+	ddi_dma_free_handle(&pkt->pkt_handle);
+	pkt->pkt_handle = NULL;
+	pkt->pkt_numcookies = 0;
+	pktw->pcw_total_xfer = 0;
+	pktw->pcw_totalwin = 0;
+	pktw->pcw_curwin = 0;
 }
 
 /*
@@ -396,14 +423,11 @@ scsi_hba_attach_setup(
 	 * If this changes, be sure to revisit the implementation
 	 * of scsi_hba_attach(9F).
 	 */
-	hba_tran->tran_min_xfer = hba_dma_attr->dma_attr_minxfer;
-	hba_tran->tran_min_burst_size =
-		(1<<(ddi_ffs(hba_dma_attr->dma_attr_burstsizes)-1));
-	hba_tran->tran_max_burst_size =
-		(1<<(ddi_fls(hba_dma_attr->dma_attr_burstsizes)-1));
+	(void) memcpy(&hba_tran->tran_dma_attr, hba_dma_attr,
+	    sizeof (ddi_dma_attr_t));
 
 	/* create kmem_cache, if needed */
-	if (hba_tran->tran_pkt_constructor) {
+	if (hba_tran->tran_setup_pkt) {
 		char tmp[96];
 		int hbalen;
 		int cmdlen = 0;
@@ -414,6 +438,8 @@ scsi_hba_attach_setup(
 
 		hba_tran->tran_init_pkt = scsi_init_cache_pkt;
 		hba_tran->tran_destroy_pkt = scsi_free_cache_pkt;
+		hba_tran->tran_sync_pkt = scsi_sync_cache_pkt;
+		hba_tran->tran_dmafree = scsi_cache_dmafree;
 
 		hbalen = ROUNDUP(hba_tran->tran_hba_len);
 		if (flags & SCSI_HBA_TRAN_CDB)
@@ -575,8 +601,7 @@ scsi_hba_detach(dev_info_t *dip)
 	 */
 	hba->tran_hba_dip = (dev_info_t *)NULL;
 	hba->tran_hba_flags = 0;
-	hba->tran_min_burst_size = (uchar_t)0;
-	hba->tran_max_burst_size = (uchar_t)0;
+	(void) memset(&hba->tran_dma_attr, 0, sizeof (ddi_dma_attr_t));
 
 	if (hba->tran_pkt_cache_ptr != NULL) {
 		kmem_cache_destroy(hba->tran_pkt_cache_ptr);
@@ -706,12 +731,14 @@ scsi_hba_bus_ctl(
 	{
 		int		val;
 		scsi_hba_tran_t	*hba;
+		ddi_dma_attr_t	*attr;
 
 		hba = ddi_get_driver_private(dip);
 		ASSERT(hba != NULL);
+		attr = &hba->tran_dma_attr;
 
 		val = *((int *)result);
-		val = maxbit(val, hba->tran_min_xfer);
+		val = maxbit(val, attr->dma_attr_minxfer);
 		/*
 		 * The 'arg' value of nonzero indicates 'streaming'
 		 * mode.  If in streaming mode, pick the largest
@@ -719,8 +746,8 @@ scsi_hba_bus_ctl(
 		 * is our minimum value (modulo what minxfer is).
 		 */
 		*((int *)result) = maxbit(val, ((intptr_t)arg ?
-			hba->tran_max_burst_size :
-			hba->tran_min_burst_size));
+			(1<<ddi_ffs(attr->dma_attr_burstsizes)-1) :
+			(1<<(ddi_fls(attr->dma_attr_burstsizes)-1))));
 
 		return (ddi_ctlops(dip, rdip, op, arg, result));
 	}

@@ -132,6 +132,140 @@ scsi_free_consistent_buf(struct buf *bp)
 		"scsi_free_consistent_buf_end");
 }
 
+void
+scsi_dmafree_attr(struct scsi_pkt *pktp)
+{
+	struct scsi_pkt_cache_wrapper *pktw =
+		(struct scsi_pkt_cache_wrapper *)pktp;
+
+	if (pktw->pcw_flags & PCW_BOUND) {
+		if (ddi_dma_unbind_handle(pktp->pkt_handle) !=
+		    DDI_SUCCESS)
+			cmn_err(CE_WARN, "scsi_dmafree_attr: "
+			    "unbind handle failed");
+		pktw->pcw_flags &= ~PCW_BOUND;
+	}
+	pktp->pkt_numcookies = 0;
+}
+
+struct buf *
+scsi_pkt2bp(struct scsi_pkt *pkt)
+{
+	return (((struct scsi_pkt_cache_wrapper *)pkt)->pcw_bp);
+}
+
+int
+scsi_dma_buf_bind_attr(struct scsi_pkt_cache_wrapper *pktw,
+			struct buf	*bp,
+			int		 dma_flags,
+			int		(*callback)(),
+			caddr_t		 arg)
+{
+	struct scsi_pkt *pktp = &(pktw->pcw_pkt);
+	int	 status;
+
+	/*
+	 * First time, need to establish the handle.
+	 */
+
+	ASSERT(pktp->pkt_numcookies == 0);
+	ASSERT(pktw->pcw_totalwin == 0);
+
+	status = ddi_dma_buf_bind_handle(pktp->pkt_handle, bp, dma_flags,
+		    callback, arg, &pktw->pcw_cookie,
+		    &pktp->pkt_numcookies);
+
+	switch (status) {
+	case DDI_DMA_MAPPED:
+		pktw->pcw_totalwin = 1;
+		break;
+
+	case DDI_DMA_PARTIAL_MAP:
+		/* enable first call to ddi_dma_getwin */
+		if (ddi_dma_numwin(pktp->pkt_handle,
+		    &pktw->pcw_totalwin) != DDI_SUCCESS) {
+			bp->b_error = 0;
+			return (0);
+		}
+		break;
+
+	case DDI_DMA_NORESOURCES:
+		bp->b_error = 0;
+		return (0);
+
+	case DDI_DMA_TOOBIG:
+		bioerror(bp, EINVAL);
+		return (0);
+
+	case DDI_DMA_NOMAPPING:
+	case DDI_DMA_INUSE:
+	default:
+		bioerror(bp, EFAULT);
+		return (0);
+	}
+
+	/* initialize the loop controls for scsi_dmaget_attr() */
+	pktw->pcw_curwin = 0;
+	pktw->pcw_total_xfer = 0;
+	pktp->pkt_dma_flags = dma_flags;
+	return (1);
+}
+
+#if defined(_DMA_USES_PHYSADDR)
+int
+scsi_dmaget_attr(struct scsi_pkt_cache_wrapper *pktw)
+{
+	struct scsi_pkt *pktp = &(pktw->pcw_pkt);
+
+	int		status;
+	int		num_segs = 0;
+	ddi_dma_impl_t	*hp = (ddi_dma_impl_t *)pktp->pkt_handle;
+	ddi_dma_cookie_t *cp;
+
+	if (pktw->pcw_curwin != 0) {
+		ddi_dma_cookie_t	cookie;
+
+		/*
+		 * start the next window, and get its first cookie
+		 */
+		status = ddi_dma_getwin(pktp->pkt_handle,
+				pktw->pcw_curwin, &pktp->pkt_dma_offset,
+				&pktp->pkt_dma_len, &cookie,
+				&pktp->pkt_numcookies);
+		if (status != DDI_SUCCESS)
+			return (0);
+	}
+
+	/*
+	 * start the Scatter/Gather loop
+	 */
+	cp = hp->dmai_cookie - 1;
+	pktp->pkt_dma_len = 0;
+	for (;;) {
+
+		/* take care of the loop-bookkeeping */
+		pktp->pkt_dma_len += cp->dmac_size;
+		num_segs++;
+		/*
+		 * if this was the last cookie in the current window
+		 * set the loop controls start the next window and
+		 * exit so the HBA can do this partial transfer
+		 */
+		if (num_segs >= pktp->pkt_numcookies) {
+			pktw->pcw_curwin++;
+			break;
+		}
+
+		cp++;
+	}
+	pktw->pcw_total_xfer += pktp->pkt_dma_len;
+	pktp->pkt_cookies = hp->dmai_cookie - 1;
+	hp->dmai_cookie = cp;
+
+	return (1);
+}
+#endif
+
 void scsi_free_cache_pkt(struct scsi_address *, struct scsi_pkt *);
 
 struct scsi_pkt *
@@ -157,8 +291,9 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		if (pktw == NULL)
 			goto fail1;
 
-		pktw->pcw_kmflags = 0;
+		pktw->pcw_flags = 0;
 		in_pktp = &(pktw->pcw_pkt);
+		in_pktp->pkt_address = *ap;
 		/*
 		 * target drivers should initialize pkt_comp and
 		 * pkt_time, but sometimes they don't so initialize
@@ -171,18 +306,25 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		in_pktp->pkt_state = 0;
 		in_pktp->pkt_statistics = 0;
 		in_pktp->pkt_reason = 0;
+		in_pktp->pkt_dma_offset = 0;
+		in_pktp->pkt_dma_len = 0;
+		in_pktp->pkt_dma_flags = 0;
+		ASSERT(in_pktp->pkt_numcookies == 0);
+		pktw->pcw_curwin = 0;
+		pktw->pcw_totalwin = 0;
+		pktw->pcw_total_xfer = 0;
 
 		in_pktp->pkt_cdblen = cmdlen;
 		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_CDB) &&
 		    (cmdlen > DEFAULT_CDBLEN)) {
-			pktw->pcw_kmflags |= NEED_EXT_CDB;
+			pktw->pcw_flags |= PCW_NEED_EXT_CDB;
 			in_pktp->pkt_cdbp = kmem_alloc(cmdlen, kf);
 			if (in_pktp->pkt_cdbp == NULL)
 				goto fail2;
 		}
 		in_pktp->pkt_tgtlen = pplen;
 		if (pplen > DEFAULT_PRIVLEN) {
-			pktw->pcw_kmflags |= NEED_EXT_TGT;
+			pktw->pcw_flags |= PCW_NEED_EXT_TGT;
 			in_pktp->pkt_private = kmem_alloc(pplen, kf);
 			if (in_pktp->pkt_private == NULL)
 				goto fail3;
@@ -190,7 +332,7 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		in_pktp->pkt_scblen = statuslen;
 		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_SCB) &&
 		    (statuslen > DEFAULT_SCBLEN)) {
-			pktw->pcw_kmflags |= NEED_EXT_SCB;
+			pktw->pcw_flags |= PCW_NEED_EXT_SCB;
 			in_pktp->pkt_scbp = kmem_alloc(statuslen, kf);
 			if (in_pktp->pkt_scbp == NULL)
 				goto fail4;
@@ -205,18 +347,106 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 			bzero((void *)in_pktp->pkt_private, pplen);
 		if (statuslen)
 			bzero((void *)in_pktp->pkt_scbp, statuslen);
-	}
+	} else
+		pktw = (struct scsi_pkt_cache_wrapper *)in_pktp;
+
 	if (bp && bp->b_bcount) {
-		if ((*tranp->tran_setup_bp) (in_pktp, bp,
-		    flags, func, NULL) == -1) {
-			scsi_free_cache_pkt(ap, in_pktp);
-			in_pktp = NULL;
+
+		int dma_flags = 0;
+
+		/*
+		 * we need to transfer data, so we alloc dma resources
+		 * for this packet
+		 */
+		/*CONSTCOND*/
+		ASSERT(SLEEP_FUNC == DDI_DMA_SLEEP);
+		/*CONSTCOND*/
+		ASSERT(NULL_FUNC == DDI_DMA_DONTWAIT);
+
+#if defined(_DMA_USES_PHYSADDR)
+		/*
+		 * with an IOMMU we map everything, so we don't
+		 * need to bother with this
+		 */
+		if (tranp->tran_dma_attr.dma_attr_granular !=
+			pktw->pcw_granular) {
+
+			ddi_dma_free_handle(&in_pktp->pkt_handle);
+			if (ddi_dma_alloc_handle(tranp->tran_hba_dip,
+				&tranp->tran_dma_attr,
+				func, NULL,
+				&in_pktp->pkt_handle) != DDI_SUCCESS) {
+
+				in_pktp->pkt_handle = NULL;
+				return (NULL);
+			}
+			pktw->pcw_granular =
+				tranp->tran_dma_attr.dma_attr_granular;
 		}
+#endif
+
+		if (in_pktp->pkt_numcookies == 0) {
+			pktw->pcw_bp = bp;
+			/*
+			 * set dma flags; the "read" case must be first
+			 * since B_WRITE isn't always be set for writes.
+			 */
+			if (bp->b_flags & B_READ) {
+				dma_flags |= DDI_DMA_READ;
+			} else {
+				dma_flags |= DDI_DMA_WRITE;
+			}
+			if (flags & PKT_CONSISTENT)
+				dma_flags |= DDI_DMA_CONSISTENT;
+			if (flags & PKT_DMA_PARTIAL)
+				dma_flags |= DDI_DMA_PARTIAL;
+
+#if defined(__sparc)
+			/*
+			 * workaround for byte hole issue on psycho and
+			 * schizo pre 2.1
+			 */
+			if ((bp->b_flags & B_READ) && ((bp->b_flags &
+			    (B_PAGEIO|B_REMAPPED)) != B_PAGEIO) &&
+			    (((uintptr_t)bp->b_un.b_addr & 0x7) ||
+			    ((uintptr_t)bp->b_bcount & 0x7))) {
+				dma_flags |= DDI_DMA_CONSISTENT;
+			}
+#endif
+			if (!scsi_dma_buf_bind_attr(pktw, bp,
+			    dma_flags, callback, callback_arg)) {
+				return (NULL);
+			} else {
+				pktw->pcw_flags |= PCW_BOUND;
+			}
+		}
+
+#if defined(_DMA_USES_PHYSADDR)
+		if (!scsi_dmaget_attr(pktw)) {
+			scsi_dmafree_attr(in_pktp);
+			goto fail5;
+		}
+#else
+		in_pktp->pkt_cookies = &pktw->pcw_cookie;
+		in_pktp->pkt_dma_len = pktw->pcw_cookie.dmac_size;
+		pktw->pcw_total_xfer += in_pktp->pkt_dma_len;
+#endif
+		ASSERT(in_pktp->pkt_numcookies <=
+			tranp->tran_dma_attr.dma_attr_sgllen);
+		ASSERT(pktw->pcw_total_xfer <= bp->b_bcount);
+		in_pktp->pkt_resid = bp->b_bcount -
+			pktw->pcw_total_xfer;
+
+		ASSERT((in_pktp->pkt_resid % pktw->pcw_granular) ==
+			0);
+	} else {
+		/* !bp or no b_bcount */
+		in_pktp->pkt_resid = 0;
 	}
 	return (in_pktp);
 
 fail5:
-	if (pktw->pcw_kmflags & NEED_EXT_SCB) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_SCB) {
 		kmem_free(in_pktp->pkt_scbp, statuslen);
 		in_pktp->pkt_scbp = (opaque_t)((char *)in_pktp +
 		    tranp->tran_hba_len + DEFAULT_PRIVLEN +
@@ -227,21 +457,21 @@ fail5:
 		in_pktp->pkt_scblen = 0;
 	}
 fail4:
-	if (pktw->pcw_kmflags & NEED_EXT_TGT) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_TGT) {
 		kmem_free(in_pktp->pkt_private, pplen);
 		in_pktp->pkt_tgtlen = 0;
 		in_pktp->pkt_private = NULL;
 	}
 fail3:
-	if (pktw->pcw_kmflags & NEED_EXT_CDB) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_CDB) {
 		kmem_free(in_pktp->pkt_cdbp, cmdlen);
 		in_pktp->pkt_cdbp = (opaque_t)((char *)in_pktp +
 		    tranp->tran_hba_len +
 		    sizeof (struct scsi_pkt));
 		in_pktp->pkt_cdblen = 0;
 	}
-	pktw->pcw_kmflags &=
-	    ~(NEED_EXT_CDB|NEED_EXT_TGT|NEED_EXT_SCB);
+	pktw->pcw_flags &=
+	    ~(PCW_NEED_EXT_CDB|PCW_NEED_EXT_TGT|PCW_NEED_EXT_SCB);
 fail2:
 	kmem_cache_free(tranp->tran_pkt_cache_ptr, pktw);
 fail1:
@@ -260,12 +490,14 @@ scsi_free_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
 
 	(*A_TO_TRAN(ap)->tran_teardown_pkt)(pktp);
 	pktw = (struct scsi_pkt_cache_wrapper *)pktp;
+	if (pktw->pcw_flags & PCW_BOUND)
+		scsi_dmafree_attr(pktp);
 
 	/*
 	 * if we allocated memory for anything that wouldn't fit, free
 	 * the memory and restore the pointers
 	 */
-	if (pktw->pcw_kmflags & NEED_EXT_SCB) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_SCB) {
 		kmem_free(pktp->pkt_scbp, pktp->pkt_scblen);
 		pktp->pkt_scbp = (opaque_t)((char *)pktp +
 		    (A_TO_TRAN(ap))->tran_hba_len +
@@ -275,21 +507,20 @@ scsi_free_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
 				DEFAULT_CDBLEN);
 		pktp->pkt_scblen = 0;
 	}
-	if (pktw->pcw_kmflags & NEED_EXT_TGT) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_TGT) {
 		kmem_free(pktp->pkt_private, pktp->pkt_tgtlen);
 		pktp->pkt_tgtlen = 0;
 		pktp->pkt_private = NULL;
 	}
-	if (pktw->pcw_kmflags & NEED_EXT_CDB) {
+	if (pktw->pcw_flags & PCW_NEED_EXT_CDB) {
 		kmem_free(pktp->pkt_cdbp, pktp->pkt_cdblen);
 		pktp->pkt_cdbp = (opaque_t)((char *)pktp +
 		    (A_TO_TRAN(ap))->tran_hba_len +
 		    sizeof (struct scsi_pkt_cache_wrapper));
 		pktp->pkt_cdblen = 0;
 	}
-	pktw->pcw_kmflags &=
-	    ~(NEED_EXT_CDB|NEED_EXT_TGT|NEED_EXT_SCB);
-	ASSERT(pktw->pcw_kmflags == 0);
+	pktw->pcw_flags &=
+	    ~(PCW_NEED_EXT_CDB|PCW_NEED_EXT_TGT|PCW_NEED_EXT_SCB);
 	kmem_cache_free(A_TO_TRAN(ap)->tran_pkt_cache_ptr, pktw);
 
 	if (scsi_callback_id != 0) {
@@ -297,6 +528,7 @@ scsi_free_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
 	}
 
 }
+
 
 struct scsi_pkt *
 scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
@@ -429,7 +661,21 @@ void
 scsi_dmafree(struct scsi_pkt *pkt)
 {
 	register struct scsi_address	*ap = P_TO_ADDR(pkt);
+
 	(*A_TO_TRAN(ap)->tran_dmafree)(ap, pkt);
+
+	if (scsi_callback_id != 0) {
+		ddi_run_callback(&scsi_callback_id);
+	}
+}
+
+/*ARGSUSED*/
+void
+scsi_cache_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	ASSERT(pkt->pkt_numcookies == 0);
+	ASSERT(pkt->pkt_handle != NULL);
+	scsi_dmafree_attr(pkt);
 
 	if (scsi_callback_id != 0) {
 		ddi_run_callback(&scsi_callback_id);
@@ -441,6 +687,20 @@ scsi_sync_pkt(struct scsi_pkt *pkt)
 {
 	register struct scsi_address	*ap = P_TO_ADDR(pkt);
 	(*A_TO_TRAN(ap)->tran_sync_pkt)(ap, pkt);
+}
+
+/*ARGSUSED*/
+void
+scsi_sync_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	if (pkt->pkt_handle) {
+		ASSERT((pkt->pkt_dma_flags & DDI_DMA_WRITE) ||
+			(pkt->pkt_dma_flags & DDI_DMA_READ));
+		(void) ddi_dma_sync(pkt->pkt_handle,
+			pkt->pkt_dma_offset, pkt->pkt_dma_len,
+			(pkt->pkt_dma_flags & DDI_DMA_WRITE) ?
+			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+	}
 }
 
 void

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef __lock_lint
+#include <note.h>
+#endif
 #include <sys/scsi/scsi_types.h>
 
 #ifdef	__cplusplus
@@ -80,13 +82,27 @@ void		scsi_resfree(struct scsi_pkt *);
  * Private wrapper for scsi_pkt's allocated via scsi_init_cache_pkt()
  */
 struct scsi_pkt_cache_wrapper {
-	struct scsi_pkt		pcw_pkt;
-	uint_t			pcw_kmflags;
+	struct scsi_pkt		 pcw_pkt;
+	uint_t			 pcw_total_xfer;
+	uint_t			 pcw_curwin;
+	uint_t			 pcw_totalwin;
+	uint_t			 pcw_granular;
+	struct buf		*pcw_bp;
+	ddi_dma_cookie_t	 pcw_cookie;
+	void			(*pcw_orig_comp)(struct scsi_pkt *);
+	uint_t			 pcw_flags;
 };
 
-#define	NEED_EXT_CDB	0x0001
-#define	NEED_EXT_TGT	0x0002
-#define	NEED_EXT_SCB	0x0004
+#ifdef __lock_lint
+_NOTE(SCHEME_PROTECTS_DATA("unique per packet", \
+	scsi_pkt_cache_wrapper::pcw_orig_comp))
+#endif
+struct buf	*scsi_pkt2bp(struct scsi_pkt *);
+
+#define	PCW_NEED_EXT_CDB	0x0001
+#define	PCW_NEED_EXT_TGT	0x0002
+#define	PCW_NEED_EXT_SCB	0x0004
+#define	PCW_BOUND		0x0020
 
 /*
  * Private defines i.e. not part of the DDI.
