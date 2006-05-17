@@ -195,6 +195,12 @@ typedef struct devinfo_intr {
 	uint_t		devi_intr_curr_nintrs;	/* #intr currently being used */
 
 	ddi_intr_handle_t **devi_intr_handle_p;	/* Hdl for legacy intr APIs */
+
+#if defined(__i386) || defined(__amd64)
+	/* Save the PCI config space handle */
+	ddi_acc_handle_t devi_cfg_handle;
+	int		 devi_cap_ptr;		/* MSI or MSI-X cap pointer */
+#endif
 } devinfo_intr_t;
 
 #define	NEXUS_HAS_INTR_OP(dip)	\
@@ -228,6 +234,13 @@ void	i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 
 ddi_intr_msix_t	*i_ddi_get_msix(dev_info_t *dip);
 void	i_ddi_set_msix(dev_info_t *dip, ddi_intr_msix_t *msix_p);
+
+#if defined(__i386) || defined(__amd64)
+ddi_acc_handle_t	i_ddi_get_pci_config_handle(dev_info_t *dip);
+void	i_ddi_set_pci_config_handle(dev_info_t *dip, ddi_acc_handle_t handle);
+int	i_ddi_get_msi_msix_cap_ptr(dev_info_t *dip);
+void	i_ddi_set_msi_msix_cap_ptr(dev_info_t *dip, int cap_ptr);
+#endif
 
 int32_t i_ddi_get_intr_weight(dev_info_t *);
 int32_t i_ddi_set_intr_weight(dev_info_t *, int32_t);

@@ -71,6 +71,16 @@ check_if_device_is_pciex(dev_info_t *cdip, uchar_t bus, uchar_t dev,
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
 			    "pcix-capid-pointer", capsp);
 
+		if (cap == PCI_CAP_ID_MSI && cdip) {
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pci-msi-capid-pointer", capsp);
+		}
+
+		if (cap == PCI_CAP_ID_MSI_X && cdip) {
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "pci-msix-capid-pointer", capsp);
+		}
+
 		if (cap == PCI_CAP_ID_PCI_E) {
 #ifdef	DEBUG
 			if (pci_boot_debug)

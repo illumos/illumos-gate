@@ -682,6 +682,9 @@ extern	int	intpri_use_cr8;
 extern int	apic_pci_msi_enable_vector(dev_info_t *, int, int,
 		    int, int, int);
 extern apic_irq_t *apic_find_irq(dev_info_t *, struct intrspec *, int);
+extern int	apic_pci_msi_unconfigure(dev_info_t *, int, int);
+extern int	apic_pci_msi_disable_mode(dev_info_t *, int, int);
+extern int	apic_pci_msi_enable_mode(dev_info_t *, int, int);
 
 /*
  *	This is the loadable module wrapper
@@ -2481,11 +2484,10 @@ apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 		 * of the multi-MSI support
 		 */
 		if (i_ddi_intr_get_current_nintrs(irqptr->airq_dip) == 1) {
-			(void) pci_msi_unconfigure(irqptr->airq_dip, type,
-			    irqptr->airq_ioapicindex);
-
-			(void) pci_msi_disable_mode(irqptr->airq_dip, type,
-			    irqptr->airq_ioapicindex);
+			(void) apic_pci_msi_unconfigure(irqptr->airq_dip,
+			    type, irqptr->airq_ioapicindex);
+			(void) apic_pci_msi_disable_mode(irqptr->airq_dip,
+			    type, irqptr->airq_ioapicindex);
 		}
 	}
 
@@ -4337,7 +4339,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 	} else {
 		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
 		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
-		(void) pci_msi_disable_mode(irq_ptr->airq_dip, type,
+		(void) apic_pci_msi_disable_mode(irq_ptr->airq_dip, type,
 		    irq_ptr->airq_ioapicindex);
 		if (irq_ptr->airq_ioapicindex == irq_ptr->airq_origirq) {
 			/* first one */
@@ -4356,14 +4358,12 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 		    irq_ptr->airq_origirq) { /* last one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 			    "pci_msi_enable_mode\n"));
-			if (pci_msi_enable_mode(irq_ptr->airq_dip, type,
-			    which_irq) != DDI_SUCCESS) {
+			if (apic_pci_msi_enable_mode(irq_ptr->airq_dip,
+			    type, which_irq) != PSM_SUCCESS) {
 				DDI_INTR_IMPLDBG((CE_CONT, "pcplusmp: "
 				    "pci_msi_enable failed\n"));
-				(void) pci_msi_unconfigure(irq_ptr->airq_dip,
-				(irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
-				DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX,
-				which_irq);
+				(void) apic_pci_msi_unconfigure(
+				    irq_ptr->airq_dip, type, which_irq);
 			}
 		}
 	}

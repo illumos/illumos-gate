@@ -106,11 +106,17 @@ int
 apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
     int count, int target_apic_id)
 {
-	uint64_t	msi_addr, msi_data;
+	uint64_t		msi_addr, msi_data;
+	ushort_t		msi_ctrl;
+	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(dip);
+	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(dip);
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: dip=0x%p\n"
 	    "\tdriver = %s, inum=0x%x vector=0x%x apicid=0x%x\n", (void *)dip,
 	    ddi_driver_name(dip), inum, vector, target_apic_id));
+
+	if (handle == NULL)
+		return (PSM_FAILURE);
 
 	/* MSI Address */
 	msi_addr = (MSI_ADDR_HDR | (target_apic_id << MSI_ADDR_DEST_SHIFT));
@@ -123,11 +129,38 @@ apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: addr=0x%lx "
 	    "data=0x%lx\n", (long)msi_addr, (long)msi_data));
 
-	if (pci_msi_configure(dip, type, count, inum, msi_addr, msi_data) !=
-	    DDI_SUCCESS) {
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: "
-		    "pci_msi_configure failed\n"));
-		return (PSM_FAILURE);
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+
+		/* Set the bits to inform how many MSIs are enabled */
+		msi_ctrl |= ((highbit(count) -1) << PCI_MSI_MME_SHIFT);
+		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+		pci_config_put32(handle,
+		    cap_ptr + PCI_MSI_ADDR_OFFSET, msi_addr);
+
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
+			pci_config_put32(handle,
+			    cap_ptr + PCI_MSI_ADDR_OFFSET + 4, msi_addr >> 32);
+			pci_config_put16(handle,
+			    cap_ptr + PCI_MSI_64BIT_DATA, msi_data);
+		} else {
+			pci_config_put16(handle,
+			    cap_ptr + PCI_MSI_32BIT_DATA, msi_data);
+		}
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uintptr_t	off;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(dip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uintptr_t)msix_p->msix_tbl_addr +
+		    (inum  * PCI_MSIX_VECTOR_SIZE);
+
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), msi_data);
+		ddi_put64(msix_p->msix_tbl_hdl,
+		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
 	}
 
 	return (PSM_SUCCESS);
@@ -591,6 +624,147 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	}
 
 	mutex_exit(&airq_mutex);
+
+	return (PSM_SUCCESS);
+}
+
+/*
+ * apic_pci_msi_unconfigure:
+ *
+ * This and next two interfaces are copied from pci_intr_lib.c
+ * Do ensure that these two files stay in sync.
+ * These needed to be copied over here to avoid a deadlock situation on
+ * certain mp systems that use MSI interrupts.
+ *
+ * IMPORTANT regards next three interfaces:
+ * i) are called only for MSI/X interrupts.
+ * ii) called with interrupts disabled, and must not block
+ */
+int
+apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		msi_ctrl;
+	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
+	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
+
+	if (handle == NULL)
+		return (PSM_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+		msi_ctrl &= (~PCI_MSI_MME_MASK);
+		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
+		pci_config_put32(handle, cap_ptr + PCI_MSI_ADDR_OFFSET, 0);
+
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
+			pci_config_put16(handle,
+			    cap_ptr + PCI_MSI_64BIT_DATA, 0);
+			pci_config_put32(handle,
+			    cap_ptr + PCI_MSI_ADDR_OFFSET + 4, 0);
+		} else {
+			pci_config_put16(handle,
+			    cap_ptr + PCI_MSI_32BIT_DATA, 0);
+		}
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uintptr_t	off;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uintptr_t)msix_p->msix_tbl_addr +
+		    (inum * PCI_MSIX_VECTOR_SIZE);
+
+		/* Reset the "data" and "addr" bits */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
+		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
+	}
+
+	return (PSM_SUCCESS);
+}
+
+
+/*
+ * apic_pci_msi_enable_mode:
+ */
+int
+apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		msi_ctrl;
+	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
+	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
+
+	if (handle == NULL)
+		return (PSM_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+		if ((msi_ctrl & PCI_MSI_ENABLE_BIT))
+			return (PSM_SUCCESS);
+
+		msi_ctrl |= PCI_MSI_ENABLE_BIT;
+		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uintptr_t	off;
+		ddi_intr_msix_t	*msix_p;
+
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
+
+		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
+			return (PSM_SUCCESS);
+
+		msi_ctrl |= PCI_MSIX_ENABLE_BIT;
+		pci_config_put16(handle, cap_ptr + PCI_MSIX_CTRL, msi_ctrl);
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into "inum"th entry in the MSI-X table & clear mask */
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0);
+	}
+
+	return (PSM_SUCCESS);
+}
+
+/*
+ * apic_pci_msi_disable_mode:
+ */
+int
+apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		msi_ctrl;
+	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
+	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
+
+	if (handle == NULL)
+		return (PSM_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+		if (!(msi_ctrl & PCI_MSI_ENABLE_BIT))
+			return (PSM_SUCCESS);
+
+		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;	/* MSI disable */
+		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uintptr_t	off;
+		ddi_intr_msix_t	*msix_p;
+
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSIX_CTRL);
+
+		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
+			return (PSM_SUCCESS);
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into "inum"th entry in the MSI-X table & mask it */
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x1);
+	}
 
 	return (PSM_SUCCESS);
 }

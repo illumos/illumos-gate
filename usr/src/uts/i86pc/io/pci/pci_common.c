@@ -225,12 +225,14 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	int			pciepci = 0;
 	int			i, j, count;
 	int			behavior;
+	int			cap_ptr;
 	ddi_intrspec_t		isp;
 	struct intrspec		*ispec;
 	ddi_intr_handle_impl_t	tmp_hdl;
 	ddi_intr_msix_t		*msix_p;
 	ihdl_plat_t		*ihdl_plat_datap;
 	ddi_intr_handle_t	*h_array;
+	ddi_acc_handle_t	handle;
 
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "pci_common_intr_ops: pdip 0x%p, rdip 0x%p, op %x handle 0x%p\n",
@@ -284,6 +286,30 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			} else
 				hdlp->ih_pri = priority;
 			behavior = (int)(uintptr_t)hdlp->ih_scratch2;
+
+			/*
+			 * Cache in the config handle and cap_ptr
+			 */
+			if (i_ddi_get_pci_config_handle(rdip) == NULL) {
+				if (pci_config_setup(rdip, &handle) !=
+				    DDI_SUCCESS)
+					return (DDI_FAILURE);
+				i_ddi_set_pci_config_handle(rdip, handle);
+			}
+
+			if (i_ddi_get_msi_msix_cap_ptr(rdip) == 0) {
+				char *prop =
+				    (hdlp->ih_type == DDI_INTR_TYPE_MSI) ?
+				    "pci-msi-capid-pointer" :
+				    "pci-msix-capid-pointer";
+
+				cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+				    DDI_PROP_DONTPASS, prop,
+				    PCI_CAP_NEXT_PTR_NULL);
+				i_ddi_set_msi_msix_cap_ptr(rdip, cap_ptr);
+			}
+
+
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_ALLOC_VECTORS, result);
 
@@ -330,6 +356,16 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) &&
 		    (psm_intr_ops != NULL)) {
+			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
+				if (handle = i_ddi_get_pci_config_handle(
+				    rdip)) {
+					(void) pci_config_teardown(&handle);
+					i_ddi_set_pci_config_handle(rdip, NULL);
+				}
+				if (cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip))
+					i_ddi_set_msi_msix_cap_ptr(rdip, 0);
+			}
+
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_FREE_VECTORS, NULL);
 
