@@ -157,6 +157,7 @@ public class LocalConsumer implements Consumer {
 
     private State state = State.INIT;
     private boolean stopCalled;
+    private boolean abortCalled;
 
     //
     // Per-consumer lock used in native code to prevent conflict between
@@ -306,6 +307,10 @@ public class LocalConsumer implements Consumer {
 
 	state = State.OPEN;
 	setOptions(DEFAULT_OPTIONS);
+
+	if (abortCalled) {
+	    _interrupt();
+	}
 
 	if (logger.isLoggable(Level.INFO)) {
 	    logger.info("consumer table count: " + _openCount());
@@ -846,10 +851,13 @@ public class LocalConsumer implements Consumer {
 	}
     }
 
-    public void
+    public synchronized void
     abort()
     {
-	_interrupt();
+	if ((state != State.INIT) && (state != State.CLOSED)) {
+	    _interrupt();
+	}
+	abortCalled = true;
     }
 
     /**
