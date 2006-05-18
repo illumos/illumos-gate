@@ -826,17 +826,15 @@ setregs(uarg_t *args)
 	if (p->p_model == DATAMODEL_LP64 &&
 	    mpcb->mpcb_wstate != WSTATE_USER64) {
 		ASSERT(mpcb->mpcb_wbcnt == 0);
-		kmem_free(mpcb->mpcb_wbuf, MAXWIN * sizeof (struct rwindow32));
-		mpcb->mpcb_wbuf = kmem_alloc(MAXWIN *
-		    sizeof (struct rwindow64), KM_SLEEP);
+		kmem_cache_free(wbuf32_cache, mpcb->mpcb_wbuf);
+		mpcb->mpcb_wbuf = kmem_cache_alloc(wbuf64_cache, KM_SLEEP);
 		ASSERT(((uintptr_t)mpcb->mpcb_wbuf & 7) == 0);
 		mpcb->mpcb_wstate = WSTATE_USER64;
 	} else if (p->p_model == DATAMODEL_ILP32 &&
 	    mpcb->mpcb_wstate != WSTATE_USER32) {
 		ASSERT(mpcb->mpcb_wbcnt == 0);
-		kmem_free(mpcb->mpcb_wbuf, MAXWIN * sizeof (struct rwindow64));
-		mpcb->mpcb_wbuf = kmem_alloc(MAXWIN *
-		    sizeof (struct rwindow32), KM_SLEEP);
+		kmem_cache_free(wbuf64_cache, mpcb->mpcb_wbuf);
+		mpcb->mpcb_wbuf = kmem_cache_alloc(wbuf32_cache, KM_SLEEP);
 		mpcb->mpcb_wstate = WSTATE_USER32;
 	}
 	mpcb->mpcb_pa = va_to_pa(mpcb);

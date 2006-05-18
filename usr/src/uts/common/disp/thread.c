@@ -171,6 +171,8 @@ thread_init(void)
 	thread_cache = kmem_cache_create("thread_cache", sizeof (kthread_t),
 	    PTR24_ALIGN, NULL, NULL, NULL, NULL, static_arena, 0);
 
+	lwp_stk_cache_init();
+
 	lwp_cache = kmem_cache_create("lwp_cache", sizeof (klwp_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
 #endif

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,7 @@
 #include <sys/sysmacros.h>
 #include <sys/promif.h>
 #include <sys/pool_pset.h>
+#include <vm/seg_kmem.h>
 
 int maxphys = MMU_PAGESIZE * 16;	/* 128k */
 int klustsize = MMU_PAGESIZE * 16;	/* 128k */
@@ -80,6 +80,21 @@ thread_stk_init(caddr_t stk)
 
 	stk -= SA(MINFRAME);
 	return (stk);
+}
+
+#define	WIN32_SIZE	(MAXWIN * sizeof (struct rwindow32))
+#define	WIN64_SIZE	(MAXWIN * sizeof (struct rwindow64))
+
+kmem_cache_t	*wbuf32_cache;
+kmem_cache_t	*wbuf64_cache;
+
+void
+lwp_stk_cache_init(void)
+{
+	wbuf32_cache = kmem_cache_create("wbuf32_cache", WIN32_SIZE,
+	    0, NULL, NULL, NULL, NULL, static_arena, 0);
+	wbuf64_cache = kmem_cache_create("wbuf64_cache", WIN64_SIZE,
+	    0, NULL, NULL, NULL, NULL, static_arena, 0);
 }
 
 /*
@@ -120,12 +135,10 @@ lwp_stk_init(klwp_t *lwp, caddr_t stk)
 	mpcb->mpcb_wbcnt = 0;
 	if (lwp->lwp_procp->p_model == DATAMODEL_ILP32) {
 		mpcb->mpcb_wstate = WSTATE_USER32;
-		mpcb->mpcb_wbuf = kmem_alloc(MAXWIN * sizeof (struct rwindow32),
-		    KM_SLEEP);
+		mpcb->mpcb_wbuf = kmem_cache_alloc(wbuf32_cache, KM_SLEEP);
 	} else {
 		mpcb->mpcb_wstate = WSTATE_USER64;
-		mpcb->mpcb_wbuf = kmem_alloc(MAXWIN * sizeof (struct rwindow64),
-		    KM_SLEEP);
+		mpcb->mpcb_wbuf = kmem_cache_alloc(wbuf64_cache, KM_SLEEP);
 	}
 	ASSERT(((uintptr_t)mpcb->mpcb_wbuf & 7) == 0);
 	mpcb->mpcb_wbuf_pa = va_to_pa(mpcb->mpcb_wbuf);
@@ -144,9 +157,9 @@ lwp_stk_fini(klwp_t *lwp)
 	 */
 	mpcb->mpcb_wbcnt = 0;
 	if (mpcb->mpcb_wstate == WSTATE_USER32)
-		kmem_free(mpcb->mpcb_wbuf, MAXWIN * sizeof (struct rwindow32));
+		kmem_cache_free(wbuf32_cache, mpcb->mpcb_wbuf);
 	else
-		kmem_free(mpcb->mpcb_wbuf, MAXWIN * sizeof (struct rwindow64));
+		kmem_cache_free(wbuf64_cache, mpcb->mpcb_wbuf);
 	mpcb->mpcb_wbuf = NULL;
 	mpcb->mpcb_wbuf_pa = -1;
 }
@@ -189,19 +202,15 @@ lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 	 * Here, we took on the data model of the cloned lwp.
 	 */
 	if (mpcb->mpcb_wstate != wstate) {
-		size_t osize, size;
-
 		if (wstate == WSTATE_USER32) {
-			osize = MAXWIN * sizeof (struct rwindow32);
-			size = MAXWIN * sizeof (struct rwindow64);
+			kmem_cache_free(wbuf32_cache, wbuf);
+			wbuf = kmem_cache_alloc(wbuf64_cache, KM_SLEEP);
 			wstate = WSTATE_USER64;
 		} else {
-			osize = MAXWIN * sizeof (struct rwindow64);
-			size = MAXWIN * sizeof (struct rwindow32);
+			kmem_cache_free(wbuf64_cache, wbuf);
+			wbuf = kmem_cache_alloc(wbuf32_cache, KM_SLEEP);
 			wstate = WSTATE_USER32;
 		}
-		kmem_free(wbuf, osize);
-		wbuf = kmem_alloc(size, KM_SLEEP);
 	}
 
 	mpcb->mpcb_pa = va_to_pa(mpcb);

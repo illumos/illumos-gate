@@ -716,6 +716,7 @@ extern	void	lwp_setrval(klwp_t *, int, int);
 extern	void	lwp_forkregs(klwp_t *, klwp_t *);
 extern	void	lwp_freeregs(klwp_t *, int);
 extern	caddr_t	lwp_stk_init(klwp_t *, caddr_t);
+extern	void	lwp_stk_cache_init(void);
 extern	void	lwp_stk_fini(klwp_t *);
 extern	void	lwp_installctx(klwp_t *);
 extern	void	lwp_rtt(void);
