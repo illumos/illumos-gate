@@ -311,8 +311,22 @@ cpuid_pass1(cpu_t *cpu)
 	if (cpi->cpi_family == 0xf)
 		cpi->cpi_family += CPI_FAMILY_XTD(cpi);
 
-	if (cpi->cpi_model == 0xf)
-		cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
+	/*
+	 * Beware: AMD uses "extended model" iff *FAMILY* == 0xf.
+	 * Intel, and presumably everyone else, uses model == 0xf, as
+	 * one would expect (max value means possible overflow).  Sigh.
+	 */
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_AMD:
+		if (cpi->cpi_family == 0xf)
+			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
+		break;
+	default:
+		if (cpi->cpi_model == 0xf)
+			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
+		break;
+	}
 
 	cpi->cpi_step = CPI_STEP(cpi);
 	cpi->cpi_brandid = CPI_BRANDID(cpi);
@@ -2591,6 +2605,8 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
+		create = CPI_MODEL(cpi) == 0xf;
+		break;
 	case X86_VENDOR_AMD:
 		create = CPI_FAMILY(cpi) == 0xf;
 		break;
