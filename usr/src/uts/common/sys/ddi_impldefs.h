@@ -496,7 +496,6 @@ void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
 #define	DEVI_BRANCH_HELD	0x00000008 /* branch rooted at this dip held */
 #define	DEVI_NO_BIND		0x00000010 /* prevent driver binding */
 #define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
-#define	DEVI_PHCI_SIGNALS_VHCI	0x00000040 /* pHCI ndi_devi_exit signals vHCI */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
 #define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\

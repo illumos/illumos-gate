@@ -265,30 +265,29 @@ mdivhci(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("----------------- mdi_vhci @ %#lr ----------\n", addr);
 
 	dump_string((uintptr_t)value.vh_class, "Class name (vh_class)");
-	mdb_printf("vh_refcnt: %19d\n", value.vh_refcnt);
+	dump_state_str("Load Balance (vh_lb)", value.vh_lb, client_lb_str);
+	mdb_printf("vh_client_count: %19d\n", value.vh_client_count);
+
+	mdb_printf("vh_client_table: %19l#r::print struct client_hash\n",
+	    value.vh_client_table);
 	mdb_printf("vh_dip: %28l#r::print struct dev_info\n", value.vh_dip);
 	mdb_printf("vh_next: %27l#r::print struct mdi_vhci\n", value.vh_next);
 	mdb_printf("vh_prev: %27l#r::print struct mdi_vhci\n", value.vh_prev);
-	dump_state_str("Load Balance (vh_lb)", value.vh_lb, client_lb_str);
 	mdb_printf("vh_ops: %28l#r::print struct mdi_vhci_ops\n",
 	    value.vh_ops);
-
-	dump_mutex(value.vh_phci_mutex, "phci mutex (vh_phci_mutex):");
-	mdb_printf("vh_phci_count: %21d\n", value.vh_phci_count);
 	mdb_printf("\nvh_phci_head: %22l#r::print struct mdi_phci\n",
 	    value.vh_phci_head);
 	mdb_printf("vh_phci_tail: %22l#r::print struct mdi_phci\n",
 	    value.vh_phci_tail);
 
-	dump_mutex(value.vh_phci_mutex, "client mutex (vh_client_mutex):");
-	mdb_printf("vh_client_count: %19d\n", value.vh_client_count);
-	mdb_printf("vh_client_table: %19l#r::print struct client_hash\n",
-	    value.vh_client_table);
-
+	mdb_printf("vh_phci_count: %21d\n", value.vh_phci_count);
 	mdb_printf("List of pHCIs:\n");
 	mdb_pwalk("mdiphci_list", (mdb_walk_cb_t)mpxio_walk_cb,
 			mdiphci_cb_str, (uintptr_t)value.vh_phci_head);
+
 	mdb_printf("\n");
+	mdb_printf("vh_flags UNUSED: %19d\n", value.vh_flags);
+
 	return (DCMD_OK);
 }
 

@@ -541,46 +541,163 @@ tvh_get_phci_devname(char *cname, char *guid,
 	return (pname);
 }
 
-/*
- * Return a pointer to the guid part of the devnm.
- * devnm format is "nodename@busaddr", busaddr format is "gGUID".
- */
-static char *
-tvhci_devnm_to_guid(char *devnm)
+static int
+tvh_enum_by_phci(dev_info_t *vdip, char *devnm, int flags)
 {
-	char *cp = devnm;
+	mdi_phci_t *ph;
+	mdi_vhci_t *vh = (mdi_vhci_t *)DEVI(vdip)->devi_mdi_xhci;
+	dev_info_t *pdip, *cdip;
+	char *cname, *caddr, *guid, *pname;
+	int rval = DDI_FAILURE;
 
-	if (devnm == NULL)
-		return (NULL);
+	(void) i_ddi_parse_name(devnm, &cname, &caddr, NULL);
+	if (cname == NULL || caddr == NULL || caddr[0] != 'g')
+		return (rval);
 
-	while (*cp != '\0' && *cp != '@')
-		cp++;
-	if (*cp == '@' && *(cp + 1) == 'g')
-		return (cp + 2);
-	return (NULL);
+	guid = caddr + 1;
+	pname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	/* mutex_enter(&mdi_mutex); XXX need lock access */
+	ph = vh->vh_phci_head;
+	while (ph) {
+		pdip = ph->ph_dip;
+		/* mutex_exit(&mdi_mutex); */
+		(void) tvh_get_phci_devname(cname, guid, pdip, pname,
+		    MAXNAMELEN);
+		if (ndi_devi_config_one(pdip, pname, &cdip, flags)
+		    == DDI_SUCCESS) {
+			ndi_rele_devi(cdip);
+			rval = DDI_SUCCESS;
+		}
+		/* mutex_enter(&mdi_mutex); */
+		ph = ph->ph_next;
+	}
+	/* mutex_exit(&mdi_mutex); */
+
+	*(caddr - 1) = '@';	/* undo damage from i_ddi_parse_name() */
+	kmem_free(pname, MAXNAMELEN);
+	return (rval);
 }
 
 static int
-tvhci_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
-    void *arg, dev_info_t **child)
+tvh_remove_by_phci(dev_info_t *vdip, char *devnm, int flags)
 {
-	char *guid;
+	int rval = DDI_SUCCESS;
+	mdi_phci_t *ph;
+	mdi_vhci_t *vh = (mdi_vhci_t *)DEVI(vdip)->devi_mdi_xhci;
+	dev_info_t *pdip;
+	char *cname, *caddr, *guid, *pname;
 
-	if (op == BUS_CONFIG_ONE || op == BUS_UNCONFIG_ONE)
-		guid = tvhci_devnm_to_guid((char *)arg);
-	else
-		guid = NULL;
+	(void) i_ddi_parse_name(devnm, &cname, &caddr, NULL);
+	if (cname == NULL || caddr == NULL || caddr[0] != 'g')
+		return (rval);	/* devnm can't exist */
 
-	if (mdi_vhci_bus_config(pdip, flags, op, arg, child, guid)
-	    == MDI_SUCCESS)
-		return (NDI_SUCCESS);
-	else
-		return (NDI_FAILURE);
+	guid = caddr + 1;
+	pname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	/* mutex_enter(&mdi_mutex); XXX need lock access */
+	ph = vh->vh_phci_head;
+	while (ph) {
+		pdip = ph->ph_dip;
+		/* mutex_exit(&mdi_mutex); */
+		(void) tvh_get_phci_devname(cname, guid, pdip, pname,
+		    MAXNAMELEN);
+		rval = ndi_devi_unconfig_one(pdip, pname, NULL, flags);
+		/* mutex_enter(&mdi_mutex); */
+		if (rval != NDI_SUCCESS)
+			break;
+		ph = ph->ph_next;
+	}
+	/* mutex_exit(&mdi_mutex); */
+
+	kmem_free(pname, MAXNAMELEN);
+	return (rval);
+}
+
+static int
+tvhci_bus_config(dev_info_t *parent, uint_t flags,
+    ddi_bus_config_op_t op, void *arg, dev_info_t **childp)
+{
+	char *devnm;
+	dev_info_t *cdip;
+	int circ;
+
+	switch (op) {
+	case BUS_CONFIG_ONE:
+		break;
+	case BUS_CONFIG_ALL:
+		/* XXX call into phci's here? */
+	case BUS_CONFIG_DRIVER:
+		return (ndi_busop_bus_config(parent, flags, op, arg, childp,
+		    0));
+	default:
+		return (DDI_FAILURE);
+	}
+
+	devnm = (char *)arg;
+	ndi_devi_enter(parent, &circ);
+	cdip = ndi_devi_findchild(parent, devnm);
+	ndi_devi_exit(parent, circ);
+	if (cdip == NULL) {
+		/* call into registered phci's */
+		(void) tvh_enum_by_phci(parent, devnm, flags);
+	}
+
+	return (ndi_busop_bus_config(parent, flags, op, arg, childp, 0));
 }
 
 static int
 tvhci_bus_unconfig(dev_info_t *parent, uint_t flags,
     ddi_bus_config_op_t op, void *arg)
 {
-	return (ndi_busop_bus_unconfig(parent, flags, op, arg));
+	char *devnm, *slashname;
+	int rval, circ;
+	dev_info_t *cdip, *ndip;
+
+	/*
+	 * If we are not removing device nodes, pathinfo can be
+	 * left as is. So no need to disturb the phci's.
+	 */
+	if ((flags & NDI_DEVI_REMOVE) == 0) {
+		return (ndi_busop_bus_unconfig(parent, flags, op, arg));
+	}
+
+	switch (op) {
+	case BUS_UNCONFIG_ONE:
+		devnm = (char *)arg;
+		ndi_devi_enter(parent, &circ);
+		if (ndi_devi_findchild(parent, devnm) == NULL) {
+			ndi_devi_exit(parent, circ);
+			return (DDI_SUCCESS);
+		}
+		ndi_devi_exit(parent, circ);
+		return (tvh_remove_by_phci(parent, devnm, flags));
+
+	case BUS_UNCONFIG_ALL:
+		/* this functionality is for developers only */
+		rval = DDI_SUCCESS;
+		slashname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		devnm = slashname + 1;
+		ndi_devi_enter(parent, &circ);
+		cdip = ddi_get_child(parent);
+		while (cdip != NULL) {
+			ndip = ddi_get_next_sibling(cdip);
+			(void) ddi_deviname(cdip, slashname);
+			ndi_devi_exit(parent, circ);
+			rval = tvh_remove_by_phci(parent, devnm, flags);
+			if (rval != DDI_SUCCESS) {
+				break;
+			}
+			ndi_devi_enter(parent, &circ);
+			cdip = ndip;
+		}
+		ndi_devi_exit(parent, circ);
+		return (rval);
+
+	case BUS_UNCONFIG_DRIVER:
+		/* unconfig driver never comes with NDI_DEVI_REMOVE */
+	default:
+		return (DDI_FAILURE);
+	}
+	/*NOTREACHED*/
 }

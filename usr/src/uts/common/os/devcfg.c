@@ -174,8 +174,6 @@ static int
 ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
     dev_info_t **childp, int flags);
 static void i_link_vhci_node(dev_info_t *);
-static void ndi_devi_exit_and_wait(dev_info_t *dip,
-    int circular, clock_t end_time);
 
 /*
  * dev_info cache and node management
@@ -977,7 +975,6 @@ attach_node(dev_info_t *dip)
 {
 	int rv;
 
-	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 	ASSERT(i_ddi_node_state(dip) == DS_PROBED);
 
 	NDI_CONFIG_DEBUG((CE_CONT, "attach_node: 0x%p(%s%d)\n",
@@ -1013,15 +1010,18 @@ attach_node(dev_info_t *dip)
 		    TASKQ_DEFAULTPRI, 0);
 
 	mutex_enter(&(DEVI(dip)->devi_lock));
+	DEVI_SET_ATTACHING(dip);
 	DEVI_SET_NEED_RESET(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
 
 	rv = devi_attach(dip, DDI_ATTACH);
 
-	if (rv != DDI_SUCCESS) {
-		mutex_enter(&(DEVI(dip)->devi_lock));
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	if (rv != DDI_SUCCESS)
 		DEVI_CLR_NEED_RESET(dip);
+	DEVI_CLR_ATTACHING(dip);
 
+	if (rv != DDI_SUCCESS) {
 		/* ensure that devids are unregistered */
 		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
 			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
@@ -1048,7 +1048,8 @@ attach_node(dev_info_t *dip)
 		NDI_CONFIG_DEBUG((CE_CONT, "attach_node: 0x%p(%s%d) failed\n",
 		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
 		return (DDI_FAILURE);
-	}
+	} else
+		mutex_exit(&DEVI(dip)->devi_lock);
 
 	/* successful attach, return with driver held */
 
@@ -1065,7 +1066,6 @@ detach_node(dev_info_t *dip, uint_t flag)
 	struct devnames	*dnp;
 	int		rv;
 
-	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 	ASSERT(i_ddi_node_state(dip) == DS_ATTACHED);
 
 	/* check references */
@@ -1074,18 +1074,6 @@ detach_node(dev_info_t *dip, uint_t flag)
 
 	NDI_CONFIG_DEBUG((CE_CONT, "detach_node: 0x%p(%s%d)\n",
 	    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
-
-	/*
-	 * NOTE: If we are processing a pHCI node then the calling code
-	 * must detect this and ndi_devi_enter() in (vHCI, parent(pHCI))
-	 * order unless pHCI and vHCI are siblings.  Code paths leading
-	 * here that must ensure this ordering include:
-	 * unconfig_immediate_children(), devi_unconfig_one(),
-	 * ndi_devi_unconfig_one(), ndi_devi_offline().
-	 */
-	ASSERT(!MDI_PHCI(dip) ||
-	    (ddi_get_parent(mdi_devi_get_vdip(dip)) == ddi_get_parent(dip)) ||
-	    DEVI_BUSY_OWNED(mdi_devi_get_vdip(dip)));
 
 	/* Offline the device node with the mpxio framework. */
 	if (mdi_devi_offline(dip, flag) != NDI_SUCCESS) {
@@ -1097,6 +1085,11 @@ detach_node(dev_info_t *dip, uint_t flag)
 		ddi_taskq_wait(DEVI(dip)->devi_taskq);
 
 	rv = devi_detach(dip, DDI_DETACH);
+	if (rv == DDI_SUCCESS) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
+		DEVI_CLR_NEED_RESET(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
+	}
 
 	if (rv != DDI_SUCCESS) {
 		NDI_CONFIG_DEBUG((CE_CONT,
@@ -1104,10 +1097,6 @@ detach_node(dev_info_t *dip, uint_t flag)
 		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
 		return (DDI_FAILURE);
 	}
-
-	mutex_enter(&(DEVI(dip)->devi_lock));
-	DEVI_CLR_NEED_RESET(dip);
-	mutex_exit(&(DEVI(dip)->devi_lock));
 
 	/* destroy the taskq */
 	if (DEVI(dip)->devi_taskq) {
@@ -1302,18 +1291,8 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 			break;
 		case DS_PROBED:
 			atomic_add_long(&devinfo_attach_detach, 1);
-
-			mutex_enter(&(DEVI(dip)->devi_lock));
-			DEVI_SET_ATTACHING(dip);
-			mutex_exit(&(DEVI(dip)->devi_lock));
-
 			if ((rv = attach_node(dip)) == DDI_SUCCESS)
 				i_ddi_set_node_state(dip, DS_ATTACHED);
-
-			mutex_enter(&(DEVI(dip)->devi_lock));
-			DEVI_CLR_ATTACHING(dip);
-			mutex_exit(&(DEVI(dip)->devi_lock));
-
 			atomic_add_long(&devinfo_attach_detach, -1);
 			break;
 		case DS_ATTACHED:
@@ -1447,14 +1426,14 @@ ddi_uninitchild(dev_info_t *dip)
 static int
 i_ddi_attachchild(dev_info_t *dip)
 {
-	dev_info_t	*parent = ddi_get_parent(dip);
-	int		ret;
-
-	ASSERT(parent && DEVI_BUSY_OWNED(parent));
+	int ret, circ;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
 
 	if ((i_ddi_node_state(dip) < DS_BOUND) || DEVI_IS_DEVICE_OFFLINE(dip))
 		return (DDI_FAILURE);
 
+	ndi_devi_enter(parent, &circ);
 	ret = i_ndi_config_node(dip, DS_READY, 0);
 	if (ret == NDI_SUCCESS) {
 		ret = DDI_SUCCESS;
@@ -1466,6 +1445,7 @@ i_ddi_attachchild(dev_info_t *dip)
 		(void) i_ndi_unconfig_node(dip, DS_INITIALIZED, 0);
 		ret = DDI_FAILURE;
 	}
+	ndi_devi_exit(parent, circ);
 
 	return (ret);
 }
@@ -1480,17 +1460,19 @@ i_ddi_attachchild(dev_info_t *dip)
 static int
 i_ddi_detachchild(dev_info_t *dip, uint_t flags)
 {
-	dev_info_t	*parent = ddi_get_parent(dip);
-	int		ret;
+	int ret, circ;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
 
-	ASSERT(parent && DEVI_BUSY_OWNED(parent));
-
+	ndi_devi_enter(parent, &circ);
 	ret = i_ndi_unconfig_node(dip, DS_PROBED, flags);
 	if (ret != DDI_SUCCESS)
 		(void) i_ndi_config_node(dip, DS_READY, 0);
 	else
 		/* allow pm_pre_probe to reestablish pm state */
 		(void) i_ndi_unconfig_node(dip, DS_INITIALIZED, 0);
+	ndi_devi_exit(parent, circ);
+
 	return (ret);
 }
 
@@ -1614,10 +1596,6 @@ ndi_devi_enter(dev_info_t *dip, int *circular)
 	struct dev_info *devi = DEVI(dip);
 	ASSERT(dip != NULL);
 
-	/* for vHCI, enforce (vHCI, pHCI) ndi_deve_enter() order */
-	ASSERT(!MDI_VHCI(dip) || (mdi_devi_pdip_entered(dip) == 0) ||
-	    DEVI_BUSY_OWNED(dip));
-
 	mutex_enter(&devi->devi_lock);
 	if (devi->devi_busy_thread == curthread) {
 		devi->devi_circular++;
@@ -1641,8 +1619,7 @@ ndi_devi_enter(dev_info_t *dip, int *circular)
 void
 ndi_devi_exit(dev_info_t *dip, int circular)
 {
-	struct dev_info	*devi = DEVI(dip);
-	struct dev_info	*vdevi;
+	struct dev_info *devi = DEVI(dip);
 	ASSERT(dip != NULL);
 
 	if (panicstr)
@@ -1657,53 +1634,6 @@ ndi_devi_exit(dev_info_t *dip, int circular)
 		devi->devi_busy_thread = NULL;
 		cv_broadcast(&(devi->devi_cv));
 	}
-	mutex_exit(&(devi->devi_lock));
-
-	/*
-	 * For pHCI exit we issue a broadcast to vHCI for ndi_devi_config_one()
-	 * doing cv_wait on vHCI.
-	 */
-	if (MDI_PHCI(dip)) {
-		vdevi = DEVI(mdi_devi_get_vdip(dip));
-		if (vdevi) {
-			mutex_enter(&(vdevi->devi_lock));
-			if (vdevi->devi_flags & DEVI_PHCI_SIGNALS_VHCI) {
-				vdevi->devi_flags &= ~DEVI_PHCI_SIGNALS_VHCI;
-				cv_broadcast(&(vdevi->devi_cv));
-			}
-			mutex_exit(&(vdevi->devi_lock));
-		}
-	}
-}
-
-/*
- * Release ndi_devi_enter and wait for possibility of new children, avoiding
- * possibility of missing broadcast before getting to cv_timedwait().
- */
-static void
-ndi_devi_exit_and_wait(dev_info_t *dip, int circular, clock_t end_time)
-{
-	struct dev_info	*devi = DEVI(dip);
-	ASSERT(dip != NULL);
-
-	if (panicstr)
-		return;
-
-	/*
-	 * We are called to wait for of a new child, and new child can
-	 * only be added if circular is zero.
-	 */
-	ASSERT(circular == 0);
-
-	/* like ndi_devi_exit with circular of zero */
-	mutex_enter(&(devi->devi_lock));
-	devi->devi_flags &= ~DEVI_BUSY;
-	ASSERT(devi->devi_busy_thread == curthread);
-	devi->devi_busy_thread = NULL;
-	cv_broadcast(&(devi->devi_cv));
-
-	/* now wait for new children while still holding devi_lock */
-	(void) cv_timedwait(&devi->devi_cv, &(devi->devi_lock), end_time);
 	mutex_exit(&(devi->devi_lock));
 }
 
@@ -4365,10 +4295,6 @@ init_bound_node_ev(dev_info_t *pdip, dev_info_t *dip, int flags)
 static int
 devi_attach_node(dev_info_t *dip, uint_t flags)
 {
-	dev_info_t *pdip = ddi_get_parent(dip);
-
-	ASSERT(pdip && DEVI_BUSY_OWNED(pdip));
-
 	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (flags & NDI_DEVI_ONLINE) {
 		if (!i_ddi_devi_attached(dip))
@@ -4419,13 +4345,43 @@ devi_attach_node(dev_info_t *dip, uint_t flags)
 	return (NDI_SUCCESS);
 }
 
+/*
+ * Configure all children of a nexus, assuming all spec children have
+ * been made.
+ */
+static int
+devi_attach_children(dev_info_t *pdip, uint_t flags, major_t major)
+{
+	dev_info_t *dip;
+
+	ASSERT(DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
+
+	dip = ddi_get_child(pdip);
+	while (dip) {
+		/*
+		 * NOTE: devi_attach_node() may remove the dip
+		 */
+		dev_info_t *next = ddi_get_next_sibling(dip);
+
+		/*
+		 * Configure all nexus nodes or leaf nodes with
+		 * matching driver major
+		 */
+		if ((major == (major_t)-1) ||
+		    (major == ddi_driver_major(dip)) ||
+		    ((flags & NDI_CONFIG) && (is_leaf_node(dip) == 0)))
+			(void) devi_attach_node(dip, flags);
+		dip = next;
+	}
+
+	return (NDI_SUCCESS);
+}
+
 /* internal function to config immediate children */
 static int
 config_immediate_children(dev_info_t *pdip, uint_t flags, major_t major)
 {
-	dev_info_t	*child, *next;
-	int		circ;
-
+	int circ;
 	ASSERT(i_ddi_devi_attached(pdip));
 
 	if (!NEXUS_DRV(ddi_get_driver(pdip)))
@@ -4445,22 +4401,7 @@ config_immediate_children(dev_info_t *pdip, uint_t flags, major_t major)
 	}
 	(void) i_ndi_make_spec_children(pdip, flags);
 	i_ndi_init_hw_children(pdip, flags);
-
-	child = ddi_get_child(pdip);
-	while (child) {
-		/* NOTE: devi_attach_node() may remove the dip */
-		next = ddi_get_next_sibling(child);
-
-		/*
-		 * Configure all nexus nodes or leaf nodes with
-		 * matching driver major
-		 */
-		if ((major == (major_t)-1) ||
-		    (major == ddi_driver_major(child)) ||
-		    ((flags & NDI_CONFIG) && (is_leaf_node(child) == 0)))
-			(void) devi_attach_node(child, flags);
-		child = next;
-	}
+	(void) devi_attach_children(pdip, flags, major);
 
 	ndi_devi_exit(pdip, circ);
 
@@ -4560,164 +4501,115 @@ ndi_devi_config_driver(dev_info_t *dip, int flags, major_t major)
 }
 
 /*
- * Called by nexus drivers to configure its children.
+ * called by nexus drivers to configure/unconfigure its children
  */
 static int
-devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
+devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **dipp,
     uint_t flags, clock_t timeout)
 {
-	dev_info_t	*vdip = NULL;
-	char		*drivername = NULL;
-	char		*name, *addr;
-	int		v_circ, p_circ;
-	clock_t		end_time;	/* 60 sec */
-	int		probed;
-	dev_info_t	*cdip;
-	mdi_pathinfo_t	*cpip;
-
-	*cdipp = NULL;
+	int circ, probed, rv;
+	dev_info_t *dip = NULL;
+	char *name, *addr, *drivername = NULL;
+	clock_t end_time;	/* 60 sec */
 
 	if (!NEXUS_DRV(ddi_get_driver(pdip)))
 		return (NDI_FAILURE);
 
+	if (MDI_PHCI(pdip)) {
+		/* Call mdi_ to configure the child */
+		rv = mdi_devi_config_one(pdip, devnm, dipp, flags, timeout);
+		if (rv == MDI_SUCCESS)
+			return (NDI_SUCCESS);
+
+		/*
+		 * Normally, we should return failure here.
+		 *
+		 * Leadville implemented an unfortunate fallback mechanism.
+		 * If a target is non-standard and scsi_vhci doesn't know
+		 * how to do failover, then the node is enumerated under
+		 * phci. Leadville specifies NDI_MDI_FALLBACK flag to
+		 * maintain the old behavior.
+		 */
+		if ((flags & NDI_MDI_FALLBACK) == 0)
+			return (NDI_FAILURE);
+	}
+
 	/* split name into "name@addr" parts */
 	i_ddi_parse_name(devnm, &name, &addr, NULL);
 
-	/*
-	 * If the nexus is a pHCI and we are not processing a pHCI from
-	 * mdi bus_config code then we need to know the vHCI.
-	 */
-	if (MDI_PHCI(pdip))
-		vdip = mdi_devi_get_vdip(pdip);
-
-	/*
-	 * We may have a genericname on a system that creates drivername
-	 * nodes (from .conf files).  Find the drivername by nodeid. If we
-	 * can't find a node with devnm as the node name then we search by
-	 * drivername.  This allows an implementation to supply a genericly
-	 * named boot path (disk) and locate drivename nodes (sd).
-	 */
-	if (flags & NDI_PROMNAME)
+	if (flags & NDI_PROMNAME) {
+		/*
+		 * We may have a genericname on a system that creates
+		 * drivername nodes (from .conf files).  Find the drivername
+		 * by nodeid. If we can't find a node with devnm as the
+		 * node name then we search by drivername.  This allows an
+		 * implementation to supply a genericly named boot path (disk)
+		 * and locate drivename nodes (sd).
+		 */
 		drivername = child_path_to_driver(pdip, name, addr);
+	}
 
-	/*
-	 * Determine end_time: This routine should *not* be called with a
-	 * constant non-zero timeout argument, the caller should be adjusting
-	 * the timeout argument relative to when it *started* its asynchronous
-	 * enumeration.
-	 */
-	if (timeout > 0)
+	if (timeout > 0) {
 		end_time = ddi_get_lbolt() + timeout;
+	}
 
+	ndi_devi_enter(pdip, &circ);
+
+reprobe:
+	probed = (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
+	(void) i_ndi_make_spec_children(pdip, flags);
 	for (;;) {
+		dip = find_child_by_name(pdip, name, addr);
 		/*
-		 * For pHCI, enter (vHCI, pHCI) and search for pathinfo/client
-		 * child - break out of for(;;) loop if child found.
-		 * NOTE: Lock order for ndi_devi_enter is (vHCI, pHCI).
+		 * Search for a node bound to the drivername driver with
+		 * the specified "@addr".
 		 */
-		if (vdip) {
-			/* use mdi_devi_enter ordering */
-			ndi_devi_enter(vdip, &v_circ);
-			ndi_devi_enter(pdip, &p_circ);
-			cpip = mdi_pi_find(pdip, NULL, addr);
-			cdip = mdi_pi_get_client(cpip);
-			if (cdip)
-				break;
-		} else
-			ndi_devi_enter(pdip, &p_circ);
+		if (dip == NULL && drivername)
+			dip = find_child_by_driver(pdip, drivername, addr);
 
-		/*
-		 * When not a  vHCI or not all pHCI devices are required to
-		 * enumerated under the vHCI (NDI_MDI_FALLBACK) search for
-		 * devinfo child.
-		 */
-		if ((vdip == NULL) || (flags & NDI_MDI_FALLBACK)) {
-			/* determine if .conf nodes already built */
-			probed = (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
-
-			/*
-			 * Search for child by name, if not found then search
-			 * for a node bound to the drivername driver with the
-			 * specified "@addr". Break out of for(;;) loop if
-			 * child found.
-			 */
-again:			(void) i_ndi_make_spec_children(pdip, flags);
-			cdip = find_child_by_name(pdip, name, addr);
-			if ((cdip == NULL) && drivername)
-				cdip = find_child_by_driver(pdip,
-				    drivername, addr);
-			if (cdip)
-				break;
-
-			/*
-			 * determine if we should reenumerate .conf nodes
-			 * and look for child again.
-			 */
-			if (probed &&
-			    i_ddi_io_initialized() &&
-			    (flags & NDI_CONFIG_REPROBE) &&
-			    ((timeout <= 0) || (ddi_get_lbolt() >= end_time))) {
-				probed = 0;
-				mutex_enter(&DEVI(pdip)->devi_lock);
-				DEVI(pdip)->devi_flags &= ~DEVI_MADE_CHILDREN;
-				mutex_exit(&DEVI(pdip)->devi_lock);
-				goto again;
-			}
-		}
-
-		/* break out of for(;;) if time expired */
-		if ((timeout <= 0) || (ddi_get_lbolt() >= end_time))
+		if (dip || timeout <= 0 || ddi_get_lbolt() >= end_time)
 			break;
 
 		/*
-		 * Child not found, exit and wait for asynchronous enumeration
-		 * to add child (or timeout). The addition of a new child (vhci
-		 * or phci) requires the asynchronous enumeration thread to
-		 * ndi_devi_enter/ndi_devi_exit. This exit will signal devi_cv
-		 * and cause us to return from ndi_devi_exit_and_wait, after
-		 * which we loop and search for the requested child again.
+		 * Wait up to end_time for asynchronous enumeration
 		 */
+		ndi_devi_exit(pdip, circ);
 		NDI_DEBUG(flags, (CE_CONT,
 		    "%s%d: waiting for child %s@%s, timeout %ld",
 		    ddi_driver_name(pdip), ddi_get_instance(pdip),
 		    name, addr, timeout));
-		if (vdip) {
-			/*
-			 * Mark vHCI for pHCI ndi_devi_exit broadcast.
-			 */
-			mutex_enter(&DEVI(vdip)->devi_lock);
-			DEVI(vdip)->devi_flags |=
-			    DEVI_PHCI_SIGNALS_VHCI;
-			mutex_exit(&DEVI(vdip)->devi_lock);
-			ndi_devi_exit(pdip, p_circ);
 
-			/*
-			 * NB: There is a small race window from above
-			 * ndi_devi_exit() of pdip to cv_wait() in
-			 * ndi_devi_exit_and_wait() which can result in
-			 * not immediately finding a new pHCI child
-			 * of a pHCI that uses NDI_MDI_FAILBACK.
-			 */
-			ndi_devi_exit_and_wait(vdip, v_circ, end_time);
-		} else {
-			ndi_devi_exit_and_wait(pdip, p_circ, end_time);
-		}
+		mutex_enter(&DEVI(pdip)->devi_lock);
+		(void) cv_timedwait(&DEVI(pdip)->devi_cv,
+		    &DEVI(pdip)->devi_lock, end_time);
+		mutex_exit(&DEVI(pdip)->devi_lock);
+		ndi_devi_enter(pdip, &circ);
+		(void) i_ndi_make_spec_children(pdip, flags);
 	}
 
-	/* done with paddr, fixup i_ddi_parse_name '@'->'\0' change */
-	if (addr && *addr != '\0')
+	if ((dip == NULL) && probed && (flags & NDI_CONFIG_REPROBE) &&
+	    i_ddi_io_initialized()) {
+		/*
+		 * reenumerate .conf nodes and probe again
+		 */
+		mutex_enter(&DEVI(pdip)->devi_lock);
+		DEVI(pdip)->devi_flags &= ~DEVI_MADE_CHILDREN;
+		mutex_exit(&DEVI(pdip)->devi_lock);
+		goto reprobe;
+	}
+
+	if (addr[0] != '\0')
 		*(addr - 1) = '@';
 
-	/* attach and hold the child, returning pointer to child */
-	if (cdip && (devi_attach_node(cdip, flags) == NDI_SUCCESS)) {
-		ndi_hold_devi(cdip);
-		*cdipp = cdip;
+	if (dip == NULL || devi_attach_node(dip, flags) != NDI_SUCCESS) {
+		ndi_devi_exit(pdip, circ);
+		return (NDI_FAILURE);
 	}
 
-	ndi_devi_exit(pdip, p_circ);
-	if (vdip)
-		ndi_devi_exit(vdip, v_circ);
-	return (*cdipp ? NDI_SUCCESS : NDI_FAILURE);
+	*dipp = dip;
+	ndi_hold_devi(dip);
+	ndi_devi_exit(pdip, circ);
+	return (NDI_SUCCESS);
 }
 
 /*
@@ -4823,10 +4715,8 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 	int ret = NDI_SUCCESS;
 	ddi_eventcookie_t cookie;
 
-	ASSERT(pdip && DEVI_BUSY_OWNED(pdip));
-
 	if (flags & NDI_POST_EVENT) {
-		if (i_ddi_devi_attached(pdip)) {
+		if (pdip && i_ddi_devi_attached(pdip)) {
 			if (ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
 			    &cookie) == NDI_SUCCESS)
 				(void) ndi_post_event(dip, dip, cookie, NULL);
@@ -4897,51 +4787,15 @@ unconfig_immediate_children(
 	int flags,
 	major_t major)
 {
-	int rv = NDI_SUCCESS;
-	int circ, vcirc;
+	int rv = NDI_SUCCESS, circ;
 	dev_info_t *child;
-	dev_info_t *vdip = NULL;
-	dev_info_t *next;
 
 	ASSERT(dipp == NULL || *dipp == NULL);
 
-	/*
-	 * Scan forward to see if we will be processing a pHCI child. If we
-	 * have a child that is a pHCI and vHCI and pHCI are not siblings then
-	 * enter vHCI before parent(pHCI) to prevent deadlock with mpxio
-	 * Client power management operations.
-	 */
 	ndi_devi_enter(dip, &circ);
-	for (child = ddi_get_child(dip); child;
-	    child = ddi_get_next_sibling(child)) {
-		/* skip same nodes we skip below */
-		if (((major != (major_t)-1) &&
-		    (major != ddi_driver_major(child))) ||
-		    ((flags & NDI_AUTODETACH) && !is_leaf_node(child)))
-			continue;
-
-		if (MDI_PHCI(child)) {
-			vdip = mdi_devi_get_vdip(child);
-			/*
-			 * If vHCI and vHCI is not a sibling of pHCI
-			 * then enter in (vHCI, parent(pHCI)) order.
-			 */
-			if (vdip && (ddi_get_parent(vdip) != dip)) {
-				ndi_devi_exit(dip, circ);
-
-				/* use mdi_devi_enter ordering */
-				ndi_devi_enter(vdip, &vcirc);
-				ndi_devi_enter(dip, &circ);
-				break;
-			} else
-				vdip = NULL;
-		}
-	}
-
 	child = ddi_get_child(dip);
 	while (child) {
-		next = ddi_get_next_sibling(child);
-
+		dev_info_t *next = ddi_get_next_sibling(child);
 		if ((major != (major_t)-1) &&
 		    (major != ddi_driver_major(child))) {
 			child = next;
@@ -4967,11 +4821,7 @@ unconfig_immediate_children(
 		 */
 		child = next;
 	}
-
 	ndi_devi_exit(dip, circ);
-	if (vdip)
-		ndi_devi_exit(vdip, vcirc);
-
 	return (rv);
 }
 
@@ -5126,44 +4976,19 @@ e_ddi_devi_unconfig(dev_info_t *dip, dev_info_t **dipp, int flags)
 static int
 devi_unconfig_one(dev_info_t *pdip, char *devnm, int flags)
 {
-	int		rv, circ;
-	dev_info_t	*child;
-	dev_info_t	*vdip = NULL;
-	int		v_circ;
+	int rv, circ;
+	dev_info_t *child;
 
 	ndi_devi_enter(pdip, &circ);
 	child = ndi_devi_findchild(pdip, devnm);
-
-	/*
-	 * If child is pHCI and vHCI and pHCI are not siblings then enter vHCI
-	 * before parent(pHCI) to avoid deadlock with mpxio Client power
-	 * management operations.
-	 */
-	if (child && MDI_PHCI(child)) {
-		vdip = mdi_devi_get_vdip(child);
-		if (vdip && (ddi_get_parent(vdip) != pdip)) {
-			ndi_devi_exit(pdip, circ);
-
-			/* use mdi_devi_enter ordering */
-			ndi_devi_enter(vdip, &v_circ);
-			ndi_devi_enter(pdip, &circ);
-			child = ndi_devi_findchild(pdip, devnm);
-		} else
-			vdip = NULL;
-	}
-
-	if (child) {
-		rv = devi_detach_node(child, flags);
-	} else {
+	if (child == NULL) {
 		NDI_CONFIG_DEBUG((CE_CONT,
 		    "devi_unconfig_one: %s not found\n", devnm));
-		rv = NDI_SUCCESS;
+		ndi_devi_exit(pdip, circ);
+		return (NDI_SUCCESS);
 	}
-
+	rv = devi_detach_node(child, flags);
 	ndi_devi_exit(pdip, circ);
-	if (vdip)
-		ndi_devi_exit(pdip, v_circ);
-
 	return (rv);
 }
 
@@ -5174,12 +4999,10 @@ ndi_devi_unconfig_one(
 	dev_info_t **dipp,
 	int flags)
 {
-	int		(*f)();
-	int		circ, rv;
-	int		pm_cookie;
-	dev_info_t	*child;
-	dev_info_t	*vdip = NULL;
-	int		v_circ;
+	int (*f)();
+	int circ, rv;
+	int pm_cookie;
+	dev_info_t *child;
 	struct brevq_node *brevq = NULL;
 
 	ASSERT(i_ddi_devi_attached(pdip));
@@ -5197,30 +5020,12 @@ ndi_devi_unconfig_one(
 
 	ndi_devi_enter(pdip, &circ);
 	child = ndi_devi_findchild(pdip, devnm);
-
-	/*
-	 * If child is pHCI and vHCI and pHCI are not siblings then enter vHCI
-	 * before parent(pHCI) to avoid deadlock with mpxio Client power
-	 * management operations.
-	 */
-	if (child && MDI_PHCI(child)) {
-		vdip = mdi_devi_get_vdip(child);
-		if (vdip && (ddi_get_parent(vdip) != pdip)) {
-			ndi_devi_exit(pdip, circ);
-
-			/* use mdi_devi_enter ordering */
-			ndi_devi_enter(vdip, &v_circ);
-			ndi_devi_enter(pdip, &circ);
-			child = ndi_devi_findchild(pdip, devnm);
-		} else
-			vdip = NULL;
-	}
-
 	if (child == NULL) {
 		NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_unconfig_one: %s"
 		    " not found\n", devnm));
-		rv = NDI_SUCCESS;
-		goto out;
+		ndi_devi_exit(pdip, circ);
+		pm_post_unconfig(pdip, pm_cookie, devnm);
+		return (NDI_SUCCESS);
 	}
 
 	/*
@@ -5256,9 +5061,6 @@ ndi_devi_unconfig_one(
 
 out:
 	ndi_devi_exit(pdip, circ);
-	if (vdip)
-		ndi_devi_exit(pdip, v_circ);
-
 	pm_post_unconfig(pdip, pm_cookie, devnm);
 
 	return (rv);
@@ -5354,7 +5156,7 @@ ndi_devi_online(dev_info_t *dip, uint_t flags)
 	/* merge .conf properties */
 	(void) i_ndi_make_spec_children(pdip, flags);
 
-	flags |= (NDI_DEVI_ONLINE | NDI_CONFIG | NDI_MTC_OFF);
+	flags |= (NDI_DEVI_ONLINE | NDI_CONFIG);
 
 	if (flags & NDI_NO_EVENT) {
 		/*
@@ -5438,30 +5240,14 @@ ndi_devi_online_async(dev_info_t *dip, uint_t flags)
 int
 ndi_devi_offline(dev_info_t *dip, uint_t flags)
 {
-	int		circ, rval = 0;
-	dev_info_t	*pdip = ddi_get_parent(dip);
-	dev_info_t	*vdip = NULL;
-	int		v_circ;
+	int circ, rval = 0;
+	dev_info_t *pdip = ddi_get_parent(dip);
 	struct brevq_node *brevq = NULL;
 
 	ASSERT(pdip);
 
 	flags |= NDI_DEVI_OFFLINE;
-
-	/*
-	 * If child is pHCI and vHCI and pHCI are not siblings then enter vHCI
-	 * before parent(pHCI) to avoid deadlock with mpxio Client power
-	 * management operations.
-	 */
-	if (MDI_PHCI(dip)) {
-		vdip = mdi_devi_get_vdip(dip);
-		if (vdip && (ddi_get_parent(vdip) != pdip))
-			ndi_devi_enter(vdip, &v_circ);
-		else
-			vdip = NULL;
-	}
 	ndi_devi_enter(pdip, &circ);
-
 	if (i_ddi_node_state(dip) == DS_READY) {
 		/*
 		 * If dip is in DS_READY state, there may be cached dv_nodes
@@ -5471,10 +5257,7 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 		 */
 		char *devname = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 		(void) ddi_deviname(dip, devname);
-
 		ndi_devi_exit(pdip, circ);
-		if (vdip)
-			ndi_devi_exit(vdip, v_circ);
 
 		/*
 		 * If we own parent lock, this is part of a branch
@@ -5490,8 +5273,6 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 		if (rval)
 			return (NDI_FAILURE);
 
-		if (vdip)
-			ndi_devi_enter(vdip, &v_circ);
 		ndi_devi_enter(pdip, &circ);
 	}
 
@@ -5506,8 +5287,6 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 	}
 
 	ndi_devi_exit(pdip, circ);
-	if (vdip)
-		ndi_devi_exit(vdip, v_circ);
 
 	return (rval);
 }
@@ -5917,28 +5696,23 @@ ddi_rele_driver(major_t major)
 int
 i_ddi_attach_node_hierarchy(dev_info_t *dip)
 {
-	dev_info_t	*parent;
-	int		ret, circ;
+	dev_info_t *parent;
 
-	/*
-	 * Recurse up until attached parent is found.
-	 */
 	if (i_ddi_devi_attached(dip))
 		return (DDI_SUCCESS);
+
+	/*
+	 * Attach parent dip
+	 */
 	parent = ddi_get_parent(dip);
 	if (i_ddi_attach_node_hierarchy(parent) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	/*
-	 * Come top-down, expanding .conf nodes under this parent
-	 * and driving attach.
+	 * Expand .conf nodes under this parent
 	 */
-	ndi_devi_enter(parent, &circ);
 	(void) i_ndi_make_spec_children(parent, 0);
-	ret = i_ddi_attachchild(dip);
-	ndi_devi_exit(parent, circ);
-
-	return (ret);
+	return (i_ddi_attachchild(dip));
 }
 
 /* keep this function static */
@@ -6426,22 +6200,8 @@ mt_config_thread(void *arg)
 	gethrestime(&end_time);
 	hdl->total_time += time_diff_in_msec(start_time, end_time);
 #endif /* DEBUG */
-
-	if ((rv != NDI_SUCCESS) && (hdl->mtc_error == 0)) {
+	if (rv != NDI_SUCCESS)
 		hdl->mtc_error = rv;
-#ifdef	DEBUG
-		if ((ddidebug & DDI_DEBUG) && (major != (major_t)-1)) {
-			char	*path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-			(void) ddi_pathname(dip, path);
-			cmn_err(CE_NOTE, "mt_config_thread: "
-			    "op %d.%d.%x at %s failed %d",
-			    hdl->mtc_op, major, flags, path, rv);
-			kmem_free(path, MAXPATHLEN);
-		}
-#endif	/* DEBUG */
-	}
-
 	if (hdl->mtc_fdip && *hdl->mtc_fdip == NULL) {
 		*hdl->mtc_fdip = rdip;
 		rdip = NULL;
@@ -6566,7 +6326,7 @@ mt_config_children(struct mt_config_handle *hdl)
 	/* go through the list of held children */
 	for (mcd = mcd_head; mcd; mcd = mcd_head) {
 		mcd_head = mcd->mtc_next;
-		if (mtc_off || (mcd->mtc_flags & NDI_MTC_OFF))
+		if (mtc_off)
 			mt_config_thread(mcd);
 		else
 			(void) thread_create(NULL, 0, mt_config_thread, mcd,
@@ -6640,7 +6400,7 @@ mt_config_driver(struct mt_config_handle *hdl)
 	/* go through the list of held children */
 	for (mcd = mcd_head; mcd; mcd = mcd_head) {
 		mcd_head = mcd->mtc_next;
-		if (mtc_off || (mcd->mtc_flags & NDI_MTC_OFF))
+		if (mtc_off)
 			mt_config_thread(mcd);
 		else
 			(void) thread_create(NULL, 0, mt_config_thread, mcd,

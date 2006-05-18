@@ -73,90 +73,68 @@ extern "C" {
  * With the scsi_vhci, a QLC card, and mpxio enabled, the device tree might
  * look like this:
  *
- *              /\
- *             /  ............
- *     <vHCI>:/               \
- *      +-----------+   +-----------+
+ *	+-----------+   +-----------+
  *      | scsi_vhci |   |  pci@1f,0 |
  *      +-----------+   +-----------+
- *            /   \               \
- * <Client>: /     \ :<Client>     \ :parent(pHCI)
- *  +----------+ +-----------+    +-------------+
- *  | ssd 1    | | ssd 2     |    | qlc@0,0     |
- *  +----------+ +-----------+    +-------------+
- *   |            |                /        \
- *   |            |       <pHCI>: /          \ :<pHCI>
- *   |            |      +-------------+   +-------------+
- *   |            |      | pHCI 1 (fp) |   | pHCI 2 (fp) |
- *   |            |      +-------------+   +-------------+
- *   |            |          /        |      /          |
- *   |            |    +------+       |    +------+     |
- *   |            |    | ssd 3|       |    | ssd  |     |
- *   |            |    |!mpxio|       |    | (OBP)|     |
- *   |            |    +------+       |    +------+     |
- *   |            |                   |                 |
- *   |            |       <pathinfo>: |                 |
- *   |            |               +-------+         +--------+
- *   |            +-------------->| path  |-------->| path   |
- *   |                            | info  |         | info   |
- *   |                            | node 1|         | node 3 |
- *   |                            +-------+         +--------+
- *   |                                |               |
- *   |                                |            +~~~~~~~~+
- *   |                            +-------+        :+--------+
- *   +--------------------------->| path  |-------->| path   |
- *                                | info  |        :| info   |
- *                                | node 2|        +| node 4 |
- *                                +-------+         +--------+
+ *         /     \               \
+ * +----------+ +-----------+    +-------------+
+ * | ssd1     | | ssd2	    |    | qlc@0,0     |
+ * +----------+ +-----------+    +-------------+
+ *   |          |                  /        \
+ *   |          |        +-------------+   +------------+
+ *   |          |        | pHCI 1      |   |  pHCI 2    |
+ *   |          |        +-------------+   +------------+
+ *   |          |          /        |      /          |
+ *   |          |    +------+       |    +------+     |
+ *   |          |    |  ssd |       |    |  ssd |     |
+ *   |          |    | (OBP)|       |    | (OBP)|     |
+ *   |          |    +------+       |    +------+     |
+ *   |          |                   |                 |
+ *   |          |               +-------+           +--------+
+ *   |          +-------------->| path  |---------->| path   |
+ *   |                          | info  |           | info   |
+ *   |                          | node 1|           | node 3 |
+ *   |                          +-------+           +--------+
+ *   |                              |                 |
+ *   |                          +-------+           +--------+
+ *   +------------------------->| path  |---------->| path   |
+ *                              | info  |           | info   |
+ *                              | node 2|           | node 4 |
+ *                              +-------+           +--------+
  *
  * The multipath information nodes (mdi_pathinfo nodes) establish the
- * relationship between the pseudo client driver instance nodes (children
- * of the vHCI) and the physical host controller interconnect (pHCI
- * drivers) forming a matrix structure.
+ * relationship between the pseudo client driver instance nodes and the
+ * physical host controller interconnect (pHCI drivers) forming a matrix
+ * structure.
  *
  * The mpxio module implements locking at multiple granularity levels to
  * support the needs of various consumers.  The multipath matrix can be
- * column locked, or row locked depending on the consumer. The intention
- * is to balance simplicity and performance.
+ * globally locked, column locked, or row locked depending on the consumer.
+ * The intention is to balance simplicity and performance.
  *
  * Locking:
  *
- * The devinfo locking still applies:
+ * The current implementation utilizes the following locks:
  *
- *   1) An ndi_devi_enter of a parent protects linkage/state of children.
- *   2) state >= DS_INITIALIZED adds devi_ref of parent
- *   3) devi_ref at state >= DS_ATTACHED prevents detach(9E).
+ *   mdi_mutex: protects the vHCI list, per-vHCI structure and the
+ *   list of pHCIs and Client devices registered against them (protection
+ *   against multi-threaded add/remove).
  *
- * The ordering of 1) is (vHCI, pHCI). For a DEBUG kernel this ordering
- * is asserted by the ndi_devi_enter() implementation.  There is also an
- * ndi_devi_enter(Client), which is atypical since the client is a leaf.
- * This is done to synchronize pathinfo nodes during devinfo snapshot (see
- * di_register_pip) by pretending that the pathinfo nodes are children
- * of the client.
+ *   devinfo_tree_lock (rw): protects system wide creation/removal of
+ *   mdi_pathinfo nodes into the multipath matrix.  Consumers (like the devinfo
+ *   driver) can freeze the configuration by acquiring this as a reader.
  *
- * In addition to devinfo locking the current implementation utilizes
- * the following locks:
+ *   per-pHCI (mutex) lock: protects the column (pHCI-mdi_pathinfo node list)
+ *   and per-pHCI structure fields.  mdi_pathinfo node creation, deletion and
+ *   child mdi_pathinfo node state changes are serialized on per pHCI basis
+ *   (Protection against DR).
  *
- *   mdi_mutex: protects the global list of vHCIs.
+ *   per-client (mutex) lock: protects the row (client-mdi_pathinfo node list)
+ *   and per-client structure fields.  The client-mdi_pathinfo node list is
+ *   typically walked to select an optimal path when routing I/O requests.
  *
- *   vh_phci_mutex: per-vHCI (mutex) lock: protects list of pHCIs registered
- *   with vHCI.
- *
- *   vh_client_mutex: per-vHCI (mutex) lock: protects list/hash of Clients
- *   associated with vHCI.
- *
- *   ph_mutex: per-pHCI (mutex) lock: protects the column (pHCI-mdi_pathinfo
- *   node list) and per-pHCI structure fields.  mdi_pathinfo node creation,
- *   deletion and child mdi_pathinfo node state changes are serialized on per
- *   pHCI basis (Protection against DR).
- *
- *   ct_mutex: per-client (mutex) lock: protects the row (client-mdi_pathinfo
- *   node list) and per-client structure fields.  The client-mdi_pathinfo node
- *   list is typically walked to select an optimal path when routing I/O
- *   requests.
- *
- *   pi_mutex: per-mdi_pathinfo (mutex) lock: protects the mdi_pathinfo node
- *   structure fields.
+ *   per-mdi_pathinfo (mutex) lock: protects the mdi_pathinfo node structure
+ *   fields.
  *
  * Note that per-Client structure and per-pHCI fields are freely readable when
  * corresponding mdi_pathinfo locks are held, since holding an mdi_pathinfo
@@ -249,54 +227,27 @@ typedef struct mdi_vhci_ops {
  * Each vHCI driver is associated with a vHCI class name; this is the handle
  * used to register and unregister pHCI drivers for a given transport.
  *
- * Locking: Different parts of this structure are guarded by different
- * locks: global threading of multiple vHCIs and initialization is protected
- * by mdi_mutex, the list of pHCIs associated with a vHCI is protected by
- * vh_phci_mutex, and Clients are protected by vh_client_mutex.
- *
- * XXX Depending on the context, some of the fields can be freely read without
- * holding any locks (ex. holding vh_client_mutex lock also guarantees that
- * the vHCI (parent) cannot be unexpectedly freed).
+ * Locking: This structure is guarded by the mdi_mutex; however, depending
+ * on the context, some of the fields can be freely read without holding any
+ * locks (ex. holding a child's lock also guarantees that the vHCI (parent)
+ * cannot be unexpectedly freed).
  */
 typedef struct mdi_vhci {
-	/* protected by mdi_mutex... */
-	struct mdi_vhci		*vh_next;	/* next vHCI link	*/
-	struct mdi_vhci		*vh_prev;	/* prev vHCI link	*/
-	char			*vh_class;	/* vHCI class name	*/
-	dev_info_t		*vh_dip;	/* vHCI devi handle	*/
-	int			vh_refcnt;	/* vHCI reference count	*/
-	struct mdi_vhci_config	*vh_config;	/* vHCI config		*/
-	client_lb_t		vh_lb;		/* vHCI load-balancing	*/
-	struct mdi_vhci_ops	*vh_ops;	/* vHCI callback vectors */
-
-	/* protected by MDI_VHCI_PHCI_LOCK vh_phci_mutex... */
-	kmutex_t		vh_phci_mutex;	/* pHCI mutex		*/
+	struct mdi_vhci		*vh_next;	/* next link		*/
+	struct mdi_vhci		*vh_prev;	/* prev link		*/
+	int			vh_flags;	/* Operation flags	*/
+	dev_info_t		*vh_dip;	/* devi handle		*/
+	char			*vh_class;	/* Class name		*/
+	struct mdi_vhci_ops	*vh_ops;	/* Callback vectors	*/
+	client_lb_t		vh_lb;		/* Global cache		*/
 	int			vh_phci_count;	/* pHCI device count	*/
 	struct mdi_phci		*vh_phci_head;	/* pHCI list head	*/
 	struct mdi_phci		*vh_phci_tail;	/* pHCI list tail	*/
-
-	/* protected by MDI_VHCI_CLIENT_LOCK vh_client_mutex... */
-	kmutex_t		vh_client_mutex; /* Client mutex	*/
-	int			vh_client_count; /* Client count	*/
-	struct client_hash	*vh_client_table; /* Client hash	*/
+	int			vh_client_count;	/* Client count	*/
+	struct client_hash	*vh_client_table;	/* Client hash	*/
+	int			vh_refcnt;	/* reference count */
+	struct mdi_vhci_config	*vh_config;	/* vhci config */
 } mdi_vhci_t;
-
-/*
- * per-vHCI lock macros
- */
-#define	MDI_VHCI_PHCI_LOCK(vh)		mutex_enter(&(vh)->vh_phci_mutex)
-#define	MDI_VHCI_PHCI_TRYLOCK(vh)	mutex_tryenter(&(vh)->vh_phci_mutex)
-#define	MDI_VHCI_PHCI_UNLOCK(vh)	mutex_exit(&(vh)->vh_phci_mutex)
-#ifdef	DEBUG
-#define	MDI_VHCI_PCHI_LOCKED(vh)	MUTEX_HELD(&(vh)->vh_phci_mutex)
-#endif	/* DEBUG */
-#define	MDI_VHCI_CLIENT_LOCK(vh)	mutex_enter(&(vh)->vh_client_mutex)
-#define	MDI_VHCI_CLIENT_TRYLOCK(vh)	mutex_tryenter(&(vh)->vh_client_mutex)
-#define	MDI_VHCI_CLIENT_UNLOCK(vh)	mutex_exit(&(vh)->vh_client_mutex)
-#ifdef	DEBUG
-#define	MDI_VHCI_CLIENT_LOCKED(vh)	MUTEX_HELD(&(vh)->vh_client_mutex)
-#endif	/* DEBUG */
-
 
 /*
  * GUID Hash definitions
@@ -326,31 +277,29 @@ struct client_hash {
  * similarly call mdi_phci_unregister().
  *
  * The framework maintains a list of registered pHCI device instances for each
- * vHCI.  This list involves (vh_phci_count, vh_phci_head, vh_phci_tail) and
- * (ph_next, ph_prev, ph_vhci) and is protected by vh_phci_mutex.
+ * vHCI.  This list is vHCI->vh_phci_count, vHCI->vh_phci_head,
+ * vHCI->vh_phci_tail and pHCI->ph_next.  This list is protected by the global
+ * mdi_mutex.
  *
  * Locking order:
  *
- * _NOTE(LOCK_ORDER(mdi_mutex, mdi_phci::ph_mutex))		XXX
- * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex devinfo_tree_lock))		XXX
+ * _NOTE(LOCK_ORDER(mdi_mutex, mdi_phci::ph_mutex))
+ * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex devinfo_tree_lock))
  */
 typedef struct mdi_phci {
-	/* protected by MDI_VHCI_PHCI_LOCK vh_phci_mutex... */
-	struct mdi_phci		*ph_next;	/* next pHCI link	*/
-	struct mdi_phci		*ph_prev;	/* prev pHCI link	*/
-	dev_info_t		*ph_dip;	/* pHCI devi handle	*/
-	struct mdi_vhci 	*ph_vhci;	/* pHCI back ref. to vHCI */
-
-	/* protected by MDI_PHCI_LOCK ph_mutex... */
 	kmutex_t		ph_mutex;	/* per-pHCI mutex	*/
-	int			ph_path_count;	/* pi count		*/
+	struct mdi_phci		*ph_next;	/* next link		*/
+	struct mdi_phci		*ph_prev;	/* prev link		*/
+	dev_info_t		*ph_dip;	/* devi handle		*/
+	struct mdi_vhci 	*ph_vhci;	/* back ref. to vHCI	*/
+	int			ph_flags;	/* pHCI operation flags	*/
+	int			ph_path_count;	/* child pi count	*/
 	mdi_pathinfo_t		*ph_path_head;	/* pi list head		*/
 	mdi_pathinfo_t		*ph_path_tail;	/* pi list tail		*/
-	int			ph_flags;	/* pHCI operation flags	*/
 	int			ph_unstable;	/* Paths in transient state */
 	kcondvar_t		ph_unstable_cv;	/* Paths in transient state */
-
-	/* protected by mdi_phci_[gs]et_vhci_private caller... */
+	kcondvar_t		ph_powerchange_cv;
+						/* Paths in transient state */
 	void			*ph_vprivate;	/* vHCI driver private	*/
 } mdi_phci_t;
 
@@ -369,12 +318,9 @@ typedef struct mdi_phci {
 /*
  * per-pHCI lock macros
  */
-#define	MDI_PHCI_LOCK(ph)		mutex_enter(&(ph)->ph_mutex)
-#define	MDI_PHCI_TRYLOCK(ph)		mutex_tryenter(&(ph)->ph_mutex)
-#define	MDI_PHCI_UNLOCK(ph)		mutex_exit(&(ph)->ph_mutex)
-#ifdef	DEBUG
-#define	MDI_PHCI_LOCKED(vh)		MUTEX_HELD(&(ph)->ph_mutex)
-#endif	/* DEBUG */
+#define	MDI_PHCI_LOCK(ph)		mutex_enter(&((ph))->ph_mutex)
+#define	MDI_PHCI_TRYLOCK(ph)		mutex_tryenter(&((ph))->ph_mutex)
+#define	MDI_PHCI_UNLOCK(ph)		mutex_exit(&((ph))->ph_mutex)
 
 /*
  * pHCI state definitions and macros to track the pHCI driver instance state
@@ -388,81 +334,79 @@ typedef struct mdi_phci {
 #define	MDI_PHCI_FLAGS_D_DISABLE_TRANS	0x40	/* pHCI is disabled,transient */
 #define	MDI_PHCI_FLAGS_POWER_TRANSITION	0x80	/* pHCI is power transition */
 
-#define	MDI_PHCI_DISABLE_MASK						\
-	    (MDI_PHCI_FLAGS_USER_DISABLE | MDI_PHCI_FLAGS_D_DISABLE |	\
-	    MDI_PHCI_FLAGS_D_DISABLE_TRANS)
+#define	MDI_PHCI_DISABLE_MASK	(~(MDI_PHCI_FLAGS_USER_DISABLE | \
+				MDI_PHCI_FLAGS_D_DISABLE | \
+				MDI_PHCI_FLAGS_D_DISABLE_TRANS))
+#define	MDI_PHCI_IS_READY(ph) \
+	(((ph)->ph_flags &  (MDI_PHCI_DISABLE_MASK)) == 0)
 
-#define	MDI_PHCI_IS_READY(ph)						\
-	    (((ph)->ph_flags & MDI_PHCI_DISABLE_MASK) == 0)
+#define	MDI_PHCI_SET_OFFLINE(ph) \
+	    ((ph)->ph_flags |= MDI_PHCI_FLAGS_OFFLINE)
 
-#define	MDI_PHCI_SET_OFFLINE(ph) 					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_OFFLINE;			}
-#define	MDI_PHCI_SET_ONLINE(ph)						{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_OFFLINE;			}
-#define	MDI_PHCI_IS_OFFLINE(ph)						\
+#define	MDI_PHCI_SET_ONLINE(ph) \
+	    ((ph)->ph_flags &= ~MDI_PHCI_FLAGS_OFFLINE)
+
+#define	MDI_PHCI_SET_SUSPEND(ph) \
+	    ((ph)->ph_flags |= MDI_PHCI_FLAGS_SUSPEND)
+
+#define	MDI_PHCI_SET_RESUME(ph) \
+	    ((ph)->ph_flags &= ~MDI_PHCI_FLAGS_SUSPEND)
+
+#define	MDI_PHCI_IS_OFFLINE(ph) \
 	    ((ph)->ph_flags & MDI_PHCI_FLAGS_OFFLINE)
 
-#define	MDI_PHCI_SET_SUSPEND(ph) 					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_SUSPEND;			}
-#define	MDI_PHCI_SET_RESUME(ph)						{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_SUSPEND;			}
-#define	MDI_PHCI_IS_SUSPENDED(ph)					\
+#define	MDI_PHCI_IS_SUSPENDED(ph) \
 	    ((ph)->ph_flags & MDI_PHCI_FLAGS_SUSPEND)
 
-#define	MDI_PHCI_SET_DETACH(ph)						{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_DETACH;			}
-#define	MDI_PHCI_SET_ATTACH(ph)						{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_DETACH;			}
+#define	MDI_PHCI_SET_DETACH(ph) \
+	    ((ph)->ph_flags |= MDI_PHCI_FLAGS_DETACH)
 
-#define	MDI_PHCI_SET_POWER_DOWN(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_POWER_DOWN;		}
-#define	MDI_PHCI_SET_POWER_UP(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_POWER_DOWN;		}
-#define	MDI_PHCI_IS_POWERED_DOWN(ph)					\
+#define	MDI_PHCI_SET_ATTACH(ph) \
+	    ((ph)->ph_flags &= ~MDI_PHCI_FLAGS_DETACH)
+
+#define	MDI_PHCI_SET_POWER_DOWN(ph) \
+	    ((ph)->ph_flags |= MDI_PHCI_FLAGS_POWER_DOWN)
+
+#define	MDI_PHCI_SET_POWER_UP(ph) \
+	    ((ph)->ph_flags &= ~MDI_PHCI_FLAGS_POWER_DOWN)
+
+#define	MDI_PHCI_SET_USER_ENABLE(ph) \
+		((ph)->ph_flags &= ~MDI_PHCI_FLAGS_USER_DISABLE)
+
+#define	MDI_PHCI_SET_USER_DISABLE(ph) \
+		((ph)->ph_flags |= MDI_PHCI_FLAGS_USER_DISABLE)
+
+#define	MDI_PHCI_SET_DRV_ENABLE(ph)	\
+		((ph)->ph_flags &= ~MDI_PHCI_FLAGS_D_DISABLE)
+
+#define	MDI_PHCI_SET_DRV_DISABLE(ph)	\
+		((ph)->ph_flags |= MDI_PHCI_FLAGS_D_DISABLE)
+
+#define	MDI_PHCI_SET_DRV_ENABLE_TRANSIENT(ph)	\
+		((ph)->ph_flags &= ~MDI_PHCI_FLAGS_D_DISABLE_TRANS)
+
+#define	MDI_PHCI_SET_DRV_DISABLE_TRANSIENT(ph)	\
+		((ph)->ph_flags |= MDI_PHCI_FLAGS_D_DISABLE_TRANS)
+
+#define	MDI_PHCI_IS_USER_DISABLED(ph) \
+		((ph)->ph_flags & MDI_PHCI_FLAGS_USER_DISABLE)
+
+#define	MDI_PHCI_IS_DRV_DISABLED_TRANSIENT(ph)	\
+		((ph)->ph_flags & MDI_PHCI_FLAGS_D_DISABLE_TRANS)
+
+#define	MDI_PHCI_IS_DRV_DISABLED(ph)	\
+		((ph)->ph_flags & MDI_PHCI_FLAGS_D_DISABLE)
+
+#define	MDI_PHCI_IS_POWERED_DOWN(ph) \
 	    ((ph)->ph_flags & MDI_PHCI_FLAGS_POWER_DOWN)
 
-#define	MDI_PHCI_SET_USER_ENABLE(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_USER_DISABLE;		}
-#define	MDI_PHCI_SET_USER_DISABLE(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_USER_DISABLE;		}
-#define	MDI_PHCI_IS_USER_DISABLED(ph)					\
-	    ((ph)->ph_flags & MDI_PHCI_FLAGS_USER_DISABLE)
+#define	MDI_PHCI_SET_POWER_TRANSITION(ph) \
+	    ((ph)->ph_flags |= MDI_PHCI_FLAGS_POWER_TRANSITION)
 
-#define	MDI_PHCI_SET_DRV_ENABLE(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_D_DISABLE;		}
-#define	MDI_PHCI_SET_DRV_DISABLE(ph)					{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_D_DISABLE;			}
-#define	MDI_PHCI_IS_DRV_DISABLED(ph)					\
-	    ((ph)->ph_flags & MDI_PHCI_FLAGS_D_DISABLE)
+#define	MDI_PHCI_CLEAR_POWER_TRANSITION(ph) \
+	    ((ph)->ph_flags &= ~MDI_PHCI_FLAGS_POWER_TRANSITION)
 
-#define	MDI_PHCI_SET_DRV_ENABLE_TRANSIENT(ph)				{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_D_DISABLE_TRANS;		}
-#define	MDI_PHCI_SET_DRV_DISABLE_TRANSIENT(ph)				{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_D_DISABLE_TRANS;		}
-#define	MDI_PHCI_IS_DRV_DISABLED_TRANSIENT(ph)				\
-	    ((ph)->ph_flags & MDI_PHCI_FLAGS_D_DISABLE_TRANS)
-
-#define	MDI_PHCI_SET_POWER_TRANSITION(ph)				{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags |= MDI_PHCI_FLAGS_POWER_TRANSITION;		}
-#define	MDI_PHCI_CLEAR_POWER_TRANSITION(ph)				{\
-	    ASSERT(MDI_PHCI_LOCKED(ph));				\
-	    (ph)->ph_flags &= ~MDI_PHCI_FLAGS_POWER_TRANSITION;		}
-#define	MDI_PHCI_IS_POWER_TRANSITION(ph)				\
+#define	MDI_PHCI_IS_POWER_TRANSITION(ph) \
 	    ((ph)->ph_flags & MDI_PHCI_FLAGS_POWER_TRANSITION)
 
 /*
@@ -481,11 +425,12 @@ typedef struct mdi_phci {
  * Multipath client devices are instantiated as children of corresponding vHCI
  * driver instance. Each client device is uniquely identified by a GUID
  * provided by target device itself.  The parent vHCI device also maintains a
- * hashed list of client devices, protected by vh_client_mutex.
+ * hashed list of client devices, protected by the global mdi_mutex.
  *
  * Typically pHCI devices self-enumerate their child devices using taskq,
  * resulting in multiple paths to the same client device to be enumerated by
- * competing threads.
+ * competing threads.  mdi_mutex is also used to serialize the client device
+ * creation.
  *
  * Currently this framework supports two kinds of load-balancing policy
  * configurable through the vHCI driver configuration files.
@@ -497,40 +442,36 @@ typedef struct mdi_phci {
  *
  * OPTIMAL	- Client device has atleast one redundant path.
  * DEGRADED	- No redundant paths (critical).  Failure in the current active
- *		  path would result in data access failures.
+ *                path would result in data access failures.
  * FAILED 	- No paths are available to access this device.
  *
  * Locking order:
  *
- * _NOTE(LOCK_ORDER(mdi_mutex, mdi_client::ct_mutex))			XXX
- * _NOTE(LOCK_ORDER(mdi_client::ct_mutex devinfo_tree_lock))		XXX
+ * _NOTE(LOCK_ORDER(mdi_mutex, mdi_client::ct_mutex))
+ * _NOTE(LOCK_ORDER(mdi_client::ct_mutex devinfo_tree_lock))
  */
 typedef struct mdi_client {
-	/* protected by MDI_VHCI_CLIENT_LOCK vh_client_mutex... */
+	kmutex_t		ct_mutex;	/* per-client mutex	*/
 	struct mdi_client	*ct_hnext;	/* next client		*/
 	struct mdi_client	*ct_hprev;	/* prev client		*/
 	dev_info_t		*ct_dip;	/* client devi handle	*/
 	struct mdi_vhci		*ct_vhci;	/* vHCI back ref	*/
 	char			*ct_drvname;	/* client driver name	*/
 	char			*ct_guid;	/* client guid		*/
+	void			*ct_cprivate;	/* client driver private */
 	client_lb_t		ct_lb;		/* load balancing scheme */
 	client_lb_args_t	*ct_lb_args; 	/* load balancing args */
-
-
-	/* protected by MDI_CLIENT_LOCK ct_mutex... */
-	kmutex_t		ct_mutex;	/* per-client mutex	*/
+	int			ct_flags;	/* Driver op. flags	*/
+	int			ct_state;	/* state information	*/
+	int			ct_failover_flags;	/* Failover args */
+	int			ct_failover_status;	/* last fo status */
+	kcondvar_t		ct_failover_cv;	/* Failover status cv	*/
 	int			ct_path_count;	/* multi path count	*/
 	mdi_pathinfo_t		*ct_path_head;	/* multi path list head	*/
 	mdi_pathinfo_t		*ct_path_tail;	/* multi path list tail	*/
 	mdi_pathinfo_t		*ct_path_last;	/* last path used for i/o */
-	int			ct_state;	/* state information	*/
-	int			ct_flags;	/* Driver op. flags	*/
-	int			ct_failover_flags;	/* Failover args */
-	int			ct_failover_status;	/* last fo status */
-	kcondvar_t		ct_failover_cv;	/* Failover status cv	*/
 	int			ct_unstable;	/* Paths in transient state */
 	kcondvar_t		ct_unstable_cv;	/* Paths in transient state */
-
 	int			ct_power_cnt;	/* Hold count on parent power */
 	kcondvar_t		ct_powerchange_cv;
 					/* Paths in power transient state */
@@ -540,20 +481,15 @@ typedef struct mdi_client {
 					/* held in pre/post unconfig */
 	int			ct_powercnt_reset;
 					/* ct_power_cnt was resetted */
-
-	void			*ct_cprivate;	/* client driver private */
 	void			*ct_vprivate;	/* vHCI driver private	*/
 } mdi_client_t;
 
 /*
  * per-Client device locking definitions
  */
-#define	MDI_CLIENT_LOCK(ct)		mutex_enter(&(ct)->ct_mutex)
-#define	MDI_CLIENT_TRYLOCK(ct)		mutex_tryenter(&(ct)->ct_mutex)
-#define	MDI_CLIENT_UNLOCK(ct)		mutex_exit(&(ct)->ct_mutex)
-#ifdef	DEBUG
-#define	MDI_CLIENT_LOCKED(ct)		MUTEX_HELD(&(ct)->ct_mutex)
-#endif	/* DEBUG */
+#define	MDI_CLIENT_LOCK(ct)		mutex_enter(&((ct))->ct_mutex)
+#define	MDI_CLIENT_TRYLOCK(ct)		mutex_tryenter(&((ct))->ct_mutex)
+#define	MDI_CLIENT_UNLOCK(ct)		mutex_exit(&((ct))->ct_mutex)
 
 /*
  * A Client device is in unstable while one or more paths are in transitional
@@ -583,81 +519,81 @@ typedef struct mdi_client {
 #define	MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED	0x00000100
 #define	MDI_CLIENT_FLAGS_POWER_TRANSITION	0x00000200
 
-#define	MDI_CLIENT_SET_OFFLINE(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_OFFLINE;			}
-#define	MDI_CLIENT_SET_ONLINE(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_OFFLINE;		}
+#define	MDI_CLIENT_SET_OFFLINE(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_OFFLINE)
+
+#define	MDI_CLIENT_SET_ONLINE(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_OFFLINE)
+
 #define	MDI_CLIENT_IS_OFFLINE(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_OFFLINE)
 
-#define	MDI_CLIENT_SET_SUSPEND(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_SUSPEND;			}
-#define	MDI_CLIENT_SET_RESUME(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_SUSPEND;		}
+#define	MDI_CLIENT_SET_SUSPEND(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_SUSPEND)
+
+#define	MDI_CLIENT_SET_RESUME(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_SUSPEND)
+
 #define	MDI_CLIENT_IS_SUSPENDED(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_SUSPEND)
 
-#define	MDI_CLIENT_SET_POWER_DOWN(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_POWER_DOWN;		}
-#define	MDI_CLIENT_SET_POWER_UP(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_POWER_DOWN;		}
+#define	MDI_CLIENT_SET_POWER_DOWN(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_POWER_DOWN)
+
+#define	MDI_CLIENT_SET_POWER_UP(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_POWER_DOWN)
+
 #define	MDI_CLIENT_IS_POWERED_DOWN(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_POWER_DOWN)
 
-#define	MDI_CLIENT_SET_POWER_TRANSITION(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_POWER_TRANSITION;	}
-#define	MDI_CLIENT_CLEAR_POWER_TRANSITION(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_POWER_TRANSITION;	}
+#define	MDI_CLIENT_SET_POWER_TRANSITION(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_POWER_TRANSITION)
+
+#define	MDI_CLIENT_CLEAR_POWER_TRANSITION(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_POWER_TRANSITION)
+
 #define	MDI_CLIENT_IS_POWER_TRANSITION(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_POWER_TRANSITION)
 
-#define	MDI_CLIENT_SET_DETACH(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_DETACH;			}
-#define	MDI_CLIENT_SET_ATTACH(ct)					{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_DETACH;			}
+#define	MDI_CLIENT_SET_DETACH(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_DETACH)
+
+#define	MDI_CLIENT_SET_ATTACH(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_DETACH)
+
 #define	MDI_CLIENT_IS_DETACHED(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_DETACH)
 
-#define	MDI_CLIENT_SET_FAILOVER_IN_PROGRESS(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_FAILOVER;		}
-#define	MDI_CLIENT_CLEAR_FAILOVER_IN_PROGRESS(ct)			{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_FAILOVER;		}
+#define	MDI_CLIENT_SET_FAILOVER_IN_PROGRESS(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_FAILOVER)
+
+#define	MDI_CLIENT_CLEAR_FAILOVER_IN_PROGRESS(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_FAILOVER)
+
 #define	MDI_CLIENT_IS_FAILOVER_IN_PROGRESS(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_FAILOVER)
 
-#define	MDI_CLIENT_SET_REPORT_DEV_NEEDED(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_REPORT_DEV;		}
-#define	MDI_CLIENT_CLEAR_REPORT_DEV_NEEDED(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_REPORT_DEV;		}
+#define	MDI_CLIENT_SET_REPORT_DEV_NEEDED(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_REPORT_DEV)
+
+#define	MDI_CLIENT_CLEAR_REPORT_DEV_NEEDED(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_REPORT_DEV)
+
 #define	MDI_CLIENT_IS_REPORT_DEV_NEEDED(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_REPORT_DEV)
 
-#define	MDI_CLIENT_SET_PATH_FREE_IN_PROGRESS(ct)			{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_PATH_FREE_IN_PROGRESS;	}
-#define	MDI_CLIENT_CLEAR_PATH_FREE_IN_PROGRESS(ct)			{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags &= ~MDI_CLIENT_FLAGS_PATH_FREE_IN_PROGRESS;	}
+#define	MDI_CLIENT_SET_PATH_FREE_IN_PROGRESS(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_PATH_FREE_IN_PROGRESS)
+
+#define	MDI_CLIENT_CLEAR_PATH_FREE_IN_PROGRESS(ct) \
+	    ((ct)->ct_flags &= ~MDI_CLIENT_FLAGS_PATH_FREE_IN_PROGRESS)
+
 #define	MDI_CLIENT_IS_PATH_FREE_IN_PROGRESS(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_PATH_FREE_IN_PROGRESS)
 
-#define	MDI_CLIENT_SET_DEV_NOT_SUPPORTED(ct)				{\
-	    ASSERT(MDI_CLIENT_LOCKED(ct));				\
-	    (ct)->ct_flags |= MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED;	}
+#define	MDI_CLIENT_SET_DEV_NOT_SUPPORTED(ct) \
+	    ((ct)->ct_flags |= MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED)
+
 #define	MDI_CLIENT_IS_DEV_NOT_SUPPORTED(ct) \
 	    ((ct)->ct_flags & MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED)
 
@@ -691,33 +627,26 @@ typedef struct mdi_client {
  *
  * Locking order:
  *
- * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_pathinfo::pi_mutex))		XXX
- * _NOTE(LOCK_ORDER(mdi_client::ct_mutex mdi_pathinfo::pi_mutex))	XXX
- * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_client::ct_mutex))		XXX
- * _NOTE(LOCK_ORDER(devinfo_tree_lock mdi_pathinfo::pi_mutex))		XXX
+ * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_pathinfo::pi_mutex))
+ * _NOTE(LOCK_ORDER(mdi_client::ct_mutex mdi_pathinfo::pi_mutex))
+ * _NOTE(LOCK_ORDER(mdi_phci::ph_mutex mdi_client::ct_mutex))
+ * _NOTE(LOCK_ORDER(devinfo_tree_lock mdi_pathinfo::pi_mutex))
  *
  * mdi_pathinfo node structure definition
  */
 struct mdi_pathinfo {
-	/* protected by MDI_PHCI_LOCK ph_mutex... */
-	struct mdi_pathinfo	*pi_phci_link;	 /* next path in phci list */
-	mdi_phci_t		*pi_phci;	/* pHCI dev_info node	*/
-
-	/* protected by MDI_CLIENT_LOCK ct_mutex... */
-	struct mdi_pathinfo	*pi_client_link; /* next path in client list */
-	mdi_client_t		*pi_client;	/* client		*/
-
-	/* protected by MDI_VHCI_CLIENT_LOCK vh_client_mutex... */
-	char			*pi_addr;	/* path unit address	*/
-
-	/* protected by MDI_PI_LOCK pi_mutex... */
 	kmutex_t		pi_mutex;	/* per path mutex	*/
 	mdi_pathinfo_state_t	pi_state;	/* path state		*/
 	mdi_pathinfo_state_t	pi_old_state;	/* path state		*/
 	kcondvar_t		pi_state_cv;	/* path state condvar	*/
+	mdi_client_t		*pi_client;	/* client		*/
+	mdi_phci_t		*pi_phci;	/* pHCI dev_info node	*/
+	char			*pi_addr;	/* path unit address	*/
 	nvlist_t		*pi_prop;	/* Properties		*/
 	void			*pi_cprivate;	/* client private info	*/
 	void			*pi_pprivate;	/* phci private info	*/
+	struct mdi_pathinfo	*pi_client_link; /* next path in client list */
+	struct mdi_pathinfo	*pi_phci_link;	 /* next path in phci list */
 	int			pi_ref_cnt;	/* pi reference count	*/
 	kcondvar_t		pi_ref_cv;	/* condition variable	*/
 	struct mdi_pi_kstats	*pi_kstats;	/* aggregate kstats */
@@ -782,15 +711,10 @@ struct pi_errs {
 
 #define	MDI_PI(type)			((struct mdi_pathinfo *)(type))
 
-#define	MDI_PI_LOCK(pip)		mutex_enter(&MDI_PI(pip)->pi_mutex)
-#define	MDI_PI_TRYLOCK(pip)		mutex_tryenter(&MDI_PI(pip)->pi_mutex)
-#define	MDI_PI_UNLOCK(pip)		mutex_exit(&MDI_PI(pip)->pi_mutex)
-#ifdef	DEBUG
-#define	MDI_PI_LOCKED(pip)		MUTEX_HELD(&MDI_PI(pip)->pi_mutex)
-#endif	/* DEBUG */
-
-#define	MDI_PI_HOLD(pip)		(++MDI_PI(pip)->pi_ref_cnt)
-#define	MDI_PI_RELE(pip)		(--MDI_PI(pip)->pi_ref_cnt)
+#define	MDI_PI_LOCK(pip)		mutex_enter(&MDI_PI((pip))->pi_mutex)
+#define	MDI_PI_UNLOCK(pip)		mutex_exit(&MDI_PI((pip))->pi_mutex)
+#define	MDI_PI_HOLD(pip)		(++MDI_PI((pip))->pi_ref_cnt)
+#define	MDI_PI_RELE(pip)		(--MDI_PI((pip))->pi_ref_cnt)
 
 #define	MDI_EXT_STATE_CHANGE		0x10000000
 
@@ -801,159 +725,161 @@ struct pi_errs {
 #define	MDI_AFTER_STATE_CHANGE		0x8
 #define	MDI_SYNC_FLAG			0x10
 
-#define	MDI_PI_STATE(pip)						\
-	(MDI_PI((pip))->pi_state & MDI_PATHINFO_STATE_MASK)
-#define	MDI_PI_OLD_STATE(pip)						\
-	(MDI_PI((pip))->pi_old_state & MDI_PATHINFO_STATE_MASK)
+#define	MDI_PI_STATE(pip) \
+	    (MDI_PI((pip))->pi_state & MDI_PATHINFO_STATE_MASK)
 
-#define	MDI_PI_EXT_STATE(pip)						\
-	(MDI_PI((pip))->pi_state & MDI_PATHINFO_EXT_STATE_MASK)
-#define	MDI_PI_OLD_EXT_STATE(pip)					\
-	(MDI_PI((pip))->pi_old_state & MDI_PATHINFO_EXT_STATE_MASK)
+#define	MDI_PI_OLD_STATE(pip) \
+	    (MDI_PI((pip))->pi_old_state & MDI_PATHINFO_STATE_MASK)
 
-#define	MDI_PI_SET_TRANSIENT(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_TRANSIENT;		}
-#define	MDI_PI_CLEAR_TRANSIENT(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_TRANSIENT;		}
+#define	MDI_PI_EXT_STATE(pip) \
+		(MDI_PI((pip))->pi_state & MDI_PATHINFO_EXT_STATE_MASK)
+
+#define	MDI_PI_OLD_EXT_STATE(pip) \
+		(MDI_PI((pip))->pi_old_state & MDI_PATHINFO_EXT_STATE_MASK)
+
+#define	MDI_PI_SET_TRANSIENT(pip) \
+	    (MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_TRANSIENT)
+
+#define	MDI_PI_CLEAR_TRANSIENT(pip) \
+	    (MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_TRANSIENT)
+
 #define	MDI_PI_IS_TRANSIENT(pip) \
 	(MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_TRANSIENT)
 
-#define	MDI_PI_SET_USER_DISABLE(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_USER_DISABLE;	}
-#define	MDI_PI_SET_DRV_DISABLE(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_DRV_DISABLE;	}
-#define	MDI_PI_SET_DRV_DISABLE_TRANS(pip)				{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT; }
+#define	MDI_PI_SET_USER_DISABLE(pip) \
+	(MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_USER_DISABLE)
 
-#define	MDI_PI_SET_USER_ENABLE(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_USER_DISABLE;	}
-#define	MDI_PI_SET_DRV_ENABLE(pip)					{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_DRV_DISABLE;	}
-#define	MDI_PI_SET_DRV_ENABLE_TRANS(pip)				{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT; }
+#define	MDI_PI_SET_DRV_DISABLE(pip) \
+	(MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_DRV_DISABLE)
 
-#define	MDI_PI_IS_USER_DISABLE(pip)					\
+#define	MDI_PI_SET_DRV_DISABLE_TRANS(pip) \
+	(MDI_PI(pip)->pi_state |= MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT)
+
+#define	MDI_PI_SET_USER_ENABLE(pip) \
+	(MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_USER_DISABLE)
+
+#define	MDI_PI_SET_DRV_ENABLE(pip) \
+	(MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_DRV_DISABLE)
+
+#define	MDI_PI_SET_DRV_ENABLE_TRANS(pip) \
+	(MDI_PI(pip)->pi_state &= ~MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT)
+
+#define	MDI_PI_IS_USER_DISABLE(pip)	\
 	(MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_USER_DISABLE)
-#define	MDI_PI_IS_DRV_DISABLE(pip)					\
+
+#define	MDI_PI_IS_DRV_DISABLE(pip)	\
 	(MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_DRV_DISABLE)
-#define	MDI_PI_IS_DRV_DISABLE_TRANSIENT(pip)				\
+
+#define	MDI_PI_IS_DRV_DISABLE_TRANSIENT(pip)	\
 	(MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT)
 
-#define	MDI_PI_IS_DISABLE(pip)						\
-	(MDI_PI_IS_USER_DISABLE(pip) ||					\
-	MDI_PI_IS_DRV_DISABLE(pip) ||					\
+#define	MDI_PI_IS_DISABLE(pip)	\
+	(MDI_PI_IS_USER_DISABLE(pip) || \
+	MDI_PI_IS_DRV_DISABLE(pip) || \
 	MDI_PI_IS_DRV_DISABLE_TRANSIENT(pip))
 
-#define	MDI_PI_IS_INIT(pip)						\
-	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) ==		\
+#define	MDI_PI_IS_INIT(pip) \
+	    ((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) == \
 		MDI_PATHINFO_STATE_INIT)
 
-#define	MDI_PI_IS_INITING(pip)						\
-	((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) ==	\
+#define	MDI_PI_IS_INITING(pip) \
+	    ((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) == \
 		(MDI_PATHINFO_STATE_INIT | MDI_PATHINFO_STATE_TRANSIENT))
 
-#define	MDI_PI_SET_INIT(pip)						{\
-	ASSERT(MDI_PI_LOCKED(pip));					\
-	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_INIT;		}
+#define	MDI_PI_SET_INIT(pip) \
+	    (MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_INIT)
 
-#define	MDI_PI_SET_ONLINING(pip)					{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_ONLINING(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip);			\
-	MDI_PI(pip)->pi_state =						\
-	(MDI_PATHINFO_STATE_ONLINE | MDI_PATHINFO_STATE_TRANSIENT);	\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip); \
+	MDI_PI(pip)->pi_state = \
+	(MDI_PATHINFO_STATE_ONLINE | MDI_PATHINFO_STATE_TRANSIENT); \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_ONLINING(pip)						\
-	((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) ==	\
+#define	MDI_PI_IS_ONLINING(pip) \
+	((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) == \
 	(MDI_PATHINFO_STATE_ONLINE | MDI_PATHINFO_STATE_TRANSIENT))
 
-#define	MDI_PI_SET_ONLINE(pip)						{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_ONLINE(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_ONLINE;		\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_ONLINE; \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_ONLINE(pip)						\
-	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) ==		\
+
+#define	MDI_PI_IS_ONLINE(pip) \
+	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) == \
 	MDI_PATHINFO_STATE_ONLINE)
 
-#define	MDI_PI_SET_OFFLINING(pip)					{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_OFFLINING(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip);			\
-	MDI_PI(pip)->pi_state =						\
-	(MDI_PATHINFO_STATE_OFFLINE | MDI_PATHINFO_STATE_TRANSIENT);	\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip); \
+	MDI_PI(pip)->pi_state = \
+	(MDI_PATHINFO_STATE_OFFLINE | MDI_PATHINFO_STATE_TRANSIENT); \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_OFFLINING(pip)					\
-	((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) ==	\
-	(MDI_PATHINFO_STATE_OFFLINE | MDI_PATHINFO_STATE_TRANSIENT))
+#define	MDI_PI_IS_OFFLINING(pip) \
+	    ((MDI_PI(pip)->pi_state & ~MDI_PATHINFO_EXT_STATE_MASK) == \
+	    (MDI_PATHINFO_STATE_OFFLINE | MDI_PATHINFO_STATE_TRANSIENT))
 
-#define	MDI_PI_SET_OFFLINE(pip)						{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_OFFLINE(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_OFFLINE;		\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_OFFLINE; \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_OFFLINE(pip)						\
-	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) ==		\
-	MDI_PATHINFO_STATE_OFFLINE)
+#define	MDI_PI_IS_OFFLINE(pip) \
+	    ((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) == \
+		MDI_PATHINFO_STATE_OFFLINE)
 
-#define	MDI_PI_SET_STANDBYING(pip)					{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_STANDBYING(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip);			\
-	MDI_PI(pip)->pi_state =						\
-	(MDI_PATHINFO_STATE_STANDBY | MDI_PATHINFO_STATE_TRANSIENT);	\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip); \
+	MDI_PI(pip)->pi_state = \
+	(MDI_PATHINFO_STATE_STANDBY | MDI_PATHINFO_STATE_TRANSIENT); \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_SET_STANDBY(pip)						{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_STANDBY(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_STANDBY;		\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_STANDBY; \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_STANDBY(pip)						\
-	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) ==		\
+#define	MDI_PI_IS_STANDBY(pip) \
+	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) == \
 	MDI_PATHINFO_STATE_STANDBY)
 
-#define	MDI_PI_SET_FAULTING(pip)					{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_FAULTING(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip);			\
-	MDI_PI(pip)->pi_state =						\
-	    (MDI_PATHINFO_STATE_FAULT | MDI_PATHINFO_STATE_TRANSIENT);	\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_old_state = MDI_PI_STATE(pip); \
+	MDI_PI(pip)->pi_state = \
+	    (MDI_PATHINFO_STATE_FAULT | MDI_PATHINFO_STATE_TRANSIENT); \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_SET_FAULT(pip)						{\
-	uint32_t	ext_state;					\
-	ASSERT(MDI_PI_LOCKED(pip));					\
+#define	MDI_PI_SET_FAULT(pip) { \
+	uint32_t	ext_state; \
 	ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK; \
-	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_FAULT;		\
-	MDI_PI(pip)->pi_state |= ext_state;				}
+	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_FAULT; \
+	MDI_PI(pip)->pi_state |= ext_state; \
+}
 
-#define	MDI_PI_IS_FAULT(pip)						\
-	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) ==		\
+#define	MDI_PI_IS_FAULT(pip) \
+	((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK) == \
 	MDI_PATHINFO_STATE_FAULT)
 
-#define	MDI_PI_IS_SUSPENDED(pip)					\
-	((MDI_PI(pip))->pi_phci->ph_flags & MDI_PHCI_FLAGS_SUSPEND)
+#define	MDI_PI_IS_SUSPENDED(pip) \
+	    ((MDI_PI(pip))->pi_phci->ph_flags & MDI_PHCI_FLAGS_SUSPEND)
 
 /*
  * mdi_vhcache_client, mdi_vhcache_pathinfo, and mdi_vhcache_phci structures
@@ -1127,12 +1053,13 @@ dev_info_t	*mdi_phci_path2devinfo(dev_info_t *, caddr_t);
  * 	MDI_SELECT_USER_DISABLE_PATH: select user disable for failover and
  *		auto_failback
  *
- * The selected paths are returned in an mdi_hold_path() state (pi_ref_cnt),
- * caller should release the hold by calling mdi_rele_path() at the end of
- * operation.
+ * The selected paths are returned in a held state (ref_cnt) and caller should
+ * release the hold by calling mdi_rele_path() at the end of operation.
  */
 int		mdi_select_path(dev_info_t *, struct buf *, int,
 		    mdi_pathinfo_t *, mdi_pathinfo_t **);
+void		mdi_hold_path(mdi_pathinfo_t *);
+void		mdi_rele_path(mdi_pathinfo_t *);
 int		mdi_set_lb_policy(dev_info_t *, client_lb_t);
 int		mdi_set_lb_region_size(dev_info_t *, int);
 client_lb_t	mdi_get_lb_policy(dev_info_t *);

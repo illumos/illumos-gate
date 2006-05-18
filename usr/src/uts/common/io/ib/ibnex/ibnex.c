@@ -1104,21 +1104,8 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 	dev_info_t		*cdip, *pdip = NULL;
 	ibnex_node_data_t	*node_data;
 	ibnex_port_node_t	*port_node;
-	int			use_mdi_devi_locking = 0;
 
-
-	/* Set use_mdi_devi_locking appropriately */
-	if ((mdi_component_is_phci(parent, NULL) == MDI_SUCCESS) &&
-	    ((op != BUS_CONFIG_ONE) || (op == BUS_CONFIG_ONE &&
-	    strncmp((char *)devname, IBNEX_IBPORT_CNAME, 6) != 0))) {
-		IBTF_DPRINTF_L4("ibnex", "\tbus_config: using mdi_devi_enter");
-		use_mdi_devi_locking = 1;
-	}
-
-	if (use_mdi_devi_locking)
-		mdi_devi_enter(parent, &circ);
-	else
-		ndi_devi_enter(parent, &circ);
+	ndi_devi_enter(parent, &circ);
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
@@ -1131,10 +1118,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 
 		if (caddr == NULL || (strlen(caddr) == 0)) {
 			kmem_free(device_name, len);
-			if (use_mdi_devi_locking)
-				mdi_devi_exit(parent, circ);
-			else
-				ndi_devi_exit(parent, circ);
+			ndi_devi_exit(parent, circ);
 			return (NDI_FAILURE);
 		}
 
@@ -1153,11 +1137,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		if (cdip == NULL) {
 			/* Node is not present */
 			if (strncmp(cname, IBNEX_IOC_CNAME, 3) == 0) {
-				if (use_mdi_devi_locking)
-					mdi_devi_exit(parent, circ);
-				else
-					ndi_devi_exit(parent, circ);
-
+				ndi_devi_exit(parent, circ);
 				ret = ibnex_ioc_bus_config_one(&parent, flag,
 				    op, devname, child, &need_bus_config);
 				if (!need_bus_config) {
@@ -1165,10 +1145,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 					return (ret);
 				}
 
-				if (use_mdi_devi_locking)
-					mdi_devi_enter(parent, &circ);
-				else
-					ndi_devi_enter(parent, &circ);
+				ndi_devi_enter(parent, &circ);
 			} else if ((strncmp(cname,
 			    IBNEX_IBPORT_CNAME, 6) == 0) &&
 			    (parent != ibnex.ibnex_dip)) { /* parent is HCA */
@@ -1191,11 +1168,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 				ret = IBNEX_SUCCESS;
 				ibnex_pseudo_initnodes();
 				if (parent == ibnex.ibnex_dip) {
-					if (use_mdi_devi_locking)
-						mdi_devi_exit(parent, circ);
-					else
-						ndi_devi_exit(parent, circ);
-
+					ndi_devi_exit(parent, circ);
 					mutex_enter(&ibnex.ibnex_mutex);
 					ret = ibnex_pseudo_mdi_config_one(
 					    flag, devname, child, cname,
@@ -1253,15 +1226,6 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 			    ", parent %p", parent);
 
 		/*
-		 * No locks to be held while calling mdi_vhci_bus_config()
-		 * ibnex_config_all_children() holds appropriate locks.
-		 */
-		if (use_mdi_devi_locking)
-			mdi_devi_exit(parent, circ);
-		else
-			ndi_devi_exit(parent, circ);
-
-		/*
 		 * Drive CONFIG requests for IB Nexus parent through
 		 * MDI. This is needed to load the HCA drivers in x86 SRP
 		 * boot case.
@@ -1270,16 +1234,12 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		 * ibdm and configure all children.
 		 */
 		if (parent == ibnex.ibnex_dip) {
+			ndi_devi_exit(parent, circ);
 			ret = mdi_vhci_bus_config(parent,
 			    flag, op, devname, child, NULL);
 			return (ret);
 		} else {
 			ibnex_config_all_children(parent);
-
-			if (use_mdi_devi_locking)
-				mdi_devi_enter(parent, &circ);
-			else
-				ndi_devi_enter(parent, &circ);
 		}
 		break;
 	default:
@@ -1287,12 +1247,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		ret = IBNEX_FAILURE;
 		break;
 	}
-
-	if (use_mdi_devi_locking)
-		mdi_devi_exit(parent, circ);
-	else
-		ndi_devi_exit(parent, circ);
-
+	ndi_devi_exit(parent, circ);
 	if (ret == IBNEX_SUCCESS) {
 		if (op == BUS_CONFIG_OBP_ARGS)
 			op = BUS_CONFIG_ONE;
@@ -1431,17 +1386,13 @@ ibnex_config_all_children(dev_info_t *parent)
 	ibdm_ioc_info_t		*ioc_list, *ioc;
 	ibdm_hca_list_t		*hca_list;
 	ib_guid_t		hca_guid;
-	int			circ;
 
 	IBTF_DPRINTF_L4("ibnex", "\tconfig_all_children: Begin");
 
 	/*
 	 * Enumerate children of this HCA, port nodes,
-	 * VPPA & HCA_SVC nodes. Use ndi_devi_enter() for
-	 * locking. IB Nexus is enumerating the children
-	 * of HCA, not MPXIO clients.
+	 * VPPA & HCA_SVC nodes
 	 */
-	ndi_devi_enter(parent, &circ);
 	hca_guid = ibtl_ibnex_hcadip2guid(parent);
 	wait_time = ibdm_ibnex_get_waittime(
 		hca_guid, &ibnex_port_settling_time);
@@ -1459,13 +1410,6 @@ ibnex_config_all_children(dev_info_t *parent)
 		    parent, &hca_list->hl_port_attr[ii]);
 	}
 	ibdm_ibnex_free_hca_list(hca_list);
-	ndi_devi_exit(parent, circ);
-
-	/*
-	 * Use mdi_devi_enter() for locking. IB Nexus is
-	 * enumerating MPXIO clients.
-	 */
-	mdi_devi_enter(parent, &circ);
 
 	ibnex_pseudo_initnodes();
 
@@ -1494,7 +1438,6 @@ ibnex_config_all_children(dev_info_t *parent)
 
 	mutex_exit(&ibnex.ibnex_mutex);
 	ibdm_ibnex_free_ioc_list(ioc);
-	mdi_devi_exit(parent, circ);
 
 	IBTF_DPRINTF_L4("ibnex", "\tconfig_all_children: End");
 }
@@ -4110,7 +4053,7 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		if (ret == MDI_SUCCESS)
 			*need_bus_config = 0;
 	} else {
-		mdi_devi_enter(pdip, &circ);
+		ndi_devi_enter(pdip, &circ);
 		if (strstr((char *)devname, ":port=") != NULL) {
 			ret = ibnex_config_root_iocnode(pdip, devname);
 			ASSERT(ibnex.ibnex_dip == NULL);
@@ -4118,7 +4061,7 @@ ibnex_ioc_bus_config_one(dev_info_t **pdipp, uint_t flag,
 		} else {
 			ret = ibnex_config_ioc_node(devname, pdip);
 		}
-		mdi_devi_exit(pdip, circ);
+		ndi_devi_exit(pdip, circ);
 	}
 	return (ret);
 }
