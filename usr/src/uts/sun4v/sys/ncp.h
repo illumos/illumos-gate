@@ -268,11 +268,10 @@ struct ncp_stat {
 #define	NCP_MAQUEUE_WRAPMASK	(NCP_MAQUEUE_NENTRIES - 1)
 #define	NCP_MAQUEUE_SIZE	(NCP_MAQUEUE_NENTRIES * sizeof (ncs_hvdesc_t))
 #define	NCP_MAQUEUE_ALIGN	(NCP_MAQUEUE_SIZE - 1)
+#define	NCP_MAQUEUE_SLOTS_USED(q)	\
+		(((q)->nmq_tail - (q)->nmq_head) & NCP_MAQUEUE_WRAPMASK)
 #define	NCP_MAQUEUE_SLOTS_AVAIL(q)	\
-		(((q)->nmq_head > (q)->nmq_tail) ? \
-			((q)->nmq_head > (q)->nmq_tail - 1) : \
-			(NCP_MAQUEUE_NENTRIES - \
-			((q)->nmq_tail - (q)->nmq_head) - 1))
+		(NCP_MAQUEUE_NENTRIES - NCP_MAQUEUE_SLOTS_USED(q) - 1)
 
 #define	NCP_QINDEX_TO_QOFFSET(i)	((i) * sizeof (ncs_hvdesc_t))
 #define	NCP_QOFFSET_TO_QINDEX(o)	((o) / sizeof (ncs_hvdesc_t))
