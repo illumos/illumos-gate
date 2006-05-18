@@ -75,7 +75,10 @@ cpu_core_t	cpu_core[NCPU];			/* cpu_core structures */
  */
 int use_mp = 1;
 
-int mp_cpus = 0x1;	/* to be set by platform specific module	*/
+/*
+ * To be set by a PSM to indicate what CPUs are available on the system.
+ */
+cpuset_t mp_cpus = 1;
 
 /*
  * This variable is used by the hat layer to decide whether or not
@@ -84,7 +87,7 @@ int mp_cpus = 0x1;	/* to be set by platform specific module	*/
  * order to allow cross calls.
  */
 int flushes_require_xcalls = 0;
-ulong_t	cpu_ready_set = 1;
+cpuset_t	cpu_ready_set = 1;
 
 extern	void	real_mode_start(void);
 extern	void	real_mode_end(void);
@@ -288,7 +291,6 @@ extern void *long_mode_64(void);
 
 	cp->cpu_id = cpun;
 	cp->cpu_self = cp;
-	cp->cpu_mask = 1 << cpun;
 	cp->cpu_thread = tp;
 	cp->cpu_lwp = NULL;
 	cp->cpu_dispthread = tp;
@@ -906,16 +908,18 @@ workaround_errata_end()
 static ushort_t *mp_map_warm_reset_vector();
 static void mp_unmap_warm_reset_vector(ushort_t *warm_reset_vector);
 
+static cpuset_t procset = 1;
+
 /*ARGSUSED*/
 void
 start_other_cpus(int cprboot)
 {
-	unsigned who;
+	unsigned int who;
+	int skipped = 0;
 	int cpuid = 0;
 	int delays = 0;
 	int started_cpu;
 	ushort_t *warm_reset_vector = NULL;
-	extern int procset;
 
 	/*
 	 * Initialize our own cpu_info.
@@ -930,7 +934,7 @@ start_other_cpus(int cprboot)
 	/*
 	 * if only 1 cpu or not using MP, skip the rest of this
 	 */
-	if (!(mp_cpus & ~(1 << cpuid)) || use_mp == 0) {
+	if (CPUSET_ISEQUAL(mp_cpus, cpu_ready_set) || use_mp == 0) {
 		if (use_mp == 0)
 			cmn_err(CE_CONT, "?***** Not in MP mode\n");
 		goto done;
@@ -963,15 +967,19 @@ start_other_cpus(int cprboot)
 	for (who = 0; who < NCPU; who++) {
 		if (who == cpuid)
 			continue;
-
-		if ((mp_cpus & (1 << who)) == 0)
+		if (!CPU_IN_SET(mp_cpus, who))
 			continue;
+
+		if (ncpus >= max_ncpus) {
+			skipped = who;
+			continue;
+		}
 
 		mp_startup_init(who);
 		started_cpu = 1;
 		(*cpu_startf)(who, rm_platter_pa);
 
-		while ((procset & (1 << who)) == 0) {
+		while (!CPU_IN_SET(procset, who)) {
 
 			delay(1);
 			if (++delays > (20 * hz)) {
@@ -994,7 +1002,6 @@ start_other_cpus(int cprboot)
 		if (tsc_gethrtime_enable)
 			tsc_sync_master(who);
 
-
 		if (dtrace_cpu_init != NULL) {
 			/*
 			 * DTrace CPU initialization expects cpu_lock
@@ -1012,11 +1019,21 @@ start_other_cpus(int cprboot)
 		if (who == cpuid)
 			continue;
 
-		if (!(procset & (1 << who)))
+		if (!CPU_IN_SET(procset, who))
 			continue;
 
-		while (!(cpu_ready_set & (1 << who)))
+		while (!CPU_IN_SET(cpu_ready_set, who))
 			delay(1);
+	}
+
+	if (skipped) {
+		cmn_err(CE_NOTE,
+		    "System detected %d CPU(s), but "
+		    "only %d CPU(s) were enabled during boot.",
+		    skipped + 1, ncpus);
+		cmn_err(CE_NOTE,
+		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
+		    "See eeprom(1M).");
 	}
 
 done:
@@ -1059,7 +1076,6 @@ void
 mp_startup(void)
 {
 	struct cpu *cp = CPU;
-	extern int procset;
 	uint_t new_x86_feature;
 
 	new_x86_feature = cpuid_pass1(cp);
@@ -1117,7 +1133,7 @@ mp_startup(void)
 	init_cpu_info(cp);
 
 	mutex_enter(&cpu_lock);
-	procset |= 1 << cp->cpu_id;
+	CPUSET_ADD(procset, cp->cpu_id);
 	mutex_exit(&cpu_lock);
 
 	if (tsc_gethrtime_enable)

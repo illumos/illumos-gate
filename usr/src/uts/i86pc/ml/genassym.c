@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +165,6 @@ main(int argc, char *argv[])
 	printf("#define\tMMU_STD_PAGESHIFT 0x%x\n", (uint_t)MMU_STD_PAGESHIFT);
 	printf("#define\tMMU_STD_PAGEMASK 0x%x\n", (uint_t)MMU_STD_PAGEMASK);
 	printf("#define\tMMU_L2_MASK 0x%x\n", (uint_t)(NPTEPERPT - 1));
-	printf("#define\tMMU_PAGEOFFSET 0x%x\n", (uint_t)(MMU_PAGESIZE - 1));
 	printf("#define\tNPTESHIFT 0x%x\n", (uint_t)NPTESHIFT);
 	printf("#define\tFOURMB_PAGEOFFSET 0x%x\n", (uint_t)FOURMB_PAGEOFFSET);
 	printf("#define\tFOURMB_PAGESIZE 0x%x\n", (uint_t)FOURMB_PAGESIZE);
@@ -175,8 +173,6 @@ main(int argc, char *argv[])
 	printf("#define\tPTE_SRWX 0x%x\n", (uint_t)PTE_SRWX);
 
 	printf("#define\tTRAPTR_NENT 0x%x\n", TRAPTR_NENT);
-
-	printf("#define\tNCPU 0x%x\n", NCPU);
 
 	printf("#define\tCPU_DTRACE_NOFAULT 0x%x\n", CPU_DTRACE_NOFAULT);
 	printf("#define\tCPU_DTRACE_BADADDR 0x%x\n", CPU_DTRACE_BADADDR);

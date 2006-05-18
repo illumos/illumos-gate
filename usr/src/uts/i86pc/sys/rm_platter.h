@@ -102,11 +102,6 @@ typedef	struct rm_platter {
  * allocated when a CPU starts up. Makes it more memory efficient and easier
  * to allocate/release
  *
- * IMPORTANT: i86pc/ml/offsets.in depends upon ct_stack being DEFAULTSTKSZ
- * bytes long, and followed immediately by ct_gdt. Yes, it's a hack. If
- * changing cpu_tables, you must updates offsets.in so that it can
- * continue to calculate the size of DEFAULTSTKSZ.
- *
  * Note: gdt and tss should be 16 byte aligned for best performance on
  * amd64.  Since DEFAULTSTKSIZE is a multiple of pagesize gdt will be aligned.
  * We test below that the tss is properly aligned.

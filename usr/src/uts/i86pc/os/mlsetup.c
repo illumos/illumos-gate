@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -103,7 +102,7 @@ extern void init_tables(void);
 
 
 static uint32_t
-cpuid_getval(char *name)
+bootprop_getval(char *name)
 {
 	char prop[32];
 	u_longlong_t ll;
@@ -126,6 +125,7 @@ mlsetup(struct regs *rp)
 	extern struct chip cpu0_chip;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
+	int boot_ncpus;
 
 	ASSERT_STACK_ALIGNED();
 
@@ -170,13 +170,13 @@ mlsetup(struct regs *rp)
 	 */
 
 	cpuid_feature_ecx_include =
-	    cpuid_getval("cpuid_feature_ecx_include");
+	    bootprop_getval("cpuid_feature_ecx_include");
 	cpuid_feature_ecx_exclude =
-	    cpuid_getval("cpuid_feature_ecx_exclude");
+	    bootprop_getval("cpuid_feature_ecx_exclude");
 	cpuid_feature_edx_include =
-	    cpuid_getval("cpuid_feature_edx_include");
+	    bootprop_getval("cpuid_feature_edx_include");
 	cpuid_feature_edx_exclude =
-	    cpuid_getval("cpuid_feature_edx_exclude");
+	    bootprop_getval("cpuid_feature_edx_exclude");
 
 	/*
 	 * The first lightweight pass (pass0) through the cpuid data
@@ -289,7 +289,6 @@ mlsetup(struct regs *rp)
 	CPU->cpu_flags = CPU_READY | CPU_RUNNING | CPU_EXISTS | CPU_ENABLE;
 	CPU->cpu_dispatch_pri = t0.t_pri;
 
-	CPU->cpu_mask = 1;
 	CPU->cpu_id = 0;
 
 	CPU->cpu_tss = &ktss0;
@@ -342,6 +341,21 @@ mlsetup(struct regs *rp)
 	rp->r_fp = 0;	/* terminate kernel stack traces! */
 
 	prom_init("kernel", (void *)NULL);
+
+	boot_ncpus = bootprop_getval("boot-ncpus");
+
+	/*
+	 * To avoid wasting kernel memory, we're temporarily limiting the
+	 * total number of processors to 32 by default until we get the
+	 * capability to scan ACPI tables early on boot to detect how many
+	 * processors are actually present.  However, 64-bit systems
+	 * can be booted with up to 64 processors by setting "boot-ncpus"
+	 * boot property to 64.
+	 */
+	if (boot_ncpus <= 0 || boot_ncpus > NCPU)
+		boot_ncpus = 32;
+
+	max_ncpus = boot_max_ncpus = boot_ncpus;
 
 	if (boothowto & RB_HALT) {
 		prom_printf("unix: kernel halted by -h flag\n");

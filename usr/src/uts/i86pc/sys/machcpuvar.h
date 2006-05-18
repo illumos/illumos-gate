@@ -68,7 +68,6 @@ struct	machcpu {
 						/* data for setting priority */
 						/* level */
 
-	uint_t		mcpu_mask;	/* bitmask for this cpu (1<<cpu_id) */
 	struct hat	*mcpu_current_hat; /* cpu's current hat */
 
 	struct hat_cpu_info	*mcpu_hat_info;
@@ -106,7 +105,6 @@ struct	machcpu {
 #define	cpu_nodeid cpu_m.mcpu_nodeid
 #define	cpu_pri cpu_m.mcpu_pri
 #define	cpu_pri_data cpu_m.mcpu_pri_data
-#define	cpu_mask cpu_m.mcpu_mask
 #define	cpu_current_hat cpu_m.mcpu_current_hat
 #define	cpu_hat_info cpu_m.mcpu_hat_info
 #define	cpu_ppaddr_mutex cpu_m.mcpu_ppaddr_mutex

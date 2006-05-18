@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -576,17 +575,17 @@ mach_init()
 static void
 mach_smpinit(void)
 {
-	register struct psm_ops  *pops;
-	register processorid_t cpu_id;
-	int	 cnt;
-	int	 cpumask;
+	struct psm_ops  *pops;
+	processorid_t cpu_id;
+	int cnt;
+	cpuset_t cpumask;
 
 	pops = mach_set[0];
 
 	cpu_id = -1;
 	cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
-	for (cnt = 0, cpumask = 0; cpu_id != -1; cnt++) {
-		cpumask |= 1 << cpu_id;
+	for (cnt = 0, CPUSET_ZERO(cpumask); cpu_id != -1; cnt++) {
+		CPUSET_ADD(cpumask, cpu_id);
 		cpu_id = (*pops->psm_get_next_processorid)(cpu_id);
 	}
 
@@ -665,7 +664,7 @@ mach_smpinit(void)
 static void
 mach_picinit()
 {
-	register struct psm_ops  *pops;
+	struct psm_ops  *pops;
 	extern void install_spl(void);	/* XXX: belongs in a header file */
 #if defined(__amd64) && defined(DEBUG)
 	extern void *spl_patch, *slow_spl, *setsplhi_patch, *slow_setsplhi;

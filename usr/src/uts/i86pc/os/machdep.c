@@ -149,8 +149,6 @@ int vac;
 void stop_other_cpus();
 void debug_enter(char *);
 
-int	procset = 1;
-
 extern void pm_cfb_check_and_powerup(void);
 extern void pm_cfb_rele(void);
 

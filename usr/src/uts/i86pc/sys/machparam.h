@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#if !defined(_ASM)
 #include <sys/types.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,9 +47,15 @@ extern "C" {
 #endif  /* _ASM */
 
 /*
- * Machine dependent parameters and limits - PC version.
+ * Machine dependent parameters and limits.
  */
-#define	NCPU 	21
+#if defined(__amd64)
+#define	NCPU	64	/* NBBY * sizeof (ulong_t) for simple cpuset_t */
+#elif defined(__i386)
+#define	NCPU	32
+#else
+#error	"port me"
+#endif
 
 /*
  * The value defined below could grow to 16. hat structure and
@@ -76,7 +83,13 @@ extern "C" {
 
 #define	MMU_PAGESIZE	0x1000		/* 4096 bytes */
 #define	MMU_PAGESHIFT	12		/* log2(MMU_PAGESIZE) */
+
+#if !defined(_ASM)
 #define	MMU_PAGEOFFSET	(MMU_PAGESIZE-1) /* Mask of address bits in page */
+#else	/* !_ASM */
+#define	MMU_PAGEOFFSET	_CONST(MMU_PAGESIZE-1)  /* assembler lameness */
+#endif	/* !_ASM */
+
 #define	MMU_PAGEMASK	(~MMU_PAGEOFFSET)
 
 #define	PAGESIZE	0x1000		/* All of the above, for logical */
@@ -90,13 +103,19 @@ extern "C" {
 #define	DATA_ALIGN	PAGESIZE
 
 /*
- * DEFAULT KERNEL THREAD stack size.
+ * DEFAULT KERNEL THREAD stack size (in pages).
  */
 #if defined(__amd64)
-#define	DEFAULTSTKSZ	(5 * PAGESIZE)
+#define	DEFAULTSTKSZ_NPGS	5
 #elif defined(__i386)
-#define	DEFAULTSTKSZ	(2 * PAGESIZE)
+#define	DEFAULTSTKSZ_NPGS	2
 #endif
+
+#if !defined(_ASM)
+#define	DEFAULTSTKSZ	(DEFAULTSTKSZ_NPGS * PAGESIZE)
+#else	/* !_ASM */
+#define	DEFAULTSTKSZ	_MUL(DEFAULTSTKSZ_NPGS, PAGESIZE) /* as(1) lameness */
+#endif	/* !_ASM */
 
 /*
  * KERNELBASE is the virtual address at which the kernel segments start in
@@ -219,7 +238,7 @@ extern "C" {
 
 #endif	/* __i386 */
 
-#if	!defined(_KADB)
+#if !defined(_ASM) && !defined(_KADB)
 extern uintptr_t kernelbase, segkmap_start, segmapsize;
 #endif
 

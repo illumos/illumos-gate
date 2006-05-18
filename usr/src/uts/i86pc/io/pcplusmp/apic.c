@@ -446,7 +446,7 @@ int	apic_debug_msgbufindex = 0;
 
 apic_cpus_info_t	*apic_cpus;
 
-static uint_t	apic_cpumask = 0;
+static cpuset_t	apic_cpumask;
 static uint_t	apic_flag;
 
 /* Flag to indicate that we need to shut down all processors */
@@ -988,6 +988,7 @@ acpi_probe(void)
 	id = apicadr[APIC_LID_REG];
 	local_ids[0] = (uchar_t)(((uint_t)id) >> 24);
 	apic_nproc = index = 1;
+	CPUSET_ONLY(apic_cpumask, 0);
 	apic_io_max = 0;
 
 	ap = (APIC_HEADER *) (acpi_mapic_dtp + 1);
@@ -1004,6 +1005,7 @@ acpi_probe(void)
 				else if (apic_nproc < NCPU) {
 					local_ids[index] = mpa->LocalApicId;
 					proc_ids[index] = mpa->ProcessorId;
+					CPUSET_ADD(apic_cpumask, index);
 					index++;
 					apic_nproc++;
 				} else
@@ -1099,8 +1101,6 @@ acpi_probe(void)
 	if ((apic_cpus = kmem_zalloc(sizeof (*apic_cpus) * apic_nproc,
 	    KM_NOSLEEP)) == NULL)
 		goto cleanup;
-
-	apic_cpumask = (1 << apic_nproc) - 1;
 
 	/*
 	 * ACPI doesn't provide the local apic ver, get it directly from the
@@ -1237,7 +1237,8 @@ apic_handle_defconf()
 	    kmem_zalloc(sizeof (*apic_cpus) * 2, KM_NOSLEEP);
 	if ((!apicadr) || (!apicioadr[0]) || (!apic_cpus))
 		goto apic_handle_defconf_fail;
-	apic_cpumask = 3;
+	CPUSET_ONLY(apic_cpumask, 0);
+	CPUSET_ADD(apic_cpumask, 1);
 	apic_nproc = 2;
 	lid = apicadr[APIC_LID_REG];
 	apic_cpus[0].aci_local_id = (uchar_t)(lid >> APIC_ID_BIT_OFFSET);
@@ -1299,8 +1300,11 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 
 		/* Find max # of CPUS and allocate structure accordingly */
 		apic_nproc = 0;
+		CPUSET_ZERO(apic_cpumask);
 		while (procp->proc_entry == APIC_CPU_ENTRY) {
 			if (procp->proc_cpuflags & CPUFLAGS_EN) {
+				if (apic_nproc < NCPU)
+					CPUSET_ADD(apic_cpumask, apic_nproc);
 				apic_nproc++;
 			}
 			procp++;
@@ -1348,11 +1352,6 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 			}
 		}
 		procp++;
-	}
-
-	if (!bypass_cpus_and_ioapics) {
-		/* convert the number of processors into a cpumask */
-		apic_cpumask = (1 << apic_nproc) - 1;
 	}
 
 	/*
@@ -2608,7 +2607,7 @@ apic_get_next_processorid(processorid_t cpu_id)
 		return ((processorid_t)0);
 
 	for (i = cpu_id + 1; i < NCPU; i++) {
-		if (apic_cpumask & (1 << i))
+		if (CPU_IN_SET(apic_cpumask, i))
 			return (i);
 	}
 

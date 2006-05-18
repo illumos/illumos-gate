@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -59,7 +58,7 @@ static void xc_common(xc_func_t, xc_arg_t, xc_arg_t, xc_arg_t,
     int, cpuset_t, int);
 
 static int	xc_initialized = 0;
-extern ulong_t	cpu_ready_set;
+extern cpuset_t	cpu_ready_set;
 
 void
 xc_init()
@@ -89,7 +88,7 @@ kdi_xc_initialized(void)
 	return (xc_initialized);
 }
 
-#define	CAPTURE_CPU_ARG	0xffffffff
+#define	CAPTURE_CPU_ARG	~0UL
 
 /*
  * X-call interrupt service routine.
@@ -114,7 +113,7 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 		argp = &xc_mboxes[X_CALL_MEDPRI].arg2;
 		arg2val = *argp;
 		if (arg2val != CAPTURE_CPU_ARG &&
-		    !(arg2val & (1 << cpup->cpu_id)))
+		    !CPU_IN_SET((cpuset_t)arg2val, cpup->cpu_id))
 			return (DDI_INTR_UNCLAIMED);
 		ASSERT(arg2val == CAPTURE_CPU_ARG);
 		if (cpup->cpu_m.xc_pend[pri] == 0)

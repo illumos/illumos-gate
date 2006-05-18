@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,10 +106,9 @@ extern void psm_modload(void);
  *	External Reference Data
  */
 extern struct av_head autovect[]; /* array of auto intr vectors		*/
-extern int clock_vector;	/* clock interrupt vector		*/
 extern uint32_t rm_platter_pa;	/* phy addr realmode startup storage	*/
 extern caddr_t rm_platter_va;	/* virt addr realmode startup storage	*/
-extern int mp_cpus;		/* bit map of possible cpus found	*/
+extern cpuset_t mp_cpus;	/* bit map of possible cpus found	*/
 
 #ifdef	__cplusplus
 }

@@ -49,6 +49,7 @@
 #include <sys/privregs.h>
 #include <sys/dtrace.h>
 #include <sys/traptrace.h>
+#include <sys/machparam.h>
 
 /*
  * only one routine in this file is interesting to lint
