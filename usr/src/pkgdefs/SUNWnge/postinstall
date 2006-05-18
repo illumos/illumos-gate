@@ -127,5 +127,5 @@ check_add_drv()
 }
 
 	check_add_drv -b "${BASEDIR}" -i \
-		'"pci10de,56" "pci10de,57" "pci10de,373"' \
+		'"pci10de,56" "pci10de,57" "pci10de,269" "pci10de,268" "pci10de,373"' \
 		-m '* 0666 root root' nge
