@@ -653,6 +653,7 @@ _NOTE(READ_ONLY_DATA(sd_lun::un_sd))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_reservation_type))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_mincdb))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_maxcdb))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_max_hba_cdb))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_status_len))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_f_arq_enabled))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_ctype))
@@ -1138,7 +1139,7 @@ struct sd_fi_arq {
 	if ((bp)->b_error == 0) {					\
 		bioerror(bp, errcode);					\
 	}								\
-	(bp)->b_flags |= B_ERROR;					\
+	(bp)->b_flags |= B_ERROR;
 
 #define	SD_FILL_SCSI1_LUN_CDB(lunp, cdbp)				\
 	if (! (lunp)->un_f_is_fibre &&					\
