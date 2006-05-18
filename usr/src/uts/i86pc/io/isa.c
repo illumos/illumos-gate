@@ -37,6 +37,7 @@
 #include <sys/errno.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <sys/psm.h>
 #include <sys/ddidmareq.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/dma_engine.h>
@@ -48,6 +49,9 @@
 extern int isa_resource_setup(void);
 static char USED_RESOURCES[] = "used-resources";
 static void isa_alloc_nodes(dev_info_t *);
+static void enumerate_BIOS_serial(dev_info_t *);
+
+#define	BIOS_DATA_AREA	0x400
 /*
  * #define ISA_DEBUG 1
  */
@@ -594,6 +598,9 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 				cmn_err(CE_WARN, "isa nexus: isa "
 				    "resource setup failed");
 			}
+
+			/* serial ports? */
+			enumerate_BIOS_serial(isa_dip);
 			return;
 		}
 		cmn_err(CE_NOTE, "!Solaris did not detect ACPI BIOS");
@@ -626,4 +633,90 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 	ndi_devi_exit(isa_dip, circ);
 
+}
+
+/*
+ * On some machines, serial port 2 isn't listed in the ACPI table.
+ * This function goes through the BIOS data area and makes sure all
+ * the serial ports there are in the dev_info tree.  If any are missing,
+ * this function will add them.
+ */
+
+static int num_BIOS_serial = 2;	/* number of BIOS serial ports to look at */
+
+static void
+enumerate_BIOS_serial(dev_info_t *isa_dip)
+{
+	ushort_t *bios_data;
+	int i;
+	dev_info_t *xdip;
+	int found;
+	int ret;
+	struct regspec *tmpregs;
+	int tmpregs_len;
+	static struct regspec tmp_asy_regs[] = {
+		{1, 0x3f8, 0x8},
+	};
+	static int default_asy_intrs[] = { 4, 3, 4, 3 };
+	static size_t size = 4;
+
+	/*
+	 * The first four 2-byte quantities of the BIOS data area contain
+	 * the base I/O addresses of the first four serial ports.
+	 */
+	bios_data = (ushort_t *)psm_map_new((paddr_t)BIOS_DATA_AREA, size,
+		PSM_PROT_READ);
+	for (i = 0; i < num_BIOS_serial; i++) {
+		if (bios_data[i] == 0) {
+			/* no COM[i]: port */
+			continue;
+		}
+
+		/* Look for it in the dev_info tree */
+		found = 0;
+		for (xdip = ddi_get_child(isa_dip); xdip != NULL;
+		    xdip = ddi_get_next_sibling(xdip)) {
+			if (strncmp(ddi_node_name(xdip), "asy", 3) != 0) {
+				/* skip non asy */
+				continue;
+			}
+
+			/* Match by addr */
+			ret = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, xdip,
+				DDI_PROP_DONTPASS, "reg", (int **)&tmpregs,
+				(uint_t *)&tmpregs_len);
+			if (ret != DDI_PROP_SUCCESS) {
+				/* error */
+				continue;
+			}
+
+			if (tmpregs->regspec_addr == bios_data[i])
+				found = 1;
+
+			/*
+			 * Free the memory allocated by
+			 * ddi_prop_lookup_int_array().
+			 */
+			ddi_prop_free(tmpregs);
+		}
+
+		/* If not found, then add it */
+		if (!found) {
+			ndi_devi_alloc_sleep(isa_dip, "asy",
+			    (pnode_t)DEVI_SID_NODEID, &xdip);
+			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
+			    "compatible", "PNP0500");
+			/* This should be gotten from master file: */
+			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
+			    "model", "Standard PC COM port");
+			tmp_asy_regs[0].regspec_addr = bios_data[i];
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
+			    "reg", (int *)&tmp_asy_regs[0], 3);
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
+			    "interrupts", default_asy_intrs[i]);
+			(void) ndi_devi_bind_driver(xdip, 0);
+		}
+	}
+
+	psm_unmap((caddr_t)bios_data, size);
 }
