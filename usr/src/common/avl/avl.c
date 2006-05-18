@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -569,6 +568,9 @@ avl_insert_here(
 {
 	avl_node_t *node;
 	int child = direction;	/* rely on AVL_BEFORE == 0, AVL_AFTER == 1 */
+#ifdef DEBUG
+	int diff;
+#endif
 
 	ASSERT(tree != NULL);
 	ASSERT(new_data != NULL);
@@ -580,20 +582,34 @@ avl_insert_here(
 	 * node and reverse the insertion direction.
 	 */
 	node = AVL_DATA2NODE(here, tree->avl_offset);
-	ASSERT(tree->avl_compar(new_data, here) > 0 ? child == 1 : child == 0);
+
+#ifdef DEBUG
+	diff = tree->avl_compar(new_data, here);
+	ASSERT(-1 <= diff && diff <= 1);
+	ASSERT(diff != 0);
+	ASSERT(diff > 0 ? child == 1 : child == 0);
+#endif
 
 	if (node->avl_child[child] != NULL) {
 		node = node->avl_child[child];
 		child = 1 - child;
 		while (node->avl_child[child] != NULL) {
-			ASSERT(tree->avl_compar(new_data,
-			    AVL_NODE2DATA(node, tree->avl_offset)) > 0 ?
-			    child == 1 : child == 0);
+#ifdef DEBUG
+			diff = tree->avl_compar(new_data,
+			    AVL_NODE2DATA(node, tree->avl_offset));
+			ASSERT(-1 <= diff && diff <= 1);
+			ASSERT(diff != 0);
+			ASSERT(diff > 0 ? child == 1 : child == 0);
+#endif
 			node = node->avl_child[child];
 		}
-		ASSERT(tree->avl_compar(new_data,
-		    AVL_NODE2DATA(node, tree->avl_offset)) > 0 ?
-		    child == 1 : child == 0);
+#ifdef DEBUG
+		diff = tree->avl_compar(new_data,
+		    AVL_NODE2DATA(node, tree->avl_offset));
+		ASSERT(-1 <= diff && diff <= 1);
+		ASSERT(diff != 0);
+		ASSERT(diff > 0 ? child == 1 : child == 0);
+#endif
 	}
 	ASSERT(node->avl_child[child] == NULL);
 
@@ -727,6 +743,7 @@ avl_remove(avl_tree_t *tree, void *data)
 	 * Here we know "delete" is at least partially a leaf node. It can
 	 * be easily removed from the tree.
 	 */
+	ASSERT(tree->avl_numnodes > 0);
 	--tree->avl_numnodes;
 	parent = AVL_XPARENT(delete);
 	which_child = AVL_XCHILD(delete);
