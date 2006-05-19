@@ -356,7 +356,8 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) &&
 		    (psm_intr_ops != NULL)) {
-			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
+			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1 ==
+			    0) {
 				if (handle = i_ddi_get_pci_config_handle(
 				    rdip)) {
 					(void) pci_config_teardown(&handle);
@@ -372,8 +373,8 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			if (hdlp->ih_type == DDI_INTR_TYPE_MSIX) {
 				msix_p = i_ddi_get_msix(hdlp->ih_dip);
 				if (msix_p &&
-				    i_ddi_intr_get_current_nintrs(hdlp->ih_dip)
-				    == 0) {
+				    (i_ddi_intr_get_current_nintrs(
+					hdlp->ih_dip) - 1) == 0) {
 					pci_msix_fini(msix_p);
 					i_ddi_set_msix(hdlp->ih_dip, NULL);
 				}
