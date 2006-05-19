@@ -88,7 +88,8 @@ static void apic_xlate_vector_free_timeout_handler(void *arg);
 static void apic_free_vector(uchar_t vector);
 static void apic_reprogram_timeout_handler(void *arg);
 static int apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
-    int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq);
+    int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq,
+    int iflag, boolean_t *restore_intrp);
 static int apic_setup_io_intr(apic_irq_t *irqptr, int irq);
 static int apic_setup_io_intr_deferred(apic_irq_t *irqptr, int irq);
 static void apic_record_rdt_entry(apic_irq_t *irqptr, int irq);
@@ -4234,6 +4235,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 	apic_cpus_info_t	*cpu_infop;
 	int			iflag;
 	int		which_irq = apic_vector_to_irq[irq_ptr->airq_vector];
+	boolean_t		restore_iflag = B_TRUE;
 
 	intin_no = irq_ptr->airq_intin_no;
 	ioapic = apicioadr[irq_ptr->airq_ioapicindex];
@@ -4284,12 +4286,13 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 	 */
 	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index) &&
 	    apic_check_stuck_interrupt(irq_ptr, airq_temp_cpu, bind_cpu,
-	    ioapic, intin_no, which_irq) != 0) {
+	    ioapic, intin_no, which_irq, iflag, &restore_iflag) != 0) {
 
 		if (acquire_lock)
 			lock_clear(&apic_ioapic_lock);
 
-		intr_restore(iflag);
+		if (restore_iflag)
+			intr_restore(iflag);
 		return (0);
 	}
 
@@ -4386,7 +4389,8 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
  */
 static int
 apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
-	int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq)
+    int new_bind_cpu, volatile int32_t *ioapic, int intin_no, int which_irq,
+    int iflag, boolean_t *intr_restorep)
 {
 	int32_t			rdt_entry;
 	int			waited;
@@ -4544,6 +4548,9 @@ apic_check_stuck_interrupt(apic_irq_t *irq_ptr, int old_bind_cpu,
 			apic_reprogram_info[which_irq].timeouts++;
 
 			lock_clear(&apic_ioapic_reprogram_lock);
+
+			*intr_restorep = B_FALSE;
+			intr_restore(iflag);
 
 			/* Fire up a timeout to handle this later */
 			(void) timeout(apic_reprogram_timeout_handler,
