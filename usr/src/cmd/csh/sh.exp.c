@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -524,7 +524,7 @@ exp6(tchar ***vp, bool ignore)
 		 * an error.  Even this check isn't quite right, since
 		 * it doesn't take globbing into account.
 		 */
-		if (isa(**vp, ANYOP) && stat_(**vp, &stb))
+		if ((**vp == NULL) || isa(**vp, ANYOP) && stat_(**vp, &stb))
 			bferr("Missing file name");
 		dp = *(*vp)++;
 
