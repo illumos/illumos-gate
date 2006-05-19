@@ -5823,6 +5823,18 @@ mondo_loop() {
 	rm -f $root/kernel/drv/objmgr
 	rm -f $root/kernel/drv/amd64/objmgr
 	rm -f $root/usr/include/sys/dktp/objmgr.h
+
+	#
+	# Remove other unused headers
+	#
+	rm -f $root/usr/include/sys/scsi/impl/pkt_wrapper.h
+	rm -f $root/usr/include/sys/dktp/hba.h
+	rm -f $root/usr/include/sys/dktp/cdtypes.h
+	rm -f $root/usr/include/sys/dktp/scdk.h
+	rm -f $root/usr/include/sys/dktp/scdkwatch.h
+	rm -f $root/usr/include/sys/dktp/sctarget.h
+	rm -f $root/usr/include/sys/dktp/tgcd.h
+	rm -f $root/usr/include/sys/dktp/tgpassthru.h
  
 	#
 	# Remove Floating Point Emulator for EOF as per PSARC/2003/651

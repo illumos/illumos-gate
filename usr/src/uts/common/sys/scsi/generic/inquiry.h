@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_INQUIRY_H
@@ -204,17 +203,22 @@ struct scsi_inquiry {
 #define	DTYPE_PROCESSOR		0x03
 #define	DTYPE_WORM		0x04
 #define	DTYPE_RODIRECT		0x05
-#define	DTYPE_SCANNER		0x06
+#define	DTYPE_SCANNER		0x06	/* obsolete */
 #define	DTYPE_OPTICAL		0x07
 #define	DTYPE_CHANGER		0x08
-#define	DTYPE_COMM		0x09
+#define	DTYPE_COMM		0x09	/* obsolete */
 #define	DTYPE_ARRAY_CTRL	0x0C
 #define	DTYPE_ESI		0x0D
-
+#define	DTYPE_RBC		0x0E
+#define	DTYPE_OCRW		0x0F
+#define	DTYPE_BCC		0x10
+#define	DTYPE_OSD		0x11
+#define	DTYPE_ADC		0x12
 /*
- * Device types 0x0E-0x1E are reserved
+ * Device types 0x13-0x1D are reserved in spc-3 (r23)
  */
 
+#define	DTYPE_WELLKNOWN		0x1E
 #define	DTYPE_UNKNOWN		0x1F
 
 #define	DTYPE_MASK		0x1F

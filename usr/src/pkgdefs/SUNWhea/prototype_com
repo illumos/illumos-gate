@@ -991,7 +991,6 @@ d none usr/include/sys/scsi/impl 755 root bin
 f none usr/include/sys/scsi/impl/commands.h 644 root bin
 f none usr/include/sys/scsi/impl/inquiry.h 644 root bin
 f none usr/include/sys/scsi/impl/mode.h 644 root bin
-f none usr/include/sys/scsi/impl/pkt_wrapper.h 644 root bin
 f none usr/include/sys/scsi/impl/scsi_reset_notify.h 644 root bin
 f none usr/include/sys/scsi/impl/sense.h 644 root bin
 f none usr/include/sys/scsi/impl/services.h 644 root bin

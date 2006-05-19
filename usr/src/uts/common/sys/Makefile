@@ -750,7 +750,6 @@ SCSIIMPLHDRS=		\
 	commands.h	\
 	inquiry.h	\
 	mode.h		\
-	pkt_wrapper.h	\
 	sense.h		\
 	services.h	\
 	status.h	\
@@ -878,7 +877,6 @@ DKTPHDRS=		\
 	fdisk.h		\
 	flowctrl.h	\
 	gda.h		\
-	hba.h		\
 	quetypes.h	\
 	queue.h		\
 	tgcom.h		\
