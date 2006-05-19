@@ -346,12 +346,12 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Link Control register?  Both are hardware dependent and likely
 	 * set by OBP.
 	 *
-	 * Disable non-posted write bit - ordering by setting
-	 * NPWR_EN bit to force serialization of writes.
+	 * NOTE: Do not set the NPWR_EN bit.  The desired value of this bit
+	 * will be set by OBP.
 	 */
 	val = CSR_XR(csr_base, TLU_CONTROL);
 	val |= (TLU_CONTROL_L0S_TIM_DEFAULT << TLU_CONTROL_L0S_TIM) |
-	    (1ull << TLU_CONTROL_NPWR_EN) | TLU_CONTROL_CONFIG_DEFAULT;
+	    TLU_CONTROL_CONFIG_DEFAULT;
 
 	/*
 	 * For Oberon, NPWR_EN is set to 0 to prevent PIO reads from blocking
