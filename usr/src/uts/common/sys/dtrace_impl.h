@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -987,16 +988,17 @@ typedef enum dtrace_activity {
 #define	DTRACE_NHELPER_ACTIONS		1
 
 typedef struct dtrace_helper_action {
-	dtrace_difo_t *dthp_predicate;		/* helper action predicate */
-	int dthp_nactions;			/* number of actions */
-	dtrace_difo_t **dthp_actions;		/* array of actions */
-	int dthp_generation;			/* helper action generation */
-	struct dtrace_helper_action *dthp_next;	/* next helper action */
+	int dtha_generation;			/* helper action generation */
+	int dtha_nactions;			/* number of actions */
+	dtrace_difo_t *dtha_predicate;		/* helper action predicate */
+	dtrace_difo_t **dtha_actions;		/* array of actions */
+	struct dtrace_helper_action *dtha_next;	/* next helper action */
 } dtrace_helper_action_t;
 
 typedef struct dtrace_helper_provider {
-	dof_helper_t dthp_prov;			/* DOF w/ provider and probes */
+	int dthp_generation;			/* helper provider generation */
 	uint32_t dthp_ref;			/* reference count */
+	dof_helper_t dthp_prov;			/* DOF w/ provider and probes */
 } dtrace_helper_provider_t;
 
 typedef struct dtrace_helpers {
@@ -1004,6 +1006,7 @@ typedef struct dtrace_helpers {
 	dtrace_vstate_t dthps_vstate;		/* helper action var. state */
 	dtrace_helper_provider_t **dthps_provs;	/* array of providers */
 	uint_t dthps_nprovs;			/* count of providers */
+	uint_t dthps_maxprovs;			/* provider array size */
 	int dthps_generation;			/* current generation */
 	pid_t dthps_pid;			/* pid of associated proc */
 	int dthps_deferred;			/* helper in deferred list */

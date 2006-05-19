@@ -1361,7 +1361,7 @@ dtrace_helptrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	} else {
 		switch (help.dtht_where) {
 		case 0:
-			mdb_printf("%p\n", helper.dthp_predicate);
+			mdb_printf("%p\n", helper.dtha_predicate);
 			break;
 
 		case DTRACE_HELPTRACE_NEXT:
@@ -1371,7 +1371,7 @@ dtrace_helptrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			break;
 
 		default:
-			haddr = (uintptr_t)helper.dthp_actions +
+			haddr = (uintptr_t)helper.dtha_actions +
 			    (help.dtht_where - 1) * sizeof (uintptr_t);
 
 			if (mdb_vread(&haddr, sizeof (haddr), haddr) == -1) {

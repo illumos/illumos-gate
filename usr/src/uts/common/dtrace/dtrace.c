@@ -6790,7 +6790,7 @@ dtrace_helper_provide(dof_helper_t *dhp, pid_t pid)
 }
 
 static void
-dtrace_helper_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
+dtrace_helper_provider_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 {
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
 	dof_hdr_t *dof = (dof_hdr_t *)daddr;
@@ -6818,7 +6818,7 @@ dtrace_helper_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 }
 
 static void
-dtrace_helper_remove(dof_helper_t *dhp, pid_t pid)
+dtrace_helper_provider_remove(dof_helper_t *dhp, pid_t pid)
 {
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
 	dof_hdr_t *dof = (dof_hdr_t *)daddr;
@@ -6833,7 +6833,7 @@ dtrace_helper_remove(dof_helper_t *dhp, pid_t pid)
 		if (sec->dofs_type != DOF_SECT_PROVIDER)
 			continue;
 
-		dtrace_helper_remove_one(dhp, sec, pid);
+		dtrace_helper_provider_remove_one(dhp, sec, pid);
 	}
 }
 
@@ -12216,8 +12216,8 @@ dtrace_helper(int which, dtrace_mstate_t *mstate,
 	 * Also, note the calls to dtrace_dif_emulate() may allocate scratch
 	 * from machine state; this is okay, too.
 	 */
-	for (; helper != NULL; helper = helper->dthp_next) {
-		if ((pred = helper->dthp_predicate) != NULL) {
+	for (; helper != NULL; helper = helper->dtha_next) {
+		if ((pred = helper->dtha_predicate) != NULL) {
 			if (trace)
 				dtrace_helper_trace(helper, mstate, vstate, 0);
 
@@ -12228,12 +12228,12 @@ dtrace_helper(int which, dtrace_mstate_t *mstate,
 				goto err;
 		}
 
-		for (i = 0; i < helper->dthp_nactions; i++) {
+		for (i = 0; i < helper->dtha_nactions; i++) {
 			if (trace)
 				dtrace_helper_trace(helper,
 				    mstate, vstate, i + 1);
 
-			rval = dtrace_dif_emulate(helper->dthp_actions[i],
+			rval = dtrace_dif_emulate(helper->dtha_actions[i],
 			    mstate, vstate, state);
 
 			if (*flags & CPU_DTRACE_FAULT)
@@ -12273,27 +12273,29 @@ err:
 }
 
 static void
-dtrace_helper_destroy(dtrace_helper_action_t *helper, dtrace_vstate_t *vstate)
+dtrace_helper_action_destroy(dtrace_helper_action_t *helper,
+    dtrace_vstate_t *vstate)
 {
 	int i;
 
-	if (helper->dthp_predicate != NULL)
-		dtrace_difo_release(helper->dthp_predicate, vstate);
+	if (helper->dtha_predicate != NULL)
+		dtrace_difo_release(helper->dtha_predicate, vstate);
 
-	for (i = 0; i < helper->dthp_nactions; i++) {
-		ASSERT(helper->dthp_actions[i] != NULL);
-		dtrace_difo_release(helper->dthp_actions[i], vstate);
+	for (i = 0; i < helper->dtha_nactions; i++) {
+		ASSERT(helper->dtha_actions[i] != NULL);
+		dtrace_difo_release(helper->dtha_actions[i], vstate);
 	}
 
-	kmem_free(helper->dthp_actions,
-	    helper->dthp_nactions * sizeof (dtrace_difo_t *));
+	kmem_free(helper->dtha_actions,
+	    helper->dtha_nactions * sizeof (dtrace_difo_t *));
 	kmem_free(helper, sizeof (dtrace_helper_action_t));
 }
 
 static int
 dtrace_helper_destroygen(int gen)
 {
-	dtrace_helpers_t *help = curproc->p_dtrace_helpers;
+	proc_t *p = curproc;
+	dtrace_helpers_t *help = p->p_dtrace_helpers;
 	dtrace_vstate_t *vstate;
 	int i;
 
@@ -12308,20 +12310,66 @@ dtrace_helper_destroygen(int gen)
 		dtrace_helper_action_t *last = NULL, *h, *next;
 
 		for (h = help->dthps_actions[i]; h != NULL; h = next) {
-			next = h->dthp_next;
+			next = h->dtha_next;
 
-			if (h->dthp_generation == gen) {
+			if (h->dtha_generation == gen) {
 				if (last != NULL) {
-					last->dthp_next = next;
+					last->dtha_next = next;
 				} else {
 					help->dthps_actions[i] = next;
 				}
 
-				dtrace_helper_destroy(h, vstate);
+				dtrace_helper_action_destroy(h, vstate);
 			} else {
 				last = h;
 			}
 		}
+	}
+
+	/*
+	 * Interate until we've cleared out all helper providers with the
+	 * given generation number.
+	 */
+	for (;;) {
+		dtrace_helper_provider_t *prov;
+
+		/*
+		 * Look for a helper provider with the right generation.
+		 */
+		for (i = 0; i < help->dthps_nprovs; i++) {
+			prov = help->dthps_provs[i];
+
+			if (prov->dthp_generation == gen)
+				break;
+		}
+
+		/*
+		 * If there were no matches, we're done.
+		 */
+		if (i == help->dthps_nprovs)
+			break;
+
+		/*
+		 * Move the last helper provider into this slot.
+		 */
+		help->dthps_nprovs--;
+		help->dthps_provs[i] = help->dthps_provs[help->dthps_nprovs];
+		help->dthps_provs[help->dthps_nprovs] = NULL;
+
+		mutex_exit(&dtrace_lock);
+
+		/*
+		 * If we have a meta provider, remove this helper provider.
+		 */
+		mutex_enter(&dtrace_meta_lock);
+		if (dtrace_meta_pid != NULL) {
+			ASSERT(dtrace_deferred_pid == NULL);
+			dtrace_helper_provider_remove(&prov->dthp_prov,
+			    p->p_pid);
+		}
+		mutex_exit(&dtrace_meta_lock);
+
+		mutex_enter(&dtrace_lock);
 	}
 
 	return (0);
@@ -12333,11 +12381,11 @@ dtrace_helper_validate(dtrace_helper_action_t *helper)
 	int err = 0, i;
 	dtrace_difo_t *dp;
 
-	if ((dp = helper->dthp_predicate) != NULL)
+	if ((dp = helper->dtha_predicate) != NULL)
 		err += dtrace_difo_validate_helper(dp);
 
-	for (i = 0; i < helper->dthp_nactions; i++)
-		err += dtrace_difo_validate_helper(helper->dthp_actions[i]);
+	for (i = 0; i < helper->dtha_nactions; i++)
+		err += dtrace_difo_validate_helper(helper->dtha_actions[i]);
 
 	return (err == 0);
 }
@@ -12359,9 +12407,9 @@ dtrace_helper_action_add(int which, dtrace_ecbdesc_t *ep)
 	last = help->dthps_actions[which];
 	vstate = &help->dthps_vstate;
 
-	for (count = 0; last != NULL; last = last->dthp_next) {
+	for (count = 0; last != NULL; last = last->dtha_next) {
 		count++;
-		if (last->dthp_next == NULL)
+		if (last->dtha_next == NULL)
 			break;
 	}
 
@@ -12373,12 +12421,12 @@ dtrace_helper_action_add(int which, dtrace_ecbdesc_t *ep)
 		return (ENOSPC);
 
 	helper = kmem_zalloc(sizeof (dtrace_helper_action_t), KM_SLEEP);
-	helper->dthp_generation = help->dthps_generation;
+	helper->dtha_generation = help->dthps_generation;
 
 	if ((pred = ep->dted_pred.dtpdd_predicate) != NULL) {
 		ASSERT(pred->dtp_difo != NULL);
 		dtrace_difo_hold(pred->dtp_difo);
-		helper->dthp_predicate = pred->dtp_difo;
+		helper->dtha_predicate = pred->dtp_difo;
 	}
 
 	for (act = ep->dted_action; act != NULL; act = act->dtad_next) {
@@ -12391,12 +12439,12 @@ dtrace_helper_action_add(int which, dtrace_ecbdesc_t *ep)
 		nactions++;
 	}
 
-	helper->dthp_actions = kmem_zalloc(sizeof (dtrace_difo_t *) *
-	    (helper->dthp_nactions = nactions), KM_SLEEP);
+	helper->dtha_actions = kmem_zalloc(sizeof (dtrace_difo_t *) *
+	    (helper->dtha_nactions = nactions), KM_SLEEP);
 
 	for (act = ep->dted_action, i = 0; act != NULL; act = act->dtad_next) {
 		dtrace_difo_hold(act->dtad_difo);
-		helper->dthp_actions[i++] = act->dtad_difo;
+		helper->dtha_actions[i++] = act->dtad_difo;
 	}
 
 	if (!dtrace_helper_validate(helper))
@@ -12405,7 +12453,7 @@ dtrace_helper_action_add(int which, dtrace_ecbdesc_t *ep)
 	if (last == NULL) {
 		help->dthps_actions[which] = helper;
 	} else {
-		last->dthp_next = helper;
+		last->dtha_next = helper;
 	}
 
 	if (vstate->dtvs_nlocals > dtrace_helptrace_nlocals) {
@@ -12415,7 +12463,7 @@ dtrace_helper_action_add(int which, dtrace_ecbdesc_t *ep)
 
 	return (0);
 err:
-	dtrace_helper_destroy(helper, vstate);
+	dtrace_helper_action_destroy(helper, vstate);
 	return (EINVAL);
 }
 
@@ -12479,11 +12527,13 @@ dtrace_helper_provider_register(proc_t *p, dtrace_helpers_t *help,
 }
 
 static int
-dtrace_helper_provider_add(dof_helper_t *dofhp)
+dtrace_helper_provider_add(dof_helper_t *dofhp, int gen)
 {
 	dtrace_helpers_t *help;
 	dtrace_helper_provider_t *hprov, **tmp_provs;
-	uint_t tmp_nprovs, i;
+	uint_t tmp_maxprovs, i;
+
+	ASSERT(MUTEX_HELD(&dtrace_lock));
 
 	help = curproc->p_dtrace_helpers;
 	ASSERT(help != NULL);
@@ -12507,26 +12557,43 @@ dtrace_helper_provider_add(dof_helper_t *dofhp)
 	hprov = kmem_zalloc(sizeof (dtrace_helper_provider_t), KM_SLEEP);
 	hprov->dthp_prov = *dofhp;
 	hprov->dthp_ref = 1;
+	hprov->dthp_generation = gen;
 
-	tmp_nprovs = help->dthps_nprovs;
-	tmp_provs = help->dthps_provs;
-	help->dthps_nprovs++;
-	help->dthps_provs = kmem_zalloc(help->dthps_nprovs *
-	    sizeof (dtrace_helper_provider_t *), KM_SLEEP);
+	/*
+	 * Allocate a bigger table for helper providers if it's already full.
+	 */
+	if (help->dthps_maxprovs == help->dthps_nprovs) {
+		tmp_maxprovs = help->dthps_maxprovs;
+		tmp_provs = help->dthps_provs;
 
-	help->dthps_provs[tmp_nprovs] = hprov;
-	if (tmp_provs != NULL) {
-		bcopy(tmp_provs, help->dthps_provs, tmp_nprovs *
-		    sizeof (dtrace_helper_provider_t *));
-		kmem_free(tmp_provs, tmp_nprovs *
-		    sizeof (dtrace_helper_provider_t *));
+		if (help->dthps_maxprovs == 0)
+			help->dthps_maxprovs = 2;
+		else
+			help->dthps_maxprovs *= 2;
+		if (help->dthps_maxprovs > dtrace_helper_providers_max)
+			help->dthps_maxprovs = dtrace_helper_providers_max;
+
+		ASSERT(tmp_maxprovs < help->dthps_maxprovs);
+
+		help->dthps_provs = kmem_zalloc(help->dthps_maxprovs *
+		    sizeof (dtrace_helper_provider_t *), KM_SLEEP);
+
+		if (tmp_provs != NULL) {
+			bcopy(tmp_provs, help->dthps_provs, tmp_maxprovs *
+			    sizeof (dtrace_helper_provider_t *));
+			kmem_free(tmp_provs, tmp_maxprovs *
+			    sizeof (dtrace_helper_provider_t *));
+		}
 	}
+
+	help->dthps_provs[help->dthps_nprovs] = hprov;
+	help->dthps_nprovs++;
 
 	return (0);
 }
 
 static void
-dtrace_helper_provider_remove(dtrace_helper_provider_t *hprov)
+dtrace_helper_provider_destroy(dtrace_helper_provider_t *hprov)
 {
 	mutex_enter(&dtrace_lock);
 
@@ -12836,7 +12903,7 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 
 	if (dhp != NULL && nprovs > 0) {
 		dhp->dofhp_dof = (uint64_t)(uintptr_t)dof;
-		if (dtrace_helper_provider_add(dhp) == 0) {
+		if (dtrace_helper_provider_add(dhp, gen) == 0) {
 			mutex_exit(&dtrace_lock);
 			dtrace_helper_provider_register(curproc, help, dhp);
 			mutex_enter(&dtrace_lock);
@@ -12898,8 +12965,8 @@ dtrace_helpers_destroy(void)
 		dtrace_helper_action_t *h, *next;
 
 		for (h = help->dthps_actions[i]; h != NULL; h = next) {
-			next = h->dthp_next;
-			dtrace_helper_destroy(h, vstate);
+			next = h->dtha_next;
+			dtrace_helper_action_destroy(h, vstate);
 			h = next;
 		}
 	}
@@ -12909,13 +12976,13 @@ dtrace_helpers_destroy(void)
 	/*
 	 * Destroy the helper providers.
 	 */
-	if (help->dthps_nprovs > 0) {
+	if (help->dthps_maxprovs > 0) {
 		mutex_enter(&dtrace_meta_lock);
 		if (dtrace_meta_pid != NULL) {
 			ASSERT(dtrace_deferred_pid == NULL);
 
 			for (i = 0; i < help->dthps_nprovs; i++) {
-				dtrace_helper_remove(
+				dtrace_helper_provider_remove(
 				    &help->dthps_provs[i]->dthp_prov, p->p_pid);
 			}
 		} else {
@@ -12943,10 +13010,10 @@ dtrace_helpers_destroy(void)
 		mutex_exit(&dtrace_meta_lock);
 
 		for (i = 0; i < help->dthps_nprovs; i++) {
-			dtrace_helper_provider_remove(help->dthps_provs[i]);
+			dtrace_helper_provider_destroy(help->dthps_provs[i]);
 		}
 
-		kmem_free(help->dthps_provs, help->dthps_nprovs *
+		kmem_free(help->dthps_provs, help->dthps_maxprovs *
 		    sizeof (dtrace_helper_provider_t *));
 	}
 
@@ -12988,30 +13055,30 @@ dtrace_helpers_duplicate(proc_t *from, proc_t *to)
 		if ((helper = help->dthps_actions[i]) == NULL)
 			continue;
 
-		for (last = NULL; helper != NULL; helper = helper->dthp_next) {
+		for (last = NULL; helper != NULL; helper = helper->dtha_next) {
 			new = kmem_zalloc(sizeof (dtrace_helper_action_t),
 			    KM_SLEEP);
-			new->dthp_generation = helper->dthp_generation;
+			new->dtha_generation = helper->dtha_generation;
 
-			if ((dp = helper->dthp_predicate) != NULL) {
+			if ((dp = helper->dtha_predicate) != NULL) {
 				dp = dtrace_difo_duplicate(dp, vstate);
-				new->dthp_predicate = dp;
+				new->dtha_predicate = dp;
 			}
 
-			new->dthp_nactions = helper->dthp_nactions;
-			sz = sizeof (dtrace_difo_t *) * new->dthp_nactions;
-			new->dthp_actions = kmem_alloc(sz, KM_SLEEP);
+			new->dtha_nactions = helper->dtha_nactions;
+			sz = sizeof (dtrace_difo_t *) * new->dtha_nactions;
+			new->dtha_actions = kmem_alloc(sz, KM_SLEEP);
 
-			for (j = 0; j < new->dthp_nactions; j++) {
-				dtrace_difo_t *dp = helper->dthp_actions[j];
+			for (j = 0; j < new->dtha_nactions; j++) {
+				dtrace_difo_t *dp = helper->dtha_actions[j];
 
 				ASSERT(dp != NULL);
 				dp = dtrace_difo_duplicate(dp, vstate);
-				new->dthp_actions[j] = dp;
+				new->dtha_actions[j] = dp;
 			}
 
 			if (last != NULL) {
-				last->dthp_next = new;
+				last->dtha_next = new;
 			} else {
 				newhelp->dthps_actions[i] = new;
 			}
