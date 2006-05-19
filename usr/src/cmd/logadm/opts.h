@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * logadm/opts.h -- public definitions for opts module
  */
@@ -49,7 +48,7 @@ struct optinfo {
 	char *oi_o;	/* the option */
 	enum opttype oi_t;	/* the type of this option */
 	/* parser, if set, is called to parse optarg */
-	int (*oi_parser)(const char *o, const char *optarg);
+	off_t (*oi_parser)(const char *o, const char *optarg);
 	int oi_flags;
 };
 
@@ -63,17 +62,17 @@ void opts_free(struct opts *opts);
 void opts_set(struct opts *opts, const char *o, const char *optarg);
 int opts_count(struct opts *opts, const char *options);
 const char *opts_optarg(struct opts *opts, const char *o);
-int opts_optarg_int(struct opts *opts, const char *o);
+off_t opts_optarg_int(struct opts *opts, const char *o);
 struct fn_list *opts_cmdargs(struct opts *opts);
 struct opts *opts_merge(struct opts *back, struct opts *front);
 
 #define	OPTP_NOW (-1)
 #define	OPTP_NEVER (-2)
 
-int opts_parse_ctime(const char *o, const char *optarg);
-int opts_parse_bytes(const char *o, const char *optarg);
-int opts_parse_atopi(const char *o, const char *optarg);
-int opts_parse_seconds(const char *o, const char *optarg);
+off_t opts_parse_ctime(const char *o, const char *optarg);
+off_t opts_parse_bytes(const char *o, const char *optarg);
+off_t opts_parse_atopi(const char *o, const char *optarg);
+off_t opts_parse_seconds(const char *o, const char *optarg);
 
 void opts_print(struct opts *opts, FILE *stream, char *exclude);
 void opts_printword(const char *word, FILE *stream);

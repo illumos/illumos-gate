@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,13 +176,16 @@ opts_free(struct opts *opts)
 void
 opts_set(struct opts *opts, const char *o, const char *optarg)
 {
+	off_t *rval;
 	struct optinfo *info = opt_info(*o);
 
+	rval = MALLOC(sizeof (off_t));
 	opts->op_raw = lut_add(opts->op_raw, o, (void *)optarg);
 
-	if (info->oi_parser)
-		opts->op_ints = lut_add(opts->op_ints, o, (void *)
-		    (*info->oi_parser)(o, optarg));
+	if (info->oi_parser) {
+		*rval = (*info->oi_parser)(o, optarg);
+		opts->op_ints = lut_add(opts->op_ints, o, (void *)rval);
+	}
 }
 
 /*
@@ -225,10 +227,15 @@ opts_optarg(struct opts *opts, const char *o)
 /*
  * opts_optarg_int -- return the int value for the given option
  */
-int
+off_t
 opts_optarg_int(struct opts *opts, const char *o)
 {
-	return ((int)lut_lookup(opts->op_ints, o));
+	off_t	*ret;
+
+	ret = (off_t *)lut_lookup(opts->op_ints, o);
+	if (ret != NULL)
+		return (*ret);
+	return (0);
 }
 
 /*
@@ -270,18 +277,18 @@ opts_merge(struct opts *back, struct opts *front)
 /*
  * opts_parse_ctime -- parse a ctime format optarg
  */
-int
+off_t
 opts_parse_ctime(const char *o, const char *optarg)
 {
 	struct tm tm;
-	int ret;
+	off_t ret;
 
 	if (strptime(optarg, "%a %b %e %T %Z %Y", &tm) == NULL &&
 	    strptime(optarg, "%c", &tm) == NULL)
 		err(EF_FILE|EF_JMP,
 		    "Option '%c' requires ctime-style time", *o);
 	errno = 0;
-	if ((ret = (int)mktime(&tm)) == -1 && errno)
+	if ((ret = (off_t)mktime(&tm)) == -1 && errno)
 		err(EF_FILE|EF_SYS|EF_JMP, "Option '%c' Illegal time", *o);
 
 	return (ret);
@@ -290,10 +297,10 @@ opts_parse_ctime(const char *o, const char *optarg)
 /*
  * opts_parse_atopi -- parse a positive integer format optarg
  */
-int
+off_t
 opts_parse_atopi(const char *o, const char *optarg)
 {
-	int ret = atoi(optarg);
+	off_t ret = atoll(optarg);
 
 	while (isdigit(*optarg))
 		optarg++;
@@ -308,10 +315,10 @@ opts_parse_atopi(const char *o, const char *optarg)
 /*
  * opts_parse_atopi -- parse a size format optarg into bytes
  */
-int
+off_t
 opts_parse_bytes(const char *o, const char *optarg)
 {
-	int ret = atoi(optarg);
+	off_t ret = atoll(optarg);
 	while (isdigit(*optarg))
 		optarg++;
 
@@ -343,10 +350,10 @@ opts_parse_bytes(const char *o, const char *optarg)
 /*
  * opts_parse_seconds -- parse a time format optarg into seconds
  */
-int
+off_t
 opts_parse_seconds(const char *o, const char *optarg)
 {
-	int ret;
+	off_t ret;
 
 	if (strcasecmp(optarg, "now") == 0)
 		return (OPTP_NOW);
@@ -354,7 +361,7 @@ opts_parse_seconds(const char *o, const char *optarg)
 	if (strcasecmp(optarg, "never") == 0)
 		return (OPTP_NEVER);
 
-	ret = atoi(optarg);
+	ret = atoll(optarg);
 	while (isdigit(*optarg))
 		optarg++;
 

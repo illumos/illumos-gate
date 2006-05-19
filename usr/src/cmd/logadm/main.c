@@ -633,7 +633,7 @@ rotatelog(struct fn *fnp, struct opts *opts)
 
 	/* see if age condition is present, and return if not met */
 	if (opts_count(opts, "p")) {
-		int when = opts_optarg_int(opts, "p");
+		off_t when = opts_optarg_int(opts, "p");
 		struct opts *cfopts;
 
 		/* unless rotate forced by "-p now", see if period has passed */
@@ -671,14 +671,14 @@ rotatelog(struct fn *fnp, struct opts *opts)
 			 * logname in the conf file.
 			 */
 			if (opts_count(opts, "P")) {
-				int last = opts_optarg_int(opts, "P");
+				off_t last = opts_optarg_int(opts, "P");
 
 				/* return if not enough time has passed */
 				if (Now - last < when)
 					return (B_TRUE);
 			} else if ((cfopts = conf_opts(fname)) != NULL &&
 			    opts_count(cfopts, "P")) {
-				int last = opts_optarg_int(cfopts, "P");
+				off_t last = opts_optarg_int(cfopts, "P");
 
 				/*
 				 * just checking this means this entry
@@ -857,10 +857,11 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 
 	/* gzip the old log file  according to -z count */
 	if (!isgz && opts_count(opts, "z")) {
-		int count = opts_optarg_int(opts, "z");
+		off_t count = opts_optarg_int(opts, "z");
 
 		if (Debug)
-			(void) fprintf(stderr, "rotateto z count %d\n", count);
+			(void) fprintf(stderr, "rotateto z count %lld\n",
+			    count);
 
 		if (count <= n) {
 
@@ -888,8 +889,8 @@ expirefiles(struct fn *fnp, struct opts *opts)
 	struct fn *pattern;
 	struct fn_list *files;
 	struct fn *nextfnp;
-	int count;
-	size_t size;
+	off_t count;
+	off_t size;
 
 	if (Debug)
 		(void) fprintf(stderr, "expirefiles: fname <%s>\n", fname);
@@ -954,7 +955,7 @@ expirefiles(struct fn *fnp, struct opts *opts)
 
 	/* see if age causes expiration */
 	if (opts_count(opts, "A")) {
-		int mtime = (int)time(0) - opts_optarg_int(opts, "A");
+		int mtime = (int)time(0) - (int)opts_optarg_int(opts, "A");
 
 		while ((nextfnp = fn_list_popoldest(files)) != NULL)
 			if (fn_getstat(nextfnp)->st_mtime < mtime) {
