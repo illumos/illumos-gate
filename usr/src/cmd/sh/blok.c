@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,7 @@ char *
 alloc(nbytes)
 	size_t nbytes;
 {
-	unsigned rbytes = round(nbytes+BYTESPERWORD, BYTESPERWORD);
+	unsigned rbytes = round(nbytes + ALIGNSIZ, ALIGNSIZ);
 
 	if (stakbot == 0) {
 		addblok((unsigned)0);
@@ -102,6 +101,11 @@ addblok(unsigned int reqd)
 {
 	if (stakbot == 0) {
 		brkbegin = setbrk(3 * BRKINCR);
+		/*
+		 * setbrk() returns 8 byte aligned address
+		 * but we could need larger align in future
+		 */
+		brkbegin = (unsigned char *)round(brkbegin, ALIGNSIZ);
 		bloktop = (struct blk *)brkbegin;
 	}
 
@@ -112,7 +116,7 @@ addblok(unsigned int reqd)
 		if (staktop >= brkend)
 			growstak(staktop);
 		pushstak(0);
-		rndstak = (unsigned char *)round(staktop, BYTESPERWORD);
+		rndstak = (unsigned char *)round(staktop, ALIGNSIZ);
 		blokstak = (struct blk *)(stakbas) - 1;
 		blokstak->word = stakbsy;
 		stakbsy = blokstak;
