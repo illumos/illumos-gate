@@ -5804,6 +5804,7 @@ sd_build_default_label(struct sd_lun *un)
 
 	un->un_g.dkg_apc = 0;
 	un->un_vtoc.v_nparts = V_NUMPAR;
+	un->un_vtoc.v_version = V_VERSION;
 
 	/* Add backup slice */
 	un->un_vtoc.v_part[2].p_start = 0;
@@ -5828,7 +5829,6 @@ sd_build_default_label(struct sd_lun *un)
 
 	un->un_g.dkg_intrlv = 1;
 
-	un->un_vtoc.v_version = V_VERSION;
 	un->un_vtoc.v_sanity  = VTOC_SANE;
 
 	un->un_f_geometry_is_valid = TRUE;
