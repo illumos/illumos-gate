@@ -127,6 +127,28 @@ sun4u_libc_psr_mount() {
 	fi
 }
 
+# 
+# Discover architecture and find and mount optimal libc_psr 
+#  
+libc_psr_mount() {
+	PLAT=`/usr/bin/uname -i` 
+	ARCH=`/usr/bin/uname -m` 
+	if [ "$ARCH" = "sun4v" ]; then 
+		sun4v_libc_psr_mount 
+	elif [ "$ARCH" = "sun4u" ]; then 
+		if [ -h /platform/$PLAT/lib/libc_psr.so.1 ]; then 
+			LINKSTO=`/usr/bin/ls -l \
+			    /platform/$PLAT/lib/libc_psr.so.1 | 
+			    /usr/bin/awk '{print $NF}'` 
+			if [ "$LINKSTO" = \
+			    "../../sun4u-us3/lib/libc_psr.so.1" ]; then 
+				ARCH=sun4u-us3 
+			fi
+		fi
+		sun4u_libc_psr_mount 
+	fi
+}
+
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
@@ -137,6 +159,7 @@ sun4u_libc_psr_mount() {
 #
 if smf_is_nonglobalzone; then
 	libc_mount
+	libc_psr_mount
 	exit $SMF_EXIT_OK
 fi
 
@@ -237,23 +260,6 @@ fi
 [ -f /etc/.dynamic_routing ] && /usr/bin/rm -f /etc/.dynamic_routing
 
 libc_mount
-
-# 
-# Discover architecture and find and mount optimal libc_psr 
-#  
-PLAT=`/usr/bin/uname -i` 
-ARCH=`/usr/bin/uname -m` 
-if [ "$ARCH" = "sun4v" ]; then 
-	sun4v_libc_psr_mount 
-elif [ "$ARCH" = "sun4u" ]; then 
-	if [ -h /platform/$PLAT/lib/libc_psr.so.1 ]; then 
-		LINKSTO=`/usr/bin/ls -l /platform/$PLAT/lib/libc_psr.so.1 | 
-			/usr/bin/awk '{print $NF}'` 
-		if [ "$LINKSTO" = "../../sun4u-us3/lib/libc_psr.so.1" ]; then 
-			ARCH=sun4u-us3 
-		fi
-	fi
-	sun4u_libc_psr_mount 
-fi
+libc_psr_mount
 
 exit $SMF_EXIT_OK
