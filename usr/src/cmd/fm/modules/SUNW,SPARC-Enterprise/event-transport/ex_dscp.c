@@ -152,13 +152,13 @@ exs_prep_client(fmd_hdl_t *hdl, exs_hdl_t *hp)
 	if ((rv = dscpAddr(hp->h_domain_id, DSCP_ADDR_REMOTE,
 	    (struct sockaddr *)&hp->h_client.c_saddr,
 	    &hp->h_client.c_len)) != DSCP_OK) {
-		fmd_hdl_debug(hdl, "xport - dscpAddr for %s failed: %d",
+		fmd_hdl_error(hdl, "xport - dscpAddr for %s failed: %d",
 		    hp->h_endpt_id, rv);
 		return (1);
 	}
 
 	if ((hp->h_client.c_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		fmd_hdl_debug(hdl, "xport - client socket failed for %s",
+		fmd_hdl_error(hdl, "xport - client socket failed for %s",
 		    hp->h_endpt_id);
 		return (1);
 	}
@@ -166,7 +166,7 @@ exs_prep_client(fmd_hdl_t *hdl, exs_hdl_t *hp)
 	/* Bind the socket to the local IP address of the DSCP link */
 	if ((rv = dscpBind(hp->h_domain_id, hp->h_client.c_sd,
 	    EXS_CLIENT_PORT)) != DSCP_OK) {
-		fmd_hdl_debug(hdl, "xport - client bind for %s failed: %d",
+		fmd_hdl_error(hdl, "xport - client bind for %s failed: %d",
 		    hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
@@ -177,7 +177,7 @@ exs_prep_client(fmd_hdl_t *hdl, exs_hdl_t *hp)
 
 	/* Set IPsec security policy for this socket */
 	if ((rv = dscpSecure(hp->h_domain_id, hp->h_client.c_sd)) != DSCP_OK) {
-		fmd_hdl_debug(hdl, "xport - dscpSecure for %s failed: %d",
+		fmd_hdl_error(hdl, "xport - dscpSecure for %s failed: %d",
 		    hp->h_endpt_id, rv);
 		(void) close(hp->h_client.c_sd);
 		hp->h_client.c_sd = EXS_SD_FREE;
@@ -200,13 +200,13 @@ exs_prep_accept(fmd_hdl_t *hdl)
 	int rv;
 
 	if ((Acceptor_conn.c_sd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		fmd_hdl_debug(hdl, "xport - acceptor socket failed");
+		fmd_hdl_error(hdl, "xport - acceptor socket failed");
 		return (1);
 	}
 
 	if (setsockopt(Acceptor_conn.c_sd, SOL_SOCKET, SO_REUSEADDR,
 	    &optval, sizeof (optval))) {
-		fmd_hdl_debug(hdl, "xport - set REUSEADDR failed");
+		fmd_hdl_error(hdl, "xport - set REUSEADDR failed");
 		(void) close(Acceptor_conn.c_sd);
 		Acceptor_conn.c_sd = EXS_SD_FREE;
 		return (1);
@@ -215,7 +215,7 @@ exs_prep_accept(fmd_hdl_t *hdl)
 	/* Bind the socket to the local IP address of the DSCP link */
 	if ((rv = dscpBind(domain, Acceptor_conn.c_sd,
 	    EXS_SERVER_PORT)) != DSCP_OK) {
-		fmd_hdl_debug(hdl, "xport - acceptor bind failed: %d", rv);
+		fmd_hdl_error(hdl, "xport - acceptor bind failed: %d", rv);
 		(void) close(Acceptor_conn.c_sd);
 		Acceptor_conn.c_sd = EXS_SD_FREE;
 		return (1);
@@ -223,7 +223,7 @@ exs_prep_accept(fmd_hdl_t *hdl)
 
 	/* Activate IPsec security policy for this socket */
 	if ((rv = dscpSecure(domain, Acceptor_conn.c_sd)) != DSCP_OK) {
-		fmd_hdl_debug(hdl, "xport - dscpSecure for acceptor failed: %d",
+		fmd_hdl_error(hdl, "xport - dscpSecure for acceptor failed: %d",
 		    rv);
 		(void) close(Acceptor_conn.c_sd);
 		Acceptor_conn.c_sd = EXS_SD_FREE;
@@ -231,7 +231,7 @@ exs_prep_accept(fmd_hdl_t *hdl)
 	}
 
 	if ((listen(Acceptor_conn.c_sd, EXS_NUM_SOCKS)) == -1) {
-		fmd_hdl_debug(hdl, "xport - acceptor listen failed");
+		fmd_hdl_error(hdl, "xport - acceptor listen failed");
 		(void) close(Acceptor_conn.c_sd);
 		Acceptor_conn.c_sd = EXS_SD_FREE;
 		return (1);
@@ -305,7 +305,7 @@ exs_build_set(fmd_hdl_t *hdl)
 			else if ((errno == EBADF) || (errno == ENOTSOCK))
 				curr->h_server.c_sd = EXS_SD_FREE;
 			else
-				fmd_hdl_error(hdl, "xport - getsockname fail");
+				fmd_hdl_debug(hdl, "xport - getsockname fail");
 
 			if (curr->h_server.c_sd > max_sd)
 				max_sd = curr->h_server.c_sd;
@@ -535,7 +535,7 @@ etm_xport_init(fmd_hdl_t *hdl, char *endpoint_id,
 	exs_hdl_t *hp, *curr;
 	int domain_id;
 
-	if ((exs_get_id(hdl, endpoint_id, &domain_id)) == -1)
+	if (exs_get_id(hdl, endpoint_id, &domain_id))
 		return (NULL);
 
 	(void) pthread_mutex_lock(&List_lock);
@@ -682,19 +682,21 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_hdl_t tlhdl)
 			return (NULL);
 	}
 
-	if ((connect(hp->h_client.c_sd,
-	    (struct sockaddr *)&hp->h_client.c_saddr,
-	    hp->h_client.c_len)) == -1) {
-		fmd_hdl_error(hdl, "xport - failed connect to server for %s",
-		    hp->h_endpt_id);
-		(void) close(hp->h_client.c_sd);
-		hp->h_client.c_sd = EXS_SD_FREE;
-		return (NULL);
-	}
-
 	/* Set the socket to be non-blocking */
 	flags = fcntl(hp->h_client.c_sd, F_GETFL, 0);
 	(void) fcntl(hp->h_client.c_sd, F_SETFL, flags | O_NONBLOCK);
+
+	if ((connect(hp->h_client.c_sd,
+	    (struct sockaddr *)&hp->h_client.c_saddr,
+	    hp->h_client.c_len)) == -1) {
+		if (errno != EINPROGRESS) {
+			fmd_hdl_error(hdl, "xport - failed server connect : %s",
+			    hp->h_endpt_id);
+			(void) close(hp->h_client.c_sd);
+			hp->h_client.c_sd = EXS_SD_FREE;
+			return (NULL);
+		}
+	}
 
 	fmd_hdl_debug(hdl, "xport - connected client socket for %s",
 	    hp->h_endpt_id);

@@ -235,7 +235,7 @@ etm_check_hdr(fmd_hdl_t *hdl, etm_epmap_t *mp, void *buf)
 	etm_proto_hdr_t *hp = (etm_proto_hdr_t *)buf;
 
 	if (bcmp(hp->hdr_delim, ETM_DELIM, ETM_DELIMLEN) != 0) {
-		fmd_hdl_error(hdl, "Bad delimiter in ETM header from %s "
+		fmd_hdl_debug(hdl, "Bad delimiter in ETM header from %s "
 		    ": 0x%x\n", mp->epm_ep_str, hp->hdr_delim);
 		return (ETM_HDR_INVALID);
 	}
@@ -247,14 +247,14 @@ etm_check_hdr(fmd_hdl_t *hdl, etm_epmap_t *mp, void *buf)
 	}
 
 	if (hp->hdr_ver != mp->epm_ver) {
-		fmd_hdl_error(hdl, "Bad version in ETM header from %s : 0x%x\n",
+		fmd_hdl_debug(hdl, "Bad version in ETM header from %s : 0x%x\n",
 		    mp->epm_ep_str, hp->hdr_ver);
 		return (ETM_HDR_BADVERSION);
 	}
 
 	if ((hp->hdr_type == ETM_HDR_TYPE_TOO_LOW) ||
 	    (hp->hdr_type >= ETM_HDR_TYPE_TOO_HIGH)) {
-		fmd_hdl_error(hdl, "Bad type in ETM header from %s : 0x%x\n",
+		fmd_hdl_debug(hdl, "Bad type in ETM header from %s : 0x%x\n",
 		    mp->epm_ep_str, hp->hdr_type);
 		return (ETM_HDR_BADTYPE);
 	}
@@ -292,7 +292,7 @@ etm_post_msg(fmd_hdl_t *hdl, etm_epmap_t *mp, void *buf, size_t buflen)
 	int rv;
 
 	if (nvlist_unpack((char *)buf, buflen, &nvl, 0)) {
-		fmd_hdl_debug(hdl, "failed to unpack message");
+		fmd_hdl_error(hdl, "failed to unpack message");
 		return (1);
 	}
 
@@ -317,11 +317,15 @@ etm_post_msg(fmd_hdl_t *hdl, etm_epmap_t *mp, void *buf, size_t buflen)
 		} else {
 			fmd_hdl_debug(hdl, "unable to post message, qstat = %d",
 			    mp->epm_qstat);
+			nvlist_free(nvl);
+			/* Remote peer will attempt to resend event */
 			rv = 2;
 		}
 	} else {
 		(void) pthread_mutex_unlock(&Etm_mod_lock);
 		fmd_hdl_debug(hdl, "unable to post message, module exiting");
+		nvlist_free(nvl);
+		/* Remote peer will attempt to resend event */
 		rv = 3;
 	}
 
@@ -435,7 +439,7 @@ etm_get_ep_nvl(fmd_hdl_t *hdl, etm_epmap_t *mp)
 	(void) nvlist_alloc(&mp->epm_ep_nvl, NV_UNIQUE_NAME, 0);
 
 	if (nvlist_add_string(mp->epm_ep_nvl, "domain-id", mp->epm_ep_str)) {
-		fmd_hdl_debug(hdl, "failed to add domain-id string to nvlist "
+		fmd_hdl_error(hdl, "failed to add domain-id string to nvlist "
 		    "for %s", mp->epm_ep_str);
 		nvlist_free(mp->epm_ep_nvl);
 		return (1);
@@ -508,6 +512,7 @@ etm_reconnect(fmd_hdl_t *hdl, etm_epmap_t *mp)
 
 /*
  * Suspend a given connection and setup for reconnection retries.
+ * Assume caller holds lock on epm_lock.
  */
 static void
 etm_suspend_reconnect(fmd_hdl_t *hdl, etm_epmap_t *mp)
@@ -518,8 +523,6 @@ etm_suspend_reconnect(fmd_hdl_t *hdl, etm_epmap_t *mp)
 		return;
 	}
 	(void) pthread_mutex_unlock(&Etm_mod_lock);
-
-	(void) pthread_mutex_lock(&mp->epm_lock);
 
 	if (mp->epm_oconn != NULL) {
 		(void) etm_xport_close(hdl, mp->epm_oconn);
@@ -540,8 +543,6 @@ etm_suspend_reconnect(fmd_hdl_t *hdl, etm_epmap_t *mp)
 			mp->epm_timer_in_use = 1;
 		}
 	}
-
-	(void) pthread_mutex_unlock(&mp->epm_lock);
 }
 
 /*
@@ -561,7 +562,7 @@ etm_reinit(fmd_hdl_t *hdl, etm_epmap_t *mp)
 
 	if (mp->epm_xprthdl != NULL) {
 		fmd_xprt_close(hdl, mp->epm_xprthdl);
-		fmd_hdl_debug(hdl, "queue closed for %s",  mp->epm_ep_str);
+		fmd_hdl_debug(hdl, "queue closed for %s", mp->epm_ep_str);
 		mp->epm_xprthdl = NULL;
 		/* mp->epm_ep_nvl is free'd in fmd_xprt_close */
 		mp->epm_ep_nvl = NULL;
@@ -896,11 +897,20 @@ etm_init_epmap(fmd_hdl_t *hdl, char *epname, int flags)
 
 	if (IS_CLIENT(newmap)) {
 		if (etm_handle_startup(hdl, newmap)) {
-			etm_free_ep_nvl(hdl, newmap);
-			(void) etm_xport_fini(hdl, newmap->epm_tlhdl);
-			fmd_hdl_strfree(hdl, newmap->epm_ep_str);
-			fmd_hdl_free(hdl, newmap, sizeof (etm_epmap_t));
-			return;
+			/*
+			 * For whatever reason, we could not complete the
+			 * startup handshake with the server.  Set the timer
+			 * and try again.
+			 */
+			if (newmap->epm_oconn != NULL) {
+				(void) etm_xport_close(hdl, newmap->epm_oconn);
+				newmap->epm_oconn = NULL;
+			}
+			newmap->epm_cstat = C_UNINITIALIZED;
+			newmap->epm_qstat = Q_UNINITIALIZED;
+			newmap->epm_timer_id = fmd_timer_install(hdl, newmap,
+			    NULL, Reconn_interval);
+			newmap->epm_timer_in_use = 1;
 		}
 	}
 
@@ -1084,15 +1094,24 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	mp = fmd_xprt_getspecific(hdl, xprthdl);
 
-	(void) pthread_mutex_lock(&mp->epm_lock);
+	if (pthread_mutex_trylock(&mp->epm_lock))
+		/* Another thread may be trying to close this fmd_xprt_t */
+		return (FMD_SEND_RETRY);
 
 	mp->epm_txbusy++;
 
-	if (mp->epm_cstat == C_CLOSED) {
+	if (mp->epm_qstat == Q_UNINITIALIZED) {
 		mp->epm_txbusy--;
 		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
+		return (FMD_SEND_FAILED);
+	}
+
+	if (mp->epm_cstat == C_CLOSED) {
 		etm_suspend_reconnect(hdl, mp);
+		mp->epm_txbusy--;
+		(void) pthread_mutex_unlock(&mp->epm_lock);
+		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
 		return (FMD_SEND_RETRY);
 	}
 
@@ -1114,10 +1133,10 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 	if (mp->epm_oconn == NULL) {
 		if ((mp->epm_oconn = etm_xport_open(hdl, mp->epm_tlhdl))
 		    == NULL) {
+			etm_suspend_reconnect(hdl, mp);
 			mp->epm_txbusy--;
 			(void) pthread_mutex_unlock(&mp->epm_lock);
 			(void) pthread_cond_broadcast(&mp->epm_tx_cv);
-			etm_suspend_reconnect(hdl, mp);
 			return (FMD_SEND_RETRY);
 		} else {
 			mp->epm_cstat = C_OPEN;
@@ -1129,8 +1148,9 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	msgnvl = fmd_xprt_translate(hdl, xprthdl, ep);
 	if (msgnvl == NULL) {
-		mp->epm_qstat = Q_UNINITIALIZED;
+		mp->epm_txbusy--;
 		(void) pthread_mutex_unlock(&mp->epm_lock);
+		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
 		fmd_hdl_error(hdl, "Failed to translate event %p\n",
 		    (void *) ep);
 		return (FMD_SEND_FAILED);
@@ -1150,6 +1170,10 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 	(void) etm_create_hdr(buf, mp->epm_ver, ETM_HDR_MSG, nvsize);
 
 	if (rv = nvlist_pack(msgnvl, &nvbuf, &nvsize, NV_ENCODE_XDR, 0)) {
+		(void) pthread_mutex_lock(&mp->epm_lock);
+		mp->epm_txbusy--;
+		(void) pthread_mutex_unlock(&mp->epm_lock);
+		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
 		fmd_hdl_error(hdl, "Failed to pack event : %s\n", strerror(rv));
 		FREE_BUF(hdl, buf, buflen);
 		return (FMD_SEND_FAILED);
@@ -1159,15 +1183,15 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	if (etm_xport_write(hdl, mp->epm_oconn, Rw_timeout, buf,
 	    buflen) != buflen) {
+		fmd_hdl_debug(hdl, "failed to send message to %s",
+		    mp->epm_ep_str);
 		(void) pthread_mutex_lock(&mp->epm_lock);
+		etm_suspend_reconnect(hdl, mp);
 		mp->epm_txbusy--;
 		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
-		fmd_hdl_debug(hdl, "failed to send message to %s",
-		    mp->epm_ep_str);
 		FREE_BUF(hdl, buf, buflen);
 		INCRSTAT(Etm_stats.error_write.fmds_value.ui64);
-		etm_suspend_reconnect(hdl, mp);
 		return (FMD_SEND_RETRY);
 	}
 
@@ -1178,15 +1202,15 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 	if (etm_xport_read(hdl, mp->epm_oconn, Rw_timeout, buf,
 	    hdrlen) != hdrlen) {
+		fmd_hdl_debug(hdl, "failed to read ACK from %s",
+		    mp->epm_ep_str);
 		(void) pthread_mutex_lock(&mp->epm_lock);
+		etm_suspend_reconnect(hdl, mp);
 		mp->epm_txbusy--;
 		(void) pthread_mutex_unlock(&mp->epm_lock);
 		(void) pthread_cond_broadcast(&mp->epm_tx_cv);
-		fmd_hdl_debug(hdl, "failed to read ACK from %s",
-		    mp->epm_ep_str);
 		FREE_BUF(hdl, buf, buflen);
 		INCRSTAT(Etm_stats.error_read.fmds_value.ui64);
-		etm_suspend_reconnect(hdl, mp);
 		return (FMD_SEND_RETRY);
 	}
 
@@ -1215,19 +1239,18 @@ etm_send(fmd_hdl_t *hdl, fmd_xprt_t *xprthdl, fmd_event_t *ep, nvlist_t *nvl)
 
 		} else if (hdrstat == ETM_HDR_S_RESTART) {
 			/* Server has restarted */
-			if (mp->epm_xprthdl != NULL) {
-				mp->epm_cstat = C_CLOSED;
-				fmd_xprt_close(hdl, xprthdl);
-				/* mp->epm_ep_nvl is free'd in fmd_xprt_close */
-				mp->epm_ep_nvl = NULL;
-				mp->epm_qstat = Q_UNINITIALIZED;
-				fmd_hdl_debug(hdl, "server restarted, queue "
-				    "closed for %s", mp->epm_ep_str);
-				if (mp->epm_timer_in_use == 0) {
-					mp->epm_timer_id = fmd_timer_install(
-					    hdl, mp, NULL, Reconn_interval);
-					mp->epm_timer_in_use = 1;
-				}
+			mp->epm_cstat = C_CLOSED;
+			mp->epm_qstat = Q_UNINITIALIZED;
+			fmd_hdl_debug(hdl, "server %s restarted",
+			    mp->epm_ep_str);
+			/*
+			 * Cannot call fmd_xprt_close here, so we'll do it
+			 * on the timeout thread.
+			 */
+			if (mp->epm_timer_in_use == 0) {
+				mp->epm_timer_id = fmd_timer_install(
+				    hdl, mp, NULL, 0);
+				mp->epm_timer_in_use = 1;
 			}
 
 			/*
@@ -1278,10 +1301,24 @@ etm_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 
 	if (mp->epm_qstat == Q_UNINITIALIZED) {
 		/* Server has shutdown and we (client) need to reconnect */
+		if (mp->epm_xprthdl != NULL) {
+			fmd_xprt_close(hdl, mp->epm_xprthdl);
+			fmd_hdl_debug(hdl, "queue closed for %s",
+			    mp->epm_ep_str);
+			mp->epm_xprthdl = NULL;
+			/* mp->epm_ep_nvl is free'd in fmd_xprt_close */
+			mp->epm_ep_nvl = NULL;
+		}
+
 		if (mp->epm_ep_nvl == NULL)
 			(void) etm_get_ep_nvl(hdl, mp);
 
 		if (etm_handle_startup(hdl, mp)) {
+			if (mp->epm_oconn != NULL) {
+				(void) etm_xport_close(hdl, mp->epm_oconn);
+				mp->epm_oconn = NULL;
+			}
+			mp->epm_cstat = C_UNINITIALIZED;
 			mp->epm_qstat = Q_UNINITIALIZED;
 			mp->epm_timer_id = fmd_timer_install(hdl, mp, NULL,
 			    Reconn_interval);
