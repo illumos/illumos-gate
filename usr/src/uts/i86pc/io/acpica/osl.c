@@ -90,6 +90,9 @@ static char *acpi_table_path = "/boot/acpi/tables/";
 /* non-zero while create_d2a_map() is working */
 static int creating_d2a_map = 0;
 
+/* set by acpi_poweroff() in PSMs */
+int acpica_powering_off = 0;
+
 /*
  *
  */
@@ -641,9 +644,13 @@ AcpiOsSleep(ACPI_INTEGER Milliseconds)
 	/*
 	 * During kernel startup, before the first
 	 * tick interrupt has taken place, we can't call
-	 * delay.  So we busy wait if lbolt == 0.
+	 * delay; very late in kernel shutdown, clock interrupts
+	 * are blocked, so delay doesn't work then either.
+	 * So we busy wait if lbolt == 0 (kernel startup)
+	 * or if psm_shutdown() has set acpi_powering_off to
+	 * a non-zero value.
 	 */
-	if (ddi_get_lbolt() == 0)
+	if ((ddi_get_lbolt() == 0) || acpica_powering_off)
 		drv_usecwait(Milliseconds * 1000);
 	else
 		delay(drv_usectohz(Milliseconds * 1000));

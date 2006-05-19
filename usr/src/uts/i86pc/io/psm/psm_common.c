@@ -948,7 +948,11 @@ acpi_get_irq_lnk_cache_ent(ACPI_HANDLE lnkobj, int *pci_irqp,
 int
 acpi_poweroff(void)
 {
+	extern int acpica_powering_off;
+
 	PSM_VERBOSE_POWEROFF(("acpi_poweroff: starting poweroff\n"));
+
+	acpica_powering_off = 1;
 
 	if (AcpiEnterSleepStatePrep(5) != AE_OK)
 		return (1);
