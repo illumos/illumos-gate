@@ -40,7 +40,12 @@ cat <<EOF > $HEADER_FILE
 #ifndef	_BSM_AUDIT_UEVENTS_H
 #define	_BSM_AUDIT_UEVENTS_H
 
-#pragma ident	"%Z%$HEADER_FILE	%I%	%E% SMI"
+EOF
+
+grep '^# ident' $DATABASE | sed -e 's/^#/#pragma/' \
+	-e "s/$DATABASE/$HEADER_FILE/" >> $HEADER_FILE
+
+cat <<EOF >> $HEADER_FILE
 
 /*
  * User level audit event numbers.

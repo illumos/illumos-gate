@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,26 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# Wrapper script that will fail if there is any output, for commands
-# that don't exit with a non-zero exit code when they find errors
-ERRIFOUTPUT_SCRIPT = $(METASSIST_TOPLEVEL)/scripts/errifoutput
-
 # Suffixes for files that flag a particular check
 SUFFIX_LINT = .lint
-SUFFIX_CSTYLE = .cstyle
-SUFFIX_HDRCHK = .hdrchk
-SUFFIX_KEYWORDS = .keywords
-
-# Get list of (non-deleted) SCCS files
-tmp1 :sh= echo SCCS/s.*
-tmp2 = ${tmp1:SCCS/s.%=%}
-SCCSFILES = ${tmp2:.del-%=}
 
 all       := TARGET = all
 install   := TARGET = install
@@ -49,7 +36,6 @@ catalog   := TARGET = catalog
 check     := TARGET = check
 cstyle    := TARGET = cstyle
 hdrchk    := TARGET = hdrchk
-keywords  := TARGET = keywords
 lint      := TARGET = lint
 
 .KEEP_STATE:
@@ -102,38 +88,20 @@ install: all .WAIT \
 # Run lint on all source files
 lint: ${SUBDIRS} $(SRCS:%=%$(SUFFIX_LINT))
 
-# Pattern-matching rule for cstyle
-# cstyle doesn't exit with a non-zero exit code when it finds errors,
-# so run it through a wrapper script that fails if there is any output
-%$(SUFFIX_CSTYLE): %
-	$(ERRIFOUTPUT_SCRIPT) ${CSTYLE} -p -P $< && touch $@
+CSTYLE_FLAGS=	-Pp
+HDRCHK_FLAGS=	-a
 
-# Run cstyle on all source files and headers
-cstyle: $(ERRIFOUTPUT_SCRIPT) ${SUBDIRS} $(SRCS:%=%.cstyle) $(HDRS:%=%$(SUFFIX_CSTYLE))
+cstyle: ${SUBDIRS}
 
-# Pattern-matching rule for hdrchk
-# hdrchk doesn't exit with a non-zero exit code when it finds errors,
-# so run it through a wrapper script that fails if there is any output
-%$(SUFFIX_HDRCHK): %
-	$(ERRIFOUTPUT_SCRIPT) ${HDRCHK} $< && touch $@
+hdrchk: ${SUBDIRS}
 
-# Run hdrchk on all headers
-hdrchk: $(ERRIFOUTPUT_SCRIPT) ${SUBDIRS} $(HDRS:%=%$(SUFFIX_HDRCHK))
-
-# Pattern-matching rule for keywords
-%$(SUFFIX_KEYWORDS): %
-	keywords $< && touch $@
-
-# Run keywords on all SCCS files
-keywords: ${SUBDIRS} ${SCCSFILES:%=%$(SUFFIX_KEYWORDS)}
-
-check: cstyle lint hdrchk keywords
+check: cstyle hdrchk
 
 clobber: ${SUBDIRS}
 
 clean: ${SUBDIRS}
 	-${RM} *.o *.ln *.i *~ core a.out $(CLEANFILES) \
-		*$(SUFFIX_LINT) *$(SUFFIX_CSTYLE) *$(SUFFIX_HDRCHK) *$(SUFFIX_KEYWORDS)
+		*$(SUFFIX_LINT)
 
 catalog: $(POFILE)
 

@@ -1438,7 +1438,6 @@ $a
 #endif	/* _CURSES_H */
 .
 0r copyright.h
-/copyright\.h/d
-.
-1,$s/\@(\#)curses\.ed/\@(\#)curses\.h/
+1,.g/#pragma ident/d
+g/\@(\#)curses\.ed/s//\@(\#)curses\.h/
 w curses.h

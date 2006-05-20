@@ -86,6 +86,6 @@ tifgetstr(char *tistr)
 }
 .
 0r copyright.h
-/copyright\.h/d
+1,.g/#pragma ident/d
 w tifget.c
 q
