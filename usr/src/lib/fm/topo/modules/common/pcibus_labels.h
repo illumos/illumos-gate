@@ -101,7 +101,7 @@ typedef struct missing_names {
 	struct pdevlabs *mn_names;	/* platform entries */
 } missing_names_t;
 
-extern int pci_label_cmn(tnode_t *, nvlist_t *, nvlist_t **);
+extern int pci_label_cmn(tnode_t *, nvlist_t *, nvlist_t **, topo_mod_t *mod);
 
 #ifdef __cplusplus
 }

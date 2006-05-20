@@ -30,9 +30,10 @@
 #include "hostbridge.h"
 #include "pcibus.h"
 #include "util.h"
+#include "did.h"
 
 int
-count_busorrc(busorrc_t *list, int *hbc, int *bph)
+count_busorrc(busorrc_t *list, int *hbc, int *bph, topo_mod_t *mod)
 {
 	ulong_t start;
 	busorrc_t *p;
@@ -54,28 +55,29 @@ count_busorrc(busorrc_t *list, int *hbc, int *bph)
 	 * each hostbridge
 	 */
 	if (bt % *hbc != 0) {
-		topo_mod_dprintf(HbHdl,
+		topo_mod_dprintf(mod,
 		    "Imbalance between bus/root complex count and "
 		    "the number of hostbridges.\n");
-		return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}
 	*bph = bt / *hbc;
-	topo_mod_dprintf(HbHdl,
+	topo_mod_dprintf(mod,
 	    "%d hostbridge%s\n", *hbc, (*hbc > 1) ? "s." : ".");
-	topo_mod_dprintf(HbHdl, "%d buses total.\n", bt);
+	topo_mod_dprintf(mod, "%d buses total.\n", bt);
 	return (0);
 }
 
 static int
-busorrc_process(busorrc_t *list, int isrc, tnode_t *ptn)
+busorrc_process(busorrc_t *list, int isrc, tnode_t *ptn,
+    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	int hbc, busper;
 
 	if (list == NULL) {
 		if (isrc == 1)
-			topo_mod_dprintf(HbHdl, "No root complexes found.\n");
+			topo_mod_dprintf(mod, "No root complexes found.\n");
 		else
-			topo_mod_dprintf(HbHdl, "No pci buses found.\n");
+			topo_mod_dprintf(mod, "No pci buses found.\n");
 		return (0);
 	}
 
@@ -102,16 +104,18 @@ busorrc_process(busorrc_t *list, int isrc, tnode_t *ptn)
 	 * values of X2 maintains the correct associations of
 	 * buses/root complexes and bridges.
 	 */
-	if (count_busorrc(list, &hbc, &busper) < 0)
+	if (count_busorrc(list, &hbc, &busper, mod) < 0)
 		return (-1);
 	if (isrc == 1)
-		return (declare_exbuses(list, ptn, hbc, busper));
+		return (declare_exbuses(list, ptn, hbc, busper, didhash,
+		    promtree, mod));
 	else
-		return (declare_buses(list, ptn, hbc));
+		return (declare_buses(list, ptn, hbc, didhash, promtree, mod));
 }
 
 static int
-pci_hostbridges_find(tnode_t *ptn)
+pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	busorrc_t *buses = NULL;
 	busorrc_t *rcs = NULL;
@@ -121,51 +125,51 @@ pci_hostbridges_find(tnode_t *ptn)
 	/* Scan for buses, top-level devinfo nodes with the right driver */
 	devtree = di_init("/", DINFOCPYALL);
 	if (devtree == DI_NODE_NIL) {
-		topo_mod_dprintf(HbHdl, "devinfo init failed.");
+		topo_mod_dprintf(mod, "devinfo init failed.");
 		topo_node_range_destroy(ptn, HOSTBRIDGE);
-		return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 	}
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode) < 0) {
+		if (busorrc_add(&buses, pnode, mod) < 0) {
 			di_fini(devtree);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(PSYCHO, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode) < 0) {
+		if (busorrc_add(&buses, pnode, mod) < 0) {
 			di_fini(devtree);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(SCHIZO, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&buses, pnode) < 0) {
+		if (busorrc_add(&buses, pnode, mod) < 0) {
 			di_fini(devtree);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
 	pnode = di_drv_first_node(PX, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (busorrc_add(&rcs, pnode) < 0) {
+		if (busorrc_add(&rcs, pnode, mod) < 0) {
 			di_fini(devtree);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
-	if (busorrc_process(buses, 0, ptn) < 0)
-		return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+	if (busorrc_process(buses, 0, ptn, didhash, promtree, mod) < 0)
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
-	if (busorrc_process(rcs, 1, ptn) < 0)
-		return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+	if (busorrc_process(rcs, 1, ptn, didhash, promtree, mod) < 0)
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 
-	busorrc_free(buses);
-	busorrc_free(rcs);
+	busorrc_free(buses, mod);
+	busorrc_free(rcs, mod);
 	di_fini(devtree);
 	return (0);
 }
@@ -173,14 +177,15 @@ pci_hostbridges_find(tnode_t *ptn)
 /*ARGSUSED*/
 int
 platform_hb_enum(tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax)
+    topo_instance_t imin, topo_instance_t imax, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
-	return (pci_hostbridges_find(parent));
+	return (pci_hostbridges_find(parent, didhash, promtree, mod));
 }
 
 /*ARGSUSED*/
 int
-platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out)
+platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
 {
-	return (labelmethod_inherit(HbHdl, node, in, out));
+	return (labelmethod_inherit(mod, node, in, out));
 }

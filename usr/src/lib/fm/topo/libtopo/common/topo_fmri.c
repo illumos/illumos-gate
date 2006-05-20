@@ -348,7 +348,7 @@ topo_fmri_compare(topo_hdl_t *thp, nvlist_t *f1, nvlist_t *f2, int *err)
 	if (nvlist_lookup_string(f1, FM_FMRI_SCHEME, &scheme1) != 0)
 		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
 		    TOPO_METH_COMPARE, NULL));
-	if (nvlist_lookup_string(f1, FM_FMRI_SCHEME, &scheme2) != 0)
+	if (nvlist_lookup_string(f2, FM_FMRI_SCHEME, &scheme2) != 0)
 		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
 		    TOPO_METH_COMPARE, NULL));
 

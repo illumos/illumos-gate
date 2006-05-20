@@ -30,4 +30,8 @@ include ../../Makefile.com
 include $(SRC)/Makefile.master.64
 include ../../Makefile.targ
 
+LDLIBS += -ltopo
+LDFLAGS += -L$(ROOT)/usr/lib/fm/amd64 -R/usr/lib/fm/amd64
+LINTFLAGS += -L$(ROOT)/usr/lib/fm/amd64
+
 install: all $(ROOTPROG64)

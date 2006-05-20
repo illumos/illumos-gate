@@ -25,7 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip hostbridge pcibus
+SUBDIRS = chip hostbridge pcibus sata
 
 .PARALLEL: $(SUBDIRS)
 

@@ -20,12 +20,17 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <string.h>
+#include <dirent.h>
 #include "cfga_sata.h"
 
 /*
@@ -233,9 +238,6 @@ static cfga_sata_ret_t
 do_control_ioctl(const char *ap_id, sata_cfga_apctl_t subcommand, uint_t arg,
 	void **descrp, size_t *sizep);
 
-static int
-get_link(di_devlink_t devlink, void *arg);
-
 static void
 cleanup_after_devctl_cmd(devctl_hdl_t devctl_hdl, nvlist_t *user_nvlist);
 
@@ -248,83 +250,140 @@ sata_confirm(struct cfga_confirm *confp, char *msg);
 
 /* Utilities */
 
-/*
- * The next two funcs are similar to functions from cfgadm_scsi.
- * physpath_to_devlink is the only func directly used by cfgadm_sata.
- * get_link supports it.
- */
-/*
- * Routine to search the /dev directory or a subtree of /dev.
- */
-static int
-get_link(di_devlink_t devlink, void *arg)
+static cfga_sata_ret_t
+physpath_to_devlink(const char *basedir, const char *node_path,
+    char **logpp, int *l_errnop)
 {
-	walk_link_t *larg = (walk_link_t *)arg;
+	char *linkpath;
+	char *buf;
+	char *real_path;
+	DIR *dp;
+	struct dirent *dep, *newdep;
+	int deplen;
+	boolean_t found = B_FALSE;
+	int err = 0;
+	struct stat sb;
+	char *p;
+	cfga_sata_ret_t rv = CFGA_SATA_INTERNAL_ERROR;
 
 	/*
-	 * When path is specified, it's the node path without minor
-	 * name. Therefore, the ../.. prefixes needs to be stripped.
+	 * Using libdevinfo for this is overkill and kills performance
+	 * when multiple consumers of libcfgadm are executing
+	 * concurrently.
 	 */
-	if (larg->path) {
-		char *content = (char *)di_devlink_content(devlink);
-		char *start = strstr(content, "/devices/");
-
-		/* line content must have minor node */
-		if (start == NULL ||
-		    strncmp(start, larg->path, larg->len) != 0 ||
-		    start[larg->len] != ':') {
-
-			return (DI_WALK_CONTINUE);
-		}
+	if ((dp = opendir(basedir)) == NULL) {
+		*l_errnop = errno;
+		return (CFGA_SATA_INTERNAL_ERROR);
 	}
 
+	linkpath = malloc(PATH_MAX);
+	buf = malloc(PATH_MAX);
+	real_path = malloc(PATH_MAX);
 
-	*(larg->linkpp) = strdup(di_devlink_path(devlink));
+	deplen = pathconf(basedir, _PC_NAME_MAX) +
+	    sizeof (struct dirent);
+	dep = (struct dirent *)malloc(deplen);
 
-	return (DI_WALK_TERMINATE);
-}
-
-/* ARGSUSED */
-static sata_cfga_ret_t
-physpath_to_devlink(
-	const char *basedir,
-	const char *node_path,
-	char **logpp,
-	int *l_errnop,
-	int match_minor)
-{
-	walk_link_t larg;
-	di_devlink_handle_t hdl;
-	char *minor_path;
-
-	if ((hdl = di_devlink_init(NULL, 0)) == NULL) {
-		*l_errnop = errno;
-		return (SATA_CFGA_LIB_ERR);
+	if (dep == NULL || linkpath == NULL || buf == NULL ||
+	    real_path == NULL) {
+		*l_errnop = ENOMEM;
+		rv = CFGA_SATA_ALLOC_FAIL;
+		goto pp_cleanup;
 	}
 
 	*logpp = NULL;
-	larg.linkpp = logpp;
-	minor_path = (char *)node_path + strlen("/devices");
-	if (match_minor) {
-		larg.path = NULL;
-		(void) di_devlink_walk(hdl, NULL, minor_path, DI_PRIMARY_LINK,
-			(void *)&larg, get_link);
-	} else {
-		minor_path = NULL;
-		larg.len = strlen(node_path);
-		larg.path = (char *)node_path;
-		(void) di_devlink_walk(hdl, "/", minor_path, DI_PRIMARY_LINK,
-			(void *)&larg, get_link);
+
+	while (!found && (err = readdir_r(dp, dep, &newdep)) == 0 &&
+	    newdep != NULL) {
+
+		assert(newdep == dep);
+
+		if (strcmp(dep->d_name, ".") == 0 ||
+		    strcmp(dep->d_name, "..") == 0)
+			continue;
+
+		(void) snprintf(linkpath, MAXPATHLEN,
+		    "%s/%s", basedir, dep->d_name);
+
+		if (lstat(linkpath, &sb) < 0)
+			continue;
+
+		if (S_ISDIR(sb.st_mode)) {
+
+			if ((rv = physpath_to_devlink(linkpath, node_path,
+			    logpp, l_errnop)) != CFGA_SATA_OK) {
+
+				goto pp_cleanup;
+			}
+
+			if (*logpp != NULL)
+				found = B_TRUE;
+
+		} else if (S_ISLNK(sb.st_mode)) {
+
+			bzero(buf, PATH_MAX);
+			if (readlink(linkpath, buf, PATH_MAX) < 0)
+				continue;
+
+
+			/*
+			 * realpath() is too darn slow, so fake
+			 * it, by using what we know about /dev
+			 * links: they are always of the form:
+			 * <"../">+/devices/<path>
+			 */
+			p = buf;
+			while (strncmp(p, "../", 3) == 0)
+				p += 3;
+
+			if (p != buf)
+				p--;	/* back up to get a slash */
+
+			assert (*p == '/');
+
+			if (strcmp(p, node_path) == 0) {
+				*logpp = strdup(linkpath);
+				if (*logpp == NULL) {
+
+					rv = CFGA_SATA_ALLOC_FAIL;
+					goto pp_cleanup;
+				}
+
+				found = B_TRUE;
+			}
+		}
 	}
 
-	(void) di_devlink_fini(&hdl);
+	free(linkpath);
+	free(buf);
+	free(real_path);
+	free(dep);
+	(void) closedir(dp);
 
-	if (*logpp == NULL) {
-		*l_errnop = errno;
-		return (SATA_CFGA_LIB_ERR);
+	if (err != 0) {
+		*l_errnop = err;
+		return (CFGA_SATA_INTERNAL_ERROR);
 	}
 
-	return (SATA_CFGA_OK);
+	return (CFGA_SATA_OK);
+
+pp_cleanup:
+
+	if (dp)
+		(void) closedir(dp);
+	if (dep)
+		free(dep);
+	if (linkpath)
+		free(linkpath);
+	if (buf)
+		free(buf);
+	if (real_path)
+		free(real_path);
+	if (*logpp) {
+		free(*logpp);
+		*logpp = NULL;
+	}
+	return (rv);
 }
 
 
@@ -1078,9 +1137,19 @@ sata_check_target_node(di_node_t node, void *arg)
 int
 sata_make_dyncomp(const char *ap_id, char **dyncomp)
 {
-	char *devpath = NULL;
-	char *cp = NULL;
-	int l_errno;
+	char	*devpath = NULL;
+	char	*cp = NULL;
+	int	l_errno;
+	char	minor_path[MAXPATHLEN];
+	char	name_part[MAXNAMELEN];
+	char	*devlink = NULL;
+	char	*minor_portion = NULL;
+	int	deplen;
+	int	err;
+	DIR	*dp = NULL;
+	struct stat sb;
+	struct dirent *dep = NULL;
+	struct dirent *newdep = NULL;
 
 	assert(dyncomp != NULL);
 
@@ -1089,79 +1158,109 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 	 */
 	devpath = sata_get_devicepath(ap_id);
 	if (devpath == NULL) {
+
 		(void) printf("cfga_list_ext: cannot locate target device\n");
 		return (CFGA_SATA_DYNAMIC_AP);
+
 	} else {
-		di_node_t root, walk_root;
-		char minor_path[MAXPATHLEN];
-		char devstr[128];
-		char *devlink = NULL;
 
-		(void) strcpy(minor_path, devpath);
-		cp = strrchr(minor_path, (int)*PATH_SEP);
-		if (cp != NULL)
-			*cp = '\0';
-		(void) strcpy(devstr, cp + 1);
+		cp = strrchr(devpath, *PATH_SEP);
+		assert(cp != NULL);
+		*cp = 0;	/* terminate path for opendir() */
 
-		/* Get a snapshot */
-		if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+		(void) strncpy(name_part, cp + 1, MAXNAMELEN);
+
+		/*
+		 * Using libdevinfo for this is overkill and kills
+		 * performance when many consumers are using libcfgadm
+		 * concurrently.
+		 */
+		if ((dp = opendir(devpath)) == NULL) {
 			goto bailout;
 		}
 
 		/*
-		 * Lookup the subtree of interest
+		 * deplen is large enough to fit the largest path-
+		 * struct dirent includes one byte (the terminator)
+		 * so we don't add 1 to the calculation here.
 		 */
-		walk_root = di_lookup_node(root,
-		    minor_path + strlen("/devices"));
-
-		if (walk_root == DI_NODE_NIL) {
-			di_fini(root);
+		deplen = pathconf(devpath, _PC_NAME_MAX) +
+		    sizeof (struct dirent);
+		dep = (struct dirent *)malloc(deplen);
+		if (dep == NULL)
 			goto bailout;
+
+		while ((err = readdir_r(dp, dep, &newdep)) == 0 &&
+		    newdep != NULL) {
+
+			assert(newdep == dep);
+
+			if (strcmp(dep->d_name, ".") == 0 ||
+			    strcmp(dep->d_name, "..") == 0 ||
+			    (minor_portion = strchr(dep->d_name,
+			    *MINOR_SEP)) == NULL)
+				continue;
+
+			*minor_portion = 0;
+			if (strcmp(dep->d_name, name_part) != 0)
+				continue;
+			*minor_portion = *MINOR_SEP;
+
+			(void) snprintf(minor_path, MAXPATHLEN,
+			    "%s/%s", devpath, dep->d_name);
+
+			if (stat(minor_path, &sb) < 0)
+				continue;
+
+			if (S_ISBLK(sb.st_mode))
+				break;
 		}
 
-		if (di_walk_node(walk_root, DI_WALK_CLDFIRST, devstr,
-		    sata_check_target_node) != 0) {
-			di_fini(root);
-			goto bailout;
-		}
-		di_fini(root);
-
-		/* fix the minor node path */
-		(void) strlcpy(minor_path, devpath, (size_t)MAXPATHLEN);
-		(void) strlcat(minor_path, devstr, (size_t)MAXPATHLEN);
+		(void) closedir(dp);
+		free(dep);
 		free(devpath);
 
-		(void) (cfga_sata_ret_t)physpath_to_devlink(
-			CFGA_DEV_DIR, minor_path, &devlink, &l_errno, 1);
+		dp = NULL;
+		dep = NULL;
+		devpath = NULL;
+
+		/*
+		 * If there was an error, or we didn't exit the loop
+		 * by finding a block or character device, bail out.
+		 */
+		if (err != 0 || newdep == NULL)
+			goto bailout;
+
+		/*
+		 * Look for links to the physical path in /dev/dsk,
+		 * since we ONLY looked for BLOCK devices above.
+		 */
+		(void) physpath_to_devlink("/dev/dsk",
+		    minor_path, &devlink, &l_errno);
 
 		/* postprocess and copy logical name here */
 		if (devlink != NULL) {
 			/*
 			 * For disks, remove partition info
 			 */
-			if (strstr(devlink, "/dsk/") ||
-			    strstr(devlink, "/rdsk/")) {
-				if ((cp = strrchr(devlink, (int)*SLICE)) !=
-				    NULL) {
-					*cp = '\0';
-				} else if ((cp = strrchr(devlink,
-				    (int)*PARTITION)) != NULL) {
-					*cp = '\0';
-				}
+			if ((cp = strstr(devlink, "dsk/")) != NULL) {
+				cp[strlen(cp) - 2] = 0;
+				*dyncomp = strdup(cp);
 			}
-			cp = strstr(devlink, "/dev/");
-			if (cp == NULL)
-				cp = devlink;
-			else
-				cp = devlink + strlen("/dev/");
-			*dyncomp = strdup(cp);
+
 			free(devlink);
 		}
+
 		return (SATA_CFGA_OK);
 	}
+
 bailout:
-	if (devpath != NULL)
+	if (dp)
+		(void) closedir(dp);
+	if (devpath)
 		free(devpath);
+	if (dep)
+		free(dep);
 	return (CFGA_SATA_DYNAMIC_AP);
 }
 
@@ -1234,8 +1333,8 @@ cfga_list_ext(
 
 	/* Get /dev/cfg path to corresponding to the physical ap_id */
 	/* Remember ap_id_log must be freed */
-	rv = (cfga_sata_ret_t)physpath_to_devlink(CFGA_DEV_DIR, (char *)ap_id,
-	    &ap_id_log, &l_errno, MATCH_MINOR_NAME);
+	rv = physpath_to_devlink(CFGA_DEV_DIR, (char *)ap_id,
+	    &ap_id_log, &l_errno);
 
 	if (rv != 0) {
 		rv = CFGA_SATA_DEVLINK;
@@ -1629,7 +1728,6 @@ cleanup_after_devctl_cmd(devctl_hdl_t devctl_hdl, nvlist_t *user_nvlist)
 	}
 }
 
-
 static cfga_sata_ret_t
 setup_for_devctl_cmd(
 	const char *ap_id,
@@ -1651,7 +1749,9 @@ setup_for_devctl_cmd(
 
 	/* Get a devctl handle to pass to the devctl_ap_XXX functions */
 	if ((*devctl_hdl = devctl_ap_acquire((char *)lap_id, oflag)) == NULL) {
-		(void) printf("devctl_ap_acquire failed\n");
+		(void) fprintf(stderr, "[libcfgadm:sata] "
+		    "setup_for_devctl_cmd: devctl_ap_acquire failed: %s\n",
+		    strerror(errno));
 		rv = CFGA_SATA_DEVCTL;
 		goto bailout;
 	}
@@ -1685,6 +1785,7 @@ setup_for_devctl_cmd(
 		goto bailout;
 	}
 
+	free(lap_id);
 	return (rv);
 
 bailout:

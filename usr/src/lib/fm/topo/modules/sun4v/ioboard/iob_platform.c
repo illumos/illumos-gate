@@ -47,27 +47,28 @@
 
 /*ARGSUSED*/
 int
-platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out)
+platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out,
+    topo_mod_t *mod)
 {
 	return (0);
 }
 
 static tnode_t *
-iob_node_create(tnode_t *parent)
+iob_node_create(tnode_t *parent, topo_mod_t *mod)
 {
 	int err;
 	tnode_t *ion;
 	nvlist_t *fmri, *args = NULL, *pfmri = NULL;
-	topo_hdl_t *thp = topo_mod_handle(IobHdl);
+	topo_hdl_t *thp = topo_mod_handle(mod);
 
 	(void) topo_node_resource(parent, &pfmri, &err);
 	if (pfmri != NULL) {
-		if (topo_mod_nvalloc(IobHdl, &args, NV_UNIQUE_NAME) != 0 ||
+		if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0 ||
 		    nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, pfmri)
 		    != 0) {
 			nvlist_free(pfmri);
 			nvlist_free(args);
-			(void) topo_mod_seterrno(IobHdl, EMOD_FMRI_NVL);
+			(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
 			return (NULL);
 		}
 		nvlist_free(pfmri);
@@ -75,18 +76,18 @@ iob_node_create(tnode_t *parent)
 
 	if ((fmri = topo_fmri_create(thp, FM_FMRI_SCHEME_HC, IOBOARD, 0, args,
 		&err)) == NULL) {
-		topo_mod_dprintf(IobHdl, "creation of tnode for ioboard=0 "
+		topo_mod_dprintf(mod, "creation of tnode for ioboard=0 "
 		    "failed: %s\n", topo_strerror(err));
-		(void) topo_mod_seterrno(IobHdl, err);
+		(void) topo_mod_seterrno(mod, err);
 		nvlist_free(args);
 		return (NULL);
 	}
 	nvlist_free(args);
-	ion = topo_node_bind(IobHdl, parent, IOBOARD, 0, fmri, NULL);
+	ion = topo_node_bind(mod, parent, IOBOARD, 0, fmri, NULL);
 	if (ion == NULL) {
 		nvlist_free(fmri);
-		topo_mod_dprintf(IobHdl, "unable to bind ioboard=0: %s",
-		    topo_strerror(topo_mod_errno(IobHdl)));
+		topo_mod_dprintf(mod, "unable to bind ioboard=0: %s",
+		    topo_strerror(topo_mod_errno(mod)));
 		return (NULL); /* mod_errno already set */
 	}
 	nvlist_free(fmri);
@@ -102,7 +103,8 @@ iob_node_create(tnode_t *parent)
 
 /*ARGSUSED*/
 int
-platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
+platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
+    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	int err;
 	tnode_t *ion;
@@ -110,7 +112,7 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
 
 	if (topo_prop_get_string(parent,
 	    TOPO_PGROUP_SYSTEM, TOPO_PROP_PLATFORM, &plat, &err) < 0) {
-		return (topo_mod_seterrno(IobHdl, err));
+		return (topo_mod_seterrno(mod, err));
 	}
 
 	/*
@@ -133,31 +135,31 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
 	 */
 	if (strcmp(plat, ERIE) == 0) {
 		if (strcmp(topo_node_name(parent), "motherboard") != 0) {
-			topo_mod_strfree(IobHdl, plat);
+			topo_mod_strfree(mod, plat);
 			return (0);
 		}
 		ion = parent;
 	} else if (strcmp(topo_node_name(parent), "motherboard") == 0) {
-		topo_mod_strfree(IobHdl, plat);
+		topo_mod_strfree(mod, plat);
 		return (0);
 	} else {
-		ion = iob_node_create(parent);
+		ion = iob_node_create(parent, mod);
 	}
 
-	topo_mod_strfree(IobHdl, plat);
+	topo_mod_strfree(mod, plat);
 
 	if (ion == NULL) {
-		topo_mod_dprintf(IobHdl, "Enumeration of ioboard failed: %s\n",
-		    topo_strerror(topo_mod_errno(IobHdl)));
+		topo_mod_dprintf(mod, "Enumeration of ioboard failed: %s\n",
+		    topo_strerror(topo_mod_errno(mod)));
 		return (-1); /* mod_errno already set */
 	}
 
-	if (child_range_add(IobHdl, ion, HOSTBRIDGE, 0, HB_MAX) < 0 ||
-	    topo_mod_enumerate(IobHdl, ion, HOSTBRIDGE, HOSTBRIDGE, 0, HB_MAX)
+	if (child_range_add(mod, ion, HOSTBRIDGE, 0, HB_MAX) < 0 ||
+	    topo_mod_enumerate(mod, ion, HOSTBRIDGE, HOSTBRIDGE, 0, HB_MAX)
 	    < 0) {
-		topo_mod_dprintf(IobHdl, "Enumeration of %s=%d "
+		topo_mod_dprintf(mod, "Enumeration of %s=%d "
 		    "failed: %s\n", HOSTBRIDGE, 0,
-		    topo_strerror(topo_mod_errno(IobHdl)));
+		    topo_strerror(topo_mod_errno(mod)));
 		return (-1); /* mod_errno already set */
 	}
 

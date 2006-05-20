@@ -57,7 +57,7 @@ typedef struct txprop {
 	 *	topo property.
 	 */
 	int (*tx_xlate)(tnode_t *, did_t *,
-	    const char *, const char *, const char *);
+	    const char *, const char *, const char *, di_prom_handle_t);
 } txprop_t;
 
 #define	TOPO_PGROUP_PCI		"pci"
@@ -81,14 +81,17 @@ typedef struct txprop {
 #define	DI_PHYSPROP	"physical-slot#"
 #define	DI_SLOTPROP	"slot-names"
 
-extern int did_props_set(tnode_t *, did_t *, txprop_t[], int);
+extern int did_props_set(tnode_t *, did_t *, txprop_t[], int,
+    di_prom_handle_t);
 
 extern int pciex_cap_get(did_hash_t *, di_node_t);
 extern int pci_BDF_get(did_hash_t *, di_node_t, int *, int *, int *);
 extern int pci_classcode_get(did_hash_t *, di_node_t, uint_t *, uint_t *);
 
-extern int di_uintprop_get(di_node_t, const char *, uint_t *);
-extern int di_bytes_get(di_node_t, const char *, int *, uchar_t **);
+extern int di_uintprop_get(di_node_t, const char *, uint_t *,
+    di_prom_handle_t);
+extern int di_bytes_get(di_node_t, const char *, int *, uchar_t **,
+    di_prom_handle_t);
 
 #ifdef __cplusplus
 }

@@ -62,17 +62,26 @@ extern "C" {
 #define	GETCLASS(x) (((x) & 0xff0000) >> 16)
 #define	GETSUBCLASS(x) (((x) & 0xff00) >> 8)
 
-extern tnode_t *pcibus_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pcidev_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pcifn_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pciexbus_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pciexdev_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pciexfn_declare(tnode_t *, di_node_t, topo_instance_t);
-extern int pci_children_instantiate(tnode_t *, di_node_t,
-    int, int, int, int, int);
+struct did_hash;
 
-extern di_prom_handle_t Promtree;
-extern topo_mod_t *PciHdl;
+extern tnode_t *pcibus_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pcidev_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pcifn_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pciexbus_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pciexdev_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pciexfn_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern int pci_children_instantiate(tnode_t *, di_node_t,
+    int, int, int, int, int, struct did_hash *, di_prom_handle_t,
+    topo_mod_t *);
+
+extern int platform_pci_label(tnode_t *, nvlist_t *, nvlist_t **, topo_mod_t *);
+
 extern const topo_method_t Pci_methods[];
 
 #ifdef __cplusplus

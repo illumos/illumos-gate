@@ -33,13 +33,11 @@
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
 #include <libnvpair.h>
+#include "did_impl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct did did_t;
-typedef struct did_hash did_hash_t;
 
 extern topo_mod_t *did_mod(did_t *);
 extern di_node_t did_dinode(did_t *);
@@ -54,7 +52,8 @@ extern int did_inherit(did_t *, did_t *);
 extern int did_excap(did_t *);
 extern int did_bdf(did_t *);
 
-extern did_t *did_create(did_hash_t *, di_node_t, int, int, int, int);
+extern did_t *did_create(did_hash_t *, di_node_t, int, int, int, int,
+    di_prom_handle_t);
 extern did_t *did_find(did_hash_t *, di_node_t);
 extern did_t *did_link_get(did_t *);
 extern did_t *did_chain_get(did_t *);

@@ -223,6 +223,7 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 					topo_mod_dprintf(mp,
 					    "unable to create hbnode: %s",
 					    topo_strerror(topo_mod_errno(mp)));
+					topo_mod_unload(pcimod);
 					return (-1);
 				}
 
@@ -234,6 +235,7 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 				topo_mod_dprintf(mp,
 				    "unable to create rcnode: %s",
 				    topo_strerror(topo_mod_errno(mp)));
+				topo_mod_unload(pcimod);
 				return (-1);
 			}
 
@@ -243,9 +245,11 @@ opl_hb_enum(topo_mod_t *mp, const ioboard_contents_t *iob, tnode_t *ion,
 				topo_mod_dprintf(mp,
 				    "error enumerating pcibus",
 				    topo_strerror(topo_mod_errno(mp)));
+				topo_mod_unload(pcimod);
 				return (-1);
 			}
 		}
 	}
+	topo_mod_unload(pcimod);
 	return (0);
 }

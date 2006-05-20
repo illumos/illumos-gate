@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,14 +54,49 @@
 #undef RW_READ_HELD
 #undef RW_WRITE_HELD
 
+#include <fmd_asru.h>
 #include <fmd_error.h>
+#include <fmd_fmri.h>
 #include <fmd_subr.h>
 #include <fmd.h>
+
+static void
+fmd_dr_repair_containee(fmd_asru_t *ee, void *er)
+{
+	if ((ee->asru_flags & FMD_ASRU_FAULTY) &&
+	    fmd_fmri_contains(er, ee->asru_fmri) > 0)
+		(void) fmd_asru_clrflags(ee, FMD_ASRU_FAULTY, NULL, NULL);
+}
+
+/*ARGSUSED*/
+static void
+fmd_dr_rcache_sync(fmd_asru_t *ap, void *arg)
+{
+	if (fmd_fmri_present(ap->asru_fmri) != 0)
+		return;
+
+	if (!fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL))
+		return;
+
+	/*
+	 * We've located the requested ASRU, and have repaired it.  Now
+	 * traverse the ASRU cache, looking for any faulty entries that
+	 * are contained by this one.  If we find any, repair them too.
+	 */
+	fmd_asru_hash_apply(fmd.d_asrus, fmd_dr_repair_containee,
+	    ap->asru_fmri);
+}
 
 static void
 fmd_dr_event(sysevent_t *sep)
 {
 	uint64_t gen;
+
+	/*
+	 * If the event target is in the R$ and this sysevent indicates it was
+	 * removed, remove it from the R$ also.
+	 */
+	(void) fmd_asru_hash_apply(fmd.d_asrus, fmd_dr_rcache_sync, NULL);
 
 	(void) pthread_mutex_lock(&fmd.d_stats_lock);
 	gen = fmd.d_stats->ds_dr_gen.fmds_value.ui64++;

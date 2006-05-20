@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,8 @@
 
 MAPDIR= ../spec/i386
 include ../Makefile.com
+CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
+LINTFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 
 .KEEP_STATE:
 

@@ -34,40 +34,43 @@
 #include "did.h"
 #include "util.h"
 
-extern did_hash_t *Didhash;
-
 static int
-hb_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
+hb_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	tnode_t *hb;
 
-	if (did_create(Didhash, bn, 0, hbi, NO_RC, TRUST_BDF) == NULL)
+	if (did_create(didhash, bn, 0, hbi, NO_RC, TRUST_BDF, promtree) == NULL)
 		return (-1);
-	if ((hb = pcihostbridge_declare(ptn, bn, hbi)) == NULL)
+	if ((hb = pcihostbridge_declare(ptn, bn, hbi, didhash,
+	    promtree, mod)) == NULL)
 		return (-1);
-	return (topo_mod_enumerate(HbHdl,
-	    hb, PCI_BUS, PCI_BUS, 0, MAX_HB_BUSES));
+	return (topo_mod_enumerate(mod, hb, PCI_BUS, PCI_BUS, 0,
+	    MAX_HB_BUSES));
 }
 
 static int
-rc_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
+rc_process(tnode_t *ptn, topo_instance_t hbi, di_node_t bn, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	tnode_t *hb;
 	tnode_t *rc;
 
-	if (did_create(Didhash, bn, 0, hbi, hbi, TRUST_BDF) == NULL)
+	if (did_create(didhash, bn, 0, hbi, hbi, TRUST_BDF, promtree) == NULL)
 		return (-1);
-	if ((hb = pciexhostbridge_declare(ptn, bn, hbi)) == NULL)
+	if ((hb = pciexhostbridge_declare(ptn, bn, hbi, didhash, promtree, mod))
+	    == NULL)
 		return (-1);
-	if ((rc = pciexrc_declare(hb, bn, hbi)) == NULL)
+	if ((rc = pciexrc_declare(hb, bn, hbi, didhash, promtree, mod)) == NULL)
 		return (-1);
-	return (topo_mod_enumerate(HbHdl,
+	return (topo_mod_enumerate(mod,
 	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES));
 }
 
 
 int
-pci_hostbridges_find(tnode_t *ptn)
+pci_hostbridges_find(tnode_t *ptn, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	di_node_t devtree;
 	di_node_t pnode;
@@ -77,17 +80,18 @@ pci_hostbridges_find(tnode_t *ptn)
 	/* Scan for buses, top-level devinfo nodes with the right driver */
 	devtree = di_init("/", DINFOCPYALL);
 	if (devtree == DI_NODE_NIL) {
-		topo_mod_dprintf(HbHdl, "devinfo init failed.");
+		topo_mod_dprintf(mod, "devinfo init failed.");
 		topo_node_range_destroy(ptn, HOSTBRIDGE);
 		return (0);
 	}
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (hb_process(ptn, hbcnt++, pnode) < 0) {
+		if (hb_process(ptn, hbcnt++, pnode, didhash, promtree, mod)
+		    < 0) {
 			di_fini(devtree);
 			topo_node_range_destroy(ptn, HOSTBRIDGE);
-			return (topo_mod_seterrno(HbHdl, EMOD_PARTIAL_ENUM));
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
 		pnode = di_drv_next_node(pnode);
 	}
@@ -99,20 +103,22 @@ pci_hostbridges_find(tnode_t *ptn)
 			if (di_driver_name(cnode) == NULL)
 				continue;
 			if (strcmp(di_driver_name(cnode), PCI_PCI) == 0) {
-				if (hb_process(ptn, hbcnt++, cnode) < 0) {
+				if (hb_process(ptn, hbcnt++, cnode, didhash,
+				    promtree, mod) < 0) {
 					di_fini(devtree);
 					topo_node_range_destroy(ptn,
 					    HOSTBRIDGE);
-					return (topo_mod_seterrno(HbHdl,
+					return (topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM));
 				}
 			}
 			if (strcmp(di_driver_name(cnode), PCIE_PCI) == 0) {
-				if (rc_process(ptn, hbcnt++, cnode) < 0) {
+				if (rc_process(ptn, hbcnt++, cnode, didhash,
+				    promtree, mod) < 0) {
 					di_fini(devtree);
 					topo_node_range_destroy(ptn,
 					    HOSTBRIDGE);
-					return (topo_mod_seterrno(HbHdl,
+					return (topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM));
 				}
 			}
@@ -126,14 +132,15 @@ pci_hostbridges_find(tnode_t *ptn)
 /*ARGSUSED*/
 int
 platform_hb_enum(tnode_t *parent, const char *name,
-    topo_instance_t imin, topo_instance_t imax)
+    topo_instance_t imin, topo_instance_t imax, did_hash_t *didhash,
+    di_prom_handle_t promtree, topo_mod_t *mod)
 {
-	return (pci_hostbridges_find(parent));
+	return (pci_hostbridges_find(parent, didhash, promtree, mod));
 }
 
 /*ARGSUSED*/
 int
-platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out)
+platform_hb_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
 {
-	return (labelmethod_inherit(HbHdl, node, in, out));
+	return (labelmethod_inherit(mod, node, in, out));
 }

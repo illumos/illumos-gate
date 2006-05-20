@@ -30,6 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libdevinfo.h>
+#include "did.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,11 +70,19 @@ extern "C" {
  */
 #define	TO_PCI		(1000)
 
-extern topo_mod_t *HbHdl;
+struct did_hash;
 
-extern tnode_t *pcihostbridge_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pciexhostbridge_declare(tnode_t *, di_node_t, topo_instance_t);
-extern tnode_t *pciexrc_declare(tnode_t *, di_node_t, topo_instance_t);
+extern tnode_t *pcihostbridge_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pciexhostbridge_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+extern tnode_t *pciexrc_declare(tnode_t *, di_node_t, topo_instance_t,
+    struct did_hash *, di_prom_handle_t, topo_mod_t *);
+
+extern int platform_hb_label(tnode_t *, nvlist_t *, nvlist_t **, topo_mod_t *);
+extern int platform_hb_enum(tnode_t *,
+    const char *, topo_instance_t, topo_instance_t, did_hash_t *,
+    di_prom_handle_t, topo_mod_t *);
 
 #ifdef __cplusplus
 }

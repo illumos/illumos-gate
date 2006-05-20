@@ -74,9 +74,21 @@ module_load(topo_mod_t *mp, tnode_t *parent, const char *name)
 static int
 module_run(topo_mod_t *mp, tnode_t *parent, pfn_enum_t *ep)
 {
+	return (topo_mod_enumerate(mp, parent,
+	    ep->pfne_modname, ep->pfne_childname,
+	    ep->pfne_imin, ep->pfne_imax));
+}
+
+int
+pcifn_enum(topo_mod_t *mp, tnode_t *parent)
+{
 	char *ccstr;
+	int rv = 0;
+	int i, e;
 	uint_t cc;
-	int e;
+	topo_mod_t *child_mod;
+
+	topo_mod_dprintf(mp, "Enumerating beneath pci(ex) function.\n");
 
 	/*
 	 * Extract the class code of the PCI function and make sure
@@ -91,36 +103,20 @@ module_run(topo_mod_t *mp, tnode_t *parent, pfn_enum_t *ep)
 	}
 	topo_mod_strfree(mp, ccstr);
 	cc = cc >> 16;
-	if (cc != ep->pfne_class)
-		return (0);
-
-	return (topo_mod_enumerate(mp, parent,
-	    ep->pfne_modname, ep->pfne_childname,
-	    ep->pfne_imin, ep->pfne_imax));
-}
-
-int
-pcifn_enum(topo_mod_t *mp, tnode_t *node)
-{
-	int rv = 0;
-	int i;
-
-	topo_mod_dprintf(mp, "Enumerating beneath pci(ex) function.\n");
 
 	for (i = 0; i < Pcifn_enumerator_count; i++) {
-		if (Pcifn_enumerators[i].pfne_loaded == 0)
+
+		if (cc != Pcifn_enumerators[i].pfne_class)
 			continue;
-		if (Pcifn_enumerators[i].pfne_loaded < 0) {
-			Pcifn_enumerators[i].pfne_mod = module_load(mp,
-			    node, Pcifn_enumerators[i].pfne_modname);
-			if (Pcifn_enumerators[i].pfne_mod == NULL) {
-				Pcifn_enumerators[i].pfne_loaded = 0;
-				continue;
-			}
-			Pcifn_enumerators[i].pfne_loaded = 1;
+
+		child_mod = module_load(mp, parent,
+		    Pcifn_enumerators[i].pfne_modname);
+
+		if (child_mod) {
+			rv = module_run(mp, parent,
+			    &Pcifn_enumerators[i]) != 0 ? -1 : 0;
+			topo_mod_unload(child_mod);
 		}
-		if (module_run(mp, node, &Pcifn_enumerators[i]) != 0)
-			rv = -1;
 	}
 	return (rv);
 }

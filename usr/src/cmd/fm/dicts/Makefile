@@ -27,6 +27,7 @@
 include ../../Makefile.cmd
 
 common_DCNAMES = \
+	DISK \
 	FMD \
 	SMF \
 	SUNOS \

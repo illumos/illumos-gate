@@ -287,6 +287,7 @@ main(int argc, char *argv[])
 		    " %s\n", g_pname, opt_s, topo_strerror(err));
 
 		topo_hdl_strfree(thp, uuid);
+		topo_snap_release(thp);
 		topo_close(thp);
 
 		return (err ? FMTOPO_EXIT_ERROR : FMTOPO_EXIT_SUCCESS);
@@ -300,6 +301,8 @@ main(int argc, char *argv[])
 	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
 		(void) fprintf(stderr, "%s: failed to walk topology\n",
 		    g_pname);
+		topo_walk_fini(twp);
+		topo_snap_release(thp);
 		topo_close(thp);
 		return (FMTOPO_EXIT_ERROR);
 	}

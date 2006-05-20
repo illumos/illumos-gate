@@ -102,7 +102,8 @@ extern did_t *did_hash_lookup(did_hash_t *, di_node_t);
 extern void did_hash_destroy(did_hash_t *);
 extern void did_hash_insert(did_hash_t *, di_node_t, did_t *);
 
-extern did_t *did_create(did_hash_t *, di_node_t, int, int, int, int);
+extern did_t *did_create(did_hash_t *, di_node_t, int, int, int, int,
+    di_prom_handle_t);
 extern void did_destroy(did_t *);
 extern void did_hold(did_t *);
 extern void did_rele(did_t *);

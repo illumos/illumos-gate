@@ -44,13 +44,11 @@
  * the module pointer returned by topo_mod_load().
  */
 typedef struct pfn_enum {
-	int pfne_loaded;	/* -1 untried, 0 did not load, 1 loaded */
 	uint_t pfne_class;	/* expected PCI class of the parent function */
 	const char *pfne_modname; /* enumerator module name */
 	const char *pfne_childname; /* name of nodes to enumerate */
 	topo_instance_t pfne_imin; /* minimum instance number to enumerate */
 	topo_instance_t pfne_imax; /* maximum instance number to enumerate */
-	topo_mod_t *pfne_mod;	/* loaded module handle */
 } pfn_enum_t;
 
 /*
@@ -58,8 +56,8 @@ typedef struct pfn_enum {
  * beneath pci(-express) functions.
  */
 pfn_enum_t Pcifn_enumerators[] = {
-	{ -1, PCI_CLASS_MASS, "sata", "sata-port", 0, 7, NULL },
-	{ -1, PCI_CLASS_MASS, "scsi", "disk", 0, 15, NULL }
+	{ PCI_CLASS_MASS, "sata", "sata-port", 0, 7	},
+	{ PCI_CLASS_MASS, "scsi", "disk", 0, 15		}
 };
 
 int Pcifn_enumerator_count = sizeof (Pcifn_enumerators) / sizeof (pfn_enum_t);

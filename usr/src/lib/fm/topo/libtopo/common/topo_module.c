@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in comodliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -320,7 +319,7 @@ topo_modhash_load(topo_hdl_t *thp, const char *path, const topo_modops_t *ops)
 		*p = '\0'; /* strip trailing .so from any module name */
 
 	if ((mod = topo_mod_create(thp, name, path, ops)) == NULL) {
-		topo_hdl_unlock(thp);
+		topo_modhash_unlock(mhp);
 		return (NULL); /* th_errno set */
 	}
 

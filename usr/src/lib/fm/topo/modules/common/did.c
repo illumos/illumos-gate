@@ -115,14 +115,15 @@ slotnm_cp(did_t *from, did_t *to, int *nslots)
 
 static int
 di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
-    int *slotnum, char **slotnm)
+    int *slotnum, char **slotnm, di_prom_handle_t promtree)
 {
 	char *slotbuf;
 	int sz;
 	uchar_t *buf;
 
 	*slotnum = -1;
-	(void) di_uintprop_get(src, DI_PHYSPROP, (uint_t *)slotnum);
+	(void) di_uintprop_get(src, DI_PHYSPROP, (uint_t *)slotnum,
+	    promtree);
 	/*
 	 * If no physical slot number property was found, then the
 	 * capabilities register may indicate the pci-express device
@@ -131,7 +132,8 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 	if (*slotnum == -1 && (excap & PCIE_PCIECAP_SLOT_IMPL) != 0) {
 		uint_t slotcap;
 		int e;
-		e = di_uintprop_get(src, "pcie-slotcap-reg", &slotcap);
+		e = di_uintprop_get(src, "pcie-slotcap-reg", &slotcap,
+		    promtree);
 		if (e == 0)
 			*slotnum = slotcap >> PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT;
 	}
@@ -143,7 +145,8 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 	 * a slot-names property, and if it exists, ignore the slotmask value
 	 * and use the string as the label.
 	 */
-	if (di_bytes_get(src, DI_SLOTPROP, &sz, &buf) == 0 && sz > 4) {
+	if (di_bytes_get(src, DI_SLOTPROP, &sz, &buf, promtree) == 0 &&
+	    sz > 4) {
 		slotbuf = (char *)&buf[4];
 	} else {
 		/*
@@ -160,7 +163,8 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, uint_t excap,
 }
 
 static int
-di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
+di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots,
+    di_prom_handle_t promtree)
 {
 	slotnm_t *lastslot = NULL;
 	slotnm_t *newslot;
@@ -172,7 +176,7 @@ di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
 
 	*slots = NULL;
 	*nslots = 0;
-	if (di_bytes_get(src, DI_SLOTPROP, &sz, &slotbuf) < 0)
+	if (di_bytes_get(src, DI_SLOTPROP, &sz, &slotbuf, promtree) < 0)
 		return (0);
 	if (sz < sizeof (uint_t))
 		return (0);
@@ -220,7 +224,7 @@ did_hash(did_t *did)
 
 did_t *
 did_create(did_hash_t *dhash, di_node_t src,
-    int ibrd, int ibrdge, int irc, int ibus)
+    int ibrd, int ibrdge, int irc, int ibus, di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	did_t *np;
@@ -245,7 +249,7 @@ did_create(did_hash_t *dhash, di_node_t src,
 	 * We must have a reg prop and from it we extract the bus #,
 	 * device #, and function #.
 	 */
-	if (di_uintprop_get(src, DI_REGPROP, &reg) < 0) {
+	if (di_uintprop_get(src, DI_REGPROP, &reg, promtree) < 0) {
 		topo_mod_free(mp, np, sizeof (did_t));
 		return (NULL);
 	}
@@ -264,7 +268,7 @@ did_create(did_hash_t *dhash, di_node_t src,
 	 * There *may* be a class code we can capture.  If there wasn't
 	 * one, capture that fact by setting the class value to -1.
 	 */
-	if (di_uintprop_get(src, DI_CCPROP, &code) == 0) {
+	if (di_uintprop_get(src, DI_CCPROP, &code, promtree) == 0) {
 		np->dp_class = GETCLASS(code);
 		np->dp_subclass = GETSUBCLASS(code);
 	} else {
@@ -275,19 +279,22 @@ did_create(did_hash_t *dhash, di_node_t src,
 	 * If there wasn't one, the capabilities will be the out-of-bounds
 	 * value of zero.
 	 */
-	(void) di_uintprop_get(src, "pcie-capid-reg", &np->dp_excap);
+	(void) di_uintprop_get(src, "pcie-capid-reg", &np->dp_excap,
+	    promtree);
 	/*
 	 * There *may* be a physical slot number property we can capture.
 	 */
 	if (di_physlotinfo_get(mp,
-	    src, np->dp_excap, &np->dp_physlot, &np->dp_physlot_label) < 0) {
+	    src, np->dp_excap, &np->dp_physlot, &np->dp_physlot_label,
+	    promtree) < 0) {
 		topo_mod_free(mp, np, sizeof (did_t));
 		return (NULL);
 	}
 	/*
 	 * There *may* be PCI slot info we can capture
 	 */
-	if (di_slotinfo_get(mp, src, &np->dp_nslots, &np->dp_slotnames) < 0) {
+	if (di_slotinfo_get(mp, src, &np->dp_nslots, &np->dp_slotnames,
+	    promtree) < 0) {
 		if (np->dp_physlot_label != NULL)
 			topo_mod_strfree(mp, np->dp_physlot_label);
 		topo_mod_free(mp, np, sizeof (did_t));

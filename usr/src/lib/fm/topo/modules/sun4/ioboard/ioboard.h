@@ -47,16 +47,19 @@ extern "C" {
 #define	IOB_BUSADDR1	0x600000
 #define	IOB_BUSADDR2	0x700000
 
-extern topo_mod_t *IobHdl;
+extern tnode_t *ioboard_declare(tnode_t *, topo_instance_t, void *,
+    di_prom_handle_t, topo_mod_t *);
 
-extern tnode_t *ioboard_declare(tnode_t *, topo_instance_t, void *);
+extern int platform_iob_enum(tnode_t *, topo_instance_t, topo_instance_t,
+    did_hash_t *, di_prom_handle_t, topo_mod_t *);
+extern int platform_iob_label(tnode_t *, nvlist_t *, nvlist_t **, topo_mod_t *);
 
 /*
  * This routine works for splitting up the string we get from
  * di_bus_addr() for all machines that currently use this enumerator.
  */
 extern did_t *split_bus_address(did_hash_t *, di_node_t, uint_t, uint_t,
-    int, int, int *, int *, int *);
+    int, int, int *, int *, int *, di_prom_handle_t, topo_mod_t *);
 
 #ifdef __cplusplus
 }

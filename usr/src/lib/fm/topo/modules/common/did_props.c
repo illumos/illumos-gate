@@ -45,23 +45,23 @@
 #include "did_props.h"
 
 static int ASRU_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int FRU_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int DEVprop_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int DRIVERprop_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int EXCAP_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int BDF_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int label_set(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int maybe_di_chars_copy(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 static int maybe_di_uint_to_str(tnode_t *, did_t *,
-    const char *, const char *, const char *);
+    const char *, const char *, const char *, di_prom_handle_t);
 
 /*
  * Arrays of "property translation routines" to set the properties a
@@ -187,12 +187,13 @@ int Fn_propcnt = sizeof (Fn_common_props) / sizeof (txprop_t);
  * gets updated with the property value and we return 0.
  */
 static int
-promprop2uint(di_node_t n, const char *propnm, uint_t *val)
+promprop2uint(di_node_t n, const char *propnm, uint_t *val,
+    di_prom_handle_t promtree)
 {
 	di_prom_prop_t pp = DI_PROM_PROP_NIL;
 	uchar_t *buf;
 
-	while ((pp = di_prom_prop_next(Promtree, n, pp)) != DI_PROM_PROP_NIL) {
+	while ((pp = di_prom_prop_next(promtree, n, pp)) != DI_PROM_PROP_NIL) {
 		if (strcmp(di_prom_prop_name(pp), propnm) == 0) {
 			if (di_prom_prop_data(pp, &buf) < sizeof (uint_t))
 				continue;
@@ -231,16 +232,18 @@ hwprop2uint(di_node_t n, const char *propnm, uint_t *val)
 }
 
 int
-di_uintprop_get(di_node_t n, const char *pnm, uint_t *pv)
+di_uintprop_get(di_node_t n, const char *pnm, uint_t *pv,
+    di_prom_handle_t promtree)
 {
 	if (hwprop2uint(n, pnm, pv) < 0)
-		if (promprop2uint(n, pnm, pv) < 0)
+		if (promprop2uint(n, pnm, pv, promtree) < 0)
 			return (-1);
 	return (0);
 }
 
 int
-di_bytes_get(di_node_t n, const char *pnm, int *sz, uchar_t **db)
+di_bytes_get(di_node_t n, const char *pnm, int *sz, uchar_t **db,
+    di_prom_handle_t promtree)
 {
 	di_prom_prop_t pp = DI_PROM_PROP_NIL;
 	di_prop_t hp = DI_PROP_NIL;
@@ -254,7 +257,7 @@ di_bytes_get(di_node_t n, const char *pnm, int *sz, uchar_t **db)
 		}
 	}
 	if (*sz < 0) {
-		while ((pp = di_prom_prop_next(Promtree, n, pp)) !=
+		while ((pp = di_prom_prop_next(promtree, n, pp)) !=
 		    DI_PROM_PROP_NIL) {
 			if (strcmp(di_prom_prop_name(pp), pnm) == 0) {
 				*sz = di_prom_prop_data(pp, db);
@@ -358,7 +361,8 @@ dev_for_hostbridge(topo_mod_t *mp, char *path)
 /*ARGSUSED*/
 static int
 ASRU_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	topo_hdl_t *hp;
@@ -459,7 +463,8 @@ FRU_fmri_hack(topo_mod_t *mp, tnode_t *tn, const char *label)
 /*ARGSUSED*/
 static int
 FRU_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	char *label, *nm;
@@ -502,7 +507,8 @@ FRU_set(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 label_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	nvlist_t *in, *out;
@@ -538,7 +544,8 @@ label_set(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 EXCAP_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	int excap;
 	int err;
@@ -581,7 +588,8 @@ EXCAP_set(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 DEVprop_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	char *dnpath;
@@ -620,7 +628,8 @@ DEVprop_set(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 DRIVERprop_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	char *dnm;
 	int err;
@@ -637,7 +646,8 @@ DRIVERprop_set(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 maybe_di_chars_copy(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	uchar_t *typbuf;
@@ -645,7 +655,8 @@ maybe_di_chars_copy(tnode_t *tn, did_t *pd,
 	int sz = -1;
 	int err, e;
 
-	if (di_bytes_get(did_dinode(pd), dpnm, &sz, &typbuf) < 0)
+	if (di_bytes_get(did_dinode(pd), dpnm, &sz, &typbuf,
+	    promtree) < 0)
 		return (0);
 	mp = did_mod(pd);
 	tmpbuf = topo_mod_alloc(mp, sz + 1);
@@ -675,11 +686,13 @@ uint_to_strprop(topo_mod_t *mp, uint_t v, tnode_t *tn,
 
 static int
 maybe_di_uint_to_str(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	uint_t v;
 
-	if (di_uintprop_get(did_dinode(pd), dpnm, &v) < 0)
+	if (di_uintprop_get(did_dinode(pd), dpnm, &v,
+	    promtree) < 0)
 		return (0);
 
 	return (uint_to_strprop(did_mod(pd), v, tn, tpgrp, tpnm));
@@ -688,7 +701,8 @@ maybe_di_uint_to_str(tnode_t *tn, did_t *pd,
 /*ARGSUSED*/
 static int
 BDF_set(tnode_t *tn, did_t *pd,
-    const char *dpnm, const char *tpgrp, const char *tpnm)
+    const char *dpnm, const char *tpgrp, const char *tpnm,
+    di_prom_handle_t promtree)
 {
 	int bdf;
 	char str[23]; /* '0x' + sizeof (UINT64_MAX) + '\0' */
@@ -705,7 +719,8 @@ BDF_set(tnode_t *tn, did_t *pd,
 }
 
 int
-did_props_set(tnode_t *tn, did_t *pd, txprop_t txarray[], int txnum)
+did_props_set(tnode_t *tn, did_t *pd, txprop_t txarray[], int txnum,
+    di_prom_handle_t promtree)
 {
 	topo_mod_t *mp;
 	const char *ppgroup = NULL;
@@ -730,7 +745,7 @@ did_props_set(tnode_t *tn, did_t *pd, txprop_t txarray[], int txnum)
 		    txarray[i].tx_tprop, txarray[i].tx_tpgroup);
 		r = txarray[i].tx_xlate(tn, pd,
 		    txarray[i].tx_diprop, txarray[i].tx_tpgroup,
-		    txarray[i].tx_tprop);
+		    txarray[i].tx_tprop, promtree);
 		if (r != 0) {
 			topo_mod_dprintf(mp, "failed.\n");
 			topo_mod_dprintf(mp, "Error was %s.\n",

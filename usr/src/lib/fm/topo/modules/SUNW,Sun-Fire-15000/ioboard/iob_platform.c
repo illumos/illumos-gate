@@ -10,9 +10,9 @@
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When distributing Covered Code, include this CDDL IOB_SUNFIRE in each
+ * When distributing Covered Code, include this CDDL HEADER in each
  * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL IOB_SUNFIRE, with the
+ * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
@@ -39,11 +39,10 @@
 #include "ioboard.h"
 #include "util.h"
 
-extern did_hash_t *Didhash;
-
 /*ARGSUSED*/
 int
-platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out)
+platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out,
+    topo_mod_t *mod)
 {
 	/*
 	 * For E15K, the label is simply IOXX where XX is the
@@ -53,7 +52,7 @@ platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out)
 
 	*out = NULL;
 	(void) snprintf(buf, 10, "IO%d", topo_node_instance(node));
-	if (topo_mod_nvalloc(IobHdl, out, NV_UNIQUE_NAME) == 0 &&
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) == 0 &&
 	    nvlist_add_string(*out, TOPO_METH_LABEL_RET_STR, buf) == 0)
 		return (0);
 	nvlist_free(*out);
@@ -66,7 +65,8 @@ platform_iob_label(tnode_t *node, nvlist_t *ignored, nvlist_t **out)
 
 /*ARGSUSED*/
 int
-platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
+platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax,
+    did_hash_t *didhash, di_prom_handle_t promtree, topo_mod_t *mod)
 {
 	/*
 	 * An E15K and its successors may have up to 18 I/O boards,
@@ -85,7 +85,7 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
 
 	devtree = di_init("/", DINFOCPYALL);
 	if (devtree == DI_NODE_NIL) {
-		topo_mod_dprintf(IobHdl, "devinfo init failed.");
+		topo_mod_dprintf(mod, "devinfo init failed.");
 		return (-1);
 	}
 
@@ -98,8 +98,9 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
 	while (pnode != DI_NODE_NIL) {
 		did_t *d;
 
-		d = split_bus_address(Didhash,
-		    pnode, IOB_BASEADDR, BUS_ADDRDIST, 0, 17, &brd, &br, &bus);
+		d = split_bus_address(didhash,
+		    pnode, IOB_BASEADDR, BUS_ADDRDIST, 0, 17, &brd, &br, &bus,
+		    promtree, mod);
 		if (d == NULL) {
 			pnode = di_drv_next_node(pnode);
 			continue;
@@ -119,21 +120,22 @@ platform_iob_enum(tnode_t *parent, topo_instance_t imin, topo_instance_t imax)
 		did_did_link_set(iobs[i][0][0], iobs[i][0][1]);
 		did_did_link_set(iobs[i][1][0], iobs[i][1][1]);
 		did_did_chain_set(iobs[i][0][0], iobs[i][1][0]);
-		if ((ion = ioboard_declare(parent, i, iobs[i][0][0])) == NULL) {
-			topo_mod_dprintf(IobHdl,
+		if ((ion = ioboard_declare(parent, i, iobs[i][0][0],
+		    promtree, mod)) == NULL) {
+			topo_mod_dprintf(mod,
 			    "Creation of tnode for %s%d failed.\n", IOBOARD, i);
 			continue;
 		}
-		if (topo_mod_enumerate(IobHdl,
+		if (topo_mod_enumerate(mod,
 		    ion, HOSTBRIDGE, HOSTBRIDGE, 0, 0) < 0) {
-			topo_mod_dprintf(IobHdl,
+			topo_mod_dprintf(mod,
 			    "Enumeration of %s%d/%s%d failed.\n",
 			    IOBOARD, i, HOSTBRIDGE, 0);
 			continue;
 		}
-		if (topo_mod_enumerate(IobHdl,
+		if (topo_mod_enumerate(mod,
 		    ion, HOSTBRIDGE, HOSTBRIDGE, 1, 1) < 0) {
-			topo_mod_dprintf(IobHdl,
+			topo_mod_dprintf(mod,
 			    "Enumeration of %s%d/%s%d failed.\n",
 			    IOBOARD, i, HOSTBRIDGE, 1);
 			continue;

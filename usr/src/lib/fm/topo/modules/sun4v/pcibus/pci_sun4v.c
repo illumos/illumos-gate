@@ -37,7 +37,7 @@
 #include "pci_sun4v.h"
 
 int
-platform_pci_label(tnode_t *node, nvlist_t *in, nvlist_t **out)
+platform_pci_label(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
 {
-	return (pci_label_cmn(node, in, out));
+	return (pci_label_cmn(node, in, out, mod));
 }

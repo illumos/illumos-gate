@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1020,8 +1019,15 @@ fmd_xprt_recv(fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 	 */
 	(void) pthread_mutex_lock(&xip->xi_lock);
 
-	while (xip->xi_flags & (FMD_XPRT_DSUSPENDED | FMD_XPRT_ISUSPENDED))
+	while (xip->xi_flags & (FMD_XPRT_DSUSPENDED | FMD_XPRT_ISUSPENDED)) {
+
+		if (fmd.d_signal != 0) {
+			(void) pthread_mutex_unlock(&xip->xi_lock);
+			return; /* fmd_destroy() is in progress */
+		}
+
 		(void) pthread_cond_wait(&xip->xi_cv, &xip->xi_lock);
+	}
 
 	xip->xi_busy++;
 	ASSERT(xip->xi_busy != 0);

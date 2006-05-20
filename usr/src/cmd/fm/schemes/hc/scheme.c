@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,91 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <fm/topo_mod.h>
 #include <fm/fmd_fmri.h>
+#include <fm/libtopo.h>
+
+typedef struct hc_walk_arg {
+	void	*p;
+	int	*resultp;
+} hc_walk_arg_t;
+
+static topo_hdl_t	*HC_thp = NULL;
+static char		*HC_uuid = NULL;
+
+int
+fmd_fmri_init(void)
+{
+	int err;
+
+	if ((HC_thp = topo_open(TOPO_VERSION, NULL, &err)) == NULL)
+		return (-1);
+
+	return (0);
+}
+
+void
+fmd_fmri_fini(void)
+{
+	if (HC_uuid) {
+		topo_snap_release(HC_thp);
+		topo_hdl_strfree(HC_thp, HC_uuid);
+		HC_uuid = NULL;
+	}
+	topo_close(HC_thp);
+}
+
+static int
+hc_update_topology(void)
+{
+	static uint64_t lastgen = 0;
+	int err;
+	uint64_t curgen;
+
+	if (HC_uuid == NULL ||
+	    (curgen = fmd_fmri_get_drgen()) > lastgen) {
+
+		lastgen = curgen;
+
+		if (HC_uuid) {
+			topo_snap_release(HC_thp);
+			topo_hdl_strfree(HC_thp, HC_uuid);
+			HC_uuid = NULL;
+		}
+
+		if ((HC_uuid = topo_snap_hold(HC_thp, NULL, &err)) == NULL) {
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+static int
+hc_topo_walk(topo_walk_cb_t fn, void *arg, int *resultp)
+{
+	int err, rv;
+	topo_walk_t *twp;
+	hc_walk_arg_t hcarg;
+
+	hcarg.p = arg;
+	hcarg.resultp = resultp;
+
+	if ((twp = topo_walk_init(HC_thp, FM_FMRI_SCHEME_HC, fn,
+	    &hcarg, &err)) == NULL)
+		return (-1);
+
+	rv = (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR)
+	    ? -1 : 0;
+
+	topo_walk_fini(twp);
+	return (rv);
+}
 
 /*
  * buf_append -- Append str to buf (if it's non-NULL).  Place prepend
@@ -176,18 +253,74 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	return (size);
 }
 
+/*ARGSUSED*/
+static int
+hc_topo_present(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int cmp, err;
+	nvlist_t *out = NULL;
+	nvlist_t *asru;
+	hc_walk_arg_t *hcargp = (hc_walk_arg_t *)arg;
+
+	if (topo_node_asru(node, &asru, NULL, &err) != 0 ||
+	    asru == NULL) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	/*
+	 * Check if the ASRU of this node matches the ASRU passed in
+	 */
+	cmp = topo_fmri_compare(thp, asru, (nvlist_t *)hcargp->p, &err);
+
+	nvlist_free(asru);
+
+	if (cmp <= 0)
+		return (TOPO_WALK_NEXT);
+
+	/*
+	 * Yes, so try to execute the topo-present method.
+	 */
+	cmp = topo_method_invoke(node, TOPO_METH_PRESENT,
+	    TOPO_METH_PRESENT_VERSION, (nvlist_t *)hcargp->p, &out, &err);
+
+	if (out)
+		nvlist_free(out);
+
+	if (cmp == 1) {
+		*(hcargp->resultp) = 1;
+		return (TOPO_WALK_TERMINATE);
+	} else if (cmp == 0) {
+		*(hcargp->resultp) = 0;
+		return (TOPO_WALK_TERMINATE);
+	}
+
+	return (TOPO_WALK_NEXT);
+}
+
+
 /*
  * fmd_fmri_present() is called by fmadm to determine if a faulty ASRU
  * is still present in the system.  In general we don't expect to get
  * ASRUs in this scheme, so it's unlikely this routine will get called.
- * In case it does, though, we just return true by default, as we have no
- * real way to look up the component in the system configuration.
+ * In case it does, though, we just traverse our libtopo snapshot,
+ * looking for a matching ASRU (minus the serial number information),
+ * then invoke the "topo_present" method to determine presence.
  */
-/*ARGSUSED*/
 int
 fmd_fmri_present(nvlist_t *nvl)
 {
-	return (1);
+	int ispresent = 1;
+
+	/*
+	 * If there's an error during the topology update, punt by
+	 * indicating presence.
+	 */
+	if (hc_update_topology() < 0)
+		return (1);
+
+	(void) hc_topo_walk(hc_topo_present, nvl, &ispresent);
+
+	return (ispresent);
 }
 
 /*

@@ -30,4 +30,8 @@ include ../../Makefile.com
 include $(SRC)/Makefile.master.64
 include ../../Makefile.targ
 
+LDLIBS += -ltopo
+LDFLAGS += -L$(ROOT)/usr/lib/fm/sparcv9 -R/usr/lib/fm/sparcv9
+LINTFLAGS += -L$(ROOT)/usr/lib/fm/sparcv9
+
 install: all $(ROOTPROG64)

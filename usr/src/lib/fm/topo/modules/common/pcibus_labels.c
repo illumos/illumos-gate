@@ -96,7 +96,7 @@ pci_slotname_rewrite(char *platform, const char *label)
 }
 
 static const char *
-pci_missing_match(char *platform, did_t *dp)
+pci_missing_match(char *platform, did_t *dp, topo_mod_t *mod)
 {
 	const char *rlabel = NULL;
 	int board, bridge, rc, bus, dev;
@@ -109,7 +109,7 @@ pci_missing_match(char *platform, did_t *dp)
 	rc = did_rc(dp);
 	did_BDF(dp, &bus, &dev, NULL);
 
-	topo_mod_dprintf(PciHdl, "Missing a name for %d, %d, %d, %d, %d ?\n",
+	topo_mod_dprintf(mod, "Missing a name for %d, %d, %d, %d, %d ?\n",
 	    board, bridge, rc, bus, dev);
 
 	for (p = 0; p < Missing_Names->mn_nplats; p++) {
@@ -132,7 +132,7 @@ pci_missing_match(char *platform, did_t *dp)
 }
 
 static const char *
-pci_slotname_lookup(tnode_t *node, did_t *dp)
+pci_slotname_lookup(tnode_t *node, did_t *dp, topo_mod_t *mod)
 {
 	const char *l;
 	char *plat;
@@ -141,7 +141,7 @@ pci_slotname_lookup(tnode_t *node, did_t *dp)
 
 	if (topo_prop_get_string(node,
 	    TOPO_PGROUP_SYSTEM, TOPO_PROP_PLATFORM, &plat, &err) < 0) {
-		(void) topo_mod_seterrno(PciHdl, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
 	}
 	did_BDF(dp, NULL, &d, NULL);
@@ -149,14 +149,14 @@ pci_slotname_lookup(tnode_t *node, did_t *dp)
 		if ((l = did_label(dp, d)) != NULL) {
 			l = pci_slotname_rewrite(plat, l);
 		} else {
-			l = pci_missing_match(plat, dp);
+			l = pci_missing_match(plat, dp, mod);
 		}
-	topo_mod_strfree(PciHdl, plat);
+	topo_mod_strfree(mod, plat);
 	return (l);
 }
 
 int
-pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out)
+pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out, topo_mod_t *mod)
 {
 	uint64_t ptr;
 	const char *l;
@@ -175,12 +175,12 @@ pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out)
 	    strcmp(nm, PCIEX_BUS) != 0) {
 		if (topo_node_label_set(node, NULL, &err) < 0)
 			if (err != ETOPO_PROP_NOENT)
-				return (topo_mod_seterrno(PciHdl, err));
+				return (topo_mod_seterrno(mod, err));
 		return (0);
 	}
 
 	if (nvlist_lookup_uint64(in, TOPO_METH_LABEL_ARG_NVL, &ptr) != 0) {
-		topo_mod_dprintf(PciHdl,
+		topo_mod_dprintf(mod,
 		    "label method argument not found.\n");
 		return (-1);
 	}
@@ -189,18 +189,18 @@ pci_label_cmn(tnode_t *node, nvlist_t *in, nvlist_t **out)
 	/*
 	 * Is there a slotname associated with the device?
 	 */
-	if ((l = pci_slotname_lookup(node, dp)) != NULL) {
+	if ((l = pci_slotname_lookup(node, dp, mod)) != NULL) {
 		nvlist_t *rnvl;
 
-		if (topo_mod_nvalloc(PciHdl, &rnvl, NV_UNIQUE_NAME) != 0 ||
+		if (topo_mod_nvalloc(mod, &rnvl, NV_UNIQUE_NAME) != 0 ||
 		    nvlist_add_string(rnvl, TOPO_METH_LABEL_RET_STR, l) != 0)
-			return (topo_mod_seterrno(PciHdl, EMOD_FMRI_NVL));
+			return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 		*out = rnvl;
 		return (0);
 	} else {
 		if (topo_node_label_set(node, NULL, &err) < 0)
 			if (err != ETOPO_PROP_NOENT)
-				return (topo_mod_seterrno(PciHdl, err));
+				return (topo_mod_seterrno(mod, err));
 		return (0);
 	}
 }

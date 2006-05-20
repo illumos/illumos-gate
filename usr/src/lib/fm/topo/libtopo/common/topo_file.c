@@ -46,15 +46,15 @@
 #define	PLATFORM_TOPO_PATH	"%susr/platform/%s/lib/fm/topo/%s"
 #define	COMMON_TOPO_PATH	"%susr/lib/fm/topo/%s"
 
-static char _topo_file[MAXNAMELEN * 2];
-static char _topo_path[PATH_MAX];
-
 static int
 xml_read(topo_hdl_t *hp, ttree_t *tp)
 {
 	topo_file_t *tfp;
 	char *pplat, *pmach;
 	int err, e;
+	char _topo_file[MAXNAMELEN * 2];
+	char _topo_path[PATH_MAX];
+
 
 	tfp = (topo_file_t *)tp->tt_file;
 
