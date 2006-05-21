@@ -2421,24 +2421,6 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 }
 
 /*
- * Common code to set ipsa_unique_id; used from both add and update paths.
- */
-static void
-sadb_set_unique(ipsa_t *sa, uint8_t proto,
-    struct sockaddr_in *src, struct sockaddr_in *dst)
-{
-	/* Assume that ports are in the same place for INET and INET6 */
-	uint16_t srcport = src->sin_port;
-	uint16_t dstport = dst->sin_port;
-
-	sa->ipsa_unique_id = SA_UNIQUE_ID(srcport, dstport, proto);
-	sa->ipsa_unique_mask = SA_UNIQUE_MASK(srcport, dstport, proto);
-	if (sa->ipsa_unique_mask != 0)
-		sa->ipsa_flags |= IPSA_F_UNIQUE;
-}
-
-
-/*
  * Initialize the mechanism parameters associated with an SA.
  * These parameters can be shared by multiple packets, which saves
  * us from the overhead of consulting the algorithm table for
@@ -2695,7 +2677,13 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	(void) drv_getparm(TIME, &newbie->ipsa_addtime);
 
 	/* Set unique value */
-	sadb_set_unique(newbie, dstext->sadb_address_proto, src, dst);
+	newbie->ipsa_unique_id = SA_UNIQUE_ID((uint16_t)src->sin_port,
+	    (uint16_t)dst->sin_port, dstext->sadb_address_proto);
+	newbie->ipsa_unique_mask = SA_UNIQUE_MASK((uint16_t)src->sin_port,
+	    (uint16_t)dst->sin_port, dstext->sadb_address_proto);
+
+	if (newbie->ipsa_unique_mask != 0)
+		newbie->ipsa_flags |= IPSA_F_UNIQUE;
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
@@ -3843,8 +3831,6 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	}
 
 	if (outbound_target != NULL) {
-		sadb_set_unique(outbound_target, dstext->sadb_address_proto,
-		    src, dst);
 		sadb_update_lifetimes(outbound_target, hard, soft);
 		if (kmp != 0)
 			outbound_target->ipsa_kmp = kmp;
@@ -3853,8 +3839,6 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	}
 
 	if (inbound_target != NULL) {
-		sadb_set_unique(inbound_target, dstext->sadb_address_proto,
-		    src, dst);
 		sadb_update_lifetimes(inbound_target, hard, soft);
 		if (kmp != 0)
 			inbound_target->ipsa_kmp = kmp;
