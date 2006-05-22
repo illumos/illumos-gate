@@ -54,6 +54,7 @@
 #include <sys/policy.h>
 #include <sys/fem.h>
 #include <sys/sdt.h>
+#include <sys/ddi.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -272,10 +273,6 @@ rfs4_servinst_t	*rfs4_cur_servinst = NULL;	/* current server instance */
 kmutex_t	rfs4_servinst_lock;		/* protects linked list */
 int		rfs4_seen_first_compound;	/* set first time we see one */
 
-#ifdef DEBUG
-int	rfs4_servinst_debug = 0;
-#endif
-
 /*
  * NFS4 op dispatch table
  */
@@ -470,6 +467,8 @@ static char *rfs4_op_string[] = {
 
 void rfs4_ss_chkclid(rfs4_client_t *);
 
+extern size_t strlcpy(char *dst, const char *src, size_t dstsize);
+
 #ifdef	nextdp
 #undef nextdp
 #endif
@@ -601,9 +600,6 @@ rfs4_grace_start(rfs4_servinst_t *sip)
 {
 	time_t now = gethrestime_sec();
 
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_grace_start: inst %p: 0x%lx", (void *)sip, now));
-
 	rw_enter(&sip->rwlock, RW_WRITER);
 	sip->start_time = now;
 	sip->grace_period = rfs4_grace_period;
@@ -655,24 +651,13 @@ rfs4_clnt_in_grace(rfs4_client_t *cp)
 void
 rfs4_grace_reset_all(void)
 {
-#ifdef DEBUG
-	int n = 0;
-#endif
 	rfs4_servinst_t *sip;
 
 	mutex_enter(&rfs4_servinst_lock);
-	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev) {
-		if (rfs4_servinst_in_grace(sip)) {
+	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev)
+		if (rfs4_servinst_in_grace(sip))
 			rfs4_grace_start(sip);
-#ifdef DEBUG
-			n++;
-#endif
-		}
-	}
 	mutex_exit(&rfs4_servinst_lock);
-
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_grace_reset_all: reset %d instances", n));
 }
 
 /*
@@ -681,23 +666,52 @@ rfs4_grace_reset_all(void)
 void
 rfs4_grace_start_new(void)
 {
-#ifdef DEBUG
-	int n = 0;
-#endif
 	rfs4_servinst_t *sip;
 
 	mutex_enter(&rfs4_servinst_lock);
-	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev) {
+	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev)
 		if (rfs4_servinst_grace_new(sip))
 			rfs4_grace_start(sip);
-#ifdef DEBUG
-		n++;
-#endif
-	}
 	mutex_exit(&rfs4_servinst_lock);
+}
 
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_grace_start_new: started %d new instances", n));
+static rfs4_dss_path_t *
+rfs4_dss_newpath(rfs4_servinst_t *sip, char *path, unsigned index)
+{
+	size_t len;
+	rfs4_dss_path_t *dss_path;
+
+	dss_path = kmem_alloc(sizeof (rfs4_dss_path_t), KM_SLEEP);
+
+	/*
+	 * Take a copy of the string, since the original may be overwritten.
+	 * Sadly, no strdup() in the kernel.
+	 */
+	/* allow for NUL */
+	len = strlen(path) + 1;
+	dss_path->path = kmem_alloc(len, KM_SLEEP);
+	(void) strlcpy(dss_path->path, path, len);
+
+	/* associate with servinst */
+	dss_path->sip = sip;
+	dss_path->index = index;
+
+	/*
+	 * Add to list of served paths.
+	 * No locking required, as we're only ever called at startup.
+	 */
+	if (rfs4_dss_pathlist == NULL) {
+		/* this is the first dss_path_t */
+
+		/* needed for insque/remque */
+		dss_path->next = dss_path->prev = dss_path;
+
+		rfs4_dss_pathlist = dss_path;
+	} else {
+		insque(dss_path, rfs4_dss_pathlist);
+	}
+
+	return (dss_path);
 }
 
 /*
@@ -706,9 +720,11 @@ rfs4_grace_start_new(void)
  * recovery window.
  */
 void
-rfs4_servinst_create(int start_grace)
+rfs4_servinst_create(int start_grace, int dss_npaths, char **dss_paths)
 {
+	unsigned i;
 	rfs4_servinst_t *sip;
+	rfs4_oldstate_t *oldstate;
 
 	sip = kmem_alloc(sizeof (rfs4_servinst_t), KM_SLEEP);
 	rw_init(&sip->rwlock, NULL, RW_DEFAULT, NULL);
@@ -718,11 +734,28 @@ rfs4_servinst_create(int start_grace)
 	sip->next = NULL;
 	sip->prev = NULL;
 
+	rw_init(&sip->oldstate_lock, NULL, RW_DEFAULT, NULL);
+	/*
+	 * This initial dummy entry is required to setup for insque/remque.
+	 * It must be skipped over whenever the list is traversed.
+	 */
+	oldstate = kmem_alloc(sizeof (rfs4_oldstate_t), KM_SLEEP);
+	/* insque/remque require initial list entry to be self-terminated */
+	oldstate->next = oldstate;
+	oldstate->prev = oldstate;
+	sip->oldstate = oldstate;
+
+
+	sip->dss_npaths = dss_npaths;
+	sip->dss_paths = kmem_alloc(dss_npaths *
+	    sizeof (rfs4_dss_path_t *), KM_SLEEP);
+
+	for (i = 0; i < dss_npaths; i++) {
+		sip->dss_paths[i] = rfs4_dss_newpath(sip, dss_paths[i], i);
+	}
+
 	mutex_enter(&rfs4_servinst_lock);
-	if (rfs4_cur_servinst == NULL) {
-		NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-		    "rfs4_servinst_create: creating first instance"));
-	} else {
+	if (rfs4_cur_servinst != NULL) {
 		/* add to linked list */
 		sip->prev = rfs4_cur_servinst;
 		rfs4_cur_servinst->next = sip;
@@ -731,11 +764,8 @@ rfs4_servinst_create(int start_grace)
 		rfs4_grace_start(sip);
 	/* make the new instance "current" */
 	rfs4_cur_servinst = sip;
-	mutex_exit(&rfs4_servinst_lock);
 
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_servinst_create: new current instance: %p; start_grace: %d",
-	    (void *)sip, start_grace));
+	mutex_exit(&rfs4_servinst_lock);
 }
 
 /*
@@ -757,15 +787,17 @@ rfs4_servinst_destroy_all(void)
 	for (sip = current; sip != NULL; sip = prev) {
 		prev = sip->prev;
 		rw_destroy(&sip->rwlock);
+		if (sip->oldstate)
+			kmem_free(sip->oldstate, sizeof (rfs4_oldstate_t));
+		if (sip->dss_paths)
+			kmem_free(sip->dss_paths,
+			    sip->dss_npaths * sizeof (rfs4_dss_path_t *));
 		kmem_free(sip, sizeof (rfs4_servinst_t));
 #ifdef DEBUG
 		n++;
 #endif
 	}
 	mutex_exit(&rfs4_servinst_lock);
-
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_servinst_destroy_all: destroyed %d instances", n));
 }
 
 /*
@@ -776,10 +808,6 @@ void
 rfs4_servinst_assign(rfs4_client_t *cp, rfs4_servinst_t *sip)
 {
 	ASSERT(rfs4_dbe_refcnt(cp->dbe) > 0);
-
-	NFS4_DEBUG(rfs4_servinst_debug, (CE_NOTE,
-	    "rfs4_servinst_assign: client: %p, old: %p, new: %p", (void *)cp,
-	    (void *)cp->server_instance, (void *)sip));
 
 	/*
 	 * The lock ensures that if the current instance is in the process
@@ -7486,7 +7514,15 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	}
 
 	/*
-	 * Record clientid in stable storage
+	 * Update the client's associated server instance, if it's changed
+	 * since the client was created.
+	 */
+	if (rfs4_servinst(cp) != rfs4_cur_servinst)
+		rfs4_servinst_assign(cp, rfs4_cur_servinst);
+
+	/*
+	 * Record clientid in stable storage.
+	 * Must be done after server instance has been assigned.
 	 */
 	rfs4_ss_clid(cp, req);
 
@@ -7499,13 +7535,6 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	/* If needed, initiate CB_NULL call for callback path */
 	rfs4_deleg_cb_check(cp);
 	rfs4_update_lease(cp);
-
-	/*
-	 * Update the client's associated server instance, if it's changed
-	 * since the client was created.
-	 */
-	if (rfs4_servinst(cp) != rfs4_cur_servinst)
-		rfs4_servinst_assign(cp, rfs4_cur_servinst);
 
 	/*
 	 * Check to see if client can perform reclaims

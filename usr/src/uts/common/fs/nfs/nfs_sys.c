@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -38,6 +37,7 @@
 #include <sys/policy.h>
 #include <sys/siginfo.h>
 #include <sys/proc.h>		/* for exit() declaration */
+#include <sys/kmem.h>
 #include <nfs/nfs4.h>
 #include <nfs/nfssys.h>
 #include <sys/thread.h>
@@ -69,6 +69,12 @@ void (*nfs_srv_quiesce_func)(void) = NULL;
 #define	RFS4_LEASETIME 90			/* seconds */
 time_t rfs4_lease_time = RFS4_LEASETIME;
 time_t rfs4_grace_period = RFS4_LEASETIME;
+
+/* DSS: distributed stable storage */
+size_t nfs4_dss_buflen = 0;
+/* This filled in by nfssrv:_init() */
+int (*nfs_srv_dss_func)(char *, size_t) = NULL;
+
 
 int
 nfssys(enum nfssys_op opcode, void *arg)
@@ -182,22 +188,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 		break;
 	}
 
-	/* Request that NFS server quiesce on next shutdown */
-	case NFS_SVC_REQUEST_QUIESCE: {
-		int id;
-
-		/* check that nfssrv module is loaded */
-		if (nfs_srv_quiesce_func == NULL)
-			return (set_errno(ENOTSUP));
-
-		if (copyin(arg, &id, sizeof (id)))
-			return (set_errno(EFAULT));
-
-		error = svc_pool_control(id, SVCPSET_SHUTDOWN_PROC,
-		    (void *)nfs_srv_quiesce_func);
-		break;
-	}
-
 	case EXPORTFS: { /* export a file system */
 		STRUCT_DECL(exportfs_args, ea);
 
@@ -295,6 +285,22 @@ nfssys(enum nfssys_op opcode, void *arg)
 		break;
 	}
 
+	/* Request that NFSv4 server quiesce on next shutdown */
+	case NFS4_SVC_REQUEST_QUIESCE: {
+		int id;
+
+		/* check that nfssrv module is loaded */
+		if (nfs_srv_quiesce_func == NULL)
+			return (set_errno(ENOTSUP));
+
+		if (copyin(arg, &id, sizeof (id)))
+			return (set_errno(EFAULT));
+
+		error = svc_pool_control(id, SVCPSET_SHUTDOWN_PROC,
+		    (void *)nfs_srv_quiesce_func);
+		break;
+	}
+
 	case NFS_IDMAP: {
 		struct nfsidmap_args idm;
 
@@ -303,6 +309,47 @@ nfssys(enum nfssys_op opcode, void *arg)
 
 		nfs_idmap_args(&idm);
 		error = 0;
+		break;
+	}
+
+	case NFS4_DSS_SETPATHS_SIZE: {
+		/* crosses ILP32/LP64 boundary */
+		uint32_t nfs4_dss_bufsize = 0;
+
+		if (copyin(arg, &nfs4_dss_bufsize, sizeof (nfs4_dss_bufsize)))
+			return (set_errno(EFAULT));
+		nfs4_dss_buflen = (long)nfs4_dss_bufsize;
+		error = 0;
+		break;
+	}
+
+	case NFS4_DSS_SETPATHS: {
+		char *nfs4_dss_bufp;
+
+		/* check that nfssrv module is loaded */
+		if (nfs_srv_dss_func == NULL)
+			return (set_errno(ENOTSUP));
+
+		/*
+		 * NFS4_DSS_SETPATHS_SIZE must be called before
+		 * NFS4_DSS_SETPATHS, to tell us how big a buffer we need
+		 * to allocate.
+		 */
+		if (nfs4_dss_buflen == 0)
+			return (set_errno(EINVAL));
+		nfs4_dss_bufp = kmem_alloc(nfs4_dss_buflen, KM_SLEEP);
+		if (nfs4_dss_bufp == NULL)
+			return (set_errno(ENOMEM));
+
+		if (copyin(arg, nfs4_dss_bufp, nfs4_dss_buflen)) {
+			kmem_free(nfs4_dss_bufp, nfs4_dss_buflen);
+			return (set_errno(EFAULT));
+		}
+
+		/* unpack the buffer and extract the pathnames */
+		error = nfs_srv_dss_func(nfs4_dss_bufp, nfs4_dss_buflen);
+		kmem_free(nfs4_dss_bufp, nfs4_dss_buflen);
+
 		break;
 	}
 

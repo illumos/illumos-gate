@@ -106,6 +106,9 @@ static struct modlinkage modlinkage = {
 
 char _depends_on[] = "misc/klmmod";
 
+/* for testing RG failover code path on non-Cluster system */
+int hanfsv4_force = 0;
+
 int
 _init(void)
 {
@@ -125,7 +128,19 @@ _init(void)
 		nfs_srvfini();
 	}
 
+	/*
+	 * Initialise some placeholders for nfssys() calls. These have
+	 * to be declared by the nfs module, since that handles nfssys()
+	 * calls - also used by NFS clients - but are provided by this
+	 * nfssrv module. These also then serve as confirmation to the
+	 * relevant code in nfs that nfssrv has been loaded, as they're
+	 * initially NULL.
+	 */
 	nfs_srv_quiesce_func = nfs_srv_quiesce_all;
+	nfs_srv_dss_func = rfs4_dss_setpaths;
+
+	/* setup DSS paths here; must be done before initial server startup */
+	rfs4_dss_paths = rfs4_dss_oldpaths = NULL;
 
 	return (status);
 }
@@ -166,6 +181,7 @@ static void	acl_dispatch(struct svc_req *, SVCXPRT *);
 static void	common_dispatch(struct svc_req *, SVCXPRT *,
 		rpcvers_t, rpcvers_t, char *,
 		struct rpc_disptable *);
+static void	hanfsv4_failover(void);
 static	int	checkauth(struct exportinfo *, struct svc_req *, cred_t *, int,
 			bool_t);
 static char	*client_name(struct svc_req *req);
@@ -241,6 +257,12 @@ static nfs_server_running_t nfs_server_upordown;
 static kmutex_t nfs_server_upordown_lock;
 static	kcondvar_t nfs_server_upordown_cv;
 
+/*
+ * DSS: distributed stable storage
+ * lists of all DSS paths: current, and before last warmstart
+ */
+nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
+
 int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
 
 /*
@@ -298,6 +320,11 @@ nfs_srv_shutdown_all(int quiesce) {
 			nfs_server_upordown == NFS_SERVER_OFFLINE) {
 			nfs_server_upordown = NFS_SERVER_QUIESCED;
 			cv_signal(&nfs_server_upordown_cv);
+
+			/* reset DSS state, for subsequent warm restart */
+			rfs4_dss_numnewpaths = 0;
+			rfs4_dss_newpaths = NULL;
+
 			cmn_err(CE_NOTE, "nfs_server: server is now quiesced; "
 			    "NFSv4 state has been preserved");
 		}
@@ -458,7 +485,7 @@ nfs_svc(struct nfs_svc_args *arg, model_t model)
 
 	releasef(STRUCT_FGET(uap, fd));
 
-	/* save the cluster nodeid */
+	/* HA-NFSv4: save the cluster nodeid */
 	if (cluster_bootflags & CLUSTER_BOOTED)
 		lm_global_nlmid = clconf_get_nodeid();
 
@@ -489,28 +516,20 @@ rfs4_server_start(int nfs4_srv_delegation)
 
 			/* is this an nfsd warm start? */
 			if (nfs_server_upordown == NFS_SERVER_QUIESCED) {
-				int start_grace;
-
 				cmn_err(CE_NOTE, "nfs_server: "
 				    "server was previously quiesced; "
 				    "existing NFSv4 state will be re-used");
 
 				/*
-				 * Cluster: this is also the signal that
-				 * a failover has occurred, so create a new
-				 * server instance, and start its grace period.
-				 * We also need to reset all currently
-				 * active grace periods in case of multiple
-				 * failovers within the grace duration,
-				 * to avoid partitioning clients of the same
-				 * resource into different instances.
+				 * HA-NFSv4: this is also the signal
+				 * that a Resource Group failover has
+				 * occurred.
 				 */
-				if (cluster_bootflags & CLUSTER_BOOTED) {
-					rfs4_grace_reset_all();
-					start_grace = 1;
-					rfs4_servinst_create(start_grace);
-				}
+				if (cluster_bootflags & CLUSTER_BOOTED ||
+				    hanfsv4_force)
+					hanfsv4_failover();
 			} else {
+				/* cold start */
 				rfs4_state_init();
 				nfs4_drc = rfs4_init_drc(nfs4_drc_max,
 							nfs4_drc_hash,
@@ -2835,4 +2854,161 @@ nfs_check_vpexi(vnode_t *mc_dvp, vnode_t *vp, cred_t *cr,
 	}
 
 	return (error);
+}
+
+/*
+ * Do the main work of handling HA-NFSv4 Resource Group failover on
+ * Sun Cluster.
+ * We need to detect whether any RG admin paths have been added or removed,
+ * and adjust resources accordingly.
+ * Currently we're using a very inefficient algorithm, ~ 2 * O(n**2). In
+ * order to scale, the list and array of paths need to be held in more
+ * suitable data structures.
+ */
+static void
+hanfsv4_failover(void)
+{
+	int i, start_grace, numadded_paths = 0;
+	char **added_paths = NULL;
+	rfs4_dss_path_t *dss_path;
+
+	/*
+	 * First, look for removed paths: RGs that have been failed-over
+	 * away from this node.
+	 * Walk the "currently-serving" rfs4_dss_pathlist and, for each
+	 * path, check if it is on the "passed-in" rfs4_dss_newpaths array
+	 * from nfsd. If not, that RG path has been removed.
+	 *
+	 * Note that nfsd has sorted rfs4_dss_newpaths for us, and removed
+	 * any duplicates.
+	 */
+	dss_path = rfs4_dss_pathlist;
+	do {
+		int found = 0;
+		char *path = dss_path->path;
+
+		/* used only for non-HA so may not be removed */
+		if (strcmp(path, NFS4_DSS_VAR_DIR) == 0) {
+			dss_path = dss_path->next;
+			continue;
+		}
+
+		for (i = 0; i < rfs4_dss_numnewpaths; i++) {
+			int cmpret;
+			size_t ncmp;
+			char *newpath = rfs4_dss_newpaths[i];
+
+			ncmp = MAX(strlen(path), strlen(newpath));
+			cmpret = strncmp(path, newpath, ncmp);
+
+			/*
+			 * Since nfsd has sorted rfs4_dss_newpaths for us,
+			 * once the return from strncmp is negative we know
+			 * we've passed the point where "path" should be,
+			 * and can stop searching: "path" has been removed.
+			 */
+			if (cmpret < 0)
+				break;
+
+			if (cmpret == 0) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (found == 0) {
+			unsigned index = dss_path->index;
+			rfs4_servinst_t *sip = dss_path->sip;
+			rfs4_dss_path_t *path_next = dss_path->next;
+
+			/*
+			 * This path has been removed.
+			 * We must clear out the servinst reference to
+			 * it, since it's now owned by another
+			 * node: we should not attempt to touch it.
+			 */
+			ASSERT(dss_path == sip->dss_paths[index]);
+			sip->dss_paths[index] = NULL;
+
+			/* remove from "currently-serving" list, and destroy */
+			remque(dss_path);
+			kmem_free(dss_path, sizeof (rfs4_dss_path_t));
+
+			dss_path = path_next;
+		} else {
+			/* path was found; not removed */
+			dss_path = dss_path->next;
+		}
+	} while (dss_path != rfs4_dss_pathlist);
+
+	/*
+	 * Now, look for added paths: RGs that have been failed-over
+	 * to this node.
+	 * Walk the "passed-in" rfs4_dss_newpaths array from nfsd and,
+	 * for each path, check if it is on the "currently-serving"
+	 * rfs4_dss_pathlist. If not, that RG path has been added.
+	 *
+	 * Note: we don't do duplicate detection here; nfsd does that for us.
+	 *
+	 * Note: numadded_paths <= rfs4_dss_numnewpaths, which gives us
+	 * an upper bound for the size needed for added_paths[numadded_paths].
+	 */
+
+	/* probably more space than we need, but guaranteed to be enough */
+	if (rfs4_dss_numnewpaths > 0) {
+		size_t sz = rfs4_dss_numnewpaths * sizeof (char *);
+		added_paths = kmem_zalloc(sz, KM_SLEEP);
+	}
+
+	/* walk the "passed-in" rfs4_dss_newpaths array from nfsd */
+	for (i = 0; i < rfs4_dss_numnewpaths; i++) {
+		int found = 0;
+		char *newpath = rfs4_dss_newpaths[i];
+
+		dss_path = rfs4_dss_pathlist;
+		do {
+			char *path = dss_path->path;
+
+			/* used only for non-HA */
+			if (strcmp(path, NFS4_DSS_VAR_DIR) == 0) {
+				dss_path = dss_path->next;
+				continue;
+			}
+
+			if (strncmp(path, newpath, strlen(path)) == 0) {
+				found = 1;
+				break;
+			}
+
+			dss_path = dss_path->next;
+		} while (dss_path != rfs4_dss_pathlist);
+
+		if (found == 0) {
+			added_paths[numadded_paths] = newpath;
+			numadded_paths++;
+		}
+	}
+
+	/* did we find any added paths? */
+	if (numadded_paths > 0) {
+		/* create a new server instance, and start its grace period */
+		start_grace = 1;
+		rfs4_servinst_create(start_grace, numadded_paths, added_paths);
+
+		/* read in the stable storage state from these paths */
+		rfs4_dss_readstate(numadded_paths, added_paths);
+
+		/*
+		 * Multiple failovers during a grace period will cause
+		 * clients of the same resource group to be partitioned
+		 * into different server instances, with different
+		 * grace periods.  Since clients of the same resource
+		 * group must be subject to the same grace period,
+		 * we need to reset all currently active grace periods.
+		 */
+		rfs4_grace_reset_all();
+	}
+
+	if (rfs4_dss_numnewpaths > 0)
+		kmem_free(added_paths, rfs4_dss_numnewpaths * sizeof (char *));
 }

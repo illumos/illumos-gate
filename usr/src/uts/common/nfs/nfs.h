@@ -44,6 +44,7 @@
 #include <sys/dirent.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
+#include <sys/nvpair.h>
 #include <nfs/mount.h>
 #endif
 #include <vm/page.h>
@@ -933,8 +934,12 @@ extern int	nfs_mount_label_policy(vfs_t *vfsp, struct netbuf *addr,
 extern void	nfs_srv_stop_all(void);
 extern void	nfs_srv_quiesce_all(void);
 extern void	(*nfs_srv_quiesce_func)(void);
+extern int	rfs4_dss_setpaths(char *, size_t);
+extern int	(*nfs_srv_dss_func)(char *, size_t);
 extern time_t	rfs4_lease_time;
 extern time_t	rfs4_grace_period;
+extern nvlist_t	*rfs4_dss_paths, *rfs4_dss_oldpaths;
+
 
 extern kstat_named_t	*global_svstat_ptr[];
 

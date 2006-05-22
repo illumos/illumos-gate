@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +38,7 @@
 #include <nfs/nfssys.h>
 #include <nfs/lm.h>
 #include <sys/pathname.h>
-
+#include <sys/nvpair.h>
 
 
 extern time_t rfs4_start_time;
@@ -71,6 +70,11 @@ int rfs4_debug;
 #endif
 
 static uint32_t rfs4_database_debug = 0x00;
+
+static void rfs4_ss_clid_write(rfs4_client_t *cp, char *leaf);
+static void rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dir, char *leaf);
+static void rfs4_dss_clear_oldstate(rfs4_servinst_t *sip);
+static void rfs4_ss_chkclid_sip(rfs4_client_t *cp, rfs4_servinst_t *sip);
 
 /*
  * Couple of simple init/destroy functions for a general waiter
@@ -333,6 +337,8 @@ static time_t rfs4_file_cache_time = 0;
 static time_t rfs4_deleg_state_cache_time = 0;
 
 static bool_t rfs4_client_create(rfs4_entry_t, void *);
+static void rfs4_dss_remove_cpleaf(rfs4_client_t *);
+static void rfs4_dss_remove_leaf(rfs4_servinst_t *, char *, char *);
 static void rfs4_client_destroy(rfs4_entry_t);
 static bool_t rfs4_client_expiry(rfs4_entry_t);
 static uint32_t clientid_hash(void *);
@@ -394,14 +400,7 @@ static void *deleg_state_mkkey(rfs4_entry_t);
 
 static void rfs4_state_rele_nounlock(rfs4_state_t *);
 
-static rfs4_oldstate_t *rfs4_oldstate = NULL;
-static krwlock_t rfs4_oldstate_lock;
 static int rfs4_ss_enabled = 0;
-
-#define	NFS4_VAR_DIR		"/var/nfs"
-#define	NFS4_STATE_DIR 		NFS4_VAR_DIR"/v4_state"
-#define	NFS4_OLDSTATE_DIR 	NFS4_VAR_DIR"/v4_oldstate"
-#define	NFS4_SS_DIR_MODE	0755
 
 extern void (*rfs4_client_clrst)(struct nfs4clrst_args *);
 
@@ -409,24 +408,6 @@ void
 rfs4_ss_pnfree(rfs4_ss_pn_t *ss_pn)
 {
 	kmem_free(ss_pn, sizeof (rfs4_ss_pn_t));
-}
-
-/*
- * Free all malloced rsf4_oldstate_t memory
- */
-void
-rfs4_oldstate_free(rfs4_oldstate_t *ros)
-{
-	if (ros == NULL)
-		return;
-
-	if (ros->cl_id4.id_val)
-		kmem_free(ros->cl_id4.id_val, ros->cl_id4.id_len);
-
-	if (ros->ss_pn)
-		kmem_free(ros->ss_pn, sizeof (rfs4_ss_pn_t));
-
-	kmem_free(ros, sizeof (rfs4_oldstate_t));
 }
 
 static rfs4_ss_pn_t *
@@ -465,9 +446,8 @@ rfs4_ss_movestate(char *sdir, char *ddir, char *leaf)
 {
 	rfs4_ss_pn_t *src, *dst;
 
-	if ((src = rfs4_ss_pnalloc(sdir, leaf)) == NULL) {
+	if ((src = rfs4_ss_pnalloc(sdir, leaf)) == NULL)
 		return (NULL);
-	}
 
 	if ((dst = rfs4_ss_pnalloc(ddir, leaf)) == NULL) {
 		rfs4_ss_pnfree(src);
@@ -500,9 +480,8 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	uint_t id_len;
 	int err, kill_file, file_vers;
 
-	if (ss_pn == NULL) {
+	if (ss_pn == NULL)
 		return (NULL);
-	}
 
 	/*
 	 * open the state file.
@@ -554,7 +533,7 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	 */
 	iov[0].iov_base = (caddr_t)&file_vers;
 	iov[0].iov_len = sizeof (int);
-	iov[1].iov_base = (caddr_t)cl_ss;
+	iov[1].iov_base = (caddr_t)&cl_ss->cl_id4.verifier;
 	iov[1].iov_len = NFS4_VERIFIER_SIZE;
 	iov[2].iov_base = (caddr_t)&id_len;
 	iov[2].iov_len = sizeof (uint_t);
@@ -626,9 +605,11 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 #define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
 
 /*
+ * Add entries from statedir to supplied oldstate list.
+ * Optionally, move all entries from statedir -> destdir.
  */
 void
-rfs4_ss_oldstate(char *dir, int do_move)
+rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 {
 	rfs4_ss_pn_t *ss_pn;
 	rfs4_oldstate_t *cl_ss = NULL;
@@ -643,24 +624,11 @@ rfs4_ss_oldstate(char *dir, int do_move)
 	/*
 	 * open the state directory
 	 */
-	if (err = vn_open(dir, UIO_SYSSPACE, FREAD, 0, &dvp, 0, 0)) {
+	if (vn_open(statedir, UIO_SYSSPACE, FREAD, 0, &dvp, 0, 0))
 		return;
-	}
 
-	/*
-	 * if this is not a directory return
-	 */
-	if (dvp->v_type != VDIR) {
-		(void) VOP_CLOSE(dvp, FREAD, 1, (offset_t)0, CRED());
-		VN_RELE(dvp);
-		return;
-	}
-
-	err = VOP_ACCESS(dvp, VREAD, 0, CRED());
-	if (err) {
-		/* Can't read the directory. So get the heck out. */
+	if (dvp->v_type != VDIR || VOP_ACCESS(dvp, VREAD, 0, CRED()))
 		goto out;
-	}
 
 	dirt = kmem_alloc(RFS4_SS_DIRSIZE, KM_SLEEP);
 
@@ -678,12 +646,9 @@ rfs4_ss_oldstate(char *dir, int do_move)
 		uio.uio_resid = RFS4_SS_DIRSIZE;
 
 		err = VOP_READDIR(dvp, &uio, CRED(), &dir_eof);
-
 		VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
-
-		if (err) {
+		if (err)
 			goto out;
-		}
 
 		size = RFS4_SS_DIRSIZE - uio.uio_resid;
 
@@ -700,96 +665,43 @@ rfs4_ss_oldstate(char *dir, int do_move)
 			/*
 			 * Skip '.' and '..'
 			 */
-			if (NFS_IS_DOTNAME(dep->d_name)) {
+			if (NFS_IS_DOTNAME(dep->d_name))
 				continue;
-			}
 
-			if ((ss_pn = rfs4_ss_pnalloc(dir, dep->d_name))
-							== NULL) {
+			ss_pn = rfs4_ss_pnalloc(statedir, dep->d_name);
+			if (ss_pn == NULL)
 				continue;
-			}
 
 			if (cl_ss = rfs4_ss_getstate(dvp, ss_pn)) {
-				if (do_move) {
+				if (destdir != NULL) {
 					rfs4_ss_pnfree(ss_pn);
 					cl_ss->ss_pn = rfs4_ss_movestate(
-						NFS4_STATE_DIR,
-						NFS4_OLDSTATE_DIR,
-						dep->d_name);
+						statedir, destdir, dep->d_name);
 				} else {
 					cl_ss->ss_pn = ss_pn;
 				}
-				insque(cl_ss, rfs4_oldstate);
+				insque(cl_ss, oldstate);
 			} else {
 				rfs4_ss_pnfree(ss_pn);
 			}
 		}
 	}
-out:
 
+out:
 	(void) VOP_CLOSE(dvp, FREAD, 1, (offset_t)0, CRED());
 	VN_RELE(dvp);
 	if (dirt)
 		kmem_free((caddr_t)dirt, RFS4_SS_DIRSIZE);
 }
 
-/*
- * Validates that the needed directories exist
- */
-bool_t
-rfs4_validate_var(void)
-{
-	vnode_t *vp;
-	int i;
-	char *dnp;
-	bool_t ret_val = TRUE;
-	char *dir_names[] = {
-			NFS4_VAR_DIR,
-			NFS4_STATE_DIR,
-			NFS4_OLDSTATE_DIR,
-			NULL
-	};
-
-	for (i = 0, dnp = dir_names[i]; dnp; i++) {
-		if (lookupname(dnp, UIO_SYSSPACE,
-					NO_FOLLOW, NULLVPP, &vp) != 0) {
-			cmn_err(CE_WARN, "!NFS4 stable storage directory "
-				"missing!: %s", dnp);
-			ret_val = FALSE;
-		} else {
-			VN_RELE(vp);
-		}
-		dnp = dir_names[i];
-	}
-	return (ret_val);
-}
-
-/*
- *
- */
 static void
 rfs4_ss_init(void)
 {
-	rw_init(&rfs4_oldstate_lock, NULL, RW_DEFAULT, NULL);
+	int npaths = 1;
+	char *default_dss_path = NFS4_DSS_VAR_DIR;
 
-	if (rfs4_validate_var() == FALSE) {
-		rfs4_oldstate = NULL;
-		return;
-	}
-
-	rfs4_oldstate = kmem_alloc(sizeof (rfs4_oldstate_t), KM_SLEEP);
-	rfs4_oldstate->next = rfs4_oldstate;
-	rfs4_oldstate->prev = rfs4_oldstate;
-
-	/*
-	 * load info from the OLD directory
-	 */
-	rfs4_ss_oldstate(NFS4_OLDSTATE_DIR, 0);
-
-	/*
-	 * Gather and move NFS4_STATE_DIR to NFS4_OLDSTATE_DIR
-	 */
-	rfs4_ss_oldstate(NFS4_STATE_DIR, 1);
+	/* read the default stable storage state */
+	rfs4_dss_readstate(npaths, &default_dss_path);
 
 	rfs4_ss_enabled = 1;
 }
@@ -797,34 +709,92 @@ rfs4_ss_init(void)
 static void
 rfs4_ss_fini(void)
 {
+	rfs4_servinst_t *sip;
 
-	rfs4_oldstate_t *ost, *osp, *os_head;
+	mutex_enter(&rfs4_servinst_lock);
+	sip = rfs4_cur_servinst;
+	while (sip != NULL) {
+		rfs4_dss_clear_oldstate(sip);
+		sip = sip->next;
+	}
+	mutex_exit(&rfs4_servinst_lock);
+}
 
-	rw_destroy(&rfs4_oldstate_lock);
+/*
+ * Remove all oldstate files referenced by this servinst.
+ */
+static void
+rfs4_dss_clear_oldstate(rfs4_servinst_t *sip)
+{
+	rfs4_oldstate_t *os_head, *osp;
 
-	/*
-	 * short circuit everything if we have no
-	 * remaining oldstate!
-	 */
-	if (rfs4_oldstate == NULL) {
+	rw_enter(&sip->oldstate_lock, RW_WRITER);
+	os_head = sip->oldstate;
+
+	if (os_head == NULL)
 		return;
-	}
 
-	/*
-	 * It is possible to start and immediately stop the server
-	 * in which case we would not have cleaned up the oldstate
-	 * circular queue so we may do it here.
-	 */
-	os_head = rfs4_oldstate;
+	/* skip dummy entry */
 	osp = os_head->next;
-
 	while (osp != os_head) {
-		ost = osp->next;
+		char *leaf = osp->ss_pn->leaf;
+		rfs4_oldstate_t *os_next;
+
+		rfs4_dss_remove_leaf(sip, NFS4_DSS_OLDSTATE_LEAF, leaf);
+
+		if (osp->cl_id4.id_val)
+			kmem_free(osp->cl_id4.id_val, osp->cl_id4.id_len);
+		if (osp->ss_pn)
+			kmem_free(osp->ss_pn, sizeof (rfs4_ss_pn_t));
+
+		os_next = osp->next;
 		remque(osp);
-		rfs4_oldstate_free(osp);
-		osp = ost;
+		kmem_free(osp, sizeof (rfs4_oldstate_t));
+		osp = os_next;
 	}
-	kmem_free(os_head, sizeof (rfs4_oldstate_t));
+
+	/* free dummy entry */
+	kmem_free(osp, sizeof (rfs4_oldstate_t));
+
+	sip->oldstate = NULL;
+
+	rw_exit(&sip->oldstate_lock);
+}
+
+/*
+ * Form the state and oldstate paths, and read in the stable storage files.
+ */
+void
+rfs4_dss_readstate(int npaths, char **paths)
+{
+	int i;
+	char *state, *oldstate;
+
+	state = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	oldstate = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	for (i = 0; i < npaths; i++) {
+		char *path = paths[i];
+
+		(void) sprintf(state, "%s/%s", path, NFS4_DSS_STATE_LEAF);
+		(void) sprintf(oldstate, "%s/%s", path, NFS4_DSS_OLDSTATE_LEAF);
+
+		/*
+		 * Populate the current server instance's oldstate list.
+		 *
+		 * 1. Read stable storage data from old state directory,
+		 *    leaving its contents alone.
+		 *
+		 * 2. Read stable storage data from state directory,
+		 *    and move the latter's contents to old state
+		 *    directory.
+		 */
+		rfs4_ss_oldstate(rfs4_cur_servinst->oldstate, oldstate, NULL);
+		rfs4_ss_oldstate(rfs4_cur_servinst->oldstate, state, oldstate);
+	}
+
+	kmem_free(state, MAXPATHLEN);
+	kmem_free(oldstate, MAXPATHLEN);
 }
 
 
@@ -835,63 +805,63 @@ rfs4_ss_fini(void)
 void
 rfs4_ss_chkclid(rfs4_client_t *cp)
 {
-	rfs4_oldstate_t *ost, *osp, *os_head;
+	rfs4_servinst_t *sip;
 
 	/*
-	 * short circuit everything if we have no
-	 * oldstate!
+	 * It should be sufficient to check the oldstate data for just
+	 * this client's instance. However, since our per-instance
+	 * client grouping is solely temporal, HA-NFSv4 RG failover
+	 * might result in clients of the same RG being partitioned into
+	 * separate instances.
+	 *
+	 * Until the client grouping is improved, we must check the
+	 * oldstate data for all instances with an active grace period.
+	 *
+	 * This also serves as the mechanism to remove stale oldstate data.
+	 * The first time we check an instance after its grace period has
+	 * expired, the oldstate data should be cleared.
+	 *
+	 * Start at the current instance, and walk the list backwards
+	 * to the first.
 	 */
-	if (rfs4_oldstate == NULL) {
-		return;
+	mutex_enter(&rfs4_servinst_lock);
+	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev) {
+		rfs4_ss_chkclid_sip(cp, sip);
+
+		/* if the above check found this client, we're done */
+		if (cp->can_reclaim)
+			break;
 	}
+	mutex_exit(&rfs4_servinst_lock);
+}
 
-	/*
-	 * if we are not in the grace_period then
-	 * we can destroy and mutilate all the old state.
-	 */
-	if (!rfs4_clnt_in_grace(cp)) {
-		rw_enter(&rfs4_oldstate_lock, RW_WRITER);
-		if (rfs4_oldstate == NULL) {
-			/*
-			 * some other thread is killing
-			 * the state so we get to just return.
-			 */
-			rw_exit(&rfs4_oldstate_lock);
-			return;
-		}
+static void
+rfs4_ss_chkclid_sip(rfs4_client_t *cp, rfs4_servinst_t *sip)
+{
+	rfs4_oldstate_t *osp, *os_head;
 
-		os_head = rfs4_oldstate;
-		rfs4_oldstate = NULL;
-		rw_exit(&rfs4_oldstate_lock);
-
-		/*
-		 * Now ditch the state files and structures
-		 * we've malloc()'d
-		 */
-		osp = os_head->next;
-
-		while (osp != os_head) {
-			if (osp->ss_pn != NULL) {
-				(void) vn_remove(osp->ss_pn->pn,
-						UIO_SYSSPACE, RMFILE);
-			}
-			ost = osp->next;
-			remque(osp);
-			rfs4_oldstate_free(osp);
-			osp = ost;
-		}
-		kmem_free(os_head, sizeof (rfs4_oldstate_t));
+	/* short circuit everything if this server instance has no oldstate */
+	rw_enter(&sip->oldstate_lock, RW_READER);
+	os_head = sip->oldstate;
+	rw_exit(&sip->oldstate_lock);
+	if (os_head == NULL)
 		return;
-	}
 
 	/*
-	 * we're still in grace, search for the clientid
+	 * If this server instance is no longer in a grace period then
+	 * the client won't be able to reclaim. No further need for this
+	 * instance's oldstate data, so it can be cleared.
 	 */
-	rw_enter(&rfs4_oldstate_lock, RW_READER);
+	if (!rfs4_servinst_in_grace(sip))
+		return;
 
-	os_head = rfs4_oldstate;
+	/* this instance is still in grace; search for the clientid */
+
+	rw_enter(&sip->oldstate_lock, RW_READER);
+
+	os_head = sip->oldstate;
+	/* skip dummy entry */
 	osp = os_head->next;
-
 	while (osp != os_head) {
 		if (osp->cl_id4.id_len == cp->nfs_client.id_len) {
 			if (bcmp(osp->cl_id4.id_val, cp->nfs_client.id_val,
@@ -903,25 +873,19 @@ rfs4_ss_chkclid(rfs4_client_t *cp)
 		osp = osp->next;
 	}
 
-	rw_exit(&rfs4_oldstate_lock);
+	rw_exit(&sip->oldstate_lock);
 }
 
 /*
- * Place client information into stable storage.
+ * Place client information into stable storage: 1/3.
+ * First, generate the leaf filename, from the client's IP address and
+ * the server-generated short-hand clientid.
  */
 void
 rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 {
 	const char *kinet_ntop6(uchar_t *, char *, size_t);
-
-	nfs_client_id4		*cl_id4;
-	rfs4_ss_pn_t *ss_pn;
 	char leaf[MAXNAMELEN], buf[INET6_ADDRSTRLEN];
-	vnode_t *vp;
-	struct uio uio;
-	struct iovec iov[4];
-	int file_vers = NFS4_SS_VERSION;
-	int ioflag;
 	struct sockaddr *ca;
 	uchar_t *b;
 
@@ -959,10 +923,70 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 
 	(void) snprintf(leaf, MAXNAMELEN, "%s-%llx", buf,
 	    (longlong_t)cp->clientid);
+	rfs4_ss_clid_write(cp, leaf);
+}
 
-	if ((ss_pn = rfs4_ss_pnalloc(NFS4_STATE_DIR, leaf)) == NULL) {
-		return;
+/*
+ * Place client information into stable storage: 2/3.
+ * DSS: distributed stable storage: the file may need to be written to
+ * multiple directories.
+ */
+static void
+rfs4_ss_clid_write(rfs4_client_t *cp, char *leaf)
+{
+	rfs4_servinst_t *sip;
+
+	/*
+	 * It should be sufficient to write the leaf file to (all) DSS paths
+	 * associated with just this client's instance. However, since our
+	 * per-instance client grouping is solely temporal, HA-NFSv4 RG
+	 * failover might result in us losing DSS data.
+	 *
+	 * Until the client grouping is improved, we must write the DSS data
+	 * to all instances' paths. Start at the current instance, and
+	 * walk the list backwards to the first.
+	 */
+	mutex_enter(&rfs4_servinst_lock);
+	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev) {
+		int i, npaths = sip->dss_npaths;
+
+		/* write the leaf file to all DSS paths */
+		for (i = 0; i < npaths; i++) {
+			rfs4_dss_path_t *dss_path = sip->dss_paths[i];
+
+			/* HA-NFSv4 path might have been failed-away from us */
+			if (dss_path == NULL)
+				continue;
+
+			rfs4_ss_clid_write_one(cp, dss_path->path, leaf);
+		}
 	}
+	mutex_exit(&rfs4_servinst_lock);
+}
+
+/*
+ * Place client information into stable storage: 3/3.
+ * Write the stable storage data to the requested file.
+ */
+static void
+rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
+{
+	int ioflag;
+	int file_vers = NFS4_SS_VERSION;
+	struct uio uio;
+	struct iovec iov[4];
+	char *dir;
+	rfs4_ss_pn_t *ss_pn;
+	vnode_t *vp;
+	nfs_client_id4 *cl_id4 = &(cp->nfs_client);
+
+	/* allow 2 extra bytes for '/' & NUL */
+	dir = kmem_alloc(strlen(dss_path) + strlen(NFS4_DSS_STATE_LEAF) + 2,
+	    KM_SLEEP);
+	(void) sprintf(dir, "%s/%s", dss_path, NFS4_DSS_STATE_LEAF);
+
+	if ((ss_pn = rfs4_ss_pnalloc(dir, leaf)) == NULL)
+		return;
 
 	if (vn_open(ss_pn->pn, UIO_SYSSPACE, FCREAT|FWRITE, 0600, &vp,
 			    CRCREAT, 0)) {
@@ -970,19 +994,31 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 		return;
 	}
 
-	if (cp->ss_pn)
-		rfs4_ss_pnfree(cp->ss_pn);
-
-	cp->ss_pn = ss_pn;
-
-	cl_id4 = &(cp->nfs_client);
+	/*
+	 * We need to record leaf - i.e. the filename - so that we know
+	 * what to remove, in the future. However, the dir part of cp->ss_pn
+	 * should never be referenced directly, since it's potentially only
+	 * one of several paths with this leaf in it.
+	 */
+	if (cp->ss_pn != NULL) {
+		if (strcmp(cp->ss_pn->leaf, leaf) == 0) {
+			/* we've already recorded *this* leaf */
+			rfs4_ss_pnfree(ss_pn);
+		} else {
+			/* replace with this leaf */
+			rfs4_ss_pnfree(cp->ss_pn);
+			cp->ss_pn = ss_pn;
+		}
+	} else {
+		cp->ss_pn = ss_pn;
+	}
 
 	/*
 	 * Build a scatter list that points to the nfs_client_id4
 	 */
 	iov[0].iov_base = (caddr_t)&file_vers;
 	iov[0].iov_len = sizeof (int);
-	iov[1].iov_base = (caddr_t)cl_id4;
+	iov[1].iov_base = (caddr_t)&(cl_id4->verifier);
 	iov[1].iov_len = NFS4_VERIFIER_SIZE;
 	iov[2].iov_base = (caddr_t)&(cl_id4->id_len);
 	iov[2].iov_len = sizeof (uint_t);
@@ -1007,6 +1043,45 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 
 	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
 	VN_RELE(vp);
+}
+
+/*
+ * DSS: distributed stable storage.
+ * Unpack the list of paths passed by nfsd.
+ * Use nvlist_alloc(9F) to manage the data.
+ * The caller is responsible for allocating and freeing the buffer.
+ */
+int
+rfs4_dss_setpaths(char *buf, size_t buflen)
+{
+	int error;
+
+	/*
+	 * If this is a "warm start", i.e. we previously had DSS paths,
+	 * preserve the old paths.
+	 */
+	if (rfs4_dss_paths != NULL) {
+		/*
+		 * Before we lose the ptr, destroy the nvlist and pathnames
+		 * array from the warm start before this one.
+		 */
+		if (rfs4_dss_oldpaths)
+			nvlist_free(rfs4_dss_oldpaths);
+		rfs4_dss_oldpaths = rfs4_dss_paths;
+	}
+
+	/* unpack the buffer into a searchable nvlist */
+	error = nvlist_unpack(buf, buflen, &rfs4_dss_paths, KM_SLEEP);
+	if (error)
+		return (error);
+
+	/*
+	 * Search the nvlist for the pathnames nvpair (which is the only nvpair
+	 * in the list, and record its location.
+	 */
+	error = nvlist_lookup_string_array(rfs4_dss_paths, NFS4_DSS_NVPAIR_NAME,
+	    &rfs4_dss_newpaths, &rfs4_dss_numnewpaths);
+	return (error);
 }
 
 /*
@@ -1089,6 +1164,7 @@ rfs4_state_init()
 {
 	int start_grace;
 	extern boolean_t rfs4_cpr_callb(void *, int);
+	char *dss_path = NFS4_DSS_VAR_DIR;
 
 	mutex_enter(&rfs4_state_lock);
 
@@ -1114,6 +1190,9 @@ rfs4_state_init()
 	else
 		rfs4_start_time++;
 
+	/* DSS: distributed stable storage: initialise served paths list */
+	rfs4_dss_pathlist = NULL;
+
 	/*
 	 * Create the first server instance, or a new one if the server has
 	 * been restarted; see above comments on rfs4_start_time. Don't
@@ -1121,7 +1200,7 @@ rfs4_state_init()
 	 * clients' recovery window.
 	 */
 	start_grace = 0;
-	rfs4_servinst_create(start_grace);
+	rfs4_servinst_create(start_grace, 1, &dss_path);
 
 	/* reset the "first NFSv4 request" status */
 	rfs4_seen_first_compound = 0;
@@ -1355,6 +1434,13 @@ rfs4_state_fini()
 
 	/* reset the "first NFSv4 request" status */
 	rfs4_seen_first_compound = 0;
+
+	/* DSS: distributed stable storage */
+	if (rfs4_dss_oldpaths)
+		nvlist_free(rfs4_dss_oldpaths);
+	if (rfs4_dss_paths)
+		nvlist_free(rfs4_dss_paths);
+	rfs4_dss_paths = rfs4_dss_oldpaths = NULL;
 }
 
 typedef union {
@@ -1455,9 +1541,48 @@ rfs4_client_expiry(rfs4_entry_t u_entry)
 	cp_expired = (cp->forced_expire ||
 		(gethrestime_sec() - cp->last_access
 			> rfs4_lease_time));
+
 	if (!cp->ss_remove && cp_expired)
 		cp->ss_remove = 1;
 	return (cp_expired);
+}
+
+/*
+ * Remove the leaf file from all distributed stable storage paths.
+ */
+static void
+rfs4_dss_remove_cpleaf(rfs4_client_t *cp)
+{
+	char *leaf = cp->ss_pn->leaf;
+
+	rfs4_dss_remove_leaf(cp->server_instance, NFS4_DSS_STATE_LEAF, leaf);
+}
+
+static void
+rfs4_dss_remove_leaf(rfs4_servinst_t *sip, char *dir_leaf, char *leaf)
+{
+	int i, npaths = sip->dss_npaths;
+
+	for (i = 0; i < npaths; i++) {
+		rfs4_dss_path_t *dss_path = sip->dss_paths[i];
+		char *path, *dir;
+		size_t pathlen;
+
+		/* the HA-NFSv4 path might have been failed-over away from us */
+		if (dss_path == NULL)
+			continue;
+
+		dir = dss_path->path;
+
+		/* allow 3 extra bytes for two '/' & a NUL */
+		pathlen = strlen(dir) + strlen(dir_leaf) + strlen(leaf) + 3;
+		path = kmem_alloc(pathlen, KM_SLEEP);
+		(void) sprintf(path, "%s/%s/%s", dir, dir_leaf, leaf);
+
+		(void) vn_remove(path, UIO_SYSSPACE, RMFILE);
+
+		kmem_free(path, pathlen);
+	}
 }
 
 static void
@@ -1476,12 +1601,9 @@ rfs4_client_destroy(rfs4_entry_t u_entry)
 		rfs4_client_rele(cp->cp_confirmed);
 
 	if (cp->ss_pn) {
-		/*
-		 * check if the stable storage file needs
-		 * to be removed
-		 */
+		/* check if the stable storage files need to be removed */
 		if (cp->ss_remove)
-			(void) vn_remove(cp->ss_pn->pn, UIO_SYSSPACE, RMFILE);
+			rfs4_dss_remove_cpleaf(cp);
 		rfs4_ss_pnfree(cp->ss_pn);
 	}
 

@@ -45,6 +45,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <syslog.h>
 #include <tiuser.h>
 #include <rpc/rpc.h>
@@ -73,15 +74,22 @@
 #include <deflt.h>
 #include <rpcsvc/daemon_utils.h>
 #include <rpcsvc/nfs4_prot.h>
+#include <libnvpair.h>
 #include "nfs_tbind.h"
 #include "thrpool.h"
 
 /* quiesce requests will be ignored if nfs_server_vers_max < QUIESCE_VERSMIN */
 #define	QUIESCE_VERSMIN	4
+/* DSS: distributed stable storage */
+#define	DSS_VERSMIN	4
 
 static	int	nfssvc(int, struct netbuf, struct netconfig *);
-static int nfssvcpool(int maxservers);
+static	int	nfssvcpool(int maxservers);
+static	int	dss_init(uint_t npaths, char **pathnames);
+static	void	dss_mkleafdirs(uint_t npaths, char **pathnames);
+static	void	dss_mkleafdir(char *dir, char *leaf, char *path);
 static	void	usage(void);
+int		qstrcmp(const void *s1, const void *s2);
 
 extern	int	_nfssys(int, void *);
 
@@ -138,6 +146,8 @@ main(int ac, char *av[])
 	NETSELPDECL(providerp);
 	char *defval;
 	boolean_t can_do_mlp;
+	uint_t dss_npaths = 0;
+	char **dss_pathnames = NULL;
 
 	MyName = *av;
 
@@ -239,7 +249,7 @@ main(int ac, char *av[])
 	}
 	opt_cnt = 0;
 
-	while ((i = getopt(ac, av, "ac:p:t:l:")) != EOF) {
+	while ((i = getopt(ac, av, "ac:p:s:t:l:")) != EOF) {
 		switch (i) {
 		case 'a':
 			free(df_proto);
@@ -259,6 +269,39 @@ main(int ac, char *av[])
 			proto = optarg;
 			df_allflag = 0;
 			opt_cnt++;
+			break;
+
+		/*
+		 * DSS: NFSv4 distributed stable storage.
+		 *
+		 * This is a Contracted Project Private interface, for
+		 * the sole use of Sun Cluster HA-NFS. See PSARC/2006/313.
+		 */
+		case 's':
+			if (strlen(optarg) < MAXPATHLEN) {
+				/* first "-s" option encountered? */
+				if (dss_pathnames == NULL) {
+					/*
+					 * Allocate maximum possible space
+					 * required given cmdline arg count;
+					 * "-s <path>" consumes two args.
+					 */
+					size_t sz = (ac / 2) * sizeof (char *);
+					dss_pathnames = (char **)malloc(sz);
+					if (dss_pathnames == NULL) {
+						(void) fprintf(stderr, "%s: "
+						    "dss paths malloc failed\n",
+						    av[0]);
+						exit(1);
+					}
+					(void) memset(dss_pathnames, 0, sz);
+				}
+				dss_pathnames[dss_npaths] = optarg;
+				dss_npaths++;
+			} else {
+				(void) fprintf(stderr,
+				    "%s: -s pathname too long.\n", av[0]);
+			}
 			break;
 
 		case 't':
@@ -410,6 +453,18 @@ main(int ac, char *av[])
 		exit(0);
 	}
 
+	/*
+	 * If we've been given a list of paths to be used for distributed
+	 * stable storage, and provided we're going to run a version
+	 * that supports it, setup the DSS paths.
+	 */
+	if (dss_pathnames != NULL && nfs_server_vers_max >= DSS_VERSMIN) {
+		if (dss_init(dss_npaths, dss_pathnames) != 0) {
+			syslog(LOG_ERR, "dss_init failed. Exiting.");
+			exit(1);
+		}
+	}
+
 	sigset(SIGTERM, sigflush);
 	sigset(SIGUSR1, quiesce);
 
@@ -520,7 +575,7 @@ done:
 
 	if (num_fds == 0) {
 		(void) syslog(LOG_ERR,
-		"Could not start NFS service for any protocol. Exiting.");
+		"Could not start NFS service for any protocol. Exiting");
 		exit(1);
 	}
 
@@ -643,7 +698,12 @@ sigflush(int sig)
 
 /*
  * SIGUSR1 handler.
- * Request server quiesce, then exit. For subsequent warm start.
+ *
+ * Request that server quiesce, then (nfsd) exit. For subsequent warm start.
+ *
+ * This is a Contracted Project Private interface, for the sole use
+ * of Sun Cluster HA-NFS. See PSARC/2004/497.
+ *
  * Equivalent to SIGTERM handler if nfs_server_vers_max < QUIESCE_VERSMIN.
  */
 static void
@@ -654,10 +714,10 @@ quiesce(int sig)
 
 	if (nfs_server_vers_max >= QUIESCE_VERSMIN) {
 		/* Request server quiesce at next shutdown */
-		error = _nfssys(NFS_SVC_REQUEST_QUIESCE, &id);
+		error = _nfssys(NFS4_SVC_REQUEST_QUIESCE, &id);
 		if (error) {
 			syslog(LOG_ERR,
-			    "_nfssys(NFS_SVC_REQUEST_QUIESCE) failed: %s\n",
+			    "_nfssys(NFS4_SVC_REQUEST_QUIESCE) failed: %s",
 			    strerror(errno));
 			return;
 		}
@@ -667,4 +727,215 @@ quiesce(int sig)
 	nfsl_flush();
 
 	exit(0);
+}
+
+/*
+ * DSS: distributed stable storage.
+ * Create leaf directories as required, keeping an eye on path
+ * lengths. Calls exit(1) on failure.
+ * The pathnames passed in must already exist, and must be writeable by nfsd.
+ * Note: the leaf directories under NFS4_VAR_DIR are not created here;
+ * they're created at pkg install.
+ */
+static void
+dss_mkleafdirs(uint_t npaths, char **pathnames)
+{
+	int i;
+	char *tmppath = NULL;
+
+	/*
+	 * Create the temporary storage used by dss_mkleafdir() here,
+	 * rather than in that function, so that it only needs to be
+	 * done once, rather than once for each call. Too big to put
+	 * on the function's stack.
+	 */
+	tmppath = (char *)malloc(MAXPATHLEN);
+	if (tmppath == NULL) {
+		syslog(LOG_ERR, "tmppath malloc failed. Exiting");
+		exit(1);
+	}
+
+	for (i = 0; i < npaths; i++) {
+		char *p = pathnames[i];
+
+		dss_mkleafdir(p, NFS4_DSS_STATE_LEAF, tmppath);
+		dss_mkleafdir(p, NFS4_DSS_OLDSTATE_LEAF, tmppath);
+	}
+
+	free(tmppath);
+}
+
+/*
+ * Create "leaf" in "dir" (which must already exist).
+ * leaf: should start with a '/'
+ */
+static void
+dss_mkleafdir(char *dir, char *leaf, char *tmppath)
+{
+	/* MAXPATHLEN includes the terminating NUL */
+	if (strlen(dir) + strlen(leaf) > MAXPATHLEN - 1) {
+		syslog(LOG_ERR, "stable storage path too long: %s%s. Exiting",
+		    dir, leaf);
+		exit(1);
+	}
+
+	(void) snprintf(tmppath, MAXPATHLEN, "%s/%s", dir, leaf);
+
+	/* the directory may already exist: that's OK */
+	if (mkdir(tmppath, NFS4_DSS_DIR_MODE) == -1 && errno != EEXIST) {
+		syslog(LOG_ERR, "error creating stable storage directory: "
+		    "%s: %s. Exiting", strerror(errno), tmppath);
+		exit(1);
+	}
+}
+
+/*
+ * Create the storage dirs, and pass the path list to the kernel.
+ * This requires the nfssrv module to be loaded; the _nfssys() syscall
+ * will fail ENOTSUP if it is not.
+ * Use libnvpair(3LIB) to pass the data to the kernel.
+ */
+static int
+dss_init(uint_t npaths, char **pathnames)
+{
+	int i, j, nskipped, error;
+	char *bufp;
+	uint32_t bufsize;
+	size_t buflen;
+	nvlist_t *nvl;
+
+	if (npaths > 1) {
+		/*
+		 * We need to remove duplicate paths; this might be user error
+		 * in the general case, but HA-NFSv4 can also cause this.
+		 * Sort the pathnames array, and NULL out duplicates,
+		 * then write the non-NULL entries to a new array.
+		 * Sorting will also allow the kernel to optimise its searches.
+		 */
+
+		qsort(pathnames, npaths, sizeof (char *), qstrcmp);
+
+		/* now NULL out any duplicates */
+		i = 0; j = 1; nskipped = 0;
+		while (j < npaths) {
+			if (strcmp(pathnames[i], pathnames[j]) == NULL) {
+				pathnames[j] = NULL;
+				j++;
+				nskipped++;
+				continue;
+			}
+
+			/* skip i over any of its NULLed duplicates */
+			i = j++;
+		}
+
+		/* finally, write the non-NULL entries to a new array */
+		if (nskipped > 0) {
+			int nreal;
+			size_t sz;
+			char **tmp_pathnames;
+
+			nreal = npaths - nskipped;
+
+			sz = nreal * sizeof (char *);
+			tmp_pathnames = (char **)malloc(sz);
+			if (tmp_pathnames == NULL) {
+				syslog(LOG_ERR, "tmp_pathnames malloc failed");
+				exit(1);
+			}
+
+			for (i = 0, j = 0; i < npaths; i++)
+				if (pathnames[i] != NULL)
+					tmp_pathnames[j++] = pathnames[i];
+			free(pathnames);
+			pathnames = tmp_pathnames;
+			npaths = nreal;
+		}
+
+	}
+
+	/* Create directories to store the distributed state files */
+	dss_mkleafdirs(npaths, pathnames);
+
+	/* Create the name-value pair list */
+	error = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
+	if (error) {
+		syslog(LOG_ERR, "nvlist_alloc failed: %s.", strerror(errno));
+		return (1);
+	}
+
+	/* Add the pathnames array as a single name-value pair */
+	error = nvlist_add_string_array(nvl, NFS4_DSS_NVPAIR_NAME,
+	    pathnames, npaths);
+	if (error) {
+		syslog(LOG_ERR, "nvlist_add_string_array failed: %s.",
+		    strerror(errno));
+		nvlist_free(nvl);
+		return (1);
+	}
+
+	/*
+	 * Pack list into contiguous memory, for passing to kernel.
+	 * nvlist_pack() will allocate the memory for the buffer,
+	 * which we should free() when no longer needed.
+	 * NV_ENCODE_XDR for safety across ILP32/LP64 kernel boundary.
+	 */
+	bufp = NULL;
+	error = nvlist_pack(nvl, &bufp, &buflen, NV_ENCODE_XDR, 0);
+	if (error) {
+		syslog(LOG_ERR, "nvlist_pack failed: %s.", strerror(errno));
+		nvlist_free(nvl);
+		return (1);
+	}
+
+	/* Now we have the packed buffer, we no longer need the list */
+	nvlist_free(nvl);
+
+	/*
+	 * Let the kernel know in advance how big the buffer is.
+	 * NOTE: we cannot just pass buflen, since size_t is a long, and
+	 * thus a different size between ILP32 userland and LP64 kernel.
+	 * Use an int for the transfer, since that should be big enough;
+	 * this is a no-op at the moment, here, since nfsd is 32-bit, but
+	 * that could change.
+	 */
+	bufsize = (uint32_t)buflen;
+	error = _nfssys(NFS4_DSS_SETPATHS_SIZE, &bufsize);
+	if (error) {
+		syslog(LOG_ERR,
+		    "_nfssys(NFS4_DSS_SETPATHS_SIZE) failed: %s. ",
+		    strerror(errno));
+		free(bufp);
+		return (1);
+	}
+
+	/* Pass the packed buffer to the kernel */
+	error = _nfssys(NFS4_DSS_SETPATHS, bufp);
+	if (error) {
+		syslog(LOG_ERR,
+		    "_nfssys(NFS4_DSS_SETPATHS) failed: %s. ", strerror(errno));
+		free(bufp);
+		return (1);
+	}
+
+	/*
+	 * The kernel has now unpacked the buffer and extracted the
+	 * pathnames array, we no longer need the buffer.
+	 */
+	free(bufp);
+
+	return (0);
+}
+
+/*
+ * Quick sort string compare routine, for qsort.
+ * Needed to make arg types correct.
+ */
+int
+qstrcmp(const void *p1, const void *p2)
+{
+	char *s1 = *((char **)p1);
+	char *s2 = *((char **)p2);
+
+	return (strcmp(s1, s2));
 }

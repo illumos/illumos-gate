@@ -36,6 +36,7 @@
 
 #ifdef _KERNEL
 #include <nfs/nfs4_kprot.h>
+#include <sys/nvpair.h>
 #else
 #include <rpcsvc/nfs4_prot.h>
 #endif
@@ -324,15 +325,44 @@ typedef struct {
  *
  * Currently used only for Sun Cluster HA-NFS support, to group clients
  * on NFS resource failover so each set of clients gets its own dedicated
- * grace period.
+ * grace period and distributed stable storage data.
  */
 typedef struct rfs4_servinst {
+	int			dss_npaths;
 	krwlock_t		rwlock;
+	krwlock_t		oldstate_lock;
 	time_t			start_time;
 	time_t			grace_period;
+	rfs4_oldstate_t		*oldstate;
+	struct rfs4_dss_path	**dss_paths;
 	struct rfs4_servinst	*next;
 	struct rfs4_servinst	*prev;
 } rfs4_servinst_t;
+
+/*
+ * DSS: distributed stable storage
+ */
+
+typedef struct rfs4_dss_path {
+	struct rfs4_dss_path	*next; /* for insque/remque */
+	struct rfs4_dss_path	*prev; /* for insque/remque */
+	char			*path;
+	struct rfs4_servinst	*sip;
+	unsigned		index; /* offset in servinst's array */
+} rfs4_dss_path_t;
+
+/* array of paths passed-in from nfsd command-line; stored in nvlist */
+char		**rfs4_dss_newpaths;
+uint_t		rfs4_dss_numnewpaths;
+
+/*
+ * Circular doubly-linked list of paths for currently-served RGs.
+ * No locking required: only changed on warmstart. Managed with insque/remque.
+ */
+rfs4_dss_path_t	*rfs4_dss_pathlist;
+
+/* nvlists of all DSS paths: current, and before last warmstart */
+nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 
 /*
  * List declarations (suitable for insque/remque) used to link the
@@ -712,12 +742,11 @@ typedef struct rfs4_file {
 	krwlock_t	file_rwlock;
 } rfs4_file_t;
 
-extern int	rfs4_servinst_debug;
 extern int	rfs4_seen_first_compound;	/* set first time we see one */
 
 extern rfs4_servinst_t	*rfs4_cur_servinst;	/* current server instance */
 extern kmutex_t		rfs4_servinst_lock;	/* protects linked list */
-extern void		rfs4_servinst_create(int);
+extern void		rfs4_servinst_create(int, int, char **);
 extern void		rfs4_servinst_destroy_all(void);
 extern void		rfs4_servinst_assign(rfs4_client_t *,
 			    rfs4_servinst_t *);
@@ -728,6 +757,8 @@ extern int		rfs4_servinst_grace_new(rfs4_servinst_t *);
 extern void		rfs4_grace_start(rfs4_servinst_t *);
 extern void		rfs4_grace_start_new(void);
 extern void		rfs4_grace_reset_all(void);
+extern void		rfs4_ss_oldstate(rfs4_oldstate_t *, char *, char *);
+extern void		rfs4_dss_readstate(int, char **);
 
 /*
  * rfs4_deleg_policy is used to signify the server's global delegation

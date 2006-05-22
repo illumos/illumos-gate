@@ -50,7 +50,8 @@ enum nfssys_op	{ OLD_NFS_SVC, OLD_ASYNC_DAEMON, EXPORTFS, OLD_NFS_GETFH,
     OLD_NFS_CNVT, NFS_REVAUTH, OLD_NFS_FH_TO_FID, OLD_LM_SVC, KILL_LOCKMGR,
     LOG_FLUSH, SVCPOOL_CREATE, NFS_SVC, LM_SVC, SVCPOOL_WAIT, SVCPOOL_RUN,
     NFS4_SVC, RDMA_SVC_INIT, NFS4_CLR_STATE, NFS_IDMAP,
-    NFS_SVC_REQUEST_QUIESCE, NFS_GETFH };
+    NFS4_SVC_REQUEST_QUIESCE, NFS_GETFH, NFS4_DSS_SETPATHS,
+    NFS4_DSS_SETPATHS_SIZE };
 
 struct nfs_svc_args {
 	int		fd;		/* Connection endpoint */
@@ -293,6 +294,14 @@ struct nfs4_svc_args32 {
 #define	NFS4_KRPC_START	1
 #define	NFS4_SETPORT	2
 #define	NFS4_DQUERY	4
+
+/* DSS: distributed stable storage */
+#define	NFS4_DSS_STATE_LEAF	"v4_state"
+#define	NFS4_DSS_OLDSTATE_LEAF	"v4_oldstate"
+#define	NFS4_DSS_DIR_MODE	0755
+#define	NFS4_DSS_NVPAIR_NAME	"dss_pathname_array"
+/* default storage dir */
+#define	NFS4_DSS_VAR_DIR	"/var/nfs"
 
 #ifdef _KERNEL
 
