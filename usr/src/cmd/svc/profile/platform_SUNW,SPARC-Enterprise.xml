@@ -44,4 +44,7 @@
 	<service name='platform/sun4u/dscp' version='1' type='service'>
 		<instance name='default' enabled='true'/>
 	</service>
+	<service name='platform/sun4u/oplhpd' version='1' type='service'>
+		<instance name='default' enabled='true'/>
+	</service>
 </service_bundle>

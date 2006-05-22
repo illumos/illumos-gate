@@ -450,6 +450,7 @@ sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
 	fruadm		\
+	oplhpd		\
 	prtdscp		\
 	prtfru		\
 	scadm		\
@@ -757,6 +758,7 @@ MANIFEST_TOPDIRS=			\
 	keyserv				\
 	ldapcachemgr			\
 	nscd				\
+	oplhpd				\
 	power				\
 	rexd				\
 	rpcbind				\
