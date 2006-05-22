@@ -13688,21 +13688,6 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 		ASSERT(mp->b_datap->db_type == M_DATA);
 		ASSERT(mp->b_datap->db_ref == 1);
 
-		/*
-		 * Invoke the CGTP (multirouting) filtering module to process
-		 * the incoming packet. Packets identified as duplicates
-		 * must be discarded. Filtering is active only if the
-		 * the ip_cgtp_filter ndd variable is non-zero.
-		 */
-		cgtp_flt_pkt = CGTP_IP_PKT_NOT_CGTP;
-		if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL)) {
-			cgtp_flt_pkt =
-			    ip_cgtp_filter_ops->cfo_filter_fp(q, mp);
-			if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
-				freemsg(first_mp);
-				continue;
-			}
-		}
 
 		ipha = (ipha_t *)mp->b_rptr;
 		len = mp->b_wptr - rptr;
@@ -13776,6 +13761,22 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 				continue;
 		} else {
 			dst = ipha->ipha_dst;
+		}
+
+		/*
+		 * Invoke the CGTP (multirouting) filtering module to process
+		 * the incoming packet. Packets identified as duplicates
+		 * must be discarded. Filtering is active only if the
+		 * the ip_cgtp_filter ndd variable is non-zero.
+		 */
+		cgtp_flt_pkt = CGTP_IP_PKT_NOT_CGTP;
+		if (ip_cgtp_filter && (ip_cgtp_filter_ops != NULL)) {
+			cgtp_flt_pkt =
+			    ip_cgtp_filter_ops->cfo_filter(q, mp);
+			if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
+				freemsg(first_mp);
+				continue;
+			}
 		}
 
 		/*
