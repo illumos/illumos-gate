@@ -310,10 +310,10 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 	assert(p != NULL);
 	*p = 0;
 	if (nvlist_lookup_uint64(g_topo2diskmon, cstr, &ptr) != 0) {
-		log_msg(MM_TOPO, "Could not find parent's diskmon for node "
-		    "%p!\n", node);
+		log_msg(MM_TOPO, "No diskmon for parent of node %p.\n", node);
 		topo_hdl_free(thp, cstr, orig_cstr_len);
-		return (-1);
+		/* Skip this disk: */
+		return (0);
 	}
 
 	topo_hdl_free(thp, cstr, orig_cstr_len);

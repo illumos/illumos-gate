@@ -1340,10 +1340,9 @@ cfga_list_ext(
 		rv = CFGA_SATA_DEVLINK;
 		goto bailout;
 	}
-	assert(ap_id_log != NULL);
 
 	/* Get logical ap_id corresponding to the physical */
-	if (strstr(ap_id_log, CFGA_DEV_DIR) == NULL) {
+	if (ap_id_log == NULL || strstr(ap_id_log, CFGA_DEV_DIR) == NULL) {
 		rv = CFGA_SATA_DEVLINK;
 		goto bailout;
 	}
