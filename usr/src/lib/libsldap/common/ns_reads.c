@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1045,6 +1044,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 	char			errstr[MAXERROR];
 	int			num_eq = 0, num_veq = 0;
 	int			in_quote = FALSE;
+	int			is_value = FALSE;
 	int			i, j, oc_len, len;
 	int			at_least_one = FALSE;
 	filter_mapping_info_t	**info, *info1;
@@ -1138,7 +1138,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 
 		switch (*c) {
 		case TOKENSEPARATOR:
-			if (!in_quote) {
+			if (!in_quote && !is_value) {
 				info1 = (filter_mapping_info_t *)calloc(1,
 					sizeof (filter_mapping_info_t));
 				if (!info1) {
@@ -1154,7 +1154,19 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 				 * remember the location of this "="
 				 */
 				info[num_veq++]->veq_pos = c;
+
+				/*
+				 * skip until the end of the attribute value
+				 */
+				is_value = TRUE;
 			}
+			break;
+		case CPARATOK:
+			/*
+			 * mark the end of the attribute value
+			 */
+			if (!in_quote)
+				is_value = FALSE;
 			break;
 		case QUOTETOK:
 			/*
