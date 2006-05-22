@@ -577,12 +577,15 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "IBM     1742",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1815",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     FAStT",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "IBM     1814",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "IBM     1814-200",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "LSI     INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "ENGENIO INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SGI     TP",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SGI     IS",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "*CSM100_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "*CSM200_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "Fujitsu SX300",	SD_CONF_BSET_THROTTLE,  &lsi_oem_properties },
 	{ "LSI",		SD_CONF_BSET_NRR_COUNT, &lsi_properties },
 	{ "SUN     T3", SD_CONF_BSET_THROTTLE |
 			SD_CONF_BSET_BSY_RETRY_COUNT|
