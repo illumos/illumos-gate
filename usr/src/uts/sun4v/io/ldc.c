@@ -138,6 +138,12 @@ static hsvc_info_t intr_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_INTR, 1, 0, "ldc"
 };
 
+/*
+ * LDC retry count and delay
+ */
+int ldc_max_retries = LDC_MAX_RETRIES;
+clock_t ldc_delay = LDC_DELAY;
+
 #ifdef DEBUG
 
 /*
@@ -529,23 +535,32 @@ i_ldc_clear_intr(ldc_chan_t *ldcp, cnex_intrtype_t itype)
 
 /*
  * Set the receive queue head
- * Returns an error if it fails
+ * Resets connection and returns an error if it fails.
  */
 static int
 i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 {
-	int rv;
+	int 	rv;
+	int 	retries;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
-	rv = hv_ldc_rx_set_qhead(ldcp->id, head);
-	if (rv && rv != H_EWOULDBLOCK) {
-		cmn_err(CE_WARN,
-		    "ldc_rx_set_qhead: (0x%lx) cannot set qhead", ldcp->id);
-		i_ldc_reset(ldcp);
-		return (ECONNRESET);
+	for (retries = 0; retries < ldc_max_retries; retries++) {
+
+		if ((rv = hv_ldc_rx_set_qhead(ldcp->id, head)) == 0)
+			return (0);
+
+		if (rv != H_EWOULDBLOCK)
+			break;
+
+		/* wait for ldc_delay usecs */
+		drv_usecwait(ldc_delay);
 	}
 
-	return (0);
+	cmn_err(CE_WARN, "ldc_rx_set_qhead: (0x%lx) cannot set qhead 0x%lx",
+		ldcp->id, head);
+	i_ldc_reset(ldcp);
+
+	return (ECONNRESET);
 }
 
 
@@ -602,17 +617,17 @@ i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail)
 
 /*
  * Set the tail pointer. If HV returns EWOULDBLOCK, it will back off
- * and retry LDC_CHK_CNT times before returning an error.
+ * and retry ldc_max_retries times before returning an error.
  * Returns 0, EWOULDBLOCK or EIO
  */
 static int
 i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail)
 {
 	int		rv, retval = EWOULDBLOCK;
-	int 		loop_cnt, chk_cnt;
+	int 		retries;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
-	for (chk_cnt = 0; chk_cnt < LDC_CHK_CNT; chk_cnt++) {
+	for (retries = 0; retries < ldc_max_retries; retries++) {
 
 		if ((rv = hv_ldc_tx_set_qtail(ldcp->id, tail)) == 0) {
 			retval = 0;
@@ -625,8 +640,8 @@ i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail)
 			break;
 		}
 
-		/* spin LDC_LOOP_CNT and then try again */
-		for (loop_cnt = 0; loop_cnt < LDC_LOOP_CNT; loop_cnt++);
+		/* wait for ldc_delay usecs */
+		drv_usecwait(ldc_delay);
 	}
 	return (retval);
 }
@@ -824,6 +839,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 				/* Save the ACK'd version */
 				ldcp->version.major = rcvd_ver->major;
 				ldcp->version.minor = rcvd_ver->minor;
+				ldcp->hstate |= TS_RCVD_VER;
 				ldcp->tstate |= TS_VER_DONE;
 				DWARN(DBG_ALL_LDCS,
 				    "(0x%llx) Agreed on version v%u.%u\n",
@@ -885,7 +901,6 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 			return (ECONNRESET);
 		}
 
-		ldcp->last_msg_snt++;
 		ldcp->tx_tail = tx_tail;
 		ldcp->hstate |= TS_SENT_RTS;
 
@@ -1760,8 +1775,11 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 		/* move the head one position */
 		rx_head = (rx_head + LDC_PACKET_SIZE) %
 			(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
-		if (rv = i_ldc_set_rx_head(ldcp, rx_head))
+		if (rv = i_ldc_set_rx_head(ldcp, rx_head)) {
+			notify_client = B_TRUE;
+			notify_event = LDC_EVT_RESET;
 			break;
+		}
 
 	} /* for */
 
@@ -2572,6 +2590,7 @@ ldc_up(ldc_handle_t handle)
 		return (rv);
 	}
 
+	ldcp->hstate |= TS_SENT_VER;
 	ldcp->tx_tail = tx_tail;
 	D1(ldcp->id, "ldc_up: (0x%llx) channel up initiated\n", ldcp->id);
 
@@ -2845,7 +2864,7 @@ i_ldc_read_raw(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	*sizep = LDC_PAYLOAD_SIZE_RAW;
 
 	rx_head = (rx_head + LDC_PACKET_SIZE) & q_size_mask;
-	(void) i_ldc_set_rx_head(ldcp, rx_head);
+	rv = i_ldc_set_rx_head(ldcp, rx_head);
 
 	return (rv);
 }
@@ -2865,7 +2884,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	ldc_msg_t 	*msg;
 	caddr_t 	target;
 	size_t 		len = 0, bytes_read = 0;
-	int 		loop_cnt = 0, chk_cnt = 0;
+	int 		retries = 0;
 	uint64_t 	q_size_mask;
 
 	target = target_bufp;
@@ -2920,27 +2939,24 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 
 			/* If in the middle of a fragmented xfer */
 			if (ldcp->first_fragment != 0) {
-				if (++loop_cnt > LDC_LOOP_CNT) {
-					loop_cnt = 0;
-					++chk_cnt;
-				}
-				if (chk_cnt < LDC_CHK_CNT) {
+
+				/* wait for ldc_delay usecs */
+				drv_usecwait(ldc_delay);
+
+				if (++retries < ldc_max_retries)
 					continue;
-				} else {
-					*sizep = 0;
-					ldcp->last_msg_rcd =
-						ldcp->first_fragment - 1;
-					DWARN(DBG_ALL_LDCS,
-					    "ldc_read: (0x%llx) read timeout",
-					    ldcp->id);
-					return (ETIMEDOUT);
-				}
+
+				*sizep = 0;
+				ldcp->last_msg_rcd = ldcp->first_fragment - 1;
+				DWARN(DBG_ALL_LDCS,
+					"ldc_read: (0x%llx) read timeout",
+					ldcp->id);
+				return (ETIMEDOUT);
 			}
 			*sizep = 0;
 			break;
 		}
-		loop_cnt = 0;
-		chk_cnt = 0;
+		retries = 0;
 
 		D2(ldcp->id,
 		    "ldc_read: (0x%llx) chd=0x%llx, rxhd=0x%llx, rxtl=0x%llx\n",
@@ -2957,6 +2973,9 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 
 			DWARN(ldcp->id, "ldc_read: (0x%llx) seqid error, "
 			    "q_ptrs=0x%lx,0x%lx", ldcp->id, rx_head, rx_tail);
+
+			/* throw away data */
+			bytes_read = 0;
 
 			/* Reset last_msg_rcd to start of message */
 			if (ldcp->first_fragment != 0) {
@@ -2977,7 +2996,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 			}
 
 			/* purge receive queue */
-			(void) i_ldc_set_rx_head(ldcp, rx_tail);
+			rv = i_ldc_set_rx_head(ldcp, rx_tail);
 
 			break;
 		}
@@ -2993,10 +3012,9 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 			if (rv = i_ldc_ctrlmsg(ldcp, msg)) {
 				if (rv == EAGAIN)
 					continue;
-				(void) i_ldc_set_rx_head(ldcp, rx_tail);
+				rv = i_ldc_set_rx_head(ldcp, rx_tail);
 				*sizep = 0;
 				bytes_read = 0;
-				rv = ECONNRESET;
 				break;
 			}
 		}

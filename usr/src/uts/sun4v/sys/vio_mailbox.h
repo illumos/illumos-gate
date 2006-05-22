@@ -146,6 +146,13 @@ typedef union vio_msg_tag {
  * tag.submsgtype = VIO_SUBTYPE_{INFO|ACK|NACK}
  * tag.subtype_env == VIO_VER_INFO
  */
+
+/* Structure to store a version tuple */
+typedef struct vio_ver {
+	uint16_t		major;		/* major version number */
+	uint16_t		minor;		/* minor version number */
+} vio_ver_t;
+
 typedef struct vio_ver_msg {
 	/* Common tag */
 	vio_msg_tag_t		tag;
@@ -161,6 +168,7 @@ typedef struct vio_ver_msg {
 	uint16_t		resv2;
 	uint64_t		resv3[VIO_PAYLOAD_ELEMS - 1];
 } vio_ver_msg_t;
+
 
 /*
  * VIO Descriptor Ring Register message.

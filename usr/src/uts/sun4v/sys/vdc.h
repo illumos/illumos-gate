@@ -68,13 +68,6 @@ extern "C" {
 #define	VDC_HANDSHAKE_STOP	0x2000	/* stop further handshakes */
 
 /*
- * Bit-field values to indicate status of local DRing entry
- *
- * The lowest 8 bits are reserved for the DRing state.
- */
-#define	VDC_ALLOC_HANDLE	0x10
-
-/*
  * Definitions of strings to be used to create device node properties.
  * (vdc uses the capitalised versions of these properties as they are 64-bit)
  */
@@ -100,7 +93,7 @@ extern "C" {
  * variables controlling how long to wait before timing out and how many
  * retries to attempt before giving up when communicating with vds.
  */
-#define	VDC_RETRIES	10
+#define	VDC_RETRIES	3
 
 #define	VDC_USEC_TIMEOUT_MIN	(30 * MICROSEC)		/* 30 sec */
 
@@ -133,7 +126,7 @@ extern "C" {
 #define	VDC_INIT_DRING_DATA_MSG_IDS(dmsg, vdc)		\
 		ASSERT(vdc != NULL);			\
 		dmsg.tag.vio_sid = vdc->session_id;	\
-		dmsg.seq_num = ++(vdc->seq_num);
+		dmsg.seq_num = vdc->seq_num;
 
 /*
  * The states the message processing thread can be in.
@@ -175,9 +168,11 @@ typedef struct vdc {
 	dev_info_t	*dip;		/* device info pointer */
 	int		instance;	/* driver instance number */
 	int		initialized;	/* keeps track of what's init'ed */
+	int		hshake_cnt;	/* number of failed handshakes */
 	int		open;		/* count of outstanding opens */
 	int		dkio_flush_pending;	/* # outstanding DKIO flushes */
 
+	vio_ver_t	ver;		/* version number agreed with server */
 	uint64_t	session_id;	/* common ID sent with all messages */
 	uint64_t	seq_num;	/* most recent sequence num generated */
 	uint64_t	seq_num_reply;	/* Last seq num ACK/NACK'ed by vds */
@@ -187,6 +182,7 @@ typedef struct vdc {
 	uint64_t	vdisk_size;	/* device size in bytes */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
 	uint64_t	block_size;	/* device block size used */
+	struct dk_label	*label;		/* structure to store disk label */
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
 	struct vtoc	*vtoc;		/* structure to store VTOC data */

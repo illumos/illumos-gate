@@ -146,45 +146,131 @@ typedef struct vd_dring_entry {
  */
 
 /*
- * VTOC message
- *
- * vDisk Get Volume Table of Contents (VD_OP_GET_VTOC)
- *
+ * vDisk geometry definition (VD_OP_GET_DISKGEOM and VD_OP_SET_DISKGEOM)
+ */
+typedef struct vd_geom {
+	uint16_t	ncyl;		/* number of data cylinders */
+	uint16_t	acyl;		/* number of alternate cylinders */
+	uint16_t	bcyl;		/* cyl offset for fixed head area */
+	uint16_t	nhead;		/* number of heads */
+	uint16_t	nsect;		/* number of data sectors per track */
+	uint16_t	intrlv;		/* interleave factor */
+	uint16_t	apc;		/* alternates per cyl (SCSI only) */
+	uint16_t	rpm;		/* revolutions per minute */
+	uint16_t	pcyl;		/* number of physical cylinders */
+	uint16_t	write_reinstruct;	/* # sectors to skip, writes */
+	uint16_t	read_reinstruct;	/* # sectors to skip, reads */
+} vd_geom_t;
+
+
+/*
+ * vDisk partition definition
  */
 typedef struct vd_partition {
-	uint16_t	p_tag;		/* ID tag of partition */
-	uint16_t	p_flag;		/* permision flags */
+	uint16_t	id_tag;		/* ID tag of partition */
+	uint16_t	perm;		/* permission flags for partition */
 	uint32_t	reserved;	/* padding */
-	int64_t		p_start;	/* start sector no of partition */
-	int64_t		p_size;		/* # of blocks in partition */
+	uint64_t	start;		/* block number of partition start */
+	uint64_t	nblocks;	/* number of blocks in partition */
 } vd_partition_t;
 
+/*
+ * vDisk VTOC definition (VD_OP_GET_VTOC and VD_OP_SET_VTOC)
+ */
+#define	VD_VOLNAME_LEN		8	/* length of volume_name field */
+#define	VD_ASCIILABEL_LEN	128	/* length of ascii_label field */
 typedef struct vd_vtoc {
-	uint8_t		v_volume[LEN_DKL_VVOL]; /* volume name */
-	uint16_t	v_sectorsz;		/* sector size in bytes */
-	uint16_t	v_nparts;		/* num of partitions */
-	uint32_t	reserved;		/* padding */
-	uint8_t		v_asciilabel[LEN_DKL_ASCII];    /* for compatibility */
-
+	char		volume_name[VD_VOLNAME_LEN];	/* volume name */
+	uint16_t	sector_size;		/* sector size in bytes */
+	uint16_t	num_partitions;		/* number of partitions */
+	char		ascii_label[VD_ASCIILABEL_LEN];	/* ASCII label */
+	vd_partition_t	partition[V_NUMPAR];	/* partition headers */
 } vd_vtoc_t;
 
 
 /*
- * vDisk Get Geometry (VD_OP_GET_GEOM)
+ * Copy the contents of a vd_geom_t to the contents of a dk_geom struct
  */
-typedef struct vd_geom {
-	uint16_t	dkg_ncyl;	/* # of data cylinders */
-	uint16_t	dkg_acyl;	/* # of alternate cylinders */
-	uint16_t	dkg_bcyl;	/* cyl offset (for fixed head area) */
-	uint16_t	dkg_nhead;	/* # of heads */
-	uint16_t	dkg_nsect;	/* # of data sectors per track */
-	uint16_t	dkg_intrlv;	/* interleave factor */
-	uint16_t	dkg_apc;	/* alternates per cyl (SCSI only) */
-	uint16_t	dkg_rpm;	/* revolutions per minute */
-	uint16_t	dkg_pcyl;	/* # of physical cylinders */
-	uint16_t	dkg_write_reinstruct;	/* # sectors to skip, writes */
-	uint16_t	dkg_read_reinstruct;	/* # sectors to skip, reads */
-} vd_geom_t;
+#define	VD_GEOM2DK_GEOM(vd_geom, dk_geom)				\
+{									\
+	bzero((dk_geom), sizeof (*(dk_geom)));				\
+	(dk_geom)->dkg_ncyl		= (vd_geom)->ncyl;		\
+	(dk_geom)->dkg_acyl		= (vd_geom)->acyl;		\
+	(dk_geom)->dkg_bcyl		= (vd_geom)->bcyl;		\
+	(dk_geom)->dkg_nhead		= (vd_geom)->nhead;		\
+	(dk_geom)->dkg_nsect		= (vd_geom)->nsect;		\
+	(dk_geom)->dkg_intrlv		= (vd_geom)->intrlv;		\
+	(dk_geom)->dkg_apc		= (vd_geom)->apc;		\
+	(dk_geom)->dkg_rpm		= (vd_geom)->rpm;		\
+	(dk_geom)->dkg_pcyl		= (vd_geom)->pcyl;		\
+	(dk_geom)->dkg_write_reinstruct	= (vd_geom)->write_reinstruct;	\
+	(dk_geom)->dkg_read_reinstruct	= (vd_geom)->read_reinstruct;	\
+}
+
+/*
+ * Copy the contents of a vd_vtoc_t to the contents of a vtoc struct
+ */
+#define	VD_VTOC2VTOC(vd_vtoc, vtoc)					\
+{									\
+	bzero((vtoc), sizeof (*(vtoc)));				\
+	bcopy((vd_vtoc)->volume_name, (vtoc)->v_volume,			\
+	    MIN(sizeof ((vd_vtoc)->volume_name),			\
+		sizeof ((vtoc)->v_volume)));				\
+	bcopy((vd_vtoc)->ascii_label, (vtoc)->v_asciilabel,		\
+	    MIN(sizeof ((vd_vtoc)->ascii_label),			\
+		sizeof ((vtoc)->v_asciilabel)));			\
+	(vtoc)->v_sanity	= VTOC_SANE;				\
+	(vtoc)->v_version	= V_VERSION;				\
+	(vtoc)->v_sectorsz	= (vd_vtoc)->sector_size;		\
+	(vtoc)->v_nparts	= (vd_vtoc)->num_partitions;		\
+	for (int i = 0; i < (vd_vtoc)->num_partitions; i++) {		\
+		(vtoc)->v_part[i].p_tag	= (vd_vtoc)->partition[i].id_tag; \
+		(vtoc)->v_part[i].p_flag = (vd_vtoc)->partition[i].perm; \
+		(vtoc)->v_part[i].p_start = (vd_vtoc)->partition[i].start; \
+		(vtoc)->v_part[i].p_size = (vd_vtoc)->partition[i].nblocks; \
+	}								\
+}
+
+/*
+ * Copy the contents of a dk_geom struct to the contents of a vd_geom_t
+ */
+#define	DK_GEOM2VD_GEOM(dk_geom, vd_geom)				\
+{									\
+	bzero((vd_geom), sizeof (*(vd_geom)));				\
+	(vd_geom)->ncyl			= (dk_geom)->dkg_ncyl;		\
+	(vd_geom)->acyl			= (dk_geom)->dkg_acyl;		\
+	(vd_geom)->bcyl			= (dk_geom)->dkg_bcyl;		\
+	(vd_geom)->nhead		= (dk_geom)->dkg_nhead;		\
+	(vd_geom)->nsect		= (dk_geom)->dkg_nsect;		\
+	(vd_geom)->intrlv		= (dk_geom)->dkg_intrlv;	\
+	(vd_geom)->apc			= (dk_geom)->dkg_apc;		\
+	(vd_geom)->rpm			= (dk_geom)->dkg_rpm;		\
+	(vd_geom)->pcyl			= (dk_geom)->dkg_pcyl;		\
+	(vd_geom)->write_reinstruct	= (dk_geom)->dkg_write_reinstruct; \
+	(vd_geom)->read_reinstruct	= (dk_geom)->dkg_read_reinstruct; \
+}
+
+/*
+ * Copy the contents of a vtoc struct to the contents of a vd_vtoc_t
+ */
+#define	VTOC2VD_VTOC(vtoc, vd_vtoc)					\
+{									\
+	bzero((vd_vtoc), sizeof (*(vd_vtoc)));				\
+	bcopy((vtoc)->v_volume, (vd_vtoc)->volume_name,			\
+	    MIN(sizeof ((vtoc)->v_volume),				\
+		sizeof ((vd_vtoc)->volume_name)));			\
+	bcopy((vtoc)->v_asciilabel, (vd_vtoc)->ascii_label,		\
+	    MIN(sizeof ((vtoc)->v_asciilabel),				\
+		sizeof ((vd_vtoc)->ascii_label)));			\
+	(vd_vtoc)->sector_size			= (vtoc)->v_sectorsz;	\
+	(vd_vtoc)->num_partitions		= (vtoc)->v_nparts;	\
+	for (int i = 0; i < (vtoc)->v_nparts; i++) {			\
+		(vd_vtoc)->partition[i].id_tag	= (vtoc)->v_part[i].p_tag; \
+		(vd_vtoc)->partition[i].perm	= (vtoc)->v_part[i].p_flag; \
+		(vd_vtoc)->partition[i].start	= (vtoc)->v_part[i].p_start; \
+		(vd_vtoc)->partition[i].nblocks	= (vtoc)->v_part[i].p_size; \
+	}								\
+}
 
 
 #ifdef	__cplusplus

@@ -47,7 +47,6 @@
 #include <sys/vdsk_mailbox.h>
 #include <sys/vdsk_common.h>
 #include <sys/vtoc.h>
-#include <sys/scsi/impl/uscsi.h>
 
 
 /* Virtual disk server initialization flags */
@@ -178,14 +177,21 @@ typedef struct vds_operation {
 	int	(*function)(vd_t *vd, vd_dring_payload_t *request);
 } vds_operation_t;
 
-typedef struct ioctl {
-	uint8_t		operation;
-	const char	*operation_name;
-	int		cmd;
-	const char	*cmd_name;
-	uint_t		copy;
-	size_t		nbytes;
-} ioctl_t;
+typedef struct vd_ioctl {
+	uint8_t		operation;		/* vdisk operation */
+	const char	*operation_name;	/* vdisk operation name */
+	size_t		nbytes;			/* size of operation buffer */
+	int		cmd;			/* corresponding ioctl cmd */
+	const char	*cmd_name;		/* ioctl cmd name */
+	void		*arg;			/* ioctl cmd argument */
+	/* convert input vd_buf to output ioctl_arg */
+	void		(*copyin)(void *vd_buf, void *ioctl_arg);
+	/* convert input ioctl_arg to output vd_buf */
+	void		(*copyout)(void *ioctl_arg, void *vd_buf);
+} vd_ioctl_t;
+
+/* Define trivial copyin/copyout conversion function flag */
+#define	VD_IDENTITY	((void (*)(void *, void *))-1)
 
 
 static int	vds_ldc_retries = VDS_LDC_RETRIES;
@@ -193,6 +199,17 @@ static void	*vds_state;
 static uint64_t	vds_operations;	/* see vds_operation[] definition below */
 
 static int	vd_open_flags = VD_OPEN_FLAGS;
+
+/*
+ * Supported protocol version pairs, from highest (newest) to lowest (oldest)
+ *
+ * Each supported major version should appear only once, paired with (and only
+ * with) its highest supported minor version number (as the protocol requires
+ * supporting all lower minor version numbers as well)
+ */
+static const vio_ver_t	vds_version[] = {{1, 0}};
+static const size_t	vds_num_versions =
+    sizeof (vds_version)/sizeof (vds_version[0]);
 
 #ifdef DEBUG
 static int	vd_msglevel;
@@ -282,17 +299,41 @@ vd_bwrite(vd_t *vd, vd_dring_payload_t *request)
 	return (status);
 }
 
+static void
+vd_geom2dk_geom(void *vd_buf, void *ioctl_arg)
+{
+	VD_GEOM2DK_GEOM((vd_geom_t *)vd_buf, (struct dk_geom *)ioctl_arg);
+}
+
+static void
+vd_vtoc2vtoc(void *vd_buf, void *ioctl_arg)
+{
+	VD_VTOC2VTOC((vd_vtoc_t *)vd_buf, (struct vtoc *)ioctl_arg);
+}
+
+static void
+dk_geom2vd_geom(void *ioctl_arg, void *vd_buf)
+{
+	DK_GEOM2VD_GEOM((struct dk_geom *)ioctl_arg, (vd_geom_t *)vd_buf);
+}
+
+static void
+vtoc2vd_vtoc(void *ioctl_arg, void *vd_buf)
+{
+	VTOC2VD_VTOC((struct vtoc *)ioctl_arg, (vd_vtoc_t *)vd_buf);
+}
+
 static int
-vd_do_slice_ioctl(vd_t *vd, int cmd, void *buf)
+vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	switch (cmd) {
 	case DKIOCGGEOM:
-		ASSERT(buf != NULL);
-		bcopy(&vd->dk_geom, buf, sizeof (vd->dk_geom));
+		ASSERT(ioctl_arg != NULL);
+		bcopy(&vd->dk_geom, ioctl_arg, sizeof (vd->dk_geom));
 		return (0);
 	case DKIOCGVTOC:
-		ASSERT(buf != NULL);
-		bcopy(&vd->vtoc, buf, sizeof (vd->vtoc));
+		ASSERT(ioctl_arg != NULL);
+		bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
 		return (0);
 	default:
 		return (ENOTSUP);
@@ -300,7 +341,7 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *buf)
 }
 
 static int
-vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
+vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 {
 	int	rval = 0, status;
 	size_t	nbytes = request->nbytes;	/* modifiable copy */
@@ -310,8 +351,8 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
 	ASSERT(request->slice < vd->nslices);
 	PR0("Performing %s", ioctl->operation_name);
 
-	/* Get data from client, if necessary */
-	if (ioctl->copy & VD_COPYIN)  {
+	/* Get data from client and convert, if necessary */
+	if (ioctl->copyin != NULL)  {
 		ASSERT(nbytes != 0 && buf != NULL);
 		PR1("Getting \"arg\" data from client");
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
@@ -321,6 +362,12 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
 			    "copying from client", status);
 			return (status);
 		}
+
+		/* Convert client's data, if necessary */
+		if (ioctl->copyin == VD_IDENTITY)	/* use client buffer */
+			ioctl->arg = buf;
+		else	/* convert client vdisk operation data to ioctl data */
+			(ioctl->copyin)(buf, (void *)ioctl->arg);
 	}
 
 	/*
@@ -328,10 +375,12 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
 	 * real driver perform the ioctl()
 	 */
 	if (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo) {
-		if ((status = vd_do_slice_ioctl(vd, ioctl->cmd, buf)) != 0)
+		if ((status = vd_do_slice_ioctl(vd, ioctl->cmd,
+			    (void *)ioctl->arg)) != 0)
 			return (status);
 	} else if ((status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    ioctl->cmd, (intptr_t)buf, FKIOCTL, kcred, &rval)) != 0) {
+		    ioctl->cmd, (intptr_t)ioctl->arg, FKIOCTL, kcred,
+		    &rval)) != 0) {
 		PR0("ldi_ioctl(%s) = errno %d", ioctl->cmd_name, status);
 		return (status);
 	}
@@ -342,10 +391,15 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
 	}
 #endif /* DEBUG */
 
-	/* Send data to client, if necessary */
-	if (ioctl->copy & VD_COPYOUT)  {
+	/* Convert data and send to client, if necessary */
+	if (ioctl->copyout != NULL)  {
 		ASSERT(nbytes != 0 && buf != NULL);
 		PR1("Sending \"arg\" data to client");
+
+		/* Convert ioctl data to vdisk operation data, if necessary */
+		if (ioctl->copyout != VD_IDENTITY)
+			(ioctl->copyout)((void *)ioctl->arg, buf);
+
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
 			    request->cookie, request->ncookies,
 			    LDC_COPY_OUT)) != 0) {
@@ -358,39 +412,113 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, ioctl_t *ioctl)
 	return (status);
 }
 
+/*
+ * Open any slices which have become non-empty as a result of performing a
+ * set-VTOC operation for the client.
+ *
+ * When serving a full disk, vds attempts to exclusively open all of the
+ * disk's slices to prevent another thread or process in the service domain
+ * from "stealing" a slice or from performing I/O to a slice while a vds
+ * client is accessing it.  Unfortunately, underlying drivers, such as sd(7d)
+ * and cmdk(7d), return an error when attempting to open the device file for a
+ * slice which is currently empty according to the VTOC.  This driver behavior
+ * means that vds must skip opening empty slices when initializing a vdisk for
+ * full-disk service and try to open slices that become non-empty (via a
+ * set-VTOC operation) during use of the full disk in order to begin serving
+ * such slices to the client.  This approach has an inherent (and therefore
+ * unavoidable) race condition; it also means that failure to open a
+ * newly-non-empty slice has different semantics than failure to open an
+ * initially-non-empty slice:  Due to driver bahavior, opening a
+ * newly-non-empty slice is a necessary side effect of vds performing a
+ * (successful) set-VTOC operation for a client on an in-service (and in-use)
+ * disk in order to begin serving the slice; failure of this side-effect
+ * operation does not mean that the client's set-VTOC operation failed or that
+ * operations on other slices must fail.  Therefore, this function prints an
+ * error message on failure to open a slice, but does not return an error to
+ * its caller--unlike failure to open a slice initially, which results in an
+ * error that prevents serving the vdisk (and thereby requires an
+ * administrator to resolve the problem).  Note that, apart from another
+ * thread or process opening a new slice during the race-condition window,
+ * failure to open a slice in this function will likely indicate an underlying
+ * drive problem, which will also likely become evident in errors returned by
+ * operations on other slices, and which will require administrative
+ * intervention and possibly servicing the drive.
+ */
+static void
+vd_open_new_slices(vd_t *vd)
+{
+	int		rval, status;
+	struct vtoc	vtoc;
+
+
+	/* Get the (new) VTOC for updated slice sizes */
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
+		    FKIOCTL, kcred, &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
+		return;
+	}
+
+	/* Open any newly-non-empty slices */
+	for (int slice = 0; slice < vd->nslices; slice++) {
+		/* Skip zero-length slices */
+		if (vtoc.v_part[slice].p_size == 0) {
+			if (vd->ldi_handle[slice] != NULL)
+				PR0("Open slice %u now has zero length", slice);
+			continue;
+		}
+
+		/* Skip already-open slices */
+		if (vd->ldi_handle[slice] != NULL)
+			continue;
+
+		PR0("Opening newly-non-empty slice %u", slice);
+		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
+			    vd_open_flags, kcred, &vd->ldi_handle[slice],
+			    vd->vds->ldi_ident)) != 0) {
+			PRN("ldi_open_by_dev() returned errno %d "
+			    "for slice %u", status, slice);
+		}
+	}
+}
+
 #define	RNDSIZE(expr) P2ROUNDUP(sizeof (expr), sizeof (uint64_t))
 static int
 vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
 {
-	static ioctl_t	ioctl[] = {
-		/* Command (no-copy) operations */
-		{VD_OP_FLUSH, STRINGIZE(VD_OP_FLUSH), DKIOCFLUSHWRITECACHE,
-		    STRINGIZE(DKIOCFLUSHWRITECACHE), 0, 0},
-
-		/* "Get" (copy-out) operations */
-		{VD_OP_GET_WCE, STRINGIZE(VD_OP_GET_WCE), DKIOCGETWCE,
-		    STRINGIZE(DKIOCGETWCE), VD_COPYOUT, RNDSIZE(int)},
-		{VD_OP_GET_DISKGEOM, STRINGIZE(VD_OP_GET_DISKGEOM), DKIOCGGEOM,
-		    STRINGIZE(DKIOCGGEOM), VD_COPYOUT, RNDSIZE(struct dk_geom)},
-		{VD_OP_GET_VTOC, STRINGIZE(VD_OP_GET_VTOC), DKIOCGVTOC,
-		    STRINGIZE(DKIOCGVTOC), VD_COPYOUT, RNDSIZE(struct vtoc)},
-
-		/* "Set" (copy-in) operations */
-		{VD_OP_SET_WCE, STRINGIZE(VD_OP_SET_WCE), DKIOCSETWCE,
-		    STRINGIZE(DKIOCSETWCE), VD_COPYOUT, RNDSIZE(int)},
-		{VD_OP_SET_DISKGEOM, STRINGIZE(VD_OP_SET_DISKGEOM), DKIOCSGEOM,
-		    STRINGIZE(DKIOCSGEOM), VD_COPYIN, RNDSIZE(struct dk_geom)},
-		{VD_OP_SET_VTOC, STRINGIZE(VD_OP_SET_VTOC), DKIOCSVTOC,
-		    STRINGIZE(DKIOCSVTOC), VD_COPYIN, RNDSIZE(struct vtoc)},
-
-		/* "Get/set" (copy-in/copy-out) operations */
-		{VD_OP_SCSICMD, STRINGIZE(VD_OP_SCSICMD), USCSICMD,
-		    STRINGIZE(USCSICMD), VD_COPYIN|VD_COPYOUT,
-		    RNDSIZE(struct uscsi_cmd)}
-
-	};
 	int		i, status;
 	void		*buf = NULL;
+	struct dk_geom	dk_geom = {0};
+	struct vtoc	vtoc = {0};
+	vd_ioctl_t	ioctl[] = {
+		/* Command (no-copy) operations */
+		{VD_OP_FLUSH, STRINGIZE(VD_OP_FLUSH), 0,
+		    DKIOCFLUSHWRITECACHE, STRINGIZE(DKIOCFLUSHWRITECACHE),
+		    NULL, NULL, NULL},
+
+		/* "Get" (copy-out) operations */
+		{VD_OP_GET_WCE, STRINGIZE(VD_OP_GET_WCE), RNDSIZE(int),
+		    DKIOCGETWCE, STRINGIZE(DKIOCGETWCE),
+		    NULL, NULL, VD_IDENTITY},
+		{VD_OP_GET_DISKGEOM, STRINGIZE(VD_OP_GET_DISKGEOM),
+		    RNDSIZE(vd_geom_t),
+		    DKIOCGGEOM, STRINGIZE(DKIOCGGEOM),
+		    &dk_geom, NULL, dk_geom2vd_geom},
+		{VD_OP_GET_VTOC, STRINGIZE(VD_OP_GET_VTOC), RNDSIZE(vd_vtoc_t),
+		    DKIOCGVTOC, STRINGIZE(DKIOCGVTOC),
+		    &vtoc, NULL, vtoc2vd_vtoc},
+
+		/* "Set" (copy-in) operations */
+		{VD_OP_SET_WCE, STRINGIZE(VD_OP_SET_WCE), RNDSIZE(int),
+		    DKIOCSETWCE, STRINGIZE(DKIOCSETWCE),
+		    NULL, VD_IDENTITY, NULL},
+		{VD_OP_SET_DISKGEOM, STRINGIZE(VD_OP_SET_DISKGEOM),
+		    RNDSIZE(vd_geom_t),
+		    DKIOCSGEOM, STRINGIZE(DKIOCSGEOM),
+		    &dk_geom, vd_geom2dk_geom, NULL},
+		{VD_OP_SET_VTOC, STRINGIZE(VD_OP_SET_VTOC), RNDSIZE(vd_vtoc_t),
+		    DKIOCSVTOC, STRINGIZE(DKIOCSVTOC),
+		    &vtoc, vd_vtoc2vtoc, NULL},
+	};
 	size_t		nioctls = (sizeof (ioctl))/(sizeof (ioctl[0]));
 
 
@@ -403,15 +531,13 @@ vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
 	 */
 	for (i = 0; i < nioctls; i++) {
 		if (request->operation == ioctl[i].operation) {
-			if (request->nbytes > ioctl[i].nbytes) {
-				PRN("%s:  Expected <= %lu \"nbytes\", "
-				    "got %lu", ioctl[i].operation_name,
-				    ioctl[i].nbytes, request->nbytes);
-				return (EINVAL);
-			} else if ((request->nbytes % sizeof (uint64_t)) != 0) {
-				PRN("%s:  nbytes = %lu not a multiple of %lu",
-				    ioctl[i].operation_name, request->nbytes,
-				    sizeof (uint64_t));
+			/* LDC memory operations require 8-byte multiples */
+			ASSERT(ioctl[i].nbytes % sizeof (uint64_t) == 0);
+
+			if (request->nbytes != ioctl[i].nbytes) {
+				PRN("%s:  Expected nbytes = %lu, got %lu",
+				    ioctl[i].operation_name, ioctl[i].nbytes,
+				    request->nbytes);
 				return (EINVAL);
 			}
 
@@ -425,6 +551,9 @@ vd_ioctl(vd_t *vd, vd_dring_payload_t *request)
 	status = vd_do_ioctl(vd, request, buf, &ioctl[i]);
 	if (request->nbytes)
 		kmem_free(buf, request->nbytes);
+	if ((request->operation == VD_OP_SET_VTOC) &&
+	    (vd->vdisk_type == VD_DISK_TYPE_DISK))
+		vd_open_new_slices(vd);
 	return (status);
 }
 
@@ -441,8 +570,7 @@ static const vds_operation_t	vds_operation[] = {
 	{VD_OP_GET_VTOC,	vd_ioctl},
 	{VD_OP_SET_VTOC,	vd_ioctl},
 	{VD_OP_GET_DISKGEOM,	vd_ioctl},
-	{VD_OP_SET_DISKGEOM,	vd_ioctl},
-	{VD_OP_SCSICMD,		vd_ioctl}
+	{VD_OP_SET_DISKGEOM,	vd_ioctl}
 };
 
 static const size_t	vds_noperations =
@@ -505,19 +633,83 @@ send_msg(ldc_handle_t ldc_handle, void *msg, size_t msglen)
 }
 
 /*
- * Return 1 if the "type", "subtype", and "env" fields of the "tag" first
- * argument match the corresponding remaining arguments; otherwise, return 0
+ * Return true if the "type", "subtype", and "env" fields of the "tag" first
+ * argument match the corresponding remaining arguments; otherwise, return false
  */
-int
+boolean_t
 vd_msgtype(vio_msg_tag_t *tag, int type, int subtype, int env)
 {
 	return ((tag->vio_msgtype == type) &&
 		(tag->vio_subtype == subtype) &&
-		(tag->vio_subtype_env == env)) ? 1 : 0;
+		(tag->vio_subtype_env == env)) ? B_TRUE : B_FALSE;
 }
 
+/*
+ * Check whether the major/minor version specified in "ver_msg" is supported
+ * by this server.
+ */
+static boolean_t
+vds_supported_version(vio_ver_msg_t *ver_msg)
+{
+	for (int i = 0; i < vds_num_versions; i++) {
+		ASSERT(vds_version[i].major > 0);
+		ASSERT((i == 0) ||
+		    (vds_version[i].major < vds_version[i-1].major));
+
+		/*
+		 * If the major versions match, adjust the minor version, if
+		 * necessary, down to the highest value supported by this
+		 * server and return true so this message will get "ack"ed;
+		 * the client should also support all minor versions lower
+		 * than the value it sent
+		 */
+		if (ver_msg->ver_major == vds_version[i].major) {
+			if (ver_msg->ver_minor > vds_version[i].minor) {
+				PR0("Adjusting minor version from %u to %u",
+				    ver_msg->ver_minor, vds_version[i].minor);
+				ver_msg->ver_minor = vds_version[i].minor;
+			}
+			return (B_TRUE);
+		}
+
+		/*
+		 * If the message contains a higher major version number, set
+		 * the message's major/minor versions to the current values
+		 * and return false, so this message will get "nack"ed with
+		 * these values, and the client will potentially try again
+		 * with the same or a lower version
+		 */
+		if (ver_msg->ver_major > vds_version[i].major) {
+			ver_msg->ver_major = vds_version[i].major;
+			ver_msg->ver_minor = vds_version[i].minor;
+			return (B_FALSE);
+		}
+
+		/*
+		 * Otherwise, the message's major version is less than the
+		 * current major version, so continue the loop to the next
+		 * (lower) supported version
+		 */
+	}
+
+	/*
+	 * No common version was found; "ground" the version pair in the
+	 * message to terminate negotiation
+	 */
+	ver_msg->ver_major = 0;
+	ver_msg->ver_minor = 0;
+	return (B_FALSE);
+}
+
+/*
+ * Process a version message from a client.  vds expects to receive version
+ * messages from clients seeking service, but never issues version messages
+ * itself; therefore, vds can ACK or NACK client version messages, but does
+ * not expect to receive version-message ACKs or NACKs (and will treat such
+ * messages as invalid).
+ */
 static int
-process_ver_msg(vio_msg_t *msg, size_t msglen)
+vd_process_ver_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 {
 	vio_ver_msg_t	*ver_msg = (vio_ver_msg_t *)msg;
 
@@ -541,16 +733,46 @@ process_ver_msg(vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
-	if ((ver_msg->ver_major != VD_VER_MAJOR) ||
-	    (ver_msg->ver_minor != VD_VER_MINOR)) {
-		/* Unsupported version; send back supported version */
-		ver_msg->ver_major = VD_VER_MAJOR;
-		ver_msg->ver_minor = VD_VER_MINOR;
-		return (EBADMSG);
-	}
-
-	/* Valid message, version accepted */
+	/*
+	 * We're talking to the expected kind of client; set our device class
+	 * for "ack/nack" back to the client
+	 */
 	ver_msg->dev_class = VDEV_DISK_SERVER;
+
+	/*
+	 * Check whether the (valid) version message specifies a version
+	 * supported by this server.  If the version is not supported, return
+	 * EBADMSG so the message will get "nack"ed; vds_supported_version()
+	 * will have updated the message with a supported version for the
+	 * client to consider
+	 */
+	if (!vds_supported_version(ver_msg))
+		return (EBADMSG);
+
+
+	/*
+	 * A version has been agreed upon; use the client's SID for
+	 * communication on this channel now
+	 */
+	ASSERT(!(vd->initialized & VD_SID));
+	vd->sid = ver_msg->tag.vio_sid;
+	vd->initialized |= VD_SID;
+
+	/*
+	 * When multiple versions are supported, this function should store
+	 * the negotiated major and minor version values in the "vd" data
+	 * structure to govern further communication; in particular, note that
+	 * the client might have specified a lower minor version for the
+	 * agreed major version than specifed in the vds_version[] array.  The
+	 * following assertions should help remind future maintainers to make
+	 * the appropriate changes to support multiple versions.
+	 */
+	ASSERT(vds_num_versions == 1);
+	ASSERT(ver_msg->ver_major == vds_version[0].major);
+	ASSERT(ver_msg->ver_minor == vds_version[0].minor);
+
+	PR0("Using major version %u, minor version %u",
+	    ver_msg->ver_major, ver_msg->ver_minor);
 	return (0);
 }
 
@@ -598,7 +820,6 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * "max_xfer_sz" isn't an integral multiple of the page size.
 		 * Must first get the maximum transfer size in bytes.
 		 */
-#if 1	/* NEWOBP */
 		size_t	max_xfer_bytes = attr_msg->vdisk_block_size ?
 		    attr_msg->vdisk_block_size*attr_msg->max_xfer_sz :
 		    attr_msg->max_xfer_sz;
@@ -607,13 +828,6 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		    ((max_xfer_bytes/PAGESIZE +
 			((max_xfer_bytes % PAGESIZE) ? 1 : 0))*
 			(sizeof (ldc_mem_cookie_t)));
-#else	/* NEWOBP */
-		size_t	max_inband_msglen =
-		    sizeof (vd_dring_inband_msg_t) +
-		    ((attr_msg->max_xfer_sz/PAGESIZE
-			+ (attr_msg->max_xfer_sz % PAGESIZE ? 1 : 0))*
-			(sizeof (ldc_mem_cookie_t)));
-#endif	/* NEWOBP */
 
 		/*
 		 * Set the maximum expected message length to
@@ -710,7 +924,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 	if (dring_minfo.vaddr == NULL) {
 		PRN("Descriptor ring virtual address is NULL");
-		return (EBADMSG);	/* FIXME appropriate status? */
+		return (ENXIO);
 	}
 
 
@@ -753,7 +967,6 @@ vd_process_dring_unreg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
-	/* FIXME set ack in unreg_msg? */
 	return (0);
 }
 
@@ -1005,12 +1218,7 @@ recv_msg(ldc_handle_t ldc_handle, void *msg, size_t *nbytes)
 {
 	int	retry, status;
 	size_t	size = *nbytes;
-	boolean_t	isempty = B_FALSE;
 
-
-	/* FIXME work around interrupt problem */
-	if ((ldc_chkq(ldc_handle, &isempty) != 0) || isempty)
-		return (ENOMSG);
 
 	for (retry = 0, status = ETIMEDOUT;
 	    retry < vds_ldc_retries && status == ETIMEDOUT;
@@ -1058,13 +1266,8 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	 */
 	switch (vd->state) {
 	case VD_STATE_INIT:	/* expect version message */
-		if ((status = process_ver_msg(msg, msglen)) != 0)
+		if ((status = vd_process_ver_msg(vd, msg, msglen)) != 0)
 			return (status);
-
-		/* The first version message sets the SID */
-		ASSERT(!(vd->initialized & VD_SID));
-		vd->sid = msg->tag.vio_sid;
-		vd->initialized |= VD_SID;
 
 		/* Version negotiated, move to that state */
 		vd->state = VD_STATE_VER;
@@ -1226,25 +1429,63 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 }
 
 static void
-vd_process_queue(void *arg)
+vd_recv_msg(void *arg)
 {
-	vd_t		*vd = (vd_t *)arg;
-	size_t		max_msglen, nbytes;
-	vio_msg_t	*vio_msg;
+	vd_t	*vd = (vd_t *)arg;
+	int	status = 0;
 
 
 	PR2("Entered");
 	ASSERT(vd != NULL);
 	mutex_enter(&vd->lock);
-	max_msglen = vd->max_msglen;	/* vd->maxmsglen can change */
-	vio_msg = kmem_alloc(max_msglen, KM_SLEEP);
-	for (nbytes = vd->max_msglen;
-		vd->enabled && recv_msg(vd->ldc_handle, vio_msg, &nbytes) == 0;
-		nbytes = vd->max_msglen)
-		vd_process_msg(vd, vio_msg, nbytes);
-	kmem_free(vio_msg, max_msglen);
+	/*
+	 * Receive and process any messages in the LDC queue; max_msglen is
+	 * reset each time through the loop, as vd->max_msglen can increase
+	 * during connection handshake
+	 */
+	for (size_t max_msglen = vd->max_msglen;
+	    vd->enabled && status == 0;
+	    max_msglen = vd->max_msglen) {
+		size_t		msglen = max_msglen;
+		vio_msg_t	*vio_msg = kmem_alloc(max_msglen, KM_SLEEP);
+
+		if ((status = recv_msg(vd->ldc_handle, vio_msg, &msglen)) == 0)
+			vd_process_msg(vd, vio_msg, msglen);
+		else if (status != ENOMSG)
+			vd_reset_connection(vd, B_TRUE);
+		kmem_free(vio_msg, max_msglen);
+	}
 	mutex_exit(&vd->lock);
 	PR2("Returning");
+}
+
+static uint_t
+vd_do_handle_ldc_events(vd_t *vd, uint64_t event)
+{
+	ASSERT(mutex_owned(&vd->lock));
+
+	if (!vd->enabled)
+		return (LDC_SUCCESS);
+
+	if (event & LDC_EVT_RESET) {
+		PR0("Channel was reset");
+		return (LDC_SUCCESS);
+	}
+
+	if (event & LDC_EVT_UP) {
+		/* Reset the connection state when channel comes (back) up */
+		vd_reset_connection(vd, B_FALSE);
+	}
+
+	if (event & LDC_EVT_READ) {
+		PR1("New data available");
+		/* Queue a task to receive the new data */
+		if (ddi_taskq_dispatch(vd->taskq, vd_recv_msg, vd, DDI_SLEEP) !=
+		    DDI_SUCCESS)
+			PRN("Unable to dispatch vd_recv_msg()");
+	}
+
+	return (LDC_SUCCESS);
 }
 
 static uint_t
@@ -1256,24 +1497,9 @@ vd_handle_ldc_events(uint64_t event, caddr_t arg)
 
 	ASSERT(vd != NULL);
 	mutex_enter(&vd->lock);
-	if (event & LDC_EVT_READ) {
-		PR1("New packet(s) available");
-		/* Queue a task to process the new data */
-		if (ddi_taskq_dispatch(vd->taskq, vd_process_queue, vd, 0) !=
-		    DDI_SUCCESS)
-			PRN("Unable to dispatch vd_process_queue()");
-	} else if (event & LDC_EVT_RESET) {
-		PR0("Attempting to bring up reset channel");
-		if (((status = ldc_up(vd->ldc_handle)) != 0) &&
-		    (status != ECONNREFUSED)) {
-			PRN("ldc_up() returned errno %d", status);
-		}
-	} else if (event & LDC_EVT_UP) {
-		/* Reset the connection state when channel comes (back) up */
-		vd_reset_connection(vd, B_FALSE);
-	}
+	status = vd_do_handle_ldc_events(vd, event);
 	mutex_exit(&vd->lock);
-	return (LDC_SUCCESS);
+	return (status);
 }
 
 static uint_t
@@ -1348,20 +1574,104 @@ is_pseudo_device(dev_info_t *dip)
 }
 
 static int
-vd_get_params(ldi_handle_t lh, char *block_device, vd_t *vd)
+vd_setup_full_disk(vd_t *vd)
+{
+	int		rval, status;
+	major_t		major = getmajor(vd->dev[0]);
+	minor_t		minor = getminor(vd->dev[0]) - VD_ENTIRE_DISK_SLICE;
+	struct vtoc	vtoc;
+
+
+	/* Get the VTOC for slice sizes */
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vtoc,
+		    FKIOCTL, kcred, &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d", status);
+		return (status);
+	}
+
+	/* Set full-disk parameters */
+	vd->vdisk_type	= VD_DISK_TYPE_DISK;
+	vd->nslices	= (sizeof (vd->dev))/(sizeof (vd->dev[0]));
+
+	/* Move dev number and LDI handle to entire-disk-slice array elements */
+	vd->dev[VD_ENTIRE_DISK_SLICE]		= vd->dev[0];
+	vd->dev[0]				= 0;
+	vd->ldi_handle[VD_ENTIRE_DISK_SLICE]	= vd->ldi_handle[0];
+	vd->ldi_handle[0]			= NULL;
+
+	/* Initialize device numbers for remaining slices and open them */
+	for (int slice = 0; slice < vd->nslices; slice++) {
+		/*
+		 * Skip the entire-disk slice, as it's already open and its
+		 * device known
+		 */
+		if (slice == VD_ENTIRE_DISK_SLICE)
+			continue;
+		ASSERT(vd->dev[slice] == 0);
+		ASSERT(vd->ldi_handle[slice] == NULL);
+
+		/*
+		 * Construct the device number for the current slice
+		 */
+		vd->dev[slice] = makedevice(major, (minor + slice));
+
+		/*
+		 * At least some underlying drivers refuse to open
+		 * devices for (currently) zero-length slices, so skip
+		 * them for now
+		 */
+		if (vtoc.v_part[slice].p_size == 0) {
+			PR0("Skipping zero-length slice %u", slice);
+			continue;
+		}
+
+		/*
+		 * Open all non-empty slices of the disk to serve them to the
+		 * client.  Slices are opened exclusively to prevent other
+		 * threads or processes in the service domain from performing
+		 * I/O to slices being accessed by a client.  Failure to open
+		 * a slice results in vds not serving this disk, as the client
+		 * could attempt (and should be able) to access any non-empty
+		 * slice immediately.  Any slices successfully opened before a
+		 * failure will get closed by vds_destroy_vd() as a result of
+		 * the error returned by this function.
+		 */
+		PR0("Opening device major %u, minor %u = slice %u",
+		    major, minor, slice);
+		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
+			    vd_open_flags, kcred, &vd->ldi_handle[slice],
+			    vd->vds->ldi_ident)) != 0) {
+			PRN("ldi_open_by_dev() returned errno %d "
+			    "for slice %u", status, slice);
+			/* vds_destroy_vd() will close any open slices */
+			return (status);
+		}
+	}
+
+	return (0);
+}
+
+static int
+vd_setup_vd(char *block_device, vd_t *vd)
 {
 	int		otyp, rval, status;
 	dev_info_t	*dip;
 	struct dk_cinfo	dk_cinfo;
 
 
+	if ((status = ldi_open_by_name(block_device, vd_open_flags, kcred,
+		    &vd->ldi_handle[0], vd->vds->ldi_ident)) != 0) {
+		PRN("ldi_open_by_name(%s) = errno %d", block_device, status);
+		return (status);
+	}
+
 	/* Get block device's device number, otyp, and size */
-	if ((status = ldi_get_dev(lh, &vd->dev[0])) != 0) {
+	if ((status = ldi_get_dev(vd->ldi_handle[0], &vd->dev[0])) != 0) {
 		PRN("ldi_get_dev() returned errno %d for %s",
 		    status, block_device);
 		return (status);
 	}
-	if ((status = ldi_get_otyp(lh, &otyp)) != 0) {
+	if ((status = ldi_get_otyp(vd->ldi_handle[0], &otyp)) != 0) {
 		PRN("ldi_get_otyp() returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1370,7 +1680,7 @@ vd_get_params(ldi_handle_t lh, char *block_device, vd_t *vd)
 		PRN("Cannot serve non-block device %s", block_device);
 		return (ENOTBLK);
 	}
-	if (ldi_get_size(lh, &vd->vdisk_size) != DDI_SUCCESS) {
+	if (ldi_get_size(vd->ldi_handle[0], &vd->vdisk_size) != DDI_SUCCESS) {
 		PRN("ldi_get_size() failed for %s", block_device);
 		return (EIO);
 	}
@@ -1390,8 +1700,8 @@ vd_get_params(ldi_handle_t lh, char *block_device, vd_t *vd)
 	}
 
 	/* Get dk_cinfo to determine slice of backing block device */
-	if ((status = ldi_ioctl(lh, DKIOCINFO, (intptr_t)&dk_cinfo,
-		    FKIOCTL, kcred, &rval)) != 0) {
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
+		    (intptr_t)&dk_cinfo, FKIOCTL, kcred, &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1403,27 +1713,20 @@ vd_get_params(ldi_handle_t lh, char *block_device, vd_t *vd)
 		return (EIO);
 	}
 
-	/* If block device slice is entire disk, fill in all slice devices */
-	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE) {
-		uint_t	slice;
-		major_t	major = getmajor(vd->dev[0]);
-		minor_t	minor = getminor(vd->dev[0]) - VD_ENTIRE_DISK_SLICE;
 
-		vd->vdisk_type	= VD_DISK_TYPE_DISK;
-		vd->nslices	= V_NUMPAR;
-		for (slice = 0; slice < vd->nslices; slice++)
-			vd->dev[slice] = makedevice(major, (minor + slice));
-		return (0);	/* ...and we're done */
-	}
+	/* If slice is entire-disk slice, initialize for full disk */
+	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE)
+		return (vd_setup_full_disk(vd));
 
-	/* Otherwise, we have a (partial) slice of a block device */
+
+	/* Otherwise, we have a non-entire slice of a block device */
 	vd->vdisk_type	= VD_DISK_TYPE_SLICE;
 	vd->nslices	= 1;
 
 
 	/* Initialize dk_geom structure for single-slice block device */
-	if ((status = ldi_ioctl(lh, DKIOCGGEOM, (intptr_t)&vd->dk_geom,
-		    FKIOCTL, kcred, &rval)) != 0) {
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
+		    (intptr_t)&vd->dk_geom, FKIOCTL, kcred, &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1443,8 +1746,8 @@ vd_get_params(ldi_handle_t lh, char *block_device, vd_t *vd)
 
 
 	/* Initialize vtoc structure for single-slice block device */
-	if ((status = ldi_ioctl(lh, DKIOCGVTOC, (intptr_t)&vd->vtoc,
-		    FKIOCTL, kcred, &rval)) != 0) {
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
+		    (intptr_t)&vd->vtoc, FKIOCTL, kcred, &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCGVTOC) returned errno %d for %s",
 		    status, block_device);
 		return (status);
@@ -1469,11 +1772,9 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
     vd_t **vdp)
 {
 	char			tq_name[TASKQ_NAMELEN];
-	int			param_status, status;
-	uint_t			slice;
+	int			status;
 	ddi_iblock_cookie_t	iblock = NULL;
 	ldc_attr_t		ldc_attr;
-	ldi_handle_t		lh = NULL;
 	vd_t			*vd;
 
 
@@ -1490,19 +1791,9 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 	vd->vds = vds;
 
 
-	/* Get device parameters */
-	if ((status = ldi_open_by_name(block_device, FREAD, kcred, &lh,
-		    vds->ldi_ident)) != 0) {
-		PRN("ldi_open_by_name(%s) = errno %d", block_device, status);
+	/* Open vdisk and initialize parameters */
+	if ((status = vd_setup_vd(block_device, vd)) != 0)
 		return (status);
-	}
-	param_status = vd_get_params(lh, block_device, vd);
-	if ((status = ldi_close(lh, FREAD, kcred)) != 0) {
-		PRN("ldi_close(%s) = errno %d", block_device, status);
-		return (status);
-	}
-	if (param_status != 0)
-		return (param_status);
 	ASSERT(vd->nslices > 0 && vd->nslices <= V_NUMPAR);
 	PR0("vdisk_type = %s, pseudo = %s, nslices = %u",
 	    ((vd->vdisk_type == VD_DISK_TYPE_DISK) ? "disk" : "slice"),
@@ -1518,24 +1809,6 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 
 	mutex_init(&vd->lock, NULL, MUTEX_DRIVER, iblock);
 	vd->initialized |= VD_LOCKING;
-
-
-	/* Open the backing-device slices */
-	for (slice = 0; slice < vd->nslices; slice++) {
-		ASSERT(vd->ldi_handle[slice] == NULL);
-		PR0("Opening device %u, minor %u = slice %u",
-		    getmajor(vd->dev[slice]), getminor(vd->dev[slice]), slice);
-		if ((status = ldi_open_by_dev(&vd->dev[slice], OTYP_BLK,
-			    vd_open_flags, kcred, &vd->ldi_handle[slice],
-			    vds->ldi_ident)) != 0) {
-			PRN("ldi_open_by_dev() returned errno %d for slice %u",
-			    status, slice);
-			/* vds_destroy_vd() will close any open slices */
-#if 0	/* FIXME */
-			return (status);
-#endif
-		}
-	}
 
 
 	/* Create the task queue for the vdisk */
@@ -1569,12 +1842,6 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *block_device, uint64_t ldc_id,
 
 	if ((status = ldc_open(vd->ldc_handle)) != 0) {
 		PRN("ldc_open() returned errno %d", status);
-		return (status);
-	}
-
-	if (((status = ldc_up(vd->ldc_handle)) != 0) &&
-	    (status != ECONNREFUSED)) {
-		PRN("ldc_up() returned errno %d", status);
 		return (status);
 	}
 
@@ -1786,7 +2053,7 @@ vds_change_vd(vds_t *vds, md_t *prev_md, mde_cookie_t prev_vd_node,
 		return;
 	}
 	if (curr_ldc_id != prev_ldc_id) {
-		_NOTE(NOTREACHED);	/* FIXME is there a better way? */
+		_NOTE(NOTREACHED);	/* lint is confused */
 		PRN("Not changing vdisk:  "
 		    "LDC ID changed from %lu to %lu", prev_ldc_id, curr_ldc_id);
 		return;
@@ -1921,6 +2188,13 @@ vds_do_attach(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 	vds->initialized |= VDS_MDEG;
+
+	/* Prevent auto-detaching so driver is available whenever MD changes */
+	if (ddi_prop_update_int(DDI_DEV_T_NONE, dip, DDI_NO_AUTODETACH, 1) !=
+	    DDI_PROP_SUCCESS) {
+		PRN("failed to set \"%s\" property for instance %u",
+		    DDI_NO_AUTODETACH, instance);
+	}
 
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);

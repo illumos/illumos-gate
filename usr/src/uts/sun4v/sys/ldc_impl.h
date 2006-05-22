@@ -88,12 +88,14 @@ extern "C" {
 #define	TS_UP		(TS_READY | TS_VER_DONE | TS_HSHAKE_DONE)
 
 /*  LDC Channel Transport Handshake states */
-#define	TS_SENT_RTS	0x01	/* Sent RTS */
-#define	TS_RCVD_RTR	0x02	/* Received RTR */
-#define	TS_SENT_RDX	0x04	/* Sent RDX */
-#define	TS_RCVD_RTS	0x10	/* Received RTS */
-#define	TS_SENT_RTR	0x20	/* Sent RTR */
-#define	TS_RCVD_RDX	0x40	/* Received RDX */
+#define	TS_SENT_VER	0x01	/* Sent version */
+#define	TS_SENT_RTS	0x02	/* Sent RTS */
+#define	TS_RCVD_RTR	0x04	/* Received RTR */
+#define	TS_SENT_RDX	0x08	/* Sent RDX */
+#define	TS_RCVD_VER	0x10	/* Received version */
+#define	TS_RCVD_RTS	0x20	/* Received RTS */
+#define	TS_SENT_RTR	0x40	/* Sent RTR */
+#define	TS_RCVD_RDX	0x80	/* Received RDX */
 
 /* LDC MSG Envelope */
 #define	LDC_LEN_MASK	0x3F
@@ -104,13 +106,12 @@ extern "C" {
 #define	LDC_FRAG_CONT	0x00	/* frag_info = 0x00 */
 
 /*
- * LDC fragmented xfer loop wait cnt
- * When data is arriving in fragments, the read thread will
- * look for a packet 'LDC_CHK_CNT' times. Between each check
- * it will loop 'LDC_LOOP_CNT' times
+ * LDC will retry LDC_MAX_RETRIES times when sending or
+ * receiving data or if the HV returns back EWOULDBLOCK.
+ * Between each retry it will wait LDC_DELAY usecs.
  */
-#define	LDC_CHK_CNT	1000
-#define	LDC_LOOP_CNT	1000
+#define	LDC_MAX_RETRIES	1000
+#define	LDC_DELAY	1
 
 /*
  * LDC Version information
