@@ -819,6 +819,8 @@ PORTREGEX=			\
 	regex.o			\
 	wordexp.o
 
+VALUES=	values-Xa.o
+
 MOSTOBJS=			\
 	$(STRETS)		\
 	$(CRTOBJS)		\
@@ -850,7 +852,8 @@ MOSTOBJS=			\
 	$(COMSYSOBJS)		\
 	$(SYSOBJS)		\
 	$(COMSYSOBJS64)		\
-	$(SYSOBJS64)
+	$(SYSOBJS64)		\
+	$(VALUES)
 
 TRACEOBJS=			\
 	plockstat.o
@@ -904,7 +907,7 @@ CFLAGS64 +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
 ASFLAGS=	-K PIC -P -D__STDC__ -D_ASM -D__sparcv9 $(CPPFLAGS) \
-		$(sparcv9_XARCH)
+		$(sparcv9_AS_XARCH)
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
@@ -931,7 +934,6 @@ CLEANFILES=			\
 	genassym		\
 	pics/crti.o		\
 	pics/crtn.o		\
-	pics/values-Xa.o	\
 	$(ALTPICS)
 
 CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
@@ -965,7 +967,7 @@ SRCS=							\
 
 # conditional assignments
 # $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
-$(DYNLIB) := CRTI = crti.o values-Xa.o
+$(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
 $(DYNLIB):	$(MAPFILE)
@@ -1084,10 +1086,6 @@ lint	:=	LINTFLAGS64 += -mn
 lint:
 	@echo $(LINT.c) ... $(LDLIBS)
 	@$(LINT.c) $(SRCS) $(LDLIBS)
-
-# these aren't listed as $(PICS), so we need to force CTF
-pics/values-Xa.o := CFLAGS64 += $(CTF_FLAGS)
-pics/values-Xa.o := CTFCONVERT_POST = $(CTFCONVERT_O)
 
 $(LINTLIB):= SRCS=../port/llib-lc
 $(LINTLIB):= CPPFLAGS += -D_MSE_INT_H

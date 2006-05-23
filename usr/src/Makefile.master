@@ -307,7 +307,7 @@ i386_XARCH=
 amd64_XARCH=		-xarch=amd64 -Ui386 -U__i386
 
 # assembler '-xarch' flag.  Different from compiler '-xarch' flag.
-sparc_AS_XARCH=		-xarch=v8
+sparc_AS_XARCH=		-xarch=v8plus
 sparcv9_AS_XARCH=	-xarch=v9
 i386_AS_XARCH=
 amd64_AS_XARCH=		-xarch=amd64 -P -Ui386 -U__i386

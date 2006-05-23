@@ -810,6 +810,9 @@ PORTREGEX=			\
 	regex.o			\
 	wordexp.o
 
+VALUES=				\
+	values-Xa.o
+
 MOSTOBJS=			\
 	$(STRETS)		\
 	$(CRTOBJS)		\
@@ -841,7 +844,8 @@ MOSTOBJS=			\
 	$(COMSYSOBJS)		\
 	$(SYSOBJS)		\
 	$(COMSYSOBJS64)		\
-	$(SYSOBJS64)
+	$(SYSOBJS64)		\
+	$(VALUES)
 
 TRACEOBJS=			\
 	plockstat.o
@@ -857,9 +861,6 @@ TRACEOBJS=			\
 # crtn.o modules is safe and avoids the problems described above.
 OBJECTS= $(CRTI) $(MOSTOBJS) $(CRTN)
 CRTSRCS= ../../common/amd64
-
-# these aren't listed as $(PICS), so we need to force CTF
-pics/values-Xa.o := POST_PROCESS_O = $(CTFCONVERT_O)
 
 # include common library definitions
 include ../../Makefile.lib
@@ -896,7 +897,7 @@ MAPFILE=	$(MAPDIR)/mapfile
 CPPFLAGS=	-D_REENTRANT -D$(MACH64) -D__$(MACH64) \
 		-I. -I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master) -I/usr/include
 ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) \
-		-xarch=generic64
+		$(amd64_AS_XARCH)
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
@@ -923,7 +924,6 @@ CLEANFILES=			\
 	crt/_rtld.s		\
 	pics/crti.o		\
 	pics/crtn.o		\
-	pics/values-Xa.o	\
 	$(ALTPICS)
 
 CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
@@ -956,7 +956,7 @@ SRCS=							\
 
 # conditional assignments
 # $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
-$(DYNLIB) := CRTI = crti.o values-Xa.o
+$(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
 $(DYNLIB):	$(MAPFILE)

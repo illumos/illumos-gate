@@ -1,7 +1,3 @@
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,6 +16,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -3273,6 +3272,11 @@ version		SUNW_1.21
 errno		EACCES EBUSY EDQUOT EEXIST EINVAL EISDIR ELOOP ENAMETOOLONG \
 			EMLINK ENOENT ENOSPC ENOTDIR EROFS EXDEV EIO
 exception	$return == -1
+end
+
+function	_renameat
+weak		renameat
+version		SUNW_1.23
 end
 
 function	getrctl

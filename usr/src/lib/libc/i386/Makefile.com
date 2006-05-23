@@ -32,9 +32,7 @@ VERS=	.1
 CPP=	/usr/lib/cpp
 TARGET_ARCH=	i386
 
-# values deliverables
-VALUES=	values-Xa.o values-Xc.o values-Xs.o values-Xt.o values-xpg4.o \
-	values-xpg6.o
+VALUES=	values-Xa.o
 
 # objects are grouped by source directory
 
@@ -881,7 +879,8 @@ MOSTOBJS=			\
 	$(COMSYSOBJS)		\
 	$(SYSOBJS)		\
 	$(COMSYSOBJS64)		\
-	$(SYSOBJS64)
+	$(SYSOBJS64)		\
+	$(VALUES)
 
 TRACEOBJS=			\
 	plockstat.o
@@ -942,7 +941,7 @@ MAPFILE=	$(MAPDIR)/mapfile
 CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Di386 $(EXTN_CPPFLAGS) \
 		-I$(LIBCBASE)/inc -I../inc $(CPPFLAGS.master)
-ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
+ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(i386_AS_XARCH)
 
 # Inform the run-time linker about libc specialized initialization
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
@@ -974,8 +973,6 @@ CLEANFILES=			\
 	pics/_rtbootld.o	\
 	pics/crti.o		\
 	pics/crtn.o		\
-	pics/values-Xa.o	\
-	$(VALUES)		\
 	$(ALTPICS)
 
 CLOBBERFILES +=	$(MAPFILE) $(LIB_PIC)
@@ -1009,7 +1006,7 @@ SRCS=							\
 
 # conditional assignments
 $(DYNLIB) $(LIB_PIC) := DYNOBJS = _rtbootld.o
-$(DYNLIB) := CRTI = crti.o values-Xa.o
+$(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
 
 $(DYNLIB):	$(MAPFILE)
@@ -1089,7 +1086,7 @@ $(PORTI18N_COND:%=pics/%) := \
 
 .KEEP_STATE:
 
-all: $(LIBS) $(LIB_PIC) values
+all: $(LIBS) $(LIB_PIC)
 
 lint	:=	CPPFLAGS += -I../$(MACH)/fp
 lint	:=	CPPFLAGS += -D_MSE_INT_H -D_LCONV_C99
@@ -1098,12 +1095,6 @@ lint	:=	LINTFLAGS += -mn -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 lint:
 	@echo $(LINT.c) ...
 	@$(LINT.c) $(SRCS) $(LDLIBS)
-
-values: $(VALUES)
-
-# these aren't listed as $(PICS), so we need to force CTF
-$(VALUES) := CTFCONVERT_POST = $(CTFCONVERT_O)
-pics/values-Xa.o := CTFCONVERT_POST = $(CTFCONVERT_O)
 
 $(LINTLIB):= SRCS=../port/llib-lc
 $(LINTLIB):= CPPFLAGS += -D_MSE_INT_H

@@ -57,6 +57,7 @@ const char *okshells[] = {
 	"/bin/zsh",
 	"/usr/xpg4/bin/sh",
 	"/sbin/pfsh",
+	"/usr/sfw/bin/zsh",
 	NULL
 };
 
