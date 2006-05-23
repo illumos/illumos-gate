@@ -3019,6 +3019,17 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 			return (ret);
 		}
 	}
+	if ((cap_id_loc = pcicfg_get_cap(config_handle, PCI_CAP_ID_MSI)) > 0) {
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pci-msi-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
+			return (ret);
+	}
+	if ((cap_id_loc = pcicfg_get_cap(config_handle, PCI_CAP_ID_MSI_X)) >
+	    0) {
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pci-msix-capid-pointer", cap_id_loc)) != DDI_SUCCESS)
+			return (ret);
+	}
 	if ((cap_id_loc = pcicfg_get_cap(config_handle, PCI_CAP_ID_PCIX)) > 0) {
 		/* create the pcix-capid-pointer property */
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
