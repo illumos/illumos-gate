@@ -238,6 +238,19 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 		px_err_reg_enable(px_p, PX_ERR_TLU_UE);
 		px_err_reg_enable(px_p, PX_ERR_TLU_CE);
 		px_err_reg_enable(px_p, PX_ERR_TLU_OE);
+
+		/*
+		 * Oberon hotplug uses SPARE3 field in ILU Error Log Enable
+		 * register to indicate the status of leaf reset,
+		 * we need to preserve the value of this bit, and keep it in
+		 * px_ilu_log_mask to reflect the state of the bit
+		 */
+		if (CSR_BR(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3))
+			px_ilu_log_mask |= (1ull <<
+			    ILU_ERROR_LOG_ENABLE_SPARE3);
+		else
+			px_ilu_log_mask &= ~(1ull <<
+			    ILU_ERROR_LOG_ENABLE_SPARE3);
 		px_err_reg_enable(px_p, PX_ERR_ILU);
 
 		px_fabric_die_rc_ue |= PCIE_AER_UCE_UC;

@@ -3143,6 +3143,7 @@ static uint_t
 oberon_hp_pwroff(caddr_t csr_base)
 {
 	volatile uint64_t reg;
+	volatile uint64_t reg_tluue, reg_tluce;
 
 	DBG(DBG_HP, NULL, "oberon_hp_pwroff the slot\n");
 
@@ -3155,6 +3156,13 @@ oberon_hp_pwroff(caddr_t csr_base)
 	/* DRN_TR_DIS on */
 	CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
 	delay(drv_usectohz(10000));
+
+	/* Save the TLU registers */
+	reg_tluue = CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE);
+	reg_tluce = CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE);
+	/* All clear */
+	CSR_XS(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE, 0);
+	CSR_XS(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE, 0);
 
 	/* Disable port */
 	CSR_BS(csr_base, FLP_PORT_CONTROL, PORT_DIS);
@@ -3176,6 +3184,10 @@ oberon_hp_pwroff(caddr_t csr_base)
 
 	/* write 0 to bit 7 of ILU Error Log Enable Register */
 	CSR_BC(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3);
+
+	/* Set back TLU registers */
+	CSR_XS(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE, reg_tluue);
+	CSR_XS(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE, reg_tluce);
 
 	/* Power LED off */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
