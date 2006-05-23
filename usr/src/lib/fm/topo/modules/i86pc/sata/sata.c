@@ -762,17 +762,23 @@ sata_info_to_fru(char *info, char **model, int *modlen, char **manuf,
 	/*
 	 * The model string is broken into 2 fields --
 	 * manufacturer and model string (separated by one space)
+	 * If there is no space, then there's just a model number
+	 * with no manufacturer.
 	 */
 	manup = modlp;
 	modlp = strchr(modlp, ' ');
-	assert(modlp != NULL);
-	*modlp = 0;
-	modlp += 1;
-
-	*manuf = tp_strdup(mod, manup, manulen);
-	*model = tp_strdup(mod, modlp, modlen);
+	if (modlp == NULL) {
+		*manuf = tp_strdup(mod, "", manulen);
+		*model = tp_strdup(mod, manup, modlen);
+	} else {
+		*modlp = 0;
+		modlp += 1;
+		*manuf = tp_strdup(mod, manup, manulen);
+		*model = tp_strdup(mod, modlp, modlen);
+	}
 	*firm = tp_strdup(mod, revp, firmlen);
 	*serial = tp_strdup(mod, snp, serlen);
+
 
 	topo_mod_free(mod, sata_info, infolen);
 }
