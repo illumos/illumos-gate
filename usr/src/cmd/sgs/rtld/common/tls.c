@@ -168,8 +168,7 @@ tls_assign_soffset(Rt_map *lmp)
 	 * Only objects on the primary link-map list are associated
 	 * with the STATIC tls block.
 	 */
-	if ((LIST(lmp)->lm_flags & LML_FLG_BASELM) &&
-	    ((rtld_flags2 & RT_FL2_PLMSETUP) == 0)) {
+	if (LIST(lmp)->lm_flags & LML_FLG_BASELM) {
 		tls_static_size += S_ROUND(PTTLS(lmp)->p_memsz, M_TLSSTATALIGN);
 		TLSSTATOFF(lmp) = tls_static_size;
 	}
