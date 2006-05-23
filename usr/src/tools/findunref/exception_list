@@ -174,11 +174,6 @@
 ./src/cmd/sendmail/src/statusd_shm.h
 
 #
-# Ignore libbsm files which won't be used until later.
-#
-./src/lib/libbsm/common/adt_ucred.h
-
-#
 # Ignore libdiskmgt.h. Used for building but not delivered.
 #
 ./src/lib/libdiskmgt/common/libdiskmgt.h
