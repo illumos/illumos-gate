@@ -90,6 +90,7 @@ extern "C" {
 #define	HV_MACH_EXIT		0x00
 #define	HV_MACH_DESC		0x01
 #define	HV_MACH_SIR		0x02
+#define	MACH_SET_WATCHDOG	0x05
 
 #define	HV_CPU_START		0x10
 #define	HV_CPU_STOP		0x11
@@ -352,6 +353,7 @@ extern uint64_t hv_ttrace_buf_conf(uint64_t, uint64_t, uint64_t *);
 extern uint64_t hv_ttrace_enable(uint64_t, uint64_t *);
 extern uint64_t hv_ttrace_freeze(uint64_t, uint64_t *);
 extern uint64_t hv_dump_buf_update(uint64_t, uint64_t, uint64_t *);
+extern uint64_t hv_mach_set_watchdog(uint64_t, uint64_t *);
 
 extern int64_t hv_cnputchar(uint8_t);
 extern int64_t hv_cngetchar(uint8_t *);

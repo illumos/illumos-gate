@@ -50,6 +50,7 @@
 #include <sys/callb.h>
 #include <sys/mdesc.h>
 #include <sys/mach_descrip.h>
+#include <sys/wdt.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -150,6 +151,8 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	 * accessing devices
 	 */
 	reset_leaves();
+
+	watchdog_clear();
 
 	if (fcn == AD_HALT) {
 		halt((char *)NULL);
@@ -467,23 +470,32 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 void
 clear_watchdog_on_exit(void)
 {
+	prom_printf("Debugging requested; hardware watchdog suspended.\n");
+	(void) watchdog_suspend();
 }
 
+/*
+ * Restore the watchdog timer when returning from a debugger
+ * after a panic or L1-A and resume watchdog pat.
+ */
 void
-clear_watchdog_timer(void)
+restore_watchdog_on_entry()
 {
+	watchdog_resume();
 }
 
 int
 kdi_watchdog_disable(void)
 {
-	return (0);	/* sun4v has no watchdog */
+	watchdog_suspend();
+
+	return (0);
 }
 
 void
 kdi_watchdog_restore(void)
 {
-	/* nothing to do -- no watchdog to re-enable */
+	watchdog_resume();
 }
 
 void
@@ -975,6 +987,25 @@ cpu_kdi_init(kdi_t *kdi)
 	kdi->mkdi_xc_one = kdi_xc_one;
 	kdi->mkdi_tickwait = kdi_tickwait;
 	kdi->mkdi_get_stick = kdi_get_stick;
+}
+
+static void
+sun4v_system_claim(void)
+{
+	watchdog_suspend();
+}
+
+static void
+sun4v_system_release(void)
+{
+	watchdog_resume();
+}
+
+void
+plat_kdi_init(kdi_t *kdi)
+{
+	kdi->pkdi_system_claim = sun4v_system_claim;
+	kdi->pkdi_system_release = sun4v_system_release;
 }
 
 /*

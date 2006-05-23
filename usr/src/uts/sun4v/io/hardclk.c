@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +48,7 @@
 #include <sys/atomic.h>
 #include <sys/cpu_module.h>
 #include <sys/hypervisor_api.h>
+#include <sys/wdt.h>
 
 uint_t sys_clock_mhz = 0;
 uint64_t sys_tick_freq = 0;
@@ -61,6 +61,10 @@ char clock_started = 0;
 void
 clkstart(void)
 {
+	/*
+	 * Now is a good time to activate hardware watchdog.
+	 */
+	watchdog_init();
 }
 
 /*
@@ -146,6 +150,12 @@ tod_get(void)
 	int i;
 	unsigned int spl_old;
 	uint64_t ret;
+
+	/*
+	 * Pat the watchdog timer regularly.
+	 */
+	watchdog_pat();
+
 	/*
 	 * Make sure we don't get preempted
 	 * while getting the tod value.

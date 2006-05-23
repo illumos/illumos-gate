@@ -321,6 +321,11 @@ hv_api_set_version(uint64_t api_group, uint64_t major, uint64_t minor,
     uint64_t *supported_minor)
 { return (0); }
 
+/*ARGSUSED*/	
+uint64_t
+hv_mach_set_watchdog(uint64_t timeout, uint64_t *time_remaining)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
@@ -658,6 +663,20 @@ hv_api_set_version(uint64_t api_group, uint64_t major, uint64_t minor,
 	stx	%o1, [%o2]
 	SET_SIZE(hv_dump_buf_update)
 
+	/*
+	 * arg0 - timeout value (%o0)
+	 *
+	 * ret0 - status (%o0)
+	 * ret1 - time_remaining (%o1)
+	 * hv_mach_set_watchdog(uint64_t timeout, uint64_t *time_remaining)
+	 */
+	ENTRY(hv_mach_set_watchdog)
+	mov	%o1, %o2
+	mov	MACH_SET_WATCHDOG, %o5
+	ta	FAST_TRAP
+	retl
+	stx	%o1, [%o2]
+	SET_SIZE(hv_mach_set_watchdog)
 
 	/*
 	 * For memory scrub

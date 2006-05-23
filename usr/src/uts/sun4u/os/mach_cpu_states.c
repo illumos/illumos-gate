@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -50,7 +49,7 @@ u_longlong_t panic_tick;
 
 extern u_longlong_t	gettick();
 static void reboot_machine(char *);
-extern int disable_watchdog_on_exit;
+int disable_watchdog_on_exit = 0;
 
 /*
  * Machine dependent code to reboot.
@@ -434,6 +433,14 @@ clear_watchdog_on_exit()
 	}
 }
 
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+restore_watchdog_on_entry(void)
+{
+}
+
 int
 kdi_watchdog_disable(void)
 {
@@ -454,6 +461,46 @@ kdi_watchdog_restore(void)
 		(void) tod_ops.tod_set_watchdog_timer(watchdog_timeout_seconds);
 		mutex_exit(&tod_lock);
 	}
+}
+
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+watchdog_init(void)
+{
+}
+
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+watchdog_pat(void)
+{
+}
+
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+watchdog_suspend(void)
+{
+}
+
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+watchdog_resume(void)
+{
+}
+
+/*
+ * This null routine is only used by sun4v watchdog timer support.
+ */
+void
+watchdog_clear(void)
+{
 }
 
 /*ARGSUSED*/

@@ -78,6 +78,7 @@ CORE_OBJS +=	promif_test.o
 CORE_OBJS +=	promif_version.o
 CORE_OBJS +=	sfmmu_kdi.o
 CORE_OBJS +=	swtch.o
+CORE_OBJS +=	wdt.o
 CORE_OBJS +=	xhat_sfmmu.o
 
 CORE_OBJS +=	mdesc_diff.o

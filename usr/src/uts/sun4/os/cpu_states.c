@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,7 @@
 #include <sys/ivintr.h>
 #include <sys/kdi.h>
 #include <sys/callb.h>
+#include <sys/wdt.h>
 
 #ifdef	TRAPTRACE
 #include <sys/traptrace.h>
@@ -63,9 +63,7 @@ void (*abort_seq_handler)(char *) = debug_enter;
 /*
  * Platform tunable to disable the h/w watchdog timer.
  */
-int disable_watchdog_on_exit = 0;
 extern void clear_watchdog_on_exit(void);
-
 
 /*
  * On sun4u platform, abort_sequence_enter() can be called at high PIL
@@ -264,6 +262,8 @@ debug_enter(char *msg)
 		kdi_dvec_enter();
 	else
 		prom_enter_mon();
+
+	restore_watchdog_on_entry();
 
 	curthread->t_pcb = old_pcb;
 	splx(s);
