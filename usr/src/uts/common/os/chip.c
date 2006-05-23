@@ -292,6 +292,7 @@ chip_cpu_init(cpu_t *cp)
 		chip_plat_define_chip(cp, &chp_def);
 		chp->chip_rechoose_adj = chp_def.chipd_rechoose_adj;
 		chp->chip_type = chp_def.chipd_type;
+		chp->chip_nosteal = chp_def.chipd_nosteal;
 
 		ASSERT((chp->chip_type < CHIP_NUM_TYPES) &&
 		    (chp->chip_type >= CHIP_DEFAULT));

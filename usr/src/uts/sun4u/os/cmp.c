@@ -31,6 +31,7 @@
 #include <sys/cmp.h>
 #include <sys/debug.h>
 #include <sys/chip.h>
+#include <sys/disp.h>
 #include <sys/cheetahregs.h>
 
 /*
@@ -199,4 +200,5 @@ chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 	 * will change with future processors.
 	 */
 	cd->chipd_rechoose_adj = 0;
+	cd->chipd_nosteal = 100000ULL; /* 100 usecs */
 }

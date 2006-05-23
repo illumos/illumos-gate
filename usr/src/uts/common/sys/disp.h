@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,7 @@ typedef struct _disp {
 	volatile int	disp_nrunnable;	/* runnable threads in cpu dispq */
 
 	struct cpu	*disp_cpu;	/* cpu owning this queue or NULL */
+	hrtime_t	disp_steal;	/* time when threads become stealable */
 } disp_t;
 
 #if defined(_KERNEL)
@@ -102,6 +103,12 @@ extern	pri_t	intr_pri;	/* interrupt thread priority base level */
  */
 #define	RECHOOSE_INTERVAL	3
 extern int	rechoose_interval;
+
+/*
+ * Minimum amount of time that a thread can remain runnable before it can
+ * be stolen by another CPU (in nanoseconds).
+ */
+extern hrtime_t nosteal_nsec;
 
 /*
  * Kernel preemption occurs if a higher-priority thread is runnable with

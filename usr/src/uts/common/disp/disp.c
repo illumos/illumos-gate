@@ -88,15 +88,15 @@ static void	idle_exit();
 static void	generic_enq_thread(cpu_t *, int);
 void		(*disp_enq_thread)(cpu_t *, int) = generic_enq_thread;
 
-pri_t	kpreemptpri;	/* priority where kernel preemption applies */
-pri_t	upreemptpri = 0; /* priority where normal preemption applies */
-pri_t	intr_pri;	/* interrupt thread priority base level */
+pri_t	kpreemptpri;		/* priority where kernel preemption applies */
+pri_t	upreemptpri = 0; 	/* priority where normal preemption applies */
+pri_t	intr_pri;		/* interrupt thread priority base level */
 
-#define	KPQPRI	-1 /* priority where cpu affinity is dropped for kp queue */
-pri_t	kpqpri = KPQPRI; /* can be set in /etc/system */
-disp_t	cpu0_disp;	/* boot CPU's dispatch queue */
+#define	KPQPRI	-1 		/* pri where cpu affinity is dropped for kpq */
+pri_t	kpqpri = KPQPRI; 	/* can be set in /etc/system */
+disp_t	cpu0_disp;		/* boot CPU's dispatch queue */
 disp_lock_t	swapped_lock;	/* lock swapped threads and swap queue */
-int	nswapped;	/* total number of swapped threads */
+int	nswapped;		/* total number of swapped threads */
 void	disp_swapped_enq(kthread_t *tp);
 static void	disp_swapped_setrun(kthread_t *tp);
 static void	cpu_resched(cpu_t *cp, pri_t tpri);
@@ -124,15 +124,36 @@ static void setkpdq(kthread_t *tp, int borf);
  * cpu structures. See cpu_choose()
  */
 int	rechoose_interval = RECHOOSE_INTERVAL;
-
 static cpu_t	*cpu_choose(kthread_t *, pri_t);
+
+/*
+ * Parameter that determines how long (in nanoseconds) a thread must
+ * be sitting on a run queue before it can be stolen by another CPU
+ * to reduce migrations.  The interval is in nanoseconds.
+ *
+ * The nosteal_nsec should be set by a platform code to an appropriate value.
+ *
+ */
+hrtime_t nosteal_nsec = 0;
+
+/*
+ * Value of nosteal_nsec meaning that nosteal optimization should be disabled
+ */
+#define	NOSTEAL_DISABLED 1
 
 id_t	defaultcid;	/* system "default" class; see dispadmin(1M) */
 
 disp_lock_t	transition_lock;	/* lock on transitioning threads */
 disp_lock_t	stop_lock;		/* lock on stopped threads */
 
-static void		cpu_dispqalloc(int numpris);
+static void	cpu_dispqalloc(int numpris);
+
+/*
+ * This gets returned by disp_getwork/disp_getbest if we couldn't steal
+ * a thread because it was sitting on its run queue for a very short
+ * period of time.
+ */
+#define	T_DONTSTEAL	(kthread_t *)(-1) /* returned by disp_getwork/getbest */
 
 static kthread_t	*disp_getwork(cpu_t *to);
 static kthread_t	*disp_getbest(disp_t *from);
@@ -598,6 +619,12 @@ idle()
 				(*idle_cpu)();
 				continue;
 			}
+			/*
+			 * If there was a thread but we couldn't steal
+			 * it, then keep trying.
+			 */
+			if (t == T_DONTSTEAL)
+				continue;
 			idle_exit();
 			restore_mstate(t);
 			swtch_to(t);
@@ -706,7 +733,8 @@ reschedule:
 	if (pri == -1) {
 		if (!(cpup->cpu_flags & CPU_OFFLINE)) {
 			disp_lock_exit(&dp->disp_lock);
-			if ((tp = disp_getwork(cpup)) == NULL) {
+			if ((tp = disp_getwork(cpup)) == NULL ||
+			    tp == T_DONTSTEAL) {
 				tp = cpup->cpu_idle_thread;
 				(void) splhigh();
 				THREAD_ONPROC(tp, cpup);
@@ -1191,16 +1219,20 @@ setbackdq(kthread_t *tp)
 			    !(tp->t_schedflag & TS_RUNQMATCH))
 				qlen -= RUNQ_MAX_DIFF;
 			if (qlen > 0) {
-				cpu_t	*np;
+				cpu_t *newcp;
 
-				if (tp->t_lpl->lpl_lgrpid == LGRP_ROOTID)
-					np = cp->cpu_next_part;
-				else {
-					if ((np = cp->cpu_next_lpl) == cp)
-						np = cp->cpu_next_part;
+				if (tp->t_lpl->lpl_lgrpid == LGRP_ROOTID) {
+					newcp = cp->cpu_next_part;
+				} else if ((newcp = cp->cpu_next_lpl) == cp) {
+					newcp = cp->cpu_next_part;
 				}
-				if (RUNQ_LEN(np, tpri) < qlen)
-					cp = np;
+
+				if (RUNQ_LEN(newcp, tpri) < qlen) {
+					DTRACE_PROBE3(runq__balance,
+					    kthread_t *, tp,
+					    cpu_t *, cp, cpu_t *, newcp);
+					cp = newcp;
+				}
 			}
 		} else {
 			/*
@@ -1243,6 +1275,8 @@ setbackdq(kthread_t *tp)
 
 	dq = &dp->disp_q[tpri];
 	dp->disp_nrunnable++;
+	if (!bound)
+		dp->disp_steal = 0;
 	membar_enter();
 
 	if (dq->dq_sruncnt++ != 0) {
@@ -1381,6 +1415,8 @@ setfrontdq(kthread_t *tp)
 
 	dq = &dp->disp_q[tpri];
 	dp->disp_nrunnable++;
+	if (!bound)
+		dp->disp_steal = 0;
 	membar_enter();
 
 	if (dq->dq_sruncnt++ != 0) {
@@ -1788,10 +1824,12 @@ disp_getwork(cpu_t *cp)
 	cpu_t		*ocp_start;
 	cpu_t		*tcp;		/* target local CPU */
 	kthread_t	*tp;
+	kthread_t	*retval = NULL;
 	pri_t		maxpri;
 	disp_t		*kpq;		/* kp queue for this partition */
 	lpl_t		*lpl, *lpl_leaf;
 	int		hint, leafidx;
+	hrtime_t	stealtime;
 
 	maxpri = -1;
 	tcp = NULL;
@@ -1878,8 +1916,27 @@ disp_getwork(cpu_t *cp)
 
 				pri = ocp->cpu_disp->disp_max_unbound_pri;
 				if (pri > maxpri) {
-					maxpri = pri;
-					tcp = ocp;
+					/*
+					 * Don't steal threads that we attempted
+					 * to be stolen very recently until
+					 * they're ready to be stolen again.
+					 */
+					stealtime = ocp->cpu_disp->disp_steal;
+					if (stealtime == 0 ||
+					    stealtime - gethrtime() <= 0) {
+						maxpri = pri;
+						tcp = ocp;
+					} else {
+						/*
+						 * Don't update tcp, just set
+						 * the retval to T_DONTSTEAL, so
+						 * that if no acceptable CPUs
+						 * are found the return value
+						 * will be T_DONTSTEAL rather
+						 * then NULL.
+						 */
+						retval = T_DONTSTEAL;
+					}
 				}
 			} while ((ocp = ocp->cpu_next_lpl) != ocp_start);
 
@@ -1902,11 +1959,12 @@ disp_getwork(cpu_t *cp)
 	 * from it to our queue.
 	 */
 	if (tcp && cp->cpu_disp->disp_nrunnable == 0) {
-		tp = (disp_getbest(tcp->cpu_disp));
-		if (tp)
-			return (disp_ratify(tp, kpq));
+		tp = disp_getbest(tcp->cpu_disp);
+		if (tp == NULL || tp == T_DONTSTEAL)
+			return (tp);
+		return (disp_ratify(tp, kpq));
 	}
-	return (NULL);
+	return (retval);
 }
 
 
@@ -2013,12 +2071,15 @@ disp_adjust_unbound_pri(kthread_t *tp)
 }
 
 /*
- * disp_getbest() - de-queue the highest priority unbound runnable thread.
- *	returns with the thread unlocked and onproc
- *	but at splhigh (like disp()).
- *	returns NULL if nothing found.
+ * disp_getbest()
+ *   De-queue the highest priority unbound runnable thread.
+ *   Returns with the thread unlocked and onproc but at splhigh (like disp()).
+ *   Returns NULL if nothing found.
+ *   Returns T_DONTSTEAL if the thread was not stealable.
+ *   so that the caller will try again later.
  *
- *	Passed a pointer to a dispatch queue not associated with this CPU.
+ *   Passed a pointer to a dispatch queue not associated with this CPU, and
+ *   its type.
  */
 static kthread_t *
 disp_getbest(disp_t *dp)
@@ -2026,7 +2087,8 @@ disp_getbest(disp_t *dp)
 	kthread_t	*tp;
 	dispq_t		*dq;
 	pri_t		pri;
-	cpu_t		*cp;
+	cpu_t		*cp, *tcp;
+	boolean_t	allbound;
 
 	disp_lock_enter(&dp->disp_lock);
 
@@ -2034,38 +2096,145 @@ disp_getbest(disp_t *dp)
 	 * If there is nothing to run, or the CPU is in the middle of a
 	 * context switch of the only thread, return NULL.
 	 */
+	tcp = dp->disp_cpu;
+	cp = CPU;
 	pri = dp->disp_max_unbound_pri;
 	if (pri == -1 ||
-		(dp->disp_cpu != NULL &&
-		    (dp->disp_cpu->cpu_disp_flags & CPU_DISP_DONTSTEAL) &&
-		dp->disp_cpu->cpu_disp->disp_nrunnable == 1)) {
+	    (tcp != NULL && (tcp->cpu_disp_flags & CPU_DISP_DONTSTEAL) &&
+	    tcp->cpu_disp->disp_nrunnable == 1)) {
 		disp_lock_exit_nopreempt(&dp->disp_lock);
 		return (NULL);
 	}
 
 	dq = &dp->disp_q[pri];
-	tp = dq->dq_first;
+
 
 	/*
-	 * Skip over bound threads.
-	 * Bound threads can be here even though disp_max_unbound_pri
-	 * indicated this level.  Besides, it not always accurate because it
-	 * isn't reduced until another CPU looks for work.
-	 * Note that tp could be NULL right away due to this.
+	 * Assume that all threads are bound on this queue, and change it
+	 * later when we find out that it is not the case.
 	 */
-	while (tp && (tp->t_bound_cpu || tp->t_weakbound_cpu)) {
-		tp = tp->t_link;
+	allbound = B_TRUE;
+	for (tp = dq->dq_first; tp != NULL; tp = tp->t_link) {
+		hrtime_t now, nosteal, rqtime;
+		chip_type_t chtype;
+		chip_t *chip;
+
+		/*
+		 * Skip over bound threads which could be here even
+		 * though disp_max_unbound_pri indicated this level.
+		 */
+		if (tp->t_bound_cpu || tp->t_weakbound_cpu)
+			continue;
+
+		/*
+		 * We've got some unbound threads on this queue, so turn
+		 * the allbound flag off now.
+		 */
+		allbound = B_FALSE;
+
+		/*
+		 * The thread is a candidate for stealing from its run queue. We
+		 * don't want to steal threads that became runnable just a
+		 * moment ago. This improves CPU affinity for threads that get
+		 * preempted for short periods of time and go back on the run
+		 * queue.
+		 *
+		 * We want to let it stay on its run queue if it was only placed
+		 * there recently and it was running on the same CPU before that
+		 * to preserve its cache investment. For the thread to remain on
+		 * its run queue, ALL of the following conditions must be
+		 * satisfied:
+		 *
+		 * - the disp queue should not be the kernel preemption queue
+		 * - delayed idle stealing should not be disabled
+		 * - nosteal_nsec should be non-zero
+		 * - it should run with user priority
+		 * - it should be on the run queue of the CPU where it was
+		 *   running before being placed on the run queue
+		 * - it should be the only thread on the run queue (to prevent
+		 *   extra scheduling latency for other threads)
+		 * - it should sit on the run queue for less than per-chip
+		 *   nosteal interval or global nosteal interval
+		 * - in case of CPUs with shared cache it should sit in a run
+		 *   queue of a CPU from a different chip
+		 *
+		 * The checks are arranged so that the ones that are faster are
+		 * placed earlier.
+		 */
+		if (tcp == NULL ||
+		    pri >= minclsyspri ||
+		    tp->t_cpu != tcp)
+			break;
+
+		/*
+		 * Steal immediately if the chip has shared cache and we are
+		 * sharing the chip with the target thread's CPU.
+		 */
+		chip = tcp->cpu_chip;
+		chtype = chip->chip_type;
+		if ((chtype == CHIP_SMT || chtype == CHIP_CMP_SHARED_CACHE) &&
+		    chip == cp->cpu_chip)
+			break;
+
+		/*
+		 * Get the value of nosteal interval either from nosteal_nsec
+		 * global variable or from a value specified by a chip
+		 */
+		nosteal = nosteal_nsec ? nosteal_nsec : chip->chip_nosteal;
+		if (nosteal == 0 || nosteal == NOSTEAL_DISABLED)
+			break;
+
+		/*
+		 * Calculate time spent sitting on run queue
+		 */
+		now = gethrtime_unscaled();
+		rqtime = now - tp->t_waitrq;
+		scalehrtime(&rqtime);
+
+		/*
+		 * Steal immediately if the time spent on this run queue is more
+		 * than allowed nosteal delay.
+		 *
+		 * Negative rqtime check is needed here to avoid infinite
+		 * stealing delays caused by unlikely but not impossible
+		 * drifts between CPU times on different CPUs.
+		 */
+		if (rqtime > nosteal || rqtime < 0)
+			break;
+
+		DTRACE_PROBE4(nosteal, kthread_t *, tp,
+		    cpu_t *, tcp, cpu_t *, cp, hrtime_t, rqtime);
+		scalehrtime(&now);
+		/*
+		 * Calculate when this thread becomes stealable
+		 */
+		now += (nosteal - rqtime);
+
+		/*
+		 * Calculate time when some thread becomes stealable
+		 */
+		if (now < dp->disp_steal)
+			dp->disp_steal = now;
 	}
 
 	/*
 	 * If there were no unbound threads on this queue, find the queue
-	 * where they are and then return NULL so that other CPUs will be
-	 * considered.
+	 * where they are and then return later. The value of
+	 * disp_max_unbound_pri is not always accurate because it isn't
+	 * reduced until another idle CPU looks for work.
+	 */
+	if (allbound)
+		disp_fix_unbound_pri(dp, pri);
+
+	/*
+	 * If we reached the end of the queue and found no unbound threads
+	 * then return NULL so that other CPUs will be considered.  If there
+	 * are unbound threads but they cannot yet be stolen, then
+	 * return T_DONTSTEAL and try again later.
 	 */
 	if (tp == NULL) {
-		disp_fix_unbound_pri(dp, pri);
 		disp_lock_exit_nopreempt(&dp->disp_lock);
-		return (NULL);
+		return (allbound ? NULL : T_DONTSTEAL);
 	}
 
 	/*
@@ -2075,6 +2244,7 @@ disp_getbest(disp_t *dp)
 	 * put the thread in transition state, thereby dropping the dispq
 	 * lock.
 	 */
+
 #ifdef DEBUG
 	{
 		int	thread_was_on_queue;
@@ -2082,22 +2252,29 @@ disp_getbest(disp_t *dp)
 		thread_was_on_queue = dispdeq(tp);	/* drops disp_lock */
 		ASSERT(thread_was_on_queue);
 	}
+
 #else /* DEBUG */
 	(void) dispdeq(tp);			/* drops disp_lock */
 #endif /* DEBUG */
+
+	/*
+	 * Reset the disp_queue steal time - we do not know what is the smallest
+	 * value across the queue is.
+	 */
+	dp->disp_steal = 0;
 
 	tp->t_schedflag |= TS_DONT_SWAP;
 
 	/*
 	 * Setup thread to run on the current CPU.
 	 */
-	cp = CPU;
-
 	tp->t_disp_queue = cp->cpu_disp;
 
 	cp->cpu_dispthread = tp;		/* protected by spl only */
 	cp->cpu_dispatch_pri = pri;
 	ASSERT(pri == DISP_PRIO(tp));
+
+	DTRACE_PROBE3(steal, kthread_t *, tp, cpu_t *, tcp, cpu_t *, cp);
 
 	thread_onproc(tp, cp);			/* set t_state to TS_ONPROC */
 
@@ -2349,14 +2526,12 @@ disp_lowpri_cpu(cpu_t *hint, lpl_t *lpl, pri_t tpri, cpu_t *curcpu)
 				cp = cpstart = lpl_leaf->lpl_cpus;
 
 			do {
-
 				if (cp == curcpu)
 					cpupri = -1;
 				else if (cp == cpu_inmotion)
 					cpupri = SHRT_MAX;
 				else
 					cpupri = cp->cpu_dispatch_pri;
-
 				if (cp->cpu_disp->disp_maxrunpri > cpupri)
 					cpupri = cp->cpu_disp->disp_maxrunpri;
 				if (cp->cpu_chosen_level > cpupri)

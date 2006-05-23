@@ -112,6 +112,7 @@ chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 	 * will change with future processors.
 	 */
 	cd->chipd_rechoose_adj = 0;
+	cd->chipd_nosteal = 0;
 }
 
 /*

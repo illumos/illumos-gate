@@ -41,6 +41,7 @@ extern "C" {
 #include <sys/processor.h>
 #include <sys/bitmap.h>
 #include <sys/atomic.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 /*
@@ -69,6 +70,7 @@ typedef enum chip_type {
 typedef struct	chip_def {
 	chip_type_t		chipd_type;
 	int			chipd_rechoose_adj;
+	hrtime_t		chipd_nosteal;
 } chip_def_t;
 
 /*
@@ -117,6 +119,7 @@ typedef struct chip {
 
 	struct chip	*chip_balance;		/* chip to balance against */
 	uint32_t	chip_nrunning;		/* # of running threads */
+	hrtime_t	chip_nosteal;		/* nosteal interval (nsecs) */
 } chip_t;
 
 /*
