@@ -6183,17 +6183,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		return;
 	}
 
-	/*
-	 * Check for conflicts in deny and access before checking for
-	 * conflicts in delegation.  We don't want to recall a
-	 * delegation based on an open that will eventually fail based
-	 * on shares modes.
-	 */
-
-	shr.s_access = (short)access;
-	shr.s_deny = (short)deny;
-	shr.s_pid = rfs4_dbe_getid(oo->dbe);
-
+	/* try to get the sysid before continuing */
 	if ((status = rfs4_client_sysid(oo->client, &sysid)) != NFS4_OK) {
 		resp->status = status;
 		rfs4_file_rele(file);
@@ -6203,33 +6193,6 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		rfs4_state_rele(state);
 		return;
 	}
-	shr.s_sysid = sysid;
-	shr_loco.sl_pid = shr.s_pid;
-	shr_loco.sl_id = shr.s_sysid;
-	shr.s_owner = (caddr_t)&shr_loco;
-	shr.s_own_len = sizeof (shr_loco);
-
-	fflags = 0;
-	if (access & OPEN4_SHARE_ACCESS_READ)
-		fflags |= FREAD;
-	if (access & OPEN4_SHARE_ACCESS_WRITE)
-		fflags |= FWRITE;
-
-	if ((err = vop_shrlock(cs->vp, F_SHARE, &shr, fflags)) != 0) {
-
-		resp->status = err == EAGAIN ?
-			NFS4ERR_SHARE_DENIED : puterrno4(err);
-
-		rfs4_file_rele(file);
-		/* Not a fully formed open; "close" it */
-		if (screate == TRUE)
-			rfs4_state_close(state, FALSE, FALSE, cs->cr);
-		rfs4_state_rele(state);
-		return;
-	}
-
-	rfs4_dbe_lock(state->dbe);
-	rfs4_dbe_lock(file->dbe);
 
 	/*
 	 * Calculate the new deny and access mode that this open is adding to
@@ -6237,6 +6200,50 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	 */
 	dmodes = (deny & ~state->share_deny);
 	amodes = (access & ~state->share_access);
+
+	/*
+	 * Check to see the client has already sent an open for this
+	 * open owner on this file with the same share/deny modes.
+	 * If so, we don't need to check for a conflict and we don't
+	 * need to add another shrlock.  If not, then we need to
+	 * check for conflicts in deny and access before checking for
+	 * conflicts in delegation.  We don't want to recall a
+	 * delegation based on an open that will eventually fail based
+	 * on shares modes.
+	 */
+
+	if (dmodes || amodes) {
+		shr.s_access = (short)access;
+		shr.s_deny = (short)deny;
+		shr.s_pid = rfs4_dbe_getid(oo->dbe);
+		shr.s_sysid = sysid;
+		shr_loco.sl_pid = shr.s_pid;
+		shr_loco.sl_id = shr.s_sysid;
+		shr.s_owner = (caddr_t)&shr_loco;
+		shr.s_own_len = sizeof (shr_loco);
+
+		fflags = 0;
+		if (access & OPEN4_SHARE_ACCESS_READ)
+			fflags |= FREAD;
+		if (access & OPEN4_SHARE_ACCESS_WRITE)
+			fflags |= FWRITE;
+
+		if ((err = vop_shrlock(cs->vp, F_SHARE, &shr, fflags)) != 0) {
+
+			resp->status = err == EAGAIN ?
+				NFS4ERR_SHARE_DENIED : puterrno4(err);
+
+			rfs4_file_rele(file);
+			/* Not a fully formed open; "close" it */
+			if (screate == TRUE)
+				rfs4_state_close(state, FALSE, FALSE, cs->cr);
+			rfs4_state_rele(state);
+			return;
+		}
+	}
+
+	rfs4_dbe_lock(state->dbe);
+	rfs4_dbe_lock(file->dbe);
 
 	/*
 	 * Check to see if this file is delegated and if so, if a
