@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1152,7 +1152,7 @@ updateclean(void)
 	char fsclean;
 	int fsreclaim;
 	char fsflags;
-	int flags_ok;
+	int flags_ok = 1;
 	daddr32_t fslogbno;
 	offset_t sblkoff;
 	time_t t;
@@ -1235,24 +1235,15 @@ updateclean(void)
 		fsflags &= ~FSLARGEFILES;
 
 	/*
-	 * If the only flag difference is that the superblock thinks
-	 * there are largefiles, but we didn't find any, then ignore
-	 * the discrepancy.  The kernel never clears the flag, it just
-	 * sets it whenever a largefile is created.  Since it is harmless
-	 * to have the flag set when it's not actually true, that by
-	 * itself is not grounds for declaring the superblock to be
-	 * in the wrong state.
-	 *
-	 * This could, in theory, prevent a filesystem from being
-	 * mounted, if the existing superblock claims such files are
-	 * out there and the user uses the nolargefiles option.  So,
-	 * if we were forced to scan the filesystem, go ahead and
-	 * take FSLARGEFILES into account as well.
+	 * There can be two discrepencies here.  A) The superblock
+	 * shows no largefiles but we found some while scanning.
+	 * B) The superblock indicates the presence of largefiles,
+	 * but none are present.  Note that if preening, the superblock
+	 * is silently corrected.
 	 */
-	if (fflag)
+	if ((fsflags == FSLARGEFILES && sblock.fs_flags != FSLARGEFILES) ||
+	    (fsflags != FSLARGEFILES && sblock.fs_flags == FSLARGEFILES))
 		flags_ok = 0;
-	else
-		flags_ok = (sblock.fs_flags & ~FSLARGEFILES) == fsflags;
 
 	if (debug)
 		(void) printf(

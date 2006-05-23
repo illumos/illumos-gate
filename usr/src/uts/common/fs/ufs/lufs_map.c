@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1737,27 +1736,32 @@ logmap_cancel(ml_unit_t *ul, offset_t mof, off_t nb, int metadata)
 		if (hnb > nb)
 			hnb = nb;
 		/*
-		 * find overlapping entries
+		 * Find overlapping metadata entries.  Don't search through
+		 * the hash chains if this is user data because it is only
+		 * possible to have overlapping map entries for metadata,
+		 * and the search can become expensive for large files.
 		 */
-		mep = MAP_HASH(mof, mtm);
-		mutex_enter(&mtm->mtm_mutex);
-		for (me = *mep; me; me = me->me_hash) {
-			if (!DATAoverlapME(mof, hnb, me))
-				continue;
+		if (metadata) {
+			mep = MAP_HASH(mof, mtm);
+			mutex_enter(&mtm->mtm_mutex);
+			for (me = *mep; me; me = me->me_hash) {
+				if (!DATAoverlapME(mof, hnb, me))
+					continue;
 
-			ASSERT(MEwithinDATA(me, mof, hnb));
+				ASSERT(MEwithinDATA(me, mof, hnb));
 
-			if ((me->me_flags & ME_CANCEL) == 0) {
-				me->me_cancel = mtm->mtm_cancel;
-				mtm->mtm_cancel = me;
-				me->me_flags |= ME_CANCEL;
-				crb = me->me_crb;
-				if (crb) {
-					crb->c_invalid = 1;
+				if ((me->me_flags & ME_CANCEL) == 0) {
+					me->me_cancel = mtm->mtm_cancel;
+					mtm->mtm_cancel = me;
+					me->me_flags |= ME_CANCEL;
+					crb = me->me_crb;
+					if (crb) {
+						crb->c_invalid = 1;
+					}
 				}
 			}
+			mutex_exit(&mtm->mtm_mutex);
 		}
-		mutex_exit(&mtm->mtm_mutex);
 
 		/*
 		 * put a cancel record into the log
