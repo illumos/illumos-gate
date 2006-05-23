@@ -1197,8 +1197,13 @@ notreg:
 			while (size != 0) {
 				amt = MIN(size, SENDFILE_SIZE);
 				cnt = sendfile(rem, f, &off, amt);
-				if (cnt == -1)
-					break;
+				if (cnt == -1) {
+					if (errno == EINTR) {
+						continue;
+					} else {
+						break;
+					}
+				}
 				size -= cnt;
 			}
 			if (cnt == -1) {
