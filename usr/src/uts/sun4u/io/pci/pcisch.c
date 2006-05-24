@@ -3592,3 +3592,17 @@ pci_vmem_free(iommu_t *iommu_p, ddi_dma_impl_t *mp, void *dvma_addr,
 		pci_vmem_do_free(iommu_p, dvma_addr, npages,
 		    (mp->dmai_flags & DMAI_FLAGS_VMEMCACHE));
 }
+
+/*
+ * pci_iommu_bypass_end_configure
+ *
+ * Support for 42-bit bus width to SAFARI and JBUS in DVMA and
+ * iommu bypass transfers:
+ */
+
+dma_bypass_addr_t
+pci_iommu_bypass_end_configure(void)
+{
+
+	return ((dma_bypass_addr_t)SAFARI_JBUS_IOMMU_BYPASS_END);
+}

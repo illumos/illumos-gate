@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +173,14 @@ extern "C" {
 extern uint_t cb_thermal_intr(caddr_t a);
 
 #define	PCI_ID_TO_IGN(pci_id)		((pci_ign_t)UPAID_TO_IGN(pci_id))
+
+/*
+ * The following macro defines the 40-bit bus width support for UPA bus
+ * in DVMA and iommu bypass transfers:
+ */
+
+#define	UPA_IOMMU_BYPASS_END		0xFFFC00FFFFFFFFFFull
+
 #ifdef	__cplusplus
 }
 #endif

@@ -2016,3 +2016,16 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 		rem_ivintr(pci_mondo, NULL);
 	}
 }
+
+/*
+ * pci_iommu_bypass_end_configure
+ *
+ * Support for 40-bit bus width to UPA in DVMA and iommu bypass transfers:
+ */
+
+dma_bypass_addr_t
+pci_iommu_bypass_end_configure(void)
+{
+
+	return ((dma_bypass_addr_t)UPA_IOMMU_BYPASS_END);
+}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +102,7 @@ iommu_create(pci_t *pci_p)
 	iommu_p->iommu_dvma_reserve = tsb_entries >> 1;
 	iommu_p->dvma_end_pg = IOMMU_BTOP(iommu_p->iommu_dvma_end);
 	iommu_p->iommu_dma_bypass_base = COMMON_IOMMU_BYPASS_BASE;
-	iommu_p->iommu_dma_bypass_end = COMMON_IOMMU_BYPASS_END;
+	iommu_p->iommu_dma_bypass_end = pci_iommu_bypass_end_configure();
 
 	/*
 	 * export "virtual-dma" software property to support
