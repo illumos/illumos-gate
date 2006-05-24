@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# All Rights Reserved, Copyright (c) FUJITSU LIMITED 2005
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -53,6 +51,6 @@ d none usr/lib 755 root bin
 f none usr/lib/dcs 755 root bin
 d none usr/platform 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
-d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root sys
-d none usr/platform/SUNW,SPARC-Enterprise/lib/sparcv9 755 root sys
-f none usr/platform/SUNW,SPARC-Enterprise/lib/sparcv9/oplhpd 755 root sys
+d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
+d none usr/platform/SUNW,SPARC-Enterprise/lib/sparcv9 755 root bin
+f none usr/platform/SUNW,SPARC-Enterprise/lib/sparcv9/oplhpd 755 root bin
