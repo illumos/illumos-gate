@@ -1046,8 +1046,8 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		if (sata_minorname_to_ap(minorname, &ap, &apbuflen, &cfglist,
 		    mod) != 0) {
 			topo_mod_dprintf(mod, "Could not translate minor node "
-			    "into an attachment point\n");
-			++nerr;
+			    "into an attachment point: ignoring sata-port=%d\n",
+			    i);
 			continue;
 		}
 
