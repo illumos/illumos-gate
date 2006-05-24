@@ -2366,25 +2366,35 @@ px_cpr_callb(void *arg, int code)
 	return (B_TRUE);
 }
 
-/*
- * fetch chip's range propery's value
- */
 uint64_t
-px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+px_get_rng_parent_hi_mask(px_t *px_p)
 {
 	pxu_t *pxu_p = (pxu_t *)px_p->px_plat_p;
-	uint64_t mask, range_prop;
+	uint64_t mask;
 
 	switch (PX_CHIP_TYPE(pxu_p)) {
 	case PX_CHIP_OBERON:
 		mask = OBERON_RANGE_PROP_MASK;
 		break;
 	case PX_CHIP_FIRE:
-		mask = FIRE_RANGE_PROP_MASK;
+		mask = PX_RANGE_PROP_MASK;
 		break;
 	default:
-		mask = FIRE_RANGE_PROP_MASK;
+		mask = PX_RANGE_PROP_MASK;
 	}
+
+	return (mask);
+}
+
+/*
+ * fetch chip's range propery's value
+ */
+uint64_t
+px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+{
+	uint64_t mask, range_prop;
+
+	mask = px_get_rng_parent_hi_mask(px_p);
 	range_prop = (((uint64_t)(rp[bank].parent_high & mask)) << 32) |
 		rp[bank].parent_low;
 

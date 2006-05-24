@@ -160,14 +160,10 @@ extern int px_lib_pmctl(int cmd, px_t *px_p);
 extern uint_t px_pmeq_intr(caddr_t arg);
 
 /*
- * PCI tool Functions:
+ * Common range property functions and definitions.
  */
-extern int px_lib_tools_dev_reg_ops(dev_info_t *dip, void *arg,
-    int cmd, int mode);
-extern int px_lib_tools_bus_reg_ops(dev_info_t *dip, void *arg, int cmd,
-    int mode);
-extern int px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd,
-    int mode);
+#define	PX_RANGE_PROP_MASK	0x7ff
+extern uint64_t px_get_rng_parent_hi_mask(px_t *px_p);
 
 /*
  * Peek and poke access ddi_ctlops helper functions

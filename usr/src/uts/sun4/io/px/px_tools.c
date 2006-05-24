@@ -345,7 +345,6 @@ pxtool_validate_barnum_bdf(pcitool_reg_t *prg)
 	return (rval);
 }
 
-
 /*
  * px_p defines which leaf, space defines which space in that leaf, offset
  * defines the offset within the specified space.
@@ -355,40 +354,50 @@ pxtool_validate_barnum_bdf(pcitool_reg_t *prg)
 static uintptr_t
 pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
 {
-	px_ranges_t	*rp;
 	uint64_t range_base;
 	int rval;
+	pci_regspec_t dev_regspec;
+	struct regspec xlated_regspec;
 	dev_info_t *dip = px_p->px_dip;
-	uint32_t base_offset = 0;
-	extern uint64_t px_get_range_prop(px_t *, px_ranges_t *, int);
 
 	/*
 	 * Assume that requested entity is small enough to be on the same page.
-	 * (Same starting and ending value "offset" passed to px_search_ranges.)
 	 * PCItool checks alignment so that this will be true for single
 	 * accesses.
-	 *
-	 * Base_offset is the offset from the specified address, where the
-	 * current range begins.  This is nonzero when a PCI space is split and
-	 * the address is inside the second or subsequent range.
-	 *
-	 * NOTE: offset is a uint64_t but px_search_ranges takes a uint32_t.
-	 * px_search_ranges should also take a uint64_t for base_offset.
-	 * RFE is to have px_search_ranges handle a uint64_t offset.
 	 */
-	rval = px_search_ranges(px_p, space, offset, offset, &rp,
-	    (uint32_t *)&base_offset);
+	dev_regspec.pci_phys_hi = space << PCI_REG_ADDR_SHIFT;
+	if (space == PCI_CONFIG_SPACE) {
+		dev_regspec.pci_phys_hi +=
+		    (offset & (PCI_REG_BDFR_M ^ PCI_REG_REG_M));
+		dev_regspec.pci_phys_low = offset & PCI_REG_REG_M;
+	} else {
+		dev_regspec.pci_phys_mid = offset >> 32;
+		dev_regspec.pci_phys_low = offset & 0xffffffff;
+	}
+	dev_regspec.pci_size_hi = 0;	/* Not used. */
+
+	/* Note: object is guaranteed to be within a page. */
+	dev_regspec.pci_size_low = 4;
+
+	rval = px_xlate_reg(px_p, &dev_regspec, &xlated_regspec);
+
 	DBG(DBG_TOOLS, dip,
-	    "space:0x%d, offset:0x%" PRIx64 ", base_offset:0x%" PRIx64 "\n",
-	    space, offset, base_offset);
+	    "space:0x%d, offset:0x%" PRIx64 "\n", space, offset);
 
 	if (rval != DDI_SUCCESS)
 		return (NULL);
-	else {
-		range_base = px_get_range_prop(px_p, rp, 0);
-		DBG(DBG_TOOLS, dip, "range base:0x%" PRIx64 "\n", range_base);
-		return (base_offset + range_base);
-	}
+
+	/* Bustype here returns the high order address bits. */
+	xlated_regspec.regspec_bustype &= px_get_rng_parent_hi_mask(px_p);
+
+	range_base = (((uint64_t)xlated_regspec.regspec_bustype) << 32) +
+	    xlated_regspec.regspec_addr;
+	DBG(DBG_TOOLS, dip,
+	    "regspec: hi:0x%x, lo:0x%x, sz:0x%x, range base:0x%" PRIx64 "\n",
+	    xlated_regspec.regspec_bustype, xlated_regspec.regspec_addr,
+	    xlated_regspec.regspec_size, range_base);
+
+	return ((uintptr_t)range_base);
 }
 
 
@@ -416,8 +425,7 @@ pxtool_get_bar(px_t *px_p, pcitool_reg_t *prg_p, uint64_t *bar_p,
 	 * sun4v acc function doesn't use phys_addr but uses cfg_prg.offset.
 	 */
 	cfg_prg.offset = PCI_BAR_OFFSET((*prg_p));
-	off_in_space = (PX_GET_BDF(prg_p) << PX_PCI_BDF_OFFSET_DELTA) +
-	    cfg_prg.offset;
+	off_in_space = PX_GET_BDF(prg_p) + cfg_prg.offset;
 	cfg_prg.phys_addr = pxtool_get_phys_addr(px_p, PCI_CONFIG_SPACE,
 	    off_in_space);
 
@@ -559,9 +567,6 @@ pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			goto done_reg;
 		}
 
-		off_in_space = (PX_GET_BDF(&prg) << PX_PCI_BDF_OFFSET_DELTA) +
-		    (uint32_t)prg.offset;
-
 		/*
 		 * For sun4v, config space base won't be known.
 		 * pxtool_get_phys_addr will return zero.
@@ -570,10 +575,21 @@ pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 		 *
 		 * For sun4u, assume that phys_addr will come back valid.
 		 */
-
-		/* Accessed entity is assumed small enough to be on one page. */
-		prg.phys_addr = pxtool_get_phys_addr(px_p, PCI_CONFIG_SPACE,
-		    off_in_space);
+		/*
+		 * Accessed entity is assumed small enough to be on one page.
+		 *
+		 * Since config space is less than a page and is aligned to
+		 * 0x1000, a device's entire config space will be on a single
+		 * page.  Pass the device's base config space address here,
+		 * then add the offset within that space later.  This works
+		 * around an issue in px_xlate_reg (called by
+		 * pxtool_get_phys_addr) which accepts only a 256 byte
+		 * range within a device.
+		 */
+		off_in_space = PX_GET_BDF(&prg);
+		prg.phys_addr =
+		    pxtool_get_phys_addr(px_p, PCI_CONFIG_SPACE, off_in_space);
+		prg.phys_addr += prg.offset;
 
 		DBG(DBG_TOOLS, dip,
 		    "off_in_space:0x%" PRIx64 ", phys_addr:0x%" PRIx64 ", "

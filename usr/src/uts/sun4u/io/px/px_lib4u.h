@@ -281,7 +281,6 @@ typedef enum {
 #define	FIRE_VER_10	PX_CHIP_ID(PX_CHIP_FIRE, 0x01, 0x00)
 #define	FIRE_VER_20	PX_CHIP_ID(PX_CHIP_FIRE, 0x03, 0x00)
 #define	OBERON_VER_10	PX_CHIP_ID(PX_CHIP_OBERON, 0x00, 0x00)
-#define	FIRE_RANGE_PROP_MASK	0x7ff
 #define	OBERON_RANGE_PROP_MASK	0x7fff
 
 extern void hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p);

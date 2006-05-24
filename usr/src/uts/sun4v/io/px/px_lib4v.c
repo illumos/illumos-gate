@@ -427,16 +427,11 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 	return (DDI_SUCCESS);
 }
 
-/*
- * fetch chip's range propery's value. For sun4v, config space base
- * is not used (pxtool_get_phys_addr) will return zero, so just return
- * zero for px_get_range_prop().
- */
 /*ARGSUSED*/
 uint64_t
-px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+px_get_rng_parent_hi_mask(px_t *px_p)
 {
-	return (0);
+	return (PX_RANGE_PROP_MASK);
 }
 
 /*

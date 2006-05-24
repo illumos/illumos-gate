@@ -203,14 +203,29 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	return (i < assign_entries ? DDI_SUCCESS : DDI_ME_INVAL);
 }
 
+/*
+ * use "ranges" to translate relocated pci regspec into parent space
+ */
 int
-px_search_ranges(px_t *px_p, uint32_t space_type, uint32_t reg_begin,
-    uint32_t reg_end, px_ranges_t **sel_rng_p, uint_t *base_offset_p)
+px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
 {
+	int n;
 	px_ranges_t *rng_p = px_p->px_ranges_p;
 	int rng_n = px_p->px_ranges_length / sizeof (px_ranges_t);
-	int n;
+
+	uint32_t space_type = PCI_REG_ADDR_G(px_rp->pci_phys_hi);
+	uint32_t reg_end, reg_begin = px_rp->pci_phys_low;
+	uint32_t sz = px_rp->pci_size_low;
+
 	uint32_t rng_begin, rng_end;
+
+	if (space_type == PCI_REG_ADDR_G(PCI_ADDR_CONFIG)) {
+		if (reg_begin > PCI_CONF_HDR_SIZE)
+			return (DDI_ME_INVAL);
+		sz = sz ? MIN(sz, PCI_CONF_HDR_SIZE) : PCI_CONF_HDR_SIZE;
+		reg_begin += px_rp->pci_phys_hi << 4;
+	}
+	reg_end = reg_begin + sz - 1;
 
 	for (n = 0; n < rng_n; n++, rng_p++) {
 		if (space_type != PCI_REG_ADDR_G(rng_p->child_high))
@@ -227,44 +242,14 @@ px_search_ranges(px_t *px_p, uint32_t space_type, uint32_t reg_begin,
 	if (n >= rng_n)
 		return (DDI_ME_REGSPEC_RANGE);
 
-	*base_offset_p = reg_begin - rng_begin + rng_p->parent_low;
-	*sel_rng_p = rng_p;
+	new_rp->regspec_addr = reg_begin - rng_begin + rng_p->parent_low;
+	new_rp->regspec_bustype = rng_p->parent_high;
+	new_rp->regspec_size = sz;
+	DBG(DBG_MAP | DBG_CONT, px_p->px_dip,
+		"\tpx_xlate_reg: entry %d new_rp %x.%x %x\n",
+		n, new_rp->regspec_bustype, new_rp->regspec_addr, sz);
 
 	return (DDI_SUCCESS);
-}
-
-/*
- * use "ranges" to translate relocated pci regspec into parent space
- */
-int
-px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
-{
-	uint32_t space_type = PCI_REG_ADDR_G(px_rp->pci_phys_hi);
-	uint32_t reg_end, reg_begin = px_rp->pci_phys_low;
-	uint32_t sz = px_rp->pci_size_low;
-	px_ranges_t *sel_rng_p;
-	int rval;
-
-	if (space_type == PCI_REG_ADDR_G(PCI_ADDR_CONFIG)) {
-		if (reg_begin > PCI_CONF_HDR_SIZE)
-			return (DDI_ME_INVAL);
-		sz = sz ? MIN(sz, PCI_CONF_HDR_SIZE) : PCI_CONF_HDR_SIZE;
-		reg_begin += px_rp->pci_phys_hi << 4;
-	}
-	reg_end = reg_begin + sz - 1;
-
-	if ((rval = px_search_ranges(px_p, space_type, reg_begin, reg_end,
-	    &sel_rng_p, &new_rp->regspec_addr)) == DDI_SUCCESS) {
-
-		new_rp->regspec_bustype = sel_rng_p->parent_high;
-		new_rp->regspec_size = sz;
-
-		DBG(DBG_MAP | DBG_CONT, px_p->px_dip,
-		    "\tpx_xlate_reg: new_rp %x.%x %x\n",
-		    new_rp->regspec_bustype, new_rp->regspec_addr, sz);
-	}
-
-	return (rval);
 }
 
 /*
