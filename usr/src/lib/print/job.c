@@ -48,6 +48,8 @@
 #include <print/list.h>
 
 
+#define	MAX_RETRIES	(5)
+
 	/*
 	 * These specify important strings in the job routines
 	 */
@@ -693,183 +695,221 @@ job_store(job_t *job)
 	return (0);
 }
 
+int
+get_job_from_cfile(jobfile_t *file, char *cFile, char *xFile, job_t *tmp)
+{
+	jobfile_t *file1;
+	int	n_cnt;
+	char	*p, *cfp;
+
+	/* map in the control data */
+	if ((file->jf_size = map_in_file(cFile, &file->jf_data, 0)) <= 0) {
+		syslog(LOG_INFO, "could not read control file (%s): %m, "
+		    "canceling %d destined for %s:%s",
+		    (file->jf_spl_path ? file->jf_spl_path:"NULL"),
+		    tmp->job_id,
+		    (tmp->job_server ? tmp->job_server : "NULL"),
+		    (tmp->job_printer ? tmp->job_printer : "NULL"));
+		return (0);
+	}
+	file->jf_mmapped = 1;
+	tmp->job_cf = file;
+
+	/* look for usr, host, & data files */
+
+	/*
+	 * Bugid 4137904 - "File Name" can be
+	 * anywhere in control file.
+	 * Bugid 4179341 - "File Name" can be missing
+	 * in control file.
+	 * Keep a separate pointer to the control file.
+	 * When a CF_UNLINK entry is found use the second
+	 * pointer to search for a corresponding 'N' entry.
+	 * The behavior is to associate the first CF_UNLINK
+	 * entry with the first 'N' entry and so on.
+	 * Note: n_cnt is only used to determine if we
+	 *	should test for 'N' at the beginning of
+	 *	the file.
+	 */
+	cfp = file->jf_data;
+	n_cnt = 0;
+	for (p = file->jf_data - 1; p != NULL; p = strchr(p, '\n')) {
+		switch (*(++p)) {
+		case CF_USER:
+			tmp->job_user = strcdup(++p, '\n');
+			break;
+		case CF_HOST:
+			tmp->job_host = strcdup(++p, '\n');
+			break;
+		case CF_UNLINK:
+			if ((file1 = calloc(1, sizeof (*file))) == NULL) {
+				syslog(LOG_DEBUG, "cf_unlink: calloc() failed");
+				munmap(file->jf_data, file->jf_size);
+				file->jf_mmapped = 0;
+				return (0);
+			}
+			file1->jf_src_path = strdup(xFile);
+			file1->jf_spl_path = strcdup(++p, '\n');
+			file1->jf_size = file_size(file1->jf_spl_path);
+
+			if (cfp != NULL) {
+				/*
+				 * Beginning of file. Check for first
+				 * character == 'N'
+				 */
+				if ((n_cnt == 0) && (*cfp == 'N')) {
+					cfp++;
+					n_cnt++;
+				} else {
+					cfp = strstr(cfp, "\nN");
+					if (cfp != NULL) {
+						cfp += 2;
+						n_cnt++;
+					}
+				}
+				if (cfp != NULL) {
+					file1->jf_name = strcdup(cfp, '\n');
+					/*
+					 * Move cfp to end of line or
+					 * set to NULL if end of file.
+					 */
+					cfp = strchr(cfp, '\n');
+				}
+			}
+			tmp->job_df_list = (jobfile_t **)list_append((void **)
+			    tmp->job_df_list, (void *)file1);
+			break;
+		}
+	}
+	if (tmp->job_df_list == NULL) {
+		munmap(file->jf_data, file->jf_size);
+		file->jf_mmapped = 0;
+		return (0);
+	}
+
+	return (1);
+}
 
 /*
- *  job_retreive() will retrieve the disk copy of a job associated with the
+ *  job_retrieve() will retrieve the disk copy of a job associated with the
  *	transfer file name passed in.  It returns a pointer to a job structure
  *	or a NULL if the job was not on disk.
  */
 job_t *
 job_retrieve(char *xFile, char *spool)
 {
+	int	n;
+	int	retry_cnt = 0;
+	char	*s;
+	jobfile_t *file, *file1;
+	char 	cFile[BUFSIZ];
+	char	buf[BUFSIZ];
+	int	fd, n_cnt, lck = 1;
+	char	*p, *cfp;
+	flock_t flk;
 	job_t	*tmp;
 
 	syslog(LOG_DEBUG, "job_retrieve(%s)", xFile);
-	if ((tmp = (job_t *)calloc(1, sizeof (*tmp))) != NULL) {
-		jobfile_t *file;
-		char	buf[BUFSIZ];
-		int	fd, n_cnt, lck = 1;
-		char	*p, *cfp;
-		flock_t flk;
+	if ((tmp = (job_t *)calloc(1, sizeof (*tmp))) == NULL) {
+		return (NULL);
+	}
 
-		flk.l_type = F_RDLCK;
-		flk.l_whence = 1;
-		flk.l_start = 0;
-		flk.l_len = 0;
+	if ((file = calloc(1, sizeof (*file))) == NULL) {
+		free(tmp);
+		return (NULL);
+	}
 
-		(void) memset(buf, NULL, sizeof (buf));
+	flk.l_type = F_RDLCK;
+	flk.l_whence = 1;
+	flk.l_start = 0;
+	flk.l_len = 0;
 
-		/* get printer & server */
-		if (((fd = open(xFile, O_RDONLY)) >= 0) &&
-			((lck = fcntl(fd, F_SETLK, &flk)) == 0) &&
-		    (read(fd, buf, sizeof (buf)) > 0)) {
-			char	*s;
+	(void) memset(buf, NULL, sizeof (buf));
+	/* get job id, from binding file name */
+	(void) strlcpy(buf, xFile + strlen(_xfer_file_prefix) + 1,
+	    sizeof (buf));
 
+	buf[3] = NULL;
+	tmp->job_id = atoi(buf);
+
+	/* Construct data file and control file names */
+	(void) strlcpy(cFile, _control_file_prefix, sizeof (cFile));
+	(void) strlcat(cFile, xFile + strlen(_xfer_file_prefix),
+	    sizeof (cFile));
+
+	/* remove data file and control file whenever xFile is removed */
+	if ((fd = open(xFile, O_RDONLY)) < 0) {
+		syslog(LOG_DEBUG, "job_retrieve(%s) open failed errno=%d",
+		    xFile, errno);
+		if (get_job_from_cfile(file, cFile, xFile, tmp))
+			job_destroy(tmp);
+		free(file);
+		free(tmp);
+		(void) unlink(xFile);
+		(void) unlink(cFile);
+		return (NULL);
+	}
+
+	/*
+	 * If failed to get a lock on the file, just return NULL. It will
+	 * be retried later.
+	 */
+	if ((lck = fcntl(fd, F_SETLK, &flk)) < 0) {
+		syslog(LOG_DEBUG, "job_retrieve(%s) lock failed errno=%d",
+		    xFile, errno);
+		close(fd);
+		free(file);
+		free(tmp);
+		return (NULL);
+	}
+
+	/*
+	 * Retry a few times if we failed to read or read returns 0, just
+	 * to make sure we tried hard before giving up. In practice,
+	 * there were cases of read() returning 0. To handle that
+	 * scenario just try a few times.
+	 */
+	for (retry_cnt = 0; retry_cnt < MAX_RETRIES; retry_cnt++) {
+		if ((n = read(fd, buf, sizeof (buf))) > 0) {
+			close(fd);
 			if ((s = strtok(buf, ":\n")) != NULL)
 				tmp->job_server = strdup(s);
 			if ((s = strtok(NULL, ":\n")) != NULL)
 				tmp->job_printer = strdup(s);
-			close(fd);
-		} else {
-			free(tmp);
-			if (fd >= 0)
-				close(fd);
-			if (lck == 0)
-				(void) unlink(xFile);
-			return (NULL);
-		}
-
-		/*
-		 * If file is corrupted, then job_server & job_printer
-		 * can be NULL. In that case return NULL
-		 */
-		if (tmp->job_server == NULL || tmp->job_printer == NULL)
-			return (NULL);
-
-		/* get job id, from binding file name */
-		(void) strlcpy(buf, xFile + strlen(_xfer_file_prefix) + 1,
-			sizeof (buf));
-		buf[3] = NULL;
-		tmp->job_id = atoi(buf);
-
-		/*
-		 * add control file and binding file names.  the will should
-		 * always only differ by the prefix.
-		 */
-		if ((file = calloc(1, sizeof (*file))) == NULL)
-			return (NULL);
-
-		(void) strlcpy(buf, _control_file_prefix, sizeof (buf));
-		(void) strlcat(buf, xFile + strlen(_xfer_file_prefix),
-				sizeof (buf));
-		file->jf_src_path = strdup(xFile);
-		file->jf_spl_path = strdup(buf);
-
-		/* map in the control data */
-		if ((file->jf_size = map_in_file(buf, &file->jf_data, 0))
-		    <= 0) {
-			syslog(LOG_INFO,
-	"could not read control (%s): %m, canceling %d destined for %s@%s",
-				(file->jf_spl_path ? file->jf_spl_path:"NULL"),
-				tmp->job_id,
-				(tmp->job_printer ? tmp->job_printer : "NULL"),
-				(tmp->job_server ? tmp->job_server : "NULL"));
-			(void) unlink(file->jf_spl_path);  /* control file */
-			(void) unlink(file->jf_src_path);  /* binding file */
-			free(tmp);
-			free(file);
-			return (NULL);
-		}
-		file->jf_mmapped = 1;
-		tmp->job_cf = file;
-
-		/* look for usr, host, & data files */
-
-		/*
-		 * Bugid 4137904 - "File Name" can be
-		 * anywhere in control file.
-		 * Bugid 4179341 - "File Name" can be missing
-		 * in control file.
-		 * Keep a separate pointer to the control file.
-		 * When a CF_UNLINK entry is found use the second
-		 * pointer to search for a corresponding 'N' entry.
-		 * The behavior is to associate the first CF_UNLINK
-		 * entry with the first 'N' entry and so on.
-		 * Note: n_cnt is only used to determine if we
-		 *	should test for 'N' at the beginning of
-		 *	the file.
-		 */
-		cfp = file->jf_data;
-		n_cnt = 0;
-		for (p = file->jf_data - 1; p != NULL; p = strchr(p, '\n')) {
-			switch (*(++p)) {
-			case CF_USER:
-				tmp->job_user = strcdup(++p, '\n');
-				break;
-			case CF_HOST:
-				tmp->job_host = strcdup(++p, '\n');
-				break;
-			case CF_UNLINK:
-				if ((file = calloc(1, sizeof (*file)))
-						== NULL) {
-					syslog(LOG_DEBUG,
-						"cf_unlink: calloc() failed");
-					if (tmp != NULL)
-						free(tmp);
-					return (NULL);
-				}
-				file ->jf_spl_path = strcdup(++p, '\n');
-				file->jf_size = file_size(file->jf_spl_path);
-
-				if (cfp != NULL) {
-					/*
-					 * Beginning of file. Check for first
-					 * character == 'N'
-					 */
-					if ((n_cnt == 0) && (*cfp == 'N')) {
-						cfp++;
-						n_cnt++;
-					} else {
-						cfp = strstr(cfp, "\nN");
-						if (cfp != NULL) {
-							cfp += 2;
-							n_cnt++;
-						}
-					}
-					if (cfp != NULL) {
-						file->jf_name =
-						    strcdup(cfp, '\n');
-						/*
-						 * Move cfp to end of line or
-						 * set to NULL if end of file.
-						 */
-						cfp = strchr(cfp, '\n');
-					}
-				}
-				tmp->job_df_list = (jobfile_t **)
-				    list_append((void **)
-					tmp->job_df_list,
-					(void *)file);
-				break;
-			}
-		}
-		if (tmp->job_df_list == NULL) {
-			syslog(LOG_DEBUG,
-	"Invalid control file (%s). Missing 'U' entry. "
-	"Canceling %d destined for %s@%s",
-				(file->jf_spl_path ? file->jf_spl_path:"NULL"),
-				tmp->job_id,
-				(tmp->job_printer ? tmp->job_printer : "NULL"),
-				(tmp->job_server ? tmp->job_server : "NULL"));
-			(void) unlink(file->jf_spl_path);  /* control file */
-			(void) unlink(file->jf_src_path);  /* binding file */
-			free(tmp);
-			free(file);
-			return (NULL);
-		} else {
-			tmp->job_spool_dir = strdup(spool);
+			syslog(LOG_DEBUG, "job_retrieve(%s) success - %s:%s",
+			    xFile, tmp->job_server, tmp->job_printer);
+			break;
 		}
 	}
+	/*
+	 * If failed to read after MAX_RETRIES, return NULL and remove xFile,
+	 * and cFile.
+	 */
+	if (retry_cnt == MAX_RETRIES) {
+		syslog(LOG_DEBUG, "job_retrieve(%s) unsuccessful", xFile);
+		if (get_job_from_cfile(file, cFile, xFile, tmp))
+			job_destroy(tmp);
+		free(file);
+		free(tmp);
+		(void) unlink(xFile);
+		(void) unlink(cFile);
+		return (NULL);
+	}
+
+	file->jf_src_path = strdup(xFile);
+	file->jf_spl_path = strdup(cFile);
+
+	if (!get_job_from_cfile(file, cFile, xFile, tmp)) {
+		(void) unlink(file->jf_spl_path);  /* control file */
+		(void) unlink(file->jf_src_path);  /* binding file */
+		free(file->jf_src_path);
+		free(file->jf_spl_path);
+		free(file);
+		free(tmp);
+		return (NULL);
+	}
+
+	tmp->job_spool_dir = strdup(spool);
 	return (tmp);
 }
 
