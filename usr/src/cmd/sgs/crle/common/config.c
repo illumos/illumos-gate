@@ -239,8 +239,8 @@ genconfig(Crle_desc * crle)
 	fltrtbl = (Rtc_fltr *)(CAST_PTRINT(char *, head->ch_fltr) + addr);
 	head->ch_flte = flteoff;
 	/* LINTED */
-	fltetbl = _fltetbl =
-		(Rtc_flte *)(CAST_PTRINT(char *, head->ch_flte) + addr);
+	fltetbl = _fltetbl = (Rtc_flte *)
+		(CAST_PTRINT(char *, head->ch_flte) + addr);
 
 	head->ch_str = stroff;
 	strtbl = _strtbl = (char *)(CAST_PTRINT(char *, head->ch_str) + addr);

@@ -200,7 +200,7 @@ extern Hash_ent *	get_hash(Hash_tbl *, Addr, Half, int);
 extern int		inspect(Crle_desc *, const char *, Half);
 extern Listnode *	list_append(List *, const void *);
 extern Hash_tbl *	make_hash(int, Hash_type, ulong_t);
-extern INSCFG_RET	inspectconfig(Crle_desc *);
+extern INSCFG_RET	inspectconfig(Crle_desc *, int);
 extern int		updateconfig(Crle_desc *);
 
 #ifdef	__cplusplus

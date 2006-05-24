@@ -109,6 +109,7 @@ typedef struct {
 	unsigned int	o_flags;
 } Objdir;
 
+/*ARGSUSED2*/
 int
 main(int argc, char **argv, char **envp)
 {
@@ -308,14 +309,13 @@ main(int argc, char **argv, char **envp)
 	 */
 	if ((crle.c_flags & CRLE_UPDATE) ||
 	    ((crle.c_flags & CRLE_CREAT) == 0)) {
-		switch (inspectconfig(&crle)) {
+		switch (inspectconfig(&crle, c_class)) {
 		case INSCFG_RET_OK:
 			if ((crle.c_flags & CRLE_UPDATE) == 0)
 				return (0);
 			break;
 		case INSCFG_RET_FAIL:
 			return (1);
-			break;
 		case INSCFG_RET_NEED64:
 			c_class = ELFCLASS64;
 			break;

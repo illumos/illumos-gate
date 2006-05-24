@@ -1085,10 +1085,10 @@ Bugid   Risk Synopsis
 6371877 LD_PROFILE_64 with gprof does not produce correct results on amd64
 6372082 ld -r erroneously creates .got section on i386
 6201866 amd64: linker symbol elimination is broken
-6372620 printstack() segfaults when called from static function 
+6372620 printstack() segfaults when called from static function (D)
 6380470 32-bit ld(1) incorrectly builds 64-bit relocatable objects
 6391407 Insufficient alignment of 32-bit object in archive makes ld segfault
-        (libelf component only)
+        (libelf component only) (D)
 6316708 LD_DEBUG should provide a means of identifying/isolating individual
         link-map lists
 6280209 elfdump cores on memory model 0x3
@@ -1103,3 +1103,4 @@ Bugid   Risk Synopsis
 6174390 crle configuration files are inconsistent across platforms (D)
 6426048 C++ exceptions broken in Nevada for amd64
 6429418 ld.so.1: need work-around for Nvidia drivers use of static TLS
+6429504 crle(1) shows wrong defaults for non-existent 64-bit config file

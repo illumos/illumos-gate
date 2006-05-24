@@ -39,5 +39,7 @@ LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
 ROOTPROG =	$(ROOTPROG64)
 
+lint:		$(LINTOUT64)
+
 include		../Makefile.targ
 include		../../Makefile.sub.64

@@ -207,8 +207,9 @@ getflags(Half flags)
  * Dump a configuration files information.  This routine is very close to the
  * scanconfig() in libcrle.
  */
+/*ARGSUSED2*/
 static INSCFG_RET
-scanconfig(Crle_desc * crle, Addr addr)
+scanconfig(Crle_desc * crle, Addr addr, int c_class)
 {
 	Rtc_id		*id;
 	Rtc_head	*head;
@@ -257,6 +258,16 @@ scanconfig(Crle_desc * crle, Addr addr)
 	/* 32-bit program with an existing 64-bit file? Restart. */
 	if (head->ch_cnflags & RTC_HDR_64)
 		return (INSCFG_RET_NEED64);
+
+	/*
+	 * 32-bit program with an existing 32-bit file, but the
+	 * user specified the -64 option? Abort
+	 */
+	if (c_class != ELFCLASS32) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
+			crle->c_name, crle->c_confil);
+		return (INSCFG_RET_FAIL);
+	}
 #endif
 	/*
 	 * Now that the ELFCLASS has been settled, ensure that the
@@ -302,12 +313,12 @@ scanconfig(Crle_desc * crle, Addr addr)
 		if (crle->c_flags & CRLE_UPDATE) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_UPDATEVER),
 				crle->c_name, crle->c_confil,
-				head->ch_version, RTC_VER_CURRENT);
+				(int)head->ch_version, RTC_VER_CURRENT);
 			return (INSCFG_RET_FAIL);
 		} else {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_PRINTVER),
 				crle->c_name, crle->c_confil,
-				head->ch_version, RTC_VER_CURRENT);
+				(int)head->ch_version, RTC_VER_CURRENT);
 		}
 	}
 
@@ -317,7 +328,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 	 */
 	if (head->ch_version == RTC_VER_ONE) {
 		(void) printf(MSG_INTL(MSG_ARG_UPDATE), crle->c_name,
-		    crle->c_confil, head->ch_version);
+		    crle->c_confil, (int)head->ch_version);
 	}
 
 
@@ -342,14 +353,14 @@ scanconfig(Crle_desc * crle, Addr addr)
 		else
 			fmt = MSG_ORIG(MSG_STR_EMPTY);
 
-		(void) printf(MSG_INTL(MSG_DMP_HEAD), head->ch_version,
+		(void) printf(MSG_INTL(MSG_DMP_HEAD), (int)head->ch_version,
 		    crle->c_confil, fmt);
 
 		/*
 		 * If the file has an id block, show the information
 		 */
 		if (id)
-		    printf(MSG_INTL(MSG_DMP_PLATFORM),
+		    (void) printf(MSG_INTL(MSG_DMP_PLATFORM),
 			conv_ehdr_class(id->id_class, CONV_FMT_ALTFILE),
 			conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE),
 			conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE));
@@ -732,8 +743,10 @@ scanconfig(Crle_desc * crle, Addr addr)
 	 * objects.
 	 */
 	if (head->ch_resbgn && ((crle->c_flags & CRLE_UPDATE) == 0))
-		(void) printf(MSG_INTL(MSG_DMP_RESV), head->ch_resbgn,
-		    head->ch_resend, (head->ch_resend - head->ch_resbgn));
+		(void) printf(MSG_INTL(MSG_DMP_RESV),
+			(u_longlong_t)head->ch_resbgn,
+			(u_longlong_t)head->ch_resend,
+			(u_longlong_t)(head->ch_resend - head->ch_resbgn));
 
 	/*
 	 * If there's no hash table there's nothing else to process.
@@ -971,7 +984,7 @@ scanconfig(Crle_desc * crle, Addr addr)
 
 
 INSCFG_RET
-inspectconfig(Crle_desc * crle)
+inspectconfig(Crle_desc * crle, int c_class)
 {
 	INSCFG_RET	error;
 	int		fd;
@@ -985,7 +998,13 @@ inspectconfig(Crle_desc * crle)
 	if ((fd = open(file, O_RDONLY, 0)) == -1) {
 		int	err = errno;
 
-		if ((err == ENOENT)) {
+		if (err == ENOENT) {
+#ifndef _ELF64
+			/* Must restart if user requested a 64-bit file */
+			if (c_class == ELFCLASS64)
+				return (INSCFG_RET_NEED64);
+#endif
+
 			/*
 			 * To allow an update (-u) from scratch, fabricate any
 			 * default search and secure paths that the user
@@ -994,21 +1013,21 @@ inspectconfig(Crle_desc * crle)
 			if (crle->c_flags & CRLE_UPDATE) {
 				if (crle->c_flags & CRLE_EDLIB) {
 					if (fablib(crle, CRLE_EDLIB))
-						return (1);
+						return (INSCFG_RET_FAIL);
 				}
 				if (crle->c_flags & CRLE_ESLIB) {
 					if (fablib(crle, CRLE_ESLIB))
-						return (1);
+						return (INSCFG_RET_FAIL);
 				}
 				if (crle->c_flags & CRLE_ADLIB) {
 					if (fablib(crle, CRLE_ADLIB))
-						return (1);
+						return (INSCFG_RET_FAIL);
 				}
 				if (crle->c_flags & CRLE_ASLIB) {
 					if (fablib(crle, CRLE_ASLIB))
-						return (1);
+						return (INSCFG_RET_FAIL);
 				}
-				return (0);
+				return (INSCFG_RET_OK);
 
 			} else if (crle->c_flags & CRLE_CONFDEF) {
 				const char	*fmt1, *fmt2;
@@ -1019,6 +1038,14 @@ inspectconfig(Crle_desc * crle)
 				 * them and display the ELF defaults.
 				 */
 				(void) printf(MSG_INTL(MSG_DEF_NOCONF), file);
+				(void) printf(MSG_INTL(MSG_DMP_PLATFORM),
+					conv_ehdr_class(M_CLASS,
+						CONV_FMT_ALTFILE),
+					conv_ehdr_data(M_DATA,
+						CONV_FMT_ALTFILE),
+					conv_ehdr_mach(M_MACH,
+						CONV_FMT_ALTFILE));
+
 
 				if (crle->c_flags & CRLE_AOUT) {
 					fmt1 = MSG_INTL(MSG_DEF_AOUTDLP);
@@ -1045,7 +1072,7 @@ inspectconfig(Crle_desc * crle)
 				(void) printf(fmt1);
 				(void) printf(fmt2);
 
-				return (0);
+				return (INSCFG_RET_OK);
 			}
 		}
 
@@ -1055,14 +1082,14 @@ inspectconfig(Crle_desc * crle)
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_OPEN), caller, file,
 		    strerror(err));
 
-		return (1);
+		return (INSCFG_RET_FAIL);
 	}
 
 	(void) fstat(fd, &status);
 	if (status.st_size < sizeof (Rtc_head)) {
 		(void) close(fd);
 		(void) fprintf(stderr, MSG_INTL(MSG_COR_TRUNC), caller, file);
-		return (1);
+		return (INSCFG_RET_FAIL);
 	}
 	if ((addr = (Addr)mmap(0, status.st_size, PROT_READ, MAP_SHARED,
 	    fd, 0)) == (Addr)MAP_FAILED) {
@@ -1070,14 +1097,14 @@ inspectconfig(Crle_desc * crle)
 		(void) fprintf(stderr, MSG_INTL(MSG_SYS_MMAP), caller, file,
 		    strerror(err));
 		(void) close(fd);
-		return (1);
+		return (INSCFG_RET_FAIL);
 	}
 	(void) close(fd);
 
 	/*
 	 * Print the contents of the configuration file.
 	 */
-	error = scanconfig(crle, addr);
+	error = scanconfig(crle, addr, c_class);
 
 	(void) munmap((void *)addr, status.st_size);
 	return (error);

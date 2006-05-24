@@ -65,16 +65,16 @@
 			 dynamic executables: %s: %s\n"
 @ MSG_ARG_ALT		"%s: %s: cannot override original file with \
 			 alternative; specify -o\n"
-@ MSG_ARG_UPDATE	"%s: %s: version [%lu] of configuration file provides \
+@ MSG_ARG_UPDATE	"%s: %s: version [%d] of configuration file provides \
 			 limited update (-u) and command-line regeneration \
 			 capabilities: best effort in effect\n"
-@ MSG_ARG_UPDATEVER	"%s: %s: file version [%lu] newer than crle version \
-			[%lu]. Unable to update\n"
-@ MSG_ARG_PRINTVER	"%s: %s: file version [%lu] newer than crle version \
-			[%lu]. Displayed information may be incomplete\n"
-@ MSG_ARG_CLASS		"%s: %s: 32-bit file update is incompatible with -64 \
+@ MSG_ARG_UPDATEVER	"%s: %s: file version [%d] newer than crle version \
+			[%d]. Unable to update\n"
+@ MSG_ARG_PRINTVER	"%s: %s: file version [%d] newer than crle version \
+			[%d]. Displayed information may be incomplete\n"
+@ MSG_ARG_CLASS		"%s: %s: 32-bit file is incompatible with -64 \
 			 option\n"
-@ MSG_ARG_WRONGARCH	"%s: %s: %s %s file update is incompatible with \
+@ MSG_ARG_WRONGARCH	"%s: %s: %s %s file is incompatible with \
 			%s %s version of crle\n"
 
 @ MSG_WARN_ENV		"%s: warning: %.*s: environment variable \
@@ -171,7 +171,7 @@
 
 # Dump strings
 
-@ MSG_DMP_HEAD		"\nConfiguration file [version %lu]: %s  %s\n"
+@ MSG_DMP_HEAD		"\nConfiguration file [version %d]: %s  %s\n"
 @ MSG_DMP_PLATFORM	"  Platform:\t%s %s %s\n"
 @ MSG_DMP_APP		"  Specific application: %s  (original: %s)\n" 
 @ MSG_DMP_DLIBPTH	"  Default Library Path (%s):\t%s\n"
