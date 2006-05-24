@@ -62,12 +62,7 @@ typedef struct aggr_port_s {
 			lp_tx_enabled : 1,
 			lp_collector_enabled : 1,
 			lp_promisc_on : 1,
-			/*
-			 * Indicates whether it is in the process of setting
-			 * MAC address to the aggregation group MAC
-			 */
-			lp_set_grpmac : 1,
-			lp_pad_bits : 27;
+			lp_pad_bits : 28;
 	uint32_t	lp_closing;
 	uint_t		lp_port;
 	mac_handle_t	lp_mh;
@@ -108,11 +103,11 @@ typedef struct aggr_grp_s {
 	uint16_t	lg_nports;		/* number of MAC ports */
 	uint8_t		lg_addr[ETHERADDRL];	/* group MAC address */
 	uint16_t
+			lg_closing : 1,
 			lg_addr_fixed : 1,	/* fixed MAC address? */
 			lg_started : 1,		/* group started? */
 			lg_promisc : 1,		/* in promiscuous mode? */
-			lg_pad_bits : 13;
-	uint32_t	lg_closing;
+			lg_pad_bits : 12;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_t		lg_mac;
@@ -178,10 +173,11 @@ extern int aggr_grp_info(uint_t *, uint32_t, void *,
 extern void aggr_grp_notify(aggr_grp_t *, uint32_t);
 extern boolean_t aggr_grp_attach_port(aggr_grp_t *, aggr_port_t *);
 extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *);
-extern boolean_t aggr_grp_port_mac_changed(aggr_grp_t *, aggr_port_t *);
+extern void aggr_grp_port_mac_changed(aggr_grp_t *, aggr_port_t *,
+    boolean_t *, boolean_t *);
 extern int aggr_grp_add_ports(uint32_t, uint_t, laioc_port_t *);
 extern int aggr_grp_rem_ports(uint32_t, uint_t, laioc_port_t *);
-extern void aggr_grp_update_ports_mac(aggr_grp_t *);
+extern boolean_t aggr_grp_update_ports_mac(aggr_grp_t *);
 extern int aggr_grp_modify(uint32_t, aggr_grp_t *, uint8_t, uint32_t,
     boolean_t, const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);

@@ -69,7 +69,8 @@ static void aggr_m_resources(void *);
 static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
 
 static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, const char *, uint32_t);
-static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *);
+static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
+    boolean_t *);
 static void aggr_stats_op(enum mac_stat, uint64_t *, uint64_t *, boolean_t);
 static void aggr_grp_capab_set(aggr_grp_t *);
 static boolean_t aggr_grp_capab_check(aggr_grp_t *, aggr_port_t *);
@@ -170,7 +171,7 @@ aggr_grp_count(void)
 boolean_t
 aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 {
-	boolean_t link_changed = B_FALSE;
+	boolean_t link_state_changed = B_FALSE;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
@@ -199,7 +200,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		 * attached.
 		 */
 		grp->lg_ifspeed = port->lp_ifspeed;
-		link_changed = B_TRUE;
+		link_state_changed = B_TRUE;
 	} else if (grp->lg_ifspeed != port->lp_ifspeed) {
 		/*
 		 * The link speed of the MAC port must be the same as
@@ -217,7 +218,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	if (grp->lg_link_state != LINK_STATE_UP) {
 		grp->lg_link_state = LINK_STATE_UP;
 		grp->lg_link_duplex = LINK_DUPLEX_FULL;
-		link_changed = B_TRUE;
+		link_state_changed = B_TRUE;
 	}
 
 	aggr_grp_multicst_port(port, B_TRUE);
@@ -245,13 +246,13 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	else
 		aggr_lacp_port_attached(port);
 
-	return (link_changed);
+	return (link_state_changed);
 }
 
 boolean_t
 aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 {
-	boolean_t link_changed = B_FALSE;
+	boolean_t link_state_changed = B_FALSE;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
@@ -277,10 +278,10 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 		grp->lg_ifspeed = 0;
 		grp->lg_link_state = LINK_STATE_DOWN;
 		grp->lg_link_duplex = LINK_DUPLEX_UNKNOWN;
-		link_changed = B_TRUE;
+		link_state_changed = B_TRUE;
 	}
 
-	return (link_changed);
+	return (link_state_changed);
 }
 
 /*
@@ -292,48 +293,73 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
  *   that port was used for the MAC address of the group.
  * - after the MAC address of a port changed when the MAC address
  *   of that port was used for the MAC address of the group.
+ *
+ * Return true if the link state of the aggregation changed, for example
+ * as a result of a failure changing the MAC address of one of the
+ * constituent ports.
  */
-void
+boolean_t
 aggr_grp_update_ports_mac(aggr_grp_t *grp)
 {
 	aggr_port_t *cport;
+	boolean_t link_state_changed = B_FALSE;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+
+	if (grp->lg_closing)
+		return (link_state_changed);
 
 	for (cport = grp->lg_ports; cport != NULL;
 	    cport = cport->lp_next) {
 		rw_enter(&cport->lp_lock, RW_WRITER);
-		if (aggr_port_unicst(cport, grp->lg_addr) != 0)
-			(void) aggr_grp_detach_port(grp, cport);
+		if (aggr_port_unicst(cport, grp->lg_addr) != 0) {
+			link_state_changed = link_state_changed ||
+			    aggr_grp_detach_port(grp, cport);
+		} else {
+			/*
+			 * If a port was detached because of a previous
+			 * failure changing the MAC address, the port is
+			 * reattached when it successfully changes the MAC
+			 * address now, and this might cause the link state
+			 * of the aggregation to change.
+			 */
+			link_state_changed = link_state_changed ||
+			    aggr_grp_attach_port(grp, cport);
+		}
 		rw_exit(&cport->lp_lock);
-		if (grp->lg_closing)
-			break;
 	}
+	return (link_state_changed);
 }
 
 /*
  * Invoked when the MAC address of a port has changed. If the port's
- * MAC address was used for the group MAC address, returns B_TRUE.
- * In that case, it is the responsibility of the caller to
- * invoke aggr_grp_update_ports_mac() after releasing the
- * the port lock, and aggr_grp_notify() after releasing the
- * group lock.
+ * MAC address was used for the group MAC address, set mac_addr_changedp
+ * to B_TRUE to indicate to the caller that it should send a MAC_NOTE_UNICST
+ * notification. If the link state changes due to detach/attach of
+ * the constituent port, set link_state_changedp to B_TRUE to indicate
+ * to the caller that it should send a MAC_NOTE_LINK notification. In both
+ * cases, it is the responsibility of the caller to invoke notification
+ * functions after releasing the the port lock.
  */
-boolean_t
-aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port)
+void
+aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
+    boolean_t *mac_addr_changedp, boolean_t *link_state_changedp)
 {
-	boolean_t grp_addr_changed = B_FALSE;
-
 	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(mac_addr_changedp != NULL);
+	ASSERT(link_state_changedp != NULL);
+
+	*mac_addr_changedp = B_FALSE;
+	*link_state_changedp = B_FALSE;
 
 	if (grp->lg_addr_fixed) {
 		/*
 		 * The group is using a fixed MAC address or an automatic
 		 * MAC address has not been set.
 		 */
-		return (B_FALSE);
+		return;
 	}
 
 	if (grp->lg_mac_addr_port == port) {
@@ -342,17 +368,25 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port)
 		 * MAC address. Update the group MAC address.
 		 */
 		bcopy(port->lp_addr, grp->lg_addr, ETHERADDRL);
-		grp_addr_changed = B_TRUE;
+		*mac_addr_changedp = B_TRUE;
 	} else {
 		/*
 		 * Update the actual port MAC address to the MAC address
 		 * of the group.
 		 */
-		if (aggr_port_unicst(port, grp->lg_addr) != 0)
-			(void) aggr_grp_detach_port(grp, port);
+		if (aggr_port_unicst(port, grp->lg_addr) != 0) {
+			*link_state_changedp = aggr_grp_detach_port(grp, port);
+		} else {
+			/*
+			 * If a port was detached because of a previous
+			 * failure changing the MAC address, the port is
+			 * reattached when it successfully changes the MAC
+			 * address now, and this might cause the link state
+			 * of the aggregation to change.
+			 */
+			*link_state_changedp = aggr_grp_attach_port(grp, port);
+		}
 	}
-
-	return (grp_addr_changed);
 }
 
 /*
@@ -458,7 +492,8 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	}
 
 	/* update the MAC address of the constituent ports */
-	aggr_grp_update_ports_mac(grp);
+	if (aggr_grp_update_ports_mac(grp))
+		mac_link_update(&grp->lg_mac, grp->lg_link_state);
 
 bail:
 	if (rc != 0) {
@@ -472,7 +507,7 @@ bail:
 				aggr_port_stop(port);
 				rw_exit(&port->lp_lock);
 			}
-			(void) aggr_grp_rem_port(grp, port, NULL);
+			(void) aggr_grp_rem_port(grp, port, NULL, NULL);
 		}
 	}
 
@@ -495,6 +530,7 @@ aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
 	int rc = 0;
 	aggr_grp_t *grp = NULL;
 	boolean_t mac_addr_changed = B_FALSE;
+	boolean_t link_state_changed = B_FALSE;
 
 	if (grp_arg == NULL) {
 		/* get group corresponding to key */
@@ -550,7 +586,7 @@ aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
 	}
 
 	if (mac_addr_changed)
-		aggr_grp_update_ports_mac(grp);
+		link_state_changed = aggr_grp_update_ports_mac(grp);
 
 	if (update_mask & AGGR_MODIFY_LACP_MODE)
 		aggr_lacp_update_mode(grp, lacp_mode);
@@ -559,15 +595,26 @@ aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
 		aggr_lacp_update_timer(grp, lacp_timer);
 
 bail:
+	if (grp != NULL && !grp->lg_closing) {
+		/*
+		 * If grp_arg is non-NULL, this function is called from
+		 * mac_unicst_set(), and the MAC_NOTE_UNICST notification
+		 * will be sent there.
+		 */
+		if ((grp_arg == NULL) && mac_addr_changed)
+			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
+
+		if (link_state_changed)
+			mac_link_update(&grp->lg_mac, grp->lg_link_state);
+
+	}
+
 	if (grp_arg == NULL) {
 		if (grp != NULL) {
 			rw_exit(&grp->lg_lock);
 			AGGR_LACP_UNLOCK(grp);
 		}
 		rw_exit(&aggr_grp_lock);
-		/* pass new unicast address up to MAC layer */
-		if (grp != NULL && mac_addr_changed && !grp->lg_closing)
-			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
 	}
 
 	if (grp != NULL)
@@ -589,6 +636,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	aggr_port_t *port;
 	mac_t *mac;
 	mac_info_t *mip;
+	boolean_t link_state_changed;
 	int err;
 	int i;
 
@@ -612,7 +660,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	grp->lg_refs = 1;
-	grp->lg_closing = 0;
+	grp->lg_closing = B_FALSE;
 	grp->lg_key = key;
 
 	grp->lg_ifspeed = 0;
@@ -652,8 +700,13 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 		grp->lg_mac_addr_port = grp->lg_ports;
 	}
 
-	/* update the MAC address of the constituent ports */
-	aggr_grp_update_ports_mac(grp);
+	/*
+	 * Update the MAC address of the constituent ports.
+	 * None of the port is attached at this time, the link state of the
+	 * aggregation will not change.
+	 */
+	link_state_changed = aggr_grp_update_ports_mac(grp);
+	ASSERT(!link_state_changed);
 
 	/* update outbound load balancing policy */
 	aggr_send_update_policy(grp, policy);
@@ -715,7 +768,7 @@ bail:
 	if (grp != NULL) {
 		aggr_port_t *cport;
 
-		atomic_add_32(&grp->lg_closing, 1);
+		grp->lg_closing = B_TRUE;
 
 		port = grp->lg_ports;
 		while (port != NULL) {
@@ -758,25 +811,28 @@ aggr_grp_port_lookup(aggr_grp_t *grp, const char *devname, uint32_t portnum)
  * Stop, detach and remove a port from a link aggregation group.
  */
 static int
-aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t *do_notify)
+aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
+    boolean_t *mac_addr_changedp, boolean_t *link_state_changedp)
 {
+	int rc = 0;
 	aggr_port_t **pport;
-	boolean_t grp_mac_addr_changed = B_FALSE;
+	boolean_t mac_addr_changed = B_FALSE;
+	boolean_t link_state_changed = B_FALSE;
 	uint64_t val;
 	uint_t i;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(grp->lg_nports > 1);
-
-	if (do_notify != NULL)
-		*do_notify = B_FALSE;
+	ASSERT(!grp->lg_closing);
 
 	/* unlink port */
 	for (pport = &grp->lg_ports; *pport != port;
 	    pport = &(*pport)->lp_next) {
-		if (*pport == NULL)
-			return (ENOENT);
+		if (*pport == NULL) {
+			rc = ENOENT;
+			goto done;
+		}
 	}
 	*pport = port->lp_next;
 
@@ -796,10 +852,10 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t *do_notify)
 		 */
 		bcopy(grp->lg_ports->lp_addr, grp->lg_addr, ETHERADDRL);
 		grp->lg_mac_addr_port = grp->lg_ports;
-		grp_mac_addr_changed = B_TRUE;
+		mac_addr_changed = B_TRUE;
 	}
 
-	(void) aggr_grp_detach_port(grp, port);
+	link_state_changed = aggr_grp_detach_port(grp, port);
 
 	/*
 	 * Add the statistics of the ports while it was aggregated
@@ -829,17 +885,17 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t *do_notify)
 	 * the remaining consistuent ports according to the new MAC
 	 * address of the group.
 	 */
-	if (grp->lg_closing) {
-		*do_notify = B_FALSE;
-	} else {
-		if (grp_mac_addr_changed)
-			aggr_grp_update_ports_mac(grp);
+	if (mac_addr_changed)
+		link_state_changed = link_state_changed ||
+		    aggr_grp_update_ports_mac(grp);
 
-		if (do_notify != NULL)
-			*do_notify = grp_mac_addr_changed;
-	}
+done:
+	if (mac_addr_changedp != NULL)
+		*mac_addr_changedp = mac_addr_changed;
+	if (link_state_changedp != NULL)
+		*link_state_changedp = link_state_changed;
 
-	return (0);
+	return (rc);
 }
 
 /*
@@ -851,7 +907,8 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	int rc = 0, i;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
-	boolean_t notify = B_FALSE, grp_mac_addr_changed;
+	boolean_t mac_addr_update = B_FALSE, mac_addr_changed;
+	boolean_t link_state_update = B_FALSE, link_state_changed;
 
 	/* get group corresponding to key */
 	rw_enter(&aggr_grp_lock, RW_READER);
@@ -897,17 +954,21 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 		}
 
 		/* remove port from group */
-		rc = aggr_grp_rem_port(grp, port, &grp_mac_addr_changed);
+		rc = aggr_grp_rem_port(grp, port, &mac_addr_changed,
+		    &link_state_changed);
 		ASSERT(rc == 0);
-		notify = notify || grp_mac_addr_changed;
+		mac_addr_update = mac_addr_update || mac_addr_changed;
+		link_state_update = link_state_update || link_state_changed;
 	}
 
 bail:
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
-	if (notify && !grp->lg_closing)
+	if (mac_addr_update)
 		mac_unicst_update(&grp->lg_mac, grp->lg_addr);
-	if (rc == 0 && !grp->lg_closing)
+	if (link_state_update)
+		mac_link_update(&grp->lg_mac, grp->lg_link_state);
+	if (rc == 0)
 		mac_resource_update(&grp->lg_mac);
 	AGGR_GRP_REFRELE(grp);
 
@@ -929,10 +990,10 @@ aggr_grp_delete(uint32_t key)
 		return (ENOENT);
 	}
 
-	atomic_add_32(&grp->lg_closing, 1);
-
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
+
+	grp->lg_closing = B_TRUE;
 
 	/*
 	 * Unregister from the MAC service module. Since this can
@@ -1176,10 +1237,13 @@ aggr_m_promisc(void *arg, boolean_t on)
 {
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
+	boolean_t link_state_changed = B_FALSE;
 
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	AGGR_GRP_REFHOLD(grp);
+
+	ASSERT(!grp->lg_closing);
 
 	if (on == grp->lg_promisc)
 		goto bail;
@@ -1188,16 +1252,29 @@ aggr_m_promisc(void *arg, boolean_t on)
 		rw_enter(&port->lp_lock, RW_WRITER);
 		AGGR_PORT_REFHOLD(port);
 		if (port->lp_started) {
-			if (aggr_port_promisc(port, on) != 0)
-				(void) aggr_grp_detach_port(grp, port);
+			if (aggr_port_promisc(port, on) != 0) {
+				link_state_changed = link_state_changed ||
+				    aggr_grp_detach_port(grp, port);
+			} else {
+				/*
+				 * If a port was detached because of a previous
+				 * failure changing the promiscuity, the port
+				 * is reattached when it successfully changes
+				 * the promiscuity now, and this might cause
+				 * the link state of the aggregation to change.
+				 */
+				link_state_changed = link_state_changed ||
+				    aggr_grp_attach_port(grp, port);
+			}
 		}
 		rw_exit(&port->lp_lock);
 		AGGR_PORT_REFRELE(port);
-		if (grp->lg_closing)
-			break;
 	}
 
 	grp->lg_promisc = on;
+
+	if (link_state_changed)
+		mac_link_update(&grp->lg_mac, grp->lg_link_state);
 
 bail:
 	rw_exit(&grp->lg_lock);

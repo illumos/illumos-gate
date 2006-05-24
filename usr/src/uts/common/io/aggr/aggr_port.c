@@ -129,7 +129,6 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	port->lp_port = portnum;
 	(void) strlcpy(port->lp_devname, name, sizeof (port->lp_devname));
 	port->lp_closing = 0;
-	port->lp_set_grpmac = B_FALSE;
 
 	/* get the port's original MAC address */
 	mac_unicst_get(port->lp_mh, port->lp_addr);
@@ -208,7 +207,7 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 {
 	boolean_t do_attach = B_FALSE;
 	boolean_t do_detach = B_FALSE;
-	boolean_t grp_link_changed = B_TRUE;
+	boolean_t link_state_changed = B_TRUE;
 	uint64_t ifspeed;
 	link_state_t link_state;
 	link_duplex_t link_duplex;
@@ -249,64 +248,75 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 
 	if (do_attach) {
 		/* attempt to attach the port to the aggregation */
-		grp_link_changed = aggr_grp_attach_port(grp, port);
+		link_state_changed = aggr_grp_attach_port(grp, port);
 	} else if (do_detach) {
 		/* detach the port from the aggregation */
-		grp_link_changed = aggr_grp_detach_port(grp, port);
+		link_state_changed = aggr_grp_detach_port(grp, port);
 	}
 
 	rw_exit(&port->lp_lock);
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
 
-	return (grp_link_changed);
+	return (link_state_changed);
 }
 
 /*
  * Invoked upon receiving a MAC_NOTE_UNICST for one of the constituent
  * ports of a group.
  */
-static boolean_t
-aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port)
+static void
+aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port,
+    boolean_t *mac_addr_changedp, boolean_t *link_state_changedp)
 {
-	boolean_t grp_mac_changed;
+	boolean_t mac_addr_changed = B_FALSE;
+	boolean_t link_state_changed = B_FALSE;
+	uint8_t mac_addr[ETHERADDRL];
+
+	ASSERT(mac_addr_changedp != NULL);
+	ASSERT(link_state_changedp != NULL);
+
+	AGGR_LACP_LOCK(grp);
+	rw_enter(&grp->lg_lock, RW_WRITER);
+
+	rw_enter(&port->lp_lock, RW_WRITER);
 
 	/*
 	 * If it is called when setting the MAC address to the
 	 * aggregation group MAC address, do nothing.
 	 */
-	if (port->lp_set_grpmac)
-		return (B_FALSE);
-
-	AGGR_LACP_LOCK(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
-	rw_enter(&port->lp_lock, RW_WRITER);
+	mac_unicst_get(port->lp_mh, mac_addr);
+	if (bcmp(mac_addr, grp->lg_addr, ETHERADDRL) == 0) {
+		rw_exit(&port->lp_lock);
+		goto done;
+	}
 
 	/* save the new port MAC address */
-	mac_unicst_get(port->lp_mh, port->lp_addr);
+	bcopy(mac_addr, port->lp_addr, ETHERADDRL);
 
-	grp_mac_changed = aggr_grp_port_mac_changed(grp, port);
+	aggr_grp_port_mac_changed(grp, port, &mac_addr_changed,
+	    &link_state_changed);
 
 	rw_exit(&port->lp_lock);
 
-	if (grp->lg_closing) {
-		rw_exit(&grp->lg_lock);
-		AGGR_LACP_UNLOCK(grp);
-		return (B_FALSE);
-	}
+	if (grp->lg_closing)
+		goto done;
 
 	/*
 	 * If this port was used to determine the MAC address of
 	 * the group, update the MAC address of the constituent
 	 * ports.
 	 */
-	if (grp_mac_changed)
-		aggr_grp_update_ports_mac(grp);
+	if (mac_addr_changed) {
+		link_state_changed = link_state_changed ||
+		    aggr_grp_update_ports_mac(grp);
+	}
 
+done:
+	*mac_addr_changedp = mac_addr_changed;
+	*link_state_changedp = link_state_changed;
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
-
-	return (grp_mac_changed);
 }
 
 /*
@@ -318,6 +328,7 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 {
 	aggr_port_t *port = arg;
 	aggr_grp_t *grp = port->lp_grp;
+	boolean_t mac_addr_changed, link_state_changed;
 
 	/*
 	 * Do nothing if the aggregation or the port is in the deletion
@@ -337,8 +348,12 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 			mac_link_update(&grp->lg_mac, grp->lg_link_state);
 		break;
 	case MAC_NOTE_UNICST:
-		if (aggr_port_notify_unicst(grp, port))
+		aggr_port_notify_unicst(grp, port, &mac_addr_changed,
+		    &link_state_changed);
+		if (mac_addr_changed)
 			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
+		if (link_state_changed)
+			mac_link_update(&grp->lg_mac, grp->lg_link_state);
 		break;
 	case MAC_NOTE_PROMISC:
 		port->lp_txinfo = mac_tx_get(port->lp_mh);
@@ -414,15 +429,7 @@ aggr_port_unicst(aggr_port_t *port, uint8_t *macaddr)
 
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 
-	/*
-	 * set lp_set_grpmac to indicate it is going to set the MAC
-	 * address to the aggregation MAC address.
-	 */
-	port->lp_set_grpmac = B_TRUE;
-
 	rc = mac_unicst_set(port->lp_mh, macaddr);
-
-	port->lp_set_grpmac = B_FALSE;
 
 	return (rc);
 }
