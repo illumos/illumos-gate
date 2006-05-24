@@ -792,6 +792,11 @@ anon_resvmem(size_t size, uint_t takemem)
 	 * swapfs_reserve is minimum of 4Mb or 1/16 of physmem.
 	 *
 	 */
+	mutex_exit(&anoninfo_lock);
+	(void) page_reclaim_mem(mswap_pages,
+	    swapfs_minfree + swapfs_reserve, 0);
+	mutex_enter(&anoninfo_lock);
+
 	mutex_enter(&freemem_lock);
 	if (availrmem > (swapfs_minfree + swapfs_reserve + mswap_pages) ||
 		(availrmem > (swapfs_minfree + mswap_pages) &&
@@ -3093,14 +3098,10 @@ anon_swap_adjust(pgcnt_t npages)
 		 * if there is not enough unlocked mem swap we take missing
 		 * amount from phys swap and give it to mem swap
 		 */
-		mutex_enter(&freemem_lock);
-		if (availrmem < adjusted_swap + segspt_minfree) {
-			mutex_exit(&freemem_lock);
+		if (!page_reclaim_mem(adjusted_swap, segspt_minfree, 1)) {
 			mutex_exit(&anoninfo_lock);
 			return (ENOMEM);
 		}
-		availrmem -= adjusted_swap;
-		mutex_exit(&freemem_lock);
 
 		k_anoninfo.ani_mem_resv += adjusted_swap;
 		ASSERT(k_anoninfo.ani_phys_resv >= adjusted_swap);

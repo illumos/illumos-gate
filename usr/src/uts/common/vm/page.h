@@ -750,6 +750,7 @@ void	page_clrtoxic(page_t *, uchar_t);
 void	page_settoxic(page_t *, uchar_t);
 
 int	page_mem_avail(pgcnt_t);
+int	page_reclaim_mem(pgcnt_t, pgcnt_t, int);
 
 void page_set_props(page_t *, uint_t);
 void page_clr_all_props(page_t *);

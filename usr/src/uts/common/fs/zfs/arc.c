@@ -1110,6 +1110,8 @@ arc_flush(void)
 void
 arc_kmem_reclaim(void)
 {
+	uint64_t to_free;
+
 	/* Remove 12.5% */
 	/*
 	 * We need arc_reclaim_lock because we don't want multiple
@@ -1129,7 +1131,16 @@ arc_kmem_reclaim(void)
 
 	mutex_enter(&arc_reclaim_lock);
 
-	atomic_add_64(&arc.c, -(arc.c >> 3));
+#ifdef _KERNEL
+	to_free = MAX(arc.c >> 3, ptob(needfree));
+#else
+	to_free = arc.c >> 3;
+#endif
+	if (arc.c > to_free)
+		atomic_add_64(&arc.c, -to_free);
+	else
+		arc.c = arc.c_min;
+
 	atomic_add_64(&arc.p, -(arc.p >> 3));
 	if (arc.c > arc.size)
 		arc.c = arc.size;
@@ -1150,6 +1161,10 @@ arc_reclaim_needed(void)
 	uint64_t extra;
 
 #ifdef _KERNEL
+
+	if (needfree)
+		return (1);
+
 	/*
 	 * take 'desfree' extra pages, so we reclaim sooner, rather than later
 	 */

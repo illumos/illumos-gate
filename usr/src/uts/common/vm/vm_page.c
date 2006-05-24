@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -5789,6 +5788,50 @@ page_mem_avail(pgcnt_t npages)
 	return (1);
 }
 
+#define	MAX_CNT	60	/* max num of iterations */
+/*
+ * Reclaim/reserve availrmem for npages.
+ * If there is not enough memory start reaping seg, kmem caches.
+ * Start pageout scanner (via page_needfree()).
+ * Exit after ~ MAX_CNT s regardless of how much memory has been released.
+ * Note: There is no guarantee that any availrmem will be freed as
+ * this memory typically is locked (kernel heap) or reserved for swap.
+ * Also due to memory fragmentation kmem allocator may not be able
+ * to free any memory (single user allocated buffer will prevent
+ * freeing slab or a page).
+ */
+int
+page_reclaim_mem(pgcnt_t npages, pgcnt_t epages, int adjust)
+{
+	int	i = 0;
+	int	ret = 0;
+	pgcnt_t	deficit;
+	pgcnt_t old_availrmem;
+
+	mutex_enter(&freemem_lock);
+	old_availrmem = availrmem - 1;
+	while ((availrmem < tune.t_minarmem + npages + epages) &&
+	    (old_availrmem < availrmem) && (i++ < MAX_CNT)) {
+		old_availrmem = availrmem;
+		deficit = tune.t_minarmem + npages + epages - availrmem;
+		mutex_exit(&freemem_lock);
+		page_needfree(deficit);
+		seg_preap();
+		kmem_reap();
+		delay(hz);
+		page_needfree(-(spgcnt_t)deficit);
+		mutex_enter(&freemem_lock);
+	}
+
+	if (adjust && (availrmem >= tune.t_minarmem + npages + epages)) {
+		availrmem -= npages;
+		ret = 1;
+	}
+
+	mutex_exit(&freemem_lock);
+
+	return (ret);
+}
 
 /*
  * Search the memory segments to locate the desired page.  Within a
