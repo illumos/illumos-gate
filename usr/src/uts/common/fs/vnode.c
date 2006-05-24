@@ -808,6 +808,7 @@ vn_openat(
 	int in_crit = 0;
 	struct vattr vattr;
 	enum symfollow follow;
+	int estale_retry = 0;
 
 	mode = 0;
 	if (filemode & FREAD)
@@ -851,7 +852,8 @@ top:
 		 */
 		if (error = lookupnameat(pnamep, seg, follow,
 		    NULLVPP, &vp, startvp)) {
-			if (error == ESTALE)
+			if ((error == ESTALE) &&
+			    fs_need_estale_retry(estale_retry++))
 				goto top;
 			return (error);
 		}
@@ -1011,7 +1013,7 @@ out:
 		 * above instead of looping around from here.
 		 */
 		VN_RELE(vp);
-		if (error == ESTALE)
+		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 			goto top;
 	} else
 		*vpp = vp;
@@ -1057,6 +1059,7 @@ vn_createat(
 	int in_crit = 0;
 	struct vattr vattr;
 	enum symfollow follow;
+	int estale_retry = 0;
 
 	ASSERT((vap->va_mask & (AT_TYPE|AT_MODE)) == (AT_TYPE|AT_MODE));
 
@@ -1096,7 +1099,7 @@ top:
 	    (excl == EXCL) ? NULLVPP : vpp, startvp);
 	if (error) {
 		pn_free(&pn);
-		if (error == ESTALE)
+		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 			goto top;
 		if (why == CRMKDIR && error == EINVAL)
 			error = EEXIST;		/* SVID */
@@ -1309,7 +1312,7 @@ out:
 	 * of the file will fail and the error will be returned
 	 * above instead of looping around from here.
 	 */
-	if (error == ESTALE)
+	if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 		goto top;
 	return (error);
 }
@@ -1323,6 +1326,7 @@ vn_link(char *from, char *to, enum uio_seg seg)
 	int error;
 	struct vattr vattr;
 	dev_t fsid;
+	int estale_retry = 0;
 
 top:
 	fvp = tdvp = NULL;
@@ -1362,7 +1366,7 @@ out:
 		VN_RELE(fvp);
 	if (tdvp)
 		VN_RELE(tdvp);
-	if (error == ESTALE)
+	if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 		goto top;
 	return (error);
 }
@@ -1385,6 +1389,7 @@ vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp,
 	int in_crit = 0;
 	vnode_t *fromvp, *fvp;
 	vnode_t *tovp;
+	int estale_retry = 0;
 
 top:
 	fvp = fromvp = tovp = NULL;
@@ -1486,7 +1491,7 @@ out:
 		VN_RELE(tovp);
 	if (fvp)
 		VN_RELE(fvp);
-	if (error == ESTALE)
+	if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 		goto top;
 	return (error);
 }
@@ -1512,6 +1517,7 @@ vn_removeat(vnode_t *startvp, char *fnamep, enum uio_seg seg, enum rm dirflag)
 	struct vfs *vfsp;
 	struct vfs *dvfsp;	/* ptr to parent dir vfs */
 	int in_crit = 0;
+	int estale_retry = 0;
 
 top:
 	if (error = pn_get(fnamep, seg, &pn))
@@ -1519,7 +1525,7 @@ top:
 	dvp = vp = NULL;
 	if (error = lookuppnat(&pn, NULL, NO_FOLLOW, &dvp, &vp, startvp)) {
 		pn_free(&pn);
-		if (error == ESTALE)
+		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 			goto top;
 		return (error);
 	}
@@ -1648,7 +1654,7 @@ out:
 		VN_RELE(vp);
 	if (dvp != NULL)
 		VN_RELE(dvp);
-	if (error == ESTALE)
+	if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 		goto top;
 	return (error);
 }

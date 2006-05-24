@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +45,7 @@
 #include <sys/uio.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <fs/fs_subr.h>
 
 /*
  * Determine accessibility of file.
@@ -65,6 +65,7 @@ access(char *fname, int fmode)
 	int mode;
 	int eok;
 	cred_t *cr;
+	int estale_retry = 0;
 
 	if (fmode & ~(E_OK|R_OK|W_OK|X_OK))
 		return (set_errno(EINVAL));
@@ -89,7 +90,7 @@ access(char *fname, int fmode)
 
 lookup:
 	if (error = lookupname(fname, UIO_USERSPACE, FOLLOW, NULLVPP, &vp)) {
-		if (error == ESTALE)
+		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		if (!eok)
 			crfree(tmpcr);
@@ -99,7 +100,8 @@ lookup:
 	if (mode) {
 		error = VOP_ACCESS(vp, mode, 0, tmpcr);
 		if (error) {
-			if (error == ESTALE) {
+			if ((error == ESTALE) &&
+			    fs_need_estale_retry(estale_retry++)) {
 				VN_RELE(vp);
 				goto lookup;
 			}

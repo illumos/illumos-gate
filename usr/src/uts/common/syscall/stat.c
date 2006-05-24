@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +56,7 @@
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 #include <c2/audit.h>
+#include <fs/fs_subr.h>
 
 /*
  * Get the vp to be stated and the cred to be used for the call
@@ -79,6 +79,7 @@ cstatat_getvp(int fd, char *name, int nmflag,
 	file_t *fp;
 	int error;
 	cred_t *cr;
+	int estale_retry = 0;
 
 	*vp = NULL;
 
@@ -129,7 +130,8 @@ cstatat_getvp(int fd, char *name, int nmflag,
 lookup:
 		if (error = lookupnameat(name, UIO_USERSPACE, follow, NULLVPP,
 		    vp, startvp)) {
-			if (error == ESTALE)
+			if ((error == ESTALE) &&
+			    fs_need_estale_retry(estale_retry++))
 				goto lookup;
 			if (startvp != NULL)
 				VN_RELE(startvp);
@@ -308,6 +310,7 @@ cstatat(int fd, char *name, int nmflag, struct stat *sb, int follow, int flags)
 	int error;
 	cred_t *cred;
 	int link_follow;
+	int estale_retry = 0;
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
@@ -319,6 +322,7 @@ lookup:
 out:
 	if (error != 0) {
 		if (error == ESTALE &&
+		    fs_need_estale_retry(estale_retry++) &&
 		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
 			goto lookup;
 		return (set_errno(error));
@@ -446,6 +450,7 @@ cstatat32(int fd, char *name, int nmflag, struct stat32 *sb,
 	int error;
 	cred_t *cred;
 	int link_follow;
+	int estale_retry = 0;
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
@@ -457,6 +462,7 @@ lookup:
 out:
 	if (error != 0) {
 		if (error == ESTALE &&
+		    fs_need_estale_retry(estale_retry++) &&
 		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
 			goto lookup;
 		return (set_errno(error));
@@ -544,6 +550,7 @@ cstatat64(int fd, char *name, int nmflag, struct stat64 *sb,
 	int error;
 	cred_t *cred;
 	int link_follow;
+	int estale_retry = 0;
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
@@ -555,6 +562,7 @@ lookup:
 out:
 	if (error != 0) {
 		if (error == ESTALE &&
+		    fs_need_estale_retry(estale_retry++) &&
 		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
 			goto lookup;
 		return (set_errno(error));
@@ -653,6 +661,7 @@ cstatat64_32(int fd, char *name, int nmflag, struct stat64_32 *sb,
 	int error;
 	cred_t *cred;
 	int link_follow;
+	int estale_retry = 0;
 
 	link_follow = (follow == AT_SYMLINK_NOFOLLOW) ? NO_FOLLOW : FOLLOW;
 lookup:
@@ -664,6 +673,7 @@ lookup:
 out:
 	if (error != 0) {
 		if (error == ESTALE &&
+		    fs_need_estale_retry(estale_retry++) &&
 		    (nmflag == 1 || (nmflag == 2 && name != NULL)))
 			goto lookup;
 		return (set_errno(error));
