@@ -247,9 +247,9 @@ dflt_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	writethruput = DELTA(write_bytes);
 
 	if (dispflag & DISP_HEADER) {
-		(void) printf(gettext(
+		(void) printf(
 " new  name   name  attr  attr lookup rddir  read read  write write\n"
-" file remov  chng   get   set    ops   ops   ops bytes   ops bytes\n"));
+" file remov  chng   get   set    ops   ops   ops bytes   ops bytes\n");
 	}
 
 	PRINTSTAT(niceflag, "%5s ", "%lld:", nnewfile, ' ', buf);
@@ -273,9 +273,9 @@ io_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	char		buf[LBUFSZ];
 
 	if (dispflag & DISP_HEADER) {
-		(void) printf(gettext(
+		(void) printf(
 " read read  write write rddir rddir rwlock rwulock\n"
-"  ops bytes   ops bytes   ops bytes    ops     ops\n"));
+"  ops bytes   ops bytes   ops bytes    ops     ops\n");
 	}
 
 	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nread), ' ', buf);
@@ -300,8 +300,7 @@ vm_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	char		buf[LBUFSZ];
 
 	if (dispflag & DISP_HEADER) {
-		(void) printf(
-		    gettext("  map addmap delmap getpag putpag pagio\n"));
+		(void) printf("  map addmap delmap getpag putpag pagio\n");
 	}
 
 	PRINTSTAT(niceflag, "%5s ", "%lld:", DELTA(nmap), ' ', buf);
@@ -320,7 +319,7 @@ attr_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	char		buf[LBUFSZ];
 
 	if (dispflag & DISP_HEADER) {
-		(void) printf(gettext("getattr setattr getsec  setsec\n"));
+		(void) printf("getattr setattr getsec  setsec\n");
 	}
 
 	PRINTSTAT(niceflag, " %5s ", "%lld:", DELTA(ngetattr), ' ', buf);
@@ -338,8 +337,8 @@ naming_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	char		buf[LBUFSZ];
 
 	if (dispflag & DISP_HEADER) {
-		(void) printf(gettext(
-	"lookup creat remov  link renam mkdir rmdir rddir symlnk rdlnk\n"));
+		(void) printf(
+	"lookup creat remov  link renam mkdir rmdir rddir symlnk rdlnk\n");
 	}
 
 	PRINTSTAT(niceflag, "%5s  ", "%lld:", DELTA(nlookup), ' ', buf);
@@ -379,7 +378,7 @@ vop_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 
 	if (niceflag) {
 		(void) printf("%s\n", name);
-		(void) printf(gettext(" operation  #ops  bytes\n"));
+		(void) printf(" operation  #ops  bytes\n");
 	}
 
 	PRINT_VOPSTAT(niceflag, open);
@@ -458,7 +457,7 @@ get_vopstats(kstat_ctl_t *kc, char *ksname, vopstats_t *vsp, kstat_t **kspp)
 			(void) poll(NULL, 0, RETRY_DELAY);
 			continue;
 		}
-		perror(gettext("kstat_chain_update"));
+		perror("kstat_chain_update");
 		exit(1);
 	}
 
@@ -516,18 +515,18 @@ build_fstype_list(char ***fstypep)
 	char	buf[FSTYPSZ + 1];
 
 	if ((nfstype = sysfs(GETNFSTYP)) < 0) {
-		perror(gettext("sysfs(GETNFSTYP)"));
+		perror("sysfs(GETNFSTYP)");
 		return (0);
 	}
 
 	if ((*fstypep = calloc(nfstype, sizeof (char *))) == NULL) {
-		perror(gettext("calloc on fstypes"));
+		perror("calloc() fstypes");
 		return (0);
 	}
 
 	for (i = 1; i < nfstype; i++) {
 		if (sysfs(GETFSTYP, i, buf) < 0) {
-			perror(gettext("sysfs(GETFSTYP)"));
+			perror("sysfs(GETFSTYP)");
 			return (0);
 		}
 
@@ -539,7 +538,7 @@ build_fstype_list(char ***fstypep)
 			continue;
 
 		if (((*fstypep)[i] = strdup(buf)) == NULL) {
-			perror(gettext("strdup() of fstype name"));
+			perror("strdup() fstype name");
 			return (0);
 		}
 	}
@@ -581,7 +580,7 @@ parse_operands(
 	 * to be:  argc - optind
 	 */
 	if ((*entityp = calloc((argc - optind), sizeof (entity_t))) == NULL) {
-		perror(gettext("calloc"));
+		perror("calloc() entities");
 		return (-1);
 	}
 
@@ -700,7 +699,7 @@ set_mntpt(entity_t *ep)
 		 */
 		while (getmntent(fp, &mnttab) == 0) {
 			if ((mntp = malloc(sizeof (*mntp))) == NULL) {
-				perror(gettext("Can't create mount list"));
+				perror("malloc() mount list");
 				return (1);
 			}
 			mntp->m_mntpt = strdup(mnttab.mnt_mountp);
@@ -780,7 +779,7 @@ set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 				/* Now allocate the vopstats array */
 				ep->e_vs = calloc(VS_SIZE, sizeof (vopstats_t));
 				if (entities[i].e_vs == NULL) {
-					perror(gettext("calloc() vopstats"));
+					perror("calloc() fstype vopstats");
 					exit(1);
 				}
 				break;
@@ -818,7 +817,7 @@ set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 		/* Now allocate the vopstats array */
 		ep->e_vs = calloc(VS_SIZE, sizeof (vopstats_t));
 		if (entities[i].e_vs == NULL) {
-			perror(gettext("Can't calloc vopstats"));
+			perror("calloc() vopstats array");
 			exit(1);
 		}
 	}
@@ -996,8 +995,7 @@ main(int argc, char *argv[])
 	 */
 	if ((nentities == 0) && (fstypes_only == B_TRUE)) {
 		if ((entities = calloc(nfstypes, sizeof (entity_t))) == NULL) {
-			(void) fprintf(stderr,
-			    gettext("Can't calloc fstype stats\n"));
+			perror("calloc() fstype stats");
 			exit(1);
 		}
 
@@ -1012,7 +1010,7 @@ main(int argc, char *argv[])
 	set_ksnames(entities, nentities, fstypes, nfstypes);
 
 	if ((kc = kstat_open()) == NULL) {
-		perror(gettext("kstat_open"));
+		perror("kstat_open");
 		exit(1);
 	}
 
