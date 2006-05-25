@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1631,7 +1630,7 @@ rfs4_fattr4_maxlink(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_LINK_MAX, &val,
 				sarg->cs->cr);
-		if (!error && (na->maxlink != val))
+		if (!error && (na->maxlink != (uint32_t)val))
 			error = -1;	/* no match */
 		break;
 	case NFS4ATTR_FREEIT:

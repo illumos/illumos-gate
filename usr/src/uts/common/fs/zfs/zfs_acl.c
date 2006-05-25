@@ -1030,7 +1030,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 		if ((vap->va_mask & AT_GID) &&
 		    ((vap->va_gid == parent->z_phys->zp_gid) ||
 		    groupmember(vap->va_gid, cr) ||
-		    secpolicy_vnode_create_gid(cr)))
+		    secpolicy_vnode_create_gid(cr) == 0))
 			gid = vap->va_gid;
 		else
 			gid = (parent->z_phys->zp_mode & S_ISGID) ?

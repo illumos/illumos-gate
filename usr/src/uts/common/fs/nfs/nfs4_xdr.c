@@ -4399,15 +4399,6 @@ xdr_nfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 }
 
 static bool_t
-xdr_cnfs_resop4_wrap(XDR *xdrs, nfs_resop4 *objp)
-{
-	if (!xdr_int(xdrs, (int *)&objp->resop))
-		return (FALSE);
-
-	return (xdr_nfs_resop4(xdrs, objp));
-}
-
-static bool_t
 xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 {
 	if (!xdr_int(xdrs, (int *)&objp->resop))
