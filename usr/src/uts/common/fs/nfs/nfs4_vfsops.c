@@ -2443,6 +2443,7 @@ recov_retry:
 	if (!np) {
 		struct nfs4_server *tnp;
 		np = new_nfs4_server(svp, cr);
+		mutex_enter(&np->s_lock);
 
 		mutex_enter(&nfs4_server_lst_lock);
 		tnp = servinfo4_to_nfs4_server(svp);
@@ -2460,7 +2461,6 @@ recov_retry:
 			 * do not give list a reference until everything
 			 * succeeds
 			 */
-			mutex_enter(&np->s_lock);
 			insque(np, &nfs4_server_lst);
 		}
 		mutex_exit(&nfs4_server_lst_lock);
