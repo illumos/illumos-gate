@@ -51,13 +51,20 @@ extern "C" {
 #define	NFS_FLAVOR_NOMAP	999999	/* no nfs flavor mapping */
 
 /*
+ * As duplicate flavors can be passed into exportfs in the arguments, we
+ * allocate a cleaned up array with non duplicate flavors on the stack.
+ * So we need to know how much to allocate.
+ */
+#define	MAX_FLAVORS		6	/* none, sys, dh, krb5, krb5i krb5p */
+
+/*
  * Note: exported_lock is currently used to ensure the integrity of
  * the secinfo fields.
  */
 struct secinfo {
 	seconfig_t	s_secinfo;	/* /etc/nfssec.conf entry */
 	unsigned int	s_flags;	/* flags (see below) */
-	uint32_t	s_refcnt;	/* reference count for tracking */
+	int32_t		s_refcnt;	/* reference count for tracking */
 					/* how many children (self included) */
 					/* use this flavor. */
 	int 		s_window;	/* window */
@@ -71,7 +78,7 @@ struct secinfo {
 struct secinfo32 {
 	seconfig32_t	s_secinfo;	/* /etc/nfssec.conf entry */
 	uint32_t	s_flags;	/* flags (see below) */
-	uint32_t	s_refcnt;	/* reference count for tracking */
+	int32_t		s_refcnt;	/* reference count for tracking */
 					/* how many children (self included) */
 					/* use this flavor. */
 	int32_t 	s_window;	/* window */
