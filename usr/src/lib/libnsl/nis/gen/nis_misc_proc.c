@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,8 +226,14 @@ __nis_auth2princ(
 				"__nis_auth2princ: error doing nis_list: %s",
 						nis_sperrno(res->status));
 	} else {
-		(void) strncpy(name, ENTRY_VAL(res->objects.objects_val, 0),
-				1024);
+		if (strlcpy(name,
+		    ENTRY_VAL(res->objects.objects_val, 0), 1024) >= 1024) {
+			(void) strcpy(name, nobody); /* default is "nobody" */
+			syslog(LOG_ERR,
+		"__nis_auth2princ: buffer overflow, returning '%s'", nobody);
+			nis_freeresult(res);
+			return;
+		}
 		if (flavor == AUTH_DES)
 			add_cred_item(ad->adc_fullname.name, name);
 	}
@@ -689,8 +694,15 @@ __nis_auth2princ_rpcgss(
 			"__nis_auth2princ_rpcgss: error doing nis_list: %s",
 						nis_sperrno(res->status));
 	} else {
-		(void) strncpy(name, ENTRY_VAL(res->objects.objects_val, 0),
-				1024);
+		if (strlcpy(name,
+		    ENTRY_VAL(res->objects.objects_val, 0), 1024) >= 1024) {
+			(void) strcpy(name, nobody); /* default is "nobody" */
+			syslog(LOG_ERR,
+		"__nis_auth2princ_rpcgss: buffer overflow, returning '%s'",
+		nobody);
+			nis_freeresult(res);
+			return;
+		}
 		if (flavor == AUTH_DES || flavor == RPCSEC_GSS) {
 			if (verbose)
 				syslog(LOG_INFO,

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -961,6 +960,13 @@ add_cred_item(char *netname, char *pname, time_t cred_expires)
 {
 	struct creditem *foo, *old;
 
+	if (strlen(pname) >= sizeof (foo->pname)) {
+		syslog(LOG_ERR,
+		"add_cred_item: principal name too long '%s'",
+			pname);
+		return;
+	}
+
 	old = (struct creditem *)nis_find_item(netname, &credtbl);
 	if (old) {
 		__nis_release_item((NIS_HASH_ITEM *)old, &credtbl, -1);
@@ -1279,9 +1285,9 @@ nis_getprincipal(
 				"nis_getprincipal: error doing nis_list: %s",
 						nis_sperrno(res->status));
 	} else {
-		if (strlcpy(name, ENTRY_VAL(res->objects.objects_val, 0), 1024)
-			>= 1024) {
-			strcpy(name, nobody); /* default is "nobody" */
+		if (strlcpy(name,
+		    ENTRY_VAL(res->objects.objects_val, 0), 1024) >= 1024) {
+			(void) strcpy(name, nobody); /* default is "nobody" */
 			syslog(LOG_ERR,
 		"nis_getprincipal: buffer overflow, returning '%s'", nobody);
 			nis_freeresult(res);
