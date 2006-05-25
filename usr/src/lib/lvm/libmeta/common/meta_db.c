@@ -1132,7 +1132,7 @@ meta_db_patch(
 		goto out;
 	}
 
-	if (meta_systemfile_append_mddb(cname, sname, tsname, tsfp, 1, 0,
+	if (meta_systemfile_append_mddb(cname, sname, tsname, tsfp, 1, 0, 0,
 	    ep) != 0)
 		goto out;
 

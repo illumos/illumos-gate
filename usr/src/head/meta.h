@@ -1680,7 +1680,7 @@ extern	int		meta_systemfile_append_mdroot(mdname_t *rootnp,
 			    int doit, int verbose, md_error_t *ep);
 extern	int		meta_systemfile_append_mddb(char *cname, char *sname,
 			    char *tname, FILE *tfp, int doit, int verbose,
-			    md_error_t *ep);
+			    int check, md_error_t *ep);
 
 /* meta_tab.c */
 extern	void		meta_tab_dump(md_tab_t *tabp, FILE *fp);

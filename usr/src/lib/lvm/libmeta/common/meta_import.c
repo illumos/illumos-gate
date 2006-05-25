@@ -3644,6 +3644,8 @@ meta_imp_set(
 		return (mdstealerror(ep, &c.c_mde));
 	}
 
+	(void) meta_smf_enable(META_SMF_DISKSET, NULL);
+
 	/*
 	 * Create a set name for the set.
 	 */
@@ -3655,7 +3657,6 @@ meta_imp_set(
 	(void) strcpy(sd->sd_nodes[0], mynode());
 	sd->sd_ctime = tp;
 	sd->sd_genid = 0;
-
 
 	if (misp->mis_flags & MD_IM_SET_REPLICATED) {
 		/* Update the diskset namespace */

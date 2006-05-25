@@ -6158,10 +6158,10 @@ errout:
 		 */
 		if (rip->ri_mbip) {
 			md_dev64_t dev64 = md_xlate_targ_2_mini(rip->ri_dev);
-			if (dev64 != NODEV64) {
+			if (dev64 != NODEV64)
 				mddb_devclose(dev64);
-				free_mbipp(&rip->ri_mbip);
-			}
+
+			free_mbipp(&rip->ri_mbip);
 		}
 		/*
 		 * Turn off MDDB_F_EMASTER flag in a diskset since diskset
@@ -6509,10 +6509,10 @@ initit(
 				dev = md_expldev(
 					s->s_lbp->lb_locators[i].l_dev);
 				dev = md_xlate_targ_2_mini(dev);
-				if (dev != NODEV64) {
+				if (dev != NODEV64)
 					mddb_devclose(dev);
-					free_mbipp(&s->s_mbiarray[i]);
-				}
+
+				free_mbipp(&s->s_mbiarray[i]);
 			}
 
 			kmem_free((caddr_t)s->s_mbiarray,
@@ -7120,10 +7120,10 @@ mddb_unload_set(
 
 		dev = md_expldev(s->s_lbp->lb_locators[i].l_dev);
 		dev = md_xlate_targ_2_mini(dev);
-		if (dev != NODEV64) {
+		if (dev != NODEV64)
 			mddb_devclose(dev);
-			free_mbipp(&s->s_mbiarray[i]);
-		}
+
+		free_mbipp(&s->s_mbiarray[i]);
 	}
 
 	if (s->s_mbiarray) {
@@ -12483,7 +12483,6 @@ md_imp_db(
 				lp->l_flags = MDDB_F_DELETED;
 				/* then remove the device id from the list */
 				free_mbipp(&s->s_mbiarray[i]);
-				s->s_mbiarray[i] = 0;
 				(void) mddb_devid_delete(s, i);
 			}
 		}

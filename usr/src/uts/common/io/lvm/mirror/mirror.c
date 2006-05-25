@@ -109,7 +109,7 @@ dmr_stats_t	mirror_dmr_stats = {0, 0};
  * Mutex protecting list of non-failfast drivers.
  */
 static kmutex_t	non_ff_drv_mutex;
-static char	**non_ff_drivers = NULL;
+extern char	**non_ff_drivers;
 
 extern major_t	md_major;
 
@@ -5074,8 +5074,8 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 			md_create_unit_incore(MD_SID(un), &mirror_md_ops, 0);
 			resync_start_timeout(setno);
 			gotsomething = 1;
-		} else if (retval == -1) {
-			return (-1);
+		} else {
+			return (retval);
 		}
 		/*
 		 * Set flag to indicate that the mirror has not yet

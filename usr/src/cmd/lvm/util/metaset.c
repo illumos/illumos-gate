@@ -225,7 +225,12 @@ printset(mdsetname_t *sp, md_error_t *ep)
 	for (i = 0; i < max_meds; i++) {
 		if (sd->sd_med.n_lst[i].a_cnt == 0)
 			continue;
-		(void) printf("  %-17.17s   ", sd->sd_med.n_lst[i].a_nm[0]);
+		/*
+		 * Standard hostname field is 17 bytes but metaset will
+		 * display up to MD_MAX_NODENAME, def in meta_basic.h
+		 */
+		(void) printf("  %-17.*s   ", MD_MAX_NODENAME,
+			sd->sd_med.n_lst[i].a_nm[0]);
 		for (j = 1; j < sd->sd_med.n_lst[i].a_cnt; j++) {
 			(void) printf("%s", sd->sd_med.n_lst[i].a_nm[j]);
 			if (sd->sd_med.n_lst[i].a_cnt - j > 1)

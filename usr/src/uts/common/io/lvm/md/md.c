@@ -86,6 +86,12 @@ int		md_init_debug	= 0;	/* module binding debug */
  */
 int		md_ff_disable = 0;
 
+/*
+ * dynamically allocated list of non FF driver names - needs to
+ * be freed when md is detached.
+ */
+char	**non_ff_drivers = NULL;
+
 md_krwlock_t	md_unit_array_rw;	/* protects all unit arrays */
 md_krwlock_t	nm_lock;		/* protects all the name spaces */
 
@@ -685,6 +691,16 @@ mddetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	md_nunits = 0;
 	md_nsets = 0;
 	md_nmedh = 0;
+
+	if (non_ff_drivers != NULL) {
+		int	i;
+
+		for (i = 0; non_ff_drivers[i] != NULL; i++)
+		    kmem_free(non_ff_drivers[i], strlen(non_ff_drivers[i]) + 1);
+
+		kmem_free(non_ff_drivers, 2 * sizeof (char *));
+		non_ff_drivers = NULL;
+	}
 
 	if (md_med_trans_lst != NULL) {
 		kmem_free(md_med_trans_lst, strlen(md_med_trans_lst) + 1);

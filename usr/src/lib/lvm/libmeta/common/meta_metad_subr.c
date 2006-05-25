@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,8 +370,8 @@ sr_hosts(md_set_record *sr)
 		}
 	}
 
-	if ((self_in_set == FALSE) && (!(MD_MNSET_REC(sr))) &&
-	    (_cladm(CL_CONFIG, CL_NODEID, &nid) == 0)) {
+	if ((self_in_set == FALSE) && (!(MD_MNSET_REC(sr)))) {
+	    if (_cladm(CL_CONFIG, CL_NODEID, &nid) == 0) {
 
 		/*
 		 * See if we've got a node which has been booted in
@@ -385,17 +385,26 @@ sr_hosts(md_set_record *sr)
 			if (atoi(sr->sr_nodes[i]) == nid)
 				self_in_set = TRUE;
 		}
-	}
 
-	/* If we aren't in the set, delete the set */
-	if (self_in_set == FALSE) {
+		/* If we aren't in the set, delete the set */
+		if (self_in_set == FALSE) {
+			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			    "Removing set %s from database\n"), sr->sr_setname);
+			s_delset(sr->sr_setname, &xep);
+			if (! mdisok(&xep))
+				mdclrerror(&xep);
+			return (1);
+		}
+	    } else {
+		/*
+		 * Send a message to syslog and return without
+		 * deleting any sets
+		 */
 		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-		    "Removing set %s from database\n"),
-		    sr->sr_setname);
-		s_delset(sr->sr_setname, &xep);
-		if (! mdisok(&xep))
-			mdclrerror(&xep);
+			"Call to _cladm failed for set %s\n"),
+			sr->sr_setname);
 		return (1);
+	    }
 	}
 	return (0);
 }
@@ -1957,11 +1966,11 @@ s_delset(char *setname, md_error_t *ep)
 	}
 
 	if (num_mn_sets == 0)
-		(void) meta_smf_disable(META_SMF_MN_DISKSET, &xep);
+		(void) meta_smf_disable(META_SMF_MN_DISKSET, NULL);
 
 	/* The set we just deleted is the only one left */
 	if (num_sets == 0)
-		(void) meta_smf_disable(META_SMF_DISKSET, &xep);
+		(void) meta_smf_disable(META_SMF_DISKSET, NULL);
 
 	sr_cache_del(sr->sr_selfid);
 	free_sr(sr);

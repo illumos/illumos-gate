@@ -241,10 +241,8 @@ sp_update_watermarks(void *d, int mode)
 	side = mddb_getsidenum(setno);
 	un = MD_UNIT(mnum);
 
-	if (un == NULL) {
-		err = EFAULT;
-		goto out;
-	}
+	if (un == NULL)
+		return (EFAULT);
 
 	mdep = &mup->mde;
 
