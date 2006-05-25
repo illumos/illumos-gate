@@ -35,6 +35,7 @@
 #include <sys/cladm.h>
 #include <devid.h>
 #include <sys/lvm/md_convert.h>
+#include <sdssc.h>
 
 /*
  * Exported Entry Points
@@ -645,6 +646,7 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 	char			*minor_name = NULL;
 	size_t			sz;
 	char			*devid_str = NULL;
+	sdssc_version_t		version;
 	int			need_to_free_devidp = 0;
 
 	if ((sd = metaget_setdesc(sp, ep)) == NULL)
@@ -730,7 +732,14 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			}
 		}
 
-		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd)) {
+		/*
+		 * If the device does not have a devid or is a multinode
+		 * diskset or we are in a SunCluster 3.x enviroment then
+		 * do not use devids.
+		 */
+		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd) ||
+		    ((sdssc_version(&version) == SDSSC_OKAY) &&
+		    (version.major >= 3))) {
 			use_devid = 0;
 		}
 
