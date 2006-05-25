@@ -798,14 +798,12 @@ get_job_from_cfile(jobfile_t *file, char *cFile, char *xFile, job_t *tmp)
 job_t *
 job_retrieve(char *xFile, char *spool)
 {
-	int	n;
 	int	retry_cnt = 0;
 	char	*s;
-	jobfile_t *file, *file1;
+	jobfile_t *file;
 	char 	cFile[BUFSIZ];
 	char	buf[BUFSIZ];
-	int	fd, n_cnt, lck = 1;
-	char	*p, *cfp;
+	int	fd;
 	flock_t flk;
 	job_t	*tmp;
 
@@ -854,7 +852,7 @@ job_retrieve(char *xFile, char *spool)
 	 * If failed to get a lock on the file, just return NULL. It will
 	 * be retried later.
 	 */
-	if ((lck = fcntl(fd, F_SETLK, &flk)) < 0) {
+	if ((fcntl(fd, F_SETLK, &flk)) < 0) {
 		syslog(LOG_DEBUG, "job_retrieve(%s) lock failed errno=%d",
 		    xFile, errno);
 		close(fd);
@@ -870,7 +868,7 @@ job_retrieve(char *xFile, char *spool)
 	 * scenario just try a few times.
 	 */
 	for (retry_cnt = 0; retry_cnt < MAX_RETRIES; retry_cnt++) {
-		if ((n = read(fd, buf, sizeof (buf))) > 0) {
+		if ((read(fd, buf, sizeof (buf))) > 0) {
 			close(fd);
 			if ((s = strtok(buf, ":\n")) != NULL)
 				tmp->job_server = strdup(s);
