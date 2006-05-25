@@ -3207,24 +3207,6 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 		cmd->cmd_actual_len = CDB_GROUP0;
 		break;
 
-	/*
-	 * Do not convert SCMD_MODE_SENSE/SELECT to G1 cmds because
-	 * the mode header is different as well. USB devices don't
-	 * support 0x03 & 0x04 mode pages, which are already obsoleted
-	 * by SPC-2 specification.
-	 */
-	case SCMD_MODE_SENSE:
-	case SCMD_MODE_SELECT:
-		if ((pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE3_CODE) ||
-		    (pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE4_CODE)) {
-			if (cmd->cmd_bp) {
-				cmd->cmd_pkt->pkt_resid = cmd->cmd_bp->b_bcount;
-			}
-			scsa2usb_force_invalid_request(scsa2usbp, cmd);
-			return (SCSA2USB_JUST_ACCEPT);
-		}
-		break;
-
 	case SCMD_DOORLOCK:
 	case SCMD_START_STOP:
 	case SCMD_TEST_UNIT_READY:
@@ -3266,6 +3248,24 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 		cmd->cmd_actual_len = CDB_GROUP0;
 		cmd->cmd_xfercount = pkt->pkt_cdbp[4]; /* Length of password */
 		break;
+
+	/*
+	 * Do not convert SCMD_MODE_SENSE/SELECT to G1 cmds because
+	 * the mode header is different as well. USB devices don't
+	 * support 0x03 & 0x04 mode pages, which are already obsoleted
+	 * by SPC-2 specification.
+	 */
+	case SCMD_MODE_SENSE:
+	case SCMD_MODE_SELECT:
+		if ((pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE3_CODE) ||
+		    (pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE4_CODE)) {
+			if (cmd->cmd_bp) {
+				cmd->cmd_pkt->pkt_resid = cmd->cmd_bp->b_bcount;
+			}
+			scsa2usb_force_invalid_request(scsa2usbp, cmd);
+			return (SCSA2USB_JUST_ACCEPT);
+		}
+		/* FALLTHROUGH */
 
 	default:
 		/*
