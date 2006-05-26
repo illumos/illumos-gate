@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,10 +609,10 @@ retry:
 }
 
 /*
- * Bind the pii_probe_sock to the chosen IFF_NOFAILOVER address in
- * pii_probe_logint. This socket will be used for sending and receiving
- * ICMP/ICMPv6 probes to targets. Do the common part in this function, and
- * complete the initializations by calling the protocol specific functions
+ * Bind pii_probe_sock to the address associated with pii_probe_logint.
+ * This socket will be used for sending and receiving ICMP/ICMPv6 probes to
+ * targets. Do the common part in this function, and complete the
+ * initializations by calling the protocol specific functions
  * phyint_inst_v{4,6}_sockinit() respectively.
  *
  * Return values: _B_TRUE/_B_FALSE for success or failure respectively.
@@ -631,8 +630,7 @@ phyint_inst_sockinit(struct phyint_instance *pii)
 
 	assert(pii->pii_probe_logint != NULL);
 	assert(pii->pii_probe_logint->li_flags & IFF_UP);
-	assert(SINGLETON_GROUP(pii->pii_phyint) ||
-	    (pii->pii_probe_logint->li_flags & IFF_NOFAILOVER));
+	assert(pii->pii_probe_logint->li_flags & IFF_NOFAILOVER);
 	assert(pii->pii_af == AF_INET || pii->pii_af == AF_INET6);
 
 	/*
@@ -1117,8 +1115,7 @@ phyint_inst_delete(struct phyint_instance *pii)
 		logint_delete(pii->pii_logint);
 
 	/*
-	 * Close the IFF_NOFAILOVER socket used to send probes to targets
-	 * from this phyint.
+	 * Close the socket used to send probes to targets from this phyint.
 	 */
 	if (pii->pii_probe_sock != -1)
 		close_probe_socket(pii, _B_TRUE);
@@ -1518,8 +1515,8 @@ logint_delete(struct logint *li)
 	li->li_prev = NULL;
 
 	/*
-	 * If this logint corresponds to the IFF_NOFAILOVER testaddress of
-	 * this phyint, then close the associated socket, if it exists
+	 * If this logint is also being used for probing, then close the
+	 * associated socket, if it exists.
 	 */
 	if (pii->pii_probe_logint == li) {
 		if (pii->pii_probe_sock != -1)
@@ -1878,10 +1875,10 @@ target_create(struct phyint_instance *pii, struct in6_addr addr,
 	target_insert(pii, tg);
 
 	/*
-	 * Change to running state, if this phyint instance is capable of
-	 * sending and receiving probes. i.e if we know of at least 1 target,
-	 * and this phyint instance socket is bound to the IFF_NOFAILOVER
-	 * address. More details in phyint state diagram in probe.c.
+	 * Change state to PI_RUNNING if this phyint instance is capable of
+	 * sending and receiving probes -- that is, if we know of at least 1
+	 * target, and this phyint instance is probe-capable.  For more
+	 * details, see the phyint state diagram in mpd_probe.c.
 	 */
 	pi = pii->pii_phyint;
 	if (pi->pi_state == PI_NOTARGETS && PROBE_CAPABLE(pii)) {

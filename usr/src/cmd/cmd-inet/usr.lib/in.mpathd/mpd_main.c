@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -549,21 +548,6 @@ check_addr_unique(int af, char *name)
 }
 
 /*
- * The pii_probe_logint used for probing, must satisfy the following properties
- * with respect to its li_flags.
- * IFF_NOFAILOVER - must be set (except in singleton group case)
- * IFF_UP	  - must be set
- * IFF_NOXMIT	  - must be clear
- * IFF_NOLOCAL	  - must be clear
- * IFF_DEPRECATED - preferably set (for IPv4)
- */
-#define	BEST_FLAG_SET	(IFF_NOFAILOVER | IFF_UP | IFF_DEPRECATED)
-#define	CLEAR_FLAG_SET	(IFF_NOXMIT | IFF_NOLOCAL)
-#define	TEST_CLEAR_FLAG_SET	CLEAR_FLAG_SET
-#define	TEST_MINIMAL_FLAG_SET	(IFF_UP | CLEAR_FLAG_SET)
-#define	TEST_BEST_FLAG_SET	(BEST_FLAG_SET | CLEAR_FLAG_SET)
-
-/*
  * Stop probing an interface.  Called when an interface is offlined.
  * The probe socket is closed on each interface instance, and the
  * interface state set to PI_OFFLINE.
@@ -590,13 +574,36 @@ stop_probing(struct phyint *pi)
 	phyint_chstate(pi, PI_OFFLINE);
 }
 
+enum { BAD_TESTFLAGS, OK_TESTFLAGS, BEST_TESTFLAGS };
+
 /*
- * Do the test address selection for each phyint instance. Pick an
- * IFF_NOFAILOVER address as test address. For singleton case,
- * if user didn't configure an IFF_NOFAILOVER address, we will pick a
- * normal address as test address. For (multiple adapter) groups,
- * user is required to configure IFF_NOFAILOVER test address. Call
- * phyint_inst_sockinit() to complete the initializations.
+ * Rate the provided test flags.  By definition, IFF_NOFAILOVER must be set.
+ * IFF_UP must also be set so that the associated address can be used as a
+ * source address.  Further, we must be able to exchange packets with local
+ * destinations, so IFF_NOXMIT and IFF_NOLOCAL must be clear.  For historical
+ * reasons, we have a proclivity for IFF_DEPRECATED IPv4 test addresses.
+ */
+static int
+rate_testflags(uint64_t flags)
+{
+	if ((flags & (IFF_NOFAILOVER | IFF_UP)) != (IFF_NOFAILOVER | IFF_UP))
+		return (BAD_TESTFLAGS);
+
+	if ((flags & (IFF_NOXMIT | IFF_NOLOCAL)) != 0)
+		return (BAD_TESTFLAGS);
+
+	if ((flags & (IFF_IPV6 | IFF_DEPRECATED)) == IFF_DEPRECATED)
+		return (BEST_TESTFLAGS);
+
+	if ((flags & (IFF_IPV6 | IFF_DEPRECATED)) == IFF_IPV6)
+		return (BEST_TESTFLAGS);
+
+	return (OK_TESTFLAGS);
+}
+
+/*
+ * Attempt to select a test address for each phyint instance.
+ * Call phyint_inst_sockinit() to complete the initializations.
  */
 static void
 select_test_ifs(void)
@@ -604,10 +611,11 @@ select_test_ifs(void)
 	struct phyint		*pi;
 	struct phyint_instance	*pii;
 	struct phyint_instance	*next_pii;
-	struct logint	*li;
-	struct logint	*test_logint;
-	boolean_t target_scan_reqd = _B_FALSE;
-	struct target *tg;
+	struct logint		*li;
+	struct logint  		*probe_logint;
+	boolean_t		target_scan_reqd = _B_FALSE;
+	struct target		*tg;
+	int			rating;
 
 	if (debug & D_PHYINT)
 		logdebug("select_test_ifs\n");
@@ -617,6 +625,8 @@ select_test_ifs(void)
 	 */
 	for (pii = phyint_instances; pii != NULL; pii = next_pii) {
 		next_pii = pii->pii_next;
+		probe_logint = NULL;
+
 		/*
 		 * An interface that is offline, should not be probed.
 		 * Offline interfaces should always in PI_OFFLINE state,
@@ -634,24 +644,14 @@ select_test_ifs(void)
 			continue;
 		}
 
-		test_logint = pii->pii_probe_logint;
-
-		if (test_logint != NULL) {
-			if ((test_logint->li_flags & TEST_BEST_FLAG_SET)
-			    == BEST_FLAG_SET)
-				continue;
-
+		li = pii->pii_probe_logint;
+		if (li != NULL) {
 			/*
-			 * If user configures IFF_NOXMIT or IFF_NOLOCAL
-			 * flags on test addresses after in.mpathd has
-			 * has started, the daemon aborts. In future
-			 * this can be better handling, i.e. instead
-			 * of abort the daemon, a more appropriate
-			 * action may be issuing a warning and choose
-			 * a different test address.
+			 * We've already got a test address; only proceed
+			 * if it's suboptimal.
 			 */
-			assert((test_logint->li_flags & TEST_CLEAR_FLAG_SET)
-			    == 0);
+			if (rate_testflags(li->li_flags) == BEST_TESTFLAGS)
+				continue;
 		}
 
 		/*
@@ -668,51 +668,31 @@ select_test_ifs(void)
 			    !IN6_IS_ADDR_LINKLOCAL(&li->li_addr))
 				continue;
 
-			if ((li->li_flags & TEST_MINIMAL_FLAG_SET) == IFF_UP) {
-				/*
-				 * Now we have a testaddress, that satisfies
-				 * the minimal properties.
-				 */
-				if ((li->li_flags & TEST_BEST_FLAG_SET)
-				    == BEST_FLAG_SET) {
-					/*
-					 * This is the best possible address.
-					 * So break, and continue to the
-					 * next phyint
-					 */
-					test_logint = li;
-					break;
-				}
-				if ((test_logint == NULL) ||
-				    (!(test_logint->li_flags &
-				    IFF_NOFAILOVER) &&
-				    (li->li_flags & IFF_NOFAILOVER)))
-					/*
-					 * This is a possible candidate,
-					 * unless we find a better one.
-					 */
-					test_logint = li;
-			}
+			/*
+			 * Rate the testflags. If we've found an optimal
+			 * match, then break out; otherwise, record the most
+			 * recent OK one.
+			 */
+			rating = rate_testflags(li->li_flags);
+			if (rating == BAD_TESTFLAGS)
+				continue;
+
+			probe_logint = li;
+			if (rating == BEST_TESTFLAGS)
+				break;
 		}
 
 		/*
-		 * If we've gone from a singleton group to a multiple adapter
-		 * group, and we haven't found an IFF_NOFAILOVER test address
-		 * by now, the old test address is no longer valid. If we are
-		 * not dealing with a singleton group, and the above test
-		 * address selection loop has selected a non IFF_NOFAILOVER
-		 * address as a candidate, we will correct that here.
+		 * If the probe logint has changed, ditch the old one.
 		 */
-		if ((test_logint != NULL) &&
-		    !SINGLETON_GROUP(pii->pii_phyint) &&
-		    !(test_logint->li_flags & IFF_NOFAILOVER)) {
-			test_logint = NULL;
+		if (pii->pii_probe_logint != NULL &&
+		    pii->pii_probe_logint != probe_logint) {
 			if (pii->pii_probe_sock != -1)
 				close_probe_socket(pii, _B_TRUE);
 			pii->pii_probe_logint = NULL;
 		}
 
-		if (test_logint == NULL) {
+		if (probe_logint == NULL) {
 			/*
 			 * We don't have a test address. Don't print an
 			 * error message immediately. check_config() will
@@ -728,7 +708,7 @@ select_test_ifs(void)
 				reset_crtt_all(pii->pii_phyint);
 			}
 			continue;
-		} else if (test_logint == pii->pii_probe_logint) {
+		} else if (probe_logint == pii->pii_probe_logint) {
 			/*
 			 * If we didn't find any new test addr, go to the
 			 * next phyint.
@@ -741,7 +721,7 @@ select_test_ifs(void)
 		 * or is being assigned a testaddr for the 1st time.
 		 * Need to initialize the phyint socket
 		 */
-		pii->pii_probe_logint = test_logint;
+		pii->pii_probe_logint = probe_logint;
 		if (!phyint_inst_sockinit(pii)) {
 			if (debug & D_PHYINT) {
 				logdebug("select_test_ifs: "
@@ -780,7 +760,7 @@ select_test_ifs(void)
 			assert(pii->pii_targets == NULL);
 			assert(pii->pii_target_next == NULL);
 			assert(pii->pii_ntargets == 0);
-			target_create(pii, test_logint->li_dstaddr,
+			target_create(pii, probe_logint->li_dstaddr,
 			    _B_TRUE);
 		}
 
@@ -921,9 +901,6 @@ check_config(void)
 	 * been configured, notify the administrator, but continue on since we
 	 * can still perform load spreading, along with "link up/down" based
 	 * failure detection.
-	 *
-	 * Note: In the singleton group case, when user didn't configure
-	 * a test address, the probe address is picked by this daemon.
 	 */
 	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
 		if (pi->pi_flags & IFF_OFFLINE)
