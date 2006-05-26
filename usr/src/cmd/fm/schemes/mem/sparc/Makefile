@@ -28,9 +28,11 @@
 
 include ../Makefile.com
 
-SRCS += mdesc_devinit.c
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc -ltopo
-LDFLAGS += -R/usr/lib/fm
+
+CPPFLAGS += -I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += -L$(ROOTLIB)/fm -L$(ROOT)/usr/platform/sun4v/lib/fm/fmd \
+	-lmdesc -ltopo -lldom
+LDFLAGS += -R/usr/lib/fm -R/usr/platform/sun4v/lib/fm/fmd
 
 include ../../Makefile.targ
 

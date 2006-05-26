@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,16 +36,41 @@
 #include <cmd_cpu.h>
 #include <cmd.h>
 
+#include <assert.h>
 #include <strings.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <fm/fmd_api.h>
+#include <sys/fm/ldom.h>
 #include <sys/fm/protocol.h>
 
 #include <sys/fm/cpu/UltraSPARC-T1.h>
+#include <sys/mdesc.h>
 #include <sys/async.h>
 #include <sys/errclassify.h>
 #include <sys/niagararegs.h>
+#include <sys/fm/ldom.h>
+
+extern ldom_hdl_t *cpumem_diagnosis_lhp;
+
+static fmd_hdl_t *cpumem_hdl = NULL;
+
+static void *
+cpumem_alloc(size_t size)
+{
+	assert(cpumem_hdl != NULL);
+
+	return (fmd_hdl_alloc(cpumem_hdl, size, FMD_SLEEP));
+}
+
+static void
+cpumem_free(void *addr, size_t size)
+{
+	assert(cpumem_hdl != NULL);
+
+	fmd_hdl_free(cpumem_hdl, addr, size);
+}
 
 /*ARGSUSED*/
 cmd_evdisp_t
@@ -80,7 +104,7 @@ static cmd_evdisp_t
 xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, cmd_errcl_t clcode, cmd_xe_handler_f *hdlr)
 {
-	uint64_t afar, l2_real_afar, dram_real_afar;
+	uint64_t afar, l2_afar, dram_afar;
 	uint64_t l2_afsr, dram_afsr;
 	uint16_t synd;
 	uint8_t afar_status, synd_status;
@@ -92,10 +116,10 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if (nvlist_lookup_pairs(nvl, 0,
 	    FM_EREPORT_PAYLOAD_NAME_L2_AFSR, DATA_TYPE_UINT64, &l2_afsr,
 	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR, DATA_TYPE_UINT64, &dram_afsr,
-	    FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR, DATA_TYPE_UINT64,
-	    &l2_real_afar,
-	    FM_EREPORT_PAYLOAD_NAME_DRAM_REAL_AFAR, DATA_TYPE_UINT64,
-	    &dram_real_afar,
+	    FM_EREPORT_PAYLOAD_NAME_L2_AFAR, DATA_TYPE_UINT64,
+	    &l2_afar,
+	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFAR, DATA_TYPE_UINT64,
+	    &dram_afar,
 	    FM_EREPORT_PAYLOAD_NAME_ERR_TYPE, DATA_TYPE_STRING, &typenm,
 	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, DATA_TYPE_NVLIST, &rsrc,
 	    NULL) != 0)
@@ -116,26 +140,26 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	 */
 	switch (clcode) {
 	case CMD_ERRCL_DAC:
-		afar = l2_real_afar;
+		afar = l2_afar;
 		afar_status = ((l2_afsr & NI_L2AFSR_P10) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = ((dram_afsr & NI_DMAFSR_P01) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		break;
 	case CMD_ERRCL_DSC:
-		afar = dram_real_afar;
+		afar = dram_afar;
 		afar_status = ((dram_afsr & NI_DMAFSR_P01) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = afar_status;
 		break;
 	case CMD_ERRCL_DAU:
-		afar = l2_real_afar;
+		afar = l2_afar;
 		afar_status = ((l2_afsr & NI_L2AFSR_P05) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = AFLT_STAT_VALID;
 		break;
 	case CMD_ERRCL_DSU:
-		afar = dram_real_afar;
+		afar = dram_afar;
 		afar_status = synd_status = AFLT_STAT_VALID;
 		break;
 	default:
@@ -174,4 +198,49 @@ cmd_frx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
 	return (CMD_EVD_UNUSED);
+}
+
+/*ARGSUSED*/
+ulong_t
+cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
+{
+	/*
+	 * return the total physical memory in pages
+	 */
+	md_t *mdp;
+	mde_cookie_t *listp;
+	uint64_t bmem, physmem = 0;
+	size_t bufsiz = 0;
+	uint64_t *bufp;
+	int num_nodes, nmblocks, i;
+
+	if (cpumem_hdl == NULL) {
+		cpumem_hdl = hdl;
+	}
+
+	bufsiz = (size_t)ldom_get_core_md(cpumem_diagnosis_lhp, &bufp);
+	if (bufsiz > 0) {
+		mdp = md_init_intern(bufp, cpumem_alloc,
+					cpumem_free);
+	}
+	if (mdp == NULL || bufsiz == 0)
+		return (0);
+
+	num_nodes = md_node_count(mdp);
+	listp = (mde_cookie_t *)cpumem_alloc(sizeof (mde_cookie_t) *
+						num_nodes);
+
+	nmblocks = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
+				md_find_name(mdp, "mblock"),
+				md_find_name(mdp, "fwd"), listp);
+
+	for (i = 0; i < nmblocks; i++) {
+		if (md_get_prop_val(mdp, listp[i], "size", &bmem) < 0) {
+			physmem = 0;
+			break;
+		}
+		physmem += bmem;
+	}
+
+	return ((ulong_t)(physmem / cmd.cmd_pagesize));
 }

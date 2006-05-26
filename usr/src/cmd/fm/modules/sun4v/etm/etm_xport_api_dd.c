@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +58,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <poll.h>
+#include <sys/ldc.h>
+#include <sys/vldc.h>
 
 #include "etm_xport_api.h"
 #include "etm_etm_proto.h"
@@ -97,18 +99,27 @@ typedef struct _etm_xport_conn {
 } _etm_xport_conn_t;
 
 /*
- * default filename of device node to reach SP from domain
+ * filename of device node to reach SP from domain.  one of these two
+ * device nodes will be used:
+ *   ETM_XPORT_DEV_FN_SP - the Ontario glvc
+ *   ETM_XPORT_DEV_VLDC  - the more recent LDOMS 1.0 (a.k.a. Ontario+) vldc
+ * When the latter is in use, use_vldc is set to 1.
  *
  * filenames of device nodes to reach domains from SP
  * are NA because SP runs ALOM vs Solaris or Linux
  * and ETM is for Unix based OSes
  */
-
 #define	ETM_XPORT_DEV_FN_SP	"/dev/spfma"
+
+#define	ETM_XPORT_DEV_VLDC	\
+	"/devices/virtual-devices@100/channel-devices@200" \
+	"/virtual-channel-client@2:spfma"
 
 /*
  * -------------------------- global variables -------------------------------
  */
+
+static int use_vldc = 0;
 
 static struct stats {
 
@@ -228,6 +239,13 @@ etm_xport_ser_lock;		/* xport access serialization lock */
 
 static _etm_xport_conn_t *
 etm_xport_ser_conn = NULL;	/* serialization connection handle */
+
+static _etm_xport_conn_t *
+etm_xport_vldc_conn = NULL;	/* single connection handle for VLDC */
+
+static pthread_mutex_t
+etm_xport_vldc_lock = PTHREAD_MUTEX_INITIALIZER;
+				/* lock for open()/close() VLDC */
 
 static int
 etm_xport_debug_lvl = 0;	/* debug level: 0 off, 1 on, 2 more, ... */
@@ -351,8 +369,19 @@ etm_xport_get_fn(fmd_hdl_t *hdl, int io_op)
 	}
 
 	if (strlen(prop_str) == 0) {
-		(void) strncpy(fn_wr, ETM_XPORT_DEV_FN_SP, PATH_MAX - 1);
-		(void) strncpy(fn_rd, ETM_XPORT_DEV_FN_SP, PATH_MAX - 1);
+		struct stat buf;
+		char *fname;
+
+		if (stat(ETM_XPORT_DEV_VLDC, &buf) == 0) {
+			use_vldc = 1;
+			fname = ETM_XPORT_DEV_VLDC;
+		} else {
+			use_vldc = 0;
+			fname = ETM_XPORT_DEV_FN_SP;
+		}
+
+		(void) strncpy(fn_wr, fname, PATH_MAX - 1);
+		(void) strncpy(fn_rd, fname, PATH_MAX - 1);
 		rv = fn_rd;
 		if (io_op == ETM_IO_OP_WR) {
 			rv = fn_wr;
@@ -492,6 +521,13 @@ etm_xport_dup_addr(fmd_hdl_t *hdl, etm_xport_addr_t addr)
  *			into the caller's given buffer,
  *			return how many bytes actually peeked
  *			or -errno value
+ *
+ * caveats:
+ *		peeked data is NOT guaranteed by all platform transports
+ *		to remain enqueued if this process/thread crashes;
+ *		this casts some doubt on the utility of this func
+ *
+ *		transport does NOT support peek sizes > MTU
  */
 
 static ssize_t
@@ -641,10 +677,26 @@ etm_xport_buffered_read(fmd_hdl_t *hdl, _etm_xport_conn_t *_conn,
 	 * there is no race condition between peeking and reading
 	 * due to unbuffered design of the device driver
 	 */
+	if (use_vldc) {
+		pollfd_t pollfd;
 
-	if ((i = etm_xport_raw_peek(hdl, _conn, etm_xport_irb_tail,
-						etm_xport_irb_mtu_sz)) < 0) {
-		return (i);
+		pollfd.events = POLLIN;
+		pollfd.revents = 0;
+		pollfd.fd = _conn->fd;
+
+		if (poll(&pollfd, 1, -1) < 1)
+			return (-EIO);
+
+		/*
+		 * set i to the maximum size --- read(..., i) below will
+		 * pull in n bytes (n <= i) anyway
+		 */
+		i = etm_xport_irb_mtu_sz;
+	} else {
+		if ((i = etm_xport_raw_peek(hdl, _conn, etm_xport_irb_tail,
+					    etm_xport_irb_mtu_sz)) < 0) {
+			return (i);
+		}
 	}
 	if ((n = read(_conn->fd, etm_xport_irb_tail, i)) < 0) {
 		/* errno assumed set by above call */
@@ -720,7 +772,7 @@ etm_xport_init(fmd_hdl_t *hdl)
 		rv = (-errno);
 		goto func_ret;
 	}
-	if (!S_ISCHR(stat_buf.st_mode)) {
+	if (!S_ISCHR(stat_buf.st_mode) && use_vldc == 0) {
 		etm_xport_should_fake_dd = 1;	/* not a char driver */
 	}
 	fmd_hdl_debug(hdl, "info: etm_xport_should_fake_dd %d\n",
@@ -747,6 +799,13 @@ etm_xport_init(fmd_hdl_t *hdl)
 
 	(void) pthread_mutex_init(&etm_xport_ser_lock, NULL);
 	etm_xport_ser_conn = NULL;
+
+	if (use_vldc) {
+		etm_xport_vldc_conn = etm_xport_open(hdl, _addrv[0]);
+		if (etm_xport_vldc_conn == NULL) {
+			fmd_hdl_debug(hdl, "info: etm_xport_open() failed\n");
+		}
+	}
 
 func_ret:
 
@@ -789,13 +848,42 @@ etm_xport_open(fmd_hdl_t *hdl, etm_xport_addr_t addr)
 
 	_conn = fmd_hdl_zalloc(hdl, sizeof (_etm_xport_conn_t), FMD_SLEEP);
 
-	if ((_conn->fd = open(_addr->fn, ETM_XPORT_OPEN_FLAGS, 0)) == -1) {
-		/* errno assumed set by above call */
-		etm_xport_free_addr(hdl, _addr);
-		fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
-		etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
-		return (NULL);
+	(void) pthread_mutex_lock(&etm_xport_vldc_lock);
+
+	if (use_vldc == 0 || etm_xport_vldc_conn == NULL) {
+		if ((_conn->fd = open(_addr->fn,
+				    ETM_XPORT_OPEN_FLAGS, 0)) == -1) {
+			/* errno assumed set by above call */
+			etm_xport_free_addr(hdl, _addr);
+			fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
+			etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
+			return (NULL);
+		}
 	}
+
+	if (use_vldc && etm_xport_vldc_conn == NULL) {
+		vldc_opt_op_t op;
+
+		/* Set the channel to reliable mode */
+		op.op_sel = VLDC_OP_SET;
+		op.opt_sel = VLDC_OPT_MODE;
+		op.opt_val = LDC_MODE_STREAM;
+
+		if (ioctl(_conn->fd, VLDC_IOCTL_OPT_OP, &op) != 0) {
+			/* errno assumed set by above call */
+			(void) close(_conn->fd);
+			etm_xport_free_addr(hdl, _addr);
+			fmd_hdl_free(hdl, _conn, sizeof (_etm_xport_conn_t));
+			etm_xport_stats.xport_os_open_fail.fmds_value.ui64++;
+			return (NULL);
+		}
+
+		etm_xport_vldc_conn = _conn;
+	} else if (use_vldc && etm_xport_vldc_conn != NULL) {
+		_conn->fd = dup(etm_xport_vldc_conn->fd);
+	}
+
+	(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
 
 	/* return the fully formed connection handle */
 
@@ -896,10 +984,22 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 	 * behavior; this will pend until some ETM message is written
 	 * from the other end
 	 */
+	if (use_vldc) {
+		pollfd_t pollfd;
 
-	if ((n = etm_xport_peek(hdl, _conn, buf, 1)) < 0) {
-		errno = (-n);
-		goto func_ret;
+		pollfd.events = POLLIN;
+		pollfd.revents = 0;
+		pollfd.fd = _conn->fd;
+
+		if (poll(&pollfd, 1, -1) < 1) {
+			errno = -EIO;
+			goto func_ret;
+		}
+	} else {
+		if ((n = etm_xport_raw_peek(hdl, _conn, buf, 1)) < 0) {
+			errno = (-n);
+			goto func_ret;
+		}
 	}
 
 	rv = _conn;	/* success, return the open connection */
@@ -962,12 +1062,20 @@ etm_xport_close(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 
 	/* close the device node */
 
+	(void) pthread_mutex_lock(&etm_xport_vldc_lock);
+
 	if (close(_conn->fd) < 0) {
 		/* errno assumed set by above call */
 		etm_xport_stats.xport_os_close_fail.fmds_value.ui64++;
 		nev = (-errno);
 		rv = NULL;
 	}
+
+	if (use_vldc && (_conn == etm_xport_vldc_conn)) {
+		etm_xport_vldc_conn = NULL;
+	}
+
+	(void) pthread_mutex_unlock(&etm_xport_vldc_lock);
 
 	/*
 	 * unlock the mutex after the device node is closed
@@ -1188,6 +1296,11 @@ etm_xport_fini(fmd_hdl_t *hdl)
 	(void) pthread_mutex_destroy(&etm_xport_ser_lock);
 	etm_xport_ser_conn = NULL;
 
+	if (use_vldc && (etm_xport_vldc_conn != NULL)) {
+		(void) etm_xport_close(hdl, etm_xport_vldc_conn);
+		etm_xport_vldc_conn = NULL;
+	}
+
 	/* free any long standing properties from FMD */
 
 	fmd_prop_free_string(hdl, etm_xport_addrs);
@@ -1227,28 +1340,6 @@ etm_xport_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, void *buf,
 	return (etm_xport_buffered_read(hdl, conn, buf, byte_cnt));
 
 } /* etm_xport_read() */
-
-/*
- * etm_xport_peek - same as etm_xport_read() but data is not dequeued
- *			from the transport/connection; peeked data is
- *			guaranteed by the transport to remain enqueued
- *			if this process/thread crashes
- *
- * caveats:
- *		peeked data is NOT guaranteed by all platform transports
- *		to remain enqueued if this process/thread crashes;
- *		this casts some doubt on the utility of this func
- *
- *		transport does NOT support peek sizes > MTU
- */
-
-ssize_t
-etm_xport_peek(fmd_hdl_t *hdl, etm_xport_conn_t conn, void *buf,
-							size_t byte_cnt)
-{
-	return (etm_xport_raw_peek(hdl, conn, buf, byte_cnt));
-
-} /* etm_xport_peek() */
 
 /*
  * etm_xport_write - try to write N bytes to the connection
@@ -1319,6 +1410,19 @@ etm_xport_get_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_xport_opt_t opt)
 	if (etm_xport_should_fake_dd) {
 		n = etm_fake_ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP,
 								&op_ctl);
+	} else if (use_vldc) {
+		if (opt == ETM_XPORT_OPT_MTU_SZ) {
+			vldc_opt_op_t operation;
+
+			operation.op_sel = VLDC_OP_GET;
+			operation.opt_sel = VLDC_OPT_MTU_SZ;
+
+			n = ioctl(_conn->fd, VLDC_IOCTL_OPT_OP, &operation);
+
+			op_ctl.oo_val = operation.opt_val;
+		} else {
+			return (-EINVAL);
+		}
 	} else {
 		n = ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP, &op_ctl);
 	}
@@ -1333,46 +1437,3 @@ etm_xport_get_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_xport_opt_t opt)
 	return (rv);
 
 } /* etm_xport_get_opt() */
-
-/*
- * etm_xport_set_opt - set a connection's transport option value,
- *			return the value actually set
- *			or -errno value (ex: -ENOTSUP)
- */
-
-ssize_t
-etm_xport_set_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn,
-			etm_xport_opt_t opt, size_t new_val)
-{
-	_etm_xport_conn_t	*_conn;		/* connection handle */
-	etm_xport_opt_op_t	op_ctl;		/* struct for option ops */
-	ssize_t			n;		/* gen use */
-
-	_conn = conn;
-
-	if (hdl == NULL) {		/* appease lint */
-		return (-EINVAL);
-	}
-	if ((n = etm_xport_valid_conn(_conn)) < 0) {
-		return (n);
-	}
-
-	op_ctl.oo_op = ETM_XPORT_OPT_SET;
-	op_ctl.oo_opt = opt;
-	op_ctl.oo_val = new_val;
-
-	if (etm_xport_should_fake_dd) {
-		n = etm_fake_ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP,
-							&op_ctl);
-	} else {
-		n = ioctl(_conn->fd, ETM_XPORT_IOCTL_OPT_OP, &op_ctl);
-	}
-	if (n < 0) {
-		/* errno assumed set by above call */
-		etm_xport_stats.xport_os_ioctl_fail.fmds_value.ui64++;
-		return (-errno);
-	}
-
-	return ((int)op_ctl.oo_val);
-
-} /* etm_xport_set_opt() */

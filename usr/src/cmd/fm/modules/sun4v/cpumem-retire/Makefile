@@ -24,13 +24,24 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+MODULE = cpumem-retire
+CLASS = arch
 ARCH = sun4v
+SRCS = \
+	cma_cpu.c \
+	cma_main.c \
+	cma_page.c \
+	cma_cpu_arch.c \
+	cma_page_arch.c
 
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
+include ../../Makefile.plugin
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+CMA_VERSION = "1.1"
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
+INCDIRS = . \
+	 $(ROOT)/usr/platform/sun4v/include
+
+CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt \
+	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom

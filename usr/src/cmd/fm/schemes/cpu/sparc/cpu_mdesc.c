@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -53,16 +52,24 @@ cpu_get_serialid_mdesc(uint32_t cpuid, uint64_t *serialidp)
 }
 
 int
-cpu_mdesc_init(void)
+cpu_mdesc_init(ldom_hdl_t *lhp)
 {
 	md_t *mdp;
 	mde_cookie_t *listp;
 	md_cpumap_t *mcmp;
+	uint64_t *bufp;
 	int num_nodes, idx;
-	size_t bufsiz = 0;
+	ssize_t bufsiz = 0;
 
-	if ((mdp = mdesc_devinit(&bufsiz)) == NULL)
-		return (0); /* successful, no mdesc */
+	if ((bufsiz = ldom_get_core_md(lhp, &bufp)) > 0) {
+		if ((mdp = md_init_intern(bufp, fmd_fmri_alloc,
+					fmd_fmri_free)) == NULL) {
+			fmd_fmri_free(bufp, (size_t)bufsiz);
+			return (0);
+		}
+	} else {
+		return (0);
+	}
 
 	num_nodes = md_node_count(mdp);
 	listp = fmd_fmri_alloc(sizeof (mde_cookie_t) * num_nodes);
@@ -95,7 +102,7 @@ cpu_mdesc_init(void)
 	}
 
 	fmd_fmri_free(listp, sizeof (mde_cookie_t) * num_nodes);
-	fmd_fmri_free(*mdp, bufsiz);
+	fmd_fmri_free(bufp, (size_t)bufsiz);
 	(void) md_fini(mdp);
 
 	return (0);

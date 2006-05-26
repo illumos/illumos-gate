@@ -55,6 +55,12 @@
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
 
+#ifdef	sun4v
+#include <sys/fm/ldom.h>
+static fmd_hdl_t *init_hdl;
+ldom_hdl_t *cpumem_diagnosis_lhp;
+#endif
+
 cmd_t cmd;
 
 #ifdef sun4u
@@ -397,6 +403,10 @@ static const struct cmd_evdisp_name {
 void
 _fmd_fini(fmd_hdl_t *hdl)
 {
+
+#ifdef	sun4v
+	ldom_fini(cpumem_diagnosis_lhp);
+#endif
 	cmd_cpu_fini(hdl);
 	cmd_mem_fini(hdl);
 	cmd_page_fini(hdl);
@@ -407,6 +417,20 @@ _fmd_fini(fmd_hdl_t *hdl)
 	fmd_hdl_free(hdl, cmd.cmd_xxcu_trw,
 	    sizeof (cmd_xxcu_trw_t) * cmd.cmd_xxcu_ntrw);
 }
+
+#ifdef	sun4v
+static void *
+cpumem_diagnosis_init_alloc(size_t size)
+{
+	return (fmd_hdl_alloc(init_hdl, size, FMD_SLEEP));
+}
+
+static void
+cpumem_diagnosis_init_free(void *addr, size_t size)
+{
+	fmd_hdl_free(init_hdl, addr, size);
+}
+#endif
 
 void
 _fmd_init(fmd_hdl_t *hdl)
@@ -573,4 +597,10 @@ _fmd_init(fmd_hdl_t *hdl)
 		_fmd_fini(hdl);
 		fmd_hdl_abort(hdl, "failed to restore saved state\n");
 	}
+
+#ifdef	sun4v
+	init_hdl = hdl;
+	cpumem_diagnosis_lhp = ldom_init(cpumem_diagnosis_init_alloc,
+					cpumem_diagnosis_init_free);
+#endif
 }

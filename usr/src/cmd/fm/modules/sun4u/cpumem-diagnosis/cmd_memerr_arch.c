@@ -40,6 +40,7 @@
 #include <strings.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/cpu/UltraSPARC-III.h>
@@ -440,4 +441,11 @@ cmd_ioxe_sec(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	 * resources, as they don't contain enough information.  Ignore them.
 	 */
 	return (CMD_EVD_OK);
+}
+
+/*ARGSUSED*/
+ulong_t
+cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
+{
+	return (sysconf(_SC_PHYS_PAGES));
 }

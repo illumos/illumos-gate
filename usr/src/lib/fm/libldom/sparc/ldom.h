@@ -18,44 +18,41 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_CPU_MDESC_H
-#define	_CPU_MDESC_H
+#ifndef	_LDOM_H
+#define	_LDOM_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdlib.h>
+#include <libnvpair.h>
 #include <sys/types.h>
-#include <sys/mdesc.h>
-#include <sys/fm/ldom.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef struct md_cpumap {
-	uint32_t cpumap_id;
-	uint32_t cpumap_pid;
-	uint64_t cpumap_serialno;
-} md_cpumap_t;
+typedef struct ldom_hdl ldom_hdl_t;
 
-typedef struct cpu {
-	md_cpumap_t *cpu_mdesc_cpus;	/* head of ptr list for cpu maps */
-	uint32_t cpu_mdesc_ncpus;	/* number of cpu maps */
-} cpu_t;
+extern ldom_hdl_t *ldom_init(void *(*allocp)(size_t size),
+			    void (*freep)(void *addr, size_t size));
+extern void ldom_fini(ldom_hdl_t *lhp);
 
-extern cpu_t cpu;
+extern int ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
+extern int ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
+extern int ldom_fmri_blacklist(ldom_hdl_t *lhp, nvlist_t *nvl_fmri);
 
-extern int cpu_get_serialid_mdesc(uint32_t, uint64_t *);
-extern int cpu_mdesc_init(ldom_hdl_t *lhp);
-extern void cpu_mdesc_fini(void);
+extern ssize_t ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf);
 
-#ifdef __cplusplus
+extern int ldom_major_version(ldom_hdl_t *lhp);
+extern int ldom_on_service(ldom_hdl_t *lhp);
+
+#ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _CPU_MDESC_H */
+#endif	/* _LDOM_H */

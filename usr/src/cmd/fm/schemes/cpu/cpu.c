@@ -36,6 +36,7 @@
 
 #ifdef	sparc
 #include <cpu_mdesc.h>
+#include <sys/fm/ldom.h>
 #endif
 
 /*
@@ -43,10 +44,8 @@
  */
 
 #ifdef sparc
-#define	ONTARIO_PLAT_NAME	"SUNW,Sun-Fire-T200"
-#define	ERIE_PLAT_NAME		"SUNW,Sun-Fire-T1000"
-#define	PELTON_PLAT_NAME	"SUNW,Netra-T2000"
 cpu_t cpu;
+static ldom_hdl_t *cpu_scheme_lhp;
 #endif /* sparc */
 
 ssize_t
@@ -157,30 +156,6 @@ cpu_get_serialid_V0(uint32_t cpuid, uint64_t *serialidp)
 		return (cpu_get_serialid_kstat(cpuid, serialidp));
 }
 
-#ifdef sparc
-static int
-cpu_phys2virt(uint32_t cpuid, uint32_t *cpuvidp)
-{
-	md_cpumap_t *mcmp;
-	int idx;
-
-	if (cpu.cpu_mdesc_cpus == NULL)
-		return (ENOENT);
-
-	for (idx = 0, mcmp = cpu.cpu_mdesc_cpus;
-	    idx < cpu.cpu_mdesc_ncpus; idx++, mcmp++) {
-		if (mcmp->cpumap_pid == (uint32_t)-1)
-			continue; /* ignore invalid value */
-		if (mcmp->cpumap_pid == cpuid) {
-			*cpuvidp = mcmp->cpumap_id;
-			return (0);
-		}
-	}
-
-	return (ENOENT);
-}
-#endif /* sparc */
-
 int
 fmd_fmri_expand(nvlist_t *nvl)
 {
@@ -223,25 +198,6 @@ fmd_fmri_expand(nvlist_t *nvl)
 	} else {
 		return (fmd_fmri_set_errno(EINVAL));
 	}
-
-#ifdef sparc
-	{
-		uint32_t cpuvid;
-		const char *platform = fmd_fmri_get_platform();
-
-		if (strcmp(platform, ONTARIO_PLAT_NAME) == 0 ||
-		    strcmp(platform, PELTON_PLAT_NAME) == 0 ||
-		    strcmp(platform, ERIE_PLAT_NAME) == 0) {
-			if (cpu_phys2virt(cpuid, &cpuvid) != 0)
-				return (fmd_fmri_set_errno(ENOENT));
-
-			(void) nvlist_remove_all(nvl, FM_FMRI_CPU_VID);
-			if ((rc = nvlist_add_uint32(nvl, FM_FMRI_CPU_VID,
-			    cpuvid)) != 0)
-				return (fmd_fmri_set_errno(rc));
-		}
-	}
-#endif /* sparc */
 
 	return (0);
 }
@@ -297,35 +253,31 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	    version > FM_CPU_SCHEME_VERSION ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
+
 #ifdef sparc
 	{
-		uint32_t cpuvid;
-		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_VID, &cpuvid) == 0) {
-			/*
-			 * This FMRI has a 'cpuvid' member, but its value could
-			 * be stale -- especially when restoring saved state.
-			 * Do a fresh lookup and use the result for p_online().
-			 */
-			if (cpu_phys2virt(cpuid, &cpuvid) != 0)
-				return (fmd_fmri_set_errno(ENOENT));
-			return (p_online(cpuvid, P_STATUS) == P_FAULTED);
-		}
-	}
-#endif /* sparc */
+		int cpustatus = ldom_fmri_status(cpu_scheme_lhp, nvl);
 
+		return (cpustatus == P_FAULTED || (cpustatus == P_OFFLINE &&
+				ldom_major_version(cpu_scheme_lhp) == 1));
+	}
+#else
 	return (p_online(cpuid, P_STATUS) == P_FAULTED);
+#endif
 }
 
 #ifdef	sparc
 int
 fmd_fmri_init(void)
 {
-	return (cpu_mdesc_init());
+	cpu_scheme_lhp = ldom_init(fmd_fmri_alloc, fmd_fmri_free);
+	return (cpu_mdesc_init(cpu_scheme_lhp));
 }
 
 void
 fmd_fmri_fini(void)
 {
 	cpu_mdesc_fini();
+	ldom_fini(cpu_scheme_lhp);
 }
 #endif	/* sparc */

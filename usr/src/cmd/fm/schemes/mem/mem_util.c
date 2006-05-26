@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,11 @@
 #include <errno.h>
 #include <sys/mem.h>
 #include <fm/fmd_fmri.h>
+
+#ifdef sparc
+#include <sys/fm/ldom.h>
+extern ldom_hdl_t *mem_scheme_lhp;
+#endif
 
 void
 mem_strarray_free(char **arr, size_t dim)
@@ -48,6 +52,25 @@ mem_strarray_free(char **arr, size_t dim)
 int
 mem_page_cmd(int cmd, nvlist_t *nvl)
 {
+#ifdef sparc
+	int rc;
+
+	if (cmd == MEM_PAGE_ISRETIRED || cmd == MEM_PAGE_FMRI_ISRETIRED) {
+		rc = ldom_fmri_status(mem_scheme_lhp, nvl);
+	} else if (cmd == MEM_PAGE_RETIRE || cmd == MEM_PAGE_FMRI_RETIRE) {
+		rc = ldom_fmri_retire(mem_scheme_lhp, nvl);
+	} else {
+		errno = ENOTSUP;
+		return (-1);
+	}
+
+	if (rc > -1) {
+		return (0);
+	} else {
+		errno = EIO;
+		return (-1);
+	}
+#else
 	mem_page_t mpage;
 	char *fmribuf;
 	size_t fmrisz;
@@ -86,4 +109,5 @@ mem_page_cmd(int cmd, nvlist_t *nvl)
 	}
 
 	return (0);
+#endif
 }

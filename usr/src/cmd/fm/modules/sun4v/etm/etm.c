@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -42,6 +41,7 @@
 #include <sys/fm/util.h>
 #include <netinet/in.h>
 #include <fm/fmd_api.h>
+#include <sys/fm/ldom.h>
 
 #include "etm_xport_api.h"
 #include "etm_etm_proto.h"
@@ -60,6 +60,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+
 
 /*
  * ----------------------------- forward decls -------------------------------
@@ -126,6 +127,9 @@ static const fmd_hdl_info_t fmd_info = {
 /*
  * ---------------------------- global data ----------------------------------
  */
+
+static fmd_hdl_t
+*init_hdl = NULL;	/* used in mem allocator at init time */
 
 static int
 etm_debug_lvl = 0;	/* debug level: 0 is off, 1 is on, 2 is more, etc */
@@ -556,11 +560,6 @@ etm_io_op(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn,
 			io_func_ptr = etm_xport_write;
 			io_retry_stat = etm_stats.etm_xport_wr_retry;
 			io_fail_stat = etm_stats.etm_xport_wr_fail;
-			break;
-		case ETM_IO_OP_PK:
-			io_func_ptr = etm_xport_peek;
-			io_retry_stat = etm_stats.etm_xport_pk_retry;
-			io_fail_stat = etm_stats.etm_xport_pk_fail;
 			break;
 		default:
 			return (-EINVAL);
@@ -1084,6 +1083,7 @@ etm_req_ver_negot(fmd_hdl_t *hdl)
 
 	for (i = 0; addrv[i] != NULL; i++) {
 
+		etm_stats.etm_xport_open_fail.fmds_value.ui64++;
 		if (etm_conn_open(hdl, "bad conn open during ver negot",
 					addrv[i], &conn) < 0) {
 			continue;
@@ -1534,6 +1534,18 @@ etm_server(void *arg)
 	}
 } /* etm_server() */
 
+static void *
+etm_init_alloc(size_t size)
+{
+	return (fmd_hdl_alloc(init_hdl, size, FMD_SLEEP));
+}
+
+static void
+etm_init_free(void *addr, size_t size)
+{
+	fmd_hdl_free(init_hdl, addr, size);
+}
+
 /*
  * -------------------------- FMD entry points -------------------------------
  */
@@ -1550,12 +1562,28 @@ _fmd_init(fmd_hdl_t *hdl)
 {
 	struct timeval		tmv;		/* timeval */
 	ssize_t			n;		/* gen use */
+	ldom_hdl_t		*lhp;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
 		return; /* invalid data in configuration file */
 	}
 
 	fmd_hdl_debug(hdl, "info: module initializing\n");
+
+	init_hdl = hdl;
+	lhp = ldom_init(etm_init_alloc, etm_init_free);
+
+	/*
+	 * Do not load this module if it is runing on a guest ldom.
+	 */
+	if (ldom_major_version(lhp) == 1 && ldom_on_service(lhp) == 0) {
+		fmd_hdl_debug(hdl, "info: module unregistering\n");
+		ldom_fini(lhp);
+		fmd_hdl_unregister(hdl);
+		return;
+	} else {
+		ldom_fini(lhp);
+	}
 
 	/* setup statistics and properties from FMD */
 
@@ -1593,6 +1621,13 @@ _fmd_init(fmd_hdl_t *hdl)
 	}
 
 	etm_svr_tid = fmd_thr_create(hdl, etm_server, hdl);
+
+	/*
+	 * Wait a second for the receiving is ready before start handshaking
+	 * with the SP.
+	 */
+	(void) etm_sleep(ETM_SLEEP_QUIK);
+
 	etm_req_ver_negot(hdl);
 
 	fmd_hdl_debug(hdl, "info: module initialized ok\n");

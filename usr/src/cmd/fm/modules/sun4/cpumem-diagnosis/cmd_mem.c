@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,8 +111,13 @@ cmd_mem_retirestat_create(fmd_hdl_t *hdl, fmd_stat_t *st, const char *unum,
 int
 cmd_mem_thresh_check(fmd_hdl_t *hdl, uint_t nret)
 {
-	ulong_t npages = sysconf(_SC_PHYS_PAGES);
+	ulong_t npages = cmd_mem_get_phys_pages(hdl);
 	ulong_t wrnpgs;
+
+	fmd_hdl_debug(hdl, "thresh_check: npages is %lu\n", npages);
+	if (npages == 0) {
+		return (0);
+	}
 
 	if (cmd.cmd_thresh_abs_sysmem != 0) {
 		wrnpgs = cmd.cmd_thresh_abs_sysmem;

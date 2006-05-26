@@ -36,9 +36,17 @@
 #include <time.h>
 #include <sys/mem.h>
 
+#ifdef	sparc
+#include <sys/fm/ldom.h>
+ldom_hdl_t *mem_scheme_lhp;
+#endif	/* sparc */
+
 mem_t mem;
 
 #ifdef	sparc
+
+extern int mem_update_mdesc(void);
+
 /*
  * Retry values for handling the case where the kernel is not yet ready
  * to provide DIMM serial ids.  Some platforms acquire DIMM serial id
@@ -218,6 +226,72 @@ mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
 	return (rc);
 }
 
+/*
+ * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
+ * the unum (or a component of same) wasn't found, -1 is returned with errno
+ * set to ENOENT.
+ */
+static int
+mem_get_serids_from_mdesc(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	uint64_t drgen = fmd_fmri_get_drgen();
+	char **dimms, **serids;
+	size_t ndimms, nserids;
+	mem_dimm_map_t *dm;
+	int i, rc = 0;
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
+		return (-1); /* errno is set for us */
+
+	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nserids = ndimms;
+
+	/*
+	 * first go through dimms and see if dm_drgen entries are outdated
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL ||
+		    dm->dm_drgen != drgen)
+			break;
+	}
+
+	if (i < ndimms && mem_update_mdesc() != 0) {
+		mem_strarray_free(dimms, ndimms);
+		return (-1);
+	}
+
+	/*
+	 * get to this point if an up-to-date mdesc (and corresponding
+	 * entries in the global mem list) exists
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL) {
+			rc = fmd_fmri_set_errno(EINVAL);
+			break;
+		}
+
+		if (dm->dm_drgen != drgen)
+			dm->dm_drgen = drgen;
+
+		/*
+		 * mdesc and dm entry was updated by an earlier call to
+		 * mem_update_mdesc, so we go ahead and dup the serid
+		 */
+		serids[i] = fmd_fmri_strdup(dm->dm_serid);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	if (rc == 0) {
+		*seridsp = serids;
+		*nseridsp = nserids;
+	} else {
+		mem_strarray_free(serids, nserids);
+	}
+
+	return (rc);
+}
+
 #endif	/* sparc */
 
 /*ARGSUSED*/
@@ -232,6 +306,8 @@ mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 #ifdef	sparc
 	if (mem.mem_dm == NULL)
 		return (mem_get_serids_from_kernel(unum, seridsp, nseridsp));
+	else if (mem_get_serids_from_mdesc(unum, seridsp, nseridsp) == 0)
+		return (0);
 	else
 		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
 #else
@@ -410,10 +486,14 @@ fmd_fmri_present(nvlist_t *nvl)
 	 * pages to DIMMs changes, e.g. for change in DIMM size or interleave.
 	 * If we detect such a change, we discard ereports associated with a
 	 * previous memconfig value as invalid.
+	 *
+	 * The test (mem.mem_memconfig != 0) means we run on a system that
+	 * actually suplies a memconfig value.
 	 */
 
 	if ((nvlist_lookup_uint64(nvl, FM_FMRI_MEM_MEMCONFIG,
-	    &memconfig) == 0) && memconfig != mem.mem_memconfig)
+	    &memconfig) == 0) && (mem.mem_memconfig != 0) &&
+	    (memconfig != mem.mem_memconfig))
 		return (0);
 
 	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
@@ -538,6 +618,9 @@ fmd_fmri_unusable(nvlist_t *nvl)
 int
 fmd_fmri_init(void)
 {
+#ifdef	sparc
+	mem_scheme_lhp = ldom_init(fmd_fmri_alloc, fmd_fmri_free);
+#endif	/* sparc */
 	return (mem_discover());
 }
 
@@ -552,4 +635,7 @@ fmd_fmri_fini(void)
 		fmd_fmri_strfree(dm->dm_device);
 		fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
 	}
+#ifdef	sparc
+	ldom_fini(mem_scheme_lhp);
+#endif	/* sparc */
 }

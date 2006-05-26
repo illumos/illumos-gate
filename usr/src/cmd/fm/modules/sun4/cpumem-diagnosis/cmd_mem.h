@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,6 +171,7 @@ extern char *cmd_mem_serdnm_create(fmd_hdl_t *, const char *, const char *);
 extern void cmd_mem_retirestat_create(fmd_hdl_t *, fmd_stat_t *, const char *,
     uint64_t);
 extern int cmd_mem_thresh_check(fmd_hdl_t *, uint_t);
+extern ulong_t cmd_mem_get_phys_pages(fmd_hdl_t *);
 
 extern void cmd_mem_timeout(fmd_hdl_t *, id_t);
 extern void cmd_mem_gc(fmd_hdl_t *);

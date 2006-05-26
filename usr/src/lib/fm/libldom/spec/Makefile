@@ -24,13 +24,4 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-ARCH = sun4v
-
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
-
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
-
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+include $(SRC)/lib/Makefile.spec.arch

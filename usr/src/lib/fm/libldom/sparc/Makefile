@@ -24,13 +24,28 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-ARCH = sun4v
+MAPDIR = ../spec/sparc
+MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
 
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
+include ../Makefile.com
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+DYNFLAGS += -R/usr/lib/fm
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+FMHDRS = ldom.h
+HDRDIR = .
+SRCDIR = .
+
+ROOTFMHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys/fm
+
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+
+install_h: $(ROOTFMHDRDIR) $(ROOTFMHDRS)
+
+$(ROOTFMHDRDIR):
+	$(INS.dir)
+
+$(ROOTFMHDRDIR)/%: $(HDRDIR)/%
+	$(INS.file)
+
+$(ROOTLIBDIR):
+	$(INS.dir)

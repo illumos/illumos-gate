@@ -1,4 +1,7 @@
 #
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,19 +21,36 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-ARCH = sun4v
+function	ldom_init
+version		SUNWprivate
+end
 
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
+function	ldom_fini
+version		SUNWprivate
+end
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+function	ldom_fmri_status
+version		SUNWprivate
+end
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+function	ldom_fmri_retire
+version		SUNWprivate
+end
+
+function	ldom_fmri_blacklist
+version		SUNWprivate
+end
+
+function	ldom_get_core_md
+version		SUNWprivate
+end
+
+function	ldom_major_version
+version		SUNWprivate
+end
+
+function	ldom_on_service
+version		SUNWprivate
+end

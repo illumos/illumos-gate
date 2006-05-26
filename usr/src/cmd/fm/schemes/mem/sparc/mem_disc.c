@@ -55,8 +55,9 @@
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
+#include <sys/fm/ldom.h>
 
-extern md_t *mdesc_devinit(size_t *);
+extern ldom_hdl_t *mem_scheme_lhp;
 
 #define	PICL_FRUTREE_PATH \
 	"%s/usr/platform/%s/lib/picl/plugins/piclfrutree.conf"
@@ -433,6 +434,30 @@ mem_discover_picl(void)
 }
 
 /*
+ * Initialize sun4v machine descriptor file for subsequent use.
+ * If the open fails (most likely because file doesn't exist), or if
+ * initialization fails, return NULL.
+ *
+ * If the open succeeds and initialization also succeeds, the returned value is
+ * a pointer to an md_impl_t, whose 1st element points to the buffer where
+ * the full mdesc has been read in.  The size of this buffer is returned
+ * as 'bufsiz'.  Caller is responsible for deallocating BOTH of these objects.
+ */
+static md_t *
+mdesc_devinit(size_t *bufsiz)
+{
+	uint64_t *bufp;
+	ssize_t size;
+
+	if ((size = ldom_get_core_md(mem_scheme_lhp, &bufp)) > 0) {
+		*bufsiz = (size_t)size;
+		return (md_init_intern(bufp, fmd_fmri_alloc, fmd_fmri_free));
+	}
+
+	return (NULL);
+}
+
+/*
  * Sun4v: if a valid 'mdesc' machine description file exists,
  * read the mapping of dimm unum+jnum to serial number from it.
  */
@@ -446,4 +471,26 @@ mem_discover(void)
 		return (mem_discover_picl());
 	else
 		return (mem_discover_mdesc(mdp, mdbufsz));
+}
+
+int
+mem_update_mdesc(void)
+{
+	size_t mdbufsz = 0;
+	md_t *mdp = mdesc_devinit(&mdbufsz);
+
+	if (mdp == NULL) {
+		return (1);
+	} else {
+		mem_dimm_map_t *dm, *next;
+
+		for (dm = mem.mem_dm; dm != NULL; dm = next) {
+			next = dm->dm_next;
+			fmd_fmri_strfree(dm->dm_label);
+			fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
+		}
+		mem.mem_dm = NULL;
+
+		return (mem_discover_mdesc(mdp, mdbufsz));
+	}
 }

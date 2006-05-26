@@ -29,7 +29,8 @@
 include ../Makefile.lib
 
 sparc_SUBDIRS = \
-	libmdesc
+	libmdesc \
+	libldom
 
 i386_SUBDIRS =
 

@@ -18,44 +18,48 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_CPU_MDESC_H
-#define	_CPU_MDESC_H
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/mdesc.h>
+#include <cma.h>
+
 #include <sys/fm/ldom.h>
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#include <assert.h>
+#include <errno.h>
+#include <sys/mem.h>
 
-typedef struct md_cpumap {
-	uint32_t cpumap_id;
-	uint32_t cpumap_pid;
-	uint64_t cpumap_serialno;
-} md_cpumap_t;
+extern ldom_hdl_t *cma_lhp;
 
-typedef struct cpu {
-	md_cpumap_t *cpu_mdesc_cpus;	/* head of ptr list for cpu maps */
-	uint32_t cpu_mdesc_ncpus;	/* number of cpu maps */
-} cpu_t;
+/*
+ * cma_page_cmd()
+ *    Retire a page or check if it is retired.
+ *    Return: 0 upon successful, -1 otherwise.
+ */
+int
+cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
+{
+	int rc;
 
-extern cpu_t cpu;
+	fmd_hdl_debug(hdl, "cma_page_cmd(%d)\n", cmd);
 
-extern int cpu_get_serialid_mdesc(uint32_t, uint64_t *);
-extern int cpu_mdesc_init(ldom_hdl_t *lhp);
-extern void cpu_mdesc_fini(void);
+	switch (cmd) {
+	case MEM_PAGE_FMRI_RETIRE:
+		rc = ldom_fmri_retire(cma_lhp, nvl);
+		break;
+	case MEM_PAGE_FMRI_ISRETIRED:
+		rc = ldom_fmri_status(cma_lhp, nvl);
+		break;
+	}
 
-#ifdef __cplusplus
+	if (rc > 0) {
+		errno = rc;
+		rc = -1;
+	}
+
+	return (rc);
 }
-#endif
-
-#endif	/* _CPU_MDESC_H */

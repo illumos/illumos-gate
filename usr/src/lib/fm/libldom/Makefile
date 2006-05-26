@@ -24,13 +24,38 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-ARCH = sun4v
+include ../../Makefile.lib
+include ../Makefile.lib
 
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
+FMHDRS = ldom.h
+HDRDIR = sparc
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+SUBDIRS = $(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+install_h := TARGET = install_h
+lint := TARGET = lint
+
+.KEEP_STATE:
+
+all clean clobber: spec .WAIT $(SUBDIRS)
+
+install: install_h spec .WAIT $(SUBDIRS)
+
+lint: $(SUBDIRS)
+
+install_h: $(SUBDIRS)
+
+check: $(CHECKHDRS)
+
+spec $(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../../Makefile.targ
+include ../Makefile.targ

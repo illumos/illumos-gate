@@ -29,10 +29,12 @@
 include ../../Makefile.com
 include $(SRC)/Makefile.master.64
 
-SRCS = cpu.c cpu_mdesc.c mdesc_devinit.c
-CPPFLAGS += -I../sparc
-LDLIBS += -L$(ROOTLIB)/fm/$(MACH64) -lmdesc -lkstat
-LDFLAGS += -R/usr/lib/fm/$(MACH64)
+SRCS = cpu.c cpu_mdesc.c
+CPPFLAGS += -I../sparc -I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += -lkstat \
+	-L$(ROOTLIB)/fm/$(MACH64) -lmdesc \
+	-L$(ROOT)/usr/platform/sun4v/lib/fm/fmd/$(MACH64)  -lldom
+LDFLAGS += -R/usr/lib/fm/$(MACH64) -R/usr/platform/sun4v/lib/fm/fmd/$(MACH64)
 
 include ../../Makefile.targ
 

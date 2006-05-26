@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -208,24 +207,6 @@ etm_xport_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, void* buf,
 							size_t byte_cnt);
 
 /*
- * etm_xport_peek - same as etm_xport_read() but data is not dequeued
- *			from the transport/connection; peeked data is
- *			guaranteed by the transport to remain enqueued
- *			if this process/thread crashes
- *
- * caveats:
- *		peeked data is NOT guaranteed by all platform transports
- *		to remain enqueued if this process/thread crashes;
- *		this casts some doubt on the utility of this func
- *
- *		transport does NOT support peek sizes > MTU
- */
-
-ssize_t
-etm_xport_peek(fmd_hdl_t *hdl, etm_xport_conn_t conn, void* buf,
-							size_t byte_cnt);
-
-/*
  * etm_xport_write - try to write N bytes to the connection
  *			from the given buffer,
  *			return how many bytes actually written
@@ -258,15 +239,6 @@ typedef enum {
 ssize_t
 etm_xport_get_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn, etm_xport_opt_t opt);
 
-/*
- * etm_xport_set_opt - set a connection's transport option value,
- *			return the value actually set
- *			or -errno value (ex: -ENOTSUP)
- */
-
-ssize_t
-etm_xport_set_opt(fmd_hdl_t *hdl, etm_xport_conn_t conn,
-			etm_xport_opt_t opt, size_t new_val);
 
 /*
  * -------------------------- device driver defns ----------------------------

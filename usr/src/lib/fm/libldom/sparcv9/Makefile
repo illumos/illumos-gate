@@ -24,13 +24,17 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-ARCH = sun4v
+MAPDIR = ../spec/sparcv9
+MACH_LDLIBS = -L$(ROOT)/usr/lib/fm/$(MACH64)
 
-INCDIRS = $(SRC)/uts/sun4v \
-	$(ROOT)/usr/platform/sun4v/include
+include ../Makefile.com
+include ../../../Makefile.lib.64
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+DYNFLAGS += -R/usr/lib/fm/$(MACH64)
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
+install: all $(ROOTLIBDIR64) $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+
+install_h:
+
+$(ROOTLIBDIR64):
+	$(INS.dir)
