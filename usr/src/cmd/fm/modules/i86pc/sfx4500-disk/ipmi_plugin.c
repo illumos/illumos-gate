@@ -703,7 +703,7 @@ sel_setupfn(nvlist_t *props, void **databpp, int *datablen,
 		    manuf_id);
 		return (DMPE_FAILURE);
 	} else if ((oem_data & ~0xFFFFFFFFFFFFULL) != 0) {
-		log_warn("IPMI Plugin: Invalid oemd field `0x%" PRIx64
+		log_warn("IPMI Plugin: Invalid oem field `0x%" PRIx64
 		    "'.\n", oem_data);
 		return (DMPE_FAILURE);
 	}
@@ -714,12 +714,12 @@ sel_setupfn(nvlist_t *props, void **databpp, int *datablen,
 	sep->manuf_id[0] = (uint8_t)(manuf_id & 0xFFULL);
 	sep->manuf_id[1] = (uint8_t)((manuf_id & 0xFF00ULL) >> 8);
 	sep->manuf_id[2] = (uint8_t)((manuf_id & 0xFF0000ULL) >> 16);
-	sep->oem_defined[0] = (uint8_t)((oem_data & 0xFFULL) >> 8);
-	sep->oem_defined[1] = (uint8_t)((oem_data & 0xFF00ULL) >> 16);
-	sep->oem_defined[2] = (uint8_t)((oem_data & 0xFF0000ULL) >> 24);
-	sep->oem_defined[3] = (uint8_t)((oem_data & 0xFF000000ULL) >> 32);
-	sep->oem_defined[4] = (uint8_t)((oem_data & 0xFF00000000ULL) >> 40);
-	sep->oem_defined[5] = (uint8_t)((oem_data & 0xFF0000000000ULL) >> 48);
+	sep->oem_defined[0] = (uint8_t)(oem_data & 0xFFULL);
+	sep->oem_defined[1] = (uint8_t)((oem_data & 0xFF00ULL) >> 8);
+	sep->oem_defined[2] = (uint8_t)((oem_data & 0xFF0000ULL) >> 16);
+	sep->oem_defined[3] = (uint8_t)((oem_data & 0xFF000000ULL) >> 24);
+	sep->oem_defined[4] = (uint8_t)((oem_data & 0xFF00000000ULL) >> 32);
+	sep->oem_defined[5] = (uint8_t)((oem_data & 0xFF0000000000ULL) >> 40);
 
 	*datablen = sizeof (struct ipmi_sel_entry);
 	*databpp = sep;
