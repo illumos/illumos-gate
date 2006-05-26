@@ -2655,6 +2655,7 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	 */
 	if ((rval = sata_dma_buf_setup(spx, flags, callback, arg,
 	    &cur_dma_attr)) != DDI_SUCCESS) {
+		spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
 		sata_pkt_free(spx);
 		/*
 		 * If a DMA allocation request fails with
