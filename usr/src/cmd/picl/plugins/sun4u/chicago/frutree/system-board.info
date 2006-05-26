@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * # ident	"%Z%%M%	%I%	%E% SMI"
@@ -151,10 +150,10 @@ name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE0
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX1
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=1
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=1
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX0
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=2
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=2
 
 /*
  * SEEPROM source for the motherboard
@@ -259,10 +258,10 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-ca
 _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=1
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=1
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
 
-_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=2
+_class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pci@0,2/picl?DeviceID=2
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
 
 /*
