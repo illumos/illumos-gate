@@ -8373,15 +8373,26 @@ ddi_umem_unlock(ddi_umem_cookie_t cookie)
 	ASSERT(ddi_umem_unlock_thread != NULL);
 
 	p->unl_forw = (struct ddi_umem_cookie *)NULL;	/* end of list */
-	mutex_enter(&ddi_umem_unlock_mutex);
-	if (ddi_umem_unlock_head == NULL) {
-		ddi_umem_unlock_head = ddi_umem_unlock_tail = p;
-		cv_broadcast(&ddi_umem_unlock_cv);
+	/*
+	 * Queue the unlock request and notify i_ddi_umem_unlock thread
+	 * if it's called in the interrupt context. Otherwise, unlock pages
+	 * immediately.
+	 */
+	if (servicing_interrupt()) {
+		/* queue the unlock request and notify the thread */
+		mutex_enter(&ddi_umem_unlock_mutex);
+		if (ddi_umem_unlock_head == NULL) {
+			ddi_umem_unlock_head = ddi_umem_unlock_tail = p;
+			cv_broadcast(&ddi_umem_unlock_cv);
+		} else {
+			ddi_umem_unlock_tail->unl_forw = p;
+			ddi_umem_unlock_tail = p;
+		}
+		mutex_exit(&ddi_umem_unlock_mutex);
 	} else {
-		ddi_umem_unlock_tail->unl_forw = p;
-		ddi_umem_unlock_tail = p;
+		/* unlock the pages right away */
+		(void) i_ddi_umem_unlock(p);
 	}
-	mutex_exit(&ddi_umem_unlock_mutex);
 }
 
 /*
