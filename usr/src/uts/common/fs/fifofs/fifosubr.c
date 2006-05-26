@@ -1021,7 +1021,17 @@ fifo_fastoff(fifonode_t *fnp)
 	ASSERT(MUTEX_HELD(&fnp->fn_lock->flk_lock));
 	ASSERT(FTOV(fnp)->v_stream);
 
+	/* FIFOSTAYFAST is set => FIFOFAST is set */
+	while ((fnp->fn_flag & FIFOSTAYFAST) || ((fnp->fn_flag & ISPIPE) &&
+	    (fnp->fn_dest->fn_flag & FIFOSTAYFAST))) {
+		ASSERT(fnp->fn_flag & FIFOFAST);
+		/* indicate someone is waiting to turn into stream mode */
+		fnp->fn_flag |= FIFOWAITMODE;
+		cv_wait(&fnp->fn_wait_cv, &fnp->fn_lock->flk_lock);
+		fnp->fn_flag &= ~FIFOWAITMODE;
+	}
 
+	/* as we may have relased the lock, test the FIFOFAST flag here */
 	if (!(fnp->fn_flag & FIFOFAST))
 		return;
 #if FIFODEBUG

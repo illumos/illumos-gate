@@ -91,6 +91,10 @@ static void fifo_rwunlock(vnode_t *, int, caller_context_t *);
 static int fifo_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
 static int fifo_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
 
+/* functions local to this file */
+static boolean_t fifo_stayfast_enter(fifonode_t *);
+static void fifo_stayfast_exit(fifonode_t *);
+
 /*
  * Define the data structures external to this file.
  */
@@ -964,8 +968,11 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 		 * this writer thread.
 		 */
 		hotread = fn_dest->fn_count > 0;
-		if (hotread)
+		if (hotread) {
+			if (!fifo_stayfast_enter(fnp))
+				goto stream_mode;
 			mutex_exit(&fn_lock->flk_lock);
+		}
 
 		ASSERT(size != 0);
 		/*
@@ -980,6 +987,15 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 			error = strwaitbuf(size, BPRI_MED);
 
 			mutex_enter(&fn_lock->flk_lock);
+
+			if (hotread) {
+				/*
+				 * As we dropped the mutex for a moment, we
+				 * need to wake up any thread waiting to be
+				 * allowed to go from fast mode to stream mode.
+				 */
+				fifo_stayfast_exit(fnp);
+			}
 			if (error != 0) {
 				goto done;
 			}
@@ -1004,8 +1020,21 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 		bp->b_rptr += ((uintptr_t)uiop->uio_iov->iov_base & 0x7);
 		bp->b_wptr = bp->b_rptr + size;
 		error = uiomove((caddr_t)bp->b_rptr, size, UIO_WRITE, uiop);
-		if (hotread)
+		if (hotread) {
 			mutex_enter(&fn_lock->flk_lock);
+			/*
+			 * As we dropped the mutex for a moment, we need to:
+			 * - wake up any thread waiting to be allowed to go
+			 *   from fast mode to stream mode,
+			 * - make sure readers didn't go away.
+			 */
+			fifo_stayfast_exit(fnp);
+			if (fn_dest->fn_rcnt == 0 || fn_dest->fn_wcnt == 0) {
+				freeb(bp);
+				goto epipe;
+			}
+		}
+
 		if (error != 0) {
 			freeb(bp);
 			goto done;
@@ -1902,4 +1931,49 @@ fifo_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp)
 		return (VOP_GETSECATTR(VTOF(vp)->fn_realvp, vsap, flag, crp));
 	else
 		return (fs_fab_acl(vp, vsap, flag, crp));
+}
+
+
+/*
+ * Set the FIFOSTAYFAST flag so nobody can turn the fifo into stream mode.
+ * If the flag is already set then wait until it is removed - releasing
+ * the lock.
+ * If the fifo switches into stream mode while we are waiting, return failure.
+ */
+static boolean_t
+fifo_stayfast_enter(fifonode_t *fnp)
+{
+	ASSERT(MUTEX_HELD(&fnp->fn_lock->flk_lock));
+	while (fnp->fn_flag & FIFOSTAYFAST) {
+		fnp->fn_flag |= FIFOWAITMODE;
+		cv_wait(&fnp->fn_wait_cv, &fnp->fn_lock->flk_lock);
+		fnp->fn_flag &= ~FIFOWAITMODE;
+	}
+	if (!(fnp->fn_flag & FIFOFAST))
+		return (B_FALSE);
+
+	fnp->fn_flag |= FIFOSTAYFAST;
+	return (B_TRUE);
+}
+
+/*
+ * Unset the FIFOSTAYFAST flag and notify anybody waiting for this flag
+ * to be removed:
+ *	- threads wanting to turn into stream mode waiting in fifo_fastoff(),
+ *	- other writers threads waiting in fifo_stayfast_enter().
+ */
+static void
+fifo_stayfast_exit(fifonode_t *fnp)
+{
+	fifonode_t *fn_dest = fnp->fn_dest;
+
+	ASSERT(MUTEX_HELD(&fnp->fn_lock->flk_lock));
+
+	fnp->fn_flag &= ~FIFOSTAYFAST;
+
+	if (fnp->fn_flag & FIFOWAITMODE)
+		cv_broadcast(&fnp->fn_wait_cv);
+
+	if ((fnp->fn_flag & ISPIPE) && (fn_dest->fn_flag & FIFOWAITMODE))
+		cv_broadcast(&fn_dest->fn_wait_cv);
 }
