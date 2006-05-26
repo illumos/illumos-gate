@@ -577,11 +577,19 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	pci_config_put16(handle, PCI_CONF_STAT, ~0);
 
 	/*
-	 * Make sure these indirect-access registers are sane
-	 * rather than random after power-up or reset
+	 * Do following if and only if the device is NOT BCM5714C OR
+	 * BCM5715C
 	 */
-	pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
-	pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
+
+	if (!((cidp->device == DEVICE_ID_5714C) ||
+		(cidp->device == DEVICE_ID_5715C))) {
+		/*
+		 * Make sure these indirect-access registers are sane
+		 * rather than random after power-up or reset
+		 */
+		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
+		pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
+	}
 }
 
 #ifdef __amd64
@@ -816,10 +824,26 @@ static void bge_nic_setwin(bge_t *bgep, bge_regno_t base);
 static void
 bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 {
+	chip_id_t *cidp;
+
 	BGE_TRACE(("bge_nic_setwin($%p, 0x%lx)",
 		(void *)bgep, base));
 
 	ASSERT((base & MWBAR_GRANULE_MASK) == 0);
+
+	/*
+	 * Don't do repeated zero data writes,
+	 * if the device is BCM5714C/15C.
+	 */
+	cidp = &bgep->chipid;
+	if ((cidp->device == DEVICE_ID_5714C) ||
+		(cidp->device == DEVICE_ID_5715C)) {
+		if (bgep->lastWriteZeroData && (base == (bge_regno_t)0))
+			return;
+		/* Adjust lastWriteZeroData */
+		bgep->lastWriteZeroData = ((base == (bge_regno_t)0) ?
+			B_TRUE : B_FALSE);
+	}
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, base);
 }
 

@@ -920,6 +920,12 @@ typedef struct bge {
 	uintptr_t		resmap[BGE_MAX_RESOURCES];
 
 	/*
+	 * A flag to prevent excessive config space accesses
+	 * on platforms having BCM5714C/15C
+	 */
+	boolean_t		lastWriteZeroData;
+
+	/*
 	 * Spare space, plus guard element used to check data integrity
 	 */
 	uint64_t		spare[5];
