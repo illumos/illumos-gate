@@ -1566,7 +1566,10 @@ hwc_free_spec_list(struct hwc_spec *list)
 
 struct val_list {
 	struct val_list *val_next;
-	int		val_type;
+	enum {
+		VAL_STRING,
+		VAL_INTEGER
+	} val_type;
 	int		val_size;
 	union {
 		char *string;
@@ -1578,13 +1581,17 @@ static struct val_list *
 add_val(struct val_list **val_listp, struct val_list *tail,
     int val_type, caddr_t val)
 {
-	struct val_list *new_val, *listp = *val_listp;
+	struct val_list *new_val;
+#ifdef DEBUG
+	struct val_list *listp = *val_listp;
+#endif
 
 	new_val = kmem_alloc(sizeof (struct val_list), KM_SLEEP);
 	new_val->val_next = NULL;
-	if ((new_val->val_type = val_type) == 0) {
+	if ((new_val->val_type = val_type) == VAL_STRING) {
 		new_val->val_size = strlen((char *)val) + 1;
-		new_val->val.string = (char *)val;
+		new_val->val.string = kmem_alloc(new_val->val_size, KM_SLEEP);
+		(void) strcpy(new_val->val.string, (char *)val);
 	} else {
 		new_val->val_size = sizeof (int);
 		new_val->val.integer = (int)(uintptr_t)val;
@@ -1601,6 +1608,20 @@ add_val(struct val_list **val_listp, struct val_list *tail,
 	}
 
 	return (new_val);
+}
+
+static void
+free_val_list(struct val_list *head)
+{
+	struct val_list *tval_list;
+
+	for (/* CSTYLED */; head != NULL; /* CSTYLED */) {
+		tval_list = head;
+		head = head->val_next;
+		if (tval_list->val_type == VAL_STRING)
+			kmem_free(tval_list->val.string, tval_list->val_size);
+		kmem_free(tval_list, sizeof (struct val_list));
+	}
 }
 
 /*
@@ -1643,7 +1664,6 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 #endif
 	if (!valid_prop_name(name)) {
 		cmn_err(CE_WARN, "invalid property name '%s'", name);
-		kmem_free(name, strlen(name) + 1);
 		return;
 	}
 	if (val) {
@@ -1657,7 +1677,7 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 
 		vl = val;
 
-		if (val_type == 1) {
+		if (val_type == VAL_INTEGER) {
 			valip = (int *)kmem_alloc(
 			    (propcnt * sizeof (int)), KM_SLEEP);
 			valbuf = (caddr_t)valip;
@@ -1669,7 +1689,6 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 #endif
 				*valip = tvl->val.integer;
 				valip++;
-				kmem_free(tvl, sizeof (struct val_list));
 			}
 			/* restore valip */
 			valip = (int *)valbuf;
@@ -1682,7 +1701,7 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 			}
 			/* cleanup */
 			kmem_free(valip, (propcnt * sizeof (int)));
-		} else if (val_type == 0) {
+		} else if (val_type == VAL_STRING) {
 			valsp = (char **)kmem_alloc(
 			    ((propcnt + 1) * sizeof (char *)), KM_SLEEP);
 			valbuf = (caddr_t)valsp;
@@ -1709,13 +1728,6 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 				    "cannot create property %s", name);
 			}
 			/* Clean up */
-			vl = val;
-			while (vl) {
-				tvl = vl;
-				vl = vl->val_next;
-				kmem_free(tvl->val.string, tvl->val_size);
-				kmem_free(tvl, sizeof (struct val_list));
-			}
 			kmem_free(valsp, ((propcnt + 1) * sizeof (char *)));
 		} else {
 			cmn_err(CE_WARN, "Invalid property type");
@@ -1736,7 +1748,6 @@ make_prop(struct _buf *file, dev_info_t *devi, char *name, struct val_list *val)
 			    "cannot create property %s", name);
 		}
 	}
-	kmem_free(name, strlen(name) + 1);
 }
 
 static char omit_err[] = "(the ';' may have been omitted on previous spec!)";
@@ -1756,7 +1767,7 @@ typedef enum {
 static struct hwc_spec *
 get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 {
-	char *prop_name, *string, *class_string;
+	char *prop_name;
 	token_t token;
 	struct hwc_spec *hwcp;
 	struct dev_info *devi;
@@ -1772,7 +1783,6 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 	prop_name = NULL;
 	val_list = NULL;
 	tail = NULL;
-	string = NULL;
 	do {
 #ifdef DEBUG
 		parse_debug(NULL, "state 0x%x\n", state);
@@ -1785,8 +1795,15 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			case prop_equals_integer:
 				make_prop(file, (dev_info_t *)devi,
 				    prop_name, val_list);
-				prop_name = NULL;
-				val_list = NULL;
+				if (prop_name) {
+					kmem_free(prop_name,
+					    strlen(prop_name) + 1);
+					prop_name = NULL;
+				}
+				if (val_list) {
+					free_val_list(val_list);
+					val_list = NULL;
+				}
 				tail = NULL;
 				/*FALLTHROUGH*/
 			case hwc_begin:
@@ -1832,8 +1849,6 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			}
 			break;
 		case STRING:
-			string = kmem_alloc(strlen(tokbuf) + 1, KM_SLEEP);
-			(void) strcpy(string, tokbuf);
 			switch (state) {
 			case name_equals:
 				if (ddi_get_name((dev_info_t *)devi)) {
@@ -1841,8 +1856,9 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 						nm_err, omit_err);
 					goto bad;
 				}
-				devi->devi_name = string;
-				string = NULL;
+				devi->devi_name = kmem_alloc(strlen(tokbuf) + 1,
+				    KM_SLEEP);
+				(void) strcpy(devi->devi_name, tokbuf);
 				state = hwc_begin;
 				break;
 			case parent_equals:
@@ -1851,8 +1867,9 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 						prnt_err, omit_err);
 					goto bad;
 				}
-				hwcp->hwc_parent_name = string;
-				string = NULL;
+				hwcp->hwc_parent_name = kmem_alloc(strlen
+				    (tokbuf) + 1, KM_SLEEP);
+				(void) strcpy(hwcp->hwc_parent_name, tokbuf);
 				state = hwc_begin;
 				break;
 			case drvclass_equals:
@@ -1860,15 +1877,14 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 					kobj_file_err(CE_WARN, file, class_err);
 					goto bad;
 				}
-				class_string = kmem_alloc(strlen(string) + 1,
-					KM_SLEEP);
-				(void) strcpy(class_string, string);
-				hwcp->hwc_class_name = class_string;
+				hwcp->hwc_class_name = kmem_alloc(
+				    strlen(tokbuf) + 1, KM_SLEEP);
+				(void) strcpy(hwcp->hwc_class_name, tokbuf);
 				/*FALLTHROUGH*/
 			case prop_equals:
 			case prop_equals_string_comma:
-				tail = add_val(&val_list, tail, 0, string);
-				string = NULL;
+				tail = add_val(&val_list, tail, VAL_STRING,
+				    tokbuf);
 				state = prop_equals_string;
 				break;
 			default:
@@ -1882,7 +1898,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			case prop_equals_integer_comma:
 				(void) kobj_getvalue(tokbuf, &ival);
 				tail = add_val(&val_list, tail,
-				    1, (caddr_t)(uintptr_t)ival);
+				    VAL_INTEGER, (caddr_t)(uintptr_t)ival);
 				state = prop_equals_integer;
 				break;
 			default:
@@ -1935,23 +1951,28 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 	hwcp->hwc_devi_sys_prop_ptr = devi->devi_sys_prop_ptr;
 	hwcp->hwc_devi_name = devi->devi_name;
 
+	if (prop_name)
+		kmem_free(prop_name, strlen(prop_name) + 1);
+	if (val_list)
+		free_val_list(val_list);
+
 	kmem_free(devi, sizeof (struct dev_info));
 
 	return (hwcp);
 
 bad:
-	if (string) {
-		kmem_free(string, strlen(string) + 1);
-	}
-	if (hwcp) {
-		hwc_free(hwcp);
-	}
-	if (devi) {
-		if (devi->devi_name)
-			kmem_free(devi->devi_name,
-			    strlen(devi->devi_name) + 1);
-		kmem_free(devi, sizeof (struct dev_info));
-	}
+	if (prop_name)
+		kmem_free(prop_name, strlen(prop_name) + 1);
+	if (val_list)
+		free_val_list(val_list);
+
+	hwc_free(hwcp);
+
+	if (devi->devi_name)
+		kmem_free(devi->devi_name, strlen(devi->devi_name) + 1);
+
+	kmem_free(devi, sizeof (struct dev_info));
+
 	return (NULL);
 }
 
