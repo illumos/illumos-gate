@@ -13093,6 +13093,7 @@ dtrace_helpers_duplicate(proc_t *from, proc_t *to)
 	 */
 	if (help->dthps_nprovs > 0) {
 		newhelp->dthps_nprovs = help->dthps_nprovs;
+		newhelp->dthps_maxprovs = help->dthps_nprovs;
 		newhelp->dthps_provs = kmem_alloc(newhelp->dthps_nprovs *
 		    sizeof (dtrace_helper_provider_t *), KM_SLEEP);
 		for (i = 0; i < newhelp->dthps_nprovs; i++) {
