@@ -71,9 +71,6 @@ extern	int	scf_dscp_ack_wait_time;
 extern	int	scf_dscp_end_wait_time;
 extern	int	scf_dscp_txbusy_time;
 extern	int	scf_dscp_callback_time;
-extern	int	scf_shutdown_wait_time;
-extern	int	scf_poff_wait_time;
-extern	int	scf_halt_wait_time;
 
 
 /*
@@ -355,6 +352,7 @@ scf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 			scf_chg_scf(statep, PATH_STAT_ACTIVE);
 			scf_comtbl.scf_pchg_event_sub = EVENT_SUB_PCHG_WAIT;
+			scf_comtbl.scf_domain_event_sub = EVENT_SUB_DOMAIN_WAIT;
 			scf_next_cmd_check(statep);
 		} else {
 			/* exists execute scf device */

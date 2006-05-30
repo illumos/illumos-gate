@@ -34,6 +34,7 @@
 #include <sys/sunddi.h>
 
 #include <sys/scfd/scfparam.h>
+#include <sys/scfd/scfdscp.h>
 
 /*
  * Timer control table and control flag
@@ -88,7 +89,7 @@ extern void	scf_dscp_end_tout(void);
 extern void	scf_dscp_busy_tout(void);
 extern void	scf_dscp_callback_tout(void);
 extern void	scf_report_send_wait_tout(void);
-extern void	scf_dscp_init_tout(void);
+extern void	scf_dscp_init_tout(uint8_t id);
 
 /*
  * scf_timer_init()
@@ -151,6 +152,10 @@ scf_timer_init(void)
 	scf_timer[SCF_TIMERCD_DSCP_INIT].value = scf_dscp_init_time;
 	scf_timer[SCF_TIMERCD_DSCP_INIT].tbl[0].code = SCF_TIMERCD_DSCP_INIT;
 	scf_timer[SCF_TIMERCD_DSCP_INIT].tbl[1].code = SCF_TIMERCD_DSCP_INIT;
+
+	scf_timer[SCF_TIMERCD_DKMD_INIT].value = scf_dscp_init_time;
+	scf_timer[SCF_TIMERCD_DKMD_INIT].tbl[0].code = SCF_TIMERCD_DKMD_INIT;
+	scf_timer[SCF_TIMERCD_DKMD_INIT].tbl[1].code = SCF_TIMERCD_DKMD_INIT;
 
 	SCFDBGMSG(SCF_DBGFLAG_TIMER, SCF_FUNC_NAME ": end");
 }
@@ -446,7 +451,12 @@ scf_tout(void *arg)
 
 		case SCF_TIMERCD_DSCP_INIT:
 			/* DSCP INIT_REQ retry timeout */
-			scf_dscp_init_tout();
+			scf_dscp_init_tout(MBIF_DSCP);
+			break;
+
+		case SCF_TIMERCD_DKMD_INIT:
+			/* DKMD INIT_REQ retry timeout */
+			scf_dscp_init_tout(MBIF_DKMD);
 			break;
 
 		default:

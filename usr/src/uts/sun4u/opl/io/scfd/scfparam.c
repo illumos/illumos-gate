@@ -113,6 +113,16 @@ caddr_t	scf_avail_cmd_reg_vaddr = 0;	/* SCF Command register address */
 int	scf_dm_secure_mode = 0;		/* secure mode */
 
 /*
+ * SCF driver version interface
+ */
+ushort_t	scf_scfd_comif_version = 0x0000;	/* SCF driver version */
+
+/*
+ * XSCF version interface
+ */
+ushort_t	scf_xscf_comif_version = 0xffff;	/* XSCF version */
+
+/*
  * ioctl control value and flag
  */
 int	scf_save_hac_flag = 0;		/* Host address disp flag */

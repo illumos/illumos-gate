@@ -162,6 +162,8 @@ typedef struct scf_dscp_main {
 	uint16_t	rd_last;		/* Recv data last */
 	uint16_t	rd_put;			/* Recv data put */
 	uint16_t	rd_get;			/* Recv data get */
+
+	uint_t		timer_code;		/* DSCP INIT_REQ timer code */
 } scf_dscp_main_t;
 
 /*

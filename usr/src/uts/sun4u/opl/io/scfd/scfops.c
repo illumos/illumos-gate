@@ -888,15 +888,19 @@ scf_ioc_optiondisp(intptr_t arg, int mode, int *rval_p, int u_mode)
 	int			ret = 0;
 	struct scf_cmd		scf_cmd;
 	scfoption_t		scfoption;
+	scf_short_buffer_t	sbuf;
 
 	SCFDBGMSG(SCF_DBGFLAG_IOCTL, SCF_FUNC_NAME ": start");
 
 	bzero((void *)&scfoption, sizeof (scfoption_t));
+	bzero((void *)&sbuf.b[0], SCF_S_CNT_16);
 
 	scf_cmd.cmd = CMD_DOMAIN_INFO;
 	scf_cmd.subcmd = SUB_OPTION_DISP;
-	scf_cmd.sbuf = 0;
-	scf_cmd.scount = 0;
+	sbuf.b[13] = (uchar_t)(scf_scfd_comif_version >> 8);
+	sbuf.b[14] = (uchar_t)scf_scfd_comif_version;
+	scf_cmd.sbuf = &sbuf.b[0];
+	scf_cmd.scount = SCF_S_CNT_15;
 	scf_cmd.rbuf = &scfoption.rbuf[0];
 	scf_cmd.rcount = SCF_S_CNT_15;
 	scf_cmd.flag = SCF_USE_SSBUF;
@@ -908,6 +912,9 @@ scf_ioc_optiondisp(intptr_t arg, int mode, int *rval_p, int u_mode)
 	mutex_exit(&scf_comtbl.all_mutex);
 
 	if (ret == 0) {
+		/* Set XSCF version */
+		bcopy((void *)&scfoption.rbuf[13],
+			(void *)&scf_xscf_comif_version, 2);
 
 		if (ddi_copyout((void *)&scfoption, (void *)arg,
 			sizeof (scfoption_t), mode) != 0) {

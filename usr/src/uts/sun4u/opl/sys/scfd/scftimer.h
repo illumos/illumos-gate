@@ -46,6 +46,7 @@ typedef enum {
 	SCF_TIMERCD_BUF_FUL,	/* SCF command BUF_FUL retry timer */
 	SCF_TIMERCD_RCI_BUSY,	/* SCF command RCI_BUSY retry timer */
 	SCF_TIMERCD_DSCP_INIT,	/* DSCP INIT_REQ retry timer */
+	SCF_TIMERCD_DKMD_INIT,	/* DKMD INIT_REQ retry timer */
 	SCF_TIMERCD_MAX		/* Max timer code */
 } scf_tm_code_t;
 

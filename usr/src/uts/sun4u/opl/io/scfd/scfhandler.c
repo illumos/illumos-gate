@@ -1275,6 +1275,40 @@ scf_intr_cmdcmp_driver(scf_state_t *statep, struct scf_cmd *scfcmdp)
 			break;
 		}
 		break;
+
+	case CMD_DOMAIN_INFO:		/* Domain info command */
+		/* Check command return value */
+		if (scfcmdp->stat0 != NORMAL_END) {
+			switch (scfcmdp->stat0) {
+			case BUF_FUL:
+			case RCI_BUSY:
+			case E_NOT_SUPPORT:
+			case E_PARAM:
+			case E_RCI_ACCESS:
+			case RCI_NS:
+				scf_comtbl.scf_domain_event_sub =
+					EVENT_SUB_NONE;
+				break;
+
+			default:
+				/* INTERFACE */
+				/* E_SCFC_NOPATH */
+				/* Rx DATA SUM ERROR */
+				scf_comtbl.scf_domain_event_sub =
+					EVENT_SUB_DOMAIN_WAIT;
+
+				/* Set command retry send flag */
+				scf_comtbl.scf_cmd_resend_req |= RESEND_DOMAIN;
+				break;
+			}
+			break;
+		}
+
+		/* Set XSCF version */
+		scf_xscf_comif_version = (ushort_t)(statep->reg_rdata[3] >> 8);
+
+		scf_comtbl.scf_domain_event_sub = EVENT_SUB_NONE;
+		break;
 	}
 
 	SCFDBGMSG(SCF_DBGFLAG_SYS, SCF_FUNC_NAME ": end");
@@ -1692,6 +1726,8 @@ scf_status_change(scf_state_t *statep)
 				scf_comtbl.scf_cmd_exec_flag = 0;
 			}
 
+			scf_comtbl.scf_domain_event_sub = EVENT_SUB_DOMAIN_WAIT;
+
 			/* Check Alive check exec */
 			if (scf_comtbl.alive_running == SCF_ALIVE_START) {
 				scf_comtbl.scf_alive_event_sub =
@@ -1938,6 +1974,28 @@ scf_next_cmd_check(scf_state_t *statep)
 			scf_comtbl.scf_last_report = SCF_SHUTDOWN_START;
 			scf_comtbl.shutdown_start_reported = 1;
 		}
+	}
+
+	if ((scf_comtbl.scf_cmd_exec_flag == 0) &&
+		(scf_comtbl.scf_domain_event_sub == EVENT_SUB_DOMAIN_WAIT)) {
+		/* Send Option disp command */
+		scfcmdp->cmd = CMD_DOMAIN_INFO;
+		scfcmdp->subcmd = SUB_OPTION_DISP;
+		bzero((void *)&scf_comtbl.scf_sbuf[0], SCF_S_CNT_16);
+		scf_comtbl.scf_sbuf[13] =
+			(uchar_t)(scf_scfd_comif_version >> 8);
+		scf_comtbl.scf_sbuf[14] = (uchar_t)scf_scfd_comif_version;
+		scfcmdp->sbuf = &scf_comtbl.scf_sbuf[0];
+		scfcmdp->scount = SCF_S_CNT_15;
+		scfcmdp->rbuf = &scf_comtbl.scf_rbuf[0];
+		scfcmdp->rcount = SCF_S_CNT_15;
+		scfcmdp->flag = SCF_USE_SSBUF;
+		if ((scf_comtbl.scf_cmd_resend_req & RESEND_DOMAIN) != 0) {
+			scf_comtbl.scf_cmd_resend_flag = 1;
+			scf_comtbl.scf_cmd_resend_req &= ~RESEND_DOMAIN;
+		}
+		scf_i_send_cmd(scfcmdp, statep);
+		scf_comtbl.scf_domain_event_sub = EVENT_SUB_DOMAIN_EXEC;
 	}
 
 	if (scf_comtbl.scf_cmd_exec_flag == 0) {
@@ -2222,6 +2280,8 @@ scf_online_wait_tout(void)
 			scf_cmdwait_status_set();
 			scf_comtbl.scf_cmd_exec_flag = 0;
 		}
+
+		scf_comtbl.scf_domain_event_sub = EVENT_SUB_DOMAIN_WAIT;
 
 		/* Next command send check */
 		scf_next_cmd_check(statep);
@@ -3445,6 +3505,14 @@ scf_cmdwait_status_set(void)
 
 	default:
 		break;
+	}
+
+	/* Set command wait status */
+	if (scf_comtbl.scf_domain_event_sub == EVENT_SUB_DOMAIN_EXEC) {
+		scf_comtbl.scf_domain_event_sub = EVENT_SUB_DOMAIN_WAIT;
+
+		/* Set command retry send flag */
+		scf_comtbl.scf_cmd_resend_req |= RESEND_DOMAIN;
 	}
 
 	if (scf_comtbl.scf_cmd_exec_flag) {

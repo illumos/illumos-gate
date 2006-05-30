@@ -63,7 +63,7 @@ void	scf_dscp_end_tout(void);
 void	scf_dscp_busy_tout(void);
 void	scf_dscp_callback_tout(void);
 void	scf_dscp_callback(void);
-void	scf_dscp_init_tout(void);
+void	scf_dscp_init_tout(uint8_t id);
 
 /*
  * Interrupt function : from scf_dscp_intr()
@@ -384,6 +384,9 @@ scf_mb_fini(target_id_t target_id, mkey_t mkey)
 
 		/* Change main status (D0) */
 		SCF_SET_STATUS(mainp, SCF_ST_CLOSE_TXEND_RECV_WAIT);
+
+		/* INIT_REQ retry timer stop */
+		scf_timer_stop(mainp->timer_code);
 
 		/* TxEND(FINI) receive wait */
 		SC_DBG_DRV_TRACE(TC_W_SIG, __LINE__, &mainp->fini_cv,
@@ -1447,6 +1450,13 @@ scf_dscp_init(void)
 		mainp->rd_last = (uint16_t)(mainp->rd_maxcount - 1);
 		mainp->rd_put = 0;
 		mainp->rd_get = 0;
+
+		/* Set DSCP INIT_REQ retry timer code */
+		if (mainp->id == MBIF_DSCP) {
+			mainp->timer_code = SCF_TIMERCD_DSCP_INIT;
+		} else {
+			mainp->timer_code = SCF_TIMERCD_DKMD_INIT;
+		}
 	}
 
 	/* Initialize success flag ON */
@@ -1516,6 +1526,7 @@ scf_dscp_fini(void)
 	scf_timer_stop(SCF_TIMERCD_DSCP_CALLBACK);
 	scf_timer_stop(SCF_TIMERCD_DSCP_BUSY);
 	scf_timer_stop(SCF_TIMERCD_DSCP_INIT);
+	scf_timer_stop(SCF_TIMERCD_DKMD_INIT);
 
 	/* All DSC buffer release */
 	scf_dscp_dscbuff_free_all();
@@ -1763,7 +1774,6 @@ scf_dscp_stop(uint32_t factor)
 	scf_timer_stop(SCF_TIMERCD_DSCP_ACK);
 	scf_timer_stop(SCF_TIMERCD_DSCP_END);
 	scf_timer_stop(SCF_TIMERCD_DSCP_BUSY);
-	scf_timer_stop(SCF_TIMERCD_DSCP_INIT);
 
 	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": end");
 }
@@ -2184,46 +2194,50 @@ scf_dscp_callback_tout(void)
 /*
  * scf_dscp_init_tout()
  *
- * Description: INIT_REQ retray timeout performs TxREQ transmission again.
+ * Description: INIT_REQ retry timeout performs TxREQ transmission again.
  *
  */
 void
-scf_dscp_init_tout(void)
+scf_dscp_init_tout(uint8_t id)
 {
 #undef	SCF_FUNC_NAME
 #define	SCF_FUNC_NAME		"scf_dscp_init_tout() "
+	scf_dscp_main_t		*mainp;		/* Main table address */
 	scf_dscp_dsc_t		*dsc_p;		/* TxDSC address */
 
 	ASSERT(MUTEX_HELD(&scf_comtbl.all_mutex));
 
 	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": start");
 
-	/* Check pending send TxDSC or local control TxDSC */
-	if ((scf_dscp_comtbl.tx_dsc_count == 0) &&
-		(scf_dscp_comtbl.tx_local_use_flag == FLAG_OFF)) {
-		goto END_dscp_init_tout;
-	}
+	/* Get main table address */
+	mainp = scf_dscp_id2mainp(id);
 
-	/* Check local control data flag */
-	if (scf_dscp_comtbl.tx_local_use_flag == FLAG_OFF) {
-		/* Get TxDSC address */
-		dsc_p = &scf_dscp_comtbl.tx_dscp[scf_dscp_comtbl.tx_get];
+	/* Get TxDSC address */
+	dsc_p = &scf_dscp_comtbl.tx_dscp[scf_dscp_comtbl.tx_put];
+
+	/* Make Tx descriptor : INIT_REQ */
+	dsc_p->dinfo.base.c_flag = DSC_FLAG_DEFAULT;
+	dsc_p->dinfo.base.offset = DSC_OFFSET_NOTHING;
+	dsc_p->dinfo.base.length = 0;
+	dsc_p->dinfo.base.dscp_datap = NULL;
+	dsc_p->dinfo.bdcr.id = mainp->id & DSC_CNTL_MASK_ID;
+	dsc_p->dinfo.bdcr.code = DSC_CNTL_INIT_REQ;
+
+	/* Update Tx descriptor offset */
+	if (scf_dscp_comtbl.tx_put == scf_dscp_comtbl.tx_last) {
+		scf_dscp_comtbl.tx_put = scf_dscp_comtbl.tx_first;
 	} else {
-		/* Get local data TxDSC address */
-		dsc_p = &scf_dscp_comtbl.tx_dscp[scf_dscp_comtbl.tx_local];
+		scf_dscp_comtbl.tx_put++;
 	}
 
-	/* Check TxDSC status */
-	if (dsc_p->status == SCF_TX_ST_TXREQ_SEND_WAIT) {
-		/* TxDSC status (SB2) */
-		/* Call send matrix */
-		scf_dscp_send_matrix();
-	}
+	/* Update Tx descriptor count */
+	scf_dscp_comtbl.tx_dsc_count++;
 
-/*
- * END_dscp_init_tout
- */
-END_dscp_init_tout:
+	/* Change TxDSC status (SB2) */
+	SCF_SET_DSC_STATUS(dsc_p, SCF_TX_ST_TXREQ_SEND_WAIT);
+
+	/* Call send matrix */
+	scf_dscp_send_matrix();
 
 	SCFDBGMSG(SCF_DBGFLAG_DSCP, SCF_FUNC_NAME ": end");
 }
@@ -2519,15 +2533,8 @@ scf_dscp_txend_recv(scf_state_t *statep)
 				/* Check main status */
 				if (mainp->status ==
 					SCF_ST_EST_TXEND_RECV_WAIT) {
-					/* TxREQ busy timer start */
-					scf_timer_start(SCF_TIMERCD_DSCP_INIT);
-
-					/* Change TxDSC status (SB2) */
-					SCF_SET_DSC_STATUS(dsc_p,
-						SCF_TX_ST_TXREQ_SEND_WAIT);
-
-					/* TxDSC not release */
-					norel_txdsc = FLAG_ON;
+					/* INIT_REQ retry timer start */
+					scf_timer_start(mainp->timer_code);
 				}
 				break;
 			}
@@ -2618,15 +2625,8 @@ scf_dscp_txend_recv(scf_state_t *statep)
 				/* Check main status */
 				if (mainp->status ==
 					SCF_ST_EST_TXEND_RECV_WAIT) {
-					/* TxREQ busy timer start */
-					scf_timer_start(SCF_TIMERCD_DSCP_INIT);
-
-					/* Change TxDSC status (SB2) */
-					SCF_SET_DSC_STATUS(dsc_p,
-						SCF_TX_ST_TXREQ_SEND_WAIT);
-
-					/* TxDSC not release */
-					norel_txdsc = FLAG_ON;
+					/* INIT_REQ retry timer start */
+					scf_timer_start(mainp->timer_code);
 				}
 				break;
 			}
@@ -3577,11 +3577,6 @@ scf_dscp_send_matrix(void)
 		if (timer_ret == SCF_TIMER_EXEC) {
 			break;
 		}
-		timer_ret = scf_timer_check(SCF_TIMERCD_DSCP_INIT);
-		/* Check INIT_REQ retry timer exec */
-		if (timer_ret == SCF_TIMER_EXEC) {
-			break;
-		}
 		/* Check SCF path status */
 		if (path_ret != SCF_PATH_ONLINE) {
 			break;
@@ -4310,6 +4305,9 @@ scf_dscp_event_queue(scf_dscp_main_t *mainp, scf_event_t mevent)
 
 	/* Check DISC ERROR event */
 	if (mevent == SCF_MB_DISC_ERROR) {
+		/* INIT_REQ retry timer stop */
+		scf_timer_stop(mainp->timer_code);
+
 		/* TxDSC buffer release */
 		scf_dscp_txdscbuff_free(mainp);
 

@@ -48,7 +48,7 @@ extern "C" {
 #define	FLAG_ON			(1)
 #define	FLAG_OFF		(0)
 
-#define	SCF_DRIVER_VERSION	"SCF driver 1.6"
+#define	SCF_DRIVER_VERSION	"SCF driver 1.7"
 #define	SCF_DRIVER_NAME		"scfd"
 #define	SCF_DEVICE_NAME		"scfc"
 
@@ -732,6 +732,7 @@ typedef struct scf_comtbl {
 	uint_t	scf_shut_event_sub;	/* SHUTDOWN event status */
 	uint_t	scf_alive_event_sub;	/* ALIVE event status */
 	uint_t	scf_report_event_sub;	/* REPORT processing status */
+	uint_t	scf_domain_event_sub;	/* Domain processing status */
 
 	/* SCF command control */
 	scf_cmd_t	*scf_cmdp;	/* SCF command table address */
@@ -839,6 +840,9 @@ typedef struct scf_comtbl {
 #define	EVENT_SUB_REPORT_RUN_EXEC	2 /* Report (runnning) send exec */
 #define	EVENT_SUB_REPORT_SHUT_WAIT	3 /* Report (shutdown) send wait */
 #define	EVENT_SUB_REPORT_SHOT_EXEC	4 /* Report (shutdown) send exec */
+/* (scf_domain_event_sub) Domain processing status */
+#define	EVENT_SUB_DOMAIN_WAIT	1	/* Domain info command wait */
+#define	EVENT_SUB_DOMAIN_EXEC	2	/* Domain info command exec */
 
 /* (scf_last_report) define */
 #define	NOT_SEND_REPORT		0xffffffff	/* Not report send */
@@ -852,6 +856,7 @@ typedef struct scf_comtbl {
 #define	RESEND_ALSP		(1 << 5) /* Alive check command (stop) */
 #define	RESEND_REPORT_RUN	(1 << 6) /* Report command (system running) */
 #define	RESEND_REPORT_SHUT	(1 << 7) /* Report command (shutdown start) */
+#define	RESEND_DOMAIN		(1 << 8) /* Domain info command */
 
 #ifdef	__cplusplus
 }

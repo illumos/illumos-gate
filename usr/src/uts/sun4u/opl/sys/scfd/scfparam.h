@@ -116,6 +116,16 @@ extern caddr_t	scf_avail_cmd_reg_vaddr; /* SCF Command register address */
 extern int	scf_dm_secure_mode;	/* secure mode */
 
 /*
+ * SCF driver version interface
+ */
+extern ushort_t	scf_scfd_comif_version;	/* SCF driver version */
+
+/*
+ * XSCF version interface
+ */
+extern ushort_t	scf_xscf_comif_version;	/* XSCF version */
+
+/*
  * ioctl control value and flag
  */
 extern int	scf_save_hac_flag;	/* Host address disp flag */
