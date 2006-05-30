@@ -106,12 +106,14 @@ int zfs_prop_readonly(zfs_prop_t);
 const char *zfs_prop_default_string(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 
+
 /*
- * On-disk format version.
+ * On-disk version number.
  */
 #define	ZFS_VERSION_1			1ULL
 #define	ZFS_VERSION_2			2ULL
-#define	ZFS_VERSION			ZFS_VERSION_2
+#define	ZFS_VERSION_3			3ULL
+#define	ZFS_VERSION			ZFS_VERSION_3
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -126,6 +128,11 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
  */
 #define	ZFS_VERSION_INITIAL		ZFS_VERSION_1
 #define	ZFS_VERSION_DITTO_BLOCKS	ZFS_VERSION_2
+#define	ZFS_VERSION_SPARES		ZFS_VERSION_3
+#define	ZFS_VERSION_RAID6		ZFS_VERSION_3
+#define	ZFS_VERSION_BPLIST_ACCOUNT	ZFS_VERSION_3
+#define	ZFS_VERSION_RAIDZ_DEFLATE	ZFS_VERSION_3
+#define	ZFS_VERSION_DNODE_BYTES		ZFS_VERSION_3
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -156,6 +163,9 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 #define	ZPOOL_CONFIG_OFFLINE		"offline"
 #define	ZPOOL_CONFIG_ERRCOUNT		"error_count"
 #define	ZPOOL_CONFIG_NOT_PRESENT	"not_present"
+#define	ZPOOL_CONFIG_SPARES		"spares"
+#define	ZPOOL_CONFIG_IS_SPARE		"is_spare"
+#define	ZPOOL_CONFIG_NPARITY		"nparity"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -164,6 +174,7 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 #define	VDEV_TYPE_DISK			"disk"
 #define	VDEV_TYPE_FILE			"file"
 #define	VDEV_TYPE_MISSING		"missing"
+#define	VDEV_TYPE_SPARE			"spare"
 
 /*
  * This is needed in userland to report the minimum necessary device size.
@@ -206,18 +217,20 @@ typedef enum vdev_aux {
 	VDEV_AUX_TOO_SMALL,	/* vdev size is too small		*/
 	VDEV_AUX_BAD_LABEL,	/* the label is OK but invalid		*/
 	VDEV_AUX_VERSION_NEWER,	/* on-disk version is too new		*/
-	VDEV_AUX_VERSION_OLDER	/* on-disk version is too old		*/
+	VDEV_AUX_VERSION_OLDER,	/* on-disk version is too old		*/
+	VDEV_AUX_SPARED		/* hot spare used in another pool	*/
 } vdev_aux_t;
 
 /*
  * pool state.  The following states are written to disk as part of the normal
- * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED.  The remaining states are
+ * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED, SPARE.  The remaining states are
  * software abstractions used at various levels to communicate pool state.
  */
 typedef enum pool_state {
 	POOL_STATE_ACTIVE = 0,		/* In active use		*/
 	POOL_STATE_EXPORTED,		/* Explicitly exported		*/
 	POOL_STATE_DESTROYED,		/* Explicitly destroyed		*/
+	POOL_STATE_SPARE,		/* Reserved for hot spare use	*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
 	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/
 	POOL_STATE_POTENTIALLY_ACTIVE	/* Internal libzfs state	*/
@@ -256,6 +269,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_aux;			/* see vdev_aux_t	*/
 	uint64_t	vs_alloc;		/* space allocated	*/
 	uint64_t	vs_space;		/* total capacity	*/
+	uint64_t	vs_dspace;		/* deflated capacity	*/
 	uint64_t	vs_rsize;		/* replaceable dev size */
 	uint64_t	vs_ops[ZIO_TYPES];	/* operation count	*/
 	uint64_t	vs_bytes[ZIO_TYPES];	/* bytes read/written	*/
@@ -335,7 +349,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_INJECT_LIST_NEXT,
 	ZFS_IOC_ERROR_LOG,
 	ZFS_IOC_CLEAR,
-	ZFS_IOC_BOOKMARK_NAME
+	ZFS_IOC_BOOKMARK_NAME,
+	ZFS_IOC_PROMOTE
 } zfs_ioc_t;
 
 /*

@@ -1392,7 +1392,6 @@ zio_vdev_io_assess(zio_t *zio)
 	/* XXPOLICY */
 	if (zio_should_retry(zio)) {
 		ASSERT(tvd == vd);
-		ASSERT(!(zio->io_flags & ZIO_FLAG_DONT_PROPAGATE));
 
 		zio->io_retries++;
 		zio->io_error = 0;

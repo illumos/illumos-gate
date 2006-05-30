@@ -44,6 +44,15 @@ struct dsl_pool;
 
 typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
 
+#define	DS_FLAG_INCONSISTENT	(1ULL<<0)
+/*
+ * NB: nopromote can not yet be set, but we want support for it in this
+ * on-disk version, so that we don't need to upgrade for it later.  It
+ * will be needed when we implement 'zfs split' (where the split off
+ * clone should not be promoted).
+ */
+#define	DS_FLAG_NOPROMOTE	(1ULL<<1)
+
 typedef struct dsl_dataset_phys {
 	uint64_t ds_dir_obj;
 	uint64_t ds_prev_snap_obj;
@@ -65,9 +74,9 @@ typedef struct dsl_dataset_phys {
 	 */
 	uint64_t ds_fsid_guid;
 	uint64_t ds_guid;
-	uint64_t ds_inconsistent; /* boolean */
+	uint64_t ds_flags;
 	blkptr_t ds_bp;
-	uint64_t ds_pad[8]; /* pad out to 256 bytes for good measure */
+	uint64_t ds_pad[8]; /* pad out to 320 bytes for good measure */
 } dsl_dataset_phys_t;
 
 typedef struct dsl_dataset {
@@ -119,6 +128,7 @@ int dsl_dataset_destroy_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
 int dsl_dataset_rollback(const char *name);
 int dsl_dataset_rollback_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
 int dsl_dataset_rename(const char *name, const char *newname);
+int dsl_dataset_promote(const char *name);
 
 void *dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
     void *p, dsl_dataset_evict_func_t func);

@@ -436,22 +436,28 @@ translate_device(const char *pool, const char *device, zinject_record_t *record)
 {
 	char *end;
 	zpool_handle_t *zhp;
+	nvlist_t *tgt;
+	boolean_t isspare;
 
 	/*
 	 * Given a device name or GUID, create an appropriate injection record
 	 * with zi_guid set.
 	 */
-	if ((zhp = zpool_open(pool)) == NULL)
+	if ((zhp = zpool_open(g_zfs, pool)) == NULL)
 		return (-1);
 
 	record->zi_guid = strtoull(device, &end, 16);
-	if (record->zi_guid == 0 || *end != '\0')
-		record->zi_guid = zpool_vdev_to_guid(zhp, device);
+	if (record->zi_guid == 0 || *end != '\0') {
+		tgt = zpool_find_vdev(zhp, device, &isspare);
 
-	if (record->zi_guid == 0) {
-		(void) fprintf(stderr, "cannot find device '%s' in pool '%s'\n",
-		    device, pool);
-		return (-1);
+		if (tgt == NULL) {
+			(void) fprintf(stderr, "cannot find device '%s' in "
+			    "pool '%s'\n", device, pool);
+			return (-1);
+		}
+
+		verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID,
+		    &record->zi_guid) == 0);
 	}
 
 	return (0);

@@ -177,12 +177,17 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
  */
 typedef void dmu_byteswap_func_t(void *buf, size_t size);
 
+/*
+ * The names of zap entries in the DIRECTORY_OBJECT of the MOS.
+ */
 #define	DMU_POOL_DIRECTORY_OBJECT	1
 #define	DMU_POOL_CONFIG			"config"
 #define	DMU_POOL_ROOT_DATASET		"root_dataset"
 #define	DMU_POOL_SYNC_BPLIST		"sync_bplist"
 #define	DMU_POOL_ERRLOG_SCRUB		"errlog_scrub"
 #define	DMU_POOL_ERRLOG_LAST		"errlog_last"
+#define	DMU_POOL_SPARES			"spares"
+#define	DMU_POOL_DEFLATE		"deflate"
 
 /*
  * Allocate an object from this objset.  The range of object numbers

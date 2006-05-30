@@ -26,6 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "libzfs_jni_util.h"
 #include "libzfs_jni_pool.h"
 #include <strings.h>
 
@@ -1110,7 +1111,7 @@ zjni_pool_status_to_obj(JNIEnv *env, zpool_status_t status)
 int
 zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 {
-	nvlist_t *pools = zpool_find_import(argc, argv);
+	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;

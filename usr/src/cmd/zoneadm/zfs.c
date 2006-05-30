@@ -47,7 +47,7 @@
 
 #include "zoneadm.h"
 
-static const char *current_dataset;
+libzfs_handle_t *g_zfs;
 
 typedef struct zfs_mount_data {
 	char		*match_name;
@@ -59,41 +59,6 @@ typedef struct zfs_snapshot_data {
 	int	len;
 	int	max;
 } zfs_snapshot_data_t;
-
-/*
- * ZFS error handler to do nothing - do not print the libzfs error messages.
- */
-/* ARGSUSED */
-static void
-noop_err_handler(const char *fmt, va_list ap)
-{
-}
-
-/*
- * Custom error handler for errors incurred as part of verifying datasets.  We
- * want to trim off the leading 'cannot open ...' to create a better error
- * message.  The only other way this can fail is if we fail to set the 'zoned'
- * property.  In this case we just pass the error on verbatim.
- */
-static void
-err_handler(const char *fmt, va_list ap)
-{
-	char buf[1024];
-
-	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
-
-	if (strncmp(gettext("cannot open "), buf,
-	    strlen(gettext("cannot open "))) == 0)
-		/*
-		 * TRANSLATION_NOTE
-		 * zfs and dataset are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("could not verify zfs "
-		    "dataset %s%s\n"), current_dataset, strchr(buf, ':'));
-	else
-		(void) fprintf(stderr, gettext("could not verify zfs dataset "
-		    "%s: %s\n"), current_dataset, buf);
-}
 
 /*
  * A ZFS file system iterator call-back function which is used to validate
@@ -141,7 +106,7 @@ match_mountpoint(zfs_handle_t *zhp, void *data)
 
 	cbp = (zfs_mount_data_t *)data;
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mp, sizeof (mp), NULL, NULL,
-	    0, FALSE) == 0 && strcmp(mp, cbp->match_name) == 0) {
+	    0, B_FALSE) == 0 && strcmp(mp, cbp->match_name) == 0) {
 		cbp->match_handle = zhp;
 		return (1);
 	}
@@ -161,7 +126,7 @@ mount2zhandle(char *mountpoint)
 
 	cb.match_name = mountpoint;
 	cb.match_handle = NULL;
-	(void) zfs_iter_root(match_mountpoint, &cb);
+	(void) zfs_iter_root(g_zfs, match_mountpoint, &cb);
 	return (cb.match_handle);
 }
 
@@ -331,7 +296,7 @@ take_snapshot(char *source_zone, zfs_handle_t *zhp, char *snapshot_name,
 
 	if (pre_snapshot(source_zone) != Z_OK)
 		return (Z_ERR);
-	res = zfs_snapshot(snapshot_name);
+	res = zfs_snapshot(g_zfs, snapshot_name);
 	if (post_snapshot(source_zone) != Z_OK)
 		return (Z_ERR);
 
@@ -443,7 +408,7 @@ clone_snap(char *snapshot_name, char *zonepath)
 	zfs_handle_t	*zhp;
 	zfs_handle_t	*clone;
 
-	if ((zhp = zfs_open(snapshot_name, ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zhp = zfs_open(g_zfs, snapshot_name, ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (Z_NO_ENTRY);
 
 	(void) printf(gettext("Cloning snapshot %s\n"), snapshot_name);
@@ -454,7 +419,7 @@ clone_snap(char *snapshot_name, char *zonepath)
 		return (Z_ERR);
 
 	/* create the mountpoint if necessary */
-	if ((clone = zfs_open(zonepath, ZFS_TYPE_ANY)) == NULL)
+	if ((clone = zfs_open(g_zfs, zonepath, ZFS_TYPE_ANY)) == NULL)
 		return (Z_ERR);
 
 	/*
@@ -574,14 +539,14 @@ snap2path(char *snap_name, char *path, int len)
 
 	/* Get the file system name from the snap_name. */
 	*p = '\0';
-	zhp = zfs_open(snap_name, ZFS_TYPE_ANY);
+	zhp = zfs_open(g_zfs, snap_name, ZFS_TYPE_ANY);
 	*p = '@';
 	if (zhp == NULL)
 		return (Z_ERR);
 
 	/* Get the file system mount point. */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mp, sizeof (mp), NULL, NULL,
-	    0, FALSE) != 0) {
+	    0, B_FALSE) != 0) {
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
@@ -739,15 +704,16 @@ create_zfs_zonepath(char *zonepath)
 	if (path2name(zonepath, zfs_name, sizeof (zfs_name)) != Z_OK)
 		return;
 
-	zfs_set_error_handler(noop_err_handler);
-
-	if (zfs_create(zfs_name, ZFS_TYPE_FILESYSTEM, NULL, NULL) != 0 ||
-	    (zhp = zfs_open(zfs_name, ZFS_TYPE_ANY)) == NULL) {
-		zfs_set_error_handler(NULL);
+	if (zfs_create(g_zfs, zfs_name, ZFS_TYPE_FILESYSTEM, NULL, NULL) != 0 ||
+	    (zhp = zfs_open(g_zfs, zfs_name, ZFS_TYPE_ANY)) == NULL) {
+		(void) fprintf(stderr, gettext("cannot create ZFS dataset %s: "
+		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
 		return;
 	}
 
 	if (zfs_mount(zhp, NULL, 0) != 0) {
+		(void) fprintf(stderr, gettext("cannot mount ZFS dataset %s: "
+		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
 		(void) zfs_destroy(zhp);
 	} else if (zfs_prop_set(zhp, ZFS_PROP_SHARENFS, "off") != 0) {
 		(void) fprintf(stderr, gettext("file system %s successfully "
@@ -765,7 +731,6 @@ create_zfs_zonepath(char *zonepath)
 		}
 	}
 
-	zfs_set_error_handler(NULL);
 	zfs_close(zhp);
 }
 
@@ -782,12 +747,8 @@ destroy_zfs(char *zonepath)
 	boolean_t	is_clone = B_FALSE;
 	char		origin[ZFS_MAXPROPLEN];
 
-	zfs_set_error_handler(noop_err_handler);
-
-	if ((zhp = mount2zhandle(zonepath)) == NULL) {
-		zfs_set_error_handler(NULL);
+	if ((zhp = mount2zhandle(zonepath)) == NULL)
 		return (Z_ERR);
-	}
 
 	/*
 	 * We can't destroy the file system if it has dependents.
@@ -795,7 +756,6 @@ destroy_zfs(char *zonepath)
 	if (zfs_iter_dependents(zhp, has_dependent, NULL) != 0 ||
 	    zfs_unmount(zhp, NULL, 0) != 0) {
 		zfs_close(zhp);
-		zfs_set_error_handler(NULL);
 		return (Z_ERR);
 	}
 
@@ -804,10 +764,9 @@ destroy_zfs(char *zonepath)
 	 * to destroy that as well.
 	 */
 	if (zfs_prop_get(zhp, ZFS_PROP_ORIGIN, origin, sizeof (origin), NULL,
-	    NULL, 0, FALSE) == 0)
+	    NULL, 0, B_FALSE) == 0)
 		is_clone = B_TRUE;
 
-	zfs_set_error_handler(NULL);
 	if (zfs_destroy(zhp) != 0) {
 		/*
 		 * If the destroy fails for some reason, try to remount
@@ -818,7 +777,6 @@ destroy_zfs(char *zonepath)
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
-	zfs_set_error_handler(noop_err_handler);
 
 	(void) printf(gettext("The ZFS file system for this zone has been "
 	    "destroyed.\n"));
@@ -829,17 +787,16 @@ destroy_zfs(char *zonepath)
 		/*
 		 * Try to clean up the snapshot that the clone was taken from.
 		 */
-		if ((ohp = zfs_open(origin, ZFS_TYPE_SNAPSHOT)) != NULL) {
+		if ((ohp = zfs_open(g_zfs, origin,
+		    ZFS_TYPE_SNAPSHOT)) != NULL) {
 			if (zfs_iter_dependents(ohp, has_dependent, NULL)
-			    == 0 && zfs_unmount(ohp, NULL, 0) == 0) {
+			    == 0 && zfs_unmount(ohp, NULL, 0) == 0)
 				(void) zfs_destroy(ohp);
-			}
 			zfs_close(ohp);
 		}
 	}
 
 	zfs_close(zhp);
-	zfs_set_error_handler(NULL);
 	return (Z_OK);
 }
 
@@ -889,12 +846,8 @@ move_zfs(char *zonepath, char *new_zonepath)
 	int		ret = Z_ERR;
 	zfs_handle_t	*zhp;
 
-	zfs_set_error_handler(noop_err_handler);
-
-	if ((zhp = mount2zhandle(zonepath)) == NULL) {
-		zfs_set_error_handler(NULL);
+	if ((zhp = mount2zhandle(zonepath)) == NULL)
 		return (Z_ERR);
-	}
 
 	if (zfs_prop_set(zhp, ZFS_PROP_MOUNTPOINT, new_zonepath) == 0) {
 		/*
@@ -906,7 +859,6 @@ move_zfs(char *zonepath, char *new_zonepath)
 	}
 
 	zfs_close(zhp);
-	zfs_set_error_handler(NULL);
 
 	return (ret);
 }
@@ -940,14 +892,13 @@ verify_datasets(zone_dochandle_t handle)
 		return (Z_ERR);
 	}
 
-	zfs_set_error_handler(err_handler);
-
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
 
-		current_dataset = dstab.zone_dataset_name;
-
-		if ((zhp = zfs_open(dstab.zone_dataset_name,
+		if ((zhp = zfs_open(g_zfs, dstab.zone_dataset_name,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME)) == NULL) {
+			(void) fprintf(stderr, gettext("could not verify zfs "
+			    "dataset %s: %s\n"), dstab.zone_dataset_name,
+			    libzfs_error_description(g_zfs));
 			return_code = Z_ERR;
 			continue;
 		}
@@ -978,7 +929,6 @@ verify_datasets(zone_dochandle_t handle)
 		zfs_close(zhp);
 	}
 	(void) zonecfg_enddsent(handle);
-	zfs_set_error_handler(NULL);
 
 	return (return_code);
 }
@@ -993,13 +943,11 @@ verify_fs_zfs(struct zone_fstab *fstab)
 	zfs_handle_t *zhp;
 	char propbuf[ZFS_MAXPROPLEN];
 
-	zfs_set_error_handler(noop_err_handler);
-
-	if ((zhp = zfs_open(fstab->zone_fs_special, ZFS_TYPE_ANY)) == NULL) {
+	if ((zhp = zfs_open(g_zfs, fstab->zone_fs_special,
+	    ZFS_TYPE_ANY)) == NULL) {
 		(void) fprintf(stderr, gettext("could not verify fs %s: "
 		    "could not access zfs dataset '%s'\n"),
 		    fstab->zone_fs_dir, fstab->zone_fs_special);
-		zfs_set_error_handler(NULL);
 		return (Z_ERR);
 	}
 
@@ -1008,7 +956,6 @@ verify_fs_zfs(struct zone_fstab *fstab)
 		    "'%s' is not a file system\n"),
 		    fstab->zone_fs_dir, fstab->zone_fs_special);
 		zfs_close(zhp);
-		zfs_set_error_handler(NULL);
 		return (Z_ERR);
 	}
 
@@ -1018,11 +965,21 @@ verify_fs_zfs(struct zone_fstab *fstab)
 		    "zfs '%s' mountpoint is not \"legacy\"\n"),
 		    fstab->zone_fs_dir, fstab->zone_fs_special);
 		zfs_close(zhp);
-		zfs_set_error_handler(NULL);
 		return (Z_ERR);
 	}
 
 	zfs_close(zhp);
-	zfs_set_error_handler(NULL);
+	return (Z_OK);
+}
+
+int
+init_zfs(void)
+{
+	if ((g_zfs = libzfs_init()) == NULL) {
+		(void) fprintf(stderr, gettext("failed to initialize ZFS "
+		    "library\n"));
+		return (Z_ERR);
+	}
+
 	return (Z_OK);
 }

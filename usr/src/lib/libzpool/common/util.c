@@ -111,11 +111,17 @@ show_vdev_stats(const char *desc, nvlist_t *nv, int indent)
 
 	for (c = 0; c < children; c++) {
 		nvlist_t *cnv = child[c];
-		char *cname;
+		char *cname, *tname;
+		uint64_t np;
 		if (nvlist_lookup_string(cnv, ZPOOL_CONFIG_PATH, &cname) &&
 		    nvlist_lookup_string(cnv, ZPOOL_CONFIG_TYPE, &cname))
 			cname = "<unknown>";
-		show_vdev_stats(cname, cnv, indent + 2);
+		tname = calloc(1, strlen(cname) + 2);
+		(void) strcpy(tname, cname);
+		if (nvlist_lookup_uint64(cnv, ZPOOL_CONFIG_NPARITY, &np) == 0)
+			tname[strlen(tname)] = '0' + np;
+		show_vdev_stats(tname, cnv, indent + 2);
+		free(tname);
 	}
 }
 

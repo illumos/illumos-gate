@@ -789,7 +789,7 @@ replay_incremental_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	/* The point of no (unsuccessful) return. */
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_inconsistent = TRUE;
+	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (0);
@@ -841,7 +841,7 @@ replay_full_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	    ds, drrb->drr_type, tx);
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_inconsistent = TRUE;
+	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (0);
@@ -875,7 +875,7 @@ replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_creation_time = drrb->drr_creation_time;
 	ds->ds_phys->ds_guid = drrb->drr_toguid;
-	ds->ds_phys->ds_inconsistent = FALSE;
+	ds->ds_phys->ds_flags &= ~DS_FLAG_INCONSISTENT;
 
 	dsl_dataset_close(ds, DS_MODE_PRIMARY, FTAG);
 
@@ -883,7 +883,7 @@ replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	    dd->dd_phys->dd_head_dataset_obj,
 	    NULL, DS_MODE_STANDARD | DS_MODE_INCONSISTENT, FTAG, &ds));
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_inconsistent = FALSE;
+	ds->ds_phys->ds_flags &= ~DS_FLAG_INCONSISTENT;
 	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
 
 	return (0);
@@ -1686,7 +1686,8 @@ dmu_object_info_from_dnode(dnode_t *dn, dmu_object_info_t *doi)
 	doi->doi_indirection = dn->dn_nlevels;
 	doi->doi_checksum = dn->dn_checksum;
 	doi->doi_compress = dn->dn_compress;
-	doi->doi_physical_blks = dn->dn_phys->dn_secphys;
+	doi->doi_physical_blks = (DN_USED_BYTES(dn->dn_phys) +
+	    SPA_MINBLOCKSIZE/2) >> SPA_MINBLOCKSHIFT;
 	doi->doi_max_block_offset = dn->dn_phys->dn_maxblkid;
 	doi->doi_type = dn->dn_type;
 	doi->doi_bonus_size = dn->dn_bonuslen;
@@ -1735,7 +1736,9 @@ dmu_object_size_from_db(dmu_buf_t *db, uint32_t *blksize, u_longlong_t *nblk512)
 	dnode_t *dn = ((dmu_buf_impl_t *)db)->db_dnode;
 
 	*blksize = dn->dn_datablksz;
-	*nblk512 = dn->dn_phys->dn_secphys + 1;	/* add 1 for dnode space */
+	/* add 1 for dnode space */
+	*nblk512 = ((DN_USED_BYTES(dn->dn_phys) + SPA_MINBLOCKSIZE/2) >>
+	    SPA_MINBLOCKSHIFT) + 1;
 }
 
 /*

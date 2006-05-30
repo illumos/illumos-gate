@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -47,12 +46,12 @@ void no_memory(void);
  * Virtual device functions
  */
 nvlist_t *make_root_vdev(nvlist_t *poolconfig, int force, int check_rep,
-    int argc, char **argv);
+    boolean_t isreplace, int argc, char **argv);
 
 /*
  * Pool list functions
  */
-int for_each_pool(int, char **, int unavail, zpool_iter_f, void *);
+int for_each_pool(int, char **, boolean_t unavail, zpool_iter_f, void *);
 
 typedef struct zpool_list zpool_list_t;
 
@@ -68,6 +67,8 @@ void pool_list_remove(zpool_list_t *, zpool_handle_t *);
  */
 int unmount_datasets(zpool_handle_t *, int);
 int mount_share_datasets(zpool_handle_t *, const char *);
+
+libzfs_handle_t *g_zfs;
 
 #ifdef	__cplusplus
 }

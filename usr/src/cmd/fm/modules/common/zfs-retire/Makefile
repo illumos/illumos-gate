@@ -22,39 +22,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-PROG:sh=	cd ..; basename `pwd`
-OBJS= $(PROG).o translate.o
-SRCS= $(OBJS:%.o=../%.c)
+MODULE = zfs-retire
+CLASS = common
+SRCS = zfs_retire.c
 
-include ../../Makefile.cmd
+include ../../Makefile.plugin
 
-INCS +=	-I../../../lib/libzpool/common
-INCS +=	-I../../../uts/common/fs/zfs
-
-LDLIBS += -lzpool -lzfs -lnvpair
-
-C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
-
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
-
-.KEEP_STATE:
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-clean:
-
-lint:	lint_SRCS
-
-%.o: ../%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
-include ../../Makefile.targ
+LDLIBS += -lzfs

@@ -63,44 +63,44 @@
 #include "libzfs_impl.h"
 
 /*
- * Search the sharetab for the given mountpoint, returning TRUE if it is found.
+ * Search the sharetab for the given mountpoint, returning true if it is found.
  */
-static int
-is_shared(const char *mountpoint)
+static boolean_t
+is_shared(libzfs_handle_t *hdl, const char *mountpoint)
 {
 	char buf[MAXPATHLEN], *tab;
 
-	if (zfs_sharetab() == NULL)
+	if (hdl->libzfs_sharetab == NULL)
 		return (0);
 
-	(void) fseek(zfs_sharetab(), 0, SEEK_SET);
+	(void) fseek(hdl->libzfs_sharetab, 0, SEEK_SET);
 
-	while (fgets(buf, sizeof (buf), zfs_sharetab()) != NULL) {
+	while (fgets(buf, sizeof (buf), hdl->libzfs_sharetab) != NULL) {
 
 		/* the mountpoint is the first entry on each line */
 		if ((tab = strchr(buf, '\t')) != NULL) {
 			*tab = '\0';
 			if (strcmp(buf, mountpoint) == 0)
-				return (1);
+				return (B_TRUE);
 		}
 	}
 
-	return (0);
+	return (B_FALSE);
 }
 
 /*
- * Returns TRUE if the specified directory is empty.  If we can't open the
- * directory at all, return TRUE so that the mount can fail with a more
+ * Returns true if the specified directory is empty.  If we can't open the
+ * directory at all, return true so that the mount can fail with a more
  * informative error message.
  */
-static int
+static boolean_t
 dir_is_empty(const char *dirname)
 {
 	DIR *dirp;
 	struct dirent64 *dp;
 
 	if ((dirp = opendir(dirname)) == NULL)
-		return (TRUE);
+		return (B_TRUE);
 
 	while ((dp = readdir64(dirp)) != NULL) {
 
@@ -109,11 +109,11 @@ dir_is_empty(const char *dirname)
 			continue;
 
 		(void) closedir(dirp);
-		return (FALSE);
+		return (B_FALSE);
 	}
 
 	(void) closedir(dirp);
-	return (TRUE);
+	return (B_TRUE);
 }
 
 /*
@@ -121,7 +121,7 @@ dir_is_empty(const char *dirname)
  * in 'where' with the current mountpoint, and return 1.  Otherwise, we return
  * 0.
  */
-int
+boolean_t
 zfs_is_mounted(zfs_handle_t *zhp, char **where)
 {
 	struct mnttab search = { 0 }, entry;
@@ -134,14 +134,14 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
 
-	rewind(zfs_mnttab());
-	if (getmntany(zfs_mnttab(), &entry, &search) != 0)
-		return (FALSE);
+	rewind(zhp->zfs_hdl->libzfs_mnttab);
+	if (getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry, &search) != 0)
+		return (B_FALSE);
 
 	if (where != NULL)
-		*where = zfs_strdup(entry.mnt_mountp);
+		*where = zfs_strdup(zhp->zfs_hdl, entry.mnt_mountp);
 
-	return (TRUE);
+	return (B_TRUE);
 }
 
 /*
@@ -153,6 +153,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	struct stat buf;
 	char mountpoint[ZFS_MAXPROPLEN];
 	char mntopts[MNT_LINE_MAX];
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
 	if (options == NULL)
 		mntopts[0] = '\0';
@@ -161,7 +162,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 
 	/* ignore non-filesystems */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
-	    sizeof (mountpoint), NULL, NULL, 0, FALSE) != 0)
+	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0)
 		return (0);
 
 	/* return success if there is no mountpoint set */
@@ -173,25 +174,18 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	 * If the 'zoned' property is set, and we're in the global zone, simply
 	 * return success.
 	 */
-	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED)) {
-		char zonename[ZONENAME_MAX];
-		if (getzonenamebyid(getzoneid(), zonename,
-		    sizeof (zonename)) < 0) {
-			zfs_error(dgettext(TEXT_DOMAIN, "internal error: "
-			    "cannot determine current zone"));
-			return (1);
-		}
-
-		if (strcmp(zonename, "global") == 0)
-			return (0);
-	}
+	if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
+	    getzoneid() == GLOBAL_ZONEID)
+		return (0);
 
 	/* Create the directory if it doesn't already exist */
 	if (lstat(mountpoint, &buf) != 0) {
 		if (mkdirp(mountpoint, 0755) != 0) {
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot mount '%s': "
-			    "unable to create mountpoint"), mountpoint);
-			return (1);
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "failed to create mountpoint"));
+			return (zfs_error(hdl, EZFS_MOUNTFAILED,
+			    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
+			    mountpoint));
 		}
 	}
 
@@ -204,11 +198,10 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	if ((flags & MS_OVERLAY) == 0 &&
 	    strstr(mntopts, MNTOPT_REMOUNT) == NULL &&
 	    !dir_is_empty(mountpoint)) {
-		zfs_error(dgettext(TEXT_DOMAIN, "cannot mount '%s': "
-		    "directory is not empty"), mountpoint);
-		zfs_error(dgettext(TEXT_DOMAIN, "use legacy mountpoint to "
-		    "allow this behavior, or use the -O flag"));
-		return (1);
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "directory is not empty"));
+		return (zfs_error(hdl, EZFS_MOUNTFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"), mountpoint));
 	}
 
 	/* perform the mount */
@@ -219,24 +212,15 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		 * from mount(), and they're well-understood.  We pick a few
 		 * common ones to improve upon.
 		 */
-		switch (errno) {
-		case EBUSY:
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot mount '%s': "
-			    "mountpoint or dataset is busy"), zhp->zfs_name);
-			break;
-		case EPERM:
-		case EACCES:
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot mount '%s': "
-			    "permission denied"), zhp->zfs_name,
-			    mountpoint);
-			break;
-		default:
-			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot mount '%s': %s"),
-			    mountpoint, strerror(errno));
-			break;
-		}
-		return (1);
+		if (errno == EBUSY)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "mountpoint or dataset is busy"));
+		else
+			zfs_error_aux(hdl, strerror(errno));
+
+		return (zfs_error(hdl, EZFS_MOUNTFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
+		    zhp->zfs_name));
 	}
 
 	return (0);
@@ -253,9 +237,9 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
-	rewind(zfs_mnttab());
+	rewind(zhp->zfs_hdl->libzfs_mnttab);
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
-	    getmntany(zfs_mnttab(), &entry, &search) == 0)) {
+	    getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry, &search) == 0)) {
 
 		if (mountpoint == NULL)
 			mountpoint = entry.mnt_mountp;
@@ -277,10 +261,10 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 		 * semantics from the kernel.
 		 */
 		if (umount2(mountpoint, flags) != 0) {
-			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot unmount '%s': %s"),
-			    mountpoint, strerror(errno));
-			return (-1);
+			zfs_error_aux(zhp->zfs_hdl, strerror(errno));
+			return (zfs_error(zhp->zfs_hdl, EZFS_UMOUNTFAILED,
+			    dgettext(TEXT_DOMAIN, "cannot unmount '%s'"),
+			    mountpoint));
 		}
 
 		/*
@@ -315,23 +299,23 @@ zfs_unmountall(zfs_handle_t *zhp, int flags)
 /*
  * Check to see if the filesystem is currently shared.
  */
-int
+boolean_t
 zfs_is_shared(zfs_handle_t *zhp, char **where)
 {
 	char *mountpoint;
 
 	if (!zfs_is_mounted(zhp, &mountpoint))
-		return (FALSE);
+		return (B_FALSE);
 
-	if (is_shared(mountpoint)) {
+	if (is_shared(zhp->zfs_hdl, mountpoint)) {
 		if (where != NULL)
 			*where = mountpoint;
 		else
 			free(mountpoint);
-		return (TRUE);
+		return (B_TRUE);
 	} else {
 		free(mountpoint);
-		return (FALSE);
+		return (B_FALSE);
 	}
 }
 
@@ -346,6 +330,7 @@ zfs_share(zfs_handle_t *zhp)
 	char shareopts[ZFS_MAXPROPLEN];
 	char buf[MAXPATHLEN];
 	FILE *fp;
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
 	/* ignore non-filesystems */
 	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM)
@@ -353,14 +338,14 @@ zfs_share(zfs_handle_t *zhp)
 
 	/* return success if there is no mountpoint set */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT,
-	    mountpoint, sizeof (mountpoint), NULL, NULL, 0, FALSE) != 0 ||
+	    mountpoint, sizeof (mountpoint), NULL, NULL, 0, B_FALSE) != 0 ||
 	    strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
 	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0)
 		return (0);
 
 	/* return success if there are no share options */
 	if (zfs_prop_get(zhp, ZFS_PROP_SHARENFS, shareopts, sizeof (shareopts),
-	    NULL, NULL, 0, FALSE) != 0 ||
+	    NULL, NULL, 0, B_FALSE) != 0 ||
 	    strcmp(shareopts, "off") == 0)
 		return (0);
 
@@ -386,11 +371,10 @@ zfs_share(zfs_handle_t *zhp)
 		    "-F nfs -o \"%s\" \"%s\" 2>&1", shareopts,
 		    mountpoint);
 
-	if ((fp = popen(buf, "r")) == NULL) {
-		zfs_error(dgettext(TEXT_DOMAIN, "cannot share '%s': "
-		    "share(1M) failed"), zfs_get_name(zhp));
-		return (-1);
-	}
+	if ((fp = popen(buf, "r")) == NULL)
+		return (zfs_error(hdl, EZFS_SHAREFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
+		    zfs_get_name(zhp)));
 
 	/*
 	 * share(1M) should only produce output if there is some kind
@@ -403,14 +387,11 @@ zfs_share(zfs_handle_t *zhp)
 		while (buf[strlen(buf) - 1] == '\n')
 			buf[strlen(buf) - 1] = '\0';
 
-		if (colon == NULL)
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot share "
-			    "'%s': share(1M) failed"),
-			    zfs_get_name(zhp));
-		else
-			zfs_error(dgettext(TEXT_DOMAIN, "cannot share "
-			    "'%s': %s"), zfs_get_name(zhp),
-			    colon + 2);
+		if (colon != NULL)
+			zfs_error_aux(hdl, colon + 2);
+
+		(void) zfs_error(hdl, EZFS_SHAREFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot share '%s'"));
 
 		verify(pclose(fp) != 0);
 		return (-1);
@@ -429,30 +410,29 @@ zfs_unshare(zfs_handle_t *zhp, const char *mountpoint)
 {
 	char buf[MAXPATHLEN];
 	struct mnttab search = { 0 }, entry;
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
-	rewind(zfs_mnttab());
+	rewind(zhp->zfs_hdl->libzfs_mnttab);
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
-	    getmntany(zfs_mnttab(), &entry, &search) == 0)) {
+	    getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry, &search) == 0)) {
 
 		if (mountpoint == NULL)
 			mountpoint = entry.mnt_mountp;
 
-		if (is_shared(mountpoint)) {
+		if (is_shared(zhp->zfs_hdl, mountpoint)) {
 			FILE *fp;
 
 			(void) snprintf(buf, sizeof (buf),
 			    "/usr/sbin/unshare  \"%s\" 2>&1",
 			    mountpoint);
 
-			if ((fp = popen(buf, "r")) == NULL) {
-				zfs_error(dgettext(TEXT_DOMAIN, "cannot "
-				    "unshare '%s': unshare(1M) failed"),
-				    zfs_get_name(zhp));
-				return (-1);
-			}
+			if ((fp = popen(buf, "r")) == NULL)
+				return (zfs_error(hdl, EZFS_UNSHAREFAILED,
+				    dgettext(TEXT_DOMAIN,
+				    "cannot unshare '%s'"), zfs_get_name(zhp)));
 
 			/*
 			 * unshare(1M) should only produce output if there is
@@ -465,17 +445,14 @@ zfs_unshare(zfs_handle_t *zhp, const char *mountpoint)
 				while (buf[strlen(buf) - 1] == '\n')
 					buf[strlen(buf) - 1] = '\0';
 
-				if (colon == NULL)
-					zfs_error(dgettext(TEXT_DOMAIN,
-					    "cannot unshare '%s': unshare(1M) "
-					    "failed"), zfs_get_name(zhp));
-				else
-					zfs_error(dgettext(TEXT_DOMAIN,
-					    "cannot unshare '%s': %s"),
-					    zfs_get_name(zhp), colon + 2);
+				if (colon != NULL)
+					zfs_error_aux(hdl, colon + 2);
 
 				verify(pclose(fp) != 0);
-				return (-1);
+
+				return (zfs_error(hdl, EZFS_UNSHAREFAILED,
+				    dgettext(TEXT_DOMAIN,
+				    "cannot unshare '%s'"), zfs_get_name(zhp)));
 			}
 
 			verify(pclose(fp) == 0);
@@ -521,24 +498,20 @@ remove_mountpoint(zfs_handle_t *zhp)
 	char mountpoint[ZFS_MAXPROPLEN];
 	char source[ZFS_MAXNAMELEN];
 	zfs_source_t sourcetype;
-	char zonename[ZONENAME_MAX];
+	int zoneid = getzoneid();
 
 	/* ignore non-filesystems */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
 	    sizeof (mountpoint), &sourcetype, source, sizeof (source),
-	    FALSE) != 0)
+	    B_FALSE) != 0)
 		return;
-
-	if (getzonenamebyid(getzoneid(), zonename, sizeof (zonename)) < 0)
-		zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: "
-		    "cannot determine current zone"));
 
 	if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) != 0 &&
 	    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) != 0 &&
 	    (sourcetype == ZFS_SRC_DEFAULT ||
 	    sourcetype == ZFS_SRC_INHERITED) &&
 	    (!zfs_prop_get_int(zhp, ZFS_PROP_ZONED) ||
-	    strcmp(zonename, "global") != 0)) {
+	    zoneid != GLOBAL_ZONEID)) {
 
 		/*
 		 * Try to remove the directory, silently ignoring any errors.

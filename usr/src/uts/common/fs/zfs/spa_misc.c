@@ -175,6 +175,9 @@ static kcondvar_t spa_namespace_cv;
 static int spa_active_count;
 static int spa_max_replication_override = SPA_DVAS_PER_BP;
 
+static avl_tree_t spa_spare_avl;
+static kmutex_t spa_spare_lock;
+
 kmem_cache_t *spa_buffer_pool;
 int spa_mode;
 
@@ -334,6 +337,99 @@ spa_refcount_zero(spa_t *spa)
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
 	return (refcount_count(&spa->spa_refcount) == SPA_MINREF);
+}
+
+/*
+ * ==========================================================================
+ * SPA spare tracking
+ * ==========================================================================
+ */
+
+/*
+ * We track spare information on a global basis.  This allows us to do two
+ * things: determine when a spare is no longer referenced by any active pool,
+ * and (quickly) determine if a spare is currently in use in another pool on the
+ * system.
+ */
+typedef struct spa_spare {
+	uint64_t	spare_guid;
+	avl_node_t	spare_avl;
+	int		spare_count;
+} spa_spare_t;
+
+static int
+spa_spare_compare(const void *a, const void *b)
+{
+	const spa_spare_t *sa = a;
+	const spa_spare_t *sb = b;
+
+	if (sa->spare_guid < sb->spare_guid)
+		return (-1);
+	else if (sa->spare_guid > sb->spare_guid)
+		return (1);
+	else
+		return (0);
+}
+
+void
+spa_spare_add(uint64_t guid)
+{
+	avl_index_t where;
+	spa_spare_t search;
+	spa_spare_t *spare;
+
+	mutex_enter(&spa_spare_lock);
+
+	search.spare_guid = guid;
+	if ((spare = avl_find(&spa_spare_avl, &search, &where)) != NULL) {
+		spare->spare_count++;
+	} else {
+		spare = kmem_alloc(sizeof (spa_spare_t), KM_SLEEP);
+		spare->spare_guid = guid;
+		spare->spare_count = 1;
+		avl_insert(&spa_spare_avl, spare, where);
+	}
+
+	mutex_exit(&spa_spare_lock);
+}
+
+void
+spa_spare_remove(uint64_t guid)
+{
+	spa_spare_t search;
+	spa_spare_t *spare;
+	avl_index_t where;
+
+	mutex_enter(&spa_spare_lock);
+
+	search.spare_guid = guid;
+	spare = avl_find(&spa_spare_avl, &search, &where);
+
+	ASSERT(spare != NULL);
+
+	if (--spare->spare_count == 0) {
+		avl_remove(&spa_spare_avl, spare);
+		kmem_free(spare, sizeof (spa_spare_t));
+	}
+
+	mutex_exit(&spa_spare_lock);
+}
+
+boolean_t
+spa_spare_inuse(uint64_t guid)
+{
+	spa_spare_t search;
+	avl_index_t where;
+	boolean_t ret;
+
+	mutex_enter(&spa_spare_lock);
+
+	search.spare_guid = guid;
+	ret = (avl_find(&spa_spare_avl, &search, &where) != NULL);
+
+	mutex_exit(&spa_spare_lock);
+
+	return (ret);
 }
 
 /*
@@ -779,7 +875,7 @@ spa_metaslab_class_select(spa_t *spa)
 }
 
 /*
- * Return pool-wide allocated space.
+ * Return how much space is allocated in the pool (ie. sum of all asize)
  */
 uint64_t
 spa_get_alloc(spa_t *spa)
@@ -788,12 +884,24 @@ spa_get_alloc(spa_t *spa)
 }
 
 /*
- * Return pool-wide allocated space.
+ * Return how much (raid-z inflated) space there is in the pool.
  */
 uint64_t
 spa_get_space(spa_t *spa)
 {
 	return (spa->spa_root_vdev->vdev_stat.vs_space);
+}
+
+/*
+ * Return the amount of raid-z-deflated space in the pool.
+ */
+uint64_t
+spa_get_dspace(spa_t *spa)
+{
+	if (spa->spa_deflate)
+		return (spa->spa_root_vdev->vdev_stat.vs_dspace);
+	else
+		return (spa->spa_root_vdev->vdev_stat.vs_space);
 }
 
 /* ARGSUSED */
@@ -826,6 +934,23 @@ spa_max_replication(spa_t *spa)
 	if (spa_version(spa) < ZFS_VERSION_DITTO_BLOCKS)
 		return (1);
 	return (MIN(SPA_DVAS_PER_BP, spa_max_replication_override));
+}
+
+uint64_t
+bp_get_dasize(spa_t *spa, const blkptr_t *bp)
+{
+	int sz = 0, i;
+
+	if (!spa->spa_deflate)
+		return (BP_GET_ASIZE(bp));
+
+	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
+		vdev_t *vd =
+		    vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[i]));
+		sz += (DVA_GET_ASIZE(&bp->blk_dva[i]) >> SPA_MINBLOCKSHIFT) *
+		    vd->vdev_deflate_ratio;
+	}
+	return (sz);
 }
 
 /*
@@ -864,6 +989,9 @@ spa_init(int mode)
 	avl_create(&spa_namespace_avl, spa_name_compare, sizeof (spa_t),
 	    offsetof(spa_t, spa_avl));
 
+	avl_create(&spa_spare_avl, spa_spare_compare, sizeof (spa_spare_t),
+	    offsetof(spa_spare_t, spare_avl));
+
 	spa_mode = mode;
 
 	refcount_init();
@@ -885,6 +1013,7 @@ spa_fini(void)
 	refcount_fini();
 
 	avl_destroy(&spa_namespace_avl);
+	avl_destroy(&spa_spare_avl);
 
 	cv_destroy(&spa_namespace_cv);
 	mutex_destroy(&spa_namespace_lock);

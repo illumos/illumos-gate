@@ -574,7 +574,7 @@ is_fs_snapshot(zfs_handle_t *zhp)
 	zjni_get_dataset_from_snapshot(
 	    zfs_get_name(zhp), parent, sizeof (parent));
 
-	parent_zhp = zfs_open(parent, ZFS_TYPE_ANY);
+	parent_zhp = zfs_open(g_zfs, parent, ZFS_TYPE_ANY);
 	if (parent_zhp == NULL) {
 		return (-1);
 	}
@@ -606,7 +606,8 @@ zjni_create_add_Pool(zpool_handle_t *zphp, void *data)
 	zjni_Collection_t *list = ((zjni_ArrayCallbackData_t *)data)->list;
 
 	/* Get root fs for this pool -- may be NULL if pool is faulted */
-	zfs_handle_t *zhp = zfs_open(zpool_get_name(zphp), ZFS_TYPE_FILESYSTEM);
+	zfs_handle_t *zhp = zfs_open(g_zfs, zpool_get_name(zphp),
+	    ZFS_TYPE_FILESYSTEM);
 
 	jobject bean = create_PoolBean(env, zphp, zhp);
 
@@ -682,7 +683,7 @@ zjni_get_Datasets_below(JNIEnv *env, jstring parentUTF,
 		zjni_new_DatasetSet(env, list);
 
 		/* Retrieve parent dataset */
-		zhp = zfs_open(name, parent_typemask);
+		zhp = zfs_open(g_zfs, name, parent_typemask);
 
 		if (zhp != NULL) {
 			zjni_DatasetArrayCallbackData_t data = {0};
@@ -703,7 +704,7 @@ zjni_get_Datasets_below(JNIEnv *env, jstring parentUTF,
 		/* Parent is not a dataset -- see if it's a faulted pool */
 		if ((parent_typemask & ZFS_TYPE_FILESYSTEM) &&
 		    is_pool_name(name)) {
-			zpool_handle_t *zphp = zpool_open_canfail(name);
+			zpool_handle_t *zphp = zpool_open_canfail(g_zfs, name);
 
 			if (zphp != NULL) {
 				/* A faulted pool has no datasets */
@@ -750,7 +751,7 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 			const char *path =
 			    (*env)->GetStringUTFChars(env, pathUTF, NULL);
 
-			zfs_handle_t *zhp = zfs_open(path, ZFS_TYPE_ANY);
+			zfs_handle_t *zhp = zfs_open(g_zfs, path, ZFS_TYPE_ANY);
 			if (zhp != NULL) {
 				/* Add all dependents of this Dataset to list */
 				(void) zfs_iter_dependents(zhp,
@@ -762,7 +763,8 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 
 			/* Path is not a dataset - see if it's a faulted pool */
 			if (is_pool_name(path)) {
-				zpool_handle_t *zphp = zpool_open_canfail(path);
+				zpool_handle_t *zphp = zpool_open_canfail(g_zfs,
+				    path);
 
 				if (zphp != NULL) {
 					/*
@@ -795,10 +797,10 @@ zjni_get_Dataset(JNIEnv *env, jstring nameUTF, zfs_type_t typemask)
 {
 	jobject device = NULL;
 	const char *name = (*env)->GetStringUTFChars(env, nameUTF, NULL);
-	zfs_handle_t *zhp = zfs_open(name, typemask);
+	zfs_handle_t *zhp = zfs_open(g_zfs, name, typemask);
 
 	if ((typemask & ZFS_TYPE_FILESYSTEM) && is_pool_name(name)) {
-		zpool_handle_t *zphp = zpool_open_canfail(name);
+		zpool_handle_t *zphp = zpool_open_canfail(g_zfs, name);
 
 		if (zphp != NULL) {
 			device = create_PoolBean(env, zphp, zhp);

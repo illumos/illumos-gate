@@ -47,6 +47,9 @@
 #include <libzfs.h>
 
 #include "zfs_iter.h"
+#include "zfs_util.h"
+
+libzfs_handle_t *g_zfs;
 
 static FILE *mnttab_file;
 
@@ -66,6 +69,7 @@ static int zfs_do_share(int argc, char **argv);
 static int zfs_do_unshare(int argc, char **argv);
 static int zfs_do_send(int argc, char **argv);
 static int zfs_do_receive(int argc, char **argv);
+static int zfs_do_promote(int argc, char **argv);
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -91,6 +95,7 @@ typedef enum {
 	HELP_INHERIT,
 	HELP_LIST,
 	HELP_MOUNT,
+	HELP_PROMOTE,
 	HELP_RECEIVE,
 	HELP_RENAME,
 	HELP_ROLLBACK,
@@ -124,6 +129,7 @@ static zfs_command_t command_table[] = {
 	{ "snapshot",	zfs_do_snapshot,	HELP_SNAPSHOT		},
 	{ "rollback",	zfs_do_rollback,	HELP_ROLLBACK		},
 	{ "clone",	zfs_do_clone,		HELP_CLONE		},
+	{ "promote",	zfs_do_promote,		HELP_PROMOTE		},
 	{ "rename",	zfs_do_rename,		HELP_RENAME		},
 	{ NULL },
 	{ "list",	zfs_do_list,		HELP_LIST		},
@@ -176,6 +182,8 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tmount\n"
 		    "\tmount [-o opts] [-O] -a\n"
 		    "\tmount [-o opts] [-O] <filesystem>\n"));
+	case HELP_PROMOTE:
+		return (gettext("\tpromote <clone filesystem>\n"));
 	case HELP_RECEIVE:
 		return (gettext("\treceive [-vn] <filesystem|volume|snapshot>\n"
 		    "\treceive [-vn] -d <filesystem>\n"));
@@ -228,10 +236,10 @@ safe_malloc(size_t size)
  * a complete usage message.
  */
 static void
-usage(int requested)
+usage(boolean_t requested)
 {
 	int i;
-	int show_properties = FALSE;
+	boolean_t show_properties = B_FALSE;
 	FILE *fp = requested ? stdout : stderr;
 
 	if (current_command == NULL) {
@@ -260,7 +268,7 @@ usage(int requested)
 	    strcmp(current_command->name, "get") == 0 ||
 	    strcmp(current_command->name, "inherit") == 0 ||
 	    strcmp(current_command->name, "list") == 0)
-		show_properties = TRUE;
+		show_properties = B_TRUE;
 
 	if (show_properties) {
 
@@ -313,27 +321,27 @@ zfs_do_clone(int argc, char **argv)
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* check number of arguments */
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing source dataset "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc < 3) {
 		(void) fprintf(stderr, gettext("missing target dataset "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 3) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* open the source dataset */
-	if ((zhp = zfs_open(argv[1], ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[1], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
 	/* pass to libzfs */
@@ -341,7 +349,7 @@ zfs_do_clone(int argc, char **argv)
 
 	/* create the mountpoint if necessary */
 	if (ret == 0) {
-		zfs_handle_t *clone = zfs_open(argv[2], ZFS_TYPE_ANY);
+		zfs_handle_t *clone = zfs_open(g_zfs, argv[2], ZFS_TYPE_ANY);
 		if (clone != NULL) {
 			if ((ret = zfs_mount(clone, NULL, 0)) == 0)
 				ret = zfs_share(clone);
@@ -374,7 +382,7 @@ zfs_do_create(int argc, char **argv)
 	char *size = NULL;
 	char *blocksize = NULL;
 	int c;
-	int noreserve = FALSE;
+	boolean_t noreserve = B_FALSE;
 	int ret;
 
 	/* check options */
@@ -388,24 +396,24 @@ zfs_do_create(int argc, char **argv)
 			blocksize = optarg;
 			break;
 		case 's':
-			noreserve = TRUE;
+			noreserve = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing size "
 			    "argument\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
 	if (noreserve && type != ZFS_TYPE_VOLUME) {
 		(void) fprintf(stderr, gettext("'-s' can only be used when "
 		    "creating a volume\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	argc -= optind;
@@ -415,18 +423,18 @@ zfs_do_create(int argc, char **argv)
 	if (argc == 0) {
 		(void) fprintf(stderr, gettext("missing %s argument\n"),
 		    zfs_type_to_name(type));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* pass to libzfs */
-	if (zfs_create(argv[0], type, size, blocksize) != 0)
+	if (zfs_create(g_zfs, argv[0], type, size, blocksize) != 0)
 		return (1);
 
-	if ((zhp = zfs_open(argv[0], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
 		return (1);
 
 	/*
@@ -476,7 +484,7 @@ zfs_do_create(int argc, char **argv)
  * either be a child, or a clone of a child.
  */
 typedef struct destroy_cbdata {
-	int		cb_first;
+	boolean_t	cb_first;
 	int		cb_force;
 	int		cb_recurse;
 	int		cb_error;
@@ -511,7 +519,7 @@ destroy_check_dependent(zfs_handle_t *zhp, void *data)
 			    zfs_type_to_name(zfs_get_type(cbp->cb_target)));
 			(void) fprintf(stderr, gettext("use '-r' to destroy "
 			    "the following datasets:\n"));
-			cbp->cb_first = 0;
+			cbp->cb_first = B_FALSE;
 			cbp->cb_error = 1;
 		}
 
@@ -532,7 +540,7 @@ destroy_check_dependent(zfs_handle_t *zhp, void *data)
 			    zfs_type_to_name(zfs_get_type(cbp->cb_target)));
 			(void) fprintf(stderr, gettext("use '-R' to destroy "
 			    "the following datasets:\n"));
-			cbp->cb_first = 0;
+			cbp->cb_first = B_FALSE;
 			cbp->cb_error = 1;
 		}
 
@@ -597,7 +605,7 @@ zfs_do_destroy(int argc, char **argv)
 		default:
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -607,15 +615,15 @@ zfs_do_destroy(int argc, char **argv)
 	/* check number of arguments */
 	if (argc == 0) {
 		(void) fprintf(stderr, gettext("missing path argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* Open the given dataset */
-	if ((zhp = zfs_open(argv[0], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
 		return (1);
 
 	cb.cb_target = zhp;
@@ -641,7 +649,7 @@ zfs_do_destroy(int argc, char **argv)
 	/*
 	 * Check for any dependents and/or clones.
 	 */
-	cb.cb_first = 1;
+	cb.cb_first = B_TRUE;
 	if (!cb.cb_doclones)
 		(void) zfs_iter_dependents(zhp, destroy_check_dependent, &cb);
 
@@ -678,13 +686,13 @@ zfs_do_destroy(int argc, char **argv)
  *  columns to display as well as which property types to allow.
  */
 typedef struct get_cbdata {
-	int cb_scripted;
 	int cb_sources;
-	int cb_literal;
 	int cb_columns[4];
-	zfs_prop_t cb_prop[ZFS_NPROP_ALL];
 	int cb_nprop;
-	int cb_isall;
+	boolean_t cb_scripted;
+	boolean_t cb_literal;
+	boolean_t cb_isall;
+	zfs_prop_t cb_prop[ZFS_NPROP_ALL];
 } get_cbdata_t;
 
 #define	GET_COL_NAME		1
@@ -804,7 +812,7 @@ static int
 zfs_do_get(int argc, char **argv)
 {
 	get_cbdata_t cb = { 0 };
-	int recurse = 0;
+	boolean_t recurse = B_FALSE;
 	int c;
 	char *value, *fields, *badopt;
 	int i;
@@ -823,18 +831,18 @@ zfs_do_get(int argc, char **argv)
 	while ((c = getopt(argc, argv, ":o:s:rHp")) != -1) {
 		switch (c) {
 		case 'p':
-			cb.cb_literal = TRUE;
+			cb.cb_literal = B_TRUE;
 			break;
 		case 'r':
-			recurse = TRUE;
+			recurse = B_TRUE;
 			break;
 		case 'H':
-			cb.cb_scripted = TRUE;
+			cb.cb_scripted = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case 'o':
 			/*
@@ -852,7 +860,7 @@ zfs_do_get(int argc, char **argv)
 					(void) fprintf(stderr, gettext("too "
 					    "many fields given to -o "
 					    "option\n"));
-					usage(FALSE);
+					usage(B_FALSE);
 				}
 
 				switch (getsubopt(&optarg, col_subopts,
@@ -873,7 +881,7 @@ zfs_do_get(int argc, char **argv)
 					(void) fprintf(stderr,
 					    gettext("invalid column name "
 					    "'%s'\n"), value);
-					    usage(FALSE);
+					    usage(B_FALSE);
 				}
 			}
 			break;
@@ -906,7 +914,7 @@ zfs_do_get(int argc, char **argv)
 					(void) fprintf(stderr,
 					    gettext("invalid source "
 					    "'%s'\n"), value);
-					    usage(FALSE);
+					    usage(B_FALSE);
 				}
 			}
 			break;
@@ -914,7 +922,7 @@ zfs_do_get(int argc, char **argv)
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -924,7 +932,7 @@ zfs_do_get(int argc, char **argv)
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing property "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	fields = argv[0];
@@ -935,7 +943,7 @@ zfs_do_get(int argc, char **argv)
 	 * given dataset.
 	 */
 	if (strcmp(fields, "all") == 0)
-		cb.cb_isall = TRUE;
+		cb.cb_isall = B_TRUE;
 
 	if ((ret = zfs_get_proplist(fields, cb.cb_prop, ZFS_NPROP_ALL,
 	    &cb.cb_nprop, &badopt)) != 0) {
@@ -945,7 +953,7 @@ zfs_do_get(int argc, char **argv)
 		else
 			(void) fprintf(stderr, gettext("too many properties "
 			    "specified\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	argc--;
@@ -954,7 +962,7 @@ zfs_do_get(int argc, char **argv)
 	/* check for at least one dataset name */
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing dataset argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/*
@@ -1008,7 +1016,7 @@ inherit_callback(zfs_handle_t *zhp, void *data)
 static int
 zfs_do_inherit(int argc, char **argv)
 {
-	int recurse = 0;
+	boolean_t recurse = B_FALSE;
 	int c;
 	zfs_prop_t prop;
 	char *propname;
@@ -1017,13 +1025,13 @@ zfs_do_inherit(int argc, char **argv)
 	while ((c = getopt(argc, argv, "r")) != -1) {
 		switch (c) {
 		case 'r':
-			recurse = TRUE;
+			recurse = B_TRUE;
 			break;
 		case '?':
 		default:
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -1033,11 +1041,11 @@ zfs_do_inherit(int argc, char **argv)
 	/* check number of arguments */
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing property argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing dataset argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	propname = argv[0];
@@ -1050,7 +1058,7 @@ zfs_do_inherit(int argc, char **argv)
 	if ((prop = zfs_name_to_prop(propname)) == ZFS_PROP_INVAL) {
 		(void) fprintf(stderr, gettext("invalid property '%s'\n"),
 		    propname);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (zfs_prop_readonly(prop)) {
 		(void) fprintf(stderr, gettext("%s property is read-only\n"),
@@ -1083,8 +1091,8 @@ zfs_do_inherit(int argc, char **argv)
  * '-r' is specified.
  */
 typedef struct list_cbdata {
-	int		cb_first;
-	int		cb_scripted;
+	boolean_t	cb_first;
+	boolean_t	cb_scripted;
 	zfs_prop_t	cb_fields[ZFS_NPROP_ALL];
 	int		cb_fieldcount;
 } list_cbdata_t;
@@ -1129,7 +1137,7 @@ print_dataset(zfs_handle_t *zhp, zfs_prop_t *fields, size_t count, int scripted)
 		}
 
 		if (zfs_prop_get(zhp, fields[i], property,
-		    sizeof (property), NULL, NULL, 0, FALSE) != 0)
+		    sizeof (property), NULL, NULL, 0, B_FALSE) != 0)
 			(void) strlcpy(property, "-", sizeof (property));
 
 		/*
@@ -1159,7 +1167,7 @@ list_callback(zfs_handle_t *zhp, void *data)
 	if (cbp->cb_first) {
 		if (!cbp->cb_scripted)
 			print_header(cbp->cb_fields, cbp->cb_fieldcount);
-		cbp->cb_first = FALSE;
+		cbp->cb_first = B_FALSE;
 	}
 
 	print_dataset(zhp, cbp->cb_fields, cbp->cb_fieldcount,
@@ -1172,8 +1180,8 @@ static int
 zfs_do_list(int argc, char **argv)
 {
 	int c;
-	int recurse = 0;
-	int scripted = FALSE;
+	boolean_t recurse = B_FALSE;
+	boolean_t scripted = B_FALSE;
 	static char default_fields[] =
 	    "name,used,available,referenced,mountpoint";
 	int types = ZFS_TYPE_ANY;
@@ -1193,10 +1201,10 @@ zfs_do_list(int argc, char **argv)
 			fields = optarg;
 			break;
 		case 'r':
-			recurse = TRUE;
+			recurse = B_TRUE;
 			break;
 		case 'H':
-			scripted = TRUE;
+			scripted = B_TRUE;
 			break;
 		case 't':
 			types = 0;
@@ -1216,19 +1224,19 @@ zfs_do_list(int argc, char **argv)
 					(void) fprintf(stderr,
 					    gettext("invalid type '%s'\n"),
 					    value);
-					usage(FALSE);
+					usage(B_FALSE);
 				}
 			}
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -1258,16 +1266,16 @@ zfs_do_list(int argc, char **argv)
 		else
 			(void) fprintf(stderr, gettext("too many properties "
 			    "specified\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	cb.cb_fieldcount += alloffset;
 	cb.cb_scripted = scripted;
-	cb.cb_first = TRUE;
+	cb.cb_first = B_TRUE;
 
 	ret = zfs_for_each(argc, argv, recurse, types, list_callback, &cb);
 
-	if (ret == 0 && cb.cb_first == TRUE)
+	if (ret == 0 && cb.cb_first)
 		(void) printf(gettext("no datasets available\n"));
 
 	return (ret);
@@ -1283,39 +1291,76 @@ static int
 zfs_do_rename(int argc, char **argv)
 {
 	zfs_handle_t *zhp;
-	int ret = 1;
+	int ret;
 
 	/* check options */
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* check number of arguments */
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing source dataset "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc < 3) {
 		(void) fprintf(stderr, gettext("missing target dataset "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 3) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
-	if ((zhp = zfs_open(argv[1], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[1], ZFS_TYPE_ANY)) == NULL)
 		return (1);
 
-	if (zfs_rename(zhp, argv[2]) != 0)
-		goto error;
+	ret = (zfs_rename(zhp, argv[2]) != 0);
 
-	ret = 0;
-error:
+	zfs_close(zhp);
+	return (ret);
+}
+
+/*
+ * zfs promote <fs>
+ *
+ * Promotes the given clone fs to be the parent
+ */
+/* ARGSUSED */
+static int
+zfs_do_promote(int argc, char **argv)
+{
+	zfs_handle_t *zhp;
+	int ret;
+
+	/* check options */
+	if (argc > 1 && argv[1][0] == '-') {
+		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+		    argv[1][1]);
+		usage(B_FALSE);
+	}
+
+	/* check number of arguments */
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("missing clone filesystem"
+		    "argument\n"));
+		usage(B_FALSE);
+	}
+	if (argc > 2) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(B_FALSE);
+	}
+
+	zhp = zfs_open(g_zfs, argv[1], ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
+	if (zhp == NULL)
+		return (1);
+
+	ret = (zfs_promote(zhp) != 0);
+
 	zfs_close(zhp);
 	return (ret);
 }
@@ -1333,12 +1378,12 @@ error:
  */
 typedef struct rollback_cbdata {
 	uint64_t	cb_create;
-	int		cb_first;
+	boolean_t	cb_first;
 	int		cb_doclones;
 	char		*cb_target;
 	int		cb_error;
-	int		cb_recurse;
-	int		cb_dependent;
+	boolean_t	cb_recurse;
+	boolean_t	cb_dependent;
 } rollback_cbdata_t;
 
 /*
@@ -1352,8 +1397,10 @@ rollback_check(zfs_handle_t *zhp, void *data)
 {
 	rollback_cbdata_t *cbp = data;
 
-	if (cbp->cb_doclones)
+	if (cbp->cb_doclones) {
+		zfs_close(zhp);
 		return (0);
+	}
 
 	if (!cbp->cb_dependent) {
 		if (strcmp(zfs_get_name(zhp), cbp->cb_target) != 0 &&
@@ -1374,10 +1421,10 @@ rollback_check(zfs_handle_t *zhp, void *data)
 			}
 
 			if (cbp->cb_recurse) {
-				cbp->cb_dependent = TRUE;
+				cbp->cb_dependent = B_TRUE;
 				(void) zfs_iter_dependents(zhp, rollback_check,
 				    cbp);
-				cbp->cb_dependent = FALSE;
+				cbp->cb_dependent = B_FALSE;
 			} else {
 				(void) fprintf(stderr, "%s\n",
 				    zfs_get_name(zhp));
@@ -1429,7 +1476,7 @@ zfs_do_rollback(int argc, char **argv)
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -1439,22 +1486,22 @@ zfs_do_rollback(int argc, char **argv)
 	/* check number of arguments */
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing dataset argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* open the snapshot */
-	if ((snap = zfs_open(argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((snap = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
 	/* open the parent dataset */
 	(void) strlcpy(parentname, argv[0], sizeof (parentname));
 	verify((delim = strrchr(parentname, '@')) != NULL);
 	*delim = '\0';
-	if ((zhp = zfs_open(parentname, ZFS_TYPE_ANY)) == NULL) {
+	if ((zhp = zfs_open(g_zfs, parentname, ZFS_TYPE_ANY)) == NULL) {
 		zfs_close(snap);
 		return (1);
 	}
@@ -1465,7 +1512,7 @@ zfs_do_rollback(int argc, char **argv)
 	 */
 	cb.cb_target = argv[0];
 	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
-	cb.cb_first = 1;
+	cb.cb_first = B_TRUE;
 	cb.cb_error = 0;
 	(void) zfs_iter_children(zhp, rollback_check, &cb);
 
@@ -1606,18 +1653,18 @@ zfs_do_set(int argc, char **argv)
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* check number of arguments */
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing property=value "
 		    "argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc < 3) {
 		(void) fprintf(stderr, gettext("missing dataset name\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* validate property=value argument */
@@ -1625,7 +1672,7 @@ zfs_do_set(int argc, char **argv)
 	if ((cb.cb_value = strchr(cb.cb_propname, '=')) == NULL) {
 		(void) fprintf(stderr, gettext("missing value in "
 		    "property=value argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	*cb.cb_value = '\0';
@@ -1634,12 +1681,12 @@ zfs_do_set(int argc, char **argv)
 	if (*cb.cb_propname == '\0') {
 		(void) fprintf(stderr,
 		    gettext("missing property in property=value argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (*cb.cb_value == '\0') {
 		(void) fprintf(stderr,
 		    gettext("missing value in property=value argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* get the property type */
@@ -1647,7 +1694,7 @@ zfs_do_set(int argc, char **argv)
 	    ZFS_PROP_INVAL) {
 		(void) fprintf(stderr,
 		    gettext("invalid property '%s'\n"), cb.cb_propname);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/*
@@ -1655,10 +1702,10 @@ zfs_do_set(int argc, char **argv)
 	 * once now so we don't generate multiple errors each time we try to
 	 * apply it to a dataset.
 	 */
-	if (zfs_prop_validate(cb.cb_prop, cb.cb_value, NULL) != 0)
+	if (zfs_prop_validate(g_zfs, cb.cb_prop, cb.cb_value, NULL) != 0)
 		return (1);
 
-	return (zfs_for_each(argc - 2, argv + 2, FALSE,
+	return (zfs_for_each(argc - 2, argv + 2, B_FALSE,
 	    ZFS_TYPE_ANY, set_callback, &cb));
 }
 
@@ -1675,20 +1722,20 @@ zfs_do_snapshot(int argc, char **argv)
 	if (argc > 1 && argv[1][0] == '-') {
 		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 		    argv[1][1]);
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	/* check number of arguments */
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing snapshot argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 2) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
-	return (zfs_snapshot(argv[1]) != 0);
+	return (zfs_snapshot(g_zfs, argv[1]) != 0);
 }
 
 /*
@@ -1712,12 +1759,12 @@ zfs_do_send(int argc, char **argv)
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -1727,11 +1774,11 @@ zfs_do_send(int argc, char **argv)
 	/* check number of arguments */
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing snapshot argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	if (isatty(STDOUT_FILENO)) {
@@ -1743,10 +1790,11 @@ zfs_do_send(int argc, char **argv)
 	}
 
 	if (fromname) {
-		if ((zhp_from = zfs_open(fromname, ZFS_TYPE_SNAPSHOT)) == NULL)
+		if ((zhp_from = zfs_open(g_zfs, fromname,
+		    ZFS_TYPE_SNAPSHOT)) == NULL)
 			return (1);
 	}
-	if ((zhp_to = zfs_open(argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zhp_to = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
 	err = zfs_send(zhp_to, zhp_from);
@@ -1767,31 +1815,31 @@ static int
 zfs_do_receive(int argc, char **argv)
 {
 	int c, err;
-	int isprefix = FALSE;
-	int dryrun = FALSE;
-	int verbose = FALSE;
+	boolean_t isprefix = B_FALSE;
+	boolean_t dryrun = B_FALSE;
+	boolean_t verbose = B_FALSE;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":dnv")) != -1) {
 		switch (c) {
 		case 'd':
-			isprefix = TRUE;
+			isprefix = B_TRUE;
 			break;
 		case 'n':
-			dryrun = TRUE;
+			dryrun = B_TRUE;
 			break;
 		case 'v':
-			verbose = TRUE;
+			verbose = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -1801,11 +1849,11 @@ zfs_do_receive(int argc, char **argv)
 	/* check number of arguments */
 	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing snapshot argument\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	if (isatty(STDIN_FILENO)) {
@@ -1816,7 +1864,7 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(argv[0], isprefix, verbose, dryrun);
+	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun);
 	return (err != 0);
 }
 
@@ -1868,7 +1916,7 @@ get_all_filesystems(zfs_handle_t ***fslist, size_t *count)
 {
 	get_all_cbdata_t cb = { 0 };
 
-	(void) zfs_iter_root(get_one_filesystem, &cb);
+	(void) zfs_iter_root(g_zfs, get_one_filesystem, &cb);
 
 	*fslist = cb.cb_handles;
 	*count = cb.cb_used;
@@ -1883,9 +1931,9 @@ mountpoint_compare(const void *a, const void *b)
 	char mountb[MAXPATHLEN];
 
 	verify(zfs_prop_get(*za, ZFS_PROP_MOUNTPOINT, mounta,
-	    sizeof (mounta), NULL, NULL, 0, FALSE) == 0);
+	    sizeof (mounta), NULL, NULL, 0, B_FALSE) == 0);
 	verify(zfs_prop_get(*zb, ZFS_PROP_MOUNTPOINT, mountb,
-	    sizeof (mountb), NULL, NULL, 0, FALSE) == 0);
+	    sizeof (mountb), NULL, NULL, 0, B_FALSE) == 0);
 
 	return (strcmp(mounta, mountb));
 }
@@ -1953,9 +2001,9 @@ share_mount_callback(zfs_handle_t *zhp, void *data)
 	 * with a legacy mountpoint, or those with legacy share options.
 	 */
 	verify(zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
-	    sizeof (mountpoint), NULL, NULL, 0, FALSE) == 0);
+	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE) == 0);
 	verify(zfs_prop_get(zhp, ZFS_PROP_SHARENFS, shareopts,
-	    sizeof (shareopts), NULL, NULL, 0, FALSE) == 0);
+	    sizeof (shareopts), NULL, NULL, 0, B_FALSE) == 0);
 
 	if (cbp->cb_type == OP_SHARE) {
 		if (strcmp(shareopts, "off") == 0) {
@@ -2080,12 +2128,12 @@ share_or_mount(int type, int argc, char **argv)
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -2099,7 +2147,7 @@ share_or_mount(int type, int argc, char **argv)
 
 		if (argc != 0) {
 			(void) fprintf(stderr, gettext("too many arguments\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 
 		get_all_filesystems(&fslist, &count);
@@ -2124,7 +2172,7 @@ share_or_mount(int type, int argc, char **argv)
 		if (type == OP_SHARE) {
 			(void) fprintf(stderr, gettext("missing filesystem "
 			    "argument\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 
 		/*
@@ -2149,13 +2197,14 @@ share_or_mount(int type, int argc, char **argv)
 		if (argc > 1) {
 			(void) fprintf(stderr,
 			    gettext("too many arguments\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 
-		if ((zhp = zfs_open(argv[0], ZFS_TYPE_FILESYSTEM)) == NULL)
+		if ((zhp = zfs_open(g_zfs, argv[0],
+		    ZFS_TYPE_FILESYSTEM)) == NULL)
 			ret = 1;
 		else {
-			cb.cb_explicit = TRUE;
+			cb.cb_explicit = B_TRUE;
 			ret = share_mount_callback(zhp, &cb);
 			zfs_close(zhp);
 		}
@@ -2210,7 +2259,7 @@ unshare_unmount_compare(const void *larg, const void *rarg, void *unused)
  * and unmount it appropriately.
  */
 static int
-unshare_unmount_path(int type, char *path, int flags, int is_manual)
+unshare_unmount_path(int type, char *path, int flags, boolean_t is_manual)
 {
 	zfs_handle_t *zhp;
 	int ret;
@@ -2252,12 +2301,13 @@ unshare_unmount_path(int type, char *path, int flags, int is_manual)
 		return (1);
 	}
 
-	if ((zhp = zfs_open(entry.mnt_special, ZFS_TYPE_FILESYSTEM)) == NULL)
+	if ((zhp = zfs_open(g_zfs, entry.mnt_special,
+	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (1);
 
 	verify(zfs_prop_get(zhp, type == OP_SHARE ?
 		ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT, property,
-		sizeof (property), NULL, NULL, 0, FALSE) == 0);
+		sizeof (property), NULL, NULL, 0, B_FALSE) == 0);
 
 	if (type == OP_SHARE) {
 		if (strcmp(property, "off") == 0) {
@@ -2318,7 +2368,7 @@ unshare_unmount(int type, int argc, char **argv)
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
@@ -2329,7 +2379,7 @@ unshare_unmount(int type, int argc, char **argv)
 	if (do_all) {
 		if (argc != 0) {
 			(void) fprintf(stderr, gettext("too many arguments\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	} else if (argc != 1) {
 		if (argc == 0)
@@ -2338,7 +2388,7 @@ unshare_unmount(int type, int argc, char **argv)
 		else
 			(void) fprintf(stderr,
 			    gettext("too many arguments\n"));
-		usage(FALSE);
+		usage(B_FALSE);
 	}
 
 	if (do_all) {
@@ -2390,7 +2440,7 @@ unshare_unmount(int type, int argc, char **argv)
 			if (strchr(entry.mnt_special, '@') != NULL)
 				continue;
 
-			if ((zhp = zfs_open(entry.mnt_special,
+			if ((zhp = zfs_open(g_zfs, entry.mnt_special,
 			    ZFS_TYPE_FILESYSTEM)) == NULL) {
 				ret = 1;
 				continue;
@@ -2399,7 +2449,7 @@ unshare_unmount(int type, int argc, char **argv)
 			verify(zfs_prop_get(zhp, type == OP_SHARE ?
 			    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT,
 			    property, sizeof (property), NULL, NULL,
-			    0, FALSE) == 0);
+			    0, B_FALSE) == 0);
 
 			/* Ignore legacy mounts and shares */
 			if ((type == OP_SHARE &&
@@ -2476,14 +2526,15 @@ unshare_unmount(int type, int argc, char **argv)
 		 */
 		if (argv[0][0] == '/')
 			return (unshare_unmount_path(type, argv[0],
-				flags, FALSE));
+				flags, B_FALSE));
 
-		if ((zhp = zfs_open(argv[0], ZFS_TYPE_FILESYSTEM)) == NULL)
+		if ((zhp = zfs_open(g_zfs, argv[0],
+		    ZFS_TYPE_FILESYSTEM)) == NULL)
 			return (1);
 
 		verify(zfs_prop_get(zhp, type == OP_SHARE ?
 		    ZFS_PROP_SHARENFS : ZFS_PROP_MOUNTPOINT, property,
-		    sizeof (property), NULL, NULL, 0, FALSE) == 0);
+		    sizeof (property), NULL, NULL, 0, B_FALSE) == 0);
 
 		switch (type) {
 		case OP_SHARE:
@@ -2581,7 +2632,7 @@ manual_mount(int argc, char **argv)
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
 			    "'%c' option\n"), optopt);
-			usage(FALSE);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -2613,11 +2664,11 @@ manual_mount(int argc, char **argv)
 	path = argv[1];
 
 	/* try to open the dataset */
-	if ((zhp = zfs_open(dataset, ZFS_TYPE_FILESYSTEM)) == NULL)
+	if ((zhp = zfs_open(g_zfs, dataset, ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (1);
 
 	(void) zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mountpoint,
-	    sizeof (mountpoint), NULL, NULL, 0, FALSE);
+	    sizeof (mountpoint), NULL, NULL, 0, B_FALSE);
 
 	/* check for legacy mountpoint and complain appropriately */
 	ret = 0;
@@ -2683,7 +2734,7 @@ manual_unmount(int argc, char **argv)
 		return (2);
 	}
 
-	return (unshare_unmount_path(OP_MOUNT, argv[0], flags, TRUE));
+	return (unshare_unmount_path(OP_MOUNT, argv[0], flags, B_TRUE));
 }
 
 static int
@@ -2702,9 +2753,9 @@ volcheck(zpool_handle_t *zhp, void *data)
  * links, depending on the value of 'isinit'.
  */
 static int
-do_volcheck(int isinit)
+do_volcheck(boolean_t isinit)
 {
-	return (zpool_iter(volcheck, (void *)isinit) ? 1 : 0);
+	return (zpool_iter(g_zfs, volcheck, (void *)isinit) ? 1 : 0);
 }
 
 int
@@ -2719,6 +2770,14 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	opterr = 0;
+
+	if ((g_zfs = libzfs_init()) == NULL) {
+		(void) fprintf(stderr, gettext("internal error: failed to "
+		    "initialize ZFS library\n"));
+		return (1);
+	}
+
+	libzfs_print_on_error(g_zfs, B_TRUE);
 
 	if ((mnttab_file = fopen(MNTTAB, "r")) == NULL) {
 		(void) fprintf(stderr, gettext("internal error: unable to "
@@ -2741,7 +2800,7 @@ main(int argc, char **argv)
 		 */
 		if (argc < 2) {
 			(void) fprintf(stderr, gettext("missing command\n"));
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 
 		cmdname = argv[1];
@@ -2762,16 +2821,16 @@ main(int argc, char **argv)
 		 * Special case '-?'
 		 */
 		if (strcmp(cmdname, "-?") == 0)
-			usage(TRUE);
+			usage(B_TRUE);
 
 		/*
 		 * 'volinit' and 'volfini' do not appear in the usage message,
 		 * so we have to special case them here.
 		 */
 		if (strcmp(cmdname, "volinit") == 0)
-			return (do_volcheck(TRUE));
+			return (do_volcheck(B_TRUE));
 		else if (strcmp(cmdname, "volfini") == 0)
-			return (do_volcheck(FALSE));
+			return (do_volcheck(B_FALSE));
 
 		/*
 		 * Run the appropriate command.
@@ -2790,11 +2849,13 @@ main(int argc, char **argv)
 		if (i == NCOMMAND) {
 			(void) fprintf(stderr, gettext("unrecognized "
 			    "command '%s'\n"), cmdname);
-			usage(FALSE);
+			usage(B_FALSE);
 		}
 	}
 
 	(void) fclose(mnttab_file);
+
+	libzfs_fini(g_zfs);
 
 	/*
 	 * The 'ZFS_ABORT' environment variable causes us to dump core on exit

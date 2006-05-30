@@ -43,90 +43,320 @@
 
 #include "libzfs_impl.h"
 
-static int zfs_fd = -1;
-static FILE *mnttab_file;
-static FILE *sharetab_file;
-static int sharetab_opened;
+int
+libzfs_errno(libzfs_handle_t *hdl)
+{
+	return (hdl->libzfs_error);
+}
 
-void (*error_func)(const char *, va_list);
+const char *
+libzfs_error_action(libzfs_handle_t *hdl)
+{
+	return (hdl->libzfs_action);
+}
 
-/*
- * All error handling is kept within libzfs where we have the most information
- * immediately available.  While this may not be suitable for a general purpose
- * library, it greatly simplifies our commands.  This command name is used to
- * prefix all error messages appropriately.
- */
+const char *
+libzfs_error_description(libzfs_handle_t *hdl)
+{
+	if (hdl->libzfs_desc[0] != '\0')
+		return (hdl->libzfs_desc);
+
+	switch (hdl->libzfs_error) {
+	case EZFS_NOMEM:
+		return (dgettext(TEXT_DOMAIN, "out of memory"));
+	case EZFS_BADPROP:
+		return (dgettext(TEXT_DOMAIN, "invalid property value"));
+	case EZFS_PROPREADONLY:
+		return (dgettext(TEXT_DOMAIN, "read only property"));
+	case EZFS_PROPTYPE:
+		return (dgettext(TEXT_DOMAIN, "property doesn't apply to "
+		    "datasets of this type"));
+	case EZFS_PROPNONINHERIT:
+		return (dgettext(TEXT_DOMAIN, "property cannot be inherited"));
+	case EZFS_PROPSPACE:
+		return (dgettext(TEXT_DOMAIN, "invalid quota or reservation"));
+	case EZFS_BADTYPE:
+		return (dgettext(TEXT_DOMAIN, "operation not applicable to "
+		    "datasets of this type"));
+	case EZFS_BUSY:
+		return (dgettext(TEXT_DOMAIN, "pool or dataset is busy"));
+	case EZFS_EXISTS:
+		return (dgettext(TEXT_DOMAIN, "pool or dataset exists"));
+	case EZFS_NOENT:
+		return (dgettext(TEXT_DOMAIN, "no such pool or dataset"));
+	case EZFS_BADSTREAM:
+		return (dgettext(TEXT_DOMAIN, "invalid backup stream"));
+	case EZFS_DSREADONLY:
+		return (dgettext(TEXT_DOMAIN, "dataset is read only"));
+	case EZFS_VOLTOOBIG:
+		return (dgettext(TEXT_DOMAIN, "volume size exceeds limit for "
+		    "this system"));
+	case EZFS_VOLHASDATA:
+		return (dgettext(TEXT_DOMAIN, "volume has data"));
+	case EZFS_INVALIDNAME:
+		return (dgettext(TEXT_DOMAIN, "invalid name"));
+	case EZFS_BADRESTORE:
+		return (dgettext(TEXT_DOMAIN, "unable to restore to "
+		    "destination"));
+	case EZFS_BADBACKUP:
+		return (dgettext(TEXT_DOMAIN, "backup failed"));
+	case EZFS_BADTARGET:
+		return (dgettext(TEXT_DOMAIN, "invalid target vdev"));
+	case EZFS_NODEVICE:
+		return (dgettext(TEXT_DOMAIN, "no such device in pool"));
+	case EZFS_BADDEV:
+		return (dgettext(TEXT_DOMAIN, "invalid device"));
+	case EZFS_NOREPLICAS:
+		return (dgettext(TEXT_DOMAIN, "no valid replicas"));
+	case EZFS_RESILVERING:
+		return (dgettext(TEXT_DOMAIN, "currently resilvering"));
+	case EZFS_BADVERSION:
+		return (dgettext(TEXT_DOMAIN, "unsupported version"));
+	case EZFS_POOLUNAVAIL:
+		return (dgettext(TEXT_DOMAIN, "pool is unavailable"));
+	case EZFS_DEVOVERFLOW:
+		return (dgettext(TEXT_DOMAIN, "too many devices in one vdev"));
+	case EZFS_BADPATH:
+		return (dgettext(TEXT_DOMAIN, "must be an absolute path"));
+	case EZFS_CROSSTARGET:
+		return (dgettext(TEXT_DOMAIN, "operation crosses datasets or "
+		    "pools"));
+	case EZFS_ZONED:
+		return (dgettext(TEXT_DOMAIN, "dataset in use by local zone"));
+	case EZFS_MOUNTFAILED:
+		return (dgettext(TEXT_DOMAIN, "mount failed"));
+	case EZFS_UMOUNTFAILED:
+		return (dgettext(TEXT_DOMAIN, "umount failed"));
+	case EZFS_UNSHAREFAILED:
+		return (dgettext(TEXT_DOMAIN, "unshare(1M) failed"));
+	case EZFS_SHAREFAILED:
+		return (dgettext(TEXT_DOMAIN, "share(1M) failed"));
+	case EZFS_DEVLINKS:
+		return (dgettext(TEXT_DOMAIN, "failed to create /dev links"));
+	case EZFS_PERM:
+		return (dgettext(TEXT_DOMAIN, "permission denied"));
+	case EZFS_NOSPC:
+		return (dgettext(TEXT_DOMAIN, "out of space"));
+	case EZFS_IO:
+		return (dgettext(TEXT_DOMAIN, "I/O error"));
+	case EZFS_INTR:
+		return (dgettext(TEXT_DOMAIN, "signal received"));
+	case EZFS_ISSPARE:
+		return (dgettext(TEXT_DOMAIN, "device is reserved as a hot "
+		    "spare"));
+	case EZFS_INVALCONFIG:
+		return (dgettext(TEXT_DOMAIN, "invalid vdev configuration"));
+	case EZFS_UNKNOWN:
+		return (dgettext(TEXT_DOMAIN, "unknown error"));
+	default:
+		abort();
+	}
+
+	/* NOTREACHED */
+}
+
+/*PRINTFLIKE2*/
 void
-zfs_error(const char *fmt, ...)
+zfs_error_aux(libzfs_handle_t *hdl, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
 
-	if (error_func != NULL) {
-		error_func(fmt, ap);
-	} else {
-		(void) vfprintf(stderr, fmt, ap);
-		(void) fprintf(stderr, "\n");
-	}
+	(void) vsnprintf(hdl->libzfs_desc, sizeof (hdl->libzfs_desc),
+	    fmt, ap);
+	hdl->libzfs_desc_active = 1;
 
 	va_end(ap);
 }
 
-/*
- * An internal error is something that we cannot recover from, and should never
- * happen (such as running out of memory).  It should only be used in
- * exceptional circumstances.
- */
-void
-zfs_fatal(const char *fmt, ...)
+static void
+zfs_verror(libzfs_handle_t *hdl, int error, const char *fmt, va_list ap)
+{
+	(void) vsnprintf(hdl->libzfs_action, sizeof (hdl->libzfs_action),
+	    fmt, ap);
+	hdl->libzfs_error = error;
+
+	if (hdl->libzfs_desc_active)
+		hdl->libzfs_desc_active = 0;
+	else
+		hdl->libzfs_desc[0] = '\0';
+
+	if (hdl->libzfs_printerr) {
+		if (error == EZFS_UNKNOWN) {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "internal "
+			    "error: %s\n"), libzfs_error_description(hdl));
+			abort();
+		}
+
+		(void) fprintf(stderr, "%s: %s\n", hdl->libzfs_action,
+		    libzfs_error_description(hdl));
+		if (error == EZFS_NOMEM)
+			exit(1);
+	}
+}
+
+/*PRINTFLIKE3*/
+int
+zfs_error(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
 
-	if (error_func != NULL) {
-		error_func(fmt, ap);
-	} else {
-		(void) vfprintf(stderr, fmt, ap);
-		(void) fprintf(stderr, "\n");
-	}
+	zfs_verror(hdl, error, fmt, ap);
 
 	va_end(ap);
 
-	exit(1);
+	return (-1);
 }
 
-/*
- * Consumers (such as the JNI interface) that need to capture error output can
- * override the default error handler using this function.
- */
-void
-zfs_set_error_handler(void (*func)(const char *, va_list))
+static int
+zfs_common_error(libzfs_handle_t *hdl, int error, const char *fmt,
+    va_list ap)
 {
-	error_func = func;
+	switch (error) {
+	case EPERM:
+	case EACCES:
+		zfs_verror(hdl, EZFS_PERM, fmt, ap);
+		return (-1);
+
+	case EIO:
+		zfs_verror(hdl, EZFS_IO, fmt, ap);
+		return (-1);
+
+	case EINTR:
+		zfs_verror(hdl, EZFS_INTR, fmt, ap);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*PRINTFLIKE3*/
+int
+zfs_standard_error(libzfs_handle_t *hdl, int error, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	if (zfs_common_error(hdl, error, fmt, ap) != 0) {
+		va_end(ap);
+		return (-1);
+	}
+
+
+	switch (error) {
+	case ENXIO:
+		zfs_verror(hdl, EZFS_IO, fmt, ap);
+		break;
+
+	case ENOENT:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "dataset does not exist"));
+		zfs_verror(hdl, EZFS_NOENT, fmt, ap);
+		break;
+
+	case ENOSPC:
+	case EDQUOT:
+		zfs_verror(hdl, EZFS_NOSPC, fmt, ap);
+		return (-1);
+
+	case EEXIST:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "dataset already exists"));
+		zfs_verror(hdl, EZFS_EXISTS, fmt, ap);
+		break;
+
+	case EBUSY:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "dataset is busy"));
+		zfs_verror(hdl, EZFS_BUSY, fmt, ap);
+		break;
+
+	default:
+		zfs_error_aux(hdl, strerror(errno));
+		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
+		break;
+	}
+
+	va_end(ap);
+	return (-1);
+}
+
+/*PRINTFLIKE3*/
+int
+zpool_standard_error(libzfs_handle_t *hdl, int error, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	if (zfs_common_error(hdl, error, fmt, ap) != 0) {
+		va_end(ap);
+		return (-1);
+	}
+
+	switch (error) {
+	case ENODEV:
+		zfs_verror(hdl, EZFS_NODEVICE, fmt, ap);
+		break;
+
+	case ENOENT:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "no such pool"));
+		zfs_verror(hdl, EZFS_NOENT, fmt, ap);
+		break;
+
+	case EEXIST:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "pool already exists"));
+		zfs_verror(hdl, EZFS_EXISTS, fmt, ap);
+		break;
+
+	case EBUSY:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "pool is busy"));
+		zfs_verror(hdl, EZFS_EXISTS, fmt, ap);
+		break;
+
+	case ENXIO:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "one or more devices is currently unavailable"));
+		zfs_verror(hdl, EZFS_BADDEV, fmt, ap);
+		break;
+
+	case ENAMETOOLONG:
+		zfs_verror(hdl, EZFS_DEVOVERFLOW, fmt, ap);
+		break;
+
+	default:
+		zfs_error_aux(hdl, strerror(error));
+		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
+	}
+
+	va_end(ap);
+	return (-1);
 }
 
 /*
  * Display an out of memory error message and abort the current program.
  */
-void
-no_memory(void)
+int
+no_memory(libzfs_handle_t *hdl)
 {
-	assert(errno == ENOMEM);
-	zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: out of memory\n"));
+	return (zfs_error(hdl, EZFS_NOMEM, "internal error"));
 }
 
 /*
  * A safe form of malloc() which will die if the allocation fails.
  */
 void *
-zfs_malloc(size_t size)
+zfs_alloc(libzfs_handle_t *hdl, size_t size)
 {
 	void *data;
 
 	if ((data = calloc(1, size)) == NULL)
-		no_memory();
+		(void) no_memory(hdl);
 
 	return (data);
 }
@@ -135,66 +365,14 @@ zfs_malloc(size_t size)
  * A safe form of strdup() which will die if the allocation fails.
  */
 char *
-zfs_strdup(const char *str)
+zfs_strdup(libzfs_handle_t *hdl, const char *str)
 {
 	char *ret;
 
 	if ((ret = strdup(str)) == NULL)
-		no_memory();
+		(void) no_memory(hdl);
 
 	return (ret);
-}
-
-/*
- * Utility functions around common used files - /dev/zfs, /etc/mnttab, and
- * /etc/dfs/sharetab.
- */
-int
-zfs_ioctl(int cmd, zfs_cmd_t *zc)
-{
-	if (zfs_fd == -1 &&
-	    (zfs_fd = open(ZFS_DEV, O_RDWR)) < 0)
-		zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: unable to "
-		    "open ZFS device\n"), MNTTAB);
-
-	return (ioctl(zfs_fd, cmd, zc));
-}
-
-FILE *
-zfs_mnttab(void)
-{
-	if (mnttab_file == NULL &&
-	    (mnttab_file = fopen(MNTTAB, "r")) == NULL)
-		zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: unable to "
-		    "open %s\n"), MNTTAB);
-
-	return (mnttab_file);
-}
-
-FILE *
-zfs_sharetab(void)
-{
-	if (sharetab_opened)
-		return (sharetab_file);
-
-	sharetab_opened = TRUE;
-	return (sharetab_file = fopen("/etc/dfs/sharetab", "r"));
-}
-
-/*
- * Cleanup function for library.  Close any file descriptors that were
- * opened as part of the above functions.
- */
-#pragma fini(zfs_fini)
-void
-zfs_fini(void)
-{
-	if (zfs_fd != -1)
-		(void) close(zfs_fd);
-	if (sharetab_file)
-		(void) fclose(sharetab_file);
-	if (mnttab_file)
-		(void) fclose(mnttab_file);
 }
 
 /*
@@ -240,4 +418,59 @@ zfs_nicenum(uint64_t num, char *buf, size_t buflen)
 				break;
 		}
 	}
+}
+
+void
+libzfs_print_on_error(libzfs_handle_t *hdl, boolean_t printerr)
+{
+	hdl->libzfs_printerr = printerr;
+}
+
+libzfs_handle_t *
+libzfs_init(void)
+{
+	libzfs_handle_t *hdl;
+
+	if ((hdl = calloc(sizeof (libzfs_handle_t), 1)) == NULL) {
+		return (NULL);
+	}
+
+	if ((hdl->libzfs_fd = open(ZFS_DEV, O_RDWR)) == NULL) {
+		free(hdl);
+		return (NULL);
+	}
+
+	if ((hdl->libzfs_mnttab = fopen(MNTTAB, "r")) == NULL) {
+		(void) close(hdl->libzfs_fd);
+		free(hdl);
+		return (NULL);
+	}
+
+	hdl->libzfs_sharetab = fopen("/etc/dfs/sharetab", "r");
+
+	return (hdl);
+}
+
+void
+libzfs_fini(libzfs_handle_t *hdl)
+{
+	(void) close(hdl->libzfs_fd);
+	if (hdl->libzfs_mnttab)
+		(void) fclose(hdl->libzfs_mnttab);
+	if (hdl->libzfs_sharetab)
+		(void) fclose(hdl->libzfs_sharetab);
+	namespace_clear(hdl);
+	free(hdl);
+}
+
+libzfs_handle_t *
+zpool_get_handle(zpool_handle_t *zhp)
+{
+	return (zhp->zpool_hdl);
+}
+
+libzfs_handle_t *
+zfs_get_handle(zfs_handle_t *zhp)
+{
+	return (zhp->zfs_hdl);
 }

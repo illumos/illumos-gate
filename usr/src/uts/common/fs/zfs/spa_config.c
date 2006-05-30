@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -279,7 +280,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_VERSION,
-	    spa->spa_uberblock.ub_version) == 0);
+	    spa_version(spa)) == 0);
 	VERIFY(nvlist_add_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    spa_name(spa)) == 0);
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_POOL_STATE,
@@ -294,10 +295,13 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 		    vd->vdev_top->vdev_guid) == 0);
 		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_GUID,
 		    vd->vdev_guid) == 0);
+		if (vd->vdev_isspare)
+			VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_IS_SPARE,
+			    1ULL) == 0);
 		vd = vd->vdev_top;		/* label contains top config */
 	}
 
-	nvroot = vdev_config_generate(vd, getstats);
+	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE);
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);
 

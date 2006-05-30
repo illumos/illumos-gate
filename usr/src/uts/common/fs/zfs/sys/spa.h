@@ -232,7 +232,11 @@ typedef struct blkptr {
 
 #define	BP_GET_ASIZE(bp)	\
 	(DVA_GET_ASIZE(&(bp)->blk_dva[0]) + DVA_GET_ASIZE(&(bp)->blk_dva[1]) + \
-	DVA_GET_ASIZE(&(bp)->blk_dva[2]))
+		DVA_GET_ASIZE(&(bp)->blk_dva[2]))
+
+#define	BP_GET_UCSIZE(bp) \
+	((BP_GET_LEVEL(bp) > 0 || dmu_ot[BP_GET_TYPE(bp)].ot_metadata) ? \
+	BP_GET_PSIZE(bp) : BP_GET_LSIZE(bp));
 
 #define	BP_GET_NDVAS(bp)	\
 	(!!DVA_GET_ASIZE(&(bp)->blk_dva[0]) + \
@@ -326,7 +330,13 @@ extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
 extern int spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot,
     int replacing);
 extern int spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done);
+extern int spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
+
+/* spare state (which is global across all pools) */
+extern void spa_spare_add(uint64_t guid);
+extern void spa_spare_remove(uint64_t guid);
+extern boolean_t spa_spare_inuse(uint64_t guid);
 
 /* scrubbing */
 extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);
@@ -390,12 +400,14 @@ extern char *spa_name(spa_t *spa);
 extern uint64_t spa_guid(spa_t *spa);
 extern uint64_t spa_last_synced_txg(spa_t *spa);
 extern uint64_t spa_first_txg(spa_t *spa);
+extern uint64_t spa_version(spa_t *spa);
 extern int spa_state(spa_t *spa);
 extern uint64_t spa_freeze_txg(spa_t *spa);
 struct metaslab_class;
 extern struct metaslab_class *spa_metaslab_class_select(spa_t *spa);
 extern uint64_t spa_get_alloc(spa_t *spa);
 extern uint64_t spa_get_space(spa_t *spa);
+extern uint64_t spa_get_dspace(spa_t *spa);
 extern uint64_t spa_get_asize(spa_t *spa, uint64_t lsize);
 extern uint64_t spa_version(spa_t *spa);
 extern int spa_max_replication(spa_t *spa);
@@ -412,6 +424,8 @@ extern void spa_freeze(spa_t *spa);
 extern void spa_upgrade(spa_t *spa);
 extern void spa_evict_all(void);
 extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid);
+extern boolean_t spa_has_spare(spa_t *, uint64_t guid);
+extern uint64_t bp_get_dasize(spa_t *spa, const blkptr_t *bp);
 
 /* error handling */
 struct zbookmark;

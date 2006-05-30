@@ -35,6 +35,8 @@
 #include "libzfs_jni_diskmgt.h"
 #include "libzfs_jni_disk.h"
 
+libzfs_handle_t *g_zfs;
+
 /*
  * Function prototypes
  */
@@ -46,14 +48,14 @@ static void init();
  * Static functions
  */
 
-char libzfs_err[1024];
+char libdskmgt_err[1024];
 static void
 handle_error(const char *fmt, va_list ap)
 {
 	/* Save the error message in case it's needed */
-	(void) vsnprintf(libzfs_err, sizeof (libzfs_err), fmt, ap);
+	(void) vsnprintf(libdskmgt_err, sizeof (libdskmgt_err), fmt, ap);
 #ifdef	DEBUG
-	(void) fprintf(stderr, "caught error: %s\n", libzfs_err);
+	(void) fprintf(stderr, "caught error: %s\n", libdskmgt_err);
 #endif
 }
 
@@ -64,10 +66,8 @@ handle_error(const char *fmt, va_list ap)
 static void
 init()
 {
-	libzfs_err[0] = '\0';
-
-	/* libzfs error handler */
-	zfs_set_error_handler(handle_error);
+	if ((g_zfs = libzfs_init()) == NULL)
+		abort();
 
 	/* diskmgt.o error handler */
 	dmgt_set_error_handler(handle_error);
@@ -151,7 +151,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getPools(JNIEnv *env, jobject obj)
 	data.env = env;
 	data.list = (zjni_Collection_t *)list;
 
-	result = zpool_iter(zjni_create_add_Pool, &data);
+	result = zpool_iter(g_zfs, zjni_create_add_Pool, &data);
 	if (result && (*env)->ExceptionOccurred(env) != NULL) {
 		/* Must not call any more Java methods to preserve exception */
 		return (NULL);
@@ -334,7 +334,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevice(JNIEnv *env,
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env, poolUTF,
 		    NULL);
-		zpool_handle_t *zhp = zpool_open_canfail(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(g_zfs, pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		if (zhp != NULL) {
@@ -371,7 +371,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env, poolUTF,
 		    NULL);
-		zpool_handle_t *zhp = zpool_open_canfail(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(g_zfs, pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		/* Is the pool valid? */
@@ -408,7 +408,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 	if (poolUTF != NULL) {
 		const char *pool = (*env)->GetStringUTFChars(env,
 		    poolUTF, NULL);
-		zpool_handle_t *zhp = zpool_open_canfail(pool);
+		zpool_handle_t *zhp = zpool_open_canfail(g_zfs, pool);
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		/* Is the pool valid? */
@@ -446,7 +446,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getAvailableDisks(JNIEnv *env,
 	error = dmgt_avail_disk_iter(zjni_create_add_DiskDevice, &data);
 
 	if (error) {
-		zjni_throw_exception(env, "%s", libzfs_err);
+		zjni_throw_exception(env, "%s", libdskmgt_err);
 	} else {
 		array = zjni_Collection_to_array(
 		    env, (zjni_Collection_t *)list,

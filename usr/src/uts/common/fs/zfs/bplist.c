@@ -45,12 +45,13 @@ bplist_hold(bplist_t *bpl)
 uint64_t
 bplist_create(objset_t *mos, int blocksize, dmu_tx_t *tx)
 {
-	uint64_t obj;
+	int size;
 
-	obj = dmu_object_alloc(mos, DMU_OT_BPLIST, blocksize,
-	    DMU_OT_BPLIST_HDR, sizeof (bplist_phys_t), tx);
+	size = spa_version(dmu_objset_spa(mos)) < ZFS_VERSION_BPLIST_ACCOUNT ?
+	    BPLIST_SIZE_V0 : sizeof (bplist_phys_t);
 
-	return (obj);
+	return (dmu_object_alloc(mos, DMU_OT_BPLIST, blocksize,
+	    DMU_OT_BPLIST_HDR, size, tx));
 }
 
 void
@@ -76,11 +77,14 @@ bplist_open(bplist_t *bpl, objset_t *mos, uint64_t object)
 	ASSERT(bpl->bpl_cached_dbuf == NULL);
 	ASSERT(bpl->bpl_queue == NULL);
 	ASSERT(object != 0);
+	ASSERT3U(doi.doi_type, ==, DMU_OT_BPLIST);
+	ASSERT3U(doi.doi_bonus_type, ==, DMU_OT_BPLIST_HDR);
 
 	bpl->bpl_mos = mos;
 	bpl->bpl_object = object;
 	bpl->bpl_blockshift = highbit(doi.doi_data_block_size - 1);
 	bpl->bpl_bpshift = bpl->bpl_blockshift - SPA_BLKPTRSHIFT;
+	bpl->bpl_havecomp = (doi.doi_bonus_size == sizeof (bplist_phys_t));
 
 	mutex_exit(&bpl->bpl_lock);
 	return (0);
@@ -210,7 +214,12 @@ bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx)
 
 	dmu_buf_will_dirty(bpl->bpl_dbuf, tx);
 	bpl->bpl_phys->bpl_entries++;
-	bpl->bpl_phys->bpl_bytes += BP_GET_ASIZE(bp);
+	bpl->bpl_phys->bpl_bytes +=
+	    bp_get_dasize(dmu_objset_spa(bpl->bpl_mos), bp);
+	if (bpl->bpl_havecomp) {
+		bpl->bpl_phys->bpl_comp += BP_GET_PSIZE(bp);
+		bpl->bpl_phys->bpl_uncomp += BP_GET_UCSIZE(bp);
+	}
 	mutex_exit(&bpl->bpl_lock);
 
 	return (0);
@@ -259,5 +268,45 @@ bplist_vacate(bplist_t *bpl, dmu_tx_t *tx)
 	    bpl->bpl_object, 0, -1ULL, tx));
 	bpl->bpl_phys->bpl_entries = 0;
 	bpl->bpl_phys->bpl_bytes = 0;
+	if (bpl->bpl_havecomp) {
+		bpl->bpl_phys->bpl_comp = 0;
+		bpl->bpl_phys->bpl_uncomp = 0;
+	}
 	mutex_exit(&bpl->bpl_lock);
+}
+
+int
+bplist_space(bplist_t *bpl, uint64_t *usedp, uint64_t *compp, uint64_t *uncompp)
+{
+	uint64_t itor = 0, comp = 0, uncomp = 0;
+	int err;
+	blkptr_t bp;
+
+	mutex_enter(&bpl->bpl_lock);
+
+	err = bplist_hold(bpl);
+	if (err) {
+		mutex_exit(&bpl->bpl_lock);
+		return (err);
+	}
+
+	*usedp = bpl->bpl_phys->bpl_bytes;
+	if (bpl->bpl_havecomp) {
+		*compp = bpl->bpl_phys->bpl_comp;
+		*uncompp = bpl->bpl_phys->bpl_uncomp;
+	}
+	mutex_exit(&bpl->bpl_lock);
+
+	if (!bpl->bpl_havecomp) {
+		while ((err = bplist_iterate(bpl, &itor, &bp)) == 0) {
+			comp += BP_GET_PSIZE(&bp);
+			uncomp += BP_GET_UCSIZE(&bp);
+		}
+		if (err == ENOENT)
+			err = 0;
+		*compp = comp;
+		*uncompp = uncomp;
+	}
+
+	return (err);
 }

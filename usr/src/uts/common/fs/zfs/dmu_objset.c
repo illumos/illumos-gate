@@ -164,9 +164,10 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	/*
 	 * Note: the changed_cb will be called once before the register
 	 * func returns, thus changing the checksum/compression from the
-	 * default (fletcher2/off).
+	 * default (fletcher2/off).  Snapshots don't need to know, and
+	 * registering would complicate clone promotion.
 	 */
-	if (ds) {
+	if (ds && ds->ds_phys->ds_num_children == 0) {
 		err = dsl_prop_register(ds, "checksum",
 		    checksum_changed_cb, osi);
 		if (err == 0)
@@ -177,7 +178,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			kmem_free(osi, sizeof (objset_impl_t));
 			return (err);
 		}
-	} else {
+	} else if (ds == NULL) {
 		/* It's the meta-objset. */
 		osi->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
 		osi->os_compress = ZIO_COMPRESS_LZJB;
@@ -329,21 +330,18 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 {
 	objset_impl_t *osi = arg;
 	objset_t os;
-	int err, i;
+	int i;
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		ASSERT(list_head(&osi->os_dirty_dnodes[i]) == NULL);
 		ASSERT(list_head(&osi->os_free_dnodes[i]) == NULL);
 	}
 
-	if (ds) {
-		err = dsl_prop_unregister(ds, "checksum",
-		    checksum_changed_cb, osi);
-		ASSERT(err == 0);
-
-		err = dsl_prop_unregister(ds, "compression",
-		    compression_changed_cb, osi);
-		ASSERT(err == 0);
+	if (ds && ds->ds_phys->ds_num_children == 0) {
+		VERIFY(0 == dsl_prop_unregister(ds, "checksum",
+		    checksum_changed_cb, osi));
+		VERIFY(0 == dsl_prop_unregister(ds, "compression",
+		    compression_changed_cb, osi));
 	}
 
 	/*

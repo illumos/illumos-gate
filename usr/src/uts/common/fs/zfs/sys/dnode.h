@@ -75,6 +75,9 @@ extern "C" {
 #define	DN_BONUS(dnp)	((void*)((dnp)->dn_bonus + \
 	(((dnp)->dn_nblkptr - 1) * sizeof (blkptr_t))))
 
+#define	DN_USED_BYTES(dnp) (((dnp)->dn_flags & DNODE_FLAG_USED_BYTES) ? \
+	(dnp)->dn_used : (dnp)->dn_used << SPA_MINBLOCKSHIFT)
+
 #define	EPB(blkshift, typeshift)	(1 << (blkshift - typeshift))
 
 struct dmu_buf_impl;
@@ -87,6 +90,9 @@ enum dnode_dirtycontext {
 	DN_DIRTY_SYNC
 };
 
+/* Is dn_used in bytes?  if not, it's in multiples of SPA_MINBLOCKSIZE */
+#define	DNODE_FLAG_USED_BYTES	(1<<0)
+
 typedef struct dnode_phys {
 	uint8_t dn_type;		/* dmu_object_type_t */
 	uint8_t dn_indblkshift;		/* ln2(indirect block size) */
@@ -95,14 +101,14 @@ typedef struct dnode_phys {
 	uint8_t dn_bonustype;		/* type of data in bonus buffer */
 	uint8_t	dn_checksum;		/* ZIO_CHECKSUM type */
 	uint8_t	dn_compress;		/* ZIO_COMPRESS type */
-	uint8_t dn_pad1[1];
+	uint8_t dn_flags;		/* DNODE_FLAG_* */
 	uint16_t dn_datablkszsec;	/* data block size in 512b sectors */
 	uint16_t dn_bonuslen;		/* length of dn_bonus */
 	uint8_t dn_pad2[4];
 
 	/* accounting is protected by dn_dirty_mtx */
 	uint64_t dn_maxblkid;		/* largest allocated block ID */
-	uint64_t dn_secphys;		/* 512b sectors of disk space used */
+	uint64_t dn_used;		/* bytes (or sectors) of disk space */
 
 	uint64_t dn_pad3[4];
 

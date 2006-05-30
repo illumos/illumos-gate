@@ -744,8 +744,8 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)ds->ds_fsid_guid);
 	(void) printf("\t\tguid = %llu\n",
 	    (u_longlong_t)ds->ds_guid);
-	(void) printf("\t\tinconsistent = %llu\n",
-	    (u_longlong_t)ds->ds_inconsistent);
+	(void) printf("\t\tflags = %llx\n",
+	    (u_longlong_t)ds->ds_flags);
 	(void) printf("\t\tbp = %s\n", blkbuf);
 }
 
@@ -755,7 +755,9 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	bplist_t bpl = { 0 };
 	blkptr_t blk, *bp = &blk;
 	uint64_t itor = 0;
-	char numbuf[6];
+	char bytes[6];
+	char comp[6];
+	char uncomp[6];
 
 	if (dump_opt['d'] < 3)
 		return;
@@ -766,10 +768,17 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 		return;
 	}
 
-	nicenum(bpl.bpl_phys->bpl_bytes, numbuf);
-
-	(void) printf("\n    %s: %llu entries, %s\n",
-	    name, (u_longlong_t)bpl.bpl_phys->bpl_entries, numbuf);
+	nicenum(bpl.bpl_phys->bpl_bytes, bytes);
+	if (bpl.bpl_dbuf->db_size == sizeof (bplist_phys_t)) {
+		nicenum(bpl.bpl_phys->bpl_comp, comp);
+		nicenum(bpl.bpl_phys->bpl_uncomp, uncomp);
+		(void) printf("\n    %s: %llu entries, %s (%s/%s comp)\n",
+		    name, (u_longlong_t)bpl.bpl_phys->bpl_entries,
+		    bytes, comp, uncomp);
+	} else {
+		(void) printf("\n    %s: %llu entries, %s\n",
+		    name, (u_longlong_t)bpl.bpl_phys->bpl_entries, bytes);
+	}
 
 	if (dump_opt['d'] < 5) {
 		bplist_close(&bpl);

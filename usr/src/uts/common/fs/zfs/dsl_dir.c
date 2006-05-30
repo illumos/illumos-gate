@@ -739,7 +739,7 @@ dsl_dir_space_available(dsl_dir_t *dd,
 		used += delta;
 
 	if (dd->dd_parent == NULL) {
-		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, B_FALSE);
+		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, FALSE);
 		quota = MIN(quota, poolsize);
 	}
 
@@ -754,23 +754,19 @@ dsl_dir_space_available(dsl_dir_t *dd,
 	if (used > quota) {
 		/* over quota */
 		myspace = 0;
-#ifdef ZFS_DEBUG
-		{
-			/*
-			 * While it's OK to be a little over quota, if
-			 * we think we are using more space than there
-			 * is in the pool (which is already 6% more than
-			 * dsl_pool_adjustedsize()), something is very
-			 * wrong.
-			 */
-			uint64_t space = spa_get_space(dd->dd_pool->dp_spa);
-			ASSERT3U(used, <=, space);
-		}
-#endif
+
+		/*
+		 * While it's OK to be a little over quota, if
+		 * we think we are using more space than there
+		 * is in the pool (which is already 1.6% more than
+		 * dsl_pool_adjustedsize()), something is very
+		 * wrong.
+		 */
+		ASSERT3U(used, <=, spa_get_space(dd->dd_pool->dp_spa));
 	} else {
 		/*
-		 * the lesser of parent's space and the space
-		 * left in our quota
+		 * the lesser of the space provided by our parent and
+		 * the space left in our quota
 		 */
 		myspace = MIN(parentspace, quota - used);
 	}
@@ -1170,27 +1166,22 @@ dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	}
 
 	if (newpds != dd->dd_parent) {
-		dsl_dir_t *ancestor;
-		int64_t adelta;
-		uint64_t myspace, avail;
-
-		ancestor = closest_common_ancestor(dd, newpds);
+		/* is there enough space? */
+		uint64_t myspace =
+		    MAX(dd->dd_used_bytes, dd->dd_phys->dd_reserved);
 
 		/* no rename into our descendent */
-		if (ancestor == dd) {
+		if (closest_common_ancestor(dd, newpds) == dd) {
 			dsl_dir_close(newpds, FTAG);
 			rw_exit(&dp->dp_config_rwlock);
 			return (EINVAL);
 		}
 
-		myspace = MAX(dd->dd_used_bytes, dd->dd_phys->dd_reserved);
-		adelta = would_change(dd->dd_parent, -myspace, ancestor);
-		avail = dsl_dir_space_available(newpds,
-		    ancestor, adelta, FALSE);
-		if (avail < myspace) {
+		if (err = dsl_dir_transfer_possible(dd->dd_parent, newpds,
+		    myspace)) {
 			dsl_dir_close(newpds, FTAG);
 			rw_exit(&dp->dp_config_rwlock);
-			return (ENOSPC);
+			return (err);
 		}
 
 		/* The point of no (unsuccessful) return */
@@ -1225,5 +1216,21 @@ dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 
 	dsl_dir_close(newpds, FTAG);
 	rw_exit(&dp->dp_config_rwlock);
+	return (0);
+}
+
+int
+dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space)
+{
+	dsl_dir_t *ancestor;
+	int64_t adelta;
+	uint64_t avail;
+
+	ancestor = closest_common_ancestor(sdd, tdd);
+	adelta = would_change(sdd, -space, ancestor);
+	avail = dsl_dir_space_available(tdd, ancestor, adelta, FALSE);
+	if (avail < space)
+		return (ENOSPC);
+
 	return (0);
 }

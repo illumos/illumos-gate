@@ -208,73 +208,6 @@ freelist_walk_fini(mdb_walk_state_t *wsp)
 {
 }
 
-typedef struct dbuf_walk_data {
-	dbuf_hash_table_t ht;
-	int64_t bucket;
-	uintptr_t dbp;
-	dmu_buf_impl_t db;
-} dbuf_walk_data_t;
-
-static int
-dbuf_walk_init(mdb_walk_state_t *wsp)
-{
-	dbuf_walk_data_t *dwd;
-
-	if (wsp->walk_addr != NULL) {
-		mdb_warn("must supply starting address\n");
-		return (WALK_ERR);
-	}
-
-	dwd = mdb_alloc(sizeof (dbuf_walk_data_t), UM_SLEEP);
-
-	if (mdb_readvar(&dwd->ht, "dbuf_hash_table") == -1) {
-		mdb_warn("failed to read 'dbuf_hash_table'");
-		mdb_free(dwd, sizeof (dbuf_walk_data_t));
-		return (WALK_ERR);
-	}
-	dwd->bucket = -1;
-	dwd->dbp = 0;
-	wsp->walk_data = dwd;
-	return (WALK_NEXT);
-}
-
-static int
-dbuf_walk_step(mdb_walk_state_t *wsp)
-{
-	int status;
-	dbuf_walk_data_t *dwd = wsp->walk_data;
-
-	while (dwd->dbp == 0) {
-		dwd->bucket++;
-		if (dwd->bucket == dwd->ht.hash_table_mask+1)
-			return (WALK_DONE);
-
-		if (mdb_vread(&dwd->dbp, sizeof (void *),
-		    (uintptr_t)(dwd->ht.hash_table+dwd->bucket)) == -1) {
-			mdb_warn("failed to read hash bucket %u at %p",
-			    dwd->bucket, dwd->ht.hash_table+dwd->bucket);
-			return (WALK_DONE);
-		}
-	}
-
-	wsp->walk_addr = dwd->dbp;
-	if (mdb_vread(&dwd->db, sizeof (dmu_buf_impl_t),
-	    wsp->walk_addr) == -1) {
-		mdb_warn("failed to read dbuf at %p", wsp->walk_addr);
-		return (WALK_DONE);
-	}
-	status = wsp->walk_callback(wsp->walk_addr, &dwd->db, wsp->walk_cbdata);
-
-	dwd->dbp = (uintptr_t)dwd->db.db_hash_next;
-	return (status);
-}
-
-static void
-dbuf_walk_fini(mdb_walk_state_t *wsp)
-{
-	dbuf_walk_data_t *dwd = wsp->walk_data;
-	mdb_free(dwd, sizeof (dbuf_walk_data_t));
-}
 
 static int
 dataset_name(uintptr_t addr, char *buf)
@@ -693,7 +626,7 @@ dbufs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (mdb_pwalk("dbufs", dbufs_cb, &data, 0) != 0) {
+	if (mdb_pwalk("dmu_buf_impl_t", dbufs_cb, &data, 0) != 0) {
 		mdb_warn("can't walk dbufs");
 		return (DCMD_ERR);
 	}
@@ -1580,8 +1513,6 @@ static const mdb_walker_t walkers[] = {
 	{ LIST_WALK_NAME, LIST_WALK_DESC,
 		list_walk_init, list_walk_step, list_walk_fini },
 #endif
-	{ "dbufs", "walk cached ZFS dbufs",
-		dbuf_walk_init, dbuf_walk_step, dbuf_walk_fini },
 	{ "zms_freelist", "walk ZFS metaslab freelist",
 		freelist_walk_init, freelist_walk_step, freelist_walk_fini },
 	{ "txg_list", "given any txg_list_t *, walk all entries in all txgs",

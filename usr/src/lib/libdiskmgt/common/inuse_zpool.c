@@ -46,17 +46,21 @@
 #include <ctype.h>
 #include <sys/fs/zfs.h>
 
+#include <libzfs.h>
 #include "libdiskmgt.h"
 #include "disks_private.h"
 
 /*
  * Pointers to libzfs.so functions that we dynamically resolve.
  */
-static	int	(*zfsdl_zpool_in_use)(int fd, pool_state_t *state, char **name);
+static int (*zfsdl_zpool_in_use)(libzfs_handle_t *hdl, int fd,
+    pool_state_t *state, char **name, boolean_t *);
+static libzfs_handle_t *(*zfsdl_libzfs_init)(boolean_t);
 
 static mutex_t			init_lock = DEFAULTMUTEX;
 static rwlock_t			zpool_lock = DEFAULTRWLOCK;
-static	int			initialized = 0;
+static boolean_t		initialized;
+static libzfs_handle_t		*zfs_hdl;
 
 static void	*init_zpool();
 
@@ -67,6 +71,7 @@ inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 	char		*name;
 	int		fd;
 	pool_state_t	state;
+	boolean_t	used;
 
 	*errp = 0;
 	if (slice == NULL) {
@@ -83,15 +88,21 @@ inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 			(void) mutex_unlock(&init_lock);
 			return (found);
 		}
-		initialized = 1;
+		initialized = B_TRUE;
 	}
 	(void) mutex_unlock(&init_lock);
 	(void) rw_rdlock(&zpool_lock);
 	if ((fd = open(slice, O_RDONLY)) > 0) {
-		if (zfsdl_zpool_in_use(fd, &state, &name)) {
+		name = NULL;
+		if (zfsdl_zpool_in_use(zfs_hdl, fd, &state,
+		    &name, &used) == 0 && used) {
 			if (strcmp(type, DM_USE_ACTIVE_ZPOOL) == 0) {
-				if (state == POOL_STATE_ACTIVE)
+				if (state == POOL_STATE_ACTIVE) {
 					found = 1;
+				} else if (state == POOL_STATE_SPARE) {
+					found = 1;
+					type = DM_USE_SPARE_ZPOOL;
+				}
 			} else {
 				found = 1;
 			}
@@ -100,9 +111,11 @@ inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 				libdiskmgt_add_str(attrs, DM_USED_BY,
 				    type, errp);
 				libdiskmgt_add_str(attrs, DM_USED_NAME,
-					name, errp);
+				    name, errp);
 			}
 		}
+		if (name)
+			free(name);
 		(void) close(fd);
 	}
 	(void) rw_unlock(&zpool_lock);
@@ -133,12 +146,21 @@ init_zpool()
 	if ((lh = dlopen("libzfs.so", RTLD_NOW)) == NULL) {
 		return (lh);
 	}
+
 	/*
 	 * Instantiate the functions needed to get zpool configuration
 	 * data
 	 */
-	if ((zfsdl_zpool_in_use = (int (*)(int, pool_state_t *, char **))
+	if ((zfsdl_libzfs_init = (libzfs_handle_t *(*)(boolean_t))
+	    dlsym(lh, "libzfs_init")) == NULL ||
+	    (zfsdl_zpool_in_use = (int (*)(libzfs_handle_t *, int,
+	    pool_state_t *, char **, boolean_t *))
 	    dlsym(lh, "zpool_in_use")) == NULL) {
+		(void) dlclose(lh);
+		return (NULL);
+	}
+
+	if ((zfs_hdl = (*zfsdl_libzfs_init)(B_FALSE)) == NULL) {
 		(void) dlclose(lh);
 		return (NULL);
 	}

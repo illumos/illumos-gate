@@ -119,8 +119,8 @@ free_blocks(dnode_t *dn, blkptr_t *bp, int num, dmu_tx_t *tx)
 		if (BP_IS_HOLE(bp))
 			continue;
 
-		bytesfreed += BP_GET_ASIZE(bp);
-		ASSERT3U(bytesfreed >> DEV_BSHIFT, <=, dn->dn_phys->dn_secphys);
+		bytesfreed += bp_get_dasize(os->os_spa, bp);
+		ASSERT3U(bytesfreed, <=, DN_USED_BYTES(dn->dn_phys));
 		dsl_dataset_block_kill(os->os_dsl_dataset, bp, tx);
 	}
 	dnode_diduse_space(dn, -bytesfreed);
@@ -457,7 +457,7 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 
 	/* free up all the blocks in the file. */
 	dnode_sync_free_range(dn, 0, dn->dn_phys->dn_maxblkid+1, tx);
-	ASSERT3U(dn->dn_phys->dn_secphys, ==, 0);
+	ASSERT3U(DN_USED_BYTES(dn->dn_phys), ==, 0);
 
 	/* ASSERT(blkptrs are zero); */
 	ASSERT(dn->dn_phys->dn_type != DMU_OT_NONE);

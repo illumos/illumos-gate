@@ -24,6 +24,30 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+function libzfs_fini
+version SUNWprivate_1.1
+end
+
+function libzfs_init
+version SUNWprivate_1.1
+end
+
+function libzfs_errno
+version SUNWprivate_1.1
+end
+
+function libzfs_error_action
+version SUNWprivate_1.1
+end
+
+function libzfs_error_description
+version SUNWprivate_1.1
+end
+
+function libzfs_print_on_error
+version SUNWprivate_1.1
+end
+
 function zfs_clone
 version SUNWprivate_1.1
 end
@@ -37,6 +61,10 @@ version SUNWprivate_1.1
 end
 
 function zfs_destroy
+version SUNWprivate_1.1
+end
+
+function zfs_get_handle
 version SUNWprivate_1.1
 end
 
@@ -101,6 +129,10 @@ version SUNWprivate_1.1
 end
 
 function zfs_open
+version SUNWprivate_1.1
+end
+
+function zfs_promote
 version SUNWprivate_1.1
 end
 
@@ -188,10 +220,6 @@ function zfs_send
 version SUNWprivate_1.1
 end
 
-function zfs_set_error_handler
-version SUNWprivate_1.1
-end
-
 function zfs_share
 version SUNWprivate_1.1
 end
@@ -248,6 +276,10 @@ function zpool_export
 version SUNWprivate_1.1
 end
 
+function zpool_find_vdev
+version  SUNWprivate_1.1
+end
+
 function zpool_find_import
 version SUNWprivate_1.1
 end
@@ -261,6 +293,10 @@ version SUNWprivate_1.1
 end
 
 function zpool_get_guid
+version SUNWprivate_1.1
+end
+
+function zpool_get_handle
 version SUNWprivate_1.1
 end
 
@@ -285,6 +321,10 @@ version SUNWprivate_1.1
 end
 
 function zpool_get_status
+version SUNWprivate_1.1
+end
+
+function zpool_get_version
 version SUNWprivate_1.1
 end
 
@@ -352,6 +392,7 @@ function zpool_vdev_name
 version  SUNWprivate_1.1
 end
 
-function zpool_vdev_to_guid
-version  SUNWprivate_1.1
+function zpool_vdev_remove
+version SUNWprivate_1.1
 end
+

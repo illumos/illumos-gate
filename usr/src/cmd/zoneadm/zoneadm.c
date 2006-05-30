@@ -4433,6 +4433,9 @@ main(int argc, char **argv)
 		exit(Z_ERR);
 	}
 
+	if (init_zfs() != Z_OK)
+		exit(Z_ERR);
+
 	while ((arg = getopt(argc, argv, "?z:R:")) != EOF) {
 		switch (arg) {
 		case '?':

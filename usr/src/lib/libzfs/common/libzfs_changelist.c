@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -73,11 +72,11 @@ struct prop_changelist {
 	zfs_prop_t		cl_realprop;
 	uu_list_pool_t		*cl_pool;
 	uu_list_t		*cl_list;
-	int			cl_waslegacy;
-	int			cl_allchildren;
-	int			cl_alldependents;
+	boolean_t		cl_waslegacy;
+	boolean_t		cl_allchildren;
+	boolean_t		cl_alldependents;
 	int			cl_flags;
-	int			cl_haszonedchild;
+	boolean_t		cl_haszonedchild;
 };
 
 /*
@@ -109,7 +108,8 @@ changelist_prefix(prop_changelist_t *clp)
 		 */
 		if (cn->cn_handle->zfs_volblocksize &&
 		    clp->cl_realprop == ZFS_PROP_NAME) {
-			if (zvol_remove_link(cn->cn_handle->zfs_name) != 0)
+			if (zvol_remove_link(cn->cn_handle->zfs_hdl,
+			    cn->cn_handle->zfs_name) != 0)
 				ret = -1;
 		} else if (zfs_unmount(cn->cn_handle, NULL, clp->cl_flags) != 0)
 			ret = -1;
@@ -167,7 +167,8 @@ changelist_postfix(prop_changelist_t *clp)
 		 */
 		if (cn->cn_handle->zfs_volblocksize &&
 		    clp->cl_realprop == ZFS_PROP_NAME) {
-			if (zvol_create_link(cn->cn_handle->zfs_name) != 0)
+			if (zvol_create_link(cn->cn_handle->zfs_hdl,
+			    cn->cn_handle->zfs_name) != 0)
 				ret = -1;
 			continue;
 		}
@@ -186,7 +187,7 @@ changelist_postfix(prop_changelist_t *clp)
 			char shareopts[ZFS_MAXPROPLEN];
 			if (zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARENFS,
 			    shareopts, sizeof (shareopts), NULL, NULL, 0,
-			    FALSE) == 0 && strcmp(shareopts, "off") == 0)
+			    B_FALSE) == 0 && strcmp(shareopts, "off") == 0)
 				ret = zfs_unshare(cn->cn_handle, NULL);
 			else
 				ret = zfs_share(cn->cn_handle);
@@ -199,22 +200,22 @@ changelist_postfix(prop_changelist_t *clp)
 /*
  * Is this "dataset" a child of "parent"?
  */
-static int
+static boolean_t
 isa_child_of(char *dataset, const char *parent)
 {
 	int len;
 
 	/* snapshot does not have a child */
 	if (strchr(parent, '@'))
-		return (FALSE);
+		return (B_FALSE);
 
 	len = strlen(parent);
 
 	if (strncmp(dataset, parent, len) == 0 &&
 	    (dataset[len] == '/' || dataset[len] == '\0'))
-		return (TRUE);
+		return (B_TRUE);
 	else
-		return (FALSE);
+		return (B_FALSE);
 
 }
 
@@ -326,6 +327,9 @@ changelist_free(prop_changelist_t *clp)
 		free(cn);
 	}
 
+	uu_list_walk_end(walk);
+
+	uu_list_destroy(clp->cl_list);
 	uu_list_pool_destroy(clp->cl_pool);
 
 	free(clp);
@@ -353,12 +357,18 @@ change_one(zfs_handle_t *zhp, void *data)
 	if (!(zhp->zfs_volblocksize && clp->cl_realprop == ZFS_PROP_NAME) &&
 	    zfs_prop_get(zhp, clp->cl_prop, property,
 	    sizeof (property), &sourcetype, where, sizeof (where),
-	    FALSE) != 0)
+	    B_FALSE) != 0) {
+		zfs_close(zhp);
 		return (0);
+	}
 
 	if (clp->cl_alldependents || clp->cl_allchildren ||
 	    sourcetype == ZFS_SRC_DEFAULT || sourcetype == ZFS_SRC_INHERITED) {
-		cn = zfs_malloc(sizeof (prop_changenode_t));
+		if ((cn = zfs_alloc(zfs_get_handle(zhp),
+		    sizeof (prop_changenode_t))) == NULL) {
+			zfs_close(zhp);
+			return (-1);
+		}
 
 		cn->cn_handle = zhp;
 		cn->cn_mounted = zfs_is_mounted(zhp, NULL);
@@ -367,7 +377,7 @@ change_one(zfs_handle_t *zhp, void *data)
 
 		/* indicate if any child is exported to a local zone */
 		if ((getzoneid() == GLOBAL_ZONEID) && cn->cn_zoned)
-			clp->cl_haszonedchild = TRUE;
+			clp->cl_haszonedchild = B_TRUE;
 
 		uu_list_node_init(cn, &cn->cn_listnode, clp->cl_pool);
 
@@ -399,10 +409,13 @@ change_one(zfs_handle_t *zhp, void *data)
 prop_changelist_t *
 changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 {
-	prop_changelist_t *clp = zfs_malloc(sizeof (prop_changelist_t));
+	prop_changelist_t *clp;
 	prop_changenode_t *cn;
 	zfs_handle_t *temp;
 	char property[ZFS_MAXPROPLEN];
+
+	if ((clp = zfs_alloc(zhp->zfs_hdl, sizeof (prop_changelist_t))) == NULL)
+		return (NULL);
 
 	clp->cl_pool = uu_list_pool_create("changelist_pool",
 	    sizeof (prop_changenode_t),
@@ -423,10 +436,10 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 */
 	if (prop == ZFS_PROP_NAME) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
-		clp->cl_alldependents = TRUE;
+		clp->cl_alldependents = B_TRUE;
 	} else if (prop == ZFS_PROP_ZONED) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
-		clp->cl_allchildren = TRUE;
+		clp->cl_allchildren = B_TRUE;
 	} else {
 		clp->cl_prop = prop;
 	}
@@ -450,8 +463,9 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * We have to re-open ourselves because we auto-close all the handles
 	 * and can't tell the difference.
 	 */
-	if ((temp = zfs_open(zfs_get_name(zhp), ZFS_TYPE_ANY)) == NULL) {
-		free(clp);
+	if ((temp = zfs_open(zhp->zfs_hdl, zfs_get_name(zhp),
+	    ZFS_TYPE_ANY)) == NULL) {
+		changelist_free(clp);
 		return (NULL);
 	}
 
@@ -459,7 +473,13 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * Always add ourself to the list.  We add ourselves to the end so that
 	 * we're the last to be unmounted.
 	 */
-	cn = zfs_malloc(sizeof (prop_changenode_t));
+	if ((cn = zfs_alloc(zhp->zfs_hdl,
+	    sizeof (prop_changenode_t))) == NULL) {
+		zfs_close(temp);
+		changelist_free(clp);
+		return (NULL);
+	}
+
 	cn->cn_handle = temp;
 	cn->cn_mounted = zfs_is_mounted(temp, NULL);
 	cn->cn_shared = zfs_is_shared(temp, NULL);
@@ -474,10 +494,10 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * as the behavior of changelist_postfix() will be different.
 	 */
 	if (zfs_prop_get(zhp, prop, property, sizeof (property),
-	    NULL, NULL, 0, FALSE) == 0 &&
+	    NULL, NULL, 0, B_FALSE) == 0 &&
 	    (strcmp(property, "legacy") == 0 || strcmp(property, "none") == 0 ||
 	    strcmp(property, "off") == 0))
-		clp->cl_waslegacy = TRUE;
+		clp->cl_waslegacy = B_TRUE;
 
 	return (clp);
 }

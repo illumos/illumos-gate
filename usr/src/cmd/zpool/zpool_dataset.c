@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +58,8 @@ do_unmount(zfs_handle_t *zfsp, void *data)
 	if (zfs_unmount(zfsp, NULL, cbp->cb_force ? MS_FORCE : 0) != 0)
 		cbp->cb_failed = 1;
 
+	zfs_close(zfsp);
+
 	return (0);
 }
 
@@ -78,7 +79,8 @@ unmount_datasets(zpool_handle_t *zhp, int force)
 	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL)
 		return (0);
 
-	if ((zfsp = zfs_open(zpool_get_name(zhp), ZFS_TYPE_FILESYSTEM)) == NULL)
+	if ((zfsp = zfs_open(g_zfs, zpool_get_name(zhp),
+	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (-1);
 
 	cb.cb_force = force;
@@ -89,12 +91,8 @@ unmount_datasets(zpool_handle_t *zhp, int force)
 		return (-1);
 	}
 
-	if (do_unmount(zfsp, &cb) != 0 || cb.cb_failed != 0) {
-		zfs_close(zfsp);
+	if (do_unmount(zfsp, &cb) != 0 || cb.cb_failed != 0)
 		return (-1);
-	}
-
-	zfs_close(zfsp);
 
 	return (0);
 }
@@ -108,8 +106,10 @@ do_mount_share(zfs_handle_t *zfsp, void *data)
 	cbdata_t *cbp = data;
 	int ret;
 
-	if (zfs_get_type(zfsp) != ZFS_TYPE_FILESYSTEM)
+	if (zfs_get_type(zfsp) != ZFS_TYPE_FILESYSTEM) {
+		zfs_close(zfsp);
 		return (0);
+	}
 
 	if (zfs_mount(zfsp, cbp->cb_mntopts, 0) != 0)
 		cbp->cb_failed = 1;
@@ -118,6 +118,7 @@ do_mount_share(zfs_handle_t *zfsp, void *data)
 
 	ret = zfs_iter_children(zfsp, do_mount_share, data);
 
+	zfs_close(zfsp);
 	return (ret);
 }
 
@@ -142,15 +143,12 @@ mount_share_datasets(zpool_handle_t *zhp, const char *options)
 	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL)
 		return (0);
 
-	if ((zfsp = zfs_open(zpool_get_name(zhp), ZFS_TYPE_FILESYSTEM)) == NULL)
+	if ((zfsp = zfs_open(g_zfs, zpool_get_name(zhp),
+	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (-1);
 
-	if (do_mount_share(zfsp, &cb) != 0 || cb.cb_failed != 0) {
-		zfs_close(zfsp);
+	if (do_mount_share(zfsp, &cb) != 0 || cb.cb_failed != 0)
 		return (-1);
-	}
-
-	zfs_close(zfsp);
 
 	return (0);
 }

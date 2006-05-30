@@ -45,9 +45,6 @@
 
 #include "libzfs_impl.h"
 
-static uu_avl_t *namespace_avl;
-static uint64_t namespace_generation;
-
 typedef struct config_node {
 	char		*cn_name;
 	nvlist_t	*cn_config;
@@ -73,11 +70,41 @@ config_node_compare(const void *a, const void *b, void *unused)
 		return (0);
 }
 
+void
+namespace_clear(libzfs_handle_t *hdl)
+{
+	if (hdl->libzfs_ns_avl) {
+		uu_avl_walk_t *walk;
+		config_node_t *cn;
+
+		if ((walk = uu_avl_walk_start(hdl->libzfs_ns_avl,
+		    UU_WALK_ROBUST)) == NULL)
+			return;
+
+		while ((cn = uu_avl_walk_next(walk)) != NULL) {
+			uu_avl_remove(hdl->libzfs_ns_avl, cn);
+			nvlist_free(cn->cn_config);
+			free(cn->cn_name);
+			free(cn);
+		}
+
+		uu_avl_walk_end(walk);
+
+		uu_avl_destroy(hdl->libzfs_ns_avl);
+		hdl->libzfs_ns_avl = NULL;
+	}
+
+	if (hdl->libzfs_ns_avlpool) {
+		uu_avl_pool_destroy(hdl->libzfs_ns_avlpool);
+		hdl->libzfs_ns_avlpool = NULL;
+	}
+}
+
 /*
  * Loads the pool namespace, or re-loads it if the cache has changed.
  */
-static void
-namespace_reload()
+static int
+namespace_reload(libzfs_handle_t *hdl)
 {
 	nvlist_t *config;
 	config_node_t *cn;
@@ -85,23 +112,21 @@ namespace_reload()
 	zfs_cmd_t zc = { 0 };
 	uu_avl_walk_t *walk;
 
-	if (namespace_generation == 0) {
+	if (hdl->libzfs_ns_gen == 0) {
 		/*
 		 * This is the first time we've accessed the configuration
 		 * cache.  Initialize the AVL tree and then fall through to the
 		 * common code.
 		 */
-		uu_avl_pool_t *pool;
-
-		if ((pool = uu_avl_pool_create("config_pool",
+		if ((hdl->libzfs_ns_avlpool = uu_avl_pool_create("config_pool",
 		    sizeof (config_node_t),
 		    offsetof(config_node_t, cn_avl),
 		    config_node_compare, UU_DEFAULT)) == NULL)
-			no_memory();
+			return (no_memory(hdl));
 
-		if ((namespace_avl = uu_avl_create(pool, NULL,
-		    UU_DEFAULT)) == NULL)
-			no_memory();
+		if ((hdl->libzfs_ns_avl = uu_avl_create(hdl->libzfs_ns_avlpool,
+		    NULL, UU_DEFAULT)) == NULL)
+			return (no_memory(hdl));
 	}
 
 	/*
@@ -114,68 +139,92 @@ namespace_reload()
 	 *			been modified to tell us how much to allocate.
 	 */
 	zc.zc_config_dst_size = 1024;
-	zc.zc_config_dst = (uint64_t)(uintptr_t)
-	    zfs_malloc(zc.zc_config_dst_size);
+	if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
+	    zfs_alloc(hdl, zc.zc_config_dst_size)) == NULL)
+		return (-1);
 	for (;;) {
-		zc.zc_cookie = namespace_generation;
-		if (zfs_ioctl(ZFS_IOC_POOL_CONFIGS, &zc) != 0) {
+		zc.zc_cookie = hdl->libzfs_ns_gen;
+		if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_CONFIGS, &zc) != 0) {
 			switch (errno) {
 			case EEXIST:
 				/*
 				 * The namespace hasn't changed.
 				 */
 				free((void *)(uintptr_t)zc.zc_config_dst);
-				return;
+				return (0);
 
 			case ENOMEM:
 				free((void *)(uintptr_t)zc.zc_config_dst);
-				zc.zc_config_dst = (uint64_t)(uintptr_t)
-				    zfs_malloc(zc.zc_config_dst_size);
+				if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
+				    zfs_alloc(hdl, zc.zc_config_dst_size))
+				    == NULL)
+					return (-1);
 				break;
 
 			default:
-				zfs_baderror(errno);
+				return (zfs_standard_error(hdl, errno,
+				    dgettext(TEXT_DOMAIN, "failed to read "
+				    "pool configuration")));
 			}
 		} else {
-			namespace_generation = zc.zc_cookie;
+			hdl->libzfs_ns_gen = zc.zc_cookie;
 			break;
 		}
 	}
 
-	verify(nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, &config, 0) == 0);
+	if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
+	    zc.zc_config_dst_size, &config, 0) != 0)
+		return (no_memory(hdl));
 
 	free((void *)(uintptr_t)zc.zc_config_dst);
 
 	/*
 	 * Clear out any existing configuration information.
 	 */
-	if ((walk = uu_avl_walk_start(namespace_avl, UU_WALK_ROBUST)) == NULL)
-		no_memory();
+	if ((walk = uu_avl_walk_start(hdl->libzfs_ns_avl,
+	    UU_WALK_ROBUST)) == NULL) {
+		nvlist_free(config);
+		return (no_memory(hdl));
+	}
 
 	while ((cn = uu_avl_walk_next(walk)) != NULL) {
-		uu_avl_remove(namespace_avl, cn);
+		uu_avl_remove(hdl->libzfs_ns_avl, cn);
 		nvlist_free(cn->cn_config);
 		free(cn->cn_name);
 		free(cn);
 	}
+
+	uu_avl_walk_end(walk);
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(config, elem)) != NULL) {
 		nvlist_t *child;
 		uu_avl_index_t where;
 
-		cn = zfs_malloc(sizeof (config_node_t));
-		cn->cn_name = zfs_strdup(nvpair_name(elem));
+		if ((cn = zfs_alloc(hdl, sizeof (config_node_t))) == NULL) {
+			nvlist_free(config);
+			return (-1);
+		}
+
+		if ((cn->cn_name = zfs_strdup(hdl,
+		    nvpair_name(elem))) == NULL) {
+			free(cn);
+			return (-1);
+		}
 
 		verify(nvpair_value_nvlist(elem, &child) == 0);
-		verify(nvlist_dup(child, &cn->cn_config, 0) == 0);
-		verify(uu_avl_find(namespace_avl, cn, NULL, &where) == NULL);
+		if (nvlist_dup(child, &cn->cn_config, 0) != 0) {
+			nvlist_free(config);
+			return (no_memory(hdl));
+		}
+		verify(uu_avl_find(hdl->libzfs_ns_avl, cn, NULL, &where)
+		    == NULL);
 
-		uu_avl_insert(namespace_avl, cn, where);
+		uu_avl_insert(hdl->libzfs_ns_avl, cn, where);
 	}
 
 	nvlist_free(config);
+	return (0);
 }
 
 /*
@@ -209,35 +258,43 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 		zhp->zpool_config_size = 1 << 16;
 
 	zc.zc_config_dst_size = zhp->zpool_config_size;
-	zc.zc_config_dst = (uint64_t)(uintptr_t)
-	    zfs_malloc(zc.zc_config_dst_size);
+	if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
+	    zfs_alloc(zhp->zpool_hdl, zc.zc_config_dst_size)) == NULL)
+		return (-1);
 
 	for (;;) {
-		if (zfs_ioctl(ZFS_IOC_POOL_STATS, &zc) == 0) {
+		if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_STATS,
+		    &zc) == 0) {
 			/*
 			 * The real error is returned in the zc_cookie field.
 			 */
-			error = zc.zc_cookie;
+			error = errno = zc.zc_cookie;
 			break;
 		}
 
 		if (errno == ENOMEM) {
 			free((void *)(uintptr_t)zc.zc_config_dst);
-			zc.zc_config_dst = (uint64_t)(uintptr_t)
-			    zfs_malloc(zc.zc_config_dst_size);
+			if ((zc.zc_config_dst = (uint64_t)(uintptr_t)
+			    zfs_alloc(zhp->zpool_hdl,
+			    zc.zc_config_dst_size)) == NULL)
+				return (-1);
 		} else {
 			free((void *)(uintptr_t)zc.zc_config_dst);
-			return (errno);
+			return (-1);
 		}
 	}
 
-	verify(nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, &config, 0) == 0);
+	if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
+	    zc.zc_config_dst_size, &config, 0) != 0) {
+		free((void *)(uintptr_t)zc.zc_config_dst);
+		return (no_memory(zhp->zpool_hdl));
+	}
 
 	zhp->zpool_config_size = zc.zc_config_dst_size;
 	free((void *)(uintptr_t)zc.zc_config_dst);
 
-	set_pool_health(config);
+	if (set_pool_health(config) != 0)
+		return (no_memory(zhp->zpool_hdl));
 
 	if (zhp->zpool_config != NULL) {
 		uint64_t oldtxg, newtxg;
@@ -260,25 +317,26 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 
 	zhp->zpool_config = config;
 
-	return (error);
+	return (error ? -1 : 0);
 }
 
 /*
  * Iterate over all pools in the system.
  */
 int
-zpool_iter(zpool_iter_f func, void *data)
+zpool_iter(libzfs_handle_t *hdl, zpool_iter_f func, void *data)
 {
 	config_node_t *cn;
 	zpool_handle_t *zhp;
 	int ret;
 
-	namespace_reload();
+	if (namespace_reload(hdl) != 0)
+		return (-1);
 
-	for (cn = uu_avl_first(namespace_avl); cn != NULL;
-	    cn = uu_avl_next(namespace_avl, cn)) {
+	for (cn = uu_avl_first(hdl->libzfs_ns_avl); cn != NULL;
+	    cn = uu_avl_next(hdl->libzfs_ns_avl, cn)) {
 
-		if ((zhp = zpool_open_silent(cn->cn_name)) == NULL)
+		if ((zhp = zpool_open_silent(hdl, cn->cn_name)) == NULL)
 			continue;
 
 		if ((ret = func(zhp, data)) != 0)
@@ -293,18 +351,19 @@ zpool_iter(zpool_iter_f func, void *data)
  * handle passed each time must be explicitly closed by the callback.
  */
 int
-zfs_iter_root(zfs_iter_f func, void *data)
+zfs_iter_root(libzfs_handle_t *hdl, zfs_iter_f func, void *data)
 {
 	config_node_t *cn;
 	zfs_handle_t *zhp;
 	int ret;
 
-	namespace_reload();
+	if (namespace_reload(hdl) != 0)
+		return (-1);
 
-	for (cn = uu_avl_first(namespace_avl); cn != NULL;
-	    cn = uu_avl_next(namespace_avl, cn)) {
+	for (cn = uu_avl_first(hdl->libzfs_ns_avl); cn != NULL;
+	    cn = uu_avl_next(hdl->libzfs_ns_avl, cn)) {
 
-		if ((zhp = make_dataset_handle(cn->cn_name)) == NULL)
+		if ((zhp = make_dataset_handle(hdl, cn->cn_name)) == NULL)
 			continue;
 
 		if ((ret = func(zhp, data)) != 0)

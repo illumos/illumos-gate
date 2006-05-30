@@ -114,6 +114,7 @@ static uint64_t zopt_vdevtime;
 static int zopt_ashift = SPA_MINBLOCKSHIFT;
 static int zopt_mirrors = 2;
 static int zopt_raidz = 4;
+static int zopt_raidz_parity = 1;
 static size_t zopt_vdev_size = SPA_MINDEVSIZE;
 static int zopt_datasets = 7;
 static int zopt_threads = 23;
@@ -346,6 +347,7 @@ usage(void)
 	    "\t[-a alignment_shift (default: %d) (use 0 for random)]\n"
 	    "\t[-m mirror_copies (default: %d)]\n"
 	    "\t[-r raidz_disks (default: %d)]\n"
+	    "\t[-R raidz_parity (default: %d)]\n"
 	    "\t[-d datasets (default: %d)]\n"
 	    "\t[-t threads (default: %d)]\n"
 	    "\t[-g gang_block_threshold (default: %s)]\n"
@@ -364,6 +366,7 @@ usage(void)
 	    zopt_ashift,			/* -a */
 	    zopt_mirrors,			/* -m */
 	    zopt_raidz,				/* -r */
+	    zopt_raidz_parity,			/* -R */
 	    zopt_datasets,			/* -d */
 	    zopt_threads,			/* -t */
 	    nice_gang_bang,			/* -g */
@@ -407,7 +410,7 @@ process_options(int argc, char **argv)
 	zio_gang_bang = 32 << 10;
 
 	while ((opt = getopt(argc, argv,
-	    "v:s:a:m:r:d:t:g:i:k:p:f:VET:P:")) != EOF) {
+	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:")) != EOF) {
 		value = 0;
 		switch (opt) {
 		    case 'v':
@@ -415,6 +418,7 @@ process_options(int argc, char **argv)
 		    case 'a':
 		    case 'm':
 		    case 'r':
+		    case 'R':
 		    case 'd':
 		    case 't':
 		    case 'g':
@@ -439,6 +443,9 @@ process_options(int argc, char **argv)
 			break;
 		    case 'r':
 			zopt_raidz = MAX(1, value);
+			break;
+		    case 'R':
+			zopt_raidz_parity = MIN(MAX(value, 1), 2);
 			break;
 		    case 'd':
 			zopt_datasets = MAX(1, value);
@@ -480,8 +487,10 @@ process_options(int argc, char **argv)
 		}
 	}
 
+	zopt_raidz_parity = MIN(zopt_raidz_parity, zopt_raidz - 1);
+
 	zopt_vdevtime = (zopt_vdevs > 0 ? zopt_time / zopt_vdevs : UINT64_MAX);
-	zopt_maxfaults = MAX(zopt_mirrors, 1) * (zopt_raidz >= 2 ? 2 : 1) - 1;
+	zopt_maxfaults = MAX(zopt_mirrors, 1) * (zopt_raidz_parity + 1) - 1;
 }
 
 static uint64_t
@@ -542,6 +551,8 @@ make_vdev_raidz(size_t size, int r)
 	VERIFY(nvlist_alloc(&raidz, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(raidz, ZPOOL_CONFIG_TYPE,
 	    VDEV_TYPE_RAIDZ) == 0);
+	VERIFY(nvlist_add_uint64(raidz, ZPOOL_CONFIG_NPARITY,
+	    zopt_raidz_parity) == 0);
 	VERIFY(nvlist_add_nvlist_array(raidz, ZPOOL_CONFIG_CHILDREN,
 	    child, r) == 0);
 
@@ -671,7 +682,7 @@ ztest_replay_create(ztest_replay_t *zr, lr_create_t *lr, boolean_t byteswap)
 
 	error = dmu_object_claim(os, lr->lr_doid, lr->lr_mode, 0,
 	    DMU_OT_NONE, 0, tx);
-	ASSERT(error == 0);
+	ASSERT3U(error, ==, 0);
 	dmu_tx_commit(tx);
 
 	if (zopt_verbose >= 5) {

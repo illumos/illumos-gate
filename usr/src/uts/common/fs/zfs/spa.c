@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -185,33 +186,40 @@ spa_deactivate(spa_t *spa)
  * in the CLOSED state.  This will prep the pool before open/creation/import.
  * All vdev validation is done by the vdev_alloc() routine.
  */
-static vdev_t *
-spa_config_parse(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int atype)
+static int
+spa_config_parse(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent,
+    uint_t id, int atype)
 {
 	nvlist_t **child;
 	uint_t c, children;
-	vdev_t *vd;
+	int error;
 
-	if ((vd = vdev_alloc(spa, nv, parent, id, atype)) == NULL)
-		return (NULL);
+	if ((error = vdev_alloc(spa, vdp, nv, parent, id, atype)) != 0)
+		return (error);
 
-	if (vd->vdev_ops->vdev_op_leaf)
-		return (vd);
+	if ((*vdp)->vdev_ops->vdev_op_leaf)
+		return (0);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) != 0) {
-		vdev_free(vd);
-		return (NULL);
+		vdev_free(*vdp);
+		*vdp = NULL;
+		return (EINVAL);
 	}
 
 	for (c = 0; c < children; c++) {
-		if (spa_config_parse(spa, child[c], vd, c, atype) == NULL) {
-			vdev_free(vd);
-			return (NULL);
+		vdev_t *vd;
+		if ((error = spa_config_parse(spa, &vd, child[c], *vdp, c,
+		    atype)) != 0) {
+			vdev_free(*vdp);
+			*vdp = NULL;
+			return (error);
 		}
 	}
 
-	return (vd);
+	ASSERT(*vdp != NULL);
+
+	return (0);
 }
 
 /*
@@ -220,6 +228,8 @@ spa_config_parse(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int atype)
 static void
 spa_unload(spa_t *spa)
 {
+	int i;
+
 	/*
 	 * Stop async tasks.
 	 */
@@ -254,7 +264,114 @@ spa_unload(spa_t *spa)
 		vdev_free(spa->spa_root_vdev);
 	ASSERT(spa->spa_root_vdev == NULL);
 
+	for (i = 0; i < spa->spa_nspares; i++)
+		vdev_free(spa->spa_spares[i]);
+	if (spa->spa_spares) {
+		kmem_free(spa->spa_spares, spa->spa_nspares * sizeof (void *));
+		spa->spa_spares = NULL;
+	}
+	if (spa->spa_sparelist) {
+		nvlist_free(spa->spa_sparelist);
+		spa->spa_sparelist = NULL;
+	}
+
 	spa->spa_async_suspended = 0;
+}
+
+/*
+ * Load (or re-load) the current list of vdevs describing the active spares for
+ * this pool.  When this is called, we have some form of basic information in
+ * 'spa_sparelist'.  We parse this into vdevs, try to open them, and then
+ * re-generate a more complete list including status information.
+ */
+static void
+spa_load_spares(spa_t *spa)
+{
+	nvlist_t **spares;
+	uint_t nspares;
+	int i;
+
+	/*
+	 * First, close and free any existing spare vdevs.
+	 */
+	for (i = 0; i < spa->spa_nspares; i++) {
+		vdev_close(spa->spa_spares[i]);
+		vdev_free(spa->spa_spares[i]);
+	}
+	if (spa->spa_spares)
+		kmem_free(spa->spa_spares, spa->spa_nspares * sizeof (void *));
+
+	if (spa->spa_sparelist == NULL)
+		nspares = 0;
+	else
+		VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+		    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
+
+	spa->spa_nspares = (int)nspares;
+	spa->spa_spares = NULL;
+
+	if (nspares == 0)
+		return;
+
+	/*
+	 * Construct the array of vdevs, opening them to get status in the
+	 * process.
+	 */
+	spa->spa_spares = kmem_alloc(nspares * sizeof (void *), KM_SLEEP);
+	for (i = 0; i < spa->spa_nspares; i++) {
+		vdev_t *vd;
+
+		VERIFY(spa_config_parse(spa, &vd, spares[i], NULL, 0,
+		    VDEV_ALLOC_SPARE) == 0);
+		ASSERT(vd != NULL);
+
+		spa->spa_spares[i] = vd;
+
+		if (vdev_open(vd) != 0)
+			continue;
+
+		vd->vdev_top = vd;
+		(void) vdev_validate_spare(vd);
+	}
+
+	/*
+	 * Recompute the stashed list of spares, with status information
+	 * this time.
+	 */
+	VERIFY(nvlist_remove(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	    DATA_TYPE_NVLIST_ARRAY) == 0);
+
+	spares = kmem_alloc(spa->spa_nspares * sizeof (void *), KM_SLEEP);
+	for (i = 0; i < spa->spa_nspares; i++)
+		spares[i] = vdev_config_generate(spa, spa->spa_spares[i],
+		    B_TRUE, B_TRUE);
+	VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	    spares, spa->spa_nspares) == 0);
+	for (i = 0; i < spa->spa_nspares; i++)
+		nvlist_free(spares[i]);
+	kmem_free(spares, spa->spa_nspares * sizeof (void *));
+}
+
+static int
+load_nvlist(spa_t *spa, uint64_t obj, nvlist_t **value)
+{
+	dmu_buf_t *db;
+	char *packed = NULL;
+	size_t nvsize = 0;
+	int error;
+	*value = NULL;
+
+	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset, obj, FTAG, &db));
+	nvsize = *(uint64_t *)db->db_data;
+	dmu_buf_rele(db, FTAG);
+
+	packed = kmem_alloc(nvsize, KM_SLEEP);
+	error = dmu_read(spa->spa_meta_objset, obj, 0, nvsize, packed);
+	if (error == 0)
+		error = nvlist_unpack(packed, nvsize, value, 0);
+	kmem_free(packed, nvsize);
+
+	return (error);
 }
 
 /*
@@ -270,6 +387,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	uberblock_t *ub = &spa->spa_uberblock;
 	uint64_t config_cache_txg = spa->spa_config_txg;
 	uint64_t pool_guid;
+	uint64_t version;
 	zio_t *zio;
 
 	spa->spa_load_state = state;
@@ -279,6 +397,13 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		error = EINVAL;
 		goto out;
 	}
+
+	/*
+	 * Versioning wasn't explicitly added to the label until later, so if
+	 * it's not present treat it as the initial version.
+	 */
+	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &version) != 0)
+		version = ZFS_VERSION_INITIAL;
 
 	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
 	    &spa->spa_config_txg);
@@ -290,16 +415,17 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 
 	/*
-	 * Parse the configuration into a vdev tree.
+	 * Parse the configuration into a vdev tree.  We explicitly set the
+	 * value that will be returned by spa_version() since parsing the
+	 * configuration requires knowing the version number.
 	 */
 	spa_config_enter(spa, RW_WRITER, FTAG);
-	rvd = spa_config_parse(spa, nvroot, NULL, 0, VDEV_ALLOC_LOAD);
+	spa->spa_ubsync.ub_version = version;
+	error = spa_config_parse(spa, &rvd, nvroot, NULL, 0, VDEV_ALLOC_LOAD);
 	spa_config_exit(spa, FTAG);
 
-	if (rvd == NULL) {
-		error = EINVAL;
+	if (error != 0)
 		goto out;
-	}
 
 	ASSERT(spa->spa_root_vdev == rvd);
 	ASSERT(spa_guid(spa) == pool_guid);
@@ -396,24 +522,9 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 
 	if (!mosconfig) {
-		dmu_buf_t *db;
-		char *packed = NULL;
-		size_t nvsize = 0;
-		nvlist_t *newconfig = NULL;
+		nvlist_t *newconfig;
 
-		VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset,
-		    spa->spa_config_object, FTAG, &db));
-		nvsize = *(uint64_t *)db->db_data;
-		dmu_buf_rele(db, FTAG);
-
-		packed = kmem_alloc(nvsize, KM_SLEEP);
-		error = dmu_read(spa->spa_meta_objset,
-		    spa->spa_config_object, 0, nvsize, packed);
-		if (error == 0)
-			error = nvlist_unpack(packed, nvsize, &newconfig, 0);
-		kmem_free(packed, nvsize);
-
-		if (error) {
+		if (load_nvlist(spa, spa->spa_config_object, &newconfig) != 0) {
 			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			error = EIO;
@@ -421,7 +532,6 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		}
 
 		spa_config_set(spa, newconfig);
-
 		spa_unload(spa);
 		spa_deactivate(spa);
 		spa_activate(spa);
@@ -432,6 +542,21 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	if (zap_lookup(spa->spa_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SYNC_BPLIST,
 	    sizeof (uint64_t), 1, &spa->spa_sync_bplist_obj) != 0) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+
+	/*
+	 * Load the bit that tells us to use the new accounting function
+	 * (raid-z deflation).  If we have an older pool, this will not
+	 * be present.
+	 */
+	error = zap_lookup(spa->spa_meta_objset,
+	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_DEFLATE,
+	    sizeof (uint64_t), 1, &spa->spa_deflate);
+	if (error != 0 && error != ENOENT) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
 		error = EIO;
@@ -460,6 +585,32 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		    VDEV_AUX_CORRUPT_DATA);
 		error = EIO;
 		goto out;
+	}
+
+	/*
+	 * Load any hot spares for this pool.
+	 */
+	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_SPARES, sizeof (uint64_t), 1, &spa->spa_spares_object);
+	if (error != 0 && error != ENOENT) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+	if (error == 0) {
+		ASSERT(spa_version(spa) >= ZFS_VERSION_SPARES);
+		if (load_nvlist(spa, spa->spa_spares_object,
+		    &spa->spa_sparelist) != 0) {
+			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			error = EIO;
+			goto out;
+		}
+
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_spares(spa);
+		spa_config_exit(spa, FTAG);
 	}
 
 	/*
@@ -527,7 +678,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 
 	error = 0;
 out:
-	if (error)
+	if (error && error != EBADF)
 		zfs_ereport_post(FM_EREPORT_ZFS_POOL, spa, NULL, NULL, 0, 0);
 	spa->spa_load_state = SPA_LOAD_NONE;
 	spa->spa_ena = 0;
@@ -587,6 +738,7 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 			 * this is the case, the config cache is out of sync and
 			 * we should remove the pool from the namespace.
 			 */
+			zfs_post_ok(spa, NULL);
 			spa_unload(spa);
 			spa_deactivate(spa);
 			spa_remove(spa);
@@ -678,6 +830,48 @@ spa_inject_delref(spa_t *spa)
 	mutex_exit(&spa_namespace_lock);
 }
 
+static void
+spa_add_spares(spa_t *spa, nvlist_t *config)
+{
+	nvlist_t **spares;
+	uint_t i, nspares;
+	nvlist_t *nvroot;
+	uint64_t guid;
+	vdev_stat_t *vs;
+	uint_t vsc;
+
+	if (spa->spa_nspares == 0)
+		return;
+
+	VERIFY(nvlist_lookup_nvlist(config,
+	    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+	VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+	    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
+	if (nspares != 0) {
+		VERIFY(nvlist_add_nvlist_array(nvroot,
+		    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
+		VERIFY(nvlist_lookup_nvlist_array(nvroot,
+		    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
+
+		/*
+		 * Go through and find any spares which have since been
+		 * repurposed as an active spare.  If this is the case, update
+		 * their status appropriately.
+		 */
+		for (i = 0; i < nspares; i++) {
+			VERIFY(nvlist_lookup_uint64(spares[i],
+			    ZPOOL_CONFIG_GUID, &guid) == 0);
+			if (spa_spare_inuse(guid)) {
+				VERIFY(nvlist_lookup_uint64_array(
+				    spares[i], ZPOOL_CONFIG_STATS,
+				    (uint64_t **)&vs, &vsc) == 0);
+				vs->vs_state = VDEV_STATE_CANT_OPEN;
+				vs->vs_aux = VDEV_AUX_SPARED;
+			}
+		}
+	}
+}
+
 int
 spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 {
@@ -687,9 +881,12 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 	*config = NULL;
 	error = spa_open_common(name, &spa, FTAG, config);
 
-	if (spa && *config != NULL)
+	if (spa && *config != NULL) {
 		VERIFY(nvlist_add_uint64(*config, ZPOOL_CONFIG_ERRCOUNT,
 		    spa_get_errlog_size(spa)) == 0);
+
+		spa_add_spares(spa, *config);
+	}
 
 	/*
 	 * We want to get the alternate root even for faulted pools, so we cheat
@@ -717,6 +914,65 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 }
 
 /*
+ * Validate that the 'spares' array is well formed.  We must have an array of
+ * nvlists, each which describes a valid leaf vdev.
+ */
+static int
+spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
+{
+	nvlist_t **spares;
+	uint_t i, nspares;
+	vdev_t *vd;
+	int error;
+
+	/*
+	 * It's acceptable to have no spares specified.
+	 */
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) != 0)
+		return (0);
+
+	if (nspares == 0)
+		return (EINVAL);
+
+	/*
+	 * Make sure the pool is formatted with a version that supports hot
+	 * spares.
+	 */
+	if (spa_version(spa) < ZFS_VERSION_SPARES)
+		return (ENOTSUP);
+
+	for (i = 0; i < nspares; i++) {
+		if ((error = spa_config_parse(spa, &vd, spares[i], NULL, 0,
+		    mode)) != 0)
+			return (error);
+
+		if (!vd->vdev_ops->vdev_op_leaf) {
+			vdev_free(vd);
+			return (EINVAL);
+		}
+
+		if ((error = vdev_open(vd)) != 0) {
+			vdev_free(vd);
+			return (error);
+		}
+
+		vd->vdev_top = vd;
+		if ((error = vdev_label_spare(vd, crtxg)) != 0) {
+			vdev_free(vd);
+			return (error);
+		}
+
+		VERIFY(nvlist_add_uint64(spares[i], ZPOOL_CONFIG_GUID,
+		    vd->vdev_guid) == 0);
+
+		vdev_free(vd);
+	}
+
+	return (0);
+}
+
+/*
  * Pool Creation
  */
 int
@@ -726,8 +982,10 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	vdev_t *rvd;
 	dsl_pool_t *dp;
 	dmu_tx_t *tx;
-	int c, error;
+	int c, error = 0;
 	uint64_t txg = TXG_INITIAL;
+	nvlist_t **spares;
+	uint_t nspares;
 
 	/*
 	 * If this pool already exists, return failure.
@@ -753,28 +1011,46 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	 */
 	spa_config_enter(spa, RW_WRITER, FTAG);
 
-	rvd = spa_config_parse(spa, nvroot, NULL, 0, VDEV_ALLOC_ADD);
+	error = spa_config_parse(spa, &rvd, nvroot, NULL, 0, VDEV_ALLOC_ADD);
 
-	ASSERT(spa->spa_root_vdev == rvd);
+	ASSERT(error != 0 || rvd != NULL);
+	ASSERT(error != 0 || spa->spa_root_vdev == rvd);
 
-	if (rvd == NULL) {
+	if (error == 0 && rvd->vdev_children == 0)
 		error = EINVAL;
-	} else {
-		if ((error = vdev_create(rvd, txg)) == 0) {
-			for (c = 0; c < rvd->vdev_children; c++)
-				vdev_init(rvd->vdev_child[c], txg);
-			vdev_config_dirty(rvd);
-		}
+
+	if (error == 0 &&
+	    (error = vdev_create(rvd, txg, B_FALSE)) == 0 &&
+	    (error = spa_validate_spares(spa, nvroot, txg,
+	    VDEV_ALLOC_ADD)) == 0) {
+		for (c = 0; c < rvd->vdev_children; c++)
+			vdev_init(rvd->vdev_child[c], txg);
+		vdev_config_dirty(rvd);
 	}
 
 	spa_config_exit(spa, FTAG);
 
-	if (error) {
+	if (error != 0) {
 		spa_unload(spa);
 		spa_deactivate(spa);
 		spa_remove(spa);
 		mutex_exit(&spa_namespace_lock);
 		return (error);
+	}
+
+	/*
+	 * Get the list of spares, if specified.
+	 */
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) == 0) {
+		VERIFY(nvlist_alloc(&spa->spa_sparelist, NV_UNIQUE_NAME,
+		    KM_SLEEP) == 0);
+		VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+		    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_spares(spa);
+		spa_config_exit(spa, FTAG);
+		spa->spa_sync_spares = B_TRUE;
 	}
 
 	spa->spa_dsl_pool = dp = dsl_pool_create(spa, txg);
@@ -793,6 +1069,14 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_CONFIG,
 	    sizeof (uint64_t), 1, &spa->spa_config_object, tx) != 0) {
 		cmn_err(CE_PANIC, "failed to add pool config");
+	}
+
+	/* Newly created pools are always deflated. */
+	spa->spa_deflate = TRUE;
+	if (zap_add(spa->spa_meta_objset,
+	    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_DEFLATE,
+	    sizeof (uint64_t), 1, &spa->spa_deflate, tx) != 0) {
+		cmn_err(CE_PANIC, "failed to add deflate");
 	}
 
 	/*
@@ -838,6 +1122,9 @@ spa_import(const char *pool, nvlist_t *config, const char *altroot)
 {
 	spa_t *spa;
 	int error;
+	nvlist_t *nvroot;
+	nvlist_t **spares;
+	uint_t nspares;
 
 	if (!(spa_mode & FWRITE))
 		return (EROFS);
@@ -864,12 +1151,50 @@ spa_import(const char *pool, nvlist_t *config, const char *altroot)
 	 */
 	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_TRUE);
 
-	if (error) {
+	spa_config_enter(spa, RW_WRITER, FTAG);
+	/*
+	 * Toss any existing sparelist, as it doesn't have any validity anymore,
+	 * and conflicts with spa_has_spare().
+	 */
+	if (spa->spa_sparelist) {
+		nvlist_free(spa->spa_sparelist);
+		spa->spa_sparelist = NULL;
+		spa_load_spares(spa);
+	}
+
+	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+	if (error == 0)
+		error = spa_validate_spares(spa, nvroot, -1ULL,
+		    VDEV_ALLOC_SPARE);
+	spa_config_exit(spa, FTAG);
+
+	if (error != 0) {
 		spa_unload(spa);
 		spa_deactivate(spa);
 		spa_remove(spa);
 		mutex_exit(&spa_namespace_lock);
 		return (error);
+	}
+
+	/*
+	 * Override any spares as specified by the user, as these may have
+	 * correct device names/devids, etc.
+	 */
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) == 0) {
+		if (spa->spa_sparelist)
+			VERIFY(nvlist_remove(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, DATA_TYPE_NVLIST_ARRAY) == 0);
+		else
+			VERIFY(nvlist_alloc(&spa->spa_sparelist,
+			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+		    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_spares(spa);
+		spa_config_exit(spa, FTAG);
+		spa->spa_sync_spares = B_TRUE;
 	}
 
 	/*
@@ -933,6 +1258,11 @@ spa_tryimport(nvlist_t *tryconfig)
 		    poolname) == 0);
 		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_POOL_STATE,
 		    state) == 0);
+
+		/*
+		 * Add the list of hot spares.
+		 */
+		spa_add_spares(spa, config);
 	}
 
 	spa_unload(spa);
@@ -1083,26 +1413,80 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	int c, error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd, *tvd;
+	nvlist_t **spares;
+	uint_t i, nspares;
 
 	txg = spa_vdev_enter(spa);
 
-	vd = spa_config_parse(spa, nvroot, NULL, 0, VDEV_ALLOC_ADD);
+	if ((error = spa_config_parse(spa, &vd, nvroot, NULL, 0,
+	    VDEV_ALLOC_ADD)) != 0)
+		return (spa_vdev_exit(spa, NULL, txg, error));
 
-	if (vd == NULL)
-		return (spa_vdev_exit(spa, vd, txg, EINVAL));
-
-	if ((error = vdev_create(vd, txg)) != 0)
+	if ((error = spa_validate_spares(spa, nvroot, txg,
+	    VDEV_ALLOC_ADD)) != 0)
 		return (spa_vdev_exit(spa, vd, txg, error));
 
-	/*
-	 * Transfer each new top-level vdev from vd to rvd.
-	 */
-	for (c = 0; c < vd->vdev_children; c++) {
-		tvd = vd->vdev_child[c];
-		vdev_remove_child(vd, tvd);
-		tvd->vdev_id = rvd->vdev_children;
-		vdev_add_child(rvd, tvd);
-		vdev_config_dirty(tvd);
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) != 0)
+		nspares = 0;
+
+	if (vd->vdev_children == 0 && nspares == 0)
+		return (spa_vdev_exit(spa, vd, txg, EINVAL));
+
+	if (vd->vdev_children != 0) {
+		if ((error = vdev_create(vd, txg, B_FALSE)) != 0)
+			return (spa_vdev_exit(spa, vd, txg, error));
+
+		/*
+		 * Transfer each new top-level vdev from vd to rvd.
+		 */
+		for (c = 0; c < vd->vdev_children; c++) {
+			tvd = vd->vdev_child[c];
+			vdev_remove_child(vd, tvd);
+			tvd->vdev_id = rvd->vdev_children;
+			vdev_add_child(rvd, tvd);
+			vdev_config_dirty(tvd);
+		}
+	}
+
+	if (nspares != 0) {
+		if (spa->spa_sparelist != NULL) {
+			nvlist_t **oldspares;
+			uint_t oldnspares;
+			nvlist_t **newspares;
+
+			VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, &oldspares, &oldnspares) == 0);
+
+			newspares = kmem_alloc(sizeof (void *) *
+			    (nspares + oldnspares), KM_SLEEP);
+			for (i = 0; i < oldnspares; i++)
+				VERIFY(nvlist_dup(oldspares[i],
+				    &newspares[i], KM_SLEEP) == 0);
+			for (i = 0; i < nspares; i++)
+				VERIFY(nvlist_dup(spares[i],
+				    &newspares[i + oldnspares],
+				    KM_SLEEP) == 0);
+
+			VERIFY(nvlist_remove(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, DATA_TYPE_NVLIST_ARRAY) == 0);
+
+			VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, newspares,
+			    nspares + oldnspares) == 0);
+			for (i = 0; i < oldnspares + nspares; i++)
+				nvlist_free(newspares[i]);
+			kmem_free(newspares, (oldnspares + nspares) *
+			    sizeof (void *));
+		} else {
+			VERIFY(nvlist_alloc(&spa->spa_sparelist,
+			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+			VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
+		}
+
+		spa_load_spares(spa);
+		spa->spa_sync_spares = B_TRUE;
 	}
 
 	/*
@@ -1147,7 +1531,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	int error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *newrootvd, *pvd, *tvd;
-	vdev_ops_t *pvops = replacing ? &vdev_replacing_ops : &vdev_mirror_ops;
+	vdev_ops_t *pvops;
 
 	txg = spa_vdev_enter(spa);
 
@@ -1161,18 +1545,8 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 	pvd = oldvd->vdev_parent;
 
-	/*
-	 * The parent must be a mirror or the root, unless we're replacing;
-	 * in that case, the parent can be anything but another replacing vdev.
-	 */
-	if (pvd->vdev_ops != &vdev_mirror_ops &&
-	    pvd->vdev_ops != &vdev_root_ops &&
-	    (!replacing || pvd->vdev_ops == &vdev_replacing_ops))
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
-
-	newrootvd = spa_config_parse(spa, nvroot, NULL, 0, VDEV_ALLOC_ADD);
-
-	if (newrootvd == NULL || newrootvd->vdev_children != 1)
+	if ((error = spa_config_parse(spa, &newrootvd, nvroot, NULL, 0,
+	    VDEV_ALLOC_ADD)) != 0 || newrootvd->vdev_children != 1)
 		return (spa_vdev_exit(spa, newrootvd, txg, EINVAL));
 
 	newvd = newrootvd->vdev_child[0];
@@ -1180,8 +1554,42 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	if (!newvd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_exit(spa, newrootvd, txg, EINVAL));
 
-	if ((error = vdev_create(newrootvd, txg)) != 0)
+	if ((error = vdev_create(newrootvd, txg, replacing)) != 0)
 		return (spa_vdev_exit(spa, newrootvd, txg, error));
+
+	if (!replacing) {
+		/*
+		 * For attach, the only allowable parent is a mirror or the root
+		 * vdev.
+		 */
+		if (pvd->vdev_ops != &vdev_mirror_ops &&
+		    pvd->vdev_ops != &vdev_root_ops)
+			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
+
+		pvops = &vdev_mirror_ops;
+	} else {
+		/*
+		 * Active hot spares can only be replaced by inactive hot
+		 * spares.
+		 */
+		if (pvd->vdev_ops == &vdev_spare_ops &&
+		    pvd->vdev_child[1] == oldvd &&
+		    !spa_has_spare(spa, newvd->vdev_guid))
+			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
+
+		/*
+		 * If the source is a hot spare, and the parent isn't already a
+		 * spare, then we want to create a new hot spare.  Otherwise, we
+		 * want to create a replacing vdev.
+		 */
+		if (pvd->vdev_ops == &vdev_replacing_ops)
+			return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
+		else if (pvd->vdev_ops != &vdev_spare_ops &&
+		    newvd->vdev_isspare)
+			pvops = &vdev_spare_ops;
+		else
+			pvops = &vdev_replacing_ops;
+	}
 
 	/*
 	 * Compare the new device size with the replaceable/attachable
@@ -1214,8 +1622,8 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	}
 
 	/*
-	 * If the parent is not a mirror, or if we're replacing,
-	 * insert the new mirror/replacing vdev above oldvd.
+	 * If the parent is not a mirror, or if we're replacing, insert the new
+	 * mirror/replacing/spare vdev above oldvd.
 	 */
 	if (pvd->vdev_ops != pvops)
 		pvd = vdev_add_parent(oldvd, pvops);
@@ -1283,6 +1691,8 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	int c, t, error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd, *pvd, *cvd, *tvd;
+	boolean_t unspare = B_FALSE;
+	uint64_t unspare_guid;
 
 	txg = spa_vdev_enter(spa);
 
@@ -1298,17 +1708,27 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 
 	/*
 	 * If replace_done is specified, only remove this device if it's
-	 * the first child of a replacing vdev.
+	 * the first child of a replacing vdev.  For the 'spare' vdev, either
+	 * disk can be removed.
 	 */
-	if (replace_done &&
-	    (vd->vdev_id != 0 || pvd->vdev_ops != &vdev_replacing_ops))
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+	if (replace_done) {
+		if (pvd->vdev_ops == &vdev_replacing_ops) {
+			if (vd->vdev_id != 0)
+				return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		} else if (pvd->vdev_ops != &vdev_spare_ops) {
+			return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		}
+	}
+
+	ASSERT(pvd->vdev_ops != &vdev_spare_ops ||
+	    spa_version(spa) >= ZFS_VERSION_SPARES);
 
 	/*
-	 * Only mirror and replacing vdevs support detach.
+	 * Only mirror, replacing, and spare vdevs support detach.
 	 */
 	if (pvd->vdev_ops != &vdev_replacing_ops &&
-	    pvd->vdev_ops != &vdev_mirror_ops)
+	    pvd->vdev_ops != &vdev_mirror_ops &&
+	    pvd->vdev_ops != &vdev_spare_ops)
 		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
 
 	/*
@@ -1339,8 +1759,23 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 		if (!dirty)
 			break;
 	}
-	if (c == pvd->vdev_children)
+
+	/*
+	 * If we are a replacing or spare vdev, then we can always detach the
+	 * latter child, as that is how one cancels the operation.
+	 */
+	if ((pvd->vdev_ops == &vdev_mirror_ops || vd->vdev_id != 1) &&
+	    c == pvd->vdev_children)
 		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
+
+	/*
+	 * If we are detaching the original disk from a spare, then it implies
+	 * that the spare should become a real disk, and be removed from the
+	 * active spare list for the pool.
+	 */
+	if (pvd->vdev_ops == &vdev_spare_ops &&
+	    vd->vdev_id == 0)
+		unspare = B_TRUE;
 
 	/*
 	 * Erase the disk labels so the disk can be used for other things.
@@ -1350,7 +1785,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 * it may be that the unwritability of the disk is the reason
 	 * it's being detached!
 	 */
-	error = vdev_label_init(vd, 0);
+	error = vdev_label_init(vd, 0, B_FALSE);
 	if (error)
 		dprintf("unable to erase labels on %s\n", vdev_description(vd));
 
@@ -1364,6 +1799,19 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	 * Remember one of the remaining children so we can get tvd below.
 	 */
 	cvd = pvd->vdev_child[0];
+
+	/*
+	 * If we need to remove the remaining child from the list of hot spares,
+	 * do it now, marking the vdev as no longer a spare in the process.  We
+	 * must do this before vdev_remove_parent(), because that can change the
+	 * GUID if it creates a new toplevel GUID.
+	 */
+	if (unspare) {
+		ASSERT(cvd->vdev_isspare);
+		spa_spare_remove(cvd->vdev_guid);
+		cvd->vdev_isspare = B_FALSE;
+		unspare_guid = cvd->vdev_guid;
+	}
 
 	/*
 	 * If the parent mirror/replacing vdev only has one child,
@@ -1408,7 +1856,104 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 
 	dprintf("detached %s in txg %llu\n", vd->vdev_path, txg);
 
-	return (spa_vdev_exit(spa, vd, txg, 0));
+	error = spa_vdev_exit(spa, vd, txg, 0);
+
+	/*
+	 * If we are supposed to remove the given vdev from the list of spares,
+	 * iterate over all pools in the system and replace it if it's present.
+	 */
+	if (unspare) {
+		spa = NULL;
+		mutex_enter(&spa_namespace_lock);
+		while ((spa = spa_next(spa)) != NULL) {
+			if (spa->spa_state != POOL_STATE_ACTIVE)
+				continue;
+
+			(void) spa_vdev_remove(spa, unspare_guid, B_TRUE);
+		}
+		mutex_exit(&spa_namespace_lock);
+	}
+
+	return (error);
+}
+
+/*
+ * Remove a device from the pool.  Currently, this supports removing only hot
+ * spares.
+ */
+int
+spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
+{
+	vdev_t *vd;
+	nvlist_t **spares, *nv, **newspares;
+	uint_t i, j, nspares;
+	int ret = 0;
+
+	spa_config_enter(spa, RW_WRITER, FTAG);
+
+	vd = spa_lookup_by_guid(spa, guid);
+
+	nv = NULL;
+	if (spa->spa_spares != NULL &&
+	    nvlist_lookup_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) == 0) {
+		for (i = 0; i < nspares; i++) {
+			uint64_t theguid;
+
+			VERIFY(nvlist_lookup_uint64(spares[i],
+			    ZPOOL_CONFIG_GUID, &theguid) == 0);
+			if (theguid == guid) {
+				nv = spares[i];
+				break;
+			}
+		}
+	}
+
+	/*
+	 * We only support removing a hot spare, and only if it's not currently
+	 * in use in this pool.
+	 */
+	if (nv == NULL && vd == NULL) {
+		ret = ENOENT;
+		goto out;
+	}
+
+	if (nv == NULL && vd != NULL) {
+		ret = ENOTSUP;
+		goto out;
+	}
+
+	if (!unspare && nv != NULL && vd != NULL) {
+		ret = EBUSY;
+		goto out;
+	}
+
+	if (nspares == 1) {
+		newspares = NULL;
+	} else {
+		newspares = kmem_alloc((nspares - 1) * sizeof (void *),
+		    KM_SLEEP);
+		for (i = 0, j = 0; i < nspares; i++) {
+			if (spares[i] != nv)
+				VERIFY(nvlist_dup(spares[i],
+				    &newspares[j++], KM_SLEEP) == 0);
+		}
+	}
+
+	VERIFY(nvlist_remove(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	    DATA_TYPE_NVLIST_ARRAY) == 0);
+	VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	    newspares, nspares - 1) == 0);
+	for (i = 0; i < nspares - 1; i++)
+		nvlist_free(newspares[i]);
+	kmem_free(newspares, (nspares - 1) * sizeof (void *));
+	spa_load_spares(spa);
+	spa->spa_sync_spares = B_TRUE;
+
+out:
+	spa_config_exit(spa, FTAG);
+
+	return (ret);
 }
 
 /*
@@ -1446,14 +1991,30 @@ static void
 spa_vdev_replace_done(spa_t *spa)
 {
 	vdev_t *vd;
+	vdev_t *pvd;
 	uint64_t guid;
+	uint64_t pguid = 0;
 
 	spa_config_enter(spa, RW_READER, FTAG);
 
 	while ((vd = spa_vdev_replace_done_hunt(spa->spa_root_vdev)) != NULL) {
 		guid = vd->vdev_guid;
+		/*
+		 * If we have just finished replacing a hot spared device, then
+		 * we need to detach the parent's first child (the original hot
+		 * spare) as well.
+		 */
+		pvd = vd->vdev_parent;
+		if (pvd->vdev_parent->vdev_ops == &vdev_spare_ops &&
+		    pvd->vdev_id == 0) {
+			ASSERT(pvd->vdev_ops == &vdev_replacing_ops);
+			ASSERT(pvd->vdev_parent->vdev_children == 2);
+			pguid = pvd->vdev_parent->vdev_child[1]->vdev_guid;
+		}
 		spa_config_exit(spa, FTAG);
 		if (spa_vdev_detach(spa, guid, B_TRUE) != 0)
+			return;
+		if (pguid != 0 && spa_vdev_detach(spa, pguid, B_TRUE) != 0)
 			return;
 		spa_config_enter(spa, RW_READER, FTAG);
 	}
@@ -1475,8 +2036,36 @@ spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
 
 	txg = spa_vdev_enter(spa);
 
-	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENOENT));
+	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL) {
+		/*
+		 * Determine if this is a reference to a hot spare.  In that
+		 * case, update the path as stored in the spare list.
+		 */
+		nvlist_t **spares;
+		uint_t i, nspares;
+		if (spa->spa_sparelist != NULL) {
+			VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+			    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
+			for (i = 0; i < nspares; i++) {
+				uint64_t theguid;
+				VERIFY(nvlist_lookup_uint64(spares[i],
+				    ZPOOL_CONFIG_GUID, &theguid) == 0);
+				if (theguid == guid)
+					break;
+			}
+
+			if (i == nspares)
+				return (spa_vdev_exit(spa, NULL, txg, ENOENT));
+
+			VERIFY(nvlist_add_string(spares[i],
+			    ZPOOL_CONFIG_PATH, newpath) == 0);
+			spa_load_spares(spa);
+			spa->spa_sync_spares = B_TRUE;
+			return (spa_vdev_exit(spa, NULL, txg, 0));
+		} else {
+			return (spa_vdev_exit(spa, NULL, txg, ENOENT));
+		}
+	}
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
@@ -2049,12 +2638,79 @@ spa_sync_deferred_frees(spa_t *spa, uint64_t txg)
 }
 
 static void
-spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
+spa_sync_nvlist(spa_t *spa, uint64_t obj, nvlist_t *nv, dmu_tx_t *tx)
 {
-	nvlist_t *config;
 	char *packed = NULL;
 	size_t nvsize = 0;
 	dmu_buf_t *db;
+
+	VERIFY(nvlist_size(nv, &nvsize, NV_ENCODE_XDR) == 0);
+
+	packed = kmem_alloc(nvsize, KM_SLEEP);
+
+	VERIFY(nvlist_pack(nv, &packed, &nvsize, NV_ENCODE_XDR,
+	    KM_SLEEP) == 0);
+
+	dmu_write(spa->spa_meta_objset, obj, 0, nvsize, packed, tx);
+
+	kmem_free(packed, nvsize);
+
+	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset, obj, FTAG, &db));
+	dmu_buf_will_dirty(db, tx);
+	*(uint64_t *)db->db_data = nvsize;
+	dmu_buf_rele(db, FTAG);
+}
+
+static void
+spa_sync_spares(spa_t *spa, dmu_tx_t *tx)
+{
+	nvlist_t *nvroot;
+	nvlist_t **spares;
+	int i;
+
+	if (!spa->spa_sync_spares)
+		return;
+
+	/*
+	 * Update the MOS nvlist describing the list of available spares.
+	 * spa_validate_spares() will have already made sure this nvlist is
+	 * valid and the vdevs are labelled appropriately.
+	 */
+	if (spa->spa_spares_object == 0) {
+		spa->spa_spares_object = dmu_object_alloc(spa->spa_meta_objset,
+		    DMU_OT_PACKED_NVLIST, 1 << 14,
+		    DMU_OT_PACKED_NVLIST_SIZE, sizeof (uint64_t), tx);
+		VERIFY(zap_update(spa->spa_meta_objset,
+		    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SPARES,
+		    sizeof (uint64_t), 1, &spa->spa_spares_object, tx) == 0);
+	}
+
+	VERIFY(nvlist_alloc(&nvroot, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	if (spa->spa_nspares == 0) {
+		VERIFY(nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+		    NULL, 0) == 0);
+	} else {
+		spares = kmem_alloc(spa->spa_nspares * sizeof (void *),
+		    KM_SLEEP);
+		for (i = 0; i < spa->spa_nspares; i++)
+			spares[i] = vdev_config_generate(spa,
+			    spa->spa_spares[i], B_FALSE, B_TRUE);
+		VERIFY(nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+		    spares, spa->spa_nspares) == 0);
+		for (i = 0; i < spa->spa_nspares; i++)
+			nvlist_free(spares[i]);
+		kmem_free(spares, spa->spa_nspares * sizeof (void *));
+	}
+
+	spa_sync_nvlist(spa, spa->spa_spares_object, nvroot, tx);
+
+	spa->spa_sync_spares = B_FALSE;
+}
+
+static void
+spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
+{
+	nvlist_t *config;
 
 	if (list_is_empty(&spa->spa_dirty_list))
 		return;
@@ -2065,23 +2721,7 @@ spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
 		nvlist_free(spa->spa_config_syncing);
 	spa->spa_config_syncing = config;
 
-	VERIFY(nvlist_size(config, &nvsize, NV_ENCODE_XDR) == 0);
-
-	packed = kmem_alloc(nvsize, KM_SLEEP);
-
-	VERIFY(nvlist_pack(config, &packed, &nvsize, NV_ENCODE_XDR,
-	    KM_SLEEP) == 0);
-
-	dmu_write(spa->spa_meta_objset, spa->spa_config_object, 0, nvsize,
-	    packed, tx);
-
-	kmem_free(packed, nvsize);
-
-	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset,
-	    spa->spa_config_object, FTAG, &db));
-	dmu_buf_will_dirty(db, tx);
-	*(uint64_t *)db->db_data = nvsize;
-	dmu_buf_rele(db, FTAG);
+	spa_sync_nvlist(spa, spa->spa_config_object, config, tx);
 }
 
 /*
@@ -2109,6 +2749,29 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	VERIFY(0 == bplist_open(bpl, mos, spa->spa_sync_bplist_obj));
 
+	tx = dmu_tx_create_assigned(dp, txg);
+
+	/*
+	 * If we are upgrading to ZFS_VERSION_RAIDZ_DEFLATE this txg,
+	 * set spa_deflate if we have no raid-z vdevs.
+	 */
+	if (spa->spa_ubsync.ub_version < ZFS_VERSION_RAIDZ_DEFLATE &&
+	    spa->spa_uberblock.ub_version >= ZFS_VERSION_RAIDZ_DEFLATE) {
+		int i;
+
+		for (i = 0; i < rvd->vdev_children; i++) {
+			vd = rvd->vdev_child[i];
+			if (vd->vdev_deflate_ratio != SPA_MINBLOCKSIZE)
+				break;
+		}
+		if (i == rvd->vdev_children) {
+			spa->spa_deflate = TRUE;
+			VERIFY(0 == zap_add(spa->spa_meta_objset,
+			    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_DEFLATE,
+			    sizeof (uint64_t), 1, &spa->spa_deflate, tx));
+		}
+	}
+
 	/*
 	 * If anything has changed in this txg, push the deferred frees
 	 * from the previous txg.  If not, leave them alone so that we
@@ -2124,12 +2787,9 @@ spa_sync(spa_t *spa, uint64_t txg)
 	do {
 		spa->spa_sync_pass++;
 
-		tx = dmu_tx_create_assigned(dp, txg);
 		spa_sync_config_object(spa, tx);
-		dmu_tx_commit(tx);
-
+		spa_sync_spares(spa, tx);
 		spa_errlog_sync(spa, txg);
-
 		dsl_pool_sync(dp, txg);
 
 		dirty_vdevs = 0;
@@ -2138,10 +2798,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 			dirty_vdevs++;
 		}
 
-		tx = dmu_tx_create_assigned(dp, txg);
 		bplist_sync(bpl, tx);
-		dmu_tx_commit(tx);
-
 	} while (dirty_vdevs);
 
 	bplist_close(bpl);
@@ -2174,6 +2831,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 		if (c == children)
 			VERIFY(vdev_config_sync(rvd, txg) == 0);
 	}
+
+	dmu_tx_commit(tx);
 
 	/*
 	 * Clear the dirty config list.
@@ -2219,7 +2878,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 	/*
 	 * It had better be the case that we didn't dirty anything
-	 * since spa_sync_labels().
+	 * since vdev_config_sync().
 	 */
 	ASSERT(txg_list_empty(&dp->dp_dirty_datasets, txg));
 	ASSERT(txg_list_empty(&dp->dp_dirty_dirs, txg));
@@ -2319,4 +2978,18 @@ spa_upgrade(spa_t *spa)
 	vdev_config_dirty(spa->spa_root_vdev);
 
 	spa_config_exit(spa, FTAG);
+
+	txg_wait_synced(spa_get_dsl(spa), 0);
+}
+
+boolean_t
+spa_has_spare(spa_t *spa, uint64_t guid)
+{
+	int i;
+
+	for (i = 0; i < spa->spa_nspares; i++)
+		if (spa->spa_spares[i]->vdev_guid == guid)
+			return (B_TRUE);
+
+	return (B_FALSE);
 }

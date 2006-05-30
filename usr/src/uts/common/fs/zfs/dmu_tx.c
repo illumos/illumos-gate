@@ -181,8 +181,9 @@ dmu_tx_count_write(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 
 	/*
 	 * For i/o error checking, read the first and last level-0
-	 * blocks, and all the level-1 blocks.  We needn't do this on
-	 * the meta-dnode, because we've already read it in.
+	 * blocks (if they are not aligned), and all the level-1 blocks.
+	 * We needn't do this on the meta-dnode, because we've already
+	 * read it in.
 	 */
 
 	if (dn && dn->dn_object != DMU_META_DNODE_OBJECT) {
@@ -199,16 +200,20 @@ dmu_tx_count_write(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 			    NULL, NULL, ZIO_FLAG_CANFAIL);
 
 			/* first level-0 block */
-			start = off/dn->dn_datablksz;
-			err = dmu_tx_check_ioerr(zio, dn, 0, start);
-			if (err) {
-				tx->tx_err = err;
-				return;
+			start = off >> dn->dn_datablkshift;
+			if (P2PHASE(off, dn->dn_datablksz) ||
+			    len < dn->dn_datablksz) {
+				err = dmu_tx_check_ioerr(zio, dn, 0, start);
+				if (err) {
+					tx->tx_err = err;
+					return;
+				}
 			}
 
 			/* last level-0 block */
-			end = (off+len)/dn->dn_datablksz;
-			if (end != start) {
+			end = (off+len-1) >> dn->dn_datablkshift;
+			if (end != start &&
+			    P2PHASE(off+len, dn->dn_datablksz)) {
 				err = dmu_tx_check_ioerr(zio, dn, 0, end);
 				if (err) {
 					tx->tx_err = err;
@@ -330,6 +335,7 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 	uint64_t blkid, nblks;
 	uint64_t space = 0;
 	dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
+	spa_t *spa = tx->tx_pool->dp_spa;
 	int dirty;
 
 	/*
@@ -388,7 +394,7 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 			bp += blkid + i;
 			if (dsl_dataset_block_freeable(ds, bp->blk_birth)) {
 				dprintf_bp(bp, "can free old%s", "");
-				space += BP_GET_ASIZE(bp);
+				space += bp_get_dasize(spa, bp);
 			}
 		}
 		nblks = 0;
@@ -423,7 +429,7 @@ dmu_tx_count_free(dmu_tx_t *tx, dnode_t *dn, uint64_t off, uint64_t len)
 				    bp[i].blk_birth)) {
 					dprintf_bp(&bp[i],
 					    "can free old%s", "");
-					space += BP_GET_ASIZE(&bp[i]);
+					space += bp_get_dasize(spa, &bp[i]);
 				}
 			}
 			dbuf_rele(dbuf, FTAG);

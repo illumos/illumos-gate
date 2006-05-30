@@ -356,8 +356,6 @@ buf_hash_find(spa_t *spa, dva_t *dva, uint64_t birth, kmutex_t **lockp)
  * will be returned and the new element will not be inserted.
  * Otherwise returns NULL.
  */
-static arc_buf_hdr_t *fbufs[4]; /* XXX to find 6341326 */
-static kthread_t *fbufs_lastthread;
 static arc_buf_hdr_t *
 buf_hash_insert(arc_buf_hdr_t *buf, kmutex_t **lockp)
 {
@@ -367,13 +365,10 @@ buf_hash_insert(arc_buf_hdr_t *buf, kmutex_t **lockp)
 	uint32_t max, i;
 
 	ASSERT(!HDR_IN_HASH_TABLE(buf));
-	fbufs_lastthread = curthread;
 	*lockp = hash_lock;
 	mutex_enter(hash_lock);
 	for (fbuf = buf_hash_table.ht_table[idx], i = 0; fbuf != NULL;
 	    fbuf = fbuf->b_hash_next, i++) {
-		if (i < sizeof (fbufs) / sizeof (fbufs[0]))
-			fbufs[i] = fbuf;
 		if (BUF_EQUAL(buf->b_spa, &buf->b_dva, buf->b_birth, fbuf))
 			return (fbuf);
 	}

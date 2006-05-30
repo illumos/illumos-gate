@@ -1029,7 +1029,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 			 * it's OK if we get an odd answer.
 			 */
 			dnode_willuse_space(dn,
-			    -BP_GET_ASIZE(db->db_blkptr), tx);
+			    -bp_get_dasize(os->os_spa, db->db_blkptr), tx);
 		}
 		dnode_willuse_space(dn, db->db.db_size, tx);
 	}
@@ -1951,8 +1951,8 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		arc_buf_t **old =
 		    (arc_buf_t **)&db->db_d.db_data_old[txg&TXG_MASK];
 		blkptr_t **bpp = &db->db_d.db_overridden_by[txg&TXG_MASK];
-		int old_size = BP_GET_ASIZE(db->db_blkptr);
-		int new_size = BP_GET_ASIZE(*bpp);
+		int old_size = bp_get_dasize(os->os_spa, db->db_blkptr);
+		int new_size = bp_get_dasize(os->os_spa, *bpp);
 
 		ASSERT(db->db_blkid != DB_BONUS_BLKID);
 
@@ -2078,8 +2078,8 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 
 	dprintf_dbuf_bp(db, &zio->io_bp_orig, "bp_orig: %s", "");
 
-	old_size = BP_GET_ASIZE(&zio->io_bp_orig);
-	new_size = BP_GET_ASIZE(zio->io_bp);
+	old_size = bp_get_dasize(os->os_spa, &zio->io_bp_orig);
+	new_size = bp_get_dasize(os->os_spa, zio->io_bp);
 
 	dnode_diduse_space(dn, new_size-old_size);
 

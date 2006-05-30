@@ -34,6 +34,8 @@ typedef struct cbdata {
 	zpool_handle_t	*cb_pool;
 } cbdata_t;
 
+libzfs_handle_t *g_zfs;
+
 static int
 find_pool(zpool_handle_t *zhp, void *data)
 {
@@ -66,7 +68,7 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	cb.cb_guid = pool_guid;
 	cb.cb_pool = NULL;
 
-	if (zpool_iter(find_pool, &cb) == 1) {
+	if (zpool_iter(g_zfs, find_pool, &cb) == 1) {
 		name = zpool_get_name(cb.cb_pool);
 	} else {
 		(void) snprintf(guidbuf, sizeof (guidbuf), "%llx", pool_guid);
@@ -135,7 +137,7 @@ fmd_fmri_present(nvlist_t *nvl)
 	cb.cb_guid = pool_guid;
 	cb.cb_pool = NULL;
 
-	if (zpool_iter(find_pool, &cb) != 1)
+	if (zpool_iter(g_zfs, find_pool, &cb) != 1)
 		return (0);
 
 	if (nvlist_lookup_uint64(nvl, FM_FMRI_ZFS_VDEV, &vdev_guid) != 0) {
@@ -163,7 +165,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	cb.cb_guid = pool_guid;
 	cb.cb_pool = NULL;
 
-	if (zpool_iter(find_pool, &cb) != 1)
+	if (zpool_iter(g_zfs, find_pool, &cb) != 1)
 		return (1);
 
 	if (nvlist_lookup_uint64(nvl, FM_FMRI_ZFS_VDEV, &vdev_guid) != 0) {
@@ -188,4 +190,22 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	zpool_close(cb.cb_pool);
 
 	return (ret);
+}
+
+int
+fmd_fmri_init(void)
+{
+	g_zfs = libzfs_init();
+
+	if (g_zfs == NULL)
+		return (-1);
+	else
+		return (0);
+}
+
+void
+fmd_fmri_fini(void)
+{
+	if (g_zfs)
+		libzfs_fini(g_zfs);
 }

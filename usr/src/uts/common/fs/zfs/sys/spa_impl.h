@@ -65,7 +65,6 @@ struct spa {
 	nvlist_t	*spa_config;		/* last synced config */
 	nvlist_t	*spa_config_syncing;	/* currently syncing config */
 	uint64_t	spa_config_txg;		/* txg of last config change */
-	spa_config_lock_t spa_config_lock;	/* configuration changes */
 	kmutex_t	spa_config_cache_lock;	/* for spa_config RW_READER */
 	int		spa_sync_pass;		/* iterate-to-convergence */
 	int		spa_state;		/* pool state */
@@ -84,6 +83,11 @@ struct spa {
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
 	vdev_t		*spa_root_vdev;		/* top-level vdev container */
 	list_t		spa_dirty_list;		/* vdevs with dirty labels */
+	uint64_t	spa_spares_object;	/* MOS object for spare list */
+	nvlist_t	*spa_sparelist;		/* cached spare config */
+	vdev_t		**spa_spares;		/* available hot spares */
+	int		spa_nspares;		/* number of hot spares */
+	boolean_t	spa_sync_spares;	/* sync the spares list */
 	uint64_t	spa_config_object;	/* MOS object for pool config */
 	uint64_t	spa_syncing_txg;	/* txg currently syncing */
 	uint64_t	spa_sync_bplist_obj;	/* object for deferred frees */
@@ -122,11 +126,13 @@ struct spa {
 	kmutex_t	spa_errlist_lock;	/* error list/ereport lock */
 	avl_tree_t	spa_errlist_last;	/* last error list */
 	avl_tree_t	spa_errlist_scrub;	/* scrub error list */
+	uint64_t	spa_deflate;		/* should we deflate? */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function
 	 * correctly, the other fields must remain in the same location.
 	 */
+	spa_config_lock_t spa_config_lock;	/* configuration changes */
 	refcount_t	spa_refcount;		/* number of opens */
 };
 

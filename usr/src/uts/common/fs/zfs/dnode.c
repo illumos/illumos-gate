@@ -177,17 +177,10 @@ dnode_byteswap(dnode_phys_t *dnp)
 		return;
 	}
 
-	dnp->dn_type = BSWAP_8(dnp->dn_type);
-	dnp->dn_indblkshift = BSWAP_8(dnp->dn_indblkshift);
-	dnp->dn_nlevels = BSWAP_8(dnp->dn_nlevels);
-	dnp->dn_nblkptr = BSWAP_8(dnp->dn_nblkptr);
-	dnp->dn_bonustype = BSWAP_8(dnp->dn_bonustype);
-	dnp->dn_checksum = BSWAP_8(dnp->dn_checksum);
-	dnp->dn_compress = BSWAP_8(dnp->dn_compress);
 	dnp->dn_datablkszsec = BSWAP_16(dnp->dn_datablkszsec);
 	dnp->dn_bonuslen = BSWAP_16(dnp->dn_bonuslen);
 	dnp->dn_maxblkid = BSWAP_64(dnp->dn_maxblkid);
-	dnp->dn_secphys = BSWAP_64(dnp->dn_secphys);
+	dnp->dn_used = BSWAP_64(dnp->dn_used);
 
 	/*
 	 * dn_nblkptr is only one byte, so it's OK to read it in either
@@ -1110,27 +1103,29 @@ dnode_block_freed(dnode_t *dn, uint64_t blkid)
 
 /* call from syncing context when we actually write/free space for this dnode */
 void
-dnode_diduse_space(dnode_t *dn, int64_t space)
+dnode_diduse_space(dnode_t *dn, int64_t delta)
 {
-	uint64_t sectors;
-
-	dprintf_dnode(dn, "dn=%p dnp=%p secphys=%llu space=%lld\n",
+	uint64_t space;
+	dprintf_dnode(dn, "dn=%p dnp=%p used=%llu delta=%lld\n",
 	    dn, dn->dn_phys,
-	    (u_longlong_t)dn->dn_phys->dn_secphys,
-	    (longlong_t)space);
-
-	ASSERT(P2PHASE(space, 1<<DEV_BSHIFT) == 0);
+	    (u_longlong_t)dn->dn_phys->dn_used,
+	    (longlong_t)delta);
 
 	mutex_enter(&dn->dn_mtx);
-	if (space > 0) {
-		sectors = space >> DEV_BSHIFT;
-		ASSERT3U(dn->dn_phys->dn_secphys + sectors, >=,
-		    dn->dn_phys->dn_secphys);
-		dn->dn_phys->dn_secphys += sectors;
+	space = DN_USED_BYTES(dn->dn_phys);
+	if (delta > 0) {
+		ASSERT3U(space + delta, >=, space); /* no overflow */
 	} else {
-		sectors = -space >> DEV_BSHIFT;
-		ASSERT3U(dn->dn_phys->dn_secphys, >=, sectors);
-		dn->dn_phys->dn_secphys -= sectors;
+		ASSERT3U(space, >=, -delta); /* no underflow */
+	}
+	space += delta;
+	if (spa_version(dn->dn_objset->os_spa) < ZFS_VERSION_DNODE_BYTES) {
+		ASSERT((dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES) == 0);
+		ASSERT3U(P2PHASE(space, 1<<DEV_BSHIFT), ==, 0);
+		dn->dn_phys->dn_used = space >> DEV_BSHIFT;
+	} else {
+		dn->dn_phys->dn_used = space;
+		dn->dn_phys->dn_flags |= DNODE_FLAG_USED_BYTES;
 	}
 	mutex_exit(&dn->dn_mtx);
 }

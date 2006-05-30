@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +49,7 @@ typedef struct zpool_node {
 } zpool_node_t;
 
 struct zpool_list {
-	int		zl_findall;
+	boolean_t	zl_findall;
 	uu_avl_t	*zl_avl;
 	uu_avl_pool_t	*zl_pool;
 };
@@ -114,18 +113,18 @@ pool_list_get(int argc, char **argv, int *err)
 		no_memory();
 
 	if (argc == 0) {
-		(void) zpool_iter(add_pool, zlp);
-		zlp->zl_findall = TRUE;
+		(void) zpool_iter(g_zfs, add_pool, zlp);
+		zlp->zl_findall = B_TRUE;
 	} else {
 		int i;
 
 		for (i = 0; i < argc; i++) {
 			zpool_handle_t *zhp;
 
-			if ((zhp = zpool_open_canfail(argv[i])) != NULL)
+			if ((zhp = zpool_open_canfail(g_zfs, argv[i])) != NULL)
 				(void) add_pool(zhp, zlp);
 			else
-				*err = TRUE;
+				*err = B_TRUE;
 		}
 	}
 
@@ -141,7 +140,7 @@ void
 pool_list_update(zpool_list_t *zlp)
 {
 	if (zlp->zl_findall)
-		(void) zpool_iter(add_pool, zlp);
+		(void) zpool_iter(g_zfs, add_pool, zlp);
 }
 
 /*
@@ -223,7 +222,7 @@ pool_list_count(zpool_list_t *zlp)
  * using the pool_list_* interfaces.
  */
 int
-for_each_pool(int argc, char **argv, int unavail, zpool_iter_f func,
+for_each_pool(int argc, char **argv, boolean_t unavail, zpool_iter_f func,
     void *data)
 {
 	zpool_list_t *list;

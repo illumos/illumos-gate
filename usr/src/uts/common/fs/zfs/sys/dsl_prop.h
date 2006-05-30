@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -42,10 +41,9 @@ struct dsl_dataset;
 /* The callback func may not call into the DMU or DSL! */
 typedef void (dsl_prop_changed_cb_t)(void *arg, uint64_t newval);
 
-#define	DSL_PROP_VALUE_UNDEFINED (-1ULL)
-
 typedef struct dsl_prop_cb_record {
 	list_node_t cbr_node; /* link on dd_prop_cbs */
+	struct dsl_dataset *cbr_ds;
 	const char *cbr_propname;
 	dsl_prop_changed_cb_t *cbr_func;
 	void *cbr_arg;
@@ -55,6 +53,7 @@ int dsl_prop_register(struct dsl_dataset *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg);
 int dsl_prop_unregister(struct dsl_dataset *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg);
+int dsl_prop_numcb(struct dsl_dataset *ds);
 
 int dsl_prop_get(const char *ddname, const char *propname,
     int intsz, int numints, void *buf, char *setpoint);

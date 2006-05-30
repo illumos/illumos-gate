@@ -34,13 +34,29 @@
 #include <sys/zfs_acl.h>
 #include <sys/nvpair.h>
 
+#include <libuutil.h>
 #include <libzfs.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+struct libzfs_handle {
+	int libzfs_error;
+	int libzfs_fd;
+	FILE *libzfs_mnttab;
+	FILE *libzfs_sharetab;
+	uu_avl_pool_t *libzfs_ns_avlpool;
+	uu_avl_t *libzfs_ns_avl;
+	uint64_t libzfs_ns_gen;
+	int libzfs_desc_active;
+	char libzfs_action[1024];
+	char libzfs_desc[1024];
+	int libzfs_printerr;
+};
+
 struct zfs_handle {
+	libzfs_handle_t *zfs_hdl;
 	char zfs_name[ZFS_MAXNAMELEN];
 	zfs_type_t zfs_type;
 	dmu_objset_stats_t zfs_dmustats;
@@ -52,6 +68,7 @@ struct zfs_handle {
 };
 
 struct zpool_handle {
+	libzfs_handle_t *zpool_hdl;
 	char zpool_name[ZPOOL_MAXNAMELEN];
 	int zpool_state;
 	size_t zpool_config_size;
@@ -61,18 +78,16 @@ struct zpool_handle {
 	size_t zpool_error_count;
 };
 
-void zfs_error(const char *, ...);
-void zfs_fatal(const char *, ...);
-void *zfs_malloc(size_t);
-char *zfs_strdup(const char *);
-void no_memory(void);
+int zfs_error(libzfs_handle_t *, int, const char *, ...);
+void zfs_error_aux(libzfs_handle_t *, const char *, ...);
+void *zfs_alloc(libzfs_handle_t *, size_t);
+char *zfs_strdup(libzfs_handle_t *, const char *);
+int no_memory(libzfs_handle_t *);
 
-#define	zfs_baderror(err)						\
-	(zfs_fatal(dgettext(TEXT_DOMAIN,				\
-	"internal error: unexpected error %d at line %d of %s"),	\
-	(err), (__LINE__), (__FILE__)))
+int zfs_standard_error(libzfs_handle_t *, int, const char *, ...);
+int zpool_standard_error(libzfs_handle_t *, int, const char *, ...);
 
-char **get_dependents(const char *, size_t *);
+char **get_dependents(libzfs_handle_t *, const char *, size_t *);
 
 typedef struct prop_changelist prop_changelist_t;
 
@@ -87,17 +102,15 @@ int changelist_haszonedchild(prop_changelist_t *);
 
 void remove_mountpoint(zfs_handle_t *);
 
-zfs_handle_t *make_dataset_handle(const char *);
-void set_pool_health(nvlist_t *);
+zfs_handle_t *make_dataset_handle(libzfs_handle_t *, const char *);
+int set_pool_health(nvlist_t *);
 
-zpool_handle_t *zpool_open_silent(const char *);
+zpool_handle_t *zpool_open_silent(libzfs_handle_t *, const char *);
 
-int zvol_create_link(const char *);
-int zvol_remove_link(const char *);
+int zvol_create_link(libzfs_handle_t *, const char *);
+int zvol_remove_link(libzfs_handle_t *, const char *);
 
-int zfs_ioctl(int, zfs_cmd_t *);
-FILE *zfs_mnttab(void);
-FILE *zfs_sharetab(void);
+void namespace_clear(libzfs_handle_t *);
 
 #ifdef	__cplusplus
 }

@@ -121,9 +121,12 @@ typedef struct zfs_graph {
  * Allocate a new edge pointing to the target vertex.
  */
 static zfs_edge_t *
-zfs_edge_create(zfs_vertex_t *dest)
+zfs_edge_create(libzfs_handle_t *hdl, zfs_vertex_t *dest)
 {
-	zfs_edge_t *zep = zfs_malloc(sizeof (zfs_edge_t));
+	zfs_edge_t *zep = zfs_alloc(hdl, sizeof (zfs_edge_t));
+
+	if (zep == NULL)
+		return (NULL);
 
 	zep->ze_dest = dest;
 
@@ -143,15 +146,23 @@ zfs_edge_destroy(zfs_edge_t *zep)
  * Allocate a new vertex with the given name.
  */
 static zfs_vertex_t *
-zfs_vertex_create(const char *dataset)
+zfs_vertex_create(libzfs_handle_t *hdl, const char *dataset)
 {
-	zfs_vertex_t *zvp = zfs_malloc(sizeof (zfs_vertex_t));
+	zfs_vertex_t *zvp = zfs_alloc(hdl, sizeof (zfs_vertex_t));
+
+	if (zvp == NULL)
+		return (NULL);
 
 	assert(strlen(dataset) < ZFS_MAXNAMELEN);
 
 	(void) strlcpy(zvp->zv_dataset, dataset, sizeof (zvp->zv_dataset));
 
-	zvp->zv_edges = zfs_malloc(MIN_EDGECOUNT * sizeof (void *));
+	if ((zvp->zv_edges = zfs_alloc(hdl,
+	    MIN_EDGECOUNT * sizeof (void *))) == NULL) {
+		free(zvp);
+		return (NULL);
+	}
+
 	zvp->zv_edgealloc = MIN_EDGECOUNT;
 
 	return (zvp);
@@ -175,14 +186,21 @@ zfs_vertex_destroy(zfs_vertex_t *zvp)
 /*
  * Given a vertex, add an edge to the destination vertex.
  */
-static void
-zfs_vertex_add_edge(zfs_vertex_t *zvp, zfs_vertex_t *dest)
+static int
+zfs_vertex_add_edge(libzfs_handle_t *hdl, zfs_vertex_t *zvp,
+    zfs_vertex_t *dest)
 {
-	zfs_edge_t *zep = zfs_edge_create(dest);
+	zfs_edge_t *zep = zfs_edge_create(hdl, dest);
+
+	if (zep == NULL)
+		return (-1);
 
 	if (zvp->zv_edgecount == zvp->zv_edgealloc) {
-		zfs_edge_t **newedges = zfs_malloc(zvp->zv_edgealloc * 2 *
+		zfs_edge_t **newedges = zfs_alloc(hdl, zvp->zv_edgealloc * 2 *
 		    sizeof (void *));
+
+		if (newedges == NULL)
+			return (-1);
 
 		bcopy(zvp->zv_edges, newedges,
 		    zvp->zv_edgealloc * sizeof (void *));
@@ -193,6 +211,8 @@ zfs_vertex_add_edge(zfs_vertex_t *zvp, zfs_vertex_t *dest)
 	}
 
 	zvp->zv_edges[zvp->zv_edgecount++] = zep;
+
+	return (0);
 }
 
 static int
@@ -227,12 +247,19 @@ zfs_vertex_sort_edges(zfs_vertex_t *zvp)
  * datasets in the pool.
  */
 static zfs_graph_t *
-zfs_graph_create(size_t size)
+zfs_graph_create(libzfs_handle_t *hdl, size_t size)
 {
-	zfs_graph_t *zgp = zfs_malloc(sizeof (zfs_graph_t));
+	zfs_graph_t *zgp = zfs_alloc(hdl, sizeof (zfs_graph_t));
+
+	if (zgp == NULL)
+		return (NULL);
 
 	zgp->zg_size = size;
-	zgp->zg_hash = zfs_malloc(size * sizeof (zfs_vertex_t *));
+	if ((zgp->zg_hash = zfs_alloc(hdl,
+	    size * sizeof (zfs_vertex_t *))) == NULL) {
+		free(zgp);
+		return (NULL);
+	}
 
 	return (zgp);
 }
@@ -280,7 +307,8 @@ zfs_graph_hash(zfs_graph_t *zgp, const char *str)
  * Given a dataset name, finds the associated vertex, creating it if necessary.
  */
 static zfs_vertex_t *
-zfs_graph_lookup(zfs_graph_t *zgp, const char *dataset, uint64_t txg)
+zfs_graph_lookup(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset,
+    uint64_t txg)
 {
 	size_t idx = zfs_graph_hash(zgp, dataset);
 	zfs_vertex_t *zvp;
@@ -293,7 +321,9 @@ zfs_graph_lookup(zfs_graph_t *zgp, const char *dataset, uint64_t txg)
 		}
 	}
 
-	zvp = zfs_vertex_create(dataset);
+	if ((zvp = zfs_vertex_create(hdl, dataset)) == NULL)
+		return (NULL);
+
 	zvp->zv_next = zgp->zg_hash[idx];
 	zvp->zv_txg = txg;
 	zgp->zg_hash[idx] = zvp;
@@ -308,43 +338,52 @@ zfs_graph_lookup(zfs_graph_t *zgp, const char *dataset, uint64_t txg)
  * created it as a destination of another edge.  If 'dest' is NULL, then this
  * is an individual vertex (i.e. the starting vertex), so don't add an edge.
  */
-static void
-zfs_graph_add(zfs_graph_t *zgp, const char *source, const char *dest,
-    uint64_t txg)
+static int
+zfs_graph_add(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *source,
+    const char *dest, uint64_t txg)
 {
 	zfs_vertex_t *svp, *dvp;
 
-	svp = zfs_graph_lookup(zgp, source, 0);
+	if ((svp = zfs_graph_lookup(hdl, zgp, source, 0)) == NULL)
+		return (-1);
 	svp->zv_visited = 1;
 	if (dest != NULL) {
-		dvp = zfs_graph_lookup(zgp, dest, txg);
-		zfs_vertex_add_edge(svp, dvp);
+		dvp = zfs_graph_lookup(hdl, zgp, dest, txg);
+		if (dvp == NULL)
+			return (-1);
+		if (zfs_vertex_add_edge(hdl, svp, dvp) != 0)
+			return (-1);
 	}
+
+	return (0);
 }
 
 /*
  * Iterate over all children of the given dataset, adding any vertices as
- * necessary.  Returns 0 if no cloned snapshots were seen, 1 otherwise.  This is
+ * necessary.  Returns 0 if no cloned snapshots were seen, -1 if there was an
+ * error, or 1 otherwise.  This is
  * a simple recursive algorithm - the ZFS namespace typically is very flat.  We
  * manually invoke the necessary ioctl() calls to avoid the overhead and
  * additional semantics of zfs_open().
  */
 static int
-iterate_children(zfs_graph_t *zgp, const char *dataset)
+iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
 {
 	zfs_cmd_t zc = { 0 };
-	int ret = 0;
+	int ret = 0, err;
 	zfs_vertex_t *zvp;
 
 	/*
 	 * Look up the source vertex, and avoid it if we've seen it before.
 	 */
-	zvp = zfs_graph_lookup(zgp, dataset, 0);
+	zvp = zfs_graph_lookup(hdl, zgp, dataset, 0);
+	if (zvp == NULL)
+		return (-1);
 	if (zvp->zv_visited)
 		return (0);
 
 	for ((void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
-	    zfs_ioctl(ZFS_IOC_DATASET_LIST_NEXT, &zc) == 0;
+	    ioctl(hdl->libzfs_fd, ZFS_IOC_DATASET_LIST_NEXT, &zc) == 0;
 	    (void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name))) {
 
 		/*
@@ -358,32 +397,38 @@ iterate_children(zfs_graph_t *zgp, const char *dataset)
 		 * dataset and clone statistics.  If this fails, the dataset has
 		 * since been removed, and we're pretty much screwed anyway.
 		 */
-		if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) != 0)
+		if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) != 0)
 			continue;
 
 		/*
 		 * Add an edge between the parent and the child.
 		 */
-		zfs_graph_add(zgp, dataset, zc.zc_name,
-		    zc.zc_objset_stats.dds_creation_txg);
+		if (zfs_graph_add(hdl, zgp, dataset, zc.zc_name,
+		    zc.zc_objset_stats.dds_creation_txg) != 0)
+			return (-1);
 
 		/*
 		 * If this dataset has a clone parent, add an appropriate edge.
 		 */
-		if (zc.zc_objset_stats.dds_clone_of[0] != '\0')
-			zfs_graph_add(zgp, zc.zc_objset_stats.dds_clone_of,
-			    zc.zc_name, zc.zc_objset_stats.dds_creation_txg);
+		if (zc.zc_objset_stats.dds_clone_of[0] != '\0' &&
+		    zfs_graph_add(hdl, zgp, zc.zc_objset_stats.dds_clone_of,
+		    zc.zc_name, zc.zc_objset_stats.dds_creation_txg) != 0)
+			return (-1);
 
 		/*
 		 * Iterate over all children
 		 */
-		ret |= iterate_children(zgp, zc.zc_name);
+		err = iterate_children(hdl, zgp, zc.zc_name);
+		if (err == -1)
+			return (-1);
+		else if (err == 1)
+			ret = 1;
 
 		/*
 		 * Indicate if we found a dataset with a non-zero clone count.
 		 */
 		if (zc.zc_objset_stats.dds_num_clones != 0)
-			ret |= 1;
+			ret = 1;
 	}
 
 	/*
@@ -392,7 +437,7 @@ iterate_children(zfs_graph_t *zgp, const char *dataset)
 	bzero(&zc, sizeof (zc));
 
 	for ((void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
-	    zfs_ioctl(ZFS_IOC_SNAPSHOT_LIST_NEXT, &zc) == 0;
+	    ioctl(hdl->libzfs_fd, ZFS_IOC_SNAPSHOT_LIST_NEXT, &zc) == 0;
 	    (void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name))) {
 
 		/*
@@ -400,20 +445,21 @@ iterate_children(zfs_graph_t *zgp, const char *dataset)
 		 * dataset and clone statistics.  If this fails, the dataset has
 		 * since been removed, and we're pretty much screwed anyway.
 		 */
-		if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) != 0)
+		if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) != 0)
 			continue;
 
 		/*
 		 * Add an edge between the parent and the child.
 		 */
-		zfs_graph_add(zgp, dataset, zc.zc_name,
-		    zc.zc_objset_stats.dds_creation_txg);
+		if (zfs_graph_add(hdl, zgp, dataset, zc.zc_name,
+		    zc.zc_objset_stats.dds_creation_txg) != 0)
+			return (-1);
 
 		/*
 		 * Indicate if we found a dataset with a non-zero clone count.
 		 */
 		if (zc.zc_objset_stats.dds_num_clones != 0)
-			ret |= 1;
+			ret = 1;
 	}
 
 	zvp->zv_visited = 1;
@@ -428,20 +474,24 @@ iterate_children(zfs_graph_t *zgp, const char *dataset)
  * over all datasets.
  */
 static zfs_graph_t *
-construct_graph(const char *dataset)
+construct_graph(libzfs_handle_t *hdl, const char *dataset)
 {
-	zfs_graph_t *zgp = zfs_graph_create(ZFS_GRAPH_SIZE);
+	zfs_graph_t *zgp = zfs_graph_create(hdl, ZFS_GRAPH_SIZE);
 	zfs_cmd_t zc = { 0 };
+	int ret = 0;
+
+	if (zgp == NULL)
+		return (zgp);
 
 	/*
 	 * We need to explicitly check whether this dataset has clones or not,
 	 * since iterate_children() only checks the children.
 	 */
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
-	(void) zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc);
+	(void) ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc);
 
 	if (zc.zc_objset_stats.dds_num_clones != 0 ||
-	    iterate_children(zgp, dataset) != 0) {
+	    (ret = iterate_children(hdl, zgp, dataset)) != 0) {
 		/*
 		 * Determine pool name and try again.
 		 */
@@ -449,17 +499,29 @@ construct_graph(const char *dataset)
 
 		if ((slash = strchr(dataset, '/')) != NULL ||
 		    (slash = strchr(dataset, '@')) != NULL) {
-			pool = zfs_malloc(slash - dataset + 1);
+			pool = zfs_alloc(hdl, slash - dataset + 1);
+			if (pool == NULL) {
+				zfs_graph_destroy(zgp);
+				return (NULL);
+			}
 			(void) strncpy(pool, dataset, slash - dataset);
 			pool[slash - dataset] = '\0';
 
-			(void) iterate_children(zgp, pool);
-			zfs_graph_add(zgp, pool, NULL, 0);
+			if (iterate_children(hdl, zgp, pool) == -1 ||
+			    zfs_graph_add(hdl, zgp, pool, NULL, 0) != 0) {
+				free(pool);
+				zfs_graph_destroy(zgp);
+				return (NULL);
+			}
 
 			free(pool);
 		}
 	}
-	zfs_graph_add(zgp, dataset, NULL, 0);
+
+	if (ret == -1 || zfs_graph_add(hdl, zgp, dataset, NULL, 0) != 0) {
+		zfs_graph_destroy(zgp);
+		return (NULL);
+	}
 
 	return (zgp);
 }
@@ -469,27 +531,33 @@ construct_graph(const char *dataset)
  * really just a depth first search, so that the deepest nodes appear first.
  * hijack the 'zv_visited' marker to avoid visiting the same vertex twice.
  */
-static void
-topo_sort(char **result, size_t *idx, zfs_vertex_t *zgv)
+static int
+topo_sort(libzfs_handle_t *hdl, char **result, size_t *idx, zfs_vertex_t *zgv)
 {
 	int i;
 
 	/* avoid doing a search if we don't have to */
 	if (zgv->zv_visited == 2)
-		return;
+		return (0);
 
 	zfs_vertex_sort_edges(zgv);
-	for (i = 0; i < zgv->zv_edgecount; i++)
-		topo_sort(result, idx, zgv->zv_edges[i]->ze_dest);
+	for (i = 0; i < zgv->zv_edgecount; i++) {
+		if (topo_sort(hdl, result, idx, zgv->zv_edges[i]->ze_dest) != 0)
+			return (-1);
+	}
 
 	/* we may have visited this in the course of the above */
 	if (zgv->zv_visited == 2)
-		return;
+		return (0);
 
-	result[*idx] = zfs_malloc(strlen(zgv->zv_dataset) + 1);
+	if ((result[*idx] = zfs_alloc(hdl,
+	    strlen(zgv->zv_dataset) + 1)) == NULL)
+		return (-1);
+
 	(void) strcpy(result[*idx], zgv->zv_dataset);
 	*idx += 1;
 	zgv->zv_visited = 2;
+	return (0);
 }
 
 /*
@@ -498,19 +566,33 @@ topo_sort(char **result, size_t *idx, zfs_vertex_t *zgv)
  * sort, and then return the array of strings to the caller.
  */
 char **
-get_dependents(const char *dataset, size_t *count)
+get_dependents(libzfs_handle_t *hdl, const char *dataset, size_t *count)
 {
 	char **result;
 	zfs_graph_t *zgp;
 	zfs_vertex_t *zvp;
 
-	zgp = construct_graph(dataset);
-	result = zfs_malloc(zgp->zg_nvertex * sizeof (char *));
+	if ((zgp = construct_graph(hdl, dataset)) == NULL)
+		return (NULL);
 
-	zvp = zfs_graph_lookup(zgp, dataset, 0);
+	if ((result = zfs_alloc(hdl,
+	    zgp->zg_nvertex * sizeof (char *))) == NULL) {
+		zfs_graph_destroy(zgp);
+		return (NULL);
+	}
+
+	if ((zvp = zfs_graph_lookup(hdl, zgp, dataset, 0)) == NULL) {
+		free(result);
+		zfs_graph_destroy(zgp);
+		return (NULL);
+	}
 
 	*count = 0;
-	topo_sort(result, count, zvp);
+	if (topo_sort(hdl, result, count, zvp) != 0) {
+		free(result);
+		zfs_graph_destroy(zgp);
+		return (NULL);
+	}
 
 	/*
 	 * Get rid of the last entry, which is our starting vertex and not

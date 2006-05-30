@@ -237,55 +237,43 @@ static void do_df(int, char **)	__NORETURN;
 static void parse_options(int, char **);
 static char *basename(char *);
 
-
-/* ARGSUSED */
-static void
-dummy_error_handler(const char *fmt, va_list ap)
-{
-	/* Do nothing */
-}
-
-static zfs_handle_t *(*_zfs_open)(const char *, int);
+static libzfs_handle_t *(*_libzfs_init)(boolean_t);
+static zfs_handle_t *(*_zfs_open)(libzfs_handle_t *, const char *, int);
 static void (*_zfs_close)(zfs_handle_t *);
 static uint64_t (*_zfs_prop_get_int)(zfs_handle_t *, zfs_prop_t);
-static void (*_zfs_set_error_handler)(void (*)(const char *, va_list));
+static libzfs_handle_t *g_zfs;
 
 /*
  * Dynamically check for libzfs, in case the user hasn't installed the SUNWzfs
  * packages.  A basic utility such as df shouldn't depend on optional
  * filesystems.
  */
-static int
+static boolean_t
 load_libzfs(void)
 {
 	void *hdl;
 
-	if (_zfs_open != NULL)
-		return (1);
+	if (_libzfs_init != NULL)
+		return (g_zfs != NULL);
 
 	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
-		_zfs_set_error_handler = (void (*)())
-		    dlsym(hdl, "zfs_set_error_handler");
+		_libzfs_init = (libzfs_handle_t *(*)(boolean_t))dlsym(hdl,
+		    "libzfs_init");
 		_zfs_open = (zfs_handle_t *(*)())dlsym(hdl, "zfs_open");
 		_zfs_close = (void (*)())dlsym(hdl, "zfs_close");
 		_zfs_prop_get_int = (uint64_t (*)())
 		    dlsym(hdl, "zfs_prop_get_int");
 
-		if (_zfs_set_error_handler != NULL) {
+		if (_libzfs_init != NULL) {
 			assert(_zfs_open != NULL);
 			assert(_zfs_close != NULL);
 			assert(_zfs_prop_get_int != NULL);
 
-			/*
-			 * Disable ZFS error reporting, so we don't get messages
-			 * like "can't open ..." under race conditions.
-			 */
-			_zfs_set_error_handler(dummy_error_handler);
-			return (1);
+			g_zfs = _libzfs_init(B_FALSE);
 		}
 	}
 
-	return (0);
+	return (g_zfs != NULL);
 }
 
 int
@@ -1257,7 +1245,7 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 	do {
 		*slash = '\0';
 
-		if ((zhp = _zfs_open(dataset, ZFS_TYPE_ANY)) == NULL) {
+		if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL) {
 			free(dataset);
 			return;
 		}
@@ -1274,7 +1262,7 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 	} while ((slash = strrchr(dataset, '/')) != NULL);
 
 
-	if ((zhp = _zfs_open(dataset, ZFS_TYPE_ANY)) == NULL) {
+	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL) {
 		free(dataset);
 		return;
 	}

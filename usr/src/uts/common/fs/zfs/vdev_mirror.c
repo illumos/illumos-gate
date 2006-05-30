@@ -85,6 +85,7 @@ vdev_mirror_map_alloc(zio_t *zio)
 
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
+
 			mc->mc_vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[c]));
 			mc->mc_offset = DVA_GET_OFFSET(&dva[c]);
 		}
@@ -93,7 +94,8 @@ vdev_mirror_map_alloc(zio_t *zio)
 
 		mm = kmem_zalloc(offsetof(mirror_map_t, mm_child[c]), KM_SLEEP);
 		mm->mm_children = c;
-		mm->mm_replacing = (vd->vdev_ops == &vdev_replacing_ops);
+		mm->mm_replacing = (vd->vdev_ops == &vdev_replacing_ops ||
+		    vd->vdev_ops == &vdev_spare_ops);
 		mm->mm_preferred = mm->mm_replacing ? 0 : spa_get_random(c);
 		mm->mm_root = B_FALSE;
 
@@ -475,5 +477,16 @@ vdev_ops_t vdev_replacing_ops = {
 	vdev_mirror_io_done,
 	vdev_mirror_state_change,
 	VDEV_TYPE_REPLACING,	/* name of this vdev type */
+	B_FALSE			/* not a leaf vdev */
+};
+
+vdev_ops_t vdev_spare_ops = {
+	vdev_mirror_open,
+	vdev_mirror_close,
+	vdev_default_asize,
+	vdev_mirror_io_start,
+	vdev_mirror_io_done,
+	vdev_mirror_state_change,
+	VDEV_TYPE_SPARE,	/* name of this vdev type */
 	B_FALSE			/* not a leaf vdev */
 };

@@ -142,7 +142,8 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	if ((config = zpool_read_label(fd)) == NULL)
+	if (zpool_read_label(fd, &config) != 0 ||
+	    config == NULL)
 		return (1);
 
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,

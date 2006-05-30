@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -160,7 +159,7 @@ zfs_compare(const void *larg, const void *rarg, void *unused)
 }
 
 int
-zfs_for_each(int argc, char **argv, int recurse, zfs_type_t types,
+zfs_for_each(int argc, char **argv, boolean_t recurse, zfs_type_t types,
     zfs_iter_f callback, void *data)
 {
 	callback_data_t cb;
@@ -190,7 +189,7 @@ zfs_for_each(int argc, char **argv, int recurse, zfs_type_t types,
 		 * If given no arguments, iterate over all datasets.
 		 */
 		cb.cb_recurse = 1;
-		ret = zfs_iter_root(zfs_callback, &cb);
+		ret = zfs_iter_root(g_zfs, zfs_callback, &cb);
 	} else {
 		int i;
 		zfs_handle_t *zhp;
@@ -209,8 +208,8 @@ zfs_for_each(int argc, char **argv, int recurse, zfs_type_t types,
 		}
 
 		for (i = 0; i < argc; i++) {
-			if ((zhp = zfs_open(argv[i], argtype)) != NULL)
-				ret = zfs_callback(zhp, &cb);
+			if ((zhp = zfs_open(g_zfs, argv[i], argtype)) != NULL)
+				ret |= zfs_callback(zhp, &cb);
 			else
 				ret = 1;
 		}

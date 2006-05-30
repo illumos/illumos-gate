@@ -45,7 +45,11 @@ typedef struct bplist_phys {
 	 */
 	uint64_t	bpl_entries;
 	uint64_t	bpl_bytes;
+	uint64_t	bpl_comp;
+	uint64_t	bpl_uncomp;
 } bplist_phys_t;
+
+#define	BPLIST_SIZE_V0	(2 * sizeof (uint64_t))
 
 typedef struct bplist_q {
 	blkptr_t	bpq_blk;
@@ -56,8 +60,9 @@ typedef struct bplist {
 	kmutex_t	bpl_lock;
 	objset_t	*bpl_mos;
 	uint64_t	bpl_object;
-	int		bpl_blockshift;
-	int		bpl_bpshift;
+	uint8_t		bpl_blockshift;
+	uint8_t		bpl_bpshift;
+	uint8_t		bpl_havecomp;
 	bplist_q_t	*bpl_queue;
 	bplist_phys_t	*bpl_phys;
 	dmu_buf_t	*bpl_dbuf;
@@ -74,6 +79,8 @@ extern int bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx);
 extern void bplist_enqueue_deferred(bplist_t *bpl, blkptr_t *bp);
 extern void bplist_sync(bplist_t *bpl, dmu_tx_t *tx);
 extern void bplist_vacate(bplist_t *bpl, dmu_tx_t *tx);
+extern int bplist_space(bplist_t *bpl,
+    uint64_t *usedp, uint64_t *compp, uint64_t *uncompp);
 
 #ifdef	__cplusplus
 }

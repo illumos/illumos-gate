@@ -57,6 +57,8 @@ int translate_device(const char *pool, const char *device,
     zinject_record_t *record);
 void usage(void);
 
+extern libzfs_handle_t *g_zfs;
+
 #ifdef	__cplusplus
 }
 #endif

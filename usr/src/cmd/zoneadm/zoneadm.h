@@ -81,6 +81,7 @@ extern boolean_t is_zonepath_zfs(char *zonepath);
 extern int move_zfs(char *zonepath, char *new_zonepath);
 extern int verify_datasets(zone_dochandle_t handle);
 extern int verify_fs_zfs(struct zone_fstab *fstab);
+extern int init_zfs(void);
 
 /*
  * sw_cmp.c

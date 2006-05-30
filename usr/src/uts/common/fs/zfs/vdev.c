@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -49,6 +50,7 @@ static vdev_ops_t *vdev_ops_table[] = {
 	&vdev_raidz_ops,
 	&vdev_mirror_ops,
 	&vdev_replacing_ops,
+	&vdev_spare_ops,
 	&vdev_disk_ops,
 	&vdev_file_ops,
 	&vdev_missing_ops,
@@ -324,6 +326,9 @@ vdev_free_common(vdev_t *vd)
 	if (vd->vdev_devid)
 		spa_strfree(vd->vdev_devid);
 
+	if (vd->vdev_isspare)
+		spa_spare_remove(vd->vdev_guid);
+
 	txg_list_destroy(&vd->vdev_ms_list);
 	txg_list_destroy(&vd->vdev_dtl_list);
 	mutex_enter(&vd->vdev_dtl_lock);
@@ -345,8 +350,9 @@ vdev_free_common(vdev_t *vd)
  * creating a new vdev or loading an existing one - the behavior is slightly
  * different for each case.
  */
-vdev_t *
-vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
+int
+vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
+    int alloctype)
 {
 	vdev_ops_t *ops;
 	char *type;
@@ -356,10 +362,10 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	ASSERT(spa_config_held(spa, RW_WRITER));
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
-		return (NULL);
+		return (EINVAL);
 
 	if ((ops = vdev_getops(type)) == NULL)
-		return (NULL);
+		return (EINVAL);
 
 	/*
 	 * If this is a load, get the vdev guid from the nvlist.
@@ -370,11 +376,20 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ID, &label_id) ||
 		    label_id != id)
-			return (NULL);
+			return (EINVAL);
 
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
-			return (NULL);
+			return (EINVAL);
+	} else if (alloctype == VDEV_ALLOC_SPARE) {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
+			return (EINVAL);
 	}
+
+	/*
+	 * The first allocated vdev must be of type 'root'.
+	 */
+	if (ops != &vdev_root_ops && spa->spa_root_vdev == NULL)
+		return (EINVAL);
 
 	vd = vdev_alloc_common(spa, id, guid, ops);
 
@@ -382,6 +397,41 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 		vd->vdev_path = spa_strdup(vd->vdev_path);
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &vd->vdev_devid) == 0)
 		vd->vdev_devid = spa_strdup(vd->vdev_devid);
+
+	/*
+	 * Set the nparity propery for RAID-Z vdevs.
+	 */
+	if (ops == &vdev_raidz_ops) {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
+		    &vd->vdev_nparity) == 0) {
+			/*
+			 * Currently, we can only support 2 parity devices.
+			 */
+			if (vd->vdev_nparity > 2)
+				return (EINVAL);
+			/*
+			 * Older versions can only support 1 parity device.
+			 */
+			if (vd->vdev_nparity == 2 &&
+			    spa_version(spa) < ZFS_VERSION_RAID6)
+				return (ENOTSUP);
+
+		} else {
+			/*
+			 * We require the parity to be specified for SPAs that
+			 * support multiple parity levels.
+			 */
+			if (spa_version(spa) >= ZFS_VERSION_RAID6)
+				return (EINVAL);
+
+			/*
+			 * Otherwise, we default to 1 parity device for RAID-Z.
+			 */
+			vd->vdev_nparity = 1;
+		}
+	} else {
+		vd->vdev_nparity = 0;
+	}
 
 	/*
 	 * Set the whole_disk property.  If it's not specified, leave the value
@@ -402,6 +452,15 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	 * Get the alignment requirement.
 	 */
 	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASHIFT, &vd->vdev_ashift);
+
+	/*
+	 * Look for the 'is_spare' flag.  If this is the case, then we are a
+	 * repurposed hot spare.
+	 */
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPARE,
+	    &vd->vdev_isspare);
+	if (vd->vdev_isspare)
+		spa_spare_add(vd->vdev_guid);
 
 	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
@@ -430,7 +489,9 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	 */
 	vdev_add_child(parent, vd);
 
-	return (vd);
+	*vdp = vd;
+
+	return (0);
 }
 
 void
@@ -462,6 +523,7 @@ vdev_free(vdev_t *vd)
 		vdev_metaslab_fini(vd);
 
 	ASSERT3U(vd->vdev_stat.vs_space, ==, 0);
+	ASSERT3U(vd->vdev_stat.vs_dspace, ==, 0);
 	ASSERT3U(vd->vdev_stat.vs_alloc, ==, 0);
 
 	/*
@@ -506,9 +568,11 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 
 	tvd->vdev_stat.vs_alloc = svd->vdev_stat.vs_alloc;
 	tvd->vdev_stat.vs_space = svd->vdev_stat.vs_space;
+	tvd->vdev_stat.vs_dspace = svd->vdev_stat.vs_dspace;
 
 	svd->vdev_stat.vs_alloc = 0;
 	svd->vdev_stat.vs_space = 0;
+	svd->vdev_stat.vs_dspace = 0;
 
 	for (t = 0; t < TXG_SIZE; t++) {
 		while ((msp = txg_list_remove(&svd->vdev_ms_list, t)) != NULL)
@@ -526,6 +590,9 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 
 	tvd->vdev_reopen_wanted = svd->vdev_reopen_wanted;
 	svd->vdev_reopen_wanted = 0;
+
+	tvd->vdev_deflate_ratio = svd->vdev_deflate_ratio;
+	svd->vdev_deflate_ratio = 0;
 }
 
 static void
@@ -585,13 +652,28 @@ vdev_remove_parent(vdev_t *cvd)
 
 	ASSERT(mvd->vdev_children == 1);
 	ASSERT(mvd->vdev_ops == &vdev_mirror_ops ||
-	    mvd->vdev_ops == &vdev_replacing_ops);
+	    mvd->vdev_ops == &vdev_replacing_ops ||
+	    mvd->vdev_ops == &vdev_spare_ops);
 	cvd->vdev_ashift = mvd->vdev_ashift;
 
 	vdev_remove_child(mvd, cvd);
 	vdev_remove_child(pvd, mvd);
 	cvd->vdev_id = mvd->vdev_id;
 	vdev_add_child(pvd, cvd);
+	/*
+	 * If we created a new toplevel vdev, then we need to change the child's
+	 * vdev GUID to match the old toplevel vdev.  Otherwise, we could have
+	 * detached an offline device, and when we go to import the pool we'll
+	 * think we have two toplevel vdevs, instead of a different version of
+	 * the same toplevel vdev.
+	 */
+	if (cvd->vdev_top == cvd) {
+		pvd->vdev_guid_sum -= cvd->vdev_guid;
+		cvd->vdev_guid_sum -= cvd->vdev_guid;
+		cvd->vdev_guid = mvd->vdev_guid;
+		cvd->vdev_guid_sum += mvd->vdev_guid;
+		pvd->vdev_guid_sum += cvd->vdev_guid;
+	}
 	vdev_top_update(cvd->vdev_top, cvd->vdev_top);
 
 	if (cvd == cvd->vdev_top)
@@ -801,6 +883,18 @@ vdev_open(vdev_t *vd)
 	}
 
 	/*
+	 * If this is a top-level vdev, compute the raidz-deflation
+	 * ratio.  Note, we hard-code in 128k (1<<17) because it is the
+	 * current "typical" blocksize.  Even if SPA_MAXBLOCKSIZE
+	 * changes, this algorithm must never change, or we will
+	 * inconsistently account for existing bp's.
+	 */
+	if (vd->vdev_top == vd) {
+		vd->vdev_deflate_ratio = (1<<17) /
+		    (vdev_psize_to_asize(vd, 1<<17) >> SPA_MINBLOCKSHIFT);
+	}
+
+	/*
 	 * This allows the ZFS DE to close cases appropriately.  If a device
 	 * goes away and later returns, we want to close the associated case.
 	 * But it's not enough to simply post this only when a device goes from
@@ -933,7 +1027,7 @@ vdev_reopen(vdev_t *vd)
 }
 
 int
-vdev_create(vdev_t *vd, uint64_t txg)
+vdev_create(vdev_t *vd, uint64_t txg, boolean_t isreplacing)
 {
 	int error;
 
@@ -952,7 +1046,7 @@ vdev_create(vdev_t *vd, uint64_t txg)
 	/*
 	 * Recursively initialize all labels.
 	 */
-	if ((error = vdev_label_init(vd, txg)) != 0) {
+	if ((error = vdev_label_init(vd, txg, isreplacing)) != 0) {
 		vdev_close(vd);
 		return (error);
 	}
@@ -1200,6 +1294,45 @@ vdev_load(vdev_t *vd)
 	if (vd->vdev_ops->vdev_op_leaf && vdev_dtl_load(vd) != 0)
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
+}
+
+/*
+ * This special case of vdev_spare() is used for hot spares.  It's sole purpose
+ * it to set the vdev state for the associated vdev.  To do this, we make sure
+ * that we can open the underlying device, then try to read the label, and make
+ * sure that the label is sane and that it hasn't been repurposed to another
+ * pool.
+ */
+int
+vdev_validate_spare(vdev_t *vd)
+{
+	nvlist_t *label;
+	uint64_t guid, version;
+	uint64_t state;
+
+	if ((label = vdev_label_read_config(vd)) == NULL) {
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		return (-1);
+	}
+
+	if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_VERSION, &version) != 0 ||
+	    version > ZFS_VERSION ||
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_GUID, &guid) != 0 ||
+	    guid != vd->vdev_guid ||
+	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE, &state) != 0) {
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		nvlist_free(label);
+		return (-1);
+	}
+
+	/*
+	 * We don't actually check the pool state here.  If it's in fact in
+	 * use by another pool, we update this fact on the fly when requested.
+	 */
+	nvlist_free(label);
+	return (0);
 }
 
 void
@@ -1560,14 +1693,31 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
  * Update the in-core space usage stats for this vdev and the root vdev.
  */
 void
-vdev_space_update(vdev_t *vd, uint64_t space_delta, uint64_t alloc_delta)
+vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta)
 {
 	ASSERT(vd == vd->vdev_top);
+	int64_t dspace_delta = space_delta;
 
 	do {
+		if (vd->vdev_ms_count) {
+			/*
+			 * If this is a top-level vdev, apply the
+			 * inverse of its psize-to-asize (ie. RAID-Z)
+			 * space-expansion factor.  We must calculate
+			 * this here and not at the root vdev because
+			 * the root vdev's psize-to-asize is simply the
+			 * max of its childrens', thus not accurate
+			 * enough for us.
+			 */
+			ASSERT((dspace_delta & (SPA_MINBLOCKSIZE-1)) == 0);
+			dspace_delta = (dspace_delta >> SPA_MINBLOCKSHIFT) *
+			    vd->vdev_deflate_ratio;
+		}
+
 		mutex_enter(&vd->vdev_stat_lock);
 		vd->vdev_stat.vs_space += space_delta;
 		vd->vdev_stat.vs_alloc += alloc_delta;
+		vd->vdev_stat.vs_dspace += dspace_delta;
 		mutex_exit(&vd->vdev_stat_lock);
 	} while ((vd = vd->vdev_parent) != NULL);
 }

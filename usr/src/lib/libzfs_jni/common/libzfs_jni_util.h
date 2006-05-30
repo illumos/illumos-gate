@@ -32,6 +32,7 @@
 #include <jni.h>
 #include <regex.h>
 #include <libnvpair.h>
+#include <libzfs.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,6 +105,8 @@ char **zjni_java_string_array_to_c(JNIEnv *, jobjectArray);
 int zjni_count_elements(void **);
 nvpair_t *zjni_nvlist_walk_nvpair(
 	nvlist_t *, const char *, data_type_t, nvpair_t *);
+
+extern libzfs_handle_t *g_zfs;
 
 #ifdef __cplusplus
 }

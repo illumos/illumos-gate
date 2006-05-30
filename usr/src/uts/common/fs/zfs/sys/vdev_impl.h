@@ -153,6 +153,7 @@ struct vdev {
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
 	uint8_t		vdev_reopen_wanted; /* async reopen wanted?	*/
 	list_node_t	vdev_dirty_node; /* config dirty list		*/
+	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
 
 	/*
 	 * Leaf vdev state.
@@ -162,6 +163,7 @@ struct vdev {
 	txg_node_t	vdev_dtl_node;	/* per-txg dirty DTL linkage	*/
 	uint64_t	vdev_wholedisk;	/* true if this is a whole disk */
 	uint64_t	vdev_offline;	/* device taken offline?	*/
+	uint64_t	vdev_nparity;	/* number of parity devices for raidz */
 	char		*vdev_path;	/* vdev path (if any)		*/
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	uint64_t	vdev_fault_arg; /* fault injection paramater	*/
@@ -170,6 +172,7 @@ struct vdev {
 	uint8_t		vdev_cache_active; /* vdev_cache and vdev_queue	*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
+	uint64_t	vdev_isspare;	/* was a hot spare */
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
 	uint64_t	vdev_not_present; /* not present during import	*/
@@ -245,12 +248,13 @@ typedef struct vdev_label {
 
 #define	VDEV_ALLOC_LOAD		0
 #define	VDEV_ALLOC_ADD		1
+#define	VDEV_ALLOC_SPARE	2
 
 /*
  * Allocate or free a vdev
  */
-extern vdev_t *vdev_alloc(spa_t *spa, nvlist_t *config, vdev_t *parent,
-    uint_t id, int alloctype);
+extern int vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *config,
+    vdev_t *parent, uint_t id, int alloctype);
 extern void vdev_free(vdev_t *vd);
 
 /*
@@ -280,6 +284,7 @@ extern vdev_ops_t vdev_raidz_ops;
 extern vdev_ops_t vdev_disk_ops;
 extern vdev_ops_t vdev_file_ops;
 extern vdev_ops_t vdev_missing_ops;
+extern vdev_ops_t vdev_spare_ops;
 
 /*
  * Common size functions

@@ -121,6 +121,7 @@ int dsl_dir_sync_task(dsl_dir_t *dd,
 int dsl_dir_set_quota(const char *ddname, uint64_t quota);
 int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
 int dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
+int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_dd(dd, fmt, ...) do { \

@@ -60,9 +60,10 @@ typedef struct vdev_knob {
 extern int vdev_open(vdev_t *);
 extern int vdev_validate(vdev_t *);
 extern void vdev_close(vdev_t *);
-extern int vdev_create(vdev_t *, uint64_t txg);
+extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);
 extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
+extern int vdev_validate_spare(vdev_t *);
 
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
 extern vdev_t *vdev_lookup_by_guid(vdev_t *vd, uint64_t guid);
@@ -85,8 +86,8 @@ extern void vdev_propagate_state(vdev_t *vd);
 extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
     vdev_aux_t aux);
 
-extern void vdev_space_update(vdev_t *vd, uint64_t space_delta,
-    uint64_t alloc_delta);
+extern void vdev_space_update(vdev_t *vd, int64_t space_delta,
+    int64_t alloc_delta);
 
 extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
 
@@ -116,7 +117,8 @@ extern void vdev_config_dirty(vdev_t *vd);
 extern void vdev_config_clean(vdev_t *vd);
 extern int vdev_config_sync(vdev_t *vd, uint64_t txg);
 
-extern nvlist_t *vdev_config_generate(vdev_t *vd, int getstats);
+extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
+    boolean_t getstats, boolean_t isspare);
 
 /*
  * Label routines
@@ -125,7 +127,8 @@ struct uberblock;
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
 extern nvlist_t *vdev_label_read_config(vdev_t *vd);
 extern void vdev_uberblock_load(zio_t *zio, vdev_t *vd, struct uberblock *ub);
-int vdev_label_init(vdev_t *vd, uint64_t create_txg);
+int vdev_label_init(vdev_t *vd, uint64_t create_txg, boolean_t isreplacing);
+int vdev_label_spare(vdev_t *vd, uint64_t create_txg);
 
 #ifdef	__cplusplus
 }

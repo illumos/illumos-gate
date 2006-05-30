@@ -116,7 +116,7 @@ vdev_offlined(uint64_t state, uint64_t aux, uint64_t errs)
 /*
  * Detect if any leaf devices that have seen errors or could not be opened.
  */
-static int
+static boolean_t
 find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
 {
 	nvlist_t **child;
@@ -132,13 +132,13 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
 	 */
 	verify(nvlist_lookup_string(vdev, ZPOOL_CONFIG_TYPE, &type) == 0);
 	if (strcmp(type, VDEV_TYPE_REPLACING) == 0)
-		return (FALSE);
+		return (B_FALSE);
 
 	if (nvlist_lookup_nvlist_array(vdev, ZPOOL_CONFIG_CHILDREN, &child,
 	    &children) == 0) {
 		for (c = 0; c < children; c++)
 			if (find_vdev_problem(child[c], func))
-				return (TRUE);
+				return (B_TRUE);
 	} else {
 		verify(nvlist_lookup_uint64_array(vdev, ZPOOL_CONFIG_STATS,
 		    (uint64_t **)&vs, &c) == 0);
@@ -147,10 +147,10 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
 		    vs->vs_read_errors +
 		    vs->vs_write_errors +
 		    vs->vs_checksum_errors))
-			return (TRUE);
+			return (B_TRUE);
 	}
 
-	return (FALSE);
+	return (B_FALSE);
 }
 
 /*
@@ -171,7 +171,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
  * only picks the most damaging of all the current errors to report.
  */
 static zpool_status_t
-check_status(nvlist_t *config, int isimport)
+check_status(nvlist_t *config, boolean_t isimport)
 {
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
@@ -265,7 +265,7 @@ check_status(nvlist_t *config, int isimport)
 zpool_status_t
 zpool_get_status(zpool_handle_t *zhp, char **msgid)
 {
-	zpool_status_t ret = check_status(zhp->zpool_config, FALSE);
+	zpool_status_t ret = check_status(zhp->zpool_config, B_FALSE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;
@@ -278,7 +278,7 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid)
 zpool_status_t
 zpool_import_status(nvlist_t *config, char **msgid)
 {
-	zpool_status_t ret = check_status(config, TRUE);
+	zpool_status_t ret = check_status(config, B_TRUE);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;

@@ -2631,21 +2631,13 @@ out:
 	return (error);
 }
 
-/* ARGSUSED */
-static void
-zfs_error_handler(const char *fmt, va_list ap)
-{
-	/*
-	 * Do nothing - we interpret the failures from each libzfs call below.
-	 */
-}
-
 static int
 validate_datasets(zlog_t *zlogp)
 {
 	zone_dochandle_t handle;
 	struct zone_dstab dstab;
 	zfs_handle_t *zhp;
+	libzfs_handle_t *hdl;
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zerror(zlogp, B_TRUE, "getting zone configuration handle");
@@ -2663,15 +2655,20 @@ validate_datasets(zlog_t *zlogp)
 		return (-1);
 	}
 
-	zfs_set_error_handler(zfs_error_handler);
+	if ((hdl = libzfs_init()) == NULL) {
+		zerror(zlogp, B_FALSE, "opening ZFS library");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
 
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
 
-		if ((zhp = zfs_open(dstab.zone_dataset_name,
+		if ((zhp = zfs_open(hdl, dstab.zone_dataset_name,
 		    ZFS_TYPE_FILESYSTEM)) == NULL) {
 			zerror(zlogp, B_FALSE, "cannot open ZFS dataset '%s'",
 			    dstab.zone_dataset_name);
 			zonecfg_fini_handle(handle);
+			libzfs_fini(hdl);
 			return (-1);
 		}
 
@@ -2686,6 +2683,7 @@ validate_datasets(zlog_t *zlogp)
 			    dstab.zone_dataset_name);
 			zonecfg_fini_handle(handle);
 			zfs_close(zhp);
+			libzfs_fini(hdl);
 			return (-1);
 		}
 
@@ -2694,6 +2692,7 @@ validate_datasets(zlog_t *zlogp)
 	(void) zonecfg_enddsent(handle);
 
 	zonecfg_fini_handle(handle);
+	libzfs_fini(hdl);
 
 	return (0);
 }

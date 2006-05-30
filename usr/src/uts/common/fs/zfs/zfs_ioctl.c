@@ -564,11 +564,18 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	return (error);
 }
 
-/* ARGSUSED */
 static int
 zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 {
-	return (ENOTSUP);
+	spa_t *spa;
+	int error;
+
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error != 0)
+		return (error);
+	error = spa_vdev_remove(spa, zc->zc_guid, B_FALSE);
+	spa_close(spa, FTAG);
+	return (error);
 }
 
 static int
@@ -1176,6 +1183,12 @@ zfs_ioc_bookmark_name(zfs_cmd_t *zc)
 	return (error);
 }
 
+static int
+zfs_ioc_promote(zfs_cmd_t *zc)
+{
+	return (dsl_dataset_promote(zc->zc_name));
+}
+
 static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_create,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_destroy,		zfs_secpolicy_config,	pool_name },
@@ -1215,7 +1228,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_inject_list_next,	zfs_secpolicy_inject,	no_name },
 	{ zfs_ioc_error_log,		zfs_secpolicy_inject,	pool_name },
 	{ zfs_ioc_clear,		zfs_secpolicy_config,	pool_name },
-	{ zfs_ioc_bookmark_name,	zfs_secpolicy_inject,	pool_name }
+	{ zfs_ioc_bookmark_name,	zfs_secpolicy_inject,	pool_name },
+	{ zfs_ioc_promote,		zfs_secpolicy_write,	dataset_name }
 };
 
 static int

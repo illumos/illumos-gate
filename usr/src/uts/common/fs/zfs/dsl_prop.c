@@ -62,33 +62,28 @@ dodefault(const char *propname, int intsz, int numint, void *buf)
 }
 
 static int
-dsl_prop_get_impl(dsl_pool_t *dp, uint64_t ddobj, const char *propname,
+dsl_prop_get_impl(dsl_dir_t *dd, const char *propname,
     int intsz, int numint, void *buf, char *setpoint)
 {
-	int err = 0;
-	objset_t *mos = dp->dp_meta_objset;
+	int err = ENOENT;
 
 	if (setpoint)
 		setpoint[0] = '\0';
 
-	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock));
-
-	while (ddobj != 0) {
-		dsl_dir_t *dd;
-		err = dsl_dir_open_obj(dp, ddobj, NULL, FTAG, &dd);
-		if (err)
-			break;
+	/*
+	 * Note: dd may be NULL, therefore we shouldn't dereference it
+	 * ouside this loop.
+	 */
+	for (; dd != NULL; dd = dd->dd_parent) {
+		objset_t *mos = dd->dd_pool->dp_meta_objset;
+		ASSERT(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
 		err = zap_lookup(mos, dd->dd_phys->dd_props_zapobj,
 		    propname, intsz, numint, buf);
 		if (err != ENOENT) {
 			if (setpoint)
 				dsl_dir_name(dd, setpoint);
-			dsl_dir_close(dd, FTAG);
 			break;
 		}
-		ASSERT3U(err, ==, ENOENT);
-		ddobj = dd->dd_phys->dd_parent_obj;
-		dsl_dir_close(dd, FTAG);
 	}
 	if (err == ENOENT)
 		err = dodefault(propname, intsz, numint, buf);
@@ -107,27 +102,21 @@ int
 dsl_prop_register(dsl_dataset_t *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg)
 {
-	dsl_dir_t *dd;
+	dsl_dir_t *dd = ds->ds_dir;
 	uint64_t value;
 	dsl_prop_cb_record_t *cbr;
 	int err;
 
-	dd = ds->ds_dir;
-
 	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 
-	err = dsl_prop_get_impl(dd->dd_pool, dd->dd_object, propname,
-	    8, 1, &value, NULL);
-	if (err == ENOENT) {
-		err = 0;
-		value = DSL_PROP_VALUE_UNDEFINED;
-	}
+	err = dsl_prop_get_impl(dd, propname, 8, 1, &value, NULL);
 	if (err != 0) {
 		rw_exit(&dd->dd_pool->dp_config_rwlock);
 		return (err);
 	}
 
 	cbr = kmem_alloc(sizeof (dsl_prop_cb_record_t), KM_SLEEP);
+	cbr->cbr_ds = ds;
 	cbr->cbr_propname = kmem_alloc(strlen(propname)+1, KM_SLEEP);
 	(void) strcpy((char *)cbr->cbr_propname, propname);
 	cbr->cbr_func = callback;
@@ -152,8 +141,7 @@ dsl_prop_get_ds(dsl_dir_t *dd, const char *propname,
 	int err;
 
 	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
-	err = dsl_prop_get_impl(dd->dd_pool, dd->dd_object,
-	    propname, intsz, numints, buf, setpoint);
+	err = dsl_prop_get_impl(dd, propname, intsz, numints, buf, setpoint);
 	rw_exit(&dd->dd_pool->dp_config_rwlock);
 
 	return (err);
@@ -222,17 +210,16 @@ int
 dsl_prop_unregister(dsl_dataset_t *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg)
 {
-	dsl_dir_t *dd;
+	dsl_dir_t *dd = ds->ds_dir;
 	dsl_prop_cb_record_t *cbr;
-
-	dd = ds->ds_dir;
 
 	mutex_enter(&dd->dd_lock);
 	for (cbr = list_head(&dd->dd_prop_cbs);
 	    cbr; cbr = list_next(&dd->dd_prop_cbs, cbr)) {
-		if (strcmp(cbr->cbr_propname, propname) == 0 &&
+		if (cbr->cbr_ds == ds &&
 		    cbr->cbr_func == callback &&
-		    cbr->cbr_arg == cbarg)
+		    cbr->cbr_arg == cbarg &&
+		    strcmp(cbr->cbr_propname, propname) == 0)
 			break;
 	}
 
@@ -249,6 +236,27 @@ dsl_prop_unregister(dsl_dataset_t *ds, const char *propname,
 	/* Clean up from dsl_prop_register */
 	dsl_dir_close(dd, cbr);
 	return (0);
+}
+
+/*
+ * Return the number of callbacks that are registered for this dataset.
+ */
+int
+dsl_prop_numcb(dsl_dataset_t *ds)
+{
+	dsl_dir_t *dd = ds->ds_dir;
+	dsl_prop_cb_record_t *cbr;
+	int num = 0;
+
+	mutex_enter(&dd->dd_lock);
+	for (cbr = list_head(&dd->dd_prop_cbs);
+	    cbr; cbr = list_next(&dd->dd_prop_cbs, cbr)) {
+		if (cbr->cbr_ds == ds)
+			num++;
+	}
+	mutex_exit(&dd->dd_lock);
+
+	return (num);
 }
 
 static void
@@ -330,9 +338,8 @@ dsl_prop_set_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 		if (err == ENOENT) /* that's fine. */
 			err = 0;
 		if (err == 0 && isint) {
-			err = dsl_prop_get_impl(dd->dd_pool,
-			    dd->dd_phys->dd_parent_obj, psa->name,
-			    8, 1, &intval, NULL);
+			err = dsl_prop_get_impl(dd->dd_parent,
+			    psa->name, 8, 1, &intval, NULL);
 		}
 	} else {
 		err = zap_update(mos, zapobj, psa->name,
@@ -380,7 +387,7 @@ int
 dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 {
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
-	dsl_dir_t *dd, *parent;
+	dsl_dir_t *dd = ds->ds_dir;
 	int err = 0;
 	dsl_pool_t *dp;
 	objset_t *mos;
@@ -395,15 +402,13 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 		return (0);
 	}
 
-	dd = ds->ds_dir;
-
 	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	dp = dd->dd_pool;
 	mos = dp->dp_meta_objset;
 
 	rw_enter(&dp->dp_config_rwlock, RW_READER);
-	while (dd != NULL) {
+	for (; dd != NULL; dd = dd->dd_parent) {
 		dsl_dir_name(dd, setpoint);
 
 		for (zap_cursor_init(&zc, mos, dd->dd_phys->dd_props_zapobj);
@@ -418,7 +423,6 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 				/*
 				 * String property
 				 */
-
 				tmp = kmem_alloc(za.za_num_integers, KM_SLEEP);
 				err = zap_lookup(mos,
 				    dd->dd_phys->dd_props_zapobj,
@@ -448,27 +452,9 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 		}
 		zap_cursor_fini(&zc);
 
-		if (err != ENOENT) {
-			if (dd != ds->ds_dir)
-				dsl_dir_close(dd, FTAG);
+		if (err != ENOENT)
 			break;
-		} else {
-			err = 0;
-		}
-
-		/*
-		 * Continue to parent.
-		 */
-		if (dd->dd_phys->dd_parent_obj == 0)
-			parent = NULL;
-		else
-			err = dsl_dir_open_obj(dp,
-			    dd->dd_phys->dd_parent_obj, NULL, FTAG, &parent);
-		if (dd != ds->ds_dir)
-			dsl_dir_close(dd, FTAG);
-		if (err)
-			break;
-		dd = parent;
+		err = 0;
 	}
 	rw_exit(&dp->dp_config_rwlock);
 

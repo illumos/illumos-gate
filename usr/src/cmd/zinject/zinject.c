@@ -151,6 +151,7 @@
 
 #include "zinject.h"
 
+libzfs_handle_t *g_zfs;
 int zfs_fd;
 
 #define	ECKSUM	EBADE
@@ -479,6 +480,14 @@ main(int argc, char **argv)
 	int ret;
 	int flags = 0;
 
+	if ((g_zfs = libzfs_init()) == NULL) {
+		(void) fprintf(stderr, "internal error: failed to "
+		    "initialize ZFS library\n");
+		return (1);
+	}
+
+	libzfs_print_on_error(g_zfs, B_TRUE);
+
 	if ((zfs_fd = open(ZFS_DEV, O_RDWR)) < 0) {
 		(void) fprintf(stderr, "failed to open ZFS device\n");
 		return (1);
@@ -721,7 +730,7 @@ main(int argc, char **argv)
 	 * time we access the pool.
 	 */
 	if (dataset[0] != '\0' && domount) {
-		if ((zhp = zfs_open(dataset, ZFS_TYPE_ANY)) == NULL)
+		if ((zhp = zfs_open(g_zfs, dataset, ZFS_TYPE_ANY)) == NULL)
 			return (1);
 
 		if (zfs_unmount(zhp, NULL, 0) != 0)
@@ -734,6 +743,8 @@ main(int argc, char **argv)
 
 	if (dataset[0] != '\0' && domount)
 		ret = (zfs_mount(zhp, NULL, 0) != 0);
+
+	libzfs_fini(g_zfs);
 
 	return (ret);
 }
