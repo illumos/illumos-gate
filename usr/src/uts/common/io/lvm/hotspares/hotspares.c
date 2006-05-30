@@ -1308,7 +1308,7 @@ load_hotspare(set_t setno, mddb_recid_t recid)
 			(recid, sizeof (*hs), 0);
 		break;
 	}
-	NOTE_FN(rbp->rb_revision, hs->hs_revision);
+	MDDB_NOTE_FN(rbp->rb_revision, hs->hs_revision);
 
 #if defined(_ILP32)
 	if (hs->hs_revision & MD_64BIT_META_DEV) {

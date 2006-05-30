@@ -372,7 +372,7 @@ reset_stripe(ms_unit_t *un, minor_t mnum, int removing)
 	/*
 	 * Attempt release of its minor node
 	 */
-	(void) md_remove_minor_node(mnum);
+	md_remove_minor_node(mnum);
 
 	if (!removing)
 		return;
@@ -885,7 +885,7 @@ stripe_snarf(md_snarfcmd_t cmd, set_t setno)
 			un->c.un_flag |= MD_EFILABEL;
 			break;
 		}
-		NOTE_FN(rbp->rb_revision, un->c.un_revision);
+		MDDB_NOTE_FN(rbp->rb_revision, un->c.un_revision);
 
 		/* Create minor node for snarfed unit. */
 		(void) md_create_minor_node(MD_MIN2SET(MD_SID(un)), MD_SID(un));

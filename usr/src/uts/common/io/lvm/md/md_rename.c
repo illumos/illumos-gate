@@ -814,7 +814,7 @@ md_rename_update_self(
 	/*
 	 * Remove associated device node as well
 	 */
-	(void) md_remove_minor_node(from_min);
+	md_remove_minor_node(from_min);
 
 	/*
 	 * and store the record id (from the unit struct) into recids

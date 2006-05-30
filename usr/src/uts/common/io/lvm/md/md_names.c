@@ -1321,7 +1321,7 @@ lookup_deventry(
 				 * Apparently it is invalid so
 				 * clean it up
 				 */
-				(void) md_remove_minor_node(n->n_minor);
+				md_remove_minor_node(n->n_minor);
 				rw_exit(&nm_lock.lock);
 				(void) md_rem_selfname(n->n_minor);
 				rw_enter(&nm_lock.lock, RW_WRITER);

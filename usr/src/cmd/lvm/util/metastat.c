@@ -169,11 +169,8 @@ print_setstat(
 	if (fname != NULL && strchr(fname, '/') != NULL) {
 		/* get the canonical name */
 		cname = meta_name_getname(spp, fname, META_DEVICE, ep);
-		if (cname == NULL) {
-			mde_perror(ep, "");
-			mdclrerror(ep);
+		if (cname == NULL)
 			return (-1);
-		}
 		Free(cname);
 	}
 

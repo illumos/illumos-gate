@@ -3307,7 +3307,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		/*
 		 * Attempt to remove the assocated device node
 		 */
-		(void) md_remove_minor_node(*(minor_t *)d);
+		md_remove_minor_node(*(minor_t *)d);
 		break;
 	}
 

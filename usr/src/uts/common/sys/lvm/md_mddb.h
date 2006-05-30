@@ -227,7 +227,7 @@ typedef struct md_set {
 /*
  * Transfer record block friendly name status to unit/hs structure.
  */
-#define	NOTE_FN(rbv, unv)	switch (rbv) { \
+#define	MDDB_NOTE_FN(rbv, unv)	switch (rbv) { \
 				case MDDB_REV_RB: \
 				case MDDB_REV_RB64: \
 					unv &= ~MD_FN_META_DEV; \

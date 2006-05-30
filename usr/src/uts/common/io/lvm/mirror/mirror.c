@@ -1975,7 +1975,7 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 	/*
 	 * Attempt release of its minor node
 	 */
-	(void) md_remove_minor_node(mnum);
+	md_remove_minor_node(mnum);
 
 	if (!removing)
 		return;
@@ -5056,7 +5056,7 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 			un->c.un_flag |= MD_EFILABEL;
 			break;
 		}
-		NOTE_FN(rbp->rb_revision, un->c.un_revision);
+		MDDB_NOTE_FN(rbp->rb_revision, un->c.un_revision);
 
 		/*
 		 * Create minor device node for snarfed entry.
