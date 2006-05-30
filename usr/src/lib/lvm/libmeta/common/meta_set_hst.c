@@ -162,6 +162,8 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 	} else {
 		/*CONSTCOND*/
 		while (1) {
+			char	*drvnm = NULL;
+
 			nm.mde   = mdnullerror;
 			nm.setno = sp->setno;
 			nm.side  = otherside;
@@ -171,10 +173,36 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 			if (nm.key == MD_KEYWILD)
 				return (0);
 
-			nm.devname = (uintptr_t)meta_getnmbykey(sp->setno,
-				otherside, nm.key, ep);
-			if (nm.devname == NULL)
+			/*
+			 * Okay we have a valid key
+			 * Let's see if it is hsp or not
+			 */
+			nm.devname = (uintptr_t)meta_getnmentbykey(sp->setno,
+				otherside, nm.key, &drvnm, NULL, NULL, ep);
+			if (nm.devname == NULL || drvnm == NULL) {
+				if (nm.devname)
+					Free((void *)(uintptr_t)nm.devname);
+				if (drvnm)
+					Free((void *)(uintptr_t)drvnm);
 				return (-1);
+			}
+
+			/*
+			 * If it is hsp add here
+			 */
+			if (strcmp(drvnm, MD_HOTSPARES) == 0) {
+				if (add_name(sp, sideno, nm.key, MD_HOTSPARES,
+				    minor(NODEV), (char *)(uintptr_t)nm.devname,
+				    NULL, NULL, ep) == -1) {
+					Free((void *)(uintptr_t)nm.devname);
+					Free((void *)(uintptr_t)drvnm);
+					return (-1);
+				} else {
+					Free((void *)(uintptr_t)nm.devname);
+					Free((void *)(uintptr_t)drvnm);
+					continue;
+				}
+			}
 
 			nm.side = sideno;
 			if (MD_MNSET_DESC(sd)) {
@@ -192,6 +220,7 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 
 			assert(done == 1);
 			Free((void *)(uintptr_t)nm.devname);
+			Free((void *)(uintptr_t)drvnm);
 
 			/*
 			 * The device reference count can be greater than 1 if

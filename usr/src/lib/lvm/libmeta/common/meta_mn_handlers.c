@@ -1424,6 +1424,8 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	/* While loop continues until IOCNXTKEY_NM gives nm.key of KEYWILD */
 	/*CONSTCOND*/
 	while (1) {
+		char	*drvnm = NULL;
+
 		nm.mde = mdnullerror;
 		nm.setno = msg->msg_setno;
 		nm.side = d->msg_otherside;
@@ -1439,13 +1441,41 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			return;
 		}
 
-		nm.devname = (uintptr_t)meta_getnmbykey(msg->msg_setno,
-			d->msg_otherside, nm.key, &ep);
-		if (nm.devname == NULL) {
+		/*
+		 * Okay we have a valid key
+		 * Let's see if it is hsp or not
+		 */
+		nm.devname = (uintptr_t)meta_getnmentbykey(msg->msg_setno,
+			d->msg_otherside, nm.key, &drvnm, NULL, NULL, &ep);
+		if (nm.devname == NULL || drvnm == NULL) {
+			if (nm.devname)
+				Free((void *)(uintptr_t)nm.devname);
+			if (drvnm)
+				Free((void *)(uintptr_t)drvnm);
 			(void) mdstealerror(&(resp->mmr_ep), &ep);
 			resp->mmr_exitval = -1;
 			return;
 		}
+
+		/*
+		 * If it is hsp add here
+		 */
+		if (strcmp(drvnm, MD_HOTSPARES) == 0) {
+			if (add_name(sp, d->msg_sideno, nm.key, MD_HOTSPARES,
+			    minor(NODEV), (char *)(uintptr_t)nm.devname,
+			    NULL, NULL, &ep) == -1) {
+				Free((void *)(uintptr_t)nm.devname);
+				Free((void *)(uintptr_t)drvnm);
+				(void) mdstealerror(&(resp->mmr_ep), &ep);
+				resp->mmr_exitval = -1;
+				return;
+			} else {
+				Free((void *)(uintptr_t)nm.devname);
+				Free((void *)(uintptr_t)drvnm);
+				continue;
+			}
+		}
+
 		nm.side = d->msg_sideno;
 		if ((done = meta_getside_devinfo(sp,
 		    (char *)(uintptr_t)nm.devname,
@@ -1455,7 +1485,10 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			resp->mmr_exitval = -1;
 			return;
 		}
+
 		Free((void *)(uintptr_t)nm.devname);
+		Free((void *)(uintptr_t)drvnm);
+
 		if (done != 1) {
 			Free(cname);
 			Free(dname);
