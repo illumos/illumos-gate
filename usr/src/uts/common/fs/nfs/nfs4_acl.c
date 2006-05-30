@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1438,6 +1437,19 @@ ln_ace4_to_aent(nfsace4 *ace4, int n,
 			acl->seen |= OTHER_OBJ;
 			vals = &acl->other_obj;
 			vals->aent_type = OTHER_OBJ | acl->dfacl_flag;
+		} else if ((ace4p->who.utf8string_len == 6) &&
+		    (bcmp(ACE4_WHO_GROUP, ace4p->who.utf8string_val, 6) == 0)) {
+			if (acl->state > ace4_group) {
+				NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+				    "ln_ace4_to_aent: group entry found "
+				    "out of order"));
+				error = ENOTSUP;
+				goto out;
+			}
+			acl->seen |= GROUP_OBJ;
+			vals = &acl->group_obj;
+			vals->aent_type = GROUP_OBJ | acl->dfacl_flag;
+			acl->state = ace4_group;
 		} else if (ace4p->flag & ACE4_IDENTIFIER_GROUP) {
 			if (acl->state > ace4_group) {
 				NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
@@ -1446,18 +1458,10 @@ ln_ace4_to_aent(nfsace4 *ace4, int n,
 				error = ENOTSUP;
 				goto out;
 			}
-			if ((ace4p->who.utf8string_len == 6) &&
-			    (bcmp(ACE4_WHO_GROUP,
-			    ace4p->who.utf8string_val, 6) == 0)) {
-				acl->seen |= GROUP_OBJ;
-				vals = &acl->group_obj;
-				vals->aent_type = GROUP_OBJ | acl->dfacl_flag;
-			} else {
-				acl->seen |= GROUP;
-				vals = ace4vals_find(ace4p, &acl->group,
-				    &acl->numgroups);
-				vals->aent_type = GROUP | acl->dfacl_flag;
-			}
+			acl->seen |= GROUP;
+			vals = ace4vals_find(ace4p, &acl->group,
+			    &acl->numgroups);
+			vals->aent_type = GROUP | acl->dfacl_flag;
 			acl->state = ace4_group;
 		} else {
 			if (acl->state > ace4_user) {
@@ -1741,60 +1745,52 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 	}
 	ace4_flags_to_acet_flags(nfsace4->flag, &ace->a_flags);
 
-	if (nfsace4->flag & ACE4_IDENTIFIER_GROUP) {
-		if ((nfsace4->who.utf8string_len == 6) &&
-		    (bcmp(ACE4_WHO_GROUP,
-		    nfsace4->who.utf8string_val, 6)) == 0) {
-			ace->a_who = group;
-			ace->a_flags |= ACE_GROUP;
-			error = 0;
-		} else {
-			ace->a_flags |= ACE_IDENTIFIER_GROUP;
-			error = nfs_idmap_str_gid(&nfsace4->who,
-			    &ace->a_who, isserver);
-			if (error != 0) {
-				NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-				    "ace4_to_acet: idmap failed with %d",
-				    error));
-				if (isserver && (error == EPERM))
-					error = NFS4ERR_BADOWNER;
-				goto out;
-			}
-			error = validate_idmapping(&nfsace4->who,
-			    ace->a_who, FALSE, isserver, just_count);
-			if (error != 0) {
-				goto out;
-			}
+	if ((nfsace4->who.utf8string_len == 6) &&
+	    (bcmp(ACE4_WHO_GROUP,
+	    nfsace4->who.utf8string_val, 6)) == 0) {
+		ace->a_who = group;
+		ace->a_flags |= ACE_GROUP | ACE_IDENTIFIER_GROUP;
+	} else if ((nfsace4->who.utf8string_len == 6) &&
+	    (bcmp(ACE4_WHO_OWNER,
+	    nfsace4->who.utf8string_val, 6) == 0)) {
+		ace->a_flags |= ACE_OWNER;
+		ace->a_who = owner;
+	} else if ((nfsace4->who.utf8string_len == 9) &&
+	    (bcmp(ACE4_WHO_EVERYONE,
+	    nfsace4->who.utf8string_val, 9) == 0)) {
+		ace->a_flags |= ACE_EVERYONE;
+		ace->a_who = 0;
+	} else if (nfsace4->flag & ACE4_IDENTIFIER_GROUP) {
+		ace->a_flags |= ACE_IDENTIFIER_GROUP;
+		error = nfs_idmap_str_gid(&nfsace4->who,
+		    &ace->a_who, isserver);
+		if (error != 0) {
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "ace4_to_acet: idmap failed with %d",
+			    error));
+			if (isserver && (error == EPERM))
+				error = NFS4ERR_BADOWNER;
+			goto out;
 		}
+		error = validate_idmapping(&nfsace4->who,
+		    ace->a_who, FALSE, isserver, just_count);
+		if (error != 0)
+			goto out;
 	} else {
-		if ((nfsace4->who.utf8string_len == 6) &&
-		    (bcmp(ACE4_WHO_OWNER,
-		    nfsace4->who.utf8string_val, 6) == 0)) {
-			ace->a_flags |= ACE_OWNER;
-			ace->a_who = owner;
-			error = 0;
-		} else if ((nfsace4->who.utf8string_len == 9) &&
-		    (bcmp(ACE4_WHO_EVERYONE,
-		    nfsace4->who.utf8string_val, 9) == 0)) {
-			ace->a_flags |= ACE_EVERYONE;
-			ace->a_who = 0;
-		} else {
-			error = nfs_idmap_str_uid(&nfsace4->who,
-			    &ace->a_who, isserver);
-			if (error != 0) {
-				NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-				    "ace4_to_acet: idmap failed with %d",
-				    error));
-				if (isserver && (error == EPERM))
-					error = NFS4ERR_BADOWNER;
-				goto out;
-			}
-			error = validate_idmapping(&nfsace4->who,
-			    ace->a_who, TRUE, isserver, just_count);
-			if (error != 0) {
-				goto out;
-			}
+		error = nfs_idmap_str_uid(&nfsace4->who,
+		    &ace->a_who, isserver);
+		if (error != 0) {
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "ace4_to_acet: idmap failed with %d",
+			    error));
+			if (isserver && (error == EPERM))
+				error = NFS4ERR_BADOWNER;
+			goto out;
 		}
+		error = validate_idmapping(&nfsace4->who,
+		    ace->a_who, TRUE, isserver, just_count);
+		if (error != 0)
+			goto out;
 	}
 
 out:
@@ -1888,8 +1884,7 @@ ace4_flags_to_acet_flags(aceflag4 ace4_flags, uint16_t *acet_flags)
 		*acet_flags |= ACE_SUCCESSFUL_ACCESS_ACE_FLAG;
 	if (ace4_flags & ACE4_FAILED_ACCESS_ACE_FLAG)
 		*acet_flags |= ACE_FAILED_ACCESS_ACE_FLAG;
-	if (ace4_flags & ACE4_IDENTIFIER_GROUP)
-		*acet_flags |= ACE_IDENTIFIER_GROUP;
+	/* ACE_IDENTIFIER_GROUP is handled in ace4_to_acet() */
 }
 
 static void
@@ -1909,8 +1904,7 @@ acet_flags_to_ace4_flags(uint16_t acet_flags, aceflag4 *ace4_flags)
 		*ace4_flags |= ACE4_SUCCESSFUL_ACCESS_ACE_FLAG;
 	if (acet_flags & ACE_FAILED_ACCESS_ACE_FLAG)
 		*ace4_flags |= ACE4_FAILED_ACCESS_ACE_FLAG;
-	if (acet_flags & ACE_IDENTIFIER_GROUP)
-		*ace4_flags |= ACE4_IDENTIFIER_GROUP;
+	/* ACE4_IDENTIFIER_GROUP is handled in acet_to_ace4() */
 }
 
 int
