@@ -228,9 +228,9 @@ patch_check(char *header, zone_dochandle_t handle1, zone_dochandle_t handle2,
 			if (err < 0)
 				(void) fprintf(stderr,
 				    (flag & SW_CMP_SRC) ?
-				    gettext("\t%s: not installed\n") :
-				    gettext("\t%s\n"),
-				    patchtab.zone_patch_id);
+				    gettext("\t%s-%s: not installed\n") :
+				    gettext("\t%s-%s\n"),
+				    patchtab.zone_patch_id, patch_vers);
 			else
 				(void) fprintf(stderr,
 				    gettext("\t%s: version mismatch\n\t\t(%s) "

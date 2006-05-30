@@ -603,6 +603,68 @@ zonecfg_get_template_handle(const char *template, const char *zonename,
 	return (setrootattr(handle, DTD_ATTR_NAME, zonename));
 }
 
+/*
+ * Initialize two handles from the manifest read on fd.  The rem_handle
+ * is initialized from the input file, including the sw inventory.  The
+ * local_handle is initialized with the same zone configuration but with
+ * no sw inventory.
+ */
+int
+zonecfg_attach_manifest(int fd, zone_dochandle_t local_handle,
+    zone_dochandle_t rem_handle)
+{
+	xmlValidCtxtPtr cvp;
+	int valid;
+
+	/* load the manifest into the handle for the remote system */
+	if ((rem_handle->zone_dh_doc = xmlReadFd(fd, NULL, NULL, 0)) == NULL) {
+		return (Z_INVALID_DOCUMENT);
+	}
+	if ((cvp = xmlNewValidCtxt()) == NULL)
+		return (Z_NOMEM);
+	cvp->error = zonecfg_error_func;
+	cvp->warning = zonecfg_error_func;
+	valid = xmlValidateDocument(cvp, rem_handle->zone_dh_doc);
+	xmlFreeValidCtxt(cvp);
+	if (valid == 0)
+		return (Z_INVALID_DOCUMENT);
+
+	/* delete any comments such as inherited Sun copyright / ident str */
+	stripcomments(rem_handle);
+
+	rem_handle->zone_dh_newzone = B_TRUE;
+	rem_handle->zone_dh_sw_inv = B_TRUE;
+
+	/*
+	 * Now use the remote system handle to generate a local system handle
+	 * with an identical zones configuration but no sw inventory.
+	 */
+	if ((local_handle->zone_dh_doc = xmlCopyDoc(rem_handle->zone_dh_doc,
+	    1)) == NULL) {
+		return (Z_INVALID_DOCUMENT);
+	}
+
+	/*
+	 * We need to re-run xmlValidateDocument on local_handle to properly
+	 * update the in-core representation of the configuration.
+	 */
+	if ((cvp = xmlNewValidCtxt()) == NULL)
+		return (Z_NOMEM);
+	cvp->error = zonecfg_error_func;
+	cvp->warning = zonecfg_error_func;
+	valid = xmlValidateDocument(cvp, local_handle->zone_dh_doc);
+	xmlFreeValidCtxt(cvp);
+	if (valid == 0)
+		return (Z_INVALID_DOCUMENT);
+
+	strip_sw_inv(local_handle);
+
+	local_handle->zone_dh_newzone = B_TRUE;
+	local_handle->zone_dh_sw_inv = B_FALSE;
+
+	return (Z_OK);
+}
+
 static boolean_t
 is_renaming(zone_dochandle_t handle)
 {
@@ -1065,7 +1127,7 @@ zonecfg_save(zone_dochandle_t handle)
 }
 
 int
-zonecfg_detach_save(zone_dochandle_t handle)
+zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 {
 	char zname[ZONENAME_MAX];
 	char path[MAXPATHLEN];
@@ -1082,15 +1144,21 @@ zonecfg_detach_save(zone_dochandle_t handle)
 	if (!handle->zone_dh_sw_inv)
 		return (Z_INVAL);
 
-	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
-		return (err);
+	if (flags & ZONE_DRY_RUN) {
+		(void) strlcpy(migpath, "-", sizeof (migpath));
+	} else {
+		if ((err = zonecfg_get_name(handle, zname, sizeof (zname)))
+		    != Z_OK)
+			return (err);
 
-	if ((err = zone_get_zonepath(zname, path, sizeof (path))) != Z_OK)
-		return (err);
+		if ((err = zone_get_zonepath(zname, path, sizeof (path)))
+		    != Z_OK)
+			return (err);
 
-	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
-	    sizeof (migpath))
-		return (Z_NOMEM);
+		if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED)
+		    >= sizeof (migpath))
+			return (Z_NOMEM);
+	}
 
 	if ((err = operation_prep(handle)) != Z_OK)
 		return (err);
@@ -1110,7 +1178,8 @@ zonecfg_detach_save(zone_dochandle_t handle)
 	if (xmlSaveFormatFile(migpath, handle->zone_dh_doc, 1) <= 0)
 		return (Z_SAVING_FILE);
 
-	(void) chmod(migpath, 0644);
+	if (!(flags & ZONE_DRY_RUN))
+		(void) chmod(migpath, 0644);
 
 	stripcomments(handle);
 

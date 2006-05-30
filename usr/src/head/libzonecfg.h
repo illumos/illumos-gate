@@ -114,6 +114,11 @@ extern "C" {
 #define	ZONE_PKG_VERSMAX	256
 
 /*
+ * Bit flag definitions for passing into libzonecfg functions.
+ */
+#define	ZONE_DRY_RUN		0x01
+
+/*
  * The integer field expresses the current values on a get.
  * On a put, it represents the new values if >= 0 or "don't change" if < 0.
  */
@@ -307,7 +312,9 @@ extern	int	zonecfg_lookup_ds(zone_dochandle_t, struct zone_dstab *);
  */
 extern	int	zonecfg_get_attach_handle(const char *, const char *,
     boolean_t, zone_dochandle_t);
-extern	int	zonecfg_detach_save(zone_dochandle_t);
+extern	int	zonecfg_attach_manifest(int, zone_dochandle_t,
+    zone_dochandle_t);
+extern	int	zonecfg_detach_save(zone_dochandle_t, uint_t);
 extern	int	zonecfg_get_detach_info(zone_dochandle_t, boolean_t);
 extern	boolean_t zonecfg_detached(const char *);
 extern	void	zonecfg_rm_detached(zone_dochandle_t, boolean_t forced);

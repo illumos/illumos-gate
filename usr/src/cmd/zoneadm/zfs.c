@@ -222,7 +222,7 @@ pre_snapshot(char *source_zone)
 		return (Z_ERR);
 	}
 
-	if ((err = zonecfg_detach_save(handle)) != Z_OK) {
+	if ((err = zonecfg_detach_save(handle, 0)) != Z_OK) {
 		errno = err;
 		zperror(gettext("saving the software version manifest failed"),
 		    B_TRUE);

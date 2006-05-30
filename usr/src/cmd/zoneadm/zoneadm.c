@@ -122,8 +122,8 @@ struct cmd {
 #define	SHELP_UNINSTALL	"uninstall [-F]"
 #define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] zonename"
 #define	SHELP_MOVE	"move zonepath"
-#define	SHELP_DETACH	"detach"
-#define	SHELP_ATTACH	"attach [-F]"
+#define	SHELP_DETACH	"detach [-n]"
+#define	SHELP_ATTACH	"attach [-F] [-n <path>]"
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -246,7 +246,10 @@ long_help(int cmd_num)
 		    "state is changed to\n\t'configured' (but the files under "
 		    "the zonepath are untouched).\n\tThe zone can subsequently "
 		    "be attached, or can be moved to another\n\tsystem and "
-		    "attached there."));
+		    "attached there.  The -n option can be used to specify\n\t"
+		    "'no-execute' mode.  When -n is used, the information "
+		    "needed to attach\n\tthe zone is sent to standard output "
+		    "but the zone is not actually\n\tdetached."));
 	case CMD_ATTACH:
 		return (gettext("Attach the zone to the system.  The zone "
 		    "state must be 'configured'\n\tprior to attach; upon "
@@ -254,7 +257,12 @@ long_help(int cmd_num)
 		    "'installed'.  The system software on the current "
 		    "system must be\n\tcompatible with the software on the "
 		    "zone's original system.\n\tSpecify -F to force the attach "
-		    "and skip software compatibility tests."));
+		    "and skip software compatibility tests.\n\tThe -n option "
+		    "can be used to specify 'no-execute' mode.  When -n is\n\t"
+		    "used, the information needed to attach the zone is read "
+		    "from the\n\tspecified path and the configuration is only "
+		    "validated.  The path can\n\tbe '-' to specify standard "
+		    "input."));
 	default:
 		return ("");
 	}
@@ -2371,59 +2379,12 @@ print_net_err(char *phys, char *addr, int af, char *msg)
 }
 
 static int
-verify_details(int cmd_num)
+verify_handle(int cmd_num, zone_dochandle_t handle)
 {
-	zone_dochandle_t handle;
 	struct zone_nwiftab nwiftab;
-	char zonepath[MAXPATHLEN], checkpath[MAXPATHLEN];
 	int return_code = Z_OK;
 	int err;
 	boolean_t in_alt_root;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(cmd_num), B_TRUE);
-		return (Z_ERR);
-	}
-	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(cmd_num), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-	if ((err = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath))) !=
-	    Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(cmd_num), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-	/*
-	 * zonecfg_get_zonepath() gets its data from the XML repository.
-	 * Verify this against the index file, which is checked first by
-	 * zone_get_zonepath().  If they don't match, bail out.
-	 */
-	if ((err = zone_get_zonepath(target_zone, checkpath,
-	    sizeof (checkpath))) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not get zone path"));
-		return (Z_ERR);
-	}
-	if (strcmp(zonepath, checkpath) != 0) {
-		/*
-		 * TRANSLATION_NOTE
-		 * XML and zonepath are literals that should not be translated.
-		 */
-		(void) fprintf(stderr, gettext("The XML repository has "
-		    "zonepath '%s',\nbut the index file has zonepath '%s'.\n"
-		    "These must match, so fix the incorrect entry.\n"),
-		    zonepath, checkpath);
-		return (Z_ERR);
-	}
-	if (validate_zonepath(zonepath, cmd_num) != Z_OK) {
-		(void) fprintf(stderr, gettext("could not verify zonepath %s "
-		    "because of the above errors.\n"), zonepath);
-		return_code = Z_ERR;
-	}
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)
@@ -2476,7 +2437,9 @@ verify_details(int cmd_num)
 no_net:
 
 	/* verify that lofs has not been excluded from the kernel */
-	if (modctl(MODLOAD, 1, "fs/lofs", NULL) != 0) {
+	if (!(cmd_num == CMD_DETACH || cmd_num == CMD_ATTACH ||
+	    cmd_num == CMD_MOVE || cmd_num == CMD_CLONE) &&
+	    modctl(MODLOAD, 1, "fs/lofs", NULL) != 0) {
 		if (errno == ENXIO)
 			(void) fprintf(stderr, gettext("could not verify "
 			    "lofs(7FS): possibly excluded in /etc/system\n"));
@@ -2507,6 +2470,66 @@ no_net:
 	if (!in_alt_root && cmd_num != CMD_MOUNT &&
 	    verify_limitpriv(handle) != Z_OK)
 		return_code = Z_ERR;
+
+	return (return_code);
+}
+
+static int
+verify_details(int cmd_num)
+{
+	zone_dochandle_t handle;
+	char zonepath[MAXPATHLEN], checkpath[MAXPATHLEN];
+	int return_code = Z_OK;
+	int err;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath))) !=
+	    Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(cmd_num), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+	/*
+	 * zonecfg_get_zonepath() gets its data from the XML repository.
+	 * Verify this against the index file, which is checked first by
+	 * zone_get_zonepath().  If they don't match, bail out.
+	 */
+	if ((err = zone_get_zonepath(target_zone, checkpath,
+	    sizeof (checkpath))) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		return (Z_ERR);
+	}
+	if (strcmp(zonepath, checkpath) != 0) {
+		/*
+		 * TRANSLATION_NOTE
+		 * XML and zonepath are literals that should not be translated.
+		 */
+		(void) fprintf(stderr, gettext("The XML repository has "
+		    "zonepath '%s',\nbut the index file has zonepath '%s'.\n"
+		    "These must match, so fix the incorrect entry.\n"),
+		    zonepath, checkpath);
+		return (Z_ERR);
+	}
+	if (validate_zonepath(zonepath, cmd_num) != Z_OK) {
+		(void) fprintf(stderr, gettext("could not verify zonepath %s "
+		    "because of the above errors.\n"), zonepath);
+		return_code = Z_ERR;
+	}
+
+	if (verify_handle(cmd_num, handle) != Z_OK)
+		return_code = Z_ERR;
+
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
 		(void) fprintf(stderr,
@@ -3730,6 +3753,7 @@ detach_func(int argc, char *argv[])
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	zone_dochandle_t handle;
+	boolean_t execute = B_TRUE;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot detach zone in alternate root"));
@@ -3737,20 +3761,47 @@ detach_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?")) != EOF) {
+	if ((arg = getopt(argc, argv, "?n")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_DETACH, CMD_DETACH);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'n':
+			execute = B_FALSE;
+			break;
 		default:
 			sub_usage(SHELP_DETACH, CMD_DETACH);
 			return (Z_USAGE);
 		}
 	}
-	if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE) != Z_OK)
-		return (Z_ERR);
-	if (verify_details(CMD_DETACH) != Z_OK)
-		return (Z_ERR);
+	if (execute) {
+		if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE)
+		    != Z_OK)
+			return (Z_ERR);
+		if (verify_details(CMD_DETACH) != Z_OK)
+			return (Z_ERR);
+	} else {
+		/*
+		 * We want a dry-run to work for a non-privileged user so we
+		 * only do minimal validation.
+		 */
+		if (getzoneid() != GLOBAL_ZONEID) {
+			zerror(gettext("must be in the global zone to %s a "
+			    "zone."), cmd_to_str(CMD_DETACH));
+			return (Z_ERR);
+		}
+
+		if (target_zone == NULL) {
+			zerror(gettext("no zone specified"));
+			return (Z_ERR);
+		}
+
+		if (strcmp(target_zone, GLOBAL_ZONENAME) == 0) {
+			zerror(gettext("%s operation is invalid for the "
+			    "global zone."), cmd_to_str(CMD_DETACH));
+			return (Z_ERR);
+		}
+	}
 
 	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
 	    != Z_OK) {
@@ -3760,7 +3811,7 @@ detach_func(int argc, char *argv[])
 	}
 
 	/* Don't detach the zone if anything is still mounted there */
-	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
+	if (execute && zonecfg_find_mounts(zonepath, NULL, NULL)) {
 		zerror(gettext("These file systems are mounted on "
 		    "subdirectories of %s.\n"), zonepath);
 		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
@@ -3779,7 +3830,7 @@ detach_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+	if (execute && grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
 		zonecfg_fini_handle(handle);
@@ -3793,21 +3844,27 @@ detach_func(int argc, char *argv[])
 		goto done;
 	}
 
-	if ((err = zonecfg_detach_save(handle)) != Z_OK) {
+	if ((err = zonecfg_detach_save(handle, (execute ? 0 : ZONE_DRY_RUN)))
+	    != Z_OK) {
 		errno = err;
 		zperror(gettext("saving the detach manifest failed"), B_TRUE);
 		goto done;
 	}
 
-	if ((err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED))
-	    != Z_OK) {
+	/*
+	 * Set the zone state back to configured unless we are running with the
+	 * no-execute option.
+	 */
+	if (execute && (err = zone_set_state(target_zone,
+	    ZONE_STATE_CONFIGURED)) != Z_OK) {
 		errno = err;
 		zperror(gettext("could not reset state"), B_TRUE);
 	}
 
 done:
 	zonecfg_fini_handle(handle);
-	release_lock_file(lockfd);
+	if (execute)
+		release_lock_file(lockfd);
 
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
@@ -3896,6 +3953,78 @@ dev_fix(zone_dochandle_t handle)
 	return (Z_OK);
 }
 
+/*
+ * Validate attaching a zone but don't actually do the work.  The zone
+ * does not have to exist, so there is some complexity getting a new zone
+ * configuration set up so that we can perform the validation.  This is
+ * handled within zonecfg_attach_manifest() which returns two handles; one
+ * for the the full configuration to validate (rem_handle) and the other
+ * (local_handle) containing only the zone configuration derived from the
+ * manifest.
+ */
+static int
+dryrun_attach(char *manifest_path)
+{
+	int fd;
+	int err;
+	int res;
+	zone_dochandle_t local_handle;
+	zone_dochandle_t rem_handle = NULL;
+
+	if (strcmp(manifest_path, "-") == 0) {
+		fd = 0;
+	} else if ((fd = open(manifest_path, O_RDONLY)) < 0) {
+		zperror(gettext("could not open manifest path"), B_FALSE);
+		return (Z_ERR);
+	}
+
+	if ((local_handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		res = Z_ERR;
+		goto done;
+	}
+
+	if ((rem_handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		res = Z_ERR;
+		goto done;
+	}
+
+	if ((err = zonecfg_attach_manifest(fd, local_handle, rem_handle))
+	    != Z_OK) {
+		if (err == Z_INVALID_DOCUMENT)
+			zerror(gettext("Cannot attach to an earlier release "
+			    "of the operating system"));
+		else
+			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		res = Z_ERR;
+		goto done;
+	}
+
+	res = verify_handle(CMD_ATTACH, local_handle);
+
+	/* Get the detach information for the locally defined zone. */
+	if ((err = zonecfg_get_detach_info(local_handle, B_FALSE)) != Z_OK) {
+		errno = err;
+		zperror(gettext("getting the attach information failed"),
+		    B_TRUE);
+		res = Z_ERR;
+	} else {
+		/* sw_cmp prints error msgs as necessary */
+		if (sw_cmp(local_handle, rem_handle, SW_CMP_NONE) != Z_OK)
+			res = Z_ERR;
+	}
+
+done:
+	if (strcmp(manifest_path, "-") != 0)
+		(void) close(fd);
+
+	zonecfg_fini_handle(local_handle);
+	zonecfg_fini_handle(rem_handle);
+
+	return ((res == Z_OK) ? Z_OK : Z_ERR);
+}
+
 static int
 attach_func(int argc, char *argv[])
 {
@@ -3905,6 +4034,8 @@ attach_func(int argc, char *argv[])
 	zone_dochandle_t handle;
 	zone_dochandle_t athandle = NULL;
 	char zonepath[MAXPATHLEN];
+	boolean_t execute = B_TRUE;
+	char *manifest_path;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot attach zone in alternate root"));
@@ -3912,7 +4043,7 @@ attach_func(int argc, char *argv[])
 	}
 
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?F")) != EOF) {
+	if ((arg = getopt(argc, argv, "?Fn:")) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_ATTACH, CMD_ATTACH);
@@ -3920,11 +4051,24 @@ attach_func(int argc, char *argv[])
 		case 'F':
 			force = B_TRUE;
 			break;
+		case 'n':
+			execute = B_FALSE;
+			manifest_path = optarg;
+			break;
 		default:
 			sub_usage(SHELP_ATTACH, CMD_ATTACH);
 			return (Z_USAGE);
 		}
 	}
+
+	/*
+	 * If the no-execute option was specified, we need to branch down
+	 * a completely different path since there is no zone required to be
+	 * configured for this option.
+	 */
+	if (!execute)
+		return (dryrun_attach(manifest_path));
+
 	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE) != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_ATTACH) != Z_OK)

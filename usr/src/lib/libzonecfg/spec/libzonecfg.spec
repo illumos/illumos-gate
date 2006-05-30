@@ -77,6 +77,13 @@ declaration	int zonecfg_get_template_handle(const char *, const char *, \
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_attach_manifest
+include		<libzonecfg.h>
+declaration	int zonecfg_attach_manifest(int, zone_dochandle_t, \
+			zone_dochandle_t)
+version		SUNWprivate_1.1
+end
+
 function	zonecfg_check_handle
 include		<libzonecfg.h>
 declaration	int zonecfg_check_handle(zone_dochandle_t)
@@ -601,7 +608,7 @@ end
 
 function	zonecfg_detach_save
 include		<libzonecfg.h>
-declaration	int zonecfg_detach_save(zone_dochandle_t)
+declaration	int zonecfg_detach_save(zone_dochandle_t, uint_t)
 version		SUNWprivate_1.1
 end		
 
