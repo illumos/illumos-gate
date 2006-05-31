@@ -73,7 +73,7 @@ typedef	int64_t (*llfcn_t)();	/* function returning long long */
 int pre_syscall(void);
 void post_syscall(long rval1, long rval2);
 static krwlock_t *lock_syscall(struct sysent *, uint_t);
-static void deferred_singlestep_trap(caddr_t);
+void deferred_singlestep_trap(caddr_t);
 
 #ifdef _SYSCALL32_IMPL
 #define	LWP_GETSYSENT(lwp)	\
@@ -475,6 +475,7 @@ post_syscall(long rval1, long rval2)
 	if (rp->r_ps & PS_T) {
 		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 		rp->r_ps &= ~PS_T;
+		aston(curthread);
 	}
 #ifdef C2_AUDIT
 	if (audit_active) {	/* put out audit record for this syscall */
@@ -600,15 +601,6 @@ sig_check:
 	clear_stale_fd();
 	t->t_flag &= ~T_FORKALL;
 
-	/*
-	 * If a single-step trap occurred on a syscall (see trap())
-	 * recognize it now.  Do this before checking for signals
-	 * because deferred_singlestep_trap() may generate a SIGTRAP to
-	 * the LWP or may otherwise mark the LWP to call issig(FORREAL).
-	 */
-	if (lwp->lwp_pcb.pcb_flags & DEBUG_PENDING)
-		deferred_singlestep_trap((caddr_t)rp->r_pc);
-
 	if (t->t_astflag | t->t_sig_check) {
 		/*
 		 * Turn off the AST flag before checking all the conditions that
@@ -617,6 +609,15 @@ sig_check:
 		 * syscall.
 		 */
 		astoff(t);
+		/*
+		 * If a single-step trap occurred on a syscall (see trap())
+		 * recognize it now.  Do this before checking for signals
+		 * because deferred_singlestep_trap() may generate a SIGTRAP to
+		 * the LWP or may otherwise mark the LWP to call issig(FORREAL).
+		 */
+		if (lwp->lwp_pcb.pcb_flags & DEBUG_PENDING)
+			deferred_singlestep_trap((caddr_t)rp->r_pc);
+
 		t->t_sig_check = 0;
 
 		/*
@@ -811,7 +812,7 @@ sig_check:
 /*
  * Called from post_syscall() when a deferred singlestep is to be taken.
  */
-static void
+void
 deferred_singlestep_trap(caddr_t pc)
 {
 	proc_t *p = ttoproc(curthread);

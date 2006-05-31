@@ -103,6 +103,19 @@ savecontext(ucontext_t *ucp, k_sigset_t mask)
 	if (rp->r_ps & PS_T) {
 		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 		rp->r_ps &= ~PS_T;
+		/*
+		 * We always check DEBUG_PENDING before checking for any
+		 * pending signal. This at times can potentially lead to
+		 * DEBUG_PENDING not being honoured. (for eg: the lwp is
+		 * stopped by stop_on_fault() called from trap(), after
+		 * being awakened it might see a pending signal and call
+		 * savecontext(), however on the way back to userland there
+		 * is no place it can be detected). Hence in anticipation of
+		 * such occassion, we set AST flag for the thread which will
+		 * make the thread take an excursion through trap() where
+		 * we will handle it appropriately.
+		 */
+		aston(curthread);
 	}
 }
 
@@ -136,6 +149,7 @@ restorecontext(ucontext_t *ucp)
 		setgregs(lwp, ucp->uc_mcontext.gregs);
 		lwp->lwp_eosys = JUSTRETURN;
 		t->t_post_sys = 1;
+		aston(curthread);
 	}
 
 	if (ucp->uc_flags & UC_FPU)
@@ -277,6 +291,10 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask)
 	if (rp->r_ps & PS_T) {
 		lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 		rp->r_ps &= ~PS_T;
+		/*
+		 * See comments in savecontext().
+		 */
+		aston(curthread);
 	}
 }
 

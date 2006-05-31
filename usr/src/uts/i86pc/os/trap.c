@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -375,7 +374,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	kthread_t *cur_thread = curthread;
 	enum seg_rw rw;
 	unsigned type;
-	extern int stop_on_fault(uint_t, k_siginfo_t *);
 	proc_t *p = ttoproc(cur_thread);
 	klwp_t *lwp = ttolwp(cur_thread);
 	uintptr_t lofault;
@@ -993,6 +991,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				rp->r_ps &= ~PS_T; /* turn off trace */
 				lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 				cur_thread->t_post_sys = 1;
+				aston(curthread);
 				goto cleanup;
 			}
 		}
@@ -1272,6 +1271,15 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * syscall.
 		 */
 		astoff(cur_thread);
+		/*
+		 * If a single-step trap occurred on a syscall (see above)
+		 * recognize it now.  Do this before checking for signals
+		 * because deferred_singlestep_trap() may generate a SIGTRAP to
+		 * the LWP or may otherwise mark the LWP to call issig(FORREAL).
+		 */
+		if (lwp->lwp_pcb.pcb_flags & DEBUG_PENDING)
+			deferred_singlestep_trap((caddr_t)rp->r_pc);
+
 		cur_thread->t_sig_check = 0;
 
 		mutex_enter(&p->p_lock);
