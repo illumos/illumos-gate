@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -270,8 +269,8 @@ extern plcnt_t	plcnt;
 #define	MTYPE_NEXT(mnode, mtype, flags) { 				\
 	if (!(flags & (PG_NORELOC | PGI_NOCAGE | PGI_RELOCONLY)) &&	\
 	    (kcage_freemem >= kcage_lotsfree)) {			\
-		if (plcnt[mnode][mtype].plc_mt_pgmax == 0) {		\
-			ASSERT(MNODETYPE_PGCNT(mnode, mtype) == 0);	\
+		if (plcnt[mnode][MTYPE_NORELOC].plc_mt_pgmax == 0) {	\
+			ASSERT(MNODETYPE_PGCNT(mnode, MTYPE_NORELOC) == 0); \
 			mtype = -1;					\
 		} else {						\
 			mtype = MTYPE_NORELOC;				\
