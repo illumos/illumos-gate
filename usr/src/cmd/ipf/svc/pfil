@@ -2,7 +2,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -17,7 +17,7 @@ PFILAP=/etc/ipf/pfil.ap
 case "$1" in
 'start')
 	/sbin/autopush -f ${PFILAP}
-	enabled=`svcprop -p general/enabled svc:/network/ipfilter:default`
+	enabled=`svcprop -c -p general/enabled svc:/network/ipfilter:default`
 
 	# To avoid a window of vulnerability during the time that networking
 	# is being initialized but before the full ipf.conf configuration is

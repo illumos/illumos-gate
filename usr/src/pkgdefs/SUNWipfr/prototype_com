@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,6 +40,8 @@ d none kernel/drv 755 root sys
 f none kernel/drv/pfil.conf 644 root sys
 d none kernel/strmod 755 root sys
 d none var 755 root sys
+d none var/db 755 root sys
+d none var/db/ipf 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/network 755 root sys

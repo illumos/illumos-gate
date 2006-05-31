@@ -2,14 +2,14 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 . /lib/svc/share/smf_include.sh
 
 PATH=${PATH}:/usr/sbin:/usr/lib/ipf
-PIDFILE=/etc/ipf/ipmon.pid
+PIDFILE=/var/run/ipmon.pid
 IPFILCONF=/etc/ipf/ipf.conf
 IP6FILCONF=/etc/ipf/ipf6.conf
 IPNATCONF=/etc/ipf/ipnat.conf

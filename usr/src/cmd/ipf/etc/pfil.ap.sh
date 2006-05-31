@@ -28,6 +28,7 @@ case "$MACH" in
 #dnet	-1	0	pfil
 #pcelx	-1	0	pfil
 #spwr	-1	0	pfil
+#ce	-1	0	pfil
 
 " > pfil.ap
 	;;

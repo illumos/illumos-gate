@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,10 +134,10 @@ struct	flags	tcpfl[] = {
 	{ 0, '\0' }
 };
 
-#ifdef	MENTAT
+#if defined(__hpux) || (SOLARIS && (SOLARIS2 < 10))
 static	char	*pidfile = "/etc/ipf/ipmon.pid";
 #else
-# if BSD >= 199306
+# if (BSD >= 199306) || SOLARIS
 static	char	*pidfile = "/var/run/ipmon.pid";
 # else
 static	char	*pidfile = "/etc/ipmon.pid";
