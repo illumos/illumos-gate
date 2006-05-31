@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -21,15 +22,38 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
- 
-include ../Makefile.com
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-DATAFILES += depend i.preserve
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
 
-.KEEP_STATE:
+add_mpt_entry() {
+cat >> $dest << EOF
 
-all: $(FILES)
-install: all pkg
+#
+# Enable Target 7 for the mpt SCSI/SAS/SATA driver.  Target 7 has
+# traditionally been reserved for legacy SCSI HBAs, but SAS controllers
+# supported by the mpt driver do not use target 7 for that purpose.
+# Enabling Target 7 allows the use of 8 disks on those controllers.
+#
+name="sd" parent="mpt"
+	target=7 lun=0;
+EOF
+}
 
-include ../Makefile.targ
+while read src dest; do
+	if [ ! -f $dest ]; then
+		cp $src $dest
+	else
+		line1="name=\"sd\" parent=\"mpt\""
+		line2="target=7 lun=0;"
+		echo `cat $dest` | grep "$line1[# ]*$line2" >/dev/null
+
+		if [ $? -ne 0 ]; then
+			add_mpt_entry
+		fi
+	fi
+done
+
+exit 0

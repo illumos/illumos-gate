@@ -43,6 +43,8 @@
 #
 # List files which are SPARC specific here
 #
+i i.sdconf
+#
 # source locations relative to the prototype file
 #
 # SUNWckr
@@ -60,7 +62,7 @@ f none kernel/crypto/sparcv9/swrand 755 root sys
 d none kernel/dacf/sparcv9 755 root sys
 f none kernel/dacf/sparcv9/consconfig_dacf 755 root sys
 f none kernel/drv/dad.conf 644 root sys
-f none kernel/drv/sd.conf 644 root sys
+e sdconf kernel/drv/sd.conf 644 root sys
 e preserve kernel/drv/uata.conf 644 root sys
 d none kernel/drv/sparcv9 755 root sys
 f none kernel/drv/sparcv9/aggr 755 root sys
