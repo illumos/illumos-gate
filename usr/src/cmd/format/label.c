@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -485,7 +484,6 @@ get_disk_info_from_devid(int fd, struct efi_info *label)
 	struct dk_minfo	minf;
 	struct dk_cinfo	dkinfo;
 
-
 	if (devid_get(fd, &devid)) {
 		if (option_msg && diag_msg)
 			err_print("devid_get failed\n");
@@ -542,26 +540,34 @@ get_disk_info(int fd, struct efi_info *label)
 {
 	struct scsi_inquiry	inquiry;
 	struct scsi_capacity_16	capacity;
+	struct dk_minfo		minf;
 
 	if (!get_disk_info_from_devid(fd, label))
 		return (0);
 
 	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
-		err_print("Inquiry failed on %d\n", fd);
-		return (-1);
+		(void) strlcpy(label->vendor, "Unknown", 8);
+		(void) strlcpy(label->product, "Unknown", 8);
+		(void) strlcpy(label->revision, "0001", 5);
+	} else {
+		(void) strlcpy(label->vendor, inquiry.inq_vid, 9);
+		(void) strlcpy(label->product, inquiry.inq_pid, 17);
+		(void) strlcpy(label->revision, inquiry.inq_revision, 5);
 	}
+
 	if (uscsi_read_capacity(fd, &capacity)) {
-		err_print("Read Capacity failed for %d\n", fd);
-		return (-1);
+		if (ioctl(fd, DKIOCGMEDIAINFO, &minf) == -1) {
+			err_print("Fetch Capacity failed\n");
+			return (-1);
+		}
+		label->capacity = minf.dki_capacity * minf.dki_lbsize / 512;
+	} else {
+		label->capacity = capacity.sc_capacity;
+
+		/* Since we are counting from zero, add 1 to capacity */
+		label->capacity++;
 	}
 
-	(void) strlcpy(label->vendor, inquiry.inq_vid, 9);
-	(void) strlcpy(label->product, inquiry.inq_pid, 17);
-	(void) strlcpy(label->revision, inquiry.inq_revision, 5);
-	label->capacity = capacity.sc_capacity;
-
-	/* Since we are counting from zero, add 1 to capacity */
-	label->capacity++;
 	return (0);
 }
 

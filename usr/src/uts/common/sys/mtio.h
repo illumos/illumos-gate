@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983-1989 by AT&T.
@@ -318,7 +317,7 @@ enum mtio_state { MTIO_NONE, MTIO_EJECTED, MTIO_INSERTED };
 #define	MT_DENSITY2	(1 <<3)
 #define	MT_DENSITY3	(2 <<3)
 #define	MT_DENSITY4	(3 <<3)		/* Highest density/format */
-#define	MTMINOR(unit)	(((unit & 0x7fc) << 5) + (unit & 0x3))
+#define	MTMINOR(unit)	((((unit) & 0x7fc) << 5) + ((unit) & 0x3))
 #define	MT_BSD		(1 <<6)		/* BSD behavior on close */
 #define	MT_DENSITY(dev) ((getminor(dev) & MT_DENSITY_MASK) >> 3)
 
