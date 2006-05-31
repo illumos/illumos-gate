@@ -2201,7 +2201,8 @@ hvio_msiq_init(devhandle_t dev_hdl, pxu_t *pxu_p)
 	    CSR_XR((caddr_t)dev_hdl, EVENT_QUEUE_BASE_ADDRESS));
 
 	CSRA_XS((caddr_t)dev_hdl, INTERRUPT_MONDO_DATA_0, 0,
-	    (uint64_t)ID_TO_IGN(pxu_p->portid) << INO_BITS);
+	    (uint64_t)ID_TO_IGN(PX_CHIP_TYPE(pxu_p),
+	    pxu_p->portid) << INO_BITS);
 	DBG(DBG_IB, NULL, "hvio_msiq_init: "
 	    "INTERRUPT_MONDO_DATA_0: 0x%llx\n",
 	    CSR_XR((caddr_t)dev_hdl, INTERRUPT_MONDO_DATA_0));

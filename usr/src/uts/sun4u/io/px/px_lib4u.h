@@ -180,16 +180,18 @@ typedef	struct eq_rec {
 #define	MMU_TTE_RO		(1ull << 62)	/* Oberon Relaxed Ordering */
 
 #define	INO_BITS		6	/* INO#s are 6 bits long */
-#define	IGN_BITS		5	/* IGN#s are 5 bits long */
 #define	INO_MASK		0x3F	/* INO#s mask */
-#define	IGN_MASK		0x1F	/* IGN#s mask */
 
-#define	ID_TO_IGN(portid)		((uint16_t)((portid) & IGN_MASK))
-#define	ID_TO_NODEID(portid)		((uint16_t)((portid) >> IGN_BITS))
-#define	DEVINO_TO_SYSINO(portid, devino)	\
-	((ID_TO_NODEID(portid) << (IGN_BITS + INO_BITS)) | \
-	((ID_TO_IGN(portid) << INO_BITS) | (devino & INO_MASK)))
 #define	SYSINO_TO_DEVINO(sysino)	(sysino & INO_MASK)
+
+#define	FIRE_IGN_MASK		0x1F	/* IGN#s mask, 5 bits long for Fire */
+#define	OBERON_IGN_MASK		0xFF	/* IGN#s mask, 8 bits long for Oberon */
+
+#define	ID_TO_IGN(chip, portid) ((portid) & ((chip) == PX_CHIP_OBERON ? \
+	OBERON_IGN_MASK : FIRE_IGN_MASK))
+
+#define	DEVINO_TO_SYSINO(portid, devino) \
+	(((portid) << INO_BITS) | ((devino) & INO_MASK))
 
 /* Interrupt states */
 #define	INTERRUPT_IDLE_STATE		0
