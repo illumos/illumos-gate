@@ -42,6 +42,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/inttypes.h>
 #include <sys/param.h>
 
 /*
@@ -73,7 +74,7 @@ typedef struct dis86 {
 	int		d86_rmindex;		/* index of modrm byte or -1 */
 	uint_t		d86_memsize;		/* size of memory referenced */
 	char		d86_bytes[16];		/* bytes of instruction */
-	char		d86_mneu[OPLEN];
+	char		d86_mnem[OPLEN];
 	uint_t		d86_numopnds;
 	uint_t		d86_rex_prefix;		/* value of REX prefix if !0 */
 	char		*d86_seg_prefix;	/* segment prefix, if any */
@@ -94,10 +95,10 @@ typedef struct dis86 {
 
 extern int dtrace_disx86(dis86_t *x, uint_t cpu_mode);
 
-#define	DIS_OP_OCTAL	0x1	/* Print all numbers in octal */
+#define	DIS_F_OCTAL	0x1	/* Print all numbers in octal */
 
 #ifdef DIS_TEXT
-extern void dtrace_disx86_str(dis86_t *x, uint_t cpu_mode, uintptr_t pc,
+extern void dtrace_disx86_str(dis86_t *x, uint_t cpu_mode, uint64_t pc,
     char *buf, size_t len);
 #endif
 

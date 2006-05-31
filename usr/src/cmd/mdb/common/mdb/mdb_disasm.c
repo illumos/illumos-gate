@@ -242,14 +242,12 @@ libdisasm_lookup(void *data, uint64_t addr, char *buf, size_t buflen,
 #ifdef __sparc
 out:
 #endif
-	if (start != NULL || len != NULL) {
-		if (mdb_lookup_by_addr(addr, MDB_SYM_FUZZY, &c, 1, &sym) < 0)
-			return (-1);
-		if (start != NULL)
-			*start = sym.st_value;
-		if (len != NULL)
-			*len = sym.st_size;
-	}
+	if (mdb_lookup_by_addr(addr, MDB_SYM_FUZZY, &c, 1, &sym) < 0)
+		return (-1);
+	if (start != NULL)
+		*start = sym.st_value;
+	if (len != NULL)
+		*len = sym.st_size;
 
 	return (0);
 }

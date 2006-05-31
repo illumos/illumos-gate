@@ -128,7 +128,7 @@ dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
 		dhp->dh_mode = SIZE32;
 
 	if (flags & DIS_OCTAL)
-		dhp->dh_dis.d86_flags = DIS_OP_OCTAL;
+		dhp->dh_dis.d86_flags = DIS_F_OCTAL;
 
 	dhp->dh_dis.d86_sprintf_func = snprintf;
 	dhp->dh_dis.d86_get_byte = get_byte;

@@ -78,9 +78,12 @@ void
 getsymname(uint64_t addr, const char *symbol, off_t offset, char *buf,
     size_t buflen)
 {
-	if (symbol == NULL || g_numeric)
-		(void) snprintf(buf, buflen, "%llx", addr);
-	else {
+	if (symbol == NULL || g_numeric) {
+		if (g_flags & DIS_OCTAL)
+			(void) snprintf(buf, buflen, "0%llo", addr);
+		else
+			(void) snprintf(buf, buflen, "0x%llx", addr);
+	} else {
 		if (g_demangle)
 			symbol = dis_demangle(symbol);
 
@@ -247,6 +250,9 @@ do_lookup(void *data, uint64_t addr, char *buf, size_t buflen, uint64_t *start,
 		*start = addr - offset;
 	if (symlen != NULL)
 		*symlen = size;
+
+	if (symbol == NULL)
+		return (-1);
 
 	return (0);
 }

@@ -71,7 +71,7 @@ typedef struct	instable {
 	uchar_t		it_adrmode;
 #ifdef DIS_TEXT
 	char		it_name[NCPS];
-	uint_t		it_suffix:1;		/* mneu + "w", "l", or "d" */
+	uint_t		it_suffix:1;		/* mnem + "w", "l", or "d" */
 #endif
 #ifdef DIS_MEM
 	uint_t		it_size:16;
@@ -217,6 +217,7 @@ enum {
 #define	MODE_SIGNED	2	/* sign extended immediate */
 #define	MODE_IMPLIED	3	/* constant value implied from opcode */
 #define	MODE_OFFSET	4	/* offset part of an address */
+#define	MODE_RIPREL	5	/* like IPREL, but from %rip (amd64) */
 
 /*
  * The letters used in these macros are:
@@ -1401,9 +1402,9 @@ dtrace_imm_opnd(dis86_t *x, int wbit, int size, int opindex)
 	}
 	/* Do sign extension */
 	if (x->d86_bytes[x->d86_len - 1] & 0x80) {
-		for (; i < valsize; i++)
+		for (; i < sizeof (uint64_t); i++)
 			x->d86_opnd[opindex].d86_value |=
-			    (uint64_t)0xff << (i* 8);
+			    (uint64_t)0xff << (i * 8);
 	}
 #ifdef DIS_TEXT
 	x->d86_opnd[opindex].d86_mode = MODE_SIGNED;
@@ -1598,12 +1599,17 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 				(void) strlcat(opnd, dis_addr32_mode12[r_m],
 				    OPLEN);
 		} else {
-			if (mode == 0)
+			if (mode == 0) {
 				(void) strlcat(opnd, dis_addr64_mode0[r_m],
 				    OPLEN);
-			else
+				if (r_m == 5) {
+					x->d86_opnd[opindex].d86_mode =
+					    MODE_RIPREL;
+				}
+			} else {
 				(void) strlcat(opnd, dis_addr64_mode12[r_m],
 				    OPLEN);
+			}
 		}
 	} else {
 		uint_t need_paren = 0;
@@ -1710,7 +1716,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	uint_t opcode2;		/* low nibble of 1st byte */
 	uint_t opcode3;		/* extra opcode bits usually from ModRM byte */
 	uint_t opcode4;		/* high nibble of 2nd byte */
-	uint_t opcode5;		/* low nibble of 2ne byte */
+	uint_t opcode5;		/* low nibble of 2nd byte */
 	uint_t opcode6;		/* high nibble of 3rd byte */
 	uint_t opcode7;		/* low nibble of 3rd byte */
 	uint_t opcode_bytes = 1;
@@ -1732,7 +1738,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 #ifdef DIS_TEXT
 	x->d86_numopnds = 0;
 	x->d86_seg_prefix = NULL;
-	x->d86_mneu[0] = 0;
+	x->d86_mnem[0] = 0;
 	for (i = 0; i < 3; ++i) {
 		x->d86_opnd[i].d86_opnd[0] = 0;
 		x->d86_opnd[i].d86_prefix[0] = 0;
@@ -1765,7 +1771,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	if (opcode1 == 0 && opcode2 == 0 &&
 	    x->d86_check_func != NULL && x->d86_check_func(x->d86_data)) {
 #ifdef DIS_TEXT
-		(void) strncpy(x->d86_mneu, ".byte\t0", OPLEN);
+		(void) strncpy(x->d86_mnem, ".byte\t0", OPLEN);
 #endif
 		goto done;
 	}
@@ -1830,7 +1836,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	 * ignored.
 	 */
 	if (cpu_mode == SIZE64) {
-		if (rex_prefix & 0x08)
+		if (rex_prefix & REX_W)
 			opnd_size = SIZE64;
 		else if (opnd_size_prefix)
 			opnd_size = SIZE16;
@@ -2035,33 +2041,33 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	 * including the prefixes.
 	 */
 	if (lock_prefix)
-		(void) strlcat(x->d86_mneu, "lock ", OPLEN);
+		(void) strlcat(x->d86_mnem, "lock ", OPLEN);
 
 	if (rep_prefix == 0xf2)
-		(void) strlcat(x->d86_mneu, "repnz ", OPLEN);
+		(void) strlcat(x->d86_mnem, "repnz ", OPLEN);
 	else if (rep_prefix == 0xf3)
-		(void) strlcat(x->d86_mneu, "repz ", OPLEN);
+		(void) strlcat(x->d86_mnem, "repz ", OPLEN);
 
 	if (cpu_mode == SIZE64 && addr_size_prefix)
-		(void) strlcat(x->d86_mneu, "addr32 ", OPLEN);
+		(void) strlcat(x->d86_mnem, "addr32 ", OPLEN);
 
 	if (dp->it_adrmode != CBW &&
 	    dp->it_adrmode != CWD &&
 	    dp->it_adrmode != XMMSFNC) {
 		if (strcmp(dp->it_name, "INVALID") == 0)
 			goto error;
-		(void) strlcat(x->d86_mneu, dp->it_name, OPLEN);
+		(void) strlcat(x->d86_mnem, dp->it_name, OPLEN);
 		if (dp->it_suffix) {
 			char *types[] = {"", "w", "l", "q"};
 			if (opcode_bytes == 2 && opcode4 == 4) {
 				/* It's a cmovx.yy. Replace the suffix x */
 				for (i = 5; i < OPLEN; i++) {
-					if (x->d86_mneu[i] == '.')
+					if (x->d86_mnem[i] == '.')
 						break;
 				}
-				x->d86_mneu[i - 1] = *types[opnd_size];
+				x->d86_mnem[i - 1] = *types[opnd_size];
 			} else {
-				(void) strlcat(x->d86_mneu, types[opnd_size],
+				(void) strlcat(x->d86_mnem, types[opnd_size],
 				    OPLEN);
 			}
 		}
@@ -2084,7 +2090,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	case MOVSXZ:
 #ifdef DIS_TEXT
 		if (rex_prefix == 0)
-			(void) strncpy(x->d86_mneu, "movzld", OPLEN);
+			(void) strncpy(x->d86_mnem, "movzld", OPLEN);
 #endif
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
@@ -2097,14 +2103,14 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 
 		/*
 		 * movsbl movsbw movsbq (0x0FBE) or movswl movswq (0x0FBF)
-		 * movzbl movzbw movzbq (0x0FB6) or mobzwl movzwq (0x0FB7)
+		 * movzbl movzbw movzbq (0x0FB6) or movzwl movzwq (0x0FB7)
 		 * wbit lives in 2nd byte, note that operands
 		 * are different sized
 		 */
 	case MOVZ:
 		if (rex_prefix & REX_W) {
 			/* target register size = 64 bit */
-			x->d86_mneu[5] = 'q';
+			x->d86_mnem[5] = 'q';
 		}
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
@@ -2311,7 +2317,7 @@ just_mem:
 	case SWAPGS:
 		if (cpu_mode == SIZE64 && mode == 3 && r_m == 0) {
 #ifdef DIS_TEXT
-			(void) strncpy(x->d86_mneu, "swapgs", OPLEN);
+			(void) strncpy(x->d86_mnem, "swapgs", OPLEN);
 #endif
 			NOMEM;
 			break;
@@ -2521,9 +2527,9 @@ xmmprm:
 		 */
 		if (mode == REG_ONLY) {
 			if (strcmp(dp->it_name, "movlps") == 0)
-				(void) strncpy(x->d86_mneu, "movhlps", OPLEN);
+				(void) strncpy(x->d86_mnem, "movhlps", OPLEN);
 			else if (strcmp(dp->it_name, "movhps") == 0)
-				(void) strncpy(x->d86_mneu, "movlhps", OPLEN);
+				(void) strncpy(x->d86_mnem, "movlhps", OPLEN);
 		}
 #endif
 		if (dp->it_adrmode == XMMXIMPL)
@@ -2555,7 +2561,7 @@ xmmprm:
 #ifdef DIS_TEXT
 		if (mode == REG_ONLY) {
 			if (strcmp(dp->it_name, "movhps") == 0)
-				(void) strncpy(x->d86_mneu, "movlhps", OPLEN);
+				(void) strncpy(x->d86_mnem, "movlhps", OPLEN);
 			else
 				goto error;
 		}
@@ -2631,10 +2637,10 @@ xmmprm:
 			if (pred >= (sizeof (dis_PREDSUFFIX) / sizeof (char *)))
 				goto error;
 
-			(void) strncpy(x->d86_mneu, "cmp", OPLEN);
-			(void) strlcat(x->d86_mneu, dis_PREDSUFFIX[pred],
+			(void) strncpy(x->d86_mnem, "cmp", OPLEN);
+			(void) strlcat(x->d86_mnem, dis_PREDSUFFIX[pred],
 			    OPLEN);
-			(void) strlcat(x->d86_mneu,
+			(void) strlcat(x->d86_mnem,
 			    dp->it_name + strlen(dp->it_name) - 2,
 			    OPLEN);
 			x->d86_opnd[0] = x->d86_opnd[1];
@@ -2855,11 +2861,11 @@ xmmprm:
 	case CBW:
 #ifdef DIS_TEXT
 		if (opnd_size == SIZE16)
-			(void) strlcat(x->d86_mneu, "cbtw", OPLEN);
+			(void) strlcat(x->d86_mnem, "cbtw", OPLEN);
 		else if (opnd_size == SIZE32)
-			(void) strlcat(x->d86_mneu, "cwtl", OPLEN);
+			(void) strlcat(x->d86_mnem, "cwtl", OPLEN);
 		else
-			(void) strlcat(x->d86_mneu, "cltq", OPLEN);
+			(void) strlcat(x->d86_mnem, "cltq", OPLEN);
 #endif
 		wbit = LONG_OPND;
 		NOMEM;
@@ -2868,11 +2874,11 @@ xmmprm:
 	case CWD:
 #ifdef DIS_TEXT
 		if (opnd_size == SIZE16)
-			(void) strlcat(x->d86_mneu, "cwtd", OPLEN);
+			(void) strlcat(x->d86_mnem, "cwtd", OPLEN);
 		else if (opnd_size == SIZE32)
-			(void) strlcat(x->d86_mneu, "cltd", OPLEN);
+			(void) strlcat(x->d86_mnem, "cltd", OPLEN);
 		else
-			(void) strlcat(x->d86_mneu, "cqtd", OPLEN);
+			(void) strlcat(x->d86_mnem, "cqtd", OPLEN);
 #endif
 		wbit = LONG_OPND;
 		NOMEM;
@@ -2888,9 +2894,9 @@ xmmprm:
 		/* sfence doesn't take operands */
 #ifdef DIS_TEXT
 		if (mode == REG_ONLY) {
-			(void) strlcat(x->d86_mneu, "sfence", OPLEN);
+			(void) strlcat(x->d86_mnem, "sfence", OPLEN);
 		} else {
-			(void) strlcat(x->d86_mneu, "clflush", OPLEN);
+			(void) strlcat(x->d86_mnem, "clflush", OPLEN);
 			dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
 			dtrace_get_operand(x, mode, r_m, BYTE_OPND, 0);
 			NOMEM;
@@ -3023,7 +3029,7 @@ done:
 
 error:
 #ifdef DIS_TEXT
-	(void) strlcat(x->d86_mneu, "undef", OPLEN);
+	(void) strlcat(x->d86_mnem, "undef", OPLEN);
 #endif
 	return (1);
 }
@@ -3039,6 +3045,7 @@ static char *unsigned_ops[] = {
 	"rcr", "rcl", "ror", "rol", "shl", "shr", "sal", "psr", "psl",
 	0
 };
+
 
 static int
 isunsigned_op(char *opcode)
@@ -3067,14 +3074,81 @@ isunsigned_op(char *opcode)
 	return (is_unsigned);
 }
 
+/*
+ * Print a numeric immediate into end of buf, maximum length buflen.
+ * The immediate may be an address or a displacement.  Mask is set
+ * for address size.  If the immediate is a "small negative", or
+ * if it's a negative displacement of any magnitude, print as -<absval>.
+ * Respect the "octal" flag.  "Small negative" is defined as "in the
+ * interval [NEG_LIMIT, 0)".
+ *
+ * Also, "isunsigned_op()" instructions never print negatives.
+ *
+ * Return whether we decided to print a negative value or not.
+ */
+
+#define	NEG_LIMIT	-255
+enum {IMM, DISP};
+enum {POS, TRY_NEG};
+
+static int
+print_imm(dis86_t *dis, uint64_t usv, uint64_t mask, char *buf,
+    size_t buflen, int disp, int try_neg)
+{
+	int curlen;
+	int64_t sv = (int64_t)usv;
+	int octal = dis->d86_flags & DIS_F_OCTAL;
+
+	curlen = strlen(buf);
+
+	if (try_neg == TRY_NEG && sv < 0 &&
+	    (disp || sv >= NEG_LIMIT) &&
+	    !isunsigned_op(dis->d86_mnem)) {
+		dis->d86_sprintf_func(buf + curlen, buflen - curlen,
+		    octal ? "-0%llo" : "-0x%llx", (-sv) & mask);
+		return (1);
+	} else {
+		if (disp == DISP)
+			dis->d86_sprintf_func(buf + curlen, buflen - curlen,
+			    octal ? "+0%llo" : "+0x%llx", usv & mask);
+		else
+			dis->d86_sprintf_func(buf + curlen, buflen - curlen,
+			    octal ? "0%llo" : "0x%llx", usv & mask);
+		return (0);
+
+	}
+}
+
+
+static int
+log2(int size)
+{
+	switch (size) {
+	case 1: return (0);
+	case 2: return (1);
+	case 4: return (2);
+	case 8: return (3);
+	}
+	return (0);
+}
+
 /* ARGSUSED */
 void
-dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
+dtrace_disx86_str(dis86_t *dis, uint_t mode, uint64_t pc, char *buf,
     size_t buflen)
 {
+	uint64_t reltgt = 0;
+	uint64_t tgt = 0;
+	int curlen;
+	int (*lookup)(void *, uint64_t, char *, size_t);
 	int i;
+	int64_t sv;
+	uint64_t usv, mask, save_mask, save_usv;
+	static uint64_t masks[] =
+	    {0xffU, 0xffffU, 0xffffffffU, 0xffffffffffffffffULL};
+	save_usv = 0;
 
-	dis->d86_sprintf_func(buf, buflen, "%-6s ", dis->d86_mneu);
+	dis->d86_sprintf_func(buf, buflen, "%-6s ", dis->d86_mnem);
 
 	/*
 	 * For PC-relative jumps, the pc is really the next pc after executing
@@ -3084,15 +3158,37 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 
 	for (i = 0; i < dis->d86_numopnds; i++) {
 		d86opnd_t *op = &dis->d86_opnd[i];
-		int64_t sv;
-		uint64_t mask;
 
 		if (i != 0)
 			(void) strlcat(buf, ",", buflen);
 
 		(void) strlcat(buf, op->d86_prefix, buflen);
 
-		sv = op->d86_value;
+		/*
+		 * sv is for the signed, possibly-truncated immediate or
+		 * displacement; usv retains the original size and
+		 * unsignedness for symbol lookup.
+		 */
+
+		sv = usv = op->d86_value;
+
+		/*
+		 * About masks: for immediates that represent
+		 * addresses, the appropriate display size is
+		 * the effective address size of the instruction.
+		 * This includes MODE_OFFSET, MODE_IPREL, and
+		 * MODE_RIPREL.  Immediates that are simply
+		 * immediate values should display in the operand's
+		 * size, however, since they don't represent addresses.
+		 */
+
+		/* d86_addr_size is SIZEnn, which is log2(real size) */
+		mask = masks[dis->d86_addr_size];
+
+		/* d86_value_size and d86_imm_bytes are in bytes */
+		if (op->d86_mode == MODE_SIGNED ||
+		    op->d86_mode == MODE_IMPLIED)
+			mask = masks[log2(op->d86_value_size)];
 
 		switch (op->d86_mode) {
 
@@ -3105,86 +3201,97 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 		case MODE_IMPLIED:
 		case MODE_OFFSET:
 
+			tgt = usv;
+
 			if (dis->d86_seg_prefix)
 				(void) strlcat(buf, dis->d86_seg_prefix,
 				    buflen);
 
-			switch (op->d86_value_size) {
-			case 1:
-				sv = (int8_t)sv;
-				mask = 0xff;
-				break;
-			case 2:
-				sv = (int16_t)sv;
-				mask = 0xffff;
-				break;
-			case 4:
-				sv = (int32_t)sv;
-				mask = 0xffffffff;
-				break;
-			case 8:
-				mask = 0xffffffffffffffffULL;
-				break;
+			if (op->d86_mode == MODE_SIGNED ||
+			    op->d86_mode == MODE_IMPLIED) {
+				(void) strlcat(buf, "$", buflen);
 			}
 
-			if (op->d86_mode == MODE_SIGNED ||
-			    op->d86_mode == MODE_IMPLIED)
-				(void) strlcat(buf, "$", buflen);
+			if (print_imm(dis, usv, mask, buf, buflen,
+			    IMM, TRY_NEG) &&
+			    (op->d86_mode == MODE_SIGNED ||
+			    op->d86_mode == MODE_IMPLIED)) {
 
-			if (sv < 0 && sv > -0xffff &&
-			    !isunsigned_op(dis->d86_mneu)) {
-				dis->d86_sprintf_func(buf + strlen(buf),
-				    buflen - strlen(buf),
-				    (dis->d86_flags & DIS_OP_OCTAL) ?
-				    "-0%llo" : "-0x%llx", -sv & mask);
-			} else {
-				dis->d86_sprintf_func(buf + strlen(buf),
-				    buflen - strlen(buf),
-				    (dis->d86_flags & DIS_OP_OCTAL) ?
-				    "0%llo" : "0x%llx", sv & mask);
+				/*
+				 * We printed a negative value for an
+				 * immediate that wasn't a
+				 * displacement.  Note that fact so we can
+				 * print the positive value as an
+				 * annotation.
+				 */
+
+				save_usv = usv;
+				save_mask = mask;
 			}
 			(void) strlcat(buf, op->d86_opnd, buflen);
+
 			break;
 
 		case MODE_IPREL:
+		case MODE_RIPREL:
 
-			switch (op->d86_value_size) {
-			case 1:
-				sv = (int8_t)sv;
+			reltgt = pc + sv;
+
+			switch (mode) {
+			case SIZE16:
+				reltgt = (uint16_t)reltgt;
 				break;
-			case 2:
-				sv = (int16_t)sv;
-				break;
-			case 4:
-				sv = (int32_t)sv;
+			case SIZE32:
+				reltgt = (uint32_t)reltgt;
 				break;
 			}
 
-			if (sv < 0)
-				dis->d86_sprintf_func(buf + strlen(buf),
-				    buflen - strlen(buf),
-				    (dis->d86_flags & DIS_OP_OCTAL) ?
-				    "-0%llo" : "-0x%llx", -sv - dis->d86_len);
-			else
-				dis->d86_sprintf_func(buf + strlen(buf),
-				    buflen - strlen(buf),
-				    (dis->d86_flags & DIS_OP_OCTAL) ?
-				    "+0%llo" : "+0x%llx", sv + dis->d86_len);
+			(void) print_imm(dis, usv, mask, buf, buflen,
+			    DISP, TRY_NEG);
 
-			(void) strlcat(buf, "\t<", buflen);
-
-			if (dis->d86_sym_lookup == NULL ||
-			    dis->d86_sym_lookup(dis->d86_data, pc + sv,
-			    buf + strlen(buf), buflen - strlen(buf)) != 0)
-				dis->d86_sprintf_func(buf + strlen(buf),
-				    buflen - strlen(buf),
-				    (dis->d86_flags & DIS_OP_OCTAL) ?
-				    "0%llo" : "0x%llx", pc + sv);
-
-			(void) strlcat(buf, ">", buflen);
-
+			if (op->d86_mode == MODE_RIPREL)
+				(void) strlcat(buf, "(%rip)", buflen);
 			break;
 		}
+	}
+
+	/*
+	 * The symbol lookups may result in false positives,
+	 * particularly on object files, where small numbers may match
+	 * the 0-relative non-relocated addresses of symbols.
+	 */
+
+	lookup = dis->d86_sym_lookup;
+	if (tgt != 0) {
+		/* Print symbol, if found, for tgt */
+		if (lookup(dis->d86_data, tgt, NULL, 0) == 0) {
+			(void) strlcat(buf, "\t<", buflen);
+			curlen = strlen(buf);
+			lookup(dis->d86_data, tgt, buf + curlen,
+			    buflen - curlen);
+			(void) strlcat(buf, ">", buflen);
+		}
+
+		/*
+		 * If we printed a negative immediate above, print the
+		 * positive in case our heuristic was unhelpful
+		 */
+		if (save_usv) {
+			(void) strlcat(buf, "\t<", buflen);
+			(void) print_imm(dis, save_usv, save_mask, buf, buflen,
+			    IMM, POS);
+			(void) strlcat(buf, ">", buflen);
+		}
+	}
+
+	if (reltgt != 0) {
+		/* Print symbol or effective address for reltgt */
+
+		(void) strlcat(buf, "\t<", buflen);
+		curlen = strlen(buf);
+		lookup(dis->d86_data, reltgt, buf + curlen,
+		    buflen - curlen);
+		(void) strlcat(buf, ">", buflen);
 	}
 }
 
