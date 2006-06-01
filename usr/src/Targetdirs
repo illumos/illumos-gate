@@ -126,6 +126,8 @@ ROOT.SYS= \
 	/var/adm/sm.bin \
 	/var/adm/streams \
 	/var/cron \
+	/var/db \
+	/var/db/ipf \
 	/var/krb5 \
 	/var/krb5/rcache  \
 	/var/krb5/rcache/root  \
