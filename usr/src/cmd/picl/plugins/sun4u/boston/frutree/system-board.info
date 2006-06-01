@@ -160,8 +160,11 @@ name:/frutree/chassis/MB/system-board/C0/cpu-module/P0
 	PROP SlotType string r 0 "cpu"
 	PROP Label string r 0 "P0"
 	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@0,0
 
 name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@0,0
 	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
 
 name:/frutree/chassis/MB/system-board/C1/cpu-module
@@ -170,8 +173,11 @@ name:/frutree/chassis/MB/system-board/C1/cpu-module/P0
 	PROP SlotType string r 0 "cpu"
 	PROP Label string r 0 "P0"
 	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@1,0
 
 name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@1,0
 	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
 
 name:/frutree/chassis/MB/system-board/C2/cpu-module
@@ -180,8 +186,11 @@ name:/frutree/chassis/MB/system-board/C2/cpu-module/P0
 	PROP SlotType string r 0 "cpu"
 	PROP Label string r 0 "P0"
 	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@2,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@2,0
 
 name:/platform/SUNW,UltraSPARC-IIIi+@2,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@2,0
 	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
 
 name:/frutree/chassis/MB/system-board/C3/cpu-module
@@ -190,8 +199,11 @@ name:/frutree/chassis/MB/system-board/C3/cpu-module/P0
 	PROP SlotType string r 0 "cpu"
 	PROP Label string r 0 "P0"
 	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi+@3,0
+	REFNODE cpu location WITH name:/platform/SUNW,UltraSPARC-IIIi@3,0
 
 name:/platform/SUNW,UltraSPARC-IIIi+@3,0
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
+name:/platform/SUNW,UltraSPARC-IIIi@3,0
 	REFPROP _location_parent name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
 
 

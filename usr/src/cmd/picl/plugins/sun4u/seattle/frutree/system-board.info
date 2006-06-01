@@ -108,6 +108,7 @@ name:/platform/i2c@1f,530000/motherboard-fru-prom@0,a2
  */
 name:/frutree/chassis/MB/system-board/P0
 	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi@0,0
 name:/frutree/chassis/MB/system-board/P0/cpu
         NODE B0 location
             PROP Label string r 0 "B0"
@@ -133,6 +134,7 @@ name:/frutree/chassis/MB/system-board/P0/cpu
  */
 name:/frutree/chassis/MB/system-board/P1
 	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFNODE cpu fru WITH name:/platform/SUNW,UltraSPARC-IIIi@1,0
 name:/frutree/chassis/MB/system-board/P1/cpu
         NODE B0 location
             PROP Label string r 0 "B0"
@@ -258,6 +260,11 @@ name:/platform/SUNW,UltraSPARC-IIIi+@0,0
 name:/platform/SUNW,UltraSPARC-IIIi+@1,0
 	REFPROP _fru_parent /frutree/chassis/MB/system-board/P1/cpu
 
+name:/platform/SUNW,UltraSPARC-IIIi@0,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P0/cpu
+
+name:/platform/SUNW,UltraSPARC-IIIi@1,0
+	REFPROP _fru_parent /frutree/chassis/MB/system-board/P1/cpu
 /*
  * DIMM parents
  */

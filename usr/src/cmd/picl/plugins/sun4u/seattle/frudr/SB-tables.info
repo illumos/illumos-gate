@@ -293,6 +293,7 @@ name:/frutree/chassis/MB/system-board/P0/cpu
 	ROW
 	PROP Class string r 0 "cpu"
 	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi+@0,0
+	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi@0,0
 	ENDROW
 	ROW
 	PROP Class string r 0 "temperature-sensor"
@@ -314,6 +315,7 @@ name:/frutree/chassis/MB/system-board/P1/cpu
 	ROW
 	PROP Class string r 0 "cpu"
 	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi+@1,0
+	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi@1,0
 	ENDROW
 	ROW
 	PROP Class string r 0 "temperature-sensor"
