@@ -139,6 +139,7 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 	size_t	bufsize = sizeof (labeld_data_t);
 	size_t	datasize;
 	int	err;
+	int	string_start = 0;
 
 	if (inited == 0) {
 		inited = 1;
@@ -161,12 +162,13 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 				*s = NULL;
 				return (-1);
 			}
-			if ((*s = strdup(lsret.buf)) == NULL) {
-				return (-1);
-			}
+			*s = strdup(lsret.buf);
 			if (callp != &call) {
 				/* release returned buffer */
 				(void) munmap((void *)callp, bufsize);
+			}
+			if (*s == NULL) {
+				return (-1);
 			}
 			return (0);
 		}
@@ -226,19 +228,26 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 		call.callop = BLTOCOLOR;
 		ccall.label = *l;
 
-		if (__call_labeld(&callp, &bufsize, &datasize) != SUCCESS) {
+		if (__call_labeld(&callp, &bufsize, &datasize) == SUCCESS) {
+			if (callp->reterr != 0) {
+				errno = EINVAL;
+				*s = NULL;
+				return (-1);
+			}
+			*s = strdup(cret.color);
+			if (callp != &call) {
+				/* release returned buffer */
+				(void) munmap((void *)callp, bufsize);
+			}
+			if (*s == NULL) {
+				return (-1);
+			}
+			return (0);
+		} else {
 			errno = ENOTSUP;
 			*s = NULL;
 			return (-1);
-		} if (callp->reterr != 0) {
-			errno = EINVAL;
-			*s = NULL;
-			return (-1);
 		}
-		if ((*s = strdup(cret.color)) == NULL) {
-			return (-1);
-		}
-		return (0);
 #undef	ccall
 #undef	cret
 
@@ -252,9 +261,11 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 		break;
 	case PRINTER_CAVEATS:
 		call.callop = PR_CAVEATS;
+		string_start = 1;	/* compensate for leading space */
 		break;
 	case PRINTER_CHANNELS:
 		call.callop = PR_CHANNELS;
+		string_start = 1;	/* compensate for leading space */
 		break;
 	default:
 		errno = EINVAL;
@@ -265,19 +276,27 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 	datasize = CALL_SIZE(pr_call_t, 0);
 	prcall.label = *l;
 	prcall.flags = f;
-	if (__call_labeld(&callp, &bufsize, &datasize) != SUCCESS) {
+	prret.buf[string_start] = '\0';	/* ensure valid buffer end */
+	if (__call_labeld(&callp, &bufsize, &datasize) == SUCCESS) {
+		if (callp->reterr != 0) {
+			errno = EINVAL;
+			*s = NULL;
+			return (-1);
+		}
+		*s = strdup(&prret.buf[string_start]);
+		if (callp != &call) {
+			/* release returned buffer */
+			(void) munmap((void *)callp, bufsize);
+		}
+		if (*s == NULL) {
+			return (-1);
+		}
+		return (0);
+	} else {
 		errno = ENOTSUP;
 		*s = NULL;
 		return (-1);
-	} if (callp->reterr != 0) {
-		errno = EINVAL;
-		*s = NULL;
-		return (-1);
 	}
-	if ((*s = strdup(prret.buf)) == NULL) {
-		return (-1);
-	}
-	return (0);
 #undef	prcall
 #undef	prret
 }
