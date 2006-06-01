@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -239,9 +238,14 @@ get_pname(char *name)
 	/*
 	 * If it is a full path /dev/[r]dsk/cn[tn]dnsn, use this path
 	 */
-	(void) strcpy(np, cur_disk->disk_name);
-	if (strncmp(rdevp, cur_disk->disk_name, strlen(rdevp)) == 0 ||
-	    strncmp(devp, cur_disk->disk_name, strlen(devp)) == 0) {
+	if (cur_disk == NULL) {
+		(void) strcpy(np, x86_devname);
+	} else {
+		(void) strcpy(np, cur_disk->disk_name);
+	}
+
+	if (strncmp(rdevp, np, strlen(rdevp)) == 0 ||
+	    strncmp(devp, np, strlen(devp)) == 0) {
 		/*
 		 * Skip if the path is already included with pN
 		 */
@@ -654,7 +658,7 @@ auto_solaris_part(struct dk_label *label)
 	char		pbuf[MAXPATHLEN];
 
 
-	(void) snprintf(pbuf, sizeof (pbuf), "/dev/rdsk/%sp0", x86_devname);
+	(void) get_pname(&pbuf[0]);
 	if ((fd = open_disk(pbuf, O_RDONLY)) < 0) {
 		err_print("Error: can't open selected disk '%s'.\n", pbuf);
 		return (-1);

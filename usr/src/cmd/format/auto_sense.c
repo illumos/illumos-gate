@@ -807,6 +807,22 @@ auto_sense(
 	if (uscsi_read_capacity(fd, &capacity)) {
 		return ((struct disk_type *)NULL);
 	}
+
+	/*
+	 * If the reported capacity is set to zero, then the disk
+	 * is not usable. If the reported capacity is set to all
+	 * 0xf's, then this disk is too large.  These could only
+	 * happen with a device that supports LBAs larger than 64
+	 * bits which are not defined by any current T10 standards
+	 * or by error responding from target.
+	 */
+	if ((capacity.sc_capacity == 0) ||
+	    (capacity.sc_capacity == UINT_MAX64)) {
+		if (option_msg && diag_msg) {
+			err_print("Invalid capacity\n");
+		}
+		return ((struct disk_type *)NULL);
+	}
 	if (option_msg && diag_msg) {
 		err_print("blocks:  %llu (0x%llx)\n",
 			capacity.sc_capacity, capacity.sc_capacity);
