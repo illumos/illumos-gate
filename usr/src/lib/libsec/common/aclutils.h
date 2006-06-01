@@ -44,7 +44,7 @@ extern "C" {
 
 /*
  * Hint for whether acl_totext() should use
- * mneumonics:
+ * mnemonics:
  * read_data/list_directory
  * write_data/add_file or
  * append_data/add_subdirectory

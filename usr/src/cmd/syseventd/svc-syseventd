@@ -39,9 +39,6 @@ case "$1" in
 # by syseventd. syseventd should be stopped before devfsadm and syseventconfd.
 #
 'stop')
-	dpid=`/usr/bin/pgrep devfsadm`
-	scpid=`/usr/bin/pgrep syseventconfd`
-	spid=`/usr/bin/pgrep syseventd`
 	zone=`smf_zonename`
 	/usr/bin/pkill -x -u 0 -P 1 -z $zone rcm_daemon
 	/usr/bin/pkill -x -u 0 -P 1 -z $zone syseventd
