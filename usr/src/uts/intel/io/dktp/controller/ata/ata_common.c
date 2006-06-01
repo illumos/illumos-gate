@@ -2,7 +2,7 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").  
+ * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2072,13 +2072,50 @@ ata_init_pciide(
 	 */
 
 	if (status & PCIIDE_BMISX_SIMPLEX) {
-		if (ata_check_pciide_blacklist(dip, ATA_BL_NO_SIMPLEX))  {
+		if (ata_check_pciide_blacklist(dip, ATA_BL_NO_SIMPLEX)) {
 			cmn_err(CE_WARN, "Ignoring false simplex bit \n");
+
 		} else {
-			ata_ctlp->ac_pciide_bm = FALSE;
-			ata_cntrl_DMA_sel_msg =
-				"cntrl sharing DMA engine between channels";
-			return;
+
+			int simplex_dma_channel, *rp, proplen, channel;
+			int dma_on = FALSE;
+
+			/*
+			 * By default,use DMA on channel 0 and PIO on channel
+			 * 1.  This can be switched by setting
+			 * ata-simplex-dma-channel to:
+			 *	0  DMA on channel 0 (default without this
+			 *			    property)
+			 *	1  DMA on channel 1
+			 *	any other value: DMA off on both channels.
+			 */
+			simplex_dma_channel = ata_prop_lookup_int(DDI_DEV_T_ANY,
+			    ata_ctlp->ac_dip, 0, "ata-simplex-dma-channel", 0);
+
+			if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
+			    ata_ctlp->ac_dip, DDI_PROP_DONTPASS, "reg", &rp,
+			    (uint_t *)&proplen) == DDI_PROP_SUCCESS) {
+
+				channel = *rp;
+				ddi_prop_free(rp);
+
+				if (simplex_dma_channel == channel) {
+					cmn_err(CE_NOTE, "?ata: simplex "
+					    "controller.  DMA on channel"
+					    "  %d PIO on channel %d\n",
+					    channel, channel ? 0:1);
+					dma_on = TRUE;
+				} else {
+					ata_cntrl_DMA_sel_msg =
+					    "simplex controller";
+				}
+			}
+
+			if (dma_on == FALSE) {
+				ata_ctlp->ac_pciide_bm = FALSE;
+
+				return;
+			}
 		}
 	}
 
