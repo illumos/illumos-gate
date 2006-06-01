@@ -599,7 +599,7 @@ __ns_ldap_DumpConfiguration(char *file)
 ns_config_t *
 __ns_ldap_make_config(ns_ldap_result_t *result)
 {
-	int		i, l, m;
+	int		l, m;
 	char		val[BUFSIZ];
 	char    	*attrname;
 	ns_ldap_entry_t	*entry;
@@ -611,9 +611,20 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 	int		firsttime;
 	int		prof_ver;
 	ns_config_t	*curr_ptr = NULL;
+	char		errstr[MAXERROR];
+	ns_ldap_error_t	*errorp;
 
 	if (result == NULL)
 		return (NULL);
+
+	if (result->entries_count > 1) {
+		(void) snprintf(errstr, MAXERROR,
+			gettext("Configuration Error: More than"
+				" one profile found"));
+		MKERROR(LOG_ERR, errorp, NS_PARSE_ERR, strdup(errstr), NULL);
+		(void) __ns_ldap_freeError(&errorp);
+		return (NULL);
+	}
 
 	ptr = __s_api_create_config();
 	if (ptr == NULL)
@@ -628,20 +639,18 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 	/* Check to see if the profile is version 1 or version 2 */
 	prof_ver = 1;
 	entry = result->entry;
-	for (i = 0; i < result->entries_count; i++) {
-		for (l = 0; l < entry->attr_count; l++) {
-			attr = entry->attr_pair[l];
+	for (l = 0; l < entry->attr_count; l++) {
+		attr = entry->attr_pair[l];
 
-			attrname = attr->attrname;
-			if (attrname == NULL)
-				continue;
-			if (strcasecmp(attrname, "objectclass") == 0) {
-				for (m = 0; m < attr->value_count; m++) {
-					if (strcasecmp(_PROFILE2_OBJECTCLASS,
-						attr->attrvalue[m]) == 0) {
-						prof_ver = 2;
-						break;
-					}
+		attrname = attr->attrname;
+		if (attrname == NULL)
+			continue;
+		if (strcasecmp(attrname, "objectclass") == 0) {
+			for (m = 0; m < attr->value_count; m++) {
+				if (strcasecmp(_PROFILE2_OBJECTCLASS,
+					attr->attrvalue[m]) == 0) {
+					prof_ver = 2;
+					break;
 				}
 			}
 		}
@@ -657,55 +666,48 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 				NS_LDAP_FILE_VERSION_P, val, &error);
 	}
 
-	entry = result->entry;
-	for (i = 0; i < result->entries_count; i++) {
-		for (l = 0; l < entry->attr_count; l++) {
-			attr = entry->attr_pair[l];
+	for (l = 0; l < entry->attr_count; l++) {
+		attr = entry->attr_pair[l];
 
-			attrname = attr->attrname;
-			if (attrname == NULL)
-				continue;
-			if (__s_api_get_profiletype(attrname, &index) != 0)
-				continue;
+		attrname = attr->attrname;
+		if (attrname == NULL)
+			continue;
+		if (__s_api_get_profiletype(attrname, &index) != 0)
+			continue;
 
-			attrval = attr->attrvalue;
-			switch (index) {
-			case NS_LDAP_SEARCH_DN_P:
-			case NS_LDAP_SERVICE_SEARCH_DESC_P:
-			case NS_LDAP_ATTRIBUTEMAP_P:
-			case NS_LDAP_OBJECTCLASSMAP_P:
-			case NS_LDAP_SERVICE_CRED_LEVEL_P:
-			case NS_LDAP_SERVICE_AUTH_METHOD_P:
-				/* Multiple Value - insert 1 at a time */
-				for (m = 0; m < attr->value_count; m++) {
-					(void) __ns_ldap_setParamValue(ptr,
-							index,
-							attrval[m],
-							&error);
-				}
-				break;
-			default:
-				firsttime = 1;
-				/* Single or Multiple Value */
-				val[0] = '\0';
-				for (m = 0; m < attr->value_count; m++) {
-					if (firsttime == 1) {
-						firsttime = 0;
-						(void) strlcpy(val, attrval[m],
-							sizeof (val));
-					} else {
-						(void) strlcat(val, " ",
-							sizeof (val));
-						(void) strlcat(val, attrval[m],
-							sizeof (val));
-					}
-				}
+		attrval = attr->attrvalue;
+		switch (index) {
+		case NS_LDAP_SEARCH_DN_P:
+		case NS_LDAP_SERVICE_SEARCH_DESC_P:
+		case NS_LDAP_ATTRIBUTEMAP_P:
+		case NS_LDAP_OBJECTCLASSMAP_P:
+		case NS_LDAP_SERVICE_CRED_LEVEL_P:
+		case NS_LDAP_SERVICE_AUTH_METHOD_P:
+			/* Multiple Value - insert 1 at a time */
+			for (m = 0; m < attr->value_count; m++) {
 				(void) __ns_ldap_setParamValue(ptr, index,
-							val, &error);
-				break;
+						attrval[m], &error);
 			}
+			break;
+		default:
+			firsttime = 1;
+			/* Single or Multiple Value */
+			val[0] = '\0';
+			for (m = 0; m < attr->value_count; m++) {
+				if (firsttime == 1) {
+					firsttime = 0;
+					(void) strlcpy(val, attrval[m],
+						sizeof (val));
+				} else {
+					(void) strlcat(val, " ", sizeof (val));
+					(void) strlcat(val, attrval[m],
+						sizeof (val));
+				}
+			}
+			(void) __ns_ldap_setParamValue(ptr, index, val,
+						&error);
+			break;
 		}
-		entry = entry->next;
 	}
 	if (ptr->version != NS_LDAP_V1) {
 	    if (curr_ptr->paramList[NS_LDAP_BINDDN_P].ns_ptype == CHARPTR) {
@@ -781,6 +783,9 @@ __ns_ldap_download(const char *profile, char *addr, char *baseDN,
 
 	new_ptr = __ns_ldap_make_config(result);
 	(void) __ns_ldap_freeResult(&result);
+
+	if (new_ptr == NULL)
+		return (NS_LDAP_OP_FAILED);
 
 	rc = __s_api_crosscheck(new_ptr, errstr, B_FALSE);
 	if (rc != NS_LDAP_SUCCESS) {
