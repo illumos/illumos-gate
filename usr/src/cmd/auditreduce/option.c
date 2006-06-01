@@ -90,7 +90,7 @@ static int	proc_group(char *, gid_t *);
 static int	proc_id(char *, int);
 static int	proc_object(char *);
 static void	proc_pcb(audit_pcb_t *, char *, int);
-static int	proc_slabel(char *);
+static int	proc_label(char *);
 static int	proc_subject(char *);
 static int	proc_sid(char *);
 static int	proc_type(char *);
@@ -197,14 +197,14 @@ start_over:
 			if (proc_id(optarg, opt))
 				error = TRUE;
 			break;
-		case 'l':		/* label range -- reserved for TX */
+		case 'l':		/* TX label range */
 			if (!is_system_labeled()) {
 				(void) fprintf(stderr,
 				    gettext("%s option 'l' requires "
 				    "Trusted Extensions.\n"), ar);
 				return (-1);
 			}
-			if (proc_slabel(optarg))
+			if (proc_label(optarg))
 				error = TRUE;
 			break;
 		case 's':		/* session ID */
@@ -1139,16 +1139,16 @@ proc_pcb(audit_pcb_t *pcb, char *suffix, int i)
 
 
 /*
- * .func	proc_slabel - process sensitivity label range argument.
- * .desc	Parse sensitivity label range sl:sl
- * .call	ret = proc_slabel(optstr).
+ * .func	proc_label - process label range argument.
+ * .desc	Parse label range lower-bound[;upper-bound]
+ * .call	ret = proc_label(optstr).
  * .arg	opstr	- ptr to label range string
  * .ret 0	- no errors detected.
- * .ret -1	- errors detected or not Trusted Solaris (error_str set).
+ * .ret -1	- errors detected (error_str set).
  */
 
 int
-proc_slabel(char *optstr)
+proc_label(char *optstr)
 {
 	char	*p;
 	int	error;
@@ -1183,8 +1183,7 @@ proc_slabel(char *optstr)
 		/* lower bound is not specified .. default is admin_low */
 		if (str_to_label(ADMIN_LOW, &m_label->lower_bound, MAC_LABEL,
 		    L_NO_CORRECTION, &error) == -1) {
-			free(m_label);
-			return (-1);
+			goto errout;
 		}
 
 		p++;
@@ -1192,9 +1191,7 @@ proc_slabel(char *optstr)
 			/* upper bound not specified .. default is admin_high */
 			if (str_to_label(ADMIN_HIGH, &m_label->upper_bound,
 			    MAC_LABEL, L_NO_CORRECTION, &error) == -1) {
-				m_label_free(m_label->lower_bound);
-				free(m_label);
-				return (-1);
+				goto errout;
 			}
 		} else {
 			if (str_to_label(p, &m_label->upper_bound, MAC_LABEL,
@@ -1221,9 +1218,7 @@ proc_slabel(char *optstr)
 		/* upper bound is not specified .. default is admin_high */
 		if (str_to_label(ADMIN_HIGH, &m_label->upper_bound,
 		    MAC_LABEL, L_NO_CORRECTION, &error) == -1) {
-			m_label_free(m_label->lower_bound);
-			free(m_label);
-			return (-1);
+			goto errout;
 		}
 	} else {
 		if (str_to_label(p, &m_label->upper_bound, MAC_LABEL,

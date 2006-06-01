@@ -97,7 +97,7 @@ extern void	acl_token(adr_t *, parse_context_t *);
 extern void	attribute_token(adr_t *, parse_context_t *);
 extern void	s5_IPC_perm_token(adr_t *, parse_context_t *);
 extern void	group_token();
-extern void	slabel_token(adr_t *, parse_context_t *);
+extern void	label_token(adr_t *, parse_context_t *);
 extern void	privilege_token(adr_t *, parse_context_t *);
 extern void	useofpriv_token(adr_t *, parse_context_t *);
 extern void	zonename_token(adr_t *, parse_context_t *);

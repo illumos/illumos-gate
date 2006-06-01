@@ -63,7 +63,6 @@ extern "C" {
 #include <bsm/libbsm.h>
 
 #include <tsol/label.h>
-#include <sys/tsol/label_macro.h>
 
 #include "auditrt.h"
 

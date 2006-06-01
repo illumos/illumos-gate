@@ -789,17 +789,11 @@ path_attr_token(parse_context_t *ctx)
  *	mode					adr_int32
  *	seq					adr_int32
  *	key					adr_int32
- *	label					adr_opaque, sizeof (bslabel_t)
- *							    bytes
  */
 int
 s5_IPC_perm_token(parse_context_t *ctx)
 {
 	ctx->adr.adr_now += (7 * sizeof (int32_t));
-
-#if TSOL
-	ctx->adr.adr_now += sizeof (bslabel_t);
-#endif
 	return (0);
 }
 
@@ -1417,14 +1411,14 @@ privilege_token(parse_context_t *ctx)
 
 
 /*
- * Format of slabel token:
+ * Format of label token:
  *	label ID                1 byte
  *	compartment length      1 byte
  *	classification          2 bytes
  *	compartment words       <compartment length> * 4 bytes
  */
 int
-slabel_token(parse_context_t *ctx)
+label_token(parse_context_t *ctx)
 {
 	char	c;
 

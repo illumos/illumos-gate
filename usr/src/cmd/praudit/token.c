@@ -65,7 +65,6 @@
 #include <bsm/libbsm.h>
 
 #include <tsol/label.h>
-#include <sys/tsol/label_macro.h>
 
 #include "praudit.h"
 #include "toktable.h"
@@ -2156,47 +2155,58 @@ xclient_token(pr_context_t *context)
 
 /*
  * -----------------------------------------------------------------------
- * slabel_token() 	: Process sensitivity label token and display contents
+ * label_token() 	: Process label token and display contents
  * return codes 	: -1 - error
  *			: 0 - successful
- * NOTE: At the time of call, the slabel token id has been retrieved
+ * NOTE: At the time of call, the label token id has been retrieved
  *
- * Format of sensitivity label token:
- *	slabel token id		adr_char
- *	label			adr_char, sizeof (bslabel_t) bytes
+ * Format of label token:
+ *	label token id			adr_char
+ *      label ID                	adr_char
+ *      label compartment length	adr_char
+ *      label classification		adr_short
+ *      label compartment words		<compartment length> * 4 adr_char
  * -----------------------------------------------------------------------
  */
 /*ARGSUSED*/
 int
-slabel_token(pr_context_t *context)
+label_token(pr_context_t *context)
 {
-	bslabel_t label;
+	static m_label_t *label = NULL;
+	static size_t l_size;
+	int	len;
 	int	returnstat;
-	char	strbuf[2048];
-	char	*sp = strbuf;
 	uval_t	uval;
 
-	if ((returnstat = pr_adr_char(context, (char *)&label,
-	    sizeof (label))) == 0) {
+	if (label == NULL) {
+		if ((label = m_label_alloc(MAC_LABEL)) == NULL) {
+			return (-1);
+		}
+		l_size = blabel_size() - 4;
+	}
+	if ((returnstat = pr_adr_char(context, (char *)label, 4)) == 0) {
+		len = (int)(((char *)label)[1] * 4);
+		if ((len > l_size) ||
+		    (pr_adr_char(context, &((char *)label)[4], len) != 0)) {
+			return (-1);
+		}
 		uval.uvaltype = PRA_STRING;
 		if (!(context->format & PRF_RAWM)) {
 			/* print in ASCII form */
-			if (label_to_str(&label, &sp, M_LABEL,
+			if (label_to_str(label, &uval.string_val, M_LABEL,
 			    DEF_NAMES) == 0) {
-				uval.string_val = sp;
 				returnstat = pa_print(context, &uval, 1);
 			} else /* cannot convert to string */
 				returnstat = 1;
 		}
 		/* print in hexadecimal form */
 		if ((context->format & PRF_RAWM) || (returnstat == 1)) {
-			uval.string_val = hexconvert((char *)&label,
-			    sizeof (bslabel_t), sizeof (bslabel_t));
+			uval.string_val = hexconvert((char *)label, len, len);
 			if (uval.string_val) {
 				returnstat = pa_print(context, &uval, 1);
-				free(uval.string_val);
 			}
 		}
+		free(uval.string_val);
 	}
 	return (returnstat);
 }

@@ -822,8 +822,6 @@ path_token(adr_t *adr)
  *	mode					adr_int32
  *	seq					adr_int32
  *	key					adr_int32
- *	label					adr_opaque, sizeof (bslabel_t)
- *							    bytes
  */
 int
 s5_IPC_perm_token(adr_t *adr)
@@ -1906,18 +1904,43 @@ privilege_token(adr_t *adr)
 }
 
 /*
- * Format of slabel token:
- *	slabel			adr_char*(sizeof (bslabel_t))
+ * Format of label token:
+ *      label ID                1 byte
+ *      compartment length      1 byte
+ *      classification          2 bytes
+ *      compartment words       <compartment length> * 4 bytes
  */
 int
-slabel_token(adr_t *adr)
+label_token(adr_t *adr)
 {
-	bslabel_t slabel;
+	static m_label_t *label = NULL;
+	static size_t l_size;
+	int len;
 
-	adrm_char(adr, (char *)&slabel, sizeof (slabel));
+	if (label == NULL) {
+		label = m_label_alloc(MAC_LABEL);
+		l_size = blabel_size() - 4;
+	}
+
+	if (label == NULL) {
+		/* out of memory, should never happen; skip label */
+		char	l;	/* length */
+
+		adr->adr_now += sizeof (char);
+		adrm_char(adr, (char *)&l, 1);
+		adr->adr_now += sizeof (short) + (4 * l);
+		return (-1);
+	}
+
+	adrm_char(adr, (char *)label, 4);
+	len = (int)(((char *)label)[1] * 4);
+	if (len > l_size) {
+		return (-1);
+	}
+	adrm_char(adr, &((char *)label)[4], len);
 
 	if (flags & M_LABEL) {
-		if (blinrange(&slabel, m_label))
+		if (blinrange(label, m_label))
 			checkflags = checkflags | M_LABEL;
 	}
 
@@ -1928,30 +1951,15 @@ slabel_token(adr_t *adr)
 /*
  * Format of useofpriv token:
  *	success/failure		adr_char
- * TSOL:
- *	privilege		adr_int32
- * SOL:
  *	privilege(s)		adr_string
  */
-#ifndef	TSOL
 /* ARGSUSED */
-#endif	/* !TSOL */
 int
 useofpriv_token(adr_t *adr)
 {
 	char	flag;
 
-#ifdef	TSOL
-	priv_t	priv;
-
-	adrm_char(adr, &flag, 1);
-	adrm_int32(adr, (int32_t *)&priv, 1);
-
-	return (-1);
-#else	/* !TSOL */
-
 	adrm_char(adr, &flag, 1);
 	skip_string(adr);
 	return (-1);
-#endif	/* TSOL */
 }

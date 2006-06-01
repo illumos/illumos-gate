@@ -200,7 +200,7 @@ extern int	acl_token();
 extern int	attribute_token();
 extern int	s5_IPC_perm_token();
 extern int	group_token();
-extern int	slabel_token();
+extern int	label_token();
 extern int	privilege_token();
 extern int	useofpriv_token();
 extern int	liaison_token();
