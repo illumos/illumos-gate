@@ -616,7 +616,7 @@ conskbdclose(queue_t *q, int flag, cred_t *crp)
 		for (prev = NULL, pmsg = conskbd_msg_queue; pmsg != NULL;
 		    pmsg = next) {
 			next = pmsg->kpm_next;
-			if (pmsg->kpm_upper_queue == q) {
+			if (pmsg->kpm_upper_queue == WR(q)) {
 				if (prev == NULL)
 					conskbd_msg_queue = next;
 				else
