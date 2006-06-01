@@ -1830,6 +1830,13 @@ meta_init_hsp(
 	}
 
 	/* see if it exists already */
+	if (is_existing_metadevice(*spp, uname)) {
+		mdname_t	*np;
+		if ((np = metaname(spp, uname, META_DEVICE, ep)) != NULL)
+			if ((meta_get_unit(*spp, np, ep)) != NULL)
+				return (mderror(ep, MDE_NAME_IN_USE, uname));
+	}
+
 	if (meta_get_hsp(*spp, hspnp, ep) != NULL) {
 		(void) mdhsperror(ep, MDE_HSP_ALREADY_SETUP,
 		    hspnp->hsp, uname);

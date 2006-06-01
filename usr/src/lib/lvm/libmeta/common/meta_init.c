@@ -241,7 +241,10 @@ meta_init_make_device(
 	 * and return the key
 	 */
 	if ((rval = add_self_name(*spp, uname, &params, ep)) <= 0) {
-		return (mderror(ep, MDE_UNIT_NOT_FOUND, NULL));
+		if (mdisok(ep))
+			(void) mderror(ep, MDE_UNIT_NOT_FOUND, NULL);
+
+		return (-1);
 	}
 
 	/*

@@ -1481,10 +1481,6 @@ mdrpc_createset_common(
 	if (! mdisok(ep))
 		return (TRUE);
 
-	/* create the symlink */
-	if (symlink(stringbuf1, stringbuf2) == -1)
-		(void) mdsyserror(ep, errno, stringbuf2);
-
 	err = svc_fini(ep);
 
 	return (TRUE);
@@ -1563,11 +1559,6 @@ mdrpc_mncreateset_common(
 	if (! mdisok(ep)) {
 		return (TRUE);
 	}
-
-	/* create the symlink */
-	if (symlink(stringbuf1, stringbuf2) == -1)
-		(void) mdsyserror(ep, errno, stringbuf2);
-
 	err = svc_fini(ep);
 
 	return (TRUE);

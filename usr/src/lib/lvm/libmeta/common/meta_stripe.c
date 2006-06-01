@@ -2300,6 +2300,16 @@ done_row_opts:
 			    ep)) == NULL) {
 				goto out;
 			}
+
+			/*
+			 * Get out if the specified hotspare pool really
+			 * doesn't exist.
+			 */
+			if (stripep->hspnamep->hsp == MD_HSP_NONE) {
+				(void) mdhsperror(ep, MDE_INVAL_HSP,
+				    stripep->hspnamep->hsp, optarg);
+				goto out;
+			}
 			break;
 
 		default:

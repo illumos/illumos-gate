@@ -90,11 +90,14 @@ md_create(di_minor_t minor, di_node_t node)
 {
 	char mn[MAXNAMELEN + 1];
 	char path[PATH_MAX + 1];
+	char set_path[PATH_MAX +1];
+	char sym_path[PATH_MAX + 1];
 	int set = -1, ret;
 	char *type, *dir;
 	char *device_name;
 	dev_t minor_devt = di_minor_devt(minor);
 	int key;
+	mdsetname_t	*sp = NULL;
 	md_error_t ep;
 
 	(void) strcpy(mn, di_minor_name(minor));
@@ -147,9 +150,30 @@ md_create(di_minor_t minor, di_node_t node)
 				(void) snprintf(path, sizeof (path),
 				"md/shared/%d/%s/%s", set, dir,
 				basename(device_name));
+
+				/*
+				 * flush the caches so the next call to
+				 * metasetnosetname will get us the
+				 * updated cache.
+				 */
+				metaflushnames(0);
+				if ((sp = metasetnosetname(set, &ep))
+				    != NULL) {
+					(void) snprintf(set_path,
+					    sizeof (set_path), "md/shared/%d",
+					    sp->setno);
+					(void) snprintf(sym_path,
+					    sizeof (sym_path), "md/%s",
+					    sp->setname);
+				}
 			}
 			(void) devfsadm_mklink(path, node, minor, 0);
 			Free(device_name);
+
+			if (sp != NULL) {
+				(void) devfsadm_secondary_link(sym_path,
+				    set_path, 0);
+			}
 		}
 	}
 

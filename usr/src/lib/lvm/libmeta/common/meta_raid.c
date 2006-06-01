@@ -2524,6 +2524,16 @@ meta_init_raid(
 			    ep)) == NULL) {
 				goto out;
 			}
+
+			/*
+			 * Get out if the specified hotspare pool really
+			 * doesn't exist.
+			 */
+			if (raidp->hspnamep->hsp == MD_HSP_NONE) {
+				(void) mdhsperror(ep, MDE_INVAL_HSP,
+				    raidp->hspnamep->hsp, optarg);
+				goto out;
+			}
 			break;
 
 		case 'i':
