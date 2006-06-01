@@ -698,7 +698,8 @@ mddetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		for (i = 0; non_ff_drivers[i] != NULL; i++)
 		    kmem_free(non_ff_drivers[i], strlen(non_ff_drivers[i]) + 1);
 
-		kmem_free(non_ff_drivers, 2 * sizeof (char *));
+		/* free i+1 entries because there is a null entry at list end */
+		kmem_free(non_ff_drivers, (i + 1) * sizeof (char *));
 		non_ff_drivers = NULL;
 	}
 
