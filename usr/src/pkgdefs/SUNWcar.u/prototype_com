@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -60,8 +60,6 @@ d none platform/SUNW,Netra-T4 755 root sys
 d none platform/SUNW,Netra-CP2300 755 root sys
 d none platform/SUNW,Netra-CP3010 755 root sys
 d none platform/SUNW,SPARC-Enterprise 755 root sys
-s none platform/FJSV,SPARC-Enterprise=SUNW,SPARC-Enterprise
-s none platform/SUNW,OPL-Enterprise=SUNW,SPARC-Enterprise
 d none platform/SUNW,Serverblade1 755 root sys
 d none platform/SUNW,Sun-Blade-100 755 root sys
 d none platform/SUNW,Sun-Blade-1000 755 root sys

@@ -4791,6 +4791,12 @@ mondo_loop() {
 		$usr/platform/sun4u/include/sys/dr.h	\
 		$usr/platform/sun4u/include/sys/sfdr.h
 
+	# Remove obsolete OPL platform links.
+		rm -f $root/platform/FJSV,SPARC-Enterprise
+		rm -f $root/platform/SUNW,OPL-Enterprise
+		rm -f $usr/platform/FJSV,SPARC-Enterprise
+		rm -f $usr/platform/SUNW,OPL-Enterprise
+
 	# Solstice Enterprise Agent(SEA) : mib-II subagent mibiisa
 	# needs to be disabled during startup. SMA(System Management Agent)
 	# has the capability to support mib-II requests.

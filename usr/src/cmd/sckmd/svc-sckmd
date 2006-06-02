@@ -35,14 +35,10 @@
 platform=${_INIT_UTS_PLATFORM:-`/sbin/uname -i`}
 starcat="SUNW,Sun-Fire-15000" 
 opl="SUNW,SPARC-Enterprise" 
-fjopl="FJSV,SPARC-Enterprise" 
-tmpopl="SUNW,OPL-Enterprise" 
 sckmd="/usr/platform/sun4u/lib/sckmd"
 
 if [ ${platform} = "${starcat}" -o  \
-     ${platform} = "${opl}" -o \
-     ${platform} = "${fjopl}" -o \
-     ${platform} = "${tmpopl}" ]; then
+     ${platform} = "${opl}" ]; then
 	if [ -x ${sckmd} ]; then 
 		${sckmd}
 		exit $SMF_EXIT_OK

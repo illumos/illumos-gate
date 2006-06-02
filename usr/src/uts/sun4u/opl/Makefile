@@ -70,9 +70,6 @@ lintlib:	unix
 modlintlib:	$(OPL_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise
-LINKED_PLATFORMS	= FJSV,SPARC-Enterprise
-# temporary link to the development platform name - remove before ON putback!
-LINKED_PLATFORMS	+= SUNW,OPL-Enterprise
 
 # EXPORT DELETE START
 #
@@ -90,8 +87,6 @@ install: $(ROOT_OPL_DIR) $(USR_OPL_DIR) \
 	$(USR_OPL_SBIN_TRAPSTAT) \
 	$(USR_OPL_SBIN_FRUADM) \
 	$(USR_OPL_LIB_DIR) \
-	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \
-	$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
 	$(OPL_CRYPTO_LINKS) \
 	genassym unix .WAIT $(OPL_CPU_KMODS) $(OPL_KMODS) \
 	$(OPLMSU_OPTION)

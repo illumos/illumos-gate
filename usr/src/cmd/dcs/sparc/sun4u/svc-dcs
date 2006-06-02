@@ -50,24 +50,18 @@ platform=`/sbin/uname -i`
 e10k="SUNW,Ultra-Enterprise-10000"
 sf15k="SUNW,Sun-Fire-15000"
 opl="SUNW,SPARC-Enterprise"
-fjopl="FJSV,SPARC-Enterprise"
-tmpopl="SUNW,OPL-Enterprise"
 
 args=""
 if [ $platform = "$sf15k" ]; then
 	args="$args `getproparg -a dcs/ah_auth`"
 	args="$args `getproparg -e dcs/esp_encr`"
 	args="$args `getproparg -u dcs/esp_auth`"
-elif [ $platform = "$opl" -o \
-       $platform = "$fjopl" -o \
-       $platform = "$tmpopl" ]; then
+elif [ $platform = "$opl" ]; then
 	args="-l"
 fi
 
 if [ $platform = "$e10k" -o $platform = "$sf15k" -o \
-     $platform = "$opl" -o \
-     $platform = "$fjopl" -o \
-     $platform = "$tmpopl" ]; then
+     $platform = "$opl" ]; then
 	$DCS $args			# Fail if can't execute
 	exit				# Use dcs's exit status
 else

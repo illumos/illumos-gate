@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-#       ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -44,10 +44,7 @@ do
       PLATFORM_TOKEN=`uname -i`
       case "$PLATFORM_TOKEN"
       in
-        SUNW,OPL-Enterprise | \
-        SUNW,SPARC-Enterprise | \
-        FJSV,SPARC-Enterprise) 
-
+        SUNW,SPARC-Enterprise)
           # Add the crtscts flag for the console settings
           sed -e "/^console:.*onlcr:/ {
 		 s/onlcr:/onlcr crtscts:/

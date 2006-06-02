@@ -33,8 +33,6 @@
 . /lib/svc/share/smf_include.sh
 
 OPL=SUNW,SPARC-Enterprise
-FJOPL=FJSV,SPARC-Enterprise
-TMPOPL=SUNW,OPL-Enterprise
 OPL_LIB=/usr/platform/${OPL}/lib
 DM2S_DEVICE=/dev/dm2s0
 PPP_OPTIONS=${OPL_LIB}/dscp.ppp.options
@@ -47,10 +45,7 @@ PKILL=/bin/pkill
 LD_LIBRARY_PATH=/lib:${OPL_LIB}; export LD_LIBRARY_PATH
 
 # This service can only run on OPL.
-if  [ "${PLATFORM}" != "${OPL}" -a \
-      "${PLATFORM}" != "${FJOPL}" -a \
-      "${PLATFORM}" != "${TMPOPL}" ]; then
-
+if  [ "${PLATFORM}" != "${OPL}" ]; then
 	exit $SMF_EXIT_ERR_CONFIG
 fi
 
