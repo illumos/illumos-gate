@@ -40,10 +40,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_0",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=0" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040700 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad00 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -61,10 +57,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_12",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=12" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070c manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0c manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -82,10 +74,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_24",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=24" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040718 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad18 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -103,10 +91,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_36",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=36" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040724 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad24 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -124,10 +108,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_1",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=1" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040701 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad01 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -145,10 +125,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_13",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=13" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070d manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0d manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -166,10 +142,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_25",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=25" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040719 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad19 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -187,10 +159,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_37",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=37" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040725 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad25 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -208,10 +176,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_2",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=2" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040702 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad02 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -229,10 +193,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_14",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=14" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070e manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0e manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -250,10 +210,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_26",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=26" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071a manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1a manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -271,10 +227,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_38",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=38" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040726 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad26 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -292,10 +244,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_3",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=3" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040703 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad03 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -313,10 +261,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_15",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=15" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070f manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0f manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -334,10 +278,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_27",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=27" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071b manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1b manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -355,10 +295,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_39",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=39" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040727 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad27 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -376,10 +312,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_4",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=4" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040704 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad04 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -397,10 +329,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_16",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=16" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040710 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad10 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -418,10 +346,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_28",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=28" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071c manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1c manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -439,10 +363,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_40",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=40" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040728 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad28 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -460,10 +380,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_5",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=5" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040705 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad05 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -481,10 +397,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_17",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=17" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040711 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad11 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -502,10 +414,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_29",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=29" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071d manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1d manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -523,10 +431,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_41",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=41" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040729 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad29 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -544,10 +448,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_6",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=6" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040706 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad06 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -565,10 +465,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_18",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=18" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040712 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad12 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -586,10 +482,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_30",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=30" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071e manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1e manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -607,10 +499,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_42",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=42" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072a manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2a manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -628,10 +516,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_7",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=7" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040707 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad07 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -649,10 +533,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_19",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=19" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040713 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad13 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -670,10 +550,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_31",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=31" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004071f manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad1f manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -691,10 +567,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_43",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=43" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072b manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2b manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -712,10 +584,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_8",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=8" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040708 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad08 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -733,10 +601,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_20",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=20" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040714 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad14 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -754,10 +618,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_32",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=32" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040720 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad20 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -775,10 +635,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_44",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=44" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072c manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2c manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -796,10 +652,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_9",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=9" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040709 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad09 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -817,10 +669,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_21",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=21" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040715 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad15 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -838,10 +686,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_33",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=33" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040721 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad21 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -859,10 +703,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_45",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=45" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072d manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2d manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -880,10 +720,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_10",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=10" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070a manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0a manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -901,10 +737,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_22",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=22" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040716 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad16 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -922,10 +754,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_34",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=34" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040722 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad22 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -943,10 +771,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_46",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=46" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072e manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2e manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -964,10 +788,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_11",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=11" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004070b manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad0b manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -985,10 +805,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_23",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=23" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040717 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad17 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -1006,10 +822,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_35",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=35" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x0070040723 manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad23 manu=42" },
 		{ NULL,				NULL }
 	},
 	{
@@ -1027,10 +839,6 @@ SUN_FIRE_X4500_PROPERTIES,
 	"HD_ID_47",
 	{
 		{ SFX4500_FRU_UPDATE_ACTION,	"ipmi:fru gid=3 hdd=47" },
-		{ SFX4500_OVERTEMP_ACTION,
-		    "ipmi:sel oem=0x007004072f manu=42" },
-		{ SFX4500_ST_FAIL_ACTION,
-		    "ipmi:sel oem=0x07e57bad2f manu=42" },
 		{ NULL,				NULL }
 	},
 	{
