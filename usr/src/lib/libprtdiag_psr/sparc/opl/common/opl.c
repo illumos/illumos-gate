@@ -78,10 +78,10 @@
 struct  cs_status {
 	int cs_number;
 	int status;
-	int avail_hi;
-	int avail_lo;
-	int dimm_hi;
-	int dimm_lo;
+	uint_t avail_hi;
+	uint_t avail_lo;
+	uint_t dimm_hi;
+	uint_t dimm_lo;
 	int dimms;
 };
 
@@ -614,14 +614,14 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
 
 	(void) textdomain(TEXT_DOMAIN);
 
-
 	for (i = 0; i < ngrps; i++) {
-		int64_t	mem_size = 0;
+		uint64_t	mem_size;
 
-		mem_size = ((((int64_t)cs_stat[i].avail_hi)<<32) +
+		mem_size = ((((uint64_t)cs_stat[i].avail_hi)<<32) +
 		    cs_stat[i].avail_lo);
 
-		if (mem_size == 0) continue;
+		if (mem_size == 0)
+			continue;
 
 		/* Lsb Id */
 		log_printf(" %02d    ", lsb, 0);
@@ -643,7 +643,7 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps)
 
 		/* DIMM Size */
 		log_printf("%4lldMB   ",
-		    ((((int64_t)cs_stat[i].dimm_hi)<<32)
+		    ((((uint64_t)cs_stat[i].dimm_hi)<<32)
 		    + cs_stat[i].dimm_lo)/MBYTE, 0);
 
 		/* Number of DIMMs */
