@@ -1655,23 +1655,23 @@ zone_t *
 zone_find_by_label(const ts_label_t *label)
 {
 	zone_t *zone;
+	zone_status_t status;
 
 	mutex_enter(&zonehash_lock);
 	if ((zone = zone_find_all_by_label(label)) == NULL) {
 		mutex_exit(&zonehash_lock);
 		return (NULL);
 	}
-	mutex_enter(&zone_status_lock);
-	if (zone_status_get(zone) > ZONE_IS_DOWN) {
+
+	status = zone_status_get(zone);
+	if (status > ZONE_IS_DOWN) {
 		/*
 		 * For all practical purposes the zone doesn't exist.
 		 */
-		mutex_exit(&zone_status_lock);
-		zone = NULL;
-	} else {
-		mutex_exit(&zone_status_lock);
-		zone_hold(zone);
+		mutex_exit(&zonehash_lock);
+		return (NULL);
 	}
+	zone_hold(zone);
 	mutex_exit(&zonehash_lock);
 	return (zone);
 }

@@ -109,9 +109,9 @@ typedef struct {
 	caddr32_t extended_error;
 	caddr32_t zfsbuf;
 	size32_t  zfsbufsz;
-	int match;
-	int doi;
-	caddr32_t label;
+	int match;			/* match level */
+	uint32_t doi;			/* DOI for label */
+	caddr32_t label;		/* label associated with zone */
 } zone_def32;
 #endif
 typedef struct {
@@ -125,7 +125,7 @@ typedef struct {
 	const char *zfsbuf;
 	size_t zfsbufsz;
 	int match;			/* match level */
-	int doi;			/* DOI for label */
+	uint32_t doi;			/* DOI for label */
 	const bslabel_t *label;		/* label associated with zone */
 } zone_def;
 
@@ -307,8 +307,8 @@ typedef struct zone {
 	 */
 	list_t		zone_datasets;	/* list of datasets */
 
-	ts_label_t	*zone_slabel;
-	int		zone_match;
+	ts_label_t	*zone_slabel;	/* zone sensitivity label */
+	int		zone_match;	/* require label match for packets */
 	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
 } zone_t;
 
