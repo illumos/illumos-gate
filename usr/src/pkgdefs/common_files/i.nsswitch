@@ -302,26 +302,33 @@ do
 		rm -f /tmp/d.$$
 
 		# If the file doesn't have Trusted Extensions networking
-		# database (TNdb) entries, add appropriate entries. Default
-		# to everything if we can't figure out what is appropriate.
-		for DB in tnrhtp tnrhdb
-		do
-			grep $DB: $dest > /dev/null 2>&1
-			if [ $? != 0 ]; then
-				ATTR="files ldap"
-				egrep '/etc/nsswitch\.(dns|files)' $dest >\
-				    /dev/null 2>&1
-				if [ $? = 0 ] ; then
-					ATTR="files"
-				fi
-				grep '/etc/nsswitch.ldap' $dest >/dev/null \
-				    2>&1
-				if [ $? = 0 ] ; then
+		# database (TNdb) entries, add appropriate entries. 
+		# TNdb entries is not supported in nis/nisplus, So avoid
+ 		# appending these entries in /etc/nsswitch.conf.
+		# And for rest of the name services append these TNdb entries
+		# according to name service.
+		egrep '/etc/nsswitch.(nis|nisplus)' $dest >\
+		    /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			for DB in tnrhtp tnrhdb
+			do
+				grep $DB: $dest > /dev/null 2>&1
+				if [ $? != 0 ]; then
 					ATTR="files ldap"
+					egrep '/etc/nsswitch\.(dns|files)' $dest >\
+					    /dev/null 2>&1
+					if [ $? = 0 ] ; then
+						ATTR="files"
+					fi
+					grep '/etc/nsswitch.ldap' $dest >/dev/null \
+					    2>&1
+					if [ $? = 0 ] ; then
+						ATTR="files ldap"
+					fi
+					echo "${DB}:	${ATTR}" >> $dest
 				fi
-				echo "${DB}:	${ATTR}" >> $dest
-			fi
-		done
+			done
+		fi
 	fi
 done
 
