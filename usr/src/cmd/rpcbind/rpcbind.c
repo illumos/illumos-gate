@@ -118,6 +118,7 @@ char *loopback_vc_ord;	/* COTS_ORD loopback transport, for set and unset */
 boolean_t verboselog = B_FALSE;
 boolean_t wrap_enabled = B_FALSE;
 boolean_t allow_indirect = B_TRUE;
+boolean_t local_only = B_FALSE;
 
 /* Local Variable */
 static int warmstart = 0;	/* Grab a old copy of registrations */
@@ -945,58 +946,41 @@ logthread(void *arg)
 	/* NOTREACHED */
 }
 
+static boolean_t
+get_smf_prop(const char *var, boolean_t def_val)
+{
+	scf_simple_prop_t *prop;
+	uint8_t *val;
+	boolean_t res = def_val;
+
+	prop = scf_simple_prop_get(NULL, NULL, "config", var);
+	if (prop) {
+		if ((val = scf_simple_prop_next_boolean(prop)) != NULL)
+			res = (*val == 0) ? B_FALSE : B_TRUE;
+		scf_simple_prop_free(prop);
+	}
+
+	if (prop == NULL || val == NULL) {
+		syslog(LOG_ALERT, "no value for config/%s (%s). "
+		    "Using default \"%s\"", var, scf_strerror(scf_error()),
+		    def_val ? "true" : "false");
+	}
+
+	return (res);
+}
+
 /*
- * Initialize: read the configuration parameters from the default file.
+ * Initialize: read the configuration parameters from SMF
  */
 static void
 rpcb_check_init(void)
 {
 	thread_t tid;
-	scf_simple_prop_t *prop;
-	uint8_t	*bool;
 
-	if ((prop = scf_simple_prop_get(NULL, NULL, "config",
-	    "enable_tcpwrappers")) != NULL) {
-
-		if ((bool = scf_simple_prop_next_boolean(prop)) != NULL) {
-			wrap_enabled = (*bool == 0) ? B_FALSE : B_TRUE;
-		} else {
-			syslog(LOG_ALERT, "enable_tcpwrappers no value %s",
-			    scf_strerror(scf_error()));
-		}
-		scf_simple_prop_free(prop);
-	} else {
-		syslog(LOG_ALERT, "unable to get enable_tcpwrappers %s",
-		    scf_strerror(scf_error()));
-	}
-	if ((prop = scf_simple_prop_get(NULL, NULL, "config",
-	    "verbose_logging")) != NULL) {
-
-		if ((bool = scf_simple_prop_next_boolean(prop)) != NULL) {
-			verboselog = (*bool == 0) ? B_FALSE : B_TRUE;
-		} else {
-			syslog(LOG_ALERT, "verboselog no value %s",
-			    scf_strerror(scf_error()));
-		}
-		scf_simple_prop_free(prop);
-	} else {
-		syslog(LOG_ALERT, "unable to get verbose_logging %s",
-		    scf_strerror(scf_error()));
-	}
-	if ((prop = scf_simple_prop_get(NULL, NULL, "config",
-	    "allow_indirect")) != NULL) {
-
-		if ((bool = scf_simple_prop_next_boolean(prop)) != NULL) {
-			allow_indirect = (*bool == 0) ? B_FALSE : B_TRUE;
-		} else {
-			syslog(LOG_ALERT, "allow_indirect no value %s",
-			    scf_strerror(scf_error()));
-		}
-		scf_simple_prop_free(prop);
-	} else {
-		syslog(LOG_ALERT, "unable to get allow_indirect %s",
-		    scf_strerror(scf_error()));
-	}
+	wrap_enabled = get_smf_prop("enable_tcpwrappers", B_FALSE);
+	verboselog = get_smf_prop("verbose_logging", B_FALSE);
+	allow_indirect = get_smf_prop("allow_indirect", B_TRUE);
+	local_only = get_smf_prop("local_only", B_FALSE);
 
 	if (wrap_enabled)
 		(void) thr_create(NULL, 0, logthread, NULL, THR_DETACHED, &tid);

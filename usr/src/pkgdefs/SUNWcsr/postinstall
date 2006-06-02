@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -200,4 +199,25 @@ if [ $? -eq 0 ]; then
 fi
 _ENABLE_AUDIT
 
+if [ -f $BASEDIR/var/SUNWcsr-apply-limited-net ]; then
+	PROFILEDIR=$BASEDIR/var/svc/profile
+	UPGRADEFILE=${PROFILEDIR}/upgrade
+	ln -sf ./generic_limited_net.xml ${PROFILEDIR}/generic.xml
+	cat >> ${UPGRADEFILE} <<\_ENABLE_LIMITED_NET
+#
+# apply the generic_limit_net profile selected at install
+# time, and set the accompanying properties since they can't
+# be readily set in the profile as of yet.
+#
+apply_limited_net()
+{
+	/usr/sbin/netservices limited
+}
+
+# apply_limited_net as last action of this upgrade script
+trap apply_limited_net 0
+
+_ENABLE_LIMITED_NET
+	rm -f $BASEDIR/var/SUNWcsr-apply-limited-net
+fi
 exit 0

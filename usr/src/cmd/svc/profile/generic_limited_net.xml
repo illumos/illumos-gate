@@ -1,37 +1,35 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
-
- CDDL HEADER START
-
- The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
-
- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- or http://www.opensolaris.org/os/licensing.
- See the License for the specific language governing permissions
- and limitations under the License.
-
- When distributing Covered Code, include this CDDL HEADER in each
- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- If applicable, add the following below this CDDL HEADER, with the
- fields enclosed by brackets "[]" replaced with your own identifying
- information: Portions Copyright [yyyy] [name of copyright owner]
-
- CDDL HEADER END
+    CDDL HEADER START
+   
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+   
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+   
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+   
+    CDDL HEADER END
+   
+    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
 
-    The purpose of the limited_net profile is to provide a set of active
-    services that allow one to connect to the machine via ssh (requires
-    sshd,) to be authenticated (requires rpc,) and to access network
-    filesystems (requires nfs.)  The services which are deactivated here
-    are those that are at odds with this goal.  Those which are activated
-    are explicit requirements for the goal's satisfaction.
+    The purpose of the limited_net profile is to provide a set of
+    active services that allow one to connect to the machine via ssh
+    (requires sshd). The services which are deactivated here are those
+    that are at odds with this goal. Those which are activated are
+    explicit requirements for the goal's satisfaction.
 
     NOTE:  Service profiles delivered by this package are not editable,
     and their contents will be overwritten by package or patch
@@ -93,20 +91,27 @@
     <instance name='default' enabled='true'/>
   </service>
   <service name='network/nfs/status' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
   <service name='network/nfs/nlockmgr' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
   <service name='network/nfs/client' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
   <service name='network/nfs/server' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
   <service name='network/nfs/rquota' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
+  <service name='network/nfs/cbd' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/mapid' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
   <service name='network/ssh' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
@@ -132,9 +137,6 @@
     <instance name='default' enabled='true' />
   </service>
 
-  <!--
-      non-default svc.startd(1M) services disabled
-  -->
   <service name='network/dhcp-server' version='1' type='service'>
     <instance name='default' enabled='false' />
   </service>
@@ -157,8 +159,27 @@
     <instance name='default' enabled='false' />
   </service>
 
+  <service name='application/management/sma' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/seaport' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/snmpdx' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/wbem' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/print/rfc1179' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/print/ipp-listener' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+
   <!--
-	default inetd(1M) services disabled
+	default inetd(1M) services
   -->
   <service name='network/finger' version='1' type='service'>
     <instance name='default' enabled='false'/>
@@ -167,26 +188,20 @@
     <instance name='default' enabled='false'/>
   </service>
   <service name='network/login' version='1' type='service'>
-    <instance name='rlogin' enabled='false'/>
-    <!--
-	non-default inetd(1M) instances disabled
-    -->
-    <instance name='klogin' enabled='false'/>
+    <instance name='rlogin'  enabled='false'/>
+    <instance name='klogin'  enabled='false'/>
     <instance name='eklogin' enabled='false'/>
   </service>
   <service name='network/shell' version='1' type='service'>
     <instance name='default' enabled='false'/>
-    <!--
-	non-default inetd(1M) instance disabled
-    -->
-    <instance name='kshell' enabled='false'/>
+    <instance name='kshell'  enabled='false'/>
   </service>
   <service name='network/telnet' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
 
   <!--
-	non-default inetd(1M) services disabled
+	non-default inetd(1M) services
   -->
   <service name='network/tname' version='1' type='service'>
     <instance name='default' enabled='false'/>
@@ -223,6 +238,9 @@
   <service name='network/talk' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
+  <service name='application/x11/xfs' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
 
   <!--
 	default inetd(1M) RPC services enabled
@@ -231,16 +249,7 @@
     <instance name='default' enabled='true'/>
   </service>
   <service name='network/rpc/mdcomm' version='1' type='service'>
-    <instance name='default' enabled='true'/>
-  </service>
-  <service name='network/rpc/meta' version='1' type='service'>
-    <instance name='default' enabled='true'/>
-  </service>
-  <service name='network/rpc/metamed' version='1' type='service'>
-    <instance name='default' enabled='true'/>
-  </service>
-  <service name='network/rpc/metamh' version='1' type='service'>
-    <instance name='default' enabled='true'/>
+    <instance name='default' enabled='false'/>
   </service>
   <service name='network/rpc/smserver' version='1' type='service'>
     <instance name='default' enabled='true'/>
@@ -258,6 +267,15 @@
   <service name='network/rpc/rusers' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
+  <service name='network/rpc/meta' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/metamed' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/metamh' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
 
   <!--
 	non-default inetd(1M) RPC services disabled
@@ -273,6 +291,27 @@
   </service>
   <service name='network/rpc/wall' version='1' type='service'>
     <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Enable CDE services.
+  -->
+  <service name='application/cde-printinfo' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/graphical-login/cde-login' version='1'
+    type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='network/rpc/cde-calendar-manager' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+
+  <!--
+      Disabled CDE services.
+  -->
+  <service name='network/cde-spc' version='1' type='service'>
+     <instance name='default' enabled='false' />
   </service>
 
 </service_bundle>

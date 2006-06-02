@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-DATAFILES += depend i.initd i.preserve
+DATAFILES += depend i.initd i.preserve i.manifest r.manifest
 CHKINSTALLSRC=checkinstall.initd
 
 ACTION_all=grep SUNWter depend > /dev/null || \

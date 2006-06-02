@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -43,7 +42,7 @@
  *	Single function for pmap* and rpcb*;
  *	Local transport checks made using localxprt().
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,7 +219,8 @@ rpcb_check(SVCXPRT *transp, rpcproc_t procnum, boolean_t ispmap)
 		const char *addr_string = sgen_toa(svc_getgencaller(transp));
 
 		if (!localxprt(transp, ispmap) &&
-		    hosts_ctl("rpcbind", addr_string, addr_string, "") == 0) {
+		    (local_only ||
+		    hosts_ctl("rpcbind", addr_string, addr_string, "") == 0)) {
 			res = B_FALSE;
 		}
 	}

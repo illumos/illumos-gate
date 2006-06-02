@@ -55,8 +55,6 @@ PROFILESRCS = \
 PROFILES = $(PROFILESRCS:%=$(ROOTPROFILE)/%)
 
 install: $(PROFILES)
-	$(RM) $(ROOTPROFILE)/generic.xml
-	$(LN) -s generic_open.xml $(ROOTPROFILE)/generic.xml
 	$(RM) $(ROOTPROFILE)/platform.xml
 	# SUNW,Sun-Fire-V890
 	$(RM) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-V890.xml

@@ -249,6 +249,7 @@ COMMON_SUBDIRS = \
 	cmd/sync \
 	cmd/syseventadm \
 	cmd/syseventd \
+	cmd/syslogd \
 	cmd/tabs \
 	cmd/tee \
 	cmd/th_tools \

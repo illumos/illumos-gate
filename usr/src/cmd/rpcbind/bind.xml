@@ -2,38 +2,36 @@
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
+    CDDL HEADER START
+   
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+   
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+   
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+   
+    CDDL HEADER END
+   
+    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
 
+    ident	"%Z%%M%	%I%	%E% SMI"
 
- CDDL HEADER START
+    Service manifest for rpcbind
 
- The contents of this file are subject to the terms of the
- Common Development and Distribution License (the "License").
- You may not use this file except in compliance with the License.
-
- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- or http://www.opensolaris.org/os/licensing.
- See the License for the specific language governing permissions
- and limitations under the License.
-
- When distributing Covered Code, include this CDDL HEADER in each
- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- If applicable, add the following below this CDDL HEADER, with the
- fields enclosed by brackets "[]" replaced with your own identifying
- information: Portions Copyright [yyyy] [name of copyright owner]
-
- CDDL HEADER END
-
-
-	ident	"%Z%%M%	%I%	%E% SMI"
-
-	NOTE:  This service manifest is not editable; its contents will
-	be overwritten by package or patch operations, including
-	operating system upgrade.  Make customizations in a different
-	file.
-
-	Service manifest for rpcbind
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
 -->
 
 <service_bundle type='manifest' name='SUNWcsr:rpcbind'>
@@ -152,8 +150,31 @@
 			name='allow_indirect'
 			type='boolean'
 			value='true' />
+
+		<!-- local_only specifies whether rpcbind should allow
+		     calls from hosts other than the localhost.
+		     Setting local_only to true will make rpcbind serve
+		     only those requests that come in from the local machine.
+		     the default value is false, i.e. allow connections
+		     from other systems too.
+		-->
+		<propval
+			name='local_only'
+			type='boolean'
+			value='false' />
+
+		<!-- to configure rpc/bind -->
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.rpc.bind' />
 	</property_group>
 
+	<!-- Authorization -->
+	<property_group name='general' type='framework'>
+		<!-- to enable/disable rpc/bind -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.rpc.bind' />
+	</property_group>
+		
 	<stability value='Unstable' />
 
 	<template>

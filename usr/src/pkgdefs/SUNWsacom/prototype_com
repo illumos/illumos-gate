@@ -48,14 +48,12 @@ i postinstall
 i space
 i i.initd
 i i.preserve
+i i.manifest
+i r.manifest
 #
 d none etc 0755 root sys
 d none etc/init.d 0755 root sys
-d none etc/rc0.d 0755 root sys
-d none etc/rcS.d 0755 root sys
-d none etc/rc1.d 0755 root sys
-d none etc/rc2.d 0755 root sys
-d none etc/rc3.d 0755 root sys
+f initd etc/init.d/init.snmpdx 744 root sys
 #
 d none etc/snmp 0755 root sys
 d none etc/snmp/conf 0755 root sys
@@ -64,12 +62,16 @@ d none var 0755 root sys
 d none var/snmp 0755 root sys
 d none var/snmp/mib 0755 root sys
 #
-e initd etc/init.d/init.snmpdx 744 root sys
-l initd etc/rc3.d/S76snmpdx=../../etc/init.d/init.snmpdx
-l initd etc/rc2.d/K07snmpdx=../../etc/init.d/init.snmpdx
-l initd etc/rc1.d/K07snmpdx=../../etc/init.d/init.snmpdx
-l initd etc/rcS.d/K07snmpdx=../../etc/init.d/init.snmpdx
-l initd etc/rc0.d/K07snmpdx=../../etc/init.d/init.snmpdx
+d none var/svc 0755 root sys
+d none var/svc/manifest 0755 root sys
+d none var/svc/manifest/application 0755 root sys
+d none var/svc/manifest/application/management 0755 root sys
+f manifest var/svc/manifest/application/management/snmpdx.xml 0444 root sys
+#
+d none lib 0755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-snmpdx 0555 root bin
 #
 e preserve etc/snmp/conf/snmpdx.rsrc 644 root sys
 v none etc/snmp/conf/snmpdx.reg 644 root sys

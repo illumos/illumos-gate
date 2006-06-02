@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,9 +17,8 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -82,21 +80,24 @@ extern boolean_t localxprt(SVCXPRT *, boolean_t);
 extern void qsyslog(int pri, const char *fmt, ...);
 extern boolean_t rpcb_check(SVCXPRT *, rpcproc_t, boolean_t);
 extern void rpcb_log(boolean_t, SVCXPRT *, rpcproc_t, rpcprog_t, boolean_t);
-extern boolean_t allow_indirect, wrap_enabled, verboselog;
+extern boolean_t allow_indirect, wrap_enabled, verboselog, local_only;
 
 #define	svc_getgencaller(transp) \
 	((struct sockaddr_gen *)svc_getrpccaller((transp))->buf)
 
 #define	RPCB_CHECK(xprt, proc) \
-	if (wrap_enabled && !rpcb_check((xprt), (proc), B_FALSE)) \
+	if ((wrap_enabled || local_only) && \
+	    !rpcb_check((xprt), (proc), B_FALSE)) \
 		return
 
 #define	PMAP_CHECK(xprt, proc) \
-	if (wrap_enabled && !rpcb_check((xprt), (proc), B_TRUE)) \
+	if ((wrap_enabled || local_only) && \
+	    !rpcb_check((xprt), (proc), B_TRUE)) \
 		return
 
 #define	PMAP_CHECK_RET(xprt, proc, ret) \
-	if (wrap_enabled && !rpcb_check((xprt), (proc), B_TRUE)) \
+	if ((wrap_enabled || local_only) && \
+	    !rpcb_check((xprt), (proc), B_TRUE)) \
 		return (ret)
 
 #define	RPCB_LOG(xprt, proc, prog) \

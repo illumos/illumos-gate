@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +48,7 @@ dataq_init(dataq_t *ptr)
 	ptr->num_waiters = 0;
 	ll_init(&ptr->data);
 	ll_init(&ptr->waiters);
-	pthread_mutex_init(&ptr->lock, NULL);
+	(void) pthread_mutex_init(&ptr->lock, NULL);
 	assert((pthread_mutex_lock(&ptr->lock) == 0) &&
 		(dataq_check(ptr) == 1) &&
 		(pthread_mutex_unlock(&ptr->lock) == 0));
@@ -65,7 +64,7 @@ dataq_enqueue(dataq_t *dataq, void *in)
 	if (ptr == NULL)
 		return (-1);
 	ptr->data = in;
-	pthread_mutex_lock(&dataq->lock);
+	(void) pthread_mutex_lock(&dataq->lock);
 	assert(dataq_check(dataq));
 	ll_enqueue(&dataq->data, &ptr->list);
 	dataq->num_data++;
@@ -73,10 +72,10 @@ dataq_enqueue(dataq_t *dataq, void *in)
 		/*LINTED*/
 		sleeper = (dataq_waiter_t *)ll_peek(&dataq->waiters);
 		sleeper->wakeup = 1;
-		pthread_cond_signal(&sleeper->cv);
+		(void) pthread_cond_signal(&sleeper->cv);
 	}
 	assert(dataq_check(dataq));
-	pthread_mutex_unlock(&dataq->lock);
+	(void) pthread_mutex_unlock(&dataq->lock);
 	return (0);
 }
 
@@ -86,23 +85,23 @@ dataq_dequeue(dataq_t *dataq, void **outptr, int try)
 	dataq_data_t *dptr;
 	dataq_waiter_t *sleeper;
 
-	pthread_mutex_lock(&dataq->lock);
+	(void) pthread_mutex_lock(&dataq->lock);
 	if ((dataq->num_waiters > 0) ||
 	    ((dptr = (dataq_data_t *)ll_dequeue(&dataq->data)) == NULL)) {
 		dataq_waiter_t wait;
 		if (try) {
-			pthread_mutex_unlock(&dataq->lock);
+			(void) pthread_mutex_unlock(&dataq->lock);
 			return (1);
 		}
 		wait.wakeup = 0;
-		pthread_cond_init(&wait.cv, NULL);
+		(void) pthread_cond_init(&wait.cv, NULL);
 		dataq->num_waiters++;
 		ll_enqueue(&dataq->waiters, &wait.list);
 		while (wait.wakeup == 0)
-			pthread_cond_wait(&wait.cv, &dataq->lock);
-		ll_dequeue(&dataq->waiters);
+			(void) pthread_cond_wait(&wait.cv, &dataq->lock);
+		(void) ll_dequeue(&dataq->waiters);
 		dataq->num_waiters--;
-		pthread_cond_destroy(&wait.cv);
+		(void) pthread_cond_destroy(&wait.cv);
 		dptr = (dataq_data_t *)ll_dequeue(&dataq->data);
 	}
 	dataq->num_data--;
@@ -110,9 +109,9 @@ dataq_dequeue(dataq_t *dataq, void **outptr, int try)
 		/*LINTED*/
 		sleeper = (dataq_waiter_t *)ll_peek(&dataq->waiters);
 		sleeper->wakeup = 1;
-		pthread_cond_signal(&sleeper->cv);
+		(void) pthread_cond_signal(&sleeper->cv);
 	}
-	pthread_mutex_unlock(&dataq->lock);
+	(void) pthread_mutex_unlock(&dataq->lock);
 	*outptr = dptr->data;
 	free(dptr);
 	return (0);
@@ -130,14 +129,14 @@ static void
 dataq_waiters_destroy(void * p)
 {
 	dataq_waiter_t *d = (dataq_waiter_t *)p;
-	pthread_cond_destroy(&d->cv);
+	(void) pthread_cond_destroy(&d->cv);
 	free(d);
 }
 
 int
 dataq_destroy(dataq_t *dataq)
 {
-	pthread_mutex_destroy(&dataq->lock);
+	(void) pthread_mutex_destroy(&dataq->lock);
 	ll_mapf(&dataq->data, dataq_data_destroy);
 	ll_mapf(&dataq->waiters, dataq_waiters_destroy);
 	return (0);

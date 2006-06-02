@@ -19,22 +19,16 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All rights reserved.
 #
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-COMMON_STARTLST=""
 
 COMMON_STOPLST="\
 27boot.server"
-
-INIT_STOPLST="07snmpdx"
 
 INSDIR=${ROOT}/etc/rcS.d
 
@@ -50,16 +44,4 @@ do
 	name=`echo $f | sed -e 's/^..//' | sed -e 's/\.sh$//'`
 	rm -f ${INSDIR}/K$f
 	ln ${ROOT}/etc/init.d/${name} ${INSDIR}/K$f
-done
-for f in ${INIT_STOPLST}
-do
-	name=`echo $f | sed -e 's/^..//' | sed -e 's/\.sh$//'`
-	rm -f ${INSDIR}/K$f
-	ln ${ROOT}/etc/init.d/init.${name} ${INSDIR}/K$f
-done
-for f in ${COMMON_STARTLST}
-do
-        name=`echo $f | sed -e 's/^..//' | sed -e 's/\.sh$//`
-        rm -f ${INSDIR}/S$f
-        ln ${ROOT}/etc/init.d/${name} ${INSDIR}/S$f
 done

@@ -57,8 +57,8 @@ f none usr/bin/auths 555 root bin
 f none usr/bin/basename 555 root bin
 l none usr/bin/bg=../../usr/bin/alias
 f none usr/bin/busstat 555 root bin
-s none usr/bin/cachefsstat=../lib/fs/cachefs/cachefsstat
 s none usr/bin/cachefspack=../lib/fs/cachefs/cachefspack
+s none usr/bin/cachefsstat=../lib/fs/cachefs/cachefsstat
 f none usr/bin/captoinfo 555 root bin
 f none usr/bin/cat 555 root bin
 l none usr/bin/cd=../../usr/bin/alias
@@ -150,12 +150,12 @@ l none usr/bin/i486=../../usr/bin/i286
 l none usr/bin/i860=../../usr/bin/i286
 l none usr/bin/i86pc=../../usr/bin/i286
 l none usr/bin/iAPX286=../../usr/bin/i286
-f none usr/bin/isainfo 555 root bin
-f none usr/bin/isalist 555 root bin
 f none usr/bin/iconv 555 root bin
 f none usr/bin/id 555 root bin
 f none usr/bin/infocmp 555 root bin
 f none usr/bin/iostat 555 root bin
+f none usr/bin/isainfo 555 root bin
+f none usr/bin/isalist 555 root bin
 l none usr/bin/jobs=../../usr/bin/alias
 f none usr/bin/join 555 root bin
 s none usr/bin/jsh=../../sbin/sh
@@ -191,6 +191,7 @@ f none usr/bin/mkpwdict 555 root bin
 f none usr/bin/mktemp 555 root bin
 f none usr/bin/moe 555 root bin
 f none usr/bin/more 555 root bin
+f none usr/bin/mpstat 555 root bin
 f none usr/bin/mt 555 root bin
 l none usr/bin/mv=../../usr/bin/cp
 f none usr/bin/netstat 555 root bin
@@ -207,8 +208,8 @@ f none usr/bin/patch 555 root bin
 f none usr/bin/pathchk 555 root bin
 f none usr/bin/pax 555 root bin
 l none usr/bin/pdp11=../../usr/bin/i286
-f none usr/bin/pfexec 4555 root bin
 l none usr/bin/pfcsh=../../usr/bin/csh
+f none usr/bin/pfexec 4555 root bin
 l none usr/bin/pfksh=../../usr/bin/ksh
 s none usr/bin/pfsh=../../sbin/sh
 f none usr/bin/pg 555 root bin
@@ -218,9 +219,9 @@ f none usr/bin/pktool 555 root bin
 f none usr/bin/pr 555 root bin
 l none usr/bin/prctl=../../usr/lib/isaexec
 f none usr/bin/priocntl 555 root bin
+f none usr/bin/profiles 555 root bin
 f none usr/bin/projects 555 root bin
 l none usr/bin/prstat=../../usr/lib/isaexec
-f none usr/bin/profiles 555 root bin
 l none usr/bin/ps=../../usr/lib/isaexec
 f none usr/bin/putdev 555 root bin
 f none usr/bin/putdgrp 555 root bin
@@ -252,7 +253,6 @@ f none usr/bin/strconf 555 root root
 s none usr/bin/strerr=../sbin/strerr
 f none usr/bin/stty 555 root bin
 f none usr/bin/su 4555 root sys
-l none usr/bin/sun=../../usr/bin/i286
 l none usr/bin/sun2=../../usr/bin/i286
 l none usr/bin/sun3=../../usr/bin/i286
 l none usr/bin/sun3x=../../usr/bin/i286
@@ -261,6 +261,7 @@ l none usr/bin/sun4c=../../usr/bin/i286
 l none usr/bin/sun4d=../../usr/bin/i286
 l none usr/bin/sun4e=../../usr/bin/i286
 l none usr/bin/sun4m=../../usr/bin/i286
+l none usr/bin/sun=../../usr/bin/i286
 f none usr/bin/svcprop 0555 root bin
 f none usr/bin/svcs 0555 root bin
 s none usr/bin/sync=../../sbin/sync
@@ -281,10 +282,10 @@ f none usr/bin/tty 555 root bin
 l none usr/bin/type=../../usr/bin/alias
 f none usr/bin/tzselect 555 root bin
 l none usr/bin/u370=../../usr/bin/i286
-l none usr/bin/u3b=../../usr/bin/i286
 l none usr/bin/u3b15=../../usr/bin/i286
 l none usr/bin/u3b2=../../usr/bin/i286
 l none usr/bin/u3b5=../../usr/bin/i286
+l none usr/bin/u3b=../../usr/bin/i286
 l none usr/bin/ulimit=../../usr/bin/alias
 l none usr/bin/umask=../../usr/bin/alias
 l none usr/bin/unalias=../../usr/bin/alias
@@ -332,52 +333,52 @@ d none usr/lib/class 755 root bin
 d none usr/lib/class/FX 755 root bin
 f none usr/lib/class/FX/FXdispadmin 555 root bin
 f none usr/lib/class/FX/FXpriocntl 555 root bin
+d none usr/lib/class/IA 755 root bin
+f none usr/lib/class/IA/IAdispadmin 555 root bin
+f none usr/lib/class/IA/IApriocntl 555 root bin
 d none usr/lib/class/RT 755 root bin
 f none usr/lib/class/RT/RTdispadmin 555 root bin
 f none usr/lib/class/RT/RTpriocntl 555 root bin
 d none usr/lib/class/TS 755 root bin
 f none usr/lib/class/TS/TSdispadmin 555 root bin
 f none usr/lib/class/TS/TSpriocntl 555 root bin
-d none usr/lib/class/IA 755 root bin
-f none usr/lib/class/IA/IAdispadmin 555 root bin
-f none usr/lib/class/IA/IApriocntl 555 root bin
 s none usr/lib/cron=../../etc/cron.d
 d none usr/lib/crypto 755 root bin
 f none usr/lib/crypto/kcfd 555 root bin
 d none usr/lib/devfsadm 755 root sys
-d none usr/lib/devfsadm/linkmod 755 root sys
 s none usr/lib/devfsadm/devfsadmd=../../sbin/devfsadm
+d none usr/lib/devfsadm/linkmod 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_audio_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_cfg_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_disk_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_lofi_link.so 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_md_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_misc_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_port_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_ramdisk_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_sgen_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_tape_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_usb_link.so 755 root sys
-f none usr/lib/devfsadm/linkmod/SUNW_md_link.so 755 root sys
 f none usr/lib/diffh 555 root bin
 s none usr/lib/embedded_su=../bin/su
 f none usr/lib/expreserve 555 root bin
 f none usr/lib/exrecover 555 root bin
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/cachefs 755 root sys
-f none usr/lib/fs/cachefs/cfsadmin 555 root bin
-f none usr/lib/fs/cachefs/cachefsstat 555 root bin
+f none usr/lib/fs/cachefs/cachefsd 555 root bin
 f none usr/lib/fs/cachefs/cachefslog 555 root bin
+f none usr/lib/fs/cachefs/cachefspack 555 root bin
+f none usr/lib/fs/cachefs/cachefsstat 555 root bin
 f none usr/lib/fs/cachefs/cachefswssize 555 root bin
+f none usr/lib/fs/cachefs/cfsadmin 555 root bin
 f none usr/lib/fs/cachefs/cfsfstype 555 root bin
 f none usr/lib/fs/cachefs/cfstagchk 555 root bin
+f none usr/lib/fs/cachefs/dfshares 555 root bin
 f none usr/lib/fs/cachefs/fsck 555 root bin
 f none usr/lib/fs/cachefs/mount 555 root bin
-f none usr/lib/fs/cachefs/umount 555 root bin
-f none usr/lib/fs/cachefs/cachefspack 555 root bin
-f none usr/lib/fs/cachefs/cachefsd 555 root bin
-f none usr/lib/fs/cachefs/dfshares 555 root bin
 f none usr/lib/fs/cachefs/share 555 root bin
+f none usr/lib/fs/cachefs/umount 555 root bin
 f none usr/lib/fs/cachefs/unshare 555 root bin
 d none usr/lib/fs/ctfs 755 root sys
 f none usr/lib/fs/ctfs/mount 555 root bin
@@ -432,39 +433,37 @@ d none usr/lib/help 755 root bin
 d none usr/lib/help/auths 755 root bin
 d none usr/lib/help/auths/locale 755 root bin
 d none usr/lib/help/auths/locale/C 755 root bin
+f none usr/lib/help/auths/locale/C/AllSolAuthsHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/AuditConfig.html 444 root bin
 f none usr/lib/help/auths/locale/C/AuditHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/AuditRead.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthJobsAdmin.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthJobsUser.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthProfmgrAssign.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthProfmgrDelegate.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthProfmgrExecattrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthProfmgrRead.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthProfmgrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthRoleAssign.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthRoleDelegate.html 444 root bin
+f none usr/lib/help/auths/locale/C/AuthRoleWrite.html 444 root bin
+f none usr/lib/help/auths/locale/C/BindStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevAllocHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevAllocate.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevConfig.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevGrant.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevRevoke.html 444 root bin
+f none usr/lib/help/auths/locale/C/DhcpmgrHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/DhcpmgrWrite.html 444 root bin
 f none usr/lib/help/auths/locale/C/JobHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthJobsAdmin.html 444 root bin
 f none usr/lib/help/auths/locale/C/JobsGrant.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthJobsUser.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginEnable.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginRemote.html 444 root bin
+f none usr/lib/help/auths/locale/C/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/PriAdmin.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthProfmgrAssign.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthProfmgrDelegate.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthProfmgrExecattrWrite.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthProfmgrRead.html 444 root bin
 f none usr/lib/help/auths/locale/C/ProfmgrHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthProfmgrWrite.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthRoleAssign.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthRoleDelegate.html 444 root bin
 f none usr/lib/help/auths/locale/C/RoleHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/AuthRoleWrite.html 444 root bin
-f none usr/lib/help/auths/locale/C/SysDate.html 444 root bin
-f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/SysShutdown.html 444 root bin
-f none usr/lib/help/auths/locale/C/AllSolAuthsHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/DhcpmgrHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/DhcpmgrWrite.html 444 root bin
-f none usr/lib/help/auths/locale/C/BindStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfAutofsStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfCronStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfHeader.html 444 root bin
@@ -480,7 +479,9 @@ f none usr/lib/help/auths/locale/C/SmfSendmailStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueHeader.html 444 root bin
-f none usr/lib/help/auths/locale/C/NetworkHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/SysDate.html 444 root bin
+f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/SysShutdown.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiWep.html 444 root bin
 d none usr/lib/help/profiles 755 root bin
@@ -489,15 +490,21 @@ d none usr/lib/help/profiles/locale/C 755 root bin
 f none usr/lib/help/profiles/locale/C/RtAll.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtAuditCtrl.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtAuditReview.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtDeviceMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtContractObserver.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtCronMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtCryptoMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtLogMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtDHCPMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtDatAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtDefault.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtDeviceMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtDeviceSecurity.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtFileSysMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtFTPMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtFileSysMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtFileSysSecurity.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtIPFilterMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtKerberosSrvrMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtLogMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMailMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMaintAndRepair.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMediaBkup.html 444 root bin
@@ -509,19 +516,13 @@ f none usr/lib/help/profiles/locale/C/RtNetSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetWifiSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtObAccessMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtProcManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSoftwareInstall.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtSysEvMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtUserMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtUserSecurity.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtDefault.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtFileSysSecurity.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtDHCPMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtSysEvMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtKerberosSrvrMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtIPFilterMngmnt.html 444 root bin
-f none usr/lib/help/profiles/locale/C/RtDatAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtZFSFileSysMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtZoneMngmnt.html 444 root bin
@@ -558,8 +559,8 @@ f none usr/lib/kssladm 555 root bin
 s none usr/lib/ld.so.1=../../lib/ld.so.1
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin
-d none usr/lib/locale/C/LC_CTYPE 755 root bin
 d none usr/lib/locale/C/LC_COLLATE 755 root bin
+d none usr/lib/locale/C/LC_CTYPE 755 root bin
 d none usr/lib/locale/C/LC_MESSAGES 755 root bin
 d none usr/lib/locale/C/LC_MONETARY 755 root bin
 d none usr/lib/locale/C/LC_NUMERIC 755 root bin
@@ -567,11 +568,11 @@ d none usr/lib/locale/C/LC_TIME 755 root bin
 f none usr/lib/locale/C/locale_description 444 root bin
 s none usr/lib/locale/POSIX=./C
 d none usr/lib/localedef 755 root bin
-d none usr/lib/localedef/src 755 root bin
-f none usr/lib/makekey 555 root bin
 d none usr/lib/localedef/extensions 755 root bin
 f none usr/lib/localedef/extensions/generic_eucbc.x 444 root bin
 f none usr/lib/localedef/extensions/single_byte.x 444 root bin
+d none usr/lib/localedef/src 755 root bin
+f none usr/lib/makekey 555 root bin
 f none usr/lib/more.help 644 root bin
 d none usr/lib/netsvc 755 root sys
 f none usr/lib/newsyslog 555 root sys
@@ -583,14 +584,14 @@ f none usr/lib/platexec 555 root bin
 f none usr/lib/pt_chmod 4511 root bin
 d none usr/lib/rcm 755 root bin
 d none usr/lib/rcm/modules 755 root bin
-f none usr/lib/rcm/modules/SUNW_filesys_rcm.so 555 root bin
+f none usr/lib/rcm/modules/SUNW_cluster_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_dump_rcm.so 555 root bin
+f none usr/lib/rcm/modules/SUNW_filesys_rcm.so 555 root bin
+f none usr/lib/rcm/modules/SUNW_ip_anon_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_ip_rcm.so 555 root bin
+f none usr/lib/rcm/modules/SUNW_mpxio_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_network_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_swap_rcm.so 555 root bin
-f none usr/lib/rcm/modules/SUNW_cluster_rcm.so 555 root bin
-f none usr/lib/rcm/modules/SUNW_ip_anon_rcm.so 555 root bin
-f none usr/lib/rcm/modules/SUNW_mpxio_rcm.so 555 root bin
 f none usr/lib/rcm/rcm_daemon 555 root bin
 d none usr/lib/rcm/scripts 755 root bin
 s none usr/lib/rsh=../../sbin/sh
@@ -599,24 +600,24 @@ f none usr/lib/saf/listen 755 root sys
 f none usr/lib/saf/nlps_server 755 root sys
 f none usr/lib/saf/sac 555 root sys
 f none usr/lib/saf/ttymon 555 root sys
-d none usr/lib/security 755 root bin
 d none usr/lib/secure 755 root bin
 s none usr/lib/secure/32=.
+d none usr/lib/security 755 root bin
 d none usr/lib/sysevent 755 root bin
 d none usr/lib/sysevent/modules 755 root bin
-f none usr/lib/sysevent/syseventd 555 root bin
-f none usr/lib/sysevent/syseventconfd 555 root bin
 f none usr/lib/sysevent/modules/devfsadmd_mod.so 755 root bin
 f none usr/lib/sysevent/modules/sysevent_conf_mod.so 755 root bin
 f none usr/lib/sysevent/modules/sysevent_reg_mod.so 755 root bin
-d none usr/lib/term 755 root bin
+f none usr/lib/sysevent/syseventconfd 555 root bin
+f none usr/lib/sysevent/syseventd 555 root bin
 f none usr/lib/t300 555 root bin
 f none usr/lib/t300s 555 root bin
 f none usr/lib/t4014 555 root bin
 f none usr/lib/t450 555 root bin
-f none usr/lib/vplot 555 root bin
+d none usr/lib/term 755 root bin
 f none usr/lib/utmp_update 4555 root bin
 f none usr/lib/utmpd 555 root bin
+f none usr/lib/vplot 555 root bin
 s none usr/mail=../var/mail
 d none usr/net 755 root sys
 d none usr/net/nls 755 root sys
@@ -667,14 +668,14 @@ d none usr/sadm/install 755 root bin
 f none usr/sadm/install/miniroot.db 444 root sys
 d none usr/sadm/install/scripts 755 root bin
 f none usr/sadm/install/scripts/i.ipsecalgs 555 root sys
-f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/i.kcfconf 555 root sys
-f none usr/sadm/install/scripts/r.kcfconf 555 root sys
 f none usr/sadm/install/scripts/i.manifest 555 root sys
-f none usr/sadm/install/scripts/r.manifest 555 root sys
 f none usr/sadm/install/scripts/i.pkcs11conf 555 root sys
-f none usr/sadm/install/scripts/r.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/i.rbac 555 root sys
+f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys
+f none usr/sadm/install/scripts/r.kcfconf 555 root sys
+f none usr/sadm/install/scripts/r.manifest 555 root sys
+f none usr/sadm/install/scripts/r.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/r.rbac 555 root sys
 d none usr/sadm/sysadm 755 root bin
 d none usr/sadm/sysadm/add-ons 755 root bin
@@ -692,36 +693,24 @@ f none usr/sbin/auditconfig 555 root bin
 f none usr/sbin/auditd 555 root bin
 f none usr/sbin/auditreduce 555 root bin
 f none usr/sbin/auditstat 555 root bin
-f none usr/sbin/cfgadm 555 root bin
-s none usr/sbin/cfsadmin=../lib/fs/cachefs/cfsadmin
-s none usr/sbin/cachefslog=../lib/fs/cachefs/cachefslog
-s none usr/sbin/cachefswssize=../lib/fs/cachefs/cachefswssize
-f none usr/sbin/clear_locks 555 root bin
-f none usr/sbin/cryptoadm 555 root bin
-l none usr/sbin/deallocate=../../usr/sbin/allocate
-f none usr/sbin/dminfo 555 root bin
-s none usr/sbin/fdisk=../../sbin/fdisk
-f none usr/sbin/ikeadm 555 root bin
-f none usr/sbin/ikecert 555 root bin
-f none usr/sbin/ipaddrsel 555 root bin
-f none usr/sbin/ipsecalgs 555 root bin
-f none usr/sbin/ipsecconf 555 root bin
-f none usr/sbin/ipseckey 555 root bin
-l none usr/sbin/list_devices=../../usr/sbin/allocate
-f none usr/sbin/mkdevalloc 555 root bin
-l none usr/sbin/mkdevmaps=../../usr/sbin/mkdevalloc
-f none usr/sbin/praudit 555 root bin
 l none usr/sbin/audlinks=./devfsadm
 s none usr/sbin/autopush=../../sbin/autopush
-f none usr/sbin/bsmrecord 555 root bin
 s none usr/sbin/bootadm=../../sbin/bootadm
+f none usr/sbin/bsmrecord 555 root bin
+s none usr/sbin/cachefslog=../lib/fs/cachefs/cachefslog
+s none usr/sbin/cachefswssize=../lib/fs/cachefs/cachefswssize
+f none usr/sbin/cfgadm 555 root bin
+s none usr/sbin/cfsadmin=../lib/fs/cachefs/cfsadmin
 f none usr/sbin/chroot 555 root bin
+f none usr/sbin/clear_locks 555 root bin
 f none usr/sbin/clinfo 555 root bin
 f none usr/sbin/clri 555 root bin
 f none usr/sbin/consadm 555 root sys
 l none usr/sbin/consadmd=../../usr/sbin/consadm
 f none usr/sbin/cron 555 root sys
+f none usr/sbin/cryptoadm 555 root bin
 s none usr/sbin/dcopy=./clri
+l none usr/sbin/deallocate=../../usr/sbin/allocate
 f none usr/sbin/devfsadm 755 root sys
 f none usr/sbin/devinfo 555 root bin
 l none usr/sbin/devlinks=./devfsadm
@@ -732,10 +721,12 @@ l none usr/sbin/dfshares=../../usr/sbin/dfmounts
 l none usr/sbin/disks=./devfsadm
 f none usr/sbin/dispadmin 555 root bin
 s none usr/sbin/dladm=../../sbin/dladm
+f none usr/sbin/dminfo 555 root bin
 l none usr/sbin/drvconfig=./devfsadm
 f none usr/sbin/dumpadm 555 root bin
 s none usr/sbin/edquota=../lib/fs/ufs/edquota
 l none usr/sbin/eeprom=../../usr/lib/platexec
+s none usr/sbin/fdisk=../../sbin/fdisk
 f none usr/sbin/ff 555 root bin
 f none usr/sbin/fmthard 555 root sys
 f none usr/sbin/format 555 root bin
@@ -753,23 +744,33 @@ f none usr/sbin/groupmod 555 root sys
 f none usr/sbin/grpck 555 root bin
 f none usr/sbin/halt 755 root bin
 s none usr/sbin/hostconfig=../../sbin/hostconfig
-s none usr/sbin/ifconfig=../../sbin/ifconfig
 f none usr/sbin/if_mpadm 555 root bin
+s none usr/sbin/ifconfig=../../sbin/ifconfig
+f none usr/sbin/ikeadm 555 root bin
+f none usr/sbin/ikecert 555 root bin
 f none usr/sbin/inetadm 555 root bin
 f none usr/sbin/inetconv 555 root bin
 s none usr/sbin/inetd=../lib/inet/inetd
 s none usr/sbin/init=../../sbin/init
 f none usr/sbin/install 555 root bin
+f none usr/sbin/installboot 555 root sys
+f none usr/sbin/ipaddrsel 555 root bin
+f none usr/sbin/ipsecalgs 555 root bin
+f none usr/sbin/ipsecconf 555 root bin
+f none usr/sbin/ipseckey 555 root bin
 f none usr/sbin/keyserv 555 root sys
 f none usr/sbin/killall 555 root bin
 f none usr/sbin/ksslcfg 555 root bin
 s none usr/sbin/labelit=./clri
 f none usr/sbin/link 555 root bin
-s none usr/sbin/lockfs=../lib/fs/ufs/lockfs
+l none usr/sbin/list_devices=../../usr/sbin/allocate
 f none usr/sbin/locator 555 root bin
+s none usr/sbin/lockfs=../lib/fs/ufs/lockfs
 f none usr/sbin/lofiadm 555 root bin
 f none usr/sbin/logadm 555 root bin
 f none usr/sbin/makedbm 555 root bin
+f none usr/sbin/mkdevalloc 555 root bin
+l none usr/sbin/mkdevmaps=../../usr/sbin/mkdevalloc
 f none usr/sbin/mkfile 555 root bin
 s none usr/sbin/mkfs=./clri
 f none usr/sbin/mknod 555 root bin
@@ -778,22 +779,23 @@ l none usr/sbin/modload=../../usr/lib/isaexec
 l none usr/sbin/modunload=../../usr/lib/isaexec
 s none usr/sbin/mount=../../sbin/mount
 f none usr/sbin/mountall 555 root sys
-f none usr/bin/mpstat 555 root bin
 f none usr/sbin/msgid 555 root bin
 f none usr/sbin/mvdir 555 root bin
 s none usr/sbin/ncheck=./ff
 f none usr/sbin/ndd 555 root bin
+f none usr/sbin/netservices 0555 root sys
 s none usr/sbin/newfs=../lib/fs/ufs/newfs
 f none usr/sbin/nlsadmin 755 root adm
 f none usr/sbin/nscd 555 root bin
 f none usr/sbin/passmgmt 555 root sys
+l none usr/sbin/pbind=../../usr/lib/isaexec
 f none usr/sbin/pmadm 555 root sys
 l none usr/sbin/ports=./devfsadm
 l none usr/sbin/poweroff=./halt
+f none usr/sbin/praudit 555 root bin
 l none usr/sbin/prtconf=../../usr/lib/isaexec
-f none usr/sbin/prtvtoc 555 root sys
-l none usr/sbin/pbind=../../usr/lib/isaexec
 l none usr/sbin/prtdiag=../../usr/lib/platexec
+f none usr/sbin/prtvtoc 555 root sys
 f none usr/sbin/psradm 555 root sys
 f none usr/sbin/psrinfo 555 root sys
 l none usr/sbin/psrset=../../usr/lib/isaexec
@@ -878,16 +880,16 @@ f none usr/share/lib/tabset/wyse-adds 644 root bin
 f none usr/share/lib/tabset/xerox1720 644 root bin
 f none usr/share/lib/termcap 644 root bin
 d none usr/share/lib/terminfo 755 root bin
-d none usr/share/lib/terminfo/A 755 root bin
-l none usr/share/lib/terminfo/A/AT386-M=../../../../../usr/share/lib/terminfo/a/at386-m
-l none usr/share/lib/terminfo/A/AT386=../../../../../usr/share/lib/terminfo/a/at386
-f none usr/share/lib/terminfo/A/AT386-DOS-M 644 root bin
-f none usr/share/lib/terminfo/A/AT386-DOS 644 root bin
 d none usr/share/lib/terminfo/3 755 root bin
 l none usr/share/lib/terminfo/3/386AT-M=../../../../../usr/share/lib/terminfo/a/at386-m
-l none usr/share/lib/terminfo/3/386at-m=../../../../../usr/share/lib/terminfo/a/at386-m
 l none usr/share/lib/terminfo/3/386AT=../../../../../usr/share/lib/terminfo/a/at386
+l none usr/share/lib/terminfo/3/386at-m=../../../../../usr/share/lib/terminfo/a/at386-m
 l none usr/share/lib/terminfo/3/386at=../../../../../usr/share/lib/terminfo/a/at386
+d none usr/share/lib/terminfo/A 755 root bin
+f none usr/share/lib/terminfo/A/AT386-DOS 644 root bin
+f none usr/share/lib/terminfo/A/AT386-DOS-M 644 root bin
+l none usr/share/lib/terminfo/A/AT386-M=../../../../../usr/share/lib/terminfo/a/at386-m
+l none usr/share/lib/terminfo/A/AT386=../../../../../usr/share/lib/terminfo/a/at386
 d none usr/share/lib/terminfo/a 755 root bin
 f none usr/share/lib/terminfo/a/ansi 644 root bin
 f none usr/share/lib/terminfo/a/ansi+arrows 644 root bin
@@ -908,8 +910,8 @@ f none usr/share/lib/terminfo/a/ansi+sgrdim 644 root bin
 f none usr/share/lib/terminfo/a/ansi+sgrso 644 root bin
 f none usr/share/lib/terminfo/a/ansi+sgrul 644 root bin
 f none usr/share/lib/terminfo/a/ansi+tabs 644 root bin
-f none usr/share/lib/terminfo/a/at386-m 644 root bin
 f none usr/share/lib/terminfo/a/at386 644 root bin
+f none usr/share/lib/terminfo/a/at386-m 644 root bin
 d none usr/share/lib/terminfo/s 755 root bin
 f none usr/share/lib/terminfo/s/sun 644 root bin
 f none usr/share/lib/terminfo/s/sun-1 644 root bin
@@ -1423,12 +1425,12 @@ l none usr/share/lib/zoneinfo/Europe/Zagreb=../../../../../usr/share/lib/zoneinf
 f none usr/share/lib/zoneinfo/Europe/Zaporozhye 644 root bin
 f none usr/share/lib/zoneinfo/Europe/Zurich 644 root bin
 f none usr/share/lib/zoneinfo/Factory 644 root bin
-l none usr/share/lib/zoneinfo/GB=../../../../usr/share/lib/zoneinfo/Europe/London
 l none usr/share/lib/zoneinfo/GB-Eire=../../../../usr/share/lib/zoneinfo/Europe/London
-l none usr/share/lib/zoneinfo/GMT=../../../../usr/share/lib/zoneinfo/Etc/GMT
+l none usr/share/lib/zoneinfo/GB=../../../../usr/share/lib/zoneinfo/Europe/London
 l none usr/share/lib/zoneinfo/GMT+0=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/GMT-0=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/GMT0=../../../../usr/share/lib/zoneinfo/Etc/GMT
+l none usr/share/lib/zoneinfo/GMT=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/Greenwich=../../../../usr/share/lib/zoneinfo/Etc/GMT
 f none usr/share/lib/zoneinfo/HST 644 root bin
 l none usr/share/lib/zoneinfo/Hongkong=../../../../usr/share/lib/zoneinfo/Asia/Hong_Kong
@@ -1462,8 +1464,8 @@ d none usr/share/lib/zoneinfo/Mideast 755 root bin
 l none usr/share/lib/zoneinfo/Mideast/Riyadh87=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh87
 l none usr/share/lib/zoneinfo/Mideast/Riyadh88=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh88
 l none usr/share/lib/zoneinfo/Mideast/Riyadh89=../../../../../usr/share/lib/zoneinfo/Asia/Riyadh89
-l none usr/share/lib/zoneinfo/NZ=../../../../usr/share/lib/zoneinfo/Pacific/Auckland
 l none usr/share/lib/zoneinfo/NZ-CHAT=../../../../usr/share/lib/zoneinfo/Pacific/Chatham
+l none usr/share/lib/zoneinfo/NZ=../../../../usr/share/lib/zoneinfo/Pacific/Auckland
 l none usr/share/lib/zoneinfo/Navajo=../../../../usr/share/lib/zoneinfo/America/Denver
 l none usr/share/lib/zoneinfo/PRC=../../../../usr/share/lib/zoneinfo/Asia/Shanghai
 f none usr/share/lib/zoneinfo/PST8PDT 644 root bin
@@ -1525,8 +1527,8 @@ l none usr/share/lib/zoneinfo/US/Hawaii=../../../../../usr/share/lib/zoneinfo/Pa
 l none usr/share/lib/zoneinfo/US/Indiana-Starke=../../../../../usr/share/lib/zoneinfo/America/Indiana/Knox
 l none usr/share/lib/zoneinfo/US/Michigan=../../../../../usr/share/lib/zoneinfo/America/Detroit
 l none usr/share/lib/zoneinfo/US/Mountain=../../../../../usr/share/lib/zoneinfo/America/Denver
-l none usr/share/lib/zoneinfo/US/Pacific=../../../../../usr/share/lib/zoneinfo/America/Los_Angeles
 l none usr/share/lib/zoneinfo/US/Pacific-New=../../../../../usr/share/lib/zoneinfo/America/Los_Angeles
+l none usr/share/lib/zoneinfo/US/Pacific=../../../../../usr/share/lib/zoneinfo/America/Los_Angeles
 l none usr/share/lib/zoneinfo/US/Samoa=../../../../../usr/share/lib/zoneinfo/Pacific/Pago_Pago
 l none usr/share/lib/zoneinfo/UTC=../../../../usr/share/lib/zoneinfo/Etc/UTC
 l none usr/share/lib/zoneinfo/Universal=../../../../usr/share/lib/zoneinfo/Etc/UTC
@@ -1551,14 +1553,13 @@ f none usr/share/lib/zoneinfo/src/solar89 644 root bin
 f none usr/share/lib/zoneinfo/src/southamerica 644 root bin
 f none usr/share/lib/zoneinfo/src/systemv 644 root bin
 d none usr/share/lib/zoneinfo/tab 755 root bin
-f none usr/share/lib/zoneinfo/tab/zone_sun.tab 644 root bin
-f none usr/share/lib/zoneinfo/tab/country.tab 644 root bin
 f none usr/share/lib/zoneinfo/tab/continent.tab 644 root bin
+f none usr/share/lib/zoneinfo/tab/country.tab 644 root bin
+f none usr/share/lib/zoneinfo/tab/zone_sun.tab 644 root bin
 d none usr/share/src 755 root sys
 s none usr/spool=../var/spool
 s none usr/src=./share/src
 s none usr/tmp=../var/tmp
-f none usr/sbin/installboot 555 root sys
 d none usr/xpg4 755 root bin
 d none usr/xpg4/bin 755 root bin
 f none usr/xpg4/bin/sh 555 root bin

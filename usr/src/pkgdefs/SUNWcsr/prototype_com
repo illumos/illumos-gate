@@ -508,7 +508,6 @@ f manifest var/svc/manifest/system/svc/restarter.xml 0444 root sys
 d none var/svc/profile 755 root sys
 f none var/svc/profile/generic_open.xml 0444 root sys
 f none var/svc/profile/generic_limited_net.xml 0444 root sys
-s none var/svc/profile/generic.xml=./generic_open.xml
 f none var/svc/profile/inetd_generic.xml 0444 root sys
 f none var/svc/profile/inetd_upgrade.xml 0444 root sys
 f none var/svc/profile/ns_files.xml 0444 root sys

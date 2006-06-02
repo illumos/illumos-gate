@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Copyright 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * All rights reserved.
  *
@@ -255,7 +256,7 @@ static int ismyaddr(struct netbuf *nbp);
 static void getnets(void);
 static int addnet(struct netconfig *ncp, struct netbuf *nbp);
 static void bindnet(void);
-static int logforward(struct filed *f, char *ebuf);
+static int logforward(struct filed *f, char *ebuf, size_t elen);
 static int amiloghost(void);
 static int same_addr(struct netbuf *, struct netbuf *);
 static void prepare_sys_poll(void);
@@ -290,7 +291,7 @@ static size_t copynl_frwd(char *, const size_t, const char *, const size_t);
 static size_t copy_frwd(char *, const size_t, const char *, const size_t);
 static void logerror_format(const char *, char *, va_list);
 static int logerror_to_console(int, const char *);
-static void defaults(void);
+static void properties(void);
 static void shutdown_input(void);
 static void *hostname_lookup(void *);
 static void reconfigure(void);
