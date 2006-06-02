@@ -783,6 +783,8 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
+		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT)
+			dmu_tx_wait(tx);
 		dmu_tx_abort(tx);
 		return (error);
 	}
@@ -858,7 +860,7 @@ top:
 	zfs_dirent_unlock(dl);
 
 	if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-		txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+		/* NB: we already did dmu_tx_wait() if necessary */
 		goto top;
 	}
 

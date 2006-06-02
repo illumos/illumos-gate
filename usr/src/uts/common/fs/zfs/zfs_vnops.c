@@ -108,7 +108,7 @@
  *	forever, because the previous txg can't quiesce until B's tx commits.
  *
  *	If dmu_tx_assign() returns ERESTART and zfsvfs->z_assign is TXG_NOWAIT,
- *	then drop all locks, call txg_wait_open(), and try again.
+ *	then drop all locks, call dmu_tx_wait(), and try again.
  *
  *  (5)	If the operation succeeded, generate the intent log entry for it
  *	before dropping locks.  This ensures that the ordering of events
@@ -130,14 +130,15 @@
  *	dmu_tx_hold_*();		// hold each object you might modify
  *	error = dmu_tx_assign(tx, zfsvfs->z_assign);	// try to assign
  *	if (error) {
- *		dmu_tx_abort(tx);	// abort DMU tx
  *		rw_exit(...);		// drop locks
  *		zfs_dirent_unlock(dl);	// unlock directory entry
  *		VN_RELE(...);		// release held vnodes
  *		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
- *			txg_wait_open(dmu_objset_pool(os), 0);
+ *			dmu_tx_wait(tx);
+ *			dmu_tx_abort(tx);
  *			goto top;
  *		}
+ *		dmu_tx_abort(tx);	// abort DMU tx
  *		ZFS_EXIT(zfsvfs);	// finished in zfs
  *		return (error);		// really out of space
  *	}
@@ -668,11 +669,12 @@ top:
 	dmu_tx_hold_write(tx, zp->z_id, woff, MIN(n, max_blksz));
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		goto no_tx_done;
 	}
 
@@ -776,12 +778,13 @@ top:
 		dmu_tx_hold_write(tx, zp->z_id, woff, MIN(n, max_blksz));
 		error = dmu_tx_assign(tx, zfsvfs->z_assign);
 		if (error) {
-			dmu_tx_abort(tx);
 			if (error == ERESTART &&
 			    zfsvfs->z_assign == TXG_NOWAIT) {
-				txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+				dmu_tx_wait(tx);
+				dmu_tx_abort(tx);
 				goto top;
 			}
+			dmu_tx_abort(tx);
 			goto no_tx_done;
 		}
 	}
@@ -1109,13 +1112,14 @@ top:
 			    0, SPA_MAXBLOCKSIZE);
 		error = dmu_tx_assign(tx, zfsvfs->z_assign);
 		if (error) {
-			dmu_tx_abort(tx);
 			zfs_dirent_unlock(dl);
 			if (error == ERESTART &&
 			    zfsvfs->z_assign == TXG_NOWAIT) {
-				txg_wait_open(dmu_objset_pool(os), 0);
+				dmu_tx_wait(tx);
+				dmu_tx_abort(tx);
 				goto top;
 			}
+			dmu_tx_abort(tx);
 			ZFS_EXIT(zfsvfs);
 			return (error);
 		}
@@ -1162,8 +1166,8 @@ top:
 			error = zfs_freesp(zp, 0, 0, mode, TRUE);
 			if (error == ERESTART &&
 			    zfsvfs->z_assign == TXG_NOWAIT) {
+				/* NB: we already did dmu_tx_wait() */
 				zfs_dirent_unlock(dl);
-				txg_wait_open(dmu_objset_pool(os), 0);
 				goto top;
 			}
 		}
@@ -1296,13 +1300,14 @@ top:
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		zfs_dirent_unlock(dl);
 		VN_RELE(vp);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -1437,12 +1442,13 @@ top:
 		    0, SPA_MAXBLOCKSIZE);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		zfs_dirent_unlock(dl);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -1542,14 +1548,15 @@ top:
 	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		rw_exit(&zp->z_parent_lock);
 		zfs_dirent_unlock(dl);
 		VN_RELE(vp);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -1962,9 +1969,8 @@ top:
 		 * should be addressed in openat().
 		 */
 		do {
-			if (err == ERESTART)
-				txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 			err = zfs_freesp(zp, vap->va_size, 0, 0, FALSE);
+			/* NB: we already did dmu_tx_wait() if necessary */
 		} while (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT);
 		if (err) {
 			ZFS_EXIT(zfsvfs);
@@ -2088,11 +2094,12 @@ top:
 	if (err) {
 		if (attrzp)
 			VN_RELE(ZTOV(attrzp));
-		dmu_tx_abort(tx);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (err);
 	}
@@ -2411,7 +2418,6 @@ top:
 	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		if (zl != NULL)
 			zfs_rename_unlock(&zl);
 		zfs_dirent_unlock(sdl);
@@ -2420,9 +2426,11 @@ top:
 		if (tzp)
 			VN_RELE(ZTOV(tzp));
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -2516,12 +2524,13 @@ top:
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, SPA_MAXBLOCKSIZE);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		zfs_dirent_unlock(dl);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -2715,12 +2724,13 @@ top:
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, name);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
 		zfs_dirent_unlock(dl);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -2785,12 +2795,13 @@ top:
 	dmu_tx_hold_bonus(tx, zp->z_id);
 	err = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (err != 0) {
-		dmu_tx_abort(tx);
 		zfs_range_unlock(zp, rl);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		goto out;
 	}
 
@@ -3412,9 +3423,8 @@ top:
 	len = bfp->l_len; /* 0 means from off to end of file */
 
 	do {
-		if (error == ERESTART)
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
 		error = zfs_freesp(zp, off, len, flag, TRUE);
+		/* NB: we already did dmu_tx_wait() if necessary */
 	} while (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT);
 
 	ZFS_EXIT(zfsvfs);

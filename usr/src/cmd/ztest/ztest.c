@@ -1963,12 +1963,13 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 		txg_how = ztest_random(2) == 0 ? TXG_WAIT : TXG_NOWAIT;
 		error = dmu_tx_assign(tx, txg_how);
 		if (error) {
-			dmu_tx_abort(tx);
 			if (error == ERESTART) {
 				ASSERT(txg_how == TXG_NOWAIT);
-				txg_wait_open(dmu_objset_pool(os), 0);
+				dmu_tx_wait(tx);
+				dmu_tx_abort(tx);
 				continue;
 			}
+			dmu_tx_abort(tx);
 			ztest_record_enospc("dmu write parallel");
 			return;
 		}

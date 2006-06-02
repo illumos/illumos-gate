@@ -1192,15 +1192,15 @@ top:
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		dmu_tx_abort(tx);
-
 		mutex_exit(&zp->z_acl_lock);
 		mutex_exit(&zp->z_lock);
 
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(zfsvfs->z_os), 0);
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
 			goto top;
 		}
+		dmu_tx_abort(tx);
 		return (error);
 	}
 

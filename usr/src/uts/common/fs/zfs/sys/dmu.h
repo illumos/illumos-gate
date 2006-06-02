@@ -400,6 +400,7 @@ void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name);
 void dmu_tx_hold_bonus(dmu_tx_t *tx, uint64_t object);
 void dmu_tx_abort(dmu_tx_t *tx);
 int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
+void dmu_tx_wait(dmu_tx_t *tx);
 void dmu_tx_commit(dmu_tx_t *tx);
 
 /*

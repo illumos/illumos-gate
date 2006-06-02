@@ -239,16 +239,11 @@ zvol_replay_write(zvol_state_t *zv, lr_write_t *lr, boolean_t byteswap)
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
-restart:
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, off, len);
 	error = dmu_tx_assign(tx, zv->zv_txg_assign);
 	if (error) {
 		dmu_tx_abort(tx);
-		if (error == ERESTART && zv->zv_txg_assign == TXG_NOWAIT) {
-			txg_wait_open(dmu_objset_pool(os), 0);
-			goto restart;
-		}
 	} else {
 		dmu_write(os, ZVOL_OBJ, off, len, data, tx);
 		dmu_tx_commit(tx);

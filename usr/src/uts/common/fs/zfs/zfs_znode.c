@@ -993,6 +993,8 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
+		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT)
+			dmu_tx_wait(tx);
 		dmu_tx_abort(tx);
 		zfs_range_unlock(zp, rl);
 		return (error);

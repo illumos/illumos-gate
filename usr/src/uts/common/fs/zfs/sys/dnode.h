@@ -167,7 +167,6 @@ typedef struct dnode {
 	uint64_t dn_allocated_txg;
 	uint64_t dn_free_txg;
 	uint64_t dn_assigned_txg;
-	struct dmu_tx *dn_assigned_tx;		/* if only one tx cares */
 	kcondvar_t dn_notxholds;
 	enum dnode_dirtycontext dn_dirtyctx;
 	uint8_t *dn_dirtyctx_firstset;		/* dbg: contents meaningless */

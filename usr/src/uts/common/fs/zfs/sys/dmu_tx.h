@@ -38,6 +38,7 @@ extern "C" {
 #endif
 
 struct dmu_buf_impl;
+struct dmu_tx_hold;
 struct dnode_link;
 struct dsl_pool;
 struct dnode;
@@ -54,18 +55,18 @@ struct dmu_tx {
 	struct dsl_pool *tx_pool;
 	uint64_t tx_txg;
 	uint64_t tx_lastsnap_txg;
+	uint64_t tx_lasttried_txg;
 	txg_handle_t tx_txgh;
-	uint64_t tx_space_towrite;
-	refcount_t tx_space_written;
-	uint64_t tx_space_tofree;
-	refcount_t tx_space_freed;
-	uint64_t tx_space_tooverwrite;
 	void *tx_tempreserve_cookie;
+	struct dmu_tx_hold *tx_needassign_txh;
 	uint8_t tx_anyobj;
 	int tx_err;
 #ifdef ZFS_DEBUG
-	char *tx_debug_buf;
-	int tx_debug_len;
+	uint64_t tx_space_towrite;
+	uint64_t tx_space_tofree;
+	uint64_t tx_space_tooverwrite;
+	refcount_t tx_space_written;
+	refcount_t tx_space_freed;
 #endif
 };
 
@@ -80,12 +81,17 @@ enum dmu_tx_hold_type {
 };
 
 typedef struct dmu_tx_hold {
-	list_node_t dth_node;
-	struct dnode *dth_dnode;
-	enum dmu_tx_hold_type dth_type;
-	uint64_t dth_arg1;
-	uint64_t dth_arg2;
-	/* XXX track what the actual estimates were for this hold */
+	dmu_tx_t *txh_tx;
+	list_node_t txh_node;
+	struct dnode *txh_dnode;
+	uint64_t txh_space_towrite;
+	uint64_t txh_space_tofree;
+	uint64_t txh_space_tooverwrite;
+#ifdef ZFS_DEBUG
+	enum dmu_tx_hold_type txh_type;
+	uint64_t txh_arg1;
+	uint64_t txh_arg2;
+#endif
 } dmu_tx_hold_t;
 
 
@@ -97,6 +103,7 @@ int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
 void dmu_tx_commit(dmu_tx_t *tx);
 void dmu_tx_abort(dmu_tx_t *tx);
 uint64_t dmu_tx_get_txg(dmu_tx_t *tx);
+void dmu_tx_wait(dmu_tx_t *tx);
 
 /*
  * These routines are defined in dmu_spa.h, and are called by the SPA.
@@ -116,33 +123,9 @@ int dmu_tx_holds(dmu_tx_t *tx, uint64_t object);
 void dmu_tx_hold_space(dmu_tx_t *tx, uint64_t space);
 
 #ifdef ZFS_DEBUG
-
-extern int dmu_use_tx_debug_bufs;
-
-#define	dprintf_tx(tx, fmt, ...) \
-	if (dmu_use_tx_debug_bufs) \
-	do { \
-	char *__bufp; \
-	int __len; \
-	if (tx->tx_debug_buf == NULL) { \
-		__bufp = kmem_zalloc(4096, KM_SLEEP); \
-		tx->tx_debug_buf = __bufp; \
-		tx->tx_debug_len = __len = 4096; \
-	} else { \
-		__len = tx->tx_debug_len; \
-		__bufp = &tx->tx_debug_buf[4096-__len]; \
-	} \
-	tx->tx_debug_len -= snprintf(__bufp, __len, fmt, __VA_ARGS__); \
-_NOTE(CONSTCOND) } while (0); \
-	else dprintf(fmt, __VA_ARGS__)
-
 #define	DMU_TX_DIRTY_BUF(tx, db)	dmu_tx_dirty_buf(tx, db)
-
 #else
-
-#define	dprintf_tx(tx, fmt, ...)
 #define	DMU_TX_DIRTY_BUF(tx, db)
-
 #endif
 
 #ifdef	__cplusplus
