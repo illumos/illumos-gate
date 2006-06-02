@@ -97,7 +97,7 @@ cpu_blacklist(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru)
 	return (0);
 }
 
-static int
+int
 cpu_offline(fmd_hdl_t *hdl, uint_t cpuid, int cpustate)
 {
 	int i;

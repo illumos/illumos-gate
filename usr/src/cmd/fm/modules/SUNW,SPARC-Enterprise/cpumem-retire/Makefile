@@ -24,6 +24,34 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = event-transport cpumem-retire
+PLATFORMS = SUNW,SPARC-Enterprise
+CLASS = plat
+MODULE = cpumem-retire
 
-include ../../Makefile.subdirs
+CPUMEM_RETIRE_COMMON = ../../common/$(MODULE)
+
+INCDIRS += .
+INCDIRS += $(CPUMEM_RETIRE_COMMON)
+
+SRCS = \
+        cma_cpu.c \
+        cma_cpu_hc.c \
+        cma_main.c \
+        cma_page.c
+
+include ../../Makefile.plugin
+
+CMA_VERSION = "1.1"
+
+
+LIBDIRS = $(ROOT)/usr/platform/$(PLATFORMS)/lib
+CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
+LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt
+
+%.o: $(CPUMEM_RETIRE_COMMON)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(CPUMEM_RETIRE_COMMON)/%.c
+	$(LINT.c) -c $<

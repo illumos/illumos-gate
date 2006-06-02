@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -63,6 +62,8 @@
 #include <fmd_dr.h>
 #include <fmd_xprt.h>
 #include <fmd_ctl.h>
+#include <sys/openpromio.h>
+#include <libdevinfo.h>
 
 #include <fmd.h>
 
@@ -328,6 +329,10 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	smbios_info_t s2;
 	id_t id;
 
+	di_prom_handle_t promh = DI_PROM_HANDLE_NIL;
+	di_node_t rooth = DI_NODE_NIL;
+	char *bufp;
+
 	(void) sysinfo(SI_PLATFORM, _fmd_plat, sizeof (_fmd_plat));
 	(void) sysinfo(SI_ARCHITECTURE, _fmd_isa, sizeof (_fmd_isa));
 	(void) uname(&_fmd_uts);
@@ -339,7 +344,18 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 			(void) strlcpy(_fmd_csn, s2.smbi_serial, MAXNAMELEN);
 		}
 		smbios_close(shp);
+	} else if ((rooth = di_init("/", DINFOCPYALL)) != DI_NODE_NIL &&
+	    (promh = di_prom_init()) != DI_PROM_HANDLE_NIL) {
+		if (di_prom_prop_lookup_bytes(promh, rooth, "chassis-sn",
+		    (unsigned char **)&bufp) != -1) {
+			(void) strlcpy(_fmd_csn, bufp, MAXNAMELEN);
+		}
 	}
+
+	if (promh != DI_PROM_HANDLE_NIL)
+		di_prom_fini(promh);
+	if (rooth != DI_NODE_NIL)
+		di_fini(rooth);
 
 	bzero(dp, sizeof (fmd_t));
 
