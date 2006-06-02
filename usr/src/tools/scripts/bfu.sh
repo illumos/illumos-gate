@@ -906,6 +906,7 @@ smf_obsolete_rc_files="
 	etc/rc0.d/K01zones
 	etc/rc0.d/K03sshd
 	etc/rc0.d/K05volmgt
+	etc/rc0.d/K07snmpdx
 	etc/rc0.d/K10rcapd
 	etc/rc0.d/K21dhcp
 	etc/rc0.d/K28kdc
@@ -938,6 +939,7 @@ smf_obsolete_rc_files="
 	etc/rc1.d/K01zones
 	etc/rc1.d/K03sshd
 	etc/rc1.d/K05volmgt
+	etc/rc1.d/K07snmpdx
 	etc/rc1.d/K10rcapd
 	etc/rc1.d/K21dhcp
 	etc/rc1.d/K28kdc
@@ -966,6 +968,7 @@ smf_obsolete_rc_files="
 	etc/rc2.d/K01zones
 	etc/rc2.d/K03sshd
 	etc/rc2.d/K05volmgt
+	etc/rc2.d/K07snmpdx
 	etc/rc2.d/K21dhcp
 	etc/rc2.d/K28kdc
 	etc/rc2.d/K28kdc.master
@@ -1004,12 +1007,14 @@ smf_obsolete_rc_files="
 	etc/rc3.d/S14kdc
 	etc/rc3.d/S15nfs.server
 	etc/rc3.d/S34dhcp
+	etc/rc3.d/S76snmpdx
 	etc/rc3.d/S81volmgt
 	etc/rc3.d/S89sshd
 	etc/rc3.d/S99zones
 	etc/rcS.d/K01zones
 	etc/rcS.d/K03sshd
 	etc/rcS.d/K05volmgt
+	etc/rcS.d/K07snmpdx
 	etc/rcS.d/K10rcapd
 	etc/rcS.d/K21dhcp
 	etc/rcS.d/K28kdc

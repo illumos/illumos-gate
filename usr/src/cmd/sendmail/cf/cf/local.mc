@@ -34,11 +34,11 @@ VERSIONID(`%W% (Sun) %G%')
 OSTYPE(`solaris8')dnl
 DOMAIN(`solaris-generic')dnl
 define(`confFALLBACK_SMARTHOST', `mailhost$?m.$m$.')dnl
-MAILER(`local')dnl
-MAILER(`smtp')dnl
 FEATURE(`no_default_msa')dnl
 DAEMON_OPTIONS(`NAME=NoMTA4, Family=inet, Addr=127.0.0.1')dnl
 DAEMON_OPTIONS(`Name=MSA4,   Family=inet, Addr=127.0.0.1, Port=587, M=E')dnl
+MAILER(`local')dnl
+MAILER(`smtp')dnl
 
 LOCAL_NET_CONFIG
 R$* < @ $* .$m. > $*	$#esmtp $@ $2.$m $: $1 < @ $2.$m. > $3
