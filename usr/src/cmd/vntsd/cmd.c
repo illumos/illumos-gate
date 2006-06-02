@@ -41,12 +41,12 @@
  * HT
  *
  * Vntsd special commands are:
- *  send break		(~#)
- *  exit		(~.)
- *  force write access	(~w)
- *  cycle console down	(~n)
- *  cycle console up	(~p)
- *  help		(~?)
+ *  Send break		(~#)
+ *  Exit		(~.)
+ *  Force write access	(~w)
+ *  Console next	(~n)
+ *  Console previous	(~p)
+ *  Help		(~?)
  */
 
 #include <stdio.h>
@@ -200,22 +200,22 @@ static int daemon_cmd_help(vntsd_client_t *clientp);
 static esctable_t  etable[] = {
 
 	/* send a break to vcc */
-	{'#', "send break",  genbrk},
+	{'#', "Send break",  genbrk},
 
 	/* exit */
-	{'.', "exit from this console",  (e_func_t)client_exit},
+	{'.', "Exit from this console",  (e_func_t)client_exit},
 
 	/* acquire write access */
-	{'w', "force write access", acquire_write},
+	{'w', "Force write access", acquire_write},
 
 	/* connect to next console in queue */
-	{'n', "console down", (e_func_t)console_forward},
+	{'n', "Console next", (e_func_t)console_forward},
 
 	/* connect to previous console in queue */
-	{'p', "console up", (e_func_t)console_backward},
+	{'p', "Console previous", (e_func_t)console_backward},
 
 	/* help must be next to last */
-	{'?', "_", daemon_cmd_help},
+	{'?', "Help", daemon_cmd_help},
 
 	/* table terminator */
 	{0, 0, 0}

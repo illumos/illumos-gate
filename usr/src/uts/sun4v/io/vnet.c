@@ -122,7 +122,7 @@ static struct ether_addr etherbroadcastaddr = {
 /*
  * This is the string displayed by modinfo(1m).
  */
-static char vnet_ident[] = "vnet driver v1.0";
+static char vnet_ident[] = "vnet driver v%I%";
 extern struct mod_ops mod_driverops;
 static struct cb_ops cb_vnetops = {
 	nulldev,		/* cb_open */
@@ -545,12 +545,9 @@ vnet_m_unicst(void *arg, const uint8_t *macaddr)
 	/*
 	 * XXX: setting mac address dynamically is not supported.
 	 */
-#if 0
-	bcopy(macaddr, vnetp->curr_macaddr, ETHERADDRL);
-#endif
 	DBG1((vnetp, "vnet_m_unicst: exit\n"));
 
-	return (VNET_SUCCESS);
+	return (VNET_FAILURE);
 }
 
 /* enable/disable a multicast address */

@@ -252,8 +252,8 @@ static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 0} };
 /* Tunables */
 uint32_t vgen_hwd_interval = 1000;	/* handshake watchdog freq in msec */
 uint32_t vgen_max_hretries = 1;		/* max # of handshake retries */
-
 uint32_t vgen_ldcwr_retries = 10;	/* max # of ldc_write() retries */
+uint32_t vgen_ldcup_retries = 5;	/* max # of ldc_up() retries */
 
 #ifdef DEBUG
 /* flags to simulate error conditions for debugging */
@@ -553,17 +553,11 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 {
 	void		*vnetp;
 	size_t		size;
-	uint64_t	datalen;
-	uchar_t		*rptr;
-	mblk_t 		*bp = NULL;
 	int		rv;
 	uint32_t	i;
 	uint32_t	start;
 	uint32_t	end;
 	int		txpending = 0;
-	int		ci;
-	uint32_t	ncookies;
-	uint64_t	nc;
 	vgen_private_desc_t	*tbufp;
 	vgen_private_desc_t	*ntbufp;
 	vnet_public_desc_t	*txdp;
@@ -574,65 +568,36 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	boolean_t	is_mcast = B_FALSE;
 	boolean_t	reclaim = B_FALSE;
 	boolean_t	need_intr = B_FALSE;
-	boolean_t	err = B_FALSE;
 
 	vnetp = LDC_TO_VNET(ldcp);
 	statsp = ldcp->statsp;
-	DBG1((vnetp, "vgen_ldcsend: enter ldcid(%lx)\n", ldcp->ldc_id));
-
-	/* drop the packet if handshake is not done or ldc is not up */
-	if ((ldcp->hphase != VH_DONE) || (ldcp->ldc_status != LDC_UP)) {
-		DWARN((vnetp,
-		    "vgen_ldcsend: id(%lx) status(%d), dropping packet\n",
-		    ldcp->ldc_id, ldcp->ldc_status));
-		freemsg(mp);
-		return (VGEN_TX_SUCCESS);
-	}
-
 	size = msgsize(mp);
-	if (size > (size_t)ETHERMAX) {
-		DWARN((vnetp, "vgen_ldcsend: id(%lx) invalid size(%d)\n",
-		    ldcp->ldc_id, size));
-		freemsg(mp);
-		return (VGEN_TX_SUCCESS);
-	}
-	if ((size < (size_t)ETHERMIN) ||	/* needs padding to ETHERMIN */
-	    (mp->b_cont) ||			/* more than 1 mblk */
-	    ((uintptr_t)mp->b_rptr & 0x7) ||	/* data not 8 byte aligned */
-	    ((mp->b_wptr - mp->b_rptr) & 0x7)) { /* datalen not multiple of 8 */
-		if (size < ETHERMIN)
-			size = ETHERMIN;
-		/*
-		 * The data buffer returned by allocb(9F) is 8byte aligned.
-		 * We allocate extra 8 bytes to ensure size is multiple of
-		 * 8 bytes for ldc_mem_bind_handle().
-		 */
-		bp = allocb(size + 8, BPRI_MED);
-		if (bp == NULL) {
-			/* drop the packet */
-			freemsg(mp);
-			mutex_enter(&ldcp->txlock);
-			statsp->tx_allocb_fail++;
-			mutex_exit(&ldcp->txlock);
-			return (VGEN_TX_SUCCESS);
-		}
-		vgen_copymsg(mp, bp->b_rptr);
-		bp->b_wptr += size;
-		datalen = size;		/* actual data length without pad */
-		size = (datalen + 7) & ~7;
-		bp->b_wptr += (size - datalen);
-	} else { /* size/alignment are ok */
-		datalen = size;
-	}
+
+	DBG1((vnetp, "vgen_ldcsend: enter ldcid(%lx)\n", ldcp->ldc_id));
 
 	mutex_enter(&ldcp->txlock);
 
-	/*  check if the channel is still up & running */
-	if ((ldcp->hphase != VH_DONE) || (ldcp->ldc_status != LDC_UP)) {
+	/* drop the packet if ldc is not up or handshake is not done */
+	if (ldcp->ldc_status != LDC_UP) {
 		DWARN((vnetp,
 		    "vgen_ldcsend: id(%lx) status(%d), dropping packet\n",
 		    ldcp->ldc_id, ldcp->ldc_status));
-		err = B_TRUE;
+		/* retry ldc_up() if needed */
+		if (ldcp->flags & CHANNEL_STARTED)
+			(void) ldc_up(ldcp->ldc_handle);
+		goto vgen_tx_exit;
+	}
+
+	if (ldcp->hphase != VH_DONE) {
+		DWARN((vnetp,
+		    "vgen_ldcsend: id(%lx) hphase(%x), dropping packet\n",
+		    ldcp->ldc_id, ldcp->hphase));
+		goto vgen_tx_exit;
+	}
+
+	if (size > (size_t)ETHERMAX) {
+		DWARN((vnetp, "vgen_ldcsend: id(%lx) invalid size(%d)\n",
+		    ldcp->ldc_id, size));
 		goto vgen_tx_exit;
 	}
 
@@ -651,8 +616,6 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 
 		statsp->tx_no_desc++;
 		mutex_exit(&ldcp->txlock);
-		if (bp)
-			freemsg(bp);
 #ifdef VGEN_USE_MAC_TX_UPDATE
 		/*
 		 * This cflag is disabled by default. This can be enabled if we
@@ -671,6 +634,12 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 		return (VGEN_TX_SUCCESS);
 #endif
 	}
+
+	if (size < ETHERMIN)
+		size = ETHERMIN;
+
+	/* copy data into pre-allocated transmit buffer */
+	vgen_copymsg(mp, tbufp->datap);
 
 	txpending = vgen_num_txpending(ldcp);
 	if (txpending >= ldcp->reclaim_hiwat) {
@@ -692,55 +661,12 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 
 	i = tbufp - ldcp->tbufp;
 
-	rptr = bp ? (bp->b_rptr) : (mp->b_rptr);
-	ci = 0;
-	rv = ldc_mem_bind_handle(tbufp->memhandle, (caddr_t)rptr, size,
-		LDC_SHADOW_MAP, LDC_MEM_R, &(tbufp->memcookie[ci]), &ncookies);
-	if (rv != 0) {
-		DWARN((vnetp, "vgen_ldcsend: id(%lx)ldc_mem_bind_handle failed"
-		    " rv(%d) tbufi(%d)\n", ldcp->ldc_id, rv, i));
-		err = B_TRUE;
-		statsp->oerrors++;
-		goto vgen_tx_exit;
-	}
-
-	if ((ncookies < 0) || (ncookies > (uint64_t)MAX_COOKIES)) {
-		DWARN((vnetp,
-		    "vgen_ldcsend: id(%lx)ldc_mem_bind_handle returned"
-		    " invalid cookies (%d)\n", ldcp->ldc_id, ncookies));
-		err = B_TRUE;
-		statsp->oerrors++;
-		(void) ldc_mem_unbind_handle(tbufp->memhandle);
-		goto vgen_tx_exit;
-	}
-
-	if (ncookies > 1) {
-		nc = ncookies - 1;
-		while (nc) {
-			ci++;
-			rv = ldc_mem_nextcookie(tbufp->memhandle,
-			    &(tbufp->memcookie[ci]));
-			if (rv != 0) {
-				DWARN((vnetp,
-				    "vgen_ldcsend: ldc_mem_nextcookie"
-				    " err(%d)\n", rv));
-				err = B_TRUE;
-				statsp->oerrors++;
-				(void) ldc_mem_unbind_handle(tbufp->memhandle);
-				goto vgen_tx_exit;
-			}
-			nc--;
-		}
-	}
-
-	ehp = (struct ether_header *)rptr;
+	ehp = (struct ether_header *)tbufp->datap;
 	is_bcast = IS_BROADCAST(ehp);
 	is_mcast = IS_MULTICAST(ehp);
-	/* save the packet, free when the descr done flag is set */
-	tbufp->mp = (bp ? bp : mp);
+
 	tbufp->flags = VGEN_PRIV_DESC_BUSY;
-	tbufp->datalen = datalen;
-	tbufp->ncookies = ncookies;
+	tbufp->datalen = size;
 	tbufp->seqnum = ldcp->next_txseq;
 
 	/* initialize the corresponding public descriptor (txd) */
@@ -749,10 +675,10 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	hdrp->dstate = VIO_DESC_READY;
 	if (need_intr)
 		hdrp->ack = B_TRUE;
-	txdp->nbytes = datalen;
-	txdp->ncookies = ncookies;
+	txdp->nbytes = size;
+	txdp->ncookies = tbufp->ncookies;
 	bcopy((tbufp->memcookie), (txdp->memcookie),
-	    ncookies * sizeof (ldc_mem_cookie_t));
+		tbufp->ncookies * sizeof (ldc_mem_cookie_t));
 
 	/* send dring datamsg to the peer */
 	start = end = i;
@@ -761,13 +687,11 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 		/* vgen_send_dring_data() error: drop the packet */
 		DWARN((vnetp,
 		    "vgen_ldcsend: vgen_send_dring_data():  failed: "
-		    "id(%lx) rv(%d) len (%d)\n", ldcp->ldc_id, rv, datalen));
-		(void) ldc_mem_unbind_handle(tbufp->memhandle);
+		    "id(%lx) rv(%d) len (%d)\n", ldcp->ldc_id, rv, size));
 		tbufp->flags = VGEN_PRIV_DESC_FREE;	/* free tbuf */
 		hdrp->dstate = VIO_DESC_FREE;	/* free txd */
 		hdrp->ack = B_FALSE;
 		statsp->oerrors++;
-		err = B_TRUE;
 		goto vgen_tx_exit;
 	}
 
@@ -779,7 +703,7 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 
 	/* update stats */
 	statsp->opackets++;
-	statsp->obytes += datalen;
+	statsp->obytes += size;
 	if (is_bcast)
 		statsp->brdcstxmt++;
 	else if (is_mcast)
@@ -793,20 +717,8 @@ vgen_tx_exit:
 	}
 	DBG1((vnetp, "vgen_ldcsend: exit: ldcid (%lx)\n", ldcp->ldc_id));
 
-	if (err) {
-		if (bp)
-			freemsg(bp);
-#ifdef VGEN_USE_MAC_TX_UPDATE
-		return (VGEN_TX_FAILURE);	/* transmit failed */
-#else
-		freemsg(mp);			/* drop the packet */
-		return (VGEN_TX_SUCCESS);
-#endif
-	} else {
-		if (bp)	/* free original pkt, copy is in bp */
-			freemsg(mp);
-		return (VGEN_TX_SUCCESS);
-	}
+	freemsg(mp);
+	return (VGEN_TX_SUCCESS);
 }
 
 /* register resources */
@@ -1869,6 +1781,7 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 			    }
 			init_state;
 	uint32_t	ncookies = 0;
+	uint32_t	retries = 0;
 
 	init_state = ST_init;
 
@@ -1915,12 +1828,17 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 
 	init_state |= ST_dring_bind;
 
-	rv = ldc_up(ldcp->ldc_handle);
-	if (rv != 0) {
-		DBG2((vnetp,
-		    "vgen_ldcinit: ldc_up err id(%lx) rv(%d)\n",
-		    ldcp->ldc_id, rv));
-	}
+	do {
+		rv = ldc_up(ldcp->ldc_handle);
+		if ((rv != 0) && (rv == EWOULDBLOCK)) {
+			DBG2((vnetp,
+			    "vgen_ldcinit: ldc_up err id(%lx) rv(%d)\n",
+			    ldcp->ldc_id, rv));
+			drv_usecwait(VGEN_LDC_UP_DELAY);
+		}
+		if (retries++ >= vgen_ldcup_retries)
+			break;
+	} while (rv == EWOULDBLOCK);
 
 	(void) ldc_status(ldcp->ldc_handle, &istatus);
 	if (istatus != LDC_UP) {
@@ -2021,17 +1939,24 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 	vio_dring_entry_hdr_t		*hdrp;
 	int 			i;
 	int 			rv;
+	caddr_t			datap = NULL;
+	int			ci;
+	uint32_t		ncookies;
 
 	bzero(ldcp->tbufp, sizeof (*tbufp) * (ldcp->num_txds));
 	bzero(ldcp->txdp, sizeof (*txdp) * (ldcp->num_txds));
 
+	datap = kmem_zalloc(ldcp->num_txds * VGEN_TX_DBLK_SZ, KM_SLEEP);
+	ldcp->tx_datap = datap;
+
 	/*
-	 * for each tx buf (priv_desc), allocate a ldc mem_handle which is
+	 * for each private descriptor, allocate a ldc mem_handle which is
 	 * required to map the data during transmit, set the flags
 	 * to free (available for use by transmit routine).
 	 */
 
 	for (i = 0; i < ldcp->num_txds; i++) {
+
 		tbufp = &(ldcp->tbufp[i]);
 		rv = ldc_mem_alloc_handle(ldcp->ldc_handle,
 			&(tbufp->memhandle));
@@ -2039,12 +1964,47 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 			tbufp->memhandle = 0;
 			goto init_tbufs_failed;
 		}
+
+		/*
+		 * bind ldc memhandle to the corresponding transmit buffer.
+		 */
+		ci = ncookies = 0;
+		rv = ldc_mem_bind_handle(tbufp->memhandle,
+		    (caddr_t)datap, VGEN_TX_DBLK_SZ, LDC_SHADOW_MAP,
+		    LDC_MEM_R, &(tbufp->memcookie[ci]), &ncookies);
+		if (rv != 0) {
+			goto init_tbufs_failed;
+		}
+
+		/*
+		 * successful in binding the handle to tx data buffer.
+		 * set datap in the private descr to this buffer.
+		 */
+		tbufp->datap = datap;
+
+		if ((ncookies == 0) ||
+			(ncookies > (uint64_t)MAX_COOKIES)) {
+			goto init_tbufs_failed;
+		}
+
+		for (ci = 1; ci < ncookies; ci++) {
+			rv = ldc_mem_nextcookie(tbufp->memhandle,
+				&(tbufp->memcookie[ci]));
+			if (rv != 0) {
+				goto init_tbufs_failed;
+			}
+		}
+
+		tbufp->ncookies = ncookies;
+		datap += VGEN_TX_DBLK_SZ;
+
 		tbufp->flags = VGEN_PRIV_DESC_FREE;
 		txdp = &(ldcp->txdp[i]);
 		hdrp = &txdp->hdr;
 		hdrp->dstate = VIO_DESC_FREE;
 		hdrp->ack = B_FALSE;
 		tbufp->descp = txdp;
+
 	}
 
 	/* reset tbuf walking pointers */
@@ -2078,19 +2038,24 @@ vgen_uninit_tbufs(vgen_ldc_t *ldcp)
 		txdp = tbufp->descp;
 		hdrp = &txdp->hdr;
 
-		if (tbufp->flags != VGEN_PRIV_DESC_FREE) {
+		if (tbufp->datap) { /* if bound to a ldc memhandle */
 			(void) ldc_mem_unbind_handle(tbufp->memhandle);
-			freemsg(tbufp->mp);
-			tbufp->mp = NULL;
-			tbufp->flags = VGEN_PRIV_DESC_FREE;
-			hdrp->dstate = VIO_DESC_FREE;
-			hdrp->ack = B_FALSE;
+			tbufp->datap = NULL;
 		}
+		tbufp->flags = VGEN_PRIV_DESC_FREE;
+		hdrp->dstate = VIO_DESC_FREE;
+		hdrp->ack = B_FALSE;
 		if (tbufp->memhandle) {
 			(void) ldc_mem_free_handle(tbufp->memhandle);
 			tbufp->memhandle = 0;
 		}
 		tbufp->descp = NULL;
+	}
+
+	if (ldcp->tx_datap) {
+		/* prealloc'd tx data buffer */
+		kmem_free(ldcp->tx_datap, ldcp->num_txds * VGEN_TX_DBLK_SZ);
+		ldcp->tx_datap = NULL;
 	}
 
 	bzero(ldcp->tbufp, sizeof (*tbufp) * (ldcp->num_txds));
@@ -2117,9 +2082,6 @@ vgen_clobber_tbufs(vgen_ldc_t *ldcp)
 		hdrp = &txdp->hdr;
 
 		if (tbufp->flags & VGEN_PRIV_DESC_BUSY) {
-			(void) ldc_mem_unbind_handle(tbufp->memhandle);
-			freemsg(tbufp->mp);
-			tbufp->mp = NULL;
 			tbufp->flags = VGEN_PRIV_DESC_FREE;
 #ifdef DEBUG
 			if (hdrp->dstate == VIO_DESC_DONE)
@@ -4344,8 +4306,6 @@ vgen_next_rxi:		if (rxi == end) {
 				tbufp = &(ldcp->tbufp[txi]);
 				txdp = tbufp->descp;
 				hdrp = &txdp->hdr;
-				(void) ldc_mem_unbind_handle(tbufp->memhandle);
-				freemsg(tbufp->mp);
 				tbufp->flags = VGEN_PRIV_DESC_FREE;
 				hdrp->dstate = VIO_DESC_FREE;
 				hdrp->ack = B_FALSE;
@@ -4419,9 +4379,6 @@ vgen_reclaim_dring(vgen_ldc_t *ldcp)
 
 	while ((hdrp->dstate == VIO_DESC_DONE) &&
 	    (tbufp != ldcp->next_tbufp)) {
-		(void) ldc_mem_unbind_handle(tbufp->memhandle);
-		freemsg(tbufp->mp);
-		tbufp->mp = NULL;
 		tbufp->flags = VGEN_PRIV_DESC_FREE;
 		hdrp->dstate = VIO_DESC_FREE;
 		hdrp->ack = B_FALSE;

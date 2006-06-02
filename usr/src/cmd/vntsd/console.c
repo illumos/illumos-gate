@@ -183,7 +183,7 @@ display_help(vntsd_client_t *clientp)
 	 * messages for single character commands. Do not translate the
 	 * character before the --.
 	 */
-	bufp = gettext("h -- this help)");
+	bufp = gettext("h -- this help");
 
 	if ((rv = vntsd_write_line(clientp, bufp)) != VNTSD_SUCCESS) {
 		return (rv);
@@ -207,7 +207,8 @@ display_help(vntsd_client_t *clientp)
 	 * "identifier" and both occurrences should be translated.
 	 */
 
-	bufp = gettext("[c[c ]]{id} -- connect to console of domain {id}");
+	bufp = gettext("c{id}, n{name} -- connect to a console of domain {id}"
+		" or domain {name}");
 
 	if ((rv = vntsd_write_line(clientp, bufp)) != VNTSD_SUCCESS) {
 		return (rv);
@@ -216,12 +217,38 @@ display_help(vntsd_client_t *clientp)
 	return (VNTSD_SUCCESS);
 }
 
+/* cons_by_name() - find a console structure according to  a ldom's name */
+static boolean_t
+cons_by_name(vntsd_cons_t *consp, char *name)
+{
+	if (consp->status & VNTSD_CONS_DELETED) {
+		return (B_FALSE);
+	}
+	return (strcmp(consp->domain_name, name) == 0);
+}
+
+/* name_to_cons_no - convert a ldom's name to its consno */
+static int
+name_to_cons_no(vntsd_group_t *groupp, char *name)
+{
+	vntsd_cons_t *consp;
+
+	consp = (vntsd_cons_t *)vntsd_que_find(groupp->conspq,
+		    (compare_func_t)cons_by_name, name);
+
+	if (consp == NULL) {
+		return (-1);
+	}
+
+	return (consp->cons_no);
+}
+
 /* select a console to connect */
 static int
-select_cons(vntsd_group_t *groupp, int num_cons, vntsd_cons_t **consp,
+select_cons(vntsd_group_t *groupp, vntsd_cons_t **consp,
     vntsd_client_t *clientp, char c)
 {
-	int	    cons_no = -2;
+	int	    cons_no = -1;
 	int	    n;
 	int	    i;
 	char	    buf[VNTSD_LINE_LEN];
@@ -237,24 +264,9 @@ select_cons(vntsd_group_t *groupp, int num_cons, vntsd_cons_t **consp,
 	}
 	(void) mutex_unlock(&groupp->lock);
 
-	if (num_cons == 1) {
-		/* by pass selecting console */
-		*consp = (vntsd_cons_t *)(groupp->conspq->handle);
-		return (VNTSD_SUCCESS);
-	}
 
+	/* c{id} or n{name} */
 
-	if (isdigit(c)) {
-		/* {id} input */
-		cons_no = c - '0';
-	} else if (c == 'c') {
-		/* c{id} or c {id} input */
-		cons_no = -1;
-	} else if (!isspace(c)) {
-		return (VNTSD_ERR_INVALID_INPUT);
-	}
-
-	/* get client selections */
 	n = VNTSD_LINE_LEN;
 
 	if ((rv = vntsd_read_line(clientp, buf, &n)) != VNTSD_SUCCESS) {
@@ -263,25 +275,39 @@ select_cons(vntsd_group_t *groupp, int num_cons, vntsd_cons_t **consp,
 
 	/* parse command */
 	for (i = 0; i < n; i++) {
-		if (cons_no == -1) {
-			/* c{id} */
+		switch (c) {
+
+		case 'c':
+			/* c{id} or c {id} */
+			if (isspace(buf[i])) {
+			    continue;
+			}
+
+			if (!isdigit(buf[i])) {
+				return (VNTSD_ERR_INVALID_INPUT);
+			}
+
 			cons_no = atoi(buf + i);
 			break;
-		}
 
-		if (isspace(buf[i]) && cons_no == -2) {
-			/* skip space */
-			continue;
-		}
+		case 'n':
+			/* n{name) or n {name} */
+			if (isspace(buf[i])) {
+			    continue;
+			}
 
-		if (buf[i] == 'c') {
-			/* c{id} or c {id} */
-			cons_no = -1;
-		} else if (buf[i] == CR) {
+			buf[n-1] = 0;
+			cons_no = name_to_cons_no(groupp, buf+i);
 			break;
-		} else {
+
+		default:
+			/* should never get here */
 			return (VNTSD_ERR_INVALID_INPUT);
+
 		}
+
+		/* got user selection */
+		break;
 	}
 
 	if (cons_no < 0) {
@@ -650,11 +676,11 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 	}
 
 	if (snprintf(prompt, sizeof (prompt),
-		    "%s-vnts-%s: h,l,{id},c{id},c {id},q:",
+		    "%s-vnts-%s: h, l, c{id}, n{name}, q:",
 	    buf, groupp->group_name) >= sizeof (prompt)) {
 		/* long prompt doesn't fit, use short one */
 		(void) snprintf(prompt, sizeof (prompt),
-				"vnts: h,l,{id},c{id},c {id}, q:");
+				"vnts: h, l, c{id}, n{name}, q:");
 	}
 
 
@@ -686,15 +712,31 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 			rv = VNTSD_STATUS_CLIENT_QUIT;
 			break;
 
-		case 'h':
-			rv = display_help(clientp);
+		case ' ':
+
+			if (clientp->cons == NULL) {
+				if (num_cons == 1) {
+					/* by pass selecting console */
+					consp = (vntsd_cons_t *)
+					    (groupp->conspq->handle);
+				} else {
+					continue;
+				}
+
+			} else {
+				consp = clientp->cons;
+			}
+
+			/* connect to console */
+			rv = connect_cons(consp, clientp);
+
 			break;
 
-		default:
+		case 'c':
+		case 'n':
 			/* select console */
 			if (clientp->cons == NULL) {
-				rv = select_cons(groupp, num_cons,
-				    &consp, clientp, cmd);
+				rv = select_cons(groupp, &consp, clientp, cmd);
 				if (rv == VNTSD_ERR_INVALID_INPUT) {
 					rv = display_help(clientp);
 					break;
@@ -711,7 +753,13 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 			    thr_self(), rv);
 			break;
 
+		case 'h':
+		default:
+			rv = display_help(clientp);
+			break;
+
 		}
+
 		/* check error and may  exit */
 		console_chk_status(groupp, clientp, rv);
 	}

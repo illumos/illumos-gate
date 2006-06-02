@@ -69,6 +69,9 @@ extern "C" {
 #define	LDC_TO_VNET(ldcp)  ((ldcp)->portp->vgenp->vnetp)
 #define	LDC_TO_VGEN(ldcp)  ((ldcp)->portp->vgenp)
 
+#define	VGEN_TX_DBLK_SZ		2048	/* tx data buffer size */
+#define	VGEN_LDC_UP_DELAY	100	/* usec delay between ldc_up retries */
+
 /* get the address of next tbuf */
 #define	NEXTTBUF(ldcp, tbufp)	(((tbufp) + 1) == (ldcp)->tbufendp    \
 		? (ldcp)->tbufp : ((tbufp) + 1))
@@ -102,8 +105,7 @@ typedef struct vgen_priv_desc {
 	uint64_t		flags;		/* flag bits */
 	vnet_public_desc_t	*descp;		/* associated public desc */
 	ldc_mem_handle_t	memhandle;	/* mem handle for data */
-	mblk_t			*mp;		/* associated packet */
-	uint64_t		datap;		/* mp->b_rptr */
+	caddr_t			datap;		/* prealloc'd tx data buffer */
 	uint64_t		datalen;	/* total actual datalen */
 	uint64_t		seqnum;		/* sequence number of pkt */
 	uint64_t		ncookies;	/* num ldc_mem_cookies */
@@ -274,6 +276,7 @@ typedef struct vgen_ldc {
 	uint64_t		next_rxseq;	/* next expected recv seqnum */
 	uint32_t		next_rxi;	/* next expected recv index */
 	uint32_t		num_rxds;	/* number of rx descriptors */
+	caddr_t			tx_datap;	/* prealloc'd tx data area */
 
 	/* misc */
 	uint32_t		flags;		/* flags */

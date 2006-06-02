@@ -462,7 +462,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->ldc_state	= 0;
 	vdc->session_id = 0;
 	vdc->block_size = DEV_BSIZE;
-	vdc->max_xfer_sz = VD_MAX_BLOCK_SIZE / DEV_BSIZE;
+	vdc->max_xfer_sz = maxphys / DEV_BSIZE;
 
 	vdc->vtoc = NULL;
 	vdc->cinfo = NULL;
@@ -568,9 +568,6 @@ static int
 vdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int	status;
-
-	PR0("%s[%d]  Entered.  Built %s %s\n", __func__, ddi_get_instance(dip),
-		__DATE__, __TIME__);
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -2021,9 +2018,8 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 	int			idx = 0;	/* Index of DRing entry used */
 	vio_dring_msg_t		dmsg;
 	size_t			msglen = sizeof (dmsg);
-	int			status = 0;
-	int			rv;
 	int			retries = 0;
+	int			rv;
 
 	ASSERT(vdc != NULL);
 	ASSERT(slice < V_NUMPAR);
@@ -2064,7 +2060,6 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		rv = vdc_populate_mem_hdl(vdc, idx, addr, nbytes, operation);
 		break;
 
-	case VD_OP_FLUSH:
 	case VD_OP_GET_VTOC:
 	case VD_OP_SET_VTOC:
 	case VD_OP_GET_DISKGEOM:
@@ -2075,6 +2070,13 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 							operation);
 		}
 		break;
+
+	case VD_OP_FLUSH:
+	case VD_OP_GET_WCE:
+	case VD_OP_SET_WCE:
+		rv = 0;		/* nothing to bind */
+		break;
+
 	default:
 		cmn_err(CE_NOTE, "[%d] Unsupported vDisk operation [%d]\n",
 				vdc->instance, operation);
@@ -2115,13 +2117,13 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			dmsg.seq_num, dep->payload.req_id, dep);
 
 	mutex_enter(&vdc->lock);
-	status = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
+	rv = vdc_send(vdc, (caddr_t)&dmsg, &msglen);
 	mutex_exit(&vdc->lock);
-	PR1("%s[%d]: ldc_write() status=%d\n", __func__, vdc->instance, status);
-	if (status != 0) {
+	PR1("%s[%d]: ldc_write() rv=%d\n", __func__, vdc->instance, rv);
+	if (rv != 0) {
 		mutex_exit(&local_dep->lock);
 		mutex_exit(&vdc->dring_lock);
-		vdc_msg("%s: ldc_write(%d)\n", __func__, status);
+		vdc_msg("%s: ldc_write(%d)\n", __func__, rv);
 		return (EAGAIN);
 	}
 
@@ -2149,21 +2151,21 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		retries = 0;
 		for (;;) {
 			msglen = sizeof (dmsg);
-			status = ldc_read(vdc->ldc_handle, (caddr_t)&dmsg,
+			rv = ldc_read(vdc->ldc_handle, (caddr_t)&dmsg,
 					&msglen);
-			if (status) {
-				status = EINVAL;
+			if (rv) {
+				rv = EINVAL;
 				break;
 			}
 
 			/*
 			 * if there are no packets wait and check again
 			 */
-			if ((status == 0) && (msglen == 0)) {
+			if ((rv == 0) && (msglen == 0)) {
 				if (retries++ > vdc_dump_retries) {
 					PR0("[%d] Giving up waiting, idx %d\n",
 							vdc->instance, idx);
-					status = EAGAIN;
+					rv = EAGAIN;
 					break;
 				}
 
@@ -2191,10 +2193,10 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 			 */
 			switch (dmsg.tag.vio_subtype) {
 			case VIO_SUBTYPE_ACK:
-				status = 0;
+				rv = 0;
 				break;
 			case VIO_SUBTYPE_NACK:
-				status = EAGAIN;
+				rv = EAGAIN;
 				break;
 			default:
 				continue;
@@ -2238,26 +2240,26 @@ vdc_populate_descriptor(vdc_t *vdc, caddr_t addr, size_t nbytes, int operation,
 		mutex_exit(&local_dep->lock);
 		mutex_exit(&vdc->dring_lock);
 
-		return (status);
+		return (rv);
 	}
 
 	/*
 	 * Now watch the DRing entries we modified to get the response
 	 * from vds.
 	 */
-	status = vdc_wait_for_descriptor_update(vdc, idx, dmsg);
-	if (status == ETIMEDOUT) {
+	rv = vdc_wait_for_descriptor_update(vdc, idx, dmsg);
+	if (rv == ETIMEDOUT) {
 		/* debug info when dumping state on vds side */
 		dep->payload.status = ECANCELED;
 	}
 
-	status = vdc_depopulate_descriptor(vdc, idx);
-	PR1("%s[%d] Status=%d\n", __func__, vdc->instance, status);
+	rv = vdc_depopulate_descriptor(vdc, idx);
+	PR1("%s[%d] Status=%d\n", __func__, vdc->instance, rv);
 
 	mutex_exit(&local_dep->lock);
 	mutex_exit(&vdc->dring_lock);
 
-	return (status);
+	return (rv);
 }
 
 /*
@@ -2415,8 +2417,10 @@ static int
 vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 {
 	vd_dring_entry_t *dep = NULL;		/* Dring Entry Pointer */
-	vdc_local_desc_t *ldep = NULL;	/* Local Dring Entry Pointer */
-	int	status = ENXIO;
+	vdc_local_desc_t *ldep = NULL;		/* Local Dring Entry Pointer */
+	int		status = ENXIO;
+	int		operation;
+	int		rv = 0;
 
 	ASSERT(vdc != NULL);
 	ASSERT(idx < VD_DRING_LEN);
@@ -2426,9 +2430,16 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	ASSERT(dep != NULL);
 
 	status = dep->payload.status;
+	operation = dep->payload.operation;
 	VDC_MARK_DRING_ENTRY_FREE(vdc, idx);
 	ldep = &vdc->local_dring[idx];
 	VIO_SET_DESC_STATE(ldep->flags, VIO_DESC_FREE);
+
+	/* the DKIO W$ operations never bind handles so we can return now */
+	if ((operation == VD_OP_FLUSH) ||
+	    (operation == VD_OP_GET_WCE) ||
+	    (operation == VD_OP_SET_WCE))
+		return (status);
 
 	/*
 	 * If the upper layer passed in a misaligned address we copied the
@@ -2445,10 +2456,17 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 		ldep->align_addr = NULL;
 	}
 
-	status = ldc_mem_unbind_handle(ldep->desc_mhdl);
-	if (status != 0) {
+	rv = ldc_mem_unbind_handle(ldep->desc_mhdl);
+	if (rv != 0) {
 		cmn_err(CE_NOTE, "[%d] unbind mem hdl 0x%lx @ idx %d failed:%d",
-				vdc->instance, ldep->desc_mhdl, idx, status);
+				vdc->instance, ldep->desc_mhdl, idx, rv);
+		/*
+		 * The error returned by the vDisk server is more informative
+		 * and thus has a higher priority but if it isn't set we ensure
+		 * that this function returns an error.
+		 */
+		if (status == 0)
+			status = EINVAL;
 	}
 
 	return (status);
@@ -2498,7 +2516,6 @@ vdc_populate_mem_hdl(vdc_t *vdc, uint_t idx, caddr_t addr, size_t nbytes,
 		perm = LDC_MEM_R;
 		break;
 
-	case VD_OP_FLUSH:
 	case VD_OP_GET_VTOC:
 	case VD_OP_SET_VTOC:
 	case VD_OP_GET_DISKGEOM:
@@ -3477,10 +3494,9 @@ vdc_dkio_flush_cb(void *arg)
 	rv = vdc_populate_descriptor(vdc, NULL, 0, VD_OP_FLUSH,
 		dk_arg->mode, SDPART(getminor(dk_arg->dev)));
 	if (rv != 0) {
-		PR0("%s[%d] DKIOCFLUSHWRITECACHE failed : model %x\n",
-			__func__, vdc->instance,
+		PR0("%s[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
+			__func__, vdc->instance, rv,
 			ddi_model_convert_from(dk_arg->mode & FMODELS));
-		return;
 	}
 
 	/*
@@ -3491,7 +3507,7 @@ vdc_dkio_flush_cb(void *arg)
 	    (dkc != NULL) &&
 	    (dkc->dkc_callback != NULL)) {
 		ASSERT(dkc->dkc_cookie != NULL);
-		(*dkc->dkc_callback)(dkc->dkc_cookie, ENOTSUP);
+		(*dkc->dkc_callback)(dkc->dkc_cookie, rv);
 	}
 
 	/* Indicate that one less DKIO write flush is outstanding */
@@ -3499,6 +3515,9 @@ vdc_dkio_flush_cb(void *arg)
 	vdc->dkio_flush_pending--;
 	ASSERT(vdc->dkio_flush_pending >= 0);
 	mutex_exit(&vdc->lock);
+
+	/* free the mem that was allocated when the callback was dispatched */
+	kmem_free(arg, sizeof (vdc_dk_arg_t));
 }
 
 /*
@@ -3647,15 +3666,67 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		}
 
 	case DKIOCGMEDIAINFO:
-		if (vdc->minfo == NULL)
-			return (ENXIO);
+		{
+			if (vdc->minfo == NULL)
+				return (ENXIO);
 
-		rv = ddi_copyout(vdc->minfo, (void *)arg,
-				sizeof (struct dk_minfo), mode);
-		if (rv != 0)
-			return (EFAULT);
+			rv = ddi_copyout(vdc->minfo, (void *)arg,
+					sizeof (struct dk_minfo), mode);
+			if (rv != 0)
+				return (EFAULT);
 
-		return (0);
+			return (0);
+		}
+
+	case DKIOCFLUSHWRITECACHE:
+		{
+			struct dk_callback *dkc = (struct dk_callback *)arg;
+			vdc_dk_arg_t	*dkarg = NULL;
+
+			PR1("[%d] Flush W$: mode %x\n", instance, mode);
+
+			/*
+			 * If the backing device is not a 'real' disk then the
+			 * W$ operation request to the vDisk server will fail
+			 * so we might as well save the cycles and return now.
+			 */
+			if (vdc->vdisk_type != VD_DISK_TYPE_DISK)
+				return (ENOTTY);
+
+			/*
+			 * If arg is NULL, then there is no callback function
+			 * registered and the call operates synchronously; we
+			 * break and continue with the rest of the function and
+			 * wait for vds to return (i.e. after the request to
+			 * vds returns successfully, all writes completed prior
+			 * to the ioctl will have been flushed from the disk
+			 * write cache to persistent media.
+			 *
+			 * If a callback function is registered, we dispatch
+			 * the request on a task queue and return immediately.
+			 * The callback will deal with informing the calling
+			 * thread that the flush request is completed.
+			 */
+			if (dkc == NULL)
+				break;
+
+			dkarg = kmem_zalloc(sizeof (vdc_dk_arg_t), KM_SLEEP);
+
+			dkarg->mode = mode;
+			dkarg->dev = dev;
+			bcopy(dkc, &dkarg->dkc, sizeof (*dkc));
+
+			mutex_enter(&vdc->lock);
+			vdc->dkio_flush_pending++;
+			dkarg->vdc = vdc;
+			mutex_exit(&vdc->lock);
+
+			/* put the request on a task queue */
+			rv = taskq_dispatch(system_taskq, vdc_dkio_flush_cb,
+				(void *)dkarg, DDI_SLEEP);
+
+			return (rv == NULL ? ENOMEM : 0);
+		}
 	}
 
 	/* catch programming error in vdc - should be a VD_OP_XXX ioctl */
@@ -3682,44 +3753,6 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 		return (rv);
-	}
-
-	/*
-	 * handle the special case of DKIOCFLUSHWRITECACHE
-	 */
-	if (cmd == DKIOCFLUSHWRITECACHE) {
-		struct dk_callback *dkc = (struct dk_callback *)arg;
-
-		PR0("%s[%d]: DKIOCFLUSHWRITECACHE\n", __func__, instance);
-
-		/* no mem should have been allocated hence no need to free it */
-		ASSERT(mem_p == NULL);
-
-		/*
-		 * If arg is NULL, we break here and the call operates
-		 * synchronously; waiting for vds to return.
-		 *
-		 * i.e. after the request to vds returns successfully,
-		 * all writes completed prior to the ioctl will have been
-		 * flushed from the disk write cache to persistent media.
-		 */
-		if (dkc != NULL) {
-			vdc_dk_arg_t	arg;
-			arg.mode = mode;
-			arg.dev = dev;
-			bcopy(dkc, &arg.dkc, sizeof (*dkc));
-
-			mutex_enter(&vdc->lock);
-			vdc->dkio_flush_pending++;
-			arg.vdc = vdc;
-			mutex_exit(&vdc->lock);
-
-			/* put the request on a task queue */
-			rv = taskq_dispatch(system_taskq, vdc_dkio_flush_cb,
-				(void *)&arg, DDI_SLEEP);
-
-			return (rv == NULL ? ENOMEM : 0);
-		}
 	}
 
 	/*
@@ -4024,7 +4057,8 @@ vdc_create_fake_geometry(vdc_t *vdc)
 
 	(void) strcpy(vdc->cinfo->dki_cname, VDC_DRIVER_NAME);
 	(void) strcpy(vdc->cinfo->dki_dname, VDC_DRIVER_NAME);
-	vdc->cinfo->dki_maxtransfer = vdc->max_xfer_sz / vdc->block_size;
+	/* max_xfer_sz is #blocks so we don't need to divide by DEV_BSIZE */
+	vdc->cinfo->dki_maxtransfer = vdc->max_xfer_sz;
 	vdc->cinfo->dki_ctype = DKC_SCSI_CCS;
 	vdc->cinfo->dki_flags = DKI_FMTVOL;
 	vdc->cinfo->dki_cnum = 0;

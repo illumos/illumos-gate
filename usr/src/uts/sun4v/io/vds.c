@@ -2251,8 +2251,6 @@ _init(void)
 {
 	int		i, status;
 
-
-	PR0("Built %s %s", __DATE__, __TIME__);
 	if ((status = ddi_soft_state_init(&vds_state, sizeof (vds_t), 1)) != 0)
 		return (status);
 	if ((status = mod_install(&modlinkage)) != 0) {
@@ -2278,8 +2276,6 @@ _fini(void)
 {
 	int	status;
 
-
-	PR0("Entered");
 	if ((status = mod_remove(&modlinkage)) != 0)
 		return (status);
 	ddi_soft_state_fini(&vds_state);
