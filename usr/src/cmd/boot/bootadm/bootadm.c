@@ -130,6 +130,7 @@ typedef struct {
 	char	*subcmd;
 	option_t option;
 	error_t (*handler)();
+	int	unpriv;			/* is this an unprivileged command */
 } subcmd_defn_t;
 
 
@@ -295,20 +296,20 @@ static void sparc_abort(void);
 
 /* Menu related sub commands */
 static subcmd_defn_t menu_subcmds[] = {
-	"set_option",		OPT_OPTIONAL,	set_option,	/* PUB */
-	"list_entry",		OPT_OPTIONAL,	list_entry,	/* PUB */
-	"delete_all_entries",	OPT_ABSENT,	delete_all_entries, /* PVT */
-	"update_entry",		OPT_REQ,	update_entry,	/* menu */
-	"update_temp",		OPT_OPTIONAL,	update_temp,	/* reboot */
-	NULL,			0,		NULL	/* must be last */
+	"set_option",		OPT_OPTIONAL,	set_option, 0,	/* PUB */
+	"list_entry",		OPT_OPTIONAL,	list_entry, 1,	/* PUB */
+	"delete_all_entries",	OPT_ABSENT,	delete_all_entries, 0, /* PVT */
+	"update_entry",		OPT_REQ,	update_entry, 0, /* menu */
+	"update_temp",		OPT_OPTIONAL,	update_temp, 0,	/* reboot */
+	NULL,			0,		NULL, 0	/* must be last */
 };
 
 /* Archive related sub commands */
 static subcmd_defn_t arch_subcmds[] = {
-	"update",		OPT_ABSENT,	update_archive, /* PUB */
-	"update_all",		OPT_ABSENT,	update_all,	/* PVT */
-	"list",			OPT_OPTIONAL,	list_archive,	/* PUB */
-	NULL,			0,		NULL	/* must be last */
+	"update",		OPT_ABSENT,	update_archive, 0, /* PUB */
+	"update_all",		OPT_ABSENT,	update_all, 0,	/* PVT */
+	"list",			OPT_OPTIONAL,	list_archive, 1, /* PUB */
+	NULL,			0,		NULL, 0	/* must be last */
 };
 
 static struct {
@@ -348,12 +349,6 @@ main(int argc, char *argv[])
 		prog++;
 	}
 
-	if (geteuid() != 0) {
-		bam_error(MUST_BE_ROOT);
-		bam_exit(1);
-	}
-
-	bam_lock();
 
 	/*
 	 * Don't depend on caller's umask
@@ -610,6 +605,14 @@ check_subcmd_and_options(
 		return (BAM_ERROR);
 	}
 
+	if (bam_argc != 0 || bam_argv) {
+		if (strcmp(subcmd, "set_option") != 0 || bam_argc != 1) {
+			bam_error(TRAILING_ARGS);
+			usage();
+			return (BAM_ERROR);
+		}
+	}
+
 	if (bam_root == NULL) {
 		bam_root = rootbuf;
 		bam_rootlen = 1;
@@ -625,6 +628,17 @@ check_subcmd_and_options(
 		bam_error(INVALID_SUBCMD, subcmd);
 		return (BAM_ERROR);
 	}
+
+	if (table[i].unpriv == 0 && geteuid() != 0) {
+		bam_error(MUST_BE_ROOT);
+		return (BAM_ERROR);
+	}
+
+	/*
+	 * Currently only privileged commands need a lock
+	 */
+	if (table[i].unpriv == 0)
+		bam_lock();
 
 	/* subcmd verifies that opt is appropriate */
 	if (table[i].option != OPT_OPTIONAL) {

@@ -38,7 +38,7 @@ extern "C" {
 
 #define	DIR_MISS gettext("directory not found: %s\n")
 
-#define	MUST_BE_ROOT gettext("you must be root to run this program\n")
+#define	MUST_BE_ROOT gettext("you must be root to run this command\n")
 
 #define	NOT_GRUB_BOOT gettext("%s: not a GRUB boot OS instance\n")
 
@@ -300,6 +300,8 @@ the failsafe archive unbootable\n")
 #define	MISSING_ROOT_FILE gettext("file missing: %s: %s\n")
 
 #define	BAD_ROOT_FILE gettext("file is invalid: %s\n")
+
+#define	TRAILING_ARGS gettext("invalid trailing arguments\n")
 
 #define	RESTORING_GRUB \
 	gettext("No GRUB installation found. Restoring GRUB from backup\n")
