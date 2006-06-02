@@ -392,6 +392,16 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			return (DDI_SUCCESS);
 		}
 		asy->suspended = B_TRUE;
+
+		/*
+		 * The quad UART ST16C554D, version D2 (made by EXAR) has an
+		 * anomaly of generating spurious interrups when the ICR is
+		 * loaded with zero. The workaround would be to read any of
+		 * status registers/SPR/ICR before such write. This anomaly
+		 * will be fixed in future versions of the chip.
+		 */
+		(void) INB(ICR);
+
 		/* Disable further interrupts */
 		OUTB(ICR, 0);
 		mutex_exit(asy->asy_excl_hi);
@@ -416,7 +426,9 @@ asydetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	 */
 	mutex_enter(asy->asy_excl);
 	mutex_enter(asy->asy_excl_hi);
-	OUTB(ICR, 0); /* disables interrupt */
+	/* disable interrupts, see EXAR bug */
+	(void) INB(ICR);
+	OUTB(ICR, 0);
 	mutex_exit(asy->asy_excl_hi);
 	mutex_exit(asy->asy_excl);
 
@@ -576,7 +588,9 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		}
 	}
 
-	OUTB(ICR, 0); /* disable all interrupts */
+	/* disable interrupts, see EXAR bug */
+	(void) INB(ICR);
+	OUTB(ICR, 0);
 	OUTB(LCR, DLAB); /* select baud rate generator */
 	/* Set the baud rate to 9600 */
 	OUTB(DAT+DLL, (ASY9600*asy->asy_baud_divisor_factor) & 0xff);
@@ -1332,7 +1346,10 @@ asy_program(struct asycom *asy, int mode)
 	c_flag = async->async_ttycommon.t_cflag &
 	    (CLOCAL | CREAD | CSTOPB | CSIZE | PARENB | PARODD | CBAUD |
 	    CBAUDEXT | CIBAUD | CIBAUDEXT);
-	OUTB(ICR, 0);	/* disable interrupts */
+
+	/* disable interrupts, see EXAR bug */
+	(void) INB(ICR);
+	OUTB(ICR, 0);
 
 	ocflags = asy->asy_ocflags;
 
