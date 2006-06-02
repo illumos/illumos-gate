@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -75,18 +74,34 @@ extern struct lut *Dicts;
 extern void literals_init(void);
 extern void literals_fini(void);
 
+struct eftsubr {
+	const char *prefix;
+	void (*hdlr)(fmd_hdl_t *, fmd_event_t *, nvlist_t *, const char *);
+} eftsubrs[] = {
+	{ "ereport.",		fme_receive_external_report },
+	{ "list.repaired",	fme_receive_repair_list },
+	{ NULL,			NULL }
+};
+
 /*ARGSUSED*/
 static void
 eft_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	static char prefix[] = "ereport.";
+	struct eftsubr *sp = eftsubrs;
 
-	if (strncmp(class, prefix, sizeof (prefix) - 1))
+	while (sp->prefix != NULL) {
+		if (strncmp(class, sp->prefix, strlen(sp->prefix)) == 0)
+			break;
+		sp++;
+	}
+
+	if (sp->prefix != NULL) {
+		(sp->hdlr)(hdl, ep, nvl, class);
+	} else {
 		out(O_DIE,
-		    "eft_recv: event class \"%s\" does not begin with %s",
-		    class, prefix);
-
-	fme_receive_external_report(hdl, ep, nvl, class);
+		    "eft_recv: event class \"%s\" does not match our "
+		    "subscriptions", class);
+	}
 }
 
 /*ARGSUSED*/
@@ -263,6 +278,9 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	/* subscribe to events we expect to consume */
 	lut_walk(Ereportenames, (lut_cb)dosubscribe, NULL);
+
+	/* subscribe to repair events so we can clear state on repair */
+	fmd_hdl_subscribe(hdl, "list.repaired");
 
 	/* open dictionaries referenced by all .eft files */
 	lut_walk(Dicts, (lut_cb)doopendict, (void *)0);

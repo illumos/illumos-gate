@@ -64,6 +64,7 @@ extern int Max_fme;
 extern fmd_hdl_t *Hdl;
 
 static int Istat_need_save;
+void istat_save(void);
 
 /* fme under construction is global so we can free it on module abort */
 static struct fme *Nfmep;
@@ -148,6 +149,8 @@ static void save_suspects(struct fme *fmep);
 static void destroy_fme(struct fme *f);
 static void fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     const char *eventstring, const struct ipath *ipp, nvlist_t *nvl);
+static void istat_counter_reset_cb(struct istat_entry *entp,
+    struct stats *statp, const struct ipath *ipp);
 
 static struct fme *
 alloc_fme(void)
@@ -957,6 +960,50 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 	ipp = ipath(epnamenp);
 	tree_free(epnamenp);
 	fme_receive_report(hdl, ffep, stable(eventstring), ipp, nvl);
+}
+
+/*ARGSUSED*/
+void
+fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
+    const char *eventstring)
+{
+	char *uuid;
+	nvlist_t **nva;
+	uint_t nvc;
+	const struct ipath *ipp;
+
+	if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) != 0 ||
+	    nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
+	    &nva, &nvc) != 0) {
+		out(O_ALTFP, "No uuid or fault list for list.repaired event");
+		return;
+	}
+
+	out(O_ALTFP, "Processing list.repaired from case %s", uuid);
+
+	while (nvc-- != 0) {
+		/*
+		 * Reset any istat associated with this path.
+		 */
+		char *path;
+
+		if ((ipp = platform_fault2ipath(*nva++)) == NULL)
+			continue;
+
+		path = ipath2str(NULL, ipp);
+		out(O_ALTFP, "fme_receive_repair_list: resetting state for %s",
+		    path);
+		FREE(path);
+
+		lut_walk(Istats, (lut_cb)istat_counter_reset_cb, (void *)ipp);
+		istat_save();
+
+		/*
+		 * We do not have a list of stat engines in a form that
+		 * we can readily clear any associated serd engines.  When we
+		 * do, this will be the place to clear them.
+		 */
+	}
 }
 
 static int mark_arrows(struct fme *fmep, struct event *ep, int mark,
@@ -1861,6 +1908,24 @@ istat_destructor(void *left, void *right, void *arg)
 	struct stats *statp = (struct stats *)right;
 	FREE(entp);
 	stats_delete(statp);
+}
+
+/*
+ * Callback used in a walk of the Istats to reset matching stat counters.
+ */
+static void
+istat_counter_reset_cb(struct istat_entry *entp, struct stats *statp,
+    const struct ipath *ipp)
+{
+	char *path;
+
+	if (entp->ipath == ipp) {
+		path = ipath2str(entp->ename, ipp);
+		out(O_ALTFP, "istat_counter_reset_cb: resetting %s", path);
+		FREE(path);
+		stats_counter_reset(statp);
+		Istat_need_save = 1;
+	}
 }
 
 void

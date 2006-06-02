@@ -2190,3 +2190,36 @@ platform_payloadprop_values(const char *propstr, int *nvals)
 
 	return (NULL);
 }
+
+/*
+ * When a list.repaired event is seen the following is called for
+ * each fault in the associated fault list to convert the given FMRI
+ * to an instanced path.  Only hc scheme is supported.
+ */
+const struct ipath *
+platform_fault2ipath(nvlist_t *flt)
+{
+	nvlist_t *rsrc;
+	struct node *np;
+	char *scheme;
+
+	if (nvlist_lookup_nvlist(flt, FM_FAULT_RESOURCE, &rsrc) != 0) {
+		out(O_ALTFP, "platform_fault2ipath: no resource member");
+		return (NULL);
+	} else if (nvlist_lookup_string(rsrc, FM_FMRI_SCHEME, &scheme) != 0) {
+		out(O_ALTFP, "platform_fault2ipath: no scheme type for rsrc");
+		return (NULL);
+	}
+
+	if (strncmp(scheme, FM_FMRI_SCHEME_HC,
+	    sizeof (FM_FMRI_SCHEME_HC) - 1) != 0) {
+		out(O_ALTFP, "platform_fault2ipath: returning NULL for non-hc "
+		"scheme %s", scheme);
+		return (NULL);
+	}
+
+	if ((np = hc_fmri_nodeize(rsrc)) == NULL)
+		return (NULL);		/* nodeize will already have whinged */
+
+	return (ipath(np));
+}
