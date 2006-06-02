@@ -161,6 +161,8 @@ uppc_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 static const mdb_dcmd_t dcmds[] = {
 	{ "interrupts", "?[-di]", "print interrupts", uppc_interrupt_dump,
 	    interrupt_help},
+	{ "softint", "?[-d]", "print soft interrupts", soft_interrupt_dump,
+	    soft_interrupt_help},
 	{ NULL }
 };
 

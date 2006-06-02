@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -592,6 +591,37 @@ mdb_cpu2cpuid(uintptr_t cpup)
 		return (-1);
 
 	return (cpu.cpu_id);
+}
+
+int
+mdb_cpuset_find(uintptr_t cpusetp)
+{
+	ulong_t	*cpuset;
+	size_t nr_words = BT_BITOUL(NCPU);
+	size_t sz = nr_words * sizeof (ulong_t);
+	size_t	i;
+	int cpu = -1;
+
+	cpuset = mdb_alloc(sz, UM_SLEEP);
+
+	if (mdb_vread(cpuset, sz, cpusetp) != sz)
+		goto out;
+
+	for (i = 0; i < nr_words; i++) {
+		size_t j;
+		ulong_t m;
+
+		for (j = 0, m = 1; j < BT_NBIPUL; j++, m <<= 1) {
+			if (cpuset[i] & m) {
+				cpu = i * BT_NBIPUL + j;
+				goto out;
+			}
+		}
+	}
+
+out:
+	mdb_free(cpuset, sz);
+	return (cpu);
 }
 
 uintptr_t

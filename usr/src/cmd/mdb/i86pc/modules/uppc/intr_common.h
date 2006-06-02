@@ -45,7 +45,10 @@ extern "C" {
  * Function prototypes
  */
 void	interrupt_help(void);
+void	soft_interrupt_help(void);
 void	interrupt_print_isr(uintptr_t vector, uintptr_t arg1, uintptr_t dip);
+int	soft_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
+	    const mdb_arg_t *argv);
 
 /*
  * ::interrupts usage related defines and variables

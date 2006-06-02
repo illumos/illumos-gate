@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,6 +64,8 @@ extern int mdb_devinfo2driver(uintptr_t, char *, size_t);
 extern int mdb_devinfo2statep(uintptr_t, char *, uintptr_t *);
 
 extern int mdb_cpu2cpuid(uintptr_t);
+
+extern int mdb_cpuset_find(uintptr_t cpusetp);
 
 /*
  * Returns a pointer to the top of the soft state struct for the instance
