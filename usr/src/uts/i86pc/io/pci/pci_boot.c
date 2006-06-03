@@ -53,19 +53,35 @@
 #define	CONFIG_INFO	0
 #define	CONFIG_UPDATE	1
 #define	CONFIG_NEW	2
+#define	CONFIG_FIX	3
 #define	COMPAT_BUFSIZE	512
+
+/* See AMD-8111 Datasheet Rev 3.03, Page 149: */
+#define	LPC_IO_CONTROL_REG_1	0x40
+#define	AMD8111_ENABLENMI	(uint8_t)0x80
+#define	VENID_AMD		0x1022
+#define	DEVID_AMD8111_LPC	0x7468
+
+struct pci_fixundo {
+	uint8_t			bus;
+	uint8_t			dev;
+	uint8_t			fn;
+	void			(*undofn)(uint8_t, uint8_t, uint8_t);
+	struct pci_fixundo	*next;
+};
 
 extern int pci_bios_nbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
 int pci_boot_debug = 0;
 extern struct memlist *find_bus_res(int, int);
+static struct pci_fixundo *undolist = NULL;
 
 /*
  * Module prototypes
  */
 static void enumerate_bus_devs(uchar_t bus, int config_op);
 static void create_root_bus_dip(uchar_t bus);
-static dev_info_t *new_func_pci(uchar_t, uchar_t, uchar_t, uchar_t,
+static dev_info_t *process_devfunc(uchar_t, uchar_t, uchar_t, uchar_t,
     ushort_t, int);
 static void add_compatible(dev_info_t *, ushort_t, ushort_t,
     ushort_t, ushort_t, uchar_t, uint_t, int);
@@ -450,6 +466,8 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 
 	if (config_op == CONFIG_NEW) {
 		dcmn_err(CE_NOTE, "configuring pci bus 0x%x", bus);
+	} else if (config_op == CONFIG_FIX) {
+		dcmn_err(CE_NOTE, "fixing devices on pci bus 0x%x", bus);
 	} else
 		dcmn_err(CE_NOTE, "enumerating pci bus 0x%x", bus);
 
@@ -461,6 +479,7 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 			    dev, func);
 
 			venid = pci_getw(bus, dev, func, PCI_CONF_VENID);
+
 			if ((venid == 0xffff) || (venid == 0)) {
 				/* no function at this address */
 				continue;
@@ -481,14 +500,22 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 				nfunc = 8;
 			}
 
-			if (config_op == CONFIG_INFO) {
+			if (config_op == CONFIG_FIX) {
+				/*
+				 * If we're processing PCI fixes, no dip
+				 * will be returned.
+				 */
+				(void) process_devfunc(bus, dev, func, header,
+				    venid, config_op);
+
+			} else if (config_op == CONFIG_INFO) {
 				/*
 				 * Create the node, unconditionally, on the
 				 * first pass only.  It may still need
 				 * resource assignment, which will be
 				 * done on the second, CONFIG_NEW, pass.
 				 */
-				dip = new_func_pci(bus, dev, func, header,
+				dip = process_devfunc(bus, dev, func, header,
 				    venid, config_op);
 				/*
 				 * If dip isn't null, put on a list to
@@ -523,7 +550,7 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 			kmem_free(entry, sizeof (*entry));
 		}
 		pci_bus_res[bus].privdata = NULL;
-	} else {
+	} else if (config_op != CONFIG_FIX) {
 		pci_bus_res[bus].privdata = devlist;
 	}
 }
@@ -628,8 +655,108 @@ is_display(uint_t classcode)
 	return (0);
 }
 
+static void
+add_undofix_entry(uint8_t bus, uint8_t dev, uint8_t fn,
+    void (*undofn)(uint8_t, uint8_t, uint8_t))
+{
+	struct pci_fixundo *newundo;
+
+	newundo = kmem_alloc(sizeof (struct pci_fixundo), KM_SLEEP);
+
+	/*
+	 * Adding an item to this list means that we must turn its NMIENABLE
+	 * bit back on at a later time.
+	 */
+	newundo->bus = bus;
+	newundo->dev = dev;
+	newundo->fn = fn;
+	newundo->undofn = undofn;
+	newundo->next = undolist;
+
+	/* add to the undo list in LIFO order */
+	undolist = newundo;
+}
+
+void
+add_pci_fixes(void)
+{
+	int i;
+
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		/*
+		 * For each bus, apply needed fixes to the appropriate devices.
+		 * This must be done before the main enumeration loop because
+		 * some fixes must be applied to devices normally encountered
+		 * later in the pci scan (e.g. if a fix to device 7 must be
+		 * applied before scanning device 6, applying fixes in the
+		 * normal enumeration loop would obviously be too late).
+		 */
+		enumerate_bus_devs(i, CONFIG_FIX);
+	}
+}
+
+void
+undo_pci_fixes(void)
+{
+	struct pci_fixundo *nextundo;
+	uint8_t bus, dev, fn;
+
+	/*
+	 * All fixes in the undo list are performed unconditionally.  Future
+	 * fixes may require selective undo.
+	 */
+	while (undolist != NULL) {
+
+		bus = undolist->bus;
+		dev = undolist->dev;
+		fn = undolist->fn;
+
+		(*(undolist->undofn))(bus, dev, fn);
+
+		nextundo = undolist->next;
+		kmem_free(undolist, sizeof (struct pci_fixundo));
+		undolist = nextundo;
+	}
+}
+
+static void
+undo_amd8111_pci_fix(uint8_t bus, uint8_t dev, uint8_t fn)
+{
+	uint8_t val8;
+
+	val8 = pci_getb(bus, dev, fn, LPC_IO_CONTROL_REG_1);
+	/*
+	 * The NMIONERR bit is turned back on to allow the SMM BIOS
+	 * to handle more critical PCI errors (e.g. PERR#).
+	 */
+	val8 |= AMD8111_ENABLENMI;
+	pci_putb(bus, dev, fn, LPC_IO_CONTROL_REG_1, val8);
+}
+
+static void
+pci_fix_amd8111(uint8_t bus, uint8_t dev, uint8_t fn)
+{
+	uint8_t val8;
+
+	val8 = pci_getb(bus, dev, fn, LPC_IO_CONTROL_REG_1);
+
+	if ((val8 & AMD8111_ENABLENMI) == 0)
+		return;
+
+	/*
+	 * We reset NMIONERR in the LPC because master-abort on the PCI
+	 * bridge side of the 8111 will cause NMI, which might cause SMI,
+	 * which sometimes prevents all devices from being enumerated.
+	 */
+	val8 &= ~AMD8111_ENABLENMI;
+
+	pci_putb(bus, dev, fn, LPC_IO_CONTROL_REG_1, val8);
+
+	add_undofix_entry(bus, dev, fn, undo_amd8111_pci_fix);
+}
+
 static dev_info_t *
-new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
+process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
     ushort_t vendorid, int config_op)
 {
 	char nodename[32], unitaddr[5];
@@ -658,6 +785,13 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		subvenid = 0;
 		subdevid = 0;
 		break;
+	}
+
+	if (config_op == CONFIG_FIX) {
+		if (vendorid == VENID_AMD && deviceid == DEVID_AMD8111_LPC) {
+			pci_fix_amd8111(bus, dev, func);
+		}
+		return (NULL);
 	}
 
 	/* XXX should be use generic names? derive from class? */
