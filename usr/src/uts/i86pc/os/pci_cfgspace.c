@@ -110,7 +110,7 @@ pci_check(void)
 	pci_bios_cfg_type = pci_check_bios();
 
 	if (pci_bios_cfg_type == PCI_MECHANISM_NONE)
-		return (FALSE);
+		pci_bios_cfg_type = PCI_MECHANISM_1;	/* default to mech 1 */
 
 	switch (pci_get_cfg_type()) {
 	case PCI_MECHANISM_1:

@@ -1,5 +1,23 @@
+/*  
+ *  GRUB  --  GRand Unified Bootloader
+ *  Copyright (C) 2006 Free Software Foundation, Inc.
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,17 +112,20 @@ ufs_read(char *buf, int len)
 	  	off = blkoff(SUPERBLOCK, filepos);
 		lblk = lblkno(SUPERBLOCK, filepos);
 		size = SUPERBLOCK->fs_bsize;
-		if ((dblk = sbmap(lblk)) == 0)
-		  	break;
 		size -= off;
 		if (size > len)
 		  	size = len;
 
-		disk_read_func = disk_read_hook;
-		ok = devread(fsbtodb(SUPERBLOCK, dblk), off, size, buf);
-		disk_read_func = 0;
-		if (!ok)
-		  	return 0;
+		if ((dblk = sbmap(lblk)) <= 0) {
+			/* we are in a file hole, just zero the buf */
+			grub_memset(buf, 0, size);
+		} else {
+			disk_read_func = disk_read_hook;
+			ok = devread(fsbtodb(SUPERBLOCK, dblk), off, size, buf);
+			disk_read_func = 0;
+			if (!ok)
+		  		return 0;
+		}
 		buf += size;
 		len -= size;
 		filepos += size;
@@ -138,7 +159,11 @@ openi(grub_ino_t inode)
 	return (devread(dblk, off, sizeof (struct icommon), (char *)INODE));
 }
 
-/* performs fileblock mapping. Convert file block no. to disk block no. */
+/*
+ * Performs fileblock mapping. Convert file block no. to disk block no.
+ * Returns 0 when block doesn't exist and <0 when block isn't initialized
+ * (i.e belongs to a hole in the file).
+ */
 grub_daddr32_t
 sbmap(grub_daddr32_t bn)
 {

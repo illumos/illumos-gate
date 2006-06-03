@@ -5835,7 +5835,8 @@ ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
 	 * only log ddi_create_minor_node() calls which occur
 	 * outside the scope of attach(9e)/detach(9e) reconfigurations
 	 */
-	if (!(DEVI_IS_ATTACHING(dip) || DEVI_IS_DETACHING(dip))) {
+	if (!(DEVI_IS_ATTACHING(dip) || DEVI_IS_DETACHING(dip)) &&
+	    mtype != DDM_INTERNAL_PATH) {
 		(void) i_log_devfs_minor_create(dip, name);
 	}
 
@@ -5900,8 +5901,9 @@ ddi_remove_minor_node(dev_info_t *dip, char *name)
 		if ((name == NULL || (dmdp->ddm_name != NULL &&
 		    strcmp(name, dmdp->ddm_name) == 0))) {
 			if (dmdp->ddm_name != NULL) {
-				(void) i_log_devfs_minor_remove(dip,
-				    dmdp->ddm_name);
+				if (dmdp->type != DDM_INTERNAL_PATH)
+					(void) i_log_devfs_minor_remove(dip,
+					    dmdp->ddm_name);
 				kmem_free(dmdp->ddm_name,
 				    strlen(dmdp->ddm_name) + 1);
 			}
