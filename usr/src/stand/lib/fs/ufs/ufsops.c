@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +241,11 @@ find(fileid_t *filep, char *path)
 	return (inode);
 }
 
+/*
+ * Map <file, file logical block> into a file system block number.
+ * Reads indirect blocks as needed to find the block.  Returns zero when
+ * block isn't there; returns negative fsbn when block is uninitialized.
+ */
 static daddr32_t
 sbmap(fileid_t *filep, daddr32_t bn)
 {
@@ -418,7 +422,7 @@ readdir(struct dirinfo *dstuff)
 			lbn = lblkno(&devp->un_fs.di_fs, dstuff->loc);
 			d = sbmap(filep, lbn);
 
-			if (d == 0)
+			if (d <= 0)
 				return (NULL);
 
 			filep->fi_blocknum = fsbtodb(&devp->un_fs.di_fs, d);
@@ -448,8 +452,8 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 {
 	struct fs *fs;
 	caddr_t p;
-	int off, size, diff;
-	daddr32_t lbn;
+	int off, size, diff, zeroize;
+	daddr32_t lbn, fsbn;
 	devid_t	*devp;
 #ifndef	i386
 	static int	pos;
@@ -472,7 +476,16 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 		lbn = lblkno(fs, filep->fi_offset);
 
 		/* which physical block on the device do we read? */
-		filep->fi_blocknum = fsbtodb(fs, sbmap(filep, lbn));
+		fsbn = sbmap(filep, lbn);
+
+		/*
+		 * zero fsbn -> unallocated hole.
+		 * negative fsbn -> allocated but uninitialized.
+		 * since we only read from the fs, treat both the same.
+		 */
+		zeroize = (fsbn <= 0);
+
+		filep->fi_blocknum = fsbtodb(fs, fsbn);
 
 		off = blkoff(fs, filep->fi_offset);
 
@@ -488,7 +501,9 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 		*rcount = 0;
 		if (off == 0 && count >= size) {
 			filep->fi_memp = buf;
-			if (diskread(filep)) {
+			if (zeroize) {
+				bzero(buf, size);
+			} else if (diskread(filep)) {
 				return (-1);
 			}
 			*rcount = size;
@@ -499,9 +514,12 @@ getblock(fileid_t *filep, caddr_t buf, int count, int *rcount)
 				printf("%c\b", ind[pos++ & 3]);
 #endif
 			return (0);
-		} else
-			if (diskread(filep))
+		} else {
+			if (zeroize) {
+				bzero(filep->fi_memp, size);
+			} else if (diskread(filep))
 				return (-1);
+		}
 
 		/*
 		 * round and round she goes (though not on every block..
