@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2983,6 +2982,9 @@ page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
 
 	VM_STAT_ADD(vmm_vmstats.pgcp_alloc[szc]);
 
+	/* no allocations from cage */
+	flags |= PGI_NOCAGE;
+
 	/* LINTED */
 	MTYPE_START(mnode, mtype, flags);
 	if (mtype < 0) {	/* mnode does not have memory in mtype range */
@@ -2991,9 +2993,6 @@ page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
 	}
 
 	ASSERT(szc > 0 || (flags & PGI_PGCPSZC0));
-
-	/* no allocations from cage */
-	flags |= PGI_NOCAGE;
 
 	/* do not limit search and ignore color if hi pri */
 
