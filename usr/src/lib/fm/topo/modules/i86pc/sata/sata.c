@@ -530,6 +530,9 @@ lookup_sdp_by_minor(char *minorpath)
 {
 	int i;
 
+	if (sata_dev_props == NULL)
+		return (NULL);
+
 	for (i = 0; sata_dev_props[i].ap_node != NULL; i++) {
 		if (strcmp(minorpath, sata_dev_props[i].ap_node) == 0)
 			return (&sata_dev_props[i]);
