@@ -52,7 +52,7 @@ DYNALOADER=lib/auto/DynaLoader/DynaLoader.a
 AUTOSPLIT = lib/auto/.tstamp
 
 CLEANFILES = miniperlmain.o perlmain.o opmini.o perlmain.c writemain cflags \
-    ext.libs
+    ext.libs writemain.sh config_h.sh
 
 CLOBBERFILES = $(MINIPERL) $(PROG) $(PERL_CONFIGDEP) libperl.so lib/re.pm \
     lib/ExtUtils/Miniperl.pm  t/perl
@@ -74,22 +74,25 @@ clobber :=	TARGET = clobber
 clean :=	TARGET = clean
 test :=		TARGET = test
 
+%.sh: %.SH
+	$(RM) $@
+	cat $< > $@
+	chmod +x $@
+
 all: perl extensions utilities
 
 #
 # Expand template files that depend on config.sh.
 #
 
-$(PERL_CONFIG_H): config_h.SH config.sh
-	$(CHMOD) 0555 config_h.SH
-	./config_h.SH
+$(PERL_CONFIG_H): config_h.sh config.sh
+	./config_h.sh
 
 perlmain.c: writemain $(PERL_CONFIG_H)
 	./writemain $(DYNALOADER) > perlmain.c
 
-writemain: writemain.SH $(PERL_CONFIG_H)
-	$(CHMOD) 0555 writemain.SH
-	./writemain.SH
+writemain: writemain.sh $(PERL_CONFIG_H)
+	./writemain.sh
 
 #
 # Build the libperl.so and libperl.so.1 shared objects using Makefile.lib,
