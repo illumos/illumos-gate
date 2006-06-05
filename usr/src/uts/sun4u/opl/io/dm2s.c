@@ -690,7 +690,11 @@ dm2s_mbox_init(dm2s_t *dm2sp)
 		    dm2s_event_handler, (void *)dm2sp);
 		DPRINTF(DBG_MBOX, ("dm2s_mbox_init: mb_init ret=%d\n", ret));
 
-		if (ret == 0) {
+		if (ret != 0) {
+			DPRINTF(DBG_MBOX,
+			    ("dm2s_mbox_init: failed ret =%d\n", ret));
+			DTRACE_PROBE1(dm2s_mbox_fail, int, ret);
+		} else {
 			dm2sp->ms_state |= DM2S_MB_INITED;
 
 			/* Block until the mailbox is ready to communicate. */
@@ -706,27 +710,25 @@ dm2s_mbox_init(dm2s_t *dm2sp)
 			}
 		}
 
-		if (ret != 0) {
-
-			DPRINTF(DBG_MBOX,
-			    ("dm2s_mbox_init: failed/interrupted\n"));
-			DTRACE_PROBE1(dm2s_mbox_fail, int, ret);
-			dm2sp->ms_state &= ~DM2S_MB_INITED;
-			(void) scf_mb_fini(dm2sp->ms_target, dm2sp->ms_key);
-
-			/* if interrupted, return immediately. */
-			if (ret == EINTR)
-				return (ret);
-
-		}
-
 		if ((ret != 0) || (dm2sp->ms_state & DM2S_MB_DISC)) {
 
-			DPRINTF(DBG_WARN,
-			    ("dm2s_mbox_init: mbox DISC_ERROR\n"));
-			DTRACE_PROBE1(dm2s_mbox_fail, int, DM2S_MB_DISC);
-			dm2sp->ms_state &= ~DM2S_MB_INITED;
-			(void) scf_mb_fini(dm2sp->ms_target, dm2sp->ms_key);
+			if (dm2sp->ms_state & DM2S_MB_INITED) {
+				(void) scf_mb_fini(dm2sp->ms_target,
+				    dm2sp->ms_key);
+			}
+			if (dm2sp->ms_state & DM2S_MB_DISC) {
+				DPRINTF(DBG_WARN,
+				    ("dm2s_mbox_init: mbox DISC_ERROR\n"));
+				DTRACE_PROBE1(dm2s_mbox_fail,
+				    int, DM2S_MB_DISC);
+			}
+
+			dm2sp->ms_state &= ~(DM2S_MB_INITED | DM2S_MB_DISC |
+			    DM2S_MB_CONN);
+
+			if (ret == EINTR) {
+				return (ret);
+			}
 
 			/*
 			 * If there was failure, then wait for
@@ -1269,6 +1271,7 @@ dm2s_dump_bytes(char *str, uint32_t total_len,
 		str, total_len, digest);
 	DTRACE_PROBE1(dm2s_dump_digest, unsigned char *, bytestr);
 
+	tlen = 0;
 	for (nsg = 0; (nsg < num_sg) && (tlen < total_len); nsg++) {
 		tp = &sgp[nsg];
 		datap = (uint8_t *)tp->msc_dptr;

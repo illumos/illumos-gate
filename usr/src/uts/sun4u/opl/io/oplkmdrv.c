@@ -832,7 +832,11 @@ okm_mbox_init(okms_t *okmsp)
 		    okm_event_handler, (void *)okmsp);
 		DPRINTF(DBG_MBOX, ("okm_mbox_init: mb_init ret=%d\n", ret));
 
-		if (ret == 0) {
+		if (ret != 0) {
+			DPRINTF(DBG_MBOX,
+			    ("okm_mbox_init: failed ret =%d\n", ret));
+			DTRACE_PROBE1(okm_mbox_fail, int, ret);
+		} else {
 			okmsp->km_state |= OKM_MB_INITED;
 
 			/* Block until the mailbox is ready to communicate. */
@@ -848,27 +852,25 @@ okm_mbox_init(okms_t *okmsp)
 			}
 		}
 
-		if (ret != 0) {
-
-			DPRINTF(DBG_MBOX,
-			    ("okm_mbox_init: failed/interrupted\n"));
-			DTRACE_PROBE1(okm_mbox_fail, int, ret);
-			okmsp->km_state &= ~OKM_MB_INITED;
-			(void) scf_mb_fini(okmsp->km_target, okmsp->km_key);
-
-			/* if interrupted, return immediately. */
-			if (ret == EINTR)
-				return (ret);
-
-		}
-
 		if ((ret != 0) || (okmsp->km_state & OKM_MB_DISC)) {
 
-			DPRINTF(DBG_WARN,
-			    ("okm_mbox_init: mbox DISC_ERROR\n"));
-			DTRACE_PROBE1(okm_mbox_fail, int, OKM_MB_DISC);
-			okmsp->km_state &= ~OKM_MB_INITED;
-			(void) scf_mb_fini(okmsp->km_target, okmsp->km_key);
+			if (okmsp->km_state & OKM_MB_INITED) {
+				(void) scf_mb_fini(okmsp->km_target,
+				    okmsp->km_key);
+			}
+			if (okmsp->km_state & OKM_MB_DISC) {
+				DPRINTF(DBG_WARN,
+				    ("okm_mbox_init: mbox DISC_ERROR\n"));
+				DTRACE_PROBE1(okm_mbox_fail,
+				    int, OKM_MB_DISC);
+			}
+
+			okmsp->km_state &= ~(OKM_MB_INITED | OKM_MB_DISC |
+			    OKM_MB_CONN);
+
+			if (ret == EINTR) {
+				return (ret);
+			}
 
 			/*
 			 * If there was failure, then wait for
