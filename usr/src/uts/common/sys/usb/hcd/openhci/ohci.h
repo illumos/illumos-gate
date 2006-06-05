@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,8 +82,11 @@ extern "C" {
 #define	OHCI_DMA_ATTR_MAX_XFER		0x00ffffffull
 #define	OHCI_DMA_ATTR_COUNT_MAX		0x00ffffffull
 #define	OHCI_DMA_ATTR_GRANULAR		1
-#define	OHCI_DMA_ATTR_ALIGNMENT		1
+#define	OHCI_DMA_ATTR_ALIGNMENT		OHCI_4K_ALIGN
 #endif
+
+#define	OHCI_DMA_ATTR_TW_SGLLEN		0x7fffffff	/* not limited */
+#define	OHCI_DMA_ATTR_TD_SGLLEN		2	/* maximum 8K per TD */
 
 /*
  * According to the OHCI spec ED and TD need to be 16 byte aligned.
@@ -356,7 +358,9 @@ typedef	volatile struct ohci_td {
 	uint32_t	hctd_state;		/* TD state */
 	uint32_t	hctd_tw_next_td;	/* Next TD on TW */
 	uint32_t	hctd_ctrl_phase;	/* Control Xfer Phase info */
-	uint8_t		hctd_pad[16];		/* Required padding */
+	uint32_t	hctd_xfer_offs;		/* Starting buffer offset */
+	uint32_t	hctd_xfer_len;		/* Transfer length */
+	uint8_t		hctd_pad[8];		/* Required padding */
 } ohci_td_t;
 
 /*
@@ -446,6 +450,22 @@ typedef	volatile struct ohci_td {
 #define	OHCI_CTRL_DATA_PHASE		2	/* Data phase */
 #define	OHCI_CTRL_STATUS_PHASE		3	/* Status phase */
 
+/*
+ * Structure for Isoc DMA buffer
+ *	One Isoc transfer includes multiple Isoc packets and need to be
+ *	transfered in multiple TDs.
+ *	One DMA buffer is allocated for one Isoc TD which may hold up
+ *	to eight Isoc packets.
+ */
+typedef struct ohci_isoc_buf {
+	caddr_t			buf_addr;	/* Starting buffer address */
+	ddi_dma_cookie_t	cookie;		/* DMA cookie */
+	ddi_dma_handle_t	dma_handle;	/* DMA handle */
+	ddi_acc_handle_t	mem_handle;	/* Memory handle */
+	size_t			length;		/* Buffer length */
+	uint_t			ncookies;	/* DMA cookie count */
+	uint_t			index;		/* Index of the TD */
+} ohci_isoc_buf_t;
 
 #ifdef __cplusplus
 }

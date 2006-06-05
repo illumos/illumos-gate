@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1526,7 +1525,7 @@ ohci_polled_handle_normal_td(
 	ohci_state_t		*ohcip = ohci_polledp->ohci_polled_ohcip;
 	uchar_t			*buf;
 	ohci_trans_wrapper_t	*tw;
-	int			length;
+	size_t			length, residue;
 
 	/* Obtain the transfer wrapper from the TD */
 	tw = (ohci_trans_wrapper_t *)OHCI_LOOKUP_ID((uint32_t)
@@ -1546,8 +1545,9 @@ ohci_polled_handle_normal_td(
 	 */
 	if (Get_TD(td->hctd_cbp)) {
 
-		length = Get_TD(td->hctd_cbp) -
-		    tw->tw_cookie.dmac_address;
+		residue = ohci_get_td_residue(ohcip, td);
+		length = Get_TD(td->hctd_xfer_offs) +
+		    Get_TD(td->hctd_xfer_len) - residue;
 	}
 
 	/* Sync IO buffer */
@@ -1584,6 +1584,9 @@ ohci_polled_insert_td(
 	/* Obtain the transfer wrapper from the TD */
 	tw = (ohci_trans_wrapper_t *)OHCI_LOOKUP_ID(
 	    (uint32_t)Get_TD(td->hctd_trans_wrapper));
+
+	/* Ensure the DMA cookie is valid for reuse */
+	ASSERT((tw->tw_cookie_idx == 0) && (tw->tw_dma_offs == 0));
 
 	/*
 	 * Take this TD off the transfer wrapper's list since
@@ -1630,7 +1633,7 @@ ohci_polled_insert_td(
 	 * add the new dummy to the end.
 	 */
 	ohci_polled_fill_in_td(ohcip, cpu_current_dummy, td,
-	    td_control, tw->tw_cookie.dmac_address, tw->tw_length, tw);
+	    td_control, 0, tw->tw_length, tw);
 
 	/* Insert this td onto the tw */
 	ohci_polled_insert_td_on_tw(ohcip, tw, cpu_current_dummy);
@@ -1655,7 +1658,7 @@ ohci_polled_fill_in_td(
 	ohci_td_t		*td,
 	ohci_td_t		*new_dummy,
 	uint_t			hctd_ctrl,
-	uint32_t		hctd_iommu_cbp,
+	uint32_t		hctd_dma_offs,
 	size_t			hctd_length,
 	ohci_trans_wrapper_t	*tw)
 {
@@ -1668,21 +1671,11 @@ ohci_polled_fill_in_td(
 	/* Update the dummy with control information */
 	Set_TD(td->hctd_ctrl, (hctd_ctrl | HC_TD_CC_NA));
 
-	/* Update the beginning of the buffer */
-	Set_TD(td->hctd_cbp, hctd_iommu_cbp);
+	/* Update the beginning and end of the buffer */
+	ohci_init_td(ohcip, tw, hctd_dma_offs, hctd_length, td);
 
 	/* The current dummy now points to the new dummy */
 	Set_TD(td->hctd_next_td, (ohci_td_cpu_to_iommu(ohcip, new_dummy)));
-
-	/* Fill in the end of the buffer */
-	if (hctd_length == 0) {
-		ASSERT(Get_TD(td->hctd_cbp) == 0);
-		ASSERT(hctd_iommu_cbp == 0);
-		Set_TD(td->hctd_buf_end, 0);
-	} else {
-		Set_TD(td->hctd_buf_end,
-		hctd_iommu_cbp + hctd_length - 1);
-	}
 
 	/* Fill in the wrapper portion of the TD */
 	Set_TD(td->hctd_trans_wrapper, (uint32_t)tw->tw_id);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,8 @@
  *   bulk transfers.
  */
 #include <sys/usb/hcd/openhci/ohcid.h>
+
+#include <sys/disp.h>
 
 /* Pointer to the state structure */
 static void *ohci_statep;
@@ -268,9 +269,9 @@ static int	ohci_insert_isoc_req(ohci_state_t	*ohcip,
 				ohci_pipe_private_t	*pp,
 				ohci_trans_wrapper_t	*tw,
 				uint_t			flags);
-static int	ohci_insert_hc_td(ohci_state_t			*ohcip,
+static int	ohci_insert_hc_td(ohci_state_t		*ohcip,
 				uint_t			hctd_ctrl,
-				uint32_t		hctd_iommu_cbp,
+				uint32_t		hctd_dma_offs,
 				size_t			hctd_length,
 				uint32_t		hctd_ctrl_phase,
 				ohci_pipe_private_t	*pp,
@@ -281,17 +282,16 @@ static void	ohci_fill_in_td(ohci_state_t		*ohcip,
 				ohci_td_t		*td,
 				ohci_td_t		*new_dummy,
 				uint_t			hctd_ctrl,
-				uint32_t		hctd_iommu_cbp,
+				uint32_t		hctd_dma_offs,
 				size_t			hctd_length,
 				uint32_t		hctd_ctrl_phase,
 				ohci_pipe_private_t	*pp,
 				ohci_trans_wrapper_t	*tw);
 static void	ohci_init_itd(
 				ohci_state_t		*ohcip,
-				ohci_pipe_private_t	*pp,
 				ohci_trans_wrapper_t	*tw,
 				uint_t			hctd_ctrl,
-				uint32_t		hctd_iommu_cbp,
+				uint32_t		index,
 				ohci_td_t		*td);
 static int	ohci_insert_td_with_frame_number(
 				ohci_state_t		*ohcip,
@@ -310,6 +310,14 @@ static ohci_trans_wrapper_t  *ohci_create_transfer_wrapper(
 				ohci_state_t		*ohcip,
 				ohci_pipe_private_t	*pp,
 				size_t			length,
+				uint_t			usb_flags);
+static ohci_trans_wrapper_t  *ohci_create_isoc_transfer_wrapper(
+				ohci_state_t		*ohcip,
+				ohci_pipe_private_t	*pp,
+				size_t			length,
+				usb_isoc_pkt_descr_t	*descr,
+				ushort_t		pkt_count,
+				size_t 			td_count,
 				uint_t			usb_flags);
 static int	ohci_allocate_tds_for_tw(
 				ohci_state_t		*ohcip,
@@ -340,6 +348,10 @@ static void	ohci_start_timer(ohci_state_t		*ohcip);
 static void	ohci_free_dma_resources(ohci_state_t	*ohcip,
 				usba_pipe_handle_data_t	*ph);
 static void	ohci_free_tw(ohci_state_t		*ohcip,
+				ohci_trans_wrapper_t	*tw);
+static int	ohci_tw_rebind_cookie(
+				ohci_state_t		*ohcip,
+				ohci_pipe_private_t	*pp,
 				ohci_trans_wrapper_t	*tw);
 
 /* Interrupt Handling functions */
@@ -4606,6 +4618,7 @@ ohci_allocate_ctrl_resources(
 	usb_flags_t		usb_flags)
 {
 	size_t 			td_count = 2;
+	size_t			ctrl_buf_size;
 	ohci_trans_wrapper_t	*tw;
 
 	/* Add one more td for data phase */
@@ -4613,8 +4626,21 @@ ohci_allocate_ctrl_resources(
 		td_count++;
 	}
 
-	tw = ohci_allocate_tw_resources(ohcip, pp,
-	    ctrl_reqp->ctrl_wLength + SETUP_SIZE,
+	/*
+	 * If we have a control data phase, the data buffer starts
+	 * on the next 4K page boundary. So the TW buffer is allocated
+	 * to be larger than required. The buffer in the range of
+	 * [SETUP_SIZE, OHCI_MAX_TD_BUF_SIZE) is just for padding
+	 * and not to be transferred.
+	 */
+	if (ctrl_reqp->ctrl_wLength) {
+		ctrl_buf_size = OHCI_MAX_TD_BUF_SIZE +
+		    ctrl_reqp->ctrl_wLength;
+	} else {
+		ctrl_buf_size = SETUP_SIZE;
+	}
+
+	tw = ohci_allocate_tw_resources(ohcip, pp, ctrl_buf_size,
 	    usb_flags, td_count);
 
 	return (tw);
@@ -4691,8 +4717,7 @@ ohci_insert_ctrl_req(
 	 * Once this TD is placed on the done list, the
 	 * data or status phase TD will be enqueued.
 	 */
-	(void) ohci_insert_hc_td(ohcip, ctrl,
-	    tw->tw_cookie.dmac_address, SETUP_SIZE,
+	(void) ohci_insert_hc_td(ohcip, ctrl, 0, SETUP_SIZE,
 	    OHCI_CTRL_SETUP_PHASE, pp, tw);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
@@ -4712,7 +4737,7 @@ ohci_insert_ctrl_req(
 
 			/* Copy the data into the message */
 			ddi_rep_put8(tw->tw_accesshandle, data->b_rptr,
-			    (uint8_t *)(tw->tw_buf + SETUP_SIZE),
+			    (uint8_t *)(tw->tw_buf + OHCI_MAX_TD_BUF_SIZE),
 			    wLength, DDI_DEV_AUTOINCR);
 
 		}
@@ -4734,10 +4759,8 @@ ohci_insert_ctrl_req(
 		 * Create the TD.  If this is an OUT transaction,
 		 * the data is already in the buffer of the TW.
 		 */
-		(void) ohci_insert_hc_td(ohcip, ctrl,
-		    tw->tw_cookie.dmac_address + SETUP_SIZE,
-		    tw->tw_length - SETUP_SIZE, OHCI_CTRL_DATA_PHASE,
-		    pp, tw);
+		(void) ohci_insert_hc_td(ohcip, ctrl, OHCI_MAX_TD_BUF_SIZE,
+		    wLength, OHCI_CTRL_DATA_PHASE, pp, tw);
 
 		/*
 		 * The direction of the STATUS TD depends on
@@ -4753,7 +4776,7 @@ ohci_insert_ctrl_req(
 	}
 
 	/* Status stage */
-	(void) ohci_insert_hc_td(ohcip, ctrl, NULL,
+	(void) ohci_insert_hc_td(ohcip, ctrl, 0,
 	    0, OHCI_CTRL_STATUS_PHASE, pp, tw);
 
 	/* Indicate that the control list is filled */
@@ -4896,8 +4919,7 @@ ohci_insert_bulk_req(
 		}
 
 		/* Insert the TD onto the endpoint */
-		(void) ohci_insert_hc_td(ohcip, ctrl,
-		    tw->tw_cookie.dmac_address + len,
+		(void) ohci_insert_hc_td(ohcip, ctrl, len,
 		    bulk_pkt_size, 0, pp, tw);
 
 		len = len + bulk_pkt_size;
@@ -5319,8 +5341,7 @@ ohci_insert_intr_req(
 	}
 
 	/* Insert another interrupt TD */
-	(void) ohci_insert_hc_td(ohcip, ctrl,
-	    tw->tw_cookie.dmac_address, tw->tw_length, 0, pp, tw);
+	(void) ohci_insert_hc_td(ohcip, ctrl, 0, tw->tw_length, 0, pp, tw);
 
 	/* Start the timer for this Interrupt transfer */
 	ohci_start_xfer_timer(ohcip, pp, tw);
@@ -5392,7 +5413,7 @@ ohci_allocate_isoc_resources(
 	int			pipe_dir;
 	uint_t			max_pkt_size = ph->p_ep.wMaxPacketSize;
 	uint_t			max_isoc_xfer_size;
-	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
+	usb_isoc_pkt_descr_t	*isoc_pkt_descr, *start_isoc_pkt_descr;
 	ushort_t		isoc_pkt_count;
 	size_t 			count, td_count;
 	size_t			tw_length;
@@ -5430,6 +5451,8 @@ ohci_allocate_isoc_resources(
 		isoc_pkt_count = ((usb_isoc_req_t *)
 		    pp->pp_client_periodic_in_reqp)->isoc_pkts_count;
 	}
+
+	start_isoc_pkt_descr = isoc_pkt_descr;
 
 	/*
 	 * For isochronous IN pipe, get value of number of isochronous
@@ -5472,8 +5495,23 @@ ohci_allocate_isoc_resources(
 		td_count++;
 	}
 
-	if ((tw = ohci_allocate_tw_resources(ohcip, pp, tw_length,
-	    flags, td_count)) == NULL) {
+	tw = ohci_create_isoc_transfer_wrapper(ohcip, pp, tw_length,
+	    start_isoc_pkt_descr, isoc_pkt_count, td_count, flags);
+
+	if (tw == NULL) {
+		USB_DPRINTF_L2(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+		    "ohci_create_isoc_transfer_wrapper: "
+		    "Unable to allocate TW");
+
+		return (NULL);
+	}
+
+	if (ohci_allocate_tds_for_tw(ohcip, tw, td_count) ==
+	    USB_SUCCESS) {
+		tw->tw_num_tds = td_count;
+	} else {
+		ohci_deallocate_tw_resources(ohcip, pp, tw);
+
 		return (NULL);
 	}
 
@@ -5487,13 +5525,21 @@ ohci_allocate_isoc_resources(
 		tw->tw_direction = HC_TD_IN;
 	} else {
 		if (tw->tw_length) {
+			uchar_t *p;
+			int i;
+
 			ASSERT(isoc_reqp->isoc_data != NULL);
+			p = isoc_reqp->isoc_data->b_rptr;
 
 			/* Copy the data into the message */
-			ddi_rep_put8(tw->tw_accesshandle,
-			    isoc_reqp->isoc_data->b_rptr,
-			    (uint8_t *)tw->tw_buf, tw->tw_length,
-			    DDI_DEV_AUTOINCR);
+			for (i = 0; i < td_count; i++) {
+				ddi_rep_put8(
+				    tw->tw_isoc_bufs[i].mem_handle, p,
+				    (uint8_t *)tw->tw_isoc_bufs[i].buf_addr,
+				    tw->tw_isoc_bufs[i].length,
+				    DDI_DEV_AUTOINCR);
+				p += tw->tw_isoc_bufs[i].length;
+			}
 		}
 		tw->tw_curr_xfer_reqp = (usb_opaque_t)isoc_reqp;
 		tw->tw_direction = HC_TD_OUT;
@@ -5589,8 +5635,7 @@ ohci_insert_isoc_req(
 		}
 
 		/* Insert the TD into the endpoint */
-		if ((error = ohci_insert_hc_td(ohcip, ctrl,
-		    tw->tw_cookie.dmac_address + curr_isoc_xfer_offset,
+		if ((error = ohci_insert_hc_td(ohcip, ctrl, count,
 		    curr_isoc_xfer_len, 0, pp, tw)) !=
 		    USB_SUCCESS) {
 			tw->tw_num_tds = count;
@@ -5653,7 +5698,7 @@ static int
 ohci_insert_hc_td(
 	ohci_state_t		*ohcip,
 	uint_t			hctd_ctrl,
-	uint32_t		hctd_iommu_cbp,
+	uint32_t		hctd_dma_offs,
 	size_t			hctd_length,
 	uint32_t		hctd_ctrl_phase,
 	ohci_pipe_private_t	*pp,
@@ -5684,7 +5729,7 @@ ohci_insert_hc_td(
 	 * add the new dummy to the end.
 	 */
 	ohci_fill_in_td(ohcip, cpu_current_dummy, new_dummy,
-	    hctd_ctrl, hctd_iommu_cbp, hctd_length, hctd_ctrl_phase, pp, tw);
+	    hctd_ctrl, hctd_dma_offs, hctd_length, hctd_ctrl_phase, pp, tw);
 
 	/*
 	 * If this is an isochronous TD, first write proper
@@ -5783,6 +5828,13 @@ ohci_allocate_td_from_pool(ohci_state_t	*ohcip)
  * ohci_fill_in_td:
  *
  * Fill in the fields of a Transfer Descriptor (TD).
+ *
+ * hctd_dma_offs - different meanings for non-isoc and isoc TDs:
+ *          starting offset into the TW buffer for a non-isoc TD
+ *          and the index into the isoc TD list for an isoc TD.
+ *          For non-isoc TDs, the starting offset should be 4k
+ *          aligned and the TDs in one transfer must be filled in
+ *          increasing order.
  */
 static void
 ohci_fill_in_td(
@@ -5790,45 +5842,35 @@ ohci_fill_in_td(
 	ohci_td_t		*td,
 	ohci_td_t		*new_dummy,
 	uint_t			hctd_ctrl,
-	uint32_t		hctd_iommu_cbp,
+	uint32_t		hctd_dma_offs,
 	size_t			hctd_length,
 	uint32_t		hctd_ctrl_phase,
 	ohci_pipe_private_t	*pp,
 	ohci_trans_wrapper_t	*tw)
 {
+	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+	    "ohci_fill_in_td: td 0x%p bufoffs 0x%x len 0x%lx",
+	    td, hctd_dma_offs, hctd_length);
+
 	/* Assert that the td to be filled in is a dummy */
 	ASSERT(Get_TD(td->hctd_state) == HC_TD_DUMMY);
 
 	/* Change TD's state Active */
 	Set_TD(td->hctd_state, HC_TD_ACTIVE);
 
-	/*
-	 * If this is an isochronous TD, update the special itd
-	 * portions. Otherwise, just update the control field.
-	 */
+	/* Update the TD special fields */
 	if ((pp->pp_pipe_handle->p_ep.bmAttributes &
 		USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH) {
-		ohci_init_itd(ohcip, pp, tw, hctd_ctrl, hctd_iommu_cbp, td);
+		ohci_init_itd(ohcip, tw, hctd_ctrl, hctd_dma_offs, td);
 	} else {
 		/* Update the dummy with control information */
 		Set_TD(td->hctd_ctrl, (hctd_ctrl | HC_TD_CC_NA));
 
-		/* Update the beginning of the buffer */
-		Set_TD(td->hctd_cbp, hctd_iommu_cbp);
+		ohci_init_td(ohcip, tw, hctd_dma_offs, hctd_length, td);
 	}
 
 	/* The current dummy now points to the new dummy */
 	Set_TD(td->hctd_next_td, (ohci_td_cpu_to_iommu(ohcip, new_dummy)));
-
-	/* Fill in the end of the buffer */
-	if (hctd_length == 0) {
-		ASSERT(Get_TD(td->hctd_cbp) == 0);
-		ASSERT(hctd_iommu_cbp == 0);
-		Set_TD(td->hctd_buf_end, 0);
-	} else {
-		Set_TD(td->hctd_buf_end,
-		hctd_iommu_cbp + hctd_length - 1);
-	}
 
 	/*
 	 * For Control transfer, hctd_ctrl_phase is a valid field.
@@ -5852,21 +5894,107 @@ ohci_fill_in_td(
 
 
 /*
+ * ohci_init_td:
+ *
+ * Initialize the buffer address portion of non-isoc Transfer
+ * Descriptor (TD).
+ */
+void
+ohci_init_td(
+	ohci_state_t		*ohcip,
+	ohci_trans_wrapper_t	*tw,
+	uint32_t		hctd_dma_offs,
+	size_t			hctd_length,
+	ohci_td_t		*td)
+{
+	uint32_t	page_addr, start_addr = 0, end_addr = 0;
+	size_t		buf_len = hctd_length;
+	int		rem_len, i;
+
+	/*
+	 * TDs must be filled in increasing DMA offset order.
+	 * tw_dma_offs is initialized to be 0 at TW creation and
+	 * is only increased in this function.
+	 */
+	ASSERT(buf_len == 0 || hctd_dma_offs >= tw->tw_dma_offs);
+
+	Set_TD(td->hctd_xfer_offs, hctd_dma_offs);
+	Set_TD(td->hctd_xfer_len, buf_len);
+
+	/* Computing the starting buffer address and end buffer address */
+	for (i = 0; (i < 2) && (buf_len > 0); i++) {
+		/* Advance to the next DMA cookie if necessary */
+		if ((tw->tw_dma_offs + tw->tw_cookie.dmac_size) <=
+		    hctd_dma_offs) {
+			/*
+			 * tw_dma_offs always points to the starting offset
+			 * of a cookie
+			 */
+			tw->tw_dma_offs += tw->tw_cookie.dmac_size;
+			ddi_dma_nextcookie(tw->tw_dmahandle, &tw->tw_cookie);
+			tw->tw_cookie_idx++;
+			ASSERT(tw->tw_cookie_idx < tw->tw_ncookies);
+		}
+
+		ASSERT((tw->tw_dma_offs + tw->tw_cookie.dmac_size) >
+		    hctd_dma_offs);
+
+		/*
+		 * Counting the remained buffer length to be filled in
+		 * the TD for current DMA cookie
+		 */
+		rem_len = (tw->tw_dma_offs + tw->tw_cookie.dmac_size) -
+		    hctd_dma_offs;
+
+		/* Get the beginning address of the buffer */
+		page_addr = (hctd_dma_offs - tw->tw_dma_offs) +
+		    tw->tw_cookie.dmac_address;
+		ASSERT((page_addr % OHCI_4K_ALIGN) == 0);
+
+		if (i == 0) {
+			start_addr = page_addr;
+		}
+
+		USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+		    "ohci_init_td: page_addr 0x%p dmac_size "
+		    "0x%lx idx %d", page_addr, tw->tw_cookie.dmac_size,
+		    tw->tw_cookie_idx);
+
+		if (buf_len <= OHCI_MAX_TD_BUF_SIZE) {
+			ASSERT(buf_len <= rem_len);
+			end_addr = page_addr + buf_len - 1;
+			buf_len = 0;
+			break;
+		} else {
+			ASSERT(rem_len >= OHCI_MAX_TD_BUF_SIZE);
+			buf_len -= OHCI_MAX_TD_BUF_SIZE;
+			hctd_dma_offs += OHCI_MAX_TD_BUF_SIZE;
+		}
+	}
+
+	ASSERT(buf_len == 0);
+
+	Set_TD(td->hctd_cbp, start_addr);
+	Set_TD(td->hctd_buf_end, end_addr);
+}
+
+
+/*
  * ohci_init_itd:
  *
- * Initialize the Isochronous portion of the Transfer Descriptor (TD).
+ * Initialize the buffer address portion of isoc Transfer Descriptor (TD).
  */
-/* ARGSUSED */
 static void
 ohci_init_itd(
 	ohci_state_t		*ohcip,
-	ohci_pipe_private_t	*pp,
 	ohci_trans_wrapper_t	*tw,
 	uint_t			hctd_ctrl,
-	uint32_t		hctd_iommu_cbp,
+	uint32_t		index,
 	ohci_td_t		*td)
 {
-	uint32_t		offset, offset_addr;
+	uint32_t		start_addr, end_addr, offset, offset_addr;
+	ohci_isoc_buf_t		*bufp;
+	size_t			buf_len;
 	uint_t			buf, fc, toggle, flag;
 	usb_isoc_pkt_descr_t	*temp_pkt_descr;
 	int			i;
@@ -5882,15 +6010,30 @@ ohci_init_itd(
 	 */
 	Set_TD(td->hctd_ctrl, (hctd_ctrl | HC_TD_CC_NA));
 
+	bufp = &tw->tw_isoc_bufs[index];
+	Set_TD(td->hctd_xfer_offs, index);
+	Set_TD(td->hctd_xfer_len, bufp->length);
+
+	start_addr = bufp->cookie.dmac_address;
+	ASSERT((start_addr % OHCI_4K_ALIGN) == 0);
+
+	buf_len = bufp->length;
+	if (bufp->ncookies == OHCI_DMA_ATTR_TD_SGLLEN) {
+		buf_len = bufp->length - bufp->cookie.dmac_size;
+		ddi_dma_nextcookie(bufp->dma_handle, &bufp->cookie);
+	}
+	end_addr = bufp->cookie.dmac_address + buf_len - 1;
+
 	/*
 	 * For an isochronous transfer, the hctd_cbp contains,
 	 * the 4k page, and not the actual start of the buffer.
 	 */
-	Set_TD(td->hctd_cbp, ((uint32_t)hctd_iommu_cbp & HC_ITD_PAGE_MASK));
+	Set_TD(td->hctd_cbp, ((uint32_t)start_addr & HC_ITD_PAGE_MASK));
+	Set_TD(td->hctd_buf_end, end_addr);
 
 	fc = (hctd_ctrl & HC_ITD_FC) >> HC_ITD_FC_SHIFT;
 	toggle = 0;
-	buf = hctd_iommu_cbp;
+	buf = start_addr;
 
 	/*
 	 * Get the address of first isochronous data packet
@@ -5903,7 +6046,7 @@ ohci_init_itd(
 		offset_addr = (uint32_t)((buf &
 		    HC_ITD_OFFSET_ADDR) | (HC_TD_CC_NA >> HC_ITD_CC_SHIFT));
 
-		flag =	((hctd_iommu_cbp &
+		flag =	((start_addr &
 		    HC_ITD_PAGE_MASK) ^ (buf & HC_ITD_PAGE_MASK));
 
 		if (flag) {
@@ -6516,8 +6659,8 @@ ohci_free_tw_tds_resources(
  *
  * ohci_create_transfer_wrapper:
  *
- * Create a Transaction Wrapper (TW) and this involves the allocating of DMA
- * resources.
+ * Create a Transaction Wrapper (TW) for non-isoc transfer types
+ * and this involves the allocating of DMA resources.
  */
 static ohci_trans_wrapper_t *
 ohci_create_transfer_wrapper(
@@ -6529,8 +6672,11 @@ ohci_create_transfer_wrapper(
 	ddi_device_acc_attr_t	dev_attr;
 	int			result;
 	size_t			real_length;
-	uint_t			ccount;	/* Cookie count */
 	ohci_trans_wrapper_t	*tw;
+	ddi_dma_attr_t		dma_attr;
+	int			kmem_flag;
+	int			(*dmamem_wait)(caddr_t);
+	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
 	    "ohci_create_transfer_wrapper: length = 0x%lx flags = 0x%x",
@@ -6538,8 +6684,24 @@ ohci_create_transfer_wrapper(
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
+	/* isochronous pipe should not call into this function */
+	if ((ph->p_ep.bmAttributes & USB_EP_ATTR_MASK) ==
+	    USB_EP_ATTR_ISOCH) {
+
+		return (NULL);
+	}
+
+	/* SLEEP flag should not be used in interrupt context */
+	if (servicing_interrupt()) {
+		kmem_flag = KM_NOSLEEP;
+		dmamem_wait = DDI_DMA_DONTWAIT;
+	} else {
+		kmem_flag = KM_SLEEP;
+		dmamem_wait = DDI_DMA_SLEEP;
+	}
+
 	/* Allocate space for the transfer wrapper */
-	tw = kmem_zalloc(sizeof (ohci_trans_wrapper_t), KM_NOSLEEP);
+	tw = kmem_zalloc(sizeof (ohci_trans_wrapper_t), kmem_flag);
 
 	if (tw == NULL) {
 		USB_DPRINTF_L2(PRINT_MASK_ALLOC,  ohcip->ohci_log_hdl,
@@ -6548,12 +6710,14 @@ ohci_create_transfer_wrapper(
 		return (NULL);
 	}
 
-	/*  Force the required 4K restrictive alignment */
-	ohcip->ohci_dma_attr.dma_attr_align = OHCI_DMA_ATTR_ALIGNMENT;
+	/* allow sg lists for transfer wrapper dma memory */
+	bcopy(&ohcip->ohci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
+	dma_attr.dma_attr_sgllen = OHCI_DMA_ATTR_TW_SGLLEN;
+	dma_attr.dma_attr_align = OHCI_DMA_ATTR_ALIGNMENT;
 
 	/* Allocate the DMA handle */
 	result = ddi_dma_alloc_handle(ohcip->ohci_dip,
-	    &ohcip->ohci_dma_attr, DDI_DMA_DONTWAIT, 0, &tw->tw_dmahandle);
+	    &dma_attr, dmamem_wait, 0, &tw->tw_dmahandle);
 
 	if (result != DDI_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
@@ -6572,7 +6736,7 @@ ohci_create_transfer_wrapper(
 
 	/* Allocate the memory */
 	result = ddi_dma_mem_alloc(tw->tw_dmahandle, length,
-	    &dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &dev_attr, DDI_DMA_CONSISTENT, dmamem_wait, NULL,
 	    (caddr_t *)&tw->tw_buf, &real_length, &tw->tw_accesshandle);
 
 	if (result != DDI_SUCCESS) {
@@ -6590,24 +6754,9 @@ ohci_create_transfer_wrapper(
 	/* Bind the handle */
 	result = ddi_dma_addr_bind_handle(tw->tw_dmahandle, NULL,
 	    (caddr_t)tw->tw_buf, real_length, DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
-	    DDI_DMA_DONTWAIT, NULL, &tw->tw_cookie, &ccount);
+	    dmamem_wait, NULL, &tw->tw_cookie, &tw->tw_ncookies);
 
-	if (result == DDI_DMA_MAPPED) {
-		/* The cookie count should be 1 */
-		if (ccount != 1) {
-			USB_DPRINTF_L2(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
-			    "ohci_create_transfer_wrapper: More than 1 cookie");
-
-			result = ddi_dma_unbind_handle(tw->tw_dmahandle);
-			ASSERT(result == DDI_SUCCESS);
-
-			ddi_dma_mem_free(&tw->tw_accesshandle);
-			ddi_dma_free_handle(&tw->tw_dmahandle);
-			kmem_free(tw, sizeof (ohci_trans_wrapper_t));
-
-			return (NULL);
-		}
-	} else {
+	if (result != DDI_DMA_MAPPED) {
 		ohci_decode_ddi_dma_addr_bind_handle_result(ohcip, result);
 
 		ddi_dma_mem_free(&tw->tw_accesshandle);
@@ -6616,6 +6765,9 @@ ohci_create_transfer_wrapper(
 
 		return (NULL);
 	}
+
+	tw->tw_cookie_idx = 0;
+	tw->tw_dma_offs = 0;
 
 	/*
 	 * Only allow one wrapper to be added at a time. Insert the
@@ -6644,7 +6796,241 @@ ohci_create_transfer_wrapper(
 	ASSERT(tw->tw_id != NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
-	    "ohci_create_transfer_wrapper: tw = 0x%p", tw);
+	    "ohci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
+	    tw, tw->tw_ncookies);
+
+	return (tw);
+}
+
+
+/*
+ * Transfer Wrapper functions
+ *
+ * ohci_create_isoc_transfer_wrapper:
+ *
+ * Create a Transaction Wrapper (TW) for isoc transfer
+ * and this involves the allocating of DMA resources.
+ */
+static ohci_trans_wrapper_t *
+ohci_create_isoc_transfer_wrapper(
+	ohci_state_t		*ohcip,
+	ohci_pipe_private_t	*pp,
+	size_t			length,
+	usb_isoc_pkt_descr_t	*descr,
+	ushort_t		pkt_count,
+	size_t 			td_count,
+	uint_t			usb_flags)
+{
+	ddi_device_acc_attr_t	dev_attr;
+	int			result;
+	size_t			real_length, xfer_size;
+	uint_t			ccount;
+	ohci_trans_wrapper_t	*tw;
+	ddi_dma_attr_t		dma_attr;
+	int			kmem_flag;
+	uint_t			i, j, frame_count, residue;
+	int			(*dmamem_wait)(caddr_t);
+	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
+	usb_isoc_pkt_descr_t	*isoc_pkt_descr = descr;
+
+	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+	    "ohci_create_isoc_transfer_wrapper: length = 0x%lx flags = 0x%x",
+	    length, usb_flags);
+
+	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
+
+	/* non-isochronous pipe should not call into this function */
+	if ((ph->p_ep.bmAttributes & USB_EP_ATTR_MASK) !=
+	    USB_EP_ATTR_ISOCH) {
+
+		return (NULL);
+	}
+
+	/* SLEEP flag should not be used in interrupt context */
+	if (servicing_interrupt()) {
+		kmem_flag = KM_NOSLEEP;
+		dmamem_wait = DDI_DMA_DONTWAIT;
+	} else {
+		kmem_flag = KM_SLEEP;
+		dmamem_wait = DDI_DMA_SLEEP;
+	}
+
+	/* Allocate space for the transfer wrapper */
+	tw = kmem_zalloc(sizeof (ohci_trans_wrapper_t), kmem_flag);
+
+	if (tw == NULL) {
+		USB_DPRINTF_L2(PRINT_MASK_ALLOC,  ohcip->ohci_log_hdl,
+		    "ohci_create_transfer_wrapper: kmem_zalloc failed");
+
+		return (NULL);
+	}
+
+	/* Allocate space for the isoc buffer handles */
+	tw->tw_isoc_strtlen = sizeof (ohci_isoc_buf_t) * td_count;
+	if ((tw->tw_isoc_bufs = kmem_zalloc(tw->tw_isoc_strtlen,
+	    kmem_flag)) == NULL) {
+		USB_DPRINTF_L2(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
+		    "ohci_create_isoc_transfer_wrapper: kmem_alloc "
+		    "isoc buffer failed");
+		kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+		return (NULL);
+	}
+
+	/* allow sg lists for transfer wrapper dma memory */
+	bcopy(&ohcip->ohci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
+	dma_attr.dma_attr_sgllen = OHCI_DMA_ATTR_TD_SGLLEN;
+	dma_attr.dma_attr_align = OHCI_DMA_ATTR_ALIGNMENT;
+
+	dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+
+	/* The host controller will be little endian */
+	dev_attr.devacc_attr_endian_flags  = DDI_STRUCTURE_BE_ACC;
+	dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+	residue = pkt_count % OHCI_ISOC_PKTS_PER_TD;
+
+	for (i = 0; i < td_count; i++) {
+		tw->tw_isoc_bufs[i].index = i;
+
+		if ((i == (td_count - 1)) && (residue != 0)) {
+			frame_count = residue;
+		} else {
+			frame_count = OHCI_ISOC_PKTS_PER_TD;
+		}
+
+		/* Allocate the DMA handle */
+		result = ddi_dma_alloc_handle(ohcip->ohci_dip, &dma_attr,
+		    dmamem_wait, 0, &tw->tw_isoc_bufs[i].dma_handle);
+
+		if (result != DDI_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+			    "ohci_create_isoc_transfer_wrapper: "
+			    "Alloc handle failed");
+
+			for (j = 0; j < i; j++) {
+				result = ddi_dma_unbind_handle(
+				    tw->tw_isoc_bufs[j].dma_handle);
+				ASSERT(result == USB_SUCCESS);
+				ddi_dma_mem_free(&tw->tw_isoc_bufs[j].
+				    mem_handle);
+				ddi_dma_free_handle(&tw->tw_isoc_bufs[j].
+				    dma_handle);
+			}
+			kmem_free(tw->tw_isoc_bufs, tw->tw_isoc_strtlen);
+			kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+			return (NULL);
+		}
+
+		/* Compute the memory length */
+		for (xfer_size = 0, j = 0; j < frame_count; j++) {
+			ASSERT(isoc_pkt_descr != NULL);
+			xfer_size += isoc_pkt_descr->isoc_pkt_length;
+			isoc_pkt_descr++;
+		}
+
+		/* Allocate the memory */
+		result = ddi_dma_mem_alloc(tw->tw_isoc_bufs[i].dma_handle,
+		    xfer_size, &dev_attr, DDI_DMA_CONSISTENT, dmamem_wait,
+		    NULL, (caddr_t *)&tw->tw_isoc_bufs[i].buf_addr,
+		    &real_length, &tw->tw_isoc_bufs[i].mem_handle);
+
+		if (result != DDI_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+			    "ohci_create_isoc_transfer_wrapper: "
+			    "dma_mem_alloc %d fail", i);
+			ddi_dma_free_handle(&tw->tw_isoc_bufs[i].dma_handle);
+
+			for (j = 0; j < i; j++) {
+				result = ddi_dma_unbind_handle(
+				    tw->tw_isoc_bufs[j].dma_handle);
+				ASSERT(result == USB_SUCCESS);
+				ddi_dma_mem_free(&tw->tw_isoc_bufs[j].
+				    mem_handle);
+				ddi_dma_free_handle(&tw->tw_isoc_bufs[j].
+				    dma_handle);
+			}
+			kmem_free(tw->tw_isoc_bufs, tw->tw_isoc_strtlen);
+			kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+			return (NULL);
+		}
+
+		ASSERT(real_length >= xfer_size);
+
+		/* Bind the handle */
+		result = ddi_dma_addr_bind_handle(
+		    tw->tw_isoc_bufs[i].dma_handle, NULL,
+		    (caddr_t)tw->tw_isoc_bufs[i].buf_addr, real_length,
+		    DDI_DMA_RDWR|DDI_DMA_CONSISTENT, dmamem_wait, NULL,
+		    &tw->tw_isoc_bufs[i].cookie, &ccount);
+
+		if ((result == DDI_DMA_MAPPED) &&
+		    (ccount <= OHCI_DMA_ATTR_TD_SGLLEN)) {
+			tw->tw_isoc_bufs[i].length = xfer_size;
+			tw->tw_isoc_bufs[i].ncookies = ccount;
+
+			continue;
+		} else {
+			USB_DPRINTF_L2(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+			    "ohci_create_isoc_transfer_wrapper: "
+			    "Bind handle %d failed", i);
+			if (result == DDI_DMA_MAPPED) {
+				result = ddi_dma_unbind_handle(
+				    tw->tw_isoc_bufs[i].dma_handle);
+				ASSERT(result == USB_SUCCESS);
+			}
+			ddi_dma_mem_free(&tw->tw_isoc_bufs[i].mem_handle);
+			ddi_dma_free_handle(&tw->tw_isoc_bufs[i].dma_handle);
+
+			for (j = 0; j < i; j++) {
+				result = ddi_dma_unbind_handle(
+				    tw->tw_isoc_bufs[j].dma_handle);
+				ASSERT(result == USB_SUCCESS);
+				ddi_dma_mem_free(&tw->tw_isoc_bufs[j].
+				    mem_handle);
+				ddi_dma_free_handle(&tw->tw_isoc_bufs[j].
+				    dma_handle);
+			}
+			kmem_free(tw->tw_isoc_bufs, tw->tw_isoc_strtlen);
+			kmem_free(tw, sizeof (ohci_trans_wrapper_t));
+
+			return (NULL);
+		}
+	}
+
+	/*
+	 * Only allow one wrapper to be added at a time. Insert the
+	 * new transaction wrapper into the list for this pipe.
+	 */
+	if (pp->pp_tw_head == NULL) {
+		pp->pp_tw_head = tw;
+		pp->pp_tw_tail = tw;
+	} else {
+		pp->pp_tw_tail->tw_next = tw;
+		pp->pp_tw_tail = tw;
+	}
+
+	/* Store the transfer length */
+	tw->tw_length = length;
+
+	/* Store the td numbers */
+	tw->tw_ncookies = td_count;
+
+	/* Store a back pointer to the pipe private structure */
+	tw->tw_pipe_private = pp;
+
+	/* Store the transfer type - synchronous or asynchronous */
+	tw->tw_flags = usb_flags;
+
+	/* Get and Store 32bit ID */
+	tw->tw_id = OHCI_GET_ID((void *)tw);
+
+	ASSERT(tw->tw_id != NULL);
+
+	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
+	    "ohci_create_isoc_transfer_wrapper: tw = 0x%p", tw);
 
 	return (tw);
 }
@@ -7049,7 +7435,7 @@ ohci_free_tw(
 	ohci_state_t		*ohcip,
 	ohci_trans_wrapper_t	*tw)
 {
-	int			rval;
+	int			rval, i;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
 	    "ohci_free_tw: tw = 0x%p", tw);
@@ -7060,11 +7446,26 @@ ohci_free_tw(
 	/* Free 32bit ID */
 	OHCI_FREE_ID((uint32_t)tw->tw_id);
 
-	rval = ddi_dma_unbind_handle(tw->tw_dmahandle);
-	ASSERT(rval == DDI_SUCCESS);
-
-	ddi_dma_mem_free(&tw->tw_accesshandle);
-	ddi_dma_free_handle(&tw->tw_dmahandle);
+	if (tw->tw_isoc_strtlen > 0) {
+		ASSERT(tw->tw_isoc_bufs != NULL);
+		for (i = 0; i < tw->tw_ncookies; i++) {
+			if (tw->tw_isoc_bufs[i].ncookies > 0) {
+				rval = ddi_dma_unbind_handle(
+				    tw->tw_isoc_bufs[i].dma_handle);
+				ASSERT(rval == USB_SUCCESS);
+			}
+			ddi_dma_mem_free(&tw->tw_isoc_bufs[i].mem_handle);
+			ddi_dma_free_handle(&tw->tw_isoc_bufs[i].dma_handle);
+		}
+		kmem_free(tw->tw_isoc_bufs, tw->tw_isoc_strtlen);
+	} else if (tw->tw_dmahandle != NULL) {
+		if (tw->tw_ncookies > 0) {
+			rval = ddi_dma_unbind_handle(tw->tw_dmahandle);
+			ASSERT(rval == DDI_SUCCESS);
+		}
+		ddi_dma_mem_free(&tw->tw_accesshandle);
+		ddi_dma_free_handle(&tw->tw_dmahandle);
+	}
 
 	/* Free transfer wrapper */
 	kmem_free(tw, sizeof (ohci_trans_wrapper_t));
@@ -8171,9 +8572,11 @@ ohci_handle_error(
 			 */
 			if (Get_TD(td->hctd_cbp)) {
 				usb_opaque_t xfer_reqp = tw->tw_curr_xfer_reqp;
+				size_t residue;
 
-				length = Get_TD(td->hctd_cbp) -
-				    tw->tw_cookie.dmac_address;
+				residue = ohci_get_td_residue(ohcip, td);
+				length = Get_TD(td->hctd_xfer_offs) +
+				    Get_TD(td->hctd_xfer_len) - residue;
 
 				USB_DPRINTF_L2(PRINT_MASK_INTR,
 				    ohcip->ohci_log_hdl,
@@ -8374,10 +8777,11 @@ ohci_handle_ctrl_td(
 		 * actual received data size.
 		 */
 		if (Get_TD(td->hctd_cbp)) {
-			size_t			length;
+			size_t			length, residue;
 
-			length = Get_TD(td->hctd_cbp) -
-			    tw->tw_cookie.dmac_address;
+			residue = ohci_get_td_residue(ohcip, td);
+			length = Get_TD(td->hctd_xfer_offs) +
+			    Get_TD(td->hctd_xfer_len) - residue;
 
 			USB_DPRINTF_L2(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 			    "ohci_handle_ctrl_qtd: requested data %lu "
@@ -8404,7 +8808,7 @@ ohci_handle_ctrl_td(
 			    pp, tw, td, USB_CR_OK);
 		} else {
 			ohci_do_byte_stats(ohcip,
-			    tw->tw_length - SETUP_SIZE,
+			    tw->tw_length - OHCI_MAX_TD_BUF_SIZE,
 			    ph->p_ep.bmAttributes,
 			    ph->p_ep.bEndpointAddress);
 
@@ -8560,8 +8964,11 @@ ohci_handle_intr_td(
 
 		tw->tw_num_tds = 1;
 
-		if (ohci_allocate_tds_for_tw(ohcip, tw, tw->tw_num_tds) !=
-		    USB_SUCCESS) {
+		if (ohci_tw_rebind_cookie(ohcip, pp, tw) != USB_SUCCESS) {
+			ohci_deallocate_periodic_in_resource(ohcip, pp, tw);
+			error = USB_FAILURE;
+		} else if (ohci_allocate_tds_for_tw(ohcip, tw,
+		    tw->tw_num_tds) != USB_SUCCESS) {
 			ohci_deallocate_periodic_in_resource(ohcip, pp, tw);
 			error = USB_FAILURE;
 		}
@@ -8717,8 +9124,11 @@ ohci_handle_isoc_td(
 			tw->tw_num_tds++;
 		}
 
-		if (ohci_allocate_tds_for_tw(ohcip, tw, tw->tw_num_tds) !=
-		    USB_SUCCESS) {
+		if (ohci_tw_rebind_cookie(ohcip, pp, tw) != USB_SUCCESS) {
+			ohci_deallocate_periodic_in_resource(ohcip, pp, tw);
+			error = USB_FAILURE;
+		} else if (ohci_allocate_tds_for_tw(ohcip, tw,
+		    tw->tw_num_tds) != USB_SUCCESS) {
 			ohci_deallocate_periodic_in_resource(ohcip, pp, tw);
 			error = USB_FAILURE;
 		}
@@ -8745,6 +9155,100 @@ ohci_handle_isoc_td(
 
 
 /*
+ * ohci_tw_rebind_cookie:
+ *
+ * If the cookie associated with a DMA buffer has been walked, the cookie
+ * is not usable any longer. To reuse the DMA buffer, the DMA handle needs
+ * to rebind for cookies.
+ */
+static int
+ohci_tw_rebind_cookie(
+	ohci_state_t		*ohcip,
+	ohci_pipe_private_t	*pp,
+	ohci_trans_wrapper_t	*tw)
+{
+	usb_ep_descr_t		*eptd = &pp->pp_pipe_handle->p_ep;
+	int			rval, i;
+	uint_t			ccount;
+
+	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
+	    "ohci_tw_rebind_cookie:");
+
+	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
+
+	if ((eptd->bmAttributes & USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH) {
+		ASSERT(tw->tw_num_tds == tw->tw_ncookies);
+
+		for (i = 0; i < tw->tw_num_tds; i++) {
+			if (tw->tw_isoc_bufs[i].ncookies == 1) {
+
+				/*
+				 * no need to rebind when there is
+				 * only one cookie in a buffer
+				 */
+				continue;
+			}
+
+			/* unbind the DMA handle before rebinding */
+			rval = ddi_dma_unbind_handle(
+			    tw->tw_isoc_bufs[i].dma_handle);
+			ASSERT(rval == USB_SUCCESS);
+			tw->tw_isoc_bufs[i].ncookies = 0;
+
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
+			    "rebind dma_handle %d", i);
+
+			/* rebind the handle to get cookies */
+			rval = ddi_dma_addr_bind_handle(
+			    tw->tw_isoc_bufs[i].dma_handle, NULL,
+			    (caddr_t)tw->tw_isoc_bufs[i].buf_addr,
+			    tw->tw_isoc_bufs[i].length,
+			    DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
+			    DDI_DMA_DONTWAIT, NULL,
+			    &tw->tw_isoc_bufs[i].cookie, &ccount);
+
+			if ((rval == DDI_DMA_MAPPED) &&
+			    (ccount <= OHCI_DMA_ATTR_TD_SGLLEN)) {
+				tw->tw_isoc_bufs[i].ncookies = ccount;
+			} else {
+
+				return (USB_NO_RESOURCES);
+			}
+		}
+	} else {
+		if (tw->tw_cookie_idx != 0) {
+			/* unbind the DMA handle before rebinding */
+			rval = ddi_dma_unbind_handle(tw->tw_dmahandle);
+			ASSERT(rval == DDI_SUCCESS);
+			tw->tw_ncookies = 0;
+
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
+			    "rebind dma_handle");
+
+			/* rebind the handle to get cookies */
+			rval = ddi_dma_addr_bind_handle(
+			    tw->tw_dmahandle, NULL,
+			    (caddr_t)tw->tw_buf, tw->tw_length,
+			    DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
+			    DDI_DMA_DONTWAIT, NULL,
+			    &tw->tw_cookie, &ccount);
+
+			if (rval == DDI_DMA_MAPPED) {
+				tw->tw_ncookies = ccount;
+				tw->tw_dma_offs = 0;
+				tw->tw_cookie_idx = 0;
+			} else {
+
+				return (USB_NO_RESOURCES);
+			}
+		}
+	}
+
+	return (USB_SUCCESS);
+}
+
+
+/*
  * ohci_sendup_td_message:
  *	copy data, if necessary and do callback
  */
@@ -8758,7 +9262,7 @@ ohci_sendup_td_message(
 {
 	usb_ep_descr_t		*eptd = &pp->pp_pipe_handle->p_ep;
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
-	size_t			length = 0, skip_len = 0;
+	size_t			length = 0, skip_len = 0, residue;
 	mblk_t			*mp;
 	uchar_t			*buf;
 	usb_opaque_t		curr_xfer_reqp = tw->tw_curr_xfer_reqp;
@@ -8779,10 +9283,14 @@ ohci_sendup_td_message(
 		 * which is not part of the data length in control end
 		 * points.  Update tw->tw_length for future references.
 		 */
-		tw->tw_length = length = length - SETUP_SIZE;
+		if (((usb_ctrl_req_t *)curr_xfer_reqp)->ctrl_wLength) {
+			tw->tw_length = length = length - OHCI_MAX_TD_BUF_SIZE;
+		} else {
+			tw->tw_length = length = length - SETUP_SIZE;
+		}
 
 		/* Set the length of the buffer to skip */
-		skip_len = SETUP_SIZE;
+		skip_len = OHCI_MAX_TD_BUF_SIZE;
 
 		if (Get_TD(td->hctd_ctrl_phase) != OHCI_CTRL_DATA_PHASE) {
 			break;
@@ -8806,9 +9314,9 @@ ohci_sendup_td_message(
 		 * case, get the actual received data size.
 		 */
 		if (Get_TD(td->hctd_cbp)) {
-
-			length = Get_TD(td->hctd_cbp) -
-			    tw->tw_cookie.dmac_address - skip_len;
+			residue = ohci_get_td_residue(ohcip, td);
+			length = Get_TD(td->hctd_xfer_offs) +
+			    Get_TD(td->hctd_xfer_len) - residue - skip_len;
 
 			USB_DPRINTF_L2(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 			    "ohci_sendup_qtd_message: requested data %lu "
@@ -8846,6 +9354,9 @@ ohci_sendup_td_message(
 	ASSERT(mp != NULL);
 
 	if (length) {
+		int i;
+		uchar_t *p = mp->b_rptr;
+
 		/*
 		 * Update kstat byte counts
 		 * The control endpoints don't have direction bits so in
@@ -8861,12 +9372,27 @@ ohci_sendup_td_message(
 			    eptd->bmAttributes, eptd->bEndpointAddress);
 		}
 
-		/* Sync IO buffer */
-		Sync_IO_Buffer(tw->tw_dmahandle, length);
+		if ((eptd->bmAttributes & USB_EP_ATTR_MASK) ==
+		    USB_EP_ATTR_ISOCH) {
+			for (i = 0; i < tw->tw_ncookies; i++) {
+				Sync_IO_Buffer(
+				    tw->tw_isoc_bufs[i].dma_handle,
+				    tw->tw_isoc_bufs[i].length);
 
-		/* Copy the data into the message */
-		ddi_rep_get8(tw->tw_accesshandle,
-		    mp->b_rptr, buf, length, DDI_DEV_AUTOINCR);
+				ddi_rep_get8(tw->tw_isoc_bufs[i].mem_handle,
+				    p, (uint8_t *)tw->tw_isoc_bufs[i].buf_addr,
+				    tw->tw_isoc_bufs[i].length,
+				    DDI_DEV_AUTOINCR);
+				p += tw->tw_isoc_bufs[i].length;
+			}
+		} else {
+			/* Sync IO buffer */
+			Sync_IO_Buffer(tw->tw_dmahandle, (skip_len + length));
+
+			/* Copy the data into the message */
+			ddi_rep_get8(tw->tw_accesshandle,
+			    mp->b_rptr, buf, length, DDI_DEV_AUTOINCR);
+		}
 
 		/* Increment the write pointer */
 		mp->b_wptr = mp->b_wptr + length;
@@ -8876,6 +9402,35 @@ ohci_sendup_td_message(
 	}
 
 	ohci_hcdi_callback(ph, tw, error);
+}
+
+
+/*
+ * ohci_get_td_residue:
+ *
+ * Calculate the bytes not transfered by the TD
+ */
+size_t
+ohci_get_td_residue(
+	ohci_state_t	*ohcip,
+	ohci_td_t	*td)
+{
+	uint32_t	buf_addr, end_addr;
+	size_t		residue;
+
+	buf_addr = Get_TD(td->hctd_cbp);
+	end_addr = Get_TD(td->hctd_buf_end);
+
+	if ((buf_addr & 0xfffff000) ==
+	    (end_addr & 0xfffff000)) {
+		residue = end_addr - buf_addr + 1;
+	} else {
+		residue = OHCI_MAX_TD_BUF_SIZE -
+		    (buf_addr & 0x00000fff) +
+		    (end_addr & 0x00000fff) + 1;
+	}
+
+	return (residue);
 }
 
 

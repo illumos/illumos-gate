@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +155,7 @@ void	uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td);
 void	uhci_fill_in_bulk_isoc_td(uhci_state_t *uhcip,
 		uhci_td_t *current_td, uhci_td_t *next_td,
 		uint32_t next_td_paddr, usba_pipe_handle_data_t *ph,
-		uint_t buffer_address, uint_t length,
+		uint_t offset, uint_t length,
 		uhci_trans_wrapper_t *tw);
 void	uhci_remove_bulk_tds_tws(uhci_state_t *uhcip,
 		uhci_pipe_private_t *pp, int);

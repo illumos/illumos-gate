@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,7 +214,7 @@ typedef struct uhci_td {
 	uint32_t			link_ptr;
 	uint32_t			dw2;
 	uint32_t			dw3;
-					/* Data buffer address	 */
+					/* Data buffer address */
 	uint32_t			buffer_address;
 
 	/* Information required by HCD for managing the request */
@@ -277,15 +276,38 @@ typedef struct uhci_td {
 
 
 /*
+ * Structure for Bulk and Isoc TD pools
+ */
+typedef struct uhci_bulk_isoc_td_pool {
+	caddr_t				pool_addr;
+	ddi_dma_cookie_t		cookie;	    /* DMA cookie */
+	ddi_dma_handle_t		dma_handle; /* DMA handle */
+	ddi_acc_handle_t		mem_handle; /* Memory handle */
+	ushort_t			num_tds;
+} uhci_bulk_isoc_td_pool_t;
+
+/*
  *  Structure for Bulk and Isoc transfers
  */
 typedef struct uhci_bulk_isoc_xfer_info {
-	caddr_t			pool_addr;
+	uhci_bulk_isoc_td_pool_t	*td_pools;
+	ushort_t			num_pools;
+	ushort_t			num_tds;
+} uhci_bulk_isoc_xfer_t;
+
+/*
+ * Structure for Isoc DMA buffer
+ *	One Isoc transfer includes multiple Isoc packets.
+ *	One DMA buffer is allocated for one packet each.
+ */
+typedef struct uhci_isoc_buf {
+	caddr_t			buf_addr;	/* Starting buffer address */
 	ddi_dma_cookie_t	cookie;		/* DMA cookie */
 	ddi_dma_handle_t	dma_handle;	/* DMA handle */
 	ddi_acc_handle_t	mem_handle;	/* Memory handle */
-	ushort_t		num_tds;
-} uhci_bulk_isoc_xfer_t;
+	size_t			length;		/* Buffer length */
+	ushort_t		index;
+} uhci_isoc_buf_t;
 
 /*
  * Macros related to ISOC transfers

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +62,7 @@ extern "C" {
 #define	UHCI_BULK_MAX_XFER_SIZE	(124*1024) /* Max bulk xfer size */
 
 /* Maximum allowable data transfer size per transaction */
-#define	UHCI_MAX_TD_XFER_SIZE	0x2000 /* Maximum data per transaction */
+#define	UHCI_MAX_TD_XFER_SIZE	0x500 /* Maximum data per transaction */
 
 /*
  * Generic UHCI Macro definitions
@@ -340,12 +339,23 @@ typedef void (*uhci_handler_function_t) (uhci_state_t *uhcip, uhci_td_t  *td);
  *
  * The transfer wrapper represents a USB transfer on the bus and there
  * is one instance per USB transfer.  A transfer is made up of one or
- * more transactions.
+ * more transactions. UHCI uses one TD for one transaction. So one
+ * transfer wrapper may have one or more TDs associated.
  *
  * Control and bulk pipes will have one transfer wrapper per transfer
  * and where as Isochronous and Interrupt pipes will only have one
  * transfer wrapper. The transfers wrapper are continually reused for
  * the Interrupt and Isochronous pipes as those pipes are polled.
+ *
+ * Control, bulk and interrupt transfers will have one DMA buffer per
+ * transfer. The data to be transferred are contained in the DMA buffer
+ * which is virtually contiguous but physically discontiguous. When
+ * preparing the TDs for a USB transfer, the DMA cookies contained in
+ * the buffer need to be walked through to retrieve the DMA addresses.
+ *
+ * Isochronous transfers will have multiple DMA buffers per transfer
+ * with each isoc packet having a DMA buffer. And the DMA buffers should
+ * only contain one cookie each, so no cookie walking is necessary.
  */
 typedef struct uhci_trans_wrapper {
 	struct uhci_trans_wrapper	*tw_next;	/* Next wrapper */
@@ -356,6 +366,9 @@ typedef struct uhci_trans_wrapper {
 	ddi_acc_handle_t		tw_accesshandle; /* Acc hndle */
 	char				*tw_buf;	/* Buffer for txfer */
 	ddi_dma_cookie_t		tw_cookie;	/* DMA cookie */
+	uint_t				tw_ncookies;	/* DMA cookie count */
+	uint_t				tw_cookie_idx;	/* DMA cookie index */
+	size_t				tw_dma_offs;	/* DMA buffer offset */
 	int				tw_ctrl_state;	/* See below */
 	uhci_td_t			*tw_hctd_head;	/* Head TD */
 	uhci_td_t			*tw_hctd_tail;	/* Tail TD */
@@ -381,6 +394,8 @@ typedef struct uhci_trans_wrapper {
 
 	usb_isoc_req_t			*tw_isoc_req;
 	uhci_bulk_isoc_xfer_t		tw_xfer_info;
+	uhci_isoc_buf_t			*tw_isoc_bufs;	/* Isoc DMA buffers */
+	size_t				tw_isoc_strtlen;
 
 	/* This is used to avoid multiple tw deallocation */
 	uint_t				tw_claim;
@@ -393,6 +408,26 @@ typedef struct uhci_trans_wrapper {
 	/* save a copy of current request */
 	usb_opaque_t			tw_curr_xfer_reqp;
 } uhci_trans_wrapper_t;
+
+/* Macros for uhci DMA buffer */
+#define	UHCI_DMA_ATTR_ALIGN	0x800
+#define	UHCI_DMA_ATTR_SGLLEN	0x7fffffff
+#define	UHCI_CTRL_EPT_MAX_SIZE	64
+
+/*
+ * Macro for allocation of Bulk and Isoc TD pools
+ *
+ * When a Bulk or Isoc transfer needs to allocate too many TDs,
+ * the allocation for one physical contiguous TD pool may fail
+ * due to the fragmentation of physical memory. The number of
+ * TDs in one pool should be limited so that a TD pool is within
+ * page size under this situation.
+ */
+#if defined(__sparc)
+#define	UHCI_MAX_TD_NUM_PER_POOL	88
+#else
+#define	UHCI_MAX_TD_NUM_PER_POOL	44
+#endif
 
 /* set timeout flag so as to decrement timeout_cnt only once */
 #define	TW_TIMEOUT_FLAG		0x1000

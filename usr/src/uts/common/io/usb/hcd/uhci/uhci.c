@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1059,7 +1058,7 @@ uhci_handle_intr_td(uhci_state_t *uhcip, uhci_td_t *td)
 		}
 
 		/* Insert another interrupt TD */
-		if (uhci_insert_hc_td(uhcip, tw->tw_cookie.dmac_address,
+		if (uhci_insert_hc_td(uhcip, 0,
 		    tw->tw_length, pp, tw, PID_IN, attrs) != USB_SUCCESS) {
 
 			uhci_deallocate_periodic_in_resource(uhcip, pp, tw);
@@ -1104,7 +1103,7 @@ uhci_sendup_td_message(
 
 	switch (UHCI_XFER_TYPE(ept)) {
 	case USB_EP_ATTR_CONTROL:
-		skip_len = SETUP_SIZE;	/* length of the buffer to skip */
+		skip_len = UHCI_CTRL_EPT_MAX_SIZE; /* length to skip */
 		mp = ((usb_ctrl_req_t *)curr_xfer_reqp)->ctrl_data;
 		break;
 	case USB_EP_ATTR_INTR:
@@ -1137,16 +1136,34 @@ uhci_sendup_td_message(
 	    USB_EP_DIR_IN : ept->bEndpointAddress);
 
 	if (length) {
-		int rval;
+		int rval, i;
+		uchar_t *p = mp->b_rptr;
 
-		/* Sync the streaming buffer */
-		rval = ddi_dma_sync(tw->tw_dmahandle, 0, length,
-		    DDI_DMA_SYNC_FORCPU);
-		ASSERT(rval == DDI_SUCCESS);
+		if (UHCI_XFER_TYPE(ept) == USB_EP_ATTR_ISOCH) {
+			/* Deal with isoc data by packets */
+			for (i = 0; i < tw->tw_ncookies; i++) {
+				rval = ddi_dma_sync(
+				    tw->tw_isoc_bufs[i].dma_handle, 0,
+				    tw->tw_isoc_bufs[i].length,
+				    DDI_DMA_SYNC_FORCPU);
+				ASSERT(rval == DDI_SUCCESS);
 
-		/* Copy the data into the message */
-		ddi_rep_get8(tw->tw_accesshandle,
-		    mp->b_rptr, buf, length, DDI_DEV_AUTOINCR);
+				ddi_rep_get8(tw->tw_isoc_bufs[i].mem_handle,
+				    p, (uint8_t *)tw->tw_isoc_bufs[i].buf_addr,
+				    tw->tw_isoc_bufs[i].length,
+				    DDI_DEV_AUTOINCR);
+				p += tw->tw_isoc_bufs[i].length;
+			}
+		} else {
+			/* Sync the streaming buffer */
+			rval = ddi_dma_sync(tw->tw_dmahandle, 0,
+			    (skip_len + length), DDI_DMA_SYNC_FORCPU);
+			ASSERT(rval == DDI_SUCCESS);
+
+			/* Copy the data into the message */
+			ddi_rep_get8(tw->tw_accesshandle,
+			    mp->b_rptr, buf, length, DDI_DEV_AUTOINCR);
+		}
 
 		/* Increment the write pointer */
 		mp->b_wptr += length;
@@ -1248,7 +1265,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 			 * There is no data stage,  then
 			 * initiate status phase from the host.
 			 */
-			if ((uhci_insert_hc_td(uhcip, NULL, 0, pp, tw, PID_IN,
+			if ((uhci_insert_hc_td(uhcip, 0, 0, pp, tw, PID_IN,
 			    reqp->ctrl_attributes)) != USB_SUCCESS) {
 				USB_DPRINTF_L2(PRINT_MASK_LISTS,
 				    uhcip->uhci_log_hdl,
@@ -1275,7 +1292,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 			 * frame. This is bcos OHCI has seen some problem
 			 * when multiple TD's are inserted at the same time.
 			 */
-			tw->tw_length -= 8;
+			tw->tw_length -= UHCI_CTRL_EPT_MAX_SIZE;
 			MaxPacketSize = eptd->wMaxPacketSize;
 
 			/*
@@ -1300,7 +1317,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 			 * Get first 8 bytes of the command only.
 			 */
 			if ((uhci_insert_hc_td(uhcip,
-			    tw->tw_cookie.dmac_address + SETUP_SIZE, xx,
+			    UHCI_CTRL_EPT_MAX_SIZE, xx,
 			    pp, tw, tw->tw_direction,
 			    reqp->ctrl_attributes)) != USB_SUCCESS) {
 
@@ -1372,8 +1389,8 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 			tw->tw_tmp = bytes_for_xfer;
 
 			if ((uhci_insert_hc_td(uhcip,
-			    tw->tw_cookie.dmac_address + SETUP_SIZE +
-			    tw->tw_bytes_xfered, bytes_for_xfer, pp, tw,
+			    UHCI_CTRL_EPT_MAX_SIZE + tw->tw_bytes_xfered,
+			    bytes_for_xfer, pp, tw,
 			    tw->tw_direction,
 			    reqp->ctrl_attributes)) != USB_SUCCESS) {
 				USB_DPRINTF_L2(PRINT_MASK_LISTS,
@@ -1394,7 +1411,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 		pp->pp_data_toggle = 1;
 		direction = (tw->tw_direction == PID_IN) ? PID_OUT : PID_IN;
 
-		if ((uhci_insert_hc_td(uhcip, NULL, 0, pp, tw, direction,
+		if ((uhci_insert_hc_td(uhcip, 0, 0, pp, tw, direction,
 		    reqp->ctrl_attributes)) != USB_SUCCESS) {
 			USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 			    "uhci_handle_ctrl_td: TD exhausted");

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,12 +564,23 @@ typedef void (*ohci_handler_function_t)(
  *
  * The transfer wrapper represents a USB transfer on the bus and there
  * is one instance per USB transfer.  A transfer is made up of one or
- * more transactions.
+ * more transactions. OHCI uses one TD for one transaction. So one
+ * transfer wrapper may have one or more TDs associated.
  *
  * Control and bulk pipes will have one transfer wrapper per transfer
  * and where as Isochronous and Interrupt pipes will only have one
  * transfer wrapper. The transfers wrapper are continually reused for
  * the Interrupt and Isochronous pipes as those pipes are polled.
+ *
+ * Control, bulk and interrupt transfers will have one DMA buffer per
+ * transfer. The data to be transferred are contained in the DMA buffer
+ * which is virtually contiguous but physically discontiguous. When
+ * preparing the TDs for a USB transfer, the DMA cookies contained in
+ * the buffer need to be walked through to retrieve the DMA addresses.
+ *
+ * Isochronous transfers may have multiple DMA buffers per transfer
+ * with each isoc TD having a DMA buffer. And one isoc TD may hold up to
+ * eight isoc packets, but two cookies at most.
  */
 typedef struct ohci_trans_wrapper {
 	struct ohci_trans_wrapper	*tw_next;	/* Next wrapper */
@@ -581,6 +591,9 @@ typedef struct ohci_trans_wrapper {
 	uint32_t			tw_id;		/* 32bit ID */
 	size_t				tw_length;	/* Txfer length */
 	char				*tw_buf;	/* Buffer for Xfer */
+	uint_t				tw_ncookies;	/* DMA cookie count */
+	uint_t				tw_cookie_idx;	/* DMA cookie index */
+	size_t				tw_dma_offs;	/* DMA buffer offset */
 	usb_flags_t			tw_flags;	/* Flags */
 	uint_t				tw_num_tds;	/* Number of TDs */
 	ohci_td_t			*tw_hctd_head;	/* Head TD */
@@ -595,6 +608,10 @@ typedef struct ohci_trans_wrapper {
 
 	/* Current isochronous packet descriptor pointer */
 	usb_isoc_pkt_descr_t		*tw_curr_isoc_pktp;
+
+	/* Isochronous DMA handlers and buffer pointers are stored here */
+	ohci_isoc_buf_t			*tw_isoc_bufs;
+	size_t				tw_isoc_strtlen;
 
 	/* Transfer timeout information */
 	uint_t				tw_timeout;	/* Timeout value */
@@ -638,6 +655,12 @@ _NOTE(MUTEX_PROTECTS_DATA(ohci_state_t::ohci_int_mutex, ohci_trans_wrapper))
  * by OHCI is 8k. (See Open Host Controller Interface Spec rev 1.0a)
  */
 #define	OHCI_MAX_TD_XFER_SIZE	0x2000	/* Maxmum data per transaction */
+
+/*
+ * One OHCI TD allows two physically discontiguous pages. The page size
+ * is 4k.
+ */
+#define	OHCI_MAX_TD_BUF_SIZE	0x1000
 
 /*
  * The maximum allowable bulk data transfer size. It can be different
@@ -930,6 +953,15 @@ uint32_t	ohci_td_cpu_to_iommu(
 ohci_td_t	*ohci_td_iommu_to_cpu(
 				ohci_state_t		*ohcip,
 				uintptr_t		addr);
+size_t		ohci_get_td_residue(
+				ohci_state_t		*ohcip,
+				ohci_td_t		*td);
+void		ohci_init_td(
+				ohci_state_t		*ohcip,
+				ohci_trans_wrapper_t	*tw,
+				uint32_t		hctd_dma_offs,
+				size_t			hctd_length,
+				ohci_td_t		*td);
 
 /* Transfer Wrapper (TW) functions */
 void		ohci_deallocate_tw_resources(
