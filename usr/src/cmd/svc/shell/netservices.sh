@@ -277,19 +277,6 @@ then
 	svcadm restart $SENDMAIL_FMRI
 fi
 
-if [ "`svcprop -p restarter/state $BIND_FMRI:default`" = "online" ]
-then
-	# since inetd won't successfully re-register RPC-services after
-	# rpcbind restarts, we need to stop/start inetd too (and serialize
-	# these state-transitions)
-	svcadm disable -s $INETD_FMRI:default
-	svcadm disable -s $BIND_FMRI:default
-	echo "restarting rpcbind"
-	svcadm enable -s $BIND_FMRI:default
-	echo "restarting inetd"
-	svcadm enable -s $INETD_FMRI:default
-fi
-
 if [ $DT_CHANGED -eq 1 ]; then
 	if [ "`svcprop -p restarter/state $DTLOGIN_FMRI:default`" = "online" ]
 	then

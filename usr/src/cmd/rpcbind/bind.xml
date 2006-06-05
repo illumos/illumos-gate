@@ -99,6 +99,13 @@
 
 	<exec_method
 		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
 		name='stop'
 		exec='/lib/svc/method/rpc-bind %m %{restarter/contract}'
 		timeout_seconds='60'>

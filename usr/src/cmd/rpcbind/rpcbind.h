@@ -47,6 +47,7 @@
 #include <rpc/pmap_prot.h>
 #endif
 #include <rpc/rpcb_prot.h>
+#include <signal.h>
 
 #include <tcpd.h>
 
@@ -60,6 +61,7 @@ extern rpcblist_ptr list_rbl;	/* A list of version 3 & 4 rpcbind services */
 extern char *loopback_dg;	/* CLTS loopback transport, for set/unset */
 extern char *loopback_vc;	/* COTS loopback transport, for set/unset */
 extern char *loopback_vc_ord;	/* COTS_ORD loopback transport, for set/unset */
+extern volatile sig_atomic_t sigrefresh; /* Did we receive a SIGHUP recently? */
 
 #ifdef PORTMAP
 extern pmaplist *list_pml;	/* A list of version 2 rpcbind services */
@@ -74,6 +76,7 @@ extern int add_bndlist();
 extern int create_rmtcall_fd();
 extern bool_t is_bound();
 extern void my_svc_run();
+extern void rpcb_check_init(void);
 
 /* TCP wrapper functions and variables. */
 extern boolean_t localxprt(SVCXPRT *, boolean_t);

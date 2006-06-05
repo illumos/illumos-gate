@@ -59,7 +59,6 @@
 #include <stdlib.h>
 #include <thread.h>
 #include <synch.h>
-#include <deflt.h>
 #include <stdarg.h>
 #ifdef PORTMAP
 #include <netinet/in.h>
@@ -89,6 +88,7 @@ extern int Is_ipv6present(void);
 #define	MAX_FILEDESC_LIMIT	1023
 
 static void terminate(int);
+static void note_refresh(int);
 static void detachfromtty(void);
 static void parseargs(int, char *[]);
 static void rbllist_add(ulong_t, ulong_t, struct netconfig *, struct netbuf *);
@@ -96,7 +96,6 @@ static int init_transport(struct netconfig *);
 static int check_netconfig(void);
 
 static boolean_t check_hostserv(struct netconfig *, const char *, const char *);
-static void rpcb_check_init(void);
 static int setopt_reuseaddr(int);
 static int setopt_anon_mlp(int);
 static int setup_callit(int);
@@ -119,6 +118,8 @@ boolean_t verboselog = B_FALSE;
 boolean_t wrap_enabled = B_FALSE;
 boolean_t allow_indirect = B_TRUE;
 boolean_t local_only = B_FALSE;
+
+volatile sig_atomic_t sigrefresh;
 
 /* Local Variable */
 static int warmstart = 0;	/* Grab a old copy of registrations */
@@ -241,7 +242,7 @@ main(int argc, char *argv[])
 	(void) signal(SIGTERM, terminate);
 	(void) signal(SIGQUIT, terminate);
 	/* ignore others that could get sent */
-	(void) signal(SIGHUP, SIG_IGN);
+	(void) sigset(SIGHUP, note_refresh);
 	(void) signal(SIGUSR1, SIG_IGN);
 	(void) signal(SIGUSR2, SIG_IGN);
 	if (warmstart) {
@@ -710,6 +711,13 @@ terminate(int sig)
 	exit(2);
 }
 
+/* ARGSUSED */
+static void
+note_refresh(int sig)
+{
+	sigrefresh = 1;
+}
+
 void
 rpcbind_abort(void)
 {
@@ -904,8 +912,6 @@ check_hostserv(struct netconfig *nconf, const char *host, const char *serv)
 	return (B_TRUE);
 }
 
-#define	DEFRPCBIND	"/etc/default/rpcbind"
-
 /* Maximum outstanding syslog requests */
 #define	MAXLOG		100
 /* Maximum length: the messages generated are fairly short; no hostnames. */
@@ -970,20 +976,25 @@ get_smf_prop(const char *var, boolean_t def_val)
 }
 
 /*
- * Initialize: read the configuration parameters from SMF
+ * Initialize: read the configuration parameters from SMF.
+ * This function must be idempotent because it can be called from the
+ * main poll() loop in my_svc_run().
  */
-static void
+void
 rpcb_check_init(void)
 {
 	thread_t tid;
+	static int thr_running;
 
 	wrap_enabled = get_smf_prop("enable_tcpwrappers", B_FALSE);
 	verboselog = get_smf_prop("verbose_logging", B_FALSE);
 	allow_indirect = get_smf_prop("allow_indirect", B_TRUE);
 	local_only = get_smf_prop("local_only", B_FALSE);
 
-	if (wrap_enabled)
+	if (wrap_enabled && !thr_running) {
 		(void) thr_create(NULL, 0, logthread, NULL, THR_DETACHED, &tid);
+		thr_running = 1;
+	}
 }
 
 /*

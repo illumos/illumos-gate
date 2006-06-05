@@ -1433,7 +1433,13 @@ my_svc_run()
 			 * We ignore all errors, continuing with the assumption
 			 * that it was set by the signal handlers (or any
 			 * other outside event) and not caused by poll().
+			 * If it was our refresh signal, call the refresh
+			 * function.
 			 */
+			if (sigrefresh) {
+				sigrefresh = 0;
+				rpcb_check_init();
+			}
 		case 0:
 			continue;
 		default:
