@@ -206,6 +206,27 @@ name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0
 name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1
 	REFNODE mem-module fru WITH name:/platform/i2c@1f,530000/dimm-spd@0,ee
 
+/* Populate all possible nodes in the devtree with a status of "okay".
+ * This will get overridden by ASR.  If the dimm slots are not fully
+ * populated then no extra nodes or properties are created.
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+
 /*
  * DIMM seeprom sources
  */

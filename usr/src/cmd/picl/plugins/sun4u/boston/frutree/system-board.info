@@ -423,9 +423,48 @@ name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D0
 name:/frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu/B1/bank/D1
 	REFNODE mem-module fru WITH name:/platform/i2c@1f,520000/dimm-spd?UnitAddress=0,96
 
-/************************************
- * DIMM seeprom sources
- ************************************/
+/*********************************************
+ * DIMM seeprom sources and operational status
+ *********************************************/
+
+/* Fill in a status of "ok" for all possible dimms in the platform
+ * tree.  This status may be overridden by ASR with "disabled" or "unused".
+ * If a slot is actually not populated then no nodes/status properties
+ * actually get created.
+ */
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@2,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=0/memory-module?ID=1
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=0
+	PROP status string r 0 "okay"
+name:/platform/memory-controller@3,0/memory-module-group?ID=1/memory-module?ID=1
+	PROP status string r 0 "okay"
+
 /*
  * Board 0 CPU 0
  */
