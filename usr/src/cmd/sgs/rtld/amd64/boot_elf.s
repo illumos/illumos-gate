@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -105,7 +104,12 @@ elf_plt_trace()
  *	    %r11			 8
  *	    %rax			 8
  *				    =======
- *			    Total:	144 (16byte aligned)
+ *			    Subtotal:	144 (16byte aligned)
+ *
+ *	Saved Media Regs (used to pass floating point args):
+ *	    %xmm0 - %xmm7   16 * 8:	128
+ *				    =======
+ *			    Total:	272 (16byte aligned)
  *  
  *  So - will subtract the following to create enough space
  *
@@ -122,6 +126,14 @@ elf_plt_trace()
  *	-144(%rbp)	entering %r10
  *	-152(%rbp)	entering %r11
  *	-160(%rax)	entering %rax
+ *	-176(%xmm0)	entering %xmm0
+ *	-192(%xmm1)	entering %xmm1
+ *	-208(%xmm2)	entering %xmm2
+ *	-224(%xmm3)	entering %xmm3
+ *	-240(%xmm4)	entering %xmm4
+ *	-256(%xmm5)	entering %xmm5
+ *	-272(%xmm6)	entering %xmm6
+ *	-288(%xmm7)	entering %xmm7
  *
  */
 #define	SPDYNOFF    -8
@@ -137,12 +149,20 @@ elf_plt_trace()
 #define	SPR10OFF    -144
 #define	SPR11OFF    -152
 #define	SPRAXOFF    -160
+#define	SPXMM0OFF   -176
+#define	SPXMM1OFF   -192
+#define	SPXMM2OFF   -208
+#define	SPXMM3OFF   -224
+#define	SPXMM4OFF   -240
+#define	SPXMM5OFF   -256
+#define	SPXMM6OFF   -272
+#define	SPXMM7OFF   -288
 
 	.globl	elf_plt_trace
 	.type	elf_plt_trace,@function
 	.align 16
 elf_plt_trace:
-	subq	$144,%rsp	/ create some local storage
+	subq	$272,%rsp	/ create some local storage
 	movq	%rdi, SPRDIOFF(%rbp)
 	movq	%rsi, SPRSIOFF(%rbp)
 	movq	%rdx, SPRDXOFF(%rbp)
@@ -152,6 +172,14 @@ elf_plt_trace:
 	movq	%r10, SPR10OFF(%rbp)
 	movq	%r11, SPR11OFF(%rbp)
 	movq	%rax, SPRAXOFF(%rbp)
+	movdqa	%xmm0, SPXMM0OFF(%rbp)
+	movdqa	%xmm1, SPXMM1OFF(%rbp)
+	movdqa	%xmm2, SPXMM2OFF(%rbp)
+	movdqa	%xmm3, SPXMM3OFF(%rbp)
+	movdqa	%xmm4, SPXMM4OFF(%rbp)
+	movdqa	%xmm5, SPXMM5OFF(%rbp)
+	movdqa	%xmm6, SPXMM6OFF(%rbp)
+	movdqa	%xmm7, SPXMM7OFF(%rbp)
 
 	movq	SPDYNOFF(%rbp), %rax			/ %rax = dyndata
 	testb	$LA_SYMB_NOPLTENTER, SBFLAGS_OFF(%rax)	/ <link.h>
@@ -235,6 +263,14 @@ elf_plt_trace:
 	movq	SPR10OFF(%rbp), %r10
 	movq	SPR11OFF(%rbp), %r11
 	movq	SPRAXOFF(%rbp), %rax
+	movdqa	SPXMM0OFF(%rbp), %xmm0
+	movdqa	SPXMM1OFF(%rbp), %xmm1
+	movdqa	SPXMM2OFF(%rbp), %xmm2
+	movdqa	SPXMM3OFF(%rbp), %xmm3
+	movdqa	SPXMM4OFF(%rbp), %xmm4
+	movdqa	SPXMM5OFF(%rbp), %xmm5
+	movdqa	SPXMM6OFF(%rbp), %xmm6
+	movdqa	SPXMM7OFF(%rbp), %xmm7
 
 	subq	$8, %rbp			/ adjust %rbp for 'ret'
 	movq	%rbp, %rsp			/
@@ -314,6 +350,14 @@ elf_plt_trace:
 	movq	SPR10OFF(%rbp), %r10
 	movq	SPR11OFF(%rbp), %r11
 	movq	SPRAXOFF(%rbp), %rax
+	movdqa	SPXMM0OFF(%rbp), %xmm0
+	movdqa	SPXMM1OFF(%rbp), %xmm1
+	movdqa	SPXMM2OFF(%rbp), %xmm2
+	movdqa	SPXMM3OFF(%rbp), %xmm3
+	movdqa	SPXMM4OFF(%rbp), %xmm4
+	movdqa	SPXMM5OFF(%rbp), %xmm5
+	movdqa	SPXMM6OFF(%rbp), %xmm6
+	movdqa	SPXMM7OFF(%rbp), %xmm7
 
 	/*
 	 * Call to desitnation function - we'll return here
@@ -351,6 +395,14 @@ elf_plt_trace:
 	movq	SPR10OFF(%rbp), %r10
 	movq	SPR11OFF(%rbp), %r11
 	// rax already contains return value
+	movdqa	SPXMM0OFF(%rbp), %xmm0
+	movdqa	SPXMM1OFF(%rbp), %xmm1
+	movdqa	SPXMM2OFF(%rbp), %xmm2
+	movdqa	SPXMM3OFF(%rbp), %xmm3
+	movdqa	SPXMM4OFF(%rbp), %xmm4
+	movdqa	SPXMM5OFF(%rbp), %xmm5
+	movdqa	SPXMM6OFF(%rbp), %xmm6
+	movdqa	SPXMM7OFF(%rbp), %xmm7
 
 	movq	%rbp, %rsp			/
 	popq	%rbp				/

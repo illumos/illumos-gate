@@ -1104,3 +1104,4 @@ Bugid   Risk Synopsis
 6426048 C++ exceptions broken in Nevada for amd64
 6429418 ld.so.1: need work-around for Nvidia drivers use of static TLS
 6429504 crle(1) shows wrong defaults for non-existent 64-bit config file
+6431835 data corruption on x64 in 64-bit mode while LD_PROFILE is in effect
