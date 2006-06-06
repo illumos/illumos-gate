@@ -54,13 +54,21 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
+# No lint libraries are delivered for Net-SNMP yet
+SNMPLIBS = -L$(SFWLIBDIR) -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
+lint := SNMPLIBS=
+
 LDLIBS += $(MACH_LDLIBS)
 LDLIBS += -lfmd_adm -luutil -lnvpair
-LDLIBS += -L$(SFWLIBDIR) -lnetsnmp -lnetsnmphelpers -lnetsnmpagent -lc
+LDLIBS += $(SNMPLIBS)
+LDLIBS += -lc
 DYNFLAGS += -R$(SFWLIBDIR)
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
+
+# Net-SNMP's headers use do {} while (0) a lot
+LINTCHECKFLAGS += -erroff=E_CONSTANT_CONDITION
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx

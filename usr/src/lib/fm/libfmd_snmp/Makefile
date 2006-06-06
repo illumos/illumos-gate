@@ -51,11 +51,9 @@ lint := TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber: spec .WAIT $(SUBDIRS)
+all lint clean clobber: spec .WAIT $(SUBDIRS)
 
 install: install_h install_mibs spec .WAIT $(SUBDIRS)
-
-lint:
 
 install_h: $(ROOTFMHDRS)
 

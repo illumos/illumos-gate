@@ -73,9 +73,6 @@ static pthread_mutex_t	update_lock;
 static pthread_cond_t	update_cv;
 static volatile enum { US_QUIET, US_NEEDED, US_INPROGRESS } update_status;
 
-static const char SNMP_URL[] = SNMP_URL_MSG;
-#define	URL_BASE	"http://sun.com/msg/"
-
 static Netsnmp_Node_Handler	sunFmProblemTable_handler;
 static Netsnmp_Node_Handler	sunFmFaultEventTable_handler;
 
@@ -132,11 +129,10 @@ faultevent_lookup_index_exact(sunFmProblem_data_t *data, ulong_t index)
 	return (data->d_suspects[index - 1]);
 }
 
+/*ARGSUSED*/
 static int
 problem_update_one(const fmd_adm_caseinfo_t *acp, void *arg)
 {
-	const sunFmProblem_update_ctx_t	*update_ctx =
-	    (sunFmProblem_update_ctx_t *)arg;
 	sunFmProblem_data_t		*data;
 	nvlist_t			*nvl;
 	int64_t				*diag_time;
@@ -450,7 +446,6 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
     netsnmp_table_request_info *table_info)
 {
 	sunFmProblem_data_t	*data;
-	netsnmp_variable_list	*var;
 	char			*uuid = "";
 
 	if (table_info->number_indexes < 1) {
@@ -458,11 +453,12 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 
 		DEBUGMSGTL((MODNAME_STR, "nextpr: no indexes given\n"));
 
+		snmp_free_varbind(table_info->indexes);
 		table_info->indexes =
 		    SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
 		snmp_set_var_typed_value(table_info->indexes, ASN_OCTET_STR,
 		    (const uchar_t *)uuid, 0);
-		memcpy(tmpoid, reginfo->rootoid,
+		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;
 		tmpoid[reginfo->rootoid_len + 1] = table_info->colnum;
@@ -472,7 +468,7 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 		}
 		table_info->number_indexes = 1;
 		table_info->index_oid_len = table_info->indexes->name_length;
-		memcpy(table_info->index_oid, table_info->indexes->name,
+		(void) memcpy(table_info->index_oid, table_info->indexes->name,
 		    table_info->indexes->name_length);
 
 		DEBUGMSGTL((MODNAME_STR, "nextpr: built fake index:\n"));
@@ -500,7 +496,8 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 	if ((data = problem_lookup_uuid_next(uuid)) == NULL) {
 		DEBUGMSGTL((MODNAME_STR, "nextpr: next match not found for "
 		    "%s; trying next column\n", uuid));
-		if (table_info->colnum >= SUNFMPROBLEM_COLMAX) {
+		if (table_info->colnum >=
+		    netsnmp_find_table_registration_info(reginfo)->max_column) {
 			snmp_free_varbind(table_info->indexes);
 			table_info->indexes = NULL;
 			table_info->number_indexes = 0;
@@ -535,11 +532,11 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
  * Returns the problem data corresponding to the request in table_info.
  * All request parameters are unmodified.
  */
+/*ARGSUSED*/
 static sunFmProblem_data_t *
 sunFmProblemTable_pr(netsnmp_handler_registration *reginfo,
     netsnmp_table_request_info *table_info)
 {
-	sunFmProblem_data_t	*data;
 	char			*uuid;
 
 	ASSERT(table_info->number_indexes >= 1);
@@ -563,7 +560,6 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 	sunFmProblem_data_t	*data;
 	sunFmFaultEvent_data_t	*rv;
 	netsnmp_variable_list	*var;
-	char			*uuid;
 	ulong_t			index;
 
 	for (;;) {
@@ -607,7 +603,7 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 				    SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
 				snmp_set_var_typed_value(var, ASN_UNSIGNED,
 				    (uchar_t *)&index, sizeof (index));
-				memcpy(tmpoid, reginfo->rootoid,
+				(void) memcpy(tmpoid, reginfo->rootoid,
 				    reginfo->rootoid_len * sizeof (oid));
 				tmpoid[reginfo->rootoid_len] = 1;
 				tmpoid[reginfo->rootoid_len + 1] =
@@ -616,6 +612,8 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 					snmp_free_varbind(var);
 					return (NULL);
 				}
+				snmp_free_varbind(
+				    table_info->indexes->next_variable);
 				table_info->indexes->next_variable = var;
 				table_info->number_indexes = 2;
 				DEBUGMSGTL((MODNAME_STR, "nextfe: built fake "
@@ -655,6 +653,7 @@ sunFmFaultEventTable_fe(netsnmp_handler_registration *reginfo,
 	    *(ulong_t *)table_info->indexes->next_variable->val.integer));
 }
 
+/*ARGSUSED*/
 static void
 sunFmProblemTable_return(unsigned int reg, void *arg)
 {
@@ -662,9 +661,7 @@ sunFmProblemTable_return(unsigned int reg, void *arg)
 	netsnmp_request_info		*request;
 	netsnmp_agent_request_info	*reqinfo;
 	netsnmp_handler_registration	*reginfo;
-	netsnmp_mib_handler		*handler;
 	netsnmp_table_request_info	*table_info;
-	netsnmp_variable_list		*var;
 	sunFmProblem_data_t		*data;
 
 	ASSERT(netsnmp_handler_check_cache(cache) != NULL);
@@ -685,9 +682,7 @@ sunFmProblemTable_return(unsigned int reg, void *arg)
 	request = cache->requests;
 	reqinfo = cache->reqinfo;
 	reginfo = cache->reginfo;
-	handler = cache->handler;
 
-	var = request->requestvb;
 	table_info = netsnmp_extract_table_info(request);
 	request->delegated = 0;
 
@@ -824,6 +819,7 @@ sunFmProblemTable_handler(netsnmp_mib_handler *handler,
 	return (SNMP_ERR_NOERROR);
 }
 
+/*ARGSUSED*/
 static void
 sunFmFaultEventTable_return(unsigned int reg, void *arg)
 {
@@ -831,9 +827,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	netsnmp_request_info		*request;
 	netsnmp_agent_request_info	*reqinfo;
 	netsnmp_handler_registration	*reginfo;
-	netsnmp_mib_handler		*handler;
 	netsnmp_table_request_info	*table_info;
-	netsnmp_variable_list		*var;
 	sunFmProblem_data_t		*pdata;
 	sunFmFaultEvent_data_t		*data;
 
@@ -855,9 +849,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	request = cache->requests;
 	reqinfo = cache->reqinfo;
 	reginfo = cache->reginfo;
-	handler = cache->handler;
 
-	var = request->requestvb;
 	table_info = netsnmp_extract_table_info(request);
 	request->delegated = 0;
 
@@ -943,37 +935,49 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	case SUNFMFAULTEVENT_COL_ASRU:
 	{
 		nvlist_t	*asru = NULL;
-		char		*fmri;
+		char		*fmri, *str;
 
 		(void) nvlist_lookup_nvlist(data, FM_FAULT_ASRU, &asru);
-		if ((fmri = sunFm_nvl2str(asru)) == NULL)
+		if ((str = sunFm_nvl2str(asru)) == NULL)
 			fmri = "-";
+		else
+			fmri = str;
+
 		netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
+		free(str);
 		break;
 	}
 	case SUNFMFAULTEVENT_COL_FRU:
 	{
 		nvlist_t	*fru = NULL;
-		char		*fmri;
+		char		*fmri, *str;
 
 		(void) nvlist_lookup_nvlist(data, FM_FAULT_FRU, &fru);
-		if ((fmri = sunFm_nvl2str(fru)) == NULL)
+		if ((str = sunFm_nvl2str(fru)) == NULL)
 			fmri = "-";
+		else
+			fmri = str;
+
 		netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
+		free(str);
 		break;
 	}
 	case SUNFMFAULTEVENT_COL_RESOURCE:
 	{
 		nvlist_t	*rsrc = NULL;
-		char		*fmri;
+		char		*fmri, *str;
 
-		(void) nvlist_lookup_nvlist(data, FM_FAULT_ASRU, &rsrc);
-		if ((fmri = sunFm_nvl2str(rsrc)) == NULL)
+		(void) nvlist_lookup_nvlist(data, FM_FAULT_RESOURCE, &rsrc);
+		if ((str = sunFm_nvl2str(rsrc)) == NULL)
 			fmri = "-";
+		else
+			fmri = str;
+
 		netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
+		free(str);
 		break;
 	}
 	default:

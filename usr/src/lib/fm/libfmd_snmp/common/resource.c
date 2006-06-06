@@ -80,7 +80,7 @@ key_build(const char *fmri, const ulong_t index)
 
 	key.d_index = index;
 	if (fmri)
-		strlcpy(key.d_ari_fmri, fmri, sizeof (key.d_ari_fmri));
+		(void) strlcpy(key.d_ari_fmri, fmri, sizeof (key.d_ari_fmri));
 	else
 		key.d_ari_fmri[0] = '\0';
 
@@ -188,7 +188,7 @@ rsrcinfo_update_one(const fmd_adm_rsrcinfo_t *rsrcinfo, void *arg)
 		DEBUGMSGTL((MODNAME_STR, "index %lu is %s@%p\n", data->d_index,
 		    rsrcinfo->ari_fmri, data));
 
-		strlcpy(data->d_ari_fmri, rsrcinfo->ari_fmri,
+		(void) strlcpy(data->d_ari_fmri, rsrcinfo->ari_fmri,
 		    sizeof (data->d_ari_fmri));
 
 		uu_avl_node_init(data, &data->d_fmri_avl, rsrc_fmri_avl_pool);
@@ -210,7 +210,7 @@ rsrcinfo_update_one(const fmd_adm_rsrcinfo_t *rsrcinfo, void *arg)
 
 	if ((update_ctx->uc_type & UCT_ALL) ||
 	    update_ctx->uc_index == data->d_index) {
-		strlcpy(data->d_ari_case, rsrcinfo->ari_case,
+		(void) strlcpy(data->d_ari_case, rsrcinfo->ari_case,
 		    sizeof (data->d_ari_case));
 		data->d_ari_flags = rsrcinfo->ari_flags;
 	}
@@ -284,6 +284,7 @@ update_thread(void *arg)
 	uc.uc_prog = FMD_ADM_PROGRAM;
 	uc.uc_version = FMD_ADM_VERSION;
 
+	uc.uc_all = 0;
 	uc.uc_index = 0;
 	uc.uc_type = UCT_ALL;
 
@@ -493,7 +494,7 @@ sunFmResourceTable_nextrsrc(netsnmp_handler_registration *reginfo,
 		var = SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
 		snmp_set_var_typed_value(var, ASN_UNSIGNED, (uchar_t *)&index,
 		    sizeof (index));
-		memcpy(tmpoid, reginfo->rootoid,
+		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;
 		tmpoid[reginfo->rootoid_len + 1] = table_info->colnum;
@@ -506,7 +507,7 @@ sunFmResourceTable_nextrsrc(netsnmp_handler_registration *reginfo,
 		DEBUGMSGVAR((MODNAME_STR, var));
 		DEBUGMSG((MODNAME_STR, "\n"));
 	} else {
-		var = table_info->indexes;
+		var = snmp_clone_varbind(table_info->indexes);
 		index = *var->val.integer;
 		DEBUGMSGTL((MODNAME_STR, "nextrsrc: received index:\n"));
 		DEBUGMSGVAR((MODNAME_STR, var));
@@ -514,13 +515,16 @@ sunFmResourceTable_nextrsrc(netsnmp_handler_registration *reginfo,
 		index++;
 	}
 
+	snmp_free_varbind(table_info->indexes);
+	table_info->indexes = NULL;
+	table_info->number_indexes = 0;
+
 	if ((data = resource_lookup_index_nextvalid(index)) == NULL) {
 		DEBUGMSGTL((MODNAME_STR, "nextrsrc: exact match not found for "
 		    "index %lu; trying next column\n", index));
-		if (table_info->colnum >= SUNFMRESOURCE_COLMAX) {
+		if (table_info->colnum >=
+		    netsnmp_find_table_registration_info(reginfo)->max_column) {
 			snmp_free_varbind(var);
-			table_info->indexes = NULL;
-			table_info->number_indexes = 0;
 			DEBUGMSGTL((MODNAME_STR, "nextrsrc: out of columns\n"));
 			return (NULL);
 		}
@@ -534,13 +538,12 @@ sunFmResourceTable_nextrsrc(netsnmp_handler_registration *reginfo,
 		DEBUGMSGTL((MODNAME_STR, "nextrsrc: exact match not found for "
 		    "index %lu; stopping\n", index));
 		snmp_free_varbind(var);
-		table_info->indexes = NULL;
-		table_info->number_indexes = 0;
 		return (NULL);
 	}
 
 	*var->val.integer = index;
 	table_info->indexes = var;
+	table_info->number_indexes = 1;
 
 	DEBUGMSGTL((MODNAME_STR, "matching data is %lu/%s@%p\n", data->d_index,
 	    data->d_ari_fmri, data));
@@ -553,14 +556,12 @@ static sunFmResource_data_t *
 sunFmResourceTable_rsrc(netsnmp_handler_registration *reginfo,
     netsnmp_table_request_info *table_info)
 {
-	sunFmResource_data_t	*data;
-	netsnmp_variable_list	*var;
-
 	ASSERT(table_info->number_indexes == 1);
 
 	return (resource_lookup_index_exact(table_info->index_oid[0]));
 }
 
+/*ARGSUSED*/
 static void
 sunFmResourceTable_return(unsigned int reg, void *arg)
 {
@@ -568,9 +569,7 @@ sunFmResourceTable_return(unsigned int reg, void *arg)
 	netsnmp_request_info		*request;
 	netsnmp_agent_request_info	*reqinfo;
 	netsnmp_handler_registration	*reginfo;
-	netsnmp_mib_handler		*handler;
 	netsnmp_table_request_info	*table_info;
-	netsnmp_variable_list		*var;
 	sunFmResource_data_t		*data;
 	ulong_t				rsrcstate;
 
@@ -592,9 +591,7 @@ sunFmResourceTable_return(unsigned int reg, void *arg)
 	request = cache->requests;
 	reqinfo = cache->reqinfo;
 	reginfo = cache->reginfo;
-	handler = cache->handler;
 
-	var = request->requestvb;
 	table_info = netsnmp_extract_table_info(request);
 	request->delegated = 0;
 
@@ -709,16 +706,14 @@ sunFmResourceTable_handler(netsnmp_mib_handler *handler,
 	return (SNMP_ERR_NOERROR);
 }
 
+/*ARGSUSED*/
 static void
 sunFmResourceCount_return(unsigned int reg, void *arg)
 {
 	netsnmp_delegated_cache		*cache = (netsnmp_delegated_cache *)arg;
 	netsnmp_request_info		*request;
 	netsnmp_agent_request_info	*reqinfo;
-	netsnmp_handler_registration	*reginfo;
-	netsnmp_mib_handler		*handler;
 	ulong_t				rsrc_count_long;
-	int				err;
 
 	ASSERT(netsnmp_handler_check_cache(cache) != NULL);
 
@@ -737,13 +732,23 @@ sunFmResourceCount_return(unsigned int reg, void *arg)
 
 	request = cache->requests;
 	reqinfo = cache->reqinfo;
-	reginfo = cache->reginfo;
-	handler = cache->handler;
 
 	request->delegated = 0;
 
 	switch (reqinfo->mode) {
+	/*
+	 * According to the documentation, it's not possible for us ever to
+	 * be called with MODE_GETNEXT.  However, Net-SNMP does the following:
+	 * - set reqinfo->mode to MODE_GET
+	 * - invoke the handler
+	 * - set reqinfo->mode to MODE_GETNEXT (even if the request was not
+	 *   actually processed; i.e. it's been delegated)
+	 * Since we're called back later with the same reqinfo, we see
+	 * GETNEXT.  Therefore this case is needed to work around the
+	 * Net-SNMP bug.
+	 */
 	case MODE_GET:
+	case MODE_GETNEXT:
 		DEBUGMSGTL((MODNAME_STR, "resource count is %u\n", rsrc_count));
 		rsrc_count_long = (ulong_t)rsrc_count;
 		snmp_set_var_typed_value(request->requestvb, ASN_GAUGE,

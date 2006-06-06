@@ -96,7 +96,7 @@ key_build(const char *name, const ulong_t index)
 
 	key.d_index = index;
 	if (name)
-		strlcpy(key.d_ami_name, name, sizeof (key.d_ami_name));
+		(void) strlcpy(key.d_ami_name, name, sizeof (key.d_ami_name));
 	else
 		key.d_ami_name[0] = '\0';
 
@@ -201,7 +201,7 @@ modinfo_update_one(const fmd_adm_modinfo_t *modinfo, void *arg)
 		DEBUGMSGTL((MODNAME_STR, "index %lu is %s@%p\n", data->d_index,
 		    modinfo->ami_name, data));
 
-		strlcpy(data->d_ami_name, modinfo->ami_name,
+		(void) strlcpy(data->d_ami_name, modinfo->ami_name,
 		    sizeof (data->d_ami_name));
 
 		uu_avl_node_init(data, &data->d_name_avl, mod_name_avl_pool);
@@ -223,9 +223,9 @@ modinfo_update_one(const fmd_adm_modinfo_t *modinfo, void *arg)
 
 	if ((update_ctx->uc_type & UCT_ALL) ||
 	    update_ctx->uc_index == data->d_index) {
-		strlcpy(data->d_ami_vers, modinfo->ami_vers,
+		(void) strlcpy(data->d_ami_vers, modinfo->ami_vers,
 		    sizeof (data->d_ami_vers));
-		strlcpy(data->d_ami_desc, modinfo->ami_desc,
+		(void) strlcpy(data->d_ami_desc, modinfo->ami_desc,
 		    sizeof (data->d_ami_desc));
 		data->d_ami_flags = modinfo->ami_flags;
 	}
@@ -481,18 +481,20 @@ sunFmModuleTable_nextmod(netsnmp_handler_registration *reginfo,
 		var = SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
 		snmp_set_var_typed_value(var, ASN_UNSIGNED, (uchar_t *)&index,
 		    sizeof (index));
-		memcpy(tmpoid, reginfo->rootoid,
+		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;	/* Entry is .1 */
 		tmpoid[reginfo->rootoid_len + 1] = table_info->colnum;
 		if (build_oid(&var->name, &var->name_length, tmpoid,
-		    reginfo->rootoid_len + 2, var) != SNMPERR_SUCCESS)
+		    reginfo->rootoid_len + 2, var) != SNMPERR_SUCCESS) {
+			snmp_free_varbind(var);
 			return (NULL);
+		}
 		DEBUGMSGTL((MODNAME_STR, "nextmod: built fake index:\n"));
 		DEBUGMSGVAR((MODNAME_STR, var));
 		DEBUGMSG((MODNAME_STR, "\n"));
 	} else {
-		var = table_info->indexes;
+		var = snmp_clone_varbind(table_info->indexes);
 		index = *var->val.integer;
 		DEBUGMSGTL((MODNAME_STR, "nextmod: received index:\n"));
 		DEBUGMSGVAR((MODNAME_STR, var));
@@ -500,13 +502,16 @@ sunFmModuleTable_nextmod(netsnmp_handler_registration *reginfo,
 		index++;
 	}
 
+	snmp_free_varbind(table_info->indexes);
+	table_info->indexes = NULL;
+	table_info->number_indexes = 0;
+
 	if ((data = module_lookup_index_nextvalid(index)) == NULL) {
 		DEBUGMSGTL((MODNAME_STR, "nextmod: exact match not found for "
 		    "index %lu; trying next column\n", index));
-		if (table_info->colnum >= SUNFMMODULE_COLMAX) {
+		if (table_info->colnum >=
+		    netsnmp_find_table_registration_info(reginfo)->max_column) {
 			snmp_free_varbind(var);
-			table_info->indexes = NULL;
-			table_info->number_indexes = 0;
 			DEBUGMSGTL((MODNAME_STR, "nextmod: out of columns\n"));
 			return (NULL);
 		}
@@ -520,13 +525,12 @@ sunFmModuleTable_nextmod(netsnmp_handler_registration *reginfo,
 		DEBUGMSGTL((MODNAME_STR, "nextmod: exact match not found for "
 		    "index %lu; stopping\n", index));
 		snmp_free_varbind(var);
-		table_info->indexes = NULL;
-		table_info->number_indexes = 0;
 		return (NULL);
 	}
 
 	*var->val.integer = index;
 	table_info->indexes = var;
+	table_info->number_indexes = 1;
 
 	DEBUGMSGTL((MODNAME_STR, "matching data is %lu/%s@%p\n", data->d_index,
 	    data->d_ami_name, data));
@@ -539,14 +543,12 @@ static sunFmModule_data_t *
 sunFmModuleTable_mod(netsnmp_handler_registration *reginfo,
     netsnmp_table_request_info *table_info)
 {
-	sunFmModule_data_t	*data;
-	netsnmp_variable_list	*var;
-
 	ASSERT(table_info->number_indexes == 1);
 
 	return (module_lookup_index_exact(table_info->index_oid[0]));
 }
 
+/*ARGSUSED*/
 static void
 sunFmModuleTable_return(unsigned int reg, void *arg)
 {
@@ -554,9 +556,7 @@ sunFmModuleTable_return(unsigned int reg, void *arg)
 	netsnmp_request_info		*request;
 	netsnmp_agent_request_info	*reqinfo;
 	netsnmp_handler_registration	*reginfo;
-	netsnmp_mib_handler		*handler;
 	netsnmp_table_request_info	*table_info;
-	netsnmp_variable_list		*var;
 	sunFmModule_data_t		*data;
 	ulong_t				modstate;
 
@@ -578,9 +578,7 @@ sunFmModuleTable_return(unsigned int reg, void *arg)
 	request = cache->requests;
 	reqinfo = cache->reqinfo;
 	reginfo = cache->reginfo;
-	handler = cache->handler;
 
-	var = request->requestvb;
 	table_info = netsnmp_extract_table_info(request);
 	request->delegated = 0;
 

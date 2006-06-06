@@ -291,6 +291,7 @@ fmd_fmri_set_errno(int err)
 	return (-1);
 }
 
+/*ARGSUSED*/
 void
 fmd_fmri_warn(const char *format, ...)
 {
