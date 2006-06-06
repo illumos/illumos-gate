@@ -89,6 +89,7 @@ sparc_SUBDIRS= \
 	SUNWstc.u \
 	SUNWus.u \
 	SUNWust1.v \
+	SUNWustcar.v \
 	SUNWwrsa.u \
 	SUNWwrsd.u \
 	SUNWwrsm.u \

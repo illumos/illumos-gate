@@ -340,8 +340,6 @@ superfluous_local_zone_files="
 	platform/sun4u/sbin
 	platform/sun4u/ufsboot
 	platform/sun4u/wanboot
-	platform/sun4v/lib/libc_psr
-	platform/sun4v/lib/sparcv9/libc_psr
 	platform/sun4v/ufsboot
 	platform/sun4v/wanboot
 	sbin/dladm

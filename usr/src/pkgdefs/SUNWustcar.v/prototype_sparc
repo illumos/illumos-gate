@@ -35,21 +35,14 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i depend
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+# List files which are SPARC specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWust1.v
+# SUNWustcar.v
 #
-d none platform 755 root sys
-d none platform/sun4v 755 root sys
-d none platform/sun4v/kernel 755 root sys
-d none platform/sun4v/kernel/cpu 755 root sys
-d none platform/sun4v/kernel/cpu/sparcv9 755 root sys
-f none platform/sun4v/kernel/cpu/sparcv9/SUNW,UltraSPARC-T1 755 root sys
-d none platform/sun4v/kernel/pcbe 755 root sys
-d none platform/sun4v/kernel/pcbe/sparcv9 755 root sys
-f none platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T1 755 root sys
