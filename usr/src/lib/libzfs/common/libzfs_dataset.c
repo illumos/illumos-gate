@@ -351,7 +351,7 @@ zfs_open(libzfs_handle_t *hdl, const char *path, int types)
 
 	if (!(types & zhp->zfs_type)) {
 		(void) zfs_error(hdl, EZFS_BADTYPE, errbuf);
-		free(zhp);
+		zfs_close(zhp);
 		return (NULL);
 	}
 

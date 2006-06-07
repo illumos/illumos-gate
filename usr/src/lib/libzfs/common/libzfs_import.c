@@ -337,21 +337,28 @@ add_config(libzfs_handle_t *hdl, pool_list_t *pl, const char *path,
 /*
  * Returns true if the named pool matches the given GUID.
  */
-static boolean_t
-pool_active(libzfs_handle_t *hdl, const char *name, uint64_t guid)
+static int
+pool_active(libzfs_handle_t *hdl, const char *name, uint64_t guid,
+    boolean_t *isactive)
 {
 	zpool_handle_t *zhp;
 	uint64_t theguid;
 
-	if ((zhp = zpool_open_silent(hdl, name)) == NULL)
-		return (B_FALSE);
+	if (zpool_open_silent(hdl, name, &zhp) != 0)
+		return (-1);
+
+	if (zhp == NULL) {
+		*isactive = B_FALSE;
+		return (0);
+	}
 
 	verify(nvlist_lookup_uint64(zhp->zpool_config, ZPOOL_CONFIG_POOL_GUID,
 	    &theguid) == 0);
 
 	zpool_close(zhp);
 
-	return (theguid == guid);
+	*isactive = (theguid == guid);
+	return (0);
 }
 
 /*
@@ -381,6 +388,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 	uint_t children = 0;
 	nvlist_t **child = NULL;
 	uint_t c;
+	boolean_t isactive;
 
 	if (nvlist_alloc(&ret, 0, 0) != 0)
 		goto nomem;
@@ -555,7 +563,10 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 		    &guid) == 0);
 
-		if (pool_active(hdl, name, guid)) {
+		if (pool_active(hdl, name, guid, &isactive) != 0)
+			goto error;
+
+		if (!isactive) {
 			nvlist_free(config);
 			config = NULL;
 			continue;
@@ -641,14 +652,11 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 nomem:
 	(void) no_memory(hdl);
 error:
-	if (config)
-		nvlist_free(config);
-	if (ret)
-		nvlist_free(ret);
+	nvlist_free(config);
+	nvlist_free(ret);
 	for (c = 0; c < children; c++)
 		nvlist_free(child[c]);
-	if (child)
-		free(child);
+	free(child);
 
 	return (NULL);
 }
@@ -896,6 +904,7 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 	nvlist_t *pool_config;
 	uint64_t stateval;
 	spare_cbdata_t cb = { 0 };
+	boolean_t isactive;
 
 	*inuse = B_FALSE;
 
@@ -932,7 +941,12 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 		 * active pool that was disconnected without being explicitly
 		 * exported.
 		 */
-		if (pool_active(hdl, name, guid)) {
+		if (pool_active(hdl, name, guid, &isactive) != 0) {
+			nvlist_free(config);
+			return (-1);
+		}
+
+		if (isactive) {
 			/*
 			 * Because the device may have been removed while
 			 * offlined, we only report it as active if the vdev is

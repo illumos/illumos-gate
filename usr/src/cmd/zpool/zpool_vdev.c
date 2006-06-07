@@ -590,6 +590,28 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 
 				verify(nvlist_lookup_string(cnv,
 				    ZPOOL_CONFIG_TYPE, &childtype) == 0);
+
+				/*
+				 * If this is a a replacing or spare vdev, then
+				 * get the real first child of the vdev.
+				 */
+				if (strcmp(childtype,
+				    VDEV_TYPE_REPLACING) == 0 ||
+				    strcmp(childtype, VDEV_TYPE_SPARE) == 0) {
+					nvlist_t **rchild;
+					uint_t rchildren;
+
+					verify(nvlist_lookup_nvlist_array(cnv,
+					    ZPOOL_CONFIG_CHILDREN, &rchild,
+					    &rchildren) == 0);
+					assert(rchildren == 2);
+					cnv = rchild[0];
+
+					verify(nvlist_lookup_string(cnv,
+					    ZPOOL_CONFIG_TYPE,
+					    &childtype) == 0);
+				}
+
 				verify(nvlist_lookup_string(cnv,
 				    ZPOOL_CONFIG_PATH, &path) == 0);
 

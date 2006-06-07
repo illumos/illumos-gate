@@ -173,8 +173,10 @@ namespace_reload(libzfs_handle_t *hdl)
 	}
 
 	if (nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, &config, 0) != 0)
+	    zc.zc_config_dst_size, &config, 0) != 0) {
+		free((void *)(uintptr_t)zc.zc_config_dst);
 		return (no_memory(hdl));
+	}
 
 	free((void *)(uintptr_t)zc.zc_config_dst);
 
@@ -246,12 +248,13 @@ zpool_get_config(zpool_handle_t *zhp, nvlist_t **oldconfig)
  * been destroyed.
  */
 int
-zpool_refresh_stats(zpool_handle_t *zhp)
+zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 {
 	zfs_cmd_t zc = { 0 };
 	int error;
 	nvlist_t *config;
 
+	*missing = B_FALSE;
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
 
 	if (zhp->zpool_config_size == 0)
@@ -268,7 +271,7 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 			/*
 			 * The real error is returned in the zc_cookie field.
 			 */
-			error = errno = zc.zc_cookie;
+			error = zc.zc_cookie;
 			break;
 		}
 
@@ -280,7 +283,10 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 				return (-1);
 		} else {
 			free((void *)(uintptr_t)zc.zc_config_dst);
-			return (-1);
+			if (errno == ENOENT || errno == EINVAL)
+				*missing = B_TRUE;
+			zhp->zpool_state = POOL_STATE_UNAVAIL;
+			return (0);
 		}
 	}
 
@@ -293,8 +299,10 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 	zhp->zpool_config_size = zc.zc_config_dst_size;
 	free((void *)(uintptr_t)zc.zc_config_dst);
 
-	if (set_pool_health(config) != 0)
+	if (set_pool_health(config) != 0) {
+		nvlist_free(config);
 		return (no_memory(zhp->zpool_hdl));
+	}
 
 	if (zhp->zpool_config != NULL) {
 		uint64_t oldtxg, newtxg;
@@ -316,8 +324,12 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 	}
 
 	zhp->zpool_config = config;
+	if (error)
+		zhp->zpool_state = POOL_STATE_UNAVAIL;
+	else
+		zhp->zpool_state = POOL_STATE_ACTIVE;
 
-	return (error ? -1 : 0);
+	return (0);
 }
 
 /*
@@ -336,7 +348,10 @@ zpool_iter(libzfs_handle_t *hdl, zpool_iter_f func, void *data)
 	for (cn = uu_avl_first(hdl->libzfs_ns_avl); cn != NULL;
 	    cn = uu_avl_next(hdl->libzfs_ns_avl, cn)) {
 
-		if ((zhp = zpool_open_silent(hdl, cn->cn_name)) == NULL)
+		if (zpool_open_silent(hdl, cn->cn_name, &zhp) != 0)
+			return (-1);
+
+		if (zhp == NULL)
 			continue;
 
 		if ((ret = func(zhp, data)) != 0)

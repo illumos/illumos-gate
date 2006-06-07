@@ -1472,11 +1472,15 @@ static int
 refresh_iostat(zpool_handle_t *zhp, void *data)
 {
 	iostat_cbdata_t *cb = data;
+	boolean_t missing;
 
 	/*
 	 * If the pool has disappeared, remove it from the list and continue.
 	 */
-	if (zpool_refresh_stats(zhp) != 0)
+	if (zpool_refresh_stats(zhp, &missing) != 0)
+		return (-1);
+
+	if (missing)
 		pool_list_remove(cb->cb_list, zhp);
 
 	return (0);

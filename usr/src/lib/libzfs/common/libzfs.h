@@ -197,7 +197,7 @@ extern zpool_status_t zpool_import_status(nvlist_t *, char **);
  * Statistics and configuration functions.
  */
 extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **);
-extern int zpool_refresh_stats(zpool_handle_t *);
+extern int zpool_refresh_stats(zpool_handle_t *, boolean_t *);
 extern int zpool_get_errlog(zpool_handle_t *, nvlist_t ***, size_t *);
 
 #define	ZPOOL_ERR_DATASET	"dataset"

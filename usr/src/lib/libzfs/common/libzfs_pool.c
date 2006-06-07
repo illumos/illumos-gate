@@ -154,6 +154,7 @@ zpool_handle_t *
 zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
 {
 	zpool_handle_t *zhp;
+	boolean_t missing;
 
 	/*
 	 * Make sure the pool name is valid.
@@ -171,20 +172,19 @@ zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
 	zhp->zpool_hdl = hdl;
 	(void) strlcpy(zhp->zpool_name, pool, sizeof (zhp->zpool_name));
 
-	if (zpool_refresh_stats(zhp) != 0) {
-		if (errno == ENOENT || errno == EINVAL) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "no such pool"));
-			(void) zfs_error(hdl, EZFS_NOENT,
-			    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
-			    pool);
-			free(zhp);
-			return (NULL);
-		} else {
-			zhp->zpool_state = POOL_STATE_UNAVAIL;
-		}
-	} else {
-		zhp->zpool_state = POOL_STATE_ACTIVE;
+	if (zpool_refresh_stats(zhp, &missing) != 0) {
+		zpool_close(zhp);
+		return (NULL);
+	}
+
+	if (missing) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "no such pool"));
+		(void) zfs_error(hdl, EZFS_NOENT,
+		    dgettext(TEXT_DOMAIN, "cannot open '%s'"),
+		    pool);
+		zpool_close(zhp);
+		return (NULL);
 	}
 
 	return (zhp);
@@ -194,29 +194,31 @@ zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
  * Like the above, but silent on error.  Used when iterating over pools (because
  * the configuration cache may be out of date).
  */
-zpool_handle_t *
-zpool_open_silent(libzfs_handle_t *hdl, const char *pool)
+int
+zpool_open_silent(libzfs_handle_t *hdl, const char *pool, zpool_handle_t **ret)
 {
 	zpool_handle_t *zhp;
+	boolean_t missing;
 
-	if ((zhp = calloc(sizeof (zpool_handle_t), 1)) == NULL)
-		return (NULL);
+	if ((zhp = zfs_alloc(hdl, sizeof (zpool_handle_t))) == NULL)
+		return (-1);
 
 	zhp->zpool_hdl = hdl;
 	(void) strlcpy(zhp->zpool_name, pool, sizeof (zhp->zpool_name));
 
-	if (zpool_refresh_stats(zhp) != 0) {
-		if (errno == ENOENT || errno == EINVAL) {
-			free(zhp);
-			return (NULL);
-		} else {
-			zhp->zpool_state = POOL_STATE_UNAVAIL;
-		}
-	} else {
-		zhp->zpool_state = POOL_STATE_ACTIVE;
+	if (zpool_refresh_stats(zhp, &missing) != 0) {
+		zpool_close(zhp);
+		return (-1);
 	}
 
-	return (zhp);
+	if (missing) {
+		zpool_close(zhp);
+		*ret = NULL;
+		return (0);
+	}
+
+	*ret = zhp;
+	return (0);
 }
 
 /*
@@ -708,7 +710,9 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		/*
 		 * This should never fail, but play it safe anyway.
 		 */
-		if ((zhp = zpool_open_silent(hdl, thename)) != NULL) {
+		if (zpool_open_silent(hdl, thename, &zhp) != 0) {
+			ret = -1;
+		} else if (zhp != NULL) {
 			ret = zpool_create_zvol_links(zhp);
 			zpool_close(zhp);
 		}

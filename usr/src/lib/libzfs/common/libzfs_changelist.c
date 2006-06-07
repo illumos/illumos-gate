@@ -316,21 +316,24 @@ changelist_free(prop_changelist_t *clp)
 	prop_changenode_t *cn;
 	uu_list_walk_t *walk;
 
-	verify((walk = uu_list_walk_start(clp->cl_list,
-	    UU_WALK_ROBUST)) != NULL);
+	if (clp->cl_list) {
+		verify((walk = uu_list_walk_start(clp->cl_list,
+		    UU_WALK_ROBUST)) != NULL);
 
-	while ((cn = uu_list_walk_next(walk)) != NULL) {
+		while ((cn = uu_list_walk_next(walk)) != NULL) {
 
-		uu_list_remove(clp->cl_list, cn);
+			uu_list_remove(clp->cl_list, cn);
 
-		zfs_close(cn->cn_handle);
-		free(cn);
+			zfs_close(cn->cn_handle);
+			free(cn);
+		}
+
+		uu_list_walk_end(walk);
+
+		uu_list_destroy(clp->cl_list);
 	}
-
-	uu_list_walk_end(walk);
-
-	uu_list_destroy(clp->cl_list);
-	uu_list_pool_destroy(clp->cl_pool);
+	if (clp->cl_pool)
+		uu_list_pool_destroy(clp->cl_pool);
 
 	free(clp);
 }
@@ -421,10 +424,22 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	    sizeof (prop_changenode_t),
 	    offsetof(prop_changenode_t, cn_listnode),
 	    NULL, 0);
-	assert(clp->cl_pool != NULL);
+	if (clp->cl_pool == NULL) {
+		assert(uu_error() == UU_ERROR_NO_MEMORY);
+		(void) zfs_error(zhp->zfs_hdl, EZFS_NOMEM, "internal error");
+		changelist_free(clp);
+		return (NULL);
+	}
 
 	clp->cl_list = uu_list_create(clp->cl_pool, NULL, 0);
 	clp->cl_flags = flags;
+
+	if (clp->cl_list == NULL) {
+		assert(uu_error() == UU_ERROR_NO_MEMORY);
+		(void) zfs_error(zhp->zfs_hdl, EZFS_NOMEM, "internal error");
+		changelist_free(clp);
+		return (NULL);
+	}
 
 	/*
 	 * If this is a rename or the 'zoned' property, we pretend we're
