@@ -566,7 +566,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		if (pool_active(hdl, name, guid, &isactive) != 0)
 			goto error;
 
-		if (!isactive) {
+		if (isactive) {
 			nvlist_free(config);
 			config = NULL;
 			continue;
