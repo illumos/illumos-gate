@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -27,7 +26,7 @@
  * All rights reserved.
  *
  * pmButton.java
- * 
+ *
  */
 
 package com.sun.admin.pm.client;
@@ -39,13 +38,13 @@ import javax.swing.*;
 
 import com.sun.admin.pm.server.*;
 
-/* 
+/*
  * strategy:
  * Keep a hashtable of root panes and their associated default buttons.
  * Note that there is at present no way to remove a root pane entry
  * from the table...
  *
- * Ideally there should be an interface to allow objects to 
+ * Ideally there should be an interface to allow objects to
  * remove themselves before disappearing.
  */
 
@@ -67,7 +66,7 @@ public class pmButton extends JButton {
     boolean makeDefaultButton() {
         return makeDefaultButton(this);
     }
-    
+
     /*
      * make b the default on this root pane
      * returns true if success, false otherwise
@@ -86,8 +85,8 @@ public class pmButton extends JButton {
 
         /*
          * Debug.info("\nBUTTON:  makeDefaultButton " +
-         *         (b == null ? "null" : b.getText()) +
-         *              " on " + r + "\n");
+         *	(b == null ? "null" : b.getText()) +
+         *		" on " + r + "\n");
          */
 
         if (b != null && b.isDefaultCapable() == false) {
@@ -102,16 +101,16 @@ public class pmButton extends JButton {
         }
 
         /*
-         * Debug.info("\nBUTTON:  makeDefaultButton: old button was " + 
-         *              (oldb == null ? "null" : oldb.getText()) + "\n");
+         * Debug.info("\nBUTTON:  makeDefaultButton: old button was " +
+         *	(oldb == null ? "null" : oldb.getText()) + "\n");
          */
- 
+
         r.setDefaultButton(b);
 
         return true;
     }
 
-    
+
     public pmButton(String s) {
         super(s);
 
@@ -122,7 +121,7 @@ public class pmButton extends JButton {
                 if (e.isTemporary()) {
                     /*
                      * Debug.info("BUTTON:  " + getText() +
-                     *             " gained temp - ignoring");
+                     *		" gained temp - ignoring");
                      */
                     return;
                 }
@@ -131,7 +130,7 @@ public class pmButton extends JButton {
 
                 if (makeDefaultButton())
                     setFocusPainted(true);
-                
+
             }
 
             // upon losing focus: make 'true' default the default
@@ -139,7 +138,7 @@ public class pmButton extends JButton {
                 if (e.isTemporary()) {
                     /*
                      * Debug.info("BUTTON:  " + getText() +
-                     *              " lost temp - ignoring");
+                     *		" lost temp - ignoring");
                      */
                     return;
                 }
@@ -151,11 +150,11 @@ public class pmButton extends JButton {
                  * next focusable comp, but what if focus is being
                  * lost as the result of a mouse click??
                  */
-                
+
                 makeDefaultButton((JButton) map.get(getRootPane()));
                 // setFocusPainted(false);
             }
-                        
+
         });
     }
 
@@ -163,22 +162,22 @@ public class pmButton extends JButton {
     void setAsDefaultButton() {
         setAsDefaultButton(this);
     }
-    
+
     // make b the true default for this root pane
     void setAsDefaultButton(JButton b) {
         JRootPane r = getRootPane();
 
         /*
          * Debug.message("BUTTON:  setAsDefaultButton " +
-         *            (b == null ? "null" : b.getText()) +
-         *                   " root = " + r);
+         *	(b == null ? "null" : b.getText()) +
+         *			" root = " + r);
          */
 
         // setting default to null removes state
         if (b == null)
             map.remove(r);
         else
-            map.put(r, b);         // creates a new entry if needed
+            map.put(r, b);	// creates a new entry if needed
         makeDefaultButton(b);
     }
 
@@ -188,16 +187,16 @@ public class pmButton extends JButton {
         JRootPane r = getRootPane();
         map.remove(r);
     }
-    
+
     public static void unreference(JComponent c) {
         JRootPane r = c.getRootPane();
         map.remove(r);
     }
-    
+
     public static void unreference(JRootPane r) {
         map.remove(r);
     }
-    
+
 
     static boolean enableMnemonics = false;
 
@@ -206,7 +205,7 @@ public class pmButton extends JButton {
     }
 
     public void setMnemonic(int mnemonic) {
-        setMnemonic((char)mnemonic);    
+        setMnemonic((char)mnemonic);
     }
 
     public void setMnemonic(char mnemonic) {
@@ -215,7 +214,3 @@ public class pmButton extends JButton {
     }
 
 }
-
-
-
-

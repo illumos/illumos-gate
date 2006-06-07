@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -52,12 +51,12 @@ public interface Constants
 	int ADD = 6;
 	int DELETE = 7;
 
-	// Printer type to add/modify 
-	int ADDLOCAL = 1; 
+	// Printer type to add/modify
+	int ADDLOCAL = 1;
 	int ADDNETWORK = 2;
-	int MODIFYATTACHED = 3; 
-	int MODIFYREMOTE = 4; 
-	int MODIFYNETWORK = 5; 
+	int MODIFYATTACHED = 3;
+	int MODIFYREMOTE = 4;
+	int MODIFYNETWORK = 5;
 
 	// Printer connection types
 	int ATTACHED = 1;
@@ -66,7 +65,7 @@ public interface Constants
 	// Useful Constants
 	int MAXPNAMELEN = 20;
 
-	// Combo Listener 
+	// Combo Listener
 	int PORT = 1;
 	int TYPE = 2;
 	int MAKE = 3;

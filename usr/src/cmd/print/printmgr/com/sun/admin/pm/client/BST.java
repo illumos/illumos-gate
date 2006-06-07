@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -25,7 +24,7 @@
  *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
- * 
+ *
  * BST.java
  * Simple binary search tree implementation for help articles
  *
@@ -39,7 +38,7 @@ import com.sun.admin.pm.server.*;
 
 
 public class BST extends Object {
-    
+
     // these should be protected...
     public BST left = null;
     public BST right = null;
@@ -54,7 +53,7 @@ public class BST extends Object {
         left = right = null;
         data = theItem;
     }
-    
+
 
     public BST() {
         this(new BSTItem("", null));
@@ -72,7 +71,7 @@ public class BST extends Object {
         BST node = null;
 
         if (comp == 0) {
-            Debug.info("HELP: Duplicate insert: " + 
+            Debug.info("HELP: Duplicate insert: " +
                         theItem.toString());
         } else if (comp > 0) {
             if (left != null)
@@ -84,12 +83,12 @@ public class BST extends Object {
                 right.insert(theItem);
             else
                 right = node = new BST(theItem);
-        } 
+        }
 
         return node;
     }
 
-    
+
     public BST find_tree(String newKey) {
         return find_tree(newKey, true);
     }
@@ -101,13 +100,13 @@ public class BST extends Object {
 
     public BST find_tree(String newKey, boolean exactMatch) {
         /*
-          Debug.info("HELP: Finding " +(exactMatch ? "exact " : "partial ") +
-          newKey);
-        */
+         * Debug.info("HELP: Finding " +(exactMatch ? "exact " : "partial ") +
+         * newKey);
+         */
 
         BST rv = null;
         int comp = data.compare(newKey, exactMatch);
-      
+
         ++comparisons;
 
         if (comp > 0) {
@@ -119,7 +118,7 @@ public class BST extends Object {
         } else {
             rv = this;
             // Debug.info("HELP: Found " + newKey + " in " + data);
-        } 
+        }
 
         return rv;
     }
@@ -130,7 +129,7 @@ public class BST extends Object {
 
         BSTItem rv = null;
         int comp = data.compare(newKey, exactMatch);
-      
+
         ++comparisons;
 
         if (comp > 0) {
@@ -142,12 +141,12 @@ public class BST extends Object {
         } else {
             Debug.info("HELP: Found " + newKey + " in " + data);
             rv = this.data;
-        } 
+        }
 
         return rv;
     }
 
-    
+
 
     public void traverse() {
         if (left != null)
@@ -163,7 +162,7 @@ public class BST extends Object {
             right.traverse();
     }
 
- 
+
     public void traverse_find(String key) {
         if (left != null)
             left.traverse_find(key);
@@ -177,7 +176,7 @@ public class BST extends Object {
     // empty search string is a wildcard...
     public void traverse_find_vector(Vector v, String key) {
         /*
-         * Debug.info("HELP: traverse_find_vector: node " + 
+         * Debug.info("HELP: traverse_find_vector: node " +
          * data.key + "[" +(left!=null?left.data.key:"null") + "]" +
          * "[" +(right!=null ?right.data.key:"null") + "]" +
          * " seeking " + key);
@@ -186,12 +185,12 @@ public class BST extends Object {
 
         if (key.length() > 0)
             c = data.compare(key, false);
-      
+
         /*
-         * Debug.info("HELP: traverse_find_vector: compare " + 
+         * Debug.info("HELP: traverse_find_vector: compare " +
          * data.key + " to "+ key + " = " + c);
          */
-			
+
         if (c >= 0 && left != null)
             left.traverse_find_vector(v, key);
 
@@ -199,14 +198,14 @@ public class BST extends Object {
             // Debug.info("HELP: traverse_find_vector: adding " + data.key);
             v.addElement(data.data);
         }
-      
+
         if (c <= 0) {
             if (right != null)
                 right.traverse_find_vector(v, key);
         }
     }
 
-    
+
     public void dump() {
         Debug.info("HELP: \nDump: this = " + data.key);
 
@@ -249,27 +248,27 @@ public class BST extends Object {
 
         BST.comparisons = 0;
         bst.insert(a);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.insert(x);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.insert(e);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.insert(c);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.insert(b);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.insert(d);
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
 
         bst.insert(aa);
@@ -285,19 +284,19 @@ public class BST extends Object {
 
         BST.comparisons = 0;
         bst.find("Echo");
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.find("Xray");
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.find("Delta");
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         BST.comparisons = 0;
         bst.find("Root");
-        System.out.println(BST.comparisons + 
+        System.out.println(BST.comparisons +
                             " comparisons\n");
         bst.find("Alpha");
 
@@ -326,10 +325,3 @@ public class BST extends Object {
         }
     }
 }
-
-
-    
-
-
-
-

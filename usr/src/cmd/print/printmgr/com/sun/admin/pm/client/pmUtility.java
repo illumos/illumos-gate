@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -100,22 +99,22 @@ public class pmUtility {
 	int keyvalue = 0;
 	String s = null;
 	ResourceBundle bundle = null;
-	
+
 	try {
 		bundle = ResourceBundle.getBundle(
 			"com.sun.admin.pm.client.pmResources");
 	} catch (MissingResourceException e) {
 		Debug.fatal("Could not load pmResources file");
 	}
-	
+
 	try {
     		s = bundle.getString(key);
 	} catch (MissingResourceException e) {
 		Debug.error("Missing: " + key);
 	}
-	
+
 	Debug.message("Resource: " + key + " Value: " + s);
-	
+
 	if (s != null) {
 		try {
 		    keyvalue = s.charAt(0);
@@ -123,7 +122,7 @@ public class pmUtility {
 		    Debug.error("Resource: " + key + " threw: " + x);
 		}
         }
- 
+
 	return keyvalue;
     }
 
@@ -133,7 +132,7 @@ public class pmUtility {
 	pmLogin l;
 
 	if (mytop.ns.getNameService().equals("nis") ||
-	 	mytop.ns.getNameService().equals("ldap")) {
+		mytop.ns.getNameService().equals("ldap")) {
 
 	    if (mytop.ns.getNameService().equals("nis")) {
 
@@ -189,9 +188,9 @@ public class pmUtility {
 		    }
 
 		    try {
-		    	mytop.ns.checkAuth();
+			mytop.ns.checkAuth();
 				Debug.message("doLogin():checkauth() OK");
-		    } catch (Exception e) { 
+		    } catch (Exception e) {
 			Debug.warning("doLogin:checkAuth()exception " + e);
 			throw new pmGuiException("Login.Authorization.Failed");
 		    }
@@ -200,7 +199,7 @@ public class pmUtility {
 
 	// User has not put in printer or server
 	} else {
-    	    pmMessageDialog m =
+	    pmMessageDialog m =
 		new pmMessageDialog(
 			frame,
 			pmUtility.getResource("Login.Failure"),
@@ -210,7 +209,7 @@ public class pmUtility {
 	    m.setVisible(true);
 	    throw new pmGuiException("pmAccess: Cannot create Login screen");
 	}
-        
+
     }
 
 

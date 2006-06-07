@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -61,18 +60,18 @@ public class pmAccess extends pmButtonScreen {
     pmTop mytop;
     String printer = null;
     String server = null;
-    
+
     String cmdLog = null;
     String errorLog = null;
     String warnLog = null;
-    
+
 
     final static int OK =  1;
     final static int APPLY =  2;
     final static int RESET =  3;
     final static int CANCEL =  4;
     final static int HELP =  5;
-    
+
     public pmAccess(pmTop mytop) {
 
         // ensure that pmButton hashtable gets cleaned up
@@ -81,20 +80,20 @@ public class pmAccess extends pmButtonScreen {
         setLayout(new BorderLayout());
 
 	this.mytop = mytop;
-        
+
 	// Build the Frame
 	centerPanel();
 	southPanel();
-        
+
 	/*
-         * let's try doing this in Show...
-         *
-         * // default button is always OK, for now...
-         * frame.getRootPane().setDefaultButton(okButton);
-         * 
-         * okButton.setAsDefaultButton();
-         */
-        
+	 * let's try doing this in Show...
+	 *
+	 * // default button is always OK, for now...
+	 * frame.getRootPane().setDefaultButton(okButton);
+	 *
+	 * okButton.setAsDefaultButton();
+	 */
+
         // handle Esc as cancel
 	this.registerKeyboardAction(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -103,10 +102,10 @@ public class pmAccess extends pmButtonScreen {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-        
+
         // enable the pmFrame to set focus to our default comp on activation
 	frame.setDefaultComponent(pnameText);
-        
+
 
 	// following is test code, I think...
 	Component glass = frame.getGlassPane();
@@ -122,7 +121,7 @@ public class pmAccess extends pmButtonScreen {
                 Debug.info("Glass: " + k);
             }
 	});
-        
+
     }
 
     public void centerPanel() {
@@ -351,7 +350,7 @@ public class pmAccess extends pmButtonScreen {
 				"Continue.creating.access.for.this.printer?"));
 		d.setVisible(true);
 		if (d.getValue() != JOptionPane.OK_OPTION) {
-		    pmMessageDialog m = new pmMessageDialog(frame,      
+		    pmMessageDialog m = new pmMessageDialog(frame,
 			    pmUtility.getResource("Warning"),
 			    pmUtility.getResource("Operation.Cancelled"));
 		    m.setVisible(true);
@@ -378,10 +377,10 @@ public class pmAccess extends pmButtonScreen {
     // returns true if success, false otherwise
     boolean doAction() {
         boolean rv = false;
-        
+
         try {
             createAccess();
-            rv = true;      // only if it didn't throw!
+	    rv = true;	// only if it didn't throw!
         } catch (pmIncompleteFormException ix) {
 		Debug.warning(
 			"CLNT:pmAccess:incomplete form " + ix.getMessage());
@@ -449,7 +448,7 @@ public class pmAccess extends pmButtonScreen {
         return rv;
     }
 
-    
+
     public void pmScreendispose() {
         frame.dispose();
     }
@@ -475,13 +474,13 @@ public class pmAccess extends pmButtonScreen {
         Debug.message("CLNT:pmAccess:actionapplyButton()");
 
         if (doAction() == true) {
-	    		mytop.pmsetdefaultpLabel();
+			mytop.pmsetdefaultpLabel();
 			mytop.scrollPane.revalidate();
 			mytop.scrollPane.repaint();
 
 		}
     }
- 
+
 
     public void actionresetButton() {
         Debug.message("CLNT:pmAccess:actionresetButton()");

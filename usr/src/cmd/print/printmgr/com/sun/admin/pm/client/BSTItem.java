@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,7 +38,7 @@ public class BSTItem extends Object {
     public String key;
     public Object data;
     public int handle = UNINITIALIZED;
-  
+
     static int serial = 0;
     static final int UNINITIALIZED = -1;
 
@@ -58,7 +57,7 @@ public class BSTItem extends Object {
     }
 
     public int compare(BSTItem otherItem, boolean exact) {
-    
+
         return compare(otherItem.key, exact);
     }
 
@@ -86,9 +85,9 @@ public class BSTItem extends Object {
                 key.compareTo(otherKey) :
                 compareSub(otherKey.toLowerCase());
 
-        /*
+	/*
 	 *  System.out.println(
-         *       "Compare: " + key + " to " + otherKey + " -> " + rv);
+	 *	"Compare: " + key + " to " + otherKey + " -> " + rv);
 	 */
 
         return rv;
@@ -97,7 +96,7 @@ public class BSTItem extends Object {
 
     public int compareSub(String s) {
         Debug.info("HELP:  compareSub: " + key + " to " + s);
-    
+
         int rv = 0;
         try {
             rv = key.substring(0, s.length()).compareTo(s);
@@ -108,17 +107,3 @@ public class BSTItem extends Object {
         return rv;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

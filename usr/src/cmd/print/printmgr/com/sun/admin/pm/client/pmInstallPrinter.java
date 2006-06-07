@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -88,17 +87,17 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 	String actionName = null;
 
-	// where to place initial focus 
+	// where to place initial focus
    	Component defaultComponent = null;
 
 	boolean usePPD;
 	boolean useLocalhost;
- 
+
     public pmInstallPrinter(pmTop myTop, int action) throws pmGuiException {
         boolean failed = false;
 	boolean cacheerr = false;
 	boolean ppdincacheerr = false;
-        
+
 	this.myTop = myTop;
 	this.action = action;
 	workingPrinter = new Printer(myTop.ns);
@@ -121,7 +120,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    actionName =
 	    pmUtility.getResource("New.Attached.Printer");
 	    break;
-            
+
 	case Constants.ADDNETWORK:
 
 	    Debug.message("CLNT:pmInstPr: ADD NETWORK");
@@ -188,17 +187,17 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    // error popup?
 	    // throw something?
 	    }
-		    
+
 	    pmCalls.debugShowPrinter(workingPrinter);
 	    dumpLogs("ModifyAttached()");
-		    
+
 	    if (workingPrinter.getPPD() != null)
 		helpTag = "ModifyPPD";
 	    else
 		helpTag = "Modify";
 
 	    // helpTag = "ModifyAttached";
-	    
+
 	    actionName = pmUtility.getResource("Modify.Printer.Properties");
 	    break;
 
@@ -217,7 +216,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    } catch (Exception e) {
 		failed = true;
 		Debug.message("CLNT:pmInstPr:ModifyNetwork caught " + e);
-	    }   
+	    }
 
 	    gatherLogs(workingPrinter);
 
@@ -225,7 +224,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    // error popup?
 		// throw new pmGuiException();
 	    }
-	    
+
 	    pmCalls.debugShowPrinter(workingPrinter);
 	    dumpLogs("ModifyNetwork()");
 
@@ -236,7 +235,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    // helpTag = "ModifyNetwork";
 
 	    actionName = pmUtility.getResource("Modify.Printer.Properties");
-	    
+
 	    break;
 
 	case Constants.MODIFYREMOTE:
@@ -259,7 +258,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 		// error popup?
 		// throw something?
 	    }
-	    
+
 
 	    if (workingPrinter.getPPD() != null)
 		helpTag = "ModifyPPD";
@@ -269,9 +268,9 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 	    actionName = pmUtility.getResource("Modify.Printer.Properties");
 	    break;
-       
+
         }
-	
+
 	// ensure that pmButton hashtable gets cleaned up
 	frame.setClearButtonsOnClose(true);
 
@@ -297,11 +296,11 @@ public class pmInstallPrinter extends pmInstallScreen {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-                                                            
+
 	if (action == Constants.ADDLOCAL || action == Constants.ADDNETWORK) {
 			defaultComponent = pnameText;
 	} else {
-              	defaultComponent = descText; 
+              	defaultComponent = descText;
 	}
 
 	frame.setDefaultComponent(defaultComponent);
@@ -326,12 +325,12 @@ public class pmInstallPrinter extends pmInstallScreen {
 	public accessListModel() {
 		numColumns = getColumnCount();
 	}
-	
+
 	public void addaccessList(String data[]) {
 
 		for (int i = 0; i < data.length; i++) {
 			access.addElement(data[i]);
-			
+
 		}
 	}
 
@@ -398,19 +397,19 @@ public class pmInstallPrinter extends pmInstallScreen {
 
     public void centerPanel() {
 	JPanel center = new JPanel();
-		
+
 	accessModel = new accessListModel();
 	accessList = new JList(accessModel);
 	accessList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-		
+
 	center.setLayout(new GridBagLayout());
 	GridBagConstraints c = new GridBagConstraints();
 
 	ListSelectionModel rowSelectModel = accessList.getSelectionModel();
 	rowSelectModel.addListSelectionListener(new ListSelectionListener() {
 		public void valueChanged(ListSelectionEvent e) {
-			ListSelectionModel accessSM = 
+			ListSelectionModel accessSM =
 				(ListSelectionModel)e.getSource();
 		}
 	});
@@ -443,8 +442,8 @@ public class pmInstallPrinter extends pmInstallScreen {
 	center.add(ascrollPane, c);
 
 	// Create Textfield
-	c.gridx = 1;	
-	c.gridy = 1;	
+	c.gridx = 1;
+	c.gridy = 1;
 	c.ipadx = 15;
 	c.fill = GridBagConstraints.HORIZONTAL;
 	c.anchor = GridBagConstraints.WEST;
@@ -457,7 +456,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	c.gridy = 2;
 
 	adButtons(c);
-	
+
 	c.gridwidth = 1;
 	center.add(addButton, c);
 
@@ -474,7 +473,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	GridBagConstraints c = new GridBagConstraints();
 
 	northPanelConstraints(c);
-	
+
 	// Define the constraints and create the labels
 
 	// All Add/Modify
@@ -557,7 +556,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	c.gridy = 0;
 
 	// Printer Name and Server Name
-	if ((action == Constants.ADDLOCAL) || 
+	if ((action == Constants.ADDLOCAL) ||
 		(action == Constants.ADDNETWORK)) {
 
 		TextFieldConstraints(c);
@@ -585,7 +584,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	// Description
 	TextFieldConstraints(c);
 	descriptionField(north, c);
-	if (action == Constants.MODIFYATTACHED || 
+	if (action == Constants.MODIFYATTACHED ||
 		action == Constants.MODIFYNETWORK ||
 		action == Constants.MODIFYREMOTE) {
 		if (workingPrinter.getComment() != null)
@@ -689,7 +688,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 			defaultp.doClick();
 		}
 	}
-	
+
 	add("North", north);
     }
 
@@ -697,7 +696,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	String p = workingPrinter.getProtocol();
 
 	if (p != null)  {
-		if (p.equals("bsd")) 
+		if (p.equals("bsd"))
 			protocolCombo.setSelectedItem("BSD");
 		else if (p.equals("tcp"))
 			protocolCombo.setSelectedItem("TCP");
@@ -730,7 +729,7 @@ public class pmInstallPrinter extends pmInstallScreen {
     public void setFault() {
 	String fault = workingPrinter.getNotify();
 
-	if (fault == null || fault == "none") 
+	if (fault == null || fault == "none")
 		faultCombo.setSelectedItem(
 		    pmUtility.getResource("None"));
 
@@ -783,7 +782,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 			filecontents = filecontents.concat(filedata[i]);
 		}
-		Debug.message("CLNT:pmInstPr:setType: filecontents = " + 
+		Debug.message("CLNT:pmInstPr:setType: filecontents = " +
 				filecontents);
 
 		if (filecontents.equals("postscript")) {
@@ -820,7 +819,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 
        	if (type == null)
        		return;
-        
+
 	if (type.equals("PS")) {
 		typeCombo.setSelectedItem("PostScript");
 	} else if (type.equals("hplaser")) {
@@ -905,12 +904,12 @@ public class pmInstallPrinter extends pmInstallScreen {
 		Debug.warning(
 		"CLNT:pmInstPr:getLocalHostName exception " + e);
 	}
-		
+
 	Debug.message(
 	    "CLNT:pmInstPr:getPrinterServer(): printer is: " + printer);
 	Debug.message(
 	    "CLNT:pmInstPr:getPrinterServer(): server is: " + server);
-	
+
     }
 
     public void getPort() throws pmGuiException {
@@ -974,7 +973,7 @@ public class pmInstallPrinter extends pmInstallScreen {
     }
 
     public void getUserAccess() {
-		
+
 	if (accessModel.getRowCount() != 0) {
 		useraccesslist = new String[accessModel.getRowCount()];
 		accessModel.accesstoArray(useraccesslist);
@@ -1066,7 +1065,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 			lp = new String("mail");
 		else if (n.equals(pmUtility.getResource("None")))
 			lp = new String("none");
-			
+
 	} else {
 		Debug.message(
 		"CLNT:pmInstPr:gui2lpfaultn():input faultnotify null");
@@ -1150,10 +1149,10 @@ public class pmInstallPrinter extends pmInstallScreen {
                 a[0] = new String("none");
                 workingPrinter.setUserAllowList(a);
             }
-                
+
             if (defaultp != null)
                 workingPrinter.setIsDefaultPrinter(defaultp.isSelected());
-                
+
             if (banner != null)
                 workingPrinter.setBanner(gui2lpbanner(banner));
 
@@ -1177,7 +1176,7 @@ public class pmInstallPrinter extends pmInstallScreen {
         Debug.message(who + " warnings: " + warnLog);
         Debug.message(who + " errors: " + errorLog);
     }
-    
+
 
     public void doAddLocal() throws pmGuiException {
 
@@ -1208,7 +1207,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 		exist = PrinterUtil.exists(printer, myTop.ns);
         } catch (Exception e) {
             throw new pmGuiException();
-        } 
+        }
 
         if (exist) {
             throw new pmPrinterExistsException();
@@ -1228,7 +1227,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 
     }
 
-    
+
     public void doAddNetwork() throws pmGuiException {
 	try {
 		getPrinterServer();
@@ -1248,7 +1247,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	}
 
        	boolean exist = false;
-        
+
 	try {
 		exist = PrinterUtil.exists(printer, myTop.ns);
 	} catch (Exception e) {
@@ -1277,7 +1276,7 @@ public class pmInstallPrinter extends pmInstallScreen {
         }
     }
 
-        
+
     public void doModifyLocalAttached() throws pmGuiException {
 	getDescription();
 	getFault();
@@ -1357,15 +1356,15 @@ public class pmInstallPrinter extends pmInstallScreen {
 
     }
 
-    
+
     public void doClearFields() {
 
 	if (pnameText != null)
-		pnameText.setText("");	
+		pnameText.setText("");
 	if (snameText != null)
-		snameText.setText("");	
+		snameText.setText("");
 	if (descText != null)
-		descText.setText("");	
+		descText.setText("");
 	if (portCombo != null)
 		portCombo.setSelectedIndex(0);
 	if (makeCombo != null)
@@ -1381,7 +1380,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	if (protocolCombo != null)
 		protocolCombo.setSelectedIndex(0);
 	if (destText != null)
-		destText.setText("");	
+		destText.setText("");
 
 	if (defaultp.isSelected())
 		defaultp.doClick();
@@ -1433,7 +1432,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 		if (action == Constants.MODIFYNETWORK)
 			setNetworkInfo();
-	
+
 		try {
 			accessModel.removeListEntries();
 			accessModel.addaccessList(
@@ -1455,10 +1454,10 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    }
 
 	    // selected and printer object out of sync
-	    if ((defaultp.isSelected() && 
+	    if ((defaultp.isSelected() &&
 			!workingPrinter.getIsDefaultPrinter()) ||
 
-		(!defaultp.isSelected() && 
+		(!defaultp.isSelected() &&
 			workingPrinter.getIsDefaultPrinter()))
 
 			defaultp.doClick();
@@ -1490,7 +1489,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	}
 
         // as a side effect, the OK button will regain default status
-        if (defaultComponent != null) 
+        if (defaultComponent != null)
 		defaultComponent.requestFocus();
     }
 
@@ -1555,7 +1554,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 		workingPrinter.getPrinterDetails();
 		Debug.message(
 			"CLNT:pmInstPr:Printer Details: server is " +
-               	    	workingPrinter.getPrintServer());
+			workingPrinter.getPrintServer());
 		doModifyLocalAttached();
 		break;
 	    case Constants.MODIFYNETWORK:
@@ -1580,14 +1579,14 @@ public class pmInstallPrinter extends pmInstallScreen {
 		throw new pmIncompleteFormException();
         } catch (pmPrinterExistsException ee) {
             	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Error"),
 		    pmUtility.getResource(
 			"The.specified.printer.already.exists."));
             	m.setVisible(true);
 	} catch (pmNullSelectedPrinterException ne) {
         	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Error"),
 		    pmUtility.getResource(
 			"The.selected.printer.does.not.exist."));
@@ -1596,43 +1595,43 @@ public class pmInstallPrinter extends pmInstallScreen {
                 // frame.dispose();
         } catch (pmAddPrinterFailedException ae) {
          	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Error"),
 		    ae.getMessage(),
 		    myTop,
-		    "AddPrinterFailed");  
+		    "AddPrinterFailed");
 		m.setVisible(true);
-            
+
         } catch (pmModifyPrinterFailedException me) {
             	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Error"),
 		    me.getMessage(),
 		    myTop,
-		    "ModifyFailed");  
+		    "ModifyFailed");
             	m.setVisible(true);
         } catch (pmGuiException ge) {
             	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Application.Error"),
 		    ge.toString());
             	m.setVisible(true);
 
         } catch (pmCmdFailedException cfe) {
 		String msg = cfe.getMessage();
-            	if (msg == null || msg.length() == 0) 
+            	if (msg == null || msg.length() == 0)
 			msg = pmUtility.getResource(
                                 "error.message.command-failed");
-		
+
 		pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Command.Failed.Error"),
 		    msg);
             	m.setVisible(true);
 
         } catch (Exception e) {
             	pmMessageDialog m = new pmMessageDialog(
-		    frame, 
+		    frame,
 		    pmUtility.getResource("Unknown.Application.Error"),
 		    e.toString());
             	m.setVisible(true);
@@ -1684,7 +1683,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	    o.setVisible(true);
 	    if (o.getValue() == JOptionPane.OK_OPTION) {
 		    port = o.deviceName.getText();
-		   int idx = portCombo.getItemCount(); 
+		   int idx = portCombo.getItemCount();
 		    try {
 			if (!port.equals("") && Valid.device(port)) {
 				portCombo.insertItemAt(
@@ -1743,7 +1742,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 			Debug.message(
 			    "CLNT: makemodel[1] = " + makemodel[1]);
 
-			if (idx != -1) 
+			if (idx != -1)
 			    tmake = new String(makemodel[0].substring(0, idx));
 			else
 			    tmake = new String(makemodel[0]);
@@ -1804,14 +1803,14 @@ public class pmInstallPrinter extends pmInstallScreen {
 				// Make to front of model
 				if (!havemodel) {
 				    for (i = 0; i < models.length; i++) {
-				        if (models[i].equalsIgnoreCase(
-					    tmake.trim() + 
+					if (models[i].equalsIgnoreCase(
+					    tmake.trim() +
 					    " " + makemodel[1].trim())) {
 					    havemodel = true;
 					    addmake = true;
-					
-				        }
-			            }
+
+					}
+				    }
 				}
 
 			    if (havemodel) {
@@ -1824,15 +1823,15 @@ public class pmInstallPrinter extends pmInstallScreen {
 				    modelCombo.setSelectedItem(tmake.trim() +
 					" " + makemodel[1]);
 				    Debug.message("CLNT:pmInstPr:model is " +
-				 	tmake.trim() + " " + makemodel[1]);
+					tmake.trim() + " " + makemodel[1]);
 				}
-			
+
 			    }
 			    }
 			}
 		    }
 		}
-	    } 
+	    }
 	}
     }
 
@@ -1861,7 +1860,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 				pmMessageDialog m = new pmMessageDialog(
 				    frame,
 				    pmUtility.getResource("Error"),
-                           	    pmUtility.getResource(
+				    pmUtility.getResource(
 					"Invalid.printer.type."),
 				    myTop,
 				    "PrinterType");
@@ -2016,12 +2015,12 @@ public class pmInstallPrinter extends pmInstallScreen {
 		    m.setVisible(true);
 
 		} else {
-		    if (accessModel.getRowCount() > 0 && 
+		    if (accessModel.getRowCount() > 0 &&
 		    (accessModel.getElementAt(0).equals("all") ||
-		     accessModel.getElementAt(0).equals("none")))
+			accessModel.getElementAt(0).equals("none")))
 				    accessModel.removeRow(0);
 
-		    if (trimtmp.equals("all") || 
+		    if (trimtmp.equals("all") ||
 			    trimtmp.equals("none")) {
 			    accessModel.removeListEntries();
 		    }
@@ -2090,7 +2089,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	Debug.message("CLNT:pmInstPr:actionokButton()");
 	boolean incomplete = false;
 
-	try {	
+	try {
 		doAction();
 	} catch (pmLoginFailedException le) {
 		// User already notified
@@ -2103,9 +2102,9 @@ public class pmInstallPrinter extends pmInstallScreen {
 	}
 
 	if (!incomplete) {
-	    	cleanup();
-	    	myTop.pmsetdefaultpLabel();
-	    	Debug.message("CLNT:pmInstPr:actionokbutton(): work done");
+		cleanup();
+		myTop.pmsetdefaultpLabel();
+		Debug.message("CLNT:pmInstPr:actionokbutton(): work done");
             	pmCalls.debugShowPrinter(workingPrinter);
             	frame.setVisible(false);
             	frame.repaint();
@@ -2114,12 +2113,12 @@ public class pmInstallPrinter extends pmInstallScreen {
             	myTop.scrollPane.repaint();
 	}
     }
- 
+
     public void actionapplyButton() {
 
 	Debug.message("CLNT:pmInstPr:actionapplyButton()");
 
-	try {	
+	try {
             doAction();
 	} catch (pmLoginFailedException le) {
 		// User already notified
@@ -2134,8 +2133,8 @@ public class pmInstallPrinter extends pmInstallScreen {
         myTop.scrollPane.revalidate();
         myTop.scrollPane.repaint();
     }
- 
- 
+
+
     public void actionresetButton() {
         Debug.message("CLNT:pmInstPr:actionresetButton()");
         doReset();
@@ -2148,8 +2147,8 @@ public class pmInstallPrinter extends pmInstallScreen {
         frame.setVisible(false);
         frame.repaint();
         // frame.dispose();
-    }   
- 
+    }
+
     public void actionhelpButton() {
         Debug.message("CLNT:pmInstPr:actionhelpButton()");
         myTop.showHelpItem(helpTag);

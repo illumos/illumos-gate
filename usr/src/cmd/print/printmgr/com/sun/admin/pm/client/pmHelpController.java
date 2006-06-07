@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -45,7 +44,7 @@ import com.sun.admin.pm.server.*;
 class pmHelpController {
 
     public pmHelpFrame frame = null;
-    
+
     /*
      * request presentation of the specified help item.
      */
@@ -66,7 +65,7 @@ class pmHelpController {
     pmHelpDetailPanel viewPanel;
     pmHelpIndexPanel indexPanel;
     pmHelpSearchPanel searchPanel;
-  
+
     Vector history;
 
     public JTabbedPane getTopPane() {
@@ -76,31 +75,27 @@ class pmHelpController {
     public pmHelpController(pmHelpFrame f) {
 
         frame = f;
-    
+
         outerPanel = new JTabbedPane();
-    
+
         viewPanel = new pmHelpDetailPanel(this);
         indexPanel = new pmHelpIndexPanel(this);
         searchPanel = new pmHelpSearchPanel(this);
-    
+
         outerPanel.add(pmUtility.getResource("View"), viewPanel);
         outerPanel.add(pmUtility.getResource("Index"), indexPanel);
         outerPanel.add(pmUtility.getResource("Search"), searchPanel);
-    
+
         pmHelpRepository.populateHelpItemDB();
         pmHelpRepository.populateHelpKeywordDB();
         pmHelpRepository.populateHelpTitleDB();
 
-        indexPanel.queryPanel.handleText("");      // prime it... ugly.
-    
+	indexPanel.queryPanel.handleText("");	// prime it... ugly.
+
         history = new Vector();
 
         frame.setDefaultComponent(outerPanel);
-    }  
+    }
 
 
 }
-
-
-
-

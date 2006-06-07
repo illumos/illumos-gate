@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -46,7 +45,7 @@ import com.sun.admin.pm.server.*;
  * helpItemDB:      String tag -> pmHelpItem
  *      Returns a pmHelpItem given its unique tag.
  *      Used to resolve a reference from the app.
- * 
+ *
  * helpKeywordDB:   String -> Vector(of pmHelpItems)
  *      Returns a Vector containing all pmHelpItems whose `keywords'
  *      property contains the specifed keyword.
@@ -75,15 +74,15 @@ final class pmHelpRepository  {
         if (helpItemDB == null)
             return;
 
-        /*
-         * Strategy:
-         *  for each item
-         *     for each keyword
-         *         if kw not in db
-         *             add ititem.tag
-         *         add item to keyword entry
-         */
-    
+	/*
+	 * Strategy:
+	 *  for each item
+	 *    for each keyword
+	 *	   if kw not in db
+	 *		add ititem.tag
+	 *		    add item to keyword entry
+	 */
+
         helpKeywordDB = new Hashtable();
 
         Vector v = null;
@@ -93,8 +92,8 @@ final class pmHelpRepository  {
             Enumeration keywords = item.keywords.elements();
             while (keywords.hasMoreElements()) {
                 String keyword = (String) keywords.nextElement();
-                v = (Vector) helpKeywordDB.get(keyword);  
-                if (v == null) 
+                v = (Vector) helpKeywordDB.get(keyword);
+                if (v == null)
                     helpKeywordDB.put(keyword, v = new Vector());
                 v.addElement(item);
             }
@@ -108,14 +107,14 @@ final class pmHelpRepository  {
     static void populateHelpTitleDB() {
         if (helpItemDB == null)
             return;
-  
-        /*
-         * strategy: 
-         *   assume itemDB is loaded
-         *   for each item in itemDB
-         *     create an entry in titleDB
-         */
-    
+
+	/*
+	 * strategy:
+	 *   assume itemDB is loaded
+	 *   for each item in itemDB
+	 *	create an entry in titleDB
+	 */
+
         helpTitleDB = new BST();
 
         Enumeration items = helpItemDB.elements();
@@ -124,8 +123,8 @@ final class pmHelpRepository  {
             helpTitleDB.insert(item.title, item);
         }
     }
-    
-    
+
+
     static public pmHelpItem helpItemForTag(String tag) {
         if (helpItemDB == null || tag == null)
             return null;
@@ -147,7 +146,7 @@ final class pmHelpRepository  {
 
         if (helpTitleDB == null)
             return new Vector();
-      
+
         Vector v = new Vector();
         helpTitleDB.traverse_find_vector(v, partialTitle);
 
@@ -194,16 +193,16 @@ final class pmHelpRepository  {
 
         // Debug.setDebugLevel(new pmHelpRepository(), Debug.ALL);
 
-        /*
-         * strategy: 
-         *   for each tag name (from pmHelpTagNameEnumerator):
-         *      get the property values from the resource bundle
-         */
+	/*
+	 * strategy:
+	 *   for each tag name (from pmHelpTagNameEnumerator):
+	 *	get the property values from the resource bundle
+	 */
 
         Debug.message("HELP:  Starting help item load");
-    
+
         ResourceBundle bundle = null;
-    
+
         try {
             bundle = ResourceBundle.getBundle(
                 "com.sun.admin.pm.client.pmHelpResources");
@@ -211,7 +210,7 @@ final class pmHelpRepository  {
             Debug.fatal("HELP:  Could not load pmHelpResources file");
             return;
         }
-        Enumeration e = bundle.getKeys(); 
+        Enumeration e = bundle.getKeys();
         while (e.hasMoreElements()) {
             String key = (String) e.nextElement();
             if (key.endsWith(".tag")) {
@@ -221,7 +220,7 @@ final class pmHelpRepository  {
                 } catch (MissingResourceException x) {
                     Debug.warning("HELP:  Unable to find tag for " + key);
                     continue;
-                } 
+                }
 
                 Debug.message("HELP:  Making new item " + tagName);
 
@@ -240,7 +239,7 @@ final class pmHelpRepository  {
                 if (s != null) {
                     v = new Vector();
                     st = new StringTokenizer(s);
-                    while (st.hasMoreTokens()) 
+                    while (st.hasMoreTokens())
                         v.addElement(st.nextToken());
                     item.setSeeAlso(v);
                 }
@@ -254,13 +253,13 @@ final class pmHelpRepository  {
                         String quotelessWord = word.replace('\"', ' ');
                         v.addElement(quotelessWord.trim());
                     }
-                } else  
+                } else
                     Debug.warning("HELP:  Item " + tagName +
                                   " keywords is empty");
 
 
                 // insert item's title words into its keywords
-                st = new StringTokenizer(theTitle);            
+                st = new StringTokenizer(theTitle);
                 while (st.hasMoreTokens()) {
                     String word = (st.nextToken()).toLowerCase();
 
@@ -268,7 +267,7 @@ final class pmHelpRepository  {
                     if (ignoreKeyTitleWords.indexOf(word) != -1) {
                         Debug.message("HELP:  ignoring " + word +
                                       " from " + theTitle);
-                        continue;   
+                        continue;
                     }
 
                     Debug.message("HELP:  adding " + word +
@@ -279,7 +278,7 @@ final class pmHelpRepository  {
 
                 item.setKeywords(v);
 
-    
+
                 Debug.message("HELP:  New item: " + item);
 
                 helpItemDB.put(item.tag, item);
@@ -289,7 +288,7 @@ final class pmHelpRepository  {
 
 
     // these words are not to be treated as keywords when they appear in title
-    static final private String 
+    static final private String
 		/* JSTYLED */
 		ignoreKeyTitleWords = pmUtility.getResource("help.ignore.words");                    
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -35,7 +34,7 @@ import java.util.*;
 /**
  * A simple configurable debug logging class.
  * <p>
- * 
+ *
  * Calling member classes <b>message()</b>, <b>warning()</b>,
  * <b>error()</b>, and <b>fatal()</b> causes a log entry to be
  * generated if the current verbosity level is greater than or equal
@@ -168,7 +167,7 @@ public class Debug {
     static public void setDebugLevel(int lvl) {
         if (lvl < ALL || lvl > NONE)
             return;
-        
+
         globalDebugLevel = lvl;
     }
 
@@ -179,19 +178,19 @@ public class Debug {
     static public void setDebugLevel(Object o, int lvl) {
         if (lvl < ALL || lvl > NONE)
             return;
-        
+
         classDB.put(o.getClass(), new Integer(lvl));
 
-        /*
-          System.out.println("Debug: class " + o.getClass().getName() +
-                            " level = " + classDB.get(o.getClass()));
-        */
+	/*
+	 * System.out.println("Debug: class " + o.getClass().getName() +
+	 *		" level = " + classDB.get(o.getClass()));
+	 */
     }
-    
+
 	static public void setDebugLevel(String classname, int lvl) {
         if (lvl < ALL || lvl > NONE)
             return;
-        
+
         try {
 			classDB.put(Class.forName(classname), new Integer(lvl));
 		} catch (Exception x) {
@@ -212,7 +211,7 @@ public class Debug {
         debugPrint(s);
     }
 
-    
+
     /*
      * get debug level for o's class, if already there
      * otherwise create an entry for o and set it to the global level
@@ -225,24 +224,24 @@ public class Debug {
         else
             classDB.put(o.getClass(), new Integer(lvl));
 
-        /*
-          System.out.println("Debug: getLevelForClass " +
-                            o.getClass().getName() +
-                            " = " + lvl);
-         */
+	/*
+	 * System.out.println("Debug: getLevelForClass " +
+	 *		o.getClass().getName() +
+	 *		" = " + lvl);
+	 */
 
         return lvl;
     }
 
     // here is where we could hide syslog or file destination...
     private static void debugPrint(String s) {
-        System.out.println(s);         // for now
+	System.out.println(s);	// for now
     }
-    
+
 	Object theInstance = null;
 
 	public Debug(Object o) {
-		theInstance = o;		
+		theInstance = o;
 	}
 
     public void SetDebugLevel(int lvl) {
@@ -270,7 +269,7 @@ public class Debug {
 	public void Info(String s) {
 		info(theInstance, s);
 	}
-    
+
     /*
      * Verbosity level to suppress all messages.
      */
@@ -308,7 +307,7 @@ public class Debug {
      * Verbosity level to log all messages.
      */
     static public final int ALL = 0;
-    
+
     private static int globalDebugLevel = FATAL;
     private static Hashtable classDB = new Hashtable();
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -41,12 +40,12 @@ import java.util.*;
  * two strings:
  *	string 1 is the key used by the app -- DO NOT LOCALIZE
  *	string 2 is the string to be localized
- *       
+ *
  * For example, in the tuple
  *	{"info_name", "Solaris Print Manager"}
  *
- *       "info_name" is the resource key that must 
- * 		          not be modified in any way
+ *	"info_name" is the resource key that must
+ *			not be modified in any way
  *
  *       "Solaris Print Manager" is the corresponding
  *                        text to be localized
@@ -55,7 +54,7 @@ import java.util.*;
 public class pmResources extends ListResourceBundle {
     static final Object[][] pmBundlecontents = {
 
-	/* 
+	/*
 	 * Descriptive strings used in the 'About' dialog
 	 */
         {"info_name", "Solaris Print Manager"},
@@ -190,36 +189,36 @@ public class pmResources extends ListResourceBundle {
 
 
 	/*
-         * 'Add Access to Printer' dialog title
-         */
+	 * 'Add Access to Printer' dialog title
+	 */
         {"SPM:Add.Access.To.Printer",
                 "Solaris Print Manager: Add Access to Printer"},
 
 
 	/*
-         * 'Add Attached Printer' dialog title
-         */
+	 * 'Add Attached Printer' dialog title
+	 */
         {"SPM:New.Attached.Printer",
                 "Solaris Print Manager: New Attached Printer"},
 
 
 	/*
-         * 'Add Network Printer' dialog title
-         */
+	 * 'Add Network Printer' dialog title
+	 */
         {"SPM:New.Network.Printer",
                 "Solaris Print Manager: New Network Printer"},
 
 
 	/*
-         * 'Modify Printer Properties' dialog title
-         */
+	 * 'Modify Printer Properties' dialog title
+	 */
         {"SPM:Modify.Printer.Properties",
                 "Solaris Print Manager: Modify Printer Properties"},
 
 
 	/*
-         * 'Find Printer' dialog title
-         */
+	 * 'Find Printer' dialog title
+	 */
         {"SPM:Find.Printer", "Solaris Print Manager: Find Printer"},
 
 
@@ -238,14 +237,14 @@ public class pmResources extends ListResourceBundle {
 	/*
 	 * 'User Input of Printer Port' dialog title
 	 */
-        {"SPM:Specify.Printer.Port", 
+        {"SPM:Specify.Printer.Port",
 		"Solaris Print Manager: Specify Printer Port"},
 
 
 	/*
 	 * 'User Input of Printer Type' dialog title
 	 */
-        {"SPM:Specify.Printer.Type", 
+        {"SPM:Specify.Printer.Type",
 		"Solaris Print Manager: Specify Printer Type"},
 
 
@@ -311,7 +310,7 @@ public class pmResources extends ListResourceBundle {
 
 	/*
 	 * Actions performed by the application
-         * as displayed in the Command-Line Console
+	 * as displayed in the Command-Line Console
 	 */
 	{"New.Attached.Printer", "New Attached Printer"},
 	{"New.Network.Printer", "New Network Printer"},
@@ -323,9 +322,9 @@ public class pmResources extends ListResourceBundle {
 	/*
 	 * Prompts: messages to user describing required input.
 	 */
-	{"Enter.name.of.printer.to.find", 
+	{"Enter.name.of.printer.to.find",
 		"Enter the name of a printer to find:"},
-	{"Please.confirm.deletion.of.printer", 
+	{"Please.confirm.deletion.of.printer",
 		"Please confirm deletion of printer "},
 	{"Enter.printer.type:", "Enter printer type:"},
 	{"Enter.printer.port.or.file", "Enter printer port or file:"},
@@ -345,11 +344,11 @@ public class pmResources extends ListResourceBundle {
         {"Help.on:", "Help on:"},
         {"See.also:", "See also:"},
 
-	{"Matching.entries:", "Matching entries:"}, 
-	{"Matching.entries:.mnemonic", "M"}, 
+	{"Matching.entries:", "Matching entries:"},
+	{"Matching.entries:.mnemonic", "M"},
 
-	{"Search.help.index.for:", "Search help index for: "}, 
-	{"Search.help.index.for:.mnemonic", "S"}, 
+	{"Search.help.index.for:", "Search help index for: "},
+	{"Search.help.index.for:.mnemonic", "S"},
 
         {"Search.Results:", "Search Results:"},
         {"Search.Results:.mnemonic", "R"},
@@ -357,24 +356,24 @@ public class pmResources extends ListResourceBundle {
         {"Keywords:", "Keywords: "},
         {"Keywords:.mnemonic", "K"},
 
-      
+
 	/*
 	 * 'Help' dialog descriptive messages to provide
-         * assistance in using the features.
+	 * assistance in using the features.
 	 */
 
 	/*
-	 * The following two labels create one message, displayed on 
-	 * two adjacent lines.  
+	 * The following two labels create one message, displayed on
+	 * two adjacent lines.
 	 */
         {"To.search.the.index...",
 		 "To search the index of help articles alphabetically,"},
         {"type.your.query.below...",
-		 "type your query below then select the desired article."}, 
+		 "type your query below then select the desired article."},
 
 	/*
-	 * The following two labels create one message, displayed on 
-	 * two adjacent lines.  
+	 * The following two labels create one message, displayed on
+	 * two adjacent lines.
 	 */
         {"To.find.help.articles...",
 		"To find help articles about a particular topic,"},
@@ -409,7 +408,7 @@ public class pmResources extends ListResourceBundle {
 
 	/*
 	 * Combo item allowing custom 'Printer Port' selection
- 	 * See "Printer.Port:" above.
+	 * See "Printer.Port:" above.
 	 */
 	{"Other...", "Other..."},
 
@@ -435,7 +434,7 @@ public class pmResources extends ListResourceBundle {
 
 	/*
 	 * Labels for checkboxes used in 'Install Printer' and
-         * 'Modify Printer' dialogs
+	 * 'Modify Printer' dialogs
 	 */
 	{"Default.Printer", "Default Printer"},
 	{"Always.Print.Banner", "Always Print Banner"},
@@ -444,7 +443,7 @@ public class pmResources extends ListResourceBundle {
 
 
 	/*
-	 * Prompt for 'Select Naming Service' combo 
+	 * Prompt for 'Select Naming Service' combo
 	 */
 	{"Naming.Service:", "Naming Service:"},
 
@@ -496,10 +495,10 @@ public class pmResources extends ListResourceBundle {
         {"Item.not.found:", "Item not found: "},
         {"No.information.available.", "No information available."},
 	{"Unable.to.find.printer", "Unable to find printer "},
-	{"Printer.delete.operation.failed.", 
+	{"Printer.delete.operation.failed.",
 		"Printer delete operation failed."},
 	{"Invalid.printer.type.", "Invalid printer type."},
-	{"Device.missing.or.not.writeable.", 
+	{"Device.missing.or.not.writeable.",
 		"Device missing or not writeable."},
         {"Printer.name.required.", "Printer name required."},
 	{"Printer.Port.Selection.required", "Printer Port Selection required."},
@@ -528,7 +527,7 @@ public class pmResources extends ListResourceBundle {
 	{"Required.login.failed.", "Required login failed."},
 	{"Invalid.printer.type.", "Invalid printer type."},
 	{"Invalid.username", "Invalid username"},
-	{"Device.missing.or.not.writeable.", 
+	{"Device.missing.or.not.writeable.",
 		"Device missing or not writeable."},
 	{"User.cancelled.login.", "User cancelled login."},
         {"Nothing.matched.", "Nothing matched."},
@@ -558,52 +557,52 @@ public class pmResources extends ListResourceBundle {
 
 
 	/*
-	 * The help subsystem builds a database of searchable 
+	 * The help subsystem builds a database of searchable
 	 * keywords based in part on the title of each help
 	 * article.  In order to avoid excessive false hits, the
-	 * following words are ignored when adding title words 
+	 * following words are ignored when adding title words
 	 * to the searchable keyword list.
-         *
-         * If this list is left empty, all the words in the title of 
-         * each help article will be added to the keywords database.
+	 *
+	 * If this list is left empty, all the words in the title of
+	 * each help article will be added to the keywords database.
 	 */
         {"help.ignore.words", "to an a of if the and or"},
 
-	
 
-	/* 
-	 * Title for the authorization dialog which is invoked by 
+
+	/*
+	 * Title for the authorization dialog which is invoked by
 	 * the printmgr executable.
-	 */ 
+	 */
 	{"Authentication.required", "Authentication Required"},
 
-	/* 
-	 * Prompt for the printmgr authorization dialog.  
+	/*
+	 * Prompt for the printmgr authorization dialog.
 	 * This is displayed with line breaks.
 	 */
 	/* JSTYLED */
 	{"Root.access.is.required", "Root access is required for full functionality.\nYou may authenticate as root or continue\nwith limited functionality."},
 
-	/* 
+	/*
 	 * Buttons for the authorization dialog.
 	 */
 	{"Authenticate", "Authenticate"},
 	{"Authenticate.mnemonic", "A"},
-	
-	{"Continue", "Continue"}, 
+
+	{"Continue", "Continue"},
 	{"Continue.mnemonic", "N"},
 
-	/* 
+	/*
 	 * Title for the root password request dialog invoked by printmgr.
 	 */
-	{"Root.authentication", "Root Authentication"}, 
+	{"Root.authentication", "Root Authentication"},
 
-	/* 
+	/*
 	 * Prompt for the root password request dialog.
 	 */
 	{"Enter.root.password", "Enter root password"},
 
-	/* 
+	/*
 	 * Prompt for the root password request dialog.
 	 */
 	{"Invalid.password", "Invalid password entered.  Retry?"},

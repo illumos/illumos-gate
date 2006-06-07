@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -42,20 +41,20 @@ public class pmOKCancelDialog extends pmDialog {
     private pmTop theTop;
     private String theTag;
     protected boolean defaultIsOK = true;
-    
+
     public pmOKCancelDialog(Frame f, String title, String msg) {
         this(f, title, msg, null, null, true);
     }
 
     public pmOKCancelDialog(Frame f, String title, String msg, boolean ok) {
         this(f, title, msg, null, null, ok);
-    } 
+    }
 
     public pmOKCancelDialog(Frame f, String title, String msg,
                              pmTop t, String h) {
         this(f, title, msg, t, h, true);
     }
-    
+
     public pmOKCancelDialog(Frame f, String title, String msg,
                              pmTop t, String h, boolean ok) {
         super(f, title, true);		// modal
@@ -63,7 +62,7 @@ public class pmOKCancelDialog extends pmDialog {
         theTop = t;
         theTag = h;
         defaultIsOK = ok;
-        
+
         // initialize constraints
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = 0;
@@ -81,13 +80,13 @@ public class pmOKCancelDialog extends pmDialog {
         p.add(label, c);
 
         this.getContentPane().add(p, "Center");
-        
+
         this.getContentPane().add(
             buttonPanel(defaultIsOK, theTop != null && theTag != null),
             "South");
 
         this.pack();
-        
+
         this.addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent evt) {
                 returnValue = JOptionPane.CLOSED_OPTION;
@@ -129,7 +128,7 @@ public class pmOKCancelDialog extends pmDialog {
         c.gridy = 0;
 
 
-	if (okDefault) 
+	if (okDefault)
             c.gridx = 0;
         else
             c.gridx = 1;
@@ -139,7 +138,7 @@ public class pmOKCancelDialog extends pmDialog {
         okButton.setMnemonic(
             pmUtility.getIntResource("OK.mnemonic"));
 
-	if (okDefault) 
+	if (okDefault)
             c.gridx = 1;
         else
             c.gridx = 0;
@@ -150,7 +149,7 @@ public class pmOKCancelDialog extends pmDialog {
             pmUtility.getIntResource("Cancel.mnemonic"));
 
         helpButton = null;
-            
+
         if (useHelp) {
             c.gridx = 2;
             helpButton = new pmButton(
@@ -175,7 +174,7 @@ public class pmOKCancelDialog extends pmDialog {
             helpButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     theTop.showHelpItem(theTag);
-                }   
+                }
             });
         }
 
@@ -201,8 +200,8 @@ public class pmOKCancelDialog extends pmDialog {
         pmOKCancelDialog.this.setVisible(false);
     }
 
-    
-        
+
+
     public int getValue() {
         return returnValue;
     }
@@ -211,7 +210,7 @@ public class pmOKCancelDialog extends pmDialog {
     public static void main(String[] args) {
         JFrame f = new JFrame("Test Dialog");
         f.setSize(300, 100);
-    
+
         f.addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent evt) {
                 System.exit(0);
@@ -229,7 +228,7 @@ public class pmOKCancelDialog extends pmDialog {
             System.out.println("Dialog returns " + d.getValue());
 
             d.dispose();
-    
+
         }
 
     }
@@ -238,6 +237,6 @@ public class pmOKCancelDialog extends pmDialog {
     pmButton helpButton = null;
     pmButton okButton = null;
     pmButton cancelButton = null;
-    
+
     protected int returnValue = JOptionPane.CLOSED_OPTION;
 }

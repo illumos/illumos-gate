@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -41,10 +40,10 @@ import com.sun.admin.pm.server.*;
 
 
 /*
- * Window for Edit -> Delete 
+ * Window for Edit -> Delete
  */
 
-//public class pmDelete extends JPanel {
+// public class pmDelete extends JPanel {
 public class pmDelete {
 
     Printer newpr = null;
@@ -64,9 +63,9 @@ public class pmDelete {
          }
 
         pmOKCancelDialog d = new pmOKCancelDialog(
-            mytop.parentFrame, 
+            mytop.parentFrame,
             pmUtility.getResource("SPM:Delete.Printer"),
-            pmUtility.getResource("Please.confirm.deletion.of.printer") + 
+            pmUtility.getResource("Please.confirm.deletion.of.printer") +
 		mytop.selectedPrinter, false);
         d.setVisible(true);
 
@@ -95,7 +94,7 @@ public class pmDelete {
         }
 
     }
- 
+
     public void actionokButton() throws pmGuiException {
 	int ret;
         String cmd = null;
@@ -135,7 +134,7 @@ public class pmDelete {
         } catch (Exception e) {
 		Debug.warning("CLNT:  pmDelete:deletePrinter exception " + e);
 		failed = true;
-	} 
+	}
 
 	cmd = newpr.getCmdLog();
 	warn = newpr.getWarnLog();
@@ -151,10 +150,10 @@ public class pmDelete {
 			pmUtility.getResource("Error"),
 			((err == null) ?
 			   pmUtility.getResource(
-				"Printer.delete.operation.failed.") : 
+				"Printer.delete.operation.failed.") :
 			err),
 			mytop,
-			"DeletePrinterFailed");  
+			"DeletePrinterFailed");
 		m.setVisible(true);
 
         } else {
@@ -175,8 +174,8 @@ public class pmDelete {
 	mytop.setLogData(cmd, err, warn);
 	mytop.showLogData(pmUtility.getResource("Delete.Printer"));
     }
- 
- 
+
+
     public void actioncancelButton() {
 	Debug.message("CLNT:  pmDelete: actioncancelButton()");
     }

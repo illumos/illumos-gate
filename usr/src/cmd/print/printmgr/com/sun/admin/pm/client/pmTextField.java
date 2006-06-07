@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -55,7 +54,7 @@ public class pmTextField extends JTextField {
     }
 
     /*
-     * This doc implementation will disallow insertion of a 
+     * This doc implementation will disallow insertion of a
      * string containing any characters which are non-8-bit-ascii.
      */
     private class pmFilterDoc extends PlainDocument {
@@ -85,4 +84,3 @@ public class pmTextField extends JTextField {
     }
 
 }
-

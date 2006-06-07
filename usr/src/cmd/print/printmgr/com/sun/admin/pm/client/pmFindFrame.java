@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -41,16 +40,16 @@ import com.sun.admin.pm.server.*;
 
 
 public class pmFindFrame extends pmFrame {
-    
+
     JLabel statusText = null;
     pmButton okButton = null;
     pmButton cancelButton = null;
     pmButton helpButton = null;
     pmTop theTop = null;
-    
+
     String label = pmUtility.getResource("Enter.name.of.printer.to.find");
     String helpTag = "ToFindPrinter";
-    
+
     public pmFindFrame(pmTop t) {
 
         super(pmUtility.getResource("SPM:Find.Printer"));
@@ -59,7 +58,7 @@ public class pmFindFrame extends pmFrame {
 
         theTop = t;
 
-        
+
         JLabel l;
         JPanel p;
 
@@ -73,11 +72,11 @@ public class pmFindFrame extends pmFrame {
         c.anchor = GridBagConstraints.WEST;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.weightx = 1.0;
-        
+
         // top panel contains the message
         p = new JPanel();
         p.setLayout(new GridBagLayout());
-           
+
         l = new JLabel(label, SwingConstants.LEFT);
         p.add(l, c);
 
@@ -91,7 +90,7 @@ public class pmFindFrame extends pmFrame {
         printerName.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 okPressed();
-            }   
+            }
         });
         l.setLabelFor(printerName);
 
@@ -112,7 +111,7 @@ public class pmFindFrame extends pmFrame {
 
         c.insets = new Insets(5, 10, 5, 10);
         p.add(statusText, c);
-        
+
         getContentPane().add(p, "Center");
 
         // bottom panel contains buttons
@@ -136,7 +135,7 @@ public class pmFindFrame extends pmFrame {
             }
         });
         thePanel.add(okButton, c);
-        
+
         cancelButton = new pmButton(
             pmUtility.getResource("Dismiss"));
         cancelButton.setMnemonic(
@@ -155,7 +154,7 @@ public class pmFindFrame extends pmFrame {
         helpButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 theTop.showHelpItem(helpTag);
-            }   
+            }
         });
         thePanel.add(helpButton, c);
 
@@ -172,24 +171,24 @@ public class pmFindFrame extends pmFrame {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-           
+
 
         // set focus to initial field, depending on which action is tbd
         // this seems to work best after pack()
-        
-	/**
-          frame.setVisible(true);
-          frame.repaint();
-        */
+
+	/*
+	 * frame.setVisible(true);
+	 * frame.repaint();
+	 */
 
         // getRootPane().setDefaultButton (okButton);
         okButton.setAsDefaultButton();
-        
+
         printerName.requestFocus();
-		
+
 		// enable improved focus handling
 		setDefaultComponent(printerName);
-        
+
     }
 
 
@@ -204,9 +203,9 @@ public class pmFindFrame extends pmFrame {
                     pmUtility.getResource("Unable.to.find.printer") + name));
 	    else
 		statusText.setText(" ");
-            
+
 	// pmFindPanel.this.frame.setVisible (false);
-        
+
 	}
 
 	public void cancelPressed() {
@@ -218,12 +217,5 @@ public class pmFindFrame extends pmFrame {
 	}
 
     public pmTextField printerName = null;
-    
+
 }
-                
-    
-    
-    
- 
-
-

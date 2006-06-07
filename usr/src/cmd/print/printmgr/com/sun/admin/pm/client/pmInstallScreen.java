@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -121,7 +120,7 @@ public class pmInstallScreen extends pmButtonScreen {
 	    String devices[];
 	    int i;
 
-	    try {	
+	    try {
 		    devices = PrinterUtil.getDeviceList();
 	    } catch (Exception e) {
 		    Debug.warning("CLNT:  pmAccess:getDeviceList caught " + e);
@@ -136,7 +135,7 @@ public class pmInstallScreen extends pmButtonScreen {
 	    portCombo.addActionListener(new ComboListener(Constants.PORT));
 
 	    north.add(portCombo, c);
- 
+
 	}
 	public void printertypeLabel(JPanel north, GridBagConstraints c) {
 		north.add(new JLabel
@@ -235,7 +234,7 @@ public class pmInstallScreen extends pmButtonScreen {
 	}
 	public void faultnotField(JPanel north, GridBagConstraints c) {
 		faultCombo = new JComboBox();
-		
+
 		faultCombo.addItem(pmUtility.getResource("Write.to.Superuser"));
 		faultCombo.addItem(pmUtility.getResource("Mail.to.Superuser"));
 		faultCombo.addItem(pmUtility.getResource("None"));
@@ -281,10 +280,10 @@ public class pmInstallScreen extends pmButtonScreen {
 	public void optionsFields(JPanel north, GridBagConstraints c) {
 		defaultp = new JCheckBox(
 			pmUtility.getResource("Default.Printer"));
-		
+
 		north.add(defaultp, c);
- 
-		c.gridy++; 
+
+		c.gridy++;
 		bannerCombo = new JComboBox();
 		bannerCombo.addItem(pmUtility.getResource
 					("Always.Print.Banner"));
@@ -292,14 +291,14 @@ public class pmInstallScreen extends pmButtonScreen {
 					("User.Selectable.Default.On"));
 		bannerCombo.addItem(pmUtility.getResource
 					("Never.Print.Banner"));
-		
+
 		north.add(bannerCombo, c);
 	}
 
 	public void defaultoptionField(JPanel north, GridBagConstraints c) {
 		defaultp = new JCheckBox(
 			pmUtility.getResource("Default.Printer"));
-		
+
 		north.add(defaultp, c);
 	}
 
@@ -345,7 +344,7 @@ public class pmInstallScreen extends pmButtonScreen {
 		}
 
 		public void actionPerformed(ActionEvent e) {
-			
+
 			switch (activeCombo)
 			{
 				case Constants.PORT:
@@ -392,7 +391,7 @@ public class pmInstallScreen extends pmButtonScreen {
 		}
 
 		public void actionPerformed(ActionEvent e) {
-	
+
 			switch (activeButton)
 			{
 				case Constants.ADD:
@@ -428,14 +427,14 @@ public class pmInstallScreen extends pmButtonScreen {
 	}
 
         public void xxcenterPanel() {
- 
+
                 JPanel center = new JPanel();
                 center.setLayout(new GridBagLayout());
                 GridBagConstraints c = new GridBagConstraints();
- 
+
                 c.insets = new Insets(15, 15, 15, 15);
                 c.anchor = GridBagConstraints.WEST;
- 
+
 		// Create the label
                 c.gridx = 0;
                 c.gridy = 0;
@@ -444,18 +443,18 @@ public class pmInstallScreen extends pmButtonScreen {
                 c.anchor = GridBagConstraints.NORTHWEST;
                 center.add(new JLabel
                         (pmUtility.getResource("User.Access.List:")), c);
- 
+
 		// Create the User Access List as JList
                 userList = new JList();
                 JScrollPane scrollPane = new JScrollPane();
                 scrollPane.getViewport().setView(userList);
- 
+
                 c.gridwidth = 2;
                 c.gridx = 1;
                 c.weightx = c.weighty = 1.0;
                 c.fill = GridBagConstraints.BOTH;
                 center.add(scrollPane, c);
- 
+
 		// Create the text field for adding users
                 c.gridx = 1;
                 c.gridy = 1;
@@ -466,7 +465,7 @@ public class pmInstallScreen extends pmButtonScreen {
 
                 userText = new pmTextField(25);
                 center.add(userText, c);
- 
+
 		// Create the add/delete buttons
                 c.gridx = 1;
                 c.gridy = 2;
@@ -481,7 +480,7 @@ public class pmInstallScreen extends pmButtonScreen {
 		deleteButton.addActionListener(
 			new adddelButtonListener(Constants.DELETE));
 
- 
+
                 c.gridwidth = 1;
                 center.add(addButton, c);
 
@@ -489,7 +488,7 @@ public class pmInstallScreen extends pmButtonScreen {
                 center.add(deleteButton, c);
 
                 add("Center", center);
- 
+
         }
 
 }

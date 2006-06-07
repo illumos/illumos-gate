@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -52,11 +51,11 @@ public class pmLogin extends pmDialog {
     protected pmButton okButton = null;
     protected pmButton cancelButton = null;
     protected pmButton helpButton = null;
-    
+
     public pmLogin(JFrame f, String title, String msg) {
         this(f, title, msg, null, null);
     }
-    
+
     public pmLogin(JFrame f, String title, String msg, pmTop t, String h) {
 
         super(f, title, true);	// modal
@@ -64,7 +63,7 @@ public class pmLogin extends pmDialog {
         theTop = t;
         theTag = h;
 	theFrame = f;
-        
+
         JLabel l;
         JPanel p;
 
@@ -80,13 +79,13 @@ public class pmLogin extends pmDialog {
         // top panel contains the desired message
         p = new JPanel();
         p.setLayout(new GridBagLayout());
-           
+
         l = new JLabel(msg, SwingConstants.CENTER);
         p.add(l, c);
         this.getContentPane().add(p, "North");
 
-	// NIS middle panel 
-	// contains username and password 
+	// NIS middle panel
+	// contains username and password
 	if (t.ns.getNameService().equals("nis")) {
 
         p = new JPanel();
@@ -99,7 +98,7 @@ public class pmLogin extends pmDialog {
         l = new JLabel(pmUtility.getResource("Username:"),
                         SwingConstants.RIGHT);
         p.add(l, c);
-    
+
         l = new JLabel(pmUtility.getResource("Password:"),
                         SwingConstants.RIGHT);
         p.add(l, c);
@@ -141,28 +140,28 @@ public class pmLogin extends pmDialog {
 
         p.add(passwordField, c);
         passwordField.setEchoChar('*');
-        
+
         this.getContentPane().add(p, "Center");
 
 	} else if (t.ns.getNameService().equals("ldap")) {
-                                               
+
             // middle panel contains LDAP server name, distinguished name,
             // and password
             p = new JPanel();
             p.setLayout(new GridBagLayout());
- 
+
             // LDAP Server Name
             l = new JLabel(pmUtility.getResource("LDAP.Server:"),
                         SwingConstants.RIGHT);
             p.add(l, c);
- 
+
             serverField = new pmTextField(25);
             serverField.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
                     okPressed();
                 }
             });
- 
+
             String ldapMaster;
             try {
                 ldapMaster = theTop.host.getLDAPMaster();
@@ -170,26 +169,26 @@ public class pmLogin extends pmDialog {
                 ldapMaster = new String("");
                 Debug.warning(
 		    "pmLdap: getLDAPMaster() returns exception: " + e);
-            } 
-     
+            }
+
             serverField.setText(ldapMaster);
             c.gridx = 1;
             p.add(serverField, c);
- 
- 
+
+
             // Distinguished Name
             c.gridx = 0;
             l = new JLabel(pmUtility.getResource("Distinguished.Name:"),
                             SwingConstants.RIGHT);
             p.add(l, c);
- 
+
             dnField = new pmTextField(25);
             dnField.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
                     okPressed();
                 }
             });
- 
+
             String defaultDN;
             try {
                 defaultDN = theTop.host.getDefaultAdminDN();
@@ -197,18 +196,18 @@ public class pmLogin extends pmDialog {
                 defaultDN = new String("");
                 Debug.warning(
 		    "pmLdap: getDefaultAdminDN() returns exception: " + e);
-            } 
- 
+            }
+
             dnField.setText(defaultDN);
             c.gridx = 1;
             p.add(dnField, c);
-       
-        // Password     
+
+        // Password
         c.gridx = 0;
         l = new JLabel(pmUtility.getResource("Password:"),
                             SwingConstants.RIGHT);
         p.add(l, c);
-          
+
         passwordField = new JPasswordField(12);
         passwordField.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -218,18 +217,18 @@ public class pmLogin extends pmDialog {
         l.setLabelFor(passwordField);
         // for consistency, don't implement this until all are...
         // l.setDisplayedMnemonic(
-        //      pmUtility.getIntResource("Password.mnemonic"));
-          
+	//	pmUtility.getIntResource("Password.mnemonic"));
+
         c.gridx = 1;
         c.weightx = 1.0;
- 
+
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.CENTER;
         c.gridy = GridBagConstraints.RELATIVE;
-          
+
         p.add(passwordField, c);
         passwordField.setEchoChar('*');
-          
+
         this.getContentPane().add(p, "Center");
 
 	}
@@ -277,7 +276,7 @@ public class pmLogin extends pmDialog {
             helpButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
 					helpPressed();
-                }   
+                }
             });
             thePanel.add(helpButton, c);
         }
@@ -299,14 +298,14 @@ public class pmLogin extends pmDialog {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-       
+
         // lay out the dialog
         this.pack();
 
         // set focus and defaults after packing...
         // this.getRootPane().setDefaultButton(okButton);
         okButton.setAsDefaultButton();
-        
+
         passwordField.requestFocus();
     }
 
@@ -352,7 +351,7 @@ public class pmLogin extends pmDialog {
 
     public void okPressed() {
 
-	// For LDAP, Check Server, Distinguished Name and Password 
+	// For LDAP, Check Server, Distinguished Name and Password
 	boolean complete = true;
 
 	if (theTop.ns.getNameService().equals("ldap")) {
@@ -376,7 +375,7 @@ public class pmLogin extends pmDialog {
             pmLogin.this.setVisible(false);
 	}
     }
-	
+
 
 
     public void cancelPressed() {
@@ -393,7 +392,7 @@ public class pmLogin extends pmDialog {
     public void helpPressed() {
         theTop.showHelpItem(theTag);
     }
-    
+
     public static void main(String[] args) {
         JFrame f = new JFrame("Password test");
 
@@ -420,5 +419,5 @@ public class pmLogin extends pmDialog {
     public pmTextField dnField = null;
 
     protected int returnValue = JOptionPane.CLOSED_OPTION;
-    
+
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -56,12 +55,12 @@ public class pmLoad extends JPanel {
 	JComboBox nameserviceCombo = new JComboBox();
 	pmTop mytop = null;
 	int resetIndex;
-		
+
     pmButton okButton = null;
     pmButton cancelButton = null;
     pmButton resetButton = null;
     pmButton helpButton = null;
-    
+
 
     public pmLoad(pmTop mytop) {
 	this.mytop = mytop;
@@ -73,7 +72,7 @@ public class pmLoad extends JPanel {
 	northPanel();
 	southPanel();
 
-                                                            
+
     }
 
     public void northPanel() {
@@ -98,13 +97,13 @@ public class pmLoad extends JPanel {
 
 	nameserviceCombo.addItem("files");
 
-	if (mytop.nisns != null) 
+	if (mytop.nisns != null)
 		nameserviceCombo.addItem("NIS");
 
-	if (mytop.nisplusns != null) 
+	if (mytop.nisplusns != null)
 		nameserviceCombo.addItem("NIS+");
 
-	if (mytop.ldapns != null) 
+	if (mytop.ldapns != null)
 		nameserviceCombo.addItem("LDAP");
 
 	nameserviceCombo.setSelectedIndex(mytop.actionindex);
@@ -112,7 +111,7 @@ public class pmLoad extends JPanel {
 
 	nameserviceCombo.addActionListener(new nsListener());
 	nameserviceCombo.addItemListener(mytop.new topnsListener());
-	 
+
 	add("North", north);
 
     }
@@ -148,12 +147,12 @@ public class pmLoad extends JPanel {
         c.fill = GridBagConstraints.HORIZONTAL;
         c.insets = new Insets(15, 15, 15, 15);
         c.gridy = 0;
- 
+
 	okButton = new pmButton(
             pmUtility.getResource("OK"));
         okButton.setMnemonic(
             pmUtility.getIntResource("OK.mnemonic"));
-        
+
         resetButton = new pmButton(
             pmUtility.getResource("Reset"));
         resetButton.setMnemonic(
@@ -168,12 +167,12 @@ public class pmLoad extends JPanel {
             pmUtility.getResource("Help"));
         helpButton.setMnemonic(
             pmUtility.getIntResource("Help.mnemonic"));
-        
+
         okButton.addActionListener(new ButtonListener(OK));
         resetButton.addActionListener(new ButtonListener(RESET));
         cancelButton.addActionListener(new ButtonListener(CANCEL));
         helpButton.addActionListener(new ButtonListener(HELP));
-		
+
         c.gridx = 0;
         south.add(okButton, c);
         c.gridx = 1;
@@ -182,7 +181,7 @@ public class pmLoad extends JPanel {
         south.add(cancelButton, c);
         c.gridx = 3;
         south.add(helpButton, c);
- 
+
         add("South", south);
     }
 
@@ -196,12 +195,12 @@ public class pmLoad extends JPanel {
 	}
 
 	// Select Active Button and call routine
-		
+
 	public void actionPerformed(ActionEvent e)
 	{
 
 		switch (activeButton) {
-		case OK:	
+		case OK:
 			actionokButton();
 			break;
 		case RESET:
@@ -214,14 +213,14 @@ public class pmLoad extends JPanel {
 			actionhelpButton();
 			break;
 		}
-		
+
 	}
     }
 
     public void pmScreendispose() {
 	frame.dispose();
     }
-		
+
 	// Action for buttons
 
     public void actionokButton() {
@@ -268,14 +267,14 @@ public class pmLoad extends JPanel {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-                                                            
+
         // default button is always OK, for now...
         okButton.setAsDefaultButton();
 
         frame.setDefaultComponent(nameserviceCombo);
-        
+
         nameserviceCombo.requestFocus();
-        
+
 	frame.setVisible(true);
 	frame.repaint();
 

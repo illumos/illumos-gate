@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,34 +48,34 @@ public class pmHelpIndexPanel extends JPanel {
     pmHelpIndexQueryPanel queryPanel;
     pmHelpIndexResultPanel resultPanel;
     JLabel textPanels[];
-    
+
     public pmHelpIndexPanel(pmHelpController ctrl) {
         controller = ctrl;
 
         // build subpanels
         queryPanel = new pmHelpIndexQueryPanel(this);
         resultPanel = new pmHelpIndexResultPanel(this);
-    
+
         textPanels = new JLabel[4];
         textPanels[0] = new JLabel(
             pmUtility.getResource("To.search.the.index..."));
         textPanels[1] = new JLabel(
             pmUtility.getResource("type.your.query.below..."));
-    
+
         // lay out top panel
         this.setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(5, 5, 5, 5);
         c.gridwidth = GridBagConstraints.REMAINDER;
-    
+
         c.gridx = 0;
         c.gridy = 0;
-    
+
         c.gridheight = 1; // GridBagConstraints.REMAINDER;
         c.fill = GridBagConstraints.BOTH;
         c.weightx = 1.0;
         c.weighty = 0.0;
-    
+
         JPanel p = new JPanel();
         p.setLayout(new GridBagLayout());
         GridBagConstraints pc = new GridBagConstraints();
@@ -91,9 +90,9 @@ public class pmHelpIndexPanel extends JPanel {
         pc.insets = new Insets(0, 5, 5, 5);
         p.add(textPanels[1], pc);
         // p.add(textPanels[2]);
-    
+
         this.add(p, c);
-      
+
         p = new JPanel();
         p.setLayout(new BorderLayout());
         p.add(queryPanel, "North");
@@ -104,7 +103,7 @@ public class pmHelpIndexPanel extends JPanel {
         c.gridheight = 0;
         c.weighty = 1.0;
         c.weightx = 0.0;
-        c.fill = GridBagConstraints.BOTH; 
+        c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.EAST;
 
         this.add(p, c);
@@ -119,20 +118,20 @@ public class pmHelpIndexPanel extends JPanel {
                 Debug.info("HELP:  Tab event!");
                 if (!(tp.getSelectedComponent() instanceof
                     com.sun.admin.pm.client.pmHelpIndexPanel)) {
-                    Debug.info("HELP:  Tab event: resetting default"); 
-                    /*
-                      controller.frame.getRootPane().
-                          setDefaultButton(
-                              controller.frame.dismiss);
-                     */
+                    Debug.info("HELP:  Tab event: resetting default");
+		    /*
+		     * controller.frame.getRootPane().
+		     *	setDefaultButton(
+		     *		controller.frame.dismiss);
+		     */
                 } else {
                     // allow tab to retain focus
                     // queryPanel.query.requestFocus();
                 }
             }
         });
-            
-            
+
+
     }
 
 
@@ -160,7 +159,7 @@ public class pmHelpIndexPanel extends JPanel {
 
 
 class pmHelpIndexResultPanel extends JPanel {
-  
+
     JList resultList = null;
     pmButton selectButton = null;
     pmHelpIndexPanel parentPanel = null;
@@ -168,7 +167,7 @@ class pmHelpIndexResultPanel extends JPanel {
 
 
     public pmHelpIndexResultPanel(pmHelpIndexPanel p) {
-    
+
         parentPanel = p;
 
         this.setLayout(new GridBagLayout());
@@ -180,7 +179,7 @@ class pmHelpIndexResultPanel extends JPanel {
         c.gridx = 0;
         c.gridy = 0;
         c.anchor = GridBagConstraints.NORTHWEST;
-    
+
         JLabel promptLabel = new JLabel(
             pmUtility.getResource("Matching.entries:"));
 /*
@@ -188,9 +187,9 @@ class pmHelpIndexResultPanel extends JPanel {
  *        promptLabel.setDisplayedMnemonic(
  *           pmUtility.getIntResource("Matching.entries:.mnemonic"));
  */
-       
+
         this.add(promptLabel, c);
-    
+
         c.gridy = 1;
         c.anchor = GridBagConstraints.WEST;
 
@@ -198,18 +197,18 @@ class pmHelpIndexResultPanel extends JPanel {
             pmUtility.getResource("Show"));
         selectButton.setMnemonic(
             pmUtility.getIntResource("Show.mnemonic"));
-        
+
         selectButton.setEnabled(false);
-        
+
         this.add(selectButton, c);
-        
+
         selectButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 pmHelpItem selectedItem = (pmHelpItem)
                     resultList.getSelectedValue();
                 Debug.message("Selected " + selectedItem);
                 parentPanel.controller.showHelpItem(selectedItem);
-            } 
+            }
         });
 
         Vector resultItems = null;
@@ -229,15 +228,15 @@ class pmHelpIndexResultPanel extends JPanel {
         resultList.setVisibleRowCount(8);
 
         promptLabel.setLabelFor(resultList);
-        
+
         resultList.addListSelectionListener(new ListSelectionListener() {
             public void valueChanged(ListSelectionEvent e) {
                 if (!listEmpty) {
                     selectButton.setEnabled(true);
-                    /*
-                      parentPanel.controller.frame.
-                        getRootPane().setDefaultButton(selectButton);
-                    */
+		    /*
+		     * parentPanel.controller.frame.
+		     * getRootPane().setDefaultButton(selectButton);
+		     */
                     selectButton.setAsDefaultButton();
 
                 }
@@ -265,9 +264,9 @@ class pmHelpIndexResultPanel extends JPanel {
         c.weightx = c.weighty = 1.0;
         c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.EAST;
-    
+
         this.add(scrollPane, c);
-    
+
     }
 
     void setResultList(Vector v) {
@@ -280,10 +279,10 @@ class pmHelpIndexResultPanel extends JPanel {
     void setListEmpty(boolean e) {
         listEmpty = e;
         selectButton.setEnabled(false);
-        /*
-          parentPanel.controller.frame.getRootPane().
-            setDefaultButton(parentPanel.controller.frame.dismiss);
-        */
+	/*
+	 * parentPanel.controller.frame.getRootPane().
+	 *    setDefaultButton(parentPanel.controller.frame.dismiss);
+	 */
         if (parentPanel.controller.frame.dismiss != null)
             parentPanel.controller.frame.dismiss.
                 setAsDefaultButton();
@@ -308,21 +307,21 @@ class pmHelpIndexQueryPanel extends JPanel {
         c.fill = GridBagConstraints.NONE;
         c.weightx = c.weighty = 0.0;
         c.anchor = GridBagConstraints.WEST;
-      
+
         c.gridx = 0;
         c.gridy = 0;
         c.gridwidth = 1;
         c.gridheight = 1;
         c.insets = new Insets(10, 10, 10, 10);
-      
+
         JLabel promptLabel =
             new JLabel(pmUtility.getResource("Search.help.index.for:"));
 /*
  * MNEMONIC
- *     promptLabel.setDisplayedMnemonic(
- *        pmUtility.getIntResource("Search.help.index.for:.mnemonic"));
- */ 
-      
+ *    promptLabel.setDisplayedMnemonic(
+ *		pmUtility.getIntResource("Search.help.index.for:.mnemonic"));
+ */
+
         this.add(promptLabel, c);
 
         query = new JTextField();
@@ -335,7 +334,7 @@ class pmHelpIndexQueryPanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 Debug.info("HELP:  Action!");
                 parentPanel.resultPanel.selectButton.doClick();
-            }     
+            }
         });
 
         c.gridwidth = GridBagConstraints.REMAINDER;
@@ -343,14 +342,14 @@ class pmHelpIndexQueryPanel extends JPanel {
         c.weightx = 1.0;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.EAST;
-      
+
         this.add(query, c);
-      
+
         DocumentListener d = new DocumentListener() {
             public void changedUpdate(DocumentEvent e) {
                 // ignore
             }
-        
+
             public void insertUpdate(DocumentEvent e) {
                 handleText(query.getText());
             }
@@ -359,7 +358,7 @@ class pmHelpIndexQueryPanel extends JPanel {
                 handleText(query.getText());
             }
         };
-      
+
         query.getDocument().addDocumentListener(d);
     }
 
@@ -382,10 +381,3 @@ class pmHelpIndexQueryPanel extends JPanel {
     // belongs in controller?
     //  static pmHelpRepository helpDB = new pmHelpRepository();
 }
-
-
-
-
-
-
-

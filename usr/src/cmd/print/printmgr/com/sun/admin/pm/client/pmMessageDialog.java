@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -50,22 +49,22 @@ public class pmMessageDialog extends pmDialog {
     public pmMessageDialog(String title, String msg) {
         this(null, title, msg, null, null);
     }
-    
+
     public pmMessageDialog(Frame f, String title, String msg) {
         this(f, title, msg, null, null);
     }
-    
-    public pmMessageDialog(Frame f, 
-			    String title, 
-			    String msg, 
-			    pmTop top,     
+
+    public pmMessageDialog(Frame f,
+			    String title,
+			    String msg,
+			    pmTop top,
 			    String h) {
 
-        super(f, title, true);        // modal
+	super(f, title, true);	// modal
 
         theTop = top;
         helpTag = h;
-        
+
         // initialize constraints
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = 0;
@@ -90,11 +89,11 @@ public class pmMessageDialog extends pmDialog {
         Vector v = new Vector();
 
         Debug.message("CLNT:  MessageDialog: " + title + " , " + msg);
-        
+
         if (msg != null) {
             StringTokenizer st = new StringTokenizer(msg, "\n", false);
             try {
-                while (st.hasMoreTokens()) 
+                while (st.hasMoreTokens())
                     v.addElement(st.nextToken());
             } catch (Exception x) {
                 Debug.warning("CLNT:  pmMessageDialog caught " + x);
@@ -103,12 +102,12 @@ public class pmMessageDialog extends pmDialog {
         }
 
         theText.setBackground(p.getBackground());
-        
+
         // p.add(theText, "Center");
         p.add(theText, c);
-        
+
         this.getContentPane().add(p, "Center");
-        
+
         okButton = new pmButton(
             pmUtility.getResource("Dismiss"));
         okButton.setMnemonic(
@@ -130,7 +129,7 @@ public class pmMessageDialog extends pmDialog {
 
         p = new JPanel();
         p.add(okButton);
-    
+
         if (theTop != null && helpTag != null) {
             helpButton = new pmButton(
                 pmUtility.getResource("Help"));
@@ -140,10 +139,10 @@ public class pmMessageDialog extends pmDialog {
             helpButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     theTop.showHelpItem(helpTag);
-                }   
+                }
             });
         }
-        
+
         this.getContentPane().add(p, "South");
         this.addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent evt) {
@@ -155,13 +154,13 @@ public class pmMessageDialog extends pmDialog {
 
         // this.getRootPane().setDefaultButton(okButton);
         okButton.setAsDefaultButton();
-        
+
         // okButton.requestFocus();
         okButton.grabFocus();
 
     }
 
-    
+
     protected void actionOKButton() {
         returnValue = JOptionPane.OK_OPTION;
         pmMessageDialog.this.setVisible(false);
@@ -176,7 +175,7 @@ public class pmMessageDialog extends pmDialog {
     public static void main(String[] args) {
         JFrame f = new JFrame("Test Dialog");
         f.setSize(300, 100);
-    
+
         f.addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent evt) {
                 System.exit(0);
@@ -189,15 +188,15 @@ public class pmMessageDialog extends pmDialog {
             System.out.println("creating a new dialog instance...");
             pmMessageDialog d =
                 new pmMessageDialog(null,
-                                     "Dialog Test",
-                                     "Dumb test message.",
-				      null,
-                                     null);
+                                    "Dialog Test",
+                                    "Dumb test message.",
+				    null,
+                                    null);
             d.setVisible(true);
             System.out.println("Dialog returns " + d.getValue());
 
             d.dispose();
-    
+
         }
 
     }

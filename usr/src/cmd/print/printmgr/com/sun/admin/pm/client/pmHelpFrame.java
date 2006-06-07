@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -44,16 +43,16 @@ import com.sun.admin.pm.server.*;
 
 
 public class pmHelpFrame extends pmFrame {
-    
+
     protected pmHelpController theController = null;
     public pmButton dismiss = null;  // expose for default button hacks
-    
+
     public pmHelpFrame() {
         super(pmUtility.getResource("SPM:Help"));
 
         theController = new pmHelpController(this);
         getContentPane().add("Center", theController.getTopPane());
-        
+
         dismiss = new pmButton(
             pmUtility.getResource("Dismiss"));
         dismiss.setMnemonic(
@@ -68,7 +67,7 @@ public class pmHelpFrame extends pmFrame {
         p.add(dismiss);
 
         getContentPane().add("South", p);
-    
+
         this.pack();
         this.setVisible(false);
         this.repaint();
@@ -76,7 +75,7 @@ public class pmHelpFrame extends pmFrame {
         // default button is dismiss
         // getRootPane().setDefaultButton(dismiss);
         dismiss.setAsDefaultButton();
-    
+
         // handle Esc as dismiss
         getRootPane().registerKeyboardAction(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -92,12 +91,11 @@ public class pmHelpFrame extends pmFrame {
         this.setVisible(false);
     }
 
-    
+
     public void showHelp(String tag) {
         theController.showHelpItem(tag);
         this.setVisible(true);
         this.repaint();
     }
-        
-}
 
+}

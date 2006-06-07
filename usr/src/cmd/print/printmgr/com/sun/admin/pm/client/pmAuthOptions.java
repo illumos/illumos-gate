@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -28,7 +27,7 @@
  *
  * pmAuthOptions.java
  * Prompt for root password from printmgr.
- * This a helper for printmgr which echoes YES, NO, or CANCEL to stdout. 
+ * This a helper for printmgr which echoes YES, NO, or CANCEL to stdout.
  */
 
 package com.sun.admin.pm.client;
@@ -68,8 +67,8 @@ public class pmAuthOptions {
 	    }
 
 	while (!done) {
-	    pmAuthLogin d = new pmAuthLogin(null, 
-			    pmUtility.getResource("Root.authentication"), 
+	    pmAuthLogin d = new pmAuthLogin(null,
+			    pmUtility.getResource("Root.authentication"),
 			    pmUtility.getResource("Enter.root.password"));
 	    d.setVisible(true);
 	    if (d.getValue() != JOptionPane.OK_OPTION)
@@ -84,11 +83,11 @@ public class pmAuthOptions {
 
 		}
 		if (!ok) {
-		    pmOKCancelDialog m = new pmOKCancelDialog(null, 
-				    pmUtility.getResource("Error"),  
+		    pmOKCancelDialog m = new pmOKCancelDialog(null,
+				    pmUtility.getResource("Error"),
 				    pmUtility.getResource("Invalid.password"));
 		    m.setVisible(true);
-		    if (m.getValue() != JOptionPane.OK_OPTION) 
+		    if (m.getValue() != JOptionPane.OK_OPTION)
 			done = true;
 		} else {
 		    done = true;
@@ -101,13 +100,9 @@ public class pmAuthOptions {
 	System.exit(0);
     }
 
-    
+
 }
-                
-    
-    
-    
- 
+
 
 /*
  */
@@ -117,10 +112,10 @@ class pmAuthLogin extends pmDialog {
 
     protected pmButton okButton = null;
     protected pmButton cancelButton = null;
-    
+
     public pmAuthLogin(JFrame f, String title, String msg) {
 
-        super(f, title, true);         // modal
+	super(f, title, true);		// modal
 
         JLabel l;
         JPanel p;
@@ -137,13 +132,13 @@ class pmAuthLogin extends pmDialog {
         // top panel contains the desired message
         p = new JPanel();
         p.setLayout(new GridBagLayout());
-           
+
         l = new JLabel(msg, SwingConstants.CENTER);
         p.add(l, c);
         this.getContentPane().add(p, "North");
-        
 
-        // middle panel contains username and password 
+
+        // middle panel contains username and password
         p = new JPanel();
         p.setLayout(new GridBagLayout());
 
@@ -189,7 +184,7 @@ class pmAuthLogin extends pmDialog {
 
         p.add(passwordField, c);
         passwordField.setEchoChar('*');
-        
+
         this.getContentPane().add(p, "Center");
 
         // bottom panel contains buttons
@@ -241,14 +236,14 @@ class pmAuthLogin extends pmDialog {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-       
+
         // lay out the dialog
         this.pack();
 
         // set focus and defaults after packing...
         // this.getRootPane().setDefaultButton(okButton);
         okButton.setAsDefaultButton();
-        
+
         passwordField.requestFocus();
     }
 
@@ -280,13 +275,8 @@ class pmAuthLogin extends pmDialog {
     public JPasswordField passwordField = null;
 
     protected int returnValue = JOptionPane.CANCEL_OPTION;
-    
+
 }
-                
-    
-    
-    
- 
 
 
 class pmAuthMessage extends pmDialog {
@@ -298,7 +288,7 @@ class pmAuthMessage extends pmDialog {
 
     public pmAuthMessage(JFrame f, String title, String msg) {
 
-        super(f, title, true);         // modal
+	super(f, title, true);		// modal
 
         JPanel p;
 
@@ -314,7 +304,7 @@ class pmAuthMessage extends pmDialog {
         // top panel contains the desired message
         p = new JPanel();
         p.setLayout(new GridBagLayout());
-           
+
 
         JList l = new JList() {
             public boolean isFocusable() {
@@ -331,7 +321,7 @@ class pmAuthMessage extends pmDialog {
         if (msg != null) {
             StringTokenizer st = new StringTokenizer(msg, "\n", false);
             try {
-                while (st.hasMoreTokens()) 
+                while (st.hasMoreTokens())
                     v.addElement(st.nextToken());
             } catch (Exception x) {
             }
@@ -341,7 +331,7 @@ class pmAuthMessage extends pmDialog {
 
         p.add(l, c);
         this.getContentPane().add(p, "North");
-        
+
 
         // bottom panel contains buttons
         c.gridx = 0;
@@ -398,13 +388,13 @@ class pmAuthMessage extends pmDialog {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-       
+
         // lay out the dialog
         this.pack();
 
         // set focus and defaults after packing...
         authButton.setAsDefaultButton();
-        
+
     }
 
     public int getValue() {
@@ -429,5 +419,5 @@ class pmAuthMessage extends pmDialog {
     }
 
     protected int returnValue = JOptionPane.CANCEL_OPTION;
-    
+
 }

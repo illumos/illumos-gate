@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * DoPrinterMod class
@@ -174,7 +173,7 @@ public class  DoPrinterMod {
 			comment = "";
 		}
 	}
-	if (!strings_equal(curr.getDevice(), p.getDevice())) 
+	if (!strings_equal(curr.getDevice(), p.getDevice()))
 		device = p.getDevice();
 
 	if (!strings_equal(curr.getNotify(), p.getNotify()))
@@ -195,7 +194,7 @@ public class  DoPrinterMod {
 	Debug.message(
 	    "SVR:DoPrinterMod:curr.getProtocol(): " + curr.getProtocol());
 	Debug.message("SVR:DoPrinterMod:p.getProtocol(): " + p.getProtocol());
-	
+
 	if (!strings_equal(curr.getDestination(), p.getDestination()))
 		destination = p.getDestination();
 
@@ -258,7 +257,7 @@ public class  DoPrinterMod {
 					allow_changed = false;
 				}
 			}
-		} 
+		}
 	}
 	if (!arrays_equal(curr.getUserDenyList(), p.getUserDenyList())) {
 		allow_changed = true;
@@ -387,7 +386,7 @@ public class  DoPrinterMod {
 	// properties of the queue
 
 	if (isURI) {
-		if (destination != null) 
+		if (destination != null)
 			device = destination;
 		else
 			device = curr.getDestination();
@@ -420,7 +419,9 @@ public class  DoPrinterMod {
 	// Network printer
 	if (isURI) {
                 cmd = cmd.concat(" -m uri");
-	} else {
+
+	} else if (protocol != null) {
+
 		if (curr.getPPD() != null)
                		cmd = cmd.concat(" -m netstandard_foomatic");
 		else
@@ -668,7 +669,7 @@ public class  DoPrinterMod {
 
 	//
 	// If this is only a default printer change then set modhints
-	// 
+	//
 	if ((printserver == null) &&
 	    (extensions == null) &&
 	    (comment == null)) {

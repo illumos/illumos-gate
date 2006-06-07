@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,14 +48,14 @@ public class pmHelpSearchPanel extends JPanel {
     pmHelpSearchQueryPanel queryPanel;
     pmHelpSearchResultPanel resultPanel;
     JLabel textPanels[];
-  
+
     public pmHelpSearchPanel(pmHelpController ctrl) {
         controller = ctrl;
 
         // build subpanels
         queryPanel = new pmHelpSearchQueryPanel(this);
         resultPanel = new pmHelpSearchResultPanel(this);
-    
+
         textPanels = new JLabel[4];
         textPanels[0] = new JLabel(
             pmUtility.getResource("To.find.help.articles..."));
@@ -100,20 +99,20 @@ public class pmHelpSearchPanel extends JPanel {
         resultPanel.setBorder(BorderFactory.createEtchedBorder());
         p.add(resultPanel, "Center");
         // p.setBorder(BorderFactory.createEtchedBorder());
-    
+
         c.gridy = 1;
         // new stuff
         c.gridy = GridBagConstraints.RELATIVE;
         c.gridheight = 0;
         c.weighty = 1.0;
         c.weightx = 0.0;
-        c.fill = GridBagConstraints.BOTH; 
+        c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.EAST;
         // end new stuff
 
         this.add(p, c);
         this.setBorder(BorderFactory.createEtchedBorder());
-    
+
 
         // figure out when we are tabbed or un-tabbed
         controller.outerPanel.addChangeListener(new ChangeListener() {
@@ -122,18 +121,18 @@ public class pmHelpSearchPanel extends JPanel {
                 Debug.info("HELP:  Tab event!");
                 if (!(tp.getSelectedComponent() instanceof
                        com.sun.admin.pm.client.pmHelpSearchPanel)) {
-                    Debug.info("HELP:  Tab event: resetting default"); 
-                    /*
-                      controller.frame.getRootPane().
-                          setDefaultButton(
-                              controller.frame.dismiss);
-                    */
-                    /*
-                      System.out.println(controller);
-                      System.out.println(controller.frame);
-                      System.out.println(controller.frame.dismiss);
-                     */
-                    
+                    Debug.info("HELP:  Tab event: resetting default");
+		    /*
+		     * controller.frame.getRootPane().
+		     *	setDefaultButton(
+		     * 		controller.frame.dismiss);
+		     */
+		    /*
+		     * System.out.println(controller);
+		     * System.out.println(controller.frame);
+		     * System.out.println(controller.frame.dismiss);
+		     */
+
                     if (controller.frame.dismiss != null)
                         controller.frame.dismiss.
                             setAsDefaultButton();
@@ -143,10 +142,10 @@ public class pmHelpSearchPanel extends JPanel {
                 }
             }
         });
-            
+
     }
 
-    
+
     // place item titles in search result panel
     public void setSearchResults(Vector items) {
         Vector v = new Vector();
@@ -197,9 +196,9 @@ class pmHelpSearchResultPanel extends JPanel {
  *        promptLabel.setDisplayedMnemonic(
  *            pmUtility.getIntResource("Search.Results:.mnemonic"));
  */
-        
+
         this.add(promptLabel, c);
-        
+
         selectButton = new pmButton(
             pmUtility.getResource("Show"));
         selectButton.setMnemonic(
@@ -221,7 +220,7 @@ class pmHelpSearchResultPanel extends JPanel {
         c.gridy = 1;
         c.anchor = GridBagConstraints.SOUTHWEST;
         this.add(selectButton, c);
-    
+
 
         Vector resultItems = new Vector();
 
@@ -231,15 +230,15 @@ class pmHelpSearchResultPanel extends JPanel {
         resultList.setVisibleRowCount(8);
 
         promptLabel.setLabelFor(resultList);
-        
+
         resultList.addListSelectionListener(new ListSelectionListener() {
             public void valueChanged(ListSelectionEvent e) {
                 if (!listEmpty) {
                     selectButton.setEnabled(true);
-                    /*
-                      parentPanel.controller.frame.
-                        getRootPane().setDefaultButton(selectButton);
-                    */
+		    /*
+		     * parentPanel.controller.frame.
+		     * getRootPane().setDefaultButton(selectButton);
+		     */
                     selectButton.setAsDefaultButton();
 
                 }
@@ -269,9 +268,9 @@ class pmHelpSearchResultPanel extends JPanel {
         c.weightx = c.weighty = 1.0;
         c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.WEST;
-    
+
         this.add(scrollPane, c);
-    
+
     }
 
     public void setResultList(Vector v) {
@@ -283,10 +282,10 @@ class pmHelpSearchResultPanel extends JPanel {
     void setListEmpty(boolean e) {
         listEmpty = e;
         selectButton.setEnabled(false);
-        /*
-          parentPanel.controller.frame.getRootPane().
-            setDefaultButton(parentPanel.controller.frame.dismiss);
-        */
+	/*
+	 * parentPanel.controller.frame.getRootPane().
+	 * setDefaultButton(parentPanel.controller.frame.dismiss);
+	 */
         parentPanel.controller.frame.dismiss.setAsDefaultButton();
 
     }
@@ -325,7 +324,7 @@ class pmHelpSearchQueryPanel extends JPanel {
  *     promptLabel.setDisplayedMnemonic(
  *         pmUtility.getIntResource("Keywords:.mnemonic"));
  */
-      
+
         this.add(promptLabel, c);
 
         search = new pmButton(
@@ -342,7 +341,7 @@ class pmHelpSearchQueryPanel extends JPanel {
                 if (s != null) {
                     v = new Vector();
                     st = new StringTokenizer(s);
-                    while (st.hasMoreTokens()) 
+                    while (st.hasMoreTokens())
                         v.addElement(st.nextToken());
                     v = getItemsForKeywords(v);
                     parentPanel.setSearchResults(v);
@@ -354,13 +353,13 @@ class pmHelpSearchQueryPanel extends JPanel {
                         Debug.info("HELP:  search vector empty");
                     }
                 }
-      
+
             }
         });
-    
+
         c.fill = GridBagConstraints.NONE;
         c.gridx = 2;
-        c.gridy = 0;           // GridBagConstraints.RELATIVE;
+	c.gridy = 0;	// GridBagConstraints.RELATIVE;
         this.add(search, c);
 
         query = new JTextField();
@@ -373,36 +372,36 @@ class pmHelpSearchQueryPanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 Debug.info("HELP:  Action!");
                 pmHelpSearchQueryPanel.this.search.doClick();
-            }     
+            }
         });
 
         query.getDocument().addDocumentListener(new DocumentListener() {
             public void changedUpdate(DocumentEvent e) {
                 // ignore
             }
-        
+
             public void insertUpdate(DocumentEvent e) {
                 // make search the default button
                 Debug.info("HELP:  search doc inserted update");
                 pmHelpSearchQueryPanel.this.search.setEnabled(true);
-                /*
-                  parentPanel.controller.frame.
-                  getRootPane().setDefaultButton(
-                  pmHelpSearchQueryPanel.this.search);
-                 */
+		/*
+		 * parentPanel.controller.frame.
+		 * getRootPane().setDefaultButton(
+		 * pmHelpSearchQueryPanel.this.search);
+		 */
                 if (pmHelpSearchQueryPanel.this.search != null)
                     pmHelpSearchQueryPanel.this.search.
                         setAsDefaultButton();
-            }   
+            }
 
             public void removeUpdate(DocumentEvent e) {
                 Debug.info("HELP:  search doc removed update");
                 // restore the default button
                 if (query.getText().length() == 0) {
                     /*
-                      parentPanel.controller.frame.
-                      getRootPane().setDefaultButton(
-                      parentPanel.controller.frame.dismiss);
+                     * parentPanel.controller.frame.
+                     * getRootPane().setDefaultButton(
+                     * parentPanel.controller.frame.dismiss);
                      */
                     if (parentPanel.controller.frame.dismiss != null)
                         parentPanel.controller.frame.dismiss.
@@ -410,20 +409,20 @@ class pmHelpSearchQueryPanel extends JPanel {
                 }
             }
         });
-      
 
-      
-        c.gridwidth = 1;        // GridBagConstraints.REMAINDER;
+
+
+	c.gridwidth = 1;	// GridBagConstraints.REMAINDER;
         c.gridx = 1;
         c.weightx = 1.0;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.EAST;
-      
+
         this.add(query, c);
 
     }
 
-    
+
     Vector getItemsForKeywords(Vector keywords) {
         Vector result = new Vector();
 
@@ -434,14 +433,14 @@ class pmHelpSearchQueryPanel extends JPanel {
             String s = (String) words.nextElement();
             Vector newItems = pmHelpRepository.helpItemsForKeyword(s);
             Debug.info("HELP:  getItemsForKeywords new items: " + newItems);
-      
+
             if (newItems != null) {
                 Enumeration items = newItems.elements();
                 while (items.hasMoreElements()) {
                     pmHelpItem i = (pmHelpItem) items.nextElement();
                     Debug.info("HELP:  getItemsForKeywords result: " + result);
                     Debug.info("HELP:  getItemsForKeywords item: " + i);
-    
+
                     if (!result.contains(i))
                         result.addElement(i);
                 }
@@ -450,4 +449,3 @@ class pmHelpSearchQueryPanel extends JPanel {
         return result;
     }
 }
-

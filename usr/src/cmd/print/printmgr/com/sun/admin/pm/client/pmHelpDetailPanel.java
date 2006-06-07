@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -73,9 +72,9 @@ public class pmHelpDetailPanel extends JPanel {
     int historyLast;
 
     static final int MAX_HISTORY_ITEMS = 101;
-    
+
     public pmHelpDetailPanel(pmHelpController ctrl) {
-    
+
         controller = ctrl;
 
         // build subpanels
@@ -105,13 +104,13 @@ public class pmHelpDetailPanel extends JPanel {
         c.gridheight = 0;
         c.weighty = 0.0;
         c.weightx = 1.0;
-        c.fill = GridBagConstraints.BOTH; 
+        c.fill = GridBagConstraints.BOTH;
         c.anchor = GridBagConstraints.WEST;
         c.insets = new Insets(0, 5, 5, 5);
         this.add(seeAlsoPanel, c);
 
         this.setBorder(BorderFactory.createEtchedBorder());
-    
+
         history = new pmHelpLoc[MAX_HISTORY_ITEMS];
         historyIndex = 0;
         historyLast = 0;
@@ -123,12 +122,12 @@ public class pmHelpDetailPanel extends JPanel {
                 Debug.info("HELP:  Tab event!");
                 if (!(tp.getSelectedComponent() instanceof
                        com.sun.admin.pm.client.pmHelpDetailPanel)) {
-                    Debug.info("HELP:  Tab event: resetting default"); 
+                    Debug.info("HELP:  Tab event: resetting default");
                     /*
-                      controller.frame.getRootPane().
-                      setDefaultButton(
-                          controller.frame.dismiss);
-                    */
+                     * controller.frame.getRootPane().
+                     * setDefaultButton(
+                     *		controller.frame.dismiss);
+                     */
                     if (controller.frame.dismiss != null)
                         controller.frame.dismiss.
                             setAsDefaultButton();
@@ -138,11 +137,11 @@ public class pmHelpDetailPanel extends JPanel {
 
         addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) {
-                Debug.info("HELP:  detailPanel gained focus"); 
+                Debug.info("HELP:  detailPanel gained focus");
                 if (controller.frame.dismiss != null)
                     controller.frame.dismiss.
                         setAsDefaultButton();
-            
+
             }
         });
     }
@@ -163,7 +162,7 @@ public class pmHelpDetailPanel extends JPanel {
         history[historyIndex].pos = viewPanel.getPos();
 
         Debug.info("back: pos is " + history[historyIndex].pos);
-    
+
         if (historyIndex > 1) {
             pmHelpLoc l = history [--historyIndex];
             pmHelpItem item = l.item;
@@ -183,7 +182,7 @@ public class pmHelpDetailPanel extends JPanel {
         history[historyIndex].pos = viewPanel.getPos();
 
         Debug.info("HELP:  fwd: pos is " + history[historyIndex].pos);
-       
+
         if (historyIndex < historyLast) {
             pmHelpLoc l = history [++historyIndex];
             pmHelpItem item = l.item;
@@ -201,7 +200,7 @@ public class pmHelpDetailPanel extends JPanel {
     protected pmHelpItem loadItem(pmHelpItem item) {
         return loadItem(item, new Point(0, 0));
     }
-    
+
     protected pmHelpItem loadItem(pmHelpItem item, Point pos) {
         Debug.message("HELP:  View: loadItem " + item.tag);
         seeAlsoPanel.setItems(item.seealso);
@@ -213,16 +212,16 @@ public class pmHelpDetailPanel extends JPanel {
         return item;
     }
 
-        
+
     /*
      * load the help item corresponding to the specified tag
      * external - called from helpController
-     *            note that this is how see-also items are loadedes
+     *		note that this is how see-also items are loadedes
      */
     public pmHelpItem loadItemForTag(String tag) {
 
         pmHelpItem item;
-            
+
         if (tag == null ||
             (item = pmHelpRepository.helpItemForTag(tag)) == null) {
             Debug.warning("HELP:  View: item not found");
@@ -236,7 +235,7 @@ public class pmHelpDetailPanel extends JPanel {
         // if there's already an item visible, preserve its position
         if (historyIndex != 0 && historyLast != 0)
             history[historyIndex].pos = viewPanel.getPos();
-    
+
         loadItem(item);
 
         Debug.info("HELP:  loadItemForTag: index = " + historyIndex +
@@ -248,7 +247,7 @@ public class pmHelpDetailPanel extends JPanel {
          * if the history length is maxed out, the new item
          * will replace the item that's currently last.
          */
-       
+
         if (historyIndex < history.length - 1) {
             // init pos to 0,0
             history [++historyIndex] = new pmHelpLoc(item);
@@ -264,7 +263,7 @@ public class pmHelpDetailPanel extends JPanel {
                    ", last = " + historyLast);
         return item;
     }
-        
+
     private void loadEmptyItem(String itm) {
         String msg = new String(
             pmUtility.getResource("Item.not.found:") + itm);
@@ -285,10 +284,10 @@ class pmHelpSeeAlsoPanel extends JPanel {
     pmButton selectButton = null;
 
     private void layoutBox() {
-    
+
         JPanel p = new JPanel();
         p.setLayout(new BorderLayout(5, 0));
-    
+
         p.add(new JPanel(), "North");
         p.add(new JPanel(), "South");
 
@@ -309,30 +308,30 @@ class pmHelpSeeAlsoPanel extends JPanel {
             new Dimension(300, theComboBox.getPreferredSize().height));
         theComboBox.setEnabled(false);
 
-        /*
-          theComboBox.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                JComboBox src = (JComboBox) e.getSource();
-                System.out.println("Combo: action = " +
-                                    e.getActionCommand());
-                System.out.println("Combo: mod = " +
-                                    e.getModifiers());
-                System.out.println("Combo: param = " +
-                                    e.paramString());
-                System.out.println("Combo: item = " +
-                                    src.getSelectedItem());
-            }
-        });
-        */
+	/*
+	 * theComboBox.addActionListener(new ActionListener() {
+	 *    public void actionPerformed(ActionEvent e) {
+	 *	JComboBox src = (JComboBox) e.getSource();
+	 *	System.out.println("Combo: action = " +
+	 *			e.getActionCommand());
+	 *	System.out.println("Combo: mod = " +
+	 *			e.getModifiers());
+	 *	System.out.println("Combo: param = " +
+	 *			e.paramString());
+	 *	System.out.println("Combo: item = " +
+	 *			src.getSelectedItem());
+	 *    }
+	 * });
+	 */
 
         p.add(theComboBox, "Center");
 
         selectButton = new pmButton(
             pmUtility.getResource("Show"));
         selectButton.setMnemonic(
-            pmUtility.getIntResource("Show.mnemonic")); 
+            pmUtility.getIntResource("Show.mnemonic"));
         selectButton.setEnabled(false);
-    
+
         p.add(selectButton, "East");
         selectButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -359,7 +358,7 @@ class pmHelpSeeAlsoPanel extends JPanel {
         parentPanel = p;
         layoutBox();
         this.setBorder(BorderFactory.createEtchedBorder());
-    } 
+    }
 
 
     /*
@@ -375,7 +374,7 @@ class pmHelpSeeAlsoPanel extends JPanel {
         Enumeration e = tags.elements();
         while (e.hasMoreElements()) {
             pmHelpItem i =
-                pmHelpRepository.helpItemForTag((String) e.nextElement()); 
+                pmHelpRepository.helpItemForTag((String) e.nextElement());
             if (i != null)
                 theComboBox.addItem(i);
         }
@@ -387,7 +386,7 @@ class pmHelpSeeAlsoPanel extends JPanel {
         // repaint();
     }
 
-    
+
     public void clearItems() {
         if (theComboBox.getItemCount() > 0)
             theComboBox.removeAllItems();
@@ -451,7 +450,7 @@ class pmHelpViewPanel extends JPanel {
         this.add(scrollPane, c);
 
         this.setBorder(BorderFactory.createEtchedBorder());
-    
+
         /*
          */
         try {
@@ -476,7 +475,7 @@ class pmHelpViewPanel extends JPanel {
         backButton = new pmButton(
             pmUtility.getResource("Back"));
         backButton.setMnemonic(
-            pmUtility.getIntResource("Back.mnemonic")); 
+            pmUtility.getIntResource("Back.mnemonic"));
         p.add(backButton, pc);
         backButton.setEnabled(false);
         backButton.setDefaultCapable(false);
@@ -493,7 +492,7 @@ class pmHelpViewPanel extends JPanel {
         forwardButton = new pmButton(
             pmUtility.getResource("Forward"));
         forwardButton.setMnemonic(
-            pmUtility.getIntResource("Forward.mnemonic")); 
+            pmUtility.getIntResource("Forward.mnemonic"));
         p.add(forwardButton, pc);
         forwardButton.setEnabled(false);
         forwardButton.setDefaultCapable(false);
@@ -508,7 +507,7 @@ class pmHelpViewPanel extends JPanel {
         c.gridwidth = GridBagConstraints.REMAINDER;
         c.weightx = 1.0;
         // c.weighty = 1.0;
-        c.weighty = 0.05;     // NEW
+	c.weighty = 0.05;	// NEW
 
         c.fill = GridBagConstraints.BOTH;
         c.insets = new Insets(0, 10, 5, 10);
@@ -518,9 +517,9 @@ class pmHelpViewPanel extends JPanel {
 
         add(p, c);
 
-    }    
+    }
 
-    
+
     public void setItem(String title, pmHelpContent content) {
         helpView.setText(content.getText());
         // scrollPane.getViewport().setViewPosition(new Point(0, 0));
@@ -530,15 +529,15 @@ class pmHelpViewPanel extends JPanel {
     public void setPos(Point p) {
         scrollPane.getViewport().setViewPosition(p);
     }
-    
+
     public Point getPos() {
         return scrollPane.getViewport().getViewPosition();
     }
-    
+
     public void setNavButtons(int index, int last) {
         Debug.message("HELP:  NavButtons " + index + " " + last);
 
-        if (last > index) 
+        if (last > index)
             forwardButton.setEnabled(true);
         else
             forwardButton.setEnabled(false);
@@ -561,7 +560,7 @@ class pmJTextField extends JTextField {
 class pmHelpHelpOnPanel extends JPanel {
 
     pmJTextField helpTopic;
-    
+
     public  pmHelpHelpOnPanel() {
 
         helpTopic = new pmJTextField();
@@ -580,11 +579,11 @@ class pmHelpHelpOnPanel extends JPanel {
             pmUtility.getResource("Help.on:")),
               "West");
         p.add(helpTopic, "Center");
-      
+
         JPanel pp = new JPanel();
         pp.setLayout(new BorderLayout(0, 0));
         pp.add(p, "Center");
-      
+
         // this.add(Box.createHorizontalStrut(5));
         this.add(pp);
         // this.add(Box.createHorizontalStrut(5));
@@ -596,26 +595,3 @@ class pmHelpHelpOnPanel extends JPanel {
     }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

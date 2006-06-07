@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -116,12 +115,12 @@ public class pmTop extends JPanel {
 
     pmFrame frame;
 
-    
-    public pmTop(JFrame parent) { 
+
+    public pmTop(JFrame parent) {
 	parentFrame = parent;
 	setLayout(new BorderLayout());
 	pmTopInit();
-		
+
     }
 
     public void pmTopInit() {
@@ -200,7 +199,7 @@ public class pmTop extends JPanel {
             pmUtility.getResource("Printer.Name"),
             pmUtility.getResource("Printer.Server"),
             pmUtility.getResource("Description")
-            
+
         };
 
 	// Initialize for JTable calls from SWING classes
@@ -222,7 +221,7 @@ public class pmTop extends JPanel {
 		for (int i = 0; i < rowDataList.length; i = i + 3) {
 			rowData = new Vector(3, 1);
 			for (j = 0; j < 3; j++) {
-		  	   rowData.addElement(
+			    rowData.addElement(
 				rowDataList[i + j]);
 			}
 			data.addElement(rowData);
@@ -236,7 +235,7 @@ public class pmTop extends JPanel {
 	public int getRowCount() {
 		return data.size();
 	}
- 
+
 	public int getColumnCount() {
 		return columnNames.length;
 	}
@@ -244,12 +243,12 @@ public class pmTop extends JPanel {
 	public String getColumnName(int col) {
 		return columnNames[col];
 	}
- 
+
 	public Object getValueAt(int row, int col) {
 		Vector rowVector = (Vector)data.elementAt(row);
 		return rowVector.elementAt(col);
 	}
- 
+
 	public void setValueAt(String value, int row, int col) {
 		Vector rowVector = (Vector)data.elementAt(row);
 		rowVector.setElementAt(value, col);
@@ -286,16 +285,16 @@ public class pmTop extends JPanel {
 
         selectedPrinter =
             (String) listTable.getModel().getValueAt(selectedRow, 0);
-        selprinterServer = 
+        selprinterServer =
                     (String)listTable.getModel().getValueAt(selectedRow, 1);
 
         Debug.message("CLNT:  selectedPrinter is " + selectedPrinter);
-        
+
         doModify();
     }
 
-    
-    // Create printer list in center panel 
+
+    // Create printer list in center panel
     public void centerPanel() {
 
 	center = new JPanel();
@@ -317,7 +316,7 @@ public class pmTop extends JPanel {
             }},
             KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, false),
             JComponent.WHEN_IN_FOCUSED_WINDOW);
-    
+
 
 	listTable.addMouseListener(new MouseAdapter() {
 	    public void mouseClicked(MouseEvent e) {
@@ -341,7 +340,7 @@ public class pmTop extends JPanel {
             }
 	});
 
-	// Add selection listener 
+	// Add selection listener
 	ListSelectionModel rowSelectModel = listTable.getSelectionModel();
 
 	rowSelectModel.addListSelectionListener(new ListSelectionListener() {
@@ -358,7 +357,7 @@ public class pmTop extends JPanel {
 		    selectedRow = listSM.getMinSelectionIndex();
 		    Debug.message(
 			"CLNT:  list element selected" + selectedRow);
-		    selectedPrinter = 
+		    selectedPrinter =
 		    (String)listTable.getModel().getValueAt(selectedRow, 0);
 		    selprinterServer =
 			(String)listTable.getModel().getValueAt(selectedRow, 1);
@@ -389,7 +388,7 @@ public class pmTop extends JPanel {
 		m.setVisible(true);
 		System.exit(-1);
 	}
-		
+
 	scrollPane = new JScrollPane();
 	scrollPane.setViewportView(listTable);
 
@@ -419,7 +418,7 @@ public class pmTop extends JPanel {
 	c.weightx = c.weighty = 1.0;
 
 	try {
-	defaultpLabel = 
+	defaultpLabel =
 		new JLabel(pmUtility.getResource("Default.Printer:") +
                        " " + PrinterUtil.getDefaultPrinter(ns));
 
@@ -431,7 +430,7 @@ public class pmTop extends JPanel {
 
 	south.add(defaultpLabel, c);
 
-		
+
 	if (newNS.startsWith("files")) {
 		try {
 			domainhostLabel = new JLabel(pmUtility.getResource(
@@ -448,7 +447,7 @@ public class pmTop extends JPanel {
 		    nameserviceLabel.setText(
 		    pmUtility.getResource("Naming.Service:") + " " + newNS);
 		   domainhostLabel = new JLabel(
-			pmUtility.getResource("Domain:") + " " + 
+			pmUtility.getResource("Domain:") + " " +
                    host.getDomainName());
 		} catch (Exception e) {
 		    Debug.warning("CLNT: pmTop:getDomainName caught " + e);
@@ -484,9 +483,9 @@ public class pmTop extends JPanel {
 	});
 
         JMenuItem load = new JMenuItem(
-            pmUtility.getResource("Select.Naming.Service"), 
+            pmUtility.getResource("Select.Naming.Service"),
             pmUtility.getIntResource("Select.Naming.Service.mnemonic"));
-            
+
         load.addActionListener(
             new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -537,12 +536,12 @@ public class pmTop extends JPanel {
 
 	usePPD = new JCheckBoxMenuItem(
 		pmUtility.getResource("Use.PPD.files"), true);
-	usePPD.setMnemonic(pmUtility.getIntResource("Use.PPD.files.mnemonic"));	
+	usePPD.setMnemonic(pmUtility.getIntResource("Use.PPD.files.mnemonic"));
 
 	useLocalhost = new JCheckBoxMenuItem(
 		pmUtility.getResource("Use.localhost"), true);
 	useLocalhost.setMnemonic(
-		pmUtility.getIntResource("Use.localhost.mnemonic"));	
+		pmUtility.getIntResource("Use.localhost.mnemonic"));
 
 
 	if (!runningAuth) {
@@ -553,7 +552,7 @@ public class pmTop extends JPanel {
 	appMenu.add(useLocalhost);
 
         appMenu.addSeparator();
-        
+
         JMenuItem exit = new JMenuItem(
             pmUtility.getResource("Exit"),
             pmUtility.getIntResource("Exit.mnemonic"));
@@ -565,7 +564,7 @@ public class pmTop extends JPanel {
                 System.exit(0);
             };
         });
- 
+
         exit.setEnabled(true);
         appMenu.add(exit);
 
@@ -596,9 +595,9 @@ public class pmTop extends JPanel {
 	    new ActionListener() {
 		public void actionPerformed(ActionEvent e) {
                 	Debug.message("CLNT:  call from access action");
-		    	if (accessView != null)
+			if (accessView != null)
                 		accessView.setVisible(true);
-		    	else
+			else
                    		accessView = new pmAccess(myTop);
 		    accessView.Show();
 		};
@@ -609,11 +608,11 @@ public class pmTop extends JPanel {
 
         objectMenu.add(access);
         objectMenu.addSeparator();
-        
+
         local = new JMenuItem(
             pmUtility.getResource("New.Attached.Printer..."),
             pmUtility.getIntResource("New.Attached.Printer.mnemonic"));
-        
+
         local.addActionListener(
             new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -636,7 +635,7 @@ public class pmTop extends JPanel {
             local.setEnabled(false);
 
         objectMenu.add(local);
- 
+
         network = new JMenuItem(
             pmUtility.getResource("New.Network.Printer..."),
             pmUtility.getIntResource("New.Network.Printer.mnemonic"));
@@ -649,7 +648,7 @@ public class pmTop extends JPanel {
                     networkinstallView.setVisible(true);
 		else {
 		    try {
-                    networkinstallView = new 
+                    networkinstallView = new
                         pmInstallPrinter(myTop, Constants.ADDNETWORK);
 		    } catch (Exception ex) {
 			Debug.message("CLNT:pmTop:caught exception" + ex);
@@ -665,7 +664,7 @@ public class pmTop extends JPanel {
 
         objectMenu.add(network);
         objectMenu.addSeparator();
-        
+
         modifyMenuItem = new JMenuItem(
             pmUtility.getResource("Modify.Printer.Properties..."),
             pmUtility.getIntResource("Modify.Printer.Properties.mnemonic"));
@@ -680,7 +679,7 @@ public class pmTop extends JPanel {
 		doModify();
             };
         });
-       
+
         modifyMenuItem.setEnabled(false);
         objectMenu.add(modifyMenuItem);
 
@@ -723,13 +722,13 @@ public class pmTop extends JPanel {
             listTable.clearSelection();
             listTable.setRowSelectionInterval(row, row);
             listTable.scrollRectToVisible(listTable.getCellRect(row, 0, true));
-            listTable.revalidate(); 
+            listTable.revalidate();
             scrollPane.revalidate();
             scrollPane.repaint();
         }
         return row != -1;
     }
-    
+
     public JMenu toolsMenu() {
 
         // find printer...
@@ -737,7 +736,7 @@ public class pmTop extends JPanel {
             pmUtility.getResource("Tools"));
         toolsMenu.setMnemonic(
             pmUtility.getIntResource("Tools.mnemonic"));
-        
+
         JMenuItem find = new JMenuItem(
             pmUtility.getResource("Find.Printer"),
             pmUtility.getIntResource("Find.Printer.mnemonic"));
@@ -787,8 +786,8 @@ public class pmTop extends JPanel {
             pmUtility.getIntResource("About.Print.Manager.mnemonic"));
         about.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-	        Debug.message("CLNT:  call from about help action");
-	        aboutBox.setVisible(true);
+		Debug.message("CLNT:  call from about help action");
+		aboutBox.setVisible(true);
             };
         });
 
@@ -820,7 +819,7 @@ public class pmTop extends JPanel {
 	    try {
 
 		if (selectedPrinter == null || selprinterServer == null) {
-		
+
 		} else {
 
 		    if ((host.getLocalHostName()).equals(selprinterServer) ||
@@ -828,12 +827,12 @@ public class pmTop extends JPanel {
 
 			if (isNetwork()) {
 
-			    modifyView = new 
+			    modifyView = new
 				pmInstallPrinter(
 					myTop, Constants.MODIFYNETWORK);
 
 			} else {
-			    modifyView = new 
+			    modifyView = new
 				pmInstallPrinter(
 					myTop, Constants.MODIFYATTACHED);
 			}
@@ -859,8 +858,8 @@ public class pmTop extends JPanel {
 
 
     public boolean isNetwork() {
- 
-	Printer newpr = new Printer(myTop.ns); 
+
+	Printer newpr = new Printer(myTop.ns);
 	newpr.setPrinterName(selectedPrinter);
 
 	try {
@@ -875,11 +874,11 @@ public class pmTop extends JPanel {
 		Debug.message("CLNT:  isNetwork:getDestination " +
                           newpr.getDestination());
 		return true;
-	} else { 
+	} else {
 		Debug.message("CLNT:  isNetwork:getDestination is null");
-		return false; 
+		return false;
 	}
-    } 
+    }
 
     // Set the new namespace
     public void pmsetNS() {
@@ -915,7 +914,7 @@ public class pmTop extends JPanel {
 		} else
 			ns = systemns;
 	}
-	
+
 
 	// This tool is read-only unless the user is root on the
 	// print server. Thus, don't check for namespace authorization
@@ -925,8 +924,8 @@ public class pmTop extends JPanel {
 		// Check if user is authorized with this nameservice
 		if (ns.isAuth()) {
 			runningAuth = true;
-		} else {	
-		    // nis/ldap is a special case 
+		} else {
+		    // nis/ldap is a special case
 		    // need to login to nis/ldap server
 		    if (ns.getNameService().equals("nis") == true ||
 			ns.getNameService().equals("ldap") == true) {
@@ -965,7 +964,7 @@ public class pmTop extends JPanel {
 				    "LoginFailed");
 			    m.setVisible(true);
                 	}
-        	    } else {
+		    } else {
 			try {
 				ns.checkAuth();
 				runningAuth = true;
@@ -1028,12 +1027,12 @@ public class pmTop extends JPanel {
 
     class topnsListener implements ItemListener {
         public topnsListener() {}
- 
+
         public void itemStateChanged(ItemEvent e) {
             Debug.message("CLNT:  hello from topnsListener" + e.getItem());
 			if (e.getStateChange() == ItemEvent.SELECTED) {
 				newNS = (String)e.getItem();
-			}   
+			}
         }
     }
 
@@ -1044,9 +1043,9 @@ public class pmTop extends JPanel {
                 " " + PrinterUtil.getDefaultPrinter(ns));
 
 		Debug.message(
-			"CLNT: pmTop:pmsetdefaultpLabel(): default printer: " + 
+			"CLNT: pmTop:pmsetdefaultpLabel(): default printer: " +
                           PrinterUtil.getDefaultPrinter(ns));
-            
+
 	} catch (Exception e) {
 		Debug.warning("CLNT: pmTop:getDefaultPrinter() caught " + e);
 	}
@@ -1130,7 +1129,7 @@ public class pmTop extends JPanel {
 	// Debug.info("CLNT: showLogData():actionName: " + actionName);
 	// Debug.info("CLNT: showLogData():cmdLog: " + cmdLog);
 
-        if (cmdLog == null) 
+        if (cmdLog == null)
 		return;
 
         addToCommandLog(actionName + "\n");
@@ -1161,11 +1160,11 @@ public class pmTop extends JPanel {
 
         addToCommandLog("***\n");
     }
-    
-    private void addToCommandLog(String s) {   
+
+    private void addToCommandLog(String s) {
         commandLog.addText(s);
     }
-    
+
     public void showHelpItem(String tag) {
         if (helpFrame != null)
 	    helpFrame.showHelp(tag);
@@ -1207,7 +1206,7 @@ public class pmTop extends JPanel {
 		}
 	}
     }
-	
+
 	// Update the list of printers
 	// Printer list will change if nameservice changes and when user
 	// adds/deletes/changes printers
@@ -1234,7 +1233,7 @@ public class pmTop extends JPanel {
     // returns -1 if error, 0 otherwise
     protected static int parseArgs(String[] args) {
         int rv = 0;
-        
+
         for (int i = 0; i < args.length; ++i) {
             if (args[i].compareTo("-debugall") == 0)
                 Debug.setDebugLevel(Debug.ALL);
@@ -1251,10 +1250,10 @@ public class pmTop extends JPanel {
             else if (args[i].compareTo("-debuginfo") == 0)
                 Debug.setDebugLevel(Debug.INFO);
         }
-        
+
         return rv;
     }
-    
+
     public static void main(String[] args) {
 
         if (parseArgs(args) < 0)
@@ -1262,7 +1261,7 @@ public class pmTop extends JPanel {
 
         // use pmFrame to get app icon
         pmFrame frame = new pmFrame(pmUtility.getResource("info_name"));
-        
+
 	myTop = new pmTop(frame);
 
 	frame.addWindowListener(new WindowAdapter() {
@@ -1276,9 +1275,9 @@ public class pmTop extends JPanel {
 	frame.setVisible(true);
 	frame.repaint();
 
-	pmLoad firstload = new pmLoad(myTop); 
+	pmLoad firstload = new pmLoad(myTop);
 	myTop.loadView = firstload;
-	firstload.Show(); 
+	firstload.Show();
 
         aboutBox = new pmAboutBox();
         commandLog = new pmLogDisplay(myTop, "ShowCommandConsole");
@@ -1291,7 +1290,7 @@ public class pmTop extends JPanel {
 	 * takes a long time for the help frame to load.
 	 */
         helpFrame = new pmHelpFrame();
-        
+
     }
 
     // disable Enter action **for all JTextFields**
