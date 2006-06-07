@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	nfsauth.c
- *
- *	Copyright (c) 1988-1996,1998,1999 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,61 +45,12 @@
 #include <unistd.h>
 #include <thread.h>
 #include <netdir.h>
-#include <rpcsvc/nfsauth_prot.h>
+#include <nfs/auth.h>
 #include "../lib/sharetab.h"
 #include "mountd.h"
 
-static void nfsauth_access_svc(auth_req *, auth_res *, struct svc_req *);
-
-void
-nfsauth_prog(struct svc_req *rqstp, register SVCXPRT *transp)
-{
-	union {
-		auth_req nfsauth_access_arg;
-	} argument;
-	auth_res  result;
-
-	bool_t (*xdr_argument)();
-	bool_t (*xdr_result)();
-	void   (*local)();
-
-	switch (rqstp->rq_proc) {
-	case NULLPROC:
-		(void) svc_sendreply(transp, xdr_void, (char *)NULL);
-		return;
-
-	case NFSAUTH_ACCESS:
-		xdr_argument = xdr_auth_req;
-		xdr_result = xdr_auth_res;
-		local = nfsauth_access_svc;
-		break;
-
-	default:
-		svcerr_noproc(transp);
-		return;
-	}
-
-	(void) memset((char *)&argument, 0, sizeof (argument));
-	if (!svc_getargs(transp, xdr_argument, (caddr_t)&argument)) {
-		svcerr_decode(transp);
-		return;
-	}
-
-	(*local)(&argument, &result, rqstp);
-
-	if (!svc_sendreply(transp, xdr_result, (caddr_t)&result)) {
-		svcerr_systemerr(transp);
-	}
-
-	if (!svc_freeargs(transp, xdr_argument, (caddr_t)&argument)) {
-		syslog(LOG_ERR, "unable to free arguments");
-	}
-}
-
-/*ARGSUSED*/
-
 static void
-nfsauth_access_svc(auth_req *argp, auth_res *result, struct svc_req *rqstp)
+nfsauth_access(auth_req *argp, auth_res *result)
 {
 	struct netconfig *nconf;
 	struct nd_hostservlist *clnames = NULL;
@@ -165,4 +113,93 @@ done:
 	freenetconfigent(nconf);
 	if (clnames)
 		netdir_free(clnames, ND_HOSTSERVLIST);
+}
+
+void
+nfsauth_func(void *cookie, char *dataptr, size_t arg_size,
+	door_desc_t *dp, uint_t n_desc)
+
+{
+	nfsauth_arg_t	*ap;
+	nfsauth_res_t	 res = {0};
+	nfsauth_res_t	*rp = &res;
+	XDR		 xdrs_a;
+	XDR		 xdrs_r;
+	caddr_t		 abuf = dataptr;
+	size_t		 absz = arg_size;
+	size_t		 rbsz = (size_t)(BYTES_PER_XDR_UNIT * 2);
+	char		 result[BYTES_PER_XDR_UNIT * 2];
+	caddr_t		 rbuf = (caddr_t)&result;
+	varg_t		 varg = {0};
+
+	/*
+	 * Decode the inbound door data, so we can look at the cmd.
+	 */
+	xdrmem_create(&xdrs_a, abuf, absz, XDR_DECODE);
+	if (!xdr_varg(&xdrs_a, &varg)) {
+		/*
+		 * If the arguments can't be decoded, bail.
+		 */
+		if (varg.vers == V_ERROR)
+			syslog(LOG_ERR, gettext("Arg version mismatch"));
+		res.stat = NFSAUTH_DR_DECERR;
+		goto encres;
+	}
+
+	/*
+	 * Now set the args pointer to the proper version of the args
+	 */
+	switch (varg.vers) {
+	case V_PROTO:
+		ap = &varg.arg_u.arg;
+		break;
+
+		/* Additional arguments versions go here */
+
+	default:
+		syslog(LOG_ERR, gettext("Invalid args version"));
+		goto encres;
+	}
+
+	/*
+	 * Call the specified cmd
+	 */
+	switch (ap->cmd) {
+		case NFSAUTH_ACCESS:
+			nfsauth_access(&ap->areq, &rp->ares);
+			rp->stat = NFSAUTH_DR_OKAY;
+			break;
+		default:
+			rp->stat = NFSAUTH_DR_BADCMD;
+			break;
+	}
+
+encres:
+	/*
+	 * Free space used to decode the args
+	 */
+	xdrs_a.x_op = XDR_FREE;
+	(void) xdr_varg(&xdrs_a, &varg);
+	xdr_destroy(&xdrs_a);
+
+	/*
+	 * Encode the results before passing thru door.
+	 *
+	 * The result (nfsauth_res_t) is always two int's, so we don't
+	 * have to dynamically size (or allocate) the results buffer.
+	 */
+	xdrmem_create(&xdrs_r, rbuf, rbsz, XDR_ENCODE);
+	if (!xdr_nfsauth_res(&xdrs_r, rp)) {
+		/*
+		 * return only the status code
+		 */
+		rp->stat = NFSAUTH_DR_EFAIL;
+		rbsz = sizeof (uint_t);
+		*rbuf = (uint_t)rp->stat;
+	}
+	xdr_destroy(&xdrs_r);
+
+	(void) door_return((char *)rbuf, rbsz, NULL, 0);
+	(void) door_return(NULL, 0, NULL, 0);
+	/* NOTREACHED */
 }

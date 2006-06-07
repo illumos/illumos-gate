@@ -62,7 +62,8 @@
 #include <thread.h>
 #include <assert.h>
 #include <priv_utils.h>
-#include <rpcsvc/nfsauth_prot.h>
+#include <nfs/auth.h>
+#include <nfs/nfssys.h>
 #include <nfs/nfs.h>
 #include <nfs/nfs_sec.h>
 #include <rpcsvc/daemon_utils.h>
@@ -103,16 +104,81 @@ static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
 
+thread_t	nfsauth_thread;
+
+/* ARGSUSED */
+static void *
+nfsauth_svc(void *arg)
+{
+	int	doorfd = -1;
+	uint_t	darg;
+#ifdef DEBUG
+	int	dfd;
+#endif
+
+	if ((doorfd = door_create(nfsauth_func, NULL,
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
+		syslog(LOG_ERR, "Unable to create door: %m\n");
+		exit(10);
+	}
+
+#ifdef DEBUG
+	/*
+	 * Create a file system path for the door
+	 */
+	if ((dfd = open(MOUNTD_DOOR, O_RDWR|O_CREAT|O_TRUNC,
+	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
+		syslog(LOG_ERR, "Unable to open %s: %m\n", MOUNTD_DOOR);
+		(void) close(doorfd);
+		exit(11);
+	}
+
+	/*
+	 * Clean up any stale namespace associations
+	 */
+	(void) fdetach(MOUNTD_DOOR);
+
+	/*
+	 * Register in namespace to pass to the kernel to door_ki_open
+	 */
+	if (fattach(doorfd, MOUNTD_DOOR) == -1) {
+		syslog(LOG_ERR, "Unable to fattach door: %m\n");
+		(void) close(dfd);
+		(void) close(doorfd);
+		exit(12);
+	}
+	(void) close(dfd);
+#endif
+
+	/*
+	 * Must pass the doorfd down to the kernel.
+	 */
+	darg = doorfd;
+	(void) _nfssys(MOUNTD_ARGS, &darg);
+
+	/*
+	 * Wait for incoming calls
+	 */
+	/*CONSTCOND*/
+	for (;;)
+		(void) pause();
+
+	/*NOTREACHED*/
+	syslog(LOG_ERR, gettext("Door server exited"));
+	return (NULL);
+}
+
 int
 main(int argc, char *argv[])
 {
-	int pid;
-	int c;
-	int rpc_svc_mode = RPC_SVC_MT_AUTO;
-	int maxthreads;
-	int maxrecsz = RPC_MAXDATASIZE;
-	bool_t exclbind = TRUE;
-	bool_t can_do_mlp;
+	int	pid;
+	int	c;
+	int	rpc_svc_mode = RPC_SVC_MT_AUTO;
+	int	maxthreads;
+	int	maxrecsz = RPC_MAXDATASIZE;
+	bool_t	exclbind = TRUE;
+	bool_t	can_do_mlp;
+	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
 
 	/*
 	 * Mountd requires uid 0 for:
@@ -308,18 +374,19 @@ main(int argc, char *argv[])
 	 * Make sure to unregister any previous versions in case the
 	 * user is reconfiguring the server in interesting ways.
 	 */
-	svc_unreg(NFSAUTH_PROG, NFSAUTH_VERS);
 	svc_unreg(MOUNTPROG, MOUNTVERS);
 	svc_unreg(MOUNTPROG, MOUNTVERS_POSIX);
 	svc_unreg(MOUNTPROG, MOUNTVERS3);
 
 	/*
-	 * Create Authentication Service
+	 * Create the nfsauth thread with same signal disposition
+	 * as the main thread. We need to create a separate thread
+	 * since mountd() will be both an RPC server (for remote
+	 * traffic) _and_ a doors server (for kernel upcalls).
 	 */
-	if (svc_create_local_service(nfsauth_prog,
-		NFSAUTH_PROG, NFSAUTH_VERS, "netpath", "nfsauth") == 0) {
-		syslog(LOG_ERR, "unable to create nfsauth service");
-		exit(1);
+	if (thr_create(NULL, 0, nfsauth_svc, 0, thr_flags, &nfsauth_thread)) {
+		syslog(LOG_ERR, gettext("Failed to create NFSAUTH svc thread"));
+		exit(2);
 	}
 
 	/*

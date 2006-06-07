@@ -353,6 +353,21 @@ nfssys(enum nfssys_op opcode, void *arg)
 		break;
 	}
 
+	case MOUNTD_ARGS: {
+		uint_t	did;
+
+		/*
+		 * For now, only passing down the door fd; if we
+		 * ever need to pass down more info, we can use
+		 * a (properly aligned) struct.
+		 */
+		if (copyin(arg, &did, sizeof (did)))
+			return (set_errno(EFAULT));
+		mountd_args(did);
+		error = 0;
+		break;
+	}
+
 	default:
 		error = EINVAL;
 		break;

@@ -51,7 +51,7 @@ enum nfssys_op	{ OLD_NFS_SVC, OLD_ASYNC_DAEMON, EXPORTFS, OLD_NFS_GETFH,
     LOG_FLUSH, SVCPOOL_CREATE, NFS_SVC, LM_SVC, SVCPOOL_WAIT, SVCPOOL_RUN,
     NFS4_SVC, RDMA_SVC_INIT, NFS4_CLR_STATE, NFS_IDMAP,
     NFS4_SVC_REQUEST_QUIESCE, NFS_GETFH, NFS4_DSS_SETPATHS,
-    NFS4_DSS_SETPATHS_SIZE };
+    NFS4_DSS_SETPATHS_SIZE, MOUNTD_ARGS };
 
 struct nfs_svc_args {
 	int		fd;		/* Connection endpoint */
@@ -318,6 +318,7 @@ extern int	nfs4_svc(struct nfs4_svc_args *, model_t);
 extern int 	rdma_start(struct rdma_svc_args *);
 extern void	rfs4_clear_client_state(struct nfs4clrst_args *);
 extern void	nfs_idmap_args(struct nfsidmap_args *);
+extern void	mountd_args(uint_t);
 #endif
 
 #ifdef	__cplusplus

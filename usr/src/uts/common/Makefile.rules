@@ -833,17 +833,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/zmod/%.c
 	$(CTFCONVERT_O)
 
 #
-# NFS
-#
-
-$(OBJS_DIR)/nfs_auth_xdr.o:	nfs_auth_xdr.c
-	$(COMPILE.c) -o $@ nfs_auth_xdr.c
-	$(CTFCONVERT_O)
-
-nfs_auth_xdr.c:			$(UTSBASE)/common/rpcsvc/nfsauth_prot.x
-	$(RPCGEN) -i 0 -C -c -o $@ $(UTSBASE)/common/rpcsvc/nfsauth_prot.x
-
-#
 # SVM
 #
 
@@ -1462,5 +1451,3 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/vm/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/zmod/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/nfs_auth_xdr.ln:	nfs_auth_xdr.c
-	@($(LHEAD) $(LINT.c) nfs_auth_xdr.c $(LTAIL))

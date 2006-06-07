@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,33 +19,28 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
-FSTYPE=		nfs
-TYPEPROG=	mountd
-ATTMK=		$(TYPEPROG)
+FSTYPE	  =	nfs
+TYPEPROG  =	mountd
+ATTMK	  =	$(TYPEPROG)
 
 include		../../Makefile.fstype
 
-COMMON=		$(FSLIB) nfs_sec.o sharetab.o
-LOCAL=		mountd.o netgroup.o rmtab.o nfsauth.o \
-		nfsauth_xdr.o svc_local.o exportlist.o hashset.o
-OBJS= 		$(LOCAL) $(COMMON)
-SRCS=		$(LOCAL:%.o=%.c) \
-		$(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
-LDLIBS +=	-lrpcsvc -lnsl -lbsm -lsocket -lcmd
+COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o
+LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
+		nfsauth_xdr.o exportlist.o hashset.o
+OBJS	  = 	$(LOCAL) $(COMMON)
+SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -lcmd -ldoor
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
-
-nfsauth_xdr.c:	$(ROOT)/usr/include/rpcsvc/nfsauth_prot.x
-	$(RPCGEN) -C -c -o $@ $(ROOT)/usr/include/rpcsvc/nfsauth_prot.x
 
 nfs_sec.o:	../lib/nfs_sec.c
 		$(COMPILE.c) ../lib/nfs_sec.c
@@ -58,4 +52,4 @@ lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)
 
 clean:     
-	$(RM) $(OBJS) nfsauth_xdr.c
+	$(RM) $(OBJS)

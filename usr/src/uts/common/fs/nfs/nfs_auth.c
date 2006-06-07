@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,8 @@
 #include <sys/pathname.h>
 #include <sys/utsname.h>
 #include <sys/debug.h>
+#include <sys/door.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -45,7 +46,7 @@
 #include <nfs/nfs.h>
 #include <nfs/export.h>
 #include <nfs/nfs_clnt.h>
-#include <rpcsvc/nfsauth_prot.h>
+#include <nfs/auth.h>
 
 #define	EQADDR(a1, a2)  \
 	(bcmp((char *)(a1)->buf, (char *)(a2)->buf, (a1)->len) == 0 && \
@@ -68,45 +69,31 @@ int nfsauth_cache_reclaim;
  */
 static int nfsauth_timeout = 20;
 
+/*
+ * mountd is a server-side only daemon. This will need to be
+ * revisited if the NFS server is ever made zones-aware.
+ */
+kmutex_t	mountd_lock;
+door_handle_t   mountd_dh;
+
+void
+mountd_args(uint_t did)
+{
+	mutex_enter(&mountd_lock);
+	if (mountd_dh)
+		door_ki_rele(mountd_dh);
+	mountd_dh = door_ki_lookup(did);
+	mutex_exit(&mountd_lock);
+}
+
 void
 nfsauth_init(void)
 {
-	vnode_t *kvp;
-	int error;
-	char addrbuf[SYS_NMLN+16];
-
 	/*
-	 * Setup netconfig.
-	 * Assume a connectionless loopback transport.
+	 * mountd can be restarted by smf(5). We need to make sure
+	 * the updated door handle will safely make it to mountd_dh
 	 */
-	if ((error = lookupname("/dev/ticotsord", UIO_SYSSPACE, FOLLOW,
-		NULLVPP, &kvp)) != 0) {
-		cmn_err(CE_CONT, "nfsauth: lookupname: %d\n", error);
-		return;
-	}
-
-	auth_knconf.knc_rdev = kvp->v_rdev;
-	auth_knconf.knc_protofmly = NC_LOOPBACK;
-	auth_knconf.knc_semantics = NC_TPI_COTS_ORD;
-	VN_RELE(kvp);
-
-	(void) strcpy(addrbuf, utsname.nodename);
-	(void) strcat(addrbuf, ".nfsauth");
-
-	svp.sv_knconf = &auth_knconf;
-	svp.sv_addr.buf = kmem_alloc(strlen(addrbuf)+1, KM_SLEEP);
-	(void) strcpy(svp.sv_addr.buf, addrbuf);
-	svp.sv_addr.len = (uint_t)strlen(addrbuf);
-	svp.sv_addr.maxlen = svp.sv_addr.len;
-	svp.sv_secdata = kmem_alloc(sizeof (struct sec_data), KM_SLEEP);
-	svp.sv_secdata->rpcflavor = AUTH_LOOPBACK;
-	svp.sv_secdata->data = NULL;
-
-	ci.cl_prog = NFSAUTH_PROG;
-	ci.cl_vers = NFSAUTH_VERS;
-	ci.cl_readsize = 0;
-	ci.cl_retrans = 1;
-	ci.cl_flags = 0x0;
+	mutex_init(&mountd_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
 	 * Allocate nfsauth cache handle
@@ -127,12 +114,6 @@ nfsauth_fini(void)
 	 * Deallocate nfsauth cache handle
 	 */
 	kmem_cache_destroy(exi_cache_handle);
-}
-
-static int
-nfsauth_clget(CLIENT **newcl, struct chtab **chp)
-{
-	return (clget(&ci, &svp, CRED(), newcl, chp));
 }
 
 /*
@@ -204,6 +185,22 @@ nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req)
 	return (access);
 }
 
+static void
+sys_log(const char *msg)
+{
+	static time_t	tstamp = 0;
+	time_t		now;
+
+	/*
+	 * msg is shown (at most) once per minute
+	 */
+	now = gethrestime_sec();
+	if ((tstamp + 60) < now) {
+		tstamp = now;
+		cmn_err(CE_WARN, msg);
+	}
+}
+
 /*
  * Get the access information from the cache or callup to the mountd
  * to get and cache the access information in the kernel.
@@ -211,17 +208,25 @@ nfsauth4_access(struct exportinfo *exi, vnode_t *vp, struct svc_req *req)
 int
 nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 {
-	struct netbuf addr, *claddr;
-	struct auth_cache **head, *ap;
-	CLIENT *clnt;
-	struct chtab *ch;
-	struct auth_req request;
-	struct auth_res result;
-	enum clnt_stat rpcstat;
-	int access;
-	struct timeval timout;
-	static time_t exi_msg = 0;
-	time_t now;
+	struct netbuf		  addr;
+	struct netbuf		 *claddr;
+	struct auth_cache	**head;
+	struct auth_cache	 *ap;
+	int			  access;
+	varg_t			  varg = {0};
+	nfsauth_res_t		  res = {0};
+	XDR			  xdrs_a;
+	XDR			  xdrs_r;
+	size_t			  absz;
+	caddr_t			  abuf;
+	size_t			  rbsz = (size_t)(BYTES_PER_XDR_UNIT * 2);
+	char			  result[BYTES_PER_XDR_UNIT * 2] = {0};
+	caddr_t			  rbuf = (caddr_t)&result;
+	int			  last = 0;
+	door_arg_t		  da;
+	door_info_t		  di;
+	door_handle_t		  dh;
+	uint_t			  ntries = 0;
 
 	/*
 	 * Now check whether this client already
@@ -235,7 +240,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 
 	claddr = svc_getrpccaller(req->rq_xprt);
 	addr = *claddr;
-	addr.buf = mem_alloc(addr.len);
+	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
 	bcopy(claddr->buf, addr.buf, claddr->len);
 	addrmask(&addr, svc_getaddrmask(req->rq_xprt));
 	head = &exi->exi_cache[hash(&addr)];
@@ -265,62 +270,213 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor)
 	 * so we need to call the nfsauth service in the
 	 * mount daemon.
 	 */
+retry:
+	mutex_enter(&mountd_lock);
+	dh = mountd_dh;
+	if (dh)
+		door_ki_hold(dh);
+	mutex_exit(&mountd_lock);
 
-	if (nfsauth_clget(&clnt, &ch)) {
+	if (dh == NULL) {
+		/*
+		 * The rendezvous point has not been established yet !
+		 * This could mean that either mountd(1m) has not yet
+		 * been started or that _this_ routine nuked the door
+		 * handle after receiving an EINTR for a REVOKED door.
+		 *
+		 * Returning NFSAUTH_DROP will cause the NFS client
+		 * to retransmit the request, so let's try to be more
+		 * rescillient and attempt for ntries before we bail.
+		 */
+		if (++ntries % NFSAUTH_DR_TRYCNT) {
+			delay(hz);
+			goto retry;
+		}
+		sys_log("nfsauth: mountd has not established door");
 		kmem_free(addr.buf, addr.len);
 		return (NFSAUTH_DROP);
 	}
+	ntries = 0;
+	varg.vers = V_PROTO;
+	varg.arg_u.arg.cmd = NFSAUTH_ACCESS;
+	varg.arg_u.arg.areq.req_client.n_len = addr.len;
+	varg.arg_u.arg.areq.req_client.n_bytes = addr.buf;
+	varg.arg_u.arg.areq.req_netid = svc_getnetid(req->rq_xprt);
+	varg.arg_u.arg.areq.req_path = exi->exi_export.ex_path;
+	varg.arg_u.arg.areq.req_flavor = flavor;
 
-	timout.tv_sec = nfsauth_timeout;
-	timout.tv_usec = 0;
+	/*
+	 * Setup the XDR stream for encoding the arguments. Notice that
+	 * in addition to the args having variable fields (req_netid and
+	 * req_path), the argument data structure is itself versioned,
+	 * so we need to make sure we can size the arguments buffer
+	 * appropriately to encode all the args. If we can't get sizing
+	 * info _or_ properly encode the arguments, there's really no
+	 * point in continuting, so we fail the request.
+	 */
+	DTRACE_PROBE1(nfsserv__func__nfsauth__varg, varg_t *, &varg);
+	if ((absz = xdr_sizeof(xdr_varg, (void *)&varg)) == 0) {
+		door_ki_rele(dh);
+		kmem_free(addr.buf, addr.len);
+		return (NFSAUTH_DENIED);
+	}
+	abuf = (caddr_t)kmem_alloc(absz, KM_SLEEP);
+	xdrmem_create(&xdrs_a, abuf, absz, XDR_ENCODE);
+	if (!xdr_varg(&xdrs_a, &varg)) {
+		door_ki_rele(dh);
+		goto fail;
+	}
+	XDR_DESTROY(&xdrs_a);
 
-	request.req_client.n_len = addr.len;
-	request.req_client.n_bytes = addr.buf;
-	request.req_netid = svc_getnetid(req->rq_xprt);
-	request.req_path = exi->exi_export.ex_path;
-	request.req_flavor = flavor;
+	/*
+	 * The result (nfsauth_res_t) is always two int's, so we don't
+	 * have to dynamically size (or allocate) the results buffer.
+	 * Now that we've got what we need, we prep the door arguments
+	 * and place the call.
+	 */
+	da.data_ptr = (char *)abuf;
+	da.data_size = absz;
+	da.desc_ptr = NULL;
+	da.desc_num = 0;
+	da.rbuf = (char *)rbuf;
+	da.rsize = rbsz;
 
-	rpcstat = clnt_call(clnt, NFSAUTH_ACCESS,
-		(xdrproc_t)xdr_auth_req, (caddr_t)&request,
-		(xdrproc_t)xdr_auth_res, (caddr_t)&result,
-		timout);
+	switch (door_ki_upcall(dh, &da)) {
+		case 0:				/* Success */
+			if (da.data_ptr != da.rbuf && da.data_size == 0) {
+				/*
+				 * The door_return that contained the data
+				 * failed ! We're here because of the 2nd
+				 * door_return (w/o data) such that we can
+				 * get control of the thread (and exit
+				 * gracefully).
+				 */
+				DTRACE_PROBE1(nfsserv__func__nfsauth__door__nil,
+				    door_arg_t *, &da);
+				door_ki_rele(dh);
+				goto fail;
 
-	switch (rpcstat) {
-	case RPC_SUCCESS:
-		access = result.auth_perm;
-		break;
-	case RPC_INTR:
-		break;
-	case RPC_TIMEDOUT:
-		/*
-		 * Show messages no more than once per minute
-		 */
-		now = gethrestime_sec();
-		if ((exi_msg + 60) < now) {
-			exi_msg = now;
-			cmn_err(CE_WARN, "nfsauth: mountd not responding");
-		}
-		break;
-	default:
-		/*
-		 * Show messages no more than once per minute
-		 */
-		now = gethrestime_sec();
-		if ((exi_msg + 60) < now) {
-			char *errmsg;
+			} else if (rbuf != da.rbuf) {
+				/*
+				 * The only time this should be true
+				 * is iff userland wanted to hand us
+				 * a bigger response than what we
+				 * expect; that should not happen
+				 * (nfsauth_res_t is only 2 int's),
+				 * but we check nevertheless.
+				 */
+				rbuf = da.rbuf;
+				rbsz = da.rsize;
 
-			exi_msg = now;
-			errmsg = clnt_sperror(clnt, "nfsauth upcall failed");
-			cmn_err(CE_WARN, errmsg);
-			kmem_free(errmsg, MAXPATHLEN);
-		}
-		break;
+			} else if (rbsz > da.data_size) {
+				/*
+				 * We were expecting two int's; but if
+				 * userland fails in encoding the XDR
+				 * stream, we detect that here, since
+				 * the mountd forces down only one byte
+				 * in such scenario.
+				 */
+				door_ki_rele(dh);
+				goto fail;
+			}
+			door_ki_rele(dh);
+			break;
+
+		case EAGAIN:
+			/*
+			 * Server out of resources; back off for a bit
+			 */
+			door_ki_rele(dh);
+			kmem_free(abuf, absz);
+			delay(hz);
+			goto retry;
+			/* NOTREACHED */
+
+		case EINTR:
+			if (!door_ki_info(dh, &di)) {
+				if (di.di_attributes & DOOR_REVOKED) {
+					/*
+					 * The server barfed and revoked
+					 * the (existing) door on us; we
+					 * want to wait to give smf(5) a
+					 * chance to restart mountd(1m)
+					 * and establish a new door handle.
+					 */
+					mutex_enter(&mountd_lock);
+					if (dh == mountd_dh)
+						mountd_dh = NULL;
+					mutex_exit(&mountd_lock);
+					door_ki_rele(dh);
+					kmem_free(abuf, absz);
+					delay(hz);
+					goto retry;
+				}
+				/*
+				 * If the door was _not_ revoked on us,
+				 * then more than likely we took an INTR,
+				 * so we need to fail the operation.
+				 */
+				door_ki_rele(dh);
+				goto fail;
+			}
+			/*
+			 * The only failure that can occur from getting
+			 * the door info is EINVAL, so we let the code
+			 * below handle it.
+			 */
+			/* FALLTHROUGH */
+
+		case EBADF:
+		case EINVAL:
+		default:
+			/*
+			 * If we have a stale door handle, give smf a last
+			 * chance to start it by sleeping for a little bit.
+			 * If we're still hosed, we'll fail the call.
+			 *
+			 * Since we're going to reacquire the door handle
+			 * upon the retry, we opt to sleep for a bit and
+			 * _not_ to clear mountd_dh. If mountd restarted
+			 * and was able to set mountd_dh, we should see
+			 * the new instance; if not, we won't get caught
+			 * up in the retry/DELAY loop.
+			 */
+			door_ki_rele(dh);
+			if (!last) {
+				delay(hz);
+				last++;
+				goto retry;
+			}
+			sys_log("nfsauth: stale mountd door handle");
+			goto fail;
 	}
 
-	clfree(clnt, ch);
-	if (rpcstat != RPC_SUCCESS) {
-		kmem_free(addr.buf, addr.len);
-		return (NFSAUTH_DROP);
+	/*
+	 * No door errors encountered; setup the XDR stream for decoding
+	 * the results. If we fail to decode the results, we've got no
+	 * other recourse than to fail the request.
+	 */
+	xdrmem_create(&xdrs_r, rbuf, rbsz, XDR_DECODE);
+	if (!xdr_nfsauth_res(&xdrs_r, &res))
+		goto fail;
+	XDR_DESTROY(&xdrs_r);
+
+	DTRACE_PROBE1(nfsserv__func__nfsauth__results, nfsauth_res_t *, &res);
+	switch (res.stat) {
+		case NFSAUTH_DR_OKAY:
+			access = res.ares.auth_perm;
+			kmem_free(abuf, absz);
+			break;
+
+		case NFSAUTH_DR_EFAIL:
+		case NFSAUTH_DR_DECERR:
+		case NFSAUTH_DR_BADCMD:
+		default:
+fail:
+			kmem_free(addr.buf, addr.len);
+			kmem_free(abuf, absz);
+			return (NFSAUTH_DENIED);
+			/* NOTREACHED */
 	}
 
 	/*

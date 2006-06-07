@@ -83,8 +83,6 @@
 #include <nfs/nfs_dispatch.h>
 #include <nfs/nfs4_drc.h>
 
-#include <rpcsvc/nfsauth_prot.h>
-
 #include <sys/modctl.h>
 #include <sys/cladm.h>
 #include <sys/clconf.h>

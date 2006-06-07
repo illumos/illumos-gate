@@ -270,6 +270,7 @@ f none usr/include/netinet/tcpip.h 644 root bin
 f none usr/include/netinet/udp.h 644 root bin
 f none usr/include/netinet/udp_var.h 644 root bin
 d none usr/include/nfs 755 root bin
+f none usr/include/nfs/auth.h 644 root bin
 f none usr/include/nfs/export.h 644 root bin
 f none usr/include/nfs/lm.h 644 root bin
 f none usr/include/nfs/lm_impl.h 644 root bin
@@ -407,8 +408,6 @@ f none usr/include/rpcsvc/nfs4_prot.h 644 root bin
 f none usr/include/rpcsvc/nfs4_prot.x 644 root bin
 f none usr/include/rpcsvc/nfs_prot.h 644 root bin
 f none usr/include/rpcsvc/nfs_prot.x 644 root bin
-f none usr/include/rpcsvc/nfsauth_prot.h 644 root bin
-f none usr/include/rpcsvc/nfsauth_prot.x 644 root bin
 f none usr/include/rpcsvc/nis.h 644 root bin
 f none usr/include/rpcsvc/nis.x 644 root bin
 f none usr/include/rpcsvc/nispasswd.h 644 root bin

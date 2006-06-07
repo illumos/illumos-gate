@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +35,7 @@ HDRS=	export.h	lm.h						\
 	nfs_clnt.h	nfs_log.h 	nfs_sec.h	nfs4.h		\
 	nfs4_attr.h	nfs4_clnt.h	rnode.h		rnode4.h	\
 	nfs4_kprot.h	nfs4_db_impl.h	nfs4_idmap_impl.h \
-	nfsid_map.h
+	nfsid_map.h	auth.h
 
 $(CLOSED_BUILD)CLOSEDHDRS=	lm_impl.h	lm_nlm.h	lm_server.h
 

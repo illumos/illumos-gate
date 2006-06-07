@@ -29,6 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <door.h>
 #include <nfs/nfs.h>
 
 #ifdef	__cplusplus
@@ -46,8 +47,7 @@ extern void mntlist_delete_all(char *host);
 extern void netgroup_init(void);
 extern int  netgroup_check(struct nd_hostservlist *, char *, int);
 extern void export(struct svc_req *);
-extern int svc_create_local_service(void (*) (), ulong_t, ulong_t,
-					char *, char *);
+extern void nfsauth_func(void *, char *, size_t, door_desc_t *, uint_t);
 extern char *inet_ntoa_r(struct in_addr, char *);
 extern int nfs_getfh(char *, int, int *, char *);
 
