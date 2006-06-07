@@ -33,7 +33,7 @@
 /*
  * Future features ... ?
  */
-#define	BGE_CFG_IO8	0	/* 8/16-bit cfg space BIS/BIC	*/
+#define	BGE_CFG_IO8	1	/* 8/16-bit cfg space BIS/BIC	*/
 #define	BGE_IND_IO32	0	/* indirect access code		*/
 #define	BGE_SEE_IO32	1	/* SEEPROM access code		*/
 #define	BGE_FLASH_IO32	1	/* FLASH access code		*/
@@ -386,7 +386,7 @@ bge_pci_check(bge_t *bgep)
  * effectively performs steps 3-1(!) of the initialisation sequence
  * (the rest are not required but should be harmless).
  *
- * It MUST also be called also after a chip reset, as this disables
+ * It MUST also be called after a chip reset, as this disables
  * Memory Space cycles!  In this case, <enable_dma> is B_TRUE, and
  * it is effectively performing steps 6-8.
  */
@@ -413,7 +413,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * and subsystem device id.  We expect (but don't check) that
 	 * (vendor == VENDOR_ID_BROADCOM) && (device == DEVICE_ID_5704)
 	 *
-	 * Also save all bus-transation related registers (cache-line
+	 * Also save all bus-transaction related registers (cache-line
 	 * size, bus-grant/latency parameters, etc).  Some of these are
 	 * cleared by reset, so we'll have to restore them later.  This
 	 * comes from the Broadcom document 570X-PG102-R ...
@@ -455,7 +455,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * Step 2 (also step 6): disable and clear interrupts.
 	 * Steps 11-13: configure PIO endianness options, and enable
 	 * indirect register access.  We'll also select any other
-	 * options controlled by the MHCR (eg tagged status, mask
+	 * options controlled by the MHCR (e.g. tagged status, mask
 	 * interrupt mode) at this stage ...
 	 *
 	 * Note: internally, the chip is 64-bit and BIG-endian, but
@@ -538,8 +538,6 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * In this way we preserve the OBP/nexus-parent's preferred settings
 	 * of the parity-error and system-error enable bits across multiple
 	 * chip RESETs.
-	 *
-	 * Step 8: Disable PCI-X Relaxed Ordering -- doesn't apply
 	 */
 	command = bgep->chipid.command | PCI_COMM_MAE;
 	command &= ~(PCI_COMM_ME|PCI_COMM_MEMWR_INVAL);
@@ -547,7 +545,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 		command |= PCI_COMM_ME;
 	/*
 	 * on BCM5714 revision A0, false parity error gets generated
-	 * due to a logic bug. Provide a workaround by disabling parrity
+	 * due to a logic bug. Provide a workaround by disabling parity
 	 * error.
 	 */
 	if (((cidp->device == DEVICE_ID_5714C) ||
@@ -580,7 +578,6 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * Do following if and only if the device is NOT BCM5714C OR
 	 * BCM5715C
 	 */
-
 	if (!((cidp->device == DEVICE_ID_5714C) ||
 		(cidp->device == DEVICE_ID_5715C))) {
 		/*
@@ -590,6 +587,14 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 		pci_config_put32(handle, PCI_CONF_BGE_RIAAR, 0);
 		pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
 	}
+	/*
+	 * Step 8: Disable PCI-X/PCI-E Relaxed Ordering
+	 */
+	bge_cfg_clr16(bgep, PCIX_CONF_COMM, PCIX_COMM_RELAXED);
+
+	if (cidp->pci_type == BGE_PCI_E)
+		bge_cfg_clr16(bgep, PCI_CONF_DEV_CTRL,
+				DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
 }
 
 #ifdef __amd64
@@ -1305,7 +1310,7 @@ bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 	/*
 	 * Hmm ... what happened here?
 	 *
-	 * Most likely, the user addressed an non-existent SEEPROM. Or
+	 * Most likely, the user addressed a non-existent SEEPROM. Or
 	 * maybe the SEEPROM was busy internally (e.g. processing a write)
 	 * and didn't respond to being addressed. Either way, it's left
 	 * the SEEPROM access state machine wedged. So we'll reset it
@@ -1403,7 +1408,7 @@ bge_flash_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 	/*
 	 * Hmm ... what happened here?
 	 *
-	 * Most likely, the user addressed an non-existent Flash. Or
+	 * Most likely, the user addressed a non-existent Flash. Or
 	 * maybe the Flash was busy internally (e.g. processing a write)
 	 * and didn't respond to being addressed. Either way, there's
 	 * nothing we can here ...
@@ -1527,7 +1532,7 @@ bge_nvmem_acquire(bge_t *bgep)
 
 	/*
 	 * We're holding the per-port mutex <genlock>, so no-one other
-	 * threads can be attempting to access the NVmem through *this*
+	 * thread can be attempting to access the NVmem through *this*
 	 * port. But it could be in use by the *other* port (of a 5704),
 	 * or by the chip's internal firmware, so we have to go through
 	 * the full (hardware) arbitration protocol ...
@@ -1593,7 +1598,7 @@ bge_nvmem_acquire(bge_t *bgep)
  * defines as the default -- which we've assumed is the PROTECTED state.
  * So, we always change GPIO1 back to being an *input* whenever we're not
  * specifically using it to unprotect the NVmem. This allows either port
- * to update the NVmem, although obviously only one at a a time!
+ * to update the NVmem, although obviously only one at a time!
  *
  * The caller should hold <genlock> and *also* have already acquired the
  * right to access the NVmem, via bge_nvmem_acquire() above.
@@ -1822,6 +1827,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5706:
 	case DEVICE_ID_5782:
 	case DEVICE_ID_5788:
+	case DEVICE_ID_5789:
 	case DEVICE_ID_5751:
 	case DEVICE_ID_5751M:
 	case DEVICE_ID_5721:
@@ -1941,20 +1947,21 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5700:
 	case DEVICE_ID_5700x:
 		cidp->chip_label = 5700;
-		cidp->flags |= CHIP_FLAG_NO_CSUM;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		break;
 
 	case DEVICE_ID_5701:
 		cidp->chip_label = 5701;
 		dev_ok = B_TRUE;
-		cidp->flags |= CHIP_FLAG_NO_CSUM;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		break;
 
 	case DEVICE_ID_5702:
 	case DEVICE_ID_5702fe:
 		cidp->chip_label = 5702;
 		dev_ok = B_TRUE;
-		cidp->flags |= CHIP_FLAG_NO_CSUM;	/* for now	*/
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->pci_type = BGE_PCI;
 		break;
 
 	case DEVICE_ID_5703C:
@@ -1968,6 +1975,7 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->chip_label = cidp->subven == VENDOR_ID_SUN ? 5793 : 5703;
 		if (bgep->chipid.asic_rev != MHCR_CHIP_REV_5703_A0)
 			dev_ok = B_TRUE;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		break;
 
 	case DEVICE_ID_5704C:
@@ -1981,6 +1989,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5704;
 		cidp->mbuf_length = bge_mbuf_pool_len_5704;
 		dev_ok = B_TRUE;
+		if (cidp->asic_rev <  MHCR_CHIP_REV_5704_B0)
+			cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		break;
 
 	case DEVICE_ID_5705C:
@@ -1997,6 +2007,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->pci_type = BGE_PCI;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
@@ -2004,7 +2016,6 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5706:
 		cidp->chip_label = 5706;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
-		cidp->flags |= CHIP_FLAG_NO_CSUM;	/* for now	*/
 		break;
 
 	case DEVICE_ID_5782:
@@ -2021,6 +2032,7 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
@@ -2115,6 +2127,22 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		dev_ok = B_TRUE;
+		break;
+
+	case DEVICE_ID_5789:
+		cidp->chip_label = 5789;
+		cidp->mbuf_base = bge_mbuf_pool_base_5721;
+		cidp->mbuf_length = bge_mbuf_pool_len_5721;
+		cidp->recv_slots = BGE_RECV_SLOTS_5721;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->msi_enabled = B_TRUE;
 		dev_ok = B_TRUE;
 		break;
 
@@ -2402,8 +2430,9 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 			drv_usecwait(120000);
 
 			/* Set PCIE max payload size and clear error status. */
-			if (bgep->chipid.chip_label == 5721 ||
-			    bgep->chipid.chip_label == 5751) {
+			if ((bgep->chipid.chip_label == 5721) ||
+			    (bgep->chipid.chip_label == 5751) ||
+			    (bgep->chipid.chip_label == 5789)) {
 				pci_config_put16(bgep->cfg_handle,
 					PCI_CONF_DEV_CTRL, READ_REQ_SIZE_MAX);
 				pci_config_put16(bgep->cfg_handle,
@@ -2856,7 +2885,7 @@ bge_poll_firmware(bge_t *bgep)
 	 * to the ones complement of T3_MAGIC_NUMBER).
 	 *
 	 * While we're at it, we also read the MAC address register;
-	 * at some stage the the firmware will load this with the
+	 * at some stage the firmware will load this with the
 	 * factory-set value.
 	 *
 	 * When both the magic number and the MAC address are set,
@@ -3008,7 +3037,9 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * Step 8a: This may belong elsewhere, but BCM5721 needs
 	 * a bit set to avoid a fifo overflow/underflow bug.
 	 */
-	if (bgep->chipid.chip_label == 5721 || bgep->chipid.chip_label == 5751)
+	if ((bgep->chipid.chip_label == 5721) ||
+		(bgep->chipid.chip_label == 5751) ||
+		(bgep->chipid.chip_label == 5789))
 		bge_reg_set32(bgep, TLP_CONTROL_REG, TLP_DATA_FIFO_PROTECT);
 
 
@@ -3241,7 +3272,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 *
 	 *	Workaround for Incorrect pseudo-header checksum calculation.
 	 */
-	if (bgep->macp->m_info.mi_cksum & HCKSUM_INET_PARTIAL)
+	if (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM)
 		bge_reg_set32(bgep, MODE_CONTROL_REG,
 			MODE_SEND_NO_PSEUDO_HDR_CSUM);
 
@@ -5220,7 +5251,7 @@ bge_asf_update_status(bge_t *bgep)
  * The driver is supposed to notify ASF that the OS is still running
  * every three seconds, otherwise the management server may attempt
  * to reboot the machine.  If it hasn't actually failed, this is
- * not a desireable result.  However, this isn't running as a real-time
+ * not a desirable result.  However, this isn't running as a real-time
  * thread, and even if it were, it might not be able to generate the
  * heartbeat in a timely manner due to system load.  As it isn't a
  * significant strain on the machine, we will set the interval to half
@@ -5259,7 +5290,7 @@ bge_asf_stop_timer(bge_t *bgep)
 
 
 /*
- * This function should be placed at the earliest postion of bge_attach().
+ * This function should be placed at the earliest position of bge_attach().
  */
 void
 bge_asf_get_config(bge_t *bgep)

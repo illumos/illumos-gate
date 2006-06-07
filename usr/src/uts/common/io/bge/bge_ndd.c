@@ -37,6 +37,7 @@
 static char transfer_speed_propname[] = "transfer-speed";
 static char speed_propname[] = "speed";
 static char duplex_propname[] = "full-duplex";
+static char supported_net[] = "supported-network-types";
 
 /*
  * Notes:
@@ -258,6 +259,8 @@ bge_nd_init(bge_t *bgep)
 	dev_info_t *dip;
 	int duplex;
 	int speed;
+	char **options, *prop;
+	uint_t  noptions;
 
 	BGE_TRACE(("bge_nd_init($%p)", (void *)bgep));
 
@@ -268,6 +271,60 @@ bge_nd_init(bge_t *bgep)
 	 */
 	if (bge_param_register(bgep) != DDI_SUCCESS)
 		return (-1);
+
+	/*
+	 * check the OBP property "supported-network-types"
+	 */
+	if (BGE_PROP_EXISTS(bgep->devinfo, supported_net)) {
+		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, bgep->devinfo,
+			DDI_PROP_DONTPASS, supported_net,
+			&options, &noptions) == DDI_PROP_SUCCESS) {
+
+			bgep->param_adv_autoneg = 0;
+			bgep->param_adv_1000fdx = 0;
+			bgep->param_adv_1000hdx = 0;
+			bgep->param_adv_100fdx = 0;
+			bgep->param_adv_100hdx = 0;
+			bgep->param_adv_10fdx = 0;
+			bgep->param_adv_10hdx = 0;
+
+			for (; noptions > 0; noptions--) {
+				prop = options[noptions-1];
+				if (strstr(prop, "ethernet") == NULL)
+					continue;
+				if (strstr(prop, "1000")) {
+					if (strstr(prop, "auto")) {
+						bgep->param_adv_1000fdx = 1;
+						bgep->param_adv_1000hdx = 1;
+						bgep->param_adv_autoneg = 1;
+					} else if (strstr(prop, "full"))
+						bgep->param_adv_1000fdx = 1;
+					else if (strstr(prop, "half"))
+						bgep->param_adv_1000hdx = 1;
+				} else if (strstr(prop, "100")) {
+					if (strstr(prop, "auto")) {
+						bgep->param_adv_100fdx = 1;
+						bgep->param_adv_100hdx = 1;
+						bgep->param_adv_autoneg = 1;
+					} else if (strstr(prop, "full"))
+						bgep->param_adv_100fdx = 1;
+					else if (strstr(prop, "half"))
+						bgep->param_adv_100hdx = 1;
+				} else if (strstr(prop, "10")) {
+					if (strstr(prop, "auto")) {
+						bgep->param_adv_10fdx = 1;
+						bgep->param_adv_10hdx = 1;
+						bgep->param_adv_autoneg = 1;
+					} else if (strstr(prop, "full"))
+						bgep->param_adv_10fdx = 1;
+					else if (strstr(prop, "half"))
+						bgep->param_adv_10hdx = 1;
+				}
+			}
+
+			ddi_prop_free(options);
+		}
+	}
 
 	/*
 	 * The link speed may be forced to 10, 100 or 1000 Mbps using

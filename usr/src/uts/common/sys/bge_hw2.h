@@ -71,6 +71,7 @@ extern "C" {
 #define	DEVICE_ID_5706			0x164a
 #define	DEVICE_ID_5782			0x1696
 #define	DEVICE_ID_5788			0x169c
+#define	DEVICE_ID_5789			0x169d
 #define	DEVICE_ID_5751			0x1677
 #define	DEVICE_ID_5751M			0x167d
 #define	DEVICE_ID_5721			0x1659
@@ -148,7 +149,8 @@ extern "C" {
 #define	DEVICE_5721_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5721) ||\
 		(bgep->chipid.device == DEVICE_ID_5751) ||\
-		(bgep->chipid.device == DEVICE_ID_5751M))
+		(bgep->chipid.device == DEVICE_ID_5751M) ||\
+		(bgep->chipid.device == DEVICE_ID_5789))
 
 #define	DEVICE_5714_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5714C) ||\
@@ -374,8 +376,11 @@ extern "C" {
  * which are only applicable on BCM5751 and BCM5721.
  */
 #define	PCI_CONF_DEV_CTRL		0xd8
-#define	PCI_CONF_DEV_STUS		0xda
 #define	READ_REQ_SIZE_MAX		0x5000
+#define	DEV_CTRL_NO_SNOOP		0x0800
+#define	DEV_CTRL_RELAXED		0x0010
+
+#define	PCI_CONF_DEV_STUS		0xda
 #define	DEVICE_ERROR_STUS		0xf
 
 #define	NIC_MEM_WINDOW_OFFSET		0x00008000	/* 32k	*/
@@ -715,7 +720,7 @@ extern "C" {
 #define	RECEIVE_STATUS_SENT_XOFF	0x00000001
 
 /*
- * These four-byte registers consitute a hash table for deciding
+ * These four-byte registers constitute a hash table for deciding
  * whether to accept incoming multicast packets.  The bits are
  * numbered in big-endian fashion, from hash 0 => the MSB of
  * register 0 to hash 127 => the LSB of the highest-numbered
@@ -1340,7 +1345,7 @@ extern "C" {
 #define	MII_EXT_STAT_MLT3_CODE_ERROR	0x0001
 
 /*
- * The AUX CONTROL register is seriously wierd!
+ * The AUX CONTROL register is seriously weird!
  *
  * It hides (up to) eight 'shadow' registers.  When writing, which one
  * of them is written is determined by the low-order bits of the data
@@ -1415,7 +1420,7 @@ extern "C" {
  * 	Hardware-defined data structures
  *
  * Note that the chip is naturally BIG-endian, so, for a big-endian
- * host, the structures defined below match those descibed in the PRM.
+ * host, the structures defined below match those described in the PRM.
  * For little-endian hosts, some structures have to be swapped around.
  */
 

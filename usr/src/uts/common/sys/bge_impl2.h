@@ -93,7 +93,7 @@ typedef uchar_t ether_addr_t[ETHERADDRL];
  * Reconfiguring the network devices requires the net_config privilege
  * in Solaris 10+.  Prior to this, root privilege is required.  In order
  * that the driver binary can run on both S10+ and earlier versions, we
- * make the decisiion as to which to use at runtime.  These declarations
+ * make the decision as to which to use at runtime.  These declarations
  * allow for either (or both) to exist ...
  */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
@@ -242,12 +242,13 @@ extern int drv_priv(cred_t *);
 /*
  * PCI type. PCI-Express or PCI/PCIX
  */
+#define	BGE_PCI		0
 #define	BGE_PCI_E	1
 #define	BGE_PCI_X	2
 
 /*
- * Statistic type. There are two type of statistic:statistic block and
- * staristic registers
+ * Statistic type. There are two type of statistic:
+ * statistic block and statistic registers
  */
 #define	BGE_STAT_BLK	1
 #define	BGE_STAT_REG	2
@@ -596,7 +597,7 @@ typedef struct {
 
 #define	CHIP_FLAG_SUPPORTED	0x80
 #define	CHIP_FLAG_SERDES	0x40
-#define	CHIP_FLAG_NO_CSUM	0x20
+#define	CHIP_FLAG_PARTIAL_CSUM	0x20
 #define	CHIP_FLAG_NO_JUMBO	0x1
 
 /*
@@ -786,7 +787,7 @@ typedef struct bge {
 	/*
 	 * For the BCM5705/5788/5721/5751/5752/5714 and 5715,
 	 * the statistic block is not available,the statistic counter must
-	 * be get from statistic registers.And bge_statistics_reg_t record
+	 * be gotten from statistic registers.And bge_statistics_reg_t record
 	 * the statistic registers value
 	 */
 	bge_statistics_reg_t	stat_val;

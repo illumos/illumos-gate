@@ -2234,7 +2234,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * in that context or with that set of mutexes held.  So, these
 	 * softints are triggered instead:
 	 *
-	 * the <resched> softint is triggered if if we have previously
+	 * the <resched> softint is triggered if we have previously
 	 * had to refuse to send a packet because of resource shortage
 	 * (we've run out of transmit buffers), but the send completion
 	 * interrupt handler has now detected that more buffers have
@@ -2403,16 +2403,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mip->mi_media = DL_ETHER;
 	mip->mi_sdu_min = 0;
 	mip->mi_sdu_max = cidp->ethmax_size - sizeof (struct ether_header);
+	mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 	mip->mi_poll = DL_CAPAB_POLL;
-
-	/*
-	 * Workaround for Incorrect pseudo-header checksum calculation.
-	 * 	Use partial checksum offload for all affected chips.
-	 */
-	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
-		mip->mi_cksum = HCKSUM_INET_PARTIAL | HCKSUM_IPHDRCKSUM;
-	else
-		mip->mi_cksum = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 
 	mip->mi_addr_length = ETHERADDRL;
 	bcopy(ether_brdcst, mip->mi_brdcst_addr, ETHERADDRL);

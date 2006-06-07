@@ -226,7 +226,7 @@ bge_statistics_update(kstat_t *ksp, int flag)
 	 *
 	 * As above, we don't bother to sync or stop updates to the
 	 * statistics, 'cos it doesn't really matter if they're a few
-	 * microsends out of date or less than 100% consistent ...
+	 * microseconds out of date or less than 100% consistent ...
 	 */
 	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
 		for (ksip = bge_statistics; ksip->name != NULL; ++knp, ++ksip)

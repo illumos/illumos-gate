@@ -472,6 +472,20 @@ bge_phy_tweak_gmii(bge_t *bgep)
 	bge_mii_put16(bgep, 0x1c, 0x8d68);
 }
 
+/* Bit Error Rate reduction fix */
+static void
+bge_phy_bit_err_fix(bge_t *bgep)
+{
+	bge_mii_put16(bgep, 0x18, 0x0c00);
+	bge_mii_put16(bgep, 0x17, 0x000a);
+	bge_mii_put16(bgep, 0x15, 0x310b);
+	bge_mii_put16(bgep, 0x17, 0x201f);
+	bge_mii_put16(bgep, 0x15, 0x9506);
+	bge_mii_put16(bgep, 0x17, 0x401f);
+	bge_mii_put16(bgep, 0x15, 0x14e2);
+	bge_mii_put16(bgep, 0x18, 0x0400);
+}
+
 /*
  * End of Broadcom-derived workaround code				*
  */
@@ -527,6 +541,13 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 
 	case MHCR_CHIP_REV_5704_A0:
 		bge_phy_tweak_gmii(bgep);
+		break;
+	}
+
+	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
+	case MHCR_CHIP_ASIC_REV_5705:
+	case MHCR_CHIP_ASIC_REV_5721_5751:
+		bge_phy_bit_err_fix(bgep);
 		break;
 	}
 
@@ -881,7 +902,7 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 
 	/*
 	 * Discover all the link partner's abilities.
-	 * These are scattered through various registters ...
+	 * These are scattered through various registers ...
 	 */
 	if (BIS(aux, MII_AUX_STATUS_LP_ANEG_ABLE)) {
 		bgep->param_lp_autoneg = B_TRUE;

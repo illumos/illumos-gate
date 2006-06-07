@@ -242,6 +242,44 @@ bge_send_claim(bge_t *bgep, send_ring_t *srp)
 	return (slot);
 }
 
+#define	TCP_CKSUM_OFFSET	16
+#define	UDP_CKSUM_OFFSET	6
+
+static void
+bge_pseudo_cksum(uint8_t *buf)
+{
+	uint32_t cksum;
+	uint16_t iphl;
+	uint16_t proto;
+
+	/*
+	 * Point it to the ip header.
+	 */
+	buf += sizeof (struct ether_header);
+
+	/*
+	 * Calculate the pseudo-header checksum.
+	 */
+	iphl = 4 * (buf[0] & 0xF);
+	cksum = (((uint16_t)buf[2])<<8) + buf[3] - iphl;
+	cksum += proto = buf[9];
+	cksum += (((uint16_t)buf[12])<<8) + buf[13];
+	cksum += (((uint16_t)buf[14])<<8) + buf[15];
+	cksum += (((uint16_t)buf[16])<<8) + buf[17];
+	cksum += (((uint16_t)buf[18])<<8) + buf[19];
+	cksum = (cksum>>16) + (cksum & 0xFFFF);
+	cksum = (cksum>>16) + (cksum & 0xFFFF);
+
+	/*
+	 * Point it to the TCP/UDP header, and
+	 * update the checksum field.
+	 */
+	buf += iphl + ((proto == IPPROTO_TCP) ?
+		TCP_CKSUM_OFFSET : UDP_CKSUM_OFFSET);
+
+	*(uint16_t *)buf = htons((uint16_t)cksum);
+}
+
 /*
  * Send a message by copying it into a preallocated (and premapped) buffer
  */
@@ -289,7 +327,26 @@ bge_send_copy(bge_t *bgep, mblk_t *mp, send_ring_t *srp, uint16_t tci)
 	 * splitting the message across multiple buffers either.
 	 */
 	txb = DMA_VPTR(ssbdp->pbuf);
-	for (totlen = 0, bp = mp; bp != NULL; bp = bp->b_cont) {
+	totlen = 0;
+	bp = mp;
+	if (tci != 0) {
+		mblen = bp->b_wptr - bp->b_rptr;
+
+		ASSERT(mblen >= 2 * ETHERADDRL + VLAN_TAGSZ);
+
+		bcopy(bp->b_rptr, txb, 2 * ETHERADDRL);
+		txb += 2 * ETHERADDRL;
+		totlen = 2 * ETHERADDRL;
+
+		if (mblen -= 2 * ETHERADDRL + VLAN_TAGSZ) {
+			if ((totlen += mblen) <= bgep->chipid.ethmax_size) {
+				bcopy(bp->b_wptr-mblen, txb, mblen);
+				txb += mblen;
+			}
+		}
+		bp = bp->b_cont;
+	}
+	for (; bp != NULL; bp = bp->b_cont) {
 		mblen = bp->b_wptr - bp->b_rptr;
 		if ((totlen += mblen) <= bgep->chipid.ethmax_size) {
 			bcopy(bp->b_rptr, txb, mblen);
@@ -298,7 +355,7 @@ bge_send_copy(bge_t *bgep, mblk_t *mp, send_ring_t *srp, uint16_t tci)
 	}
 
 	/*
-	 * We'e reached the end of the chain; and we should have
+	 * We've reached the end of the chain; and we should have
 	 * collected no more than ETHERMAX bytes into our buffer.
 	 */
 	ASSERT(bp == NULL);
@@ -322,8 +379,11 @@ bge_send_copy(bge_t *bgep, mblk_t *mp, send_ring_t *srp, uint16_t tci)
 	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
 	if (pflags & HCK_IPV4_HDRCKSUM)
 		hw_sbd_p->flags |= SBD_FLAG_IP_CKSUM;
-	if (pflags & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))
+	if (pflags & HCK_FULLCKSUM) {
 		hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
+		if (bgep->chipid.flags & CHIP_FLAG_PARTIAL_CSUM)
+			bge_pseudo_cksum((uint8_t *)DMA_VPTR(ssbdp->pbuf));
+	}
 
 	return (SEND_FREE);
 }
@@ -391,10 +451,6 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	 */
 	if (need_strip) {
 		tci = ntohs(ehp->ether_tci);
-
-		(void) memmove(mp->b_rptr + VLAN_TAGSZ, mp->b_rptr,
-		    2 * ETHERADDRL);
-		mp->b_rptr += VLAN_TAGSZ;
 	} else {
 		tci = 0;
 	}

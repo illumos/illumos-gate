@@ -156,7 +156,8 @@ then
 	"pci14e4,169c"
 	"pci14e4,1677"
 	"pci14e4,1678"
-	"pci14e4,167d"' \
+	"pci14e4,167d"
+	"pciex14e4,169d"' \
 	-b "$BASEDIR" bge
 else if [ ${ARCH} = "sparc" ]
 	then
