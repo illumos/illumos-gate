@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1283,9 +1282,10 @@ system_temp_thr(void *args)
 				    (wtstamp == 0 || (ct - wtstamp) >=
 				    sensor_warning_interval)) {
 					envd_log(LOG_CRIT, ENV_WARNING_MSG,
-					    sensorp->name, sensorp->cur_temp,
-					    sensorp->es->esb_low_warning,
-					    sensorp->es->esb_high_warning);
+					sensorp->name, sensorp->cur_temp,
+					(int8_t)sensorp->es->esb_low_warning,
+					(int8_t)sensorp->es->esb_high_warning);
+
 					sensorp->warning_tstamp = ct;
 				}
 			} else if (sensorp->warning_start != 0)
@@ -1309,11 +1309,13 @@ system_temp_thr(void *args)
 					 * Log error
 					 */
 					sensorp->shutdown_initiated = B_TRUE;
+
 					(void) snprintf(msgbuf, sizeof (msgbuf),
-					    ENV_SHUTDOWN_MSG, sensorp->name,
-					    sensorp->cur_temp,
-					    sensorp->es->esb_low_shutdown,
-					    sensorp->es->esb_high_shutdown);
+					ENV_SHUTDOWN_MSG, sensorp->name,
+					sensorp->cur_temp,
+					(int8_t)sensorp->es->esb_low_shutdown,
+					(int8_t)sensorp->es->esb_high_shutdown);
+
 					envd_log(LOG_ALERT, msgbuf);
 
 					/*
