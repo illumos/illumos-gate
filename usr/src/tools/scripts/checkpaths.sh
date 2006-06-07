@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,6 +59,11 @@ else
 	rootlist="$CODEMGR_WS/proto/root_sparc $CODEMGR_WS/proto/root_i386"
 fi
 
+# If the closed source is not present, then exclude IKE from validation.
+if [ "$CLOSED_IS_PRESENT" = no ]; then
+	excl="-e ^usr/include/ike/"
+fi
+
 for ROOT in $rootlist
 do
 	case "$ROOT" in
@@ -70,8 +75,8 @@ do
 		;;
 	esac
 	if [ -d $ROOT ]; then
-		validate_paths '-s/\s*'$arch'$//' -e '^opt/onbld' -b $ROOT \
-			$args $SRC/pkgdefs/etc/exception_list_$arch
+		validate_paths '-s/\s*'$arch'$//' -e '^opt/onbld' $excl \
+		    -b $ROOT $args $SRC/pkgdefs/etc/exception_list_$arch
 	fi
 done
 
@@ -84,17 +89,36 @@ done
 # marked with ISUSED are always known to be good, thus the Latin quote
 # at the top of the file.
 if [ -r $SRC/tools/findunref/exception_list ]; then
-	validate_paths -k ISUSED -r -e '^\*' -b $SRC/.. \
+	# If the closed source is not present, then don't validate it.
+	if [ "$CLOSED_IS_PRESENT" = no ]; then
+		excl="-e ^\./closed"
+	fi
+	validate_paths -k ISUSED -r -e '^\*' $excl -b $SRC/.. \
 		$SRC/tools/findunref/exception_list
 fi
 
 # These are straightforward.
 if [ -d $SRC/xmod ]; then
-	validate_paths $SRC/xmod/cry_files
-	validate_paths -b $SRC $SRC/xmod/xmod_files
+	# If the closed source is not present, then don't validate it.
+	if [ "$CLOSED_IS_PRESENT" = no ]; then
+		excl_cry="-e ^usr/closed"
+		excl_xmod="-e ^../closed"
+	fi
+	validate_paths $excl_cry $SRC/xmod/cry_files
+	validate_paths $excl_xmod -b $SRC $SRC/xmod/xmod_files
 fi
 
 # Finally, make sure the that (req|inc).flg files are in good shape.
-validate_flg
+# If SCCS files are not expected to be present, though, then don't
+# check them.
+if [ ! -d "$CODEMGR_WS/Codemgr_wsdata" ]; then
+	f_flg='-f'
+fi
+# If the closed source is not present, then don't validate it.
+if [ "$CLOSED_IS_PRESENT" = no ]; then
+	excl="-e ^usr/closed/"
+fi
+
+validate_flg $f_flg $excl
 
 exit 0

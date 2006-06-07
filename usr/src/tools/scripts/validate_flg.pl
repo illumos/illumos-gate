@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +29,7 @@ use strict;
 use File::Find ();
 require v5.6.1;
 
-use vars qw/$f_flg *name *dir @execlist $basedir/;
+use vars qw/$f_flg *name *dir @execlist $basedir @opt_e @exclude/;
 *name   = *File::Find::name;
 *dir    = *File::Find::dir;
 
@@ -46,11 +45,15 @@ sub sccs_empty {
 
 # Not pretty, but simple enough to work for the known cases.
 # Does not bother with curly braces or fancy substitutions.
+# Returns undef if this pattern is excluded.
 sub expand {
     my ($str) = @_;
     while ($str =~ /\$(\w+)/) {
 	my $newstr = $ENV{$1};
 	$str =~ s/\$$1/$newstr/g;
+    }
+    foreach my $pat (@exclude) {
+	return undef if $str =~ /$pat/;
     }
     $str;
 }
@@ -92,11 +95,11 @@ sub process_file {
 	    }
 	    $cont = 0;
 	    if ($text =~ /\s*echo_file\s+(\S+)/) {
-		$expfile = expand($1);
+		next if !defined($expfile = expand($1));
 		warn "$fname:$firstline: $1 isn't a file\n" if ! -f $expfile;
 	    } elsif ($text =~ /\s*find_files\s+['"]([^'"]+)['"]\s+(.*)/) {
 		foreach my $dir (split(/\s+/, "$2")) {
-		    $expfile = expand($dir);
+		    next if !defined($expfile = expand($dir));
 		    if (! -d $expfile) {
 			warn "$fname:$firstline: $dir isn't a directory\n";
 		    } elsif ($isincflg && $expfile eq $dname) {
@@ -107,7 +110,7 @@ sub process_file {
 		    }
 		}
 	    } elsif ($text =~ /\s*exec_file\s+(\S+)/) {
-		$expfile = expand($1);
+		next if !defined($expfile = expand($1));
 		if (-f $expfile) {
 		    push @execlist, $expfile, "$newpath:$firstline";
 		} else {
@@ -129,8 +132,38 @@ sub wanted {
     process_file($_, undef) if /\/(inc|req)\.flg$/ && -f $_;
 }
 
-$f_flg = $ARGV[0] eq "-f";
-shift @ARGV if $f_flg;
+sub next_arg {
+    my ($arg) = @_;
+    if ($arg eq "") {
+	die "$0: missing argument for $_\n" if $#ARGV == -1;
+	$arg = shift @ARGV;
+    }
+    $arg;
+}
+
+# I'd like to use Perl's getopts here, but it doesn't handle repeated
+# options, and using comma separators is just too ugly.
+# This doesn't handle combined options (as in '-rm'), but I don't care.
+my $arg;
+while ($#ARGV >= 0) {
+    $_ = $ARGV[0];
+    last if /^[^-]/;
+    shift @ARGV;
+    last if /^--$/;
+    SWITCH: {
+	  /^-f/ && do { $f_flg = 1; last SWITCH; };
+	  if (/^-e(.*)$/) {
+	      $arg = next_arg($1);
+	      push @opt_e, $arg;
+	      last SWITCH;
+	  }
+	  print "$0: unknown option $_\n";
+	  usage();
+    }
+}
+
+# compile the 'exclude' regexps
+@exclude = map qr/$_/x, @opt_e;
 
 $basedir = "usr";
 if ($#ARGV == 0) {
