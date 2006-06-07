@@ -32,6 +32,7 @@ sparc_SUBDIRS= \
 	SUNWbcp  \
 	SUNWcakr.u \
 	SUNWcakr.v \
+	SUNWcakrnt2000.v \
 	SUNWcar.u  \
 	SUNWcar.v  \
 	SUNWcart200.v \

@@ -18,24 +18,17 @@
 #
 # CDDL HEADER END
 #
-# uts/sun4v/ontario/Makefile.files
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-#	Global definitions for sun4v implementation specific modules.
-#
+include ../Makefile.com
 
-#
-# Define objects.
-#
-ONTARIO_PLATMOD_OBJS	= ontario.o
-ONTARIO_TSALARM_OBJS    = tsalarm.o
+.KEEP_STATE:
 
-#
-#	include ontario header files
-#
-INC_PATH	+= -I$(UTSBASE)/sun4v -I$(UTSBASE)/sun4v/ontario -I$(UTSBASE)/sun4u/mpxu
+all: $(FILES)
+install: all pkg
+
+include ../Makefile.targ
