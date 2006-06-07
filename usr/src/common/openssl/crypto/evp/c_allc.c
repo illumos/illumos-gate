@@ -56,6 +56,13 @@
  * [including the GNU Public Licence.]
  */
 
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <stdio.h>
 #include "cryptlib.h"
 #include <openssl/evp.h>
@@ -67,6 +74,8 @@ void OpenSSL_add_all_ciphers(void)
 
 #ifndef OPENSSL_NO_DES
 	EVP_add_cipher(EVP_des_cfb());
+	EVP_add_cipher(EVP_des_cfb1());
+	EVP_add_cipher(EVP_des_cfb8());
 	EVP_add_cipher(EVP_des_ede_cfb());
 	EVP_add_cipher(EVP_des_ede3_cfb());
 
@@ -150,6 +159,8 @@ void OpenSSL_add_all_ciphers(void)
 	EVP_add_cipher(EVP_aes_128_ecb());
 	EVP_add_cipher(EVP_aes_128_cbc());
 	EVP_add_cipher(EVP_aes_128_cfb());
+	EVP_add_cipher(EVP_aes_128_cfb1());
+	EVP_add_cipher(EVP_aes_128_cfb8());
 	EVP_add_cipher(EVP_aes_128_ofb());
 #if 0
 	EVP_add_cipher(EVP_aes_128_ctr());
@@ -160,6 +171,8 @@ void OpenSSL_add_all_ciphers(void)
 	EVP_add_cipher(EVP_aes_192_ecb());
 	EVP_add_cipher(EVP_aes_192_cbc());
 	EVP_add_cipher(EVP_aes_192_cfb());
+	EVP_add_cipher(EVP_aes_192_cfb1());
+	EVP_add_cipher(EVP_aes_192_cfb8());
 	EVP_add_cipher(EVP_aes_192_ofb());
 #if 0
 	EVP_add_cipher(EVP_aes_192_ctr());
@@ -169,6 +182,8 @@ void OpenSSL_add_all_ciphers(void)
 	EVP_add_cipher(EVP_aes_256_ecb());
 	EVP_add_cipher(EVP_aes_256_cbc());
 	EVP_add_cipher(EVP_aes_256_cfb());
+	EVP_add_cipher(EVP_aes_256_cfb1());
+	EVP_add_cipher(EVP_aes_256_cfb8());
 	EVP_add_cipher(EVP_aes_256_ofb());
 #if 0
 	EVP_add_cipher(EVP_aes_256_ctr());

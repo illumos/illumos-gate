@@ -55,16 +55,21 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+/* ====================================================================
+ * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
+ * ECC cipher suite support in OpenSSL originally developed by 
+ * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
+ */
 
 /*
- * The portions of this code that are #ifdef SOLARIS_OPENSSL are
+ * The portions of this code that are #ifdef CRYPTO_UNLIMITED are
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <openssl/objects.h>
@@ -85,6 +90,10 @@
 static const EVP_CIPHER *ssl_cipher_methods[SSL_ENC_NUM_IDX]={
 	NULL,NULL,NULL,NULL,NULL,NULL,
 	};
+
+#define SSL_COMP_NULL_IDX	0
+#define SSL_COMP_ZLIB_IDX	1
+#define SSL_COMP_NUM_IDX	2
 
 static STACK_OF(SSL_COMP) *ssl_comp_methods=NULL;
 
@@ -111,18 +120,20 @@ typedef struct cipher_order_st
 
 static const SSL_CIPHER cipher_aliases[]={
 	/* Don't include eNULL unless specifically enabled. */
-	{0,SSL_TXT_ALL, 0,SSL_ALL & ~SSL_eNULL, SSL_ALL ,0,0,0,SSL_ALL,SSL_ALL}, /* must be first */
-        {0,SSL_TXT_CMPALL,0,SSL_eNULL,0,0,0,0,SSL_ENC_MASK,0},  /* COMPLEMENT OF ALL */
+	/* Don't include ECC in ALL because these ciphers are not yet official. */
+	{0,SSL_TXT_ALL, 0,SSL_ALL & ~SSL_eNULL & ~SSL_kECDH & ~SSL_kECDHE, SSL_ALL ,0,0,0,SSL_ALL,SSL_ALL}, /* must be first */
+	/* TODO: COMPLEMENT OF ALL and COMPLEMENT OF DEFAULT do not have ECC cipher suites handled properly. */
+	{0,SSL_TXT_CMPALL,0,SSL_eNULL,0,0,0,0,SSL_ENC_MASK,0},  /* COMPLEMENT OF ALL */
 	{0,SSL_TXT_CMPDEF,0,SSL_ADH, 0,0,0,0,SSL_AUTH_MASK,0},
-        {0,SSL_TXT_kKRB5,0,SSL_kKRB5,0,0,0,0,SSL_MKEY_MASK,0},  /* VRS Kerberos5 */
+	{0,SSL_TXT_kKRB5,0,SSL_kKRB5,0,0,0,0,SSL_MKEY_MASK,0},  /* VRS Kerberos5 */
 	{0,SSL_TXT_kRSA,0,SSL_kRSA,  0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_kDHr,0,SSL_kDHr,  0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_kDHd,0,SSL_kDHd,  0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_kEDH,0,SSL_kEDH,  0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_kFZA,0,SSL_kFZA,  0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_DH,	0,SSL_DH,    0,0,0,0,SSL_MKEY_MASK,0},
+	{0,SSL_TXT_ECC,	0,(SSL_kECDH|SSL_kECDHE), 0,0,0,0,SSL_MKEY_MASK,0},
 	{0,SSL_TXT_EDH,	0,SSL_EDH,   0,0,0,0,SSL_MKEY_MASK|SSL_AUTH_MASK,0},
-
 	{0,SSL_TXT_aKRB5,0,SSL_aKRB5,0,0,0,0,SSL_AUTH_MASK,0},  /* VRS Kerberos5 */
 	{0,SSL_TXT_aRSA,0,SSL_aRSA,  0,0,0,0,SSL_AUTH_MASK,0},
 	{0,SSL_TXT_aDSS,0,SSL_aDSS,  0,0,0,0,SSL_AUTH_MASK,0},
@@ -165,11 +176,8 @@ static const SSL_CIPHER cipher_aliases[]={
 	{0,SSL_TXT_HIGH,  0, 0,  SSL_HIGH, 0,0,0,0,SSL_STRONG_MASK},
 	};
 
-static int init_ciphers=1;
-
-static void load_ciphers(void)
+void ssl_load_ciphers(void)
 	{
-	init_ciphers=0;
 	ssl_cipher_methods[SSL_ENC_DES_IDX]= 
 		EVP_get_cipherbyname(SN_des_cbc);
 	ssl_cipher_methods[SSL_ENC_3DES_IDX]=
@@ -196,7 +204,51 @@ static void load_ciphers(void)
 		EVP_get_digestbyname(SN_sha1);
 	}
 
-int ssl_cipher_get_evp(SSL_SESSION *s, const EVP_CIPHER **enc,
+
+#ifndef OPENSSL_NO_COMP
+
+static int sk_comp_cmp(const SSL_COMP * const *a,
+			const SSL_COMP * const *b)
+	{
+	return((*a)->id-(*b)->id);
+	}
+
+static void load_builtin_compressions(void)
+	{
+	if (ssl_comp_methods != NULL)
+		return;
+
+	CRYPTO_w_lock(CRYPTO_LOCK_SSL);
+	if (ssl_comp_methods == NULL)
+		{
+		SSL_COMP *comp = NULL;
+
+		MemCheck_off();
+		ssl_comp_methods=sk_SSL_COMP_new(sk_comp_cmp);
+		if (ssl_comp_methods != NULL)
+			{
+			comp=(SSL_COMP *)OPENSSL_malloc(sizeof(SSL_COMP));
+			if (comp != NULL)
+				{
+				comp->method=COMP_zlib();
+				if (comp->method
+					&& comp->method->type == NID_undef)
+					OPENSSL_free(comp);
+				else
+					{
+					comp->id=SSL_COMP_ZLIB_IDX;
+					comp->name=comp->method->name;
+					sk_SSL_COMP_push(ssl_comp_methods,comp);
+					}
+				}
+			}
+		MemCheck_on();
+		}
+	CRYPTO_w_unlock(CRYPTO_LOCK_SSL);
+	}
+#endif
+
+int ssl_cipher_get_evp(const SSL_SESSION *s, const EVP_CIPHER **enc,
 	     const EVP_MD **md, SSL_COMP **comp)
 	{
 	int i;
@@ -207,18 +259,14 @@ int ssl_cipher_get_evp(SSL_SESSION *s, const EVP_CIPHER **enc,
 	if (comp != NULL)
 		{
 		SSL_COMP ctmp;
+#ifndef OPENSSL_NO_COMP
+		load_builtin_compressions();
+#endif
 
-		if (s->compress_meth == 0)
-			*comp=NULL;
-		else if (ssl_comp_methods == NULL)
+		*comp=NULL;
+		ctmp.id=s->compress_meth;
+		if (ssl_comp_methods != NULL)
 			{
-			/* bad */
-			*comp=NULL;
-			}
-		else
-			{
-
-			ctmp.id=s->compress_meth;
 			i=sk_SSL_COMP_find(ssl_comp_methods,&ctmp);
 			if (i >= 0)
 				*comp=sk_SSL_COMP_value(ssl_comp_methods,i);
@@ -331,7 +379,9 @@ static unsigned long ssl_cipher_get_disabled(void)
 #ifdef OPENSSL_NO_KRB5
 	mask |= SSL_kKRB5|SSL_aKRB5;
 #endif
-
+#ifdef OPENSSL_NO_ECDH
+	mask |= SSL_kECDH|SSL_kECDHE;
+#endif
 #ifdef SSL_FORBID_ENULL
 	mask |= SSL_eNULL;
 #endif
@@ -704,9 +754,18 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
 			if (!found)
 				break;	/* ignore this entry */
 
-			algorithms |= ca_list[j]->algorithms;
+			/* New algorithms:
+			 *  1 - any old restrictions apply outside new mask
+			 *  2 - any new restrictions apply outside old mask
+			 *  3 - enforce old & new where masks intersect
+			 */
+			algorithms = (algorithms & ~ca_list[j]->mask) |		/* 1 */
+			             (ca_list[j]->algorithms & ~mask) |		/* 2 */
+			             (algorithms & ca_list[j]->algorithms);	/* 3 */
 			mask |= ca_list[j]->mask;
-			algo_strength |= ca_list[j]->algo_strength;
+			algo_strength = (algo_strength & ~ca_list[j]->mask_strength) |
+			                (ca_list[j]->algo_strength & ~mask_strength) |
+			                (algo_strength & ca_list[j]->algo_strength);
 			mask_strength |= ca_list[j]->mask_strength;
 
 			if (!multi) break;
@@ -760,7 +819,7 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	{
 	int ok, num_of_ciphers, num_of_alias_max, num_of_group_aliases;
 	unsigned long disabled_mask;
-	STACK_OF(SSL_CIPHER) *cipherstack;
+	STACK_OF(SSL_CIPHER) *cipherstack, *tmp_cipher_list;
 	const char *rule_p;
 	CIPHER_ORDER *co_list = NULL, *head = NULL, *tail = NULL, *curr;
 	SSL_CIPHER **ca_list = NULL;
@@ -768,14 +827,8 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	/*
 	 * Return with error if nothing to do.
 	 */
-	if (rule_str == NULL) return(NULL);
-
-	if (init_ciphers)
-		{
-		CRYPTO_w_lock(CRYPTO_LOCK_SSL);
-		if (init_ciphers) load_ciphers();
-		CRYPTO_w_unlock(CRYPTO_LOCK_SSL);
-		}
+	if (rule_str == NULL || cipher_list == NULL || cipher_list_by_id == NULL)
+		return NULL;
 
 	/*
 	 * To reduce the work to do we only want to process the compiled
@@ -875,46 +928,18 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 		}
 	OPENSSL_free(co_list);	/* Not needed any longer */
 
-	/*
-	 * The following passage is a little bit odd. If pointer variables
-	 * were supplied to hold STACK_OF(SSL_CIPHER) return information,
-	 * the old memory pointed to is free()ed. Then, however, the
-	 * cipher_list entry will be assigned just a copy of the returned
-	 * cipher stack. For cipher_list_by_id a copy of the cipher stack
-	 * will be created. See next comment...
-	 */
-	if (cipher_list != NULL)
-		{
-		if (*cipher_list != NULL)
-			sk_SSL_CIPHER_free(*cipher_list);
-		*cipher_list = cipherstack;
-		}
-
-	if (cipher_list_by_id != NULL)
-		{
-		if (*cipher_list_by_id != NULL)
-			sk_SSL_CIPHER_free(*cipher_list_by_id);
-		*cipher_list_by_id = sk_SSL_CIPHER_dup(cipherstack);
-		}
-
-	/*
-	 * Now it is getting really strange. If something failed during
-	 * the previous pointer assignment or if one of the pointers was
-	 * not requested, the error condition is met. That might be
-	 * discussable. The strange thing is however that in this case
-	 * the memory "ret" pointed to is "free()ed" and hence the pointer
-	 * cipher_list becomes wild. The memory reserved for
-	 * cipher_list_by_id however is not "free()ed" and stays intact.
-	 */
-	if (	(cipher_list_by_id == NULL) ||
-		(*cipher_list_by_id == NULL) ||
-		(cipher_list == NULL) ||
-		(*cipher_list == NULL))
+	tmp_cipher_list = sk_SSL_CIPHER_dup(cipherstack);
+	if (tmp_cipher_list == NULL)
 		{
 		sk_SSL_CIPHER_free(cipherstack);
-		return(NULL);
+		return NULL;
 		}
-
+	if (*cipher_list != NULL)
+		sk_SSL_CIPHER_free(*cipher_list);
+	*cipher_list = cipherstack;
+	if (*cipher_list_by_id != NULL)
+		sk_SSL_CIPHER_free(*cipher_list_by_id);
+	*cipher_list_by_id = tmp_cipher_list;
 	sk_SSL_CIPHER_set_cmp_func(*cipher_list_by_id,ssl_cipher_ptr_id_cmp);
 
 	return(cipherstack);
@@ -923,13 +948,13 @@ STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 char *SSL_CIPHER_description(SSL_CIPHER *cipher, char *buf, int len)
 	{
 	int is_export,pkl,kl;
-	char *ver,*exp_str;
-	char *kx,*au,*enc,*mac;
+	const char *ver,*exp_str;
+	const char *kx,*au,*enc,*mac;
 	unsigned long alg,alg2,alg_s;
 #ifdef KSSL_DEBUG
-	static char *format="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s%s AL=%lx\n";
+	static const char *format="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s%s AL=%lx\n";
 #else
-	static char *format="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s%s\n";
+	static const char *format="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s%s\n";
 #endif /* KSSL_DEBUG */
 
 	alg=cipher->algorithms;
@@ -940,7 +965,7 @@ char *SSL_CIPHER_description(SSL_CIPHER *cipher, char *buf, int len)
 	pkl=SSL_C_EXPORT_PKEYLENGTH(cipher);
 	kl=SSL_C_EXPORT_KEYLENGTH(cipher);
 	exp_str=is_export?" export":"";
-
+	
 	if (alg & SSL_SSLV2)
 		ver="SSLv2";
 	else if (alg & SSL_SSLV3)
@@ -969,6 +994,10 @@ char *SSL_CIPHER_description(SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_kEDH:
 		kx=is_export?(pkl == 512 ? "DH(512)" : "DH(1024)"):"DH";
 		break;
+	case SSL_kECDH:
+	case SSL_kECDHE:
+		kx=is_export?"ECDH(<=163)":"ECDH";
+		break;
 	default:
 		kx="unknown";
 		}
@@ -991,6 +1020,9 @@ char *SSL_CIPHER_description(SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_aFZA:
 	case SSL_aNULL:
 		au="None";
+		break;
+	case SSL_aECDSA:
+		au="ECDSA";
 		break;
 	default:
 		au="unknown";
@@ -1065,7 +1097,7 @@ char *SSL_CIPHER_description(SSL_CIPHER *cipher, char *buf, int len)
 	return(buf);
 	}
 
-char *SSL_CIPHER_get_version(SSL_CIPHER *c)
+char *SSL_CIPHER_get_version(const SSL_CIPHER *c)
 	{
 	int i;
 
@@ -1080,7 +1112,7 @@ char *SSL_CIPHER_get_version(SSL_CIPHER *c)
 	}
 
 /* return the actual cipher being used */
-const char *SSL_CIPHER_get_name(SSL_CIPHER *c)
+const char *SSL_CIPHER_get_name(const SSL_CIPHER *c)
 	{
 	if (c != NULL)
 		return(c->name);
@@ -1088,7 +1120,7 @@ const char *SSL_CIPHER_get_name(SSL_CIPHER *c)
 	}
 
 /* number of bits for symmetric cipher */
-int SSL_CIPHER_get_bits(SSL_CIPHER *c, int *alg_bits)
+int SSL_CIPHER_get_bits(const SSL_CIPHER *c, int *alg_bits)
 	{
 	int ret=0;
 
@@ -1116,35 +1148,63 @@ SSL_COMP *ssl3_comp_find(STACK_OF(SSL_COMP) *sk, int n)
 	return(NULL);
 	}
 
-static int sk_comp_cmp(const SSL_COMP * const *a,
-			const SSL_COMP * const *b)
+#ifdef OPENSSL_NO_COMP
+void *SSL_COMP_get_compression_methods(void)
 	{
-	return((*a)->id-(*b)->id);
+	return NULL;
+	}
+int SSL_COMP_add_compression_method(int id, void *cm)
+	{
+	return 1;
 	}
 
+const char *SSL_COMP_get_name(const void *comp)
+	{
+	return NULL;
+	}
+#else
 STACK_OF(SSL_COMP) *SSL_COMP_get_compression_methods(void)
 	{
+	load_builtin_compressions();
 	return(ssl_comp_methods);
 	}
 
 int SSL_COMP_add_compression_method(int id, COMP_METHOD *cm)
 	{
 	SSL_COMP *comp;
-	STACK_OF(SSL_COMP) *sk;
 
         if (cm == NULL || cm->type == NID_undef)
                 return 1;
+
+	/* According to draft-ietf-tls-compression-04.txt, the
+	   compression number ranges should be the following:
+
+	   0 to 63:    methods defined by the IETF
+	   64 to 192:  external party methods assigned by IANA
+	   193 to 255: reserved for private use */
+	if (id < 193 || id > 255)
+		{
+		SSLerr(SSL_F_SSL_COMP_ADD_COMPRESSION_METHOD,SSL_R_COMPRESSION_ID_NOT_WITHIN_PRIVATE_RANGE);
+		return 0;
+		}
 
 	MemCheck_off();
 	comp=(SSL_COMP *)OPENSSL_malloc(sizeof(SSL_COMP));
 	comp->id=id;
 	comp->method=cm;
-	if (ssl_comp_methods == NULL)
-		sk=ssl_comp_methods=sk_SSL_COMP_new(sk_comp_cmp);
-	else
-		sk=ssl_comp_methods;
-	if ((sk == NULL) || !sk_SSL_COMP_push(sk,comp))
+	load_builtin_compressions();
+	if (ssl_comp_methods
+		&& !sk_SSL_COMP_find(ssl_comp_methods,comp))
 		{
+		OPENSSL_free(comp);
+		MemCheck_on();
+		SSLerr(SSL_F_SSL_COMP_ADD_COMPRESSION_METHOD,SSL_R_DUPLICATE_COMPRESSION_ID);
+		return(1);
+		}
+	else if ((ssl_comp_methods == NULL)
+		|| !sk_SSL_COMP_push(ssl_comp_methods,comp))
+		{
+		OPENSSL_free(comp);
 		MemCheck_on();
 		SSLerr(SSL_F_SSL_COMP_ADD_COMPRESSION_METHOD,ERR_R_MALLOC_FAILURE);
 		return(1);
@@ -1155,3 +1215,12 @@ int SSL_COMP_add_compression_method(int id, COMP_METHOD *cm)
 		return(0);
 		}
 	}
+
+const char *SSL_COMP_get_name(const COMP_METHOD *comp)
+	{
+	if (comp)
+		return comp->name;
+	return NULL;
+	}
+
+#endif

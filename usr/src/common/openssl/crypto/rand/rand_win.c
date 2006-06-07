@@ -121,11 +121,15 @@
 #include <wincrypt.h>
 #include <tlhelp32.h>
 
+/* Limit the time spent walking through the heap, processes, threads and modules to
+   a maximum of 1000 miliseconds each, unless CryptoGenRandom failed */
+#define MAXDELAY 1000
+
 /* Intel hardware RNG CSP -- available from
  * http://developer.intel.com/design/security/rng/redist_license.htm
  */
 #define PROV_INTEL_SEC 22
-#define INTEL_DEF_PROV TEXT("Intel Hardware Cryptographic Service Provider")
+#define INTEL_DEF_PROV L"Intel Hardware Cryptographic Service Provider"
 
 static void readtimer(void);
 static void readscreen(void);
@@ -152,7 +156,8 @@ typedef struct tagCURSORINFO
 #define CURSOR_SHOWING     0x00000001
 #endif /* CURSOR_SHOWING */
 
-typedef BOOL (WINAPI *CRYPTACQUIRECONTEXT)(HCRYPTPROV *, LPCTSTR, LPCTSTR,
+#if !defined(OPENSSL_SYS_WINCE)
+typedef BOOL (WINAPI *CRYPTACQUIRECONTEXTW)(HCRYPTPROV *, LPCWSTR, LPCWSTR,
 				    DWORD, DWORD);
 typedef BOOL (WINAPI *CRYPTGENRANDOM)(HCRYPTPROV, DWORD, BYTE *);
 typedef BOOL (WINAPI *CRYPTRELEASECONTEXT)(HCRYPTPROV, DWORD);
@@ -163,7 +168,7 @@ typedef DWORD (WINAPI *GETQUEUESTATUS)(UINT);
 
 typedef HANDLE (WINAPI *CREATETOOLHELP32SNAPSHOT)(DWORD, DWORD);
 typedef BOOL (WINAPI *CLOSETOOLHELP32SNAPSHOT)(HANDLE);
-typedef BOOL (WINAPI *HEAP32FIRST)(LPHEAPENTRY32, DWORD, DWORD);
+typedef BOOL (WINAPI *HEAP32FIRST)(LPHEAPENTRY32, DWORD, SIZE_T);
 typedef BOOL (WINAPI *HEAP32NEXT)(LPHEAPENTRY32);
 typedef BOOL (WINAPI *HEAP32LIST)(HANDLE, LPHEAPLIST32);
 typedef BOOL (WINAPI *PROCESS32)(HANDLE, LPPROCESSENTRY32);
@@ -171,9 +176,7 @@ typedef BOOL (WINAPI *THREAD32)(HANDLE, LPTHREADENTRY32);
 typedef BOOL (WINAPI *MODULE32)(HANDLE, LPMODULEENTRY32);
 
 #include <lmcons.h>
-#ifndef OPENSSL_SYS_WINCE
 #include <lmstats.h>
-#endif
 #if 1 /* The NET API is Unicode only.  It requires the use of the UNICODE
        * macro.  When UNICODE is defined LPTSTR becomes LPWSTR.  LMSTR was
        * was added to the Platform SDK to allow the NET API to be used in
@@ -184,26 +187,14 @@ typedef NET_API_STATUS (NET_API_FUNCTION * NETSTATGET)
         (LPWSTR, LPWSTR, DWORD, DWORD, LPBYTE*);
 typedef NET_API_STATUS (NET_API_FUNCTION * NETFREE)(LPBYTE);
 #endif /* 1 */
+#endif /* !OPENSSL_SYS_WINCE */
 
 int RAND_poll(void)
 {
 	MEMORYSTATUS m;
 	HCRYPTPROV hProvider = 0;
-	BYTE buf[64];
 	DWORD w;
-	HWND h;
-
-	HMODULE advapi, kernel, user, netapi;
-	CRYPTACQUIRECONTEXT acquire = 0;
-	CRYPTGENRANDOM gen = 0;
-	CRYPTRELEASECONTEXT release = 0;
-#if 1 /* There was previously a problem with NETSTATGET.  Currently, this
-       * section is still experimental, but if all goes well, this conditional
-       * will be removed
-       */
-	NETSTATGET netstatget = 0;
-	NETFREE netfree = 0;
-#endif /* 1 */
+	int good = 0;
 
 	/* Determine the OS version we are on so we can turn off things 
 	 * that do not work properly.
@@ -212,32 +203,54 @@ int RAND_poll(void)
         osverinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO) ;
         GetVersionEx( &osverinfo ) ;
 
-#if defined(OPENSSL_SYS_WINCE) && WCEPLATFORM!=MS_HPC_PRO
+#if defined(OPENSSL_SYS_WINCE)
+# if defined(_WIN32_WCE) && _WIN32_WCE>=300
+/* Even though MSDN says _WIN32_WCE>=210, it doesn't seem to be available
+ * in commonly available implementations prior 300... */
+	{
+	BYTE buf[64];
 	/* poll the CryptoAPI PRNG */
 	/* The CryptoAPI returns sizeof(buf) bytes of randomness */
-	if (CryptAcquireContext(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+	if (CryptAcquireContextW(&hProvider, NULL, NULL, PROV_RSA_FULL,
+				CRYPT_VERIFYCONTEXT))
 		{
 		if (CryptGenRandom(hProvider, sizeof(buf), buf))
 			RAND_add(buf, sizeof(buf), sizeof(buf));
 		CryptReleaseContext(hProvider, 0); 
 		}
-#endif
-
+	}
+# endif
+#else	/* OPENSSL_SYS_WINCE */
+	/*
+	 * None of below libraries are present on Windows CE, which is
+	 * why we #ifndef the whole section. This also excuses us from
+	 * handling the GetProcAddress issue. The trouble is that in
+	 * real Win32 API GetProcAddress is available in ANSI flavor
+	 * only. In WinCE on the other hand GetProcAddress is a macro
+	 * most commonly defined as GetProcAddressW, which accepts
+	 * Unicode argument. If we were to call GetProcAddress under
+	 * WinCE, I'd recommend to either redefine GetProcAddress as
+	 * GetProcAddressA (there seem to be one in common CE spec) or
+	 * implement own shim routine, which would accept ANSI argument
+	 * and expand it to Unicode.
+	 */
+	{
 	/* load functions dynamically - not available on all systems */
-	advapi = LoadLibrary(TEXT("ADVAPI32.DLL"));
-	kernel = LoadLibrary(TEXT("KERNEL32.DLL"));
-	user = LoadLibrary(TEXT("USER32.DLL"));
-	netapi = LoadLibrary(TEXT("NETAPI32.DLL"));
+	HMODULE advapi = LoadLibrary(TEXT("ADVAPI32.DLL"));
+	HMODULE kernel = LoadLibrary(TEXT("KERNEL32.DLL"));
+	HMODULE user = NULL;
+	HMODULE netapi = LoadLibrary(TEXT("NETAPI32.DLL"));
+	CRYPTACQUIRECONTEXTW acquire = NULL;
+	CRYPTGENRANDOM gen = NULL;
+	CRYPTRELEASECONTEXT release = NULL;
+	NETSTATGET netstatget = NULL;
+	NETFREE netfree = NULL;
+	BYTE buf[64];
 
-#ifndef OPENSSL_SYS_WINCE
-#if 1 /* There was previously a problem with NETSTATGET.  Currently, this
-       * section is still experimental, but if all goes well, this conditional
-       * will be removed
-       */
 	if (netapi)
 		{
-		netstatget = (NETSTATGET) GetProcAddress(netapi,TEXT("NetStatisticsGet"));
-		netfree = (NETFREE) GetProcAddress(netapi,TEXT("NetApiBufferFree"));
+		netstatget = (NETSTATGET) GetProcAddress(netapi,"NetStatisticsGet");
+		netfree = (NETFREE) GetProcAddress(netapi,"NetApiBufferFree");
 		}
 
 	if (netstatget && netfree)
@@ -263,10 +276,7 @@ int RAND_poll(void)
 
 	if (netapi)
 		FreeLibrary(netapi);
-#endif /* 1 */
-#endif /* !OPENSSL_SYS_WINCE */
- 
-#ifndef OPENSSL_SYS_WINCE
+
         /* It appears like this can cause an exception deep within ADVAPI32.DLL
          * at random times on Windows 2000.  Reported by Jeffrey Altman.  
          * Only use it on NT.
@@ -321,28 +331,33 @@ int RAND_poll(void)
 			free(buf);
 		}
 #endif
-#endif /* !OPENSSL_SYS_WINCE */
 
 	if (advapi)
 		{
-		acquire = (CRYPTACQUIRECONTEXT) GetProcAddress(advapi,
-			TEXT("CryptAcquireContextA"));
+		/*
+		 * If it's available, then it's available in both ANSI
+		 * and UNICODE flavors even in Win9x, documentation says.
+		 * We favor Unicode...
+		 */
+		acquire = (CRYPTACQUIRECONTEXTW) GetProcAddress(advapi,
+			"CryptAcquireContextW");
 		gen = (CRYPTGENRANDOM) GetProcAddress(advapi,
-			TEXT("CryptGenRandom"));
+			"CryptGenRandom");
 		release = (CRYPTRELEASECONTEXT) GetProcAddress(advapi,
-			TEXT("CryptReleaseContext"));
+			"CryptReleaseContext");
 		}
 
 	if (acquire && gen && release)
 		{
 		/* poll the CryptoAPI PRNG */
                 /* The CryptoAPI returns sizeof(buf) bytes of randomness */
-		if (acquire(&hProvider, 0, 0, PROV_RSA_FULL,
+		if (acquire(&hProvider, NULL, NULL, PROV_RSA_FULL,
 			CRYPT_VERIFYCONTEXT))
 			{
 			if (gen(hProvider, sizeof(buf), buf) != 0)
 				{
 				RAND_add(buf, sizeof(buf), 0);
+				good = 1;
 #if 0
 				printf("randomness from PROV_RSA_FULL\n");
 #endif
@@ -356,6 +371,7 @@ int RAND_poll(void)
 			if (gen(hProvider, sizeof(buf), buf) != 0)
 				{
 				RAND_add(buf, sizeof(buf), sizeof(buf));
+				good = 1;
 #if 0
 				printf("randomness from PROV_INTEL_SEC\n");
 #endif
@@ -367,31 +383,22 @@ int RAND_poll(void)
         if (advapi)
 		FreeLibrary(advapi);
 
-	/* timer data */
-	readtimer();
-	
-	/* memory usage statistics */
-	GlobalMemoryStatus(&m);
-	RAND_add(&m, sizeof(m), 1);
-
-	/* process ID */
-	w = GetCurrentProcessId();
-	RAND_add(&w, sizeof(w), 1);
-
-	if (user)
+	if ((osverinfo.dwPlatformId != VER_PLATFORM_WIN32_NT ||
+	     !OPENSSL_isservice()) &&
+	    (user = LoadLibrary(TEXT("USER32.DLL"))))
 		{
 		GETCURSORINFO cursor;
 		GETFOREGROUNDWINDOW win;
 		GETQUEUESTATUS queue;
 
-		win = (GETFOREGROUNDWINDOW) GetProcAddress(user, TEXT("GetForegroundWindow"));
-		cursor = (GETCURSORINFO) GetProcAddress(user, TEXT("GetCursorInfo"));
-		queue = (GETQUEUESTATUS) GetProcAddress(user, TEXT("GetQueueStatus"));
+		win = (GETFOREGROUNDWINDOW) GetProcAddress(user, "GetForegroundWindow");
+		cursor = (GETCURSORINFO) GetProcAddress(user, "GetCursorInfo");
+		queue = (GETQUEUESTATUS) GetProcAddress(user, "GetQueueStatus");
 
 		if (win)
 			{
 			/* window handle */
-			h = win();
+			HWND h = win();
 			RAND_add(&h, sizeof(h), 0);
 			}
 		if (cursor)
@@ -456,21 +463,22 @@ int RAND_poll(void)
 		PROCESSENTRY32 p;
 		THREADENTRY32 t;
 		MODULEENTRY32 m;
+		DWORD stoptime = 0;
 
 		snap = (CREATETOOLHELP32SNAPSHOT)
-			GetProcAddress(kernel, TEXT("CreateToolhelp32Snapshot"));
+			GetProcAddress(kernel, "CreateToolhelp32Snapshot");
 		close_snap = (CLOSETOOLHELP32SNAPSHOT)
-			GetProcAddress(kernel, TEXT("CloseToolhelp32Snapshot"));
-		heap_first = (HEAP32FIRST) GetProcAddress(kernel, TEXT("Heap32First"));
-		heap_next = (HEAP32NEXT) GetProcAddress(kernel, TEXT("Heap32Next"));
-		heaplist_first = (HEAP32LIST) GetProcAddress(kernel, TEXT("Heap32ListFirst"));
-		heaplist_next = (HEAP32LIST) GetProcAddress(kernel, TEXT("Heap32ListNext"));
-		process_first = (PROCESS32) GetProcAddress(kernel, TEXT("Process32First"));
-		process_next = (PROCESS32) GetProcAddress(kernel, TEXT("Process32Next"));
-		thread_first = (THREAD32) GetProcAddress(kernel, TEXT("Thread32First"));
-		thread_next = (THREAD32) GetProcAddress(kernel, TEXT("Thread32Next"));
-		module_first = (MODULE32) GetProcAddress(kernel, TEXT("Module32First"));
-		module_next = (MODULE32) GetProcAddress(kernel, TEXT("Module32Next"));
+			GetProcAddress(kernel, "CloseToolhelp32Snapshot");
+		heap_first = (HEAP32FIRST) GetProcAddress(kernel, "Heap32First");
+		heap_next = (HEAP32NEXT) GetProcAddress(kernel, "Heap32Next");
+		heaplist_first = (HEAP32LIST) GetProcAddress(kernel, "Heap32ListFirst");
+		heaplist_next = (HEAP32LIST) GetProcAddress(kernel, "Heap32ListNext");
+		process_first = (PROCESS32) GetProcAddress(kernel, "Process32First");
+		process_next = (PROCESS32) GetProcAddress(kernel, "Process32Next");
+		thread_first = (THREAD32) GetProcAddress(kernel, "Thread32First");
+		thread_next = (THREAD32) GetProcAddress(kernel, "Thread32Next");
+		module_first = (MODULE32) GetProcAddress(kernel, "Module32First");
+		module_next = (MODULE32) GetProcAddress(kernel, "Module32Next");
 
 		if (snap && heap_first && heap_next && heaplist_first &&
 			heaplist_next && process_first && process_next &&
@@ -487,6 +495,7 @@ int RAND_poll(void)
                          * of entropy.
                          */
 			hlist.dwSize = sizeof(HEAPLIST32);		
+			if (good) stoptime = GetTickCount() + MAXDELAY;
 			if (heaplist_first(handle, &hlist))
 				do
 					{
@@ -504,18 +513,20 @@ int RAND_poll(void)
 							&& --entrycnt > 0);
 						}
 					} while (heaplist_next(handle,
-						&hlist));
-			
+						&hlist) && GetTickCount() < stoptime);
+
 			/* process walking */
                         /* PROCESSENTRY32 contains 9 fields that will change
                          * with each entry.  Consider each field a source of
                          * 1 byte of entropy.
                          */
 			p.dwSize = sizeof(PROCESSENTRY32);
+		
+			if (good) stoptime = GetTickCount() + MAXDELAY;
 			if (process_first(handle, &p))
 				do
 					RAND_add(&p, p.dwSize, 9);
-				while (process_next(handle, &p));
+				while (process_next(handle, &p) && GetTickCount() < stoptime);
 
 			/* thread walking */
                         /* THREADENTRY32 contains 6 fields that will change
@@ -523,10 +534,11 @@ int RAND_poll(void)
                          * 1 byte of entropy.
                          */
 			t.dwSize = sizeof(THREADENTRY32);
+			if (good) stoptime = GetTickCount() + MAXDELAY;
 			if (thread_first(handle, &t))
 				do
 					RAND_add(&t, t.dwSize, 6);
-				while (thread_next(handle, &t));
+				while (thread_next(handle, &t) && GetTickCount() < stoptime);
 
 			/* module walking */
                         /* MODULEENTRY32 contains 9 fields that will change
@@ -534,18 +546,34 @@ int RAND_poll(void)
                          * 1 byte of entropy.
                          */
 			m.dwSize = sizeof(MODULEENTRY32);
+			if (good) stoptime = GetTickCount() + MAXDELAY;
 			if (module_first(handle, &m))
 				do
 					RAND_add(&m, m.dwSize, 9);
-				while (module_next(handle, &m));
+				while (module_next(handle, &m)
+					       	&& (GetTickCount() < stoptime));
 			if (close_snap)
 				close_snap(handle);
 			else
 				CloseHandle(handle);
+
 			}
 
 		FreeLibrary(kernel);
 		}
+	}
+#endif /* !OPENSSL_SYS_WINCE */
+
+	/* timer data */
+	readtimer();
+	
+	/* memory usage statistics */
+	GlobalMemoryStatus(&m);
+	RAND_add(&m, sizeof(m), 1);
+
+	/* process ID */
+	w = GetCurrentProcessId();
+	RAND_add(&w, sizeof(w), 1);
 
 #if 0
 	printf("Exiting RAND_poll\n");
@@ -607,7 +635,7 @@ static void readtimer(void)
 	DWORD w;
 	LARGE_INTEGER l;
 	static int have_perfc = 1;
-#if defined(_MSC_VER) && !defined(OPENSSL_SYS_WINCE)
+#if defined(_MSC_VER) && defined(_M_X86)
 	static int have_tsc = 1;
 	DWORD cyclecount;
 
@@ -660,7 +688,7 @@ static void readtimer(void)
 
 static void readscreen(void)
 {
-#ifndef OPENSSL_SYS_WINCE
+#if !defined(OPENSSL_SYS_WINCE) && !defined(OPENSSL_SYS_WIN32_CYGWIN)
   HDC		hScrDC;		/* screen DC */
   HDC		hMemDC;		/* memory DC */
   HBITMAP	hBitmap;	/* handle for our bitmap */
@@ -672,6 +700,9 @@ static void readscreen(void)
   int		h;		/* screen height */
   int		y;		/* y-coordinate of screen lines to grab */
   int		n = 16;		/* number of screen lines to grab at a time */
+
+  if (GetVersion() >= 0x80000000 || !OPENSSL_isservice())
+    return;
 
   /* Create a screen DC and a memory DC compatible to screen DC */
   hScrDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);

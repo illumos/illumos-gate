@@ -184,15 +184,15 @@ int i2a_ASN1_OBJECT(BIO *bp, ASN1_OBJECT *a)
 	if ((a == NULL) || (a->data == NULL))
 		return(BIO_write(bp,"NULL",4));
 	i=i2t_ASN1_OBJECT(buf,sizeof buf,a);
-	if (i > sizeof buf) i=sizeof buf;
+	if (i > (int)sizeof(buf)) i=sizeof buf;
 	BIO_write(bp,buf,i);
 	return(i);
 	}
 
-ASN1_OBJECT *d2i_ASN1_OBJECT(ASN1_OBJECT **a, unsigned char **pp,
+ASN1_OBJECT *d2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
 	     long length)
 {
-	unsigned char *p;
+	const unsigned char *p;
 	long len;
 	int tag,xclass;
 	int inf,i;
@@ -219,11 +219,11 @@ err:
 		ASN1_OBJECT_free(ret);
 	return(NULL);
 }
-ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, unsigned char **pp,
+ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
 	     long len)
 	{
 	ASN1_OBJECT *ret=NULL;
-	unsigned char *p;
+	const unsigned char *p;
 	int i;
 
 	/* only the ASN1_OBJECTs from the 'table' will have values
@@ -255,7 +255,7 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, unsigned char **pp,
 	*pp=p;
 	return(ret);
 err:
-	ASN1err(ASN1_F_D2I_ASN1_OBJECT,i);
+	ASN1err(ASN1_F_C2I_ASN1_OBJECT,i);
 	if ((ret != NULL) && ((a == NULL) || (*a != ret)))
 		ASN1_OBJECT_free(ret);
 	return(NULL);

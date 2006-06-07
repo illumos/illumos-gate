@@ -54,7 +54,7 @@
  */
 
 /*
- * Copyright 2002, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/x509.h>
+#include <openssl/ssl.h>
 
 #include <openssl/pkcs12.h>
 #include <p12aux.h>
@@ -86,8 +87,9 @@ void
 sunw_crypto_init(void)
 {
 	OpenSSL_add_all_algorithms();
-	ERR_load_crypto_strings();
+	SSL_load_error_strings();
 	ERR_load_SUNW_strings();
+	(void) SSL_library_init();
 }
 
 /*

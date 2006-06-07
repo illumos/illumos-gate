@@ -57,11 +57,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <openssl/opensslconf.h>	/* for OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DSA
 #include <stdio.h>
 #include <string.h>

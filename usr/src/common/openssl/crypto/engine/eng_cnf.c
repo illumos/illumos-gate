@@ -56,11 +56,15 @@
  *
  */
 
-#include <stdio.h>
-#include <openssl/crypto.h>
-#include "cryptlib.h"
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "eng_int.h"
 #include <openssl/conf.h>
-#include <openssl/engine.h>
 
 /* #define ENGINE_CONF_DEBUG */
 
@@ -165,7 +169,7 @@ static int int_engine_configure(char *name, char *value, const CONF *cnf)
 		 	 */
 			if (!strcmp(ctrlvalue, "EMPTY"))
 				ctrlvalue = NULL;
-			else if (!strcmp(ctrlname, "init"))
+			if (!strcmp(ctrlname, "init"))
 				{
 				if (!NCONF_get_number_e(cnf, value, "init", &do_init))
 					goto err;
@@ -217,7 +221,7 @@ static int int_engine_module_init(CONF_IMODULE *md, const CONF *cnf)
 
 	if (!elist)
 		{
-		ENGINEerr(ENGINE_F_ENGINE_MODULE_INIT, ENGINE_R_ENGINES_SECTION_ERROR);
+		ENGINEerr(ENGINE_F_INT_ENGINE_MODULE_INIT, ENGINE_R_ENGINES_SECTION_ERROR);
 		return 0;
 		}
 

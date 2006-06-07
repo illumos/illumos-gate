@@ -52,6 +52,7 @@
 
 #include "../e_os.h"
 
+#include <openssl/opensslconf.h>
 #include <openssl/evp.h>
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
@@ -162,6 +163,7 @@ static void test1(const EVP_CIPHER *c,const unsigned char *key,int kn,
 	if(!EVP_EncryptInit_ex(&ctx,c,NULL,key,iv))
 	    {
 	    fprintf(stderr,"EncryptInit failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(10);
 	    }
 	EVP_CIPHER_CTX_set_padding(&ctx,0);
@@ -169,11 +171,13 @@ static void test1(const EVP_CIPHER *c,const unsigned char *key,int kn,
 	if(!EVP_EncryptUpdate(&ctx,out,&outl,plaintext,pn))
 	    {
 	    fprintf(stderr,"Encrypt failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(6);
 	    }
 	if(!EVP_EncryptFinal_ex(&ctx,out+outl,&outl2))
 	    {
 	    fprintf(stderr,"EncryptFinal failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(7);
 	    }
 
@@ -198,6 +202,7 @@ static void test1(const EVP_CIPHER *c,const unsigned char *key,int kn,
 	if(!EVP_DecryptInit_ex(&ctx,c,NULL,key,iv))
 	    {
 	    fprintf(stderr,"DecryptInit failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(11);
 	    }
 	EVP_CIPHER_CTX_set_padding(&ctx,0);
@@ -205,11 +210,13 @@ static void test1(const EVP_CIPHER *c,const unsigned char *key,int kn,
 	if(!EVP_DecryptUpdate(&ctx,out,&outl,ciphertext,cn))
 	    {
 	    fprintf(stderr,"Decrypt failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(6);
 	    }
 	if(!EVP_DecryptFinal_ex(&ctx,out+outl,&outl2))
 	    {
 	    fprintf(stderr,"DecryptFinal failed\n");
+	    ERR_print_errors_fp(stderr);
 	    test1_exit(7);
 	    }
 
@@ -272,16 +279,19 @@ static int test_digest(const char *digest,
     if(!EVP_DigestInit_ex(&ctx,d, NULL))
 	{
 	fprintf(stderr,"DigestInit failed\n");
+	ERR_print_errors_fp(stderr);
 	EXIT(100);
 	}
     if(!EVP_DigestUpdate(&ctx,plaintext,pn))
 	{
 	fprintf(stderr,"DigestUpdate failed\n");
+	ERR_print_errors_fp(stderr);
 	EXIT(101);
 	}
     if(!EVP_DigestFinal_ex(&ctx,md,&mdn))
 	{
 	fprintf(stderr,"DigestFinal failed\n");
+	ERR_print_errors_fp(stderr);
 	EXIT(101);
 	}
     EVP_MD_CTX_cleanup(&ctx);
@@ -386,6 +396,27 @@ int main(int argc,char **argv)
 	if(!test_cipher(cipher,key,kn,iv,in,plaintext,pn,ciphertext,cn,encdec)
 	   && !test_digest(cipher,plaintext,pn,ciphertext,cn))
 	    {
+#ifdef OPENSSL_NO_AES
+	    if (strstr(cipher, "AES") == cipher)
+		{
+		fprintf(stdout, "Cipher disabled, skipping %s\n", cipher); 
+		continue;
+		}
+#endif
+#ifdef OPENSSL_NO_DES
+	    if (strstr(cipher, "DES") == cipher)
+		{
+		fprintf(stdout, "Cipher disabled, skipping %s\n", cipher); 
+		continue;
+		}
+#endif
+#ifdef OPENSSL_NO_RC4
+	    if (strstr(cipher, "RC4") == cipher)
+		{
+		fprintf(stdout, "Cipher disabled, skipping %s\n", cipher); 
+		continue;
+		}
+#endif
 	    fprintf(stderr,"Can't find %s\n",cipher);
 	    EXIT(3);
 	    }

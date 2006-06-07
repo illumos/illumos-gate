@@ -100,6 +100,7 @@ int MAIN(int argc, char **argv)
 	EVP_PKEY *sigkey = NULL;
 	unsigned char *sigbuf = NULL;
 	int siglen = 0;
+	char *passargin = NULL, *passin = NULL;
 #ifndef OPENSSL_NO_ENGINE
 	char *engine=NULL;
 #endif
@@ -144,6 +145,12 @@ int MAIN(int argc, char **argv)
 			{
 			if (--argc < 1) break;
 			keyfile=*(++argv);
+			}
+		else if (!strcmp(*argv,"-passin"))
+			{
+			if (--argc < 1)
+				break;
+			passargin=*++argv;
 			}
 		else if (strcmp(*argv,"-verify") == 0)
 			{
@@ -222,10 +229,20 @@ int MAIN(int argc, char **argv)
 			LN_md4,LN_md4);
 		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
 			LN_md2,LN_md2);
+#ifndef OPENSSL_NO_SHA
 		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
 			LN_sha1,LN_sha1);
 		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
 			LN_sha,LN_sha);
+#ifndef OPENSSL_NO_SHA256
+		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
+			LN_sha256,LN_sha256);
+#endif
+#ifndef OPENSSL_NO_SHA512
+		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
+			LN_sha512,LN_sha512);
+#endif
+#endif
 		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
 			LN_mdc2,LN_mdc2);
 		BIO_printf(bio_err,"-%3s to use the %s message digest algorithm\n",
@@ -245,6 +262,12 @@ int MAIN(int argc, char **argv)
 		BIO_set_callback(in,BIO_debug_callback);
 		/* needed for windows 3.1 */
 		BIO_set_callback_arg(in,bio_err);
+		}
+
+	if(!app_passwd(bio_err, passargin, NULL, &passin, NULL))
+		{
+		BIO_printf(bio_err, "Error getting password\n");
+		goto end;
 		}
 
 	if ((in == NULL) || (bmd == NULL))
@@ -288,7 +311,7 @@ int MAIN(int argc, char **argv)
 			sigkey = load_pubkey(bio_err, keyfile, keyform, 0, NULL,
 				e, "key file");
 		else
-			sigkey = load_key(bio_err, keyfile, keyform, 0, NULL,
+			sigkey = load_key(bio_err, keyfile, keyform, 0, passin,
 				e, "key file");
 		if (!sigkey)
 			{
@@ -322,7 +345,13 @@ int MAIN(int argc, char **argv)
 
 
 	/* we use md as a filter, reading from 'in' */
-	BIO_set_md(bmd,md);
+	if (!BIO_set_md(bmd,md))
+		{
+		BIO_printf(bio_err, "Error setting digest %s\n", pname);
+		ERR_print_errors(bio_err);
+		goto end;
+		}
+		
 	inp=BIO_push(bmd,in);
 
 	if (argc == 0)
@@ -369,6 +398,8 @@ end:
 		OPENSSL_free(buf);
 		}
 	if (in != NULL) BIO_free(in);
+	if (passin)
+		OPENSSL_free(passin);
 	BIO_free_all(out);
 	EVP_PKEY_free(sigkey);
 	if(sigbuf) OPENSSL_free(sigbuf);

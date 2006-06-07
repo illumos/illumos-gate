@@ -92,8 +92,8 @@ $SkipFiles = qr{ ^(?:
 	libpsvcpolicy_psr\.so\.1 |	#  "  "
 	libpsvcpolicy\.so\.1 |		#  "  "
 	picl_slm\.so |			#  "  "
-	libcrypto_extra\.so\.0\.9\.7 |	# OpenSSL SUNWcry filter lib
-	libssl_extra\.so\.0\.9\.7 |	# OpenSSL SUNWcry filter lib
+	libcrypto_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
+	libssl_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
 	fcpackage\.so |			# circular dependency on fcthread.so
 	grub
 	)$

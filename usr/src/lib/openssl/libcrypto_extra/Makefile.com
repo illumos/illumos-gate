@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,28 +19,28 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # usr/src/lib/openssl/libcrypto_extra/Makefile.com
 
-LIBRARY= libcrypto_extra.a
+LIBRARY = libcrypto_extra.a
 
-OBJECTS=\
-	sunw.o                                                              \
+OBJECTS = sunw.o							\
 	\
-	aes/aes_cbc.o    aes/aes_cfb.o    aes/aes_core.o   aes/aes_ctr.o    \
-	aes/aes_ecb.o    aes/aes_misc.o   aes/aes_ofb.o                     \
+	aes/aes_cbc.o	aes/aes_cfb.o	aes/aes_core.o	aes/aes_ctr.o	\
+	aes/aes_ecb.o	aes/aes_misc.o	aes/aes_ofb.o			\
 	\
-	bf/bf_skey.o     bf/bf_ecb.o      bf/bf_cfb64.o    bf/bf_ofb64.o    \
+	bf/bf_skey.o	bf/bf_ecb.o	bf/bf_cfb64.o	bf/bf_ofb64.o	\
 	\
-	evp/e_aes.o      evp/e_bf.o       evp/e_rc4.o      evp/c_allc.o     \
+	evp/e_aes.o	evp/e_bf.o	evp/e_rc4.o	evp/c_allc.o	\
+	evp/e_old.o							\
 	\
-	rc4/rc4_enc.o    rc4/rc4_skey.o                                     \
+	rc4/rc4_enc.o	rc4/rc4_skey.o					\
 	\
-	$(BF_ENC) \
+	$(BF_ENC)							\
 	$(RC4_ENC)
 
 
@@ -51,21 +50,21 @@ include ../../Makefile.com
 
 CFLAGS +=	-K PIC -DCRYPTO_UNLIMITED
 CFLAGS64 +=	-K PIC -DCRYPTO_UNLIMITED
-ZDEFS = -znodefs
+ZDEFS =		-znodefs
 
 SONAME =        $(LIBRARY:.a=.so)$(VERS)
 
 LIBS =		$(DYNLIB)
 SRCDIR =	$(OPENSSL_SRC)/crypto
-SRCS=		$(OBJECTS:%.o=$(SRCDIR)/%.c)
+SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-$(LINTLIB):= 	SRCS = $(SRCDIR)/$(LINTSRC)
+$(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
-all: subdirs $(LIBS)
+all:		subdirs $(LIBS)
 
-subdirs: FRC
+subdirs:	FRC
 	@mkdir -p \
 		pics/aes \
 		pics/bf \
@@ -74,7 +73,7 @@ subdirs: FRC
 
 FRC:
 
-pics/%.o: $(SRCDIR)/%.c
+pics/%.o:	$(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

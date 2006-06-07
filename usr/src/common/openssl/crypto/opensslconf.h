@@ -1,3 +1,10 @@
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /* opensslconf.h */
 /* WARNING: Generated automatically from opensslconf.h.in by Configure. */
 
@@ -12,6 +19,14 @@
 # define OPENSSL_NO_EC
 #endif
 
+#ifndef OPENSSL_NO_ECDH
+# define OPENSSL_NO_ECDH
+#endif
+
+#ifndef OPENSSL_NO_ECDSA
+# define OPENSSL_NO_ECDSA
+#endif
+
 #ifndef OPENSSL_NO_MDC2
 # define OPENSSL_NO_MDC2
 #endif
@@ -20,6 +35,12 @@
 # define OPENSSL_NO_IDEA
 #endif
 
+#ifndef OPENSSL_NO_KRB5
+# define OPENSSL_NO_KRB5
+#endif
+#ifndef OPENSSL_NO_GMP
+# define OPENSSL_NO_GMP
+#endif
 #ifndef OPENSSL_NO_RC3
 # define OPENSSL_NO_RC3
 #endif
@@ -30,10 +51,6 @@
 
 #ifndef OPENSSL_NO_HW_CSWIFT
 # define OPENSSL_NO_HW_CSWIFT
-#endif
-
-#ifndef OPENSSL_NO_HW_NCIPHER
-# define OPENSSL_NO_HW_NCIPHER
 #endif
 
 #ifndef OPENSSL_NO_HW_ATALLA
@@ -60,19 +77,18 @@
 # define OPENSSL_NO_HW_4758_CCA
 #endif
 
-#ifndef OPENSSL_DOING_MAKEDEPEND
-
-#ifndef OPENSSL_NO_KRB5
-# define OPENSSL_NO_KRB5
+#ifndef OPENSSL_NO_HW_CHIL
+# define OPENSSL_NO_HW_CHIL
 #endif
-
-#endif /* OPENSSL_DOING_MAKEDEPEND */
-
+#ifndef OPENSSL_NO_HW_GMP
+# define OPENSSL_NO_HW_GMP
+#endif
 /* The OPENSSL_NO_* macros are also defined as NO_* if the application
    asks for it.  This is a transient feature that is provided for those
    who haven't had the time to do the appropriate changes in their
    applications.  */
 #ifdef OPENSSL_ALGORITHM_DEFINES
+/* AES, CAST, RC4 and RIPEMD stuff is here because of Solaris WAN boot */
 # if defined(OPENSSL_NO_AES) && !defined(NO_AES)
 #  define NO_AES
 # endif
@@ -81,6 +97,12 @@
 # endif
 # if defined(OPENSSL_NO_EC) && !defined(NO_EC)
 #  define NO_EC
+# endif
+# if defined(OPENSSL_NO_ECDH) && !defined(NO_ECDH)
+#  define NO_ECDH
+# endif
+# if defined(OPENSSL_NO_ECDSA) && !defined(NO_ECDSA)
+#  define NO_ECDSA
 # endif
 # if defined(OPENSSL_NO_MDC2) && !defined(NO_MDC2)
 #  define NO_MDC2
@@ -100,6 +122,9 @@
 # if defined(OPENSSL_NO_IDEA) && !defined(NO_IDEA)
 #  define NO_IDEA
 # endif
+# if defined(OPENSSL_NO_GMP) && !defined(NO_GMP)
+#  define NO_GMP
+# endif
 # if defined(OPENSSL_NO_KRB5) && !defined(NO_KRB5)
 #  define NO_KRB5
 # endif
@@ -112,6 +137,7 @@
 
 #if !(defined(VMS) || defined(__VMS)) /* VMS uses logical names instead */
 #if defined(HEADER_CRYPTLIB_H) && !defined(OPENSSLDIR)
+#define ENGINESDIR "/usr/local/ssl/lib/engines"
 #define OPENSSLDIR "/usr/local/ssl"
 #endif
 #endif
@@ -278,3 +304,9 @@ YOU SHOULD NOT HAVE BOTH DES_RISC1 AND DES_RISC2 DEFINED!!!!!
 
 #endif /* DES_DEFAULT_OPTIONS */
 #endif /* HEADER_DES_LOCL_H */
+
+#ifndef  _BOOT
+#ifndef OPENSSL_THREADS
+# define OPENSSL_THREADS
+#endif
+#endif

@@ -103,6 +103,11 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  * ====================================================================
  */
+/* ====================================================================
+ * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
+ * ECC cipher suite support in OpenSSL originally developed by 
+ * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
+ */
 
 #include <stdio.h>
 
@@ -111,23 +116,15 @@
 # include <sys/types.h>
 #endif
 
-#if !defined(OPENSSL_SYS_WIN32) && !defined(OPENSSL_SYS_VMS) && !defined(NeXT) && !defined(MAC_OS_pre_X)
-#include <dirent.h>
-#endif
-
-#if defined(WIN32)
-#include <windows.h>
-#endif
-
-#ifdef NeXT
-#include <sys/dir.h>
-#define dirent direct
-#endif
-
+#include "o_dir.h"
 #include <openssl/objects.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#ifndef OPENSSL_NO_DH
+#include <openssl/dh.h>
+#endif
+#include <openssl/bn.h>
 #include "ssl_locl.h"
 
 int SSL_get_ex_data_X509_STORE_CTX_idx(void)
@@ -203,7 +200,6 @@ CERT *ssl_cert_dup(CERT *cert)
 #ifndef OPENSSL_NO_DH
 	if (cert->dh_tmp != NULL)
 		{
-		/* DH parameters don't have a reference count */
 		ret->dh_tmp = DHparams_dup(cert->dh_tmp);
 		if (ret->dh_tmp == NULL)
 			{
@@ -232,6 +228,19 @@ CERT *ssl_cert_dup(CERT *cert)
 			}
 		}
 	ret->dh_tmp_cb = cert->dh_tmp_cb;
+#endif
+
+#ifndef OPENSSL_NO_ECDH
+	if (cert->ecdh_tmp)
+		{
+		ret->ecdh_tmp = EC_KEY_dup(cert->ecdh_tmp);
+		if (ret->ecdh_tmp == NULL)
+			{
+			SSLerr(SSL_F_SSL_CERT_DUP, ERR_R_EC_LIB);
+			goto err;
+			}
+		}
+	ret->ecdh_tmp_cb = cert->ecdh_tmp_cb;
 #endif
 
 	for (i = 0; i < SSL_PKEY_NUM; i++)
@@ -268,7 +277,11 @@ CERT *ssl_cert_dup(CERT *cert)
 			case SSL_PKEY_DH_DSA:
 				/* We have a DH key. */
 				break;
-				
+
+			case SSL_PKEY_ECC:
+				/* We have an ECC key */
+				break;
+
 			default:
 				/* Can't happen. */
 				SSLerr(SSL_F_SSL_CERT_DUP, SSL_R_LIBRARY_BUG);
@@ -293,6 +306,10 @@ err:
 #ifndef OPENSSL_NO_DH
 	if (ret->dh_tmp != NULL)
 		DH_free(ret->dh_tmp);
+#endif
+#ifndef OPENSSL_NO_ECDH
+	if (ret->ecdh_tmp != NULL)
+		EC_KEY_free(ret->ecdh_tmp);
 #endif
 
 	for (i = 0; i < SSL_PKEY_NUM; i++)
@@ -332,6 +349,9 @@ void ssl_cert_free(CERT *c)
 #endif
 #ifndef OPENSSL_NO_DH
 	if (c->dh_tmp) DH_free(c->dh_tmp);
+#endif
+#ifndef OPENSSL_NO_ECDH
+	if (c->ecdh_tmp) EC_KEY_free(c->ecdh_tmp);
 #endif
 
 	for (i=0; i<SSL_PKEY_NUM; i++)
@@ -439,6 +459,10 @@ void ssl_sess_cert_free(SESS_CERT *sc)
 	if (sc->peer_dh_tmp != NULL)
 		DH_free(sc->peer_dh_tmp);
 #endif
+#ifndef OPENSSL_NO_ECDH
+	if (sc->peer_ecdh_tmp != NULL)
+		EC_KEY_free(sc->peer_ecdh_tmp);
+#endif
 
 	OPENSSL_free(sc);
 	}
@@ -464,20 +488,22 @@ int ssl_verify_cert_chain(SSL *s,STACK_OF(X509) *sk)
 		SSLerr(SSL_F_SSL_VERIFY_CERT_CHAIN,ERR_R_X509_LIB);
 		return(0);
 		}
+	if (s->param)
+		X509_VERIFY_PARAM_inherit(X509_STORE_CTX_get0_param(&ctx),
+						s->param);
+#if 0
 	if (SSL_get_verify_depth(s) >= 0)
 		X509_STORE_CTX_set_depth(&ctx, SSL_get_verify_depth(s));
+#endif
 	X509_STORE_CTX_set_ex_data(&ctx,SSL_get_ex_data_X509_STORE_CTX_idx(),s);
 
-	/* We need to set the verify purpose. The purpose can be determined by
+	/* We need to inherit the verify parameters. These can be determined by
 	 * the context: if its a server it will verify SSL client certificates
 	 * or vice versa.
 	 */
-	if (s->server)
-		i = X509_PURPOSE_SSL_CLIENT;
-	else
-		i = X509_PURPOSE_SSL_SERVER;
 
-	X509_STORE_CTX_purpose_inherit(&ctx, i, s->purpose, s->trust);
+	X509_STORE_CTX_set_default(&ctx,
+				s->server ? "ssl_client" : "ssl_server");
 
 	if (s->verify_callback)
 		X509_STORE_CTX_set_verify_cb(&ctx, s->verify_callback);
@@ -542,12 +568,12 @@ void SSL_CTX_set_client_CA_list(SSL_CTX *ctx,STACK_OF(X509_NAME) *name_list)
 	set_client_CA_list(&(ctx->client_CA),name_list);
 	}
 
-STACK_OF(X509_NAME) *SSL_CTX_get_client_CA_list(SSL_CTX *ctx)
+STACK_OF(X509_NAME) *SSL_CTX_get_client_CA_list(const SSL_CTX *ctx)
 	{
 	return(ctx->client_CA);
 	}
 
-STACK_OF(X509_NAME) *SSL_get_client_CA_list(SSL *s)
+STACK_OF(X509_NAME) *SSL_get_client_CA_list(const SSL *s)
 	{
 	if (s->type == SSL_ST_CONNECT)
 		{ /* we are in the client */
@@ -614,14 +640,13 @@ STACK_OF(X509_NAME) *SSL_load_client_CA_file(const char *file)
 	BIO *in;
 	X509 *x=NULL;
 	X509_NAME *xn=NULL;
-	STACK_OF(X509_NAME) *ret,*sk;
+	STACK_OF(X509_NAME) *ret = NULL,*sk;
 
-	ret=sk_X509_NAME_new_null();
 	sk=sk_X509_NAME_new(xname_cmp);
 
 	in=BIO_new(BIO_s_file_internal());
 
-	if ((ret == NULL) || (sk == NULL) || (in == NULL))
+	if ((sk == NULL) || (in == NULL))
 		{
 		SSLerr(SSL_F_SSL_LOAD_CLIENT_CA_FILE,ERR_R_MALLOC_FAILURE);
 		goto err;
@@ -634,6 +659,15 @@ STACK_OF(X509_NAME) *SSL_load_client_CA_file(const char *file)
 		{
 		if (PEM_read_bio_X509(in,&x,NULL,NULL) == NULL)
 			break;
+		if (ret == NULL)
+			{
+			ret = sk_X509_NAME_new_null();
+			if (ret == NULL)
+				{
+				SSLerr(SSL_F_SSL_LOAD_CLIENT_CA_FILE,ERR_R_MALLOC_FAILURE);
+				goto err;
+				}
+			}
 		if ((xn=X509_get_subject_name(x)) == NULL) goto err;
 		/* check for duplicates */
 		xn=X509_NAME_dup(xn);
@@ -656,6 +690,8 @@ err:
 	if (sk != NULL) sk_X509_NAME_free(sk);
 	if (in != NULL) BIO_free(in);
 	if (x != NULL) X509_free(x);
+	if (ret != NULL)
+		ERR_clear_error();
 	return(ret);
 	}
 #endif
@@ -730,131 +766,52 @@ err:
  * certs may have been added to \c stack.
  */
 
-#ifndef OPENSSL_SYS_WIN32
-#ifndef OPENSSL_SYS_VMS		/* XXXX This may be fixed in the future */
-#ifndef OPENSSL_SYS_MACINTOSH_CLASSIC /* XXXXX: Better scheme needed! */
-
 int SSL_add_dir_cert_subjects_to_stack(STACK_OF(X509_NAME) *stack,
 				       const char *dir)
 	{
-	DIR *d;
-	struct dirent *dstruct;
+	OPENSSL_DIR_CTX *d = NULL;
+	const char *filename;
 	int ret = 0;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_READDIR);
-	d = opendir(dir);
 
 	/* Note that a side effect is that the CAs will be sorted by name */
-	if(!d)
+
+	while((filename = OPENSSL_DIR_read(&d, dir)))
+		{
+		char buf[1024];
+		int r;
+
+		if(strlen(dir)+strlen(filename)+2 > sizeof buf)
+			{
+			SSLerr(SSL_F_SSL_ADD_DIR_CERT_SUBJECTS_TO_STACK,SSL_R_PATH_TOO_LONG);
+			goto err;
+			}
+
+#ifdef OPENSSL_SYS_VMS
+		r = BIO_snprintf(buf,sizeof buf,"%s%s",dir,filename);
+#else
+		r = BIO_snprintf(buf,sizeof buf,"%s/%s",dir,filename);
+#endif
+		if (r <= 0 || r >= (int)sizeof(buf))
+			goto err;
+		if(!SSL_add_file_cert_subjects_to_stack(stack,buf))
+			goto err;
+		}
+
+	if (errno)
 		{
 		SYSerr(SYS_F_OPENDIR, get_last_sys_error());
-		ERR_add_error_data(3, "opendir('", dir, "')");
+		ERR_add_error_data(3, "OPENSSL_DIR_read(&ctx, '", dir, "')");
 		SSLerr(SSL_F_SSL_ADD_DIR_CERT_SUBJECTS_TO_STACK, ERR_R_SYS_LIB);
 		goto err;
 		}
-	
-	while((dstruct=readdir(d)))
-		{
-		char buf[1024];
-		int r;
-		
-		if(strlen(dir)+strlen(dstruct->d_name)+2 > sizeof buf)
-			{
-			SSLerr(SSL_F_SSL_ADD_DIR_CERT_SUBJECTS_TO_STACK,SSL_R_PATH_TOO_LONG);
-			goto err;
-			}
-		
-		r = BIO_snprintf(buf,sizeof buf,"%s/%s",dir,dstruct->d_name);
-		if (r <= 0 || r >= sizeof buf)
-			goto err;
-		if(!SSL_add_file_cert_subjects_to_stack(stack,buf))
-			goto err;
-		}
+
 	ret = 1;
 
-err:	
-	if (d) closedir(d);
+err:
+	if (d) OPENSSL_DIR_end(&d);
 	CRYPTO_w_unlock(CRYPTO_LOCK_READDIR);
 	return ret;
 	}
 
-#endif
-#endif
-
-#else /* OPENSSL_SYS_WIN32 */
-
-int SSL_add_dir_cert_subjects_to_stack(STACK_OF(X509_NAME) *stack,
-				       const char *dir)
-	{
-	WIN32_FIND_DATA FindFileData;
-	HANDLE hFind;
-	int ret = 0;
-#ifdef OPENSSL_SYS_WINCE
-	WCHAR* wdir = NULL;
-#endif
-
-	CRYPTO_w_lock(CRYPTO_LOCK_READDIR);
-	
-#ifdef OPENSSL_SYS_WINCE
-	/* convert strings to UNICODE */
-	{
-		BOOL result = FALSE;
-		int i;
-		wdir = malloc((strlen(dir)+1)*2);
-		if (wdir == NULL)
-			goto err_noclose;
-		for (i=0; i<(int)strlen(dir)+1; i++)
-			wdir[i] = (short)dir[i];
-	}
-#endif
-
-#ifdef OPENSSL_SYS_WINCE
-	hFind = FindFirstFile(wdir, &FindFileData);
-#else
-	hFind = FindFirstFile(dir, &FindFileData);
-#endif
-	/* Note that a side effect is that the CAs will be sorted by name */
-	if(hFind == INVALID_HANDLE_VALUE)
-		{
-		SYSerr(SYS_F_OPENDIR, get_last_sys_error());
-		ERR_add_error_data(3, "opendir('", dir, "')");
-		SSLerr(SSL_F_SSL_ADD_DIR_CERT_SUBJECTS_TO_STACK, ERR_R_SYS_LIB);
-		goto err_noclose;
-		}
-	
-	do 
-		{
-		char buf[1024];
-		int r;
-		
-#ifdef OPENSSL_SYS_WINCE
-		if(strlen(dir)+_tcslen(FindFileData.cFileName)+2 > sizeof buf)
-#else
-		if(strlen(dir)+strlen(FindFileData.cFileName)+2 > sizeof buf)
-#endif
-			{
-			SSLerr(SSL_F_SSL_ADD_DIR_CERT_SUBJECTS_TO_STACK,SSL_R_PATH_TOO_LONG);
-			goto err;
-			}
-		
-		r = BIO_snprintf(buf,sizeof buf,"%s/%s",dir,FindFileData.cFileName);
-		if (r <= 0 || r >= sizeof buf)
-			goto err;
-		if(!SSL_add_file_cert_subjects_to_stack(stack,buf))
-			goto err;
-		}
-	while (FindNextFile(hFind, &FindFileData) != FALSE);
-	ret = 1;
-
-err:	
-	FindClose(hFind);
-err_noclose:
-#ifdef OPENSSL_SYS_WINCE
-	if (wdir != NULL)
-		free(wdir);
-#endif
-	CRYPTO_w_unlock(CRYPTO_LOCK_READDIR);
-	return ret;
-	}
-
-#endif

@@ -160,12 +160,12 @@
 				} \
 			}
 
-#if defined(OPENSSL_SYS_WIN32) && defined(_MSC_VER)
+#if (defined(OPENSSL_SYS_WIN32) && defined(_MSC_VER)) || defined(__ICC)
 #define	ROTATE(a,n)	(_lrotr(a,n))
 #elif defined(__GNUC__) && __GNUC__>=2 && !defined(__STRICT_ANSI__) && !defined(OPENSSL_NO_ASM) && !defined(OPENSSL_NO_INLINE_ASM) && !defined(PEDANTIC)
 # if defined(__i386) || defined(__i386__) || defined(__x86_64) || defined(__x86_64__)
 #  define ROTATE(a,n)	({ register unsigned int ret;	\
-				asm ("rorl %1,%0"	\
+				__asm__ ("rorl %1,%0"	\
 					: "=r"(ret)	\
 					: "I"(n),"0"(a)	\
 					: "cc");	\
@@ -421,7 +421,7 @@
 	PERM_OP(l,r,tt, 4,0x0f0f0f0fL); \
 	}
 
-OPENSSL_EXTERN const DES_LONG DES_SPtrans[8][64];
+extern const DES_LONG DES_SPtrans[8][64];
 
 void fcrypt_body(DES_LONG *out,DES_key_schedule *ks,
 		 DES_LONG Eswap0, DES_LONG Eswap1);

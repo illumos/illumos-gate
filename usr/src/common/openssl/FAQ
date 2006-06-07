@@ -46,12 +46,15 @@ OpenSSL  -  Frequently Asked Questions
 * Why does the OpenSSL test suite fail on MacOS X?
 * Why does the OpenSSL test suite fail in BN_sqr test [on a 64-bit platform]?
 * Why does OpenBSD-i386 build fail on des-586.s with "Unimplemented segment type"?
+* Why does the OpenSSL test suite fail in sha512t on x86 CPU?
+* Why does compiler fail to compile sha512.c?
 
 [PROG] Questions about programming with OpenSSL
 
 * Is OpenSSL thread-safe?
 * I've compiled a program under Windows and it crashes: why?
 * How do I read or write a DER encoded buffer using the ASN1 functions?
+* OpenSSL uses DER but I need BER format: does OpenSSL support BER?
 * I've tried using <M_some_evil_pkcs12_macro> and I get errors why?
 * I've called <some function> and it fails, why?
 * I just get a load of numbers for the error output, what do they mean?
@@ -60,6 +63,7 @@ OpenSSL  -  Frequently Asked Questions
 * Can I use OpenSSL's SSL library with non-blocking I/O?
 * Why doesn't my server application receive a client certificate?
 * Why does compilation fail due to an undefined symbol NID_uniqueIdentifier?
+* I think I've detected a memory leak, is this a bug?
 
 ===============================================================================
 
@@ -68,7 +72,7 @@ OpenSSL  -  Frequently Asked Questions
 * Which is the current version of OpenSSL?
 
 The current version is available from <URL: http://www.openssl.org>.
-OpenSSL 0.9.7d was released on March 17, 2004.
+OpenSSL 0.9.8a was released on October 11th, 2005.
 
 In addition to the current stable release, you can also access daily
 snapshots of the OpenSSL development version at <URL:
@@ -139,8 +143,8 @@ less Unix-centric, it might have been used much earlier.
 
 With version 0.9.6 OpenSSL was extended to interface to external crypto
 hardware. This was realized in a special release '0.9.6-engine'. With
-version 0.9.7 (not yet released) the changes were merged into the main
-development line, so that the special release is no longer necessary.
+version 0.9.7 the changes were merged into the main development line,
+so that the special release is no longer necessary.
 
 * How do I check the authenticity of the OpenSSL distribution?
 
@@ -150,7 +154,8 @@ Use MD5 to check that a tarball from a mirror site is identical:
    md5sum TARBALL | awk '{print $1;}' | cmp - TARBALL.md5
 
 You can check authenticity using pgp or gpg. You need the OpenSSL team
-member public key used to sign it (download it from a key server). Then
+member public key used to sign it (download it from a key server, see a
+list of keys at <URL: http://www.openssl.org/about/>). Then
 just do:
 
    pgp TARBALL.asc
@@ -164,8 +169,8 @@ you if you want to use OpenSSL.  For information on intellectual
 property rights, please consult a lawyer.  The OpenSSL team does not
 offer legal advice.
 
-You can configure OpenSSL so as not to use RC5 and IDEA by using
- ./config no-rc5 no-idea
+You can configure OpenSSL so as not to use IDEA, MDC2 and RC5 by using
+ ./config no-idea no-mdc2 no-rc5
 
 
 * Can I use OpenSSL with GPL software?
@@ -470,6 +475,10 @@ This will only compile sha_dgst.c with -O0, the rest with the optimization
 level chosen by the configuration process.  When the above is done, do the
 test and installation and you're set.
 
+3. Reconfigure the toolkit with no-sha0 option to leave out SHA0. It 
+should not be used and is not used in SSL/TLS nor any other recognized
+protocol in either case.
+
 
 * Why does the OpenSSL compilation fail with "ar: command not found"?
 
@@ -591,6 +600,23 @@ Reportedly elder *BSD a.out platforms also suffer from this problem and
 remedy should be same. Provided binary is statically linked and should be
 working across wider range of *BSD branches, not just OpenBSD.
 
+* Why does the OpenSSL test suite fail in sha512t on x86 CPU?
+
+If the test program in question fails withs SIGILL, Illegal Instruction
+exception, then you more than likely to run SSE2-capable CPU, such as
+Intel P4, under control of kernel which does not support SSE2
+instruction extentions. See accompanying INSTALL file and
+OPENSSL_ia32cap(3) documentation page for further information.
+
+* Why does compiler fail to compile sha512.c?
+
+OpenSSL SHA-512 implementation depends on compiler support for 64-bit
+integer type. Few elder compilers [ULTRIX cc, SCO compiler to mention a
+couple] lack support for this and therefore are incapable of compiling
+the module in question. The recommendation is to disable SHA-512 by
+adding no-sha512 to ./config [or ./Configure] command line. Another
+possible alternative might be to switch to GCC.
+
 [PROG] ========================================================================
 
 * Is OpenSSL thread-safe?
@@ -645,30 +671,41 @@ by:
 Note that debug and release libraries are NOT interchangeable.  If you
 built OpenSSL with /MD your application must use /MD and cannot use /MDd.
 
+As per 0.9.8 the above limitation is eliminated for .DLLs. OpenSSL
+.DLLs compiled with some specific run-time option [we recommend the
+default /MD] can be deployed with application compiled with different
+option or even different compiler. But there is a catch! Instead of
+re-compiling OpenSSL toolkit, as you would have to with prior versions,
+you have to compile small C snippet with compiler and/or options of
+your choice. The snippet gets installed as
+<install-root>/include/openssl/applink.c and should be either added to
+your project or simply #include-d in one [and only one] of your source
+files. Failure to do either manifests itself as fatal "no
+OPENSSL_Applink" error.
 
 * How do I read or write a DER encoded buffer using the ASN1 functions?
 
 You have two options. You can either use a memory BIO in conjunction
-with the i2d_XXX_bio() or d2i_XXX_bio() functions or you can use the
-i2d_XXX(), d2i_XXX() functions directly. Since these are often the
+with the i2d_*_bio() or d2i_*_bio() functions or you can use the
+i2d_*(), d2i_*() functions directly. Since these are often the
 cause of grief here are some code fragments using PKCS7 as an example:
 
-unsigned char *buf, *p;
-int len;
+ unsigned char *buf, *p;
+ int len;
 
-len = i2d_PKCS7(p7, NULL);
-buf = OPENSSL_malloc(len); /* or Malloc, error checking omitted */
-p = buf;
-i2d_PKCS7(p7, &p);
+ len = i2d_PKCS7(p7, NULL);
+ buf = OPENSSL_malloc(len); /* or Malloc, error checking omitted */
+ p = buf;
+ i2d_PKCS7(p7, &p);
 
 At this point buf contains the len bytes of the DER encoding of
 p7.
 
 The opposite assumes we already have len bytes in buf:
 
-unsigned char *p;
-p = buf;
-p7 = d2i_PKCS7(NULL, &p, len);
+ unsigned char *p;
+ p = buf;
+ p7 = d2i_PKCS7(NULL, &p, len);
 
 At this point p7 contains a valid PKCS7 structure of NULL if an error
 occurred. If an error occurred ERR_print_errors(bio) should give more
@@ -681,6 +718,20 @@ variable the buffer pointer is changed to point just after the data
 that has been read or written. This may well be uninitialized data
 and attempts to free the buffer will have unpredictable results
 because it no longer points to the same address.
+
+
+* OpenSSL uses DER but I need BER format: does OpenSSL support BER?
+
+The short answer is yes, because DER is a special case of BER and OpenSSL
+ASN1 decoders can process BER.
+
+The longer answer is that ASN1 structures can be encoded in a number of
+different ways. One set of ways is the Basic Encoding Rules (BER) with various
+permissible encodings. A restriction of BER is the Distinguished Encoding
+Rules (DER): these uniquely specify how a given structure is encoded.
+
+Therefore, because DER is a special case of BER, DER is an acceptable encoding
+for BER.
 
 
 * I've tried using <M_some_evil_pkcs12_macro> and I get errors why?
@@ -763,6 +814,29 @@ For OpenSSL 0.9.7 the OID table was extended and corrected. In earlier
 versions, uniqueIdentifier was incorrectly used for X.509 certificates.
 The correct name according to RFC2256 (LDAP) is x500UniqueIdentifier.
 Change your code to use the new name when compiling against OpenSSL 0.9.7.
+
+
+* I think I've detected a memory leak, is this a bug?
+
+In most cases the cause of an apparent memory leak is an OpenSSL internal table
+that is allocated when an application starts up. Since such tables do not grow
+in size over time they are harmless.
+
+These internal tables can be freed up when an application closes using various
+functions.  Currently these include following:
+
+Thread-local cleanup functions:
+
+  ERR_remove_state()
+
+Application-global cleanup functions that are aware of usage (and therefore
+thread-safe):
+
+  ENGINE_cleanup() and CONF_modules_unload()
+
+"Brutal" (thread-unsafe) Application-global cleanup functions:
+
+  ERR_free_strings(), EVP_cleanup() and CRYPTO_cleanup_all_ex_data().
 
 
 ===============================================================================

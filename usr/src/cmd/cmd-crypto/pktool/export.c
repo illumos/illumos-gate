@@ -1051,8 +1051,8 @@ cvt_cert2x509(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, X509 **c)
 
 	/* Subject name (required) */
 	cryptodebug("calling d2i_X509_NAME for subject name");
-	if ((ssl_subject = d2i_X509_NAME(NULL, &subject, subject_len)) ==
-	    NULL) {
+	if ((ssl_subject = d2i_X509_NAME(NULL,
+	    (const unsigned char **) &subject, subject_len)) == NULL) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Unable to convert certificate subject name."));
 		return (CKR_GENERAL_ERROR);
@@ -1076,7 +1076,8 @@ cvt_cert2x509(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, X509 **c)
 
 	/* Issuer name (optional) */
 	cryptodebug("calling d2i_X509_NAME for issuer name");
-	if ((ssl_issuer = d2i_X509_NAME(NULL, &issuer, issuer_len)) == NULL) {
+	if ((ssl_issuer = d2i_X509_NAME(NULL, (const unsigned char **) &issuer,
+	    issuer_len)) == NULL) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Unable to convert certificate issuer name."));
 		return (CKR_GENERAL_ERROR);
@@ -1117,7 +1118,8 @@ cvt_cert2x509(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj, X509 **c)
 	 * if we started with CKA_VALUE that was saved originally.
 	 */
 	cryptodebug("calling d2i_X509 for cert value");
-	if ((temp_cert = d2i_X509(NULL, &value, value_len)) == NULL) {
+	if ((temp_cert = d2i_X509(NULL, (const unsigned char **) &value,
+	    value_len)) == NULL) {
 		cryptoerror(LOG_STDERR, gettext(
 		    "Unable to convert main certificate values."));
 		return (CKR_GENERAL_ERROR);

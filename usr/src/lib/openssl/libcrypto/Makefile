@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +34,7 @@ HDRS= \
 	asn1_mac.h \
 	asn1t.h \
 	bio.h \
+	bio_lcl.h \
 	blowfish.h \
 	bn.h \
 	buffer.h \
@@ -50,6 +50,10 @@ HDRS= \
 	dso.h \
 	ebcdic.h \
 	ec.h \
+	ecdh.h \
+	ecdsa.h \
+	ech_locl.h \
+	ecs_locl.h \
 	engine.h \
 	err.h \
 	evp.h \
@@ -61,25 +65,32 @@ HDRS= \
 	md4.h \
 	md5.h \
 	mdc2.h \
+	o_dir.h \
+	o_str.h \
 	obj_mac.h \
 	objects.h \
 	ocsp.h \
 	opensslconf.h \
 	opensslv.h \
 	ossl_typ.h \
+	pcy_int.h \
 	pem.h \
 	pem2.h \
-	pkcs7.h \
 	pkcs12.h \
+	pkcs7.h \
+	pq_compat.h \
+	pqueue.h \
 	rand.h \
 	rc2.h \
 	rc4.h \
 	rc5.h \
 	ripemd.h \
 	rsa.h \
+	safestack.h \
 	sha.h \
 	stack.h \
-	safestack.h \
+	store.h \
+	str_locl.h \
 	symhacks.h \
 	tmdiff.h \
 	txt_db.h \
@@ -89,10 +100,11 @@ HDRS= \
 	x509_vfy.h \
 	x509v3.h
 
-HDRDIR=		$(OPENSSL_SRC)/crypto
-ROOTHDRDIR=	$(ROOTSFWINCLUDE)/openssl
 
-SUBDIRS=	$(MACH)
+HDRDIR =	$(OPENSSL_SRC)/crypto
+ROOTHDRDIR =	$(ROOTSFWINCLUDE)/openssl
+
+SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
@@ -157,6 +169,12 @@ $(ROOTHDRDIR)/%: $(HDRDIR)/dso/%
 $(ROOTHDRDIR)/%: $(HDRDIR)/ec/%
 	 $(INS.file)
 
+$(ROOTHDRDIR)/%: $(HDRDIR)/ecdh/%
+	 $(INS.file)
+
+$(ROOTHDRDIR)/%: $(HDRDIR)/ecdsa/%
+	 $(INS.file)
+
 $(ROOTHDRDIR)/%: $(HDRDIR)/engine/%
 	 $(INS.file)
 
@@ -205,6 +223,9 @@ $(ROOTHDRDIR)/%: $(HDRDIR)/pkcs12/%
 $(ROOTHDRDIR)/%: $(HDRDIR)/pkcs7/%
 	 $(INS.file)
 
+$(ROOTHDRDIR)/%: $(HDRDIR)/pqueue/%
+	 $(INS.file)
+
 $(ROOTHDRDIR)/%: $(HDRDIR)/rand/%
 	 $(INS.file)
 
@@ -227,6 +248,9 @@ $(ROOTHDRDIR)/%: $(HDRDIR)/sha/%
 	 $(INS.file)
 
 $(ROOTHDRDIR)/%: $(HDRDIR)/stack/%
+	 $(INS.file)
+
+$(ROOTHDRDIR)/%: $(HDRDIR)/store/%
 	 $(INS.file)
 
 $(ROOTHDRDIR)/%: $(HDRDIR)/txt_db/%

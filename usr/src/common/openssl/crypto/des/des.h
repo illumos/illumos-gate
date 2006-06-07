@@ -59,12 +59,12 @@
 #ifndef HEADER_NEW_DES_H
 #define HEADER_NEW_DES_H
 
+#include <openssl/e_os2.h>	/* OPENSSL_EXTERN, OPENSSL_NO_DES,
+				   DES_LONG (via openssl/opensslconf.h */
+
 #ifdef OPENSSL_NO_DES
 #error DES is disabled.
 #endif
-
-#include <openssl/opensslconf.h> /* DES_LONG */
-#include <openssl/e_os2.h>	/* OPENSSL_EXTERN */
 
 #ifdef OPENSSL_BUILD_SHLIBCRYPTO
 # undef OPENSSL_EXTERN
@@ -187,6 +187,10 @@ void DES_ede3_cfb64_encrypt(const unsigned char *in,unsigned char *out,
 			    long length,DES_key_schedule *ks1,
 			    DES_key_schedule *ks2,DES_key_schedule *ks3,
 			    DES_cblock *ivec,int *num,int enc);
+void DES_ede3_cfb_encrypt(const unsigned char *in,unsigned char *out,
+			  int numbits,long length,DES_key_schedule *ks1,
+			  DES_key_schedule *ks2,DES_key_schedule *ks3,
+			  DES_cblock *ivec,int enc);
 void DES_ede3_ofb64_encrypt(const unsigned char *in,unsigned char *out,
 			    long length,DES_key_schedule *ks1,
 			    DES_key_schedule *ks2,DES_key_schedule *ks3,

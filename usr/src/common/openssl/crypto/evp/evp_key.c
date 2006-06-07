@@ -56,6 +56,13 @@
  * [including the GNU Public Licence.]
  */
 
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <stdio.h>
 #include "cryptlib.h"
 #include <openssl/x509.h>
@@ -66,7 +73,7 @@
 /* should be init to zeros. */
 static char prompt_string[80];
 
-void EVP_set_pw_prompt(char *prompt)
+void EVP_set_pw_prompt(const char *prompt)
 	{
 	if (prompt == NULL)
 		prompt_string[0]='\0';
@@ -85,7 +92,7 @@ char *EVP_get_pw_prompt(void)
 		return(prompt_string);
 	}
 
-#ifndef			_BOOT
+#ifndef	_BOOT
 /* For historical reasons, the standard function for reading passwords is
  * in the DES library -- if someone ever wants to disable DES,
  * this function will fail */

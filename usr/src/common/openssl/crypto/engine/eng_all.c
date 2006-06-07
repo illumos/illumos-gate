@@ -57,13 +57,13 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <openssl/err.h>
-#include <openssl/engine.h>
+#include "cryptlib.h"
 #include "eng_int.h"
 
 void ENGINE_load_builtin_engines(void)
@@ -83,37 +83,45 @@ void ENGINE_load_builtin_engines(void)
 #ifndef	SOLARIS_OPENSSL
 	ENGINE_load_dynamic();
 #endif
+#ifndef OPENSSL_NO_STATIC_ENGINE
 #ifndef OPENSSL_NO_HW
-#ifndef OPENSSL_NO_HW_CSWIFT
-	ENGINE_load_cswift();
-#endif
-#ifndef OPENSSL_NO_HW_NCIPHER
-	ENGINE_load_chil();
-#endif
-#ifndef OPENSSL_NO_HW_ATALLA
-	ENGINE_load_atalla();
-#endif
-#ifndef OPENSSL_NO_HW_NURON
-	ENGINE_load_nuron();
-#endif
-#ifndef OPENSSL_NO_HW_UBSEC
-	ENGINE_load_ubsec();
+#ifndef OPENSSL_NO_HW_4758_CCA
+	ENGINE_load_4758cca();
 #endif
 #ifndef OPENSSL_NO_HW_AEP
 	ENGINE_load_aep();
 #endif
+#ifndef OPENSSL_NO_HW_ATALLA
+	ENGINE_load_atalla();
+#endif
+#ifndef OPENSSL_NO_HW_CSWIFT
+	ENGINE_load_cswift();
+#endif
+#ifndef OPENSSL_NO_HW_CHIL
+	ENGINE_load_chil();
+#endif
+#ifndef OPENSSL_NO_HW_NURON
+	ENGINE_load_nuron();
+#endif
 #ifndef OPENSSL_NO_HW_SUREWARE
 	ENGINE_load_sureware();
 #endif
-#ifndef OPENSSL_NO_HW_4758_CCA
-	ENGINE_load_4758cca();
+#ifndef OPENSSL_NO_HW_UBSEC
+	ENGINE_load_ubsec();
+#endif
+#ifndef OPENSSL_NO_HW_PADLOCK
+	ENGINE_load_padlock();
+#endif
 #endif
 #if defined(__OpenBSD__) || defined(__FreeBSD__)
 	ENGINE_load_cryptodev();
 #endif
+#if !defined(OPENSSL_NO_GMP) && !defined(OPENSSL_NO_HW_GMP)
+	ENGINE_load_gmp();
 #endif
 #ifndef	OPENSSL_NO_HW_PKCS11
 	ENGINE_load_pk11();
+#endif
 #endif
 	}
 

@@ -60,6 +60,7 @@
 #include "cryptlib.h"
 #include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
@@ -116,7 +117,7 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *imp
 			{
 			if (!ENGINE_init(impl))
 				{
-				EVPerr(EVP_F_EVP_CIPHERINIT, EVP_R_INITIALIZATION_ERROR);
+				EVPerr(EVP_F_EVP_CIPHERINIT_EX, EVP_R_INITIALIZATION_ERROR);
 				return 0;
 				}
 			}
@@ -133,7 +134,7 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *imp
 				 * control history, is that we should at least
 				 * be able to avoid using US mispellings of
 				 * "initialisation"? */
-				EVPerr(EVP_F_EVP_CIPHERINIT, EVP_R_INITIALIZATION_ERROR);
+				EVPerr(EVP_F_EVP_CIPHERINIT_EX, EVP_R_INITIALIZATION_ERROR);
 				return 0;
 				}
 			/* We'll use the ENGINE's private cipher definition */
@@ -153,7 +154,7 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *imp
 			ctx->cipher_data=OPENSSL_malloc(ctx->cipher->ctx_size);
 			if (!ctx->cipher_data)
 				{
-				EVPerr(EVP_F_EVP_CIPHERINIT, ERR_R_MALLOC_FAILURE);
+				EVPerr(EVP_F_EVP_CIPHERINIT_EX, ERR_R_MALLOC_FAILURE);
 				return 0;
 				}
 			}
@@ -167,14 +168,14 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *imp
 			{
 			if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_INIT, 0, NULL))
 				{
-				EVPerr(EVP_F_EVP_CIPHERINIT, EVP_R_INITIALIZATION_ERROR);
+				EVPerr(EVP_F_EVP_CIPHERINIT_EX, EVP_R_INITIALIZATION_ERROR);
 				return 0;
 				}
 			}
 		}
 	else if(!ctx->cipher)
 		{
-		EVPerr(EVP_F_EVP_CIPHERINIT, EVP_R_NO_CIPHER_SET);
+		EVPerr(EVP_F_EVP_CIPHERINIT_EX, EVP_R_NO_CIPHER_SET);
 		return 0;
 		}
 #ifndef OPENSSL_NO_ENGINE
@@ -199,7 +200,8 @@ skip_to_init:
 
 			case EVP_CIPH_CBC_MODE:
 
-			OPENSSL_assert(EVP_CIPHER_CTX_iv_length(ctx) <= sizeof ctx->iv);
+			OPENSSL_assert(EVP_CIPHER_CTX_iv_length(ctx) <=
+					(int)sizeof(ctx->iv));
 			if(iv) memcpy(ctx->oiv, iv, EVP_CIPHER_CTX_iv_length(ctx));
 			memcpy(ctx->iv, ctx->oiv, EVP_CIPHER_CTX_iv_length(ctx));
 			break;
@@ -286,7 +288,7 @@ int EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
 		}
 	i=ctx->buf_len;
 	bl=ctx->cipher->block_size;
-	OPENSSL_assert(bl <= sizeof ctx->buf);
+	OPENSSL_assert(bl <= (int)sizeof(ctx->buf));
 	if (i != 0)
 		{
 		if (i+inl < bl)
@@ -332,7 +334,8 @@ int EVP_EncryptFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
 int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 	{
-	int i,n,b,bl,ret;
+	int n,ret;
+	unsigned int i, b, bl;
 
 	b=ctx->cipher->block_size;
 	OPENSSL_assert(b <= sizeof ctx->buf);
@@ -346,7 +349,7 @@ int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 		{
 		if(bl)
 			{
-			EVPerr(EVP_F_EVP_ENCRYPTFINAL,EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH);
+			EVPerr(EVP_F_EVP_ENCRYPTFINAL_EX,EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH);
 			return 0;
 			}
 		*outl = 0;
@@ -368,7 +371,8 @@ int EVP_EncryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 int EVP_DecryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
 	     const unsigned char *in, int inl)
 	{
-	int b, fix_len;
+	int fix_len;
+	unsigned int b;
 
 	if (inl == 0)
 		{
@@ -421,8 +425,8 @@ int EVP_DecryptFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 
 int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 	{
-	int i,b;
-	int n;
+	int i,n;
+	unsigned int b;
 
 	*outl=0;
 	b=ctx->cipher->block_size;
@@ -430,7 +434,7 @@ int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 		{
 		if(ctx->buf_len)
 			{
-			EVPerr(EVP_F_EVP_DECRYPTFINAL,EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH);
+			EVPerr(EVP_F_EVP_DECRYPTFINAL_EX,EVP_R_DATA_NOT_MULTIPLE_OF_BLOCK_LENGTH);
 			return 0;
 			}
 		*outl = 0;
@@ -440,21 +444,21 @@ int EVP_DecryptFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 		{
 		if (ctx->buf_len || !ctx->final_used)
 			{
-			EVPerr(EVP_F_EVP_DECRYPTFINAL,EVP_R_WRONG_FINAL_BLOCK_LENGTH);
+			EVPerr(EVP_F_EVP_DECRYPTFINAL_EX,EVP_R_WRONG_FINAL_BLOCK_LENGTH);
 			return(0);
 			}
 		OPENSSL_assert(b <= sizeof ctx->final);
 		n=ctx->final[b-1];
-		if (n > b)
+		if (n == 0 || n > (int)b)
 			{
-			EVPerr(EVP_F_EVP_DECRYPTFINAL,EVP_R_BAD_DECRYPT);
+			EVPerr(EVP_F_EVP_DECRYPTFINAL_EX,EVP_R_BAD_DECRYPT);
 			return(0);
 			}
 		for (i=0; i<n; i++)
 			{
 			if (ctx->final[--b] != n)
 				{
-				EVPerr(EVP_F_EVP_DECRYPTFINAL,EVP_R_BAD_DECRYPT);
+				EVPerr(EVP_F_EVP_DECRYPTFINAL_EX,EVP_R_BAD_DECRYPT);
 				return(0);
 				}
 			}
@@ -531,3 +535,13 @@ int EVP_CIPHER_CTX_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
 	}
 	return ret;
 }
+
+int EVP_CIPHER_CTX_rand_key(EVP_CIPHER_CTX *ctx, unsigned char *key)
+	{
+	if (ctx->cipher->flags & EVP_CIPH_RAND_KEY)
+		return EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_RAND_KEY, 0, key);
+	if (RAND_bytes(key, ctx->key_len) <= 0)
+		return 0;
+	return 1;
+	}
+

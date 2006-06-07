@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@
 #include <openssl/dso.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
+#include <openssl/md5.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/rand.h>
@@ -154,7 +155,7 @@ static void check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key);
 static int md_nid_to_pk11(int nid);
 static int pk11_digest_init(EVP_MD_CTX *ctx);
 static int pk11_digest_update(EVP_MD_CTX *ctx,const void *data,
-	unsigned long count);
+	size_t count);
 static int pk11_digest_final(EVP_MD_CTX *ctx,unsigned char *md);
 static int pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from);
 static int pk11_digest_cleanup(EVP_MD_CTX *ctx);
@@ -1619,7 +1620,7 @@ pk11_digest_init(EVP_MD_CTX *ctx)
 	}
 
 static int 
-pk11_digest_update(EVP_MD_CTX *ctx,const void *data,unsigned long count)
+pk11_digest_update(EVP_MD_CTX *ctx,const void *data,size_t count)
         { 
 	CK_RV rv;
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->md_data;

@@ -64,7 +64,7 @@
 
 static int asn1_print_info(BIO *bp, int tag, int xclass,int constructed,
 	int indent);
-static int asn1_parse2(BIO *bp, unsigned char **pp, long length,
+static int asn1_parse2(BIO *bp, const unsigned char **pp, long length,
 	int offset, int depth, int indent, int dump);
 static int asn1_print_info(BIO *bp, int tag, int xclass, int constructed,
 	     int indent)
@@ -103,20 +103,20 @@ err:
 	return(0);
 	}
 
-int ASN1_parse(BIO *bp, unsigned char *pp, long len, int indent)
+int ASN1_parse(BIO *bp, const unsigned char *pp, long len, int indent)
 	{
 	return(asn1_parse2(bp,&pp,len,0,0,indent,0));
 	}
 
-int ASN1_parse_dump(BIO *bp, unsigned char *pp, long len, int indent, int dump)
+int ASN1_parse_dump(BIO *bp, const unsigned char *pp, long len, int indent, int dump)
 	{
 	return(asn1_parse2(bp,&pp,len,0,0,indent,dump));
 	}
 
-static int asn1_parse2(BIO *bp, unsigned char **pp, long length, int offset,
+static int asn1_parse2(BIO *bp, const unsigned char **pp, long length, int offset,
 	     int depth, int indent, int dump)
 	{
-	unsigned char *p,*ep,*tot,*op,*opp;
+	const unsigned char *p,*ep,*tot,*op,*opp;
 	long len;
 	int tag,xclass,ret=0;
 	int nl,hl,j,r;
@@ -215,7 +215,7 @@ static int asn1_parse2(BIO *bp, unsigned char **pp, long length, int offset,
 				{
 				if (BIO_write(bp,":",1) <= 0) goto end;
 				if ((len > 0) &&
-					BIO_write(bp,(char *)p,(int)len)
+					BIO_write(bp,(const char *)p,(int)len)
 					!= (int)len)
 					goto end;
 				}
@@ -256,9 +256,11 @@ static int asn1_parse2(BIO *bp, unsigned char **pp, long length, int offset,
 
 				opp=op;
 				os=d2i_ASN1_OCTET_STRING(NULL,&opp,len+hl);
-				if (os != NULL)
+				if (os != NULL && os->length > 0)
 					{
-					opp=os->data;
+					opp = os->data;
+					/* testing whether the octet string is
+					 * printable */
 					for (i=0; i<os->length; i++)
 						{
 						if ((	(opp[i] < ' ') &&
@@ -271,28 +273,47 @@ static int asn1_parse2(BIO *bp, unsigned char **pp, long length, int offset,
 							break;
 							}
 						}
-					if (printable && (os->length > 0))
+					if (printable)
+					/* printable string */
 						{
 						if (BIO_write(bp,":",1) <= 0)
 							goto end;
-						if (BIO_write(bp,(char *)opp,
+						if (BIO_write(bp,(const char *)opp,
 							os->length) <= 0)
 							goto end;
 						}
-					if (!printable && (os->length > 0)
-						&& dump)
+					else if (!dump)
+					/* not printable => print octet string
+					 * as hex dump */
+						{
+						if (BIO_write(bp,"[HEX DUMP]:",11) <= 0)
+							goto end;
+						for (i=0; i<os->length; i++)
+							{
+							if (BIO_printf(bp,"%02X"
+								, opp[i]) <= 0)
+								goto end;
+							}
+						}
+					else
+					/* print the normal dump */
 						{
 						if (!nl) 
 							{
 							if (BIO_write(bp,"\n",1) <= 0)
 								goto end;
 							}
-						if (BIO_dump_indent(bp,(char *)opp,
-							((dump == -1 || dump > os->length)?os->length:dump),
+						if (BIO_dump_indent(bp,
+							(const char *)opp,
+							((dump == -1 || dump > 
+							os->length)?os->length:dump),
 							dump_indent) <= 0)
 							goto end;
 						nl=1;
 						}
+					}
+				if (os != NULL)
+					{
 					M_ASN1_OCTET_STRING_free(os);
 					os=NULL;
 					}
@@ -368,7 +389,7 @@ static int asn1_parse2(BIO *bp, unsigned char **pp, long length, int offset,
 					if (BIO_write(bp,"\n",1) <= 0)
 						goto end;
 					}
-				if (BIO_dump_indent(bp,(char *)p,
+				if (BIO_dump_indent(bp,(const char *)p,
 					((dump == -1 || dump > len)?len:dump),
 					dump_indent) <= 0)
 					goto end;
@@ -398,7 +419,7 @@ end:
 
 const char *ASN1_tag2str(int tag)
 {
-	const static char *tag2str[] = {
+	static const char *tag2str[] = {
 	 "EOC", "BOOLEAN", "INTEGER", "BIT STRING", "OCTET STRING", /* 0-4 */
 	 "NULL", "OBJECT", "OBJECT DESCRIPTOR", "EXTERNAL", "REAL", /* 5-9 */
 	 "ENUMERATED", "<ASN1 11>", "UTF8STRING", "<ASN1 13>", 	    /* 10-13 */

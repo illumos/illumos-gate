@@ -113,7 +113,7 @@ get_modulus(uchar_t *ber_buf, int buflen, int *modlen)
 	BIGNUM *bn;
 	uchar_t *m = NULL, *mptr;
 
-	x = d2i_X509(NULL, &ber_buf, buflen);
+	x = d2i_X509(NULL, (const unsigned char **) &ber_buf, buflen);
 	if (x != NULL) {
 		pkey = X509_get_pubkey(x);
 		if (pkey == NULL) {

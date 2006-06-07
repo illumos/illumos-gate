@@ -56,9 +56,16 @@
  * [including the GNU Public Licence.]
  */
 
-#ifndef OPENSSL_NO_BF
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <stdio.h>
 #include "cryptlib.h"
+#ifndef OPENSSL_NO_BF
 #include <openssl/evp.h>
 #include "evp_locl.h"
 #include <openssl/objects.h>
@@ -85,6 +92,7 @@ static int bf_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	if (ctx->key_len > 16)
 		return 0;
 #endif /* CRYPTO_UNLIMITED */
+
 	BF_set_key(&data(ctx)->ks,EVP_CIPHER_CTX_key_length(ctx),key);
 	return 1;
 	}

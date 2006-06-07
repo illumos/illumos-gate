@@ -36,16 +36,26 @@
 # default openssl.cnf file has setup as per the following
 # demoCA ... where everything is stored
 
+my $openssl;
+if(defined $ENV{OPENSSL}) {
+	$openssl = $ENV{OPENSSL};
+} else {
+	$openssl = "openssl";
+	$ENV{OPENSSL} = $openssl;
+}
+
 $SSLEAY_CONFIG=$ENV{"SSLEAY_CONFIG"};
-$DAYS="-days 365";
-$REQ="openssl req $SSLEAY_CONFIG";
-$CA="openssl ca $SSLEAY_CONFIG";
-$VERIFY="openssl verify";
-$X509="openssl x509";
-$PKCS12="openssl pkcs12";
+$DAYS="-days 365";	# 1 year
+$CADAYS="-days 1095";	# 3 years
+$REQ="$openssl req $SSLEAY_CONFIG";
+$CA="$openssl ca $SSLEAY_CONFIG";
+$VERIFY="$openssl verify";
+$X509="$openssl x509";
+$PKCS12="$openssl pkcs12";
 
 $CATOP="/etc/sfw/openssl";
 $CAKEY="cakey.pem";
+$CAREQ="careq.pem";
 $CACERT="cacert.pem";
 
 $DIRMODE = 0777;
@@ -58,19 +68,19 @@ foreach (@ARGV) {
 	    exit 0;
 	} elsif (/^-newcert$/) {
 	    # create a certificate
-	    system ("$REQ -new -x509 -keyout newreq.pem -out newreq.pem $DAYS");
+	    system ("$REQ -new -x509 -keyout newkey.pem -out newcert.pem $DAYS");
 	    $RET=$?;
-	    print "Certificate (and private key) is in newreq.pem\n"
+	    print "Certificate is in newcert.pem, private key is in newkey.pem\n"
 	} elsif (/^-newreq$/) {
 	    # create a certificate request
-	    system ("$REQ -new -keyout newreq.pem -out newreq.pem $DAYS");
+	    system ("$REQ -new -keyout newkey.pem -out newreq.pem $DAYS");
 	    $RET=$?;
-	    print "Request (and private key) is in newreq.pem\n";
+	    print "Request is in newreq.pem, private key is in newkey.pem\n";
 	} elsif (/^-newreq-nodes$/) {
 	    # create a certificate request
-	    system ("$REQ -new -nodes -keyout newreq.pem -out newreq.pem $DAYS");
+	    system ("$REQ -new -nodes -keyout newkey.pem -out newreq.pem $DAYS");
 	    $RET=$?;
-	    print "Request (and private key) is in newreq.pem\n";
+	    print "Request is in newreq.pem, private key is in newkey.pem\n";
 	} elsif (/^-newca$/) {
 		# if explicitly asked for or it doesn't exist then setup the
 		# directory structure that Eric likes to manage things 
@@ -82,9 +92,6 @@ foreach (@ARGV) {
 		mkdir "${CATOP}/crl", $DIRMODE ;
 		mkdir "${CATOP}/newcerts", $DIRMODE;
 		mkdir "${CATOP}/private", $DIRMODE;
-		open OUT, ">${CATOP}/serial";
-		print OUT "01\n";
-		close OUT;
 		open OUT, ">${CATOP}/index.txt";
 		close OUT;
 	    }
@@ -101,18 +108,23 @@ foreach (@ARGV) {
 		    $RET=$?;
 		} else {
 		    print "Making CA certificate ...\n";
-		    system ("$REQ -new -x509 -keyout " .
-			"${CATOP}/private/$CAKEY -out ${CATOP}/$CACERT $DAYS");
+		    system ("$REQ -new -keyout " .
+			"${CATOP}/private/$CAKEY -out ${CATOP}/$CAREQ");
+		    system ("$CA -create_serial " .
+			"-out ${CATOP}/$CACERT $CADAYS -batch " . 
+			"-keyfile ${CATOP}/private/$CAKEY -selfsign " .
+			"-infiles ${CATOP}/$CAREQ ");
 		    $RET=$?;
 		}
 	    }
 	} elsif (/^-pkcs12$/) {
 	    my $cname = $ARGV[1];
 	    $cname = "My Certificate" unless defined $cname;
-	    system ("$PKCS12 -in newcert.pem -inkey newreq.pem " .
+	    system ("$PKCS12 -in newcert.pem -inkey newkey.pem " .
 			"-certfile ${CATOP}/$CACERT -out newcert.p12 " .
 			"-export -name \"$cname\"");
 	    $RET=$?;
+	    print "PKCS #12 file is in newcert.p12\n";
 	    exit $RET;
 	} elsif (/^-xsign$/) {
 	    system ("$CA -policy policy_anything -infiles newreq.pem");

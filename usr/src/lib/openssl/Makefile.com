@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,24 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-VERS= .0.9.7
+VERS= .0.9.8
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/openssl/Makefile.openssl
 
-CPPFLAGS=	$(OPENSSL_BUILD_CPPFLAGS) $(CPPFLAGS.master)
+CPPFLAGS =	$(OPENSSL_BUILD_CPPFLAGS) $(CPPFLAGS.master)
 
-COPTFLAG=   -xO5
-sparcv9_COPTFLAG=	-xO5
+COPTFLAG =   -xO5
+sparcv9_COPTFLAG =	-xO5
 
-ROOTLIBDIR=     $(ROOTSFWLIB)
-ROOTLIBDIR64=   $(ROOTSFWLIB64)
+ROOTLIBDIR =     $(ROOTSFWLIB)
+ROOTLIBDIR64 =   $(ROOTSFWLIB64)
 
 #Linker flag for auxiliary filtering
 OPENSSL_FILTER_FLAG =	-Wl,-f$(LIBRARY:.a=_extra.so)$(VERS)
@@ -58,9 +57,9 @@ all:
 # what is documented in pkg-config(1) and it is also where all the
 # existing sparcv9 pkgconfig files are.
 
-LIBPCDIR=/usr/lib/pkgconfig
-LIBPCDIR64=/usr/lib/$(MACH64)/pkgconfig
-LIBPCSRC= openssl.pc
+LIBPCDIR =/usr/lib/pkgconfig
+LIBPCDIR64 =/usr/lib/$(MACH64)/pkgconfig
+LIBPCSRC = openssl.pc
 
 $(LIBPCSRC): ../../$(LIBPCSRC).tmpl
 	$(SED)	-e "s@__VERSION__@$(VERS:.%=%)@" \
@@ -68,7 +67,7 @@ $(LIBPCSRC): ../../$(LIBPCSRC).tmpl
 		-e "s@__LIBDIR__@$(SFWLIBDIR)@" \
 		 < ../../$(LIBPCSRC).tmpl > $(LIBPCSRC)
 
-ROOTLIBPCDIR= $(ROOT)/$(LIBPCDIR)
+ROOTLIBPCDIR = $(ROOT)/$(LIBPCDIR)
 ROOTLIBPC = $(LIBPCSRC:%=$(ROOTLIBPCDIR)/%)
 
 ROOTLIBPCDIR64 = $(ROOT)/$(LIBPCDIR64)
