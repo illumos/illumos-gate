@@ -515,7 +515,6 @@ cred_t		*cr;
 	ace_t		*acep;
 	struct vattr	vattr;
 	int		error;
-	ulong_t		acl_flavor;
 
 	vsecattr->vsa_aclcnt	= 0;
 	vsecattr->vsa_aclentp	= NULL;
@@ -526,11 +525,7 @@ cred_t		*cr;
 	if (error = VOP_GETATTR(vp, &vattr, 0, cr))
 		return (error);
 
-	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &acl_flavor, cr);
-	if (error || acl_flavor == 0)
-		acl_flavor = _ACL_ACLENT_ENABLED;
-
-	if (acl_flavor == _ACL_ACLENT_ENABLED) {
+	if (vsecattr->vsa_mask & (VSA_ACLCNT | VSA_ACL)) {
 		vsecattr->vsa_aclcnt	= 4; /* USER, GROUP, OTHER, and CLASS */
 		vsecattr->vsa_aclentp = kmem_zalloc(4 * sizeof (aclent_t),
 		    KM_SLEEP);
@@ -554,18 +549,16 @@ cred_t		*cr;
 		aclentp->a_type = CLASS_OBJ;    /* Class */
 		aclentp->a_perm = (ushort_t)(0007);
 		aclentp->a_id = -1;		/* Really undefined */
-	} else if (acl_flavor == _ACL_ACE_ENABLED) {
+	} else if (vsecattr->vsa_mask & (VSA_ACECNT | VSA_ACE)) {
 		vsecattr->vsa_aclcnt	= 6;
 		vsecattr->vsa_aclentp = kmem_zalloc(6 * sizeof (ace_t),
 		    KM_SLEEP);
-
 		acep = vsecattr->vsa_aclentp;
 		(void) memcpy(acep, trivial_acl, sizeof (ace_t) * 6);
 		adjust_ace_pair(acep, (vattr.va_mode & 0700) >> 6);
 		adjust_ace_pair(acep + 2, (vattr.va_mode & 0070) >> 3);
 		adjust_ace_pair(acep + 4, vattr.va_mode & 0007);
-	} else
-		return (EINVAL);
+	}
 
 	return (0);
 }
