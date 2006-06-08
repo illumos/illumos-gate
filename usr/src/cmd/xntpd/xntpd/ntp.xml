@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-    Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
@@ -22,14 +22,6 @@
 	<create_default_instance enabled='false' />
 
 	<single_instance />
-
-	<dependency name='paths'
-	    grouping='require_all'
-	    restart_on='error'
-	    type='path'>
-		<service_fmri value='file://localhost/usr/sbin/ntpdate' />
-		<service_fmri value='file://localhost/usr/sbin/ntpq' />
-	</dependency>
 
 	<!--
 		In its multicast mode, xntpd(1M) requires the default

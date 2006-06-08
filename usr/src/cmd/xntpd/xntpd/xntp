@@ -1,16 +1,18 @@
 #!/sbin/sh
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Service Method Support Program (Script) for the NTP service
-#
 
 . /lib/svc/share/smf_include.sh
 
-[ -f /etc/inet/ntp.conf ] || exit $SMF_EXIT_ERR_CONFIG
+if [ ! -f /etc/inet/ntp.conf ]; then
+	echo "Error: Configuration file '/etc/inet/ntp.conf' not found." \
+	    "  See xntpd(1M)."
+	exit $SMF_EXIT_ERR_CONFIG
+fi
 
 ARGS=`/usr/bin/nawk '
 	BEGIN {
