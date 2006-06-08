@@ -62,6 +62,18 @@ static void impl_scsi_log(dev_info_t *dev, char *label, uint_t level,
 static void v_scsi_log(dev_info_t *dev, char *label, uint_t level,
     const char *fmt, va_list ap) __KVPRINTFLIKE(4);
 
+static int
+scsi_get_next_descr(uint8_t *sdsp,
+    int sense_buf_len, struct scsi_descr_template **descrpp);
+
+#define	DESCR_GOOD	0
+#define	DESCR_PARTIAL	1
+#define	DESCR_END	2
+
+static int
+scsi_validate_descr(struct scsi_descr_sense_hdr *sdsp,
+    int valid_sense_length, struct scsi_descr_template *descrp);
+
 int
 scsi_poll(struct scsi_pkt *pkt)
 {
@@ -1077,6 +1089,8 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 		"All", "Unknown", "Informational",
 		"Recovered", "Retryable", "Fatal"
 	};
+	uchar_t sense_key, asc, ascq, fru_code;
+	uchar_t *fru_code_ptr;
 	int i, buflen;
 
 	mutex_enter(&scsi_log_mutex);
@@ -1137,46 +1151,51 @@ scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt, char *label,
 	impl_scsi_log(dev, label, CE_CONT, "%s\n", buf);
 
 	if (sensep) {
+		sense_key = scsi_sense_key((uint8_t *)sensep);
+		asc = scsi_sense_asc((uint8_t *)sensep);
+		ascq = scsi_sense_ascq((uint8_t *)sensep);
+		scsi_ext_sense_fields((uint8_t *)sensep, SENSE_LENGTH,
+		    NULL, NULL, &fru_code_ptr, NULL, NULL);
+		fru_code = (fru_code_ptr ? *fru_code_ptr : 0);
+
 		bzero(buf, 256);
 		(void) sprintf(buf, "Sense Key: %s\n",
-		    sense_keys[sensep->es_key]);
+		    sense_keys[sense_key]);
 		impl_scsi_log(dev, label, CE_CONT, buf);
 
 		bzero(buf, 256);
-		if ((sensep->es_fru_code != 0) &&
+		if ((fru_code != 0) &&
 		    (decode_fru != NULL)) {
 			(*decode_fru)(devp, buf, SCSI_ERRMSG_BUF_LEN,
-			    sensep->es_fru_code);
+			    fru_code);
 			if (buf[0] != NULL) {
 				bzero(buf1, 256);
 				(void) sprintf(&buf1[strlen(buf1)],
-				    "ASC: 0x%x (%s)", sensep->es_add_code,
-				    scsi_asc_ascq_name(sensep->es_add_code,
-				    sensep->es_qual_code, tmpbuf, asc_list));
+				    "ASC: 0x%x (%s)", asc,
+				    scsi_asc_ascq_name(asc, ascq,
+					tmpbuf, asc_list));
 				buflen = strlen(buf1);
 				if (buflen < SCSI_ERRMSG_COLUMN_LEN) {
 				    pad[SCSI_ERRMSG_COLUMN_LEN - buflen] = '\0';
 				    (void) sprintf(&buf1[buflen],
-				    "%s ASCQ: 0x%x", pad, sensep->es_qual_code);
+				    "%s ASCQ: 0x%x", pad, ascq);
 				} else {
 				    (void) sprintf(&buf1[buflen], " ASCQ: 0x%x",
-					sensep->es_qual_code);
+					ascq);
 				}
 				impl_scsi_log(dev,
 					label, CE_CONT, "%s\n", buf1);
 				impl_scsi_log(dev, label, CE_CONT,
 					"FRU: 0x%x (%s)\n",
-						sensep->es_fru_code, buf);
+						fru_code, buf);
 				mutex_exit(&scsi_log_mutex);
 				return;
 			}
 		}
 		(void) sprintf(&buf[strlen(buf)],
 		    "ASC: 0x%x (%s), ASCQ: 0x%x, FRU: 0x%x",
-		    sensep->es_add_code,
-		    scsi_asc_ascq_name(sensep->es_add_code,
-			sensep->es_qual_code, tmpbuf, asc_list),
-		    sensep->es_qual_code, sensep->es_fru_code);
+		    asc, scsi_asc_ascq_name(asc, ascq, tmpbuf, asc_list),
+		    ascq, fru_code);
 		impl_scsi_log(dev, label, CE_CONT, "%s\n", buf);
 	}
 	mutex_exit(&scsi_log_mutex);
@@ -1343,4 +1362,513 @@ scsi_get_device_type_scsi_options(dev_info_t *dip,
 	}
 
 	return (options);
+}
+
+/*
+ * Functions for format-neutral sense data functions
+ */
+
+int
+scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags)
+{
+	int result;
+	struct scsi_extended_sense *es =
+	    (struct scsi_extended_sense *)sense_buffer;
+
+	/*
+	 * Init flags if present
+	 */
+	if (flags != NULL) {
+		*flags = 0;
+	}
+
+	/*
+	 * Check response code (Solaris breaks this into a 3-bit class
+	 * and 4-bit code field.
+	 */
+	if ((es->es_class != CLASS_EXTENDED_SENSE) ||
+	    ((es->es_code != CODE_FMT_FIXED_CURRENT) &&
+		(es->es_code != CODE_FMT_FIXED_DEFERRED) &&
+		(es->es_code != CODE_FMT_DESCR_CURRENT) &&
+		(es->es_code != CODE_FMT_DESCR_DEFERRED))) {
+		/*
+		 * Sense data (if there's actually anything here) is not
+		 * in a format we can handle).
+		 */
+		return (SENSE_UNUSABLE);
+	}
+
+	/*
+	 * Check if this is deferred sense
+	 */
+	if ((flags != NULL) &&
+	    ((es->es_code == CODE_FMT_FIXED_DEFERRED) ||
+		(es->es_code == CODE_FMT_DESCR_DEFERRED))) {
+		*flags |= SNS_BUF_DEFERRED;
+	}
+
+	/*
+	 * Make sure length is OK
+	 */
+	if (es->es_code == CODE_FMT_FIXED_CURRENT ||
+	    es->es_code == CODE_FMT_FIXED_DEFERRED) {
+		/*
+		 * We can get by with a buffer that only includes the key,
+		 * asc, and ascq.  In reality the minimum length we should
+		 * ever see is 18 bytes.
+		 */
+		if ((sense_buf_len < MIN_FIXED_SENSE_LEN) ||
+		    ((es->es_add_len + ADDL_SENSE_ADJUST) <
+			MIN_FIXED_SENSE_LEN)) {
+			result = SENSE_UNUSABLE;
+		} else {
+			/*
+			 * The es_add_len field contains the number of sense
+			 * data bytes that follow the es_add_len field.
+			 */
+			if ((flags != NULL) &&
+			    (sense_buf_len <
+				(es->es_add_len + ADDL_SENSE_ADJUST))) {
+				*flags |= SNS_BUF_OVERFLOW;
+			}
+
+			result = SENSE_FIXED_FORMAT;
+		}
+	} else {
+		struct scsi_descr_sense_hdr *ds =
+		    (struct scsi_descr_sense_hdr *)sense_buffer;
+
+		/*
+		 * For descriptor format we need at least the descriptor
+		 * header
+		 */
+		if (sense_buf_len < sizeof (struct scsi_descr_sense_hdr)) {
+			result = SENSE_UNUSABLE;
+		} else {
+			/*
+			 * Check for overflow
+			 */
+			if ((flags != NULL) &&
+			    (sense_buf_len <
+				(ds->ds_addl_sense_length + sizeof (*ds)))) {
+				*flags |= SNS_BUF_OVERFLOW;
+			}
+
+			result = SENSE_DESCR_FORMAT;
+		}
+	}
+
+	return (result);
+}
+
+
+uint8_t
+scsi_sense_key(uint8_t *sense_buffer)
+{
+	uint8_t skey;
+	if (SCSI_IS_DESCR_SENSE(sense_buffer)) {
+		struct scsi_descr_sense_hdr *sdsp =
+		    (struct scsi_descr_sense_hdr *)sense_buffer;
+		skey = sdsp->ds_key;
+	} else {
+		struct scsi_extended_sense *ext_sensep =
+		    (struct scsi_extended_sense *)sense_buffer;
+		skey = ext_sensep->es_key;
+	}
+	return (skey);
+}
+
+uint8_t
+scsi_sense_asc(uint8_t *sense_buffer)
+{
+	uint8_t asc;
+	if (SCSI_IS_DESCR_SENSE(sense_buffer)) {
+		struct scsi_descr_sense_hdr *sdsp =
+		    (struct scsi_descr_sense_hdr *)sense_buffer;
+		asc = sdsp->ds_add_code;
+	} else {
+		struct scsi_extended_sense *ext_sensep =
+		    (struct scsi_extended_sense *)sense_buffer;
+		asc = ext_sensep->es_add_code;
+	}
+	return (asc);
+}
+
+uint8_t
+scsi_sense_ascq(uint8_t *sense_buffer)
+{
+	uint8_t ascq;
+	if (SCSI_IS_DESCR_SENSE(sense_buffer)) {
+		struct scsi_descr_sense_hdr *sdsp =
+		    (struct scsi_descr_sense_hdr *)sense_buffer;
+		ascq = sdsp->ds_qual_code;
+	} else {
+		struct scsi_extended_sense *ext_sensep =
+		    (struct scsi_extended_sense *)sense_buffer;
+		ascq = ext_sensep->es_qual_code;
+	}
+	return (ascq);
+}
+
+void scsi_ext_sense_fields(uint8_t *sense_buffer, int sense_buf_len,
+    uint8_t **information, uint8_t **cmd_spec_info, uint8_t **fru_code,
+    uint8_t **sk_specific, uint8_t **stream_flags)
+{
+	int sense_fmt;
+
+	/*
+	 * Sanity check sense data and determine the format
+	 */
+	sense_fmt = scsi_validate_sense(sense_buffer, sense_buf_len, NULL);
+
+	/*
+	 * Initialize any requested data to 0
+	 */
+	if (information) {
+		*information = NULL;
+	}
+	if (cmd_spec_info) {
+		*cmd_spec_info = NULL;
+	}
+	if (fru_code) {
+		*fru_code = NULL;
+	}
+	if (sk_specific) {
+		*sk_specific = NULL;
+	}
+	if (stream_flags) {
+		*stream_flags = NULL;
+	}
+
+	if (sense_fmt == SENSE_DESCR_FORMAT) {
+		struct scsi_descr_template *sdt = NULL;
+
+		while (scsi_get_next_descr(sense_buffer,
+		    sense_buf_len, &sdt) != -1) {
+			switch (sdt->sdt_descr_type) {
+			case DESCR_INFORMATION: {
+				struct scsi_information_sense_descr *isd =
+				    (struct scsi_information_sense_descr *)
+				    sdt;
+				if (information) {
+					*information =
+					    &isd->isd_information[0];
+				}
+				break;
+			}
+			case DESCR_COMMAND_SPECIFIC: {
+				struct scsi_cmd_specific_sense_descr *csd =
+				    (struct scsi_cmd_specific_sense_descr *)
+				    sdt;
+				if (cmd_spec_info) {
+					*cmd_spec_info =
+					    &csd->css_cmd_specific_info[0];
+				}
+				break;
+			}
+			case DESCR_SENSE_KEY_SPECIFIC: {
+				struct scsi_sk_specific_sense_descr *ssd =
+				    (struct scsi_sk_specific_sense_descr *)
+				    sdt;
+				if (sk_specific) {
+					*sk_specific =
+					    (uint8_t *)&ssd->sss_data;
+				}
+				break;
+			}
+			case DESCR_FRU: {
+				struct scsi_fru_sense_descr *fsd =
+				    (struct scsi_fru_sense_descr *)
+				    sdt;
+				if (fru_code) {
+					*fru_code = &fsd->fs_fru_code;
+				}
+				break;
+			}
+			case DESCR_STREAM_COMMANDS: {
+				struct scsi_stream_cmd_sense_descr *strsd =
+				    (struct scsi_stream_cmd_sense_descr *)
+				    sdt;
+				if (stream_flags) {
+					*stream_flags =
+					    (uint8_t *)&strsd->scs_data;
+				}
+				break;
+			}
+			case DESCR_BLOCK_COMMANDS: {
+				struct scsi_block_cmd_sense_descr *bsd =
+				    (struct scsi_block_cmd_sense_descr *)
+				    sdt;
+				/*
+				 * The "Block Command" sense descriptor
+				 * contains an ili bit that we can store
+				 * in the stream specific data if it is
+				 * available.  We shouldn't see both
+				 * a block command and a stream command
+				 * descriptor in the same collection
+				 * of sense data.
+				 */
+				if (stream_flags) {
+					/*
+					 * Can't take an address of a bitfield,
+					 * but the flags are just after the
+					 * bcs_reserved field.
+					 */
+					*stream_flags =
+					    (uint8_t *)&bsd->bcs_reserved + 1;
+				}
+				break;
+			}
+			}
+		}
+	} else {
+		struct scsi_extended_sense *es =
+		    (struct scsi_extended_sense *)sense_buffer;
+
+		/* Get data from fixed sense buffer */
+		if (information && es->es_valid) {
+			*information = &es->es_info_1;
+		}
+		if (cmd_spec_info && es->es_valid) {
+			*cmd_spec_info = &es->es_cmd_info[0];
+		}
+		if (fru_code) {
+			*fru_code = &es->es_fru_code;
+		}
+		if (sk_specific) {
+			*sk_specific = &es->es_skey_specific[0];
+		}
+		if (stream_flags) {
+			/*
+			 * Can't take the address of a bit field,
+			 * but the stream flags are located just after
+			 * the es_segnum field;
+			 */
+			*stream_flags = &es->es_segnum + 1;
+		}
+	}
+}
+
+boolean_t
+scsi_sense_info_uint64(uint8_t *sense_buffer, int sense_buf_len,
+    uint64_t *information)
+{
+	boolean_t valid;
+	int sense_fmt;
+
+	ASSERT(sense_buffer != NULL);
+	ASSERT(information != NULL);
+
+	/* Validate sense data and get format */
+	sense_fmt = scsi_validate_sense(sense_buffer, sense_buf_len, NULL);
+
+	if (sense_fmt == SENSE_UNUSABLE) {
+		/* Information is not valid */
+		valid = 0;
+	} else if (sense_fmt == SENSE_FIXED_FORMAT) {
+		struct scsi_extended_sense *es =
+		    (struct scsi_extended_sense *)sense_buffer;
+
+		*information = (uint64_t)SCSI_READ32(&es->es_info_1);
+
+		valid = es->es_valid;
+	} else {
+		/* Sense data is descriptor format */
+		struct scsi_information_sense_descr *isd;
+
+		isd = (struct scsi_information_sense_descr *)
+		    scsi_find_sense_descr(sense_buffer, sense_buf_len,
+			DESCR_INFORMATION);
+
+		if (isd) {
+			*information = SCSI_READ64(isd->isd_information);
+			valid = 1;
+		} else {
+			valid = 0;
+		}
+	}
+
+	return (valid);
+}
+
+boolean_t
+scsi_sense_cmdspecific_uint64(uint8_t *sense_buffer, int sense_buf_len,
+    uint64_t *cmd_specific_info)
+{
+	boolean_t valid;
+	int sense_fmt;
+
+	ASSERT(sense_buffer != NULL);
+	ASSERT(cmd_specific_info != NULL);
+
+	/* Validate sense data and get format */
+	sense_fmt = scsi_validate_sense(sense_buffer, sense_buf_len, NULL);
+
+	if (sense_fmt == SENSE_UNUSABLE) {
+		/* Command specific info is not valid */
+		valid = 0;
+	} else if (sense_fmt == SENSE_FIXED_FORMAT) {
+		struct scsi_extended_sense *es =
+		    (struct scsi_extended_sense *)sense_buffer;
+
+		*cmd_specific_info = (uint64_t)SCSI_READ32(es->es_cmd_info);
+
+		valid = es->es_valid;
+	} else {
+		/* Sense data is descriptor format */
+		struct scsi_cmd_specific_sense_descr *c;
+
+		c = (struct scsi_cmd_specific_sense_descr *)
+		    scsi_find_sense_descr(sense_buffer, sense_buf_len,
+			DESCR_COMMAND_SPECIFIC);
+
+		if (c) {
+			valid = 1;
+			*cmd_specific_info =
+			    SCSI_READ64(c->css_cmd_specific_info);
+		} else {
+			valid = 0;
+		}
+	}
+
+	return (valid);
+}
+
+uint8_t *
+scsi_find_sense_descr(uint8_t *sdsp, int sense_buf_len, int req_descr_type)
+{
+	struct scsi_descr_template *sdt = NULL;
+
+	while (scsi_get_next_descr(sdsp, sense_buf_len, &sdt) != -1) {
+		ASSERT(sdt != NULL);
+		if (sdt->sdt_descr_type == req_descr_type) {
+			/* Found requested descriptor type */
+			break;
+		}
+	}
+
+	return ((uint8_t *)sdt);
+}
+
+/*
+ * Sense Descriptor format is:
+ *
+ * <Descriptor type> <Descriptor length> <Descriptor data> ...
+ *
+ * 2 must be added to the descriptor length value to get the
+ * total descriptor length sense the stored length does not
+ * include the "type" and "additional length" fields.
+ */
+
+#define	NEXT_DESCR_PTR(ndp_descr) \
+	((struct scsi_descr_template *)(((uint8_t *)(ndp_descr)) + \
+	    ((ndp_descr)->sdt_addl_length + \
+	    sizeof (struct scsi_descr_template))))
+
+static int
+scsi_get_next_descr(uint8_t *sense_buffer,
+    int sense_buf_len, struct scsi_descr_template **descrpp)
+{
+	struct scsi_descr_sense_hdr *sdsp =
+	    (struct scsi_descr_sense_hdr *)sense_buffer;
+	struct scsi_descr_template *cur_descr;
+	boolean_t find_first;
+	int valid_sense_length;
+
+	ASSERT(descrpp != NULL);
+	find_first = (*descrpp == NULL);
+
+	/*
+	 * If no descriptor is passed in then return the first
+	 * descriptor
+	 */
+	if (find_first) {
+		/*
+		 * The first descriptor will immediately follow the header
+		 * (Pointer arithmetic)
+		 */
+		cur_descr = (struct scsi_descr_template *)(sdsp+1);
+	} else {
+		cur_descr = *descrpp;
+		ASSERT(cur_descr > (struct scsi_descr_template *)sdsp);
+	}
+
+	/* Assume no more descriptors are available */
+	*descrpp = NULL;
+
+	/*
+	 * Calculate the amount of valid sense data -- make sure the length
+	 * byte in this descriptor lies within the valid sense data.
+	 */
+	valid_sense_length =
+	    min((sizeof (struct scsi_descr_sense_hdr) +
+	    sdsp->ds_addl_sense_length),
+	    sense_buf_len);
+
+	/*
+	 * Make sure this descriptor is complete (either the first
+	 * descriptor or the descriptor passed in)
+	 */
+	if (scsi_validate_descr(sdsp, valid_sense_length, cur_descr) !=
+	    DESCR_GOOD) {
+		return (-1);
+	}
+
+	/*
+	 * If we were looking for the first descriptor go ahead and return it
+	 */
+	if (find_first) {
+		*descrpp = cur_descr;
+		return ((*descrpp)->sdt_descr_type);
+	}
+
+	/*
+	 * Get pointer to next descriptor
+	 */
+	cur_descr = NEXT_DESCR_PTR(cur_descr);
+
+	/*
+	 * Make sure this descriptor is also complete.
+	 */
+	if (scsi_validate_descr(sdsp, valid_sense_length, cur_descr) !=
+	    DESCR_GOOD) {
+		return (-1);
+	}
+
+	*descrpp = (struct scsi_descr_template *)cur_descr;
+	return ((*descrpp)->sdt_descr_type);
+}
+
+static int
+scsi_validate_descr(struct scsi_descr_sense_hdr *sdsp,
+    int valid_sense_length, struct scsi_descr_template *descrp)
+{
+	int descr_offset, next_descr_offset;
+
+	/*
+	 * Make sure length is present
+	 */
+	descr_offset = (uint8_t *)descrp - (uint8_t *)sdsp;
+	if (descr_offset + sizeof (struct scsi_descr_template) >
+	    valid_sense_length) {
+		return (DESCR_PARTIAL);
+	}
+
+	/*
+	 * Check if length is 0 (no more descriptors)
+	 */
+	if (descrp->sdt_addl_length == 0) {
+		return (DESCR_END);
+	}
+
+	/*
+	 * Make sure the rest of the descriptor is present
+	 */
+	next_descr_offset =
+	    (uint8_t *)NEXT_DESCR_PTR(descrp) - (uint8_t *)sdsp;
+	if (next_descr_offset > valid_sense_length) {
+		return (DESCR_PARTIAL);
+	}
+
+	return (DESCR_GOOD);
 }

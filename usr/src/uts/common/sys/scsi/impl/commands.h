@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,6 +273,59 @@ union scsi_cdb {		/* scsi command description block */
 /*
  *	Various useful Macros for SCSI commands
  */
+
+/*
+ * defines for getting/setting fields in data received from or destined for
+ * a SCSI device.  These macros are necessary (in place of BE16/BE32/BE64)
+ * because the address to be read or written may not be on a proper alignment.
+ */
+
+#define	SCSI_READ16(Sr16_Addr) \
+	(((uint16_t)*((uint8_t *)(Sr16_Addr)) << 8) | \
+	    ((uint16_t)*((uint8_t *)((Sr16_Addr)+1))))
+
+#define	SCSI_READ32(Sr32_Addr) \
+	(((uint32_t)*((uint8_t *)(Sr32_Addr)) << 24) | \
+	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+1)) << 16) | \
+	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+2)) << 8) | \
+	    ((uint32_t)*((uint8_t *)((Sr32_Addr)+3))))
+
+#define	SCSI_READ64(Sr64_Addr) \
+	(((uint64_t)*((uint8_t *)(Sr64_Addr)) << 56) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+1)) << 48) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+2)) << 40) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+3)) << 32) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+4)) << 24) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+5)) << 16) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+6)) << 8) | \
+	    ((uint64_t)*((uint8_t *)((Sr64_Addr)+7))))
+
+#define	SCSI_WRITE16(Sr16_Addr, Sr16_Val) \
+	*((uint8_t *)(Sr16_Addr)) = (((uint16_t)(Sr16_Val) >> 8) & 0xff); \
+	*(((uint8_t *)(Sr16_Addr))+1) = ((uint16_t)(Sr16_Val) & 0xff);
+
+#define	SCSI_WRITE32(Sr32_Addr, Sr32_Val) \
+	*(uint8_t *)(Sr32_Addr) = (((uint32_t)(Sr32_Val) >> 24) & 0xff); \
+	*(((uint8_t *)(Sr32_Addr))+1) = \
+	    (((uint32_t)(Sr32_Val) >> 16) & 0xff); \
+	*(((uint8_t *)(Sr32_Addr))+2) = (((uint32_t)(Sr32_Val) >> 8) & 0xff); \
+	*(((uint8_t *)(Sr32_Addr))+3) = (((uint32_t)(Sr32_Val)) & 0xff);
+
+#define	SCSI_WRITE64(Sr64_Addr, Sr64_Val) \
+	*(uint8_t *)(Sr64_Addr) = (((uint64_t)(Sr64_Val) >> 56) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+1) = \
+	    (((uint64_t)(Sr64_Val) >> 48) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+2) = \
+	    (((uint64_t)(Sr64_Val) >> 40) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+3) = \
+	    (((uint64_t)(Sr64_Val) >> 32) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+4) = \
+	    (((uint64_t)(Sr64_Val) >> 24) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+5) = \
+	    (((uint64_t)(Sr64_Val) >> 16) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+6) = \
+	    (((uint64_t)(Sr64_Val) >> 8) & 0xff); \
+	*(((uint8_t *)(Sr64_Addr))+7) = (((uint64_t)(Sr64_Val)) & 0xff);
 
 /*
  * defines for getting/setting fields within the various command groups

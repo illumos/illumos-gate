@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +54,7 @@ root    sata_scsi_setcap
 add     sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
 root    sd.c:sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
 root    sd.c:sd_wm_cache_constructor sd_wm_cache_destructor
-root	sd.c:sd_read_modify_write_task
+root	sd.c:sd_read_modify_write_task sd_reenable_dsense_task
 root	sd.c:sd_failfast_flushq_callback sd_start_direct_priority_command
 root	sd.c:sdstrategy sdioctl
 

@@ -786,6 +786,7 @@ static int sd_pm_idletime = 1;
 #define	sd_scsi_probe_with_cache	ssd_scsi_probe_with_cache
 #define	sd_spin_up_unit			ssd_spin_up_unit
 #define	sd_enable_descr_sense		ssd_enable_descr_sense
+#define	sd_reenable_dsense_task		ssd_reenable_dsense_task
 #define	sd_set_mmc_caps			ssd_set_mmc_caps
 #define	sd_read_unit_properties		ssd_read_unit_properties
 #define	sd_process_sdconf_file		ssd_process_sdconf_file
@@ -922,7 +923,6 @@ static int sd_pm_idletime = 1;
 #define	sd_validate_sense_data		ssd_validate_sense_data
 #define	sd_decode_sense			ssd_decode_sense
 #define	sd_print_sense_msg		ssd_print_sense_msg
-#define	sd_extract_sense_info_descr	ssd_extract_sense_info_descr
 #define	sd_sense_key_no_sense		ssd_sense_key_no_sense
 #define	sd_sense_key_recoverable_error	ssd_sense_key_recoverable_error
 #define	sd_sense_key_not_ready		ssd_sense_key_not_ready
@@ -1097,7 +1097,9 @@ static int  sd_scsi_probe_with_cache(struct scsi_device *devp, int (*fn)());
 static int	sd_spin_up_unit(struct sd_lun *un);
 #ifdef _LP64
 static void	sd_enable_descr_sense(struct sd_lun *un);
+static void	sd_reenable_dsense_task(void *arg);
 #endif /* _LP64 */
+
 static void	sd_set_mmc_caps(struct sd_lun *un);
 
 static void sd_read_unit_properties(struct sd_lun *un);
@@ -1352,24 +1354,22 @@ static void sd_decode_sense(struct sd_lun *un, struct buf *bp,
 
 static void sd_print_sense_msg(struct sd_lun *un, struct buf *bp,
 	void *arg, int code);
-static diskaddr_t sd_extract_sense_info_descr(
-	struct scsi_descr_sense_hdr *sdsp);
 
 static void sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_recoverable_error(struct sd_lun *un,
-	uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_not_ready(struct sd_lun *un,
-	uint8_t asc, uint8_t ascq,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_medium_or_hardware_error(struct sd_lun *un,
-	int sense_key, uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_unit_attention(struct sd_lun *un,
-	uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_fail_command(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
@@ -1378,7 +1378,7 @@ static void sd_sense_key_blank_check(struct sd_lun *un, struct buf *bp,
 static void sd_sense_key_aborted_command(struct sd_lun *un, struct buf *bp,
 	struct sd_xbuf *xp, struct scsi_pkt *pktp);
 static void sd_sense_key_default(struct sd_lun *un,
-	int sense_key,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp);
 
 static void sd_print_retry_msg(struct sd_lun *un, struct buf *bp,
@@ -2953,8 +2953,23 @@ sd_enable_descr_sense(struct sd_lun *un)
 eds_exit:
 	kmem_free(header, buflen);
 }
-#endif /* _LP64 */
 
+/*
+ *    Function: sd_reenable_dsense_task
+ *
+ * Description: Re-enable descriptor sense after device or bus reset
+ *
+ *     Context: Executes in a taskq() thread context
+ */
+static void
+sd_reenable_dsense_task(void *arg)
+{
+	struct	sd_lun	*un = arg;
+
+	ASSERT(un != NULL);
+	sd_enable_descr_sense(un);
+}
+#endif /* _LP64 */
 
 /*
  *    Function: sd_set_mmc_caps
@@ -8266,12 +8281,16 @@ sd_unit_attach(dev_info_t *devi)
 			case 0: {
 				if (capacity > DK_MAX_BLOCKS) {
 #ifdef _LP64
-					/*
-					 * Enable descriptor format sense data
-					 * so that we can get 64 bit sense
-					 * data fields.
-					 */
-					sd_enable_descr_sense(un);
+					if (capacity + 1 >
+					    SD_GROUP1_MAX_ADDRESS) {
+						/*
+						 * Enable descriptor format
+						 * sense data so that we can
+						 * get 64 bit sense data
+						 * fields.
+						 */
+						sd_enable_descr_sense(un);
+					}
 #else
 					/* 32-bit kernels can't handle this */
 					scsi_log(SD_DEVINFO(un),
@@ -16936,9 +16955,7 @@ static void
 sd_decode_sense(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	struct scsi_pkt *pktp)
 {
-	struct scsi_extended_sense *esp;
-	struct scsi_descr_sense_hdr *sdsp;
-	uint8_t asc, ascq, sense_key;
+	uint8_t sense_key;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -16947,46 +16964,31 @@ sd_decode_sense(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	ASSERT(xp != NULL);
 	ASSERT(pktp != NULL);
 
-	esp = (struct scsi_extended_sense *)xp->xb_sense_data;
-
-	switch (esp->es_code) {
-	case CODE_FMT_DESCR_CURRENT:
-	case CODE_FMT_DESCR_DEFERRED:
-		sdsp = (struct scsi_descr_sense_hdr *)xp->xb_sense_data;
-		sense_key = sdsp->ds_key;
-		asc = sdsp->ds_add_code;
-		ascq = sdsp->ds_qual_code;
-		break;
-	case CODE_FMT_VENDOR_SPECIFIC:
-	case CODE_FMT_FIXED_CURRENT:
-	case CODE_FMT_FIXED_DEFERRED:
-	default:
-		sense_key = esp->es_key;
-		asc = esp->es_add_code;
-		ascq = esp->es_qual_code;
-		break;
-	}
+	sense_key = scsi_sense_key(xp->xb_sense_data);
 
 	switch (sense_key) {
 	case KEY_NO_SENSE:
 		sd_sense_key_no_sense(un, bp, xp, pktp);
 		break;
 	case KEY_RECOVERABLE_ERROR:
-		sd_sense_key_recoverable_error(un, asc, bp, xp, pktp);
+		sd_sense_key_recoverable_error(un, xp->xb_sense_data,
+		    bp, xp, pktp);
 		break;
 	case KEY_NOT_READY:
-		sd_sense_key_not_ready(un, asc, ascq, bp, xp, pktp);
+		sd_sense_key_not_ready(un, xp->xb_sense_data,
+		    bp, xp, pktp);
 		break;
 	case KEY_MEDIUM_ERROR:
 	case KEY_HARDWARE_ERROR:
 		sd_sense_key_medium_or_hardware_error(un,
-		    sense_key, asc, bp, xp, pktp);
+		    xp->xb_sense_data, bp, xp, pktp);
 		break;
 	case KEY_ILLEGAL_REQUEST:
 		sd_sense_key_illegal_request(un, bp, xp, pktp);
 		break;
 	case KEY_UNIT_ATTENTION:
-		sd_sense_key_unit_attention(un, asc, bp, xp, pktp);
+		sd_sense_key_unit_attention(un, xp->xb_sense_data,
+		    bp, xp, pktp);
 		break;
 	case KEY_WRITE_PROTECT:
 	case KEY_VOLUME_OVERFLOW:
@@ -17004,7 +17006,8 @@ sd_decode_sense(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	case KEY_EQUAL:
 	case KEY_RESERVED:
 	default:
-		sd_sense_key_default(un, sense_key, bp, xp, pktp);
+		sd_sense_key_default(un, xp->xb_sense_data,
+		    bp, xp, pktp);
 		break;
 	}
 }
@@ -17142,12 +17145,11 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 {
 	struct sd_xbuf	*xp;
 	struct scsi_pkt	*pktp;
-	struct scsi_extended_sense *sensep;
+	uint8_t *sensep;
 	daddr_t request_blkno;
 	diskaddr_t err_blkno;
 	int severity;
 	int pfa_flag;
-	int fixed_format = TRUE;
 	extern struct scsi_key_strings scsi_cmds[];
 
 	ASSERT(un != NULL);
@@ -17173,48 +17175,10 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 	/*
 	 * Now try to get the error block number from the sense data
 	 */
-	sensep = (struct scsi_extended_sense *)xp->xb_sense_data;
-	switch (sensep->es_code) {
-	case CODE_FMT_DESCR_CURRENT:
-	case CODE_FMT_DESCR_DEFERRED:
-		err_blkno =
-		    sd_extract_sense_info_descr(
-			(struct scsi_descr_sense_hdr *)sensep);
-		fixed_format = FALSE;
-		break;
-	case CODE_FMT_FIXED_CURRENT:
-	case CODE_FMT_FIXED_DEFERRED:
-	case CODE_FMT_VENDOR_SPECIFIC:
-	default:
-		/*
-		 * With the es_valid bit set, we assume that the error
-		 * blkno is in the sense data.  Also, if xp->xb_blkno is
-		 * greater than 0xffffffff then the target *should* have used
-		 * a descriptor sense format (or it shouldn't have set
-		 * the es_valid bit), and we may as well ignore the
-		 * 32-bit value.
-		 */
-		if ((sensep->es_valid != 0) && (xp->xb_blkno <= 0xffffffff)) {
-			err_blkno = (diskaddr_t)
-			    ((sensep->es_info_1 << 24) |
-			    (sensep->es_info_2 << 16) |
-			    (sensep->es_info_3 << 8)  |
-			    (sensep->es_info_4));
-		} else {
-			err_blkno = (diskaddr_t)-1;
-		}
-		break;
-	}
+	sensep = xp->xb_sense_data;
 
-	if (err_blkno == (diskaddr_t)-1) {
-		/*
-		 * Without the es_valid bit set (for fixed format) or an
-		 * information descriptor (for descriptor format) we cannot
-		 * be certain of the error blkno, so just use the
-		 * request_blkno.
-		 */
-		err_blkno = (diskaddr_t)request_blkno;
-	} else {
+	if (scsi_sense_info_uint64(sensep, SENSE_LENGTH,
+		(uint64_t *)&err_blkno)) {
 		/*
 		 * We retrieved the error block number from the information
 		 * portion of the sense data.
@@ -17227,6 +17191,14 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 		    ((pktp->pkt_flags & FLAG_SILENT) == 0)) {
 			request_blkno = err_blkno;
 		}
+	} else {
+		/*
+		 * Without the es_valid bit set (for fixed format) or an
+		 * information descriptor (for descriptor format) we cannot
+		 * be certain of the error blkno, so just use the
+		 * request_blkno.
+		 */
+		err_blkno = (diskaddr_t)request_blkno;
 	}
 
 	/*
@@ -17253,14 +17225,12 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 	}
 
 	/*
-	 * If the data is fixed format then check for Sonoma Failover,
-	 * and keep a count of how many failed I/O's.  We should not have
-	 * to worry about Sonoma returning descriptor format sense data,
-	 * and asc/ascq are in a different location in descriptor format.
+	 * Check for Sonoma Failover and keep a count of how many failed I/O's
 	 */
-	if (fixed_format &&
-	    (SD_IS_LSI(un)) && (sensep->es_key == KEY_ILLEGAL_REQUEST) &&
-	    (sensep->es_add_code == 0x94) && (sensep->es_qual_code == 0x01)) {
+	if ((SD_IS_LSI(un)) &&
+	    (scsi_sense_key(sensep) == KEY_ILLEGAL_REQUEST) &&
+	    (scsi_sense_asc(sensep) == 0x94) &&
+	    (scsi_sense_ascq(sensep) == 0x01)) {
 		un->un_sonoma_failure_count++;
 		if (un->un_sonoma_failure_count > 1) {
 			return;
@@ -17268,89 +17238,9 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 	}
 
 	scsi_vu_errmsg(SD_SCSI_DEVP(un), pktp, sd_label, severity,
-	    request_blkno, err_blkno, scsi_cmds, sensep,
+	    request_blkno, err_blkno, scsi_cmds,
+	    (struct scsi_extended_sense *)sensep,
 	    un->un_additional_codes, NULL);
-}
-
-/*
- *    Function: sd_extract_sense_info_descr
- *
- * Description: Retrieve "information" field from descriptor format
- *              sense data.  Iterates through each sense descriptor
- *              looking for the information descriptor and returns
- *              the information field from that descriptor.
- *
- *     Context: May be called from interrupt context
- */
-
-static diskaddr_t
-sd_extract_sense_info_descr(struct scsi_descr_sense_hdr *sdsp)
-{
-	diskaddr_t result;
-	uint8_t *descr_offset;
-	int valid_sense_length;
-	struct scsi_information_sense_descr *isd;
-
-	/*
-	 * Initialize result to -1 indicating there is no information
-	 * descriptor
-	 */
-	result = (diskaddr_t)-1;
-
-	/*
-	 * The first descriptor will immediately follow the header
-	 */
-	descr_offset = (uint8_t *)(sdsp+1); /* Pointer arithmetic */
-
-	/*
-	 * Calculate the amount of valid sense data
-	 */
-	valid_sense_length =
-	    min((sizeof (struct scsi_descr_sense_hdr) +
-	    sdsp->ds_addl_sense_length),
-	    SENSE_LENGTH);
-
-	/*
-	 * Iterate through the list of descriptors, stopping when we
-	 * run out of sense data
-	 */
-	while ((descr_offset + sizeof (struct scsi_information_sense_descr)) <=
-	    (uint8_t *)sdsp + valid_sense_length) {
-		/*
-		 * Check if this is an information descriptor.  We can
-		 * use the scsi_information_sense_descr structure as a
-		 * template sense the first two fields are always the
-		 * same
-		 */
-		isd = (struct scsi_information_sense_descr *)descr_offset;
-		if (isd->isd_descr_type == DESCR_INFORMATION) {
-			/*
-			 * Found an information descriptor.  Copy the
-			 * information field.  There will only be one
-			 * information descriptor so we can stop looking.
-			 */
-			result =
-			    (((diskaddr_t)isd->isd_information[0] << 56) |
-				((diskaddr_t)isd->isd_information[1] << 48) |
-				((diskaddr_t)isd->isd_information[2] << 40) |
-				((diskaddr_t)isd->isd_information[3] << 32) |
-				((diskaddr_t)isd->isd_information[4] << 24) |
-				((diskaddr_t)isd->isd_information[5] << 16) |
-				((diskaddr_t)isd->isd_information[6] << 8)  |
-				((diskaddr_t)isd->isd_information[7]));
-			break;
-		}
-
-		/*
-		 * Get pointer to the next descriptor.  The "additional
-		 * length" field holds the length of the descriptor except
-		 * for the "type" and "additional length" fields, so
-		 * we need to add 2 to get the total length.
-		 */
-		descr_offset += (isd->isd_addl_length + 2);
-	}
-
-	return (result);
 }
 
 /*
@@ -17393,10 +17283,11 @@ sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_sense_key_recoverable_error(struct sd_lun *un,
-	uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
+	uint8_t asc = scsi_sense_asc(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -17441,10 +17332,12 @@ sd_sense_key_recoverable_error(struct sd_lun *un,
 
 static void
 sd_sense_key_not_ready(struct sd_lun *un,
-	uint8_t asc, uint8_t ascq,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
+	uint8_t asc = scsi_sense_asc(sense_datap);
+	uint8_t ascq = scsi_sense_ascq(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -17710,10 +17603,12 @@ fail_command:
 
 static void
 sd_sense_key_medium_or_hardware_error(struct sd_lun *un,
-	int sense_key, uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
+	uint8_t sense_key = scsi_sense_key(sense_datap);
+	uint8_t asc = scsi_sense_asc(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -17839,7 +17734,7 @@ sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_sense_key_unit_attention(struct sd_lun *un,
-	uint8_t asc,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	/*
@@ -17850,6 +17745,7 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 	int	retry_check_flag = SD_RETRIES_UA;
 	boolean_t	kstat_updated = B_FALSE;
 	struct	sd_sense_info		si;
+	uint8_t asc = scsi_sense_asc(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -17869,6 +17765,7 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 			retry_check_flag = SD_RETRIES_STANDARD;
 			goto do_retry;
 		}
+
 		break;
 
 	case 0x29:  /* POWER ON, RESET, OR BUS DEVICE RESET OCCURRED */
@@ -17876,6 +17773,22 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 			un->un_resvd_status |=
 			    (SD_LOST_RESERVE | SD_WANT_RESERVE);
 		}
+#ifdef _LP64
+		if (un->un_blockcount + 1 > SD_GROUP1_MAX_ADDRESS) {
+			if (taskq_dispatch(sd_tq, sd_reenable_dsense_task,
+			    un, KM_NOSLEEP) == 0) {
+				/*
+				 * If we can't dispatch the task we'll just
+				 * live without descriptor sense.  We can
+				 * try again on the next "unit attention"
+				 */
+				SD_ERROR(SD_LOG_ERROR, un,
+				    "sd_sense_key_unit_attention: "
+				    "Could not dispatch "
+				    "sd_reenable_dsense_task\n");
+			}
+		}
+#endif /* _LP64 */
 		/* FALLTHRU */
 
 	case 0x28: /* NOT READY TO READY CHANGE, MEDIUM MAY HAVE CHANGED */
@@ -18054,10 +17967,11 @@ sd_sense_key_aborted_command(struct sd_lun *un, struct buf *bp,
 
 static void
 sd_sense_key_default(struct sd_lun *un,
-	int sense_key,
+	uint8_t *sense_datap,
 	struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	struct sd_sense_info	si;
+	uint8_t sense_key = scsi_sense_key(sense_datap);
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -19030,7 +18944,7 @@ sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 
 	if ((status == EIO) && (ucmd_buf.uscsi_status == STATUS_CHECK) &&
 	    (ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-	    (sense_buf.es_key == KEY_ILLEGAL_REQUEST)) {
+	    (scsi_sense_key((uint8_t *)&sense_buf) == KEY_ILLEGAL_REQUEST)) {
 		/* fake success and skip subsequent doorlock commands */
 		un->un_f_doorlock_supported = FALSE;
 		return (0);
@@ -19174,8 +19088,8 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 			 * (LOGICAL UNIT IS IN PROCESS OF BECOMING READY)
 			 */
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_add_code  == 0x04) &&
-			    (sense_buf.es_qual_code == 0x01)) {
+			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x04) &&
+			    (scsi_sense_ascq((uint8_t *)&sense_buf) == 0x01)) {
 				kmem_free(capacity_buf, SD_CAPACITY_SIZE);
 				return (EAGAIN);
 			}
@@ -19387,8 +19301,8 @@ sd_send_scsi_READ_CAPACITY_16(struct sd_lun *un, uint64_t *capp,
 			 * (LOGICAL UNIT IS IN PROCESS OF BECOMING READY)
 			 */
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_add_code  == 0x04) &&
-			    (sense_buf.es_qual_code == 0x01)) {
+			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x04) &&
+			    (scsi_sense_ascq((uint8_t *)&sense_buf) == 0x01)) {
 				kmem_free(capacity16_buf, SD_CAPACITY_16_SIZE);
 				return (EAGAIN);
 			}
@@ -19486,12 +19400,15 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 			break;
 		case STATUS_CHECK:
 			if (ucmd_buf.uscsi_rqstatus == STATUS_GOOD) {
-				switch (sense_buf.es_key) {
+				switch (scsi_sense_key(
+						(uint8_t *)&sense_buf)) {
 				case KEY_ILLEGAL_REQUEST:
 					status = ENOTSUP;
 					break;
 				case KEY_NOT_READY:
-					if (sense_buf.es_add_code == 0x3A) {
+					if (scsi_sense_asc(
+						    (uint8_t *)&sense_buf)
+					    == 0x3A) {
 						status = ENXIO;
 					}
 					break;
@@ -19773,8 +19690,9 @@ sd_send_scsi_TEST_UNIT_READY(struct sd_lun *un, int flag)
 				break;
 			}
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_key == KEY_NOT_READY) &&
-			    (sense_buf.es_add_code == 0x3A)) {
+			    (scsi_sense_key((uint8_t *)&sense_buf) ==
+				KEY_NOT_READY) &&
+			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x3A)) {
 				status = ENXIO;
 			}
 			break;
@@ -19861,7 +19779,8 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 			break;
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_key == KEY_ILLEGAL_REQUEST)) {
+			    (scsi_sense_key((uint8_t *)&sense_buf) ==
+				KEY_ILLEGAL_REQUEST)) {
 				status = ENOTSUP;
 			}
 			break;
@@ -20005,7 +19924,8 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 			break;
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_key == KEY_ILLEGAL_REQUEST)) {
+			    (scsi_sense_key((uint8_t *)&sense_buf) ==
+				KEY_ILLEGAL_REQUEST)) {
 				status = ENOTSUP;
 			}
 			break;
@@ -20123,7 +20043,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 {
 	struct sd_uscsi_info *uip;
 	struct uscsi_cmd *uscmd;
-	struct scsi_extended_sense *sense_buf;
+	uint8_t *sense_buf;
 	struct sd_lun *un;
 	int status;
 
@@ -20133,7 +20053,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 	uscmd = uip->ui_cmdp;
 	ASSERT(uscmd != NULL);
 
-	sense_buf = (struct scsi_extended_sense *)uscmd->uscsi_rqbuf;
+	sense_buf = (uint8_t *)uscmd->uscsi_rqbuf;
 	ASSERT(sense_buf != NULL);
 
 	un = ddi_get_soft_state(sd_state, SD_GET_INSTANCE_FROM_BUF(bp));
@@ -20152,7 +20072,8 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 
 		case STATUS_CHECK:
 			if ((uscmd->uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf->es_key == KEY_ILLEGAL_REQUEST)) {
+			    (scsi_sense_key(sense_buf) ==
+				KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
 				mutex_enter(SD_MUTEX(un));
 				un->un_f_sync_cache_supported = FALSE;
@@ -20777,8 +20698,9 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 			break;
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_key == KEY_ILLEGAL_REQUEST) &&
-			    (sense_buf.es_add_code == 0x24)) {
+			    (scsi_sense_key((uint8_t *)&sense_buf) ==
+				KEY_ILLEGAL_REQUEST) &&
+			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x24)) {
 				/*
 				 * ASC 0x24: INVALID FIELD IN CDB
 				 */
@@ -24362,10 +24284,11 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 {
 	struct sd_lun			*un;
 	struct scsi_status		*statusp = resultp->statusp;
-	struct scsi_extended_sense	*sensep = resultp->sensep;
+	uint8_t				*sensep = (uint8_t *)resultp->sensep;
 	enum dkio_state			state = DKIO_NONE;
 	dev_t				dev = (dev_t)arg;
 	uchar_t				actual_sense_length;
+	uint8_t				skey, asc, ascq;
 
 	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
 		return (-1);
@@ -24390,14 +24313,17 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	 * If status was not a check condition but a reservation or busy status
 	 * then the new state is DKIO_NONE
 	 */
+	skey = scsi_sense_key(sensep);
+	asc = scsi_sense_asc(sensep);
+	ascq = scsi_sense_ascq(sensep);
 	if (sensep != NULL) {
 		SD_INFO(SD_LOG_COMMON, un,
 		    "sd_media_watch_cb: sense KEY=%x, ASC=%x, ASCQ=%x\n",
-		    sensep->es_key, sensep->es_add_code, sensep->es_qual_code);
+		    skey, asc, ascq);
 		/* This routine only uses up to 13 bytes of sense data. */
 		if (actual_sense_length >= 13) {
-			if (sensep->es_key == KEY_UNIT_ATTENTION) {
-				if (sensep->es_add_code == 0x28) {
+			if (skey == KEY_UNIT_ATTENTION) {
+				if (asc == 0x28) {
 					state = DKIO_INSERTED;
 				}
 			} else {
@@ -24412,8 +24338,8 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				 * device to the right state good for
 				 * media access.
 				 */
-				if ((sensep->es_key == KEY_NOT_READY) &&
-				    (sensep->es_add_code == 0x3a)) {
+				if ((skey == KEY_NOT_READY) &&
+				    (asc == 0x3a)) {
 					state = DKIO_EJECTED;
 				}
 
@@ -24423,11 +24349,11 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				 * inserted state.
 				 */
 
-				if ((sensep->es_key == KEY_NOT_READY) &&
-				    (sensep->es_add_code == 0x04) &&
-				    ((sensep->es_qual_code == 0x02) ||
-				    (sensep->es_qual_code == 0x07) ||
-				    (sensep->es_qual_code == 0x08))) {
+				if ((skey == KEY_NOT_READY) &&
+				    (asc == 0x04) &&
+				    ((ascq == 0x02) ||
+				    (ascq == 0x07) ||
+				    (ascq == 0x08))) {
 					state = DKIO_INSERTED;
 				}
 			}
@@ -25247,14 +25173,14 @@ sd_mhd_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 {
 	struct sd_lun			*un;
 	struct scsi_status		*statusp;
-	struct scsi_extended_sense	*sensep;
+	uint8_t				*sensep;
 	struct scsi_pkt			*pkt;
 	uchar_t				actual_sense_length;
 	dev_t  				dev = (dev_t)arg;
 
 	ASSERT(resultp != NULL);
 	statusp			= resultp->statusp;
-	sensep			= resultp->sensep;
+	sensep			= (uint8_t *)resultp->sensep;
 	pkt			= resultp->pkt;
 	actual_sense_length	= resultp->actual_sense_length;
 
@@ -25295,7 +25221,8 @@ sd_mhd_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	if (sensep != NULL) {
 		if (actual_sense_length >= (SENSE_LENGTH - 2)) {
 			mutex_enter(SD_MUTEX(un));
-			if ((sensep->es_add_code == SD_SCSI_RESET_SENSE_CODE) &&
+			if ((scsi_sense_asc(sensep) ==
+			    SD_SCSI_RESET_SENSE_CODE) &&
 			    (un->un_resvd_status & SD_RESERVE)) {
 				/*
 				 * The additional sense code indicates a power
@@ -26604,7 +26531,7 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 	int timeout;
 	int rval = SD_FAILURE;
 	int savef;
-	struct scsi_extended_sense *sensep;
+	uint8_t *sensep;
 	long savet;
 	void (*savec)();
 	/*
@@ -26678,7 +26605,7 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 				struct scsi_arq_status *arqstat =
 				    (struct scsi_arq_status *)(pkt->pkt_scbp);
 
-				sensep = &arqstat->sts_sensedata;
+				sensep = (uint8_t *)&arqstat->sts_sensedata;
 			} else {
 				sensep = NULL;
 			}
@@ -26710,15 +26637,16 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 				busy_count += (SD_SEC_TO_CSEC - 1);
 
 			} else if ((sensep != NULL) &&
-			    (sensep->es_key == KEY_UNIT_ATTENTION)) {
+			    (scsi_sense_key(sensep) ==
+				KEY_UNIT_ATTENTION)) {
 				/* Unit Attention - try again */
 				busy_count += (SD_SEC_TO_CSEC - 1); /* 1 */
 				continue;
 
 			} else if ((sensep != NULL) &&
-			    (sensep->es_key == KEY_NOT_READY) &&
-			    (sensep->es_add_code == 0x04) &&
-			    (sensep->es_qual_code == 0x01)) {
+			    (scsi_sense_key(sensep) == KEY_NOT_READY) &&
+			    (scsi_sense_asc(sensep) == 0x04) &&
+			    (scsi_sense_ascq(sensep) == 0x01)) {
 				/* Not ready -> ready - try again. */
 				poll_delay = 100 * SD_CSEC; /* 1 sec. */
 				busy_count += (SD_SEC_TO_CSEC - 1);

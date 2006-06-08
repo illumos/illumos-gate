@@ -338,6 +338,11 @@ struct mode_control_scsi3 {
 	uchar_t	reserved_2[2];
 };
 
+#ifdef __lock_lint
+_NOTE(SCHEME_PROTECTS_DATA("Unshared SCSI payload", \
+	mode_control_scsi3))
+#endif
+
 #define	CTRL_QMOD_RESTRICT	0x0
 #define	CTRL_QMOD_UNRESTRICT	0x1
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_IMPL_SENSE_H
@@ -91,6 +90,55 @@ extern "C" {
 #define	emulex_cyl_lsb		es_info_2
 #define	emulex_head_num		es_info_3
 #define	emulex_sect_num		es_info_4
+
+struct scsi_descr_template {
+	uchar_t sdt_descr_type;
+	uchar_t sdt_addl_length;
+};
+
+/*
+ * Function prototypes for descriptor-format sense data functions
+ */
+
+uint8_t *scsi_find_sense_descr(uint8_t *sense_buffer, int sense_buf_len,
+    int descr_type);
+
+/*
+ * Function prototypes for format-neutral sense data functions
+ */
+
+uint8_t scsi_sense_key(uint8_t *sense_buffer);
+
+uint8_t scsi_sense_asc(uint8_t *sense_buffer);
+
+uint8_t scsi_sense_ascq(uint8_t *sense_buffer);
+
+boolean_t scsi_sense_info_uint64(uint8_t *sense_buffer,
+    int sense_buf_len, uint64_t *information);
+
+boolean_t scsi_sense_cmdspecific_uint64(uint8_t *sense_buffer,
+    int sense_buf_len, uint64_t *cmd_spec_info);
+
+void scsi_ext_sense_fields(uint8_t *sense_buffer, int sense_buf_len,
+    uint8_t **information, uint8_t **cmd_spec_info, uint8_t **fru_code,
+    uint8_t **sk_specific, uint8_t **stream_flags);
+
+int scsi_validate_sense(uint8_t *sense_buffer, int sense_buf_len, int *flags);
+
+/*
+ * Return codes for scsi_validate_sense
+ */
+
+#define	SENSE_UNUSABLE		0
+#define	SENSE_FIXED_FORMAT	1
+#define	SENSE_DESCR_FORMAT	2
+
+/*
+ * Flags from scsi_validate_sense
+ */
+
+#define	SNS_BUF_OVERFLOW	1	/* Sense buffer too small */
+#define	SNS_BUF_DEFERRED 	2 	/* Sense data is for prior operation */
 
 #ifdef	__cplusplus
 }

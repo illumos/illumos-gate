@@ -1248,10 +1248,10 @@ struct sd_fi_arq {
 #define	SD_DONT_RETRY_TUR		0x02
 #define	SD_BYPASS_PM			0x04
 
-#define	SD_GROUP0_MAXADDR	(2 << 20)
+#define	SD_GROUP0_MAX_ADDRESS	(0x1fffff)
 #define	SD_GROUP0_MAXCOUNT	(0xff)
+#define	SD_GROUP1_MAX_ADDRESS	(0xffffffff)
 #define	SD_GROUP1_MAXCOUNT	(0xffff)
-
 
 #define	SD_BECOMING_ACTIVE	0x01
 #define	SD_REMOVAL_ALLOW	0

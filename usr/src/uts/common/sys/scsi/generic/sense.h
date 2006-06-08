@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +71,8 @@ struct scsi_sense {
  */
 
 #define	CLASS_EXTENDED_SENSE	0x7	/* indicates extended sense */
+#define	ADDL_SENSE_ADJUST	0x8	/* Add to es_add_length for total */
+#define	MIN_FIXED_SENSE_LEN	0xE	/* Minimum allowed fixed buf len */
 
 struct scsi_extended_sense {
 #if defined(_BIT_FIELDS_LTOH)
@@ -136,6 +137,12 @@ struct scsi_extended_sense {
 #define	CODE_FMT_DESCR_CURRENT		0x2
 #define	CODE_FMT_DESCR_DEFERRED		0x3
 #define	CODE_FMT_VENDOR_SPECIFIC	0xF
+
+#define	SCSI_IS_DESCR_SENSE(sns_ptr) \
+	(((((struct scsi_extended_sense *)(sns_ptr))->es_code) == \
+	    CODE_FMT_DESCR_CURRENT) || \
+	    ((((struct scsi_extended_sense *)(sns_ptr))->es_code) == \
+		CODE_FMT_DESCR_DEFERRED))
 
 /*
  * Sense Key values for Extended Sense.
@@ -221,72 +228,74 @@ struct scsi_cmd_specific_sense_descr {
 	uchar_t css_cmd_specific_info[8]; /* Command specific info	*/
 };
 
+union scsi_sk_specific_data {
+	/*
+	 * Field pointer (Sense key = Illegal Request)
+	 */
+	struct {
+#if defined(_BIT_FIELDS_LTOH)
+		uchar_t	bit_pointer	: 3,
+			bpv		: 1,
+			reserved	: 2,
+			cd		: 1,
+			sksv		: 1;
+#elif defined(_BIT_FIELDS_HTOL)
+		uchar_t	sksv		: 1,
+			cd		: 1,
+			reserved	: 2,
+			bpv		: 1,
+			bit_pointer	: 3;
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
+		uchar_t field_pointer[2];
+	} fp;
+	/*
+	 * Actual Retry Count (Sense key = Hardware error,
+	 * Medium Error or Recovered Error)
+	 */
+	struct {
+		uchar_t sksv;
+		uchar_t actual_retry_count[2];
+	} arc;
+	/*
+	 * Progress Indication (Sense key = No Sense or Not Ready
+	 */
+	struct {
+		uchar_t sksv;
+		uchar_t progress_indication[2];
+	} pi;
+	/*
+	 * Segment Pointer (Sense key = Copy Aborted)
+	 */
+	struct {
+#if defined(_BIT_FIELDS_LTOH)
+		uchar_t	bit_pointer	: 3,
+			bpv		: 1,
+			reserved	: 1,
+			sd		: 1,
+			reserved2	: 1,
+			sksv		: 1;
+#elif defined(_BIT_FIELDS_HTOL)
+		uchar_t	sksv		: 1,
+			reserved2	: 1,
+			sd		: 1,
+			reserved	: 1,
+			bpv		: 1,
+			bit_pointer	: 3;
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
+		uchar_t field_pointer[2];
+	} sp;
+};
+
 struct scsi_sk_specific_sense_descr {
 	uchar_t sss_descr_type;		/* Descriptor type 		*/
 	uchar_t sss_addl_length;	/* Additional byte count (0x06)	*/
 	uchar_t sss_reserved[2];	/* reserved 			*/
-	union {
-		/*
-		 * Field pointer (Sense key = Illegal Request)
-		 */
-		struct {
-#if defined(_BIT_FIELDS_LTOH)
-			uchar_t	bit_pointer	: 3,
-				bpv		: 1,
-				reserved	: 2,
-				cd		: 1,
-				sksv		: 1;
-#elif defined(_BIT_FIELDS_HTOL)
-			uchar_t	sksv		: 1,
-				cd		: 1,
-				reserved	: 2,
-				bpv		: 1,
-				bit_pointer	: 3;
-#else
-#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
-#endif	/* _BIT_FIELDS_LTOH */
-			uchar_t field_pointer[2];
-		} fp;
-		/*
-		 * Actual Retry Count (Sense key = Hardware error,
-		 * Medium Error or Recovered Error)
-		 */
-		struct {
-			uchar_t sksv;
-			uchar_t actual_retry_count[2];
-		} arc;
-		/*
-		 * Progress Indication (Sense key = No Sense or Not Ready
-		 */
-		struct {
-			uchar_t sksv;
-			uchar_t progress_indication[2];
-		} pi;
-		/*
-		 * Segment Pointer (Sense key = Copy Aborted)
-		 */
-		struct {
-#if defined(_BIT_FIELDS_LTOH)
-			uchar_t	bit_pointer	: 3,
-				bpv		: 1,
-				reserved	: 1,
-				sd		: 1,
-				reserved2	: 1,
-				sksv		: 1;
-#elif defined(_BIT_FIELDS_HTOL)
-			uchar_t	sksv		: 1,
-				reserved2	: 1,
-				sd		: 1,
-				reserved	: 1,
-				bpv		: 1,
-				bit_pointer	: 3;
-#else
-#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
-#endif	/* _BIT_FIELDS_LTOH */
-			uchar_t field_pointer[2];
-		} sp;
-	} sss_data;
-	uchar_t sss_reserved2;		/* reserved 			*/
+	union	scsi_sk_specific_data sss_data;
+	uchar_t sss_reserved2;
 };
 
 struct scsi_fru_sense_descr {
@@ -296,10 +305,7 @@ struct scsi_fru_sense_descr {
 	uchar_t fs_fru_code; 		/* Field Replaceable Unit Code	*/
 };
 
-struct scsi_stream_cmd_sense_descr {
-	uchar_t scs_descr_type;		/* Descriptor type (0x04)	*/
-	uchar_t scs_addl_length;	/* Additional byte count (0x02)	*/
-	uchar_t scs_reserved;		/* reserved 			*/
+struct scsi_stream_cmd_data {
 #if defined(_BIT_FIELDS_LTOH)
 	uchar_t	scs_reserved2	: 5,
 		scs_ili		: 1,
@@ -313,6 +319,13 @@ struct scsi_stream_cmd_sense_descr {
 #else
 #error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
 #endif	/* _BIT_FIELDS_LTOH */
+};
+
+struct scsi_stream_cmd_sense_descr {
+	uchar_t scs_descr_type;		/* Descriptor type (0x04)	*/
+	uchar_t scs_addl_length;	/* Additional byte count (0x02)	*/
+	uchar_t scs_reserved;		/* reserved 			*/
+	struct scsi_stream_cmd_data scs_data;
 };
 
 struct scsi_block_cmd_sense_descr {
@@ -350,6 +363,9 @@ struct scsi_vendor_specific_sense_descr {
 #define	DESCR_FRU			0x03
 #define	DESCR_STREAM_COMMANDS		0x04
 #define	DESCR_BLOCK_COMMANDS		0x05
+#define	DESCR_OSD_OID			0x06
+#define	DESCR_OSD_RESP_INTEGRITY	0x07
+#define	DESCR_OSD_ATTR_ID		0x08
 
 #ifdef	__cplusplus
 }
