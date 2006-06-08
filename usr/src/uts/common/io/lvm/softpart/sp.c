@@ -961,6 +961,7 @@ md_sp_strategy(buf_t *parent_buf, int flag, void *private)
 			parent_buf->b_flags |= B_ERROR;
 			parent_buf->b_error = ENXIO;
 			parent_buf->b_resid = parent_buf->b_bcount;
+			md_kstat_waitq_exit(ui);
 			md_unit_readerexit(ui);
 			biodone(parent_buf);
 			return;
@@ -1107,6 +1108,7 @@ sp_directed_read(minor_t mnum, vol_directed_rd_t *vdr, int mode)
 	kbuffer = kmem_alloc(vdr->vdr_nbytes, KM_NOSLEEP);
 	if (kbuffer == NULL) {
 		vdr->vdr_flags |= DKV_DMR_ERROR;
+		md_kstat_waitq_exit(ui);
 		md_unit_readerexit(ui);
 		return (ENOMEM);
 	}
@@ -1114,6 +1116,7 @@ sp_directed_read(minor_t mnum, vol_directed_rd_t *vdr, int mode)
 	parent_buf = getrbuf(KM_NOSLEEP);
 	if (parent_buf == NULL) {
 		vdr->vdr_flags |= DKV_DMR_ERROR;
+		md_kstat_waitq_exit(ui);
 		md_unit_readerexit(ui);
 		kmem_free(kbuffer, vdr->vdr_nbytes);
 		return (ENOMEM);
@@ -1140,6 +1143,8 @@ sp_directed_read(minor_t mnum, vol_directed_rd_t *vdr, int mode)
 	current_count = parent_buf->b_bcount;
 	current_blkno = (sp_ext_offset_t)parent_buf->b_lblkno;
 	current_offset  = 0;
+
+	md_kstat_waitq_to_runq(ui);
 
 	ps->ps_frags++;
 	vdr->vdr_bytesread = 0;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1066,12 +1065,31 @@ morethan2_ctl_balance(
 {
 	md_ctlr_ctl_t		*c;
 	int			err;
+	int			multiple_reps = 0;
+	md_ctlr_drv_t		*d;
 
 	for (c = clp; c != NULL; c = c->ctl_next) {
 		if (c->ctl_drcnt == 0)
 			continue;
 
-		while (c->ctl_dbcnt < min_reps) {
+		/*
+		 * check for multiple databases on a disk and compensate
+		 */
+		for (d = c->ctl_drvs; d != NULL; d = d->drv_next) {
+			if (d->drv_dbcnt)
+				multiple_reps += d->drv_dbcnt - 1;
+		}
+
+		/*
+		 * remove the number of multiple databases count from the
+		 * total db count. This enables us to rebalance if one of
+		 * the disks has a large enough slice for 2 metadb's. If we
+		 * then add a disk with a smaller slice into the set, we want
+		 * that disk to get a replica on it. If we just compare to
+		 * ctl_dbcnt, it won't.
+		 */
+		while ((c->ctl_dbcnt - multiple_reps) <
+		    min_reps) {
 			if ((err = add_replica_to_ctl(sp, c, min_reps, ep)) < 0)
 				return (-1);
 			if (err == 0)
@@ -1099,12 +1117,31 @@ lessthan3_ctl_balance(
 {
 	md_ctlr_ctl_t		*c;
 	int			err;
+	int			multiple_reps = 0;
+	md_ctlr_drv_t		*d;
 
 	for (c = clp; c != NULL; c = c->ctl_next) {
 		if (c->ctl_drcnt == 0)
 			continue;
 
-		while (c->ctl_dbcnt < (min_reps * c->ctl_drcnt)) {
+		/*
+		 * check for multiple databases on a disk and compensate
+		 */
+		for (d = c->ctl_drvs; d != NULL; d = d->drv_next) {
+			if (d->drv_dbcnt)
+				multiple_reps += d->drv_dbcnt - 1;
+		}
+
+		/*
+		 * remove the number of multiple databases count from the
+		 * total db count. This enables us to rebalance if one of
+		 * the disks has a large enough slice for 2 metadb's. If we
+		 * then add a disk with a smaller slice into the set, we want
+		 * that disk to get a replica on it. If we just compare to
+		 * ctl_dbcnt, it won't.
+		 */
+		while ((c->ctl_dbcnt - multiple_reps) <
+		    (min_reps * c->ctl_drcnt)) {
 			if ((err = add_replica_to_ctl(sp, c, min_reps, ep)) < 0)
 				return (-1);
 			if (err == 0)

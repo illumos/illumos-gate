@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +30,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/uadmin.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <thread.h>
@@ -519,6 +519,9 @@ global_init(void)
 	md_mn_msgclass_t	class;
 	struct sigaction	sighandler;
 	time_t			clock_val;
+	struct rlimit		commd_limit;
+
+
 
 	/* Do these global initializations only once */
 	if (md_commd_global_state & MD_CGS_INITED) {
@@ -528,6 +531,13 @@ global_init(void)
 
 	/* setup the debug options from the config file */
 	setup_debug();
+
+	/* make sure that we don't run out of file descriptors */
+	commd_limit.rlim_cur = commd_limit.rlim_max = RLIM_INFINITY;
+	if (setrlimit(RLIMIT_NOFILE, &commd_limit) != 0) {
+		syslog(LOG_WARNING, gettext("setrlimit failed."
+		    "Could not increase the max file descriptors"));
+	}
 
 	/* Make setup_debug() be the action in case of SIGHUP */
 	sighandler.sa_flags = 0;

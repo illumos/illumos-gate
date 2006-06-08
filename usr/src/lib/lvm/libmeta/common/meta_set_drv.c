@@ -224,6 +224,7 @@ meta_set_adddrives(
 	int			suspend1_flag = 0;
 	int			lock_flag = 0;
 	int			flush_set_onerr = 0;
+	md_replicalist_t	*rlp = NULL, *rl;
 
 	if ((sd = metaget_setdesc(sp, ep)) == NULL)
 		return (-1);
@@ -362,31 +363,6 @@ meta_set_adddrives(
 	}
 
 	/*
-	 * Slam a dummy master block on all the disks that we are adding
-	 * Used by diskset import if the disksets are remotely replicated
-	 */
-	for (ddp = dd; ddp != NULL; ddp = ddp->dd_next) {
-		uint_t		rep_slice;
-		int		fd = -1;
-		mdname_t	*np = NULL;
-
-		if (meta_replicaslice(ddp->dd_dnp, &rep_slice, &xep) != 0) {
-			mdclrerror(&xep);
-			continue;
-		}
-
-		if ((np = metaslicename(ddp->dd_dnp, rep_slice, &xep))
-		    == NULL) {
-			mdclrerror(&xep);
-			continue;
-		}
-
-		if ((fd = open(np->rname, O_RDWR)) >= 0) {
-			meta_mkdummymaster(sp, fd, 16);
-			(void) close(fd);
-		}
-	}
-	/*
 	 * Get the set timeout information.
 	 */
 	(void) memset(&mhiargs, '\0', sizeof (mhiargs));
@@ -517,6 +493,59 @@ meta_set_adddrives(
 	 */
 	if ((rval = meta_db_balance(sp, dd, curdd, dbsize, ep)) == -1)
 		goto rollback;
+
+	/*
+	 * Slam a dummy master block on all the disks that we are adding
+	 * that don't have replicas on them.
+	 * Used by diskset import if the disksets are remotely replicated
+	 */
+	if (metareplicalist(sp, MD_BASICNAME_OK, &rlp, ep) >= 0) {
+		for (ddp = dd; ddp != NULL; ddp = ddp->dd_next) {
+			uint_t		rep_slice;
+			int		fd = -1;
+			mdname_t	*np = NULL;
+			char		*drive_name;
+
+			drive_name = ddp->dd_dnp->cname;
+
+			for (rl = rlp; rl != NULL; rl = rl->rl_next) {
+				char	*rep_name;
+
+				rep_name =
+				    rl->rl_repp->r_namep->drivenamep->cname;
+
+				if (strcmp(drive_name, rep_name) == 0) {
+					/*
+					 * Disk has a replica on it so don't
+					 * add dummy master block.
+					 */
+					break;
+				}
+			}
+			if (rl == NULL) {
+				/*
+				 * Drive doesn't have a replica on it so
+				 * we need a dummy master block. Add it.
+				 */
+				if (meta_replicaslice(ddp->dd_dnp, &rep_slice,
+				    &xep) != 0) {
+					mdclrerror(&xep);
+					continue;
+				}
+
+				if ((np = metaslicename(ddp->dd_dnp, rep_slice,
+				    &xep)) == NULL) {
+					mdclrerror(&xep);
+					continue;
+				}
+
+				if ((fd = open(np->rname, O_RDWR)) >= 0) {
+					meta_mkdummymaster(sp, fd, 16);
+					(void) close(fd);
+				}
+			}
+		}
+	}
 
 	if ((curdd == NULL) && (MD_MNSET_DESC(sd))) {
 		/*

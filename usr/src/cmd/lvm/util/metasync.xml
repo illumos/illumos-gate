@@ -30,17 +30,17 @@
 	operating system upgrade.  Make customizations in a different
 	file.
 
-	Service manifest for mdmonitord.
+	Service manifest for metasync.
 -->
 
-<service_bundle type='manifest' name='SUNWmdr:mdmonitord'>
+<service_bundle type='manifest' name='SUNWmdr:metasync'>
 
 <service
-	name='system/mdmonitor'
+	name='system/metasync'
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
+	<create_default_instance enabled='true' />
 
 	<single_instance />
 
@@ -48,7 +48,7 @@
 	    name='usr'
 	    type='service'
 	    grouping='require_all'
-	    restart_on='refresh'>
+	    restart_on='none'>
 		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
@@ -60,16 +60,8 @@
 		<service_fmri value='svc:/system/metainit' />
 	</dependency>
 
-	<dependency
-	    name='metad'
-	    type='service'
-	    grouping='optional_all'
-	    restart_on='none'>
-		<service_fmri value='svc:/network/rpc/meta' />
-	</dependency>
-
 	<dependent
-	    name='mdmonitord_multi-user'
+	    name='metasync_multi-user'
 	    grouping='optional_all'
 	    restart_on='none'>
 		<service_fmri value='svc:/milestone/multi-user' />
@@ -78,33 +70,37 @@
 	<exec_method
 	    type='method'
 	    name='start'
-	    exec='/lib/svc/method/svc-mdmonitor'
-	    timeout_seconds='60' />
+	    exec='/lib/svc/method/svc-metasync'
+	    timeout_seconds='180' />
 
 	<exec_method
 	    type='method'
 	    name='stop'
 	    exec=':true'
-	    timeout_seconds='60' />
+	    timeout_seconds='2' />
 
 	<property_group
 	    name='startd'
 	    type='framework'>
-		<propval name='duration' type='astring' value='transient' />
+		<propval
+		    name='duration'
+		    type='astring'
+		    value='transient' />
 	</property_group>
+
 
 	<stability value='Unstable' />
 
 	<template>
 	    	<common_name>
 		    	<loctext xml:lang='C'>
-				SVM monitor
+				SVM metasync
 			</loctext>
 		</common_name>
 
 		<documentation>
 		    	<manpage
-			    title='mdmonitord'
+			    title='metasync'
 			    section='1M'
 			    manpath='/usr/share/man' />
 		</documentation>

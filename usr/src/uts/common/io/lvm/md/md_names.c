@@ -4270,12 +4270,21 @@ md_resolve_bydevid(minor_t mnum, md_dev64_t device, mdkey_t key)
 			if (update &&
 				!(md_get_setstatus(setno) & MD_SET_STALE)) {
 				n->n_minor = md_getminor(targ_dev);
-				n->n_drv_key = setshared_name(setno,
-					md_targ_major_to_name(
-						md_getmajor(targ_dev)),
-						MD_KEYWILD, 0L);
-				(void) update_entry(nh,
-					MD_SIDEWILD, n->n_key, 0L);
+				/*
+				 * If we have the key for the driver get
+				 * it and update the entry. If it's not there
+				 * we need to create it.
+				 */
+				if ((n->n_drv_key = getshared_key(setno,
+				    md_targ_major_to_name(
+				    md_getmajor(targ_dev)), 0L)) == MD_KEYBAD) {
+					n->n_drv_key = setshared_name(setno,
+					    md_targ_major_to_name(
+					    md_getmajor(targ_dev)),
+					    MD_KEYWILD, 0L);
+				}
+				(void) update_entry(nh, MD_SIDEWILD,
+				    n->n_key, 0L);
 			}
 			/*
 			 * Free memory

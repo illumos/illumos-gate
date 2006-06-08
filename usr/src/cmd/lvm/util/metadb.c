@@ -463,6 +463,9 @@ chngdb(
 			if (default_size && (nblks > 0))
 				dbsize = nblks;	/* adjust replica size */
 
+			if (dbsize > maxblks)
+				usage(sp, gettext("size (-l) is too big"));
+
 			rval = meta_db_attach(sp, dbnlp, options, NULL, dbcnt,
 			    dbsize, sysfilename, ep);
 			if (rval) {
@@ -607,13 +610,15 @@ info(
 	    " c - replica's location was in %s\n"
 	    " p - replica's location was patched in kernel\n"
 	    " m - replica is master, this is replica selected as input\n"
+	    " t - tagged data is associated with the replica\n"
 	    " W - replica has device write errors\n"
 	    " a - replica is active, commits are occurring to this replica\n"
 	    " M - replica had problem with master blocks\n"
 	    " D - replica had problem with data blocks\n"
 	    " F - replica had format problems\n"
 	    " S - replica is too small to hold current data base\n"
-	    " R - replica had device read errors\n"),
+	    " R - replica had device read errors\n"
+	    " B - tagged data associated with the replica is not valid\n"),
 	    META_DBCONF);
 	return (0);
 }

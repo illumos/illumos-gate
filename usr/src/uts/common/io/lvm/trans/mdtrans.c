@@ -649,6 +649,7 @@ md_trans_strategy(buf_t *pb, int flag, void *private)
 		pb->b_flags |= B_ERROR;
 		pb->b_error = ENXIO;
 		pb->b_resid = pb->b_bcount;
+		md_kstat_waitq_exit(ui);
 		md_unit_readerexit(ui);
 		biodone(pb);
 		return;
