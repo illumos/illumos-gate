@@ -133,14 +133,26 @@ int mdi_devi_online(dev_info_t *, uint_t);
 int mdi_devi_offline(dev_info_t *, uint_t);
 
 /*
+ * MDI devinfo locking functions.
+ */
+void mdi_devi_enter(dev_info_t *, int *);
+void mdi_devi_exit_phci(dev_info_t *, int);
+void mdi_devi_enter_phci(dev_info_t *, int *);
+void mdi_devi_exit(dev_info_t *, int);
+
+/*
+ * MDI device support functions.
+ */
+dev_info_t *mdi_devi_get_vdip(dev_info_t *);
+int mdi_devi_pdip_entered(dev_info_t *);
+
+/*
  * MDI component device instance attach/detach notification
  */
 int mdi_pre_attach(dev_info_t *, ddi_attach_cmd_t);
 void mdi_post_attach(dev_info_t *, ddi_attach_cmd_t, int);
 int mdi_pre_detach(dev_info_t *, ddi_detach_cmd_t);
 void mdi_post_detach(dev_info_t *, ddi_detach_cmd_t, int);
-
-int mdi_devi_config_one(dev_info_t *, char *, dev_info_t **, int, clock_t);
 
 /*
  * mdi_pathinfo management functions.
@@ -152,6 +164,9 @@ int mdi_pi_alloc(dev_info_t *, char *, char *, char *, int, mdi_pathinfo_t **);
 int mdi_pi_alloc_compatible(dev_info_t *, char *, char *, char *,
 	char **, int, int, mdi_pathinfo_t **);
 int mdi_pi_free(mdi_pathinfo_t *, int);
+
+void mdi_hold_path(mdi_pathinfo_t *);
+void mdi_rele_path(mdi_pathinfo_t *);
 
 /*
  * mdi_pathinfo node state change functions.

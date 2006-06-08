@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1192,8 +1191,6 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 
 		return (rval);
 	}
-	case DDI_CTLOPS_BTOP:
-	case DDI_CTLOPS_BTOPR:
 	case DDI_CTLOPS_DETACH:
 		{
 		dev_info_t *child = (dev_info_t *)rdip;
@@ -1297,6 +1294,8 @@ pshot_ctl(dev_info_t *dip, dev_info_t *rdip,
 		return (rval);
 	}
 
+	case DDI_CTLOPS_BTOP:
+	case DDI_CTLOPS_BTOPR:
 	case DDI_CTLOPS_DVMAPAGESIZE:
 	case DDI_CTLOPS_IOMIN:
 	case DDI_CTLOPS_PTOB:
@@ -2600,9 +2599,6 @@ pshot_bus_config(dev_info_t *parent, uint_t flags,
 		break;
 
 	case BUS_CONFIG_DRIVER:
-		rval = NDI_FAILURE;
-		break;
-
 	case BUS_CONFIG_ALL:
 		rval = NDI_SUCCESS;
 		break;
@@ -2894,6 +2890,7 @@ pshot_bus_config_setup_nexus(dev_info_t *parent, char *cname, char *caddr)
 			    "pshot%d: bus_config one %s@%s found\n",
 			    ddi_get_instance(parent), cname, caddr);
 		}
+
 		/*
 		 * create the "pm-want-child-notification?" property
 		 * for this child, if it doesn't already exist

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +58,7 @@
 #include <sys/fs/snode.h>
 #include <sys/sunndi.h>
 #include <sys/policy.h>
+#include <sys/sunmdi.h>
 
 /*
  * devfs vfs operations.
@@ -341,6 +341,31 @@ devfs_dip_to_dvnode(dev_info_t *dip)
 }
 
 /*
+ * If DV_CLEAN_FORCE devfs_clean is issued with a dip that is not the root
+ * and not a vHCI we also need to clean any vHCI branches because they
+ * may contain pHCI nodes. A detach_node() of a pHCI will fail if its
+ * mdi_devi_offline() fails, and the mdi_devi_offline() of the last
+ * pHCI will fail unless an ndi_devi_offline() of the Client nodes under
+ * the vHCI is successful - which requires a clean vHCI branch to removed
+ * the devi_refs associated with devfs vnodes.
+ */
+static int
+devfs_clean_vhci(dev_info_t *dip, void *args)
+{
+	struct dv_node	*dvp;
+	uint_t		flags = (uint_t)(uintptr_t)args;
+
+	(void) tsd_set(devfs_clean_key, (void *)1);
+	dvp = devfs_dip_to_dvnode(dip);
+	(void) tsd_set(devfs_clean_key, NULL);
+	if (dvp) {
+		(void) dv_cleandir(dvp, NULL, flags);
+		VN_RELE(DVTOV(dvp));
+	}
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
  * devfs_clean()
  *
  * Destroy unreferenced dv_node's and detach devices.
@@ -362,7 +387,8 @@ devfs_dip_to_dvnode(dev_info_t *dip)
 int
 devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 {
-	struct dv_node *dvp;
+	struct dv_node		*dvp;
+	int			rval = 0;
 
 	dcmn_err(("devfs_unconfigure: dip = 0x%p, flags = 0x%x",
 		(void *)dip, flags));
@@ -374,12 +400,31 @@ devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 	if (dvp == NULL)
 		return (0);
 
-	if (dv_cleandir(dvp, devnm, flags) != 0) {
-		VN_RELE(DVTOV(dvp));
-		return (EBUSY);
-	}
+	if (dv_cleandir(dvp, devnm, flags) != 0)
+		rval = EBUSY;
 	VN_RELE(DVTOV(dvp));
-	return (0);
+
+	/*
+	 * If we are doing a DV_CLEAN_FORCE, and we did not start at the
+	 * root, and we did not start at a vHCI node then clean vHCI
+	 * branches too.  Failure to clean vHCI branch does not cause EBUSY.
+	 *
+	 * Also, to accommodate nexus callers that clean 'self' to DR 'child'
+	 * (like pcihp) we clean vHCIs even when dv_cleandir() of dip branch
+	 * above fails - this prevents a busy DR 'child' sibling from causing
+	 * the DR of 'child' to fail because a vHCI branch was not cleaned.
+	 */
+	if ((flags & DV_CLEAN_FORCE) && (dip != ddi_root_node()) &&
+	    (mdi_component_is_vhci(dip, NULL) != MDI_SUCCESS)) {
+		/*
+		 * NOTE: for backport the following is recommended
+		 * 	(void) devfs_clean_vhci(scsi_vhci_dip,
+		 *	    (void *)(uintptr_t)flags);
+		 */
+		mdi_walk_vhcis(devfs_clean_vhci, (void *)(uintptr_t)flags);
+	}
+
+	return (rval);
 }
 
 /*

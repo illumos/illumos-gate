@@ -1663,7 +1663,6 @@ pm_set_power(dev_info_t *dip, int comp, int level, int direction,
 	return (ret);
 }
 
-
 static dev_info_t *
 find_dip(dev_info_t *dip, char *dev_name, int holddip)
 {
@@ -2026,13 +2025,17 @@ e_pm_hold_rele_power(dev_info_t *dip, int cnt)
 	if ((dip == NULL) ||
 	    (PM_GET_PM_INFO(dip) == NULL) || PM_ISBC(dip))
 		return;
+
 	PM_LOCK_POWER(dip, &circ);
 	ASSERT(cnt >= 0 && PM_KUC(dip) >= 0 || cnt < 0 && PM_KUC(dip) > 0);
 	PMD(PMD_KIDSUP, ("%s: kidsupcnt for %s@%s(%s#%d) %d->%d\n", pmf,
 	    PM_DEVICE(dip), PM_KUC(dip), (PM_KUC(dip) + cnt)))
+
 	PM_KUC(dip) += cnt;
+
 	ASSERT(PM_KUC(dip) >= 0);
 	PM_UNLOCK_POWER(dip, circ);
+
 	if (cnt < 0 && PM_KUC(dip) == 0)
 		pm_rescan(dip);
 }
@@ -4604,7 +4607,8 @@ pm_stop(dev_info_t *dip)
 				DEVI(dip)->devi_pm_flags &= ~PMC_NOPMKID;
 				if (pdip && !PM_WANTS_NOTIFICATION(pdip)) {
 					pm_rele_power(pdip);
-				} else if (pdip && MDI_VHCI(pdip)) {
+				} else if (pdip &&
+				    MDI_VHCI(pdip) && MDI_CLIENT(dip)) {
 					(void) mdi_power(pdip,
 					    MDI_PM_RELE_POWER,
 					    (void *)dip, NULL, 0);
@@ -4897,7 +4901,7 @@ pm_start(dev_info_t *dip)
 		DEVI(dip)->devi_pm_flags |= PMC_NOPMKID;
 		if (pdip && !PM_WANTS_NOTIFICATION(pdip)) {
 			pm_hold_power(pdip);
-		} else if (pdip && MDI_VHCI(pdip)) {
+		} else if (pdip && MDI_VHCI(pdip) && MDI_CLIENT(dip)) {
 			(void) mdi_power(pdip, MDI_PM_HOLD_POWER,
 			    (void *)dip, NULL, 0);
 		}
