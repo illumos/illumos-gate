@@ -150,9 +150,9 @@ MACHINE_DEFS	+= -DITLB_32M_256M_SUPPORT
 #
 # OLYMPUS C cross-call erratas.
 #  - revision A can only deliver one xcall at a time.
-#  - revision B can dispatch xcalls to 32 (IDSR_BN_SETS) CPUs at a time,
+#  - revision B can dispatch xcalls to 31 (IDSR_BN_SETS) CPUs at a time,
 #    but it can not send more xcalls until all the pending xcalls are
-#    dispatched. In other words, all previous 32 xcall slots must be
+#    dispatched. In other words, all previous 31 xcall slots must be
 #    in non-busy state before further xcalls can be issued.
 MACHINE_DEFS += -DOLYMPUS_C_REV_A_ERRATA_XCALL
 MACHINE_DEFS += -DOLYMPUS_C_REV_B_ERRATA_XCALL

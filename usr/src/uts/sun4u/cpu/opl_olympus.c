@@ -267,6 +267,18 @@ cpu_fiximp(pnode_t dnode)
 	vac = 1;
 }
 
+#ifdef	OLYMPUS_C_REV_B_ERRATA_XCALL
+/*
+ * Quick and dirty way to redefine locally in
+ * OPL the value of IDSR_BN_SETS to 31 instead
+ * of the standard 32 value. This is to workaround
+ * REV_B of Olympus_c processor's problem in handling
+ * more than 31 xcall broadcast.
+ */
+#undef	IDSR_BN_SETS
+#define	IDSR_BN_SETS    31
+#endif	/* OLYMPUS_C_REV_B_ERRATA_XCALL */
+
 void
 send_mondo_set(cpuset_t set)
 {
