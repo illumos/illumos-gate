@@ -1325,13 +1325,15 @@ wrtblklst(
 	 * If a MN diskset and only the master can write,
 	 * then a non-master node will just return success.
 	 */
-	if ((lbp->lb_flags & MDDB_MNSET) &&
-	    (master_only == MDDB_WR_ONLY_MASTER)) {
-
-		/* return successfully if we aren't the master */
-		if (!(md_set[s->s_setno].s_am_i_master)) {
-			return (0);
+	if (lbp->lb_flags & MDDB_MNSET) {
+		if (master_only == MDDB_WR_ONLY_MASTER) {
+			/* return successfully if we aren't the master */
+			if (!(md_set[s->s_setno].s_am_i_master)) {
+				return (0);
+			}
 		}
+		if (mbip == NULL)
+			return (MDDB_F_EWRITE);
 	}
 
 	dev = md_xlate_targ_2_mini(md_expldev(lp->l_dev));
