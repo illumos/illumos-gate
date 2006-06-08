@@ -1447,6 +1447,12 @@ fpu_trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t code)
 	case T_STDF_ALIGN + T_USER: /* 64 bit user stdfa alignment error */
 		alignfaults++;
 		lwp->lwp_state = LWP_SYS;
+		if (&vis1_partial_support != NULL) {
+			bzero(&siginfo, sizeof (siginfo));
+			if (vis1_partial_support(rp,
+			    &siginfo, &fault) == 0)
+				goto out;
+		}
 		if (do_unaligned(rp, &badaddr) == SIMU_SUCCESS) {
 			rp->r_pc = rp->r_npc;
 			rp->r_npc += 4;
