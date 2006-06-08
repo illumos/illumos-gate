@@ -95,6 +95,7 @@ $SkipFiles = qr{ ^(?:
 	libcrypto_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
 	libssl_extra\.so\.0\.9\.8 |	# OpenSSL SUNWcry filter lib
 	fcpackage\.so |			# circular dependency on fcthread.so
+	mod_ipp\.so |			# Apache loadable module
 	grub
 	)$
 }x;
