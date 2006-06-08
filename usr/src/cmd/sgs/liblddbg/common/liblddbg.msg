@@ -311,7 +311,7 @@
 			 u44=%d, full=%d, far=%d, Total=%d"
 @ MSG_BND_PSUM_SPARC	"Summary of PLT types bound: 21d=%d, 24d=%d, \
 			 full=%d, Total=%d"
-@ MSG_BND_PSUM_DEFAULT	"Summary of PLT types bound: Total=%d"
+@ MSG_BND_PSUM_DEFAULT	"Summary of PLT types bound: total=%d"
 
 # Relocation messages
 
@@ -430,7 +430,7 @@
 @ MSG_FIL_CONFIG_ERR_3	"unable to process file"
 @ MSG_FIL_CONFIG_ERR_4	"corrupt or truncated file"
 @ MSG_FIL_CONFIG_ERR_5	"incompatible ELF class, byte order, or machine \
-			architecture"
+			 architecture"
 
 @ MSG_CNTL_TITLE	"control list processing complete: moving lmco 0x%llx \
 			 to lmco 0x%llx"
@@ -502,9 +502,13 @@
 # Move messages
 
 @ MSG_MOVE_FILE		"file=%s  processing move data"
-@ MSG_MOVE_TITLE2	"         address       value  repeat  stride  symbol"
-@ MSG_MOVE_ENTRY2	"   in %#10llx   %#10llx  %6d  %6d  %s"
-@ MSG_MOVE_EXPAND	"      %#10llx   %#10llx  (expanded)"
+
+@ MSG_MOVE_TITLE1	"  i/o      offset       value  repeat  stride  symbol"
+@ MSG_MOVE_TITLE2	"          address       value  repeat  stride  symbol"
+
+@ MSG_MOVE_ENTRYIN	"   in  %#10llx  %#10llx  %6d  %6d  %s"
+@ MSG_MOVE_ENTRYOUT	"  out  %#10llx  %#10llx  %6d  %6d  %s"
+@ MSG_MOVE_EXPAND	"       %#10llx  %#10llx  (expanded)"
 
 @ MSG_MOVE_ADJEXPAND	"for symbol=%s roffset: new=0x%llx"
 @ MSG_MOVE_ADJMOVE	"for symbol=%s roffset: from=0x%llx, to=0x%llx"
@@ -512,10 +516,6 @@
 @ MSG_MOVE_PAREXPN	"expanding %s into .SUNW_data1: %s"
 @ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
 @ MSG_MOVE_INPUT	"collecting move entries: file=%s"
-
-@ MSG_MOVE_TITLE1	"\t i/o offset\tvalue\trepeat\tstride\tsymbol"
-@ MSG_MOVE_ENTRY1IN	"\t  in 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
-@ MSG_MOVE_ENTRY1OUT	"\t out 0x%llx\t0x%llx\t0x%x\t0x%x\t%s"
 
 # Section messages
 
@@ -628,22 +628,23 @@
 
 @ MSG_ORD_SORT_BEFORE	"Output section to be sorted=%s"
 @ MSG_ORD_SORT_AFTER	"Output section sorted=%s"
-@ MSG_ORD_HDR_1		" No. of SHN_BEGIN=%u, SHN_AFTER=%u, sh_info/sh_link=%u"
+@ MSG_ORD_HDR_1		" number of SHN_BEGIN=%u, SHN_AFTER=%u, \
+			 sh_info/sh_link=%u"
 @ MSG_ORD_TITLE_0	" section=%s from %s is not an ordered section"
 @ MSG_ORD_TITLE_1	" section=%s from %s, sh_info=SHN_BEGIN"
 @ MSG_ORD_TITLE_2	" section=%s from %s, sh_info=SHN_AFTER"
 @ MSG_ORD_TITLE_3	" section=%s from %s, sh_info=%s, sort_val=%d"
 @ MSG_ORD_TITLE_4	" section=%s from %s, sh_link=%s, sort_val=%d"
 
-@ MSG_ORD_ERR_TITLE	"The SHF_ORDERED section %s from %s has \
+@ MSG_ORD_ERR_TITLE	"the SHF_ORDERED section %s from %s has \
 			 an error;  flag ignored"
 
-@ MSG_ORD_ERR_INFORANGE	" The sh_info field is out of range"
-@ MSG_ORD_ERR_ORDER	" The section pointed by sh_info is an ordered section"
-@ MSG_ORD_ERR_LINKRANGE	" The sh_link field is out of range"
-@ MSG_ORD_ERR_FLAGS	" The sh_flag is incorrect"
-@ MSG_ORD_ERR_CYCLIC	" The sh_link is cyclic"
-@ MSG_ORD_ERR_LINKINV	" A section pointed to by sh_link has an error"
+@ MSG_ORD_ERR_INFORANGE	" the sh_info field is out of range"
+@ MSG_ORD_ERR_ORDER	" the section pointed by sh_info is an ordered section"
+@ MSG_ORD_ERR_LINKRANGE	" the sh_link field is out of range"
+@ MSG_ORD_ERR_FLAGS	" the sh_flag is incorrect"
+@ MSG_ORD_ERR_CYCLIC	" the sh_link is cyclic"
+@ MSG_ORD_ERR_LINKINV	" a section pointed to by sh_link has an error"
 
 # Link-Auditing Messages
 
@@ -720,10 +721,14 @@
 
 # TLS related messages
 
-@ MSG_TLS_STATBLOCK1	"static TLS module: [%2d] %s"
-@ MSG_TLS_STATBLOCK2	"static TLS module: Total Static Size: %#llx"
-@ MSG_TLS_STMODENT1	"    block:  %#10llx    soff:  %#10llx  flags: %#4llx"
-@ MSG_TLS_STMODENT2	"    filesz: %#10llx    memsz: %#10llx  modid: %#4llx"
+@ MSG_TLS_STATBLOCK1	"static TLS module: [%ld] %s"
+@ MSG_TLS_STATBLOCK2	"static TLS reservation: in use %#llx: \
+			 additional backup: %#llx"
+@ MSG_TLS_STATBLOCK3	"static TLS requirement: [%ld] %s: size %#llx: \
+			 satisfied from backup reservation: remaining %#llx"
+@ MSG_TLS_MODENT1	"    block:  %#18llx    soff:   %#10llx  flags:  %#llx \
+			 %s"
+@ MSG_TLS_MODENT2	"    filesz: %#18llx    memsz:  %#10llx  modid:  %lld"
 @ MSG_TLS_MODACT	"%s TLS module: %s"
 @ MSG_TLS_ADD		"add"
 @ MSG_TLS_REMOVE	"remove"
@@ -829,22 +834,43 @@
 
 
 # Global offset table entries.
-# TRANSLATION_NOTE - the following two entries provide for a series of one or
-# more 32-bit got table entries that align with the initial title.
+# TRANSLATION_NOTE - the following two entries are used by elfdump(1), and
+# provide for a series of one or more 32-bit got table entries that align with
+# the initial title.
 
 @ MSG_GOT_TITLE_32	"     index    addr        value     \
 			 pending relocation"
 @ MSG_GOT_ENTRY_RE_32	"%10.10s  0x%08llx  0x%08llx  %-24s  %s"
 @ MSG_GOT_ENTRY_NR_32	"%10.10s  0x%08llx  0x%08llx"
 
-# TRANSLATION_NOTE - the following two entries provide for a series of one or
-# more 64-bit got table entries that align with the initial title.
+# TRANSLATION_NOTE - the following two entries are used by elfdump(1), and
+# provide for a series of one or more 64-bit got table entries that align with
+# the initial title.
 
 @ MSG_GOT_TITLE_64	"     index    addr                \
 			 value             pending relocation"
 @ MSG_GOT_ENTRY_RE_64	"%10.10s  0x%016llx  0x%016llx  %-24s  %s"
 @ MSG_GOT_ENTRY_NR_64	"%10.10s  0x%016llx  0x%016llx"
 
+# TRANSLATION_NOTE - the following three entries are used by ld(1), and provide
+# for a series of one or more 32-bit got table entries that align with one of
+# the initial titles.
+
+@ MSG_GOT_COLUMNS1_32	"     index ref      offset    addend    symbol"
+@ MSG_GOT_COLUMNS2_32	"     index ref      offset    value     symbol"
+@ MSG_GOT_FORMAT1_32	"%10.10s %3s  0x%08llx  0x%08llx  %s"
+@ MSG_GOT_FORMAT2_32	"%10.10s %3s  0x%08llx  0x%08llx  %s:%s"
+
+# TRANSLATION_NOTE - the following three entries are used by ld(1), and provide
+# for a series of one or more 64-bit got table entries that align with one of
+# the initial titles.
+
+@ MSG_GOT_COLUMNS1_64	"     index ref    offset              \
+			 addend            symbol"
+@ MSG_GOT_COLUMNS2_64	"     index ref    offset              \
+			 value             symbol"
+@ MSG_GOT_FORMAT1_64	"%10.10s %3s  0x%016llx  0x%016llx  %s"
+@ MSG_GOT_FORMAT2_64	"%10.10s %3s  0x%016llx  0x%016llx  %s:%s"
 
 # Version table entries.
 @ MSG_VER_DEF		"     index  version                     dependency"
@@ -1131,20 +1157,16 @@
 @ MSG_VER_ALL		"       ALL  %-26.26s"
 @ MSG_VER_L_ALL		"       ALL  %-26s"
 
-# GOT messages
+# Global offset table entries.
 
-@ MSG_GOT_COLUMNS	"index  ref  addend  symbol"
+@ MSG_GOT_INDEX		" [%ld]"
 @ MSG_GOT_SMALL_PIC	"pic"
 @ MSG_GOT_BIG_PIC	"PIC"
-@ MSG_GOT_FORMAT1	"[%05d] %3s  0x%08llx  %s"
-@ MSG_GOT_FORMAT2	"[%05d] %3s  0x%08llx  %s:%s"
 
 @ MSG_CNTL_ENTRY	"   [0x%llx]  %s"
 
-@ MSG_STR_EMPTY		""
 @ MSG_STR_NL		"\n"
 
-@ MSG_GOT_INDEX		" [%ld]"
 @ MSG_FMT_INDEX		" [%d]"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
@@ -1222,3 +1244,11 @@
 @ MSG_CI_TLS_MODREM	"TLS_MODREM"
 @ MSG_CI_TLS_STATMOD	"TLS_STATMOD"
 @ MSG_CI_THRINIT	"THRINIT"
+
+# TLS information flags
+
+@ MSG_TLS_FLAG_START	"["
+@ MSG_TLS_FLAG_END	"]"
+@ MSG_TLS_FLAG_SEP	" "
+
+@ MSG_TLS_FLAG_STATIC	" STATIC-TLS "

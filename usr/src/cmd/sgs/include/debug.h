@@ -642,7 +642,7 @@ extern	void	Dbg_file_rejected(Lm_list *, Rej_desc *);
 extern	void	Dbg_file_reuse(Lm_list *, const char *, const char *);
 extern	void	Dbg_file_skip(Lm_list *, const char *, const char *);
 
-extern	void	Dbg_got_display(Ofl_desc *, Gottable *);
+extern	void	Dbg_got_display(Ofl_desc *, Off, int);
 
 extern	void	Dbg_libs_audit(Lm_list *, const char *, const char *);
 extern	void	Dbg_libs_find(Lm_list *, const char *);
@@ -767,7 +767,8 @@ extern	void	Dbg_syms_updated(Ofl_desc *, Sym_desc *, const char *);
 extern	void	Dbg_syms_up_title(Lm_list *);
 
 extern	void	Dbg_tls_modactivity(Lm_list *, void *, uint_t);
-extern	void	Dbg_tls_static_block(Lm_list *, void *, ulong_t);
+extern	void	Dbg_tls_static_block(Lm_list *, void *, ulong_t, ulong_t);
+extern	void	Dbg_tls_static_resv(Rt_map *, ulong_t, ulong_t);
 
 extern	void	Dbg_util_broadcast(Rt_map *);
 extern	void	Dbg_util_call_array(Rt_map *, void *, int, Word);

@@ -223,7 +223,7 @@
 			 relocation not currently supported"
 @ MSG_REL_PICREDLOC	"relocation error: %s: file %s symbol %s: \
 			 -z redlocsym may not be used for pic code"
-@ MSG_REL_TLSIE		"relocation error: %s: file %s: symbol %s: \
+@ MSG_REL_TLSLE		"relocation error: %s: file %s: symbol %s: \
 			 relocation illegal when building a shared object"
 @ MSG_REL_TLSBND	"relocation error: %s: file %s: symbol %s: \
 			 bound to: %s: relocation illegal when not bound \
@@ -279,6 +279,9 @@
 @ MSG_REL_COPY		"relocation warning: %s: file %s: symbol %s: \
 			 relocation bound to a symbol with \
 			 STV_PROTECTED visibility"
+
+@ MSG_REL_TLSIE		"relocation: %s: file %s: symbol %s: relocation \
+			 has restricted use when building a shared object"
 
 #
 # TRANSLATION_NOTE

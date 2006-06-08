@@ -228,7 +228,8 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_allocate_got		ld64_allocate_got
 #endif
 #define	ld_assign_got		ld64_assign_got
-#define	ld_assign_gotndx	ld64_assign_gotndx
+#define	ld_assign_got_ndx	ld64_assign_got_ndx
+#define	ld_assign_got_TLS	ld64_assign_got_TLS
 #define	ld_assign_plt_ndx	ld64_assign_plt_ndx
 #define	ld_calc_got_offset	ld64_calc_got_offset
 #define	ld_calc_plt_addr	ld64_calc_plt_addr
@@ -322,7 +323,8 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_allocate_got		ld32_allocate_got
 #endif
 #define	ld_assign_got		ld32_assign_got
-#define	ld_assign_gotndx	ld32_assign_gotndx
+#define	ld_assign_got_ndx	ld32_assign_got_ndx
+#define	ld_assign_got_TLS	ld32_assign_got_TLS
 #define	ld_assign_plt_ndx	ld32_assign_plt_ndx
 #define	ld_calc_got_offset	ld32_calc_got_offset
 #define	ld_calc_plt_addr	ld32_calc_plt_addr
@@ -419,8 +421,11 @@ extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
 extern uintptr_t	ld_allocate_got(Ofl_desc *);
 #endif
 extern uintptr_t	ld_assign_got(Ofl_desc *, Sym_desc *);
-extern uintptr_t	ld_assign_gotndx(List *, Gotndx *, Gotref, Ofl_desc *,
+extern uintptr_t	ld_assign_got_ndx(List *, Gotndx *, Gotref, Ofl_desc *,
 			    Rel_desc *, Sym_desc *);
+extern uintptr_t	ld_assign_got_TLS(Boolean, Rel_desc *, Ofl_desc *,
+			    Sym_desc *, Gotndx *, Gotref, Word, Word,
+			    Word, Word);
 extern void		ld_assign_plt_ndx(Sym_desc *, Ofl_desc *);
 
 extern Xword		ld_calc_got_offset(Rel_desc *, Ofl_desc *);

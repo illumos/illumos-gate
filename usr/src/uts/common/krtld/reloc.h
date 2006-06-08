@@ -63,8 +63,8 @@ extern "C" {
 #define	FLG_RE_WDISP16		0x00000100	/* funky sparc DISP16 rel */
 #define	FLG_RE_SIGN		0x00000200	/* value is signed */
 #define	FLG_RE_ADDRELATIVE	0x00000400	/* RELATIVE relocation */
-						/* required for non-fixed */
-						/* objects */
+						/*	required for non- */
+						/*	fixed objects */
 #define	FLG_RE_EXTOFFSET	0x00000800	/* extra offset required */
 #define	FLG_RE_REGISTER		0x00001000	/* relocation initializes */
 						/*    a REGISTER by OLO10 */
@@ -72,7 +72,7 @@ extern "C" {
 
 #define	FLG_RE_SEGREL		0x00040000	/* segment relative */
 #define	FLG_RE_SECREL		0x00080000	/* section relative */
-#define	FLG_RE_TLSINS		0x00100000	/* TLS instructino rel */
+
 #define	FLG_RE_TLSGD		0x00200000	/* TLS GD relocation */
 #define	FLG_RE_TLSLD		0x00400000	/* TLS LD relocation */
 #define	FLG_RE_TLSIE		0x00800000	/* TLS IE relocation */
@@ -133,7 +133,8 @@ extern	const Rel_entry		reloc_table[];
 #define	IS_SEC_RELATIVE(X)	((reloc_table[(X)].re_flags & \
 					FLG_RE_SECREL) != 0)
 #define	IS_TLS_INS(X)		((reloc_table[(X)].re_flags & \
-					FLG_RE_TLSINS) != 0)
+					(FLG_RE_TLSGD | FLG_RE_TLSLD | \
+					FLG_RE_TLSIE | FLG_RE_TLSLE)) != 0)
 #define	IS_TLS_GD(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSGD) != 0)
 #define	IS_TLS_LD(X)		((reloc_table[(X)].re_flags & \
@@ -142,10 +143,6 @@ extern	const Rel_entry		reloc_table[];
 					FLG_RE_TLSIE) != 0)
 #define	IS_TLS_LE(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_TLSLE) != 0)
-#define	IS_TLS(X)		((reloc_table[(X)].re_flags & \
-					(FLG_RE_TLSINS|FLG_RE_TLSGD| \
-					FLG_RE_TLSLD|FLG_RE_TLSIE| \
-					FLG_RE_TLSLE)) != 0)
 #define	IS_LOCALBND(X)		((reloc_table[(X)].re_flags & \
 					FLG_RE_LOCLBND) != 0)
 

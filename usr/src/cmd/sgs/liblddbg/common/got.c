@@ -46,10 +46,12 @@ Dbg_got_compare(Gottable *gtp1, Gottable *gtp2)
 }
 
 void
-Dbg_got_display(Ofl_desc *ofl, Gottable *gtp)
+Dbg_got_display(Ofl_desc *ofl, Off goff, int stage)
 {
-	Lm_list	*lml = ofl->ofl_lml;
-	Word	gotndx;
+	Lm_list		*lml = ofl->ofl_lml;
+	Gottable	*gtp = ofl->ofl_gottable;
+	Word		gotndx;
+	Xword		*gptr;
 
 	if (DBG_NOTCLASS(DBG_C_GOT))
 		return;
@@ -66,35 +68,50 @@ Dbg_got_display(Ofl_desc *ofl, Gottable *gtp)
 	qsort((char *)gtp, ofl->ofl_gotcnt, sizeof (Gottable),
 	    (int(*)(const void *, const void *))Dbg_got_compare);
 
-	dbg_print(lml, MSG_ORIG(MSG_GOT_COLUMNS));
+	if (stage == 0)
+		dbg_print(lml, MSG_INTL(MSG_GOT_COLUMNS1));
+	else
+		dbg_print(lml, MSG_INTL(MSG_GOT_COLUMNS2));
 
-	for (gotndx = 0; gotndx < ofl->ofl_gotcnt; gotndx++, gtp++) {
-		Sym_desc	*sdp;
+	gptr = (Xword *)ofl->ofl_osgot->os_outdata->d_buf;
+
+	for (gotndx = 0; gotndx < ofl->ofl_gotcnt; gotndx++, gtp++, gptr++) {
+		Sym_desc	*sdp = gtp->gt_sym;
 		const char	*refstr, *name;
 		Gotndx		*gnp = &gtp->gt_gndx;
+		Lword		gotaddval;
+		Off		off = goff + (gotndx * M_GOT_ENTSIZE);
+		char		index[INDEX_STR_SIZE];
 
-		if ((sdp = gtp->gt_sym) == 0)
-			continue;
+		(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_GOT_INDEX),
+		    EC_SWORD(gnp->gn_gotndx));
 
-		if (sdp->sd_flags & FLG_SY_SMGOT)
+		if (sdp == 0)
+			refstr = MSG_ORIG(MSG_STR_EMPTY);
+		else if (sdp->sd_flags & FLG_SY_SMGOT)
 			refstr = MSG_ORIG(MSG_GOT_SMALL_PIC);
 		else
 			refstr = MSG_ORIG(MSG_GOT_BIG_PIC);
 
-		if (sdp->sd_name)
+		if (sdp == 0)
+			name = MSG_ORIG(MSG_STR_EMPTY);
+		else if (sdp->sd_name)
 			name = Dbg_demangle_name(sdp->sd_name);
 		else
 			name = MSG_INTL(MSG_STR_UNKNOWN);
 
-		if ((sdp->sd_sym->st_shndx == SHN_UNDEF) ||
+		if (stage == 0)
+			gotaddval = gnp->gn_addend;
+		else
+			gotaddval = *gptr;
+
+		if ((sdp == 0) || (sdp->sd_sym->st_shndx == SHN_UNDEF) ||
 		    (sdp->sd_file == 0)) {
-			dbg_print(lml, MSG_ORIG(MSG_GOT_FORMAT1),
-			    EC_SWORD(gnp->gn_gotndx), refstr,
-			    EC_LWORD(gnp->gn_addend), name);
+			dbg_print(lml, MSG_INTL(MSG_GOT_FORMAT1), index,
+			    refstr, EC_OFF(off), EC_XWORD(gotaddval), name);
 		} else {
-			dbg_print(lml, MSG_ORIG(MSG_GOT_FORMAT2),
-			    EC_SWORD(gnp->gn_gotndx), refstr,
-			    EC_LWORD(gnp->gn_addend),
+			dbg_print(lml, MSG_INTL(MSG_GOT_FORMAT2), index,
+			    refstr, EC_OFF(off), EC_XWORD(gotaddval),
 			    sdp->sd_file->ifl_name, name);
 		}
 	}

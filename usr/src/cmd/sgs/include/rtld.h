@@ -680,6 +680,7 @@ typedef struct rt_map32 {
 #define	MSK_RT_FILTER	0x0000f000	/* mask for all filter possibilites */
 
 #define	FL1_RT_TLSADD	0x00010000	/* objects TLS has been registered */
+#define	FL1_RT_TLSSTAT	0x00020000	/* object requires static TLS */
 
 /*
  * The following range of bits are reserved to hold LML_TFLG_AUD_ values

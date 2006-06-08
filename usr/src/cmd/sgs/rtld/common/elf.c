@@ -2254,6 +2254,14 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}
+				/*
+				 * Capture any static TLS use, and enforce that
+				 * this object be non-deletable.
+				 */
+				if (ld->d_un.d_val & DF_STATIC_TLS) {
+					FLAGS1(lmp) |= FL1_RT_TLSSTAT;
+					MODE(lmp) |= RTLD_NODELETE;
+				}
 				break;
 			case DT_FLAGS_1:
 				if (ld->d_un.d_val & DF_1_DISPRELPND)
@@ -2755,16 +2763,15 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	}
 
 	/*
-	 * If this shared object contains a any special segments, record them.
+	 * If this shared object contains any special segments, record them.
 	 */
 	if (swph) {
 		FLAGS(lmp) |= FLG_RT_SUNWBSS;
 		SUNWBSS(lmp) = phdr + (swph - phdr0);
 	}
-	if (tlph) {
-		PTTLS(lmp) = phdr + (tlph - phdr0);
-		tls_assign_soffset(lmp);
-		lml->lm_tls++;
+	if (tlph && (tls_assign(lml, lmp, (phdr + (tlph - phdr0))) == 0)) {
+		remove_so(lml, lmp);
+		return (0);
 	}
 
 	if (unwindph)
@@ -2775,7 +2782,6 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 
 	return (lmp);
 }
-
 
 /*
  * Function to correct protection settings.  Segments are all mapped initially
@@ -3168,4 +3174,66 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
 	}
 
 	Dbg_reloc_error(lml, ELF_DBG_RTLD, M_MACH, M_REL_SHT_TYPE, rel, name);
+}
+
+/*
+ * Resolve a static TLS relocation.
+ */
+long
+elf_static_tls(Rt_map *lmp, Sym *sym, void *rel, uchar_t rtype, char *name,
+    ulong_t roffset, long value)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	/*
+	 * Relocations against a static TLS block have limited support once
+	 * process initialization has completed.  Any error condition should be
+	 * discovered by testing for DF_STATIC_TLS as part of loading an object,
+	 * however individual relocations are tested in case the dynamic flag
+	 * had not been set when this object was built.
+	 */
+	if (PTTLS(lmp) == 0) {
+		DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH,
+		    M_REL_SHT_TYPE, rel, NULL, name));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),
+		    _conv_reloc_type((uint_t)rtype), NAME(lmp),
+		    name ? demangle(name) : MSG_INTL(MSG_STR_UNKNOWN));
+		return (0);
+	}
+
+	/*
+	 * If no static TLS has been set aside for this object, determine if
+	 * any can be obtained.  Enforce that any object using static TLS is
+	 * non-deletable.
+	 */
+	if (TLSSTATOFF(lmp) == 0) {
+		FLAGS1(lmp) |= FL1_RT_TLSSTAT;
+		MODE(lmp) |= RTLD_NODELETE;
+
+		if (tls_assign(lml, lmp, PTTLS(lmp)) == 0) {
+			DBG_CALL(Dbg_reloc_in(lml, ELF_DBG_RTLD, M_MACH,
+			    M_REL_SHT_TYPE, rel, NULL, name));
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLS),
+			    _conv_reloc_type((uint_t)rtype), NAME(lmp),
+			    name ? demangle(name) : MSG_INTL(MSG_STR_UNKNOWN));
+			return (0);
+		}
+	}
+
+	/*
+	 * Typically, a static TLS offset is maintained as a symbols value.
+	 * For local symbols that are not apart of the dynamic symbol table,
+	 * the TLS relocation points to a section symbol, and the static TLS
+	 * offset was deposited in the associated GOT table.  Make sure the GOT
+	 * is cleared, so that the value isn't reused in do_reloc().
+	 */
+	if (ELF_ST_BIND(sym->st_info) == STB_LOCAL) {
+		if ((ELF_ST_TYPE(sym->st_info) == STT_SECTION)) {
+			value = *(long *)roffset;
+			*(long *)roffset = 0;
+		} else {
+			value = sym->st_value;
+		}
+	}
+	return (-(TLSSTATOFF(lmp) - value));
 }

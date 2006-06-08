@@ -100,7 +100,8 @@
 			 called from 0x%llx"
 @ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
 			 offset size (%d bytes) is not supported"
-
+@ MSG_REL_BADTLS	"relocation error: %s: file %s: symbol %s: \
+			 file contains insufficient TLS support information"
 
 # System call messages.
 
@@ -218,9 +219,18 @@
 
 # Error TLS failures
 
-@ MSG_ERR_TLS_NOTLS	"%s: object requires TLS, but TLS failed to initialize"
+@ MSG_TLS_NOSUPPORT	"%s: TLS requirement failure : TLS support is \
+			 unavailable"
+@ MSG_TLS_STATBASE	"%s: static TLS failure: object is not part of primary \
+			 link-map list"
+@ MSG_TLS_STATSIZE	"%s: static TLS failure: object loaded after process \
+			 initialization: size (%#llx) exceeds available backup \
+			 reservation (%#llx)"  
+@ MSG_TLS_STATINIT	"%s: static TLS failure: object loaded after process \
+			 initialization: can not accommodate initialized data"
 
 # Error expand()
+
 @ MSG_ERR_EXPAND1	"%s: %s: path name too long"
 @ MSG_ERR_EXPAND2	"%s: %s: token %s could not be expanded"
 

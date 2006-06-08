@@ -381,7 +381,7 @@ rt_get_extern(Lm_list *lml, Rt_map *lmp)
 	 * have the associated external interfaces.
 	 */
 	if (lml->lm_tls && (lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func == 0)) {
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ERR_TLS_NOTLS),
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_TLS_NOSUPPORT),
 		    NAME(lmp));
 		return (0);
 	}

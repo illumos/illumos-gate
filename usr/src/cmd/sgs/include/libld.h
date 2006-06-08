@@ -132,7 +132,6 @@ typedef struct {
 	Gotndx		gt_gndx;
 } Gottable;
 
-
 /*
  * Output file processing structure
  */
@@ -274,6 +273,7 @@ struct ofl_desc {
 	Xword		ofl_hwcap_1;	/* hardware capabilities */
 	Xword		ofl_sfcap_1;	/* software capabilities */
 	Lm_list		*ofl_lml;	/* runtime link-map list */
+	Gottable	*ofl_gottable;	/* debugging got information */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -667,10 +667,9 @@ struct sym_desc {
 	List		sd_GOTndxs;	/* list of associated GOT entries */
 	Sym		*sd_sym;	/* pointer to symbol table entry */
 	Sym		*sd_osym;	/* copy of the original symbol entry */
-					/* Used only for local partial */
-	Psym_info	*sd_psyminfo;	/* If this is partial symbol, this */
-					/* field holds the pointer to */
-					/* parsym_info */
+					/*	used only for local partial */
+	Psym_info	*sd_psyminfo;	/* for partial symbols, maintain a */
+					/*	pointer to parsym_info */
 	const char	*sd_name;	/* symbols name */
 	Ifl_desc	*sd_file;	/* file where symbol is taken */
 	Is_desc		*sd_isc;	/* input section of symbol definition */

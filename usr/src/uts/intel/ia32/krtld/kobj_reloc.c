@@ -155,7 +155,7 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 			    symnum);
 			return (-1);
 		}
-		if ((rtype > R_386_NUM) || IS_TLS(rtype)) {
+		if ((rtype > R_386_NUM) || IS_TLS_INS(rtype)) {
 			_kobj_printf(ops, "krtld: invalid relocation type %d",
 			    rtype);
 			_kobj_printf(ops, " at 0x%llx:", off);

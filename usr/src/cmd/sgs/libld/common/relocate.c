@@ -518,7 +518,7 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	    ofl, rsp)) == 0) {
 		Word	rtype = rsp->rel_rtype;
 
-		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), 0, GOT_REF_GENERIC,
+		if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), 0, GOT_REF_GENERIC,
 		    ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 
@@ -571,7 +571,7 @@ ld_reloc_GOT_relative(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 			rsp->rel_rtype = rtype;
 		}
 	} else {
-		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_GENERIC,
+		if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_GENERIC,
 		    ofl, rsp, sdp) == S_ERROR)
 			return (S_ERROR);
 	}
@@ -981,6 +981,88 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	return (ld_add_outrel(oflags, rsp, ofl));
 }
 
+/*
+ * Perform any generic TLS validations before passing control to machine
+ * specific routines.  At this point we know we are dealing with an executable
+ * or shared object - relocatable objects have already been processed.
+ */
+static uintptr_t
+reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
+{
+	Word		rtype = rsp->rel_rtype, flags = ofl->ofl_flags;
+	Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
+	Half		mach = ifl->ifl_ehdr->e_machine;
+	Sym_desc	*sdp = rsp->rel_sym;
+	unsigned char	type;
+
+	/*
+	 * All TLS relocations are illegal in a static executable.
+	 */
+	if ((flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
+	    (FLG_OF_STATIC | FLG_OF_EXEC)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
+		    conv_reloc_type(mach, rtype, 0), ifl->ifl_name,
+		    demangle(rsp->rel_sname));
+		return (S_ERROR);
+	}
+
+	/*
+	 * Any TLS relocation must be against a STT_TLS symbol, all others
+	 * are illegal.
+	 */
+	if ((type = ELF_ST_TYPE(sdp->sd_sym->st_info)) != STT_TLS) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
+		    conv_reloc_type(mach, rtype, 0), ifl->ifl_name,
+		    demangle(rsp->rel_sname),
+		    conv_sym_info_type(mach, type, 0));
+		return (S_ERROR);
+	}
+
+	/*
+	 * A dynamic executable can not use the LD or LE reference models to
+	 * reference an external symbol.  A shared object can not use the LD
+	 * reference model to reference an external symbol.
+	 */
+	if (!local && (IS_TLS_LD(rtype) ||
+	    ((flags & FLG_OF_EXEC) && IS_TLS_LE(rtype)))) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
+		    conv_reloc_type(mach, rtype, 0), ifl->ifl_name,
+		    demangle(rsp->rel_sname), sdp->sd_file->ifl_name);
+		return (S_ERROR);
+	}
+
+	/*
+	 * The TLS LE model is only allowed for dynamic executables.  The TLS IE
+	 * model is allowed for shared objects, but this model has restrictions.
+	 * This model can only be used freely in dependencies that are loaded
+	 * immediately as part of process initialization.  However, during the
+	 * initial runtime handshake with libc that establishes the thread
+	 * pointer, a small backup TLS reservation is created.  This area can
+	 * be used by objects that are loaded after threads are initialized.
+	 * However, this area is limited in size and may have already been
+	 * used.  This area is intended for specialized applications, and does
+	 * not provide the degree of flexibility dynamic TLS can offer.  Under
+	 * -z verbose indicate this restriction to the user.
+	 */
+	if ((flags & FLG_OF_EXEC) == 0) {
+		if (IS_TLS_LE(rtype)) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_TLSLE),
+			    conv_reloc_type(mach, rtype, 0), ifl->ifl_name,
+			    demangle(rsp->rel_sname));
+			return (S_ERROR);
+
+		} else if ((IS_TLS_IE(rtype)) && (flags & FLG_OF_VERBOSE)) {
+			eprintf(ofl->ofl_lml, ERR_WARNING,
+			    MSG_INTL(MSG_REL_TLSIE),
+			    conv_reloc_type(mach, rtype, 0), ifl->ifl_name,
+			    demangle(rsp->rel_sname));
+		}
+	}
+
+	return (ld_reloc_TLS(local, rsp, ofl));
+}
+
 uintptr_t
 ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
     const char *isname)
@@ -1107,7 +1189,8 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	/*
 	 * TLS symbols can only have TLS relocations.
 	 */
-	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_TLS) && !IS_TLS(rtype)) {
+	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_TLS) &&
+	    (IS_TLS_INS(rtype) == 0)) {
 		/*
 		 * The above test is relaxed if the target section is
 		 * non-allocable.
@@ -1133,7 +1216,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		return (reloc_relobj(local, reld, ofl));
 
 	if (IS_TLS_INS(rtype))
-		return (ld_reloc_TLS(local, reld, ofl));
+		return (reloc_TLS(local, reld, ofl));
 
 	if (IS_GOT_INS(rtype))
 		return (ld_reloc_GOTOP(local, reld, ofl));
@@ -1826,6 +1909,7 @@ ld_reloc_process(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Sg_desc		*sgp;
+	Os_desc		*osp;
 	Word		ndx = 0, flags = ofl->ofl_flags;
 	Shdr		*shdr;
 
@@ -1872,7 +1956,7 @@ ld_reloc_process(Ofl_desc *ofl)
 			Aliste	off;
 
 			for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-				Os_desc	*osp = *ospp;
+				osp = *ospp;
 
 				if (osp->os_relosdesc == 0)
 					continue;
@@ -1886,10 +1970,10 @@ ld_reloc_process(Ofl_desc *ofl)
 
 		/*
 		 * Since the .rel[a] section is not tied to any specific
-		 * section, we'd of not found it above.
+		 * section, we'd not have found it above.
 		 */
-		if (ofl->ofl_osrel) {
-			shdr = ofl->ofl_osrel->os_shdr;
+		if ((osp = ofl->ofl_osrel) != NULL) {
+			shdr = osp->os_shdr;
 			shdr->sh_link = ndx;
 			shdr->sh_info = 0;
 		}
@@ -1899,17 +1983,16 @@ ld_reloc_process(Ofl_desc *ofl)
 		 * coalesced) so just hit them directly instead of stepping
 		 * over the output sections.
 		 */
-		if (ofl->ofl_osrelhead) {
-			shdr = ofl->ofl_osrelhead->os_shdr;
+		if ((osp = ofl->ofl_osrelhead) != NULL) {
+			shdr = osp->os_shdr;
 			shdr->sh_link = ndx;
 			shdr->sh_info = 0;
 		}
-		if (ofl->ofl_osplt && ofl->ofl_osplt->os_relosdesc) {
-			shdr = ofl->ofl_osplt->os_relosdesc->os_shdr;
+		if (((osp = ofl->ofl_osplt) != NULL) && osp->os_relosdesc) {
+			shdr = osp->os_relosdesc->os_shdr;
 			shdr->sh_link = ndx;
 			/* LINTED */
-			shdr->sh_info =
-			    (Word)elf_ndxscn(ofl->ofl_osplt->os_scn);
+			shdr->sh_info = (Word)elf_ndxscn(osp->os_scn);
 		}
 	}
 
@@ -1933,6 +2016,13 @@ ld_reloc_process(Ofl_desc *ofl)
 		if (ld_fillin_gotplt(ofl) == S_ERROR)
 			return (S_ERROR);
 	}
+
+	/*
+	 * Now that any GOT information has been written, display the debugging
+	 * information if required.
+	 */
+	if ((osp = ofl->ofl_osgot) != NULL)
+		DBG_CALL(Dbg_got_display(ofl, osp->os_shdr->sh_addr, 1));
 
 	return (1);
 }
@@ -2021,9 +2111,54 @@ ld_reloc_remain_entry(Rel_desc *orsp, Os_desc *osp, Ofl_desc *ofl)
 }
 
 /*
- * The following functions are called from
- * machine functions defined in {sparc,i386,sparcv9}/machrel.c
+ * Generic encapsulation for generating a TLS got index.
  */
+uintptr_t
+ld_assign_got_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl, Sym_desc *sdp,
+    Gotndx *gnp, Gotref gref, Word rflag, Word ortype, Word rtype1, Word rtype2)
+{
+	Word	rflags;
+
+	if (ld_assign_got_ndx(&(sdp->sd_GOTndxs), gnp, gref, ofl,
+	    rsp, sdp) == S_ERROR)
+		return (S_ERROR);
+
+	rflags = FLG_REL_GOT | rflag;
+	if (local)
+		rflags |= FLG_REL_SCNNDX;
+	rsp->rel_rtype = rtype1;
+
+	if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
+		return (S_ERROR);
+
+	if (local && (gref == GOT_REF_TLSIE)) {
+		/*
+		 * If this is a local LE TLS symbol, then the symbol won't be
+		 * available at runtime.  The value of the local symbol will
+		 * be placed in the associated got entry, and the got
+		 * relocation is reassigned to a section symbol.
+		 */
+		if (ld_add_actrel(rflags, rsp, ofl) == S_ERROR)
+			return (S_ERROR);
+	}
+
+	if (rtype2) {
+		rflags = FLG_REL_GOT | rflag;
+		rsp->rel_rtype = rtype2;
+
+		if (local) {
+			if (ld_add_actrel(rflags, rsp, ofl) == S_ERROR)
+				return (S_ERROR);
+		} else {
+			if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
+				return (S_ERROR);
+		}
+	}
+
+	rsp->rel_rtype = ortype;
+
+	return (1);
+}
 
 /*
  * Move Section related function

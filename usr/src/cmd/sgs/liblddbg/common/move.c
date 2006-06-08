@@ -142,9 +142,9 @@ Dbg_move_entry1(Lm_list *lml, int which, Move *mv, Sym_desc *s)
 		return;
 
 	if (which)
-		str = MSG_INTL(MSG_MOVE_ENTRY1IN);
+		str = MSG_INTL(MSG_MOVE_ENTRYIN);
 	else
-		str = MSG_INTL(MSG_MOVE_ENTRY1OUT);
+		str = MSG_INTL(MSG_MOVE_ENTRYOUT);
 
 	dbg_print(lml, str, EC_XWORD(mv->m_poffset), EC_LWORD(mv->m_value),
 	    mv->m_repeat, mv->m_stride, s->sd_name);
@@ -165,6 +165,6 @@ Dbg_move_entry2(Lm_list *lml, Move *mv, Word st_name, const char *name)
 	else
 		sname = MSG_INTL(MSG_STR_UNKNOWN);
 
-	dbg_print(lml, MSG_INTL(MSG_MOVE_ENTRY2), EC_XWORD(mv->m_poffset),
+	dbg_print(lml, MSG_INTL(MSG_MOVE_ENTRYIN), EC_XWORD(mv->m_poffset),
 	    EC_LWORD(mv->m_value), mv->m_repeat, mv->m_stride, sname);
 }

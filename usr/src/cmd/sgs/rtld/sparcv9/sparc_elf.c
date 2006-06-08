@@ -1003,11 +1003,23 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				name = (char *)0;
 
 				/*
-				 * TLS relocation - value for DTPMOD relocation
-				 * is the TLS modid.
+				 * Special case TLS relocations.
 				 */
-				if (rtype == M_R_DTPMOD)
+				if ((rtype == R_SPARC_TLS_DTPMOD32) ||
+				    (rtype == R_SPARC_TLS_DTPMOD64)) {
+					/*
+					 * Use the TLS modid.
+					 */
 					value = TLSMODID(lmp);
+
+				} else if ((rtype == R_SPARC_TLS_TPOFF32) ||
+				    (rtype == R_SPARC_TLS_TPOFF64)) {
+					if ((value = elf_static_tls(lmp, symref,
+					    rel, rtype, 0, roffset, 0)) == 0) {
+						ret = 0;
+						break;
+					}
+				}
 			} else {
 				/*
 				 * If the symbol index is equal to the previous
@@ -1102,6 +1114,10 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 							NAME(lmp));
 						    continue;
 						} else {
+						    DBG_CALL(Dbg_reloc_in(lml,
+							ELF_DBG_RTLD, M_MACH,
+							M_REL_SHT_TYPE, rel,
+							NULL, name));
 						    eprintf(lml, ERR_FATAL,
 							MSG_INTL(MSG_REL_NOSYM),
 							NAME(lmp),
@@ -1182,32 +1198,51 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					value -= roffset;
 
 				/*
-				 * TLS relocation - value for DTPMOD relocation
-				 * is the TLS modid.
+				 * Special case TLS relocations.
 				 */
-				if (rtype == M_R_DTPMOD)
+				if ((rtype == R_SPARC_TLS_DTPMOD32) ||
+				    (rtype == R_SPARC_TLS_DTPMOD64)) {
+					/*
+					 * Relocation value is the TLS modid.
+					 */
 					value = TLSMODID(_lmp);
-				else if (rtype == M_R_TPOFF)
-					value = -(TLSSTATOFF(_lmp) - value);
+
+				} else if ((rtype == R_SPARC_TLS_TPOFF64) ||
+				    (rtype == R_SPARC_TLS_TPOFF32)) {
+					if ((value = elf_static_tls(_lmp,
+					    symdef, rel, rtype, name, roffset,
+					    value)) == 0) {
+						ret = 0;
+						break;
+					}
+				}
 			}
 		} else {
 			/*
-			 * Special cases, a regsiter symbol associated with
-			 * symbol index 0 is initialized (i.e. relocated) to
-			 * a constant in the r_addend field rather than to a
-			 * symbol value.
-			 *
-			 * A DTPMOD relocation is a local binding to a TLS
-			 * symbol.  Fill in the TLSMODID for the current object.
+			 * Special cases.
 			 */
-			if (rtype == R_SPARC_REGISTER)
+			if (rtype == R_SPARC_REGISTER) {
+				/*
+				 * A register symbol associated with symbol
+				 * index 0 is initialized (i.e. relocated) to
+				 * a constant in the r_addend field rather than
+				 * to a symbol value.
+				 */
 				value = 0;
-			else if (rtype == M_R_DTPMOD)
+
+			} else if ((rtype == R_SPARC_TLS_DTPMOD32) ||
+			    (rtype == R_SPARC_TLS_DTPMOD64)) {
+				/*
+				 * TLS relocation value is the TLS modid.
+				 */
 				value = TLSMODID(lmp);
-			else
+			} else
 				value = basebgn;
 			name = (char *)0;
 		}
+
+		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,
+		    M_REL_SHT_TYPE, rel, NULL, name));
 
 		/*
 		 * If this object has relocations in the text segment, turn
@@ -1225,9 +1260,6 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		/*
 		 * Call relocation routine to perform required relocation.
 		 */
-		DBG_CALL(Dbg_reloc_in(LIST(lmp), ELF_DBG_RTLD, M_MACH,
-		    M_REL_SHT_TYPE, rel, NULL, name));
-
 		switch (rtype) {
 		case R_SPARC_REGISTER:
 			/*

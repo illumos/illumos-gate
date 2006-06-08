@@ -541,6 +541,8 @@ extern ulong_t		elf_reloc_relative(ulong_t, ulong_t, ulong_t,
 			    ulong_t, ulong_t, ulong_t);
 extern ulong_t		elf_reloc_relacount(ulong_t, ulong_t,
 			    ulong_t, ulong_t);
+extern long		elf_static_tls(Rt_map *, Sym*, void *, uchar_t, char *,
+			    ulong_t, long);
 extern int		enter(void);
 extern uint_t		expand(char **, size_t *, char **, uint_t, uint_t,
 			    Rt_map *);
@@ -627,7 +629,7 @@ extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    Dyn *, ulong_t, ulong_t, int fd, Phdr *, char *,
 			    char **, int, uid_t, uid_t, gid_t, gid_t, void *,
 			    int, uint_t);
-extern void		tls_assign_soffset(Rt_map *);
+extern int		tls_assign(Lm_list *, Rt_map *, Phdr *);
 extern void		tls_modaddrem(Rt_map *, uint_t);
 extern int		tls_statmod(Lm_list *, Rt_map *);
 extern Rt_map		**tsort(Rt_map *, int, int);

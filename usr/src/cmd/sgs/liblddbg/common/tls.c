@@ -29,39 +29,79 @@
 #include	<link.h>
 #include	<libc_int.h>
 #include	<rtld.h>
+#include	<strings.h>
 #include	<debug.h>
 #include	"msg.h"
 #include	"_debug.h"
 
+#define	FLAGSZ	MSG_TLS_FLAG_START_SIZE + \
+		MSG_TLS_FLAG_STATIC_SIZE + \
+		CONV_INV_STRSIZE + MSG_TLS_FLAG_END_SIZE
+
 static void
 Dbg_tls_modent(Lm_list *lml, TLS_modinfo * tmodent)
 {
-	dbg_print(lml, MSG_INTL(MSG_TLS_STMODENT1),
+	static Val_desc	vda[] = {
+		{ TM_FLG_STATICTLS,	MSG_ORIG(MSG_TLS_FLAG_STATIC) },
+		{ 0,			0 }
+	};
+	char	flagstr[FLAGSZ];
+	ulong_t	flags;
+
+	if ((flags = tmodent->tm_flags) != 0) {
+		(void) strlcpy(flagstr, MSG_ORIG(MSG_TLS_FLAG_START), FLAGSZ);
+
+		if (conv_expn_field(flagstr, FLAGSZ, vda, flags, flags,
+		    MSG_ORIG(MSG_TLS_FLAG_SEP), 0))
+			(void) strcat(flagstr, MSG_ORIG(MSG_TLS_FLAG_END));
+	} else
+		flagstr[0] = '\0';
+
+	dbg_print(lml, MSG_INTL(MSG_TLS_MODENT1),
 	    EC_XWORD((uintptr_t)tmodent->tm_tlsblock),
-	    EC_XWORD(tmodent->tm_stattlsoffset), EC_XWORD(tmodent->tm_flags));
-	dbg_print(lml, MSG_INTL(MSG_TLS_STMODENT2),
+	    EC_XWORD(tmodent->tm_stattlsoffset), EC_XWORD(tmodent->tm_flags),
+	    flagstr);
+	dbg_print(lml, MSG_INTL(MSG_TLS_MODENT2),
 	    EC_XWORD(tmodent->tm_filesz), EC_XWORD(tmodent->tm_memsz),
 	    EC_XWORD(tmodent->tm_modid));
 }
 
 void
-Dbg_tls_static_block(Lm_list *lml, void *vtlsmodlist, ulong_t tlsstatsize)
+Dbg_tls_static_block(Lm_list *lml, void *list, ulong_t size, ulong_t resv)
 {
-	uint_t		i;
-	TLS_modinfo **	tlsmodlist;
+	if (DBG_NOTCLASS(DBG_C_TLS))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+
+	if (list) {
+		ulong_t		ndx;
+		TLS_modinfo	**tlsmodlist;
+
+		tlsmodlist = (TLS_modinfo **)list;
+
+		for (ndx = 0; tlsmodlist[ndx]; ndx++) {
+			dbg_print(lml, MSG_INTL(MSG_TLS_STATBLOCK1), ndx,
+			    tlsmodlist[ndx]->tm_modname);
+			Dbg_tls_modent(lml, tlsmodlist[ndx]);
+			Dbg_util_nl(lml, DBG_NL_STD);
+		}
+	}
+	dbg_print(lml, MSG_INTL(MSG_TLS_STATBLOCK2), EC_XWORD(size),
+	    EC_XWORD(resv));
+}
+
+void
+Dbg_tls_static_resv(Rt_map *lmp, ulong_t size, ulong_t resv)
+{
+	Lm_list	*lml = LIST(lmp);
 
 	if (DBG_NOTCLASS(DBG_C_TLS))
 		return;
 
-	tlsmodlist = (TLS_modinfo **)vtlsmodlist;
 	Dbg_util_nl(lml, DBG_NL_STD);
-
-	for (i = 0; tlsmodlist[i]; i++) {
-		dbg_print(lml, MSG_INTL(MSG_TLS_STATBLOCK1), i,
-		    tlsmodlist[i]->tm_modname);
-		Dbg_tls_modent(lml, tlsmodlist[i]);
-	}
-	dbg_print(lml, MSG_INTL(MSG_TLS_STATBLOCK2), EC_XWORD(tlsstatsize));
+	dbg_print(lml, MSG_INTL(MSG_TLS_STATBLOCK3), TLSMODID(lmp), NAME(lmp),
+	    EC_XWORD(size), EC_XWORD(resv));
 }
 
 void

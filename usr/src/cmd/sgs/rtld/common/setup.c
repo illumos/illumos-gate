@@ -639,13 +639,13 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			    (ulong_t)ehdr, memsize, mmaps, mmapcnt)) == 0) {
 				return (0);
 			}
-			if (tlsphdr) {
-				PTTLS(mlmp) = tlsphdr;
-				tls_assign_soffset(mlmp);
-				lml_main.lm_tls++;
-			}
+			if (tlsphdr &&
+			    (tls_assign(&lml_main, mlmp, tlsphdr) == 0))
+				return (0);
+
 			if (unwindphdr)
 				PTUNWIND(mlmp) = unwindphdr;
+
 			if (cap)
 				cap_assign(cap, mlmp);
 		}

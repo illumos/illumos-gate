@@ -36,8 +36,6 @@
 #include <msg.h>
 #include <debug.h>
 
-static ulong_t	tls_static_size = 0;	/* static TLS buffer size */
-
 #define	TLSBLOCKCNT	16	/* number of blocks of tmi_bits to allocate */
 				/* at a time. */
 typedef struct {
@@ -48,11 +46,10 @@ typedef struct {
 
 static Tlsmodid	tmid = {0, 0, 0};
 
-ulong_t
+static ulong_t
 tls_getmodid()
 {
-	ulong_t		ndx;
-	ulong_t		i;
+	ulong_t	ndx, cnt;
 
 	if (tmid.tmi_bits == 0) {
 		if ((tmid.tmi_bits = calloc(TLSBLOCKCNT, sizeof (uint_t))) == 0)
@@ -63,18 +60,20 @@ tls_getmodid()
 		return (0);
 	}
 
-	for (i = tmid.tmi_lowfree / (sizeof (uint_t) * 8);
-	    i < tmid.tmi_cnt; i++) {
-		uint_t	j;
+	for (cnt = tmid.tmi_lowfree / (sizeof (uint_t) * 8);
+	    cnt < tmid.tmi_cnt; cnt++) {
+		uint_t	bits;
+
 		/*
 		 * If all bits are assigned - move on.
 		 */
-		if ((tmid.tmi_bits[i] ^ ~((uint_t)0)) == 0)
+		if ((tmid.tmi_bits[cnt] ^ ~((uint_t)0)) == 0)
 			continue;
-		for (ndx = 0, j = 1; j; j = j << 1, ndx++) {
-			if ((tmid.tmi_bits[i] & j) == 0) {
-				tmid.tmi_bits[i] |= j;
-				ndx = (i * (sizeof (uint_t)) * 8) + ndx;
+
+		for (ndx = 0, bits = 1; bits; bits = bits << 1, ndx++) {
+			if ((tmid.tmi_bits[cnt] & bits) == 0) {
+				tmid.tmi_bits[cnt] |= bits;
+				ndx = (cnt * (sizeof (uint_t)) * 8) + ndx;
 				tmid.tmi_lowfree = ndx + 1;
 				return (ndx);
 			}
@@ -152,8 +151,8 @@ tls_modaddrem(Rt_map *lmp, uint_t flag)
 	(*fptr)(&tmi);
 
 	/*
-	 * Tag that this link-map has registered its TLS, and free up the
-	 * moduleid
+	 * Tag that this link-map has registered its TLS, and, if this object
+	 * is being removed, free up the module id.
 	 */
 	FLAGS1(lmp) |= FL1_RT_TLSADD;
 
@@ -161,22 +160,96 @@ tls_modaddrem(Rt_map *lmp, uint_t flag)
 		tls_freemodid(TLSMODID(lmp));
 }
 
-void
-tls_assign_soffset(Rt_map *lmp)
+static ulong_t	tls_static_size = 0;	/* static TLS buffer size */
+static ulong_t	tls_static_resv = 512;	/* (extra) static TLS reservation */
+
+/*
+ * Track any static TLS use, retain the TLS header, and assign a TLS module
+ * identifier.
+ */
+int
+tls_assign(Lm_list *lml, Rt_map *lmp, Phdr *phdr)
 {
+	ulong_t	memsz = S_ROUND(phdr->p_memsz, M_TLSSTATALIGN);
+	ulong_t	filesz = phdr->p_filesz;
+	ulong_t	resv = tls_static_resv;
+
 	/*
-	 * Only objects on the primary link-map list are associated
-	 * with the STATIC tls block.
+	 * If this object explicitly references static TLS, then there are some
+	 * limitations.
 	 */
-	if (LIST(lmp)->lm_flags & LML_FLG_BASELM) {
-		tls_static_size += S_ROUND(PTTLS(lmp)->p_memsz, M_TLSSTATALIGN);
+	if (FLAGS1(lmp) & FL1_RT_TLSSTAT) {
+		/*
+		 * Static TLS is only available to objects on the primary
+		 * link-map list.
+		 */
+		if ((lml->lm_flags & LML_FLG_BASELM) == 0) {
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_TLS_STATBASE),
+			    NAME(lmp));
+			return (0);
+		}
+
+		/*
+		 * All TLS blocks that are processed before thread
+		 * initialization, are registered with libc.  This
+		 * initialization is carried out through a handshake with libc
+		 * prior to executing any user code (ie. before the first .init
+		 * sections are called).  As part of this initialization, a
+		 * small backup TLS reservation is added (tls_static_resv).
+		 * Only explicit static TLS references that can be satisfied by
+		 * this TLS backup reservation can be satisfied.
+		 */
+		if (rtld_flags2 & RT_FL2_PLMSETUP) {
+			/*
+			 * Initialized static TLS can not be satisfied from the
+			 * TLS backup reservation.
+			 */
+			if (filesz) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_TLS_STATINIT), NAME(lmp));
+				return (0);
+			}
+
+			/*
+			 * Make sure the backup reservation is sufficient.
+			 */
+			if (memsz > tls_static_resv) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_TLS_STATSIZE), NAME(lmp),
+				    EC_XWORD(memsz), EC_XWORD(tls_static_resv));
+				return (0);
+			}
+
+			tls_static_resv -= memsz;
+		}
+	}
+
+	/*
+	 * If we haven't yet initialized threads, or this static reservation can
+	 * be satisfied from the TLS backup reservation, determine the total
+	 * static TLS size, and assign this object a static TLS offset.
+	 */
+	if (((rtld_flags2 & RT_FL2_PLMSETUP) == 0) ||
+	    (FLAGS1(lmp) & FL1_RT_TLSSTAT)) {
+		tls_static_size += memsz;
 		TLSSTATOFF(lmp) = tls_static_size;
 	}
 
 	/*
-	 * Everyone get's a dynamic TLS modid.
+	 * Retain the PT_TLS header, obtain a new module identifier, and
+	 * indicate that this link-map list contains a new TLS object.
 	 */
+	PTTLS(lmp) = phdr;
 	TLSMODID(lmp) = tls_getmodid();
+
+	/*
+	 * Now that we have a TLS module id, generate any static TLS reservation
+	 * diagnostic.
+	 */
+	if (resv != tls_static_resv)
+		DBG_CALL(Dbg_tls_static_resv(lmp, memsz, tls_static_resv));
+
+	return (++lml->lm_tls);
 }
 
 int
@@ -195,6 +268,8 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	if (tlsmodcnt == 0) {
 		if (fptr)
 			(*fptr)(0, 0);
+		DBG_CALL(Dbg_tls_static_block(&lml_main, 0, 0,
+		    tls_static_resv));
 		return (1);
 	}
 	lml->lm_tls = 0;
@@ -246,8 +321,8 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	}
 
 	DBG_CALL(Dbg_tls_static_block(&lml_main, (void *)tlsmodlist,
-	    tls_static_size));
-	(*fptr)(tlsmodlist, tls_static_size);
+	    tls_static_size, tls_static_resv));
+	(*fptr)(tlsmodlist, (tls_static_size + tls_static_resv));
 
 	/*
 	 * We're done with the list - clean it up.

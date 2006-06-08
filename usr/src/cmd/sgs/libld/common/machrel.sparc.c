@@ -123,7 +123,7 @@ ld_mach_make_dynamic(Ofl_desc *ofl, size_t *cnt)
 }
 
 void
-ld_mach_update_odynamic(Ofl_desc * ofl, Dyn ** dyn)
+ld_mach_update_odynamic(Ofl_desc *ofl, Dyn **dyn)
 {
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) && ofl->ofl_pltcnt) {
 		(*dyn)->d_tag = DT_PLTGOT;
@@ -1621,53 +1621,21 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	Word		rtype = rsp->rel_rtype;
 	Sym_desc	*sdp = rsp->rel_sym;
 	Word		flags = ofl->ofl_flags;
-	Word		rflags;
 	Gotndx		*gnp;
 
 	/*
-	 * all TLS relocations are illegal in a static executable.
+	 * If we're building an executable - use either the IE or LE access
+	 * model.  If we're building a shared object process any IE model.
 	 */
-	if ((ofl->ofl_flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
-	    (FLG_OF_STATIC | FLG_OF_EXEC)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
-		    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
-		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname));
-		return (S_ERROR);
-	}
-
-	/*
-	 * Any TLS relocation must be against a STT_TLS symbol, all others
-	 * are illegal.
-	 */
-	if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_TLS) {
-		Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
-
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBADSYM),
-		    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
-		    ifl->ifl_name, demangle(rsp->rel_sname),
-		    conv_sym_info_type(ifl->ifl_ehdr->e_machine,
-		    ELF_ST_TYPE(sdp->sd_sym->st_info), 0));
-		return (S_ERROR);
-	}
-
-	/*
-	 * We're a executable - use either the IE or LE
-	 * access model.
-	 */
-	if (flags & FLG_OF_EXEC) {
+	if ((flags & FLG_OF_EXEC) || (IS_TLS_IE(rtype))) {
 		/*
-		 * If we are using either IE or LE reference
-		 * model set the DF_STATIC_TLS flag.
+		 * Set the DF_STATIC_TLS flag.
 		 */
 		ofl->ofl_dtflags |= DF_STATIC_TLS;
 
-		if (!local) {
+		if (!local || ((flags & FLG_OF_EXEC) == 0)) {
 			/*
-			 * IE access model
-			 */
-			/*
-			 * When building a executable - these relocations
+			 * When processing static TLS - these relocations
 			 * can be ignored.
 			 */
 			if ((rtype == R_SPARC_TLS_IE_LD) ||
@@ -1676,22 +1644,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 				return (1);
 
 			/*
-			 * It's not possible for LD or LE reference
-			 * models to reference a symbol external to
-			 * the current object.
-			 */
-			if (IS_TLS_LD(rtype) || IS_TLS_LE(rtype)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_REL_TLSBND),
-				    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
-				    rsp->rel_isdesc->is_file->ifl_name,
-				    demangle(rsp->rel_sname),
-				    sdp->sd_file->ifl_name);
-				return (S_ERROR);
-			}
-
-			/*
-			 * Assign a GOT entry for static TLS references
+			 * Assign a GOT entry for IE static TLS references.
 			 */
 			if (((rtype == R_SPARC_TLS_GD_HI22) ||
 			    (rtype == R_SPARC_TLS_GD_LO10) ||
@@ -1699,35 +1652,35 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			    (rtype == R_SPARC_TLS_IE_LO10)) &&
 			    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
 			    GOT_REF_TLSIE, ofl, rsp)) == 0)) {
-				if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp,
-				    GOT_REF_TLSIE, ofl, rsp, sdp) == S_ERROR)
+
+				if (ld_assign_got_TLS(local, rsp, ofl, sdp,
+				    gnp, GOT_REF_TLSIE, FLG_REL_STLS,
+				    rtype, M_R_TPOFF, 0) == S_ERROR)
 					return (S_ERROR);
-				rsp->rel_rtype = M_R_TPOFF;
-				if (ld_add_outrel((FLG_REL_GOT | FLG_REL_STLS),
-				    rsp, ofl) == S_ERROR)
-					return (S_ERROR);
-				rsp->rel_rtype = rtype;
 			}
 
+			/*
+			 * IE access model.
+			 */
 			if (IS_TLS_IE(rtype))
 				return (ld_add_actrel(FLG_REL_STLS, rsp, ofl));
 
 			/*
-			 * If (GD) reference models - fixups
-			 * are required.
+			 * Fixups are required for other executable models.
 			 */
 			return (ld_add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS),
 			    rsp, ofl));
 		}
+
 		/*
-		 * LE access model
+		 * LE access model.
 		 */
 		if (IS_TLS_LE(rtype))
 			return (ld_add_actrel(FLG_REL_STLS, rsp, ofl));
 
 		/*
-		 * When building a executable - these relocations
-		 * can be ignored.
+		 * When processing static TLS - these relocations can be
+		 * ignored.
 		 */
 		if (rtype == R_SPARC_TLS_IE_ADD)
 			return (1);
@@ -1737,36 +1690,9 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	}
 
 	/*
-	 * Building a shared object
-	 */
-
-	/*
-	 * Building a shared object - only GD & LD access models
-	 * will work here.
-	 */
-	if (IS_TLS_IE(rtype) || IS_TLS_LE(rtype)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSIE),
-		    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
-		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname));
-		return (S_ERROR);
-	}
-
-	/*
-	 * LD access mode can only bind to local symbols.
-	 */
-	if (!local && IS_TLS_LD(rtype)) {
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSBND),
-		    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
-		    rsp->rel_isdesc->is_file->ifl_name,
-		    demangle(rsp->rel_sname),
-		    sdp->sd_file->ifl_name);
-		return (S_ERROR);
-	}
-
-	/*
-	 * For dynamic TLS references - ADD relocations
-	 * are ignored.
+	 * Building a shared object.
+	 *
+	 * For dynamic TLS references, ADD relocations are ignored.
 	 */
 	if ((rtype == R_SPARC_TLS_GD_ADD) || (rtype == R_SPARC_TLS_LDM_ADD) ||
 	    (rtype == R_SPARC_TLS_LDO_ADD))
@@ -1777,52 +1703,27 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 */
 	if (((rtype == R_SPARC_TLS_LDM_HI22) ||
 	    (rtype == R_SPARC_TLS_LDM_LO10)) &&
-	    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
-	    GOT_REF_TLSLD, ofl, rsp)) == 0)) {
-		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSLD,
-		    ofl, rsp, sdp) == S_ERROR)
-			return (S_ERROR);
-		rsp->rel_rtype = M_R_DTPMOD;
-		rflags = FLG_REL_GOT | FLG_REL_MTLS;
-		if (local)
-			rflags |= FLG_REL_SCNNDX;
+	    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), GOT_REF_TLSLD,
+	    ofl, rsp)) == 0)) {
 
-		if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
+		if (ld_assign_got_TLS(local, rsp, ofl, sdp, gnp, GOT_REF_TLSLD,
+		    FLG_REL_MTLS, rtype, M_R_DTPMOD, 0) == S_ERROR)
 			return (S_ERROR);
 
-		rsp->rel_rtype = rtype;
+	} else if (((rtype == R_SPARC_TLS_GD_HI22) ||
+	    (rtype == R_SPARC_TLS_GD_LO10)) &&
+	    ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs), GOT_REF_TLSGD,
+	    ofl, rsp)) == 0)) {
 
-	} else if (((rtype == R_SPARC_TLS_GD_HI22) || (rtype ==
-	    R_SPARC_TLS_GD_LO10)) && ((gnp = ld_find_gotndx(&(sdp->sd_GOTndxs),
-	    GOT_REF_TLSGD, ofl, rsp)) == 0)) {
-		if (ld_assign_gotndx(&(sdp->sd_GOTndxs), gnp, GOT_REF_TLSGD,
-		    ofl, rsp, sdp) == S_ERROR)
+		if (ld_assign_got_TLS(local, rsp, ofl, sdp, gnp, GOT_REF_TLSGD,
+		    FLG_REL_DTLS, rtype, M_R_DTPMOD, M_R_DTPOFF) == S_ERROR)
 			return (S_ERROR);
-		rsp->rel_rtype = M_R_DTPMOD;
-		rflags = FLG_REL_GOT | FLG_REL_DTLS;
-		if (local)
-			rflags |= FLG_REL_SCNNDX;
-
-		if (ld_add_outrel(rflags, rsp, ofl) == S_ERROR)
-			return (S_ERROR);
-
-		if (local == TRUE) {
-			rsp->rel_rtype = M_R_DTPOFF;
-			if (ld_add_actrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
-			    ofl) == S_ERROR)
-				return (S_ERROR);
-		} else {
-			rsp->rel_rtype = M_R_DTPOFF;
-			if (ld_add_outrel((FLG_REL_GOT | FLG_REL_DTLS), rsp,
-			    ofl) == S_ERROR)
-				return (S_ERROR);
-		}
-		rsp->rel_rtype = rtype;
 	}
+
 	/*
 	 * For GD/LD TLS reference - TLS_{GD,LD}_CALL, this will eventually
-	 * cause a call to __tls_get_addr().  Let's convert this
-	 * relocation to that symbol now, and prepare for the PLT magic.
+	 * cause a call to __tls_get_addr().  Convert this relocation to that
+	 * symbol now, and prepare for the PLT magic.
 	 */
 	if ((rtype == R_SPARC_TLS_GD_CALL) || (rtype == R_SPARC_TLS_LDM_CALL)) {
 		Sym_desc *	tlsgetsym;
@@ -1830,11 +1731,14 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 		if ((tlsgetsym = ld_sym_add_u(MSG_ORIG(MSG_SYM_TLSGETADDR_U),
 		    ofl)) == (Sym_desc *)S_ERROR)
 			return (S_ERROR);
+
 		rsp->rel_sym = tlsgetsym;
 		rsp->rel_sname = tlsgetsym->sd_name;
 		rsp->rel_rtype = R_SPARC_WPLT30;
+
 		if (ld_reloc_plt(rsp, ofl) == S_ERROR)
 			return (S_ERROR);
+
 		rsp->rel_sym = sdp;
 		rsp->rel_sname = sdp->sd_name;
 		rsp->rel_rtype = rtype;
@@ -1947,7 +1851,7 @@ ld_calc_got_offset(Rel_desc * rdesc, Ofl_desc * ofl)
 }
 
 uintptr_t
-ld_assign_gotndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
+ld_assign_got_ndx(List * lst, Gotndx * pgnp, Gotref gref, Ofl_desc * ofl,
     Rel_desc * rsp, Sym_desc * sdp)
 {
 	Xword		raddend;
@@ -2076,20 +1980,20 @@ ld_allocate_got(Ofl_desc * ofl)
 	return (1);
 }
 
-
 /*
  * Initializes .got[0] with the _DYNAMIC symbol value.
  */
 uintptr_t
-ld_fillin_gotplt(Ofl_desc * ofl)
+ld_fillin_gotplt(Ofl_desc *ofl)
 {
 	if (ofl->ofl_osgot) {
-		Sym_desc *	sdp;
+		Sym_desc	*sdp;
 
 		if ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
 		    SYM_NOHASH, 0, ofl)) != NULL) {
-			uchar_t	*genptr = ((uchar_t *)
-			    ofl->ofl_osgot->os_outdata->d_buf +
+			uchar_t	*genptr;
+
+			genptr = ((uchar_t *)ofl->ofl_osgot->os_outdata->d_buf +
 			    (-neggotoffset * M_GOT_ENTSIZE) +
 			    (M_GOT_XDYNAMIC * M_GOT_ENTSIZE));
 			/* LINTED */

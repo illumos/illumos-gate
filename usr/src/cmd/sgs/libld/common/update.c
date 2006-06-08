@@ -98,7 +98,6 @@ update_osym(Ofl_desc *ofl)
 	Versym		*versym;
 	Gottable	*gottable;	/* used for display got debugging */
 					/*	information */
-	Gottable	*_gottable;
 	Syminfo		*syminfo;
 	Sym_s_list	*sorted_syms;	/* table to hold sorted symbols */
 	Word		ssndx;		/* global index into sorted_syms */
@@ -196,8 +195,8 @@ update_osym(Ofl_desc *ofl)
 	 * the buffer to 'cache' the GOT symbols into now.
 	 */
 	if (DBG_ENABLED) {
-		if ((_gottable = gottable = libld_calloc(ofl->ofl_gotcnt,
-		    sizeof (Gottable))) == 0)
+		if ((ofl->ofl_gottable = gottable =
+		    libld_calloc(ofl->ofl_gotcnt, sizeof (Gottable))) == 0)
 		return ((Addr)S_ERROR);
 	}
 
@@ -481,10 +480,10 @@ update_osym(Ofl_desc *ofl)
 #endif
 			if (DBG_ENABLED) {
 			    for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
-				_gottable->gt_sym = sdp;
-				_gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
-				_gottable->gt_gndx.gn_addend = gnp->gn_addend;
-				_gottable++;
+				gottable->gt_sym = sdp;
+				gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
+				gottable->gt_gndx.gn_addend = gnp->gn_addend;
+				gottable++;
 			    }
 			}
 
@@ -902,17 +901,17 @@ update_osym(Ofl_desc *ofl)
 #endif
 		if (DBG_ENABLED) {
 			for (LIST_TRAVERSE(&sdp->sd_GOTndxs, lnp2, gnp)) {
-				_gottable->gt_sym = sdp;
-				_gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
-				_gottable->gt_gndx.gn_addend = gnp->gn_addend;
-				_gottable++;
+				gottable->gt_sym = sdp;
+				gottable->gt_gndx.gn_gotndx = gnp->gn_gotndx;
+				gottable->gt_gndx.gn_addend = gnp->gn_addend;
+				gottable++;
 			}
 
 			if (sdp->sd_aux && sdp->sd_aux->sa_PLTGOTndx) {
-				_gottable->gt_sym = sdp;
-				_gottable->gt_gndx.gn_gotndx =
+				gottable->gt_sym = sdp;
+				gottable->gt_gndx.gn_gotndx =
 				    sdp->sd_aux->sa_PLTGOTndx;
-				_gottable++;
+				gottable++;
 			}
 		}
 
@@ -1526,7 +1525,7 @@ update_osym(Ofl_desc *ofl)
 	/*
 	 * Now display GOT debugging information if required.
 	 */
-	DBG_CALL(Dbg_got_display(ofl, gottable));
+	DBG_CALL(Dbg_got_display(ofl, 0, 0));
 
 	/*
 	 * Update the section headers information.
