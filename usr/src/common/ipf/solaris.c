@@ -713,6 +713,7 @@ frdest_t *fdp;
 #else
 	void *target = NULL;
 	char *ifname = NULL;
+	s_ill_t *ifp;
 #endif
 	queue_t *q = NULL;
 	mblk_t *mp = NULL;
@@ -898,23 +899,26 @@ frdest_t *fdp;
 	}
 	mb = mp;
 	/*
-	 * TODO: assign fin->fin_ifp = ?
-	 * The ? can be get from mb->b_queue depending on
-	 * what will be done when replacing of s_ill_t.
+	 * Determine the s_ill_t we're going out on
 	 */
+	ifp = ((qif_t *)(q->q_ptr))->qf_ill;
 #endif /* IRE_ILL_CN */
 
 	mb->b_queue = q;
 	*mpp = mb;
 
 	if (fin->fin_out == 0) {
+		void *saveifp;
 		u_32_t pass;
 
+		saveifp = fin->fin_ifp;
+		fin->fin_ifp = ifp;
 		(void)fr_acctpkt(fin, &pass);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK))
 			(void) fr_checkstate(fin, &pass);
 		(void) fr_checknatout(fin, NULL);
+		fin->fin_ifp = saveifp;
 	}
 #ifndef	sparc
 	if (fin->fin_v == 4) {

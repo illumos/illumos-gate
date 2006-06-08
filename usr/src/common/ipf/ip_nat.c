@@ -1346,7 +1346,7 @@ int getlock;
 	if (nat->nat_dir == NAT_OUTBOUND) {
 		fin.fin_data[0] = ntohs(nat->nat_oport);
 		fin.fin_data[1] = ntohs(nat->nat_outport);
-		fin.fin_ifp = nat->nat_ifps[1];
+		fin.fin_ifp = nat->nat_ifps[0];
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
@@ -1362,12 +1362,12 @@ int getlock;
 	} else if (nat->nat_dir == NAT_INBOUND) {
 		fin.fin_data[0] = ntohs(nat->nat_inport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
-		fin.fin_ifp = nat->nat_ifps[0];
+		fin.fin_ifp = nat->nat_ifps[1];
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
 		n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
-			nat->nat_outip, nat->nat_oip);
+			nat->nat_inip, nat->nat_oip);
 		if (getlock) {
 			RWLOCK_EXIT(&ipf_nat);
 		}
@@ -2317,14 +2317,21 @@ int direction;
 
 	np = ni->nai_np;
 
-	(void) COPYIFNAME(fin->fin_ifp, nat->nat_ifnames[0]);
+	if (np->in_ifps[0] != NULL) {
+		(void) COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+	}
+	if (np->in_ifps[1] != NULL) {
+		(void) COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+	}
 #ifdef	IPFILTER_SYNC
-	nat->nat_sync = ipfsync_new(SMC_NAT, fin, nat);
+	if ((nat->nat_flags & SI_CLONE) == 0)
+		nat->nat_sync = ipfsync_new(SMC_NAT, fin, nat);
 #endif
 
 	nat->nat_me = natsave;
 	nat->nat_dir = direction;
-	nat->nat_ifps[0] = fin->fin_ifp;
+	nat->nat_ifps[0] = np->in_ifps[0];
+	nat->nat_ifps[1] = np->in_ifps[1];
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
 	nat->nat_mssclamp = np->in_mssclamp;
@@ -2426,13 +2433,15 @@ nat_t	*nat;
 	tqe->tqe_next = NULL;
 
 	nat->nat_ifnames[0][sizeof(nat->nat_ifnames[0]) - 1] = '\0';
-	if (nat->nat_ifnames[0][0] !='\0') {
+	if (nat->nat_ifnames[0][0] != '\0') {
 		nat->nat_ifps[0] = GETIFP(nat->nat_ifnames[0], 4);
 	}
 	nat->nat_ifnames[1][sizeof(nat->nat_ifnames[1]) - 1] = '\0';
-	if (nat->nat_ifnames[1][0] !='\0') {
+	if (nat->nat_ifnames[1][0] != '\0') {
 		nat->nat_ifps[1] = GETIFP(nat->nat_ifnames[1], 4);
 	} else {
+		(void) strncpy(nat->nat_ifnames[1], nat->nat_ifnames[0],
+			       sizeof(nat->nat_ifnames[1]));
 		nat->nat_ifps[1] = nat->nat_ifps[0];
 	}
 
@@ -3062,17 +3071,13 @@ struct in_addr src , mapdst;
 	hv = NAT_HASH_FN(src.s_addr, hv + sport, ipf_nattable_sz);
 	nat = nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
-		nflags = nat->nat_flags;
+		if (nat->nat_ifps[0] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[0] = ifp;
 
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			}
-		}
+		nflags = nat->nat_flags;
 
 		if (nat->nat_oip.s_addr == src.s_addr &&
 		    nat->nat_outip.s_addr == dst &&
@@ -3125,15 +3130,11 @@ find_in_wild_ports:
 
 	nat = nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			}
-		}
+		if (nat->nat_ifps[0] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[0] = ifp;
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3269,8 +3270,16 @@ struct in_addr src , dst;
 	int nflags;
 	void *ifp;
 	u_int hv;
+	frentry_t *fr;
 
-	ifp = fin->fin_ifp;
+	fr = fin->fin_fr;
+
+	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
+	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
+		ifp = fr->fr_tif.fd_ifp;
+	else
+		ifp = fin->fin_ifp;
+
 	srcip = src.s_addr;
 	sflags = flags & IPN_TCPUDPICMP;
 	if ((flags & IPN_TCPUDP) != 0) {
@@ -3287,17 +3296,13 @@ struct in_addr src , dst;
 	hv = NAT_HASH_FN(dst.s_addr, hv + dport, ipf_nattable_sz);
 	nat = nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
-		nflags = nat->nat_flags;
+		if (nat->nat_ifps[1] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[1] = ifp;
 
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			}
-		}
+		nflags = nat->nat_flags;
 
 		if (nat->nat_inip.s_addr == srcip &&
 		    nat->nat_oip.s_addr == dst.s_addr &&
@@ -3348,15 +3353,11 @@ find_out_wild_ports:
 
 	nat = nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (ifp != NULL) {
-			if (nat->nat_dir == NAT_REDIRECT) {
-				if (ifp != nat->nat_ifps[1])
-					continue;
-			} else {
-				if (ifp != nat->nat_ifps[0])
-					continue;
-			}
-		}
+		if (nat->nat_ifps[1] != NULL) {
+			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
+				continue;
+		} else if (ifp != NULL)
+			nat->nat_ifps[1] = ifp;
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3574,7 +3575,7 @@ u_32_t *passp;
 	icmphdr_t *icmp = NULL;
 	tcphdr_t *tcp = NULL;
 	ipnat_t *np = NULL;
-	struct ifnet *ifp;
+	struct ifnet *ifp, *sifp;
 	u_int nflags = 0;
 	u_32_t ipa, iph;
 	int natadd = 1;
@@ -3586,11 +3587,11 @@ u_32_t *passp;
 		return 0;
 
 	fr = fin->fin_fr;
+	sifp = fin->fin_ifp;
 	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
 	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
-		ifp = fr->fr_tif.fd_ifp;
-	else
-		ifp = fin->fin_ifp;
+		fin->fin_ifp = fr->fr_tif.fd_ifp;
+	ifp = fin->fin_ifp;
 
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
 		switch (fin->fin_p)
@@ -3647,7 +3648,7 @@ maskloop:
 		hv = NAT_HASH_FN(iph, 0, ipf_natrules_sz);
 		for (np = nat_rules[hv]; np; np = np->in_mnext)
 		{
-			if ((np->in_ifps[0] && (np->in_ifps[0] != ifp)))
+			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
 			if ((np->in_flags & IPN_RF) && !(np->in_flags & nflags))
 				continue;
@@ -3707,6 +3708,7 @@ maskloop:
 			*passp = FR_BLOCK;
 		fin->fin_flx |= FI_BADNAT;
 	}
+	fin->fin_ifp = sifp;
 	return rval;
 }
 
@@ -4306,11 +4308,24 @@ void *ifp;
 		return;
 	}
 
-	for (nat = nat_instances; nat; nat = nat->nat_next)
-		if (((ifp == NULL) || (ifp == nat->nat_ifps[0])) &&
-		    !(nat->nat_flags & IPN_TCP) && (np = nat->nat_ptr) &&
-		    (np->in_outmsk == 0xffffffff) && !np->in_nip) {
+	for (nat = nat_instances; nat; nat = nat->nat_next) {
+		if ((nat->nat_flags & IPN_TCP) != 0)
+			continue;
+		np = nat->nat_ptr;
+		if ((np == NULL) ||
+		    (np->in_outip != 0) || (np->in_outmsk != 0xffffffff))
+			continue;
+		if (((ifp == NULL) || (ifp == nat->nat_ifps[0]) ||
+		    (ifp == nat->nat_ifps[1]))) {
+			nat->nat_ifps[0] = GETIFP(nat->nat_ifnames[0], 4);
+			if (nat->nat_ifnames[1][0] != '\0') {
+				nat->nat_ifps[1] = GETIFP(nat->nat_ifnames[1],
+							  4);
+			} else
+				nat->nat_ifps[1] = nat->nat_ifps[0];
 			ifp2 = nat->nat_ifps[0];
+			if (ifp2 == NULL)
+				continue;
 			/*
 			 * Change the map-to address to be the same as the
 			 * new one.
@@ -4335,13 +4350,15 @@ void *ifp;
 			nat->nat_sumd[1] = nat->nat_sumd[0];
 		}
 
+	}
+
 	for (n = nat_list; (n != NULL); n = n->in_next) {
-		if (n->in_ifps[0] == ifp) {
+		if ((ifp == NULL) || (n->in_ifps[0] == ifp)) {
 			n->in_ifps[0] = (void *)GETIFP(n->in_ifnames[0], 4);
 			if (n->in_ifps[0] == NULL)
 				n->in_ifps[0] = (void *)-1;
 		}
-		if (n->in_ifps[1] == ifp) {
+		if ((ifp == NULL) || (n->in_ifps[1] == ifp)) {
 			n->in_ifps[1] = (void *)GETIFP(n->in_ifnames[1], 4);
 			if (n->in_ifps[1] == NULL)
 				n->in_ifps[1] = (void *)-1;
