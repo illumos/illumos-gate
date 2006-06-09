@@ -194,6 +194,8 @@ extern int aggr_port_promisc(aggr_port_t *, boolean_t);
 extern int aggr_port_unicst(aggr_port_t *, uint8_t *);
 extern int aggr_port_multicst(void *, boolean_t, const uint8_t *);
 extern uint64_t aggr_port_stat(aggr_port_t *, enum mac_stat);
+extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *, boolean_t);
+extern void aggr_port_init_callbacks(aggr_port_t *);
 
 extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *);
 

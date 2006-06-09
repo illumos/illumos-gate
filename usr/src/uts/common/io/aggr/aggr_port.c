@@ -102,6 +102,17 @@ aggr_port_resource_add(void *arg, mac_resource_t *mrp)
 	return (mac_resource_add(&grp->lg_mac, mrp));
 }
 
+void
+aggr_port_init_callbacks(aggr_port_t *port)
+{
+	/* add the port's receive callback */
+	port->lp_mnh = mac_notify_add(port->lp_mh, aggr_port_notify_cb,
+	    (void *)port);
+
+	/* set port's resource_add callback */
+	mac_resource_set(port->lp_mh, aggr_port_resource_add, (void *)port);
+}
+
 int
 aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 {
@@ -133,14 +144,8 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	/* get the port's original MAC address */
 	mac_unicst_get(port->lp_mh, port->lp_addr);
 
-	/* add the port's receive callback */
-	port->lp_mnh = mac_notify_add(mh, aggr_port_notify_cb, (void *)port);
-
 	/* set port's transmit information */
 	port->lp_txinfo = mac_tx_get(port->lp_mh);
-
-	/* set port's ring add and ring remove callbacks */
-	mac_resource_set(mh, aggr_port_resource_add, (void *)port);
 
 	/* initialize state */
 	port->lp_state = AGGR_PORT_STATE_STANDBY;
@@ -202,8 +207,8 @@ aggr_port_free(aggr_port_t *port)
  * Invoked upon receiving a MAC_NOTE_LINK notification for
  * one of the consistuent ports.
  */
-static boolean_t
-aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
+boolean_t
+aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 {
 	boolean_t do_attach = B_FALSE;
 	boolean_t do_detach = B_FALSE;
@@ -212,8 +217,14 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 	link_state_t link_state;
 	link_duplex_t link_duplex;
 
-	AGGR_LACP_LOCK(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	if (dolock) {
+		AGGR_LACP_LOCK(grp);
+		rw_enter(&grp->lg_lock, RW_WRITER);
+	} else {
+		ASSERT(AGGR_LACP_LOCK_HELD(grp));
+		ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	}
+
 	rw_enter(&port->lp_lock, RW_WRITER);
 
 	/* link state change? */
@@ -255,8 +266,11 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 	}
 
 	rw_exit(&port->lp_lock);
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
+
+	if (dolock) {
+		rw_exit(&grp->lg_lock);
+		AGGR_LACP_UNLOCK(grp);
+	}
 
 	return (link_state_changed);
 }
@@ -344,7 +358,7 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 		mac_tx_update(&grp->lg_mac);
 		break;
 	case MAC_NOTE_LINK:
-		if (aggr_port_notify_link(grp, port))
+		if (aggr_port_notify_link(grp, port, B_TRUE))
 			mac_link_update(&grp->lg_mac, grp->lg_link_state);
 		break;
 	case MAC_NOTE_UNICST:

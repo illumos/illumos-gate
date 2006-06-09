@@ -1238,6 +1238,8 @@ gld_update_vlan_kstat(kstat_t *ksp, int rw)
 	gld_mac_info_t	*macinfo;
 	struct gldkstats *gsp;
 	struct gld_stats *stats;
+	gld_mac_pvt_t *mac_pvt;
+	uint32_t media;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
@@ -1247,6 +1249,8 @@ gld_update_vlan_kstat(kstat_t *ksp, int rw)
 
 	macinfo = vlan->gldv_mac;
 	GLDM_LOCK(macinfo, RW_WRITER);
+
+	mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
 
 	gsp = vlan->gldv_kstatp->ks_data;
 	ASSERT(gsp);
@@ -1270,6 +1274,15 @@ gld_update_vlan_kstat(kstat_t *ksp, int rw)
 	gsp->glds_blocked.value.ul = stats->glds_blocked;
 	gsp->glds_pktrcv64.value.ui64 = stats->glds_pktrcv64;
 	gsp->glds_bytercv64.value.ui64 = stats->glds_bytercv64;
+	gsp->glds_unknowns.value.ul = stats->glds_unknowns;
+	gsp->glds_xmtbadinterp.value.ui32 = stats->glds_xmtbadinterp;
+	gsp->glds_rcvbadinterp.value.ui32 = stats->glds_rcvbadinterp;
+
+	gsp->glds_speed.value.ui64 = mac_pvt->statistics->glds_speed;
+	media = mac_pvt->statistics->glds_media;
+	(void) strcpy(gsp->glds_media.value.c,
+	    gld_media[media < sizeof (gld_media) / sizeof (gld_media[0]) ?
+	    media : 0]);
 
 	GLDM_UNLOCK(macinfo);
 	return (0);

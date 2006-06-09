@@ -426,6 +426,12 @@ aggr_grp_add_port(aggr_grp_t *grp, const char *name, uint_t portnum,
 
 	aggr_lacp_init_port(port);
 
+	/*
+	 * Initialize the callback functions for this port. Note that this
+	 * can only be done after the lp_grp field is set.
+	 */
+	aggr_port_init_callbacks(port);
+
 	rw_exit(&port->lp_lock);
 
 	if (pp != NULL)
@@ -443,6 +449,7 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	int rc, i, nadded = 0;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
+	boolean_t link_state_changed = B_FALSE;
 
 	/* get group corresponding to key */
 	rw_enter(&aggr_grp_lock, RW_READER);
@@ -489,10 +496,19 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 			}
 			rw_exit(&port->lp_lock);
 		}
+
+		/*
+		 * Attach each port if necessary.
+		 */
+		link_state_changed = link_state_changed ||
+		    aggr_port_notify_link(grp, port, B_FALSE);
 	}
 
 	/* update the MAC address of the constituent ports */
-	if (aggr_grp_update_ports_mac(grp))
+	link_state_changed = link_state_changed ||
+	    aggr_grp_update_ports_mac(grp);
+
+	if (link_state_changed)
 		mac_link_update(&grp->lg_mac, grp->lg_link_state);
 
 bail:
@@ -752,6 +768,12 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 
 	/* set LACP mode */
 	aggr_lacp_set_mode(grp, lacp_mode, lacp_timer);
+
+	/*
+	 * Attach each port if necessary.
+	 */
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
+		(void) aggr_port_notify_link(grp, port, B_FALSE);
 
 	/* add new group to hash table */
 	err = mod_hash_insert(aggr_grp_hash, GRP_HASH_KEY(key),
