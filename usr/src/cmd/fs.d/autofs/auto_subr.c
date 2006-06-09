@@ -923,7 +923,8 @@ bitness(char *isaname)
 	    strcmp(isaname, "i386") == 0)
 		return (32);
 
-	if (strcmp(isaname, "sparcv9") == 0)
+	if (strcmp(isaname, "sparcv9") == 0 ||
+	    strcmp(isaname, "amd64") == 0)
 		return (64);
 
 	return (0);
