@@ -35,6 +35,7 @@
 #include "agent.h"
 #include "interface.h"
 #include "script_handler.h"
+#include "states.h"
 
 static void	async_timeout(iu_tq_t *, void *);
 
