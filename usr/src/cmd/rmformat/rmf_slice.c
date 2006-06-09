@@ -1562,7 +1562,7 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 		ret = read_vtoc(fd, &t_vtoc);
 
 		/* Turn off privileges. */
-		(void) __priv_brackets(PRIV_OFF);
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret < 0) {
 			/* No valid vtoc, erase fdisk table. */
