@@ -995,8 +995,20 @@ zfs_prop_inherit(zfs_handle_t *zhp, zfs_prop_t prop)
 		return (zfs_standard_error(hdl, errno, errbuf));
 	} else {
 
-		if ((ret = changelist_postfix(cl)) != 0)
+		if ((ret = changelist_postfix(cl)) != 0) {
+			/*
+			 * If we got an error then warn the user that the
+			 * property was changed but not remounted/reshared
+			 */
+			if (ret != 0 && (prop == ZFS_PROP_MOUNTPOINT ||
+			    prop == ZFS_PROP_SHARENFS)) {
+				zfs_error(dgettext(TEXT_DOMAIN,
+				    "property set but unable to %s "
+				    "filesystem"), prop == ZFS_PROP_MOUNTPOINT ?
+				    "remount":"reshare");
+			}
 			goto error;
+		}
 
 		/*
 		 * Refresh the statistics so the new property is reflected.
