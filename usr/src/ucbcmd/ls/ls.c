@@ -1,5 +1,5 @@
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -687,12 +687,12 @@ fmtlstuff(struct afile *p)
 /* get uname */
 	{
 		char *cp = getname(p->fuid);
-		(void) sprintf(uname, "%-9s", cp);
+		(void) sprintf(uname, "%-8s ", cp);
 	}
 /* get gname */
 	if (gflg) {
 		char *cp = getgroup(p->fgid);
-		(void) sprintf(gname, "%-9s", cp);
+		(void) sprintf(gname, "%-8s ", cp);
 	}
 /* get fsize */
 	if (p->ftype == 'b' || p->ftype == 'c')
