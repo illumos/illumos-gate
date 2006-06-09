@@ -31,9 +31,8 @@ include ../../Makefile.com
 SRCS = cpu.c cpu_mdesc.c
 
 CPPFLAGS += -I. -I$(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOTLIB)/fm -L$(ROOT)/usr/platform/sun4v/lib/fm/fmd \
-	-lmdesc -lkstat -lldom
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/sun4v/lib/fm/fmd
+LDLIBS += -L$(ROOTLIB)/fm -lmdesc -lkstat -lldom
+LDFLAGS += -R/usr/lib/fm
 
 include ../../Makefile.targ
 

@@ -4536,6 +4536,17 @@ mondo_loop() {
 	rm -rf $usr/platform/SUNW,Sun-Fire-15000/lib/fm
 
 	#
+	# Remove old FMA LDOMS files
+	#
+	rm -f $usr/platform/sun4v/lib/fm/fmd/libldom.so.1
+	rm -f $usr/platform/sun4v/lib/fm/fmd/libldom.so
+	rm -f $usr/platform/sun4v/lib/fm/fmd/llib-lldom
+	rm -f $usr/platform/sun4v/lib/fm/fmd/llib-lldom.ln
+	rm -f $usr/platform/sun4v/lib/fm/fmd/sparcv9/libldom.so.1
+	rm -f $usr/platform/sun4v/lib/fm/fmd/sparcv9/libldom.so
+	rm -f $usr/platform/sun4v/lib/fm/fmd/sparcv9/llib-lldom.ln
+
+	#
 	# Remove old topology data
 	#
 	rm -rf $usr/lib/fm/topo

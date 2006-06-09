@@ -33,6 +33,7 @@ OBJECTS = $(LIBSRCS:%.c=%.o)
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
+SRCS = $(LIBSRCS:%.c=../sparc/%.c)
 SRCDIR = ../sparc
 
 LIBS = $(DYNLIB) $(LINTLIB)
@@ -53,9 +54,6 @@ $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
 $(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9) \
 	-I$(ROOT)/usr/platform/sun4v/include
-
-ROOTLIBDIR = $(ROOT)/usr/platform/sun4v/lib/fm/fmd
-ROOTLIBDIR64 = $(ROOT)/usr/platform/sun4v/lib/fm/fmd/$(MACH64)
 
 .KEEP_STATE:
 

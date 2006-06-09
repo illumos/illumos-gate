@@ -35,6 +35,10 @@ f none usr/lib/fm/libmdesc.so.1 755 root bin
 s none usr/lib/fm/libmdesc.so=libmdesc.so.1 755 root bin
 f none usr/lib/fm/llib-lmdesc 644 root bin
 f none usr/lib/fm/llib-lmdesc.ln 644 root bin
+f none usr/lib/fm/libldom.so.1 755 root bin
+s none usr/lib/fm/libldom.so=libldom.so.1 755 root bin
+f none usr/lib/fm/llib-lldom 644 root bin
+f none usr/lib/fm/llib-lldom.ln 644 root bin
 d none usr/lib/fm/fmd/schemes/sparcv9 755 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/cpu.so 555 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/dev.so 555 root bin
@@ -58,6 +62,9 @@ f none usr/lib/fm/sparcv9/llib-lfmd_log.ln 644 root bin
 f none usr/lib/fm/sparcv9/libmdesc.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libmdesc.so=libmdesc.so.1 755 root bin
 f none usr/lib/fm/sparcv9/llib-lmdesc.ln 644 root bin
+f none usr/lib/fm/sparcv9/libldom.so.1 755 root bin
+s none usr/lib/fm/sparcv9/libldom.so=libldom.so.1 755 root bin
+f none usr/lib/fm/sparcv9/llib-lldom.ln 644 root bin
 f none usr/lib/fm/sparcv9/libfmd_snmp.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libfmd_snmp.so=libfmd_snmp.so.1
 f none usr/lib/fm/sparcv9/llib-lfmd_snmp.ln 644 root bin
@@ -102,10 +109,6 @@ d none usr/platform/sun4v/lib/fm 755 root bin
 d none usr/platform/sun4v/lib/fm/eft 755 root bin
 f none usr/platform/sun4v/lib/fm/eft/fire.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
-f none usr/platform/sun4v/lib/fm/fmd/libldom.so.1 755 root bin
-s none usr/platform/sun4v/lib/fm/fmd/libldom.so=libldom.so.1 755 root bin
-f none usr/platform/sun4v/lib/fm/fmd/llib-lldom 644 root bin
-f none usr/platform/sun4v/lib/fm/fmd/llib-lldom.ln 644 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.conf 644 root bin
@@ -113,10 +116,6 @@ f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.conf 644 root bin
-d none usr/platform/sun4v/lib/fm/fmd/sparcv9 755 root bin
-f none usr/platform/sun4v/lib/fm/fmd/sparcv9/libldom.so.1 755 root bin
-s none usr/platform/sun4v/lib/fm/fmd/sparcv9/libldom.so=libldom.so.1 755 root bin
-f none usr/platform/sun4v/lib/fm/fmd/sparcv9/llib-lldom.ln 644 root bin
 d none usr/platform/sun4v/lib/fm/topo 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/hc-topology.xml 444 root bin
 d none usr/platform/sun4v/lib/fm/topo/plugins 755 root bin

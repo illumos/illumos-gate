@@ -42,6 +42,5 @@ INCDIRS = . \
 	 $(ROOT)/usr/platform/sun4v/include
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
-LDFLAGS += -R/usr/lib/fm -R/usr/platform/$(ARCH)/lib/fm/fmd
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt \
-	-L$(ROOT)/usr/platform/$(ARCH)/lib/fm/fmd -lldom
+LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt -lldom

@@ -30,9 +30,8 @@ include ../Makefile.com
 include $(SRC)/Makefile.master.64
 
 CPPFLAGS += -I$(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOTLIB)/fm/$(MACH64) -lmdesc -ltopo \
-	-L$(ROOT)/usr/platform/sun4v/lib/fm/fmd/$(MACH64) -lldom
-LDFLAGS += -R/usr/lib/fm/$(MACH64) -R/usr/platform/sun4v/lib/fm/fmd/$(MACH64)
+LDLIBS += -L$(ROOTLIB)/fm/$(MACH64) -lmdesc -ltopo -lldom
+LDFLAGS += -R/usr/lib/fm/$(MACH64)
 
 include ../../Makefile.targ
 

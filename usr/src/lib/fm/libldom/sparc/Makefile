@@ -37,15 +37,14 @@ SRCDIR = .
 
 ROOTFMHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys/fm
 
-install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
 
-install_h: $(ROOTFMHDRDIR) $(ROOTFMHDRS)
+install_h: $(ROOTFMHDRS)
+
+$(ROOTFMHDRS): $(ROOTFMHDRDIR)
 
 $(ROOTFMHDRDIR):
 	$(INS.dir)
 
 $(ROOTFMHDRDIR)/%: $(HDRDIR)/%
 	$(INS.file)
-
-$(ROOTLIBDIR):
-	$(INS.dir)
