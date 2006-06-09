@@ -16873,8 +16873,6 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 		mi_free(rep_ipif_ptr);
 	}
 
-	ilm_send_multicast_reqs(from_ill, to_ill);
-
 	conn_move_ill(from_ill, to_ill, ifindex);
 
 	return (err);
@@ -17215,6 +17213,14 @@ no_err:
 	if (err == 0) {
 		err = ill_up_ipifs(ill_to_v4 == NULL ? ill_to_v6:ill_to_v4,
 		    q, mp);
+	}
+
+	if (err == 0) {
+		if (ill_to_v4 != NULL)
+			ilm_send_multicast_reqs(ill_from_v4, ill_to_v4);
+
+		if (ill_to_v6 != NULL)
+			ilm_send_multicast_reqs(ill_from_v6, ill_to_v6);
 	}
 done:
 
