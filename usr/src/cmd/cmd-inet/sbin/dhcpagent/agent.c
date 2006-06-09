@@ -766,7 +766,6 @@ load_option:
 		return;
 
 	case DHCP_START:
-		assert(ifsp->if_state == INIT);
 		(void) canonize_ifs(ifsp);
 
 		/*

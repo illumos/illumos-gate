@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +180,7 @@ async_finish(struct ifslist *ifsp)
 int
 async_cancel(struct ifslist *ifsp)
 {
-	boolean_t do_reset = B_FALSE;
+	boolean_t do_restart = B_FALSE;
 
 	/*
 	 * we decide how to cancel the command depending on our
@@ -217,11 +216,11 @@ async_cancel(struct ifslist *ifsp)
 
 		/*
 		 * these states imply we're still trying to get a lease.
-		 * just return to a clean slate (INIT) -- but not until
+		 * jump to SELECTING and start from there -- but not until
 		 * after we've finished the asynchronous command!
 		 */
 
-		do_reset = B_TRUE;
+		do_restart = B_TRUE;
 		break;
 
 	default:
@@ -233,8 +232,8 @@ async_cancel(struct ifslist *ifsp)
 	async_finish(ifsp);
 	dhcpmsg(MSG_DEBUG, "async_cancel: asynchronous command (%d) aborted",
 	    ifsp->if_async.as_cmd);
-	if (do_reset)
-		reset_ifs(ifsp);
+	if (do_restart)
+		dhcp_selecting(ifsp);
 
 	return (1);
 }
