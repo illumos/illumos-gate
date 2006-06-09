@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1000,15 +999,13 @@ process_s_flag(smedia_handle_t handle, int32_t fd)
 
 	/* Get existing Vtoc, don't bother if it fails. */
 
-	/* need the file_dac_read privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	(void) read_vtoc(fd, &t_vtoc);
 
-	/* drop the file_dac_read privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	for (i = 0; i < V_NUMPAR; i++) {
 		t_vtoc.v_part[i].p_start = v_toc.v_part[i].p_start;
@@ -1020,15 +1017,13 @@ process_s_flag(smedia_handle_t handle, int32_t fd)
 	errno = 0;
 
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = write_vtoc(fd, &t_vtoc);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0)  {
 #ifdef sparc
@@ -1160,15 +1155,13 @@ process_b_flag(int32_t fd)
 
 	/* Get existing Vtoc */
 
-	/* need the file_dac_read privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = read_vtoc(fd, &v_toc);
 
-	/* drop the file_dac_read privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn off privileges */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0) {
 #ifdef sparc
@@ -1189,15 +1182,13 @@ process_b_flag(int32_t fd)
 	(void) strncpy(v_toc.v_volume, label, LEN_DKL_VVOL);
 
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on the privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = write_vtoc(fd, &v_toc);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off the privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0) {
 #ifdef sparc

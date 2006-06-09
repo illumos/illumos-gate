@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -532,15 +531,13 @@ check_and_unmount_floppy(int32_t fd, int32_t flag)
 		 * Attempt to open the device.	If it fails, skip it.
 		 */
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		mfd = open(raw_device, O_RDWR | O_NDELAY);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (mfd < 0) {
 			continue;
@@ -650,30 +647,26 @@ is not a raw device.\n"));
 			exit(1);
 		}
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		dirp = opendir(tmp_path_name);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (dirp == NULL) {
 			return (-1);
 		}
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 		have_read_priv = 1;
 
 		while ((dp = readdir(dirp)) != NULL) {
 
-			/* drop the file_dac_read privilege */
-			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
-			    PRIV_FILE_DAC_READ, (char *)NULL);
+			/* Turn off the privileges. */
+			(void) __priv_bracket(PRIV_OFF);
 			have_read_priv = 0;
 
 			DPRINTF1("Found %s\n", dp->d_name);
@@ -686,16 +679,14 @@ is not a raw device.\n"));
 				break;
 			}
 
-			/* need the file_dac_read privilege */
-			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
-			    PRIV_FILE_DAC_READ, (char *)NULL);
+			/* Turn on the privileges. */
+			(void) __priv_bracket(PRIV_ON);
 			have_read_priv = 1;
 		}
 
 		if (have_read_priv) {
 			/* drop the file_dac_read privilege */
-			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
-			    PRIV_FILE_DAC_READ, (char *)NULL);
+			(void) __priv_bracket(PRIV_OFF);
 			have_read_priv = 0;
 		}
 
@@ -704,18 +695,16 @@ is not a raw device.\n"));
 
 
 	if (volmgt_running() == 0) {
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on privileges. */
+		(void) __priv_bracket(PRIV_ON);
 		have_read_priv = 1;
 	}
 
 	fd = open(tmp_path_name, flags);
 
 	if (have_read_priv) {
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 		have_read_priv = 0;
 	}
 
@@ -917,15 +906,13 @@ write_sunos_label(int32_t fd, int32_t media_type)
 	/* let the fd driver finish constructing the label and writing it. */
 
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on the privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = write_vtoc(fd, &v_toc);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off the privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0) {
 		PERROR("Write vtoc");
@@ -993,33 +980,29 @@ verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
 
 	if ((flag == VERIFY_READ) && (!no_raw_rw)) {
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = smedia_raw_read(handle, start_sector, buf, nblocks *
 			blocksize);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if ((ret < 0) || (ret != (nblocks * blocksize)))
-			return (-1);
+				return (-1);
 		return (0);
 
-	} else if ((flag == VERIFY_WRITE) && (!no_raw_rw)) {
+		} else if ((flag == VERIFY_WRITE) && (!no_raw_rw)) {
 
-		/* need the file_dac_write privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn on privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = smedia_raw_write(handle, start_sector, buf, nblocks *
 			blocksize);
 
-		/* drop the file_dac_write privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if ((ret < 0) || (ret != (blocksize * nblocks)))
 			return (-1);
@@ -1032,15 +1015,13 @@ verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
 			return (-2);
 		}
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = read(fd, buf, nblocks * blocksize);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret != nblocks * blocksize) {
 			return (-1);
@@ -1053,15 +1034,13 @@ verify(smedia_handle_t handle, int32_t fd, uint32_t start_sector,
 			return (-2);
 		}
 
-		/* need the file_dac_write privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = write(fd, buf, nblocks * blocksize);
 
-		/* drop the file_dac_write privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn off the privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret != nblocks * blocksize) {
 			return (-1);
@@ -1082,13 +1061,13 @@ my_umount(char *mountp)
 
 	/* create a child to unmount the path */
 
-	/* need the proc_fork privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_FORK, (char *)NULL);
+	/* Turn on the privileges */
+	(void) __priv_bracket(PRIV_ON);
 
 	pid = fork();
 
-	/* drop the proc_fork privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, (char *)NULL);
+	/* Turn off the privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (pid < 0) {
 		PERROR("fork failed");
@@ -1100,21 +1079,14 @@ my_umount(char *mountp)
 		/* get rid of those nasty err messages */
 		DPRINTF1("call_unmount_prog: calling %s \n", mountp);
 
-		/* need the proc_exec privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_EXEC,
-		    (char *)NULL);
+		/* Turn on the priviliges. */
+		(void) __priv_bracket(PRIV_ON);
 
-		/* umount needs the sys_mount privilege */
-		(void) priv_set(PRIV_ON, PRIV_INHERITABLE, PRIV_SYS_MOUNT,
-			(char *)NULL);
-
-		/* Become root again for the exec */
-		if (seteuid(0) < 0) {
-			PERROR("Can't set effective user id to root");
-		}
 		if (execl("/usr/sbin/umount", "/usr/sbin/umount", mountp,
 			NULL) < 0) {
 			perror("exec failed");
+			/* Turn off the privileges */
+			(void) __priv_bracket(PRIV_OFF);
 			exit(-1);
 		}
 	}
@@ -1137,13 +1109,13 @@ my_volrmmount(char *real_name)
 {
 	int pid, rval;
 
-	/* need the proc_fork privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_FORK, (char *)NULL);
+	/* Turn on the privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	pid = fork();
 
-	/* drop the proc_fork privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, (char *)NULL);
+	/* Turn off the privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	/* create a child to unmount the path */
 	if (pid < 0) {
@@ -1157,21 +1129,13 @@ my_volrmmount(char *real_name)
 		DPRINTF1("call_unmount_prog: calling %s \n",
 					"/usr/bin/volrmmount");
 
-		/* need the proc_exec privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_EXEC,
-		    (char *)NULL);
-
-		/* volrmmount needs the sys_mount privilege */
-		(void) priv_set(PRIV_ON, PRIV_INHERITABLE, PRIV_SYS_MOUNT,
-			(char *)NULL);
-
-		/* Become root again for the exec */
-		if (seteuid(0) < 0) {
-			PERROR("Can't set effective user id to root");
-		}
+		/* Turn on the privileges. */
+		(void) __priv_bracket(PRIV_ON);
 		if (execl("/usr/bin/volrmmount", "/usr/bin/volrmmount", "-e",
 			real_name, NULL) < 0) {
 			PERROR("volrmmount exec failed");
+			/* Turn off the privileges */
+			(void) __priv_bracket(PRIV_OFF);
 			exit(-1);
 		}
 	} else if (waitpid(pid, &rval, 0) == pid) {
@@ -1403,9 +1367,8 @@ get_device(char *user_supplied, char *node)
 	    (strncmp(devnode, "/vol/dev/rdsk", 13) != 0))
 		return (NULL);
 
-	/* need the file_dac_read privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn on the privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	/*
 	 * Since we are currently running with the user euid it is
@@ -1414,9 +1377,8 @@ get_device(char *user_supplied, char *node)
 
 	fd = open(devnode, O_RDONLY|O_NDELAY);
 
-	/* drop the file_dac_read privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn off the privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (fd < 0) {
 		return (NULL);
@@ -1431,6 +1393,8 @@ get_device(char *user_supplied, char *node)
 
 	dev->d_inq = (uchar_t *)my_zalloc(INQUIRY_DATA_LENGTH);
 
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 	if (!inquiry(fd, dev->d_inq)) {
 		DPRINTF1("USCSI ioctl failed %d\n",
 		    uscsi_error);
@@ -1438,8 +1402,12 @@ get_device(char *user_supplied, char *node)
 		free(dev->d_node);
 		(void) close(dev->d_fd);
 		free(dev);
+		/* Turn off privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 		return (NULL);
 	}
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (user_supplied) {
 		dev->d_name = (char *)my_zalloc(strlen(user_supplied) + 1);
@@ -1494,24 +1462,21 @@ lookup_device(char *supplied, char *found)
 	int fd;
 	char tmpstr[PATH_MAX];
 
-	/* need the file_dac_read privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn on privileges */
+	(void) __priv_bracket(PRIV_ON);
 
 	/* If everything is fine and proper, no need to analyze */
 	if ((stat(supplied, &statbuf) == 0) && S_ISCHR(statbuf.st_mode) &&
 	    ((fd = open(supplied, O_RDONLY|O_NDELAY)) >= 0)) {
 		(void) close(fd);
 		(void) strlcpy(found, supplied, PATH_MAX);
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off privilege */
+		(void) __priv_bracket(PRIV_OFF);
 		return (1);
 	}
 
-	/* drop the file_dac_read privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (strncmp(supplied, "/dev/rdsk/", 10) == 0)
 		return (vol_lookup(supplied, found));

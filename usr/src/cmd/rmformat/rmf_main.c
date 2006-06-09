@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,7 @@
  */
 
 
-#include <priv.h>
+#include <priv_utils.h>
 #include "rmformat.h"
 
 int32_t b_flag = 0;
@@ -82,28 +81,13 @@ main(int32_t argc, char **argv)
 
 	/*
 	 * This program requires file_dac_read, file_dac_write,
-	 * proc_fork, and proc_exec privileges
+	 * proc_fork, proc_exec, and sys_devices privileges.
 	 *
 	 * child processes require the sys_mount privilege
 	 */
-	(void) priv_set(PRIV_SET, PRIV_LIMIT, PRIV_FILE_DAC_READ,
-	    PRIV_FILE_DAC_WRITE, PRIV_PROC_FORK, PRIV_PROC_EXEC,
-	    PRIV_SYS_MOUNT, (char *)NULL);
-
-	/* Turn privileges off until needed */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-	    PRIV_FILE_DAC_WRITE, PRIV_PROC_FORK, PRIV_PROC_EXEC,
-	    PRIV_SYS_MOUNT, (char *)NULL);
-
-	/* Become who we really are */
-	if (seteuid(getuid()) < 0) {
-		PERROR("Can't set effective user id");
-		exit(1);
-	}
-	if (setegid(getgid()) < 0) {
-		PERROR("Can't set effective group id");
-		exit(1);
-	}
+	(void) __init_suid_priv(PU_INHERITPRIVS,
+	    PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, PRIV_PROC_FORK,
+	    PRIV_PROC_EXEC, PRIV_SYS_MOUNT, PRIV_SYS_DEVICES, NULL);
 
 	(void) setlocale(LC_ALL, "");
 
@@ -126,6 +110,7 @@ main(int32_t argc, char **argv)
 			if (strlen(label) > 8) {
 				(void) fprintf(stderr, gettext("Label is \
 restricted to 8 characters.\n"));
+				__priv_relinquish();
 				exit(1);
 			}
 
@@ -264,6 +249,7 @@ restricted to 8 characters.\n"));
 	} else if ((optind == argc) && !l_flag) {
 		(void) fprintf(stderr,
 		    gettext("No device specified.\n"));
+		__priv_relinquish();
 		exit(1);
 #if 0
 		(void) printf("Using floppy device\n");
@@ -272,6 +258,9 @@ restricted to 8 characters.\n"));
 	}
 
 	process_options();
+
+	/* Remove the privileges we gave. */
+	__priv_relinquish();
 	return (0);
 }
 
@@ -292,6 +281,7 @@ usage(char *str)
 [ -w enable|disable ] [ -W enable|disable ] devname \n"), myname);
 	(void) fprintf(stderr, gettext("\t%s -l [ devname ]\n"),
 	    myname);
+	__priv_relinquish();
 	exit(1);
 }
 

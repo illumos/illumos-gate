@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1137,16 +1136,14 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 			return (-1);
 		}
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = smedia_raw_read(handle, offset/med_info.sm_blocksize,
 			buf, med_info.sm_blocksize);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		save_errno = errno;
 		errno = save_errno;
@@ -1159,15 +1156,13 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 				    return (-1);
 				}
 
-				/* need the file_dac_read privilege */
-				(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
-				    PRIV_FILE_DAC_READ, (char *)NULL);
+				/* Turn on privileges. */
+				(void) __priv_bracket(PRIV_ON);
 
 				ret = read(fd, buf, sizeof (struct mboot));
 
-				/* drop the file_dac_read privilege */
-				(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
-				    PRIV_FILE_DAC_READ, (char *)NULL);
+				/* Turn off privileges. */
+				(void) __priv_bracket(PRIV_OFF);
 
 				if (ret != sizeof (struct mboot)) {
 				    PERROR("Could not read master boot record");
@@ -1302,15 +1297,13 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 
 	errno = 0;
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = write_vtoc(fd, &v_toc);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0) {
 		PERROR("write VTOC failed");
@@ -1403,15 +1396,13 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	(void) memcpy(&(boot_code.parts), parts, sizeof (parts));
 	(void) memcpy(fdisk_buf, &boot_code, sizeof (boot_code));
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = ioctl(fd, DKIOCSMBOOT, fdisk_buf);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret == -1) {
 		if (errno != ENOTTY) {
@@ -1419,31 +1410,27 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 			return;
 		}
 
-		/* need the file_dac_write privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn on privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		bytes_written = smedia_raw_write(handle, 0, fdisk_buf,
 			blocksize);
 
-		/* drop the file_dac_write privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-		    (char *)NULL);
+		/* Turn off privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		save_errno = errno;
 		errno = save_errno;
 		if (bytes_written != blocksize) {
 			if (errno == ENOTSUP) {
 
-			    /* need the file_dac_write privilege */
-			    (void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
-				PRIV_FILE_DAC_WRITE, (char *)NULL);
+			    /* Turn on privileges. */
+			    (void) __priv_bracket(PRIV_ON);
 
 			    ret = write(fd, fdisk_buf, blocksize);
 
-			    /* drop the file_dac_write privilege */
-			    (void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
-				PRIV_FILE_DAC_WRITE, (char *)NULL);
+			    /* Turn off privileges. */
+			    (void) __priv_bracket(PRIV_OFF);
 
 			    if (ret != blocksize) {
 					return;
@@ -1480,15 +1467,13 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 	errno = 0;
 
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = write_vtoc(fd, &v_toc);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret < 0) {
 		PERROR("write VTOC failed");
@@ -1571,15 +1556,13 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 		/* fdisk x86 Solaris partition */
 		/* VTOC location in solaris partition is DK_LABEL_LOC */
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on privileges. */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = read_vtoc(fd, &t_vtoc);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off privileges. */
+		(void) __priv_brackets(PRIV_OFF);
 
 		if (ret < 0) {
 			/* No valid vtoc, erase fdisk table. */
@@ -1589,15 +1572,13 @@ overwrite_metadata(int32_t fd, smedia_handle_t handle)
 	} else {
 		/* Sparc Solaris or x86 solaris with faked fdisk */
 
-		/* need the file_dac_read privilege */
-		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn on privileges */
+		(void) __priv_bracket(PRIV_ON);
 
 		ret = read_vtoc(fd, &t_vtoc);
 
-		/* drop the file_dac_read privilege */
-		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_READ,
-		    (char *)NULL);
+		/* Turn off privileges. */
+		(void) __priv_bracket(PRIV_OFF);
 
 		if (ret < 0) {
 			/* No valid vtoc, erase from 0th sector */
@@ -1667,16 +1648,14 @@ erase(smedia_handle_t handle, uint32_t offset, uint32_t size)
 	}
 	(void) memset(buf, 0, nblocks * med_info.sm_blocksize);
 
-	/* need the file_dac_write privilege */
-	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn on privileges. */
+	(void) __priv_bracket(PRIV_ON);
 
 	ret = smedia_raw_write(handle, offset, buf,
 	    nblocks * med_info.sm_blocksize);
 
-	/* drop the file_dac_write privilege */
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    (char *)NULL);
+	/* Turn off privileges. */
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (ret != (nblocks * med_info.sm_blocksize))
 		PERROR("error in writing\n");
