@@ -896,19 +896,20 @@ fmd_xprt_destroy(fmd_xprt_t *xp)
 	fmd_xprt_class_hash_destroy(&xip->xi_usub);
 
 	/*
-	 * Since our statistics are created by hand, after deleting them from
-	 * the ustat hash we must manually free them and any embedded strings.
+	 * Uniquify the stat names exactly as was done in fmd_xprt_create()
+	 * before calling fmd_ustat_insert(), otherwise fmd_ustat_delete()
+	 * won't find the entries in the hash table.
 	 */
-	fmd_ustat_delete(mp->mod_ustat, sizeof (_fmd_xprt_stat_tmpl) /
-	    sizeof (fmd_stat_t), (fmd_stat_t *)&_fmd_xprt_stat_tmpl);
-
-	sp = (fmd_stat_t *)xip->xi_stats;
-	n = sizeof (fmd_xprt_stat_t) / sizeof (fmd_stat_t);
-
-	for (i = 0; i < n; i++, sp++) {
-		if (sp->fmds_type == FMD_TYPE_STRING)
-			fmd_strfree(sp->fmds_value.str);
+	n = sizeof (_fmd_xprt_stat_tmpl) / sizeof (fmd_stat_t);
+	sp = fmd_alloc(sizeof (_fmd_xprt_stat_tmpl), FMD_SLEEP);
+	bcopy(&_fmd_xprt_stat_tmpl, sp, sizeof (_fmd_xprt_stat_tmpl));
+	for (i = 0; i < n; i++) {
+		(void) snprintf(sp[i].fmds_name,
+		    sizeof (sp[i].fmds_name), "fmd.xprt.%u.%s", xip->xi_id,
+		    ((fmd_stat_t *)&_fmd_xprt_stat_tmpl + i)->fmds_name);
 	}
+	fmd_ustat_delete(mp->mod_ustat, n, sp);
+	fmd_free(sp, sizeof (_fmd_xprt_stat_tmpl));
 
 	fmd_free(xip->xi_stats, sizeof (fmd_xprt_stat_t));
 	fmd_eventq_destroy(xip->xi_queue);

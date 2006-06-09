@@ -621,6 +621,8 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 		struct config *ocp = epname->u.name.cp;
 		char *ncp_s;
 		int ncp_num, num;
+		struct iterinfo *iterinfop = NULL;
+		const char *iters;
 
 		for (; ncp; ncp = config_next(ncp)) {
 			config_getcompname(ncp, &ncp_s, &ncp_num);
@@ -634,11 +636,25 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 				    ncp_num != num)
 					continue;
 
+				iters = epname->u.name.child->u.name.s;
+				if ((iterinfop = lut_lookup(infop->ex,
+				    (void *)iters, NULL)) == NULL) {
+					out(O_DIE,
+					    "hmatch_event: internal error: "
+					    "iterator \"%s\" undefined", iters);
+				} else {
+					/* advance dict entry to next match */
+					iterinfop->num = ncp_num;
+				}
 				epname->u.name.cp = ncp;
 				hmatch_event(infop, eventnp,
 				    epname->u.name.next, config_child(ncp),
 				    nextnp, 1);
 			}
+		}
+		if (iterinfop != NULL) {
+			/* restore dict entry */
+			iterinfop->num = num;
 		}
 
 		epname->u.name.cp = ocp;
