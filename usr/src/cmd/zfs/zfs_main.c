@@ -1636,9 +1636,19 @@ set_callback(zfs_handle_t *zhp, void *data)
 		}
 	}
 
-	if (zfs_prop_set(zhp, cbp->cb_prop, cbp->cb_value) != 0)
+	if (zfs_prop_set(zhp, cbp->cb_prop, cbp->cb_value) != 0) {
+		switch (libzfs_errno(g_zfs)) {
+		case EZFS_MOUNTFAILED:
+			(void) fprintf(stderr, gettext("property may be set "
+			    "but unable to remount filesystem\n"));
+			break;
+		case EZFS_SHAREFAILED:
+			(void) fprintf(stderr, gettext("property may be set "
+			    "but unable to reshare filesystem\n"));
+			break;
+		}
 		return (1);
-
+	}
 	ret = 0;
 error:
 	return (ret);
