@@ -39,21 +39,21 @@
 #include "automount.h"
 
 int
-do_lookup1(mapname, key, subdir, mapopts, path, isdirect, action, linkp, cred)
-	char *mapname;
-	char *key;
-	char *subdir;
-	char *mapopts;
-	char *path;
-	uint_t isdirect;
-	enum autofs_action *action;
-	struct linka *linkp;
-	struct authunix_parms *cred;
+do_lookup1(
+	char *mapname,
+	char *key,
+	char *subdir,
+	char *mapopts,
+	char *path,
+	uint_t isdirect,
+	autofs_action_t *action,
+	struct linka *linkp,
+	ucred_t	*cred)
 {
 	struct mapline ml;
 	struct mapent *mapents = NULL;
 	int err;
-	struct rddir_cache *rdcp;
+	struct autofs_rddir_cache *rdcp;
 	int found = 0;
 	bool_t iswildcard = FALSE;
 	bool_t isrestricted = hasrestrictopt(mapopts);
@@ -68,10 +68,10 @@ do_lookup1(mapname, key, subdir, mapopts, path, isdirect, action, linkp, cred)
 	/*
 	 * Is there a cache for this map?
 	 */
-	rw_rdlock(&rddir_cache_lock);
-	err = rddir_cache_lookup(mapname, &rdcp);
+	rw_rdlock(&autofs_rddir_cache_lock);
+	err = autofs_rddir_cache_lookup(mapname, &rdcp);
 	if (!err && rdcp->full) {
-		rw_unlock(&rddir_cache_lock);
+		rw_unlock(&autofs_rddir_cache_lock);
 		/*
 		 * Try to lock readdir cache entry for reading, if
 		 * the entry can not be locked, then avoid blocking
@@ -84,7 +84,7 @@ do_lookup1(mapname, key, subdir, mapopts, path, isdirect, action, linkp, cred)
 			rw_unlock(&rdcp->rwlock);
 		}
 	} else
-		rw_unlock(&rddir_cache_lock);
+		rw_unlock(&autofs_rddir_cache_lock);
 
 	if (!err) {
 		/*
@@ -122,7 +122,7 @@ do_lookup1(mapname, key, subdir, mapopts, path, isdirect, action, linkp, cred)
 	 * to superusers.
 	 */
 	if (mapents == NULL && *action == AUTOFS_NONE) {
-		if (*key == '=' && cred->aup_uid == 0) {
+		if (*key == '=' && ucred_geteuid(cred) == 0) {
 			if (isdigit(*(key+1))) {
 				/*
 				 * If next character is a digit

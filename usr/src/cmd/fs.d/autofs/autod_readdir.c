@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,13 +44,13 @@
 #include <fcntl.h>
 #include "automount.h"
 
-static void build_dir_entry_list(struct rddir_cache *rdcp,
+static void build_dir_entry_list(struct autofs_rddir_cache *rdcp,
 				struct dir_entry *list);
-static int rddir_cache_enter(char *map, ulong_t bucket_size,
-				struct rddir_cache **rdcpp);
-int rddir_cache_lookup(char *map, struct rddir_cache **rdcpp);
-static int rddir_cache_delete(struct rddir_cache *rdcp);
-static int create_dirents(struct rddir_cache *rdcp, ulong_t offset,
+static int autofs_rddir_cache_enter(char *map, ulong_t bucket_size,
+				struct autofs_rddir_cache **rdcpp);
+int autofs_rddir_cache_lookup(char *map, struct autofs_rddir_cache **rdcpp);
+static int autofs_rddir_cache_delete(struct autofs_rddir_cache *rdcp);
+static int create_dirents(struct autofs_rddir_cache *rdcp, ulong_t offset,
 				autofs_rddirres *res);
 struct dir_entry *rddir_entry_lookup(char *name, struct dir_entry *list);
 static void free_offset_tbl(struct off_tbl *head);
@@ -59,15 +58,14 @@ static void free_dir_list(struct dir_entry *head);
 
 #define	OFFSET_BUCKET_SIZE	100
 
-rwlock_t rddir_cache_lock;		/* readdir cache lock */
-struct rddir_cache *rddir_head;		/* readdir cache head */
+rwlock_t autofs_rddir_cache_lock;		/* readdir cache lock */
+struct autofs_rddir_cache *rddir_head;		/* readdir cache head */
 
 int
-do_readdir(struct autofs_rddirargs *rda, struct autofs_rddirres *rd,
-    struct authunix_parms *cred)
+do_readdir(autofs_rddirargs *rda, autofs_rddirres *rd, ucred_t *cred)
 {
 	struct dir_entry *list = NULL, *l;
-	struct rddir_cache *rdcp = NULL;
+	struct autofs_rddir_cache *rdcp = NULL;
 	int error;
 	int cache_time = RDDIR_CACHE_TIME;
 
@@ -83,12 +81,12 @@ do_readdir(struct autofs_rddirargs *rda, struct autofs_rddirres *rd,
 		return (0);
 	}
 
-	rw_rdlock(&rddir_cache_lock);
-	error = rddir_cache_lookup(rda->rda_map, &rdcp);
+	rw_rdlock(&autofs_rddir_cache_lock);
+	error = autofs_rddir_cache_lookup(rda->rda_map, &rdcp);
 	if (error) {
-		rw_unlock(&rddir_cache_lock);
-		rw_wrlock(&rddir_cache_lock);
-		error = rddir_cache_lookup(rda->rda_map, &rdcp);
+		rw_unlock(&autofs_rddir_cache_lock);
+		rw_wrlock(&autofs_rddir_cache_lock);
+		error = autofs_rddir_cache_lookup(rda->rda_map, &rdcp);
 		if (error) {
 			if (trace > 2)
 				trace_prt(1,
@@ -96,11 +94,11 @@ do_readdir(struct autofs_rddirargs *rda, struct autofs_rddirres *rd,
 			/*
 			 * entry doesn't exist, add it.
 			 */
-			error = rddir_cache_enter(rda->rda_map,
+			error = autofs_rddir_cache_enter(rda->rda_map,
 					OFFSET_BUCKET_SIZE, &rdcp);
 		}
 	}
-	rw_unlock(&rddir_cache_lock);
+	rw_unlock(&autofs_rddir_cache_lock);
 
 	if (error)
 		return (error);
@@ -123,7 +121,7 @@ do_readdir(struct autofs_rddirargs *rda, struct autofs_rddirres *rd,
 			 */
 			stack_op(INIT, NULL, stack, &stkptr);
 			(void) getmapkeys(rda->rda_map, &list, &error,
-			    &cache_time, stack, &stkptr, cred->aup_uid);
+			    &cache_time, stack, &stkptr, ucred_geteuid(cred));
 			if (!error)
 				build_dir_entry_list(rdcp, list);
 			else if (list) {
@@ -221,7 +219,10 @@ do_readdir(struct autofs_rddirargs *rda, struct autofs_rddirres *rd,
 	(((int)(((dirent64_t *)0)->d_name) + 1 + (namelen) + 7) & ~ 7)
 
 static int
-create_dirents(struct rddir_cache *rdcp, ulong_t offset, autofs_rddirres *res)
+create_dirents(
+	struct autofs_rddir_cache *rdcp,
+	ulong_t offset,
+	autofs_rddirres *res)
 {
 	uint_t total_bytes_wanted;
 	int bufsize;
@@ -331,7 +332,8 @@ create_dirents(struct rddir_cache *rdcp, ulong_t offset, autofs_rddirres *res)
 	}
 	return (error);
 
-empty:	res->rd_rddir.rddir_size = (long)0;
+empty:
+	res->rd_rddir.rddir_size = 0L;
 	res->rd_rddir.rddir_eof = TRUE;
 	res->rd_rddir.rddir_entries = NULL;
 	return (error);
@@ -342,18 +344,21 @@ empty:	res->rd_rddir.rddir_size = (long)0;
  * add new entry to cache for 'map'
  */
 static int
-rddir_cache_enter(char *map, ulong_t bucket_size, struct rddir_cache **rdcpp)
+autofs_rddir_cache_enter(
+	char *map,
+	ulong_t bucket_size,
+	struct autofs_rddir_cache **rdcpp)
 {
-	struct rddir_cache *p;
-	assert(RW_LOCK_HELD(&rddir_cache_lock));
+	struct autofs_rddir_cache *p;
+	assert(RW_LOCK_HELD(&autofs_rddir_cache_lock));
 
 	/*
 	 * Add to front of the list at this time
 	 */
-	p = (struct rddir_cache *)malloc(sizeof (*p));
+	p = (struct autofs_rddir_cache *)malloc(sizeof (*p));
 	if (p == NULL) {
 		syslog(LOG_ERR,
-			"rddir_cache_enter: memory allocation failed\n");
+			"autofs_rddir_cache_enter: memory allocation failed\n");
 		return (ENOMEM);
 	}
 	memset((char *)p, 0, sizeof (*p));
@@ -361,7 +366,7 @@ rddir_cache_enter(char *map, ulong_t bucket_size, struct rddir_cache **rdcpp)
 	p->map = malloc(strlen(map) + 1);
 	if (p->map == NULL) {
 		syslog(LOG_ERR,
-			"rddir_cache_enter: memory allocation failed\n");
+			"autofs_rddir_cache_enter: memory allocation failed\n");
 		free(p);
 		return (ENOMEM);
 	}
@@ -391,11 +396,11 @@ rddir_cache_enter(char *map, ulong_t bucket_size, struct rddir_cache **rdcpp)
  * find 'map' in readdir cache
  */
 int
-rddir_cache_lookup(char *map, struct rddir_cache **rdcpp)
+autofs_rddir_cache_lookup(char *map, struct autofs_rddir_cache **rdcpp)
 {
-	struct rddir_cache *p;
+	struct autofs_rddir_cache *p;
 
-	assert(RW_LOCK_HELD(&rddir_cache_lock));
+	assert(RW_LOCK_HELD(&autofs_rddir_cache_lock));
 	for (p = rddir_head; p != NULL; p = p->next) {
 		if (strcmp(p->map, map) == 0) {
 			/*
@@ -445,9 +450,9 @@ free_dir_list(struct dir_entry *head)
 }
 
 static void
-rddir_cache_entry_free(struct rddir_cache *p)
+autofs_rddir_cache_entry_free(struct autofs_rddir_cache *p)
 {
-	assert(RW_LOCK_HELD(&rddir_cache_lock));
+	assert(RW_LOCK_HELD(&autofs_rddir_cache_lock));
 	assert(!p->in_use);
 	if (p->map)
 		free(p->map);
@@ -460,14 +465,14 @@ rddir_cache_entry_free(struct rddir_cache *p)
 
 /*
  * Remove entry from the rddircache
- * the caller must own the rddir_cache_lock.
+ * the caller must own the autofs_rddir_cache_lock.
  */
 static int
-rddir_cache_delete(struct rddir_cache *rdcp)
+autofs_rddir_cache_delete(struct autofs_rddir_cache *rdcp)
 {
-	struct rddir_cache *p, *prev;
+	struct autofs_rddir_cache *p, *prev;
 
-	assert(RW_LOCK_HELD(&rddir_cache_lock));
+	assert(RW_LOCK_HELD(&autofs_rddir_cache_lock));
 	/*
 	 * Search cache for entry
 	 */
@@ -483,7 +488,7 @@ rddir_cache_delete(struct rddir_cache *rdcp)
 				prev->next = p->next;
 			else
 				rddir_head = p->next;
-			rddir_cache_entry_free(p);
+			autofs_rddir_cache_entry_free(p);
 			return (0);
 		}
 		prev = p;
@@ -503,7 +508,7 @@ rddir_entry_lookup(char *name, struct dir_entry *list)
 }
 
 static void
-build_dir_entry_list(struct rddir_cache *rdcp, struct dir_entry *list)
+build_dir_entry_list(struct autofs_rddir_cache *rdcp, struct dir_entry *list)
 {
 	struct dir_entry *p;
 	ulong_t offset = AUTOFS_DAEMONCOOKIE, offset_list = AUTOFS_DAEMONCOOKIE;
@@ -558,7 +563,7 @@ void
 cache_cleanup(void)
 {
 	timestruc_t reltime;
-	struct rddir_cache *p, *next = NULL;
+	struct autofs_rddir_cache *p, *next = NULL;
 	int error;
 
 	mutex_init(&cleanup_lock, USYNC_THREAD, NULL);
@@ -588,7 +593,7 @@ cache_cleanup(void)
 		/*
 		 * Perform the cache cleanup
 		 */
-		rw_wrlock(&rddir_cache_lock);
+		rw_wrlock(&autofs_rddir_cache_lock);
 		for (p = rddir_head; p != NULL; p = next) {
 			next = p->next;
 			if (p->in_use > 0) {
@@ -603,7 +608,8 @@ cache_cleanup(void)
 			}
 			/*
 			 * Cache entry is not in use, and nobody can grab a
-			 * new reference since I'm holding the rddir_cache_lock
+			 * new reference since I'm holding the
+			 * autofs_rddir_cache_lock
 			 */
 
 			/*
@@ -627,10 +633,10 @@ cache_cleanup(void)
 			if (trace > 1)
 				trace_prt(1, "%s freeing cache\n", p->map);
 			assert(!p->in_use);
-			error = rddir_cache_delete(p);
+			error = autofs_rddir_cache_delete(p);
 			assert(!error);
 		}
-		rw_unlock(&rddir_cache_lock);
+		rw_unlock(&autofs_rddir_cache_lock);
 
 		/*
 		 * wakeup the thread/threads waiting for the

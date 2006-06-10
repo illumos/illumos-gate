@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +34,9 @@
 #include <synch.h>		/* needed for mutex_t declaration */
 #include <sys/types.h>
 #include <rpc/rpc.h>
-#include <rpcsvc/autofs_prot.h>
+#include <sys/fs/autofs.h>
 #include <netinet/in.h>		/* needed for sockaddr_in declaration */
+#include <ucred.h>
 
 #ifdef MALLOC_DEBUG
 #include <debug_alloc.h>
@@ -51,6 +51,8 @@ extern "C" {
 #define	rpc_control(a, b)	1
 #endif
 
+#define	DOMOUNT_USER	1
+#define	DOMOUNT_KERNEL	2
 
 /*
  * Solaris autofs configuration file location
@@ -197,7 +199,7 @@ struct off_tbl {
 /*
  * directory cache for 'map'
  */
-struct rddir_cache {
+struct autofs_rddir_cache {
 	char			*map;
 	struct off_tbl		*offtp;
 	ulong_t			bucket_size;
@@ -207,7 +209,7 @@ struct rddir_cache {
 	int			in_use;		/* # threads referencing it */
 	rwlock_t		rwlock;		/* protects 'full' and 'next' */
 	int			full;		/* full == 1 when cache full */
-	struct rddir_cache	*next;
+	struct autofs_rddir_cache	*next;
 };
 
 #define	RDDIR_CACHE_TIME	300		/* in seconds */
@@ -231,13 +233,12 @@ extern int automountd_nobrowse;
 extern struct autodir *dir_head;
 extern struct autodir *dir_tail;
 extern struct mntlist *current_mounts;
-struct autofs_args;
 struct mounta;			/* defined in sys/vfs.h */
 extern struct myaddrs *myaddrs_head;
 
 extern rwlock_t	cache_lock;
 extern rwlock_t portmap_cache_lock;
-extern rwlock_t rddir_cache_lock;
+extern rwlock_t autofs_rddir_cache_lock;
 
 extern mutex_t cleanup_lock;
 extern cond_t cleanup_start_cv;
@@ -265,7 +266,8 @@ extern int str_opt(struct mnttab *, char *, char **);
 extern void dirinit(char *, char *, char *, int, char **, char ***);
 extern void pr_msg(const char *, ...);
 extern void trace_prt(int, char *, ...);
-extern void free_autofs_args(struct autofs_args *);
+extern void free_autofs_args(autofs_args *);
+extern void free_nfs_args(struct nfs_args *);
 extern void free_mounta(struct mounta *);
 
 extern int nopt(struct mnttab *, char *, int *);
@@ -273,24 +275,22 @@ extern int set_versrange(rpcvers_t, rpcvers_t *, rpcvers_t *);
 extern enum clnt_stat pingnfs(char *, int, rpcvers_t *, rpcvers_t,
 	ushort_t, bool_t, char *, char *);
 
+extern void *autofs_get_buffer(size_t);
 extern int self_check(char *);
 extern int do_mount1(char *, char *, char *, char *, char *, uint_t,
-	action_list **, struct authunix_parms *);
+	action_list **, ucred_t *, int);
 extern int do_lookup1(char *, char *, char *, char *, char *, uint_t,
-	enum autofs_action *, struct linka *, struct authunix_parms *);
+	autofs_action_t *, struct linka *, ucred_t *);
 extern int do_unmount1(umntrequest *);
-extern int do_readdir(struct autofs_rddirargs *, struct autofs_rddirres *,
-	struct authunix_parms *);
+extern int do_readdir(autofs_rddirargs *, autofs_rddirres *, ucred_t *);
 extern int nfsunmount(struct mnttab *);
 extern int loopbackmount(char *, char *, char *, int);
 extern int mount_nfs(struct mapent *, char *, char *, int,
-	struct authunix_parms *);
+	ucred_t *, action_list **);
 extern int mount_autofs(struct mapent *, char *, action_list *,
-	char *root, char *subdir, char *key);
+	char *rootp, char *subdir, char *key);
 extern int mount_generic(char *, char *, char *, char *, int);
 extern enum clnt_stat nfs_cast(struct mapfs *, struct mapfs **, int);
-extern int svc_create_local_service(void (*) (), ulong_t, ulong_t,
-	char *, char *);
 
 extern bool_t hasrestrictopt(char *);
 
@@ -304,7 +304,7 @@ extern struct dir_entry *btree_lookup(struct dir_entry *, char *);
 extern void btree_enter(struct dir_entry **, struct dir_entry *);
 extern int add_dir_entry(char *, struct dir_entry **, struct dir_entry **);
 extern void cache_cleanup(void);
-extern int rddir_cache_lookup(char *, struct rddir_cache **);
+extern int autofs_rddir_cache_lookup(char *, struct autofs_rddir_cache **);
 extern struct dir_entry *rddir_entry_lookup(char *, struct dir_entry *);
 #endif /* NO_RDDIR_CACHE */
 
@@ -373,7 +373,6 @@ extern int getnetmaskbynet(const struct in_addr, struct in_addr *);
  */
 extern int __nis_reset_state();
 extern int __rpc_negotiate_uid(int);
-extern int __rpc_get_local_uid(SVCXPRT *, uid_t *);
 
 #ifdef __cplusplus
 }

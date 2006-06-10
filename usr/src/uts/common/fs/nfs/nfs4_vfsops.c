@@ -75,6 +75,8 @@
 #include <nfs/nfs4.h>
 #include <nfs/rnode4.h>
 #include <nfs/nfs4_clnt.h>
+#include <sys/fs/autofs.h>
+
 
 /*
  * Arguments passed to thread to free data structures from forced unmount.
@@ -301,125 +303,115 @@ nfs4_chkdup_servinfo4(servinfo4_t *svp_head, servinfo4_t *svp)
 	return (0);
 }
 
-/*
- * nfs mount vfsop
- * Set up mount info record and attach it to vfs struct.
- */
-static int
-nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
+void
+nfs4_free_args(struct nfs_args *nargs)
 {
-	char *data = uap->dataptr;
+	if (nargs->knconf) {
+		if (nargs->knconf->knc_protofmly)
+			kmem_free(nargs->knconf->knc_protofmly,
+				KNC_STRSIZE);
+		if (nargs->knconf->knc_proto)
+			kmem_free(nargs->knconf->knc_proto, KNC_STRSIZE);
+		kmem_free(nargs->knconf, sizeof (*nargs->knconf));
+		nargs->knconf = NULL;
+	}
+
+	if (nargs->fh) {
+		kmem_free(nargs->fh, strlen(nargs->fh) + 1);
+		nargs->fh = NULL;
+	}
+
+	if (nargs->hostname) {
+		kmem_free(nargs->hostname, strlen(nargs->hostname) + 1);
+		nargs->hostname = NULL;
+	}
+
+	if (nargs->addr) {
+		if (nargs->addr->buf) {
+			ASSERT(nargs->addr->len);
+			kmem_free(nargs->addr->buf, nargs->addr->len);
+		}
+		kmem_free(nargs->addr, sizeof (struct netbuf));
+		nargs->addr = NULL;
+	}
+
+	if (nargs->syncaddr) {
+		ASSERT(nargs->syncaddr->len);
+		if (nargs->syncaddr->buf) {
+			ASSERT(nargs->syncaddr->len);
+			kmem_free(nargs->syncaddr->buf, nargs->syncaddr->len);
+		}
+		kmem_free(nargs->syncaddr, sizeof (struct netbuf));
+		nargs->syncaddr = NULL;
+	}
+
+	if (nargs->netname) {
+		kmem_free(nargs->netname, strlen(nargs->netname) + 1);
+		nargs->netname = NULL;
+	}
+
+	if (nargs->nfs_ext_u.nfs_extA.secdata) {
+		sec_clnt_freeinfo(
+			nargs->nfs_ext_u.nfs_extA.secdata);
+		nargs->nfs_ext_u.nfs_extA.secdata = NULL;
+	}
+}
+
+
+int
+nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
+{
+
 	int error;
-	vnode_t *rtvp;			/* the server's root */
-	mntinfo4_t *mi;			/* mount info, pointed at by vfs */
 	size_t hlen;			/* length of hostname */
 	size_t nlen;			/* length of netname */
 	char netname[MAXNETNAMELEN+1];	/* server's netname */
 	struct netbuf addr;		/* server's address */
 	struct netbuf syncaddr;		/* AUTH_DES time sync addr */
-	struct knetconfig *knconf;	/* transport knetconfig structure */
-	struct knetconfig *rdma_knconf;	/* rdma transport structure */
-	rnode4_t *rp;
-	struct servinfo4 *svp;		/* nfs server info */
-	struct servinfo4 *svp_tail = NULL; /* previous nfs server info */
-	struct servinfo4 *svp_head;	/* first nfs server info */
-	struct servinfo4 *svp_2ndlast;	/* 2nd last in server info list */
-	struct sec_data *secdata;	/* security data */
-	STRUCT_DECL(nfs_args, args);	/* nfs mount arguments */
+	struct knetconfig *knconf;		/* transport structure */
+	struct sec_data *secdata = NULL;	/* security data */
+	STRUCT_DECL(nfs_args, args);		/* nfs mount arguments */
 	STRUCT_DECL(knetconfig, knconf_tmp);
 	STRUCT_DECL(netbuf, addr_tmp);
-	int flags, addr_type, removed;
+	int flags;
 	char *p, *pf;
 	struct pathname pn;
 	char *userbufptr;
-	zone_t *zone = nfs_zone();
-	nfs4_error_t n4e;
-	zone_t *mntzone = NULL;
 
-	if (secpolicy_fs_mount(cr, mvp, vfsp) != 0)
-		return (EPERM);
-	if (mvp->v_type != VDIR)
-		return (ENOTDIR);
-	/*
-	 * get arguments
-	 *
-	 * nfs_args is now versioned and is extensible, so
-	 * uap->datalen might be different from sizeof (args)
-	 * in a compatible situation.
-	 */
-more:
+
+	bzero(nargs, sizeof (*nargs));
+
 	STRUCT_INIT(args, get_udatamodel());
 	bzero(STRUCT_BUF(args), SIZEOF_STRUCT(nfs_args, DATAMODEL_NATIVE));
-	if (copyin(data, STRUCT_BUF(args), MIN(uap->datalen,
+	if (copyin(data, STRUCT_BUF(args), MIN(datalen,
 	    STRUCT_SIZE(args))))
 		return (EFAULT);
 
+	nargs->wsize = STRUCT_FGET(args, wsize);
+	nargs->rsize = STRUCT_FGET(args, rsize);
+	nargs->timeo = STRUCT_FGET(args, timeo);
+	nargs->retrans = STRUCT_FGET(args, retrans);
+	nargs->acregmin = STRUCT_FGET(args, acregmin);
+	nargs->acregmax = STRUCT_FGET(args, acregmax);
+	nargs->acdirmin = STRUCT_FGET(args, acdirmin);
+	nargs->acdirmax = STRUCT_FGET(args, acdirmax);
+
 	flags = STRUCT_FGET(args, flags);
+	nargs->flags = flags;
 
-	/*
-	 * If the request changes the locking type, disallow the remount,
-	 * because it's questionable whether we can transfer the
-	 * locking state correctly.
-	 */
-	if (uap->flags & MS_REMOUNT) {
-		if ((mi = VFTOMI4(vfsp)) != NULL) {
-			uint_t new_mi_llock;
-			uint_t old_mi_llock;
-
-			new_mi_llock = (flags & NFSMNT_LLOCK) ? 1 : 0;
-			old_mi_llock = (mi->mi_flags & MI4_LLOCK) ? 1 : 0;
-			if (old_mi_llock != new_mi_llock)
-				return (EBUSY);
-		}
-		return (0);
-	}
-
-	mutex_enter(&mvp->v_lock);
-	if (!(uap->flags & MS_OVERLAY) &&
-	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
-		mutex_exit(&mvp->v_lock);
-		return (EBUSY);
-	}
-	mutex_exit(&mvp->v_lock);
-
-	/* make sure things are zeroed for errout: */
-	rtvp = NULL;
-	mi = NULL;
 	addr.buf = NULL;
 	syncaddr.buf = NULL;
-	secdata = NULL;
 
-	/*
-	 * A valid knetconfig structure is required.
-	 */
-	if (!(flags & NFSMNT_KNCONF))
-		return (EINVAL);
-
-	/*
-	 * Allocate a servinfo4 struct.
-	 */
-	svp = kmem_zalloc(sizeof (*svp), KM_SLEEP);
-	nfs_rw_init(&svp->sv_lock, NULL, RW_DEFAULT, NULL);
-	if (svp_tail) {
-		svp_2ndlast = svp_tail;
-		svp_tail->sv_next = svp;
-	} else {
-		svp_head = svp;
-		svp_2ndlast = svp;
-	}
-
-	svp_tail = svp;
 
 	/*
 	 * Allocate space for a knetconfig structure and
 	 * its strings and copy in from user-land.
 	 */
 	knconf = kmem_zalloc(sizeof (*knconf), KM_SLEEP);
-	svp->sv_knconf = knconf;
 	STRUCT_INIT(knconf_tmp, get_udatamodel());
 	if (copyin(STRUCT_FGETP(args, knconf), STRUCT_BUF(knconf_tmp),
 	    STRUCT_SIZE(knconf_tmp))) {
-		sv4_free(svp_head);
+		kmem_free(knconf, sizeof (*knconf));
 		return (EFAULT);
 	}
 
@@ -438,24 +430,23 @@ more:
 	if (error) {
 		kmem_free(pf, KNC_STRSIZE);
 		kmem_free(p, KNC_STRSIZE);
-		sv4_free(svp_head);
+		kmem_free(knconf, sizeof (*knconf));
 		return (error);
 	}
+
 	error = copyinstr(knconf->knc_proto, p, KNC_STRSIZE, NULL);
 	if (error) {
 		kmem_free(pf, KNC_STRSIZE);
 		kmem_free(p, KNC_STRSIZE);
-		sv4_free(svp_head);
+		kmem_free(knconf, sizeof (*knconf));
 		return (error);
 	}
-	if (strcmp(p, NC_UDP) == 0) {
-		kmem_free(pf, KNC_STRSIZE);
-		kmem_free(p, KNC_STRSIZE);
-		sv4_free(svp_head);
-		return (ENOTSUP);
-	}
+
+
 	knconf->knc_protofmly = pf;
 	knconf->knc_proto = p;
+
+	nargs->knconf = knconf;
 
 	/*
 	 * Get server address
@@ -467,7 +458,8 @@ more:
 		goto errout;
 	}
 
-	userbufptr = addr.buf = STRUCT_FGETP(addr_tmp, buf);
+	nargs->addr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+	userbufptr = STRUCT_FGETP(addr_tmp, buf);
 	addr.len = STRUCT_FGET(addr_tmp, len);
 	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
 	addr.maxlen = addr.len;
@@ -476,23 +468,21 @@ more:
 		error = EFAULT;
 		goto errout;
 	}
-
-	svp->sv_addr = addr;
+	bcopy(&addr, nargs->addr, sizeof (struct netbuf));
 
 	/*
 	 * Get the root fhandle
 	 */
 	error = pn_get(STRUCT_FGETP(args, fh), UIO_USERSPACE, &pn);
-
 	if (error)
 		goto errout;
 
 	/* Volatile fh: keep server paths, so use actual-size strings */
-	svp->sv_path = kmem_alloc(pn.pn_pathlen + 1, KM_SLEEP);
-	bcopy(pn.pn_path, svp->sv_path, pn.pn_pathlen);
-	svp->sv_path[pn.pn_pathlen] = '\0';
-	svp->sv_pathlen = pn.pn_pathlen + 1;
+	nargs->fh = kmem_alloc(pn.pn_pathlen + 1, KM_SLEEP);
+	bcopy(pn.pn_path, nargs->fh, pn.pn_pathlen);
+	nargs->fh[pn.pn_pathlen] = '\0';
 	pn_free(&pn);
+
 
 	/*
 	 * Get server's hostname
@@ -502,14 +492,281 @@ more:
 				netname, sizeof (netname), &hlen);
 		if (error)
 			goto errout;
+		nargs->hostname = kmem_zalloc(hlen, KM_SLEEP);
+		(void) strcpy(nargs->hostname, netname);
+
+	} else {
+		nargs->hostname = NULL;
+	}
+
+
+	/*
+	 * If there are syncaddr and netname data, load them in. This is
+	 * to support data needed for NFSV4 when AUTH_DH is the negotiated
+	 * flavor via SECINFO. (instead of using MOUNT protocol in V3).
+	 */
+	netname[0] = '\0';
+	if (flags & NFSMNT_SECURE) {
+
+		/* get syncaddr */
+		STRUCT_INIT(addr_tmp, get_udatamodel());
+		if (copyin(STRUCT_FGETP(args, syncaddr), STRUCT_BUF(addr_tmp),
+			STRUCT_SIZE(addr_tmp))) {
+			error = EINVAL;
+			goto errout;
+		}
+		userbufptr = STRUCT_FGETP(addr_tmp, buf);
+		syncaddr.len = STRUCT_FGET(addr_tmp, len);
+		syncaddr.buf = kmem_alloc(syncaddr.len, KM_SLEEP);
+		syncaddr.maxlen = syncaddr.len;
+		if (copyin(userbufptr, syncaddr.buf, syncaddr.len)) {
+			kmem_free(syncaddr.buf, syncaddr.len);
+			error = EFAULT;
+			goto errout;
+		}
+
+		nargs->syncaddr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+		bcopy(&syncaddr, nargs->syncaddr, sizeof (struct netbuf));
+	}
+	/* get server's netname */
+	if (copyinstr(STRUCT_FGETP(args, netname), netname,
+		sizeof (netname), &nlen)) {
+		error = EFAULT;
+		goto errout;
+	}
+
+	netname[nlen] = '\0';
+	nargs->netname = kmem_zalloc(nlen, KM_SLEEP);
+	(void) strcpy(nargs->netname, netname);
+
+	/*
+	 * Get the extention data which has the security data structure.
+	 * This includes data for AUTH_SYS as well.
+	 */
+	if (flags & NFSMNT_NEWARGS) {
+		nargs->nfs_args_ext = STRUCT_FGET(args, nfs_args_ext);
+		if (nargs->nfs_args_ext == NFS_ARGS_EXTA ||
+			nargs->nfs_args_ext == NFS_ARGS_EXTB) {
+			/*
+			 * Indicating the application is using the new
+			 * sec_data structure to pass in the security
+			 * data.
+			 */
+			if (STRUCT_FGETP(args,
+			    nfs_ext_u.nfs_extA.secdata) != NULL) {
+				error = sec_clnt_loadinfo(
+				    (struct sec_data *)STRUCT_FGETP(args,
+					nfs_ext_u.nfs_extA.secdata),
+				    &secdata, get_udatamodel());
+			}
+			nargs->nfs_ext_u.nfs_extA.secdata = secdata;
+		}
+	}
+
+	if (error)
+		goto errout;
+
+	/*
+	 * Failover support:
+	 *
+	 * We may have a linked list of nfs_args structures,
+	 * which means the user is looking for failover.  If
+	 * the mount is either not "read-only" or "soft",
+	 * we want to bail out with EINVAL.
+	 */
+	if (nargs->nfs_args_ext == NFS_ARGS_EXTB)
+		nargs->nfs_ext_u.nfs_extB.next =
+			STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
+
+errout:
+	if (error)
+		nfs4_free_args(nargs);
+
+	return (error);
+}
+
+
+/*
+ * nfs mount vfsop
+ * Set up mount info record and attach it to vfs struct.
+ */
+static int
+nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
+{
+	char *data = uap->dataptr;
+	int error;
+	vnode_t *rtvp;			/* the server's root */
+	mntinfo4_t *mi;			/* mount info, pointed at by vfs */
+	struct knetconfig *rdma_knconf;	/* rdma transport structure */
+	rnode4_t *rp;
+	struct servinfo4 *svp;		/* nfs server info */
+	struct servinfo4 *svp_tail = NULL; /* previous nfs server info */
+	struct servinfo4 *svp_head;	/* first nfs server info */
+	struct servinfo4 *svp_2ndlast;	/* 2nd last in server info list */
+	struct sec_data *secdata;	/* security data */
+	struct nfs_args *args = NULL;
+	int flags, addr_type, removed;
+	zone_t *zone = nfs_zone();
+	nfs4_error_t n4e;
+	zone_t *mntzone = NULL;
+
+	if (secpolicy_fs_mount(cr, mvp, vfsp) != 0)
+		return (EPERM);
+	if (mvp->v_type != VDIR)
+		return (ENOTDIR);
+	/*
+	 * get arguments
+	 *
+	 * nfs_args is now versioned and is extensible, so
+	 * uap->datalen might be different from sizeof (args)
+	 * in a compatible situation.
+	 */
+more:
+	if (!(uap->flags & MS_SYSSPACE)) {
+		if (args == NULL)
+			args = kmem_zalloc(sizeof (struct nfs_args), KM_SLEEP);
+		else
+			nfs4_free_args(args);
+		error = nfs4_copyin(data, uap->datalen, args);
+		if (error) {
+			if (args) {
+				kmem_free(args, sizeof (*args));
+			}
+			return (error);
+		}
+	} else {
+		args = (struct nfs_args *)data;
+	}
+
+
+	flags = args->flags;
+
+	/*
+	 * If the request changes the locking type, disallow the remount,
+	 * because it's questionable whether we can transfer the
+	 * locking state correctly.
+	 */
+	if (uap->flags & MS_REMOUNT) {
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs4_free_args(args);
+			kmem_free(args, sizeof (*args));
+		}
+		if ((mi = VFTOMI4(vfsp)) != NULL) {
+			uint_t new_mi_llock;
+			uint_t old_mi_llock;
+			new_mi_llock = (flags & NFSMNT_LLOCK) ? 1 : 0;
+			old_mi_llock = (mi->mi_flags & MI4_LLOCK) ? 1 : 0;
+			if (old_mi_llock != new_mi_llock)
+				return (EBUSY);
+		}
+		return (0);
+	}
+
+	mutex_enter(&mvp->v_lock);
+	if (!(uap->flags & MS_OVERLAY) &&
+	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
+		mutex_exit(&mvp->v_lock);
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs4_free_args(args);
+			kmem_free(args, sizeof (*args));
+		}
+		return (EBUSY);
+	}
+	mutex_exit(&mvp->v_lock);
+
+	/* make sure things are zeroed for errout: */
+	rtvp = NULL;
+	mi = NULL;
+	secdata = NULL;
+
+	/*
+	 * A valid knetconfig structure is required.
+	 */
+
+	if (!(flags & NFSMNT_KNCONF) ||
+		args->knconf == NULL || args->knconf->knc_protofmly == NULL ||
+		args->knconf->knc_proto == NULL ||
+		(strcmp(args->knconf->knc_proto, NC_UDP) == 0)) {
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs4_free_args(args);
+			kmem_free(args, sizeof (*args));
+		}
+		return (EINVAL);
+	}
+
+	if ((strlen(args->knconf->knc_protofmly) >= KNC_STRSIZE) ||
+		(strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs4_free_args(args);
+			kmem_free(args, sizeof (*args));
+		}
+		return (EINVAL);
+	}
+
+
+	/*
+	 * Allocate a servinfo4 struct.
+	 */
+	svp = kmem_zalloc(sizeof (*svp), KM_SLEEP);
+	nfs_rw_init(&svp->sv_lock, NULL, RW_DEFAULT, NULL);
+	if (svp_tail) {
+		svp_2ndlast = svp_tail;
+		svp_tail->sv_next = svp;
+	} else {
+		svp_head = svp;
+		svp_2ndlast = svp;
+	}
+
+	svp_tail = svp;
+	svp->sv_knconf = args->knconf;
+	args->knconf = NULL;
+
+
+	/*
+	 * Get server address
+	 */
+
+	if (args->addr == NULL || args->addr->buf == NULL) {
+		error = EINVAL;
+		goto errout;
+	}
+
+	svp->sv_addr.maxlen = args->addr->maxlen;
+	svp->sv_addr.len = args->addr->len;
+	svp->sv_addr.buf = args->addr->buf;
+	args->addr->buf = NULL;
+
+
+	/*
+	 * Get the root fhandle
+	 */
+	if (args->fh == NULL || (strlen(args->fh) >= MAXPATHLEN)) {
+		error = EINVAL;
+		goto errout;
+	}
+
+	svp->sv_path = args->fh;
+	svp->sv_pathlen = strlen(args->fh) + 1;
+	args->fh = NULL;
+
+	/*
+	 * Get server's hostname
+	 */
+	if (flags & NFSMNT_HOSTNAME) {
+		if (args->hostname == NULL || (strlen(args->hostname) >
+			MAXNETNAMELEN)) {
+			error = EINVAL;
+			goto errout;
+		}
+		svp->sv_hostnamelen = strlen(args->hostname) + 1;
+		svp->sv_hostname = args->hostname;
+		args->hostname = NULL;
 	} else {
 		char *p = "unknown-host";
-		hlen = strlen(p) + 1;
-		(void) strcpy(netname, p);
+		svp->sv_hostnamelen = strlen(p) + 1;
+		svp->sv_hostname = kmem_zalloc(svp->sv_hostnamelen, KM_SLEEP);
+		(void) strcpy(svp->sv_hostname, p);
 	}
-	svp->sv_hostnamelen = hlen;
-	svp->sv_hostname = kmem_alloc(svp->sv_hostnamelen, KM_SLEEP);
-	(void) strcpy(svp->sv_hostname, netname);
 
 	/*
 	 * RDMA MOUNT SUPPORT FOR NFS v4.
@@ -533,7 +790,6 @@ more:
 			 */
 			svp->sv_origknconf = svp->sv_knconf;
 			svp->sv_knconf = rdma_knconf;
-			knconf = rdma_knconf;
 		} else {
 			if (flags & NFSMNT_TRYRDMA) {
 #ifdef	DEBUG
@@ -553,14 +809,14 @@ more:
 				 * Check if more servers are specified;
 				 * Failover case, otherwise bail out of mount.
 				 */
-				if (STRUCT_FGET(args, nfs_args_ext) ==
-				    NFS_ARGS_EXTB && STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extB.next) != NULL) {
+				if (args->nfs_args_ext ==
+					NFS_ARGS_EXTB &&
+					args->nfs_ext_u.nfs_extB.next
+					!= NULL) {
+					data = (char *)
+						args->nfs_ext_u.nfs_extB.next;
 					if (uap->flags & MS_RDONLY &&
 					    !(flags & NFSMNT_SOFT)) {
-						data = (char *)
-						    STRUCT_FGETP(args,
-						nfs_ext_u.nfs_extB.next);
 						if (svp_head->sv_next == NULL) {
 							svp_tail = NULL;
 							svp_2ndlast = NULL;
@@ -613,37 +869,10 @@ more:
 	 * to support data needed for NFSV4 when AUTH_DH is the negotiated
 	 * flavor via SECINFO. (instead of using MOUNT protocol in V3).
 	 */
-	netname[0] = '\0';
-	if (flags & NFSMNT_SECURE) {
-
-		/* get syncaddr */
-		STRUCT_INIT(addr_tmp, get_udatamodel());
-		if (copyin(STRUCT_FGETP(args, syncaddr), STRUCT_BUF(addr_tmp),
-			STRUCT_SIZE(addr_tmp))) {
-			error = EINVAL;
-			goto errout;
-		}
-		userbufptr = STRUCT_FGETP(addr_tmp, buf);
-		syncaddr.len = STRUCT_FGET(addr_tmp, len);
-		syncaddr.buf = kmem_alloc(syncaddr.len, KM_SLEEP);
-		syncaddr.maxlen = syncaddr.len;
-		if (copyin(userbufptr, syncaddr.buf, syncaddr.len)) {
-			kmem_free(syncaddr.buf, syncaddr.len);
-			error = EFAULT;
-			goto errout;
-		}
-
-		/* get server's netname */
-		if (copyinstr(STRUCT_FGETP(args, netname), netname,
-				sizeof (netname), &nlen)) {
-			kmem_free(syncaddr.buf, syncaddr.len);
-			error = EFAULT;
-			goto errout;
-		}
-		netname[nlen] = '\0';
-
-		svp->sv_dhsec = create_authdh_data(netname, nlen, &syncaddr,
-						knconf);
+	if (args->flags & NFSMNT_SECURE) {
+		svp->sv_dhsec = create_authdh_data(args->netname,
+			strlen(args->netname),
+			args->syncaddr, svp->sv_knconf);
 	}
 
 	/*
@@ -651,7 +880,7 @@ more:
 	 * This includes data for AUTH_SYS as well.
 	 */
 	if (flags & NFSMNT_NEWARGS) {
-		switch (STRUCT_FGET(args, nfs_args_ext)) {
+		switch (args->nfs_args_ext) {
 		case NFS_ARGS_EXTA:
 		case NFS_ARGS_EXTB:
 			/*
@@ -659,15 +888,28 @@ more:
 			 * sec_data structure to pass in the security
 			 * data.
 			 */
-			if (STRUCT_FGETP(args,
-			    nfs_ext_u.nfs_extA.secdata) == NULL) {
+			secdata = args->nfs_ext_u.nfs_extA.secdata;
+			if (secdata == NULL) {
 				error = EINVAL;
-			} else {
-				error = sec_clnt_loadinfo(
-				    (struct sec_data *)STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extA.secdata),
-				    &secdata, get_udatamodel());
+			} else if (uap->flags & MS_SYSSPACE) {
+				/*
+				 * Need to validate the flavor here if
+				 * sysspace, userspace was already
+				 * validate from the nfs_copyin function.
+				 */
+				switch (secdata->rpcflavor) {
+				case AUTH_NONE:
+				case AUTH_UNIX:
+				case AUTH_LOOPBACK:
+				case AUTH_DES:
+				case RPCSEC_GSS:
+					break;
+				default:
+					error = EINVAL;
+					goto errout;
+				}
 			}
+			args->nfs_ext_u.nfs_extA.secdata = NULL;
 			break;
 
 		default:
@@ -682,7 +924,8 @@ more:
 		 * that may use this undocumented interface to do
 		 * AUTH_DH security.
 		 */
-		secdata = create_authdh_data(netname, nlen, &syncaddr, knconf);
+		secdata = create_authdh_data(args->netname,
+			strlen(args->netname), args->syncaddr, svp->sv_knconf);
 
 	} else {
 		secdata = kmem_alloc(sizeof (*secdata), KM_SLEEP);
@@ -691,10 +934,6 @@ more:
 	}
 
 	svp->sv_secdata = secdata;
-
-	/* syncaddr is no longer needed. */
-	if (syncaddr.buf != NULL)
-		kmem_free(syncaddr.buf, syncaddr.len);
 
 	/*
 	 * User does not explictly specify a flavor, and a user
@@ -714,11 +953,10 @@ more:
 	 * the mount is either not "read-only" or "soft",
 	 * we want to bail out with EINVAL.
 	 */
-	if (STRUCT_FGET(args, nfs_args_ext) == NFS_ARGS_EXTB &&
-	    STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next) != NULL) {
+	if (args->nfs_args_ext == NFS_ARGS_EXTB &&
+	    args->nfs_ext_u.nfs_extB.next != NULL) {
 		if (uap->flags & MS_RDONLY && !(flags & NFSMNT_SOFT)) {
-			data = (char *)STRUCT_FGETP(args,
-			    nfs_ext_u.nfs_extB.next);
+			data = (char *)args->nfs_ext_u.nfs_extB.next;
 			goto more;
 		}
 		error = EINVAL;
@@ -793,8 +1031,7 @@ proceed:
 		mi->mi_flags |= MI4_LLOCK;
 		mutex_exit(&mi->mi_lock);
 	}
-
-	error = nfs4_setopts(rtvp, get_udatamodel(), STRUCT_BUF(args));
+	error = nfs4_setopts(rtvp, DATAMODEL_NATIVE, args);
 
 errout:
 	if (error) {
@@ -816,12 +1053,20 @@ errout:
 			if (removed)
 				zone_rele(mi->mi_zone);
 			MI4_RELE(mi);
+			if (!(uap->flags & MS_SYSSPACE) && args) {
+				nfs4_free_args(args);
+				kmem_free(args, sizeof (*args));
+			}
 			return (error);
 		}
 		if (svp_head)
 			sv4_free(svp_head);
 	}
 
+	if (!(uap->flags & MS_SYSSPACE) && args) {
+		nfs4_free_args(args);
+		kmem_free(args, sizeof (*args));
+	}
 	if (rtvp != NULL)
 		VN_RELE(rtvp);
 
@@ -831,28 +1076,29 @@ errout:
 	return (error);
 }
 
-#ifdef	DEBUG
+#ifdef  DEBUG
 #define	VERS_MSG	"NFS4 server "
 #else
 #define	VERS_MSG	"NFS server "
 #endif
 
-#define	READ_MSG	\
+#define	READ_MSG        \
 	VERS_MSG "%s returned 0 for read transfer size"
-#define	WRITE_MSG	\
+#define	WRITE_MSG       \
 	VERS_MSG "%s returned 0 for write transfer size"
-#define	SIZE_MSG	\
+#define	SIZE_MSG        \
 	VERS_MSG "%s returned 0 for maximum file size"
 
 /*
  * Get the symbolic link text from the server for a given filehandle
  * of that symlink.
  *
- *	(get symlink text) PUTFH READLINK
+ *      (get symlink text) PUTFH READLINK
  */
 static int
 getlinktext_otw(mntinfo4_t *mi, nfs_fh4 *fh, char **linktextp, cred_t *cr,
-		int flags)
+	int flags)
+
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -903,14 +1149,14 @@ recov_retry:
 	if (needrecov && !recovery && num_retry-- > 0) {
 
 		NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-		    "getlinktext_otw: initiating recovery\n"));
+			"getlinktext_otw: initiating recovery\n"));
 
 		if (nfs4_start_recovery(&e, mi, NULL, NULL, NULL, NULL,
-		    OP_READLINK, NULL) == FALSE) {
-			nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
-			if (!e.error)
-				(void) xdr_free(xdr_COMPOUND4res_clnt,
-						(caddr_t)&res);
+			OP_READLINK, NULL) == FALSE) {
+		nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
+		if (!e.error)
+			(void) xdr_free(xdr_COMPOUND4res_clnt,
+				(caddr_t)&res);
 			goto recov_retry;
 		}
 	}
@@ -937,7 +1183,7 @@ recov_retry:
 	/* res.status == NFS4_OK */
 	ASSERT(res.status == NFS4_OK);
 
-	resop = &res.array[1];	/* readlink res */
+	resop = &res.array[1];  /* readlink res */
 	lr_res = &resop->nfs_resop4_u.opreadlink;
 
 	/* treat symlink name as data */
@@ -947,7 +1193,6 @@ recov_retry:
 		nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
 	sfh4_rele(&sfh);
 	(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-
 	return (0);
 }
 
@@ -1998,6 +2243,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 */
 	omax = mi->mi_max_threads;
 	if (nfs4_async_stop_sig(vfsp)) {
+
 		return (EINTR);
 	}
 	r4flush(vfsp, cr);

@@ -40,48 +40,53 @@
 #include <syslog.h>
 #include <errno.h>
 #include <sys/sockio.h>
-#include <rpc/rpc.h>
 #include <rpc/xdr.h>
-#include <rpcsvc/nfs_prot.h>
 #include <net/if.h>
 #include <netdir.h>
 #include <string.h>
 #include <thread.h>
 #include <locale.h>
+#include <ucred.h>
+#include <door.h>
 #include "automount.h"
 #include <sys/vfs.h>
 #include <sys/mnttab.h>
 #include <arpa/inet.h>
-#include <rpc/svc.h>			/* for private dupcache routines */
 #include <rpcsvc/daemon_utils.h>
 #include <deflt.h>
 #include <strings.h>
 #include <priv.h>
 #include <tsol/label.h>
+#include <sys/utsname.h>
+#include <sys/thread.h>
+#include <nfs/rnode.h>
+#include <nfs/nfs.h>
 
-static void autofs_prog(struct svc_req *, SVCXPRT *);
-static void autofs_mount_1_r(struct autofs_lookupargs *,
-		struct autofs_mountres *, struct authunix_parms *);
+static void autofs_doorfunc(void *, char *, size_t, door_desc_t *, uint_t);
+static void autofs_setdoor(int);
+static void autofs_mntinfo_1_r(autofs_lookupargs *,
+		autofs_mountres *, ucred_t *);
 static void autofs_mount_1_free_r(struct autofs_mountres *);
-static void autofs_lookup_1_r(struct autofs_lookupargs *,
-		struct autofs_lookupres *, struct authunix_parms *);
-static void autofs_lookup_1_free_r(struct autofs_lookupres *);
-static void autofs_unmount_1_r(struct umntrequest *, struct umntres *,
-		struct authunix_parms *);
-static void autofs_unmount_1_free_r(struct umntres *);
-static void autofs_readdir_1_r(struct autofs_rddirargs *,
-		struct autofs_rddirres *, struct authunix_parms *);
+static void autofs_lookup_1_r(autofs_lookupargs *,
+		autofs_lookupres *, ucred_t *);
+static void autofs_lookup_1_free_args(autofs_lookupargs *);
+static void autofs_unmount_1_r(umntrequest *, umntres *,
+		ucred_t *);
+static void autofs_unmount_1_free_args(umntrequest *);
+static void autofs_readdir_1_r(autofs_rddirargs *,
+		autofs_rddirres *, ucred_t *);
 static void autofs_readdir_1_free_r(struct autofs_rddirres *);
+static int decode_args(xdrproc_t, autofs_door_args_t *, caddr_t *, int);
+static bool_t encode_res(xdrproc_t, autofs_door_res_t **, caddr_t, int *);
 static void usage();
 static void warn_hup(int);
 static void free_action_list();
+static int start_autofs_svcs();
 
-static int dupreq_nonidemp(struct svc_req *, SVCXPRT *, int, bool_t (*)(),
-		void (*)());
-static int dupdonereq_nonidemp(struct svc_req *, caddr_t, bool_t (*)());
-static int dupreq_idemp(struct svc_req *, SVCXPRT *, int, bool_t (*)(),
-		void (*)());
-static int dupdonereq_idemp(struct svc_req *, caddr_t, bool_t (*)());
+/*
+ * Private autofs system call
+ */
+extern int _autofssys(int, void *);
 
 #define	CTIME_BUF_LEN 26
 
@@ -93,9 +98,14 @@ static int dupdonereq_idemp(struct svc_req *, caddr_t, bool_t (*)());
 #define	MAXTHREADS 64
 
 #define	RESOURCE_FACTOR 8
+#ifdef DEBUG
+#define	AUTOFS_DOOR	"/var/run/autofs_door"
+#endif /* DEBUG */
 
-static char str_arch[32];
-static char str_cpu[32];
+
+static char		str_arch[32];
+static char		str_cpu[32];
+static thread_key_t	s_thr_key;
 
 struct autodir *dir_head;
 struct autodir *dir_tail;
@@ -113,11 +123,8 @@ main(argc, argv)
 
 {
 	pid_t pid;
-	int c, i, error;
+	int c, error;
 	struct rlimit rlset;
-	int rpc_svc_mode = RPC_SVC_MT_AUTO;
-	int maxthreads = MAXTHREADS;
-	int prevthreads = 0;
 	char *defval;
 	int defflags;
 
@@ -184,7 +191,7 @@ main(argc, argv)
 
 	if (sysinfo(SI_HOSTNAME, self, sizeof (self)) == -1) {
 		error = errno;
-		fprintf(stderr,
+		(void) fprintf(stderr,
 			"automountd: can't determine hostname, error: %d\n",
 			error);
 		exit(1);
@@ -236,57 +243,13 @@ main(argc, argv)
 	}
 
 	(void) rwlock_init(&cache_lock, USYNC_THREAD, NULL);
-	(void) rwlock_init(&rddir_cache_lock, USYNC_THREAD, NULL);
+	(void) rwlock_init(&autofs_rddir_cache_lock, USYNC_THREAD, NULL);
 
 	/*
 	 * initialize the name services, use NULL arguments to ensure
 	 * we don't initialize the stack of files used in file service
 	 */
 	(void) ns_setup(NULL, NULL);
-
-	/*
-	 * set the maximum number of threads to be used. If it succeeds
-	 * increase the number of resources the threads need. If the
-	 * the resource allocation fails, return the threads value back
-	 * to the default value
-	 */
-	if (((rpc_control(RPC_SVC_THRMAX_GET, &prevthreads)) == TRUE) &&
-		((rpc_control(RPC_SVC_THRMAX_SET, &maxthreads)) == TRUE)) {
-		rlset.rlim_max = RESOURCE_FACTOR * maxthreads;
-		rlset.rlim_cur = RESOURCE_FACTOR * maxthreads;
-		if ((setrlimit(RLIMIT_NOFILE, &rlset)) != 0) {
-			syslog(LOG_ERR,
-				"unable to increase system resource limit");
-
-			/* back off changes to threads */
-			if ((rpc_control(RPC_SVC_THRMAX_SET, &prevthreads))
-				== FALSE) {
-				/*
-				 * Exit if we have more threads than resources.
-				 */
-				syslog(LOG_ERR,
-				"unable to match threads to system resources");
-				exit(1);
-			}
-			syslog(LOG_ERR,
-				"decreased threads to match low resources");
-		} else {
-			/*
-			 * Both are successful. Note that setrlimit
-			 * allows a max setting of 1024
-			 */
-			if (trace > 3) {
-				trace_prt(1,
-				"  maxthreads: %d rlim_max: %d rlim_cur: %d\n",
-				maxthreads, rlset.rlim_max, rlset.rlim_cur);
-			}
-			closefrom(3);
-		}
-		(void) enable_extended_FILE_stdio(-1, -1);
-	} else {
-		syslog(LOG_ERR,
-			"unable to increase threads - continue with default");
-	}
 
 	/*
 	 * establish our lock on the lock file and write our pid to it.
@@ -332,21 +295,11 @@ main(argc, argv)
 			    "mode: %m");
 	}
 
-	if (!rpc_control(RPC_SVC_MTMODE_SET, &rpc_svc_mode)) {
-		syslog(LOG_ERR, "unable to set automatic MT mode");
-		exit(1);
-	}
-	if (svc_create_local_service(autofs_prog,
-		AUTOFS_PROG, AUTOFS_VERS, "netpath", "autofs") == 0) {
-		syslog(LOG_ERR, "unable to create service");
-		exit(1);
-	}
-
 	(void) signal(SIGHUP, warn_hup);
 
-	svc_run();
-	syslog(LOG_ERR, "svc_run returned");
-	return (1);
+	/* start services */
+	return (start_autofs_svcs());
+
 }
 
 /*
@@ -377,413 +330,24 @@ usage()
 	/* NOTREACHED */
 }
 
-/*
- * dupreq_nonidemp(struct svc_req *rqstp, SVCXPRT *transp, int res_sz,
- *		bool_t (*xdr_result)(), void (*local_free)())
- * check the status of nonidempotent requests in the duplicate request cache.
- * Get result of done requests and send a reply to the kernel. Return status.
- */
-static int
-dupreq_nonidemp(struct svc_req *rqstp, SVCXPRT *transp, int res_sz,
-		bool_t (*xdr_result)(), void (*local_free)())
-{
-	caddr_t resp_buf;
-	uint_t resp_bufsz;
-	int dupstat;
-	XDR xdrs;
-	caddr_t res;
-
-	dupstat = __svc_vc_dup(rqstp, &resp_buf, &resp_bufsz);
-	switch (dupstat) {
-	case DUP_NEW:
-		break;
-	case DUP_DONE:
-		if (!resp_buf) {
-			if (verbose) {
-				syslog(LOG_ERR,
-				"dupreq_nonidemp: done, no cached result");
-			}
-			break;
-		}
-		/* buffer contains xdr encoded results - decode and sendreply */
-		if (verbose) {
-			syslog(LOG_ERR,
-			"dupreq_nonidemp: done, send reply to kernel");
-		}
-
-		memset((caddr_t)&xdrs, 0, sizeof (XDR));
-		xdrmem_create(&xdrs, resp_buf, resp_bufsz, XDR_DECODE);
-
-		if ((res = (caddr_t)malloc(res_sz)) == NULL) {
-			syslog(LOG_ERR, "dupreq_nonidemp: out of memory");
-			xdr_destroy(&xdrs);
-			free(resp_buf);
-			break;
-		}
-		memset(res, 0, res_sz);
-
-		if ((*xdr_result)(&xdrs, res) == FALSE) {
-			if (verbose)
-				syslog(LOG_ERR,
-				"dupreq_nonidemp: cannot xdr decode result");
-			xdr_destroy(&xdrs);
-			free(resp_buf);
-			free(res);
-			break;
-		}
-
-		if (!svc_sendreply(transp, xdr_result, (caddr_t)res)) {
-			xdr_destroy(&xdrs);
-			free(resp_buf);
-			(void) (*local_free)(res);
-			free(res);
-			svcerr_systemerr(transp);
-			return (DUP_ERROR);
-		}
-		xdr_destroy(&xdrs);
-		free(resp_buf);
-		(void) (*local_free)(res);
-		free(res);
-		break;
-
-	/* all other cases log the case and drop the request */
-	case DUP_INPROGRESS:
-		if (verbose) {
-			syslog(LOG_ERR,
-			"dupreq_nonidemp: duplicate request in progress\n");
-		}
-		break;
-	case DUP_DROP:	/* should never be called in automountd */
-		if (verbose)
-			syslog(LOG_ERR,
-			"dupreq_nonidemp: dropped duplicate request error");
-		break;
-	case DUP_ERROR: /* fall through */
-	default:
-		if (verbose)
-			syslog(LOG_ERR,
-			"dupreq_nonidemp: duplicate request cache error");
-		break;
-	}
-	return (dupstat);
-}
-
-/*
- * dupdonereq_nonidemp(struct svc_req *rqstp, caddr_t res,
- *		bool_t (*xdr_result)())
- * call the cache to indicate we are done with the nonidempotent request.
- * xdr_result will write the encoded xdr form of results into the buffer
- * provided in xdrmem_create. Makes a best effort to update the cache
- * first with a buffer containing the results, and then with a NULL buffer.
- * Return status.
- */
-static int
-dupdonereq_nonidemp(struct svc_req *rqstp, caddr_t res, bool_t (*xdr_result)())
-{
-	caddr_t resp_buf;
-	ulong_t resp_bufsz;
-	XDR xdrs;
-	int dupstat;
-
-	/*
-	 * create a results buffer and write into the cache
-	 * continue with a NULL buffer on errors.
-	 */
-	if ((resp_bufsz = xdr_sizeof(xdr_result, (void *)res)) == 0) {
-		if (verbose)
-			syslog(LOG_ERR, "dupdonereq_nonidemp: xdr error");
-		resp_buf = NULL;
-		resp_bufsz = 0;
-	} else {
-		if ((resp_buf = (caddr_t)malloc(resp_bufsz)) == NULL) {
-			syslog(LOG_ERR, "dupdonereq_nonidemp: out of memory");
-			resp_bufsz = 0;
-		} else {
-			memset(resp_buf, 0, resp_bufsz);
-			memset((caddr_t)&xdrs, 0, sizeof (XDR));
-			xdrmem_create(&xdrs, resp_buf, (uint_t)resp_bufsz,
-			    XDR_ENCODE);
-			if ((*xdr_result)(&xdrs, res) == FALSE) {
-				if (verbose)
-					syslog(LOG_ERR,
-					"cannot xdr encode results");
-				xdr_destroy(&xdrs);
-				free(resp_buf);
-				resp_buf = NULL;
-				resp_bufsz = 0;
-			} else
-				xdr_destroy(&xdrs);
-		}
-	}
-
-	dupstat = __svc_vc_dupdone(rqstp, resp_buf, (uint_t)resp_bufsz,
-	    DUP_DONE);
-	if (dupstat == DUP_ERROR) {
-		if (verbose)
-			syslog(LOG_ERR, "dupdonereq_nonidemp: cache error");
-		if (resp_buf != NULL) {
-			if (verbose)
-				syslog(LOG_ERR, "dupdonereq_nonidemp: retry");
-			dupstat = __svc_vc_dupdone(rqstp, NULL, 0, DUP_DONE);
-			if ((dupstat == DUP_ERROR) && verbose)
-				syslog(LOG_ERR,
-				"dupdonereq_nonidemp: retry failed");
-		}
-	}
-	if (resp_buf)
-		free(resp_buf);
-	return (dupstat);
-}
-
-/*
- * dupreq_idemp(struct svc_req *rqstp, SVCXPRT *transp, int res_sz;
- *		bool_t (*xdr_result)(), void (*local_free)())
- * check the status of idempotent requests in the duplicate request cache.
- * treat a idempotent request like a new one if its done, but do workavoids
- * if its a request in progress. Return status.
- */
-static int
-dupreq_idemp(struct svc_req *rqstp, SVCXPRT *transp, int res_sz,
-		bool_t (*xdr_result)(), void (*local_free)())
-{
-	int dupstat;
-
-#ifdef lint
-	transp = transp;
-	res_sz = res_sz;
-	local_free = local_free;
-	xdr_result = xdr_result;
-#endif /* lint */
-
-	/*
-	 * call the cache to check the status of the request. don't care
-	 * about results in the cache.
-	 */
-	dupstat = __svc_vc_dup(rqstp, NULL, NULL);
-	switch (dupstat) {
-	case DUP_NEW:
-		break;
-	case DUP_DONE:
-		if (verbose)
-			syslog(LOG_ERR, "dupreq_idemp: done request, redo");
-		dupstat = DUP_NEW;
-		break;
-
-	/* all other cases log the case and drop the request */
-	case DUP_INPROGRESS:
-		if (verbose)
-			syslog(LOG_ERR,
-			"dupreq_idemp: duplicate request in progress\n");
-		break;
-	case DUP_DROP:	/* should never be called in automountd */
-		if (verbose)
-			syslog(LOG_ERR,
-			"dupreq_idemp: dropped duplicate request error");
-		break;
-	case DUP_ERROR:	/* fall through */
-	default:
-		if (verbose)
-			syslog(LOG_ERR,
-			"dupreq_idemp: duplicate request cache error");
-		break;
-	}
-	return (dupstat);
-}
-
-/*
- * dupdonereq_idemp(struct svc_req *rqstp, caddr_t res,	bool_t (*xdr_result)())
- * call the cache to indicate we are done with the idempotent request - we do
- * this to allow work avoids for in progress requests. don't bother to store
- * any results in the cache. Return status.
- */
-static int
-dupdonereq_idemp(struct svc_req *rqstp, caddr_t res, bool_t (*xdr_result)())
-{
-	int dupstat;
-
-#ifdef lint
-	res = res;
-	xdr_result = xdr_result;
-#endif /* lint */
-
-	dupstat = __svc_vc_dupdone(rqstp, NULL, (uint_t)0, DUP_DONE);
-	if ((dupstat == DUP_ERROR) && verbose)
-		syslog(LOG_ERR, "dupdonereq_idemp: cannot cache result");
-	return (dupstat);
-}
-
-/*
- * Returns the UID of the caller
- */
-static uid_t
-getowner(transp)
-	SVCXPRT *transp;
-{
-	uid_t uid;
-
-	if (__rpc_get_local_uid(transp, &uid) < 0) {
-		char *err_msg = "Could not get local uid - request ignored\n";
-
-		if (trace > 1)
-			trace_prt(1, err_msg);
-		if (verbose)
-			pr_msg(err_msg);
-		return (-1);
-	}
-	if (uid != 0) {
-		char *err_msg =
-			"Illegal access attempt by uid=%ld - request ignored\n";
-
-		if (trace > 1)
-			trace_prt(1, err_msg, uid);
-		pr_msg(err_msg, uid);
-	}
-	return (uid);
-}
-
-/*
- * Each RPC request will automatically spawn a new thread with this
- * as its entry point.
- * XXX - the switch statement should be changed to a table of procedures
- * similar to that used by rfs_dispatch() in uts/common/fs/nfs/nfs_server.c.
- * duplicate request handling should also be synced with rfs_dispatch().
- */
 static void
-autofs_prog(rqstp, transp)
-	struct svc_req *rqstp;
-	register SVCXPRT *transp;
-{
-	union {
-		autofs_lookupargs autofs_mount_1_arg;
-		autofs_lookupargs autofs_lookup_1_arg;
-		umntrequest autofs_umount_1_arg;
-		autofs_rddirargs autofs_readdir_1_arg;
-	} argument;
-
-	union {
-		autofs_mountres mount_res;
-		autofs_lookupres lookup_res;
-		umntres umount_res;
-		autofs_rddirres readdir_res;
-	} res;
-
-	bool_t (*xdr_argument)();
-	bool_t (*xdr_result)();
-	void   (*local)();
-	void   (*local_free)();
-	int    (*dup_request)();
-	int    (*dupdone_request)();
-
-	timenow = time((time_t *)NULL);
-
-	if (rqstp->rq_proc != NULLPROC && getowner(transp) != 0) {
-		/*
-		 * Drop request
-		 */
-		return;
-	}
-
-	switch (rqstp->rq_proc) {
-	case NULLPROC:
-		(void) svc_sendreply(transp, xdr_void, (char *)NULL);
-		return;
-
-#ifdef MALLOC_DEBUG
-	case AUTOFS_DUMP_DEBUG:
-		(void) svc_sendreply(transp, xdr_void, (char *)NULL);
-		check_leaks("/var/tmp/automountd.leak");
-		return;
-#endif
-
-	case AUTOFS_LOOKUP:
-		xdr_argument = xdr_autofs_lookupargs;
-		xdr_result = xdr_autofs_lookupres;
-		local = autofs_lookup_1_r;
-		local_free = autofs_lookup_1_free_r;
-		dup_request = dupreq_nonidemp;
-		dupdone_request = dupdonereq_nonidemp;
-		break;
-
-	case AUTOFS_MOUNT:
-		xdr_argument = xdr_autofs_lookupargs;
-		xdr_result = xdr_autofs_mountres;
-		local = autofs_mount_1_r;
-		local_free = autofs_mount_1_free_r;
-		dup_request = dupreq_nonidemp;
-		dupdone_request = dupdonereq_nonidemp;
-		break;
-
-	case AUTOFS_UNMOUNT:
-		xdr_argument = xdr_umntrequest;
-		xdr_result = xdr_umntres;
-		local = autofs_unmount_1_r;
-		local_free = autofs_unmount_1_free_r;
-		dup_request = dupreq_nonidemp;
-		dupdone_request = dupdonereq_nonidemp;
-		break;
-
-	case AUTOFS_READDIR:
-		xdr_argument = xdr_autofs_rddirargs;
-		xdr_result = xdr_autofs_rddirres;
-		local = autofs_readdir_1_r;
-		local_free = autofs_readdir_1_free_r;
-		dup_request = dupreq_idemp;
-		dupdone_request = dupdonereq_idemp;
-		break;
-
-	default:
-		svcerr_noproc(transp);
-		return;
-	}
-
-
-	if ((*dup_request)(rqstp, transp, sizeof (res), xdr_result,
-				local_free) != DUP_NEW)
-		return;
-
-	(void) memset((char *)&argument, 0, sizeof (argument));
-	if (!svc_getargs(transp, xdr_argument, (caddr_t)&argument)) {
-		svcerr_decode(transp);
-		return;
-	}
-
-	(void) memset((char *)&res, 0, sizeof (res));
-	(*local)(&argument, &res, rqstp->rq_clntcred);
-
-	/* update cache with done request results */
-	(void) (*dupdone_request)(rqstp, (caddr_t)&res, xdr_result);
-
-	if (!svc_sendreply(transp, xdr_result, (caddr_t)&res)) {
-		svcerr_systemerr(transp);
-	}
-
-	if (!svc_freeargs(transp, xdr_argument, (caddr_t)&argument)) {
-		syslog(LOG_ERR, "unable to free arguments");
-	}
-
-	(*local_free)(&res);
-
-}
-
-static void
-autofs_readdir_1_r(req, res, cred)
-	struct autofs_rddirargs *req;
-	struct autofs_rddirres *res;
-	struct authunix_parms *cred;
+autofs_readdir_1_r(
+	autofs_rddirargs *req,
+	autofs_rddirres *res,
+	ucred_t	*autofs_cred)
 {
 	if (trace > 0)
 		trace_prt(1, "READDIR REQUEST	: %s @ %ld\n",
 		req->rda_map, req->rda_offset);
 
-	(void) do_readdir(req, res, cred);
-
+	do_readdir(req, res, autofs_cred);
 	if (trace > 0)
-		trace_prt(1, "READDIR REPLY	: status=%d\n", res->rd_status);
+		trace_prt(1, "READDIR REPLY	: status=%d\n",
+			res->rd_status);
 }
 
 static void
-autofs_readdir_1_free_r(res)
-	struct autofs_rddirres *res;
+autofs_readdir_1_free_r(struct autofs_rddirres *res)
 {
 	if (res->rd_status == AUTOFS_OK) {
 		if (res->rd_rddir.rddir_entries)
@@ -791,19 +355,20 @@ autofs_readdir_1_free_r(res)
 	}
 }
 
+
 /* ARGSUSED */
 static void
-autofs_unmount_1_r(m, res, cred)
-	struct umntrequest *m;
-	struct umntres *res;
-	struct authunix_parms *cred;
+autofs_unmount_1_r(
+	umntrequest *m,
+	umntres *res,
+	ucred_t	*autofs_cred)
 {
 	struct umntrequest *ul;
 
 	if (trace > 0) {
 		char ctime_buf[CTIME_BUF_LEN];
 		if (ctime_r(&timenow, ctime_buf, CTIME_BUF_LEN) == NULL)
-			ctime_buf[0] = '\0';
+		    ctime_buf[0] = '\0';
 
 		trace_prt(1, "UNMOUNT REQUEST: %s", ctime_buf);
 		for (ul = m; ul; ul = ul->next)
@@ -816,6 +381,7 @@ autofs_unmount_1_r(m, res, cred)
 				ul->isdirect ? "direct" : "indirect");
 	}
 
+
 	res->status = do_unmount1(m);
 
 	if (trace > 0)
@@ -823,22 +389,13 @@ autofs_unmount_1_r(m, res, cred)
 }
 
 static void
-autofs_unmount_1_free_r(res)
-	struct umntres *res;
+autofs_lookup_1_r(
+	autofs_lookupargs *m,
+	autofs_lookupres *res,
+	ucred_t	*autofs_cred)
 {
-#ifdef lint
-	res = res;
-#endif /* lint */
-}
-
-static void
-autofs_lookup_1_r(m, res, cred)
-	struct autofs_lookupargs *m;
-	struct autofs_lookupres *res;
-	struct authunix_parms *cred;
-{
-	enum autofs_action action;
-	struct linka link;
+	autofs_action_t action;
+	struct	linka link;
 	int status;
 
 	if (trace > 0) {
@@ -852,15 +409,18 @@ autofs_lookup_1_r(m, res, cred)
 			m->path, m->isdirect);
 	}
 
+	bzero(&link, sizeof (struct linka));
+
 	status = do_lookup1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, &action, &link, cred);
+			(uint_t)m->isdirect, &action, &link, autofs_cred);
 	if (status == 0) {
 		/*
 		 * Return action list to kernel.
 		 */
 		res->lu_res = AUTOFS_OK;
-		if ((res->lu_type.action = action) == AUTOFS_LINK_RQ)
+		if ((res->lu_type.action = action) == AUTOFS_LINK_RQ) {
 			res->lu_type.lookup_result_type_u.lt_linka = link;
+		}
 	} else {
 		/*
 		 * Entry not found
@@ -874,32 +434,13 @@ autofs_lookup_1_r(m, res, cred)
 }
 
 static void
-autofs_lookup_1_free_r(res)
-	struct autofs_lookupres *res;
-{
-	struct linka link;
-
-	if ((res->lu_res == AUTOFS_OK) &&
-	    (res->lu_type.action == AUTOFS_LINK_RQ)) {
-		/*
-		 * Free link information
-		 */
-		link = res->lu_type.lookup_result_type_u.lt_linka;
-		if (link.dir)
-			free(link.dir);
-		if (link.link)
-			free(link.link);
-	}
-}
-
-static void
-autofs_mount_1_r(m, res, cred)
-	struct autofs_lookupargs *m;
-	struct autofs_mountres *res;
-	struct authunix_parms *cred;
+autofs_mntinfo_1_r(
+	autofs_lookupargs *m,
+	autofs_mountres *res,
+	ucred_t	*autofs_cred)
 {
 	int status;
-	action_list *alp = NULL;
+	action_list		*alp = NULL;
 
 	if (trace > 0) {
 		char ctime_buf[CTIME_BUF_LEN];
@@ -913,7 +454,7 @@ autofs_mount_1_r(m, res, cred)
 	}
 
 	status = do_mount1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, &alp, cred);
+			(uint_t)m->isdirect, &alp, autofs_cred, DOMOUNT_USER);
 	if (status != 0) {
 		/*
 		 * An error occurred, free action list if allocated.
@@ -936,7 +477,6 @@ autofs_mount_1_r(m, res, cred)
 		res->mr_type.status = AUTOFS_DONE;
 		res->mr_type.mount_result_type_u.error = status;
 	}
-	res->mr_verbose = verbose;
 
 	if (trace > 0) {
 		switch (res->mr_type.status) {
@@ -969,13 +509,11 @@ autofs_mount_1_r(m, res, cred)
 }
 
 static void
-autofs_mount_1_free_r(res)
-	struct autofs_mountres *res;
+autofs_mount_1_free_r(struct autofs_mountres *res)
 {
 	if (res->mr_type.status == AUTOFS_ACTION) {
 		if (trace > 2)
 			trace_prt(1, "freeing action list\n");
-
 		free_action_list(res->mr_type.mount_result_type_u.list);
 	}
 }
@@ -1029,7 +567,16 @@ free_action_list(action_list *alp)
 		case AUTOFS_MOUNT_RQ:
 			mp = &(p->action.action_list_entry_u.mounta);
 			/* LINTED pointer alignment */
-			free_autofs_args((autofs_args *)mp->dataptr);
+			if (mp->fstype) {
+				if (strcmp(mp->fstype, "autofs") == 0) {
+					free_autofs_args((autofs_args *)
+						mp->dataptr);
+				} else if (strncmp(mp->fstype,
+					"nfs", 3) == 0) {
+					free_nfs_args((struct nfs_args *)
+						mp->dataptr);
+				}
+			}
 			mp->dataptr = NULL;
 			mp->datalen = 0;
 			free_mounta(mp);
@@ -1046,4 +593,443 @@ free_action_list(action_list *alp)
 		next = p->next;
 		free(p);
 	}
+}
+
+static void
+autofs_lookup_1_free_args(autofs_lookupargs *args)
+{
+	if (args->map)
+		free(args->map);
+	if (args->path)
+		free(args->path);
+	if (args->name)
+		free(args->name);
+	if (args->subdir)
+		free(args->subdir);
+	if (args->opts)
+		free(args->opts);
+}
+
+static void
+autofs_unmount_1_free_args(umntrequest *args)
+{
+	if (args->mntresource)
+		free(args->mntresource);
+	if (args->mntpnt)
+		free(args->mntpnt);
+	if (args->fstype)
+		free(args->fstype);
+	if (args->mntopts)
+		free(args->mntopts);
+	if (args->next)
+		autofs_unmount_1_free_args(args->next);
+}
+
+static void
+autofs_setdoor(int did)
+{
+
+	if (did < 0) {
+		did = 0;
+	}
+
+	(void) _autofssys(AUTOFS_SETDOOR, &did);
+}
+
+void *
+autofs_get_buffer(size_t size)
+{
+	autofs_tsd_t *tsd = NULL;
+
+	/*
+	 * Make sure the buffer size is aligned
+	 */
+	(void) thr_getspecific(s_thr_key, (void **)&tsd);
+	if (tsd == NULL) {
+		tsd = (autofs_tsd_t *)malloc(sizeof (autofs_tsd_t));
+		if (tsd == NULL) {
+			return (NULL);
+		}
+		tsd->atsd_buf = malloc(size);
+		if (tsd->atsd_buf != NULL)
+			tsd->atsd_len = size;
+		else
+			tsd->atsd_len = 0;
+		(void) thr_setspecific(s_thr_key, tsd);
+	} else {
+		if (tsd->atsd_buf && (tsd->atsd_len < size)) {
+			free(tsd->atsd_buf);
+			tsd->atsd_buf = malloc(size);
+			if (tsd->atsd_buf != NULL)
+				tsd->atsd_len = size;
+			else {
+				tsd->atsd_len = 0;
+			}
+		}
+	}
+	if (tsd->atsd_buf) {
+		bzero(tsd->atsd_buf, size);
+		return (tsd->atsd_buf);
+	} else {
+		syslog(LOG_ERR, gettext("Can't Allocate tsd buffer, size %d"),
+			size);
+		return (NULL);
+	}
+}
+
+/*
+ * Each request will automatically spawn a new thread with this
+ * as its entry point.
+ */
+/* ARGUSED */
+static void
+autofs_doorfunc(
+	void *cookie,
+	char *argp,
+	size_t arg_size,
+	door_desc_t *dp,
+	uint_t n_desc)
+{
+
+	char			*res;
+	int			res_size;
+	int			which, error = 0;
+
+	autofs_lookupargs	*xdrargs;
+	autofs_lookupres	lookup_res;
+	autofs_rddirargs	*rddir_args;
+	autofs_rddirres		rddir_res;
+	autofs_mountres		mount_res;
+	umntrequest		*umnt_args;
+	umntres			umount_res;
+	autofs_door_res_t	*door_res;
+	autofs_door_res_t	failed_res;
+
+	/*
+	 * autofs_cred is nulled because door_cred assumes non-null
+	 * to have been previously allocated.
+	 */
+	ucred_t 		*autofs_cred = NULL;
+
+	if (arg_size < sizeof (autofs_door_args_t)) {
+		failed_res.res_status = EINVAL;
+		error = door_return((char *)&failed_res,
+		    sizeof (autofs_door_res_t), NULL, 0);
+		/*
+		 * If we got here the door_return() failed.
+		 */
+		syslog(LOG_ERR, "Bad argument, door_return failure %d",
+			error);
+		return;
+	}
+
+	error = door_ucred(&autofs_cred);
+	if (error) {
+		failed_res.res_status = error;
+		error = door_return((char *)&failed_res,
+		    sizeof (autofs_door_res_t), NULL, 0);
+		/*
+		 * If we got here, door_return() failed
+		 */
+		syslog(LOG_ERR, "Bad cred, door_return() failed, %d",
+			error);
+		return;
+	}
+
+	timenow = time((time_t *)NULL);
+
+	which = ((autofs_door_args_t *)argp)->cmd;
+	switch (which) {
+	case AUTOFS_LOOKUP:
+		if (error = decode_args(xdr_autofs_lookupargs,
+				(autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
+				sizeof (autofs_lookupargs))) {
+			syslog(LOG_ERR, "error allocating lookup arguments"
+				" buffer");
+			failed_res.res_status = error;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = 0;
+			break;
+		}
+		bzero(&lookup_res, sizeof (autofs_lookupres));
+
+		autofs_lookup_1_r(xdrargs, &lookup_res, autofs_cred);
+
+		autofs_lookup_1_free_args(xdrargs);
+		free(xdrargs);
+
+		if (!encode_res(xdr_autofs_lookupres, &door_res,
+					(caddr_t)&lookup_res, &res_size)) {
+			syslog(LOG_ERR, "error allocating lookup"
+			"results buffer");
+			failed_res.res_status = EINVAL;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+		} else {
+			door_res->res_status = 0;
+			res = (caddr_t)door_res;
+		}
+		break;
+
+	case AUTOFS_MNTINFO:
+		if (error = decode_args(xdr_autofs_lookupargs,
+				(autofs_door_args_t *)argp, (caddr_t *)&xdrargs,
+				sizeof (autofs_lookupargs))) {
+			syslog(LOG_ERR, "error allocating lookup arguments"
+				" buffer");
+			failed_res.res_status = error;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = 0;
+			break;
+		}
+
+		autofs_mntinfo_1_r((autofs_lookupargs *)xdrargs,
+					&mount_res, autofs_cred);
+
+		autofs_lookup_1_free_args(xdrargs);
+		free(xdrargs);
+
+		/*
+		 * Only reason we would get a NULL res is because
+		 * we could not allocate a results buffer.  Use
+		 * a local one to return the error EAGAIN as has
+		 * always been done when memory allocations fail.
+		 */
+		if (!encode_res(xdr_autofs_mountres, &door_res,
+					(caddr_t)&mount_res, &res_size)) {
+			syslog(LOG_ERR, "error allocating mount"
+				"results buffer");
+			failed_res.res_status = EAGAIN;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+		} else {
+			door_res->res_status = 0;
+			res = (caddr_t)door_res;
+		}
+		autofs_mount_1_free_r(&mount_res);
+		break;
+
+	case AUTOFS_UNMOUNT:
+		if (error = decode_args(xdr_umntrequest,
+			    (autofs_door_args_t *)argp,
+			    (caddr_t *)&umnt_args, sizeof (umntrequest))) {
+			syslog(LOG_ERR, "error allocating unmount "
+			    "argument buffer");
+			failed_res.res_status = error;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+			break;
+		}
+
+		autofs_unmount_1_r(umnt_args,
+		    &umount_res, autofs_cred);
+
+		error = umount_res.status;
+
+		autofs_unmount_1_free_args(umnt_args);
+		free(umnt_args);
+
+		if (!encode_res(xdr_umntres, &door_res, (caddr_t)&umount_res,
+				&res_size)) {
+			syslog(LOG_ERR, "error allocating unmount"
+			    "results buffer");
+			failed_res.res_status = EINVAL;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+		} else {
+			door_res->res_status = 0;
+			res = (caddr_t)door_res;
+		}
+		break;
+
+	case AUTOFS_READDIR:
+		if (error = decode_args(xdr_autofs_rddirargs,
+			(autofs_door_args_t *)argp,
+			(caddr_t *)&rddir_args,
+			sizeof (autofs_rddirargs))) {
+			syslog(LOG_ERR,
+				"error allocating readdir argument buffer");
+			failed_res.res_status = error;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+			break;
+		}
+
+		autofs_readdir_1_r(rddir_args, &rddir_res, autofs_cred);
+
+		free(rddir_args->rda_map);
+		free(rddir_args);
+
+		if (!encode_res(xdr_autofs_rddirres, &door_res,
+		    (caddr_t)&rddir_res, &res_size)) {
+			syslog(LOG_ERR, "error allocating readdir"
+			    "results buffer");
+			failed_res.res_status = ENOMEM;
+			failed_res.xdr_len = 0;
+			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+		} else {
+			door_res->res_status = 0;
+			res = (caddr_t)door_res;
+		}
+		autofs_readdir_1_free_r(&rddir_res);
+		break;
+#ifdef MALLOC_DEBUG
+	case AUTOFS_DUMP_DEBUG:
+			ucred_free(autofs_cred);
+			check_leaks("/var/tmp/automountd.leak");
+			error = door_return(NULL, 0, NULL, 0);
+			/*
+			 * If we got here, door_return() failed
+			 */
+			syslog(LOG_ERR, "dump debug door_return failure %d",
+				error);
+			return;
+#endif
+	case NULLPROC:
+			res = NULL;
+			res_size = 0;
+			break;
+	default:
+			failed_res.res_status = EINVAL;
+			res = (char *)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+			break;
+	}
+	ucred_free(autofs_cred);
+	error = door_return(res, res_size, NULL, 0);
+	/*
+	 * If we got here, door_return failed.
+	 */
+	syslog(LOG_ERR, "door_return failed %d, buffer %p, buffer size %d",
+		error, (void *)res, res_size);
+}
+
+static int
+start_autofs_svcs(void)
+{
+	int doorfd;
+#ifdef DEBUG
+	int dfd;
+#endif
+
+	if ((doorfd = door_create(autofs_doorfunc, NULL,
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
+		syslog(LOG_ERR, gettext("Unable to create door\n"));
+		return (1);
+	}
+
+#ifdef DEBUG
+	/*
+	 * Create a file system path for the door
+	 */
+	if ((dfd = open(AUTOFS_DOOR, O_RDWR|O_CREAT|O_TRUNC,
+	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
+		syslog(LOG_ERR, "Unable to open %s: %m\n", AUTOFS_DOOR);
+		(void) close(doorfd);
+		return (1);
+	}
+
+	/*
+	 * stale associations clean up
+	 */
+	(void) fdetach(AUTOFS_DOOR);
+
+	/*
+	 * Register in the namespace to the kernel to door_ki_open.
+	 */
+	if (fattach(doorfd, AUTOFS_DOOR) == -1) {
+		syslog(LOG_ERR, "Unable to fattach door %m\n", AUTOFS_DOOR);
+		(void) close(dfd);
+		(void) close(doorfd);
+		return (1);
+	}
+#endif /* DEBUG */
+
+	/*
+	 * Pass door name to kernel for door_ki_open
+	 */
+	autofs_setdoor(doorfd);
+
+	(void) thr_keycreate(&s_thr_key, NULL);
+
+	/*
+	 * Wait for incoming calls
+	 */
+	/*CONSTCOND*/
+	while (1)
+		(void) pause();
+
+	/* NOTREACHED */
+	syslog(LOG_ERR, gettext("Door server exited"));
+	return (10);
+}
+
+static int
+decode_args(
+	xdrproc_t xdrfunc,
+	autofs_door_args_t *argp,
+	caddr_t *xdrargs,
+	int size)
+{
+	XDR xdrs;
+
+	caddr_t tmpargs = (caddr_t)&((autofs_door_args_t *)argp)->xdr_arg;
+	size_t arg_size = ((autofs_door_args_t *)argp)->xdr_len;
+
+	xdrmem_create(&xdrs, tmpargs, arg_size, XDR_DECODE);
+
+	*xdrargs = malloc(size);
+	if (*xdrargs == NULL) {
+		syslog(LOG_ERR, "error allocating arguments"
+				" buffer");
+		return (ENOMEM);
+	}
+
+	bzero(*xdrargs, size);
+
+	if (!(*xdrfunc)(&xdrs, *xdrargs)) {
+		free(*xdrargs);
+		*xdrargs = NULL;
+		syslog(LOG_ERR, "error decoding arguments");
+		return (EINVAL);
+	}
+
+	return (0);
+}
+
+
+static bool_t
+encode_res(
+	xdrproc_t xdrfunc,
+	autofs_door_res_t **results,
+	caddr_t resp,
+	int *size)
+{
+	XDR xdrs;
+
+	*size = xdr_sizeof((*xdrfunc), resp);
+	*results = autofs_get_buffer(
+	    sizeof (autofs_door_res_t) + *size);
+	if (*results == NULL) {
+		(*results)->res_status = ENOMEM;
+		return (FALSE);
+	}
+	(*results)->xdr_len = *size;
+	*size = sizeof (autofs_door_res_t) + (*results)->xdr_len;
+	xdrmem_create(&xdrs, (caddr_t)((*results)->xdr_res),
+		(*results)->xdr_len,
+		XDR_ENCODE);
+	if (!(*xdrfunc)(&xdrs, resp)) {
+		(*results)->res_status = EINVAL;
+		syslog(LOG_ERR, "error encoding results");
+		return (FALSE);
+	}
+	(*results)->res_status = 0;
+	return (TRUE);
 }

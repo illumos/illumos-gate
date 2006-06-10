@@ -105,6 +105,7 @@
 #include <sys/pool.h>
 
 #include <libzonecfg.h>
+#include <synch.h>
 #include "zoneadmd.h"
 #include <tsol/label.h>
 #include <libtsnet.h>

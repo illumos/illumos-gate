@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  *	autod_mount.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,15 +62,16 @@ static void remove_browse_options(char *);
 static int inherit_options(char *, char **);
 
 int
-do_mount1(mapname, key, subdir, mapopts, path, isdirect, alpp, cred)
-	char *mapname;
-	char *key;
-	char *subdir;
-	char *mapopts;
-	char *path;
-	uint_t isdirect;
-	struct action_list **alpp;
-	struct authunix_parms *cred;
+do_mount1(
+	char *mapname,
+	char *key,
+	char *subdir,
+	char *mapopts,
+	char *path,
+	uint_t isdirect,
+	action_list **alpp,
+	ucred_t	*cred,
+	int flags)
 {
 	struct mapline ml;
 	struct mapent *me, *mapents = NULL;
@@ -104,7 +104,7 @@ retry:
 				    subdir, isdirect, mount_access);
 	}
 
-	if (trace > 1) {
+	if (trace) {
 		struct mapfs *mfs;
 		trace_prt(1, "  do_mount1:\n");
 		for (me = mapents; me; me = me->map_next) {
@@ -166,8 +166,20 @@ retry:
 
 		if (strcmp(me->map_fstype, MNTTYPE_NFS) == 0) {
 			remove_browse_options(me->map_mntopts);
+			if (flags == DOMOUNT_KERNEL) {
+				alp = (action_list *)malloc(
+					sizeof (action_list));
+				if (alp == NULL) {
+					syslog(LOG_ERR,
+						"malloc of alp failed");
+					continue;
+				}
+				memset(alp, 0, sizeof (action_list));
+			} else
+				alp = NULL;
 			err =
-			    mount_nfs(me, spec_mntpnt, private, overlay, cred);
+			    mount_nfs(me, spec_mntpnt, private, overlay, cred,
+				    &alp);
 			/*
 			 * We must retry if we don't have access to the
 			 * root file system and there are other
@@ -185,7 +197,21 @@ retry:
 					mount_access = FALSE;
 					err = 0;
 					free_mapent(mapents);
+					if (alp) {
+						free(alp);
+						alp = NULL;
+					}
 					goto retry;
+				}
+			}
+			if (alp) {
+				if (*alpp == NULL)
+					*alpp = alp;
+				else {
+					for (tmp = *alpp; tmp != NULL;
+						tmp = tmp->next)
+						prev = tmp;
+					prev->next = alp;
 				}
 			}
 			mount_ok = !err;

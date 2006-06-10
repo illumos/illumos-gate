@@ -131,12 +131,12 @@ static struct cache_entry *cache_head = NULL;
 rwlock_t cache_lock;	/* protect the cache chain */
 
 static enum nfsstat nfsmount(struct mapfs *, char *, char *, int, int,
-	struct authunix_parms *);
+	ucred_t *, action_list *);
 static int is_nfs_port(char *);
 
-static void netbuf_free(struct netbuf *);
-static struct knetconfig *get_knconf(struct netconfig *);
-static void free_knconf(struct knetconfig *);
+void netbuf_free(struct netbuf *);
+struct knetconfig *get_knconf(struct netconfig *);
+void free_knconf(struct knetconfig *);
 static int get_pathconf(CLIENT *, char *, char *, struct pathcnf **, int);
 static struct mapfs *enum_servers(struct mapent *, char *);
 static struct mapfs *get_mysubnet_servers(struct mapfs *);
@@ -156,11 +156,11 @@ enum type_of_stuff {
 	SERVER_FH = 2
 };
 
-static	void *get_server_stuff(enum type_of_stuff, char *, rpcprog_t,
+void *get_server_stuff(enum type_of_stuff, char *, rpcprog_t,
 	rpcvers_t, mfs_snego_t *, struct netconfig **, char *, ushort_t,
 	struct t_info *, caddr_t *, bool_t, char *, enum clnt_stat *);
 
-static	void *get_the_stuff(enum type_of_stuff, char *, rpcprog_t,
+void *get_the_stuff(enum type_of_stuff, char *, rpcprog_t,
 	rpcvers_t, mfs_snego_t *, struct netconfig *, ushort_t, struct t_info *,
 	caddr_t *, bool_t, char *, enum clnt_stat *);
 
@@ -171,7 +171,7 @@ static char *dump_distance(struct mapfs *);
 static void cache_free(struct cache_entry *);
 static int cache_check(char *, rpcvers_t *, char *);
 static void cache_enter(char *, rpcvers_t, rpcvers_t, char *, int);
-static void destroy_auth_client_handle(CLIENT *cl);
+void destroy_auth_client_handle(CLIENT *cl);
 
 #ifdef CACHE_DEBUG
 static void trace_host_cache();
@@ -221,16 +221,21 @@ static int is_v4_mount(char *);
 static void start_nfs4cbd(void);
 
 int
-mount_nfs(me, mntpnt, prevhost, overlay, cred)
-	struct mapent *me;
-	char *mntpnt;
-	char *prevhost;
-	int overlay;
-	struct authunix_parms *cred;
+mount_nfs(
+	struct mapent *me,
+	char *mntpnt,
+	char *prevhost,
+	int overlay,
+	ucred_t	*cred,
+	action_list **alpp)
 {
 	struct mapfs *mfs, *mp;
 	int err = -1;
 	int cached;
+	action_list *alp;
+
+
+	alp = *alpp;
 
 	read_default_nfs();
 
@@ -250,6 +255,17 @@ mount_nfs(me, mntpnt, prevhost, overlay, cred)
 				if (err) {
 					mp->mfs_ignore = 1;
 				} else {
+					/*
+					 * Free action_list if there
+					 * is one as it is not needed.
+					 * Make sure to set alpp to null
+					 * so caller doesn't try to free it
+					 * again.
+					 */
+					if (*alpp) {
+						free(*alpp);
+						*alpp = NULL;
+					}
 					break;
 				}
 			}
@@ -258,7 +274,7 @@ mount_nfs(me, mntpnt, prevhost, overlay, cred)
 	if (err) {
 		cached = strcmp(me->map_mounter, MNTTYPE_CACHEFS) == 0;
 		err = nfsmount(mfs, mntpnt, me->map_mntopts,
-				cached, overlay, cred);
+				cached, overlay, cred, alp);
 		if (err && trace > 1) {
 			trace_prt(1, "	Couldn't mount %s:%s, err=%d\n",
 				mfs->mfs_host, mfs->mfs_dir, err);
@@ -611,16 +627,18 @@ done:
 }
 
 static enum nfsstat
-nfsmount(mfs_in, mntpnt, opts, cached, overlay, cred)
-	struct mapfs *mfs_in;
-	char *mntpnt, *opts;
-	int cached, overlay;
-	struct authunix_parms *cred;
+nfsmount(
+	struct mapfs *mfs_in,
+	char *mntpnt, char *opts,
+	int cached, int overlay,
+	ucred_t	*cred,
+	action_list *alp)
 {
 	CLIENT *cl;
 	char remname[MAXPATHLEN], *mnttabtext = NULL;
 	char mopts[MAX_MNTOPT_STR];
 	char netname[MAXNETNAMELEN+1];
+	char	*mntopts = NULL;
 	int mnttabcnt = 0;
 	int loglevel;
 	struct mnttab m;
@@ -1780,7 +1798,7 @@ try_mnt_slash:
 
 		argp->flags |= NFSMNT_NEWARGS;
 		argp->flags |= NFSMNT_INT;	/* default is "intr" */
-		argp->hostname = host;
+		argp->hostname = strdup(host);
 		argp->flags |= NFSMNT_HOSTNAME;
 
 		/*
@@ -1814,6 +1832,8 @@ try_mnt_slash:
 			}
 
 			if (argp->addr == NULL) {
+				if (argp->hostname)
+					free(argp->hostname);
 				free(argp->fh);
 				free(argp);
 				head = prevhead;
@@ -1849,6 +1869,8 @@ try_mnt_slash:
 		if (argp->knconf == NULL) {
 			netbuf_free(argp->addr);
 			freenetconfigent(nconf);
+			if (argp->hostname)
+				free(argp->hostname);
 			free(argp->fh);
 			free(argp);
 			head = prevhead;
@@ -1901,6 +1923,8 @@ try_mnt_slash:
 				free_knconf(argp->knconf);
 				netbuf_free(argp->addr);
 				freenetconfigent(nconf);
+				if (argp->hostname)
+					free(argp->hostname);
 				free(argp->fh);
 				free(argp);
 				head = prevhead;
@@ -1960,6 +1984,8 @@ try_mnt_slash:
 				free_knconf(argp->knconf);
 				netbuf_free(argp->addr);
 				freenetconfigent(nconf);
+				if (argp->hostname)
+					free(argp->hostname);
 				free(argp->fh);
 				free(argp);
 				head = prevhead;
@@ -2006,7 +2032,7 @@ try_mnt_slash:
 		if (is_system_labeled())
 			nfs_sec.sc_uid = (uid_t)0;
 		else
-			nfs_sec.sc_uid = cred->aup_uid;
+			nfs_sec.sc_uid = ucred_geteuid(cred);
 		/*
 		 * If AUTH_DH is a chosen flavor now, its data will be stored
 		 * in the sec_data structure via nfs_clnt_secdata().
@@ -2023,6 +2049,8 @@ try_mnt_slash:
 				netbuf_free(argp->syncaddr);
 			if (argp->netname)
 				free(argp->netname);
+			if (argp->hostname)
+				free(argp->hostname);
 			free_knconf(argp->knconf);
 			netbuf_free(argp->addr);
 			freenetconfigent(nconf);
@@ -2099,6 +2127,8 @@ try_mnt_slash:
 					netbuf_free(argp->syncaddr);
 				if (argp->netname)
 					free(argp->netname);
+				if (argp->hostname)
+					free(argp->hostname);
 				free(argp->fh);
 				free(argp);
 				head = prevhead;
@@ -2279,29 +2309,57 @@ try_mnt_slash:
 		trace_prt(1, "	mount %s %s (%s)\n", mnttabtext, mntpnt, mopts);
 	}
 
-	if (mount(mnttabtext, mntpnt, flags | MS_DATA, fstype,
+	/*
+	 * If no action list pointer then do the mount, otherwise
+	 * build the actions list pointer with the mount information.
+	 * so the mount can be done in the kernel.
+	 */
+	if (alp == NULL) {
+		if (mount(mnttabtext, mntpnt, flags | MS_DATA, fstype,
 			head, sizeof (*head), mopts, MAX_MNTOPT_STR) < 0) {
-		if (trace > 1)
-			trace_prt(1, "	Mount of %s on %s: %d\n",
-			    mnttabtext, mntpnt, errno);
-		if (errno != EBUSY || verbose)
-			syslog(LOG_ERR,
+			if (trace > 1)
+				trace_prt(1, "	Mount of %s on %s: %d\n",
+					mnttabtext, mntpnt, errno);
+			if (errno != EBUSY || verbose)
+				syslog(LOG_ERR,
 				"Mount of %s on %s: %m", mnttabtext, mntpnt);
-		last_error = NFSERR_IO;
-		goto out;
-	}
+			last_error = NFSERR_IO;
+			goto out;
+		}
 
-	last_error = NFS_OK;
-	if (stat(mntpnt, &stbuf) == 0) {
-		if (trace > 1) {
-			trace_prt(1, "	mount %s dev=%x rdev=%x OK\n",
+		last_error = NFS_OK;
+		if (stat(mntpnt, &stbuf) == 0) {
+			if (trace > 1) {
+				trace_prt(1, "	mount %s dev=%x rdev=%x OK\n",
 				mnttabtext, stbuf.st_dev, stbuf.st_rdev);
+			}
+		} else {
+			if (trace > 1) {
+				trace_prt(1, "	mount %s OK\n", mnttabtext);
+				trace_prt(1, "	stat of %s failed\n", mntpnt);
+			}
+
 		}
 	} else {
-		if (trace > 1) {
-			trace_prt(1, "	mount %s OK\n", mnttabtext);
-			trace_prt(1, "	stat of %s failed\n", mntpnt);
-		}
+		alp->action.action = AUTOFS_MOUNT_RQ;
+		alp->action.action_list_entry_u.mounta.spec =
+			strdup(mnttabtext);
+		alp->action.action_list_entry_u.mounta.dir = strdup(mntpnt);
+		alp->action.action_list_entry_u.mounta.flags =
+			flags | MS_DATA;
+		alp->action.action_list_entry_u.mounta.fstype =
+			strdup(fstype);
+		alp->action.action_list_entry_u.mounta.dataptr = (char *)head;
+		alp->action.action_list_entry_u.mounta.datalen =
+			sizeof (*head);
+		mntopts = malloc(strlen(mopts) + 1);
+		strcpy(mntopts, mopts);
+		mntopts[strlen(mopts)] = '\0';
+		alp->action.action_list_entry_u.mounta.optptr = mntopts;
+		alp->action.action_list_entry_u.mounta.optlen =
+			strlen(mntopts) + 1;
+		last_error = NFS_OK;
+		goto ret;
 	}
 
 out:
@@ -2316,6 +2374,8 @@ out:
 		if (argp->netname) {
 			free(argp->netname);
 		}
+		if (argp->hostname)
+			free(argp->hostname);
 		nfs_free_secdata(argp->nfs_ext_u.nfs_extB.secdata);
 		free(argp->fh);
 		head = argp;
@@ -2336,7 +2396,7 @@ ret:
 			mfs->mfs_flags &= ~MFS_ALLOC_DIR;
 		}
 
-		if (mfs->mfs_args != NULL) {
+		if (mfs->mfs_args != NULL && alp == NULL) {
 			free(mfs->mfs_args);
 			mfs->mfs_args = NULL;
 		}
@@ -2393,7 +2453,7 @@ get_pathconf(CLIENT *cl, char *path, char *fsname, struct pathcnf **pcnf,
 	return (RET_OK);
 }
 
-static struct knetconfig *
+struct knetconfig *
 get_knconf(nconf)
 	struct netconfig *nconf;
 {
@@ -2424,7 +2484,7 @@ nomem:
 	return (NULL);
 }
 
-static void
+void
 free_knconf(k)
 	struct knetconfig *k;
 {
@@ -2437,7 +2497,7 @@ free_knconf(k)
 	free(k);
 }
 
-static void
+void
 netbuf_free(nb)
 	struct netbuf *nb;
 {
@@ -2709,7 +2769,7 @@ get_cached_srv_addr(char *hostname, rpcprog_t prog, rpcvers_t vers,
  * tinfo argument is for matching the get_the_addr() defined in
  * ../nfs/mount/mount.c
  */
-static void *
+void *
 get_the_stuff(
 	enum type_of_stuff type_of_stuff,
 	char *hostname,
@@ -3134,7 +3194,7 @@ get_ping(char *hostname, rpcprog_t prog, rpcvers_t vers,
 	return (cstat);
 }
 
-static void *
+void *
 get_server_stuff(
 	enum type_of_stuff type_of_stuff,
 	char *hostname,
@@ -3997,7 +4057,7 @@ is_nfs_port(char *opts)
  * destroy_auth_client_handle(cl)
  * destroys the created client handle
  */
-static void
+void
 destroy_auth_client_handle(CLIENT *cl)
 {
 	if (cl) {
@@ -4311,4 +4371,76 @@ create_homedir(const char *src, const char *dst) {
 
 	/* Created new home directory for the user */
 	return (1);
+}
+
+void
+free_nfs_args(struct nfs_args *argp)
+{
+	struct nfs_args *oldp;
+	while (argp) {
+		if (argp->pathconf)
+			free(argp->pathconf);
+		if (argp->knconf)
+			free_knconf(argp->knconf);
+		if (argp->addr)
+			netbuf_free(argp->addr);
+		if (argp->syncaddr)
+			netbuf_free(argp->syncaddr);
+		if (argp->netname)
+			free(argp->netname);
+		if (argp->hostname)
+			free(argp->hostname);
+		if (argp->nfs_ext_u.nfs_extB.secdata)
+			nfs_free_secdata(argp->nfs_ext_u.nfs_extB.secdata);
+		if (argp->fh)
+			free(argp->fh);
+		if (argp->nfs_ext_u.nfs_extA.secdata) {
+			sec_data_t	*sd;
+			sd = argp->nfs_ext_u.nfs_extA.secdata;
+			if (sd == NULL)
+				break;
+			switch (sd->rpcflavor) {
+			case AUTH_NONE:
+			case AUTH_UNIX:
+			case AUTH_LOOPBACK:
+				break;
+			case AUTH_DES:
+			{
+				dh_k4_clntdata_t	*dhk4;
+				dhk4 = (dh_k4_clntdata_t *)sd->data;
+				if (dhk4 == NULL)
+					break;
+				if (dhk4->syncaddr.buf)
+					free(dhk4->syncaddr.buf);
+				if (dhk4->knconf->knc_protofmly)
+					free(dhk4->knconf->knc_protofmly);
+				if (dhk4->knconf->knc_proto)
+					free(dhk4->knconf->knc_proto);
+				if (dhk4->knconf)
+					free(dhk4->knconf);
+				if (dhk4->netname)
+					free(dhk4->netname);
+				free(dhk4);
+				break;
+			}
+			case RPCSEC_GSS:
+			{
+				gss_clntdata_t	*gss;
+				gss = (gss_clntdata_t *)sd->data;
+				if (gss == NULL)
+					break;
+				if (gss->mechanism.elements)
+					free(gss->mechanism.elements);
+				free(gss);
+				break;
+			}
+			}
+		}
+		oldp = argp;
+		if (argp->nfs_args_ext == NFS_ARGS_EXTB)
+			argp = argp->nfs_ext_u.nfs_extB.next;
+		else
+			argp = NULL;
+		free(oldp);
+	}
 }

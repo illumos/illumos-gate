@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,19 +38,19 @@
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/systm.h>
-#include <rpc/types.h>
-#include <rpc/xdr.h>
-#include <rpc/auth.h>
-#include <rpc/clnt.h>
-#include <sys/ticotsord.h>
 #include <sys/dirent.h>
 #include <fs/fs_subr.h>
-#include <rpcsvc/autofs_prot.h>
 #include <sys/fs/autofs.h>
 #include <sys/callb.h>
 #include <sys/sysmacros.h>
 #include <sys/zone.h>
+#include <sys/door.h>
 #include <sys/fs/mntdata.h>
+#include <nfs/mount.h>
+#include <rpc/clnt.h>
+#include <rpcsvc/autofs_prot.h>
+#include <nfs/rnode.h>
+#include <sys/utsname.h>
 
 /*
  * Autofs and Zones:
@@ -85,9 +84,11 @@ static int auto_perform_actions(fninfo_t *, fnnode_t *,
     action_list *, cred_t *);
 static int auto_getmntpnt(vnode_t *, char *, vnode_t **, cred_t *);
 static int auto_lookup_request(fninfo_t *, char *, struct linka *,
-    cred_t *, bool_t, bool_t *);
+    bool_t, bool_t *);
 static int auto_mount_request(fninfo_t *, char *, action_list **,
-    cred_t *, bool_t);
+    bool_t);
+
+extern struct autofs_globals *autofs_zone_init(void);
 
 /*
  * Clears the MF_INPROG flag, and wakes up those threads sleeping on
@@ -158,15 +159,13 @@ auto_lookup_aux(fnnode_t *fnp, char *name, cred_t *cred)
 
 	fnip = vfstofni(fntovn(fnp)->v_vfsp);
 	bzero(&link, sizeof (link));
-	error = auto_lookup_request(fnip, name, &link, cred, TRUE, &mountreq);
+	error = auto_lookup_request(fnip, name, &link, TRUE, &mountreq);
 	if (!error) {
-		if (link.link != NULL) {
+		if (link.link != NULL || link.link != '\0') {
 			/*
 			 * This node should be a symlink
 			 */
 			error = auto_perform_link(fnp, &link, cred);
-			kmem_free(link.dir, strlen(link.dir) + 1);
-			kmem_free(link.link, strlen(link.link) + 1);
 		} else if (mountreq) {
 			/*
 			 * The automount daemon is requesting a mount,
@@ -207,6 +206,10 @@ auto_lookup_aux(fnnode_t *fnp, char *name, cred_t *cred)
 		}
 	}
 
+	if (link.link)
+		kmem_free(link.link, strlen(link.link) + 1);
+	if (link.dir)
+		kmem_free(link.dir, strlen(link.dir) + 1);
 	mutex_enter(&fnp->fn_lock);
 	fnp->fn_error = error;
 
@@ -238,20 +241,20 @@ auto_lookup_aux(fnnode_t *fnp, char *name, cred_t *cred)
 static void
 auto_mount_thread(struct autofs_callargs *argsp)
 {
-	struct fninfo *fnip;
-	fnnode_t *fnp;
-	vnode_t *vp;
-	char *name;
-	size_t namelen;
-	cred_t *cred;
-	action_list *alp = NULL;
-	int error;
-	callb_cpr_t cprinfo;
-	kmutex_t auto_mount_thread_cpr_lock;
+	struct fninfo 		*fnip;
+	fnnode_t 		*fnp;
+	vnode_t 		*vp;
+	char 			*name;
+	size_t 			namelen;
+	cred_t 			*cred;
+	action_list		*alp = NULL;
+	int 			error;
+	callb_cpr_t 		cprinfo;
+	kmutex_t 		auto_mount_thread_cpr_lock;
 
 	mutex_init(&auto_mount_thread_cpr_lock, NULL, MUTEX_DEFAULT, NULL);
-	CALLB_CPR_INIT(&cprinfo, &auto_mount_thread_cpr_lock, callb_generic_cpr,
-		"auto_mount_thread");
+	CALLB_CPR_INIT(&cprinfo, &auto_mount_thread_cpr_lock,
+		callb_generic_cpr, "auto_mount_thread");
 
 	fnp = argsp->fnc_fnp;
 	vp = fntovn(fnp);
@@ -260,7 +263,7 @@ auto_mount_thread(struct autofs_callargs *argsp)
 	cred = argsp->fnc_cred;
 	ASSERT(crgetzoneid(argsp->fnc_cred) == fnip->fi_zoneid);
 
-	error = auto_mount_request(fnip, name, &alp, cred, TRUE);
+	error = auto_mount_request(fnip, name, &alp, TRUE);
 	if (!error)
 		error = auto_perform_actions(fnip, fnp, alp, cred);
 	mutex_enter(&fnp->fn_lock);
@@ -311,177 +314,224 @@ auto_new_mount_thread(fnnode_t *fnp, char *name, cred_t *cred)
 	autofs_thr_success++;
 }
 
+
 int
 auto_calldaemon(
-	fninfo_t *fnip,
-	rpcproc_t which,
-	xdrproc_t xdrargs,
-	void *argsp,
-	xdrproc_t xdrres,
-	void *resp,
-	cred_t *cred,
-	bool_t hard)				/* retry forever? */
+	zoneid_t 		zoneid,
+	int			which,
+	xdrproc_t		xarg_func,
+	void 			*argsp,
+	xdrproc_t		xresp_func,
+	void 			*resp,
+	int			reslen,
+	bool_t 			hard)	/* retry forever? */
 {
-	CLIENT *client;
-	enum clnt_stat status;
-	struct rpc_err rpcerr;
-	struct timeval wait;
-	bool_t tryagain;
-	int error = 0;
-	k_sigset_t smask;
-	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
-	AUTOFS_DPRINT((4, "auto_calldaemon\n"));
+	int 			retry, error = 0;
+	k_sigset_t 		smask;
+	door_arg_t		door_args;
+	door_handle_t		dh;
+	XDR			xdrarg, xdrres;
+	struct autofs_globals 	*fngp = NULL;
+	zone_t 			*autofs_zone;
+	void			*orig_resp = NULL;
+	int			orig_reslen = reslen;
+	autofs_door_args_t	*xdr_argsp;
+	int			xdr_len = 0;
 
-	error = clnt_tli_kcreate(&fnip->fi_knconf, &fnip->fi_addr,
-	    AUTOFS_PROG, AUTOFS_VERS, 0, INT_MAX, cred, &client);
+	autofs_zone = zone_find_by_id(zoneid);
 
-	if (error) {
-		auto_log(fngp, CE_WARN, "autofs: clnt_tli_kcreate: error %d",
-		    error);
-		goto done;
+
+	/*
+	 * We know that the current thread is doing work on
+	 * behalf of its own zone, so it's ok to use
+	 * curproc->p_zone.
+	 */
+	ASSERT(zoneid == getzoneid());
+	if (zone_status_get(curproc->p_zone) >=
+			ZONE_IS_SHUTTING_DOWN) {
+		/*
+		 * There's no point in trying to talk to
+		 * automountd.  Plus, zone_shutdown() is
+		 * waiting for us.
+		 */
+		return (ECONNREFUSED);
+	}
+
+	if ((fngp = zone_getspecific(autofs_key, autofs_zone)) ==
+	    NULL) {
+		fngp = autofs_zone_init();
+		(void) zone_setspecific(autofs_key, autofs_zone, fngp);
+	}
+
+	ASSERT(fngp != NULL);
+
+	if (argsp != NULL && (xdr_len = xdr_sizeof(xarg_func, argsp)) == 0)
+		return (EINVAL);
+	xdr_argsp = kmem_zalloc(xdr_len + sizeof (*xdr_argsp), KM_SLEEP);
+	xdr_argsp->xdr_len = xdr_len;
+	xdr_argsp->cmd = which;
+
+	if (argsp) {
+		xdrmem_create(&xdrarg, (char *)&xdr_argsp->xdr_arg,
+			xdr_argsp->xdr_len, XDR_ENCODE);
+
+		if (!(*xarg_func)(&xdrarg, argsp)) {
+			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
+			return (EINVAL);
+		}
 	}
 
 	/*
-	 * Release the old authentication handle.  It was probably
-	 * AUTH_UNIX.
+	 * We're saving off the original pointer and length due to the
+	 * possibility that the results buffer returned by the door
+	 * upcall can be different then what we passed in. This is because
+	 * the door will allocate new memory if the results buffer passed
+	 * in isn't large enough to hold what we need to send back.
+	 * In this case we need to free the memory originally allocated
+	 * for that buffer.
 	 */
-	auth_destroy(client->cl_auth);
+	if (orig_reslen)
+		orig_resp = kmem_zalloc(orig_reslen, KM_SLEEP);
 
-	/*
-	 * Create a new authentication handle for AUTH_LOOPBACK.  This
-	 * will allow us to correctly handle the entire groups list.
-	 */
-	client->cl_auth = authloopback_create();
-	if (client->cl_auth == NULL) {
-		clnt_destroy(client);
-		error = EINTR;
-		auto_log(fngp, CE_WARN,
-		    "autofs: authloopback_create: error %d", error);
-		goto done;
-	}
-
-	wait.tv_sec = fnip->fi_rpc_to;
-	wait.tv_usec = 0;
 	do {
-		tryagain = FALSE;
-		error = 0;
+		retry = 0;
+		mutex_enter(&fngp->fng_autofs_daemon_lock);
+		dh = fngp->fng_autofs_daemon_dh;
+		if (dh)
+			door_ki_hold(dh);
+		mutex_exit(&fngp->fng_autofs_daemon_lock);
 
-		/*
-		 * Mask out all signals except SIGHUP, SIGINT, SIGQUIT
-		 * and SIGTERM. (Preserving the existing masks)
-		 */
+		if (dh == NULL) {
+			if (orig_resp)
+				kmem_free(orig_resp, orig_reslen);
+			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
+			return (ENOENT);
+		}
+		door_args.data_ptr = (char *)xdr_argsp;
+		door_args.data_size = sizeof (*xdr_argsp) + xdr_argsp->xdr_len;
+		door_args.desc_ptr = NULL;
+		door_args.desc_num = 0;
+		door_args.rbuf = orig_resp ? (char *)orig_resp : NULL;
+		door_args.rsize = reslen;
+
 		sigintr(&smask, 1);
-
-		status = CLNT_CALL(client, which, xdrargs, argsp,
-		    xdrres, resp, wait);
-
-		/*
-		 * Restore original signal mask
-		 */
+		error = door_ki_upcall(dh, &door_args);
 		sigunintr(&smask);
 
-		switch (status) {
-		case RPC_SUCCESS:
-			break;
+		door_ki_rele(dh);
 
-		case RPC_INTR:
-			error = EINTR;
-			break;
-
-		case RPC_TIMEDOUT:
-			tryagain = TRUE;
-			error = ETIMEDOUT;
-			break;
-
-		case RPC_CANTCONNECT:
-		case RPC_CANTCREATESTREAM:
-			/*
-			 * The connection could not be established
-			 */
-			/* fall thru */
-		case RPC_XPRTFAILED:
-			/*
-			 * The connection could not be established or
-			 * was dropped, we differentiate between the two
-			 * conditions by calling CLNT_GETERR and look at
-			 * rpcerror.re_errno.
-			 * If rpcerr.re_errno == ECONNREFUSED, then the
-			 * connection could not be established at all.
-			 */
-			error = ECONNREFUSED;
-			if (status == RPC_XPRTFAILED) {
-				CLNT_GETERR(client, &rpcerr);
-				if (rpcerr.re_errno != ECONNREFUSED) {
-					/*
-					 * The connection was dropped, return
-					 * to the caller if hard is not set.
-					 * It is the responsability of the
-					 * caller to retry the call if
-					 * appropriate.
-					 */
-					error = ECONNRESET;
-				}
+		if (!error) {
+			autofs_door_res_t *adr =
+				(autofs_door_res_t *)door_args.rbuf;
+			if (door_args.rbuf != NULL &&
+				(error = adr->res_status)) {
+				kmem_free(xdr_argsp,
+					xdr_len + sizeof (*xdr_argsp));
+				if (orig_resp)
+					kmem_free(orig_resp, orig_reslen);
+				return (error);
 			}
+			continue;
+		}
+		switch (error) {
+		case EINTR:
 			/*
-			 * We know that the current thread is doing work on
-			 * behalf of its own zone, so it's ok to use
-			 * curproc->p_zone.
+			 * interrupts should be handled properly by the
+			 * door upcall.
+			 *
+			 * We may have gotten EINTR for other reasons
+			 * like the door being revoked on us. Instead
+			 * of trying to extract this out of the door
+			 * handle, sleep and try again, if still
+			 * revoked we will get EBADF next time
+			 * through.
 			 */
-			ASSERT(fngp->fng_zoneid == getzoneid());
-			if (zone_status_get(curproc->p_zone) >=
-			    ZONE_IS_SHUTTING_DOWN) {
-				/*
-				 * There's no point in trying to talk to
-				 * automountd.  Plus, zone_shutdown() is
-				 * waiting for us.
-				 */
-				tryagain = FALSE;
+		case EAGAIN:    /* process may be forking */
+			/*
+			 * Back off for a bit
+			 */
+			delay(hz);
+			retry = 1;
+			break;
+		case EBADF:	/* Invalid door */
+		case EINVAL:    /* Not a door, wrong target */
+			/*
+			 * A fatal door error, if our failing door
+			 * handle is the current door handle, clean
+			 * up our state.
+			 */
+			mutex_enter(&fngp->fng_autofs_daemon_lock);
+			if (dh == fngp->fng_autofs_daemon_dh) {
+				door_ki_rele(fngp->fng_autofs_daemon_dh);
+				fngp->fng_autofs_daemon_dh = NULL;
+			}
+			mutex_exit(&fngp->fng_autofs_daemon_lock);
+			AUTOFS_DPRINT((5,
+				"auto_calldaemon error=%d\n", error));
+			if (hard) {
+				if (!fngp->fng_printed_not_running_msg) {
+				    fngp->fng_printed_not_running_msg = 1;
+				    zprintf(zoneid, "automountd not "\
+					"running, retrying\n");
+				}
+				delay(hz);
+				retry = 1;
 				break;
+			} else {
+				error = ECONNREFUSED;
+				kmem_free(xdr_argsp,
+					xdr_len + sizeof (*xdr_argsp));
+				if (orig_resp)
+					kmem_free(orig_resp, orig_reslen);
+				return (error);
 			}
-			tryagain = hard;
-			if (!fngp->fng_printed_not_running_msg) {
-				if (tryagain) {
-					fngp->fng_printed_not_running_msg = 1;
-					zprintf(fngp->fng_zoneid,
-					"automountd not running, retrying\n");
-				}
-			}
-			break;
-
-		default:
-			auto_log(fngp, CE_WARN, "autofs: %s",
-			    clnt_sperrno(status));
+		default:	/* Unknown must be fatal */
 			error = ENOENT;
-			break;
+			kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
+			if (orig_resp)
+				kmem_free(orig_resp, orig_reslen);
+			return (error);
 		}
-	} while (tryagain);
+	} while (retry);
 
-	if (status == RPC_SUCCESS) {
-		if (fngp->fng_printed_not_running_msg == 1) {
-			fngp->fng_printed_not_running_msg = 0;
-			zprintf(fngp->fng_zoneid, "automountd OK\n");
-		}
+	if (fngp->fng_printed_not_running_msg == 1) {
+		fngp->fng_printed_not_running_msg = 0;
+		zprintf(zoneid, "automountd OK\n");
 	}
-	auth_destroy(client->cl_auth);
-	clnt_destroy(client);
 
-done:
-	ASSERT(status == RPC_SUCCESS || error != 0);
-
-	AUTOFS_DPRINT((5, "auto_calldaemon error=%d\n", error));
+	if (orig_resp && orig_reslen) {
+		autofs_door_res_t	*door_resp;
+		door_resp =
+			(autofs_door_res_t *)door_args.rbuf;
+		if ((void *)door_args.rbuf != orig_resp)
+			kmem_free(orig_resp, orig_reslen);
+		xdrmem_create(&xdrres, (char *)&door_resp->xdr_res,
+			door_resp->xdr_len, XDR_DECODE);
+		if (!((*xresp_func)(&xdrres, resp)))
+			error = EINVAL;
+		kmem_free(door_args.rbuf, door_args.rsize);
+	}
+	kmem_free(xdr_argsp, xdr_len + sizeof (*xdr_argsp));
 	return (error);
 }
 
 static int
-auto_null_request(fninfo_t *fnip, cred_t *cred, bool_t hard)
+auto_null_request(fninfo_t *fnip, bool_t hard)
 {
 	int error;
+	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
 	AUTOFS_DPRINT((4, "\tauto_null_request\n"));
 
-	error = auto_calldaemon(fnip, NULLPROC, xdr_void, NULL, xdr_void, NULL,
-	    cred, hard);
+	error = auto_calldaemon(fngp->fng_zoneid,
+		NULLPROC,
+		xdr_void,
+		NULL,
+		xdr_void,
+		NULL,
+		0,
+		hard);
 
 	AUTOFS_DPRINT((5, "\tauto_null_request: error=%d\n", error));
 	return (error);
@@ -492,43 +542,57 @@ auto_lookup_request(
 	fninfo_t *fnip,
 	char *key,
 	struct linka *lnp,
-	cred_t *cred,
 	bool_t hard,
 	bool_t *mountreq)
 {
-	int error;
-	struct autofs_globals *fngp;
-	struct autofs_lookupargs request;
-	struct autofs_lookupres result;
-	struct linka *p;
+	int 				error;
+	struct autofs_globals 		*fngp;
+	struct autofs_lookupargs	reqst;
+	autofs_lookupres 		*resp;
+	struct linka 			*p;
 
-	AUTOFS_DPRINT((4, "auto_lookup_request: path=%s name=%s\n",
+
+	AUTOFS_DPRINT((4, "auto_lookup_equest: path=%s name=%s\n",
 	    fnip->fi_path, key));
 
 	fngp = vntofn(fnip->fi_rootvp)->fn_globals;
-	request.map = fnip->fi_map;
-	request.path = fnip->fi_path;
+
+	reqst.map = fnip->fi_map;
+	reqst.path = fnip->fi_path;
 
 	if (fnip->fi_flags & MF_DIRECT)
-		request.name = fnip->fi_key;
+		reqst.name = fnip->fi_key;
 	else
-		request.name = key;
-	AUTOFS_DPRINT((4, "auto_lookup_request: using key=%s\n", request.name));
+		reqst.name = key;
+	AUTOFS_DPRINT((4, "auto_lookup_request: using key=%s\n", reqst.name));
 
-	request.subdir = fnip->fi_subdir;
-	request.opts = fnip->fi_opts;
-	request.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
+	reqst.subdir = fnip->fi_subdir;
+	reqst.opts = fnip->fi_opts;
+	reqst.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
 
-	bzero(&result, sizeof (result));
-	error = auto_calldaemon(fnip, AUTOFS_LOOKUP,
-	    xdr_autofs_lookupargs, &request,
-	    xdr_autofs_lookupres, &result,
-	    cred, hard);
+	resp = kmem_zalloc(sizeof (*resp), KM_SLEEP);
+
+	error = auto_calldaemon(fngp->fng_zoneid,
+		AUTOFS_LOOKUP,
+		xdr_autofs_lookupargs,
+		&reqst,
+		xdr_autofs_lookupres,
+		(void *)resp,
+		sizeof (autofs_lookupres),
+		hard);
+
+
+	if (error) {
+		xdr_free(xdr_autofs_lookupres, (char *)resp);
+		kmem_free(resp, sizeof (*resp));
+		return (error);
+	}
+
 	if (!error) {
-		fngp->fng_verbose = result.lu_verbose;
-		switch (result.lu_res) {
+		fngp->fng_verbose = resp->lu_verbose;
+		switch (resp->lu_res) {
 		case AUTOFS_OK:
-			switch (result.lu_type.action) {
+			switch (resp->lu_type.action) {
 			case AUTOFS_MOUNT_RQ:
 				lnp->link = NULL;
 				lnp->dir = NULL;
@@ -536,12 +600,12 @@ auto_lookup_request(
 				break;
 			case AUTOFS_LINK_RQ:
 				p =
-				&result.lu_type.lookup_result_type_u.lt_linka;
+				&resp->lu_type.lookup_result_type_u.lt_linka;
 				lnp->dir = kmem_alloc(strlen(p->dir) + 1,
-				    KM_SLEEP);
+					KM_SLEEP);
 				(void) strcpy(lnp->dir, p->dir);
 				lnp->link = kmem_alloc(strlen(p->link) + 1,
-				    KM_SLEEP);
+					KM_SLEEP);
 				(void) strcpy(lnp->link, p->link);
 				break;
 			case AUTOFS_NONE:
@@ -549,9 +613,10 @@ auto_lookup_request(
 				lnp->dir = NULL;
 				break;
 			default:
-				auto_log(fngp, CE_WARN,
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid, CE_WARN,
 				    "auto_lookup_request: bad action type %d",
-				    result.lu_res);
+				    resp->lu_res);
 				error = ENOENT;
 			}
 			break;
@@ -560,16 +625,15 @@ auto_lookup_request(
 			break;
 		default:
 			error = ENOENT;
-			auto_log(fngp, CE_WARN,
+			auto_log(fngp->fng_verbose, fngp->fng_zoneid, CE_WARN,
 			    "auto_lookup_request: unknown result: %d",
-			    result.lu_res);
+			    resp->lu_res);
 			break;
 		}
 	}
-
 done:
-	xdr_free(xdr_autofs_lookupres, (char *)&result);
-
+	xdr_free(xdr_autofs_lookupres, (char *)resp);
+	kmem_free(resp, sizeof (*resp));
 	AUTOFS_DPRINT((5, "auto_lookup_request: path=%s name=%s error=%d\n",
 	    fnip->fi_path, key, error));
 	return (error);
@@ -580,40 +644,46 @@ auto_mount_request(
 	fninfo_t *fnip,
 	char *key,
 	action_list **alpp,
-	cred_t *cred,
 	bool_t hard)
 {
-	int error;
-	struct autofs_globals *fngp;
-	struct autofs_lookupargs request;
-	struct autofs_mountres *result;
+	int 			error;
+	struct autofs_globals 	*fngp;
+	autofs_lookupargs 	reqst;
+	autofs_mountres		*xdrres = NULL;
 
 	AUTOFS_DPRINT((4, "auto_mount_request: path=%s name=%s\n",
 	    fnip->fi_path, key));
 
 	fngp = vntofn(fnip->fi_rootvp)->fn_globals;
-	request.map = fnip->fi_map;
-	request.path = fnip->fi_path;
+	reqst.map = fnip->fi_map;
+	reqst.path = fnip->fi_path;
 
 	if (fnip->fi_flags & MF_DIRECT)
-		request.name = fnip->fi_key;
+		reqst.name = fnip->fi_key;
 	else
-		request.name = key;
-	AUTOFS_DPRINT((4, "auto_mount_request: using key=%s\n", request.name));
+		reqst.name = key;
 
-	request.subdir = fnip->fi_subdir;
-	request.opts = fnip->fi_opts;
-	request.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
+	AUTOFS_DPRINT((4, "auto_mount_request: using key=%s\n", reqst.name));
 
-	*alpp = NULL;
-	result = kmem_zalloc(sizeof (*result), KM_SLEEP);
-	error = auto_calldaemon(fnip, AUTOFS_MOUNT,
-	    xdr_autofs_lookupargs, &request,
-	    xdr_autofs_mountres, result,
-	    cred, hard);
+	reqst.subdir = fnip->fi_subdir;
+	reqst.opts = fnip->fi_opts;
+	reqst.isdirect = fnip->fi_flags & MF_DIRECT ? TRUE : FALSE;
+
+	xdrres = kmem_zalloc(sizeof (*xdrres), KM_SLEEP);
+
+	error = auto_calldaemon(fngp->fng_zoneid,
+		AUTOFS_MNTINFO,
+		xdr_autofs_lookupargs,
+		&reqst,
+		xdr_autofs_mountres,
+		(void *)xdrres,
+		sizeof (autofs_mountres),
+		hard);
+
+
 	if (!error) {
-		fngp->fng_verbose = result->mr_verbose;
-		switch (result->mr_type.status) {
+		fngp->fng_verbose = xdrres->mr_verbose;
+		switch (xdrres->mr_type.status) {
 		case AUTOFS_ACTION:
 			error = 0;
 			/*
@@ -622,23 +692,24 @@ auto_mount_request(
 			 * in 'result' so that xdr_free() will not free
 			 * the list.
 			 */
-			*alpp = result->mr_type.mount_result_type_u.list;
-			result->mr_type.mount_result_type_u.list = NULL;
+			*alpp = xdrres->mr_type.mount_result_type_u.list;
+			xdrres->mr_type.mount_result_type_u.list = NULL;
 			break;
 		case AUTOFS_DONE:
-			error = result->mr_type.mount_result_type_u.error;
+			error = xdrres->mr_type.mount_result_type_u.error;
 			break;
 		default:
 			error = ENOENT;
-			auto_log(fngp, CE_WARN,
+			auto_log(fngp->fng_verbose, fngp->fng_zoneid, CE_WARN,
 			    "auto_mount_request: unknown status %d",
-			    result->mr_type.status);
+			    xdrres->mr_type.status);
 			break;
 		}
 	}
 
-	xdr_free(xdr_autofs_mountres, (char *)result);
-	kmem_free(result, sizeof (*result));
+	xdr_free(xdr_autofs_mountres, (char *)xdrres);
+	kmem_free(xdrres, sizeof (*xdrres));
+
 
 	AUTOFS_DPRINT((5, "auto_mount_request: path=%s name=%s error=%d\n",
 	    fnip->fi_path, key, error));
@@ -650,21 +721,25 @@ static int
 auto_send_unmount_request(
 	fninfo_t *fnip,
 	umntrequest *ul,
-	cred_t *cred,
 	bool_t hard)
 {
-	int error;
-	umntres result;
+	int 	error;
+	umntres	xdrres;
+
+	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
 	AUTOFS_DPRINT((4, "\tauto_send_unmount_request: fstype=%s "
 			" mntpnt=%s\n", ul->fstype, ul->mntpnt));
 
-	error = auto_calldaemon(fnip, AUTOFS_UNMOUNT,
-	    xdr_umntrequest, ul,
-	    xdr_umntres, &result,
-	    cred, hard);
-	if (!error)
-		error = result.status;
+	bzero(&xdrres, sizeof (umntres));
+	error = auto_calldaemon(fngp->fng_zoneid,
+		AUTOFS_UNMOUNT,
+		xdr_umntrequest,
+		(void *)ul,
+		xdr_umntres,
+		(void *)&xdrres,
+		sizeof (umntres),
+		hard);
 
 	AUTOFS_DPRINT((5, "\tauto_send_unmount_request: error=%d\n", error));
 
@@ -698,8 +773,58 @@ auto_perform_link(fnnode_t *fnp, struct linka *linkp, cred_t *cred)
 	return (0);
 }
 
+static void
+auto_free_autofs_args(struct mounta *m)
+{
+	autofs_args	*aargs = (autofs_args *)m->dataptr;
+
+	if (aargs->addr.buf)
+		kmem_free(aargs->addr.buf, aargs->addr.len);
+	if (aargs->path)
+		kmem_free(aargs->path, strlen(aargs->path) + 1);
+	if (aargs->opts)
+		kmem_free(aargs->opts, strlen(aargs->opts) + 1);
+	if (aargs->map)
+		kmem_free(aargs->map, strlen(aargs->map) + 1);
+	if (aargs->subdir)
+		kmem_free(aargs->subdir, strlen(aargs->subdir) + 1);
+	if (aargs->key)
+		kmem_free(aargs->key, strlen(aargs->key) + 1);
+	kmem_free(aargs, sizeof (*aargs));
+}
+
+static void
+auto_free_action_list(action_list *alp)
+{
+	struct	mounta	*m;
+	action_list	*lastalp;
+	char		*fstype;
+
+	m = &alp->action.action_list_entry_u.mounta;
+	while (alp != NULL) {
+		fstype = alp->action.action_list_entry_u.mounta.fstype;
+		m = &alp->action.action_list_entry_u.mounta;
+		if (m->dataptr) {
+			if (strcmp(fstype, "autofs") == 0) {
+				auto_free_autofs_args(m);
+			}
+		}
+		if (m->spec)
+			kmem_free(m->spec, strlen(m->spec) + 1);
+		if (m->dir)
+			kmem_free(m->dir, strlen(m->dir) + 1);
+		if (m->fstype)
+			kmem_free(m->fstype, strlen(m->fstype) + 1);
+		if (m->optptr)
+			kmem_free(m->optptr, m->optlen);
+		lastalp = alp;
+		alp = alp->next;
+		kmem_free(lastalp, sizeof (*lastalp));
+	}
+}
+
 static boolean_t
-auto_invalid_action(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
+auto_invalid_autofs(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 {
 	struct mounta *m;
 	struct autofs_args *argsp;
@@ -710,11 +835,7 @@ auto_invalid_action(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 
 	fngp = dfnp->fn_globals;
 	dvp = fntovn(dfnp);
-	/*
-	 * Before we go any further, this better be a mount request.
-	 */
-	if (p->action.action != AUTOFS_MOUNT_RQ)
-		return (B_TRUE);
+
 	m = &p->action.action_list_entry_u.mounta;
 	/*
 	 * Make sure we aren't geting passed NULL values or a "dir" that
@@ -771,11 +892,29 @@ auto_invalid_action(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 		    dfnip->fi_path, dfnp->fn_name, m->dir + 1);
 	}
 	if (strcmp(argsp->path, buff) != 0) {
-		auto_log(fngp, CE_WARN, "autofs: expected path of '%s', "
+		auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+		    CE_WARN, "autofs: expected path of '%s', "
 		    "got '%s' instead.", buff, argsp->path);
 		return (B_TRUE);
 	}
 	return (B_FALSE); /* looks OK */
+}
+
+/*
+ * auto_invalid_action will validate the action_list received.  If all is good
+ * this function returns FALSE, if there is a problem it returns TRUE.
+ */
+static boolean_t
+auto_invalid_action(fninfo_t *dfnip, fnnode_t *dfnp, action_list *alistpp)
+{
+
+	/*
+	 * Before we go any further, this better be a mount request.
+	 */
+	if (alistpp->action.action != AUTOFS_MOUNT_RQ)
+		return (B_TRUE);
+	return (auto_invalid_autofs(dfnip, dfnp, alistpp));
+
 }
 
 static int
@@ -785,23 +924,24 @@ auto_perform_actions(
 	action_list *alp,
 	cred_t *cred)	/* Credentials of the caller */
 {
-	action_list *p;
-	struct mounta *m, margs;
-	struct autofs_args *argsp;
-	int error, success = 0;
-	vnode_t *mvp, *dvp, *newvp;
-	fnnode_t *newfnp, *mfnp;
-	int auto_mount = 0;
-	int save_triggers = 0;		/* set when we need to save at least */
-					/* one trigger node */
-	int update_times = 0;
-	char *mntpnt;
-	char buff[AUTOFS_MAXPATHLEN];
-	timestruc_t now;
-	struct autofs_globals *fngp;
-	cred_t *zcred;	/* kcred-like credentials limited by our zone */
 
-	AUTOFS_DPRINT((4, "auto_perform_actions: alp=%p\n", (void *)alp));
+	action_list *p;
+	struct mounta		*m, margs;
+	struct autofs_args 		*argsp;
+	int 			error, success = 0;
+	vnode_t 		*mvp, *dvp, *newvp;
+	fnnode_t 		*newfnp, *mfnp;
+	int 			auto_mount = 0;
+	int 			save_triggers = 0;
+	int 			update_times = 0;
+	char 			*mntpnt;
+	char 			buff[AUTOFS_MAXPATHLEN];
+	timestruc_t 		now;
+	struct autofs_globals 	*fngp;
+	cred_t 			*zcred;
+
+	AUTOFS_DPRINT((4, "auto_perform_actions: alp=%p\n",
+		(void *)alp));
 
 	fngp = dfnp->fn_globals;
 	dvp = fntovn(dfnp);
@@ -812,6 +952,7 @@ auto_perform_actions(
 	 * need to do argument verification.  We'll issue a warning and drop
 	 * the request if it doesn't seem right.
 	 */
+
 	for (p = alp; p != NULL; p = p->next) {
 		if (auto_invalid_action(dfnip, dfnp, p)) {
 			/*
@@ -850,7 +991,7 @@ auto_perform_actions(
 		mutex_enter(&dfnp->fn_lock);
 		if (dfnp->fn_flags & MF_MOUNTPOINT) {
 			AUTOFS_DPRINT((10, "autofs: clearing mountpoint "
-			    "flag on %s.", dfnp->fn_name));
+				"flag on %s.", dfnp->fn_name));
 			ASSERT(dfnp->fn_dirents == NULL);
 			ASSERT(dfnp->fn_trigger == NULL);
 		}
@@ -859,6 +1000,7 @@ auto_perform_actions(
 	}
 
 	for (p = alp; p != NULL; p = p->next) {
+
 		vfs_t *vfsp;	/* dummy argument */
 		vfs_t *mvfsp;
 
@@ -866,6 +1008,7 @@ auto_perform_actions(
 
 		m = &p->action.action_list_entry_u.mounta;
 		argsp = (struct autofs_args *)m->dataptr;
+		ASSERT(strcmp(m->fstype, "autofs") == 0);
 		/*
 		 * use the parent directory's timeout since it's the
 		 * one specified/inherited by automount.
@@ -897,21 +1040,24 @@ auto_perform_actions(
 
 		if (dfnip->fi_flags & MF_DIRECT) {
 			AUTOFS_DPRINT((10, "\tDIRECT\n"));
-			(void) sprintf(buff, "%s/%s", dfnip->fi_path, mntpnt);
+			(void) sprintf(buff, "%s/%s", dfnip->fi_path,
+				mntpnt);
 		} else {
 			AUTOFS_DPRINT((10, "\tINDIRECT\n"));
-			(void) sprintf(buff, "%s/%s/%s", dfnip->fi_path,
-			    dfnp->fn_name, mntpnt);
+			(void) sprintf(buff, "%s/%s/%s",
+				dfnip->fi_path,
+				dfnp->fn_name, mntpnt);
 		}
 
 		if (vn_mountedvfs(dvp) == NULL) {
 			/*
 			 * Daemon didn't mount anything on the root
-			 * We have to create the mountpoint if it doesn't
-			 * exist already
+			 * We have to create the mountpoint if it
+			 * doesn't exist already
 			 *
-			 * We use the caller's credentials in case a UID-match
-			 * is required (MF_THISUID_MATCH_RQD).
+			 * We use the caller's credentials in case a
+			 * UID-match is required
+			 * (MF_THISUID_MATCH_RQD).
 			 */
 			rw_enter(&dfnp->fn_rwlock, RW_WRITER);
 			error = auto_search(dfnp, mntpnt, &mfnp, cred);
@@ -921,8 +1067,9 @@ auto_perform_actions(
 				 */
 				if (vn_mountedvfs(fntovn(mfnp)) != NULL) {
 					cmn_err(CE_PANIC,
-					    "auto_perform_actions: "
-					    "mfnp=%p covered", (void *)mfnp);
+						"auto_perform_actions:"
+						" mfnp=%p covered",
+						(void *)mfnp);
 				}
 			} else {
 				/*
@@ -943,25 +1090,34 @@ auto_perform_actions(
 				 */
 				mvp = fntovn(mfnp);
 			} else {
-				auto_log(fngp, CE_WARN, "autofs: mount of %s "
-				    "failed - can't create mountpoint.", buff);
-				continue;
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+					CE_WARN, "autofs: mount of %s "
+					"failed - can't create"
+					" mountpoint.", buff);
+					continue;
 			}
 		} else {
 			/*
-			 * Find mountpoint in VFS mounted here. If not found,
-			 * fail the submount, though the overall mount has
-			 * succeeded since the root is mounted.
+			 * Find mountpoint in VFS mounted here. If not
+			 * found, fail the submount, though the overall
+			 * mount has succeeded since the root is
+			 * mounted.
 			 */
-			if (error = auto_getmntpnt(dvp, mntpnt, &mvp, kcred)) {
-				auto_log(fngp, CE_WARN, "autofs: mount of %s "
-				    "failed - mountpoint doesn't exist.", buff);
+			if (error = auto_getmntpnt(dvp, mntpnt, &mvp,
+				kcred)) {
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid,
+					CE_WARN, "autofs: mount of %s "
+					"failed - mountpoint doesn't"
+					" exist.", buff);
 				continue;
 			}
 			if (mvp->v_type == VLNK) {
-				auto_log(fngp, CE_WARN, "autofs: %s symbolic "
-				    "link: not a valid mountpoint "
-				    "- mount failed", buff);
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid,
+					CE_WARN, "autofs: %s symbolic "
+					"link: not a valid mountpoint "
+					"- mount failed", buff);
 				VN_RELE(mvp);
 				error = ENOENT;
 				continue;
@@ -969,10 +1125,12 @@ auto_perform_actions(
 		}
 mount:
 		m->flags |= MS_SYSSPACE | MS_OPTIONSTR;
+
 		/*
-		 * Copy mounta struct here so we can substitute a buffer
-		 * that is large enough to hold the returned option string,
-		 * if that string is longer that the input option string.
+		 * Copy mounta struct here so we can substitute a
+		 * buffer that is large enough to hold the returned
+		 * option string, if that string is longer than the
+		 * input option string.
 		 * This can happen if there are default options enabled
 		 * that were not in the input option string.
 		 */
@@ -981,16 +1139,18 @@ mount:
 		margs.optlen = MAX_MNTOPT_STR;
 		(void) strcpy(margs.optptr, m->optptr);
 		margs.dir = argsp->path;
+
 		/*
-		 * We use the zone's kcred because we don't want the zone to be
-		 * able to thus do something it wouldn't normally be able to.
+		 * We use the zone's kcred because we don't want the
+		 * zone to be able to thus do something it wouldn't
+		 * normally be able to.
 		 */
 		error = domount(NULL, &margs, mvp, zcred, &vfsp);
 		kmem_free(margs.optptr, MAX_MNTOPT_STR);
 		if (error != 0) {
-			auto_log(fngp, CE_WARN,
-			    "autofs: domount of %s failed error=%d",
-			    buff, error);
+			auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				CE_WARN, "autofs: domount of %s failed "
+				"error=%d", buff, error);
 			VN_RELE(mvp);
 			continue;
 		}
@@ -998,29 +1158,34 @@ mount:
 
 		/*
 		 * If mountpoint is an AUTOFS node, then I'm going to
-		 * flag it that the Filesystem mounted on top was mounted
-		 * in the kernel so that the unmount can be done inside the
-		 * kernel as well.
-		 * I don't care to flag non-AUTOFS mountpoints when an AUTOFS
-		 * in-kernel mount was done on top, because the unmount
-		 * routine already knows that such case was done in the kernel.
+		 * flag it that the Filesystem mounted on top was
+		 * mounted in the kernel so that the unmount can be
+		 * done inside the kernel as well.
+		 * I don't care to flag non-AUTOFS mountpoints when an
+		 * AUTOFS in-kernel mount was done on top, because the
+		 * unmount routine already knows that such case was
+		 * done in the kernel.
 		 */
-		if (vfs_matchops(dvp->v_vfsp, vfs_getops(mvp->v_vfsp))) {
+		if (vfs_matchops(dvp->v_vfsp,
+			vfs_getops(mvp->v_vfsp))) {
 			mfnp = vntofn(mvp);
 			mutex_enter(&mfnp->fn_lock);
 			mfnp->fn_flags |= MF_IK_MOUNT;
 			mutex_exit(&mfnp->fn_lock);
 		}
 
-		(void) vn_vfsrlock_wait(mvp);
+		(void) vn_vfswlock_wait(mvp);
 		mvfsp = vn_mountedvfs(mvp);
 		if (mvfsp != NULL) {
-			error = VFS_ROOT(mvfsp, &newvp);
+			vfs_lock_wait(mvfsp);
 			vn_vfsunlock(mvp);
+			error = VFS_ROOT(mvfsp, &newvp);
+			vfs_unlock(mvfsp);
 			if (error) {
 				/*
-				 * We've dropped the locks, so let's get
-				 * the mounted vfs again in case it changed.
+				 * We've dropped the locks, so let's
+				 * get the mounted vfs again in case
+				 * it changed.
 				 */
 				(void) vn_vfswlock_wait(mvp);
 				mvfsp = vn_mountedvfs(mvp);
@@ -1028,9 +1193,10 @@ mount:
 					error = dounmount(mvfsp, 0, CRED());
 					if (error) {
 						cmn_err(CE_WARN,
-						    "autofs: could not "
-						    "unmount vfs=%p",
-						(void *)mvfsp);
+							"autofs: could"
+							" not unmount"
+							" vfs=%p",
+							(void *)mvfsp);
 					}
 				} else
 					vn_vfsunlock(mvp);
@@ -1044,18 +1210,19 @@ mount:
 		}
 
 		auto_mount = vfs_matchops(dvp->v_vfsp,
-						vfs_getops(newvp->v_vfsp));
+			vfs_getops(newvp->v_vfsp));
 		newfnp = vntofn(newvp);
 		newfnp->fn_parent = dfnp;
 
 		/*
-		 * At this time we want to save the AUTOFS filesystem as
-		 * a trigger node. (We only do this if the mount occured
-		 * on a node different from the root.
+		 * At this time we want to save the AUTOFS filesystem
+		 * as a trigger node. (We only do this if the mount
+		 * occurred on a node different from the root.
 		 * We look at the trigger nodes during
 		 * the automatic unmounting to make sure we remove them
-		 * as a unit and remount them as a unit if the filesystem
-		 * mounted at the root could not be unmounted.
+		 * as a unit and remount them as a unit if the
+		 * filesystem mounted at the root could not be
+		 * unmounted.
 		 */
 		if (auto_mount && (error == 0) && (mvp != dvp)) {
 			save_triggers++;
@@ -1070,18 +1237,20 @@ mount:
 			dfnp->fn_trigger = newfnp;
 			rw_exit(&dfnp->fn_rwlock);
 			/*
-			 * Don't VN_RELE(newvp) here since dfnp now holds
-			 * reference to it as its trigger node.
+			 * Don't VN_RELE(newvp) here since dfnp now
+			 * holds reference to it as its trigger node.
 			 */
 			AUTOFS_DPRINT((10, "\tadding trigger %s to %s\n",
-			    newfnp->fn_name, dfnp->fn_name));
+				newfnp->fn_name, dfnp->fn_name));
 			AUTOFS_DPRINT((10, "\tfirst trigger is %s\n",
-			    dfnp->fn_trigger->fn_name));
+				dfnp->fn_trigger->fn_name));
 			if (newfnp->fn_next != NULL)
-				AUTOFS_DPRINT((10, "\tnext trigger is %s\n",
-				    newfnp->fn_next->fn_name));
+				AUTOFS_DPRINT((10,
+					"\tnext trigger is %s\n",
+					newfnp->fn_next->fn_name));
 			else
-				AUTOFS_DPRINT((10, "\tno next trigger\n"));
+				AUTOFS_DPRINT((10,
+					"\tno next trigger\n"));
 		} else
 			VN_RELE(newvp);
 
@@ -1132,7 +1301,6 @@ done:
 			xdr_free(xdr_action_list, (char *)alp);
 		}
 	}
-
 	AUTOFS_DPRINT((5, "auto_perform_actions: error=%d\n", error));
 	return (error);
 }
@@ -1743,7 +1911,9 @@ unmount_node(vnode_t *cvp, int force)
 		bzero(&ul, sizeof (ul));
 		mntfs_getmntopts(vfsp, &ul.mntopts, &mntoptslen);
 		if (ul.mntopts == NULL) {
-			auto_log(cfnp->fn_globals, CE_WARN, "unmount_node: "
+			auto_log(cfnp->fn_globals->fng_verbose,
+				cfnp->fn_globals->fng_zoneid,
+				CE_WARN, "unmount_node: "
 			    "no memory");
 			vn_vfsunlock(cvp);
 			error = ENOMEM;
@@ -1778,10 +1948,11 @@ unmount_node(vnode_t *cvp, int force)
 				    ZONE_PATH_TRANSLATE(ul.mntresource, zone);
 			}
 		}
+
 		ul.fstype = vfssw[vfsp->vfs_fstype].vsw_name;
 		vn_vfsunlock(cvp);
 
-		error = auto_send_unmount_request(fnip, &ul, CRED(), FALSE);
+		error = auto_send_unmount_request(fnip, &ul, FALSE);
 		kmem_free(ul.mntopts, mntoptslen);
 		refstr_rele(mntpt);
 		refstr_rele(resource);
@@ -1945,7 +2116,7 @@ unmount_tree(struct autofs_globals *fngp, int force)
 	 * so we don't need to fudge with the credentials.
 	 */
 	ASSERT(force || fnip->fi_zoneid == getzoneid());
-	if (!force && auto_null_request(fnip, kcred, FALSE) != 0) {
+	if (!force && auto_null_request(fnip, FALSE) != 0) {
 		/*
 		 * automountd not running in this zone,
 		 * don't attempt unmounting this round.
@@ -2088,7 +2259,7 @@ top:
 			/*
 			 * Attempt to unmount all the trigger nodes,
 			 * save the action_list in case we need to
-			 * remount them later. The action_list will be XDR
+			 * remount them later. The action_list will be
 			 * freed later if there was no need to remount the
 			 * trigger nodes.
 			 */
@@ -2160,21 +2331,26 @@ top:
 				 * may have already been removed from mnttab,
 				 * in such case the devid/rdevid we send to
 				 * the daemon will not be matched. So we have
-				 * to be contempt with the partial unmount.
+				 * to be content with the partial unmount.
 				 * Since the mountpoint is no longer covered, we
 				 * clear the error condition.
 				 */
 				error = 0;
-				auto_log(fngp, CE_WARN,
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+					CE_WARN,
 				    "unmount_tree: automountd connection "
 				    "dropped");
 				if (fnip->fi_flags & MF_DIRECT) {
-					auto_log(fngp, CE_WARN, "unmount_tree: "
+					auto_log(fngp->fng_verbose,
+						fngp->fng_zoneid, CE_WARN,
+						"unmount_tree: "
 					    "%s successfully unmounted - "
 					    "do not remount triggers",
 					    fnip->fi_path);
 				} else {
-					auto_log(fngp, CE_WARN, "unmount_tree: "
+					auto_log(fngp->fng_verbose,
+						fngp->fng_zoneid, CE_WARN,
+						"unmount_tree: "
 					    "%s/%s successfully unmounted - "
 					    "do not remount triggers",
 					    fnip->fi_path, fnp->fn_name);
@@ -2218,18 +2394,22 @@ top:
 			 * Unmount failed, got to remount triggers.
 			 */
 			ASSERT((fnp->fn_flags & MF_THISUID_MATCH_RQD) == 0);
-			error = auto_perform_actions(fnip, fnp, alp, CRED());
+			error = auto_perform_actions(fnip, fnp, alp,
+				CRED());
 			if (error) {
-				auto_log(fngp, CE_WARN, "autofs: can't remount "
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid, CE_WARN,
+					"autofs: can't remount "
 				    "triggers fnp=%p error=%d", (void *)fnp,
 				    error);
 				error = 0;
 				/*
 				 * The action list should have been
-				 * xdr_free'd by auto_perform_actions
+				 * free'd by auto_perform_actions
 				 * since an error occured
 				 */
 				alp = NULL;
+
 			}
 		}
 	} else {
@@ -2432,14 +2612,15 @@ auto_nobrowse_option(char *opts)
  * used to log warnings only if automountd is running
  * with verbose mode set
  */
-void
-auto_log(struct autofs_globals *fngp, int level, const char *fmt, ...)
-{
-	va_list args;
 
-	if (fngp->fng_verbose > 0) {
+void
+auto_log(int verbose, zoneid_t zoneid, int level, const char *fmt, ...)
+{
+	va_list	args;
+
+	if (verbose) {
 		va_start(args, fmt);
-		vzcmn_err(fngp->fng_zoneid, level, fmt, args);
+		vzcmn_err(zoneid, level, fmt, args);
 		va_end(args);
 	}
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,8 +21,8 @@
 /*
  *	autod_autofs.c
  *
- *	Copyright (c) 1988-1996 Sun Microsystems Inc
- *	All Rights Reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ *	Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +61,7 @@ mount_autofs(
 {
 	int mntflags = 0;
 	struct utsname utsname;
-	struct autofs_args *fnip = NULL;
+	autofs_args *fnip = NULL;
 	int mount_timeout = AUTOFS_MOUNT_TIMEOUT;
 	int sawnest, len, error = 0;
 	char *buf, rel_mntpnt[MAXPATHLEN];
@@ -90,8 +89,8 @@ mount_autofs(
 		return (error);
 	}
 
-	if ((fnip = (struct autofs_args *)
-	    malloc(sizeof (struct autofs_args))) == NULL) {
+	if ((fnip = (autofs_args *)
+	    malloc(sizeof (autofs_args))) == NULL) {
 		goto free_mem;
 	}
 	(void) memset((void *) fnip, 0, sizeof (*fnip));
@@ -117,11 +116,11 @@ mount_autofs(
 	 */
 	if ((fnip->path = strdup(mntpnt)) == NULL)
 		goto free_mem;
-
 	if ((fnip->map = strdup(me->map_fs->mfs_dir)) == NULL)
 		goto free_mem;
 	if ((fnip->subdir = strdup(subdir)) == NULL)
 		goto free_mem;
+
 	/*
 	 * This timeout is really ignored by autofs, it uses the
 	 * parent directory's timeout since it's really the one
@@ -170,7 +169,7 @@ mount_autofs(
 		(void) strcat(buf, "nest");
 	}
 	alp->action.action_list_entry_u.mounta.optptr = buf;
-	alp->action.action_list_entry_u.mounta.optlen = strlen(buf);
+	alp->action.action_list_entry_u.mounta.optlen = strlen(buf) + 1;
 	alp->action.action_list_entry_u.mounta.flags =
 		mntflags | MS_DATA | MS_OPTIONSTR;
 	if ((alp->action.action_list_entry_u.mounta.fstype =
@@ -198,8 +197,6 @@ free_mem:
  * Set *directp to 1 if "direct" is found, and 0 otherwise
  * (mounts are indirect by default).  If both "direct" and "indirect" are
  * found, the last one wins.
- * XXX - add nest to args if it's not there, this should go away later
- * when we add option string to the xdr data.
  */
 static int
 process_opts(char *options, int *directp, int *sawnestp)
@@ -241,7 +238,7 @@ process_opts(char *options, int *directp, int *sawnestp)
  * Free autofs_args structure
  */
 void
-free_autofs_args(struct autofs_args *p)
+free_autofs_args(autofs_args *p)
 {
 	if (p == NULL)
 		return;

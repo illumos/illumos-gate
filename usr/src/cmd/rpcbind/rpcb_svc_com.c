@@ -69,7 +69,6 @@
 #include <rpcsvc/mount.h>
 #include <nfs/nfs_acl.h>
 #include <rpc/key_prot.h>
-#include <rpcsvc/autofs_prot.h>
 #include <rpcsvc/nfsauth_prot.h>
 #include <rpcsvc/nispasswd.h>
 #include <rpcsvc/yp_prot.h>
@@ -809,12 +808,6 @@ rpcbproc_callit_com(rqstp, transp, reply_type, versnum)
 			if (debugging)
 				fprintf(stderr,
 					"rpcbind: rejecting KEY_PROG(%d)\n",
-					a.rmt_proc);
-			goto error;
-		case AUTOFS_PROG:
-			if (debugging)
-				fprintf(stderr,
-					"rpcbind: rejecting AUTOFS_PROG(%d)\n",
 					a.rmt_proc);
 			goto error;
 		case MOUNTPROG:

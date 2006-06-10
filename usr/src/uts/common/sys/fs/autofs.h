@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,21 +28,28 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <rpcsvc/autofs_prot.h>
-#include <rpc/rpc.h>
+#include <rpc/clnt.h>
+#include <gssapi/gssapi.h>
+#include <sys/vfs.h>
+#include <sys/dirent.h>
+#include <sys/types.h>
+#include <sys/types32.h>
 #include <sys/note.h>
 #include <sys/time_impl.h>
-#include <sys/types.h>
 #include <sys/mntent.h>
+#include <nfs/mount.h>
+#include <rpc/rpcsec_gss.h>
 #include <sys/zone.h>
+#include <sys/door.h>
+#include <rpcsvc/autofs_prot.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+
 #ifdef	_KERNEL
 
-struct action_list;
 
 /*
  * Tracing macro; expands to nothing for non-debug kernels.
@@ -182,6 +188,7 @@ typedef struct fnnode {
 	struct autofs_globals *fn_globals;	/* global variables */
 } fnnode_t;
 
+
 #define	vntofn(vp)	((struct fnnode *)((vp)->v_data))
 #define	fntovn(fnp)	(((fnp)->fn_vnode))
 #define	vfstofni(vfsp)	((struct fninfo *)((vfsp)->vfs_data))
@@ -217,6 +224,12 @@ struct autofs_globals {
 	int			fng_unmount_threads;
 	int			fng_verbose;
 	zoneid_t		fng_zoneid;
+	pid_t			fng_autofs_pid;
+	kmutex_t		fng_autofs_daemon_lock;
+	/*
+	 * autofs_daemon_lock protects fng_autofs_daemon_dh
+	 */
+	door_handle_t		fng_autofs_daemon_dh;
 };
 
 extern zone_key_t autofs_key;
@@ -251,14 +264,15 @@ extern fnnode_t *auto_makefnnode(vtype_t, vfs_t *, char *, cred_t *,
 extern void auto_freefnnode(fnnode_t *);
 extern void auto_disconnect(fnnode_t *, fnnode_t *);
 extern void auto_do_unmount(struct autofs_globals *);
-/*PRINTFLIKE3*/
-extern void auto_log(struct autofs_globals *, int level, const char *fmt, ...)
-    __KPRINTFLIKE(3);
+/*PRINTFLIKE4*/
+extern void auto_log(int verbose, zoneid_t zoneid, int level,
+	const char *fmt, ...)
+    __KPRINTFLIKE(4);
 /*PRINTFLIKE2*/
 extern void auto_dprint(int level, const char *fmt, ...)
     __KPRINTFLIKE(2);
-extern int auto_calldaemon(fninfo_t *, rpcproc_t, xdrproc_t, void *,
-	xdrproc_t, void *, cred_t *, bool_t);
+extern int auto_calldaemon(zoneid_t, int, xdrproc_t, void *, xdrproc_t,
+	void *, int, bool_t);
 extern int auto_lookup_aux(fnnode_t *, char *, cred_t *);
 extern void auto_new_mount_thread(fnnode_t *, char *, cred_t *);
 extern int auto_nobrowse_option(char *);
@@ -274,6 +288,66 @@ extern bool_t xdr_uid_t(XDR *, uid_t *);
 #endif	/* _KERNEL */
 
 /*
+ * autofs structures and defines needed for use with doors.
+ */
+#define	AUTOFS_NULL	0
+#define	AUTOFS_MOUNT	1
+#define	AUTOFS_UNMOUNT	2
+#define	AUTOFS_READDIR	3
+#define	AUTOFS_LOOKUP	4
+#define	AUTOFS_SRVINFO	5
+#define	AUTOFS_MNTINFO	6
+
+/*
+ * autofs_door_args is a generic structure used to grab the command
+ * from any of the argument structures passed in.
+ */
+
+typedef struct {
+	int cmd;
+	int xdr_len;
+	char xdr_arg[1];	/* buffer holding xdr encoded data */
+} autofs_door_args_t;
+
+
+typedef struct {
+	int res_status;
+	int xdr_len;
+	char xdr_res[1];	/* buffer holding xdr encoded data */
+} autofs_door_res_t;
+
+typedef enum autofs_res autofs_res_t;
+typedef enum autofs_stat autofs_stat_t;
+typedef enum autofs_action autofs_action_t;
+
+typedef struct {
+	void *	atsd_buf;
+	size_t	atsd_len;
+} autofs_tsd_t;
+
+typedef struct sec_desdata {
+	int		nd_sec_syncaddr_len;
+	int		nd_sec_knc_semantics;
+	int		nd_sec_netnamelen;
+	uint64_t	nd_sec_knc_rdev;
+	int		nd_sec_knc_unused[8];
+} sec_desdata_t;
+
+typedef struct sec_gssdata {
+	int			element_length;
+	rpc_gss_service_t	service;
+	char			uname[MAX_NAME_LEN];
+	char			inst[MAX_NAME_LEN];
+	char			realm[MAX_NAME_LEN];
+	uint_t			qop;
+} sec_gssdata_t;
+
+typedef struct nfs_secdata  {
+	sec_desdata_t	nfs_des_clntdata;
+	sec_gssdata_t	nfs_gss_clntdata;
+} nfs_secdata_t;
+
+/*
  * Comma separated list of mntoptions which are inherited when the
  * "restrict" option is present.  The RESTRICT option must be first!
  * This define is shared between the kernel and the automount daemon.
@@ -284,7 +358,7 @@ extern bool_t xdr_uid_t(XDR *, uid_t *);
 /*
  * AUTOFS syscall entry point
  */
-enum autofssys_op { AUTOFS_UNMOUNTALL };
+enum autofssys_op { AUTOFS_UNMOUNTALL, AUTOFS_SETDOOR };
 
 #ifdef	_KERNEL
 extern int autofssys(enum autofssys_op, uintptr_t);

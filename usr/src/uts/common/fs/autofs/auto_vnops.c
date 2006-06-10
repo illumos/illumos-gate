@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +106,8 @@ const fs_operation_def_t auto_vnodeops_template[] = {
 	VOPNAME_SHRLOCK, fs_error,
 	NULL, NULL
 };
+
+
 
 /* ARGSUSED */
 static int
@@ -303,7 +304,6 @@ done:
 	AUTOFS_DPRINT((5, "auto_access: error=%d\n", error));
 	return (error);
 }
-
 
 static int
 auto_lookup(
@@ -599,7 +599,9 @@ top:
 			goto top;
 		break;
 	default:
-		auto_log(dfnp->fn_globals, CE_WARN, "auto_lookup: unknown "
+		auto_log(dfnp->fn_globals->fng_verbose,
+			dfnp->fn_globals->fng_zoneid, CE_WARN,
+			"auto_lookup: unknown "
 		    "operation %d", operation);
 	}
 
@@ -855,8 +857,8 @@ static int autofs_nobrowse = 0;
 static int
 auto_readdir(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp)
 {
-	struct autofs_rddirargs rda;
-	struct autofs_rddirres rd;
+	struct autofs_rddirargs	rda;
+	autofs_rddirres rd;
 	fnnode_t *fnp = vntofn(vp);
 	fnnode_t *cfnp, *nfnp;
 	dirent64_t *dp;
@@ -864,13 +866,14 @@ auto_readdir(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp)
 	ulong_t outcount = 0, count = 0;
 	size_t namelen;
 	ulong_t alloc_count;
-	void *outbuf;
+	void *outbuf = NULL;
 	fninfo_t *fnip = vfstofni(vp->v_vfsp);
 	struct iovec *iovp;
 	int error = 0;
 	int reached_max = 0;
 	int myeof = 0;
 	int this_reclen;
+	struct autofs_globals *fngp = vntofn(fnip->fi_rootvp)->fn_globals;
 
 	AUTOFS_DPRINT((4, "auto_readdir vp=%p offset=%lld\n",
 	    (void *)vp, uiop->uio_loffset));
@@ -878,16 +881,16 @@ auto_readdir(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp)
 	if (eofp != NULL)
 		*eofp = 0;
 
-	iovp = uiop->uio_iov;
-	alloc_count = iovp->iov_len;
-
 	if (uiop->uio_iovcnt != 1)
 		return (EINVAL);
+
+	iovp = uiop->uio_iov;
+	alloc_count = iovp->iov_len;
 
 	gethrestime(&fnp->fn_atime);
 	fnp->fn_ref_time = fnp->fn_atime.tv_sec;
 
-	dp = outbuf = kmem_alloc(alloc_count, KM_SLEEP);
+	dp = outbuf = kmem_zalloc(alloc_count, KM_SLEEP);
 
 	/*
 	 * Held when getdents calls VOP_RWLOCK....
@@ -900,23 +903,32 @@ again:
 		 * Drop readers lock and reacquire after reply.
 		 */
 		rw_exit(&fnp->fn_rwlock);
-
+		bzero(&rd, sizeof (struct autofs_rddirres));
 		count = 0;
 		rda.rda_map = fnip->fi_map;
 		rda.rda_offset = (uint_t)uiop->uio_offset;
 		rd.rd_rddir.rddir_entries = dp;
 		rda.rda_count = rd.rd_rddir.rddir_size = (uint_t)alloc_count;
-		error = auto_calldaemon(fnip, AUTOFS_READDIR,
-		    xdr_autofs_rddirargs, &rda,
-		    xdr_autofs_rddirres, &rd,
-		    cred, TRUE);
+
+		error = auto_calldaemon(fngp->fng_zoneid,
+			AUTOFS_READDIR,
+			xdr_autofs_rddirargs,
+			&rda,
+			xdr_autofs_rddirres,
+			(void *)&rd,
+			sizeof (autofs_rddirres),
+			TRUE);
+
 		/*
 		 * reacquire previously dropped lock
 		 */
 		rw_enter(&fnp->fn_rwlock, RW_READER);
 
-		if (!error)
+		if (!error) {
 			error = rd.rd_status;
+			dp = rd.rd_rddir.rddir_entries;
+		}
+
 		if (error) {
 			if (error == AUTOFS_SHUTDOWN) {
 				/*
@@ -929,17 +941,17 @@ again:
 			}
 			goto done;
 		}
-
 		if (rd.rd_rddir.rddir_size) {
-			dirent64_t *odp = dp;	/* next in output buffer */
-			dirent64_t *cdp = dp;	/* current examined entry */
+			dirent64_t *odp = dp;   /* next in output buffer */
+			dirent64_t *cdp = dp;   /* current examined entry */
 
 			/*
 			 * Check for duplicates here
 			 */
 			do {
 				this_reclen = cdp->d_reclen;
-				if (auto_search(fnp, cdp->d_name, NULL, cred)) {
+				if (auto_search(fnp, cdp->d_name,
+					NULL, cred)) {
 					/*
 					 * entry not found in kernel list,
 					 * include it in readdir output.
@@ -951,7 +963,7 @@ again:
 					 */
 					if (cdp != odp)
 						bcopy(cdp, odp,
-						    (size_t)this_reclen);
+							(size_t)this_reclen);
 					odp = nextdp(odp);
 					outcount += this_reclen;
 				} else {
@@ -967,7 +979,7 @@ again:
 				}
 				count += this_reclen;
 				cdp = (struct dirent64 *)
-				    ((char *)cdp + this_reclen);
+					((char *)cdp + this_reclen);
 			} while (count < rd.rd_rddir.rddir_size);
 
 			if (outcount)
@@ -1014,7 +1026,7 @@ again:
 		/* use strncpy(9f) to zero out uninitialized bytes */
 
 		(void) strncpy(dp->d_name, ".",
-		    DIRENT64_NAMELEN(this_reclen));
+			DIRENT64_NAMELEN(this_reclen));
 		outcount += dp->d_reclen;
 		dp = nextdp(dp);
 
@@ -1030,7 +1042,7 @@ again:
 		/* use strncpy(9f) to zero out uninitialized bytes */
 
 		(void) strncpy(dp->d_name, "..",
-		    DIRENT64_NAMELEN(this_reclen));
+			DIRENT64_NAMELEN(this_reclen));
 		outcount += dp->d_reclen;
 		dp = nextdp(dp);
 	}
@@ -1041,7 +1053,7 @@ again:
 		nfnp = cfnp->fn_next;
 		offset = cfnp->fn_offset;
 		if ((offset >= uiop->uio_offset) &&
-		    (!(cfnp->fn_flags & MF_LOOKUP))) {
+			(!(cfnp->fn_flags & MF_LOOKUP))) {
 			int reclen;
 
 			/*
@@ -1073,7 +1085,7 @@ again:
 			/* use strncpy(9f) to zero out uninitialized bytes */
 
 			(void) strncpy(dp->d_name, cfnp->fn_name,
-			    DIRENT64_NAMELEN(reclen));
+				DIRENT64_NAMELEN(reclen));
 			outcount += dp->d_reclen;
 			dp = nextdp(dp);
 		}
@@ -1094,11 +1106,12 @@ again:
 			if (outcount == 0)
 				error = EINVAL;
 		} else if (autofs_nobrowse ||
-		    auto_nobrowse_option(fnip->fi_opts) ||
-		    (fnip->fi_flags & MF_DIRECT) || (fnp->fn_trigger != NULL) ||
-		    (((vp->v_flag & VROOT) == 0) &&
-		    ((fntovn(fnp->fn_parent))->v_flag & VROOT) &&
-		    (fnp->fn_dirents == NULL))) {
+			auto_nobrowse_option(fnip->fi_opts) ||
+			(fnip->fi_flags & MF_DIRECT) ||
+			(fnp->fn_trigger != NULL) ||
+			(((vp->v_flag & VROOT) == 0) &&
+				((fntovn(fnp->fn_parent))->v_flag & VROOT) &&
+				(fnp->fn_dirents == NULL))) {
 			/*
 			 * done reading directory entries
 			 */
@@ -1116,7 +1129,7 @@ again:
 done:
 	kmem_free(outbuf, alloc_count);
 	AUTOFS_DPRINT((5, "auto_readdir vp=%p offset=%lld eof=%d\n",
-	    (void *)vp, uiop->uio_loffset, myeof));
+		(void *)vp, uiop->uio_loffset, myeof));
 	return (error);
 }
 

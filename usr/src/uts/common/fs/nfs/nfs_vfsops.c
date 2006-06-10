@@ -75,7 +75,8 @@
 extern int sec_clnt_loadinfo(struct sec_data *, struct sec_data **, model_t);
 extern void sec_clnt_freeinfo(struct sec_data *);
 
-static int pathconf_get(struct mntinfo *, model_t, struct nfs_args *);
+static int pathconf_copyin(struct nfs_args *, struct pathcnf *);
+static int pathconf_get(struct mntinfo *, struct nfs_args *);
 static void pathconf_rele(struct mntinfo *);
 
 /*
@@ -194,6 +195,305 @@ nfsfini(void)
 {
 }
 
+static void
+nfs_free_args(struct nfs_args *nargs, nfs_fhandle *fh)
+{
+
+	if (fh)
+		kmem_free(fh, sizeof (*fh));
+
+	if (nargs->pathconf) {
+		kmem_free(nargs->pathconf, sizeof (struct pathcnf));
+		nargs->pathconf = NULL;
+	}
+
+	if (nargs->knconf) {
+		if (nargs->knconf->knc_protofmly)
+			kmem_free(nargs->knconf->knc_protofmly,
+				KNC_STRSIZE);
+		if (nargs->knconf->knc_proto)
+			kmem_free(nargs->knconf->knc_proto, KNC_STRSIZE);
+		kmem_free(nargs->knconf, sizeof (*nargs->knconf));
+		nargs->knconf = NULL;
+	}
+
+	if (nargs->fh) {
+		kmem_free(nargs->fh, strlen(nargs->fh) + 1);
+		nargs->fh = NULL;
+	}
+
+	if (nargs->hostname) {
+		kmem_free(nargs->hostname, strlen(nargs->hostname) + 1);
+		nargs->hostname = NULL;
+	}
+
+	if (nargs->addr) {
+		if (nargs->addr->buf) {
+			ASSERT(nargs->addr->len);
+			kmem_free(nargs->addr->buf, nargs->addr->len);
+		}
+		kmem_free(nargs->addr, sizeof (struct netbuf));
+		nargs->addr = NULL;
+	}
+
+	if (nargs->syncaddr) {
+		ASSERT(nargs->syncaddr->len);
+		if (nargs->syncaddr->buf) {
+			ASSERT(nargs->syncaddr->len);
+			kmem_free(nargs->syncaddr->buf, nargs->syncaddr->len);
+		}
+		kmem_free(nargs->syncaddr, sizeof (struct netbuf));
+		nargs->syncaddr = NULL;
+	}
+
+	if (nargs->netname) {
+		kmem_free(nargs->netname, strlen(nargs->netname) + 1);
+		nargs->netname = NULL;
+	}
+
+	if (nargs->nfs_ext_u.nfs_extA.secdata) {
+		sec_clnt_freeinfo(
+			nargs->nfs_ext_u.nfs_extA.secdata);
+		nargs->nfs_ext_u.nfs_extA.secdata = NULL;
+	}
+}
+
+static int
+nfs_copyin(char *data, int datalen, struct nfs_args *nargs, nfs_fhandle *fh)
+{
+
+	int error;
+	size_t nlen;			/* length of netname */
+	size_t hlen;			/* length of hostname */
+	char netname[MAXNETNAMELEN+1];	/* server's netname */
+	struct netbuf addr;		/* server's address */
+	struct netbuf syncaddr;		/* AUTH_DES time sync addr */
+	struct knetconfig *knconf;	/* transport knetconfig structure */
+	struct sec_data *secdata = NULL;	/* security data */
+	STRUCT_DECL(nfs_args, args);		/* nfs mount arguments */
+	STRUCT_DECL(knetconfig, knconf_tmp);
+	STRUCT_DECL(netbuf, addr_tmp);
+	int flags;
+	struct pathcnf	*pc;		/* Pathconf */
+	char *p, *pf;
+	char *userbufptr;
+
+
+	bzero(nargs, sizeof (*nargs));
+
+	STRUCT_INIT(args, get_udatamodel());
+	bzero(STRUCT_BUF(args), SIZEOF_STRUCT(nfs_args, DATAMODEL_NATIVE));
+	if (copyin(data, STRUCT_BUF(args), MIN(datalen,
+		STRUCT_SIZE(args))))
+		return (EFAULT);
+
+	nargs->wsize = STRUCT_FGET(args, wsize);
+	nargs->rsize = STRUCT_FGET(args, rsize);
+	nargs->timeo = STRUCT_FGET(args, timeo);
+	nargs->retrans = STRUCT_FGET(args, retrans);
+	nargs->acregmin = STRUCT_FGET(args, acregmin);
+	nargs->acregmax = STRUCT_FGET(args, acregmax);
+	nargs->acdirmin = STRUCT_FGET(args, acdirmin);
+	nargs->acdirmax = STRUCT_FGET(args, acdirmax);
+
+	flags = STRUCT_FGET(args, flags);
+	nargs->flags = flags;
+
+
+	addr.buf = NULL;
+	syncaddr.buf = NULL;
+
+	/*
+	 * Allocate space for a knetconfig structure and
+	 * its strings and copy in from user-land.
+	 */
+	knconf = kmem_zalloc(sizeof (*knconf), KM_SLEEP);
+	STRUCT_INIT(knconf_tmp, get_udatamodel());
+	if (copyin(STRUCT_FGETP(args, knconf), STRUCT_BUF(knconf_tmp),
+		STRUCT_SIZE(knconf_tmp))) {
+		kmem_free(knconf, sizeof (*knconf));
+		return (EFAULT);
+	}
+
+	knconf->knc_semantics = STRUCT_FGET(knconf_tmp, knc_semantics);
+	knconf->knc_protofmly = STRUCT_FGETP(knconf_tmp, knc_protofmly);
+	knconf->knc_proto = STRUCT_FGETP(knconf_tmp, knc_proto);
+	if (get_udatamodel() != DATAMODEL_LP64) {
+		knconf->knc_rdev = expldev(STRUCT_FGET(knconf_tmp, knc_rdev));
+	} else {
+		knconf->knc_rdev = STRUCT_FGET(knconf_tmp, knc_rdev);
+	}
+
+	pf = kmem_alloc(KNC_STRSIZE, KM_SLEEP);
+	p = kmem_alloc(KNC_STRSIZE, KM_SLEEP);
+	error = copyinstr(knconf->knc_protofmly, pf, KNC_STRSIZE, NULL);
+	if (error) {
+		kmem_free(pf, KNC_STRSIZE);
+		kmem_free(p, KNC_STRSIZE);
+		kmem_free(knconf, sizeof (*knconf));
+		return (error);
+	}
+
+	error = copyinstr(knconf->knc_proto, p, KNC_STRSIZE, NULL);
+	if (error) {
+		kmem_free(pf, KNC_STRSIZE);
+		kmem_free(p, KNC_STRSIZE);
+		kmem_free(knconf, sizeof (*knconf));
+		return (error);
+	}
+
+
+	knconf->knc_protofmly = pf;
+	knconf->knc_proto = p;
+
+	nargs->knconf = knconf;
+
+	/* Copyin pathconf if there is one */
+	if (STRUCT_FGETP(args, pathconf) != NULL) {
+		pc = kmem_alloc(sizeof (*pc), KM_SLEEP);
+		error = pathconf_copyin(STRUCT_BUF(args), pc);
+		nargs->pathconf = pc;
+		if (error)
+			goto errout;
+	}
+
+	/*
+	 * Get server address
+	 */
+	STRUCT_INIT(addr_tmp, get_udatamodel());
+	if (copyin(STRUCT_FGETP(args, addr), STRUCT_BUF(addr_tmp),
+		STRUCT_SIZE(addr_tmp))) {
+		error = EFAULT;
+		goto errout;
+	}
+	nargs->addr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+	userbufptr = STRUCT_FGETP(addr_tmp, buf);
+	addr.len = STRUCT_FGET(addr_tmp, len);
+	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
+	addr.maxlen = addr.len;
+	if (copyin(userbufptr, addr.buf, addr.len)) {
+		kmem_free(addr.buf, addr.len);
+		error = EFAULT;
+		goto errout;
+	}
+	bcopy(&addr, nargs->addr, sizeof (struct netbuf));
+
+	/*
+	 * Get the root fhandle
+	 */
+
+	if (copyin(STRUCT_FGETP(args, fh), &fh->fh_buf, NFS_FHSIZE)) {
+		error = EFAULT;
+		goto errout;
+	}
+	fh->fh_len = NFS_FHSIZE;
+
+	/*
+	 * Get server's hostname
+	 */
+	if (flags & NFSMNT_HOSTNAME) {
+		error = copyinstr(STRUCT_FGETP(args, hostname),
+			netname, sizeof (netname), &hlen);
+		if (error)
+			goto errout;
+		nargs->hostname = kmem_zalloc(hlen, KM_SLEEP);
+		(void) strcpy(nargs->hostname, netname);
+
+	} else {
+		nargs->hostname = NULL;
+	}
+
+
+	/*
+	 * If there are syncaddr and netname data, load them in. This is
+	 * to support data needed for NFSV4 when AUTH_DH is the negotiated
+	 * flavor via SECINFO. (instead of using MOUNT protocol in V3).
+	 */
+	netname[0] = '\0';
+	if (flags & NFSMNT_SECURE) {
+		if (STRUCT_FGETP(args, syncaddr) == NULL) {
+			error = EINVAL;
+			goto errout;
+		}
+		/* get syncaddr */
+		STRUCT_INIT(addr_tmp, get_udatamodel());
+		if (copyin(STRUCT_FGETP(args, syncaddr), STRUCT_BUF(addr_tmp),
+			STRUCT_SIZE(addr_tmp))) {
+			error = EINVAL;
+			goto errout;
+		}
+		userbufptr = STRUCT_FGETP(addr_tmp, buf);
+		syncaddr.len = STRUCT_FGET(addr_tmp, len);
+		syncaddr.buf = kmem_alloc(syncaddr.len, KM_SLEEP);
+		syncaddr.maxlen = syncaddr.len;
+		if (copyin(userbufptr, syncaddr.buf, syncaddr.len)) {
+			kmem_free(syncaddr.buf, syncaddr.len);
+			error = EFAULT;
+			goto errout;
+		}
+
+		nargs->syncaddr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+		bcopy(&syncaddr, nargs->syncaddr, sizeof (struct netbuf));
+
+		ASSERT(STRUCT_FGETP(args, netname));
+		if (copyinstr(STRUCT_FGETP(args, netname), netname,
+			sizeof (netname), &nlen)) {
+			error = EFAULT;
+			goto errout;
+		}
+
+		netname[nlen] = '\0';
+		nargs->netname = kmem_zalloc(nlen, KM_SLEEP);
+		(void) strcpy(nargs->netname, netname);
+	}
+
+	/*
+	 * Get the extention data which has the security data structure.
+	 * This includes data for AUTH_SYS as well.
+	 */
+	if (flags & NFSMNT_NEWARGS) {
+		nargs->nfs_args_ext = STRUCT_FGET(args, nfs_args_ext);
+		if (nargs->nfs_args_ext == NFS_ARGS_EXTA ||
+			nargs->nfs_args_ext == NFS_ARGS_EXTB) {
+			/*
+			 * Indicating the application is using the new
+			 * sec_data structure to pass in the security
+			 * data.
+			 */
+			if (STRUCT_FGETP(args,
+				nfs_ext_u.nfs_extA.secdata) != NULL) {
+				error = sec_clnt_loadinfo(
+					(struct sec_data *)STRUCT_FGETP(args,
+						nfs_ext_u.nfs_extA.secdata),
+						&secdata, get_udatamodel());
+			}
+			nargs->nfs_ext_u.nfs_extA.secdata = secdata;
+		}
+	}
+
+	if (error)
+		goto errout;
+
+	/*
+	 * Failover support:
+	 *
+	 * We may have a linked list of nfs_args structures,
+	 * which means the user is looking for failover.  If
+	 * the mount is either not "read-only" or "soft",
+	 * we want to bail out with EINVAL.
+	 */
+	if (nargs->nfs_args_ext == NFS_ARGS_EXTB)
+		nargs->nfs_ext_u.nfs_extB.next =
+			STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next);
+
+errout:
+	if (error)
+		nfs_free_args(nargs, fh);
+
+	return (error);
+}
+
+
 /*
  * nfs mount vfsop
  * Set up mount info record and attach it to vfs struct.
@@ -205,11 +505,7 @@ nfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	int error;
 	vnode_t *rtvp;			/* the server's root */
 	mntinfo_t *mi;			/* mount info, pointed at by vfs */
-	size_t hlen;			/* length of hostname */
 	size_t nlen;			/* length of netname */
-	char netname[SYS_NMLN];		/* server's netname */
-	struct netbuf addr;		/* server's address */
-	struct netbuf syncaddr;		/* AUTH_DES time sync addr */
 	struct knetconfig *knconf;	/* transport knetconfig structure */
 	struct knetconfig *rdma_knconf;	/* rdma transport structure */
 	rnode_t *rp;
@@ -218,13 +514,11 @@ nfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	struct servinfo *svp_head;	/* first nfs server info */
 	struct servinfo *svp_2ndlast;	/* 2nd last in the server info list */
 	struct sec_data *secdata;	/* security data */
-	STRUCT_DECL(nfs_args, args);	/* nfs mount arguments */
-	STRUCT_DECL(knetconfig, knconf_tmp);
-	STRUCT_DECL(netbuf, addr_tmp);
+	struct nfs_args	*args = NULL;
 	int flags, addr_type;
-	char *p, *pf;
 	zone_t *zone = nfs_zone();
 	zone_t *mntzone = NULL;
+	nfs_fhandle	*fhandle = NULL;
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (error);
@@ -240,28 +534,49 @@ nfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * in a compatible situation.
 	 */
 more:
-	STRUCT_INIT(args, get_udatamodel());
-	bzero(STRUCT_BUF(args), SIZEOF_STRUCT(nfs_args, DATAMODEL_NATIVE));
-	if (copyin(data, STRUCT_BUF(args), MIN(uap->datalen,
-	    STRUCT_SIZE(args))))
-		return (EFAULT);
 
-	flags = STRUCT_FGET(args, flags);
+	if (!(uap->flags & MS_SYSSPACE)) {
+		if (args == NULL)
+			args = kmem_alloc(sizeof (struct nfs_args), KM_SLEEP);
+		else {
+			nfs_free_args(args, fhandle);
+			fhandle = NULL;
+		}
+		if (fhandle == NULL)
+			fhandle = kmem_zalloc(sizeof (nfs_fhandle), KM_SLEEP);
+		error = nfs_copyin(data, uap->datalen, args, fhandle);
+		if (error)  {
+			if (args)
+				kmem_free(args, sizeof (*args));
+			return (error);
+		}
+	} else {
+		args = (struct nfs_args *)data;
+		fhandle = (nfs_fhandle *)args->fh;
+	}
+
+
+	flags = args->flags;
 
 	if (uap->flags & MS_REMOUNT) {
 		size_t n;
 		char name[FSTYPSZ];
 
-		if (uap->flags & MS_SYSSPACE)
+
+		if (uap->flags & MS_SYSSPACE) {
 			error = copystr(uap->fstype, name, FSTYPSZ, &n);
-		else
+		} else {
+			nfs_free_args(args, fhandle);
+			kmem_free(args, sizeof (*args));
 			error = copyinstr(uap->fstype, name, FSTYPSZ, &n);
+		}
 
 		if (error) {
 			if (error == ENAMETOOLONG)
 				return (EINVAL);
 			return (error);
 		}
+
 
 		/*
 		 * This check is to ensure that the request is a
@@ -290,14 +605,19 @@ more:
 			if (old_mi_llock != new_mi_llock)
 				return (EBUSY);
 		}
-		return (pathconf_get((struct mntinfo *)vfsp->vfs_data,
-		    get_udatamodel(), STRUCT_BUF(args)));
+		error = pathconf_get((struct mntinfo *)vfsp->vfs_data, args);
+
+		return (error);
 	}
 
 	mutex_enter(&mvp->v_lock);
 	if (!(uap->flags & MS_OVERLAY) &&
 	    (mvp->v_count != 1 || (mvp->v_flag & VROOT))) {
 		mutex_exit(&mvp->v_lock);
+		if (!(uap->flags) & MS_SYSSPACE) {
+			nfs_free_args(args, fhandle);
+			kmem_free(args, sizeof (*args));
+		}
 		return (EBUSY);
 	}
 	mutex_exit(&mvp->v_lock);
@@ -305,15 +625,28 @@ more:
 	/* make sure things are zeroed for errout: */
 	rtvp = NULL;
 	mi = NULL;
-	addr.buf = NULL;
-	syncaddr.buf = NULL;
 	secdata = NULL;
 
 	/*
 	 * A valid knetconfig structure is required.
 	 */
-	if (!(flags & NFSMNT_KNCONF))
+	if (!(flags & NFSMNT_KNCONF)) {
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs_free_args(args, fhandle);
+			kmem_free(args, sizeof (*args));
+		}
 		return (EINVAL);
+	}
+
+	if ((strlen(args->knconf->knc_protofmly) >= KNC_STRSIZE) ||
+		(strlen(args->knconf->knc_proto) >= KNC_STRSIZE)) {
+		if (!(uap->flags & MS_SYSSPACE)) {
+			nfs_free_args(args, fhandle);
+			kmem_free(args, sizeof (*args));
+		}
+		return (EINVAL);
+	}
+
 
 	/*
 	 * Allocate a servinfo struct.
@@ -331,94 +664,47 @@ more:
 	svp_tail = svp;
 
 	/*
-	 * Allocate space for a knetconfig structure and
-	 * its strings and copy in from user-land.
+	 * Get knetconfig and server address
 	 */
-	knconf = kmem_zalloc(sizeof (*knconf), KM_SLEEP);
-	svp->sv_knconf = knconf;
-	STRUCT_INIT(knconf_tmp, get_udatamodel());
-	if (copyin(STRUCT_FGETP(args, knconf), STRUCT_BUF(knconf_tmp),
-	    STRUCT_SIZE(knconf_tmp))) {
-		sv_free(svp_head);
-		return (EFAULT);
-	}
+	svp->sv_knconf = args->knconf;
+	args->knconf = NULL;
 
-	knconf->knc_semantics = STRUCT_FGET(knconf_tmp, knc_semantics);
-	knconf->knc_protofmly = STRUCT_FGETP(knconf_tmp, knc_protofmly);
-	knconf->knc_proto = STRUCT_FGETP(knconf_tmp, knc_proto);
-	if (get_udatamodel() != DATAMODEL_LP64) {
-		knconf->knc_rdev = expldev(STRUCT_FGET(knconf_tmp, knc_rdev));
-	} else {
-		knconf->knc_rdev = STRUCT_FGET(knconf_tmp, knc_rdev);
-	}
-
-	pf = kmem_alloc(KNC_STRSIZE, KM_SLEEP);
-	p = kmem_alloc(KNC_STRSIZE, KM_SLEEP);
-	error = copyinstr(knconf->knc_protofmly, pf, KNC_STRSIZE, NULL);
-	if (error) {
-		kmem_free(pf, KNC_STRSIZE);
-		kmem_free(p, KNC_STRSIZE);
-		sv_free(svp_head);
-		return (error);
-	}
-	error = copyinstr(knconf->knc_proto, p, KNC_STRSIZE, NULL);
-	if (error) {
-		kmem_free(pf, KNC_STRSIZE);
-		kmem_free(p, KNC_STRSIZE);
-		sv_free(svp_head);
-		return (error);
-	}
-	knconf->knc_protofmly = pf;
-	knconf->knc_proto = p;
-
-	/*
-	 * Get server address
-	 */
-	STRUCT_INIT(addr_tmp, get_udatamodel());
-	if (copyin(STRUCT_FGETP(args, addr), STRUCT_BUF(addr_tmp),
-	    STRUCT_SIZE(addr_tmp))) {
-		addr.buf = NULL;
-		error = EFAULT;
-	} else {
-		char *userbufptr;
-
-		userbufptr = addr.buf = STRUCT_FGETP(addr_tmp, buf);
-		addr.len = STRUCT_FGET(addr_tmp, len);
-		addr.buf = kmem_alloc(addr.len, KM_SLEEP);
-		addr.maxlen = addr.len;
-		if (copyin(userbufptr, addr.buf, addr.len))
-			error = EFAULT;
-	}
-	svp->sv_addr = addr;
-	if (error)
+	if (args->addr == NULL || args->addr->buf == NULL) {
+		error = EINVAL;
 		goto errout;
+	}
+
+	svp->sv_addr.maxlen = args->addr->maxlen;
+	svp->sv_addr.len = args->addr->len;
+	svp->sv_addr.buf = args->addr->buf;
+	args->addr->buf = NULL;
 
 	/*
 	 * Get the root fhandle
 	 */
-	if (copyin(STRUCT_FGETP(args, fh), &(svp->sv_fhandle.fh_buf),
-	    NFS_FHSIZE)) {
-		error = EFAULT;
-		goto errout;
-	}
-	svp->sv_fhandle.fh_len = NFS_FHSIZE;
+	ASSERT(fhandle);
+
+	bcopy(&fhandle->fh_buf, &svp->sv_fhandle.fh_buf, fhandle->fh_len);
+	svp->sv_fhandle.fh_len = fhandle->fh_len;
 
 	/*
 	 * Get server's hostname
 	 */
 	if (flags & NFSMNT_HOSTNAME) {
-		error = copyinstr(STRUCT_FGETP(args, hostname),
-		    netname, sizeof (netname), &hlen);
-		if (error)
+		if (args->hostname == NULL) {
+			error = EINVAL;
 			goto errout;
+		}
+		svp->sv_hostnamelen = strlen(args->hostname) + 1;
+		svp->sv_hostname = args->hostname;
+		args->hostname = NULL;
 	} else {
 		char *p = "unknown-host";
-		hlen = strlen(p) + 1;
-		(void) strcpy(netname, p);
+		svp->sv_hostnamelen = strlen(p) + 1;
+		svp->sv_hostname = kmem_zalloc(svp->sv_hostnamelen, KM_SLEEP);
+		(void) strcpy(svp->sv_hostname, p);
 	}
-	svp->sv_hostnamelen = hlen;
-	svp->sv_hostname = kmem_alloc(svp->sv_hostnamelen, KM_SLEEP);
-	(void) strcpy(svp->sv_hostname, netname);
+
 
 	/*
 	 * RDMA MOUNT SUPPORT FOR NFS v2:
@@ -462,14 +748,14 @@ more:
 				 * Check if more servers are specified;
 				 * Failover case, otherwise bail out of mount.
 				 */
-				if (STRUCT_FGET(args, nfs_args_ext) ==
-				    NFS_ARGS_EXTB && STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extB.next) != NULL) {
+				if (args->nfs_args_ext ==
+				    NFS_ARGS_EXTB &&
+					args->nfs_ext_u.nfs_extB.next
+					!= NULL) {
+					data = (char *)
+						args->nfs_ext_u.nfs_extB.next;
 					if (uap->flags & MS_RDONLY &&
 					    !(flags & NFSMNT_SOFT)) {
-						data = (char *)
-						    STRUCT_FGETP(args,
-						nfs_ext_u.nfs_extB.next);
 						if (svp_head->sv_next == NULL) {
 							svp_tail = NULL;
 							svp_2ndlast = NULL;
@@ -521,7 +807,7 @@ more:
 	 * Get the extention data which has the new security data structure.
 	 */
 	if (flags & NFSMNT_NEWARGS) {
-		switch (STRUCT_FGET(args, nfs_args_ext)) {
+		switch (args->nfs_args_ext) {
 		case NFS_ARGS_EXTA:
 		case NFS_ARGS_EXTB:
 			/*
@@ -529,15 +815,28 @@ more:
 			 * sec_data structure to pass in the security
 			 * data.
 			 */
-			if (STRUCT_FGETP(args,
-			    nfs_ext_u.nfs_extA.secdata) == NULL) {
+			secdata = args->nfs_ext_u.nfs_extA.secdata;
+			if (secdata == NULL) {
 				error = EINVAL;
 			} else {
-				error = sec_clnt_loadinfo(
-				    (struct sec_data *)STRUCT_FGETP(args,
-					nfs_ext_u.nfs_extA.secdata),
-				    &secdata, get_udatamodel());
+				/*
+				 * Need to validate the flavor here if
+				 * sysspace, userspace was already
+				 * validate from the nfs_copyin function.
+				 */
+				switch (secdata->rpcflavor) {
+					case AUTH_NONE:
+					case AUTH_UNIX:
+					case AUTH_LOOPBACK:
+					case AUTH_DES:
+					case RPCSEC_GSS:
+						break;
+					default:
+						error = EINVAL;
+						goto errout;
+				}
 			}
+			args->nfs_ext_u.nfs_extA.secdata = NULL;
 			break;
 
 		default:
@@ -549,51 +848,23 @@ more:
 		 * Keep this for backward compatibility to support
 		 * NFSMNT_SECURE/NFSMNT_RPCTIMESYNC flags.
 		 */
-		if (STRUCT_FGETP(args, syncaddr) == NULL) {
+		if (args->syncaddr == NULL || args->syncaddr->buf == NULL) {
 			error = EINVAL;
-		} else {
-			/*
-			 * get time sync address.
-			 */
-			if (copyin(STRUCT_FGETP(args, syncaddr), &addr_tmp,
-			    STRUCT_SIZE(addr_tmp))) {
-				syncaddr.buf = NULL;
-				error = EFAULT;
-			} else {
-				char *userbufptr;
+			goto errout;
+		}
 
-				userbufptr = syncaddr.buf =
-				    STRUCT_FGETP(addr_tmp, buf);
-				syncaddr.len =
-				    STRUCT_FGET(addr_tmp, len);
-				syncaddr.buf = kmem_alloc(syncaddr.len,
-				    KM_SLEEP);
-				syncaddr.maxlen = syncaddr.len;
-
-				if (copyin(userbufptr, syncaddr.buf,
-				    syncaddr.len))
-					error = EFAULT;
-			}
-
-			/*
-			 * get server's netname
-			 */
-			if (!error) {
-				error = copyinstr(STRUCT_FGETP(args, netname),
-				    netname, sizeof (netname), &nlen);
-				netname[nlen] = '\0';
-			}
-
-			if (error && syncaddr.buf != NULL) {
-				kmem_free(syncaddr.buf, syncaddr.len);
-				syncaddr.buf = NULL;
-			}
+		/*
+		 * get time sync address.
+		 */
+		if (args->syncaddr == NULL) {
+			error = EFAULT;
+			goto errout;
 		}
 
 		/*
 		 * Move security related data to the sec_data structure.
 		 */
-		if (!error) {
+		{
 			dh_k4_clntdata_t *data;
 			char *pf, *p;
 
@@ -601,7 +872,9 @@ more:
 			if (flags & NFSMNT_RPCTIMESYNC)
 				secdata->flags |= AUTH_F_RPCTIMESYNC;
 			data = kmem_alloc(sizeof (*data), KM_SLEEP);
-			data->syncaddr = syncaddr;
+			bcopy(args->syncaddr, &data->syncaddr,
+				sizeof (*args->syncaddr));
+
 
 			/*
 			 * duplicate the knconf information for the
@@ -617,9 +890,10 @@ more:
 			data->knconf->knc_proto = p;
 
 			/* move server netname to the sec_data structure */
+			nlen = strlen(args->hostname) + 1;
 			if (nlen != 0) {
 				data->netname = kmem_alloc(nlen, KM_SLEEP);
-				bcopy(netname, data->netname, nlen);
+				bcopy(args->hostname, data->netname, nlen);
 				data->netnamelen = (int)nlen;
 			}
 			secdata->secmod = secdata->rpcflavor = AUTH_DES;
@@ -631,8 +905,6 @@ more:
 		secdata->data = NULL;
 	}
 	svp->sv_secdata = secdata;
-	if (error)
-		goto errout;
 
 	/*
 	 * See bug 1180236.
@@ -658,11 +930,10 @@ more:
 	 * the mount is either not "read-only" or "soft",
 	 * we want to bail out with EINVAL.
 	 */
-	if (STRUCT_FGET(args, nfs_args_ext) == NFS_ARGS_EXTB &&
-	    STRUCT_FGETP(args, nfs_ext_u.nfs_extB.next) != NULL) {
+	if (args->nfs_args_ext == NFS_ARGS_EXTB &&
+	    args->nfs_ext_u.nfs_extB.next != NULL) {
 		if (uap->flags & MS_RDONLY && !(flags & NFSMNT_SOFT)) {
-			data = (char *)STRUCT_FGETP(args,
-			    nfs_ext_u.nfs_extB.next);
+			data = (char *)args->nfs_ext_u.nfs_extB.next;
 			goto more;
 		}
 		error = EINVAL;
@@ -721,10 +992,10 @@ proceed:
 	if (svp_head->sv_next)
 		mi->mi_flags |= MI_LLOCK;
 
-	error = nfs_setopts(rtvp, get_udatamodel(), STRUCT_BUF(args));
+	error = nfs_setopts(rtvp, DATAMODEL_NATIVE, args);
 	if (!error) {
 		/* static pathconf kludge */
-		error = pathconf_get(mi, get_udatamodel(), STRUCT_BUF(args));
+		error = pathconf_get(mi, args);
 	}
 
 errout:
@@ -750,6 +1021,11 @@ errout:
 		}
 	}
 
+	if (!(uap->flags & MS_SYSSPACE) && args) {
+		nfs_free_args(args, fhandle);
+		kmem_free(args, sizeof (*args));
+	}
+
 	if (rtvp != NULL)
 		VN_RELE(rtvp);
 
@@ -768,25 +1044,17 @@ errout:
 static struct pathcnf *allpc = NULL;
 
 static int
-pathconf_get(struct mntinfo *mi, model_t model, struct nfs_args *args)
+pathconf_copyin(struct nfs_args *args, struct pathcnf *pc)
 {
-	struct pathcnf *p;
-	struct pathcnf pc;
 	STRUCT_DECL(pathcnf, pc_tmp);
 	STRUCT_HANDLE(nfs_args, ap);
 	int i;
+	model_t	model;
 
-#ifdef lint
-	model = model;
-#endif
-
+	model = get_udatamodel();
 	STRUCT_INIT(pc_tmp, model);
 	STRUCT_SET_HANDLE(ap, model, args);
 
-	if (mi->mi_pathconf != NULL) {
-		pathconf_rele(mi);
-		mi->mi_pathconf = NULL;
-	}
 	if ((STRUCT_FGET(ap, flags) & NFSMNT_POSIX) &&
 	    STRUCT_FGETP(ap, pathconf) != NULL) {
 		if (copyin(STRUCT_FGETP(ap, pathconf), STRUCT_BUF(pc_tmp),
@@ -795,19 +1063,38 @@ pathconf_get(struct mntinfo *mi, model_t model, struct nfs_args *args)
 		if (_PC_ISSET(_PC_ERROR, STRUCT_FGET(pc_tmp, pc_mask)))
 			return (EINVAL);
 
-		pc.pc_link_max = STRUCT_FGET(pc_tmp, pc_link_max);
-		pc.pc_max_canon = STRUCT_FGET(pc_tmp, pc_max_canon);
-		pc.pc_max_input = STRUCT_FGET(pc_tmp, pc_max_input);
-		pc.pc_name_max = STRUCT_FGET(pc_tmp, pc_name_max);
-		pc.pc_path_max = STRUCT_FGET(pc_tmp, pc_path_max);
-		pc.pc_pipe_buf = STRUCT_FGET(pc_tmp, pc_pipe_buf);
-		pc.pc_vdisable = STRUCT_FGET(pc_tmp, pc_vdisable);
-		pc.pc_xxx = STRUCT_FGET(pc_tmp, pc_xxx);
+		pc->pc_link_max = STRUCT_FGET(pc_tmp, pc_link_max);
+		pc->pc_max_canon = STRUCT_FGET(pc_tmp, pc_max_canon);
+		pc->pc_max_input = STRUCT_FGET(pc_tmp, pc_max_input);
+		pc->pc_name_max = STRUCT_FGET(pc_tmp, pc_name_max);
+		pc->pc_path_max = STRUCT_FGET(pc_tmp, pc_path_max);
+		pc->pc_pipe_buf = STRUCT_FGET(pc_tmp, pc_pipe_buf);
+		pc->pc_vdisable = STRUCT_FGET(pc_tmp, pc_vdisable);
+		pc->pc_xxx = STRUCT_FGET(pc_tmp, pc_xxx);
 		for (i = 0; i < _PC_N; i++)
-			pc.pc_mask[i] = STRUCT_FGET(pc_tmp, pc_mask[i]);
+			pc->pc_mask[i] = STRUCT_FGET(pc_tmp, pc_mask[i]);
+	}
+	return (0);
+}
+
+static int
+pathconf_get(struct mntinfo *mi, struct nfs_args *args)
+{
+	struct pathcnf *p, *pc;
+
+	pc = args->pathconf;
+	if (mi->mi_pathconf != NULL) {
+		pathconf_rele(mi);
+		mi->mi_pathconf = NULL;
+	}
+	if (args->flags & NFSMNT_POSIX &&
+		args->pathconf != NULL) {
+
+		if (_PC_ISSET(_PC_ERROR, pc->pc_mask))
+			return (EINVAL);
 
 		for (p = allpc; p != NULL; p = p->pc_next) {
-			if (PCCMP(p, &pc) == 0)
+			if (PCCMP(p, pc) == 0)
 				break;
 		}
 		if (p != NULL) {
@@ -815,7 +1102,7 @@ pathconf_get(struct mntinfo *mi, model_t model, struct nfs_args *args)
 			p->pc_refcnt++;
 		} else {
 			p = kmem_alloc(sizeof (*p), KM_SLEEP);
-			*p = pc;
+			bcopy(pc, p, sizeof (struct pathcnf));
 			p->pc_next = allpc;
 			p->pc_refcnt = 1;
 			allpc = mi->mi_pathconf = p;

@@ -47,7 +47,6 @@
 #include <rpc/clnt.h>
 #include <fs/fs_subr.h>
 #include <sys/fs/autofs.h>
-#include <rpcsvc/autofs_prot.h>
 #include <sys/modctl.h>
 #include <sys/mntent.h>
 #include <sys/policy.h>
@@ -215,7 +214,7 @@ autofs_zone_destructor(zoneid_t zoneid, void *arg)
  * The current zone is implied as the zone of interest, since we will be
  * calling zthread_create() which must be called from the correct zone.
  */
-static struct autofs_globals *
+struct autofs_globals *
 autofs_zone_init(void)
 {
 	char rootname[sizeof ("root_fnnode_zone_") + ZONEID_WIDTH];
@@ -237,6 +236,8 @@ autofs_zone_init(void)
 	mutex_init(&fngp->fng_unmount_threads_lock, NULL, MUTEX_DEFAULT,
 	    NULL);
 	fngp->fng_unmount_threads = 0;
+
+	mutex_init(&fngp->fng_autofs_daemon_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
 	 * Start the unmounter thread for this zone.
@@ -350,14 +351,14 @@ auto_mount(vfs_t *vfsp, vnode_t *vp, struct mounta *uap, cred_t *cr)
 {
 	int error;
 	size_t len = 0;
-	struct autofs_args args;
+	autofs_args args;
 	fninfo_t *fnip = NULL;
 	vnode_t *rootvp = NULL;
 	fnnode_t *rootfnp = NULL;
 	char *data = uap->dataptr;
 	char datalen = uap->datalen;
 	dev_t autofs_dev;
-	char strbuff[MAXPATHLEN+1];
+	char strbuff[MAXPATHLEN + 1];
 	vnode_t *kvp;
 	struct autofs_globals *fngp;
 	zone_t *zone = curproc->p_zone;

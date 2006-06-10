@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
  * CDDL HEADER END
  */
 /*
- *	autod_xdr.c
+ * autod_xdr.c
  *
- *	Copyright 1999, 2002 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,7 +76,7 @@ xdr_autofs_netbuf(xdrs, objp)
 		return (FALSE);
 	}
 	dummy = xdr_bytes(xdrs, (char **)&(objp->buf),
-			(u_int *)&(objp->len), objp->maxlen);
+			(uint_t *)&(objp->len), objp->maxlen);
 	return (dummy);
 }
 
@@ -117,7 +116,7 @@ xdr_mounta(register XDR *xdrs, struct mounta *objp)
 	if (!xdr_string(xdrs, &objp->fstype, AUTOFS_MAXCOMPONENTLEN))
 		return (FALSE);
 	if (!xdr_pointer(xdrs, (char **)&objp->dataptr, sizeof (autofs_args),
-	    (xdrproc_t) xdr_autofs_args))
+	    (xdrproc_t)xdr_autofs_args))
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->datalen))
 		return (FALSE);
@@ -152,7 +151,7 @@ xdr_action_list(register XDR *xdrs, action_list *objp)
 	if (!xdr_action_list_entry(xdrs, &objp->action))
 		return (FALSE);
 	if (!xdr_pointer(xdrs, (char **)&objp->next, sizeof (action_list),
-			(xdrproc_t) xdr_action_list))
+			(xdrproc_t)xdr_action_list))
 		return (FALSE);
 	return (TRUE);
 }
@@ -171,7 +170,7 @@ xdr_umntrequest(register XDR *xdrs, umntrequest *objp)
 	if (!xdr_string(xdrs, &objp->mntopts, AUTOFS_MAXOPTSLEN))
 		return (FALSE);
 	if (!xdr_pointer(xdrs, (char **)&objp->next, sizeof (umntrequest),
-			(xdrproc_t) xdr_umntrequest))
+			(xdrproc_t)xdr_umntrequest))
 		return (FALSE);
 	return (TRUE);
 }
@@ -225,7 +224,7 @@ xdr_mount_result_type(xdrs, objp)
 	case AUTOFS_ACTION:
 		if (!xdr_pointer(xdrs,
 		    (char **)&objp->mount_result_type_u.list,
-		    sizeof (action_list), (xdrproc_t) xdr_action_list))
+		    sizeof (action_list), (xdrproc_t)xdr_action_list))
 			return (FALSE);
 		break;
 	case AUTOFS_DONE:
@@ -344,7 +343,7 @@ xdr_autofs_putrddirres(xdrs, rddir, reqsize)
 	struct dirent64 *dp;
 	char *name;
 	int size;
-	u_int namlen;
+	uint_t namlen;
 	bool_t true = TRUE;
 	bool_t false = FALSE;
 	int entrysz;
@@ -365,8 +364,8 @@ xdr_autofs_putrddirres(xdrs, rddir, reqsize)
 		}
 		name = dp->d_name;
 		namlen = strlen(name);
-		ino = (uint_t) dp->d_ino;
-		off = (uint_t) dp->d_off;
+		ino = (uint_t)dp->d_ino;
+		off = (uint_t)dp->d_off;
 		entrysz = (1 + 1 + 1 + 1) * BYTES_PER_XDR_UNIT +
 		    roundup(namlen, BYTES_PER_XDR_UNIT);
 		tofit = entrysz + 2 * BYTES_PER_XDR_UNIT;
@@ -404,7 +403,7 @@ xdr_autofs_getrddirres(xdrs, rddir)
 	struct autofsrddir *rddir;
 {
 	struct dirent64 *dp;
-	uint namlen;
+	uint_t namlen;
 	int size;
 	bool_t valid;
 	int offset = -1;
