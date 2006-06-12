@@ -23,10 +23,6 @@
  * Use is subject to license terms.
  */
 
-/*
- * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>

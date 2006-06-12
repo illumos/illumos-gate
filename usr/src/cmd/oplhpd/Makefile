@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
-#
 
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
