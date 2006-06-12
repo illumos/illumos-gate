@@ -32,7 +32,7 @@
 
 #include "rmformat.h"
 #include <sys/smedia.h>
-#include <priv.h>
+#include <priv_utils.h>
 
 extern int32_t D_flag;
 extern int32_t e_flag;

@@ -46,7 +46,7 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <sys/dkio.h>
-#include <priv.h>
+#include <priv_utils.h>
 #include "rmformat.h"
 
 extern void my_perror(char *err_string);

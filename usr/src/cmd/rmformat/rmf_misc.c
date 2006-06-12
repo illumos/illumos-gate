@@ -44,7 +44,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <dirent.h>
-#include <priv.h>
+#include <priv_utils.h>
 #include <stdarg.h>
 #include "rmformat.h"
 /*
