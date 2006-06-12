@@ -24313,10 +24313,11 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	 * If status was not a check condition but a reservation or busy status
 	 * then the new state is DKIO_NONE
 	 */
-	skey = scsi_sense_key(sensep);
-	asc = scsi_sense_asc(sensep);
-	ascq = scsi_sense_ascq(sensep);
 	if (sensep != NULL) {
+		skey = scsi_sense_key(sensep);
+		asc = scsi_sense_asc(sensep);
+		ascq = scsi_sense_ascq(sensep);
+
 		SD_INFO(SD_LOG_COMMON, un,
 		    "sd_media_watch_cb: sense KEY=%x, ASC=%x, ASCQ=%x\n",
 		    skey, asc, ascq);
