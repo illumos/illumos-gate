@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,7 +187,7 @@ setup_door(void)
 	 * Create the door
 	 */
 	door_id = door_create(event_handler, PICLEVENT_DOOR_COOKIE,
-	    DOOR_UNREF | DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 
 	if (door_id < 0)
 		return (-1);
