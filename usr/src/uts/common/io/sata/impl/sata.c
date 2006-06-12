@@ -2678,10 +2678,8 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			bioerror(bp, EINVAL);
 			break;
 		}
-		if (new_pkt == TRUE) {
-			sata_pkt_free(spx);
+		if (new_pkt == TRUE)
 			scsi_hba_pkt_free(ap, pkt);
-		}
 		return (NULL);
 	}
 	/* Set number of bytes that are not yet accounted for */
@@ -8326,6 +8324,10 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 		cmn_err(CE_CONT, "?\tSATA1 & SATA2 compatible\n");
 	else if (sdinfo->satadrv_features_support & SATA_DEV_F_SATA1)
 		cmn_err(CE_CONT, "?\tSATA1 compatible\n");
+	if (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ) {
+		cmn_err(CE_CONT, "?\tQueue depth %d\n",
+			sdinfo->satadrv_queue_depth);
+	}
 
 #ifdef __i386
 	(void) sprintf(msg_buf, "\tcapacity = %llu sectors\n",
