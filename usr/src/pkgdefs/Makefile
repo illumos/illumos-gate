@@ -362,6 +362,7 @@ COMMON_XMODS= \
 	SUNWintgige \
 	SUNWkdcr \
 	SUNWkdcu \
+	SUNWopenssl-man \
 	SUNWopenssl-libraries \
 	SUNWopenssl-include \
 	SUNWopenssl-commands \
