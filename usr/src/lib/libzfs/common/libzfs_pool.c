@@ -700,6 +700,10 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			(void) zfs_error(hdl, EZFS_BADVERSION, desc);
 			break;
 
+		case EINVAL:
+			(void) zfs_error(hdl, EZFS_INVALCONFIG, desc);
+			break;
+
 		default:
 			(void) zpool_standard_error(hdl, errno, desc);
 		}

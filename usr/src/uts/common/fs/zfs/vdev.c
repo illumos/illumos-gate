@@ -933,7 +933,12 @@ vdev_validate(vdev_t *vd)
 		if (vdev_validate(vd->vdev_child[c]) != 0)
 			return (-1);
 
-	if (vd->vdev_ops->vdev_op_leaf) {
+	/*
+	 * If the device has already failed, or was marked offline, don't do
+	 * any further validation.  Otherwise, label I/O will fail and we will
+	 * overwrite the previous state.
+	 */
+	if (vd->vdev_ops->vdev_op_leaf && !vdev_is_dead(vd)) {
 
 		if ((label = vdev_label_read_config(vd)) == NULL) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,

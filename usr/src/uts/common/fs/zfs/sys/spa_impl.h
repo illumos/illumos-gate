@@ -82,6 +82,7 @@ struct spa {
 	objset_t	*spa_meta_objset;	/* copy of dp->dp_meta_objset */
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
 	vdev_t		*spa_root_vdev;		/* top-level vdev container */
+	uint64_t	spa_load_guid;		/* initial guid for spa_load */
 	list_t		spa_dirty_list;		/* vdevs with dirty labels */
 	uint64_t	spa_spares_object;	/* MOS object for spare list */
 	nvlist_t	*spa_sparelist;		/* cached spare config */

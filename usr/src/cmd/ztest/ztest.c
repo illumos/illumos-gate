@@ -936,12 +936,12 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	 *
 	 * If newvd is too small, it should fail with EOVERFLOW.
 	 */
-	if (pvd->vdev_ops != &vdev_mirror_ops &&
+	if (newvd != NULL)
+		expected_error = EBUSY;
+	else if (pvd->vdev_ops != &vdev_mirror_ops &&
 	    pvd->vdev_ops != &vdev_root_ops &&
 	    (!replacing || pvd->vdev_ops == &vdev_replacing_ops))
 		expected_error = ENOTSUP;
-	else if (newvd != NULL)
-		expected_error = EBUSY;
 	else if (newsize < oldsize)
 		expected_error = EOVERFLOW;
 	else if (ashift > oldvd->vdev_top->vdev_ashift)

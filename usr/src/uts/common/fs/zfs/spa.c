@@ -414,6 +414,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
+	spa->spa_load_guid = pool_guid;
+
 	/*
 	 * Parse the configuration into a vdev tree.  We explicitly set the
 	 * value that will be returned by spa_version() since parsing the

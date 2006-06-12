@@ -837,7 +837,16 @@ spa_name(spa_t *spa)
 uint64_t
 spa_guid(spa_t *spa)
 {
-	return (spa->spa_root_vdev->vdev_guid);
+	/*
+	 * If we fail to parse the config during spa_load(), we can go through
+	 * the error path (which posts an ereport) and end up here with no root
+	 * vdev.  We stash the original pool guid in 'spa_load_guid' to handle
+	 * this case.
+	 */
+	if (spa->spa_root_vdev != NULL)
+		return (spa->spa_root_vdev->vdev_guid);
+	else
+		return (spa->spa_load_guid);
 }
 
 uint64_t
