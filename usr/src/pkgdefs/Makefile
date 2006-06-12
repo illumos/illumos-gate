@@ -102,8 +102,8 @@ i386_SUBDIRS= \
 	SUNWaac \
 	SUNWad810 \
 	SUNWadixp \
-        SUNWagp \
-        SUNWagph \
+	SUNWagp \
+	SUNWagph \
 	SUNWamr \
 	SUNWatheros \
 	SUNWcakr.i \
