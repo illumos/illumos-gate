@@ -99,7 +99,8 @@ $(MSGFILES):=	OWNER = root
 $(MSGFILES):=	GROUP = lp
 $(MSGFILES):=	FILEMODE = 644
 
-CLEANFILES=	*.class pmHelpResources.java pmCopyright.java
+CLEANFILES=	*.class pmHelpResources.java pmCopyright.java \
+	    	helptools/*.class helptools/parsehelp
 CLOBBERFILES=
 
 #
@@ -144,5 +145,4 @@ jstyle:
 lint:
 clean:
 	$(RM) $(CLEANFILES)
-	cd helptools; $(MAKE) clean
 clobber: clean
