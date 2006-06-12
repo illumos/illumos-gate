@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,24 +70,6 @@ dtrace_toxic_ranges(void (*func)(uintptr_t base, uintptr_t limit))
 
 	if (hole_end > hole_start)
 		(*func)((uintptr_t)hole_start, (uintptr_t)hole_end);
-}
-
-int (*dtrace_fasttrap_probe_ptr)(struct regs *);
-
-void
-dtrace_fasttrap_probe(struct regs *rp)
-{
-	krwlock_t *rwp = &CPU->cpu_ft_lock;
-
-	rw_enter(rwp, RW_READER);
-	if (dtrace_fasttrap_probe_ptr == NULL) {
-		rw_exit(rwp);
-		rp->r_pc = rp->r_npc;
-		rp->r_npc = rp->r_pc + 4;
-	} else {
-		(void) (*dtrace_fasttrap_probe_ptr)(rp);
-		rw_exit(rwp);
-	}
 }
 
 int (*dtrace_pid_probe_ptr)(struct regs *);

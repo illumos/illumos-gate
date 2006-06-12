@@ -551,7 +551,7 @@ extern void _start(), cmnint();
 extern void achktrap(), mcetrap();
 extern void xmtrap();
 extern void fasttrap();
-extern void dtrace_fasttrap(), dtrace_ret();
+extern void dtrace_ret();
 
 #if !defined(__amd64)
 extern void pentium_pftrap();

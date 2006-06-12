@@ -83,6 +83,7 @@ typedef struct fasttrap_provider {
 	uint_t ftp_marked;			/* mark for possible removal */
 	uint_t ftp_retired;			/* mark when retired */
 	kmutex_t ftp_mtx;			/* provider lock */
+	kmutex_t ftp_cmtx;			/* lock on creating probes */
 	uint64_t ftp_rcount;			/* enabled probes ref count */
 	uint64_t ftp_ccount;			/* consumers creating probes */
 	uint64_t ftp_mcount;			/* meta provider count */
@@ -176,11 +177,10 @@ extern int fasttrap_tracepoint_init(proc_t *, fasttrap_tracepoint_t *,
 extern int fasttrap_tracepoint_install(proc_t *, fasttrap_tracepoint_t *);
 extern int fasttrap_tracepoint_remove(proc_t *, fasttrap_tracepoint_t *);
 
-extern int fasttrap_probe(struct regs *);
 extern int fasttrap_pid_probe(struct regs *);
 extern int fasttrap_return_probe(struct regs *);
 
-extern uint64_t fasttrap_getarg(void *, dtrace_id_t, void *, int, int);
+extern uint64_t fasttrap_pid_getarg(void *, dtrace_id_t, void *, int, int);
 extern uint64_t fasttrap_usdt_getarg(void *, dtrace_id_t, void *, int, int);
 
 #ifdef	__cplusplus

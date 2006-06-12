@@ -428,6 +428,7 @@ static intptr_t dtrace_buffer_reserve(dtrace_buffer_t *, size_t, size_t,
 static int dtrace_state_option(dtrace_state_t *, dtrace_optid_t,
     dtrace_optval_t);
 static int dtrace_ecb_create_enable(dtrace_probe_t *, void *);
+static void dtrace_helper_provider_destroy(dtrace_helper_provider_t *);
 
 /*
  * DTrace Probe Context Functions
@@ -12334,7 +12335,10 @@ dtrace_helper_destroygen(int gen)
 		dtrace_helper_provider_t *prov;
 
 		/*
-		 * Look for a helper provider with the right generation.
+		 * Look for a helper provider with the right generation. We
+		 * have to start back at the beginning of the list each time
+		 * because we drop dtrace_lock. It's unlikely that we'll make
+		 * more than two passes.
 		 */
 		for (i = 0; i < help->dthps_nprovs; i++) {
 			prov = help->dthps_provs[i];
@@ -12368,6 +12372,8 @@ dtrace_helper_destroygen(int gen)
 			    p->p_pid);
 		}
 		mutex_exit(&dtrace_meta_lock);
+
+		dtrace_helper_provider_destroy(prov);
 
 		mutex_enter(&dtrace_lock);
 	}

@@ -215,10 +215,6 @@ function	dtrace_printf_format
 version		SUNWprivate_1.1
 end
 
-function	dtrace_probe
-version		SUNWprivate_1.1
-end
-
 function	dtrace_probe_info
 version		SUNWprivate_1.1
 end

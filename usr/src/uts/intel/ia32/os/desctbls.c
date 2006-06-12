@@ -592,10 +592,8 @@ init_idt(void)
 	    SDT_SYSIGT, SEL_UPL);
 
 	/*
-	 * Install the DTrace interrupt handlers for the fasttrap provider.
+	 * Install the DTrace interrupt handler for the pid provider.
 	 */
-	set_gatesegd(&idt0[T_DTRACE_PROBE], &dtrace_fasttrap, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
 	set_gatesegd(&idt0[T_DTRACE_RET], &dtrace_ret, KCS_SEL, 0,
 	    SDT_SYSIGT, SEL_UPL);
 
@@ -720,10 +718,8 @@ init_idt(void)
 	    SDT_SYSIGT, SEL_UPL);
 
 	/*
-	 * Install the DTrace interrupt handlers for the fasttrap provider.
+	 * Install the DTrace interrupt handler for the pid provider.
 	 */
-	set_gatesegd(&idt0[T_DTRACE_PROBE], &dtrace_fasttrap, KCS_SEL, 0,
-	    SDT_SYSIGT, SEL_UPL);
 	set_gatesegd(&idt0[T_DTRACE_RET], &dtrace_ret, KCS_SEL, 0,
 	    SDT_SYSIGT, SEL_UPL);
 

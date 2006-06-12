@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -231,17 +232,6 @@
 /*
  * DTrace traps.
  */
-#define	DTRACE_FASTTRAP			\
-	.global dtrace_fasttrap_probe				;\
-	.global dtrace_fasttrap_probe_ptr			;\
-	sethi	%hi(dtrace_fasttrap_probe_ptr), %g4		;\
-	ldn	[%g4 + %lo(dtrace_fasttrap_probe_ptr)], %g4	;\
-	set	dtrace_fasttrap_probe, %g1			;\
-	brnz,pn	%g4, user_trap					;\
-	sub	%g0, 1, %g4					;\
-	FAST_TRAP_DONE						;\
-	.align	32
-
 #define	DTRACE_PID			\
 	.global dtrace_pid_probe				;\
 	set	dtrace_pid_probe, %g1				;\
@@ -1263,7 +1253,7 @@ trap_table0:
 	BAD; BAD; BAD4;			/* 12A - 12F unused */
 	BAD4; BAD4; 			/* 130 - 137 unused */
 	DTRACE_PID;			/* 138  dtrace pid tracing provider */
-	DTRACE_FASTTRAP;		/* 139  dtrace fasttrap provider */
+	BAD;				/* 139  unused */
 	DTRACE_RETURN;			/* 13A	dtrace pid return probe */
 	BAD; BAD4;			/* 13B - 13F unused */
 	SYSCALL(syscall_trap)		/* 140  LP64 system call */

@@ -589,37 +589,6 @@ fasttrap_fuword32_noerr(const void *uaddr)
 	return (0);
 }
 
-/*ARGSUSED*/
-int
-fasttrap_probe(struct regs *rp)
-{
-#ifdef __amd64
-	proc_t *p = curproc;
-#endif
-
-#ifdef __amd64
-	if (p->p_model == DATAMODEL_LP64) {
-		dtrace_probe(fasttrap_probe_id, rp->r_rdi, rp->r_rsi,
-		    rp->r_rdx, rp->r_rcx, rp->r_r8);
-	} else {
-#endif
-		uint32_t *stack = (uint32_t *)rp->r_sp;
-		uintptr_t s0, s1, s2, s3, s4;
-
-		s0 = fasttrap_fuword32_noerr(&stack[1]);
-		s1 = fasttrap_fuword32_noerr(&stack[2]);
-		s2 = fasttrap_fuword32_noerr(&stack[3]);
-		s3 = fasttrap_fuword32_noerr(&stack[4]);
-		s4 = fasttrap_fuword32_noerr(&stack[5]);
-
-		dtrace_probe(fasttrap_probe_id, s0, s1, s2, s3, s4);
-#ifdef __amd64
-	}
-#endif
-
-	return (0);
-}
-
 static void
 fasttrap_return_common(struct regs *rp, uintptr_t pc, pid_t pid,
     uintptr_t new_pc)
@@ -1511,7 +1480,8 @@ fasttrap_return_probe(struct regs *rp)
 
 /*ARGSUSED*/
 uint64_t
-fasttrap_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
+fasttrap_pid_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
+    int aframes)
 {
 	return (fasttrap_anarg(ttolwp(curthread)->lwp_regs, 1, argno));
 }

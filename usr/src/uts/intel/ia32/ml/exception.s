@@ -1052,11 +1052,6 @@ check_for_user_address:
 
 #endif	/* __i386 */
 
-	ENTRY_NP(dtrace_fasttrap)
-	TRAP_NOERR(T_DTRACE_PROBE)
-	jmp	dtrace_trap
-	SET_SIZE(dtrace_fasttrap)
-
 	ENTRY_NP(dtrace_ret)
 	TRAP_NOERR(T_DTRACE_RET)
 	jmp	dtrace_trap

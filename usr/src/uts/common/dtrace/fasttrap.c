@@ -106,10 +106,37 @@
  * function are visible. Return probes must be fired _after_ we have
  * single-stepped the instruction whereas all other probes are fired
  * beforehand.
+ *
+ *
+ * Lock Ordering
+ * -------------
+ *
+ * The lock ordering below -- both internally and with respect to the DTrace
+ * framework -- is a little tricky and bears some explanation. Each provider
+ * has a lock (ftp_mtx) that protects its members including reference counts
+ * for enabled probes (ftp_rcount), consumers actively creating probes
+ * (ftp_ccount) and USDT consumers (ftp_mcount); all three prevent a provider
+ * from being freed. A provider is looked up by taking the bucket lock for the
+ * provider hash table, and is returned with its lock held. The provider lock
+ * may be taken in functions invoked by the DTrace framework, but may not be
+ * held while calling functions in the DTrace framework.
+ *
+ * To ensure consistency over multiple calls to the DTrace framework, the
+ * creation lock (ftp_cmtx) should be held. Naturally, the creation lock may
+ * not be taken when holding the provider lock as that would create a cyclic
+ * lock ordering. In situations where one would naturally take the provider
+ * lock and then the creation lock, we instead up a reference count to prevent
+ * the provider from disappearing, drop the provider lock, and acquire the
+ * creation lock.
+ *
+ * Briefly:
+ * 	bucket lock before provider lock
+ *	DTrace before provider lock
+ *	creation lock before DTrace
+ *	never hold the provider lock and creation lock simultaneously
  */
 
 static dev_info_t *fasttrap_devi;
-static dtrace_provider_id_t fasttrap_id;
 static dtrace_meta_provider_id_t fasttrap_meta_id;
 
 static timeout_id_t fasttrap_timeout;
@@ -143,9 +170,7 @@ fasttrap_hash_t			fasttrap_tpoints;
 static fasttrap_hash_t		fasttrap_provs;
 static fasttrap_hash_t		fasttrap_procs;
 
-dtrace_id_t			fasttrap_probe_id;
-static int			fasttrap_count;		/* ref count */
-static int			fasttrap_pid_count;	/* pid ref count */
+static uint64_t			fasttrap_pid_count;	/* pid ref count */
 static kmutex_t			fasttrap_count_mtx;	/* lock on ref count */
 
 #define	FASTTRAP_ENABLE_FAIL	1
@@ -293,10 +318,10 @@ fasttrap_pid_cleanup_cb(void *data)
 				mutex_enter(&fp->ftp_mtx);
 
 				/*
-				 * If this provider is referenced either
-				 * because it is a USDT provider or is being
-				 * modified, we can't unregister or even
-				 * condense.
+				 * If this provider has consumers actively
+				 * creating probes (ftp_ccount) or is a USDT
+				 * provider (ftp_mcount), we can't unregister
+				 * or even condense.
 				 */
 				if (fp->ftp_ccount != 0 ||
 				    fp->ftp_mcount != 0) {
@@ -462,15 +487,6 @@ fasttrap_pid_provide(void *arg, const dtrace_probedesc_t *desc)
 	/*
 	 * There are no "default" pid probes.
 	 */
-}
-
-/*ARGSUSED*/
-static void
-fasttrap_provide(void *arg, const dtrace_probedesc_t *desc)
-{
-	if (dtrace_probe_lookup(fasttrap_id, NULL, "fasttrap", "fasttrap") == 0)
-		fasttrap_probe_id = dtrace_probe_create(fasttrap_id, NULL,
-		    "fasttrap", "fasttrap", FASTTRAP_AFRAMES, NULL);
 }
 
 static int
@@ -805,11 +821,8 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	probe->ftp_gen = fasttrap_mod_gen;
 }
 
-typedef int fasttrap_probe_f(struct regs *);
-
 static void
-fasttrap_enable_common(int *count, fasttrap_probe_f **fptr, fasttrap_probe_f *f,
-    fasttrap_probe_f **fptr2, fasttrap_probe_f *f2)
+fasttrap_enable_callbacks(void)
 {
 	/*
 	 * We don't have to play the rw lock game here because we're
@@ -818,28 +831,27 @@ fasttrap_enable_common(int *count, fasttrap_probe_f **fptr, fasttrap_probe_f *f,
 	 * function pointer yet.
 	 */
 	mutex_enter(&fasttrap_count_mtx);
-	if (*count == 0) {
-		ASSERT(*fptr == NULL);
-		*fptr = f;
-		if (fptr2 != NULL)
-			*fptr2 = f2;
+	if (fasttrap_pid_count == 0) {
+		ASSERT(dtrace_pid_probe_ptr == NULL);
+		ASSERT(dtrace_return_probe_ptr == NULL);
+		dtrace_pid_probe_ptr = &fasttrap_pid_probe;
+		dtrace_return_probe_ptr = &fasttrap_return_probe;
 	}
-	ASSERT(*fptr == f);
-	ASSERT(fptr2 == NULL || *fptr2 == f2);
-	(*count)++;
+	ASSERT(dtrace_pid_probe_ptr == &fasttrap_pid_probe);
+	ASSERT(dtrace_return_probe_ptr == &fasttrap_return_probe);
+	fasttrap_pid_count++;
 	mutex_exit(&fasttrap_count_mtx);
 }
 
 static void
-fasttrap_disable_common(int *count, fasttrap_probe_f **fptr,
-    fasttrap_probe_f **fptr2)
+fasttrap_disable_callbacks(void)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	mutex_enter(&fasttrap_count_mtx);
-	(*count)--;
-	ASSERT(*count >= 0);
-	if (*count == 0) {
+	ASSERT(fasttrap_pid_count > 0);
+	fasttrap_pid_count--;
+	if (fasttrap_pid_count == 0) {
 		cpu_t *cur, *cpu = CPU;
 
 		for (cur = cpu->cpu_next_onln; cur != cpu;
@@ -847,9 +859,8 @@ fasttrap_disable_common(int *count, fasttrap_probe_f **fptr,
 			rw_enter(&cur->cpu_ft_lock, RW_WRITER);
 		}
 
-		*fptr = NULL;
-		if (fptr2 != NULL)
-			*fptr2 = NULL;
+		dtrace_pid_probe_ptr = NULL;
+		dtrace_return_probe_ptr = NULL;
 
 		for (cur = cpu->cpu_next_onln; cur != cpu;
 			cur = cur->cpu_next_onln) {
@@ -858,23 +869,6 @@ fasttrap_disable_common(int *count, fasttrap_probe_f **fptr,
 	}
 	mutex_exit(&fasttrap_count_mtx);
 }
-
-/*ARGSUSED*/
-static void
-fasttrap_enable(void *arg, dtrace_id_t id, void *parg)
-{
-	/*
-	 * Enable the probe that corresponds to statically placed trace
-	 * points which have not explicitly been placed in the process's text
-	 * by the fasttrap provider.
-	 */
-	ASSERT(arg == NULL);
-	ASSERT(id == fasttrap_probe_id);
-
-	fasttrap_enable_common(&fasttrap_count,
-	    &dtrace_fasttrap_probe_ptr, fasttrap_probe, NULL, NULL);
-}
-
 
 /*ARGSUSED*/
 static void
@@ -937,13 +931,11 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 	mutex_exit(&p->p_lock);
 
 	/*
-	 * We have to enable the trap entry before any user threads have
+	 * We have to enable the trap entry point before any user threads have
 	 * the chance to execute the trap instruction we're about to place
 	 * in their process's text.
 	 */
-	fasttrap_enable_common(&fasttrap_pid_count,
-	    &dtrace_pid_probe_ptr, fasttrap_pid_probe,
-	    &dtrace_return_probe_ptr, fasttrap_return_probe);
+	fasttrap_enable_callbacks();
 
 	/*
 	 * Enable all the tracepoints and add this probe's id to each
@@ -977,8 +969,7 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 			 * Since we're not actually enabling this probe,
 			 * drop our reference on the trap table entry.
 			 */
-			fasttrap_disable_common(&fasttrap_pid_count,
-			    &dtrace_pid_probe_ptr, &dtrace_return_probe_ptr);
+			fasttrap_disable_callbacks();
 			return;
 		}
 	}
@@ -987,22 +978,6 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 	sprunlock(p);
 
 	probe->ftp_enabled = 1;
-}
-
-
-/*ARGSUSED*/
-static void
-fasttrap_disable(void *arg, dtrace_id_t id, void *parg)
-{
-	/*
-	 * Disable the probe the corresponds to statically placed trace
-	 * points.
-	 */
-	ASSERT(arg == NULL);
-	ASSERT(id == fasttrap_probe_id);
-	ASSERT(MUTEX_HELD(&cpu_lock));
-	fasttrap_disable_common(&fasttrap_count, &dtrace_fasttrap_probe_ptr,
-	    NULL);
 }
 
 /*ARGSUSED*/
@@ -1075,8 +1050,7 @@ fasttrap_pid_disable(void *arg, dtrace_id_t id, void *parg)
 	probe->ftp_enabled = 0;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	fasttrap_disable_common(&fasttrap_pid_count, &dtrace_pid_probe_ptr,
-	    &dtrace_return_probe_ptr);
+	fasttrap_disable_callbacks();
 }
 
 /*ARGSUSED*/
@@ -1125,14 +1099,6 @@ fasttrap_pid_getargdesc(void *arg, dtrace_id_t id, void *parg,
 
 /*ARGSUSED*/
 static void
-fasttrap_destroy(void *arg, dtrace_id_t id, void *parg)
-{
-	ASSERT(arg == NULL);
-	ASSERT(id == fasttrap_probe_id);
-}
-
-/*ARGSUSED*/
-static void
 fasttrap_pid_destroy(void *arg, dtrace_id_t id, void *parg)
 {
 	fasttrap_probe_t *probe = parg;
@@ -1158,27 +1124,6 @@ fasttrap_pid_destroy(void *arg, dtrace_id_t id, void *parg)
 }
 
 
-static const dtrace_pattr_t fasttrap_attr = {
-{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
-{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
-{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
-{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
-{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
-};
-
-static dtrace_pops_t fasttrap_pops = {
-	fasttrap_provide,
-	NULL,
-	fasttrap_enable,
-	fasttrap_disable,
-	NULL,
-	NULL,
-	NULL,
-	fasttrap_getarg,
-	NULL,
-	fasttrap_destroy
-};
-
 static const dtrace_pattr_t pid_attr = {
 { DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 { DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
@@ -1195,7 +1140,7 @@ static dtrace_pops_t pid_pops = {
 	NULL,
 	NULL,
 	fasttrap_pid_getargdesc,
-	fasttrap_getarg,
+	fasttrap_pid_getarg,
 	NULL,
 	fasttrap_pid_destroy
 };
@@ -1572,49 +1517,23 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 
 	/*
 	 * Increment this reference count to indicate that a consumer is
-	 * actively adding a new probe associated with this provider.
+	 * actively adding a new probe associated with this provider. This
+	 * prevents the provider from being deleted -- we'll need to check
+	 * for pending deletions when we drop this reference count.
 	 */
 	provider->ftp_ccount++;
 	mutex_exit(&provider->ftp_mtx);
 
-	if (name != NULL) {
-		if (dtrace_probe_lookup(provider->ftp_provid,
-		    pdata->ftps_mod, pdata->ftps_func, name) != 0)
-			goto done;
+	/*
+	 * Grab the creation lock to ensure consistency between calls to
+	 * dtrace_probe_lookup() and dtrace_probe_create() in the face of
+	 * other threads creating probes. We must drop the provider lock
+	 * before taking this lock to avoid a three-way deadlock with the
+	 * DTrace framework.
+	 */
+	mutex_enter(&provider->ftp_cmtx);
 
-		atomic_add_32(&fasttrap_total, pdata->ftps_noffs);
-
-		if (fasttrap_total > fasttrap_max) {
-			atomic_add_32(&fasttrap_total, -pdata->ftps_noffs);
-			goto no_mem;
-		}
-
-		ASSERT(pdata->ftps_noffs > 0);
-		pp = kmem_zalloc(offsetof(fasttrap_probe_t,
-		    ftp_tps[pdata->ftps_noffs]), KM_SLEEP);
-
-		pp->ftp_prov = provider;
-		pp->ftp_faddr = pdata->ftps_pc;
-		pp->ftp_fsize = pdata->ftps_size;
-		pp->ftp_pid = pdata->ftps_pid;
-		pp->ftp_ntps = pdata->ftps_noffs;
-
-		for (i = 0; i < pdata->ftps_noffs; i++) {
-			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
-			    KM_SLEEP);
-
-			tp->ftt_proc = provider->ftp_proc;
-			tp->ftt_pc = pdata->ftps_offs[i] + pdata->ftps_pc;
-			tp->ftt_pid = pdata->ftps_pid;
-
-			pp->ftp_tps[i].fit_tp = tp;
-			pp->ftp_tps[i].fit_id.fti_probe = pp;
-			pp->ftp_tps[i].fit_id.fti_ptype = pdata->ftps_type;
-		}
-
-		pp->ftp_id = dtrace_probe_create(provider->ftp_provid,
-		    pdata->ftps_mod, pdata->ftps_func, name, aframes, pp);
-	} else {
+	if (name == NULL) {
 		for (i = 0; i < pdata->ftps_noffs; i++) {
 			char name_str[17];
 
@@ -1655,14 +1574,50 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 			    pdata->ftps_mod, pdata->ftps_func, name_str,
 			    FASTTRAP_OFFSET_AFRAMES, pp);
 		}
+
+	} else if (dtrace_probe_lookup(provider->ftp_provid, pdata->ftps_mod,
+	    pdata->ftps_func, name) == 0) {
+		atomic_add_32(&fasttrap_total, pdata->ftps_noffs);
+
+		if (fasttrap_total > fasttrap_max) {
+			atomic_add_32(&fasttrap_total, -pdata->ftps_noffs);
+			goto no_mem;
+		}
+
+		ASSERT(pdata->ftps_noffs > 0);
+		pp = kmem_zalloc(offsetof(fasttrap_probe_t,
+		    ftp_tps[pdata->ftps_noffs]), KM_SLEEP);
+
+		pp->ftp_prov = provider;
+		pp->ftp_faddr = pdata->ftps_pc;
+		pp->ftp_fsize = pdata->ftps_size;
+		pp->ftp_pid = pdata->ftps_pid;
+		pp->ftp_ntps = pdata->ftps_noffs;
+
+		for (i = 0; i < pdata->ftps_noffs; i++) {
+			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
+			    KM_SLEEP);
+
+			tp->ftt_proc = provider->ftp_proc;
+			tp->ftt_pc = pdata->ftps_offs[i] + pdata->ftps_pc;
+			tp->ftt_pid = pdata->ftps_pid;
+
+			pp->ftp_tps[i].fit_tp = tp;
+			pp->ftp_tps[i].fit_id.fti_probe = pp;
+			pp->ftp_tps[i].fit_id.fti_ptype = pdata->ftps_type;
+		}
+
+		pp->ftp_id = dtrace_probe_create(provider->ftp_provid,
+		    pdata->ftps_mod, pdata->ftps_func, name, aframes, pp);
 	}
 
-done:
+	mutex_exit(&provider->ftp_cmtx);
+
 	/*
 	 * We know that the provider is still valid since we incremented the
-	 * reference count. If someone tried to free this provider while we
-	 * were using it (e.g. because the process called exec(2) or exit(2)),
-	 * take note of that and try to free it now.
+	 * creation reference count. If someone tried to clean up this provider
+	 * while we were using it (e.g. because the process called exec(2) or
+	 * exit(2)), take note of that and try to clean it up now.
 	 */
 	mutex_enter(&provider->ftp_mtx);
 	provider->ftp_ccount--;
@@ -1681,6 +1636,7 @@ no_mem:
 	 * the user has accidentally created many more probes than was
 	 * intended (e.g. pid123:::).
 	 */
+	mutex_exit(&provider->ftp_cmtx);
 	mutex_enter(&provider->ftp_mtx);
 	provider->ftp_ccount--;
 	provider->ftp_marked = 1;
@@ -1763,11 +1719,22 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 	int i, j;
 	uint32_t ntps;
 
-	mutex_enter(&provider->ftp_mtx);
+	/*
+	 * Since the meta provider count is non-zero we don't have to worry
+	 * about this provider disappearing.
+	 */
+	ASSERT(provider->ftp_mcount > 0);
+
+	/*
+	 * Grab the creation lock to ensure consistency between calls to
+	 * dtrace_probe_lookup() and dtrace_probe_create() in the face of
+	 * other threads creating probes.
+	 */
+	mutex_enter(&provider->ftp_cmtx);
 
 	if (dtrace_probe_lookup(provider->ftp_provid, dhpb->dthpb_mod,
 	    dhpb->dthpb_func, dhpb->dthpb_name) != 0) {
-		mutex_exit(&provider->ftp_mtx);
+		mutex_exit(&provider->ftp_cmtx);
 		return;
 	}
 
@@ -1778,7 +1745,7 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 
 	if (fasttrap_total > fasttrap_max) {
 		atomic_add_32(&fasttrap_total, -ntps);
-		mutex_exit(&provider->ftp_mtx);
+		mutex_exit(&provider->ftp_cmtx);
 		return;
 	}
 
@@ -1843,7 +1810,7 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 	pp->ftp_id = dtrace_probe_create(provider->ftp_provid, dhpb->dthpb_mod,
 	    dhpb->dthpb_func, dhpb->dthpb_name, FASTTRAP_OFFSET_AFRAMES, pp);
 
-	mutex_exit(&provider->ftp_mtx);
+	mutex_exit(&provider->ftp_cmtx);
 }
 
 /*ARGSUSED*/
@@ -2078,9 +2045,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "fasttrap", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
-	    dtrace_register("fasttrap", &fasttrap_attr, DTRACE_PRIV_USER, NULL,
-	    &fasttrap_pops, NULL, &fasttrap_id) != 0) {
+	    DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
@@ -2229,7 +2194,7 @@ fasttrap_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		mutex_exit(&bucket->ftb_mtx);
 	}
 
-	if (fail || dtrace_unregister(fasttrap_id) != 0) {
+	if (fail) {
 		uint_t work;
 		/*
 		 * If we're failing to detach, we need to unblock timeouts
@@ -2252,7 +2217,7 @@ fasttrap_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 #ifdef DEBUG
 	mutex_enter(&fasttrap_count_mtx);
-	ASSERT(fasttrap_count == 0);
+	ASSERT(fasttrap_pid_count == 0);
 	mutex_exit(&fasttrap_count_mtx);
 #endif
 

@@ -225,18 +225,6 @@ fasttrap_anarg(struct regs *rp, int argno)
 static ulong_t fasttrap_getreg(struct regs *, uint_t);
 static void fasttrap_putreg(struct regs *, uint_t, ulong_t);
 
-int
-fasttrap_probe(struct regs *rp)
-{
-	dtrace_probe(fasttrap_probe_id,
-	    rp->r_o0, rp->r_o1, rp->r_o2, rp->r_o3, rp->r_o4);
-
-	rp->r_pc = rp->r_npc;
-	rp->r_npc = rp->r_pc + 4;
-
-	return (0);
-}
-
 static void
 fasttrap_usdt_args(fasttrap_probe_t *probe, struct regs *rp, int argc,
     uintptr_t *argv)
@@ -1335,7 +1323,8 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 
 /*ARGSUSED*/
 uint64_t
-fasttrap_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
+fasttrap_pid_getarg(void *arg, dtrace_id_t id, void *parg, int argno,
+    int aframes)
 {
 	return (fasttrap_anarg(ttolwp(curthread)->lwp_regs, argno));
 }

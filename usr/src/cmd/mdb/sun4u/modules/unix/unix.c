@@ -310,7 +310,7 @@ static const char *const ttdescr[] = {
 	BAD, BAD, BAD4,			/* 12A - 12F unused */
 	BAD4, BAD4,			/* 130 - 137 unused */
 	"dtrace-pid",			/* 138  DTrace pid provider */
-	"dtrace-fasttrap",		/* 139  DTrace pid provider */
+	BAD,				/* 139  unused */
 	"dtrace-return",		/* 13A  DTrace pid provider */
 	BAD, BAD4,			/* 13B - 13F unused */
 	"syscall-64",			/* 140  LP64 system call */

@@ -3978,8 +3978,7 @@ apic_allocate_vector(int ipl, int irq, int pri)
 
 	for (i = lowest; i < highest; i++) {
 		if ((i == T_FASTTRAP) || (i == APIC_SPUR_INTR) ||
-			(i == T_SYSCALLINT) || (i == T_DTRACE_PROBE) ||
-			(i == T_DTRACE_RET))
+			(i == T_SYSCALLINT) || (i == T_DTRACE_RET))
 			continue;
 		if (apic_vector_to_irq[i] == APIC_RESV_IRQ) {
 			apic_vector_to_irq[i] = (uchar_t)irq;

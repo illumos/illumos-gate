@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,7 +64,6 @@ extern "C" {
 #define	T_ENOEXTFLT	0x20	/*	emulated ext not present	*/
 #define	T_FASTTRAP	0xd2	/*	fast system call		*/
 #define	T_SYSCALLINT	0x91	/*	general system call		*/
-#define	T_DTRACE_PROBE	0x7e	/*	DTrace fasttrap probe		*/
 #define	T_DTRACE_RET	0x7f	/*	DTrace pid return		*/
 #define	T_SOFTINT	0x50fd	/*	pseudo softint trap type	*/
 
