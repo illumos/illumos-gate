@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma weak memalign = _memalign
 
@@ -117,7 +116,7 @@ memalign(size_t align, size_t nbytes)
 		/* malloc sets errno */
 		return (NULL);
 	}
-	lmutex_lock(&libc_malloc_lock);
+	(void) _private_mutex_lock(&libc_malloc_lock);
 
 	/*
 	 * get size of the entire block (overhead and all)
@@ -178,6 +177,6 @@ memalign(size_t align, size_t nbytes)
 		SIZE(blk) = frag_size | BIT0;
 		_free_unlocked(DATA(blk));
 	}
-	lmutex_unlock(&libc_malloc_lock);
+	(void) _private_mutex_unlock(&libc_malloc_lock);
 	return (DATA(aligned_blk));
 }

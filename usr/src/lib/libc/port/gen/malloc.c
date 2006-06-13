@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  *	Memory management: malloc(), realloc(), free().
@@ -69,15 +68,14 @@
  * Some abusers of the system (notably java1.2) acquire __malloc_lock
  * in order to prevent threads from holding it while they are being
  * suspended via thr_suspend() or thr_suspend_allmutators().
- * The new scheme of acquiring it via lmutex_lock() solves the same
- * problem but causes these old programs to malfunction (acquiring
- * a lock by both mutex_lock() and lmutex_lock() leads to fatal
- * inconsistencies).  Therefore, we leave __malloc_lock as an external
- * variable to satisfy these old programs, but we define a new lock,
- * private to libc, to do the real locking: libc_malloc_lock
+ * This never worked when alternate malloc() libraries were used
+ * because they don't use __malloc_lock for their locking strategy.
+ * We leave __malloc_lock as an external variable to satisfy these
+ * old programs, but we define a new lock, private to libc, to do the
+ * real locking: libc_malloc_lock.  This puts libc's malloc() package
+ * on the same footing as all other malloc packages.
  */
 mutex_t __malloc_lock = DEFAULTMUTEX;
-
 mutex_t libc_malloc_lock = DEFAULTMUTEX;
 
 static TREE	*Root,		/* root of the free tree */
@@ -98,6 +96,21 @@ static void	*_malloc_unlocked(size_t);
 
 static void *flist[FREESIZE];	/* list of blocks to be freed on next malloc */
 static int freeidx;		/* index of free blocks in flist % FREESIZE */
+
+/*
+ * Interfaces used only by atfork_init() functions.
+ */
+void
+malloc_locks(void)
+{
+	(void) _private_mutex_lock(&libc_malloc_lock);
+}
+
+void
+malloc_unlocks(void)
+{
+	(void) _private_mutex_unlock(&libc_malloc_lock);
+}
 
 /*
  *	Allocation of small blocks
@@ -156,9 +169,9 @@ malloc(size_t size)
 		return (NULL);
 	}
 	assert_no_libc_locks_held();
-	lmutex_lock(&libc_malloc_lock);
+	(void) _private_mutex_lock(&libc_malloc_lock);
 	ret = _malloc_unlocked(size);
-	lmutex_unlock(&libc_malloc_lock);
+	(void) _private_mutex_unlock(&libc_malloc_lock);
 	return (ret);
 }
 
@@ -307,10 +320,10 @@ realloc(void *old, size_t size)
 	}
 
 	/* pointer to the block */
-	lmutex_lock(&libc_malloc_lock);
+	(void) _private_mutex_lock(&libc_malloc_lock);
 	if (old == NULL) {
 		new = _malloc_unlocked(size);
-		lmutex_unlock(&libc_malloc_lock);
+		(void) _private_mutex_unlock(&libc_malloc_lock);
 		return (new);
 	}
 
@@ -325,7 +338,7 @@ realloc(void *old, size_t size)
 
 	/* if the block was freed, data has been destroyed. */
 	if (!ISBIT0(ts)) {
-		lmutex_unlock(&libc_malloc_lock);
+		(void) _private_mutex_unlock(&libc_malloc_lock);
 		return (NULL);
 	}
 
@@ -333,7 +346,7 @@ realloc(void *old, size_t size)
 	CLRBITS01(SIZE(tp));
 	if (size == SIZE(tp)) {
 		SIZE(tp) = ts;
-		lmutex_unlock(&libc_malloc_lock);
+		(void) _private_mutex_unlock(&libc_malloc_lock);
 		return (old);
 	}
 
@@ -343,7 +356,7 @@ realloc(void *old, size_t size)
 		if (size == 0) {
 			SETOLD01(SIZE(tp), ts);
 			_free_unlocked(old);
-			lmutex_unlock(&libc_malloc_lock);
+			(void) _private_mutex_unlock(&libc_malloc_lock);
 			return (NULL);
 		} else {
 			goto call_malloc;
@@ -392,7 +405,7 @@ chop_big:
 
 		/* the previous block may be free */
 		SETOLD01(SIZE(tp), ts);
-		lmutex_unlock(&libc_malloc_lock);
+		(void) _private_mutex_unlock(&libc_malloc_lock);
 		return (old);
 	}
 
@@ -405,7 +418,7 @@ call_malloc:
 			ts = size;
 		MEMCOPY(new, old, ts);
 		_free_unlocked(old);
-		lmutex_unlock(&libc_malloc_lock);
+		(void) _private_mutex_unlock(&libc_malloc_lock);
 		return (new);
 	}
 
@@ -430,7 +443,7 @@ call_malloc:
 	if (SIZE(tp) < MINSIZE) {
 		if (size < SIZE(tp)) {			/* case 1. */
 			SETOLD01(SIZE(tp), ts);
-			lmutex_unlock(&libc_malloc_lock);
+			(void) _private_mutex_unlock(&libc_malloc_lock);
 			return (old);
 		} else if (size < MINSIZE) {		/* case 2. */
 			size = MINSIZE;
@@ -455,7 +468,7 @@ call_malloc:
 		goto chop_big;
 	}
 	SETOLD01(SIZE(tp), ts);
-	lmutex_unlock(&libc_malloc_lock);
+	(void) _private_mutex_unlock(&libc_malloc_lock);
 	return (NULL);
 }
 
@@ -841,9 +854,9 @@ void
 free(void *old)
 {
 	assert_no_libc_locks_held();
-	lmutex_lock(&libc_malloc_lock);
+	(void) _private_mutex_lock(&libc_malloc_lock);
 	_free_unlocked(old);
-	lmutex_unlock(&libc_malloc_lock);
+	(void) _private_mutex_unlock(&libc_malloc_lock);
 }
 
 
