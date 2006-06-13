@@ -227,7 +227,8 @@ struct ifslist {
 	 * of acquiring a lease.
 	 */
 
-	int		if_offer_wait;	/* seconds between offers */
+	int		if_offer_wait;	/* seconds between sending offers */
+	iu_timer_id_t	if_offer_timer;	/* timer associated with offer wait */
 	iu_event_id_t	if_offer_id;	/* event offer id */
 	iu_event_id_t	if_acknak_id;	/* event acknak id */
 	iu_event_id_t	if_acknak_bcast_id;
@@ -300,7 +301,6 @@ struct ifslist {
 	stop_func_t		*if_send_stop_func;
 	uint32_t		if_packet_sent;
 	iu_timer_id_t		if_retrans_timer;
-	iu_timer_id_t		if_offer_timer;
 
 	int			if_script_fd;
 	pid_t			if_script_pid;

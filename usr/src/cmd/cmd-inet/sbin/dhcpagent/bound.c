@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * BOUND state of the DHCP client state machine.
@@ -88,6 +87,8 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 {
 	lease_t		cur_lease, new_lease;
 	int		msg_level;
+	const char	*noext = "lease renewed but time not extended";
+	uint_t		minleft;
 
 	if (ack != NULL) {
 		/* If ack we're replacing is not the original, then free it */
@@ -142,7 +143,7 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 
 		/*
 		 * if the state is ADOPTING, event loop has not been started
-		 * at this time; so don''t run the script.
+		 * at this time, so don't run the script.
 		 */
 
 		if (ifsp->if_state != ADOPTING) {
@@ -161,8 +162,9 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 			return (0);
 
 		/*
-		 * if the current lease is mysteriously close
-		 * to the new lease, warn the user...
+		 * if the current lease is mysteriously close to the new
+		 * lease, warn the user.  unless there's less than a minute
+		 * left, round to the closest minute.
 		 */
 
 		if (abs((ifsp->if_newstart_monosec + ifsp->if_lease) -
@@ -173,10 +175,19 @@ dhcp_bound(struct ifslist *ifsp, PKT_LIST *ack)
 			else
 				msg_level = MSG_VERBOSE;
 
-			dhcpmsg(msg_level, "lease renewed but lease time not "
-			    "extended (expires in %d seconds)", ifsp->if_lease);
-		}
+			minleft = (ifsp->if_lease + 30) / 60;
 
+			if (ifsp->if_lease < 60) {
+				dhcpmsg(msg_level, "%s; expires in %d seconds",
+				    noext, ifsp->if_lease);
+			} else if (minleft == 1) {
+				dhcpmsg(msg_level, "%s; expires in 1 minute",
+				    noext);
+			} else {
+				dhcpmsg(msg_level, "%s; expires in %d minutes",
+				    noext, minleft);
+			}
+		}
 
 		(void) script_start(ifsp, EVENT_EXTEND, bound_event_cb,
 		    NULL, NULL);
