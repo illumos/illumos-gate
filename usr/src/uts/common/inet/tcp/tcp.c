@@ -26,8 +26,8 @@
 /* Copyright (c) 1990 Mentat Inc. */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
+
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -18613,7 +18613,7 @@ data_null:
 		 */
 		goto done;
 	} else {
-		int usable_r = tcp->tcp_swnd;
+		int usable_r;
 
 		/*
 		 * In the special case when cwnd is zero, which can only
@@ -18632,8 +18632,8 @@ data_null:
 		}
 
 		/* NOTE: trouble if xmitting while SYN not acked? */
-		usable_r -= snxt;
-		usable_r += tcp->tcp_suna;
+		usable_r = snxt - tcp->tcp_suna;
+		usable_r = tcp->tcp_swnd - usable_r;
 
 		/*
 		 * Check if the receiver has shrunk the window.  If
