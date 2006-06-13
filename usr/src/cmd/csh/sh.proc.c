@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -909,6 +909,10 @@ dokill(tchar **v)
 			return;
 		}
 		if (digit(v[0][1])) {
+			if (chkalldigit_(v[0]+1) != 0) {
+				setname(v[0]+1);
+				bferr("Unknown signal; kill -l lists signals");
+			}
 			signum = atoi_(v[0]+1);
 			if (signum < 0 || signum > NSIG)
 				bferr("Bad signal number");

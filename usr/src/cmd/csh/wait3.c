@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,9 +92,9 @@ csh_wait3(int *status, int options, struct rusage *rp)
 			diffu = after_tms.tms_cutime - before_tms.tms_cutime;
 			diffs = after_tms.tms_cstime - before_tms.tms_cstime;
 			rp->ru_utime.tv_sec = diffu/HZ;
-			rp->ru_utime.tv_usec = (diffu % HZ) / HZ * 1000000;
+			rp->ru_utime.tv_usec = ((diffu % HZ) * 1000000) / HZ;
 			rp->ru_stime.tv_sec = diffs/HZ;
-			rp->ru_stime.tv_usec = (diffs % HZ) / HZ * 1000000;
+			rp->ru_stime.tv_usec = ((diffs % HZ) * 1000000) / HZ;
 		}
 		*status = wstat(info.si_code, info.si_status);
 		return (info.si_pid);

@@ -28,14 +28,11 @@
 #include <signal.h>	/* std sysV signal.h */
 #include <setjmp.h>
 #include <sys/resource.h>
+#include <netdb.h> /* for MAXHOSTNAMELEN */
 #include "signal.h"	/* mainly BSD related signal.h */
 #include "sh.local.h"
 #include "sh.char.h"
 
-/*
- * MAXHOSTNAMELEN is defined in param.h under SunOS
- */
-#define	MAXHOSTNAMELEN	64
 
 #ifdef MBCHAR
 #if !defined(MB_LEN_MAX) || !defined(MB_CUR_MAX)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,7 +509,7 @@ doforeach(tchar **v)
 	while (*cp && alnum(*cp)) {
 		cp++;
 	}
-	if (*cp || strlen_(*v) >= 20 || !letter(**v)) {
+	if (*cp || strlen_(*v) >= MAX_VAR_LEN || !letter(**v)) {
 		bferr("Invalid variable");
 	}
 	cp = *v++;

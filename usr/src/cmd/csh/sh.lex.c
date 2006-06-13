@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -502,9 +502,9 @@ addla(tchar *cp)
 	lap = labuf;
 }
 
-tchar	lhsb[32];
-tchar	slhs[32];
-tchar	rhsb[64];
+tchar	lhsb[256];
+tchar	slhs[256];
+tchar	rhsb[512];
 int	quesarg;
 
 void

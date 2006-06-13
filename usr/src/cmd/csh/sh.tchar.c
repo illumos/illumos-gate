@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -843,6 +843,23 @@ readlink_(tchar *path, tchar *buf, int bufsiz)
 		return (-1);
 	}
 	return (i - 1); /* Return # of tchars EXCLUDING the terminating NULL. */
+}
+
+/* checks that it's a number */
+
+int
+chkalldigit_(tchar *str)
+{
+	char chbuf[BUFSIZ * MB_LEN_MAX]; /* General use buffer. */
+	char *c = chbuf;
+
+	(void) tstostr(chbuf, str);
+
+	while (*c)
+		if (!isdigit(*(c++)))
+			return (-1);
+
+	return (0);
 }
 
 int
