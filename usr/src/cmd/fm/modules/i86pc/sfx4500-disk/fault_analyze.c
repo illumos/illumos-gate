@@ -998,7 +998,6 @@ add_disk_fault(diskmon_t *diskinfop, disk_flt_src_e fltsrc,
 		newflt->msg = (msg == NULL) ? NULL : dstrdup(msg);
 	}
 
-	assert(pthread_mutex_lock(&fip->fault_data_mutex) == 0);
 	fip->disk_fault_srcs |= fltsrc;
 
 	if (fip->fault_list == NULL)
@@ -1011,7 +1010,6 @@ add_disk_fault(diskmon_t *diskinfop, disk_flt_src_e fltsrc,
 
 		flt->next = newflt;
 	}
-	assert(pthread_mutex_unlock(&fip->fault_data_mutex) == 0);
 }
 
 void
