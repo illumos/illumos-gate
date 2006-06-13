@@ -1366,7 +1366,19 @@ nfs3_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	mi = VFTOMI(vfsp);
 	if (flag & MS_FORCE) {
+
 		vfsp->vfs_flag |= VFS_UNMOUNTED;
+
+		/*
+		 * We are about to stop the async manager.
+		 * Let every one know not to schedule any
+		 * more async requests
+		 */
+		mutex_enter(&mi->mi_async_lock);
+		mi->mi_max_threads = 0;
+		cv_broadcast(&mi->mi_async_work_cv);
+		mutex_exit(&mi->mi_async_lock);
+
 		/*
 		 * We need to stop the manager thread explicitly; the worker
 		 * threads can time out and exit on their own.
