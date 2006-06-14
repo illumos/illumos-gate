@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -516,6 +515,10 @@ function	yptol_mode
 version		SUNWprivate_2.1
 end
 
+function	yptol_newlock
+version		SUNWprivate_2.1
+end
+
 # If these weak functions are not made external then then they get resolved at
 # library link time. Result when the library calls them it always sees it's 
 # own version rather that the version provided by an external program.
@@ -585,6 +588,18 @@ version		SUNWprivate_2.1
 end
 
 function	init_yptol_flag
+version		SUNWprivate_2.1
+end
+
+function	get_list_max
+version		SUNWprivate_2.1
+end
+
+function	ypcheck_domain_yptol
+version		SUNWprivate_2.1
+end
+
+function	ypcheck_map_existence_yptol
 version		SUNWprivate_2.1
 end
 

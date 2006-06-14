@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +75,16 @@ typedef struct {
 #define	MAP_MAGIC	0x09876543
 
 /*
+ * Structure for holding unique map IDs.
+ * Used for locking purposes, in N2L mode only.
+ */
+typedef struct map_id_elt {
+	char *map_name;
+	int map_id;
+	struct map_id_elt *next;
+} map_id_elt_t;
+
+/*
  * Success and failure codes the same as used by DBM
  */
 typedef int suc_code;
@@ -108,6 +117,8 @@ extern void 	dump_map_ctrl(map_ctrl *);
 extern suc_code map_ctrl_init(map_ctrl *map, char *name);
 extern int	lock_map_ctrl(map_ctrl *map);
 extern int	unlock_map_ctrl(map_ctrl *map);
+extern int	map_id_list_init();
+extern void	get_list_max(map_id_elt_t ***list, int *max);
 
 extern int	try_lock_map_update(map_ctrl *map);
 extern suc_code lock_map_update(map_ctrl *map);
@@ -118,6 +129,7 @@ extern bool_t init_update_lock_map();
  * Globals
  */
 extern bool_t yptol_mode;
+extern bool_t yptol_newlock;
 extern bool_t ypxfrd_flag;
 extern int yp2ldap;
 
@@ -145,6 +157,9 @@ extern int yp2ldap;
 
 /* Mmaped file used for update flags shared memory */
 #define	SHM_FILE "/var/run/nis_shim"
+
+/* used for map arrays reallocation purposes */
+#define	ARRAY_CHUNK	10
 
 #ifdef	__cplusplus
 }

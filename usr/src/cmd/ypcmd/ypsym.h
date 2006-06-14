@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,11 +41,11 @@ extern "C" {
 #endif
 
 /*
- * This contains symbol and structure definitions for modules in the YP server 
+ * This contains symbol and structure definitions for modules in the YP server
  */
 
 #include <ndbm.h>			/* Pull this in first */
-#define DATUM
+#define	DATUM
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
@@ -67,27 +66,34 @@ typedef short int (*PFSI)();
 typedef unsigned short int (*PFUSI)();
 
 #ifndef TRUE
-#define TRUE 1
+#define	TRUE 1
 #endif
 
 #ifndef FALSE
-#define FALSE 0
+#define	FALSE 0
 #endif
 
 #ifdef NULL
 #undef NULL
 #endif
-#define NULL 0
+#define	NULL 0
 
-/* Size of lock hash table */
-#define MAXHASH 91
+/*
+ * Size of lock hash table
+ *
+ * It's for a hash table, hence better if it is prime.
+ * It's also the max number of maps and map locks, used
+ * for initializing shared memory: need to be big enough
+ * (until dynamic shared memory allocation is implemented ?).
+ */
+#define	MAXHASH 1009
 
 /* Maximum length of a yp map name in the system v filesystem */
-#define MAXALIASLEN 8
+#define	MAXALIASLEN 8
 
-#define YPINTERTRY_TIME 10		/* Secs between tries for peer bind */
-#define YPTOTAL_TIME 30			/* Total secs until timeout */
-#define YPNOPORT ((unsigned short) 0)	/* Out-of-range port value */
+#define	YPINTERTRY_TIME 10		/* Secs between tries for peer bind */
+#define	YPTOTAL_TIME 30			/* Total secs until timeout */
+#define	YPNOPORT ((unsigned short) 0)	/* Out-of-range port value */
 
 /* External refs to yp server data structures */
 
@@ -138,16 +144,16 @@ extern void ypoldpull(SVCXPRT *transp);
 extern void ypoldget(SVCXPRT *transp);
 extern int yp_matchdns(DBM *, struct ypreq_key *, struct ypresp_val *);
 extern int yp_oldmatchdns(DBM *fdb,
-			  struct yprequest *req, struct ypresponse *resp);
+		    struct yprequest *req, struct ypresponse *resp);
 
 extern bool _xdr_ypreqeust(XDR *xdrs, struct yprequest *ps);
 extern bool _xdr_ypresponse(XDR *xdrs, struct ypresponse *ps);
 
 extern void setup_resolv(bool *fwding, int *child, CLIENT **client,
-			 char *tp_type, long prognum);
+		    char *tp_type, long prognum);
 extern int resolv_req(bool *fwding, CLIENT **client, int *pid,
-		      char *tp, SVCXPRT *xprt, struct ypreq_key *req,
-		      char *map);
+		    char *tp, SVCXPRT *xprt, struct ypreq_key *req,
+		    char *map);
 
 
 /* definitions for reading files of lists */
@@ -159,7 +165,8 @@ struct listofnames
 };
 typedef struct listofnames listofnames;
 
-/* XXX- NAME_MAX can't be defined in <limits.h> in a POSIX conformant system
+/*
+ * XXX- NAME_MAX can't be defined in <limits.h> in a POSIX conformant system
  *	(under conditions which apply to Sun systems). Removal of this define
  *	caused yp to break (and only yp!). Hence, NAME_MAX is defined here
  *	*exactly* as it was in <limits.h>. I suspect this may not be the

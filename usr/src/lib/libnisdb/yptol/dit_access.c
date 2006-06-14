@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,12 +64,11 @@
 #include "dit_access_utils.h"
 #include "stdio.h"
 
+extern bool delete_map(char *name);
+extern bool rename_map(char *from, char *to, bool_t secure_map);
+
 /* Enable standard YP code features defined in ypdefs.h */
-USE_YP_PREFIX
 USE_YP_MASTER_NAME
-USE_YP_LAST_MODIFIED
-USE_YP_INPUT_FILE
-USE_YP_OUTPUT_NAME
 USE_YP_DOMAIN_NAME
 USE_YP_SECURE
 USE_YP_INTERDOMAIN
@@ -280,7 +278,6 @@ int
 get_ttl_value(map_ctrl *map, TTL_TYPE type)
 {
 	__nis_table_mapping_t *table_map;
-	struct timeval ret;
 	int interval, res;
 	char *myself = "get_ttl_value";
 
@@ -403,14 +400,13 @@ free_map_list(char **map_list)
  *		freed by caller. (Possibly empty if no passwd maps found)
  *		NULL on error
  */
-#define	ARRAY_CHUNK	10
 char **
 get_passwd_list(bool_t adjunct, char *domain)
 {
 	char *myself = "get_passwd_list";
 	__nis_hash_item_mt *it;
 	int	i, size;
-	char 	*end_ptr, *copy_ptr;
+	char 	*end_ptr;
 	char	*target;	/* What we are looking for */
 	int	target_len;
 	int	domain_len;
@@ -479,7 +475,8 @@ get_passwd_list(bool_t adjunct, char *domain)
 			}
 
 			/* Copy from start to end_ptr */
-			memcpy(res[res_count], it->name, end_ptr-it->name - 1);
+			(void) memcpy(res[res_count], it->name,
+				    end_ptr-it->name - 1);
 			res_count ++;
 		}
 	}
@@ -547,8 +544,6 @@ suc_code
 add_special_entries(DBM *db, map_ctrl *map, bool_t *secure_flag)
 {
 	char local_host[MAX_MASTER_NAME];
-	char time_string[MAX_ASCII_ORDER_NUMBER_LENGTH];
-	struct timeval	now;
 	__nis_table_mapping_t *table_map;
 	int res;
 
@@ -557,10 +552,6 @@ add_special_entries(DBM *db, map_ctrl *map, bool_t *secure_flag)
 
 	/* Add domain name */
 	addpair(db, yp_domain_name, map->domain);
-
-	/* For N2L input and output file are meaningless */
-	/* addpair(db, yp_input_file, infilename); */
-	/* addpair(db, yp_output_file, outfilename); */
 
 	/* For N2L mode local machine is always the master */
 	sysinfo(SI_HOSTNAME, local_host, sizeof (local_host));
@@ -602,7 +593,7 @@ add_special_entries(DBM *db, map_ctrl *map, bool_t *secure_flag)
 suc_code
 update_map_from_dit(map_ctrl *map, bool_t log_flag) {
 	__nis_table_mapping_t	*t;
-	__nis_rule_value_t	*rv, *frv;
+	__nis_rule_value_t	*rv;
 	__nis_ldap_search_t	*ls;
 	__nis_object_dn_t	*objectDN = NULL;
 	datum			*datval, *datkey;
@@ -955,7 +946,7 @@ get_mapping_map_list(char *domain)
 	char *myself = "get_mapping_map_list";
 	__nis_hash_item_mt *it;
 	int	i, j, size;
-	char 	*end_ptr, *copy_ptr;
+	char 	*end_ptr;
 	char	**res;		/* Result array */
 	char	**res_old;	/* Old value of res during realloc */
 	int	array_size;	/* Current malloced size */
@@ -1045,7 +1036,7 @@ get_mapping_map_list(char *domain)
 		}
 
 		/* Copy from start to end_ptr */
-		memcpy(res[i], it->name, end_ptr-it->name - 1);
+		(void) memcpy(res[i], it->name, end_ptr-it->name - 1);
 	}
 
 	return (res);

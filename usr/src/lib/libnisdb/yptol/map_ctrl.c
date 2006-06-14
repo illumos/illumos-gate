@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,17 +43,35 @@
  */
 
 #include <unistd.h>
+#include <stdlib.h>
 #include <syslog.h>
 #include <ndbm.h>
 #include <string.h>
+#include <sys/param.h>
 #include "ypsym.h"
 #include "ypdefs.h"
 #include "shim.h"
 #include "yptol.h"
 #include "../ldap_util.h"
 
+extern int hash(char *s);
+extern bool_t add_map_domain_to_list(char *domain, char ***map_list);
+
+/*
+ * Static variables for locking mechanism in
+ * N2L mode.
+ *  map_id_list: hash table for map lists
+ *  max_map: max number of maps in map_id_list
+ *      it is also used as the map ID for
+ *      unknown maps, see get_map_id()
+ *      in usr/src/cmd/ypcmd/shared/lockmap.c
+ */
+static map_id_elt_t *map_id_list[MAXHASH];
+static int max_map = 0;
+
 /* Switch on parts of ypdefs.h */
 USE_DBM
+USE_YPDBPATH
 
 /*
  * FUNCTION: 	create_map_ctrl();
@@ -184,7 +201,7 @@ map_ctrl_init(map_ctrl *map, char *name)
 			"Could not alloc memory for domain in path %s", name);
 		return (FAILURE);
 	}
-	strncpy(map->domain, q + 1, p-q-1);
+	(void) strncpy(map->domain, q + 1, p-q-1);
 	map->domain[p-q-1] = '\0';
 
 	/* Work out extra names required by N2L */
@@ -475,4 +492,258 @@ open_yptol_files(map_ctrl *map)
 	}
 
 	return (SUCCESS);
+}
+
+/*
+ * FUNCTION :   insert_map_in_list()
+ *
+ * DESCRIPTION:	add a map in map_id_list[]
+ *
+ * GIVEN :      map name
+ *              map unique ID
+ *
+ * RETURNS :	SUCCESS = map added
+ *		FAILURE = map not added
+ */
+suc_code
+insert_map_in_list(char *map_name, int unique_value)
+{
+	int index;
+	bool_t yptol_nl_sav = yptol_newlock;
+	map_id_elt_t *new_elt;
+
+	/*
+	 * Index in the hash table is computed from the original
+	 * hash function: make sure yptol_newlock is set to false.
+	 */
+	yptol_newlock = FALSE;
+	index = hash(map_name);
+	yptol_newlock = yptol_nl_sav;
+
+	new_elt = (map_id_elt_t *)calloc(1, sizeof (map_id_elt_t));
+	if (new_elt == NULL) {
+		return (FAILURE);
+	}
+	new_elt->map_name = strdup(map_name);
+	if (new_elt->map_name == NULL) { /* strdup() failed */
+		return (FAILURE);
+	}
+	new_elt->map_id = unique_value;
+
+	if (map_id_list[index] == NULL) {
+		new_elt->next = NULL;
+	} else {
+		new_elt->next = map_id_list[index];
+	}
+	/* insert at begining */
+	map_id_list[index] = new_elt;
+
+	return (SUCCESS);
+}
+
+#ifdef NISDB_LDAP_DEBUG
+/*
+ * FUNCTION :   dump_map_id_list()
+ *
+ * DESCRIPTION:	display max_map and dump map_id_list[]
+ *		not called, here for debug convenience only
+ *
+ * GIVEN :      nothing
+ *
+ * RETURNS :	nothing
+ */
+void
+dump_map_id_list()
+{
+	int i;
+	map_id_elt_t *cur_elt;
+
+	logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+		"dump_map_id_list: max_map is: %d, dumping map_idlist ...",
+		max_map);
+
+	for (i = 0; i < MAXHASH; i++) {
+		if (map_id_list[i] == NULL) {
+			logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+				"no map for index %d", i);
+		} else {
+			logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+				"index %d has the following maps", i);
+			cur_elt = map_id_list[i];
+			do {
+				logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+					"%s, unique id: %d",
+					cur_elt->map_name,
+					cur_elt->map_id);
+				cur_elt = cur_elt->next;
+			} while (cur_elt != NULL);
+		}
+	}
+}
+#endif
+
+/*
+ * FUNCTION :   free_map_id_list()
+ *
+ * DESCRIPTION:	free all previously allocated elements of map_id_list[]
+ *		reset max_map to 0
+ *
+ * GIVEN :      nothing
+ *
+ * RETURNS :	nothing
+ */
+void
+free_map_id_list()
+{
+	int i;
+	map_id_elt_t *cur_elt, *next_elt;
+
+	for (i = 0; i < MAXHASH; i++) {
+		if (map_id_list[i] != NULL) {
+			cur_elt = map_id_list[i];
+			do {
+				next_elt = cur_elt->next;
+				if (cur_elt->map_name)
+					sfree(cur_elt->map_name);
+				sfree(cur_elt);
+				cur_elt = next_elt;
+			} while (cur_elt != NULL);
+			map_id_list[i] = NULL;
+		}
+	}
+	max_map = 0;
+}
+
+/*
+ * FUNCTION :   map_id_list_init()
+ *
+ * DESCRIPTION:	initializes map_id_list[] and max_map
+ *
+ * GIVEN :      nothing
+ *
+ * RETURNS :	 0 if OK
+ *		-1 if failure
+ */
+int
+map_id_list_init()
+{
+	char **domain_list, **map_list = NULL;
+	int domain_num;
+	int i, j;
+	char *myself = "map_id_list_init";
+	char mapbuf[MAXPATHLEN];
+	int mapbuf_len = sizeof (mapbuf);
+	int map_name_len;
+	int seqnum = 0;
+	int rc = 0;
+
+	for (i = 0; i < MAXHASH; i++) {
+		map_id_list[i] = NULL;
+	}
+
+	domain_num = get_mapping_domain_list(&domain_list);
+	for (i = 0; i < domain_num; i++) {
+		if (map_list) {
+			free_map_list(map_list);
+			map_list = NULL;
+		}
+
+		/* get map list from mapping file */
+		map_list = get_mapping_map_list(domain_list[i]);
+		if (map_list == NULL) {
+			/* no map for this domain in mapping file */
+			logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+			    "%s: get_mapping_map_list()"
+			    " found no map for domain %s",
+			    myself, domain_list[i]);
+		}
+
+		/* add maps from /var/yp/<domain> */
+		if (add_map_domain_to_list(domain_list[i], &map_list) ==
+		    FALSE) {
+			logmsg(MSG_NOTIMECHECK, LOG_ERR,
+			    "%s: add_map_domain_to_list() failed", myself);
+			free_map_id_list();
+			if (map_list) free_map_list(map_list);
+			return (-1);
+		}
+
+		if (map_list == NULL || map_list[0] == NULL) {
+			logmsg(MSG_NOTIMECHECK, LOG_DEBUG,
+			    "%s: no map in domain %s",
+			    myself, domain_list[i]);
+			continue;
+		}
+
+		for (j = 0; map_list[j] != NULL; j++) {
+			/* build long name */
+			map_name_len = ypdbpath_sz + 1 +
+					strlen(domain_list[i]) + 1 +
+					strlen(NTOL_PREFIX) +
+					strlen(map_list[j]) + 1;
+			if (map_name_len > mapbuf_len) {
+				logmsg(MSG_NOTIMECHECK, LOG_ERR,
+				    "%s: map name too long for %s",
+				    " in domain %s", myself, map_list[j],
+				    domain_list[i]);
+				free_map_id_list();
+				if (map_list) free_map_list(map_list);
+				return (-1);
+			}
+			(void) memset(mapbuf, 0, mapbuf_len);
+			(void) snprintf(mapbuf, map_name_len, "%s%c%s%c%s%s",
+				ypdbpath, SEP_CHAR, domain_list[i], SEP_CHAR,
+				NTOL_PREFIX, map_list[j]);
+
+			if (insert_map_in_list(mapbuf, seqnum)
+				    == FAILURE) {
+				logmsg(MSG_NOTIMECHECK, LOG_ERR,
+				    "%s: failed to insert map %s",
+				    " in domain %s", myself, map_list[j]);
+				free_map_id_list();
+				if (map_list) free_map_list(map_list);
+				return (-1);
+			}
+			seqnum++;
+		}
+	}
+
+	max_map = seqnum;
+
+#ifdef NISDB_LDAP_DEBUG
+	dump_map_id_list();
+#endif
+
+	/*
+	 * If more maps than allocated spaces in shared memory, that's a failure
+	 * probably need to free previously allocated memory if failure,
+	 * before returning.
+	 */
+	if (max_map > MAXHASH) {
+		rc = -1;
+		logmsg(MSG_NOTIMECHECK, LOG_ERR,
+		    "%s: too many maps (%d)",
+		    myself, max_map);
+		free_map_id_list();
+	}
+	if (map_list) free_map_list(map_list);
+	return (rc);
+}
+
+/*
+ * FUNCTION :   get_list_max()
+ *
+ * DESCRIPTION: return references to static variables map_id_list
+ *              and max_map;
+ *
+ * GIVEN :      address for referencing map_id_list
+ *              address for referencing max_map
+ *
+ * RETURNS :    nothing
+ */
+void
+get_list_max(map_id_elt_t ***list, int *max)
+{
+	*list = map_id_list;
+	*max = max_map;
 }

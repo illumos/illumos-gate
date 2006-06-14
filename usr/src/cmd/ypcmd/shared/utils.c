@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@ USE_DBM
  */
 bool check_map_existence(char *);
 void logprintf2(char *format, ...);
+extern bool ypcheck_map_existence_yptol();
 
 /*
  * This checks to see if the source map files exist, then renames them to the
@@ -269,76 +269,12 @@ logprintf2(char *format, ...)
  * the name correctly.  Errors in the stat call will be reported at this level,
  * however, the non-existence of a file is not considered an error, and so will
  * not be reported.
+ *
+ * Calls ypcheck_map_existence_yptol() defined in
+ * usr/src/lib/libnisdb/yptol/shim_ancil.c
  */
 bool
 ypcheck_map_existence(char *pname)
 {
-	char dbfile[MAXNAMLEN + sizeof (TTL_POSTFIX) + 1];
-	struct stat filestat;
-	int len;
-
-	if (!pname || ((len = (int)strlen(pname)) == 0) ||
-		(len + sizeof (dbm_pag)) > (MAXNAMLEN + 1)) {
-		return (FALSE);
-	}
-
-	errno = 0;
-
-	/* Check for existance of .dir file */
-	(void) strcpy(dbfile, pname);
-	(void) strcat(dbfile, dbm_dir);
-
-	if (stat(dbfile, &filestat) == -1) {
-		if (errno != ENOENT) {
-			(void) fprintf(stderr,
-				"ypserv:  Stat error on map file %s.\n",
-									dbfile);
-		}
-		return (FALSE);
-	}
-
-	/* Check for existance of .pag file */
-	(void) strcpy(dbfile, pname);
-	(void) strcat(dbfile, dbm_pag);
-
-	if (stat(dbfile, &filestat) == -1) {
-		if (errno != ENOENT) {
-			(void) fprintf(stderr,
-				"ypserv:  Stat error on map file %s.\n",
-									dbfile);
-		    }
-		return (FALSE);
-	}
-
-	if (yptol_mode) {
-		/* Check for existance of TTL .dir file */
-		(void) strcpy(dbfile, pname);
-		(void) strcat(dbfile, TTL_POSTFIX);
-		(void) strcat(dbfile, dbm_dir);
-
-		if (stat(dbfile, &filestat) == -1) {
-			if (errno != ENOENT) {
-				(void) fprintf(stderr,
-					"ypserv:  Stat error on map file %s.\n",
-									dbfile);
-			}
-			return (FALSE);
-		}
-
-		/* Check for existance of TTL .pag file */
-		(void) strcpy(dbfile, pname);
-		(void) strcat(dbfile, TTL_POSTFIX);
-		(void) strcat(dbfile, dbm_pag);
-
-		if (stat(dbfile, &filestat) == -1) {
-			if (errno != ENOENT) {
-				(void) fprintf(stderr,
-					"ypserv:  Stat error on map file %s.\n",
-									dbfile);
-			    }
-			    return (FALSE);
-		}
-	}
-
-	return (TRUE);
+	return (ypcheck_map_existence_yptol(pname));
 }

@@ -30,9 +30,11 @@
 #include <sys/mman.h>
 #include <thread.h>
 #include <synch.h>
+#include <strings.h>
 #include <ndbm.h>
 #include "../ypsym.h"
 #include "../ypdefs.h"
+#include "shim.h"
 
 /*
  *  These routines provide mutual exclusion between ypserv and ypxfr.
@@ -57,17 +59,65 @@ typedef struct lockarray lockarray;
 static struct lockarray	*shmlockarray;
 static int	lockfile;
 
+/*
+ * Hash functions, used for by the locking mechanism.
+ *
+ * - hash() is the front-end function that gets called.
+ * - get_map_id() returns a unique int value per map.
+ *      It is used in N2L mode only.
+ *      It is called by hash() in N2L mode.
+ */
+int
+get_map_id(char *map_name, int index)
+{
+	map_id_elt_t *cur_elt;
+	/*
+	 * Local references to hash table for map lists
+	 * and to max number of maps
+	 */
+	map_id_elt_t **map_list_p;
+	int max_map;
+
+	/* initializes map_list_p & max_map */
+	get_list_max(&map_list_p, &max_map);
+
+	cur_elt = map_list_p[index];
+	while (cur_elt != NULL) {
+		if (strcmp(map_name, cur_elt->map_name) == 0) {
+			/* found */
+			return (cur_elt->map_id);
+		}
+		cur_elt = cur_elt->next;
+	}
+	syslog(LOG_WARNING, "get_map_id: no hash id found for %s"
+		", giving max_map value (%d)",
+		map_name, max_map);
+	/*
+	 * max_map does not match any map id, hence
+	 * will not trigger any lock collision
+	 * with existing maps.
+	 * Needed for yp regular locking mechanism.
+	 */
+	return (max_map);
+}
+
 int
 hash(char *s)
 {
 	unsigned int n = 0;
 	int i;
+	char *map_name = s;
 
 	for (i = 1; *s; i += 10, s++) {
 		n += i * (*s);
 	}
 	n %= MAXHASH;
-	return (n);
+
+	if (yptol_mode & yptol_newlock) {
+		return (get_map_id(map_name, n));
+	} else {
+		return (n);
+	}
 }
 
 bool
