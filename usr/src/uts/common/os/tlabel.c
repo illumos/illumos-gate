@@ -328,8 +328,16 @@ getflabel(vnode_t *vp)
 		goto zone_out;
 	}
 
-	VFS_HOLD(vfsp);
-	vfs_is_held = B_TRUE;
+	/*
+	 * If a mountpoint exists, hold the vfs while we reference it.
+	 * Otherwise if mountpoint is NULL it should not be held (e.g.,
+	 * a hold/release on spec_vfs would result in an attempted free
+	 * and panic.)
+	 */
+	if (vfsp->vfs_mntpt != NULL) {
+		VFS_HOLD(vfsp);
+		vfs_is_held = B_TRUE;
+	}
 
 	zone = zone_find_by_any_path(vpath, B_FALSE);
 
