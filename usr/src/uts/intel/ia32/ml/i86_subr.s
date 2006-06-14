@@ -3193,7 +3193,7 @@ vpanic_common:
 	movq	0x30(%rbx), %rcx
 	movq	%rcx, REGOFF_RAX(%rsp)
 	movq	0x38(%rbx), %rcx
-	movq	%rbx, REGOFF_RBX(%rsp)
+	movq	%rcx, REGOFF_RBX(%rsp)
 	movq	0x58(%rbx), %rcx
 
 	movq	%rcx, REGOFF_RBP(%rsp)
