@@ -41,6 +41,7 @@
 #include	<string.h>
 #include	<limits.h>
 #include	<debug.h>
+#include	<unistd.h>
 #include	"msg.h"
 #include	"_libld.h"
 
@@ -76,24 +77,54 @@ ld_lcm(Xword a, Xword b)
 uintptr_t
 ld_open_outfile(Ofl_desc * ofl)
 {
-	mode_t		mask, mode;
+	mode_t		mode;
 	struct stat	status;
-	int		exists = 0;
+
+	/* Determine if the output file already exists */
+	if (stat(ofl->ofl_name, &status) == 0) {
+		if ((status.st_mode & S_IFMT) != S_IFREG) {
+			/*
+			 * It is not a regular file, so don't delete it
+			 * or allow it to be deleted.  This allows root
+			 * users to specify /dev/null output file for
+			 * verification links.
+			 */
+			ofl->ofl_flags1 |= FLG_OF1_NONREG;
+		} else {
+			/*
+			 * It's a regular file, so unlink it. In standard
+			 * Unix fashion, the old file will continue to
+			 * exist until its link count drops to 0 and no
+			 * process has the file open. In the meantime, we
+			 * create a new file (inode) under the same name,
+			 * available for new use.
+			 *
+			 * The advantage of this policy is that creating
+			 * a new executable or sharable library does not
+			 * corrupt existing processes using the old file.
+			 * A possible disadvantage is that if the existing
+			 * file has a (link_count > 1), the other names will
+			 * continue to reference the old inode, thus
+			 * breaking the link.
+			 */
+			if ((unlink(ofl->ofl_name) == -1) &&
+			    (errno != ENOENT)) {
+				int err = errno;
+
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+					MSG_INTL(MSG_SYS_UNLINK),
+					ofl->ofl_name, strerror(err));
+				return (S_ERROR);
+			}
+		}
+	}
 
 	/*
 	 * Determine the required file mode from the type of output file we
 	 * are creating.
 	 */
-	if (ofl->ofl_flags & (FLG_OF_EXEC | FLG_OF_SHAROBJ))
-		mode = 0777;
-	else
-		mode = 0666;
-
-	/*
-	 * Determine if the output file already exists.
-	 */
-	if (stat(ofl->ofl_name, &status) == 0)
-		exists++;
+	mode = (ofl->ofl_flags & (FLG_OF_EXEC | FLG_OF_SHAROBJ))
+		? 0777 : 0666;
 
 	/*
 	 * Open (or create) the output file name (ofl_fd acts as a global
@@ -107,25 +138,6 @@ ld_open_outfile(Ofl_desc * ofl)
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
 		    ofl->ofl_name, strerror(err));
 		return (S_ERROR);
-	}
-
-	/*
-	 * If we've just created this file the modes will be fine, however if
-	 * the file had already existed make sure the modes are correct.
-	 */
-	if (exists) {
-		/*
-		 * If the output file is not a regular file, don't change the
-		 * mode, or allow it to be deleted.  This allows root users to
-		 * specify /dev/null output file for verification links.
-		 */
-		if ((status.st_mode & S_IFMT) != S_IFREG) {
-			ofl->ofl_flags1 |= FLG_OF1_NONREG;
-		} else {
-			mask = umask(0);
-			(void) umask(mask);
-			(void) chmod(ofl->ofl_name, mode & ~mask);
-		}
 	}
 
 	return (1);

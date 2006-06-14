@@ -370,6 +370,7 @@
 # System call messages
 
 @ MSG_SYS_OPEN		"file %s: open failed: %s"
+@ MSG_SYS_UNLINK	"file %s: unlink failed: %s"
 @ MSG_SYS_MMAP		"file %s: mmap failed: %s"
 @ MSG_SYS_MMAPANON	"file %s: mmap anon failed: %s"
 

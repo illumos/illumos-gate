@@ -1106,3 +1106,4 @@ Bugid   Risk Synopsis
 6429504 crle(1) shows wrong defaults for non-existent 64-bit config file
 6431835 data corruption on x64 in 64-bit mode while LD_PROFILE is in effect
 6423051 static TLS support within the link-editors needs a major face lift (D)
+6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
