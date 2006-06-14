@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +280,190 @@ uhci_hcdi_polled_read(usb_console_info_impl_t *info, uint_t *num_characters)
 	return (USB_SUCCESS);
 }
 
+/*
+ * uhci_hcdi_polled_output_init:
+ *	This is the initialization routine for handling the USB serial
+ *	output in POLLED mode.  This routine is called after input_init
+ *	succeeded.
+ */
+int
+uhci_hcdi_polled_output_init(usba_pipe_handle_data_t *ph,
+	usb_console_info_impl_t *console_output_info)
+{
+	int		ret;
+	uhci_polled_t	*uhci_polledp;
+	uhci_state_t	*uhcip;
+
+	uhcip = uhci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
+
+	/*
+	 * Grab the uhci_int_mutex so that things don't change on us
+	 * if an interrupt comes in.
+	 */
+	mutex_enter(&uhcip->uhci_int_mutex);
+	ret = uhci_polled_init(ph, uhcip, console_output_info);
+	if (ret != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (ret);
+	}
+
+	uhci_polledp = (uhci_polled_t *)console_output_info->uci_private;
+	/*
+	 * Mark the structure so that if we are using it, we don't free
+	 * the structures if one of them is unplugged.
+	 */
+	uhci_polledp->uhci_polled_flags |= POLLED_OUTPUT_MODE;
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * uhci_hcdi_polled_output_fini:
+ */
+int
+uhci_hcdi_polled_output_fini(usb_console_info_impl_t *info)
+{
+	int			ret;
+	uhci_state_t		*uhcip;
+	uhci_polled_t		*uhci_polledp;
+
+	uhci_polledp = (uhci_polled_t *)info->uci_private;
+	uhcip = uhci_polledp->uhci_polled_uhcip;
+	mutex_enter(&uhcip->uhci_int_mutex);
+
+	ret = uhci_polled_fini(uhci_polledp, uhcip);
+	info->uci_private = NULL;
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	return (ret);
+}
+
+
+/*
+ * uhci_hcdi_polled_output_enter:
+ *	everything is done in input enter
+ */
+int
+uhci_hcdi_polled_output_enter(usb_console_info_impl_t *info)
+{
+	uhci_state_t		*uhcip;
+	uhci_polled_t		*uhci_polledp;
+
+	uhci_polledp = (uhci_polled_t *)info->uci_private;
+	uhcip = uhci_polledp->uhci_polled_uhcip;
+
+	/*
+	 * Check if the number of devices reaches the max number
+	 * we can support in polled mode
+	 */
+	if (uhcip->uhci_polled_count + 1 > MAX_NUM_FOR_KEYBORAD) {
+
+		return (USB_FAILURE);
+	}
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * uhci_hcdi_polled_output_exit:
+ *	everything is done in input exit
+ */
+/*ARGSUSED*/
+int
+uhci_hcdi_polled_output_exit(usb_console_info_impl_t *info)
+{
+	return (USB_SUCCESS);
+}
+
+static int uhci_polled_status;
+
+/*
+ * uhci_hcdi_polled_write:
+ *	Put a key character -- rewrite this!
+ */
+int
+uhci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
+    uint_t num_characters, uint_t *num_characters_written)
+{
+	int			i;
+	uhci_state_t		*uhcip;
+	uhci_polled_t		*uhci_polledp;
+	uhci_td_t		*td;
+	uhci_trans_wrapper_t	*tw;
+	uhci_pipe_private_t	*pp;
+	usba_pipe_handle_data_t	*ph;
+
+	uhci_polledp = (uhci_polled_t *)info->uci_private;
+	uhcip = uhci_polledp->uhci_polled_uhcip;
+	ph = uhci_polledp->uhci_polled_ph;
+	pp = (uhci_pipe_private_t *)ph->p_hcd_private;
+
+	td = uhci_polledp->uhci_polled_td;
+	tw = td->tw;
+
+	/* copy transmit buffer */
+	if (num_characters > POLLED_RAW_BUF_SIZE) {
+		cmn_err(CE_NOTE, "polled write size %d bigger than %d",
+		    num_characters, POLLED_RAW_BUF_SIZE);
+		num_characters = POLLED_RAW_BUF_SIZE;
+	}
+	tw->tw_length = num_characters;
+	ddi_put8(tw->tw_accesshandle, (uint8_t *)tw->tw_buf, *buf);
+	ddi_rep_put8(tw->tw_accesshandle, buf, (uint8_t *)tw->tw_buf,
+	    num_characters, DDI_DEV_AUTOINCR);
+
+	bzero((char *)td, sizeof (uhci_td_t));
+
+	td->tw = tw;
+	SetTD_c_err(uhcip, td, UHCI_MAX_ERR_COUNT);
+	SetTD_status(uhcip, td, UHCI_TD_ACTIVE);
+	SetTD_ioc(uhcip, td, INTERRUPT_ON_COMPLETION);
+	SetTD_mlen(uhcip, td, num_characters - 1);
+	SetTD_dtogg(uhcip, td, pp->pp_data_toggle);
+	ADJ_DATA_TOGGLE(pp);
+	SetTD_devaddr(uhcip, td, ph->p_usba_device->usb_addr);
+	SetTD_endpt(uhcip, td, ph->p_ep.bEndpointAddress &
+							END_POINT_ADDRESS_MASK);
+	SetTD_PID(uhcip, td, PID_OUT);
+	SetTD32(uhcip, td->buffer_address, tw->tw_cookie.dmac_address);
+
+	SetQH32(uhcip, uhci_polledp->uhci_polled_qh->element_ptr,
+	    TD_PADDR(td));
+
+	/*
+	 * Now, add the endpoint to the lattice that we will hang  our
+	 * TD's off of.
+	 */
+	for (i = uhcip->uhci_polled_count; i < NUM_FRAME_LST_ENTRIES;
+	    i += MIN_LOW_SPEED_POLL_INTERVAL) {
+		SetFL32(uhcip, uhcip->uhci_frame_lst_tablep[i],
+		    QH_PADDR(uhci_polledp->uhci_polled_qh) | HC_QUEUE_HEAD);
+	}
+
+	/* wait for xfer to finish */
+	while (GetTD_status(uhcip, td) & UHCI_TD_ACTIVE)
+#ifndef __sparc
+		invalidate_cache();
+#else
+		;
+#endif
+	*num_characters_written = GetTD_alen(uhcip, td) + 1;
+
+	/* Now, remove the endpoint from the lattice */
+	for (i = uhcip->uhci_polled_count; i < NUM_FRAME_LST_ENTRIES;
+	    i += MIN_LOW_SPEED_POLL_INTERVAL) {
+		SetFL32(uhcip, uhcip->uhci_frame_lst_tablep[i],
+		    HC_END_OF_LIST);
+	}
+
+	return (USB_SUCCESS);
+}
+
 
 /*
  * uhci_polled_init:
@@ -455,7 +638,7 @@ uhci_polled_save_state(uhci_polled_t	*uhci_polledp)
 	}
 
 	/*
-	 * Now, add the endpoint to the lattice that we will  hang  our
+	 * Now, add the endpoint to the lattice that we will hang  our
 	 * TD's off of.  We (assume always) need to poll this device at
 	 * every 8 ms.
 	 */
@@ -609,6 +792,7 @@ uhci_polled_insert_td_on_qh(uhci_polled_t *uhci_polledp,
 	uhci_state_t		*uhcip = uhci_polledp->uhci_polled_uhcip;
 	usb_ep_descr_t		*eptd;
 	uhci_trans_wrapper_t	*tw;
+	uint_t			direction;
 
 	/* Create the transfer wrapper */
 	if ((tw = uhci_polled_create_tw(uhci_polledp->uhci_polled_uhcip)) ==
@@ -627,16 +811,17 @@ uhci_polled_insert_td_on_qh(uhci_polled_t *uhci_polledp,
 	SetTD32(uhcip, td->link_ptr, HC_END_OF_LIST);
 
 	mutex_enter(&ph->p_usba_device->usb_mutex);
-	eptd = &ph->p_ep;
 	if (ph->p_usba_device->usb_port_status == USBA_LOW_SPEED_DEV) {
 		SetTD_ls(uhcip, td, LOW_SPEED_DEVICE);
 	}
 
+	eptd = &ph->p_ep;
+	direction = (UHCI_XFER_DIR(eptd) == USB_EP_DIR_OUT) ? PID_OUT : PID_IN;
 	SetTD_c_err(uhcip, td, UHCI_MAX_ERR_COUNT);
-	SetTD_mlen(uhcip, td, 0x7);
+	SetTD_mlen(uhcip, td, POLLED_RAW_BUF_SIZE - 1);
 	SetTD_devaddr(uhcip, td, ph->p_usba_device->usb_addr);
 	SetTD_endpt(uhcip, td, eptd->bEndpointAddress & END_POINT_ADDRESS_MASK);
-	SetTD_PID(uhcip, td, PID_IN);
+	SetTD_PID(uhcip, td, direction);
 	SetTD32(uhcip, td->buffer_address, tw->tw_cookie.dmac_address);
 	SetTD_ioc(uhcip, td, INTERRUPT_ON_COMPLETION);
 	SetTD_status(uhcip, td, UHCI_TD_ACTIVE);

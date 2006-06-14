@@ -38,6 +38,7 @@
 #include <sys/debug.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/esunddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/promif.h>
@@ -58,6 +59,7 @@ plat_support_serial_kbd_and_ms() {
 #define	CONS_SCREEN	0
 #define	CONS_TTYA	1
 #define	CONS_TTYB	2
+#define	CONS_USBSER	3
 
 static int
 console_type()
@@ -84,6 +86,17 @@ console_type()
 			boot_console = CONS_TTYA;
 		else if (strcmp(cons, "ttyb") == 0)
 			boot_console = CONS_TTYB;
+		else if (strcmp(cons, "usb-serial") == 0) {
+			(void) i_ddi_attach_hw_nodes("ehci");
+			(void) i_ddi_attach_hw_nodes("uhci");
+			(void) i_ddi_attach_hw_nodes("ohci");
+			/*
+			 * USB device enumerate asynchronously.
+			 * Wait 2 seconds for USB serial devices to attach.
+			 */
+			delay(drv_usectohz(2000000));
+			boot_console = CONS_USBSER;
+		}
 		ddi_prop_free(cons);
 	}
 	return (boot_console);
@@ -168,6 +181,28 @@ plat_mousepath(void)
 	return ("/isa/i8042@1,60/mouse@1");
 }
 
+/* return path of first usb serial device */
+static char *
+plat_usbser_path(void)
+{
+	extern dev_info_t *usbser_first_device(void);
+
+	dev_info_t *us_dip;
+	static char *us_path = NULL;
+
+	if (us_path)
+		return (us_path);
+
+	us_dip = usbser_first_device();
+	if (us_dip == NULL)
+		return (NULL);
+
+	us_path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(us_dip, us_path);
+	ndi_rele_devi(us_dip);	/* held from usbser_first_device */
+	return (us_path);
+}
+
 /*
  * Lacking support for com2 and com3, if that matters.
  * Another possible enhancement could be to use properties
@@ -181,6 +216,8 @@ plat_stdinpath(void)
 		return ("/isa/asy@1,3f8:a");
 	case CONS_TTYB:
 		return ("/isa/asy@1,2f8:b");
+	case CONS_USBSER:
+		return (plat_usbser_path());
 	case CONS_SCREEN:
 	default:
 		break;
@@ -196,6 +233,8 @@ plat_stdoutpath(void)
 		return ("/isa/asy@1,3f8:a");
 	case CONS_TTYB:
 		return ("/isa/asy@1,2f8:b");
+	case CONS_USBSER:
+		return (plat_usbser_path());
 	case CONS_SCREEN:
 	default:
 		break;

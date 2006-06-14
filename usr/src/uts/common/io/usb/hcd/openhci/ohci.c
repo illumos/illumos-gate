@@ -1194,6 +1194,36 @@ ohci_map_regs(ohci_state_t	*ohcip)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * The following simulated polling is for debugging purposes only.
+ * It is activated on x86 by setting usb-polling=true in GRUB or ohci.conf.
+ */
+static int
+ohci_is_polled(dev_info_t *dip)
+{
+	int ret;
+	char *propval;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "usb-polling", &propval) != DDI_SUCCESS)
+
+		return (0);
+
+	ret = (strcmp(propval, "true") == 0);
+	ddi_prop_free(propval);
+
+	return (ret);
+}
+
+static void
+ohci_poll_intr(void *arg)
+{
+	/* poll every millisecond */
+	for (;;) {
+		(void) ohci_intr(arg, NULL);
+		delay(drv_usectohz(1000));
+	}
+}
 
 /*
  * ohci_register_intrs_and_init_mutex:
@@ -1207,6 +1237,19 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 	    "ohci_register_intrs_and_init_mutex:");
+
+	if (ohci_is_polled(ohcip->ohci_dip)) {
+		extern pri_t maxclsyspri;
+
+		USB_DPRINTF_L1(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
+		    "ohci_register_intrs_and_init_mutex: "
+		    "running in simulated polled mode");
+
+		(void) thread_create(NULL, 0, ohci_poll_intr, ohcip, 0, &p0,
+		    TS_RUN, maxclsyspri);
+
+		goto skip_intr;
+	}
 
 	/* Get supported interrupt types */
 	if (ddi_intr_get_supported_types(ohcip->ohci_dip,
@@ -1257,6 +1300,7 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 		ohcip->ohci_flags |= OHCI_INTR;
 	}
 
+skip_intr:
 	/* Create prototype for SOF condition variable */
 	cv_init(&ohcip->ohci_SOF_cv, NULL, CV_DRIVER, NULL);
 

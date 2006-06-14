@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -330,6 +329,29 @@ serial_adjust_prop(void)
 	}
 }
 
+/* For console=usb-serial, store early output in a buffer */
+static char *usbser_buf;
+static char *usbser_cur;
+
+static void
+usbser_init(void)
+{
+	if (usbser_buf)
+		return;
+
+	usbser_cur = usbser_buf = bkmem_zalloc(MMU_PAGESIZE);
+	(void) bsetprop(NULL, "usb-serial-buf", &usbser_buf, sizeof (char *));
+}
+
+static void
+usbser_putchar(int c)
+{
+	if (usbser_buf == 0 || usbser_cur >= usbser_buf + MMU_PAGESIZE - 1)
+		return;
+
+	*usbser_cur++ = c;
+}
+
 char *
 console_init(char *bootstr)
 {
@@ -358,6 +380,8 @@ console_init(char *bootstr)
 			console = CONS_SCREEN_TEXT;
 		else if (strncmp(cons, "screen", 6) == 0)
 			console = CONS_SCREEN_TEXT;
+		else if (strncmp(cons, "usb-serial", 10) == 0)
+			console = CONS_USBSER;
 	}
 
 	/*
@@ -373,6 +397,7 @@ console_init(char *bootstr)
 	case CONS_TTYB:
 		/* leave initialization till later, when we know tty mode */
 		break;
+	case CONS_USBSER:	/* try screen for now */
 	case CONS_SCREEN_TEXT:
 	default:
 		clear_screen();
@@ -401,6 +426,8 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 				cons = CONS_TTYA;
 			else if (strcmp(consoledev, "ttyb") == 0)
 				cons = CONS_TTYB;
+			else if (strcmp(consoledev, "usb-serial") == 0)
+				cons = CONS_USBSER;
 			else if (strcmp(consoledev, "text") == 0)
 				cons = CONS_SCREEN_TEXT;
 			else if (strcmp(consoledev, "graphics") == 0)
@@ -436,6 +463,8 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 				serial_init();
 			}
 			break;
+		case CONS_USBSER:	/* see comments in _doputchar() */
+			/*FALLTHRU*/
 		case CONS_SCREEN_TEXT:
 			if (console_state != CONS_SCREEN_TEXT) {
 				clear_screen();
@@ -450,6 +479,9 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 	case CONS_TTYA:
 	case CONS_TTYB:
 		serial_init();
+		break;
+	case CONS_USBSER:
+		usbser_init();
 		break;
 	default:
 		if (get_videomode() == VGA_GRAPHICS) {
@@ -511,6 +543,15 @@ _doputchar(int c)
 	case CONS_TTYB:
 		serial_putchar(c);
 		return;
+	case CONS_USBSER:
+		/*
+		 * usbser_putchar() only prints to memory buffer, so
+		 * nothing is visible.  We fall through to print to
+		 * screen as well. This continues until kernel consconfig(),
+		 * after which putchar() is no longer called.
+		 */
+		usbser_putchar(c);
+		/*FALLTHRU*/
 	case CONS_SCREEN_TEXT:
 		screen_putchar(c);
 		return;

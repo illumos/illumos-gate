@@ -1204,11 +1204,34 @@ load_primary(struct module *mp, int lmid)
 }
 
 static int
+console_is_usb_serial(void)
+{
+	char *console;
+	int len, ret;
+
+	if ((len = BOP_GETPROPLEN(ops, "console")) == -1)
+		return (0);
+
+	console = kobj_zalloc(len, KM_WAIT|KM_TMP);
+	(void) BOP_GETPROP(ops, "console", console);
+	ret = (strcmp(console, "usb-serial") == 0);
+	kobj_free(console, len);
+
+	return (ret);
+}
+
+static int
 load_kmdb(val_t *bootaux)
 {
 	struct modctl *mctl;
 	struct module *mp;
 	Sym *sym;
+
+	if (console_is_usb_serial()) {
+		_kobj_printf(ops, "kmdb not loaded "
+		    "(unsupported on usb serial console)\n");
+		return (0);
+	}
 
 	_kobj_printf(ops, "Loading kmdb...\n");
 

@@ -788,6 +788,8 @@ uhci_alloc_hcdi_ops(uhci_state_t *uhcip)
 
 	hcdi_ops = usba_alloc_hcdi_ops();
 
+	hcdi_ops->usba_hcdi_ops_version = HCDI_OPS_VERSION_1;
+
 	hcdi_ops->usba_hcdi_pipe_open = uhci_hcdi_pipe_open;
 	hcdi_ops->usba_hcdi_pipe_close	= uhci_hcdi_pipe_close;
 	hcdi_ops->usba_hcdi_pipe_reset = uhci_hcdi_pipe_reset;
@@ -812,6 +814,13 @@ uhci_alloc_hcdi_ops(uhci_state_t *uhcip)
 	hcdi_ops->usba_hcdi_console_read = uhci_hcdi_polled_read;
 	hcdi_ops->usba_hcdi_console_input_exit = uhci_hcdi_polled_input_exit;
 	hcdi_ops->usba_hcdi_console_input_fini = uhci_hcdi_polled_input_fini;
+
+	hcdi_ops->usba_hcdi_console_output_init = uhci_hcdi_polled_output_init;
+	hcdi_ops->usba_hcdi_console_output_enter =
+	    uhci_hcdi_polled_output_enter;
+	hcdi_ops->usba_hcdi_console_write = uhci_hcdi_polled_write;
+	hcdi_ops->usba_hcdi_console_output_exit = uhci_hcdi_polled_output_exit;
+	hcdi_ops->usba_hcdi_console_output_fini = uhci_hcdi_polled_output_fini;
 
 	return (hcdi_ops);
 }

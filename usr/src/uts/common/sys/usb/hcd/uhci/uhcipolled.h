@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +46,8 @@ extern "C" {
  */
 #define	POLLED_INPUT_MODE		0x01
 #define	POLLED_INPUT_MODE_INUSE		0x04
+#define	POLLED_OUTPUT_MODE		0x10
+#define	POLLED_OUTPUT_MODE_INUSE	0x40
 
 /*
  * For uhci bandwidth of low speed interrupt devices limits,
@@ -106,6 +107,13 @@ int	uhci_hcdi_polled_input_fini(usb_console_info_impl_t *);
 int	uhci_hcdi_polled_input_enter(usb_console_info_impl_t *);
 int	uhci_hcdi_polled_input_exit(usb_console_info_impl_t *);
 int	uhci_hcdi_polled_read(usb_console_info_impl_t *, uint_t *);
+int	uhci_hcdi_polled_output_init(usba_pipe_handle_data_t *,
+	    usb_console_info_impl_t *);
+int	uhci_hcdi_polled_output_fini(usb_console_info_impl_t *);
+int	uhci_hcdi_polled_output_enter(usb_console_info_impl_t *);
+int	uhci_hcdi_polled_output_exit(usb_console_info_impl_t *);
+int	uhci_hcdi_polled_write(usb_console_info_impl_t *, uchar_t *,
+	    uint_t, uint_t *);
 
 /*
  * External Function Prototypes:

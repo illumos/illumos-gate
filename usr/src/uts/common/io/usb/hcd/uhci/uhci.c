@@ -195,6 +195,36 @@ _fini(void)
 	return (error);
 }
 
+/*
+ * The following simulated polling is for debugging purposes only.
+ * It is activated on x86 by setting usb-polling=true in GRUB or uhci.conf.
+ */
+static int
+uhci_is_polled(dev_info_t *dip)
+{
+	int ret;
+	char *propval;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "usb-polling", &propval) != DDI_SUCCESS)
+
+		return (0);
+
+	ret = (strcmp(propval, "true") == 0);
+	ddi_prop_free(propval);
+
+	return (ret);
+}
+
+static void
+uhci_poll_intr(void *arg)
+{
+	/* poll every msec */
+	for (;;) {
+		(void) uhci_intr(arg, NULL);
+		delay(drv_usectohz(1000));
+	}
+}
 
 /*
  * Host Controller Driver (HCD) Auto configuration entry points
@@ -210,7 +240,7 @@ _fini(void)
 static int
 uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int				instance;
+	int				instance, polled;
 	int				i, intr_types;
 	uhci_state_t			*uhcip = NULL;
 	usba_hcdi_register_args_t	hcdi_args;
@@ -247,6 +277,11 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Save the dip and instance */
 	uhcip->uhci_dip		= dip;
 	uhcip->uhci_instance	= instance;
+
+	polled = uhci_is_polled(dip);
+	if (polled)
+
+		goto skip_intr;
 
 	/* Get supported interrupt types */
 	if (ddi_intr_get_supported_types(uhcip->uhci_dip,
@@ -296,6 +331,7 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		uhcip->uhci_intr_type = DDI_INTR_TYPE_FIXED;
 	}
 
+skip_intr:
 	/* Semaphore to serialize opens and closes */
 	sema_init(&uhcip->uhci_ocsem, 1, NULL, SEMA_DRIVER, NULL);
 
@@ -324,7 +360,16 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uhcip->uhci_ctlr_init_flag = B_FALSE;
 
 	/* Enable all interrupts */
-	if (uhcip->uhci_intr_cap & DDI_INTR_FLAG_BLOCK) {
+	if (polled) {
+		extern pri_t maxclsyspri;
+
+		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_attach: running in simulated polled mode.");
+
+		/* create thread to poll */
+		(void) thread_create(NULL, 0, uhci_poll_intr, uhcip, 0, &p0,
+		    TS_RUN, maxclsyspri);
+	} else if (uhcip->uhci_intr_cap & DDI_INTR_FLAG_BLOCK) {
 		/* Call ddi_intr_block_enable() for MSI interrupts */
 		(void) ddi_intr_block_enable(uhcip->uhci_htable,
 		    uhcip->uhci_intr_cnt);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,8 @@ extern "C" {
  * USBAI interfaces. Refer to usbai.h for detailed description
  */
 #define	HCDI_OPS_VERSION_0 0
-#define	HCDI_OPS_VERSION	HCDI_OPS_VERSION_0
+#define	HCDI_OPS_VERSION_1 1
+#define	HCDI_OPS_VERSION	HCDI_OPS_VERSION_1
 
 typedef struct usba_hcdi_ops {
 	int	usba_hcdi_ops_version;	/* implementation version */
@@ -178,6 +178,29 @@ typedef struct usba_hcdi_ops {
 	 */
 	int	(*usba_hcdi_console_input_exit)(
 		usb_console_info_impl_t		*console_input_info);
+
+
+	/*
+	 * VERSION 1 ops: support for polled output
+	 */
+	int	(*usba_hcdi_console_output_init)(
+		usba_pipe_handle_data_t		*pipe_handle,
+		usb_console_info_impl_t		*console_output_info);
+
+	int	(*usba_hcdi_console_output_fini)(
+		usb_console_info_impl_t		*console_output_info);
+
+	int	(*usba_hcdi_console_output_enter)(
+		usb_console_info_impl_t		*console_output_info);
+
+	int	(*usba_hcdi_console_write)(
+		usb_console_info_impl_t		*console_output_info,
+		uchar_t				*buf,
+		uint_t				num_characters,
+		uint_t				*num_characters_written);
+
+	int	(*usba_hcdi_console_output_exit)(
+		usb_console_info_impl_t		*console_output_info);
 } usba_hcdi_ops_t;
 
 

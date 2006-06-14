@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +83,9 @@ static void	pl2303_start(ds_hdl_t, uint_t, int);
 static int	pl2303_fifo_flush(ds_hdl_t, uint_t, int);
 static int	pl2303_fifo_drain(ds_hdl_t, uint_t, int);
 
+/* polled I/O support */
+static usb_pipe_handle_t pl2303_out_pipe(ds_hdl_t, uint_t);
+static usb_pipe_handle_t pl2303_in_pipe(ds_hdl_t, uint_t);
 
 /*
  * Sub-routines
@@ -165,7 +167,9 @@ ds_ops_t ds_ops = {
 	pl2303_stop,
 	pl2303_start,
 	pl2303_fifo_flush,
-	pl2303_fifo_drain
+	pl2303_fifo_drain,
+	pl2303_out_pipe,
+	pl2303_in_pipe
 };
 
 
@@ -2137,4 +2141,22 @@ pl2303_put_head(mblk_t **mpp, mblk_t *bp)
 		linkb(bp, *mpp);
 	}
 	*mpp = bp;
+}
+
+/*ARGSUSED*/
+static usb_pipe_handle_t
+pl2303_out_pipe(ds_hdl_t hdl, uint_t port_num)
+{
+	pl2303_state_t	*plp = (pl2303_state_t *)hdl;
+
+	return (plp->pl_bulkout_ph);
+}
+
+/*ARGSUSED*/
+static usb_pipe_handle_t
+pl2303_in_pipe(ds_hdl_t hdl, uint_t port_num)
+{
+	pl2303_state_t	*plp = (pl2303_state_t *)hdl;
+
+	return (plp->pl_bulkin_ph);
 }

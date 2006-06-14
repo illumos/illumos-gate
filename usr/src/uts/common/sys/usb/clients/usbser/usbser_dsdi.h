@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,6 +195,10 @@ typedef struct ds_ops {
 	 * 'timeout' seconds (zero timeout means wait forever)
 	 */
 	int	(*ds_fifo_drain)(ds_hdl_t, uint_t port_num, int timeout);
+
+	/* V1 ops for polled I/O */
+	usb_pipe_handle_t (*ds_out_pipe)(ds_hdl_t, uint_t port_num);
+	usb_pipe_handle_t (*ds_in_pipe)(ds_hdl_t, uint_t port_num);
 } ds_ops_t;
 
 /*
@@ -203,7 +206,8 @@ typedef struct ds_ops {
  */
 enum {
 	DS_OPS_VERSION_V0	= 0,
-	DS_OPS_VERSION		= DS_OPS_VERSION_V0
+	DS_OPS_VERSION_V1	= 1,
+	DS_OPS_VERSION		= DS_OPS_VERSION_V1
 };
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_USB_CONSOLE_INPUT_H
@@ -113,6 +112,31 @@ int	usb_console_read(
  * in before OBP took control.
  */
 int	usb_console_input_exit(
+	usb_console_info_t	console_info_handle
+);
+
+int	usb_console_output_init(
+	dev_info_t		*dip,
+	usb_pipe_handle_t	pipe_handle,
+	usb_console_info_t	*console_info_handle
+);
+
+int	usb_console_output_fini(
+	usb_console_info_t console_output_info
+);
+
+int	usb_console_output_enter(
+	usb_console_info_t	console_info_handle
+);
+
+int	usb_console_write(
+	usb_console_info_t	console_info_handle,
+	uchar_t			*buf,
+	uint_t			num_characters,
+	uint_t			*num_characters_written
+);
+
+int	usb_console_output_exit(
 	usb_console_info_t	console_info_handle
 );
 

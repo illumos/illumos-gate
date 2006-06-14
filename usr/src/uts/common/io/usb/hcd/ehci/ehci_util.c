@@ -643,6 +643,36 @@ ehci_map_regs(ehci_state_t	*ehcip)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * The following simulated polling is for debugging purposes only.
+ * It is activated on x86 by setting usb-polling=true in GRUB or ehci.conf.
+ */
+static int
+ehci_is_polled(dev_info_t *dip)
+{
+	int ret;
+	char *propval;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "usb-polling", &propval) != DDI_SUCCESS)
+
+		return (0);
+
+	ret = (strcmp(propval, "true") == 0);
+	ddi_prop_free(propval);
+
+	return (ret);
+}
+
+static void
+ehci_poll_intr(void *arg)
+{
+	/* poll every msec */
+	for (;;) {
+		(void) ehci_intr(arg, NULL);
+		delay(drv_usectohz(1000));
+	}
+}
 
 /*
  * ehci_register_intrs_and_init_mutex:
@@ -671,6 +701,20 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 	} else {
 		/* Set the MSI enable flag from the global EHCI MSI tunable */
 		ehcip->ehci_msi_enabled = ehci_enable_msi;
+	}
+
+	/* launch polling thread instead of enabling pci interrupt */
+	if (ehci_is_polled(ehcip->ehci_dip)) {
+		extern pri_t maxclsyspri;
+
+		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_register_intrs_and_init_mutex: "
+		    "running in simulated polled mode");
+
+		(void) thread_create(NULL, 0, ehci_poll_intr, ehcip, 0, &p0,
+		    TS_RUN, maxclsyspri);
+
+		goto skip_intr;
 	}
 
 #if defined(__x86)
@@ -744,6 +788,7 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 		ehcip->ehci_flags |= EHCI_INTR;
 	}
 
+skip_intr:
 	/* Create prototype for advance on async schedule */
 	cv_init(&ehcip->ehci_async_schedule_advance_cv,
 	    NULL, CV_DRIVER, NULL);

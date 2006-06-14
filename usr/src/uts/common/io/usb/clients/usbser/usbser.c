@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/termio.h>
 #include <sys/termiox.h>
 #include <sys/stropts.h>
@@ -50,11 +50,13 @@
 #include <sys/strsun.h>
 #include <sys/strtty.h>
 #include <sys/policy.h>
+#include <sys/consdev.h>
 
 #include <sys/usb/usba.h>
 #include <sys/usb/clients/usbser/usbser_var.h>
 #include <sys/usb/clients/usbser/usbser_dsdi.h>
 #include <sys/usb/clients/usbser/usbser_rseq.h>
+#include <sys/usb/usba/genconsole.h>
 
 /* autoconfiguration subroutines */
 static int	usbser_rseq_do_cb(rseq_t *, int, uintptr_t);
@@ -149,6 +151,32 @@ uint_t   usbser_errlevel = USB_LOG_L4;
 uint_t   usbser_errmask = DPRINT_MASK_ALL;
 uint_t   usbser_instance_debug = (uint_t)-1;
 
+/* usb serial console */
+static struct usbser_state *usbser_list;
+static kmutex_t usbser_lock;
+static int usbser_console_abort;
+static usb_console_info_t console_input, console_output;
+static uchar_t *console_input_buf;
+static uchar_t *console_input_start, *console_input_end;
+
+static void usbser_putchar(cons_polledio_arg_t, uchar_t);
+static int usbser_getchar(cons_polledio_arg_t);
+static boolean_t usbser_ischar(cons_polledio_arg_t);
+static void usbser_polledio_enter(cons_polledio_arg_t);
+static void usbser_polledio_exit(cons_polledio_arg_t);
+static int usbser_polledio_init(usbser_port_t *);
+static void usbser_polledio_fini(usbser_port_t *);
+
+static struct cons_polledio usbser_polledio = {
+	CONSPOLLEDIO_V1,
+	NULL,	/* to be set later */
+	usbser_putchar,
+	usbser_getchar,
+	usbser_ischar,
+	usbser_polledio_enter,
+	usbser_polledio_exit
+};
+
 /* various statistics. TODO: replace with kstats */
 static int usbser_st_tx_data_loss = 0;
 static int usbser_st_rx_data_loss = 0;
@@ -197,14 +225,28 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int err;
+
+	mutex_init(&usbser_lock, NULL, MUTEX_DRIVER, (void *)NULL);
+	if (err = mod_install(&modlinkage))
+		mutex_destroy(&usbser_lock);
+
+	return (err);
 }
 
 
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int err;
+
+	if (err = mod_remove(&modlinkage))
+
+		return (err);
+
+	mutex_destroy(&usbser_lock);
+
+	return (0);
 }
 
 
@@ -277,6 +319,62 @@ static rseq_t rseq_att[] = {
 	RSEQ(NULL,			usbser_set_dev_state_init)
 };
 
+static void
+usbser_insert(struct usbser_state *usp)
+{
+	struct usbser_state *tmp;
+
+	mutex_enter(&usbser_lock);
+	tmp = usbser_list;
+	if (tmp == NULL)
+		usbser_list = usp;
+	else {
+		while (tmp->us_next)
+			tmp = tmp->us_next;
+		tmp->us_next = usp;
+	}
+	mutex_exit(&usbser_lock);
+}
+
+static void
+usbser_remove(struct usbser_state *usp)
+{
+	struct usbser_state *tmp, *prev = NULL;
+
+	mutex_enter(&usbser_lock);
+	tmp = usbser_list;
+	while (tmp != usp) {
+		prev = tmp;
+		tmp = tmp->us_next;
+	}
+	ASSERT(tmp == usp);	/* must exist, else attach/detach wrong */
+	if (prev)
+		prev->us_next = usp->us_next;
+	else
+		usbser_list = usp->us_next;
+	usp->us_next = NULL;
+	mutex_exit(&usbser_lock);
+}
+
+/*
+ * Return the first serial device, with dip held. This is called
+ * from the console subsystem to place console on usb serial device.
+ */
+dev_info_t *
+usbser_first_device(void)
+{
+	dev_info_t *dip = NULL;
+
+	mutex_enter(&usbser_lock);
+	if (usbser_list) {
+		dip = usbser_list->us_dip;
+		ndi_hold_devi(dip);
+	}
+	mutex_exit(&usbser_lock);
+
+	return (dip);
+}
+
 int
 usbser_attach(dev_info_t *dip, ddi_attach_cmd_t cmd,
 		void *statep, ds_ops_t *ds_ops)
@@ -317,6 +415,7 @@ usbser_attach(dev_info_t *dip, ddi_attach_cmd_t cmd,
 
 	if (rseq_do(rseq_att, NELEM(rseq_att), (uintptr_t)usp, 0) == RSEQ_OK) {
 		ddi_report_dev(dip);
+		usbser_insert(usp);
 
 		return (DDI_SUCCESS);
 	} else {
@@ -340,6 +439,7 @@ usbser_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
 	switch (cmd) {
 	case DDI_DETACH:
 		USB_DPRINTF_L4(DPRINT_DETACH, usp->us_lh, "usbser_detach");
+		usbser_remove(usp);
 		(void) rseq_undo(rseq_att, NELEM(rseq_att), (uintptr_t)usp, 0);
 		USB_DPRINTF_L4(DPRINT_DETACH, NULL,
 			"usbser_detach.%d: end", instance);
@@ -2489,6 +2589,10 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 	case TIOCMBIC:
 	case TIOCMBIS:
 	case TIOCMSET:
+	case CONSOPENPOLLEDIO:
+	case CONSCLOSEPOLLEDIO:
+	case CONSSETABORTENABLE:
+	case CONSGETABORTENABLE:
 		/*
 		 * For the above ioctls do not call ttycommon_ioctl() because
 		 * this function frees up the message block (mp->b_cont) that
@@ -2662,6 +2766,71 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 			mp->b_cont->b_wptr += sizeof (int);
 			iocp->ioc_count = sizeof (int);
 		}
+
+		break;
+	case CONSOPENPOLLEDIO:
+		error = usbser_polledio_init(pp);
+		if (error != 0)
+
+			break;
+
+		error = miocpullup(mp, sizeof (struct cons_polledio *));
+		if (error != 0)
+
+			break;
+
+		*(struct cons_polledio **)mp->b_cont->b_rptr = &usbser_polledio;
+
+		mp->b_datap->db_type = M_IOCACK;
+
+		break;
+	case CONSCLOSEPOLLEDIO:
+		usbser_polledio_fini(pp);
+		mp->b_datap->db_type = M_IOCACK;
+		mp->b_datap->db_type = M_IOCACK;
+		iocp->ioc_error = 0;
+		iocp->ioc_rval = 0;
+
+		break;
+	case CONSSETABORTENABLE:
+		error = secpolicy_console(iocp->ioc_cr);
+		if (error != 0)
+
+			break;
+
+		if (iocp->ioc_count != TRANSPARENT) {
+			error = EINVAL;
+
+			break;
+		}
+
+		/*
+		 * To do: implement console abort support
+		 * This involves adding a console flag to usbser
+		 * state structure. If flag is set, parse input stream
+		 * for abort sequence (see asy for example).
+		 *
+		 * For now, run mdb -K to get kmdb prompt.
+		 */
+		if (*(intptr_t *)mp->b_cont->b_rptr)
+			usbser_console_abort = 1;
+		else
+			usbser_console_abort = 0;
+
+		mp->b_datap->db_type = M_IOCACK;
+		iocp->ioc_error = 0;
+		iocp->ioc_rval = 0;
+
+		break;
+	case CONSGETABORTENABLE:
+		/*CONSTANTCONDITION*/
+		ASSERT(sizeof (boolean_t) <= sizeof (boolean_t *));
+		/*
+		 * Store the return value right in the payload
+		 * we were passed.  Crude.
+		 */
+		mcopyout(mp, NULL, sizeof (boolean_t), NULL, NULL);
+		*(boolean_t *)mp->b_cont->b_rptr = (usbser_console_abort != 0);
 
 		break;
 	default:
@@ -3206,4 +3375,115 @@ usbser_ioctl2str(int ioctl)
 	}
 
 	return (str);
+}
+
+/*
+ * Polled IO support
+ */
+
+/* called once  by consconfig() when polledio is opened */
+static int
+usbser_polledio_init(usbser_port_t *pp)
+{
+	int err;
+	usb_pipe_handle_t hdl;
+	ds_ops_t *ds_ops = pp->port_ds_ops;
+
+	/* only one serial line console supported */
+	if (console_input != NULL)
+
+		return (USB_FAILURE);
+
+	/* check if underlying driver supports polled io */
+	if (ds_ops->ds_version < DS_OPS_VERSION_V1 ||
+	    ds_ops->ds_out_pipe == NULL || ds_ops->ds_in_pipe == NULL)
+
+		return (USB_FAILURE);
+
+	/* init polled input pipe */
+	hdl = ds_ops->ds_in_pipe(pp->port_ds_hdl, pp->port_num);
+	err = usb_console_input_init(pp->port_usp->us_dip, hdl,
+	    &console_input_buf, &console_input);
+	if (err)
+
+		return (USB_FAILURE);
+
+	/* init polled output pipe */
+	hdl = ds_ops->ds_out_pipe(pp->port_ds_hdl, pp->port_num);
+	err = usb_console_output_init(pp->port_usp->us_dip, hdl,
+	    &console_output);
+	if (err) {
+		(void) usb_console_input_fini(console_input);
+		console_input = NULL;
+
+		return (USB_FAILURE);
+	}
+
+	return (USB_SUCCESS);
+}
+
+/* called once  by consconfig() when polledio is closed */
+/*ARGSUSED*/
+static void usbser_polledio_fini(usbser_port_t *pp)
+{
+	/* Since we can't move the console, there is nothing to do. */
+}
+
+/*ARGSUSED*/
+static void
+usbser_polledio_enter(cons_polledio_arg_t arg)
+{
+	(void) usb_console_input_enter(console_input);
+	(void) usb_console_output_enter(console_output);
+}
+
+/*ARGSUSED*/
+static void
+usbser_polledio_exit(cons_polledio_arg_t arg)
+{
+	(void) usb_console_output_exit(console_output);
+	(void) usb_console_input_exit(console_input);
+}
+
+/*ARGSUSED*/
+static void
+usbser_putchar(cons_polledio_arg_t arg, uchar_t c)
+{
+	static uchar_t cr[2] = {'\r', '\n'};
+	uint_t nout;
+
+	if (c == '\n')
+		(void) usb_console_write(console_output, cr, 2, &nout);
+	else
+		(void) usb_console_write(console_output, &c, 1, &nout);
+}
+
+/*ARGSUSED*/
+static int
+usbser_getchar(cons_polledio_arg_t arg)
+{
+	while (!usbser_ischar(arg))
+		;
+
+	return (*console_input_start++);
+}
+
+/*ARGSUSED*/
+static boolean_t
+usbser_ischar(cons_polledio_arg_t arg)
+{
+	uint_t num_bytes;
+
+	if (console_input_start < console_input_end)
+
+		return (1);
+
+	if (usb_console_read(console_input, &num_bytes) != USB_SUCCESS)
+
+		return (0);
+
+	console_input_start = console_input_buf;
+	console_input_end = console_input_buf + num_bytes;
+
+	return (num_bytes != 0);
 }

@@ -127,6 +127,8 @@
 #include <sys/kmem.h>
 #include <sys/dacf.h>
 #include <sys/consconfig_dacf.h>
+#include <sys/log.h>
+#include <sys/disp.h>
 
 /*
  * External global variables
@@ -157,6 +159,7 @@ static void	consconfig_rem_dev(cons_state_t *, dev_t);
 static void	consconfig_add_dev(cons_state_t *, cons_prop_t *);
 static cons_prop_t *consconfig_find_dev(cons_state_t *, dev_t);
 static void	consconfig_free_prop(cons_prop_t *prop);
+static void	flush_usb_serial_buf(void);
 
 
 /*
@@ -1413,6 +1416,8 @@ dynamic_console_config(void)
 	DPRINTF(DPRINT_L0,
 		"mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",
 		    mousedev,  kbddev, fbdev, rconsdev);
+
+	flush_usb_serial_buf();
 }
 
 
@@ -1962,4 +1967,62 @@ consconfig_free_prop(cons_prop_t *prop)
 	if (prop->cp_pushmod)
 		kmem_free(prop->cp_pushmod, strlen(prop->cp_pushmod) + 1);
 	kmem_free(prop, sizeof (cons_prop_t));
+}
+
+/*
+ * Boot code can't print to usb serial device. The early boot message
+ * is saved in a buffer at address indicated by "usb-serial-buf".
+ * This function flushes the message to the USB serial line
+ */
+static void
+flush_usb_serial_buf(void)
+{
+	int rval;
+	vnode_t *vp;
+	uint_t usbser_buf;
+	char *kc, *bc, *usbser_kern_buf;
+
+	usbser_buf = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "usb-serial-buf", 0);
+
+	if (usbser_buf == 0)
+		return;
+
+	/*
+	 * After consconfig() and before userland opens /dev/sysmsg,
+	 * console I/O is goes to polled I/O entry points.
+	 *
+	 * If usb-serial doesn't implement polled I/O, we need
+	 * to open /dev/console now to get kernel console I/O to work.
+	 * We also push ttcompat and ldterm explicitly to get the
+	 * correct output format (autopush isn't set up yet). We
+	 * ignore push errors because they are non-fatal.
+	 * Note that opening /dev/console causes rconsvp to be
+	 * opened as well.
+	 */
+	if (cons_polledio == NULL) {
+		if (vn_open("/dev/console", UIO_SYSSPACE, FWRITE | FNOCTTY,
+		    0, &vp, 0, 0) != 0)
+			return;
+
+		if (rconsvp) {
+			(void) strioctl(rconsvp, __I_PUSH_NOCTTY,
+			    (intptr_t)"ldterm", FKIOCTL, K_TO_K, kcred, &rval);
+			(void) strioctl(rconsvp, __I_PUSH_NOCTTY,
+			    (intptr_t)"ttcompat", FKIOCTL, K_TO_K,
+			    kcred, &rval);
+		}
+	}
+
+	/*
+	 * Copy message to a kernel buffer. Various kernel routines
+	 * expect buffer to be above kernelbase
+	 */
+	kc = usbser_kern_buf = (char *)kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
+	bc = (char *)(uintptr_t)usbser_buf;
+	while (*kc++ = *bc++)
+		;
+	console_printf("%s", usbser_kern_buf);
+
+	kmem_free(usbser_kern_buf, MMU_PAGESIZE);
 }
