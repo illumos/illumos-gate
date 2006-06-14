@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,21 +967,25 @@ map_rx_srv_fifos(int *nfifos, void *private)
 	int i, inst_taskqs, depth;
 
 	/*
-	 * Default behavior on sparc cpus (with lower cpu frequency) is
-	 * to use service fifo if ncpus > 1 and not to use service fifo
-	 * on single cpu systems; on intel/amd cpus (with higher cpu
-	 * frequency), the default is never to use service fifos. This
-	 * can be changed by tweaking ibd_srv_fifos (set to 0 or 1
-	 * by administrator). On single cpu systems, network
-	 * processing is given lower priority if using service
-	 * threads, thus possibly making the system more usable
-	 * at high network loads (maybe by throttling network
-	 * throughput).
+	 * Default behavior on both sparc and amd cpus in terms of
+	 * of worker thread is as follows: (N) indicates worker thread
+	 * not enabled , (Y) indicates worker thread enabled. Default of
+	 * ibd_srv_fifo is set to 0xffff. The default behavior can be
+	 * overridden by setting ibd_srv_fifos to 0 or 1 as shown below.
+	 * Worker thread model assigns lower priority to network
+	 * processing making system more usable at higher network
+	 * loads.
+	 *  ________________________________________________________
+	 * |Value of ibd_srv_fifo | 0 | 1 | 0xffff| 0 | 1 | 0xfffff |
+	 * |----------------------|---|---|-------|---|---|---------|
+	 * |			  |   Sparc	  |   	x86	    |
+	 * |----------------------|---|---|-------|---|---|---------|
+	 * | Single CPU		  |N  | Y | N	  | N | Y | N	    |
+	 * |----------------------|---|---|-------|---|---|---------|
+	 * | Multi CPU		  |N  | Y | Y	  | N | Y | Y	    |
+	 * |______________________|___|___|_______|___|___|_________|
 	 */
 	if ((((inst_taskqs = ncpus) == 1) && (ibd_srv_fifos != 1)) ||
-#if !defined(__sparc)
-	    (ibd_srv_fifos == 0xffff) ||
-#endif
 	    (ibd_srv_fifos == 0)) {
 		*nfifos = 0;
 		return ((p_srv_fifo_t *)1);
