@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ typedef struct {
 void function_entry(private_t *, struct bkpt *, struct callstack *);
 void function_return(private_t *, struct callstack *);
 int object_iter(void *, const prmap_t *, const char *);
+int object_present(void *, const prmap_t *, const char *);
 int symbol_iter(void *, const GElf_Sym *, const char *);
 uintptr_t get_return_address(uintptr_t *);
 int get_arguments(long *argp);
@@ -100,6 +101,34 @@ setup_thread_agent(void)
 		    td_ta_set_event(Thr_agent, &events) == TD_OK &&
 		    (Bp = create_bkpt(notify.u.bptaddr, 0, 1)) != NULL)
 			Bp->flags |= BPT_TD_CREATE;
+	}
+}
+
+/*
+ * Delete all breakpoints in the range [base .. base+size)
+ * from the breakpoint hash table.
+ */
+static void
+delete_breakpoints(uintptr_t base, size_t size)
+{
+	struct bkpt **Bpp;
+	struct bkpt *Bp;
+	int i;
+
+	if (bpt_hashtable == NULL)
+		return;
+	for (i = 0; i < HASHSZ; i++) {
+		Bpp = &bpt_hashtable[i];
+		while ((Bp = *Bpp) != NULL) {
+			if (Bp->addr < base || Bp->addr >= base + size) {
+				Bpp = &Bp->next;
+				continue;
+			}
+			*Bpp = Bp->next;
+			if (Bp->sym_name)
+				free(Bp->sym_name);
+			free(Bp);
+		}
 	}
 }
 
@@ -150,6 +179,36 @@ establish_breakpoints(void)
 	 * Tell libproc to update its mappings.
 	 */
 	Pupdate_maps(Proc);
+
+	/*
+	 * If rtld_db told us a library was being deleted,
+	 * first mark all of the dynlibs as not present, then
+	 * iterate over the shared objects, marking only those
+	 * present that really are present, and finally delete
+	 * all of the not-present dynlibs.
+	 */
+	if (delete_library) {
+		struct dynlib **Dpp;
+		struct dynlib *Dp;
+
+		for (Dp = Dyn; Dp != NULL; Dp = Dp->next)
+			Dp->present = FALSE;
+		(void) Pobject_iter(Proc, object_present, NULL);
+		Dpp = &Dyn;
+		while ((Dp = *Dpp) != NULL) {
+			if (Dp->present) {
+				Dpp = &Dp->next;
+				continue;
+			}
+			delete_breakpoints(Dp->base, Dp->size);
+			*Dpp = Dp->next;
+			free(Dp->lib_name);
+			free(Dp->match_name);
+			free(Dp->prt_name);
+			free(Dp);
+		}
+		delete_library = FALSE;
+	}
 
 	/*
 	 * Iterate over the shared objects, creating breakpoints.
@@ -332,6 +391,20 @@ object_iter(void *cd, const prmap_t *pmp, const char *object_name)
 
 	Dp->built = TRUE;
 	return (interrupt | sigusr1);
+}
+
+/* ARGSUSED */
+int
+object_present(void *cd, const prmap_t *pmp, const char *object_name)
+{
+	struct dynlib *Dp;
+
+	for (Dp = Dyn; Dp != NULL; Dp = Dp->next) {
+		if (Dp->base == pmp->pr_vaddr)
+			Dp->present = TRUE;
+	}
+
+	return (0);
 }
 
 /*
@@ -1218,16 +1291,20 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 		}
 		if (rd_event_getmsg(Rdb_agent, &event_msg) == RD_OK) {
 			if (event_msg.type == RD_DLACTIVITY) {
-				if (event_msg.u.state == RD_CONSISTENT)
+				switch (event_msg.u.state) {
+				case RD_CONSISTENT:
 					establish_breakpoints();
-				if (event_msg.u.state == RD_ADD) {
-					if (hflag)
-						(void) fprintf(stderr,
-							"RD_DLACTIVITY/RD_ADD "
-							"state reached\n");
+					break;
+				case RD_ADD:
 					not_consist = TRUE;	/* kludge */
 					establish_breakpoints();
 					not_consist = FALSE;
+					break;
+				case RD_DELETE:
+					delete_library = TRUE;
+					break;
+				default:
+					break;
 				}
 			}
 			if (hflag) {
