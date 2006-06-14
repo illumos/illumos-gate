@@ -263,11 +263,11 @@ usage(boolean_t requested)
 		(void) fprintf(fp, "%s", get_usage(current_command->usage));
 	}
 
-	if (current_command == NULL ||
-	    strcmp(current_command->name, "set") == 0 ||
+	if (current_command != NULL &&
+	    (strcmp(current_command->name, "set") == 0 ||
 	    strcmp(current_command->name, "get") == 0 ||
 	    strcmp(current_command->name, "inherit") == 0 ||
-	    strcmp(current_command->name, "list") == 0)
+	    strcmp(current_command->name, "list") == 0))
 		show_properties = B_TRUE;
 
 	if (show_properties) {
@@ -298,6 +298,14 @@ usage(boolean_t requested)
 		}
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
+	} else {
+		/*
+		 * TRANSLATION NOTE:
+		 * "zfs set|get" must not be localised this is the
+		 * command name and arguments.
+		 */
+		(void) fprintf(fp,
+		    gettext("\nFor the property list, run: zfs set|get\n"));
 	}
 
 	exit(requested ? 0 : 2);
