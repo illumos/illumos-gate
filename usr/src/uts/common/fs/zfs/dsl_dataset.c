@@ -1250,6 +1250,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 		VERIFY(0 == dsl_dataset_open_obj(dp,
 		    ds->ds_dir->dd_phys->dd_head_dataset_obj, NULL,
 		    DS_MODE_NONE, FTAG, &ds_head));
+		VERIFY(0 == dsl_dataset_get_snapname(ds));
 #ifdef ZFS_DEBUG
 		{
 			uint64_t val;
