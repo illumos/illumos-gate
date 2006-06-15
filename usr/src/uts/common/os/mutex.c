@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,6 +277,7 @@ mutex_vector_enter(mutex_impl_t *lp)
 	volatile mutex_impl_t *vlp = (volatile mutex_impl_t *)lp;
 	int		backoff;	/* current backoff */
 	int		backctr;	/* ctr for backoff */
+	int		sleep_count = 0;
 
 	ASSERT_STACK_ALIGNED();
 
@@ -402,6 +402,7 @@ spin:
 			(void) turnstile_block(ts, TS_WRITER_Q, lp,
 			    &mutex_sobj_ops, NULL, NULL);
 			sleep_time += gethrtime();
+			sleep_count++;
 		} else {
 			turnstile_exit(lp);
 		}
@@ -409,11 +410,20 @@ spin:
 
 	ASSERT(MUTEX_OWNER(lp) == curthread);
 
-	if (sleep_time == 0) {
-		LOCKSTAT_RECORD(LS_MUTEX_ENTER_SPIN, lp, spin_count);
-	} else {
+	if (sleep_time != 0) {
+		/*
+		 * Note, sleep time is the sum of all the sleeping we
+		 * did.
+		 */
 		LOCKSTAT_RECORD(LS_MUTEX_ENTER_BLOCK, lp, sleep_time);
 	}
+
+	/*
+	 * We do not count a sleep as a spin.
+	 */
+	if (spin_count > sleep_count)
+		LOCKSTAT_RECORD(LS_MUTEX_ENTER_SPIN, lp,
+		    spin_count - sleep_count);
 
 	LOCKSTAT_RECORD0(LS_MUTEX_ENTER_ACQUIRE, lp);
 }
