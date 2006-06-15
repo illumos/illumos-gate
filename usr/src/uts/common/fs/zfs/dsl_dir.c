@@ -425,7 +425,6 @@ dsl_dir_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	 * config_rwlock ensures that nobody else opens it after we
 	 * check.
 	 */
-	ASSERT(dmu_buf_refcount(dd->dd_dbuf) == 2);
 	if (dmu_buf_refcount(dd->dd_dbuf) > 2)
 		return (EBUSY);
 
