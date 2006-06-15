@@ -147,6 +147,7 @@ COMMON_SUBDIRS = \
 	cmd/halt \
 	cmd/head \
 	cmd/hostid \
+	cmd/hostname \
 	cmd/init \
 	cmd/intrstat \
 	cmd/ipcrm \
