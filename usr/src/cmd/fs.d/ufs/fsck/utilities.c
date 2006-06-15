@@ -2094,9 +2094,9 @@ fix_cg(struct cg *cgp, int cgno)
 	}
 
 	if ((cgp->cg_ncyl < 1) || (cgp->cg_ncyl > sblock.fs_cpg)) {
-		if (cgno == sblock.fs_ncg) {
+		if (cgno == (sblock.fs_ncg - 1)) {
 			cgp->cg_ncyl = sblock.fs_ncyl -
-				(sblock.fs_ncg * (cgno - 1));
+				(sblock.fs_cpg * cgno);
 		} else {
 			cgp->cg_ncyl = sblock.fs_cpg;
 		}

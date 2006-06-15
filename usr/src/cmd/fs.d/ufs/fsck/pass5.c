@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ pass5(void)
 			dmax = fs->fs_size;
 		newcg->cg_ndblk = dmax - dbase;
 		if (c == fs->fs_ncg - 1)
-			newcg->cg_ncyl = fs->fs_ncyl % fs->fs_cpg;
+			newcg->cg_ncyl = fs->fs_ncyl - (fs->fs_cpg * c);
 		else
 			newcg->cg_ncyl = fs->fs_cpg;
 		newcg->cg_niblk = sblock.fs_ipg;
