@@ -1479,7 +1479,7 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 			 */
 			if ((dst_ill->ill_usesrc_ifindex != 0) &&
 			    (src_ipif = ipif_select_source_v6(dst_ill, addr,
-			    B_FALSE, IPV6_PREFER_SRC_DEFAULT, zoneid))
+			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid))
 			    != NULL) {
 				ip3dbg(("ire_match_args: src_ipif %p"
 				    " dst_ill %p", (void *)src_ipif,

@@ -2706,7 +2706,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 					ipif_t *src_ipif;
 					src_ipif =
 					    ipif_select_source_v6(ire_stq_ill,
-					    &ire->ire_addr_v6, B_FALSE,
+					    &ire->ire_addr_v6, RESTRICT_TO_NONE,
 					    IPV6_PREFER_SRC_DEFAULT,
 					    zoneid);
 					if (src_ipif != NULL) {

@@ -1650,7 +1650,7 @@ typedef struct candidate {
 typedef struct dstinfo {
 	const in6_addr_t	*dst_addr;
 	ill_t			*dst_ill;
-	boolean_t		dst_restrict_ill;
+	uint_t			dst_restrict_ill;
 	boolean_t		dst_prefer_src_tmp;
 	in6addr_scope_t		dst_scope;
 	char			*dst_label;
@@ -1948,7 +1948,7 @@ rule_zone_specific(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo)
  */
 ipif_t *
 ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
-    boolean_t restrict_ill, uint32_t src_prefs, zoneid_t zoneid)
+    uint_t restrict_ill, uint32_t src_prefs, zoneid_t zoneid)
 {
 	dstinfo_t	dstinfo;
 	char		dstr[INET6_ADDRSTRLEN];
@@ -1961,7 +1961,6 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	uint_t		index;
 	boolean_t	first_candidate = B_TRUE;
 	rule_res_t	rule_result;
-	phyint_t	*phyi;
 	tsol_tpc_t	*src_rhtp, *dst_rhtp;
 
 	/*
@@ -2039,10 +2038,14 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	 * otherwise will almost certainly cause problems.
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MULTICAST(dst) ||
-	    ipv6_strict_dst_multihoming || usesrc_ill != NULL)
-		dstinfo.dst_restrict_ill = B_TRUE;
-	else
+	    ipv6_strict_dst_multihoming || usesrc_ill != NULL) {
+		if (restrict_ill == RESTRICT_TO_NONE)
+			dstinfo.dst_restrict_ill = RESTRICT_TO_GROUP;
+		else
+			dstinfo.dst_restrict_ill = restrict_ill;
+	} else {
 		dstinfo.dst_restrict_ill = restrict_ill;
+	}
 
 	bzero(&best_c, sizeof (cand_t));
 
@@ -2053,29 +2056,10 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	 * destination's outgoing ill.  If restrict_ill is false, we walk
 	 * the entire list of IPv6 ill's.
 	 */
-	if (dstinfo.dst_restrict_ill) {
-		if (dstinfo.dst_ill->ill_group != NULL) {
-			/*
-			 * Try to avoid FAILED/OFFLINE ills. Global and
-			 * site local addresses will failover and are not
-			 * an issue even if we select them. (i.e. this is
-			 * a race where we hit this path before in.mpathd
-			 * moves them. But link local addresses don't move.
-			 * This creates a problem for NUD. If NUD ends up
-			 * (nce_xmit) using the src addr from a failed
-			 * interface NUD will fail and end up deleting the nce
-			 * This will cause performance issues where ires
-			 * are frequently created and deleted every few secs.
-			 */
-			for (ill = dstinfo.dst_ill->ill_group->illgrp_ill;
-			    ill != NULL; ill = ill->ill_group_next) {
-				phyi = ill->ill_phyint;
-				if (!(phyi->phyint_flags &
-				    (PHYI_OFFLINE | PHYI_FAILED)))
-					break;
-			}
-			if (ill == NULL)
-				ill = dstinfo.dst_ill->ill_group->illgrp_ill;
+	if (dstinfo.dst_restrict_ill != RESTRICT_TO_NONE) {
+		if (dstinfo.dst_ill->ill_group != NULL &&
+		    dstinfo.dst_restrict_ill == RESTRICT_TO_GROUP) {
+			ill = dstinfo.dst_ill->ill_group->illgrp_ill;
 		} else {
 			ill = dstinfo.dst_ill;
 		}
@@ -2085,6 +2069,16 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 
 	while (ill != NULL) {
 		ASSERT(ill->ill_isv6);
+
+		/*
+		 * Avoid FAILED/OFFLINE ills.
+		 * Global and site local addresses will failover and
+		 * will be available on the new ill.
+		 * But link local addresses don't move.
+		 */
+		if (ill->ill_phyint->phyint_flags &
+		    (PHYI_OFFLINE | PHYI_FAILED))
+			goto next_ill;
 
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -2182,7 +2176,10 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		 * usesrc ILL then it can't be part of IPMP group and we
 		 * will exit the while loop.
 		 */
-		if (dstinfo.dst_restrict_ill)
+next_ill:
+		if (dstinfo.dst_restrict_ill == RESTRICT_TO_ILL)
+			ill = NULL;
+		else if (dstinfo.dst_restrict_ill == RESTRICT_TO_GROUP)
 			ill = ill->ill_group_next;
 		else
 			ill = ill_next(&ctx, ill);
@@ -2314,7 +2311,8 @@ ipif_recreate_interface_routes_v6(ipif_t *old_ipif, ipif_t *ipif)
 	if (ip6_asp_can_lookup()) {
 		ip6_asp_table_held = B_TRUE;
 		nipif = ipif_select_source_v6(ill, &ipif->ipif_v6subnet,
-		    B_TRUE, IPV6_PREFER_SRC_DEFAULT, ipif->ipif_zoneid);
+		    RESTRICT_TO_GROUP, IPV6_PREFER_SRC_DEFAULT,
+		    ipif->ipif_zoneid);
 	}
 	if (nipif == NULL) {
 		/* Last resort - all ipif's have IPIF_NOLOCAL */
@@ -2681,7 +2679,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		if (ip6_asp_can_lookup()) {
 			ip6_asp_table_held = B_TRUE;
 			src_ipif = ipif_select_source_v6(ipif->ipif_ill,
-			    &ipif->ipif_v6subnet, B_FALSE,
+			    &ipif->ipif_v6subnet, RESTRICT_TO_NONE,
 			    IPV6_PREFER_SRC_DEFAULT, ipif->ipif_zoneid);
 		}
 		if (src_ipif == NULL)

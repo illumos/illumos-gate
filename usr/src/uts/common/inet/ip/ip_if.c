@@ -8685,7 +8685,7 @@ ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 			src_ipif = ipif_select_source(dst_ill, v4daddr, zoneid);
 		} else {
 			src_ipif = ipif_select_source_v6(dst_ill,
-			    daddr, B_FALSE, IPV6_PREFER_SRC_DEFAULT,
+			    daddr, RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT,
 			    zoneid);
 		}
 		if (src_ipif == NULL)

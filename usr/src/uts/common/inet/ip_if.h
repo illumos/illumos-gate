@@ -139,6 +139,11 @@ extern "C" {
 #define	IPIF_TEMPORARY		IFF_TEMPORARY	/* RFC3041 */
 #define	IPIF_FIXEDMTU		IFF_FIXEDMTU	/* set with SIOCSLIFMTU */
 
+/* Source selection values for ipif_select_source_v6 */
+#define	RESTRICT_TO_NONE	0x0	/* No restriction in source selection */
+#define	RESTRICT_TO_GROUP	0x1	/* Restrict to IPMP group */
+#define	RESTRICT_TO_ILL		0x2	/* Restrict to ILL */
+
 extern	ill_t	*illgrp_scheduler(ill_t *);
 extern	mblk_t	*ill_arp_alloc(ill_t *, uchar_t *, caddr_t);
 extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
@@ -223,7 +228,7 @@ extern	int	ipif_up_done_v6(ipif_t *);
 extern	void	ipif_update_other_ipifs_v6(ipif_t *, ill_group_t *);
 extern	void	ipif_recreate_interface_routes_v6(ipif_t *, ipif_t *);
 extern	void	ill_update_source_selection(ill_t *);
-extern	ipif_t	*ipif_select_source_v6(ill_t *, const in6_addr_t *, boolean_t,
+extern	ipif_t	*ipif_select_source_v6(ill_t *, const in6_addr_t *, uint_t,
     uint32_t, zoneid_t);
 extern	boolean_t	ipif_cant_setlinklocal(ipif_t *);
 extern	int	ipif_setlinklocal(ipif_t *);

@@ -1580,7 +1580,7 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
 		ill = ire->ire_ipif->ipif_ill;
 		ire_refrele(ire);
 	}
-	ipif = ipif_select_source_v6(ill, origsrc, B_FALSE,
+	ipif = ipif_select_source_v6(ill, origsrc, RESTRICT_TO_NONE,
 	    IPV6_PREFER_SRC_DEFAULT, zoneid);
 	if (ipif != NULL) {
 		*src = ipif->ipif_v6src_addr;
@@ -2928,7 +2928,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 				goto refrele_and_quit;
 			}
 			src_ipif = ipif_select_source_v6(dst_ill, v6dst,
-			    B_FALSE, connp->conn_src_preferences, zoneid);
+			    RESTRICT_TO_NONE, connp->conn_src_preferences,
+			    zoneid);
 			ip6_asp_table_refrele();
 			if (src_ipif == NULL) {
 				pr_addr_dbg("ip_bind_connected_v6: "
@@ -4753,7 +4754,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			 */
 			ip6_asp_table_held = B_TRUE;
 			src_ipif = ipif_select_source_v6(dst_ill, &v6gw,
-			    B_TRUE, IPV6_PREFER_SRC_DEFAULT, zoneid);
+			    RESTRICT_TO_GROUP, IPV6_PREFER_SRC_DEFAULT, zoneid);
 			if (src_ipif != NULL)
 				ire_marks |= IRE_MARK_USESRC_CHECK;
 		} else {
@@ -4769,8 +4770,8 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			if (src_ipif == NULL && ip6_asp_can_lookup()) {
 				ip6_asp_table_held = B_TRUE;
 				src_ipif = ipif_select_source_v6(dst_ill,
-				    v6dstp, B_FALSE, IPV6_PREFER_SRC_DEFAULT,
-				    zoneid);
+				    v6dstp, RESTRICT_TO_NONE,
+				    IPV6_PREFER_SRC_DEFAULT, zoneid);
 				if (src_ipif != NULL)
 					ire_marks |= IRE_MARK_USESRC_CHECK;
 			}
@@ -5891,7 +5892,7 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 		if (src_ipif == NULL && ip6_asp_can_lookup()) {
 			ip6_asp_table_held = B_TRUE;
 			src_ipif = ipif_select_source_v6(dst_ill, v6dstp,
-			    B_FALSE, IPV6_PREFER_SRC_DEFAULT, zoneid);
+			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid);
 		}
 
 		if (src_ipif == NULL) {
@@ -10735,13 +10736,31 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 	mibptr = ill->ill_ip6_mib;
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) && !unspec_src) {
+		ipif_t *ipif;
+
 		/*
-		 * The ire_src_addr_v6 always contains a useable source address
-		 * for the destination (based on source address selection rules
-		 * with respect to address scope as well as deprecated vs.
-		 * preferred addresses).
+		 * Select the source address using ipif_select_source_v6.
 		 */
-		ip6h->ip6_src = ire->ire_src_addr_v6;
+		if (attach_index != 0) {
+			ipif = ipif_select_source_v6(ill, &ip6h->ip6_dst,
+			    RESTRICT_TO_ILL, IPV6_PREFER_SRC_DEFAULT, zoneid);
+		} else {
+			ipif = ipif_select_source_v6(ill, &ip6h->ip6_dst,
+			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid);
+		}
+		if (ipif == NULL) {
+			if (ip_debug > 2) {
+				/* ip1dbg */
+				pr_addr_dbg("ip_wput_ire_v6: no src for "
+				    "dst %s\n, ", AF_INET6, &ip6h->ip6_dst);
+				printf("ip_wput_ire_v6: interface name %s\n",
+				    ill->ill_name);
+			}
+			freemsg(first_mp);
+			return;
+		}
+		ip6h->ip6_src = ipif->ipif_v6src_addr;
+		ipif_refrele(ipif);
 	}
 	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
 		if ((connp != NULL && connp->conn_multicast_loop) ||

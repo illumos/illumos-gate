@@ -1677,12 +1677,12 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 		 * entry for the source address of this packet, so the
 		 * source address had better be a valid neighbor.
 		 */
-		src_ipif = ipif_select_source_v6(ill, target, B_TRUE,
+		src_ipif = ipif_select_source_v6(ill, target, RESTRICT_TO_ILL,
 		    IPV6_PREFER_SRC_DEFAULT, GLOBAL_ZONEID);
 		if (src_ipif == NULL) {
 			char buf[INET6_ADDRSTRLEN];
 
-			ip0dbg(("nce_xmit: No source ipif for dst %s\n",
+			ip1dbg(("nce_xmit: No source ipif for dst %s\n",
 			    inet_ntop(AF_INET6, (char *)target, buf,
 			    sizeof (buf))));
 			return (B_TRUE);
