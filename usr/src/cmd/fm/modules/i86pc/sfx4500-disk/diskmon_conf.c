@@ -37,7 +37,6 @@
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
-#include <assert.h>
 #include <limits.h>
 #include <pthread.h>
 
@@ -197,7 +196,7 @@ void
 link_indicator(indicator_t **first, indicator_t *to_add)
 {
 	indicator_t *travptr;
-	assert(first != NULL);
+	dm_assert(first != NULL);
 
 	if (*first == NULL)
 		*first = to_add;
@@ -240,7 +239,7 @@ void
 link_indaction(ind_action_t **first, ind_action_t *to_add)
 {
 	ind_action_t *travptr;
-	assert(first != NULL);
+	dm_assert(first != NULL);
 
 	if (*first == NULL)
 		*first = to_add;
@@ -283,7 +282,7 @@ void
 link_indrule(indrule_t **first, indrule_t *to_add)
 {
 	indrule_t *travptr;
-	assert(first != NULL);
+	dm_assert(first != NULL);
 
 	if (*first == NULL)
 		*first = to_add;
@@ -349,7 +348,7 @@ new_diskmon(nvlist_t *app_props, indicator_t *indp, indrule_t *indrp,
 	dmp->ind_list = indp;
 	dmp->indrule_list = indrp;
 
-	assert(pthread_mutex_init(&dmp->manager_mutex, NULL) == 0);
+	dm_assert(pthread_mutex_init(&dmp->manager_mutex, NULL) == 0);
 
 	dmp->state = HPS_UNKNOWN;
 
@@ -358,9 +357,9 @@ new_diskmon(nvlist_t *app_props, indicator_t *indp, indrule_t *indrp,
 	dmp->fmip = NULL;
 
 	dmp->faults_outstanding = B_FALSE;
-	assert(pthread_mutex_init(&dmp->fault_indicator_mutex, NULL) == 0);
+	dm_assert(pthread_mutex_init(&dmp->fault_indicator_mutex, NULL) == 0);
 	dmp->fault_indicator_state = INDICATOR_UNKNOWN;
-	assert(pthread_mutex_init(&dmp->disk_faults_mutex, NULL) == 0);
+	dm_assert(pthread_mutex_init(&dmp->disk_faults_mutex, NULL) == 0);
 	dmp->disk_faults = DISK_FAULT_SOURCE_NONE;
 	dmp->due = (time_t)0;
 	dmp->fault_inject_count = 0;
@@ -373,7 +372,7 @@ new_diskmon(nvlist_t *app_props, indicator_t *indp, indrule_t *indrp,
 	dmp->asru_fmri = NULL;
 	dmp->fru_fmri = NULL;
 
-	assert(pthread_mutex_init(&dmp->fru_mutex, NULL) == 0);
+	dm_assert(pthread_mutex_init(&dmp->fru_mutex, NULL) == 0);
 	dmp->frup = NULL;
 
 	dmp->next = NULL;
@@ -770,7 +769,7 @@ print_props(nvlist_t *nvlp, FILE *fp, char *prefix)
 	char *name, *str;
 
 	while (nvp != NULL) {
-		assert(nvpair_type(nvp) == DATA_TYPE_STRING);
+		dm_assert(nvpair_type(nvp) == DATA_TYPE_STRING);
 		name = nvpair_name(nvp);
 		(void) nvlist_lookup_string(nvlp, name, &str);
 		(void) fprintf(fp, "%s%s = \"%s\"\n", prefix, name, str);
@@ -837,7 +836,7 @@ print_cfgdata(cfgdata_t *cfgp, FILE *fp, char *prefix)
 int
 config_init(void)
 {
-	if (topo_init_configuration() == 0) {
+	if (init_configuration_from_topo() == 0) {
 		config_data = new_cfgdata(NULL, NULL);
 		return (0);
 	}
@@ -858,7 +857,7 @@ config_get(fmd_hdl_t *hdl, const fmd_prop_t *fmd_props)
 	u64 = fmd_prop_get_int32(hdl, GLOBAL_PROP_LOG_LEVEL);
 	g_verbose = (int)u64;
 
-	err = topo_update_configuration(NULL);
+	err = update_configuration_from_topo(NULL);
 
 	/* Pull in the properties from the DE configuration file */
 	while (fmd_props[i].fmdp_name != NULL) {
@@ -914,7 +913,7 @@ config_get(fmd_hdl_t *hdl, const fmd_prop_t *fmd_props)
 void
 config_fini(void)
 {
-	topo_fini_configuration();
+	fini_configuration_from_topo();
 	cfgdata_free(config_data);
 	config_data = NULL;
 }

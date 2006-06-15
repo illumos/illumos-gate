@@ -36,7 +36,6 @@
 #include <sys/stropts.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -513,12 +512,12 @@ exec_action_handle(ipmi_action_handle_t *hdlp)
 		return (DMPE_FAILURE);
 	}
 
-	assert(pthread_mutex_lock(&ipmi_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&ipmi_mutex) == 0);
 
 	rv = ipmi_exec_action_with_replay(hdlp->netfn, hdlp->lun, hdlp->cmd,
 	    hdlp->databp, hdlp->datablen);
 
-	assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
 
 	return (rv);
 }
@@ -539,7 +538,7 @@ action_do(const char *actionString, void *arg, boolean_t exec,
 		for (found_index = -1, i = 0;
 		    found_index == -1 && ipmi_cmd_tab[i].name != NULL; i++) {
 			if (strcasecmp(cmd, ipmi_cmd_tab[i].name) == 0) {
-				assert(ipmi_cmd_tab[i].setupfn != NULL);
+				dm_assert(ipmi_cmd_tab[i].setupfn != NULL);
 				rv = ipmi_cmd_tab[i].setupfn(props,
 				    &databp, &datablen, arg);
 				found_index = i;
@@ -555,17 +554,17 @@ action_do(const char *actionString, void *arg, boolean_t exec,
 
 		if (exec && found_index != -1 && rv == DMPE_SUCCESS) {
 
-			assert(pthread_mutex_lock(&ipmi_mutex) == 0);
+			dm_assert(pthread_mutex_lock(&ipmi_mutex) == 0);
 
 			rv = ipmi_exec_action_with_replay(netfn, lun,
 			    cmdno, databp, datablen);
 
-			assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
+			dm_assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
 
 			dfree(databp, datablen);
 
 		} else if (found_index != -1 && rv == DMPE_SUCCESS) {
-			assert(hdlpp != NULL);
+			dm_assert(hdlpp != NULL);
 
 			*hdlpp = new_ipmi_action_handle(netfn, lun, cmdno,
 			    databp, datablen);
@@ -864,8 +863,8 @@ bmc_replay_list_add(uint8_t netfn, uint8_t lun, uint8_t cmd, uint8_t *databp,
 	}
 	p->datablen = datablen;
 
-	assert(g_uu_pool_replay != NULL);
-	assert(g_uu_replaylist != NULL);
+	dm_assert(g_uu_pool_replay != NULL);
+	dm_assert(g_uu_replaylist != NULL);
 	uu_list_node_init(p, &p->un_node, g_uu_pool_replay);
 	/* The replay list is a queue, so add to its tail: */
 	(void) uu_list_insert_before(g_uu_replaylist, NULL, p);
@@ -1198,8 +1197,8 @@ bmc_state_cache_add(uint8_t netfn, uint8_t lun, uint8_t cmd, uint8_t *databp,
 
 	if (found_initfn) {
 
-		assert(g_uu_pool_cache != NULL);
-		assert(g_uu_cachelist != NULL);
+		dm_assert(g_uu_pool_cache != NULL);
+		dm_assert(g_uu_cachelist != NULL);
 		uu_list_node_init(p, &p->un_node, g_uu_pool_cache);
 		uu_list_insert(g_uu_cachelist, p, 0);
 
@@ -1352,7 +1351,7 @@ bmc_monitor_thread(void *arg)
 	struct timespec 	tspec;
 	boolean_t		refreshed;
 
-	assert(pthread_mutex_lock(&ipmi_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&ipmi_mutex) == 0);
 	while (!g_bmcmon_done) {
 
 		if (bmc_state_refresh(&refreshed) == 0 && refreshed) {
@@ -1376,7 +1375,7 @@ bmc_monitor_thread(void *arg)
 		(void) pthread_cond_timedwait(&ipmi_cond,
 		    &ipmi_mutex, &tspec);
 	}
-	assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
 
 	log_msg(MM_PLUGIN, "BMC monitoring thread exiting...");
 }
@@ -1479,9 +1478,9 @@ ipmi_plugin_fini(void)
 {
 	if (g_bmc_monitor_active) {
 		g_bmcmon_done = B_TRUE;
-		assert(pthread_mutex_lock(&ipmi_mutex) == 0);
+		dm_assert(pthread_mutex_lock(&ipmi_mutex) == 0);
 		(void) pthread_cond_broadcast(&ipmi_cond);
-		assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
+		dm_assert(pthread_mutex_unlock(&ipmi_mutex) == 0);
 
 		/* Signal the thread just in case it's blocked doing BMC I/O */
 		dm_plugin_thr_signal(g_bmcmon_tid);
@@ -1515,7 +1514,7 @@ ipmi_bmc_send_cmd(uint8_t netfn, uint8_t lun, uint8_t cmd,
 		bmc_reopen();
 
 	/* sendrecv_fn cannot be NULL at this point */
-	assert(sendrecv_fn != NULL);
+	dm_assert(sendrecv_fn != NULL);
 	rv = (*sendrecv_fn)(g_bmc_fd, netfn, lun, cmd, datap, datalen, rspp);
 
 	return (rv);

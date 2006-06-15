@@ -32,7 +32,6 @@
  * DE.
  */
 
-#include <assert.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,7 +156,7 @@ find_sfx4500_private_pgroup(topo_hdl_t *thp, tnode_t *node)
 			    nvpair_value_nvlist(nvp, &nvlp) != 0)
 				continue;
 
-			assert(nvlp != NULL);
+			dm_assert(nvlp != NULL);
 			pgroup_name = NULL;
 
 			if (nonunique_nvlist_lookup_string(nvlp,
@@ -307,7 +306,7 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 	 */
 	orig_cstr_len = strlen(cstr) + 1;
 	p = strrchr(cstr, '/');
-	assert(p != NULL);
+	dm_assert(p != NULL);
 	*p = 0;
 	if (nvlist_lookup_uint64(g_topo2diskmon, cstr, &ptr) != 0) {
 		log_msg(MM_TOPO, "No diskmon for parent of node %p.\n", node);
@@ -461,10 +460,10 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 	}
 
 	/* Add the fru information to the diskmon: */
-	assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
-	assert(diskp->frup == NULL);
+	dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
+	dm_assert(diskp->frup == NULL);
 	diskp->frup = frup;
-	assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
 
 	return (0);
 }
@@ -531,7 +530,7 @@ topoprop_indrule_add(indrule_t **indrp, char *sts, char *acts)
 
 	/* The state string is of the form "{STATE}>{STATE}" */
 	p = strchr(states, '>');
-	assert(p != NULL);
+	dm_assert(p != NULL);
 	*p = 0;
 	strans.begin = str2dmstate(states);
 	*p = '>';
@@ -631,10 +630,10 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, diskmon_t *target_diskp)
 		 */
 		if (diskp->frup && (target_diskp == NULL ||
 		    diskp == target_diskp)) {
-			assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
+			dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
 			dmfru_free(diskp->frup);
 			diskp->frup = NULL;
-			assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
+			dm_assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
 		}
 
 		dstrfree(cstr);
@@ -859,7 +858,7 @@ gather_topo_cfg(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 
 int
-topo_update_configuration(diskmon_t *diskp)
+update_configuration_from_topo(diskmon_t *diskp)
 {
 	int err;
 	topo_hdl_t *thp;
@@ -907,13 +906,13 @@ topo_update_configuration(diskmon_t *diskp)
 }
 
 int
-topo_init_configuration(void)
+init_configuration_from_topo(void)
 {
 	return (nvlist_alloc(&g_topo2diskmon, NV_UNIQUE_NAME, 0));
 }
 
 void
-topo_fini_configuration(void)
+fini_configuration_from_topo(void)
 {
 	if (g_topo2diskmon) {
 		nvlist_free(g_topo2diskmon);

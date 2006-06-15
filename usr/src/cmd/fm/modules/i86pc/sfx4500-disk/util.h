@@ -30,7 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Definitions for data structures used in the SCSI IE module
+ * Utility functions and macros
  */
 
 #ifdef	__cplusplus
@@ -40,6 +40,23 @@ extern "C" {
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
+
+extern int _dm_assert(const char *assertion, const char *file, int line,
+    const char *func);
+
+#if defined(__STDC__)
+#if __STDC_VERSION__ - 0 >= 199901L
+#define	dm_assert(EX) (void)((EX) ? 0 : \
+	_dm_assert(#EX, __FILE__, __LINE__, __func__))
+#else
+#define	dm_assert(EX) (void)((EX) ? 0 : \
+	_dm_assert(#EX, __FILE__, __LINE__, NULL))
+#endif /* __STDC_VERSION__ - 0 >= 199901L */
+#else
+#define	dm_assert(EX) (void)((EX) ? 0 : \
+	_dm_assert("EX", __FILE__, __LINE__, NULL))
+#endif  /* __STDC__ */
+
 
 /*
  * List of strings with arbitrary matching values

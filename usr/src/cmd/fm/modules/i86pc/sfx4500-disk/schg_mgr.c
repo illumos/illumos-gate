@@ -29,7 +29,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <atomic.h>
-#include <assert.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
 
@@ -114,14 +113,14 @@ dm_fault_indicator_set(diskmon_t *diskp, ind_state_t istate)
 {
 	const char *astring;
 
-	assert(pthread_mutex_lock(&diskp->fault_indicator_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&diskp->fault_indicator_mutex) == 0);
 
 	/*
 	 * No need to execute redundant indicator actions
 	 */
 	if (istate == INDICATOR_UNKNOWN ||
 	    diskp->fault_indicator_state == istate) {
-		assert(pthread_mutex_unlock(&diskp->fault_indicator_mutex)
+		dm_assert(pthread_mutex_unlock(&diskp->fault_indicator_mutex)
 		    == 0);
 		return;
 	}
@@ -147,7 +146,7 @@ dm_fault_indicator_set(diskmon_t *diskp, ind_state_t istate)
 		}
 	}
 
-	assert(pthread_mutex_unlock(&diskp->fault_indicator_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&diskp->fault_indicator_mutex) == 0);
 }
 
 static void
@@ -189,7 +188,7 @@ schg_execute_state_change_action(diskmon_t *diskp, hotplug_state_t oldstate,
 			astring = lookup_action_string(diskp->ind_list,
 			    actions->ind_state, actions->ind_name);
 
-			assert(astring != NULL);
+			dm_assert(astring != NULL);
 
 			log_msg(MM_SCHGMGR, "Executing action `%s'\n", astring);
 
@@ -235,15 +234,15 @@ static void
 schg_update_fru_info(diskmon_t *diskp)
 {
 	if (diskp->initial_configuration ||
-	    topo_update_configuration(diskp) == TOPO_SUCCESS) {
+	    update_configuration_from_topo(diskp) == TOPO_SUCCESS) {
 		diskp->initial_configuration = B_FALSE;
-		assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
+		dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
 		if (diskp->frup != NULL)
 			schg_send_fru_to_plugin(diskp, diskp->frup);
 		else
 			log_warn("frup unexpectedly went away: not updating "
 			    "FRU information for disk %s!\n", diskp->location);
-		assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
+		dm_assert(pthread_mutex_unlock(&diskp->fru_mutex) == 0);
 	} else {
 		log_warn_e("Error retrieving FRU information "
 		    "for disk in %s", diskp->location);
@@ -306,20 +305,20 @@ schg_consume_faults(diskmon_t *diskp)
 	char *er_class;
 	int e;
 
-	assert(diskp->fmip != NULL);
+	dm_assert(diskp->fmip != NULL);
 
 	/* Use the same ENA for all current faults */
 	ena = dm_gen_ena();
 
-	assert(pthread_mutex_lock(&diskp->fmip->fault_data_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&diskp->fmip->fault_data_mutex) == 0);
 	faults = diskp->fmip->fault_list;
 
 	/* Go through the list of faults, executing actions if present */
 	while (faults != NULL) {
 
-		assert(pthread_mutex_lock(&diskp->disk_faults_mutex) == 0);
+		dm_assert(pthread_mutex_lock(&diskp->disk_faults_mutex) == 0);
 		diskp->disk_faults |= faults->fault_src;
-		assert(pthread_mutex_unlock(&diskp->disk_faults_mutex) == 0);
+		dm_assert(pthread_mutex_unlock(&diskp->disk_faults_mutex) == 0);
 
 		er_class = NULL;
 		e = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
@@ -378,19 +377,19 @@ schg_consume_faults(diskmon_t *diskp)
 
 	free_disk_fault_list(diskp->fmip);
 
-	assert(pthread_mutex_unlock(&diskp->fmip->fault_data_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&diskp->fmip->fault_data_mutex) == 0);
 }
 
 void
 block_state_change_events(void)
 {
-	assert(pthread_mutex_lock(&g_schgt_add_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_add_mutex) == 0);
 }
 
 void
 unblock_state_change_events(void)
 {
-	assert(pthread_mutex_unlock(&g_schgt_add_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_add_mutex) == 0);
 }
 
 static void
@@ -441,18 +440,18 @@ disk_state_change_thread(void *vdisklistp)
 
 	unblock_state_change_events();
 
-	assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
 	if (g_schgt_state != TS_EXIT_REQUESTED) {
 		g_schgt_state = TS_RUNNING;
-		assert(pthread_cond_broadcast(&g_schgt_state_cvar) == 0);
+		dm_assert(pthread_cond_broadcast(&g_schgt_state_cvar) == 0);
 	}
-	assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
 
 	while (g_schgt_state != TS_EXIT_REQUESTED) {
 
 		if ((dscp = (disk_statechg_t *)queue_remove(g_schg_queue))
 		    == NULL) {
-			assert(g_schgt_state == TS_EXIT_REQUESTED);
+			dm_assert(g_schgt_state == TS_EXIT_REQUESTED);
 			continue;
 		}
 
@@ -574,7 +573,7 @@ disk_state_change_thread(void *vdisklistp)
 
 		}
 
-		assert(pthread_mutex_lock(&diskp->manager_mutex) == 0);
+		dm_assert(pthread_mutex_lock(&diskp->manager_mutex) == 0);
 
 		/*
 		 * Make the new state visible to all observers
@@ -594,7 +593,7 @@ disk_state_change_thread(void *vdisklistp)
 			 * When the disk is removed, the fault monitor state is
 			 * useless, so discard it.
 			 */
-			assert(DISK_STATE(nextstate) != HPS_CONFIGURED);
+			dm_assert(DISK_STATE(nextstate) != HPS_CONFIGURED);
 
 			disk_fault_uninit(diskp);
 
@@ -606,13 +605,14 @@ disk_state_change_thread(void *vdisklistp)
 			 * other faults pending in the fault list, and that's
 			 * OK.
 			 */
-			assert(pthread_mutex_lock(&diskp->disk_faults_mutex)
+			dm_assert(pthread_mutex_lock(&diskp->disk_faults_mutex)
 			    == 0);
 			diskp->disk_faults = DISK_FAULT_SOURCE_NONE;
-			assert(pthread_mutex_unlock(&diskp->disk_faults_mutex)
+			dm_assert(
+			    pthread_mutex_unlock(&diskp->disk_faults_mutex)
 			    == 0);
 		}
-		assert(pthread_mutex_unlock(&diskp->manager_mutex) == 0);
+		dm_assert(pthread_mutex_unlock(&diskp->manager_mutex) == 0);
 
 
 		if (poke_fault_manager) {
@@ -642,10 +642,10 @@ disk_state_change_thread(void *vdisklistp)
 		/* The caller is responsible for freeing the state change: */
 		free_statechange(dscp);
 	}
-	assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
 	g_schgt_state = TS_EXITED;
-	assert(pthread_cond_broadcast(&g_schgt_state_cvar) == 0);
-	assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_cond_broadcast(&g_schgt_state_cvar) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
 
 	log_msg(MM_SCHGMGR, "State change thread exiting...\n");
 }
@@ -660,9 +660,9 @@ dm_state_change_nolock(diskmon_t *diskp, hotplug_state_t newstate)
 void
 dm_state_change(diskmon_t *diskp, hotplug_state_t newstate)
 {
-	assert(pthread_mutex_lock(&g_schgt_add_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_add_mutex) == 0);
 	dm_state_change_nolock(diskp, newstate);
-	assert(pthread_mutex_unlock(&g_schgt_add_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_add_mutex) == 0);
 }
 
 int
@@ -671,7 +671,7 @@ init_state_change_manager(cfgdata_t *cfgdatap)
 	/* new_queue() is guaranteed to succeed */
 	g_schg_queue = new_queue(B_TRUE, dmalloc, dfree, free_statechange);
 
-	assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
 	g_schg_tid = fmd_thr_create(g_fm_hdl, disk_state_change_thread,
 	    cfgdatap->disk_list);
 
@@ -688,7 +688,7 @@ init_state_change_manager(cfgdata_t *cfgdatap)
 		    &g_schgt_state_mutex);
 	}
 
-	assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
 
 	return (0);
 }
@@ -702,11 +702,11 @@ cleanup_state_change_manager(cfgdata_t *cfgdatap)
 
 	g_schgt_state = TS_EXIT_REQUESTED;
 	queue_add(g_schg_queue, NULL);
-	assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_schgt_state_mutex) == 0);
 	while (g_schgt_state != TS_EXITED)
-		assert(pthread_cond_wait(&g_schgt_state_cvar,
+		dm_assert(pthread_cond_wait(&g_schgt_state_cvar,
 		    &g_schgt_state_mutex) == 0);
-	assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_schgt_state_mutex) == 0);
 	(void) pthread_join(g_schg_tid, NULL);
 	fmd_thr_destroy(g_fm_hdl, g_schg_tid);
 	queue_free(&g_schg_queue);

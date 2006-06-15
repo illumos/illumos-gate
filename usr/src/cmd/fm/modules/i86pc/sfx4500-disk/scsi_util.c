@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <stropts.h>
 #include <alloca.h>
-#include <assert.h>
 
 #include "util.h"
 #include "sfx4500-disk.h"
@@ -1270,8 +1269,8 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	int			maximum;
 	char			*pc;
 
-	assert(page_size >= 0 && page_size < 256);
-	assert(page_control == PC_CURRENT ||
+	dm_assert(page_size >= 0 && page_size < 256);
+	dm_assert(page_control == PC_CURRENT ||
 		page_control == PC_CHANGEABLE ||
 			page_control == PC_DEFAULT ||
 				page_control == PC_SAVED);
@@ -1413,8 +1412,8 @@ uscsi_mode_sense_10(int fd, int page_code, int page_control,
 	ushort_t		length, bdesc_length;
 	char			*pc;
 
-	assert(page_size >= 0 && page_size < UINT16_MAX);
-	assert(page_control == PC_CURRENT ||
+	dm_assert(page_size >= 0 && page_size < UINT16_MAX);
+	dm_assert(page_control == PC_CURRENT ||
 		page_control == PC_CHANGEABLE ||
 			page_control == PC_DEFAULT ||
 				page_control == PC_SAVED);
@@ -1556,10 +1555,10 @@ uscsi_mode_select(int fd, int page_code, int options, caddr_t page_data,
 	int				status;
 	char				*s;
 
-	assert(((struct mode_page *)page_data)->ps == 0);
-	assert(header->mode_header.length == 0);
-	assert(header->mode_header.device_specific == 0);
-	assert((options & ~(MODE_SELECT_SP|MODE_SELECT_PF)) == 0);
+	dm_assert(((struct mode_page *)page_data)->ps == 0);
+	dm_assert(header->mode_header.length == 0);
+	dm_assert(header->mode_header.device_specific == 0);
+	dm_assert((options & ~(MODE_SELECT_SP|MODE_SELECT_PF)) == 0);
 
 	/*
 	 * Allocate a buffer for the mode select header and data
@@ -1659,10 +1658,10 @@ uscsi_mode_select_10(int fd, int page_code, int options,
 	int				status;
 	char				*s;
 
-	assert(((struct mode_page *)page_data)->ps == 0);
-	assert(header->mode_header.length == 0);
-	assert(header->mode_header.device_specific == 0);
-	assert((options & ~(MODE_SELECT_SP|MODE_SELECT_PF)) == 0);
+	dm_assert(((struct mode_page *)page_data)->ps == 0);
+	dm_assert(header->mode_header.length == 0);
+	dm_assert(header->mode_header.device_specific == 0);
+	dm_assert((options & ~(MODE_SELECT_SP|MODE_SELECT_PF)) == 0);
 
 	/*
 	 * Allocate a buffer for the mode select header and data
@@ -1759,8 +1758,8 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	ushort_t		len;
 	char			*pc;
 
-	assert(page_size >= 0 && page_size < UINT16_MAX);
-	assert(page_control == PC_CURRENT ||
+	dm_assert(page_size >= 0 && page_size < UINT16_MAX);
+	dm_assert(page_control == PC_CURRENT ||
 		page_control == PC_CHANGEABLE ||
 			page_control == PC_DEFAULT ||
 				page_control == PC_SAVED);

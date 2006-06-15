@@ -26,7 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <assert.h>
 #include <atomic.h>
 #include <sys/types.h>
 #include <time.h>
@@ -132,7 +131,7 @@ disk_fault_monitor_thread(void *vdisklistp)
 		setup_fault_injection(disklistp, i);
 	}
 
-	assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
 	while (g_fmt_req_state != TS_EXIT_REQUESTED) {
 
 		/*
@@ -143,7 +142,8 @@ disk_fault_monitor_thread(void *vdisklistp)
 		while (g_fmt_req_state != TS_EXIT_REQUESTED && diskp != NULL) {
 
 			curtime = time(0);
-			assert(pthread_mutex_lock(&diskp->manager_mutex) == 0);
+			dm_assert(pthread_mutex_lock(&diskp->manager_mutex)
+			    == 0);
 
 			/*
 			 * If the disk is configured (it has a device node
@@ -169,7 +169,7 @@ disk_fault_monitor_thread(void *vdisklistp)
 				earliest_due = (earliest_due < 0) ? diskp->due :
 				    MIN(earliest_due, diskp->due);
 
-			assert(pthread_mutex_unlock(&diskp->manager_mutex)
+			dm_assert(pthread_mutex_unlock(&diskp->manager_mutex)
 			    == 0);
 
 			diskp = diskp->next;
@@ -194,7 +194,7 @@ disk_fault_monitor_thread(void *vdisklistp)
 		(void) pthread_cond_timedwait(&g_fmt_cvar,
 		    &g_fmt_mutex, &tspec);
 	}
-	assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
 
 	log_msg(MM_FAULTMGR, "Fault monitor polling thread exiting...\n");
 }
@@ -216,9 +216,9 @@ collect_fault_monitor_thread(void)
 	if (g_fmt_spawned) {
 
 		g_fmt_req_state = TS_EXIT_REQUESTED;
-		assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
-		assert(pthread_cond_broadcast(&g_fmt_cvar) == 0);
-		assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
+		dm_assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
+		dm_assert(pthread_cond_broadcast(&g_fmt_cvar) == 0);
+		dm_assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
 		fmd_thr_signal(g_fm_hdl, g_fmt_tid);
 		fmd_thr_destroy(g_fm_hdl, g_fmt_tid);
 		g_fmt_req_state = TS_NOT_RUNNING;
@@ -248,9 +248,9 @@ init_fault_manager(cfgdata_t *cfgdatap)
 void
 fault_manager_poke(void)
 {
-	assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
-	assert(pthread_cond_broadcast(&g_fmt_cvar) == 0);
-	assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&g_fmt_mutex) == 0);
+	dm_assert(pthread_cond_broadcast(&g_fmt_cvar) == 0);
+	dm_assert(pthread_mutex_unlock(&g_fmt_mutex) == 0);
 }
 
 /*ARGSUSED*/

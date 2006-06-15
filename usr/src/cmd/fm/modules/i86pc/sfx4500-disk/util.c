@@ -35,7 +35,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <assert.h>
 #include <smbios.h>
 
 #include <fm/fmd_api.h>
@@ -165,9 +164,9 @@ log_dump(log_class_t cl, char *label, char *start, unsigned length)
 	if ((g_verbose & cl) != cl)
 		return;
 
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	dump(cl, label, start, length);
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 static void
@@ -175,13 +174,13 @@ verror(const char *fmt, va_list ap)
 {
 	int error = errno;
 
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
 
 	if (fmt[strlen(fmt) - 1] != '\n')
 		fmd_hdl_debug(g_fm_hdl, ": %s\n", strerror(error));
 
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 static void
@@ -189,23 +188,23 @@ vwarn_e(const char *fmt, va_list ap)
 {
 	int error = errno;
 
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	fmd_hdl_debug(g_fm_hdl, "WARNING: ");
 	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
 
 	if (fmt[strlen(fmt) - 1] != '\n')
 		fmd_hdl_debug(g_fm_hdl, ": %s\n", strerror(error));
 
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 static void
 vwarn(const char *fmt, va_list ap)
 {
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	fmd_hdl_debug(g_fm_hdl, "WARNING: ");
 	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 void
@@ -216,13 +215,13 @@ vcont(log_class_t cl, const char *fmt, va_list ap)
 	if ((g_verbose & cl) != cl)
 		return;
 
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
 
 	if (fmt[strlen(fmt) - 1] != '\n')
 		fmd_hdl_debug(g_fm_hdl, ": %s\n", strerror(error));
 
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 static void
@@ -246,11 +245,11 @@ log_msg(log_class_t cl, const char *fmt, ...)
 	if ((g_verbose & cl) != cl)
 		return;
 
-	assert(pthread_mutex_lock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
 	va_start(ap, fmt);
 	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
 	va_end(ap);
-	assert(pthread_mutex_unlock(&log_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
 }
 
 /*PRINTFLIKE1*/
@@ -335,7 +334,7 @@ queue_add(qu_t *qp, void *data)
 
 	qnp->data = data;
 	qnp->next = NULL;
-	assert(pthread_mutex_lock(&qp->mutex) == 0);
+	dm_assert(pthread_mutex_lock(&qp->mutex) == 0);
 
 	if (qp->nodep == NULL)
 		qp->nodep = qnp;
@@ -350,8 +349,8 @@ queue_add(qu_t *qp, void *data)
 
 	/* If the queue was empty, we need to wake people up */
 	if (qp->boe && qp->nodep == qnp)
-		assert(pthread_cond_broadcast(&qp->cvar) == 0);
-	assert(pthread_mutex_unlock(&qp->mutex) == 0);
+		dm_assert(pthread_cond_broadcast(&qp->cvar) == 0);
+	dm_assert(pthread_mutex_unlock(&qp->mutex) == 0);
 }
 
 void *
@@ -360,7 +359,7 @@ queue_remove(qu_t *qp)
 	void *rv = NULL;
 	struct q_node *nextnode;
 
-	assert(pthread_mutex_lock(&qp->mutex) == 0);
+	dm_assert(pthread_mutex_lock(&qp->mutex) == 0);
 
 	/* Wait while the queue is empty */
 	while (qp->boe && qp->nodep == NULL) {
@@ -377,7 +376,7 @@ queue_remove(qu_t *qp)
 		qp->nodep = nextnode;
 	}
 
-	assert(pthread_mutex_unlock(&qp->mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&qp->mutex) == 0);
 	return (rv);
 }
 
@@ -391,8 +390,8 @@ new_queue(boolean_t block_on_empty, void *(*nodealloc)(size_t),
 	newqp->nalloc = nodealloc;
 	newqp->nfree = nodefree;
 	newqp->data_dealloc = data_deallocator;
-	assert(pthread_mutex_init(&newqp->mutex, NULL) == 0);
-	assert(pthread_cond_init(&newqp->cvar, NULL) == 0);
+	dm_assert(pthread_mutex_init(&newqp->mutex, NULL) == 0);
+	dm_assert(pthread_cond_init(&newqp->cvar, NULL) == 0);
 	newqp->nodep = NULL;
 
 	return (newqp);
@@ -404,8 +403,8 @@ queue_free(qu_t **qpp)
 	qu_t *qp = *qpp;
 	void *item;
 
-	assert(pthread_mutex_destroy(&qp->mutex) == 0);
-	assert(pthread_cond_destroy(&qp->cvar) == 0);
+	dm_assert(pthread_mutex_destroy(&qp->mutex) == 0);
+	dm_assert(pthread_cond_destroy(&qp->cvar) == 0);
 
 	qp->boe = B_FALSE;
 
@@ -413,8 +412,26 @@ queue_free(qu_t **qpp)
 		qp->data_dealloc(item);
 	}
 
-	assert(qp->nodep == NULL);
+	dm_assert(qp->nodep == NULL);
 
 	dfree(qp, sizeof (qu_t));
 	*qpp = NULL;
+}
+
+int
+_dm_assert(const char *assertion, const char *file, int line, const char *func)
+{
+	/*
+	 * No newline is appended to the assertion message so that
+	 * errno can be translated for us by fmd_hdl_abort().
+	 */
+	if (func)
+		fmd_hdl_abort(g_fm_hdl, "Assertion failed: "
+		    "%s, file: %s, line: %d, function: %s", assertion, file,
+		    line, func);
+	else
+		fmd_hdl_abort(g_fm_hdl, "Assertion failed: "
+		    "%s, file: %s, line: %d", assertion, file, line);
+	/*NOTREACHED*/
+	return (0);
 }

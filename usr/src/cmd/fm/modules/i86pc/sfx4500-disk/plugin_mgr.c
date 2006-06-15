@@ -37,7 +37,6 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <link.h>
-#include <assert.h>
 #include <pthread.h>
 
 #include "util.h"
@@ -192,7 +191,7 @@ load_dm_plugin(const char *protocol)
 
 fpi_out:
 	if (plugin_loaded) {
-		assert(dmpip != NULL);
+		dm_assert(dmpip != NULL);
 		dmpip->state = DMPS_LOADED;
 	} else if (!plugin_loaded && dmpip != NULL)
 		free_dm_plugin(&dmpip);
@@ -262,7 +261,7 @@ protocol_to_dm_plugin(const char *protocol)
 	 * Traversing the plugin list must be atomic with
 	 * respect to plugin loads
 	 */
-	assert(pthread_mutex_lock(&plugin_list_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&plugin_list_mutex) == 0);
 
 	plugin = plugin_list;
 
@@ -278,7 +277,7 @@ protocol_to_dm_plugin(const char *protocol)
 	plugin = (plugin == NULL) ? load_and_init_dm_plugin(protocol) :
 	    plugin;
 
-	assert(pthread_mutex_unlock(&plugin_list_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&plugin_list_mutex) == 0);
 
 	return (plugin);
 }
@@ -296,10 +295,10 @@ new_action_handle(const char *action, dm_plugin_t *pluginp)
 	hip->handle = (dm_plugin_action_handle_t)NULL;
 
 	/* Add the handle to the global list */
-	assert(pthread_mutex_lock(&handle_list_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&handle_list_mutex) == 0);
 	hip->next = handle_list;
 	handle_list = hip;
-	assert(pthread_mutex_unlock(&handle_list_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&handle_list_mutex) == 0);
 
 	return (hip);
 }
@@ -335,7 +334,7 @@ lookup_handle_by_action(const char *action)
 {
 	dm_plugin_action_handle_impl_t *handle;
 
-	assert(pthread_mutex_lock(&handle_list_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&handle_list_mutex) == 0);
 
 	handle = handle_list;
 
@@ -346,7 +345,7 @@ lookup_handle_by_action(const char *action)
 		handle = handle->next;
 	}
 
-	assert(pthread_mutex_unlock(&handle_list_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&handle_list_mutex) == 0);
 
 	return (handle);
 }
@@ -390,7 +389,7 @@ bind_action_handle(dm_plugin_t *dmpip, const char *action,
 	hip = new_action_handle(action, dmpip);
 	*hdlp = hip;
 
-	assert(dmpip->state == DMPS_INITED);
+	dm_assert(dmpip->state == DMPS_INITED);
 	if (dmpip->ops->indicator_bind_handle)
 		return (dmpip->ops->indicator_bind_handle(action,
 		    &hip->handle));
@@ -415,7 +414,7 @@ dm_pm_update_fru(const char *action, dm_fru_t *frup)
 	dstrfree(protocol);
 
 	if (dmpip != NULL) {
-		assert(dmpip->state == DMPS_INITED);
+		dm_assert(dmpip->state == DMPS_INITED);
 		if (dmpip->ops->indicator_fru_update)
 			return (dmpip->ops->indicator_fru_update(actionp,
 			    frup));
@@ -443,7 +442,7 @@ dm_pm_indicator_execute(const char *action)
 				return (DMPE_FAILURE);
 		}
 
-		assert(dmpip->state == DMPS_INITED);
+		dm_assert(dmpip->state == DMPS_INITED);
 		if (dmpip->ops->indicator_execute)
 			return (dmpip->ops->indicator_execute(hip->handle));
 	}

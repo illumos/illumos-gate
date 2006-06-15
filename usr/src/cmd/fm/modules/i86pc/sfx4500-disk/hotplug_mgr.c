@@ -38,7 +38,6 @@
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
-#include <assert.h>
 
 #include <libsysevent.h>
 #include <sys/sysevent_impl.h>
@@ -136,15 +135,15 @@ disk_ap_state_to_hotplug_state(diskmon_t *diskp)
 	int len;
 	boolean_t list_valid = B_FALSE;
 
-	assert(app != NULL);
+	dm_assert(app != NULL);
 
 	ap_path[0] = app;
 
 	if (config_list_ext_poll(1, ap_path, &list_array, &nlist)
 	    == CFGA_OK) {
 
-		assert(nlist == 1);
-		assert(strcmp(app, list_array[0].ap_phys_id) == 0);
+		dm_assert(nlist == 1);
+		dm_assert(strcmp(app, list_array[0].ap_phys_id) == 0);
 
 		list_valid = B_TRUE;
 
@@ -165,8 +164,8 @@ disk_ap_state_to_hotplug_state(diskmon_t *diskp)
 		if (config_list_ext_poll(1, ap_path, &list_array, &nlist)
 		    == CFGA_OK) {
 
-			assert(nlist == 1);
-			assert(strcmp(devices_app, list_array[0].ap_phys_id)
+			dm_assert(nlist == 1);
+			dm_assert(strcmp(devices_app, list_array[0].ap_phys_id)
 			    == 0);
 
 			list_valid = B_TRUE;
@@ -293,8 +292,8 @@ disk_match_by_device_path(diskmon_t *disklistp, const char *dev_path)
 	char tgtnum[MAXNAMELEN];
 	char finalpath[MAXPATHLEN];
 	char devicepath[MAXPATHLEN];
-	assert(disklistp != NULL);
-	assert(dev_path != NULL);
+	dm_assert(disklistp != NULL);
+	dm_assert(dev_path != NULL);
 
 	if (strncmp(dev_path, DEVICES_PREFIX, 8) == 0)
 		dev_path += 8;
@@ -309,7 +308,7 @@ disk_match_by_device_path(diskmon_t *disklistp, const char *dev_path)
 	while (disklistp != NULL) {
 		char *app = (char *)dm_prop_lookup(disklistp->app_props,
 		    DISK_AP_PROP_APID);
-		assert(app != NULL);
+		dm_assert(app != NULL);
 
 		/*
 		 * The disk device path is of the form:
@@ -323,10 +322,10 @@ disk_match_by_device_path(diskmon_t *disklistp, const char *dev_path)
 
 		/* Get the target number from the disk path: */
 		p = strrchr(dev_path, '/');
-		assert(p != NULL);
+		dm_assert(p != NULL);
 
 		p = strchr(p, '@');
-		assert(p != NULL);
+		dm_assert(p != NULL);
 
 		bzero(tgtnum, MAXNAMELEN);
 		(void) strlcpy(tgtnum, p + 1, MAXNAMELEN);
@@ -358,8 +357,8 @@ static diskmon_t *
 disk_match_by_ap_id(diskmon_t *disklistp, const char *ap_id)
 {
 	const char *disk_ap_id;
-	assert(disklistp != NULL);
-	assert(ap_id != NULL);
+	dm_assert(disklistp != NULL);
+	dm_assert(ap_id != NULL);
 
 	/* Match only the device-tree portion of the name */
 	if (strncmp(ap_id, DEVICES_PREFIX, 8 /* strlen("/devices") */) == 0)
@@ -369,7 +368,7 @@ disk_match_by_ap_id(diskmon_t *disklistp, const char *ap_id)
 		disk_ap_id = dm_prop_lookup(disklistp->app_props,
 		    DISK_AP_PROP_APID);
 
-		assert(disk_ap_id != NULL);
+		dm_assert(disk_ap_id != NULL);
 
 		if (strcmp(disk_ap_id, ap_id) == 0)
 			return (disklistp);
@@ -465,11 +464,11 @@ dm_fmd_sysevent_thread(void *queuep)
 	sysevent_event_t	*sevevp;
 
 	/* Signal the thread spawner that we're running */
-	assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
 	if (g_sysev_thread_state != TS_EXIT_REQUESTED)
 		g_sysev_thread_state = TS_RUNNING;
 	(void) pthread_cond_broadcast(&g_event_handler_cond);
-	assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
 
 	while (g_sysev_thread_state != TS_EXIT_REQUESTED) {
 		if ((sevevp = (sysevent_event_t *)queue_remove(qp)) == NULL)
@@ -481,10 +480,10 @@ dm_fmd_sysevent_thread(void *queuep)
 	}
 
 	/* Signal the thread spawner that we've exited */
-	assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
 	g_sysev_thread_state = TS_EXITED;
 	(void) pthread_cond_broadcast(&g_event_handler_cond);
-	assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
 
 	log_msg(MM_HPMGR, "FMD sysevent handler thread exiting...");
 }
@@ -592,7 +591,7 @@ init_hotplug_manager()
 	 * Grab the event handler lock before spawning the thread so we can
 	 * wait for the thread to transition to the running state.
 	 */
-	assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
 
 	/* Create the sysevent handling thread */
 	g_sysev_tid = fmd_thr_create(g_fm_hdl, dm_fmd_sysevent_thread,
@@ -602,7 +601,7 @@ init_hotplug_manager()
 	while (g_sysev_thread_state != TS_RUNNING)
 		(void) pthread_cond_wait(&g_event_handler_cond,
 		    &g_event_handler_lock);
-	assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
 
 	if (init_sysevents() != 0) {
 		log_warn_e("Error initializing sysevents");
@@ -622,13 +621,13 @@ cleanup_hotplug_manager()
 	 * Wait for the thread to exit before we can destroy
 	 * the event queue.
 	 */
-	assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_lock(&g_event_handler_lock) == 0);
 	g_sysev_thread_state = TS_EXIT_REQUESTED;
 	queue_add(g_sysev_queue, NULL);
 	while (g_sysev_thread_state != TS_EXITED)
 		(void) pthread_cond_wait(&g_event_handler_cond,
 		    &g_event_handler_lock);
-	assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
+	dm_assert(pthread_mutex_unlock(&g_event_handler_lock) == 0);
 	(void) pthread_join(g_sysev_tid, NULL);
 	fmd_thr_destroy(g_fm_hdl, g_sysev_tid);
 

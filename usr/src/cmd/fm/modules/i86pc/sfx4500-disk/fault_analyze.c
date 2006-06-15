@@ -28,7 +28,6 @@
 
 #include <sys/types.h>
 #include <sys/byteorder.h>
-#include <assert.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -164,7 +163,7 @@ dm_get_disk_logphys(diskmon_t *diskp, int *buflen)
 
 	path = (char *)dm_prop_lookup(diskp->props, DISK_PROP_DEVPATH);
 
-	assert(path != NULL);
+	dm_assert(path != NULL);
 
 	*buflen = strlen(path) + 1;
 	path = dstrdup(path);
@@ -245,8 +244,8 @@ disk_mode_select(int cdb_len, int fd, uchar_t page_code, int options,
 	int senselen = sizeof (struct scsi_extended_sense);
 	struct mode_page *mp = (struct mode_page *)buf;
 
-	assert(cdb_len == MODE_CMD_LEN_6 || cdb_len == MODE_CMD_LEN_10);
-	assert(headers->length == cdb_len);
+	dm_assert(cdb_len == MODE_CMD_LEN_6 || cdb_len == MODE_CMD_LEN_10);
+	dm_assert(headers->length == cdb_len);
 
 	bzero(&sense, sizeof (struct scsi_extended_sense));
 
@@ -291,7 +290,7 @@ disk_mode_sense(int cdb_len, int fd, uchar_t page_code, uchar_t pc,
 	struct scsi_extended_sense sense;
 	int senselen = sizeof (struct scsi_extended_sense);
 
-	assert(cdb_len == MODE_CMD_LEN_6 || cdb_len == MODE_CMD_LEN_10);
+	dm_assert(cdb_len == MODE_CMD_LEN_6 || cdb_len == MODE_CMD_LEN_10);
 
 	bzero(&sense, sizeof (struct scsi_extended_sense));
 
@@ -925,7 +924,7 @@ new_disk_fault_info(void)
 
 	fmi->options = opts;
 
-	assert(pthread_mutex_init(&fmi->fault_data_mutex, NULL) == 0);
+	dm_assert(pthread_mutex_init(&fmi->fault_data_mutex, NULL) == 0);
 	fmi->fault_list = NULL;
 
 	return (fmi);
@@ -953,7 +952,7 @@ static void
 free_disk_fault_info(fault_monitor_info_t **fmipp)
 {
 	free_disk_fault_list(*fmipp);
-	assert(pthread_mutex_destroy(&(*fmipp)->fault_data_mutex) == 0);
+	dm_assert(pthread_mutex_destroy(&(*fmipp)->fault_data_mutex) == 0);
 	dfree(*fmipp, sizeof (fault_monitor_info_t));
 	*fmipp = NULL;
 }
@@ -1479,9 +1478,9 @@ disk_fault_uninit(diskmon_t *diskinfop)
 		free_disk_fault_list(diskinfop->fmip);
 		free_disk_fault_info(&diskinfop->fmip);
 	}
-	assert(pthread_mutex_lock(&diskinfop->disk_faults_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&diskinfop->disk_faults_mutex) == 0);
 	diskinfop->disk_faults = DISK_FAULT_SOURCE_NONE;
-	assert(pthread_mutex_unlock(&diskinfop->disk_faults_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&diskinfop->disk_faults_mutex) == 0);
 }
 
 int
@@ -1634,7 +1633,7 @@ disk_fault_analyze(diskmon_t *diskinfop)
 	 * Grab the fault list mutex here because any of the functions below
 	 * can add to it.
 	 */
-	assert(pthread_mutex_lock(&fip->fault_data_mutex) == 0);
+	dm_assert(pthread_mutex_lock(&fip->fault_data_mutex) == 0);
 
 	if (fault_analyze_logpages(fd, diskinfop, &i, &sk, &asc, &ascq) != 0) {
 		disk_warn(diskinfop, "Error during %s log page analysis: "
@@ -1661,7 +1660,7 @@ disk_fault_analyze(diskmon_t *diskinfop)
 	 */
 
 	if (before_disk_fault_srcs == fip->disk_fault_srcs) {
-		assert(pthread_mutex_unlock(&fip->fault_data_mutex) == 0);
+		dm_assert(pthread_mutex_unlock(&fip->fault_data_mutex) == 0);
 		return (0);
 	}
 
@@ -1693,7 +1692,7 @@ disk_fault_analyze(diskmon_t *diskinfop)
 
 		flt = flt->next;
 	}
-	assert(pthread_mutex_unlock(&fip->fault_data_mutex) == 0);
+	dm_assert(pthread_mutex_unlock(&fip->fault_data_mutex) == 0);
 
 	return (faults);
 }
