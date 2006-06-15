@@ -2260,3 +2260,25 @@ itlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
 void
 dtlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
 { ASSERT(0); }
+
+/*ARGSUSED*/
+void
+read_ecc_data(struct async_flt *aflt, short verbose, short ce_err)
+{ ASSERT(0); }
+
+/*ARGSUSED*/
+int
+ce_scrub_xdiag_recirc(struct async_flt *aflt, errorq_t *eqp,
+    errorq_elem_t *eqep, size_t afltoffset)
+{
+	ASSERT(0);
+	return (0);
+}
+
+/*ARGSUSED*/
+char *
+flt_to_error_type(struct async_flt *aflt)
+{
+	ASSERT(0);
+	return (NULL);
+}
