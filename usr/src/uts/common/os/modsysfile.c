@@ -823,6 +823,7 @@ mod_read_system_file(int ask)
 
 	param_preset();
 	(void) mod_sysctl(SYS_SET_KVAR, NULL);
+	param_check();
 
 	if (ask == 0)
 		setparams();
@@ -1141,7 +1142,6 @@ mod_sysctl(int fcn, void *p)
 			}
 		}
 	}
-	param_check();
 
 	return (0);
 }

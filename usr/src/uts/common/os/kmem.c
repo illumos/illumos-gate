@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2594,6 +2593,7 @@ kmem_init(void)
 	 * strlog(9F), etc) so we can start recording messages.
 	 */
 	streams_msg_init();
+
 	/*
 	 * Initialize the ZSD framework in Zones so modules loaded henceforth
 	 * can register their callbacks.
@@ -2601,6 +2601,36 @@ kmem_init(void)
 	zone_zsd_init();
 	log_init();
 	taskq_init();
+
+	/*
+	 * Warn about invalid or dangerous values of kmem_flags.
+	 * Always warn about unsupported values.
+	 */
+	if (((kmem_flags & ~(KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE |
+	    KMF_CONTENTS | KMF_LITE)) != 0) ||
+	    ((kmem_flags & KMF_LITE) && kmem_flags != KMF_LITE))
+		cmn_err(CE_WARN, "kmem_flags set to unsupported value 0x%x. "
+		    "See the Solaris Tunable Parameters Reference Manual.",
+		    kmem_flags);
+
+#ifdef DEBUG
+	if ((kmem_flags & KMF_DEBUG) == 0)
+		cmn_err(CE_NOTE, "kmem debugging disabled.");
+#else
+	/*
+	 * For non-debug kernels, the only "normal" flags are 0, KMF_LITE,
+	 * KMF_REDZONE, and KMF_CONTENTS (the last because it is only enabled
+	 * if KMF_AUDIT is set). We should warn the user about the performance
+	 * penalty of KMF_AUDIT or KMF_DEADBEEF if they are set and KMF_LITE
+	 * isn't set (since that disables AUDIT).
+	 */
+	if (!(kmem_flags & KMF_LITE) &&
+	    (kmem_flags & (KMF_AUDIT | KMF_DEADBEEF)) != 0)
+		cmn_err(CE_WARN, "High-overhead kmem debugging features "
+		    "enabled (kmem_flags = 0x%x).  Performance degradation "
+		    "and large memory overhead possible. See the Solaris "
+		    "Tunable Parameters Reference Manual.", kmem_flags);
+#endif /* not DEBUG */
 
 	kmem_cache_applyall(kmem_cache_magazine_enable, NULL, TQ_SLEEP);
 
