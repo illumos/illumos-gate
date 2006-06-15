@@ -1288,3 +1288,18 @@ okpcntl(void)
 	if (tpgrp == 0)
 		error("No job control in subshells");
 }
+
+void
+hupforegnd(void)
+{
+	struct process *pp;
+	int omask;
+
+	omask = sigblock(sigmask(SIGCHLD));
+	for (pp = (&proclist)->p_next; pp != PNULL; pp = pp->p_next)
+		if (pp->p_pid > 0) {
+			if (pp->p_flags & PFOREGND)
+				(void) kill(pp->p_pid, SIGHUP);
+		}
+	(void) sigsetmask(omask);
+}

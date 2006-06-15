@@ -55,6 +55,10 @@ extern	gid_t getegid(), getgid();
 extern	uid_t geteuid(), getuid();
 extern tchar **strblktotsblk(/* char **, int */);
 
+extern void hupforegnd(void);
+void interactive_hup(void);
+void interactive_login_hup(void);
+
 void	importpath(tchar *);
 void	srccat(tchar *, tchar *);
 void	srccat_inlogin(tchar *, tchar *);
@@ -441,6 +445,17 @@ main(int c, char **av)
 		(void) signal(SIGINT, pintr);
 		(void) sigblock(sigmask(SIGINT));
 		(void) signal(SIGTERM, SIG_IGN);
+
+		/*
+		 * Explicitly terminate foreground jobs and exit if we are
+		 * interactive shell
+		 */
+		if (loginsh) {
+			(void) signal(SIGHUP, interactive_login_hup);
+		} else {
+			(void) signal(SIGHUP, interactive_hup);
+		}
+
 		if (quitit == 0 && arginp == 0) {
 			(void) signal(SIGTSTP, SIG_IGN);
 			(void) signal(SIGTTIN, SIG_IGN);
@@ -834,6 +849,21 @@ void
 phup(void)
 {
 	rechist();
+	exit(1);
+}
+
+void
+interactive_hup(void)
+{
+	hupforegnd();
+	exit(1);
+}
+
+void
+interactive_login_hup(void)
+{
+	rechist();
+	hupforegnd();
 	exit(1);
 }
 
