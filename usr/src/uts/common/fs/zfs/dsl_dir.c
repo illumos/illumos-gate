@@ -30,6 +30,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
+#include <sys/dsl_synctask.h>
 #include <sys/spa.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
@@ -38,10 +39,9 @@
 
 static uint64_t dsl_dir_space_accounted(dsl_dir_t *dd);
 static uint64_t dsl_dir_estimated_space(dsl_dir_t *dd);
-static int dsl_dir_set_reservation_sync(dsl_dir_t *dd,
-    void *arg, dmu_tx_t *tx);
 static uint64_t dsl_dir_space_available(dsl_dir_t *dd,
     dsl_dir_t *ancestor, int64_t delta, int ondiskonly);
+static void dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx);
 
 
 /* ARGSUSED */
@@ -59,8 +59,6 @@ dsl_dir_evict(dmu_buf_t *db, void *arg)
 	}
 
 	ASSERT3U(dd->dd_used_bytes, ==, dd->dd_phys->dd_used_bytes);
-
-	ASSERT(dd->dd_sync_txg == 0);
 
 	if (dd->dd_parent)
 		dsl_dir_close(dd->dd_parent, dd);
@@ -323,8 +321,6 @@ dsl_dir_open_spa(spa_t *spa, const char *name, void *tag,
 		ASSERT(next[0] != '\0');
 		if (next[0] == '@')
 			break;
-		if (dd->dd_phys->dd_child_dir_zapobj == 0)
-			break;
 		dprintf("looking up %s in obj%lld\n",
 		    buf, dd->dd_phys->dd_child_dir_zapobj);
 
@@ -384,39 +380,18 @@ dsl_dir_open(const char *name, void *tag, dsl_dir_t **ddp, const char **tailp)
 	return (dsl_dir_open_spa(NULL, name, tag, ddp, tailp));
 }
 
-int
+uint64_t
 dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
 {
 	objset_t *mos = pds->dd_pool->dp_meta_objset;
 	uint64_t ddobj;
 	dsl_dir_phys_t *dsphys;
 	dmu_buf_t *dbuf;
-	int err;
-
-	ASSERT(dmu_tx_is_syncing(tx));
-
-	if (pds->dd_phys->dd_child_dir_zapobj == 0) {
-		dmu_buf_will_dirty(pds->dd_dbuf, tx);
-		pds->dd_phys->dd_child_dir_zapobj = zap_create(mos,
-		    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
-	}
-
-	rw_enter(&pds->dd_pool->dp_config_rwlock, RW_WRITER);
-	err = zap_lookup(mos, pds->dd_phys->dd_child_dir_zapobj,
-	    name, sizeof (uint64_t), 1, &ddobj);
-	if (err != ENOENT) {
-		rw_exit(&pds->dd_pool->dp_config_rwlock);
-		return (err ? err : EEXIST);
-	}
 
 	ddobj = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
 	    DMU_OT_DSL_DIR, sizeof (dsl_dir_phys_t), tx);
-	err = zap_add(mos, pds->dd_phys->dd_child_dir_zapobj,
-	    name, sizeof (uint64_t), 1, &ddobj, tx);
-	ASSERT3U(err, ==, 0);
-	dprintf("dataset_create: zap_add %s->%lld to %lld returned %d\n",
-	    name, ddobj, pds->dd_phys->dd_child_dir_zapobj, err);
-
+	VERIFY(0 == zap_add(mos, pds->dd_phys->dd_child_dir_zapobj,
+	    name, sizeof (uint64_t), 1, &ddobj, tx));
 	VERIFY(0 == dmu_bonus_hold(mos, ddobj, FTAG, &dbuf));
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;
@@ -429,95 +404,64 @@ dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
 	    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
 	dmu_buf_rele(dbuf, FTAG);
 
-	rw_exit(&pds->dd_pool->dp_config_rwlock);
+	return (ddobj);
+}
+
+/* ARGSUSED */
+int
+dsl_dir_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	dsl_pool_t *dp = dd->dd_pool;
+	objset_t *mos = dp->dp_meta_objset;
+	int err;
+	uint64_t count;
+
+	/*
+	 * There should be exactly two holds, both from
+	 * dsl_dataset_destroy: one on the dd directory, and one on its
+	 * head ds.  Otherwise, someone is trying to lookup something
+	 * inside this dir while we want to destroy it.  The
+	 * config_rwlock ensures that nobody else opens it after we
+	 * check.
+	 */
+	ASSERT(dmu_buf_refcount(dd->dd_dbuf) == 2);
+	if (dmu_buf_refcount(dd->dd_dbuf) > 2)
+		return (EBUSY);
+
+	err = zap_count(mos, dd->dd_phys->dd_child_dir_zapobj, &count);
+	if (err)
+		return (err);
+	if (count != 0)
+		return (EEXIST);
 
 	return (0);
 }
 
-int
-dsl_dir_destroy_sync(dsl_dir_t *pds, void *arg, dmu_tx_t *tx)
+void
+dsl_dir_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 {
-	const char *name = arg;
-	dsl_dir_t *dd = NULL;
-	dsl_pool_t *dp = pds->dd_pool;
-	objset_t *mos = dp->dp_meta_objset;
-	uint64_t val, obj, child_zapobj, props_zapobj;
-	int t, err;
+	dsl_dir_t *dd = arg1;
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
+	uint64_t val, obj;
 
-	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
-
-	err = zap_lookup(mos, pds->dd_phys->dd_child_dir_zapobj, name,
-	    8, 1, &obj);
-	if (err)
-		goto out;
-
-	err = dsl_dir_open_obj(dp, obj, name, FTAG, &dd);
-	if (err)
-		goto out;
-	ASSERT3U(dd->dd_phys->dd_parent_obj, ==, pds->dd_object);
-
-	if (dmu_buf_refcount(dd->dd_dbuf) > 1) {
-		err = EBUSY;
-		goto out;
-	}
-
-	for (t = 0; t < TXG_SIZE; t++) {
-		/*
-		 * if they were dirty, they'd also be open.
-		 * dp_config_rwlock ensures that it stays that way.
-		 */
-		ASSERT(!txg_list_member(&dp->dp_dirty_dirs, dd, t));
-	}
-
-	child_zapobj = dd->dd_phys->dd_child_dir_zapobj;
-	props_zapobj = dd->dd_phys->dd_props_zapobj;
-
-	if (child_zapobj != 0) {
-		uint64_t count;
-		err = EEXIST;
-		(void) zap_count(mos, child_zapobj, &count);
-		if (count != 0)
-			goto out;
-	}
-
-	if (dd->dd_phys->dd_head_dataset_obj != 0) {
-		err = dsl_dataset_destroy_sync(dd, NULL, tx);
-		if (err)
-			goto out;
-	}
+	ASSERT(RW_WRITE_HELD(&dd->dd_pool->dp_config_rwlock));
 	ASSERT(dd->dd_phys->dd_head_dataset_obj == 0);
 
-	/* The point of no (unsuccessful) return */
-
-	/* Make sure parent's used gets updated */
+	/* Remove our reservation. */
 	val = 0;
-	err = dsl_dir_set_reservation_sync(dd, &val, tx);
-	ASSERT(err == 0);
+	dsl_dir_set_reservation_sync(dd, &val, tx);
 	ASSERT3U(dd->dd_used_bytes, ==, 0);
 	ASSERT3U(dd->dd_phys->dd_reserved, ==, 0);
-	dsl_dir_close(dd, FTAG);
-	dd = NULL;
 
-	err = dmu_object_free(mos, obj, tx);
-	ASSERT(err == 0);
+	VERIFY(0 == zap_destroy(mos, dd->dd_phys->dd_child_dir_zapobj, tx));
+	VERIFY(0 == zap_destroy(mos, dd->dd_phys->dd_props_zapobj, tx));
+	VERIFY(0 == zap_remove(mos,
+	    dd->dd_parent->dd_phys->dd_child_dir_zapobj, dd->dd_myname, tx));
 
-	if (child_zapobj)
-		err = zap_destroy(mos, child_zapobj, tx);
-	ASSERT(err == 0);
-
-	if (props_zapobj)
-		err = zap_destroy(mos, props_zapobj, tx);
-	ASSERT(err == 0);
-
-	err = zap_remove(mos, pds->dd_phys->dd_child_dir_zapobj, name, tx);
-	ASSERT(err == 0);
-
-out:
-	rw_exit(&dp->dp_config_rwlock);
-	if (dd)
-		dsl_dir_close(dd, FTAG);
-
-	return (err);
+	obj = dd->dd_object;
+	dsl_dir_close(dd, tag);
+	VERIFY(0 == dmu_object_free(mos, obj, tx));
 }
 
 void
@@ -577,71 +521,6 @@ dsl_dir_stats(dsl_dir_t *dd, dmu_objset_stats_t *dds)
 	}
 }
 
-int
-dsl_dir_sync_task(dsl_dir_t *dd,
-    int (*func)(dsl_dir_t *, void*, dmu_tx_t *), void *arg, uint64_t space)
-{
-	dmu_tx_t *tx;
-	dsl_pool_t *dp = dd->dd_pool;
-	int err = 0;
-	uint64_t txg;
-
-	dprintf_dd(dd, "func=%p space=%llu\n", func, space);
-
-again:
-	tx = dmu_tx_create_ds(dd);
-	dmu_tx_hold_space(tx, space);
-	err = dmu_tx_assign(tx, TXG_WAIT);
-	if (err == ENOSPC || err == EDQUOT) {
-		dsl_dir_t *rds;
-		/*
-		 * They can get their space from either this dd, or the
-		 * root dd.
-		 */
-		for (rds = dd; rds->dd_parent; rds = rds->dd_parent)
-			continue;
-		dmu_tx_abort(tx);
-		tx = dmu_tx_create_ds(rds);
-		dmu_tx_hold_space(tx, space);
-		err = dmu_tx_assign(tx, TXG_WAIT);
-	}
-	if (err) {
-		dmu_tx_abort(tx);
-		return (err);
-	}
-
-	txg = dmu_tx_get_txg(tx);
-	mutex_enter(&dd->dd_lock);
-	if (dd->dd_sync_txg != 0) {
-		mutex_exit(&dd->dd_lock);
-		dmu_tx_commit(tx);
-		txg_wait_synced(dp, 0);
-		goto again;
-	}
-
-	/* We're good to go */
-
-	dd->dd_sync_txg = txg;
-	dd->dd_sync_func = func;
-	dd->dd_sync_arg = arg;
-
-	mutex_exit(&dd->dd_lock);
-
-	dsl_dir_dirty(dd, tx);
-	dmu_tx_commit(tx);
-
-	txg_wait_synced(dp, txg);
-
-	mutex_enter(&dd->dd_lock);
-	ASSERT(dd->dd_sync_txg == txg);
-	ASSERT(dd->dd_sync_func == NULL);
-	err = dd->dd_sync_err;
-	dd->dd_sync_txg = 0;
-	mutex_exit(&dd->dd_lock);
-
-	return (err);
-}
-
 void
 dsl_dir_dirty(dsl_dir_t *dd, dmu_tx_t *tx)
 {
@@ -666,11 +545,6 @@ parent_delta(dsl_dir_t *dd, uint64_t used, int64_t delta)
 void
 dsl_dir_sync(dsl_dir_t *dd, dmu_tx_t *tx)
 {
-	if (dd->dd_sync_txg == tx->tx_txg && dd->dd_sync_func) {
-		dd->dd_sync_err = dd->dd_sync_func(dd, dd->dd_sync_arg, tx);
-		dd->dd_sync_func = NULL;
-	}
-
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
@@ -1004,24 +878,49 @@ dsl_dir_diduse_space(dsl_dir_t *dd,
 	}
 }
 
+/* ARGSUSED */
 static int
-dsl_dir_set_quota_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	uint64_t *quotap = arg;
+	dsl_dir_t *dd = arg1;
+	uint64_t *quotap = arg2;
 	uint64_t new_quota = *quotap;
 	int err = 0;
+	uint64_t towrite;
+
+	if (new_quota == 0)
+		return (0);
+
+	mutex_enter(&dd->dd_lock);
+	/*
+	 * If we are doing the preliminary check in open context, and
+	 * there are pending changes, then don't fail it, since the
+	 * pending changes could under-estimat the amount of space to be
+	 * freed up.
+	 */
+	towrite = dd->dd_space_towrite[0] + dd->dd_space_towrite[1] +
+	    dd->dd_space_towrite[2] + dd->dd_space_towrite[3];
+	if ((dmu_tx_is_syncing(tx) || towrite == 0) &&
+	    (new_quota < dd->dd_phys->dd_reserved ||
+	    new_quota < dsl_dir_estimated_space(dd))) {
+		err = ENOSPC;
+	}
+	mutex_exit(&dd->dd_lock);
+	return (err);
+}
+
+static void
+dsl_dir_set_quota_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	uint64_t *quotap = arg2;
+	uint64_t new_quota = *quotap;
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
 
 	mutex_enter(&dd->dd_lock);
-	if (new_quota != 0 && (new_quota < dd->dd_phys->dd_reserved ||
-	    new_quota < dsl_dir_estimated_space(dd))) {
-		err = ENOSPC;
-	} else {
-		dd->dd_phys->dd_quota = new_quota;
-	}
+	dd->dd_phys->dd_quota = new_quota;
 	mutex_exit(&dd->dd_lock);
-	return (err);
 }
 
 int
@@ -1039,21 +938,31 @@ dsl_dir_set_quota(const char *ddname, uint64_t quota)
 	 */
 	txg_wait_open(dd->dd_pool, 0);
 
-	err = dsl_dir_sync_task(dd, dsl_dir_set_quota_sync, &quota, 0);
+	err = dsl_sync_task_do(dd->dd_pool, dsl_dir_set_quota_check,
+	    dsl_dir_set_quota_sync, dd, &quota, 0);
 	dsl_dir_close(dd, FTAG);
 	return (err);
 }
 
+/* ARGSUSED */
 static int
-dsl_dir_set_reservation_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	uint64_t *reservationp = arg;
+	dsl_dir_t *dd = arg1;
+	uint64_t *reservationp = arg2;
 	uint64_t new_reservation = *reservationp;
 	uint64_t used, avail;
 	int64_t delta;
 
 	if (new_reservation > INT64_MAX)
 		return (EOVERFLOW);
+
+	/*
+	 * If we are doing the preliminary check in open context, the
+	 * space estimates may be inaccurate.
+	 */
+	if (!dmu_tx_is_syncing(tx))
+		return (0);
 
 	mutex_enter(&dd->dd_lock);
 	used = dd->dd_used_bytes;
@@ -1073,6 +982,23 @@ dsl_dir_set_reservation_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	if (delta > 0 && dd->dd_phys->dd_quota > 0 &&
 	    new_reservation > dd->dd_phys->dd_quota)
 		return (ENOSPC);
+	return (0);
+}
+
+static void
+dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	uint64_t *reservationp = arg2;
+	uint64_t new_reservation = *reservationp;
+	uint64_t used;
+	int64_t delta;
+
+	mutex_enter(&dd->dd_lock);
+	used = dd->dd_used_bytes;
+	delta = MAX(used, new_reservation) -
+	    MAX(used, dd->dd_phys->dd_reserved);
+	mutex_exit(&dd->dd_lock);
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
 	dd->dd_phys->dd_reserved = new_reservation;
@@ -1081,7 +1007,6 @@ dsl_dir_set_reservation_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 		/* Roll up this additional usage into our ancestors */
 		dsl_dir_diduse_space(dd->dd_parent, delta, 0, 0, tx);
 	}
-	return (0);
 }
 
 int
@@ -1093,8 +1018,8 @@ dsl_dir_set_reservation(const char *ddname, uint64_t reservation)
 	err = dsl_dir_open(ddname, FTAG, &dd, NULL);
 	if (err)
 		return (err);
-	err = dsl_dir_sync_task(dd,
-	    dsl_dir_set_reservation_sync, &reservation, 0);
+	err = dsl_sync_task_do(dd->dd_pool, dsl_dir_set_reservation_check,
+	    dsl_dir_set_reservation_sync, dd, &reservation, 0);
 	dsl_dir_close(dd, FTAG);
 	return (err);
 }
@@ -1128,73 +1053,73 @@ would_change(dsl_dir_t *dd, int64_t delta, dsl_dir_t *ancestor)
 	return (would_change(dd->dd_parent, delta, ancestor));
 }
 
-int
-dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+struct renamearg {
+	dsl_dir_t *newparent;
+	const char *mynewname;
+};
+
+/* ARGSUSED */
+static int
+dsl_dir_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	const char *newname = arg;
+	dsl_dir_t *dd = arg1;
+	struct renamearg *ra = arg2;
 	dsl_pool_t *dp = dd->dd_pool;
 	objset_t *mos = dp->dp_meta_objset;
-	dsl_dir_t *newpds;
-	const char *tail;
-	int err, len;
-
-	/* can't rename to different pool */
-	len = strlen(dp->dp_root_dir->dd_myname);
-	if (strncmp(dp->dp_root_dir->dd_myname, newname, len != 0) ||
-	    newname[len] != '/') {
-		return (ENXIO);
-	}
-
-	/* new parent should exist */
-	err = dsl_dir_open_spa(dp->dp_spa, newname, FTAG, &newpds, &tail);
-	if (err)
-		return (err);
-
-	/* new name should not already exist */
-	if (tail == NULL) {
-		dsl_dir_close(newpds, FTAG);
-		return (EEXIST);
-	}
-
-	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
+	int err;
+	uint64_t val;
 
 	/* There should be 2 references: the open and the dirty */
-	if (dmu_buf_refcount(dd->dd_dbuf) > 2) {
-		rw_exit(&dp->dp_config_rwlock);
-		dsl_dir_close(newpds, FTAG);
+	if (dmu_buf_refcount(dd->dd_dbuf) > 2)
 		return (EBUSY);
-	}
 
-	if (newpds != dd->dd_parent) {
+	/* check for existing name */
+	err = zap_lookup(mos, ra->newparent->dd_phys->dd_child_dir_zapobj,
+	    ra->mynewname, 8, 1, &val);
+	if (err == 0)
+		return (EEXIST);
+	if (err != ENOENT)
+		return (err);
+
+	if (ra->newparent != dd->dd_parent) {
 		/* is there enough space? */
 		uint64_t myspace =
 		    MAX(dd->dd_used_bytes, dd->dd_phys->dd_reserved);
 
-		/* no rename into our descendent */
-		if (closest_common_ancestor(dd, newpds) == dd) {
-			dsl_dir_close(newpds, FTAG);
-			rw_exit(&dp->dp_config_rwlock);
+		/* no rename into our descendant */
+		if (closest_common_ancestor(dd, ra->newparent) == dd)
 			return (EINVAL);
-		}
 
-		if (err = dsl_dir_transfer_possible(dd->dd_parent, newpds,
-		    myspace)) {
-			dsl_dir_close(newpds, FTAG);
-			rw_exit(&dp->dp_config_rwlock);
+		if (err = dsl_dir_transfer_possible(dd->dd_parent,
+		    ra->newparent, myspace))
 			return (err);
-		}
+	}
 
-		/* The point of no (unsuccessful) return */
+	return (0);
+}
+
+static void
+dsl_dir_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	struct renamearg *ra = arg2;
+	dsl_pool_t *dp = dd->dd_pool;
+	objset_t *mos = dp->dp_meta_objset;
+	int err;
+
+	ASSERT(dmu_buf_refcount(dd->dd_dbuf) <= 2);
+
+	if (ra->newparent != dd->dd_parent) {
+		uint64_t myspace =
+		    MAX(dd->dd_used_bytes, dd->dd_phys->dd_reserved);
 
 		dsl_dir_diduse_space(dd->dd_parent, -myspace,
 		    -dd->dd_phys->dd_compressed_bytes,
 		    -dd->dd_phys->dd_uncompressed_bytes, tx);
-		dsl_dir_diduse_space(newpds, myspace,
+		dsl_dir_diduse_space(ra->newparent, myspace,
 		    dd->dd_phys->dd_compressed_bytes,
 		    dd->dd_phys->dd_uncompressed_bytes, tx);
 	}
-
-	/* The point of no (unsuccessful) return */
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
 
@@ -1203,20 +1128,48 @@ dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	    dd->dd_myname, tx);
 	ASSERT3U(err, ==, 0);
 
-	(void) strcpy(dd->dd_myname, tail);
+	(void) strcpy(dd->dd_myname, ra->mynewname);
 	dsl_dir_close(dd->dd_parent, dd);
-	dd->dd_phys->dd_parent_obj = newpds->dd_object;
+	dd->dd_phys->dd_parent_obj = ra->newparent->dd_object;
 	VERIFY(0 == dsl_dir_open_obj(dd->dd_pool,
-	    newpds->dd_object, NULL, dd, &dd->dd_parent));
+	    ra->newparent->dd_object, NULL, dd, &dd->dd_parent));
 
 	/* add to new parent zapobj */
-	err = zap_add(mos, newpds->dd_phys->dd_child_dir_zapobj,
+	err = zap_add(mos, ra->newparent->dd_phys->dd_child_dir_zapobj,
 	    dd->dd_myname, 8, 1, &dd->dd_object, tx);
 	ASSERT3U(err, ==, 0);
+}
 
-	dsl_dir_close(newpds, FTAG);
-	rw_exit(&dp->dp_config_rwlock);
-	return (0);
+int
+dsl_dir_rename(dsl_dir_t *dd, const char *newname)
+{
+	struct renamearg ra;
+	int err;
+
+	/* new parent should exist */
+	err = dsl_dir_open(newname, FTAG, &ra.newparent, &ra.mynewname);
+	if (err)
+		return (err);
+
+	/* can't rename to different pool */
+	if (dd->dd_pool != ra.newparent->dd_pool) {
+		err = ENXIO;
+		goto out;
+	}
+
+	/* new name should not already exist */
+	if (ra.mynewname == NULL) {
+		err = EEXIST;
+		goto out;
+	}
+
+
+	err = dsl_sync_task_do(dd->dd_pool,
+	    dsl_dir_rename_check, dsl_dir_rename_sync, dd, &ra, 3);
+
+out:
+	dsl_dir_close(ra.newparent, FTAG);
+	return (err);
 }
 
 int

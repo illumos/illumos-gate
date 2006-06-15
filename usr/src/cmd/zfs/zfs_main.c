@@ -201,7 +201,8 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tshare -a\n"
 		    "\tshare <filesystem>\n"));
 	case HELP_SNAPSHOT:
-		return (gettext("\tsnapshot <filesystem@name|volume@name>\n"));
+		return (gettext("\tsnapshot [-r] "
+		    "<filesystem@name|volume@name>\n"));
 	case HELP_UNMOUNT:
 		return (gettext("\tunmount [-f] -a\n"
 		    "\tunmount [-f] <filesystem|mountpoint>\n"));
@@ -372,7 +373,7 @@ zfs_do_clone(int argc, char **argv)
 
 /*
  * zfs create fs
- * zfs create [-s] -V vol size
+ * zfs create [-s] [-b blocksize] -V vol size
  *
  * Create a new dataset.  This command can be used to create filesystems
  * and volumes.  Snapshot creation is handled by 'zfs snapshot'.
@@ -499,6 +500,7 @@ typedef struct destroy_cbdata {
 	int		cb_needforce;
 	int		cb_doclones;
 	zfs_handle_t	*cb_target;
+	char		*cb_snapname;
 } destroy_cbdata_t;
 
 /*
@@ -588,6 +590,29 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	return (0);
 }
 
+static int
+destroy_snap_clones(zfs_handle_t *zhp, void *arg)
+{
+	destroy_cbdata_t *cbp = arg;
+	char thissnap[MAXPATHLEN];
+	zfs_handle_t *szhp;
+
+	(void) snprintf(thissnap, sizeof (thissnap),
+	    "%s@%s", zfs_get_name(zhp), cbp->cb_snapname);
+
+	libzfs_print_on_error(g_zfs, B_FALSE);
+	szhp = zfs_open(g_zfs, thissnap, ZFS_TYPE_SNAPSHOT);
+	libzfs_print_on_error(g_zfs, B_TRUE);
+	if (szhp) {
+		/*
+		 * Destroy any clones of this snapshot
+		 */
+		(void) zfs_iter_dependents(szhp, destroy_callback, cbp);
+		zfs_close(szhp);
+	}
+
+	return (zfs_iter_filesystems(zhp, destroy_snap_clones, arg));
+}
 
 static int
 zfs_do_destroy(int argc, char **argv)
@@ -595,6 +620,7 @@ zfs_do_destroy(int argc, char **argv)
 	destroy_cbdata_t cb = { 0 };
 	int c;
 	zfs_handle_t *zhp;
+	char *cp;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "frR")) != -1) {
@@ -630,6 +656,34 @@ zfs_do_destroy(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
+	/*
+	 * If we are doing recursive destroy of a snapshot, then the
+	 * named snapshot may not exist.  Go straight to libzfs.
+	 */
+	if (cb.cb_recurse && (cp = strchr(argv[0], '@'))) {
+		int ret;
+
+		*cp = '\0';
+		if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+			return (1);
+		*cp = '@';
+		cp++;
+
+		if (cb.cb_doclones) {
+			cb.cb_snapname = cp;
+			(void) destroy_snap_clones(zhp, &cb);
+		}
+
+		ret = zfs_destroy_snaps(zhp, cp);
+		zfs_close(zhp);
+		if (ret) {
+			(void) fprintf(stderr,
+			    gettext("no snapshots destroyed\n"));
+		}
+		return (ret != 0);
+	}
+
+
 	/* Open the given dataset */
 	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
 		return (1);
@@ -652,7 +706,6 @@ zfs_do_destroy(int argc, char **argv)
 		zfs_close(zhp);
 		return (1);
 	}
-
 
 	/*
 	 * Check for any dependents and/or clones.
@@ -1728,7 +1781,7 @@ zfs_do_set(int argc, char **argv)
 }
 
 /*
- * zfs snapshot <fs@snap>
+ * zfs snapshot [-r] <fs@snap>
  *
  * Creates a snapshot with the given name.  While functionally equivalent to
  * 'zfs create', it is a separate command to diffferentiate intent.
@@ -1736,24 +1789,41 @@ zfs_do_set(int argc, char **argv)
 static int
 zfs_do_snapshot(int argc, char **argv)
 {
+	int recursive = B_FALSE;
+	int ret;
+	char c;
+
 	/* check options */
-	if (argc > 1 && argv[1][0] == '-') {
-		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
-		    argv[1][1]);
-		usage(B_FALSE);
+	while ((c = getopt(argc, argv, ":r")) != -1) {
+		switch (c) {
+		case 'r':
+			recursive = B_TRUE;
+			break;
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+		}
 	}
 
+	argc -= optind;
+	argv += optind;
+
 	/* check number of arguments */
-	if (argc < 2) {
+	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing snapshot argument\n"));
 		usage(B_FALSE);
 	}
-	if (argc > 2) {
+	if (argc > 1) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
 		usage(B_FALSE);
 	}
 
-	return (zfs_snapshot(g_zfs, argv[1]) != 0);
+	ret = zfs_snapshot(g_zfs, argv[0], recursive);
+	if (ret && recursive)
+		(void) fprintf(stderr, gettext("no snapshots were created\n"));
+	return (ret != 0);
+
 }
 
 /*

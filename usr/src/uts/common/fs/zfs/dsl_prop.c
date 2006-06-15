@@ -31,6 +31,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
+#include <sys/dsl_synctask.h>
 #include <sys/spa.h>
 #include <sys/zio_checksum.h> /* for the default checksum value */
 #include <sys/zap.h>
@@ -106,8 +107,11 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 	uint64_t value;
 	dsl_prop_cb_record_t *cbr;
 	int err;
+	int need_rwlock;
 
-	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
+	need_rwlock = !RW_WRITE_HELD(&dd->dd_pool->dp_config_rwlock);
+	if (need_rwlock)
+		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 
 	err = dsl_prop_get_impl(dd, propname, 8, 1, &value, NULL);
 	if (err != 0) {
@@ -129,7 +133,8 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 
 	VERIFY(0 == dsl_dir_open_obj(dd->dd_pool, dd->dd_object,
 	    NULL, cbr, &dd));
-	rw_exit(&dd->dd_pool->dp_config_rwlock);
+	if (need_rwlock)
+		rw_exit(&dd->dd_pool->dp_config_rwlock);
 	/* Leave dataset open until this callback is unregistered */
 	return (0);
 }
@@ -266,6 +271,8 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	dsl_dir_t *dd;
 	dsl_prop_cb_record_t *cbr;
 	objset_t *mos = dp->dp_meta_objset;
+	zap_cursor_t zc;
+	zap_attribute_t za;
 	int err;
 
 	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
@@ -296,20 +303,15 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	}
 	mutex_exit(&dd->dd_lock);
 
-	if (dd->dd_phys->dd_child_dir_zapobj) {
-		zap_cursor_t zc;
-		zap_attribute_t za;
-
-		for (zap_cursor_init(&zc, mos,
-		    dd->dd_phys->dd_child_dir_zapobj);
-		    zap_cursor_retrieve(&zc, &za) == 0;
-		    zap_cursor_advance(&zc)) {
-			/* XXX recursion could blow stack; esp. za! */
-			dsl_prop_changed_notify(dp, za.za_first_integer,
-			    propname, value, FALSE);
-		}
-		zap_cursor_fini(&zc);
+	for (zap_cursor_init(&zc, mos,
+	    dd->dd_phys->dd_child_dir_zapobj);
+	    zap_cursor_retrieve(&zc, &za) == 0;
+	    zap_cursor_advance(&zc)) {
+		/* XXX recursion could blow stack; esp. za! */
+		dsl_prop_changed_notify(dp, za.za_first_integer,
+		    propname, value, FALSE);
 	}
+	zap_cursor_fini(&zc);
 	dsl_dir_close(dd, FTAG);
 }
 
@@ -320,41 +322,37 @@ struct prop_set_arg {
 	const void *buf;
 };
 
-static int
-dsl_prop_set_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+
+static void
+dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	struct prop_set_arg *psa = arg;
+	dsl_dir_t *dd = arg1;
+	struct prop_set_arg *psa = arg2;
 	objset_t *mos = dd->dd_pool->dp_meta_objset;
 	uint64_t zapobj = dd->dd_phys->dd_props_zapobj;
 	uint64_t intval;
-	int err, isint;
-
-	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_WRITER);
+	int isint;
 
 	isint = (dodefault(psa->name, 8, 1, &intval) == 0);
 
 	if (psa->numints == 0) {
-		err = zap_remove(mos, zapobj, psa->name, tx);
-		if (err == ENOENT) /* that's fine. */
-			err = 0;
-		if (err == 0 && isint) {
-			err = dsl_prop_get_impl(dd->dd_parent,
-			    psa->name, 8, 1, &intval, NULL);
+		int err = zap_remove(mos, zapobj, psa->name, tx);
+		ASSERT(err == 0 || err == ENOENT);
+		if (isint) {
+			VERIFY(0 == dsl_prop_get_impl(dd->dd_parent,
+			    psa->name, 8, 1, &intval, NULL));
 		}
 	} else {
-		err = zap_update(mos, zapobj, psa->name,
-		    psa->intsz, psa->numints, psa->buf, tx);
+		VERIFY(0 == zap_update(mos, zapobj, psa->name,
+		    psa->intsz, psa->numints, psa->buf, tx));
 		if (isint)
 			intval = *(uint64_t *)psa->buf;
 	}
 
-	if (err == 0 && isint) {
+	if (isint) {
 		dsl_prop_changed_notify(dd->dd_pool,
 		    dd->dd_object, psa->name, intval, TRUE);
 	}
-	rw_exit(&dd->dd_pool->dp_config_rwlock);
-
-	return (err);
 }
 
 int
@@ -373,7 +371,8 @@ dsl_prop_set(const char *ddname, const char *propname,
 	psa.intsz = intsz;
 	psa.numints = numints;
 	psa.buf = buf;
-	err = dsl_dir_sync_task(dd, dsl_prop_set_sync, &psa, 1<<20);
+	err = dsl_sync_task_do(dd->dd_pool,
+	    NULL, dsl_prop_set_sync, dd, &psa, 2);
 
 	dsl_dir_close(dd, FTAG);
 

@@ -28,6 +28,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
+#include <sys/dsl_synctask.h>
 #include <sys/dmu_tx.h>
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
@@ -68,6 +69,8 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	    offsetof(dsl_dataset_t, ds_dirty_link));
 	txg_list_create(&dp->dp_dirty_dirs,
 	    offsetof(dsl_dir_t, dd_dirty_link));
+	txg_list_create(&dp->dp_sync_tasks,
+	    offsetof(dsl_sync_task_group_t, dstg_node));
 	list_create(&dp->dp_synced_objsets, sizeof (dsl_dataset_t),
 	    offsetof(dsl_dataset_t, ds_synced_link));
 
@@ -154,8 +157,7 @@ dsl_pool_create(spa_t *spa, uint64_t txg)
 	    NULL, dp, &dp->dp_root_dir));
 
 	/* create and open the meta-objset dir */
-	VERIFY(0 == dsl_dir_create_sync(dp->dp_root_dir, MOS_DIR_NAME, tx));
-	ASSERT3U(err, ==, 0);
+	(void) dsl_dir_create_sync(dp->dp_root_dir, MOS_DIR_NAME, tx);
 	VERIFY(0 == dsl_pool_open_mos_dir(dp, &dp->dp_mos_dir));
 
 	dmu_tx_commit(tx);
@@ -174,17 +176,20 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	do {
 		dsl_dir_t *dd;
 		dsl_dataset_t *ds;
+		dsl_sync_task_group_t *dstg;
 
 		while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
 			if (!list_link_active(&ds->ds_synced_link))
 				list_insert_tail(&dp->dp_synced_objsets, ds);
 			dsl_dataset_sync(ds, tx);
 		}
+		while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg))
+			dsl_sync_task_group_sync(dstg, tx);
 		while (dd = txg_list_remove(&dp->dp_dirty_dirs, txg))
 			dsl_dir_sync(dd, tx);
 		/*
-		 * We need to loop since dsl_dir_sync() could create a
-		 * new (dirty) objset.
+		 * We need to loop since dsl_sync_task_group_sync()
+		 * could create a new (dirty) objset.
 		 * XXX - isn't this taken care of by the spa's sync to
 		 * convergence loop?
 		 */

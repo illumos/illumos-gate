@@ -296,7 +296,7 @@ take_snapshot(char *source_zone, zfs_handle_t *zhp, char *snapshot_name,
 
 	if (pre_snapshot(source_zone) != Z_OK)
 		return (Z_ERR);
-	res = zfs_snapshot(g_zfs, snapshot_name);
+	res = zfs_snapshot(g_zfs, snapshot_name, B_FALSE);
 	if (post_snapshot(source_zone) != Z_OK)
 		return (Z_ERR);
 

@@ -1207,7 +1207,7 @@ dump_label(const char *dev)
 }
 
 /*ARGSUSED*/
-static void
+static int
 dump_one_dir(char *dsname, void *arg)
 {
 	int error;
@@ -1217,10 +1217,11 @@ dump_one_dir(char *dsname, void *arg)
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
 	if (error) {
 		(void) printf("Could not open %s\n", dsname);
-		return;
+		return (0);
 	}
 	dump_dir(os);
 	dmu_objset_close(os);
+	return (0);
 }
 
 static void
@@ -1717,7 +1718,7 @@ dump_zpool(spa_t *spa)
 			dump_dtl(spa->spa_root_vdev, 0);
 			dump_metaslabs(spa);
 		}
-		dmu_objset_find(spa->spa_name, dump_one_dir, NULL,
+		(void) dmu_objset_find(spa->spa_name, dump_one_dir, NULL,
 		    DS_FIND_SNAPSHOTS);
 	}
 

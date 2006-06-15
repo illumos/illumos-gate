@@ -853,6 +853,7 @@ ZFS_COMMON_OBJS +=		\
 	dsl_dir.o		\
 	dsl_dataset.o		\
 	dsl_pool.o		\
+	dsl_synctask.o		\
 	dmu_zfetch.o		\
 	dsl_prop.o		\
 	fletcher.o		\

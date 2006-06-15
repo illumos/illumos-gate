@@ -32,6 +32,7 @@
 #include <sys/spa.h>
 #include <sys/txg.h>
 #include <sys/bplist.h>
+#include <sys/dsl_synctask.h>
 #include <sys/zfs_context.h>
 
 #ifdef	__cplusplus
@@ -105,6 +106,9 @@ typedef struct dsl_dataset {
 	dsl_dataset_evict_func_t *ds_user_evict_func;
 	uint64_t ds_open_refcount;
 
+	/* no locking; only for making guesses */
+	uint64_t ds_trysnap_txg;
+
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[MAXNAMELEN];
 } dsl_dataset_t;
@@ -120,13 +124,13 @@ int dsl_dataset_open_obj(struct dsl_pool *dp, uint64_t dsobj,
     const char *tail, int mode, void *tag, dsl_dataset_t **);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 void dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag);
-int dsl_dataset_create_sync(dsl_dir_t *pds, const char *fullname,
+uint64_t dsl_dataset_create_sync(dsl_dir_t *pds,
     const char *lastname, dsl_dataset_t *clone_parent, dmu_tx_t *tx);
-int dsl_dataset_snapshot_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
 int dsl_dataset_destroy(const char *name);
-int dsl_dataset_destroy_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
-int dsl_dataset_rollback(const char *name);
-int dsl_dataset_rollback_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
+int dsl_snapshots_destroy(char *fsname, char *snapname);
+dsl_checkfunc_t dsl_dataset_snapshot_check;
+dsl_syncfunc_t dsl_dataset_snapshot_sync;
+int dsl_dataset_rollback(dsl_dataset_t *ds);
 int dsl_dataset_rename(const char *name, const char *newname);
 int dsl_dataset_promote(const char *name);
 

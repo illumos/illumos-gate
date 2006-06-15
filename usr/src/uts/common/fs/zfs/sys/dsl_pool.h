@@ -56,6 +56,7 @@ typedef struct dsl_pool {
 	tx_state_t dp_tx;
 	txg_list_t dp_dirty_datasets;
 	txg_list_t dp_dirty_dirs;
+	txg_list_t dp_sync_tasks;
 
 	/*
 	 * Protects administrative changes (properties, namespace)

@@ -31,6 +31,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_pool.h>
+#include <sys/dsl_synctask.h>
 #include <sys/dnode.h>
 #include <sys/dbuf.h>
 #include <sys/dmu_tx.h>
@@ -418,29 +419,56 @@ struct oscarg {
 	void (*userfunc)(objset_t *os, void *arg, dmu_tx_t *tx);
 	void *userarg;
 	dsl_dataset_t *clone_parent;
-	const char *fullname;
 	const char *lastname;
 	dmu_objset_type_t type;
 };
 
+/* ARGSUSED */
 static int
-dmu_objset_create_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	struct oscarg *oa = arg;
-	dsl_dataset_t *ds;
+	dsl_dir_t *dd = arg1;
+	struct oscarg *oa = arg2;
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
 	int err;
+	uint64_t ddobj;
+
+	err = zap_lookup(mos, dd->dd_phys->dd_child_dir_zapobj,
+	    oa->lastname, sizeof (uint64_t), 1, &ddobj);
+	if (err != ENOENT)
+		return (err ? err : EEXIST);
+
+	if (oa->clone_parent != NULL) {
+		/*
+		 * You can't clone across pools.
+		 */
+		if (oa->clone_parent->ds_dir->dd_pool != dd->dd_pool)
+			return (EXDEV);
+
+		/*
+		 * You can only clone snapshots, not the head datasets.
+		 */
+		if (oa->clone_parent->ds_phys->ds_num_children == 0)
+			return (EINVAL);
+	}
+	return (0);
+}
+
+static void
+dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	struct oscarg *oa = arg2;
+	dsl_dataset_t *ds;
 	blkptr_t bp;
+	uint64_t dsobj;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
-	err = dsl_dataset_create_sync(dd, oa->fullname, oa->lastname,
+	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
 	    oa->clone_parent, tx);
-	dprintf_dd(dd, "fn=%s ln=%s err=%d\n",
-	    oa->fullname, oa->lastname, err);
-	if (err)
-		return (err);
 
-	VERIFY(0 == dsl_dataset_open_spa(dd->dd_pool->dp_spa, oa->fullname,
+	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds));
 	dsl_dataset_get_blkptr(ds, &bp);
 	if (BP_IS_HOLE(&bp)) {
@@ -454,8 +482,6 @@ dmu_objset_create_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 			oa->userfunc(&osi->os, oa->userarg, tx);
 	}
 	dsl_dataset_close(ds, DS_MODE_STANDARD | DS_MODE_READONLY, FTAG);
-
-	return (0);
 }
 
 int
@@ -463,65 +489,39 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
     objset_t *clone_parent,
     void (*func)(objset_t *os, void *arg, dmu_tx_t *tx), void *arg)
 {
-	dsl_dir_t *pds;
+	dsl_dir_t *pdd;
 	const char *tail;
 	int err = 0;
+	struct oscarg oa = { 0 };
 
-	err = dsl_dir_open(name, FTAG, &pds, &tail);
+	ASSERT(strchr(name, '@') == NULL);
+	err = dsl_dir_open(name, FTAG, &pdd, &tail);
 	if (err)
 		return (err);
 	if (tail == NULL) {
-		dsl_dir_close(pds, FTAG);
+		dsl_dir_close(pdd, FTAG);
 		return (EEXIST);
 	}
 
 	dprintf("name=%s\n", name);
 
-	if (tail[0] == '@') {
+	oa.userfunc = func;
+	oa.userarg = arg;
+	oa.lastname = tail;
+	oa.type = type;
+	if (clone_parent != NULL) {
 		/*
-		 * If we're creating a snapshot, make sure everything
-		 * they might want is on disk.  XXX Sketchy to know
-		 * about snapshots here, better to put in DSL.
+		 * You can't clone to a different type.
 		 */
-		objset_t *os;
-		size_t plen = strchr(name, '@') - name + 1;
-		char *pbuf = kmem_alloc(plen, KM_SLEEP);
-		bcopy(name, pbuf, plen - 1);
-		pbuf[plen - 1] = '\0';
-
-		err = dmu_objset_open(pbuf, DMU_OST_ANY, DS_MODE_STANDARD, &os);
-		if (err == 0) {
-			err = zil_suspend(dmu_objset_zil(os));
-			if (err == 0) {
-				err = dsl_dir_sync_task(pds,
-				    dsl_dataset_snapshot_sync,
-				    (void*)(tail+1), 16*1024);
-				zil_resume(dmu_objset_zil(os));
-			}
-			dmu_objset_close(os);
+		if (clone_parent->os->os_phys->os_type != type) {
+			dsl_dir_close(pdd, FTAG);
+			return (EINVAL);
 		}
-		kmem_free(pbuf, plen);
-	} else {
-		struct oscarg oa = { 0 };
-		oa.userfunc = func;
-		oa.userarg = arg;
-		oa.fullname = name;
-		oa.lastname = tail;
-		oa.type = type;
-		if (clone_parent != NULL) {
-			/*
-			 * You can't clone to a different type.
-			 */
-			if (clone_parent->os->os_phys->os_type != type) {
-				dsl_dir_close(pds, FTAG);
-				return (EINVAL);
-			}
-			oa.clone_parent = clone_parent->os->os_dsl_dataset;
-		}
-		err = dsl_dir_sync_task(pds, dmu_objset_create_sync, &oa,
-		    256*1024);
+		oa.clone_parent = clone_parent->os->os_dsl_dataset;
 	}
-	dsl_dir_close(pds, FTAG);
+	err = dsl_sync_task_do(pdd->dd_pool, dmu_objset_create_check,
+	    dmu_objset_create_sync, pdd, &oa, 5);
+	dsl_dir_close(pdd, FTAG);
 	return (err);
 }
 
@@ -543,7 +543,6 @@ dmu_objset_destroy(const char *name)
 		dmu_objset_close(os);
 	}
 
-	/* XXX uncache everything? */
 	return (dsl_dataset_destroy(name));
 }
 
@@ -553,17 +552,101 @@ dmu_objset_rollback(const char *name)
 	int err;
 	objset_t *os;
 
-	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_EXCLUSIVE, &os);
+	err = dmu_objset_open(name, DMU_OST_ANY,
+	    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT, &os);
 	if (err == 0) {
 		err = zil_suspend(dmu_objset_zil(os));
 		if (err == 0)
 			zil_resume(dmu_objset_zil(os));
-		dmu_objset_close(os);
 		if (err == 0) {
 			/* XXX uncache everything? */
-			err = dsl_dataset_rollback(name);
+			err = dsl_dataset_rollback(os->os->os_dsl_dataset);
 		}
+		dmu_objset_close(os);
 	}
+	return (err);
+}
+
+struct snaparg {
+	dsl_sync_task_group_t *dstg;
+	char *snapname;
+	char failed[MAXPATHLEN];
+};
+
+static int
+dmu_objset_snapshot_one(char *name, void *arg)
+{
+	struct snaparg *sn = arg;
+	objset_t *os;
+	int err;
+
+	(void) strcpy(sn->failed, name);
+
+	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_STANDARD, &os);
+	if (err != 0)
+		return (err);
+
+	/*
+	 * NB: we need to wait for all in-flight changes to get to disk,
+	 * so that we snapshot those changes.  zil_suspend does this as
+	 * a side effect.
+	 */
+	err = zil_suspend(dmu_objset_zil(os));
+	if (err == 0) {
+		dsl_sync_task_create(sn->dstg, dsl_dataset_snapshot_check,
+		    dsl_dataset_snapshot_sync, os, sn->snapname, 3);
+	}
+	return (err);
+}
+
+int
+dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
+{
+	dsl_sync_task_t *dst;
+	struct snaparg sn = { 0 };
+	char *cp;
+	spa_t *spa;
+	int err;
+
+	(void) strcpy(sn.failed, fsname);
+
+	cp = strchr(fsname, '/');
+	if (cp) {
+		*cp = '\0';
+		err = spa_open(fsname, &spa, FTAG);
+		*cp = '/';
+	} else {
+		err = spa_open(fsname, &spa, FTAG);
+	}
+	if (err)
+		return (err);
+
+	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
+	sn.snapname = snapname;
+
+	if (recursive)
+		err = dmu_objset_find(fsname, dmu_objset_snapshot_one, &sn, 0);
+	else
+		err = dmu_objset_snapshot_one(fsname, &sn);
+
+	if (err)
+		goto out;
+
+	err = dsl_sync_task_group_wait(sn.dstg);
+
+	for (dst = list_head(&sn.dstg->dstg_tasks); dst;
+	    dst = list_next(&sn.dstg->dstg_tasks, dst)) {
+		objset_t *os = dst->dst_arg1;
+		if (dst->dst_err)
+			dmu_objset_name(os, sn.failed);
+		zil_resume(dmu_objset_zil(os));
+		dmu_objset_close(os);
+	}
+out:
+	if (err)
+		(void) strcpy(fsname, sn.failed);
+	dsl_sync_task_group_destroy(sn.dstg);
+	spa_close(spa, FTAG);
 	return (err);
 }
 
@@ -755,9 +838,6 @@ dmu_dir_list_next(objset_t *os, int namelen, char *name,
 	zap_cursor_t cursor;
 	zap_attribute_t attr;
 
-	if (dd->dd_phys->dd_child_dir_zapobj == 0)
-		return (ENOENT);
-
 	/* there is no next dir on a snapshot! */
 	if (os->os->os_dsl_dataset->ds_object !=
 	    dd->dd_phys->dd_head_dataset_obj)
@@ -790,8 +870,8 @@ dmu_dir_list_next(objset_t *os, int namelen, char *name,
 /*
  * Find all objsets under name, and for each, call 'func(child_name, arg)'.
  */
-void
-dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
+int
+dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 {
 	dsl_dir_t *dd;
 	objset_t *os;
@@ -803,33 +883,39 @@ dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
 
 	err = dsl_dir_open(name, FTAG, &dd, NULL);
 	if (err)
-		return;
+		return (err);
 
+	/* NB: the $MOS dir doesn't have a head dataset */
 	do_self = (dd->dd_phys->dd_head_dataset_obj != 0);
 
 	/*
 	 * Iterate over all children.
 	 */
-	if (dd->dd_phys->dd_child_dir_zapobj != 0) {
-		for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset,
-		    dd->dd_phys->dd_child_dir_zapobj);
-		    zap_cursor_retrieve(&zc, &attr) == 0;
-		    (void) zap_cursor_advance(&zc)) {
-			ASSERT(attr.za_integer_length == sizeof (uint64_t));
-			ASSERT(attr.za_num_integers == 1);
+	for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset,
+	    dd->dd_phys->dd_child_dir_zapobj);
+	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    (void) zap_cursor_advance(&zc)) {
+		ASSERT(attr.za_integer_length == sizeof (uint64_t));
+		ASSERT(attr.za_num_integers == 1);
 
-			/*
-			 * No separating '/' because parent's name ends in /.
-			 */
-			child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			/* XXX could probably just use name here */
-			dsl_dir_name(dd, child);
-			(void) strcat(child, "/");
-			(void) strcat(child, attr.za_name);
-			dmu_objset_find(child, func, arg, flags);
-			kmem_free(child, MAXPATHLEN);
-		}
-		zap_cursor_fini(&zc);
+		/*
+		 * No separating '/' because parent's name ends in /.
+		 */
+		child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		/* XXX could probably just use name here */
+		dsl_dir_name(dd, child);
+		(void) strcat(child, "/");
+		(void) strcat(child, attr.za_name);
+		err = dmu_objset_find(child, func, arg, flags);
+		kmem_free(child, MAXPATHLEN);
+		if (err)
+			break;
+	}
+	zap_cursor_fini(&zc);
+
+	if (err) {
+		dsl_dir_close(dd, FTAG);
+		return (err);
 	}
 
 	/*
@@ -853,17 +939,23 @@ dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
 			dsl_dir_name(dd, child);
 			(void) strcat(child, "@");
 			(void) strcat(child, attr.za_name);
-			func(child, arg);
+			err = func(child, arg);
 			kmem_free(child, MAXPATHLEN);
+			if (err)
+				break;
 		}
 		zap_cursor_fini(&zc);
 	}
 
 	dsl_dir_close(dd, FTAG);
 
+	if (err)
+		return (err);
+
 	/*
 	 * Apply to self if appropriate.
 	 */
 	if (do_self)
-		func(name, arg);
+		err = func(name, arg);
+	return (err);
 }

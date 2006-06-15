@@ -647,7 +647,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		 */
 		tx = dmu_tx_create_assigned(spa_get_dsl(spa),
 		    spa_first_txg(spa));
-		dmu_objset_find(spa->spa_name, zil_claim, tx, 0);
+		(void) dmu_objset_find(spa->spa_name, zil_claim, tx, 0);
 		dmu_tx_commit(tx);
 
 		spa->spa_sync_on = B_TRUE;

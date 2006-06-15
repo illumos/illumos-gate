@@ -238,7 +238,7 @@ extern uint64_t zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx);
 
 extern void	zil_commit(zilog_t *zilog, uint64_t seq, int ioflag);
 
-extern void	zil_claim(char *osname, void *txarg);
+extern int	zil_claim(char *osname, void *txarg);
 extern void	zil_sync(zilog_t *zilog, dmu_tx_t *tx);
 extern void	zil_clean(zilog_t *zilog);
 extern int	zil_is_committed(zilog_t *zilog);

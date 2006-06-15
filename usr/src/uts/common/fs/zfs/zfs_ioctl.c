@@ -662,7 +662,6 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 	return (error);
 }
 
-
 static int
 zfs_ioc_objset_stats(zfs_cmd_t *zc)
 {
@@ -912,8 +911,10 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		break;
 
 	default:
-		return (EINVAL);
+		cbfunc = NULL;
 	}
+	if (strchr(zc->zc_name, '@'))
+		return (EINVAL);
 
 	if (zc->zc_filename[0] != '\0') {
 		/*
@@ -929,12 +930,9 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			return (error);
 		error = dmu_objset_create(zc->zc_name, type, clone, NULL, NULL);
 		dmu_objset_close(clone);
-	} else if (strchr(zc->zc_name, '@') != 0) {
-		/*
-		 * We're taking a snapshot of an existing dataset.
-		 */
-		error = dmu_objset_create(zc->zc_name, type, NULL, NULL, NULL);
 	} else {
+		if (cbfunc == NULL)
+			return (EINVAL);
 		/*
 		 * We're creating a new dataset.
 		 */
@@ -953,31 +951,75 @@ zfs_ioc_create(zfs_cmd_t *zc)
 }
 
 static int
-zfs_ioc_destroy(zfs_cmd_t *zc)
+zfs_ioc_snapshot(zfs_cmd_t *zc)
 {
-	if (strchr(zc->zc_name, '@') != NULL &&
-	    zc->zc_objset_type == DMU_OST_ZFS) {
-		vfs_t *vfsp;
+	if (snapshot_namecheck(zc->zc_prop_value, NULL, NULL) != 0)
+		return (EINVAL);
+	return (dmu_objset_snapshot(zc->zc_name,
+	    zc->zc_prop_value, zc->zc_cookie));
+}
+
+static int
+zfs_unmount_snap(char *name, void *arg)
+{
+	char *snapname = arg;
+	char *cp;
+	vfs_t *vfsp;
+
+	/*
+	 * Snapshots (which are under .zfs control) must be unmounted
+	 * before they can be destroyed.
+	 */
+
+	if (snapname) {
+		(void) strcat(name, "@");
+		(void) strcat(name, snapname);
+		vfsp = zfs_get_vfs(name);
+		cp = strchr(name, '@');
+		*cp = '\0';
+	} else {
+		vfsp = zfs_get_vfs(name);
+	}
+
+	if (vfsp) {
+		/*
+		 * Always force the unmount for snapshots.
+		 */
+		int flag = MS_FORCE;
 		int err;
 
-		/*
-		 * Snapshots under .zfs control must be unmounted
-		 * before they can be destroyed.
-		 */
-		if ((vfsp = zfs_get_vfs(zc->zc_name)) != NULL) {
-			/*
-			 * Always force the unmount for snapshots.
-			 */
-			int flag = MS_FORCE;
-
-			if ((err = vn_vfswlock(vfsp->vfs_vnodecovered)) != 0) {
-				VFS_RELE(vfsp);
-				return (err);
-			}
+		if ((err = vn_vfswlock(vfsp->vfs_vnodecovered)) != 0) {
 			VFS_RELE(vfsp);
-			if ((err = dounmount(vfsp, flag, kcred)) != 0)
-				return (err);
+			return (err);
 		}
+		VFS_RELE(vfsp);
+		if ((err = dounmount(vfsp, flag, kcred)) != 0)
+			return (err);
+	}
+	return (0);
+}
+
+static int
+zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
+{
+	int err;
+
+	if (snapshot_namecheck(zc->zc_prop_value, NULL, NULL) != 0)
+		return (EINVAL);
+	err = dmu_objset_find(zc->zc_name,
+	    zfs_unmount_snap, zc->zc_prop_value, 0);
+	if (err)
+		return (err);
+	return (dmu_snapshots_destroy(zc->zc_name, zc->zc_prop_value));
+}
+
+static int
+zfs_ioc_destroy(zfs_cmd_t *zc)
+{
+	if (strchr(zc->zc_name, '@') && zc->zc_objset_type == DMU_OST_ZFS) {
+		int err = zfs_unmount_snap(zc->zc_name, NULL);
+		if (err)
+			return (err);
 	}
 
 	return (dmu_objset_destroy(zc->zc_name));
@@ -998,27 +1040,9 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 
 	if (strchr(zc->zc_name, '@') != NULL &&
 	    zc->zc_objset_type == DMU_OST_ZFS) {
-		vfs_t *vfsp;
-		int err;
-
-		/*
-		 * Snapshots under .zfs control must be unmounted
-		 * before they can be renamed.
-		 */
-		if ((vfsp = zfs_get_vfs(zc->zc_name)) != NULL) {
-			/*
-			 * Always force the unmount for snapshots.
-			 */
-			int flag = MS_FORCE;
-
-			if ((err = vn_vfswlock(vfsp->vfs_vnodecovered)) != 0) {
-				VFS_RELE(vfsp);
-				return (err);
-			}
-			VFS_RELE(vfsp);
-			if ((err = dounmount(vfsp, flag, kcred)) != 0)
-				return (err);
-		}
+		int err = zfs_unmount_snap(zc->zc_name, NULL);
+		if (err)
+			return (err);
 	}
 
 	return (dmu_objset_rename(zc->zc_name, zc->zc_prop_value));
@@ -1229,7 +1253,9 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_error_log,		zfs_secpolicy_inject,	pool_name },
 	{ zfs_ioc_clear,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_bookmark_name,	zfs_secpolicy_inject,	pool_name },
-	{ zfs_ioc_promote,		zfs_secpolicy_write,	dataset_name }
+	{ zfs_ioc_promote,		zfs_secpolicy_write,	dataset_name },
+	{ zfs_ioc_destroy_snaps,	zfs_secpolicy_write,	dataset_name },
+	{ zfs_ioc_snapshot,		zfs_secpolicy_write,	dataset_name }
 };
 
 static int
@@ -1237,7 +1263,7 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
 	zfs_cmd_t *zc;
 	uint_t vec;
-	int error;
+	int error, rc;
 
 	if (getminor(dev) != 0)
 		return (zvol_ioctl(dev, cmd, arg, flag, cr, rvalp));
@@ -1280,11 +1306,9 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	if (error == 0)
 		error = zfs_ioc_vec[vec].zvec_func(zc);
 
-	if (error == 0 || error == ENOMEM) {
-		int rc = xcopyout(zc, (void *)arg, sizeof (zfs_cmd_t));
-		if (error == 0)
-			error = rc;
-	}
+	rc = xcopyout(zc, (void *)arg, sizeof (zfs_cmd_t));
+	if (error == 0)
+		error = rc;
 
 	kmem_free(zc, sizeof (zfs_cmd_t));
 	return (error);

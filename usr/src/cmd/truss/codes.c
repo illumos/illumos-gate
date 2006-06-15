@@ -939,6 +939,10 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_PROMOTE,		"ZFS_IOC_PROMOTE",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DESTROY_SNAPS,	"ZFS_IOC_DESTROY_SNAPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SNAPSHOT,		"ZFS_IOC_SNAPSHOT",
+		"zfs_cmd_t" },
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",

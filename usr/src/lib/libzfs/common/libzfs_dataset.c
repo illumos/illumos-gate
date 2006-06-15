@@ -169,6 +169,13 @@ zfs_validate_name(libzfs_handle_t *hdl, const char *path, int type)
 		return (0);
 	}
 
+	if (type == ZFS_TYPE_SNAPSHOT && strchr(path, '@') == NULL) {
+		if (hdl != NULL)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "missing '@' delimeter in snapshot name"));
+		return (0);
+	}
+
 	return (-1);
 }
 
@@ -1943,7 +1950,6 @@ zfs_destroy(zfs_handle_t *zhp)
 {
 	zfs_cmd_t zc = { 0 };
 	int ret;
-	char errbuf[1024];
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
@@ -1961,16 +1967,91 @@ zfs_destroy(zfs_handle_t *zhp)
 	}
 
 	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc);
-
-	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
-	    "cannot destroy '%s'"), zhp->zfs_name);
-
-	if (ret != 0)
+	if (ret != 0) {
 		return (zfs_standard_error(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 		    zhp->zfs_name));
+	}
 
 	remove_mountpoint(zhp);
+
+	return (0);
+}
+
+struct destroydata {
+	char *snapname;
+	boolean_t gotone;
+};
+
+static int
+zfs_remove_link_cb(zfs_handle_t *zhp, void *arg)
+{
+	struct destroydata *dd = arg;
+	zfs_handle_t *szhp;
+	char name[ZFS_MAXNAMELEN];
+
+	(void) strcpy(name, zhp->zfs_name);
+	(void) strcat(name, "@");
+	(void) strcat(name, dd->snapname);
+
+	szhp = make_dataset_handle(zhp->zfs_hdl, name);
+	if (szhp) {
+		dd->gotone = B_TRUE;
+		zfs_close(szhp);
+	}
+
+	if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+		(void) zvol_remove_link(zhp->zfs_hdl, name);
+		/*
+		 * NB: this is simply a best-effort.  We don't want to
+		 * return an error, because then we wouldn't visit all
+		 * the volumes.
+		 */
+	}
+
+	return (zfs_iter_filesystems(zhp, zfs_remove_link_cb, arg));
+}
+
+/*
+ * Destroys all snapshots with the given name in zhp & descendants.
+ */
+int
+zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname)
+{
+	zfs_cmd_t zc = { 0 };
+	int ret;
+	struct destroydata dd = { 0 };
+
+	dd.snapname = snapname;
+	(void) zfs_remove_link_cb(zhp, &dd);
+
+	if (!dd.gotone) {
+		return (zfs_standard_error(zhp->zfs_hdl, ENOENT,
+		    dgettext(TEXT_DOMAIN, "cannot destroy '%s@%s'"),
+		    zhp->zfs_name, snapname));
+	}
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_prop_value, snapname, sizeof (zc.zc_prop_value));
+
+	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY_SNAPS, &zc);
+	if (ret != 0) {
+		char errbuf[1024];
+
+		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+		    "cannot destroy '%s@%s'"), zc.zc_name, snapname);
+
+		switch (errno) {
+		case EEXIST:
+			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
+			    "snapshot is cloned"));
+			return (zfs_error(zhp->zfs_hdl, EZFS_EXISTS, errbuf));
+
+		default:
+			return (zfs_standard_error(zhp->zfs_hdl, errno,
+			    errbuf));
+		}
+	}
 
 	return (0);
 }
@@ -2171,11 +2252,32 @@ zfs_promote(zfs_handle_t *zhp)
 	return (ret);
 }
 
+static int
+zfs_create_link_cb(zfs_handle_t *zhp, void *arg)
+{
+	char *snapname = arg;
+
+	if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+		char name[MAXPATHLEN];
+
+		(void) strcpy(name, zhp->zfs_name);
+		(void) strcat(name, "@");
+		(void) strcat(name, snapname);
+		(void) zvol_create_link(zhp->zfs_hdl, name);
+		/*
+		 * NB: this is simply a best-effort.  We don't want to
+		 * return an error, because then we wouldn't visit all
+		 * the volumes.
+		 */
+	}
+	return (zfs_iter_filesystems(zhp, zfs_create_link_cb, snapname));
+}
+
 /*
  * Takes a snapshot of the given dataset
  */
 int
-zfs_snapshot(libzfs_handle_t *hdl, const char *path)
+zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 {
 	const char *delim;
 	char *parent;
@@ -2191,14 +2293,8 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path)
 	if (!zfs_validate_name(hdl, path, ZFS_TYPE_SNAPSHOT))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
-	/* make sure we have a snapshot */
-	if ((delim = strchr(path, '@')) == NULL) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "missing '@' delimeter in snapshot name"));
-		return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
-	}
-
 	/* make sure the parent exists and is of the appropriate type */
+	delim = strchr(path, '@');
 	if ((parent = zfs_alloc(hdl, delim - path + 1)) == NULL)
 		return (-1);
 	(void) strncpy(parent, path, delim - path);
@@ -2210,20 +2306,27 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path)
 		return (-1);
 	}
 
-	(void) strlcpy(zc.zc_name, path, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_prop_value, delim+1, sizeof (zc.zc_prop_value));
+	zc.zc_cookie = recursive;
+	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SNAPSHOT, &zc);
 
-	if (zhp->zfs_type == ZFS_TYPE_VOLUME)
-		zc.zc_objset_type = DMU_OST_ZVOL;
-	else
-		zc.zc_objset_type = DMU_OST_ZFS;
-
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_CREATE, &zc);
-
+	/*
+	 * if it was recursive, the one that actually failed will be in
+	 * zc.zc_name.
+	 */
+	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+	    "cannot create snapshot '%s@%s'"), zc.zc_name, zc.zc_prop_value);
+	if (ret == 0 && recursive) {
+		(void) zfs_iter_filesystems(zhp,
+		    zfs_create_link_cb, (char *)delim+1);
+	}
 	if (ret == 0 && zhp->zfs_type == ZFS_TYPE_VOLUME) {
 		ret = zvol_create_link(zhp->zfs_hdl, path);
-		if (ret != 0)
+		if (ret != 0) {
 			(void) ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY,
 			    &zc);
+		}
 	}
 
 	if (ret != 0)

@@ -448,7 +448,7 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 	ASSERT(BP_IS_HOLE(&zh->zh_log));
 }
 
-void
+int
 zil_claim(char *osname, void *txarg)
 {
 	dmu_tx_t *tx = txarg;
@@ -461,7 +461,7 @@ zil_claim(char *osname, void *txarg)
 	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_STANDARD, &os);
 	if (error) {
 		cmn_err(CE_WARN, "can't process intent log for %s", osname);
-		return;
+		return (0);
 	}
 
 	zilog = dmu_objset_zil(os);
@@ -484,6 +484,7 @@ zil_claim(char *osname, void *txarg)
 
 	ASSERT3U(first_txg, ==, (spa_last_synced_txg(zilog->zl_spa) + 1));
 	dmu_objset_close(os);
+	return (0);
 }
 
 void

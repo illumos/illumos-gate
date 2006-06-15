@@ -30,6 +30,7 @@
 
 #include <sys/dmu.h>
 #include <sys/dsl_pool.h>
+#include <sys/dsl_synctask.h>
 #include <sys/refcount.h>
 #include <sys/zfs_context.h>
 
@@ -76,17 +77,10 @@ struct dsl_dir {
 	/* Protected by dd_lock */
 	kmutex_t dd_lock;
 	list_t dd_prop_cbs; /* list of dsl_prop_cb_record_t's */
-	/* Thing to do when we sync */
-	uint64_t dd_sync_txg;
-	int (*dd_sync_func)(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
-	void *dd_sync_arg;
-	int dd_sync_err;
 
 	/* Accounting */
 	/* reflects any changes to dd_phys->dd_used_bytes made this syncing */
 	int64_t dd_used_bytes;
-	/* int64_t dd_compressed_bytes; */
-	/* int64_t dd_uncompressed_bytes; */
 	/* gross estimate of space used by in-flight tx's */
 	uint64_t dd_tempreserved[TXG_SIZE];
 	/* amount of space we expect to write; == amount of dirty data */
@@ -104,9 +98,10 @@ int dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
     const char *tail, void *tag, dsl_dir_t **);
 void dsl_dir_name(dsl_dir_t *dd, char *buf);
 int dsl_dir_is_private(dsl_dir_t *dd);
-int dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx);
+uint64_t dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx);
 void dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx);
-int dsl_dir_destroy_sync(dsl_dir_t *pds, void *arg, dmu_tx_t *tx);
+dsl_checkfunc_t dsl_dir_destroy_check;
+dsl_syncfunc_t dsl_dir_destroy_sync;
 void dsl_dir_stats(dsl_dir_t *dd, dmu_objset_stats_t *dds);
 void dsl_dir_dirty(dsl_dir_t *dd, dmu_tx_t *tx);
 void dsl_dir_sync(dsl_dir_t *dd, dmu_tx_t *tx);
@@ -116,11 +111,9 @@ void dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx);
 void dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx);
 void dsl_dir_diduse_space(dsl_dir_t *dd,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx);
-int dsl_dir_sync_task(dsl_dir_t *dd,
-    int (*func)(dsl_dir_t *, void*, dmu_tx_t *), void *arg, uint64_t space);
 int dsl_dir_set_quota(const char *ddname, uint64_t quota);
 int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
-int dsl_dir_rename_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx);
+int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
 int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
 
 #ifdef ZFS_DEBUG

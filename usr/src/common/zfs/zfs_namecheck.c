@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,41 @@ valid_char(char c)
 	    (c >= 'A' && c <= 'Z') ||
 	    (c >= '0' && c <= '9') ||
 	    c == '-' || c == '_' || c == '.' || c == ':');
+}
+
+/*
+ * Snapshot names must be made up of alphanumeric characters plus the following
+ * characters:
+ *
+ * 	[-_.:]
+ */
+int
+snapshot_namecheck(const char *path, namecheck_err_t *why, char *what)
+{
+	const char *loc;
+
+	if (strlen(path) >= MAXNAMELEN) {
+		if (why)
+			*why = NAME_ERR_TOOLONG;
+		return (-1);
+	}
+
+	if (path[0] == '\0') {
+		if (why)
+			*why = NAME_ERR_EMPTY_COMPONENT;
+		return (-1);
+	}
+
+	for (loc = path; *loc; loc++) {
+		if (!valid_char(*loc)) {
+			if (why) {
+				*why = NAME_ERR_INVALCHAR;
+				*what = *loc;
+			}
+			return (-1);
+		}
+	}
+	return (0);
 }
 
 /*

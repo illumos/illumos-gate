@@ -42,7 +42,7 @@ typedef void (*dmu_tx_hold_func_t)(dmu_tx_t *tx, struct dnode *dn,
 
 
 dmu_tx_t *
-dmu_tx_create_ds(dsl_dir_t *dd)
+dmu_tx_create_dd(dsl_dir_t *dd)
 {
 	dmu_tx_t *tx = kmem_zalloc(sizeof (dmu_tx_t), KM_SLEEP);
 	tx->tx_dir = dd;
@@ -60,7 +60,7 @@ dmu_tx_create_ds(dsl_dir_t *dd)
 dmu_tx_t *
 dmu_tx_create(objset_t *os)
 {
-	dmu_tx_t *tx = dmu_tx_create_ds(os->os->os_dsl_dataset->ds_dir);
+	dmu_tx_t *tx = dmu_tx_create_dd(os->os->os_dsl_dataset->ds_dir);
 	tx->tx_objset = os;
 	tx->tx_lastsnap_txg = dsl_dataset_prev_snap_txg(os->os->os_dsl_dataset);
 	return (tx);
@@ -69,7 +69,7 @@ dmu_tx_create(objset_t *os)
 dmu_tx_t *
 dmu_tx_create_assigned(struct dsl_pool *dp, uint64_t txg)
 {
-	dmu_tx_t *tx = dmu_tx_create_ds(NULL);
+	dmu_tx_t *tx = dmu_tx_create_dd(NULL);
 
 	ASSERT3U(txg, <=, dp->dp_tx.tx_open_txg);
 	tx->tx_pool = dp;

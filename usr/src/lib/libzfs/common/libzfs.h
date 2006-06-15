@@ -284,8 +284,9 @@ extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_create(libzfs_handle_t *, const char *, zfs_type_t,
     const char *, const char *);
 extern int zfs_destroy(zfs_handle_t *);
+extern int zfs_destroy_snaps(zfs_handle_t *, char *);
 extern int zfs_clone(zfs_handle_t *, const char *);
-extern int zfs_snapshot(libzfs_handle_t *, const char *);
+extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
 extern int zfs_rename(zfs_handle_t *, const char *);
 extern int zfs_send(zfs_handle_t *, zfs_handle_t *);

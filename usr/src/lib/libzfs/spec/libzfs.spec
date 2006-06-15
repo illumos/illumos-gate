@@ -64,6 +64,10 @@ function zfs_destroy
 version SUNWprivate_1.1
 end
 
+function zfs_destroy_snaps
+version SUNWprivate_1.1
+end
+
 function zfs_get_handle
 version SUNWprivate_1.1
 end

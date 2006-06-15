@@ -113,7 +113,7 @@ extern dmu_tx_t *dmu_tx_create_assigned(struct dsl_pool *dp, uint64_t txg);
 /*
  * These routines are only called by the DMU.
  */
-dmu_tx_t *dmu_tx_create_ds(dsl_dir_t *dd);
+dmu_tx_t *dmu_tx_create_dd(dsl_dir_t *dd);
 int dmu_tx_is_syncing(dmu_tx_t *tx);
 int dmu_tx_private_ok(dmu_tx_t *tx);
 void dmu_tx_add_new_object(dmu_tx_t *tx, objset_t *os, uint64_t object);

@@ -1071,7 +1071,7 @@ ztest_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
 }
 
 /* ARGSUSED */
-static void
+static int
 ztest_destroy_cb(char *name, void *arg)
 {
 	objset_t *os;
@@ -1098,6 +1098,7 @@ ztest_destroy_cb(char *name, void *arg)
 	 */
 	error = dmu_objset_destroy(name);
 	ASSERT3U(error, ==, 0);
+	return (0);
 }
 
 /*
@@ -1191,7 +1192,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	 * create lying around from a previous run.  If so, destroy it
 	 * and all of its snapshots.
 	 */
-	dmu_objset_find(name, ztest_destroy_cb, NULL, DS_FIND_SNAPSHOTS);
+	(void) dmu_objset_find(name, ztest_destroy_cb, NULL, DS_FIND_SNAPSHOTS);
 
 	/*
 	 * Verify that the destroyed dataset is no longer in the namespace.
@@ -1310,7 +1311,7 @@ ztest_dmu_snapshot_create_destroy(ztest_args_t *za)
 	error = dmu_objset_destroy(snapname);
 	if (error != 0 && error != ENOENT)
 		fatal(0, "dmu_objset_destroy() = %d", error);
-	error = dmu_objset_create(snapname, DMU_OST_OTHER, NULL, NULL, NULL);
+	error = dmu_objset_snapshot(osname, strchr(snapname, '@')+1, FALSE);
 	if (error == ENOSPC)
 		ztest_record_enospc("dmu_take_snapshot");
 	else if (error != 0 && error != EEXIST)
@@ -3144,7 +3145,7 @@ ztest_run(char *pool)
 		    (int)ztest_random(zopt_datasets));
 		if (zopt_verbose >= 3)
 			(void) printf("Destroying %s to free up space\n", name);
-		dmu_objset_find(name, ztest_destroy_cb, NULL,
+		(void) dmu_objset_find(name, ztest_destroy_cb, NULL,
 		    DS_FIND_SNAPSHOTS);
 		(void) rw_unlock(&ztest_shared->zs_name_lock);
 	}

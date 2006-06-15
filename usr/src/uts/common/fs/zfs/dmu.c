@@ -36,6 +36,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_pool.h>
+#include <sys/dsl_synctask.h>
 #include <sys/dmu_zfetch.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zap.h>
@@ -468,6 +469,10 @@ dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 }
 #endif
 
+/*
+ * XXX move send/recv stuff to its own new file!
+ */
+
 struct backuparg {
 	dmu_replay_record_t *drr;
 	vnode_t *vp;
@@ -718,124 +723,94 @@ struct restorearg {
 	zio_cksum_t zc;
 };
 
+/* ARGSUSED */
 static int
-replay_incremental_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+replay_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	struct drr_begin *drrb = arg;
-	dsl_dataset_t *ds = NULL;
-	dsl_dataset_t *ds_prev = NULL;
+	dsl_dataset_t *ds = arg1;
+	struct drr_begin *drrb = arg2;
 	const char *snapname;
-	int err = EINVAL;
+	int err;
 	uint64_t val;
 
-	/* this must be a filesytem */
-	if (dd->dd_phys->dd_head_dataset_obj == 0)
-		goto die;
-
-	err = dsl_dataset_open_obj(dd->dd_pool,
-	    dd->dd_phys->dd_head_dataset_obj,
-	    NULL, DS_MODE_EXCLUSIVE, FTAG, &ds);
-	if (err)
-		goto die;
-
-	if (ds == NULL) {
-		err = EBUSY;
-		goto die;
-	}
-
 	/* must already be a snapshot of this fs */
-	if (ds->ds_phys->ds_prev_snap_obj == 0) {
-		err = ENODEV;
-		goto die;
-	}
+	if (ds->ds_phys->ds_prev_snap_obj == 0)
+		return (ENODEV);
 
 	/* most recent snapshot must match fromguid */
-	err = dsl_dataset_open_obj(dd->dd_pool,
-	    ds->ds_phys->ds_prev_snap_obj, NULL,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds_prev);
-	if (err)
-		goto die;
-	if (ds_prev->ds_phys->ds_guid != drrb->drr_fromguid) {
-		err = ENODEV;
-		goto die;
-	}
-
+	if (ds->ds_prev->ds_phys->ds_guid != drrb->drr_fromguid)
+		return (ENODEV);
 	/* must not have any changes since most recent snapshot */
 	if (ds->ds_phys->ds_bp.blk_birth >
-	    ds_prev->ds_phys->ds_creation_txg) {
-		err = ETXTBSY;
-		goto die;
-	}
+	    ds->ds_prev->ds_phys->ds_creation_txg)
+		return (ETXTBSY);
 
 	/* new snapshot name must not exist */
 	snapname = strrchr(drrb->drr_toname, '@');
-	if (snapname == NULL) {
-		err = EEXIST;
-		goto die;
-	}
+	if (snapname == NULL)
+		return (EEXIST);
+
 	snapname++;
-	err = zap_lookup(dd->dd_pool->dp_meta_objset,
+	err = zap_lookup(ds->ds_dir->dd_pool->dp_meta_objset,
 	    ds->ds_phys->ds_snapnames_zapobj, snapname, 8, 1, &val);
-	if (err != ENOENT) {
-		if (err == 0)
-			err = EEXIST;
-		dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
-		dsl_dataset_close(ds_prev, DS_MODE_STANDARD, FTAG);
+	if (err == 0)
+		return (EEXIST);
+	if (err != ENOENT)
 		return (err);
-	}
 
-	dsl_dataset_close(ds_prev, DS_MODE_STANDARD, FTAG);
-
-	/* The point of no (unsuccessful) return. */
-
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
-
-	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	return (0);
-
-die:
-	if (ds_prev)
-		dsl_dataset_close(ds_prev, DS_MODE_STANDARD, FTAG);
-	if (ds)
-		dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
-	return (err);
 }
 
-static int
-replay_full_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+/* ARGSUSED */
+static void
+replay_incremental_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	struct drr_begin *drrb = arg;
+	dsl_dataset_t *ds = arg1;
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
+}
+
+/* ARGSUSED */
+static int
+replay_full_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	struct drr_begin *drrb = arg2;
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
+	char *cp;
+	uint64_t val;
 	int err;
-	char *fsfullname, *fslastname, *cp;
-	dsl_dataset_t *ds;
 
-	fsfullname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) strncpy(fsfullname, drrb->drr_toname, MAXNAMELEN);
-	cp = strchr(fsfullname, '@');
-	if (cp == NULL) {
-		kmem_free(fsfullname, MAXNAMELEN);
-		return (EINVAL);
-	}
+	cp = strchr(drrb->drr_toname, '@');
 	*cp = '\0';
-	fslastname = strrchr(fsfullname, '/');
-	if (fslastname == NULL) {
-		kmem_free(fsfullname, MAXNAMELEN);
-		return (EINVAL);
-	}
-	fslastname++;
+	err = zap_lookup(mos, dd->dd_phys->dd_child_dir_zapobj,
+	    strrchr(drrb->drr_toname, '/') + 1,
+	    sizeof (uint64_t), 1, &val);
+	*cp = '@';
 
-	err = dsl_dataset_create_sync(dd, fsfullname, fslastname, NULL, tx);
-	if (err) {
-		kmem_free(fsfullname, MAXNAMELEN);
-		return (err);
-	}
+	if (err != ENOENT)
+		return (err ? err : EEXIST);
 
-	/* the point of no (unsuccessful) return */
+	return (0);
+}
 
-	VERIFY(0 == dsl_dataset_open_spa(dd->dd_pool->dp_spa, fsfullname,
+static void
+replay_full_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	struct drr_begin *drrb = arg2;
+	char *cp;
+	dsl_dataset_t *ds;
+	uint64_t dsobj;
+
+	cp = strchr(drrb->drr_toname, '@');
+	*cp = '\0';
+	dsobj = dsl_dataset_create_sync(dd, strrchr(drrb->drr_toname, '/') + 1,
+	    NULL, tx);
+	*cp = '@';
+
+	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
 	    DS_MODE_EXCLUSIVE, FTAG, &ds));
-	kmem_free(fsfullname, MAXNAMELEN);
 
 	(void) dmu_objset_create_impl(dsl_dataset_get_spa(ds),
 	    ds, drrb->drr_type, tx);
@@ -844,16 +819,14 @@ replay_full_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
-	return (0);
 }
 
 static int
-replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
+replay_end_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
-	struct drr_begin *drrb = arg;
-	int err;
+	objset_t *os = arg1;
+	struct drr_begin *drrb = arg2;
 	char *snapname;
-	dsl_dataset_t *ds;
 
 	/* XXX verify that drr_toname is in dd */
 
@@ -862,13 +835,25 @@ replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 		return (EINVAL);
 	snapname++;
 
-	/* create snapshot */
-	err = dsl_dataset_snapshot_sync(dd, snapname, tx);
-	if (err)
-		return (err);
+	return (dsl_dataset_snapshot_check(os, snapname, tx));
+}
+
+static void
+replay_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	objset_t *os = arg1;
+	struct drr_begin *drrb = arg2;
+	char *snapname;
+	dsl_dataset_t *ds, *hds;
+
+	snapname = strchr(drrb->drr_toname, '@') + 1;
+
+	dsl_dataset_snapshot_sync(os, snapname, tx);
 
 	/* set snapshot's creation time and guid */
-	VERIFY(0 == dsl_dataset_open_spa(dd->dd_pool->dp_spa, drrb->drr_toname,
+	hds = os->os->os_dsl_dataset;
+	VERIFY(0 == dsl_dataset_open_obj(hds->ds_dir->dd_pool,
+	    hds->ds_phys->ds_prev_snap_obj, NULL,
 	    DS_MODE_PRIMARY | DS_MODE_READONLY | DS_MODE_INCONSISTENT,
 	    FTAG, &ds));
 
@@ -879,14 +864,8 @@ replay_end_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 
 	dsl_dataset_close(ds, DS_MODE_PRIMARY, FTAG);
 
-	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool,
-	    dd->dd_phys->dd_head_dataset_obj,
-	    NULL, DS_MODE_STANDARD | DS_MODE_INCONSISTENT, FTAG, &ds));
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_flags &= ~DS_FLAG_INCONSISTENT;
-	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
-
-	return (0);
+	dmu_buf_will_dirty(hds->ds_dbuf, tx);
+	hds->ds_phys->ds_flags &= ~DS_FLAG_INCONSISTENT;
 }
 
 void *
@@ -1169,7 +1148,6 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 	struct restorearg ra;
 	dmu_replay_record_t *drr;
 	char *cp;
-	dsl_dir_t *dd = NULL;
 	objset_t *os = NULL;
 	zio_cksum_t pzc;
 
@@ -1228,19 +1206,29 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 	 */
 	if (drrb->drr_fromguid) {
 		/* incremental backup */
+		dsl_dataset_t *ds = NULL;
 
 		cp = strchr(tosnap, '@');
 		*cp = '\0';
-		ra.err = dsl_dir_open(tosnap, FTAG, &dd, NULL);
+		ra.err = dsl_dataset_open(tosnap, DS_MODE_EXCLUSIVE, FTAG, &ds);
 		*cp = '@';
 		if (ra.err)
 			goto out;
 
-		ra.err = dsl_dir_sync_task(dd, replay_incremental_sync,
-		    drrb, 1<<20);
+		ra.err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+		    replay_incremental_check, replay_incremental_sync,
+		    ds, drrb, 1);
+		dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 	} else {
 		/* full backup */
+		dsl_dir_t *dd = NULL;
 		const char *tail;
+
+		/* can't restore full backup into topmost fs, for now */
+		if (strrchr(drrb->drr_toname, '/') == NULL) {
+			ra.err = EINVAL;
+			goto out;
+		}
 
 		cp = strchr(tosnap, '@');
 		*cp = '\0';
@@ -1253,8 +1241,9 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 			goto out;
 		}
 
-		ra.err = dsl_dir_sync_task(dd, replay_full_sync,
-		    drrb, 1<<20);
+		ra.err = dsl_sync_task_do(dd->dd_pool, replay_full_check,
+		    replay_full_sync, dd, drrb, 5);
+		dsl_dir_close(dd, FTAG);
 	}
 	if (ra.err)
 		goto out;
@@ -1332,12 +1321,9 @@ dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
 				goto out;
 			}
 
-			/*
-			 * dd may be the parent of the dd we are
-			 * restoring into (eg. if it's a full backup).
-			 */
-			ra.err = dsl_dir_sync_task(dmu_objset_ds(os)->
-			    ds_dir, replay_end_sync, drrb, 1<<20);
+			ra.err = dsl_sync_task_do(dmu_objset_ds(os)->
+			    ds_dir->dd_pool, replay_end_check, replay_end_sync,
+			    os, drrb, 3);
 			goto out;
 		}
 		default:
@@ -1356,33 +1342,34 @@ out:
 	 * processed the begin properly.  'os' will only be set if this
 	 * is the case.
 	 */
-	if (ra.err && os && dd && tosnap && strchr(tosnap, '@')) {
+	if (ra.err && os && tosnap && strchr(tosnap, '@')) {
 		/*
 		 * rollback or destroy what we created, so we don't
 		 * leave it in the restoring state.
 		 */
-		txg_wait_synced(dd->dd_pool, 0);
-		if (drrb->drr_fromguid) {
-			/* incremental: rollback to most recent snapshot */
-			(void) dsl_dir_sync_task(dd,
-			    dsl_dataset_rollback_sync, NULL, 0);
-		} else {
-			/* full: destroy whole fs */
-			cp = strchr(tosnap, '@');
-			*cp = '\0';
-			cp = strchr(tosnap, '/');
-			if (cp) {
-				(void) dsl_dir_sync_task(dd,
-				    dsl_dir_destroy_sync, cp+1, 0);
-			}
-			cp = strchr(tosnap, '\0');
-			*cp = '@';
-		}
+		dsl_dataset_t *ds;
+		int err;
 
+		cp = strchr(tosnap, '@');
+		*cp = '\0';
+		err = dsl_dataset_open(tosnap,
+		    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT,
+		    FTAG, &ds);
+		if (err == 0) {
+			txg_wait_synced(ds->ds_dir->dd_pool, 0);
+			if (drrb->drr_fromguid) {
+				/* incremental: rollback to most recent snap */
+				(void) dsl_dataset_rollback(ds);
+				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+			} else {
+				/* full: destroy whole fs */
+				dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
+				(void) dsl_dataset_destroy(tosnap);
+			}
+		}
+		*cp = '@';
 	}
 
-	if (dd)
-		dsl_dir_close(dd, FTAG);
 	kmem_free(ra.buf, ra.bufsize);
 	if (sizep)
 		*sizep = ra.voff;
