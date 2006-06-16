@@ -2599,6 +2599,7 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp, boolean_t iswput)
 	register tty_common_t  *tp = &async->async_ttycommon;
 	register struct iocblk *iocp;
 	register unsigned datasize;
+	size_t ioc_count;
 	mblk_t *datamp;
 	int error = 0;
 	uchar_t val, icr;
@@ -2619,6 +2620,12 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp, boolean_t iswput)
 	}
 
 	iocp = (struct iocblk *)mp->b_rptr;
+
+	/*
+	 * Save off the ioc count in case we need to restore it
+	 * because we are queuing a message block.
+	 */
+	ioc_count = iocp->ioc_count;
 
 	/*
 	 * For TIOCMGET, TIOCMBIC, TIOCMBIS, TIOCMSET, and PPS, do NOT call
@@ -2680,6 +2687,18 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp, boolean_t iswput)
 			    asy->asy_lom_console)) {
 				mutex_enter(asy->asy_excl_hi);
 				if (iswput && asy_isbusy(asy)) {
+					/*
+					 * ttycommon_ioctl sets the db_type to
+					 * M_IOCACK and ioc_count to zero
+					 * we need to undo this when we
+					 * queue a control message. This will
+					 * allow the control messages to be
+					 * processed again when the chip
+					 * becomes available.
+					 */
+					mp->b_datap->db_type = M_IOCTL;
+					iocp->ioc_count = ioc_count;
+
 					if (putq(wq, mp) == 0)
 						freemsg(mp);
 					mutex_exit(asy->asy_excl_hi);
