@@ -1084,7 +1084,7 @@ const instable_t dis_opFP3[8][8] = {
 /*  [6,0]  */	TNS("faddp",FF),	TNS("fmulp",FF),	TNS("fcomp",F),		TNS("fcompp",NORM),
 /*  [6,4]  */	TNS("fsubp",FF),	TNS("fsubrp",FF),	TNS("fdivp",FF),	TNS("fdivrp",FF),
 }, {
-/*  [7,0]  */	TNS("ffree",F),		TNS("fxch",F),		TNS("fstp",F),		TNS("fstp",F),
+/*  [7,0]  */	TNS("ffreep",F),		TNS("fxch",F),		TNS("fstp",F),		TNS("fstp",F),
 /*  [7,4]  */	TNS("fnstsw",M),	TNS("fucomip",FFC),	TNS("fcomip",FFC),	INVALID,
 } };
 
