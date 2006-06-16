@@ -104,6 +104,7 @@ extern cmd_evdisp_t cmd_opl_ue_cpu(fmd_hdl_t *, fmd_event_t *,
 extern cmd_list_t *opl_cpulist_insert(fmd_hdl_t *, uint32_t, int);
 extern int cmd_fmri_hc_set(fmd_hdl_t *, nvlist_t *, int, const nvlist_t *,
     nvlist_t *, int, ...);
+extern nvlist_t *opl_mem_fru_create(fmd_hdl_t *, nvlist_t *);
 
 extern cmd_list_t opl_cpu_list;
 

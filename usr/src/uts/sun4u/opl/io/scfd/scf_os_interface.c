@@ -59,14 +59,14 @@ scf_os_putinfo(uint8_t type, char *datap, uint32_t length)
 }
 
 static int
-scf_os_getinfo(uint8_t type, char *datap, uint32_t *lengthp)
+scf_os_getinfo(uint8_t type, uint32_t transid, char *datap, uint32_t *lengthp)
 {
 	int	rv, count;
 
 	rv = 0;
 	count = SCF_RETRY_COUNT;
 	while (count-- > 0) {
-		rv = scf_service_getinfo(KEY_ESCF, type, 0, lengthp,
+		rv = scf_service_getinfo(KEY_ESCF, type, transid, lengthp,
 			(void *)datap);
 		if (rv == EBUSY) {
 			/* 5 sec delay */
@@ -116,8 +116,7 @@ scf_fmem_end()
 
 	bzero(data, XSCF_DATA_LEN);
 	len = XSCF_DATA_LEN;
-	rv = scf_os_getinfo(SUB_OS_SEND_COMPLETE_FMEMA,
-		data, &len);
+	rv = scf_os_getinfo(SUB_OS_SEND_COMPLETE_FMEMA, 0, data, &len);
 
 	if (rv == 0) {
 		/* 0 is OK and everything less than 0 is BAD but TBD */
@@ -140,4 +139,16 @@ int
 scf_fmem_cancel()
 {
 	return (scf_os_putinfo(SUB_OS_SEND_CANCEL_FMEMA, 0, 0));
+}
+
+/*
+ * scf_get_dimminfo()
+ *
+ * Description: Get the dimm infomation for a board. This information
+ * includes the serial-IDs.
+ */
+int
+scf_get_dimminfo(uint32_t boardnum, void *buf, uint32_t *bufsz)
+{
+	return (scf_os_getinfo(SUB_OS_RECEIVE_DIMM_INFO, boardnum, buf, bufsz));
 }

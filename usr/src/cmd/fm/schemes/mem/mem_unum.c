@@ -91,6 +91,9 @@ static const bank_dimm_t bank_dimm[] = {
 	{ "MB/CMP%*d/CH%*d%n%n%n",		"/R%*d/D%*d/J%*4d%n" },
 	{ "MB/C%*d/P%*d/%nB%*d:%n%n",		" B%*d/D%*d%n" },
 	{ "MB/C%*d/P%*d/%nB%*d/D%*d:%n%n",	" B%*d/D%*d%n" },
+	{ "/MBU_A/MEMB%*d/%n%nMEM%*d%*1c%n",	" MEM%*d%*1c%n" },
+	{ "/MBU_B/MEMB%*d/%n%nMEM%*d%*1c%n",	" MEM%*d%*1c%n" },
+	{ "/CMU%*2d/%n%nMEM%*2d%*1c%n",		" MEM%*2d%*1c%n" },
 	{ NULL }
 };
 

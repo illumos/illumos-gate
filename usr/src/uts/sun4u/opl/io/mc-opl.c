@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/async.h>
 #include <sys/machsystm.h>
+#include <sys/promif.h>
 #include <sys/ksynch.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -41,9 +42,13 @@
 #include <sys/fm/io/opl_mc_fm.h>
 #include <sys/memlist.h>
 #include <sys/param.h>
+#include <sys/disp.h>
 #include <sys/ontrap.h>
 #include <vm/page.h>
 #include <sys/mc-opl.h>
+#include <sys/opl.h>
+#include <sys/opl_dimm.h>
+#include <sys/scfd/scfostoescf.h>
 
 /*
  * Function prototypes
@@ -54,10 +59,14 @@ static int mc_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int mc_attach(dev_info_t *, ddi_attach_cmd_t);
 static int mc_detach(dev_info_t *, ddi_detach_cmd_t);
 
+static int mc_poll_init(void);
+static void mc_poll_fini(void);
 static int mc_board_add(mc_opl_t *mcp);
 static int mc_board_del(mc_opl_t *mcp);
 static int mc_suspend(mc_opl_t *mcp, uint32_t flag);
 static int mc_resume(mc_opl_t *mcp, uint32_t flag);
+int opl_mc_suspend(void);
+int opl_mc_resume(void);
 
 static void insert_mcp(mc_opl_t *mcp);
 static void delete_mcp(mc_opl_t *mcp);
@@ -67,13 +76,29 @@ static int pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr);
 static int mc_valid_pa(mc_opl_t *mcp, uint64_t pa);
 
 int mc_get_mem_unum(int, uint64_t, char *, int, int *);
-extern int plat_max_boards(void);
-
+int mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr);
+int mc_get_mem_offset(uint64_t paddr, uint64_t *offp);
+int mc_get_mem_sid(char *unum, char *buf, int buflen, int *lenp);
+int mc_get_mem_sid_dimm(mc_opl_t *mcp, char *dname, char *buf,
+    int buflen, int *lenp);
+mc_dimm_info_t *mc_get_dimm_list(mc_opl_t *mcp);
+mc_dimm_info_t *mc_prepare_dimmlist(board_dimm_info_t *bd_dimmp);
+int mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int lsb, int bank,
+    uint32_t mf_type, uint32_t d_slot);
+static void mc_free_dimm_list(mc_dimm_info_t *d);
 static void mc_get_mlist(mc_opl_t *);
+static void mc_polling(void);
+static int mc_opl_get_physical_board(int);
+
+#ifdef	DEBUG
+static int mc_ioctl_debug(dev_t, int, intptr_t, int, cred_t *, int *);
+void mc_dump_dimm(char *buf, int dnamesz, int serialsz, int partnumsz);
+void mc_dump_dimm_info(board_dimm_info_t *bd_dimmp);
+#endif
 
 #pragma weak opl_get_physical_board
 extern int opl_get_physical_board(int);
-static int mc_opl_get_physical_board(int);
+extern int plat_max_boards(void);
 
 /*
  * Configuration data structures
@@ -116,26 +141,152 @@ static struct dev_ops mc_ops = {
 /*
  * Driver globals
  */
-int mc_patrol_interval_sec = 10;
 
-int inject_op_delay = 5;
+static enum {
+	MODEL_FF1 = 0,
+	MODEL_FF2 = 1,
+	MODEL_DC = 2
+} plat_model = MODEL_DC;	/* The default behaviour is DC */
 
-mc_inst_list_t *mc_instances;
+static struct plat_model_names {
+	const char *unit_name;
+	const char *mem_name;
+} model_names[] = {
+	{ "MBU_A", "MEMB" },
+	{ "MBU_B", "MEMB" },
+	{ "CMU", "" }
+};
+
+/*
+ * The DIMM Names for DC platform.
+ * The index into this table is made up of (bank, dslot),
+ * Where dslot occupies bits 0-1 and bank occupies 2-4.
+ */
+static char *mc_dc_dimm_unum_table[OPL_MAX_DIMMS] = {
+	/* --------CMUnn----------- */
+	/* --CS0-----|--CS1------ */
+	/* -H-|--L-- | -H- | -L-- */
+	"03A", "02A", "03B", "02B", /* MAC 0 bank 0 */
+	"13A", "12A", "13B", "12B", /* MAC 0 bank 1 */
+	"23A", "22A", "23B", "22B", /* MAC 1 bank 2 */
+	"33A", "32A", "33B", "32B", /* MAC 1 bank 3 */
+	"01A", "00A", "01B", "00B", /* MAC 2 bank 4 */
+	"11A", "10A", "11B", "10B", /* MAC 2 bank 5 */
+	"21A", "20A", "21B", "20B", /* MAC 3 bank 6 */
+	"31A", "30A", "31B", "30B"  /* MAC 3 bank 7 */
+};
+
+/*
+ * The DIMM Names for FF1/FF2 platforms.
+ * The index into this table is made up of (board, bank, dslot),
+ * Where dslot occupies bits 0-1, bank occupies 2-4 and
+ * board occupies the bit 5.
+ */
+static char *mc_ff_dimm_unum_table[2 * OPL_MAX_DIMMS] = {
+	/* --------CMU0---------- */
+	/* --CS0-----|--CS1------ */
+	/* -H-|--L-- | -H- | -L-- */
+	"03A", "02A", "03B", "02B", /* MAC 0 bank 0 */
+	"01A", "00A", "01B", "00B", /* MAC 0 bank 1 */
+	"13A", "12A", "13B", "12B", /* MAC 1 bank 2 */
+	"11A", "10A", "11B", "10B", /* MAC 1 bank 3 */
+	"23A", "20A", "23B", "20B", /* MAC 2 bank 4 */
+	"21A", "20A", "21B", "20B", /* MAC 2 bank 5 */
+	"33A", "32A", "33B", "32B", /* MAC 3 bank 6 */
+	"31A", "30A", "31B", "30B", /* MAC 3 bank 7 */
+	/* --------CMU1---------- */
+	/* --CS0-----|--CS1------ */
+	/* -H-|--L-- | -H- | -L-- */
+	"43A", "42A", "43B", "42B", /* MAC 0 bank 0 */
+	"41A", "40A", "41B", "40B", /* MAC 0 bank 1 */
+	"53A", "52A", "53B", "50B", /* MAC 1 bank 2 */
+	"51A", "50A", "51B", "50B", /* MAC 1 bank 3 */
+	"63A", "62A", "63B", "62B", /* MAC 2 bank 4 */
+	"61A", "60A", "61B", "60B", /* MAC 2 bank 5 */
+	"73A", "72A", "73B", "72B", /* MAC 3 bank 6 */
+	"71A", "70A", "71B", "70B"  /* MAC 3 bank 7 */
+};
+
+#define	BD_BK_SLOT_TO_INDEX(bd, bk, s)			\
+	(((bd & 0x01) << 5) | ((bk & 0x07) << 2) | (s & 0x03))
+
+#define	INDEX_TO_BANK(i)			(((i) & 0x1C) >> 2)
+#define	INDEX_TO_SLOT(i)			((i) & 0x03)
+
+/* Isolation unit size is 64 MB */
+#define	MC_ISOLATION_BSIZE	(64 * 1024 * 1024)
+
+#define	MC_MAX_SPEEDS 7
+
+/* make this a structure */
+
+typedef struct {
+	uint32_t mc_speeds;
+	uint32_t mc_period;
+} mc_scan_speed_t;
+
+#define	MC_CNTL_SPEED_SHIFT 26
+
+static mc_scan_speed_t	mc_scan_speeds[MC_MAX_SPEEDS] = {
+	{0x6 << MC_CNTL_SPEED_SHIFT, 0},
+	{0x5 << MC_CNTL_SPEED_SHIFT, 32},
+	{0x4 << MC_CNTL_SPEED_SHIFT, 64},
+	{0x3 << MC_CNTL_SPEED_SHIFT, 128},
+	{0x2 << MC_CNTL_SPEED_SHIFT, 256},
+	{0x1 << MC_CNTL_SPEED_SHIFT, 512},
+	{0x0 << MC_CNTL_SPEED_SHIFT, 1024}
+};
+
+static uint32_t	mc_max_speed = (0x6 << 26);
+
+/* we have to measure these delays */
+
+int mc_isolation_bsize = MC_ISOLATION_BSIZE;
+int mc_patrol_interval_sec = MC_PATROL_INTERVAL_SEC;
+int mc_max_scf_retry = 16;
+int mc_max_scf_logs = 64;
+int mc_max_errlog_processed = BANKNUM_PER_SB*2;
+int mc_scan_period = 12 * 60 * 60;	/* 12 hours period */
+int mc_max_rewrite_loop = 100;
+int mc_rewrite_delay = 10;
+/*
+ * it takes SCF about 300 m.s. to process a requst.  We can bail out
+ * if it is busy.  It does not pay to wait for it too long.
+ */
+int mc_max_scf_loop = 2;
+int mc_scf_delay = 100;
+int mc_pce_dropped = 0;
+int mc_poll_priority = MINCLSYSPRI;
+
+
+/*
+ * Mutex heierachy in mc-opl
+ * If both mcmutex and mc_lock must be held,
+ * mcmutex must be acquired first, and then mc_lock.
+ */
+
 static kmutex_t mcmutex;
+mc_opl_t *mc_instances[OPL_MAX_BOARDS];
 
+static kmutex_t mc_polling_lock;
+static kcondvar_t mc_polling_cv;
+static kcondvar_t mc_poll_exit_cv;
+static int mc_poll_cmd = 0;
+static int mc_pollthr_running = 0;
+int mc_timeout_period = 0; /* this is in m.s. */
 void *mc_statep;
 
 #ifdef	DEBUG
 int oplmc_debug = 0;
 #endif
 
-static int mc_debug_show_all;
+static int mc_debug_show_all = 0;
 
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* module type, this one is a driver */
-	"OPL Memory-controller 1.1",	/* module name */
+	"OPL Memory-controller %I%",	/* module name */
 	&mc_ops,			/* driver ops */
 };
 
@@ -146,7 +297,16 @@ static struct modlinkage modlinkage = {
 };
 
 #pragma weak opl_get_mem_unum
+#pragma weak opl_get_mem_sid
+#pragma weak opl_get_mem_offset
+#pragma weak opl_get_mem_addr
+
 extern int (*opl_get_mem_unum)(int, uint64_t, char *, int, int *);
+extern int (*opl_get_mem_sid)(char *unum, char *buf, int buflen, int *lenp);
+extern int (*opl_get_mem_offset)(uint64_t paddr, uint64_t *offp);
+extern int (*opl_get_mem_addr)(char *unum, char *sid, uint64_t offset,
+    uint64_t *paddr);
+
 
 /*
  * pseudo-mc node portid format
@@ -165,25 +325,59 @@ extern int (*opl_get_mem_unum)(int, uint64_t, char *, int, int *);
 int
 _init(void)
 {
-	int error;
+	int	error;
+	int	plen;
+	char	model[20];
+	pnode_t	node;
 
 
 	if ((error = ddi_soft_state_init(&mc_statep,
 	    sizeof (mc_opl_t), 1)) != 0)
 		return (error);
 
+	if ((error = mc_poll_init()) != 0) {
+		ddi_soft_state_fini(&mc_statep);
+		return (error);
+	}
+
 	mutex_init(&mcmutex, NULL, MUTEX_DRIVER, NULL);
 	if (&opl_get_mem_unum)
 		opl_get_mem_unum = mc_get_mem_unum;
+	if (&opl_get_mem_sid)
+		opl_get_mem_sid = mc_get_mem_sid;
+	if (&opl_get_mem_offset)
+		opl_get_mem_offset = mc_get_mem_offset;
+	if (&opl_get_mem_addr)
+		opl_get_mem_addr = mc_get_mem_addr;
+
+	node = prom_rootnode();
+	plen = prom_getproplen(node, "model");
+
+	if (plen > 0 && plen < sizeof (model)) {
+		(void) prom_getprop(node, "model", model);
+		model[plen] = '\0';
+		if (strcmp(model, "FF1") == 0)
+			plat_model = MODEL_FF1;
+		else if (strcmp(model, "FF2") == 0)
+			plat_model = MODEL_FF2;
+		else if (strncmp(model, "DC", 2) == 0)
+			plat_model = MODEL_DC;
+	}
 
 	error =  mod_install(&modlinkage);
 	if (error != 0) {
 		if (&opl_get_mem_unum)
 			opl_get_mem_unum = NULL;
+		if (&opl_get_mem_sid)
+			opl_get_mem_sid = NULL;
+		if (&opl_get_mem_offset)
+			opl_get_mem_offset = NULL;
+		if (&opl_get_mem_addr)
+			opl_get_mem_addr = NULL;
 		mutex_destroy(&mcmutex);
+		mc_poll_fini();
 		ddi_soft_state_fini(&mc_statep);
 	}
-
 	return (error);
 }
 
@@ -195,11 +389,17 @@ _fini(void)
 	if ((error = mod_remove(&modlinkage)) != 0)
 		return (error);
 
-	mutex_destroy(&mcmutex);
-
 	if (&opl_get_mem_unum)
 		opl_get_mem_unum = NULL;
+	if (&opl_get_mem_sid)
+		opl_get_mem_sid = NULL;
+	if (&opl_get_mem_offset)
+		opl_get_mem_offset = NULL;
+	if (&opl_get_mem_addr)
+		opl_get_mem_addr = NULL;
 
+	mutex_destroy(&mcmutex);
+	mc_poll_fini();
 	ddi_soft_state_fini(&mc_statep);
 
 	return (0);
@@ -211,11 +411,59 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+static void
+mc_polling_thread()
+{
+	mutex_enter(&mc_polling_lock);
+	mc_pollthr_running = 1;
+	while (!(mc_poll_cmd & MC_POLL_EXIT)) {
+		mc_polling();
+		cv_timedwait(&mc_polling_cv, &mc_polling_lock,
+		    ddi_get_lbolt() + mc_timeout_period);
+	}
+	mc_pollthr_running = 0;
+
+	/*
+	 * signal if any one is waiting for this thread to exit.
+	 */
+	cv_signal(&mc_poll_exit_cv);
+	mutex_exit(&mc_polling_lock);
+	thread_exit();
+	/* NOTREACHED */
+}
+
+static int
+mc_poll_init()
+{
+	mutex_init(&mc_polling_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&mc_polling_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&mc_poll_exit_cv, NULL, CV_DRIVER, NULL);
+	return (0);
+}
+
+static void
+mc_poll_fini()
+{
+	mutex_enter(&mc_polling_lock);
+	if (mc_pollthr_running) {
+		mc_poll_cmd = MC_POLL_EXIT;
+		cv_signal(&mc_polling_cv);
+		while (mc_pollthr_running) {
+			cv_wait(&mc_poll_exit_cv, &mc_polling_lock);
+		}
+	}
+	mutex_exit(&mc_polling_lock);
+	mutex_destroy(&mc_polling_lock);
+	cv_destroy(&mc_polling_cv);
+	cv_destroy(&mc_poll_exit_cv);
+}
+
 static int
 mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	mc_opl_t *mcp;
 	int instance;
+	int rv;
 
 	/* get the instance of this devi */
 	instance = ddi_get_instance(devi);
@@ -225,17 +473,25 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		break;
 	case DDI_RESUME:
 		mcp = ddi_get_soft_state(mc_statep, instance);
-		return (mc_resume(mcp, MC_DRIVER_SUSPENDED));
+		rv = mc_resume(mcp, MC_DRIVER_SUSPENDED);
+		return (rv);
 	default:
 		return (DDI_FAILURE);
 	}
-
 
 	if (ddi_soft_state_zalloc(mc_statep, instance) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	if ((mcp = ddi_get_soft_state(mc_statep, instance)) == NULL) {
 		goto bad;
+	}
+
+	if (mc_timeout_period == 0) {
+		mc_patrol_interval_sec = (int)ddi_getprop(DDI_DEV_T_ANY, devi,
+			DDI_PROP_DONTPASS, "mc-timeout-interval-sec",
+			mc_patrol_interval_sec);
+		mc_timeout_period = drv_usectohz(
+			1000000 * mc_patrol_interval_sec / OPL_MAX_BOARDS);
 	}
 
 	/* set informations in mc state */
@@ -245,6 +501,16 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad;
 
 	insert_mcp(mcp);
+
+	/*
+	 * Start the polling thread if it is not running already.
+	 */
+	mutex_enter(&mc_polling_lock);
+	if (!mc_pollthr_running) {
+		(void) thread_create(NULL, 0, (void (*)())mc_polling_thread,
+			NULL, 0, &p0, TS_RUN, mc_poll_priority);
+	}
+	mutex_exit(&mc_polling_lock);
 	ddi_report_dev(devi);
 
 	return (DDI_SUCCESS);
@@ -258,6 +524,7 @@ bad:
 static int
 mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
+	int rv;
 	int instance;
 	mc_opl_t *mcp;
 
@@ -269,21 +536,18 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_SUSPEND:
-		return (mc_suspend(mcp, MC_DRIVER_SUSPENDED));
+		rv = mc_suspend(mcp, MC_DRIVER_SUSPENDED);
+		return (rv);
 	case DDI_DETACH:
 		break;
 	default:
 		return (DDI_FAILURE);
 	}
 
-	mutex_enter(&mcmutex);
+	delete_mcp(mcp);
 	if (mc_board_del(mcp) != DDI_SUCCESS) {
-		mutex_exit(&mcmutex);
 		return (DDI_FAILURE);
 	}
-
-	delete_mcp(mcp);
-	mutex_exit(&mcmutex);
 
 	/* free up the soft state */
 	ddi_soft_state_free(mc_statep, instance);
@@ -310,7 +574,11 @@ static int
 mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
+#ifdef DEBUG
+	return (mc_ioctl_debug(dev, cmd, arg, mode, credp, rvalp));
+#else
 	return (ENXIO);
+#endif
 }
 
 /*
@@ -386,10 +654,15 @@ mcaddr_to_pa(mc_opl_t *mcp, mc_addr_t *maddr, uint64_t *pa)
 	MC_LOG("pa = %lx\n", *pa);
 
 	if (pa_to_maddr(mcp, *pa, &maddr1) == -1) {
+		cmn_err(CE_WARN, "mcaddr_to_pa: /LSB%d/B%d/%x failed to "
+		    "convert PA %lx\n", maddr->ma_bd, bank,
+		    maddr->ma_dimm_addr, *pa);
 		return (-1);
 	}
 
-
+	/*
+	 * In mirror mode, PA is always translated to the even bank.
+	 */
 	if (IS_MIRROR(mcp, maddr->ma_bank)) {
 		bank0 = maddr->ma_bank & ~(1);
 		bank1 = maddr1.ma_bank & ~(1);
@@ -516,19 +789,92 @@ pa_to_maddr(mc_opl_t *mcp, uint64_t pa, mc_addr_t *maddr)
 	return (0);
 }
 
+/*
+ * UNUM format for DC is "/CMUnn/MEMxyZ", where
+ *	nn = 00..03 for DC1 and 00..07 for DC2 and 00..15 for DC3.
+ *	x = MAC 0..3
+ *	y = 0..3 (slot info).
+ *	Z = 'A' or 'B'
+ *
+ * UNUM format for FF1 is "/MBU_A/MEMBx/MEMyZ", where
+ *	x = 0..3 (MEMB number)
+ *	y = 0..3 (slot info).
+ *	Z = 'A' or 'B'
+ *
+ * UNUM format for FF2 is "/MBU_B/MEMBx/MEMyZ"
+ *	x = 0..7 (MEMB number)
+ *	y = 0..3 (slot info).
+ *	Z = 'A' or 'B'
+ */
+int
+mc_set_mem_unum(char *buf, int buflen, int lsb, int bank,
+    uint32_t mf_type, uint32_t d_slot)
+{
+	char *dimmnm;
+	char memb_num;
+	int sb;
+	int i;
+
+	if ((sb = mc_opl_get_physical_board(lsb)) < 0)
+		return (ENODEV);
+
+	if (plat_model == MODEL_DC) {
+		if (mf_type == FLT_TYPE_PERMANENT_CE) {
+			i = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
+			dimmnm = mc_dc_dimm_unum_table[i];
+			snprintf(buf, buflen, "/%s%02d/MEM%s",
+			    model_names[plat_model].unit_name, sb, dimmnm);
+		} else {
+			i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
+			snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s MEM%s MEM%s",
+			    model_names[plat_model].unit_name, sb,
+			    mc_dc_dimm_unum_table[i],
+			    mc_dc_dimm_unum_table[i + 1],
+			    mc_dc_dimm_unum_table[i + 2],
+			    mc_dc_dimm_unum_table[i + 3]);
+		}
+	} else {
+		i = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
+		if (mf_type == FLT_TYPE_PERMANENT_CE) {
+			dimmnm = mc_ff_dimm_unum_table[i];
+			memb_num = dimmnm[0];
+			snprintf(buf, buflen, "/%s/%s%c/MEM%s",
+			    model_names[plat_model].unit_name,
+			    model_names[plat_model].mem_name,
+			    memb_num, &dimmnm[1]);
+		} else {
+			i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+			memb_num = mc_ff_dimm_unum_table[i][0],
+			snprintf(buf, buflen,
+			    "/%s/%s%c/MEM%s MEM%s MEM%s MEM%s",
+			    model_names[plat_model].unit_name,
+			    model_names[plat_model].mem_name, memb_num,
+			    &mc_ff_dimm_unum_table[i][1],
+			    &mc_ff_dimm_unum_table[i + 1][1],
+			    &mc_ff_dimm_unum_table[i + 2][1],
+			    &mc_ff_dimm_unum_table[i + 3][1]);
+		}
+	}
+	return (0);
+}
+
 static void
 mc_ereport_post(mc_aflt_t *mc_aflt)
 {
 	char buf[FM_MAX_CLASS];
 	char device_path[MAXPATHLEN];
+	char sid[MAXPATHLEN];
 	nv_alloc_t *nva = NULL;
 	nvlist_t *ereport, *detector, *resource;
 	errorq_elem_t *eqep;
 	int nflts;
 	mc_flt_stat_t *flt_stat;
-	int i, n, blen;
-	char *p;
+	int i, n;
+	int blen = MAXPATHLEN;
+	char *p, *s = NULL;
 	uint32_t values[2], synd[2], dslot[2];
+	uint64_t offset = (uint64_t)-1;
+	int ret = -1;
 
 	if (panicstr) {
 		eqep = errorq_reserve(ereport_errorq);
@@ -600,6 +946,11 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	for (i = 0; i < nflts; i++)
 		values[i] = mc_aflt->mflt_stat[i]->mf_err_add;
 
+	/* offset is set only for PCE */
+	if (mc_aflt->mflt_stat[0]->mf_type == FLT_TYPE_PERMANENT_CE) {
+		offset = values[0];
+
+	}
 	fm_payload_set(ereport, MC_OPL_ERR_ADD, DATA_TYPE_UINT32_ARRAY,
 		nflts, values, NULL);
 
@@ -631,48 +982,49 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	fm_payload_set(ereport, MC_OPL_ERR_DRAM,
 		DATA_TYPE_UINT32_ARRAY, nflts, values, NULL);
 
-	blen = MAXPATHLEN;
 	device_path[0] = 0;
 	p = &device_path[0];
+	sid[0] = 0;
+	s = &sid[0];
+	ret = 0;
 
 	for (i = 0; i < nflts; i++) {
-		int bank = flt_stat->mf_flt_maddr.ma_bank;
-		int psb = -1;
+		int bank;
 
 		flt_stat = mc_aflt->mflt_stat[i];
-		psb = mc_opl_get_physical_board(
-		    flt_stat->mf_flt_maddr.ma_bd);
+		bank = flt_stat->mf_flt_maddr.ma_bank;
+		ret =  mc_set_mem_unum(p + strlen(p), blen,
+			flt_stat->mf_flt_maddr.ma_bd, bank, flt_stat->mf_type,
+			flt_stat->mf_dimm_slot);
 
-		if (psb != -1) {
-			snprintf(p, blen, "/CMU%d/B%d", psb, bank);
-		} else {
-			snprintf(p, blen, "/CMU/B%d", bank);
+		if (ret != 0) {
+			cmn_err(CE_WARN,
+			    "mc_ereport_post: Failed to determine the unum "
+			    "for board=%d bank=%d type=0x%x slot=0x%x",
+			    flt_stat->mf_flt_maddr.ma_bd, bank,
+			    flt_stat->mf_type, flt_stat->mf_dimm_slot);
+			continue;
 		}
-
-		if (flt_stat->mf_errlog_valid) {
-			snprintf(p + strlen(p), blen, "/MEM%d%d%c",
-			    bank/2, (bank & 0x1) * 2 + dslot[i] & 1,
-			    (dslot[i] & 0x2) ? 'B' : 'A');
-		}
-
-		n = strlen(&device_path[0]);
+		n = strlen(device_path);
 		blen = MAXPATHLEN - n;
 		p = &device_path[n];
 		if (i < (nflts - 1)) {
 			snprintf(p, blen, " ");
-			n += 1; blen -= 1; p += 1;
+			blen--;
+			p++;
+		}
+
+		if (ret == 0) {
+			ret = mc_set_mem_sid(mc_aflt->mflt_mcp, s + strlen(s),
+			    blen, flt_stat->mf_flt_maddr.ma_bd, bank,
+			    flt_stat->mf_type, flt_stat->mf_dimm_slot);
+
 		}
 	}
 
-	/*
-	 * UNUM format /LSB#/B#/MEMxyZ
-	 * where x is the MAC# = Bank#/2
-	 * y is slot info = (Bank# & 0x1)*2 + {0, 1} 0 for DIMM-L, 1 for DIMM-H
-	 * DIMM-L is 0 in bit 13, DIMM-H is 1 in bit 13.
-	 * Z is A(CS0) or B(CS1) given by bit 14
-	 */
 	(void) fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
-		NULL, device_path, NULL, 0);
+		NULL, device_path, (ret == 0) ? sid : NULL,
+		(ret == 0) ? offset : (uint64_t)-1);
 
 	fm_payload_set(ereport, MC_OPL_RESOURCE, DATA_TYPE_NVLIST,
 		resource, NULL);
@@ -687,6 +1039,7 @@ mc_ereport_post(mc_aflt_t *mc_aflt)
 	}
 }
 
+
 static void
 mc_err_drain(mc_aflt_t *mc_aflt)
 {
@@ -694,6 +1047,7 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	page_t *pp;
 	uint64_t errors;
 	uint64_t pa = (uint64_t)(-1);
+	int i;
 
 	MC_LOG("mc_err_drain: %s\n",
 		mc_aflt->mflt_erpt_class);
@@ -702,13 +1056,16 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 	 * In mirror mode: CMPE, MUE, SUE
 	 * In normal mode: UE, Permanent CE
 	 */
-	rv = mcaddr_to_pa(mc_aflt->mflt_mcp,
-		&(mc_aflt->mflt_stat[0]->mf_flt_maddr), &pa);
-	if (rv == 0)
-		mc_aflt->mflt_stat[0]->mf_flt_paddr = pa;
-	else
-		mc_aflt->mflt_stat[0]->mf_flt_paddr = (uint64_t)-1;
-	if (rv == 0) {
+	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
+		rv = mcaddr_to_pa(mc_aflt->mflt_mcp,
+			&(mc_aflt->mflt_stat[i]->mf_flt_maddr), &pa);
+		if (rv == 0)
+			mc_aflt->mflt_stat[i]->mf_flt_paddr = pa;
+		else
+			mc_aflt->mflt_stat[i]->mf_flt_paddr = (uint64_t)-1;
+	}
+
+	if (mc_aflt->mflt_stat[0]->mf_type != FLT_TYPE_PERMANENT_CE) {
 		MC_LOG("mc_err_drain:pa = %lx\n", pa);
 		pp = page_numtopp_nolock(pa >> PAGESHIFT);
 
@@ -735,14 +1092,17 @@ mc_err_drain(mc_aflt_t *mc_aflt)
 			(void) page_retire(pa, mc_aflt->mflt_pr);
 		}
 	}
-	mc_ereport_post(mc_aflt);
+
+	for (i = 0; i < mc_aflt->mflt_nflts; i++) {
+		mc_aflt_t mc_aflt0;
+		if (mc_aflt->mflt_stat[i]->mf_flt_paddr != (uint64_t)-1) {
+			mc_aflt0 = *mc_aflt;
+			mc_aflt0.mflt_nflts = 1;
+			mc_aflt0.mflt_stat[0] = mc_aflt->mflt_stat[i];
+			mc_ereport_post(&mc_aflt0);
+		}
+	}
 }
-
-#define	DIMM_SIZE 0x80000000
-
-#define	INC_DIMM_ADDR(p, n) \
-	(p)->ma_dimm_addr += n; \
-	(p)->ma_dimm_addr &= (DIMM_SIZE - 1)
 
 /*
  * The restart address is actually defined in unit of PA[37:6]
@@ -753,27 +1113,18 @@ mc_err_drain(mc_aflt_t *mc_aflt)
  * Also the mac patrol scans the dimms based on PA, not
  * dimm offset.
  */
-
 static int
 restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 {
 	page_t *pp;
-	uint32_t reg;
 	uint64_t pa;
 	int rv;
 	int loop_count = 0;
-
-	reg = ldphysio(MAC_PTRL_CNTL(mcp, bank));
-
-	/* already running, so we just return */
-	if (reg & MAC_CNTL_PTRL_START)
-		return (0);
 
 	if (maddr_info == NULL || (maddr_info->mi_valid == 0)) {
 		MAC_PTRL_START(mcp, bank);
 		return (0);
 	}
-
 
 	rv = mcaddr_to_pa(mcp, &maddr_info->mi_maddr, &pa);
 	if (rv != 0) {
@@ -814,10 +1165,8 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 			new_pa = pa + 64;
 
 		if (!mc_valid_pa(mcp, new_pa)) {
-			/* Isolation unit size is 64 MB */
-#define	MC_ISOLATION_BSIZE	(64 * 1024 * 1024)
 			MC_LOG("Invalid PA\n");
-			pa = roundup(new_pa + 1, MC_ISOLATION_BSIZE);
+			pa = roundup(new_pa + 1, mc_isolation_bsize);
 		} else {
 			pp = page_numtopp_nolock(new_pa >> PAGESHIFT);
 			if (pp != NULL) {
@@ -825,8 +1174,8 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 				if (page_retire_check(new_pa, &errors) &&
 					(errors == 0)) {
 					MC_LOG("Page has no error\n");
-					MAC_PTRL_START(mcp, bank);
-					return (0);
+					pa = new_pa;
+					goto done;
 				}
 				/*
 				 * skip bad pages
@@ -836,8 +1185,8 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 				MC_LOG("Skipping bad page to %lx\n", pa);
 			} else {
 				MC_LOG("Page has no page structure\n");
-				MAC_PTRL_START(mcp, bank);
-				return (0);
+				pa = new_pa;
+				goto done;
 			}
 		}
 	}
@@ -875,6 +1224,7 @@ restart_patrol(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr_info)
 		}
 	}
 
+done:
 	/* retstart MAC patrol: PA[37:6] */
 	MC_LOG("restart at pa = %lx\n", pa);
 	ST_MAC_REG(MAC_RESTART_ADD(mcp, bank), MAC_RESTART_PA(pa));
@@ -902,13 +1252,13 @@ do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr)
 	int count = 0;
 
 	/* first wait to make sure PTRL_STATUS is 0 */
-	while (count++ < MAX_MC_LOOP_COUNT) {
+	while (count++ < mc_max_rewrite_loop) {
 		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
 		if (!(cntl & MAC_CNTL_PTRL_STATUS))
 			break;
-		delay(drv_usectohz(10 * 1000));	/* 10 m.s. */
+		drv_usecwait(mc_rewrite_delay);
 	}
-	if (count >= MAX_MC_LOOP_COUNT)
+	if (count >= mc_max_rewrite_loop)
 		goto bad;
 
 	count = 0;
@@ -918,10 +1268,11 @@ do_rewrite(mc_opl_t *mcp, int bank, uint32_t dimm_addr)
 
 	do {
 		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
-		if (count++ >= MAX_MC_LOOP_COUNT) {
+		if (count++ >= mc_max_rewrite_loop) {
 			goto bad;
-		} else
-			delay(drv_usectohz(10 * 1000));	/* 10 m.s. */
+		} else {
+			drv_usecwait(mc_rewrite_delay);
+		}
 	/*
 	 * If there are other MEMORY or PCI activities, this
 	 * will be BUSY, else it should be set immediately
@@ -939,25 +1290,28 @@ bad:
 	MAC_CLEAR_ERRS(mcp, bank, MAC_CNTL_REW_ERRS);
 	return (cntl);
 }
-
 void
 mc_process_scf_log(mc_opl_t *mcp)
 {
-	int count = 0;
+	int count;
+	int n = 0;
 	scf_log_t *p;
 	int bank;
 
-	while ((p = mcp->mc_scf_log) != NULL) {
-		bank = p->sl_bank;
+	for (bank = 0; bank < BANKNUM_PER_SB; bank++) {
+	    while ((p = mcp->mc_scf_log[bank]) != NULL &&
+		(n < mc_max_errlog_processed)) {
+		ASSERT(bank == p->sl_bank);
+		count = 0;
 		while ((LD_MAC_REG(MAC_STATIC_ERR_ADD(mcp, p->sl_bank))
 			& MAC_STATIC_ERR_VLD)) {
-			if (count++ >= (MAX_MC_LOOP_COUNT)) {
+			if (count++ >= (mc_max_scf_loop)) {
 				break;
 			}
-			delay(drv_usectohz(10 * 1000));	/* 10 m.s. */
+			drv_usecwait(mc_scf_delay);
 		}
 
-		if (count < MAX_MC_LOOP_COUNT) {
+		if (count < mc_max_scf_loop) {
 			ST_MAC_REG(MAC_STATIC_ERR_LOG(mcp, p->sl_bank),
 				p->sl_err_log);
 
@@ -966,29 +1320,32 @@ mc_process_scf_log(mc_opl_t *mcp)
 			mcp->mc_scf_retry[bank] = 0;
 		} else {
 			/* if we try too many times, just drop the req */
-			if (mcp->mc_scf_retry[bank]++ <= MAX_SCF_RETRY) {
+			if (mcp->mc_scf_retry[bank]++ <= mc_max_scf_retry) {
 				return;
 			} else {
-				cmn_err(CE_WARN, "SCF is not responding. "
-					"Dropping the SCF LOG\n");
+			    if ((++mc_pce_dropped & 0xff) == 0) {
+				cmn_err(CE_WARN,
+				    "Cannot report Permanent CE to SCF\n");
+			    }
 			}
 		}
-		mcp->mc_scf_log = p->sl_next;
-		mcp->mc_scf_total--;
-		ASSERT(mcp->mc_scf_total >= 0);
+		n++;
+		mcp->mc_scf_log[bank] = p->sl_next;
+		mcp->mc_scf_total[bank]--;
+		ASSERT(mcp->mc_scf_total[bank] >= 0);
 		kmem_free(p, sizeof (scf_log_t));
+	    }
 	}
 }
-
 void
 mc_queue_scf_log(mc_opl_t *mcp, mc_flt_stat_t *flt_stat, int bank)
 {
 	scf_log_t *p;
 
-	if (mcp->mc_scf_total >= MAX_SCF_LOGS) {
-		cmn_err(CE_WARN,
-			"Max# SCF logs excceded on /LSB%d/B%d\n",
-			mcp->mc_board_num, bank);
+	if (mcp->mc_scf_total[bank] >= mc_max_scf_logs) {
+		if ((++mc_pce_dropped & 0xff) == 0) {
+		    cmn_err(CE_WARN, "Too many Permanent CE requests.\n");
+		}
 		return;
 	}
 	p = kmem_zalloc(sizeof (scf_log_t), KM_SLEEP);
@@ -997,19 +1354,18 @@ mc_queue_scf_log(mc_opl_t *mcp, mc_flt_stat_t *flt_stat, int bank)
 	p->sl_err_log = flt_stat->mf_err_log;
 	p->sl_bank = bank;
 
-	if (mcp->mc_scf_log == NULL) {
+	if (mcp->mc_scf_log[bank] == NULL) {
 		/*
 		 * we rely on mc_scf_log to detect NULL queue.
 		 * mc_scf_log_tail is irrelevant is such case.
 		 */
-		mcp->mc_scf_log_tail = mcp->mc_scf_log = p;
+		mcp->mc_scf_log_tail[bank] = mcp->mc_scf_log[bank] = p;
 	} else {
-		mcp->mc_scf_log_tail->sl_next = p;
-		mcp->mc_scf_log_tail = p;
+		mcp->mc_scf_log_tail[bank]->sl_next = p;
+		mcp->mc_scf_log_tail[bank] = p;
 	}
-	mcp->mc_scf_total++;
+	mcp->mc_scf_total[bank]++;
 }
-
 /*
  * This routine determines what kind of CE happens, intermittent
  * or permanent as follows. (See 4.7.3 in Columbus2 PRM.)
@@ -1092,28 +1448,11 @@ IS_CE_ONLY(uint32_t cntl, int ptrl_error)
 void
 mc_write_cntl(mc_opl_t *mcp, int bank, uint32_t value)
 {
-	value |= mcp->mc_bank[bank].mcb_ptrl_cntl;
+	if (mcp->mc_speedup_period[bank] > 0)
+		value |= mc_max_speed;
+	else
+		value |= mcp->mc_speed;
 	ST_MAC_REG(MAC_PTRL_CNTL(mcp, bank), value);
-}
-
-static int
-mc_stop(mc_opl_t *mcp, int bank)
-{
-	uint32_t reg;
-	int count = 0;
-
-	reg = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
-
-	if (reg & MAC_CNTL_PTRL_START)
-		MAC_PTRL_STOP(mcp, bank);
-
-	while (count++ <= MAX_MC_LOOP_COUNT) {
-		reg = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
-		if ((reg & MAC_CNTL_PTRL_STATUS) == 0)
-			return (0);
-		delay(drv_usectohz(10 * 1000));	/* 10 m.s. */
-	}
-	return (-1);
 }
 
 static void
@@ -1258,8 +1597,8 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			MAC_SET_ERRLOG_INFO(&flt_stat[0]);
 			MAC_SET_ERRLOG_INFO(&flt_stat[1]);
 			MC_LOG("MUE detected\n");
-			flt_stat[0].mf_type = flt_stat[1].mf_type =
-				FLT_TYPE_MUE;
+			flt_stat[0].mf_type = FLT_TYPE_MUE;
+			flt_stat[1].mf_type = FLT_TYPE_MUE;
 			mc_aflt->mflt_erpt_class = MC_OPL_MUE;
 			mc_aflt->mflt_nflts = 2;
 			mc_aflt->mflt_stat[0] = &flt_stat[0];
@@ -1272,7 +1611,9 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 		/* Now the only case is UE/CE, UE/OK, or don't care */
 		for (i = 0; i < 2; i++) {
 		    if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
-			/* If we have CE, we would have done REW */
+
+			/* rewrite can clear the one side UE error */
+
 			if (IS_OK(flt_stat[i^1].mf_cntl, ptrl_error)) {
 				(void) do_rewrite(mcp,
 				    flt_stat[i].mf_flt_maddr.ma_bank,
@@ -1310,6 +1651,8 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 		    }
 		}
 
+		/* rewrite can clear the one side UE error */
+
 		for (i = 0; i < 2; i++) {
 		    if (IS_UE(flt_stat[i].mf_cntl, ptrl_error)) {
 			(void) do_rewrite(mcp,
@@ -1328,19 +1671,14 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 	}
 	return (rv);
 }
-
 static void
 mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 {
 	mc_aflt_t mc_aflt;
 	mc_flt_stat_t flt_stat[2], mi_flt_stat[2];
-	int other_bank;
+	int i;
+	int mi_valid;
 
-	if (mc_stop(mcp, bank)) {
-		cmn_err(CE_WARN, "Cannot stop Memory Patrol at /LSB%d/B%d\n",
-			mcp->mc_board_num, bank);
-		return;
-	}
 	bzero(&mc_aflt, sizeof (mc_aflt_t));
 	bzero(&flt_stat, 2 * sizeof (mc_flt_stat_t));
 	bzero(&mi_flt_stat, 2 * sizeof (mc_flt_stat_t));
@@ -1350,53 +1688,67 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 
 	/* Now read all the registers into flt_stat */
 
-	MC_LOG("Reading registers of bank %d\n", bank);
-	/* patrol registers */
-	mc_read_ptrl_reg(mcp, bank, &flt_stat[0]);
+	for (i = 0; i < 2; i++) {
+		MC_LOG("Reading registers of bank %d\n", bank);
+		/* patrol registers */
+		mc_read_ptrl_reg(mcp, bank, &flt_stat[i]);
 
-	ASSERT(maddr);
-	maddr->mi_maddr = flt_stat[0].mf_flt_maddr;
+		ASSERT(maddr);
+		maddr->mi_maddr = flt_stat[i].mf_flt_maddr;
 
-	MC_LOG("ptrl registers cntl %x add %x log %x\n",
-		flt_stat[0].mf_cntl,
-		flt_stat[0].mf_err_add,
-		flt_stat[0].mf_err_log);
+		MC_LOG("ptrl registers cntl %x add %x log %x\n",
+			flt_stat[i].mf_cntl,
+			flt_stat[i].mf_err_add,
+			flt_stat[i].mf_err_log);
 
-	/* MI registers */
-	mc_read_mi_reg(mcp, bank, &mi_flt_stat[0]);
+		/* MI registers */
+		mc_read_mi_reg(mcp, bank, &mi_flt_stat[i]);
 
-	MC_LOG("MI registers cntl %x add %x log %x\n",
-		mi_flt_stat[0].mf_cntl,
-		mi_flt_stat[0].mf_err_add,
-		mi_flt_stat[0].mf_err_log);
+		MC_LOG("MI registers cntl %x add %x log %x\n",
+			mi_flt_stat[i].mf_cntl,
+			mi_flt_stat[i].mf_err_add,
+			mi_flt_stat[i].mf_err_log);
 
-	other_bank = bank^1;
-
-	MC_LOG("Reading registers of bank %d\n", other_bank);
-
-	ASSERT(mcp->mc_bank[other_bank].mcb_status & BANK_INSTALLED);
-
-	mc_read_ptrl_reg(mcp, other_bank, &flt_stat[1]);
-	MC_LOG("ptrl registers cntl %x add %x log %x\n",
-		flt_stat[1].mf_cntl,
-		flt_stat[1].mf_err_add,
-		flt_stat[1].mf_err_log);
-
-	/* MI registers */
-	mc_read_mi_reg(mcp, other_bank, &mi_flt_stat[1]);
-	MC_LOG("MI registers cntl %x add %x log %x\n",
-		mi_flt_stat[1].mf_cntl,
-		mi_flt_stat[1].mf_err_add,
-		mi_flt_stat[1].mf_err_log);
+		bank = bank^1;
+	}
 
 	/* clear errors once we read all the registers */
-	MAC_CLEAR_ERRS(mcp, other_bank,
+	MAC_CLEAR_ERRS(mcp, bank,
 		(MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
-	MAC_CLEAR_ERRS(mcp, bank, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
+	MAC_CLEAR_ERRS(mcp, bank ^ 1, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
-	/* Process PTRL errors first */
+	/* Process MI errors first */
 
+	/* if not error mode, cntl1 is 0 */
+	if ((mi_flt_stat[0].mf_err_add & MAC_ERR_ADD_INVALID) ||
+		(mi_flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
+		mi_flt_stat[0].mf_cntl = 0;
+
+	if ((mi_flt_stat[1].mf_err_add & MAC_ERR_ADD_INVALID) ||
+		(mi_flt_stat[1].mf_err_log & MAC_ERR_LOG_INVALID))
+		mi_flt_stat[1].mf_cntl = 0;
+
+	mc_aflt.mflt_is_ptrl = 0;
+	mi_valid = mc_process_error_mir(mcp, &mc_aflt, &mi_flt_stat[0]);
+
+	if ((((flt_stat[0].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
+		MAC_CNTL_PTRL_ERR_SHIFT) ==
+		((mi_flt_stat[0].mf_cntl & MAC_CNTL_MI_ERRS) >>
+		MAC_CNTL_MI_ERR_SHIFT)) &&
+		(flt_stat[0].mf_err_add == mi_flt_stat[0].mf_err_add) &&
+		(((flt_stat[1].mf_cntl & MAC_CNTL_PTRL_ERRS) >>
+		MAC_CNTL_PTRL_ERR_SHIFT) ==
+		((mi_flt_stat[1].mf_cntl & MAC_CNTL_MI_ERRS) >>
+		MAC_CNTL_MI_ERR_SHIFT)) &&
+		(flt_stat[1].mf_err_add == mi_flt_stat[1].mf_err_add)) {
+#ifdef DEBUG
+		MC_LOG("discarding PTRL error because "
+		    "it is the same as MI\n");
+#endif
+		maddr->mi_valid = mi_valid;
+		return;
+	}
 	/* if not error mode, cntl1 is 0 */
 	if ((flt_stat[0].mf_err_add & MAC_ERR_ADD_INVALID) ||
 		(flt_stat[0].mf_err_log & MAC_ERR_LOG_INVALID))
@@ -1408,11 +1760,7 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 
 	mc_aflt.mflt_is_ptrl = 1;
 	maddr->mi_valid = mc_process_error_mir(mcp, &mc_aflt, &flt_stat[0]);
-
-	mc_aflt.mflt_is_ptrl = 0;
-	mc_process_error_mir(mcp, &mc_aflt, &mi_flt_stat[0]);
 }
-
 static int
 mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
 	mc_flt_stat_t *flt_stat)
@@ -1460,12 +1808,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 {
 	mc_aflt_t mc_aflt;
 	mc_flt_stat_t flt_stat, mi_flt_stat;
-
-	if (mc_stop(mcp, bank)) {
-		cmn_err(CE_WARN, "Cannot stop Memory Patrol at /LSB%d/B%d\n",
-			mcp->mc_board_num, bank);
-		return;
-	}
+	int mi_valid;
 
 	bzero(&mc_aflt, sizeof (mc_aflt_t));
 	bzero(&flt_stat, sizeof (mc_flt_stat_t));
@@ -1488,6 +1831,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 	/* MI registers */
 	mc_read_mi_reg(mcp, bank, &mi_flt_stat);
 
+
 	MC_LOG("MI registers cntl %x add %x log %x\n",
 		mi_flt_stat.mf_cntl,
 		mi_flt_stat.mf_err_add,
@@ -1496,6 +1840,26 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 	/* clear errors once we read all the registers */
 	MAC_CLEAR_ERRS(mcp, bank, (MAC_CNTL_PTRL_ERRS|MAC_CNTL_MI_ERRS));
 
+	mc_aflt.mflt_is_ptrl = 0;
+	if ((mi_flt_stat.mf_cntl & MAC_CNTL_MI_ERRS) &&
+		((mi_flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
+		((mi_flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
+		mi_valid = mc_process_error(mcp, bank, &mc_aflt, &mi_flt_stat);
+	}
+
+	if ((((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) >>
+		MAC_CNTL_PTRL_ERR_SHIFT) ==
+		((mi_flt_stat.mf_cntl & MAC_CNTL_MI_ERRS) >>
+		MAC_CNTL_MI_ERR_SHIFT)) &&
+		(flt_stat.mf_err_add == mi_flt_stat.mf_err_add)) {
+#ifdef DEBUG
+		MC_LOG("discarding PTRL error because "
+		    "it is the same as MI\n");
+#endif
+		maddr->mi_valid = mi_valid;
+		return;
+	}
+
 	mc_aflt.mflt_is_ptrl = 1;
 	if ((flt_stat.mf_cntl & MAC_CNTL_PTRL_ERRS) &&
 		((flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
@@ -1503,14 +1867,7 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
 		maddr->mi_valid = mc_process_error(mcp, bank,
 			&mc_aflt, &flt_stat);
 	}
-	mc_aflt.mflt_is_ptrl = 0;
-	if ((mi_flt_stat.mf_cntl & MAC_CNTL_MI_ERRS) &&
-		((mi_flt_stat.mf_err_add & MAC_ERR_ADD_INVALID) == 0) &&
-		((mi_flt_stat.mf_err_log & MAC_ERR_LOG_INVALID) == 0)) {
-		mc_process_error(mcp, bank, &mc_aflt, &mi_flt_stat);
-	}
 }
-
 /*
  *	memory patrol error handling algorithm:
  *	timeout() is used to do periodic polling
@@ -1520,7 +1877,6 @@ mc_error_handler(mc_opl_t *mcp, int bank, mc_addr_info_t *maddr)
  *	    if memory bank is installed, read the status register
  *	    if any error bit is set,
  *	    -> mc_error_handler()
- *	        -> mc_stop()
  *		-> read all error regsiters
  *	        -> mc_process_error()
  *	            determine error type
@@ -1537,20 +1893,33 @@ mc_check_errors_func(mc_opl_t *mcp)
 	mc_addr_info_t maddr_info;
 	int i, error_count = 0;
 	uint32_t stat, cntl;
+	int running;
 
 	/*
 	 * scan errors.
 	 */
+	if (mcp->mc_status & MC_MEMORYLESS)
+		return;
+
 	for (i = 0; i < BANKNUM_PER_SB; i++) {
 		if (mcp->mc_bank[i].mcb_status & BANK_INSTALLED) {
 			stat = ldphysio(MAC_PTRL_STAT(mcp, i));
 			cntl = ldphysio(MAC_PTRL_CNTL(mcp, i));
+			running = cntl & MAC_CNTL_PTRL_START;
+
 			if (cntl & MAC_CNTL_PTRL_ADD_MAX) {
-				mcp->mc_period++;
+				mcp->mc_period[i]++;
 				MC_LOG("mc period %ld on "
-				    "/LSB%d/B%d\n", mcp->mc_period,
+				    "/LSB%d/B%d\n", mcp->mc_period[i],
 				    mcp->mc_board_num, i);
 				MAC_CLEAR_MAX(mcp, i);
+				if (mcp->mc_speedup_period[i] > 0) {
+				/* If patrol is stoppped, we fall through */
+					if (--mcp->mc_speedup_period[i] == 0 &&
+						running) {
+					    MAC_CMD(mcp, i, 0);
+					}
+				}
 			}
 			if (mc_debug_show_all) {
 				MC_LOG("/LSB%d/B%d stat %x cntl %x\n",
@@ -1558,56 +1927,78 @@ mc_check_errors_func(mc_opl_t *mcp)
 					stat, cntl);
 			}
 			if (stat & (MAC_STAT_PTRL_ERRS|MAC_STAT_MI_ERRS)) {
-				maddr_info.mi_valid = 0;
-				maddr_info.mi_advance = 1;
-				if (IS_MIRROR(mcp, i))
+				if (running) {
+				    MC_LOG("patrol running /LSB%d/B%d\n",
+						mcp->mc_board_num, i);
+				}
+				if (running) {
+					/* speed up the scanning */
+					mcp->mc_speedup_period[i] = 2;
+					MAC_CMD(mcp, i, 0);
+				} else {
+				    mcp->mc_speedup_period[i] = 0;
+				    maddr_info.mi_valid = 0;
+				    maddr_info.mi_advance = 1;
+				    if (IS_MIRROR(mcp, i))
 					mc_error_handler_mir(mcp, i,
 						&maddr_info);
-				else
+				    else
 					mc_error_handler(mcp, i, &maddr_info);
 
-				error_count++;
-				restart_patrol(mcp, i, &maddr_info);
+				    error_count++;
+				    restart_patrol(mcp, i, &maddr_info);
+				}
 			} else {
 				restart_patrol(mcp, i, NULL);
 			}
 		}
 	}
-	mc_process_scf_log(mcp);
 	if (error_count > 0)
 		mcp->mc_last_error += error_count;
 	else
 		mcp->mc_last_error = 0;
 }
 
-/* this is just a wrapper for the above func */
+/*
+ * mc_polling -- Check errors for only one instance,
+ * but process errors for all instances to make sure we drain the errors
+ * faster than they can be accumulated.
+ *
+ * Polling on each board should be done only once per each
+ * mc_patrol_interval_sec.  This is equivalent to setting mc_tick_left
+ * to OPL_MAX_BOARDS and decrement by 1 on each timeout.
+ * Once mc_tick_left becomes negative, the board becomes a candidate
+ * for polling because it has waited for at least
+ * mc_patrol_interval_sec's long.    If mc_timeout_period is calculated
+ * differently, this has to beupdated accordingly.
+ */
 
 static void
-mc_check_errors(void *arg)
+mc_polling(void)
 {
-	mc_opl_t *mcp = (mc_opl_t *)arg;
-	clock_t interval;
+	int i, scan_error;
+	mc_opl_t *mcp;
 
-	/*
-	 * scan errors.
-	 */
-	mutex_enter(&mcp->mc_lock);
-	mcp->mc_tid = 0;
-	if ((mcp->mc_status & MC_POLL_RUNNING) &&
-		!(mcp->mc_status & MC_SOFT_SUSPENDED)) {
-		mc_check_errors_func(mcp);
 
-		if (mcp->mc_last_error > 0) {
-			interval = (mcp->mc_interval_hz) >> mcp->mc_last_error;
-			if (interval < 1)
-				interval = 1;
-		} else
-			interval = mcp->mc_interval_hz;
-
-		mcp->mc_tid = timeout(mc_check_errors, mcp,
-		    interval);
+	scan_error = 1;
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		mutex_enter(&mcmutex);
+		if ((mcp = mc_instances[i]) == NULL) {
+			mutex_exit(&mcmutex);
+			continue;
+		}
+		mutex_enter(&mcp->mc_lock);
+		mutex_exit(&mcmutex);
+		if (scan_error && mcp->mc_tick_left <= 0) {
+			mc_check_errors_func((void *)mcp);
+			mcp->mc_tick_left = OPL_MAX_BOARDS;
+			scan_error = 0;
+		} else {
+			mcp->mc_tick_left--;
+		}
+		mc_process_scf_log(mcp);
+		mutex_exit(&mcp->mc_lock);
 	}
-	mutex_exit(&mcp->mc_lock);
 }
 
 static void
@@ -1805,11 +2196,12 @@ int
 mc_board_add(mc_opl_t *mcp)
 {
 	struct mc_addr_spec *macaddr;
-	int len, i, bk, cc;
+	cs_status_t *cs_status;
+	int len, len1, i, bk, cc;
 	mc_addr_info_t maddr;
 	uint32_t mirr;
-
-	mutex_init(&mcp->mc_lock, NULL, MUTEX_DRIVER, NULL);
+	int nbanks = 0;
+	uint64_t nbytes = 0;
 
 	/*
 	 * Get configurations from "pseudo-mc" node which includes:
@@ -1821,13 +2213,16 @@ mc_board_add(mc_opl_t *mcp)
 	mcp->mc_board_num = (int)ddi_getprop(DDI_DEV_T_ANY, mcp->mc_dip,
 		DDI_PROP_DONTPASS, "board#", -1);
 
+	if (mcp->mc_board_num == -1) {
+		return (DDI_FAILURE);
+	}
+
 	/*
 	 * Get start address in this CAB. It can be gotten from
 	 * "sb-mem-ranges" property.
 	 */
 
 	if (get_base_address(mcp) == DDI_FAILURE) {
-		mutex_destroy(&mcp->mc_lock);
 		return (DDI_FAILURE);
 	}
 	/* get mac-pa trans tables */
@@ -1850,9 +2245,98 @@ mc_board_add(mc_opl_t *mcp)
 		"mc-addr", (caddr_t)&macaddr, &len);
 	if (cc != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "Cannot get mc-addr. err=%d\n", cc);
-		mutex_destroy(&mcp->mc_lock);
 		return (DDI_FAILURE);
 	}
+
+	cc = ddi_getlongprop(DDI_DEV_T_ANY, mcp->mc_dip, DDI_PROP_DONTPASS,
+		"cs-status", (caddr_t)&cs_status, &len1);
+
+	if (cc != DDI_SUCCESS) {
+		if (len > 0)
+			kmem_free(macaddr, len);
+		cmn_err(CE_WARN, "Cannot get cs-status. err=%d\n", cc);
+		return (DDI_FAILURE);
+	}
+
+	mutex_init(&mcp->mc_lock, NULL, MUTEX_DRIVER, NULL);
+
+	for (i = 0; i < len1 / sizeof (cs_status_t); i++) {
+		nbytes += ((uint64_t)cs_status[i].cs_avail_hi << 32) |
+			((uint64_t)cs_status[i].cs_avail_low);
+	}
+	if (len1 > 0)
+		kmem_free(cs_status, len1);
+	nbanks = len / sizeof (struct mc_addr_spec);
+
+	if (nbanks > 0)
+		nbytes /= nbanks;
+	else {
+		/* No need to free macaddr because len must be 0 */
+		mcp->mc_status |= MC_MEMORYLESS;
+		return (DDI_SUCCESS);
+	}
+
+	for (i = 0; i < BANKNUM_PER_SB; i++) {
+		mcp->mc_scf_retry[i] = 0;
+		mcp->mc_period[i] = 0;
+		mcp->mc_speedup_period[i] = 0;
+	}
+
+	/*
+	 * Get the memory size here. Let it be B (bytes).
+	 * Let T be the time in u.s. to scan 64 bytes.
+	 * If we want to complete 1 round of scanning in P seconds.
+	 *
+	 *	B * T * 10^(-6)	= P
+	 *	---------------
+	 *		64
+	 *
+	 *	T = P * 64 * 10^6
+	 *	    -------------
+	 *		B
+	 *
+	 *	  = P * 64 * 10^6
+	 *	    -------------
+	 *		B
+	 *
+	 *	The timing bits are set in PTRL_CNTL[28:26] where
+	 *
+	 *	0	- 1 m.s
+	 *	1	- 512 u.s.
+	 *	10	- 256 u.s.
+	 *	11	- 128 u.s.
+	 *	100	- 64 u.s.
+	 *	101	- 32 u.s.
+	 *	110	- 0 u.s.
+	 *	111	- reserved.
+	 *
+	 *
+	 *	a[0] = 110, a[1] = 101, ... a[6] = 0
+	 *
+	 *	cs-status property is int x 7
+	 *	0 - cs#
+	 *	1 - cs-status
+	 *	2 - cs-avail.hi
+	 *	3 - cs-avail.lo
+	 *	4 - dimm-capa.hi
+	 *	5 - dimm-capa.lo
+	 *	6 - #of dimms
+	 */
+
+	if (nbytes > 0) {
+		int i;
+		uint64_t ms;
+		ms = ((uint64_t)mc_scan_period * 64 * 1000000)/nbytes;
+		mcp->mc_speed = mc_scan_speeds[MC_MAX_SPEEDS - 1].mc_speeds;
+		for (i = 0; i < MC_MAX_SPEEDS - 1; i++) {
+			if (ms < mc_scan_speeds[i + 1].mc_period) {
+				mcp->mc_speed = mc_scan_speeds[i].mc_speeds;
+				break;
+			}
+		}
+	} else
+		mcp->mc_speed = 0;
+
 
 	for (i = 0; i < len / sizeof (struct mc_addr_spec); i++) {
 		struct mc_bank *bankp;
@@ -1897,7 +2381,10 @@ mc_board_add(mc_opl_t *mcp)
 			MC_LOG("Starting up /LSB%d/B%d\n",
 				mcp->mc_board_num, bk);
 			get_ptrl_start_address(mcp, bk, &maddr.mi_maddr);
-			maddr.mi_valid = 1;
+			maddr.mi_maddr.ma_bd = mcp->mc_board_num;
+			maddr.mi_maddr.ma_bank = bk;
+			maddr.mi_maddr.ma_dimm_addr = 0;
+			maddr.mi_valid = 0;
 			maddr.mi_advance = 0;
 			restart_patrol(mcp, bk, &maddr);
 		} else {
@@ -1906,21 +2393,18 @@ mc_board_add(mc_opl_t *mcp)
 		}
 		bankp->mcb_status |= BANK_PTRL_RUNNING;
 	}
-	kmem_free(macaddr, len);
+	if (len > 0)
+		kmem_free(macaddr, len);
+
+	mcp->mc_dimm_list = mc_get_dimm_list(mcp);
 
 	/*
 	 * set interval in HZ.
 	 */
-	for (i = 0; i < BANKNUM_PER_SB; i++) {
-		mcp->mc_scf_retry[i] = 0;
-	}
 	mcp->mc_last_error = 0;
-	mcp->mc_period = 0;
 
-	mcp->mc_interval_hz = drv_usectohz(mc_patrol_interval_sec * 1000000);
 	/* restart memory patrol checking */
 	mcp->mc_status |= MC_POLL_RUNNING;
-	mcp->mc_tid = timeout(mc_check_errors, mcp, mcp->mc_interval_hz);
 
 	return (DDI_SUCCESS);
 }
@@ -1930,18 +2414,18 @@ mc_board_del(mc_opl_t *mcp)
 {
 	int i;
 	scf_log_t *p;
-	timeout_id_t tid = 0;
 
 	/*
 	 * cleanup mac state
 	 */
 	mutex_enter(&mcp->mc_lock);
+	if (mcp->mc_status & MC_MEMORYLESS) {
+		mutex_exit(&mcp->mc_lock);
+		mutex_destroy(&mcp->mc_lock);
+		return (DDI_SUCCESS);
+	}
 	for (i = 0; i < BANKNUM_PER_SB; i++) {
 		if (mcp->mc_bank[i].mcb_status & BANK_INSTALLED) {
-			if (mc_stop(mcp, i)) {
-				mutex_exit(&mcp->mc_lock);
-				return (-1);
-			}
 			mcp->mc_bank[i].mcb_status &= ~BANK_INSTALLED;
 		}
 	}
@@ -1949,23 +2433,24 @@ mc_board_del(mc_opl_t *mcp)
 	/* stop memory patrol checking */
 	if (mcp->mc_status & MC_POLL_RUNNING) {
 		mcp->mc_status &= ~MC_POLL_RUNNING;
-		tid = mcp->mc_tid;
-		mcp->mc_tid = 0;
 	}
 
 	/* just throw away all the scf logs */
-	while ((p = mcp->mc_scf_log) != NULL) {
-		mcp->mc_scf_log = p->sl_next;
-		mcp->mc_scf_total--;
+	for (i = 0; i < BANKNUM_PER_SB; i++) {
+	    while ((p = mcp->mc_scf_log[i]) != NULL) {
+		mcp->mc_scf_log[i] = p->sl_next;
+		mcp->mc_scf_total[i]--;
 		kmem_free(p, sizeof (scf_log_t));
+	    }
 	}
 
 	if (mcp->mlist)
 		mc_memlist_delete(mcp->mlist);
 
+	if (mcp->mc_dimm_list)
+		mc_free_dimm_list(mcp->mc_dimm_list);
+
 	mutex_exit(&mcp->mc_lock);
-	if (tid)
-		(void) untimeout(tid);
 
 	mutex_destroy(&mcp->mc_lock);
 	return (DDI_SUCCESS);
@@ -1974,27 +2459,18 @@ mc_board_del(mc_opl_t *mcp)
 int
 mc_suspend(mc_opl_t *mcp, uint32_t flag)
 {
-	timeout_id_t tid = 0;
-	int i;
 	/* stop memory patrol checking */
 	mutex_enter(&mcp->mc_lock);
+	if (mcp->mc_status & MC_MEMORYLESS) {
+		mutex_exit(&mcp->mc_lock);
+		return (DDI_SUCCESS);
+	}
+
 	if (mcp->mc_status & MC_POLL_RUNNING) {
-		for (i = 0; i < BANKNUM_PER_SB; i++) {
-			if (mcp->mc_bank[i].mcb_status & BANK_INSTALLED) {
-				if (mc_stop(mcp, i)) {
-					mutex_exit(&mcp->mc_lock);
-					return (-1);
-				}
-			}
-		}
 		mcp->mc_status &= ~MC_POLL_RUNNING;
-		tid = mcp->mc_tid;
 	}
 	mcp->mc_status |= flag;
-	mcp->mc_tid = 0;
 	mutex_exit(&mcp->mc_lock);
-	if (tid)
-		(void) untimeout(tid);
 
 	return (DDI_SUCCESS);
 }
@@ -2008,6 +2484,10 @@ mc_resume(mc_opl_t *mcp, uint32_t flag)
 	uint64_t basepa;
 
 	mutex_enter(&mcp->mc_lock);
+	if (mcp->mc_status & MC_MEMORYLESS) {
+		mutex_exit(&mcp->mc_lock);
+		return (DDI_SUCCESS);
+	}
 	basepa = mcp->mc_start_address;
 	if (get_base_address(mcp) == DDI_FAILURE) {
 		mutex_exit(&mcp->mc_lock);
@@ -2022,7 +2502,6 @@ mc_resume(mc_opl_t *mcp, uint32_t flag)
 	}
 
 	mcp->mc_status &= ~flag;
-	mcp->mc_list->mc_start_address = mcp->mc_start_address;
 
 	if (mcp->mc_status & (MC_SOFT_SUSPENDED | MC_DRIVER_SUSPENDED)) {
 		mutex_exit(&mcp->mc_lock);
@@ -2037,8 +2516,6 @@ mc_resume(mc_opl_t *mcp, uint32_t flag)
 				restart_patrol(mcp, i, NULL);
 			}
 		}
-		/* check error asap */
-		mcp->mc_tid = timeout(mc_check_errors, mcp, 1);
 	}
 	mutex_exit(&mcp->mc_lock);
 
@@ -2048,16 +2525,20 @@ mc_resume(mc_opl_t *mcp, uint32_t flag)
 static mc_opl_t *
 mc_pa_to_mcp(uint64_t pa)
 {
-	mc_inst_list_t *p;
+	mc_opl_t *mcp;
+	int i;
+
 	ASSERT(MUTEX_HELD(&mcmutex));
-	for (p = mc_instances; p; p = p->next) {
-		/* if mac patrol is suspended, we cannot rely on it */
-		if (!(p->mc_opl->mc_status & MC_POLL_RUNNING) ||
-			(p->mc_opl->mc_status & MC_SOFT_SUSPENDED))
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
 			continue;
-		if ((p->mc_start_address <= pa) &&
-			(pa < (p->mc_start_address + p->mc_size))) {
-			return (p->mc_opl);
+		/* if mac patrol is suspended, we cannot rely on it */
+		if (!(mcp->mc_status & MC_POLL_RUNNING) ||
+			(mcp->mc_status & MC_SOFT_SUSPENDED))
+			continue;
+		if ((mcp->mc_start_address <= pa) &&
+			(pa < (mcp->mc_start_address + mcp->mc_size))) {
+			return (mcp);
 		}
 	}
 	return (NULL);
@@ -2082,9 +2563,11 @@ int
 mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 	int *lenp)
 {
-	mc_opl_t *mcp;
-	int bank;
+	int i;
 	int sb;
+	int bank;
+	mc_opl_t *mcp;
+	char memb_num;
 
 	mutex_enter(&mcmutex);
 
@@ -2108,93 +2591,82 @@ mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
 		return (ENXIO);
 	}
 
-	if (snprintf(buf, buflen, "/CMU%d/B%d", sb, bank) >= buflen) {
-		mutex_exit(&mcmutex);
-		return (ENOSPC);
+	if (plat_model == MODEL_DC) {
+		i = BD_BK_SLOT_TO_INDEX(0, bank, 0);
+		snprintf(buf, buflen, "/%s%02d/MEM%s MEM%s MEM%s MEM%s",
+		    model_names[plat_model].unit_name, sb,
+		    mc_dc_dimm_unum_table[i], mc_dc_dimm_unum_table[i + 1],
+		    mc_dc_dimm_unum_table[i + 2], mc_dc_dimm_unum_table[i + 3]);
 	} else {
-		if (lenp)
-			*lenp = strlen(buf);
+		i = BD_BK_SLOT_TO_INDEX(sb, bank, 0);
+		memb_num = mc_ff_dimm_unum_table[i][0];
+		snprintf(buf, buflen, "/%s/%s%c/MEM%s MEM%s MEM%s MEM%s",
+		    model_names[plat_model].unit_name,
+		    model_names[plat_model].mem_name, memb_num,
+		    &mc_ff_dimm_unum_table[i][1],
+
+		    &mc_ff_dimm_unum_table[i + 1][1],
+		    &mc_ff_dimm_unum_table[i + 2][1],
+		    &mc_ff_dimm_unum_table[i + 3][1]);
+	}
+	if (lenp) {
+		*lenp = strlen(buf);
 	}
 	mutex_exit(&mcmutex);
 	return (0);
 }
 
 int
-opl_mc_suspend()
+opl_mc_suspend(void)
 {
 	mc_opl_t *mcp;
-	mc_inst_list_t *p;
+	int i;
 
 	mutex_enter(&mcmutex);
-
-	for (p = mc_instances; p; p = p->next) {
-		mcp = p->mc_opl;
-		(void) mc_suspend(mcp, MC_SOFT_SUSPENDED);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mc_suspend(mcp, MC_SOFT_SUSPENDED);
 	}
-
 	mutex_exit(&mcmutex);
+
 	return (0);
 }
 
 int
-opl_mc_resume()
+opl_mc_resume(void)
 {
 	mc_opl_t *mcp;
-	mc_inst_list_t *p;
+	int i;
 
 	mutex_enter(&mcmutex);
-
-	for (p = mc_instances; p; p = p->next) {
-		mcp = p->mc_opl;
-		(void) mc_resume(mcp, MC_SOFT_SUSPENDED);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mc_resume(mcp, MC_SOFT_SUSPENDED);
 	}
-
 	mutex_exit(&mcmutex);
+
 	return (0);
 }
-
 static void
 insert_mcp(mc_opl_t *mcp)
 {
-	mc_inst_list_t	*p;
-
-	p = kmem_zalloc(sizeof (mc_inst_list_t), KM_SLEEP);
-	p->mc_opl = mcp;
-	p->mc_board_num = mcp->mc_board_num;
-	p->mc_start_address = mcp->mc_start_address;
-	p->mc_size = mcp->mc_size;
-	mcp->mc_list = p;
-
 	mutex_enter(&mcmutex);
-
-	p->next = mc_instances;
-	mc_instances = p;
-
+	if (mc_instances[mcp->mc_board_num] != NULL) {
+		MC_LOG("mc-opl instance for board# %d already exists\n",
+			mcp->mc_board_num);
+	}
+	mc_instances[mcp->mc_board_num] = mcp;
 	mutex_exit(&mcmutex);
 }
 
 static void
 delete_mcp(mc_opl_t *mcp)
 {
-	mc_inst_list_t *prev, *current;
-	mc_inst_list_t *p;
-
-	p = mcp->mc_list;
-
-	if (mc_instances == p) {
-		mc_instances = p->next;
-		kmem_free(p, sizeof (mc_inst_list_t));
-		return;
-	}
-	prev = mc_instances;
-	for (current = mc_instances; current != NULL; current = current->next) {
-		if (current == p) {
-			prev->next = p->next;
-			kmem_free(p, sizeof (mc_inst_list_t));
-			return;
-		}
-		prev = current;
-	}
+	mutex_enter(&mcmutex);
+	mc_instances[mcp->mc_board_num] = 0;
+	mutex_exit(&mcmutex);
 }
 
 /* Error injection interface */
@@ -2217,7 +2689,6 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	MC_LOG("HW mc_inject_error(%x, %lx, %x)\n", error_type, pa, flags);
 
 	mutex_enter(&mcmutex);
-
 	if ((mcp = mc_pa_to_mcp(pa)) == NULL) {
 		mutex_exit(&mcmutex);
 		MC_LOG("mc_inject_error: invalid pa\n");
@@ -2285,7 +2756,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		if (flags & MC_INJECT_FLAG_PATH) {
 			cntl = MAC_EG_ADD_FIX
 				|MAC_EG_FORCE_READ00|MAC_EG_FORCE_READ16
-				|MAC_EG_DERR_ONCE;
+				|MAC_EG_RDERR_ONCE;
 		} else {
 			cntl = MAC_EG_ADD_FIX|MAC_EG_FORCE_DERR00
 				|MAC_EG_FORCE_DERR16|MAC_EG_DERR_ONCE;
@@ -2297,7 +2768,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		if (flags & MC_INJECT_FLAG_PATH) {
 			cntl = MAC_EG_ADD_FIX
 				|MAC_EG_FORCE_READ00
-				|MAC_EG_DERR_ONCE;
+				|MAC_EG_RDERR_ONCE;
 		} else {
 			cntl = MAC_EG_ADD_FIX
 				|MAC_EG_FORCE_DERR16
@@ -2310,7 +2781,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		if (flags & MC_INJECT_FLAG_PATH) {
 			cntl = MAC_EG_ADD_FIX
 				|MAC_EG_FORCE_READ00
-				|MAC_EG_DERR_ALWAYS;
+				|MAC_EG_RDERR_ALWAYS;
 		} else {
 			cntl = MAC_EG_ADD_FIX
 				|MAC_EG_FORCE_DERR16
@@ -2361,8 +2832,6 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 		cpu_flush_ecache();
 	}
 
-	delay(inject_op_delay * drv_usectohz(1000 * 1000));
-
 
 	if (flags & MC_INJECT_FLAG_LD) {
 		if (flags & MC_INJECT_FLAG_NO_TRAP) {
@@ -2383,15 +2852,7 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	}
 
 	if (flags & MC_INJECT_FLAG_RESTART) {
-		delay(inject_op_delay * drv_usectohz(1000 * 1000));
-
 		MC_LOG("Restart patrol\n");
-		if (mc_stop(mcp, bank)) {
-			cmn_err(CE_WARN, "Cannot stop Memory Patrol at "
-				"/LSB%d/B%d\n", mcp->mc_board_num, bank);
-			mutex_exit(&mcp->mc_lock);
-			return (EIO);
-		}
 		maddr.mi_maddr.ma_bd = mcp->mc_board_num;
 		maddr.mi_maddr.ma_bank = bank;
 		maddr.mi_maddr.ma_dimm_addr = dimm_addr;
@@ -2401,21 +2862,29 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	}
 
 	if (flags & MC_INJECT_FLAG_POLL) {
-		delay(inject_op_delay * drv_usectohz(1000 * 1000));
+		int running;
 
 		MC_LOG("Poll patrol error\n");
 		stat = LD_MAC_REG(MAC_PTRL_STAT(mcp, bank));
 		cntl = LD_MAC_REG(MAC_PTRL_CNTL(mcp, bank));
+		running = cntl & MAC_CNTL_PTRL_START;
 		if (stat & (MAC_STAT_PTRL_ERRS|MAC_STAT_MI_ERRS)) {
-			maddr.mi_valid = 0;
-			maddr.mi_advance = 1;
-			if (IS_MIRROR(mcp, bank))
-				mc_error_handler_mir(mcp, bank,
-					&maddr);
-			else
-				mc_error_handler(mcp, bank, &maddr);
+			if (running) {
+				/* speed up the scanning */
+				mcp->mc_speedup_period[bank] = 2;
+				MAC_CMD(mcp, bank, 0);
+			} else {
+				mcp->mc_speedup_period[bank] = 0;
+				maddr.mi_valid = 0;
+				maddr.mi_advance = 1;
+				if (IS_MIRROR(mcp, bank))
+					mc_error_handler_mir(mcp, bank,
+						&maddr);
+				else
+					mc_error_handler(mcp, bank, &maddr);
 
-			restart_patrol(mcp, bank, &maddr);
+				restart_patrol(mcp, bank, &maddr);
+			}
 		} else
 			restart_patrol(mcp, bank, NULL);
 	}
@@ -2423,12 +2892,20 @@ mc_inject_error(int error_type, uint64_t pa, uint32_t flags)
 	mutex_exit(&mcp->mc_lock);
 	return (0);
 }
-
 void
 mc_stphysio(uint64_t pa, uint32_t data)
 {
+#ifndef lint
+	uint32_t dummy;
+#endif
+
 	MC_LOG("0x%x -> pa(%lx)\n", data, pa);
 	stphysio(pa, data);
+
+	/* force the above write to be processed by mac patrol */
+#ifndef lint
+	dummy = ldphysio(pa);
+#endif
 }
 
 uint32_t
@@ -2440,3 +2917,547 @@ mc_ldphysio(uint64_t pa)
 	MC_LOG("pa(%lx) = 0x%x\n", pa, rv);
 	return (rv);
 }
+
+#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
+
+/*
+ * parse_unum_memory -- extract the board number and the DIMM name from
+ * the unum.
+ *
+ * Return 0 for success and non-zero for a failure.
+ */
+int
+parse_unum_memory(char *unum, int *board, char *dname)
+{
+	char *c;
+	char x, y, z;
+
+	if ((c = strstr(unum, "CMU")) != NULL) {
+		/* DC Model */
+		c += 3;
+		*board = (uint8_t)stoi(&c);
+		if ((c = strstr(c, "MEM")) == NULL) {
+			return (1);
+		}
+		c += 3;
+		if (strlen(c) < 3) {
+			return (2);
+		}
+		if ((!isdigit(c[0])) || (!(isdigit(c[1]))) ||
+		    ((c[2] != 'A') && (c[2] != 'B'))) {
+			return (3);
+		}
+		x = c[0];
+		y = c[1];
+		z = c[2];
+	} else if ((c = strstr(unum, "MBU_")) != NULL) {
+		/*  FF1/FF2 Model */
+		c += 4;
+		if ((c[0] != 'A') && (c[0] != 'B')) {
+			return (4);
+		}
+		if ((c = strstr(c, "MEMB")) == NULL) {
+			return (5);
+		}
+		c += 4;
+
+		x = c[0];
+		*board =  ((uint8_t)stoi(&c)) / 4;
+		if ((c = strstr(c, "MEM")) == NULL) {
+			return (6);
+		}
+		c += 3;
+		if (strlen(c) < 2) {
+			return (7);
+		}
+		if ((!isdigit(c[0])) || ((c[1] != 'A') && (c[1] != 'B'))) {
+			return (8);
+		}
+		y = c[0];
+		z = c[1];
+	} else {
+		return (9);
+	}
+	if (*board < 0) {
+		return (10);
+	}
+	dname[0] = x;
+	dname[1] = y;
+	dname[2] = z;
+	dname[3] = '\0';
+	return (0);
+}
+
+/*
+ * mc_get_mem_sid_dimm -- Get the serial-ID for a given board and
+ * the DIMM name.
+ */
+int
+mc_get_mem_sid_dimm(mc_opl_t *mcp, char *dname, char *buf,
+    int buflen, int *lenp)
+{
+	int		ret = ENODEV;
+	mc_dimm_info_t	*d = NULL;
+
+	if ((d = mcp->mc_dimm_list) == NULL)
+		return (ENOTSUP);
+
+	for (; d != NULL; d = d->md_next) {
+		if (strcmp(d->md_dimmname, dname) == 0) {
+			break;
+		}
+	}
+	if (d != NULL) {
+		*lenp = strlen(d->md_serial) + strlen(d->md_partnum);
+		if (buflen <=  *lenp) {
+			cmn_err(CE_WARN, "mc_get_mem_sid_dimm: "
+			    "buflen is smaller than %d\n", *lenp);
+			ret = ENOSPC;
+		} else {
+			snprintf(buf, buflen, "%s:%s",
+			    d->md_serial, d->md_partnum);
+			ret = 0;
+		}
+	}
+	MC_LOG("mc_get_mem_sid_dimm: Ret=%d Name=%s Serial-ID=%s\n",
+	    ret, dname, (ret == 0) ? buf : "");
+	return (ret);
+}
+
+int
+mc_set_mem_sid(mc_opl_t *mcp, char *buf, int buflen, int lsb,
+    int bank, uint32_t mf_type, uint32_t d_slot)
+{
+	int	sb;
+	int	lenp = buflen;
+	int	id;
+	int	ret;
+	char	*dimmnm;
+
+	if ((sb = mc_opl_get_physical_board(lsb)) < 0) {
+		return (ENODEV);
+	}
+
+	if (mf_type == FLT_TYPE_PERMANENT_CE) {
+		if (plat_model == MODEL_DC) {
+			id = BD_BK_SLOT_TO_INDEX(0, bank, d_slot);
+		} else {
+			id = BD_BK_SLOT_TO_INDEX(sb, bank, d_slot);
+		}
+		dimmnm = mc_dc_dimm_unum_table[id];
+		if ((ret = mc_get_mem_sid_dimm(mcp, dimmnm, buf, buflen,
+		    &lenp)) != 0) {
+			return (ret);
+		}
+	} else {
+		return (1);
+	}
+
+	return (0);
+}
+
+/*
+ * mc_get_mem_sid -- get the DIMM serial-ID corresponding to the unum.
+ */
+int
+mc_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{
+	int	i;
+	int	ret = ENODEV;
+	int	board;
+	char	dname[MCOPL_MAX_DIMMNAME + 1];
+	mc_opl_t *mcp;
+
+	MC_LOG("mc_get_mem_sid: unum=%s buflen=%d\n", unum, buflen);
+	if ((ret = parse_unum_memory(unum, &board, dname)) != 0) {
+		MC_LOG("mc_get_mem_sid: unum(%s) parsing failed ret=%d\n",
+		    unum, ret);
+		return (EINVAL);
+	}
+
+	if (board < 0) {
+		MC_LOG("mc_get_mem_sid: Invalid board=%d dimm=%s\n",
+		    board, dname);
+		return (EINVAL);
+	}
+
+	mutex_enter(&mcmutex);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mutex_enter(&mcp->mc_lock);
+		if (mcp->mc_board_num == board) {
+			ret = mc_get_mem_sid_dimm(mcp, dname, buf,
+			    buflen, lenp);
+			mutex_exit(&mcp->mc_lock);
+			break;
+		}
+		mutex_exit(&mcp->mc_lock);
+	}
+	mutex_exit(&mcmutex);
+	return (ret);
+}
+
+/*
+ * mc_get_mem_offset -- get the offset in a DIMM for a given physical address.
+ */
+int
+mc_get_mem_offset(uint64_t paddr, uint64_t *offp)
+{
+	int		i;
+	int		ret = ENODEV;
+	mc_addr_t	maddr;
+	mc_opl_t	*mcp;
+
+	mutex_enter(&mcmutex);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mutex_enter(&mcp->mc_lock);
+		if (!pa_is_valid(mcp, paddr)) {
+			mutex_exit(&mcp->mc_lock);
+			continue;
+		}
+		if (pa_to_maddr(mcp, paddr, &maddr) == 0) {
+			*offp = maddr.ma_dimm_addr;
+			ret = 0;
+		}
+		mutex_exit(&mcp->mc_lock);
+	}
+	mutex_exit(&mcmutex);
+	MC_LOG("mc_get_mem_offset: Ret=%d paddr=0x%lx offset=0x%lx\n",
+	    ret, paddr, *offp);
+	return (ret);
+}
+
+/*
+ * dname_to_bankslot - Get the bank and slot number from the DIMM name.
+ */
+int
+dname_to_bankslot(char *dname, int *bank, int *slot)
+{
+	int i;
+	int tsz;
+	char **tbl;
+
+	if (plat_model == MODEL_DC) { /* DC */
+		tbl = mc_dc_dimm_unum_table;
+		tsz = OPL_MAX_DIMMS;
+	} else {
+		tbl = mc_ff_dimm_unum_table;
+		tsz = 2 * OPL_MAX_DIMMS;
+	}
+
+	for (i = 0; i < tsz; i++) {
+		if (strcmp(dname,  tbl[i]) == 0) {
+			break;
+		}
+	}
+	if (i == tsz) {
+		return (1);
+	}
+	*bank = INDEX_TO_BANK(i);
+	*slot = INDEX_TO_SLOT(i);
+	return (0);
+}
+
+/*
+ * mc_get_mem_addr -- get the physical address of a DIMM corresponding
+ * to the unum and sid.
+ */
+int
+mc_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *paddr)
+{
+	int	board;
+	int	bank;
+	int	slot;
+	int	i;
+	int	ret = ENODEV;
+	char	dname[MCOPL_MAX_DIMMNAME + 1];
+	mc_addr_t maddr;
+	mc_opl_t *mcp;
+
+	MC_LOG("mc_get_mem_addr: unum=%s sid=%s offset=0x%lx\n",
+	    unum, sid, offset);
+	if (parse_unum_memory(unum, &board, dname) != 0) {
+		MC_LOG("mc_get_mem_sid: unum(%s) parsing failed ret=%d\n",
+		    unum, ret);
+		return (EINVAL);
+	}
+
+	if (board < 0) {
+		MC_LOG("mc_get_mem_addr: Invalid board=%d dimm=%s\n",
+		    board, dname);
+		return (EINVAL);
+	}
+
+	mutex_enter(&mcmutex);
+	for (i = 0; i < OPL_MAX_BOARDS; i++) {
+		if ((mcp = mc_instances[i]) == NULL)
+			continue;
+		mutex_enter(&mcp->mc_lock);
+		if (mcp->mc_board_num != board) {
+			mutex_exit(&mcp->mc_lock);
+			continue;
+		}
+
+		ret = dname_to_bankslot(dname, &bank, &slot);
+		MC_LOG("mc_get_mem_addr: bank=%d slot=%d\n", bank, slot);
+		if (ret != 0) {
+			MC_LOG("mc_get_mem_addr: dname_to_bankslot failed\n");
+			ret = ENODEV;
+		} else {
+			maddr.ma_bd = board;
+			maddr.ma_bank =  bank;
+			maddr.ma_dimm_addr = offset;
+			ret = mcaddr_to_pa(mcp, &maddr, paddr);
+			if (ret != 0) {
+				MC_LOG("mc_get_mem_addr: "
+				    "mcaddr_to_pa failed\n");
+				ret = ENODEV;
+			}
+		}
+		mutex_exit(&mcp->mc_lock);
+	}
+	mutex_exit(&mcmutex);
+	MC_LOG("mc_get_mem_addr: Ret=%d, Paddr=0x%lx\n", ret, *paddr);
+	return (ret);
+}
+
+static void
+mc_free_dimm_list(mc_dimm_info_t *d)
+{
+	mc_dimm_info_t *next;
+
+	while (d != NULL) {
+		next = d->md_next;
+		kmem_free(d, sizeof (mc_dimm_info_t));
+		d = next;
+	}
+}
+
+/*
+ * mc_get_dimm_list -- get the list of dimms with serial-id info
+ * from the SP.
+ */
+mc_dimm_info_t *
+mc_get_dimm_list(mc_opl_t *mcp)
+{
+	uint32_t	bufsz;
+	uint32_t	maxbufsz;
+	int		ret;
+	int		sexp;
+	board_dimm_info_t *bd_dimmp;
+	mc_dimm_info_t	*dimm_list = NULL;
+
+	maxbufsz = bufsz = sizeof (board_dimm_info_t) +
+	    ((MCOPL_MAX_DIMMNAME +  MCOPL_MAX_SERIAL +
+	    MCOPL_MAX_PARTNUM) * OPL_MAX_DIMMS);
+
+	bd_dimmp = (board_dimm_info_t *)kmem_alloc(bufsz, KM_SLEEP);
+	ret = scf_get_dimminfo(mcp->mc_board_num, (void *)bd_dimmp, &bufsz);
+
+	MC_LOG("mc_get_dimm_list:  scf_service_getinfo returned=%d\n", ret);
+	if (ret == 0) {
+		sexp = sizeof (board_dimm_info_t) +
+		    ((bd_dimmp->bd_dnamesz +  bd_dimmp->bd_serialsz +
+		    bd_dimmp->bd_partnumsz) * bd_dimmp->bd_numdimms);
+
+		if ((bd_dimmp->bd_version == OPL_DIMM_INFO_VERSION) &&
+		    (bd_dimmp->bd_dnamesz <= MCOPL_MAX_DIMMNAME) &&
+		    (bd_dimmp->bd_serialsz <= MCOPL_MAX_SERIAL) &&
+		    (bd_dimmp->bd_partnumsz <= MCOPL_MAX_PARTNUM) &&
+		    (sexp <= bufsz)) {
+
+#ifdef DEBUG
+			if (oplmc_debug)
+				mc_dump_dimm_info(bd_dimmp);
+#endif
+			dimm_list = mc_prepare_dimmlist(bd_dimmp);
+
+		} else {
+			cmn_err(CE_WARN, "DIMM info version mismatch\n");
+		}
+	}
+	kmem_free(bd_dimmp, maxbufsz);
+	MC_LOG("mc_get_dimm_list: dimmlist=0x%p\n", dimm_list);
+	return (dimm_list);
+}
+
+/*
+ * mc_prepare_dimmlist - Prepare the dimm list from the infomation
+ * recieved from the SP.
+ */
+mc_dimm_info_t *
+mc_prepare_dimmlist(board_dimm_info_t *bd_dimmp)
+{
+	char	*dimm_name;
+	char	*serial;
+	char	*part;
+	int	dimm;
+	int	dnamesz = bd_dimmp->bd_dnamesz;
+	int	sersz = bd_dimmp->bd_serialsz;
+	int	partsz = bd_dimmp->bd_partnumsz;
+	mc_dimm_info_t	*dimm_list = NULL;
+	mc_dimm_info_t	*d;
+
+	dimm_name = (char *)(bd_dimmp + 1);
+	for (dimm = 0; dimm < bd_dimmp->bd_numdimms; dimm++) {
+
+		d = (mc_dimm_info_t *)kmem_alloc(sizeof (mc_dimm_info_t),
+		    KM_SLEEP);
+		snprintf(d->md_dimmname, dnamesz + 1, "%s", dimm_name);
+		serial = dimm_name + dnamesz;
+		snprintf(d->md_serial, sersz + 1, "%s", serial);
+		part = serial + sersz;
+		snprintf(d->md_partnum, partsz + 1, "%s", part);
+
+		d->md_next = dimm_list;
+		dimm_list = d;
+		dimm_name = part + partsz;
+	}
+	return (dimm_list);
+}
+
+#ifdef DEBUG
+void
+mc_dump_dimm(char *buf, int dnamesz, int serialsz, int partnumsz)
+{
+	char dname[MCOPL_MAX_DIMMNAME + 1];
+	char serial[MCOPL_MAX_SERIAL + 1];
+	char part[ MCOPL_MAX_PARTNUM + 1];
+	char *b;
+
+	b = buf;
+	snprintf(dname, dnamesz + 1, "%s", b);
+	b += dnamesz;
+	snprintf(serial, serialsz + 1, "%s", b);
+	b += serialsz;
+	snprintf(part, partnumsz + 1, "%s", b);
+	printf("DIMM=%s  Serial=%s PartNum=%s\n", dname, serial, part);
+}
+
+void
+mc_dump_dimm_info(board_dimm_info_t *bd_dimmp)
+{
+	int	dimm;
+	int	dnamesz = bd_dimmp->bd_dnamesz;
+	int	sersz = bd_dimmp->bd_serialsz;
+	int	partsz = bd_dimmp->bd_partnumsz;
+	char	*buf;
+
+	printf("Version=%d Board=%02d DIMMs=%d NameSize=%d "
+	    "SerialSize=%d PartnumSize=%d\n", bd_dimmp->bd_version,
+	    bd_dimmp->bd_boardnum, bd_dimmp->bd_numdimms, bd_dimmp->bd_dnamesz,
+	    bd_dimmp->bd_serialsz, bd_dimmp->bd_partnumsz);
+	printf("======================================================\n");
+
+	buf = (char *)(bd_dimmp + 1);
+	for (dimm = 0; dimm < bd_dimmp->bd_numdimms; dimm++) {
+		mc_dump_dimm(buf, dnamesz, sersz, partsz);
+		buf += dnamesz + sersz + partsz;
+	}
+	printf("======================================================\n");
+}
+
+
+/* ARGSUSED */
+static int
+mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+	int *rvalp)
+{
+	caddr_t	buf;
+	uint64_t pa;
+	int rv = 0;
+	int i;
+	uint32_t flags;
+	static uint32_t offset = 0;
+
+
+	flags = (cmd >> 4) & 0xfffffff;
+
+	cmd &= 0xf;
+
+	MC_LOG("mc_ioctl(cmd = %x, flags = %x)\n", cmd, flags);
+
+	if (arg != NULL) {
+		if (ddi_copyin((const void *)arg, (void *)&pa,
+			sizeof (uint64_t), 0) < 0) {
+			rv = EFAULT;
+			return (rv);
+		}
+		buf = NULL;
+	} else {
+		buf = (caddr_t)kmem_alloc(PAGESIZE, KM_SLEEP);
+
+		pa = va_to_pa(buf);
+		pa += offset;
+
+		offset += 64;
+		if (offset >= PAGESIZE)
+			offset = 0;
+	}
+
+	switch (cmd) {
+	case MCI_CE:
+		mc_inject_error(MC_INJECT_INTERMITTENT_CE, pa,
+			flags);
+		break;
+	case MCI_PERM_CE:
+		mc_inject_error(MC_INJECT_PERMANENT_CE, pa,
+			flags);
+		break;
+	case MCI_UE:
+		mc_inject_error(MC_INJECT_UE, pa,
+			flags);
+		break;
+	case MCI_M_CE:
+		mc_inject_error(MC_INJECT_INTERMITTENT_MCE, pa,
+			flags);
+		break;
+	case MCI_M_PCE:
+		mc_inject_error(MC_INJECT_PERMANENT_MCE, pa,
+			flags);
+		break;
+	case MCI_M_UE:
+		mc_inject_error(MC_INJECT_MUE, pa,
+			flags);
+		break;
+	case MCI_CMP:
+		mc_inject_error(MC_INJECT_CMPE, pa,
+			flags);
+		break;
+	case MCI_NOP:
+		mc_inject_error(MC_INJECT_NOP, pa, flags);
+		break;
+	case MCI_SHOW_ALL:
+		mc_debug_show_all = 1;
+		break;
+	case MCI_SHOW_NONE:
+		mc_debug_show_all = 0;
+		break;
+	case MCI_ALLOC:
+		/*
+		 * just allocate some kernel memory and never free it
+		 * 512 MB seems to be the maximum size supported.
+		 */
+		cmn_err(CE_NOTE, "Allocating kmem %d MB\n", flags * 512);
+		for (i = 0; i < flags; i++) {
+			buf = kmem_alloc(512 * 1024 * 1024, KM_SLEEP);
+			cmn_err(CE_NOTE, "kmem buf %llx PA %llx\n",
+				(u_longlong_t)buf, (u_longlong_t)va_to_pa(buf));
+		}
+		break;
+	case MCI_SUSPEND:
+		(void) opl_mc_suspend();
+		break;
+	case MCI_RESUME:
+		(void) opl_mc_resume();
+		break;
+	default:
+		rv = ENXIO;
+	}
+	return (rv);
+}
+
+#endif /* DEBUG */

@@ -52,8 +52,9 @@ cmd_evdisp_t
 opl_ue_mem(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     int hdlr_type)
 {
-	nvlist_t *rsrc = NULL, *asru = NULL;
+	nvlist_t *rsrc = NULL, *asru = NULL, *fru = NULL;
 	uint64_t ubc_ue_log_reg, pa;
+	cmd_page_t *page;
 
 	if (nvlist_lookup_nvlist(nvl,
 	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, &rsrc) != 0)
@@ -89,12 +90,30 @@ opl_ue_mem(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return (CMD_EVD_BAD);
 	}
 
-	if ((errno = nvlist_dup(rsrc, &asru, 0)) != 0 ||
-	    (errno = nvlist_add_uint64(asru,
-	    FM_FMRI_MEM_PHYSADDR, pa)) != 0)
-		fmd_hdl_abort(hdl, "failed to build page fmri");
+	if ((page = cmd_page_lookup(pa)) != NULL &&
+	    page->page_case != NULL &&
+	    fmd_case_solved(hdl, page->page_case))
+		return (CMD_EVD_REDUND);
 
-	cmd_page_fault(hdl, asru, rsrc, ep, pa);
+	if (nvlist_dup(rsrc, &asru, 0) != 0) {
+		fmd_hdl_debug(hdl, "opl_ue_mem nvlist dup failed\n");
+		return (CMD_EVD_BAD);
+	}
+
+	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
+		nvlist_free(asru);
+		CMD_STAT_BUMP(bad_mem_asru);
+		return (CMD_EVD_BAD);
+	}
+
+	if ((fru = opl_mem_fru_create(hdl, asru)) == NULL) {
+		nvlist_free(asru);
+		return (CMD_EVD_BAD);
+	}
+
+	cmd_page_fault(hdl, asru, fru, ep, pa);
+	nvlist_free(asru);
+	nvlist_free(fru);
 	return (CMD_EVD_OK);
 }
 
@@ -226,7 +245,8 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, cmd_errcl_t clcode)
 {
 	uint64_t pa;
-	nvlist_t *rsrc = NULL, *asru = NULL;
+	nvlist_t *rsrc = NULL, *asru = NULL, *fru = NULL;
+	cmd_page_t *page;
 
 	fmd_hdl_debug(hdl, "cmd_mac_common: clcode=%ll\n", clcode);
 
@@ -246,11 +266,29 @@ cmd_opl_mac_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if (((uint64_t)1 << 63) & pa)
 		return (CMD_EVD_BAD);
 
-	if ((errno = nvlist_dup(rsrc, &asru, 0)) != 0 ||
-	    (errno = nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa)) != 0)
-		fmd_hdl_abort(hdl, "failed to build page fmri");
+	if ((page = cmd_page_lookup(pa)) != NULL &&
+	    page->page_case != NULL && fmd_case_solved(hdl, page->page_case))
+		return (CMD_EVD_REDUND);
 
-	cmd_page_fault(hdl, asru, rsrc, ep, pa);
+	if (nvlist_dup(rsrc, &asru, 0) != 0) {
+		fmd_hdl_debug(hdl, "cmd_opl_mac_common nvlist dup failed\n");
+		return (CMD_EVD_BAD);
+	}
+
+	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
+		nvlist_free(asru);
+		CMD_STAT_BUMP(bad_mem_asru);
+		return (CMD_EVD_BAD);
+	}
+
+	if ((fru = opl_mem_fru_create(hdl, asru)) == NULL) {
+		nvlist_free(asru);
+		return (CMD_EVD_BAD);
+	}
+
+	cmd_page_fault(hdl, asru, fru, ep, pa);
+	nvlist_free(asru);
+	nvlist_free(fru);
 	return (CMD_EVD_OK);
 }
 

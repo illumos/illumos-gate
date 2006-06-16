@@ -19,38 +19,42 @@
  * CDDL HEADER END
  */
 /*
- * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ifndef	_SCFOSTOESCF_H
-#define	_SCFOSTOESCF_H
+#ifndef	_OPL_DIMM_H
+#define	_OPL_DIMM_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef	__cplusplus
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-/* OS to ESCF key */
-#define	KEY_ESCF	('E' << 24 | 'S' << 16 | 'C' << 8 | 'F')
+#define	OPL_DIMM_INFO_VERSION	1	/* Version number */
+#define	OPL_MAX_DIMMS		32	/* Max dimms per board */
 
+typedef struct board_dimm_info {
+	uint8_t	bd_version;		/* Version of this structure */
+	uint8_t bd_boardnum;		/* Board Number */
+	uint8_t bd_numdimms;		/* Number of dimms attached */
+	uint8_t	bd_dnamesz;		/* DIMM name size */
+	uint8_t	bd_serialsz;		/* Serial number size */
+	uint8_t	bd_partnumsz;		/* Partnumber size */
+	/*
+	 * DIMM info for each dimm(0 - bd_numdimms) is appended
+	 * to this structure in the form similar to below:
+	 *
+	 * char name[bd_dnamesz];
+	 * char serial[bd_serialsz];
+	 * char partnum[bd_partnumsz];
+	 */
+} board_dimm_info_t;
 
-
-/*
- * External function
- */
-
-extern int scf_service_putinfo(uint32_t, uint8_t, uint32_t, uint32_t, void *);
-extern int scf_service_getinfo(uint32_t, uint8_t, uint32_t, uint32_t *, void *);
-extern int scf_get_dimminfo(uint32_t boardnum, void *buf, uint32_t *bufsz);
-
-#define	SUB_OS_SEND_PRE_FMEMA		0x10
-#define	SUB_OS_SEND_CANCEL_FMEMA	0x15
-#define	SUB_OS_SEND_COMPLETE_FMEMA	0x43
-#define	SUB_OS_RECEIVE_DIMM_INFO	0x44
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _SCFOSTOESCF_H */
+#endif /* _OPL_DIMM_H */

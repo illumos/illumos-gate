@@ -41,6 +41,10 @@ extern int oplmc_debug;
 #define	MC_LOG		_NOTE(CONSTANTCONDITION) if (0) printf
 #endif
 
+#define	MC_PATROL_INTERVAL_SEC	10
+
+#define	MC_POLL_EXIT	0x01
+
 /*
  * load/store MAC register
  */
@@ -51,12 +55,41 @@ extern void mc_stphysio(uint64_t, uint32_t);
 
 #define	BANKNUM_PER_SB	8
 
+typedef struct {
+	uint32_t cs_num;
+	uint32_t cs_status;
+	uint32_t cs_avail_hi;
+	uint32_t cs_avail_low;
+	uint32_t dimm_capa_hi;
+	uint32_t dimm_capa_low;
+	uint32_t ndimms;
+} cs_status_t;
+
 typedef	struct scf_log {
 	struct scf_log	*sl_next;
 	int		sl_bank;
 	uint32_t	sl_err_add;
 	uint32_t	sl_err_log;
 } scf_log_t;
+
+/*
+ * Current max serial number size is 12, but keep enough room
+ * to accomodate any future changes.
+ *
+ * Current max part number size is 18 + 18(Sun's partnumber + FJ's partnumber),
+ * but keep enough room to accomodate any future changes.
+ */
+#define	MCOPL_MAX_DIMMNAME	3
+#define	MCOPL_MAX_SERIAL	20
+#define	MCOPL_MAX_PARTNUM	44
+#define	MCOPL_MAX_SERIALID (MCOPL_MAX_SERIAL + MCOPL_MAX_PARTNUM)
+
+typedef struct mc_dimm_info {
+	struct	mc_dimm_info *md_next;
+	char	md_dimmname[MCOPL_MAX_DIMMNAME + 1];
+	char	md_serial[MCOPL_MAX_SERIAL + 1];
+	char	md_partnum[MCOPL_MAX_PARTNUM + 1];
+} mc_dimm_info_t;
 
 typedef struct mc_opl_state {
 	struct mc_opl_state *next;
@@ -65,6 +98,7 @@ typedef struct mc_opl_state {
 #define	MC_POLL_RUNNING	0x1
 #define	MC_SOFT_SUSPENDED	0x2	/* suspended by DR */
 #define	MC_DRIVER_SUSPENDED	0x4	/* DDI_SUSPEND */
+#define	MC_MEMORYLESS		0x8
 	uint32_t mc_board_num;		/* board# */
 	uint64_t mc_start_address;	/* sb-mem-ranges */
 	uint64_t mc_size;
@@ -77,28 +111,20 @@ typedef struct mc_opl_state {
 		uint32_t  mcb_ptrl_cntl;
 	} mc_bank[BANKNUM_PER_SB];
 	uchar_t		mc_trans_table[2][64];	/* csX-mac-pa-trans-table */
-	clock_t		mc_interval_hz;
-	timeout_id_t	mc_tid;
 	kmutex_t	mc_lock;
-	scf_log_t	*mc_scf_log;
-	scf_log_t	*mc_scf_log_tail;
-	int		mc_scf_total;
-#define	MAX_SCF_LOGS	64
-	struct mc_inst_list *mc_list;
+	scf_log_t	*mc_scf_log[BANKNUM_PER_SB];
+	scf_log_t	*mc_scf_log_tail[BANKNUM_PER_SB];
+	int		mc_scf_total[BANKNUM_PER_SB];
 	struct memlist	*mlist;
 	int		mc_scf_retry[BANKNUM_PER_SB];
 	int		mc_last_error;
-#define	MAX_SCF_RETRY	10
-	uint64_t	mc_period;	/* number of times memory scanned */
+			/* number of times memory scanned */
+	uint64_t	mc_period[BANKNUM_PER_SB];
+	uint32_t	mc_speed;
+	int		mc_speedup_period[BANKNUM_PER_SB];
+	int		mc_tick_left;
+	mc_dimm_info_t	*mc_dimm_list;
 } mc_opl_t;
-
-typedef	struct mc_inst_list {
-	struct mc_inst_list	*next;
-	mc_opl_t		*mc_opl;
-	uint32_t		mc_board_num;
-	uint64_t		mc_start_address;
-	uint64_t		mc_size;
-} mc_inst_list_t;
 
 #define	IS_MIRROR(mcp, bn)	((mcp)->mc_bank[bn].mcb_status\
 				& BANK_MIRROR_MODE)
@@ -116,12 +142,12 @@ typedef struct mc_addr_info {
 
 typedef struct mc_flt_stat {
 	uint32_t  mf_type;		/* fault type */
-#define	FLT_TYPE_CMPE			0x0001
-#define	FLT_TYPE_UE			0x0002
-#define	FLT_TYPE_PERMANENT_CE		0x0003
-#define	FLT_TYPE_INTERMITTENT_CE	0x0004
-#define	FLT_TYPE_SUE			0x0005
-#define	FLT_TYPE_MUE			0x0006
+#define	FLT_TYPE_INTERMITTENT_CE	0x0001
+#define	FLT_TYPE_PERMANENT_CE		0x0002
+#define	FLT_TYPE_UE			0x0003
+#define	FLT_TYPE_SUE			0x0004
+#define	FLT_TYPE_MUE			0x0005
+#define	FLT_TYPE_CMPE			0x0006
 	uint32_t  mf_cntl;		/* MAC_BANKm_PTRL_CNTL Register */
 	uint32_t  mf_err_add;	/* MAC_BANKm_{PTRL|MI}_ERR_ADD Register */
 	uint32_t  mf_err_log;	/* MAC_BANKm_{PTRL|MI}_ERR_LOG Register */
@@ -198,6 +224,9 @@ typedef struct mc_aflt {
 #define	MAC_CNTL_PTRL_ADD_MAX		0x00000040
 #define	MAC_CNTL_REW_CMPE		0x00000020
 
+#define	MAC_CNTL_PTRL_ERR_SHIFT		13
+#define	MAC_CNTL_MI_ERR_SHIFT		10
+
 #define	MAC_CNTL_PTRL_PRESERVE_BITS	(MAC_CNTL_PTRL_INTERVAL)
 
 #define	MAC_CNTL_PTRL_ERRS	(MAC_CNTL_PTRL_CE|MAC_CNTL_PTRL_UE\
@@ -231,9 +260,12 @@ typedef struct mc_aflt {
 extern void mc_write_cntl(mc_opl_t *, int, uint32_t);
 #define	MAC_CMD(mcp, i, cmd)	mc_write_cntl(mcp, i, cmd)
 
+#define	MAC_PTRL_START(mcp, i)	{ if (!(ldphysio(MAC_PTRL_CNTL(mcp, i))	\
+				& MAC_CNTL_PTRL_START))			\
+				MAC_CMD((mcp), (i), MAC_CNTL_PTRL_START); }
+
 #define	MAC_PTRL_START_ADD(mcp, i)	MAC_CMD((mcp), (i),\
 				MAC_CNTL_PTRL_START|MAC_CNTL_USE_RESTART_ADD)
-#define	MAC_PTRL_START(mcp, i)	MAC_CMD((mcp), (i), MAC_CNTL_PTRL_START)
 #define	MAC_PTRL_STOP(mcp, i)	MAC_CMD((mcp), (i), MAC_CNTL_PTRL_STOP)
 #define	MAC_PTRL_RESET(mcp, i)	MAC_CMD((mcp), (i), MAC_CNTL_PTRL_RESET)
 #define	MAC_REW_REQ(mcp, i)	MAC_CMD((mcp), (i), MAC_CNTL_REW_REQ)
@@ -308,8 +340,6 @@ extern void mc_write_cntl(mc_opl_t *, int, uint32_t);
 #define	MC_TT_CS	2
 
 
-#define	MAX_MC_LOOP_COUNT	100
-
 /* export interface for error injection */
 extern int mc_inject_error(int error_type, uint64_t pa, uint32_t flags);
 
@@ -334,6 +364,24 @@ extern int mc_inject_error(int error_type, uint64_t pa, uint32_t flags);
 #define	MC_INJECT_FLAG_LD	0x20
 #define	MC_INJECT_FLAG_ST	0x40
 #define	MC_INJECT_FLAG_PATH	0x80
+
+#ifdef DEBUG
+
+#define	MCI_NOP		0x0
+#define	MCI_CE		0x1
+#define	MCI_PERM_CE	0x2
+#define	MCI_UE		0x3
+#define	MCI_SHOW_ALL	0x4
+#define	MCI_SHOW_NONE	0x5
+#define	MCI_CMP		0x6
+#define	MCI_ALLOC	0x7
+#define	MCI_M_CE	0x8
+#define	MCI_M_PCE	0x9
+#define	MCI_M_UE	0xA
+#define	MCI_SUSPEND	0xB
+#define	MCI_RESUME	0xC
+
+#endif
 
 #ifdef	__cplusplus
 }

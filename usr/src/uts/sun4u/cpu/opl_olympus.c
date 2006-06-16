@@ -2234,21 +2234,33 @@ cpu_init_cache_scrub(void)
 int
 cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
 {
-	return (ENOTSUP);
+	if (&plat_get_mem_sid) {
+		return (plat_get_mem_sid(unum, buf, buflen, lenp));
+	} else {
+		return (ENOTSUP);
+	}
 }
 
 /* ARGSUSED */
 int
 cpu_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
 {
-	return (ENOTSUP);
+	if (&plat_get_mem_addr) {
+		return (plat_get_mem_addr(unum, sid, offset, addrp));
+	} else {
+		return (ENOTSUP);
+	}
 }
 
 /* ARGSUSED */
 int
 cpu_get_mem_offset(uint64_t flt_addr, uint64_t *offp)
 {
-	return (ENOTSUP);
+	if (&plat_get_mem_offset) {
+		return (plat_get_mem_offset(flt_addr, offp));
+	} else {
+		return (ENOTSUP);
+	}
 }
 
 /*ARGSUSED*/

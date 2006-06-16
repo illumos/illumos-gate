@@ -49,6 +49,10 @@
 #include <vm/vm_dep.h>
 
 int (*opl_get_mem_unum)(int, uint64_t, char *, int, int *);
+int (*opl_get_mem_sid)(char *unum, char *buf, int buflen, int *lenp);
+int (*opl_get_mem_offset)(uint64_t paddr, uint64_t *offp);
+int (*opl_get_mem_addr)(char *unum, char *sid,
+    uint64_t offset, uint64_t *paddr);
 
 /* Memory for fcode claims.  16k times # maximum possible IO units */
 #define	EFCODE_SIZE	(OPL_MAX_BOARDS * OPL_MAX_IO_UNITS_PER_BOARD * 0x4000)
@@ -69,6 +73,12 @@ int opl_tsb_spares = (OPL_MAX_BOARDS) * (OPL_MAX_PCICH_UNITS_PER_BOARD) *
 pgcnt_t opl_startup_cage_size = 0;
 
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
+
+static enum {
+	MODEL_FF1 = 0,
+	MODEL_FF2 = 1,
+	MODEL_DC = 2
+} plat_model = -1;
 
 int
 set_platform_max_ncpus(void)
@@ -746,20 +756,62 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 int
 plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 {
-	uint_t sb;
+	int	plen;
+	int	ret = 0;
+	char	model[20];
+	uint_t	sb;
+	pnode_t	node;
+
+	/* determine the platform model once */
+	if (plat_model == -1) {
+		plat_model = MODEL_DC; /* Default model */
+		node = prom_rootnode();
+		plen = prom_getproplen(node, "model");
+		if (plen > 0 && plen < sizeof (model)) {
+			(void) prom_getprop(node, "model", model);
+			model[plen] = '\0';
+			if (strcmp(model, "FF1") == 0)
+				plat_model = MODEL_FF1;
+			else if (strcmp(model, "FF2") == 0)
+				plat_model = MODEL_FF2;
+			else if (strncmp(model, "DC", 2) == 0)
+				plat_model = MODEL_DC;
+		}
+	}
 
 	sb = opl_get_physical_board(LSB_ID(cpuid));
 	if (sb == -1) {
 		return (ENXIO);
 	}
 
-	if (snprintf(buf, buflen, "CMU%d", sb) >= buflen) {
-		return (ENOSPC);
+	switch (plat_model) {
+	case MODEL_FF1:
+		plen = snprintf(buf, buflen, "/%s/CPUM%d", "MBU_A",
+		    CHIP_ID(cpuid) / 2);
+		break;
+
+	case MODEL_FF2:
+		plen = snprintf(buf, buflen, "/%s/CPUM%d", "MBU_B",
+		    CHIP_ID(cpuid) / 2);
+		break;
+
+	case MODEL_DC:
+		plen = snprintf(buf, buflen, "/%s%02d/CPUM%d", "CMU", sb,
+		    CHIP_ID(cpuid));
+		break;
+
+	default:
+		/* This should never happen */
+		return (ENODEV);
+	}
+
+	if (plen >= buflen) {
+		ret = ENOSPC;
 	} else {
 		if (lenp)
 			*lenp = strlen(buf);
-		return (0);
 	}
+	return (ret);
 }
 
 #define	SCF_PUTINFO(f, s, p)	\
@@ -852,4 +904,31 @@ plat_startup_memlist(caddr_t alloc_base)
 void
 startup_platform(void)
 {
+}
+
+int
+plat_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{
+	if (opl_get_mem_sid == NULL) {
+		return (ENOTSUP);
+	}
+	return (opl_get_mem_sid(unum, buf, buflen, lenp));
+}
+
+int
+plat_get_mem_offset(uint64_t paddr, uint64_t *offp)
+{
+	if (opl_get_mem_offset == NULL) {
+		return (ENOTSUP);
+	}
+	return (opl_get_mem_offset(paddr, offp));
+}
+
+int
+plat_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
+{
+	if (opl_get_mem_addr == NULL) {
+		return (ENOTSUP);
+	}
+	return (opl_get_mem_addr(unum, sid, offset, addrp));
 }

@@ -102,8 +102,11 @@ extern "C" {
  *     that there is no relationship.
  */
 
-/* 18+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8 */
-#define	MEM_SERID_MAXLEN	20
+/*
+ * 18+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8.
+ * 18 for Sun Partnumber, 18 partner partnumber, 12 serialnumber for OPL.
+ */
+#define	MEM_SERID_MAXLEN	64
 
 typedef struct mem_dimm_map {
 	struct mem_dimm_map *dm_next;	/* The next DIMM map */

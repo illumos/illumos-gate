@@ -33,7 +33,7 @@
 #include <cmd_opl.h>
 #include <string.h>
 #include <errno.h>
-
+#include <cmd_mem.h>
 #include <sys/fm/protocol.h>
 #include <sys/int_const.h>
 
@@ -177,5 +177,34 @@ opl_cpursrc_create(fmd_hdl_t *hdl, uint32_t cpuid)
 	}
 
 	fmd_hdl_strfree(hdl, frustr);
+	return (fmri);
+}
+
+nvlist_t *
+opl_mem_fru_create(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	nvlist_t *fmri;
+	char *unum;
+	char **serids;
+	size_t nserids;
+
+
+	if (nvlist_lookup_string(nvl, FM_FMRI_MEM_UNUM, &unum) != 0)
+		return (NULL);
+
+	fmd_hdl_debug(hdl, "opl_mem_fru_create for mem %s\n", unum);
+
+	if ((fmri = cmd_mem_fmri_create(unum)) == NULL)
+		return (NULL);
+
+	if ((nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &serids,
+	    &nserids)) == 0) {
+		if ((nvlist_add_string_array(fmri, FM_FMRI_MEM_SERIAL_ID,
+		    serids, nserids)) != 0) {
+			nvlist_free(fmri);
+			return (NULL);
+		}
+	}
+
 	return (fmri);
 }
