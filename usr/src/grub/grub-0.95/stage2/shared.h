@@ -76,6 +76,7 @@ extern char *grub_scratch_mem;
 #define BIOSDISK_READ			0x0
 #define BIOSDISK_WRITE			0x1
 #define BIOSDISK_ERROR_GEOMETRY		0x100
+#define BIOSDISK_ERROR_SHORT_IO		0x101
 #define BIOSDISK_FLAG_LBA_EXTENSION	0x1
 #define BIOSDISK_FLAG_CDROM		0x2
 
@@ -552,6 +553,7 @@ typedef enum
   ERR_DEV_NEED_INIT,
   ERR_NO_DISK_SPACE,
   ERR_NUMBER_OVERFLOW,
+  ERR_BAD_GZIP_CRC,
 
   MAX_ERR_NUM
 } grub_error_t;

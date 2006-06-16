@@ -1107,10 +1107,6 @@ ENTRY(biosdisk_int13_extensions)
 	/* clear the data segment */
 	xorw	%ax, %ax
 	movw	%ax, %ds
-	xorw	%ax, %ax	/* clear error */
-	jnc	skip_error	/* and leave clear if cy not set */
-        movb	%ah, %dl	/* set error if cy set */
-skip_error:
 	/* back to protected mode */
 	DATA32	call	EXT_C(real_to_prot)
 	.code32

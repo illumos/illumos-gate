@@ -1262,7 +1262,7 @@ grub_strlen (const char *str)
 int
 memcheck (unsigned long addr, unsigned long len)
 {
-  errnum = 0;	/* make sure errnum is cleared */
+  int local_errnum = 0;
 #ifdef GRUB_UTIL
   static unsigned long start_addr (void)
     {
@@ -1287,7 +1287,7 @@ memcheck (unsigned long addr, unsigned long len)
     }
 
   if (start_addr () <= addr && end_addr () > addr + len)
-    return ! errnum;
+    return ! local_errnum;
 #endif /* GRUB_UTIL */
 
   if ((addr < RAW_ADDR (0x1000))
@@ -1295,9 +1295,11 @@ memcheck (unsigned long addr, unsigned long len)
 	  && RAW_ADDR (mbi.mem_lower * 1024) < (addr + len))
       || (addr >= RAW_ADDR (0x100000)
 	  && RAW_ADDR (mbi.mem_upper * 1024) < ((addr - 0x100000) + len)))
-    errnum = ERR_WONT_FIT;
+    local_errnum = ERR_WONT_FIT;
 
-  return ! errnum;
+  if (errnum == 0)	/* preserve original errnum */
+    errnum = local_errnum;
+  return ! local_errnum;
 }
 
 void
@@ -1341,9 +1343,10 @@ grub_memmove (void *to, const void *from, int len)
 			 "2" (len - 1 + (char *) to)
 			 : "memory");
 	 }
+	return to;
      }
 
-   return errnum ? NULL : to;
+   return NULL;
 }
 
 void *

@@ -92,6 +92,7 @@ char *err_list[] =
   [ERR_UNRECOGNIZED] = "Unrecognized command",
   [ERR_WONT_FIT] = "Selected item cannot fit into memory",
   [ERR_WRITE] = "Disk write error",
+  [ERR_BAD_GZIP_CRC] = "Incorrect gunzip CRC checksum"
 };
 
 

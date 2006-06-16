@@ -81,6 +81,12 @@ biosdisk (int read, int drive, struct geometry *geometry,
       dap.buffer = segment << 16;
       
       err = biosdisk_int13_extensions ((read + 0x42) << 8, drive, &dap);
+      /*
+       * Try to report errors upwards when the bios has read only part of
+       * the requested buffer, but didn't return an error code.
+       */
+      if (err == 0 && dap.blocks != nsec)
+	err = BIOSDISK_ERROR_SHORT_IO;
 
 /* #undef NO_INT13_FALLBACK */
 #ifndef NO_INT13_FALLBACK
