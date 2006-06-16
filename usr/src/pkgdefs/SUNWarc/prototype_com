@@ -112,6 +112,8 @@ s none usr/lib/llib-ldoor=../../lib/llib-ldoor
 s none usr/lib/llib-ldoor.ln=../../lib/llib-ldoor.ln
 s none usr/lib/llib-lefi=../../lib/llib-lefi
 s none usr/lib/llib-lefi.ln=../../lib/llib-lefi.ln
+f none usr/lib/llib-lfstyp 644 root bin
+f none usr/lib/llib-lfstyp.ln 644 root bin
 f none usr/lib/llib-lexacct 644 root bin
 f none usr/lib/llib-lexacct.ln 644 root bin
 s none usr/lib/llib-lintl=../../lib/llib-lintl

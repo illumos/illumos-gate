@@ -128,6 +128,8 @@ s none usr/lib/libexacct.so=./libexacct.so.1
 f none usr/lib/libform.so.1 755 root bin
 s none usr/lib/libform.so=./libform.so.1
 s none usr/ccs/lib/libform.so=../../lib/libform.so.1
+s none usr/lib/libfstyp.so=./libfstyp.so.1
+f none usr/lib/libfstyp.so.1 755 root bin
 s none usr/lib/libgen.so.1=../../lib/libgen.so.1
 s none usr/lib/libgen.so=../../lib/libgen.so.1
 s none usr/ccs/lib/libgen.so=../../../lib/libgen.so.1

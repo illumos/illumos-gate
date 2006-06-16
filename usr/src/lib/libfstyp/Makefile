@@ -22,42 +22,37 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
-#  whose executable reside in $(INSDIR1) and $(INSDIR2).
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIR1=        fstyp mkproto labelit ident
-SUBDIR2=        mount
-SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
+include	../Makefile.lib
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+HDRS=		libfstyp.h libfstyp_module.h
 
-# for messaging catalog
-#
-POFILE= hsfs.po
-POFILES= $(SUBDIR2:%=%/%.po)
+HDRDIR=		common
 
+SUBDIRS=	$(MACH)
+
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+all install clean clobber: spec .WAIT $(SUBDIRS)
 
-all:	$(SUBDIRS) 
+lint: $(SUBDIRS)
 
-catalog:        $(SUBDIR2)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
+install_h: $(ROOTHDRS)
 
-install clean clobber lint: $(SUBDIRS)
+check: $(CHECKHDRS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+spec $(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include $(SRC)/lib/Makefile.targ
+

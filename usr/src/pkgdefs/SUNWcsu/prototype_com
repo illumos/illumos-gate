@@ -385,7 +385,8 @@ f none usr/lib/fs/ctfs/mount 555 root bin
 d none usr/lib/fs/fd 755 root sys
 f none usr/lib/fs/fd/mount 555 root bin
 d none usr/lib/fs/hsfs 755 root sys
-f none usr/lib/fs/hsfs/fstyp 555 root bin
+f none usr/lib/fs/hsfs/fstyp.so.1 555 root bin
+l none usr/lib/fs/hsfs/fstyp=../../../sbin/fstyp
 f none usr/lib/fs/hsfs/ident_hsfs.so.1 555 root bin
 f none usr/lib/fs/hsfs/labelit 555 root bin
 s none usr/lib/fs/hsfs/mount=../../../../etc/fs/hsfs/mount
@@ -410,7 +411,8 @@ f none usr/lib/fs/ufs/fsckall 555 root bin
 f none usr/lib/fs/ufs/fsdb 555 root bin
 f none usr/lib/fs/ufs/fsirand 555 root bin
 f none usr/lib/fs/ufs/fssnap 555 root bin
-f none usr/lib/fs/ufs/fstyp 555 root bin
+f none usr/lib/fs/ufs/fstyp.so.1 555 root bin
+l none usr/lib/fs/ufs/fstyp=../../../sbin/fstyp
 f none usr/lib/fs/ufs/ident_ufs.so.1 555 root bin
 f none usr/lib/fs/ufs/labelit 555 root bin
 f none usr/lib/fs/ufs/lockfs 555 root bin

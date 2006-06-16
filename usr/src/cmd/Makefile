@@ -162,8 +162,8 @@ COMMON_SUBDIRS=		\
 	fmtmsg		\
 	fold		\
 	format		\
-	fs.d		\
 	fstyp		\
+	fs.d		\
 	fuser		\
 	gcore		\
 	gencat		\

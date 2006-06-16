@@ -102,6 +102,7 @@ SUBDIRS += \
 	libeti		\
 	libcrypt	\
 	libefi		\
+	libfstyp	\
 	libwanboot	\
 	libwanbootutil	\
 	libcryptoutil	\
@@ -314,6 +315,7 @@ HDRSUBDIRS= libaio	\
 	libdtrace	\
 	libdtrace_jni	\
 	libeti		\
+	libfstyp	\
 	libgen		\
 	libwanboot	\
 	libwanbootutil	\
@@ -447,6 +449,7 @@ libdladm:	libdlpi libdevinfo
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
+libfstyp:	libnvpair
 $(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
 			$(CLOSED)/lib/libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo

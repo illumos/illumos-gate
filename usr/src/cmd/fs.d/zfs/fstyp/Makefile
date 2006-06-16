@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,20 +21,59 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+FSTYP_VERS=1
 FSTYPE=		zfs
-LIBPROG=	fstyp
+LIBPROG=	fstyp.so.${FSTYP_VERS} 
 
-include		../../Makefile.fstype
+include ../../../../lib/Makefile.lib
+include ../../Makefile.fstype
 
-POFILE=		fstyp.po
+CFLAGS +=	$(C_PICFLAGS)
+DYNLIB=		$(LIBPROG)
 
-catalog:	$(POFILE)
+LDLIBS += -lnvpair -lzfs -lc
 
-LDLIBS += -lzfs -lnvpair
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
 
-lint :=		PROG = $(LIBPROG)
-lint:		lint_PROG
+SRCS=	${LIBPROG:%.so.$(FSTYP_VERS)=%.c}
+
+CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
+#
+# Override PMAP dependency
+#
+PMAP=
+
+#
+# Rules for making shared objects out of .c files.  Works well if
+# we have a one-to-one mapping.  Applies in all cases so far.
+#
+.SUFFIXES: .so.${FSTYP_VERS} ${SUFFIXES}
+
+.c.so.${FSTYP_VERS}:
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DYNFLAGS) $(GSHARED) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS_SO)
+
+
+.KEEP_STATE:
+
+all: $(LIBPROG)
+
+install: all
+	$(RM) $(ROOTLIBFSTYPE)/fstyp
+	$(LN) $(ROOTUSRSBIN)/fstyp $(ROOTLIBFSTYPE)/fstyp
+
+lint: lint_SRCS
+
+cstyle:
+	$(CSTYLE) $(SRCS)
+
+clean:     
+	${RM} $(LIBPROG)
+
+clobber: clean

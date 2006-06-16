@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,28 +59,6 @@ typedef unsigned short unicode_t;
 extern uint32_t i_number;
 
 extern int32_t run_fsdb();
-extern void print_tag(struct tag *);
-extern void print_pvd(struct pri_vol_desc *);
-extern void print_avd(struct anch_vol_desc_ptr *);
-extern void print_vdp(struct vol_desc_ptr *);
-extern void print_iuvd(struct iuvd_desc *);
-extern void print_part(struct part_desc *);
-extern void print_lvd(struct log_vol_desc *);
-extern void print_usd(struct unall_spc_desc *);
-extern void print_lvid(struct log_vol_int_desc *);
-extern void print_part(struct part_desc *);
-extern void print_fsd(struct file_set_desc *);
-extern void print_aed(struct alloc_ext_desc *);
-extern void print_ie(struct indirect_entry *);
-extern void print_td(struct term_desc *);
-extern void print_fe(struct file_entry *);
-extern void ud_make_tag(struct tag *, uint16_t, uint32_t, uint16_t);
-extern void print_fid(struct file_id *);
-
-
-extern int32_t ud_open_dev(char *, uint32_t);
-extern int32_t ud_verify_tag(struct tag *, uint16_t,
-		uint32_t, int32_t, int32_t);
 
 void usage();
 void init_buffers();
@@ -121,7 +98,7 @@ int32_t openflg = O_RDONLY;
 #define	UDP_BITMAPS	0x00
 #define	UDP_SPACETBLS	0x01
 
-
+ud_handle_t udh;
 int32_t fd, nparts, nmaps;
 int32_t bmask, l2d, l2b;
 
@@ -187,21 +164,26 @@ main(int argc, char *argv[])
 		usage();
 	}
 
+	if (ud_init(-1, &udh) != 0) {
+		(void) fprintf(stderr,
+		gettext("udfs labelit: cannot initialize ud_lib\n"));
+		exit(1);
+	}
 
-	if ((fd = ud_open_dev(argv[optind], openflg)) < 0) {
+	if ((fd = ud_open_dev(udh, argv[optind], openflg)) < 0) {
 		perror("open");
 		exit(1);
 	}
 
-	if ((ret = ud_fill_udfs_info(fd)) != 0) {
+	if ((ret = ud_fill_udfs_info(udh)) != 0) {
 		return (ret);
 	}
 
-	if ((udfs.flags & VALID_UDFS) == 0) {
+	if ((udh->udfs.flags & VALID_UDFS) == 0) {
 		return (1);
 	}
 
-	bsize = udfs.lbsize;
+	bsize = udh->udfs.lbsize;
 	bmask = bsize - 1;
 	l2d = 0;
 	while ((bsize >> l2d) > DEV_BSIZE) {
@@ -209,16 +191,17 @@ main(int argc, char *argv[])
 	}
 	l2b = l2d + 9;
 
-	ricb_prn = udfs.ricb_prn;
-	ricb_loc = udfs.ricb_loc;
-	ricb_len = udfs.ricb_len;
+	ricb_prn = udh->udfs.ricb_prn;
+	ricb_loc = udh->udfs.ricb_loc;
+	ricb_len = udh->udfs.ricb_len;
 
-	value = i_number = ud_xlate_to_daddr(ricb_prn, ricb_loc);
+	value = i_number = ud_xlate_to_daddr(udh, ricb_prn, ricb_loc);
 
 	init_buffers();
 
 	run_fsdb();
 
+	ud_fini(udh);
 	(void) close(fd);
 
 	return (0);
@@ -273,11 +256,11 @@ init_buffers()
 	char *addr;
 	struct lbuf *bp;
 
-	addr = malloc(NBUF * udfs.lbsize);
+	addr = malloc(NBUF * udh->udfs.lbsize);
 	bhdr.fwd = bhdr.back = &bhdr;
 	for (i = 0; i < NBUF; i++) {
 		bp = &lbuf[i];
-		bp->blkaddr = addr + i * udfs.lbsize;
+		bp->blkaddr = addr + i * udh->udfs.lbsize;
 		bp->valid = 0;
 		INSERT(bp);
 	}
@@ -307,7 +290,7 @@ getblk(u_offset_t address)
 		return (NULL);
 	}
 	errno = 0;
-	if (read(fd, bp->blkaddr, udfs.lbsize) != udfs.lbsize) {
+	if (read(fd, bp->blkaddr, udh->udfs.lbsize) != udh->udfs.lbsize) {
 		(void) fprintf(stdout,
 			gettext("Read failed fd %x off %llx errno %x\n"),
 			fd, off, errno);
@@ -346,7 +329,8 @@ putblk(caddr_t address)
 found:
 	off = bp->blkno << l2b;
 	if (llseek(fd, off, SEEK_SET) == off) {
-		if (write(fd, bp->blkaddr, udfs.lbsize) == udfs.lbsize) {
+		if (write(fd, bp->blkaddr, udh->udfs.lbsize) ==
+			udh->udfs.lbsize) {
 			return (0);
 		}
 		(void) fprintf(stdout,
@@ -398,7 +382,7 @@ print_desc(uint32_t addr, int32_t id)
 			case AVD :
 				/* LINTED */
 				if ((tag = (struct tag *)getblk(
-					udfs.avdp_loc << l2b)) == NULL) {
+					udh->udfs.avdp_loc << l2b)) == NULL) {
 					(void) fprintf(stdout,
 					gettext("Could not read AVDP\n"));
 				}
@@ -410,17 +394,17 @@ print_desc(uint32_t addr, int32_t id)
 					uint32_t i, end;
 
 					if (id == MVDS) {
-						i = udfs.mvds_loc;
+						i = udh->udfs.mvds_loc;
 						end = i +
-						(udfs.mvds_len >> l2b);
+						(udh->udfs.mvds_len >> l2b);
 					} else if (id == RVDS) {
-						i = udfs.rvds_loc;
+						i = udh->udfs.rvds_loc;
 						end = i +
-						(udfs.rvds_len >> l2b);
+						(udh->udfs.rvds_len >> l2b);
 					} else {
-						i = udfs.lvid_loc;
+						i = udh->udfs.lvid_loc;
 						end = i +
-						(udfs.lvid_len >> l2b);
+						(udh->udfs.lvid_len >> l2b);
 					}
 
 					for (; i < end; i++) {
@@ -435,10 +419,10 @@ print_desc(uint32_t addr, int32_t id)
 					uint32_t i, end, block;
 
 					if (id == FSDS) {
-						prn = udfs.fsds_prn;
-						i = udfs.fsds_loc;
+						prn = udh->udfs.fsds_prn;
+						i = udh->udfs.fsds_loc;
 						end = i +
-						(udfs.fsds_len >> l2b);
+						(udh->udfs.fsds_len >> l2b);
 					} else {
 						prn = ricb_prn;
 						i = ricb_loc;
@@ -447,7 +431,7 @@ print_desc(uint32_t addr, int32_t id)
 
 					for (; i < end; i++) {
 						if ((block = ud_xlate_to_daddr(
-							prn, i)) == 0) {
+							udh, prn, i)) == 0) {
 							(void) fprintf(stdout,
 							gettext("Cannot xlate "
 							"prn %x loc %x\n"),
@@ -465,52 +449,50 @@ print_desc(uint32_t addr, int32_t id)
 
 	switch (SWAP_16(tag->tag_id)) {
 		case UD_PRI_VOL_DESC :
-			print_pvd((struct pri_vol_desc *)tag);
+			print_pvd(stdout, (struct pri_vol_desc *)tag);
 			break;
 		case UD_ANCH_VOL_DESC :
-			print_avd((struct anch_vol_desc_ptr *)tag);
+			print_avd(stdout, (struct anch_vol_desc_ptr *)tag);
 			break;
 		case UD_VOL_DESC_PTR :
-			print_vdp((struct vol_desc_ptr *)tag);
+			print_vdp(stdout, (struct vol_desc_ptr *)tag);
 			break;
 		case UD_IMPL_USE_DESC :
-			print_iuvd((struct iuvd_desc *)tag);
+			print_iuvd(stdout, (struct iuvd_desc *)tag);
 			break;
 		case UD_PART_DESC :
-			print_part((struct part_desc *)tag);
+			print_part(stdout, (struct part_desc *)tag);
 			break;
 		case UD_LOG_VOL_DESC :
-			print_lvd((struct log_vol_desc *)tag);
+			print_lvd(stdout, (struct log_vol_desc *)tag);
 			break;
 		case UD_UNALL_SPA_DESC :
-			print_usd((struct unall_spc_desc *)tag);
+			print_usd(stdout, (struct unall_spc_desc *)tag);
 			break;
 		case UD_TERM_DESC :
 			(void) fprintf(stdout, "TERM DESC\n");
-			print_tag(tag);
+			print_tag(stdout, tag);
 			break;
 		case UD_LOG_VOL_INT :
-			/* LINTED */
-			print_lvid((struct log_vol_int_desc *)tag);
+			print_lvid(stdout, (struct log_vol_int_desc *)tag);
 			break;
 		case UD_FILE_SET_DESC :
-			print_fsd((struct file_set_desc *)tag);
+			print_fsd(stdout, udh, (struct file_set_desc *)tag);
 			break;
 		case UD_FILE_ID_DESC :
-			print_fid((struct file_id *)tag);
+			print_fid(stdout, (struct file_id *)tag);
 			break;
 		case UD_ALLOC_EXT_DESC :
-			print_aed((struct alloc_ext_desc *)tag);
+			print_aed(stdout, (struct alloc_ext_desc *)tag);
 			break;
 		case UD_INDIRECT_ENT :
-			print_ie((struct indirect_entry *)tag);
+			print_ie(stdout, (struct indirect_entry *)tag);
 			break;
 		case UD_TERMINAL_ENT :
-			print_td((struct term_desc *)tag);
+			print_td(stdout, (struct term_desc *)tag);
 			break;
 		case UD_FILE_ENTRY :
-			/* LINTED */
-			print_fe((struct file_entry *)tag);
+			print_fe(stdout, (struct file_entry *)tag);
 			break;
 		case UD_EXT_ATTR_HDR :
 		case UD_UNALL_SPA_ENT :
@@ -521,7 +503,7 @@ print_desc(uint32_t addr, int32_t id)
 		default :
 			(void) fprintf(stdout,
 				gettext("unknown descriptor\n"));
-			print_tag(tag);
+			print_tag(stdout, tag);
 			break;
 	}
 }
@@ -542,7 +524,7 @@ set_file(int32_t id, uint32_t iloc, uint64_t value)
 	if ((fe = (struct file_entry *)getblk(iloc)) == NULL) {
 		return;
 	}
-	if (ud_verify_tag(&fe->fe_tag, UD_FILE_ENTRY,
+	if (ud_verify_tag(udh, &fe->fe_tag, UD_FILE_ENTRY,
 			SWAP_32(fe->fe_tag.tag_loc), 1, 1) != 0) {
 		return;
 	}
@@ -663,7 +645,7 @@ set_file(int32_t id, uint32_t iloc, uint64_t value)
 			ea_off = SWAP_32(eah->eah_ial);
 			ea_len = SWAP_32(fe->fe_len_ear);
 			block = SWAP_32(eah->eah_tag.tag_loc);
-			if (ea_len && (ud_verify_tag(&eah->eah_tag,
+			if (ea_len && (ud_verify_tag(udh, &eah->eah_tag,
 				UD_EXT_ATTR_HDR, block, 1, 1) == 0)) {
 				while (ea_off < ea_len) {
 					/* LINTED */
@@ -678,7 +660,7 @@ set_file(int32_t id, uint32_t iloc, uint64_t value)
 						} else {
 							ds->ds_minor_id = i32;
 						}
-						ud_make_tag(&eah->eah_tag,
+						ud_make_tag(udh, &eah->eah_tag,
 							UD_EXT_ATTR_HDR, block,
 						eah->eah_tag.tag_crc_len);
 						break;
@@ -703,7 +685,7 @@ set_file(int32_t id, uint32_t iloc, uint64_t value)
 			(void) fprintf(stdout,
 				gettext("Unknown set\n"));
 	}
-	ud_make_tag(&fe->fe_tag, UD_FILE_ENTRY,
+	ud_make_tag(udh, &fe->fe_tag, UD_FILE_ENTRY,
 		SWAP_32(fe->fe_tag.tag_loc), fe->fe_tag.tag_crc_len);
 	(void) putblk((caddr_t)fe);
 }
@@ -720,17 +702,17 @@ verify_inode(uint32_t addr, uint32_t type)
 			gettext("Could not read block %x\n"),
 			addr >> l2b);
 	} else {
-		if (ud_verify_tag(tag, UD_FILE_ENTRY, addr >> l2b, 0, 1) != 0) {
+		if (ud_verify_tag(udh, tag, UD_FILE_ENTRY,
+			addr >> l2b, 0, 1) != 0) {
 			(void) fprintf(stdout,
 				gettext("Not a file entry(inode) at %x\n"),
 				addr >> l2b);
 		} else {
-			if (ud_verify_tag(tag, UD_FILE_ENTRY,
+			if (ud_verify_tag(udh, tag, UD_FILE_ENTRY,
 				SWAP_32(tag->tag_loc), 1, 1) != 0) {
 				(void) fprintf(stdout,
 					gettext("CRC failed\n"));
 			} else {
-				/* LINTED */
 				fe = (struct file_entry *)tag;
 				if ((type == 0) ||
 					(type == fe->fe_icb_tag.itag_ftype)) {
@@ -794,7 +776,7 @@ print_dent(uint32_t i_addr, uint32_t nent)
 		while (get_fid(i_addr >> l2b, buf, off) == 0) {
 			off += FID_LEN(fid);
 			if (ent == nent) {
-				print_fid(fid);
+				print_fid(stdout, fid);
 				return;
 			}
 			ent++;
@@ -889,7 +871,7 @@ get_blkno(uint32_t inode, uint32_t *blkno, uint64_t off)
 		if (off < e_off) {
 			bno = de[i].blkno + ((off - b_off) >> l2b);
 			if ((*blkno = ud_xlate_to_daddr(
-					de[i].prn, bno)) == 0) {
+					udh, de[i].prn, bno)) == 0) {
 				return (1);
 			}
 			return (0);
@@ -929,7 +911,7 @@ read_file(uint32_t inode, uint8_t *buf, uint32_t count, uint64_t off)
 				return (1);
 			}
 		}
-		tcount = udfs.lbsize - (off & bmask);
+		tcount = udh->udfs.lbsize - (off & bmask);
 		if (tcount > count) {
 			tcount = count;
 		}
@@ -953,7 +935,7 @@ get_fid(uint32_t inode, uint8_t *buf, uint64_t off)
 		return (1);
 	}
 
-	if (ud_verify_tag(&fid->fid_tag, UD_FILE_ID_DESC, 0, 0, 1) != 0) {
+	if (ud_verify_tag(udh, &fid->fid_tag, UD_FILE_ID_DESC, 0, 0, 1) != 0) {
 		(void) fprintf(stdout,
 			gettext("file_id tag does not verify off %llx\n"),
 			off);
@@ -987,7 +969,7 @@ inode_from_path(char *path, uint32_t *in, uint8_t *fl)
 
 	if (strcmp(path, "/") == 0) {
 		*fl = FID_DIR;
-		if ((*in = ud_xlate_to_daddr(ricb_prn, ricb_loc)) == 0) {
+		if ((*in = ud_xlate_to_daddr(udh, ricb_prn, ricb_loc)) == 0) {
 			return (1);
 		}
 		return (0);
@@ -1033,7 +1015,7 @@ inode_from_path(char *path, uint32_t *in, uint8_t *fl)
 		}
 		if (strcmp((caddr_t)addr, fname) == 0) {
 			*fl = fid->fid_flags;
-			if ((*in = ud_xlate_to_daddr(
+			if ((*in = ud_xlate_to_daddr(udh,
 				SWAP_16(fid->fid_icb.lad_ext_prn),
 				SWAP_32(fid->fid_icb.lad_ext_loc))) == 0) {
 				return (1);
@@ -1045,13 +1027,14 @@ inode_from_path(char *path, uint32_t *in, uint8_t *fl)
 					*in);
 				return (1);
 			}
-			if (ud_verify_tag(tag, UD_FILE_ENTRY, 0, 0, 1) != 0) {
+			if (ud_verify_tag(udh, tag, UD_FILE_ENTRY,
+					0, 0, 1) != 0) {
 				(void) fprintf(stdout,
 					gettext("Not a file entry(inode)"
 					" at %x\n"), *in);
 				return (1);
 			}
-			if (ud_verify_tag(tag, UD_FILE_ENTRY,
+			if (ud_verify_tag(udh, tag, UD_FILE_ENTRY,
 					SWAP_32(tag->tag_loc), 1, 1) != 0) {
 				(void) fprintf(stdout,
 					gettext("CRC failed\n"));
@@ -1103,7 +1086,7 @@ list(char *nm, uint32_t in, uint32_t fl)
 		if (fid->fid_flags & FID_DELETED) {
 			continue;
 		}
-		iloc = ud_xlate_to_daddr(SWAP_16(fid->fid_icb.lad_ext_prn),
+		iloc = ud_xlate_to_daddr(udh, SWAP_16(fid->fid_icb.lad_ext_prn),
 				SWAP_32(fid->fid_icb.lad_ext_loc));
 		if (fl & 1) {
 			(void) fprintf(stdout,
@@ -1381,7 +1364,7 @@ find_it(char *dir, char *name, uint32_t in, uint32_t fl)
 			continue;
 		}
 
-		iloc = ud_xlate_to_daddr(SWAP_16(fid->fid_icb.lad_ext_prn),
+		iloc = ud_xlate_to_daddr(udh, SWAP_16(fid->fid_icb.lad_ext_prn),
 				SWAP_32(fid->fid_icb.lad_ext_loc));
 		addr = &fid->fid_spec[SWAP_16((fid)->fid_iulen) + 1];
 		if (((fl & 4) && (in == iloc)) ||

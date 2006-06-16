@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,50 +19,61 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+FSTYP_VERS=1
 FSTYPE=		udfs
-LIBPROG=	fstyp
-ATTMK=		$(LIBPROG)
+LIBPROG=	fstyp.so.${FSTYP_VERS} 
 
-include		../../Makefile.fstype
+include ../../../../lib/Makefile.lib
+include ../../Makefile.fstype
 
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_LARGEFILE64_SOURCE
-LDLIBS += -ladm
+CFLAGS +=	$(C_PICFLAGS)
+DYNLIB=		$(LIBPROG)
 
-SRCS=	fstyp.c ud_lib.c
+LDLIBS += -lnvpair -ladm -lc
 
-# for messaging catalog
+LINTFLAGS += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED -erroff=E_NAME_DEF_NOT_USED2
+
 #
-POFILE= fstyp.po
+# Override PMAP dependency
+#
+PMAP=
 
-catalog:        $(POFILE)
+OBJS= fstyp.o ud_lib.o
 
-$(POFILE):      $(SRCS)
-	$(RM) $@
-	$(COMPILE.cpp) $(SRCS)   > $(POFILE).i
-	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i
-	sed "/^domain/d" messages.po >  $@
-	$(RM) $(POFILE).i messages.po
+SRCS= $(OBJS:%.o=%.c)
 
-fstyp: fstyp.o ud_lib.o
-	$(LINK.c) -o $@ fstyp.o ud_lib.o $(LDLIBS)
-	$(POST_PROCESS)
+CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
-clean :
-	rm -f fstyp.o ud_lib.o
+$(LIBPROG): $(OBJS)
+	$(LINK.c) $(CPPFLAGS) $(CFLAGS) $(DYNFLAGS) $(GSHARED) -o $@ $(OBJS) \
+	    $(LDLIBS)
+	$(POST_PROCESS_SO)
 
-lint:
-	$(LINT.c) -mu $(SRCS)
+%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
-putback :
-	-cstyle -p fstyp.c
-	-cstyle -p ud_lib.c
-	-keywords fstyp.c
-	-keywords ud_lib.c
-	-keywords Makefile
+.KEEP_STATE:
+
+all: $(LIBPROG)
+
+install: all
+	$(RM) $(ROOTLIBFSTYPE)/fstyp
+	$(LN) $(ROOTUSRSBIN)/fstyp $(ROOTLIBFSTYPE)/fstyp
+
+lint: lint_SRCS
+
+cstyle:
+	$(CSTYLE) $(SRCS)
+
+clean:     
+	$(RM) $(LIBPROG)
+
+clobber: clean

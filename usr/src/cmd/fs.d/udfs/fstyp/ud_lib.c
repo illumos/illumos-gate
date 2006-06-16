@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,75 +44,47 @@
 #include <sys/fs/udf_volume.h>
 #include "ud_lib.h"
 
-struct	udf	udfs;
-struct	ud_part	part[MAX_PARTS];
-int32_t	n_parts = 0;
-struct	ud_map	maps[MAX_MAPS];
-int32_t	n_maps = 0;
-
 extern char *getfullrawname(char *);
 
-int32_t ud_open_dev(char *, uint32_t);
-void	ud_close_dev(int32_t);
-int32_t	ud_read_dev(int32_t, uint64_t, uint8_t *, uint32_t);
-int32_t	ud_write_dev(int32_t, uint64_t, uint8_t *, uint32_t);
+static int32_t ud_get_ecma_ver(ud_handle_t, uint32_t);
+static int32_t ud_get_fs_bsize(ud_handle_t, uint32_t, uint32_t *);
+static int32_t ud_parse_fill_vds(ud_handle_t, struct vds *, uint32_t, uint32_t);
+static int32_t	ud_read_and_translate_lvd(ud_handle_t, uint32_t, uint32_t);
+static int32_t ud_get_latest_lvid(ud_handle_t, uint32_t, uint32_t);
+static int32_t	ud_get_latest_fsd(ud_handle_t, uint16_t, uint32_t, uint32_t);
+
+static uint16_t ud_crc(uint8_t *, int32_t);
+static int32_t UdfTxName(uint16_t *, int32_t);
+static int32_t UncompressUnicode(int32_t, uint8_t *, uint16_t *);
+static int32_t ud_compressunicode(int32_t, int32_t, uint16_t *, uint8_t *);
+static int32_t ud_convert2utf8(uint8_t *, uint8_t *, int32_t);
+static int32_t ud_convert2utf16(uint8_t *, uint8_t *, int32_t);
 
 
-int32_t ud_fill_udfs_info(int32_t);
-int32_t ud_get_ecma_ver(int32_t, uint32_t);
-int32_t ud_get_fs_bsize(int32_t, uint32_t, uint32_t *);
-int32_t ud_parse_fill_vds(struct vds *, int32_t, uint32_t, uint32_t);
-int32_t	ud_read_and_translate_lvd(int32_t, uint32_t, uint32_t);
-int32_t ud_get_latest_lvid(int32_t, uint32_t, uint32_t);
-int32_t	ud_get_latest_fsd(int32_t, uint16_t, uint32_t, uint32_t);
-int32_t ud_get_num_blks(int32_t, uint32_t *);
-uint32_t ud_xlate_to_daddr(uint16_t, uint32_t);
+int
+ud_init(int fd, ud_handle_t *hp)
+{
+	struct ud_handle *h;
 
-int32_t ud_verify_tag(struct tag *, uint16_t, uint32_t, int32_t, int32_t);
-void ud_make_tag(struct tag *, uint16_t, uint32_t, uint16_t);
-uint16_t ud_crc(uint8_t *, int32_t);
-int32_t UdfTxName(uint16_t *, int32_t);
-int32_t UncompressUnicode(int32_t, uint8_t *, uint16_t *);
-int32_t ud_compressunicode(int32_t, int32_t, uint16_t *, uint8_t *);
-int32_t ud_convert2utf8(uint8_t *, uint8_t *, int32_t);
-int32_t ud_convert2utf16(uint8_t *, uint8_t *, int32_t);
-void ud_convert2local(int8_t *, int8_t *, int32_t);
+	if ((h = calloc(1, sizeof (struct ud_handle))) == NULL) {
+		return (ENOMEM);
+	}
+	h->fd = fd;
+	*hp = h;
+	return (0);
+}
 
-void print_charspec(char *, struct charspec *);
-void print_dstring(char *, uint16_t, char *, uint8_t);
-void set_dstring(dstring_t *, char *, int32_t);
-void print_tstamp(char *, tstamp_t *);
-void print_regid(char *, struct regid *, int32_t);
+void
+ud_fini(ud_handle_t h)
+{
+	free(h);
+}
 
-void print_ext_ad(char *, struct extent_ad *);
-void print_tag(struct tag *);
-void print_pvd(struct pri_vol_desc *);
-void print_avd(struct anch_vol_desc_ptr *);
-void print_vdp(struct vol_desc_ptr *);
-void print_iuvd(struct iuvd_desc *);
-void print_part(struct part_desc *);
-void print_lvd(struct log_vol_desc *);
-void print_usd(struct unall_spc_desc *);
-void print_lvid(struct log_vol_int_desc *);
-void print_part(struct part_desc *);
-
-void print_fsd(struct file_set_desc *);
-void print_phdr(struct phdr_desc *);
-void print_fid(struct file_id *);
-void print_fsd(struct file_set_desc *);
-void print_icb_tag(struct icb_tag *);
-void print_ie(struct indirect_entry *);
-void print_td(struct term_desc *);
-void print_fe(struct file_entry *);
-void print_pmaps(uint8_t *, int32_t);
-void print_short_ad(char *, struct short_ad *);
-void print_long_ad(char *, struct long_ad *);
-
+/* ARGSUSED */
 int32_t
-ud_open_dev(char *special, uint32_t flags)
+ud_open_dev(ud_handle_t h, char *special, uint32_t flags)
 {
 	char *temp;
-	int32_t fd = -1;
 	struct stat i_stat, r_stat;
 
 	(void) bzero(&i_stat, sizeof (struct stat));
@@ -160,53 +131,54 @@ ud_open_dev(char *special, uint32_t flags)
 	/*
 	 * Now finally open the device
 	 */
-	fd = open(temp, flags);
+	h->fd = open(temp, flags);
 
-	return (fd);
+	return (h->fd);
 }
 
+/* ARGSUSED */
 void
-ud_close_dev(int32_t fd)
+ud_close_dev(ud_handle_t h)
 {
 	/*
 	 * Too simple Just close it
 	 */
-	(void) close(fd);
+	(void) close(h->fd);
 }
 
 int32_t
-ud_read_dev(int32_t fd, uint64_t offset, uint8_t *buf, uint32_t count)
+ud_read_dev(ud_handle_t h, uint64_t offset, uint8_t *buf, uint32_t count)
 {
 	/*
 	 * Seek to the given offset
 	 */
-	if (llseek(fd, offset, SEEK_SET) == -1) {
+	if (lseek(h->fd, offset, SEEK_SET) == -1) {
 		return (1);
 	}
 
 	/*
 	 * Read the required number of bytes
 	 */
-	if (read(fd, buf, count) != count) {
+	if (read(h->fd, buf, count) != count) {
 		return (1);
 	}
 	return (0);
 }
 
 int32_t
-ud_write_dev(int32_t fd, uint64_t offset, uint8_t *buf, uint32_t count)
+ud_write_dev(ud_handle_t h, uint64_t offset, uint8_t *buf, uint32_t count)
 {
 	/*
 	 * Seek to the given offset
 	 */
-	if (llseek(fd, offset, SEEK_SET) == -1) {
+	if (lseek(h->fd, offset, SEEK_SET) == -1) {
 		return (1);
 	}
 
 	/*
 	 * Read the appropriate number of bytes
 	 */
-	if (write(fd, buf, count) != count) {
+	if (write(h->fd, buf, count) != count) {
 		return (1);
 	}
 	return (0);
@@ -215,66 +187,66 @@ ud_write_dev(int32_t fd, uint64_t offset, uint8_t *buf, uint32_t count)
 /* ----- BEGIN Read and translate the on disk VDS to IN CORE format -------- */
 
 int32_t
-ud_fill_udfs_info(int32_t fd)
+ud_fill_udfs_info(ud_handle_t h)
 {
 	struct	anch_vol_desc_ptr	*avdp = NULL;
 	uint32_t			offset = 0;
 
-	if (ioctl(fd, CDROMREADOFFSET, &offset) == -1) {
+	if (ioctl(h->fd, CDROMREADOFFSET, &offset) == -1) {
 		offset = 0;
 	}
 
-	udfs.flags = INVALID_UDFS;
+	h->udfs.flags = INVALID_UDFS;
 
-	udfs.ecma_version = ud_get_ecma_ver(fd, offset);
-	if (udfs.ecma_version == UD_ECMA_UNKN) {
+	h->udfs.ecma_version = ud_get_ecma_ver(h, offset);
+	if (h->udfs.ecma_version == UD_ECMA_UNKN) {
 		return (1);
 	}
 
-	udfs.lbsize = ud_get_fs_bsize(fd, offset, &udfs.avdp_loc);
-	if (udfs.lbsize == 0) {
+	h->udfs.lbsize = ud_get_fs_bsize(h, offset, &h->udfs.avdp_loc);
+	if (h->udfs.lbsize == 0) {
 		return (2);
 	}
 
-	udfs.avdp_len = lb_roundup(512, udfs.lbsize);
+	h->udfs.avdp_len = lb_roundup(512, h->udfs.lbsize);
 
 
 	if ((avdp = (struct anch_vol_desc_ptr *)
-			malloc(udfs.lbsize)) == NULL) {
+			malloc(h->udfs.lbsize)) == NULL) {
 		return (3);
 	}
-	if (ud_read_dev(fd, udfs.avdp_loc * udfs.lbsize,
-			(uint8_t *)avdp, udfs.lbsize) != 0) {
+	if (ud_read_dev(h, h->udfs.avdp_loc * h->udfs.lbsize,
+			(uint8_t *)avdp, h->udfs.lbsize) != 0) {
 		free(avdp);
 		return (4);
 	}
-	if (ud_verify_tag(&avdp->avd_tag, UD_ANCH_VOL_DESC,
-			udfs.avdp_loc, 1, 0) != 0) {
+	if (ud_verify_tag(h, &avdp->avd_tag, UD_ANCH_VOL_DESC,
+			h->udfs.avdp_loc, 1, 0) != 0) {
 		free(avdp);
 		return (5);
 	}
 
-	udfs.mvds_loc = SWAP_32(avdp->avd_main_vdse.ext_loc);
-	udfs.mvds_len = SWAP_32(avdp->avd_main_vdse.ext_len);
+	h->udfs.mvds_loc = SWAP_32(avdp->avd_main_vdse.ext_loc);
+	h->udfs.mvds_len = SWAP_32(avdp->avd_main_vdse.ext_len);
 
-	udfs.rvds_loc = SWAP_32(avdp->avd_res_vdse.ext_loc);
-	udfs.rvds_len = SWAP_32(avdp->avd_res_vdse.ext_len);
+	h->udfs.rvds_loc = SWAP_32(avdp->avd_res_vdse.ext_loc);
+	h->udfs.rvds_len = SWAP_32(avdp->avd_res_vdse.ext_len);
 
 	free(avdp);
 
 	/*
 	 * get information from mvds and rvds
 	 */
-	if (ud_parse_fill_vds(&udfs.mvds, fd,
-			udfs.mvds_loc, udfs.mvds_len) == 0) {
-		udfs.flags |= VALID_MVDS;
+	if (ud_parse_fill_vds(h, &h->udfs.mvds,
+			h->udfs.mvds_loc, h->udfs.mvds_len) == 0) {
+		h->udfs.flags |= VALID_MVDS;
 	}
-	if (ud_parse_fill_vds(&udfs.rvds, fd,
-			udfs.rvds_loc, udfs.rvds_len) == 0) {
-		udfs.flags |= VALID_RVDS;
+	if (ud_parse_fill_vds(h, &h->udfs.rvds,
+			h->udfs.rvds_loc, h->udfs.rvds_len) == 0) {
+		h->udfs.flags |= VALID_RVDS;
 	}
 
-	if ((udfs.flags & (VALID_MVDS | VALID_RVDS)) == 0) {
+	if ((h->udfs.flags & (VALID_MVDS | VALID_RVDS)) == 0) {
 		return (6);
 	}
 
@@ -283,25 +255,25 @@ ud_fill_udfs_info(int32_t fd)
 	 * a valid Volume Descriptor Seqence
 	 * Read and understand lvd
 	 */
-	if (udfs.flags & VALID_MVDS) {
-		if (ud_read_and_translate_lvd(fd, udfs.mvds.lvd_loc,
-				udfs.mvds.lvd_len) != 0) {
+	if (h->udfs.flags & VALID_MVDS) {
+		if (ud_read_and_translate_lvd(h, h->udfs.mvds.lvd_loc,
+				h->udfs.mvds.lvd_len) != 0) {
 			return (7);
 		}
 	} else {
-		if (ud_read_and_translate_lvd(fd, udfs.rvds.lvd_loc,
-				udfs.rvds.lvd_len) != 0) {
+		if (ud_read_and_translate_lvd(h, h->udfs.rvds.lvd_loc,
+				h->udfs.rvds.lvd_len) != 0) {
 			return (8);
 		}
 	}
 
-	udfs.flags |= VALID_UDFS;
+	h->udfs.flags |= VALID_UDFS;
 
 	return (0);
 }
 
-int32_t
-ud_get_ecma_ver(int32_t fd, uint32_t offset)
+static int32_t
+ud_get_ecma_ver(ud_handle_t h, uint32_t offset)
 {
 	uint8_t *buf;
 	uint64_t off;
@@ -328,7 +300,7 @@ ud_get_ecma_ver(int32_t fd, uint32_t offset)
 	end_off = offset * 2048 + UD_VOL_REC_END;
 	for (; off < end_off; off += UD_VOL_REC_BSZ) {
 
-		if (ud_read_dev(fd, off, buf, UD_VOL_REC_BSZ) == 0) {
+		if (ud_read_dev(h, off, buf, UD_VOL_REC_BSZ) == 0) {
 
 			ndsc = (struct nsr_desc *)buf;
 			/*
@@ -343,7 +315,7 @@ ud_get_ecma_ver(int32_t fd, uint32_t offset)
 					((ndsc->nsr_id[4] == '2') ||
 					(ndsc->nsr_id[4] == '3'))) {
 
-				(void) strncpy((char *)udfs.ecma_id,
+				(void) strncpy((char *)h->udfs.ecma_id,
 					(char *)ndsc->nsr_id, 5);
 
 				switch (ndsc->nsr_id[4]) {
@@ -374,11 +346,11 @@ end:
 	return (ecma_ver);
 }
 
-uint32_t last_block_index[] = {0, 0, 256, 2, 2 + 256,
+static uint32_t last_block_index[] = {0, 0, 256, 2, 2 + 256,
 		150, 150 + 256, 152, 152 + 256};
 
-int32_t
-ud_get_fs_bsize(int32_t fd, uint32_t offset, uint32_t *avd_loc)
+static int32_t
+ud_get_fs_bsize(ud_handle_t h, uint32_t offset, uint32_t *avd_loc)
 {
 	uint64_t off;
 	int32_t index, bsize, shift, end_index;
@@ -395,7 +367,7 @@ ud_get_fs_bsize(int32_t fd, uint32_t offset, uint32_t *avd_loc)
 	 * search at 256, N, N - 256 blocks
 	 * otherwise just check at 256
 	 */
-	if (ud_get_num_blks(fd, &num_blocks) != 0) {
+	if (ud_get_num_blks(h, &num_blocks) != 0) {
 		end_index = 1;
 		num_blocks = 0;
 	} else {
@@ -432,7 +404,7 @@ ud_get_fs_bsize(int32_t fd, uint32_t offset, uint32_t *avd_loc)
 				}
 			} else {
 				/*
-				 * Caliculate the bsize avd block
+				 * Calculate the bsize avd block
 				 */
 				if ((num_blocks) &&
 					(num_blocks > (sub_blk << shift))) {
@@ -448,7 +420,7 @@ ud_get_fs_bsize(int32_t fd, uint32_t offset, uint32_t *avd_loc)
 			/*
 			 * Read bsize bytes at off
 			 */
-			if (ud_read_dev(fd, off, buf, bsize) != 0) {
+			if (ud_read_dev(h, off, buf, bsize) != 0) {
 				continue;
 			}
 
@@ -458,7 +430,7 @@ ud_get_fs_bsize(int32_t fd, uint32_t offset, uint32_t *avd_loc)
 
 			/* LINTED */
 			avdp = (struct anch_vol_desc_ptr *)buf;
-			if (ud_verify_tag(&avdp->avd_tag,
+			if (ud_verify_tag(h, &avdp->avd_tag,
 				UD_ANCH_VOL_DESC, *avd_loc, 1, 0) != 0) {
 				continue;
 			}
@@ -475,8 +447,8 @@ end:
 	return (bsize);
 }
 
-int32_t
-ud_parse_fill_vds(struct vds *v, int32_t fd,
+static int32_t
+ud_parse_fill_vds(ud_handle_t h, struct vds *v,
 	uint32_t vds_loc, uint32_t vds_len)
 {
 	uint8_t *addr, *taddr, *eaddr;
@@ -494,13 +466,13 @@ begin:
 		return (1);
 	}
 
-	off = vds_loc * udfs.lbsize;
-	if (ud_read_dev(fd, off, addr, vds_len) != 0) {
+	off = vds_loc * h->udfs.lbsize;
+	if (ud_read_dev(h, off, addr, vds_len) != 0) {
 		goto end;
 	}
 
-	for (taddr = addr, eaddr = addr + udfs.mvds_len; taddr < eaddr;
-			taddr += udfs.lbsize, vds_loc ++) {
+	for (taddr = addr, eaddr = addr + h->udfs.mvds_len; taddr < eaddr;
+			taddr += h->udfs.lbsize, vds_loc ++) {
 
 		/* LINTED */
 		tag = (struct tag *)taddr;
@@ -509,7 +481,7 @@ begin:
 		 * If you cannot verify the tag just skip it
 		 * This is not a fatal error
 		 */
-		if (ud_verify_tag(tag, id, vds_loc, 1, 0) != 0) {
+		if (ud_verify_tag(h, tag, id, vds_loc, 1, 0) != 0) {
 			continue;
 		}
 		switch (id) {
@@ -524,7 +496,7 @@ begin:
 				(SWAP_32(pvd->pvd_vdsn) > v->pvd_vdsn)) {
 				v->pvd_vdsn = SWAP_32(pvd->pvd_vdsn);
 				v->pvd_loc = vds_loc;
-				v->pvd_len = udfs.lbsize;
+				v->pvd_len = h->udfs.lbsize;
 			}
 			break;
 		case UD_VOL_DESC_PTR :
@@ -549,12 +521,12 @@ begin:
 			 * Implementation Use Volume Descriptor
 			 */
 			v->iud_loc = vds_loc;
-			v->iud_len = lb_roundup(512, udfs.lbsize);
+			v->iud_len = lb_roundup(512, h->udfs.lbsize);
 			break;
 		case UD_PART_DESC :
 			{
 				struct ud_part *p;
-				struct phdr_desc *h;
+				struct phdr_desc *ph;
 				struct part_desc *pd;
 
 				/*
@@ -563,8 +535,8 @@ begin:
 				/* LINTED */
 				pd = (struct part_desc *)taddr;
 
-				for (i = 0; i < n_parts; i++) {
-					p = &part[i];
+				for (i = 0; i < h->n_parts; i++) {
+					p = &h->part[i];
 
 					if ((SWAP_16(pd->pd_pnum) ==
 							p->udp_number) &&
@@ -576,9 +548,9 @@ begin:
 
 				v->part_loc[i] = vds_loc;
 				v->part_len[i] =
-					lb_roundup(512, udfs.lbsize);
+					lb_roundup(512, h->udfs.lbsize);
 
-				p = &part[i];
+				p = &h->part[i];
 				p->udp_number = SWAP_16(pd->pd_pnum);
 				p->udp_seqno = SWAP_32(pd->pd_vdsn);
 				p->udp_access = SWAP_32(pd->pd_acc_type);
@@ -586,23 +558,23 @@ begin:
 				p->udp_length = SWAP_32(pd->pd_part_length);
 
 				/* LINTED */
-				h = (struct phdr_desc *)pd->pd_pc_use;
-				if (h->phdr_ust.sad_ext_len) {
+				ph = (struct phdr_desc *)pd->pd_pc_use;
+				if (ph->phdr_ust.sad_ext_len) {
 			p->udp_flags = UDP_SPACETBLS;
-			p->udp_unall_loc = SWAP_32(h->phdr_ust.sad_ext_loc);
-			p->udp_unall_len = SWAP_32(h->phdr_ust.sad_ext_len);
-			p->udp_freed_loc = SWAP_32(h->phdr_fst.sad_ext_loc);
-			p->udp_freed_len = SWAP_32(h->phdr_fst.sad_ext_len);
+			p->udp_unall_loc = SWAP_32(ph->phdr_ust.sad_ext_loc);
+			p->udp_unall_len = SWAP_32(ph->phdr_ust.sad_ext_len);
+			p->udp_freed_loc = SWAP_32(ph->phdr_fst.sad_ext_loc);
+			p->udp_freed_len = SWAP_32(ph->phdr_fst.sad_ext_len);
 				} else {
 			p->udp_flags = UDP_BITMAPS;
-			p->udp_unall_loc = SWAP_32(h->phdr_usb.sad_ext_loc);
-			p->udp_unall_len = SWAP_32(h->phdr_usb.sad_ext_len);
-			p->udp_freed_loc = SWAP_32(h->phdr_fsb.sad_ext_loc);
-			p->udp_freed_len = SWAP_32(h->phdr_fsb.sad_ext_len);
+			p->udp_unall_loc = SWAP_32(ph->phdr_usb.sad_ext_loc);
+			p->udp_unall_len = SWAP_32(ph->phdr_usb.sad_ext_len);
+			p->udp_freed_loc = SWAP_32(ph->phdr_fsb.sad_ext_loc);
+			p->udp_freed_len = SWAP_32(ph->phdr_fsb.sad_ext_len);
 				}
 
-				if (i == n_parts) {
-					n_parts ++;
+				if (i == h->n_parts) {
+					h->n_parts ++;
 				}
 			}
 			break;
@@ -620,7 +592,7 @@ begin:
 				v->lvd_len = ((uint32_t)
 					&((struct log_vol_desc *)0)->lvd_pmaps);
 				v->lvd_len =
-					lb_roundup(v->lvd_len, udfs.lbsize);
+					lb_roundup(v->lvd_len, h->udfs.lbsize);
 			}
 			break;
 		case UD_UNALL_SPA_DESC :
@@ -635,7 +607,7 @@ begin:
 			&((unall_spc_desc_t *)0)->ua_al_dsc) +
 				SWAP_32(usd->ua_nad) *
 				sizeof (struct extent_ad);
-			v->usd_len = lb_roundup(v->usd_len, udfs.lbsize);
+			v->usd_len = lb_roundup(v->usd_len, h->udfs.lbsize);
 			break;
 		case UD_TERM_DESC :
 			/*
@@ -662,8 +634,8 @@ end:
 	return (0);
 }
 
-int32_t
-ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
+static int32_t
+ud_read_and_translate_lvd(ud_handle_t h, uint32_t lvd_loc, uint32_t lvd_len)
 {
 	caddr_t addr;
 	uint16_t fsd_prn;
@@ -674,7 +646,7 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 
 	int32_t max_maps, i, mp_sz, index;
 	struct ud_map *m;
-	struct pmap_hdr *h;
+	struct pmap_hdr *ph;
 	struct pmap_typ1 *typ1;
 	struct pmap_typ2 *typ2;
 
@@ -687,13 +659,13 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 		return (1);
 	}
 
-	off = lvd_loc * udfs.lbsize;
-	if (ud_read_dev(fd, off, (uint8_t *)lvd, lvd_len) != 0) {
+	off = lvd_loc * h->udfs.lbsize;
+	if (ud_read_dev(h, off, (uint8_t *)lvd, lvd_len) != 0) {
 		free(lvd);
 		return (1);
 	}
 
-	if (ud_verify_tag(&lvd->lvd_tag, UD_LOG_VOL_DESC,
+	if (ud_verify_tag(h, &lvd->lvd_tag, UD_LOG_VOL_DESC,
 			lvd_loc, 1, 0) != 0) {
 		free(lvd);
 		return (1);
@@ -703,25 +675,25 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 	 * Take care of maps
 	 */
 	max_maps = SWAP_32(lvd->lvd_num_pmaps);
-	h = (struct pmap_hdr *)lvd->lvd_pmaps;
-	for (n_maps = index = 0; index < max_maps; index++) {
-		m = &maps[n_maps];
-		switch (h->maph_type) {
+	ph = (struct pmap_hdr *)lvd->lvd_pmaps;
+	for (h->n_maps = index = 0; index < max_maps; index++) {
+		m = &h->maps[h->n_maps];
+		switch (ph->maph_type) {
 		case MAP_TYPE1 :
 
 			/* LINTED */
-			typ1 = (struct pmap_typ1 *)h;
+			typ1 = (struct pmap_typ1 *)ph;
 
 			m->udm_flags = UDM_MAP_NORM;
 			m->udm_vsn = SWAP_16(typ1->map1_vsn);
 			m->udm_pn = SWAP_16(typ1->map1_pn);
-			n_maps++;
+			h->n_maps++;
 			break;
 
 		case MAP_TYPE2 :
 
 			/* LINTED */
-			typ2 = (struct pmap_typ2 *)h;
+			typ2 = (struct pmap_typ2 *)ph;
 
 			if (strncmp(typ2->map2_pti.reg_id,
 					UDF_VIRT_PART, 23) == 0) {
@@ -745,7 +717,7 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 				m->udm_nspm = typ2->map2_nst;
 				m->udm_spsz = SWAP_32(typ2->map2_sest);
 
-				mp_sz = lb_roundup(m->udm_spsz, udfs.lbsize);
+				mp_sz = lb_roundup(m->udm_spsz, h->udfs.lbsize);
 
 				if ((addr = malloc(mp_sz * m->udm_nspm)) ==
 						NULL) {
@@ -757,8 +729,8 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 						SWAP_32(typ2->map2_st[index]);
 					m->udm_spaddr[i] = addr + i * mp_sz;
 
-					off = m->udm_loc[i] * udfs.lbsize;
-					if (ud_read_dev(fd, off,
+					off = m->udm_loc[i] * h->udfs.lbsize;
+					if (ud_read_dev(h, off,
 						(uint8_t *)m->udm_spaddr[i],
 							mp_sz) != 0) {
 						m->udm_spaddr[i] = NULL;
@@ -766,11 +738,11 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 					}
 				}
 			}
-			n_maps++;
+			h->n_maps++;
 		default :
 			break;
 		}
-		h = (struct pmap_hdr *)(((uint8_t *)h) + h->maph_length);
+		ph = (struct pmap_hdr *)(((uint8_t *)h) + ph->maph_length);
 	}
 
 	lvds_loc = SWAP_32(lvd->lvd_int_seq_ext.ext_loc);
@@ -785,19 +757,19 @@ ud_read_and_translate_lvd(int32_t fd, uint32_t lvd_loc, uint32_t lvd_len)
 	/*
 	 * Get the latest LVID
 	 */
-	if (ud_get_latest_lvid(fd, lvds_loc, lvds_len) != 0) {
+	if (ud_get_latest_lvid(h, lvds_loc, lvds_len) != 0) {
 		return (1);
 	}
 
-	if (ud_get_latest_fsd(fd, fsd_prn, fsd_loc, fsd_len) != 0) {
+	if (ud_get_latest_fsd(h, fsd_prn, fsd_loc, fsd_len) != 0) {
 		return (1);
 	}
 
 	return (0);
 }
 
-int32_t
-ud_get_latest_lvid(int32_t fd, uint32_t lvds_loc, uint32_t lvds_len)
+static int32_t
+ud_get_latest_lvid(ud_handle_t h, uint32_t lvds_loc, uint32_t lvds_len)
 {
 	uint8_t *addr, *taddr, *eaddr;
 	uint16_t id;
@@ -810,13 +782,13 @@ begin:
 		return (1);
 	}
 
-	off = lvds_loc * udfs.lbsize;
-	if (ud_read_dev(fd, off, addr, lvds_len) != 0) {
+	off = lvds_loc * h->udfs.lbsize;
+	if (ud_read_dev(h, off, addr, lvds_len) != 0) {
 		goto end;
 	}
 
-	for (taddr = addr, eaddr = addr + udfs.mvds_len; taddr < eaddr;
-			taddr += udfs.lbsize, lvds_loc ++) {
+	for (taddr = addr, eaddr = addr + h->udfs.mvds_len; taddr < eaddr;
+			taddr += h->udfs.lbsize, lvds_loc ++) {
 
 		/* LINTED */
 		tag = (struct tag *)taddr;
@@ -825,7 +797,7 @@ begin:
 		 * If you cannot verify the tag just skip it
 		 * This is not a fatal error
 		 */
-		if (ud_verify_tag(tag, id, lvds_loc, 1, 0) != 0) {
+		if (ud_verify_tag(h, tag, id, lvds_loc, 1, 0) != 0) {
 			continue;
 		}
 		switch (id) {
@@ -836,12 +808,13 @@ begin:
 			 */
 			/* LINTED */
 			lvid = (struct log_vol_int_desc *)taddr;
-			udfs.lvid_loc = lvds_loc;
-			udfs.lvid_len = ((uint32_t)
+			h->udfs.lvid_loc = lvds_loc;
+			h->udfs.lvid_len = ((uint32_t)
 			&((struct log_vol_int_desc *)0)->lvid_fst) +
 				SWAP_32(lvid->lvid_npart) * 8 +
 				SWAP_32(lvid->lvid_liu);
-			udfs.lvid_len = lb_roundup(udfs.lvid_len, udfs.lbsize);
+			h->udfs.lvid_len = lb_roundup(h->udfs.lvid_len,
+				h->udfs.lbsize);
 
 			/*
 			 * It seems we have a next integrity
@@ -870,14 +843,14 @@ begin:
 	}
 end:
 	free(addr);
-	if (udfs.lvid_len == 0) {
+	if (h->udfs.lvid_len == 0) {
 		return (1);
 	}
 	return (0);
 }
 
-int32_t
-ud_get_latest_fsd(int32_t fd, uint16_t fsd_prn,
+static int32_t
+ud_get_latest_fsd(ud_handle_t h, uint16_t fsd_prn,
 	uint32_t fsd_loc, uint32_t fsd_len)
 {
 	uint8_t *addr, *taddr, *eaddr;
@@ -889,24 +862,24 @@ ud_get_latest_fsd(int32_t fd, uint16_t fsd_prn,
 	uint32_t old_fsn = 0;
 
 begin:
-	udfs.fsds_prn = fsd_prn;
-	udfs.fsds_loc = fsd_loc;
-	udfs.fsds_len = fsd_len;
+	h->udfs.fsds_prn = fsd_prn;
+	h->udfs.fsds_loc = fsd_loc;
+	h->udfs.fsds_len = fsd_len;
 
-	fsds_loc = ud_xlate_to_daddr(fsd_prn, fsd_loc);
-	fsds_len = lb_roundup(fsd_len, udfs.lbsize);
+	fsds_loc = ud_xlate_to_daddr(h, fsd_prn, fsd_loc);
+	fsds_len = lb_roundup(fsd_len, h->udfs.lbsize);
 
 	if ((addr = (uint8_t *)malloc(fsds_len)) == NULL) {
 		return (1);
 	}
 
-	off = fsds_loc * udfs.lbsize;
-	if (ud_read_dev(fd, off, addr, fsds_len) != 0) {
+	off = fsds_loc * h->udfs.lbsize;
+	if (ud_read_dev(h, off, addr, fsds_len) != 0) {
 		goto end;
 	}
 
-	for (taddr = addr, eaddr = addr + udfs.mvds_len; taddr < eaddr;
-			taddr += udfs.lbsize, fsds_loc ++) {
+	for (taddr = addr, eaddr = addr + h->udfs.mvds_len; taddr < eaddr;
+			taddr += h->udfs.lbsize, fsds_loc ++) {
 
 		/* LINTED */
 		tag = (struct tag *)taddr;
@@ -915,23 +888,24 @@ begin:
 		 * If you cannot verify the tag just skip it
 		 * This is not a fatal error
 		 */
-		if (ud_verify_tag(tag, id, fsds_loc, 1, 0) != 0) {
+		if (ud_verify_tag(h, tag, id, fsds_loc, 1, 0) != 0) {
 			continue;
 		}
 		switch (id) {
 		case UD_FILE_SET_DESC :
 			/* LINTED */
 			fsd = (struct file_set_desc *)taddr;
-			if ((udfs.fsd_len == 0) ||
+			if ((h->udfs.fsd_len == 0) ||
 				(SWAP_32(fsd->fsd_fs_no) > old_fsn)) {
 				old_fsn = SWAP_32(fsd->fsd_fs_no);
-				udfs.fsd_loc = fsds_loc;
-				udfs.fsd_len = lb_roundup(512, udfs.lbsize);
-				udfs.ricb_prn =
+				h->udfs.fsd_loc = fsds_loc;
+				h->udfs.fsd_len = lb_roundup(512,
+					h->udfs.lbsize);
+				h->udfs.ricb_prn =
 					SWAP_16(fsd->fsd_root_icb.lad_ext_prn);
-				udfs.ricb_loc =
+				h->udfs.ricb_loc =
 					SWAP_32(fsd->fsd_root_icb.lad_ext_loc);
-				udfs.ricb_len =
+				h->udfs.ricb_len =
 					SWAP_32(fsd->fsd_root_icb.lad_ext_len);
 			}
 			if (SWAP_32(fsd->fsd_next.lad_ext_len) != 0) {
@@ -958,14 +932,14 @@ begin:
 
 end:
 	free(addr);
-	if (udfs.fsd_len == 0) {
+	if (h->udfs.fsd_len == 0) {
 		return (1);
 	}
 	return (0);
 }
 
 int32_t
-ud_get_num_blks(int32_t fd, uint32_t *blkno)
+ud_get_num_blks(ud_handle_t h, uint32_t *blkno)
 {
 	struct vtoc vtoc;
 	struct dk_cinfo dki_info;
@@ -974,7 +948,7 @@ ud_get_num_blks(int32_t fd, uint32_t *blkno)
 	/*
 	 * Get VTOC from driver
 	 */
-	if ((error = ioctl(fd, DKIOCGVTOC, (intptr_t)&vtoc)) != 0) {
+	if ((error = ioctl(h->fd, DKIOCGVTOC, (intptr_t)&vtoc)) != 0) {
 		return (error);
 	}
 
@@ -988,7 +962,7 @@ ud_get_num_blks(int32_t fd, uint32_t *blkno)
 	/*
 	 * Get dk_cinfo from driver
 	 */
-	if ((error = ioctl(fd, DKIOCINFO, (intptr_t)&dki_info)) != 0) {
+	if ((error = ioctl(h->fd, DKIOCINFO, (intptr_t)&dki_info)) != 0) {
 		return (error);
 	}
 
@@ -1005,17 +979,17 @@ ud_get_num_blks(int32_t fd, uint32_t *blkno)
 }
 
 uint32_t
-ud_xlate_to_daddr(uint16_t prn, uint32_t blkno)
+ud_xlate_to_daddr(ud_handle_t h, uint16_t prn, uint32_t blkno)
 {
 	int32_t i;
 	struct ud_map *m;
 	struct ud_part *p;
 
 
-	if (prn < n_maps) {
-		m = &maps[prn];
-		for (i = 0; i < n_parts; i++) {
-			p = &part[i];
+	if (prn < h->n_maps) {
+		m = &h->maps[prn];
+		for (i = 0; i < h->n_parts; i++) {
+			p = &h->part[i];
 			if (m->udm_pn == p->udp_number) {
 				return (p->udp_start + blkno);
 			}
@@ -1027,7 +1001,7 @@ ud_xlate_to_daddr(uint16_t prn, uint32_t blkno)
 /* ------ END Read and translate the on disk VDS to IN CORE format -------- */
 
 int32_t
-ud_verify_tag(struct tag *tag, uint16_t id,
+ud_verify_tag(ud_handle_t h, struct tag *tag, uint16_t id,
 	uint32_t blockno, int32_t do_crc, int32_t print_msg)
 {
 	int32_t i;
@@ -1040,7 +1014,7 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 	 */
 	if (tag->tag_id != SWAP_16(id)) {
 		if (print_msg != 0) {
-			(void) fprintf(stdout,
+			(void) fprintf(stderr,
 				gettext("tag does not verify tag %x req %x\n"),
 				SWAP_16(tag->tag_id), id);
 		}
@@ -1050,12 +1024,13 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 	/*
 	 * Verify Tag Descriptor Version
 	 */
-	if (SWAP_16(tag->tag_desc_ver) != udfs.ecma_version) {
+	if (SWAP_16(tag->tag_desc_ver) != h->udfs.ecma_version) {
 		if (print_msg != 0) {
-			(void) fprintf(stdout,
+			(void) fprintf(stderr,
 				gettext("tag version does not match with "
 				"NSR descriptor version TAG %x NSR %x\n"),
-				SWAP_16(tag->tag_desc_ver), udfs.ecma_version);
+				SWAP_16(tag->tag_desc_ver),
+				h->udfs.ecma_version);
 		}
 		return (1);
 	}
@@ -1075,7 +1050,7 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 	 */
 	if (cksum != tag->tag_cksum) {
 		if (print_msg != 0) {
-			(void) fprintf(stdout,
+			(void) fprintf(stderr,
 				gettext("Checksum Does not Verify TAG"
 				" %x CALC %x\n"), tag->tag_cksum, cksum);
 		}
@@ -1099,7 +1074,7 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 			 */
 			if (crc != SWAP_16(tag->tag_crc)) {
 				if (print_msg != 0) {
-					(void) fprintf(stdout,
+					(void) fprintf(stderr,
 						gettext("CRC Does not verify"
 						" TAG %x CALC %x %x\n"),
 						SWAP_16(tag->tag_crc),
@@ -1113,7 +1088,7 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 		 */
 		if (SWAP_32(blockno) != tag->tag_loc) {
 			if (print_msg != 0) {
-				(void) fprintf(stdout,
+				(void) fprintf(stderr,
 					gettext("Tag Location Does not verify"
 					" blockno %x tag_blockno %x\n"),
 					blockno, SWAP_32(tag->tag_loc));
@@ -1127,7 +1102,7 @@ ud_verify_tag(struct tag *tag, uint16_t id,
 
 /* ARGSUSED1 */
 void
-ud_make_tag(struct tag *tag, uint16_t tag_id,
+ud_make_tag(ud_handle_t h, struct tag *tag, uint16_t tag_id,
 	uint32_t blkno, uint16_t crc_len)
 {
 	int32_t i;
@@ -1135,7 +1110,7 @@ ud_make_tag(struct tag *tag, uint16_t tag_id,
 	uint8_t *addr, cksum = 0;
 
 	tag->tag_id = SWAP_16(tag_id);
-	tag->tag_desc_ver = SWAP_16(udfs.ecma_version);
+	tag->tag_desc_ver = SWAP_16(h->udfs.ecma_version);
 	tag->tag_cksum = 0;
 	tag->tag_res = 0;
 
@@ -1163,7 +1138,7 @@ ud_make_tag(struct tag *tag, uint16_t tag_id,
 
 /* **************** udf specific subroutines *********************** */
 
-uint16_t ud_crc_table[256] = {
+static uint16_t ud_crc_table[256] = {
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
 	0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
 	0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
@@ -1198,7 +1173,7 @@ uint16_t ud_crc_table[256] = {
 	0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
 };
 
-uint16_t
+static uint16_t
 ud_crc(uint8_t *addr, int32_t len)
 {
 	uint16_t crc = 0;
@@ -1225,7 +1200,7 @@ static uint16_t htoc[16] = {'0', '1', '2', '3',
  * unicode is the string of 16-bot characters
  * length is the number of 16-bit characters
  */
-int32_t
+static int32_t
 UdfTxName(uint16_t *unicode, int32_t count)
 {
 	int32_t i, j, k, lic, make_crc, dot_loc;
@@ -1320,7 +1295,7 @@ UdfTxName(uint16_t *unicode, int32_t count)
  * enough to hold the uncompressed
  * code
  */
-int32_t
+static int32_t
 UncompressUnicode(
 	int32_t numberOfBytes,	/* (Input) number of bytes read from media. */
 	uint8_t *UDFCompressed,	/* (Input) bytes read from media. */
@@ -1372,7 +1347,7 @@ UncompressUnicode(
 
 
 
-int32_t
+static int32_t
 ud_compressunicode(
 	int32_t numberOfChars,	/* (Input) number of unicode characters. */
 	int32_t compID,		/* (Input) compression ID to be used. */
@@ -1399,7 +1374,7 @@ ud_compressunicode(
 }
 
 
-int32_t
+static int32_t
 ud_convert2utf8(uint8_t *ibuf, uint8_t *obuf, int32_t length)
 {
 	int i, size;
@@ -1420,7 +1395,7 @@ ud_convert2utf8(uint8_t *ibuf, uint8_t *obuf, int32_t length)
 	return (size);
 }
 
-int32_t
+static int32_t
 ud_convert2utf16(uint8_t *ibuf, uint8_t *obuf, int32_t length)
 {
 	int32_t comp_len;
@@ -1466,28 +1441,28 @@ ud_convert2local(int8_t *ibuf, int8_t *obuf, int32_t length)
 
 
 void
-print_charspec(char *name, struct charspec *cspec)
+print_charspec(FILE *fout, char *name, struct charspec *cspec)
 {
 	int i = 0;
 
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"%s : %x - \"", name, cspec->cs_type);
 	for (i = 0; i < 63; i++) {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			"%c", cspec->cs_info[i]);
 	}
-	(void) fprintf(stdout, "\n");
+	(void) fprintf(fout, "\n");
 }
 
 /* ARGSUSED */
 void
-print_dstring(char *name, uint16_t cset, char *bufc, uint8_t length)
+print_dstring(FILE *fout, char *name, uint16_t cset, char *bufc, uint8_t length)
 {
 	int8_t bufmb[1024];
 
 	ud_convert2local(bufc, bufmb, length);
 
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"%s %s\n", name, bufmb);
 }
 
@@ -1506,9 +1481,9 @@ set_dstring(dstring_t *dp, char *cp, int32_t len)
 }
 
 void
-print_tstamp(char *name, tstamp_t *ts)
+print_tstamp(FILE *fout, char *name, tstamp_t *ts)
 {
-	(void) fprintf(stdout, "%s tz : %d yr : %d mo : %d da : %d "
+	(void) fprintf(fout, "%s tz : %d yr : %d mo : %d da : %d "
 		"Time : %d : %d : %d : %d : %d : %d\n", name,
 		SWAP_16(ts->ts_tzone), SWAP_16(ts->ts_year), ts->ts_month,
 		ts->ts_day, ts->ts_hour, ts->ts_min, ts->ts_sec, ts->ts_csec,
@@ -1518,7 +1493,7 @@ print_tstamp(char *name, tstamp_t *ts)
 
 
 void
-make_regid(struct regid *reg, char *id, int32_t type)
+make_regid(ud_handle_t h, struct regid *reg, char *id, int32_t type)
 {
 	reg->reg_flags = 0;
 	(void) strncpy(reg->reg_id, id, 23);
@@ -1528,7 +1503,7 @@ make_regid(struct regid *reg, char *id, int32_t type)
 
 		/* LINTED */
 		dis = (struct dom_id_suffix *)reg->reg_ids;
-		dis->dis_udf_revison = SWAP_16(udfs.ma_write);
+		dis->dis_udf_revison = SWAP_16(h->udfs.ma_write);
 		dis->dis_domain_flags = 0;
 
 	} else if (type == REG_UDF_ID) {
@@ -1536,7 +1511,7 @@ make_regid(struct regid *reg, char *id, int32_t type)
 
 		/* LINTED */
 		uis = (struct udf_id_suffix *)reg->reg_ids;
-		uis->uis_udf_revision = SWAP_16(udfs.ma_write);
+		uis->uis_udf_revision = SWAP_16(h->udfs.ma_write);
 		uis->uis_os_class = OS_CLASS_UNIX;
 		uis->uis_os_identifier = OS_IDENTIFIER_SOLARIS;
 	} else if (type == REG_UDF_II) {
@@ -1549,9 +1524,9 @@ make_regid(struct regid *reg, char *id, int32_t type)
 }
 
 void
-print_regid(char *name, struct regid *reg, int32_t type)
+print_regid(FILE *fout, char *name, struct regid *reg, int32_t type)
 {
-	(void) fprintf(stdout, "%s : 0x%x : \"%s\" :",
+	(void) fprintf(fout, "%s : 0x%x : \"%s\" :",
 		name, reg->reg_flags, reg->reg_id);
 
 	if (type == REG_DOM_ID) {
@@ -1559,7 +1534,7 @@ print_regid(char *name, struct regid *reg, int32_t type)
 
 		/* LINTED */
 		dis = (struct dom_id_suffix *)reg->reg_ids;
-		(void) fprintf(stdout, " 0x%x : %s : %s\n",
+		(void) fprintf(fout, " 0x%x : %s : %s\n",
 			SWAP_16(dis->dis_udf_revison),
 			(dis->dis_domain_flags & PROTECT_SOFT_WRITE) ?
 				"HW Protect" : "No HW Write Protect",
@@ -1570,7 +1545,7 @@ print_regid(char *name, struct regid *reg, int32_t type)
 
 		/* LINTED */
 		uis = (struct udf_id_suffix *)reg->reg_ids;
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			" 0x%x : OS Class 0x%x : OS Identifier 0x%x\n",
 			SWAP_16(uis->uis_udf_revision),
 			uis->uis_os_class, uis->uis_os_identifier);
@@ -1578,7 +1553,7 @@ print_regid(char *name, struct regid *reg, int32_t type)
 		struct impl_id_suffix *iis;
 
 		iis = (struct impl_id_suffix *)reg->reg_ids;
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			" OS Class 0x%x : OS Identifier 0x%x\n",
 			iis->iis_os_class, iis->iis_os_identifier);
 	}
@@ -1586,13 +1561,13 @@ print_regid(char *name, struct regid *reg, int32_t type)
 
 #ifdef	OLD
 void
-print_regid(char *name, struct regid *reg)
+print_regid(FILE *fout, char *name, struct regid *reg)
 {
-	(void) fprintf(stdout, "%s : 0x%x : \"%s\" :",
+	(void) fprintf(fout, "%s : 0x%x : \"%s\" :",
 		name, reg->reg_flags, reg->reg_id);
 
 	if (strncmp(reg->reg_id, "*OSTA UDF Compliant", 19) == 0) {
-		(void) fprintf(stdout, " 0x%x : %s : %s\n",
+		(void) fprintf(fout, " 0x%x : %s : %s\n",
 			reg->reg_ids[0] | (reg->reg_ids[1] << 8),
 			(reg->reg_ids[2] & 1) ?
 				"HW Protect" : "No HW Write Protect",
@@ -1602,12 +1577,12 @@ print_regid(char *name, struct regid *reg)
 		(strncmp(reg->reg_id, "*UDF Sparable Partition", 23) == 0) ||
 		(strncmp(reg->reg_id, "*UDF Virtual Alloc Tbl", 22) == 0) ||
 		(strncmp(reg->reg_id, "*UDF Sparing Table", 18) == 0)) {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			" 0x%x : OS Class 0x%x : OS Identifier 0x%x\n",
 			reg->reg_ids[0] | (reg->reg_ids[1] << 8),
 			reg->reg_ids[2], reg->reg_ids[3]);
 	} else {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			" OS Class 0x%x : OS Identifier 0x%x\n",
 			reg->reg_ids[0], reg->reg_ids[1]);
 	}
@@ -1625,17 +1600,17 @@ print_regid(char *name, struct regid *reg)
 /* ------------ Routines to print basic structures Part 3 ---------------- */
 
 void
-print_ext_ad(char *name, struct extent_ad *ead)
+print_ext_ad(FILE *fout, char *name, struct extent_ad *ead)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"%s EAD Len %x Loc %x\n",
 		name, SWAP_32(ead->ext_len), SWAP_32(ead->ext_loc));
 }
 
 void
-print_tag(struct tag *tag)
+print_tag(FILE *fout, struct tag *tag)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"tag_id : %x ver : %x cksum : %x "
 		"sno : %x crc : %x crc_len : %x loc : %x\n",
 		SWAP_16(tag->tag_id), SWAP_16(tag->tag_desc_ver),
@@ -1646,140 +1621,140 @@ print_tag(struct tag *tag)
 
 
 void
-print_pvd(struct pri_vol_desc *pvd)
+print_pvd(FILE *fout, struct pri_vol_desc *pvd)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tPrimary Volume Descriptor\n");
-	print_tag(&pvd->pvd_tag);
-	(void) fprintf(stdout, "vdsn : %x vdn : %x\n",
+	print_tag(fout, &pvd->pvd_tag);
+	(void) fprintf(fout, "vdsn : %x vdn : %x\n",
 		SWAP_32(pvd->pvd_vdsn), SWAP_32(pvd->pvd_pvdn));
-	print_dstring("volid : ", pvd->pvd_desc_cs.cs_type,
+	print_dstring(fout, "volid : ", pvd->pvd_desc_cs.cs_type,
 			pvd->pvd_vol_id, 32);
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"vsn : %x mvsn : %x il : %x mil :"
 		" %x csl : %x mcsl %x\n",
 		SWAP_16(pvd->pvd_vsn), SWAP_16(pvd->pvd_mvsn),
 		SWAP_16(pvd->pvd_il), SWAP_16(pvd->pvd_mil),
 		SWAP_32(pvd->pvd_csl), SWAP_32(pvd->pvd_mcsl));
-	print_dstring("vsid :", pvd->pvd_desc_cs.cs_type,
+	print_dstring(fout, "vsid :", pvd->pvd_desc_cs.cs_type,
 			pvd->pvd_vsi, 128);
-	print_charspec("desc_cs", &pvd->pvd_desc_cs);
-	print_charspec("exp_cs", &pvd->pvd_exp_cs);
-	print_ext_ad("val ", &pvd->pvd_vol_abs);
-	print_ext_ad("vcnl ", &pvd->pvd_vcn);
-	print_regid("ai", &pvd->pvd_appl_id, REG_UDF_II);
-	print_regid("ii", &pvd->pvd_ii, REG_UDF_II);
-	(void) fprintf(stdout, "pvdsl : %x flags : %x\n",
+	print_charspec(fout, "desc_cs", &pvd->pvd_desc_cs);
+	print_charspec(fout, "exp_cs", &pvd->pvd_exp_cs);
+	print_ext_ad(fout, "val ", &pvd->pvd_vol_abs);
+	print_ext_ad(fout, "vcnl ", &pvd->pvd_vcn);
+	print_regid(fout, "ai", &pvd->pvd_appl_id, REG_UDF_II);
+	print_regid(fout, "ii", &pvd->pvd_ii, REG_UDF_II);
+	(void) fprintf(fout, "pvdsl : %x flags : %x\n",
 		SWAP_32(pvd->pvd_pvdsl),
 		SWAP_16(pvd->pvd_flags));
 }
 
 void
-print_avd(struct anch_vol_desc_ptr *avdp)
+print_avd(FILE *fout, struct anch_vol_desc_ptr *avdp)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tAnchor Volume Descriptor\n");
-	print_tag(&avdp->avd_tag);
-	print_ext_ad("Main Volume Descriptor Sequence : ",
+	print_tag(fout, &avdp->avd_tag);
+	print_ext_ad(fout, "Main Volume Descriptor Sequence : ",
 			&avdp->avd_main_vdse);
-	print_ext_ad("Reserve Volume Descriptor Sequence : ",
+	print_ext_ad(fout, "Reserve Volume Descriptor Sequence : ",
 			&avdp->avd_res_vdse);
 }
 
 void
-print_vdp(struct vol_desc_ptr *vdp)
+print_vdp(FILE *fout, struct vol_desc_ptr *vdp)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tVolume Descriptor Pointer\n");
-	print_tag(&vdp->vdp_tag);
-	(void) fprintf(stdout, "vdsn : %x ",
+	print_tag(fout, &vdp->vdp_tag);
+	(void) fprintf(fout, "vdsn : %x ",
 		SWAP_32(vdp->vdp_vdsn));
-	print_ext_ad("vdse ", &vdp->vdp_nvdse);
+	print_ext_ad(fout, "vdse ", &vdp->vdp_nvdse);
 }
 
 void
-print_iuvd(struct iuvd_desc *iuvd)
+print_iuvd(FILE *fout, struct iuvd_desc *iuvd)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tImplementation Use Volume Descriptor\n");
-	print_tag(&iuvd->iuvd_tag);
-	(void) fprintf(stdout,
+	print_tag(fout, &iuvd->iuvd_tag);
+	(void) fprintf(fout,
 		"vdsn : %x ", SWAP_32(iuvd->iuvd_vdsn));
-	print_regid("Impl Id : ", &iuvd->iuvd_ii, REG_UDF_ID);
-	print_charspec("cset ", &iuvd->iuvd_cset);
-	print_dstring("lvi : ", iuvd->iuvd_cset.cs_type,
+	print_regid(fout, "Impl Id : ", &iuvd->iuvd_ii, REG_UDF_ID);
+	print_charspec(fout, "cset ", &iuvd->iuvd_cset);
+	print_dstring(fout, "lvi : ", iuvd->iuvd_cset.cs_type,
 			iuvd->iuvd_lvi, 128);
-	print_dstring("ifo1 : ", iuvd->iuvd_cset.cs_type,
+	print_dstring(fout, "ifo1 : ", iuvd->iuvd_cset.cs_type,
 			iuvd->iuvd_ifo1, 36);
-	print_dstring("ifo2 : ", iuvd->iuvd_cset.cs_type,
+	print_dstring(fout, "ifo2 : ", iuvd->iuvd_cset.cs_type,
 			iuvd->iuvd_ifo2, 36);
-	print_dstring("ifo3 : ", iuvd->iuvd_cset.cs_type,
+	print_dstring(fout, "ifo3 : ", iuvd->iuvd_cset.cs_type,
 			iuvd->iuvd_ifo3, 36);
 
-	print_regid("iid ", &iuvd->iuvd_iid, REG_UDF_II);
+	print_regid(fout, "iid ", &iuvd->iuvd_iid, REG_UDF_II);
 }
 
 void
-print_part(struct part_desc *pd)
+print_part(FILE *fout, struct part_desc *pd)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tPartition Descriptor\n");
-	print_tag(&pd->pd_tag);
-	(void) fprintf(stdout,
+	print_tag(fout, &pd->pd_tag);
+	(void) fprintf(fout,
 		"vdsn : %x flags : %x num : %x ",
 		SWAP_32(pd->pd_vdsn),
 		SWAP_16(pd->pd_pflags),
 		SWAP_16(pd->pd_pnum));
-	print_regid("contents ", &pd->pd_pcontents, REG_UDF_II);
+	print_regid(fout, "contents ", &pd->pd_pcontents, REG_UDF_II);
 	/* LINTED */
-	print_phdr((struct phdr_desc *)(&pd->pd_pc_use));
-	(void) fprintf(stdout,
+	print_phdr(fout, (struct phdr_desc *)(&pd->pd_pc_use));
+	(void) fprintf(fout,
 		"acc : %x start : %x length : %x ",
 		SWAP_32(pd->pd_acc_type),
 		SWAP_32(pd->pd_part_start),
 		SWAP_32(pd->pd_part_length));
-	print_regid("Impl Id : ", &pd->pd_ii, REG_UDF_II);
+	print_regid(fout, "Impl Id : ", &pd->pd_ii, REG_UDF_II);
 }
 
 void
-print_lvd(struct log_vol_desc *lvd)
+print_lvd(FILE *fout, struct log_vol_desc *lvd)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tLogical Volume Descriptor\n");
-	print_tag(&lvd->lvd_tag);
-	(void) fprintf(stdout,
+	print_tag(fout, &lvd->lvd_tag);
+	(void) fprintf(fout,
 		"vdsn : %x ", SWAP_32(lvd->lvd_vdsn));
-	print_charspec("Desc Char Set ", &lvd->lvd_desc_cs);
-	print_dstring("lvid : ", lvd->lvd_desc_cs.cs_type,
+	print_charspec(fout, "Desc Char Set ", &lvd->lvd_desc_cs);
+	print_dstring(fout, "lvid : ", lvd->lvd_desc_cs.cs_type,
 			lvd->lvd_lvid, 28);
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"lbsize : %x ",
 		SWAP_32(lvd->lvd_log_bsize));
-	print_regid("Dom Id", &lvd->lvd_dom_id, REG_DOM_ID);
-	print_long_ad("lvcu", &lvd->lvd_lvcu);
-	(void) fprintf(stdout,
+	print_regid(fout, "Dom Id", &lvd->lvd_dom_id, REG_DOM_ID);
+	print_long_ad(fout, "lvcu", &lvd->lvd_lvcu);
+	(void) fprintf(fout,
 		"mtlen : %x nmaps : %x ",
 		SWAP_32(lvd->lvd_mtbl_len),
 		SWAP_32(lvd->lvd_num_pmaps));
-	print_regid("Impl Id : ", &lvd->lvd_ii, REG_UDF_II);
-	print_ext_ad("Int Seq", &lvd->lvd_int_seq_ext);
-	print_pmaps(lvd->lvd_pmaps, SWAP_32(lvd->lvd_num_pmaps));
+	print_regid(fout, "Impl Id : ", &lvd->lvd_ii, REG_UDF_II);
+	print_ext_ad(fout, "Int Seq", &lvd->lvd_int_seq_ext);
+	print_pmaps(fout, lvd->lvd_pmaps, SWAP_32(lvd->lvd_num_pmaps));
 }
 
 void
-print_usd(struct unall_spc_desc *ua)
+print_usd(FILE *fout, struct unall_spc_desc *ua)
 {
 	int32_t i, count;
 
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tUnallocated Space Descriptor\n");
-	print_tag(&ua->ua_tag);
+	print_tag(fout, &ua->ua_tag);
 	count = SWAP_32(ua->ua_nad);
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"vdsn : %x nad : %x\n",
 		SWAP_32(ua->ua_vdsn), count);
 	for (i = 0; i < count; i++) {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			"loc : %x len : %x\n",
 			SWAP_32(ua->ua_al_dsc[i * 2]),
 			SWAP_32(ua->ua_al_dsc[i * 2 + 1]));
@@ -1787,32 +1762,32 @@ print_usd(struct unall_spc_desc *ua)
 }
 
 void
-print_lvid(struct log_vol_int_desc *lvid)
+print_lvid(FILE *fout, struct log_vol_int_desc *lvid)
 {
 	int32_t i, count;
 	caddr_t addr;
 	struct lvid_iu *liu;
 
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tLogical Volume Integrity Descriptor\n");
-	print_tag(&lvid->lvid_tag);
-	print_tstamp("Rec TM ", &lvid->lvid_tstamp);
+	print_tag(fout, &lvid->lvid_tag);
+	print_tstamp(fout, "Rec TM ", &lvid->lvid_tstamp);
 	if (SWAP_32(lvid->lvid_int_type) == 0) {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			"int_typ : Open\n");
 	} else if (SWAP_32(lvid->lvid_int_type) == 1) {
-		(void) fprintf(stdout, "int_typ : Closed\n");
+		(void) fprintf(fout, "int_typ : Closed\n");
 	} else {
-		(void) fprintf(stdout, "int_typ : Unknown\n");
+		(void) fprintf(fout, "int_typ : Unknown\n");
 	}
-	print_ext_ad("Nie ", &lvid->lvid_nie);
+	print_ext_ad(fout, "Nie ", &lvid->lvid_nie);
 	count = SWAP_32(lvid->lvid_npart);
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"Uniq : %llx npart : %x liu : %x\n",
 		SWAP_64(lvid->lvid_lvcu.lvhd_uniqid),
 		count, SWAP_32(lvid->lvid_liu));
 	for (i = 0; i < count; i++) {
-		(void) fprintf(stdout,
+		(void) fprintf(fout,
 			"Part : %x Free : %x Size : %x\n",
 			i, SWAP_32(lvid->lvid_fst[i]),
 			SWAP_32(lvid->lvid_fst[count + i]));
@@ -1821,8 +1796,8 @@ print_lvid(struct log_vol_int_desc *lvid)
 	addr = (caddr_t)lvid->lvid_fst;
 	/* LINTED */
 	liu = (struct lvid_iu *)(addr + 2 * count * 4);
-	print_regid("Impl Id :", &liu->lvidiu_regid, REG_UDF_II);
-	(void) fprintf(stdout,
+	print_regid(fout, "Impl Id :", &liu->lvidiu_regid, REG_UDF_II);
+	(void) fprintf(fout,
 		"nfiles : %x ndirs : %x miread : %x"
 		" miwrite : %x mawrite : %x\n",
 		SWAP_32(liu->lvidiu_nfiles), SWAP_32(liu->lvidiu_ndirs),
@@ -1834,80 +1809,81 @@ print_lvid(struct log_vol_int_desc *lvid)
 /* ------------ Routines to print basic structures Part 4 ---------------- */
 
 void
-print_fsd(struct file_set_desc *fsd)
+print_fsd(FILE *fout, ud_handle_t h, struct file_set_desc *fsd)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"\n\t\t\tFile Set Descriptor\n");
 
-	print_tag(&fsd->fsd_tag);
-	print_tstamp("Rec TM ", &fsd->fsd_time);
-	(void) fprintf(stdout,
+	print_tag(fout, &fsd->fsd_tag);
+	print_tstamp(fout, "Rec TM ", &fsd->fsd_time);
+	(void) fprintf(fout,
 		"ilvl : %x milvl : %x csl : %x"
 		" mcsl : %x fsn : %x fsdn : %x\n",
 		SWAP_16(fsd->fsd_ilevel), SWAP_16(fsd->fsd_mi_level),
 		SWAP_32(fsd->fsd_cs_list), SWAP_32(fsd->fsd_mcs_list),
 		SWAP_32(fsd->fsd_fs_no), SWAP_32(fsd->fsd_fsd_no));
-	print_charspec("ID CS ", &fsd->fsd_lvidcs);
-	print_dstring("lvi : ", fsd->fsd_lvidcs.cs_type,
+	print_charspec(fout, "ID CS ", &fsd->fsd_lvidcs);
+	print_dstring(fout, "lvi : ", fsd->fsd_lvidcs.cs_type,
 			fsd->fsd_lvid, 128);
-	print_charspec("ID CS ", &fsd->fsd_fscs);
-	print_dstring("fsi : ", fsd->fsd_lvidcs.cs_type,
+	print_charspec(fout, "ID CS ", &fsd->fsd_fscs);
+	print_dstring(fout, "fsi : ", fsd->fsd_lvidcs.cs_type,
 			fsd->fsd_fsi, 32);
-	print_dstring("cfi : ", fsd->fsd_lvidcs.cs_type,
+	print_dstring(fout, "cfi : ", fsd->fsd_lvidcs.cs_type,
 			fsd->fsd_cfi, 32);
-	print_dstring("afi : ", fsd->fsd_lvidcs.cs_type,
+	print_dstring(fout, "afi : ", fsd->fsd_lvidcs.cs_type,
 			fsd->fsd_afi, 32);
-	print_long_ad("Ricb ", &fsd->fsd_root_icb);
-	print_regid("DI ", &fsd->fsd_did, REG_DOM_ID);
-	print_long_ad("Next Fsd ", &fsd->fsd_next);
-	if (udfs.ecma_version == UD_ECMA_VER3) {
-		print_long_ad("System Stream Directory ICB ", &fsd->fsd_next);
+	print_long_ad(fout, "Ricb ", &fsd->fsd_root_icb);
+	print_regid(fout, "DI ", &fsd->fsd_did, REG_DOM_ID);
+	print_long_ad(fout, "Next Fsd ", &fsd->fsd_next);
+	if (h->udfs.ecma_version == UD_ECMA_VER3) {
+		print_long_ad(fout, "System Stream Directory ICB ",
+				&fsd->fsd_next);
 	}
 }
 
 void
-print_phdr(struct phdr_desc *ph)
+print_phdr(FILE *fout, struct phdr_desc *ph)
 {
-	print_short_ad("ust ", &ph->phdr_ust);
-	print_short_ad("usb ", &ph->phdr_usb);
-	print_short_ad("int ", &ph->phdr_it);
-	print_short_ad("fst ", &ph->phdr_fst);
-	print_short_ad("fsh ", &ph->phdr_fsb);
+	print_short_ad(fout, "ust ", &ph->phdr_ust);
+	print_short_ad(fout, "usb ", &ph->phdr_usb);
+	print_short_ad(fout, "int ", &ph->phdr_it);
+	print_short_ad(fout, "fst ", &ph->phdr_fst);
+	print_short_ad(fout, "fsh ", &ph->phdr_fsb);
 }
 
 void
-print_fid(struct file_id *fid)
+print_fid(FILE *fout, struct file_id *fid)
 {
 	int32_t i;
 	uint8_t *addr;
 
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"File Identifier Descriptor\n");
-	print_tag(&fid->fid_tag);
-	(void) fprintf(stdout, "fvn : %x fc : %x length : %x ",
+	print_tag(fout, &fid->fid_tag);
+	(void) fprintf(fout, "fvn : %x fc : %x length : %x ",
 		fid->fid_ver, fid->fid_flags, fid->fid_idlen);
-	print_long_ad("ICB", &fid->fid_icb);
+	print_long_ad(fout, "ICB", &fid->fid_icb);
 	addr = &fid->fid_spec[SWAP_16(fid->fid_iulen)];
-	(void) fprintf(stdout, "iulen : %x comp : %x name : ",
+	(void) fprintf(fout, "iulen : %x comp : %x name : ",
 		SWAP_16(fid->fid_iulen), *addr);
 	addr++;
 	for (i = 0; i < fid->fid_idlen; i++) {
-		(void) fprintf(stdout, "%c", *addr++);
+		(void) fprintf(fout, "%c", *addr++);
 	}
-	(void) fprintf(stdout, "\n");
+	(void) fprintf(fout, "\n");
 }
 
 void
-print_aed(struct alloc_ext_desc *aed)
+print_aed(FILE *fout, struct alloc_ext_desc *aed)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"Allocation Extent Descriptor\n");
-	print_tag(&aed->aed_tag);
-	(void) fprintf(stdout, "prev ael loc : %x laed : %x\n",
+	print_tag(fout, &aed->aed_tag);
+	(void) fprintf(fout, "prev ael loc : %x laed : %x\n",
 		SWAP_32(aed->aed_rev_ael), SWAP_32(aed->aed_len_aed));
 }
 
-char *ftype[] = {
+static char *ftype[] = {
 	"NON",  "USE",  "PIE",  "IE",
 	"DIR",  "REG",  "BDEV", "CDEV",
 	"EATT", "FIFO", "SOCK", "TERM",
@@ -1915,13 +1891,13 @@ char *ftype[] = {
 };
 
 void
-print_icb_tag(struct icb_tag *itag)
+print_icb_tag(FILE *fout, struct icb_tag *itag)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"prnde : %x strat : %x param : %x max_ent %x\n",
 		SWAP_32(itag->itag_prnde), SWAP_16(itag->itag_strategy),
 		SWAP_16(itag->itag_param), SWAP_16(itag->itag_max_ent));
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"ftype : %s prn : %x loc : %x flags : %x\n",
 		(itag->itag_ftype >= 14) ? ftype[0] : ftype[itag->itag_ftype],
 		SWAP_16(itag->itag_lb_prn),
@@ -1930,54 +1906,54 @@ print_icb_tag(struct icb_tag *itag)
 
 
 void
-print_ie(struct indirect_entry *ie)
+print_ie(FILE *fout, struct indirect_entry *ie)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"Indirect Entry\n");
-	print_tag(&ie->ie_tag);
-	print_icb_tag(&ie->ie_icb_tag);
-	print_long_ad("ICB", &ie->ie_indirecticb);
+	print_tag(fout, &ie->ie_tag);
+	print_icb_tag(fout, &ie->ie_icb_tag);
+	print_long_ad(fout, "ICB", &ie->ie_indirecticb);
 }
 
 void
-print_td(struct term_desc *td)
+print_td(FILE *fout, struct term_desc *td)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"Terminating Descriptor\n");
-	print_tag(&td->td_tag);
+	print_tag(fout, &td->td_tag);
 }
 
 void
-print_fe(struct file_entry *fe)
+print_fe(FILE *fout, struct file_entry *fe)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"File Entry\n");
-	print_tag(&fe->fe_tag);
-	print_icb_tag(&fe->fe_icb_tag);
-	(void) fprintf(stdout,
+	print_tag(fout, &fe->fe_tag);
+	print_icb_tag(fout, &fe->fe_icb_tag);
+	(void) fprintf(fout,
 		"uid : %x gid : %x perms : %x nlnk : %x\n",
 		SWAP_32(fe->fe_uid), SWAP_32(fe->fe_gid),
 		SWAP_32(fe->fe_perms), SWAP_16(fe->fe_lcount));
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"rec_for : %x rec_dis : %x rec_len : %x "
 		"sz : %llx blks : %llx\n",
 		fe->fe_rec_for, fe->fe_rec_dis, SWAP_32(fe->fe_rec_len),
 		SWAP_64(fe->fe_info_len), SWAP_64(fe->fe_lbr));
-	print_tstamp("ctime ", &fe->fe_acc_time);
-	print_tstamp("mtime ", &fe->fe_mod_time);
-	print_tstamp("atime ", &fe->fe_attr_time);
-	(void) fprintf(stdout,
+	print_tstamp(fout, "ctime ", &fe->fe_acc_time);
+	print_tstamp(fout, "mtime ", &fe->fe_mod_time);
+	print_tstamp(fout, "atime ", &fe->fe_attr_time);
+	(void) fprintf(fout,
 		"ckpoint : %x ", SWAP_32(fe->fe_ckpoint));
-	print_long_ad("ICB", &fe->fe_ea_icb);
-	print_regid("impl", &fe->fe_impl_id, REG_UDF_II);
-	(void) fprintf(stdout,
+	print_long_ad(fout, "ICB", &fe->fe_ea_icb);
+	print_regid(fout, "impl", &fe->fe_impl_id, REG_UDF_II);
+	(void) fprintf(fout,
 		"uniq_id : %llx len_ear : %x len_adesc %x\n",
 		SWAP_64(fe->fe_uniq_id), SWAP_32(fe->fe_len_ear),
 		SWAP_32(fe->fe_len_adesc));
 }
 
 void
-print_pmaps(uint8_t *addr, int32_t count)
+print_pmaps(FILE *fout, uint8_t *addr, int32_t count)
 {
 	struct pmap_hdr *hdr;
 	struct pmap_typ1 *map1;
@@ -1989,23 +1965,23 @@ print_pmaps(uint8_t *addr, int32_t count)
 		case 1 :
 			/* LINTED */
 			map1 = (struct pmap_typ1 *)hdr;
-			(void) fprintf(stdout, "Map type 1 ");
-			(void) fprintf(stdout, "VSN %x prn %x\n",
+			(void) fprintf(fout, "Map type 1 ");
+			(void) fprintf(fout, "VSN %x prn %x\n",
 					SWAP_16(map1->map1_vsn),
 					SWAP_16(map1->map1_pn));
 			break;
 		case 2 :
 			/* LINTED */
 			map2 = (struct pmap_typ2 *)hdr;
-			(void) fprintf(stdout, "Map type 2 ");
-			(void) fprintf(stdout, "VSN %x prn %x\n",
+			(void) fprintf(fout, "Map type 2 ");
+			(void) fprintf(fout, "VSN %x prn %x\n",
 					SWAP_16(map2->map2_vsn),
 					SWAP_16(map2->map2_pn));
-			print_regid("Partition Type Identifier",
+			print_regid(fout, "Partition Type Identifier",
 					&map2->map2_pti, REG_UDF_ID);
 			break;
 		default :
-			(void) fprintf(stdout, "unknown map type\n");
+			(void) fprintf(fout, "unknown map type\n");
 		}
 		addr += hdr->maph_length;
 	}
@@ -2014,17 +1990,17 @@ print_pmaps(uint8_t *addr, int32_t count)
 
 
 void
-print_short_ad(char *name, struct short_ad *sad)
+print_short_ad(FILE *fout, char *name, struct short_ad *sad)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"%s loc : %x len : %x\n", name,
 		SWAP_32(sad->sad_ext_loc), SWAP_32(sad->sad_ext_len));
 }
 
 void
-print_long_ad(char *name, struct long_ad *lad)
+print_long_ad(FILE *fout, char *name, struct long_ad *lad)
 {
-	(void) fprintf(stdout,
+	(void) fprintf(fout,
 		"%s prn : %x loc : %x len : %x\n", name,
 		SWAP_16(lad->lad_ext_prn), SWAP_32(lad->lad_ext_loc),
 		SWAP_32(lad->lad_ext_len));

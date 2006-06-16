@@ -22,42 +22,33 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
-#  whose executable reside in $(INSDIR1) and $(INSDIR2).
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIR1=        fstyp mkproto labelit ident
-SUBDIR2=        mount
-SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
+LIBRARY =	libfstyp.a
+VERS =		.1
+OBJECTS =	libfstyp.o
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+include ../../Makefile.lib
 
-# for messaging catalog
-#
-POFILE= hsfs.po
-POFILES= $(SUBDIR2:%=%/%.po)
+SRCDIR =	../common
+MAPDIR =	../spec/$(TRANSMACH)
+SPECMAPFILE =	$(MAPDIR)/mapfile
 
+LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS +=	-lc
+INCS +=		-I$(SRCDIR)
+$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -D_LARGEFILE64_SOURCE
+CPPFLAGS +=	$(INCS)
+
+LINTFLAGS64 +=	-errchk=longptr64
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+all: $(LIBS)
 
-all:	$(SUBDIRS) 
+lint: lintcheck
 
-catalog:        $(SUBDIR2)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
-
-install clean clobber lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
-
-FRC:
+include ../../Makefile.targ

@@ -25,6 +25,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
+ * libfstyp module for zfs
+ */
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,129 +36,93 @@
 #include <libintl.h>
 #include <locale.h>
 #include <string.h>
+#include <libnvpair.h>
 #include <libzfs.h>
+#include <libfstyp_module.h>
 #include <errno.h>
 
-static void
-usage(void)
+struct fstyp_zfs {
+	int		fd;
+	nvlist_t	*config;
+};
+
+int	fstyp_mod_init(int fd, off_t offset, fstyp_mod_handle_t *handle);
+void	fstyp_mod_fini(fstyp_mod_handle_t handle);
+int	fstyp_mod_ident(fstyp_mod_handle_t handle);
+int	fstyp_mod_get_attr(fstyp_mod_handle_t handle, nvlist_t **attrp);
+
+int
+fstyp_mod_init(int fd, off_t offset, fstyp_mod_handle_t *handle)
 {
-	(void) fprintf(stderr, gettext("Usage: fstype [-v] <device>\n"));
-	exit(1);
+	struct fstyp_zfs *h;
+
+	if (offset != 0) {
+		return (FSTYP_ERR_OFFSET);
+	}
+
+	if ((h = calloc(1, sizeof (struct fstyp_zfs))) == NULL) {
+		return (FSTYP_ERR_NOMEM);
+	}
+	h->fd = fd;
+
+	*handle = (fstyp_mod_handle_t)h;
+	return (0);
 }
 
-static void
-dump_nvlist(nvlist_t *list, int indent)
+void
+fstyp_mod_fini(fstyp_mod_handle_t handle)
 {
-	nvpair_t *elem = NULL;
+	struct fstyp_zfs *h = (struct fstyp_zfs *)handle;
 
-	while ((elem = nvlist_next_nvpair(list, elem)) != NULL) {
-		switch (nvpair_type(elem)) {
-		case DATA_TYPE_STRING:
-			{
-				char *value;
-
-				verify(nvpair_value_string(elem, &value) == 0);
-				(void) printf("%*s%s='%s'\n", indent, "",
-				    nvpair_name(elem), value);
-			}
-			break;
-
-		case DATA_TYPE_UINT64:
-			{
-				uint64_t value;
-
-				verify(nvpair_value_uint64(elem, &value) == 0);
-				(void) printf("%*s%s=%llu\n", indent, "",
-				    nvpair_name(elem), (u_longlong_t)value);
-			}
-			break;
-
-		case DATA_TYPE_NVLIST:
-			{
-				nvlist_t *value;
-
-				verify(nvpair_value_nvlist(elem, &value) == 0);
-				(void) printf("%*s%s\n", indent, "",
-				    nvpair_name(elem));
-				dump_nvlist(value, indent + 4);
-			}
-			break;
-
-		case DATA_TYPE_NVLIST_ARRAY:
-			{
-				nvlist_t **value;
-				uint_t c, count;
-
-				verify(nvpair_value_nvlist_array(elem, &value,
-				    &count) == 0);
-
-				for (c = 0; c < count; c++) {
-					(void) printf("%*s%s[%u]\n", indent, "",
-					    nvpair_name(elem), c);
-					dump_nvlist(value[c], indent + 8);
-				}
-			}
-			break;
-
-		default:
-
-			(void) printf("bad config type %d for %s\n",
-			    nvpair_type(elem), nvpair_name(elem));
-		}
+	if (h->config != NULL) {
+		nvlist_free(h->config);
 	}
+	free(h);
 }
 
 int
-main(int argc, char **argv)
+fstyp_mod_ident(fstyp_mod_handle_t handle)
 {
-	int c, fd;
-	int verbose = 0;
-	nvlist_t *config;
+	struct fstyp_zfs *h = (struct fstyp_zfs *)handle;
 	uint64_t state;
+	char	*str;
+	uint64_t u64;
+	char	buf[64];
 
-	(void) setlocale(LC_ALL, "");
-
-#if !defined(TEXT_DOMAIN)
-#define	TEXT_DOMAIN "SYS_TEST"
-#endif
-	(void) textdomain(TEXT_DOMAIN);
-
-	while ((c = getopt(argc, argv, "v")) != -1) {
-		switch (c) {
-		case 'v':
-			verbose = 1;
-			break;
-		default:
-			usage();
-			break;
-		}
+	if (zpool_read_label(h->fd, &h->config) != 0 ||
+	    h->config == NULL) {
+		return (FSTYP_ERR_NO_MATCH);
 	}
 
-	argv += optind;
-	argc -= optind;
-
-	if (argc != 1)
-		usage();
-
-	if ((fd = open64(argv[0], O_RDONLY)) < 0) {
-		perror("open64");
-		return (1);
+	if (nvlist_lookup_uint64(h->config, ZPOOL_CONFIG_POOL_STATE,
+	    &state) != 0 || state == POOL_STATE_DESTROYED) {
+		nvlist_free(h->config);
+		h->config = NULL;
+		return (FSTYP_ERR_NO_MATCH);
 	}
 
-	if (zpool_read_label(fd, &config) != 0 ||
-	    config == NULL)
-		return (1);
+	/* add generic attributes */
+	(void) nvlist_add_boolean_value(h->config, "gen_clean", B_TRUE);
+	if (nvlist_lookup_uint64(h->config, "guid", &u64) == 0) {
+		(void) snprintf(buf, sizeof (buf), "%llu", (u_longlong_t)u64);
+		(void) nvlist_add_string(h->config, "gen_guid", buf);
+	}
+	if (nvlist_lookup_uint64(h->config, "version", &u64) == 0) {
+		(void) snprintf(buf, sizeof (buf), "%llu", (u_longlong_t)u64);
+		(void) nvlist_add_string(h->config, "gen_version", buf);
+	}
+	if (nvlist_lookup_string(h->config, "name", &str) == 0) {
+		(void) nvlist_add_string(h->config, "gen_volume_label", str);
+	}
 
-	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
-	    &state) != 0 || state == POOL_STATE_DESTROYED)
-		return (1);
+	return (0);
+}
 
-	(void) printf("zfs\n");
+int
+fstyp_mod_get_attr(fstyp_mod_handle_t handle, nvlist_t **attrp)
+{
+	struct fstyp_zfs *h = (struct fstyp_zfs *)handle;
 
-	if (verbose)
-		dump_nvlist(config, 4);
-
-	(void) close(fd);
-
+	*attrp = h->config;
 	return (0);
 }

@@ -181,6 +181,8 @@ f none usr/include/libdevinfo.h 644 root bin
 f none usr/include/libdevice.h 644 root bin
 f none usr/include/libdlpi.h 644 root bin
 f none usr/include/libelf.h 644 root bin
+f none usr/include/libfstyp.h 644 root bin
+f none usr/include/libfstyp_module.h 644 root bin
 f none usr/include/libgen.h 644 root bin
 f none usr/include/libintl.h 644 root bin
 f none usr/include/libnvpair.h 644 root bin

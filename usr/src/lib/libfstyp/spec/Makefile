@@ -18,46 +18,38 @@
 #
 # CDDL HEADER END
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# lib/libfstyp/spec/Makefile
+
 #
-#  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
-#  whose executable reside in $(INSDIR1) and $(INSDIR2).
+# This could've been as easy as
 #
-
-SUBDIR1=        fstyp mkproto labelit ident
-SUBDIR2=        mount
-SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
-
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
-
-# for messaging catalog
+#include	$(SRC)/lib/Makefile.spec.arch
 #
-POFILE= hsfs.po
-POFILES= $(SUBDIR2:%=%/%.po)
-
+# But we don't deliver 64-bit library yet, thus we need to override
+# the inclusion of the Makefile and build only the targets
+# for $(MACH) instead of $(MACH)_ARCHITECTURES
+#
+all		:=	TARGET= all
+install		:=	TARGET= install
+clean		:=	TARGET= clean
+clobber		:=	TARGET= clobber
+lint		:=	TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+all install clean clobber: $(MACH)
 
-all:	$(SUBDIRS) 
+$(MACH): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-catalog:        $(SUBDIR2)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
-
-install clean clobber lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+IGNORE=		_msg catalog install_h delete \
+		package tcov debug private_h \
+		check analyse test dynamic lint
+$(IGNORE):
 
 FRC:

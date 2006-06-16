@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,34 +19,36 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-PROG= fstyp
+PROG=		fstyp
 
 include ../Makefile.cmd
 
-OWNER = root
-GROUP = sys
+LDLIBS += -lnvpair -lfstyp
+
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_POSIX_PTHREAD_SEMANTICS
+
+CFLAGS += $(CCVERBOSE)
+
+# This flag is being added only for SCO (x86) compatibility  
+CFLAGS += $(iBCS2FLAG)
 
 .KEEP_STATE:
 
-all: $(PROG) 
-
-$(PROG): $(PROG).sh
-	$(RM) $@
-	sed -e "s/TEXT_DOMAIN/${TEXT_DOMAIN}/g" $(PROG).sh > $@
-	chmod +x $@
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)
 	-$(SYMLINK) ../usr/sbin/$(PROG) $(ROOTETCPROG)
 
 clean:
+	$(RM) $(OBJS)
 
-lint:
+lint:	lint_PROG
 
 include ../Makefile.targ

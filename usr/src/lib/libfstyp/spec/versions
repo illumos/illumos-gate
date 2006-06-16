@@ -1,4 +1,7 @@
 #
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,31 +21,26 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS=	fstyp
+sparc {
+	SUNW_1.1;
+	SUNWprivate_1.1;
+}
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+sparcv9 {
+	SUNW_1.1;
+	SUNWprivate_1.1;
+}
 
-.KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+i386 {
+	SUNW_1.1;
+	SUNWprivate_1.1;
+}
 
-all install clean clobber lint: $(SUBDIRS)
-
-catalog:
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+amd64 {
+	SUNW_1.1;
+	SUNWprivate_1.1;
+}

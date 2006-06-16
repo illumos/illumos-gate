@@ -43,7 +43,8 @@ d none usr/lib/devfsadm/linkmod 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_zfs_link.so 755 root sys
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/zfs 755 root sys
-f none usr/lib/fs/zfs/fstyp 555 root bin
+f none usr/lib/fs/zfs/fstyp.so.1 555 root bin
+l none usr/lib/fs/zfs/fstyp=../../../sbin/fstyp
 s none usr/lib/fs/zfs/mount=../../../../sbin/zfs
 s none usr/lib/fs/zfs/umount=../../../../sbin/zfs
 s none usr/lib/libzfs.so.1=../../lib/libzfs.so.1

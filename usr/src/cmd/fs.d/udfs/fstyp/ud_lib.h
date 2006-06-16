@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1989 by Sun Microsystem, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_UD_LIB_H
@@ -123,8 +123,6 @@ struct udf {
 	uint32_t	vat_icb_loc;
 	uint32_t	vat_icb_len;
 };
-extern	struct udf udfs;
-
 
 struct ud_part {
 	uint16_t	udp_flags;	/* See below */
@@ -146,8 +144,6 @@ struct ud_part {
 	uint32_t	udp_nblocks;	/* Total no of blks in the partition */
 					/* From lvid */
 };
-extern	struct ud_part	part[];
-extern	int32_t	n_parts;
 
 
 struct ud_map {
@@ -172,9 +168,6 @@ struct ud_map {
 	struct buf	*udm_sbp[MAX_SPM];
 	caddr_t		udm_spaddr[MAX_SPM];
 };
-
-extern	struct ud_map maps[];
-extern	int32_t	n_maps;
 
 
 
@@ -224,53 +217,63 @@ struct impl_id_suffix {
 #define	OS_IDENTIFIER_MK_LINUX	0x06
 #define	OS_IDENTIFIER_FREE_BSD	0x07
 
+struct ud_handle {
+	int		fd;
+	struct udf	udfs;
+	struct ud_part	part[MAX_PARTS];
+	int32_t		n_parts;
+	struct ud_map	maps[MAX_MAPS];
+	int32_t		n_maps;
+};
 
-extern	int32_t ud_open_dev(char *, uint32_t);
-extern	void	ud_close_dev(int32_t);
-extern	int32_t	ud_read_dev(int32_t, uint64_t, uint8_t *, uint32_t);
-extern	int32_t	ud_write_dev(int32_t, uint64_t, uint8_t *, uint32_t);
-
-
-extern	int32_t	ud_fill_udfs_info(int32_t fd);
-extern	int32_t ud_get_num_blks(int32_t, uint32_t *);
-
-
-extern	int32_t ud_verify_tag(struct tag *,
-		uint16_t, uint32_t, int32_t, int32_t);
-extern	void	ud_make_tag(struct tag *, uint16_t, uint32_t, uint16_t);
-extern	uint32_t ud_xlate_to_daddr(uint16_t, uint32_t);
-extern	void	ud_convert2local(int8_t *, int8_t *, int32_t);
+typedef struct ud_handle *ud_handle_t;
 
 
-extern	void	print_charspec(char *, struct charspec *);
-extern	void	print_dstring(char *, uint16_t, char *, uint8_t);
-extern	void	set_dstring(dstring_t *, char *, int32_t);
-extern	void	print_tstamp(char *, tstamp_t *);
-extern	void	print_regid(char *, struct regid *, int32_t);
+int	ud_init(int, ud_handle_t *);
+void	ud_fini(ud_handle_t);
+int32_t	ud_open_dev(ud_handle_t, char *, uint32_t);
+void	ud_close_dev(ud_handle_t);
+int32_t	ud_read_dev(ud_handle_t, uint64_t, uint8_t *, uint32_t);
+int32_t	ud_write_dev(ud_handle_t, uint64_t, uint8_t *, uint32_t);
 
-extern	void	print_ext_ad(char *, struct extent_ad *);
-extern	void	print_tag(struct tag *);
-extern	void	print_pvd(struct pri_vol_desc *);
-extern	void	print_avd(struct anch_vol_desc_ptr *);
-extern	void	print_vdp(struct vol_desc_ptr *);
-extern	void	print_iuvd(struct iuvd_desc *);
-extern	void	print_part(struct part_desc *);
-extern	void	print_lvd(struct log_vol_desc *);
-extern	void	print_usd(struct unall_spc_desc *);
-extern	void	print_lvid(struct log_vol_int_desc *);
-extern	void	print_part(struct part_desc *);
+int32_t	ud_fill_udfs_info(ud_handle_t);
+int32_t ud_get_num_blks(ud_handle_t, uint32_t *);
 
-extern	void	print_fsd(struct file_set_desc *);
-extern	void	print_phdr(struct phdr_desc *);
-extern	void	print_fid(struct file_id *);
-extern	void	print_fsd(struct file_set_desc *);
-extern	void	print_icb_tag(struct icb_tag *);
-extern	void	print_ie(struct indirect_entry *);
-extern	void	print_td(struct term_desc *);
-extern	void	print_fe(struct file_entry *);
-extern	void	print_pmaps(uint8_t *, int32_t);
-extern	void	print_short_ad(char *, struct short_ad *);
-extern	void	print_long_ad(char *, struct long_ad *);
+int32_t ud_verify_tag(ud_handle_t, struct tag *,
+	uint16_t, uint32_t, int32_t, int32_t);
+void	ud_make_tag(ud_handle_t, struct tag *, uint16_t, uint32_t, uint16_t);
+uint32_t ud_xlate_to_daddr(ud_handle_t, uint16_t, uint32_t);
+void	ud_convert2local(int8_t *, int8_t *, int32_t);
+
+void	print_charspec(FILE *, char *, struct charspec *);
+void	print_dstring(FILE *, char *, uint16_t, char *, uint8_t);
+void	set_dstring(dstring_t *, char *, int32_t);
+void	print_tstamp(FILE *, char *, tstamp_t *);
+void	print_regid(FILE *, char *, struct regid *, int32_t);
+
+void	print_ext_ad(FILE *, char *, struct extent_ad *);
+void	print_tag(FILE *, struct tag *);
+void	print_pvd(FILE *, struct pri_vol_desc *);
+void	print_avd(FILE *, struct anch_vol_desc_ptr *);
+void	print_vdp(FILE *, struct vol_desc_ptr *);
+void	print_iuvd(FILE *, struct iuvd_desc *);
+void	print_part(FILE *, struct part_desc *);
+void	print_lvd(FILE *, struct log_vol_desc *);
+void	print_usd(FILE *, struct unall_spc_desc *);
+void	print_lvid(FILE *, struct log_vol_int_desc *);
+void	print_part(FILE *, struct part_desc *);
+
+void	print_fsd(FILE *, ud_handle_t h, struct file_set_desc *);
+void	print_phdr(FILE *, struct phdr_desc *);
+void	print_fid(FILE *, struct file_id *);
+void	print_aed(FILE *, struct alloc_ext_desc *);
+void	print_icb_tag(FILE *, struct icb_tag *);
+void	print_ie(FILE *, struct indirect_entry *);
+void	print_td(FILE *, struct term_desc *);
+void	print_fe(FILE *, struct file_entry *);
+void	print_pmaps(FILE *, uint8_t *, int32_t);
+void	print_short_ad(FILE *, char *, struct short_ad *);
+void	print_long_ad(FILE *, char *, struct long_ad *);
 
 #ifdef	__cplusplus
 }

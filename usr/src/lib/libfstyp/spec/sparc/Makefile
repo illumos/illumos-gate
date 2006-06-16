@@ -19,45 +19,25 @@
 # CDDL HEADER END
 #
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#  /usr/src/cmd/lib/fs/hsfs is the directory of all ufs specific commands
-#  whose executable reside in $(INSDIR1) and $(INSDIR2).
-#
-
-SUBDIR1=        fstyp mkproto labelit ident
-SUBDIR2=        mount
-SUBDIRS=        $(SUBDIR1) $(SUBDIR2)
-
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
-
-# for messaging catalog
-#
-POFILE= hsfs.po
-POFILES= $(SUBDIR2:%=%/%.po)
-
+# lib/libfstyp/spec/sparc/Makefile
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+include	../Makefile.targ
 
-all:	$(SUBDIRS) 
+# Add arch specific objects here
+OBJECTS	+=
 
-catalog:        $(SUBDIR2)
-	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
+include	$(SRC)/lib/Makefile.lib
 
-install clean clobber lint: $(SUBDIRS)
+# Uncomment the following if the linker complains
+#sparc_C_PICFLAGS  = -K PIC
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+include	$(SRC)/lib/Makefile.spec
 
-FRC:
+install: $(ROOTABILIB)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -70,9 +69,9 @@ typedef unsigned short unicode_t;
 #define	INFO_STR_LEN	36
 
 static void usage();
-static void label(int32_t, uint32_t);
-static void print_info(struct vds *, char *, int32_t);
-static void label_vds(struct vds *, uint32_t, int32_t);
+static void label(ud_handle_t, uint32_t);
+static void print_info(struct vds *, char *, ud_handle_t);
+static void label_vds(struct vds *, uint32_t, ud_handle_t);
 static int32_t convert_string(int8_t *, int8_t *, int32_t, int32_t, int8_t *);
 static int32_t ud_convert2unicode(int8_t *, int8_t *, int32_t);
 
@@ -91,12 +90,12 @@ int
 main(int32_t argc, char *argv[])
 {
 	int32_t		opt = 0;
-	int32_t		fd = 0;
 	int32_t		flags = 0;
 	int32_t		ret = 0;
 	int8_t		*options = NULL;
 	int8_t		*value = NULL;
 	uint32_t	set_flags = 0;
+	ud_handle_t	udh;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -189,6 +188,12 @@ main(int32_t argc, char *argv[])
 		}
 	}
 
+	if (ud_init(-1, &udh) != 0) {
+		(void) fprintf(stderr,
+		gettext("udfs labelit: cannot initialize ud_lib\n"));
+		exit(1);
+	}
+
 	/*
 	 * Open special device
 	 */
@@ -197,26 +202,27 @@ main(int32_t argc, char *argv[])
 	} else {
 		flags = O_RDWR;
 	}
-	if ((fd = ud_open_dev(argv[optind], flags)) < 0) {
+	if (ud_open_dev(udh, argv[optind], flags) != 0) {
 		(void) fprintf(stderr,
 		gettext("udfs labelit: cannot open <%s> errorno <%d>\n"),
 					argv[optind], errno);
 		exit(1);
 	}
 
-	if ((ret = ud_fill_udfs_info(fd)) != 0) {
+	if ((ret = ud_fill_udfs_info(udh)) != 0) {
 		goto close_dev;
 	}
 
-	if ((udfs.flags & VALID_UDFS) == 0) {
+	if ((udh->udfs.flags & VALID_UDFS) == 0) {
 		ret = 1;
 		goto close_dev;
 	}
 
-	label(fd, set_flags);
+	label(udh, set_flags);
 
 close_dev:
-	ud_close_dev(fd);
+	ud_close_dev(udh);
+	ud_fini(udh);
 
 	return (ret);
 }
@@ -237,31 +243,32 @@ usage()
 }
 
 static void
-label(int32_t fd, uint32_t set_flags)
+label(ud_handle_t udh, uint32_t set_flags)
 {
 	if (set_flags == 0) {
-		if (udfs.flags & VALID_MVDS) {
-			print_info(&udfs.mvds, "mvds", fd);
+		if (udh->udfs.flags & VALID_MVDS) {
+			print_info(&udh->udfs.mvds, "mvds", udh);
 		}
-		if (udfs.flags & VALID_RVDS) {
-			print_info(&udfs.rvds, "rvds", fd);
+		if (udh->udfs.flags & VALID_RVDS) {
+			print_info(&udh->udfs.rvds, "rvds", udh);
 		}
 		return;
 	} else {
 
-		if (udfs.flags & VALID_MVDS) {
-			label_vds(&udfs.mvds, set_flags, fd);
+		if (udh->udfs.flags & VALID_MVDS) {
+			label_vds(&udh->udfs.mvds, set_flags, udh);
 		}
-		if (udfs.flags & VALID_RVDS) {
-			label_vds(&udfs.rvds, set_flags, fd);
+		if (udh->udfs.flags & VALID_RVDS) {
+			label_vds(&udh->udfs.rvds, set_flags, udh);
 		}
 		if (((set_flags & (SET_FSNAME | SET_VOLNAME)) ==
 			(SET_FSNAME | SET_VOLNAME)) &&
-			(udfs.fsd_len != 0)) {
+			(udh->udfs.fsd_len != 0)) {
 			struct file_set_desc *fsd;
 
-			off = udfs.fsd_loc * udfs.lbsize;
-			if (ud_read_dev(fd, off, buf, udfs.fsd_len) != 0) {
+			off = udh->udfs.fsd_loc * udh->udfs.lbsize;
+			if (ud_read_dev(udh, off, buf,
+				udh->udfs.fsd_len) != 0) {
 				return;
 			}
 
@@ -273,23 +280,23 @@ label(int32_t fd, uint32_t set_flags)
 			set_dstring(fsd->fsd_fsi,
 				volname, sizeof (fsd->fsd_fsi));
 
-			ud_make_tag(&fsd->fsd_tag, UD_FILE_SET_DESC,
+			ud_make_tag(udh, &fsd->fsd_tag, UD_FILE_SET_DESC,
 				SWAP_32(fsd->fsd_tag.tag_loc),
 				SWAP_16(fsd->fsd_tag.tag_crc_len));
 
-			(void) ud_write_dev(fd, off, buf, udfs.fsd_len);
+			(void) ud_write_dev(udh, off, buf, udh->udfs.fsd_len);
 		}
 	}
 }
 
 static void
-print_info(struct vds *v, char *name, int32_t fd)
+print_info(struct vds *v, char *name, ud_handle_t udh)
 {
 	uint8_t		outbuf[BUF_LEN];
 
 	if (v->pvd_len != 0) {
-		off = v->pvd_loc * udfs.lbsize;
-		if (ud_read_dev(fd, off, buf,
+		off = v->pvd_loc * udh->udfs.lbsize;
+		if (ud_read_dev(udh, off, buf,
 			sizeof (struct pri_vol_desc)) == 0) {
 
 			struct pri_vol_desc *pvd;
@@ -318,8 +325,8 @@ print_info(struct vds *v, char *name, int32_t fd)
 	}
 
 	if (v->iud_len != 0) {
-		off = v->iud_loc * udfs.lbsize;
-		if (ud_read_dev(fd, off, buf,
+		off = v->iud_loc * udh->udfs.lbsize;
+		if (ud_read_dev(udh, off, buf,
 			sizeof (struct iuvd_desc)) == 0) {
 
 			struct iuvd_desc *iud;
@@ -361,15 +368,15 @@ print_info(struct vds *v, char *name, int32_t fd)
 
 /* ARGSUSED */
 static void
-label_vds(struct vds *v, uint32_t set_flags, int32_t fd)
+label_vds(struct vds *v, uint32_t set_flags, ud_handle_t udh)
 {
 
 	if (((set_flags & (SET_FSNAME | SET_VOLNAME)) ==
 		(SET_FSNAME | SET_VOLNAME)) &&
 		(v->pvd_len)) {
 
-		off = v->pvd_loc * udfs.lbsize;
-		if (ud_read_dev(fd, off, buf,
+		off = v->pvd_loc * udh->udfs.lbsize;
+		if (ud_read_dev(udh, off, buf,
 			sizeof (struct pri_vol_desc)) == 0) {
 
 			struct pri_vol_desc *pvd;
@@ -383,20 +390,20 @@ label_vds(struct vds *v, uint32_t set_flags, int32_t fd)
 			set_dstring(pvd->pvd_vol_id,
 				volname, sizeof (pvd->pvd_vol_id));
 
-			ud_make_tag(&pvd->pvd_tag,
+			ud_make_tag(udh, &pvd->pvd_tag,
 				SWAP_16(pvd->pvd_tag.tag_id),
 				SWAP_32(pvd->pvd_tag.tag_loc),
 				SWAP_16(pvd->pvd_tag.tag_crc_len));
 
-			(void) ud_write_dev(fd, off, buf,
+			(void) ud_write_dev(udh, off, buf,
 				sizeof (struct pri_vol_desc));
 		}
 	}
 
 	if (set_flags && v->iud_len) {
 
-		off = v->iud_loc * udfs.lbsize;
-		if (ud_read_dev(fd, off, buf,
+		off = v->iud_loc * udh->udfs.lbsize;
+		if (ud_read_dev(udh, off, buf,
 			sizeof (struct iuvd_desc)) == 0) {
 
 			struct iuvd_desc *iuvd;
@@ -421,12 +428,12 @@ label_vds(struct vds *v, uint32_t set_flags, int32_t fd)
 					lvinfo3_buf, sizeof (iuvd->iuvd_ifo3));
 			}
 
-			ud_make_tag(&iuvd->iuvd_tag,
+			ud_make_tag(udh, &iuvd->iuvd_tag,
 				SWAP_16(iuvd->iuvd_tag.tag_id),
 				SWAP_32(iuvd->iuvd_tag.tag_loc),
 				SWAP_16(iuvd->iuvd_tag.tag_crc_len));
 
-			(void) ud_write_dev(fd, off, buf,
+			(void) ud_write_dev(udh, off, buf,
 				sizeof (struct iuvd_desc));
 		}
 	}
@@ -435,8 +442,8 @@ label_vds(struct vds *v, uint32_t set_flags, int32_t fd)
 		(SET_FSNAME | SET_VOLNAME)) &&
 		(v->lvd_len)) {
 
-		off = v->lvd_loc * udfs.lbsize;
-		if (ud_read_dev(fd, off, buf,
+		off = v->lvd_loc * udh->udfs.lbsize;
+		if (ud_read_dev(udh, off, buf,
 			sizeof (struct log_vol_desc)) == 0) {
 
 			struct log_vol_desc *lvd;
@@ -446,12 +453,12 @@ label_vds(struct vds *v, uint32_t set_flags, int32_t fd)
 			set_dstring(lvd->lvd_lvid,
 				volname, sizeof (lvd->lvd_lvid));
 
-			ud_make_tag(&lvd->lvd_tag,
+			ud_make_tag(udh, &lvd->lvd_tag,
 				SWAP_16(lvd->lvd_tag.tag_id),
 				SWAP_32(lvd->lvd_tag.tag_loc),
 				SWAP_16(lvd->lvd_tag.tag_crc_len));
 
-			(void) ud_write_dev(fd, off, buf,
+			(void) ud_write_dev(udh, off, buf,
 				sizeof (struct log_vol_desc));
 		}
 	}
