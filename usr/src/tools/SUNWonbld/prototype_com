@@ -75,7 +75,6 @@ f none opt/onbld/bin/hdrchk 555 root bin
 f none opt/onbld/bin/intf_check 555 root bin
 f none opt/onbld/bin/jstyle 555 root bin
 f none opt/onbld/bin/keywords 555 root bin
-f none opt/onbld/bin/lintdump 555 root bin
 f none opt/onbld/bin/makebfu 555 root bin
 f none opt/onbld/bin/make_pkg_db 555 root bin
 f none opt/onbld/bin/mkacr 555 root bin
