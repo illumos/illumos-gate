@@ -296,10 +296,11 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			break;
 
 		default:
-			cmn_err(CE_WARN, "Error Descriptor 0x%llx "
-			    " invalid in nonresumable error handler",
+			cmn_err(CE_WARN, "Panic - Error Descriptor 0x%llx "
+			    " invalid in non-resumable error handler",
 			    (long long) errh_flt.errh_er.desc);
-			continue;
+			aflt->flt_panic = 1;
+			break;
 		}
 
 		/*
