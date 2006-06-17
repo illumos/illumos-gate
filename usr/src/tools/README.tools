@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -187,6 +186,9 @@ install.bin
 intf_check
 	detects and reports ABI versioning and stability problems.
 
+lintdump
+	dumps the contents of one or more lint libraries; see lintdump(1)
+
 keywords
 	checks files for proper SCCS keywords.
 
@@ -289,6 +291,5 @@ Files you have to update to add a tool
 1.  Add the tool in its appropriate place.
 2.  Update the Makefile as required.
 3.  Update usr/src/tools/SUNWonbld/prototype_*.
-4.  Update usr/src/pkgdefs/etc/exception_list_*.
-5.  Update usr/src/tools/README.tools (this file).
-6.  Repeat 1-5 for any man pages.
+4.  Update usr/src/tools/README.tools (this file).
+5.  Repeat 1-4 for any man pages.
