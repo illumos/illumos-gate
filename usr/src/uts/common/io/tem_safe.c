@@ -780,81 +780,31 @@ tem_getparams(struct tem *tem, uchar_t ch,
 	ASSERT((called_from == CALLED_FROM_STANDALONE) ||
 	    MUTEX_HELD(&tem->lock));
 
-	if ((ch >= '0' && ch <= '9') &&
-	    (tems->a_state != A_STATE_ESC_Q_DELM)) {
-		tems->a_paramval =
-		    ((tems->a_paramval * 10) + (ch - '0'));
+	if (ch >= '0' && ch <= '9') {
+		tems->a_paramval = ((tems->a_paramval * 10) + (ch - '0'));
 		tems->a_gotparam = B_TRUE;  /* Remember got parameter */
 		return; /* Return immediately */
-	}
-	switch (tems->a_state) { /* Handle letter based on state */
-
-	case A_STATE_ESC_Q:			  /* <ESC>Q<num> ? */
-		tems->a_params[1] = ch;	  /* Save string delimiter */
-		tems->a_params[2] = 0;	  /* String length 0 to start */
-		tems->a_state = A_STATE_ESC_Q_DELM; /* Read string next */
-		break;
-
-	case A_STATE_ESC_Q_DELM: /* <ESC>Q<num><delm> ? */
-		if (ch == tems->a_params[1]) {	/* End of string? */
-			tems->a_state = A_STATE_START;
-			/* End of <ESC> sequence */
-		} else if (ch == '^')
-			/* Control char escaped with '^'? */
-			tems->a_state = A_STATE_ESC_Q_DELM_CTRL;
-			/* Read control character next */
-
-		else if (ch != '\0') {
-			/* Not a null? Add to string */
-			tems->a_fkey[tems->a_params[2]++] = ch;
-			if (tems->a_params[2] >= TEM_MAXFKEY)  /* Full? */
-				tems->a_state = A_STATE_START;
-				/* End of <ESC> sequence */
-		}
-		break;
-
-	case A_STATE_ESC_Q_DELM_CTRL:	/* Contrl character escaped with '^' */
-		tems->a_state = A_STATE_ESC_Q_DELM; /* rd more later */
-		ch -= ' ';	   /* Convert to control character */
-		if (ch != '\0') {  /* Not a null? Add to string */
-			tems->a_fkey[tems->a_params[2]++] = ch;
-			if (tems->a_params[2] >= TEM_MAXFKEY) /* Full? */
-				tems->a_state = A_STATE_START;
-				/* End of <ESC> sequence */
-		}
-		break;
-
-	default:			/* All other states */
-		if (tems->a_gotparam) {
-			if (tems->a_curparam >= TEM_MAXPARAMS) {
-				/*
-				 * Too many parameters.  Abort the
-				 * sequence.
-				 */
-				tems->a_state = A_STATE_START;
-				break;
+	} else if (tems->a_state == A_STATE_CSI_EQUAL ||
+		tems->a_state == A_STATE_CSI_QMARK) {
+		tems->a_state = A_STATE_START;
+	} else {
+		if (tems->a_curparam < TEM_MAXPARAMS) {
+			if (tems->a_gotparam) {
+				/* get the parameter value */
+				tems->a_params[tems->a_curparam] =
+							tems->a_paramval;
 			}
-			/*
-			 * Previous number parameter? Save and
-			 * point to next free parameter.
-			 */
-			tems->a_params[tems->a_curparam] =
-			    tems->a_paramval;
 			tems->a_curparam++;
 		}
 
 		if (ch == ';') {
-			/* Multiple param separator? */
 			/* Restart parameter search */
 			tems->a_gotparam = B_FALSE;
 			tems->a_paramval = 0; /* No parame value yet */
-		} else if (tems->a_state == A_STATE_CSI_EQUAL ||
-			tems->a_state == A_STATE_CSI_QMARK) {
-			tems->a_state = A_STATE_START;
-		} else	/* Regular letter */
+		} else {
 			/* Handle escape sequence */
 			tem_chkparam(tem, ch, credp, called_from);
-		break;
+		}
 	}
 }
 
@@ -1143,21 +1093,9 @@ tem_parse(struct tem *tem, uchar_t ch,
 			tems->a_params[i] = -1;
 		tems->a_state = A_STATE_CSI;
 	} else if (ch == 'Q') {	/* <ESC>Q ? */
-		tems->a_curparam = 0;
-		tems->a_paramval = 0;
-		tems->a_gotparam = B_FALSE;
-		for (i = 0; i < TEM_MAXPARAMS; i++)
-			tems->a_params[i] = -1; /* Clr */
-		/* Next get params */
-		tems->a_state = A_STATE_ESC_Q;
+		tems->a_state = A_STATE_START;
 	} else if (ch == 'C') {	/* <ESC>C ? */
-		tems->a_curparam = 0;
-		tems->a_paramval = 0;
-		tems->a_gotparam = B_FALSE;
-		for (i = 0; i < TEM_MAXPARAMS; i++)
-			tems->a_params[i] = -1; /* Clr */
-		/* Next get params */
-		tems->a_state = A_STATE_ESC_C;
+		tems->a_state = A_STATE_START;
 	} else {
 		tems->a_state = A_STATE_START;
 		if (ch == 'c')

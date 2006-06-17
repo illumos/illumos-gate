@@ -80,13 +80,9 @@ extern "C" {
 
 #define	A_STATE_START			0
 #define	A_STATE_ESC			1
-#define	A_STATE_ESC_Q			2
-#define	A_STATE_ESC_Q_DELM		3
-#define	A_STATE_ESC_Q_DELM_CTRL		4
-#define	A_STATE_ESC_C			5
-#define	A_STATE_CSI			6
-#define	A_STATE_CSI_QMARK		7
-#define	A_STATE_CSI_EQUAL		8
+#define	A_STATE_CSI			2
+#define	A_STATE_CSI_QMARK		3
+#define	A_STATE_CSI_EQUAL		4
 
 /*
  * Default number of rows and columns
@@ -152,7 +148,6 @@ typedef struct tem_state {		/* state for tem x3.64 emulator */
 	int	a_curparam;	/* current param # of output esc seq */
 	int	a_paramval;	/* value of current param */
 	int	a_params[TEM_MAXPARAMS];  /* parameters of output esc seq */
-	char	a_fkey[TEM_MAXFKEY];	/* work space for function key */
 	screen_pos_t	a_tabs[TEM_MAXTAB];	/* tab stops */
 	int	a_ntabs;		/* number of tabs used */
 	int	a_nscroll;		/* number of lines to scroll */
