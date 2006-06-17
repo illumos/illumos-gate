@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -443,7 +443,6 @@ plat_pfn_to_mem_node(pfn_t pfn)
 
 	node = slice_to_memnode[PFN_2_SLICE(pfn)];
 
-	ASSERT(node >= 0);
 	return (node);
 }
 
