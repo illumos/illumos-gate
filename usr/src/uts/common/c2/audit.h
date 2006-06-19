@@ -265,17 +265,16 @@ typedef au_id_t auid_t;
 #define	AUDIT_AHLT	0x0002	/* HALT machine on undelivered async event */
 #define	AUDIT_ARGV	0x0004	/* include argv with execv system call events */
 #define	AUDIT_ARGE	0x0008	/* include arge with execv system call events */
-#define	AUDIT_PASSWD	0x0010	/* include bad password with "login" events */
-#define	AUDIT_SEQ	0x0020	/* include sequence attribute */
-#define	AUDIT_WINDATA	0x0040	/* include interwindow moved data */
-#define	AUDIT_USER	0x0080	/* make audituser(2) un-privileged */
-#define	AUDIT_GROUP	0x0100	/* include group attribute with each record */
-#define	AUDIT_TRAIL	0x0200	/* include trailer token */
-#define	AUDIT_PATH	0x0400	/* allow multiple paths per event */
-#define	AUDIT_SCNT	0x0800	/* sleep user events but not kernel events */
-#define	AUDIT_PUBLIC	0x1000	/* audit even "public" files */
-#define	AUDIT_ZONENAME	0x2000	/* emit zonename token */
-#define	AUDIT_PERZONE	0x4000	/* auditd and audit queue for each zone */
+#define	AUDIT_SEQ	0x0010	/* include sequence attribute */
+#define	AUDIT_WINDATA	0x0020	/* include interwindow moved data */
+#define	AUDIT_USER	0x0040	/* make audituser(2) un-privileged */
+#define	AUDIT_GROUP	0x0080	/* include group attribute with each record */
+#define	AUDIT_TRAIL	0x0100	/* include trailer token */
+#define	AUDIT_PATH	0x0200	/* allow multiple paths per event */
+#define	AUDIT_SCNT	0x0400	/* sleep user events but not kernel events */
+#define	AUDIT_PUBLIC	0x0800	/* audit even "public" files */
+#define	AUDIT_ZONENAME	0x1000	/* emit zonename token */
+#define	AUDIT_PERZONE	0x2000	/* auditd and audit queue for each zone */
 
 /*
  * These next (WINDATA*) are used by TSOL. Although per-zone audit is not
@@ -291,8 +290,8 @@ typedef au_id_t auid_t;
  */
 #define	AUDIT_GLOBAL	(AUDIT_AHLT | AUDIT_PERZONE)
 #define	AUDIT_LOCAL	(AUDIT_CNT | AUDIT_ARGV | AUDIT_ARGE |\
-			AUDIT_PASSWD | AUDIT_SEQ | AUDIT_WINDATA |\
-			AUDIT_USER | AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
+			AUDIT_SEQ | AUDIT_WINDATA | AUDIT_USER |\
+			AUDIT_GROUP | AUDIT_TRAIL | AUDIT_PATH |\
 			AUDIT_PUBLIC | AUDIT_SCNT | AUDIT_ZONENAME |\
 			AUDIT_WINDATA_DOWN | AUDIT_WINDATA_UP)
 

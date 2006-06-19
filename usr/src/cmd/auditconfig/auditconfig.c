@@ -118,7 +118,6 @@ enum	commands {
 			AUDIT_ARGV|\
 			AUDIT_CNT|\
 			AUDIT_GROUP|\
-			AUDIT_PASSWD|\
 			AUDIT_WINDATA|\
 			AUDIT_SEQ|\
 			AUDIT_TRAIL|\
