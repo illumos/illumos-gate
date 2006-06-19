@@ -604,6 +604,37 @@ ehci_insert_async_qh(
 
 		/* Set the head ptr to the new endpoint */
 		Set_OpReg(ehci_async_list_addr, qh_addr);
+
+		/*
+		 * For some reason this register might get nulled out by
+		 * the Uli M1575 South Bridge. To workaround the hardware
+		 * problem, check the value after write and retry if the
+		 * last write fails.
+		 *
+		 * If the ASYNCLISTADDR remains "stuck" after
+		 * EHCI_MAX_RETRY retries, then the M1575 is broken
+		 * and is stuck in an inconsistent state and is about
+		 * to crash the machine with a trn_oor panic when it
+		 * does a DMA read from 0x0.  It is better to panic
+		 * now rather than wait for the trn_oor crash; this
+		 * way Customer Service will have a clean signature
+		 * that indicts the M1575 chip rather than a
+		 * mysterious and hard-to-diagnose trn_oor panic.
+		 */
+		if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+		    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575) &&
+		    (qh_addr != Get_OpReg(ehci_async_list_addr))) {
+			int retry = 0;
+
+			Set_OpRegRetry(ehci_async_list_addr, qh_addr, retry);
+			if (retry >= EHCI_MAX_RETRY)
+				cmn_err(CE_PANIC, "ehci_insert_async_qh:"
+				    " ASYNCLISTADDR write failed.");
+
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "ehci_insert_async_qh: ASYNCLISTADDR "
+				"write failed, retry=%d", retry);
+		}
 	} else {
 		ASSERT(Get_QH(async_head_qh->qh_ctrl) &
 		    EHCI_QH_CTRL_RECLAIM_HEAD);

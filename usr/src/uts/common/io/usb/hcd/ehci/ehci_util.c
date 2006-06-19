@@ -3684,6 +3684,32 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	Set_OpReg(ehci_async_list_addr, (uint32_t)
 		ehci_save_regs->ehci_async_list_addr);
 
+	/*
+	 * For some reason this register might get nulled out by
+	 * the Uli M1575 South Bridge. To workaround the hardware
+	 * problem, check the value after write and retry if the
+	 * last write fails.
+	 */
+	if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+	    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575) &&
+	    (ehci_save_regs->ehci_async_list_addr !=
+	    Get_OpReg(ehci_async_list_addr))) {
+		int retry = 0;
+
+		Set_OpRegRetry(ehci_async_list_addr, (uint32_t)
+			ehci_save_regs->ehci_async_list_addr, retry);
+		if (retry >= EHCI_MAX_RETRY) {
+			USB_DPRINTF_L0(PRINT_MASK_ATTA,
+			    ehcip->ehci_log_hdl, "ehci_do_soft_reset:"
+			    " ASYNCLISTADDR write failed.");
+
+			return (USB_FAILURE);
+		}
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_do_soft_reset: ASYNCLISTADDR "
+			"write failed, retry=%d", retry);
+	}
+
 	Set_OpReg(ehci_config_flag, (uint32_t)
 		ehci_save_regs->ehci_config_flag);
 
@@ -3941,6 +3967,44 @@ ehci_toggle_scheduler(ehci_state_t *ehcip) {
 			Set_OpReg(ehci_async_list_addr,
 			    ehci_qh_cpu_to_iommu(ehcip,
 				ehcip->ehci_head_of_async_sched_list));
+
+			/*
+			 * For some reason this register might get nulled out by
+			 * the Uli M1575 Southbridge. To workaround the HW
+			 * problem, check the value after write and retry if the
+			 * last write fails.
+			 *
+			 * If the ASYNCLISTADDR remains "stuck" after
+			 * EHCI_MAX_RETRY retries, then the M1575 is broken
+			 * and is stuck in an inconsistent state and is about
+			 * to crash the machine with a trn_oor panic when it
+			 * does a DMA read from 0x0.  It is better to panic
+			 * now rather than wait for the trn_oor crash; this
+			 * way Customer Service will have a clean signature
+			 * that indicts the M1575 chip rather than a
+			 * mysterious and hard-to-diagnose trn_oor panic.
+			 */
+			if ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+			    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575) &&
+			    (ehci_qh_cpu_to_iommu(ehcip,
+			    ehcip->ehci_head_of_async_sched_list) !=
+			    Get_OpReg(ehci_async_list_addr))) {
+				int retry = 0;
+
+				Set_OpRegRetry(ehci_async_list_addr,
+				    ehci_qh_cpu_to_iommu(ehcip,
+				    ehcip->ehci_head_of_async_sched_list),
+				    retry);
+				if (retry >= EHCI_MAX_RETRY)
+					cmn_err(CE_PANIC,
+					    "ehci_toggle_scheduler: "
+					    "ASYNCLISTADDR write failed.");
+
+				USB_DPRINTF_L2(PRINT_MASK_ATTA,
+				    ehcip->ehci_log_hdl,
+				    "ehci_toggle_scheduler: ASYNCLISTADDR "
+					"write failed, retry=%d", retry);
+			}
 		}
 		cmd_reg |= EHCI_CMD_ASYNC_SCHED_ENABLE;
 	} else {

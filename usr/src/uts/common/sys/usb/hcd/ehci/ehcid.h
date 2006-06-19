@@ -927,6 +927,16 @@ _NOTE(MUTEX_PROTECTS_DATA(ehci_state_t::ehci_int_mutex, ehci_isoc_xwrapper_t))
 				((uint32_t *)&ehcip->ehci_regsp->addr), \
 					((int32_t)(val)))
 
+#define	EHCI_MAX_RETRY		10
+
+#define	Set_OpRegRetry(addr, val, r) \
+				while (Get_OpReg(addr) != val) { \
+					if (r >= EHCI_MAX_RETRY) \
+						break; \
+					r++; \
+					Set_OpReg(addr, val); \
+				}
+
 #define	Sync_QH_QTD_Pool(ehcip) (void) ddi_dma_sync( \
 				ehcip->ehci_qh_pool_dma_handle, \
 				0, EHCI_QH_POOL_SIZE * sizeof (ehci_qh_t), \
