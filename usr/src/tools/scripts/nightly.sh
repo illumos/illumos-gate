@@ -1940,8 +1940,10 @@ if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 		export RELEASE_BUILD ; RELEASE_BUILD=
 		unset EXTRA_OPTIONS
 		unset EXTRA_CFLAGS
-
+		ORIG_TOOLS=$TOOLS
+		TOOLS=${EXPORT_SRC}/usr/src/tools
 		build_tools ${EXPORT_SRC}/usr/src/tools/proto
+		TOOLS=$ORIG_TOOLS
 	fi
 
 	export EXPORT_RELEASE_BUILD ; EXPORT_RELEASE_BUILD=#
