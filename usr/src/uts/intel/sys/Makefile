@@ -120,7 +120,6 @@ ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
 CHECKHDRS= 			\
 	$(HDRS:%.h=%.check)	\
 	$(SUBHDRS:%.h=%.check)	\
-	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check) \
 	$(FSHDRS:%.h=fs/%.check)
 
 $(CLOSED_BUILD)CHECKHDRS += $(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check)

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,12 +34,14 @@
 #	do not run protocmp or checkpaths (-N)
 #	do not bringover from the parent (-n)
 #	creates cpio archives for bfu (-a)
+#	runs 'make check' (-C)
+#	runs lint in usr/src (-l plus the LINTDIRS variable)
 #	sends mail on completion (-m and the MAILTO variable)
 #	checks for changes in ELF runpaths (-r)
 #	build and use this workspace's tools in $SRC/tools (-t)
 #	use dmake instead of pmake (-d)
 #
-NIGHTLY_OPTIONS="-FNnadDmrt";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-FNnaCdDlmrt";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
