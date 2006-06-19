@@ -333,14 +333,10 @@ auto_calldaemon(
 	door_handle_t		dh;
 	XDR			xdrarg, xdrres;
 	struct autofs_globals 	*fngp = NULL;
-	zone_t 			*autofs_zone;
 	void			*orig_resp = NULL;
 	int			orig_reslen = reslen;
 	autofs_door_args_t	*xdr_argsp;
 	int			xdr_len = 0;
-
-	autofs_zone = zone_find_by_id(zoneid);
-
 
 	/*
 	 * We know that the current thread is doing work on
@@ -358,10 +354,10 @@ auto_calldaemon(
 		return (ECONNREFUSED);
 	}
 
-	if ((fngp = zone_getspecific(autofs_key, autofs_zone)) ==
+	if ((fngp = zone_getspecific(autofs_key, curproc->p_zone)) ==
 	    NULL) {
 		fngp = autofs_zone_init();
-		(void) zone_setspecific(autofs_key, autofs_zone, fngp);
+		(void) zone_setspecific(autofs_key, curproc->p_zone, fngp);
 	}
 
 	ASSERT(fngp != NULL);
