@@ -1244,7 +1244,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 */
 	for (i = 0; i < kex->ex_seccnt; i++) {
 		kex->ex_secinfo[i].s_flags |= M_4SEC_EXPORTED;
-		kex->ex_secinfo[i].s_refcnt++;  /* 1 reference count */
+		kex->ex_secinfo[i].s_refcnt = 1;
 	}
 
 	/*
