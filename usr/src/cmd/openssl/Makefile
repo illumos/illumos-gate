@@ -351,12 +351,14 @@ SSLSUNPAGES =		$(SSLMANPAGES:man3%.3=sunman%.3)
 # we don't want to explicitly define what symlinks to existing man pages to
 # create. This can be easily extracted from manual pages in POD format.
 # However, for each manual page we need information about its section and
-# actual location in common/openssl/doc.
-CONFIGPODPAGES =	$(CONFIGMANPAGES:man5/%.5=5:apps:%)
-SPECPODPAGES =		$(SPECMANPAGES:man7/%.7=7:crypto:%)
-APPSPODPAGES =		$(APPSMANPAGES:man1/%.1=1:apps:%)
-CRYPTOPODPAGES =	$(CRYPTOMANPAGES:man3/%.3=3:crypto:%)
-SSLPODPAGES =		$(SSLMANPAGES:man3/%.3=3:ssl:%)
+# actual location in common/openssl/doc. Note that we don't use ':' as a
+# separator for the section/dir/pod_page triplet because ':' generally denotes
+# "noise" in the nightly build log.
+CONFIGPODPAGES =	$(CONFIGMANPAGES:man5/%.5=5,apps,%)
+SPECPODPAGES =		$(SPECMANPAGES:man7/%.7=7,crypto,%)
+APPSPODPAGES =		$(APPSMANPAGES:man1/%.1=1,apps,%)
+CRYPTOPODPAGES =	$(CRYPTOMANPAGES:man3/%.3=3,crypto,%)
+SSLPODPAGES =		$(SSLMANPAGES:man3/%.3=3,ssl,%)
 
 ALLPODPAGES =		$(CONFIGPODPAGES) \
 			$(SPECPODPAGES) \
@@ -384,7 +386,9 @@ install: $(SUBDIRS) $(ROOTOPENSSL)/openssl.cnf man
 # ./sunman directory
 # (2) install them into their respective manX directories in the proto area
 # (3) create symlinks according to NAME section of each manual page
-man: sunman $(ROOTSFWMANPAGES) mansymlinks
+man:			mansymlinks
+mansymlinks:		$(ROOTSFWMANPAGES)
+$(ROOTSFWMANPAGES):	sunman
 
 # We do NOT attempt to place 3rd Party code under the ON gate lint rules.
 lint:
@@ -423,35 +427,35 @@ $(ROOTSFWMAN)/man1/% $(ROOTSFWMAN)/man3/% $(ROOTSFWMAN)/man5/% $(ROOTSFWMAN)/man
 	$(INS.file)
 
 $(SPECSUNPAGES):
-	$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=7 \
-	--quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
-	--name=`basename $@ .7` $(OPENSSL_SRC)/doc/crypto/`basename $@ .7`.pod $@
+	@$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=7 \
+	    --quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
+	    --name=`basename $@ .7` $(OPENSSL_SRC)/doc/crypto/`basename $@ .7`.pod $@
 
 $(CONFIGSUNPAGES):
-	$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=5 \
-	--quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
-	--name=`basename $@ .5` $(OPENSSL_SRC)/doc/apps/`basename $@ .5`.pod $@
+	@$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=5 \
+	    --quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
+	    --name=`basename $@ .5` $(OPENSSL_SRC)/doc/apps/`basename $@ .5`.pod $@
 
 $(APPSSUNPAGES):
-	$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=1 \
-	--quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
-	--name=`basename $@ .1` $(OPENSSL_SRC)/doc/apps/`basename $@ .1`.pod $@
+	@$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=1 \
+	    --quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
+	    --name=`basename $@ .1` $(OPENSSL_SRC)/doc/apps/`basename $@ .1`.pod $@
 
 $(SSLSUNPAGES):
-	$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=3 \
-	--quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
-	--name=`basename $@ .3` $(OPENSSL_SRC)/doc/ssl/`basename $@ .3`.pod $@
+	@$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=3 \
+	    --quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
+	    --name=`basename $@ .3` $(OPENSSL_SRC)/doc/ssl/`basename $@ .3`.pod $@
 
 $(CRYPTOSUNPAGES):
-	$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=3 \
-	--quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
-	--name=`basename $@ .3` $(OPENSSL_SRC)/doc/crypto/`basename $@ .3`.pod $@
+	@$(POD2MAN) --date=$(DATE) --center=OpenSSL --section=3 \
+	    --quotes=none --release "OpenSSL-$(OPENSSL_VERSION)" \
+	    --name=`basename $@ .3` $(OPENSSL_SRC)/doc/crypto/`basename $@ .3`.pod $@
 
 mansymlinks:
-	for i in $(ALLPODPAGES); do \
-		section=`echo $$i | cut -f1 -d:`; \
-		dir=`echo $$i | cut -f2 -d:`; \
-		base=`echo $$i | cut -f3 -d:`; \
+	@for i in $(ALLPODPAGES); do \
+		section=`echo $$i | cut -f1 -d,`; \
+		dir=`echo $$i | cut -f2 -d,`; \
+		base=`echo $$i | cut -f3 -d,`; \
 		$(EXTRACT_NAMES) <$(OPENSSL_SRC)/doc/$$dir/$$base.pod | \
 		    grep -v "^$$base$$" | \
 		    while read j; do \

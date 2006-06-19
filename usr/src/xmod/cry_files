@@ -68,6 +68,7 @@ usr/src/pkgdefs/SUNWcry
 usr/src/pkgdefs/SUNWcryr
 usr/src/pkgdefs/SUNWcryptoint
 usr/src/pkgdefs/SUNWopensslr
+usr/src/pkgdefs/SUNWopenssl-man
 usr/src/pkgdefs/SUNWopenssl-include
 usr/src/pkgdefs/SUNWopenssl-libraries
 usr/src/pkgdefs/SUNWopenssl-commands
