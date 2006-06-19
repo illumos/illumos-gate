@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1483,11 +1482,11 @@ vis_prtl_fst(
 		if (ftt != ftt_none)
 			return (ftt);
 		_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
-		for (h = 7, i = 0, j = 0x80; i <= 7; h--, i++, j >>= 1) {
+		for (h = 7, i = 0, j = 1; i <= 7; h--, i++, j <<= 1) {
 			if ((msk & j) == j)
-				res.c[h] = k.c[i];
+				res.c[i] = k.c[h];
 			else
-				res.c[h] = l.c[i];
+				res.c[i] = l.c[i];
 		}
 		ftt = _fp_write_extword((uint64_t *)ea, res.ll, pfpsd);
 		if (ftt != ftt_none)
@@ -1515,13 +1514,13 @@ vis_prtl_fst(
 		if (ftt != ftt_none)
 			return (ftt);
 		_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
-		for (h = 7, i = 0, j = 0x8; i <= 6; h -= 2, i += 2, j >>= 1) {
+		for (h = 7, i = 0, j = 1; i <= 6; h -= 2, i += 2, j <<= 1) {
 			if ((msk & j) == j) {
-				res.c[h] = k.c[i];
-				res.c[h-1] = k.c[i+1];
+				res.c[i] = k.c[h];
+				res.c[i+1] = k.c[h-1];
 			} else {
-				res.c[h] = l.c[i];
-				res.c[h-1] = l.c[i+1];
+				res.c[i] = l.c[i];
+				res.c[i+1] = l.c[i+1];
 			}
 		}
 		ftt = _fp_write_extword((uint64_t *)ea, res.ll, pfpsd);
@@ -1550,17 +1549,17 @@ vis_prtl_fst(
 		if (ftt != ftt_none)
 			return (ftt);
 		_fp_unpack_extword(pfpsd, &k.f.FPU_DREG_FIELD, nrd);
-		for (h = 7, i = 0, j = 0x2; i <= 4; h -= 4, i += 4, j >>= 1) {
+		for (h = 7, i = 0, j = 1; i <= 4; h -= 4, i += 4, j <<= 1) {
 			if ((msk & j) == j) {
-				res.c[h] = k.c[i];
-				res.c[h-1] = k.c[i+1];
-				res.c[h-2] = k.c[i+2];
-				res.c[h-3] = k.c[i+3];
+				res.c[i] = k.c[h];
+				res.c[i+1] = k.c[h-1];
+				res.c[i+2] = k.c[h-2];
+				res.c[i+3] = k.c[h-3];
 			} else {
-				res.c[h] = l.c[i];
-				res.c[h-1] = l.c[i+1];
-				res.c[h-2] = l.c[i+2];
-				res.c[h-3] = l.c[i+3];
+				res.c[i] = l.c[i];
+				res.c[i+1] = l.c[i+1];
+				res.c[i+2] = l.c[i+2];
+				res.c[i+3] = l.c[i+3];
 			}
 		}
 		ftt = _fp_write_extword((uint64_t *)ea, res.ll, pfpsd);
