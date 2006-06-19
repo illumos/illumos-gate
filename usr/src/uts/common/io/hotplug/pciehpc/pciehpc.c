@@ -257,7 +257,9 @@ cleanup2:
 
 cleanup1:
 	PCIEHPC_ENABLE_ERRORS(ctrl_p);
-	pciehpc_regs_teardown(&ctrl_p->cfghdl);
+	/* free up the HPC register mapping  if applicable */
+	if (ctrl_p->cfghdl)
+		pciehpc_regs_teardown(&ctrl_p->cfghdl);
 
 cleanup:
 	pciehpc_destroy_soft_state(dip);
@@ -299,8 +301,9 @@ pciehpc_uninit(dev_info_t *dip)
 
 	PCIEHPC_ENABLE_ERRORS(ctrl_p);
 
-	/* free up the HPC register mapping */
-	pciehpc_regs_teardown(&ctrl_p->cfghdl);
+	/* free up the HPC register mapping  if applicable */
+	if (ctrl_p->cfghdl)
+		pciehpc_regs_teardown(&ctrl_p->cfghdl);
 
 	/* destroy the soft state structure */
 	pciehpc_destroy_soft_state(dip);
