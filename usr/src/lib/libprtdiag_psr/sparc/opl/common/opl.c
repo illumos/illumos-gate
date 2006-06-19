@@ -524,8 +524,26 @@ get_opl_mem_regs(Board_node *bnode)
 			cs_stat = (struct cs_status *)get_prop_val
 			    (find_prop(pnode, "cs-status"));
 
-			/* cs_size must be at least 28 */
-			ngrps = cs_size/sizeof (struct cs_status);
+			/*
+			 * The units of cs_size will be either number of bytes
+			 * or number of int array elements as this is derived
+			 * from the libprtdiag Prop node size field which has
+			 * inconsistent units.   Until this is addressed in
+			 * libprtdiag, we need a heuristic to determine the
+			 * number of CS groups.  Given that the maximum number
+			 * of CS groups is 2, the maximum number of cs-status
+			 * array elements will be 2*7=14.  Since this is smaller
+			 * than the byte size of a single struct status, we use
+			 * this to decide if we are dealing with bytes or array
+			 * elements in determining the number of CS groups.
+			 */
+			if (cs_size < sizeof (struct cs_status)) {
+				/* cs_size is number of total int [] elements */
+				ngrps = cs_size / 7;
+			} else {
+				/* cs_size is total byte count */
+				ngrps = cs_size/sizeof (struct cs_status);
+			}
 
 			if (cs_stat != NULL) {
 				total_mem +=
