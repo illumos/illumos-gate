@@ -1956,12 +1956,6 @@ extern int		snarf_set(mdsetname_t *sp, bool_t stale_bool,
 			    md_error_t *ep);
 extern int		halt_set(mdsetname_t *sp, md_error_t *ep);
 
-#ifdef	__cplusplus
-}
-#endif
-
-#endif	/* _META_H */
-
 /* meta_statconcise.c */
 extern  void		print_concise_entry(int indent, char *name,
 			    diskaddr_t size, char mtype);
@@ -1971,3 +1965,9 @@ extern	char		*meta_get_hs_state(hotspare_states_t);
 extern	int		report_metastat_info(mddb_mb_t *, mddb_lb_t *,
 			    mddb_rb_t *, pnm_rec_t **, mdname_t *, int,
 			    md_timeval32_t *, md_error_t *);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _META_H */
