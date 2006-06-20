@@ -319,6 +319,8 @@ superfluous_local_zone_files="
 	lib/svc/method/svc-intrd
 	lib/svc/method/svc-mdmonitor
 	lib/svc/method/svc-metainit
+	lib/svc/method/svc-metasync
+	lib/svc/method/svc-oplhpd
 	lib/svc/method/svc-poold
 	lib/svc/method/svc-pools
 	lib/svc/method/svc-power
@@ -363,6 +365,7 @@ superfluous_local_zone_files="
 	usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln
 	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
+	var/db/ipf
 	var/log/pool
 	var/svc/manifest/network/ipfilter.xml
 	var/svc/manifest/network/pfil.xml
@@ -374,15 +377,17 @@ superfluous_local_zone_files="
 	var/svc/manifest/platform/sun4u/dcs.xml
 	var/svc/manifest/platform/sun4u/dscp.xml
 	var/svc/manifest/platform/sun4u/efdaemon.xml
+	var/svc/manifest/platform/sun4u/oplhpd.xml
 	var/svc/manifest/platform/sun4u/sckmd.xml
 	var/svc/manifest/platform/sun4u/sf880drd.xml
-	var/svc/manifest/platform/sun4v/vntsd.xml
+	var/svc/manifest/platform/sun4v
 	var/svc/manifest/system/cvc.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/fmd.xml
 	var/svc/manifest/system/intrd.xml
 	var/svc/manifest/system/mdmonitor.xml
 	var/svc/manifest/system/metainit.xml
+	var/svc/manifest/system/metasync.xml
 	var/svc/manifest/system/picl.xml
 	var/svc/manifest/system/poold.xml
 	var/svc/manifest/system/pools.xml
@@ -410,7 +415,6 @@ preserve_files="
 	var/log/syslog
 	var/saf/zsmon/log
 "
-
 
 realmode_files="
 	boot/solaris/bootenv.rc
