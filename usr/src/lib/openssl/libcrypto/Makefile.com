@@ -129,7 +129,7 @@ OBJECTS = sunw.o								\
 	engine/eng_lib.o		engine/tb_rand.o		\
 	engine/tb_rsa.o			engine/tb_store.o		\
 	engine/tb_ecdh.o		engine/tb_ecdsa.o		\
-	engine/eng_cryptodev.o		engine/eng_padlock.o		\
+	engine/eng_cryptodev.o						\
 	\
 	engine/hw_pk11.o		engine/hw_pk11_pub.o		\
 	\
