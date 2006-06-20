@@ -29,7 +29,6 @@ DT_CHANGED=0
 
 LOG_FMRI=svc:/system/system-log
 CMSD_FMRI=svc:/network/rpc/cde-calendar-manager
-INETD_FMRI=svc:/network/inetd
 BIND_FMRI=svc:/network/rpc/bind
 XSERVER_FMRI=svc:/application/x11/x11-server
 SENDMAIL_FMRI=svc:/network/smtp:sendmail
@@ -37,7 +36,7 @@ RFC1179_FMRI=svc:/application/print/rfc1179
 TTDB_FMRI=svc:/network/rpc/cde-ttdbserver
 DTLOGIN_FMRI=svc:/application/graphical-login/cde-login
 WEBCONSOLE_FMRI=svc:/system/webconsole
-SMCWBEM_FMRI=svc:/application/smcwbem
+SMCWBEM_FMRI=svc:/application/management/wbem
 
 usage()
 {
@@ -275,6 +274,13 @@ then
 	# need restart since refresh won't pick up new command-line
 	echo "restarting sendmail"
 	svcadm restart $SENDMAIL_FMRI
+fi
+
+if [ "`svcprop -p restarter/state $SMCWBEM_FMRI:default`" = "online" ]
+then
+	# need restart since refresh won't pick up new command-line
+	echo "restarting wbem"
+	svcadm restart $SMCWBEM_FMRI:default
 fi
 
 if [ $DT_CHANGED -eq 1 ]; then
