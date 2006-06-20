@@ -259,6 +259,121 @@ struct tsb_info {
 #define	TSB_SWAPPED	0x4
 
 /*
+ * Per-MMU context domain kstats.
+ *
+ * TSB Miss Exceptions
+ *	Number of times a TSB miss exception is handled in an MMU. See
+ *	sfmmu_tsbmiss_exception() for more details.
+ * TSB Raise Exception
+ *	Number of times the CPUs within an MMU are cross-called
+ *	to invalidate either a specific process context (when the process
+ *	switches MMU contexts) or the context of any process that is
+ *	running on those CPUs (as part of the MMU context wrap-around).
+ * Wrap Around
+ *	The number of times a wrap-around of MMU context happens.
+ */
+typedef enum mmu_ctx_stat_types {
+	MMU_CTX_TSB_EXCEPTIONS,		/* TSB miss exceptions handled */
+	MMU_CTX_TSB_RAISE_EXCEPTION,	/* ctx invalidation cross calls */
+	MMU_CTX_WRAP_AROUND,		/* wraparounds */
+	MMU_CTX_NUM_STATS
+} mmu_ctx_stat_t;
+
+/*
+ * Per-MMU context domain structure. This is instantiated the first time a CPU
+ * belonging to the MMU context domain is configured into the system, at boot
+ * time or at DR time.
+ *
+ * mmu_gnum
+ *	The current generation number for the context IDs on this MMU context
+ *	domain. It is protected by mmu_lock.
+ * mmu_cnum
+ *	The current cnum to be allocated on this MMU context domain. It
+ *	is protected via CAS.
+ * mmu_nctxs
+ *	The max number of context IDs supported on every CPU in this
+ *	MMU context domain. It is 8K except for Rock where it is 64K.
+ *      This is needed here in case the system supports mixed type of
+ *      processors/MMUs. It also helps to make ctx switch code access
+ *      fewer cache lines i.e. no need to retrieve it from some global nctxs.
+ * mmu_lock
+ *	The mutex spin lock used to serialize context ID wrap around
+ * mmu_idx
+ *	The index for this MMU context domain structure in the global array
+ *	mmu_ctxdoms.
+ * mmu_ncpus
+ *	The actual number of CPUs that have been configured in this
+ *	MMU context domain. This also acts as a reference count for the
+ *	structure. When the last CPU in an MMU context domain is unconfigured,
+ *	the structure is freed. It is protected by mmu_lock.
+ * mmu_cpuset
+ *	The CPU set of configured CPUs for this MMU context domain. Used
+ *	to cross-call all the CPUs in the MMU context domain to invalidate
+ *	context IDs during a wraparound operation. It is protected by mmu_lock.
+ */
+
+typedef struct mmu_ctx {
+	uint64_t	mmu_gnum;
+	uint_t		mmu_cnum;
+	uint_t		mmu_nctxs;
+	kmutex_t	mmu_lock;
+	uint_t		mmu_idx;
+	uint_t		mmu_ncpus;
+	cpuset_t	mmu_cpuset;
+	kstat_t		*mmu_kstat;
+	kstat_named_t	mmu_kstat_data[MMU_CTX_NUM_STATS];
+} mmu_ctx_t;
+
+#define	mmu_tsb_exceptions	\
+		mmu_kstat_data[MMU_CTX_TSB_EXCEPTIONS].value.ui64
+#define	mmu_tsb_raise_exception	\
+		mmu_kstat_data[MMU_CTX_TSB_RAISE_EXCEPTION].value.ui64
+#define	mmu_wrap_around		\
+		mmu_kstat_data[MMU_CTX_WRAP_AROUND].value.ui64
+
+extern uint_t		max_mmu_ctxdoms;
+extern mmu_ctx_t	**mmu_ctxs_tbl;
+
+extern void	sfmmu_cpu_init(cpu_t *);
+extern void	sfmmu_cpu_cleanup(cpu_t *);
+
+/*
+ * The following structure is used to get MMU context domain information for
+ * a CPU from the platform.
+ *
+ * mmu_idx
+ *	The MMU context domain index within the global array mmu_ctxs
+ * mmu_nctxs
+ *	The number of context IDs supported in the MMU context domain
+ *	(64K for Rock)
+ */
+typedef struct mmu_ctx_info {
+	uint_t		mmu_idx;
+	uint_t		mmu_nctxs;
+} mmu_ctx_info_t;
+
+#pragma weak plat_cpuid_to_mmu_ctx_info
+
+extern void	plat_cpuid_to_mmu_ctx_info(processorid_t, mmu_ctx_info_t *);
+
+/*
+ * Each address space has an array of sfmmu_ctx_t structures, one structure
+ * per MMU context domain.
+ *
+ * cnum
+ *	The context ID allocated for an address space on an MMU context domain
+ * gnum
+ *	The generation number for the context ID in the MMU context domain.
+ *
+ * This structure needs to be a power-of-two in size.
+ */
+typedef struct sfmmu_ctx {
+	uint64_t	gnum:48;
+	uint64_t	cnum:16;
+} sfmmu_ctx_t;
+
+
+/*
  * The platform dependent hat structure.
  * tte counts should be protected by cas.
  * cpuset is protected by cas.
@@ -281,16 +396,26 @@ struct hat {
 	uchar_t		sfmmu_rmstat;	/* refmod stats refcnt */
 	uchar_t		sfmmu_clrstart;	/* start color bin for page coloring */
 	ushort_t	sfmmu_clrbin;	/* per as phys page coloring bin */
-	short		sfmmu_cnum;	/* context number */
 	ushort_t	sfmmu_flags;	/* flags */
 	struct tsb_info	*sfmmu_tsb;	/* list of per as tsbs */
 	uint64_t	sfmmu_ismblkpa; /* pa of sfmmu_iblkp, or -1 */
+	lock_t		sfmmu_ctx_lock;	/* sync ctx alloc and invalidation */
 	kcondvar_t	sfmmu_tsb_cv;	/* signals TSB swapin or relocation */
 	uchar_t		sfmmu_cext;	/* context page size encoding */
 	uint8_t		sfmmu_pgsz[MMU_PAGE_SIZES];  /* ranking for MMU */
 #ifdef sun4v
 	struct hv_tsb_block sfmmu_hvblock;
 #endif
+	/*
+	 * sfmmu_ctxs is a variable length array of max_mmu_ctxdoms # of
+	 * elements. max_mmu_ctxdoms is determined at run-time.
+	 * sfmmu_ctxs[1] is just the fist element of an array, it always
+	 * has to be the last field to ensure that the memory allocated
+	 * for sfmmu_ctxs is consecutive with the memory of the rest of
+	 * the hat data structure.
+	 */
+	sfmmu_ctx_t	sfmmu_ctxs[1];
+
 };
 
 #define	sfmmu_iblk	h_un.sfmmu_iblkp
@@ -323,28 +448,6 @@ struct hat {
  */
 #define	FLUSH_NECESSARY_CPUS	0
 #define	FLUSH_ALL_CPUS		1
-
-/*
- * Software context structure.  The size of this structure is currently
- * hardwired into the tsb miss handlers in assembly code through the
- * CTX_SZ_SHIFT define.  Since this define is used in a shift we should keep
- * this structure a power of two.
- *
- * ctx_flags:
- * Bit 0 : Free flag.
- */
-struct ctx {
-	union _ctx_un {
-		sfmmu_t *ctx_sfmmup;	/* back pointer to hat id */
-		struct ctx *ctx_freep;	/* next ctx in freelist */
-	} ctx_un;
-	krwlock_t	ctx_rwlock;	/* protect context from stealer */
-	uint32_t	ctx_flags;	/* flags */
-	uint8_t		pad[12];
-};
-
-#define	ctx_sfmmu	ctx_un.ctx_sfmmup
-#define	ctx_free	ctx_un.ctx_freep
 
 #ifdef	DEBUG
 /*
@@ -744,6 +847,14 @@ struct hmehash_bucket {
 
 #endif /* !_ASM */
 
+/* Proc Count Project */
+#define	SFMMU_PGCNT_MASK	0x3f
+#define	SFMMU_PGCNT_SHIFT	6
+#define	INVALID_MMU_ID		-1
+#define	SFMMU_MMU_GNUM_RSHIFT	16
+#define	SFMMU_MMU_CNUM_LSHIFT	(64 - SFMMU_MMU_GNUM_RSHIFT)
+#define	MAX_SFMMU_CTX_VAL	((1 << 16) - 1) /* for sanity check */
+#define	MAX_SFMMU_GNUM_VAL	((0x1UL << 48) - 1)
 
 /*
  * The tsb miss handlers written in assembly know that sfmmup
@@ -874,10 +985,10 @@ struct hmehash_bucket {
 
 #define	HME_HASH_FUNCTION(hatid, vaddr, shift)				\
 	((hatid != KHATID)?						\
-	(&uhme_hash[ (((uintptr_t)(hatid) ^ ((uintptr_t)vaddr >> (shift))) & \
-	    UHMEHASH_SZ) ]):					\
-	(&khme_hash[ (((uintptr_t)(hatid) ^ ((uintptr_t)vaddr >> (shift))) & \
-	    KHMEHASH_SZ) ]))
+	(&uhme_hash[ (((uintptr_t)(hatid) ^	\
+	    ((uintptr_t)vaddr >> (shift))) & UHMEHASH_SZ) ]):		\
+	(&khme_hash[ (((uintptr_t)(hatid) ^	\
+	    ((uintptr_t)vaddr >> (shift))) & KHMEHASH_SZ) ]))
 
 /*
  * This macro will traverse a hmeblk hash link list looking for an hme_blk
@@ -953,9 +1064,9 @@ struct hmehash_bucket {
 #define	SFMMU_HASH_LOCK_ISHELD(hmebp)					\
 		(mutex_owned(&hmebp->hmehash_mutex))
 
-#define	SFMMU_XCALL_STATS(ctxnum)					\
+#define	SFMMU_XCALL_STATS(sfmmup)					\
 {									\
-	if (ctxnum == KCONTEXT) {					\
+	if (sfmmup == ksfmmup) {					\
 		SFMMU_STAT(sf_kernel_xcalls);				\
 	} else {							\
 		SFMMU_STAT(sf_user_xcalls);				\
@@ -963,11 +1074,8 @@ struct hmehash_bucket {
 }
 
 #define	astosfmmu(as)		((as)->a_hat)
-#define	sfmmutoctxnum(sfmmup)	((sfmmup)->sfmmu_cnum)
-#define	sfmmutoctx(sfmmup)	(&ctxs[sfmmutoctxnum(sfmmup)])
 #define	hblktosfmmu(hmeblkp)	((sfmmu_t *)(hmeblkp)->hblk_tag.htag_id)
 #define	sfmmutoas(sfmmup)	((sfmmup)->sfmmu_as)
-#define	ctxnumtoctx(ctxnum)	(&ctxs[ctxnum])
 /*
  * We use the sfmmu data structure to keep the per as page coloring info.
  */
@@ -1355,6 +1463,35 @@ extern uint_t  tsb_slab_pamask;
 	sethi	%hi(0x1000000), reg
 
 /*
+ * Macro to get hat per-MMU cnum on this CPU.
+ * sfmmu - In, pass in "sfmmup" from the caller.
+ * cnum	- Out, return 'cnum' to the caller
+ * scr	- scratch
+ */
+#define	SFMMU_CPU_CNUM(sfmmu, cnum, scr)				      \
+	CPU_ADDR(scr, cnum);	/* scr = load CPU struct addr */	      \
+	ld	[scr + CPU_MMU_IDX], cnum;	/* cnum = mmuid */	      \
+	add	sfmmu, SFMMU_CTXS, scr;	/* scr = sfmmup->sfmmu_ctxs[] */      \
+	sllx    cnum, SFMMU_MMU_CTX_SHIFT, cnum;			      \
+	add	scr, cnum, scr;		/* scr = sfmmup->sfmmu_ctxs[id] */    \
+	ldx	[scr + SFMMU_MMU_GC_NUM], scr;	/* sfmmu_ctxs[id].gcnum */    \
+	sllx    scr, SFMMU_MMU_CNUM_LSHIFT, scr;			      \
+	srlx    scr, SFMMU_MMU_CNUM_LSHIFT, cnum;	/* cnum = sfmmu cnum */
+
+/*
+ * Macro to get hat gnum & cnum assocaited with sfmmu_ctx[mmuid] entry
+ * entry - In,  pass in (&sfmmu_ctxs[mmuid] - SFMMU_CTXS) from the caller.
+ * gnum - Out, return sfmmu gnum
+ * cnum - Out, return sfmmu cnum
+ * reg	- scratch
+ */
+#define	SFMMU_MMUID_GNUM_CNUM(entry, gnum, cnum, reg)			     \
+	ldx	[entry + SFMMU_CTXS], reg;  /* reg = sfmmu (gnum | cnum) */  \
+	srlx	reg, SFMMU_MMU_GNUM_RSHIFT, gnum;    /* gnum = sfmmu gnum */ \
+	sllx	reg, SFMMU_MMU_CNUM_LSHIFT, cnum;			     \
+	srlx	cnum, SFMMU_MMU_CNUM_LSHIFT, cnum;   /* cnum = sfmmu cnum */
+
+/*
  * Macro to get this CPU's tsbmiss area.
  */
 #define	CPU_TSBMISS_AREA(tsbmiss, tmp1)					\
@@ -1407,6 +1544,65 @@ label2:;								\
 label3:;
 
 #endif
+
+/*
+ * Macro to setup arguments with kernel sfmmup context + page size before
+ * calling sfmmu_setctx_sec()
+ */
+#ifdef sun4v
+#define	SET_KAS_CTXSEC_ARGS(sfmmup, arg0, arg1)			\
+	set	KCONTEXT, arg0;					\
+	set	0, arg1;
+#else
+#define	SET_KAS_CTXSEC_ARGS(sfmmup, arg0, arg1)			\
+	ldub	[sfmmup + SFMMU_CEXT], arg1;			\
+	set	KCONTEXT, arg0;					\
+	sll	arg1, CTXREG_EXT_SHIFT, arg1;
+#endif
+
+#define	PANIC_IF_INTR_DISABLED_PSTR(pstatereg, label, scr)	       	\
+	andcc	pstatereg, PSTATE_IE, %g0;	/* panic if intrs */	\
+/*CSTYLED*/								\
+	bnz,pt	%icc, label;			/* already disabled */	\
+	nop;								\
+									\
+	sethi	%hi(panicstr), scr;					\
+	ldx	[scr + %lo(panicstr)], scr;				\
+	tst	scr;							\
+/*CSTYLED*/								\
+	bnz,pt	%xcc, label;						\
+	nop;								\
+									\
+	save	%sp, -SA(MINFRAME), %sp;				\
+	sethi	%hi(sfmmu_panic1), %o0;					\
+	call	panic;							\
+	or	%o0, %lo(sfmmu_panic1), %o0;				\
+/*CSTYLED*/								\
+label:
+
+#define	PANIC_IF_INTR_ENABLED_PSTR(label, scr)				\
+	/*								\
+	 * The caller must have disabled interrupts.			\
+	 * If interrupts are not disabled, panic			\
+	 */								\
+	rdpr	%pstate, scr;						\
+	andcc	scr, PSTATE_IE, %g0;					\
+/*CSTYLED*/								\
+	bz,pt	%icc, label;						\
+	nop;								\
+									\
+	sethi	%hi(panicstr), scr;					\
+	ldx	[scr + %lo(panicstr)], scr;				\
+	tst	scr;							\
+/*CSTYLED*/								\
+	bnz,pt	%xcc, label;						\
+	nop;								\
+									\
+	sethi	%hi(sfmmu_panic6), %o0;					\
+	call	panic;							\
+	or	%o0, %lo(sfmmu_panic6), %o0;				\
+/*CSTYLED*/								\
+label:
 
 #endif	/* _ASM */
 
@@ -1503,11 +1699,10 @@ extern struct tsbe *
 extern void	sfmmu_load_tsbe(struct tsbe *, uint64_t, tte_t *, int);
 extern void	sfmmu_unload_tsbe(struct tsbe *, uint64_t, int);
 extern void	sfmmu_load_mmustate(sfmmu_t *);
-extern void	sfmmu_ctx_steal_tl1(uint64_t, uint64_t);
 extern void	sfmmu_raise_tsb_exception(uint64_t, uint64_t);
 #ifndef sun4v
-extern void	sfmmu_itlb_ld(caddr_t, int, tte_t *);
-extern void	sfmmu_dtlb_ld(caddr_t, int, tte_t *);
+extern void	sfmmu_itlb_ld_kva(caddr_t, tte_t *);
+extern void	sfmmu_dtlb_ld_kva(caddr_t, tte_t *);
 #endif /* sun4v */
 extern void	sfmmu_copytte(tte_t *, tte_t *);
 extern int	sfmmu_modifytte(tte_t *, tte_t *, tte_t *);
@@ -1517,7 +1712,8 @@ extern void	sfmmu_hblk_hash_rm(struct hmehash_bucket *,
 			struct hme_blk *, uint64_t, struct hme_blk *);
 extern void	sfmmu_hblk_hash_add(struct hmehash_bucket *, struct hme_blk *,
 			uint64_t);
-
+extern uint_t	sfmmu_disable_intrs(void);
+extern void	sfmmu_enable_intrs(uint_t);
 /*
  * functions exported to machine dependent VM code
  */
@@ -1549,7 +1745,7 @@ extern void	sfmmu_cache_flushall(void);
 extern pgcnt_t  sfmmu_tte_cnt(sfmmu_t *, uint_t);
 extern void	*sfmmu_tsb_segkmem_alloc(vmem_t *, size_t, int);
 extern void	sfmmu_tsb_segkmem_free(vmem_t *, void *, size_t);
-extern void	sfmmu_steal_context(sfmmu_t *, uint8_t *);
+extern void	sfmmu_reprog_pgsz_arr(sfmmu_t *, uint8_t *);
 
 extern void	hat_kern_setup(void);
 extern int	hat_page_relocate(page_t **, page_t **, spgcnt_t *);
@@ -1557,6 +1753,7 @@ extern uint_t	hat_preferred_pgsz(struct hat *, caddr_t, size_t, int);
 extern int	sfmmu_get_ppvcolor(struct page *);
 extern int	sfmmu_get_addrvcolor(caddr_t);
 extern int	sfmmu_hat_lock_held(sfmmu_t *);
+extern void	sfmmu_alloc_ctx(sfmmu_t *, int, struct cpu *);
 
 /*
  * Functions exported to xhat_sfmmu.c
@@ -1580,8 +1777,6 @@ extern uint_t mmu_preferred_pgsz(sfmmu_t *, caddr_t, size_t);
 extern void mmu_check_page_sizes(sfmmu_t *, uint64_t *);
 
 extern sfmmu_t 		*ksfmmup;
-extern struct ctx	*ctxs;
-extern uint_t		nctxs;
 extern caddr_t		ktsb_base;
 extern uint64_t		ktsb_pbase;
 extern int		ktsb_sz;
@@ -1700,10 +1895,6 @@ struct sfmmu_global_stat {
 
 	int		sf_swapout;		/* # times hat swapped out */
 
-	int		sf_ctxfree;		/* ctx alloc from free list */
-	int		sf_ctxdirty;		/* ctx alloc from dirty list */
-	int		sf_ctxsteal;		/* ctx allocated by steal */
-
 	int		sf_tsb_alloc;		/* # TSB allocations */
 	int		sf_tsb_allocfail;	/* # times TSB alloc fail */
 	int		sf_tsb_sectsb_create;	/* # times second TSB added */
@@ -1756,10 +1947,7 @@ struct sfmmu_global_stat {
 
 	int		sf_user_vtop;		/* # of user vatopfn calls */
 
-	int		sf_ctx_swap;		/* # times switched MMU ctxs */
-	int		sf_tlbflush_all;	/* # times flush all TLBs */
-	int		sf_tlbflush_ctx;	/* # times flush TLB ctx */
-	int		sf_tlbflush_deferred;	/* # times !flush ctx imm. */
+	int		sf_ctx_inv;		/* #times invalidate MMU ctx */
 
 	int		sf_tlb_reprog_pgsz;	/* # times switch TLB pgsz */
 };
@@ -1787,9 +1975,11 @@ struct sfmmu_percpu_stat {
 	int	sf_kmod_faults;		/* # of mod (prot viol) flts */
 };
 
-#define	SFMMU_STAT(stat)		sfmmu_global_stat.stat++;
-#define	SFMMU_STAT_ADD(stat, amount)	sfmmu_global_stat.stat += amount;
-#define	SFMMU_STAT_SET(stat, count)	sfmmu_global_stat.stat = count;
+#define	SFMMU_STAT(stat)		sfmmu_global_stat.stat++
+#define	SFMMU_STAT_ADD(stat, amount)	sfmmu_global_stat.stat += (amount)
+#define	SFMMU_STAT_SET(stat, count)	sfmmu_global_stat.stat = (count)
+
+#define	SFMMU_MMU_STAT(stat)		CPU->cpu_m.cpu_mmu_ctxp->stat++
 
 #endif /* !_ASM */
 

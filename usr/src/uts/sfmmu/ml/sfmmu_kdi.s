@@ -225,7 +225,7 @@ ttep_calc:	/* idx in %g1 */				\
  * uint64_t
  * kdi_vatotte(uintptr_t va, int cnum)
  * {
- *	sfmmu_t *sfmmup = ctxs[cnum].ctx_sfmmu;
+ *	sfmmu_t *sfmmup = ksfmmup;
  *	uint64_t hmebpa, hmetag, hmeblkpa;
  *	int i;
  *
@@ -265,7 +265,13 @@ kdi_trap_vatotte(void)
 #else
 
 	/*
-	 * Invocation in normal context as a VA-to-TTE translator.
+	 * Invocation in normal context as a VA-to-TTE translator
+	 * for kernel context only. This routine returns 0 on
+	 * success and -1 on error.
+	 *
+	 * %o0 = VA, input register
+	 * %o1 = KCONTEXT
+	 * %o2 = ttep, output register
 	 */
 	ENTRY_NP(kdi_vatotte)
 	mov	%o0, %g1		/* VA in %g1 */
@@ -288,21 +294,21 @@ kdi_trap_vatotte(void)
 	mov	-1, %o0
 	SET_SIZE(kdi_vatotte)
 
+	/*
+	 * %g1 = vaddr passed in, tte or 0 (error) when return
+	 * %g2 = KCONTEXT
+	 * %g7 = return address
+	 */
 	ENTRY_NP(kdi_trap_vatotte)
-	set	nctxs, %g3
-	ld	[%g3], %g3
-	cmp	%g2, %g3
-	bge,a	%xcc, 6f
-	clr	%g1
 
-	set	ctxs, %g3
-	ldx	[%g3], %g3
-	mulx	%g2, CTX_SIZE, %g2
-	add	%g2, %g3, %g2
-	add	%g2, CTX_SFMMUP, %g2
-	ldx	[%g2], %g2		/* VA %g1, sfmmup %g2 */
+	cmp	%g2, KCONTEXT		/* make sure called in kernel ctx */
+	bne,a,pn %icc, 6f
+	  clr	%g1
 
-	mov	1, %g3			/* VA %g1, sfmmup %g2, idx %g3 */
+	sethi   %hi(ksfmmup), %g2
+        ldx     [%g2 + %lo(ksfmmup)], %g2
+
+	mov	1, %g3			/* VA %g1, ksfmmup %g2, idx %g3 */
 	mov	HBLK_RANGE_SHIFT, %g4
 	ba	3f
 	nop

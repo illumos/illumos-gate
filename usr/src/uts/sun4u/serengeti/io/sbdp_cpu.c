@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -668,8 +668,8 @@ sbdp_cpu_stop_self(uint64_t pa)
 	    TTE_PFN_INTHI(bbsram_pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(bbsram_pfn) |
 	    TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
-	sfmmu_dtlb_ld(sbdp_shutdown_va, KCONTEXT, &tte); /* load dtlb */
-	sfmmu_itlb_ld(sbdp_shutdown_va, KCONTEXT, &tte); /* load itlb */
+	sfmmu_dtlb_ld_kva(sbdp_shutdown_va, &tte); /* load dtlb */
+	sfmmu_itlb_ld_kva(sbdp_shutdown_va, &tte); /* load itlb */
 
 	for (src = (uint_t *)sbdp_shutdown_asm, dst = (uint_t *)bbsram_addr;
 	    src < (uint_t *)sbdp_shutdown_asm_end; src++, dst++)

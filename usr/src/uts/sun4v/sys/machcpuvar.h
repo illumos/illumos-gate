@@ -122,6 +122,11 @@ struct	machcpu {
 	 * E$ data, which is needed for the specific cpu type.
 	 */
 	void		*cpu_private;		/* ptr to cpu private data */
+	/*
+	 * per-MMU ctxdom CPU data.
+	 */
+	uint_t		cpu_mmu_idx;
+	struct mmu_ctx	*cpu_mmu_ctxp;
 
 	ptl1_state_t	ptl1_state;
 
@@ -163,6 +168,8 @@ struct	machcpu {
 typedef	struct machcpu	machcpu_t;
 
 #define	cpu_startup_thread	cpu_m.startup_thread
+#define	CPU_MMU_IDX(cp)		((cp)->cpu_m.cpu_mmu_idx)
+#define	CPU_MMU_CTXP(cp)	((cp)->cpu_m.cpu_mmu_ctxp)
 #define	NINTR_THREADS	(LOCK_LEVEL)	/* number of interrupt threads */
 
 /*

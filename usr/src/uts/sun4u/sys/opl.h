@@ -67,6 +67,23 @@ extern "C" {
 	(OPL_MAX_COREID_PER_CMP - 1))
 #define	STRAND_ID(x)	((uint_t)(x) & (OPL_MAX_STRANDID_PER_CORE - 1))
 
+/*
+ * Max. boards supported in a domain per model.
+ */
+#define	OPL_MAX_BOARDS_FF1	1
+#define	OPL_MAX_BOARDS_FF2	2
+#define	OPL_MAX_BOARDS_DC1	4
+#define	OPL_MAX_BOARDS_DC2	8
+#define	OPL_MAX_BOARDS_DC3	16
+
+/*
+ * Structure to gather model-specific information at boot.
+ */
+typedef struct opl_model_info {
+	char	model_name[MAXSYSNAME];
+	int	model_max_boards;
+} opl_model_info_t;
+
 extern int	plat_max_boards(void);
 extern int	plat_max_cpu_units_per_board(void);
 extern int	plat_max_mem_units_per_board(void);

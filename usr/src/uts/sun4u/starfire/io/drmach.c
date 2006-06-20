@@ -2452,7 +2452,7 @@ drmach_cpu_start(struct cpu *cp)
 		drmach_cpu_ntries - ntries, drmach_cpu_ntries, cpuid);
 
 	xt_one(cpuid, vtag_flushpage_tl1,
-		(uint64_t)drmach_shutdown_va, (uint64_t)KCONTEXT);
+		(uint64_t)drmach_shutdown_va, (uint64_t)ksfmmup);
 
 	return (0);
 }
@@ -2516,8 +2516,8 @@ drmach_cpu_stop_self(void)
 			TTE_PFN_INTHI(bbsram_pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(bbsram_pfn) |
 			TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT;
-	sfmmu_dtlb_ld(drmach_shutdown_va, KCONTEXT, &tte);	/* load dtlb */
-	sfmmu_itlb_ld(drmach_shutdown_va, KCONTEXT, &tte);	/* load itlb */
+	sfmmu_dtlb_ld_kva(drmach_shutdown_va, &tte);	/* load dtlb */
+	sfmmu_itlb_ld_kva(drmach_shutdown_va, &tte);	/* load itlb */
 
 	for (src = (uint_t *)drmach_shutdown_asm, dst = (uint_t *)bbsram_addr;
 		src < (uint_t *)drmach_shutdown_asm_end; src++, dst++)

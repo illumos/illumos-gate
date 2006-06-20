@@ -77,14 +77,7 @@ static int  cpu_flt_in_memory(opl_async_flt_t *, uint64_t);
  */
 static int opl_async_check_interval = 60;		/* 1 min */
 
-/*
- * Maximum number of contexts for Olympus-C.
- */
-#define	MAX_NCTXS	(1 << 13)
-
-/* Will be set !NULL for SPARC64-VI and derivatives. */
-static uchar_t ctx_pgsz_arr[MAX_NCTXS];
-uchar_t *ctx_pgsz_array = ctx_pgsz_arr;
+uint_t cpu_impl_dual_pgsz = 1;
 
 /*
  * PA[22:0] represent Displacement in Jupiter
@@ -529,16 +522,6 @@ cpu_setup(void)
 	at_flags = EF_SPARC_32PLUS | EF_SPARC_SUN_US1 | EF_SPARC_SUN_US3;
 
 	/*
-	 * Use the maximum number of contexts available for SPARC64-VI
-	 * unless it has been tuned for debugging.
-	 * We are checking against 0 here since this value can be patched
-	 * while booting.  It can not be patched via /etc/system since it
-	 * will be patched too late and thus cause the system to panic.
-	 */
-	if (nctxs == 0)
-		nctxs = MAX_NCTXS;
-
-	/*
 	 * Due to the number of entries in the fully-associative tlb
 	 * this may have to be tuned lower than in spitfire.
 	 */
@@ -957,9 +940,18 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 	ASSERT(pgsz1 < mmu_page_sizes);
 	new_cext = TAGACCEXT_MKSZPAIR(pgsz1, pgsz0);
 	if (hat->sfmmu_cext != new_cext) {
+#ifdef DEBUG
+		int i;
+		/*
+		 * assert cnum should be invalid, this is because pagesize
+		 * can only be changed after a proc's ctxs are invalidated.
+		 */
+		for (i = 0; i < max_mmu_ctxdoms; i++) {
+			ASSERT(hat->sfmmu_ctxs[i].cnum == INVALID_CONTEXT);
+		}
+#endif /* DEBUG */
 		hat->sfmmu_cext = new_cext;
 	}
-	ctx_pgsz_array[hat->sfmmu_cnum] = hat->sfmmu_cext;
 	/*
 	 * sfmmu_setctx_sec() will take care of the
 	 * rest of the dirty work for us.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,7 +184,6 @@ resume(kthread_id_t t)
 	!
 	! IMPORTANT: Registers at this point must be:
 	!	%i0 = new thread
-	!	%i1 = flag (non-zero if unpinning from an interrupt thread)
 	!	%i1 = cpu pointer
 	!	%i2 = old proc pointer
 	!	%i3 = new proc pointer
@@ -200,21 +198,21 @@ resume(kthread_id_t t)
 	cmp 	%i2, %i3		! resuming the same process?
 	be,pt	%xcc, 5f		! yes.
 	  nop
+
 	ldx	[%i3 + P_AS], %o0	! load p->p_as
-	ldx	[%o0 + A_HAT], %o3	! load (p->p_as)->a_hat
-	! %o3 is live until the call to sfmmu_setctx_sec below
+	ldx	[%o0 + A_HAT], %i5	! %i5 = new proc hat
 
 	!
 	! update cpusran field
 	!
 	ld	[%i1 + CPU_ID], %o4
-	add	%o3, SFMMU_CPUSRAN, %o5
+	add	%i5, SFMMU_CPUSRAN, %o5
 	CPU_INDEXTOSET(%o5, %o4, %g1)
-	ldx	[%o5], %o2		! o2 = cpusran field
+	ldx	[%o5], %o2		! %o2 = cpusran field
 	mov	1, %g2
-	sllx	%g2, %o4, %o4		! o4 = bit for this cpu
+	sllx	%g2, %o4, %o4		! %o4 = bit for this cpu
 	andcc	%o4, %o2, %g0
-	bnz,pn	%xcc, 4f
+	bnz,pn	%xcc, 0f		! bit already set, go to 0
 	  nop
 3:
 	or	%o2, %o4, %o1		! or in this cpu's bit mask
@@ -224,20 +222,52 @@ resume(kthread_id_t t)
 	  ldx	[%o5], %o2		! o2 = cpusran field
 	membar	#LoadLoad|#StoreLoad
 
+0:
+	! 
+	! disable interrupts
 	!
-	! Switch to different address space.
+	! if resume from user to kernel thread
+	!	call sfmmu_setctx_sec
+	! if resume from kernel (or a different user) thread to user thread
+	!	call sfmmu_alloc_ctx
+	! sfmmu_load_mmustate
 	!
-4:
+	! enable interrupts
+	!
+	! %i5 = new proc hat
+	!
+
+	sethi	%hi(ksfmmup), %o2
+        ldx	[%o2 + %lo(ksfmmup)], %o2
+
 	rdpr	%pstate, %i4
-	wrpr	%i4, PSTATE_IE, %pstate		! disable interrupts
+        cmp	%i5, %o2		! new proc hat == ksfmmup ?
+	bne,pt	%xcc, 3f		! new proc is not kernel as, go to 3
+	  wrpr	%i4, PSTATE_IE, %pstate
 
-	call	sfmmu_setctx_sec		! switch to other ctx (maybe 0)
-	  lduh	[%o3 + SFMMU_CNUM], %o0
-	call	sfmmu_load_mmustate		! program MMU registers
-	  mov	%o3, %o0
+	SET_KAS_CTXSEC_ARGS(%i5, %o0, %o1)
 
-	wrpr	%g0, %i4, %pstate		! enable interrupts
+	! new proc is kernel as
+
+	call	sfmmu_setctx_sec		! switch to kernel context
+	  or	%o0, %o1, %o0
+
+	ba,a,pt	%icc, 4f
 	
+	!
+	! Switch to user address space.
+	!
+3:
+	mov	%i5, %o0			! %o0 = sfmmup
+	mov	%i1, %o2			! %o2 = CPU
+	call	sfmmu_alloc_ctx
+	  mov	%g0, %o1			! %o1 = allocate flag = 0
+4:
+	call	sfmmu_load_mmustate		! program MMU registers
+	  mov	%i5, %o0
+	
+	wrpr	%g0, %i4, %pstate		! enable interrupts
+
 5:
 	!
 	! spin until dispatched thread's mutex has

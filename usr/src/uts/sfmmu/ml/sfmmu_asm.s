@@ -482,6 +482,19 @@ label/**/2:
 /*
  * sfmmu related subroutines
  */
+uint_t
+sfmmu_disable_intrs()
+{ return(0); }
+
+/* ARGSUSED */
+void
+sfmmu_enable_intrs(uint_t pstate_save)
+{}
+
+/* ARGSUSED */
+void
+sfmmu_alloc_ctx(sfmmu_t *sfmmup, int allocflag, struct cpu *cp)
+{}
 
 /*
  * Use cas, if tte has changed underneath us then reread and try again.
@@ -533,6 +546,280 @@ sfmmu_panic4:
 	.global	sfmmu_panic5
 sfmmu_panic5:
 	.asciz	"sfmmu_asm: no unlocked TTEs in TLB 0"
+
+	.global	sfmmu_panic6
+sfmmu_panic6:
+	.asciz	"sfmmu_asm: interrupts not disabled"
+
+	.global	sfmmu_panic7
+sfmmu_panic7:
+	.asciz	"sfmmu_asm: kernel as"
+
+	.global	sfmmu_panic8
+sfmmu_panic8:
+	.asciz	"sfmmu_asm: gnum is zero"
+
+	.global	sfmmu_panic9
+sfmmu_panic9:
+	.asciz	"sfmmu_asm: cnum is greater than MAX_SFMMU_CTX_VAL"
+
+        ENTRY(sfmmu_disable_intrs)
+        rdpr    %pstate, %o0
+#ifdef DEBUG
+	PANIC_IF_INTR_DISABLED_PSTR(%o0, sfmmu_di_l0, %g1)
+#endif /* DEBUG */
+        retl
+          wrpr   %o0, PSTATE_IE, %pstate
+        SET_SIZE(sfmmu_disable_intrs)
+	
+	ENTRY(sfmmu_enable_intrs)
+        retl
+          wrpr    %g0, %o0, %pstate
+        SET_SIZE(sfmmu_enable_intrs)
+
+/*
+ * This routine is called both by resume() and sfmmu_get_ctx() to
+ * allocate a new context for the process on a MMU.
+ * if allocflag == 1, then alloc ctx when HAT mmu cnum == INVALID .
+ * if allocflag == 0, then do not alloc ctx if HAT mmu cnum == INVALID, which
+ * is the case when sfmmu_alloc_ctx is called from resume().
+ *
+ * The caller must disable interrupts before entering this routine.
+ * To reduce ctx switch overhead, the code contains both 'fast path' and
+ * 'slow path' code. The fast path code covers the common case where only
+ * a quick check is needed and the real ctx allocation is not required.
+ * It can be done without holding the per-process (PP) lock.
+ * The 'slow path' code must be protected by the PP Lock and performs ctx
+ * allocation.
+ * Hardware context register and HAT mmu cnum are updated accordingly.
+ *
+ * %o0 - sfmmup
+ * %o1 - allocflag
+ * %o2 - CPU
+ */
+        ENTRY_NP(sfmmu_alloc_ctx)
+
+#ifdef DEBUG
+	sethi   %hi(ksfmmup), %o3
+	ldx     [%o3 + %lo(ksfmmup)], %o3
+	cmp     %o3, %o0
+	bne,pt   %xcc, 0f
+	  nop
+
+	sethi   %hi(panicstr), %g1		! if kernel as, panic
+        ldx     [%g1 + %lo(panicstr)], %g1
+        tst     %g1
+        bnz,pn  %icc, 7f
+          nop
+
+	sethi	%hi(sfmmu_panic7), %o0
+	call	panic
+	  or	%o0, %lo(sfmmu_panic7), %o0
+
+7:
+	retl
+	  nop
+
+0:
+	PANIC_IF_INTR_ENABLED_PSTR(sfmmu_ei_l1, %g1)
+#endif /* DEBUG */	
+
+	! load global mmu_ctxp info
+	ldx	[%o2 + CPU_MMU_CTXP], %o3		! %o3 = mmu_ctx_t ptr
+        lduw	[%o2 + CPU_MMU_IDX], %g2		! %g2 = mmu index
+
+	! load global mmu_ctxp gnum
+	ldx	[%o3 + MMU_CTX_GNUM], %o4		! %o4 = mmu_ctxp->gnum
+
+#ifdef DEBUG
+	cmp	%o4, %g0		! mmu_ctxp->gnum should never be 0
+	bne,pt	%xcc, 3f
+	  nop
+	
+	sethi   %hi(panicstr), %g1	! test if panicstr is already set
+        ldx     [%g1 + %lo(panicstr)], %g1
+        tst     %g1
+        bnz,pn  %icc, 3f
+          nop
+	
+	sethi	%hi(sfmmu_panic8), %o0
+	call	panic
+	  or	%o0, %lo(sfmmu_panic8), %o0
+3:
+#endif
+
+	! load HAT sfmmu_ctxs[mmuid] gnum, cnum
+
+	sllx	%g2, SFMMU_MMU_CTX_SHIFT, %g2
+	add	%o0, %g2, %g2		! %g2 = &sfmmu_ctxs[mmuid] - SFMMU_CTXS
+
+	/*
+	 * %g5 = sfmmu gnum returned
+	 * %g6 = sfmmu cnum returned
+	 * %g2 = &sfmmu_ctxs[mmuid] - SFMMU_CTXS
+	 * %g4 = scratch
+	 *
+	 * Fast path code, do a quick check.
+	 */
+	SFMMU_MMUID_GNUM_CNUM(%g2, %g5, %g6, %g4)
+	
+	cmp	%g6, INVALID_CONTEXT		! hat cnum == INVALID ??
+	bne,pt	%icc, 1f			! valid hat cnum, check gnum
+	  nop
+
+	! cnum == INVALID, check allocflag
+	brz,pt  %o1, 8f		! allocflag == 0, skip ctx allocation, bail
+	  mov	%g6, %o1
+
+	! (invalid HAT cnum) && (allocflag == 1)
+	ba,pt	%icc, 2f
+	  nop
+1:
+	! valid HAT cnum, check gnum
+	cmp	%g5, %o4
+	be,a,pt	%icc, 8f			! gnum unchanged, go to done
+	  mov	%g6, %o1
+
+2:
+	/* 
+	 * Grab per process (PP) sfmmu_ctx_lock spinlock,
+	 * followed by the 'slow path' code.
+	 */
+	ldstub	[%o0 + SFMMU_CTX_LOCK], %g3	! %g3 = per process (PP) lock
+3:
+	brz	%g3, 5f
+	  nop
+4:
+	brnz,a,pt       %g3, 4b				! spin if lock is 1
+	  ldub	[%o0 + SFMMU_CTX_LOCK], %g3
+	ba	%xcc, 3b				! retry the lock
+	  ldstub	[%o0 + SFMMU_CTX_LOCK], %g3    ! %g3 = PP lock
+
+5:
+	membar  #LoadLoad
+	/*
+	 * %g5 = sfmmu gnum returned
+	 * %g6 = sfmmu cnum returned
+	 * %g2 = &sfmmu_ctxs[mmuid] - SFMMU_CTXS
+	 * %g4 = scratch
+	 */
+	SFMMU_MMUID_GNUM_CNUM(%g2, %g5, %g6, %g4)
+
+	cmp	%g6, INVALID_CONTEXT		! hat cnum == INVALID ??
+	bne,pt	%icc, 1f			! valid hat cnum, check gnum
+	  nop
+
+	! cnum == INVALID, check allocflag
+	brz,pt	%o1, 2f		! allocflag == 0, called from resume, set hw
+	  mov	%g6, %o1
+
+	! (invalid HAT cnum) && (allocflag == 1)
+	ba,pt	%icc, 6f
+	  nop
+1:
+	! valid HAT cnum, check gnum
+	cmp	%g5, %o4
+	be,a,pt	%icc, 2f			! gnum unchanged, go to done
+	  mov	%g6, %o1
+
+	ba,pt	%icc, 6f
+	  nop
+2:
+	membar  #LoadStore|#StoreStore
+	ba,pt %icc, 8f
+	  clrb  [%o0 + SFMMU_CTX_LOCK]
+6:
+	/*
+	 * We get here if we do not have a valid context, or
+	 * the HAT gnum does not match global gnum. We hold
+	 * sfmmu_ctx_lock spinlock. Allocate that context.
+	 *
+	 * %o3 = mmu_ctxp
+	 */
+	add	%o3, MMU_CTX_CNUM, %g3
+	ld	[%o3 + MMU_CTX_NCTXS], %g4
+
+	/*
+         * %g2 = &sfmmu_ctx_t[mmuid] - SFMMU_CTXS;
+         * %g3 = mmu cnum address
+	 * %g4 = mmu nctxs
+	 *
+	 * %o0 = sfmmup
+	 * %o1 = mmu current cnum value (used as new cnum)
+	 * %o4 = mmu gnum
+	 *
+	 * %o5 = scratch
+	 */
+	ld	[%g3], %o1
+0:
+	cmp	%o1, %g4
+	bl,a,pt %icc, 1f
+	  add	%o1, 1, %o5		! %o5 = mmu_ctxp->cnum + 1
+
+	/*
+	 * cnum reachs max, update HAT with INVALID
+	 */
+	set	INVALID_CONTEXT, %o1
+
+	/* 
+	 * update hat cnum to INVALID, sun4v sfmmu_load_mmustate checks
+	 * hat cnum to determine if set the number of TSBs to 0.
+	 */
+	sllx	%o4, SFMMU_MMU_GNUM_RSHIFT, %o4
+	or	%o4, %o1, %o4
+	stx	%o4, [%g2 + SFMMU_CTXS]
+
+	membar  #LoadStore|#StoreStore
+	ba,pt	%icc, 8f
+	  clrb	[%o0 + SFMMU_CTX_LOCK]
+1:
+	! %g3 = addr of mmu_ctxp->cnum
+	! %o5 = mmu_ctxp->cnum + 1
+	cas	[%g3], %o1, %o5
+	cmp	%o1, %o5
+	bne,a,pn %xcc, 0b	! cas failed
+	  ld	[%g3], %o1
+
+#ifdef DEBUG
+        set	MAX_SFMMU_CTX_VAL, %o5
+	cmp	%o1, %o5
+	ble,pt %icc, 2f
+	  nop
+	
+	sethi	%hi(sfmmu_panic9), %o0
+	call	panic
+	  or	%o0, %lo(sfmmu_panic9), %o0
+2:	
+#endif
+	! update hat gnum and cnum
+	sllx	%o4, SFMMU_MMU_GNUM_RSHIFT, %o4
+	or	%o4, %o1, %o4
+	stx	%o4, [%g2 + SFMMU_CTXS]
+
+	membar  #LoadStore|#StoreStore
+	clrb	[%o0 + SFMMU_CTX_LOCK]
+
+8:
+	/*
+	 * program the secondary context register
+	 *
+	 * %o1 = cnum
+	 */
+#ifdef	sun4u
+	ldub	[%o0 + SFMMU_CEXT], %o2
+	sll	%o2, CTXREG_EXT_SHIFT, %o2
+	or	%o1, %o2, %o1
+#endif
+
+	mov	MMU_SCONTEXT, %o4
+	sethi	%hi(FLUSH_ADDR), %o5
+	stxa	%o1, [%o4]ASI_MMU_CTX	         ! set 2nd context reg.
+	flush	%o5
+
+	retl
+	nop
+
+	SET_SIZE(sfmmu_alloc_ctx)
 
 
 	ENTRY_NP(sfmmu_modifytte)
@@ -1062,21 +1349,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	 */
 	rdpr	%pstate, %o5
 #ifdef DEBUG
-	andcc	%o5, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,pt 	%icc, 1f			/* disabled, panic	 */
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 1f
-	  nop
-
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	 or	%o0, %lo(sfmmu_panic1), %o0
-1:
+	PANIC_IF_INTR_DISABLED_PSTR(%o5, sfmmu_di_l2, %g1)
 #endif /* DEBUG */
 
 	wrpr	%o5, PSTATE_IE, %pstate		/* disable interrupts */
@@ -1117,21 +1390,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	 */
 	rdpr	%pstate, %o5			! %o5 = saved pstate
 #ifdef DEBUG
-	andcc	%o5, PSTATE_IE, %g0		! if interrupts already
-	bnz,pt	%icc, 1f			! disabled, panic
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 1f
-	  nop
-
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	  or	%o0, %lo(sfmmu_panic1), %o0
-1:
+	PANIC_IF_INTR_DISABLED_PSTR(%o5, sfmmu_di_l3, %g1)
 #endif /* DEBUG */
 	wrpr	%o5, PSTATE_IE, %pstate		! disable interrupts
 
@@ -1367,20 +1626,7 @@ hblk_add_panic2:
 
 	rdpr	%pstate, %o5
 #ifdef DEBUG
-	andcc	%o5, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,pt 	%icc, 3f			/* disabled, panic	 */
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 3f
-	  nop
-
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	 or	%o0, %lo(sfmmu_panic1), %o0
-3:
+	PANIC_IF_INTR_DISABLED_PSTR(%o5, sfmmu_di_l4, %g1)
 #endif /* DEBUG */
 	/*
 	 * disable interrupts, clear Address Mask to access 64 bit physaddr
@@ -1845,11 +2091,6 @@ sfmmu_kpm_dtsb_miss_small(void)
 }
 
 #else /* lint */
-
-
-#if (CTX_SIZE != (1 << CTX_SZ_SHIFT))
-#error - size of context struct does not match with CTX_SZ_SHIFT
-#endif
 
 #if (IMAP_SEG != 0)
 #error - ism_map->ism_seg offset is not zero
@@ -3317,21 +3558,7 @@ sfmmu_vatopfn(caddr_t vaddr, sfmmu_t *sfmmup, tte_t *ttep)
  	 */
  	rdpr	%pstate, %o3
 #ifdef DEBUG
-	andcc	%o3, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,pt	%icc, 1f			/* disabled, panic	 */
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 1f
-	  nop
-
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	 or	%o0, %lo(sfmmu_panic1), %o0
-1:
+	PANIC_IF_INTR_DISABLED_PSTR(%o3, sfmmu_di_l5, %g1)
 #endif
 	/*
 	 * disable interrupts to protect the TSBMISS area

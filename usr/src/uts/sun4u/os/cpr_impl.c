@@ -707,7 +707,7 @@ i_cpr_mapin(caddr_t vaddr, uint_t pages, pfn_t ppn)
 		tte.tte_inthi = TTE_VALID_INT | TTE_PFN_INTHI(ppn);
 		tte.tte_intlo = TTE_PFN_INTLO(ppn) | TTE_LCK_INT |
 		    TTE_CP_INT | TTE_PRIV_INT | TTE_HWWR_INT;
-		sfmmu_dtlb_ld(vaddr, KCONTEXT, &tte);
+		sfmmu_dtlb_ld_kva(vaddr, &tte);
 	}
 }
 
@@ -721,7 +721,7 @@ i_cpr_mapout(caddr_t vaddr, uint_t pages)
 		curthreadremapped = 0;
 
 	for (; pages--; vaddr += MMU_PAGESIZE)
-		vtag_flushpage(vaddr, KCONTEXT);
+		vtag_flushpage(vaddr, (uint64_t)ksfmmup);
 }
 
 /*

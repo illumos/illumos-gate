@@ -38,6 +38,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/kstat.h>
 #include <vm/hat.h>
 #include <vm/hat_sfmmu.h>
 #include <vm/page.h>
@@ -149,13 +150,7 @@ int	disable_auto_large_pages = 0;
  * Private sfmmu data structures for hat management
  */
 static struct kmem_cache *sfmmuid_cache;
-
-/*
- * Private sfmmu data structures for ctx management
- */
-static struct ctx	*ctxhand;	/* hand used while stealing ctxs */
-static struct ctx	*ctxfree;	/* head of free ctx list */
-static struct ctx	*ctxdirty;	/* head of dirty ctx list */
+static struct kmem_cache *mmuctxdom_cache;
 
 /*
  * Private sfmmu data structures for tsb management
@@ -173,7 +168,6 @@ static struct kmem_cache *sfmmu8_cache;
 static struct kmem_cache *sfmmu1_cache;
 static struct kmem_cache *pa_hment_cache;
 
-static kmutex_t 	ctx_list_lock;	/* mutex for ctx free/dirty lists */
 static kmutex_t 	ism_mlist_lock;	/* mutex for ism mapping list */
 /*
  * private data for ism
@@ -315,8 +309,7 @@ static int	sfmmu_vacconflict_array(caddr_t, page_t *, int *);
 static int	tst_tnc(page_t *pp, pgcnt_t);
 static void	conv_tnc(page_t *pp, int);
 
-static struct ctx *sfmmu_get_ctx(sfmmu_t *);
-static void	sfmmu_free_ctx(sfmmu_t *, struct ctx *);
+static void	sfmmu_get_ctx(sfmmu_t *);
 static void	sfmmu_free_sfmmu(sfmmu_t *);
 
 static void	sfmmu_gettte(struct hat *, caddr_t, tte_t *);
@@ -335,9 +328,7 @@ static void	sfmmu_ismtlbcache_demap(caddr_t, sfmmu_t *, struct hme_blk *,
 			pfn_t, int);
 static void	sfmmu_tlb_demap(caddr_t, sfmmu_t *, struct hme_blk *, int, int);
 static void	sfmmu_tlb_range_demap(demap_range_t *);
-static void	sfmmu_tlb_ctx_demap(sfmmu_t *);
-static void	sfmmu_tlb_all_demap(void);
-static void	sfmmu_tlb_swap_ctx(sfmmu_t *, struct ctx *);
+static void	sfmmu_invalidate_ctx(sfmmu_t *);
 static void	sfmmu_sync_mmustate(sfmmu_t *);
 
 static void 	sfmmu_tsbinfo_setup_phys(struct tsb_info *, pfn_t);
@@ -378,11 +369,6 @@ static void	sfmmu_hblkcache_reclaim(void *);
 static void	sfmmu_shadow_hcleanup(sfmmu_t *, struct hme_blk *,
 			struct hmehash_bucket *);
 static void	sfmmu_free_hblks(sfmmu_t *, caddr_t, caddr_t, int);
-
-static void	sfmmu_reuse_ctx(struct ctx *, sfmmu_t *);
-static void	sfmmu_disallow_ctx_steal(sfmmu_t *);
-static void	sfmmu_allow_ctx_steal(sfmmu_t *);
-
 static void	sfmmu_rm_large_mappings(page_t *, int);
 
 static void	hat_lock_init(void);
@@ -410,11 +396,13 @@ static void	sfmmu_kpm_pageunload(page_t *);
 static void	sfmmu_kpm_vac_unload(page_t *, caddr_t);
 static void	sfmmu_kpm_demap_large(caddr_t);
 static void	sfmmu_kpm_demap_small(caddr_t);
-static void	sfmmu_kpm_demap_tlbs(caddr_t, int);
+static void	sfmmu_kpm_demap_tlbs(caddr_t);
 static void	sfmmu_kpm_hme_unload(page_t *);
 static kpm_hlk_t *sfmmu_kpm_kpmp_enter(page_t *, pgcnt_t);
 static void	sfmmu_kpm_kpmp_exit(kpm_hlk_t *kpmp);
 static void	sfmmu_kpm_page_cache(page_t *, int, int);
+
+static void	sfmmu_ctx_wrap_around(mmu_ctx_t *);
 
 /* kpm globals */
 #ifdef	DEBUG
@@ -447,8 +435,13 @@ uint64_t	uhme_hash_pa;		/* PA of uhme_hash */
 uint64_t	khme_hash_pa;		/* PA of khme_hash */
 int 		uhmehash_num;		/* # of buckets in user hash table */
 int 		khmehash_num;		/* # of buckets in kernel hash table */
-struct ctx	*ctxs;			/* used by <machine/mmu.c> */
-uint_t		nctxs;			/* total number of contexts */
+
+uint_t		max_mmu_ctxdoms = 0;	/* max context domains in the system */
+mmu_ctx_t	**mmu_ctxs_tbl;		/* global array of context domains */
+uint64_t	mmu_saved_gnum = 0;	/* to init incoming MMUs' gnums */
+
+#define	DEFAULT_NUM_CTXS_PER_MMU 8192
+static uint_t	nctxs = DEFAULT_NUM_CTXS_PER_MMU;
 
 int		cache;			/* describes system cache */
 
@@ -567,7 +560,6 @@ struct sfmmu_tsbsize_stat sfmmu_tsbsize_stat;
  * Global data
  */
 sfmmu_t 	*ksfmmup;		/* kernel's hat id */
-struct ctx 	*kctx;			/* kernel's context */
 
 #ifdef DEBUG
 static void	chk_tte(tte_t *, tte_t *, tte_t *, struct hme_blk *);
@@ -682,25 +674,14 @@ static	pad_mutex_t	sfmmu_page_lock[SPL_TABLE_SIZE];
  */
 #define	MAX_CB_ADDR	32
 
-#ifdef DEBUG
-
-/*
- * Debugging trace ring buffer for stolen and freed ctxs.  The
- * stolen_ctxs[] array is protected by the ctx_trace_mutex.
- */
-struct ctx_trace stolen_ctxs[TRSIZE];
-struct ctx_trace *ctx_trace_first = &stolen_ctxs[0];
-struct ctx_trace *ctx_trace_last = &stolen_ctxs[TRSIZE-1];
-struct ctx_trace *ctx_trace_ptr = &stolen_ctxs[0];
-kmutex_t ctx_trace_mutex;
-uint_t	num_ctx_stolen = 0;
-
-int	ism_debug = 0;
-
-#endif /* DEBUG */
-
 tte_t	hw_tte;
 static ulong_t sfmmu_dmr_maxbit = DMR_MAXBIT;
+
+static char	*mmu_ctx_kstat_names[] = {
+	"mmu_ctx_tsb_exceptions",
+	"mmu_ctx_tsb_raise_exception",
+	"mmu_ctx_wrap_around",
+};
 
 /*
  * kpm virtual address to physical address
@@ -1003,9 +984,8 @@ hat_init_pagesizes()
 void
 hat_init(void)
 {
-	struct ctx	*ctx;
-	struct ctx	*cur_ctx = NULL;
 	int 		i;
+	size_t		size;
 
 	hat_lock_init();
 	hat_kstat_init();
@@ -1030,31 +1010,64 @@ hat_init(void)
 	uhmehash_num--;		/* make sure counter starts from 0 */
 
 	/*
-	 * Initialize ctx structures and list lock.
-	 * We keep two lists of ctxs. The "free" list contains contexts
-	 * ready to use.  The "dirty" list contains contexts that are OK
-	 * to use after flushing the TLBs of any stale mappings.
+	 * Allocate context domain structures.
+	 *
+	 * A platform may choose to modify max_mmu_ctxdoms in
+	 * set_platform_defaults(). If a platform does not define
+	 * a set_platform_defaults() or does not choose to modify
+	 * max_mmu_ctxdoms, it gets one MMU context domain for every CPU.
+	 *
+	 * For sun4v, there will be one global context domain, this is to
+	 * avoid the ldom cpu substitution problem.
+	 *
+	 * For all platforms that have CPUs sharing MMUs, this
+	 * value must be defined.
 	 */
-	mutex_init(&ctx_list_lock, NULL, MUTEX_DEFAULT, NULL);
-	kctx = &ctxs[KCONTEXT];
-	ctx = &ctxs[NUM_LOCKED_CTXS];
-	ctxhand = ctxfree = ctx;		/* head of free list */
-	ctxdirty = NULL;
-	for (i = NUM_LOCKED_CTXS; i < nctxs; i++) {
-		cur_ctx = &ctxs[i];
-		cur_ctx->ctx_flags = CTX_FREE_FLAG;
-		cur_ctx->ctx_free = &ctxs[i + 1];
+	if (max_mmu_ctxdoms == 0) {
+#ifndef sun4v
+		max_mmu_ctxdoms = max_ncpus;
+#else /* sun4v */
+		max_mmu_ctxdoms = 1;
+#endif /* sun4v */
 	}
-	cur_ctx->ctx_free = NULL;		/* tail of free list */
+
+	size = max_mmu_ctxdoms * sizeof (mmu_ctx_t *);
+	mmu_ctxs_tbl = kmem_zalloc(size, KM_SLEEP);
+
+	/* mmu_ctx_t is 64 bytes aligned */
+	mmuctxdom_cache = kmem_cache_create("mmuctxdom_cache",
+	    sizeof (mmu_ctx_t), 64, NULL, NULL, NULL, NULL, NULL, 0);
+	/*
+	 * MMU context domain initialization for the Boot CPU.
+	 * This needs the context domains array allocated above.
+	 */
+	mutex_enter(&cpu_lock);
+	sfmmu_cpu_init(CPU);
+	mutex_exit(&cpu_lock);
 
 	/*
 	 * Intialize ism mapping list lock.
 	 */
+
 	mutex_init(&ism_mlist_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	sfmmuid_cache = kmem_cache_create("sfmmuid_cache", sizeof (sfmmu_t),
-	    0, sfmmu_idcache_constructor, sfmmu_idcache_destructor,
-	    NULL, NULL, NULL, 0);
+	/*
+	 * Each sfmmu structure carries an array of MMU context info
+	 * structures, one per context domain. The size of this array depends
+	 * on the maximum number of context domains. So, the size of the
+	 * sfmmu structure varies per platform.
+	 *
+	 * sfmmu is allocated from static arena, because trap
+	 * handler at TL > 0 is not allowed to touch kernel relocatable
+	 * memory. sfmmu's alignment is changed to 64 bytes from
+	 * default 8 bytes, as the lower 6 bits will be used to pass
+	 * pgcnt to vtag_flush_pgcnt_tl1.
+	 */
+	size = sizeof (sfmmu_t) + sizeof (sfmmu_ctx_t) * (max_mmu_ctxdoms - 1);
+
+	sfmmuid_cache = kmem_cache_create("sfmmuid_cache", size,
+	    64, sfmmu_idcache_constructor, sfmmu_idcache_destructor,
+	    NULL, NULL, static_arena, 0);
 
 	sfmmu_tsbinfo_cache = kmem_cache_create("sfmmu_tsbinfo_cache",
 	    sizeof (struct tsb_info), 0, NULL, NULL, NULL, NULL, NULL, 0);
@@ -1233,7 +1246,6 @@ static void
 hat_lock_init()
 {
 	int i;
-	struct ctx *ctx;
 
 	/*
 	 * initialize the array of mutexes protecting a page's mapping
@@ -1256,14 +1268,6 @@ hat_lock_init()
 	for (i = 0; i < SFMMU_NUM_LOCK; i++)
 		mutex_init(HATLOCK_MUTEXP(&hat_lock[i]), NULL, MUTEX_DEFAULT,
 		    NULL);
-
-#ifdef	DEBUG
-	mutex_init(&ctx_trace_mutex, NULL, MUTEX_DEFAULT, NULL);
-#endif	/* DEBUG */
-
-	for (ctx = ctxs, i = 0; i < nctxs; i++, ctx++) {
-		rw_init(&ctx->ctx_rwlock, NULL, RW_DEFAULT, NULL);
-	}
 }
 
 extern caddr_t kmem64_base, kmem64_end;
@@ -1279,23 +1283,21 @@ struct hat *
 hat_alloc(struct as *as)
 {
 	sfmmu_t *sfmmup;
-	struct ctx *ctx;
 	int i;
+	uint64_t cnum;
 	extern uint_t get_color_start(struct as *);
 
 	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 	sfmmup = kmem_cache_alloc(sfmmuid_cache, KM_SLEEP);
 	sfmmup->sfmmu_as = as;
 	sfmmup->sfmmu_flags = 0;
+	LOCK_INIT_CLEAR(&sfmmup->sfmmu_ctx_lock);
 
 	if (as == &kas) {
-		ctx = kctx;
 		ksfmmup = sfmmup;
-		sfmmup->sfmmu_cnum = ctxtoctxnum(ctx);
-		ASSERT(sfmmup->sfmmu_cnum == KCONTEXT);
 		sfmmup->sfmmu_cext = 0;
-		ctx->ctx_sfmmu = sfmmup;
-		ctx->ctx_flags = 0;
+		cnum = KCONTEXT;
+
 		sfmmup->sfmmu_clrstart = 0;
 		sfmmup->sfmmu_tsb = NULL;
 		/*
@@ -1311,8 +1313,9 @@ hat_alloc(struct as *as)
 		 * we fault when we try to run and so have to get
 		 * another ctx.
 		 */
-		sfmmup->sfmmu_cnum = INVALID_CONTEXT;
 		sfmmup->sfmmu_cext = 0;
+		cnum = INVALID_CONTEXT;
+
 		/* initialize original physical page coloring bin */
 		sfmmup->sfmmu_clrstart = get_color_start(as);
 #ifdef DEBUG
@@ -1331,6 +1334,13 @@ hat_alloc(struct as *as)
 		sfmmup->sfmmu_flags = HAT_SWAPPED;
 		ASSERT(sfmmup->sfmmu_tsb != NULL);
 	}
+
+	ASSERT(max_mmu_ctxdoms > 0);
+	for (i = 0; i < max_mmu_ctxdoms; i++) {
+		sfmmup->sfmmu_ctxs[i].cnum = cnum;
+		sfmmup->sfmmu_ctxs[i].gnum = 0;
+	}
+
 	sfmmu_setup_tsbinfo(sfmmup);
 	for (i = 0; i < max_mmu_page_sizes; i++) {
 		sfmmup->sfmmu_ttecnt[i] = 0;
@@ -1355,6 +1365,164 @@ hat_alloc(struct as *as)
 }
 
 /*
+ * Create per-MMU context domain kstats for a given MMU ctx.
+ */
+static void
+sfmmu_mmu_kstat_create(mmu_ctx_t *mmu_ctxp)
+{
+	mmu_ctx_stat_t	stat;
+	kstat_t		*mmu_kstat;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	ASSERT(mmu_ctxp->mmu_kstat == NULL);
+
+	mmu_kstat = kstat_create("unix", mmu_ctxp->mmu_idx, "mmu_ctx",
+	    "hat", KSTAT_TYPE_NAMED, MMU_CTX_NUM_STATS, KSTAT_FLAG_VIRTUAL);
+
+	if (mmu_kstat == NULL) {
+		cmn_err(CE_WARN, "kstat_create for MMU %d failed",
+		    mmu_ctxp->mmu_idx);
+	} else {
+		mmu_kstat->ks_data = mmu_ctxp->mmu_kstat_data;
+		for (stat = 0; stat < MMU_CTX_NUM_STATS; stat++)
+			kstat_named_init(&mmu_ctxp->mmu_kstat_data[stat],
+			    mmu_ctx_kstat_names[stat], KSTAT_DATA_INT64);
+		mmu_ctxp->mmu_kstat = mmu_kstat;
+		kstat_install(mmu_kstat);
+	}
+}
+
+/*
+ * plat_cpuid_to_mmu_ctx_info() is a platform interface that returns MMU
+ * context domain information for a given CPU. If a platform does not
+ * specify that interface, then the function below is used instead to return
+ * default information. The defaults are as follows:
+ *
+ *	- For sun4u systems there's one MMU context domain per CPU.
+ *	  This default is used by all sun4u systems except OPL. OPL systems
+ *	  provide platform specific interface to map CPU ids to MMU ids
+ *	  because on OPL more than 1 CPU shares a single MMU.
+ *        Note that on sun4v, there is one global context domain for
+ *	  the entire system. This is to avoid running into potential problem
+ *	  with ldom physical cpu substitution feature.
+ *	- The number of MMU context IDs supported on any CPU in the
+ *	  system is 8K.
+ */
+/*ARGSUSED*/
+static void
+sfmmu_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *infop)
+{
+	infop->mmu_nctxs = nctxs;
+#ifndef sun4v
+	infop->mmu_idx = cpu[cpuid]->cpu_seqid;
+#else /* sun4v */
+	infop->mmu_idx = 0;
+#endif /* sun4v */
+}
+
+/*
+ * Called during CPU initialization to set the MMU context-related information
+ * for a CPU.
+ *
+ * cpu_lock serializes accesses to mmu_ctxs and mmu_saved_gnum.
+ */
+void
+sfmmu_cpu_init(cpu_t *cp)
+{
+	mmu_ctx_info_t	info;
+	mmu_ctx_t	*mmu_ctxp;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (&plat_cpuid_to_mmu_ctx_info == NULL)
+		sfmmu_cpuid_to_mmu_ctx_info(cp->cpu_id, &info);
+	else
+		plat_cpuid_to_mmu_ctx_info(cp->cpu_id, &info);
+
+	ASSERT(info.mmu_idx < max_mmu_ctxdoms);
+
+	if ((mmu_ctxp = mmu_ctxs_tbl[info.mmu_idx]) == NULL) {
+		/* Each mmu_ctx is cacheline aligned. */
+		mmu_ctxp = kmem_cache_alloc(mmuctxdom_cache, KM_SLEEP);
+		bzero(mmu_ctxp, sizeof (mmu_ctx_t));
+
+		mutex_init(&mmu_ctxp->mmu_lock, NULL, MUTEX_SPIN,
+		    (void *)ipltospl(DISP_LEVEL));
+		mmu_ctxp->mmu_idx = info.mmu_idx;
+		mmu_ctxp->mmu_nctxs = info.mmu_nctxs;
+		/*
+		 * Globally for lifetime of a system,
+		 * gnum must always increase.
+		 * mmu_saved_gnum is protected by the cpu_lock.
+		 */
+		mmu_ctxp->mmu_gnum = mmu_saved_gnum + 1;
+		mmu_ctxp->mmu_cnum = NUM_LOCKED_CTXS;
+
+		sfmmu_mmu_kstat_create(mmu_ctxp);
+
+		mmu_ctxs_tbl[info.mmu_idx] = mmu_ctxp;
+	} else {
+		ASSERT(mmu_ctxp->mmu_idx == info.mmu_idx);
+	}
+
+	/*
+	 * The mmu_lock is acquired here to prevent races with
+	 * the wrap-around code.
+	 */
+	mutex_enter(&mmu_ctxp->mmu_lock);
+
+
+	mmu_ctxp->mmu_ncpus++;
+	CPUSET_ADD(mmu_ctxp->mmu_cpuset, cp->cpu_id);
+	CPU_MMU_IDX(cp) = info.mmu_idx;
+	CPU_MMU_CTXP(cp) = mmu_ctxp;
+
+	mutex_exit(&mmu_ctxp->mmu_lock);
+}
+
+/*
+ * Called to perform MMU context-related cleanup for a CPU.
+ */
+void
+sfmmu_cpu_cleanup(cpu_t *cp)
+{
+	mmu_ctx_t	*mmu_ctxp;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	mmu_ctxp = CPU_MMU_CTXP(cp);
+	ASSERT(mmu_ctxp != NULL);
+
+	/*
+	 * The mmu_lock is acquired here to prevent races with
+	 * the wrap-around code.
+	 */
+	mutex_enter(&mmu_ctxp->mmu_lock);
+
+	CPU_MMU_CTXP(cp) = NULL;
+
+	CPUSET_DEL(mmu_ctxp->mmu_cpuset, cp->cpu_id);
+	if (--mmu_ctxp->mmu_ncpus == 0) {
+		mmu_ctxs_tbl[mmu_ctxp->mmu_idx] = NULL;
+		mutex_exit(&mmu_ctxp->mmu_lock);
+		mutex_destroy(&mmu_ctxp->mmu_lock);
+
+		if (mmu_ctxp->mmu_kstat)
+			kstat_delete(mmu_ctxp->mmu_kstat);
+
+		/* mmu_saved_gnum is protected by the cpu_lock. */
+		if (mmu_saved_gnum < mmu_ctxp->mmu_gnum)
+			mmu_saved_gnum = mmu_ctxp->mmu_gnum;
+
+		kmem_cache_free(mmuctxdom_cache, mmu_ctxp);
+
+		return;
+	}
+
+	mutex_exit(&mmu_ctxp->mmu_lock);
+}
+
+/*
  * Hat_setup, makes an address space context the current active one.
  * In sfmmu this translates to setting the secondary context with the
  * corresponding context.
@@ -1362,8 +1530,6 @@ hat_alloc(struct as *as)
 void
 hat_setup(struct hat *sfmmup, int allocflag)
 {
-	struct ctx *ctx;
-	uint_t ctx_num;
 	hatlock_t *hatlockp;
 
 	/* Init needs some special treatment. */
@@ -1383,24 +1549,8 @@ hat_setup(struct hat *sfmmup, int allocflag)
 		 */
 		sfmmu_tsb_swapin(sfmmup, hatlockp);
 
-		sfmmu_disallow_ctx_steal(sfmmup);
+		sfmmu_get_ctx(sfmmup);
 
-		kpreempt_disable();
-
-		ctx = sfmmutoctx(sfmmup);
-		CPUSET_ADD(sfmmup->sfmmu_cpusran, CPU->cpu_id);
-		ctx_num = ctxtoctxnum(ctx);
-		ASSERT(sfmmup == ctx->ctx_sfmmu);
-		ASSERT(ctx_num >= NUM_LOCKED_CTXS);
-		sfmmu_setctx_sec(ctx_num);
-		sfmmu_load_mmustate(sfmmup);
-
-		kpreempt_enable();
-
-		/*
-		 * Allow ctx to be stolen.
-		 */
-		sfmmu_allow_ctx_steal(sfmmup);
 		sfmmu_hat_exit(hatlockp);
 	} else {
 		ASSERT(allocflag == HAT_ALLOC);
@@ -1409,6 +1559,12 @@ hat_setup(struct hat *sfmmup, int allocflag)
 		kpreempt_disable();
 
 		CPUSET_ADD(sfmmup->sfmmu_cpusran, CPU->cpu_id);
+
+		/*
+		 * sfmmu_setctx_sec takes <pgsz|cnum> as a parameter,
+		 * pagesize bits don't matter in this case since we are passing
+		 * INVALID_CONTEXT to it.
+		 */
 		sfmmu_setctx_sec(INVALID_CONTEXT);
 		sfmmu_clear_utsbinfo();
 
@@ -1455,13 +1611,7 @@ hat_free_end(struct hat *sfmmup)
 	if (sfmmup->sfmmu_rmstat) {
 		hat_freestat(sfmmup->sfmmu_as, NULL);
 	}
-	if (!delay_tlb_flush) {
-		sfmmu_tlb_ctx_demap(sfmmup);
-		xt_sync(sfmmup->sfmmu_cpusran);
-	} else {
-		SFMMU_STAT(sf_tlbflush_deferred);
-	}
-	sfmmu_free_ctx(sfmmup, sfmmutoctx(sfmmup));
+
 	while (sfmmup->sfmmu_tsb != NULL) {
 		struct tsb_info *next = sfmmup->sfmmu_tsb->tsb_next;
 		sfmmu_tsbinfo_free(sfmmup->sfmmu_tsb);
@@ -1495,8 +1645,6 @@ hat_swapout(struct hat *sfmmup)
 	struct hme_blk *hmeblkp;
 	struct hme_blk *pr_hblk = NULL;
 	struct hme_blk *nx_hblk;
-	struct ctx *ctx;
-	int cnum;
 	int i;
 	uint64_t hblkpa, prevpa, nx_pa;
 	struct hme_blk *list = NULL;
@@ -1566,24 +1714,8 @@ hat_swapout(struct hat *sfmmup)
 	 * Now free up the ctx so that others can reuse it.
 	 */
 	hatlockp = sfmmu_hat_enter(sfmmup);
-	ctx = sfmmutoctx(sfmmup);
-	cnum = ctxtoctxnum(ctx);
 
-	if (cnum != INVALID_CONTEXT) {
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-		if (sfmmup->sfmmu_cnum == cnum) {
-			sfmmu_reuse_ctx(ctx, sfmmup);
-			/*
-			 * Put ctx back to the free list.
-			 */
-			mutex_enter(&ctx_list_lock);
-			CTX_SET_FLAGS(ctx, CTX_FREE_FLAG);
-			ctx->ctx_free = ctxfree;
-			ctxfree = ctx;
-			mutex_exit(&ctx_list_lock);
-		}
-		rw_exit(&ctx->ctx_rwlock);
-	}
+	sfmmu_invalidate_ctx(sfmmup);
 
 	/*
 	 * Free TSBs, but not tsbinfos, and set SWAPPED flag.
@@ -4658,9 +4790,8 @@ hat_unload_large_virtual(
 	struct hme_blk *list = NULL;
 	int i;
 	uint64_t hblkpa, prevpa, nx_pa;
-	hatlock_t	*hatlockp;
-	struct tsb_info	*tsbinfop;
-	struct ctx	*ctx;
+	demap_range_t dmr, *dmrp;
+	cpuset_t cpuset;
 	caddr_t	endaddr = startaddr + len;
 	caddr_t	sa;
 	caddr_t	ea;
@@ -4668,34 +4799,12 @@ hat_unload_large_virtual(
 	caddr_t	cb_ea[MAX_CB_ADDR];
 	int	addr_cnt = 0;
 	int	a = 0;
-	int	cnum;
 
-	hatlockp = sfmmu_hat_enter(sfmmup);
-
-	/*
-	 * Since we know we're unmapping a huge range of addresses,
-	 * just throw away the context and switch to another.  It's
-	 * cheaper than trying to unmap all of the TTEs we may find
-	 * from the TLB individually, which is too expensive in terms
-	 * of xcalls.  Better yet, if we're exiting, no need to flush
-	 * anything at all!
-	 */
-	if (!sfmmup->sfmmu_free) {
-		ctx = sfmmutoctx(sfmmup);
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-		cnum = sfmmutoctxnum(sfmmup);
-		if (cnum != INVALID_CONTEXT) {
-			sfmmu_tlb_swap_ctx(sfmmup, ctx);
-		}
-		rw_exit(&ctx->ctx_rwlock);
-
-		for (tsbinfop = sfmmup->sfmmu_tsb; tsbinfop != NULL;
-		    tsbinfop = tsbinfop->tsb_next) {
-			if (tsbinfop->tsb_flags & TSB_SWAPPED)
-				continue;
-			sfmmu_inv_tsb(tsbinfop->tsb_va,
-			    TSB_BYTES(tsbinfop->tsb_szc));
-		}
+	if (sfmmup->sfmmu_free) {
+		dmrp = NULL;
+	} else {
+		dmrp = &dmr;
+		DEMAP_RANGE_INIT(sfmmup, dmrp);
 	}
 
 	/*
@@ -4731,7 +4840,7 @@ hat_unload_large_virtual(
 			if (hmeblkp->hblk_vcnt != 0 ||
 			    hmeblkp->hblk_hmecnt != 0)
 				(void) sfmmu_hblk_unload(sfmmup, hmeblkp,
-				    sa, ea, NULL, flags);
+				    sa, ea, dmrp, flags);
 
 			/*
 			 * on unmap we also release the HME block itself, once
@@ -4765,6 +4874,12 @@ hat_unload_large_virtual(
 			cb_sa[addr_cnt] = sa;
 			cb_ea[addr_cnt] = ea;
 			if (++addr_cnt == MAX_CB_ADDR) {
+				if (dmrp != NULL) {
+					DEMAP_RANGE_FLUSH(dmrp);
+					cpuset = sfmmup->sfmmu_cpusran;
+					xt_sync(cpuset);
+				}
+
 				for (a = 0; a < MAX_CB_ADDR; ++a) {
 					callback->hcb_start_addr = cb_sa[a];
 					callback->hcb_end_addr = cb_ea[a];
@@ -4781,6 +4896,11 @@ next_block:
 	}
 
 	sfmmu_hblks_list_purge(&list);
+	if (dmrp != NULL) {
+		DEMAP_RANGE_FLUSH(dmrp);
+		cpuset = sfmmup->sfmmu_cpusran;
+		xt_sync(cpuset);
+	}
 
 	for (a = 0; a < addr_cnt; ++a) {
 		callback->hcb_start_addr = cb_sa[a];
@@ -4788,15 +4908,12 @@ next_block:
 		callback->hcb_function(callback);
 	}
 
-	sfmmu_hat_exit(hatlockp);
-
 	/*
 	 * Check TSB and TLB page sizes if the process isn't exiting.
 	 */
 	if (!sfmmup->sfmmu_free)
 		sfmmu_check_page_sizes(sfmmup, 0);
 }
-
 
 /*
  * Unload all the mappings in the range [addr..addr+len). addr and len must
@@ -5180,7 +5297,7 @@ sfmmu_hblk_unload(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
 	ttesz = get_hblk_ttesz(hmeblkp);
 
 	use_demap_range = (do_virtual_coloring &&
-				TTEBYTES(ttesz) == DEMAP_RANGE_PGSZ(dmrp));
+	    ((dmrp == NULL) || TTEBYTES(ttesz) == DEMAP_RANGE_PGSZ(dmrp)));
 	if (use_demap_range) {
 		DEMAP_RANGE_CONTINUE(dmrp, addr, endaddr);
 	} else {
@@ -5894,18 +6011,19 @@ again:
 		CPUSET_DEL(cpuset, CPU->cpu_id);
 
 		/* LINTED: constant in conditional context */
-		SFMMU_XCALL_STATS(KCONTEXT);
+		SFMMU_XCALL_STATS(ksfmmup);
 
 		/*
 		 * Flush TLB entry on remote CPU's
 		 */
-		xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr, KCONTEXT);
+		xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr,
+		    (uint64_t)ksfmmup);
 		xt_sync(cpuset);
 
 		/*
 		 * Flush TLB entry on local CPU
 		 */
-		vtag_flushpage(addr, KCONTEXT);
+		vtag_flushpage(addr, (uint64_t)ksfmmup);
 	}
 
 	while (index != 0) {
@@ -7710,8 +7828,7 @@ hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 	ism_ment_t	*free_ment = NULL;
 	ism_blk_t	*ism_blkp;
 	struct hat	*ism_hatid;
-	struct ctx	*ctx;
-	int 		cnum, found, i;
+	int 		found, i;
 	hatlock_t	*hatlockp;
 	struct tsb_info	*tsbinfo;
 	uint_t		ismshift = page_get_shift(ismszc);
@@ -7777,7 +7894,6 @@ hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 		ism_hatid = ism_map[i].imap_ismhat;
 		ASSERT(ism_hatid != NULL);
 		ASSERT(ism_hatid->sfmmu_ismhat == 1);
-		ASSERT(ism_hatid->sfmmu_cnum == INVALID_CONTEXT);
 
 		/*
 		 * First remove ourselves from the ism mapping list.
@@ -7793,14 +7909,9 @@ hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 		 * will go to tl=0.
 		 */
 		hatlockp = sfmmu_hat_enter(sfmmup);
-		ctx = sfmmutoctx(sfmmup);
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-		cnum = sfmmutoctxnum(sfmmup);
 
-		if (cnum != INVALID_CONTEXT) {
-			sfmmu_tlb_swap_ctx(sfmmup, ctx);
-		}
-		rw_exit(&ctx->ctx_rwlock);
+		sfmmu_invalidate_ctx(sfmmup);
+
 		sfmmu_hat_exit(hatlockp);
 
 		/*
@@ -8555,291 +8666,195 @@ sfmmu_page_cache(page_t *pp, int flags, int cache_flush_flag, int bcolor)
 	}
 }
 
-/*
- * This routine gets called when the system has run out of free contexts.
- * This will simply choose context passed to it to be stolen and reused.
- */
-/* ARGSUSED */
-static void
-sfmmu_reuse_ctx(struct ctx *ctx, sfmmu_t *sfmmup)
-{
-	sfmmu_t *stolen_sfmmup;
-	cpuset_t cpuset;
-	ushort_t	cnum = ctxtoctxnum(ctx);
-
-	ASSERT(cnum != KCONTEXT);
-	ASSERT(rw_read_locked(&ctx->ctx_rwlock) == 0);	/* write locked */
-
-	/*
-	 * simply steal and reuse the ctx passed to us.
-	 */
-	stolen_sfmmup = ctx->ctx_sfmmu;
-	ASSERT(sfmmu_hat_lock_held(sfmmup));
-	ASSERT(stolen_sfmmup->sfmmu_cnum == cnum);
-	ASSERT(stolen_sfmmup != ksfmmup);
-
-	TRACE_CTXS(&ctx_trace_mutex, ctx_trace_ptr, cnum, stolen_sfmmup,
-	    sfmmup, CTX_TRC_STEAL);
-	SFMMU_STAT(sf_ctxsteal);
-
-	/*
-	 * Update sfmmu and ctx structs. After this point all threads
-	 * belonging to this hat/proc will fault and not use the ctx
-	 * being stolen.
-	 */
-	kpreempt_disable();
-	/*
-	 * Enforce reverse order of assignments from sfmmu_get_ctx().  This
-	 * is done to prevent a race where a thread faults with the context
-	 * but the TSB has changed.
-	 */
-	stolen_sfmmup->sfmmu_cnum = INVALID_CONTEXT;
-	membar_enter();
-	ctx->ctx_sfmmu = NULL;
-
-	/*
-	 * 1. flush TLB in all CPUs that ran the process whose ctx
-	 * we are stealing.
-	 * 2. change context for all other CPUs to INVALID_CONTEXT,
-	 * if they are running in the context that we are going to steal.
-	 */
-	cpuset = stolen_sfmmup->sfmmu_cpusran;
-	CPUSET_DEL(cpuset, CPU->cpu_id);
-	CPUSET_AND(cpuset, cpu_ready_set);
-	SFMMU_XCALL_STATS(cnum);
-	xt_some(cpuset, sfmmu_ctx_steal_tl1, cnum, INVALID_CONTEXT);
-	xt_sync(cpuset);
-
-	/*
-	 * flush TLB of local processor
-	 */
-	vtag_flushctx(cnum);
-
-	/*
-	 * If we just stole the ctx from the current process
-	 * on local cpu then we also invalidate his context
-	 * here.
-	 */
-	if (sfmmu_getctx_sec() == cnum) {
-		sfmmu_setctx_sec(INVALID_CONTEXT);
-		sfmmu_clear_utsbinfo();
-	}
-
-	kpreempt_enable();
-	SFMMU_STAT(sf_tlbflush_ctx);
-}
 
 /*
- * Returns a context with the reader lock held.
- *
- * We maintain 2 different list of contexts.  The first list
- * is the free list and it is headed by ctxfree.  These contexts
- * are ready to use.  The second list is the dirty list and is
- * headed by ctxdirty. These contexts have been freed but haven't
- * been flushed from the TLB.
+ * Wrapper routine used to return a context.
  *
  * It's the responsibility of the caller to guarantee that the
  * process serializes on calls here by taking the HAT lock for
  * the hat.
  *
- * Changing the page size is a rather complicated process, so
- * rather than jump through lots of hoops to special case it,
- * the easiest way to go about it is to tell the MMU we want
- * to change page sizes and then switch to using a different
- * context.  When we program the context registers for the
- * process, we can take care of setting up the (new) page size
- * for that context at that point.
  */
-
-static struct ctx *
+static void
 sfmmu_get_ctx(sfmmu_t *sfmmup)
 {
-	struct ctx *ctx;
-	ushort_t cnum;
-	struct ctx *lastctx = &ctxs[nctxs-1];
-	struct ctx *firstctx = &ctxs[NUM_LOCKED_CTXS];
-	uint_t	found_stealable_ctx;
-	uint_t	retry_count = 0;
+	mmu_ctx_t *mmu_ctxp;
+	uint_t pstate_save;
 
-#define	NEXT_CTX(ctx)   (((ctx) >= lastctx) ? firstctx : ((ctx) + 1))
+	ASSERT(sfmmu_hat_lock_held(sfmmup));
+	ASSERT(sfmmup != ksfmmup);
 
-retry:
+	kpreempt_disable();
 
-	ASSERT(sfmmup->sfmmu_cnum != KCONTEXT);
-	/*
-	 * Check to see if this process has already got a ctx.
-	 * In that case just set the sec-ctx, grab a readers lock, and
-	 * return.
-	 *
-	 * We have to double check after we get the readers lock on the
-	 * context, since it could be stolen in this short window.
-	 */
-	if (sfmmup->sfmmu_cnum >= NUM_LOCKED_CTXS) {
-		ctx = sfmmutoctx(sfmmup);
-		rw_enter(&ctx->ctx_rwlock, RW_READER);
-		if (ctx->ctx_sfmmu == sfmmup) {
-			return (ctx);
-		} else {
-			rw_exit(&ctx->ctx_rwlock);
-		}
-	}
-
-	found_stealable_ctx = 0;
-	mutex_enter(&ctx_list_lock);
-	if ((ctx = ctxfree) != NULL) {
-		/*
-		 * Found a ctx in free list. Delete it from the list and
-		 * use it.  There's a short window where the stealer can
-		 * look at the context before we grab the lock on the
-		 * context, so we have to handle that with the free flag.
-		 */
-		SFMMU_STAT(sf_ctxfree);
-		ctxfree = ctx->ctx_free;
-		ctx->ctx_sfmmu = NULL;
-		mutex_exit(&ctx_list_lock);
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-		ASSERT(ctx->ctx_sfmmu == NULL);
-		ASSERT((ctx->ctx_flags & CTX_FREE_FLAG) != 0);
-	} else if ((ctx = ctxdirty) != NULL) {
-		/*
-		 * No free contexts.  If we have at least one dirty ctx
-		 * then flush the TLBs on all cpus if necessary and move
-		 * the dirty list to the free list.
-		 */
-		SFMMU_STAT(sf_ctxdirty);
-		ctxdirty = NULL;
-		if (delay_tlb_flush)
-			sfmmu_tlb_all_demap();
-		ctxfree = ctx->ctx_free;
-		ctx->ctx_sfmmu = NULL;
-		mutex_exit(&ctx_list_lock);
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-		ASSERT(ctx->ctx_sfmmu == NULL);
-		ASSERT((ctx->ctx_flags & CTX_FREE_FLAG) != 0);
-	} else {
-		/*
-		 * No free context available, so steal one.
-		 *
-		 * The policy to choose the appropriate context is simple;
-		 * just sweep all the ctxs using ctxhand. This will steal
-		 * the LRU ctx.
-		 *
-		 * We however only steal a non-free context that can be
-		 * write locked.  Keep searching till we find a stealable
-		 * ctx.
-		 */
-		mutex_exit(&ctx_list_lock);
-		ctx = ctxhand;
-		do {
-			/*
-			 * If you get the writers lock, and the ctx isn't
-			 * a free ctx, THEN you can steal this ctx.
-			 */
-			if ((ctx->ctx_flags & CTX_FREE_FLAG) == 0 &&
-			    rw_tryenter(&ctx->ctx_rwlock, RW_WRITER) != 0) {
-				if (ctx->ctx_flags & CTX_FREE_FLAG) {
-					/* let the first guy have it */
-					rw_exit(&ctx->ctx_rwlock);
-				} else {
-					found_stealable_ctx = 1;
-					break;
-				}
-			}
-			ctx = NEXT_CTX(ctx);
-		} while (ctx != ctxhand);
-
-		if (found_stealable_ctx) {
-			/*
-			 * Try and reuse the ctx.
-			 */
-			sfmmu_reuse_ctx(ctx, sfmmup);
-
-		} else if (retry_count++ < GET_CTX_RETRY_CNT) {
-			goto retry;
-
-		} else {
-			panic("Can't find any stealable context");
-		}
-	}
-
-	ASSERT(rw_read_locked(&ctx->ctx_rwlock) == 0);	/* write locked */
-	ctx->ctx_sfmmu = sfmmup;
+	mmu_ctxp = CPU_MMU_CTXP(CPU);
+	ASSERT(mmu_ctxp);
+	ASSERT(mmu_ctxp->mmu_idx < max_mmu_ctxdoms);
+	ASSERT(mmu_ctxp == mmu_ctxs_tbl[mmu_ctxp->mmu_idx]);
 
 	/*
-	 * Clear the ctx_flags field.
+	 * Do a wrap-around if cnum reaches the max # cnum supported by a MMU.
 	 */
-	ctx->ctx_flags = 0;
-
-	cnum = ctxtoctxnum(ctx);
-	membar_exit();
-	sfmmup->sfmmu_cnum = cnum;
+	if (mmu_ctxp->mmu_cnum == mmu_ctxp->mmu_nctxs)
+		sfmmu_ctx_wrap_around(mmu_ctxp);
 
 	/*
 	 * Let the MMU set up the page sizes to use for
 	 * this context in the TLB. Don't program 2nd dtlb for ism hat.
 	 */
-	if ((&mmu_set_ctx_page_sizes) && (sfmmup->sfmmu_ismhat == 0))
+	if ((&mmu_set_ctx_page_sizes) && (sfmmup->sfmmu_ismhat == 0)) {
 		mmu_set_ctx_page_sizes(sfmmup);
+	}
 
 	/*
-	 * Downgrade to reader's lock.
+	 * sfmmu_alloc_ctx and sfmmu_load_mmustate will be performed with
+	 * interrupts disabled to prevent race condition with wrap-around
+	 * ctx invalidatation. In sun4v, ctx invalidation also involves
+	 * a HV call to set the number of TSBs to 0. If interrupts are not
+	 * disabled until after sfmmu_load_mmustate is complete TSBs may
+	 * become assigned to INVALID_CONTEXT. This is not allowed.
 	 */
-	rw_downgrade(&ctx->ctx_rwlock);
+	pstate_save = sfmmu_disable_intrs();
+
+	sfmmu_alloc_ctx(sfmmup, 1, CPU);
+	sfmmu_load_mmustate(sfmmup);
+
+	sfmmu_enable_intrs(pstate_save);
+
+	kpreempt_enable();
+}
+
+/*
+ * When all cnums are used up in a MMU, cnum will wrap around to the
+ * next generation and start from 2.
+ */
+static void
+sfmmu_ctx_wrap_around(mmu_ctx_t *mmu_ctxp)
+{
+
+	/* caller must have disabled the preemption */
+	ASSERT(curthread->t_preempt >= 1);
+	ASSERT(mmu_ctxp != NULL);
+
+	/* acquire Per-MMU (PM) spin lock */
+	mutex_enter(&mmu_ctxp->mmu_lock);
+
+	/* re-check to see if wrap-around is needed */
+	if (mmu_ctxp->mmu_cnum < mmu_ctxp->mmu_nctxs)
+		goto done;
+
+	SFMMU_MMU_STAT(mmu_wrap_around);
+
+	/* update gnum */
+	ASSERT(mmu_ctxp->mmu_gnum != 0);
+	mmu_ctxp->mmu_gnum++;
+	if (mmu_ctxp->mmu_gnum == 0 ||
+	    mmu_ctxp->mmu_gnum > MAX_SFMMU_GNUM_VAL) {
+		cmn_err(CE_PANIC, "mmu_gnum of mmu_ctx 0x%p is out of bound.",
+		    (void *)mmu_ctxp);
+	}
+
+	if (mmu_ctxp->mmu_ncpus > 1) {
+		cpuset_t cpuset;
+
+		membar_enter(); /* make sure updated gnum visible */
+
+		SFMMU_XCALL_STATS(NULL);
+
+		/* xcall to others on the same MMU to invalidate ctx */
+		cpuset = mmu_ctxp->mmu_cpuset;
+		ASSERT(CPU_IN_SET(cpuset, CPU->cpu_id));
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+		CPUSET_AND(cpuset, cpu_ready_set);
+
+		/*
+		 * Pass in INVALID_CONTEXT as the first parameter to
+		 * sfmmu_raise_tsb_exception, which invalidates the context
+		 * of any process running on the CPUs in the MMU.
+		 */
+		xt_some(cpuset, sfmmu_raise_tsb_exception,
+		    INVALID_CONTEXT, INVALID_CONTEXT);
+		xt_sync(cpuset);
+
+		SFMMU_MMU_STAT(mmu_tsb_raise_exception);
+	}
+
+	if (sfmmu_getctx_sec() != INVALID_CONTEXT) {
+		sfmmu_setctx_sec(INVALID_CONTEXT);
+		sfmmu_clear_utsbinfo();
+	}
 
 	/*
-	 * If this value doesn't get set to what we want
-	 * it won't matter, so don't worry about locking.
+	 * No xcall is needed here. For sun4u systems all CPUs in context
+	 * domain share a single physical MMU therefore it's enough to flush
+	 * TLB on local CPU. On sun4v systems we use 1 global context
+	 * domain and flush all remote TLBs in sfmmu_raise_tsb_exception
+	 * handler. Note that vtag_flushall_uctxs() is called
+	 * for Ultra II machine, where the equivalent flushall functionality
+	 * is implemented in SW, and only user ctx TLB entries are flushed.
 	 */
-	ctxhand = NEXT_CTX(ctx);
+	if (&vtag_flushall_uctxs != NULL) {
+		vtag_flushall_uctxs();
+	} else {
+		vtag_flushall();
+	}
 
-	/*
-	 * Better not have been stolen while we held the ctx'
-	 * lock or we're hosed.
-	 */
-	ASSERT(sfmmup == sfmmutoctx(sfmmup)->ctx_sfmmu);
+	/* reset mmu cnum, skips cnum 0 and 1 */
+	mmu_ctxp->mmu_cnum = NUM_LOCKED_CTXS;
 
-	return (ctx);
-
-#undef NEXT_CTX
+done:
+	mutex_exit(&mmu_ctxp->mmu_lock);
 }
 
 
 /*
- * Set the process context to INVALID_CONTEXT (but
- * without stealing the ctx) so that it faults and
- * reloads the MMU state from TL=0.  Caller must
- * hold the hat lock since we don't acquire it here.
+ * For multi-threaded process, set the process context to INVALID_CONTEXT
+ * so that it faults and reloads the MMU state from TL=0. For single-threaded
+ * process, we can just load the MMU state directly without having to
+ * set context invalid. Caller must hold the hat lock since we don't
+ * acquire it here.
  */
 static void
 sfmmu_sync_mmustate(sfmmu_t *sfmmup)
 {
-	int cnum;
-	cpuset_t cpuset;
+	uint_t cnum;
+	uint_t pstate_save;
 
 	ASSERT(sfmmup != ksfmmup);
 	ASSERT(sfmmu_hat_lock_held(sfmmup));
 
 	kpreempt_disable();
 
-	cnum = sfmmutoctxnum(sfmmup);
-	if (cnum != INVALID_CONTEXT) {
-		cpuset = sfmmup->sfmmu_cpusran;
-		CPUSET_DEL(cpuset, CPU->cpu_id);
-		CPUSET_AND(cpuset, cpu_ready_set);
-		SFMMU_XCALL_STATS(cnum);
-
-		xt_some(cpuset, sfmmu_raise_tsb_exception,
-		    cnum, INVALID_CONTEXT);
-		xt_sync(cpuset);
-
+	/*
+	 * We check whether the pass'ed-in sfmmup is the same as the
+	 * current running proc. This is to makes sure the current proc
+	 * stays single-threaded if it already is.
+	 */
+	if ((sfmmup == curthread->t_procp->p_as->a_hat) &&
+	    (curthread->t_procp->p_lwpcnt == 1)) {
+		/* single-thread */
+		cnum = sfmmup->sfmmu_ctxs[CPU_MMU_IDX(CPU)].cnum;
+		if (cnum != INVALID_CONTEXT) {
+			uint_t curcnum;
+			/*
+			 * Disable interrupts to prevent race condition
+			 * with sfmmu_ctx_wrap_around ctx invalidation.
+			 * In sun4v, ctx invalidation involves setting
+			 * TSB to NULL, hence, interrupts should be disabled
+			 * untill after sfmmu_load_mmustate is completed.
+			 */
+			pstate_save = sfmmu_disable_intrs();
+			curcnum = sfmmu_getctx_sec();
+			if (curcnum == cnum)
+				sfmmu_load_mmustate(sfmmup);
+			sfmmu_enable_intrs(pstate_save);
+			ASSERT(curcnum == cnum || curcnum == INVALID_CONTEXT);
+		}
+	} else {
 		/*
-		 * If the process is running on the local CPU
-		 * we need to update the MMU state here as well.
+		 * multi-thread
+		 * or when sfmmup is not the same as the curproc.
 		 */
-		if (sfmmu_getctx_sec() == cnum)
-			sfmmu_load_mmustate(sfmmup);
-
-		SFMMU_STAT(sf_tsb_raise_exception);
+		sfmmu_invalidate_ctx(sfmmup);
 	}
 
 	kpreempt_enable();
@@ -8868,9 +8883,7 @@ sfmmu_replace_tsb(sfmmu_t *sfmmup, struct tsb_info *old_tsbinfo, uint_t szc,
 	struct tsb_info *new_tsbinfo = NULL;
 	struct tsb_info *curtsb, *prevtsb;
 	uint_t tte_sz_mask;
-	cpuset_t cpuset;
-	struct ctx *ctx = NULL;
-	int ctxnum;
+	int i;
 
 	ASSERT(sfmmup != ksfmmup);
 	ASSERT(sfmmup->sfmmu_ismhat == 0);
@@ -8959,27 +8972,7 @@ sfmmu_replace_tsb(sfmmu_t *sfmmup, struct tsb_info *old_tsbinfo, uint_t szc,
 	 */
 	if ((flags & TSB_SWAPIN) != TSB_SWAPIN) {
 		/* The TSB is either growing or shrinking. */
-		ctx = sfmmutoctx(sfmmup);
-		rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-
-		ctxnum = sfmmutoctxnum(sfmmup);
-		sfmmup->sfmmu_cnum = INVALID_CONTEXT;
-		membar_enter();	/* make sure visible on all CPUs */
-
-		kpreempt_disable();
-		if (ctxnum != INVALID_CONTEXT) {
-			cpuset = sfmmup->sfmmu_cpusran;
-			CPUSET_DEL(cpuset, CPU->cpu_id);
-			CPUSET_AND(cpuset, cpu_ready_set);
-			SFMMU_XCALL_STATS(ctxnum);
-
-			xt_some(cpuset, sfmmu_raise_tsb_exception,
-			    ctxnum, INVALID_CONTEXT);
-			xt_sync(cpuset);
-
-			SFMMU_STAT(sf_tsb_raise_exception);
-		}
-		kpreempt_enable();
+		sfmmu_invalidate_ctx(sfmmup);
 	} else {
 		/*
 		 * It is illegal to swap in TSBs from a process other
@@ -8989,8 +8982,19 @@ sfmmu_replace_tsb(sfmmu_t *sfmmup, struct tsb_info *old_tsbinfo, uint_t szc,
 		 * misses.
 		 */
 		ASSERT(curthread->t_procp->p_as->a_hat == sfmmup);
-		ASSERT(sfmmutoctxnum(sfmmup) == INVALID_CONTEXT);
 	}
+
+#ifdef DEBUG
+	ASSERT(max_mmu_ctxdoms > 0);
+
+	/*
+	 * Process should have INVALID_CONTEXT on all MMUs
+	 */
+	for (i = 0; i < max_mmu_ctxdoms; i++) {
+
+		ASSERT(sfmmup->sfmmu_ctxs[i].cnum == INVALID_CONTEXT);
+	}
+#endif
 
 	new_tsbinfo->tsb_next = old_tsbinfo->tsb_next;
 	membar_stst();	/* strict ordering required */
@@ -9007,18 +9011,6 @@ sfmmu_replace_tsb(sfmmu_t *sfmmup, struct tsb_info *old_tsbinfo, uint_t szc,
 	 */
 	if (tsb_remap_ttes && ((flags & TSB_GROW) == TSB_GROW))
 		sfmmu_copy_tsb(old_tsbinfo, new_tsbinfo);
-
-	if ((flags & TSB_SWAPIN) != TSB_SWAPIN) {
-		kpreempt_disable();
-		membar_exit();
-		sfmmup->sfmmu_cnum = ctxnum;
-		if (ctxnum != INVALID_CONTEXT &&
-		    sfmmu_getctx_sec() == ctxnum) {
-			sfmmu_load_mmustate(sfmmup);
-		}
-		kpreempt_enable();
-		rw_exit(&ctx->ctx_rwlock);
-	}
 
 	SFMMU_FLAGS_CLEAR(sfmmup, HAT_BUSY);
 
@@ -9040,15 +9032,15 @@ sfmmu_replace_tsb(sfmmu_t *sfmmup, struct tsb_info *old_tsbinfo, uint_t szc,
 }
 
 /*
- * Steal context from process, forcing the process to switch to another
- * context on the next TLB miss, and therefore start using the TLB that
- * is reprogrammed for the new page sizes.
+ * This function will re-program hat pgsz array, and invalidate the
+ * process' context, forcing the process to switch to another
+ * context on the next TLB miss, and therefore start using the
+ * TLB that is reprogrammed for the new page sizes.
  */
 void
-sfmmu_steal_context(sfmmu_t *sfmmup, uint8_t *tmp_pgsz)
+sfmmu_reprog_pgsz_arr(sfmmu_t *sfmmup, uint8_t *tmp_pgsz)
 {
-	struct ctx *ctx;
-	int i, cnum;
+	int i;
 	hatlock_t *hatlockp = NULL;
 
 	hatlockp = sfmmu_hat_enter(sfmmup);
@@ -9058,14 +9050,9 @@ sfmmu_steal_context(sfmmu_t *sfmmup, uint8_t *tmp_pgsz)
 			sfmmup->sfmmu_pgsz[i] = tmp_pgsz[i];
 	}
 	SFMMU_STAT(sf_tlb_reprog_pgsz);
-	ctx = sfmmutoctx(sfmmup);
-	rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-	cnum = sfmmutoctxnum(sfmmup);
 
-	if (cnum != INVALID_CONTEXT) {
-		sfmmu_tlb_swap_ctx(sfmmup, ctx);
-	}
-	rw_exit(&ctx->ctx_rwlock);
+	sfmmu_invalidate_ctx(sfmmup);
+
 	sfmmu_hat_exit(hatlockp);
 }
 
@@ -9326,50 +9313,6 @@ hat_preferred_pgsz(struct hat *hat, caddr_t vaddr, size_t maplen, int maptype)
 }
 
 /*
- * Free up a ctx
- */
-static void
-sfmmu_free_ctx(sfmmu_t *sfmmup, struct ctx *ctx)
-{
-	int ctxnum;
-
-	rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-
-	TRACE_CTXS(&ctx_trace_mutex, ctx_trace_ptr, sfmmup->sfmmu_cnum,
-	    sfmmup, 0, CTX_TRC_FREE);
-
-	if (sfmmup->sfmmu_cnum == INVALID_CONTEXT) {
-		CPUSET_ZERO(sfmmup->sfmmu_cpusran);
-		rw_exit(&ctx->ctx_rwlock);
-		return;
-	}
-
-	ASSERT(sfmmup == ctx->ctx_sfmmu);
-
-	ctx->ctx_sfmmu = NULL;
-	ctx->ctx_flags = 0;
-	sfmmup->sfmmu_cnum = INVALID_CONTEXT;
-	membar_enter();
-	CPUSET_ZERO(sfmmup->sfmmu_cpusran);
-	ctxnum = sfmmu_getctx_sec();
-	if (ctxnum == ctxtoctxnum(ctx)) {
-		sfmmu_setctx_sec(INVALID_CONTEXT);
-		sfmmu_clear_utsbinfo();
-	}
-
-	/*
-	 * Put the freed ctx on the dirty list
-	 */
-	mutex_enter(&ctx_list_lock);
-	CTX_SET_FLAGS(ctx, CTX_FREE_FLAG);
-	ctx->ctx_free = ctxdirty;
-	ctxdirty = ctx;
-	mutex_exit(&ctx_list_lock);
-
-	rw_exit(&ctx->ctx_rwlock);
-}
-
-/*
  * Free up a sfmmu
  * Since the sfmmu is currently embedded in the hat struct we simply zero
  * out our fields and free up the ism map blk list if any.
@@ -9389,7 +9332,7 @@ sfmmu_free_sfmmu(sfmmu_t *sfmmup)
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE4M] == 0);
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE32M] == 0);
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE256M] == 0);
-	ASSERT(sfmmup->sfmmu_cnum == INVALID_CONTEXT);
+
 	sfmmup->sfmmu_free = 0;
 	sfmmup->sfmmu_ismhat = 0;
 
@@ -10531,65 +10474,6 @@ sfmmu_hmetohblk(struct sf_hment *sfhme)
 }
 
 /*
- * Make sure that there is a valid ctx, if not get a ctx.
- * Also, get a readers lock on the ctx, so that the ctx cannot
- * be stolen underneath us.
- */
-static void
-sfmmu_disallow_ctx_steal(sfmmu_t *sfmmup)
-{
-	struct	ctx *ctx;
-
-	ASSERT(sfmmup != ksfmmup);
-	ASSERT(sfmmup->sfmmu_ismhat == 0);
-
-	/*
-	 * If ctx has been stolen, get a ctx.
-	 */
-	if (sfmmup->sfmmu_cnum == INVALID_CONTEXT) {
-		/*
-		 * Our ctx was stolen. Get a ctx with rlock.
-		 */
-		ctx = sfmmu_get_ctx(sfmmup);
-		return;
-	} else {
-		ctx = sfmmutoctx(sfmmup);
-	}
-
-	/*
-	 * Get the reader lock.
-	 */
-	rw_enter(&ctx->ctx_rwlock, RW_READER);
-	if (ctx->ctx_sfmmu != sfmmup) {
-		/*
-		 * The ctx got stolen, so spin again.
-		 */
-		rw_exit(&ctx->ctx_rwlock);
-		ctx = sfmmu_get_ctx(sfmmup);
-	}
-
-	ASSERT(sfmmup->sfmmu_cnum >= NUM_LOCKED_CTXS);
-}
-
-/*
- * Decrement reference count for our ctx. If the reference count
- * becomes 0, our ctx can be stolen by someone.
- */
-static void
-sfmmu_allow_ctx_steal(sfmmu_t *sfmmup)
-{
-	struct	ctx *ctx;
-
-	ASSERT(sfmmup != ksfmmup);
-	ASSERT(sfmmup->sfmmu_ismhat == 0);
-	ctx = sfmmutoctx(sfmmup);
-
-	ASSERT(sfmmup == ctx->ctx_sfmmu);
-	ASSERT(sfmmup->sfmmu_cnum != INVALID_CONTEXT);
-	rw_exit(&ctx->ctx_rwlock);
-}
-
-/*
  * On swapin, get appropriately sized TSB(s) and clear the HAT_SWAPPED flag.
  * If we can't get appropriately sized TSB(s), try for 8K TSB(s) using
  * KM_SLEEP allocation.
@@ -10683,22 +10567,14 @@ sfmmu_tsb_swapin(sfmmu_t *sfmmup, hatlock_t *hatlockp)
  *
  * There are many scenarios that could land us here:
  *
- *	1) Process has no context.  In this case, ctx is
- *         INVALID_CONTEXT and sfmmup->sfmmu_cnum == 1 so
- *         we will acquire a context before returning.
- *      2) Need to re-load our MMU state.  In this case,
- *         ctx is INVALID_CONTEXT and sfmmup->sfmmu_cnum != 1.
- *      3) ISM mappings are being updated.  This is handled
- *         just like case #2.
- *      4) We wish to program a new page size into the TLB.
- *         This is handled just like case #1, since changing
- *         TLB page size requires us to flush the TLB.
- *	5) Window fault and no valid translation found.
- *
- * Cases 1-4, ctx is INVALID_CONTEXT so we handle it and then
- * exit which will retry the trapped instruction.  Case #5 we
- * punt to trap() which will raise us a trap level and handle
- * the fault before unwinding.
+ * If the context is invalid we land here. The context can be invalid
+ * for 3 reasons: 1) we couldn't allocate a new context and now need to
+ * perform a wrap around operation in order to allocate a new context.
+ * 2) Context was invalidated to change pagesize programming 3) ISMs or
+ * TSBs configuration is changeing for this process and we are forced into
+ * here to do a syncronization operation. If the context is valid we can
+ * be here from window trap hanlder. In this case just call trap to handle
+ * the fault.
  *
  * Note that the process will run in INVALID_CONTEXT before
  * faulting into here and subsequently loading the MMU registers
@@ -10718,6 +10594,7 @@ sfmmu_tsbmiss_exception(struct regs *rp, uintptr_t tagaccess, uint_t traptype)
 	struct tsb_info *tsbinfop;
 
 	SFMMU_STAT(sf_tsb_exceptions);
+	SFMMU_MMU_STAT(mmu_tsb_exceptions);
 	sfmmup = astosfmmu(curthread->t_procp->p_as);
 	ctxnum = tagaccess & TAGACC_CTX_MASK;
 
@@ -10737,8 +10614,10 @@ sfmmu_tsbmiss_exception(struct regs *rp, uintptr_t tagaccess, uint_t traptype)
 	 * locking the HAT and grabbing the rwlock on the context as a
 	 * reader temporarily.
 	 */
-	if (ctxnum == INVALID_CONTEXT ||
-	    SFMMU_FLAGS_ISSET(sfmmup, HAT_SWAPPED)) {
+	ASSERT(!SFMMU_FLAGS_ISSET(sfmmup, HAT_SWAPPED) ||
+	    ctxnum == INVALID_CONTEXT);
+
+	if (ctxnum == INVALID_CONTEXT) {
 		/*
 		 * Must set lwp state to LWP_SYS before
 		 * trying to acquire any adaptive lock
@@ -10764,7 +10643,7 @@ retry:
 		 */
 		if (SFMMU_FLAGS_ISSET(sfmmup, HAT_ISMBUSY)) {
 			cv_wait(&sfmmup->sfmmu_tsb_cv,
-				    HATLOCK_MUTEXP(hatlockp));
+			    HATLOCK_MUTEXP(hatlockp));
 			goto retry;
 		}
 
@@ -10779,13 +10658,8 @@ retry:
 			goto retry;
 		}
 
-		sfmmu_disallow_ctx_steal(sfmmup);
-		ctxnum = sfmmup->sfmmu_cnum;
-		kpreempt_disable();
-		sfmmu_setctx_sec(ctxnum);
-		sfmmu_load_mmustate(sfmmup);
-		kpreempt_enable();
-		sfmmu_allow_ctx_steal(sfmmup);
+		sfmmu_get_ctx(sfmmup);
+
 		sfmmu_hat_exit(hatlockp);
 		/*
 		 * Must restore lwp_state if not calling
@@ -10857,7 +10731,6 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
 	caddr_t 	va;
 	ism_ment_t	*ment;
 	sfmmu_t		*sfmmup;
-	int 		ctxnum;
 	int 		vcolor;
 	int		ttesz;
 
@@ -10877,7 +10750,7 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
 	for (ment = ism_sfmmup->sfmmu_iment; ment; ment = ment->iment_next) {
 
 		sfmmup = ment->iment_hat;
-		ctxnum = sfmmup->sfmmu_cnum;
+
 		va = ment->iment_base_va;
 		va = (caddr_t)((uintptr_t)va  + (uintptr_t)addr);
 
@@ -10895,20 +10768,15 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
 			sfmmu_unload_tsb_range(sfmmup, sva, eva, ttesz);
 		}
 
-		if (ctxnum != INVALID_CONTEXT) {
-			/*
-			 * Flush TLBs.  We don't need to do this for
-			 * invalid context since the flushing is already
-			 * done as part of context stealing.
-			 */
-			cpuset = sfmmup->sfmmu_cpusran;
-			CPUSET_AND(cpuset, cpu_ready_set);
-			CPUSET_DEL(cpuset, CPU->cpu_id);
-			SFMMU_XCALL_STATS(ctxnum);
-			xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)va,
-			    ctxnum);
-			vtag_flushpage(va, ctxnum);
-		}
+		cpuset = sfmmup->sfmmu_cpusran;
+		CPUSET_AND(cpuset, cpu_ready_set);
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+
+		SFMMU_XCALL_STATS(sfmmup);
+		xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)va,
+		    (uint64_t)sfmmup);
+
+		vtag_flushpage(va, (uint64_t)sfmmup);
 
 		/*
 		 * Flush D$
@@ -10918,7 +10786,8 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
 		if (cache_flush_flag == CACHE_FLUSH) {
 			cpuset = cpu_ready_set;
 			CPUSET_DEL(cpuset, CPU->cpu_id);
-			SFMMU_XCALL_STATS(ctxnum);
+
+			SFMMU_XCALL_STATS(sfmmup);
 			vcolor = addr_to_vcolor(va);
 			xt_some(cpuset, vac_flushpage_tl1, pfnum, vcolor);
 			vac_flushpage(pfnum, vcolor);
@@ -10937,7 +10806,7 @@ sfmmu_tlbcache_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 	pfn_t pfnum, int tlb_noflush, int cpu_flag, int cache_flush_flag,
 	int hat_lock_held)
 {
-	int ctxnum, vcolor;
+	int vcolor;
 	cpuset_t cpuset;
 	hatlock_t *hatlockp;
 
@@ -10947,34 +10816,41 @@ sfmmu_tlbcache_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 	 */
 	vcolor = addr_to_vcolor(addr);
 
+	/*
+	 * We must hold the hat lock during the flush of TLB,
+	 * to avoid a race with sfmmu_invalidate_ctx(), where
+	 * sfmmu_cnum on a MMU could be set to INVALID_CONTEXT,
+	 * causing TLB demap routine to skip flush on that MMU.
+	 * If the context on a MMU has already been set to
+	 * INVALID_CONTEXT, we just get an extra flush on
+	 * that MMU.
+	 */
+	if (!hat_lock_held && !tlb_noflush)
+		hatlockp = sfmmu_hat_enter(sfmmup);
+
 	kpreempt_disable();
 	if (!tlb_noflush) {
 		/*
-		 * Flush the TSB.
+		 * Flush the TSB and TLB.
 		 */
-		if (!hat_lock_held)
-			hatlockp = sfmmu_hat_enter(sfmmup);
 		SFMMU_UNLOAD_TSB(addr, sfmmup, hmeblkp);
-		ctxnum = (int)sfmmutoctxnum(sfmmup);
-		if (!hat_lock_held)
-			sfmmu_hat_exit(hatlockp);
 
-		if (ctxnum != INVALID_CONTEXT) {
-			/*
-			 * Flush TLBs.  We don't need to do this if our
-			 * context is invalid context.  Since we hold the
-			 * HAT lock the context must have been stolen and
-			 * hence will be flushed before re-use.
-			 */
-			cpuset = sfmmup->sfmmu_cpusran;
-			CPUSET_AND(cpuset, cpu_ready_set);
-			CPUSET_DEL(cpuset, CPU->cpu_id);
-			SFMMU_XCALL_STATS(ctxnum);
-			xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr,
-				ctxnum);
-			vtag_flushpage(addr, ctxnum);
-		}
+		cpuset = sfmmup->sfmmu_cpusran;
+		CPUSET_AND(cpuset, cpu_ready_set);
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+
+		SFMMU_XCALL_STATS(sfmmup);
+
+		xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr,
+		    (uint64_t)sfmmup);
+
+		vtag_flushpage(addr, (uint64_t)sfmmup);
+
 	}
+
+	if (!hat_lock_held && !tlb_noflush)
+		sfmmu_hat_exit(hatlockp);
+
 
 	/*
 	 * Flush the D$
@@ -10990,7 +10866,7 @@ sfmmu_tlbcache_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 			CPUSET_AND(cpuset, cpu_ready_set);
 		}
 		CPUSET_DEL(cpuset, CPU->cpu_id);
-		SFMMU_XCALL_STATS(sfmmutoctxnum(sfmmup));
+		SFMMU_XCALL_STATS(sfmmup);
 		xt_some(cpuset, vac_flushpage_tl1, pfnum, vcolor);
 		vac_flushpage(pfnum, vcolor);
 	}
@@ -11006,7 +10882,6 @@ static void
 sfmmu_tlb_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 	int tlb_noflush, int hat_lock_held)
 {
-	int ctxnum;
 	cpuset_t cpuset;
 	hatlock_t *hatlockp;
 
@@ -11022,29 +10897,23 @@ sfmmu_tlb_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 	if (!hat_lock_held)
 		hatlockp = sfmmu_hat_enter(sfmmup);
 	SFMMU_UNLOAD_TSB(addr, sfmmup, hmeblkp);
-	ctxnum = sfmmutoctxnum(sfmmup);
+
+	kpreempt_disable();
+
+	cpuset = sfmmup->sfmmu_cpusran;
+	CPUSET_AND(cpuset, cpu_ready_set);
+	CPUSET_DEL(cpuset, CPU->cpu_id);
+
+	SFMMU_XCALL_STATS(sfmmup);
+	xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr, (uint64_t)sfmmup);
+
+	vtag_flushpage(addr, (uint64_t)sfmmup);
+
 	if (!hat_lock_held)
 		sfmmu_hat_exit(hatlockp);
 
-	/*
-	 * Flush TLBs.  We don't need to do this if our context is invalid
-	 * context.  Since we hold the HAT lock the context must have been
-	 * stolen and hence will be flushed before re-use.
-	 */
-	if (ctxnum != INVALID_CONTEXT) {
-		/*
-		 * There is no need to protect against ctx being stolen.
-		 * If the ctx is stolen we will simply get an extra flush.
-		 */
-		kpreempt_disable();
-		cpuset = sfmmup->sfmmu_cpusran;
-		CPUSET_AND(cpuset, cpu_ready_set);
-		CPUSET_DEL(cpuset, CPU->cpu_id);
-		SFMMU_XCALL_STATS(ctxnum);
-		xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)addr, ctxnum);
-		vtag_flushpage(addr, ctxnum);
-		kpreempt_enable();
-	}
+	kpreempt_enable();
+
 }
 
 /*
@@ -11057,10 +10926,9 @@ static void
 sfmmu_tlb_range_demap(demap_range_t *dmrp)
 {
 	sfmmu_t *sfmmup = dmrp->dmr_sfmmup;
-	int ctxnum;
 	hatlock_t *hatlockp;
 	cpuset_t cpuset;
-	uint64_t ctx_pgcnt;
+	uint64_t sfmmu_pgcnt;
 	pgcnt_t pgcnt = 0;
 	int pgunload = 0;
 	int dirtypg = 0;
@@ -11098,117 +10966,64 @@ sfmmu_tlb_range_demap(demap_range_t *dmrp)
 		pgcnt += dirtypg;
 	}
 
-	/*
-	 * In the case where context is invalid context, bail.
-	 * We hold the hat lock while checking the ctx to prevent
-	 * a race with sfmmu_replace_tsb() which temporarily sets
-	 * the ctx to INVALID_CONTEXT to force processes to enter
-	 * sfmmu_tsbmiss_exception().
-	 */
-	hatlockp = sfmmu_hat_enter(sfmmup);
-	ctxnum = sfmmutoctxnum(sfmmup);
-	sfmmu_hat_exit(hatlockp);
-	if (ctxnum == INVALID_CONTEXT) {
-		dmrp->dmr_bitvec = 0;
-		return;
-	}
-
 	ASSERT((pgcnt<<MMU_PAGESHIFT) <= dmrp->dmr_endaddr - dmrp->dmr_addr);
 	if (sfmmup->sfmmu_free == 0) {
 		addr = dmrp->dmr_addr;
 		bitvec = dmrp->dmr_bitvec;
-		ctx_pgcnt = (uint64_t)((ctxnum << 16) | pgcnt);
+
+		/*
+		 * make sure it has SFMMU_PGCNT_SHIFT bits only,
+		 * as it will be used to pack argument for xt_some
+		 */
+		ASSERT((pgcnt > 0) &&
+		    (pgcnt <= (1 << SFMMU_PGCNT_SHIFT)));
+
+		/*
+		 * Encode pgcnt as (pgcnt -1 ), and pass (pgcnt - 1) in
+		 * the low 6 bits of sfmmup. This is doable since pgcnt
+		 * always >= 1.
+		 */
+		ASSERT(!((uint64_t)sfmmup & SFMMU_PGCNT_MASK));
+		sfmmu_pgcnt = (uint64_t)sfmmup |
+		    ((pgcnt - 1) & SFMMU_PGCNT_MASK);
+
+		/*
+		 * We must hold the hat lock during the flush of TLB,
+		 * to avoid a race with sfmmu_invalidate_ctx(), where
+		 * sfmmu_cnum on a MMU could be set to INVALID_CONTEXT,
+		 * causing TLB demap routine to skip flush on that MMU.
+		 * If the context on a MMU has already been set to
+		 * INVALID_CONTEXT, we just get an extra flush on
+		 * that MMU.
+		 */
+		hatlockp = sfmmu_hat_enter(sfmmup);
 		kpreempt_disable();
+
 		cpuset = sfmmup->sfmmu_cpusran;
 		CPUSET_AND(cpuset, cpu_ready_set);
 		CPUSET_DEL(cpuset, CPU->cpu_id);
-		SFMMU_XCALL_STATS(ctxnum);
+
+		SFMMU_XCALL_STATS(sfmmup);
 		xt_some(cpuset, vtag_flush_pgcnt_tl1, (uint64_t)addr,
-			ctx_pgcnt);
+		    sfmmu_pgcnt);
+
 		for (; bitvec != 0; bitvec >>= 1) {
 			if (bitvec & 1)
-				vtag_flushpage(addr, ctxnum);
+				vtag_flushpage(addr, (uint64_t)sfmmup);
 			addr += MMU_PAGESIZE;
 		}
 		kpreempt_enable();
+		sfmmu_hat_exit(hatlockp);
+
 		sfmmu_xcall_save += (pgunload-1);
 	}
 	dmrp->dmr_bitvec = 0;
 }
 
 /*
- * Flushes only TLB.
- */
-static void
-sfmmu_tlb_ctx_demap(sfmmu_t *sfmmup)
-{
-	int ctxnum;
-	cpuset_t cpuset;
-
-	ctxnum = (int)sfmmutoctxnum(sfmmup);
-	if (ctxnum == INVALID_CONTEXT) {
-		/*
-		 * if ctx was stolen then simply return
-		 * whoever stole ctx is responsible for flush.
-		 */
-		return;
-	}
-	ASSERT(ctxnum != KCONTEXT);
-	/*
-	 * There is no need to protect against ctx being stolen.  If the
-	 * ctx is stolen we will simply get an extra flush.
-	 */
-	kpreempt_disable();
-
-	cpuset = sfmmup->sfmmu_cpusran;
-	CPUSET_DEL(cpuset, CPU->cpu_id);
-	CPUSET_AND(cpuset, cpu_ready_set);
-	SFMMU_XCALL_STATS(ctxnum);
-
-	/*
-	 * Flush TLB.
-	 * RFE: it might be worth delaying the TLB flush as well. In that
-	 * case each cpu would have to traverse the dirty list and flush
-	 * each one of those ctx from the TLB.
-	 */
-	vtag_flushctx(ctxnum);
-	xt_some(cpuset, vtag_flushctx_tl1, ctxnum, 0);
-
-	kpreempt_enable();
-	SFMMU_STAT(sf_tlbflush_ctx);
-}
-
-/*
- * Flushes all TLBs.
- */
-static void
-sfmmu_tlb_all_demap(void)
-{
-	cpuset_t cpuset;
-
-	/*
-	 * There is no need to protect against ctx being stolen.  If the
-	 * ctx is stolen we will simply get an extra flush.
-	 */
-	kpreempt_disable();
-
-	cpuset = cpu_ready_set;
-	CPUSET_DEL(cpuset, CPU->cpu_id);
-	/* LINTED: constant in conditional context */
-	SFMMU_XCALL_STATS(INVALID_CONTEXT);
-
-	vtag_flushall();
-	xt_some(cpuset, vtag_flushall_tl1, 0, 0);
-	xt_sync(cpuset);
-
-	kpreempt_enable();
-	SFMMU_STAT(sf_tlbflush_all);
-}
-
-/*
  * In cases where we need to synchronize with TLB/TSB miss trap
  * handlers, _and_ need to flush the TLB, it's a lot easier to
- * steal the context from the process and free it than to do a
+ * throw away the context from the process than to do a
  * special song and dance to keep things consistent for the
  * handlers.
  *
@@ -11221,79 +11036,73 @@ sfmmu_tlb_all_demap(void)
  *
  * One added advantage of this approach is that on MMUs that
  * support a "flush all" operation, we will delay the flush until
- * we run out of contexts, and then flush the TLB one time.  This
+ * cnum wrap-around, and then flush the TLB one time.  This
  * is rather rare, so it's a lot less expensive than making 8000
- * x-calls to flush the TLB 8000 times.  Another is that we can do
- * all of this without pausing CPUs, due to some knowledge of how
- * resume() loads processes onto the processor; it sets the thread
- * into cpusran, and _then_ looks at cnum.  Because we do things in
- * the reverse order here, we guarantee exactly one of the following
- * statements is always true:
+ * x-calls to flush the TLB 8000 times.
  *
- *   1) Nobody is in resume() so we have nothing to worry about anyway.
- *   2) The thread in resume() isn't in cpusran when we do the xcall,
- *      so we know when it does set itself it'll see cnum is
- *      INVALID_CONTEXT.
- *   3) The thread in resume() is in cpusran, and already might have
- *      looked at the old cnum.  That's OK, because we'll xcall it
- *      and, if necessary, flush the TLB along with the rest of the
- *      crowd.
+ * A per-process (PP) lock is used to synchronize ctx allocations in
+ * resume() and ctx invalidations here.
  */
 static void
-sfmmu_tlb_swap_ctx(sfmmu_t *sfmmup, struct ctx *ctx)
+sfmmu_invalidate_ctx(sfmmu_t *sfmmup)
 {
 	cpuset_t cpuset;
-	int cnum;
+	int cnum, currcnum;
+	mmu_ctx_t *mmu_ctxp;
+	int i;
+	uint_t pstate_save;
 
-	if (sfmmup->sfmmu_cnum == INVALID_CONTEXT)
-		return;
+	SFMMU_STAT(sf_ctx_inv);
 
-	SFMMU_STAT(sf_ctx_swap);
+	ASSERT(sfmmu_hat_lock_held(sfmmup));
+	ASSERT(sfmmup != ksfmmup);
 
 	kpreempt_disable();
 
-	ASSERT(rw_read_locked(&ctx->ctx_rwlock) == 0);
-	ASSERT(ctx->ctx_sfmmu == sfmmup);
+	mmu_ctxp = CPU_MMU_CTXP(CPU);
+	ASSERT(mmu_ctxp);
+	ASSERT(mmu_ctxp->mmu_idx < max_mmu_ctxdoms);
+	ASSERT(mmu_ctxp == mmu_ctxs_tbl[mmu_ctxp->mmu_idx]);
 
-	cnum = ctxtoctxnum(ctx);
-	ASSERT(sfmmup->sfmmu_cnum == cnum);
-	ASSERT(cnum >= NUM_LOCKED_CTXS);
+	currcnum = sfmmup->sfmmu_ctxs[mmu_ctxp->mmu_idx].cnum;
 
-	sfmmup->sfmmu_cnum = INVALID_CONTEXT;
-	membar_enter();	/* make sure visible on all CPUs */
-	ctx->ctx_sfmmu = NULL;
+	pstate_save = sfmmu_disable_intrs();
+
+	lock_set(&sfmmup->sfmmu_ctx_lock);	/* acquire PP lock */
+	/* set HAT cnum invalid across all context domains. */
+	for (i = 0; i < max_mmu_ctxdoms; i++) {
+
+		cnum = 	sfmmup->sfmmu_ctxs[i].cnum;
+		if (cnum == INVALID_CONTEXT) {
+			continue;
+		}
+
+		sfmmup->sfmmu_ctxs[i].cnum = INVALID_CONTEXT;
+	}
+	membar_enter();	/* make sure globally visible to all CPUs */
+	lock_clear(&sfmmup->sfmmu_ctx_lock);	/* release PP lock */
+
+	sfmmu_enable_intrs(pstate_save);
 
 	cpuset = sfmmup->sfmmu_cpusran;
 	CPUSET_DEL(cpuset, CPU->cpu_id);
 	CPUSET_AND(cpuset, cpu_ready_set);
-	SFMMU_XCALL_STATS(cnum);
-
-	/*
-	 * Force anybody running this process on CPU
-	 * to enter sfmmu_tsbmiss_exception() on the
-	 * next TLB miss, synchronize behind us on
-	 * the HAT lock, and grab a new context.  At
-	 * that point the new page size will become
-	 * active in the TLB for the new context.
-	 * See sfmmu_get_ctx() for details.
-	 */
-	if (delay_tlb_flush) {
+	if (!CPUSET_ISNULL(cpuset)) {
+		SFMMU_XCALL_STATS(sfmmup);
 		xt_some(cpuset, sfmmu_raise_tsb_exception,
-		    cnum, INVALID_CONTEXT);
-		SFMMU_STAT(sf_tlbflush_deferred);
-	} else {
-		xt_some(cpuset, sfmmu_ctx_steal_tl1, cnum, INVALID_CONTEXT);
-		vtag_flushctx(cnum);
-		SFMMU_STAT(sf_tlbflush_ctx);
+		    (uint64_t)sfmmup, INVALID_CONTEXT);
+		xt_sync(cpuset);
+		SFMMU_STAT(sf_tsb_raise_exception);
+		SFMMU_MMU_STAT(mmu_tsb_raise_exception);
 	}
-	xt_sync(cpuset);
 
 	/*
-	 * If we just stole the ctx from the current
+	 * If the hat to-be-invalidated is the same as the current
 	 * process on local CPU we need to invalidate
 	 * this CPU context as well.
 	 */
-	if (sfmmu_getctx_sec() == cnum) {
+	if ((sfmmu_getctx_sec() == currcnum) &&
+	    (currcnum != INVALID_CONTEXT)) {
 		sfmmu_setctx_sec(INVALID_CONTEXT);
 		sfmmu_clear_utsbinfo();
 	}
@@ -11301,15 +11110,10 @@ sfmmu_tlb_swap_ctx(sfmmu_t *sfmmup, struct ctx *ctx)
 	kpreempt_enable();
 
 	/*
-	 * Now put old ctx on the dirty list since we may not
-	 * have flushed the context out of the TLB.  We'll let
-	 * the next guy who uses this ctx flush it instead.
+	 * we hold the hat lock, so nobody should allocate a context
+	 * for us yet
 	 */
-	mutex_enter(&ctx_list_lock);
-	CTX_SET_FLAGS(ctx, CTX_FREE_FLAG);
-	ctx->ctx_free = ctxdirty;
-	ctxdirty = ctx;
-	mutex_exit(&ctx_list_lock);
+	ASSERT(sfmmup->sfmmu_ctxs[mmu_ctxp->mmu_idx].cnum == INVALID_CONTEXT);
 }
 
 /*
@@ -11322,12 +11126,11 @@ void
 sfmmu_cache_flush(pfn_t pfnum, int vcolor)
 {
 	cpuset_t cpuset;
-	int	ctxnum = INVALID_CONTEXT;
 
 	kpreempt_disable();
 	cpuset = cpu_ready_set;
 	CPUSET_DEL(cpuset, CPU->cpu_id);
-	SFMMU_XCALL_STATS(ctxnum);	/* account to any ctx */
+	SFMMU_XCALL_STATS(NULL);	/* account to any ctx */
 	xt_some(cpuset, vac_flushpage_tl1, pfnum, vcolor);
 	xt_sync(cpuset);
 	vac_flushpage(pfnum, vcolor);
@@ -11338,14 +11141,13 @@ void
 sfmmu_cache_flushcolor(int vcolor, pfn_t pfnum)
 {
 	cpuset_t cpuset;
-	int	ctxnum = INVALID_CONTEXT;
 
 	ASSERT(vcolor >= 0);
 
 	kpreempt_disable();
 	cpuset = cpu_ready_set;
 	CPUSET_DEL(cpuset, CPU->cpu_id);
-	SFMMU_XCALL_STATS(ctxnum);	/* account to any ctx */
+	SFMMU_XCALL_STATS(NULL);	/* account to any ctx */
 	xt_some(cpuset, vac_flushcolor_tl1, vcolor, pfnum);
 	xt_sync(cpuset);
 	vac_flushcolor(vcolor, pfnum);
@@ -11367,8 +11169,6 @@ sfmmu_tsb_pre_relocator(caddr_t va, uint_t tsbsz, uint_t flags, void *tsbinfo)
 	hatlock_t *hatlockp;
 	struct tsb_info *tsbinfop = (struct tsb_info *)tsbinfo;
 	sfmmu_t *sfmmup = tsbinfop->tsb_sfmmu;
-	struct ctx *ctx;
-	int cnum;
 	extern uint32_t sendmondo_in_recover;
 
 	if (flags != HAT_PRESUSPEND)
@@ -11408,20 +11208,7 @@ sfmmu_tsb_pre_relocator(caddr_t va, uint_t tsbsz, uint_t flags, void *tsbinfo)
 		}
 	}
 
-	ctx = sfmmutoctx(sfmmup);
-	rw_enter(&ctx->ctx_rwlock, RW_WRITER);
-	cnum = sfmmutoctxnum(sfmmup);
-
-	if (cnum != INVALID_CONTEXT) {
-		/*
-		 * Force all threads for this sfmmu to sfmmu_tsbmiss_exception
-		 * on their next TLB miss.
-		 */
-		sfmmu_tlb_swap_ctx(sfmmup, ctx);
-	}
-
-	rw_exit(&ctx->ctx_rwlock);
-
+	sfmmu_invalidate_ctx(sfmmup);
 	sfmmu_hat_exit(hatlockp);
 
 	return (0);
@@ -13174,7 +12961,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 			sfmmu_kpm_unload_tsb(vaddr, MMU_PAGESHIFT4M);
 #ifdef	DEBUG
 			if (kpm_tlb_flush)
-				sfmmu_kpm_demap_tlbs(vaddr, KCONTEXT);
+				sfmmu_kpm_demap_tlbs(vaddr);
 #endif
 		}
 
@@ -13271,7 +13058,7 @@ smallpages_mapout:
 		sfmmu_kpm_unload_tsb(vaddr, MMU_PAGESHIFT);
 #ifdef	DEBUG
 		if (kpm_tlb_flush)
-			sfmmu_kpm_demap_tlbs(vaddr, KCONTEXT);
+			sfmmu_kpm_demap_tlbs(vaddr);
 #endif
 
 	} else if (PP_ISTNC(pp)) {
@@ -13968,7 +13755,7 @@ static void
 sfmmu_kpm_demap_large(caddr_t vaddr)
 {
 	sfmmu_kpm_unload_tsb(vaddr, MMU_PAGESHIFT4M);
-	sfmmu_kpm_demap_tlbs(vaddr, KCONTEXT);
+	sfmmu_kpm_demap_tlbs(vaddr);
 }
 
 /*
@@ -13978,14 +13765,14 @@ static void
 sfmmu_kpm_demap_small(caddr_t vaddr)
 {
 	sfmmu_kpm_unload_tsb(vaddr, MMU_PAGESHIFT);
-	sfmmu_kpm_demap_tlbs(vaddr, KCONTEXT);
+	sfmmu_kpm_demap_tlbs(vaddr);
 }
 
 /*
  * Demap a kpm mapping in all TLB's.
  */
 static void
-sfmmu_kpm_demap_tlbs(caddr_t vaddr, int ctxnum)
+sfmmu_kpm_demap_tlbs(caddr_t vaddr)
 {
 	cpuset_t cpuset;
 
@@ -13993,9 +13780,12 @@ sfmmu_kpm_demap_tlbs(caddr_t vaddr, int ctxnum)
 	cpuset = ksfmmup->sfmmu_cpusran;
 	CPUSET_AND(cpuset, cpu_ready_set);
 	CPUSET_DEL(cpuset, CPU->cpu_id);
-	SFMMU_XCALL_STATS(ctxnum);
-	xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)vaddr, ctxnum);
-	vtag_flushpage(vaddr, ctxnum);
+	SFMMU_XCALL_STATS(ksfmmup);
+
+	xt_some(cpuset, vtag_flushpage_tl1, (uint64_t)vaddr,
+	    (uint64_t)ksfmmup);
+	vtag_flushpage(vaddr, (uint64_t)ksfmmup);
+
 	kpreempt_enable();
 }
 
@@ -14401,7 +14191,7 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 
 		/* Flush vcolor in DCache */
 		CPUSET_DEL(cpuset, CPU->cpu_id);
-		SFMMU_XCALL_STATS(ksfmmup->sfmmu_cnum);
+		SFMMU_XCALL_STATS(ksfmmup);
 		xt_some(cpuset, vac_flushpage_tl1, pfn, vcolor);
 		vac_flushpage(pfn, vcolor);
 	}
@@ -14590,8 +14380,23 @@ hat_dump(void)
 void
 hat_thread_exit(kthread_t *thd)
 {
+	uint64_t pgsz_cnum;
+	uint_t pstate_save;
+
 	ASSERT(thd->t_procp->p_as == &kas);
 
-	sfmmu_setctx_sec(KCONTEXT);
+	pgsz_cnum = KCONTEXT;
+#ifdef sun4u
+	pgsz_cnum |= (ksfmmup->sfmmu_cext << CTXREG_EXT_SHIFT);
+#endif
+	/*
+	 * Note that sfmmu_load_mmustate() is currently a no-op for
+	 * kernel threads. We need to disable interrupts here,
+	 * simply because otherwise sfmmu_load_mmustate() would panic
+	 * if the caller does not disable interrupts.
+	 */
+	pstate_save = sfmmu_disable_intrs();
+	sfmmu_setctx_sec(pgsz_cnum);
 	sfmmu_load_mmustate(ksfmmup);
+	sfmmu_enable_intrs(pstate_save);
 }

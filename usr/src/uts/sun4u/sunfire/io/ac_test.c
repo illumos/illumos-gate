@@ -83,14 +83,14 @@ ac_mapin(uint64_t pa, caddr_t va)
 	    TTE_PFN_INTHI(pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(pfn) | TTE_CP_INT |
 	    TTE_PRIV_INT | TTE_LCK_INT | TTE_HWWR_INT;
-	sfmmu_dtlb_ld(va, KCONTEXT, &tte);
+	sfmmu_dtlb_ld_kva(va, &tte);
 
 }
 
 void
 ac_unmap(caddr_t va)
 {
-	vtag_flushpage(va, KCONTEXT);
+	vtag_flushpage(va, (uint64_t)ksfmmup);
 }
 
 int

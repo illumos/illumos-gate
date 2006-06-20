@@ -261,7 +261,7 @@ pp_unload_tlb(caddr_t *pslot, caddr_t va)
 {
 	ASSERT(*pslot == va);
 
-	vtag_flushpage(va, KCONTEXT);
+	vtag_flushpage(va, (uint64_t)ksfmmup);
 	*pslot = NULL;				/* release the slot */
 }
 

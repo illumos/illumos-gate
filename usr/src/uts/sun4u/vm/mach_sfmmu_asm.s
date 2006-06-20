@@ -61,25 +61,19 @@
 /*
  * sfmmu related subroutines
  */
-
 /* ARGSUSED */
 void
-sfmmu_ctx_steal_tl1(uint64_t sctx, uint64_t rctx)
+sfmmu_raise_tsb_exception(uint64_t sfmmup, uint64_t rctx)
 {}
 
 /* ARGSUSED */
 void
-sfmmu_raise_tsb_exception(uint64_t sctx, uint64_t rctx)
+sfmmu_itlb_ld_kva(caddr_t vaddr, tte_t *tte)
 {}
 
 /* ARGSUSED */
 void
-sfmmu_itlb_ld(caddr_t vaddr, int ctxnum, tte_t *tte)
-{}
-
-/* ARGSUSED */
-void
-sfmmu_dtlb_ld(caddr_t vaddr, int ctxnum, tte_t *tte)
+sfmmu_dtlb_ld_kva(caddr_t vaddr, tte_t *tte)
 {}
 
 int
@@ -102,103 +96,113 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 }
 
 #else	/* lint */
-
+	
 /*
- * 1. If stealing ctx, flush all TLB entries whose ctx is ctx-being-stolen.
- * 2. If processor is running in the ctx-being-stolen, set the
- *    context to the resv context. That is 
- *    If processor in User-mode - pri/sec-ctx both set to ctx-being-stolen,
- *		change both pri/sec-ctx registers to resv ctx.
- *    If processor in Kernel-mode - pri-ctx is 0, sec-ctx is ctx-being-stolen,
- *		just change sec-ctx register to resv ctx. When it returns to
- *		kernel-mode, user_rtt will change pri-ctx.
+ * Invalidate either the context of a specific victim or any process
+ * currently running on this CPU. 
  *
- * Note: For multiple page size TLB, no need to set page sizes for
- *       DEMAP context.
- *
- * %g1 = ctx being stolen (victim)
- * %g2 = invalid ctx to replace victim with
+ * %g1 = sfmmup whose ctx is being invalidated
+ *	 when called from sfmmu_wrap_around, %g1 == INVALID_CONTEXT
+ * Note %g1 is the only input argument used by this xcall handler.
  */
-	ENTRY(sfmmu_ctx_steal_tl1)
-	/*
-	 * Flush TLBs.
-	 */
-	set	MMU_PCONTEXT, %g3
-	set	DEMAP_CTX_TYPE | DEMAP_PRIMARY, %g4
-	ldxa	[%g3]ASI_MMU_CTX, %g5		/* get pri-ctx */
-	sethi	%hi(FLUSH_ADDR), %g6
-	stxa	%g1, [%g3]ASI_MMU_CTX		/* temporarily set our */
-						/*   pri-ctx to victim */
-	stxa	%g0, [%g4]ASI_DTLB_DEMAP	/* flush DTLB */
-	stxa	%g0, [%g4]ASI_ITLB_DEMAP	/* flush ITLB */
-	stxa	%g5, [%g3]ASI_MMU_CTX		/* restore original pri-ctx */
-	flush	%g6				/* ensure stxa's committed */
-	/* fall through to the code below */
-
-	/*
-	 * We enter here if we're just raising a TSB miss
-	 * exception, without switching MMU contexts.  In
-	 * this case, there is no need to flush the TLB.
-	 */
-	ALTENTRY(sfmmu_raise_tsb_exception)
+	ENTRY(sfmmu_raise_tsb_exception)
 	!
-	! if (sec-ctx != victim) {
-	!	return
-	! } else {
-	!	if (pri-ctx == victim) {
-	!		write INVALID_CONTEXT to sec-ctx
-	!		write INVALID_CONTEXT to pri-ctx
-	!	} else {
+	! if (victim == INVALID_CONTEXT) {
+	!	if (sec-ctx > INVALID_CONTEXT) {
 	!		write INVALID_CONTEXT to sec-ctx
 	!	}
+	!	if (pri-ctx > INVALID_CONTEXT) {
+	!		write INVALID_CONTEXT to pri-ctx
+	!	}
+	! } else if (current CPU tsbmiss->usfmmup != victim sfmmup) {
+	!	return
+	! } else {
+	!	if (sec-ctx > INVALID_CONTEXT)
+	!		write INVALID_CONTEXT to sec-ctx
+	!	
+	!	if (pri-ctx > INVALID_CONTEXT)
+	!		write INVALID_CONTEXT to pri-ctx
 	! }
 	!
-	cmp	%g1, NUM_LOCKED_CTXS
-	blt,a,pn %icc, ptl1_panic		/* can't steal locked ctx */
-	  mov	PTL1_BAD_CTX_STEAL, %g1
-	set	CTXREG_CTX_MASK, %g6
-	set	MMU_SCONTEXT, %g3
-	ldxa	[%g3]ASI_MMU_CTX, %g5		/* get sec-ctx */
-	and	%g5, %g6, %g5
-	cmp	%g5, %g1			/* is it the victim? */
-	bne,pn	%icc, 2f			/* was our sec-ctx a victim? */
+
+	sethi   %hi(ksfmmup), %g3
+        ldx     [%g3 + %lo(ksfmmup)], %g3
+	cmp	%g1, %g3
+	be,a,pn %xcc, ptl1_panic	/* can't invalidate kernel ctx */
+	  mov	PTL1_BAD_RAISE_TSBEXCP, %g1
+
+	set	INVALID_CONTEXT, %g2
+	
+	cmp	%g1, INVALID_CONTEXT
+	bne,pt	%xcc, 1f			/* called from wrap_around? */
+	  mov	MMU_SCONTEXT, %g3
+
+	ldxa	[%g3]ASI_MMU_CTX, %g5		/* %g5 = pgsz | sec-ctx */
+	set     CTXREG_CTX_MASK, %g4
+	and	%g5, %g4, %g5			/* %g5 = sec-ctx */
+	cmp	%g5, INVALID_CONTEXT		/* kernel ctx or invald ctx? */
+	ble,pn	%xcc, 0f			/* yes, no need to change */
 	  mov	MMU_PCONTEXT, %g7
-	ldxa	[%g7]ASI_MMU_CTX, %g4		/* get pri-ctx */
-	and	%g4, %g6, %g4
-	stxa	%g2, [%g3]ASI_MMU_CTX		/* set sec-ctx to invalid ctx */
+
+	stxa	%g2, [%g3]ASI_MMU_CTX		/* set invalid ctx */
 	membar	#Sync
-	cmp	%g1, %g4			/* is it the victim? */
-	bne 	%icc, 2f			/* nope, no need to change it */
+
+0:
+	ldxa	[%g7]ASI_MMU_CTX, %g5		/* get pgz | pri-ctx */
+	and     %g5, %g4, %g5			/* %g5 = pri-ctx */
+	cmp	%g5, INVALID_CONTEXT		/* kernel ctx or invald ctx? */
+	ble,pn	%xcc, 2f			/* yes, no need to change */
 	  nop
-	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid ctx */
+
+	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid */
+	retry
+
+1:
+	/* %g3 = MMU_SCONTEXT	*/
+	CPU_TSBMISS_AREA(%g5, %g6)		/* load cpu tsbmiss area */
+	ldx	[%g5 + TSBMISS_UHATID], %g5     /* load usfmmup */
+
+	cmp	%g5, %g1			/* hat toBe-invalid running? */
+	bne,pt	%xcc, 2f
+	  nop
+
+	ldxa    [%g3]ASI_MMU_CTX, %g5           /* %g5 = pgsz | sec-ctx */
+	set     CTXREG_CTX_MASK, %g4
+	and     %g5, %g4, %g5			/* %g5 = sec-ctx */
+	cmp     %g5, INVALID_CONTEXT            /* kernel  or invalid ctx ? */
+	ble,pn  %xcc, 0f                        /* yes, no need to change */
+	  mov	MMU_PCONTEXT, %g7
+
+	stxa	%g2, [%g3]ASI_MMU_CTX		/* set sec-ctx to invalid */
+	membar	#Sync
+
+0:
+	ldxa	[%g7]ASI_MMU_CTX, %g4		/* %g4 = pgsz | pri-ctx */
+	set     CTXREG_CTX_MASK, %g6
+	and	%g4, %g6, %g4			/* %g4 = pri-ctx */
+	cmp	%g4, INVALID_CONTEXT		/* is pri-ctx the victim? */
+	ble 	%icc, 2f			/* no, no need to change it */
+	  nop
+	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid */
 	/* next instruction is retry so no membar sync */
 2:
 	retry
-	SET_SIZE(sfmmu_ctx_steal_tl1)
+	SET_SIZE(sfmmu_raise_tsb_exception)
 
-	ENTRY_NP(sfmmu_itlb_ld)
+	/*
+	 * %o0 = virtual address
+	 * %o1 = address of TTE to be loaded
+	 */
+	ENTRY_NP(sfmmu_itlb_ld_kva)
 	rdpr	%pstate, %o3
 #ifdef DEBUG
-	andcc	%o3, PSTATE_IE, %g0		! If interrupts already
-	bnz,pt %icc, 1f				!   disabled, panic
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 1f
-	  nop
-	
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	 or	%o0, %lo(sfmmu_panic1), %o0
-1:
+	PANIC_IF_INTR_DISABLED_PSTR(%o3, msfmmu_di_l1, %g1)
 #endif /* DEBUG */
 	wrpr	%o3, PSTATE_IE, %pstate		! Disable interrupts
 	srln	%o0, MMU_PAGESHIFT, %o0
 	slln	%o0, MMU_PAGESHIFT, %o0		! Clear page offset
-	or	%o0, %o1, %o0
-	ldx	[%o2], %g1
+
+	ldx	[%o1], %g1
 	set	MMU_TAG_ACCESS, %o5
 #ifdef	CHEETAHPLUS_ERRATUM_34
 	!
@@ -241,7 +245,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	call    panic                           ! found no unlocked TTE so
 	  or    %o0, %lo(sfmmu_panic5), %o0     ! give up.
 
-	
+
 2:
 	!
 	! We have found an unlocked or non-valid entry; we'll explicitly load
@@ -252,7 +256,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	stxa	%g1, [%g3]ASI_ITLB_ACCESS
 	flush	%o1				! Flush required for I-MMU
 	ba	3f				! Delay slot of ba is empty
-	nop					!   per Erratum 64
+	  nop					!   per Erratum 64
 
 0:
 #endif	/* CHEETAHPLUS_ERRATUM_34 */
@@ -263,7 +267,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 3:
 	retl
 	  wrpr	%g0, %o3, %pstate		! Enable interrupts
-	SET_SIZE(sfmmu_itlb_ld)
+	SET_SIZE(sfmmu_itlb_ld_kva)
 
 	/*
 	 * Load an entry into the DTLB.
@@ -272,36 +276,33 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	 * are some TLB slots that are reserved for the kernel but not
 	 * always held locked.  We want to avoid loading locked TTEs
 	 * into those slots since they could be displaced.
+	 *
+	 * %o0 = virtual address
+	 * %o1 = address of TTE to be loaded
 	 */
-	ENTRY_NP(sfmmu_dtlb_ld)
+	ENTRY_NP(sfmmu_dtlb_ld_kva)
 	rdpr	%pstate, %o3
 #ifdef DEBUG
-	andcc	%o3, PSTATE_IE, %g0		! if interrupts already
-	bnz,pt	%icc, 1f			! disabled, panic
-	  nop
-
-	sethi	%hi(panicstr), %g1
-	ldx	[%g1 + %lo(panicstr)], %g1
-	tst	%g1
-	bnz,pt	%icc, 1f
-	  nop
-
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	 or	%o0, %lo(sfmmu_panic1), %o0
-1:
+	PANIC_IF_INTR_DISABLED_PSTR(%o3, msfmmu_di_l2, %g1)
 #endif /* DEBUG */
 	wrpr	%o3, PSTATE_IE, %pstate		! disable interrupts
 	srln	%o0, MMU_PAGESHIFT, %o0
 	slln	%o0, MMU_PAGESHIFT, %o0		! clear page offset
-	or	%o0, %o1, %o0			! or in ctx to form tagacc
-	ldx	[%o2], %g1
-	sethi	%hi(ctx_pgsz_array), %o2	! Check for T8s
-	ldn	[%o2 + %lo(ctx_pgsz_array)], %o2
-	brz	%o2, 1f
+
+	ldx	[%o1], %g1
+
 	set	MMU_TAG_ACCESS, %o5
-	ldub	[%o2 + %o1], %o2		! Cheetah+: set up tag access
-	sll	%o2, TAGACCEXT_SHIFT, %o2	! extension register so entry
+	
+	set	cpu_impl_dual_pgsz, %o2
+	ld	[%o2], %o2
+	brz	%o2, 1f
+	  nop
+
+	sethi	%hi(ksfmmup), %o2
+	ldx	[%o2 + %lo(ksfmmup)], %o2
+	ldub    [%o2 + SFMMU_CEXT], %o2
+        sll     %o2, TAGACCEXT_SHIFT, %o2
+
 	set	MMU_TAG_ACCESS_EXT, %o4		! can go into T8 if unlocked
 	stxa	%o2,[%o4]ASI_DMMU
 	membar	#Sync
@@ -330,7 +331,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	bz,pn	%icc, 4f			! If unlocked, go displace
 	  nop
 	sub	%g3, (1 << 3), %g3		! Decrement idx
-	brgez	%g3, 3b			
+	brgez	%g3, 3b
 	  nop
 	sethi	%hi(sfmmu_panic5), %o0		! We searched all entries and
 	call	panic				! found no unlocked TTE so
@@ -345,7 +346,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	membar	#Sync
 	retl
 	  wrpr	%g0, %o3, %pstate		! enable interrupts
-	SET_SIZE(sfmmu_dtlb_ld)
+	SET_SIZE(sfmmu_dtlb_ld_kva)
 
 	ENTRY_NP(sfmmu_getctx_pri)
 	set	MMU_PCONTEXT, %o0
@@ -358,45 +359,43 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	set	CTXREG_CTX_MASK, %o1
 	ldxa	[%o0]ASI_MMU_CTX, %o0
 	retl
-	and	%o0, %o1, %o0
+	  and	%o0, %o1, %o0
 	SET_SIZE(sfmmu_getctx_sec)
 
 	/*
 	 * Set the secondary context register for this process.
-	 * %o0 = context number for this process.
+	 * %o0 = page_size | context number for this process.
 	 */
 	ENTRY_NP(sfmmu_setctx_sec)
 	/*
 	 * From resume we call sfmmu_setctx_sec with interrupts disabled.
 	 * But we can also get called from C with interrupts enabled. So,
-	 * we need to check first. Also, resume saves state in %o3 and %o5
-	 * so we can't use those registers here.
+	 * we need to check first.
 	 */
 
 	/* If interrupts are not disabled, then disable them */
 	rdpr	%pstate, %g1
 	btst	PSTATE_IE, %g1
 	bnz,a,pt %icc, 1f
-	wrpr	%g1, PSTATE_IE, %pstate		/* disable interrupts */
+	  wrpr	%g1, PSTATE_IE, %pstate		/* disable interrupts */
+
 1:
 	mov	MMU_SCONTEXT, %o1
-	sethi	%hi(ctx_pgsz_array), %g2
-	ldn	[%g2 + %lo(ctx_pgsz_array)], %g2
-	brz	%g2, 2f
-	nop
-	ldub	[%g2 + %o0], %g2
-	sll	%g2, CTXREG_EXT_SHIFT, %g2
-	or	%g2, %o0, %o0
-2:
+
 	sethi	%hi(FLUSH_ADDR), %o4
 	stxa	%o0, [%o1]ASI_MMU_CTX		/* set 2nd context reg. */
 	flush	%o4
 
+	/*
+	 * if the routine was entered with intr enabled, then enable intr now.
+	 * otherwise, keep intr disabled, return without enabing intr.
+	 * %g1 - old intr state
+	 */
 	btst	PSTATE_IE, %g1
-	bnz,a,pt %icc, 1f
-	wrpr	%g0, %g1, %pstate		/* enable interrupts */
-1:	retl
-	nop
+	bnz,a,pt %icc, 2f
+	  wrpr	%g0, %g1, %pstate		/* enable interrupts */
+2:	retl
+	  nop
 	SET_SIZE(sfmmu_setctx_sec)
 
 	/*
@@ -432,25 +431,17 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	 * %o0 - hat pointer
 	 */
 	ENTRY_NP(sfmmu_load_mmustate)
-	/*
-	 * From resume we call sfmmu_load_mmustate with interrupts disabled.
-	 * But we can also get called from C with interrupts enabled. So,
-	 * we need to check first. Also, resume saves state in %o5 and we
-	 * can't use this register here.
-	 */
 
-	sethi	%hi(ksfmmup), %o3
+#ifdef DEBUG
+	PANIC_IF_INTR_ENABLED_PSTR(msfmmu_ei_l3, %g1)
+#endif /* DEBUG */
+
+ 	sethi	%hi(ksfmmup), %o3
 	ldx	[%o3 + %lo(ksfmmup)], %o3
 	cmp	%o3, %o0
 	be,pn	%xcc, 3f			! if kernel as, do nothing
 	  nop
 
-	/* If interrupts are not disabled, then disable them */
-	rdpr	%pstate, %g1
-	btst	PSTATE_IE, %g1
-	bnz,a,pt %icc, 1f
-	wrpr	%g1, PSTATE_IE, %pstate		! disable interrupts
-1:
 	/*
 	 * We need to set up the TSB base register, tsbmiss
 	 * area, and load locked TTE(s) for the TSB.
@@ -477,7 +468,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	brz,pt  %g2, 4f
 	  nop
 	/*
-	 * We have a second TSB for this process, so we need to 
+	 * We have a second TSB for this process, so we need to
 	 * encode data for both the first and second TSB in our single
 	 * TSB base register.  See hat_sfmmu.h for details on what bits
 	 * correspond to which TSB.
@@ -522,11 +513,8 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	stx	%o0, [%o2 + TSBMISS_UHATID]
 	stuh	%o3, [%o2 + TSBMISS_HATFLAGS]
 
-	btst	PSTATE_IE, %g1
-	bnz,a,pt %icc, 3f
-	wrpr	%g0, %g1, %pstate		! enable interrupts
 3:	retl
-	nop
+	  nop
 	SET_SIZE(sfmmu_load_mmustate)
 
 #endif /* lint */
@@ -624,7 +612,7 @@ sfmmu_inv_tsb_fast(caddr_t tsb_base, uint_t tsb_bytes)
 	dec	%l3
 	stb	%l3, [THREAD_REG + T_PREEMPT]
 	ret
-	restore
+	  restore
 	SET_SIZE(sfmmu_inv_tsb_fast)
 
 #endif /* lint */
@@ -656,12 +644,12 @@ prefetch_tsbe_write(struct tsbe *tsbep)
 
 	ENTRY(prefetch_tsbe_read)
 	retl
-	prefetch	[%o0+448], #n_reads
+	  prefetch	[%o0+448], #n_reads
 	SET_SIZE(prefetch_tsbe_read)
 
 	ENTRY(prefetch_tsbe_write)
 	retl
-	prefetch	[%o0], #n_writes
+	  prefetch	[%o0], #n_writes
 	SET_SIZE(prefetch_tsbe_write)
 #endif /* lint */
 

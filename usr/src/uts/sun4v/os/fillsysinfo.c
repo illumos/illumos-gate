@@ -339,17 +339,11 @@ cpu_setup_common(char **cpu_module_isa_set)
 	}
 
 	/*
-	 * Get the valid contexts, mmu page sizes mask, Q sizes and isalist/r
+	 * Get the valid mmu page sizes mask, Q sizes and isalist/r
 	 * from the MD for the first available CPU in cpulist.
+	 *
+	 * Do not expect the MMU page sizes mask to be more than 32-bit.
 	 */
-
-	if (nctxs == 0)
-		nctxs = (uint_t)(1 << get_mmu_ctx_bits(mdp, cpulist[0]));
-
-	if (nctxs > MAX_NCTXS)
-		nctxs = MAX_NCTXS;
-
-	/* Do not expect the MMU page sizes mask to be more than 32-bit. */
 	mmu_exported_pagesize_mask = (int)get_cpu_pagesizes(mdp, cpulist[0]);
 
 	for (i = 0; i < nocpus; i++)

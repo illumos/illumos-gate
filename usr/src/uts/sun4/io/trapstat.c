@@ -577,12 +577,12 @@ trapstat_load_tlb(void)
 		if (i < TSTAT_INSTR_PAGES) {
 			tte.tte_intlo = TTE_PFN_INTLO(tcpu->tcpu_pfn[i]) |
 				TTE_LCK_INT | TTE_CP_INT | TTE_PRIV_INT;
-			sfmmu_itlb_ld(va, KCONTEXT, &tte);
+			sfmmu_itlb_ld_kva(va, &tte);
 		} else {
 			tte.tte_intlo = TTE_PFN_INTLO(tcpu->tcpu_pfn[i]) |
 				TTE_LCK_INT | TTE_CP_INT | TTE_CV_INT |
 				TTE_PRIV_INT | TTE_HWWR_INT;
-			sfmmu_dtlb_ld(va, KCONTEXT, &tte);
+			sfmmu_dtlb_ld_kva(va, &tte);
 		}
 	}
 #else /* sun4v */
@@ -1559,7 +1559,8 @@ trapstat_teardown(processorid_t cpu)
 	vmem_free(tstat_arena, tcpu->tcpu_data, tstat_data_size);
 
 	for (i = 0; i < tstat_total_pages; i++, va += MMU_PAGESIZE) {
-		xt_one(cpu, vtag_flushpage_tl1, (uint64_t)va, KCONTEXT);
+		xt_one(cpu, vtag_flushpage_tl1, (uint64_t)va,
+		    (uint64_t)ksfmmup);
 	}
 #else
 	xt_one(cpu, vtag_unmap_perm_tl1, (uint64_t)va, KCONTEXT);

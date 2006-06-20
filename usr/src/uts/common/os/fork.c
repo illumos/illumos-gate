@@ -242,11 +242,12 @@ cfork(int isvfork, int isfork1)
 			while (*orphpp != cp)
 				orphpp = &(*orphpp)->p_nextorph;
 			*orphpp = cp->p_nextorph;
-			ASSERT(p->p_child == cp);
-			p->p_child = cp->p_sibling;
-			if (p->p_child) {
-				p->p_child->p_psibling = NULL;
-			}
+			if (p->p_child == cp)
+				p->p_child = cp->p_sibling;
+			if (cp->p_sibling)
+				cp->p_sibling->p_psibling = cp->p_psibling;
+			if (cp->p_psibling)
+				cp->p_psibling->p_sibling = cp->p_sibling;
 			mutex_enter(&cp->p_lock);
 			tk = cp->p_task;
 			task_detach(cp);
@@ -594,11 +595,12 @@ forklwperr:
 	while (*orphpp != cp)
 		orphpp = &(*orphpp)->p_nextorph;
 	*orphpp = cp->p_nextorph;
-	ASSERT(p->p_child == cp);
-	p->p_child = cp->p_sibling;
-	if (p->p_child) {
-		p->p_child->p_psibling = NULL;
-	}
+	if (p->p_child == cp)
+		p->p_child = cp->p_sibling;
+	if (cp->p_sibling)
+		cp->p_sibling->p_psibling = cp->p_psibling;
+	if (cp->p_psibling)
+		cp->p_psibling->p_sibling = cp->p_sibling;
 	pid_exit(cp);
 	mutex_exit(&pidlock);
 

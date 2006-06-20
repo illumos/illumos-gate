@@ -77,6 +77,7 @@
 
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
+#include <vm/hat_sfmmu.h>
 #include <sys/machparam.h>	/* To get SYSBASE and PAGESIZE */
 #include <sys/machthread.h>
 #include <sys/clock.h>
@@ -118,12 +119,12 @@ tickcmpr_set(uint64_t clock_cycles)
 
 	cmp	%o2, %o0		! If the value we wrote was in the
 	bg,pt	%xcc, 2f		!   future, then blow out of here.
-	sllx	%o3, 1, %o3		! If not, then double our step size,
+	  sllx	%o3, 1, %o3		! If not, then double our step size,
 	ba,pt	%xcc, 1b		!   and take another lap.
-	add	%o0, %o3, %o2		!
+	  add	%o0, %o3, %o2		!
 2:
 	retl
-	nop
+	  nop
 	SET_SIZE(tickcmpr_set)
 
 #endif  /* lint */
@@ -141,7 +142,7 @@ tickcmpr_disable(void)
 	sllx	%g1, TICKINT_DIS_SHFT, %o0
 	WR_TICKCMPR(%o0,%o4,%o5,__LINE__)	! Write to TICK_CMPR
 	retl
-	nop
+	  nop
 	SET_SIZE(tickcmpr_disable)
 
 #endif
@@ -174,10 +175,10 @@ tick_write_delta_panic:
 	sethi	%hi(tick_write_delta_panic), %o1
         save    %sp, -SA(MINFRAME), %sp ! get a new window to preserve caller
 	call	panic
-	or	%i1, %lo(tick_write_delta_panic), %o0
+	  or	%i1, %lo(tick_write_delta_panic), %o0
 	/*NOTREACHED*/
 	retl
-	nop
+	  nop
 #endif
 
 #if defined(lint)
@@ -194,7 +195,7 @@ tickcmpr_disabled(void)
 	ENTRY_NP(tickcmpr_disabled)
 	RD_TICKCMPR(%g1, %o0)
 	retl
-	srlx	%g1, TICKINT_DIS_SHFT, %o0
+	  srlx	%g1, TICKINT_DIS_SHFT, %o0
 	SET_SIZE(tickcmpr_disabled)
 
 #endif  /* lint */
@@ -213,7 +214,7 @@ gettick(void)
 	ENTRY(gettick)
 	GET_NATIVE_TIME(%o0, %o2, %o3)
 	retl
-	nop
+	  nop
 	SET_SIZE(gettick)
 
 #endif  /* lint */
@@ -235,7 +236,7 @@ gettick_counter(void)
 	rdpr	%tick, %o0
 	sllx	%o0, 1, %o0
 	retl
-	srlx	%o0, 1, %o0		! shake off npt bit
+	  srlx	%o0, 1, %o0		! shake off npt bit
 	SET_SIZE(gettick_counter)
 #endif	/* lint */
 
@@ -307,13 +308,13 @@ panic_hres_tick(void)
 	GET_HRTIME(%g1, %o0, %o1, %o2, %o3, %o4, %o5, %g2)
 							! %g1 = hrtime
 	retl
-	mov	%g1, %o0
+	  mov	%g1, %o0
 	SET_SIZE(gethrtime)
 
 	ENTRY_NP(gethrtime_unscaled)
 	GET_NATIVE_TIME(%g1, %o2, %o3)			! %g1 = native time
 	retl
-	mov	%g1, %o0
+	  mov	%g1, %o0
 	SET_SIZE(gethrtime_unscaled)
 
 	ENTRY_NP(gethrtime_waitfree)
@@ -321,7 +322,7 @@ panic_hres_tick(void)
 	GET_NATIVE_TIME(%g1, %o2, %o3)			! %g1 = native time
 	NATIVE_TIME_TO_NSEC(%g1, %o2, %o3)
 	retl
-	mov	%g1, %o0
+	  mov	%g1, %o0
 	SET_SIZE(dtrace_gethrtime)
 	SET_SIZE(gethrtime_waitfree)
 
@@ -332,17 +333,17 @@ panic_hres_tick(void)
 	! hrtime_t's are signed, max hrtime_t must be positive
 	mov	-1, %o2
 	brlz,a	%g1, 1f
-	srlx	%o2, 1, %g1
+	  srlx	%o2, 1, %g1
 1:
 	retl
-	mov	%g1, %o0
+	  mov	%g1, %o0
 	SET_SIZE(gethrtime_max)
 
 	ENTRY(scalehrtime)
 	ldx	[%o0], %o1
 	NATIVE_TIME_TO_NSEC(%o1, %o2, %o3)
 	retl
-	stx	%o1, [%o0]
+	  stx	%o1, [%o0]
 	SET_SIZE(scalehrtime)
 
 /*
@@ -369,18 +370,18 @@ panic_hres_tick(void)
 	brz,pt	adj, 3f;		/* no adjustments, it's easy */	\
 	add	hrestnsec, nslt, hrestnsec; /* hrest.tv_nsec += nslt */	\
 	brlz,pn	adj, 2f;		/* if hrestime_adj negative */	\
-	srl	nslt, ADJ_SHIFT, nslt;	/* delay: nslt >>= 4 */		\
+	  srl	nslt, ADJ_SHIFT, nslt;	/* delay: nslt >>= 4 */		\
 	subcc	adj, nslt, %g0;		/* hrestime_adj - nslt/16 */	\
 	movg	%xcc, nslt, adj;	/* adj by min(adj, nslt/16) */	\
 	ba	3f;			/* go convert to sec/nsec */	\
-	add	hrestnsec, adj, hrestnsec; /* delay: apply adjustment */ \
+	  add	hrestnsec, adj, hrestnsec; /* delay: apply adjustment */ \
 2:	addcc	adj, nslt, %g0;		/* hrestime_adj + nslt/16 */	\
 	bge,a,pt %xcc, 3f;		/* is adj less negative? */	\
-	add	hrestnsec, adj, hrestnsec; /* yes: hrest.nsec += adj */	\
+	  add	hrestnsec, adj, hrestnsec; /* yes: hrest.nsec += adj */	\
 	sub	hrestnsec, nslt, hrestnsec; /* no: hrest.nsec -= nslt/16 */ \
 3:	cmp	hrestnsec, nano;	/* more than a billion? */	\
 	bl,pt	%xcc, 4f;		/* if not, we're done */	\
-	nop;				/* delay: do nothing :( */	\
+	  nop;				/* delay: do nothing :( */	\
 	add	hrestsec, 1, hrestsec;	/* hrest.tv_sec++; */		\
 	sub	hrestnsec, nano, hrestnsec; /* hrest.tv_nsec -= NANOSEC; */	\
 4:
@@ -390,7 +391,7 @@ panic_hres_tick(void)
 	CONV_HRESTIME(%o1, %o2, %o3, %o4, %o5)
 	stn	%o1, [%o0]
 	retl
-	stn	%o2, [%o0 + CLONGSIZE]
+	  stn	%o2, [%o0 + CLONGSIZE]
 	SET_SIZE(gethrestime)
 
 /*
@@ -401,7 +402,7 @@ panic_hres_tick(void)
 	GET_HRESTIME(%o0, %o2, %o3, %o4, %o5, %g1, %g2, %g3, %g4)
 	CONV_HRESTIME(%o0, %o2, %o3, %o4, %o5)
 	retl					! %o0 current hrestime seconds
-	nop
+	  nop
 	SET_SIZE(gethrestime_sec)
 
 /*
@@ -425,9 +426,9 @@ panic_hres_tick(void)
 	lduw	[%o1 + %lo(hres_lock)], %o3	! Reload lock value
 	cmp	%o3, %o2			! If lock is locked or has
 	bne	0b				!   changed, retry.
-	stn	%g1, [%o0]			! Delay: store seconds
+	  stn	%g1, [%o0]			! Delay: store seconds
 	retl
-	stn	%g2, [%o0 + CLONGSIZE]		! Delay: store nanoseconds
+	  stn	%g2, [%o0 + CLONGSIZE]		! Delay: store nanoseconds
 	SET_SIZE(gethrestime_lasttick)
 
 /*
@@ -496,13 +497,13 @@ hrtime_base_panic:
 	ldstub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5	! try locking
 7:	tst	%l5
 	bz,pt	%xcc, 8f			! if we got it, drive on
-	ld	[%l4 + %lo(nsec_scale)], %l5	! delay: %l5 = scaling factor
+	  ld	[%l4 + %lo(nsec_scale)], %l5	! delay: %l5 = scaling factor
 	ldub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5
 9:	tst	%l5
 	bz,a,pn	%xcc, 7b
-	ldstub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5
+	  ldstub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5
 	ba,pt	%xcc, 9b
-	ldub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5
+	  ldub	[%l4 + %lo(hres_lock + HRES_LOCK_OFFSET)], %l5
 8:
 	membar	#StoreLoad|#StoreStore
 
@@ -520,7 +521,7 @@ hrtime_base_panic:
 	ldx	[%l4 + %lo(hrtime_base)], %l1	
 	cmp	%l1, %l0
 	bg,pn	%xcc, 9f
-	nop
+	  nop
 
 	stx	%l0, [%l4 + %lo(hrtime_base)]	! update hrtime_base
 
@@ -531,20 +532,20 @@ hrtime_base_panic:
 	brz	%l0, 2f
 						! hrestime_adj == 0 ?
 						! yes, skip adjustments
-	clr	%l5				! delay: set adj to zero
+	  clr	%l5				! delay: set adj to zero
 	tst	%l0				! is hrestime_adj >= 0 ?
 	bge,pt	%xcc, 1f			! yes, go handle positive case
-	srl	%i1, ADJ_SHIFT, %l5		! delay: %l5 = adj
+	  srl	%i1, ADJ_SHIFT, %l5		! delay: %l5 = adj
 
 	addcc	%l0, %l5, %g0			! hrestime_adj < -adj ?
 	bl,pt	%xcc, 2f			! yes, use current adj
-	neg	%l5				! delay: %l5 = -adj
+	  neg	%l5				! delay: %l5 = -adj
 	ba,pt	%xcc, 2f
-	mov	%l0, %l5			! no, so set adj = hrestime_adj
+	  mov	%l0, %l5			! no, so set adj = hrestime_adj
 1:
 	subcc	%l0, %l5, %g0			! hrestime_adj < adj ?
 	bl,a,pt	%xcc, 2f			! yes, set adj = hrestime_adj
-	mov	%l0, %l5			! delay: adj = hrestime_adj
+	  mov	%l0, %l5			! delay: adj = hrestime_adj
 2:
 	ldx	[%l4 + %lo(timedelta)], %l0	! %l0 = timedelta
 	sub	%l0, %l5, %l0			! timedelta -= adj
@@ -561,7 +562,7 @@ hrtime_base_panic:
 	set	NANOSEC, %l5			! %l5 = NANOSEC
 	cmp	%i3, %l5
 	bl,pt	%xcc, 5f			! if hrestime.tv_nsec < NANOSEC
-	sethi	%hi(one_sec), %i1		! delay
+	  sethi	%hi(one_sec), %i1		! delay
 	add	%i2, 0x1, %i2			! hrestime.tv_sec++
 	sub	%i3, %l5, %i3			! hrestime.tv_nsec - NANOSEC
 	mov	0x1, %l5
@@ -589,7 +590,7 @@ hrtime_base_panic:
 
 	sethi	%hi(hrtime_base_panic), %o0
 	call	panic
-	or	%o0, %lo(hrtime_base_panic), %o0
+	  or	%o0, %lo(hrtime_base_panic), %o0
 
 	SET_SIZE(hres_tick)
 
@@ -605,7 +606,7 @@ kstat_q_panic_msg:
 	save	%sp, -SA(MINFRAME), %sp
 	sethi	%hi(kstat_q_panic_msg), %o0
 	call	panic
-	or	%o0, %lo(kstat_q_panic_msg), %o0
+	  or	%o0, %lo(kstat_q_panic_msg), %o0
 	/*NOTREACHED*/
 	SET_SIZE(kstat_q_panic)
 
@@ -750,7 +751,7 @@ usec_delay(int n)
 	ENTRY(drv_usecwait)
 	ALTENTRY(usec_delay)
 	brlez,a,pn %o0, 0f
-	mov	1, %o0
+	  mov	1, %o0
 0:
 	sethi	%hi(sticks_per_usec), %o1
 	lduw	[%o1 + %lo(sticks_per_usec)], %o1
@@ -762,9 +763,9 @@ usec_delay(int n)
 1:	cmp	%o1, %o2
 	GET_NATIVE_TIME(%o2, %o3, %o4)
 	bgeu,pt	%xcc, 1b
-	nop
+	  nop
 	retl
-	nop
+	  nop
 	SET_SIZE(usec_delay)
 	SET_SIZE(drv_usecwait)
 #endif	/* lint */
@@ -789,12 +790,12 @@ pil14_interrupt(int level)
 	rdpr	%tpc, %g5
 	btst	TSTATE_PRIV, %g6		! trap from supervisor mode?
 	bnz,a,pt %xcc, 1f
-	stn	%g5, [%g1 + CPU_PROFILE_PC]	! if so, record kernel PC
+	  stn	%g5, [%g1 + CPU_PROFILE_PC]	! if so, record kernel PC
 	stn	%g5, [%g1 + CPU_PROFILE_UPC]	! if not, record user PC
 	ba	pil_interrupt_common		! must be large-disp branch
-	stn	%g0, [%g1 + CPU_PROFILE_PC]	! zero kernel PC
+	  stn	%g0, [%g1 + CPU_PROFILE_PC]	! zero kernel PC
 1:	ba	pil_interrupt_common		! must be large-disp branch
-	stn	%g0, [%g1 + CPU_PROFILE_UPC]	! zero user PC
+	  stn	%g0, [%g1 + CPU_PROFILE_UPC]	! zero user PC
 	SET_SIZE(pil14_interrupt)
 
 	ENTRY_NP(tick_rtt)
@@ -813,7 +814,7 @@ pil14_interrupt(int level)
 	RD_TICKCMPR(%o5, %g1)
 	srlx	%o5, TICKINT_DIS_SHFT, %g1
 	brnz,pt	%g1, 2f
-	nop
+	  nop
 
 	rdpr 	%pstate, %g5
 	andn	%g5, PSTATE_IE, %g1
@@ -822,14 +823,14 @@ pil14_interrupt(int level)
 	sethi	%hi(cbe_level14_inum), %o1
 	ld	[%o1 + %lo(cbe_level14_inum)], %o1
 	call	intr_enqueue_req ! preserves %o5 and %g5
-	mov	PIL_14, %o0
+	  mov	PIL_14, %o0
 
 	! Check SOFTINT for TICKINT/STICKINT
 	rd	SOFTINT, %o4
 	set	(TICK_INT_MASK | STICK_INT_MASK), %o0
 	andcc	%o4, %o0, %g0
 	bz,a,pn	%icc, 2f
-	wrpr	%g0, %g5, %pstate		! Enable vec interrupts
+	  wrpr	%g0, %g5, %pstate		! Enable vec interrupts
 
 	! clear TICKINT/STICKINT
 	wr	%o0, CLEAR_SOFTINT
@@ -844,7 +845,7 @@ pil14_interrupt(int level)
 	srlx	%o0, 1, %o0
 	cmp	%o5, %o0			! In the future?
 	bg,a,pt	%xcc, 2f			! Yes, drive on.
-	wrpr	%g0, %g5, %pstate		!   delay: enable vec intr
+	  wrpr	%g0, %g5, %pstate		!   delay: enable vec intr
 
 	!
 	! If we're here, then we have programmed TICK_COMPARE with a %tick
@@ -859,12 +860,12 @@ pil14_interrupt(int level)
 	srlx	%o0, 1, %o0
 	cmp	%o5, %o0			! In the future?
 	bg,a,pt	%xcc, 2f			! Yes, drive on.
-	wrpr	%g0, %g5, %pstate		!    delay: enable vec intr
+	  wrpr	%g0, %g5, %pstate		!    delay: enable vec intr
 	ba	1b				! No, try again.
-	sllx	%o4, 1, %o4			!    delay: double step size
+	  sllx	%o4, 1, %o4			!    delay: double step size
 
 2:	ba	current_thread_complete
-	nop
+	  nop
 	SET_SIZE(tick_rtt)
 
 #endif /* lint */
@@ -888,12 +889,12 @@ prefetch_page_r(void *pp)
 /* XXXQ These should be inline templates, not functions */
         ENTRY(prefetch_page_w)
         retl
-	nop
+	  nop
         SET_SIZE(prefetch_page_w)
 
         ENTRY(prefetch_page_r)
         retl
-	nop
+	  nop
         SET_SIZE(prefetch_page_r)
 
 #endif	/* lint */
@@ -911,7 +912,7 @@ prefetch_smap_w(void *smp)
 /* XXXQ These should be inline templates, not functions */
 	ENTRY(prefetch_smap_w)
 	retl
-	nop
+	  nop
 	SET_SIZE(prefetch_smap_w)
 
 #endif	/* lint */
@@ -924,12 +925,7 @@ prefetch_smap_w(void *smp)
 
 /*ARGSUSED*/
 void
-vtag_flushpage(caddr_t vaddr, uint_t ctxnum)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushctx(uint_t ctxnum)
+vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
 {}
 
 /*ARGSUSED*/
@@ -944,17 +940,12 @@ vtag_unmap_perm_tl1(uint64_t vaddr, uint64_t ctxnum)
 
 /*ARGSUSED*/
 void
-vtag_flushpage_tl1(uint64_t vaddr, uint64_t ctxnum)
+vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
 {}
 
 /*ARGSUSED*/
 void
-vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t ctx_pgcnt)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushctx_tl1(uint64_t ctxnum, uint64_t dummy)
+vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
 {}
 
 /*ARGSUSED*/
@@ -984,39 +975,21 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	 * flush page from the tlb
 	 *
 	 * %o0 = vaddr
-	 * %o1 = ctxnum
+	 * %o1 = sfmmup
 	 */
+	SFMMU_CPU_CNUM(%o1, %g1, %g2)   /* %g1 = sfmmu cnum on this CPU */
+
+	mov	%g1, %o1 
 	mov	MAP_ITLB | MAP_DTLB, %o2
 	ta	MMU_UNMAP_ADDR
 	brz,pt	%o0, 1f
-	nop
+	  nop
 	ba	panic_bad_hcall
-	mov	MMU_UNMAP_ADDR, %o1
+	  mov	MMU_UNMAP_ADDR, %o1
 1:
  	retl
-	nop
-	SET_SIZE(vtag_flushpage)
-
-	ENTRY_NP(vtag_flushctx)
-	/*
-	 * flush context from the tlb
-	 *
-	 * %o0 = ctxnum
-	 */
-	mov	%o0, %o2
-	mov	%g0, %o0	! XXXQ no cpu list yet
-	mov	%g0, %o1	! XXXQ no cpu list yet
-	mov	MAP_ITLB | MAP_DTLB, %o3
-	mov	MMU_DEMAP_CTX, %o5
-	ta	FAST_TRAP
-	brz,pt	%o0, 1f
-	nop
-	ba	panic_bad_hcall
-	mov	MMU_DEMAP_CTX, %o1
-1:
-	retl
 	  nop
-	SET_SIZE(vtag_flushctx)
+	SET_SIZE(vtag_flushpage)
 
 	ENTRY_NP(vtag_flushall)
 	mov	%g0, %o0	! XXX no cpu list yet
@@ -1025,19 +998,19 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	mov	MMU_DEMAP_ALL, %o5
 	ta	FAST_TRAP
 	brz,pt	%o0, 1f
-	nop
+	  nop
 	ba	panic_bad_hcall
-	mov	MMU_DEMAP_ALL, %o1
+	  mov	MMU_DEMAP_ALL, %o1
 1:
 	retl
-	nop
+	  nop
 	SET_SIZE(vtag_flushall)
 
 	ENTRY_NP(vtag_unmap_perm_tl1)
 	/*
 	 * x-trap to unmap perm map entry
 	 * %g1 = vaddr
-	 * %g2 = ctxnum
+	 * %g2 = ctxnum (KCONTEXT only)
 	 */
 	mov	%o0, %g3
 	mov	%o1, %g4
@@ -1073,7 +1046,7 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	 * x-trap to flush page from tlb and tsb
 	 *
 	 * %g1 = vaddr, zero-extended on 32-bit kernel
-	 * %g2 = ctxnum
+	 * %g2 = sfmmup
 	 *
 	 * assumes TSBE_TAG = 0
 	 */
@@ -1082,13 +1055,15 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	mov	%o0, %g3
 	mov	%o1, %g4
 	mov	%o2, %g5
-	mov	%g1, %o0			! vaddr
-	mov	%g2, %o1			! ctx
+	mov	%g1, %o0			/* vaddr */
+
+	SFMMU_CPU_CNUM(%g2, %o1, %g6)   /* %o1 = sfmmu cnum on this CPU */
+
 	mov	MAP_ITLB | MAP_DTLB, %o2
 	ta	MMU_UNMAP_ADDR
 	brz,pt	%o0, 1f
 	nop
-	ba	ptl1_panic
+	  ba	ptl1_panic
 	mov	PTL1_BAD_HCALL, %g1
 1:
 	mov	%g5, %o2
@@ -1103,7 +1078,7 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	 * x-trap to flush pgcnt MMU_PAGESIZE pages from tlb
 	 *
 	 * %g1 = vaddr, zero-extended on 32-bit kernel
-	 * %g2 = <zero32|ctx16|pgcnt16>
+	 * %g2 = <sfmmup58|pgcnt6>, (pgcnt - 1) is pass'ed in via pgcnt6 bits.
 	 *
 	 * NOTE: this handler relies on the fact that no
 	 *	interrupts or traps can occur during the loop
@@ -1119,24 +1094,28 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	mov	%o1, %g4
 	mov	%o2, %g5
 
-	set	0xffff, %g6
-	and	%g6, %g2, %g7			/* g7 = pgcnt */
-	srln	%g2, 16, %g2			/* g2 = ctxnum */
+	and	%g2, SFMMU_PGCNT_MASK, %g7	/* g7 = pgcnt - 1 */
+	add	%g7, 1, %g7			/* g7 = pgcnt */
 
-	set	MMU_PAGESIZE, %g6		/* g2 = pgsize */
-1:
-	mov	%g1, %o0			! vaddr
-	mov	%g2, %o1			! ctx
+        andn    %g2, SFMMU_PGCNT_MASK, %o0      /* %o0 = sfmmup */
+
+	SFMMU_CPU_CNUM(%o0, %g2, %g6)    /* %g2 = sfmmu cnum on this CPU */
+
+	set	MMU_PAGESIZE, %g6		/* g6 = pgsize */
+
+1:	
+	mov	%g1, %o0			/* vaddr */
+	mov	%g2, %o1			/* cnum */
 	mov	MAP_ITLB | MAP_DTLB, %o2
 	ta	MMU_UNMAP_ADDR
 	brz,pt	%o0, 2f
-	nop
+	  nop
 	ba	ptl1_panic
-	mov	PTL1_BAD_HCALL, %g1
+	  mov	PTL1_BAD_HCALL, %g1
 2:
 	deccc	%g7				/* decr pgcnt */
 	bnz,pt	%icc,1b
-	add	%g1, %g6, %g1			/* go to nextpage */
+	  add	%g1, %g6, %g1			/* go to nextpage */
 
 	mov	%g5, %o2
 	mov	%g4, %o1
@@ -1144,37 +1123,6 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	membar #Sync
 	retry
 	SET_SIZE(vtag_flush_pgcnt_tl1)
-
-	ENTRY_NP(vtag_flushctx_tl1)
-	/*
-	 * x-trap to flush context from tlb
-	 *
-	 * %g1 = ctxnum
-	 */
-	mov	%o0, %g3
-	mov	%o1, %g4
-	mov	%o2, %g5
-	mov	%o3, %g6
-	mov	%o5, %g7
-	mov	%g1, %o2
-	mov	%g0, %o0	! XXXQ no cpu list yet
-	mov	%g0, %o1	! XXXQ no cpu list yet
-	mov	MAP_ITLB | MAP_DTLB, %o3
-	mov	MMU_DEMAP_CTX, %o5
-	ta	FAST_TRAP
-	brz,pt	%o0, 1f
-	nop
-	ba	ptl1_panic
-	mov	PTL1_BAD_HCALL, %g1
-1:
-	mov	%g7, %o5
-	mov	%g6, %o3
-	mov	%g5, %o2
-	mov	%g4, %o1
-	mov	%g3, %o0
-	membar #Sync
-	retry
-	SET_SIZE(vtag_flushctx_tl1)
 
 	! Not implemented on US1/US2
 	ENTRY_NP(vtag_flushall_tl1)
@@ -1189,9 +1137,9 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	mov	MMU_DEMAP_ALL, %o5
 	ta	FAST_TRAP
 	brz,pt	%o0, 1f
-	nop
+	  nop
 	ba	ptl1_panic
-	mov	PTL1_BAD_HCALL, %g1
+	  mov	PTL1_BAD_HCALL, %g1
 1:
 	mov	%g7, %o5
 	mov	%g6, %o3	! XXXQ not used?
@@ -1220,7 +1168,7 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	 */
 	! XXXQ
 	retl
-	nop
+	  nop
 	SET_SIZE(vac_flushpage)
 
 	ENTRY_NP(vac_flushpage_tl1)
@@ -1264,10 +1212,10 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	flush	%o0
 	subcc	%o1, ICACHE_FLUSHSZ, %o1		! bytes = bytes-0x20
 	bgu,pt	%ncc, 1b
-	add	%o0, ICACHE_FLUSHSZ, %o0		! vaddr = vaddr+0x20
+	  add	%o0, ICACHE_FLUSHSZ, %o0		! vaddr = vaddr+0x20
 
 	retl
-	nop
+	  nop
 	SET_SIZE(flush_instr_mem)
 
 #endif /* !lint */

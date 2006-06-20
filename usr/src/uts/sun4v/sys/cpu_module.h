@@ -69,12 +69,12 @@ int	mmu_init_mmu_page_sizes(int cinfo);
 /*
  * virtual demap flushes (tlbs & virtual tag caches)
  */
-void	vtag_flushpage(caddr_t addr, uint_t ctx);
-void	vtag_flushctx(uint_t ctx);
+void	vtag_flushpage(caddr_t addr, uint64_t sfmmup);
 void	vtag_flushall(void);
-void	vtag_flushpage_tl1(uint64_t addr, uint64_t ctx);
-void	vtag_flush_pgcnt_tl1(uint64_t addr, uint64_t ctx_pgcnt);
-void	vtag_flushctx_tl1(uint64_t ctx, uint64_t dummy);
+#pragma weak vtag_flushall_uctxs
+void    vtag_flushall_uctxs(void);
+void	vtag_flushpage_tl1(uint64_t addr,  uint64_t sfmmup);
+void	vtag_flush_pgcnt_tl1(uint64_t addr, uint64_t sfmmup_pgcnt);
 void	vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2);
 void	vtag_unmap_perm_tl1(uint64_t addr, uint64_t ctx);
 
@@ -85,12 +85,6 @@ void	vac_flushpage(pfn_t pf, int color);
 void	vac_flushpage_tl1(uint64_t pf, uint64_t color);
 void	vac_flushcolor(int color, pfn_t pf);
 void	vac_flushcolor_tl1(uint64_t color, uint64_t dummy);
-
-/*
- * Calculate, set optimal dtlb pagesize, for ISM and mpss, to support
- * cpus with non-fully-associative dtlbs.
- */
-extern uchar_t *ctx_pgsz_array;
 
 /*
  * flush instruction cache if needed

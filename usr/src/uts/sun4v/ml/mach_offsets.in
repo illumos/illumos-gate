@@ -134,12 +134,14 @@ trap_trace_record	TRAP_ENT_SIZE
 htrap_trace_record	HTRAP_ENT_SIZE
 
 hat	HAT_SIZE
-	sfmmu_cnum
 	sfmmu_cpusran
 	sfmmu_tsb
 	sfmmu_ismblkpa
 	sfmmu_flags
 	sfmmu_hvblock
+	sfmmu_cext
+	sfmmu_ctx_lock
+	sfmmu_ctxs
 
 sfmmu_global_stat HATSTAT_SIZE
 	sf_pagefaults		HATSTAT_PAGEFAULT
@@ -147,9 +149,6 @@ sfmmu_global_stat HATSTAT_SIZE
 	sf_uhash_links		HATSTAT_UHASH_LINKS
 	sf_khash_searches	HATSTAT_KHASH_SEARCH
 	sf_khash_links		HATSTAT_KHASH_LINKS
-
-ctx	CTX_SIZE		CTX_SZ_SHIFT
-	ctx_un.ctx_sfmmup	CTX_SFMMUP
 
 sf_hment	SFHME_SIZE	SFHME_SHIFT
 	hme_tte		SFHME_TTE

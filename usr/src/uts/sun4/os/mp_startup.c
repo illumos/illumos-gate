@@ -431,6 +431,12 @@ setup_cpu_common(int cpuid)
 	chip_cpu_init(cp);
 
 	cpu_intrq_setup(cp);
+
+	/*
+	 * Initialize MMU context domain information.
+	 */
+	sfmmu_cpu_init(cp);
+
 }
 
 /*
@@ -522,6 +528,7 @@ cleanup_cpu_common(int cpuid)
 	 */
 	disp_cpu_fini(cp);
 	cpu_pa[cpuid] = 0;
+	sfmmu_cpu_cleanup(cp);
 	bzero(cp, sizeof (*cp));
 
 	/*

@@ -64,6 +64,7 @@
 #include <sys/traptrace.h>
 #include <sys/memnode.h>
 #include <sys/mem_cage.h>
+#include <sys/mmu.h>
 
 extern void setup_trap_table(void);
 extern void cpu_intrq_setup(struct cpu *);
@@ -2684,10 +2685,8 @@ char obp_tte_str[] =
 	"h# %p constant khme_hash "
 	"h# %x constant UHMEHASH_SZ "
 	"h# %x constant KHMEHASH_SZ "
+	"h# %p constant KCONTEXT "
 	"h# %p constant KHATID "
-	"h# %x constant CTX_SIZE "
-	"h# %x constant CTX_SFMMU "
-	"h# %p constant ctxs "
 	"h# %x constant ASI_MEM "
 
 	": PHYS-X@ ( phys -- data ) "
@@ -2754,11 +2753,6 @@ char obp_tte_str[] =
 	"   until r> drop 						  "
 	"; "
 
-	": CNUM_TO_SFMMUP ( cnum -- sfmmup ) "
-	"   CTX_SIZE * ctxs + CTX_SFMMU + "
-	"x@ "
-	"; "
-
 	": HME_HASH_TAG ( sfmmup rehash addr -- hblktag ) "
 	"   over HME_HASH_SHIFT HME_HASH_BSPAGE      ( sfmmup rehash bspage ) "
 	"   HTAG_REHASHSZ << or nip		     ( hblktag ) "
@@ -2776,7 +2770,12 @@ char obp_tte_str[] =
 	"; "
 
 	": unix-tte ( addr cnum -- false | tte-data true ) "
-	"      CNUM_TO_SFMMUP                 ( addr sfmmup ) "
+	"    KCONTEXT = if                   ( addr ) "
+	"	KHATID                       ( addr khatid ) "
+	"    else                            ( addr ) "
+	"       drop false exit              ( false ) "
+	"    then "
+	"      ( addr khatid ) "
 	"      mmu_hashcnt 1+ 1  do           ( addr sfmmup ) "
 	"         2dup swap i HME_HASH_SHIFT  "
 					"( addr sfmmup sfmmup addr hmeshift ) "
@@ -2835,10 +2834,8 @@ create_va_to_tte(void)
 	    (caddr_t)va_to_pa((caddr_t)khme_hash),
 	    UHMEHASH_SZ,
 	    KHMEHASH_SZ,
+	    KCONTEXT,
 	    KHATID,
-	    sizeof (struct ctx),
-	    OFFSET(struct ctx, ctx_sfmmu),
-	    ctxs,
 	    ASI_MEM);
 	prom_interpret(bp, 0, 0, 0, 0, 0);
 

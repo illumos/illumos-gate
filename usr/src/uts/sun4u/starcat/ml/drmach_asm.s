@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -602,12 +601,16 @@ drmach_rename_end:
 	ldx	[%g1], %g1
 	or	%g1, KCONTEXT, %g2	! preserve %g1
 	set	MMU_TAG_ACCESS, %g4
-	sethi	%hi(ctx_pgsz_array), %g6
-	ldn	[%g6 + %lo(ctx_pgsz_array)], %g6
+	set	cpu_impl_dual_pgsz, %g6 
+	ld      [%g6], %g6 
 	brz	%g6, 1f
 	  nop
-	ldub	[%g6 + KCONTEXT], %g6
-	sll	%g6, TAGACCEXT_SHIFT, %g6
+	
+	sethi	%hi(ksfmmup), %g6
+	ldx	[%g6 + %lo(ksfmmup)], %g6
+	ldub    [%g6 + SFMMU_CEXT], %g6
+        sll     %g6, TAGACCEXT_SHIFT, %g6
+
 	set	MMU_TAG_ACCESS_EXT, %g7
 	stxa	%g6, [%g7]ASI_DMMU
 1:

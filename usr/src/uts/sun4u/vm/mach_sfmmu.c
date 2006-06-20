@@ -204,7 +204,7 @@ sfmmu_clear_user_tsbs()
 	va = utsb_vabase;
 	end_va = va + tsb_slab_size;
 	while (va < end_va) {
-		vtag_flushpage(va, KCONTEXT);
+		vtag_flushpage(va, (uint64_t)ksfmmup);
 		va += MMU_PAGESIZE;
 	}
 
@@ -212,7 +212,7 @@ sfmmu_clear_user_tsbs()
 	va = utsb4m_vabase;
 	end_va = va + tsb_slab_size;
 	while (va < end_va) {
-		vtag_flushpage(va, KCONTEXT);
+		vtag_flushpage(va, (uint64_t)ksfmmup);
 		va += MMU_PAGESIZE;
 	}
 }
@@ -294,18 +294,18 @@ kdi_tlb_page_lock(caddr_t va, int do_dtlb)
 	tte.tte_intlo = TTE_PFN_INTLO(pfn) | TTE_LCK_INT | TTE_CP_INT |
 	    TTE_PRIV_INT | TTE_HWWR_INT;
 
-	vtag_flushpage(va, KCONTEXT);
+	vtag_flushpage(va, (uint64_t)ksfmmup);
 
-	sfmmu_itlb_ld(va, KCONTEXT, &tte);
+	sfmmu_itlb_ld_kva(va, &tte);
 	if (do_dtlb)
-		sfmmu_dtlb_ld(va, KCONTEXT, &tte);
+		sfmmu_dtlb_ld_kva(va, &tte);
 }
 
 /*ARGSUSED*/
 void
 kdi_tlb_page_unlock(caddr_t va, int do_dtlb)
 {
-	vtag_flushpage(va, KCONTEXT);
+	vtag_flushpage(va, (uint64_t)ksfmmup);
 }
 
 /* clear user TSB information (applicable to hardware TSB walkers) */

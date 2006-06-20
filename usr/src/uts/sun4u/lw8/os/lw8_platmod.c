@@ -126,13 +126,12 @@ int serengeti_tsb_spares = (SG_MAX_IO_BDS * SG_SCHIZO_PER_IO_BD *
 	IOMMU_PER_SCHIZO);
 
 /*
- * sg_max_ncpus is the maximum number of CPUs supported on Serengeti
- * and Wildcat at GA.  We assume that the maximum number of SSM nodes
- * supported at GA is 4.  sg_max_ncpus is set to be smaller than NCPU
- * to reduce the amount of memory the logs take up until we have a
- * dynamic log memory allocation solution.
+ * sg_max_ncpus is the maximum number of CPUs supported on lw8.
+ * sg_max_ncpus is set to be smaller than NCPU to reduce the amount of
+ * memory the logs take up until we have a dynamic log memory allocation
+ * solution.
  */
-int sg_max_ncpus = (24 * 4);	/* (CPUs per node * max number of nodes) */
+int sg_max_ncpus = (12 * 2);    /* (max # of processors * # of cores/proc) */
 
 /*
  * variables to control mailbox message timeouts.

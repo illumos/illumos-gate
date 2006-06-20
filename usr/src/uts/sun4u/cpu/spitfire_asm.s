@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -195,6 +194,119 @@
 	sub	tmp, linesize, tmp;					\
 1:
 
+#ifdef SF_ERRATA_32
+#define SF_WORKAROUND(tmp1, tmp2)                               \
+        sethi   %hi(FLUSH_ADDR), tmp2                           ;\
+        set     MMU_PCONTEXT, tmp1                              ;\
+        stxa    %g0, [tmp1]ASI_DMMU                             ;\
+        flush   tmp2                                            ;
+#else
+#define SF_WORKAROUND(tmp1, tmp2)
+#endif /* SF_ERRATA_32 */
+
+/*
+ * arg1 = vaddr
+ * arg2 = ctxnum
+ *      - disable interrupts and clear address mask
+ *        to access 64 bit physaddr
+ *      - Blow out the TLB, flush user page.
+ *        . use secondary context.
+ */
+#define VTAG_FLUSHUPAGE(lbl, arg1, arg2, tmp1, tmp2, tmp3, tmp4) \
+        rdpr    %pstate, tmp1                                   ;\
+        andn    tmp1, PSTATE_IE, tmp2				;\
+        wrpr    tmp2, 0, %pstate                                ;\
+        sethi   %hi(FLUSH_ADDR), tmp2                           ;\
+        set     MMU_SCONTEXT, tmp3                              ;\
+        ldxa    [tmp3]ASI_DMMU, tmp4                            ;\
+        or      DEMAP_SECOND | DEMAP_PAGE_TYPE, arg1, arg1      ;\
+        cmp     tmp4, arg2                                      ;\
+        be,a,pt %icc, lbl/**/4                                  ;\
+          nop                                                   ;\
+        stxa    arg2, [tmp3]ASI_DMMU                            ;\
+lbl/**/4:                                                       ;\
+        stxa    %g0, [arg1]ASI_DTLB_DEMAP                       ;\
+        stxa    %g0, [arg1]ASI_ITLB_DEMAP                       ;\
+        flush   tmp2                                            ;\
+        be,a,pt %icc, lbl/**/5                                  ;\
+          nop                                                   ;\
+        stxa    tmp4, [tmp3]ASI_DMMU                            ;\
+        flush   tmp2                                            ;\
+lbl/**/5:                                                       ;\
+        wrpr    %g0, tmp1, %pstate
+
+	
+/*
+ * macro that flushes all the user entries in dtlb
+ * arg1 = dtlb entries
+ *	- Before first compare:
+ *              tmp4 = tte
+ *              tmp5 = vaddr
+ *              tmp6 = cntxnum
+ */
+#define DTLB_FLUSH_UNLOCKED_UCTXS(lbl, arg1, tmp1, tmp2, tmp3, \
+                                tmp4, tmp5, tmp6) \
+lbl/**/0:                                                       ;\
+        sllx    arg1, 3, tmp3                                   ;\
+        SF_WORKAROUND(tmp1, tmp2)                               ;\
+        ldxa    [tmp3]ASI_DTLB_ACCESS, tmp4                     ;\
+        srlx    tmp4, 6, tmp4                                   ;\
+        andcc   tmp4, 1, %g0                                    ;\
+        bnz,pn  %xcc, lbl/**/1                                  ;\
+        srlx    tmp4, 57, tmp4                                  ;\
+        andcc   tmp4, 1, %g0                                    ;\
+        beq,pn  %xcc, lbl/**/1                                  ;\
+          nop                                                   ;\
+        set     TAGREAD_CTX_MASK, tmp1                          ;\
+        ldxa    [tmp3]ASI_DTLB_TAGREAD, tmp2                    ;\
+        and     tmp2, tmp1, tmp6                                ;\
+        andn    tmp2, tmp1, tmp5                                ;\
+	set	KCONTEXT, tmp4					;\
+	cmp	tmp6, tmp4					;\
+	be	lbl/**/1					;\
+	  nop							;\
+        VTAG_FLUSHUPAGE(VD/**/lbl, tmp5, tmp6, tmp1, tmp2, tmp3, tmp4) ;\
+lbl/**/1:                                                       ;\
+        brgz,pt arg1, lbl/**/0                                  ;\
+          sub     arg1, 1, arg1
+
+
+/*
+ * macro that flushes all the user entries in itlb	
+ * arg1 = itlb entries
+ *      - Before first compare:
+ *              tmp4 = tte
+ *              tmp5 = vaddr
+ *              tmp6 = cntxnum
+ */
+#define ITLB_FLUSH_UNLOCKED_UCTXS(lbl, arg1, tmp1, tmp2, tmp3, \
+                                tmp4, tmp5, tmp6) \
+lbl/**/0:                                                       ;\
+        sllx    arg1, 3, tmp3                                   ;\
+        SF_WORKAROUND(tmp1, tmp2)                               ;\
+        ldxa    [tmp3]ASI_ITLB_ACCESS, tmp4                     ;\
+        srlx    tmp4, 6, tmp4                                   ;\
+        andcc   tmp4, 1, %g0                                    ;\
+        bnz,pn  %xcc, lbl/**/1                                  ;\
+        srlx    tmp4, 57, tmp4                                  ;\
+        andcc   tmp4, 1, %g0                                    ;\
+        beq,pn  %xcc, lbl/**/1                                  ;\
+          nop                                                   ;\
+        set     TAGREAD_CTX_MASK, tmp1                          ;\
+        ldxa    [tmp3]ASI_ITLB_TAGREAD, tmp2                    ;\
+        and     tmp2, tmp1, tmp6                                ;\
+        andn    tmp2, tmp1, tmp5                                ;\
+	set	KCONTEXT, tmp4					;\
+	cmp	tmp6, tmp4					;\
+	be	lbl/**/1					;\
+	  nop							;\
+        VTAG_FLUSHUPAGE(VI/**/lbl, tmp5, tmp6, tmp1, tmp2, tmp3, tmp4) ;\
+lbl/**/1:                                                       ;\
+        brgz,pt arg1, lbl/**/0                                  ;\
+        sub     arg1, 1, arg1
+
+
+	
 /*
  * Macro for getting to offset from 'cpu_private' ptr. The 'cpu_private'
  * ptr is in the machcpu structure.
@@ -245,32 +357,27 @@
 
 /*ARGSUSED*/
 void
-vtag_flushpage(caddr_t vaddr, uint_t ctxnum)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushctx(uint_t ctxnum)
+vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
 {}
 
 /*ARGSUSED*/
 void
 vtag_flushall(void)
 {}
-
+	
 /*ARGSUSED*/
 void
-vtag_flushpage_tl1(uint64_t vaddr, uint64_t ctxnum)
+vtag_flushall_uctxs(void)
+{}
+		
+/*ARGSUSED*/
+void
+vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
 {}
 
 /*ARGSUSED*/
 void
-vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t ctx_pgcnt)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushctx_tl1(uint64_t ctxnum, uint64_t dummy)
+vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
 {}
 
 /*ARGSUSED*/
@@ -341,20 +448,11 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize,
 	 * flush page from the tlb
 	 *
 	 * %o0 = vaddr
-	 * %o1 = ctxnum
+	 * %o1 = sfmmup
 	 */
 	rdpr	%pstate, %o5
 #ifdef DEBUG
-	andcc	%o5, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,a,pt %icc, 3f			/* disabled, panic */
-	nop
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	  or	%o0, %lo(sfmmu_panic1), %o0
-	ret
-	restore
-3:
+	PANIC_IF_INTR_DISABLED_PSTR(%o5, sfdi_label1, %g1)
 #endif /* DEBUG */
 	/*
 	 * disable ints
@@ -367,34 +465,40 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize,
 	 * Interrupts are disabled to prevent the secondary ctx register
 	 * from changing underneath us.
 	 */
-	brnz,pt	%o1, 1f			/* KCONTEXT? */
-	sethi	%hi(FLUSH_ADDR), %o3
+	sethi   %hi(ksfmmup), %o3
+        ldx     [%o3 + %lo(ksfmmup)], %o3
+        cmp     %o3, %o1
+        bne,pt   %xcc, 1f			! if not kernel as, go to 1
+	  sethi	%hi(FLUSH_ADDR), %o3
 	/*
 	 * For KCONTEXT demaps use primary. type = page implicitly
 	 */
 	stxa	%g0, [%o0]ASI_DTLB_DEMAP	/* dmmu flush for KCONTEXT */
 	stxa	%g0, [%o0]ASI_ITLB_DEMAP	/* immu flush for KCONTEXT */
+	flush	%o3
 	b	5f
-	  flush	%o3
+	  nop
 1:
 	/*
 	 * User demap.  We need to set the secondary context properly.
 	 * %o0 = vaddr
-	 * %o1 = ctxnum
+	 * %o1 = sfmmup
 	 * %o3 = FLUSH_ADDR
 	 */
+	SFMMU_CPU_CNUM(%o1, %g1, %g2)	/* %g1 = sfmmu cnum on this CPU */
+	
 	set	MMU_SCONTEXT, %o4
 	ldxa	[%o4]ASI_DMMU, %o2		/* rd old ctxnum */
 	or	DEMAP_SECOND | DEMAP_PAGE_TYPE, %o0, %o0
-	cmp	%o2, %o1
-	be,a,pt	%icc, 4f
+	cmp	%o2, %g1
+	be,pt	%icc, 4f
 	  nop
-	stxa	%o1, [%o4]ASI_DMMU		/* wr new ctxum */
+	stxa	%g1, [%o4]ASI_DMMU		/* wr new ctxum */
 4:
 	stxa	%g0, [%o0]ASI_DTLB_DEMAP
 	stxa	%g0, [%o0]ASI_ITLB_DEMAP
 	flush	%o3
-	be,a,pt	%icc, 5f
+	be,pt	%icc, 5f
 	  nop
 	stxa	%o2, [%o4]ASI_DMMU		/* restore old ctxnum */
 	flush	%o3
@@ -402,75 +506,65 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize,
 	retl
 	  wrpr	%g0, %o5, %pstate		/* enable interrupts */
 	SET_SIZE(vtag_flushpage)
-
-	ENTRY_NP(vtag_flushctx)
-	/*
-	 * flush context from the tlb
-	 *
-	 * %o0 = ctxnum
-	 * We disable interrupts to prevent the secondary ctx register changing
-	 * underneath us.
-	 */
-	sethi	%hi(FLUSH_ADDR), %o3
-	set	DEMAP_CTX_TYPE | DEMAP_SECOND, %g1
-	rdpr	%pstate, %o2
-
-#ifdef DEBUG
-	andcc	%o2, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,a,pt %icc, 1f			/* disabled, panic	 */
-	  nop
-	sethi	%hi(sfmmu_panic1), %o0
-	call	panic
-	  or	%o0, %lo(sfmmu_panic1), %o0
-1:
-#endif /* DEBUG */
-
-	wrpr	%o2, PSTATE_IE, %pstate		/* disable interrupts */
-	set	MMU_SCONTEXT, %o4
-	ldxa	[%o4]ASI_DMMU, %o5		/* rd old ctxnum */
-	cmp	%o5, %o0
-	be,a,pt	%icc, 4f
-	  nop
-	stxa	%o0, [%o4]ASI_DMMU		/* wr new ctxum */
-4:
-	stxa	%g0, [%g1]ASI_DTLB_DEMAP
-	stxa	%g0, [%g1]ASI_ITLB_DEMAP
-	flush	%o3
-	be,a,pt	%icc, 5f
-	  nop
-	stxa	%o5, [%o4]ASI_DMMU		/* restore old ctxnum */
-	flush	%o3
-5:
-	retl
-	  wrpr	%g0, %o2, %pstate		/* enable interrupts */
-	SET_SIZE(vtag_flushctx)
-
-	.seg	".text"
+	
+        .seg    ".text"
 .flushallmsg:
-	.asciz	"sfmmu_asm: unimplemented flush operation"
+        .asciz  "sfmmu_asm: unimplemented flush operation"
 
-	ENTRY_NP(vtag_flushall)
-	sethi	%hi(.flushallmsg), %o0
-	call	panic
-	  or	%o0, %lo(.flushallmsg), %o0
-	SET_SIZE(vtag_flushall)
+        ENTRY_NP(vtag_flushall)
+        sethi   %hi(.flushallmsg), %o0
+        call    panic
+          or    %o0, %lo(.flushallmsg), %o0
+        SET_SIZE(vtag_flushall)
+
+	ENTRY_NP(vtag_flushall_uctxs)
+	/*
+	 * flush entire DTLB/ITLB.
+	 */
+	CPU_INDEX(%g1, %g2)
+	mulx	%g1, CPU_NODE_SIZE, %g1
+	set	cpunodes, %g2
+	add	%g1, %g2, %g1
+	lduh	[%g1 + ITLB_SIZE], %g2		! %g2 = # entries in ITLB
+	lduh	[%g1 + DTLB_SIZE], %g1		! %g1 = # entries in DTLB
+	sub	%g2, 1, %g2			! %g2 = # entries in ITLB - 1
+	sub	%g1, 1, %g1			! %g1 = # entries in DTLB - 1
+
+        !
+        ! Flush itlb's
+        !
+        ITLB_FLUSH_UNLOCKED_UCTXS(I, %g2, %g3, %g4, %o2, %o3, %o4, %o5)
+
+	!
+        ! Flush dtlb's
+        !
+        DTLB_FLUSH_UNLOCKED_UCTXS(D, %g1, %g3, %g4, %o2, %o3, %o4, %o5)
+
+	membar  #Sync
+	retl
+	  nop
+	
+	SET_SIZE(vtag_flushall_uctxs)
 
 	ENTRY_NP(vtag_flushpage_tl1)
 	/*
 	 * x-trap to flush page from tlb and tsb
 	 *
 	 * %g1 = vaddr, zero-extended on 32-bit kernel
-	 * %g2 = ctxnum
+	 * %g2 = sfmmup
 	 *
 	 * assumes TSBE_TAG = 0
 	 */
 	srln	%g1, MMU_PAGESHIFT, %g1
 	slln	%g1, MMU_PAGESHIFT, %g1			/* g1 = vaddr */
+	
+	SFMMU_CPU_CNUM(%g2, %g3, %g4)   /* %g3 = sfmmu cnum on this CPU */
+
 	/* We need to set the secondary context properly. */
 	set	MMU_SCONTEXT, %g4
 	ldxa	[%g4]ASI_DMMU, %g5		/* rd old ctxnum */
 	or	DEMAP_SECOND | DEMAP_PAGE_TYPE, %g1, %g1
-	stxa	%g2, [%g4]ASI_DMMU		/* wr new ctxum */
+	stxa	%g3, [%g4]ASI_DMMU		/* wr new ctxum */
 	stxa	%g0, [%g1]ASI_DTLB_DEMAP
 	stxa	%g0, [%g1]ASI_ITLB_DEMAP
 	stxa	%g5, [%g4]ASI_DMMU		/* restore old ctxnum */
@@ -483,7 +577,7 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize,
 	 * x-trap to flush pgcnt MMU_PAGESIZE pages from tlb
 	 *
 	 * %g1 = vaddr, zero-extended on 32-bit kernel
-	 * %g2 = <zero32|ctx16|pgcnt16>
+	 * %g2 = <sfmmup58 | pgcnt6>
 	 *
 	 * NOTE: this handler relies on the fact that no
 	 *	interrupts or traps can occur during the loop
@@ -496,43 +590,34 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize,
 	srln	%g1, MMU_PAGESHIFT, %g1
 	slln	%g1, MMU_PAGESHIFT, %g1		/* g1 = vaddr */
 	or	DEMAP_SECOND | DEMAP_PAGE_TYPE, %g1, %g1
-	set	0xffff, %g4
-	and	%g4, %g2, %g3			/* g3 = pgcnt */
-	srln	%g2, 16, %g2			/* g2 = ctxnum */
+	
+	set	SFMMU_PGCNT_MASK, %g4
+	and	%g4, %g2, %g3			/* g3 = pgcnt - 1 */
+	add	%g3, 1, %g3			/* g3 = pgcnt */
+
+	andn	%g2, SFMMU_PGCNT_MASK, %g2	/* g2 = sfmmup */
+
+	SFMMU_CPU_CNUM(%g2, %g5, %g6)   ! %g5 = sfmmu cnum on this CPU
+
 	/* We need to set the secondary context properly. */
 	set	MMU_SCONTEXT, %g4
-	ldxa	[%g4]ASI_DMMU, %g5		/* read old ctxnum */
-	stxa	%g2, [%g4]ASI_DMMU		/* write new ctxum */
+	ldxa	[%g4]ASI_DMMU, %g6		/* read old ctxnum */
+	stxa	%g5, [%g4]ASI_DMMU		/* write new ctxum */
 
 	set	MMU_PAGESIZE, %g2		/* g2 = pgsize */
+	sethi	 %hi(FLUSH_ADDR), %g5
 1:
 	stxa	%g0, [%g1]ASI_DTLB_DEMAP
 	stxa	%g0, [%g1]ASI_ITLB_DEMAP
+	flush	%g5
 	deccc	%g3				/* decr pgcnt */
 	bnz,pt	%icc,1b
-	add	%g1, %g2, %g1			/* go to nextpage */
+	  add	%g1, %g2, %g1			/* go to nextpage */
 
-	stxa	%g5, [%g4]ASI_DMMU		/* restore old ctxnum */
+	stxa	%g6, [%g4]ASI_DMMU		/* restore old ctxnum */
 	membar #Sync
 	retry
 	SET_SIZE(vtag_flush_pgcnt_tl1)
-
-	ENTRY_NP(vtag_flushctx_tl1)
-	/*
-	 * x-trap to flush context from tlb
-	 *
-	 * %g1 = ctxnum
-	 */
-	set	DEMAP_CTX_TYPE | DEMAP_SECOND, %g4
-	set	MMU_SCONTEXT, %g3
-	ldxa	[%g3]ASI_DMMU, %g5		/* rd old ctxnum */
-	stxa	%g1, [%g3]ASI_DMMU		/* wr new ctxum */
-	stxa	%g0, [%g4]ASI_DTLB_DEMAP
-	stxa	%g0, [%g4]ASI_ITLB_DEMAP
-	stxa	%g5, [%g3]ASI_DMMU		/* restore old ctxnum */
-	membar #Sync
-	retry
-	SET_SIZE(vtag_flushctx_tl1)
 
 	! Not implemented on US1/US2
 	ENTRY_NP(vtag_flushall_tl1)

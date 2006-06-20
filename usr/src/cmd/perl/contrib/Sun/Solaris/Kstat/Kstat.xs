@@ -486,9 +486,6 @@ save_sfmmu_global_stat(HV *self, kstat_t *kp, int strip_str)
 	SAVE_INT32(self, sfmmugp, sf_khash_searches);
 	SAVE_INT32(self, sfmmugp, sf_khash_links);
 	SAVE_INT32(self, sfmmugp, sf_swapout);
-	SAVE_INT32(self, sfmmugp, sf_ctxfree);
-	SAVE_INT32(self, sfmmugp, sf_ctxdirty);
-	SAVE_INT32(self, sfmmugp, sf_ctxsteal);
 	SAVE_INT32(self, sfmmugp, sf_tsb_alloc);
 	SAVE_INT32(self, sfmmugp, sf_tsb_allocfail);
 	SAVE_INT32(self, sfmmugp, sf_tsb_sectsb_create);
@@ -531,10 +528,7 @@ save_sfmmu_global_stat(HV *self, kstat_t *kp, int strip_str)
 	SAVE_INT32(self, sfmmugp, sf_tsb_resize_failures);
 	SAVE_INT32(self, sfmmugp, sf_tsb_reloc);
 	SAVE_INT32(self, sfmmugp, sf_user_vtop);
-	SAVE_INT32(self, sfmmugp, sf_ctx_swap);
-	SAVE_INT32(self, sfmmugp, sf_tlbflush_all);
-	SAVE_INT32(self, sfmmugp, sf_tlbflush_ctx);
-	SAVE_INT32(self, sfmmugp, sf_tlbflush_deferred);
+	SAVE_INT32(self, sfmmugp, sf_ctx_inv);
 	SAVE_INT32(self, sfmmugp, sf_tlb_reprog_pgsz);
 }
 #endif

@@ -74,12 +74,12 @@ int	mmu_init_mmu_page_sizes(int cinfo);
 /*
  * virtual demap flushes (tlbs & virtual tag caches)
  */
-void	vtag_flushpage(caddr_t addr, uint_t ctx);
-void	vtag_flushctx(uint_t ctx);
+void	vtag_flushpage(caddr_t addr, uint64_t sfmmup);
 void	vtag_flushall(void);
-void	vtag_flushpage_tl1(uint64_t addr, uint64_t ctx);
-void	vtag_flush_pgcnt_tl1(uint64_t addr, uint64_t ctx_pgcnt);
-void	vtag_flushctx_tl1(uint64_t ctx, uint64_t dummy);
+#pragma weak vtag_flushall_uctxs
+void	vtag_flushall_uctxs(void);
+void	vtag_flushpage_tl1(uint64_t addr, uint64_t sfmmup);
+void	vtag_flush_pgcnt_tl1(uint64_t addr, uint64_t sfmmup_pgcnt);
 void	vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2);
 
 /*
@@ -100,10 +100,10 @@ void	send_mondo_set(cpuset_t set);
 #endif
 
 /*
- * Calculate, set optimal dtlb pagesize, for ISM and mpss, to support
- * cpus with non-fully-associative dtlbs.
+ * flag to support optimal dtlb pagesize setting, for ISM and mpss, to support
+ * cpus with non-fully-associative dtlbs. Page size is stored in hat sfmmu_cext
  */
-extern uchar_t *ctx_pgsz_array;
+extern uint_t cpu_impl_dual_pgsz;
 
 /*
  * flush instruction cache if needed

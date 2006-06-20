@@ -3350,8 +3350,8 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	tte = &drmach_cpu_sram_tte[CPU->cpu_id];
 	ASSERT(TTE_IS_VALID(tte) && TTE_IS_8K(tte) &&
 	    TTE_IS_PRIVILEGED(tte) && TTE_IS_LOCKED(tte));
-	sfmmu_dtlb_ld(drmach_cpu_sram_va, KCONTEXT, tte);
-	sfmmu_itlb_ld(drmach_cpu_sram_va, KCONTEXT, tte);
+	sfmmu_dtlb_ld_kva(drmach_cpu_sram_va, tte);
+	sfmmu_itlb_ld_kva(drmach_cpu_sram_va, tte);
 
 	bp = wp = drmach_cpu_sram_va;
 
@@ -3377,7 +3377,7 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	if (err) {
 cleanup:
 		xt_one(CPU->cpu_id, vtag_flushpage_tl1,
-			(uint64_t)drmach_cpu_sram_va, (uint64_t)KCONTEXT);
+			(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
 		return (err);
 	}
 
@@ -3436,7 +3436,7 @@ drmach_copy_rename_fini(drmachid_t id)
 	axq_cdc_enable_all();
 
 	xt_one(CPU->cpu_id, vtag_flushpage_tl1,
-		(uint64_t)drmach_cpu_sram_va, (uint64_t)KCONTEXT);
+		(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
 
 	switch (cr->ecode) {
 	case DRMACH_CR_OK:
@@ -5447,7 +5447,7 @@ drmach_cpu_start(struct cpu *cp)
 	}
 
 	xt_one(cpuid, vtag_flushpage_tl1,
-		(uint64_t)drmach_cpu_sram_va, (uint64_t)KCONTEXT);
+		(uint64_t)drmach_cpu_sram_va, (uint64_t)ksfmmup);
 
 	return (0);
 }
@@ -5499,8 +5499,8 @@ drmach_cpu_stop_self(void)
 	tte = &drmach_cpu_sram_tte[CPU->cpu_id];
 	ASSERT(TTE_IS_VALID(tte) && TTE_IS_8K(tte) &&
 	    TTE_IS_PRIVILEGED(tte) && TTE_IS_LOCKED(tte));
-	sfmmu_dtlb_ld(drmach_cpu_sram_va, KCONTEXT, tte);
-	sfmmu_itlb_ld(drmach_cpu_sram_va, KCONTEXT, tte);
+	sfmmu_dtlb_ld_kva(drmach_cpu_sram_va, tte);
+	sfmmu_itlb_ld_kva(drmach_cpu_sram_va, tte);
 
 	/* copy text. standard bcopy not designed to work in nc space */
 	p = (uint_t *)drmach_cpu_sram_va;

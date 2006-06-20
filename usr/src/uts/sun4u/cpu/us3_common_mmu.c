@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +45,6 @@
  * Note that 'Cheetah PRM' refers to:
  *   SPARC V9 JPS1 Implementation Supplement: Sun UltraSPARC-III
  */
-
-/* Will be set !NULL for Cheetah+ and derivatives. */
-extern uchar_t *ctx_pgsz_array;
 
 /*
  * pan_disable_ism_large_pages and pan_disable_large_pages are the Panther-
@@ -115,7 +111,7 @@ mmu_large_pages_disabled(uint_t flag)
  *
  * The effect of these restrictions is to limit the allowable values in
  * sfmmu_pgsz[0] and sfmmu_pgsz[1], since these hat variables are used in
- * mmu_set_ctx_page_sizes to set up the values in the ctx_pgsz_array that
+ * mmu_set_ctx_page_sizes to set up the values in the sfmmu_cext that
  * are used at context switch time. The value in sfmmu_pgsz[0] is used in
  * P_pgsz0 and sfmmu_pgsz[1] is used in P_pgsz1, as per Figure F-1-1
  * IMMU and DMMU Primary Context Register in the Panther Implementation
@@ -152,7 +148,7 @@ int init_mmu_page_sizes = 0;
 void
 mmu_init_large_pages(size_t ism_pagesize)
 {
-	if (ctx_pgsz_array == NULL) {	/* disable_dual_pgsz flag */
+	if (cpu_impl_dual_pgsz == 0) {	/* disable_dual_pgsz flag */
 		pan_disable_ism_large_pages = ((1 << TTE64K) |
 			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		pan_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
@@ -310,7 +306,7 @@ mmu_fixup_large_pages(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 	 */
 	ASSERT(hat->sfmmu_ismhat == NULL);
 	ASSERT(hat != ksfmmup);
-	ASSERT(ctx_pgsz_array != NULL);
+	ASSERT(cpu_impl_dual_pgsz == 1);
 
 	ASSERT((!SFMMU_FLAGS_ISSET(hat, HAT_32M_FLAG)) ||
 		(!SFMMU_FLAGS_ISSET(hat, HAT_256M_FLAG)));
@@ -362,7 +358,7 @@ mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 	ASSERT(hat->sfmmu_ismhat == NULL);
 	ASSERT(hat != ksfmmup);
 
-	if (ctx_pgsz_array == NULL)	/* disable_dual_pgsz flag */
+	if (cpu_impl_dual_pgsz == 0)	/* disable_dual_pgsz flag */
 		return;
 
 	/*
@@ -451,7 +447,7 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 	ASSERT(sfmmu_hat_lock_held(hat));
 	ASSERT(hat != ksfmmup);
 
-	if (ctx_pgsz_array == NULL)	/* disable_dual_pgsz flag */
+	if (cpu_impl_dual_pgsz == 0)	/* disable_dual_pgsz flag */
 		return;
 
 	/*
@@ -473,12 +469,22 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 #endif /* DEBUG */
 	new_cext = TAGACCEXT_MKSZPAIR(pgsz1, pgsz0);
 	if (hat->sfmmu_cext != new_cext) {
+#ifdef DEBUG
+		int i;
+		/*
+		 * assert cnum should be invalid, this is because pagesize
+		 * can only be changed after a proc's ctxs are invalidated.
+		 */
+		for (i = 0; i < max_mmu_ctxdoms; i++) {
+			ASSERT(hat->sfmmu_ctxs[i].cnum == INVALID_CONTEXT);
+		}
+#endif /* DEBUG */
 		hat->sfmmu_cext = new_cext;
 	}
-	ctx_pgsz_array[hat->sfmmu_cnum] = hat->sfmmu_cext;
+
 	/*
 	 * sfmmu_setctx_sec() will take care of the
-	 * rest of the chores reprogramming the ctx_pgsz_array
+	 * rest of the chores reprogramming the hat->sfmmu_cext
 	 * page size values into the DTLBs.
 	 */
 }
@@ -537,7 +543,7 @@ mmu_check_page_sizes(sfmmu_t *sfmmup, uint64_t *ttecnt)
 		}
 		newval = tmp_pgsz[0] << 8 | tmp_pgsz[1];
 		if (newval != oldval) {
-			sfmmu_steal_context(sfmmup, tmp_pgsz);
+			sfmmu_reprog_pgsz_arr(sfmmup, tmp_pgsz);
 		}
 	}
 }
@@ -603,8 +609,6 @@ mmu_init_kernel_pgsz(struct hat *hat)
 	new_cext_nucleus = TAGACCEXT_MKSZPAIR(tte, TTE8K);
 	new_cext_primary = TAGACCEXT_MKSZPAIR(TTE8K, tte);
 
-	if (ctx_pgsz_array)
-		ctx_pgsz_array[KCONTEXT] = new_cext_primary;
 	hat->sfmmu_cext = new_cext_primary;
 	kcontextreg = ((uint64_t)new_cext_nucleus << CTXREG_NEXT_SHIFT) |
 		((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
@@ -617,6 +621,11 @@ mmu_get_kernel_lpsize(size_t lpsize)
 	struct heap_lp_page_size *p_lpgsz, *pend_lpgsz;
 	int impl = cpunodes[getprocessorid()].implementation;
 	uint_t tte = TTE8K;
+
+	if (cpu_impl_dual_pgsz == 0) {
+		heaplp_use_dt512 = 0;
+		return (MMU_PAGESIZE);
+	}
 
 	pend_lpgsz = (struct heap_lp_page_size *)
 	    ((char *)heap_lp_pgsz + sizeof (heap_lp_pgsz));

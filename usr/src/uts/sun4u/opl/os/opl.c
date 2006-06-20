@@ -72,6 +72,17 @@ int opl_tsb_spares = (OPL_MAX_BOARDS) * (OPL_MAX_PCICH_UNITS_PER_BOARD) *
 
 pgcnt_t opl_startup_cage_size = 0;
 
+static opl_model_info_t opl_models[] = {
+	{ "FF1", OPL_MAX_BOARDS_FF1 },
+	{ "FF2", OPL_MAX_BOARDS_FF2 },
+	{ "DC1", OPL_MAX_BOARDS_DC1 },
+	{ "DC2", OPL_MAX_BOARDS_DC2 },
+	{ "DC3", OPL_MAX_BOARDS_DC3 },
+};
+static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
+
+static	opl_model_info_t *opl_cur_model = NULL;
+
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
 
 static enum {
@@ -90,6 +101,53 @@ int
 set_platform_tsb_spares(void)
 {
 	return (MIN(opl_tsb_spares, MAX_UPA));
+}
+
+static void
+set_model_info()
+{
+	char	name[MAXSYSNAME];
+	int	i;
+
+	/*
+	 * Get model name from the root node.
+	 *
+	 * We are using the prom device tree since, at this point,
+	 * the Solaris device tree is not yet setup.
+	 */
+	(void) prom_getprop(prom_rootnode(), "model", (caddr_t)name);
+
+	for (i = 0; i < opl_num_models; i++) {
+		if (strncmp(name, opl_models[i].model_name, MAXSYSNAME) == 0) {
+			opl_cur_model = &opl_models[i];
+			break;
+		}
+	}
+	if (i == opl_num_models)
+		cmn_err(CE_WARN, "No valid OPL model is found!"
+		    "Set max_mmu_ctxdoms to the default.");
+}
+
+static void
+set_max_mmu_ctxdoms()
+{
+	extern uint_t	max_mmu_ctxdoms;
+	int		max_boards;
+
+	/*
+	 * From the model, get the maximum number of boards
+	 * supported and set the value accordingly. If the model
+	 * could not be determined or recognized, we assume the max value.
+	 */
+	if (opl_cur_model == NULL)
+		max_boards = OPL_MAX_BOARDS;
+	else
+		max_boards = opl_cur_model->model_max_boards;
+
+	/*
+	 * On OPL, cores and MMUs are one-to-one.
+	 */
+	max_mmu_ctxdoms = OPL_MAX_CORE_UNITS_PER_BOARD * max_boards;
 }
 
 #pragma weak mmu_init_large_pages
@@ -123,6 +181,9 @@ set_platform_defaults(void)
 	}
 
 	tsb_lgrp_affinity = 1;
+
+	set_model_info();
+	set_max_mmu_ctxdoms();
 }
 
 /*
@@ -904,6 +965,23 @@ plat_startup_memlist(caddr_t alloc_base)
 void
 startup_platform(void)
 {
+}
+
+void
+plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
+{
+	int	impl;
+
+	impl = cpunodes[cpuid].implementation;
+	if (IS_OLYMPUS_C(impl)) {
+		/*
+		 * Olympus-C processor supports 2 strands per core.
+		 */
+		info->mmu_idx = cpuid >> 1;
+		info->mmu_nctxs = 8192;
+	} else {
+		cmn_err(CE_PANIC, "Unknown processor %d", impl);
+	}
 }
 
 int

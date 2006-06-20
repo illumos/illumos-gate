@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +31,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
 
 /*
  * Manifest constants of Starcat configuration
@@ -79,6 +77,30 @@ extern "C" {
 #define	STARCAT_DMV_HWINT	(MAX_UPA + STARCAT_DMV_EXTRA)
 #define	STARCAT_DMV_IDN_BASE	(MAX_UPA)
 
+/*
+ * The CPU ID on starcat looks like this:
+ *
+ *     9        5  4     3     2    1    0
+ *    --------------------------------------
+ *    | Expander |   | Slot | Core | LPORT |
+ *    --------------------------------------
+ *
+ * Expander   Starcat has STARCAT_BDSET_MAX (18) expanders.
+ * Slot       Starcat has STARCAT_BDSET_SLOT_MAX (2) slots per expander.
+ *            Slot 0 carries a CPU-MEM board which has 4 processor chips.
+ *            Slot 1 carries an I/O board typically. But it can be
+ *            configured to carry a MAXCAT board which has 2 processor
+ *            chips on board.
+ * LPORT      Port number within the slot for a chip. This is also the
+ *            chip number within the slot. Note that Slot 1 can have only
+ *            2 chips, but this representation allows for 4. This is just
+ *            the theoretical max.
+ * Core       Core number within the chip.
+ *
+ * Currently, the maximum number of cores supported is 2 per chip (on
+ * Panther and Jaguar).
+ *
+ */
 /*
  * Macros for manipulating CPU IDs
  */

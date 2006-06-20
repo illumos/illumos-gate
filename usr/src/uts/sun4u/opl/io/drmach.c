@@ -3681,12 +3681,12 @@ drmach_lock_critical(caddr_t va)
 	int i;
 
 	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
-		vtag_flushpage(va, KCONTEXT);
+		vtag_flushpage(va, (uint64_t)ksfmmup);
 		sfmmu_memtte(&tte, va_to_pfn(va),
 			PROC_DATA|HAT_NOSYNC, TTE8K);
 		tte.tte_intlo |= TTE_LCK_INT;
-		sfmmu_dtlb_ld(va, KCONTEXT, &tte);
-		sfmmu_itlb_ld(va, KCONTEXT, &tte);
+		sfmmu_dtlb_ld_kva(va, &tte);
+		sfmmu_itlb_ld_kva(va, &tte);
 		va += PAGESIZE;
 	}
 }
@@ -3697,7 +3697,7 @@ drmach_unlock_critical(caddr_t va)
 	int i;
 
 	for (i = 0; i < DRMACH_FMEM_LOCKED_PAGES; i++) {
-		vtag_flushpage(va, KCONTEXT);
+		vtag_flushpage(va, (uint64_t)ksfmmup);
 		va += PAGESIZE;
 	}
 }

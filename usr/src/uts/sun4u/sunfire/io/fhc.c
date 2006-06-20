@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3402,8 +3402,8 @@ os_completes_shutdown(void)
 		TTE_PFN_INTHI(pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(pfn) |
 		TTE_HWWR_INT | TTE_PRIV_INT | TTE_LCK_INT; /* un$ */
-	sfmmu_dtlb_ld(shutdown_va, KCONTEXT, &tte);	/* load dtlb */
-	sfmmu_itlb_ld(shutdown_va, KCONTEXT, &tte);	/* load itlb */
+	sfmmu_dtlb_ld_kva(shutdown_va, &tte);	/* load dtlb */
+	sfmmu_itlb_ld_kva(shutdown_va, &tte);	/* load itlb */
 
 	/*
 	 * copy the special shutdown function to sram

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -373,15 +372,8 @@ typedef struct {
 ss_t stick_sync_stats[NCPU];
 #endif /* DEBUG */
 
-/*
- * Maximum number of contexts for Cheetah.
- */
-#define	MAX_NCTXS	(1 << 13)
-
-/* Will be set !NULL for Cheetah+ and derivatives. */
-uchar_t *ctx_pgsz_array = NULL;
+uint_t cpu_impl_dual_pgsz = 0;
 #if defined(CPU_IMP_DUAL_PAGESIZE)
-static uchar_t ctx_pgsz_arr[MAX_NCTXS];
 uint_t disable_dual_pgsz = 0;
 #endif	/* CPU_IMP_DUAL_PAGESIZE */
 
@@ -487,16 +479,6 @@ cpu_setup(void)
 	cache_boot_state = get_dcu() & DCU_CACHE;
 
 	/*
-	 * Use the maximum number of contexts available for Cheetah
-	 * unless it has been tuned for debugging.
-	 * We are checking against 0 here since this value can be patched
-	 * while booting.  It can not be patched via /etc/system since it
-	 * will be patched too late and thus cause the system to panic.
-	 */
-	if (nctxs == 0)
-		nctxs = MAX_NCTXS;
-
-	/*
 	 * Due to the number of entries in the fully-associative tlb
 	 * this may have to be tuned lower than in spitfire.
 	 */
@@ -568,7 +550,7 @@ cpu_setup(void)
 	 * Use Cheetah+ and later dual page size support.
 	 */
 	if (!disable_dual_pgsz) {
-		ctx_pgsz_array = ctx_pgsz_arr;
+		cpu_impl_dual_pgsz = 1;
 	}
 #endif	/* CPU_IMP_DUAL_PAGESIZE */
 
@@ -699,7 +681,7 @@ mondo_recover_proc(uint16_t cpuid, int bn)
 	proc_t *p;
 	struct as *as;
 	struct hat *hat;
-	short  cnum;
+	uint_t  cnum;
 	struct tsb_info *tsbinfop;
 	struct tsbe *tsbep;
 	caddr_t tsbp;
@@ -710,6 +692,7 @@ mondo_recover_proc(uint16_t cpuid, int bn)
 	int pages_claimed = 0;
 	tte_t tsbe_tte;
 	int tried_kernel_tsb = 0;
+	mmu_ctx_t *mmu_ctxp;
 
 	CHEETAH_LIVELOCK_STAT(proc_entry);
 
@@ -769,10 +752,13 @@ mondo_recover_proc(uint16_t cpuid, int bn)
 		goto badstruct;
 	}
 
-	cnum = hat->sfmmu_cnum;
+	mmu_ctxp = CPU_MMU_CTXP(cp);
+	ASSERT(mmu_ctxp);
+	cnum = hat->sfmmu_ctxs[mmu_ctxp->mmu_idx].cnum;
 	CHEETAH_LIVELOCK_STATSET(proc_cnum, cnum);
 
-	if ((cnum < 0) || (cnum == INVALID_CONTEXT) || (cnum >= nctxs)) {
+	if ((cnum < 0) || (cnum == INVALID_CONTEXT) ||
+	    (cnum >= mmu_ctxp->mmu_nctxs)) {
 		CHEETAH_LIVELOCK_STAT(proc_cnum_bad);
 		goto badstruct;
 	}

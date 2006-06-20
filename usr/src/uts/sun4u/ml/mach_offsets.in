@@ -83,8 +83,8 @@
 #include <sys/traptrace.h>
 
 machcpu
-	intrstat	MCPU_INTRSTAT
-	pil_high_start	MCPU_PIL_HIGH_START
+	intrstat		MCPU_INTRSTAT
+	pil_high_start		MCPU_PIL_HIGH_START
 
 trap_trace_record	TRAP_ENT_SIZE
 	tt_tl		TRAP_ENT_TL
@@ -100,11 +100,13 @@ trap_trace_record	TRAP_ENT_SIZE
 	tt_f4		TRAP_ENT_F4
 
 hat	HAT_SIZE
-	sfmmu_cnum
 	sfmmu_cpusran
 	sfmmu_tsb
 	sfmmu_ismblkpa
 	sfmmu_flags
+	sfmmu_cext
+	sfmmu_ctx_lock
+	sfmmu_ctxs
 
 sfmmu_global_stat HATSTAT_SIZE
 	sf_pagefaults		HATSTAT_PAGEFAULT
@@ -112,9 +114,6 @@ sfmmu_global_stat HATSTAT_SIZE
 	sf_uhash_links		HATSTAT_UHASH_LINKS
 	sf_khash_searches	HATSTAT_KHASH_SEARCH
 	sf_khash_links		HATSTAT_KHASH_LINKS
-
-ctx	CTX_SIZE		CTX_SZ_SHIFT
-	ctx_un.ctx_sfmmup	CTX_SFMMUP
 
 sf_hment	SFHME_SIZE	SFHME_SHIFT
 	hme_tte		SFHME_TTE
@@ -212,6 +211,8 @@ cpu_node	CPU_NODE_SIZE
 	ecache_size	ECACHE_SIZE
 	ecache_linesize	ECACHE_LINESIZE
 	device_id	DEVICE_ID
+	itlb_size	ITLB_SIZE
+	dtlb_size	DTLB_SIZE
 
 spitfire_scrub_misc_t
 	ec_scrub_outstanding

@@ -300,6 +300,7 @@ extern "C" {
 #define	PTL1_BAD_RED				17
 #define	PTL1_BAD_HCALL_UNMAP_PERM_EINVAL	18
 #define	PTL1_BAD_HCALL_UNMAP_PERM_ENOMAP	19
+#define	PTL1_BAD_RAISE_TSBEXCP			20
 
 /*
  * Defines the max trap level allowed
