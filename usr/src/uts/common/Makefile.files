@@ -306,6 +306,7 @@ GENUNIX_OBJS +=	\
 		turnstile.o	\
 		tty_common.o	\
 		uadmin.o	\
+		uconv.o		\
 		ucredsys.o	\
 		uid.o		\
 		umask.o		\
