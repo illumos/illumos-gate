@@ -225,6 +225,7 @@ pci_spurintr(ib_ino_info_t *ino_p) {
 	ih_t *ih_p = ino_p->ino_ih_start;
 	pci_t *pci_p = ino_p->ino_ib_p->ib_pci_p;
 	char *err_fmt_str;
+	boolean_t blocked = B_FALSE;
 
 	if (ino_p->ino_unclaimed > pci_unclaimed_intr_max)
 		return (DDI_INTR_CLAIMED);
@@ -243,11 +244,14 @@ pci_spurintr(ib_ino_info_t *ino_p) {
 		goto clear;
 	}
 	err_fmt_str = "%s%d: ino 0x%x blocked";
+	blocked = B_TRUE;
 	goto warn;
 clear:
-	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);  /* clear the pending state */
-	if (!pci_spurintr_msgs) /* tomatillo errata #71 spurious mondo */
+	if (!pci_spurintr_msgs) { /* tomatillo errata #71 spurious mondo */
+		/* clear the pending state */
+		IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
 		return (DDI_INTR_CLAIMED);
+	}
 
 	err_fmt_str = "!%s%d: spurious interrupt from ino 0x%x";
 warn:
@@ -256,6 +260,9 @@ warn:
 		cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
 		    ih_p->ih_inum);
 	cmn_err(CE_CONT, "!\n");
+	if (blocked == B_FALSE)  /* clear the pending state */
+		IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
+
 	return (DDI_INTR_CLAIMED);
 }
 
