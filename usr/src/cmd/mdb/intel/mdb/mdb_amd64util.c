@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -457,6 +457,7 @@ int
 mdb_amd64_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 {
 	mdb_tgt_addr_t npc;
+	mdb_tgt_addr_t callpc;
 
 	enum {
 		M_CALL_REL = 0xe8, /* call near with relative displacement */
@@ -476,10 +477,12 @@ mdb_amd64_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 	}
 
 	/* Skip the rex prefix, if any */
-	if (curinstr >= M_REX_LO && curinstr <= M_REX_HI &&
-	    mdb_tgt_vread(t, &curinstr, sizeof (curinstr), pc) !=
-	    sizeof (curinstr))
-		return (-1); /* errno is set for us */
+	callpc = pc;
+	while (curinstr >= M_REX_LO && curinstr <= M_REX_HI) {
+		if (mdb_tgt_vread(t, &curinstr, sizeof (curinstr), ++callpc) !=
+		    sizeof (curinstr))
+			return (-1); /* errno is set for us */
+	}
 
 	if (curinstr != M_CALL_REG) {
 		/* It's not a call */
