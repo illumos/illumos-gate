@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -569,7 +568,13 @@ pctx_run(
 		msincr(&tvgoal, msec);
 	}
 
-	while (running) {
+	/*
+	 * The event handling loop continues while running is 1.
+	 * running becomes 0 when either the controlled process has
+	 * exited successfully or the number of time samples has expired.
+	 * Otherwise, if an error has occurred, running becomes -1.
+	 */
+	while (running == 1) {
 
 		if (Psetrun(pctx->Pr, 0, 0) != 0) {
 			if (pctx->verbose)
@@ -632,7 +637,7 @@ checkstate:
 			pctx_error(pctx, fn,
 			    gettext("%d: execed a program that cannot "
 			    "be tracked\n"), (int)pid);
-			running = 0;
+			running = -1;
 			break;
 		case PS_UNDEAD:
 		case PS_DEAD:
@@ -640,7 +645,7 @@ checkstate:
 				pctx_error(pctx, fn,
 				    gettext("%d: process terminated\n"),
 				    (int)pid);
-			running = 0;
+			running = -1;
 			break;
 		default:
 			if (pctx->verbose)
@@ -668,8 +673,8 @@ checkstate:
 				break;
 			}
 			if (pctx_lwpiterate(pctx, tick) != 0)
-				running = 0;
-			if (--nsamples == 0)
+				running = -1;
+			if (running == 1 && --nsamples == 0)
 				running = 0;
 			break;
 		case PR_SYSENTRY:
@@ -683,11 +688,14 @@ checkstate:
 				pctx_end_syscalls(pctx);
 				break;
 			case SYS_exit:
-				(void) pctx_lwpiterate(pctx, pctx->fini_lwp);
+				if (pctx_lwpiterate(pctx, pctx->fini_lwp)
+				    != 0)
+					running = -1;
 				pctx->exit(pctx, pid, lwpid,
 				    (int)pstatus->pr_lwp.pr_sysarg[0],
 				    pctx->uarg);
-				running = 0;
+				if (running == 1)
+					running = 0;
 				break;
 			case SYS_exec:
 			case SYS_execve:
@@ -710,8 +718,11 @@ checkstate:
 					 * Reinstate the lwps we fini'd
 					 * at exec entrance
 					 */
-					running = pctx_lwpiterate(pctx,
-					    pctx->init_lwp) == 0;
+					if (pctx_lwpiterate(pctx,
+					    pctx->init_lwp) == 0)
+						running = 1;
+					else
+						running = -1;
 					break;
 				}
 				if (pctx->exec == (pctx_sysc_execfn_t *)
@@ -723,10 +734,12 @@ checkstate:
 				    Ppsinfo(pctx->Pr), sizeof (psinfo));
 				proc_unctrl_psinfo(&psinfo);
 				pctx_begin_syscalls(pctx);
-				running = pctx->exec(pctx, pid,
-				    lwpid, psinfo.pr_psargs, pctx->uarg) == 0;
-				running = running && pctx->init_lwp(pctx,
-				    pid, 1, pctx->uarg) == 0;
+				if (pctx->exec(pctx, pid, lwpid,
+				    psinfo.pr_psargs, pctx->uarg) != 0)
+					running = -1;
+				if (running == 1 && pctx->init_lwp(pctx,
+				    pid, 1, pctx->uarg) != 0)
+					running = -1;
 				pctx_end_syscalls(pctx);
 				break;
 			case SYS_lwp_create:
@@ -734,10 +747,12 @@ checkstate:
 				    pstatus->pr_lwp.pr_rval1)
 					break;
 				pctx_begin_syscalls(pctx);
-				running = pctx->init_lwp(pctx,
-				    pid, lwpid, pctx->uarg) == 0;
-				running = running && pctx->lwp_create(pctx,
-				    pid, lwpid, pctx->uarg) == 0;
+				if (pctx->init_lwp(pctx, pid, lwpid,
+				    pctx->uarg) != 0)
+					running = -1;
+				if (running == 1 && pctx->lwp_create(pctx,
+				    pid, lwpid, pctx->uarg) != 0)
+					running = -1;
 				pctx_end_syscalls(pctx);
 				break;
 			case SYS_forkall:
@@ -772,8 +787,10 @@ checkstate:
 						(*forkfn)(pctx, ppid, pid,
 						    lwpid, pctx->uarg);
 						pctx_release(pctx);
+						_exit(0);
+					} else {
+						_exit(1);
 					}
-					_exit(0);
 					/*NOTREACHED*/
 				case -1:
 					pctx_error(pctx, fn,
@@ -802,7 +819,7 @@ checkstate:
 				pctx_error(pctx, fn,
 				    gettext("pid %d - job control stop\n"),
 				    (int)pid);
-			running = 0;
+			running = -1;
 			break;
 		case PR_FAULTED:
 			if (pctx->verbose)
@@ -825,19 +842,25 @@ checkstate:
 				pctx_error(pctx, fn,
 				    gettext("pid %d - reason %d\n"),
 				    (int)pid, pstatus->pr_lwp.pr_why);
-			running = 0;
+			running = -1;
 			break;
 		}
 	}
 
 bailout:
 	(void) signal(SIGCHLD, sigsaved);
-	if (!running)
-		return (0);
 
-	pctx_error(pctx, fn, gettext("lost control of pid %d\n"), (int)pid);
-	pctx_free(pctx);
-	return (-1);
+	switch (running) {
+	case 0:
+		return (0);
+	case -1:
+		return (-1);
+	default:
+		pctx_error(pctx, fn, gettext("lost control of pid %d\n"),
+		    (int)pid);
+		pctx_free(pctx);
+		return (-1);
+	}
 }
 
 /*
