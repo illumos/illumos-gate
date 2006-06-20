@@ -1376,185 +1376,195 @@ out:
 	return (ra.err);
 }
 
+typedef struct {
+	uint64_t	txg;
+	dmu_buf_impl_t	*db;
+	dmu_sync_cb_t	*done;
+	void		*arg;
+} dmu_sync_cbin_t;
+
+typedef union {
+	dmu_sync_cbin_t	data;
+	blkptr_t	blk;
+} dmu_sync_cbarg_t;
+
+/* ARGSUSED */
+static void
+dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
+{
+	dmu_sync_cbin_t *in = (dmu_sync_cbin_t *)varg;
+	dmu_buf_impl_t *db = in->db;
+	uint64_t txg = in->txg;
+	dmu_sync_cb_t *done = in->done;
+	void *arg = in->arg;
+	blkptr_t *blk = (blkptr_t *)varg;
+
+	if (!BP_IS_HOLE(zio->io_bp)) {
+		zio->io_bp->blk_fill = 1;
+		BP_SET_TYPE(zio->io_bp, db->db_dnode->dn_type);
+		BP_SET_LEVEL(zio->io_bp, 0);
+	}
+
+	*blk = *zio->io_bp; /* structure assignment */
+
+	mutex_enter(&db->db_mtx);
+	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] == IN_DMU_SYNC);
+	db->db_d.db_overridden_by[txg&TXG_MASK] = blk;
+	cv_broadcast(&db->db_changed);
+	mutex_exit(&db->db_mtx);
+
+	if (done)
+		done(&(db->db), arg);
+}
+
 /*
- * Intent log support: sync the block at <os, object, offset> to disk.
- * N.B. and XXX: the caller is responsible for serializing dmu_sync()s
- * of the same block, and for making sure that the data isn't changing
- * while dmu_sync() is writing it.
+ * Intent log support: sync the block associated with db to disk.
+ * N.B. and XXX: the caller is responsible for making sure that the
+ * data isn't changing while dmu_sync() is writing it.
  *
  * Return values:
  *
- *	EALREADY: this txg has already been synced, so there's nothing to to.
+ *	EEXIST: this txg has already been synced, so there's nothing to to.
  *		The caller should not log the write.
  *
  *	ENOENT: the block was dbuf_free_range()'d, so there's nothing to do.
  *		The caller should not log the write.
  *
- *	EINPROGRESS: the block is in the process of being synced by the
- *		usual mechanism (spa_sync()), so we can't sync it here.
- *		The caller should txg_wait_synced() and not log the write.
+ *	EALREADY: this block is already in the process of being synced.
+ *		The caller should track its progress (somehow).
  *
- *	EBUSY: another thread is trying to dmu_sync() the same dbuf.
- *		(This case cannot arise under the current locking rules.)
- *		The caller should txg_wait_synced() and not log the write.
+ *	EINPROGRESS: the IO has been initiated.
+ *		The caller should log this blkptr in the callback.
  *
- *	ESTALE: the block was dirtied or freed while we were writing it,
- *		so the data is no longer valid.
- *		The caller should txg_wait_synced() and not log the write.
- *
- *	0: success.  Sets *bp to the blkptr just written, and sets
- *		*blkoff to the data's offset within that block.
- *		The caller should log this blkptr/blkoff in its lr_write_t.
+ *	0: completed.  Sets *bp to the blkptr just written.
+ *		The caller should log this blkptr immediately.
  */
 int
-dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
-    blkptr_t *bp, uint64_t txg)
+dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
+    blkptr_t *bp, uint64_t txg, dmu_sync_cb_t *done, void *arg)
 {
-	objset_impl_t *osi = os->os;
-	dsl_pool_t *dp = osi->os_dsl_dataset->ds_dir->dd_pool;
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)db_fake;
+	objset_impl_t *os = db->db_objset;
+	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
 	tx_state_t *tx = &dp->dp_tx;
-	dmu_buf_impl_t *db;
+	dmu_sync_cbin_t *in;
 	blkptr_t *blk;
-	int err;
 	zbookmark_t zb;
+	uint32_t arc_flag;
+	int err;
 
-	ASSERT(RW_LOCK_HELD(&tx->tx_suspend));
 	ASSERT(BP_IS_HOLE(bp));
 	ASSERT(txg != 0);
+
 
 	dprintf("dmu_sync txg=%llu, s,o,q %llu %llu %llu\n",
 	    txg, tx->tx_synced_txg, tx->tx_open_txg, tx->tx_quiesced_txg);
 
 	/*
-	 * XXX why is this routine using dmu_buf_*() and casting between
-	 * dmu_buf_impl_t and dmu_buf_t?
+	 * XXX - would be nice if we could do this without suspending...
 	 */
+	txg_suspend(dp);
 
 	/*
 	 * If this txg already synced, there's nothing to do.
 	 */
 	if (txg <= tx->tx_synced_txg) {
+		txg_resume(dp);
 		/*
 		 * If we're running ziltest, we need the blkptr regardless.
 		 */
 		if (txg > spa_freeze_txg(dp->dp_spa)) {
-			err = dmu_buf_hold(os, object, offset,
-			    FTAG, (dmu_buf_t **)&db);
-			if (err)
-				return (err);
 			/* if db_blkptr == NULL, this was an empty write */
 			if (db->db_blkptr)
 				*bp = *db->db_blkptr; /* structure assignment */
-			else
-				bzero(bp, sizeof (blkptr_t));
-			*blkoff = offset - db->db.db_offset;
-			ASSERT3U(*blkoff, <, db->db.db_size);
-			dmu_buf_rele((dmu_buf_t *)db, FTAG);
 			return (0);
 		}
-		return (EALREADY);
+		return (EEXIST);
 	}
-
-	/*
-	 * If this txg is in the middle of syncing, just wait for it.
-	 */
-	if (txg == tx->tx_syncing_txg) {
-		ASSERT(txg != tx->tx_open_txg);
-		return (EINPROGRESS);
-	}
-
-	err = dmu_buf_hold(os, object, offset, FTAG, (dmu_buf_t **)&db);
-	if (err)
-		return (err);
 
 	mutex_enter(&db->db_mtx);
 
-	/*
-	 * If this dbuf isn't dirty, must have been free_range'd.
-	 * There's no need to log writes to freed blocks, so we're done.
-	 */
-	if (!list_link_active(&db->db_dirty_node[txg&TXG_MASK])) {
+	blk = db->db_d.db_overridden_by[txg&TXG_MASK];
+	if (blk == IN_DMU_SYNC) {
+		/*
+		 * We have already issued a sync write for this buffer.
+		 */
 		mutex_exit(&db->db_mtx);
-		dmu_buf_rele((dmu_buf_t *)db, FTAG);
+		txg_resume(dp);
+		return (EALREADY);
+	} else if (blk != NULL) {
+		/*
+		 * This buffer had already been synced.  It could not
+		 * have been dirtied since, or we would have cleared blk.
+		 */
+		*bp = *blk; /* structure assignment */
+		mutex_exit(&db->db_mtx);
+		txg_resume(dp);
+		return (0);
+	}
+
+	if (txg == tx->tx_syncing_txg) {
+		while (db->db_data_pending) {
+			/*
+			 * IO is in-progress.  Wait for it to finish.
+			 * XXX - would be nice to be able to somehow "attach"
+			 * this zio to the parent zio passed in.
+			 */
+			cv_wait(&db->db_changed, &db->db_mtx);
+			ASSERT(db->db_data_pending ||
+			    (db->db_blkptr && db->db_blkptr->blk_birth == txg));
+		}
+
+		if (db->db_blkptr && db->db_blkptr->blk_birth == txg) {
+			/*
+			 * IO is already completed.
+			 */
+			*bp = *db->db_blkptr; /* structure assignment */
+			mutex_exit(&db->db_mtx);
+			txg_resume(dp);
+			return (0);
+		}
+	}
+
+	if (db->db_d.db_data_old[txg&TXG_MASK] == NULL) {
+		/*
+		 * This dbuf isn't dirty, must have been free_range'd.
+		 * There's no need to log writes to freed blocks, so we're done.
+		 */
+		mutex_exit(&db->db_mtx);
+		txg_resume(dp);
 		return (ENOENT);
 	}
 
-	blk = db->db_d.db_overridden_by[txg&TXG_MASK];
-
-	/*
-	 * If we already did a dmu_sync() of this dbuf in this txg,
-	 * free the old block before writing the new one.
-	 */
-	if (blk != NULL) {
-		ASSERT(blk != IN_DMU_SYNC);
-		if (blk == IN_DMU_SYNC) {
-			mutex_exit(&db->db_mtx);
-			dmu_buf_rele((dmu_buf_t *)db, FTAG);
-			return (EBUSY);
-		}
-		arc_release(db->db_d.db_data_old[txg&TXG_MASK], db);
-		if (!BP_IS_HOLE(blk)) {
-			(void) arc_free(NULL, osi->os_spa, txg, blk,
-			    NULL, NULL, ARC_WAIT);
-		}
-		kmem_free(blk, sizeof (blkptr_t));
-	}
-
+	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] == NULL);
 	db->db_d.db_overridden_by[txg&TXG_MASK] = IN_DMU_SYNC;
+	/*
+	 * XXX - a little ugly to stash the blkptr in the callback
+	 * buffer.  We always need to make sure the following is true:
+	 * ASSERT(sizeof(blkptr_t) >= sizeof(dmu_sync_cbin_t));
+	 */
+	in = kmem_alloc(sizeof (blkptr_t), KM_SLEEP);
+	in->db = db;
+	in->txg = txg;
+	in->done = done;
+	in->arg = arg;
 	mutex_exit(&db->db_mtx);
+	txg_resume(dp);
 
-	blk = kmem_alloc(sizeof (blkptr_t), KM_SLEEP);
-	blk->blk_birth = 0; /* mark as invalid */
-
-	zb.zb_objset = osi->os_dsl_dataset->ds_object;
+	arc_flag = pio == NULL ? ARC_WAIT : ARC_NOWAIT;
+	zb.zb_objset = os->os_dsl_dataset->ds_object;
 	zb.zb_object = db->db.db_object;
 	zb.zb_level = db->db_level;
 	zb.zb_blkid = db->db_blkid;
-	err = arc_write(NULL, osi->os_spa,
-	    zio_checksum_select(db->db_dnode->dn_checksum, osi->os_checksum),
-	    zio_compress_select(db->db_dnode->dn_compress, osi->os_compress),
-	    dmu_get_replication_level(osi->os_spa, &zb, db->db_dnode->dn_type),
-	    txg, blk, db->db_d.db_data_old[txg&TXG_MASK], NULL, NULL,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT, &zb);
+	err = arc_write(pio, os->os_spa,
+	    zio_checksum_select(db->db_dnode->dn_checksum, os->os_checksum),
+	    zio_compress_select(db->db_dnode->dn_compress, os->os_compress),
+	    dmu_get_replication_level(os->os_spa, &zb, db->db_dnode->dn_type),
+	    txg, bp, db->db_d.db_data_old[txg&TXG_MASK], dmu_sync_done, in,
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, arc_flag, &zb);
 	ASSERT(err == 0);
 
-	if (!BP_IS_HOLE(blk)) {
-		blk->blk_fill = 1;
-		BP_SET_TYPE(blk, db->db_dnode->dn_type);
-		BP_SET_LEVEL(blk, 0);
-	}
-
-	/* copy the block pointer back to caller */
-	*bp = *blk; /* structure assignment */
-	*blkoff = offset - db->db.db_offset;
-	ASSERT3U(*blkoff, <, db->db.db_size);
-
-	mutex_enter(&db->db_mtx);
-	if (db->db_d.db_overridden_by[txg&TXG_MASK] != IN_DMU_SYNC) {
-		/* we were dirtied/freed during the sync */
-		ASSERT3P(db->db_d.db_overridden_by[txg&TXG_MASK], ==, NULL);
-		arc_release(db->db_d.db_data_old[txg&TXG_MASK], db);
-		mutex_exit(&db->db_mtx);
-		dmu_buf_rele((dmu_buf_t *)db, FTAG);
-		/* Note that this block does not free on disk until txg syncs */
-
-		/*
-		 * XXX can we use ARC_NOWAIT here?
-		 * XXX should we be ignoring the return code?
-		 */
-		if (!BP_IS_HOLE(blk)) {
-			(void) arc_free(NULL, osi->os_spa, txg, blk,
-			    NULL, NULL, ARC_WAIT);
-		}
-		kmem_free(blk, sizeof (blkptr_t));
-		return (ESTALE);
-	}
-
-	db->db_d.db_overridden_by[txg&TXG_MASK] = blk;
-	mutex_exit(&db->db_mtx);
-	dmu_buf_rele((dmu_buf_t *)db, FTAG);
-	ASSERT3U(txg, >, tx->tx_syncing_txg);
-	return (0);
+	return (arc_flag == ARC_NOWAIT ? EINPROGRESS : 0);
 }
 
 uint64_t

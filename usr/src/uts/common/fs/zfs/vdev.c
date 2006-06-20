@@ -1792,7 +1792,7 @@ static vdev_knob_t vdev_knob[] = {
 		"deadline = pri + (lbolt >> time_shift)",
 		0,
 		63,
-		4,
+		8,
 		offsetof(struct vdev, vdev_queue.vq_time_shift)
 	},
 	{

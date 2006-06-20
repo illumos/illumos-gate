@@ -2031,22 +2031,30 @@ ztest_dmu_write_parallel(ztest_args_t *za)
 			uint64_t blkoff;
 			zbookmark_t zb;
 
-			txg_suspend(dmu_objset_pool(os));
 			(void) mutex_lock(lp);
-			error = dmu_sync(os, ZTEST_DIROBJ, off, &blkoff, &blk,
-			    txg);
+			blkoff = P2ALIGN_TYPED(off, bs, uint64_t);
+			error = dmu_buf_hold(os,
+			    ZTEST_DIROBJ, blkoff, FTAG, &db);
+			if (error) {
+				dprintf("dmu_buf_hold(%s, %d, %llx) = %d\n",
+				    osname, ZTEST_DIROBJ, blkoff, error);
+				(void) mutex_unlock(lp);
+				continue;
+			}
+			blkoff = off - blkoff;
+			error = dmu_sync(NULL, db, &blk, txg, NULL, NULL);
+			dmu_buf_rele(db, FTAG);
 			(void) mutex_unlock(lp);
 			if (error) {
-				txg_resume(dmu_objset_pool(os));
 				dprintf("dmu_sync(%s, %d, %llx) = %d\n",
 				    osname, ZTEST_DIROBJ, off, error);
 				continue;
 			}
 
 			if (blk.blk_birth == 0)	{	/* concurrent free */
-				txg_resume(dmu_objset_pool(os));
 				continue;
 			}
+			txg_suspend(dmu_objset_pool(os));
 
 			ASSERT(blk.blk_fill == 1);
 			ASSERT3U(BP_GET_TYPE(&blk), ==, DMU_OT_UINT64_OTHER);

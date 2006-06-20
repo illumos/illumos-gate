@@ -43,6 +43,7 @@ typedef enum {
 } rl_type_t;
 
 typedef struct rl {
+	znode_t *r_zp;		/* znode this lock applies to */
 	avl_node_t r_node;	/* avl node link */
 	uint64_t r_off;		/* file range offset */
 	uint64_t r_len;		/* file range length */
@@ -66,13 +67,13 @@ rl_t *zfs_range_lock(znode_t *zp, uint64_t off, uint64_t len, rl_type_t type);
 /*
  * Unlock range and destroy range lock structure.
  */
-void zfs_range_unlock(znode_t *zp, rl_t *rl);
+void zfs_range_unlock(rl_t *rl);
 
 /*
  * Reduce range locked as RW_WRITER from whole file to specified range.
  * Asserts the whole file was previously locked.
  */
-void zfs_range_reduce(znode_t *zp, rl_t *rl, uint64_t off, uint64_t len);
+void zfs_range_reduce(rl_t *rl, uint64_t off, uint64_t len);
 
 /*
  * AVL comparison function used to compare range locks

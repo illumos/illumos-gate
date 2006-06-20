@@ -936,7 +936,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 		/* recheck, in case zp_size changed */
 		if (off + len > zp->z_phys->zp_size) {
 			/* lost race: file size changed, lock whole file */
-			zfs_range_unlock(zp, rl);
+			zfs_range_unlock(rl);
 			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
 		}
 	}
@@ -946,7 +946,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	 */
 	size = zp->z_phys->zp_size;
 	if (len == 0 && size == off) {
-		zfs_range_unlock(zp, rl);
+		zfs_range_unlock(rl);
 		return (0);
 	}
 
@@ -964,7 +964,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 			extent = size - off;
 		}
 		if (error = chklock(vp, FWRITE, start, extent, flag, NULL)) {
-			zfs_range_unlock(zp, rl);
+			zfs_range_unlock(rl);
 			return (error);
 		}
 	}
@@ -996,7 +996,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT)
 			dmu_tx_wait(tx);
 		dmu_tx_abort(tx);
-		zfs_range_unlock(zp, rl);
+		zfs_range_unlock(rl);
 		return (error);
 	}
 
@@ -1022,7 +1022,7 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 		seq = zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
 	}
 
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 
 	dmu_tx_commit(tx);
 

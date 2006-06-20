@@ -51,6 +51,7 @@ typedef struct lwb {
 	int		lwb_nused;	/* # used bytes in buffer */
 	int		lwb_sz;		/* size of block and buffer */
 	char		*lwb_buf;	/* log write buffer */
+	zio_t		*lwb_zio;	/* zio for this buffer */
 	uint64_t	lwb_max_txg;	/* highest txg in this lwb */
 	uint64_t	lwb_seq;	/* highest log record seq number */
 	txg_handle_t	lwb_txgh;	/* txg handle for txg_exit() */
@@ -78,6 +79,7 @@ struct zilog {
 	objset_t	*zl_os;		/* object set we're logging */
 	zil_get_data_t	*zl_get_data;	/* callback to get object content */
 	uint64_t	zl_itx_seq;	/* itx sequence number */
+	uint64_t	zl_wait_seq;	/* last tx write initiated */
 	uint64_t	zl_ss_seq;	/* last tx on stable storage */
 	uint64_t	zl_destroy_txg;	/* txg of last zil_destroy() */
 	uint64_t	zl_replay_seq[TXG_SIZE]; /* seq of last replayed rec */

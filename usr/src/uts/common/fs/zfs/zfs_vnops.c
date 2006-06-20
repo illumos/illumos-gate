@@ -487,7 +487,7 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		dmu_buf_rele_array(dbpp, numbufs, FTAG);
 	}
 out:
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 
 	ZFS_ACCESSTIME_STAMP(zfsvfs, zp);
 	ZFS_EXIT(zfsvfs);
@@ -606,10 +606,10 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	ZFS_ENTER(zfsvfs);
 
 	/*
-	 * Pre-fault the initial pages to ensure slow (eg NFS) pages
+	 * Pre-fault the pages to ensure slow (eg NFS) pages
 	 * don't hold up txg.
 	 */
-	zfs_prefault_write(MIN(start_resid, SPA_MAXBLOCKSIZE), uio);
+	zfs_prefault_write(n, uio);
 
 	/*
 	 * If in append mode, set the io offset pointer to eof.
@@ -692,7 +692,7 @@ top:
 			new_blksz = MIN(end_size, max_blksz);
 		}
 		zfs_grow_blocksize(zp, new_blksz, tx);
-		zfs_range_reduce(zp, rl, woff, n);
+		zfs_range_reduce(rl, woff, n);
 	}
 
 	/*
@@ -766,9 +766,6 @@ top:
 		    ioflag, uio);
 		dmu_tx_commit(tx);
 
-		/* Pre-fault the next set of pages */
-		zfs_prefault_write(MIN(n, SPA_MAXBLOCKSIZE), uio);
-
 		/*
 		 * Start another transaction.
 		 */
@@ -810,7 +807,7 @@ tx_done:
 
 no_tx_done:
 
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 
 	/*
 	 * If we're in replay mode, or we made no progress, return error.
@@ -827,16 +824,28 @@ no_tx_done:
 	return (0);
 }
 
+void
+zfs_get_done(dmu_buf_t *db, void *vrl)
+{
+	rl_t *rl = (rl_t *)vrl;
+	vnode_t *vp = ZTOV(rl->r_zp);
+
+	dmu_buf_rele(db, rl);
+	zfs_range_unlock(rl);
+	VN_RELE(vp);
+}
+
 /*
  * Get data to generate a TX_WRITE intent log record.
  */
 int
-zfs_get_data(void *arg, lr_write_t *lr, char *buf)
+zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 {
 	zfsvfs_t *zfsvfs = arg;
 	objset_t *os = zfsvfs->z_os;
 	znode_t *zp;
 	uint64_t off = lr->lr_offset;
+	dmu_buf_t *db;
 	rl_t *rl;
 	int dlen = lr->lr_length;  		/* length of user data */
 	int error = 0;
@@ -861,8 +870,6 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf)
 	 * we don't have to write the data twice.
 	 */
 	if (buf != NULL) { /* immediate write */
-		dmu_buf_t *db;
-
 		rl = zfs_range_lock(zp, off, dlen, RL_READER);
 		/* test for truncation needs to be done while range locked */
 		if (off >= zp->z_phys->zp_size) {
@@ -892,20 +899,30 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf)
 			rl = zfs_range_lock(zp, boff, dlen, RL_READER);
 			if (zp->z_blksz == dlen)
 				break;
-			zfs_range_unlock(zp, rl);
+			zfs_range_unlock(rl);
 		}
 		/* test for truncation needs to be done while range locked */
 		if (off >= zp->z_phys->zp_size) {
 			error = ENOENT;
 			goto out;
 		}
-		txg_suspend(dmu_objset_pool(os));
-		error = dmu_sync(os, lr->lr_foid, off, &lr->lr_blkoff,
-		    &lr->lr_blkptr, lr->lr_common.lrc_txg);
-		txg_resume(dmu_objset_pool(os));
+		VERIFY(0 == dmu_buf_hold(os, lr->lr_foid, boff, rl, &db));
+		ASSERT(boff == db->db_offset);
+		lr->lr_blkoff = off - boff;
+		error = dmu_sync(zio, db, &lr->lr_blkptr,
+		    lr->lr_common.lrc_txg, zio ? zfs_get_done : NULL, rl);
+		/*
+		 * If we get EINPROGRESS, then we need to wait for a
+		 * write IO initiated by dmu_sync() to complete before
+		 * we can release this dbuf.  We will finish everthing
+		 * up in the zfs_get_done() callback.
+		 */
+		if (error == EINPROGRESS)
+			return (0);
+		dmu_buf_rele(db, rl);
 	}
 out:
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 	VN_RELE(ZTOV(zp));
 	return (error);
 }
@@ -2785,7 +2802,7 @@ top:
 	 * Can't push pages past end-of-file.
 	 */
 	if (off >= zp->z_phys->zp_size) {
-		zfs_range_unlock(zp, rl);
+		zfs_range_unlock(rl);
 		return (EIO);
 	}
 	len = MIN(PAGESIZE, zp->z_phys->zp_size - off);
@@ -2795,7 +2812,7 @@ top:
 	dmu_tx_hold_bonus(tx, zp->z_id);
 	err = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (err != 0) {
-		zfs_range_unlock(zp, rl);
+		zfs_range_unlock(rl);
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
@@ -2815,7 +2832,7 @@ top:
 	(void) zfs_log_write(zilog, tx, TX_WRITE, zp, off, len, 0, NULL);
 	dmu_tx_commit(tx);
 
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 
 	pvn_write_done(pp, B_WRITE | flags);
 	if (offp)
@@ -3155,7 +3172,7 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 
 	/* can't fault past EOF */
 	if (off >= zp->z_phys->zp_size) {
-		zfs_range_unlock(zp, rl);
+		zfs_range_unlock(rl);
 		ZFS_EXIT(zfsvfs);
 		return (EFAULT);
 	}
@@ -3236,7 +3253,7 @@ out:
 
 	if (need_unlock)
 		rw_exit(&zp->z_map_lock);
-	zfs_range_unlock(zp, rl);
+	zfs_range_unlock(rl);
 
 	ZFS_EXIT(zfsvfs);
 	return (err);

@@ -34,8 +34,8 @@
  * ---------
  * Defined in zfs_rlock.h but essentially:
  *	rl = zfs_range_lock(zp, off, len, lock_type);
- *	zfs_range_unlock(zp, rl);
- *	zfs_range_reduce(zp, rl, off, len);
+ *	zfs_range_unlock(rl);
+ *	zfs_range_reduce(rl, off, len);
  *
  * AVL tree
  * --------
@@ -417,6 +417,7 @@ zfs_range_lock(znode_t *zp, uint64_t off, uint64_t len, rl_type_t type)
 	ASSERT(type == RL_READER || type == RL_WRITER || type == RL_APPEND);
 
 	new = kmem_alloc(sizeof (rl_t), KM_SLEEP);
+	new->r_zp = zp;
 	new->r_off = off;
 	new->r_len = len;
 	new->r_cnt = 1; /* assume it's going to be in the tree */
@@ -503,8 +504,10 @@ zfs_range_unlock_reader(znode_t *zp, rl_t *remove)
  * Unlock range and destroy range lock structure.
  */
 void
-zfs_range_unlock(znode_t *zp, rl_t *rl)
+zfs_range_unlock(rl_t *rl)
 {
+	znode_t *zp = rl->r_zp;
+
 	ASSERT(rl->r_type == RL_WRITER || rl->r_type == RL_READER);
 	ASSERT(rl->r_cnt == 1 || rl->r_cnt == 0);
 	ASSERT(!rl->r_proxy);
@@ -535,8 +538,10 @@ zfs_range_unlock(znode_t *zp, rl_t *rl)
  * entry in the tree.
  */
 void
-zfs_range_reduce(znode_t *zp, rl_t *rl, uint64_t off, uint64_t len)
+zfs_range_reduce(rl_t *rl, uint64_t off, uint64_t len)
 {
+	znode_t *zp = rl->r_zp;
+
 	/* Ensure there are no other locks */
 	ASSERT(avl_numnodes(&zp->z_range_avl) == 1);
 	ASSERT(rl->r_off == 0);

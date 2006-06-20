@@ -209,7 +209,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 /*
  * zfs_log_write() handles TX_WRITE transactions.
  */
-ssize_t zfs_immediate_write_sz = 65536;
+ssize_t zfs_immediate_write_sz = 32768;
 
 uint64_t
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,

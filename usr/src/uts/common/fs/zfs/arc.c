@@ -2217,6 +2217,8 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	ASSERT3P(hdr->b_state, ==, arc.anon);
 	ASSERT(BUF_EMPTY(hdr));
 	ASSERT(!HDR_IO_ERROR(hdr));
+	ASSERT((hdr->b_flags & ARC_IO_IN_PROGRESS) == 0);
+	ASSERT(hdr->b_acb == 0);
 	acb = kmem_zalloc(sizeof (arc_callback_t), KM_SLEEP);
 	acb->acb_done = done;
 	acb->acb_private = private;

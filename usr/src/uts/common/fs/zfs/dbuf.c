@@ -712,9 +712,9 @@ dbuf_unoverride(dmu_buf_impl_t *db, uint64_t txg)
 {
 	ASSERT(db->db_blkid != DB_BONUS_BLKID);
 	ASSERT(MUTEX_HELD(&db->db_mtx));
-	if (db->db_d.db_overridden_by[txg&TXG_MASK] == IN_DMU_SYNC) {
-		db->db_d.db_overridden_by[txg&TXG_MASK] = NULL;
-	} else if (db->db_d.db_overridden_by[txg&TXG_MASK] != NULL) {
+	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] != IN_DMU_SYNC);
+
+	if (db->db_d.db_overridden_by[txg&TXG_MASK] != NULL) {
 		/* free this block */
 		ASSERT(list_link_active(&db->db_dirty_node[txg&TXG_MASK]) ||
 		    db->db_dnode->dn_free_txg == txg);
@@ -1783,6 +1783,16 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	if (db->db_level == 0) {
 		data = (arc_buf_t **)&db->db_d.db_data_old[txg&TXG_MASK];
 		blksz = arc_buf_size(*data);
+
+		/*
+		 * This buffer is in the middle of an immdiate write.
+		 * Wait for the synchronous IO to complete.
+		 */
+		while (db->db_d.db_overridden_by[txg&TXG_MASK] == IN_DMU_SYNC) {
+			ASSERT(dn->dn_object != DMU_META_DNODE_OBJECT);
+			cv_wait(&db->db_changed, &db->db_mtx);
+			ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK]);
+		}
 		/*
 		 * If this buffer is currently "in use" (i.e., there are
 		 * active holds and db_data still references it), then make
@@ -2084,6 +2094,8 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 	dnode_diduse_space(dn, new_size-old_size);
 
 	mutex_enter(&db->db_mtx);
+
+	ASSERT(db->db_d.db_overridden_by[txg&TXG_MASK] == NULL);
 
 	if (db->db_dirtied == txg)
 		db->db_dirtied = 0;

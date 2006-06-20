@@ -572,13 +572,17 @@ uint64_t dmu_tx_get_txg(dmu_tx_t *tx);
 
 /*
  * Synchronous write.
- * On success returns 0 and fills in the blk pointed at by bp.
+ * If a parent zio is provided this function initiates a write on the
+ * provided buffer as a child of the parent zio.
+ * In the absense of a parent zio, the write is completed synchronously.
+ * At write completion, blk is filled with the bp of the written block.
  * Note that while the data covered by this function will be on stable
- * storage when the function returns this new data does not become a
+ * storage when the write completes this new data does not become a
  * permanent part of the file until the associated transaction commits.
  */
-int dmu_sync(objset_t *os, uint64_t object, uint64_t offset, uint64_t *blkoff,
-    struct blkptr *bp, uint64_t txg);
+typedef void dmu_sync_cb_t(dmu_buf_t *db, void *arg);
+int dmu_sync(struct zio *zio, dmu_buf_t *db,
+    struct blkptr *bp, uint64_t txg, dmu_sync_cb_t *done, void *arg);
 
 /*
  * Find the next hole or data block in file starting at *off

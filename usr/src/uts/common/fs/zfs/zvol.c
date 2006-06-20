@@ -68,6 +68,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/mkdev.h>
 #include <sys/zil.h>
+#include <sys/refcount.h>
 
 #include "zfs_namecheck.h"
 
@@ -683,7 +684,9 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t len,
 	itx_t *itx;
 	lr_write_t *lr;
 	objset_t *os;
+	dmu_buf_t *db;
 	uint64_t txg;
+	uint64_t boff;
 	int error;
 	uint32_t blocksize;
 
@@ -714,18 +717,22 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t len,
 		if (nbytes <= zvol_immediate_write_sz) {
 			itx = zvol_immediate_itx(off, nbytes, addr);
 		} else {
+			boff =  P2ALIGN_TYPED(off, blocksize, uint64_t);
 			itx = zil_itx_create(TX_WRITE, sizeof (*lr));
 			lr = (lr_write_t *)&itx->itx_lr;
 			lr->lr_foid = ZVOL_OBJ;
 			lr->lr_offset = off;
 			lr->lr_length = nbytes;
-			lr->lr_blkoff = 0;
+			lr->lr_blkoff = off - boff;
 			BP_ZERO(&lr->lr_blkptr);
 
-			txg_suspend(dmu_objset_pool(os));
-			error = dmu_sync(os, ZVOL_OBJ, off, &lr->lr_blkoff,
-			    &lr->lr_blkptr, txg);
-			txg_resume(dmu_objset_pool(os));
+			/* XXX - we should do these IOs in parallel */
+			VERIFY(0 == dmu_buf_hold(os, ZVOL_OBJ, boff,
+			    FTAG, &db));
+			ASSERT(boff == db->db_offset);
+			error = dmu_sync(NULL, db, &lr->lr_blkptr,
+			    txg, NULL, NULL);
+			dmu_buf_rele(db, FTAG);
 			if (error) {
 				kmem_free(itx, offsetof(itx_t, itx_lr));
 				return (error);
