@@ -61,7 +61,6 @@
 #include <sys/mdesc_impl.h>
 #include <sys/mach_descrip.h>
 #include <sys/prom_plat.h>
-#include <sys/bootconf.h>
 #include <sys/promif.h>
 
 
@@ -74,8 +73,6 @@ static void *mach_descrip_meta_alloc(size_t size);
 static uint64_t mach_descrip_find_md_gen(caddr_t ptr);
 static void init_md_params(void);
 static void init_domaining_enabled(md_t *mdp, mde_cookie_t *listp);
-
-extern struct bootops *bootops;
 
 /*
  * Global ptr of the current generation Machine Description
@@ -134,6 +131,7 @@ uint_t domaining_enabled;
  */
 uint_t force_domaining_disabled;
 
+#define	META_ALLOC_ALIGN	8
 #define	HAS_GEN(x)	(x != MDESC_INVAL_GEN)
 
 #ifdef DEBUG
@@ -464,13 +462,13 @@ mach_descrip_buf_alloc(size_t size, size_t align)
 static void *
 mach_descrip_strt_meta_alloc(size_t size)
 {
-	return (BOP_ALLOC(bootops, (caddr_t)0, size, PAGESIZE));
+	return (mach_descrip_strt_buf_alloc(size, META_ALLOC_ALIGN));
 }
 
 static void
 mach_descrip_strt_meta_free(void *buf, size_t size)
 {
-	BOP_FREE(bootops, buf, size);
+	mach_descrip_strt_buf_free(buf, size);
 }
 
 static void *
