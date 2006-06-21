@@ -113,6 +113,7 @@
 
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
+#include <inet/sctp/sctp_impl.h>
 #include <inet/udp_impl.h>
 
 #include <sys/tsol/label.h>
@@ -665,7 +666,9 @@ static void	ip_ipsec_out_prepend(mblk_t *, mblk_t *, ill_t *);
 static void	icmp_frag_needed(queue_t *, mblk_t *, int);
 static void	icmp_inbound(queue_t *, mblk_t *, boolean_t, ill_t *, int,
     uint32_t, boolean_t, boolean_t, ill_t *, zoneid_t);
-static boolean_t icmp_inbound_too_big(icmph_t *, ipha_t *);
+static ipaddr_t	icmp_get_nexthop_addr(ipha_t *, ill_t *, zoneid_t, mblk_t *mp);
+static boolean_t icmp_inbound_too_big(icmph_t *, ipha_t *, ill_t *, zoneid_t,
+		    mblk_t *mp);
 static void	icmp_inbound_error_fanout(queue_t *, ill_t *, mblk_t *,
 		    icmph_t *, ipha_t *, int, int, boolean_t, boolean_t,
 		    ill_t *, zoneid_t);
@@ -1980,7 +1983,8 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 			return;
 		case ICMP_DEST_UNREACHABLE:
 			if (icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
-				if (!icmp_inbound_too_big(icmph, ipha)) {
+				if (!icmp_inbound_too_big(icmph, ipha, ill,
+				    zoneid, mp)) {
 					freemsg(first_mp);
 					return;
 				}
@@ -2148,6 +2152,105 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 	put(WR(q), first_mp);
 }
 
+static ipaddr_t
+icmp_get_nexthop_addr(ipha_t *ipha, ill_t *ill, zoneid_t zoneid, mblk_t *mp)
+{
+	conn_t *connp;
+	connf_t *connfp;
+	ipaddr_t nexthop_addr = INADDR_ANY;
+	int hdr_length = IPH_HDR_LENGTH(ipha);
+	uint16_t *up;
+	uint32_t ports;
+
+	up = (uint16_t *)((uchar_t *)ipha + hdr_length);
+	switch (ipha->ipha_protocol) {
+		case IPPROTO_TCP:
+		{
+			tcph_t *tcph;
+
+			/* do a reverse lookup */
+			tcph = (tcph_t *)((uchar_t *)ipha + hdr_length);
+			connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcph,
+			    TCPS_LISTEN);
+			break;
+		}
+		case IPPROTO_UDP:
+		{
+			uint32_t dstport, srcport;
+
+			((uint16_t *)&ports)[0] = up[1];
+			((uint16_t *)&ports)[1] = up[0];
+
+			/* Extract ports in net byte order */
+			dstport = htons(ntohl(ports) & 0xFFFF);
+			srcport = htons(ntohl(ports) >> 16);
+
+			connfp = &ipcl_udp_fanout[IPCL_UDP_HASH(dstport)];
+			mutex_enter(&connfp->connf_lock);
+			connp = connfp->connf_head;
+
+			/* do a reverse lookup */
+			while ((connp != NULL) &&
+			    (!IPCL_UDP_MATCH(connp, dstport,
+			    ipha->ipha_src, srcport, ipha->ipha_dst) ||
+			    connp->conn_zoneid != zoneid)) {
+				connp = connp->conn_next;
+			}
+			if (connp != NULL)
+				CONN_INC_REF(connp);
+			mutex_exit(&connfp->connf_lock);
+			break;
+		}
+		case IPPROTO_SCTP:
+		{
+			in6_addr_t map_src, map_dst;
+
+			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_src);
+			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_dst);
+			((uint16_t *)&ports)[0] = up[1];
+			((uint16_t *)&ports)[1] = up[0];
+
+			if ((connp = sctp_find_conn(&map_src, &map_dst, ports,
+			    0, zoneid)) == NULL) {
+				connp = ipcl_classify_raw(mp, IPPROTO_SCTP,
+				    zoneid, ports, ipha);
+			} else {
+				CONN_INC_REF(connp);
+				SCTP_REFRELE(CONN2SCTP(connp));
+			}
+			break;
+		}
+		default:
+		{
+			ipha_t ripha;
+
+			ripha.ipha_src = ipha->ipha_dst;
+			ripha.ipha_dst = ipha->ipha_src;
+			ripha.ipha_protocol = ipha->ipha_protocol;
+
+			connfp = &ipcl_proto_fanout[ipha->ipha_protocol];
+			mutex_enter(&connfp->connf_lock);
+			connp = connfp->connf_head;
+			for (connp = connfp->connf_head; connp != NULL;
+			    connp = connp->conn_next) {
+				if (IPCL_PROTO_MATCH(connp,
+				    ipha->ipha_protocol, &ripha, ill,
+				    0, zoneid)) {
+					CONN_INC_REF(connp);
+					break;
+				}
+			}
+			mutex_exit(&connfp->connf_lock);
+		}
+	}
+	if (connp != NULL) {
+		if (connp->conn_nexthop_set)
+			nexthop_addr = connp->conn_nexthop_v4;
+		CONN_DEC_REF(connp);
+	}
+	return (nexthop_addr);
+}
+
 /* Table from RFC 1191 */
 static int icmp_frag_size_table[] =
 { 32000, 17914, 8166, 4352, 2002, 1496, 1006, 508, 296, 68 };
@@ -2161,28 +2264,53 @@ static int icmp_frag_size_table[] =
  * Returns B_FALSE on failure and B_TRUE on success.
  */
 static boolean_t
-icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha)
+icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
+    zoneid_t zoneid, mblk_t *mp)
 {
 	ire_t	*ire, *first_ire;
 	int	mtu;
 	int	hdr_length;
+	ipaddr_t nexthop_addr;
 
 	ASSERT(icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
 	    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED);
 
 	hdr_length = IPH_HDR_LENGTH(ipha);
 
-	first_ire = ire_ctable_lookup(ipha->ipha_dst, 0, IRE_CACHE, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	/* Drop if the original packet contained a source route */
+	if (ip_source_route_included(ipha)) {
+		return (B_FALSE);
+	}
+	/*
+	 * Verify we have atleast ICMP_MIN_TP_HDR_LENGTH bytes of transport
+	 * header.
+	 */
+	if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
+	    mp->b_wptr) {
+		if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
+		    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
+			BUMP_MIB(&ip_mib, ipInDiscards);
+			ip1dbg(("icmp_inbound_too_big: insufficient hdr\n"));
+			return (B_FALSE);
+		}
+		icmph = (icmph_t *)&mp->b_rptr[hdr_length];
+		ipha = (ipha_t *)&icmph[1];
+	}
+	nexthop_addr = icmp_get_nexthop_addr(ipha, ill, zoneid, mp);
+	if (nexthop_addr != INADDR_ANY) {
+		/* nexthop set */
+		first_ire = ire_ctable_lookup(ipha->ipha_dst,
+		    nexthop_addr, 0, NULL, ALL_ZONES, MBLK_GETLABEL(mp),
+		    MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW);
+	} else {
+		/* nexthop not set */
+		first_ire = ire_ctable_lookup(ipha->ipha_dst, 0, IRE_CACHE,
+		    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE);
+	}
 
 	if (!first_ire) {
 		ip1dbg(("icmp_inbound_too_big: no route for 0x%x\n",
 		    ntohl(ipha->ipha_dst)));
-		return (B_FALSE);
-	}
-	/* Drop if the original packet contained a source route */
-	if (ip_source_route_included(ipha)) {
-		ire_refrele(first_ire);
 		return (B_FALSE);
 	}
 	/* Check for MTU discovery advice as described in RFC 1191 */
@@ -2190,6 +2318,18 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha)
 	rw_enter(&first_ire->ire_bucket->irb_lock, RW_READER);
 	for (ire = first_ire; ire != NULL && ire->ire_addr == ipha->ipha_dst;
 	    ire = ire->ire_next) {
+		/*
+		 * Look for the connection to which this ICMP message is
+		 * directed. If it has the IP_NEXTHOP option set, then the
+		 * search is limited to IREs with the MATCH_IRE_PRIVATE
+		 * option. Else the search is limited to regular IREs.
+		 */
+		if (((ire->ire_marks & IRE_MARK_PRIVATE_ADDR) &&
+		    (nexthop_addr != ire->ire_gateway_addr)) ||
+		    (!(ire->ire_marks & IRE_MARK_PRIVATE_ADDR) &&
+		    (nexthop_addr != INADDR_ANY)))
+			continue;
+
 		mutex_enter(&ire->ire_lock);
 		if (icmph->icmph_du_zero == 0 && mtu > 68) {
 			/* Reduce the IRE max frag value as advised. */
