@@ -382,8 +382,10 @@ zfs_purgedir(znode_t *dzp)
 /*
  * Special function to requeue the znodes for deletion that were
  * in progress when we either crashed or umounted the file system.
+ *
+ * returns 1 if queue was drained.
  */
-static void
+static int
 zfs_drain_dq(zfsvfs_t *zfsvfs)
 {
 	zap_cursor_t	zc;
@@ -400,10 +402,11 @@ zfs_drain_dq(zfsvfs_t *zfsvfs)
 	    zap_cursor_advance(&zc)) {
 
 		/*
-		 * Need some helpers?
+		 * Create more threads if necessary to balance the load.
+		 * quit if the delete threads have been shut down.
 		 */
 		if (zfs_delete_thread_target(zfsvfs, -1) != 0)
-			return;
+			return (0);
 
 		/*
 		 * See what kind of object we have in queue
@@ -426,16 +429,18 @@ zfs_drain_dq(zfsvfs_t *zfsvfs)
 		 * We may pick up znodes that are already marked for reaping.
 		 * This could happen during the purge of an extended attribute
 		 * directory.  All we need to do is skip over them, since they
-		 * are already in the system to be processed by the taskq.
+		 * are already in the system to be processed by the delete
+		 * thread(s).
 		 */
 		if (error != 0) {
 			continue;
 		}
+
 		zp->z_reap = 1;
 		VN_RELE(ZTOV(zp));
-		break;
 	}
 	zap_cursor_fini(&zc);
+	return (1);
 }
 
 void
@@ -445,6 +450,7 @@ zfs_delete_thread(void *arg)
 	zfs_delete_t 	*zd = &zfsvfs->z_delete_head;
 	znode_t		*zp;
 	callb_cpr_t	cprinfo;
+	int		drained;
 
 	CALLB_CPR_INIT(&cprinfo, &zd->z_mutex, callb_generic_cpr, "zfs_delete");
 
@@ -453,10 +459,10 @@ zfs_delete_thread(void *arg)
 	if (!zd->z_drained && !zd->z_draining) {
 		zd->z_draining = B_TRUE;
 		mutex_exit(&zd->z_mutex);
-		zfs_drain_dq(zfsvfs);
+		drained = zfs_drain_dq(zfsvfs);
 		mutex_enter(&zd->z_mutex);
 		zd->z_draining = B_FALSE;
-		zd->z_drained = B_TRUE;
+		zd->z_drained = drained;
 		cv_broadcast(&zd->z_quiesce_cv);
 	}
 
