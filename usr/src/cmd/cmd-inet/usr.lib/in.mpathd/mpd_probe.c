@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1207,7 +1207,7 @@ incoming_mcast_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 	 * valid probe target.
 	 */
 	af = pii->pii_af;
-	if (own_address(af, fromaddr))
+	if (own_address(fromaddr))
 		return;
 
 	/*
@@ -2920,54 +2920,24 @@ reset_snxt_basetimes(void)
  * is our own. This is because, we don't track interfaces that
  * are not part of any group. We have to either use a 'bind' or
  * get the complete list of all interfaces using SIOCGLIFCONF,
- * to do this check. We choose to use 'bind'. We could use
- * SIOCTMYADDR, but bind is preferred, since it is stronger.
- * SIOCTMYADDR excludes down interfaces, while bind includes even
- * down interfaces.
+ * to do this check. We could also use SIOCTMYADDR.
+ * Bind fails for the local zone address, so we might include local zone
+ * address as target address. If local zone address is a target address
+ * and it is up, it is not possible to detect the interface failure.
+ * SIOCTMYADDR also doesn't consider local zone address as own address.
+ * So, we choose to use SIOCGLIFCONF to collect the local addresses, and they
+ * are stored in laddr_list.
  */
+
 boolean_t
-own_address(int af, struct in6_addr addr)
+own_address(struct in6_addr addr)
 {
-	int sock;
-	boolean_t ours = _B_TRUE;
+	struct local_addr *taddr = laddr_list;
 
-	sock = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (sock  == -1) {
-		logperror("own_address: socket");
-		/*
-		 * If the socket call fails, err on the side of caution,
-		 * and return true.
-		 */
-	} else {
-		struct sockaddr_in6 sin6;
-
-		(void) memset(&sin6, 0, sizeof (struct sockaddr_in6));
-		sin6.sin6_family = AF_INET6;
-		sin6.sin6_addr = addr;
-		/*
-		 * If the bind succeeds, then this address is one of our
-		 * addresses.
-		 * If bind returns error EADDRNOTAVAIL, the address is
-		 * not one of ours.
-		 * If bind returns an error other than EADDRNOTAVAIL, err
-		 * on the side of caution and report the address as one of
-		 * our own.
-		 */
-		if (bind(sock, (struct sockaddr *)&sin6,
-		    sizeof (struct sockaddr_in6)) == -1) {
-			if (errno == EADDRNOTAVAIL)
-				ours = _B_FALSE;
-			else
-				logperror("own_address: bind");
+	for (; taddr != NULL; taddr = taddr->next) {
+		if (IN6_ARE_ADDR_EQUAL(&addr, &taddr->addr)) {
+			return (_B_TRUE);
 		}
-		(void) close(sock);
 	}
-	if (debug & D_TARGET) {
-		char abuf[INET6_ADDRSTRLEN];
-
-		logdebug("own_address: addr %s is %s ours\n",
-		    pr_addr(af, addr, abuf, sizeof (abuf)),
-		    ours ? "one of" : "not");
-	}
-	return (ours);
+	return (_B_FALSE);
 }

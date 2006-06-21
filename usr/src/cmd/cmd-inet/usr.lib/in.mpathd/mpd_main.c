@@ -82,6 +82,8 @@ static unsigned int send_grouplist(int fd, ipmp_grouplist_t *grlistp);
 static unsigned int send_ifinfo(int fd, ipmp_ifinfo_t *ifinfop);
 static unsigned int send_result(int fd, unsigned int error, int syserror);
 
+struct local_addr *laddr_list = NULL;
+
 /*
  * Return the current time in milliseconds (from an arbitrary reference)
  * truncated to fit into an int. Truncation is ok since we are interested
@@ -283,11 +285,21 @@ initifs()
 	char	pi_name[LIFNAMSIZ + 1];
 	boolean_t exists;
 	struct phyint	*pi;
+	struct local_addr *next;
 
 	if (debug & D_PHYINT)
 		logdebug("initifs: Scanning interfaces\n");
 
 	last_initifs_time = getcurrenttime();
+
+	/*
+	 * Free the laddr_list before collecting the local addresses.
+	 */
+	while (laddr_list != NULL) {
+		next = laddr_list->next;
+		free(laddr_list);
+		laddr_list = next;
+	}
 
 	/*
 	 * Mark the interfaces so that we can find phyints and logints
@@ -307,7 +319,7 @@ initifs()
 	}
 
 	lifn.lifn_family = AF_UNSPEC;
-	lifn.lifn_flags = 0;
+	lifn.lifn_flags = LIFC_ALLZONES;
 	if (ioctl(ifsock_v4, SIOCGLIFNUM, (char *)&lifn) < 0) {
 		logperror("initifs: ioctl (get interface numbers)");
 		return;
@@ -321,7 +333,7 @@ initifs()
 	}
 
 	lifc.lifc_family = AF_UNSPEC;
-	lifc.lifc_flags = 0;
+	lifc.lifc_flags = LIFC_ALLZONES;
 	lifc.lifc_len = numifs * sizeof (struct lifreq);
 	lifc.lifc_buf = buf;
 
@@ -351,15 +363,61 @@ initifs()
 	 * logint.
 	 */
 	for (n = lifc.lifc_len / sizeof (struct lifreq); n > 0; n--, lifr++) {
+		int	sockfd;
+		struct local_addr	*taddr;
+		struct sockaddr_in	*sin;
+		struct sockaddr_in6	*sin6;
+		struct lifreq	lifreq;
+
 		af = lifr->lifr_addr.ss_family;
+
+		/*
+		 * Collect all local addresses.
+		 */
+		sockfd = (af == AF_INET) ? ifsock_v4 : ifsock_v6;
+		(void) memset(&lifreq, 0, sizeof (lifreq));
+		(void) strlcpy(lifreq.lifr_name, lifr->lifr_name,
+		    sizeof (lifreq.lifr_name));
+
+		if (ioctl(sockfd, SIOCGLIFFLAGS, &lifreq) == -1) {
+			if (errno != ENXIO)
+				logperror("initifs: ioctl (SIOCGLIFFLAGS)");
+			continue;
+		}
+
+		/*
+		 * Add the interface address to laddr_list.
+		 * Another node might have the same IP address which is up.
+		 * In that case, it is appropriate  to use the address as a
+		 * target, even though it is also configured (but not up) on
+		 * the local system.
+		 * Hence,the interface address is not added to laddr_list
+		 * unless it is IFF_UP.
+		 */
+		if (lifreq.lifr_flags & IFF_UP) {
+			taddr = malloc(sizeof (struct local_addr));
+			if (taddr == NULL) {
+				logperror("initifs: malloc");
+				continue;
+			}
+			if (af == AF_INET) {
+				sin = (struct sockaddr_in *)&lifr->lifr_addr;
+				IN6_INADDR_TO_V4MAPPED(&sin->sin_addr,
+				    &taddr->addr);
+			} else {
+				sin6 = (struct sockaddr_in6 *)&lifr->lifr_addr;
+				taddr->addr = sin6->sin6_addr;
+			}
+			taddr->next = laddr_list;
+			laddr_list = taddr;
+		}
 
 		/*
 		 * Need to pass a phyint name to pii_process. Insert the
 		 * null where the ':' IF_SEPARATOR is found in the logical
 		 * name.
 		 */
-		(void) strncpy(pi_name, lifr->lifr_name, sizeof (pi_name));
-		pi_name[sizeof (pi_name) - 1] = '\0';
+		(void) strlcpy(pi_name, lifr->lifr_name, sizeof (pi_name));
 		if ((cp = strchr(pi_name, IF_SEPARATOR)) != NULL)
 			*cp = '\0';
 
@@ -1826,7 +1884,7 @@ router_add_common(int af, char *ifname, struct in6_addr nexthop)
 	/*
 	 * Don't use our own addresses as targets.
 	 */
-	if (own_address(pii->pii_af, nexthop))
+	if (own_address(nexthop))
 		return;
 
 	/*

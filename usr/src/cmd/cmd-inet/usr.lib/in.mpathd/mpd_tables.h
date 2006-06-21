@@ -392,9 +392,17 @@ struct probes_missed
 	uint_t	pm_ntimes;	/* Total number of occassions */
 };
 
+struct local_addr
+{
+	struct in6_addr addr;
+	struct local_addr *next;
+};
+
 /*
  * Globals
  */
+extern struct local_addr *laddr_list;
+			/* List of all local addresses, including local zones */
 extern struct phyint *phyints;		/* List of all phyints */
 extern struct phyint_group *phyint_groups; /* List of all phyint groups */
 extern struct phyint_group *phyint_anongroup; /* Pointer to the anon group */
@@ -455,7 +463,7 @@ extern void process_link_state_changes(void);
 extern void clear_pii_probe_stats(struct phyint_instance *pii);
 extern void start_timer(struct phyint_instance *pii);
 
-extern boolean_t own_address(int af, struct in6_addr addr);
+extern boolean_t own_address(struct in6_addr addr);
 
 extern void close_probe_socket(struct phyint_instance *pii, boolean_t flag);
 
