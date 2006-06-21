@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,11 +81,13 @@ pci_dvma_unregister_callbacks(pci_t *pci_p, ddi_dma_impl_t *mp)
 	ASSERT(pplist == NULL);
 
 	offset = mp->dmai_roffset;
-	hat_delete_callback(vaddr, IOMMU_PAGE_SIZE - offset, mp, HAC_PAGELOCK);
+	hat_delete_callback(vaddr, IOMMU_PAGE_SIZE - offset, mp, HAC_PAGELOCK,
+	    MP_HAT_CB_COOKIE(mp, 0));
 	vaddr = (caddr_t)(((uintptr_t)vaddr + IOMMU_PAGE_SIZE) &
 	    IOMMU_PAGE_MASK);
 	for (i = 1; i < mp->dmai_ndvmapages; i++) {
-		hat_delete_callback(vaddr, IOMMU_PAGE_SIZE, mp, HAC_PAGELOCK);
+		hat_delete_callback(vaddr, IOMMU_PAGE_SIZE, mp, HAC_PAGELOCK,
+		    MP_HAT_CB_COOKIE(mp, i));
 		vaddr += IOMMU_PAGE_SIZE;
 	}
 	mp->dmai_flags &= ~DMAI_FLAGS_RELOC;
@@ -354,7 +355,8 @@ pci_fdvma_unregister_callbacks(pci_t *pci_p, fdvma_t *fdvma_p,
 
 	for (i = 0; i < npgs && pci_dvma_remap_enabled;
 	    i++, kva += IOMMU_PAGE_SIZE)
-		hat_delete_callback(kva, IOMMU_PAGE_SIZE, mp, HAC_PAGELOCK);
+		hat_delete_callback(kva, IOMMU_PAGE_SIZE, mp, HAC_PAGELOCK,
+		    fdvma_p->cbcookie[index + i]);
 }
 
 static int
@@ -424,13 +426,17 @@ pci_common_prerelocator(caddr_t va, uint_t len, uint_t flags, void *mpvoid)
 void
 pci_reloc_init(void)
 {
+	int key = pci_reloc_getkey();
+
 	mutex_init(&pci_reloc_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&pci_reloc_cv, NULL, CV_DEFAULT, NULL);
-	pci_dvma_cbid = hat_register_callback('D'<<24 | 'V'<<16 | 'M'<<8 | 'A',
+	pci_dvma_cbid = hat_register_callback(
+		key + ('D'<<24 | 'V'<<16 | 'M'<<8 | 'A'),
 		pci_common_prerelocator, pci_dvma_postrelocator,
 		pci_dma_relocerr, 1);
 	pci_fast_dvma_cbid = hat_register_callback(
-		'F'<<24 | 'D'<<16 | 'M'<<8 | 'A', pci_common_prerelocator,
+		key + ('F'<<24 | 'D'<<16 | 'M'<<8 | 'A'),
+		pci_common_prerelocator,
 		pci_fdvma_postrelocator, pci_dma_relocerr, 1);
 }
 

@@ -3521,6 +3521,12 @@ pci_bus_unquiesce(pci_t *pci_p, dev_info_t *dip, void *result)
 	return (DDI_SUCCESS);
 }
 
+int
+pci_reloc_getkey(void)
+{
+	return (0x200);
+}
+
 static void
 tm_vmem_free(ddi_dma_impl_t *mp, iommu_t *iommu_p, dvma_addr_t dvma_pg,
 	int npages)

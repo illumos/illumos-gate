@@ -474,11 +474,12 @@ vmem_t		*kmem_tsb_default_arena[NLGRPS_MAX];	/* For dynamic TSBs */
  * Size to use for TSB slabs.  Future platforms that support page sizes
  * larger than 4M may wish to change these values, and provide their own
  * assembly macros for building and decoding the TSB base register contents.
+ * Note disable_large_pages will override the value set here.
  */
-uint_t	tsb_slab_size = MMU_PAGESIZE4M;
-uint_t	tsb_slab_shift = MMU_PAGESHIFT4M;
 uint_t	tsb_slab_ttesz = TTE4M;
-uint_t	tsb_slab_mask = 0x1ff;	/* 4M page alignment for 8K pfn */
+uint_t	tsb_slab_size;
+uint_t	tsb_slab_shift;
+uint_t	tsb_slab_mask;	/* PFN mask for TTE */
 
 /* largest TSB size to grow to, will be smaller on smaller memory systems */
 int	tsb_max_growsize = UTSB_MAX_SZCODE;
@@ -985,6 +986,8 @@ void
 hat_init(void)
 {
 	int 		i;
+	uint_t		sz;
+	uint_t		maxtsb;
 	size_t		size;
 
 	hat_lock_init();
@@ -1100,18 +1103,29 @@ hat_init(void)
 	SFMMU_SET_TSB_MAX_GROWSIZE(physmem);
 
 	/*
-	 * On smaller memory systems, allocate TSB memory in 512K chunks
-	 * instead of the default 4M slab size.  The trap handlers need to
-	 * be patched with the final slab shift since they need to be able
-	 * to construct the TSB pointer at runtime.
+	 * On smaller memory systems, allocate TSB memory in smaller chunks
+	 * than the default 4M slab size. We also honor disable_large_pages
+	 * here.
+	 *
+	 * The trap handlers need to be patched with the final slab shift,
+	 * since they need to be able to construct the TSB pointer at runtime.
 	 */
-	if ((tsb_max_growsize <= TSB_512K_SZCODE) &&
-	    !(disable_large_pages & (1 << TTE512K))) {
-		tsb_slab_size = MMU_PAGESIZE512K;
-		tsb_slab_shift = MMU_PAGESHIFT512K;
+	if (tsb_max_growsize <= TSB_512K_SZCODE)
 		tsb_slab_ttesz = TTE512K;
-		tsb_slab_mask = 0x3f;	/* 512K page alignment for 8K pfn */
+
+	for (sz = tsb_slab_ttesz; sz > 0; sz--) {
+		if (!(disable_large_pages & (1 << sz)))
+			break;
 	}
+
+	tsb_slab_ttesz = sz;
+	tsb_slab_shift = MMU_PAGESHIFT + (sz << 1) + sz;
+	tsb_slab_size = 1 << tsb_slab_shift;
+	tsb_slab_mask = (1 << (tsb_slab_shift - MMU_PAGESHIFT)) - 1;
+
+	maxtsb = tsb_slab_shift - (TSB_START_SIZE + TSB_ENTRY_SHIFT);
+	if (tsb_max_growsize > maxtsb)
+		tsb_max_growsize = maxtsb;
 
 	/*
 	 * Set up memory callback to update tsb_alloc_hiwater and
@@ -3409,7 +3423,8 @@ readtte:
  *     seg_kpm addresses are also accepted by the routines, but nothing
  *     is done with them since by definition their PA mappings are static.
  * (2) hat_add_callback() may only be called while holding the page lock
- *     SE_SHARED or SE_EXCL of the underlying page (e.g., as_pagelock()).
+ *     SE_SHARED or SE_EXCL of the underlying page (e.g., as_pagelock()),
+ *     or passing HAC_PAGELOCK flag.
  * (3) prehandler() and posthandler() may not call hat_add_callback() or
  *     hat_delete_callback(), nor should they allocate memory. Post quiesce
  *     callbacks may not sleep or acquire adaptive mutex locks.
@@ -3512,11 +3527,12 @@ hat_register_callback(int key,
 	return (id);
 }
 
+#define	HAC_COOKIE_NONE	(void *)-1
+
 /*
  * Add relocation callbacks to the specified addr/len which will be called
- * when relocating the associated page.  See the description of pre and
- * posthandler above for more details.  IMPT: this operation is only valid
- * on seg_kmem pages!!
+ * when relocating the associated page. See the description of pre and
+ * posthandler above for more details.
  *
  * If HAC_PAGELOCK is included in flags, the underlying memory page is
  * locked internally so the caller must be able to deal with the callback
@@ -3529,37 +3545,43 @@ hat_register_callback(int key,
  * page.
  *
  * Registering multiple callbacks on the same [addr, addr+len) is supported,
- * in which case the corresponding callback will be called once with each
- * unique parameter specified. The number of subsequent deletes must match
- * since reference counts are held.  If a callback is desired for each
- * virtual object with the same parameter specified for multiple callbacks,
- * a different virtual address should be specified at the time of
- * callback registration.
+ * _provided_that_ a unique parameter is specified for each callback.
+ * If multiple callbacks are registered on the same range the callback will
+ * be invoked with each unique parameter. Registering the same callback with
+ * the same argument more than once will result in corrupted kernel state.
  *
  * Returns the pfn of the underlying kernel page in *rpfn
  * on success, or PFN_INVALID on failure.
+ *
+ * cookiep (if passed) provides storage space for an opaque cookie
+ * to return later to hat_delete_callback(). This cookie makes the callback
+ * deletion significantly quicker by avoiding a potentially lengthy hash
+ * search.
  *
  * Returns values:
  *    0:      success
  *    ENOMEM: memory allocation failure (e.g. flags was passed as HAC_NOSLEEP)
  *    EINVAL: callback ID is not valid
  *    ENXIO:  ["vaddr", "vaddr" + len) is not mapped in the kernel's address
- *            space, or crosses a page boundary
+ *            space
+ *    ERANGE: ["vaddr", "vaddr" + len) crosses a page boundary
  */
 int
 hat_add_callback(id_t callback_id, caddr_t vaddr, uint_t len, uint_t flags,
-	void *pvt, pfn_t *rpfn)
+	void *pvt, pfn_t *rpfn, void **cookiep)
 {
 	struct 		hmehash_bucket *hmebp;
 	hmeblk_tag 	hblktag;
 	struct hme_blk	*hmeblkp;
 	int 		hmeshift, hashno;
 	caddr_t 	saddr, eaddr, baseaddr;
-	struct pa_hment *pahmep, *tpahmep;
-	struct sf_hment *sfhmep, *osfhmep, *tsfhmep;
+	struct pa_hment *pahmep;
+	struct sf_hment *sfhmep, *osfhmep;
 	kmutex_t	*pml;
 	tte_t   	tte;
-	page_t		*pp, *rpp;
+	page_t		*pp;
+	vnode_t		*vp;
+	u_offset_t	off;
 	pfn_t		pfn;
 	int		kmflags = (flags & HAC_SLEEP)? KM_SLEEP : KM_NOSLEEP;
 	int		locked = 0;
@@ -3572,6 +3594,8 @@ hat_add_callback(id_t callback_id, caddr_t vaddr, uint_t len, uint_t flags,
 		uint64_t paddr;
 		SFMMU_KPM_VTOP(vaddr, paddr);
 		*rpfn = btop(paddr);
+		if (cookiep != NULL)
+			*cookiep = HAC_COOKIE_NONE;
 		return (0);
 	}
 
@@ -3615,23 +3639,29 @@ rehash:
 		return (ENXIO);
 	}
 
-	/*
-	 * Make sure the boundaries for the callback fall within this
-	 * single mapping.
-	 */
-	baseaddr = (caddr_t)get_hblk_base(hmeblkp);
-	ASSERT(saddr >= baseaddr);
-	if (eaddr > (caddr_t)get_hblk_endaddr(hmeblkp)) {
+	HBLKTOHME(osfhmep, hmeblkp, saddr);
+	sfmmu_copytte(&osfhmep->hme_tte, &tte);
+
+	if (!TTE_IS_VALID(&tte)) {
 		SFMMU_HASH_UNLOCK(hmebp);
 		kmem_cache_free(pa_hment_cache, pahmep);
 		*rpfn = PFN_INVALID;
 		return (ENXIO);
 	}
 
-	HBLKTOHME(osfhmep, hmeblkp, saddr);
-	sfmmu_copytte(&osfhmep->hme_tte, &tte);
+	/*
+	 * Make sure the boundaries for the callback fall within this
+	 * single mapping.
+	 */
+	baseaddr = (caddr_t)get_hblk_base(hmeblkp);
+	ASSERT(saddr >= baseaddr);
+	if (eaddr > saddr + TTEBYTES(TTE_CSZ(&tte))) {
+		SFMMU_HASH_UNLOCK(hmebp);
+		kmem_cache_free(pa_hment_cache, pahmep);
+		*rpfn = PFN_INVALID;
+		return (ERANGE);
+	}
 
-	ASSERT(TTE_IS_VALID(&tte));
 	pfn = sfmmu_ttetopfn(&tte, vaddr);
 
 	/*
@@ -3640,43 +3670,43 @@ rehash:
 	 * static portion of the kernel's address space, for instance.
 	 */
 	pp = osfhmep->hme_page;
-	if (pp == NULL || pp->p_vnode != &kvp) {
+	if (pp == NULL) {
 		SFMMU_HASH_UNLOCK(hmebp);
 		kmem_cache_free(pa_hment_cache, pahmep);
 		*rpfn = pfn;
+		if (cookiep)
+			*cookiep = HAC_COOKIE_NONE;
 		return (0);
 	}
+	ASSERT(pp == PP_PAGEROOT(pp));
+
+	vp = pp->p_vnode;
+	off = pp->p_offset;
 
 	pml = sfmmu_mlist_enter(pp);
 
-	if ((flags & HAC_PAGELOCK) && !locked) {
+	if (flags & HAC_PAGELOCK) {
 		if (!page_trylock(pp, SE_SHARED)) {
-			page_t *tpp;
-
 			/*
-			 * Somebody is holding SE_EXCL lock.  Drop all
+			 * Somebody is holding SE_EXCL lock. Might
+			 * even be hat_page_relocate(). Drop all
 			 * our locks, lookup the page in &kvp, and
-			 * retry. If it doesn't exist in &kvp, then we
-			 * die here; we should have caught it above,
-			 * meaning the page must have changed identity
-			 * (e.g. the caller didn't hold onto the page
-			 * lock after establishing the kernel mapping)
+			 * retry. If it doesn't exist in &kvp, then
+			 * we must be dealing with a kernel mapped
+			 * page which doesn't actually belong to
+			 * segkmem so we punt.
 			 */
 			sfmmu_mlist_exit(pml);
 			SFMMU_HASH_UNLOCK(hmebp);
-			tpp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
-			if (tpp == NULL) {
-				panic("hat_add_callback: page not found: 0x%p",
-				    pp);
+			pp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
+			if (pp == NULL) {
+				kmem_cache_free(pa_hment_cache, pahmep);
+				*rpfn = pfn;
+				if (cookiep)
+					*cookiep = HAC_COOKIE_NONE;
+				return (0);
 			}
-			pp = tpp;
-			rpp = PP_PAGEROOT(pp);
-			if (rpp != pp) {
-				page_unlock(pp);
-				(void) page_lock(rpp, SE_SHARED, NULL,
-				    P_NO_RECLAIM);
-			}
-			locked = 1;
+			page_unlock(pp);
 			goto rehash;
 		}
 		locked = 1;
@@ -3685,9 +3715,8 @@ rehash:
 	if (!PAGE_LOCKED(pp) && !panicstr)
 		panic("hat_add_callback: page 0x%p not locked", pp);
 
-	if (osfhmep->hme_page != pp || pp->p_vnode != &kvp ||
-	    pp->p_offset < (u_offset_t)baseaddr ||
-	    pp->p_offset > (u_offset_t)eaddr) {
+	if (osfhmep->hme_page != pp || pp->p_vnode != vp ||
+	    pp->p_offset != off) {
 		/*
 		 * The page moved before we got our hands on it.  Drop
 		 * all the locks and try again.
@@ -3700,45 +3729,27 @@ rehash:
 		goto rehash;
 	}
 
-	ASSERT(osfhmep->hme_page == pp);
-
-	for (tsfhmep = pp->p_mapping; tsfhmep != NULL;
-	    tsfhmep = tsfhmep->hme_next) {
-
+	if (vp != &kvp) {
 		/*
-		 * skip va to pa mappings
+		 * This is not a segkmem page but another page which
+		 * has been kernel mapped. It had better have at least
+		 * a share lock on it. Return the pfn.
 		 */
-		if (!IS_PAHME(tsfhmep))
-			continue;
-
-		tpahmep = tsfhmep->hme_data;
-		ASSERT(tpahmep != NULL);
-
-		/*
-		 * See if the pahment already exists.
-		 */
-		if ((tpahmep->pvt == pvt) &&
-		    (tpahmep->addr == vaddr) &&
-		    (tpahmep->len == len)) {
-			ASSERT(tpahmep->cb_id == callback_id);
-			tpahmep->refcnt++;
-			pp->p_share++;
-
-			sfmmu_mlist_exit(pml);
-			SFMMU_HASH_UNLOCK(hmebp);
-
-			if (locked)
-				page_unlock(pp);
-
-			kmem_cache_free(pa_hment_cache, pahmep);
-
-			*rpfn = pfn;
-			return (0);
-		}
+		sfmmu_mlist_exit(pml);
+		SFMMU_HASH_UNLOCK(hmebp);
+		if (locked)
+			page_unlock(pp);
+		kmem_cache_free(pa_hment_cache, pahmep);
+		ASSERT(PAGE_LOCKED(pp));
+		*rpfn = pfn;
+		if (cookiep)
+			*cookiep = HAC_COOKIE_NONE;
+		return (0);
 	}
 
 	/*
-	 * setup this shiny new pa_hment ..
+	 * Setup this pa_hment and link its embedded dummy sf_hment into
+	 * the mapping list.
 	 */
 	pp->p_share++;
 	pahmep->cb_id = callback_id;
@@ -3748,9 +3759,6 @@ rehash:
 	pahmep->flags = 0;
 	pahmep->pvt = pvt;
 
-	/*
-	 * .. and also set up the sf_hment and link to p_mapping list.
-	 */
 	sfhmep->hme_tte.ll = 0;
 	sfhmep->hme_data = pahmep;
 	sfhmep->hme_prev = osfhmep;
@@ -3764,9 +3772,12 @@ rehash:
 	sfmmu_mlist_exit(pml);
 	SFMMU_HASH_UNLOCK(hmebp);
 
-	*rpfn = pfn;
 	if (locked)
 		page_unlock(pp);
+
+	*rpfn = pfn;
+	if (cookiep)
+		*cookiep = (void *)pahmep;
 
 	return (0);
 }
@@ -3775,25 +3786,31 @@ rehash:
  * Remove the relocation callbacks from the specified addr/len.
  */
 void
-hat_delete_callback(caddr_t vaddr, uint_t len, void *pvt, uint_t flags)
+hat_delete_callback(caddr_t vaddr, uint_t len, void *pvt, uint_t flags,
+	void *cookie)
 {
 	struct		hmehash_bucket *hmebp;
 	hmeblk_tag	hblktag;
 	struct hme_blk	*hmeblkp;
 	int		hmeshift, hashno;
-	caddr_t		saddr, eaddr, baseaddr;
+	caddr_t		saddr;
 	struct pa_hment	*pahmep;
 	struct sf_hment	*sfhmep, *osfhmep;
 	kmutex_t	*pml;
 	tte_t		tte;
-	page_t		*pp, *rpp;
+	page_t		*pp;
+	vnode_t		*vp;
+	u_offset_t	off;
 	int		locked = 0;
 
-	if (IS_KPM_ADDR(vaddr))
+	/*
+	 * If the cookie is HAC_COOKIE_NONE then there is no pa_hment to
+	 * remove so just return.
+	 */
+	if (cookie == HAC_COOKIE_NONE || IS_KPM_ADDR(vaddr))
 		return;
 
 	saddr = (caddr_t)((uintptr_t)vaddr & MMU_PAGEMASK);
-	eaddr = saddr + len;
 
 rehash:
 	/* Find the mapping(s) for this page */
@@ -3814,46 +3831,48 @@ rehash:
 			SFMMU_HASH_UNLOCK(hmebp);
 	}
 
-	if (hmeblkp == NULL) {
-		if (!panicstr) {
-			panic("hat_delete_callback: addr 0x%p not found",
-			    saddr);
-		}
+	if (hmeblkp == NULL)
 		return;
-	}
 
-	baseaddr = (caddr_t)get_hblk_base(hmeblkp);
 	HBLKTOHME(osfhmep, hmeblkp, saddr);
 
 	sfmmu_copytte(&osfhmep->hme_tte, &tte);
-	ASSERT(TTE_IS_VALID(&tte));
-
-	pp = osfhmep->hme_page;
-	if (pp == NULL || pp->p_vnode != &kvp) {
+	if (!TTE_IS_VALID(&tte)) {
 		SFMMU_HASH_UNLOCK(hmebp);
 		return;
 	}
 
+	pp = osfhmep->hme_page;
+	if (pp == NULL) {
+		SFMMU_HASH_UNLOCK(hmebp);
+		ASSERT(cookie == NULL);
+		return;
+	}
+
+	vp = pp->p_vnode;
+	off = pp->p_offset;
+
 	pml = sfmmu_mlist_enter(pp);
 
-	if ((flags & HAC_PAGELOCK) && !locked) {
+	if (flags & HAC_PAGELOCK) {
 		if (!page_trylock(pp, SE_SHARED)) {
 			/*
-			 * Somebody is holding SE_EXCL lock.  Drop all
+			 * Somebody is holding SE_EXCL lock. Might
+			 * even be hat_page_relocate(). Drop all
 			 * our locks, lookup the page in &kvp, and
-			 * retry.
+			 * retry. If it doesn't exist in &kvp, then
+			 * we must be dealing with a kernel mapped
+			 * page which doesn't actually belong to
+			 * segkmem so we punt.
 			 */
 			sfmmu_mlist_exit(pml);
 			SFMMU_HASH_UNLOCK(hmebp);
 			pp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
-			ASSERT(pp != NULL);
-			rpp = PP_PAGEROOT(pp);
-			if (rpp != pp) {
-				page_unlock(pp);
-				(void) page_lock(rpp, SE_SHARED, NULL,
-				    P_NO_RECLAIM);
+			if (pp == NULL) {
+				ASSERT(cookie == NULL);
+				return;
 			}
-			locked = 1;
+			page_unlock(pp);
 			goto rehash;
 		}
 		locked = 1;
@@ -3861,9 +3880,8 @@ rehash:
 
 	ASSERT(PAGE_LOCKED(pp));
 
-	if (osfhmep->hme_page != pp || pp->p_vnode != &kvp ||
-	    pp->p_offset < (u_offset_t)baseaddr ||
-	    pp->p_offset > (u_offset_t)eaddr) {
+	if (osfhmep->hme_page != pp || pp->p_vnode != vp ||
+	    pp->p_offset != off) {
 		/*
 		 * The page moved before we got our hands on it.  Drop
 		 * all the locks and try again.
@@ -3876,27 +3894,43 @@ rehash:
 		goto rehash;
 	}
 
-	ASSERT(osfhmep->hme_page == pp);
-
-	for (sfhmep = pp->p_mapping; sfhmep != NULL;
-	    sfhmep = sfhmep->hme_next) {
-
+	if (vp != &kvp) {
 		/*
-		 * skip va<->pa mappings
+		 * This is not a segkmem page but another page which
+		 * has been kernel mapped.
 		 */
-		if (!IS_PAHME(sfhmep))
-			continue;
+		sfmmu_mlist_exit(pml);
+		SFMMU_HASH_UNLOCK(hmebp);
+		if (locked)
+			page_unlock(pp);
+		ASSERT(cookie == NULL);
+		return;
+	}
 
-		pahmep = sfhmep->hme_data;
-		ASSERT(pahmep != NULL);
+	if (cookie != NULL) {
+		pahmep = (struct pa_hment *)cookie;
+		sfhmep = &pahmep->sfment;
+	} else {
+		for (sfhmep = pp->p_mapping; sfhmep != NULL;
+		    sfhmep = sfhmep->hme_next) {
 
-		/*
-		 * if pa_hment matches, remove it
-		 */
-		if ((pahmep->pvt == pvt) &&
-		    (pahmep->addr == vaddr) &&
-		    (pahmep->len == len)) {
-			break;
+			/*
+			 * skip va<->pa mappings
+			 */
+			if (!IS_PAHME(sfhmep))
+				continue;
+
+			pahmep = sfhmep->hme_data;
+			ASSERT(pahmep != NULL);
+
+			/*
+			 * if pa_hment matches, remove it
+			 */
+			if ((pahmep->pvt == pvt) &&
+			    (pahmep->addr == vaddr) &&
+			    (pahmep->len == len)) {
+				break;
+			}
 		}
 	}
 
@@ -11306,7 +11340,7 @@ sfmmu_tsb_free(struct tsb_info *tsbinfo)
 		ret = as_pagelock(&kas, &ppl, slab_vaddr, PAGESIZE, S_WRITE);
 		ASSERT(ret == 0);
 		hat_delete_callback(tsbva, (uint_t)tsb_size, (void *)tsbinfo,
-		    0);
+		    0, NULL);
 		as_pageunlock(&kas, ppl, slab_vaddr, PAGESIZE, S_WRITE);
 	}
 
@@ -11509,7 +11543,7 @@ sfmmu_init_tsbinfo(struct tsb_info *tsbinfo, int tteszmask,
 		ret = as_pagelock(&kas, &pplist, slab_vaddr, PAGESIZE, S_WRITE);
 		ASSERT(ret == 0);
 		ret = hat_add_callback(sfmmu_tsb_cb_id, vaddr, (uint_t)tsbbytes,
-		    cbflags, (void *)tsbinfo, &pfn);
+		    cbflags, (void *)tsbinfo, &pfn, NULL);
 
 		/*
 		 * Need to free up resources if we could not successfully

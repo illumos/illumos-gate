@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,10 +43,13 @@ typedef	pfn_t iopfn_t;
 
 #define	HAS_REDZONE(mp)	(((mp)->dmai_rflags & DDI_DMA_REDZONE) ? 1 : 0)
 
+#define	PCI_DMA_HAT_NUM_CB_COOKIES	5
+
 typedef struct pci_dma_hdl {
 	ddi_dma_impl_t	pdh_ddi_hdl;
 	ddi_dma_attr_t	pdh_attr_dev;
 	uint64_t	pdh_sync_buf_pa;
+	void		*pdh_cbcookie[PCI_DMA_HAT_NUM_CB_COOKIES];
 } pci_dma_hdl_t;
 
 struct pci_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
@@ -77,6 +79,7 @@ struct pci_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 
 	ddi_dma_attr_t	pdh_attr_dev;
 	uint64_t	pdh_sync_buf_pa;
+	void		*pdh_cbcookie[PCI_DMA_HAT_NUM_CB_COOKIES];
 };
 
 /*
@@ -92,6 +95,11 @@ struct pci_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	dmai_roffset		dmai_pool
 
 #define	MP_PFN0(mp)		((iopfn_t)(mp)->dmai_pfn0)
+#define	MP_HAT_CB_COOKIE(mp, i)	((i < PCI_DMA_HAT_NUM_CB_COOKIES)? \
+	(((pci_dma_hdl_t *)(mp))->pdh_cbcookie[i]) : NULL)
+#define	MP_HAT_CB_COOKIE_PTR(mp, i) \
+	((i < PCI_DMA_HAT_NUM_CB_COOKIES)? \
+	&(((pci_dma_hdl_t *)(mp))->pdh_cbcookie[i]) : NULL)
 #define	WINLST(mp)		((pci_dma_win_t *)(mp)->dmai_winlst)
 #define	DEV_ATTR(mp)		(&((pci_dma_hdl_t *)(mp))->pdh_attr_dev)
 #define	SYNC_BUF_PA(mp)		(((pci_dma_hdl_t *)(mp))->pdh_sync_buf_pa)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1087,6 +1086,9 @@ size_t
 get_segkmem_lpsize(size_t lpsize)
 {
 	size_t memtotal = physmem * PAGESIZE;
+	size_t mmusz;
+	uint_t szc;
+	extern int disable_large_pages;
 
 	if (memtotal < segkmem_lpminphysmem)
 		return (PAGESIZE);
@@ -1095,5 +1097,13 @@ get_segkmem_lpsize(size_t lpsize)
 	    plat_lpkmem_is_supported() == 0)
 		return (PAGESIZE);
 
-	return (mmu_get_kernel_lpsize(lpsize));
+	mmusz = mmu_get_kernel_lpsize(lpsize);
+	szc = page_szc(mmusz);
+
+	while (szc) {
+		if (!(disable_large_pages & (1 << szc)))
+			return (page_get_pagesize(szc));
+		szc--;
+	}
+	return (PAGESIZE);
 }

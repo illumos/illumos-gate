@@ -582,7 +582,8 @@ pci_dma_type(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 			int ret;
 
 			ret = hat_add_callback(pci_dvma_cbid, vaddr,
-			    IOMMU_PAGE_SIZE - offset, flags, mp, &pfn0);
+			    IOMMU_PAGE_SIZE - offset, flags, mp, &pfn0,
+			    MP_HAT_CB_COOKIE_PTR(mp, 0));
 
 			if (pfn0 == PFN_INVALID && ret == ENOMEM) {
 				ASSERT(waitfp != DDI_DMA_SLEEP);
@@ -719,7 +720,9 @@ pci_dma_vapfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 			int ret;
 
 			ret = hat_add_callback(pci_dvma_cbid, vaddr,
-			    IOMMU_PAGE_SIZE, flags, mp, &pfn);
+			    IOMMU_PAGE_SIZE, flags, mp, &pfn,
+			    MP_HAT_CB_COOKIE_PTR(mp, i));
+
 			if (pfn == PFN_INVALID && ret == ENOMEM) {
 				ASSERT(waitfp != DDI_DMA_SLEEP);
 				if (waitfp != DDI_DMA_DONTWAIT)
