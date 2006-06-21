@@ -1150,6 +1150,7 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 	struct stat sb;
 	struct dirent *dep = NULL;
 	struct dirent *newdep = NULL;
+	char	*p;
 
 	assert(dyncomp != NULL);
 
@@ -1241,10 +1242,16 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 		/* postprocess and copy logical name here */
 		if (devlink != NULL) {
 			/*
-			 * For disks, remove partition info
+			 * For disks, remove partition/slice info
 			 */
 			if ((cp = strstr(devlink, "dsk/")) != NULL) {
-				cp[strlen(cp) - 2] = 0;
+				/* cXtYdZ[(s[0..15])|(p[0..X])] */
+				if ((p = strchr(cp + 4, 'd')) != NULL) {
+					p++;	/* Skip the 'd' */
+					while (*p != 0 && isdigit(*p))
+						p++;
+					*p = 0;
+				}
 				*dyncomp = strdup(cp);
 			}
 
