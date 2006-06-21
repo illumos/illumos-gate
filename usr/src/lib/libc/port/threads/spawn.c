@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/ts.h>
 #include <alloca.h>
 #include <spawn.h>
+#include "rtsched.h"
 
 #define	ALL_POSIX_SPAWN_FLAGS			\
 		(POSIX_SPAWN_RESETIDS |		\
@@ -64,6 +65,8 @@ typedef struct file_attr {
 	int		fa_filedes;	/* file descriptor for open()/close() */
 	int		fa_newfiledes;	/* new file descriptor for dup2() */
 } file_attr_t;
+
+extern struct pcclass ts_class, rt_class;
 
 extern	pid_t	_vfork(void);
 #pragma unknown_control_flow(_vfork)
@@ -631,7 +634,10 @@ _posix_spawnattr_setflags(
 		 * Populate ts_class and rt_class.
 		 * We will need them in the child of vfork().
 		 */
-		(void) _map_rtpri_to_gp(0);
+		if (rt_class.pcc_state == 0)
+			(void) get_info_by_policy(SCHED_FIFO);
+		if (ts_class.pcc_state == 0)
+			(void) get_info_by_policy(SCHED_OTHER);
 	}
 
 	sap->sa_psflags = flags;

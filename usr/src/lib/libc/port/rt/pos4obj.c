@@ -26,7 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
+#include "synonyms.h"
+#include "mtlib.h"
 #include <sys/types.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -41,7 +42,6 @@
 #include <stdio.h>
 #include <dlfcn.h>
 #include <md5.h>
-#include "pos4.h"
 #include "pos4obj.h"
 
 #define	HASHSTRLEN	32
@@ -95,20 +95,12 @@ __close_nc(int fildes)
 typedef void (*md5_calc_t)(unsigned char *, unsigned char *, unsigned int);
 static void *md5_handle = NULL;
 static md5_calc_t real_md5_calc = NULL;
-mutex_t md5_lock = DEFAULTMUTEX;
+static mutex_t md5_lock = DEFAULTMUTEX;
 
 static void
 load_md5_calc(void)
 {
-	/*
-	 * _sigoff() and _sigon() are consolidation-private interfaces
-	 * in libc that defer and then reenable signals.
-	 */
-	extern void _sigoff(void);
-	extern void _sigon(void);
-
-	_sigoff();
-	(void) mutex_lock(&md5_lock);
+	lmutex_lock(&md5_lock);
 	if (real_md5_calc == NULL) {
 		md5_handle = dlopen("libmd.so.1", RTLD_LAZY);
 		if (md5_handle == NULL)
@@ -123,21 +115,7 @@ load_md5_calc(void)
 			}
 		}
 	}
-	(void) mutex_unlock(&md5_lock);
-	_sigon();
-}
-
-/*
- * If librt.so.1 is dlclose()d, take libmd.so.1 down with us.
- */
-#pragma fini(unload_md5_calc)
-static void
-unload_md5_calc(void)
-{
-	if (md5_handle != NULL)
-		(void) dlclose(md5_handle);
-	md5_handle = NULL;
-	real_md5_calc = NULL;
+	lmutex_unlock(&md5_lock);
 }
 
 static char *
@@ -222,7 +200,7 @@ __pos4obj_name(const char *path, const char *type)
 	/*
 	 * Errno must be preserved across the following calls to
 	 * mkdir.  This needs to be done to prevent incorrect error
-	 * reporting in certain cases. When librt attempts to open a
+	 * reporting in certain cases. When we attempt to open a
 	 * non-existent object without the O_CREAT flag, it will
 	 * always create a lock file first.  The lock file is created
 	 * and then the open is attempted, but fails with ENOENT. The

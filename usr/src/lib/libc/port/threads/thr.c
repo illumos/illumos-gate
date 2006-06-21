@@ -1490,6 +1490,9 @@ libc_init(void)
 	if (self->ul_primarymap && __tnf_probe_notify != NULL)
 		__tnf_probe_notify();
 	/* PROBE_SUPPORT end */
+
+	init_sigev_thread();
+	init_aio();
 }
 
 #pragma fini(libc_fini)
@@ -1562,7 +1565,7 @@ finish_init()
 	/*
 	 * Set up the SIGCANCEL handler for threads cancellation.
 	 */
-	init_sigcancel();
+	setup_cancelsig(SIGCANCEL);
 
 	/*
 	 * Arrange to do special things on exit --
@@ -1596,7 +1599,7 @@ mark_dead_and_buried(ulwp_t *ulwp)
  * Reset our data structures to reflect one lwp.
  */
 void
-_postfork1_child()
+postfork1_child()
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -1668,6 +1671,15 @@ _postfork1_child()
 		udp->nzombies = 0;
 	}
 	trim_stack_cache(0);
+
+	/*
+	 * Do post-fork1 processing for subsystems that need it.
+	 */
+	postfork1_child_tpool();
+	postfork1_child_sigev_aio();
+	postfork1_child_sigev_mq();
+	postfork1_child_sigev_timer();
+	postfork1_child_aio();
 }
 
 #pragma weak thr_setprio = _thr_setprio
@@ -1761,7 +1773,7 @@ force_continue(ulwp_t *ulwp)
 		if (ulwp->ul_stopping) {	/* he is stopping himself */
 			ts.tv_sec = 0;		/* give him a chance to run */
 			ts.tv_nsec = 100000;	/* 100 usecs or clock tick */
-			(void) ___nanosleep(&ts, NULL);
+			(void) __nanosleep(&ts, NULL);
 		}
 		if (!ulwp->ul_stopping)		/* he is running now */
 			break;			/* so we are done */
@@ -2203,10 +2215,8 @@ _ti_bind_clear(int bindflag)
  * Also, signals are deferred at thread startup until TLS constructors
  * have all been called, at which time _thr_setup() calls sigon().
  *
- * _sigoff() and _sigon() are external consolidation-private interfaces
- * to sigoff() and sigon(), respectively, in libc.  _sigdeferred() is
- * a consolidation-private interface that returns the deferred signal
- * number, if any.  These are used in libnsl, librt, and libaio.
+ * _sigoff() and _sigon() are external consolidation-private interfaces to
+ * sigoff() and sigon(), respectively, in libc.  These are used in libnsl.
  * Also, _sigoff() and _sigon() are called from dbx's run-time checking
  * (librtc.so) to defer signals during its critical sections (not to be
  * confused with libc critical sections [see exit_critical() above]).
@@ -2221,12 +2231,6 @@ void
 _sigon(void)
 {
 	sigon(curthread);
-}
-
-int
-_sigdeferred(void)
-{
-	return (curthread->ul_cursig);
 }
 
 void

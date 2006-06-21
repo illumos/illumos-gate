@@ -28,6 +28,7 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include "asyncio.h"
 #include <signal.h>
 #include <siginfo.h>
 #include <ucontext.h>
@@ -154,6 +155,22 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 			do_sigcancel();
 			goto out;
 		}
+		/* SIGCANCEL is ignored by default */
+		if (uact.sa_sigaction == SIG_DFL ||
+		    uact.sa_sigaction == SIG_IGN)
+			goto out;
+	}
+
+	/*
+	 * If this thread has been sent SIGAIOCANCEL (SIGLWP) and
+	 * we are an aio worker thread, cancel the aio request.
+	 */
+	if (sig == SIGAIOCANCEL) {
+		aio_worker_t *aiowp = _pthread_getspecific(_aio_key);
+
+		if (sip != NULL && sip->si_code == SI_LWP && aiowp != NULL)
+			_siglongjmp(aiowp->work_jmp_buf, 1);
+		/* SIGLWP is ignored by default */
 		if (uact.sa_sigaction == SIG_DFL ||
 		    uact.sa_sigaction == SIG_IGN)
 			goto out;
@@ -289,10 +306,9 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	thr_panic("sigacthandler(): __setcontext() returned");
 }
 
-#pragma weak sigaction = _libc_sigaction
-#pragma weak _sigaction = _libc_sigaction
+#pragma weak sigaction = _sigaction
 int
-_libc_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
+_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -341,10 +357,11 @@ _libc_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 		if (self->ul_vfork) {
 			if (tact.sa_sigaction != SIG_IGN)
 				tact.sa_sigaction = SIG_DFL;
-		} else if (sig == SIGCANCEL) {
+		} else if (sig == SIGCANCEL || sig == SIGAIOCANCEL) {
 			/*
-			 * Always catch SIGCANCEL.
-			 * We need it for pthread_cancel() to work.
+			 * Always catch these signals.
+			 * We need SIGCANCEL for pthread_cancel() to work.
+			 * We need SIGAIOCANCEL for aio_cancel() to work.
 			 */
 			udp->siguaction[sig].sig_uaction = tact;
 			if (tact.sa_sigaction == SIG_DFL ||
@@ -371,6 +388,16 @@ _libc_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 	    oact->sa_sigaction != SIG_DFL &&
 	    oact->sa_sigaction != SIG_IGN)
 		*oact = oaction;
+
+	/*
+	 * We detect setting the disposition of SIGIO just to set the
+	 * _sigio_enabled flag for the asynchronous i/o (aio) code.
+	 */
+	if (sig == SIGIO && rv == 0 && tactp != NULL) {
+		_sigio_enabled =
+		    (tactp->sa_handler != SIG_DFL &&
+		    tactp->sa_handler != SIG_IGN);
+	}
 
 	if (!self->ul_vfork)
 		lmutex_unlock(&udp->siguaction[sig].sig_lock);
@@ -619,18 +646,22 @@ do_sigcancel()
 }
 
 /*
- * Set up the SIGCANCEL handler for threads cancellation
- * (needed only when we have more than one thread).
- * We need no locks here because we are called from
- * finish_init() while still single-threaded.
+ * Set up the SIGCANCEL handler for threads cancellation,
+ * needed only when we have more than one thread,
+ * or the SIGAIOCANCEL handler for aio cancellation,
+ * called when aio is initialized, in __uaio_init().
  */
 void
-init_sigcancel()
+setup_cancelsig(int sig)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
+	mutex_t *mp = &udp->siguaction[sig].sig_lock;
 	struct sigaction act;
 
-	act = udp->siguaction[SIGCANCEL].sig_uaction;
+	ASSERT(sig == SIGCANCEL || sig == SIGAIOCANCEL);
+	lmutex_lock(mp);
+	act = udp->siguaction[sig].sig_uaction;
+	lmutex_unlock(mp);
 	if (act.sa_sigaction == SIG_DFL ||
 	    act.sa_sigaction == SIG_IGN)
 		act.sa_flags = SA_SIGINFO;
@@ -640,5 +671,5 @@ init_sigcancel()
 	}
 	act.sa_sigaction = udp->sigacthandler;
 	act.sa_mask = maskset;
-	(void) __sigaction(SIGCANCEL, &act, NULL);
+	(void) __sigaction(sig, &act, NULL);
 }

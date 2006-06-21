@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,8 +91,8 @@ Abort(const char *msg)
  * Write a panic message w/o grabbing any locks other than assert_lock.
  * We have no idea what locks are held at this point.
  */
-void
-thr_panic(const char *why)
+static void
+common_panic(const char *head, const char *why)
 {
 	char msg[400];	/* no panic() message in the library is this long */
 	ulwp_t *self;
@@ -103,7 +103,7 @@ thr_panic(const char *why)
 	(void) _private_lwp_mutex_lock(&assert_lock);
 
 	(void) _private_memset(msg, 0, sizeof (msg));
-	(void) strcpy(msg, "*** libc thread failure: ");
+	(void) strcpy(msg, head);
 	len1 = strlen(msg);
 	len2 = strlen(why);
 	if (len1 + len2 >= sizeof (msg))
@@ -114,6 +114,18 @@ thr_panic(const char *why)
 		msg[len1++] = '\n';
 	(void) _write(2, msg, len1);
 	Abort(msg);
+}
+
+void
+thr_panic(const char *why)
+{
+	common_panic("*** libc thread failure: ", why);
+}
+
+void
+aio_panic(const char *why)
+{
+	common_panic("*** libc aio system failure: ", why);
 }
 
 /*
@@ -370,7 +382,8 @@ thread_error(const char *msg)
  * We use __assfail() because the libc __assert() calls
  * gettext() which calls malloc() which grabs a mutex.
  * We do everything without calling standard i/o.
- * _assfail() is an exported function, __assfail() is private to libc.
+ * assfail() and _assfail() are exported functions;
+ * __assfail() is private to libc.
  */
 #pragma weak _assfail = __assfail
 void
@@ -415,4 +428,18 @@ __assfail(const char *assertion, const char *filename, int line_num)
 	 *		exit_critical(self);
 	 */
 	Abort(buf);
+}
+
+/*
+ * We define and export this version of assfail() just because libaio
+ * used to define and export it, needlessly.  Now that libaio is folded
+ * into libc, we need to continue this for ABI/version reasons.
+ * We don't use "#pragma weak assfail __assfail" in order to avoid
+ * warnings from the check_fnames utility at build time for libraries
+ * that define their own version of assfail().
+ */
+void
+assfail(const char *assertion, const char *filename, int line_num)
+{
+	__assfail(assertion, filename, line_num);
 }

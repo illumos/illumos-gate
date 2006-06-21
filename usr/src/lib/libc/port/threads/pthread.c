@@ -84,7 +84,7 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 					return (EINVAL);
 				mapped = 1;
 				mappedpri = priority;
-				priority = _map_rtpri_to_gp(priority);
+				priority = map_rtpri_to_gp(priority);
 				ASSERT(priority >= THREAD_MIN_PRIORITY &&
 				    priority <= THREAD_MAX_PRIORITY);
 			}
@@ -236,7 +236,7 @@ _thread_setschedparam_main(pthread_t tid, int policy,
 			}
 			mapped = 1;
 			mappedprio = prio;
-			prio = _map_rtpri_to_gp(prio);
+			prio = map_rtpri_to_gp(prio);
 			ASSERT(prio >= THREAD_MIN_PRIORITY &&
 			    prio <= THREAD_MAX_PRIORITY);
 		}

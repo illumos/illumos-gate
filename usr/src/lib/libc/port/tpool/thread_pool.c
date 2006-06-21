@@ -26,7 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
+#include "synonyms.h"
+#include "thr_uberdata.h"
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
@@ -34,53 +35,18 @@
 
 static mutex_t thread_pool_lock = DEFAULTMUTEX;
 static tpool_t *thread_pools = NULL;
-static tpool_job_t *job_freelist = NULL;
-
-static pthread_once_t once_control = PTHREAD_ONCE_INIT;
-static sigset_t fillset;
-
-static void
-do_fillset(void)
-{
-	(void) sigfillset(&fillset);
-}
-
-static tpool_job_t *
-job_alloc(void)
-{
-	tpool_job_t *job;
-
-	(void) mutex_lock(&thread_pool_lock);
-	if ((job = job_freelist) == NULL) {
-		(void) mutex_unlock(&thread_pool_lock);
-		job = malloc(sizeof (tpool_job_t));
-	} else {
-		job_freelist = job->tpj_next;
-		(void) mutex_unlock(&thread_pool_lock);
-	}
-	return (job);
-}
-
-static void
-job_free(tpool_job_t *job)
-{
-	(void) mutex_lock(&thread_pool_lock);
-	job->tpj_next = job_freelist;
-	job_freelist = job;
-	(void) mutex_unlock(&thread_pool_lock);
-}
 
 static void
 delete_pool(tpool_t *tpool)
 {
 	tpool_job_t *job;
 
-	/* ASSERT(tpool->tp_current == 0 && tpool->tp_active == NULL); */
+	ASSERT(tpool->tp_current == 0 && tpool->tp_active == NULL);
 
 	/*
 	 * Unlink the pool from the global list of all pools.
 	 */
-	(void) mutex_lock(&thread_pool_lock);
+	lmutex_lock(&thread_pool_lock);
 	if (thread_pools == tpool)
 		thread_pools = tpool->tp_forw;
 	if (thread_pools == tpool)
@@ -89,17 +55,17 @@ delete_pool(tpool_t *tpool)
 		tpool->tp_back->tp_forw = tpool->tp_forw;
 		tpool->tp_forw->tp_back = tpool->tp_back;
 	}
-	(void) mutex_unlock(&thread_pool_lock);
+	lmutex_unlock(&thread_pool_lock);
 
 	/*
 	 * There should be no pending jobs, but just in case...
 	 */
 	for (job = tpool->tp_head; job != NULL; job = tpool->tp_head) {
 		tpool->tp_head = job->tpj_next;
-		job_free(job);
+		lfree(job, sizeof (*job));
 	}
 	(void) pthread_attr_destroy(&tpool->tp_attr);
-	free(tpool);
+	lfree(tpool, sizeof (*tpool));
 }
 
 /*
@@ -108,17 +74,19 @@ delete_pool(tpool_t *tpool)
 static void
 worker_cleanup(tpool_t *tpool)
 {
+	ASSERT(MUTEX_HELD(&tpool->tp_mutex));
+
 	if (--tpool->tp_current == 0 &&
 	    (tpool->tp_flags & (TP_DESTROY | TP_ABANDON))) {
 		if (tpool->tp_flags & TP_ABANDON) {
-			(void) mutex_unlock(&tpool->tp_mutex);
+			sig_mutex_unlock(&tpool->tp_mutex);
 			delete_pool(tpool);
 			return;
 		}
 		if (tpool->tp_flags & TP_DESTROY)
 			(void) cond_broadcast(&tpool->tp_busycv);
 	}
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
 }
 
 static void
@@ -136,15 +104,15 @@ notify_waiters(tpool_t *tpool)
 static void
 job_cleanup(tpool_t *tpool)
 {
-	pthread_t self = pthread_self();
+	pthread_t my_tid = pthread_self();
 	tpool_active_t *activep;
 	tpool_active_t **activepp;
 
-	(void) mutex_lock(&tpool->tp_mutex);
+	sig_mutex_lock(&tpool->tp_mutex);
 	/* CSTYLED */
 	for (activepp = &tpool->tp_active;; activepp = &activep->tpa_next) {
 		activep = *activepp;
-		if (activep->tpa_tid == self) {
+		if (activep->tpa_tid == my_tid) {
 			*activepp = activep->tpa_next;
 			break;
 		}
@@ -162,7 +130,7 @@ tpool_worker(void *arg)
 	void (*func)(void *);
 	tpool_active_t active;
 
-	(void) mutex_lock(&tpool->tp_mutex);
+	sig_mutex_lock(&tpool->tp_mutex);
 	pthread_cleanup_push(worker_cleanup, tpool);
 
 	/*
@@ -180,15 +148,15 @@ tpool_worker(void *arg)
 		    !(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))) {
 			if (tpool->tp_current <= tpool->tp_minimum ||
 			    tpool->tp_linger == 0) {
-				(void) cond_wait(&tpool->tp_workcv,
+				(void) sig_cond_wait(&tpool->tp_workcv,
 				    &tpool->tp_mutex);
 			} else {
 				timestruc_t timeout;
 
 				timeout.tv_sec = tpool->tp_linger;
 				timeout.tv_nsec = 0;
-				if (cond_reltimedwait(&tpool->tp_workcv,
-				    &tpool->tp_mutex, &timeout) == ETIME) {
+				if (sig_cond_reltimedwait(&tpool->tp_workcv,
+				    &tpool->tp_mutex, &timeout) != 0) {
 					elapsed = 1;
 					break;
 				}
@@ -217,9 +185,9 @@ tpool_worker(void *arg)
 			tpool->tp_njobs--;
 			active.tpa_next = tpool->tp_active;
 			tpool->tp_active = &active;
-			(void) mutex_unlock(&tpool->tp_mutex);
-			job_free(job);
+			sig_mutex_unlock(&tpool->tp_mutex);
 			pthread_cleanup_push(job_cleanup, tpool);
+			lfree(job, sizeof (*job));
 			/*
 			 * Call the specified function.
 			 */
@@ -229,7 +197,7 @@ tpool_worker(void *arg)
 			 * so we reset its signal mask and cancellation
 			 * state back to the initial values.
 			 */
-			(void) pthread_sigmask(SIG_SETMASK, &fillset, NULL);
+			(void) pthread_sigmask(SIG_SETMASK, &maskset, NULL);
 			(void) pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,
 			    NULL);
 			(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,
@@ -258,8 +226,7 @@ create_worker(tpool_t *tpool)
 	sigset_t oset;
 	int error;
 
-	(void) pthread_once(&once_control, do_fillset);
-	(void) pthread_sigmask(SIG_SETMASK, &fillset, &oset);
+	(void) pthread_sigmask(SIG_SETMASK, &maskset, &oset);
 	error = pthread_create(NULL, &tpool->tp_attr, tpool_worker, tpool);
 	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
 	return (error);
@@ -300,7 +267,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 		}
 	}
 
-	tpool = calloc(1, sizeof (tpool_t));
+	tpool = lmalloc(sizeof (*tpool));
 	if (tpool == NULL) {
 		errno = ENOMEM;
 		return (NULL);
@@ -322,7 +289,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 	 */
 	error = _pthread_attr_clone(&tpool->tp_attr, attr);
 	if (error) {
-		free(tpool);
+		lfree(tpool, sizeof (*tpool));
 		errno = error;
 		return (NULL);
 	}
@@ -334,7 +301,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 	    PTHREAD_CREATE_DAEMON_NP);
 
 	/* insert into the global list of all thread pools */
-	(void) mutex_lock(&thread_pool_lock);
+	lmutex_lock(&thread_pool_lock);
 	if (thread_pools == NULL) {
 		tpool->tp_forw = tpool;
 		tpool->tp_back = tpool;
@@ -345,7 +312,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 		tpool->tp_back = thread_pools->tp_back;
 		thread_pools->tp_back = tpool;
 	}
-	(void) mutex_unlock(&thread_pool_lock);
+	lmutex_unlock(&thread_pool_lock);
 
 	return (tpool);
 }
@@ -362,14 +329,15 @@ tpool_dispatch(tpool_t *tpool, void (*func)(void *), void *arg)
 {
 	tpool_job_t *job;
 
-	if ((job = job_alloc()) == NULL)
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	if ((job = lmalloc(sizeof (*job))) == NULL)
 		return (-1);
 	job->tpj_next = NULL;
 	job->tpj_func = func;
 	job->tpj_arg = arg;
 
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	sig_mutex_lock(&tpool->tp_mutex);
 
 	if (tpool->tp_head == NULL)
 		tpool->tp_head = job;
@@ -386,7 +354,7 @@ tpool_dispatch(tpool_t *tpool, void (*func)(void *), void *arg)
 			tpool->tp_current++;
 	}
 
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
 	return (0);
 }
 
@@ -400,10 +368,11 @@ tpool_destroy(tpool_t *tpool)
 {
 	tpool_active_t *activep;
 
-	/* ASSERT(!tpool_member(tpool)); */
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!tpool_member(tpool));
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
 
-	(void) mutex_lock(&tpool->tp_mutex);
+	sig_mutex_lock(&tpool->tp_mutex);
+	pthread_cleanup_push(sig_mutex_unlock, &tpool->tp_mutex);
 
 	/* mark the pool as being destroyed; wakeup idle workers */
 	tpool->tp_flags |= TP_DESTROY;
@@ -417,14 +386,14 @@ tpool_destroy(tpool_t *tpool)
 	/* wait for all active workers to finish */
 	while (tpool->tp_active != NULL) {
 		tpool->tp_flags |= TP_WAIT;
-		(void) cond_wait(&tpool->tp_waitcv, &tpool->tp_mutex);
+		(void) sig_cond_wait(&tpool->tp_waitcv, &tpool->tp_mutex);
 	}
 
 	/* the last worker to terminate will wake us up */
 	while (tpool->tp_current != 0)
-		(void) cond_wait(&tpool->tp_busycv, &tpool->tp_mutex);
+		(void) sig_cond_wait(&tpool->tp_busycv, &tpool->tp_mutex);
 
-	(void) mutex_unlock(&tpool->tp_mutex);
+	pthread_cleanup_pop(1);	/* sig_mutex_unlock(&tpool->tp_mutex); */
 	delete_pool(tpool);
 }
 
@@ -435,18 +404,19 @@ tpool_destroy(tpool_t *tpool)
 void
 tpool_abandon(tpool_t *tpool)
 {
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
 	if (tpool->tp_current == 0) {
 		/* no workers, just delete the pool */
-		(void) mutex_unlock(&tpool->tp_mutex);
+		sig_mutex_unlock(&tpool->tp_mutex);
 		delete_pool(tpool);
 	} else {
 		/* wake up all workers, last one will delete the pool */
 		tpool->tp_flags |= TP_ABANDON;
 		tpool->tp_flags &= ~TP_SUSPEND;
 		(void) cond_broadcast(&tpool->tp_workcv);
-		(void) mutex_unlock(&tpool->tp_mutex);
+		sig_mutex_unlock(&tpool->tp_mutex);
 	}
 }
 
@@ -457,24 +427,27 @@ tpool_abandon(tpool_t *tpool)
 void
 tpool_wait(tpool_t *tpool)
 {
-	/* ASSERT(!tpool_member(tpool)); */
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!tpool_member(tpool));
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
+	pthread_cleanup_push(sig_mutex_unlock, &tpool->tp_mutex);
 	while (tpool->tp_head != NULL || tpool->tp_active != NULL) {
 		tpool->tp_flags |= TP_WAIT;
-		(void) cond_wait(&tpool->tp_waitcv, &tpool->tp_mutex);
-		/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+		(void) sig_cond_wait(&tpool->tp_waitcv, &tpool->tp_mutex);
+		ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
 	}
-	(void) mutex_unlock(&tpool->tp_mutex);
+	pthread_cleanup_pop(1);	/* sig_mutex_unlock(&tpool->tp_mutex); */
 }
 
 void
 tpool_suspend(tpool_t *tpool)
 {
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
 	tpool->tp_flags |= TP_SUSPEND;
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
 }
 
 int
@@ -482,10 +455,12 @@ tpool_suspended(tpool_t *tpool)
 {
 	int suspended;
 
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
 	suspended = (tpool->tp_flags & TP_SUSPEND) != 0;
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
+
 	return (suspended);
 }
 
@@ -494,10 +469,11 @@ tpool_resume(tpool_t *tpool)
 {
 	int excess;
 
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
 	if (!(tpool->tp_flags & TP_SUSPEND)) {
-		(void) mutex_unlock(&tpool->tp_mutex);
+		sig_mutex_unlock(&tpool->tp_mutex);
 		return;
 	}
 	tpool->tp_flags &= ~TP_SUSPEND;
@@ -508,51 +484,26 @@ tpool_resume(tpool_t *tpool)
 			break;		/* pthread_create() failed */
 		tpool->tp_current++;
 	}
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
 }
 
 int
 tpool_member(tpool_t *tpool)
 {
-	pthread_t self = pthread_self();
+	pthread_t my_tid = pthread_self();
 	tpool_active_t *activep;
 
-	(void) mutex_lock(&tpool->tp_mutex);
-	/* ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON))); */
+	ASSERT(!(tpool->tp_flags & (TP_DESTROY | TP_ABANDON)));
+
+	sig_mutex_lock(&tpool->tp_mutex);
 	for (activep = tpool->tp_active; activep; activep = activep->tpa_next) {
-		if (activep->tpa_tid == self) {
-			(void) mutex_unlock(&tpool->tp_mutex);
+		if (activep->tpa_tid == my_tid) {
+			sig_mutex_unlock(&tpool->tp_mutex);
 			return (1);
 		}
 	}
-	(void) mutex_unlock(&tpool->tp_mutex);
+	sig_mutex_unlock(&tpool->tp_mutex);
 	return (0);
-}
-
-void
-prefork1_tpool(void)
-{
-	tpool_t *tpool;
-
-	(void) mutex_lock(&thread_pool_lock);
-	if ((tpool = thread_pools) != NULL) {
-		do {
-			(void) mutex_lock(&tpool->tp_mutex);
-		} while ((tpool = tpool->tp_forw) != thread_pools);
-	}
-}
-
-void
-postfork1_parent_tpool(void)
-{
-	tpool_t *tpool;
-
-	if ((tpool = thread_pools) != NULL) {
-		do {
-			(void) mutex_unlock(&tpool->tp_mutex);
-		} while ((tpool = tpool->tp_forw) != thread_pools);
-	}
-	(void) mutex_unlock(&thread_pool_lock);
 }
 
 void
@@ -561,8 +512,6 @@ postfork1_child_tpool(void)
 	pthread_t my_tid = pthread_self();
 	tpool_t *tpool;
 	tpool_job_t *job;
-
-	postfork1_parent_tpool();	/* release locks */
 
 	/*
 	 * All of the thread pool workers are gone, except possibly
@@ -583,7 +532,7 @@ top:
 		(void) cond_init(&tpool->tp_waitcv, USYNC_THREAD, NULL);
 		for (job = tpool->tp_head; job; job = tpool->tp_head) {
 			tpool->tp_head = job->tpj_next;
-			job_free(job);
+			lfree(job, sizeof (*job));
 		}
 		tpool->tp_tail = NULL;
 		tpool->tp_njobs = 0;

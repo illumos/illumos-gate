@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,9 +63,12 @@ fork-safe) and in which the calling thread has all signals deferred
 
 However, certain rules apply to the code within these critical regions:
 
-	- The code must be of guaranteed short duration; no
-	  calls to interfaces that might block indefinitely are
-	  allowed.  This means no calls into stdio or syslog().
+	- The code must be of guaranteed short duration; no calls
+	  to interfaces that might block indefinitely are allowed.
+	  This means no calls into stdio or syslog() and no calls
+	  to cond_wait() unless there is a guarantee of an almost-
+	  immediate call to cond_signal() or cond_broadcast()
+	  from elsewhere.
 
 	- The code cannot call any non-l* synchronization
 	  primitives (mutex_lock(), _private_mutex_lock(),
@@ -197,3 +199,40 @@ conditions such as the setting of CFLAGS and CPPFLAGS for the libc_i18n
 stuff need to be compatible with the ones for the libc stuff.  Whenever
 changes that affect the compilation conditions of libc occur, the changes
 should be propagated to libc_i18n.
+
+-----
+
+The putback of the project:
+	6416832 libaio and librt can and should be folded into libc
+introduced several libc-private locking interfaces:
+	void	sig_mutex_lock(mutex_t *);
+	void	sig_mutex_unlock(mutex_t *);
+	int	sig_mutex_trylock(mutex_t *);
+	int	sig_cond_wait(cond_t *, mutex_t *);
+	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+which are declared in both "thr_uberdata.h" and "mtlib.h".
+
+They are used in specialized code in libc, like the asynchronous i/o code.
+Unlike the lmutex_lock() and lmutex_unlock() interfaces described above,
+these interfaces do not define critical regions, but signals are
+deferred while locks acquired by these functions are held, making
+their use be async-signal safe.  Calls to malloc(), calloc(), realloc(),
+and free() are permissible while holding such locks.
+
+These interfaces were brought over from code in the former libaio
+and librt and are necessary because, where they are used, the code
+must execute potentially long-term waits and must be cancelable.
+sig_cond_wait() and sig_cond_reltimedwait() are cancellation points.
+
+These interfaces are available for other uses inside libc, as
+the need arises.  (There is no need if the code does not perform
+long-term waits.)  Just follow a few rules to be self-consistent:
+ - Don't mix calls to mutex_[un]lock(), lmutex_[un]lock() and
+   sig_mutex_[un]lock() on the same mutex.
+ - Don't call cond_wait() with a mutex acquired by sig_mutex_lock();
+   call sig_cond_wait() or sig_cond_reltimedwait().
+ - Use pthread_cleanup_push() and pthread_cleanup_pop() to make
+   your code cancellation-safe.
+ - The sig_*() interfaces are not in themselves fork-safe.
+   You have to employ other logic to make your code fork-safe.
+   See the tail of postfork1_child() for examples.

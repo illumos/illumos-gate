@@ -18,14 +18,11 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 # The list is built of owner-group combinations.  ROOT.SYS occurs twice
 # because some directories owned by root and in group sys are subdirectories
@@ -767,6 +764,10 @@ $(SYM.USRCCSLIB64:%=$(ROOT)%):= \
 
 # Special symlinks to direct libraries that have been moved
 # from /usr/lib to /lib in order to live in the root filesystem.
+$(ROOT)/lib/libposix4.so.1:=		REALPATH=librt.so.1
+$(ROOT)/lib/libposix4.so:=		REALPATH=libposix4.so.1
+$(ROOT)/lib/llib-lposix4:=		REALPATH=llib-lrt
+$(ROOT)/lib/llib-lposix4.ln:=		REALPATH=llib-lrt.ln
 $(ROOT)/lib/libthread_db.so.1:=		REALPATH=libc_db.so.1
 $(ROOT)/lib/libthread_db.so:=		REALPATH=libc_db.so.1
 $(ROOT)/usr/lib/ld.so.1:=		REALPATH=../../lib/ld.so.1
@@ -997,6 +998,12 @@ $(ROOT)/usr/lib/nss_nis.so.1:=		REALPATH=../../lib/nss_nis.so.1
 $(ROOT)/usr/lib/nss_nisplus.so.1:=	REALPATH=../../lib/nss_nisplus.so.1
 $(ROOT)/usr/lib/nss_user.so.1:=		REALPATH=../../lib/nss_user.so.1
 
+$(ROOT)/lib/$(MACH64)/libposix4.so.1:= \
+	REALPATH=librt.so.1
+$(ROOT)/lib/$(MACH64)/libposix4.so:= \
+	REALPATH=libposix4.so.1
+$(ROOT)/lib/$(MACH64)/llib-lposix4.ln:= \
+	REALPATH=llib-lrt.ln
 $(ROOT)/lib/$(MACH64)/libthread_db.so.1:= \
 	REALPATH=libc_db.so.1
 $(ROOT)/lib/$(MACH64)/libthread_db.so:= \
@@ -1345,6 +1352,10 @@ $(ROOT)/usr/platform/sun4u/sbin/wrsmconf:= \
 	REALPATH=../../../../platform/sun4u/sbin/wrsmconf
 
 SYM.USRLIB= \
+	/lib/libposix4.so \
+	/lib/libposix4.so.1 \
+	/lib/llib-lposix4 \
+	/lib/llib-lposix4.ln \
 	/lib/libthread_db.so \
 	/lib/libthread_db.so.1 \
 	/usr/lib/ld.so.1 \
@@ -1586,6 +1597,9 @@ amd64_SYM.USRLIB64=
 
 SYM.USRLIB64= \
 	$($(MACH64)_SYM.USRLIB64)		\
+	/lib/$(MACH64)/libposix4.so \
+	/lib/$(MACH64)/libposix4.so.1 \
+	/lib/$(MACH64)/llib-lposix4.ln \
 	/lib/$(MACH64)/libthread_db.so \
 	/lib/$(MACH64)/libthread_db.so.1 \
 	/usr/lib/$(MACH64)/ld.so.1 \

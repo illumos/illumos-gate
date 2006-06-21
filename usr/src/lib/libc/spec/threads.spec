@@ -1,4 +1,6 @@
 #
+# CDDL HEADER START
+#
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
@@ -951,23 +953,11 @@ arch		i386
 version		i386=SUNWprivate_1.1
 end		
 
-function	_cancel_prologue
-version		SUNWprivate_1.1
-end
-
-function	_cancel_epilogue
-version		SUNWprivate_1.1
-end
-
 function	_sigoff
 version		SUNWprivate_1.1
 end
 
 function	_sigon
-version		SUNWprivate_1.1
-end
-
-function	_sigdeferred
 version		SUNWprivate_1.1
 end
 

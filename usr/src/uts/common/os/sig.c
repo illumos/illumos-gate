@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2372,6 +2371,7 @@ sigqhdralloc(size_t size, uint_t maxcount)
 		sq = next;
 	}
 	sq->sq_next = NULL;
+	cv_init(&sqh->sqb_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&sqh->sqb_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (sqh);
 }
@@ -2422,6 +2422,7 @@ sigqrel(sigqueue_t *sq)
 	mutex_enter(&sqh->sqb_lock);
 	if (sqh->sqb_pexited && sqh->sqb_sent == 1) {
 		mutex_exit(&sqh->sqb_lock);
+		cv_destroy(&sqh->sqb_cv);
 		mutex_destroy(&sqh->sqb_lock);
 		kmem_free(sqh, sqh->sqb_size);
 	} else {
@@ -2430,6 +2431,7 @@ sigqrel(sigqueue_t *sq)
 		sq->sq_next = sqh->sqb_free;
 		sq->sq_backptr = NULL;
 		sqh->sqb_free = sq;
+		cv_signal(&sqh->sqb_cv);
 		mutex_exit(&sqh->sqb_lock);
 	}
 }
@@ -2463,6 +2465,7 @@ sigqhdrfree(sigqhdr_t *sqh)
 	mutex_enter(&sqh->sqb_lock);
 	if (sqh->sqb_sent == 0) {
 		mutex_exit(&sqh->sqb_lock);
+		cv_destroy(&sqh->sqb_cv);
 		mutex_destroy(&sqh->sqb_lock);
 		kmem_free(sqh, sqh->sqb_size);
 	} else {

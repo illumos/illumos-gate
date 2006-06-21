@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -27,11 +26,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
+#include "synonyms.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#include "pos4.h"
 
 #include <stdio.h>
 
@@ -52,7 +50,7 @@ posix_fallocate(int fd, off_t offset, off_t len)
 	return (0);
 }
 
-#if defined(_LARGEFILE64_SOURCE) && !defined(_LP64)
+#if !defined(_LP64)
 
 int
 posix_fallocate64(int fd, off64_t offset, off64_t len)

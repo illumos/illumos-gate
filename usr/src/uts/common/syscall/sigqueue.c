@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-
-
+/* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -43,13 +41,13 @@
 #include <sys/debug.h>
 
 static int
-sigqkill(pid_t pid, int signo, sigsend_t *sigsend)
+sigqkill(pid_t pid, sigsend_t *sigsend)
 {
-	register proc_t *p;
+	proc_t *p;
 	int error;
 
-	if (signo < 0 || signo >= NSIG)
-		return (set_errno(EINVAL));
+	if ((uint_t)sigsend->sig >= NSIG)
+		return (EINVAL);
 
 	if (pid == -1) {
 		procset_t set;
@@ -90,9 +88,7 @@ sigqkill(pid_t pid, int signo, sigsend_t *sigsend)
 			error = EPERM;
 	}
 
-	if (error)
-		return (set_errno(error));
-	return (0);
+	return (error);
 }
 
 
@@ -104,35 +100,39 @@ sigqkill(pid_t pid, int signo, sigsend_t *sigsend)
 int
 kill(pid_t pid, int sig)
 {
+	int error;
 	sigsend_t v;
 
 	bzero(&v, sizeof (v));
 	v.sig = sig;
 	v.checkperm = 1;
 	v.sicode = SI_USER;
-
-	return (sigqkill(pid, sig, &v));
+	if ((error = sigqkill(pid, &v)) != 0)
+		return (set_errno(error));
+	return (0);
 }
 
 /*
  * The handling of small unions, like the sigval argument to sigqueue,
- * is architecture dependent.  We have adapted the convention that the
+ * is architecture dependent.  We have adopted the convention that the
  * value itself is passed in the storage which crosses the kernel
  * protection boundary.  This procedure will accept a scalar argument,
  * and store it in the appropriate value member of the sigsend_t structure.
  */
 int
-sigqueue(pid_t pid, int signo, /* union sigval */ void *value, int si_code)
+sigqueue(pid_t pid, int sig, /* union sigval */ void *value,
+	int si_code, int block)
 {
+	int error;
 	sigsend_t v;
 	sigqhdr_t *sqh;
 	proc_t *p = curproc;
 
 	/* The si_code value must indicate the signal will be queued */
-	if (pid <= 0 || !sigwillqueue(signo, si_code))
+	if (pid <= 0 || !sigwillqueue(sig, si_code))
 		return (set_errno(EINVAL));
 
-	if (p->p_sigqhdr == NULL) {
+	if ((sqh = p->p_sigqhdr) == NULL) {
 		/* Allocate sigqueue pool first time */
 		sqh = sigqhdralloc(sizeof (sigqueue_t), _SIGQUEUE_MAX);
 		mutex_enter(&p->p_lock);
@@ -142,17 +142,33 @@ sigqueue(pid_t pid, int signo, /* union sigval */ void *value, int si_code)
 		} else {
 			/* another lwp allocated the pool, free ours */
 			sigqhdrfree(sqh);
+			sqh = p->p_sigqhdr;
 		}
 		mutex_exit(&p->p_lock);
 	}
 
-	bzero(&v, sizeof (v));
-	v.sig = signo;
-	v.checkperm = 1;
-	v.sicode = si_code;
-	v.value.sival_ptr = value;
+	do {
+		bzero(&v, sizeof (v));
+		v.sig = sig;
+		v.checkperm = 1;
+		v.sicode = si_code;
+		v.value.sival_ptr = value;
+		if ((error = sigqkill(pid, &v)) != EAGAIN || !block)
+			break;
+		/* block waiting for another chance to allocate a sigqueue_t */
+		mutex_enter(&sqh->sqb_lock);
+		while (sqh->sqb_count == 0) {
+			if (!cv_wait_sig(&sqh->sqb_cv, &sqh->sqb_lock)) {
+				error = EINTR;
+				break;
+			}
+		}
+		mutex_exit(&sqh->sqb_lock);
+	} while (error == EAGAIN);
 
-	return (sigqkill(pid, signo, &v));
+	if (error)
+		return (set_errno(error));
+	return (0);
 }
 
 #ifdef _SYSCALL32_IMPL
@@ -173,13 +189,13 @@ sigqueue(pid_t pid, int signo, /* union sigval */ void *value, int si_code)
  * models is unclear.
  */
 int
-sigqueue32(pid_t pid, int signo, /* union sigval32 */ caddr32_t value,
-    int si_code)
+sigqueue32(pid_t pid, int sig, /* union sigval32 */ caddr32_t value,
+	int si_code, int block)
 {
 	union sigval sv;
 
 	bzero(&sv, sizeof (sv));
 	sv.sival_int = (int)value;
-	return (sigqueue(pid, signo, sv.sival_ptr, si_code));
+	return (sigqueue(pid, sig, sv.sival_ptr, si_code, block));
 }
 #endif

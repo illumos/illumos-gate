@@ -19,58 +19,27 @@
  * CDDL HEADER END
  */
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
-
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/* LINTLIBRARY */
+/* PROTOLIB1 */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <signal.h>
-#include <libaio.h>
+#include <sys/asynch.h>
 
-/*
- * usr/src/lib/libaio/common
- */
-
-/* aio.c */
 int aioread(int fd, caddr_t buf, int bufsz, off_t offset, int whence,
 			aio_result_t *resultp);
 int aiowrite(int fd, caddr_t buf, int bufsz, off_t offset, int whence,
 			aio_result_t *resultp);
+#if !defined(_LP64)
 int aioread64(int fd, caddr_t buf, int bufsz, off64_t offset, int whence,
 			aio_result_t *resultp);
 int aiowrite64(int fd, caddr_t buf, int bufsz, off64_t offset, int whence,
 			aio_result_t *resultp);
+#endif	/* !_LP64 */
 int aiocancel(aio_result_t *resultp);
 aio_result_t *aiowait(struct timeval *uwait);
-
-/* scalls.c */
-int _libaio_close(int fd);
-
-/* posix_aio.c */
-int __aio_read(aiocb_t *cb);
-int __aio_write(aiocb_t *cb);
-int __lio_listio(int mode, aiocb_t * const list[],
-			int nent, struct sigevent *sig);
-int __aio_suspend(void **list, int nent, const timespec_t *timo, int lf);
-int __aio_error(aiocb_t *cb);
-ssize_t __aio_return(aiocb_t *cb);
-int __aio_fsync(int op, aiocb_t *aiocbp);
-int __aio_cancel(int fd, aiocb_t *aiocbp);
-int __aio_waitn(void **list, uint_t nent, uint_t *nwait,
-			const struct timespec *timeout);
-int __aio_read64(aiocb64_t *cb);
-int __aio_write64(aiocb64_t *cb);
-int __lio_listio64(int mode, aiocb64_t *const list[],
-			int nent, struct sigevent *sig);
-int __aio_error64(aiocb64_t *cb);
-ssize_t __aio_return64(aiocb64_t *cb);
-int __aio_fsync64(int op, aiocb64_t *aiocbp);
-int __aio_cancel64(int fd, aiocb64_t *aiocbp);

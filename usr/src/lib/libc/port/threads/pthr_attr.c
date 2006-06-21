@@ -88,7 +88,6 @@ _pthread_attr_destroy(pthread_attr_t *attr)
 
 /*
  * _pthread_attr_clone: make a copy of a pthread_attr_t.
- * This is a consolidation-private interface, for librt.
  */
 int
 _pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
@@ -231,7 +230,7 @@ _pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
 /*
  * pthread_attr_setdaemonstate_np: sets the daemon state to DAEMON or NONDAEMON.
  * PTHREAD_CREATE_DAEMON is equivalent to thr_create(THR_DAEMON).
- * For now, this is a consolidation-private interface for librt.
+ * For now, this is a private interface in libc.
  */
 int
 _pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
@@ -249,7 +248,7 @@ _pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
 
 /*
  * pthread_attr_getdaemonstate_np: gets the daemon state.
- * For now, this is a consolidation-private interface for librt.
+ * For now, this is a private interface in libc.
  */
 int
 _pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)

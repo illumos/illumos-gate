@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /* ONC_PLUS EXTRACT START */
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -670,7 +671,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 187 */ SYSENT_CI("processor_bind",	processor_bind,	4),
 	/* 188 */ SYSENT_CI("processor_info",	processor_info,	2),
 	/* 189 */ SYSENT_CI("p_online",		p_online,	2),
-	/* 190 */ SYSENT_CI("sigqueue",		sigqueue,	4),
+	/* 190 */ SYSENT_CI("sigqueue",		sigqueue,	5),
 	/* 191 */ SYSENT_CI("clock_gettime",	clock_gettime,	2),
 	/* 192 */ SYSENT_CI("clock_settime",	clock_settime,	2),
 	/* 193 */ SYSENT_CI("clock_getres",	clock_getres,	2),
@@ -1048,7 +1049,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 187 */ SYSENT_CI("processor_bind",	processor_bind,	4),
 	/* 188 */ SYSENT_CI("processor_info",	processor_info,	2),
 	/* 189 */ SYSENT_CI("p_online",		p_online,	2),
-	/* 190 */ SYSENT_CI("sigqueue",		sigqueue32,	4),
+	/* 190 */ SYSENT_CI("sigqueue",		sigqueue32,	5),
 	/* 191 */ SYSENT_CI("clock_gettime",	clock_gettime,	2),
 	/* 192 */ SYSENT_CI("clock_settime",	clock_settime,	2),
 	/* 193 */ SYSENT_CI("clock_getres",	clock_getres,	2),

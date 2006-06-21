@@ -41,26 +41,6 @@ function	__class_quadruple # used by Sun's old Fortran 77 runtime libraries
 version		SUNWprivate_1.1
 end
 
-function	__clock_getres
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__clock_gettime
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__clock_nanosleep
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__clock_settime
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
 function	__collate_init
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
@@ -78,11 +58,6 @@ version		i386=SUNWprivate_1.1
 end
 
 function	__eucpctowc_gen
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__fdsync
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -319,11 +294,6 @@ function	__multi_innetgr
 version		SUNWprivate_1.1
 end
 
-function	__nanosleep
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
 function	__nl_langinfo_std
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
@@ -360,21 +330,6 @@ version		SUNWprivate_1.1
 end
 
 function	__regfree_std
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__signotify
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__sigqueue
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__sigtimedwait
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -432,31 +387,6 @@ version		SUNWprivate_1.1
 end
 
 function	__time_init
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__timer_create
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__timer_delete
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__timer_getoverrun
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__timer_gettime
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	__timer_settime
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -1376,11 +1306,6 @@ weak		jrand48
 version		SUNWprivate_1.1
 end
 
-function	_kaio
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
 function	_l64a # extends libc/spec/gen.spec l64a
 weak		l64a
 #Declaration	/* Unknown. */
@@ -1744,27 +1669,12 @@ weak		pthread_atfork
 version		SUNWprivate_1.1
 end
 
-function	_pthread_attr_clone
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	_pthread_attr_equal
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
 function	_pthread_attr_destroy
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
 
 function	_pthread_attr_getdetachstate
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	_pthread_attr_getdaemonstate_np
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -1810,11 +1720,6 @@ version		SUNWprivate_1.1
 end
 
 function	_pthread_attr_setdetachstate
-#Declaration	/* Unknown. */
-version		SUNWprivate_1.1
-end
-
-function	_pthread_attr_setdaemonstate_np
 #Declaration	/* Unknown. */
 version		SUNWprivate_1.1
 end
@@ -2989,10 +2894,6 @@ end
 
 function	install_utrap
 arch		sparc sparcv9
-version		SUNWprivate_1.1
-end
-
-function	kaio
 version		SUNWprivate_1.1
 end
 

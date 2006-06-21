@@ -1,11 +1,11 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-LIBS = -lsocket -lnsl -lrt -lmd
+LIBS = -lsocket -lnsl -lmd
 
 LIBNTP_A= libntp/libntp.a
 LIBPARSE_A= libparse/libparse.a

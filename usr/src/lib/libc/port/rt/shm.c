@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -27,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
+#include "synonyms.h"
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -38,41 +37,38 @@
 int
 shm_open(const char *path, int oflag, mode_t mode)
 {
-	int flag, fd, flags;
+	int crflag;
+	int fd;
+	int flags;
 
-	if (__pos4obj_check(path) == -1) {
+	if (__pos4obj_check(path) == -1)
 		return (-1);
-	}
 
 	/* acquire semaphore lock to have atomic operation */
-	if ((__pos4obj_lock(path, SHM_LOCK_TYPE)) < 0) {
+	if (__pos4obj_lock(path, SHM_LOCK_TYPE) < 0)
 		return (-1);
-	}
 
-	fd = __pos4obj_open(path, SHM_DATA_TYPE, oflag, mode, &flag);
+	fd = __pos4obj_open(path, SHM_DATA_TYPE, oflag, mode, &crflag);
 
 	if (fd < 0) {
 		(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
 		return (-1);
 	}
 
-
-	if ((flags = fcntl(fd, F_GETFD)) < 0) {
+	if ((flags = fcntl(fd, F_GETFD)) < 0 ||
+	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) {
 		(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
-		return (-1);
-	}
-
-	if ((fcntl(fd, F_SETFD, flags|FD_CLOEXEC)) < 0) {
-		(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
+		(void) __close_nc(fd);
 		return (-1);
 	}
 
 	/* relase semaphore lock operation */
 	if (__pos4obj_unlock(path, SHM_LOCK_TYPE) < 0) {
+		(void) __close_nc(fd);
 		return (-1);
 	}
-	return (fd);
 
+	return (fd);
 }
 
 int

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include		../Makefile.lib
+include	../Makefile.lib
 
-SUBDIRS =	$(MACH)
+SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
@@ -39,41 +38,11 @@ lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install: spec .WAIT $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 lint: $(SUBDIRS)
 
-LIBRARY= 	libaio.a
-XGETFLAGS=	-a
-POFILE=		$(LIBRARY:.a=.po)
-POFILES=	generic.po
-
-# definitions for install_h target
-HDRS=		asynch.h
-HDRDIR=		.
-ROOTHDRDIR=	$(ROOT)/usr/include/sys
-
-install_h: $(ROOTHDRS)
-
-check: $(CHECKHDRS)
-
-spec $(SUBDIRS):	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-_msg:	$(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
-
-$(POFILE):	$(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
-
-$(POFILES):
-	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) *.[ch]* */*.[ch]*
-	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
-	$(RM) messages.po
-
 FRC:
-
-include ../Makefile.targ

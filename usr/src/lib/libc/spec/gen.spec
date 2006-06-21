@@ -1,7 +1,4 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,6 +17,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -3281,6 +3282,11 @@ errno		EPERM
 exception	$return == -1
 end
 
+function	_sigstack
+weak		sigstack
+version		SUNWprivate_1.1
+end
+
 function	sleep
 include		<unistd.h>
 declaration	unsigned sleep(unsigned seconds)
@@ -4839,19 +4845,6 @@ end
 
 function	_port_alert
 weak		port_alert
-version		SUNWprivate_1.1
-end
-
-function	port_dispatch
-include		<port.h>
-declaration	int port_dispatch(int port, int flags, int source, int events, \
-		uintptr_t object, void *user)
-version		SUNWprivate_1.1
-errno		EBADF EBADFD EINTR
-end
-
-function	_port_dispatch
-weak		port_dispatch
 version		SUNWprivate_1.1
 end
 

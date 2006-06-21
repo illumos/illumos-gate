@@ -26,7 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
+#include "synonyms.h"
+#include "mtlib.h"
 #include <sys/types.h>
 #include <sched.h>
 #include <errno.h>
@@ -40,18 +41,16 @@
 #include <thread.h>
 #include <string.h>
 #include <stdlib.h>
-#include "pos4.h"
+#include "rtsched.h"
 
 /*
  * The following variables are used for caching information
  * for priocntl scheduling classes.
  */
-static struct pcclass {
-	short		pcc_state;
-	pri_t		pcc_primin;
-	pri_t		pcc_primax;
-	pcinfo_t	pcc_info;
-}	rt_class, ts_class, sys_class, ia_class;
+struct pcclass ts_class;
+struct pcclass rt_class;
+struct pcclass ia_class;
+struct pcclass sys_class;
 
 static rtdpent_t	*rt_dptbl;	/* RT class parameter table */
 
@@ -64,7 +63,7 @@ static int	map_gp_to_rtpri(pri_t);
 /*
  * cache priocntl information on scheduling classes by policy
  */
-static int
+int
 get_info_by_policy(int policy)
 {
 	char		*pccname;
@@ -122,7 +121,7 @@ get_info_by_policy(int policy)
 			return (-1);
 		rtdpsize = (size_t)(rtadmin.rt_ndpents * sizeof (rtdpent_t));
 		if (rt_dptbl == NULL &&
-		    (rt_dptbl = (rtdpent_t *)malloc(rtdpsize)) == NULL) {
+		    (rt_dptbl = lmalloc(rtdpsize)) == NULL) {
 			errno = EAGAIN;
 			return (-1);
 		}
@@ -187,6 +186,35 @@ map_gp_to_rtpri(pri_t gpri)
 	}
 
 	return (pri);
+}
+
+/*
+ * Translate RT class's user priority to global scheduling priority.
+ */
+pri_t
+map_rtpri_to_gp(pri_t pri)
+{
+	rtdpent_t	*rtdp;
+	pri_t		gpri;
+
+	if (rt_class.pcc_state == 0)
+		(void) get_info_by_policy(SCHED_FIFO);
+
+	/* First case is the default case, other two are seldomly taken */
+	if (pri <= rt_dptbl[rt_class.pcc_primin].rt_globpri) {
+		gpri = pri + rt_dptbl[rt_class.pcc_primin].rt_globpri -
+		    rt_class.pcc_primin;
+	} else if (pri >= rt_dptbl[rt_class.pcc_primax].rt_globpri) {
+		gpri = pri + rt_dptbl[rt_class.pcc_primax].rt_globpri -
+		    rt_class.pcc_primax;
+	} else {
+		gpri =  rt_dptbl[rt_class.pcc_primin].rt_globpri + 1;
+		for (rtdp = rt_dptbl+1; rtdp->rt_globpri < pri; ++rtdp, ++gpri)
+			;
+		if (rtdp->rt_globpri > pri)
+			--gpri;
+	}
+	return (gpri);
 }
 
 static int
@@ -435,7 +463,7 @@ sched_getscheduler(pid_t pid)
 int
 sched_yield(void)
 {
-	_thr_yield();
+	thr_yield();
 	return (0);
 }
 

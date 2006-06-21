@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,7 @@ typedef struct sigaltstack32 {
 #if defined(__EXTENSIONS__) || defined(_KERNEL) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
 
-/* signotify id used only by librt for mq_notify()/aio_notify() */
+/* signotify id used only by libc for mq_notify()/aio_notify() */
 typedef struct signotify_id {		/* signotify id struct		*/
 	pid_t	sn_pid;			/* pid of proc to be notified	*/
 	int	sn_index;		/* index in preallocated pool	*/
@@ -318,6 +318,7 @@ typedef struct sigqhdr {		/* sigqueue pool header		*/
 	ushort_t	sqb_size;	/* size of header+free structs	*/
 	uchar_t		sqb_pexited;	/* process has exited		*/
 	uchar_t		sqb_sent;	/* number of sigq sent		*/
+	kcondvar_t	sqb_cv;		/* waiting for a sigq struct	*/
 	kmutex_t	sqb_lock;	/* lock for sigq pool		*/
 } sigqhdr_t;
 

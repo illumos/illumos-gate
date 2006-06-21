@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = sfx4500-disk
 CLASS = arch
@@ -34,5 +34,5 @@ SRCS = sfx4500-disk.c diskmon_conf.c topo_gather.c \
 include ../../Makefile.plugin
 LINTFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/i86pc/sata -L$(ROOT)/usr/lib/fm
 CFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/i86pc/sata
-LDLIBS += -lsysevent -lnvpair -lsmbios -ldl -lrt -lcfgadm -ltopo -luutil
+LDLIBS += -lsysevent -lnvpair -lsmbios -ldl -lcfgadm -ltopo -luutil
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm

@@ -35,17 +35,25 @@
 #pragma	weak timer_gettime = _timer_gettime
 #pragma	weak timer_settime = _timer_settime
 
-#pragma	weak clock_nanosleep = _clock_nanosleep
-#pragma	weak nanosleep = _nanosleep
-
-#include "c_synonyms.h"
+#include "synonyms.h"
 #include <time.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "pos4.h"
 #include "sigev_thread.h"
+
+/*
+ * System call wrappers found elsewhere in libc (common/sys/__clock_timer.s).
+ */
+extern int __clock_getres(clockid_t, timespec_t *);
+extern int __clock_gettime(clockid_t, timespec_t *);
+extern int __clock_settime(clockid_t, const timespec_t *);
+extern int __timer_create(clockid_t, struct sigevent *, timer_t *);
+extern int __timer_delete(timer_t);
+extern int __timer_getoverrun(timer_t);
+extern int __timer_gettime(timer_t, itimerspec_t *);
+extern int __timer_settime(timer_t, int, const itimerspec_t *, itimerspec_t *);
 
 /*
  * Array of pointers to tcd's, indexed by timer id.
@@ -108,14 +116,17 @@ _timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
 	}
 
 	rc = __timer_create(clock_id, sigevp, timerid);
-	if (rc == 0 && sigev_thread) {
-		if ((rc = launch_spawner(tcdp)) != 0)
-			__timer_delete(*timerid);
-		else
-			timer_tcd[*timerid] = tcdp;
+
+	if (sigev_thread) {
+		if (rc == 0) {
+			if ((rc = launch_spawner(tcdp)) != 0)
+				__timer_delete(*timerid);
+			else
+				timer_tcd[*timerid] = tcdp;
+		}
+		if (rc != 0)
+			free_sigev_handler(tcdp);
 	}
-	if (rc != 0 && sigev_thread)
-		free_sigev_handler(tcdp);
 
 	return (rc);
 }
@@ -150,15 +161,19 @@ _timer_settime(timer_t timerid, int flags, const itimerspec_t *value,
 	return (__timer_settime(timerid, flags, value, ovalue));
 }
 
-int
-_clock_nanosleep(clockid_t clock_id, int flags,
-	const timespec_t *rqtp, timespec_t *rmtp)
+/*
+ * Cleanup after fork1() in the child process.
+ */
+void
+postfork1_child_sigev_timer(void)
 {
-	return (__clock_nanosleep(clock_id, flags, rqtp, rmtp));
-}
+	thread_communication_data_t *tcdp;
+	int timer;
 
-int
-_nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
-{
-	return (__nanosleep(rqtp, rmtp));
+	for (timer = 0; timer < timer_max; timer++) {
+		if ((tcdp = timer_tcd[timer]) != NULL) {
+			timer_tcd[timer] = NULL;
+			tcd_teardown(tcdp);
+		}
+	}
 }

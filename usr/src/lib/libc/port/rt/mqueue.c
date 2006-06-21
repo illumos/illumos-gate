@@ -39,16 +39,8 @@
 #pragma weak mq_setattr = _mq_setattr
 #pragma weak mq_getattr = _mq_getattr
 
-#include "c_synonyms.h"
-#if !defined(__lint)	/* need a *_synonyms.h file */
-#define	sem_getvalue		_sem_getvalue
-#define	sem_init		_sem_init
-#define	sem_post		_sem_post
-#define	sem_reltimedwait_np	_sem_reltimedwait_np
-#define	sem_timedwait		_sem_timedwait
-#define	sem_trywait		_sem_trywait
-#define	sem_wait		_sem_wait
-#endif
+#include "synonyms.h"
+#include "mtlib.h"
 #define	_KMEMUSER
 #include <sys/param.h>		/* _MQ_OPEN_MAX, _MQ_PRIO_MAX, _SEM_VALUE_MAX */
 #undef	_KMEMUSER
@@ -66,10 +58,71 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <inttypes.h>
-
-#include "mqlib.h"
+#include "sigev_thread.h"
 #include "pos4obj.h"
-#include "pos4.h"
+
+/*
+ * Default values per message queue
+ */
+#define	MQ_MAXMSG	128
+#define	MQ_MAXSIZE	1024
+
+#define	MQ_MAGIC	0x4d534751		/* "MSGQ" */
+
+/*
+ * Message header which is part of messages in link list
+ */
+typedef struct {
+	uint64_t 	msg_next;	/* offset of next message in the link */
+	uint64_t	msg_len;	/* length of the message */
+} msghdr_t;
+
+/*
+ * message queue description
+ */
+struct mq_dn {
+	size_t		mqdn_flags;	/* open description flags */
+};
+
+/*
+ * message queue descriptor structure
+ */
+typedef struct mq_des {
+	struct mq_des	*mqd_next;	/* list of all open mq descriptors, */
+	struct mq_des	*mqd_prev;	/* needed for fork-safety */
+	int		mqd_magic;	/* magic # to identify mq_des */
+	int		mqd_flags;	/* operation flag per open */
+	struct mq_header *mqd_mq;	/* address pointer of message Q */
+	struct mq_dn	*mqd_mqdn;	/* open	description */
+	thread_communication_data_t *mqd_tcd;	/* SIGEV_THREAD notification */
+} mqdes_t;
+
+/*
+ * message queue common header, part of the mmap()ed file.
+ * Since message queues may be shared between 32- and 64-bit processes,
+ * care must be taken to make sure that the elements of this structure
+ * are identical for both _LP64 and _ILP32 cases.
+ */
+typedef struct mq_header {
+	/* first field must be mq_totsize, DO NOT insert before this	*/
+	int64_t		mq_totsize;	/* total size of the Queue */
+	int64_t		mq_maxsz;	/* max size of each message */
+	uint32_t	mq_maxmsg;	/* max messages in the queue */
+	uint32_t	mq_maxprio;	/* maximum mqueue priority */
+	uint32_t	mq_curmaxprio;	/* current maximum MQ priority */
+	uint32_t	mq_mask;	/* priority bitmask */
+	uint64_t	mq_freep;	/* free message's head pointer */
+	uint64_t	mq_headpp;	/* pointer to head pointers */
+	uint64_t	mq_tailpp;	/* pointer to tail pointers */
+	signotify_id_t	mq_sigid;	/* notification id (3 int's) */
+	uint32_t	mq_ntype;	/* notification type (SIGEV_*) */
+	uint64_t	mq_des;		/* pointer to msg Q descriptor */
+	mutex_t		mq_exclusive;	/* acquire for exclusive access */
+	sem_t		mq_rblocked;	/* number of processes rblocked */
+	sem_t		mq_notfull;	/* mq_send()'s block on this */
+	sem_t		mq_notempty;	/* mq_receive()'s block on this */
+	sem_t		mq_spawner;	/* spawner thread blocks on this */
+} mqhdr_t;
 
 /*
  * The code assumes that _MQ_OPEN_MAX == -1 or "no fixed implementation limit".
@@ -79,14 +132,13 @@
  * by checking _MQ_OPEN_MAX at compile time.
  */
 #if _MQ_OPEN_MAX != -1
-#error "librt:mq_open() no longer enforces _MQ_OPEN_MAX and needs fixing."
+#error "mq_open() no longer enforces _MQ_OPEN_MAX and needs fixing."
 #endif
 
 #define	MQ_ALIGNSIZE	8	/* 64-bit alignment */
 
 #ifdef DEBUG
-#define	MQ_ASSERT(x) \
-	assert(x);
+#define	MQ_ASSERT(x)	assert(x);
 
 #define	MQ_ASSERT_PTR(_m, _p) \
 	assert((_p) != NULL && !((uintptr_t)(_p) & (MQ_ALIGNSIZE -1)) && \
@@ -114,8 +166,10 @@
 #define	ABS_TIME	0
 #define	REL_TIME	1
 
-mutex_t mq_list_lock = DEFAULTMUTEX;
-mqdes_t *mq_list = NULL;
+static mutex_t mq_list_lock = DEFAULTMUTEX;
+static mqdes_t *mq_list = NULL;
+
+extern int __signotify(int cmd, siginfo_t *sigonfo, signotify_id_t *sn_id);
 
 static int
 mq_is_valid(mqdes_t *mqdp)
@@ -458,13 +512,13 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdp->mqd_magic = MQ_MAGIC;
 	mqdp->mqd_tcd = NULL;
 	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0) {
-		(void) mutex_lock(&mq_list_lock);
+		lmutex_lock(&mq_list_lock);
 		mqdp->mqd_next = mq_list;
 		mqdp->mqd_prev = NULL;
 		if (mq_list)
 			mq_list->mqd_prev = mqdp;
 		mq_list = mqdp;
-		(void) mutex_unlock(&mq_list_lock);
+		lmutex_unlock(&mq_list_lock);
 		return ((mqd_t)mqdp);
 	}
 
@@ -489,12 +543,35 @@ out:
 	return ((mqd_t)-1);
 }
 
+static void
+mq_close_cleanup(mqdes_t *mqdp)
+{
+	mqhdr_t *mqhp = mqdp->mqd_mq;
+	struct mq_dn *mqdnp = mqdp->mqd_mqdn;
+
+	/* invalidate the descriptor before freeing it */
+	mqdp->mqd_magic = 0;
+	(void) mutex_unlock(&mqhp->mq_exclusive);
+
+	lmutex_lock(&mq_list_lock);
+	if (mqdp->mqd_next)
+		mqdp->mqd_next->mqd_prev = mqdp->mqd_prev;
+	if (mqdp->mqd_prev)
+		mqdp->mqd_prev->mqd_next = mqdp->mqd_next;
+	if (mq_list == mqdp)
+		mq_list = mqdp->mqd_next;
+	lmutex_unlock(&mq_list_lock);
+
+	free(mqdp);
+	(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
+	(void) munmap((caddr_t)mqhp, (size_t)mqhp->mq_totsize);
+}
+
 int
 _mq_close(mqd_t mqdes)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
-	struct mq_dn *mqdnp;
 	thread_communication_data_t *tcdp;
 
 	if (!mq_is_valid(mqdp)) {
@@ -503,9 +580,8 @@ _mq_close(mqd_t mqdes)
 	}
 
 	mqhp = mqdp->mqd_mq;
-	mqdnp = mqdp->mqd_mqdn;
-
 	(void) mutex_lock(&mqhp->mq_exclusive);
+
 	if (mqhp->mq_des == (uintptr_t)mqdp &&
 	    mqhp->mq_sigid.sn_pid == getpid()) {
 		/* notification is set for this descriptor, remove it */
@@ -513,26 +589,15 @@ _mq_close(mqd_t mqdes)
 		mqhp->mq_ntype = 0;
 		mqhp->mq_des = 0;
 	}
+
+	pthread_cleanup_push(mq_close_cleanup, mqdp);
 	if ((tcdp = mqdp->mqd_tcd) != NULL) {
 		mqdp->mqd_tcd = NULL;
-		del_sigev_mq(tcdp);
+		del_sigev_mq(tcdp);	/* possible cancellation point */
 	}
-	/* invalidate the descriptor before freeing it */
-	mqdp->mqd_magic = 0;
-	(void) mutex_unlock(&mqhp->mq_exclusive);
+	pthread_cleanup_pop(1);		/* finish in the cleanup handler */
 
-	(void) mutex_lock(&mq_list_lock);
-	if (mqdp->mqd_next)
-		mqdp->mqd_next->mqd_prev = mqdp->mqd_prev;
-	if (mqdp->mqd_prev)
-		mqdp->mqd_prev->mqd_next = mqdp->mqd_next;
-	if (mq_list == mqdp)
-		mq_list = mqdp->mqd_next;
-	(void) mutex_unlock(&mq_list_lock);
-
-	free(mqdp);
-	(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
-	return (munmap((caddr_t)mqhp, (size_t)mqhp->mq_totsize));
+	return (0);
 }
 
 int
@@ -843,6 +908,7 @@ _mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 	struct stat64 statb;
 	port_notify_t *pn;
 	void *userval;
+	int rval = -1;
 	int ntype;
 	int port;
 
@@ -861,7 +927,7 @@ _mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 			/* notification is set for this descriptor, remove it */
 			(void) __signotify(SN_CANCEL, NULL, &mqhp->mq_sigid);
 			if ((tcdp = mqdp->mqd_tcd) != NULL) {
-				(void) mutex_lock(&tcdp->tcd_lock);
+				sig_mutex_lock(&tcdp->tcd_lock);
 				if (tcdp->tcd_msg_enabled) {
 					/* cancel the spawner thread */
 					tcdp = mqdp->mqd_tcd;
@@ -869,7 +935,7 @@ _mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 					(void) pthread_cancel(
 					    tcdp->tcd_server_id);
 				}
-				(void) mutex_unlock(&tcdp->tcd_lock);
+				sig_mutex_unlock(&tcdp->tcd_lock);
 			}
 			mqhp->mq_ntype = 0;
 			mqhp->mq_des = 0;
@@ -949,20 +1015,18 @@ _mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 			tcdp->tcd_port = port;
 			tcdp->tcd_msg_object = mqdp;
 			tcdp->tcd_msg_userval = userval;
-			(void) mutex_lock(&tcdp->tcd_lock);
+			sig_mutex_lock(&tcdp->tcd_lock);
 			tcdp->tcd_msg_enabled = ntype;
-			(void) mutex_unlock(&tcdp->tcd_lock);
+			sig_mutex_unlock(&tcdp->tcd_lock);
 			(void) cond_broadcast(&tcdp->tcd_cv);
 			break;
 		}
 	}
 
-	(void) mutex_unlock(&mqhp->mq_exclusive);
-	return (0);
-
+	rval = 0;	/* success */
 bad:
 	(void) mutex_unlock(&mqhp->mq_exclusive);
-	return (-1);
+	return (rval);
 }
 
 int
@@ -1017,4 +1081,21 @@ _mq_getattr(mqd_t mqdes, struct mq_attr *mqstat)
 	(void) sem_getvalue(&mqhp->mq_notempty, &count);
 	mqstat->mq_curmsgs = count;
 	return (0);
+}
+
+/*
+ * Cleanup after fork1() in the child process.
+ */
+void
+postfork1_child_sigev_mq(void)
+{
+	thread_communication_data_t *tcdp;
+	mqdes_t *mqdp;
+
+	for (mqdp = mq_list; mqdp; mqdp = mqdp->mqd_next) {
+		if ((tcdp = mqdp->mqd_tcd) != NULL) {
+			mqdp->mqd_tcd = NULL;
+			tcd_teardown(tcdp);
+		}
+	}
 }

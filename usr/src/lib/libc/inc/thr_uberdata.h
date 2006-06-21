@@ -53,12 +53,10 @@
 #include <schedctl.h>
 #include <sys/priocntl.h>
 #include <thread_db.h>
+#include <setjmp.h>
 #include "libc_int.h"
 #include "tdb_agent.h"
-
-/* belongs in <pthread.h> */
-#define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
-#define	PTHREAD_CREATE_NONDAEMON_NP	0
+#include "thr_debug.h"
 
 /*
  * This is an implementation-specific include file for threading support.
@@ -207,14 +205,6 @@ typedef union {
 #define	PRIO_SET_PRIO	1	/* set priority only */
 #define	PRIO_INHERIT	2
 #define	PRIO_DISINHERIT	3
-
-struct pcclass {
-	short		pcc_state;
-	pri_t		pcc_primin;
-	pri_t		pcc_primax;
-	pcinfo_t	pcc_info;
-};
-extern struct pcclass ts_class, rt_class;
 
 #define	MUTEX_TRY	0
 #define	MUTEX_LOCK	1
@@ -608,7 +598,7 @@ typedef struct ulwp {
 #define	MASKSET0	(FILLSET0 & ~CANTMASK0)
 #define	MASKSET1	(FILLSET1 & ~CANTMASK1)
 
-extern	const sigset_t maskset;	/* set of all maskable signals */
+extern	const sigset_t maskset;		/* set of all maskable signals */
 
 extern	int	thread_adaptive_spin;
 extern	uint_t	thread_max_spinners;
@@ -1048,7 +1038,7 @@ extern	greg_t		stkptr(void);
 /*
  * Implementation functions.  Not visible outside of the library itself.
  */
-extern	int	___nanosleep(const timespec_t *, timespec_t *);
+extern	int	__nanosleep(const timespec_t *, timespec_t *);
 extern	void	getgregs(ulwp_t *, gregset_t);
 extern	void	setgregs(ulwp_t *, gregset_t);
 extern	void	thr_panic(const char *);
@@ -1091,18 +1081,6 @@ extern	void	_flush_windows(void);
 #define	_flush_windows()
 #endif
 extern	void	set_curthread(void *);
-
-#if defined(THREAD_DEBUG)
-
-extern	void	__assfail(const char *, const char *, int);
-#pragma rarely_called(__assfail)
-#define	ASSERT(EX)	(void)((EX) || (__assfail(#EX, __FILE__, __LINE__), 0))
-
-#else	/* THREAD_DEBUG */
-
-#define	ASSERT(EX)	((void)0)
-
-#endif	/* THREAD_DEBUG */
 
 /* enter a critical section */
 #define	enter_critical(self)	(self->ul_critical++)
@@ -1174,21 +1152,35 @@ extern	void	*_thr_setup(ulwp_t *);
 extern	void	_fpinherit(ulwp_t *);
 extern	void	_lwp_start(void);
 extern	void	_lwp_terminate(void);
-extern	void	lmutex_unlock(mutex_t *);
 extern	void	lmutex_lock(mutex_t *);
+extern	void	lmutex_unlock(mutex_t *);
+extern	void	sig_mutex_lock(mutex_t *);
+extern	void	sig_mutex_unlock(mutex_t *);
+extern	int	sig_mutex_trylock(mutex_t *);
+extern	int	sig_cond_wait(cond_t *, mutex_t *);
+extern	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 extern	void	_prefork_handler(void);
 extern	void	_postfork_parent_handler(void);
 extern	void	_postfork_child_handler(void);
-extern	void	_postfork1_child(void);
+extern	void	postfork1_child(void);
+extern	void	postfork1_child_aio(void);
+extern	void	postfork1_child_sigev_aio(void);
+extern	void	postfork1_child_sigev_mq(void);
+extern	void	postfork1_child_sigev_timer(void);
+extern	void	postfork1_child_tpool(void);
 extern	int	fork_lock_enter(const char *);
 extern	void	fork_lock_exit(void);
 extern	void	suspend_fork(void);
 extern	void	continue_fork(int);
 extern	void	do_sigcancel(void);
-extern	void	init_sigcancel(void);
+extern	void	setup_cancelsig(int);
+extern	void	init_sigev_thread(void);
+extern	void	init_aio(void);
 extern	void	_cancelon(void);
 extern	void	_canceloff(void);
 extern	void	_canceloff_nocancel(void);
+extern	void	_cancel_prologue(void);
+extern	void	_cancel_epilogue(void);
 extern	void	no_preempt(ulwp_t *);
 extern	void	preempt(ulwp_t *);
 extern	void	_thrp_unwind(void *);
@@ -1249,8 +1241,18 @@ extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	void	__sighndlr(int, siginfo_t *, ucontext_t *, void (*)());
 extern	caddr_t	__sighndlrend;
 #pragma unknown_control_flow(__sighndlr)
+extern	void	_siglongjmp(sigjmp_buf, int);
 
+extern	int	_pthread_setspecific(pthread_key_t, const void *);
+extern	void	*_pthread_getspecific(pthread_key_t);
 extern	void	_pthread_exit(void *);
+extern	void	_private_testcancel(void);
+
+/* belongs in <pthread.h> */
+#define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
+#define	PTHREAD_CREATE_NONDAEMON_NP	0
+extern	int	_pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
+extern	int	_pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
 
 /* these are private to the library */
 extern	int	_private_mutex_init(mutex_t *, int, void *);
@@ -1293,8 +1295,10 @@ extern	int	rw_read_is_held(rwlock_t *);
 extern	int	rw_write_is_held(rwlock_t *);
 
 extern	int	_thr_continue(thread_t);
-extern	int	_thrp_create(void *, size_t, void *(*func)(void *), void *,
-			long, thread_t *, pri_t, int, size_t);
+extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
+			thread_t *);
+extern	int	_thrp_create(void *, size_t, void *(*)(void *), void *, long,
+			thread_t *, pri_t, int, size_t);
 extern	int	_thr_getprio(thread_t, int *);
 extern	int	_thr_getspecific(thread_key_t, void **);
 extern	int	_thr_join(thread_t, thread_t *, void **);
@@ -1320,7 +1324,8 @@ extern	int	_thread_setschedparam_main(pthread_t, int,
 			const struct sched_param *, int);
 extern	int	_validate_rt_prio(int, int);
 extern	int	_thrp_setlwpprio(lwpid_t, int, int);
-extern	pri_t	_map_rtpri_to_gp(pri_t);
+extern	pri_t	map_rtpri_to_gp(pri_t);
+extern	int	get_info_by_policy(int);
 
 /*
  * System call wrappers (direct interfaces to the kernel)

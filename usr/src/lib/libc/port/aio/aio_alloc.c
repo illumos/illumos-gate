@@ -26,10 +26,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "libaio.h"
+#include "synonyms.h"
+#include "thr_uberdata.h"
+#include "asyncio.h"
 
 /*
- * libaio memory allocation strategy:
+ * The aio subsystem memory allocation strategy:
  *
  * For each of the structure types we wish to allocate/free
  * (aio_worker_t, aio_req_t, aio_lio_t), we use mmap() to allocate
@@ -69,12 +71,12 @@ chunk_alloc(size_t size)
 	ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
 	    MAP_PRIVATE | MAP_ANON, -1, (off_t)0);
 	if (ptr != MAP_FAILED) {
-		sig_mutex_lock(&chunk_lock);
+		lmutex_lock(&chunk_lock);
 		chp = ptr;
 		chp->chunk_next = chunk_list;
 		chunk_list = chp;
 		chp->chunk_size = size;
-		sig_mutex_unlock(&chunk_lock);
+		lmutex_unlock(&chunk_lock);
 	}
 
 	return (chp);
@@ -97,12 +99,12 @@ _aio_worker_alloc(void)
 	int nelem;
 	int i;
 
-	sig_mutex_lock(&worker_lock);
+	lmutex_lock(&worker_lock);
 	if ((aiowp = worker_freelist) == NULL) {
 		if ((chunksize = 2 * worker_chunksize) == 0)
 			chunksize = INITIAL_CHUNKSIZE;
 		if ((chp = chunk_alloc(chunksize)) == NULL) {
-			sig_mutex_unlock(&worker_lock);
+			lmutex_unlock(&worker_lock);
 			return (NULL);
 		}
 		worker_chunksize = chunksize;
@@ -116,7 +118,7 @@ _aio_worker_alloc(void)
 	}
 	if ((worker_freelist = aiowp->work_forw) == NULL)
 		worker_freelast = NULL;
-	sig_mutex_unlock(&worker_lock);
+	lmutex_unlock(&worker_lock);
 
 	aiowp->work_forw = NULL;
 	(void) mutex_init(&aiowp->work_qlock1, USYNC_THREAD, NULL);
@@ -138,14 +140,14 @@ _aio_worker_free(void *arg)
 	(void) cond_destroy(&aiowp->work_idle_cv);
 	(void) memset(aiowp, 0, sizeof (*aiowp));
 
-	sig_mutex_lock(&worker_lock);
+	lmutex_lock(&worker_lock);
 	if (worker_freelast == NULL) {
 		worker_freelist = worker_freelast = aiowp;
 	} else {
 		worker_freelast->work_forw = aiowp;
 		worker_freelast = aiowp;
 	}
-	sig_mutex_unlock(&worker_lock);
+	lmutex_unlock(&worker_lock);
 }
 
 aio_req_t *_aio_freelist = NULL;	/* free list of request structures */
@@ -167,12 +169,12 @@ _aio_req_alloc(void)
 	int nelem;
 	int i;
 
-	sig_mutex_lock(&__aio_cache_lock);
+	lmutex_lock(&__aio_cache_lock);
 	if ((reqp = _aio_freelist) == NULL) {
 		if ((chunksize = 2 * request_chunksize) == 0)
 			chunksize = INITIAL_CHUNKSIZE;
 		if ((chp = chunk_alloc(chunksize)) == NULL) {
-			sig_mutex_unlock(&__aio_cache_lock);
+			lmutex_unlock(&__aio_cache_lock);
 			return (NULL);
 		}
 		request_chunksize = chunksize;
@@ -191,7 +193,7 @@ _aio_req_alloc(void)
 		_aio_freelast = NULL;
 	_aio_freelist_cnt--;
 	_aio_allocated_cnt++;
-	sig_mutex_unlock(&__aio_cache_lock);
+	lmutex_unlock(&__aio_cache_lock);
 
 	ASSERT(reqp->req_state == AIO_REQ_FREE);
 	reqp->req_state = 0;
@@ -212,7 +214,7 @@ _aio_req_free(aio_req_t *reqp)
 	(void) memset(reqp, 0, sizeof (*reqp));
 	reqp->req_state = AIO_REQ_FREE;
 
-	sig_mutex_lock(&__aio_cache_lock);
+	lmutex_lock(&__aio_cache_lock);
 	if (_aio_freelast == NULL) {
 		_aio_freelist = _aio_freelast = reqp;
 	} else {
@@ -221,7 +223,7 @@ _aio_req_free(aio_req_t *reqp)
 	}
 	_aio_freelist_cnt++;
 	_aio_allocated_cnt--;
-	sig_mutex_unlock(&__aio_cache_lock);
+	lmutex_unlock(&__aio_cache_lock);
 }
 
 aio_lio_t *_lio_head_freelist = NULL;	/* free list of lio head structures */
@@ -243,12 +245,12 @@ _aio_lio_alloc(void)
 	int nelem;
 	int i;
 
-	sig_mutex_lock(&__lio_mutex);
+	lmutex_lock(&__lio_mutex);
 	if ((head = _lio_head_freelist) == NULL) {
 		if ((chunksize = 2 * lio_head_chunksize) == 0)
 			chunksize = INITIAL_CHUNKSIZE;
 		if ((chp = chunk_alloc(chunksize)) == NULL) {
-			sig_mutex_unlock(&__lio_mutex);
+			lmutex_unlock(&__lio_mutex);
 			return (NULL);
 		}
 		lio_head_chunksize = chunksize;
@@ -265,7 +267,7 @@ _aio_lio_alloc(void)
 	if ((_lio_head_freelist = head->lio_next) == NULL)
 		_lio_head_freelast = NULL;
 	_lio_free--;
-	sig_mutex_unlock(&__lio_mutex);
+	lmutex_unlock(&__lio_mutex);
 
 	ASSERT(head->lio_nent == 0 && head->lio_refcnt == 0);
 	head->lio_next = NULL;
@@ -287,7 +289,7 @@ _aio_lio_free(aio_lio_t *head)
 	(void) cond_destroy(&head->lio_cond_cv);
 	(void) memset(head, 0, sizeof (*head));
 
-	sig_mutex_lock(&__lio_mutex);
+	lmutex_lock(&__lio_mutex);
 	if (_lio_head_freelast == NULL) {
 		_lio_head_freelist = _lio_head_freelast = head;
 	} else {
@@ -295,29 +297,13 @@ _aio_lio_free(aio_lio_t *head)
 		_lio_head_freelast = head;
 	}
 	_lio_free++;
-	sig_mutex_unlock(&__lio_mutex);
+	lmutex_unlock(&__lio_mutex);
 }
 
-static void
-_aio_prepare_fork(void)
-{
-	/* acquire locks */
-	sig_mutex_lock(&chunk_lock);
-}
-
-static void
-_aio_parent_fork(void)
-{
-	/* release locks */
-	sig_mutex_unlock(&chunk_lock);
-}
-
-static void
-_aio_child_fork(void)
+void
+postfork1_child_aio(void)
 {
 	chunk_t *chp;
-
-	_aio_parent_fork();	/* release locks */
 
 	/*
 	 * All of the workers are gone; free their structures.
@@ -360,6 +346,9 @@ _aio_child_fork(void)
 	(void) mutex_init(&__lio_mutex, USYNC_THREAD, NULL);
 
 	(void) mutex_init(&__aio_initlock, USYNC_THREAD, NULL);
+	(void) cond_init(&__aio_initcv, USYNC_THREAD, NULL);
+	__aio_initbusy = 0;
+
 	(void) mutex_init(&__aio_mutex, USYNC_THREAD, NULL);
 	(void) cond_init(&_aio_iowait_cv, USYNC_THREAD, NULL);
 	(void) cond_init(&_aio_waitn_cv, USYNC_THREAD, NULL);
@@ -425,18 +414,15 @@ _aio_exit_info(void)
 	DISPLAY(_aio_flags);
 }
 
-#pragma init(_aio_init)
-static void
-_aio_init(void)
+void
+init_aio(void)
 {
 	char *str;
 
 	(void) pthread_key_create(&_aio_key, _aio_worker_free);
-	(void) pthread_atfork(_aio_prepare_fork,
-	    _aio_parent_fork, _aio_child_fork);
 	if ((str = getenv("_AIO_MIN_WORKERS")) != NULL) {
 		if ((_min_workers = atoi(str)) <= 0)
-			_min_workers = 8;
+			_min_workers = 4;
 	}
 	if ((str = getenv("_AIO_MAX_WORKERS")) != NULL) {
 		if ((_max_workers = atoi(str)) <= 0)

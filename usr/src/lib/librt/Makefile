@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,59 +19,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/librt/Makefile
-#
-LIBRARY =	librt.a
-VERS =		.1
 
-include ../Makefile.lib
+include	../Makefile.lib
 
-SUBDIRS =	$(MACH)
+SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-# conditional assignments
 all :=		TARGET= all
-install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
+install :=	TARGET= install
 lint :=		TARGET= lint
-catalog :=	TARGET= catalog
-package :=	TARGET= package
-
-# include common library definitions
-
-#HDRS = 
-ROOTHDRDIR =	$(ROOT)/usr/include/sys
-ROOTHDRS =	$(HDRS:%=$(ROOTHDRDIR)/%)
-
-$(ROOTHDRS) :=	FILEMODE = 644
 
 .KEEP_STATE:
 
-all install clean clobber: spec .WAIT $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 lint: $(SUBDIRS)
 
-spec $(SUBDIRS):	FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
-install:	$(ROOTLIBS) $(ROOTLINKS)
-
-$(ROOTHDRDIR)/% : %
-		$(INS.file)
-
-install_h: $(ROOTHDRS)
-
-clean clobber:	FRC
-		@cd $(MACH); pwd; $(MAKE) $@
-
-links:
-		-$(RM) $(MACH)
-		$(SYMLINK) `mach` $(MACH)
 
 FRC:

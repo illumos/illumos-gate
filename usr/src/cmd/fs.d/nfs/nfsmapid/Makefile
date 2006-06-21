@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.
-# All rights reserved.  Use is subject to license terms.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -33,7 +33,7 @@ ATTMK	  =	$(TYPEPROG)
 include		../../Makefile.fstype
 
 LDLIBS   +=	-L$(ROOT)/usr/lib/nfs -R/usr/lib/nfs
-LDLIBS   +=	-lnsl -lmapid -lrt -ldoor -ldtrace
+LDLIBS   +=	-lnsl -lmapid -ldoor -ldtrace
 SRCS	  =	nfsmapid.c nfsmapid_server.c
 DSRC	  =	nfsmapid_dt.d
 DOBJ	  =	$(DSRC:%.d=%.o)

@@ -292,7 +292,7 @@ sparc_MSGSUBDIRS=	\
 	libprtdiag	\
 	libprtdiag_psr
 
-HDRSUBDIRS= libaio	\
+HDRSUBDIRS=		\
 	auditd_plugins	\
 	libbsm		\
 	libc		\
@@ -459,7 +459,6 @@ libmacadm:	libdevinfo
 libuuid:	libsocket
 libinetutil:	libsocket
 libsecdb:	libcmd libnsl
-librt:		libaio libmd
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl
 libsctp:	libsocket

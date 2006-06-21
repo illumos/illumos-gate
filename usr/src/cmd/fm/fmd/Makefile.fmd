@@ -112,7 +112,7 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LINTFLAGS += -mu
 LDFLAGS += -R/usr/lib/fm
 LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios -luuid -lnvpair
-LDLIBS += -lexacct -lnsl -lrt -lumem -ldevinfo
+LDLIBS += -lexacct -lnsl -lumem -ldevinfo
 
 $(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
 $(DMOD) := LDFLAGS += $(ZTEXT) -z combreloc

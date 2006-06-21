@@ -206,7 +206,7 @@ _fork1(void)
 		self->ul_siginfo.si_signo = 0;
 		udp->pid = _private_getpid();
 		/* reset the library's data structures to reflect one thread */
-		_postfork1_child();
+		postfork1_child();
 		restore_signals(self);
 		_postfork_child_handler();
 	} else {
@@ -375,8 +375,8 @@ _forkall(void)
 }
 
 /*
- * Externally-callable cancellation prologue and epilogue
- * functions, for cancellation points outside of libc.
+ * Cancellation prologue and epilogue functions,
+ * for cancellation points too complex to include here.
  */
 void
 _cancel_prologue(void)
@@ -504,13 +504,14 @@ __xpg4_putpmsg(int fd, const struct strbuf *ctlptr,
 	PERFORM(_putpmsg(fd, ctlptr, dataptr, band, flags|MSG_XPG4))
 }
 
+#pragma weak nanosleep = _nanosleep
 int
-__nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
+_nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 {
 	int error;
 
 	PROLOGUE
-	error = ___nanosleep(rqtp, rmtp);
+	error = __nanosleep(rqtp, rmtp);
 	EPILOGUE
 	if (error) {
 		errno = error;
@@ -519,8 +520,9 @@ __nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 	return (0);
 }
 
+#pragma weak clock_nanosleep = _clock_nanosleep
 int
-__clock_nanosleep(clockid_t clock_id, int flags,
+_clock_nanosleep(clockid_t clock_id, int flags,
 	const timespec_t *rqtp, timespec_t *rmtp)
 {
 	timespec_t reltime;
@@ -550,7 +552,7 @@ __clock_nanosleep(clockid_t clock_id, int flags,
 	}
 restart:
 	PROLOGUE
-	error = ___nanosleep(&reltime, rmtp);
+	error = __nanosleep(&reltime, rmtp);
 	EPILOGUE
 	if (error == 0 && clock_id == CLOCK_HIGHRES) {
 		/*
@@ -607,7 +609,7 @@ _sleep(unsigned int sec)
 	ts.tv_sec = (time_t)sec;
 	ts.tv_nsec = 0;
 	PROLOGUE
-	error = ___nanosleep(&ts, &tsr);
+	error = __nanosleep(&ts, &tsr);
 	EPILOGUE
 	if (error == EINTR) {
 		rem = (unsigned int)tsr.tv_sec;
@@ -626,7 +628,7 @@ _usleep(useconds_t usec)
 	ts.tv_sec = usec / MICROSEC;
 	ts.tv_nsec = (long)(usec % MICROSEC) * 1000;
 	PROLOGUE
-	(void) ___nanosleep(&ts, NULL);
+	(void) __nanosleep(&ts, NULL);
 	EPILOGUE
 	return (0);
 }
@@ -634,9 +636,11 @@ _usleep(useconds_t usec)
 int
 close(int fildes)
 {
+	extern void _aio_close(int);
 	extern int _close(int);
 	int rv;
 
+	_aio_close(fildes);
 	PERFORM(_close(fildes))
 }
 
@@ -856,17 +860,17 @@ _pollsys(struct pollfd *fds, nfds_t nfd, const timespec_t *timeout,
 	return (rv);
 }
 
+#pragma weak sigtimedwait = _sigtimedwait
 int
-__sigtimedwait(const sigset_t *set, siginfo_t *infop,
-	const timespec_t *timeout)
+_sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 {
-	extern int ___sigtimedwait(const sigset_t *, siginfo_t *,
+	extern int __sigtimedwait(const sigset_t *, siginfo_t *,
 		const timespec_t *);
 	siginfo_t info;
 	int sig;
 
 	PROLOGUE
-	sig = ___sigtimedwait(set, &info, timeout);
+	sig = __sigtimedwait(set, &info, timeout);
 	if (sig == SIGCANCEL &&
 	    (SI_FROMKERNEL(&info) || info.si_code == SI_LWP)) {
 		do_sigcancel();
@@ -883,7 +887,23 @@ __sigtimedwait(const sigset_t *set, siginfo_t *infop,
 int
 _sigwait(sigset_t *set)
 {
-	return (__sigtimedwait(set, NULL, NULL));
+	return (_sigtimedwait(set, NULL, NULL));
+}
+
+#pragma weak sigwaitinfo = _sigwaitinfo
+int
+_sigwaitinfo(const sigset_t *set, siginfo_t *info)
+{
+	return (_sigtimedwait(set, info, NULL));
+}
+
+#pragma weak sigqueue = _sigqueue
+int
+_sigqueue(pid_t pid, int signo, const union sigval value)
+{
+	extern int __sigqueue(pid_t pid, int signo,
+		/* const union sigval */ void *value, int si_code, int block);
+	return (__sigqueue(pid, signo, value.sival_ptr, SI_QUEUE, 0));
 }
 
 int

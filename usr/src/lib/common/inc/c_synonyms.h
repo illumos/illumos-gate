@@ -187,6 +187,10 @@ extern "C" {
 #define	chown				_chown
 #define	chroot				_chroot
 #define	_cladm				__cladm
+#define	clock_getres			_clock_getres
+#define	clock_gettime			_clock_gettime
+#define	clock_nanosleep			_clock_nanosleep
+#define	clock_settime			_clock_settime
 #define	close				_close
 #define	closedir			_closedir
 #define	closefrom			_closefrom
@@ -416,7 +420,6 @@ extern "C" {
 #define	issetugid			_issetugid
 #define	is_system_labeled		_is_system_labeled
 #define	jrand48				_jrand48
-#define	kaio				_kaio
 #define	kill				_kill
 #define	l64a				_l64a
 #define	ladd				_ladd
@@ -512,6 +515,7 @@ extern "C" {
 #define	mutex_trylock			__mutex_trylock
 #define	_mutex_unlock			__mutex_unlock
 #define	mutex_unlock			__mutex_unlock
+#define	nanosleep			_nanosleep
 #define	nfs_getfh			_nfs_getfh
 #define	nfssvc				_nfssvc
 #define	nftw				_nftw
@@ -540,7 +544,6 @@ extern "C" {
 #define	port_alert			_port_alert
 #define	port_associate			_port_associate
 #define	port_create			_port_create
-#define	port_dispatch			_port_dispatch
 #define	port_dissociate			_port_dissociate
 #define	port_getn			_port_getn
 #define	port_get			_port_get
@@ -760,12 +763,23 @@ extern "C" {
 #define	sema_timedwait			_sema_timedwait
 #define	sema_trywait			_sema_trywait
 #define	sema_wait			_sema_wait
+#define	sem_close			_sem_close
 #define	semctl64			_semctl64
 #define	semctl				_semctl
+#define	sem_destroy			_sem_destroy
 #define	semget				_semget
+#define	sem_getvalue			_sem_getvalue
 #define	semids				_semids
+#define	sem_init			_sem_init
+#define	sem_open			_sem_open
 #define	semop				_semop
+#define	sem_post			_sem_post
+#define	sem_reltimedwait_np		_sem_reltimedwait_np
 #define	semtimedop			_semtimedop
+#define	sem_timedwait			_sem_timedwait
+#define	sem_trywait			_sem_trywait
+#define	sem_unlink			_sem_unlink
+#define	sem_wait			_sem_wait
 #define	setcontext			_setcontext
 #define	setegid				_setegid
 #define	setenv				_setenv
@@ -794,7 +808,6 @@ extern "C" {
 #define	setustack			_setustack
 #define	setutent			_setutent
 #define	setutxent			_setutxent
-#define	s_fcntl				_s_fcntl
 #define	sfconvert			_sfconvert
 #define	sgconvert			_sgconvert
 #define	shmat				_shmat
@@ -821,12 +834,16 @@ extern "C" {
 #define	sigpause			_sigpause
 #define	sigpending			_sigpending
 #define	sigprocmask			_sigprocmask
+#define	sigqueue			_sigqueue
 #define	sigrelse			_sigrelse
 #define	sigsendset			_sigsendset
 #define	sigsend				_sigsend
 #define	sigsetjmp			_sigsetjmp
 #define	sigset				_sigset
+#define	sigstack			_sigstack
 #define	sigsuspend			_sigsuspend
+#define	sigtimedwait			_sigtimedwait
+#define	sigwaitinfo			_sigwaitinfo
 #define	sigwait				_sigwait
 #define	single_to_decimal		_single_to_decimal
 #define	sleep				_sleep
@@ -902,6 +919,11 @@ extern "C" {
 #define	thr_suspend			_thr_suspend
 #define	thr_wait_mutator		_thr_wait_mutator
 #define	thr_yield			_thr_yield
+#define	timer_create			_timer_create
+#define	timer_delete			_timer_delete
+#define	timer_getoverrun		_timer_getoverrun
+#define	timer_gettime			_timer_gettime
+#define	timer_settime			_timer_settime
 #define	times				_times
 #define	time				_time
 #define	tmpnam_r			_tmpnam_r
@@ -1011,6 +1033,7 @@ extern "C" {
 #define	tell64				_tell64
 #define	truncate64			_truncate64
 #define	ptrace				_ptrace
+#define	s_fcntl				_s_fcntl
 #define	sys_errlist			_sys_errlist
 #define	sys_nerr			_sys_nerr
 #endif	/* !_LP64 */

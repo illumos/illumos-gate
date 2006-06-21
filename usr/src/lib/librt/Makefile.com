@@ -24,93 +24,37 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/librt/Makefile.com
 
-LIBRARY=	librt.a
-VERS=		.1
-
-OBJECTS=	\
-	aio.o		\
-	clock_timer.o	\
-	fallocate.o	\
-	fdatasync.o	\
-	mqueue.o	\
-	pos4.o		\
-	pos4obj.o	\
-	sched.o		\
-	sem.o		\
-	shm.o		\
-	sigev_thread.o	\
-	sigrt.o		\
-	thread_pool.o
+LIBRARY = librt.a
+VERS = .1
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
+MAPFILES=	mapfile-vers $(MAPFILE-FLTR)
+MAPOPTS=	$(MAPFILES:%=-M %)
+
+DYNFLAGS +=	-F libc.so.1 $(MAPOPTS)
+
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS += 	-laio -lc
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-SRCDIR=		../common
-MAPDIR=		../spec/$(TRANSMACH)
-SPECMAPFILE=	$(MAPDIR)/mapfile
+SRCDIR =	../common
+$(LINTLIB) :=	SRCS = $(SRCDIR)/llib-lrt
 
-ROOTLINTDIR64=	$(ROOTLIBDIR64)
-ROOTLINKS64=    $(ROOTLIBDIR64)/$(LIBLINKS)
 
-# Setting LIBRT_DEBUG = -DDEBUG (make LIBRT_DEBUG=-DDEBUG ...)
-# enables ASSERT() checking in the library.
-# This is automatically enabled for DEBUG builds, not for non-debug builds.
-LIBRT_DEBUG =
-$(NOT_RELEASE_BUILD)LIBRT_DEBUG = -DDEBUG
+# Redefine shared object build rule to use $(LD) directly (this avoids .init
+# and .fini sections being added).  Also, since there are no OBJECTS, turn
+# off CTF.
 
-CFLAGS	+=	$(CCVERBOSE)
-CPPFLAGS +=	$(LIBRT_DEBUG) -D_REENTRANT -I../../common/inc
-
-#
-# If and when somebody gets around to messaging this, CLOBBERFILE should not
-# be cleared (so that any .po file will be clobbered.
-#
-CLOBBERFILES=	test
+BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
+CTFMERGE_LIB=	:
 
 .KEEP_STATE:
 
-all: $(LIBS) fnamecheck
-
-lint: lintcheck
-
-# install rule for 64 bit lint library target
-$(ROOTLINTDIR64)/%.ln:	%.ln
-	$(INS.file)
-	cd $(ROOTLINTDIR64); \
-		$(RM) llib-lposix4.ln ; \
-		$(SYMLINK) ./llib-lrt.ln llib-lposix4.ln ;
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%.ln:	%.ln
-	$(INS.file)
-	cd $(ROOTLINTDIR); \
-		$(RM) llib-lposix4 ; \
-		$(SYMLINK) ./llib-lrt llib-lposix4 ; \
-		$(RM) llib-lposix4.ln ; \
-		$(SYMLINK) ./llib-lrt.ln llib-lposix4.ln ;
-
 include ../../Makefile.targ
 
-# install rules for 32-bit librt.so in /usr/lib
-$(ROOTLINKS) := INS.liblink= \
-	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-		cd $(ROOTLIBDIR); \
-		$(RM)  libposix4.so$(VERS) libposix4.so; \
-		$(SYMLINK) librt.so$(VERS) libposix4.so$(VERS); \
-		$(SYMLINK) libposix4.so$(VERS) libposix4.so;
+all:	$(LIBS)
 
-# install rules for 64-bit librt.so in /usr/lib/sparcv9
-$(ROOTLIBDIR64)/$(LIBLINKS) := INS.liblink64 = \
-	-$(RM) $@; \
-	cd $(ROOTLIBDIR64); \
-	$(RM) libposix4.so$(VERS) libposix4.so ; \
-	$(SYMLINK) $(LIBLINKS)$(VERS) $(LIBLINKS); \
-	$(SYMLINK) librt.so$(VERS) libposix4.so$(VERS); \
-	$(SYMLINK) libposix4.so$(VERS) libposix4.so
+lint:
 
+$(DYNLIB):	$(MAPFILES)

@@ -33,5 +33,5 @@ SRCS = etm.c etm_xport_api_dd.c
 include ../../Makefile.plugin
 
 CPPFLAGS += -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
-LDLIBS += -lrt -L$(ROOT)/usr/lib/fm -lldom
+LDLIBS += -L$(ROOT)/usr/lib/fm -lldom
 LDFLAGS += -R/usr/lib/fm

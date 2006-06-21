@@ -39,7 +39,7 @@ extern "C" {
 #include <time.h>
 #include <limits.h>
 #include <semaphore.h>
-#include "thread_pool.h"
+#include <thread_pool.h>
 
 #define	SIGEV_THREAD_TERM	1
 
@@ -85,18 +85,12 @@ typedef struct thread_communication_data {
 #define	tcd_msg_object	tcd_object.mqueue.msg_object
 #define	tcd_msg_userval	tcd_object.mqueue.msg_userval
 
-/*
- * Generic freelist data structure.
- */
-typedef struct {
-	void	*fl_next;
-} freelist_t;
-
 /* Generic functions common to all entities */
 extern thread_communication_data_t *setup_sigev_handler(
 		const struct sigevent *, subsystem_t);
 extern void free_sigev_handler(thread_communication_data_t *);
 extern int launch_spawner(thread_communication_data_t *);
+extern void tcd_teardown(thread_communication_data_t *);
 
 /* Additional functions for different entities */
 extern void *timer_spawner(void *);
@@ -106,25 +100,15 @@ extern void *mqueue_spawner(void *);
 extern void del_sigev_mq(thread_communication_data_t *);
 extern void *aio_spawner(void *);
 
-/* Consolidation-private interfaces from libc */
-#define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
-#define	PTHREAD_CREATE_NONDAEMON_NP	0
-extern int _pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
-extern int _pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
+/* Private interfaces elsewhere in libc */
 extern int _pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
 extern int _pthread_attr_equal(const pthread_attr_t *, const pthread_attr_t *);
 extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
 extern thread_communication_data_t *sigev_aio_tcd;
 
-extern mutex_t sigev_aio_lock;
-extern cond_t sigev_aio_cv;
-extern int sigev_aio_busy;
-
 extern int timer_max;
 extern thread_communication_data_t **timer_tcd;
-
-extern mutex_t free_tcd_lock;
 
 #ifdef	__cplusplus
 }

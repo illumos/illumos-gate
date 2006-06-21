@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = cpumem-retire
 CLASS = arch
@@ -43,4 +43,4 @@ INCDIRS = . \
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt -lldom
+LDLIBS += -L$(ROOTLIB)/fm -ltopo -lldom

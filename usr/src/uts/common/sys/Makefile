@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -82,6 +81,7 @@ CHKHDRS=			\
 	aio_req.h		\
 	aiocb.h			\
 	ascii.h			\
+	asynch.h		\
 	atomic.h		\
 	audio.h			\
 	audiodebug.h		\

@@ -57,6 +57,15 @@ extern	int	__rw_unlock(rwlock_t *);
 extern	void	lrw_rdlock(rwlock_t *);
 extern	void	lrw_wrlock(rwlock_t *);
 extern	void	lrw_unlock(rwlock_t *);
+extern	void	sig_mutex_lock(mutex_t *);
+extern	void	sig_mutex_unlock(mutex_t *);
+extern	int	sig_mutex_trylock(mutex_t *);
+extern	int	sig_cond_wait(cond_t *, mutex_t *);
+extern	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+
+/* the private libc thread-safe allocator */
+extern	void	*lmalloc(size_t);
+extern	void	lfree(void *, size_t);
 
 /* the rest are public functions */
 extern	int	_mutex_init(mutex_t *, int, void *);
@@ -91,6 +100,8 @@ extern	thread_t _thr_self(void);
 extern	void	_thr_exit(void *);
 extern	size_t	_thr_min_stack(void);
 extern	int	_thr_kill(thread_t, int);
+extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
+			thread_t *);
 extern	int	_thr_keycreate(thread_key_t *, void (*)(void *));
 extern	int	_thr_setspecific(thread_key_t, void *);
 extern	int	_thr_getspecific(thread_key_t, void **);

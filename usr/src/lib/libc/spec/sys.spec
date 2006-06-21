@@ -1,3 +1,4 @@
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -16,6 +17,7 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -2375,11 +2377,6 @@ weak		sigaction
 version		sparc=SYSVABI_1.3 i386=SYSVABI_1.3 sparcv9=SUNW_0.7 \
 		amd64=SUNW_0.7
 binding		nodirect
-end
-
-function	_libc_sigaction
-weak		sigaction
-version		SUNWprivate_1.1
 end
 
 function	sigaltstack

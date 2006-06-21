@@ -34,5 +34,3 @@ SRCS =	\
 	mem_read.c \
 	mem_unum.c \
 	mem_util.c
-
-LDLIBS += -lrt

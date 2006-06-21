@@ -777,6 +777,24 @@ PORTI18N_COND=			\
 	wcstol_longlong.o	\
 	wcstoul_longlong.o
 
+AIOOBJS=			\
+	aio.o			\
+	aio_alloc.o		\
+	posix_aio.o		\
+
+RTOBJS=				\
+	clock_timer.o		\
+	fallocate.o		\
+	mqueue.o		\
+	pos4obj.o		\
+	sched.o			\
+	sem.o			\
+	shm.o			\
+	sigev_thread.o
+
+TPOOLOBJS=			\
+	thread_pool.o
+
 THREADSOBJS=			\
 	alloc.o			\
 	assfail.o		\
@@ -899,6 +917,9 @@ MOSTOBJS=			\
 	$(PORTSTDIO_W)		\
 	$(PORTSYS)		\
 	$(PORTSYS64)		\
+	$(AIOOBJS)		\
+	$(RTOBJS)		\
+	$(TPOOLOBJS)		\
 	$(THREADSOBJS)		\
 	$(THREADSMACHOBJS)	\
 	$(THREADSASMOBJS)	\
@@ -1004,6 +1025,9 @@ SRCS=							\
 	$(PORTREGEX:%.o=../port/regex/%.c)		\
 	$(PORTSTDIO:%.o=../port/stdio/%.c)		\
 	$(PORTSYS:%.o=../port/sys/%.c)			\
+	$(AIOOBJS:%.o=../port/aio/%.c)			\
+	$(RTOBJS:%.o=../port/rt/%.c)			\
+	$(TPOOLOBJS:%.o=../port/tpool/%.c)		\
 	$(THREADSOBJS:%.o=../port/threads/%.c)		\
 	$(THREADSMACHOBJS:%.o=../$(MACH)/threads/%.c)	\
 	$(UNWINDMACHOBJS:%.o=../port/unwind/%.c)	\
@@ -1033,6 +1057,7 @@ $(MAPFILE):
 
 # Files which need the threads .il inline template
 TIL=				\
+	aio.o			\
 	alloc.o			\
 	assfail.o		\
 	atexit.o		\
@@ -1042,7 +1067,9 @@ TIL=				\
 	errno.o			\
 	getctxt.o		\
 	lwp.o			\
+	ma.o			\
 	machdep.o		\
+	posix_aio.o		\
 	pthr_attr.o		\
 	pthr_barrier.o		\
 	pthr_cond.o		\
@@ -1055,6 +1082,7 @@ TIL=				\
 	scalls.o		\
 	sema.o			\
 	sigaction.o		\
+	sigev_thread.o		\
 	spawn.o			\
 	stack.o			\
 	swapctxt.o		\
@@ -1062,6 +1090,7 @@ TIL=				\
 	tdb_agent.o		\
 	thr.o			\
 	thread_interface.o	\
+	thread_pool.o		\
 	tls.o			\
 	tsd.o			\
 	unwind.o

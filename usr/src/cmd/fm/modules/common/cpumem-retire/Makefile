@@ -39,4 +39,4 @@ INCDIRS = .
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -lrt
+LDLIBS += -L$(ROOTLIB)/fm -ltopo

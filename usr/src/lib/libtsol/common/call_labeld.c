@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -43,12 +44,6 @@
 #ifndef	DEBUG
 #define	perror(e)
 #endif	/* !DEBUG */
-
-/*
- *	Library prototypes to get away from lots of static build problems.
- */
-
-extern int __nanosleep(const struct timespec *, struct timespec *);
 
 /*
  *	This is cloned from _nsc_trydoorcall used by the nscd client.
@@ -273,7 +268,7 @@ try_again:
 				ts.tv_sec++;
 				ts.tv_nsec = 100;
 			}
-			(void) __nanosleep(&ts, NULL);
+			(void) nanosleep(&ts, NULL);
 #ifdef	DEBUG
 			(void) printf("door_call failed EAGAIN # %d\n", busy);
 #endif	/* DEBUG */

@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "thread_pool.h"
+#include <thread_pool.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -88,12 +88,9 @@ struct tpool {
 #define	TP_DESTROY	0x04		/* pool is being destroyed */
 #define	TP_ABANDON	0x08		/* pool is abandoned (auto-destroy) */
 
-/* Consolidation-private interfaces from libc */
-#define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
-#define	PTHREAD_CREATE_NONDAEMON_NP	0
-extern int _pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
-extern int _pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
 extern int _pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
+
+extern const sigset_t maskset;		/* set of all maskable signals */
 
 #ifdef	__cplusplus
 }

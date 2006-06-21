@@ -30,7 +30,7 @@ $(PLATFORMS)_SRCS = ex_dscp.c
 
 LIBDIRS = $(ROOT)/usr/platform/$(PLATFORMS)/lib
 LIBFLAGS = \$$ORIGIN/../../../../lib
-XPORTLIBS = -lsocket -lnsl -ldscp -lrt
+XPORTLIBS = -lsocket -lnsl -ldscp
 
 include ../../common/event-transport/Makefile.etm
 

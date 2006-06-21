@@ -26,11 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
-#if !defined(__lint)	/* need a *_synonyms.h file */
-#define	nanosleep	_nanosleep
-#define	sem_wait	_sem_wait
-#endif
+#include "synonyms.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -50,71 +47,44 @@
 #include <fcntl.h>
 #include "sigev_thread.h"
 
-mutex_t free_tcd_lock = DEFAULTMUTEX;
-static thread_communication_data_t *free_tcd_head = NULL;
-static thread_communication_data_t *free_tcd_tail = NULL;
-static freelist_t *std_freelist = NULL;
+/*
+ * There is but one spawner for all aio operations.
+ */
+thread_communication_data_t *sigev_aio_tcd = NULL;
 
 /*
- * Set non-zero via LIBRT_DEBUG to enable debugging printf's.
+ * Set non-zero via _RT_DEBUG to enable debugging printf's.
  */
-static int _librt_debug = 0;
+static int _rt_debug = 0;
 
-#pragma init(__init_sigev_thread)
-static void __init_sigev_thread(void)
+void
+init_sigev_thread(void)
 {
 	char *ldebug;
 
-	if ((ldebug = getenv("_LIBRT_DEBUG")) != NULL)
-		_librt_debug = atoi(ldebug);
+	if ((ldebug = getenv("_RT_DEBUG")) != NULL)
+		_rt_debug = atoi(ldebug);
 }
 
 /*
  * Routine to print debug messages:
- * If _librt_debug is set, printf the debug message to stderr
+ * If _rt_debug is set, printf the debug message to stderr
  * with an appropriate prefix.
  */
 /*PRINTFLIKE1*/
 static void
 dprintf(const char *format, ...)
 {
-	if (_librt_debug) {
+	if (_rt_debug) {
 		va_list alist;
 
 		va_start(alist, format);
 		flockfile(stderr);
-		(void) fputs("librt DEBUG: ", stderr);
+		(void) fputs("DEBUG: ", stderr);
 		(void) vfprintf(stderr, format, alist);
 		funlockfile(stderr);
 		va_end(alist);
 	}
-}
-
-static sigev_thread_data_t *
-std_alloc(void)
-{
-	freelist_t *ptr;
-
-	(void) mutex_lock(&free_tcd_lock);
-	if ((ptr = std_freelist) == NULL) {
-		(void) mutex_unlock(&free_tcd_lock);
-		ptr = malloc(sizeof (sigev_thread_data_t));
-	} else {
-		std_freelist = ptr->fl_next;
-		(void) mutex_unlock(&free_tcd_lock);
-	}
-	return ((sigev_thread_data_t *)ptr);
-}
-
-static void
-std_free(sigev_thread_data_t *stdp)
-{
-	freelist_t *ptr = (freelist_t *)stdp;
-
-	(void) mutex_lock(&free_tcd_lock);
-	ptr->fl_next = std_freelist;
-	std_freelist = ptr;
-	(void) mutex_unlock(&free_tcd_lock);
 }
 
 /*
@@ -131,7 +101,7 @@ notify_thread(void *arg)
 	void (*function)(union sigval) = stdp->std_func;
 	union sigval argument = stdp->std_arg;
 
-	std_free(stdp);
+	lfree(stdp, sizeof (*stdp));
 	function(argument);
 	return (NULL);
 }
@@ -159,12 +129,12 @@ sigev_add_work(thread_communication_data_t *tcdp,
 
 	if (tpool == NULL)
 		return (EINVAL);
-	if ((stdp = std_alloc()) == NULL)
+	if ((stdp = lmalloc(sizeof (*stdp))) == NULL)
 		return (errno);
 	stdp->std_func = function;
 	stdp->std_arg = argument;
 	if (tpool_dispatch(tpool, notifier, stdp) != 0) {
-		std_free(stdp);
+		lfree(stdp, sizeof (*stdp));
 		return (errno);
 	}
 	return (0);
@@ -181,14 +151,14 @@ sigev_destroy_pool(thread_communication_data_t *tcdp)
 		/*
 		 * synchronize with del_sigev_mq()
 		 */
-		(void) mutex_lock(&tcdp->tcd_lock);
+		sig_mutex_lock(&tcdp->tcd_lock);
 		tcdp->tcd_server_id = 0;
 		if (tcdp->tcd_msg_closing) {
 			(void) cond_broadcast(&tcdp->tcd_cv);
-			(void) mutex_unlock(&tcdp->tcd_lock);
+			sig_mutex_unlock(&tcdp->tcd_lock);
 			return;		/* del_sigev_mq() will free the tcd */
 		}
-		(void) mutex_unlock(&tcdp->tcd_lock);
+		sig_mutex_unlock(&tcdp->tcd_lock);
 	}
 
 	/*
@@ -268,26 +238,18 @@ mqueue_spawner(void *arg)
 	pthread_cleanup_push(sigev_destroy_pool, tcdp);
 
 	while (ret == 0) {
-		/*
-		 * This kludge is to call _pthread_cond_wait(), not
-		 * _cond_wait(), because _cond_wait() is not a
-		 * cancellation point.  *Ugh*
-		 */
-		pthread_cond_t *cv = (pthread_cond_t *)&tcdp->tcd_cv;
-		pthread_mutex_t *mx = (pthread_mutex_t *)&tcdp->tcd_lock;
-
-		(void) mutex_lock(&tcdp->tcd_lock);
-		pthread_cleanup_push(mutex_unlock, &tcdp->tcd_lock);
+		sig_mutex_lock(&tcdp->tcd_lock);
+		pthread_cleanup_push(sig_mutex_unlock, &tcdp->tcd_lock);
 		while ((ntype = tcdp->tcd_msg_enabled) == 0)
-			(void) pthread_cond_wait(cv, mx);
+			(void) sig_cond_wait(&tcdp->tcd_cv, &tcdp->tcd_lock);
 		pthread_cleanup_pop(1);
 
 		while (sem_wait(tcdp->tcd_msg_avail) == -1)
 			continue;
 
-		(void) mutex_lock(&tcdp->tcd_lock);
+		sig_mutex_lock(&tcdp->tcd_lock);
 		tcdp->tcd_msg_enabled = 0;
-		(void) mutex_unlock(&tcdp->tcd_lock);
+		sig_mutex_unlock(&tcdp->tcd_lock);
 
 		/* ASSERT(ntype == SIGEV_THREAD || ntype == SIGEV_PORT); */
 		if (ntype == SIGEV_THREAD) {
@@ -300,7 +262,7 @@ mqueue_spawner(void *arg)
 			    tcdp->tcd_msg_userval);
 		}
 	}
-	(void) mutex_unlock(&tcdp->tcd_lock);
+	sig_mutex_unlock(&tcdp->tcd_lock);
 
 	pthread_cleanup_pop(1);
 	return (NULL);
@@ -392,7 +354,7 @@ aio_spawner(void *arg)
 			pthread_attr_t local_attr;
 			sigev_thread_data_t *stdp;
 
-			if ((stdp = std_alloc()) == NULL)
+			if ((stdp = lmalloc(sizeof (*stdp))) == NULL)
 				error = ENOMEM;
 			else
 				error = _pthread_attr_clone(&local_attr, attrp);
@@ -409,7 +371,7 @@ aio_spawner(void *arg)
 				(void) pthread_attr_destroy(&local_attr);
 			}
 			if (error && stdp != NULL)
-				std_free(stdp);
+				lfree(stdp, sizeof (*stdp));
 		}
 
 		if (error) {
@@ -442,29 +404,12 @@ alloc_sigev_handler(subsystem_t caller)
 {
 	thread_communication_data_t *tcdp;
 
-	(void) mutex_lock(&free_tcd_lock);
-	if ((tcdp = free_tcd_head) == NULL) {
-		(void) mutex_unlock(&free_tcd_lock);
-		tcdp = malloc(sizeof (thread_communication_data_t));
-		if (tcdp != NULL) {
-			(void) memset(tcdp, 0, sizeof (*tcdp));
-			tcdp->tcd_subsystem = caller;
-			tcdp->tcd_port = -1;
-			(void) mutex_init(&tcdp->tcd_lock,
-			    USYNC_THREAD, NULL);
-			(void) cond_init(&tcdp->tcd_cv,
-			    USYNC_THREAD, NULL);
-		}
-		return (tcdp);
+	if ((tcdp = lmalloc(sizeof (*tcdp))) != NULL) {
+		tcdp->tcd_subsystem = caller;
+		tcdp->tcd_port = -1;
+		(void) mutex_init(&tcdp->tcd_lock, USYNC_THREAD, NULL);
+		(void) cond_init(&tcdp->tcd_cv, USYNC_THREAD, NULL);
 	}
-	if ((free_tcd_head = tcdp->tcd_next) == NULL)
-		free_tcd_tail = NULL;
-	(void) mutex_unlock(&free_tcd_lock);
-	tcdp->tcd_next = NULL;
-	tcdp->tcd_subsystem = caller;
-	tcdp->tcd_port = -1;
-	tcdp->tcd_server_id = 0;
-	tcdp->tcd_poolp = NULL;
 	return (tcdp);
 }
 
@@ -493,17 +438,8 @@ free_sigev_handler(thread_communication_data_t *tcdp)
 		tcdp->tcd_msg_enabled = 0;
 		break;
 	}
-	tcdp->tcd_port = -1;
 
-	tcdp->tcd_next = NULL;
-	(void) mutex_lock(&free_tcd_lock);
-	if (free_tcd_head == NULL)
-		free_tcd_head = free_tcd_tail = tcdp;
-	else {
-		free_tcd_tail->tcd_next = tcdp;
-		free_tcd_tail = tcdp;
-	}
-	(void) mutex_unlock(&free_tcd_lock);
+	lfree(tcdp, sizeof (*tcdp));
 }
 
 /*
@@ -616,7 +552,7 @@ del_sigev_timer(timer_t timer)
 	thread_communication_data_t *tcdp;
 
 	if ((uint_t)timer < timer_max && (tcdp = timer_tcd[timer]) != NULL) {
-		(void) mutex_lock(&tcdp->tcd_lock);
+		sig_mutex_lock(&tcdp->tcd_lock);
 		if (tcdp->tcd_port >= 0) {
 			if ((rc = port_alert(tcdp->tcd_port,
 			    PORT_ALERT_SET, SIGEV_THREAD_TERM, NULL)) == 0) {
@@ -624,7 +560,7 @@ del_sigev_timer(timer_t timer)
 			}
 		}
 		timer_tcd[timer] = NULL;
-		(void) mutex_unlock(&tcdp->tcd_lock);
+		sig_mutex_unlock(&tcdp->tcd_lock);
 	}
 	return (rc);
 }
@@ -639,6 +575,13 @@ sigev_timer_getoverrun(timer_t timer)
 	return (0);
 }
 
+static void
+del_sigev_mq_cleanup(thread_communication_data_t *tcdp)
+{
+	sig_mutex_unlock(&tcdp->tcd_lock);
+	free_sigev_handler(tcdp);
+}
+
 /*
  * Delete the data associated with the sigev_thread message queue,
  * if the message queue is associated with such a notification option.
@@ -650,20 +593,123 @@ del_sigev_mq(thread_communication_data_t *tcdp)
 	pthread_t server_id;
 	int rc;
 
-	(void) mutex_lock(&tcdp->tcd_lock);
+	sig_mutex_lock(&tcdp->tcd_lock);
+
 	server_id = tcdp->tcd_server_id;
 	tcdp->tcd_msg_closing = 1;
-	if ((rc = pthread_cancel(server_id)) != 0) {
+	if ((rc = pthread_cancel(server_id)) != 0) {	/* "can't happen" */
+		sig_mutex_unlock(&tcdp->tcd_lock);
 		dprintf("Fail to cancel %u with error %d <%s>.\n",
 		    server_id, rc, strerror(rc));
-	} else {
-		/*
-		 * wait for sigev_destroy_pool() to finish
-		 */
-		while (tcdp->tcd_server_id == server_id)
-			(void) cond_wait(&tcdp->tcd_cv, &tcdp->tcd_lock);
+		return;
 	}
-	(void) mutex_unlock(&tcdp->tcd_lock);
-	if (rc == 0)
-		free_sigev_handler(tcdp);
+
+	/*
+	 * wait for sigev_destroy_pool() to finish
+	 */
+	pthread_cleanup_push(del_sigev_mq_cleanup, tcdp);
+	while (tcdp->tcd_server_id == server_id)
+		(void) sig_cond_wait(&tcdp->tcd_cv, &tcdp->tcd_lock);
+	pthread_cleanup_pop(1);
+}
+
+/*
+ * POSIX aio:
+ * If the notification type is SIGEV_THREAD, set up
+ * the port number for notifications.  Create the
+ * thread pool and launch the spawner if necessary.
+ * If the notification type is not SIGEV_THREAD, do nothing.
+ */
+int
+_aio_sigev_thread_init(struct sigevent *sigevp)
+{
+	static mutex_t sigev_aio_lock = DEFAULTMUTEX;
+	static cond_t sigev_aio_cv = DEFAULTCV;
+	static int sigev_aio_busy = 0;
+
+	thread_communication_data_t *tcdp;
+	int port;
+	int rc = 0;
+
+	if (sigevp == NULL ||
+	    sigevp->sigev_notify != SIGEV_THREAD ||
+	    sigevp->sigev_notify_function == NULL)
+		return (0);
+
+	lmutex_lock(&sigev_aio_lock);
+	while (sigev_aio_busy)
+		(void) _cond_wait(&sigev_aio_cv, &sigev_aio_lock);
+	if ((tcdp = sigev_aio_tcd) != NULL)
+		port = tcdp->tcd_port;
+	else {
+		sigev_aio_busy = 1;
+		lmutex_unlock(&sigev_aio_lock);
+
+		tcdp = setup_sigev_handler(sigevp, AIO);
+		if (tcdp == NULL) {
+			port = -1;
+			rc = -1;
+		} else if (launch_spawner(tcdp) != 0) {
+			free_sigev_handler(tcdp);
+			tcdp = NULL;
+			port = -1;
+			rc = -1;
+		} else {
+			port = tcdp->tcd_port;
+		}
+
+		lmutex_lock(&sigev_aio_lock);
+		sigev_aio_tcd = tcdp;
+		sigev_aio_busy = 0;
+		(void) cond_broadcast(&sigev_aio_cv);
+	}
+	lmutex_unlock(&sigev_aio_lock);
+	sigevp->sigev_signo = port;
+	return (rc);
+}
+
+int
+_aio_sigev_thread(aiocb_t *aiocbp)
+{
+	if (aiocbp == NULL)
+		return (0);
+	return (_aio_sigev_thread_init(&aiocbp->aio_sigevent));
+}
+
+#if !defined(_LP64)
+int
+_aio_sigev_thread64(aiocb64_t *aiocbp)
+{
+	if (aiocbp == NULL)
+		return (0);
+	return (_aio_sigev_thread_init(&aiocbp->aio_sigevent));
+}
+#endif
+
+/*
+ * Cleanup POSIX aio after fork1() in the child process.
+ */
+void
+postfork1_child_sigev_aio(void)
+{
+	thread_communication_data_t *tcdp;
+
+	if ((tcdp = sigev_aio_tcd) != NULL) {
+		sigev_aio_tcd = NULL;
+		tcd_teardown(tcdp);
+	}
+}
+
+/*
+ * Utility function for the various postfork1_child_sigev_*() functions.
+ * Clean up the tcdp data structure and close the port.
+ */
+void
+tcd_teardown(thread_communication_data_t *tcdp)
+{
+	if (tcdp->tcd_poolp != NULL)
+		tpool_abandon(tcdp->tcd_poolp);
+	tcdp->tcd_poolp = NULL;
+	tcdp->tcd_server_id = 0;
+	free_sigev_handler(tcdp);
 }

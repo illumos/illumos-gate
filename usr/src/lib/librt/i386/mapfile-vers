@@ -1,0 +1,150 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# DO NOT TOUCH THIS FILE.
+# This file declares interfaces that are cast in stone.
+# They offer interfaces that will never change.
+# DO NOT TOUCH THIS FILE.
+#
+
+SUNW_1.4 {
+    global:
+	clock_nanosleep = FUNCTION;
+	mq_reltimedreceive_np = FUNCTION;
+	mq_reltimedsend_np = FUNCTION;
+	mq_timedreceive = FUNCTION;
+	mq_timedsend = FUNCTION;
+	sem_reltimedwait_np = FUNCTION;
+	sem_timedwait = FUNCTION;
+    local:
+	*;
+} SUNW_1.3;
+
+SUNW_1.3 {
+    global:
+	aio_waitn = FUNCTION;
+	aio_waitn64 = FUNCTION;
+} SUNW_1.2;
+
+SUNW_1.2 {
+    global:
+	close = FUNCTION;
+} SUNW_1.1;
+
+SUNW_1.1 {
+    global:
+	aio_cancel64 = FUNCTION;
+	aio_error64 = FUNCTION;
+	aio_fsync64 = FUNCTION;
+	aio_read64 = FUNCTION;
+	aio_return64 = FUNCTION;
+	aio_suspend64 = FUNCTION;
+	aio_write64 = FUNCTION;
+	fork = FUNCTION;
+	lio_listio64 = FUNCTION;
+} SUNW_0.7;
+
+SUNW_0.7 {
+    global:
+	aio_cancel = FUNCTION;
+	aio_error = FUNCTION;
+	aio_fsync = FUNCTION;
+	aio_read = FUNCTION;
+	aio_return = FUNCTION;
+	aio_suspend = FUNCTION;
+	aio_write = FUNCTION;
+	clock_getres = FUNCTION;
+	clock_gettime = FUNCTION;
+	clock_settime = FUNCTION;
+	fdatasync = FUNCTION;
+	lio_listio = FUNCTION;
+	mq_close = FUNCTION;
+	mq_getattr = FUNCTION;
+	mq_notify = FUNCTION;
+	mq_open = FUNCTION;
+	mq_receive = FUNCTION;
+	mq_send = FUNCTION;
+	mq_setattr = FUNCTION;
+	mq_unlink = FUNCTION;
+	nanosleep = FUNCTION;
+	sched_getparam = FUNCTION;
+	sched_get_priority_max = FUNCTION;
+	sched_get_priority_min = FUNCTION;
+	sched_getscheduler = FUNCTION;
+	sched_rr_get_interval = FUNCTION;
+	sched_setparam = FUNCTION;
+	sched_setscheduler = FUNCTION;
+	sched_yield = FUNCTION;
+	sem_close = FUNCTION;
+	sem_destroy = FUNCTION;
+	sem_getvalue = FUNCTION;
+	sem_init = FUNCTION;
+	sem_open = FUNCTION;
+	sem_post = FUNCTION;
+	sem_trywait = FUNCTION;
+	sem_unlink = FUNCTION;
+	sem_wait = FUNCTION;
+	shm_open = FUNCTION;
+	shm_unlink = FUNCTION;
+	sigqueue = FUNCTION;
+	sigtimedwait = FUNCTION;
+	sigwaitinfo = FUNCTION;
+	timer_create = FUNCTION;
+	timer_delete = FUNCTION;
+	timer_getoverrun = FUNCTION;
+	timer_gettime = FUNCTION;
+	timer_settime = FUNCTION;
+};
+
+SUNWprivate_1.1 {
+    global:
+	_clock_getres = FUNCTION;
+	_clock_gettime = FUNCTION;
+	_clock_nanosleep = FUNCTION;
+	_clock_settime = FUNCTION;
+	_nanosleep = FUNCTION;
+	_sem_close = FUNCTION;
+	_sem_destroy = FUNCTION;
+	_sem_getvalue = FUNCTION;
+	_sem_init = FUNCTION;
+	_sem_open = FUNCTION;
+	_sem_post = FUNCTION;
+	_sem_reltimedwait_np = FUNCTION;
+	_sem_timedwait = FUNCTION;
+	_sem_trywait = FUNCTION;
+	_sem_unlink = FUNCTION;
+	_sem_wait = FUNCTION;
+	_sigqueue = FUNCTION;
+	_sigtimedwait = FUNCTION;
+	_sigwaitinfo = FUNCTION;
+	_timer_create = FUNCTION;
+	_timer_delete = FUNCTION;
+	_timer_getoverrun = FUNCTION;
+	_timer_gettime = FUNCTION;
+	_timer_settime = FUNCTION;
+};

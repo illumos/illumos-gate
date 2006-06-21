@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -415,7 +416,7 @@ const struct systable systable[] = {
 {"processor_bind", 4, DEC, NOV, IDT, DEC, DEC, HEX},		/* 187 */
 {"processor_info", 2, DEC, NOV, DEC, HEX},			/* 188 */
 {"p_online",	2, DEC, NOV, DEC, DEC},				/* 189 */
-{"sigqueue",	4, DEC, NOV, DEC, SIG, HEX, SQC},		/* 190 */
+{"sigqueue",	5, DEC, NOV, DEC, SIG, HEX, SQC, DEC},		/* 190 */
 {"clock_gettime", 2, DEC, NOV, DEC, HEX},			/* 191 */
 {"clock_settime", 2, DEC, NOV, DEC, HEX},			/* 192 */
 {"clock_getres", 2, DEC, NOV, DEC, HEX},			/* 193 */

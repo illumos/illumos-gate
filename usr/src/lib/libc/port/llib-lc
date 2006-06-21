@@ -29,6 +29,7 @@
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
+#include <aio.h>
 #include <alloca.h>
 #include <atomic.h>
 #include <ctype.h>
@@ -51,6 +52,7 @@
 #include <locale.h>
 #include <memory.h>
 #include <mon.h>
+#include <mqueue.h>
 #include <nan.h>
 #include <ndbm.h>
 #include <limits.h>
@@ -61,7 +63,9 @@
 #include <rctl.h>
 #include <regex.h>
 #include <rpcsvc/ypclnt.h>
+#include <sched.h>
 #include <search.h>
+#include <semaphore.h>
 #include <setjmp.h>
 #include <shadow.h>
 #include <siginfo.h>
@@ -80,6 +84,7 @@
 #include <synch.h>
 #include <sys/acctctl.h>
 #include <sys/acl.h>
+#include <sys/asynch.h>
 #include <sys/byteorder.h>
 #include <sys/cladm.h>
 #include <sys/corectl.h>

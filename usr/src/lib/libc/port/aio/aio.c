@@ -26,7 +26,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "libaio.h"
+#include "synonyms.h"
+#include "thr_uberdata.h"
+#include "asyncio.h"
 #include <atomic.h>
 #include <sys/param.h>
 #include <sys/file.h>
@@ -37,7 +39,6 @@ static aio_req_t *_aio_req_get(aio_worker_t *);
 static void _aio_req_add(aio_req_t *, aio_worker_t **, int);
 static void _aio_req_del(aio_worker_t *, aio_req_t *, int);
 static void _aio_work_done(aio_worker_t *);
-aio_req_t *_aio_req_remove(aio_req_t *);
 static void _aio_enq_doneq(aio_req_t *);
 
 extern void _aio_lio_free(aio_lio_t *);
@@ -85,6 +86,9 @@ aio_req_t *_aio_done_tail;		/* list of done requests */
 aio_req_t *_aio_done_head;
 
 mutex_t __aio_initlock = DEFAULTMUTEX;	/* makes aio initialization atomic */
+cond_t __aio_initcv = DEFAULTCV;
+int __aio_initbusy = 0;
+
 mutex_t __aio_mutex = DEFAULTMUTEX;	/* protects counts, and linked lists */
 cond_t _aio_iowait_cv = DEFAULTCV;	/* wait for userland I/Os */
 
@@ -105,17 +109,16 @@ int _aio_kernel_suspend = 0;		/* active kernel kaio calls */
 int _aio_suscv_cnt = 0;			/* aio_suspend calls waiting on cv's */
 
 int _max_workers = 256;			/* max number of workers permitted */
-int _min_workers = 8;			/* min number of workers */
+int _min_workers = 4;			/* min number of workers */
 int _minworkload = 2;			/* min number of request in q */
 int _aio_worker_cnt = 0;		/* number of workers to do requests */
 int __uaio_ok = 0;			/* AIO has been enabled */
 sigset_t _worker_set;			/* worker's signal mask */
-sigset_t _full_set;			/* all signals (sigfillset()) */
 
 int _aiowait_flag = 0;			/* when set, aiowait() is inprogress */
-int _aio_flags = 0;			/* see libaio.h defines for */
+int _aio_flags = 0;			/* see asyncio.h defines for */
 
-aio_worker_t *_kaiowp;			/* points to kaio cleanup thread */
+aio_worker_t *_kaiowp = NULL;		/* points to kaio cleanup thread */
 
 int hz;					/* clock ticks per second */
 
@@ -138,29 +141,32 @@ _kaio_supported_init(void)
 }
 
 /*
- * libaio is initialized when an AIO request is made.  Important
- * constants are initialized like the max number of workers that
- * libaio can create, and the minimum number of workers permitted before
- * imposing some restrictions.  Also, some workers are created.
+ * The aio subsystem is initialized when an AIO request is made.
+ * Constants are initialized like the max number of workers that
+ * the subsystem can create, and the minimum number of workers
+ * permitted before imposing some restrictions.  Also, some
+ * workers are created.
  */
 int
 __uaio_init(void)
 {
+	int ret = -1;
 	int i;
-	int ret;
 
-	sig_mutex_lock(&__aio_initlock);
+	lmutex_lock(&__aio_initlock);
+	while (__aio_initbusy)
+		(void) _cond_wait(&__aio_initcv, &__aio_initlock);
 	if (__uaio_ok) {	/* already initialized */
-		sig_mutex_unlock(&__aio_initlock);
+		lmutex_unlock(&__aio_initlock);
 		return (0);
 	}
-
-	ret = -1;
+	__aio_initbusy = 1;
+	lmutex_unlock(&__aio_initlock);
 
 	hz = (int)sysconf(_SC_CLK_TCK);
 	__pid = getpid();
 
-	init_signals();
+	setup_cancelsig(SIGAIOCANCEL);
 
 	if (_kaio_supported_init() != 0)
 		goto out;
@@ -182,12 +188,11 @@ __uaio_init(void)
 	/*
 	 * Initialize worker's signal mask to only catch SIGAIOCANCEL.
 	 */
-	(void) sigfillset(&_full_set);
 	(void) sigfillset(&_worker_set);
 	(void) sigdelset(&_worker_set, SIGAIOCANCEL);
 
 	/*
-	 * Create the minimum number of workers.
+	 * Create the minimum number of read/write workers.
 	 */
 	for (i = 0; i < _min_workers; i++)
 		(void) _aio_create_worker(NULL, AIOREAD);
@@ -197,12 +202,37 @@ __uaio_init(void)
 	 */
 	(void) _aio_create_worker(NULL, AIONOTIFY);
 
-	__uaio_ok = 1;
 	ret = 0;
-
 out:
-	sig_mutex_unlock(&__aio_initlock);
+	lmutex_lock(&__aio_initlock);
+	if (ret == 0)
+		__uaio_ok = 1;
+	__aio_initbusy = 0;
+	(void) cond_broadcast(&__aio_initcv);
+	lmutex_unlock(&__aio_initlock);
 	return (ret);
+}
+
+/*
+ * Called from close() before actually performing the real _close().
+ */
+void
+_aio_close(int fd)
+{
+	if (fd < 0)	/* avoid cancelling everything */
+		return;
+	/*
+	 * Cancel all outstanding aio requests for this file descriptor.
+	 */
+	if (__uaio_ok)
+		(void) aiocancel_all(fd);
+	/*
+	 * If we have allocated the bit array, clear the bit for this file.
+	 * The next open may re-use this file descriptor and the new file
+	 * may have different kaio() behaviour.
+	 */
+	if (_kaio_supported != NULL)
+		CLEAR_KAIO_SUPPORTED(fd);
 }
 
 /*
@@ -213,7 +243,7 @@ void *
 _kaio_cleanup_thread(void *arg)
 {
 	if (pthread_setspecific(_aio_key, arg) != 0)
-		_aiopanic("_kaio_cleanup_thread, pthread_setspecific()");
+		aio_panic("_kaio_cleanup_thread, pthread_setspecific()");
 	(void) _kaio(AIOSTART);
 	return (arg);
 }
@@ -225,37 +255,41 @@ void
 _kaio_init()
 {
 	int error;
-	sigset_t set;
 	sigset_t oset;
 
-	sig_mutex_lock(&__aio_initlock);
-	if (_kaio_supported_init() != 0)
-		_kaio_ok = -1;
-	if (_kaio_ok == 0) {
-		if ((_kaiowp = _aio_worker_alloc()) == NULL) {
-			error =  ENOMEM;
-		} else {
-			if ((error = (int)_kaio(AIOINIT)) == 0) {
-				(void) sigfillset(&set);
-				(void) pthread_sigmask(SIG_SETMASK,
-				    &set, &oset);
-				error = thr_create(NULL, AIOSTKSIZE,
-				    _kaio_cleanup_thread, _kaiowp,
-				    THR_DAEMON, &_kaiowp->work_tid);
-				(void) pthread_sigmask(SIG_SETMASK,
-				    &oset, NULL);
-			}
-			if (error) {
-				_aio_worker_free(_kaiowp);
-				_kaiowp = NULL;
-			}
-		}
-		if (error)
-			_kaio_ok = -1;
-		else
-			_kaio_ok = 1;
+	lmutex_lock(&__aio_initlock);
+	while (__aio_initbusy)
+		(void) _cond_wait(&__aio_initcv, &__aio_initlock);
+	if (_kaio_ok) {		/* already initialized */
+		lmutex_unlock(&__aio_initlock);
+		return;
 	}
-	sig_mutex_unlock(&__aio_initlock);
+	__aio_initbusy = 1;
+	lmutex_unlock(&__aio_initlock);
+
+	if (_kaio_supported_init() != 0)
+		error = ENOMEM;
+	else if ((_kaiowp = _aio_worker_alloc()) == NULL)
+		error = ENOMEM;
+	else if ((error = (int)_kaio(AIOINIT)) == 0) {
+		(void) pthread_sigmask(SIG_SETMASK, &maskset, &oset);
+		error = thr_create(NULL, AIOSTKSIZE, _kaio_cleanup_thread,
+		    _kaiowp, THR_DAEMON, &_kaiowp->work_tid);
+		(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
+	}
+	if (error && _kaiowp != NULL) {
+		_aio_worker_free(_kaiowp);
+		_kaiowp = NULL;
+	}
+
+	lmutex_lock(&__aio_initlock);
+	if (error)
+		_kaio_ok = -1;
+	else
+		_kaio_ok = 1;
+	__aio_initbusy = 0;
+	(void) cond_broadcast(&__aio_initcv);
+	lmutex_unlock(&__aio_initlock);
 }
 
 int
@@ -770,6 +804,90 @@ _aio_cancel_req(aio_worker_t *aiowp, aio_req_t *reqp, int *canceled, int *done)
 	return (1);
 }
 
+int
+_aio_create_worker(aio_req_t *reqp, int mode)
+{
+	aio_worker_t *aiowp, **workers, **nextworker;
+	int *aio_workerscnt;
+	void *(*func)(void *);
+	sigset_t oset;
+	int error;
+
+	/*
+	 * Put the new worker thread in the right queue.
+	 */
+	switch (mode) {
+	case AIOREAD:
+	case AIOWRITE:
+	case AIOAREAD:
+	case AIOAWRITE:
+#if !defined(_LP64)
+	case AIOAREAD64:
+	case AIOAWRITE64:
+#endif
+		workers = &__workers_rw;
+		nextworker = &__nextworker_rw;
+		aio_workerscnt = &__rw_workerscnt;
+		func = _aio_do_request;
+		break;
+	case AIONOTIFY:
+		workers = &__workers_no;
+		nextworker = &__nextworker_no;
+		func = _aio_do_notify;
+		aio_workerscnt = &__no_workerscnt;
+		break;
+	default:
+		aio_panic("_aio_create_worker: invalid mode");
+		break;
+	}
+
+	if ((aiowp = _aio_worker_alloc()) == NULL)
+		return (-1);
+
+	if (reqp) {
+		reqp->req_state = AIO_REQ_QUEUED;
+		reqp->req_worker = aiowp;
+		aiowp->work_head1 = reqp;
+		aiowp->work_tail1 = reqp;
+		aiowp->work_next1 = reqp;
+		aiowp->work_count1 = 1;
+		aiowp->work_minload1 = 1;
+	}
+
+	(void) pthread_sigmask(SIG_SETMASK, &maskset, &oset);
+	error = thr_create(NULL, AIOSTKSIZE, func, aiowp,
+		THR_DAEMON | THR_SUSPENDED, &aiowp->work_tid);
+	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
+	if (error) {
+		if (reqp) {
+			reqp->req_state = 0;
+			reqp->req_worker = NULL;
+		}
+		_aio_worker_free(aiowp);
+		return (-1);
+	}
+
+	lmutex_lock(&__aio_mutex);
+	(*aio_workerscnt)++;
+	if (*workers == NULL) {
+		aiowp->work_forw = aiowp;
+		aiowp->work_backw = aiowp;
+		*nextworker = aiowp;
+		*workers = aiowp;
+	} else {
+		aiowp->work_backw = (*workers)->work_backw;
+		aiowp->work_forw = (*workers);
+		(*workers)->work_backw->work_forw = aiowp;
+		(*workers)->work_backw = aiowp;
+	}
+	_aio_worker_cnt++;
+	lmutex_unlock(&__aio_mutex);
+
+	(void) thr_continue(aiowp->work_tid);
+
+	return (0);
+}
+
 /*
  * This is the worker's main routine.
  * The task of this function is to execute all queued requests;
@@ -841,13 +959,14 @@ void *
 _aio_do_request(void *arglist)
 {
 	aio_worker_t *aiowp = (aio_worker_t *)arglist;
+	ulwp_t *self = curthread;
 	struct aio_args *arg;
 	aio_req_t *reqp;		/* current AIO request */
 	ssize_t retval;
 	int error;
 
 	if (pthread_setspecific(_aio_key, aiowp) != 0)
-		_aiopanic("_aio_do_request, pthread_setspecific()");
+		aio_panic("_aio_do_request, pthread_setspecific()");
 	(void) pthread_sigmask(SIG_SETMASK, &_worker_set, NULL);
 	ASSERT(aiowp->work_req == NULL);
 
@@ -857,8 +976,9 @@ _aio_do_request(void *arglist)
 	 * we do is block SIGAIOCANCEL.
 	 */
 	(void) sigsetjmp(aiowp->work_jmp_buf, 0);
+	ASSERT(self->ul_sigdefer == 0);
 
-	_sigoff();	/* block SIGAIOCANCEL */
+	sigoff(self);	/* block SIGAIOCANCEL */
 	if (aiowp->work_req != NULL)
 		_aio_finish_request(aiowp, -1, ECANCELED);
 
@@ -873,11 +993,13 @@ _aio_do_request(void *arglist)
 
 top:
 		/* consume any deferred SIGAIOCANCEL signal here */
-		_sigon();
-		_sigoff();
+		sigon(self);
+		sigoff(self);
 
-		while ((reqp = _aio_req_get(aiowp)) == NULL)
-			_aio_idle(aiowp);
+		while ((reqp = _aio_req_get(aiowp)) == NULL) {
+			if (_aio_idle(aiowp) != 0)
+				goto top;
+		}
 		arg = &reqp->req_args;
 		ASSERT(reqp->req_state == AIO_REQ_INPROGRESS ||
 		    reqp->req_state == AIO_REQ_CANCELED);
@@ -886,7 +1008,7 @@ top:
 		switch (reqp->req_op) {
 		case AIOREAD:
 		case AIOAREAD:
-			_sigon();	/* unblock SIGAIOCANCEL */
+			sigon(self);	/* unblock SIGAIOCANCEL */
 			retval = pread(arg->fd, arg->buf,
 			    arg->bufsz, arg->offset);
 			if (retval == -1) {
@@ -899,11 +1021,11 @@ top:
 					error = errno;
 				}
 			}
-			_sigoff();	/* block SIGAIOCANCEL */
+			sigoff(self);	/* block SIGAIOCANCEL */
 			break;
 		case AIOWRITE:
 		case AIOAWRITE:
-			_sigon();	/* unblock SIGAIOCANCEL */
+			sigon(self);	/* unblock SIGAIOCANCEL */
 			retval = pwrite(arg->fd, arg->buf,
 			    arg->bufsz, arg->offset);
 			if (retval == -1) {
@@ -916,11 +1038,11 @@ top:
 					error = errno;
 				}
 			}
-			_sigoff();	/* block SIGAIOCANCEL */
+			sigoff(self);	/* block SIGAIOCANCEL */
 			break;
 #if !defined(_LP64)
 		case AIOAREAD64:
-			_sigon();	/* unblock SIGAIOCANCEL */
+			sigon(self);	/* unblock SIGAIOCANCEL */
 			retval = pread64(arg->fd, arg->buf,
 			    arg->bufsz, arg->offset);
 			if (retval == -1) {
@@ -933,10 +1055,10 @@ top:
 					error = errno;
 				}
 			}
-			_sigoff();	/* block SIGAIOCANCEL */
+			sigoff(self);	/* block SIGAIOCANCEL */
 			break;
 		case AIOAWRITE64:
-			_sigon();	/* unblock SIGAIOCANCEL */
+			sigon(self);	/* unblock SIGAIOCANCEL */
 			retval = pwrite64(arg->fd, arg->buf,
 			    arg->bufsz, arg->offset);
 			if (retval == -1) {
@@ -949,7 +1071,7 @@ top:
 					error = errno;
 				}
 			}
-			_sigoff();	/* block SIGAIOCANCEL */
+			sigoff(self);	/* block SIGAIOCANCEL */
 			break;
 #endif	/* !defined(_LP64) */
 		case AIOFSYNC:
@@ -971,11 +1093,11 @@ top:
 					error = errno;
 			}
 			if (_aio_hash_insert(reqp->req_resultp, reqp) != 0)
-				_aiopanic("_aio_do_request(): AIOFSYNC: "
+				aio_panic("_aio_do_request(): AIOFSYNC: "
 				    "request already in hash table");
 			break;
 		default:
-			_aiopanic("_aio_do_request, bad op");
+			aio_panic("_aio_do_request, bad op");
 		}
 
 		_aio_finish_request(aiowp, retval, error);
@@ -1050,34 +1172,22 @@ _aio_delay(int ticks)
 static void
 send_notification(notif_param_t *npp)
 {
-	int backoff;
+	extern int __sigqueue(pid_t pid, int signo,
+		/* const union sigval */ void *value, int si_code, int block);
 
-	if (npp->np_signo) {
-		backoff = 0;
-		while (__sigqueue(__pid, npp->np_signo, npp->np_user,
-		    SI_ASYNCIO) == -1) {
-			ASSERT(errno == EAGAIN);
-			if (++backoff > 10)
-				backoff = 10;
-			_aio_delay(backoff);
-		}
-	} else if (npp->np_port >= 0) {
+	if (npp->np_signo)
+		(void) __sigqueue(__pid, npp->np_signo, npp->np_user,
+		    SI_ASYNCIO, 1);
+	else if (npp->np_port >= 0)
 		(void) _port_dispatch(npp->np_port, 0, PORT_SOURCE_AIO,
 		    npp->np_event, npp->np_object, npp->np_user);
-	}
-	if (npp->np_lio_signo) {
-		backoff = 0;
-		while (__sigqueue(__pid, npp->np_lio_signo, npp->np_lio_user,
-		    SI_ASYNCIO) == -1) {
-			ASSERT(errno == EAGAIN);
-			if (++backoff > 10)
-				backoff = 10;
-			_aio_delay(backoff);
-		}
-	} else if (npp->np_lio_port >= 0) {
+
+	if (npp->np_lio_signo)
+		(void) __sigqueue(__pid, npp->np_lio_signo, npp->np_lio_user,
+		    SI_ASYNCIO, 1);
+	else if (npp->np_lio_port >= 0)
 		(void) _port_dispatch(npp->np_lio_port, 0, PORT_SOURCE_AIO,
 		    npp->np_lio_event, npp->np_lio_object, npp->np_lio_user);
-	}
 }
 
 /*
@@ -1093,16 +1203,17 @@ _aio_do_notify(void *arg)
 	 * This isn't really necessary.  All signals are blocked.
 	 */
 	if (pthread_setspecific(_aio_key, aiowp) != 0)
-		_aiopanic("_aio_do_notify, pthread_setspecific()");
+		aio_panic("_aio_do_notify, pthread_setspecific()");
 
 	/*
 	 * Notifications are never cancelled.
 	 * All signals remain blocked, forever.
 	 */
-
 	for (;;) {
-		while ((reqp = _aio_req_get(aiowp)) == NULL)
-			_aio_idle(aiowp);
+		while ((reqp = _aio_req_get(aiowp)) == NULL) {
+			if (_aio_idle(aiowp) != 0)
+				aio_panic("_aio_do_notify: _aio_idle() failed");
+		}
 		send_notification(&reqp->req_notify);
 		_aio_req_free(reqp);
 	}
@@ -1155,7 +1266,7 @@ _aiodone(aio_req_t *reqp, ssize_t retval, int error)
 		sigev_port = 1;
 		break;
 	default:
-		_aiopanic("_aiodone: improper sigev_notify");
+		aio_panic("_aiodone: improper sigev_notify");
 		break;
 	}
 
@@ -1328,11 +1439,11 @@ _aio_fsync_del(aio_worker_t *aiowp, aio_req_t *reqp)
 }
 
 /*
- * worker is set idle when its work queue is empty.
- * The worker checks again that it has no more work and then
- * goes to sleep waiting for more work.
+ * A worker is set idle when its work queue is empty.
+ * The worker checks again that it has no more work
+ * and then goes to sleep waiting for more work.
  */
-void
+int
 _aio_idle(aio_worker_t *aiowp)
 {
 	int error = 0;
@@ -1355,6 +1466,7 @@ _aio_idle(aio_worker_t *aiowp)
 			aiowp->work_idleflg = 0;
 	}
 	sig_mutex_unlock(&aiowp->work_qlock1);
+	return (error);
 }
 
 /*
@@ -1470,6 +1582,7 @@ _aio_set_result(aio_req_t *reqp, ssize_t retval, int error)
 void
 _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 {
+	ulwp_t *self = curthread;
 	aio_worker_t *aiowp;
 	aio_worker_t *first;
 	int load_bal_flg = 1;
@@ -1483,7 +1596,7 @@ _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 	 * or until the list is completely traversed at which point another
 	 * worker will be created.
 	 */
-	_sigoff();		/* defer SIGIO */
+	sigoff(self);		/* defer SIGIO */
 	sig_mutex_lock(&__aio_mutex);
 	first = aiowp = *nextworker;
 	if (mode != AIONOTIFY)
@@ -1532,8 +1645,8 @@ _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 		if (!found) {
 			if (_aio_worker_cnt < _max_workers) {
 				if (_aio_create_worker(reqp, mode))
-					_aiopanic("_aio_req_add: add worker");
-				_sigon();	/* reenable SIGIO */
+					aio_panic("_aio_req_add: add worker");
+				sigon(self);	/* reenable SIGIO */
 				return;
 			}
 
@@ -1559,8 +1672,8 @@ _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 			*nextworker = aiowp->work_forw;
 			sig_mutex_unlock(&__aio_mutex);
 			if (_aio_create_worker(reqp, mode))
-				_aiopanic("aio_req_add: add worker");
-			_sigon();	/* reenable SIGIO */
+				aio_panic("aio_req_add: add worker");
+			sigon(self);	/* reenable SIGIO */
 			return;
 		}
 		aiowp->work_minload1++;
@@ -1571,7 +1684,7 @@ _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 		sig_mutex_lock(&aiowp->work_qlock1);
 		break;
 	default:
-		_aiopanic("_aio_req_add: invalid mode");
+		aio_panic("_aio_req_add: invalid mode");
 		break;
 	}
 	/*
@@ -1603,7 +1716,7 @@ _aio_req_add(aio_req_t *reqp, aio_worker_t **nextworker, int mode)
 		*nextworker = aiowp->work_forw;
 		sig_mutex_unlock(&__aio_mutex);
 	}
-	_sigon();	/* reenable SIGIO */
+	sigon(self);	/* reenable SIGIO */
 }
 
 /*
@@ -1788,18 +1901,18 @@ _aio_hash_insert(aio_result_t *resultp, aio_req_t *reqp)
 	aio_req_t *next;
 
 	hashp = _aio_hash + AIOHASH(resultp);
-	sig_mutex_lock(&hashp->hash_lock);
+	lmutex_lock(&hashp->hash_lock);
 	prev = &hashp->hash_ptr;
 	while ((next = *prev) != NULL) {
 		if (resultp == next->req_resultp) {
-			sig_mutex_unlock(&hashp->hash_lock);
+			lmutex_unlock(&hashp->hash_lock);
 			return (-1);
 		}
 		prev = &next->req_link;
 	}
 	*prev = reqp;
 	ASSERT(reqp->req_link == NULL);
-	sig_mutex_unlock(&hashp->hash_lock);
+	lmutex_unlock(&hashp->hash_lock);
 	return (0);
 }
 
@@ -1815,7 +1928,7 @@ _aio_hash_del(aio_result_t *resultp)
 
 	if (_aio_hash != NULL) {
 		hashp = _aio_hash + AIOHASH(resultp);
-		sig_mutex_lock(&hashp->hash_lock);
+		lmutex_lock(&hashp->hash_lock);
 		prev = &hashp->hash_ptr;
 		while ((next = *prev) != NULL) {
 			if (resultp == next->req_resultp) {
@@ -1825,7 +1938,7 @@ _aio_hash_del(aio_result_t *resultp)
 			}
 			prev = &next->req_link;
 		}
-		sig_mutex_unlock(&hashp->hash_lock);
+		lmutex_unlock(&hashp->hash_lock);
 	}
 	return (next);
 }
@@ -1842,14 +1955,14 @@ _aio_hash_find(aio_result_t *resultp)
 
 	if (_aio_hash != NULL) {
 		hashp = _aio_hash + AIOHASH(resultp);
-		sig_mutex_lock(&hashp->hash_lock);
+		lmutex_lock(&hashp->hash_lock);
 		prev = &hashp->hash_ptr;
 		while ((next = *prev) != NULL) {
 			if (resultp == next->req_resultp)
 				break;
 			prev = &next->req_link;
 		}
-		sig_mutex_unlock(&hashp->hash_lock);
+		lmutex_unlock(&hashp->hash_lock);
 	}
 	return (next);
 }
@@ -1965,7 +2078,7 @@ _aio_rw(aiocb_t *aiocbp, aio_lio_t *lio_head, aio_worker_t **nextworker,
 
 	if ((flg & AIO_NO_DUPS) &&
 	    _aio_hash_insert(&aiocbp->aio_resultp, reqp) != 0) {
-		_aiopanic("_aio_rw(): request already in hash table");
+		aio_panic("_aio_rw(): request already in hash table");
 		_aio_req_free(reqp);
 		errno = EINVAL;
 		return (-1);
@@ -2078,7 +2191,7 @@ _aio_rw64(aiocb64_t *aiocbp, aio_lio_t *lio_head, aio_worker_t **nextworker,
 
 	if ((flg & AIO_NO_DUPS) &&
 	    _aio_hash_insert(&aiocbp->aio_resultp, reqp) != 0) {
-		_aiopanic("_aio_rw64(): request already in hash table");
+		aio_panic("_aio_rw64(): request already in hash table");
 		_aio_req_free(reqp);
 		errno = EINVAL;
 		return (-1);

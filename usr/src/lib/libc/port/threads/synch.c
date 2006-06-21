@@ -2184,6 +2184,77 @@ lmutex_unlock(mutex_t *mp)
 	exit_critical(self);
 }
 
+/*
+ * For specialized code in libc, like the asynchronous i/o code,
+ * the following sig_*() locking primitives are used in order
+ * to make the code asynchronous signal safe.  Signals are
+ * deferred while locks acquired by these functions are held.
+ */
+void
+sig_mutex_lock(mutex_t *mp)
+{
+	sigoff(curthread);
+	(void) _private_mutex_lock(mp);
+}
+
+void
+sig_mutex_unlock(mutex_t *mp)
+{
+	(void) _private_mutex_unlock(mp);
+	sigon(curthread);
+}
+
+int
+sig_mutex_trylock(mutex_t *mp)
+{
+	int error;
+
+	sigoff(curthread);
+	if ((error = _private_mutex_trylock(mp)) != 0)
+		sigon(curthread);
+	return (error);
+}
+
+/*
+ * sig_cond_wait() is a cancellation point.
+ */
+int
+sig_cond_wait(cond_t *cv, mutex_t *mp)
+{
+	int error;
+
+	ASSERT(curthread->ul_sigdefer != 0);
+	_private_testcancel();
+	error = _cond_wait(cv, mp);
+	if (error == EINTR && curthread->ul_cursig) {
+		sig_mutex_unlock(mp);
+		/* take the deferred signal here */
+		sig_mutex_lock(mp);
+	}
+	_private_testcancel();
+	return (error);
+}
+
+/*
+ * sig_cond_reltimedwait() is a cancellation point.
+ */
+int
+sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
+{
+	int error;
+
+	ASSERT(curthread->ul_sigdefer != 0);
+	_private_testcancel();
+	error = _cond_reltimedwait(cv, mp, ts);
+	if (error == EINTR && curthread->ul_cursig) {
+		sig_mutex_unlock(mp);
+		/* take the deferred signal here */
+		sig_mutex_lock(mp);
+	}
+	_private_testcancel();
+	return (error);
+}
+
 static int
 shared_mutex_held(mutex_t *mparg)
 {

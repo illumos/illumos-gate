@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_LIBAIO_H
-#define	_LIBAIO_H
+#ifndef	_ASYNCIO_H
+#define	_ASYNCIO_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,7 +33,6 @@
 extern "C" {
 #endif
 
-#include "c_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -43,21 +42,14 @@ extern "C" {
 #include <sys/stat.h>
 #include <thread.h>
 #include <pthread.h>
-#include <asynch.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <siginfo.h>
 #include <aio.h>
 #include <limits.h>
 #include <ucontext.h>
+#include <sys/asynch.h>
 #include <sys/mman.h>
-
-#if defined(DEBUG)
-extern int assfail(char *, char *, int);
-#define	ASSERT(EX) ((void)((EX) || assfail(#EX, __FILE__, __LINE__)))
-#else
-#define	ASSERT(EX)
-#endif
 
 #if !defined(_LP64)
 #define	AIOSTKSIZE	(64 * 1024)
@@ -185,19 +177,12 @@ struct aio_req {
 
 /* values for _aio_flags */
 
-/*
- * if set, _aiodone() notifies aio_waitn about done requests
- * from the threads
- */
+/* if set, _aiodone() notifies aio_waitn about done requests */
 #define	AIO_WAIT_INPROGRESS	0x1
-
-/*
- * if set, _aiodone() wakes up functions waiting for completed I/Os
- */
+/* if set, _aiodone() wakes up functions waiting for completed I/Os */
 #define	AIO_IO_WAITING		0x2
-
-#define	AIO_LIB_WAITN		0x4		/* aio_waitn in progress */
-#define	AIO_LIB_WAITN_PENDING	0x8		/* aio_waitn requests pending */
+#define	AIO_LIB_WAITN		0x4	/* aio_waitn in progress */
+#define	AIO_LIB_WAITN_PENDING	0x8	/* aio_waitn requests pending */
 
 /*
  * Before a kaio() system call, the fd will be checked
@@ -277,29 +262,6 @@ extern aio_hash_t *_aio_hash;
 				((uintptr_t)(resultp) >> 2)) & (HASHSZ - 1))
 #define	POSIX_AIO(x)		((x)->req_type == AIO_POSIX_REQ)
 
-/*
- * _sigoff(), _sigon(), and _sigdeferred() are consolidation-private
- * interfaces in libc that defer signals, enable signals, and return
- * the deferred signal number (if any), respectively.
- * Calls to _sigoff() and _sigon() can nest but must be balanced,
- * so nested calls to these functions work properly.
- */
-extern void _sigoff(void);
-extern void _sigon(void);
-extern int _sigdeferred(void);
-
-/*
- * The following five functions are the same as the corresponding
- * libc functions without the 'sig_' prefix, except that all signals
- * are deferred while the lock is held.  Their use in the library
- * makes the aio interfaces async-signal safe.
- */
-extern void sig_mutex_lock(mutex_t *);
-extern void sig_mutex_unlock(mutex_t *);
-extern int sig_mutex_trylock(mutex_t *);
-extern int sig_cond_wait(cond_t *, mutex_t *);
-extern int sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
-
 extern int __uaio_init(void);
 extern void _kaio_init(void);
 extern intptr_t _kaio(int, ...);
@@ -309,42 +271,32 @@ extern int _aio_rw(aiocb_t *, aio_lio_t *, aio_worker_t **, int, int);
 extern int _aio_rw64(aiocb64_t *, aio_lio_t *, aio_worker_t **, int, int);
 #endif
 extern int _aio_create_worker(aio_req_t *, int);
-
 extern int _aio_cancel_req(aio_worker_t *, aio_req_t *, int *, int *);
 extern int aiocancel_all(int);
-extern void init_signals(void);
-
-extern void _aiopanic(char *);
+extern void aio_panic(const char *);
 extern aio_req_t *_aio_hash_find(aio_result_t *);
 extern aio_req_t *_aio_hash_del(aio_result_t *);
 extern void _aio_req_mark_done(aio_req_t *);
 extern void _aio_waitn_wakeup(void);
-
 extern aio_worker_t *_aio_worker_alloc(void);
 extern void _aio_worker_free(void *);
 extern aio_req_t *_aio_req_alloc(void);
 extern void _aio_req_free(aio_req_t *);
 extern aio_lio_t *_aio_lio_alloc(void);
 extern void _aio_lio_free(aio_lio_t *);
-
-extern void _aio_idle(aio_worker_t *);
+extern int _aio_idle(aio_worker_t *);
 extern void *_aio_do_request(void *);
 extern void *_aio_do_notify(void *);
 extern void _lio_remove(aio_req_t *);
 extern aio_req_t *_aio_req_remove(aio_req_t *);
 extern int _aio_get_timedelta(timespec_t *, timespec_t *);
-
-extern int _close(int);
-extern int __sigqueue(pid_t pid, int signo,
-	/* const union sigval */ void *value, int si_code);
-extern int _sigaction(int sig, const struct sigaction *act,
-	struct sigaction *oact);
-extern int _sigemptyset(sigset_t *set);
-extern int _sigaddset(sigset_t *set, int signo);
-extern int _sigismember(const sigset_t *set, int signo);
-
 extern aio_result_t *_aio_req_done(void);
 extern void _aio_set_result(aio_req_t *, ssize_t, int);
+extern int _aio_sigev_thread_init(struct sigevent *);
+extern int _aio_sigev_thread(aiocb_t *);
+#if !defined(_LP64)
+extern int _aio_sigev_thread64(aiocb64_t *);
+#endif
 
 extern aio_worker_t *_kaiowp;		/* points to kaio cleanup thread */
 extern aio_worker_t *__workers_rw;	/* list of all rw workers */
@@ -354,20 +306,20 @@ extern aio_worker_t *__workers_no;	/* list of all notification workers */
 extern aio_worker_t *__nextworker_no;	/* worker chosen, next notification */
 extern int __no_workerscnt;		/* number of notification workers */
 extern mutex_t __aio_initlock;		/* makes aio initialization atomic */
+extern cond_t __aio_initcv;
+extern int __aio_initbusy;
 extern mutex_t __aio_mutex;		/* global aio lock */
 extern cond_t _aio_iowait_cv;		/* wait for userland I/Os */
 extern cond_t _aio_waitn_cv;		/* wait for end of aio_waitn */
 extern int _max_workers;		/* max number of workers permitted */
 extern int _min_workers;		/* min number of workers */
 extern sigset_t _worker_set;		/* worker's signal mask */
-extern sigset_t _full_set;		/* all signals (sigfillset()) */
 extern int _aio_worker_cnt;		/* number of AIO workers */
 extern int _sigio_enabled;		/* when set, send SIGIO signal */
 extern pid_t __pid;			/* process's PID */
 extern int __uaio_ok;			/* indicates if aio is initialized */
 extern int _kaio_ok;			/* indicates if kaio is initialized */
 extern pthread_key_t _aio_key;		/* for thread-specific data */
-
 extern aio_req_t *_aio_done_tail;	/* list of done requests */
 extern aio_req_t *_aio_done_head;
 extern aio_req_t *_aio_doneq;
@@ -382,15 +334,13 @@ extern int _aio_req_done_cnt;		/* req. done but not in "done queue" */
 extern int _aio_kernel_suspend;		/* active kernel kaio calls */
 extern int _aio_suscv_cnt;		/* aio_suspend calls waiting on cv's */
 extern int _aiowait_flag;		/* when set, aiowait() is inprogress */
-extern int _aio_flags;			/* see libaio.h defines for */
-
-/*
- * Array for determining whether or not a file supports kaio
- */
+extern int _aio_flags;			/* see defines, above */
 extern uint32_t *_kaio_supported;
+
+extern const sigset_t maskset;		/* all maskable signals */
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _LIBAIO_H */
+#endif	/* _ASYNCIO_H */

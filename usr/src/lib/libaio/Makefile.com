@@ -25,50 +25,36 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY=	libaio.a
-VERS=		.1
-
-COBJS= 		aio.o	\
-		posix_aio.o	\
-		scalls.o	\
-		sig.o	\
-		subr.o	\
-		ma.o
-
-OBJECTS=	$(COBJS) $(MOBJS)
+LIBRARY = libaio.a
+VERS = .1
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-SRCS=		$(COBJS:%.o=../common/%.c)
+MAPFILES=	mapfile-vers $(MAPFILE-FLTR)
+MAPOPTS=	$(MAPFILES:%=-M %)
+
+DYNFLAGS +=	-F libc.so.1 $(MAPOPTS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
-MAPDIR =	../spec/$(TRANSMACH)
-SPECMAPFILE =	$(MAPDIR)/mapfile
+$(LINTLIB) :=	SRCS = $(SRCDIR)/llib-laio
 
-# Setting LIBAIO_DEBUG = -DDEBUG (make LIBAIO_DEBUG=-DDEBUG ...)
-# enables ASSERT() checking and other verification in the library.
-# This is automatically enabled for DEBUG builds, not for non-debug builds.
-LIBAIO_DEBUG =
-$(NOT_RELEASE_BUILD)LIBAIO_DEBUG = -DDEBUG
 
-CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	$(LIBAIO_DEBUG) -D_REENTRANT -I.. -I$(SRCDIR) -I../../common/inc
+# Redefine shared object build rule to use $(LD) directly (this avoids .init
+# and .fini sections being added).  Also, since there are no OBJECTS, turn
+# off CTF.
 
-DYNFLAGS +=	$(ZINTERPOSE)
+BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
+CTFMERGE_LIB=	:
 
 .KEEP_STATE:
 
-all: $(LIBS) fnamecheck
-
-lint: lintcheck
-
 include ../../Makefile.targ
 
-pics/%.o: $(MDIR)/%.s
-	$(BUILD.s)
-	$(POST_PROCESS_O)
+all:	$(LIBS)
+
+lint:
+
+$(DYNLIB):	$(MAPFILES)

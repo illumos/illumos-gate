@@ -38,7 +38,8 @@
 #pragma weak	sem_post = _sem_post
 #pragma weak	sem_getvalue = _sem_getvalue
 
-#include "c_synonyms.h"
+#include "synonyms.h"
+#include "mtlib.h"
 #include <sys/types.h>
 #include <semaphore.h>
 #include <synch.h>
@@ -52,7 +53,6 @@
 #include <unistd.h>
 #include <thread.h>
 #include "pos4obj.h"
-#include "pos4.h"
 
 typedef	struct	semaddr {
 	struct	semaddr	*sad_next;	/* next in the link */
@@ -63,7 +63,7 @@ typedef	struct	semaddr {
 
 static long semvaluemax = 0;
 static semaddr_t *semheadp = NULL;
-mutex_t semlock = DEFAULTMUTEX;
+static mutex_t semlock = DEFAULTMUTEX;
 
 sem_t *
 _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
@@ -122,34 +122,30 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 	if ((cr_flag & DFILE_CREATE) != 0) {
 		if (ftruncate64(fd, (off64_t)sizeof (sem_t)) < 0)
 			goto out;
-
 	} else {
-		(void) mutex_lock(&semlock);
-
 		/*
 		 * if this semaphore has already been opened, inode
 		 * will indicate then return the same semaphore address
 		 */
+		lmutex_lock(&semlock);
 		for (next = semheadp; next != NULL; next = next->sad_next) {
 			if (statbuf.st_ino == next->sad_inode &&
-				strcmp(path, next->sad_name) == 0) {
-
+			    strcmp(path, next->sad_name) == 0) {
 				(void) __close_nc(fd);
-				(void) mutex_unlock(&semlock);
+				lmutex_unlock(&semlock);
 				(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);
-				return ((sem_t *)next->sad_addr);
+				return (next->sad_addr);
 			}
 		}
-		(void) mutex_unlock(&semlock);
+		lmutex_unlock(&semlock);
 	}
 
 
 	/* new sem descriptor to be allocated and new address to be mapped */
-	if ((next = (semaddr_t *)malloc(sizeof (semaddr_t))) == NULL) {
+	if ((next = malloc(sizeof (semaddr_t))) == NULL) {
 		errno = ENOMEM;
 		goto out;
 	}
-
 	cr_flag |= ALLOC_MEM;
 
 	/* LINTED */
@@ -157,33 +153,31 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 				MAP_SHARED, fd, (off64_t)0);
 	(void) __close_nc(fd);
 	cr_flag &= ~DFILE_OPEN;
-
 	if (sem == MAP_FAILED)
 		goto out;
-
 	cr_flag |= DFILE_MMAP;
 
-	/* add to the list pointed by semheadp */
-	next->sad_next = semheadp;
-	semheadp = next;
-	next->sad_addr = sem;
-	next->sad_inode = statbuf.st_ino;
-	(void) strcpy(next->sad_name, path);
-
-	/* initialize it by jumping through the jump table */
+	/* if created, initialize */
 	if (cr_flag & DFILE_CREATE) {
-		if ((error = sema_init((sema_t *)sem, value, USYNC_PROCESS, 0))
-		    != 0) {
+		error = sema_init((sema_t *)sem, value, USYNC_PROCESS, 0);
+		if (error) {
 			errno = error;
 			goto out;
 		}
 	}
 
-	if (__pos4obj_unlock(path, SEM_LOCK_TYPE) < 0)
-		return (SEM_FAILED);
-
-	return (sem);
-
+	if (__pos4obj_unlock(path, SEM_LOCK_TYPE) == 0) {
+		/* add to the list pointed by semheadp */
+		lmutex_lock(&semlock);
+		next->sad_next = semheadp;
+		semheadp = next;
+		next->sad_addr = sem;
+		next->sad_inode = statbuf.st_ino;
+		(void) strcpy(next->sad_name, path);
+		lmutex_unlock(&semlock);
+		return (sem);
+	}
+	/* fall into the error case */
 out:
 	error = errno;
 	if ((cr_flag & DFILE_OPEN) != 0)
@@ -191,12 +185,11 @@ out:
 	if ((cr_flag & DFILE_CREATE) != 0)
 		(void) __pos4obj_unlink(path, SEM_DATA_TYPE);
 	if ((cr_flag & ALLOC_MEM) != 0)
-		free((caddr_t)next);
+		free(next);
 	if ((cr_flag & DFILE_MMAP) != 0)
 		(void) munmap((caddr_t)sem, sizeof (sem_t));
-
-	errno = error;
 	(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);
+	errno = error;
 	return (SEM_FAILED);
 }
 
@@ -206,18 +199,17 @@ _sem_close(sem_t *sem)
 	semaddr_t	**next;
 	semaddr_t	*freeit;
 
-	(void) mutex_lock(&semlock);
-
+	lmutex_lock(&semlock);
 	for (next = &semheadp; (freeit = *next) != NULL;
 	    next = &(freeit->sad_next)) {
 		if (freeit->sad_addr == sem) {
 			*next = freeit->sad_next;
-			free((caddr_t)freeit);
-			(void) mutex_unlock(&semlock);
+			lmutex_unlock(&semlock);
+			free(freeit);
 			return (munmap((caddr_t)sem, sizeof (sem_t)));
 		}
 	}
-	(void) mutex_unlock(&semlock);
+	lmutex_unlock(&semlock);
 	errno = EINVAL;
 	return (-1);
 }
