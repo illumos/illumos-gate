@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,10 @@
 /*
  * adt_event.h
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Automatically generated code; do not edit
+ * AUTOMATICALLY GENERATED CODE; DO NOT EDIT; CONTACT AUDIT PROJECT
  *
  * This is an evolving interface; additions will be made without
  * notice.  It is also part of a contract private interface and
@@ -58,7 +57,7 @@ enum	adt_fail_value {
 	ADT_FAIL_VALUE_PW_ATTR = 1000,	/* Attribute update */
 	ADT_FAIL_VALUE_PW,		/* Password update */
 	ADT_FAIL_VALUE_USERNAME,		/* bad username */
-	ADT_FAIL_VALUE_AUTH,		/* bad auth. */
+	ADT_FAIL_VALUE_AUTH,		/* authorization failed */
 	ADT_FAIL_VALUE_UID,		/* bad uid */
 	ADT_FAIL_VALUE_UNKNOWN,		/* unknown failure */
 	ADT_FAIL_VALUE_EXPIRED,		/* password expired */
@@ -114,6 +113,7 @@ enum	adt_login_text {
 #define	ADT_prof_cmd		24
 #define	ADT_rlogin		28
 #define	ADT_role_login		13
+#define	ADT_role_logout		40
 #define	ADT_scheduledjob_add	14
 #define	ADT_scheduledjob_delete	15
 #define	ADT_scheduledjob_modify	16
@@ -124,6 +124,7 @@ enum	adt_login_text {
 #define	ADT_serialport_modify	19
 #define	ADT_ssh			2
 #define	ADT_su			30
+#define	ADT_su_logout		39
 #define	ADT_telnet		29
 #define	ADT_uauth		20
 #define	ADT_usermgr_add		21
@@ -297,6 +298,11 @@ struct adt_role_login {	/* ADT_role_login */
 };
 typedef struct adt_role_login adt_role_login_t;
 
+struct adt_role_logout {	/* ADT_role_logout */
+	int	dummy;	/* not used */
+};
+typedef struct adt_role_logout adt_role_logout_t;
+
 struct adt_scheduledjob_add {	/* ADT_scheduledjob_add */
 	char 	*object_name;	/* required */
 	char 	*domain;	/* optional */
@@ -371,6 +377,11 @@ struct adt_su {	/* ADT_su */
 };
 typedef struct adt_su adt_su_t;
 
+struct adt_su_logout {	/* ADT_su_logout */
+	int	dummy;	/* not used */
+};
+typedef struct adt_su_logout adt_su_logout_t;
+
 struct adt_telnet {	/* ADT_telnet */
 	enum adt_login_text	message;	/*  optional  */
 };
@@ -442,6 +453,7 @@ union adt_event_data {
 		adt_prof_cmd_t	adt_prof_cmd;
 		adt_rlogin_t	adt_rlogin;
 		adt_role_login_t	adt_role_login;
+		adt_role_logout_t	adt_role_logout;
 		adt_scheduledjob_add_t	adt_scheduledjob_add;
 		adt_scheduledjob_delete_t	adt_scheduledjob_delete;
 		adt_scheduledjob_modify_t	adt_scheduledjob_modify;
@@ -452,6 +464,7 @@ union adt_event_data {
 		adt_serialport_modify_t	adt_serialport_modify;
 		adt_ssh_t	adt_ssh;
 		adt_su_t	adt_su;
+		adt_su_logout_t	adt_su_logout;
 		adt_telnet_t	adt_telnet;
 		adt_uauth_t	adt_uauth;
 		adt_usermgr_add_t	adt_usermgr_add;

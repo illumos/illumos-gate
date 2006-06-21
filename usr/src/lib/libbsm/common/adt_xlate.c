@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,10 @@
 /*
  * adt_xlate.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Automatically generated code; do not edit
+ * AUTOMATICALLY GENERATED CODE; DO NOT EDIT; CONTACT AUDIT PROJECT
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,15 +38,10 @@
 
 static datadef	adr0[1] =	{{ADT_MSG, ADT_LIST_LOGIN_TEXT}};
 static datadef	adr1[1] =	{{ADT_CHARSTAR, sizeof (char *)}};
-static datadef	adr2[4] =	{{ADT_UINT32, sizeof (uint32_t)},
-				{ADT_UINT16, sizeof (uint16_t)},
-				{ADT_UINT16, sizeof (uint16_t)},
-				{ADT_UINT32ARRAY, 4 * sizeof (uint32_t)}};
-static datadef	adr3[1] =	{{ADT_PRIVSTAR, sizeof (priv_set_t *)}};
-static datadef	adr4[3] =	{{ADT_INT, sizeof (int)},
+static datadef	adr2[3] =	{{ADT_INT, sizeof (int)},
 				{ADT_CHAR2STAR, sizeof (char **)},
 				{ADT_CHAR2STAR, sizeof (char **)}};
-static datadef	adr5[8] =	{{ADT_UID, sizeof (uid_t)},
+static datadef	adr3[8] =	{{ADT_UID, sizeof (uid_t)},
 				{ADT_UID, sizeof (uid_t)},
 				{ADT_GID, sizeof (gid_t)},
 				{ADT_UID, sizeof (uid_t)},
@@ -55,6 +49,11 @@ static datadef	adr5[8] =	{{ADT_UID, sizeof (uid_t)},
 				{ADT_PID, sizeof (pid_t)},
 				{ADT_UINT32, sizeof (au_asid_t)},
 				{ADT_TERMIDSTAR, sizeof (au_tid_addr_t *)}};
+static datadef	adr4[1] =	{{ADT_PRIVSTAR, sizeof (priv_set_t *)}};
+static datadef	adr5[4] =	{{ADT_UINT32, sizeof (uint32_t)},
+				{ADT_UINT16, sizeof (uint16_t)},
+				{ADT_UINT16, sizeof (uint16_t)},
+				{ADT_UINT32ARRAY, 4 * sizeof (uint32_t)}};
 
 /* External event structure to internal event structure */
 
@@ -151,11 +150,11 @@ static struct entry XX_inetd_connect[6] = {
 		0,	0,	0,	NULL},
 	{AUT_TEXT,	1,	&adr1[0],	&(XX_inetd_connect[2]),
 		0,	0,	0,	NULL},
-	{AUT_TID,	4,	&adr2[0],	&(XX_inetd_connect[3]),
+	{AUT_TID,	4,	&adr5[0],	&(XX_inetd_connect[3]),
 		0,	1,	0,	NULL},
 	{ADT_CMD_ALT,	1,	&adr1[0],	&(XX_inetd_connect[4]),
 		0,	1,	0,	NULL},
-	{ADT_AUT_PRIV_E,	1,	&adr3[0],	&(XX_inetd_connect[5]),
+	{ADT_AUT_PRIV_E,	1,	&adr4[0],	&(XX_inetd_connect[5]),
 		0,	1,	0,	NULL},
 	{AUT_RETURN,	1,	NULL,	NULL,
 		0,	0,	0,	NULL}
@@ -437,13 +436,13 @@ static struct entry XX_prof_cmd[8] = {
 		0,	1,	0,	NULL},
 	{AUT_PATH,	1,	&adr1[0],	&(XX_prof_cmd[3]),
 		0,	1,	0,	NULL},
-	{AUT_CMD,	3,	&adr4[0],	&(XX_prof_cmd[4]),
+	{AUT_CMD,	3,	&adr2[0],	&(XX_prof_cmd[4]),
 		0,	1,	0,	NULL},
-	{AUT_PROCESS,	8,	&adr5[0],	&(XX_prof_cmd[5]),
+	{AUT_PROCESS,	8,	&adr3[0],	&(XX_prof_cmd[5]),
 		0,	1,	0,	NULL},
-	{ADT_AUT_PRIV_L,	1,	&adr3[0],	&(XX_prof_cmd[6]),
+	{ADT_AUT_PRIV_L,	1,	&adr4[0],	&(XX_prof_cmd[6]),
 		0,	0,	0,	NULL},
-	{ADT_AUT_PRIV_I,	1,	&adr3[0],	&(XX_prof_cmd[7]),
+	{ADT_AUT_PRIV_I,	1,	&adr4[0],	&(XX_prof_cmd[7]),
 		0,	0,	0,	NULL},
 	{AUT_RETURN,	1,	NULL,	NULL,
 		0,	0,	0,	NULL}
@@ -487,6 +486,20 @@ static struct translation X_role_login = {
 	3,
 	&XX_role_login[0],
 	&XX_role_login[0]
+};
+static struct entry XX_role_logout[2] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_role_logout[1]),
+		0,	0,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_role_logout = {
+	0,
+	ADT_role_logout,
+	AUE_role_logout,
+	2,
+	&XX_role_logout[0],
+	&XX_role_logout[0]
 };
 static struct entry XX_scheduledjob_add[7] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_scheduledjob_add[1]),
@@ -692,6 +705,20 @@ static struct translation X_su = {
 	&XX_su[0],
 	&XX_su[0]
 };
+static struct entry XX_su_logout[2] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_su_logout[1]),
+		0,	0,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_su_logout = {
+	0,
+	ADT_su_logout,
+	AUE_su_logout,
+	2,
+	&XX_su_logout[0],
+	&XX_su_logout[0]
+};
 static struct entry XX_telnet[3] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_telnet[1]),
 		0,	0,	0,	NULL},
@@ -832,7 +859,7 @@ static struct translation X_zone_state = {
 	&XX_zone_state[0],
 	&XX_zone_state[0]
 };
-struct translation *xlate_table[39] = {
+struct translation *xlate_table[41] = {
 	&X_admin_authenticate,
 	&X_filesystem_add,
 	&X_filesystem_delete,
@@ -854,6 +881,7 @@ struct translation *xlate_table[39] = {
 	&X_prof_cmd,
 	&X_rlogin,
 	&X_role_login,
+	&X_role_logout,
 	&X_scheduledjob_add,
 	&X_scheduledjob_delete,
 	&X_scheduledjob_modify,
@@ -864,6 +892,7 @@ struct translation *xlate_table[39] = {
 	&X_serialport_modify,
 	&X_ssh,
 	&X_su,
+	&X_su_logout,
 	&X_telnet,
 	&X_uauth,
 	&X_usermgr_add,
@@ -897,7 +926,7 @@ static char *msg_fail_value[24] = {
 	"Attribute update",
 	"Password update",
 	"bad username",
-	"bad auth.",
+	"authorization failed",
 	"bad uid",
 	"unknown failure",
 	"password expired",

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,17 +48,17 @@ $(PROG_STATIC) := FILEMODE = 0555
 # A reduced su.static is created, with just enough functionality
 # to satisfy the needs of a single-user login with /usr not mounted.
 # In particular, nss_files.so.1 may be dlopen()'ed at runtime.
-$(ROOTFS_PROG) :=	LDLIBS += -lcmd -lbsm -lpam
+$(ROOTFS_PROG) :=	LDLIBS += -lcmd -lbsm -lpam -lsecdb
 
 # The standard su is fully functional.
 $(PROG) :=	CPPFLAGS += -DDYNAMIC_SU
-$(PROG) :=	LDLIBS += -lcmd -lbsm -lpam 
+$(PROG) :=	LDLIBS += -lcmd -lbsm -lpam -lsecdb
 
 LINTFLAGS += -DDYNAMIC_SU
 
 CLOBBERFILES	+= $(ROOTFS_PROG) $(EMB_PROG)
 
-lint :=		LDLIBS += -lcmd -lbsm -lpam
+lint :=		LDLIBS += -lcmd -lbsm -lpam -lsecdb
 
 .KEEP_STATE:
 

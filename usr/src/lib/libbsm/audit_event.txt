@@ -427,6 +427,8 @@
 6225:AUE_inetd_failrate:inetd failrate:na
 6226:AUE_inetd_ratelimit:inetd ratelimit:na
 6227:AUE_zlogin:login - zlogin:lo
+6228:AUE_su_logout:su logout:lo
+6229:AUE_role_logout:role logout:lo
 #
 # Trusted Solaris/Trusted Extensions user level audit events
 #	9000 -  9999	allocated for Trusted Solaris/Trusted Extensions

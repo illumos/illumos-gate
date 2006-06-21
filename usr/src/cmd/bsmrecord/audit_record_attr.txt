@@ -35,8 +35,8 @@
 
 # first section: general attributes
 
-## skipClass=<class name of items to skip if only in that class>
-##skipClass=no    # uncomment to filter unused events
+# skipClass=<class name of items to skip if only in that class>
+#skipClass=no    # uncomment to filter unused events
 
 # token name abbreviations
 # token=alias:fullname  -- short names for key tokens
@@ -2387,10 +2387,16 @@ label=AUE_rlogin
     comment=success/fail message
 
 label=AUE_role_login
-  program=SMC server
-  title=SMC: role login
+  program=SMC server;/usr/bin/su
+  title=RBAC: role login
   format=[text]1
   comment=error message
+
+label=AUE_role_logout
+  program=/usr/bin/su
+  title=su
+  see=su(1M)
+  format=user
 
 label=AUE_rshd
   program=/usr/sbin/in.rshd
@@ -2497,16 +2503,13 @@ label=AUE_su
   title=su
   see=su(1M)
   format=[text]1
-    comment="success for user" name, or error message
-# See audit_su.c
-#	header,88,2,su,,Fri Nov 09 13:52:18 2001, + 155 msec
-#	subject,tuser1,root,staff,tuser1,staff,10419,497,0 0 tmach2
-#	text,bad auth. for user root
-#	return,failure,2
-#	header,86,2,su,,Fri Nov 09 13:52:26 2001, + 291 msec
-#	subject,tuser1,root,staff,tuser1,staff,10420,497,0 0 tmach2
-#	text,success for user root
-#	return,success,0
+  comment="user name" of failed new user/role
+
+label=AUE_su_logout
+  program=/usr/bin/su
+  title=su
+  see=su(1M)
+  format=user
 
 label=AUE_telnet
   title=telnet login
