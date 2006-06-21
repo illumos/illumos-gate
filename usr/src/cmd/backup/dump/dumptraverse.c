@@ -1,5 +1,5 @@
 /*
- * Copyright 1996, 1998, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -783,7 +783,7 @@ getino(ino)
 	lseek((fd), (((off_t)(offset))*DEV_BSIZE), (whence))
 #else
 #define	DEV_LSEEK(fd, offset, whence) \
-	llseek((fd), (((offset_t)(((unsigned)offset)))*DEV_BSIZE), (whence))
+	llseek((fd), (((offset_t)((offset)))*DEV_BSIZE), (whence))
 #endif
 
 #define	BREAD_FAIL(buf, size)	{ \
