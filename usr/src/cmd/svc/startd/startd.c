@@ -779,7 +779,7 @@ startup(void)
 static void
 usage(const char *name)
 {
-	uu_warn(gettext("usage: %s [-dnq]\n"), name);
+	uu_warn(gettext("usage: %s [-n]\n"), name);
 	exit(UU_EXIT_USAGE);
 }
 

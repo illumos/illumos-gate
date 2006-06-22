@@ -91,12 +91,11 @@
  *			svc.startd(1M) developer has occurred.
  *
  *  Logging configuration
- *    While the logging output can be configured using the -d and -v flags at
- *    invocation, the preferred approach is to set the logging property values
+ *    The preferred approach is to set the logging property values
  *    in the options property group of the svc.startd default instance.  The
  *    valid values are "quiet", "verbose", and "debug".  "quiet" is the default;
  *    "verbose" and "debug" allow LOG_INFO and LOG_DEBUG logging requests to
- *    reach the daemon-specific log, respectively.
+ *    reach the svc.startd.log file, respectively.
  */
 
 #include <sys/stat.h>
