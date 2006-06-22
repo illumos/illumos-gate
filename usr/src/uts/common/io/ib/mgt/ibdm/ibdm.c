@@ -896,6 +896,7 @@ static void
 ibdm_handle_hca_detach(ib_guid_t hca_guid)
 {
 	ibdm_hca_list_t		*head, *prev = NULL;
+	ibdm_dp_gidinfo_t	*gidinfo;
 
 	IBTF_DPRINTF_L4("ibdm",
 	    "\thandle_hca_detach: hca_guid = 0x%llx", hca_guid);
@@ -924,6 +925,28 @@ ibdm_handle_hca_detach(ib_guid_t hca_guid)
 	mutex_exit(&ibdm.ibdm_hl_mutex);
 	if (ibdm_uninit_hca(head) != IBDM_SUCCESS)
 		(void) ibdm_handle_hca_attach(hca_guid);
+
+	/*
+	 * Now clean up the HCA lists in the gidlist.
+	 */
+	for (gidinfo = ibdm.ibdm_dp_gidlist_head; gidinfo; gidinfo =
+	    gidinfo->gl_next) {
+		prev = NULL;
+		head = gidinfo->gl_hca_list;
+		while (head) {
+			if (head->hl_hca_guid == hca_guid) {
+				if (prev == NULL)
+					gidinfo->gl_hca_list =
+					    head->hl_next;
+				else
+					prev->hl_next = head->hl_next;
+
+				break;
+			}
+			prev = head;
+			head = head->hl_next;
+		}
+	}
 
 	mutex_enter(&ibdm.ibdm_mutex);
 	ibdm.ibdm_busy &= ~IBDM_BUSY;
@@ -6052,7 +6075,7 @@ ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		ret = ibmf_saa_gid_to_pathrecords(port->pa_sa_hdl, sgid, dgid,
 		    IBMF_SAA_PKEY_WC, 0, B_TRUE, &npaths, 0, &path_len, &path);
 
-		if ((ret != IBMF_SUCCESS) && path) {
+		if ((ret != IBMF_SUCCESS) || path == NULL) {
 			IBTF_DPRINTF_L4(ibdm_string,
 			    "\treset_gidinfo : no paths");
 			kmem_free(pi, pi_len);

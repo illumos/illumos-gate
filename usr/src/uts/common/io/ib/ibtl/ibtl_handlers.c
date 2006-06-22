@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -608,7 +607,7 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 		    ibt_hca != NULL;
 		    ibt_hca = ibt_hca->ha_clnt_link) {
 
-			/* Managers are handled below */
+			/* Managers are handled above */
 			if (IBTL_HCA2MODI_P(ibt_hca)->mi_async_handler ==
 			    ibtl_cm_async_handler)
 				continue;
@@ -1407,8 +1406,8 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 		if ((clntp->clnt_modinfop->mi_clnt_class != IBT_DM) &&
 		    (clntp->clnt_modinfop->mi_clnt_class != IBT_IBMA)) {
 			IBTF_DPRINTF_L4(ibtf_handlers,
-			    "ibtl_announce_new_hca: generic Class %x",
-			    clntp->clnt_modinfop->mi_clnt_class);
+			    "ibtl_announce_new_hca: Calling %s ",
+			    clntp->clnt_modinfop->mi_clnt_name);
 			if (clntp->clnt_modinfop->mi_async_handler) {
 				_NOTE(NO_COMPETING_THREADS_NOW)
 				new_hcap = kmem_alloc(sizeof (*new_hcap),
@@ -1460,11 +1459,6 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 	ibtl_hca_t		*ibt_hca;
 	ibtl_clnt_t		*clntp;
 	int			retval;
-	int			ibdm_done = 0;
-	int			ibcm_done = 0;
-#ifdef _NOT_READY
-	ibt_async_event_t	async_event;
-#endif
 
 	IBTF_DPRINTF_L2(ibtf_handlers, "ibtl_detach_all_clients(%llX)",
 	    hcaguid);
@@ -1503,6 +1497,7 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 		cv_wait(&hca_devp->hd_async_task_cv, &ibtl_clnt_list_mutex);
 	}
 	/* Go thru the clients and check if any have not closed this HCA. */
+	retval = 0;
 	ibt_hca = hca_devp->hd_clnt_list;
 	while (ibt_hca != NULL) {
 		clntp = ibt_hca->ha_clnt_devp;
@@ -1512,56 +1507,47 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 			    "client '%s' failed to close the HCA.",
 			    ibt_hca->ha_clnt_devp->clnt_modinfop->mi_clnt_name);
 			retval = 1;
-			goto bailout;
 		}
 		ibt_hca = ibt_hca->ha_clnt_link;
 	}
+	if (retval == 1)
+		goto bailout;
 
-	/* Next inform CM and DM asynchronously */
+	/* Next inform IBDM asynchronously */
 	ibt_hca = hca_devp->hd_clnt_list;
 	while (ibt_hca != NULL) {
 		clntp = ibt_hca->ha_clnt_devp;
-		if (clntp->clnt_modinfop->mi_clnt_class != IBT_IBMA) {
+		if (clntp->clnt_modinfop->mi_clnt_class == IBT_DM) {
 			++ibt_hca->ha_clnt_devp->clnt_async_cnt;
 			mutex_enter(&ibtl_async_mutex);
 			ibt_hca->ha_async_cnt++;
 			mutex_exit(&ibtl_async_mutex);
 			hca_devp->hd_async_task_cnt++;
-			if (clntp->clnt_modinfop->mi_clnt_class == IBT_DM)
-			    ibdm_done = 1;
-			if (clntp->clnt_modinfop->mi_clnt_class == IBT_CM)
-			    ibcm_done = 1;
 
 			(void) taskq_dispatch(ibtl_async_taskq,
 			    ibtl_hca_client_async_task, ibt_hca, TQ_SLEEP);
 		}
 		ibt_hca = ibt_hca->ha_clnt_link;
 	}
-#ifdef _NOT_READY
-	/* this code will likely cause a recursive mutex panic */
-	mutex_enter(&ibtl_clnt_list_mutex);
-	if (ibdm_done == 0 && ibtl_dm_async_handler != NULL) {
-		bzero(&async_event, sizeof (async_event));
-		async_event.ev_hca_guid = hcaguid;
-		ibtl_dm_async_handler(ibtl_dm_clnt_private, NULL,
-		    IBT_HCA_DETACH_EVENT, &async_event);
-	}
-	if (ibcm_done == 0 && ibtl_cm_async_handler != NULL) {
-		bzero(&async_event, sizeof (async_event));
-		async_event.ev_hca_guid = hcaguid;
-		ibtl_cm_async_handler(ibtl_cm_clnt_private, NULL,
-		    IBT_HCA_DETACH_EVENT, &async_event);
-	}
-	mutex_exit(&ibtl_clnt_list_mutex);
-#else
-	/* make sure lint does not complain */
-	IBTF_DPRINTF_L5(ibtf_handlers, "ibtl_detach_all_clients: "
-	    "DM done %d, CM done %d", ibdm_done, ibcm_done);
-#endif
-
-	/* wait for CM and DM to complete */
+	/* wait for IBDM to complete */
 	while (hca_devp->hd_async_task_cnt != 0) {
 		cv_wait(&hca_devp->hd_async_task_cv, &ibtl_clnt_list_mutex);
+	}
+
+	/*
+	 * Next inform IBCM.
+	 * As IBCM doesn't perform ibt_open_hca(), IBCM will not be
+	 * accessible via hca_devp->hd_clnt_list.
+	 * ibtl_cm_async_handler will NOT be NULL, if IBCM is registered.
+	 */
+	if (ibtl_cm_async_handler) {
+		ibtl_tell_mgr(hca_devp, ibtl_cm_async_handler,
+		    ibtl_cm_clnt_private);
+
+		/* wait for all tasks to complete */
+		while (hca_devp->hd_async_task_cnt != 0)
+			cv_wait(&hca_devp->hd_async_task_cv,
+			    &ibtl_clnt_list_mutex);
 	}
 
 	/* Go thru the clients and check if any have not closed this HCA. */
@@ -1575,10 +1561,11 @@ ibtl_detach_all_clients(ibtl_hca_devinfo_t *hca_devp)
 			    "client '%s' failed to close the HCA.",
 			    ibt_hca->ha_clnt_devp->clnt_modinfop->mi_clnt_name);
 			retval = 1;
-			goto bailout;
 		}
 		ibt_hca = ibt_hca->ha_clnt_link;
 	}
+	if (retval == 1)
+		goto bailout;
 
 	/* Finally, inform IBMA */
 	ibt_hca = hca_devp->hd_clnt_list;
