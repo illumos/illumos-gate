@@ -203,6 +203,9 @@ COMMON_SUBDIRS= \
 	SUNWipfr  \
 	SUNWipfu  \
 	SUNWipoib \
+	SUNWippcore \
+	SUNWipplr \
+	SUNWipplu \
 	SUNWixgb \
 	SUNWkrbr \
 	SUNWkrbu \
@@ -210,6 +213,8 @@ COMMON_SUBDIRS= \
 	SUNWllc \
 	SUNWllcr\
 	SUNWlldap \
+	SUNWlp-cmds \
+	SUNWlpr-cmds \
 	SUNWkey  \
 	SUNWloc  \
 	SUNWmdar \
@@ -245,6 +250,7 @@ COMMON_SUBDIRS= \
 	SUNWypr \
 	SUNWypu \
 	SUNWpamsc \
+	SUNWpapi \
 	SUNWpcelx \
 	SUNWpcmci  \
 	SUNWpcmcu  \
@@ -275,6 +281,8 @@ COMMON_SUBDIRS= \
 	SUNWpppgS \
 	SUNWpsdpr \
 	SUNWpsf	\
+	SUNWpsm-ipp \
+	SUNWpsm-lpd \
 	SUNWpmu \
 	SUNWpsr	\
 	SUNWpsu	\

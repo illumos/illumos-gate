@@ -44,7 +44,7 @@
 #include "misc.h"
 
 /* print NS include */
-#include <print/ns.h>
+#include <ns.h>
 
 
 static char *

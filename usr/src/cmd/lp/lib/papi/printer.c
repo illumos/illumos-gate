@@ -59,8 +59,8 @@ papiPrinterListFree(papi_printer_t *printers)
 }
 
 papi_status_t
-papiPrintersList(papi_service_t handle, const char **requested_attrs,
-		const papi_filter_t *filter, papi_printer_t **printers)
+papiPrintersList(papi_service_t handle, char **requested_attrs,
+		papi_filter_t *filter, papi_printer_t **printers)
 {
 	service_t *svc = handle;
 	printer_t *p = NULL;
@@ -139,9 +139,9 @@ papiPrintersList(papi_service_t handle, const char **requested_attrs,
 }
 
 papi_status_t
-papiPrinterQuery(papi_service_t handle, const char *name,
-		const char **requested_attrs,
-		const papi_attribute_t **job_attrs,
+papiPrinterQuery(papi_service_t handle, char *name,
+		char **requested_attrs,
+		papi_attribute_t **job_attrs,
 		papi_printer_t *printer)
 {
 	papi_status_t pst;
@@ -165,6 +165,22 @@ papiPrinterQuery(papi_service_t handle, const char *name,
 		return (PAPI_TEMPORARY_ERROR);
 
 	dest = printer_name_from_uri_id(name, -1);
+
+	if (strcmp(dest, "_default") == 0) {
+		static char *_default;
+
+		if (_default == NULL) {
+			int fd;
+			static char buf[128];
+
+			if ((fd = open("/etc/lp/default", O_RDONLY)) >= 0) {
+				read(fd, buf, sizeof (buf));
+				close(fd);
+				_default = strtok(buf, " \t\n");
+			}
+		}
+		dest = _default;
+	}
 
 	if (isprinter(dest) != 0) {
 		pst = lpsched_printer_configuration_to_attributes(svc, p, dest);
@@ -202,7 +218,7 @@ papiPrinterQuery(papi_service_t handle, const char *name,
 				reject_reason, reject_date);
 	} else if (strcmp(dest, "PrintService") == 0) {
 		/* fill the printer object with service information */
-		lpsched_service_information(p);
+		lpsched_service_information(&p->attributes);
 	} else
 		return (PAPI_NOT_FOUND);
 
@@ -212,19 +228,108 @@ papiPrinterQuery(papi_service_t handle, const char *name,
 }
 
 papi_status_t
-papiPrinterModify(papi_service_t handle, const char *name,
-		const papi_attribute_t **attributes, papi_printer_t *result)
+papiPrinterAdd(papi_service_t handle, char *name,
+		papi_attribute_t **attributes, papi_printer_t *result)
 {
-	service_t *svc = handle;
+	papi_status_t status;
+	printer_t *p = NULL;
+	char *dest;
 
-	if ((svc == NULL) || (name == NULL) || (attributes == NULL))
+	if ((handle == NULL) || (name == NULL) || (attributes == NULL))
 		return (PAPI_BAD_ARGUMENT);
 
-	return (PAPI_OPERATION_NOT_SUPPORTED);
+	dest = printer_name_from_uri_id(name, -1);
+
+	if (isprinter(dest) != 0) {
+		status = lpsched_add_modify_printer(handle, dest,
+							attributes, 0);
+
+		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
+			lpsched_printer_configuration_to_attributes(handle, p,
+									dest);
+		else
+			status = PAPI_TEMPORARY_ERROR;
+
+	} else if (isclass(dest) != 0) {
+		status = lpsched_add_modify_class(handle, dest, attributes);
+
+		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
+			lpsched_class_configuration_to_attributes(handle, p,
+									dest);
+		else
+			status = PAPI_TEMPORARY_ERROR;
+
+	} else
+		status = PAPI_NOT_FOUND;
+
+	free(dest);
+
+	return (status);
 }
 
 papi_status_t
-papiPrinterPause(papi_service_t handle, const char *name, const char *message)
+papiPrinterModify(papi_service_t handle, char *name,
+		papi_attribute_t **attributes, papi_printer_t *result)
+{
+	papi_status_t status;
+	printer_t *p = NULL;
+	char *dest;
+
+	if ((handle == NULL) || (name == NULL) || (attributes == NULL))
+		return (PAPI_BAD_ARGUMENT);
+
+	dest = printer_name_from_uri_id(name, -1);
+
+	if (isprinter(dest) != 0) {
+		status = lpsched_add_modify_printer(handle, dest,
+							attributes, 1);
+
+		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
+			lpsched_printer_configuration_to_attributes(handle, p,
+									dest);
+		else
+			status = PAPI_TEMPORARY_ERROR;
+	} else if (isclass(dest) != 0) {
+		status = lpsched_add_modify_class(handle, dest, attributes);
+
+		if ((*result = p = calloc(1, sizeof (*p))) != NULL)
+			lpsched_class_configuration_to_attributes(handle, p,
+									dest);
+		else
+			status = PAPI_TEMPORARY_ERROR;
+	} else
+		status = PAPI_NOT_FOUND;
+
+	free(dest);
+
+	return (status);
+}
+
+papi_status_t
+papiPrinterRemove(papi_service_t handle, char *name)
+{
+	papi_status_t result;
+	char *dest;
+
+	if ((handle == NULL) || (name == NULL))
+		return (PAPI_BAD_ARGUMENT);
+
+	dest = printer_name_from_uri_id(name, -1);
+
+	if (isprinter(dest) != 0) {
+		result = lpsched_remove_printer(handle, dest);
+	} else if (isclass(dest) != 0) {
+		result = lpsched_remove_class(handle, dest);
+	} else
+		result = PAPI_NOT_FOUND;
+
+	free(dest);
+
+	return (result);
+}
+
+papi_status_t
+papiPrinterDisable(papi_service_t handle, char *name, char *message)
 {
 	papi_status_t result;
 
@@ -237,7 +342,7 @@ papiPrinterPause(papi_service_t handle, const char *name, const char *message)
 }
 
 papi_status_t
-papiPrinterResume(papi_service_t handle, const char *name)
+papiPrinterEnable(papi_service_t handle, char *name)
 {
 	papi_status_t result;
 
@@ -250,7 +355,33 @@ papiPrinterResume(papi_service_t handle, const char *name)
 }
 
 papi_status_t
-papiPrinterPurgeJobs(papi_service_t handle, const char *name, papi_job_t **jobs)
+papiPrinterPause(papi_service_t handle, char *name, char *message)
+{
+	papi_status_t result;
+
+	if ((handle == NULL) || (name == NULL))
+		return (PAPI_BAD_ARGUMENT);
+
+	result = lpsched_reject_printer(handle, name, message);
+
+	return (result);
+}
+
+papi_status_t
+papiPrinterResume(papi_service_t handle, char *name)
+{
+	papi_status_t result;
+
+	if ((handle == NULL) || (name == NULL))
+		return (PAPI_BAD_ARGUMENT);
+
+	result = lpsched_accept_printer(handle, name);
+
+	return (result);
+}
+
+papi_status_t
+papiPrinterPurgeJobs(papi_service_t handle, char *name, papi_job_t **jobs)
 {
 	service_t *svc = handle;
 	papi_status_t result = PAPI_OK_SUBST;
@@ -263,10 +394,10 @@ papiPrinterPurgeJobs(papi_service_t handle, const char *name, papi_job_t **jobs)
 		return (PAPI_BAD_ARGUMENT);
 
 	dest = printer_name_from_uri_id(name, -1);
-	if (snd_msg(svc, S_CANCEL, dest, "", "") < 0)
-		return (PAPI_SERVICE_UNAVAILABLE);
-
+	more = snd_msg(svc, S_CANCEL, dest, "", "");
 	free(dest);
+	if (more < 0)
+		return (PAPI_SERVICE_UNAVAILABLE);
 
 	do {
 		if (rcv_msg(svc, R_CANCEL, &more, &status, &req_id) < 0)
@@ -300,9 +431,9 @@ papiPrinterPurgeJobs(papi_service_t handle, const char *name, papi_job_t **jobs)
 }
 
 papi_status_t
-papiPrinterListJobs(papi_service_t handle, const char *name,
-		const char **requested_attrs, const int type_mask,
-		const int max_num_jobs, papi_job_t **jobs)
+papiPrinterListJobs(papi_service_t handle, char *name,
+		char **requested_attrs, int type_mask,
+		int max_num_jobs, papi_job_t **jobs)
 {
 	service_t *svc = handle;
 	char *dest;

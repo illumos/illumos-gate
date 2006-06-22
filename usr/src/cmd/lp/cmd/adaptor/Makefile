@@ -38,7 +38,7 @@ include         ../../Makefile.lp
 ROOTLIBDIR=	$(ROOT)/usr/lib/print/bsd-adaptor
 
 CPPFLAGS +=	-I$(LPINC)
-CPPFLAGS +=	-I$(SRC)/lib
+CPPFLAGS +=	-I$(SRC)/lib/print/libprint/common
 LDLIBS +=	-lprint -z lazyload -ltsol -z nolazyload -lc
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/msgs -llpmsg
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/class -llpcls

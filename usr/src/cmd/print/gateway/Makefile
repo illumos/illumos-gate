@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,19 +29,29 @@
 
 include 	../Makefile.sp
 
-MANIFEST=	rfc1179.xml
-
+MANIFEST=		rfc1179.xml cleanup.xml
 ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
+ROOTMETHOD=				$(ROOTLIBSVCMETHOD)/print-cleanup
+$(ROOTLIBSVCMETHOD)/print-cleanup	:=	FILEMODE=555
+
+ROOTLIBPRINT=		$(ROOTLIB)/print
+$(ROOTLIBPRINT)		:=	OWNER=root
+$(ROOTLIBPRINT)		:=	GROUP=lp
+
+PRINTDPROG=		printd
+PRINTDSRCS=		printd.c
+PRINTDOBJS=		$(PRINTDSRCS:.c=.o)
+$(PRINTDPROG)		:=	LDLIBS +=	$(LIBNPRT)
+$(ROOTLIBPRINT)/$(PRINTDPROG)		:=	FILEMODE=	555
+
+INLPDPROG=		in.lpd
+INLPDSRCS= 		main.c adaptor.c
+INLPDOBJS=		$(INLPDSRCS:.c=.o)
+$(INLPDPROG)		:=	LDLIBS +=	-lsocket -lnsl $(LIBNPRT)
+
 SUBDIRS=	translators
-
-PROG=		in.lpd
-
-SRCS= 		main.c adaptor.c
-
-OBJS=		$(SRCS:.c=.o)
-
 
 FILEMODE=	0555
 OWNER=		root
@@ -50,31 +59,39 @@ GROUP=		bin
 
 
 CPPFLAGS +=	-I. -I$(NPRTINC) #$(CPPFLAGS.master)
-LDLIBS +=	-lsocket -lnsl $(LIBNPRT)
 
 .KEEP_STATE:
 
-all:		$(PROG) $(SUBDIRS)
+all:		$(PRINTDPROG) $(INLPDPROG) $(SUBDIRS)
 
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+$(PRINTDPROG):	$(PRINTDOBJS)
+		$(LINK.c) $(PRINTDOBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all $(ROOTLIBPRINTPROG) $(SUBDIRS) $(ROOTMANIFEST)
+$(INLPDPROG):	$(INLPDOBJS)
+		$(LINK.c) $(INLPDOBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+ROOTLIBPRINTPROG=	$(PRINTDPROG:%=$(ROOTLIBPRINT)/%) \
+			$(INLPDPROG:%=$(ROOTLIBPRINT)/%)
+
+install:	all $(ROOTLIBPRINTPROG) $(SUBDIRS) $(ROOTMANIFEST) \
+		$(ROOTMETHOD) $(ROOTLIBPRINT)
 
 check:	$(CHKMANIFEST)
 
 strip:		$(SUBDIRS)
-		$(STRIP) $(PROG)
+		$(STRIP) $(PRINTDPROG) $(INLPDPROG)
 
 cstyle:
-		cstyle $(SRCS)
+		cstyle $(PRINTDSRCS) $(INLPDSRCS)
 
 lint:
-		$(LINT.c) $(SRCS) $(LDLIBS)
+		$(LINT.c) $(PRINTDSRCS) $(LDLIBS)
+		$(LINT.c) $(INLPDSRCS) $(LDLIBS)
 
 clean clobber:	$(SUBDIRS)
-		$(RM) $(OBJS)
+		$(RM) $(PRINTDOBJS) $(INLPDOBJS)
 
 _msg:
 		@echo "Messages are made in usr/src/cmd/print"
@@ -83,3 +100,18 @@ $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+
+
+# 
+# PRINTSYMLINK=	$(ROOTLIB)/print/printd
+# 
+# FILEMODE=	04511
+# OWNER=		root
+# 
+# CPPFLAGS +=	-I$(NPRTINC)
+# LDLIBS +=	$(LIBNPRT)
+# 
+# install:	all $(ROOTBIN) $(ROOTLIB)/print $(ROOTBINPROG) \
+# 		$(ROOTUSRBINSYMLINK) $(ROOTUSRUCBSYMLINK) $(PRINTSYMLINK) \
+# 		$(ROOTMANIFEST) $(ROOTMETHOD)

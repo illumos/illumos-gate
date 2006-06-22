@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
@@ -34,8 +32,8 @@ VERS=.1
 
 LPSCHED_OBJS =	lpsched-msgs.o lpsched-service.o lpsched-printers.o \
 		lpsched-jobs.o lpsched-misc.o
-OBJECTS =	$(LPSCHED_OBJS) \
-		list.o attribute.o status.o service.o printer.o job.o
+OBJECTS =	$(LPSCHED_OBJS) service.o printer.o job.o ppd.o library.o
+		
 
 include		../../../../lib/Makefile.lib
 include         ../../Makefile.lp
@@ -44,7 +42,7 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/print
 
 CPPFLAGS =	-I.
 CPPFLAGS +=	-I$(LPINC)
-CPPFLAGS +=	-I$(SRC)/lib
+CPPFLAGS +=	-I$(SRC)/lib/print/libpapi-common/common
 CPPFLAGS +=	-D_REENTRANT
 CPPFLAGS +=	$(ENVCPPFLAGS1)
 CPPFLAGS +=	$(ENVCPPFLAGS2)
@@ -55,11 +53,12 @@ LDLIBS	+=	-L$(SRC)/cmd/lp/lib/class -llpcls
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/requests -llpreq
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/secure -llpsec
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/forms -llpfrm
+LDLIBS	+=	-L$(SRC)/cmd/lp/lib/access -llpacc
 LDLIBS	+=	-L$(SRC)/cmd/lp/lib/lp -llp
 
-MAPFILES=	mapfile-vers
+MAPFILES=	mapfile
 MAPOPTS=	$(MAPFILES:%=-M%)
-DYNFLAGS +=	$(MAPOPTS)
+DYNFLAGS +=	$(BDIRECT) $(MAPOPTS)
 
 
 LIBS = $(DYNLIB)

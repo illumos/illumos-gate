@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,24 +44,13 @@ i preremove
 #
 d none usr 0755 root sys
 d none usr/bin 0755 root bin
-f none usr/bin/cancel 4511 root lp
-s none usr/bin/disable=../sbin/accept
-s none usr/bin/enable=../sbin/accept
-f none usr/bin/lp 4511 root lp
-f none usr/bin/lpc 555 root lp
 f none usr/bin/lpget 0511 root lp
-s none usr/bin/lpq=lpstat
-s none usr/bin/lpr=lp
-s none usr/bin/lprm=cancel
 f none usr/bin/lpset 4511 root lp
-f none usr/bin/lpstat 4511 root lp
 f none usr/bin/lptest 555 root lp
 d none usr/lib 0755 root bin
-s none usr/lib/accept=../sbin/accept
 f none usr/lib/libprint.so.2 0755 root bin
 s none usr/lib/libprint.so=./libprint.so.2
 s none usr/lib/lpadmin=../sbin/lpadmin
-s none usr/lib/lpmove=../sbin/lpmove
 s none usr/lib/lpsystem=../sbin/lpsystem
 d none usr/lib/print 0755 root lp
 d none usr/lib/print/bsd-adaptor 0755 root lp
@@ -75,11 +63,7 @@ f none usr/lib/print/in.lpd 0555 root bin
 f none usr/lib/print/conv_fix 0555 root lp
 f none usr/lib/print/conv_lp 0555 root lp
 f none usr/lib/print/conv_lpd 0555 root lp
-s none usr/lib/print/printd=../../bin/lp
-s none usr/lib/reject=../sbin/accept
+f none usr/lib/print/printd 0555 root bin
 d none usr/sbin 0755 root bin
-f none usr/sbin/accept 0555 root lp
 f none usr/sbin/lpadmin 0555 root lp
-f none usr/sbin/lpmove 4511 root lp
 f none usr/sbin/lpsystem 0555 root lp
-s none usr/sbin/reject=../sbin/accept

@@ -44,14 +44,14 @@ papi_status_t
 job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 		papi_attribute_t **attributes)
 {
+	papi_status_t status = PAPI_OK;
 	papi_attribute_t *attr;
+	papi_attribute_t **unmapped = NULL;
 	int i;
 	char *s;
 
 	char **options = NULL;
 	char **modes = NULL;
-	char *class = NULL;
-	char *job_name = NULL;
 
 	char pr_filter = 0;
 	char *pr_title = NULL;
@@ -59,26 +59,36 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	int pr_indent = -1;
 	int numberUp = 0;
 	int orientation = 0;
-	int lowerPage = 0;
-	int upperPage = 0;
-	papi_status_t getResult = 0;
+	int lower = 0;
+	int upper = 0;
 	char buf[256];
 	void *iterator = NULL;
-
-	char banner = 0;
+	char *mapped_keys[] = { "copies", "document-format", "form",
+			"job-class", "job-hold-until", "job-host", "job-name",
+			"job-originating-user-name", "job-printer",
+			"job-sheets", "lp-charset", "lp-modes", "number-up",
+			"orienttation-requested", "page-ranges", "pr-filter",
+			"pr-indent", "pr-title", "pr-width", "priority",
+			"requesting-user-name", NULL };
 
 	if (attributes == NULL)
 		return (PAPI_BAD_ARGUMENT);
 
-	papiAttributeListGetString(attributes, NULL, "job-printer",
-				&r->destination);
+	/* replace the current destination */
+	papiAttributeListGetLPString(attributes,
+			"job-printer", &r->destination);
 
+	/* set the copies.  We need at least 1 */
 	i = r->copies;
 	papiAttributeListGetInteger(attributes, NULL, "copies", &i);
 	if (i <= 0)
 		i = 1;
 	r->copies = i;
 
+	/*
+	 * set the priority.  PAPI/IPP uses 1-100, lpsched use 0-39, so we
+	 * have to convert it.
+	 */
 	if (papiAttributeListGetInteger(attributes, NULL, "priority", &i)
 			== PAPI_OK) {
 		if ((i < 1) || (i > 100))
@@ -86,55 +96,40 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 		i = (i + 1) / 2.5;
 		r->priority = i;
 	}
-
 	if ((r->priority < 0) || (r->priority > 39))
 		r->priority = 20;
 
-	/*
-	 * 'media' size should be processed both in the lpsched filter and
-	 * the foomatic filter (if present) so that we ensure the result of
-	 * other options like 'page-ranges' are consistent.
-	 */
-/*
- * TODO - I thing we should really have this but I can't get it to filter
- *        so its commented out for now (paulcun)
- *	papiAttributeListGetString(attributes, NULL, "media", &r->form);
- */
+	/* set the requested form to print on */
+	papiAttributeListGetLPString(attributes, "form", &r->form);
 
+	/* set the page range */
 #ifndef LP_USE_PAPI_ATTR
-	papiAttributeListGetString(attributes, NULL, "page-ranges", &r->pages);
+	papiAttributeListGetLPString(attributes, "page-ranges", &r->pages);
 #else
-	getResult =
-	    papiAttributeListGetRange(attributes, &iterator,
-		"page-ranges", &lowerPage, &upperPage);
-	while (getResult == PAPI_OK) {
-		if (r->pages == NULL) {
-			snprintf(buf, sizeof (buf),
-				"%d-%d", lowerPage, upperPage);
-			r->pages = (char *)strdup(buf);
-		}
-		else
-		{
+	for (status = papiAttributeListGetRange(attributes, &iterator,
+				"page-ranges", &lower, &upper);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetRange(attributes, &iterator,
+				"page-ranges", &lower, &upper)) {
+		if (r->pages != NULL) {
 			snprintf(buf, sizeof (buf), "%s,%d-%d",
-				r->pages, lowerPage, upperPage);
+					r->pages, lower, upper);
 			free(r->pages);
-			r->pages = (char *)strdup(buf);
-		}
-		/*
-		 * get the next value; note the attribute 'name' is set to
-		 * NULL to do this.
-		 */
-		getResult =
-		    papiAttributeListGetRange(attributes, &iterator,
-			"page-ranges", &lowerPage, &upperPage);
+		} else
+			snprintf(buf, sizeof (buf), "%d-%d", lower, upper);
+		r->pages = (char *)strdup(buf);
 	}
 #endif
 
-
+	/*
+	 * set the document format, converting to old format names as
+	 * as needed.
+	 */
 	s = NULL;
 	papiAttributeListGetString(attributes, NULL, "document-format", &s);
 	if (s != NULL)
 		r->input_type = strdup(mime_type_to_lp_type(s));
+
 
 	/*
 	 * If we don't have an owner, set one.
@@ -165,6 +160,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 		r->user = strdup(user);
 	}
 
+	/* set any held state */
 	s = NULL;
 	papiAttributeListGetString(attributes, NULL, "job-hold-until", &s);
 	if (s != NULL) {
@@ -178,7 +174,8 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 			r->actions |= ACT_HOLD;
 	}
 
-	papiAttributeListGetString(attributes, NULL, "lp-charset", &r->charset);
+	/* set lp charset/printwheel */
+	papiAttributeListGetLPString(attributes, "lp-charset", &r->charset);
 
 	/* legacy pr(1) filter related garbage "lpr -p" */
 	papiAttributeListGetBoolean(attributes, NULL, "pr-filter", &pr_filter);
@@ -208,12 +205,16 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	"pr(1) filter options specified without enabling pr(1) filter"));
 
 	/* add burst page information */
-	papiAttributeListGetBoolean(attributes, NULL, "job-sheets", &banner);
-	papiAttributeListGetString(attributes, NULL, "job-class", &class);
-	papiAttributeListGetString(attributes, NULL, "job-name", &job_name);
-
-	{
+	s = NULL;
+	papiAttributeListGetString(attributes, NULL, "job-sheets", &s);
+	if ((s != NULL) && (strcasecmp(s, "none") == 0)) {
 		char buf[128];
+		char *class = NULL;
+		char *job_name = NULL;
+
+		papiAttributeListGetLPString(attributes, "job-class", &class);
+		papiAttributeListGetLPString(attributes, "job-name", &job_name);
+
 		/* burst page is enabled by default, add the title */
 		snprintf(buf, sizeof (buf), "%s%s%s",
 			(job_name ? job_name : ""),
@@ -224,26 +225,8 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 				free(r->title);
 			r->title = strdup(buf);
 		}
-	}
-	if (banner == 0) /* burst page is disabled via lp "option" */
+	} else	/* burst page is disabled via lp "option" */
 		appendlist(&options, "nobanner");
-
-	/* add "lp -o" options */
-	attr = papiAttributeListFind(attributes, "lp-options");
-	if ((attr != NULL) && (attr->type == PAPI_STRING) &&
-	    (attr->values != NULL)) {
-		int i;
-
-		for (i = 0; attr->values[i] != NULL; i++)
-			appendlist(&options, attr->values[i]->string);
-	}
-
-	if (options != NULL) {
-		if (r->options != NULL)
-			free(r->options);
-		r->options = sprintlist(options);
-		freelist(options);
-	}
 
 	/* Convert attribute "number-up" to mode group=n */
 	papiAttributeListGetInteger(attributes, NULL, "number-up", &numberUp);
@@ -260,45 +243,15 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 				    "orientation-requested", &orientation);
 	if ((orientation >= 3) && (orientation <= 6)) {
 		switch (orientation) {
-			case 3:
-			{
-				/* 3 = portrait */
-				appendlist(&modes, "portrait");
-				break;
-			}
-
-			case 4:
-			{
-				/* 4 = landscape */
-				appendlist(&modes, "landscape");
-				break;
-			}
-
-			case 5:
-			{
-				/*
-				 * 5 = reverse-landscape - not supported in
-				 *    lpsched so just use 'landscape' for now
-				 */
-				appendlist(&modes, "landscape");
-				break;
-			}
-
-			case 6:
-			{
-				/*
-				 * 6 = reverse-portrait not supported in
-				 *    lpsched so just use 'portrait' for now
-				 */
-				appendlist(&modes, "portrait");
-				break;
-			}
-
-			default:
-			{
-				appendlist(&modes, "portrait");
-				break;
-			}
+		case 4:	/* landscape */
+		case 5:	/* reverse-landscape, use landscape instead */
+			appendlist(&modes, "landscape");
+			break;
+		case 3:	/* portrait */
+		case 6: /* reverse-portrait, use portrait instead */
+		default:
+			appendlist(&modes, "portrait");
+			break;
 		}
 	}
 
@@ -317,6 +270,29 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 			free(r->modes);
 		r->modes = sprintlist(modes);
 		freelist(modes);
+	}
+
+	/* add any unconsumed attributes to the "options" list */
+	split_and_copy_attributes(mapped_keys, attributes, NULL, &unmapped);
+	if (unmapped != NULL) {	/* convert them to lp options */
+		char *buf = malloc(1024);
+		ssize_t size = 1024;
+
+		while (papiAttributeListToString(unmapped, ", ", buf, size)
+					!= PAPI_OK) {
+			size += 1024;
+			buf = realloc(buf, size);
+		}
+		appendlist(&options, buf);
+		free(buf);
+		papiAttributeListFree(unmapped);
+	}
+
+	if (options != NULL) {
+		if (r->options != NULL)
+			free(r->options);
+		r->options = sprintlist(options);
+		freelist(options);
 	}
 
 	return (PAPI_OK);
@@ -388,26 +364,16 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
 				"copies", r->copies);
 
 	/* destination */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "printer-name",
-				r->destination);
-
-	/* file_list */
-	addLPStrings(&j->attributes, PAPI_ATTR_REPLACE,
-				"lpsched-files", r->file_list);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"printer-name", r->destination);
 
 	/* form */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "media", r->form);
-
-	/* actions */
-	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-					"lpsched-actions", r->actions);
-
-	/* alert */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "lp-alert", r->alert);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"form", r->form);
 
 	/* options */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE,
-					"lp-options", r->options);
+	papiAttributeListFromString(&j->attributes, PAPI_ATTR_APPEND,
+				r->options);
 
 	tmp = (((r->options != NULL) && (strstr(r->options, "nobanner")
 		!= NULL)) ? "none" : "standard");
@@ -429,32 +395,29 @@ lpsched_request_to_job_attributes(REQUEST *r, job_t *j)
 				"job-priority", (int)((r->priority + 1) * 2.5));
 
 	/* pages */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "page-ranges", r->pages);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"page-ranges", r->pages);
 
 	/* charset */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "lp-charset",
-				r->charset);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"lp-charset", r->charset);
 
 	/* modes */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "lp-modes", r->modes);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"lp-modes", r->modes);
 
 	/* title */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE, "job-name", r->title);
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
+				"job-name", r->title);
 
 	/* input_type */
 
 	/* user */
-	addLPString(&j->attributes, PAPI_ATTR_REPLACE,
+	papiAttributeListAddLPString(&j->attributes, PAPI_ATTR_REPLACE,
 				"job-originating-user-name", r->user);
 
 	/* outcome */
-	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-				"lpsched-outcome", r->outcome);
 	lpsched_request_outcome_to_attributes(&j->attributes, r->outcome);
-
-	/* version */
-	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-				"lpsched-version", r->version);
 
 	/* constants, (should be derived from options) */
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
@@ -476,7 +439,7 @@ job_status_to_attributes(job_t *job, char *req_id, char *user, char *slabel,
 	char buf[BUFSIZ];
 	char *p;
 
-	addLPString(&job->attributes, PAPI_ATTR_REPLACE,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-originating-user-name", user);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-k-octets", size/1024);
@@ -486,10 +449,12 @@ job_status_to_attributes(job_t *job, char *req_id, char *user, char *slabel,
 		papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-id", atoi(++p));
 	}
-	snprintf(buf, sizeof (buf), "lpsched://%s/%d", destination, atoi(p));
+	snprintf(buf, sizeof (buf), "lpsched://localhost/printers/%s/%d",
+			destination, atoi(p));
 	papiAttributeListAddString(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-uri", buf);
-	snprintf(buf, sizeof (buf), "lpsched://%s", destination);
+	snprintf(buf, sizeof (buf), "lpsched://localhost/printers/%s",
+			destination);
 	papiAttributeListAddString(&job->attributes, PAPI_ATTR_REPLACE,
 				"job-printer-uri", buf);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
@@ -498,25 +463,26 @@ job_status_to_attributes(job_t *job, char *req_id, char *user, char *slabel,
 				"output-device-assigned", destination);
 	papiAttributeListAddString(&job->attributes, PAPI_ATTR_REPLACE,
 				"printer-name", destination);
-	addLPString(&job->attributes, PAPI_ATTR_REPLACE, "media", form);
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
+				"form", form);
 
 	lpsched_request_outcome_to_attributes(&job->attributes, state);
 
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"time-at-creation", date);
-	addLPString(&job->attributes, PAPI_ATTR_REPLACE,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
 				"lpsched-request-id", req_id);
-	addLPString(&job->attributes, PAPI_ATTR_REPLACE,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
 				"lp-charset", charset);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"lpsched-job-state", state);
 	papiAttributeListAddInteger(&job->attributes, PAPI_ATTR_REPLACE,
 				"number-of-intervening-jobs", rank - 1);
-	addLPString(&job->attributes, PAPI_ATTR_REPLACE,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_REPLACE,
 				"lpsched-file", file);
-	addLPString(&job->attributes, PAPI_ATTR_EXCL,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_EXCL,
 				"job-name", file);
-	addLPString(&job->attributes, PAPI_ATTR_EXCL,
+	papiAttributeListAddLPString(&job->attributes, PAPI_ATTR_EXCL,
 				"tsol-sensitivity-label", slabel);
 }
 

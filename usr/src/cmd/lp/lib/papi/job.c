@@ -35,11 +35,22 @@
 #include <sys/stat.h>
 #include <papi_impl.h>
 
+
+/*
+ * for an older application that may have been linked with a pre-v1.0
+ * PAPI implementation.
+ */
+papi_status_t
+papiAttributeListAdd(papi_attribute_t ***attrs, int flags, char *name,
+		papi_attribute_value_type_t type, papi_attribute_value_t *value)
+{
+	return (papiAttributeListAddValue(attrs, flags, name, type, value));
+}
+
 #ifdef LP_USE_PAPI_ATTR
-static papi_status_t psm_modifyAttrsFile(const papi_attribute_t **attrs,
-    char *file);
-static papi_status_t psm_modifyAttrsList(char *file,
-    const papi_attribute_t **attrs, papi_attribute_t ***newAttrs);
+static papi_status_t psm_modifyAttrsFile(papi_attribute_t **attrs, char *file);
+static papi_status_t psm_modifyAttrsList(char *file, papi_attribute_t **attrs,
+					papi_attribute_t ***newAttrs);
 #endif
 
 
@@ -104,12 +115,6 @@ papiJobGetId(papi_job_t job)
 	return (result);
 }
 
-papi_job_ticket_t *
-papiJobGetJobTicket(papi_job_t job)
-{
-	return (NULL);	/* NOT SUPPORTED */
-}
-
 static REQUEST *
 create_request(papi_service_t svc, char *printer, papi_attribute_t **attributes)
 {
@@ -158,7 +163,7 @@ authorized(service_t *svc, int32_t id)
 }
 
 static papi_status_t
-copy_file(const char *from, char *to)
+copy_file(char *from, char *to)
 {
 	int ifd, ofd;
 	char buf[BUFSIZ];
@@ -199,23 +204,18 @@ copy_file(const char *from, char *to)
  */
 
 static papi_status_t
-psm_copy_attrsToFile(const papi_attribute_t **attrs, char *file)
+psm_copy_attrsToFile(papi_attribute_t **attrs, char *file)
 
 {
 	papi_status_t result = PAPI_OK;
-	FILE *out = NULL;
 
-	if ((attrs != NULL) && (*attrs != NULL))
-	{
-		out = fopen(file, "w");
-		if (out != NULL)
-		{
-			papiAttributeListPrint(
-			    out, "", (papi_attribute_t **)attrs);
+	if ((attrs != NULL) && (*attrs != NULL)) {
+		FILE *out = NULL;
+
+		if ((out = fopen(file, "w")) != NULL) {
+			papiAttributeListPrint(out, attrs, "");
 			fclose(out);
-		}
-		else
-		{
+		} else {
 			result = PAPI_NOT_POSSIBLE;
 		}
 	}
@@ -238,7 +238,7 @@ psm_copy_attrsToFile(const papi_attribute_t **attrs, char *file)
  */
 
 static papi_status_t
-psm_modifyAttrsFile(const papi_attribute_t **attrs, char *file)
+psm_modifyAttrsFile(papi_attribute_t **attrs, char *file)
 
 {
 	papi_status_t result = PAPI_OK;
@@ -246,61 +246,46 @@ psm_modifyAttrsFile(const papi_attribute_t **attrs, char *file)
 	struct stat   tmpBuf;
 	FILE *fd = NULL;
 
-	if ((attrs != NULL) && (*attrs != NULL) && (file != NULL))
-	{
+	if ((attrs != NULL) && (*attrs != NULL) && (file != NULL)) {
 
 		/*
 		 * check file exist before try to modify it, if it doesn't
 		 * exist assume there is an error
 		 */
-		if (stat(file, &tmpBuf) == 0)
-		{
+		if (stat(file, &tmpBuf) == 0) {
 			/*
 			 * if file is currently empty just write the given
 			 * attributes to the file otherwise exact the attributes
 			 * from the file and modify them accordingly before
 			 * writing them back to the file
 			 */
-			if (tmpBuf.st_size == 0)
-			{
-printf("psm_modifyAttrsFile() @1 - empty attribute file\n");
+			if (tmpBuf.st_size == 0) {
 				newAttrs = (papi_attribute_t **)attrs;
 
 				fd = fopen(file, "w");
-				if (fd != NULL)
-				{
+				if (fd != NULL) {
 					papiAttributeListPrint(fd,
-								"", newAttrs);
+							newAttrs, "");
 					fclose(fd);
-				}
-				else
-				{
+				} else {
 					result = PAPI_NOT_POSSIBLE;
 				}
-			}
-			else
-			{
-printf("psm_modifyAttrsFile() @2 - modify file\n");
+			} else {
 				result =
 				    psm_modifyAttrsList(file, attrs, &newAttrs);
 
 				fd = fopen(file, "w");
-				if (fd != NULL)
-				{
+				if (fd != NULL) {
 					papiAttributeListPrint(fd,
-								"", newAttrs);
+								newAttrs, "");
 					fclose(fd);
-				}
-				else
-				{
+				} else {
 					result = PAPI_NOT_POSSIBLE;
 				}
 
 				papiAttributeListFree(newAttrs);
 			}
-		}
-		else
-		{
+		} else {
 			result = PAPI_NOT_POSSIBLE;
 		}
 	}
@@ -324,7 +309,7 @@ printf("psm_modifyAttrsFile() @2 - modify file\n");
  */
 
 static papi_status_t
-psm_modifyAttrsList(char *file, const papi_attribute_t **attrs,
+psm_modifyAttrsList(char *file, papi_attribute_t **attrs,
     papi_attribute_t ***newAttrs)
 
 {
@@ -341,39 +326,30 @@ psm_modifyAttrsList(char *file, const papi_attribute_t **attrs,
 	int n = 0;
 
 	fd = fopen(file, "r");
-	if (fd != NULL)
-	{
+	if (fd != NULL) {
 		fD = fileno(fd);
 		a = &aBuff[0];
 		p = &aBuff[0];
 		count = read(fD, &aBuff[0], sizeof (aBuff) - 1);
-		while ((result == PAPI_OK) && (count > 0))
-		{
+		while ((result == PAPI_OK) && (count > 0)) {
 			aBuff[count+n] = '\0';
-			if (count == sizeof (aBuff) - n - 1)
-			{
+			if (count == sizeof (aBuff) - n - 1) {
 				p = strrchr(aBuff, '\n');
-				if (p != NULL)
-				{
+				if (p != NULL) {
 					/* terminate at last complete line */
 					*p = '\0';
 				}
 			}
-printf("psm_modifyAttrsList() @3 - aBuff=\n");
-printf("%s\n", aBuff);
 			result = papiAttributeListFromString(
 				newAttrs, PAPI_ATTR_EXCL, aBuff);
-printf("psm_modifyAttrsList() @4 - result=%d\n", result);
 
-			if (result == PAPI_OK)
-			{
+			if (result == PAPI_OK) {
 				/*
 				 * handle any part lines and then read the next
 				 * buffer from the file
 				 */
 				n = 0;
-				if (p != a)
-				{
+				if (p != a) {
 					p++; /* skip NL */
 					n = sizeof (aBuff) - 1 - (p - a);
 					strncpy(aBuff, p, n);
@@ -389,13 +365,11 @@ printf("psm_modifyAttrsList() @4 - result=%d\n", result);
 	/* now modify the attribute list with the new attributes in 'attrs' */
 
 	nextAttr = papiAttributeListGetNext((papi_attribute_t **)attrs, &iter);
-	while ((result == PAPI_OK) && (nextAttr != NULL))
-	{
+	while ((result == PAPI_OK) && (nextAttr != NULL)) {
 		values = nextAttr->values;
 
-		if ((values != NULL) && (*values != NULL))
-		{
-			result = papiAttributeListAdd(newAttrs,
+		if ((values != NULL) && (*values != NULL)) {
+			result = papiAttributeListAddValue(newAttrs,
 						    PAPI_ATTR_REPLACE,
 						    nextAttr->name,
 						    nextAttr->type, *values);
@@ -403,9 +377,8 @@ printf("psm_modifyAttrsList() @4 - result=%d\n", result);
 		}
 
 		while ((result == PAPI_OK) &&
-			(values != NULL) && (*values != NULL))
-		{
-			result = papiAttributeListAdd(newAttrs,
+			(values != NULL) && (*values != NULL)) {
+			result = papiAttributeListAddValue(newAttrs,
 						    PAPI_ATTR_APPEND,
 						    nextAttr->name,
 						    nextAttr->type, *values);
@@ -421,10 +394,10 @@ printf("psm_modifyAttrsList() @4 - result=%d\n", result);
 
 
 papi_status_t
-papiJobSubmit(papi_service_t handle, const char *printer,
-		const papi_attribute_t **job_attributes,
-		const papi_job_ticket_t *job_ticket,
-		const char **files, papi_job_t *job)
+papiJobSubmit(papi_service_t handle, char *printer,
+		papi_attribute_t **job_attributes,
+		papi_job_ticket_t *job_ticket,
+		char **files, papi_job_t *job)
 {
 	papi_status_t status;
 	service_t *svc = handle;
@@ -526,10 +499,10 @@ papiJobSubmit(papi_service_t handle, const char *printer,
 }
 
 papi_status_t
-papiJobSubmitByReference(papi_service_t handle, const char *printer,
-		const papi_attribute_t **job_attributes,
-		const papi_job_ticket_t *job_ticket,
-		const char **files, papi_job_t *job)
+papiJobSubmitByReference(papi_service_t handle, char *printer,
+		papi_attribute_t **job_attributes,
+		papi_job_ticket_t *job_ticket,
+		char **files, papi_job_t *job)
 {
 	service_t *svc = handle;
 	job_t *j;
@@ -620,10 +593,10 @@ papiJobSubmitByReference(papi_service_t handle, const char *printer,
 }
 
 papi_status_t
-papiJobValidate(papi_service_t handle, const char *printer,
-		const papi_attribute_t **job_attributes,
-		const papi_job_ticket_t *job_ticket,
-		const char **files, papi_job_t *job)
+papiJobValidate(papi_service_t handle, char *printer,
+		papi_attribute_t **job_attributes,
+		papi_job_ticket_t *job_ticket,
+		char **files, papi_job_t *job)
 {
 	papi_status_t status;
 	papi_attribute_t **attributes = NULL;
@@ -635,7 +608,7 @@ papiJobValidate(papi_service_t handle, const char *printer,
 		list_append(&attributes, job_attributes[i]);
 
 	status = papiJobSubmitByReference(handle, printer,
-				(const papi_attribute_t **)attributes,
+				(papi_attribute_t **)attributes,
 				job_ticket, files, job);
 	if (status == PAPI_OK) {
 		int id = papiJobGetId(*job);
@@ -651,9 +624,9 @@ papiJobValidate(papi_service_t handle, const char *printer,
 }
 
 papi_status_t
-papiJobStreamOpen(papi_service_t handle, const char *printer,
-		const papi_attribute_t **job_attributes,
-		const papi_job_ticket_t *job_ticket, papi_stream_t *stream)
+papiJobStreamOpen(papi_service_t handle, char *printer,
+		papi_attribute_t **job_attributes,
+		papi_job_ticket_t *job_ticket, papi_stream_t *stream)
 {
 	papi_status_t status;
 	service_t *svc = handle;
@@ -716,7 +689,7 @@ papiJobStreamOpen(papi_service_t handle, const char *printer,
 
 papi_status_t
 papiJobStreamWrite(papi_service_t handle,
-		papi_stream_t stream, const void *buffer, const size_t buflen)
+		papi_stream_t stream, void *buffer, size_t buflen)
 {
 	service_t *svc = handle;
 	job_stream_t *s = stream;
@@ -769,8 +742,8 @@ papiJobStreamClose(papi_service_t handle,
 }
 
 papi_status_t
-papiJobQuery(papi_service_t handle, const char *printer, const int32_t job_id,
-		const char **requested_attrs,
+papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
+		char **requested_attrs,
 		papi_job_t *job)
 {
 	service_t *svc = handle;
@@ -824,7 +797,51 @@ papiJobQuery(papi_service_t handle, const char *printer, const int32_t job_id,
 }
 
 papi_status_t
-papiJobCancel(papi_service_t handle, const char *printer, const int32_t job_id)
+papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
+		char *destination)
+{
+	papi_status_t result = PAPI_OK;
+	service_t *svc = handle;
+	char req_id[64];
+	char *queue;
+	char *user = NULL;
+
+	if ((svc == NULL) || (printer == NULL) || (job_id < 0) ||
+	    (destination == NULL))
+		return (PAPI_BAD_ARGUMENT);
+
+	queue = printer_name_from_uri_id(printer, job_id);
+	snprintf(req_id, sizeof (req_id), "%s-%d", queue, job_id);
+	free(queue);
+
+	if (papiAttributeListGetString(svc->attributes, NULL, "user-name",
+			&user) == PAPI_OK) {
+		REQUEST *r = getrequest(req_id);
+
+		if ((r != NULL) && (r->user != NULL) &&
+		    (strcmp(r->user, user) != 0))
+			result = PAPI_NOT_AUTHORIZED;
+		freerequest(r);
+	}
+
+	if (result == PAPI_OK) {
+		short status = MOK;
+		char *dest = printer_name_from_uri_id(destination, -1);
+
+		if ((snd_msg(svc, S_MOVE_REQUEST, req_id, dest) < 0) ||
+		    (rcv_msg(svc, R_MOVE_REQUEST, &status) < 0))
+			status = MTRANSMITERR;
+
+		free(dest);
+
+		result = lpsched_status_to_papi_status(status);
+	}
+
+	return (result);
+}
+
+papi_status_t
+papiJobCancel(papi_service_t handle, char *printer, int32_t job_id)
 {
 	papi_status_t result = PAPI_OK;
 	service_t *svc = handle;
@@ -843,7 +860,8 @@ papiJobCancel(papi_service_t handle, const char *printer, const int32_t job_id)
 			&user) == PAPI_OK) {
 		REQUEST *r = getrequest(req_id);
 
-		if ((r != NULL) && (strcmp(r->user, user) != 0))
+		if ((r != NULL) && (r->user != NULL) &&
+		    (strcmp(r->user, user) != 0))
 			result = PAPI_NOT_AUTHORIZED;
 		freerequest(r);
 	}
@@ -862,8 +880,8 @@ papiJobCancel(papi_service_t handle, const char *printer, const int32_t job_id)
 }
 
 papi_status_t
-hold_release_job(papi_service_t handle, const char *printer,
-		const int32_t job_id, int flag)
+hold_release_job(papi_service_t handle, char *printer,
+		int32_t job_id, int flag)
 {
 	papi_status_t status;
 	service_t *svc = handle;
@@ -884,16 +902,25 @@ hold_release_job(papi_service_t handle, const char *printer,
 
 	if ((r = getrequest(file)) != NULL) {
 		r->actions &= ~ACT_RESUME;
-		if (flag == 0)
+		switch (flag) {
+		case 0:
 			r->actions |= ACT_HOLD;
-		else
+			break;
+		case 1:
 			r->actions |= ACT_RESUME;
+			break;
+		case 2:
+			r->actions |= ACT_IMMEDIATE;
+			break;
+		}
 		if (putrequest(file, r) < 0) {
 			detailed_error(svc,
 				gettext("failed to write job: %s: %s"),
 				file, strerror(errno));
+			freerequest(r);
 			return (PAPI_DEVICE_ERROR);
 		}
+		freerequest(r);
 	} else {
 		detailed_error(svc, gettext("failed to read job: %s: %s"),
 				file, strerror(errno));
@@ -901,34 +928,31 @@ hold_release_job(papi_service_t handle, const char *printer,
 	}
 
 	status = lpsched_end_change(svc, dest, job_id);
-	freerequest(r);
-	free(dest);
 
 	return (status);
 }
 
 papi_status_t
-papiJobHold(papi_service_t handle, const char *printer, const int32_t job_id,
-		const char *hold_until, const time_t *hold_until_time)
+papiJobHold(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (hold_release_job(handle, printer, job_id, 0));
 }
 
 papi_status_t
-papiJobRelease(papi_service_t handle, const char *printer, const int32_t job_id)
+papiJobRelease(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (hold_release_job(handle, printer, job_id, 1));
 }
 
 papi_status_t
-papiJobRestart(papi_service_t handle, const char *printer, const int32_t job_id)
+papiJobPromote(papi_service_t handle, char *printer, int32_t job_id)
 {
-	return (PAPI_OPERATION_NOT_SUPPORTED);
+	return (hold_release_job(handle, printer, job_id, 2));
 }
 
 papi_status_t
-papiJobModify(papi_service_t handle, const char *printer, const int32_t job_id,
-		const papi_attribute_t **attributes, papi_job_t *job)
+papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
+		papi_attribute_t **attributes, papi_job_t *job)
 {
 	papi_status_t status;
 	job_t *j = NULL;
@@ -989,7 +1013,6 @@ papiJobModify(papi_service_t handle, const char *printer, const int32_t job_id,
 	status = lpsched_end_change(svc, dest, job_id);
 	lpsched_request_to_job_attributes(r, j);
 	freerequest(r);
-	free(dest);
 
 	return (status);
 }
@@ -1000,9 +1023,9 @@ papiJobModify(papi_service_t handle, const char *printer, const int32_t job_id,
 #define	DUMMY_FILE	"/var/spool/lp/fifos/FIFO"
 
 papi_status_t
-papiJobCreate(papi_service_t handle, const char *printer,
-		const papi_attribute_t **job_attributes,
-		const papi_job_ticket_t *job_ticket, papi_job_t *job)
+papiJobCreate(papi_service_t handle, char *printer,
+		papi_attribute_t **job_attributes,
+		papi_job_ticket_t *job_ticket, papi_job_t *job)
 {
 	papi_status_t status;
 	service_t *svc = handle;
@@ -1030,6 +1053,8 @@ papiJobCreate(papi_service_t handle, const char *printer,
 	/* convert the attributes to an lpsched REQUEST structure */
 	request = create_request(svc, (char *)printer,
 				(papi_attribute_t **)job_attributes);
+	if (request == NULL)
+		return (PAPI_TEMPORARY_ERROR);
 	addlist(&request->file_list, DUMMY_FILE);	/* add a dummy file */
 	request->actions |= ACT_HOLD;			/* hold the job */
 
@@ -1046,12 +1071,14 @@ papiJobCreate(papi_service_t handle, const char *printer,
 	if (status != PAPI_OK) {
 		detailed_error(svc, "unable to copy attributes to file: %s: %s",
 				metadata_file, strerror(errno));
+		free(request_id);
 		return (PAPI_DEVICE_ERROR);
 	}
 #endif
 
 	/* store the REQUEST on disk */
 	snprintf(metadata_file, sizeof (metadata_file), "%s-0", request_id);
+	free(request_id);
 	if (putrequest(metadata_file, request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
 			metadata_file, strerror(errno));
@@ -1103,6 +1130,7 @@ papiJobCommit(papi_service_t handle, char *printer, int32_t id)
 			detailed_error(svc,
 				gettext("failed to write job: %s: %s"),
 				metadata_file, strerror(errno));
+			freerequest(r);
 			return (PAPI_DEVICE_ERROR);
 		}
 	} else {
@@ -1113,7 +1141,6 @@ papiJobCommit(papi_service_t handle, char *printer, int32_t id)
 
 	status = lpsched_end_change(svc, dest, id);
 	freerequest(r);
-	free(dest);
 
 	return (status);
 }
@@ -1173,7 +1200,6 @@ papiJobStreamAdd(papi_service_t handle, char *printer, int32_t id,
 	}
 
 	status = lpsched_end_change(svc, dest, id);
-	free(dest);
 
 	if (status != PAPI_OK)
 		return (status);

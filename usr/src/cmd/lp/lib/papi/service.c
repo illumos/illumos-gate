@@ -38,10 +38,10 @@
 #include <tsol/label.h>
 
 papi_status_t
-papiServiceCreate(papi_service_t *handle, const char *service_name,
-		const char *user_name, const char *password,
-		const int (*authCB)(papi_service_t svc),
-		const papi_encryption_t encryption, void *app_data)
+papiServiceCreate(papi_service_t *handle, char *service_name,
+		char *user_name, char *password,
+		int (*authCB)(papi_service_t svc, void *app_data),
+		papi_encryption_t encryption, void *app_data)
 {
 	service_t *svc = NULL;
 	char *path = Lp_FIFO;
@@ -125,7 +125,7 @@ papiServiceSetPeer(papi_service_t handle, int peerfd)
 }
 
 papi_status_t
-papiServiceSetUserName(papi_service_t handle, const char *user_name)
+papiServiceSetUserName(papi_service_t handle, char *user_name)
 {
 	service_t *svc = handle;
 
@@ -137,7 +137,7 @@ papiServiceSetUserName(papi_service_t handle, const char *user_name)
 }
 
 papi_status_t
-papiServiceSetPassword(papi_service_t handle, const char *password)
+papiServiceSetPassword(papi_service_t handle, char *password)
 {
 	service_t *svc = handle;
 
@@ -150,7 +150,7 @@ papiServiceSetPassword(papi_service_t handle, const char *password)
 
 papi_status_t
 papiServiceSetEncryption(papi_service_t handle,
-			const papi_encryption_t encryption)
+			papi_encryption_t encryption)
 {
 	service_t *svc = handle;
 
@@ -163,20 +163,20 @@ papiServiceSetEncryption(papi_service_t handle,
 
 papi_status_t
 papiServiceSetAuthCB(papi_service_t handle,
-			const int (*authCB)(papi_service_t svc))
+			int (*authCB)(papi_service_t svc, void *app_data))
 {
 	service_t *svc = handle;
 
 	if (svc == NULL)
 		return (PAPI_BAD_ARGUMENT);
 
-	svc->authCB = (int (*)(papi_service_t svc))authCB;
+	svc->authCB = (int (*)(papi_service_t svc, void *app_data))authCB;
 
 	return (PAPI_OK);
 }
 
 papi_status_t
-papiServiceSetAppData(papi_service_t handle, const void *app_data)
+papiServiceSetAppData(papi_service_t handle, void *app_data)
 {
 	service_t *svc = handle;
 
@@ -248,6 +248,20 @@ papiServiceGetAppData(papi_service_t handle)
 
 	if (svc != NULL)
 		result = svc->app_data;
+
+	return (result);
+}
+
+papi_attribute_t **
+papiServiceGetAttributeList(papi_service_t handle)
+{
+	service_t *svc = handle;
+	papi_attribute_t **result = NULL;
+
+	if (svc != NULL) {
+		lpsched_service_information(&svc->attributes);
+		result = svc->attributes;
+	}
 
 	return (result);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +35,8 @@
 
 
 papi_status_t
-addLPString(papi_attribute_t ***list, int flags, char *name, char *value)
+papiAttributeListAddLPString(papi_attribute_t ***list, int flags, char *name,
+		char *value)
 {
 	papi_status_t result = PAPI_BAD_ARGUMENT;
 
@@ -47,7 +47,7 @@ addLPString(papi_attribute_t ***list, int flags, char *name, char *value)
 }
 
 papi_status_t
-addLPStrings(papi_attribute_t ***list, int flags, char *name,
+papiAttributeListAddLPStrings(papi_attribute_t ***list, int flags, char *name,
 				char **values)
 {
 	papi_status_t result = PAPI_OK;
@@ -64,8 +64,45 @@ addLPStrings(papi_attribute_t ***list, int flags, char *name,
 	return (result);
 }
 
+void
+papiAttributeListGetLPString(papi_attribute_t **attributes, char *key,
+				char **string)
+{
+	char *value = NULL;
+
+	papiAttributeListGetString(attributes, NULL, key,  &value);
+	if (value != NULL) {
+		if (*string != NULL)
+			free(*string);
+		*string = strdup(value);
+	}
+}
+
+void
+papiAttributeListGetLPStrings(papi_attribute_t **attributes, char *key,
+				char ***strings)
+{
+	papi_status_t status;
+	char **values = NULL;
+	char *value = NULL;
+	void *iter = NULL;
+
+	for (status = papiAttributeListGetString(attributes, &iter,
+				key, &value);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetString(attributes, &iter,
+				NULL, &value))
+		addlist(&values, value);
+
+	if (values != NULL) {
+		if (*strings != NULL)
+			freelist(*strings);
+		*strings = values;
+	}
+}
+
 char *
-printer_name_from_uri_id(const char *uri, int32_t id)
+printer_name_from_uri_id(char *uri, int32_t id)
 {
 	REQUEST *request = NULL;
 	char *result = "";

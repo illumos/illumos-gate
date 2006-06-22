@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -318,6 +317,14 @@ if [ -f /usr/lib/lp/local/$cmd_name ] ; then
 		fi
 		eval $CMD
 		exit_code=$?
+		# add filters to the print server
+		if [ ! -f /etc/lp/filter.table ] ; then
+			cd /etc/lp/fd ; for filter in *.fd ; do
+				/usr/sbin/lpfilter \
+					-f `/usr/bin/basename $filter .fd` \
+					-F $filter
+			done
+		fi
 	fi
 fi
 
@@ -325,20 +332,33 @@ if [ $exit_code != 0 ] ; then
 	exit $exit_code
 fi
 
-
-#	split the "server" into printer and server
+#	process the "server" value
+#	It can be a hostname, UUCP form (server!queue), RCMD form(queue@server),
+#	or in URI form ({scheme}://{endpoint})
+#		
+case "${server}" in
+	*://*)	# URI form
+		uri=${server}
+		rem_printer=`expr "${server}" : ".*://.*/\([^/]*\)"`
+		server=`expr "${server}" : ".*://\([^/]*\)/.*"`
+		;;
+	*@*)	# RCMD form
+		rem_printer=`expr "${server}" : "\(.*\)@.*"`
+		server=`expr "${server}" : ".*@\(.*\)"`
+		;;
+	*!*)	# UUCP form
+		rem_printer=`expr "${server}" : ".*!\(.*\)"`
+		server=`expr "${server}" : "\(.*\)!.*"`
+		;;
+	*)	# hostname
+		rem_printer=${printer}
+		;;
+esac
+# default URI form is "lpd" form
 if [ -n "${server}" ] ; then
-	if [ `echo ${server} | /bin/grep -c !` = 1 ] ; then
-		rem_printer=`echo ${server} | cut -d! -f2`
-	fi
-	server=`echo ${server} | cut -d! -f1`
+	uri=${uri:-"lpd://${server}/printers/${rem_printer}#Solaris"}
+	bsdaddr="${server},${rem_printer},Solaris"
 fi
-
-if [ -z "${rem_printer}" ] ; then
-	rem_printer=${printer}
-fi
-
-
 
 #
 #	Do the Solstice Print Configuration in /etc
@@ -356,10 +376,12 @@ else
    		fi
 	fi
 
-	if [ -n "${printer}" -a -n "${server}" ] ; then
-		${LPSET} -n system \
-			-a "bsdaddr=${server},${rem_printer},Solaris" \
-			${printer}
+	if [ -n "${printer}" -a -n "${uri}" ] ; then
+		${LPSET} -n system -a "printer-uri-supported=${uri}" ${printer}
+		exit_code=$?
+	fi
+	if [ -n "${printer}" -a -n "${bsdaddr}" ] ; then
+		${LPSET} -n system -a "bsdaddr=${bsdaddr}" ${printer}
 		exit_code=$?
 	fi
 	if [ -n "${printer}" -a -n "${description}" ] ; then
@@ -377,14 +399,14 @@ else
 
 #		If the class doesn't already exist in printers.conf, add it.
 
-		if [ -n "${server}" ] ; then
-			CHOST=$server
-		else
-			CHOST=$HOST
-		fi
+		server=${server:-$HOST}
+		uri="lpd://${server}/printers/${class}#Solaris"
+		bsdaddr="${server},${class},Solaris"
 		if [ ${lpget_class} -ne 0 ] ; then
 			${LPSET} -n system \
-				-a "bsdaddr=${CHOST},${class},Solaris" ${class}
+				-a "printer-uri-supported=${uri}" \
+				-a "bsdaddr=${bsdaddr}" \
+				${class}
 			exit_code=$?
 		fi
 	fi

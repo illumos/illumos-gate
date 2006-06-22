@@ -54,7 +54,7 @@ extern "C" {
 
 typedef struct {
 	papi_attribute_t **attributes;
-	int (*authCB)(papi_service_t svc);
+	int (*authCB)(papi_service_t svc, void *app_data);
 	void *app_data;
 	MESG *md;
 	char *msgbuf;
@@ -86,18 +86,27 @@ extern void job_status_to_attributes(job_t *job, char *req_id, char *user,
 				char *charset, short rank, char *file);
 extern papi_status_t addLPString(papi_attribute_t ***list,
 					int flags, char *name, char *value);
-extern papi_status_t addLPStrings(papi_attribute_t ***list,
+extern papi_status_t papiAttributeListAddLPStrings(papi_attribute_t ***list,
 					int flags, char *name, char **values);
+extern void papiAttributeListGetLPString(papi_attribute_t **attributes,
+			char *key, char **string);
+extern void papiAttributeListGetLPStrings(papi_attribute_t **attributes,
+			char *key, char ***string);
+
 extern papi_status_t lpsched_printer_configuration_to_attributes(
 				service_t *svc, printer_t *p, char *dest);
 extern papi_status_t lpsched_class_configuration_to_attributes(service_t *svc,
 	printer_t *p, char *dest);
 extern papi_status_t class_status_to_attributes(printer_t *p, char *printer,
 	short status, char *reject_reason, long reject_date);
+extern papi_status_t lpsched_reject_printer(papi_service_t svc,
+	char *printer, char *message);
+extern papi_status_t lpsched_accept_printer(papi_service_t svc,
+	char *printer);
 extern papi_status_t lpsched_disable_printer(papi_service_t svc,
-	const char *printer, const char *message);
+	char *printer, char *message);
 extern papi_status_t lpsched_enable_printer(papi_service_t svc,
-	const char *printer);
+	char *printer);
 extern papi_status_t lpsched_status_to_papi_status(int status);
 extern papi_status_t job_attributes_to_lpsched_request(papi_service_t svc,
 	REQUEST *r, papi_attribute_t **attributes);
@@ -106,30 +115,31 @@ extern papi_status_t lpsched_alloc_files(papi_service_t svc, int number,
 extern papi_status_t lpsched_commit_job(papi_service_t svc, char *job,
 	char **tmp);
 extern papi_status_t lpsched_start_change(papi_service_t svc,
-	const char *printer, int32_t job_id, char **tmp);
+	char *printer, int32_t job_id, char **tmp);
 extern papi_status_t lpsched_end_change(papi_service_t svc,
-	const char *printer, int32_t job_id);
+	char *printer, int32_t job_id);
 extern papi_status_t printer_status_to_attributes(printer_t *p, char *printer,
 	char *form, char *character_set, char *reject_reason,
 	char *disable_reason, short status, char *request_id, long enable_date,
 	long reject_date);
+extern papi_status_t lpsched_remove_printer(papi_service_t svc, char *dest);
+extern papi_status_t lpsched_remove_class(papi_service_t svc, char *dest);
+extern papi_status_t lpsched_add_modify_printer(papi_service_t svc, char *dest,
+	papi_attribute_t **attributes, int type);
+extern papi_status_t lpsched_add_modify_class(papi_service_t svc, char *dest,
+	papi_attribute_t **attributes);
 
-extern void lpsched_service_information(printer_t *p);
+extern void lpsched_service_information(papi_attribute_t ***attrs);
 extern void lpsched_request_to_job_attributes(REQUEST *r, job_t *j);
 extern void detailed_error(service_t *svc, char *fmt, ...);
 extern char *banner_type(unsigned short banner);
 extern char *mime_type_to_lp_type(char *mime_type);
 extern char *lp_type_to_mime_type(char *lp_type);
-extern char *fifo_name_from_uri(const char *uri);
-extern char *printer_name_from_uri_id(const char *uri, int32_t id);
+extern char *fifo_name_from_uri(char *uri);
+extern char *printer_name_from_uri_id(char *uri, int32_t id);
 
 extern int snd_msg(service_t *svc, int type, ...);
 extern int rcv_msg(service_t *svc, int type, ...);
-
-extern int list_append();
-extern void list_remove();
-
-
 
 #ifdef __cplusplus
 }

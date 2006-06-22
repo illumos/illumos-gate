@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,71 +19,76 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/lp/client/lib/Makefile
-#
 
-LIBRARY =	libprint.a
-VERS=.2
+SUBDIRS = \
+	libprint \
+	libpapi-common \
+	libpapi-dynamic \
+	libpapi-lpd \
+	libipp-core \
+	libhttp-core \
+	libpapi-ipp \
+	libipp-listener \
+	mod_ipp
 
-FILEMODE=	0555
+all :=                  TARGET = all
+clean :=                TARGET = clean
+clobber :=              TARGET = clobber
+install :=              TARGET = install
+install_h :=              TARGET = install_h
+lint :=                 TARGET = lint
 
-NS_CMN =	ns_bsd_addr.o ns_cmn_kvp.o ns_cmn_printer.o
-NS_SWITCH = 	nss_printer.o nss_convert.o nss_write.o nss_ldap.o
-NS_SUPPORT =	ns.o ${NS_CMN} ${NS_SWITCH}
+include $(SRC)/Makefile.master
 
-OBJECTS =	network.o job.o list.o misc.o $(NS_SUPPORT)
+TEXT_DOMAIN=	SUNW_OST_OSLIB
+POFILE= print-lib.po
 
-
-include		../Makefile.lib
-
-MAPFILES=	mapfile-vers
-MAPOPTS=	$(MAPFILES:%=-M %)
-
-CPPFLAGS +=	-I../../head -I../ -I.  -D_REENTRANT
-LDLIBS +=	-lnsl -lsocket -lc -lldap
-DYNFLAGS +=	$(MAPOPTS)
-
-
-LIBS = $(DYNLIB)	# could be += for static and dynamic
-# for messaging catalog
-#
-POFILE= bsd.po
-SRCS= $(OBJECTS:%.o=%.c)
-XGETFLAGS +=-a
- 
 .KEEP_STATE:
-  
-_msg:	$(POFILE)
 
-$(POFILE):      $(SRCS)
-	$(RM)	$@
-	$(COMPILE.cpp)   $(SRCS) > $(POFILE).i
-	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i
-	sed "/^domain/d"        messages.po > $@
-	$(RM) messages.po $(POFILE).i
+all:	$(TXTS) $(SUBDIRS)
 
-all :	$(LIBS) 
+#
+# Each message catalog file is generated in each sub
+# directory and copied to the usr/src/cmd/lp/ directory.
+# Those message catalog files are consolidated into one
+# message catalog file.  The consolidated one will be copied
+# into the $(ROOT)/catalog/SUNW_OST_OSCMD/ directory.
+#
 
-install:	$(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)
+_msg:	$(MSGDOMAIN)
+	@$(RM) $(POFILE)
+	$(XGETTEXT) -s `/bin/find . -type d -name SCCS -prune -o -type f -name '*.c' -print`
+	@/bin/cat messages.po | sed '/domain/d' > $(POFILE)
+	@$(RM) messages.po
+	$(RM)  $(MSGDOMAIN)/$(POFILE)
+	/bin/cp $(POFILE) $(MSGDOMAIN)
 
-# definitions for lint
+install: $(ROOTDIRS) $(ROOTSYMLINKDIRS) $(SUBDIRS)
 
-$(LINTLIB):= SRCS = llib-lprint
-CLEANFILES +=	$(LINTLIB) $(LINTOUT)
+install_h clean strip lint: $(SUBDIRS)
 
-lint:	lintcheck
+clobber: $(SUBDIRS) local_clobber
 
-cstyle:
-	cstyle $(SRCS)
+local_clobber:
+	$(RM) $(CLOBBERFILES) $(POFILE)
 
-strip :
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-$(ROOTLIBDIR):
-	$(INS.dir)
+FRC:
 
-include		../Makefile.targ
+include $(SRC)/Makefile.msg.targ
+
+# Dependencies
+libpapi-dynamic:	libpapi-common
+libpapi-lpd:		libpapi-dynamic
+libipp-core:		libpapi-common
+libpapi-ipp:		libpapi-common libipp-core libhttp-core
+libipp-listener:	libpapi-dynamic libipp-core
+mod_ipp:		libipp-listener
+

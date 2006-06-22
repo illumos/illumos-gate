@@ -37,7 +37,7 @@
 #include <syslog.h>
 
 #include <adaptor.h>
-#include <print/ns.h>
+#include <ns.h>
 
 #ifndef RTLD_GLOBAL	/* for OSF/1 */
 #define	RTLD_GLOBAL	0
