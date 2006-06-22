@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,16 +158,38 @@ static void	r4_dup_check(rnode4_t *, vfs_t *);
 #endif
 
 /*
- * Free the resources associated with an rnode.
+ * If the vnode has pages, run the list and check for any that are
+ * still dangling.  We call this routine before putting an rnode on
+ * the free list.
+ */
+static int
+nfs4_dross_pages(vnode_t *vp)
+{
+	page_t *pp;
+	kmutex_t *vphm;
+
+	vphm = page_vnode_mutex(vp);
+	mutex_enter(vphm);
+	if ((pp = vp->v_pages) != NULL) {
+		do {
+			if (pp->p_fsdata != C_NOCOMMIT) {
+				mutex_exit(vphm);
+				return (1);
+			}
+		} while ((pp = pp->p_vpnext) != vp->v_pages);
+	}
+	mutex_exit(vphm);
+
+	return (0);
+}
+
+/*
+ * Flush any pages left on this rnode.
  */
 static void
-r4inactive(rnode4_t *rp, cred_t *cr)
+r4flushpages(rnode4_t *rp, cred_t *cr)
 {
 	vnode_t *vp;
-	char *contents;
-	int size;
-	vsecattr_t *vsp;
-	vnode_t *xattr;
 	int error;
 
 	/*
@@ -199,6 +220,23 @@ r4inactive(rnode4_t *rp, cred_t *cr)
 		}
 		nfs4_invalidate_pages(vp, (u_offset_t)0, cr);
 	}
+}
+
+/*
+ * Free the resources associated with an rnode.
+ */
+static void
+r4inactive(rnode4_t *rp, cred_t *cr)
+{
+	vnode_t *vp;
+	char *contents;
+	int size;
+	vsecattr_t *vsp;
+	vnode_t *xattr;
+
+	r4flushpages(rp, cr);
+
+	vp = RTOV4(rp);
 
 	/*
 	 * Free any held caches which may be
@@ -824,6 +862,17 @@ again:
 	mutex_exit(&rp->r_os_lock);
 
 	/*
+	 * Before we put it on the freelist, make sure there are no pages.
+	 * If there are, flush and commit of all of the dirty and
+	 * uncommitted pages, assuming the file system isn't read only.
+	 */
+	if (!(vp->v_vfsp->vfs_flag & VFS_RDONLY) && nfs4_dross_pages(vp)) {
+		rw_exit(&rp->r_hashq->r_lock);
+		r4flushpages(rp, cr);
+		goto again;
+	}
+
+	/*
 	 * Before we put it on the freelist, make sure there is no
 	 * active xattr directory cached, the freelist will not
 	 * have its entries r4inactive'd if there is still an active
@@ -850,8 +899,7 @@ again:
 		rp4freelist->r_freeb->r_freef = rp;
 		rp4freelist->r_freeb = rp;
 		if (!nfs4_has_pages(vp) && rp->r_dir == NULL &&
-				rp->r_symlink.contents == NULL &&
-				rp->r_secattr == NULL)
+		    rp->r_symlink.contents == NULL && rp->r_secattr == NULL)
 			rp4freelist = rp;
 	}
 	mutex_exit(&rp4freelist_lock);

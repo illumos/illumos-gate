@@ -14642,39 +14642,6 @@ vtoname(vnode_t *vp, char *fnamep, ssize_t maxlen)
 }
 
 /*
- * If the vnode has pages, run the list and check for
- * any that are still dangling. We call this function
- * before the OTW CLOSE occurs so we can B_INVAL the
- * danglers.
- */
-static int
-nfs4_dross_pages(vnode_t *vp)
-{
-	page_t *pp;
-	kmutex_t *vphm;
-	rnode4_t *rp;
-
-	/* make sure we're looking at the master vnode, not a shadow */
-	rp = VTOR4(vp);
-	if (IS_SHADOW(vp, rp))
-		vp = RTOV4(rp);
-
-	vphm = page_vnode_mutex(vp);
-	mutex_enter(vphm);
-	if ((pp = vp->v_pages) != NULL) {
-		do {
-			if (pp->p_fsdata != C_NOCOMMIT) {
-				mutex_exit(vphm);
-				return (1);
-			}
-		} while ((pp = pp->p_vpnext) != vp->v_pages);
-	}
-	mutex_exit(vphm);
-
-	return (0);
-}
-
-/*
  * Bookkeeping for a close that doesn't need to go over the wire.
  * *have_lockp is set to 0 if 'os_sync_lock' is released; otherwise
  * it is left at 1.
@@ -15246,11 +15213,6 @@ recov_retry:
 	}
 
 	ASSERT(osp->os_ref_count > 1);
-
-	if (!(vp->v_vfsp->vfs_flag & VFS_RDONLY) &&
-		nfs4_dross_pages(vp)) {
-		nfs4_invalidate_pages(vp, 0, cred_otw);
-	}
 
 	/*
 	 * Sixth, try the CLOSE OTW.
