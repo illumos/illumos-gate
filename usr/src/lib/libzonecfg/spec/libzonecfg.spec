@@ -162,6 +162,18 @@ declaration	int zonecfg_set_limitpriv(zone_dochandle_t, char *)
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_get_bootargs
+include		<libzonecfg.h>
+declaration	int zonecfg_get_bootargs(zone_dochandle_t, char *, size_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_set_bootargs
+include		<libzonecfg.h>
+declaration	int zonecfg_set_bootargs(zone_dochandle_t, char *)
+version		SUNWprivate_1.1
+end		
+
 function	zonecfg_add_fs_option
 include		<libzonecfg.h>
 declaration	int zonecfg_add_fs_option(struct zone_fstab *, char *)

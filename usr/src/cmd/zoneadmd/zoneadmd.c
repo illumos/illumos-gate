@@ -240,6 +240,181 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 	}
 }
 
+/*
+ * Emit a warning for any boot arguments which are unrecognized.  Since
+ * Solaris boot arguments are getopt(3c) compatible (see kernel(1m)), we
+ * put the arguments into an argv style array, use getopt to process them,
+ * and put the resultant argument string back into outargs.
+ *
+ * During the filtering, we pull out any arguments which are truly "boot"
+ * arguments, leaving only those which are to be passed intact to the
+ * progenitor process.  The one we support at the moment is -i, which
+ * indicates to the kernel which program should be launched as 'init'.
+ *
+ * A return of Z_INVAL indicates specifically that the arguments are
+ * not valid; this is a non-fatal error.  Except for Z_OK, all other return
+ * values are treated as fatal.
+ */
+static int
+filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
+    char *init_file, char *badarg)
+{
+	int argc = 0, argc_save;
+	int i;
+	int err;
+	char *arg, *lasts, **argv = NULL, **argv_save;
+	char zonecfg_args[BOOTARGS_MAX];
+	char scratchargs[BOOTARGS_MAX], *sargs;
+	char c;
+
+	bzero(outargs, BOOTARGS_MAX);
+	bzero(badarg, BOOTARGS_MAX);
+
+	(void) strlcpy(init_file, PATH_TO_INIT, MAXPATHLEN);
+
+	/*
+	 * If the user didn't specify transient boot arguments, check
+	 * to see if there were any specified in the zone configuration,
+	 * and use them if applicable.
+	 */
+	if (inargs == NULL || inargs[0] == '\0')  {
+		zone_dochandle_t handle;
+		if ((handle = zonecfg_init_handle()) == NULL) {
+			zerror(zlogp, B_TRUE,
+			    "getting zone configuration handle");
+			return (Z_BAD_HANDLE);
+		}
+		err = zonecfg_get_snapshot_handle(zone_name, handle);
+		if (err != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "invalid configuration snapshot");
+			zonecfg_fini_handle(handle);
+			return (Z_BAD_HANDLE);
+		}
+
+		bzero(zonecfg_args, sizeof (zonecfg_args));
+		(void) zonecfg_get_bootargs(handle, zonecfg_args,
+		    sizeof (zonecfg_args));
+		inargs = zonecfg_args;
+		zonecfg_fini_handle(handle);
+	}
+
+	if (strlen(inargs) >= BOOTARGS_MAX) {
+		zerror(zlogp, B_FALSE, "boot argument string too long");
+		return (Z_INVAL);
+	}
+
+	(void) strlcpy(scratchargs, inargs, sizeof (scratchargs));
+	sargs = scratchargs;
+	while ((arg = strtok_r(sargs, " \t", &lasts)) != NULL) {
+		sargs = NULL;
+		argc++;
+	}
+
+	if ((argv = calloc(argc + 1, sizeof (char *))) == NULL) {
+		zerror(zlogp, B_FALSE, "memory allocation failed");
+		return (Z_NOMEM);
+	}
+
+	argv_save = argv;
+	argc_save = argc;
+
+	(void) strlcpy(scratchargs, inargs, sizeof (scratchargs));
+	sargs = scratchargs;
+	i = 0;
+	while ((arg = strtok_r(sargs, " \t", &lasts)) != NULL) {
+		sargs = NULL;
+		if ((argv[i] = strdup(arg)) == NULL) {
+			err = Z_NOMEM;
+			zerror(zlogp, B_FALSE, "memory allocation failed");
+			goto done;
+		}
+		i++;
+	}
+
+	/*
+	 * We preserve compatibility with the Solaris system boot behavior,
+	 * which allows:
+	 *
+	 * 	# reboot kernel/unix -s -m verbose
+	 *
+	 * In this example, kernel/unix tells the booter what file to
+	 * boot.  We don't want reboot in a zone to be gratuitously different,
+	 * so we silently ignore the boot file, if necessary.
+	 */
+	if (argv[0] == NULL)
+		goto done;
+
+	assert(argv[0][0] != ' ');
+	assert(argv[0][0] != '\t');
+
+	if (argv[0][0] != '-' && argv[0][0] != '\0') {
+		argv = &argv[1];
+		argc--;
+	}
+
+	optind = 0;
+	opterr = 0;
+	err = Z_OK;
+	while ((c = getopt(argc, argv, "i:m:s")) != -1) {
+		switch (c) {
+		case 'i':
+			/*
+			 * -i is handled by the runtime and is not passed
+			 * along to userland
+			 */
+			(void) strlcpy(init_file, optarg, MAXPATHLEN);
+			break;
+		case 'm':
+		case 's':
+			/* These pass through unmolested */
+			(void) snprintf(outargs, BOOTARGS_MAX,
+			    "%s -%c %s ", outargs, c, optarg ? optarg : "");
+			break;
+		case '?':
+			/*
+			 * We warn about unknown arguments but pass them
+			 * along anyway-- if someone wants to develop their
+			 * own init replacement, they can pass it whatever
+			 * args they want.
+			 */
+			err = Z_INVAL;
+			(void) snprintf(outargs, BOOTARGS_MAX,
+			    "%s -%c", outargs, optopt);
+			(void) snprintf(badarg, BOOTARGS_MAX,
+			    "%s -%c", badarg, optopt);
+			break;
+		}
+	}
+
+	/*
+	 * For Solaris Zones we warn about and discard non-option arguments.
+	 * Hence 'boot foo bar baz gub' --> 'boot'.  However, to be similar
+	 * to the kernel, we concat up all the other remaining boot args.
+	 * and warn on them as a group.
+	 */
+	if (optind < argc) {
+		err = Z_INVAL;
+		while (optind < argc) {
+			(void) snprintf(badarg, BOOTARGS_MAX, "%s%s%s",
+			    badarg, strlen(badarg) > 0 ? " " : "",
+			    argv[optind]);
+			optind++;
+		}
+		zerror(zlogp, B_FALSE, "WARNING: Unused or invalid boot "
+		    "arguments `%s'.", badarg);
+	}
+
+done:
+	for (i = 0; i < argc_save; i++) {
+		if (argv_save[i] != NULL)
+			free(argv_save[i]);
+	}
+	free(argv_save);
+	return (err);
+}
+
+
 static int
 mkzonedir(zlog_t *zlogp)
 {
@@ -403,7 +578,9 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 {
 	zoneid_t zoneid;
 	struct stat st;
-	char zroot[MAXPATHLEN], initpath[MAXPATHLEN];
+	char zroot[MAXPATHLEN], initpath[MAXPATHLEN], init_file[MAXPATHLEN];
+	char nbootargs[BOOTARGS_MAX];
+	int err;
 
 	if (init_console_slave(zlogp) != 0)
 		return (-1);
@@ -417,15 +594,24 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	if (zone_mount_early(zlogp, zoneid) != 0)
 		return (-1);
 
+	err = filter_bootargs(zlogp, bootargs, nbootargs, init_file,
+	    bad_boot_arg);
+	if (err == Z_INVAL)
+		eventstream_write(Z_EVT_ZONE_BADARGS);
+	else if (err != Z_OK)
+		return (-1);
+
+	assert(init_file[0] != '\0');
+
 	/*
-	 * Try to anticipate possible problems: Make sure init is executable.
+	 * Try to anticipate possible problems: Make sure whatever binary
+	 * is supposed to be init is executable.
 	 */
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
 		return (-1);
 	}
-	(void) snprintf(initpath, sizeof (initpath), "%s%s", zroot,
-	    PATH_TO_INIT);
+	(void) snprintf(initpath, sizeof (initpath), "%s%s", zroot, init_file);
 
 	if (stat(initpath, &st) == -1) {
 		zerror(zlogp, B_TRUE, "could not stat %s", initpath);
@@ -437,7 +623,17 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 		return (-1);
 	}
 
-	if (zone_boot(zoneid, bootargs) == -1) {
+	if (zone_setattr(zoneid, ZONE_ATTR_INITNAME, init_file, 0) == -1) {
+		zerror(zlogp, B_TRUE, "could not set zone boot file");
+		return (-1);
+	}
+
+	if (zone_setattr(zoneid, ZONE_ATTR_BOOTARGS, nbootargs, 0) == -1) {
+		zerror(zlogp, B_TRUE, "could not set zone boot arguments");
+		return (-1);
+	}
+
+	if (zone_boot(zoneid) == -1) {
 		zerror(zlogp, B_TRUE, "unable to boot zone");
 		return (-1);
 	}
@@ -568,7 +764,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		/*
 		 * This really shouldn't be happening.
 		 */
-		zerror(&logsys, B_FALSE, "invalid argument");
+		zerror(&logsys, B_FALSE, "argument size (%d bytes) "
+		    "unexpected (expected %d bytes)", alen,
+		    sizeof (zone_cmd_arg_t));
 		goto out;
 	}
 	cmd = zargp->cmd;
@@ -754,6 +952,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = 0;
 			break;
 		case Z_BOOT:
+			(void) strlcpy(boot_args, zargp->bootbuf,
+			    sizeof (boot_args));
 			eventstream_write(Z_EVT_ZONE_BOOTING);
 			rval = zone_bootup(zlogp, zargp->bootbuf);
 			audit_put_record(zlogp, uc, rval, "boot");
@@ -762,6 +962,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				(void) zone_halt(zlogp, B_FALSE);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
+			boot_args[0] = '\0';
 			break;
 		case Z_HALT:
 			if (kernelcall)	/* Invalid; can't happen */
@@ -834,21 +1035,26 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
 		case Z_REBOOT:
+			(void) strlcpy(boot_args, zargp->bootbuf,
+			    sizeof (boot_args));
 			eventstream_write(Z_EVT_ZONE_REBOOTING);
 			if ((rval = zone_halt(zlogp, B_FALSE)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
+				boot_args[0] = '\0';
 				break;
 			}
 			if ((rval = zone_ready(zlogp, B_FALSE)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
+				boot_args[0] = '\0';
 				break;
 			}
-			rval = zone_bootup(zlogp, "");
+			rval = zone_bootup(zlogp, zargp->bootbuf);
 			audit_put_record(zlogp, uc, rval, "reboot");
 			if (rval != 0) {
 				(void) zone_halt(zlogp, B_FALSE);
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 			}
+			boot_args[0] = '\0';
 			break;
 		case Z_NOTE_UNINSTALLING:
 		case Z_MOUNT:
@@ -944,7 +1150,7 @@ make_daemon_exclusive(zlog_t *zlogp)
 
 top:
 	if ((err = zone_get_state(zone_name, &zstate)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "failed to get zone state: %s\n",
+		zerror(zlogp, B_FALSE, "failed to get zone state: %s",
 		    zonecfg_strerror(err));
 		goto out;
 	}
@@ -1125,13 +1331,13 @@ main(int argc, char *argv[])
 	}
 
 	if (zone_get_id(zone_name, &zid) != 0) {
-		zerror(zlogp, B_FALSE, "could not manage %s: %s\n", zone_name,
+		zerror(zlogp, B_FALSE, "could not manage %s: %s", zone_name,
 		    zonecfg_strerror(Z_NO_ZONE));
 		return (1);
 	}
 
 	if ((err = zone_get_state(zone_name, &zstate)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "failed to get zone state: %s\n",
+		zerror(zlogp, B_FALSE, "failed to get zone state: %s",
 		    zonecfg_strerror(err));
 		return (1);
 	}
@@ -1159,7 +1365,7 @@ main(int argc, char *argv[])
 
 	if (priv_isfullset(privset) == B_FALSE) {
 		zerror(zlogp, B_FALSE, "You lack sufficient privilege to "
-		    "run this command (all privs required)\n");
+		    "run this command (all privs required)");
 		priv_freeset(privset);
 		return (1);
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,16 +50,16 @@
  * structure (the core dumping sub-system for example) to safely use the
  * string without holding any locks on it in light of updates.
  *
- * At system boot, init_core() sets init(1M)'s core file path and content to
- * the same value as the fields core_default_path and core_default_content
- * respectively (for the global zone). All subsequent children of init(1M)
- * reference those same settings. During boot coreadm(1M) is invoked with
- * the -u option to update the system settings from /etc/coreadm.conf. This
- * has the effect of also changing the values in core_default_path and
- * core_default_content which updates the core file settings for all
- * processes in the zone.  Each zone has different default settings; when
- * processes enter a non-global zone, their core file path and content are
- * set to the zone's default path and content.
+ * At system and zone boot, init_core() sets init(1M)'s core file path and
+ * content to the same value as the fields core_default_path and
+ * core_default_content respectively (for the global zone). All subsequent
+ * children of init(1M) reference those same settings. During boot coreadm(1M)
+ * is invoked with the -u option to update the system settings from
+ * /etc/coreadm.conf. This has the effect of also changing the values in
+ * core_default_path and core_default_content which updates the core file
+ * settings for all processes in the zone.  Each zone has different default
+ * settings; when processes enter a non-global zone, their core file path and
+ * content are set to the zone's default path and content.
  *
  * Processes that have their core file settings explicitly overridden using
  * coreadm(1M) no longer reference core_default_path or core_default_content
@@ -207,22 +206,28 @@ core_free_zone(zoneid_t zoneid, void *arg)
 }
 
 /*
- * Called once, from icode(), to set init's core file path and content.
+ * Called from start_init_common(), to set init's core file path and content.
  */
 void
 init_core(void)
 {
 	struct core_globals *cg;
 
-	zone_key_create(&core_zone_key, core_init_zone, NULL, core_free_zone);
+	/*
+	 * The first time we hit this, in the global zone, we have to
+	 * initialize the zsd key.
+	 */
+	if (INGLOBALZONE(curproc)) {
+		zone_key_create(&core_zone_key, core_init_zone, NULL,
+		    core_free_zone);
+	}
 
 	/*
 	 * zone_key_create will have called core_init_zone for the
 	 * global zone, which sets up the default path and content
 	 * variables.
 	 */
-	cg = zone_getspecific(core_zone_key, global_zone);
-	ASSERT(cg != NULL);
+	VERIFY((cg = zone_getspecific(core_zone_key, curproc->p_zone)) != NULL);
 
 	corectl_path_hold(cg->core_default_path);
 	corectl_content_hold(cg->core_default_content);
@@ -293,7 +298,7 @@ corectl(int subcode, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 				error = EFAULT;
 		} else {
 			error = copyoutstr(refstr_value(rp), (char *)arg1,
-					(size_t)arg2, NULL);
+			    (size_t)arg2, NULL);
 			refstr_rele(rp);
 		}
 		break;

@@ -216,7 +216,8 @@ extern	const char *zonecfg_get_root(void);
 extern	boolean_t zonecfg_in_alt_root(void);
 
 /*
- * Zone name, path to zone directory, autoboot setting and pool.
+ * Zone name, path to zone directory, autoboot setting, pool and boot
+ * arguments.
  */
 extern	int	zonecfg_validate_zonename(const char *);
 extern	int	zonecfg_get_name(zone_dochandle_t, char *, size_t);
@@ -227,6 +228,8 @@ extern	int	zonecfg_get_autoboot(zone_dochandle_t, boolean_t *);
 extern	int	zonecfg_set_autoboot(zone_dochandle_t, boolean_t);
 extern	int	zonecfg_get_pool(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_pool(zone_dochandle_t, char *);
+extern	int	zonecfg_get_bootargs(zone_dochandle_t, char *, size_t);
+extern	int	zonecfg_set_bootargs(zone_dochandle_t, char *);
 
 /*
  * Filesystem configuration.

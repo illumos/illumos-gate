@@ -40,7 +40,7 @@ extern void yyerror(char *s);
 char *safe_strdup(char *s);
 %}
 
-%a 3000
+%a 4000
 
 %{
 /*
@@ -173,6 +173,9 @@ char *safe_strdup(char *s);
 
 <TSTATE>limitpriv	{ return LIMITPRIV; }
 <CSTATE>limitpriv	{ return LIMITPRIV; }
+
+<TSTATE>bootargs	{ return BOOTARGS; }
+<CSTATE>bootargs	{ return BOOTARGS; }
 
 <TSTATE>type	{ return TYPE; }
 <CSTATE>type	{ return TYPE; }

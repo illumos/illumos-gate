@@ -62,6 +62,7 @@ extern void exitto(func_t);
 static void print_mbinfo(void);
 
 int debug;
+static int started_bootfile = 0;
 
 #define	dprintf	if (debug & D_MBOOT) printf
 
@@ -137,7 +138,7 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	 * May set graphics mode, for which bios support is required.
 	 */
 	console_init2(inputdevice_prop, outputdevice_prop,
-		console_prop);
+	    console_prop);
 
 #ifdef  BOOTAMD64
 	/* Test to see if this CPU is an AMD64 */
@@ -197,6 +198,14 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	if (verbosemode)
 		printf("Boot about to exit to 32-bit kernel image at 0x%x.\n",
 		    entry);
+
+	/*
+	 * It's a while before the kernel actually gets around to setting
+	 * up traps; if we die during that period, multiboot's trap handler
+	 * will get control.  We want to at least know roughly where we
+	 * died.
+	 */
+	started_bootfile = 1;
 	exitto(entry);
 
 	panic("failed to boot %s\n", bootfile);
@@ -286,27 +295,27 @@ show_regs_and_stack(struct i386_machregs *regs, int stack_lines)
 	uint32_t *esp = (uint32_t *)regs->r_esp;
 
 	printf("trap type %d (0x%x) err code 0x%x eip=0x%x\n",
-		regs->r_trapno, regs->r_trapno, regs->r_err,
-		regs->r_eip);
+	    regs->r_trapno, regs->r_trapno, regs->r_err,
+	    regs->r_eip);
 	printf("%%eflags = 0x%08x\t%%cs:%%eip = 0x%04x:0x%08x\n",
-		regs->r_efl, regs->r_cs, regs->r_eip);
+	    regs->r_efl, regs->r_cs, regs->r_eip);
 	printf("%%eax = 0x%08x\t%%ebx = 0x%08x\t%%ecx = 0x%08x\n",
-		regs->r_eax, regs->r_ebx, regs->r_ecx);
+	    regs->r_eax, regs->r_ebx, regs->r_ecx);
 	printf("%%edx = 0x%08x\t%%esi = 0x%08x\t%%edi = 0x%08x\n",
-		regs->r_edx, regs->r_esi, regs->r_edi);
+	    regs->r_edx, regs->r_esi, regs->r_edi);
 	printf("%%esp = 0x%08x\t%%ebp = 0x%08x\n",
-		regs->r_esp, regs->r_ebp);
+	    regs->r_esp, regs->r_ebp);
 	printf("%%ss = 0x%04x\t%%ds = 0x%04x\t%%es = 0x%04x\t%%fs = 0x%04x\n",
-		regs->r_ss, regs->r_ds, regs->r_es, regs->r_fs);
+	    regs->r_ss, regs->r_ds, regs->r_es, regs->r_fs);
 	printf("GDT @ 0x%08x lim 0x%04x\t\tIDT @ 0x%08x lim 0x%04x\n",
-		regs->r_gdt.dtr_base, regs->r_gdt.dtr_limit,
-		regs->r_idt.dtr_base, regs->r_idt.dtr_limit);
+	    regs->r_gdt.dtr_base, regs->r_gdt.dtr_limit,
+	    regs->r_idt.dtr_base, regs->r_idt.dtr_limit);
 	printf("LDT = 0x%04x\tTASK = 0x%04x\n",
-		regs->r_ldt, regs->r_tr);
+	    regs->r_ldt, regs->r_tr);
 	printf("%%cr0 = 0x%08x\t%%cr2 = 0x%08x\t%%cr3 = 0x%08x\n",
-		regs->r_cr0, regs->r_cr2, regs->r_cr3);
+	    regs->r_cr0, regs->r_cr2, regs->r_cr3);
 	printf("%%cr4 = 0x%08x\n",
-		regs->r_cr4);
+	    regs->r_cr4);
 
 	printf("\nStack (starting at 0x%x):\n", (uint32_t)esp);
 	for (j = 0; j < stack_lines; j++) {
@@ -325,5 +334,8 @@ trap(struct i386_machregs *regs)
 	/* Show registers and stack: [24 lines max (prevents scrolling)] */
 	show_regs_and_stack(regs, STACK_LINES);
 
-	panic("unexpected trap in boot loader\n");
+	if (started_bootfile == 0)
+		panic("unexpected trap in boot loader\n");
+	else
+		panic("unexpected trap after starting %s\n", bootfile);
 }

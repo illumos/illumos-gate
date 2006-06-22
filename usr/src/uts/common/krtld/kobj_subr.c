@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,9 +27,17 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/systm.h>
 
 /*
- * Standalone copies of some basic routines.
+ * Standalone copies of some basic routines.  Note that these routines
+ * are transformed via Makefile -D flags into krtld_* routines.  So,
+ * this version of strcmp() will become krtld_strcmp() when built.
+ *
+ * This dubious practice is so that krtld can have its own private
+ * versions of these routines suitable for use during early boot,
+ * when kernel-based routines might not work.  Make sure to use 'nm'
+ * on your krtld to make sure it is calling the appropriate routines.
  */
 
 int
@@ -105,6 +112,27 @@ strcat(char *s1, const char *s2)
 	while (*s1++ = *s2++)
 		;
 	return (os1);
+}
+
+size_t
+strlcat(char *dst, const char *src, size_t dstsize)
+{
+	char *df = dst;
+	size_t left = dstsize;
+	size_t l1;
+	size_t l2 = strlen(src);
+	size_t copied;
+
+	while (left-- != 0 && *df != '\0')
+		df++;
+	l1 = df - dst;
+	if (dstsize == l1)
+		return (l1 + l2);
+
+	copied = l1 + l2 >= dstsize ? dstsize - l1 - 1 : l2;
+	bcopy(src, dst + l1, copied);
+	dst[l1+copied] = '\0';
+	return (l1 + l2);
 }
 
 char *

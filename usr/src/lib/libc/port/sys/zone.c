@@ -68,9 +68,9 @@ zone_create(const char *name, const char *root, const struct priv_set *privs,
 }
 
 int
-zone_boot(zoneid_t zoneid, const char *bootargs)
+zone_boot(zoneid_t zoneid)
 {
-	return (syscall(SYS_zone, ZONE_BOOT, zoneid, bootargs));
+	return (syscall(SYS_zone, ZONE_BOOT, zoneid));
 }
 
 int
@@ -96,6 +96,12 @@ zone_getattr(zoneid_t zoneid, int attr, void *valp, size_t size)
 	if (error)
 		(void) __set_errno(error);
 	return ((ssize_t)rval.sys_rval1);
+}
+
+int
+zone_setattr(zoneid_t zoneid, int attr, void *valp, size_t size)
+{
+	return (syscall(SYS_zone, ZONE_SETATTR, zoneid, attr, valp, size));
 }
 
 int

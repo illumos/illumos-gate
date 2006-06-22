@@ -3475,6 +3475,14 @@ version		SUNWprivate_1.1
 exception	$return == -1
 end
 
+function	zone_setattr
+include		<zone.h>
+declaration	int zone_setattr(zoneid_t zoneid, int attr, void *valp, \
+		    size_t sizep)
+version		SUNWprivate_1.1
+exception	$return == -1
+end
+
 function	zone_get_id
 include		<zone.h>
 declaration	int zone_get_id(const char *str, zoneid_t *zip)

@@ -155,6 +155,7 @@ static char *res_types[] = {
 	"attr",
 	"dataset",
 	"limitpriv",
+	"bootargs",
 	NULL
 };
 
@@ -179,6 +180,7 @@ static char *prop_types[] = {
 	"action",
 	"raw",
 	"limitpriv",
+	"bootargs",
 	NULL
 };
 
@@ -243,6 +245,7 @@ static const char *set_cmds[] = {
 	"set autoboot=",
 	"set pool=",
 	"set limitpriv=",
+	"set bootargs=",
 	NULL
 };
 
@@ -895,6 +898,8 @@ usage(bool verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_AUTOBOOT));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_BOOTARGS));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_POOL));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_LIMITPRIV));
@@ -1310,6 +1315,7 @@ export_func(cmd_t *cmd)
 	struct zone_rctlvaltab *valptr;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
+	char bootargs[BOOTARGS_MAX];
 	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
@@ -1365,6 +1371,12 @@ export_func(cmd_t *cmd)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
 		    pt_to_str(PT_AUTOBOOT), autoboot ? "true" : "false");
 
+	if (zonecfg_get_bootargs(handle, bootargs, sizeof (bootargs)) == Z_OK &&
+	    strlen(bootargs) > 0) {
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_BOOTARGS), bootargs);
+	}
+
 	if (zonecfg_get_pool(handle, pool, sizeof (pool)) == Z_OK &&
 	    strlen(pool) > 0)
 		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
@@ -1376,6 +1388,7 @@ export_func(cmd_t *cmd)
 		    pt_to_str(PT_LIMITPRIV), limitpriv);
 		free(limitpriv);
 	}
+
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
 		zone_perror(zone, err, FALSE);
@@ -2676,6 +2689,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_POOL;
 		} else if (prop_type == PT_LIMITPRIV) {
 			res_type = RT_LIMITPRIV;
+		} else if (prop_type == PT_BOOTARGS) {
+			res_type = RT_BOOTARGS;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -2780,6 +2795,12 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_LIMITPRIV:
 		if ((err = zonecfg_set_limitpriv(handle, prop_id)) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_BOOTARGS:
+		if ((err = zonecfg_set_bootargs(handle, prop_id)) != Z_OK)
 			zone_perror(zone, err, TRUE);
 		else
 			need_to_commit = TRUE;
@@ -3047,6 +3068,21 @@ info_limitpriv(zone_dochandle_t handle, FILE *fp)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_LIMITPRIV),
 		    limitpriv);
 		free(limitpriv);
+	} else {
+		zone_perror(zone, err, TRUE);
+	}
+}
+
+static void
+info_bootargs(zone_dochandle_t handle, FILE *fp)
+{
+	char bootargs[BOOTARGS_MAX];
+	int err;
+
+	if ((err = zonecfg_get_bootargs(handle, bootargs,
+	    sizeof (bootargs))) == Z_OK) {
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_BOOTARGS),
+		    bootargs);
 	} else {
 		zone_perror(zone, err, TRUE);
 	}
@@ -3421,6 +3457,7 @@ info_func(cmd_t *cmd)
 		info_zonename(handle, fp);
 		info_zonepath(handle, fp);
 		info_autoboot(handle, fp);
+		info_bootargs(handle, fp);
 		info_pool(handle, fp);
 		info_limitpriv(handle, fp);
 		info_ipd(handle, fp, cmd);
@@ -3445,6 +3482,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_LIMITPRIV:
 		info_limitpriv(handle, fp);
+		break;
+	case RT_BOOTARGS:
+		info_bootargs(handle, fp);
 		break;
 	case RT_FS:
 		info_fs(handle, fp, cmd);

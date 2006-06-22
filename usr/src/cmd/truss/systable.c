@@ -788,8 +788,9 @@ static const struct systable zonetable[] = {
 {"zone_list",	3, DEC, NOV, HID, HEX, HEX},			/* 4 */
 {"zone_shutdown", 2, DEC, NOV, HID, DEC},			/* 5 */
 {"zone_lookup", 2, DEC, NOV, HID, STG},				/* 6 */
-{"zone_boot", 3, DEC, NOV, HID, DEC, STG},			/* 7 */
+{"zone_boot", 2, DEC, NOV, HID, DEC},				/* 7 */
 {"zone_version", 2, HEX, NOV, HID, DEC},			/* 8 */
+{"zone_setattr", 5, DEC, NOV, HID, DEC, ZGA, HEX, DEC},		/* 9 */
 };
 #define	NZONECODE	(sizeof (zonetable) / sizeof (struct systable))
 
@@ -1208,9 +1209,8 @@ getsubcode(private_t *pri)
 			break;
 		case SYS_lwp_create:	/* lwp_create() */
 			subcode =	/* 0 for parent, 1 for child */
-				(Lsp->pr_why == PR_SYSEXIT &&
-				    Lsp->pr_errno == 0 &&
-				    Lsp->pr_rval1 == 0);
+			    (Lsp->pr_why == PR_SYSEXIT && Lsp->pr_errno == 0 &&
+			    Lsp->pr_rval1 == 0);
 			break;
 		case SYS_msgsys:	/* msgsys() */
 		case SYS_semsys:	/* semsys() */
@@ -1263,37 +1263,37 @@ int
 maxsyscalls()
 {
 	return (PRMAXSYS + 1
-		+ NOPENCODE - 1
-		+ NOPEN64CODE - 1
-		+ NSIGCODE - 1
-		+ NMSGCODE - 1
-		+ NSEMCODE - 1
-		+ NSHMCODE - 1
-		+ NPIDCODE - 1
-		+ NSFSCODE - 1
-		+ NUTSCODE - 1
-		+ NSGPCODE - 1
-		+ NCTXCODE - 1
-		+ NHRTCODE - 1
-		+ NCORCODE - 1
-		+ NAIOCODE - 1
-		+ NDOORCODE - 1
-		+ NPSETCODE - 1
-		+ NLWPCREATECODE - 1
-		+ NTASKSYSCODE - 1
-		+ NEXACCTSYSCODE - 1
-		+ NFSATSYSCODE - 1
-		+ NLWPPARKCODE - 1
-		+ NLWPRWLOCKCODE - 1
-		+ NSENDFILESYSCODE - 1
-		+ NLGRPSYSCODE - 1
-		+ NRUSAGESYSCODE - 1
-		+ NFCNTLCODE - 1
-		+ NPRIVSYSCODE - 1
-		+ NUCREDSYSCODE - 1
-		+ NPORTCODE - 1
-		+ NZONECODE - 1
-		+ NLABELCODE - 1);
+	    + NOPENCODE - 1
+	    + NOPEN64CODE - 1
+	    + NSIGCODE - 1
+	    + NMSGCODE - 1
+	    + NSEMCODE - 1
+	    + NSHMCODE - 1
+	    + NPIDCODE - 1
+	    + NSFSCODE - 1
+	    + NUTSCODE - 1
+	    + NSGPCODE - 1
+	    + NCTXCODE - 1
+	    + NHRTCODE - 1
+	    + NCORCODE - 1
+	    + NAIOCODE - 1
+	    + NDOORCODE - 1
+	    + NPSETCODE - 1
+	    + NLWPCREATECODE - 1
+	    + NTASKSYSCODE - 1
+	    + NEXACCTSYSCODE - 1
+	    + NFSATSYSCODE - 1
+	    + NLWPPARKCODE - 1
+	    + NLWPRWLOCKCODE - 1
+	    + NSENDFILESYSCODE - 1
+	    + NLGRPSYSCODE - 1
+	    + NRUSAGESYSCODE - 1
+	    + NFCNTLCODE - 1
+	    + NPRIVSYSCODE - 1
+	    + NUCREDSYSCODE - 1
+	    + NPORTCODE - 1
+	    + NZONECODE - 1
+	    + NLABELCODE - 1);
 }
 
 /*

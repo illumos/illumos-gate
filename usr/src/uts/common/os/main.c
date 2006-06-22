@@ -122,121 +122,134 @@ cluster_wrapper(void)
 	panic("cluster()  returned");
 }
 
-char initname[INITNAME_SZ] = "/sbin/init";
-char initargs[INITARGS_SZ] = "";
+char initname[INITNAME_SZ] = "/sbin/init";	/* also referenced by zone0 */
+char initargs[BOOTARGS_MAX] = "";		/* also referenced by zone0 */
 
 /*
- * Start the initial user process.
- * The program [initname] may be invoked with one argument
- * containing the boot flags.
- *
- * It must be a 32-bit program.
+ * Construct a stack for init containing the arguments to it, then
+ * pass control to exec_common.
  */
-void
-icode(void)
-{
-	proc_t *p = ttoproc(curthread);
-
-	ASSERT_STACK_ALIGNED();
-
-	/*
-	 * Allocate user address space and stack segment
-	 */
-	proc_init = p;
-	zone0.zone_proc_initpid = proc_init->p_pid;
-
-	p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
-	p->p_usrstack = (caddr_t)USRSTACK32;
-	p->p_model = DATAMODEL_ILP32;
-	p->p_stkprot = PROT_ZFOD & ~PROT_EXEC;
-	p->p_datprot = PROT_ZFOD & ~PROT_EXEC;
-	p->p_stk_ctl = INT32_MAX;
-
-	p->p_as = as_alloc();
-	p->p_as->a_userlimit = (caddr_t)USERLIMIT32;
-	(void) hat_setup(p->p_as->a_hat, HAT_INIT);
-	init_core();
-
-	init_mstate(curthread, LMS_SYSTEM);
-
-	if (exec_init(initname, 1, initargs[0] == '\0' ? NULL : initargs) != 0)
-		halt("Could not start init");
-
-	lwp_rtt();
-}
-
 int
-exec_init(const char *initpath, int useboothowto, const char *args)
+exec_init(const char *initpath, const char *args)
 {
-	char *ucp;
+	caddr32_t ucp;
 	caddr32_t *uap;
-	char *argv[4];				/* backwards */
+	caddr32_t *argv;
+	caddr32_t exec_fnamep;
+	char *scratchargs;
+	int i, sarg;
+	size_t argvlen, alen;
+	boolean_t in_arg;
 	int argc = 0;
-	int error = 0, len, count = 0, i;
+	int error = 0, count = 0;
 	proc_t *p = ttoproc(curthread);
 	klwp_t *lwp = ttolwp(curthread);
 
-	/*
-	 * Construct the exec arguments in userland.  That is, make an array
-	 * of pointers to the argument strings, just like for execv().  This
-	 * is done backwards.
-	 */
-	ucp = p->p_usrstack;
+	if (args == NULL)
+		args = "";
 
-	argv[0] = NULL;				/* argv terminator */
-
-	if (args != NULL) {
-		len = strlen(args) + 1;
-		ucp -= len;
-		error |= copyoutstr(args, ucp, len, NULL);
-		argv[++argc] = ucp;
-	}
-
-	if (useboothowto &&
-	    boothowto & (RB_SINGLE|RB_RECONFIG|RB_VERBOSE)) {
-		error |= subyte(--ucp, '\0');		/* trailing null byte */
-
-		if (boothowto & RB_SINGLE)
-			error |= subyte(--ucp, 's');
-		if (boothowto & RB_RECONFIG)
-			error |= subyte(--ucp, 'r');
-		if (boothowto & RB_VERBOSE)
-			error |= subyte(--ucp, 'v');
-		error |= subyte(--ucp, '-');	/* leading hyphen */
-
-		argv[++argc] = ucp;
-	}
-
-	len = strlen(initpath) + 1;
-	ucp -= len;
-	error |= copyoutstr(initpath, ucp, len, NULL);
-	argv[++argc] = ucp;
+	alen = strlen(initpath) + 1 + strlen(args) + 1;
+	scratchargs = kmem_alloc(alen, KM_SLEEP);
+	(void) snprintf(scratchargs, alen, "%s %s", initpath, args);
 
 	/*
-	 * Move out the arg pointers.
+	 * We do a quick two state parse of the string to sort out how big
+	 * argc should be.
 	 */
+	in_arg = B_FALSE;
+	for (i = 0; i < strlen(scratchargs); i++) {
+		if (scratchargs[i] == ' ' || scratchargs[i] == '\0') {
+			if (in_arg) {
+				in_arg = B_FALSE;
+				argc++;
+			}
+		} else {
+			in_arg = B_TRUE;
+		}
+	}
+	argvlen = sizeof (caddr32_t) * (argc + 1);
+	argv = kmem_zalloc(argvlen, KM_SLEEP);
+
+	/*
+	 * We pull off a bit of a hack here.  We work our way through the
+	 * args string, putting nulls at the ends of space delimited tokens
+	 * (boot args don't support quoting at this time).  Then we just
+	 * copy the whole mess to userland in one go.  In other words, we
+	 * transform this: "init -s -r\0" into this on the stack:
+	 *
+	 *	-0x00 \0
+	 *	-0x01 r
+	 *	-0x02 -  <--------.
+	 *	-0x03 \0	  |
+	 *	-0x04 s		  |
+	 *	-0x05 -  <------. |
+	 *	-0x06 \0	| |
+	 *	-0x07 t		| |
+	 *	-0x08 i 	| |
+	 *	-0x09 n		| |
+	 *	-0x0a i  <---.  | |
+	 *	-0x10 NULL   |  | |	(argv[3])
+	 *	-0x14   -----|--|-'	(argv[2])
+	 *	-0x18  ------|--'	(argv[1])
+	 *	-0x1c -------'		(argv[0])
+	 *
+	 * Since we know the value of ucp at the beginning of this process,
+	 * we can trivially compute the argv[] array which we also need to
+	 * place in userland: argv[i] = ucp - sarg(i), where ucp is the
+	 * stack ptr, and sarg is the string index of the start of the
+	 * argument.
+	 */
+	ucp = (caddr32_t)(uintptr_t)p->p_usrstack;
+
+	argc = 0;
+	in_arg = B_FALSE;
+	sarg = 0;
+
+	for (i = 0; i < alen; i++) {
+		if (scratchargs[i] == ' ' || scratchargs[i] == '\0') {
+			if (in_arg == B_TRUE) {
+				in_arg = B_FALSE;
+				scratchargs[i] = '\0';
+				argv[argc++] = ucp - (alen - sarg);
+			}
+		} else if (in_arg == B_FALSE) {
+			in_arg = B_TRUE;
+			sarg = i;
+		}
+	}
+	ucp -= alen;
+	error |= copyout(scratchargs, (caddr_t)(uintptr_t)ucp, alen);
+
 	uap = (caddr32_t *)P2ALIGN((uintptr_t)ucp, sizeof (caddr32_t));
-	for (i = 0; i < argc + 1; ++i)
-		error |= suword32(--uap, (uint32_t)(uintptr_t)argv[i]);
+	uap--;	/* advance to be below the word we're in */
+	uap -= (argc + 1);	/* advance argc words down, plus one for NULL */
+	error |= copyout(argv, uap, argvlen);
 
 	if (error != 0) {
 		zcmn_err(p->p_zone->zone_id, CE_WARN,
 		    "Could not construct stack for init.\n");
+		kmem_free(argv, argvlen);
+		kmem_free(scratchargs, alen);
 		return (EFAULT);
 	}
+
+	exec_fnamep = argv[0];
+	kmem_free(argv, argvlen);
+	kmem_free(scratchargs, alen);
 
 	/*
 	 * Point at the arguments.
 	 */
 	lwp->lwp_ap = lwp->lwp_arg;
-	lwp->lwp_arg[0] = (uintptr_t)argv[argc];
+	lwp->lwp_arg[0] = (uintptr_t)exec_fnamep;
 	lwp->lwp_arg[1] = (uintptr_t)uap;
 	lwp->lwp_arg[2] = NULL;
 	curthread->t_post_sys = 1;
 	curthread->t_sysnum = SYS_execve;
 
 again:
-	error = exec_common((const char *)argv[argc], (const char **)uap, NULL);
+	error = exec_common((const char *)(uintptr_t)exec_fnamep,
+	    (const char **)(uintptr_t)uap, NULL);
 
 	/*
 	 * Normally we would just set lwp_argsaved and t_post_sys and
@@ -270,6 +283,54 @@ again:
 	zcmn_err(p->p_zone->zone_id, CE_WARN,
 	    "exec(%s) failed with errno %d.", initpath, error);
 	return (error);
+}
+
+/*
+ * This routine does all of the common setup for invoking init; global
+ * and non-global zones employ this routine for the functionality which is
+ * in common.
+ *
+ * This program (init, presumably) must be a 32-bit process.
+ */
+int
+start_init_common()
+{
+	proc_t *p = curproc;
+	ASSERT_STACK_ALIGNED();
+	p->p_zone->zone_proc_initpid = p->p_pid;
+
+	p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
+	p->p_usrstack = (caddr_t)USRSTACK32;
+	p->p_model = DATAMODEL_ILP32;
+	p->p_stkprot = PROT_ZFOD & ~PROT_EXEC;
+	p->p_datprot = PROT_ZFOD & ~PROT_EXEC;
+	p->p_stk_ctl = INT32_MAX;
+
+	p->p_as = as_alloc();
+	p->p_as->a_userlimit = (caddr_t)USERLIMIT32;
+	(void) hat_setup(p->p_as->a_hat, HAT_INIT);
+
+	init_core();
+
+	init_mstate(curthread, LMS_SYSTEM);
+	return (exec_init(p->p_zone->zone_initname, p->p_zone->zone_bootargs));
+}
+
+/*
+ * Start the initial user process for the global zone; once running, if
+ * init should subsequently fail, it will be automatically be caught in the
+ * exit(2) path, and restarted by restart_init().
+ */
+static void
+start_init(void)
+{
+	proc_init = curproc;
+
+	ASSERT(curproc->p_zone->zone_initname != NULL);
+
+	if (start_init_common() != 0)
+		halt("unix: Could not start init");
+	lwp_rtt();
 }
 
 void
@@ -469,7 +530,7 @@ main(void)
 	 */
 
 	/* create init process */
-	if (newproc(icode, NULL, defaultcid, 59, NULL))
+	if (newproc(start_init, NULL, defaultcid, 59, NULL))
 		panic("main: unable to fork init.");
 
 	/* create pageout daemon */

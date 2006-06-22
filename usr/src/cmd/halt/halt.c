@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +43,7 @@
  * argv[0] to determine which behavior to exhibit.
  */
 
-#include <sys/stat.h>
+#include <procfs.h>
 #include <sys/types.h>
 #include <sys/uadmin.h>
 #include <alloca.h>
@@ -78,6 +77,8 @@ extern int audit_reboot_setup(void);
 extern int audit_reboot_success(void);
 extern int audit_reboot_fail(void);
 
+static char *cmdname;	/* basename(argv[0]), the name of the command */
+
 typedef struct ctidlist_struct {
 	ctid_t ctid;
 	struct ctidlist_struct *next;
@@ -91,61 +92,91 @@ static ctid_t startdct = -1;
 
 #define	ZONEADM_PROG "/usr/sbin/zoneadm"
 
+static pid_t
+get_initpid()
+{
+	static int init_pid = -1;
+
+	if (init_pid == -1) {
+		if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
+		    sizeof (init_pid)) != sizeof (init_pid)) {
+			assert(errno == ESRCH);
+			init_pid = -1;
+		}
+	}
+	return (init_pid);
+}
+
+/*
+ * Quiesce or resume init using /proc.  When stopping init, we can't send
+ * SIGTSTP (since init ignores it) or SIGSTOP (since the kernel won't permit
+ * it).
+ */
+static int
+direct_init(long command)
+{
+	char ctlfile[MAXPATHLEN];
+	pid_t pid;
+	int ctlfd;
+
+	assert(command == PCDSTOP || command == PCRUN);
+	if ((pid = get_initpid()) == -1) {
+		return (-1);
+	}
+
+	(void) snprintf(ctlfile, sizeof (ctlfile), "/proc/%d/ctl", pid);
+	if ((ctlfd = open(ctlfile, O_WRONLY)) == -1)
+		return (-1);
+
+	if (command == PCDSTOP) {
+		if (write(ctlfd, &command, sizeof (long)) == -1) {
+			(void) close(ctlfd);
+			return (-1);
+		}
+	} else {	/* command == PCRUN */
+		long cmds[2];
+		cmds[0] = command;
+		cmds[1] = 0;
+		if (write(ctlfd, cmds, sizeof (cmds)) == -1) {
+			(void) close(ctlfd);
+			return (-1);
+		}
+	}
+	(void) close(ctlfd);
+	return (0);
+}
+
 static void
 stop_startd()
 {
-	ctid_t ctid;
-
 	scf_handle_t *h;
 	scf_property_t *prop = NULL;
 	scf_value_t *val = NULL;
 	uint64_t uint64;
-	int ret;
 
-	h = scf_handle_create(SCF_VERSION);
-	if (h == NULL)
+	if ((h = scf_handle_create(SCF_VERSION)) == NULL)
 		return;
 
-	ret = scf_handle_bind(h);
-	if (ret) {
-		scf_handle_destroy(h);
-		return;
-	}
-
-	prop = scf_property_create(h);
-	val = scf_value_create(h);
-
-	if (!(prop && val))
+	if ((scf_handle_bind(h) != 0) ||
+	    ((prop = scf_property_create(h)) == NULL) ||
+	    ((val = scf_value_create(h)) == NULL))
 		goto out;
 
-	ret = scf_handle_decode_fmri(h, FMRI_STARTD_CONTRACT,
-	    NULL, NULL, NULL, NULL, prop, SCF_DECODE_FMRI_EXACT);
-	if (ret)
+	if (scf_handle_decode_fmri(h, FMRI_STARTD_CONTRACT,
+	    NULL, NULL, NULL, NULL, prop, SCF_DECODE_FMRI_EXACT) != 0)
 		goto out;
 
-	ret = scf_property_is_type(prop, SCF_TYPE_COUNT);
-	if (ret)
+	if (scf_property_is_type(prop, SCF_TYPE_COUNT) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_count(val, &uint64) != 0)
 		goto out;
 
-	ret = scf_property_get_value(prop, val);
-	if (ret)
-		goto out;
-
-	ret = scf_value_get_count(val, &uint64);
-	if (ret)
-		goto out;
-
-	ctid = (ctid_t)uint64;
-	startdct = ctid;
-	(void) sigsend(P_CTID, ctid, SIGSTOP);
+	startdct = (ctid_t)uint64;
+	(void) sigsend(P_CTID, startdct, SIGSTOP);
 
 out:
-	if (prop)
-		scf_property_destroy(prop);
-	if (val)
-		scf_value_destroy(val);
-
-	(void) scf_handle_unbind(h);
+	scf_property_destroy(prop);
+	scf_value_destroy(val);
 	scf_handle_destroy(h);
 }
 
@@ -198,7 +229,6 @@ stop_delegates()
 
 	uint64_t uint64;
 	ssize_t bytes;
-	int ret;
 
 	length = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH);
 	if (length <= 0)
@@ -207,67 +237,51 @@ stop_delegates()
 	length++;
 	fmri = alloca(length * sizeof (char));
 
-	h = scf_handle_create(SCF_VERSION);
-	if (!h)
+	if ((h = scf_handle_create(SCF_VERSION)) == NULL)
 		return;
 
-	ret = scf_handle_bind(h);
-	if (ret) {
+	if (scf_handle_bind(h) != 0) {
 		scf_handle_destroy(h);
 		return;
 	}
 
-	sc = scf_scope_create(h);
-	svc = scf_service_create(h);
-	inst = scf_instance_create(h);
-	snap = scf_snapshot_create(h);
-	pg = scf_pg_create(h);
-	prop = scf_property_create(h);
-	val = scf_value_create(h);
-	siter = scf_iter_create(h);
-	iiter = scf_iter_create(h);
-
-	if (!(sc && svc && inst && snap &&
-	    pg && prop && val && siter && iiter))
+	if ((sc = scf_scope_create(h)) == NULL ||
+	    (svc = scf_service_create(h)) == NULL ||
+	    (inst = scf_instance_create(h)) == NULL ||
+	    (snap = scf_snapshot_create(h)) == NULL ||
+	    (pg = scf_pg_create(h)) == NULL ||
+	    (prop = scf_property_create(h)) == NULL ||
+	    (val = scf_value_create(h)) == NULL ||
+	    (siter = scf_iter_create(h)) == NULL ||
+	    (iiter = scf_iter_create(h)) == NULL)
 		goto out;
 
-	ret = scf_handle_get_scope(h, SCF_SCOPE_LOCAL, sc);
-	if (ret)
+	if (scf_handle_get_scope(h, SCF_SCOPE_LOCAL, sc) != 0)
 		goto out;
 
-	ret = scf_iter_scope_services(siter, sc);
-	if (ret)
+	if (scf_iter_scope_services(siter, sc) != 0)
 		goto out;
 
 	while (scf_iter_next_service(siter, svc) == 1) {
 
-		ret = scf_iter_service_instances(iiter, svc);
-		if (ret)
+		if (scf_iter_service_instances(iiter, svc) != 0)
 			continue;
 
 		while (scf_iter_next_instance(iiter, inst) == 1) {
 
-			ret = scf_instance_get_snapshot(inst, "running", snap);
-				if (ret)
-					isnap = NULL;
-				else
-					isnap = snap;
+			if ((scf_instance_get_snapshot(inst, "running",
+			    snap)) != 0)
+				isnap = NULL;
+			else
+				isnap = snap;
 
-			ret = scf_instance_get_pg_composed(inst, isnap,
-			    SCF_PG_GENERAL, pg);
-			if (ret)
+			if (scf_instance_get_pg_composed(inst, isnap,
+			    SCF_PG_GENERAL, pg) != 0)
 				continue;
 
-			ret = scf_pg_get_property(pg, "restarter", prop);
-			if (ret)
-				continue;
-
-			ret = scf_property_is_type(prop, SCF_TYPE_ASTRING);
-			if (ret)
-				continue;
-
-			ret = scf_property_get_value(prop, val);
-			if (ret)
+			if (scf_pg_get_property(pg, SCF_PROPERTY_RESTARTER,
+			    prop) != 0 ||
+			    scf_property_get_value(prop, val) != 0)
 				continue;
 
 			bytes = scf_value_get_astring(val, fmri, length);
@@ -278,21 +292,13 @@ stop_delegates()
 			    length)
 				continue;
 
-			ret = scf_handle_decode_fmri(h, fmri, NULL, NULL,
-			    NULL, NULL, prop, SCF_DECODE_FMRI_EXACT);
-			if (ret)
+			if (scf_handle_decode_fmri(h, fmri, NULL, NULL,
+			    NULL, NULL, prop, SCF_DECODE_FMRI_EXACT) != 0)
 				continue;
 
-			ret = scf_property_is_type(prop, SCF_TYPE_COUNT);
-			if (ret)
-				continue;
-
-			ret = scf_property_get_value(prop, val);
-			if (ret)
-				continue;
-
-			ret = scf_value_get_count(val, &uint64);
-			if (ret)
+			if (scf_property_is_type(prop, SCF_TYPE_COUNT) != 0 ||
+			    scf_property_get_value(prop, val) != 0 ||
+			    scf_value_get_count(val, &uint64) != 0)
 				continue;
 
 			ctid = (ctid_t)uint64;
@@ -302,24 +308,15 @@ stop_delegates()
 		}
 	}
 out:
-	if (sc)
-		scf_scope_destroy(sc);
-	if (svc)
-		scf_service_destroy(svc);
-	if (inst)
-		scf_instance_destroy(inst);
-	if (snap)
-		scf_snapshot_destroy(snap);
-	if (pg)
-		scf_pg_destroy(pg);
-	if (prop)
-		scf_property_destroy(prop);
-	if (val)
-		scf_value_destroy(val);
-	if (siter)
-		scf_iter_destroy(siter);
-	if (iiter)
-		scf_iter_destroy(iiter);
+	scf_scope_destroy(sc);
+	scf_service_destroy(svc);
+	scf_instance_destroy(inst);
+	scf_snapshot_destroy(snap);
+	scf_pg_destroy(pg);
+	scf_property_destroy(prop);
+	scf_value_destroy(val);
+	scf_iter_destroy(siter);
+	scf_iter_destroy(iiter);
 
 	(void) scf_handle_unbind(h);
 	scf_handle_destroy(h);
@@ -374,11 +371,11 @@ gather_args(char **args, char *buf, size_t buf_sz)
  * halt later on.
  */
 static int
-halt_zones(const char *name)
+halt_zones()
 {
 	pid_t pid;
 	zoneid_t *zones;
-	size_t nz, old_nz;
+	size_t nz = 0, old_nz;
 	int i;
 	char zname[ZONENAME_MAX];
 
@@ -396,7 +393,7 @@ halt_zones(const char *name)
 		if (zones == NULL) {
 			(void) fprintf(stderr,
 			    gettext("%s: Could not halt zones"
-			    " (out of memory).\n"), name);
+			    " (out of memory).\n"), cmdname);
 			return (0);
 		}
 
@@ -407,13 +404,11 @@ halt_zones(const char *name)
 	}
 
 	if (nz == 2) {
-		(void) fprintf(stderr,
-		    gettext("%s: Halting 1 zone.\n"),
-		    name);
+		(void) fprintf(stderr, gettext("%s: Halting 1 zone.\n"),
+		    cmdname);
 	} else {
-		(void) fprintf(stderr,
-		    gettext("%s: Halting %i zones.\n"),
-		    name, nz - 1);
+		(void) fprintf(stderr, gettext("%s: Halting %i zones.\n"),
+		    cmdname, nz - 1);
 	}
 
 	for (i = 0; i < nz; i++) {
@@ -429,7 +424,7 @@ halt_zones(const char *name)
 				(void) fprintf(stderr,
 				    gettext("%s: Unexpected error while "
 				    "looking up zone %ul: %s.\n"),
-				    name, zones[i], strerror(errno));
+				    cmdname, zones[i], strerror(errno));
 			}
 
 			continue;
@@ -439,7 +434,7 @@ halt_zones(const char *name)
 			(void) fprintf(stderr,
 			    gettext("%s: Zone \"%s\" could not be"
 			    " halted (could not fork(): %s).\n"),
-			    name, zname, strerror(errno));
+			    cmdname, zname, strerror(errno));
 			continue;
 		}
 		if (pid == 0) {
@@ -448,7 +443,7 @@ halt_zones(const char *name)
 			(void) fprintf(stderr,
 			    gettext("%s: Zone \"%s\" could not be halted"
 			    " (cannot exec(" ZONEADM_PROG "): %s).\n"),
-			    name, zname, strerror(errno));
+			    cmdname, zname, strerror(errno));
 			exit(0);
 		}
 	}
@@ -463,7 +458,7 @@ halt_zones(const char *name)
  */
 
 static void
-check_zones_haltedness(const char *name)
+check_zones_haltedness()
 {
 	int t = 0, t_prog = 0;
 	size_t nz = 0, last_nz;
@@ -487,12 +482,12 @@ check_zones_haltedness(const char *name)
 				(void) fprintf(stderr,
 				    gettext("%s: Still waiting for 1 zone to "
 				    "halt. Will wait up to 20 seconds.\n"),
-				    name);
+				    cmdname);
 			} else {
 				(void) fprintf(stderr,
 				    gettext("%s: Still waiting for %i zones "
 				    "to halt. Will wait up to 20 seconds.\n"),
-				    name, nz - 1);
+				    cmdname, nz - 1);
 			}
 		}
 
@@ -502,7 +497,6 @@ check_zones_haltedness(const char *name)
 int
 main(int argc, char *argv[])
 {
-	char *cmdname = basename(argv[0]);
 	char *ttyn = ttyname(STDERR_FILENO);
 
 	int qflag = 0, needlog = 1, nosync = 0;
@@ -510,16 +504,16 @@ main(int argc, char *argv[])
 	int cmd, fcn, c, aval, r;
 	const char *usage;
 	zoneid_t zoneid = getzoneid();
-	pid_t init_pid = 1;
-	int need_check_zones;
+	int need_check_zones = 0;
 
-	char bootargs_buf[257];		/* uadmin()'s buffer is 257 bytes. */
+	char bootargs_buf[BOOTARGS_MAX];
 
 	const char * const resetting = "/etc/svc/volatile/resetting";
 
-
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
+
+	cmdname = basename(argv[0]);
 
 	if (strcmp(cmdname, "halt") == 0) {
 		(void) audit_halt_setup(argc, argv);
@@ -650,24 +644,18 @@ main(int argc, char *argv[])
 
 	(void) signal(SIGHUP, SIG_IGN);	/* for remote connections */
 
-	if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
-	    sizeof (init_pid)) != sizeof (init_pid)) {
-		assert(errno == ESRCH);
-		init_pid = -1;
-	}
-
 	/*
 	 * We start to fork a bunch of zoneadms to halt any active zones.
 	 * This will proceed with halt in parallel until we call
 	 * check_zone_haltedness later on.
 	 */
 	if (zoneid == GLOBAL_ZONEID && cmd != A_DUMP) {
-		need_check_zones = halt_zones(cmdname);
+		need_check_zones = halt_zones();
 	}
 
 
 	/* sync boot archive in the global zone */
-	if (getzoneid() == GLOBAL_ZONEID && !nosync) {
+	if (zoneid == GLOBAL_ZONEID && !nosync) {
 		(void) system("/sbin/bootadm -a update_all");
 	}
 
@@ -676,14 +664,13 @@ main(int argc, char *argv[])
 	 * smf(5)'s benefit, and idle the init process.
 	 */
 	if (cmd != A_DUMP) {
-		if (init_pid != -1 && kill(init_pid, SIGTSTP) == -1) {
+		if (direct_init(PCDSTOP) == -1) {
 			/*
 			 * TRANSLATION_NOTE
 			 * Don't translate the word "init"
 			 */
 			(void) fprintf(stderr,
 			    gettext("%s: can't idle init\n"), cmdname);
-
 			goto fail;
 		}
 
@@ -702,7 +689,7 @@ main(int argc, char *argv[])
 		 * Wait a little while for zones to shutdown.
 		 */
 		if (need_check_zones) {
-			check_zones_haltedness(cmdname);
+			check_zones_haltedness();
 
 			(void) fprintf(stderr,
 			    gettext("%s: Completing system halt.\n"),
@@ -747,20 +734,35 @@ main(int argc, char *argv[])
 	if (cmd == A_DUMP && nosync != 0)
 		(void) uadmin(A_DUMP, AD_NOSYNC, NULL);
 
-	(void) uadmin(cmd, fcn, mdep);
-	perror(cmdname);
-	do
+	if (uadmin(cmd, fcn, mdep) == -1)
+		(void) fprintf(stderr, "%s: uadmin failed: %s\n",
+		    cmdname, strerror(errno));
+	else
+		(void) fprintf(stderr, "%s: uadmin unexpectedly returned 0\n",
+		    cmdname);
+
+	do {
 		r = remove(resetting);
-	while (r != 0 && errno == EINTR);
+	} while (r != 0 && errno == EINTR);
+
 	if (r != 0 && errno != ENOENT)
 		(void) fprintf(stderr, gettext("%s: could not remove %s.\n"),
 		    cmdname, resetting);
 
+	if (direct_init(PCRUN) == -1) {
+		/*
+		 * TRANSLATION_NOTE
+		 * Don't translate the word "init"
+		 */
+		(void) fprintf(stderr,
+		    gettext("%s: can't resume init\n"), cmdname);
+	}
+
 	continue_restarters();
 
-	if (init_pid != -1)
+	if (get_initpid() != -1)
 		/* tell init to restate current level */
-		(void) kill(init_pid, SIGHUP);
+		(void) kill(get_initpid(), SIGHUP);
 
 fail:
 	if (fcn == AD_BOOT)

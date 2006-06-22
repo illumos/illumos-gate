@@ -1322,7 +1322,7 @@ build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
 	(void) zonecfg_get_uuid(zone_name, uuid);
 	altstr = strdup(zonecfg_get_root());
 	if (altstr == NULL) {
-		zerror(zlogp, B_TRUE, "out of memory");
+		zerror(zlogp, B_TRUE, "memory allocation failed");
 		return (B_FALSE);
 	}
 	zonecfg_set_root("");
@@ -2819,7 +2819,7 @@ again:
 
 	zids = malloc(nzents * sizeof (zoneid_t));
 	if (zids == NULL) {
-		zerror(zlogp, B_TRUE, "unable to allocate memory");
+		zerror(zlogp, B_TRUE, "memory allocation failed");
 		return (-1);
 	}
 	nzents_saved = nzents;
@@ -3071,7 +3071,7 @@ again:
 
 	zids = malloc(nzents * sizeof (zoneid_t));
 	if (zids == NULL) {
-		zerror(zlogp, B_TRUE, "unable to allocate memory");
+		zerror(zlogp, B_TRUE, "memory allocation failed");
 		return;
 	}
 	nzents_saved = nzents;
@@ -3291,7 +3291,7 @@ duplicate_zone_root(zlog_t *zlogp, const char *rootpath)
 		nzids += 10;
 		zids = malloc(nzids * sizeof (*zids));
 		if (zids == NULL) {
-			zerror(zlogp, B_TRUE, "unable to allocate memory");
+			zerror(zlogp, B_TRUE, "memory allocation failed");
 			return (B_TRUE);
 		}
 		if (zone_list(zids, &nzids) == 0)

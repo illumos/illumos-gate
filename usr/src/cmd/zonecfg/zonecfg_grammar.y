@@ -60,14 +60,15 @@ extern void yyerror(char *s);
 %token COMMIT REVERT EXIT SEMICOLON TOKEN ZONENAME ZONEPATH AUTOBOOT POOL NET
 %token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
-%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV
+%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
 %type <complex> complex_piece complex_prop_val
 %type <ival> resource_type NET FS IPD DEVICE RCTL ATTR
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
-    MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV VALUE PRIV LIMIT ACTION
+    MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
+    ACTION
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -446,6 +447,15 @@ info_command:	INFO
 		$$->cmd_res_type = RT_LIMITPRIV;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO BOOTARGS
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_BOOTARGS;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -688,6 +698,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| AUTOBOOT	{ $$ = PT_AUTOBOOT; }
 	| POOL		{ $$ = PT_POOL; }
 	| LIMITPRIV	{ $$ = PT_LIMITPRIV; }
+	| BOOTARGS	{ $$ = PT_BOOTARGS; }
 	| ADDRESS	{ $$ = PT_ADDRESS; }
 	| PHYSICAL	{ $$ = PT_PHYSICAL; }
 	| NAME		{ $$ = PT_NAME; }

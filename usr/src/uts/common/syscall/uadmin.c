@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,8 +107,8 @@ killall(zoneid_t zoneid)
 			} else {
 				sigtoproc(p, NULL, SIGKILL);
 				mutex_exit(&p->p_lock);
-				(void) cv_timedwait(&p->p_srwchan_cv,
-					    &pidlock, lbolt + hz);
+				(void) cv_timedwait(&p->p_srwchan_cv, &pidlock,
+				    lbolt + hz);
 				p = practive;
 			}
 		} else {
@@ -308,7 +307,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 
 		if ((mdep != NULL) && (*(char *)mdep == '/')) {
 			panic_bootstr = i_convert_boot_device_name(mdep,
-					    NULL, &buflen);
+			    NULL, &buflen);
 		} else
 			panic_bootstr = mdep;
 
@@ -331,8 +330,8 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 {
 	int error = 0, rv = 0;
 	size_t nbytes = 0;
-	char buf[257];
 	cred_t *credp = CRED();
+	char *bootargs = NULL;
 
 	/*
 	 * The swapctl system call doesn't have its own entry point: it uses
@@ -349,28 +348,28 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	}
 
 	/*
-	 * Handle zones.
+	 * Certain subcommands intepret a non-NULL mdep value as a pointer to
+	 * a boot string.  We pull that in as bootargs, if applicable.
 	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		error = zone_uadmin(cmd, fcn, credp);
-		return (error ? set_errno(error) : 0);
+	if (mdep != NULL &&
+	    (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP)) {
+		bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
+		if ((error = copyinstr((const char *)mdep, bootargs,
+		    BOOTARGS_MAX, &nbytes)) != 0) {
+			kmem_free(bootargs, BOOTARGS_MAX);
+			return (set_errno(error));
+		}
 	}
 
 	/*
-	 * Certain subcommands intepret a non-NULL mdep value as a pointer to
-	 * a boot string.  Attempt to copy it in now, or reset mdep to NULL.
+	 * Invoke the appropriate kadmin() routine.
 	 */
-	if (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP) {
-		if (mdep != NULL && copyinstr((const char *)mdep, buf,
-		    sizeof (buf) - 1, &nbytes) == 0) {
-			buf[nbytes] = '\0';
-			mdep = (uintptr_t)buf;
-		} else
-			mdep = NULL;
-	}
+	if (getzoneid() != GLOBAL_ZONEID)
+		error = zone_kadmin(cmd, fcn, bootargs, credp);
+	else
+		error = kadmin(cmd, fcn, bootargs, credp);
 
-	if ((error = kadmin(cmd, fcn, (void *)mdep, credp)) != 0)
-		return (set_errno(error));
-
-	return (0);
+	if (bootargs != NULL)
+		kmem_free(bootargs, BOOTARGS_MAX);
+	return (error ? set_errno(error) : 0);
 }

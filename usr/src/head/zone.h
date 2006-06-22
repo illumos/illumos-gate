@@ -59,9 +59,10 @@ extern int zone_get_id(const char *, zoneid_t *);
 extern zoneid_t	zone_create(const char *, const char *,
     const struct priv_set *, const char *, size_t, const char *, size_t, int *,
     int, int, const bslabel_t *);
-extern int	zone_boot(zoneid_t, const char *);
+extern int	zone_boot(zoneid_t);
 extern int	zone_destroy(zoneid_t);
 extern ssize_t	zone_getattr(zoneid_t, int, void *, size_t);
+extern int	zone_setattr(zoneid_t, int, void *, size_t);
 extern int	zone_enter(zoneid_t);
 extern int	zone_list(zoneid_t *, uint_t *);
 extern int	zone_shutdown(zoneid_t);

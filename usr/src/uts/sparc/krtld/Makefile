@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,6 +94,7 @@ $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrlen=$(MODULE)_strlen
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrcpy=$(MODULE)_strcpy
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrncpy=$(MODULE)_strncpy
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrcat=$(MODULE)_strcat
+$(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrlcat=$(MODULE)_strlcat
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dstrchr=$(MODULE)_strchr
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dbzero=$(MODULE)_bzero
 $(OBJECTS) $(LINTS)	:= CPPFLAGS += -Dbcopy=$(MODULE)_bcopy

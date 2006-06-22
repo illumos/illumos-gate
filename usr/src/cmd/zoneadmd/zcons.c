@@ -128,6 +128,8 @@
 
 static int	slavefd = -1;	/* slave side of console */
 static int	serverfd = -1;	/* console server unix domain socket fd */
+char boot_args[BOOTARGS_MAX];
+char bad_boot_arg[BOOTARGS_MAX];
 
 static struct termios base_termios = {	/* from init.c */
 	BRKINT|ICRNL|IXON|IMAXBEL,			/* iflag */
@@ -146,6 +148,8 @@ static struct termios base_termios = {	/* from init.c */
  * message the user, die off, etc.
  */
 static int eventstream[2];
+
+
 
 int
 eventstream_init()
@@ -697,39 +701,62 @@ reject_client(int servfd, pid_t clientpid)
 static void
 event_message(int clifd, char *clilocale, zone_evt_t evt)
 {
-	char msg[BUFSIZ];
-	char *str;
-	const char *fmt;
+	char *str, *lstr = NULL;
+	char lmsg[BUFSIZ];
+	char outbuf[BUFSIZ];
 
 	if (clifd == -1)
 		return;
 
 	switch (evt) {
 	case Z_EVT_ZONE_BOOTING:
-		str = "Zone booting up";
+		if (*boot_args == '\0') {
+			str = "NOTICE: Zone booting up";
+			break;
+		}
+		/*LINTED*/
+		(void) snprintf(lmsg, sizeof (lmsg), localize_msg(clilocale,
+		    "NOTICE: Zone booting up with arguments: %s"), boot_args);
+		lstr = lmsg;
 		break;
 	case Z_EVT_ZONE_READIED:
-		str = "Zone readied";
+		str = "NOTICE: Zone readied";
 		break;
 	case Z_EVT_ZONE_HALTED:
-		str = "Zone halted";
+		str = "NOTICE: Zone halted";
 		break;
 	case Z_EVT_ZONE_REBOOTING:
-		str = "Zone rebooting";
+		if (*boot_args == '\0') {
+			str = "NOTICE: Zone rebooting";
+			break;
+		}
+		/*LINTED*/
+		(void) snprintf(lmsg, sizeof (lmsg), localize_msg(clilocale,
+		    "NOTICE: Zone rebooting with arguments: %s"), boot_args);
+		lstr = lmsg;
 		break;
 	case Z_EVT_ZONE_UNINSTALLING:
-		str = "Zone is being uninstalled.  Disconnecting...";
+		str = "NOTICE: Zone is being uninstalled.  Disconnecting...";
 		break;
 	case Z_EVT_ZONE_BOOTFAILED:
-		str = "Zone boot failed";
+		str = "NOTICE: Zone boot failed";
+		break;
+	case Z_EVT_ZONE_BADARGS:
+		/*LINTED*/
+		(void) snprintf(lmsg, sizeof (lmsg),
+		    localize_msg(clilocale,
+		    "WARNING: Ignoring invalid boot arguments: %s"),
+		    bad_boot_arg);
+		lstr = lmsg;
 		break;
 	default:
 		return;
 	}
-	str = localize_msg(clilocale, str);
-	fmt = localize_msg(clilocale, "\r\n[NOTICE: %s]\r\n");
-	(void) snprintf(msg, sizeof (msg), fmt, str);
-	(void) write(clifd, msg, strlen(msg));
+
+	if (lstr == NULL)
+		lstr = localize_msg(clilocale, str);
+	(void) snprintf(outbuf, sizeof (outbuf), "\r\n[%s]\r\n", lstr);
+	(void) write(clifd, outbuf, strlen(outbuf));
 }
 
 /*

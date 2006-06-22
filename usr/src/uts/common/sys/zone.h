@@ -34,6 +34,7 @@
 #include <sys/rctl.h>
 #include <sys/pset.h>
 #include <sys/tsol/label.h>
+#include <sys/uadmin.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -72,6 +73,7 @@ extern "C" {
 #define	ZONE_LOOKUP	6
 #define	ZONE_BOOT	7
 #define	ZONE_VERSION	8
+#define	ZONE_SETATTR	9
 
 /* zone attributes */
 #define	ZONE_ATTR_ROOT		1
@@ -82,6 +84,8 @@ extern "C" {
 #define	ZONE_ATTR_POOLID	6
 #define	ZONE_ATTR_INITPID	7
 #define	ZONE_ATTR_SLBL		8
+#define	ZONE_ATTR_INITNAME	9
+#define	ZONE_ATTR_BOOTARGS	10
 
 #define	ZONE_EVENT_CHANNEL	"com.sun:zones:status"
 #define	ZONE_EVENT_STATUS_CLASS	"status"
@@ -158,16 +162,15 @@ typedef enum zone_cmd {
 	Z_MOUNT, Z_UNMOUNT
 } zone_cmd_t;
 
-#define	ZONEBOOTARGS_MAX	257	/* uadmin()'s buffer is 257 bytes. */
-
 /*
  * The structure of a request to zoneadmd.
  */
 typedef struct zone_cmd_arg {
 	uint64_t	uniqid;		/* unique "generation number" */
 	zone_cmd_t	cmd;		/* requested action */
+	uint32_t	_pad;		/* need consistent 32/64 bit alignmt */
 	char locale[MAXPATHLEN];	/* locale in which to render messages */
-	char bootbuf[ZONEBOOTARGS_MAX];	/* arguments passed to zone_boot() */
+	char bootbuf[BOOTARGS_MAX];	/* arguments passed to zone_boot() */
 } zone_cmd_arg_t;
 
 /*
@@ -276,6 +279,7 @@ typedef struct zone {
 	kcondvar_t	zone_cv;	/* used to signal state changes */
 	struct proc	*zone_zsched;	/* Dummy kernel "zsched" process */
 	pid_t		zone_proc_initpid; /* pid of "init" for this zone */
+	char		*zone_initname;	/* fs path to 'init' */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
 	char		*zone_bootargs;	/* arguments passed via zone_boot() */
 	/*
@@ -310,6 +314,7 @@ typedef struct zone {
 	ts_label_t	*zone_slabel;	/* zone sensitivity label */
 	int		zone_match;	/* require label match for packets */
 	tsol_mlp_list_t zone_mlps;	/* MLPs on zone-private addresses */
+
 } zone_t;
 
 /*
@@ -478,9 +483,9 @@ extern int zone_ncpus_online_get(zone_t *);
 extern int zone_dataset_visible(const char *, int *);
 
 /*
- * zone version of uadmin()
+ * zone version of kadmin()
  */
-extern int zone_uadmin(int, int, struct cred *);
+extern int zone_kadmin(int, int, const char *, cred_t *);
 extern void zone_shutdown_global(void);
 
 extern void mount_in_progress(void);

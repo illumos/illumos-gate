@@ -811,9 +811,9 @@ is_zonepath_zfs(char *zonepath)
 	int res;
 	char *path;
 	char *parent;
-	struct statvfs buf1, buf2;
+	struct statvfs64 buf1, buf2;
 
-	if (statvfs(zonepath, &buf1) != 0)
+	if (statvfs64(zonepath, &buf1) != 0)
 		return (B_FALSE);
 
 	if (strcmp(buf1.f_basetype, "zfs") != 0)
@@ -823,7 +823,7 @@ is_zonepath_zfs(char *zonepath)
 		return (B_FALSE);
 
 	parent = dirname(path);
-	res = statvfs(parent, &buf2);
+	res = statvfs64(parent, &buf2);
 	free(path);
 
 	if (res != 0)

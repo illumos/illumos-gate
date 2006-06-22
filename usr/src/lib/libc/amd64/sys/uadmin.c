@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,15 +44,14 @@
 #include <sys/uadmin.h>
 #include <unistd.h>
 #include <string.h>
-
-#define	MAX_BOOTARG	256
+#include <zone.h>
 
 static int
 legal_arg(char *bargs)
 {
 	int i;
 
-	for (i = 0; i < MAX_BOOTARG; i++, bargs++) {
+	for (i = 0; i < BOOTARGS_MAX; i++, bargs++) {
 		if (*bargs == 0 && i > 0)
 			return (i);
 		if (!isprint(*bargs))
@@ -73,7 +71,8 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	char *altroot;
 
 	bargs = (char *)mdep;
-	if (geteuid() == 0 && (cmd == A_SHUTDOWN || cmd == A_REBOOT)) {
+	if (geteuid() == 0 && getzoneid() == GLOBAL_ZONEID &&
+	    (cmd == A_SHUTDOWN || cmd == A_REBOOT)) {
 		switch (fcn) {
 		case AD_IBOOT:
 		case AD_SBOOT:

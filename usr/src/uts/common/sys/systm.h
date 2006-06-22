@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +58,7 @@ typedef uintptr_t pc_t;
 
 #ifdef _KERNEL
 #include <sys/varargs.h>
+#include <sys/uadmin.h>
 
 extern int hz;			/* system clock rate */
 extern struct vnode *rootdir;	/* pointer to vnode of root directory */
@@ -446,16 +446,21 @@ extern	int	__lintzero;	/* for spoofing lint */
 
 
 /*
- * initname holds the path to init.  It is defined by main.c, may be set by
- * bootflags.c, and is used by main.c:exec_init().
+ * initname holds the path to init and is used as a point of rendezvous
+ * between krtld (which processes the boot arguments) and the kernel.
  */
 #define	INITNAME_SZ	32
-#define	INITARGS_SZ	80
-
 extern char initname[INITNAME_SZ];
-extern char initargs[INITARGS_SZ];
 
-extern int exec_init(const char *, int, const char *);
+/*
+ * initargs holds the arguments to init (such as -v, -s, -r, -m verbose) and
+ * is a point of rendezvous between krtld (which processes the boot arguments)
+ * and the kernel.
+ */
+extern char initargs[BOOTARGS_MAX];
+
+extern int exec_init(const char *, const char *);
+extern int start_init_common(void);
 
 #endif	/* _KERNEL */
 

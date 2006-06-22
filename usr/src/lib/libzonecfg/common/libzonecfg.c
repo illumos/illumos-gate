@@ -90,6 +90,7 @@
 #define	DTD_ATTR_DIR		(const xmlChar *) "directory"
 #define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
 #define	DTD_ATTR_LIMITPRIV	(const xmlChar *) "limitpriv"
+#define	DTD_ATTR_BOOTARGS	(const xmlChar *) "bootargs"
 #define	DTD_ATTR_MATCH		(const xmlChar *) "match"
 #define	DTD_ATTR_NAME		(const xmlChar *) "name"
 #define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
@@ -875,9 +876,21 @@ zonecfg_get_limitpriv(zone_dochandle_t handle, char **limitpriv)
 }
 
 int
-zonecfg_set_limitpriv(zone_dochandle_t handle, char *limitprivsize)
+zonecfg_set_limitpriv(zone_dochandle_t handle, char *limitpriv)
 {
-	return (setrootattr(handle, DTD_ATTR_LIMITPRIV, limitprivsize));
+	return (setrootattr(handle, DTD_ATTR_LIMITPRIV, limitpriv));
+}
+
+int
+zonecfg_get_bootargs(zone_dochandle_t handle, char *bargs, size_t bargssize)
+{
+	return (getrootattr(handle, DTD_ATTR_BOOTARGS, bargs, bargssize));
+}
+
+int
+zonecfg_set_bootargs(zone_dochandle_t handle, char *bargs)
+{
+	return (setrootattr(handle, DTD_ATTR_BOOTARGS, bargs));
 }
 
 /*

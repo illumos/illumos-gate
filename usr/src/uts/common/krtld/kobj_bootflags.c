@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +49,7 @@ bootflags(struct bootops *ops)
 	uchar_t num_O_opt = 0;
 	char *cp;
 	int c;
-
+	char scratch[BOOTARGS_MAX];
 
 	if (BOP_GETPROP(ops, "boot-args", kern_bootargs) != 0) {
 		boothowto |= RB_ASKNAME;
@@ -74,6 +73,7 @@ bootflags(struct bootops *ops)
 	params.gos_strp = cp;
 	getoptstr_init(&params);
 	while ((c = getoptstr(&params)) != -1) {
+
 		switch (c) {
 		case 'a':
 			boothowto |= RB_ASKNAME;
@@ -110,16 +110,20 @@ bootflags(struct bootops *ops)
 			boothowto |= RB_KMDB;
 			break;
 		case 'm':
-			if (2 + params.gos_optarglen + 1 > sizeof (initargs))
-				printf(
-				    "unix: -m argument too long.  Ignoring.\n");
-			else {
-				(void) strcpy(initargs, "-m");
-				(void) strncat(initargs, params.gos_optargp,
-				    params.gos_optarglen);
-				initargs[sizeof ("-m") - 1 +
-				    params.gos_optarglen] = '\0';
+			if (strlen(initargs) + 3 + params.gos_optarglen + 1 >
+			    sizeof (initargs)) {
+				_kobj_printf(ops,
+				    "unix: init options too long.  "
+				    "Ignoring -m.\n");
+				break;
 			}
+			/* gos_optargp is not null terminated */
+			(void) strncpy(scratch, params.gos_optargp,
+			    params.gos_optarglen);
+			scratch[params.gos_optarglen] = '\0';
+			(void) strlcat(initargs, "-m ", sizeof (initargs));
+			(void) strlcat(initargs, scratch, sizeof (initargs));
+			(void) strlcat(initargs, " ", sizeof (initargs));
 			break;
 		case 'O': {
 			char **str = &kobj_kmdb_argv[num_O_opt];
@@ -139,13 +143,31 @@ bootflags(struct bootops *ops)
 			break;
 		}
 		case 'r':
+			if (strlen(initargs) + 3 + 1 > sizeof (initargs)) {
+				_kobj_printf(ops, "unix: init options too "
+				    "long.  Ignoring -r.\n");
+				break;
+			}
 			boothowto |= RB_RECONFIG;
+			(void) strlcat(initargs, "-r ", sizeof (initargs));
 			break;
 		case 's':
+			if (strlen(initargs) + 3 + 1 > sizeof (initargs)) {
+				_kobj_printf(ops, "unix: init options too "
+				    "long.  Ignoring -s.\n");
+				break;
+			}
 			boothowto |= RB_SINGLE;
+			(void) strlcat(initargs, "-s ", sizeof (initargs));
 			break;
 		case 'v':
+			if (strlen(initargs) + 3 + 1 > sizeof (initargs)) {
+				_kobj_printf(ops, "unix: init options too "
+				    "long.  Ignoring -v.\n");
+				break;
+			}
 			boothowto |= RB_VERBOSE;
+			(void) strlcat(initargs, "-v ", sizeof (initargs));
 			break;
 		case 'w':
 			boothowto |= RB_WRITABLE;

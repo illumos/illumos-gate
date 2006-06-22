@@ -175,6 +175,8 @@
  *     root path, privileges, resource controls, ZFS datasets)
  *   - zone_enter: allows the current process to enter a zone
  *   - zone_getattr: reports attributes of a zone
+ *   - zone_setattr: set attributes of a zone
+ *   - zone_boot: set 'init' running for the zone
  *   - zone_list: lists all zones active in the system
  *   - zone_lookup: looks up zone id based on name
  *   - zone_shutdown: initiates shutdown process (see states above)
@@ -221,6 +223,7 @@
 #include <sys/session.h>
 #include <sys/cmn_err.h>
 #include <sys/modhash.h>
+#include <sys/sunddi.h>
 #include <sys/nvpair.h>
 #include <sys/rctl.h>
 #include <sys/fss.h>
@@ -320,7 +323,7 @@ static int mounts_in_progress;
 static kcondvar_t mount_cv;
 static kmutex_t mount_lock;
 
-const char * const zone_initname = "/sbin/init";
+const char * const zone_default_initname = "/sbin/init";
 static char * const zone_prefix = "/zone/";
 
 static int zone_shutdown(zoneid_t zoneid);
@@ -338,8 +341,10 @@ static int zone_shutdown(zoneid_t zoneid);
  *     import of ZFS datasets to zones.
  * Version 4 alters the zone_create system call in order to support
  *     Trusted Extensions.
+ * Version 5 alters the zone_boot system call, and converts its old
+ *     bootargs parameter to be set by the zone_setattr API instead.
  */
-static const int ZONE_SYSCALL_API_VERSION = 4;
+static const int ZONE_SYSCALL_API_VERSION = 5;
 
 /*
  * Certain filesystems (such as NFS and autofs) need to know which zone
@@ -974,6 +979,7 @@ zone_zsd_init(void)
 	zone0.zone_ncpus = 0;
 	zone0.zone_ncpus_online = 0;
 	zone0.zone_proc_initpid = 1;
+	zone0.zone_initname = initname;
 	list_create(&zone0.zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
 	list_insert_head(&zone_active, &zone0);
@@ -985,7 +991,7 @@ zone_zsd_init(void)
 	 */
 	zone0.zone_rootvp = NULL;
 	zone0.zone_vfslist = NULL;
-	zone0.zone_bootargs = NULL;
+	zone0.zone_bootargs = initargs;
 	zone0.zone_privset = kmem_alloc(sizeof (priv_set_t), KM_SLEEP);
 	/*
 	 * The global zone has all privileges
@@ -1207,7 +1213,9 @@ zone_free(zone_t *zone)
 	if (zone->zone_rctls != NULL)
 		rctl_set_free(zone->zone_rctls);
 	if (zone->zone_bootargs != NULL)
-		kmem_free(zone->zone_bootargs, ZONEBOOTARGS_MAX);
+		kmem_free(zone->zone_bootargs, strlen(zone->zone_bootargs) + 1);
+	if (zone->zone_initname != NULL)
+		kmem_free(zone->zone_initname, strlen(zone->zone_initname) + 1);
 	id_free(zoneid_space, zone->zone_id);
 	mutex_destroy(&zone->zone_lock);
 	cv_destroy(&zone->zone_cv);
@@ -1234,14 +1242,13 @@ zone_status_set(zone_t *zone, zone_status_t status)
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) ||
 	    nvlist_add_string(nvl, ZONE_CB_NAME, zone->zone_name) ||
 	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE,
-		zone_status_table[status]) ||
+	    zone_status_table[status]) ||
 	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE,
-		zone_status_table[zone->zone_status]) ||
+	    zone_status_table[zone->zone_status]) ||
 	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, zone->zone_id) ||
 	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, (uint64_t)gethrtime()) ||
 	    sysevent_evc_publish(zone_event_chan, ZONE_EVENT_STATUS_CLASS,
-		ZONE_EVENT_STATUS_SUBCLASS,
-		"sun.com", "kernel", nvl, EVCH_SLEEP)) {
+	    ZONE_EVENT_STATUS_SUBCLASS, "sun.com", "kernel", nvl, EVCH_SLEEP)) {
 #ifdef DEBUG
 		(void) printf(
 		    "Failed to allocate and send zone state change event.\n");
@@ -1267,19 +1274,40 @@ zone_status_get(zone_t *zone)
 static int
 zone_set_bootargs(zone_t *zone, const char *zone_bootargs)
 {
-	char *bootargs = kmem_zalloc(ZONEBOOTARGS_MAX, KM_SLEEP);
+	char *bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);
+	int err = 0;
+
+	ASSERT(zone != global_zone);
+	if ((err = copyinstr(zone_bootargs, bootargs, BOOTARGS_MAX, NULL)) != 0)
+		goto done;	/* EFAULT or ENAMETOOLONG */
+
+	if (zone->zone_bootargs != NULL)
+		kmem_free(zone->zone_bootargs, strlen(zone->zone_bootargs) + 1);
+
+	zone->zone_bootargs = kmem_alloc(strlen(bootargs) + 1, KM_SLEEP);
+	(void) strcpy(zone->zone_bootargs, bootargs);
+
+done:
+	kmem_free(bootargs, BOOTARGS_MAX);
+	return (err);
+}
+
+static int
+zone_set_initname(zone_t *zone, const char *zone_initname)
+{
+	char initname[INITNAME_SZ];
 	size_t len;
-	int err;
+	int err = 0;
 
-	err = copyinstr(zone_bootargs, bootargs, ZONEBOOTARGS_MAX - 1, &len);
-	if (err != 0) {
-		kmem_free(bootargs, ZONEBOOTARGS_MAX);
+	ASSERT(zone != global_zone);
+	if ((err = copyinstr(zone_initname, initname, INITNAME_SZ, &len)) != 0)
 		return (err);	/* EFAULT or ENAMETOOLONG */
-	}
-	bootargs[len] = '\0';
 
-	ASSERT(zone->zone_bootargs == NULL);
-	zone->zone_bootargs = bootargs;
+	if (zone->zone_initname != NULL)
+		kmem_free(zone->zone_initname, strlen(zone->zone_initname) + 1);
+
+	zone->zone_initname = kmem_alloc(strlen(initname) + 1, KM_SLEEP);
+	(void) strcpy(zone->zone_initname, initname);
 	return (0);
 }
 
@@ -2182,44 +2210,21 @@ nvlist2rctlval(nvlist_t *nvl, rctl_val_t *rv)
 	return (0);
 }
 
+/*
+ * Non-global zone version of start_init.
+ */
 void
-zone_icode(void)
+zone_start_init(void)
 {
 	proc_t *p = ttoproc(curthread);
-	struct core_globals	*cg;
+
+	ASSERT(!INGLOBALZONE(curproc));
 
 	/*
-	 * For all purposes (ZONE_ATTR_INITPID and restart_init),
-	 * storing just the pid of init is sufficient.
+	 * We maintain zone_boot_err so that we can return the cause of the
+	 * failure back to the caller of the zone_boot syscall.
 	 */
-	p->p_zone->zone_proc_initpid = p->p_pid;
-
-	/*
-	 * Allocate user address space and stack segment
-	 */
-
-	p->p_cstime = p->p_stime = p->p_cutime = p->p_utime = 0;
-	p->p_usrstack = (caddr_t)USRSTACK32;
-	p->p_model = DATAMODEL_ILP32;
-	p->p_stkprot = PROT_ZFOD & ~PROT_EXEC;
-	p->p_datprot = PROT_ZFOD & ~PROT_EXEC;
-	p->p_stk_ctl = INT32_MAX;
-
-	p->p_as = as_alloc();
-	p->p_as->a_userlimit = (caddr_t)USERLIMIT32;
-	(void) hat_setup(p->p_as->a_hat, HAT_INIT);
-
-	cg = zone_getspecific(core_zone_key, p->p_zone);
-	ASSERT(cg != NULL);
-	corectl_path_hold(cg->core_default_path);
-	corectl_content_hold(cg->core_default_content);
-	p->p_corefile = cg->core_default_path;
-	p->p_content = cg->core_default_content;
-
-	init_mstate(curthread, LMS_SYSTEM);
-
-	p->p_zone->zone_boot_err = exec_init(zone_initname, 0,
-	    p->p_zone->zone_bootargs);
+	p->p_zone->zone_boot_err = start_init_common();
 
 	mutex_enter(&zone_status_lock);
 	if (p->p_zone->zone_boot_err != 0) {
@@ -2505,7 +2510,7 @@ zsched(void *arg)
 		 * state of the zone will be set to SHUTTING_DOWN-- userland
 		 * will have to tear down the zone, and fail, or try again.
 		 */
-		if ((zone->zone_boot_err = newproc(zone_icode, NULL, cid,
+		if ((zone->zone_boot_err = newproc(zone_start_init, NULL, cid,
 		    minclsyspri - 1, &ct)) != 0) {
 			mutex_enter(&zone_status_lock);
 			zone_status_set(zone, ZONE_IS_SHUTTING_DOWN);
@@ -2853,6 +2858,9 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_domain[0] = '\0';
 	zone->zone_shares = 1;
 	zone->zone_bootargs = NULL;
+	zone->zone_initname =
+	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
+	(void) strcpy(zone->zone_initname, zone_default_initname);
 
 	/*
 	 * Zsched initializes the rctls.
@@ -3076,10 +3084,12 @@ errout:
 
 /*
  * Cause the zone to boot.  This is pretty simple, since we let zoneadmd do
- * the heavy lifting.
+ * the heavy lifting.  initname is the path to the program to launch
+ * at the "top" of the zone; if this is NULL, we use the system default,
+ * which is stored at zone_default_initname.
  */
 static int
-zone_boot(zoneid_t zoneid, const char *bootargs)
+zone_boot(zoneid_t zoneid)
 {
 	int err;
 	zone_t *zone;
@@ -3097,11 +3107,6 @@ zone_boot(zoneid_t zoneid, const char *bootargs)
 	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
 		mutex_exit(&zonehash_lock);
 		return (set_errno(EINVAL));
-	}
-
-	if ((err = zone_set_bootargs(zone, bootargs)) != 0) {
-		mutex_exit(&zonehash_lock);
-		return (set_errno(err));
 	}
 
 	mutex_enter(&zone_status_lock);
@@ -3487,6 +3492,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	int error = 0, err;
 	zone_t *zone;
 	char *zonepath;
+	char *outstr;
 	zone_status_t zone_status;
 	pid_t initpid;
 	boolean_t global = (curproc->p_zone == global_zone);
@@ -3550,7 +3556,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 				zonepath = kmem_alloc(size, KM_SLEEP);
 				bcopy(zone_prefix, zonepath, prefix_len);
 				bcopy(zone->zone_name, zonepath +
-					prefix_len, zname_len);
+				    prefix_len, zname_len);
 				zonepath[size - 1] = '\0';
 			}
 		}
@@ -3648,6 +3654,31 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		    copyout(&initpid, buf, bufsize) != 0)
 			error = EFAULT;
 		break;
+	case ZONE_ATTR_INITNAME:
+		size = strlen(zone->zone_initname) + 1;
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL) {
+			err = copyoutstr(zone->zone_initname, buf, bufsize,
+			    NULL);
+			if (err != 0 && err != ENAMETOOLONG)
+				error = EFAULT;
+		}
+		break;
+	case ZONE_ATTR_BOOTARGS:
+		if (zone->zone_bootargs == NULL)
+			outstr = "";
+		else
+			outstr = zone->zone_bootargs;
+		size = strlen(outstr) + 1;
+		if (bufsize > size)
+			bufsize = size;
+		if (buf != NULL) {
+			err = copyoutstr(outstr, buf, bufsize, NULL);
+			if (err != 0 && err != ENAMETOOLONG)
+				error = EFAULT;
+		}
+		break;
 	default:
 		error = EINVAL;
 	}
@@ -3656,6 +3687,56 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	if (error)
 		return (set_errno(error));
 	return ((ssize_t)size);
+}
+
+/*
+ * Systemcall entry point for zone_setattr(2).
+ */
+/*ARGSUSED*/
+static int
+zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
+{
+	zone_t *zone;
+	zone_status_t zone_status;
+	int err;
+
+	if (secpolicy_zone_config(CRED()) != 0)
+		return (set_errno(EPERM));
+
+	/*
+	 * At present, attributes can only be set on non-running,
+	 * non-global zones.
+	 */
+	if (zoneid == GLOBAL_ZONEID) {
+		return (set_errno(EINVAL));
+	}
+
+	mutex_enter(&zonehash_lock);
+	if ((zone = zone_find_all_by_id(zoneid)) == NULL) {
+		mutex_exit(&zonehash_lock);
+		return (set_errno(EINVAL));
+	}
+	zone_hold(zone);
+	mutex_exit(&zonehash_lock);
+
+	zone_status = zone_status_get(zone);
+	if (zone_status > ZONE_IS_READY)
+		goto done;
+
+	switch (attr) {
+	case ZONE_ATTR_INITNAME:
+		err = zone_set_initname(zone, (const char *)buf);
+		break;
+	case ZONE_ATTR_BOOTARGS:
+		err = zone_set_bootargs(zone, (const char *)buf);
+		break;
+	default:
+		err = EINVAL;
+	}
+
+done:
+	zone_rele(zone);
+	return (err != 0 ? set_errno(err) : 0);
 }
 
 /*
@@ -4221,12 +4302,14 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		    zs.extended_error, zs.match, zs.doi,
 		    zs.label));
 	case ZONE_BOOT:
-		return (zone_boot((zoneid_t)(uintptr_t)arg1,
-		    (const char *)arg2));
+		return (zone_boot((zoneid_t)(uintptr_t)arg1));
 	case ZONE_DESTROY:
 		return (zone_destroy((zoneid_t)(uintptr_t)arg1));
 	case ZONE_GETATTR:
 		return (zone_getattr((zoneid_t)(uintptr_t)arg1,
+		    (int)(uintptr_t)arg2, arg3, (size_t)arg4));
+	case ZONE_SETATTR:
+		return (zone_setattr((zoneid_t)(uintptr_t)arg1,
 		    (int)(uintptr_t)arg2, arg3, (size_t)arg4));
 	case ZONE_ENTER:
 		return (zone_enter((zoneid_t)(uintptr_t)arg1));
@@ -4390,8 +4473,8 @@ out:
 }
 
 /*
- * Entry point for uadmin() to tell the zone to go away or reboot.  The caller
- * is a process in the zone to be modified.
+ * Entry point for uadmin() to tell the zone to go away or reboot.  Analog to
+ * kadmin().  The caller is a process in the zone.
  *
  * In order to shutdown the zone, we will hand off control to zoneadmd
  * (running in the global zone) via a door.  We do a half-hearted job at
@@ -4401,7 +4484,7 @@ out:
  * zone_destroy()) know exactly which zone they're re talking about.
  */
 int
-zone_uadmin(int cmd, int fcn, cred_t *credp)
+zone_kadmin(int cmd, int fcn, const char *mdep, cred_t *credp)
 {
 	struct zarg *zargp;
 	zone_cmd_t zcmd;
@@ -4445,6 +4528,7 @@ zone_uadmin(int cmd, int fcn, cred_t *credp)
 	if (secpolicy_zone_admin(credp, B_FALSE))
 		return (EPERM);
 	mutex_enter(&zone_status_lock);
+
 	/*
 	 * zone_status can't be ZONE_IS_EMPTY or higher since curproc
 	 * is in the zone.
@@ -4474,11 +4558,16 @@ zone_uadmin(int cmd, int fcn, cred_t *credp)
 	 * work.  This thread can't be created in our zone otherwise
 	 * zone_destroy() would deadlock.
 	 */
-	zargp = kmem_alloc(sizeof (*zargp), KM_SLEEP);
+	zargp = kmem_zalloc(sizeof (*zargp), KM_SLEEP);
 	zargp->arg.cmd = zcmd;
 	zargp->arg.uniqid = zone->zone_uniqid;
+	zargp->zone = zone;
 	(void) strcpy(zargp->arg.locale, "C");
-	zone_hold(zargp->zone = zone);
+	/* mdep was already copied in for us by uadmin */
+	if (mdep != NULL)
+		(void) strlcpy(zargp->arg.bootbuf, mdep,
+		    sizeof (zargp->arg.bootbuf));
+	zone_hold(zone);
 
 	(void) thread_create(NULL, 0, zone_ki_call_zoneadmd, zargp, 0, &p0,
 	    TS_RUN, minclsyspri);

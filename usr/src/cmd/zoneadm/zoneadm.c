@@ -112,10 +112,10 @@ struct cmd {
 };
 
 #define	SHELP_HELP	"help"
-#define	SHELP_BOOT	"boot [-s]"
+#define	SHELP_BOOT	"boot [-- boot_arguments]"
 #define	SHELP_HALT	"halt"
 #define	SHELP_READY	"ready"
-#define	SHELP_REBOOT	"reboot"
+#define	SHELP_REBOOT	"reboot [-- boot_arguments]"
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
 #define	SHELP_INSTALL	"install [-x nodataset]"
@@ -191,9 +191,8 @@ long_help(int cmd_num)
 	case CMD_HELP:
 		return (gettext("Print usage message."));
 	case CMD_BOOT:
-		return (gettext("Activates (boots) specified zone.  "
-		    "The -s flag can be used\n\tto boot the zone in "
-		    "the single-user state."));
+		return (gettext("Activates (boots) specified zone.  See "
+		    "zoneadm(1m) for valid boot\n\targuments."));
 	case CMD_HALT:
 		return (gettext("Halts specified zone, bypassing shutdown "
 		    "scripts and removing runtime\n\tresources of the zone."));
@@ -202,7 +201,8 @@ long_help(int cmd_num)
 		    "does not start any user\n\tprocesses in the zone."));
 	case CMD_REBOOT:
 		return (gettext("Restarts the zone (equivalent to a halt / "
-		    "boot sequence).\n\tFails if the zone is not active."));
+		    "boot sequence).\n\tFails if the zone is not active.  "
+		    "See zoneadm(1m) for valid boot\n\targuments."));
 	case CMD_LIST:
 		return (gettext("Lists the current zones, or a "
 		    "specific zone if indicated.  By default,\n\tall "
@@ -772,7 +772,7 @@ validate_zonepath(char *path, int cmd_num)
 	int res;			/* result of last library/system call */
 	boolean_t err = B_FALSE;	/* have we run into an error? */
 	struct stat stbuf;
-	struct statvfs vfsbuf;
+	struct statvfs64 vfsbuf;
 	char rpath[MAXPATHLEN];		/* resolved path */
 	char ppath[MAXPATHLEN];		/* parent path */
 	char rppath[MAXPATHLEN];	/* resolved parent path */
@@ -904,7 +904,7 @@ validate_zonepath(char *path, int cmd_num)
 		err = B_TRUE;
 	}
 
-	if (statvfs(rpath, &vfsbuf) != 0) {
+	if (statvfs64(rpath, &vfsbuf) != 0) {
 		zperror(rpath, B_FALSE);
 		return (Z_ERR);
 	}
@@ -1315,10 +1315,18 @@ boot_func(int argc, char *argv[])
 	zarg.bootbuf[0] = '\0';
 
 	/*
-	 * At the current time, the only supported subargument to the
-	 * "boot" subcommand is "-s" which specifies a single-user boot.
-	 * In the future, other boot arguments should be supported
-	 * including "-m" for specifying alternate smf(5) milestones.
+	 * The following getopt processes arguments to zone boot; that
+	 * is to say, the [here] portion of the argument string:
+	 *
+	 *	zoneadm -z myzone boot [here] -- -v -m verbose
+	 *
+	 * Where [here] can either be nothing, -? (in which case we bail
+	 * and print usage), or -s.  Support for -s is vestigal and
+	 * obsolete, but is retained because it was a documented interface
+	 * and there are known consumers including admin/install; the
+	 * proper way to specify boot arguments like -s is:
+	 *
+	 *	zoneadm -z myzone boot -- -s -v -m verbose.
 	 */
 	optind = 0;
 	if ((arg = getopt(argc, argv, "?s")) != EOF) {
@@ -1335,10 +1343,21 @@ boot_func(int argc, char *argv[])
 			return (Z_USAGE);
 		}
 	}
-	if (argc > optind) {
-		sub_usage(SHELP_BOOT, CMD_BOOT);
-		return (Z_USAGE);
+
+	for (; optind < argc; optind++) {
+		if (strlcat(zarg.bootbuf, argv[optind],
+		    sizeof (zarg.bootbuf)) >= sizeof (zarg.bootbuf)) {
+			zerror(gettext("Boot argument list too long"));
+			return (Z_ERR);
+		}
+		if (optind < argc - 1)
+			if (strlcat(zarg.bootbuf, " ", sizeof (zarg.bootbuf)) >=
+			    sizeof (zarg.bootbuf)) {
+				zerror(gettext("Boot argument list too long"));
+				return (Z_ERR);
+			}
 	}
+
 	if (sanity_check(target_zone, CMD_BOOT, B_FALSE, B_FALSE) != Z_OK)
 		return (Z_ERR);
 	if (verify_details(CMD_BOOT) != Z_OK)
@@ -1789,10 +1808,23 @@ reboot_func(int argc, char *argv[])
 			return (Z_USAGE);
 		}
 	}
-	if (argc > 0) {
-		sub_usage(SHELP_REBOOT, CMD_REBOOT);
-		return (Z_USAGE);
+
+	zarg.bootbuf[0] = '\0';
+	for (; optind < argc; optind++) {
+		if (strlcat(zarg.bootbuf, argv[optind],
+		    sizeof (zarg.bootbuf)) >= sizeof (zarg.bootbuf)) {
+			zerror(gettext("Boot argument list too long"));
+			return (Z_ERR);
+		}
+		if (optind < argc - 1)
+			if (strlcat(zarg.bootbuf, " ", sizeof (zarg.bootbuf)) >=
+			    sizeof (zarg.bootbuf)) {
+				zerror(gettext("Boot argument list too long"));
+				return (Z_ERR);
+			}
 	}
+
+
 	/*
 	 * zoneadmd should be the one to decide whether or not to proceed,
 	 * so even though it seems that the fourth parameter below should

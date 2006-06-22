@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -162,7 +161,6 @@ restart_init(int what, int why)
 	sess_t *sp;
 	int i, err;
 	char reason_buf[64];
-	const char *ipath;
 
 	/*
 	 * Let zone admin (and global zone admin if this is for a non-global
@@ -276,8 +274,7 @@ restart_init(int what, int why)
 	 * succeed, the caller will treat this like a successful system call.
 	 * If we fail, we issue messages and the caller will proceed with exit.
 	 */
-	ipath = INGLOBALZONE(p) ? initname : zone_initname;
-	err = exec_init(ipath, 0, NULL);
+	err = exec_init(p->p_zone->zone_initname, NULL);
 
 	if (err == 0)
 		return (0);
@@ -370,7 +367,7 @@ proc_exit(int why, int what)
 	DTRACE_PROC1(exit, int, why);
 
 	/*
-	 * Don't let init exit unless zone_icode() failed its exec, or
+	 * Don't let init exit unless zone_start_init() failed its exec, or
 	 * we are shutting down the zone or the machine.
 	 *
 	 * Since we are single threaded, we don't need to lock the
@@ -883,7 +880,7 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 	 */
 	if (idtype == P_ALL &&
 	    (options & (WOPTMASK & ~WNOWAIT)) == (WNOHANG | WEXITED) &&
-		pp->p_child_ns == NULL) {
+	    pp->p_child_ns == NULL) {
 
 		if (pp->p_child) {
 			mutex_exit(&pidlock);
