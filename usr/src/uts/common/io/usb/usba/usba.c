@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1980,15 +1979,6 @@ usba_ready_device_node(dev_info_t *child_dip)
 	/* update the address property */
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 			"assigned-address", usba_device->usb_addr);
-	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
-		    "usba_ready_device_node: address update failed");
-	}
-
-	/* update the address property */
-	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"assigned-address", usba_device->usb_addr);
-
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: address update failed");

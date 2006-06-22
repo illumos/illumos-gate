@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,8 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -927,13 +927,23 @@ usba_process_if_descr(usba_reg_state_t *state, boolean_t *requested_if)
 		return (USB_FAILURE);
 	}
 
-	*requested_if = B_TRUE;
 	new_if_descr = kmem_zalloc(sizeof (usb_if_descr_t), KM_SLEEP);
 
 	/* Strictly speaking, unpacking is not necessary.  Could use bcopy. */
 	(void) usb_parse_data("9c", state->st_curr_raw_descr,
 			state->st_curr_raw_descr_len,
 			new_if_descr, sizeof (usb_if_descr_t));
+
+	/* Check the interface number in case of a malfunction device */
+	if (new_if_descr->bInterfaceNumber >= state->st_curr_cfg->cfg_n_if) {
+		USB_DPRINTF_L2(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
+		    "usba_process_if_descr: bInterfaceNumber=%d is not "
+		    "a valid one", new_if_descr->bInterfaceNumber);
+		kmem_free(new_if_descr, sizeof (usb_if_descr_t));
+
+		return (USB_FAILURE);
+	}
+	*requested_if = B_TRUE;
 
 	/* Not a requested interface. */
 	if ((state->st_if_to_build != new_if_descr->bInterfaceNumber) &&

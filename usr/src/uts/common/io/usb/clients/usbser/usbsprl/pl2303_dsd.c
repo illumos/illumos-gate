@@ -249,34 +249,42 @@ pl2303_attach(ds_attach_info_t *aip)
 	    &pl2303_errlevel, &pl2303_errmask, &pl2303_instance_debug, 0);
 
 	/*
-	 * check the chip type: pl2303_H, pl2303_X (or pl2303_HX)
-	 * pl2303_UNKNOWN means not supported chip type
+	 * Check the chip type: pl2303_H, pl2303_X (or pl2303_HX(Chip A)),
+	 * pl2303_HX(Chip D).
+	 * pl2303_UNKNOWN means not supported chip type.
 	 */
 	if (plp->pl_dev_data->dev_descr->bcdDevice == PROLIFIC_REV_H) {
 		mutex_enter(&plp->pl_mutex);
 		plp->pl_chiptype = pl2303_H;
 		mutex_exit(&plp->pl_mutex);
-		USB_DPRINTF_L4(DPRINT_ATTACH, plp->pl_lh,
+		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
 			"Chip Type: pl2303_H");
 	} else if (plp->pl_dev_data->dev_descr->bcdDevice == PROLIFIC_REV_X) {
 		/*
-		 * pl2303_HX and pl2303_X devices have different hardware,
-		 * but from the view of device driver, they have the same
-		 * software interface.
+		 * pl2303_HX(Chip A)and pl2303_X devices have different
+		 * hardware, but from the view of device driver, they have
+		 * the same software interface.
 		 *
-		 * so "pl2303_X" will stand for both pl2303_HX and pl2303_X
-		 * devices in this driver
+		 * So "pl2303_X" will stand for both pl2303_HX(Chip A)and
+		 * pl2303_X devices in this driver.
 		 */
 		mutex_enter(&plp->pl_mutex);
 		plp->pl_chiptype = pl2303_X;
 		mutex_exit(&plp->pl_mutex);
-		USB_DPRINTF_L4(DPRINT_ATTACH, plp->pl_lh,
-			"Chip Type: pl2303_HX or pl2303_X");
+		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
+			"Chip Type: pl2303_HX(Chip A) or pl2303_X");
+	} else if (plp->pl_dev_data->dev_descr->bcdDevice ==
+			PROLIFIC_REV_HX_CHIP_D) {
+		mutex_enter(&plp->pl_mutex);
+		plp->pl_chiptype = pl2303_HX_CHIP_D;
+		mutex_exit(&plp->pl_mutex);
+		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
+			"Chip Type: pl2303_HX(Chip D)");
 	} else {
 		mutex_enter(&plp->pl_mutex);
 		plp->pl_chiptype = pl2303_UNKNOWN;
 		mutex_exit(&plp->pl_mutex);
-		USB_DPRINTF_L4(DPRINT_ATTACH, plp->pl_lh,
+		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
 			"Chip Type: Unknown");
 	}
 
@@ -718,6 +726,7 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 
 					break;
 				case pl2303_X:
+				case pl2303_HX_CHIP_D:
 					xon_char = pe->val.uc[0];
 					xoff_char = pe->val.uc[1];
 					xonxoff_symbol = (xoff_char << 8)
@@ -1841,6 +1850,7 @@ pl2303_open_hw_port(pl2303_state_t *plp)
 
 		break;
 	case (pl2303_X):
+	case (pl2303_HX_CHIP_D):
 
 		/* Set DCR0 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR0,
@@ -2029,6 +2039,7 @@ pl2303_cmd_set_rtscts(pl2303_state_t *plp)
 
 		return (pl2303_cmd_vendor_write0(plp, SET_DCR0, DCR0_INIT_H));
 	case pl2303_X:
+	case pl2303_HX_CHIP_D:
 
 		return (pl2303_cmd_vendor_write0(plp, SET_DCR0, DCR0_INIT_X));
 	case pl2303_UNKNOWN:

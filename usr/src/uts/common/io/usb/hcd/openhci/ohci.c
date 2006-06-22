@@ -1481,6 +1481,8 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 {
 	int			revision, curr_control, max_packet = 0;
 	clock_t			sof_time_wait;
+	int			retry = 0;
+	int			ohci_frame_interval;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl, "ohci_init_ctlr:");
 
@@ -1601,6 +1603,35 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 
 	Set_OpReg(hcr_frame_interval,
 	    (max_packet | ohcip->ohci_frame_interval));
+
+	/*
+	 * Sometimes the HcFmInterval register in OHCI controller does not
+	 * maintain its value after the first write. This problem is found
+	 * on ULI M1575 South Bridge. To workaround the hardware problem,
+	 * check the value after write and retry if the last write failed.
+	 */
+	if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
+	    ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+		ohci_frame_interval = Get_OpReg(hcr_frame_interval);
+		while ((ohci_frame_interval != (max_packet |
+		    ohcip->ohci_frame_interval))) {
+			if (retry >= 10) {
+				USB_DPRINTF_L1(PRINT_MASK_ATTA,
+				    ohcip->ohci_log_hdl, "ohci_init_ctlr:"
+				    " Failed to program Frame"
+				    " Interval Register, giving up.");
+
+				return (DDI_FAILURE);
+			}
+			retry++;
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
+			    "ohci_init_ctlr: Failed to program Frame"
+			    " Interval Register, retry=%d", retry);
+			Set_OpReg(hcr_frame_interval,
+			    (max_packet | ohcip->ohci_frame_interval));
+			ohci_frame_interval = Get_OpReg(hcr_frame_interval);
+		}
+	}
 
 	/* Begin sending SOFs */
 	curr_control = Get_OpReg(hcr_control);
