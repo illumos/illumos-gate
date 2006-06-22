@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -496,6 +497,7 @@ printjob(struct job *jp, int propts)
 	}
 
 	if (propts & PR_STAT) {
+		char	*gmsg;
 		while (sp-- > 0)
 			prc_buff(SPACE);
 		sp = 28;
@@ -506,25 +508,29 @@ printjob(struct job *jp, int propts)
 				prs_buff(sigstr);
 			} else {
 				itos(jp->j_xval);
-				sp -= strlen(numbuf) + 7;
-				prs_buff("Signal ");
+				gmsg = gettext(signalnum);
+				sp -= strlen(numbuf) + strlen(gmsg);
+				prs_buff((unsigned char *)gmsg);
 				prs_buff(numbuf);
 			}
 			if (jp->j_flag & J_DUMPED) {
-				sp -= strlen(coredump);
-				prs_buff(coredump);
+				gmsg = gettext(coredump);
+				sp -= strlen(gmsg);
+				prs_buff((unsigned char *)gmsg);
 			}
 		} else if (jp->j_flag & J_DONE) {
 			itos(jp->j_xval);
-			sp -= strlen(exited) + strlen(numbuf) + 2;
-			prs_buff(exited);
+			gmsg = gettext(exited);
+			sp -= strlen(gmsg) + strlen(numbuf) + 2;
+			prs_buff((unsigned char *)gmsg);
 			prc_buff('(');
 			itos(jp->j_xval);
 			prs_buff(numbuf);
 			prc_buff(')');
 		} else {
-			sp -= strlen(running);
-			prs_buff(running);
+			gmsg = gettext(running);
+			sp -= strlen(gmsg);
+			prs_buff((unsigned char *)gmsg);
 		}
 		if (sp < 1)
 			sp = 1;
@@ -598,7 +604,7 @@ int check_if;
 		if (check_if & JOB_STOPPED) {
 			for (jp = joblst; jp; jp = jp->j_nxtp) {
 				if (jp->j_jid && (jp->j_flag & J_STOPPED)) {
-					prs(jobsstopped);
+					prs(_gettext(jobsstopped));
 					prc(NL);
 					return (0);
 				}
@@ -607,7 +613,7 @@ int check_if;
 		if (check_if & JOB_RUNNING) {
 			for (jp = joblst; jp; jp = jp->j_nxtp) {
 				if (jp->j_jid && (jp->j_flag & J_RUNNING)) {
-					prs(jobsrunning);
+					prs(_gettext(jobsrunning));
 					prc(NL);
 					return (0);
 				}
@@ -780,7 +786,7 @@ char *argv[];
 
 	while ((c = getopt(argc, argv, "lpx")) != -1) {
 		if (propts) {
-			failure(usage, jobsuse);
+			gfailure(usage, jobsuse);
 			goto err;
 		}
 		switch (c) {
@@ -794,7 +800,7 @@ char *argv[];
 				propts = PR_LONG;
 				break;
 			case '?':
-				failure(usage, jobsuse);
+				gfailure(usage, jobsuse);
 				goto err;
 		}
 	}
@@ -991,8 +997,10 @@ void
 sysstop(int argc, char *argv[])
 {
 	char *cmd = *argv;
-	if (argc <= 1)
-		failed((unsigned char *)usage, stopuse);
+	if (argc <= 1) {
+		gfailure(usage, stopuse);
+		return;
+	}
 	while (*++argv)
 		sigv(cmd, SIGSTOP, *argv);
 }
@@ -1004,7 +1012,7 @@ syskill(int argc, char *argv[])
 	int sig = SIGTERM;
 
 	if (argc == 1) {
-		failure(usage, killuse);
+		gfailure(usage, killuse);
 		return;
 	}
 
@@ -1018,7 +1026,7 @@ syskill(int argc, char *argv[])
 			char buf[12];
 
 			if (!eq(argv[1], "-l")) {
-				failure(usage, killuse);
+				gfailure(usage, killuse);
 				return;
 			}
 

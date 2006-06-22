@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,9 +20,10 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -39,7 +39,7 @@
 #include <sys/stat.h>
 
 extern	int lstat();
-void bfailed(unsigned char *, unsigned char *, unsigned char *) __NORETURN;
+
 int	ap, ac;
 unsigned char **av;
 
@@ -52,7 +52,7 @@ test(int argn, unsigned char *com[])
 	if (eq(com[0],"["))
 	{
 		if (!eq(com[--ac], "]"))
-			failed((unsigned char *)"test", "] missing");
+			failed((unsigned char *)"test", nobracket);
 	}
 	com[ac] = 0;
 	if (ac <= 1)
@@ -70,7 +70,7 @@ nxtarg(mt)
 			ap++;
 			return(0);
 		}
-		failed((unsigned char *)"test", "argument expected");
+		failed((unsigned char *)"test", noarg);
 	}
 	return(av[ap++]);
 }
@@ -132,7 +132,7 @@ e3(void)
 	{
 		p1 = exp();
 		if (!eq(nxtarg(0), ")"))
-			failed((unsigned char *)"test", ") expected");
+			failed((unsigned char *)"test", noparen);
 		return(p1);
 	}
 	p2 = nxtarg(1);
@@ -217,7 +217,7 @@ e3(void)
 	if (eq(p2, "-le"))
 		return (ll_1 <= ll_2);
 
-	bfailed((unsigned char *)btest, (unsigned char *)badop, p2);
+	bfailed((unsigned char *)btest, badop, p2);
 /* NOTREACHED */
 }
 
@@ -256,23 +256,4 @@ fsizep(unsigned char *f)
 	if (stat((char *)f, &statb) < 0)
 		return(0);
 	return(statb.st_size > 0);
-}
-
-/*
- * fake diagnostics to continue to look like original
- * test(1) diagnostics
- */
-void
-bfailed(unsigned char *s1, unsigned char *s2, unsigned char *s3)
-{
-	prp();
-	prs(s1);
-	if (s2)
-	{
-		prs(colon);
-		prs(s2);
-		prs(s3);
-	}
-	newline();
-	exitsh(ERROR);
 }

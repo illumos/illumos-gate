@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,7 +197,9 @@ extern unsigned char **local_setenv();
 extern time_t time();
 extern void exitsh(int)
 	__NORETURN;
-extern void failed(unsigned char *, const char *) __NORETURN;
+extern void failed_real(unsigned char *, const char *, unsigned char *)
+    __NORETURN;
+extern void error(const char *) __NORETURN;
 extern void prf();
 extern void assign(struct namnod *, unsigned char *);
 extern void setmode(int);
@@ -209,10 +210,24 @@ extern void preacct(unsigned char *);
 
 #define		attrib(n, f)		(n->namflg |= f)
 #define		round(a, b)		(((int)(((char *)(a)+b)-1))&~((b)-1))
-#define		closepipe(x)	(close(x[INPIPE]), close(x[OTPIPE]))
+#define		closepipe(x)		(close(x[INPIPE]), close(x[OTPIPE]))
 #define		eq(a, b)		(cf(a, b) == 0)
 #define		max(a, b)		((a) > (b)?(a):(b))
 #define		assert(x)
+#define		_gettext(s)		(unsigned char *)gettext(s)
+
+/*
+ * macros using failed_real(). Only s2 is gettext'd with both functions.
+ */
+#define		failed(s1, s2)		failed_real(s1, s2, NULL)
+#define		bfailed(s1, s2, s3)	failed_real(s1, s2, s3)
+
+/*
+ * macros using failure_real(). s1 and s2 is gettext'd with gfailure(), but
+ * only s2 is gettext'd with failure().
+ */
+#define		failure(s1, s2)		failure_real(s1, s2, 0)
+#define		gfailure(s1, s2)	failure_real(s1, s2, 1)
 
 /* temp files and io */
 extern int				output;
@@ -414,8 +429,6 @@ extern const char				restricted[];
 extern const char				execpmsg[];
 extern const char				notid[];
 extern const char 				badulimit[];
-extern const char 				badresource[];
-extern const char 				badscale[];
 extern const char 				ulimit[];
 extern const char				wtfailed[];
 extern const char				badcreate[];
@@ -463,6 +476,13 @@ extern const char				nocurjob[];
 extern const char				loginsh[];
 extern const char				jobsstopped[];
 extern const char				jobsrunning[];
+extern const char				nlorsemi[];
+extern const char				signalnum[];
+extern const char				badpwd[];
+extern const char				badlocale[];
+extern const char				nobracket[];
+extern const char				noparen[];
+extern const char				noarg[];
 
 /*	'builtin' error messages	*/
 
@@ -498,7 +518,6 @@ extern int				ucb_builtins;
 #define		exitset()	retval = exitval
 
 /* Multibyte characters */
-void setwidth();
 unsigned char *readw();
 #include <stdlib.h>
 #include <limits.h>

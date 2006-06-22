@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,17 +280,14 @@ stdsigs()
 {
 	int	i;
 	stack_t	ss;
-	int	err = 0;
 	int rtmin = (int)SIGRTMIN;
 	int rtmax = (int)SIGRTMAX;
 
 	ss.ss_size = SIGSTKSZ;
 	ss.ss_sp = sigsegv_stack;
 	ss.ss_flags = 0;
-	errno = 0;
-	if (sigaltstack(&ss, (stack_t *)NULL) == -1) {
-		err = errno;
-		failure("sigaltstack(2) failed with", strerror(err));
+	if (sigaltstack(&ss, NULL) == -1) {
+		error("sigaltstack(2) failed");
 	}
 
 	for (i = 1; i < MAXTRAP; i++) {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
@@ -75,7 +75,6 @@ const char	badtrap[]	= "bad trap";
 const char	wtfailed[]	= "is read only";
 const char	notid[]		= "is not an identifier";
 const char 	badulimit[]	= "exceeds allowable limit";
-const char 	badresource[]	= "no such resource";
 const char	badreturn[] 	= "cannot return when not in function";
 const char	badexport[] 	= "cannot export functions";
 const char	badunset[] 	= "cannot unset";
@@ -87,29 +86,35 @@ const char	libacc[] 	= "can't access a needed shared library";
 const char	libbad[]	= "accessing a corrupted shared library";
 const char	libscn[]	= ".lib section in a.out corrupted";
 const char	libmax[]	= "attempting to link in too many libs";
-const char    emultihop[]     = "Multihop attempted";
-const char    nulldir[]       = "null directory";
-const char    enotdir[]       = "not a directory";
-const char    enoent[]        = "does not exist";
-const char    eacces[]        = "permission denied";
-const char    enolink[]       = "remote link inactive";
-const char badscale[] 		= "bad scaling";
-const char exited[]		= "Done";
-const char running[]		= "Running";
-const char ambiguous[]		= "ambiguous";
-const char usage[]		= "usage";
-const char nojc[]		= "no job control";
-const char stopuse[]		= "stop id ...";
-const char ulimuse[]		= "ulimit [ -HSacdfnstv ] [ limit ]"; 
-const char killuse[]		= "kill [ [ -sig ] id ... | -l ]";
-const char jobsuse[]		= "jobs [ [ -l | -p ] [ id ... ] | -x cmd ]";
-const char nosuchjob[]		= "no such job";
-const char nosuchpid[]		= "no such process";
-const char nosuchpgid[]		= "no such process group";
-const char nocurjob[]		= "no current job";
-const char jobsstopped[]	= "there are stopped jobs";
-const char jobsrunning[]	= "there are running jobs";
-const char loginsh[]		= "cannot stop login shell";
+const char	emultihop[]	= "Multihop attempted";
+const char	nulldir[]	= "null directory";
+const char	enotdir[]	= "not a directory";
+const char	enoent[]	= "does not exist";
+const char	eacces[]	= "permission denied";
+const char	enolink[]	= "remote link inactive";
+const char	exited[]	= "Done";
+const char	running[]	= "Running";
+const char	ambiguous[]	= "ambiguous";
+const char	usage[]		= "usage";
+const char	nojc[]		= "no job control";
+const char	stopuse[]	= "stop id ...";
+const char	ulimuse[]	= "ulimit [ -HSacdfnstv ] [ limit ]";
+const char	killuse[]	= "kill [ [ -sig ] id ... | -l ]";
+const char	jobsuse[]	= "jobs [ [ -l | -p ] [ id ... ] | -x cmd ]";
+const char	nosuchjob[]	= "no such job";
+const char	nosuchpid[]	= "no such process";
+const char	nosuchpgid[]	= "no such process group";
+const char	nocurjob[]	= "no current job";
+const char	jobsstopped[]	= "there are stopped jobs";
+const char	jobsrunning[]	= "there are running jobs";
+const char	loginsh[]	= "cannot stop login shell";
+const char	nlorsemi[]	= "newline or ;";
+const char	signalnum[]	= "Signal ";
+const char	badpwd[]	= "cannot determine current directory";
+const char	badlocale[]	= "couldn't set locale correctly\n";
+const char	nobracket[]	= "] missing";
+const char	noparen[]	= ") expected";
+const char	noarg[]		= "argument expected";
 
 /*
  * messages for 'builtin' functions
@@ -180,32 +185,7 @@ const struct sysnod reserved[] =
 
 const int no_reserved = sizeof(reserved)/sizeof(struct sysnod);
 
-const char	*sysmsg[] =
-{
-	0,
-	"Hangup",
-	0,	/* Interrupt */
-	"Quit",
-	"Illegal instruction",
-	"Trace/BPT trap",
-	"abort",
-	"EMT trap",
-	"Floating exception",
-	"Killed",
-	"Bus error",
-	"Memory fault",
-	"Bad system call",
-	0,	/* Broken pipe */
-	"Alarm call",
-	"Terminated",
-	"Signal 16",
-	"Signal 17",
-	"Child death",
-	"Power Fail"
-};
-
 const char	export[] = "export";
-const char	duperr[] = "cannot dup";
 const char	readonly[] = "readonly";
 
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -559,54 +558,14 @@ printnam(struct namnod *n)
 	}
 }
 
-static unsigned char *
-staknam(struct namnod *n)
-{
-	unsigned char	*p;
-
-	p = movstrstak(n->namid, staktop);
-	p = movstrstak("=", p);
-	p = movstrstak(n->namval, p);
-	return(getstak(p + 1 - (unsigned char *)(stakbot)));
-}
-
 static int namec;
-
-void
-exname(struct namnod *n)
-{
-	int 	flg = n->namflg;
-
-	if (flg & N_ENVCHG)
-	{
-
-		if (flg & N_EXPORT)
-		{
-			free(n->namenv);
-			n->namenv = make(n->namval);
-		}
-		else
-		{
-			free(n->namval);
-			n->namval = make(n->namenv);
-		}
-	}
-
-
-	if (!(flg & N_FUNCTN))
-		n->namflg = N_DEFAULT;
-
-	if (n->namval)
-		namec++;
-
-}
 
 void
 printro(struct namnod *n)
 {
 	if (n->namflg & N_RDONLY)
 	{
-		prs_buff(readonly);
+		prs_buff(_gettext(readonly));
 		prc_buff(SPACE);
 		prs_buff(n->namid);
 		prc_buff(NL);
@@ -618,7 +577,7 @@ printexp(struct namnod *n)
 {
 	if (n->namflg & N_EXPORT)
 	{
-		prs_buff(export);
+		prs_buff(_gettext(export));
 		prc_buff(SPACE);
 		prs_buff(n->namid);
 		prc_buff(NL);
@@ -688,12 +647,6 @@ local_setenv()
 	namscan(pushnam);
 	*argnam++ = 0;
 	return(er);
-}
-
-void
-setvars()
-{
-	namscan(exname);
 }
 
 struct namnod *
@@ -865,7 +818,7 @@ dolocale(nm)
 	environ = (unsigned char **)fake_env;
 
 	if (setlocale(LC_ALL, "") == NULL)
-		prs("couldn't set locale correctly\n");
+		prs(_gettext(badlocale));
 
 	/*
 	 * Switch back and tear down the fake env.

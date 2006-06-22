@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,22 +39,47 @@
 /* ========	error handling	======== */
 
 void
-failed(unsigned char *s1, const char *s2)
+error(const char *s)
 {
 	prp();
-	prs_cntl(s1);
-	if (s2) {
-		prs(colon);
-		prs((unsigned char *)s2);
-	}
+	prs(_gettext(s));
 	newline();
 	exitsh(ERROR);
 }
 
-void
-error(unsigned char *s)
+static void
+failed_body(unsigned char *s1, const char *s2, unsigned char *s3, int gflag)
 {
-	failed(s, (const char *)NIL);
+	prp();
+	if (gflag)
+		prs(_gettext((const char *)s1));
+	else
+		prs_cntl(s1);
+	prs(colon);
+	prs(_gettext(s2));
+	if (s3)
+		prs(s3);
+	newline();
+}
+
+void
+failed_real(unsigned char *s1, const char *s2, unsigned char *s3)
+{
+	failed_body(s1, s2, s3, 0);
+	exitsh(ERROR);
+}
+
+void
+failure_real(unsigned char *s1, const char *s2, int gflag)
+{
+	failed_body(s1, s2, NULL, gflag);
+
+	if (flags & errflg)
+		exitsh(ERROR);
+
+	flags |= eflag;
+	exitval = ERROR;
+	exitset();
 }
 
 void
@@ -100,23 +124,4 @@ rmfunctmp(void)
 		unlink(fiotemp->ioname);
 		fiotemp = fiotemp->iolst;
 	}
-}
-
-void
-failure(unsigned char *s1, unsigned char *s2)
-{
-	prp();
-	prs_cntl(s1);
-	if (s2) {
-		prs(colon);
-		prs(s2);
-	}
-	newline();
-
-	if (flags & errflg)
-		exitsh(ERROR);
-
-	flags |= eflag;
-	exitval = ERROR;
-	exitset();
 }

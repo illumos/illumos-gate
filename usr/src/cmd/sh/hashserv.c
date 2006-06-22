@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +211,7 @@ hashout(h)
 void
 hashpr()
 {
-	prs_buff("hits	cost	command\n");
+	prs_buff(_gettext("hits	cost	command\n"));
 	hscan(hashout);
 }
 
@@ -332,14 +331,14 @@ what_is_path(unsigned char *name)
 		switch (hashtype(h->data))
 		{
 			case BUILTIN:
-				prs_buff(" is a shell builtin\n");
+				prs_buff(_gettext(" is a shell builtin\n"));
 				return (0);
 
 			case FUNCTION:
 			{
 				struct namnod *n = lookup(name);
 
-				prs_buff(" is a function\n");
+				prs_buff(_gettext(" is a function\n"));
 				prs_buff(name);
 				prs_buff("(){\n");
 				prf(n->namenv);
@@ -356,7 +355,8 @@ what_is_path(unsigned char *name)
 					hash = pathlook(name, 0, 0);
 					if (hashtype(hash) == NOTFOUND)
 					{
-						prs_buff(" not found\n");
+						prs_buff(_gettext(" not"
+						    " found\n"));
 						return (1);
 					}
 					else
@@ -365,7 +365,7 @@ what_is_path(unsigned char *name)
 			}
 
 			case COMMAND:					
-				prs_buff(" is hashed (");
+				prs_buff(_gettext(" is hashed ("));
 				pr_path(name, hashval);
 				prs_buff(")\n");
 				return (0);
@@ -374,20 +374,20 @@ what_is_path(unsigned char *name)
 
 	if (syslook(name, commands, no_commands))
 	{
-		prs_buff(" is a shell builtin\n");
+		prs_buff(_gettext(" is a shell builtin\n"));
 		return (0);
 	}
 
 	if ((cnt = findpath(name, 0)) > 0)
 	{
-		prs_buff(" is ");
+		prs_buff(_gettext(" is "));
 		pr_path(name, cnt);
 		prc_buff(NL);
 		return (0);
 	}
 	else
 	{
-		prs_buff(" not found\n");
+		prs_buff(_gettext(" not found\n"));
 		return (1);
 	}
 }

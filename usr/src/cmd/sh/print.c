@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1996, 1997 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12.6.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  *
@@ -70,10 +69,8 @@ prp()
 void
 prs(unsigned char *as)
 {
-	char	*s;
-
-	if ((s = gettext((char *)as)) != 0) {
-		write(output, s, length(s) - 1);
+	if (as) {
+		write(output, as, length(as) - 1);
 	}
 }
 
@@ -160,6 +157,7 @@ stoi(unsigned char *icp)
 	}
 	if (r < 0 || cp == icp) {
 		failed(icp, badnum);
+		/* NOTREACHED */
 	} else {
 		return (r);
 	}
@@ -180,16 +178,7 @@ ltos(long n)
 	return (i);
 }
 
-void
-prl(long n)
-{
-	int i;
-	i = ltos(n);
-	prs_buff(&numbuf[i]);
-}
-
-
-int
+static int
 ulltos(u_longlong_t n)
 {
 	int i;
@@ -203,14 +192,6 @@ ulltos(u_longlong_t n)
 		}
 	}
 	return (i);
-}
-
-void
-prull(u_longlong_t n)
-{
-	int i;
-	i = ulltos(n);
-	prs_buff(&numbuf[i]);
 }
 
 void
@@ -241,21 +222,21 @@ prc_buff(unsigned char c)
 void
 prs_buff(unsigned char *s)
 {
-	int len = length(gettext((char *)s)) - 1;
+	int len = length(s) - 1;
 
 	if (buffd != -1 && index + len >= BUFLEN) {
 		flushb();
 	}
 
 	if (buffd != -1 && len >= BUFLEN) {
-		write(buffd, gettext((char *)s), len);
+		write(buffd, s, len);
 	} else {
-		movstr(gettext((char *)s), &bufp[index]);
+		movstr(s, &bufp[index]);
 		index += len;
 	}
 }
 
-unsigned char *
+static unsigned char *
 octal(unsigned char c, unsigned char *ptr)
 {
 	*ptr++ = '\\';
@@ -326,12 +307,6 @@ prs_cntl(unsigned char *s)
 }
 
 void
-prl_buff(long lc)
-{
-	prs_buff(&numbuf[ltos(lc)]);
-}
-
-void
 prull_buff(u_longlong_t lc)
 {
 	prs_buff(&numbuf[ulltos(lc)]);
@@ -343,14 +318,6 @@ prn_buff(int n)
 	itos(n);
 
 	prs_buff(numbuf);
-}
-
-void
-prsp_buff(int cnt)
-{
-	while (cnt--) {
-		prc_buff(SPACE);
-	}
 }
 
 int
