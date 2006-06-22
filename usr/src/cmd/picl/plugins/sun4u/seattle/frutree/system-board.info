@@ -774,21 +774,103 @@ name:PCI_R/pci-riser-board/PCI2
  */
 
 /* 1UEER, 2UEER: PCI0 */
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,7
 REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
 
 /* 2UEER: PCI2 */
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl?DeviceID=0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,0
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,1
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,2
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,3
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,4
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,5
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,6
+REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl@0,7
 REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
 
 /* 1UEEL: PCI1 */
-_class:/jbus/pciex@1f,700000/picl?DeviceID=0
+_class:/jbus/pciex@1f,700000/picl@0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/picl@0,7
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
 
-/* 2UEEL: PCI1, PCI3 */
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+/* 2UEEL: PCI1 */
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,7
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
+
+/* 2UEEL: PCI3 */
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,0
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,1
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,2
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,3
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,4
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,5
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,6
+REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,7
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
 
 /*
