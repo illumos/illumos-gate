@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -626,7 +625,7 @@ rummage_devinfo(void)
 	di_node_t root_node;
 	ldinfo_t *rv = NULL;
 
-	if ((root_node = di_init("/", DINFOCPYALL)) != DI_NODE_NIL) {
+	if ((root_node = di_init("/", DINFOCACHE)) != DI_NODE_NIL) {
 		(void) di_walk_node(root_node, DI_WALK_CLDFIRST, (void *)&rv,
 			devinfo_ident_disks);
 		(void) di_walk_node(root_node, DI_WALK_CLDFIRST, (void *)&rv,
