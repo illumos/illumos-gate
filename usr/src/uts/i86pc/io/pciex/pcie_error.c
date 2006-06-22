@@ -45,6 +45,7 @@
 #include <io/pciex/pcie_error.h>
 #include <io/pciex/pcie_ck804_boot.h>
 
+extern uint32_t pcie_expected_ue_mask;
 
 #ifdef  DEBUG
 uint_t	pcie_error_debug_flags = 0;
@@ -252,22 +253,19 @@ pcie_error_init(dev_info_t *cdip)
 		goto cleanup;
 
 	/*
-	 * Only enable these set of errors for CK8-04/IO-4 devices
+	 * Only enable these set of errors for CK8-04/IO-4 devices, and disable
+	 * UR reporting for non CK8-04 child devices.
 	 */
 	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) ==
 	    NVIDIA_CK804_VENDOR_ID) &&
 	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) ==
 	    NVIDIA_CK804_DEVICE_ID))
 		pcie_ck804_error_init(cdip, cfg_hdl, cap_ptr, aer_ptr);
+	else if (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT)
+		pcie_expected_ue_mask |= PCIE_AER_UCE_UR;
 
 	/*
 	 * Enable PCI-Express Baseline Error Handling
-	 *
-	 * NOTE: Unsupported Request related errors are not enabled
-	 * If these are enabled; then as SERR is already set the
-	 * ck8-04/io-4 based machines end up with an MCE
-	 * Programs that scan PCI configuration space can easily
-	 * generate URs as they scan entire BDFs..
 	 */
 	device_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVCTL);
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL,
@@ -384,34 +382,33 @@ pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 	    ddi_driver_name(child), rc_ctl,
 	    pci_config_get16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2));
 
-	if (!pcie_serr_disable_flag) {
-		rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
-		pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
-		    rc_ctl | pcie_root_ctrl_default);
-		PCIE_ERROR_DBG("%s: PCIe Root Control Register=0x%x->0x%x\n",
-		    ddi_driver_name(child), rc_ctl,
-		    pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL));
-	}
+	rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
+	pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
+	    pcie_serr_disable_flag ? (rc_ctl & ~pcie_root_ctrl_default) :
+	    (rc_ctl | pcie_root_ctrl_default));
+	PCIE_ERROR_DBG("%s: PCIe Root Control Register=0x%x->0x%x\n",
+	    ddi_driver_name(child), rc_ctl,
+	    pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL));
 
 	/* Root Error Command Register */
-	if (aer_ptr && !pcie_aer_disable_flag) {
-		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
-		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD,
-		    rc_ctl | pcie_root_error_cmd_default);
-		PCIE_ERROR_DBG("%s: PCIe AER Root Error Command "
-		    "Register=0x%x->0x%x\n", ddi_driver_name(child), rc_ctl,
-		    pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD));
+	if (!aer_ptr || pcie_aer_disable_flag)
+		return;
 
-		/* Also enable ECRC checking */
-		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_CTL);
-		if (rc_ctl & PCIE_AER_CTL_ECRC_GEN_CAP)
-			rc_ctl |= PCIE_AER_CTL_ECRC_GEN_ENA;
-		if (rc_ctl & PCIE_AER_CTL_ECRC_CHECK_CAP)
-			rc_ctl |= PCIE_AER_CTL_ECRC_CHECK_ENA;
-		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_CTL, rc_ctl);
-	}
+	rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
+	pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD,
+	    rc_ctl | pcie_root_error_cmd_default);
+	PCIE_ERROR_DBG("%s: PCIe AER Root Error Command "
+	    "Register=0x%x->0x%x\n", ddi_driver_name(child), rc_ctl,
+	    pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD));
+
+	/* Also enable ECRC checking */
+	rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_CTL);
+	if (rc_ctl & PCIE_AER_CTL_ECRC_GEN_CAP)
+		rc_ctl |= PCIE_AER_CTL_ECRC_GEN_ENA;
+	if (rc_ctl & PCIE_AER_CTL_ECRC_CHECK_CAP)
+		rc_ctl |= PCIE_AER_CTL_ECRC_CHECK_ENA;
+	pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_CTL, rc_ctl);
 }
-
 
 /*
  * PCI-Express CK8-04 child device de-initialization.

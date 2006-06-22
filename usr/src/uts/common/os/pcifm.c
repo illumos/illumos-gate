@@ -1132,8 +1132,7 @@ pcie_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 {
 	pcie_error_regs_t *pcie_regs = (pcie_error_regs_t *)erpt_p->pe_regs;
 	pcie_adv_error_regs_t *pcie_adv_regs = pcie_regs->pcie_adv_regs;
-	pcie_adv_rc_error_regs_t *pcie_adv_rc_regs =
-	    pcie_adv_regs->pcie_adv_rc_regs;
+	pcie_adv_rc_error_regs_t *pcie_adv_rc_regs;
 
 	switch (errtype) {
 	    case PCIEX_TYPE_CE:
@@ -1179,6 +1178,8 @@ pcie_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 		break;
 	    case PCIEX_TYPE_RC_UE_MSG:
 	    case PCIEX_TYPE_RC_CE_MSG:
+		pcie_adv_rc_regs = pcie_adv_regs->pcie_adv_rc_regs;
+
 		ddi_fm_ereport_post(dip, buf, derr->fme_ena,
 		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 		    PCIEX_ROOT_ERRSTS_REG, DATA_TYPE_UINT32,
@@ -1195,6 +1196,8 @@ pcie_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, pci_erpt_t *erpt_p,
 		    pcie_adv_rc_regs->pcie_rc_ce_src_id != 0), NULL);
 		break;
 	    case PCIEX_TYPE_RC_MULT_MSG:
+		pcie_adv_rc_regs = pcie_adv_regs->pcie_adv_rc_regs;
+
 		ddi_fm_ereport_post(dip, buf, derr->fme_ena,
 		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 		    PCIEX_ROOT_ERRSTS_REG, DATA_TYPE_UINT32,
