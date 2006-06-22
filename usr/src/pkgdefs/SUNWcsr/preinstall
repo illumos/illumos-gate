@@ -90,8 +90,8 @@ fi
 
 if [ "x$PKG_INIT_INSTALL" = "xTRUE" ]; then
 	touch $BASEDIR/var/SUNWcsr-apply-limited-net
-elif [ `/sbin/zonename` = "global" -a "x$SUNW_PKG_INSTALL_ZONENAME" != "x" -a \
-    "x$SUNW_PKG_INSTALL_ZONENAME" != "xglobal" ]; then
+elif [ -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
+    "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then
 	touch $BASEDIR/var/SUNWcsr-apply-limited-net
 fi
 

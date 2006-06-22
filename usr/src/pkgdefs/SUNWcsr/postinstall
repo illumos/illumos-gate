@@ -219,5 +219,20 @@ trap apply_limited_net 0
 
 _ENABLE_LIMITED_NET
 	rm -f $BASEDIR/var/SUNWcsr-apply-limited-net
+else
+	#
+	# This is not an initial (zone-)install: we are upgrading.
+	#
+	# If we have a previous version of generic.xml, keep that.
+	# Otherwise (upgrade from pre-SMF filesystem) take the default 
+	# action, i.e., sym-link to ./generic_open.xml
+	#
+	if [ -f $BASEDIR/var/svc/profile/generic.xml.ABCsavedXYZ ]; then
+		mv $BASEDIR/var/svc/profile/generic.xml.ABCsavedXYZ \
+			$BASEDIR/var/svc/profile/generic.xml
+	else
+		ln -s ./generic_open.xml $BASEDIR/var/svc/profile/generic.xml
+	fi
 fi
+
 exit 0
