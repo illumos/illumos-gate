@@ -1055,10 +1055,11 @@ mapid_stdchk_domain(const char *ds)
 		len = strlen(ds) - 1;
 
 	/*
-	 * 1st char _must_ be alphabetic char _AND_ last char _must_
-	 * be alphanumeric. We check for other valid chars below.
+	 * 1st _AND_ last char _must_ be alphanumeric.
+	 * We check for other valid chars below.
 	 */
-	if (!isalpha(ds[0]) || !isalpha(ds[len]) && !isdigit(ds[len]))
+	if ((!isalpha(ds[0]) && !isdigit(ds[0])) ||
+	    (!isalpha(ds[len]) && !isdigit(ds[len])))
 		return (0);
 
 	for (i = 0; *ds && i <= NS_MAXCDNAME; i++, ds++) {
