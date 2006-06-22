@@ -239,7 +239,10 @@ sctp_create_eager(sctp_t *psctp)
 		if (getpflags(NET_MAC_AWARE, credp) != 0)
 			connp->conn_mac_exempt = B_TRUE;
 	}
-	connp->conn_zoneid = psctp->sctp_zoneid;
+
+	connp->conn_allzones = pconnp->conn_allzones;
+	connp->conn_zoneid = pconnp->conn_zoneid;
+
 	sctp->sctp_mss = psctp->sctp_mss;
 	sctp->sctp_detached = B_TRUE;
 	/*
@@ -853,6 +856,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 {
 	int	err;
 	int	cnt;
+	conn_t 	*connp, *pconnp;
 
 	ASSERT((sctp->sctp_family == AF_INET &&
 	    sctp->sctp_ipversion == IPV4_VERSION) ||
@@ -954,16 +958,22 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 		/* xxx should be a better way to copy these flags xxx */
 		sctp->sctp_debug = psctp->sctp_debug;
-		sctp->sctp_dontroute = psctp->sctp_dontroute;
-		sctp->sctp_useloopback = psctp->sctp_useloopback;
-		sctp->sctp_broadcast = psctp->sctp_broadcast;
-		sctp->sctp_reuseaddr = psctp->sctp_reuseaddr;
 		sctp->sctp_bound_to_all = psctp->sctp_bound_to_all;
 		sctp->sctp_cansleep = psctp->sctp_cansleep;
 		sctp->sctp_send_adaption = psctp->sctp_send_adaption;
 		sctp->sctp_ndelay = psctp->sctp_ndelay;
 		sctp->sctp_events = psctp->sctp_events;
 		sctp->sctp_ipv6_recvancillary = psctp->sctp_ipv6_recvancillary;
+
+		/* Copy IP-layer options */
+		connp = sctp->sctp_connp;
+		pconnp = psctp->sctp_connp;
+
+		connp->conn_broadcast = pconnp->conn_broadcast;
+		connp->conn_loopback = pconnp->conn_loopback;
+		connp->conn_dontroute = pconnp->conn_dontroute;
+		connp->conn_reuseaddr = pconnp->conn_reuseaddr;
+
 	} else {
 		/*
 		 * Initialize the header template
@@ -1369,6 +1379,7 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 		 */
 		sctp->sctp_lport = psctp->sctp_lport;
 		sctp->sctp_state = SCTPS_BOUND;
+		sctp->sctp_allzones = psctp->sctp_allzones;
 		sctp->sctp_zoneid = psctp->sctp_zoneid;
 		WAKE_SCTP(psctp);
 	} else {

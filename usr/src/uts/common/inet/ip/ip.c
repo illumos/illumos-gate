@@ -4245,7 +4245,7 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 	src_ire = NULL;
 	ipif = NULL;
 
-	zoneid = connp->conn_zoneid;
+	zoneid = IPCL_ZONEID(connp);
 
 	if (src_addr) {
 		src_ire = ire_route_lookup(src_addr, 0, 0, 0,
@@ -4431,7 +4431,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		policy_mp = mp->b_cont;
 	}
 
-	zoneid = connp->conn_zoneid;
+	zoneid = IPCL_ZONEID(connp);
 
 	if (CLASSD(dst_addr)) {
 		/* Pick up an IRE_BROADCAST */
@@ -6353,7 +6353,8 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 */
 		while ((connp != NULL) &&
 		    (!IPCL_UDP_MATCH(connp, dstport, dst,
-		    srcport, src) || connp->conn_zoneid != zoneid)) {
+		    srcport, src) ||
+		    (connp->conn_zoneid != zoneid && !connp->conn_allzones))) {
 			connp = connp->conn_next;
 		}
 
@@ -6499,7 +6500,7 @@ notfound:
 	if (!broadcast && !CLASSD(dst)) {
 		while (connp != NULL) {
 			if (IPCL_UDP_MATCH_V6(connp, dstport, ipv6_all_zeros,
-			    srcport, v6src) && connp->conn_zoneid == zoneid &&
+			    srcport, v6src) && IPCL_ZONE_MATCH(connp, zoneid) &&
 			    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
 			    !connp->conn_ipv6_v6only)
 				break;
@@ -9666,16 +9667,17 @@ ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
 	ipif_t *ipif = NULL;
 	int error;
 	ill_t *ill;
+	int zoneid;
 
 	ip2dbg(("ip_opt_set_ipif: ipaddr %X\n", addr));
 
 	if (addr != INADDR_ANY || checkonly) {
 		ASSERT(connp != NULL);
+		zoneid = IPCL_ZONEID(connp);
 		if (option == IP_NEXTHOP) {
-			ipif =
-			    ipif_lookup_onlink_addr(addr, connp->conn_zoneid);
+			ipif = ipif_lookup_onlink_addr(addr, zoneid);
 		} else {
-			ipif = ipif_lookup_addr(addr, NULL, connp->conn_zoneid,
+			ipif = ipif_lookup_addr(addr, NULL, zoneid,
 			    CONNP_TO_WQ(connp), first_mp, ip_restart_optmgmt,
 			    &error);
 		}
@@ -10054,6 +10056,17 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				mutex_enter(&connp->conn_lock);
 				connp->conn_proto = *i1;
+				mutex_exit(&connp->conn_lock);
+			}
+			break;	/* goto sizeof (int) option return */
+		case SO_ALLZONES:
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				if (IPCL_IS_BOUND(connp)) {
+					mutex_exit(&connp->conn_lock);
+					return (EINVAL);
+				}
+				connp->conn_allzones = *i1 != 0 ? 1 : 0;
 				mutex_exit(&connp->conn_lock);
 			}
 			break;	/* goto sizeof (int) option return */
@@ -26384,7 +26397,7 @@ conn_wantpacket(conn_t *connp, ill_t *ill, ipha_t *ipha, int fanout_flags,
 	}
 
 	if (!CLASSD(dst)) {
-		if (connp->conn_zoneid == zoneid)
+		if (IPCL_ZONE_MATCH(connp, zoneid))
 			return (B_TRUE);
 		/*
 		 * The conn is in a different zone; we need to check that this

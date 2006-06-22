@@ -544,11 +544,12 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	    { SO_DONTROUTE,	"SO_DONTROUTE,"	},
 	    { SO_BROADCAST,	"SO_BROADCAST,"	},
 	    { SO_OOBINLINE,	"SO_OOBINLINE,"	},
-	    { SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"}
+	    { SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
+	    { SO_ALLZONES,	"SO_ALLZONES,"	},
 	};
 	struct linger l;
 
-	buf[0] = ',';
+	buf[0] = '!';		/* sentinel value, never printed */
 	buf[1] = '\0';
 
 	for (i = 0; i < sizeof (boolopts) / sizeof (boolopts[0]); i++) {
@@ -588,7 +589,7 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 		}
 	}
 
-	buf[strlen(buf) - 1] = '\0';
+	buf[strlen(buf) - 1] = '\0'; /* overwrites sentinel if no options */
 	if (buf[1] != '\0')
 		(void) printf("\t%s\n", buf+1);
 }

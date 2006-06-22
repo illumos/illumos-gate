@@ -633,7 +633,10 @@ typedef struct sctp_s {
 
 	conn_t		*sctp_connp;		/* conn_t stuff */
 #define	sctp_zoneid	sctp_connp->conn_zoneid
+#define	sctp_allzones	sctp_connp->conn_allzones
+#define	sctp_mac_exempt	sctp_connp->conn_mac_exempt
 #define	sctp_credp	sctp_connp->conn_cred
+#define	sctp_reuseaddr	sctp_connp->conn_reuseaddr
 
 	/* Peer address tracking */
 	sctp_faddr_t	*sctp_lastfaddr;	/* last faddr in list */
@@ -743,13 +746,8 @@ typedef struct sctp_s {
 
 		sctp_understands_asconf : 1, /* Peer handles ASCONF chunks */
 		sctp_debug : 1,		/* SO_DEBUG "socket" option. */
-		sctp_dontroute : 1,	/* SO_DONTROUTE "socket" option. */
-		sctp_broadcast : 1,	/* SO_BROADCAST "socket" option. */
-
-		sctp_useloopback : 1,	/* SO_USELOOPBACK "socket" option. */
 		sctp_cchunk_pend : 1,	/* Control chunk in flight. */
 		sctp_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
-		sctp_reuseaddr	: 1,	/* SO_REUSEADDR "socket" option. */
 
 		sctp_linger : 1,	/* SO_LINGER turned on */
 		sctp_lingering : 1,	/* Lingering in close */
@@ -773,11 +771,10 @@ typedef struct sctp_s {
 
 		sctp_prsctp_aware : 1,	/* is peer PR-SCTP aware? */
 		sctp_linklocal : 1,	/* is linklocal assoc. */
-		sctp_mac_exempt : 1,	/* SO_MAC_EXEMPT */
 		sctp_rexmitting : 1,	/* SCTP is retransmitting */
 		sctp_zero_win_probe : 1,	/* doing zero win probe */
 
-		sctp_dummy : 3;
+		sctp_dummy : 8;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -795,12 +792,8 @@ typedef struct sctp_s {
 #define	sctp_priv_stream sctp_bits.sctp_priv_stream
 #define	sctp_understands_asconf sctp_bits.sctp_understands_asconf
 #define	sctp_debug sctp_bits.sctp_debug
-#define	sctp_dontroute sctp_bits.sctp_dontroute
-#define	sctp_broadcast sctp_bits.sctp_broadcast
-#define	sctp_useloopback sctp_bits.sctp_useloopback
 #define	sctp_cchunk_pend sctp_bits.sctp_cchunk_pend
 #define	sctp_dgram_errind sctp_bits.sctp_dgram_errind
-#define	sctp_reuseaddr sctp_bits.sctp_reuseaddr
 #define	sctp_linger sctp_bits.sctp_linger
 #define	sctp_lingering sctp_bits.sctp_lingering
 #define	sctp_loopback sctp_bits.sctp_loopback
@@ -819,7 +812,6 @@ typedef struct sctp_s {
 #define	sctp_chk_fast_rexmit sctp_bits.sctp_chk_fast_rexmit
 #define	sctp_prsctp_aware sctp_bits.sctp_prsctp_aware
 #define	sctp_linklocal sctp_bits.sctp_linklocal
-#define	sctp_mac_exempt sctp_bits.sctp_mac_exempt
 #define	sctp_rexmitting sctp_bits.sctp_rexmitting
 #define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
 

@@ -701,16 +701,16 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*i1 = sctp->sctp_debug ? SO_DEBUG : 0;
 			break;
 		case SO_DONTROUTE:
-			*i1 = sctp->sctp_dontroute ? SO_DONTROUTE : 0;
+			*i1 = connp->conn_dontroute ? SO_DONTROUTE : 0;
 			break;
 		case SO_USELOOPBACK:
-			*i1 = sctp->sctp_useloopback ? SO_USELOOPBACK : 0;
+			*i1 = connp->conn_loopback ? SO_USELOOPBACK : 0;
 			break;
 		case SO_BROADCAST:
-			*i1 = sctp->sctp_broadcast ? SO_BROADCAST : 0;
+			*i1 = connp->conn_broadcast ? SO_BROADCAST : 0;
 			break;
 		case SO_REUSEADDR:
-			*i1 = sctp->sctp_reuseaddr ? SO_REUSEADDR : 0;
+			*i1 = connp->conn_reuseaddr ? SO_REUSEADDR : 0;
 			break;
 		case SO_DGRAM_ERRIND:
 			*i1 = sctp->sctp_dgram_errind ? SO_DGRAM_ERRIND : 0;
@@ -721,8 +721,11 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SO_RCVBUF:
 			*i1 = sctp->sctp_rwnd;
 			break;
+		case SO_ALLZONES:
+			*i1 = connp->conn_allzones;
+			break;
 		case SO_MAC_EXEMPT:
-			*i1 = sctp->sctp_mac_exempt ? SO_MAC_EXEMPT : 0;
+			*i1 = connp->conn_mac_exempt;
 			break;
 		default:
 			retval = EINVAL;
@@ -1160,22 +1163,17 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		case SO_DONTROUTE:
 			/*
 			 * SO_DONTROUTE, SO_USELOOPBACK and SO_BROADCAST are
-			 * only of interest to IP.  We track them here only so
-			 * that we can report their current value.
+			 * only of interest to IP.
 			 */
-			sctp->sctp_dontroute = onoff;
 			connp->conn_dontroute = onoff;
 			break;
 		case SO_USELOOPBACK:
-			sctp->sctp_useloopback = onoff;
 			connp->conn_loopback = onoff;
 			break;
 		case SO_BROADCAST:
-			sctp->sctp_broadcast = onoff;
 			connp->conn_broadcast = onoff;
 			break;
 		case SO_REUSEADDR:
-			sctp->sctp_reuseaddr = onoff;
 			connp->conn_reuseaddr = onoff;
 			break;
 		case SO_DGRAM_ERRIND:
@@ -1220,14 +1218,28 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 * and sctp_opt_get ?
 			 */
 			break;
-		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(sctp->sctp_credp) != 0 ||
-			    sctp->sctp_state >= SCTPS_BOUND) {
+		case SO_ALLZONES:
+			if (secpolicy_net(sctp->sctp_credp, OP_CONFIG,
+			    B_TRUE)) {
 				retval = EACCES;
-			} else {
-				sctp->sctp_mac_exempt = onoff;
-				connp->conn_mac_exempt = onoff;
+				break;
 			}
+			if (sctp->sctp_state >= SCTPS_BOUND) {
+				retval = EINVAL;
+				break;
+			}
+			sctp->sctp_allzones = onoff;
+			break;
+		case SO_MAC_EXEMPT:
+			if (secpolicy_net_mac_aware(sctp->sctp_credp) != 0) {
+				retval = EACCES;
+				break;
+			}
+			if (sctp->sctp_state >= SCTPS_BOUND) {
+				retval = EINVAL;
+				break;
+			}
+			connp->conn_mac_exempt = onoff;
 			break;
 		default:
 			retval = EINVAL;

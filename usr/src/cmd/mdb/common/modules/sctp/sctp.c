@@ -540,13 +540,8 @@ show_sctp_flags(sctp_t *sctp)
 	mdb_printf("\tunderstands_asconf\t%d\n",
 	    sctp->sctp_understands_asconf);
 	mdb_printf("\tdebug\t\t\t%d\n", sctp->sctp_debug);
-	mdb_printf("\tdontroute\t\t%d\n", sctp->sctp_dontroute);
-	mdb_printf("\tbroadcast\t\t%d\n", sctp->sctp_broadcast);
-
-	mdb_printf("\tuseloopback\t\t%d\n", sctp->sctp_useloopback);
 	mdb_printf("\tcchunk_pend\t\t%d\n", sctp->sctp_cchunk_pend);
 	mdb_printf("\tdgram_errind\t\t%d\n", sctp->sctp_dgram_errind);
-	mdb_printf("\treuseaddr\t\t%d\n", sctp->sctp_reuseaddr);
 
 	mdb_printf("\tlinger\t\t\t%d\n", sctp->sctp_linger);
 	if (sctp->sctp_lingering)
@@ -572,8 +567,8 @@ show_sctp_flags(sctp_t *sctp)
 
 	mdb_printf("\tprsctp_aware\t\t%d\n", sctp->sctp_prsctp_aware);
 	mdb_printf("\tlinklocal\t\t%d\n", sctp->sctp_linklocal);
-	mdb_printf("\tmac_exempt\t\t%d\n", sctp->sctp_mac_exempt);
 	mdb_printf("\trexmitting\t\t%d\n", sctp->sctp_rexmitting);
+	mdb_printf("\tzero_win_probe\t\t%d\n", sctp->sctp_zero_win_probe);
 
 	mdb_printf("\trecvsndrcvinfo\t\t%d\n", sctp->sctp_recvsndrcvinfo);
 	mdb_printf("\trecvassocevnt\t\t%d\n", sctp->sctp_recvassocevnt);

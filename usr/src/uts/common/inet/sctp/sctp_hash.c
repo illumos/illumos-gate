@@ -286,8 +286,8 @@ sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
 	mutex_enter(&tf->tf_lock);
 
 	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_conn_hash_next) {
-		if (ports != sctp->sctp_ports || (zoneid != ALL_ZONES &&
-		    zoneid != sctp->sctp_zoneid)) {
+		if (ports != sctp->sctp_ports ||
+		    !IPCL_ZONE_MATCH(sctp->sctp_connp, zoneid)) {
 			continue;
 		}
 
@@ -337,8 +337,8 @@ listen_match(in6_addr_t *laddr, uint32_t ports, uint_t ipif_seqid,
 	mutex_enter(&tf->tf_lock);
 
 	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_listen_hash_next) {
-		if (lport != sctp->sctp_lport || (zoneid != ALL_ZONES &&
-		    zoneid != sctp->sctp_zoneid)) {
+		if (lport != sctp->sctp_lport ||
+		    !IPCL_ZONE_MATCH(sctp->sctp_connp, zoneid)) {
 			continue;
 		}
 

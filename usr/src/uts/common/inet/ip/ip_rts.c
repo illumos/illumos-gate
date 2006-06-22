@@ -1805,7 +1805,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 		    (cmd == RTM_DELETE && pass == 2)) {
 			ncmd = ((cmd == RTM_ADD) ? RTM_NEWADDR : RTM_DELADDR);
 
-			rtm_addrs = (RTA_IFA | RTA_NETMASK | RTA_BRD);
+			rtm_addrs = (RTA_IFA | RTA_NETMASK | RTA_BRD | RTA_IFP);
 			mp = rts_alloc_msg(ncmd, rtm_addrs, af, 0);
 			if (mp == NULL)
 				continue;
@@ -1813,7 +1813,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 			case AF_INET:
 				rts_fill_msg(ncmd, rtm_addrs, 0,
 				    ipif->ipif_net_mask, 0, ipif->ipif_lcl_addr,
-				    ipif->ipif_pp_dst_addr, 0, NULL, mp,
+				    ipif->ipif_pp_dst_addr, 0, ipif, mp,
 				    0, NULL);
 				break;
 			case AF_INET6:
@@ -1821,7 +1821,7 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif)
 				    &ipv6_all_zeros, &ipif->ipif_v6net_mask,
 				    &ipv6_all_zeros, &ipif->ipif_v6lcl_addr,
 				    &ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
-				    NULL, mp, 0, NULL);
+				    ipif, mp, 0, NULL);
 				break;
 			}
 			ifam = (ifa_msghdr_t *)mp->b_rptr;

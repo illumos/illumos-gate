@@ -3511,7 +3511,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (lconnp->conn_zoneid != zoneid &&
+			if (!IPCL_ZONE_MATCH(ltcp->tcp_connp, zoneid) &&
 			    !lconnp->conn_mac_exempt &&
 			    !connp->conn_mac_exempt)
 				continue;
@@ -5341,7 +5341,7 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * reference is dropped by the squeue framework.
  *
  * 3) The ref on listener placed in 1 above is dropped in tcp_accept_finish
- * 
+ *
  * The reference must be released by the same entity that added the reference
  * In the above scheme, the eager is the entity that adds and releases the
  * references. Note that tcp_accept_finish executes in the squeue of the eager
@@ -5373,10 +5373,10 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * based on the ref placed on eager before sending T_conn_ind.
  * The only entity that can negate this refhold is a listener close
  * which is mutually exclusive with an active acceptor stream.
- * 
+ *
  * Eager's reference on the listener
  * ===================================
- * 
+ *
  * If the accept happens (even on a closed eager) the eager drops its
  * reference on the listener at the start of tcp_accept_finish. If the
  * eager is killed due to an incoming RST before the T_conn_ind is sent up,
@@ -9587,6 +9587,9 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 			*i1 = tcp->tcp_snd_zcopy_on ?
 			    SO_SND_COPYAVOID : 0;
 			break;
+		case SO_ALLZONES:
+			*i1 = connp->conn_allzones ? 1 : 0;
+			break;
 		case SO_ANON_MLP:
 			*i1 = connp->conn_anon_mlp;
 			break;
@@ -10072,6 +10075,9 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				tcp->tcp_snd_zcopy_aware = 1;
 			}
 			break;
+		case SO_ALLZONES:
+			/* Handled at the IP level */
+			return (-EINVAL);
 		case SO_ANON_MLP:
 			if (!checkonly) {
 				mutex_enter(&connp->conn_lock);
@@ -22613,7 +22619,7 @@ tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
 		mutex_enter(&tbf->tf_lock);
 		for (tcp = tbf->tf_tcp; tcp != NULL;
 		    tcp = tcp->tcp_bind_hash) {
-			if (zoneid == tcp->tcp_connp->conn_zoneid &&
+			if (IPCL_ZONE_MATCH(tcp->tcp_connp, zoneid) &&
 			    net_port == tcp->tcp_lport) {
 				/*
 				 * A port is already bound.  Search again

@@ -1362,8 +1362,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
-			    lport) &&
-			    (connp->conn_zoneid == zoneid ||
+			    lport) && (IPCL_ZONE_MATCH(connp, zoneid) ||
 			    (unlabeled && connp->conn_mac_exempt)))
 				break;
 		}
@@ -1432,7 +1431,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
-			    (connp->conn_zoneid == zoneid ||
+			    (IPCL_ZONE_MATCH(connp, zoneid) ||
 			    (unlabeled && connp->conn_mac_exempt)))
 				break;
 		}
@@ -1546,7 +1545,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
-			    (connp->conn_zoneid == zoneid ||
+			    (IPCL_ZONE_MATCH(connp, zoneid) ||
 			    (unlabeled && connp->conn_mac_exempt)))
 				break;
 		}
@@ -1617,7 +1616,7 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid)
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
-			    (connp->conn_zoneid == zoneid ||
+			    (IPCL_ZONE_MATCH(connp, zoneid) ||
 			    (unlabeled && connp->conn_mac_exempt)))
 				break;
 		}
@@ -1755,7 +1754,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 			}
 		}
 
-		if (connp->conn_zoneid == zoneid ||
+		if (IPCL_ZONE_MATCH(connp, zoneid) ||
 		    (unlabeled && connp->conn_mac_exempt))
 			break;
 	}
@@ -1784,7 +1783,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 	    connp = connp->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket. */
 		if ((af == (connp->conn_af_isv6 ? IPV4_VERSION :
-		    IPV6_VERSION)) || (connp->conn_zoneid != zoneid)) {
+		    IPV6_VERSION)) || !IPCL_ZONE_MATCH(connp, zoneid)) {
 			continue;
 		}
 		if (af == IPV4_VERSION) {
@@ -2163,7 +2162,7 @@ ipcl_lookup_listener_v4(uint16_t lport, ipaddr_t laddr, zoneid_t zoneid)
 	    connp = connp->conn_next) {
 		tcp = connp->conn_tcp;
 		if (IPCL_BIND_MATCH(connp, IPPROTO_TCP, laddr, lport) &&
-		    connp->conn_zoneid == zoneid &&
+		    IPCL_ZONE_MATCH(connp, zoneid) &&
 		    (tcp->tcp_listener == NULL)) {
 			CONN_INC_REF(connp);
 			mutex_exit(&bind_connfp->connf_lock);
@@ -2201,7 +2200,7 @@ ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
 	    connp = connp->conn_next) {
 		tcp = connp->conn_tcp;
 		if (IPCL_BIND_MATCH_V6(connp, IPPROTO_TCP, *laddr, lport) &&
-		    connp->conn_zoneid == zoneid &&
+		    IPCL_ZONE_MATCH(connp, zoneid) &&
 		    (tcp->tcp_bound_if == 0 ||
 		    tcp->tcp_bound_if == ifindex) &&
 		    tcp->tcp_listener == NULL) {

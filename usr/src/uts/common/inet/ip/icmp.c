@@ -1567,12 +1567,13 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 			*i1 = icmp->icmp_mac_exempt;
 			break;
 		/*
-		 * Following three not meaningful for icmp
+		 * Following four not meaningful for icmp
 		 * Action is same as "default" to which we fallthrough
 		 * so we keep them in comments.
 		 * case SO_LINGER:
 		 * case SO_KEEPALIVE:
 		 * case SO_OOBINLINE:
+		 * case SO_ALLZONES:
 		 */
 		default:
 			return (-1);
@@ -2024,6 +2025,13 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly)
 				icmp->icmp_dgram_errind = onoff;
 			break;
+		case SO_ALLZONES:
+			/*
+			 * "soft" error (negative)
+			 * option not handled at this level
+			 * Note: Do not modify *outlenp
+			 */
+			return (-EINVAL);
 		case SO_TIMESTAMP:
 			if (!checkonly) {
 				icmp->icmp_timestamp = onoff;

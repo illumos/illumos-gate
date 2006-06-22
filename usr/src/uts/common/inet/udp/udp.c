@@ -3104,12 +3104,15 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 			break;	/* goto sizeof (int) option return */
 		case SO_TIMESTAMP:
 			*i1 = udp->udp_timestamp;
-			break;
+			break;	/* goto sizeof (int) option return */
 		case SO_ANON_MLP:
 			*i1 = udp->udp_anon_mlp;
 			break;	/* goto sizeof (int) option return */
 		case SO_MAC_EXEMPT:
 			*i1 = udp->udp_mac_exempt;
+			break;	/* goto sizeof (int) option return */
+		case SO_ALLZONES:
+			*i1 = connp->conn_allzones;
 			break;	/* goto sizeof (int) option return */
 		default:
 			return (-1);
@@ -3477,6 +3480,13 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 			if (!checkonly)
 				udp->udp_recvucred = onoff;
 			break;
+		case SO_ALLZONES:
+			/*
+			 * "soft" error (negative)
+			 * option not handled at this level
+			 * Do not modify *outlenp.
+			 */
+			return (-EINVAL);
 		case SO_TIMESTAMP:
 			if (!checkonly)
 				udp->udp_timestamp = onoff;

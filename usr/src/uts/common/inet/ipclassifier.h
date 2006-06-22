@@ -165,18 +165,13 @@ struct conn_s {
 
 		conn_pathmtu_valid : 1,		/* The cached mtu is valid. */
 		conn_ipv6_dontfrag : 1,		/* IPV6_DONTFRAG */
-		/*
-		 * This option can take on values in [-1, 1] so we store it
-		 * +1.  Manifest constants IPV6_USE_MIN_MTU_* describe these
-		 * values.
-		 */
 		conn_fully_bound : 1,		/* Fully bound connection */
 		conn_recvif : 1,		/* IP_RECVIF option */
 
 		conn_recvslla : 1,		/* IP_RECVSLLA option */
 		conn_mdt_ok : 1,		/* MDT is permitted */
 		conn_nexthop_set : 1,
-		pad_to_bit_31 : 1;
+		conn_allzones : 1;		/* SO_ALLZONES */
 
 	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
 	struct udp_s	*conn_udp;		/* Pointer to the udp struct */
@@ -332,11 +327,27 @@ struct connf_s {
 	}								\
 }
 
+/*
+ * For use with subsystems within ip which use ALL_ZONES as a wildcard
+ */
+#define	IPCL_ZONEID(connp)						\
+	((connp)->conn_allzones ? ALL_ZONES : (connp)->conn_zoneid)
+
+/*
+ * For matching between a conn_t and a zoneid.
+ */
+#define	IPCL_ZONE_MATCH(connp, zoneid) 					\
+	(((connp)->conn_allzones) ||					\
+	    ((zoneid) == ALL_ZONES) ||					\
+	    (connp)->conn_zoneid == (zoneid))
+
+
 #define	_IPCL_V4_MATCH(v6addr, v4addr)	\
 	(V4_PART_OF_V6((v6addr)) == (v4addr) && IN6_IS_ADDR_V4MAPPED(&(v6addr)))
 
 #define	_IPCL_V4_MATCH_ANY(addr)	\
 	(IN6_IS_ADDR_V4MAPPED_ANY(&(addr)) || IN6_IS_ADDR_UNSPECIFIED(&(addr)))
+
 
 /*
  * IPCL_PROTO_MATCH() only matches conns with the specified zoneid, while
@@ -347,12 +358,12 @@ struct connf_s {
     fanout_flags, zoneid)						\
 	((((connp)->conn_src == INADDR_ANY) ||				\
 	(((connp)->conn_src == ((ipha)->ipha_dst)) &&			\
-	(((connp)->conn_rem == INADDR_ANY) ||				\
+	    (((connp)->conn_rem == INADDR_ANY) ||			\
 	((connp)->conn_rem == ((ipha)->ipha_src))))) &&			\
-	((zoneid) == ALL_ZONES || (connp)->conn_zoneid == (zoneid)) &&	\
-	(conn_wantpacket((connp), (ill), (ipha),			\
-	(fanout_flags), (zoneid)) || ((protocol) == IPPROTO_PIM) ||	\
-	((protocol) == IPPROTO_RSVP)))
+	IPCL_ZONE_MATCH(connp, zoneid) &&				\
+	(conn_wantpacket((connp), (ill), (ipha), (fanout_flags), 	\
+	    (zoneid)) || ((protocol) == IPPROTO_PIM) ||			\
+	    ((protocol) == IPPROTO_RSVP)))
 
 #define	IPCL_PROTO_MATCH_V6(connp, protocol, ip6h, ill,			   \
     fanout_flags, zoneid)						   \

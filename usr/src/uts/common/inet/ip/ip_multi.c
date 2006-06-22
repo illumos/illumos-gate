@@ -1858,12 +1858,14 @@ ip_opt_check(conn_t *connp, ipaddr_t group, ipaddr_t src, ipaddr_t ifaddr,
 {
 	ipif_t *ipif;
 	int err = 0;
-	zoneid_t zoneid = connp->conn_zoneid;
+	zoneid_t zoneid;
 
 	if (!CLASSD(group) || CLASSD(src)) {
 		return (EINVAL);
 	}
 	*ipifpp = NULL;
+
+	zoneid = IPCL_ZONEID(connp);
 
 	ASSERT(!(ifaddr != INADDR_ANY && ifindexp != NULL && *ifindexp != 0));
 	if (ifaddr != INADDR_ANY) {

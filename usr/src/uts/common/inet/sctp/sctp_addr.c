@@ -50,7 +50,7 @@
 
 static void		sctp_ipif_inactive(sctp_ipif_t *);
 static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
-			    zoneid_t zoneid, uint_t);
+			    sctp_t *, uint_t);
 static int		sctp_get_all_ipifs(sctp_t *, int);
 int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
 			    uchar_t *, size_t);
@@ -93,6 +93,9 @@ void			sctp_saddr_fini();
 #define	SCTP_UNSUPP_AF(ipif, supp_af)	\
 	((!(ipif)->sctp_ipif_isv6 && !((supp_af) & PARM_SUPP_V4)) ||	\
 	((ipif)->sctp_ipif_isv6 && !((supp_af) & PARM_SUPP_V6)))
+
+#define	SCTP_IPIF_ZONE_MATCH(sctp, ipif) 				\
+	IPCL_ZONE_MATCH((sctp)->sctp_connp, (ipif)->sctp_ipif_zoneid)
 
 #define	SCTP_ILL_HASH_FN(index)		((index) % SCTP_ILL_HASH)
 #define	SCTP_IPIF_HASH_FN(seqid)	((seqid) % SCTP_IPIF_HASH)
@@ -167,14 +170,14 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
  * Called with no locks held.
  */
 static sctp_ipif_t *
-sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid,
+sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, sctp_t *sctp,
     uint_t ifindex)
 {
 	int		i;
 	int		j;
 	sctp_ipif_t	*sctp_ipif;
 
-	ASSERT(zoneid != ALL_ZONES);
+	ASSERT(sctp->sctp_zoneid != ALL_ZONES);
 	rw_enter(&sctp_g_ipifs_lock, RW_READER);
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
 		if (sctp_g_ipifs[i].ipif_count == 0)
@@ -182,8 +185,7 @@ sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid,
 		sctp_ipif = list_head(&sctp_g_ipifs[i].sctp_ipif_list);
 		for (j = 0; j < sctp_g_ipifs[i].ipif_count; j++) {
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
-			if ((zoneid == sctp_ipif->sctp_ipif_zoneid ||
-			    sctp_ipif->sctp_ipif_zoneid == ALL_ZONES) &&
+			if (SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) &&
 			    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) &&
 			    (ifindex == 0 || ifindex ==
 			    sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
@@ -226,8 +228,7 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
 			if (SCTP_IPIF_DISCARD(sctp_ipif->sctp_ipif_flags) ||
 			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
-			    (sctp_ipif->sctp_ipif_zoneid != ALL_ZONES &&
-			    sctp_ipif->sctp_ipif_zoneid != sctp->sctp_zoneid) ||
+			    !SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) ||
 			    (sctp->sctp_ipversion == IPV4_VERSION &&
 			    sctp_ipif->sctp_ipif_isv6) ||
 			    (sctp->sctp_connp->conn_ipv6_v6only &&
@@ -359,8 +360,8 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			goto free_ret;
 		}
 		if (lookup_saddr) {
-			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE,
-			    sctp->sctp_zoneid, ifindex);
+			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE, sctp,
+			    ifindex);
 			if (ipif == NULL) {
 				/* Address not in the list */
 				err = EINVAL;
@@ -974,8 +975,8 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 			ifindex = sin6->sin6_scope_id;
 			break;
 		}
-		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE,
-		    sctp->sctp_zoneid, ifindex);
+		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE, sctp,
+		    ifindex);
 		ASSERT(sctp_ipif != NULL);
 		sctp_ipif_hash_remove(sctp, sctp_ipif);
 	}
@@ -1000,8 +1001,7 @@ sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 	sctp_saddr_ipif_t	*saddr_ipifs;
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_FALSE, sctp->sctp_zoneid,
-	    ifindex);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_FALSE, sctp, ifindex);
 	if (sctp_ipif == NULL)
 		return (NULL);
 
@@ -1015,8 +1015,7 @@ sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid,
-	    ifindex);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp, ifindex);
 	if (sctp_ipif == NULL)
 		return (EINVAL);
 
@@ -1447,7 +1446,7 @@ get_all_addrs:
 			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
 			    SCTP_IS_IPIF_LOOPBACK(sctp_ipif) ||
 			    SCTP_IS_IPIF_LINKLOCAL(sctp_ipif) ||
-			    sctp_ipif->sctp_ipif_zoneid != sctp->sctp_zoneid ||
+			    !SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) ||
 			    (sctp->sctp_ipversion == IPV4_VERSION &&
 			    sctp_ipif->sctp_ipif_isv6) ||
 			    (sctp->sctp_connp->conn_ipv6_v6only &&

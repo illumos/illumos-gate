@@ -88,7 +88,10 @@ opdes_t	icmp_opt_arr[] = {
 { SO_TIMESTAMP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0
 	},
 { SO_MAC_EXEMPT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
-    0 },
+	0 },
+
+{ SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT, sizeof (int),
+	0 },
 
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
 	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT),
