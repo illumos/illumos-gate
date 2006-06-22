@@ -258,6 +258,11 @@ set_smcwbem $keyword
 #
 ln -sf ./$profile /var/svc/profile/generic.xml
 svccfg apply /var/svc/profile/generic.xml
+if [ $profile = "generic_open.xml" ]
+then
+	# generic_open may not start inetd services on upgraded systems
+	svccfg apply /var/svc/profile/inetd_generic.xml
+fi
 
 #
 # Make the services aware of the new property values
