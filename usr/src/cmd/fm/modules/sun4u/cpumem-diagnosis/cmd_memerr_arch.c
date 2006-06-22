@@ -57,6 +57,10 @@
 #define	USIIIi_AFSR_JREQ_SHIFT	24
 #define	TOM_AID_MATCH_MASK	0xe
 
+#define	FIRE_AID		0xe
+#define	FIRE_JBC_ADDR_MASK	0x000007ffffffffffull
+#define	FIRE_JBC_JITEL1		"jbc-jitel1"
+
 /*ARGSUSED*/
 cmd_evdisp_t
 cmd_mem_synd_check(fmd_hdl_t *hdl, uint64_t afar, uint8_t afar_status,
@@ -186,8 +190,8 @@ iorxefrx_match(fmd_hdl_t *hdl, cmd_errcl_t errcl, cmd_errcl_t matchmask,
 		 */
 		if ((CMD_ERRCL_ISIOXE(rf->rf_errcl) ||
 		    CMD_ERRCL_ISIOXE(errcl)) &&
-		    ((rf->rf_afsr_agentid & TOM_AID_MATCH_MASK) ==
-		    (afsr_agentid & TOM_AID_MATCH_MASK)))
+			((rf->rf_afsr_agentid & TOM_AID_MATCH_MASK) ==
+			(afsr_agentid & TOM_AID_MATCH_MASK)))
 			return (rf);
 
 		/*
@@ -285,6 +289,83 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		    rferr->rf_synd_status, rfmatch->rf_type, rferr->rf_disp,
 		    hdlr);
 	}
+
+	cmd_iorxefrx_free(hdl, rfmatch);
+	fmd_hdl_free(hdl, rferr, sizeof (cmd_iorxefrx_t));
+
+	return (rc);
+}
+
+/*
+ * This fire IOxE must be matched with an FRx before UE/CE processing
+ * is possible.
+ *
+ * Note that for fire ereports we don't receive AFSR, AFAR, AFAR-Status,
+ * SYND and TYPNM values but we can derive the AFAR from the payload
+ * value FIRE_JBC_JITEL1
+ */
+static cmd_evdisp_t
+cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, cmd_errcl_t errcl, cmd_errcl_t matchmask)
+{
+	cmd_xe_handler_f *hdlr;
+	cmd_iorxefrx_t *rfmatch, *rferr;
+	uint64_t afar;
+	int isce = CMD_ERRCL_MATCH(errcl, CMD_ERRCL_IOCE);
+	char *portid_str;
+	char *path = NULL;
+	nvlist_t *det = NULL;
+	int rc;
+
+	rferr = fmd_hdl_zalloc(hdl, sizeof (cmd_iorxefrx_t), FMD_SLEEP);
+
+	/*
+	 * Lookup device path of host bridge.
+	 */
+	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det);
+	(void) nvlist_lookup_string(det, FM_FMRI_DEV_PATH, &path);
+
+	/*
+	 * get Jbus port id from the device path
+	 */
+	portid_str = strrchr(path, '@') + 1;
+	rferr->rf_det_agentid = strtol(portid_str, NULL, 16);
+
+	rferr->rf_errcl = errcl;
+	rferr->rf_afsr_agentid = FIRE_AID;
+	rferr->rf_afar_status = AFLT_STAT_VALID;
+	rferr->rf_synd_status = AFLT_STAT_VALID;
+
+	/*
+	 * Extract the afar from the payload
+	 */
+	(void) nvlist_lookup_uint64(nvl, FIRE_JBC_JITEL1, &afar);
+	rferr->rf_afar = afar & FIRE_JBC_ADDR_MASK;
+
+	rferr->rf_afsr = NULL;
+	rferr->rf_synd = NULL;
+
+
+	/*
+	 * Need to send in the io_jpid that we get from the device path above
+	 * for both the det_agentid and the afsr_agentid, since the CPU does not
+	 * capture the same address as the bridge.  The bridge has the LSB
+	 * aliased and the CPU is missing the MSB.
+	 */
+	if ((rfmatch = iorxefrx_match(hdl, rferr->rf_errcl, matchmask,
+	    rferr->rf_det_agentid, rferr->rf_afsr_agentid)) == NULL) {
+		cmd_iorxefrx_queue(hdl, rferr);
+		return (CMD_EVD_OK);
+		}
+
+	/* Found a match.  Synthesize an ereport for UE/CE processing. */
+	fmd_hdl_debug(hdl, "matched %cE %llx with %llx\n", "UC"[isce],
+	    rferr->rf_errcl, rfmatch->rf_errcl);
+
+	hdlr = (isce ? cmd_ce_common : cmd_ue_common);
+	rc = iorxefrx_synthesize(hdl, ep, nvl, class, rferr->rf_afar,
+	    rferr->rf_afar_status, rfmatch->rf_afsr, rfmatch->rf_synd,
+	    rfmatch->rf_synd_status, rferr->rf_type, rferr->rf_disp, hdlr);
 
 	cmd_iorxefrx_free(hdl, rfmatch);
 	fmd_hdl_free(hdl, rferr, sizeof (cmd_iorxefrx_t));
@@ -427,6 +508,9 @@ cmd_ioxe(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	if (fmd_nvl_class_match(hdl, nvl, "ereport.io.tom.*")) {
 		return (cmd_ioxefrx_common(hdl, ep, nvl, class, clcode,
 		    matchmask));
+	} else  if (fmd_nvl_class_match(hdl, nvl, "ereport.io.fire.*")) {
+			return (cmd_ioxefrx_fire(hdl, ep, nvl, class, clcode,
+				matchmask));
 	} else
 		return (ioxe_common(hdl, ep, nvl, class, clcode));
 }

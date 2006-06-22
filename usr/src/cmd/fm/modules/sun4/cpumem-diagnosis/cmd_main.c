@@ -135,6 +135,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.io.*.ecc.s-dwce",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-drue",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-dwue",	cmd_ioxe_sec },
+	{ "ereport.io.fire.jbc.ce_asyn", cmd_ioxe,	CMD_ERRCL_IOCE },
+	{ "ereport.io.fire.jbc.ue_asyn", cmd_ioxe,	CMD_ERRCL_IOUE },
 	{ "ereport.asic.*.cds.cds-dp", 	cmd_dp_cds },
 	{ "ereport.asic.*.dx.dx-dp",	cmd_dp_dx },
 	{ "ereport.asic.*.sdi.sdi-dp", 	cmd_dp_ex },
@@ -524,6 +526,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.io.oberon.ubc.piorbeue-cpu");
 	fmd_hdl_subscribe(hdl, "ereport.io.oberon.ubc.piorbeue-path");
 #endif
+	fmd_hdl_subscribe(hdl, "ereport.io.fire.jbc.ce_asyn");
+	fmd_hdl_subscribe(hdl, "ereport.io.fire.jbc.ue_asyn");
 
 	bzero(&cmd, sizeof (cmd_t));
 
