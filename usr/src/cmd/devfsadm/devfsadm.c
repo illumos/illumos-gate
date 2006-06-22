@@ -8116,10 +8116,10 @@ devlink_cb(di_devlink_t dl, void *arg)
 
 	if ((path = di_devlink_path(dl)) == NULL ||
 	    (content = di_devlink_content(dl)) == NULL ||
-	    (x->dev_names[x->count] = strdup(path)) == NULL)
+	    (x->dev_names[x->count] = s_strdup(path)) == NULL)
 		goto out;
 
-	if ((x->link_contents[x->count] = strdup(content)) == NULL) {
+	if ((x->link_contents[x->count] = s_strdup(content)) == NULL) {
 		free(x->dev_names[x->count]);
 		goto out;
 	}
@@ -8163,7 +8163,7 @@ lookup_dev_name(char *phys_path, char **dev_name)
 		return (-1);
 
 	if (cb_arg.count > 0) {
-		*dev_name = strdup(cb_arg.dev_names[0]);
+		*dev_name = s_strdup(cb_arg.dev_names[0]);
 		free_dev_names(&cb_arg);
 		if (*dev_name == NULL)
 			return (-1);
@@ -8196,7 +8196,7 @@ lookup_disk_dev_name(char *node_path)
 	for (i = 0; i < cb_arg.count; i++) {
 		if (strncmp(cb_arg.dev_names[i], DEV_RDSK,
 		    sizeof (DEV_RDSK) - 1) == 0) {
-			dev_name = strdup(cb_arg.dev_names[i]);
+			dev_name = s_strdup(cb_arg.dev_names[i]);
 			break;
 		}
 	}
@@ -8209,7 +8209,7 @@ lookup_disk_dev_name(char *node_path)
 			if (len2 >= len1 &&
 			    strcmp(cb_arg.link_contents[i] + len2 - len1,
 			    DISK_RAW_MINOR) == 0) {
-				dev_name = strdup(cb_arg.dev_names[i]);
+				dev_name = s_strdup(cb_arg.dev_names[i]);
 				break;
 			}
 		}
@@ -8217,6 +8217,8 @@ lookup_disk_dev_name(char *node_path)
 
 	free_dev_names(&cb_arg);
 
+	if (dev_name == NULL)
+		return (NULL);
 	if (strlen(dev_name) == 0) {
 		free(dev_name);
 		return (NULL);
