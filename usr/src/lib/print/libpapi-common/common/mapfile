@@ -147,5 +147,3 @@ SUNWprivate_1.0 { # Misc. semi-private supporting calls
     local:
         *;
 };
-
-FSG_1.0 {} SUNW_1.0;
