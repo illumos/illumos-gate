@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/sunddi.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
+#include <sys/disp.h>
 #include <sys/tnf_probe.h>
 
 #include <sys/1394/t1394.h>
@@ -501,7 +501,7 @@ t1394_read(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this a blocking command on interrupt stack? */
 	if ((cmd->cmd_options & CMD1394_BLOCKING) &&
-	    (curthread->t_flag == T_INTR_THREAD)) {
+	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
 		TNF_PROBE_1(t1394_read_error, S1394_TNF_SL_ATREQ_ERROR, "",
 		    tnf_string, msg, "Tried to use CMD1394_BLOCKING in "
@@ -684,7 +684,7 @@ t1394_write(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this a blocking command on interrupt stack? */
 	if ((cmd->cmd_options & CMD1394_BLOCKING) &&
-	    (curthread->t_flag == T_INTR_THREAD)) {
+	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
 		s1394_fa_check_restore_cmd(to_hal, cmd);
 		TNF_PROBE_1(t1394_write_error, S1394_TNF_SL_ATREQ_ERROR, "",
@@ -877,7 +877,7 @@ t1394_lock(t1394_handle_t t1394_hdl, cmd1394_cmd_t *cmd)
 
 	/* Is this a blocking command on interrupt stack? */
 	if ((cmd->cmd_options & CMD1394_BLOCKING) &&
-	    (curthread->t_flag == T_INTR_THREAD)) {
+	    (servicing_interrupt())) {
 		cmd->cmd_result = CMD1394_EINVALID_CONTEXT;
 		TNF_PROBE_1(t1394_lock_error, S1394_TNF_SL_ATREQ_ERROR, "",
 		    tnf_string, msg, "Tried to use CMD1394_BLOCKING in intr "
@@ -3577,7 +3577,7 @@ t1394_add_cfgrom_entry(t1394_handle_t t1394_hdl,
 	hal = target->on_hal;
 
 	/* Is this on the interrupt stack? */
-	if (curthread->t_flag == T_INTR_THREAD) {
+	if (servicing_interrupt()) {
 		*result = T1394_EINVALID_CONTEXT;
 		TNF_PROBE_0_DEBUG(t1394_add_cfgrom_entry_exit,
 		    S1394_TNF_SL_CFGROM_STACK, "");
@@ -3652,7 +3652,7 @@ t1394_rem_cfgrom_entry(t1394_handle_t t1394_hdl, uint_t flags,
 	hal = target->on_hal;
 
 	/* Is this on the interrupt stack? */
-	if (curthread->t_flag == T_INTR_THREAD) {
+	if (servicing_interrupt()) {
 		*result = T1394_EINVALID_CONTEXT;
 		TNF_PROBE_0_DEBUG(t1394_rem_cfgrom_entry_exit,
 		    S1394_TNF_SL_CFGROM_STACK, "");

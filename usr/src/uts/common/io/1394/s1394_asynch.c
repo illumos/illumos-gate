@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/cmn_err.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
+#include <sys/disp.h>
 #include <sys/tnf_probe.h>
 
 #include <sys/1394/t1394.h>
@@ -77,7 +77,7 @@ s1394_alloc_cmd(s1394_hal_t *hal, uint_t flags, cmd1394_cmd_t **cmdp)
 	alloc_sleep = (flags & T1394_ALLOC_CMD_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
 
 	if ((alloc_sleep == KM_SLEEP) &&
-	    (curthread->t_flag == T_INTR_THREAD)) {
+	    (servicing_interrupt())) {
 		TNF_PROBE_1(s1394_alloc_cmd_error, S1394_TNF_SL_ATREQ_ERROR,
 		    "", tnf_string, msg, "Tried to sleep in intr context");
 		TNF_PROBE_0_DEBUG(s1394_alloc_cmd_exit,
