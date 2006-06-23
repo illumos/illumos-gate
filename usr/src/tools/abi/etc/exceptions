@@ -67,6 +67,7 @@ PSARC 2004/619: RULE E1: usr/lib/amd64/libtecla.so.1: tecla_1.3
 PSARC 2004/619: RULE E1: usr/lib/amd64/libtecla.so.1: tecla_1.4
 PSARC 2004/619: RULE E1: usr/lib/amd64/libtecla.so.1: tecla_l.5
 PSARC 2004/619: RULE E1: usr/lib/amd64/libtecla.so.1: tecla_1.6
+6442910: RULE E1: usr/lib/libpapi.so.0: FSG_1.0
 
 #############################################
 # ERRORs exempted from RULE E2 (See RULES section of intf_check manpage) 
@@ -712,6 +713,7 @@ PSARC 2004/619: RULE W5: usr/lib/libc/libc_hwcap2.so.1: SUNW_1.9
 PSARC 2002/506: RULE W5: lib/libdevinfo.so.1: SUNW_1.2
 PSARC 2002/506: RULE W5: lib/sparcv9/libdevinfo.so.1: SUNW_1.2
 PSARC 2004/619: RULE W5: lib/amd64/libdevinfo.so.1: SUNW_1.2
+6442910: RULE W5: usr/lib/libpapi.so.0: FSG_1.0
 
 #############################################
 # WARNINGs exempted from RULE W6 (See RULES section of intf_check manpage)

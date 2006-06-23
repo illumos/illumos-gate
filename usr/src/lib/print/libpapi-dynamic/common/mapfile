@@ -148,3 +148,5 @@ SUNWprivate_1.0 {
     local:
         * ;
 } ;
+
+FSG_1.0 {} SUNW_1.0;
