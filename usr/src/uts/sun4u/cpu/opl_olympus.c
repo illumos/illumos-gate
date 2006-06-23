@@ -740,38 +740,6 @@ static uint64_t ttecnt_threshold[MMU_PAGE_SIZES] = {
 	AVAIL_DTLB_ENTRIES, AVAIL_DTLB_ENTRIES,
 	AVAIL_DTLB_ENTRIES, AVAIL_DTLB_ENTRIES};
 
-size_t
-mmu_map_pgsz(size_t pgsize)
-{
-	struct proc *p = curproc;
-	struct as *as = p->p_as;
-	struct hat *hat = as->a_hat;
-	uint_t pgsz0, pgsz1;
-	size_t size0, size1;
-
-	ASSERT(mmu_page_sizes == max_mmu_page_sizes);
-	pgsz0 = hat->sfmmu_pgsz[0];
-	pgsz1 = hat->sfmmu_pgsz[1];
-	size0 = hw_page_array[pgsz0].hp_size;
-	size1 = hw_page_array[pgsz1].hp_size;
-	/* Allow use of a larger pagesize if neither TLB is reprogrammed. */
-	if ((pgsz0 == TTE8K) && (pgsz1 == TTE8K)) {
-		return (pgsize);
-	/* Allow use of requested pagesize if TLB is reprogrammed to it. */
-	} else if ((pgsize == size0) || (pgsize == size1)) {
-		return (pgsize);
-	/* Use larger reprogrammed TLB size if pgsize is atleast that big. */
-	} else if (pgsz1 > pgsz0) {
-		if (pgsize >= size1)
-			return (size1);
-	/* Use smaller reprogrammed TLB size if pgsize is atleast that big. */
-	} else {
-		if (pgsize >= size0)
-			return (size0);
-	}
-	return (pgsize);
-}
-
 /*
  * The function returns the mmu-specific values for the
  * hat's disable_large_pages and disable_ism_large_pages variables.
@@ -869,16 +837,15 @@ mmu_preferred_pgsz(struct hat *hat, caddr_t addr, size_t len)
  * by a process change significantly.
  */
 void
-mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt)
+mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 {
-	extern int page_szc(size_t);
 	uint8_t pgsz0, pgsz1;
 
 	/*
 	 * Don't program 2nd dtlb for kernel and ism hat
 	 */
-	if (hat->sfmmu_ismhat || hat == ksfmmup)
-		return;
+	ASSERT(hat->sfmmu_ismhat == NULL);
+	ASSERT(hat != ksfmmup);
 
 	/*
 	 * hat->sfmmu_pgsz[] is an array whose elements
@@ -895,8 +862,8 @@ mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt)
 	 * do the actual programming of the TLB hardware.
 	 *
 	 */
-	pgsz0 = (uint8_t)MIN(hat->sfmmu_pgsz[0], hat->sfmmu_pgsz[1]);
-	pgsz1 = (uint8_t)MAX(hat->sfmmu_pgsz[0], hat->sfmmu_pgsz[1]);
+	pgsz0 = (uint8_t)MIN(tmp_pgsz[0], tmp_pgsz[1]);
+	pgsz1 = (uint8_t)MAX(tmp_pgsz[0], tmp_pgsz[1]);
 
 	/*
 	 * This implements PAGESIZE programming of the sTLB
@@ -906,8 +873,8 @@ mmu_setup_page_sizes(struct hat *hat, uint64_t *ttecnt)
 		pgsz0 = page_szc(MMU_PAGESIZE);
 	if (ttecnt[pgsz1] < ttecnt_threshold[pgsz1])
 		pgsz1 = page_szc(MMU_PAGESIZE);
-	hat->sfmmu_pgsz[0] = pgsz0;
-	hat->sfmmu_pgsz[1] = pgsz1;
+	tmp_pgsz[0] = pgsz0;
+	tmp_pgsz[1] = pgsz1;
 	/* otherwise, accept what the HAT chose for us */
 }
 
@@ -956,6 +923,54 @@ mmu_set_ctx_page_sizes(struct hat *hat)
 	 * sfmmu_setctx_sec() will take care of the
 	 * rest of the dirty work for us.
 	 */
+}
+
+/*
+ * This function assumes that there are either four or six supported page
+ * sizes and at most two programmable TLBs, so we need to decide which
+ * page sizes are most important and then adjust the TLB page sizes
+ * accordingly (if supported).
+ *
+ * If these assumptions change, this function will need to be
+ * updated to support whatever the new limits are.
+ */
+void
+mmu_check_page_sizes(sfmmu_t *sfmmup, uint64_t *ttecnt)
+{
+	uint64_t sortcnt[MMU_PAGE_SIZES];
+	uint8_t tmp_pgsz[MMU_PAGE_SIZES];
+	uint8_t i, j, max;
+	uint16_t oldval, newval;
+
+	/*
+	 * We only consider reprogramming the TLBs if one or more of
+	 * the two most used page sizes changes and we're using
+	 * large pages in this process.
+	 */
+	if (sfmmup->sfmmu_flags & HAT_LGPG_FLAGS) {
+		/* Sort page sizes. */
+		for (i = 0; i < mmu_page_sizes; i++) {
+			sortcnt[i] = ttecnt[i];
+		}
+		for (j = 0; j < mmu_page_sizes; j++) {
+			for (i = mmu_page_sizes - 1, max = 0; i > 0; i--) {
+				if (sortcnt[i] > sortcnt[max])
+					max = i;
+			}
+			tmp_pgsz[j] = max;
+			sortcnt[max] = 0;
+		}
+
+		oldval = sfmmup->sfmmu_pgsz[0] << 8 | sfmmup->sfmmu_pgsz[1];
+
+		mmu_setup_page_sizes(sfmmup, ttecnt, tmp_pgsz);
+
+		/* Check 2 largest values after the sort. */
+		newval = tmp_pgsz[0] << 8 | tmp_pgsz[1];
+		if (newval != oldval) {
+			sfmmu_reprog_pgsz_arr(sfmmup, tmp_pgsz);
+		}
+	}
 }
 
 /*
