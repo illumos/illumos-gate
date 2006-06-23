@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -3191,13 +3190,14 @@ di_match_drv_name(struct dev_info *node, struct di_state *st, int match)
 #define	DI_MAX_PRIVDATA	(PAGESIZE >> 1)	/* max private data size */
 
 static di_off_t
-di_getprvdata(struct di_priv_format *pdp, void *data, di_off_t *off_p,
-	struct di_state *st)
+di_getprvdata(struct di_priv_format *pdp, struct dev_info *node,
+    void *data, di_off_t *off_p, struct di_state *st)
 {
 	caddr_t pa;
 	void *ptr;
 	int i, size, repeat;
 	di_off_t off, off0, *tmp;
+	char *path;
 
 	label_t ljb;
 
@@ -3303,7 +3303,10 @@ failure:
 	 * fault occurred
 	 */
 	no_fault();
-	cmn_err(CE_WARN, "devinfo: fault in private data at %p", data);
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	cmn_err(CE_WARN, "devinfo: fault on private data for '%s' at %p",
+	    ddi_pathname((dev_info_t *)node, path), data);
+	kmem_free(path, MAXPATHLEN);
 	*off_p = -1;	/* set private data to indicate error */
 
 	return (off);
@@ -3327,8 +3330,8 @@ di_getppdata(struct dev_info *node, di_off_t *off_p, struct di_state *st)
 		return (off);
 	}
 
-	return (di_getprvdata(ppdp, ddi_get_parent_data((dev_info_t *)node),
-	    off_p, st));
+	return (di_getprvdata(ppdp, node,
+	    ddi_get_parent_data((dev_info_t *)node), off_p, st));
 }
 
 /*
@@ -3349,8 +3352,8 @@ di_getdpdata(struct dev_info *node, di_off_t *off_p, struct di_state *st)
 		return (off);
 	}
 
-	return (di_getprvdata(dpdp, ddi_get_driver_private((dev_info_t *)node),
-	    off_p, st));
+	return (di_getprvdata(dpdp, node,
+	    ddi_get_driver_private((dev_info_t *)node), off_p, st));
 }
 
 /*
