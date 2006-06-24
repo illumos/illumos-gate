@@ -1663,115 +1663,68 @@ pm_set_power(dev_info_t *dip, int comp, int level, int direction,
 	return (ret);
 }
 
-static dev_info_t *
-find_dip(dev_info_t *dip, char *dev_name, int holddip)
-{
-	PMD_FUNC(pmf, "find_dip")
-	dev_info_t	*cdip;
-	char		*child_dev, *addr;
-	char		*device;	/* writeable copy of path */
-	int		dev_len = strlen(dev_name)+1;
-	int		circ;
-
-	device = kmem_zalloc(dev_len, KM_SLEEP);
-	(void) strcpy(device, dev_name);
-	addr = strchr(device, '@');
-	child_dev = strchr(device, '/');
-	if ((addr != NULL) && (child_dev == NULL || addr < child_dev)) {
-		/*
-		 * We have device = "name@addr..." form
-		 */
-		*addr++ = '\0';			/* for strcmp (and skip '@') */
-		if (child_dev != NULL)
-			*child_dev++ = '\0';	/* for strcmp (and skip '/') */
-	} else {
-		/*
-		 * We have device = "name/..." or "name"
-		 */
-		addr = "";
-		if (child_dev != NULL)
-			*child_dev++ = '\0';	/* for strcmp (and skip '/') */
-	}
-	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
-		if (strcmp(ddi_node_name(dip), device) == 0) {
-			/* If the driver isn't loaded, we prune the search */
-			if (!i_ddi_devi_attached(dip)) {
-				continue;
-			}
-			if (strcmp(ddi_get_name_addr(dip), addr) == 0) {
-				PMD(PMD_NAMETODIP, ("%s: matched %s@%s"
-				    "(%s#%d)\n", pmf, PM_DEVICE(dip)))
-				if (child_dev != NULL) {
-					PMD(PMD_NAMETODIP, ("%s: %s@%s(%s#%d): "
-					    "held, call find_dip %s\n", pmf,
-					    PM_DEVICE(dip), child_dev))
-					ndi_devi_enter(dip, &circ);
-					cdip = dip;
-					dip = find_dip(ddi_get_child(dip),
-					    child_dev, holddip);
-					ndi_devi_exit(cdip, circ);
-					PMD(PMD_NAMETODIP, ("%s: %s@%s(%s#%d): "
-					    "release, find_dip rets %s\n", pmf,
-					    PM_DEVICE(cdip), child_dev))
-				} else {
-					if (holddip) {
-						e_ddi_hold_devi(dip);
-						PMD(PMD_DHR | PMD_NAMETODIP,
-						    ("%s: held %s@%s(%s#%d), "
-						    "refcnt=%d\n", pmf,
-						    PM_DEVICE(dip),
-						    e_ddi_devi_holdcnt(dip)))
-					}
-				}
-				kmem_free(device, dev_len);
-				return (dip);
-			}
-		}
-	}
-	kmem_free(device, dev_len);
-	return (dip);
-}
-
 /*
- * If holddip is set, then if a dip is found we return with the node held
+ * If holddip is set, then if a dip is found we return with the node held.
+ *
+ * This code uses the same locking scheme as e_ddi_hold_devi_by_path
+ * (resolve_pathname), but it does not drive attach.
  */
 dev_info_t *
 pm_name_to_dip(char *pathname, int holddip)
 {
-	PMD_FUNC(pmf, "name_to_dip")
-	dev_info_t	*dip = NULL;
-	char		dev_name[MAXNAMELEN];
-	dev_info_t	*first_child;
-	int		circular;
+	struct pathname pn;
+	char		*component;
+	dev_info_t	*parent, *child;
+	int		circ;
 
-	if (!pathname)
+	if ((pathname == NULL) || (*pathname != '/'))
 		return (NULL);
 
-	(void) strncpy(dev_name, pathname, MAXNAMELEN);
-
-	PMD(PMD_NAMETODIP, ("%s: devname: %s\n", pmf, dev_name))
-
-	/*
-	 * First we attempt to match the node in the tree.  If we succeed
-	 * we hold the driver and look up the dip again.
-	 * No need to hold the root as that node is always held.
-	 */
-	if (dev_name[0] == '/') {
-		ndi_devi_enter(ddi_root_node(), &circular);
-		first_child = ddi_get_child(ddi_root_node());
-		dip = find_dip(first_child, dev_name + 1, holddip);
-		ndi_devi_exit(ddi_root_node(), circular);
-
-	} else {
-		PMD(PMD_NAMETODIP, ("%s: physpath with unrooted "
-		    "search\n", pmf))
+	/* setup pathname and allocate component */
+	if (pn_get(pathname, UIO_SYSSPACE, &pn))
 		return (NULL);
+	component = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	/* start at top, process '/' component */
+	parent = child = ddi_root_node();
+	ndi_hold_devi(parent);
+	pn_skipslash(&pn);
+	ASSERT(i_ddi_devi_attached(parent));
+
+	/* process components of pathname */
+	while (pn_pathleft(&pn)) {
+		(void) pn_getcomponent(&pn, component);
+
+		/* enter parent and search for component child */
+		ndi_devi_enter(parent, &circ);
+		child = ndi_devi_findchild(parent, component);
+		if ((child == NULL) || !i_ddi_devi_attached(child)) {
+			child = NULL;
+			ndi_devi_exit(parent, circ);
+			ndi_rele_devi(parent);
+			goto out;
+		}
+
+		/* attached child found, hold child and release parent */
+		ndi_hold_devi(child);
+		ndi_devi_exit(parent, circ);
+		ndi_rele_devi(parent);
+
+		/* child becomes parent, and process next component */
+		parent = child;
+		pn_skipslash(&pn);
+
+		/* loop with active ndi_devi_hold of child->parent */
 	}
 
-	ASSERT(!dip ||
-	    (ddi_name_to_major(ddi_binding_name(dip)) != (major_t)-1));
+out:
+	pn_free(&pn);
+	kmem_free(component, MAXNAMELEN);
 
-	return (dip);
+	/* if we are not asked to return with hold, drop current hold */
+	if (child && !holddip)
+		ndi_rele_devi(child);
+	return (child);
 }
 
 /*
