@@ -102,6 +102,9 @@ typedef struct pxu {
 	/* sun4u specific vars */
 	caddr_t			px_address[4];
 	ddi_acc_handle_t	px_ac[4];
+
+	/* PCItool */
+	caddr_t		pcitool_addr;
 } pxu_t;
 
 #define	PX2CB(px_p) (((pxu_t *)px_p->px_plat_p)->px_cb_p)
@@ -284,6 +287,11 @@ typedef enum {
 #define	FIRE_VER_20	PX_CHIP_ID(PX_CHIP_FIRE, 0x03, 0x00)
 #define	OBERON_VER_10	PX_CHIP_ID(PX_CHIP_OBERON, 0x00, 0x00)
 #define	OBERON_RANGE_PROP_MASK	0x7fff
+
+/*
+ * HW specific paddr mask.
+ */
+extern uint64_t px_paddr_mask;
 
 extern void hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
 extern void hvio_ib_init(caddr_t csr_base, pxu_t *pxu_p);

@@ -505,7 +505,12 @@ pxtool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 
 	prg.phys_addr += prg.offset;
 
-	/*  XXX do some kind of checking here? */
+	/*
+	 * Only the hypervisor can access nexus registers.  As a result, there
+	 * can be no error recovery in the OS.  If there is an error, the
+	 * system will go down, but with a trap type 7f.  The OS cannot
+	 * intervene with this kind of trap.
+	 */
 
 	/* Access device.  prg.status is modified. */
 	rval = pxtool_phys_access(px_p, prg.phys_addr, &prg.data,

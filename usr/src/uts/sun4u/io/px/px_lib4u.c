@@ -59,6 +59,7 @@ extern void jbus_stst_order();
 ulong_t px_mmu_dvma_end = 0xfffffffful;
 uint_t px_ranges_phi_mask = 0xfffffffful;
 uint64_t *px_oberon_ubc_scratch_regs;
+uint64_t px_paddr_mask;
 
 static int px_goto_l23ready(px_t *px_p);
 static int px_goto_l0(px_t *px_p);
@@ -170,9 +171,11 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 		return (DDI_FAILURE);
 	case FIRE_VER_20:
 		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 2.0\n");
+		px_paddr_mask = MMU_FIRE_PADDR_MASK;
 		break;
 	case OBERON_VER_10:
 		DBG(DBG_ATTACH, dip, "Oberon Hardware Version 1.0\n");
+		px_paddr_mask = MMU_OBERON_PADDR_MASK;
 		break;
 	default:
 		cmn_err(CE_WARN, "%s%d: PX Hardware Version Unknown\n",

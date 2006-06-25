@@ -168,6 +168,9 @@ int px_err_jbc_jbusint_in_handle(dev_info_t *rpdip, caddr_t csr_base,
 int px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
+int px_err_jbc_safe_acc_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
 int px_err_jbc_csr_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);

@@ -162,13 +162,18 @@ px_err_bit_desc_t px_err_jbc_tbl[] = {
 	/* JBC Jbusint Out - see io erpt doc, section 1.4 */
 	{ JBC_BIT_DESC(IJP,	fatal_gos,	jbc_out) },
 
-	/* JBC Dmcint ODCD - see io erpt doc, section 1.5 */
-	{ JBC_BIT_DESC(PIO_UNMAP_RD,	jbc_dmcint_odcd,	jbc_odcd) },
-	{ JBC_BIT_DESC(ILL_ACC_RD,	jbc_dmcint_odcd,	jbc_odcd) },
-	{ JBC_BIT_DESC(PIO_UNMAP,	jbc_dmcint_odcd,	jbc_odcd) },
+	/*
+	 * JBC Dmcint ODCD - see io erpt doc, section 1.5
+	 *
+	 * Error bits which can be set via a bad PCItool access go through
+	 * jbc_safe_acc instead.
+	 */
+	{ JBC_BIT_DESC(PIO_UNMAP_RD,	jbc_safe_acc,		jbc_odcd) },
+	{ JBC_BIT_DESC(ILL_ACC_RD,	jbc_safe_acc,		jbc_odcd) },
+	{ JBC_BIT_DESC(PIO_UNMAP,	jbc_safe_acc,		jbc_odcd) },
 	{ JBC_BIT_DESC(PIO_DPE,		jbc_dmcint_odcd,	jbc_odcd) },
 	{ JBC_BIT_DESC(PIO_CPE,		non_fatal,		jbc_odcd) },
-	{ JBC_BIT_DESC(ILL_ACC,		jbc_dmcint_odcd,	jbc_odcd) },
+	{ JBC_BIT_DESC(ILL_ACC,		jbc_safe_acc,		jbc_odcd) },
 
 	/* JBC Dmcint IDC - see io erpt doc, section 1.6 */
 	{ JBC_BIT_DESC(UNSOL_RD,	non_fatal,	jbc_idc) },
@@ -1472,11 +1477,7 @@ PX_ERPT_SEND_DEC(jbc_odcd)
 
 /*
  * JBC Dmcint ODCO nonfatal errer handling -
- *    Unmapped PIO read error: pio:read:M:nonfatal
- *    Unmapped PIO write error: pio:write:M:nonfatal
  *    PIO data parity error: pio:write:M:nonfatal
- *    Invalid PIO write to PCIe cfg/io, csr, ebus or i2c bus: pio:write:nonfatal
- *    Invalid PIO read to PCIe cfg/io, csr, ebus or i2c bus: pio:read:nonfatal
  */
 /* ARGSUSED */
 int
@@ -1498,6 +1499,56 @@ px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 		rpdip, DMA_HANDLE, derr->fme_ena, (void *)paddr);
 
 	return ((ret == DDI_FM_FATAL) ? PX_FATAL_GOS : PX_NONFATAL);
+}
+
+/* Does address in DMCINT error log register match address of pcitool access? */
+static boolean_t
+px_jbc_pcitool_addr_match(dev_info_t *rpdip, caddr_t csr_base)
+{
+	px_t	*px_p = DIP_TO_STATE(rpdip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t	pcitool_addr = pxu_p->pcitool_addr;
+	caddr_t errlog_addr =
+	    (caddr_t)CSR_FR(csr_base, DMCINT_ODCD_ERROR_LOG, ADDRESS);
+
+	return (pcitool_addr == errlog_addr);
+}
+
+/*
+ * JBC Dmcint ODCD errer handling for errors which are forgivable during a safe
+ * access.  (This will be most likely be a PCItool access.)  If not a safe
+ * access context, treat like jbc_dmcint_odcd.
+ *    Unmapped PIO read error: pio:read:M:nonfatal
+ *    Unmapped PIO write error: pio:write:M:nonfatal
+ *    Invalid PIO write to PCIe cfg/io, csr, ebus or i2c bus: pio:write:nonfatal
+ *    Invalid PIO read to PCIe cfg/io, csr, ebus or i2c bus: pio:read:nonfatal
+ */
+/* ARGSUSED */
+int
+px_err_jbc_safe_acc_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
+
+	if (!pri)
+		return (PX_FATAL_GOS);
+	/*
+	 * Got an error which is forgivable during a PCItool access.
+	 *
+	 * Don't do handler check since the error may otherwise be unfairly
+	 * attributed to a device.  Just return.
+	 *
+	 * Note: There is a hole here in that a legitimate error can come in
+	 * while a PCItool access is in play and be forgiven.  This is possible
+	 * though not likely.
+	 */
+	if ((derr->fme_flag != DDI_FM_ERR_UNEXPECTED) &&
+	    (px_jbc_pcitool_addr_match(rpdip, csr_base)))
+		return (PX_FATAL_SW);
+
+	return (px_err_jbc_dmcint_odcd_handle(rpdip, csr_base, derr,
+	    err_reg_descr, err_bit_descr));
 }
 
 /* JBC Dmcint IDC - see io erpt doc, section 1.6 */
@@ -1628,7 +1679,7 @@ px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 */
 
 	if (!(imu_log_enable & imu_intr_enable & mask))
-		err = PX_FATAL_SW;
+		err = PX_FATAL_GOS;
 
 	return (err);
 }
@@ -1668,7 +1719,7 @@ px_err_imu_eq_ovfl_handle(dev_info_t *rpdip, caddr_t csr_base,
 		if (px_lib_msiq_getstate(rpdip, eqno, &msiq_state) ==
 			DDI_SUCCESS) {
 			if (msiq_state == PCI_MSIQ_STATE_ERROR) {
-				err = PX_FATAL_SW;
+				err = PX_FATAL_GOS;
 			}
 		}
 	}
@@ -1813,7 +1864,7 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	 */
 	if (mmu_log_enable & mmu_intr_enable &
 	    (mmu_ctrl & mmu_enable_bit)) {
-		err = PX_FATAL_SW;
+		err = PX_FATAL_GOS;
 	} else {
 		if (!pri)
 			return (PX_FATAL_GOS);
