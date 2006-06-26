@@ -3546,6 +3546,21 @@ int  __ns_ldap_addTypedEntry(
 
 	if (create != 1) {
 		/* Modify the entry */
+		/*
+		 * To add a shadow-like entry, the addTypedEntry function
+		 * would call __ns_ldap_repAttr first, and if server says
+		 * LDAP_NO_SUCH_OBJECT, then it tries __ns_ldap_addEntry.
+		 * This is to allow a netmask entry to be added even if the
+		 * base network entry is not in the directory. It would work
+		 * because the difference between the schema for the network
+		 * and netmask data contains only MAY attributes.
+		 *
+		 * But for shadow data, the attributes do not have MUST
+		 * attributes the base entry needs, so if the __ns_ldap_addEntry
+		 * is executed, it would fail. The real reason, however, is that
+		 * the base entry did not exist. So returning
+		 * LDAP_OBJECT_CLASS_VIOLATION would just confused.
+		 */
 		if ((__s_cvtlist[s].flags & AE) != 0)
 			rc = __ns_ldap_addAttr(service, fulldn, modattrlist,
 			    cred, flags, errorp);
@@ -3557,6 +3572,10 @@ int  __ns_ldap_addTypedEntry(
 				(void) __ns_ldap_freeError(errorp);
 				rc = __ns_ldap_addEntry(service, fulldn,
 				    entry, cred, flags, errorp);
+				if (rc == NS_LDAP_INTERNAL && *errorp &&
+				(*errorp)->status ==
+					LDAP_OBJECT_CLASS_VIOLATION)
+					(*errorp)->status = LDAP_NO_SUCH_OBJECT;
 			}
 		}
 	} else {

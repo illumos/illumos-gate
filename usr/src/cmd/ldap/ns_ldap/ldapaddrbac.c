@@ -139,8 +139,13 @@ genent_user_attr(char *line, int (*cback)())
 		    gettext("Adding entry : %s\n"), data.name);
 
 	retval = (*cback)(&data, 1);
-	if (retval)
-		res = GENENT_CBERR;
+	if (retval != NS_LDAP_SUCCESS) {
+		if (retval == LDAP_NO_SUCH_OBJECT)
+			(void) fprintf(stdout,
+			gettext("Cannot add user_attr entry (%s), "
+			"add passwd entry first\n"), data.name);
+		if (continue_onerror == 0) res = GENENT_CBERR;
+	}
 
 	free(ecol);
 
@@ -409,8 +414,13 @@ genent_audit_user(char *line, int (*cback)())
 		    gettext("Adding entry : %s\n"), data.au_name);
 
 	retval = (*cback)(&data, 1);
-	if (retval)
-		res = GENENT_CBERR;
+	if (retval != NS_LDAP_SUCCESS) {
+		if (retval == LDAP_NO_SUCH_OBJECT)
+			(void) fprintf(stdout,
+			gettext("Cannot add audit_user entry (%s), "
+			"add passwd entry first\n"), data.au_name);
+		if (continue_onerror == 0) res = GENENT_CBERR;
+	}
 
 	free(ecol);
 

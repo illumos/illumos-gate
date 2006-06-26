@@ -436,7 +436,8 @@ addentry(void *entry, int mod)
 		break;
 
 	case NS_LDAP_INTERNAL:
-		if (eres->status == LDAP_ALREADY_EXISTS)
+		if (eres->status == LDAP_ALREADY_EXISTS ||
+			eres->status == LDAP_NO_SUCH_OBJECT)
 			rc = eres->status;
 		else {
 			rc = 1;
@@ -2245,15 +2246,27 @@ genent_publickey(char *line, int (*cback)())
 	data.privkey = tmpprivkey;
 
 	retval = (*cback)(&data, 1);
-
-	if ((retval != NS_LDAP_SUCCESS) && (continue_onerror == 0))
-		return (GENENT_CBERR);
-	else {
-		free(data.name);
-		free(data.pubkey);
-		free(data.privkey);
-		return (GENENT_OK);
+	if (retval != NS_LDAP_SUCCESS) {
+		if (retval == LDAP_NO_SUCH_OBJECT) {
+			if (data.hostcred == NS_HOSTCRED_TRUE)
+				(void) fprintf(stdout,
+				gettext("Cannot add publickey entry (%s), "
+					"add host entry first\n"),
+					tmpbuf);
+			else
+				(void) fprintf(stdout,
+				gettext("Cannot add publickey entry (%s), "
+					"add passwd entry first\n"),
+					data.name);
+		}
+		if (continue_onerror == 0)
+			return (GENENT_CBERR);
 	}
+
+	free(data.name);
+	free(data.pubkey);
+	free(data.privkey);
+	return (GENENT_OK);
 }
 
 static void
@@ -2316,6 +2329,7 @@ genent_netmasks(char *line, int (*cback)())
 	char buf[BUFSIZ+1];
 	char *t;
 	entry_col ecol[3];
+	int retval;
 
 	struct _ns_netmasks data;
 
@@ -2375,8 +2389,15 @@ genent_netmasks(char *line, int (*cback)())
 		(void) fprintf(stdout,
 		    gettext("Adding entry : %s\n"), data.netnumber);
 
-	if ((*cback)(&data, 1) && continue_onerror == 0)
-		return (GENENT_CBERR);
+	retval = (*cback)(&data, 1);
+	if (retval != NS_LDAP_SUCCESS) {
+		if (retval == LDAP_NO_SUCH_OBJECT)
+			(void) fprintf(stdout,
+			gettext("Cannot add netmask entry (%s), "
+				"add network entry first\n"), data.netnumber);
+		if (continue_onerror == 0)
+			return (GENENT_CBERR);
+	}
 
 	return (GENENT_OK);
 }
@@ -2985,6 +3006,7 @@ genent_shadow(char *line, int (*cback)())
 
 	struct spwd	data;
 	int spflag;
+	int retval;
 
 
 	/*
@@ -3222,8 +3244,15 @@ genent_shadow(char *line, int (*cback)())
 		(void) fprintf(stdout,
 		    gettext("Adding entry : %s\n"), data.sp_namp);
 
-	if ((*cback)(&data, 1) && (continue_onerror == 0))
-		return (GENENT_CBERR);
+	retval = (*cback)(&data, 1);
+	if (retval != NS_LDAP_SUCCESS) {
+		if (retval == LDAP_NO_SUCH_OBJECT)
+			(void) fprintf(stdout,
+			gettext("Cannot add shadow entry (%s), "
+				"add passwd entry first\n"), data.sp_namp);
+		if (continue_onerror == 0)
+			return (GENENT_CBERR);
+	}
 
 	free(data.sp_namp);
 	free(data.sp_pwdp);
