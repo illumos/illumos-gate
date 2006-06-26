@@ -601,6 +601,7 @@ getattr_exit:
 	if (pwbuf->pwd) free(pwbuf->pwd);
 	if (pwbuf->pwd_scratch) free(pwbuf->pwd_scratch);
 	if (pwbuf->spwd) free(pwbuf->spwd);
+	if (pwbuf->spwd_scratch) free(pwbuf->spwd_scratch);
 	free(pwbuf);
 
 	return (res);
