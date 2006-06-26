@@ -1540,6 +1540,9 @@ so_cmsg2opt(void *control, t_uscalar_t controllen, int oldflg, mblk_t *mp)
  * Return the length of the control message derived from the options.
  * Exclude SO_SRCADDR and SO_UNIX_CLOSE options. Include SO_FILEP.
  * When oldflg is set only include SO_FILEP.
+ * so_opt2cmsg and so_cmsglen are inter-related since so_cmsglen
+ * allocates the space that so_opt2cmsg fills. If one changes, the other should
+ * also be checked for any possible impacts.
  */
 t_uscalar_t
 so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
@@ -1575,13 +1578,23 @@ so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
 				continue;
 			}
 			len = fdbuf_cmsglen(fdbuflen);
+		} else if (tohp->level == SOL_SOCKET &&
+		    tohp->name == SCM_TIMESTAMP) {
+			if (oldflg)
+				continue;
+
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				len = sizeof (struct timeval);
+			} else {
+				len = sizeof (struct timeval32);
+			}
 		} else {
 			if (oldflg)
 				continue;
 			len = (t_uscalar_t)_TPI_TOPT_DATALEN(tohp);
 		}
 		/*
-		 * Exlucde roundup for last option to not set
+		 * Exclude roundup for last option to not set
 		 * MSG_CTRUNC when the cmsg fits but the padding doesn't fit.
 		 */
 		last_roundup = (t_uscalar_t)
@@ -1600,6 +1613,9 @@ so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
  * Copy options from options to the control. Convert SO_FILEP to
  * file descriptors.
  * Returns errno or zero.
+ * so_opt2cmsg and so_cmsglen are inter-related since so_cmsglen
+ * allocates the space that so_opt2cmsg fills. If one changes, the other should
+ * also be checked for any possible impacts.
  */
 int
 so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
@@ -1610,7 +1626,10 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 	struct fdbuf *fdbuf;
 	int fdbuflen;
 	int error;
-
+#if defined(DEBUG) || defined(__lint)
+	struct cmsghdr *cend = (struct cmsghdr *)
+	    (((uint8_t *)control) + ROUNDUP_cmsglen(controllen));
+#endif
 	cmsg = (struct cmsghdr *)control;
 
 	ASSERT(__TPI_TOPT_ISALIGNED(opt));
@@ -1670,15 +1689,19 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 			    sizeof (intptr_t));
 
 			if (get_udatamodel() == DATAMODEL_NATIVE) {
-				struct timeval *time_native;
+				struct timeval tv;
 
 				cmsg->cmsg_len = sizeof (struct timeval) +
 				    sizeof (struct cmsghdr);
-				time_native =
-				    (struct timeval *)CMSG_CONTENT(cmsg);
-				time_native->tv_sec = timestamp->tv_sec;
-				time_native->tv_usec =
-				    timestamp->tv_nsec / (NANOSEC / MICROSEC);
+				tv.tv_sec = timestamp->tv_sec;
+				tv.tv_usec = timestamp->tv_nsec /
+				    (NANOSEC / MICROSEC);
+				/*
+				 * on LP64 systems, the struct timeval in
+				 * the destination will not be 8-byte aligned,
+				 * so use bcopy to avoid alignment trouble
+				 */
+				bcopy(&tv, CMSG_CONTENT(cmsg), sizeof (tv));
 			} else {
 				struct timeval32 *time32;
 
@@ -1707,6 +1730,9 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 		/* move to next CMSG structure! */
 		cmsg = CMSG_NEXT(cmsg);
 	}
+	dprint(1, ("so_opt2cmsg: buf %p len %d; cend %p; final cmsg %p\n",
+	    control, controllen, cend, cmsg));
+	ASSERT(cmsg <= cend);
 	return (0);
 }
 
