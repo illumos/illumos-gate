@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +52,13 @@ extern "C" {
 #define	RING_PUT(qsp, c) \
 	((qsp)->qcn_ring[(qsp)->qcn_rput++ & RINGMASK] =  (uchar_t)(c))
 #define	RING_GET(qsp)	((qsp)->qcn_ring[(qsp)->qcn_rget++ & RINGMASK])
+#define	RING_ADDR(qsp)	(&((qsp)->qcn_ring[(qsp)->qcn_rget & RINGMASK]))
+#define	RING_POFF(qsp)	((qsp)->qcn_rput & RINGMASK)
+#define	RING_GOFF(qsp)	((qsp)->qcn_rget & RINGMASK)
+#define	RING_LEFT(qsp)	(RING_POFF(qsp) >= RING_GOFF(qsp) ? (RINGSIZE) - \
+			RING_POFF(qsp) : RING_GOFF(qsp) - RING_POFF(qsp))
+
+#define	RING_UPD(qsp, n)	((qsp)->qcn_rput += (n))
 
 /*
  * qcn driver's soft state structure
@@ -81,7 +87,7 @@ typedef struct qcn {
 	uchar_t	qcn_rput;
 	int	qcn_soft_pend;
 	ddi_softint_handle_t qcn_softint_hdl;
-	ushort_t	qcn_ring[RINGSIZE];
+	uchar_t	*qcn_ring;
 	ushort_t	qcn_hangup;
 	ddi_intr_handle_t *qcn_htable;	/* For array of interrupts */
 	int	qcn_intr_type;	/* What type of interrupt */
@@ -90,6 +96,14 @@ typedef struct qcn {
 	uint_t	qcn_intr_pri;	/* Interrupt priority   */
 	ddi_iblock_cookie_t qcn_soft_pri;
 	uint_t	qcn_rbuf_overflow;
+	/*
+	 * support for console read/write support
+	 */
+	int		(*cons_transmit)(queue_t *, mblk_t *);
+	void		(*cons_receive)(void);
+	char		*cons_write_buffer;
+	uint64_t	cons_write_buf_ra;
+	uint64_t	cons_read_buf_ra;
 } qcn_t;
 
 /* Constants used by promif routines */
@@ -103,6 +117,19 @@ extern struct mod_ops mod_driverops;
 
 #define	QCN_TXINT_ENABLE	0x1
 #define	QCN_RXINT_ENABLE	0x2
+
+/*
+ * API major/minor definitions for console
+ * read/write support.
+ */
+
+#define	QCN_API_MAJOR	1
+#define	QCN_API_MINOR	1
+
+/*
+ * The buffer size must be a power of 2 or contig_mem_alloc will fail
+ */
+#define	CONS_WR_BUF_SIZE	64
 
 #ifdef __cplusplus
 }

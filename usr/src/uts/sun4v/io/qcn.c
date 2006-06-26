@@ -49,6 +49,8 @@
 #include <sys/spl.h>
 #include <sys/qcn.h>
 #include <sys/hypervisor_api.h>
+#include <sys/hsvc.h>
+#include <sys/machsystm.h>
 
 /* dev_ops and cb_ops for device driver */
 static int qcn_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
@@ -65,7 +67,10 @@ static void qcn_ioctl(queue_t *, mblk_t *);
 static void qcn_reioctl(void *);
 static void qcn_ack(mblk_t *, mblk_t *, uint_t);
 static void qcn_start(void);
-static int qcn_transmit(queue_t *, mblk_t *);
+static int qcn_transmit_write(queue_t *, mblk_t *);
+static int qcn_transmit_putchr(queue_t *, mblk_t *);
+static void qcn_receive_read(void);
+static void qcn_receive_getchr(void);
 static void qcn_flush(void);
 static uint_t qcn_hi_intr(caddr_t arg);
 static uint_t qcn_soft_intr(caddr_t arg1, caddr_t arg2);
@@ -177,20 +182,47 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-
 /* driver configuration routines */
 int
 _init(void)
 {
 	int error;
+	uint64_t	major, minor;
 
 	qcn_state = kmem_zalloc(sizeof (qcn_t), KM_SLEEP);
+	qcn_state->qcn_ring = contig_mem_alloc(RINGSIZE);
+	if (qcn_state->qcn_ring == NULL)
+		cmn_err(CE_PANIC, "console ring allocation failed");
 
 	error = mod_install(&modlinkage);
-	if (error != 0)
+	if (error != 0) {
+		contig_mem_free(qcn_state->qcn_ring, RINGSIZE);
 		kmem_free(qcn_state, sizeof (qcn_t));
+		return (error);
+	}
+	/*
+	 * check minor number to see if CONS_WRITE is supported
+	 * if so, set up real address of the buffers for hv calls.
+	 */
 
-	return (error);
+	if (((hsvc_version(HSVC_GROUP_CORE, &major, &minor) == 0) &&
+		(major == QCN_API_MAJOR) && (minor >= QCN_API_MINOR))) {
+		qcn_state->cons_write_buffer =
+					contig_mem_alloc(CONS_WR_BUF_SIZE);
+		if (qcn_state->cons_write_buffer != NULL) {
+			qcn_state->cons_write_buf_ra =
+					va_to_pa(qcn_state->cons_write_buffer);
+			qcn_state->cons_transmit = qcn_transmit_write;
+			qcn_state->cons_receive = qcn_receive_read;
+			qcn_state->cons_read_buf_ra =
+					va_to_pa((char *)RING_ADDR(qcn_state));
+		}
+	}
+	if (qcn_state->cons_transmit == NULL) {
+		qcn_state->cons_transmit = qcn_transmit_putchr;
+		qcn_state->cons_receive = qcn_receive_getchr;
+	}
+	return (0);
 }
 
 int
@@ -781,31 +813,86 @@ qcn_start(void)
 		/*
 		 * M_DATA
 		 */
-		rv = qcn_transmit(q, mp);
+		rv = qcn_state->cons_transmit(q, mp);
 		if (rv == EBUSY || rv == EAGAIN)
 			return;
 	}
 }
 
 static int
-qcn_transmit(queue_t *q, mblk_t *mp)
+qcn_transmit_write(queue_t *q, mblk_t *mp)
 {
-	caddr_t buf;
-	mblk_t *bp;
-	size_t len;
-	long i;
+	mblk_t		*bp;
+	size_t		len;
+	uint64_t	i;
+	uint64_t	retval = 0;
 
 #ifdef QCN_DEBUG
-	prom_printf("qcn_transmit(): q=%X mp=%X\n", q, mp);
+	prom_printf("qcn_transmit_write(): q=%X mp=%X\n", q, mp);
 #endif
-	do {
+
+	while (mp) {
+		bp = mp;
+		len = bp->b_wptr - bp->b_rptr;
+		/*
+		 * Use the console write call to send a block of characters to
+		 * the console.
+		 */
+		i = (len > CONS_WR_BUF_SIZE) ? CONS_WR_BUF_SIZE : len;
+		bcopy(bp->b_rptr, qcn_state->cons_write_buffer, i);
+		retval = hv_cnwrite(qcn_state->cons_write_buf_ra, i, &i);
+
+		if (retval == H_EOK) {
+			len -= i;
+			bp->b_rptr += i;
+			/*
+			 * if we have finished with this buf, free
+			 * and get the next buf if present.
+			 */
+			if (len == 0) {
+				mp = bp->b_cont;
+				freeb(bp);
+			}
+		} else {
+			(void) putbq(q, mp);
+
+			switch (retval) {
+
+			case H_EWOULDBLOCK :
+				/*
+				 * hypervisor cannot process the request -
+				 * channel busy.  Try again later.
+				 */
+				return (EAGAIN);
+
+			case H_EIO :
+				return (EIO);
+			default :
+				return (ENXIO);
+			}
+		}
+	}
+	return (0);
+}
+
+static int
+qcn_transmit_putchr(queue_t *q, mblk_t *mp)
+{
+	caddr_t		buf;
+	mblk_t		*bp;
+	size_t		len;
+	uint64_t	i;
+
+#ifdef QCN_DEBUG
+	prom_printf("qcn_transmit_putchr(): q=%X mp=%X\n", q, mp);
+#endif
+	while (mp) {
 		bp = mp;
 		len = bp->b_wptr - bp->b_rptr;
 		buf = (caddr_t)bp->b_rptr;
-
 		for (i = 0; i < len; i++) {
 			if (hv_cnputchar(buf[i]) == H_EWOULDBLOCK)
-				break;
+			break;
 		}
 		if (i != len) {
 			bp->b_rptr += i;
@@ -814,8 +901,7 @@ qcn_transmit(queue_t *q, mblk_t *mp)
 		}
 		mp = bp->b_cont;
 		freeb(bp);
-	} while (mp != NULL);
-
+	}
 	return (0);
 }
 
@@ -842,15 +928,21 @@ qcn_flush(void)
 static void
 qcn_trigger_softint(void)
 {
-
-	if (mutex_tryenter(&qcn_state->qcn_softlock)) {
-		if (!qcn_state->qcn_soft_pend) {
-			qcn_state->qcn_soft_pend = 1;
-			mutex_exit(&qcn_state->qcn_softlock);
-			(void) ddi_intr_trigger_softint(
+	/*
+	 * get lock for software ints and see if we need to trigger a soft
+	 * interrupt (no pending sofware ints).
+	 */
+	mutex_enter(&qcn_state->qcn_softlock);
+	/*
+	 * if we are not currently servicing a software interrupt
+	 * (qcn_soft_pend == 0), trigger the service routine to run.
+	 */
+	if (!qcn_state->qcn_soft_pend++) {
+		mutex_exit(&qcn_state->qcn_softlock);
+		(void) ddi_intr_trigger_softint(
 			    qcn_state->qcn_softint_hdl, NULL);
-		} else
-			mutex_exit(&qcn_state->qcn_softlock);
+	} else {
+		mutex_exit(&qcn_state->qcn_softlock);
 	}
 }
 
@@ -860,56 +952,70 @@ qcn_soft_intr(caddr_t arg1, caddr_t arg2)
 {
 	mblk_t *mp;
 	int	cc;
+	int	overflow_check;
 
+	/*
+	 * grab the lock for the soft int pending.  It is grabbed here so
+	 * that the decrement at the end of the do loop is under lock
+	 * protection.
+	 */
 	mutex_enter(&qcn_state->qcn_softlock);
-	mutex_enter(&qcn_state->qcn_hi_lock);
-	if ((cc = RING_CNT(qcn_state)) <= 0) {
-		mutex_exit(&qcn_state->qcn_hi_lock);
-		goto out;
-	}
-
-	if ((mp = allocb(cc, BPRI_MED)) == NULL) {
-		qcn_input_dropped += cc;
-		cmn_err(CE_WARN, "qcn_intr: allocb"
-		    "failed (console input dropped)");
-		mutex_exit(&qcn_state->qcn_hi_lock);
-		goto out;
-	}
-
 	do {
-		/* put console input onto stream */
-		*(char *)mp->b_wptr++ = RING_GET(qcn_state);
-	} while (--cc);
-
-	if (qcn_state->qcn_rbuf_overflow) {
-		mutex_exit(&qcn_state->qcn_hi_lock);
-		cmn_err(CE_WARN, "qcn: Ring buffer overflow\n");
+		/*
+		 * release the soft int lock so that the interrupt routine
+		 * will not be held up.
+		 */
+		mutex_exit(&qcn_state->qcn_softlock);
 		mutex_enter(&qcn_state->qcn_hi_lock);
-		qcn_state->qcn_rbuf_overflow = 0;
-	}
-
-	mutex_exit(&qcn_state->qcn_hi_lock);
-	if (qcn_state->qcn_readq) {
-		putnext(qcn_state->qcn_readq, mp);
-	}
-out:
-/*
- * If there are pending transmits because hypervisor
- * returned EWOULDBLOCK poke start now.
- */
-
-	if (qcn_state->qcn_writeq != NULL) {
-		if (qcn_state->qcn_hangup) {
-			(void) putctl(qcn_state->qcn_readq, M_HANGUP);
-			flushq(qcn_state->qcn_writeq, FLUSHDATA);
-			qcn_state->qcn_hangup = 0;
-		} else {
-			mutex_enter(&qcn_state->qcn_lock);
-			qcn_start();
-			mutex_exit(&qcn_state->qcn_lock);
+		if ((cc = RING_CNT(qcn_state)) <= 0) {
+			mutex_exit(&qcn_state->qcn_hi_lock);
+			goto out;
 		}
-	}
-	qcn_state->qcn_soft_pend = 0;
+
+		if ((mp = allocb(cc, BPRI_MED)) == NULL) {
+			qcn_input_dropped += cc;
+			mutex_exit(&qcn_state->qcn_hi_lock);
+			cmn_err(CE_WARN, "qcn_intr: allocb"
+			    "failed (console input dropped)");
+			goto out;
+		}
+
+		do {
+			/* put console input onto stream */
+			*(char *)mp->b_wptr++ = RING_GET(qcn_state);
+		} while (--cc);
+
+		if ((overflow_check = qcn_state->qcn_rbuf_overflow) != 0) {
+			qcn_state->qcn_rbuf_overflow = 0;
+		}
+		mutex_exit(&qcn_state->qcn_hi_lock);
+
+		if (overflow_check) {
+			cmn_err(CE_WARN, "qcn: Ring buffer overflow\n");
+		}
+
+		if (qcn_state->qcn_readq) {
+			putnext(qcn_state->qcn_readq, mp);
+		}
+out:
+		/*
+		 * If there are pending transmits because hypervisor
+		 * returned EWOULDBLOCK poke start now.
+		 */
+
+		if (qcn_state->qcn_writeq != NULL) {
+			if (qcn_state->qcn_hangup) {
+				(void) putctl(qcn_state->qcn_readq, M_HANGUP);
+				flushq(qcn_state->qcn_writeq, FLUSHDATA);
+				qcn_state->qcn_hangup = 0;
+			} else {
+				mutex_enter(&qcn_state->qcn_lock);
+				qcn_start();
+				mutex_exit(&qcn_state->qcn_lock);
+			}
+		}
+		mutex_enter(&qcn_state->qcn_softlock);
+	} while (qcn_state->qcn_soft_pend-- > 1);
 	mutex_exit(&qcn_state->qcn_softlock);
 	return (DDI_INTR_CLAIMED);
 }
@@ -918,43 +1024,124 @@ out:
 static uint_t
 qcn_hi_intr(caddr_t arg)
 {
-	int64_t rv;
-	uint8_t buf;
-
 	mutex_enter(&qcn_state->qcn_hi_lock);
-	/* LINTED: E_CONSTANT_CONDITION */
-	while (1) {
-		rv = hv_cngetchar(&buf);
-		if (rv == H_BREAK) {
-			if (abort_enable != KIOCABORTALTERNATE)
-				abort_sequence_enter((char *)NULL);
-		}
 
-		if (rv == H_HUP)  {
-			qcn_state->qcn_hangup = 1;
-		}
+	qcn_state->cons_receive();
 
-		if (rv != H_EOK)
-			goto out;
-
-		if (abort_enable == KIOCABORTALTERNATE) {
-			if (abort_charseq_recognize(buf)) {
-				abort_sequence_enter((char *)NULL);
-			}
-		}
-
-		/* put console input onto stream */
-		if (RING_POK(qcn_state, 1)) {
-			RING_PUT(qcn_state, buf);
-		} else {
-			qcn_state->qcn_rbuf_overflow++;
-		}
-	}
-out:
 	mutex_exit(&qcn_state->qcn_hi_lock);
 	qcn_trigger_softint();
 
 	return (DDI_INTR_CLAIMED);
+}
+
+static void
+qcn_receive_read(void)
+{
+	int64_t rv;
+	uint8_t *bufp;
+	int64_t	retcount = 0;
+	int	i;
+
+	do {
+		/*
+		 * Maximize available buffer size
+		 */
+		if (RING_CNT(qcn_state) <= 0) {
+			RING_INIT(qcn_state);
+		}
+		rv = hv_cnread(qcn_state->cons_read_buf_ra +
+				RING_POFF(qcn_state),
+				RING_LEFT(qcn_state),
+				&retcount);
+		bufp = RING_ADDR(qcn_state);
+		if (rv == H_EOK) {
+			/*
+			 * if the alternate break sequence is enabled, test
+			 * the buffer for the sequence and if it is there,
+			 * enter the debugger.
+			 */
+			if (abort_enable == KIOCABORTALTERNATE) {
+				for (i = 0; i < retcount; i++) {
+					if (abort_charseq_recognize(*bufp++)) {
+						abort_sequence_enter(
+								(char *)NULL);
+					}
+				}
+			}
+
+			/* put console input onto stream */
+			if (retcount > 0) {
+				/*
+				 * the characters are already in the ring,
+				 * just update the pointer so the characters
+				 * can be retrieved.
+				 */
+				RING_UPD(qcn_state, retcount);
+			}
+		} else {
+			switch (rv) {
+
+			case H_EWOULDBLOCK :
+				/*
+				 * hypervisor cannot handle the request.
+				 * Try again later.
+				 */
+				break;
+
+
+			case H_BREAK :
+				/*
+				 * on break, unless alternate break sequence is
+				 * enabled, enter the debugger
+				 */
+				if (abort_enable != KIOCABORTALTERNATE)
+					abort_sequence_enter((char *)NULL);
+				break;
+
+			case H_HUP :
+				qcn_state->qcn_hangup = 1;
+				break;
+
+			default :
+				break;
+			}
+		}
+	} while (rv == H_EOK);
+}
+
+static void
+qcn_receive_getchr(void)
+{
+	int64_t rv;
+	uint8_t	buf;
+
+	do {
+		rv = hv_cngetchar(&buf);
+		if (rv == H_EOK) {
+			if (abort_enable == KIOCABORTALTERNATE) {
+				if (abort_charseq_recognize(buf)) {
+					abort_sequence_enter((char *)NULL);
+				}
+			}
+
+			/* put console input onto stream */
+			if (RING_POK(qcn_state, 1)) {
+				RING_PUT(qcn_state, buf);
+			} else {
+				qcn_state->qcn_rbuf_overflow++;
+			}
+		} else {
+			if (rv == H_BREAK) {
+				if (abort_enable != KIOCABORTALTERNATE)
+					abort_sequence_enter((char *)NULL);
+			}
+
+			if (rv == H_HUP)  {
+				qcn_state->qcn_hangup = 1;
+			}
+			return;
+		}
+	} while (rv == H_EOK);
 }
 
 #ifdef QCN_POLLING

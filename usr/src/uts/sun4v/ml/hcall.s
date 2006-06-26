@@ -326,6 +326,16 @@ uint64_t
 hv_mach_set_watchdog(uint64_t timeout, uint64_t *time_remaining)
 { return (0); }
 
+/*ARGSUSED*/
+int64_t
+hv_cnwrite(uint64_t buf_ra, uint64_t count, uint64_t *retcount)
+{ return (0); }
+
+/*ARGSUSED*/
+int64_t
+hv_cnread(uint64_t buf_ra, uint64_t count, int64_t *retcount)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
@@ -1133,5 +1143,48 @@ hv_mach_set_watchdog(uint64_t timeout, uint64_t *time_remaining)
 	retl
 	  stx	%o1, [%o4]
 	SET_SIZE(hv_api_set_version)
+
+	/*
+	 * %o0 - buffer real address
+	 * %o1 - buffer size
+	 * %o2 - &characters written
+	 * returns
+	 * 	status
+	 */
+	ENTRY(hv_cnwrite)
+	mov	CONS_WRITE, %o5
+	ta	FAST_TRAP
+	retl
+	stx	%o1, [%o2]
+	SET_SIZE(hv_cnwrite)
+
+	/*
+	 * %o0 character buffer ra
+	 * %o1 buffer size
+	 * %o2 pointer to returned size
+	 * return values:
+	 * 0 success
+	 * hv_errno failure
+	 */
+	ENTRY(hv_cnread)
+	mov	CONS_READ, %o5
+	ta	FAST_TRAP
+	brnz,a	%o0, 1f		! failure, just return error
+	nop
+
+	cmp	%o1, H_BREAK
+	be	1f
+	mov	%o1, %o0
+
+	cmp	%o1, H_HUP
+	be	1f
+	mov	%o1, %o0
+
+	stx	%o1, [%o2]	! success, save count and return 0
+	mov	0, %o0
+1:
+	retl
+	nop
+	SET_SIZE(hv_cnread)
 
 #endif	/* lint || __lint */

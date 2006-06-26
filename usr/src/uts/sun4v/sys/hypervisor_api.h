@@ -119,6 +119,8 @@ extern "C" {
 
 #define	CONS_GETCHAR		0x60
 #define	CONS_PUTCHAR		0x61
+#define	CONS_READ		0x62
+#define	CONS_WRITE		0x63
 
 #define	TTRACE_BUF_CONF		0x90
 #define	TTRACE_BUF_INFO		0x91
@@ -357,6 +359,8 @@ extern uint64_t hv_mach_set_watchdog(uint64_t, uint64_t *);
 
 extern int64_t hv_cnputchar(uint8_t);
 extern int64_t hv_cngetchar(uint8_t *);
+extern int64_t hv_cnwrite(uint64_t, uint64_t, uint64_t *);
+extern int64_t hv_cnread(uint64_t, uint64_t, int64_t *);
 
 extern uint64_t hv_tod_get(uint64_t *seconds);
 extern uint64_t hv_tod_set(uint64_t);
