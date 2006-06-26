@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,12 +77,17 @@ typedef struct hid_vid_pid {
  * Hid will turn the M_CTL request into a request control request on the
  * default pipe.  Hid needs the following information in the hid_req_t
  * structure.  See the details below for specific values for each command.
+ * hid_req_data is a 256-byte buffer, which is used to transfer input, output
+ * and feature report(hid specification 6.2.2.3 long items).
  */
+
+#define	MAX_REPORT_DATA 256
+
 typedef struct hid_req_struct {
 	uint16_t	hid_req_version_no;	/* Version number */
 	uint16_t	hid_req_wValue;		/* wValue field of request */
 	uint16_t	hid_req_wLength;	/* wLength of request */
-	mblk_t		*hid_req_data;		/* data for send case */
+	uchar_t		hid_req_data[MAX_REPORT_DATA];	/* data for send case */
 } hid_req_t;
 _NOTE(SCHEME_PROTECTS_DATA("unique per call", hid_req_t))
 

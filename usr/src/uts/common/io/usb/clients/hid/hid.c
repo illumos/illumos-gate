@@ -2275,7 +2275,7 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 	} else {
 		hid_req_data = (hid_req_t *)mp->b_cont->b_rptr;
 		if ((iocp->ioc_cmd == HID_SET_REPORT) &&
-		    (hid_req_data->hid_req_data == NULL)) {
+		    (hid_req_data->hid_req_wLength == 0)) {
 			hid_qreply_merror(q, mp, EINVAL);
 
 			return (error);
@@ -2431,9 +2431,13 @@ hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
 	 * non-zero wLength value but ctrl_data would be allocated by
 	 * client for them.
 	 */
-	if (request_type & USB_DEV_REQ_DEV_TO_HOST) {
-		length = hid_request->hid_req_data ?
-		    0 : hid_request->hid_req_wLength;
+	if (hid_request->hid_req_wLength >= MAX_REPORT_DATA) {
+		USB_DPRINTF_L2(PRINT_MASK_ALL, hidp->hid_log_handle,
+		    "hid_req_wLength is exceeded");
+		return (USB_FAILURE);
+	}
+	if ((request_type & USB_DEV_REQ_DIR_MASK) == USB_DEV_REQ_DEV_TO_HOST) {
+		length = hid_request->hid_req_wLength;
 	}
 
 	if ((ctrl_req = usb_alloc_ctrl_req(hidp->hid_dip, length, 0)) == NULL) {
@@ -2444,17 +2448,10 @@ hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
 		ASSERT(hidp->hid_default_pipe_req >= 0);
 		mutex_exit(&hidp->hid_mutex);
 
-		/*
-		 * Some SET M_CTLs will have non-null
-		 * hid_req_data, free hid_req_data
-		 */
-		freemsg((mblk_t *)hid_request->hid_req_data);
-		hid_request->hid_req_data = NULL;
-
 		return (USB_FAILURE);
 	}
 
-	if (request_type & USB_DEV_REQ_HOST_TO_DEV) {
+	if ((request_type & USB_DEV_REQ_DIR_MASK) == USB_DEV_REQ_HOST_TO_DEV) {
 		ASSERT((length == 0) && (ctrl_req->ctrl_data == NULL));
 	}
 
@@ -2463,9 +2460,18 @@ hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
 	ctrl_req->ctrl_wValue		= hid_request->hid_req_wValue;
 	ctrl_req->ctrl_wIndex		= request_index;
 	ctrl_req->ctrl_wLength		= hid_request->hid_req_wLength;
-	ctrl_req->ctrl_data		= ctrl_req->ctrl_data ?
-					    ctrl_req->ctrl_data :
-					    hid_request->hid_req_data;
+	/* host to device: create a msg from hid_req_data */
+	if ((request_type & USB_DEV_REQ_DIR_MASK) == USB_DEV_REQ_HOST_TO_DEV) {
+		mblk_t *pblk = allocb(hid_request->hid_req_wLength, BPRI_HI);
+		if (pblk == NULL) {
+			usb_free_ctrl_req(ctrl_req);
+			return (USB_FAILURE);
+		}
+		bcopy(hid_request->hid_req_data, pblk->b_wptr,
+				hid_request->hid_req_wLength);
+		pblk->b_wptr += hid_request->hid_req_wLength;
+		ctrl_req->ctrl_data = pblk;
+	}
 	ctrl_req->ctrl_attributes	= USB_ATTRS_AUTOCLEARING;
 	ctrl_req->ctrl_client_private	= (usb_opaque_t)hid_default_pipe_arg;
 	ctrl_req->ctrl_cb		= hid_default_pipe_callback;
@@ -2478,8 +2484,6 @@ hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
 		ASSERT(hidp->hid_default_pipe_req >= 0);
 		mutex_exit(&hidp->hid_mutex);
 
-		/* caller will free hid_req_data in case of failure */
-		ctrl_req->ctrl_data = NULL;
 		usb_free_ctrl_req(ctrl_req);
 		USB_DPRINTF_L2(PRINT_MASK_ALL, hidp->hid_log_handle,
 		    "usb_pipe_ctrl_xfer() failed. rval = %d", rval);
@@ -2792,12 +2796,8 @@ hid_restore_device_state(dev_info_t *dip, hid_state_t *hidp)
 static void
 hid_qreply_merror(queue_t *q, mblk_t *mp, uchar_t errval)
 {
-	hid_req_t	*hid_req = NULL;
-
 	mp->b_datap->db_type = M_ERROR;
 	if (mp->b_cont) {
-		hid_req = (hid_req_t *)mp->b_cont->b_rptr;
-		freemsg((mblk_t *)hid_req->hid_req_data);
 		freemsg(mp->b_cont);
 		mp->b_cont = NULL;
 	}

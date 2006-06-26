@@ -1231,7 +1231,6 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		buf.hid_req_version_no = HID_VERSION_V_0;
 		buf.hid_req_wValue = SET_BOOT_PROTOCOL;
 		buf.hid_req_wLength = 0;
-		buf.hid_req_data = NULL;
 		mctl_ptr = usba_mk_mctl(mctlmsg, &buf, len);
 		if (mctl_ptr == NULL) {
 			USB_DPRINTF_L2(PRINT_MASK_ALL, usbkbm_log_handle,
@@ -1270,7 +1269,7 @@ static void
 usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 {
 	struct iocblk	mctlmsg;
-	mblk_t		*LED_message, *mctl_ptr;
+	mblk_t		*mctl_ptr;
 	hid_req_t	*LED_report;
 	usbkbm_state_t	*usbkbmd;
 	uchar_t		led_state;
@@ -1288,14 +1287,6 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 	/*
 	 * Send the request to the hid driver to set LED.
 	 */
-
-	/* Create an mblk_t */
-	LED_message = allocb(sizeof (uchar_t), BPRI_HI);
-	if (LED_message == NULL) {
-		kmem_free(LED_report, sizeof (hid_req_t));
-
-		return;
-	}
 
 	led_state = 0;
 
@@ -1322,26 +1313,16 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 		led_state |= USB_LED_KANA;
 	}
 
-	bcopy((void *)&led_state, (void *)LED_message->b_wptr, 1);
-
-	LED_message->b_wptr = LED_message->b_wptr + 1;
-
-	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
-		"usbkbm: Send Ctrl Request. Data is 0x%x",
-		(uchar_t)*LED_message->b_rptr);
-
 	LED_report->hid_req_version_no = HID_VERSION_V_0;
 	LED_report->hid_req_wValue = REPORT_TYPE_OUTPUT;
 	LED_report->hid_req_wLength = sizeof (uchar_t);
-	LED_report->hid_req_data = LED_message;
+	LED_report->hid_req_data[0] = led_state;
 
 	mctlmsg.ioc_cmd = HID_SET_REPORT;
 	mctlmsg.ioc_count = sizeof (LED_report);
 	mctl_ptr = usba_mk_mctl(mctlmsg, LED_report, sizeof (hid_req_t));
 	if (mctl_ptr != NULL) {
 		putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
-	} else {
-		freemsg(LED_message);
 	}
 
 	/*
@@ -1903,7 +1884,6 @@ usbkbm_set_protocol(usbkbm_state_t *usbkbmd, uint16_t protocol)
 	buf.hid_req_version_no = HID_VERSION_V_0;
 	buf.hid_req_wValue = protocol;
 	buf.hid_req_wLength = 0;
-	buf.hid_req_data = NULL;
 	mctl_ptr = usba_mk_mctl(mctlmsg, &buf, len);
 	if (mctl_ptr == NULL) {
 		usbkbmd->usbkbm_flags = 0;
