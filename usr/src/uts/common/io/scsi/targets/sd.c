@@ -104,6 +104,39 @@ char _depends_on[]	= "misc/scsi";
  * default would confuse that code, and besides things should work fine
  * anyways if the FC HBA already reports INTERCONNECT_FABRIC for the
  * "interconnect_type" property.
+ *
+ * Notes for off-by-1 workaround:
+ * -----------------------------
+ *
+ *    Refer to bug6342431. According to SCSI specifications, SCSI
+ *    READ_CAPACITY command returns the LBA number of last logical
+ *    block, but sd once treated this number as disks' capacity on
+ *    x86 platform. And LBAs are addressed based 0. So the last
+ *    block was lost on x86 platform.
+ *
+ *    Now, we remove this workaround. In order for present sd
+ *    driver to work with disks which are labeled/partitioned
+ *    via previous sd, we add workaround as follows:
+ *
+ *    1) Locate backup EFI label: sd searchs the next to last
+ *       block for backup EFI label if it can't find it on the
+ *       last block;
+ *    2) Calculate geometry: refer to sd_convert_geometry(), If
+ *       capacity increasing by 1 causes disks' capacity to cross
+ *       over the limits in table CHS_values, geometry info will
+ *       change. This will raise an issue: In case that primary
+ *       VTOC label is destroyed, format commandline can restore
+ *       it via backup VTOC labels. And format locates backup VTOC
+ *       labels by use of geometry from sd driver. So changing
+ *       geometry will prevent format from finding backup VTOC
+ *       labels. To eliminate this side effect for compatibility,
+ *       sd uses (capacity -1) to calculate geometry;
+ *    3) 1TB disks: VTOC uses 32-bit signed int, thus sd doesn't
+ *       support VTOC for a disk which has more than DK_MAX_BLOCKS
+ *       LBAs. However, for exactly 1TB disk, it was treated as
+ *       (1T - 512)B in the past, and could have VTOC. To overcome
+ *       this, if an exactly 1TB disk has solaris fdisk partition,
+ *       it will be allowed to work with sd.
  */
 #if (defined(__fibre))
 #define	SD_DEFAULT_INTERCONNECT_TYPE	SD_INTERCONNECT_FIBRE
@@ -4122,7 +4155,7 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	static	char		labelstring[128];
 	static	char		buf[256];
 	char	*label		= NULL;
-	int	label_error	= 0;
+	int	label_error = 0;
 	int	gvalid		= un->un_f_geometry_is_valid;
 	int	lbasize;
 	uint_t	capacity;
@@ -4215,14 +4248,27 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 "size to be < 1TB or relabel the disk with an EFI label");
 		} else {
 			/* unlabeled disk over 1TB */
-			return (ENOTSUP);
+#if defined(__i386) || defined(__amd64)
+			/*
+			 * Refer to comments on off-by-1 at the head of the file
+			 * A 1TB disk was treated as (1T - 512)B in the past,
+			 * thus, it might have valid solaris partition. We
+			 * will return ENOTSUP later only if this disk has no
+			 * valid solaris partition.
+			 */
+			if ((un->un_tgt_blocksize != un->un_sys_blocksize) ||
+			    (un->un_blockcount - 1 > DK_MAX_BLOCKS) ||
+			    un->un_f_has_removable_media ||
+			    un->un_f_is_hotpluggable)
+#endif
+				return (ENOTSUP);
 		}
 	}
 	label_error = 0;
 
 	/*
 	 * at this point it is either labeled with a VTOC or it is
-	 * under 1TB
+	 * under 1TB (<= 1TB actually for off-by-1)
 	 */
 	if (un->un_f_vtoc_label_supported) {
 		struct	dk_label *dkl;
@@ -4245,6 +4291,17 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 		}
 
 		if (un->un_solaris_size <= DK_LABEL_LOC) {
+
+#if defined(__i386) || defined(__amd64)
+			/*
+			 * Refer to comments on off-by-1 at the head of the file
+			 * This is for 1TB disk only. Since that there is no
+			 * solaris partitions, return ENOTSUP as we do for
+			 * >1TB disk.
+			 */
+			if (un->un_blockcount > DK_MAX_BLOCKS)
+				return (ENOTSUP);
+#endif
 			/*
 			 * Found fdisk table but no Solaris partition entry,
 			 * so don't call sd_uselabel() and don't create
@@ -4255,6 +4312,31 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 			goto no_solaris_partition;
 		}
 		label_addr = (daddr_t)(un->un_solaris_offset + DK_LABEL_LOC);
+
+#if defined(__i386) || defined(__amd64)
+		/*
+		 * Refer to comments on off-by-1 at the head of the file
+		 * Now, this 1TB disk has valid solaris partition. It
+		 * must be created by previous sd driver, we have to
+		 * treat it as (1T-512)B.
+		 */
+		if (un->un_blockcount > DK_MAX_BLOCKS) {
+			un->un_f_capacity_adjusted = 1;
+			un->un_blockcount = DK_MAX_BLOCKS;
+			un->un_map[P0_RAW_DISK].dkl_nblk  = DK_MAX_BLOCKS;
+
+			/*
+			 * Refer to sd_read_fdisk, when there is no
+			 * fdisk partition table, un_solaris_size is
+			 * set to disk's capacity. In this case, we
+			 * need to adjust it
+			 */
+			if (un->un_solaris_size > DK_MAX_BLOCKS)
+				un->un_solaris_size = DK_MAX_BLOCKS;
+			sd_resync_geom_caches(un, DK_MAX_BLOCKS,
+			    lbasize, path_flag);
+		}
+#endif
 
 		/*
 		 * sys_blocksize != tgt_blocksize, need to re-adjust
@@ -4315,7 +4397,6 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	 * If a valid label was not found, AND if no reservation conflict
 	 * was detected, then go ahead and create a default label (4069506).
 	 */
-
 	if (un->un_f_default_vtoc_supported && (label_error != EACCES)) {
 		if (un->un_f_geometry_is_valid == FALSE) {
 			sd_build_default_label(un);
@@ -5280,8 +5361,22 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 		}
 
 		sd_swap_efi_gpt((efi_gpt_t *)buf);
-		if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0)
-			goto done_err;
+		if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0) {
+
+			/*
+			 * Refer to comments related to off-by-1 at the
+			 * header of this file. Search the next to last
+			 * block for backup EFI label.
+			 */
+			if ((rval = sd_send_scsi_READ(un, buf, lbasize,
+			    cap - 2, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
+				path_flag)) != 0) {
+					goto done_err;
+			}
+			sd_swap_efi_gpt((efi_gpt_t *)buf);
+			if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0)
+				goto done_err;
+		}
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "primary label corrupt; using backup\n");
 	}
@@ -5656,6 +5751,7 @@ sd_build_default_label(struct sd_lun *un)
 	uint_t	phys_spc;
 	uint_t	disksize;
 	struct	dk_geom un_g;
+	uint64_t capacity;
 #endif
 
 	ASSERT(un != NULL);
@@ -5770,7 +5866,25 @@ sd_build_default_label(struct sd_lun *un)
 	} else {
 		/* Convert physical geometry to disk geometry */
 		bzero(&un_g, sizeof (struct dk_geom));
-		sd_convert_geometry(un->un_blockcount, &un_g);
+
+		/*
+		 * Refer to comments related to off-by-1 at the
+		 * header of this file.
+		 * Before caculating geometry, capacity should be
+		 * decreased by 1. That un_f_capacity_adjusted is
+		 * TRUE means that we are treating a 1TB disk as
+		 * (1T - 512)B. And the capacity of disks is already
+		 * decreased by 1.
+		 */
+		if (!un->un_f_capacity_adjusted &&
+		    !un->un_f_has_removable_media &&
+		    !un->un_f_is_hotpluggable &&
+			un->un_tgt_blocksize == un->un_sys_blocksize)
+			capacity = un->un_blockcount - 1;
+		else
+			capacity = un->un_blockcount;
+
+		sd_convert_geometry(capacity, &un_g);
 		bcopy(&un_g, &un->un_g, sizeof (un->un_g));
 		phys_spc = un->un_g.dkg_nhead * un->un_g.dkg_nsect;
 	}
@@ -8298,6 +8412,19 @@ sd_unit_attach(dev_info_t *devi)
 					    "disk has %llu blocks, which "
 					    "is too large for a 32-bit "
 					    "kernel", capacity);
+
+#if defined(__i386) || defined(__amd64)
+					/*
+					 * Refer to comments related to off-by-1
+					 * at the header of this file.
+					 * 1TB disk was treated as (1T - 512)B
+					 * in the past, so that it might has
+					 * valid VTOC and solaris partitions,
+					 * we have to allow it to continue to
+					 * work.
+					 */
+					if (capacity -1 > DK_MAX_BLOCKS)
+#endif
 					goto spinup_failed;
 #endif
 				}
@@ -8519,7 +8646,25 @@ sd_unit_attach(dev_info_t *devi)
 		    (instance << SDUNIT_SHIFT) | WD_NODE,
 		    un->un_node_type, NULL);
 	}
-
+#if defined(__i386) || defined(__amd64)
+	else if (un->un_f_capacity_adjusted == 1) {
+		/*
+		 * Refer to comments related to off-by-1 at the
+		 * header of this file.
+		 * Adjust minor node for 1TB disk.
+		 */
+		ddi_remove_minor_node(devi, "wd");
+		ddi_remove_minor_node(devi, "wd,raw");
+		(void) ddi_create_minor_node(devi, "h",
+		    S_IFBLK,
+		    (instance << SDUNIT_SHIFT) | WD_NODE,
+		    un->un_node_type, NULL);
+		(void) ddi_create_minor_node(devi, "h,raw",
+		    S_IFCHR,
+		    (instance << SDUNIT_SHIFT) | WD_NODE,
+		    un->un_node_type, NULL);
+	}
+#endif
 	/*
 	 * Read and initialize the devid for the unit.
 	 */
@@ -19127,13 +19272,12 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 
 #if defined(__i386) || defined(__amd64)
 	/*
-	 * On x86, compensate for off-by-1 error (number of sectors on
-	 * media)  (1175930)
+	 * Refer to comments related to off-by-1 at the
+	 * header of this file.
+	 * Treat 1TB disk as (1T - 512)B.
 	 */
-	if (!un->un_f_has_removable_media && !un->un_f_is_hotpluggable &&
-	    (lbasize == un->un_sys_blocksize)) {
-		capacity -= 1;
-	}
+	if (un->un_f_capacity_adjusted == 1)
+	    capacity = DK_MAX_BLOCKS;
 #endif
 
 	/*
@@ -21621,6 +21765,7 @@ skip_ready_valid:
 	case DKIOCG_PHYGEOM: {
 		/* Return the driver's notion of the media physical geometry */
 #if defined(__i386) || defined(__amd64)
+		uint64_t	capacity;
 		struct dk_geom	disk_geom;
 		struct dk_geom	*dkgp = &disk_geom;
 
@@ -21669,9 +21814,23 @@ skip_ready_valid:
 
 					break;
 				}
-				sd_convert_geometry(un->un_blockcount, dkgp);
+
+				/*
+				 * Refer to comments related to off-by-1 at the
+				 * header of this file
+				 */
+				if (!un->un_f_capacity_adjusted &&
+					!un->un_f_has_removable_media &&
+				    !un->un_f_is_hotpluggable &&
+					(un->un_tgt_blocksize ==
+					un->un_sys_blocksize))
+					capacity = un->un_blockcount - 1;
+				else
+					capacity = un->un_blockcount;
+
+				sd_convert_geometry(capacity, dkgp);
 				dkgp->dkg_acyl = 0;
-				dkgp->dkg_ncyl = un->un_blockcount /
+				dkgp->dkg_ncyl = capacity /
 				    (dkgp->dkg_nhead * dkgp->dkg_nsect);
 			}
 		}
@@ -23299,6 +23458,30 @@ sd_clear_efi(struct sd_lun *un)
 		    cap-1, SD_PATH_DIRECT))) {
 			SD_INFO(SD_LOG_IO_PARTITION, un,
 				"sd_clear_efi: clear backup label failed\n");
+		}
+	} else {
+		/*
+		 * Refer to comments related to off-by-1 at the
+		 * header of this file
+		 */
+		if ((rval = sd_send_scsi_READ(un, gpt, lbasize,
+		    cap - 2, ISCD(un) ? SD_PATH_DIRECT_PRIORITY :
+			SD_PATH_DIRECT)) != 0) {
+			goto done;
+		}
+		sd_swap_efi_gpt(gpt);
+		rval = sd_validate_efi(gpt);
+		if (rval == 0) {
+			/* clear legacy backup EFI label */
+			SD_TRACE(SD_LOG_IOCTL, un,
+			    "sd_clear_efi clear backup@%lu\n", cap-2);
+			bzero(gpt, sizeof (efi_gpt_t));
+			if ((rval = sd_send_scsi_WRITE(un, gpt, EFI_LABEL_SIZE,
+			    cap-2, SD_PATH_DIRECT))) {
+				SD_INFO(SD_LOG_IO_PARTITION,
+				    un, "sd_clear_efi: "
+				    " clear legacy backup label failed\n");
+			}
 		}
 	}
 
@@ -30743,28 +30926,6 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *             false          false        |   EIO
  *             false          true         |   EIO
  *             true             x          |   ENXIO
- *     ------------------------------------------------------
- *
- *
- * 10. off-by-1 workaround (bug 1175930, and 4996920) (x86 only)
- *
- *     [ this is a bit of very ugly history, soon to be removed ]
- *
- *     SCSI READ_CAPACITY command returns the last valid logical block number
- *     which starts from 0. So real capacity is larger than the returned
- *     value by 1. However, because scdk.c (which was EOL'ed) directly used
- *     the logical block number as capacity of disk devices, off-by-1 work-
- *     around was applied. This workaround causes fixed SCSI disk to loss a
- *     sector on x86 platform, and precludes exchanging fixed hard disks
- *     between sparc and x86.
- *
- *     ------------------------------------------------------
- *       removable media    hotplug        |   Off-by-1 works
- *     -------------------------------------------------------
- *             false          false        |     Yes
- *             false          true         |     No
- *             true           false        |     No
- *             true           true         |     No
  *     ------------------------------------------------------
  *
  *

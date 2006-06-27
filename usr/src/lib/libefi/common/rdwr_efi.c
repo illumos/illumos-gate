@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -387,7 +386,29 @@ efi_read(int fd, struct dk_gpt *vtoc)
 		/* no valid label here; try the alternate */
 		dk_ioc.dki_lba = disk_info.dki_capacity - 1;
 		dk_ioc.dki_length = disk_info.dki_lbsize;
-		if (check_label(fd, &dk_ioc) == 0) {
+		rval = check_label(fd, &dk_ioc);
+		if (rval != 0) {
+			/*
+			 * Refer to bug6342431. This is a workaround for
+			 * legacy.
+			 *
+			 * In the past, the last sector of SCSI disk was
+			 * invisible on x86 platform. At that time, backup
+			 * label was saved on the next to the last sector.
+			 * It is possible for users to move a disk from
+			 * previous solaris system to present system.
+			 */
+			dk_ioc.dki_lba = disk_info.dki_capacity - 2;
+			dk_ioc.dki_length = disk_info.dki_lbsize;
+			rval = check_label(fd, &dk_ioc);
+			if (efi_debug && (rval == 0)) {
+				(void) fprintf(stderr,
+				    "efi_read: primary label corrupt; "
+				    "using legacy EFI backup label\n");
+			}
+		}
+
+		if (rval == 0) {
 			if (efi_debug) {
 				(void) fprintf(stderr,
 				    "efi_read: primary label corrupt; "

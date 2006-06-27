@@ -493,7 +493,8 @@ struct sd_lun {
 						/* default to NO */
 	    un_f_wcc_inprog		:1,	/* write cache change in */
 						/* progress */
-	    un_f_reserved		:14;
+	    un_f_capacity_adjusted	:1,	/* for 1TB disk & off-by-1 */
+	    un_f_reserved		:13;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
