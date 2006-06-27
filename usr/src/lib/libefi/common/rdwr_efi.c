@@ -389,8 +389,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 		rval = check_label(fd, &dk_ioc);
 		if (rval != 0) {
 			/*
-			 * Refer to bug6342431. This is a workaround for
-			 * legacy.
+			 * This is a workaround for legacy systems.
 			 *
 			 * In the past, the last sector of SCSI disk was
 			 * invisible on x86 platform. At that time, backup

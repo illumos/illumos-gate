@@ -108,11 +108,10 @@ char _depends_on[]	= "misc/scsi";
  * Notes for off-by-1 workaround:
  * -----------------------------
  *
- *    Refer to bug6342431. According to SCSI specifications, SCSI
- *    READ_CAPACITY command returns the LBA number of last logical
- *    block, but sd once treated this number as disks' capacity on
- *    x86 platform. And LBAs are addressed based 0. So the last
- *    block was lost on x86 platform.
+ *    SCSI READ_CAPACITY command returns the LBA number of the
+ *    last logical block, but sd once treated this number as
+ *    disks' capacity on x86 platform. And LBAs are addressed
+ *    based 0. So the last block was lost on x86 platform.
  *
  *    Now, we remove this workaround. In order for present sd
  *    driver to work with disks which are labeled/partitioned
