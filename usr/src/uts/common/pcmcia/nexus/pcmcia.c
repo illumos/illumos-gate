@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1361,6 +1360,7 @@ pcmcia_find_cards(anp_t *adapt)
 			/* check the status */
 			status.socket = i;
 			if (SSGetStatus(&status) == SUCCESS &&
+			    status.IFType != IF_CARDBUS &&
 			    status.CardState & SBM_CD &&
 			    pcmcia_sockets[i]->ls_dip[0] == NULL) {
 				(void) cs_event(PCE_CARD_INSERT, i, 0);
@@ -4097,8 +4097,8 @@ pcmcia_dump_minors(dev_info_t *dip)
 		    np = (dev_info_t *)DEVI(np)->devi_next) {
 			char *cf2 = "";
 			char *cur = "";
-			if (i_ddi_devi_attached(np))
-				cf2 = "ATTACHED";
+			if (i_ddi_node_state(np) == DS_READY)
+				cf2 = "DS_READY";
 			if (np == dip)
 				cur = "CUR";
 			cmn_err(CE_CONT, "\tsibs: %s %s %s\n",

@@ -169,15 +169,6 @@ pci_reloc_reg(dev_info_t *dip, dev_info_t *rdip, pci_t *pci_p,
 	if ((phys_hi & PCI_RELOCAT_B) || !(phys_hi & PCI_ADDR_MASK))
 		return (DDI_SUCCESS);
 
-	if (pci_p->hotplug_capable == B_FALSE) {	/* validate bus # */
-		uint32_t bus = PCI_REG_BUS_G(phys_hi);
-		if (bus < pci_p->pci_bus_range.lo ||
-		    bus > pci_p->pci_bus_range.hi) {
-			DEBUG1(DBG_MAP | DBG_CONT, dip, "bad bus# (%x)\n", bus);
-			return (DDI_ME_INVAL);
-		}
-	}
-
 	/* phys_mid must be 0 regardless space type. */
 	if (rp->pci_phys_mid != 0 || rp->pci_size_hi != 0) {
 		DEBUG0(DBG_MAP | DBG_CONT, pci_p->pci_dip,

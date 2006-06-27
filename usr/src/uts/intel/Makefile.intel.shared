@@ -345,6 +345,8 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pem
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
 
+$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= cardbus
+
 #
 #	I2O specific module(s)
 #

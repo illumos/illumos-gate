@@ -101,6 +101,9 @@ extern "C" {
 #define	PCI_BCNF_BCNTRL_MAST_AB_MODE	0x20
 #define	PCI_BCNF_BCNTRL_DTO_STAT	0x400
 
+#define	PCI_BCNF_BCNTRL_RESET		0x0040
+#define	PCI_BCNF_BCNTRL_B2B_ENAB	0x0080
+
 #define	PCI_BCNF_IO_MASK	0xf0
 #define	PCI_BCNF_MEM_MASK	0xfff0
 
@@ -124,7 +127,6 @@ extern "C" {
 #define	PCI_CBUS_IO_LIMIT1	0x38	/* IO limit reg 1, 4 bytes */
 #define	PCI_CBUS_ILINE		0x3c	/* interrupt line, 1 byte */
 #define	PCI_CBUS_IPIN		0x3d	/* interrupt pin, 1 byte */
-#define	PCI_CBUS_BRIDGE_CTRL	0x3e	/* Bridge control, 2 bytes */
 #define	PCI_CBUS_BRIDGE_CTRL	0x3e	/* Bridge control, 2 bytes */
 #define	PCI_CBUS_SUBVENID	0x40	/* Subsystem Vendor ID, 2 bytes */
 #define	PCI_CBUS_SUBSYSID	0x42	/* Subsystem ID, 2 bytes */

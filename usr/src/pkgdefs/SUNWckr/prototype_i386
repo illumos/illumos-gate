@@ -149,6 +149,7 @@ d none boot/acpi 755 root sys
 d none boot/acpi/tables 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/busra 755 root sys
+f none kernel/misc/cardbus 755 root sys
 f none kernel/misc/cmlb 755 root sys
 f none kernel/misc/consconfig 755 root sys
 f none kernel/misc/ctf 755 root sys
@@ -318,6 +319,7 @@ f none kernel/ipp/amd64/ipgpc 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/busra 755 root sys
+f none kernel/misc/amd64/cardbus 755 root sys
 f none kernel/misc/amd64/cmlb 755 root sys
 f none kernel/misc/amd64/consconfig 755 root sys
 f none kernel/misc/amd64/ctf 755 root sys
