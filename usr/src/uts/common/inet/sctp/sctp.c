@@ -769,6 +769,9 @@ sctp_free(conn_t *connp)
 	sctp->sctp_autoclose = 0;
 	sctp->sctp_tx_adaption_code = 0;
 
+	sctp->sctp_v6label_len = 0;
+	sctp->sctp_v4label_len = 0;
+
 	/* Clean up conn_t stuff */
 	connp->conn_policy_cached = B_FALSE;
 	if (connp->conn_latch != NULL) {
@@ -1905,6 +1908,12 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 	ASSERT(sctp->sctp_sendq == NULL);
 	ASSERT(sctp->sctp_sendq_tail == NULL);
 	ASSERT(sctp->sctp_sendq_sending == B_FALSE);
+
+	ASSERT(sctp->sctp_ipp_hopopts == NULL);
+	ASSERT(sctp->sctp_ipp_rtdstopts == NULL);
+	ASSERT(sctp->sctp_ipp_rthdr == NULL);
+	ASSERT(sctp->sctp_ipp_dstopts == NULL);
+	ASSERT(sctp->sctp_ipp_pathmtu == NULL);
 
 	mutex_destroy(&sctp->sctp_reflock);
 	mutex_destroy(&sctp->sctp_lock);

@@ -1166,7 +1166,7 @@ sctp_set_hdraddrs(sctp_t *sctp)
 					break;
 				}
 			}
-		} else if (!gotv6) {
+		} else if (!gotv6 && !IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
 			sctp->sctp_ip6h->ip6_dst = fp->faddr;
 			/* copy in the faddr_t's saddr */
 			sctp->sctp_ip6h->ip6_src = fp->saddr;

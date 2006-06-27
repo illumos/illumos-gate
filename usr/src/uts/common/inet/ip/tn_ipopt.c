@@ -1283,6 +1283,10 @@ tsol_update_sticky(ip6_pkt_t *ipp, uint_t *labellen, const uchar_t *labelopt)
 	 * headers and padding.  newlen is the new size of the total hop-by-hop
 	 * options buffer, including user options.
 	 */
+	ASSERT(*labellen <= ipp->ipp_hopoptslen);
+	ASSERT((ipp->ipp_hopopts == NULL && ipp->ipp_hopoptslen == 0) ||
+	    (ipp->ipp_hopopts != NULL && ipp->ipp_hopoptslen != 0));
+
 	if ((rawlen = labelopt[1]) != 0) {
 		rawlen += 2;	/* add in header size */
 		optlen = (2 + rawlen + 7) & ~7;
@@ -1290,10 +1294,15 @@ tsol_update_sticky(ip6_pkt_t *ipp, uint_t *labellen, const uchar_t *labelopt)
 		optlen = 0;
 	}
 	newlen = ipp->ipp_hopoptslen + optlen - *labellen;
-	if (optlen > *labellen) {
+	if (newlen == 0 && ipp->ipp_hopopts != NULL) {
+		/* Deleting all existing hop-by-hop options */
+		kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
+		ipp->ipp_hopopts = NULL;
+		ipp->ipp_fields &= ~IPPF_HOPOPTS;
+	} else if (optlen != *labellen) {
+		/* If the label not same size as last time, then reallocate */
 		if (newlen > IP6_MAX_OPT_LENGTH)
 			return (EHOSTUNREACH);
-		/* If the label is bigger than last time, then reallocate */
 		newopts = kmem_alloc(newlen, KM_NOSLEEP);
 		if (newopts == NULL)
 			return (ENOMEM);
@@ -1314,19 +1323,6 @@ tsol_update_sticky(ip6_pkt_t *ipp, uint_t *labellen, const uchar_t *labelopt)
 		if (ipp->ipp_hopopts != NULL)
 			kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
 		ipp->ipp_hopopts = (ip6_hbh_t *)newopts;
-	} else if (optlen < *labellen) {
-		/* If the label got smaller, then adjust downward. */
-		if (newlen == 0 && ipp->ipp_hopopts != NULL) {
-			kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
-			ipp->ipp_hopopts = NULL;
-			ipp->ipp_fields &= ~IPPF_HOPOPTS;
-		}
-		/* If the user still has options, move those back. */
-		if (ipp->ipp_hopoptslen > *labellen) {
-			ovbcopy(ipp->ipp_hopopts + *labellen,
-			    ipp->ipp_hopopts + optlen,
-			    ipp->ipp_hopoptslen - *labellen);
-		}
 	}
 	ipp->ipp_hopoptslen = newlen;
 	*labellen = optlen;

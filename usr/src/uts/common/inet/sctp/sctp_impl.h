@@ -923,6 +923,7 @@ typedef struct sctp_s {
 #define	sctp_ipp_rtdstopts	sctp_sticky_ipp.ipp_rtdstopts
 #define	sctp_ipp_rthdr		sctp_sticky_ipp.ipp_rthdr
 #define	sctp_ipp_dstopts	sctp_sticky_ipp.ipp_dstopts
+#define	sctp_ipp_pathmtu	sctp_sticky_ipp.ipp_pathmtu
 #define	sctp_ipp_nexthop	sctp_sticky_ipp.ipp_nexthop
 	/* Stats */
 	uint64_t	sctp_msgcount;
