@@ -1500,6 +1500,11 @@ oplmsu_find_serial(ser_devl_t **ser_dl)
 #endif
 		}
 
+		/*
+		 * Online the cmuch_dip so that its in the right state
+		 * to get the complete path, that is both name and address.
+		 */
+		(void) ndi_devi_online(cmuch_dip, 0);
 		(void) ddi_pathname(cmuch_dip, pathname);
 		DBG_PRINT((CE_NOTE,
 		    "oplmsu: find-serial: cmu-ch path => %s", pathname));
