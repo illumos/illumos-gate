@@ -1234,7 +1234,7 @@ pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip, int inum)
 		if (pci_config_setup(rdip, &cfg_hdl) != DDI_SUCCESS) {
 			DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_iline: "
 			    "can't get config handle\n"));
-			return (NULL);
+			return ((ddi_intrspec_t)ispec);
 		}
 
 		ispec->intrspec_vec = pci_config_get8(cfg_hdl, PCI_CONF_ILINE);

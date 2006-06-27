@@ -701,7 +701,9 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 
 	/* Translate the interrupt if needed */
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
-	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) && ispec)
+	if (ispec == NULL)
+		return (DDI_FAILURE);
+	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
 		ispec->intrspec_vec = inum;
 	ihdl_plat_datap->ip_ispecp = ispec;
 
@@ -733,7 +735,9 @@ pci_disable_intr(dev_info_t *pdip, dev_info_t *rdip,
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_disable_intr: \n"));
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
-	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) && ispec)
+	if (ispec == NULL)
+		return;
+	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
 		ispec->intrspec_vec = inum;
 	ihdl_plat_datap->ip_ispecp = ispec;
 
